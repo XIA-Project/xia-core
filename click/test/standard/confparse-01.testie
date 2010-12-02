@@ -1,0 +1,12 @@
+%info
+Tests configuration parsing functionality with the ConfParseTest element.
+
+%require
+click-buildtool provides ConfParseTest
+
+%script
+click -qe 'AddressInfo(ip4_addr 1.2.3.4); ConfParseTest'
+
+%expect stderr
+config:1:{{.*}}
+  All tests pass!

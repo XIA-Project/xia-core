@@ -1,0 +1,79 @@
+# Warning: this file must be usable by regular make
+# (unlike the Makefiles in subdirectories).
+
+SHELL = @SHELL@
+@SUBMAKE@
+
+top_srcdir = @top_srcdir@
+srcdir = @srcdir@
+top_builddir = ..
+subdir = tools
+conf_auxdir = @conf_auxdir@
+
+prefix = @prefix@
+bindir = @bindir@
+INSTALL = @INSTALL@
+mkinstalldirs = $(conf_auxdir)/mkinstalldirs
+
+TOOLDIRS = @TOOLDIRS@
+TARGETS = @TOOL_TARGETS@
+
+all: $(TARGETS)
+
+lib: always Makefile
+	@cd lib && $(MAKE) all
+click-align: lib Makefile
+	@cd click-align && $(MAKE) all-local
+click-check: lib Makefile
+	@cd click-check && $(MAKE) all-local
+click-combine: lib Makefile
+	@cd click-combine && $(MAKE) all-local
+click-devirtualize: lib Makefile
+	@cd click-devirtualize && $(MAKE) all-local
+click-fastclassifier: lib Makefile
+	@cd click-fastclassifier && $(MAKE) all-local
+click-flatten: lib Makefile
+	@cd click-flatten && $(MAKE) all-local
+click-install: lib Makefile
+	@cd click-install && $(MAKE) all-local
+click-ipopt: lib Makefile
+	@cd click-ipopt && $(MAKE) all-local
+click-mkmindriver: lib Makefile
+	@cd click-mkmindriver && $(MAKE) all-local
+click-pretty: lib Makefile
+	@cd click-pretty && $(MAKE) all-local
+click-undead: lib Makefile
+	@cd click-undead && $(MAKE) all-local
+click-xform: lib Makefile
+	@cd click-xform && $(MAKE) all-local
+click2xml: lib Makefile
+	@cd click2xml && $(MAKE) all-local
+udpgen: Makefile
+	@cd udpgen && $(MAKE) all
+always:
+	@:
+
+Makefile: $(srcdir)/Makefile.in
+	cd $(top_builddir) \
+	  && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
+
+clean:
+	@-for d in lib $(TOOLDIRS); do (cd $$d && $(MAKE) clean); done
+distclean:
+	@-for d in lib $(TOOLDIRS); do (cd $$d && $(MAKE) distclean); done
+	-rm -f Makefile
+
+install: install-subdirs
+install-subdirs: lib
+	@for d in lib $(TARGETS); do (cd $$d && $(MAKE) install-local) || exit 1; done
+install-include:
+	@cd lib && $(MAKE) install-include
+install-lib:
+	@cd lib && $(MAKE) install-lib
+install-man:
+	:
+uninstall:
+	@for d in lib $(TARGETS); do (cd $$d && $(MAKE) uninstall) || exit 1; done
+
+
+.PHONY: all always lib $(TOOLDIRS) clean distclean distdir install install-subdirs install-include install-lib uninstall

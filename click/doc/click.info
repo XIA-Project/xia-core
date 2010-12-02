@@ -1,0 +1,1697 @@
+This is click.info, produced by makeinfo version 4.13 from
+../../doc/click.texi.
+
+INFO-DIR-SECTION Click modular router
+START-INFO-DIR-ENTRY
+* Click: (click).           The Click modular router programming manual.
+END-INFO-DIR-ENTRY
+
+
+File: click.info,  Node: Top,  Next: Overview,  Prev: (dir),  Up: (dir)
+
+Click
+*****
+
+This document describes the Click modular router's programming
+interface. Read this if you're interested in writing new elements for
+Click. You shouldn't need to read it if you are just building routers
+that use existing elements.
+
+   Most of Click's programming interface documentation is now stored in
+the source code as structured comments.  The formatted documentation is
+on the Web: <http://www.read.cs.ucla.edu/click/doxygen>
+
+* Menu:
+
+* Overview::
+* Helper Classes::
+* Tasks::
+* Timers::
+* Notification::
+* Coding Standards::
+* Index::                       Index.
+
+ --- The Detailed Node Listing ---
+
+Overview
+
+* Packet Transfer::
+
+Helper Classes
+
+* ErrorHandler::
+* Handlers::
+
+ErrorHandler
+
+* ErrorHandler Initialization::
+* Reporting Errors::
+* Error Format Strings::
+* Counting Errors::
+* Basic ErrorHandlers::
+* Error Veneers::
+* Writing ErrorHandlers::
+
+Handlers
+
+* Read and Write Handler Overview::
+* Adding Handlers::
+* Default Handlers::
+* Accessing Handlers Internally::
+* LLRPC Overview::
+
+Accessing Handlers Internally
+
+* Handler Objects::
+* Handlers By Name or Index::
+
+Tasks
+
+* Task Initialization::
+* Scheduling Tasks::
+* Tickets::
+* Task Thread Choice::
+* Task Status::
+* Task Handlers::
+* Task Cleanup::
+
+Timers
+
+* Timer Initialization::
+* Scheduling Timers::
+* Timer Status Methods::
+* Timer Cleanup::
+
+Coding Standards
+
+* Upper and lower case names::
+* Common name patterns::
+
+
+File: click.info,  Node: Overview,  Next: Helper Classes,  Prev: Top,  Up: Top
+
+1 Overview
+**********
+
+* Menu:
+
+* Packet Transfer::
+
+
+File: click.info,  Node: Packet Transfer,  Prev: Overview,  Up: Overview
+
+1.1 Packet Transfer
+===================
+
+
+File: click.info,  Node: Helper Classes,  Next: Tasks,  Prev: Overview,  Up: Top
+
+2 Helper Classes
+****************
+
+* Menu:
+
+* ErrorHandler::
+* Handlers::
+
+
+File: click.info,  Node: ErrorHandler,  Next: Handlers,  Prev: Helper Classes,  Up: Helper Classes
+
+2.1 ErrorHandler
+================
+
+All Click error messages are passed to an instance of the
+`ErrorHandler' class. `ErrorHandler' separates the generation of error
+messages from the particular way those messages should be printed. It
+also makes it easy to automatically decorate errors with context
+information.
+
+   Most Click users must know how to report errors to an
+`ErrorHandler', and how `ErrorHandler's count the messages they
+receive. This section also describes how to decorate error messages
+with error veneers, and how to write new `ErrorHandler's.
+
+   `ErrorHandler' and its important subclasses are defined in
+`<click/error.hh>'.
+
+* Menu:
+
+* ErrorHandler Initialization::
+* Reporting Errors::
+* Error Format Strings::
+* Counting Errors::
+* Basic ErrorHandlers::
+* Error Veneers::
+* Writing ErrorHandlers::
+
+
+File: click.info,  Node: ErrorHandler Initialization,  Next: Reporting Errors,  Prev: ErrorHandler,  Up: ErrorHandler
+
+2.1.1 Class Initialization
+--------------------------
+
+The `ErrorHandler' class maintains some global state that must be
+initialized by calling `static_initialize' at the beginning of the
+program, and may be freed by calling `static_cleanup' when execution is
+complete.
+
+ -- Static Method on ErrorHandler: void static_initialize (ErrorHandler
+          *DEFAULT_ERRH)
+     Call this function exactly once, at the beginning of the program,
+     before any error messages are reported to any `ErrorHandler'. It
+     is OK to create arbitrary `ErrorHandler' objects before calling
+     this method, however. The DEFAULT_ERRH argument becomes the default
+     `ErrorHandler'; see *note Basic ErrorHandlers::.
+
+ -- Static Method on ErrorHandler: void static_cleanup ()
+     Call this function exactly once, just before the program exits.
+     Destroys the default and silent `ErrorHandler's and cleans up other
+     `ErrorHandler'-related memory. It is an error to call any
+     `ErrorHandler' method after calling `static_cleanup'.
+
+
+File: click.info,  Node: Reporting Errors,  Next: Error Format Strings,  Prev: ErrorHandler Initialization,  Up: ErrorHandler
+
+2.1.2 Reporting Errors
+----------------------
+
+`ErrorHandler''s basic error reporting methods take a format string,
+which may use `printf'-like `%' escape sequences, and additional
+arguments as required by the format string. *Note Error Format
+Strings::, for more details on the format string. The five methods
+differ in the seriousness of the error they report.
+
+ -- Method on ErrorHandler: void debug (const char *FORMAT, ...)
+ -- Method on ErrorHandler: void message (const char *FORMAT, ...)
+ -- Method on ErrorHandler: int warning (const char *FORMAT, ...)
+ -- Method on ErrorHandler: int error (const char *FORMAT, ...)
+ -- Method on ErrorHandler: int fatal (const char *FORMAT, ...)
+     Report the error described by FORMAT and any additional arguments.
+     The methods are listed by increasing seriousness. Use `debug' for
+     debugging messages that should not be printed in a production
+     environment; `message' for explanatory messages that do not
+     indicate errors; `warning' for warnings (this function prepends the
+     string `warning: ' to every line of the error message); `error'
+     for errors; and `fatal' for errors so serious that they should
+     halt the execution of the program. The three functions that
+     indicate errors, `warning', `error', and `fatal', always return
+     `-EINVAL'. In some environments, `fatal' will actually exit the
+     program with exit code 1.
+
+   Each of these methods has an analogue that additionally takes a
+"landmark": a string representing where the error took place. A typical
+landmark contains a file name and line number, separated by a
+colon--`foo.click:31', for example.
+
+ -- Method on ErrorHandler: void ldebug (const String &LANDMARK, const
+          char *FORMAT, ...)
+ -- Method on ErrorHandler: void lmessage (const String &LANDMARK,
+          const char *FORMAT, ...)
+ -- Method on ErrorHandler: int lwarning (const String &LANDMARK, const
+          char *FORMAT, ...)
+ -- Method on ErrorHandler: int lerror (const String &LANDMARK, const
+          char *FORMAT, ...)
+ -- Method on ErrorHandler: int lfatal (const String &LANDMARK, const
+          char *FORMAT, ...)
+     Report the error described by FORMAT and any additional arguments.
+     The error took place at LANDMARK. Most `ErrorHandler's will simply
+     prepend `LANDMARK: ' to each line of the error message.
+
+   These methods are all implemented as wrappers around the `verror'
+function. This function takes a landmark, a format string, a `va_list'
+packaging up any additional arguments, and a "seriousness value", which
+encodes how serious the error was. The `Seriousness' enumerated type,
+which is defined in the `ErrorHandler' class, represents seriousness
+values. There are five constants, corresponding to the five
+error-reporting methods:
+
+`ERR_DEBUG'
+     Corresponds to `debug' and `ldebug'.
+
+`ERR_MESSAGE'
+     Corresponds to `message' and `lmessage'.
+
+`ERR_WARNING'
+     Corresponds to `warning' and `lwarning'.
+
+`ERR_ERROR'
+     Corresponds to `error' and `lerror'.
+
+`ERR_FATAL'
+     Corresponds to `fatal' and `lfatal'.
+
+ -- Method on ErrorHandler: int verror (Seriousness SERIOUSNESS, const
+          String &LANDMARK, const char *FORMAT, va_list VAL)
+     Report the error described by FORMAT and VAL. The error took place
+     at LANDMARK, if LANDMARK is nonempty. The SERIOUSNESS value is one
+     of the five constants described above.  Always returns `-EINVAL'.
+
+
+File: click.info,  Node: Error Format Strings,  Next: Counting Errors,  Prev: Reporting Errors,  Up: ErrorHandler
+
+2.1.3 Format Strings
+--------------------
+
+`ErrorHandler''s format strings closely follow C's standard `printf'
+format strings. Most characters in the format string are printed
+verbatim. The `%' character introduces a "conversion", which prints
+data read from the remaining arguments. The format string may contain
+newlines `\n', but it need not end with a newline; `ErrorHandler' will
+add a final newline if one does not exist.
+
+   Each conversion, or formatting escape, follows this pattern:
+
+   * First, the `%' character introduces each conversion.
+
+   * Next comes zero or more "flag characters";
+
+   * then an optional "field width";
+
+   * then an optional "precision";
+
+   * then an optional "length modifier";
+
+   * and finally, the mandatory "conversion specifier", which is
+     usually a single character, but may be a name enclosed in braces.
+
+We discuss each of these is turn.
+
+   Any conversion may be modified by zero or more of these flag
+characters.
+
+`#'
+     The value should be converted to an "alternate form". For `o'
+     conversions, the first character of the output string is made `0',
+     by prepending a `0' if there was not one already. For `x' and `X'
+     conversions, nonzero values have `0x' or `0X' prepended,
+     respectively.
+
+`0'
+     The value should be zero padded. For `d', `i', `u', `o', `x', and
+     `X' conversions, the converted value is padded on the left with
+     `0' characters rather than spaces.
+
+`-'
+     The value should be left-justified within the field width.
+
+` ' (a space)
+     Leave a blank before a nonnegative number produced by a signed
+     conversion.
+
+`+'
+     Print a `+' character before a nonnegative number produced by a
+     signed conversion.
+
+
+   The optional "field width", a decimal digit string, forces the
+conversion to use a minimum number of characters. The result of a
+conversion is padded on the left with space characters to reach the
+minimum field width, unless one of the `0' or `-' flags was supplied.
+
+   The optional "precision" is a decimal digit string preceded by a
+period `.'. For `d', `i', `u', `o', `x', and `X' conversions, the
+precision specifies the minimum number of digits that must appear;
+results with fewer digits are padded on the left with `0' characters.
+For the `s' conversion, the precision specifies the maximum number of
+characters that can be printed. For `e', `f', `E', and `F' conversions,
+it specifies the number of digits to appear after the radix character;
+for `g' and `G' conversions, the number of significant digits.
+
+   If either the field width or precision is specified as a star `*',
+`ErrorHandler' reads the next argument as an integer and uses that
+instead.
+
+   Length modifiers affect the argument type read by the conversion.
+There are three modifiers:
+
+`h'
+     The next argument is a `short' or `unsigned short'. Affects the
+     `d', `i', `u', `o', `x', and `X' conversions.
+
+`l'
+     The next argument is a `long' or `unsigned long'. Affects the `d',
+     `i', `u', `o', `x', and `X' conversions.
+
+`ll'
+     The next argument is a `long long' or `unsigned long long'.
+     Affects the `d', `i', `u', `o', `x', and `X' conversions.
+
+   Finally, these are the conversions themselves.
+
+`s'
+     Print the `const char *' argument, treated as a C string.
+
+`c'
+     The `int' argument is treated as a character constant. Printable
+     ASCII characters (values between 32 and 126) are printed verbatim.
+     Characters `\n', `\t', `\r', and `\0' use those C escape
+     representations. Other characters use the representation `\%03o'.
+
+`d', `i'
+     The argument is an `int'; print its decimal representation.
+
+`u'
+     The argument is an `unsigned int'; print its decimal
+     representation.
+
+`o'
+     The argument is an `unsigned int'; print its octal representation.
+
+`x', `X'
+     The argument is an `unsigned int'; print its hexadecimal
+     representation. The `%x' conversion uses lowercase letters; `%X'
+     uses uppercase letters.
+
+`e', `f', `g', `E', `F', `G'
+     The argument is a `double'; print its representation as if by
+     `printf' (user-level drivers only).
+
+`p'
+     The `void *' argument is cast to `unsigned long' and printed as by
+     `%#lx'.
+
+`%'
+     Print a literal `%' character.
+
+`{element}'
+     The argument is an `Element *'. Print that element's declaration.
+
+
+   Note that `ErrorHandler' does not support the `n' conversion.
+
+
+File: click.info,  Node: Counting Errors,  Next: Basic ErrorHandlers,  Prev: Error Format Strings,  Up: ErrorHandler
+
+2.1.4 Counting Errors
+---------------------
+
+`ErrorHandler' objects count the number of errors and warnings they
+have received and make those values available to the user.
+
+ -- Method on ErrorHandler: virtual int nwarnings () const
+ -- Method on ErrorHandler: virtual int nerrors () const
+     Returns the number of warnings or errors received by this
+     `ErrorHandler' so far.
+
+ -- Method on ErrorHandler: virtual void reset_counts ()
+     Resets the `nwarnings' and `nerrors' counters to zero.
+
+   These counters are typically used to determine whether an error has
+taken place in some complex piece of code. For example:
+
+     int before_nerrors = errh->nerrors();
+     // ... complex code that may report errors to `errh' ...
+     if (errh->nerrors() != before_nerrors) {
+         // an error has taken place
+     }
+
+
+File: click.info,  Node: Basic ErrorHandlers,  Next: Error Veneers,  Prev: Counting Errors,  Up: ErrorHandler
+
+2.1.5 Basic `ErrorHandler's
+---------------------------
+
+Every Click error message eventually reaches some "basic"
+`ErrorHandler', which generally prints the messages it receives.  The
+user-level driver's basic `ErrorHandler' prints error messages to
+standard error, while in the Linux kernel module, the basic
+`ErrorHandler' logs messages to the syslog and stores them for access
+via `/click/errors'.
+
+   Two basic `ErrorHandlers' are always accessible via static methods:
+the "default `ErrorHandler'", returned by `default_handler' and set by
+`set_default_handler'; and the "silent `ErrorHandler'", returned by
+`silent_handler', which ignores any error messages it receives.
+
+ -- Static Method on ErrorHandler: ErrorHandler * default_handler ()
+     Returns the default `ErrorHandler'.
+
+ -- Static Method on ErrorHandler: void set_default_handler
+          (ErrorHandler *errh)
+     Sets the default `ErrorHandler' to ERRH. The `static_initialize'
+     method also sets the default `ErrorHandler'; see *note
+     ErrorHandler Initialization::.
+
+ -- Static Method on ErrorHandler: ErrorHandler * silent_handler ()
+     Returns the silent `ErrorHandler'. This handler ignores any error
+     messages it receives. It maintains correct `nwarnings' and
+     `nerrors' counts, however.
+
+   `FileErrorHandler', a kind of basic `ErrorHandler', is available in
+any user-level program. It prints every message it receives to some
+file, usually standard error. It can also prepend an optional context
+string to every line of every error message.
+
+ -- Constructor on FileErrorHandler:  FileErrorHandler (FILE *F,
+          const String &PREFIX = "")
+     Constructs a `FileErrorHandler' that prints error messages to file
+     F. If PREFIX is nonempty, then every line of every error message
+     is prepended by PREFIX.
+
+
+File: click.info,  Node: Error Veneers,  Next: Writing ErrorHandlers,  Prev: Basic ErrorHandlers,  Up: ErrorHandler
+
+2.1.6 Error Veneers
+-------------------
+
+"Error veneers" wrap around basic `ErrorHandler' objects and change how
+error text is generated. An error veneer generally changes each error
+message's text in some way, perhaps by adding a context message or some
+indentation. It then passes the altered text to the basic
+`ErrorHandler' for printing. Error veneers can be easily nested.
+
+   The first argument to each error veneer constructor is a pointer to
+another `ErrorHandler' object. The veneer will pass altered error text
+to this handler, the "base handler", for further processing and
+printing. It also delegates `nwarnings()' and `nerrors()' calls to the
+base handler.
+
+   Click comes with three error veneers: one for adding context, one for
+prepending text to every line, and one for supplying missing landmarks.
+It is easy to write others; see *note Writing ErrorHandlers::, for
+details.
+
+ -- Constructor on ContextErrorHandler:  ContextErrorHandler
+          (ErrorHandler *BASE_ERRH, const String &CONTEXT,
+          const String &INDENT = "  ")
+     Constructs a `ContextErrorHandler' with BASE_ERRH as base.
+
+     The first time this handler receives an error message, it will
+     precede the message with the CONTEXT string--generally more
+     detailed information about where the error has occurred. Every
+     line in every received error message is prepended with INDENT, two
+     spaces by default, to set off the message from its context.
+
+ -- Constructor on PrefixErrorHandler:  PrefixErrorHandler
+          (ErrorHandler *BASE_ERRH, const String &PREFIX)
+     Constructs a `PrefixErrorHandler' with BASE_ERRH as base.
+
+     This handler precedes every line of every error message with
+     PREFIX.
+
+ -- Constructor on LandmarkErrorHandler:  LandmarkErrorHandler
+          (ErrorHandler *BASE_ERRH, const String &LANDMARK)
+     Constructs a `LandmarkErrorHandler' with BASE_ERRH as base.
+
+     This handler supplies LANDMARK in place of any blank landmark
+     passed to it. This will cause the base handler to include LANDMARK
+     in its error message.
+
+   To demonstrate these veneers in practice, we'll use the following
+function, which prints two error messages:
+
+     void f(ErrorHandler *errh) {
+         errh->error("First line\nSecond line");
+         errh->lwarning("here", "Third line");
+     }
+
+   A simple `FileErrorHandler' shows the base case.
+
+     FileErrorHandler errh1(stderr);
+     f(&errh1);
+         -| First line
+         -| Second line
+         -| here: warning: Third line
+
+   The simplest error veneer, `PrefixErrorHandler', just prepends text
+to every line.
+
+     PrefixErrorHandler errh2(&errh1, "prefix - ");
+     f(&errh2);
+         -| prefix - First line
+         -| prefix - Second line
+         -| prefix - here: warning: Third line
+
+   `ContextErrorHandler' supplies a line of context before the first
+error message, and indents all messages except the context.
+
+     ContextErrorHandler errh3(&errh1, "This was called from ...", "** ");
+     f(&errh3);
+         -| This was called from ...
+         -| ** First line
+         -| ** Second line
+         -| here: ** warning: Third line
+
+Note that the indentation `** ' is printed after the landmark.  This
+often looks better than the alternative.
+
+   Of course, an error veneer can take another error veneer as its "base
+handler", leading to cumulative effects.
+
+     ContextErrorHandler errh4(&errh2, "This was called from ...", "** ");
+     f(&errh4);
+         -| prefix - This was called from ...
+         -| prefix - ** First line
+         -| prefix - ** Second line
+         -| prefix - here: ** warning: Third line
+
+
+File: click.info,  Node: Writing ErrorHandlers,  Prev: Error Veneers,  Up: ErrorHandler
+
+2.1.7 Writing `ErrorHandler's
+-----------------------------
+
+`ErrorHandler' constructs an error message using three virtual
+functions. The first, `make_text', parses a format string and argument
+list into a single `String'. This is passed to the second function,
+`decorate_text', which may transform the string. The final function,
+`handle_text', prints the resulting error message.  This structure
+makes `ErrorHandler' easy to extend. To write a new basic
+`ErrorHandler', you will need to override just `handle_text' and the
+counting functions (`nwarnings', `nerrors', and `reset_counts'). The
+`ErrorVeneer' helper class, described below, lets you override just
+`decorate_text' when writing an error veneer.
+
+ -- Method on ErrorHandler: virtual String make_text (Seriousness S,
+          const char *FORMAT, va_list VAL)
+     Parses the format string FORMAT with arguments from VAL, returning
+     the results as a STRING object.
+
+     The default implementation processes the formatting escapes
+     described above (*note Error Format Strings::). It also prepends
+     every line of the error message with `warning: ' if S equals
+     `ERR_WARNING'.
+
+ -- Method on ErrorHandler: virtual String decorate_text (Seriousness
+          S, const String &PREFIX, const String &LANDMARK, const String
+          &TEXT)
+     Decorates the error message TEXT as appropriate and returns the
+     result. At minimum, every line of the result should be prepended by
+     PREFIX and, if it is nonempty, the landmark string LANDMARK.
+
+     The default implementation creates lines like this:
+
+          PREFIXLANDMARK: TEXT     (if LANDMARK is nonempty)
+          PREFIXTEXT               (if LANDMARK is empty)
+
+     Any spaces and/or a final colon are stripped from the end of
+     LANDMARK. Special landmarks, which begin and end with a backslash
+     `\', are ignored.
+
+ -- Method on ErrorHandler: virtual void handle_text
+          (Seriousness S, const String &TEXT)
+     This method is responsible for printing or otherwise informing the
+     user about the error message TEXT. If S equals `ERR_FATAL', the
+     method should exit the program or perform some other drastic
+     action.  It should also maintain the `nwarnings()' and `nerrors()'
+     counters. In most cases, it should ensure that the last character
+     in TEXT is a newline.
+
+     This method has no default implementation.
+
+   The `ErrorVeneer' class, a subclass of `ErrorHandler', supplies
+default implementations for these functions that ease the construction
+of new error veneers. `ErrorVeneer''s single instance variable,
+`ErrorHandler *_errh', is the base handler.  `ErrorVeneer' overrides
+all the relevant virtual functions--`nwarnings', `nerrors',
+`reset_counts', `make_text', `decorate_text', and `handle_text'. Its
+versions simply delegate to the corresponding methods on `_errh'.  An
+error veneer designer will generally subclass `ErrorVeneer' rather than
+`ErrorHandler'; then she will override only the methods she cares about
+(usually `decorate_text'), relying on `ErrorVeneer''s default
+implementations for the rest.
+
+ -- Constructor on ErrorVeneer:  ErrorVeneer (ErrorHandler *BASE_ERRH)
+     Constructs an `ErrorVeneer' helper class with BASE_ERRH as its
+     base error handler. This constructor simply sets `_errh =
+     base_errh'.
+
+
+File: click.info,  Node: Handlers,  Prev: ErrorHandler,  Up: Helper Classes
+
+2.2 Handlers
+============
+
+"Handlers" are access points through which users can interact with
+elements in a running Click router, or with the router as a whole.
+"Read" and "write handlers" behave like files in a file system, while
+"LLRPCs" provide a remote procedure call interface.
+
+* Menu:
+
+* Read and Write Handler Overview::
+* Adding Handlers::
+* Default Handlers::
+* Accessing Handlers Internally::
+* LLRPC Overview::
+
+
+File: click.info,  Node: Read and Write Handler Overview,  Next: Adding Handlers,  Prev: Handlers,  Up: Handlers
+
+2.2.1 Read and Write Handler Overview
+-------------------------------------
+
+Read and write handlers appear to the user like files in a file system,
+or alternatively, like a limited RPC mechanism that uses ASCII strings
+for data transfer. To the element programmer, a read handler is simply a
+function that takes an element and returns a String; a write handler is
+a function that takes an element and a String and returns an error code.
+
+ -- Function Type: String (*ReadHandler) (Element *ELEMENT, void *THUNK)
+     Read handler functions have this type. When the user accesses a
+     read handler on an element, Click calls some `ReadHandler' function
+     and passes the element as an argument. The THUNK argument contains
+     callback data specified when the handler was added. The function's
+     String return value is passed back to the user.
+
+ -- Function Type: int (*WriteHandler) (const String &DATA,
+          Element *ELEMENT, void *THUNK, ErrorHandler *ERRH)
+     Write handler functions have this type. When the user accesses some
+     element write handler by passing in a string, Click calls some
+     `WriteHandler' function and passes the data and the relevant
+     element as arguments. The THUNK argument contains callback data
+     specified when the handler was added. The return value is an error
+     code: zero when there are no errors, and the negative of some
+     `errno' value when there is an error. More detailed information
+     about any errors should be reported to the ERRH argument.
+
+   Each handler has an ASCII "name". Handler names must be unique
+within each element; for example, there can be at most one `x' read
+handler in a given element. A given name can be shared by a read handler
+and a write handler, however. Such a handler pair is colloquially called
+a "read/write handler", although its two components need not have
+anything to do with one another.
+
+   There is currently no way to pass data to a read handler or return
+data from a write handler. Use LLRPCs if you need a more RPC-like
+read-write interface.
+
+   Note that read and write handler functions are regular functions, not
+virtual functions. Often, therefore, handler functions are defined as
+private static member functions in the relevant element class.
+
+   Read and write handlers need not use ASCII-formatted data. Most
+existing handlers do format their data in ASCII, however, and use
+`cp_uncomment' to ignore leading and trailing whitespace and comments.
+You may want to do the same for consistency's sake.
+
+   Be careful when writing handlers that modify element state, or read
+state that packet processing can modify. On an SMP machine, a handler
+may be called on one processor while packets are passing through the
+router on another processor. Furthermore, multiple read handlers and
+safe LLRPCs (*note LLRPC Overview::) may be active simultaneously on
+different processors. Write handlers are serialized with respect to
+other handlers and LLRPCs (but not packet processing). That is, no other
+handler or LLRPC will proceed while a write handler is active.
+
+
+File: click.info,  Node: Adding Handlers,  Next: Default Handlers,  Prev: Read and Write Handler Overview,  Up: Handlers
+
+2.2.2 Adding Handlers
+---------------------
+
+Use `Element''s `add_read_handler' and `add_write_handler' methods to
+add handlers for an element. You will generally call these methods only
+from within your element's `add_handlers' method, although nothing
+prevents you from adding handlers at any time.
+
+ -- Method on Element: void add_read_handler (const String &NAME,
+          ReadHandler FUNC, void *THUNK)
+     Adds a read handler named NAME for this element. When the handler
+     is accessed, FUNC will be called with `this' and THUNK as
+     parameters.
+
+ -- Method on Element: void add_write_handler (const String &NAME,
+          WriteHandler FUNC, void *THUNK)
+     Adds a write handler named NAME for this element. When the handler
+     is accessed, FUNC will be called with the relevant data, `this',
+     THUNK, and an `ErrorHandler' as parameters.
+
+   To create a read/write handler, call `add_read_handler' and
+`add_write_handler' and supply the same handler name.
+
+   These methods simply forward their requests to static
+`add_read_handler' and `add_write_handler' methods on the `Router'
+class. Call those methods directly to add handlers to other elements,
+or to add global handlers.
+
+ -- Static Method on Router: void add_read_handler
+          (const Element *ELEMENT, const String &NAME,
+          ReadHandler FUNC, void *THUNK)
+ -- Static Method on Router: void add_write_handler
+          (const Element *ELEMENT, const String &NAME,
+          WriteHandler FUNC, void *THUNK)
+     Adds a read or write handler for ELEMENT, or a global read or
+     write handler if ELEMENT is null. The handler is named NAME.
+
+   The `change_handler_flags' method lets you change a handler's flags
+word (*note Handler Objects::).
+
+ -- Static Method on Router: void change_handler_flags
+          (Element *ELEMENT, const String &NAME, uint32_t CLEAR_FLAGS,
+          uint32_t SET_FLAGS)
+     Changes the flags for ELEMENT's NAME handler, or the global NAME
+     handler if ELEMENT is null. The flags are changed by first
+     clearing the bits set in CLEAR_FLAGS, then setting the bits set in
+     SET_FLAGS. This method fails and returns -1 when the specified
+     handler does not exist; otherwise, it returns 0.
+
+
+File: click.info,  Node: Default Handlers,  Next: Accessing Handlers Internally,  Prev: Adding Handlers,  Up: Handlers
+
+2.2.3 Default Read and Write Handlers
+-------------------------------------
+
+Every element automatically provides five handlers, `class', `name',
+`config', `ports', and `handlers'. There is no need to add these
+handlers yourself. The default handlers behave as follows:
+
+`class'
+     Returns the element's class name, as returned by `class_name()',
+     followed by a newline. Example result: "ARPQueriern".
+
+`name'
+     Returns the element's name, as returned by `id()', followed by a
+     newline. Example result: "arpq_0n".
+
+`config'
+     Returns the element's configuration string. If the configuration
+     string does not end in newline, the hander appends a newline
+     itself. Example result: "18.26.7.1, 00:00:C0:4F:71:EFn".
+
+     If `can_live_reconfigure' returns true, `config' is also a write
+     handler, and writing to it reconfigures the element.
+
+`ports'
+     Returns a multi-line string describing the element's ports and
+     what they are connected to. The string has the form
+
+          M input[s]
+          ... M input port descriptions, one per line ...
+          N output[s]
+          ... N output port descriptions, one per line ...
+
+     Each port description lists the port's processing type, a dash,
+     and then a comma-separated list of all the ports to which this
+     port is connected.  The processing type is either `push' or
+     `pull'; formerly agnostic ports are indicated by a trailing tilde
+     (`push~' or `pull~'). Example result:
+
+          1 input
+          push~   -       Strip@2 [0]
+          2 outputs
+          push~   -       [0] GetIPAddress@4
+          push    -       [0] Print@7
+
+     If Click was compiled with statistics collection enabled, the dash
+     on each line is replaced by a packet count.
+
+`handlers'
+     Returns a string listing the element's visible handlers, one per
+     line.  Each line contains the handler name, a tab, and then either
+     `r', `w', or `rw', depending on whether the handler is read-only,
+     write-only, or read/write. Example result for an `InfiniteSource'
+     element, which has many handlers:
+
+          scheduled       r
+          tickets r
+          reset   w
+          count   r
+          active  rw
+          burstsize       rw
+          limit   rw
+          data    rw
+          handlers        r
+          ports   r
+          config  rw
+          name    r
+          class   r
+
+
+File: click.info,  Node: Accessing Handlers Internally,  Next: LLRPC Overview,  Prev: Default Handlers,  Up: Handlers
+
+2.2.4 Accessing Handlers Internally
+-----------------------------------
+
+Element handlers are stored in the relevant `Router' as objects of type
+`Router::Handler'. (This design allows handler objects to be shared
+between elements when possible.) Handlers are often referred to by
+index; indexes between 0 and `Router::FIRST_GLOBAL_HANDLER - 1' refer
+to element handlers, while indexes above `Router::FIRST_GLOBAL_HANDLER'
+refer to global handlers. Indexes less than 0 are used for error
+returns, such as nonexistent handlers.  `Router' methods translate
+between handler indexes and `Router::Handler' objects, and find
+handlers or handler indexes given handler names.
+
+* Menu:
+
+* Handler Objects::
+* Handlers By Name or Index::
+
+
+File: click.info,  Node: Handler Objects,  Next: Handlers By Name or Index,  Prev: Accessing Handlers Internally,  Up: Accessing Handlers Internally
+
+2.2.4.1 The Router::Handler Type
+................................
+
+The `Router::Handler' type allows you to check a handler's properties
+and call the handler. All of its methods are `const'; you must go
+through `Router' to change a handler's properties.  `Router::Handler'
+objects do not contain element references, since they are shared among
+elements. That means you can't easily find the element (if any) to
+which a particular `Router::Handler' is attached.
+
+ -- Method on Router::Handler: const String & name () const
+     Returns the handler's name.
+
+ -- Method on Router::Handler: uint32_t flags () const
+     Returns the handler's flags as an integer. The lower bits of the
+     flags word are reserved for the system, and four bits are reserved
+     for drivers, but the upper bits (at least 16) are left
+     uninterpreted, and may be used by elements. The first user flag
+     bit is called `Router::Handler::USER_FLAG_0'; its position in the
+     word equals `Router::Handler::USER_FLAG_SHIFT'. To change a
+     handler's flags, use the `Router::change_handler_flags' method
+     (*note Changing Handler Flags::).
+
+ -- Method on Router::Handler: bool readable () const
+     Returns true iff this handler is readable.
+
+ -- Method on Router::Handler: bool read_visible () const
+     Returns true iff this handler is readable, and that read handler
+     should be externally visible. Drivers and the ControlSocket
+     element use `read_visible' rather than `readable' when deciding
+     whether to tell the user that a read handler exists. Inter-element
+     communication within the router, however, may use `readable'
+     rather than `read_visible'.
+
+ -- Method on Router::Handler: bool writable () const
+ -- Method on Router::Handler: bool write_visible () const
+     The analogous methods for write handlers.
+
+ -- Method on Router::Handler: bool visible () const
+     Equivalent to `read_visible() || write_visible()'.
+
+ -- Method on Router::Handler: String unparse_name (Element *ELEMENT)
+          const
+     Returns the handler's name, including its attached element's name
+     if ELEMENT is non-null. For example, calling `unparse_name' on
+     element `e''s `foo' handler would return `e.foo', while calling it
+     on a global `bar' handler would return `bar'.
+
+ -- Static Method on Router::Handler: String unparse_name
+          (Element *ELEMENT, const String &NAME)
+     Returns a string representing ELEMENT's hypothetical NAME handler,
+     or the global NAME handler if ELEMENT is null.
+
+ -- Method on Router::Handler: String call_read (Element *ELEMENT) const
+     Calls this read handler on ELEMENT and returns the result. Do not
+     use this method unless you know the handler is `readable()'.
+
+ -- Method on Router::Handler: int call_write (const String &DATA,
+          Element *ELEMENT, ErrorHandler *ERRH) const
+     Calls this write handler on ELEMENT, passing it DATA and ERRH, and
+     returns the result. Do not use this method unless you know the
+     handler is `writable()'.
+
+
+File: click.info,  Node: Handlers By Name or Index,  Prev: Handler Objects,  Up: Accessing Handlers Internally
+
+2.2.4.2 Handlers By Name or Index
+.................................
+
+These `Router' methods locate handlers by name, returning either a
+pointer to a handler object or a handler index. The methods are static
+to allow access to global handlers outside the context of a running
+router.
+
+ -- Static Method on Router: const Router::Handler * handler
+          (const Element *ELEMENT, const String &NAME)
+     Returns a pointer to the handler object for ELEMENT's handler
+     named NAME, or null if no such handler exists. ELEMENT may be
+     null, in which case the method looks for a global handler named
+     NAME.
+
+     *Caution*: Handler pointers returned by `Router::handler' and
+     similar methods should be treated as transient, since they may
+     become invalid when new handlers are added.
+
+ -- Static Method on Router: int hindex (const Element *ELEMENT,
+          const String &NAME)
+     Like `Router::handler', above, but returns an integer handler
+     index for the named handler, or a negative number if no such
+     handler exists. All valid handler indexes are nonnegative.
+
+ -- Static Method on Router: const Router::Handler * handler
+          (const Router *ROUTER, int HINDEX)
+     Returns ROUTER's handler object corresponding to HINDEX, or a null
+     pointer if HINDEX is invalid with respect to ROUTER. There are
+     three possibilities: (1) HINDEX coresponds to a valid global
+     handler, which is returned. In this case, ROUTER need not be
+     valid. (2) HINDEX corresponds to a valid local handler in class
+     ROUTER, which is returned. (3) Otherwise, a null pointer is
+     returned.
+
+ -- Static Method on Router: const Router::Handler * handler
+          (const Element *ELEMENT, int HINDEX)
+     Convenience function equivalent to `handler(ELEMENT->router(),
+     HINDEX)'. Note that HINDEX need not refer to one of ELEMENT's
+     handlers.
+
+ -- Method on Router: const Router::Handler * handler (int HINDEX) const
+     Convenience function equivalent to `handler(this, HINDEX)'.
+
+   Finally, the `element_hindexes' static method returns all the
+handler indices that apply to a given element.
+
+ -- Static Method on Router: void element_hindexes
+          (const Element *ELEMENT, Vector<int> &RESULTS)
+     Appends to RESULTS all the handler indexes for ELEMENT's handlers,
+     or all global handlers if ELEMENT is null.
+
+
+File: click.info,  Node: LLRPC Overview,  Prev: Accessing Handlers Internally,  Up: Handlers
+
+2.2.5 LLRPC Overview
+--------------------
+
+
+File: click.info,  Node: Tasks,  Next: Timers,  Prev: Helper Classes,  Up: Top
+
+3 Tasks
+*******
+
+Click schedules a router's CPU or CPUs with one or more "task queues".
+These queues are simply lists of "tasks", which represent functions
+that would like access to the CPU. Tasks are generally associated with
+elements. When scheduled, most tasks call some element's `run_task'
+method.
+
+   Click tasks are represented by `Task' objects. An element that would
+like special access to a router's CPU should include and initialize a
+`Task' instance variable.
+
+   Tasks are generally called very frequently, up to tens of thousands
+of times per second. For infrequent events, it is far more efficient to
+use timers than to use tasks; see *note Timers::.
+
+   Executing a task should not take a long time. The Click driver loop
+is not currently adaptive, so very long tasks can inappropriately delay
+timers and other periodic events. We may address this problem in a
+future release, but for now, keep tasks short.
+
+   See the Doxygen documentation on class `Task' for more information.
+
+   The `Task' class is defined in the `<click/task.hh>' header file.
+
+* Menu:
+
+* Task Initialization::
+* Scheduling Tasks::
+* Tickets::
+* Task Thread Choice::
+* Task Status::
+* Task Handlers::
+* Task Cleanup::
+
+
+File: click.info,  Node: Task Initialization,  Next: Scheduling Tasks,  Prev: Tasks,  Up: Tasks
+
+3.1 Task Initialization
+=======================
+
+Task initialization is a two-step process. First, when a `Task' object
+is constructed, you must supply information about the function that it
+should call when it is scheduled. Second, when the router is
+initialized, you must initialize the task by supplying it with the
+relevant router. (You must initialize the task even if it will not be
+scheduled right away.)
+
+   `Task' has two constructors. One of them asks the task to call an
+element's `run_task' method when scheduled; the other asks it to call
+an arbitrary function pointer.
+
+ -- Constructor on Task:  Task (Element *E)
+     When this task is scheduled, call `E->run_task()'.
+
+ -- Constructor on Task:  Task (TaskHook HOOK, void *THUNK)
+     When this task is scheduled, call `HOOK(this, THUNK)'.  The HOOK
+     argument is a function pointer with type `void (*)(Task *, void
+     *)'.
+
+   The `Task::initialize' method places the task on a router-wide list
+of `Task's, associates the task with a particular task queue, and,
+optionally, schedules it. Typically, an element's `initialize' method
+calls `Task::initialize'.
+
+ -- Method on Task: void initialize (Router *R, bool SCHEDULED)
+ -- Method on Task: void initialize (Element *E, bool SCHEDULED)
+     Attaches the task to the router object R (or `E->router()').
+     Additionally sets the task's tickets to a default value, and
+     schedules the task if SCHEDULED is true.
+
+   Many elements call `ScheduleInfo::initialize_task' instead of
+calling `Task::initialize' directly. This method queries any
+`ScheduleInfo' elements in the configuration to determine the task's
+scheduling parameters, sets those parameters, and calls
+`Task::initialize' to schedule the task. The
+`ScheduleInfo::initialize_task' method is defined in the
+`<click/standard/scheduleinfo.hh>' header file.
+
+ -- Static Method on ScheduleInfo: void initialize_task (Element *E,
+          Task *TASK, bool SCHEDULE, ErrorHandler *ERRH)
+     Sets TASK's scheduling parameters as specified by any
+     `ScheduleInfo' elements in the router configuration. The element E
+     is used to find the correct router, and provides the relevant name
+     for parameter lookup--the user supplies parameters to
+     `ScheduleInfo' by element name. If SCHEDULE is true, also
+     schedules TASK on `E->router()''s task queue. Reports any errors
+     to ERRH.
+
+ -- Static Method on ScheduleInfo: void initialize_task (Element *E,
+          Task *TASK, ErrorHandler *ERRH)
+     A synonym for `initialize_task(E, TASK, true, ERRH)'.
+
+ -- Static Method on ScheduleInfo: void join_scheduler (Element *E,
+          Task *TASK, ErrorHandler *ERRH)
+     A synonym for `initialize_task(E, TASK, true, ERRH)'.
+
+   The `initialize_task' method is generally called like this:
+
+     int
+     SomeElement::initialize(ErrorHandler *errh)
+     {
+         ScheduleInfo::initialize_task(this, &_task, errh);
+     }
+
+Here, `_task', a `Task' object, is one of `SomeElement''s instance
+variables.
+
+
+File: click.info,  Node: Scheduling Tasks,  Next: Tickets,  Prev: Task Initialization,  Up: Tasks
+
+3.2 Scheduling Tasks
+====================
+
+The user may take a task off its task queue with the `unschedule'
+method, and place it back onto its task queue with the `reschedule'
+method. As tasks move to the head of the task queue, they are
+unscheduled and their callbacks are called. Within these callback
+functions, the user will typically call `fast_reschedule', which is
+like `reschedule' without the locking overhead.
+
+ -- Method on Task: void unschedule ()
+     Unschedules the task by removing it from its task queue. Does
+     nothing if if the task is currently unscheduled, or if it was
+     never initialized.  When this function returns, the task will not
+     be scheduled.
+
+ -- Method on Task: void reschedule ()
+     Reschedules the task by placing it on its task queue. If the task
+     is already scheduled, then this method does nothing.
+
+   All three functions lock the task queue before manipulating it. This
+avoids corruption when there are multiple processors executing
+simultaneously. If `reschedule' cannot immediately lock a task
+queue--perhaps because it is being used on another processor--then they
+register a task request, which will be executed in the near future. In
+contrast, the `unschedule' function will wait until it can lock the
+task queue.
+
+   Sometimes unscheduling a task is not enough: you don't want the task
+to run, even if someone else (an upstream queue, for example) were to
+reschedule it. The `strong_unschedule' method both unschedules the task
+and shifts the task to the quiescent thread, which never runs. Thus, a
+`strong_unschedule'd task will not run until someone calls
+`strong_reschedule', which reschedules the task on its original
+preferred thread.
+
+ -- Method on Task: void strong_unschedule ()
+     Unschedules the task by removing it from its task queue and
+     shifting it to the quiescent thread. Does nothing if if the task
+     is currently unscheduled, or if it was never initialized. When
+     this function returns, the task will not be scheduled.
+
+ -- Method on Task: void strong_reschedule ()
+     Reschedules the task by placing it on the task queue corresponding
+     to its thread preference. The task will not be scheduled
+     immediately upon return, but it will become scheduled
+     soon--`strong_reschedule' uses a task request to avoid locking.
+
+   The `fast_reschedule' method avoids locking overhead in the common
+case that a task must be rescheduled from within its callback.
+
+ -- Method on Task: void fast_reschedule ()
+     Reschedules the task by placing it on its preferred task queue.
+     This method avoids locking overhead, so it is faster than
+     `reschedule'.
+
+          *Caution*: You may call a `Task''s `fast_reschedule' method
+          only from within its callback function. For instance, if an
+          element has a task, `_task', that calls the element's
+          `run_task' method when scheduled, and if `run_task' is called
+          only by that task's callback, then that element's `run_task'
+          method should call `_task.fast_reschedule()' instead of
+          `_task.reschedule()'.
+
+   The `fast_unschedule' method is to `unschedule' as `fast_reschedule'
+is to `reschedule'. It is rarely used, since tasks are automatically
+unscheduled before they are run.
+
+ -- Method on Task: void fast_unschedule ()
+     Unschedules the task by removing it from its task queue. Does
+     nothing if if the task is currently unscheduled, or if it was
+     never initialized.  This method avoids locking overhead, so it is
+     faster than `unschedule'.
+
+          *Caution*: You may call a `Task''s `fast_unschedule' method
+          only from within its callback function.
+
+
+File: click.info,  Node: Tickets,  Next: Task Thread Choice,  Prev: Scheduling Tasks,  Up: Tasks
+
+3.3 Tickets
+===========
+
+Click tasks are scheduled using the flexible, lightweight stride
+scheduling algorithm.(1) This algorithm assigns each task a parameter
+called its "tickets". A task with twice as many tickets as usual is
+scheduled twice as frequently.
+
+   `Task's have methods for querying, setting, and adjusting their
+tickets.
+
+ -- Method on Task: int tickets () const
+     Returns this task's tickets. This number will be at least 1 and no
+     more than `Task::MAX_TICKETS', which equals 32768.
+
+ -- Method on Task: void set_tickets (int T)
+     Sets this task's tickets to T. The T parameter should lie between
+     1 and `Task::MAX_TICKETS', inclusive; numbers outside this range
+     are constrained to the nearest valid value.
+
+ -- Method on Task: void adj_tickets (int DELTA)
+     Equivalent to `set_tickets(tickets() + DELTA)'.
+
+   ---------- Footnotes ----------
+
+   (1) For more information, see MIT Laboratory for Computer Science
+Technical Memo MIT/LCS/TM-528, `Stride scheduling: deterministic
+proportional-share resource management', by Carl A. Waldspurger and
+William E. Weihl, June 1995.
+
+
+File: click.info,  Node: Task Thread Choice,  Next: Task Status,  Prev: Tickets,  Up: Tasks
+
+3.4 Choosing a Thread
+=====================
+
+Each task belongs to some task queue, which generally corresponds to a
+thread of control. Single-threaded Click has one active thread, and
+therefore one task queue, but multithreaded Click can have an arbitrary
+number of threads. Either Click has a special thread, the "quiescent
+thread", numbered -1; tasks belonging to the quiescent thread never
+run, whether or not they are scheduled. Every task starts out belonging
+to the first thread, thread 0. The `change_thread' method moves a task
+to another thread.
+
+ -- Method on Task: void change_thread (int THREAD_ID)
+     Move this task to thread THREAD_ID, which should be a number
+     between -1 and the relevant `Router''s `nthreads()'.
+
+     The task is scheduled on the new task queue if and only if it was
+     scheduled on the old task queue.
+
+   Like `reschedule', `change_thread' must lock the task queue before
+manipulating it. (Unlike those methods, `change_thread' must lock two
+task queues, the old and the new.) If `change_thread' cannot lock a
+task queue, then it registers a task request that will be executed in
+the near future. This implies that a task may remain on the same
+thread, or become unscheduled, for some time after `change_thread' is
+called.
+
+
+File: click.info,  Node: Task Status,  Next: Task Handlers,  Prev: Task Thread Choice,  Up: Tasks
+
+3.5 Task Status Methods
+=======================
+
+These methods let a user check various properties of a task--for
+instance, whether it is initialized or scheduled.
+
+ -- Method on Task: bool initialized () const
+     Returns true iff the task has been initialized--that is, if it is
+     associated with some router.
+
+ -- Method on Task: bool scheduled () const
+     Returns true iff the task is currently scheduled on some task
+     queue.
+
+ -- Method on Task: RouterThread * scheduled_list () const
+     Returns the task queue with which this task is associated. Even
+     unscheduled tasks are associated with some task queue; this is the
+     task queue on which the task will be placed if `reschedule' is
+     called.
+
+ -- Method on Task: TaskHook hook () const
+     Returns the callback function that is called when the task is
+     scheduled.  If the task is associated with some element, this
+     method returns a null pointer.
+
+ -- Method on Task: void * thunk () const
+     Returns the extra data passed to the callback function when the
+     task is scheduled.
+
+ -- Method on Task: Element * element () const
+     If the task is associated with some element, this method returns
+     that element. Otherwise, returns a null pointer.
+
+
+File: click.info,  Node: Task Handlers,  Next: Task Cleanup,  Prev: Task Status,  Up: Tasks
+
+3.6 Task Handlers
+=================
+
+By convention, elements with tasks should provide handlers that access
+task properties. The `Element::add_task_handlers' method automatically
+adds these handlers for a given `Task' object.
+
+ -- Method on Element: void add_task_handlers (Task *TASK,
+          const String &PREFIX = String())
+     Adds task handlers for TASK to this element. The string PREFIX is
+     prepended to every handler name.
+
+   This method adds at least the following handlers:
+
+`scheduled'
+     Returns a Boolean value saying whether the task is currently
+     scheduled on some task queue. Example result: "truen".
+
+`tickets'
+     Returns or sets the task's currently allocated tickets. This
+     handler is only available if Click was compiled to support stride
+     scheduling.  Example result: "1024n".
+
+`thread_preference'
+     Returns the task's thread preference. This handler is only
+     available on multithreaded Click. Example result: "2n".
+
+
+File: click.info,  Node: Task Cleanup,  Prev: Task Handlers,  Up: Tasks
+
+3.7 Task Cleanup
+================
+
+You generally don't need to worry about destroying `Task' objects: they
+are automatically unscheduled and removed when the `Router' is
+destroyed. This only works if the `Task' objects have the same lifetime
+as the `Router', however. This includes the normal case, when `Task's
+are element instance variables. If you create and destroy `Task'
+objects as the router runs, however, you will need to call the
+following method before deleting the `Task'.
+
+ -- Method on Task: void cleanup ()
+     Cleans up the `Task' object.
+
+
+File: click.info,  Node: Timers,  Next: Notification,  Prev: Tasks,  Up: Top
+
+4 Timers
+********
+
+Click "timers", like Click tasks, represent callback functions that the
+driver calls when appropriate. Unlike tasks, however, you schedule
+timers to go off at a specified time. Timers are intended for more
+infrequent and/or slower tasks.
+
+   As with `Task', most `Timer' objects are declared as instance
+variables of elements and scheduled when needed.
+
+   Timers may be scheduled with microsecond precision, but on current
+hardware, only millisecond precision is likely to be achievable.
+
+   The `Timer' class is defined in the `<click/timer.hh>' header file.
+
+* Menu:
+
+* Timer Initialization::
+* Scheduling Timers::
+* Timer Status Methods::
+* Timer Cleanup::
+
+
+File: click.info,  Node: Timer Initialization,  Next: Scheduling Timers,  Prev: Timers,  Up: Timers
+
+4.1 Timer Initialization
+========================
+
+Timer initialization resembles task initialization. When the timer is
+constructed, you must supply it with information about its callback
+function. Later, after the router is initialized, you must initialize
+and, optionally, schedule it.
+
+ -- Constructor on Timer:  Timer (Element *E)
+     When this timer goes off, call `E->run_timer()'.
+
+ -- Constructor on Timer:  Timer (Task *T)
+     When this timer goes off, call `T->reschedule()'.
+
+ -- Constructor on Timer:  Timer (TimerHook HOOK, void *THUNK)
+     When this timer goes off, call `HOOK(this, THUNK)'. The HOOK
+     argument is a function pointer with type `void (*)(Timer *, void
+     *)'.
+
+ -- Method on Timer: void initialize (Router *R)
+ -- Method on Timer: void initialize (Element *E)
+     Attaches the timer to the router object R (or `E->router()').
+
+   Typically, an element's `initialize' method calls
+`Timer::initialize', and possibly one of the `schedule' functions
+described below.
+
+
+File: click.info,  Node: Scheduling Timers,  Next: Timer Status Methods,  Prev: Timer Initialization,  Up: Timers
+
+4.2 Scheduling Timers
+=====================
+
+A variety of methods schedule timers to go off at specified times. The
+basic method is `schedule_at', which schedules the timer for a
+specified time. Subsidiary methods schedule the timer relative to the
+current time (the `schedule_after' methods), or relative to the last
+time the timer was scheduled to run (the `reschedule_after' methods).
+Finally, `unschedule' unschedules the timer.
+
+   All `schedule' and `reschedule' functions first unschedule the timer
+if it was already scheduled.
+
+   The `reschedule' methods are particularly useful for timers that
+should occur periodically. For example, this callback function will
+cause its timer to go off at 20-second intervals:
+
+     void timer_callback(Timer *t, void *) {
+         t->reschedule_after_s(20);
+     }
+
+ -- Method on Timer: void schedule_at (const struct timeval &WHEN)
+     Schedule the timer to go off at WHEN. You must have initialized
+     the timer earlier.
+
+ -- Method on Timer: void schedule_now ()
+     Schedule the timer to go off as soon as possible.
+
+ -- Method on Timer: void schedule_after (const struct timeval &DELAY)
+     Schedule the timer to go off DELAY after the current time.
+
+ -- Method on Timer: void schedule_after_s (uint32_t DELAY)
+     Schedule the timer to go off DELAY seconds after the current time.
+
+ -- Method on Timer: void schedule_after_ms (uint32_t DELAY)
+     Schedule the timer to go off DELAY milliseconds after the current
+     time.
+
+ -- Method on Timer: void reschedule_after (const struct timeval &DELAY)
+     Schedule the timer to go off DELAY after it was last scheduled to
+     go off. If the timer was never previously scheduled, this method
+     will schedule the timer for some arbitrary time.
+
+ -- Method on Timer: void reschedule_after_s (uint32_t DELAY)
+     Schedule the timer to go off DELAY seconds after it was last
+     scheduled to go off.
+
+ -- Method on Timer: void reschedule_after_ms (uint32_t DELAY)
+     Schedule the timer to go off DELAY milliseconds after it was last
+     scheduled to go off.
+
+ -- Method on Timer: void unschedule ()
+     Unschedules the timer, if it was scheduled.
+
+
+File: click.info,  Node: Timer Status Methods,  Next: Timer Cleanup,  Prev: Scheduling Timers,  Up: Timers
+
+4.3 Timer Status Methods
+========================
+
+These methods return information about a timer, including when it is
+scheduled to expire.
+
+ -- Method on Timer: bool initialized () const
+     Returns true iff the timer has been initialized with a call to
+     `initialize()'. Uninitialized timers must not be scheduled.
+
+ -- Method on Timer: bool scheduled () const
+     Returns true iff the timer is scheduled to expire some time in the
+     future.
+
+ -- Method on Timer: const struct timeval & expiry () const
+     Returns the time that the timer is set to expire. If the timer has
+     never been scheduled, the value is garbage. If the timer was
+     scheduled but is not scheduled currently, the value is most
+     recently set expiry time.
+
+
+File: click.info,  Node: Timer Cleanup,  Prev: Timer Status Methods,  Up: Timers
+
+4.4 Timer Cleanup
+=================
+
+You don't need to worry about cleaning up `Timer' objects. They are
+automatically unscheduled and removed when the `Router' is destroyed,
+and deleting a `Timer' automatically removes it from any relevant
+lists. The following function is nevertheless provided for consistency
+with `Task's, which do need to be cleaned up in certain circumstances
+(*note Task Cleanup::).
+
+ -- Method on Timer: void cleanup ()
+     Cleans up the `Timer' object.
+
+
+File: click.info,  Node: Notification,  Next: Coding Standards,  Prev: Timers,  Up: Top
+
+5 Notification
+**************
+
+
+File: click.info,  Node: Coding Standards,  Next: Index,  Prev: Notification,  Up: Top
+
+6 Coding Standards
+******************
+
+* Menu:
+
+* Upper and lower case names::
+* Common name patterns::
+
+
+File: click.info,  Node: Upper and lower case names,  Next: Common name patterns,  Prev: Coding Standards,  Up: Coding Standards
+
+6.1 Upper and Lower Case in Names
+=================================
+
+Keep to the following consistent scheme for choosing between upper and
+lower case when naming variables, types, and functions.
+
+*Classes*
+     Use mixed case with an initial capital letter and no underscores:
+     `LookupIPRoute'.
+
+*Methods*
+     Use all lower case with underscores separating words:
+     `negation_is_simple'.
+
+*Constants*
+     Use all upper case with underscores separating words:
+     `TYPE_ICMP_TYPE'.
+
+*Instance variables*
+     Begin with an underscore, then use all lower case with underscores
+     separating words: `_length'.
+
+*Regular variables*
+     Use all lower case with underscores separating words: `i',
+     `the_handler'.
+
+*Class variables*
+     These variables are declared as `static' in the class header. Name
+     them like regular variables: `nelements_allocated'.
+
+*Functions*
+     Name them like methods: `quicksort_hook'.
+
+*Other types*
+     This includes typedefs and enumerated types. Name them like
+     classes: `CpVaParseCmd', `ConfigurePhase'.
+
+   There are exceptions to these guidelines. In particular:
+
+   * Instance variables in C structs--that is, classes with few methods
+     whose instance variables are mostly public--may be named like
+     regular variables, without a preceding underscore. The same goes
+     for the components of unions.
+
+   * Classes that act like simple types, such as `uatomic32_t', take
+     names similar to the types they replace (in this case `uint32_t').
+
+
+File: click.info,  Node: Common name patterns,  Prev: Upper and lower case names,  Up: Coding Standards
+
+6.2 Common Name Patterns
+========================
+
+   * Many instance variables have associated "getter methods" that
+     return their values, and/or "setter methods" that change their
+     values. For an instance variable named `_x', the getter method
+     should be named `x()' and the setter method should be named
+     `set_x()'.
+
+   * A variable or method which counts something is often named
+     `nOBJECTs'--for instance, `_nwarnings', `ninputs()', `_npackets'.
+
+   * Use a bare `0' for a null pointer, except where some ambiguity
+     might arise (for example, where an incorrect overloading might be
+     selected).
+
+
+File: click.info,  Node: Index,  Prev: Coding Standards,  Up: Top
+
+Index
+*****
+
+ [index ]
+* Menu:
+
+* (*ReadHandler):                        Read and Write Handler Overview.
+                                                               (line 13)
+* (*WriteHandler):                       Read and Write Handler Overview.
+                                                               (line 21)
+* add_read_handler on Element:           Adding Handlers.      (line 13)
+* add_read_handler on Router:            Adding Handlers.      (line 34)
+* add_task_handlers on Element:          Task Handlers.        (line 12)
+* add_write_handler on Element:          Adding Handlers.      (line 19)
+* add_write_handler on Router:           Adding Handlers.      (line 37)
+* adj_tickets on Task:                   Tickets.              (line 24)
+* call_read on Router::Handler:          Handler Objects.      (line 57)
+* call_write on Router::Handler:         Handler Objects.      (line 62)
+* change_handler_flags on Router:        Adding Handlers.      (line 46)
+* change_thread on Task:                 Task Thread Choice.   (line 16)
+* cleanup on Task:                       Task Cleanup.         (line 15)
+* cleanup on Timer:                      Timer Cleanup.        (line 14)
+* ContextErrorHandler on ContextErrorHandler: Error Veneers.   (line 26)
+* debug on ErrorHandler:                 Reporting Errors.     (line 13)
+* decorate_text on ErrorHandler:         Writing ErrorHandlers.
+                                                               (line 30)
+* default ErrorHandler:                  Basic ErrorHandlers.  (line 13)
+* default_handler on ErrorHandler:       Basic ErrorHandlers.  (line 19)
+* element on Task:                       Task Status.          (line 33)
+* element_hindexes on Router:            Handlers By Name or Index.
+                                                               (line 52)
+* error on ErrorHandler:                 Reporting Errors.     (line 16)
+* ErrorHandler, default:                 Basic ErrorHandlers.  (line 13)
+* ErrorVeneer:                           Writing ErrorHandlers.
+                                                               (line 54)
+* ErrorVeneer on ErrorVeneer:            Writing ErrorHandlers.
+                                                               (line 67)
+* expiry on Timer:                       Timer Status Methods. (line 18)
+* fast_reschedule on Task:               Scheduling Tasks.     (line 55)
+* fast_unschedule on Task:               Scheduling Tasks.     (line 72)
+* fatal on ErrorHandler:                 Reporting Errors.     (line 17)
+* FileErrorHandler on FileErrorHandler:  Basic ErrorHandlers.  (line 39)
+* flags on Router::Handler:              Handler Objects.      (line 17)
+* handle_text on ErrorHandler:           Writing ErrorHandlers.
+                                                               (line 45)
+* handler on Router:                     Handlers By Name or Index.
+                                                               (line 13)
+* hindex on Router:                      Handlers By Name or Index.
+                                                               (line 24)
+* hook on Task:                          Task Status.          (line 24)
+* initialize on Task:                    Task Initialization.  (line 31)
+* initialize on Timer:                   Timer Initialization. (line 23)
+* initialize_task on ScheduleInfo:       Task Initialization.  (line 46)
+* initialized on Task:                   Task Status.          (line 10)
+* initialized on Timer:                  Timer Status Methods. (line 10)
+* join_scheduler on ScheduleInfo:        Task Initialization.  (line 60)
+* LandmarkErrorHandler on LandmarkErrorHandler: Error Veneers. (line 43)
+* ldebug on ErrorHandler:                Reporting Errors.     (line 36)
+* lerror on ErrorHandler:                Reporting Errors.     (line 42)
+* lfatal on ErrorHandler:                Reporting Errors.     (line 44)
+* lmessage on ErrorHandler:              Reporting Errors.     (line 38)
+* lwarning on ErrorHandler:              Reporting Errors.     (line 40)
+* make_text on ErrorHandler:             Writing ErrorHandlers.
+                                                               (line 19)
+* message on ErrorHandler:               Reporting Errors.     (line 14)
+* name on Router::Handler:               Handler Objects.      (line 14)
+* nerrors on ErrorHandler:               Counting Errors.      (line 11)
+* nwarnings on ErrorHandler:             Counting Errors.      (line 10)
+* PrefixErrorHandler on PrefixErrorHandler: Error Veneers.     (line 36)
+* read_visible on Router::Handler:       Handler Objects.      (line 30)
+* readable on Router::Handler:           Handler Objects.      (line 27)
+* reschedule on Task:                    Scheduling Tasks.     (line 20)
+* reschedule_after on Timer:             Scheduling Timers.    (line 42)
+* reschedule_after_ms on Timer:          Scheduling Timers.    (line 51)
+* reschedule_after_s on Timer:           Scheduling Timers.    (line 47)
+* reset_counts on ErrorHandler:          Counting Errors.      (line 15)
+* schedule_after on Timer:               Scheduling Timers.    (line 32)
+* schedule_after_ms on Timer:            Scheduling Timers.    (line 38)
+* schedule_after_s on Timer:             Scheduling Timers.    (line 35)
+* schedule_at on Timer:                  Scheduling Timers.    (line 25)
+* schedule_now on Timer:                 Scheduling Timers.    (line 29)
+* scheduled on Task:                     Task Status.          (line 14)
+* scheduled on Timer:                    Timer Status Methods. (line 14)
+* scheduled_list on Task:                Task Status.          (line 18)
+* set_default_handler on ErrorHandler:   Basic ErrorHandlers.  (line 23)
+* set_tickets on Task:                   Tickets.              (line 19)
+* silent_handler on ErrorHandler:        Basic ErrorHandlers.  (line 28)
+* static_cleanup on ErrorHandler:        ErrorHandler Initialization.
+                                                               (line 20)
+* static_initialize on ErrorHandler:     ErrorHandler Initialization.
+                                                               (line 13)
+* strong_reschedule on Task:             Scheduling Tasks.     (line 46)
+* strong_unschedule on Task:             Scheduling Tasks.     (line 40)
+* Task on Task:                          Task Initialization.  (line 18)
+* thunk on Task:                         Task Status.          (line 29)
+* tickets on Task:                       Tickets.              (line 15)
+* Timer on Timer:                        Timer Initialization. (line 12)
+* unparse_name on Router::Handler:       Handler Objects.      (line 46)
+* unschedule on Task:                    Scheduling Tasks.     (line 14)
+* unschedule on Timer:                   Scheduling Timers.    (line 55)
+* verror on ErrorHandler:                Reporting Errors.     (line 73)
+* visible on Router::Handler:            Handler Objects.      (line 42)
+* warning on ErrorHandler:               Reporting Errors.     (line 15)
+* writable on Router::Handler:           Handler Objects.      (line 38)
+* write_visible on Router::Handler:      Handler Objects.      (line 39)
+
+
+
+Tag Table:
+Node: Top234
+Node: Overview1726
+Node: Packet Transfer1861
+Node: Helper Classes1978
+Node: ErrorHandler2137
+Node: ErrorHandler Initialization3059
+Node: Reporting Errors4209
+Node: Error Format Strings7765
+Node: Counting Errors12270
+Node: Basic ErrorHandlers13213
+Node: Error Veneers15138
+Node: Writing ErrorHandlers18879
+Node: Handlers22284
+Node: Read and Write Handler Overview22787
+Node: Adding Handlers25980
+Ref: Changing Handler Flags27840
+Node: Default Handlers28325
+Node: Accessing Handlers Internally30831
+Node: Handler Objects31680
+Node: Handlers By Name or Index34850
+Node: LLRPC Overview37325
+Node: Tasks37464
+Node: Task Initialization38754
+Node: Scheduling Tasks41846
+Node: Tickets45623
+Ref: Tickets-Footnote-146605
+Node: Task Thread Choice46837
+Node: Task Status48201
+Node: Task Handlers49547
+Node: Task Cleanup50611
+Node: Timers51243
+Node: Timer Initialization52004
+Node: Scheduling Timers53111
+Node: Timer Status Methods55387
+Node: Timer Cleanup56246
+Node: Notification56810
+Node: Coding Standards56932
+Node: Upper and lower case names57127
+Node: Common name patterns58769
+Node: Index59504
+
+End Tag Table
