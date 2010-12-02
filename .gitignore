@@ -1,0 +1,32 @@
+# our things go here
+*.o
+*.pyc
+
+
+## click
+# from click/.gitignore (don't modify)
+config.cache
+config.h
+config.log
+config.mk
+config.status
+click-buildtool
+click-compile
+elementmap
+elementmap.xml
+Makefile
+stamp-h
+stamp-egroup
+bin
+man
+autom4te*
++*
+depcomp
+installch
+# our entires to reduce accidental additions of build files
+/click/include/click/config-*.h
+/click/include/click/pathvars.h
+/click/etc/pkg-config.mk
+/click/tools/*
+/click/userlevel/*
+
