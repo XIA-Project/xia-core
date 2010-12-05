@@ -4,6 +4,7 @@
 /// @cond never
 #include <click/string.hh>
 #include <click/vector.hh>
+#include <clicknet/xia.h>
 struct in_addr;
 CLICK_DECLS
 class ErrorHandler;
@@ -173,6 +174,9 @@ bool cp_ip_prefix(const String& str, IPAddress* result_addr, IPAddress* result_m
 bool cp_ip_prefix(const String& str, unsigned char* result_addr, unsigned char* result_mask  CP_OPT_CONTEXT);
 bool cp_ip_address_list(const String& str, Vector<IPAddress>* result  CP_OPT_CONTEXT);
 
+bool cp_xid(const String &str, struct click_xid_v1& xid);
+bool cp_xid(const String &str, struct XID *xid);
+
 #if HAVE_IP6
 class IP6Address;
 struct click_in6_addr;
@@ -276,6 +280,7 @@ extern const CpVaParseCmd
     cpTimeval,		///< Result storage struct timeval*, parsed by cp_time().
     cpBandwidth,	///< Result storage uint32_t*, parsed by cp_bandwidth().
     cpIPAddress,	///< Result storage IPAddress* or equivalent, parsed by cp_ip_address().
+    cpXID,      	///< Result storage struct click_xid_v1 or equivalent, parsed by cp_xia().
     cpIPPrefix,		///< Result storage IPAddress* addr and IPAddress *mask, parsed by cp_ip_prefix().
     cpIPAddressOrPrefix,///< Result storage IPAddress* addr and IPAddress *mask, parsed by cp_ip_prefix().
     cpIPAddressList,	///< Result storage Vector<IPAddress>*, parsed by cp_ip_address_list().
@@ -408,6 +413,7 @@ struct cp_value {
 	double d;
 #endif
 	unsigned char address[16];
+        struct click_xid_v1 xid;
 	int is[4];
 #ifndef CLICK_TOOL
 	Element *element;

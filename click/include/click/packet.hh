@@ -4,6 +4,7 @@
 #include <click/ipaddress.hh>
 #include <click/glue.hh>
 #include <click/timestamp.hh>
+#include <clicknet/xia.h>
 #if CLICK_LINUXMODULE
 # include <click/skbmgr.hh>
 #else
@@ -12,6 +13,7 @@
 #if CLICK_BSDMODULE
 # include <sys/stddef.h>
 #endif
+struct click_xia;
 struct click_ether;
 struct click_ip;
 struct click_icmp;
@@ -282,6 +284,9 @@ class Packet { public:
     inline uint32_t ip6_header_length() const;
     inline void set_ip6_header(const click_ip6 *ip6h);
     inline void set_ip6_header(const click_ip6 *ip6h, uint32_t len);
+
+    inline void set_xia_header(const click_xia *xiah, uint32_t len);
+    inline const click_xia *xia_header() const;
 
     inline const click_icmp *icmp_header() const;
     inline const click_tcp *tcp_header() const;
@@ -1029,6 +1034,16 @@ Packet::ether_header() const
     return reinterpret_cast<const click_ether *>(mac_header());
 }
 
+/** @brief Return the packet's network header pointer as XIA header.
+ * @invariant (void *) xia_header() == (void *) network_header()
+ * @warning Not useful if !has_network_header().
+ * @sa network_header */
+inline const click_xia *
+Packet::xia_header() const
+{
+    return reinterpret_cast<const click_xia *>(network_header());
+}
+
 /** @brief Return the packet's network header pointer as IPv4.
  * @invariant (void *) ip_header() == (void *) network_header()
  * @warning Not useful if !has_network_header().
@@ -1695,6 +1710,18 @@ Packet::set_network_header_length(uint32_t len)
 #else				/* User-space and BSD kernel module */
     _h = _nh + len;
 #endif
+}
+
+/** @brief Set the network header pointer to an XIA header.
+ * @param xiah new XIA header pointer
+ * @param len new XIA header length in bytes
+ * @post (char *) network_header() == (char *) @a xiah
+ * @post network_header_length() == @a len
+ * @post (char *) transport_header() == (char *) @a xiah + @a len */
+inline void
+Packet::set_xia_header(const click_xia *xiah, uint32_t len)
+{
+    set_network_header(reinterpret_cast<const unsigned char *>(xiah), len);
 }
 
 /** @brief Set the network header pointer to an IPv4 header.
