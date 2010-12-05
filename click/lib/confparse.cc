@@ -30,6 +30,7 @@
 #include <click/ipaddress.hh>
 #include <click/etheraddress.hh>
 #include <click/hashtable.hh>
+#include <click/xid.hh>
 #if HAVE_IP6
 # include <click/ip6address.hh>
 # include <click/ip6flowid.hh>
@@ -2000,6 +2001,51 @@ cp_ip_address(const String &str, IPAddress *result  CP_CONTEXT)
   return cp_ip_address(str, result->data()  CP_PASS_CONTEXT);
 }
 
+bool
+cp_xid(const String &str, XID * xid)
+{
+  return cp_xid(str, xid->xid());
+}
+
+bool
+cp_xid(const String &str, struct click_xid_v1& xid)
+{
+    int delim = str.find_left(":",0);
+    String type_str, xid_str;
+    if (delim==-1) return false;
+
+    type_str = str.substring(0,delim);
+    xid_str = str.substring(delim+1);
+    //click_chatter("type %s. %s %d", type_str.c_str(), xid_str.c_str(), xid.type);
+    
+    xid.type = UNDEFINED_TYPE;
+    if (type_str.compare(String("AD"))==0)
+       xid.type = AD_TYPE;  
+    else if (type_str.compare(String("CID"))==0)
+       xid.type = CID_TYPE;  
+    else if (type_str.compare(String("HID"))==0)
+       xid.type = HID_TYPE;  
+    else if (type_str.compare(String("SID"))==0)
+       xid.type = SID_TYPE;  
+
+    int len = xid_str.length();
+    int i = 0;
+    //click_chatter("size xid %d %s\n", sizeof(xid.xid), xid_str.c_str());
+
+    for (size_t d=0;d<sizeof(xid.xid);d++) {
+        if (i< len -1 && isxdigit(xid_str[i]) && isxdigit(xid_str[i+1])) { 
+           // can read two chars
+           xid.xid[d] = xvalue(xid_str[i])*16+ xvalue(xid_str[i+1]);
+           //click_chatter("i %d xid_str %c %c\n", i, xid_str[i], xid_str[i+1]);
+           i+=2;
+        } else {
+            xid.xid[d] = 0;
+        }
+    }
+    return true;
+}
+
+
 /** @brief Parse an IP address or prefix from @a str.
  * @param  str  string
  * @param[out]  result_addr  stores parsed address result
@@ -2809,6 +2855,7 @@ const CpVaParseCmd
   cpTimeval		= "timeval",
   cpBandwidth		= "bandwidth_Bps",
   cpIPAddress		= "ip_addr",
+  cpXID		        = "xid",
   cpIPPrefix		= "ip_prefix",
   cpIPAddressOrPrefix	= "ip_addr_or_prefix",
   cpIPAddressList	= "ip_addr_list",
@@ -2871,6 +2918,7 @@ enum {
   cpiTimeval,
   cpiBandwidth,
   cpiIPAddress,
+  cpiXID,
   cpiIPPrefix,
   cpiIPAddressOrPrefix,
   cpiIPAddressList,
@@ -3182,6 +3230,11 @@ default_parsefunc(cp_value *v, const String &arg,
     }
     break;
 
+   case cpiXID:
+    if (!cp_xid(arg, v->v.xid))
+      goto type_mismatch;
+    break;
+
    case cpiIPAddress:
     if (!cp_ip_address(arg, v->v.address CP_PASS_CONTEXT))
       goto type_mismatch;
@@ -3436,6 +3489,12 @@ default_storefunc(cp_value *v  CP_CONTEXT)
      }
      vstore->push_back(v->v_string.substring(pos));
      break;
+   }
+
+   case cpiXID: {
+       unsigned char *addrstore = (unsigned char *)v->store;
+       memcpy(addrstore, &v->v.xid, sizeof(v->v.xid));
+       break;
    }
 
    case cpiIPAddress:
@@ -4816,6 +4875,7 @@ cp_va_static_initialize()
     cp_register_argtype(cpTimeval, "seconds since the epoch", 0, default_parsefunc, default_storefunc, cpiTimeval);
     cp_register_argtype(cpBandwidth, "bandwidth", 0, default_parsefunc, default_storefunc, cpiBandwidth);
     cp_register_argtype(cpIPAddress, "IP address", 0, default_parsefunc, default_storefunc, cpiIPAddress);
+    cp_register_argtype(cpXID, "XID", 0, default_parsefunc, default_storefunc, cpiXID);
     cp_register_argtype(cpIPPrefix, "IP address prefix", cpArgStore2, default_parsefunc, default_storefunc, cpiIPPrefix);
     cp_register_argtype(cpIPAddressOrPrefix, "IP address or prefix", cpArgStore2, default_parsefunc, default_storefunc, cpiIPAddressOrPrefix);
     cp_register_argtype(cpIPAddressList, "list of IP addresses", 0, default_parsefunc, default_storefunc, cpiIPAddressList);
