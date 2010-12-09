@@ -47,10 +47,10 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
   int srcid = headerbuilder.addXID(src);
   headerbuilder.setSourceStack(srcid);
   int dstid = headerbuilder.addXID(dst);
+
+
   headerbuilder.connectXID(0, srcid, dstid);
   _xiah = headerbuilder.header();
-
-  //
 
   return 0;
 }

@@ -83,6 +83,8 @@ operator<<(StringAccum &sa, XID xid)
         case SID_TYPE:
            c+= sprintf(c, "SID:");
            break;
+        default:
+           c+= sprintf(c, "%02x", xid_s.type);
     }
     for (size_t i=0;i<sizeof(xid_s.xid);i++)
         c+=sprintf(c, "%02x", p[i]);

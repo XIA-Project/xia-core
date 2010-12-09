@@ -29,8 +29,6 @@ class XID { public:
 
     String unparse() const;
 
-    inline String s() const;
-
   private:
 
     struct click_xid_v1 _xid;

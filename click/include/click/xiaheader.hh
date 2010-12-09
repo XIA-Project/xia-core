@@ -178,22 +178,24 @@ class XIAHeader { public:
         int cnt =0;  /* iteration count */
         int next_fb_pos = header->niter+1 + src_stack_len();
         XIDGraphNode* curr = src_stack;
-        while (curr->edge[0]) {
+        while (curr) {
             /* handle the primary path from src to destinations */
             header->xid()[cnt] = *curr->xid();
 
-            /* handle fallbacks */
-            XIDGraphNode* fb = curr->edge[1]; /* only one fallback */
-            if (fb) {
-                header->fb_offset()[cnt]=next_fb_pos;
-                // for each list of XIDs in this fallback
-                // copy the XID to header
-                while (fb->edge[0] && !fb->edge[0]->primary_path){
-                    header->xid()[next_fb_pos] = *fb->xid();
-                    next_fb_pos++;
+            /* handle fallbacks if this is not the end destination */
+            if (curr->edge[0]) {
+                XIDGraphNode* fb = curr->edge[1]; /* only one fallback */
+                if (fb) {
+                    header->fb_offset()[cnt]=next_fb_pos;
+                    // for each list of XIDs in this fallback
+                    // copy the XID to header
+                    while (fb->edge[0] && !fb->edge[0]->primary_path){
+                        header->xid()[next_fb_pos] = *fb->xid();
+                        next_fb_pos++;
+                    }
+                } else {
+                    header->fb_offset()[cnt]= FALLBACK_INVALID;
                 }
-            } else {
-                header->fb_offset()[cnt]= FALLBACK_INVALID;
             }
             curr = curr->edge[0];
             cnt++;
