@@ -25,6 +25,7 @@
 
 #include <clicknet/xia.h>
 #include <click/xid.hh>
+#include <click/xiaheader.hh>
 
 #if CLICK_USERLEVEL
 # include <stdio.h>
@@ -142,10 +143,15 @@ XIAPrint::cleanup(CleanupStage)
 
 void XIAPrint::print_xids(StringAccum &sa, const struct click_xia *xiah)
 {
-    sa << "src: "<< XID(xiah->src()[0]) << ' ';
-    sa << "niter " << (int)xiah->niter << ' ';
-    for (int i=0;i<xiah->niter;i++) {
-        sa << "dst(" << (i+1)<< ") " << XID(xiah->dest()[i]) << " ";
+    for (size_t i = 0; i < xiah->nxids; i++) {
+        if (i == 0)
+            sa << "DST DAG ";
+        else if (i == xiah->ndst)
+            sa << ", SRC DAG ";
+        else
+           sa << ' ';
+
+        sa << XID(xiah->node[i].xid) << ' ' << (int)xiah->node[i].incr;
     }
 }
 
@@ -169,27 +175,24 @@ XIAPrint::simple_action(Packet *p)
 	sa << ": ";
 
     const click_xia *xiah = p->xia_header();
-    int hdr_len = xiah->len();
+    int hdr_len = XIAHeader::size(xiah->nxids);
 
     if (p->network_length() < hdr_len)
-	sa << "truncated-xia";
-    else {
-	int payload_len = ntohs(xiah->payload_len);
+        sa << "truncated-xia";
+    else
+    {
+	print_xids(sa,xiah);
 
-        print_xids(sa,xiah);
+        sa << ", LAST " << (int)xiah->last;
 
 	if (_print_ttl)
-	    sa << "hlim " << (int)xiah->hlim << ' ';
-	if (_print_len) {
-	    sa << "hdr_len " << hdr_len << ' ';
-	    sa << "payload_len " << payload_len << ' ';
-        }
-
-        sa << "next_hdr " << (int)xiah->nexthdr << ' ';
+	    sa << ", HLIM " << (int)xiah->hlim;
+	if (_print_len)
+	    sa << ", PLEN " << ntohs(xiah->plen);
 
 	// print payload
 	if (_contents > 0) {
-            // TODO print payload
+	    // TODO print payload
 	}
     }
 

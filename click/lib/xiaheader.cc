@@ -4,6 +4,7 @@
 
 #include <click/config.h>
 #include <click/string.hh>
+#include <click/glue.hh>
 #include <click/xiaheader.hh>
 #if CLICK_USERLEVEL
 # include <unistd.h>
@@ -14,19 +15,24 @@ CLICK_DECLS
  * @brief The Packet class models packets in Click.
  */
 
-XIAHeader::~XIAHeader()
+XIAHeader::XIAHeader(size_t nxids)
 {
-    std::vector<XIDGraphNode*>::iterator it;
-    for (it= nodelist.begin();it!=nodelist.end();++it) {
-        delete *it;
-    }
+    const size_t size = XIAHeader::size(nxids);
+    _hdr = reinterpret_cast<click_xia*>(new uint8_t[size]);
+    memset(_hdr, 0, size);
 }
 
-/** @brief returns a string representation of the packet header */
-String XIAHeader::toString()
+XIAHeader::XIAHeader(const struct click_xia& hdr)
 {
-    /* TODO  fill this part */
-    String str=""; 
-    return str;
+    const size_t size = XIAHeader::size(hdr.nxids);
+    _hdr = reinterpret_cast<click_xia*>(new uint8_t[size]);
+    memcpy(_hdr, &hdr, size);
 }
+
+XIAHeader::~XIAHeader()
+{
+    delete [] _hdr;
+    _hdr = NULL;
+}
+
 CLICK_ENDDECLS

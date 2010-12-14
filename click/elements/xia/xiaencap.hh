@@ -52,10 +52,14 @@ class XIAEncap : public Element { public:
   Packet *simple_action(Packet *);
 
  private:
-  click_xia *_xiah;
-
-
+  class XIAHeader* _xiah;
 };
+
+typedef Vector<struct click_xia_xid> XIDList;
+typedef Vector<struct click_xia_xid_node> XIDNodeList;
+
+bool cp_xid_dag(const String& str, XIDNodeList* result);
+bool cp_xid_re(const String& str, XIDNodeList* result);
 
 CLICK_ENDDECLS
 #endif

@@ -2002,49 +2002,55 @@ cp_ip_address(const String &str, IPAddress *result  CP_CONTEXT)
 }
 
 bool
-cp_xid(const String &str, XID * xid)
+cp_xid(const String& str, XID* xid)
 {
-  return cp_xid(str, xid->xid());
+  return cp_xid(str, &xid->xid());
 }
 
 bool
-cp_xid(const String &str, struct click_xid_v1& xid)
+cp_xid(const String& str, struct click_xia_xid* xid)
 {
-    int delim = str.find_left(":",0);
+    int delim = str.find_left(":", 0);
     String type_str, xid_str;
-    if (delim==-1) return false;
 
-    type_str = str.substring(0,delim);
-    xid_str = str.substring(delim+1);
+    if (delim == -1)
+        return false;
+
+    type_str = str.substring(0, delim);
+    xid_str = str.substring(delim + 1);
     //click_chatter("type %s. %s %d", type_str.c_str(), xid_str.c_str(), xid.type);
     
-    xid.type = UNDEFINED_TYPE;
-    if (type_str.compare(String("AD"))==0)
-       xid.type = AD_TYPE;  
-    else if (type_str.compare(String("CID"))==0)
-       xid.type = CID_TYPE;  
-    else if (type_str.compare(String("HID"))==0)
-       xid.type = HID_TYPE;  
-    else if (type_str.compare(String("SID"))==0)
-       xid.type = SID_TYPE;  
+    if (type_str.compare(String("AD")) == 0)
+       xid->type = CLICK_XIA_XID_TYPE_AD;
+    else if (type_str.compare(String("CID")) == 0)
+       xid->type = CLICK_XIA_XID_TYPE_CID;
+    else if (type_str.compare(String("HID")) == 0)
+       xid->type = CLICK_XIA_XID_TYPE_HID;
+    else if (type_str.compare(String("SID")) == 0)
+       xid->type = CLICK_XIA_XID_TYPE_SID;
+    else
+        xid->type = CLICK_XIA_XID_TYPE_UNDEFINED;
 
     int len = xid_str.length();
     int i = 0;
     //click_chatter("size xid %d %s\n", sizeof(xid.xid), xid_str.c_str());
 
-    for (size_t d=0;d<sizeof(xid.xid);d++) {
-        if (i< len -1 && isxdigit(xid_str[i]) && isxdigit(xid_str[i+1])) { 
+    for (size_t d = 0; d < sizeof(xid->addr); d++) {
+        if (i < len - 1 && isxdigit(xid_str[i]) && isxdigit(xid_str[i + 1])) {
            // can read two chars
-           xid.xid[d] = xvalue(xid_str[i])*16+ xvalue(xid_str[i+1]);
+           xid->addr[d] = xvalue(xid_str[i]) * 16 + xvalue(xid_str[i + 1]);
            //click_chatter("i %d xid_str %c %c\n", i, xid_str[i], xid_str[i+1]);
-           i+=2;
+           i += 2;
         } else {
-            xid.xid[d] = 0;
+            xid->addr[d] = 0;
         }
     }
+    if (static_cast<size_t>(len) < sizeof(xid->addr) * 2)
+        click_chatter("too short xid: %s\n", str.c_str());
+    if (static_cast<size_t>(len) > sizeof(xid->addr) * 2)
+        click_chatter("truncated xid: %s\n", str.c_str());
     return true;
 }
-
 
 /** @brief Parse an IP address or prefix from @a str.
  * @param  str  string
@@ -3231,7 +3237,7 @@ default_parsefunc(cp_value *v, const String &arg,
     break;
 
    case cpiXID:
-    if (!cp_xid(arg, v->v.xid))
+    if (!cp_xid(arg, &v->v.xid))
       goto type_mismatch;
     break;
 

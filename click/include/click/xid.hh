@@ -4,61 +4,58 @@
 #include <click/string.hh>
 #include <click/glue.hh>
 #include <clicknet/xia.h>
+#include <vector>
 CLICK_DECLS
 class StringAccum;
 
 class XID { public:
-    /** @brief Construct an XID from a struct click_xid_v1. */
-    inline XID(struct click_xid_v1& xid)
+    /** @brief Construct an XID from a struct click_xia_xid. */
+    inline XID(const struct click_xia_xid& xid)
 	: _xid(xid) {
     }
 
-    XID(const String& s);
+    XID(const String& str);
 
-    inline struct click_xid_v1 xid() const;
-    inline struct click_xid_v1& xid();
+    inline const struct click_xia_xid& xid() const;
+    inline struct click_xia_xid& xid();
+
+    inline operator struct click_xia_xid() const;
+
     inline uint32_t hashcode() const;
 
-    // bool operator==(XID, XID);
-    // bool operator!=(XID, XID);
+    bool operator==(const XID&) const;
+    bool operator!=(const XID&) const;
 
-    //inline XID& operator&=(XID);
-    //inline XID& operator|=(XID);
-    //inline XID& operator^=(XID);
-    inline operator struct click_xid_v1() const;
-
+    void parse(const String& str);
     String unparse() const;
 
   private:
-
-    struct click_xid_v1 _xid;
-
+    struct click_xia_xid _xid;
 };
 
 
-
-/** @brief Return a struct click_xid_v1 corresponding to the address. */
-inline struct click_xid_v1
+/** @brief Return a struct click_xia_xid corresponding to the address. */
+inline const struct click_xia_xid&
 XID::xid() const
 {
     return _xid;
 }
 
-/** @brief Return a struct click_xid_v1 corresponding to the address. */
-inline struct click_xid_v1&
+/** @brief Return a struct click_xia_xid corresponding to the address. */
+inline struct click_xia_xid&
 XID::xid() 
 {
     return _xid;
 }
 
-/** @brief Return a struct click_xid_v1 corresponding to the address. */
+/** @brief Return a struct click_xia_xid corresponding to the address. */
 inline
-XID::operator struct click_xid_v1() const
+XID::operator struct click_xia_xid() const
 {
     return xid();
 }
 
-StringAccum& operator<<(StringAccum&, XID);
+StringAccum& operator<<(StringAccum&, const XID&);
 
 
 /** @brief Hash function.
@@ -69,9 +66,8 @@ StringAccum& operator<<(StringAccum&, XID);
 inline uint32_t
 XID::hashcode() const
 {
-    return (uint32_t)(*_xid.xid);
+    return (uint32_t)(*_xid.addr);
 }
-
 
 CLICK_ENDDECLS
 #endif

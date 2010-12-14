@@ -37,10 +37,30 @@ CLICK_DECLS
 
 XID::XID(const String &str)
 {
-    if (!cp_xid(str, this))
-	_xid.type = UNDEFINED_TYPE;
+    parse(str);
 }
 
+
+/** @brief Return if the addresses are the same. */
+bool
+XID::operator==(const XID& rhs) const
+{
+    return memcmp(&_xid, &rhs._xid, sizeof(_xid)) == 0;
+}
+
+/** @brief Return if the addresses are different. */
+bool
+XID::operator!=(const XID& rhs) const
+{
+    return memcmp(&_xid, &rhs._xid, sizeof(_xid)) != 0;
+}
+
+void
+XID::parse(const String& str)
+{
+    if (!cp_xid(str, this))
+        _xid.type = CLICK_XIA_XID_TYPE_UNDEFINED;
+}
 
 /** @brief Unparses this address into a String.
 
@@ -49,47 +69,39 @@ XID::XID(const String &str)
 String
 XID::unparse() const
 {
-    const unsigned char *p =_xid.xid;
-    char buf[46];
+    const unsigned char *p = _xid.addr;
+    char buf[48];
     char *c = buf;
-    c+= sprintf(c, "%04x:", _xid.type);
-    for (size_t i=0;i<sizeof(_xid.xid);i++)
-        c+=sprintf(c, "%02x", p[i]);
+    switch (_xid.type) {
+        case CLICK_XIA_XID_TYPE_UNDEFINED:
+           c += sprintf(c, "UNDEF");
+           break;
+        case CLICK_XIA_XID_TYPE_AD:
+           c += sprintf(c, "AD");
+           break;
+        case CLICK_XIA_XID_TYPE_HID:
+           c += sprintf(c, "HID");
+           break;
+        case CLICK_XIA_XID_TYPE_CID:
+           c += sprintf(c, "CID");
+           break;
+        case CLICK_XIA_XID_TYPE_SID:
+           c += sprintf(c, "SID");
+           break;
+        default:
+           c += sprintf(c, "%02x", _xid.type);
+    }
+    c += sprintf(c, ":");
+    for (size_t i = 0; i < sizeof(_xid.addr); i++)
+        c += sprintf(c, "%02x", p[i]);
     return String(buf);
 }
 
-
 StringAccum &
-operator<<(StringAccum &sa, XID xid) 
+operator<<(StringAccum &sa, const XID& xid)
 {
-    struct click_xid_v1 xid_s= xid.xid();
-
-    const unsigned char *p =xid_s.xid;
-    char buf[46];
-    char *c = buf;
-    switch (xid_s.type) {
-        case UNDEFINED_TYPE:
-           c+= sprintf(c, "UNDEF:");
-           break;
-        case AD_TYPE:
-           c+= sprintf(c, "AD:");
-           break;
-        case HID_TYPE:
-           c+= sprintf(c, "HID:");
-           break;
-        case CID_TYPE:
-           c+= sprintf(c, "CID:");
-           break;
-        case SID_TYPE:
-           c+= sprintf(c, "SID:");
-           break;
-        default:
-           c+= sprintf(c, "%02x", xid_s.type);
-    }
-    for (size_t i=0;i<sizeof(xid_s.xid);i++)
-        c+=sprintf(c, "%02x", p[i]);
-    sa.append(buf, c-buf);
-    return sa;
+    return sa << xid.unparse();
 }
+
 
 CLICK_ENDDECLS

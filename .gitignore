@@ -1,6 +1,7 @@
 # our things go here
 *.o
 *.pyc
+core
 
 
 ## click
