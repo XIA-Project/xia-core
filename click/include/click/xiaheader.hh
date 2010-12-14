@@ -4,7 +4,7 @@
 #include <click/string.hh>
 #include <click/glue.hh>
 #include <clicknet/xia.h>
-#include <vector>
+#include <click/vector.hh>
 
 CLICK_DECLS
 class StringAccum;
@@ -56,6 +56,9 @@ XIAHeader::size(uint8_t nxids)
 {
     return sizeof(struct click_xia) + sizeof(struct click_xia_xid_node) * nxids;
 }
+
+bool cp_xid_dag(const String& str, Vector<struct click_xia_xid_node>* result);
+bool cp_xid_re(const String& str, Vector<struct click_xia_xid_node>* result);
 
 CLICK_ENDDECLS
 #endif
