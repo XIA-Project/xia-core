@@ -195,7 +195,7 @@ EOF
 
     # add standards to provisions if necessary
     if test "x$standards" != x; then
-	provisions="$provisions AddressInfo AlignmentInfo ErrorElement PortInfo ScheduleInfo Storage"
+	provisions="$provisions AddressInfo AlignmentInfo ErrorElement PortInfo ScheduleInfo Storage XIDInfo"
     fi
 
     # add 'multithread' provision based on driver
@@ -860,6 +860,7 @@ END {
 -	<click/standard/errorelement.hh>	ErrorElement-ErrorElement
 -	<click/standard/portinfo.hh>	PortInfo-PortInfo
 -	<click/standard/scheduleinfo.hh>	ScheduleInfo-ScheduleInfo
+-	<click/standard/xidinfo.hh>	XIDInfo-XIDInfo
 EOF
 	cat - /tmp/click-buildtool-standards.$$ | $awk "$awk_program"
 	/bin/rm -f /tmp/click-buildtool-standards.$$

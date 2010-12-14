@@ -26,6 +26,7 @@
 #include <clicknet/xia.h>
 #include <click/xid.hh>
 #include <click/xiaheader.hh>
+#include <click/standard/xidinfo.hh>
 
 #if CLICK_USERLEVEL
 # include <stdio.h>
@@ -151,7 +152,12 @@ void XIAPrint::print_xids(StringAccum &sa, const struct click_xia *xiah)
         else
            sa << ' ';
 
-        sa << XID(xiah->node[i].xid) << ' ' << (int)xiah->node[i].incr;
+        String name = XIDInfo::revquery_xid(&xiah->node[i].xid, this);
+        if (name.length() != 0)
+            sa << name;
+        else
+            sa << XID(xiah->node[i].xid);
+        sa << ' ' << (int)xiah->node[i].incr;
     }
 }
 

@@ -59,7 +59,7 @@ void
 XID::parse(const String& str)
 {
     if (!cp_xid(str, this))
-        _xid.type = CLICK_XIA_XID_TYPE_UNDEFINED;
+        _xid.type = CLICK_XIA_XID_TYPE_UNDEF;
 }
 
 /** @brief Unparses this address into a String.
@@ -73,7 +73,7 @@ XID::unparse() const
     char buf[48];
     char *c = buf;
     switch (_xid.type) {
-        case CLICK_XIA_XID_TYPE_UNDEFINED:
+        case CLICK_XIA_XID_TYPE_UNDEF:
            c += sprintf(c, "UNDEF");
            break;
         case CLICK_XIA_XID_TYPE_AD:

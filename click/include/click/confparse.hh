@@ -175,8 +175,10 @@ bool cp_ip_prefix(const String& str, unsigned char* result_addr, unsigned char* 
 bool cp_ip_address_list(const String& str, Vector<IPAddress>* result  CP_OPT_CONTEXT);
 
 class XID;
-bool cp_xid(const String& str, struct click_xia_xid* xid);
-bool cp_xid(const String& str, XID* xid);
+bool cp_xid(const String& str, struct click_xia_xid* xid  CP_OPT_CONTEXT);
+bool cp_xid(const String& str, XID* xid  CP_OPT_CONTEXT);
+bool cp_xid_dag(const String& str, Vector<struct click_xia_xid_node>* result  CP_OPT_CONTEXT);
+bool cp_xid_re(const String& str, Vector<struct click_xia_xid_node>* result  CP_OPT_CONTEXT);
 
 #if HAVE_IP6
 class IP6Address;

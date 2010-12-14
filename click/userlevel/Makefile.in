@@ -69,7 +69,7 @@ EXTRA_DRIVER_OBJS = @EXTRA_DRIVER_OBJS@
 
 LIBOBJS = $(GENERIC_OBJS) $(STD_ELEMENT_OBJS) clp.o exportstub.o
 STD_ELEMENT_OBJS = addressinfo.o alignmentinfo.o \
-	errorelement.o portinfo.o scheduleinfo.o
+	errorelement.o portinfo.o scheduleinfo.o xidinfo.o
 OBJS = $(ELEMENT_OBJS) $(ELEMENTSCONF).o click.o
 
 CPPFLAGS = @CPPFLAGS@ -DCLICK_USERLEVEL

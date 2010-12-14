@@ -60,17 +60,17 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
 
     String dst_type = cp_shift_spacevec(dst_str);
     if (dst_type == "DAG")
-        cp_xid_dag(dst_str, &dst_nodes);
+        cp_xid_dag(dst_str, &dst_nodes, this);
     else if (dst_type == "RE")
-        cp_xid_re(dst_str, &dst_nodes);
+        cp_xid_re(dst_str, &dst_nodes, this);
     else
         return errh->error("unrecognized dst type: %s", dst_type.c_str());
 
     String src_type = cp_shift_spacevec(src_str);
     if (src_type == "DAG")
-        cp_xid_dag(src_str, &src_nodes);
+        cp_xid_dag(src_str, &src_nodes, this);
     else if (src_type == "RE")
-        cp_xid_re(src_str, &src_nodes);
+        cp_xid_re(src_str, &src_nodes, this);
     else
         return errh->error("unrecognized src type: %s", src_type.c_str());
 

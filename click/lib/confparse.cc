@@ -31,6 +31,7 @@
 #include <click/etheraddress.hh>
 #include <click/hashtable.hh>
 #include <click/xid.hh>
+#include <click/standard/xidinfo.hh>
 #if HAVE_IP6
 # include <click/ip6address.hh>
 # include <click/ip6flowid.hh>
@@ -2002,14 +2003,19 @@ cp_ip_address(const String &str, IPAddress *result  CP_CONTEXT)
 }
 
 bool
-cp_xid(const String& str, XID* xid)
+cp_xid(const String& str, XID* xid  CP_CONTEXT)
 {
-  return cp_xid(str, &xid->xid());
+  return cp_xid(str, &xid->xid()  CP_PASS_CONTEXT);
 }
 
 bool
-cp_xid(const String& str, struct click_xia_xid* xid)
+cp_xid(const String& str, struct click_xia_xid* xid  CP_CONTEXT)
 {
+#ifndef CLICK_TOOL
+    if (XIDInfo::query_xid(str, xid, context))
+        return true;
+#endif
+
     int delim = str.find_left(":", 0);
     String type_str, xid_str;
 
@@ -2029,7 +2035,7 @@ cp_xid(const String& str, struct click_xia_xid* xid)
     else if (type_str.compare(String("SID")) == 0)
        xid->type = CLICK_XIA_XID_TYPE_SID;
     else
-        xid->type = CLICK_XIA_XID_TYPE_UNDEFINED;
+        xid->type = CLICK_XIA_XID_TYPE_UNDEF;
 
     int len = xid_str.length();
     int i = 0;
@@ -2051,6 +2057,136 @@ cp_xid(const String& str, struct click_xia_xid* xid)
         click_chatter("truncated xid: %s\n", str.c_str());
     return true;
 }
+
+bool
+cp_xid_dag(const String& str, Vector<struct click_xia_xid_node>* result  CP_CONTEXT)
+{
+    String str_copy = str;
+    while (true)
+    {
+        click_xia_xid_node node;
+        memset(&node, 0, sizeof(node));
+
+        String xid_str = cp_shift_spacevec(str_copy);
+        if (xid_str.length() == 0)
+            break;
+
+        // parse XID
+        if (!cp_xid(xid_str, &node.xid  CP_PASS_CONTEXT))
+        {
+            click_chatter("unrecognized XID format: %s", str.c_str());
+            return false;
+        }
+
+        // parse increment
+        int incr;
+        if (!cp_integer(cp_shift_spacevec(str_copy), &incr))
+        {
+            click_chatter("unrecognized increment: %s", str.c_str());
+            return false;
+        }
+        if (incr < 0 || incr > 255)
+        {
+            click_chatter("increment out of range: %s", str.c_str());
+            return false;
+        }
+        node.incr = incr;
+
+        result->push_back(node);
+    }
+    return true;
+}
+
+bool
+cp_xid_re(const String& str, Vector<struct click_xia_xid_node>* result  CP_CONTEXT)
+{
+    String str_copy = str;
+
+    click_xia_xid prev_xid;
+    click_xia_xid_node node;
+
+    // parse the first XID
+    if (!cp_xid(cp_shift_spacevec(str_copy), &prev_xid  CP_PASS_CONTEXT))
+    {
+        click_chatter("unrecognized XID format: %s", str.c_str());
+        return false;
+    }
+
+    // parse iterations: ( ("(" fallback path ")")? main node )*
+    while (true)
+    {
+        String head = cp_shift_spacevec(str_copy);
+        if (head.length() == 0)
+            break;
+
+        Vector<struct click_xia_xid> fallback;
+        if (head == "(")
+        {
+            // parse fallback path for the next main node
+            while (true)
+            {
+                String tail = cp_shift_spacevec(str_copy);
+                if (tail == ")")
+                    break;
+
+                click_xia_xid xid;
+                cp_xid(tail, &xid  CP_PASS_CONTEXT);
+                fallback.push_back(xid);
+            }
+        }
+
+        // parse the next main node
+        click_xia_xid next_xid;
+        cp_xid(cp_shift_spacevec(str_copy), &next_xid  CP_PASS_CONTEXT);
+
+        // link the prev main node to the next main node
+        // 1 + 2*|fallback path| nodes before next main node
+        int dist_to_next_main = 1 + 2 * fallback.size();
+
+        node.xid = prev_xid;
+        node.incr = dist_to_next_main;
+        result->push_back(node);
+        dist_to_next_main--;
+
+        if (fallback.size() > 0)
+        {
+            node.xid = prev_xid;
+            node.incr = 1;
+            result->push_back(node);
+            dist_to_next_main--;
+
+            for (int i = 0; i < fallback.size(); i++)
+            {
+                // link to the next main node (implicit link)
+                node.xid = fallback[i];
+                node.incr = dist_to_next_main;
+                result->push_back(node);
+                dist_to_next_main--;
+
+                if (i != fallback.size() - 1)
+                {
+                    // link to the next fallback node
+                    node.xid = fallback[i];
+                    node.incr = 1;
+                    result->push_back(node);
+                    dist_to_next_main--;
+                }
+            }
+        }
+
+        assert(dist_to_next_main == 0);
+
+        prev_xid = next_xid;
+    }
+
+    // push the destination node
+    node.xid = prev_xid;
+    node.incr = 0;          // not meaningful
+    result->push_back(node);
+
+    return true;
+}
+
 
 /** @brief Parse an IP address or prefix from @a str.
  * @param  str  string
@@ -3237,7 +3373,7 @@ default_parsefunc(cp_value *v, const String &arg,
     break;
 
    case cpiXID:
-    if (!cp_xid(arg, &v->v.xid))
+    if (!cp_xid(arg, &v->v.xid CP_PASS_CONTEXT))
       goto type_mismatch;
     break;
 
