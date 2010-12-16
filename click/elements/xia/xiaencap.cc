@@ -87,8 +87,7 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
     _xiah->hdr().ndst = dst_nodes.size();
     _xiah->hdr().last = last;
     _xiah->hdr().hlim = hlim;
-    _xiah->hdr().flags = 0;
-    _xiah->hdr().plen = _xiah->size();
+    _xiah->hdr().plen = 0;
 
     size_t node_idx = 0;
     for (int i = 0; i < dst_nodes.size(); i++)
@@ -117,7 +116,7 @@ XIAEncap::simple_action(Packet *p_in)
 
     click_xia *xiah = reinterpret_cast<click_xia *>(p->data());
     memcpy(xiah, &_xiah->hdr(), header_len); // copy the header
-    xiah->plen = htons(payload_len);
+    xiah->plen = htons(payload_len);    // original payload length excluding new header length
 
     p->set_xia_header(xiah, header_len); // set the network header position (nh)
     return p;

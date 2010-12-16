@@ -49,7 +49,6 @@ struct click_xia {
                                            i.e. start index of source path XIDs */
     uint8_t last;			/* index of the last visited XID */
     uint8_t hlim;			/* hop limit */
-    uint8_t flags;			/* flags */
     click_xia_xid_node node[0];         /* XID node list */
 };
 
