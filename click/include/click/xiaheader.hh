@@ -12,7 +12,7 @@ class StringAccum;
 class XIAHeader { public:
 
     /** @brief Construct an XIAHeader */
-    XIAHeader(size_t nxids);
+    XIAHeader(size_t dsnode);
     XIAHeader(const struct click_xia& hdr);
     ~XIAHeader();
 
@@ -21,7 +21,7 @@ class XIAHeader { public:
     operator struct click_xia() const;
 
     size_t size() const;
-    static size_t size(uint8_t nxids);
+    static size_t size(uint8_t dsnode);
 
 private:
     struct click_xia* _hdr;
@@ -48,13 +48,13 @@ XIAHeader::operator struct click_xia() const
 inline size_t
 XIAHeader::size() const
 {
-    return size(_hdr->nxids);
+    return size(_hdr->dsnode);
 }
 
 inline size_t
-XIAHeader::size(uint8_t nxids)
+XIAHeader::size(uint8_t dsnode)
 {
-    return sizeof(struct click_xia) + sizeof(struct click_xia_xid_node) * nxids;
+    return sizeof(struct click_xia) + sizeof(struct click_xia_xid_node) * dsnode;
 }
 
 CLICK_ENDDECLS

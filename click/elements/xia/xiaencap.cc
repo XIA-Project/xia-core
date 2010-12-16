@@ -40,14 +40,14 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
     String dst_str;
     String src_str;
     int nxt = -1;
+    int last = -1;
     uint8_t hlim = 250;
-    uint8_t last = 0;
 
     if (cp_va_kparse(conf, this, errh,
                    "NXT", cpkP+cpkM, cpNamedInteger, NameInfo::T_IP_PROTO, &nxt,
                    "SRC", cpkP+cpkM, cpArgument, &src_str,
                    "DST", cpkP+cpkM, cpArgument, &dst_str,
-                   "LAST", 0, cpByte, &last,
+                   "LAST", 0, cpInteger, &last,
                    "HLIM", 0, cpByte, &hlim,
                    cpEnd) < 0)
         return -1;
@@ -76,17 +76,19 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
 
     delete _xiah;   // this is safe even when _xiah == NULL
 
-    size_t nxids = dst_nodes.size() + src_nodes.size();
-    _xiah = new XIAHeader(nxids);
+    size_t dsnode = dst_nodes.size() + src_nodes.size();
+    _xiah = new XIAHeader(dsnode);
     if (!_xiah)
         return errh->error("failed to allocate");
 
     _xiah->hdr().ver = 1;
     _xiah->hdr().nxt = nxt;
-    _xiah->hdr().nxids = nxids;
-    _xiah->hdr().ndst = dst_nodes.size();
+    _xiah->hdr().dsnode = dsnode;
+    _xiah->hdr().dnode = dst_nodes.size();
     _xiah->hdr().last = last;
     _xiah->hdr().hlim = hlim;
+    _xiah->hdr().dint = dst_nodes.size() - 1;
+    _xiah->hdr().sint = src_nodes.size() - 1;
     _xiah->hdr().plen = 0;
 
     size_t node_idx = 0;

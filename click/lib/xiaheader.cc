@@ -15,16 +15,16 @@ CLICK_DECLS
  * @brief The Packet class models packets in Click.
  */
 
-XIAHeader::XIAHeader(size_t nxids)
+XIAHeader::XIAHeader(size_t dsnode)
 {
-    const size_t size = XIAHeader::size(nxids);
+    const size_t size = XIAHeader::size(dsnode);
     _hdr = reinterpret_cast<click_xia*>(new uint8_t[size]);
     memset(_hdr, 0, size);
 }
 
 XIAHeader::XIAHeader(const struct click_xia& hdr)
 {
-    const size_t size = XIAHeader::size(hdr.nxids);
+    const size_t size = XIAHeader::size(hdr.dsnode);
     _hdr = reinterpret_cast<click_xia*>(new uint8_t[size]);
     memcpy(_hdr, &hdr, size);
 }

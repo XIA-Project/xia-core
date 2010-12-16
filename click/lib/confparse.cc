@@ -2026,7 +2026,9 @@ cp_xid(const String& str, struct click_xia_xid* xid  CP_CONTEXT)
     xid_str = str.substring(delim + 1);
     //click_chatter("type %s. %s %d", type_str.c_str(), xid_str.c_str(), xid.type);
     
-    if (type_str.compare(String("AD")) == 0)
+    if (type_str.compare(String("UNDEF")) == 0)
+       xid->type = CLICK_XIA_XID_TYPE_UNDEF;
+    else if (type_str.compare(String("AD")) == 0)
        xid->type = CLICK_XIA_XID_TYPE_AD;
     else if (type_str.compare(String("CID")) == 0)
        xid->type = CLICK_XIA_XID_TYPE_CID;
@@ -2041,19 +2043,19 @@ cp_xid(const String& str, struct click_xia_xid* xid  CP_CONTEXT)
     int i = 0;
     //click_chatter("size xid %d %s\n", sizeof(xid.xid), xid_str.c_str());
 
-    for (size_t d = 0; d < sizeof(xid->addr); d++) {
+    for (size_t d = 0; d < sizeof(xid->id); d++) {
         if (i < len - 1 && isxdigit(xid_str[i]) && isxdigit(xid_str[i + 1])) {
            // can read two chars
-           xid->addr[d] = xvalue(xid_str[i]) * 16 + xvalue(xid_str[i + 1]);
+           xid->id[d] = xvalue(xid_str[i]) * 16 + xvalue(xid_str[i + 1]);
            //click_chatter("i %d xid_str %c %c\n", i, xid_str[i], xid_str[i+1]);
            i += 2;
         } else {
-            xid->addr[d] = 0;
+            xid->id[d] = 0;
         }
     }
-    if (static_cast<size_t>(len) < sizeof(xid->addr) * 2)
+    if (static_cast<size_t>(len) < sizeof(xid->id) * 2)
         click_chatter("too short xid: %s\n", str.c_str());
-    if (static_cast<size_t>(len) > sizeof(xid->addr) * 2)
+    if (static_cast<size_t>(len) > sizeof(xid->id) * 2)
         click_chatter("truncated xid: %s\n", str.c_str());
     return true;
 }
@@ -2062,6 +2064,28 @@ bool
 cp_xid_dag(const String& str, Vector<struct click_xia_xid_node>* result  CP_CONTEXT)
 {
     String str_copy = str;
+
+    // the first 4 indices are stored after the last node's XID (wrap around)
+    //      0 1 2 3
+    // XID1 4 5 6 7
+    // XID2
+    //     =>
+    // XID1 4 5 6 7
+    // XID2 0 1 2 3
+    for (size_t i = 0; i < 4; i++)
+    {
+        String index_str = cp_shift_spacevec(str_copy);
+        int index;
+        if (!cp_integer(index_str, &index) && index_str != "-")
+        {
+            click_chatter("unrecognized index: %s", index_str.c_str());
+            return false;
+        }
+        str_copy += " " + index_str;
+        if (index_str == "-")
+            break;
+    }
+
     while (true)
     {
         click_xia_xid_node node;
@@ -2078,19 +2102,29 @@ cp_xid_dag(const String& str, Vector<struct click_xia_xid_node>* result  CP_CONT
             return false;
         }
 
-        // parse increment
-        int incr;
-        if (!cp_integer(cp_shift_spacevec(str_copy), &incr))
+        // parse indices 
+        for (size_t i = 0; i < 4; i++)
         {
-            click_chatter("unrecognized increment: %s", str.c_str());
-            return false;
+            String index_str = cp_shift_spacevec(str_copy);
+            if (index_str == "-")
+            {
+                for (size_t j = i; j < 4; j++)
+                    node.edge[i].idx = CLICK_XIA_XID_EDGE_UNUSED;
+                break;
+            }
+            int index;
+            if (!cp_integer(index_str, &index))
+            {
+                click_chatter("unrecognized index: %s", str.c_str());
+                return false;
+            }
+            if (index < 0 || index >= (int)CLICK_XIA_XID_EDGE_UNUSED)
+            {
+                click_chatter("increment out of range: %s", str.c_str());
+                return false;
+            }
+            node.edge[i].idx = index;
         }
-        if (incr < 0 || incr > 255)
-        {
-            click_chatter("increment out of range: %s", str.c_str());
-            return false;
-        }
-        node.incr = incr;
 
         result->push_back(node);
     }
@@ -2103,16 +2137,12 @@ cp_xid_re(const String& str, Vector<struct click_xia_xid_node>* result  CP_CONTE
     String str_copy = str;
 
     click_xia_xid prev_xid;
-    click_xia_xid_node node;
+    memset(&prev_xid, 0, sizeof(prev_xid));
 
-    // parse the first XID
-    if (!cp_xid(cp_shift_spacevec(str_copy), &prev_xid  CP_PASS_CONTEXT))
-    {
-        click_chatter("unrecognized XID format: %s", str.c_str());
-        return false;
-    }
+    click_xia_xid_node dummy_src_node;
 
-    // parse iterations: ( ("(" fallback path ")")? main node )*
+    // parse iterations: ( ("(" fallback path ")")? main node )+
+    int next_idx = -1;
     while (true)
     {
         String head = cp_shift_spacevec(str_copy);
@@ -2139,49 +2169,62 @@ cp_xid_re(const String& str, Vector<struct click_xia_xid_node>* result  CP_CONTE
         click_xia_xid next_xid;
         cp_xid(cp_shift_spacevec(str_copy), &next_xid  CP_PASS_CONTEXT);
 
-        // link the prev main node to the next main node
+        // add the prev main node
         // 1 + 2*|fallback path| nodes before next main node
-        int dist_to_next_main = 1 + 2 * fallback.size();
+        int next_main_idx = next_idx + 1 + fallback.size();
 
+        click_xia_xid_node node;
+        memset(&node, 0, sizeof(node));
         node.xid = prev_xid;
-        node.incr = dist_to_next_main;
-        result->push_back(node);
-        dist_to_next_main--;
-
+        // link to the next main node
+        node.edge[0].idx = next_main_idx;
+        // link to the next fallback node
         if (fallback.size() > 0)
         {
-            node.xid = prev_xid;
-            node.incr = 1;
-            result->push_back(node);
-            dist_to_next_main--;
-
-            for (int i = 0; i < fallback.size(); i++)
-            {
-                // link to the next main node (implicit link)
-                node.xid = fallback[i];
-                node.incr = dist_to_next_main;
-                result->push_back(node);
-                dist_to_next_main--;
-
-                if (i != fallback.size() - 1)
-                {
-                    // link to the next fallback node
-                    node.xid = fallback[i];
-                    node.incr = 1;
-                    result->push_back(node);
-                    dist_to_next_main--;
-                }
-            }
+            node.edge[1].idx = next_idx + 1;
+            node.edge[2].idx = node.edge[3].idx = CLICK_XIA_XID_EDGE_UNUSED;
         }
+        else
+            node.edge[1].idx = node.edge[2].idx = node.edge[3].idx = CLICK_XIA_XID_EDGE_UNUSED;
+        if (next_idx == -1)
+            dummy_src_node = node;
+        else
+            result->push_back(node);
+        next_idx++;
 
-        assert(dist_to_next_main == 0);
+        for (int i = 0; i < fallback.size(); i++)
+        {
+            click_xia_xid_node node;
+            memset(&node, 0, sizeof(node));
+            node.xid = fallback[i];
+            // link to the next main node (implicit link)
+            node.edge[0].idx = next_main_idx;
+            // link to the next fallback node
+            if (i < fallback.size() - 1)
+            {
+                node.edge[1].idx = next_idx + 1;
+                node.edge[2].idx = node.edge[3].idx = CLICK_XIA_XID_EDGE_UNUSED;
+            }
+            else
+                node.edge[1].idx = node.edge[2].idx = node.edge[3].idx = CLICK_XIA_XID_EDGE_UNUSED;
+            result->push_back(node);
+            next_idx++;
+        }
 
         prev_xid = next_xid;
     }
+    if (next_idx == -1)
+    {
+        click_chatter("empty path");
+        return false;
+    }
 
+    click_xia_xid_node node;
+    memset(&node, 0, sizeof(node));
     // push the destination node
     node.xid = prev_xid;
-    node.incr = 0;          // not meaningful
+    // bring the edges from the dummy source node to the last node
+    memcpy(node.edge, dummy_src_node.edge, sizeof(node.edge));
     result->push_back(node);
 
     return true;

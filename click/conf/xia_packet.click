@@ -8,13 +8,12 @@ XIDInfo(
 RandomSource(LENGTH 100, HEADROOM 256)
 -> XIAEncap(
     NXT 0,
-//    SRC DAG
-//        HID0 1,
-//    DST DAG
-//        HID1 1
-//         1,
+//    SRC DAG     0 -
+//        HID0,
+//    DST DAG     1 -
+//        HID1,
     SRC RE HID0,
-    DST RE HID0 ( HID1 HID2 ) CID0,
+    DST RE ( HID1 HID2 ) CID0,
     )
 -> XIAPrint(LENGTH true)
 -> AggregateCounter(COUNT_STOP 1)

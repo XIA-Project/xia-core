@@ -144,10 +144,10 @@ XIAPrint::cleanup(CleanupStage)
 
 void XIAPrint::print_xids(StringAccum &sa, const struct click_xia *xiah)
 {
-    for (size_t i = 0; i < xiah->nxids; i++) {
+    for (size_t i = 0; i < xiah->dsnode; i++) {
         if (i == 0)
             sa << "DST DAG ";
-        else if (i == xiah->ndst)
+        else if (i == xiah->dnode)
             sa << ", SRC DAG ";
         else
            sa << ' ';
@@ -157,7 +157,12 @@ void XIAPrint::print_xids(StringAccum &sa, const struct click_xia *xiah)
             sa << name;
         else
             sa << XID(xiah->node[i].xid);
-        sa << ' ' << (int)xiah->node[i].incr;
+        for (size_t j = 0; j < 4; j++)
+        {
+            if (xiah->node[i].edge[j].idx == CLICK_XIA_XID_EDGE_UNUSED)
+                break;
+            sa << ' ' << (int)xiah->node[i].edge[j].idx;
+        }
     }
 }
 
@@ -181,7 +186,7 @@ XIAPrint::simple_action(Packet *p)
 	sa << ": ";
 
     const click_xia *xiah = p->xia_header();
-    int hdr_len = XIAHeader::size(xiah->nxids);
+    int hdr_len = XIAHeader::size(xiah->dsnode);
 
     if (p->network_length() < hdr_len)
         sa << "truncated-xia";

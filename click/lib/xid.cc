@@ -69,7 +69,7 @@ XID::parse(const String& str)
 String
 XID::unparse() const
 {
-    const unsigned char *p = _xid.addr;
+    const unsigned char *p = _xid.id;
     char buf[48];
     char *c = buf;
     switch (_xid.type) {
@@ -92,7 +92,7 @@ XID::unparse() const
            c += sprintf(c, "%02x", _xid.type);
     }
     c += sprintf(c, ":");
-    for (size_t i = 0; i < sizeof(_xid.addr); i++)
+    for (size_t i = 0; i < sizeof(_xid.id); i++)
         c += sprintf(c, "%02x", p[i]);
     return String(buf);
 }

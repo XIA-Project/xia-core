@@ -12,26 +12,33 @@
 #define CLICK_XIA_XID_TYPE_HID 2
 #define CLICK_XIA_XID_TYPE_CID 3
 #define CLICK_XIA_XID_TYPE_SID 4
+#define CLICK_XIA_XID_TYPE_MAX 4
 
-#define CLICK_XIA_XID_ADDR_LEN 20
+#define CLICK_XIA_XID_ID_LEN 20
 
 struct click_xia_xid {
     uint16_t type;
-    uint8_t addr[CLICK_XIA_XID_ADDR_LEN];
+    uint8_t id[CLICK_XIA_XID_ID_LEN];
 };
 
-struct click_xia_xid_node {
-    click_xia_xid xid;
-    uint8_t incr;
+struct click_xia_xid_edge
+{
 #if CLICK_BYTE_ORDER == CLICK_LITTLE_ENDIAN
-    unsigned reserved : 7;
-    unsigned visited : 1;
+    unsigned idx : 7;                   /* index of node this edge points to */
+    unsigned visited : 1;               /* visited edge? */
 #elif CLICK_BYTE_ORDER == CLICK_BIG_ENDIAN
     unsigned visited : 1;
-    unsigned reserved : 7;
+    unsigned idx : 7;
 #else
 #   error "unknown byte order"
 #endif
+};
+
+#define CLICK_XIA_XID_EDGE_UNUSED (127u)
+
+struct click_xia_xid_node {
+    click_xia_xid xid;
+    click_xia_xid_edge edge[4];
 };
 
 struct click_xia_common {
@@ -44,10 +51,11 @@ struct click_xia {
     uint8_t ver;			/* header version */
     uint8_t nxt;			/* next header */
     uint16_t plen;			/* payload length */
-    uint8_t nxids;			/* total number of all XIDs */
-    uint8_t ndst;			/* number of destination path XIDs
-                                           i.e. start index of source path XIDs */
-    uint8_t last;			/* index of the last visited XID */
+    uint8_t dsnode;			/* total number of all nodes (excl. dummy node) */
+    uint8_t dnode;			/* total number of dest nodes (excl. dummy node) */
+    uint8_t dint;                       /* index of first intent node within dest nodes */
+    uint8_t sint;                       /* index of first intent node within source nodes */
+    int8_t last;			/* index of last visited node (note: integral) */
     uint8_t hlim;			/* hop limit */
     click_xia_xid_node node[0];         /* XID node list */
 };

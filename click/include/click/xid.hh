@@ -66,7 +66,7 @@ StringAccum& operator<<(StringAccum&, const XID&);
 inline uint32_t
 XID::hashcode() const
 {
-    return (uint32_t)(*_xid.addr);
+    return String::hashcode(_xid.id, _xid.id + sizeof(_xid.id));
 }
 
 CLICK_ENDDECLS
