@@ -35,6 +35,7 @@ class RandomSource : public Element { public:
  protected:
 
   int _length;
+  uint32_t _headroom;
   Task _task;
 
   Packet *make_packet();

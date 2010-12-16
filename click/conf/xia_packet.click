@@ -5,7 +5,7 @@ XIDInfo(
     CID0 CID:000102030405060708090a0b0c0d0e0f10111213,
 )
 
-RandomSource(100)
+RandomSource(LENGTH 100, HEADROOM 256)
 -> XIAEncap(
     NXT 0,
 //    SRC DAG

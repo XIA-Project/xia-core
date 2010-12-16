@@ -37,14 +37,17 @@ int
 RandomSource::configure(Vector<String> &conf, ErrorHandler *errh)
 {
   int length;
+  uint32_t headroom = 36;
 
   if (cp_va_kparse(conf, this, errh,
 		   "LENGTH", cpkP+cpkM, cpInteger, &length,
+                   "HEADROOM", 0, cpUnsigned, &headroom,
 		   cpEnd) < 0)
     return -1;
   if(length < 0 || length >= 64*1024)
     return errh->error("bad length %d", length);
   _length = length;
+  _headroom = headroom;
   return 0;
 }
 
@@ -59,7 +62,7 @@ RandomSource::initialize(ErrorHandler *errh)
 Packet *
 RandomSource::make_packet()
 {
-    WritablePacket *p = Packet::make(36, (const unsigned char*)0, _length, 0);
+    WritablePacket *p = Packet::make(_headroom, (const unsigned char*)0, _length, 0);
 
     int i;
     char *d = (char *) p->data();
