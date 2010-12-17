@@ -48,7 +48,7 @@ class XIDInfo : public Element { public:
   int configure_phase() const		{ return CONFIGURE_PHASE_FIRST; }
   int configure(Vector<String> &, ErrorHandler *);
 
-  static bool query_xid(String s, struct click_xia_xid* store, const Element *e);
+  static bool query_xid(const String& s, struct click_xia_xid* store, const Element *e);
   static String revquery_xid(const struct click_xia_xid* store, const Element *e);
 
 };

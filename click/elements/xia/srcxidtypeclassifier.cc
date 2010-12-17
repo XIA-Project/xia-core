@@ -7,6 +7,7 @@
 #include <click/glue.hh>
 #include <click/error.hh>
 #include <click/confparse.hh>
+#include <click/xid.hh>
 CLICK_DECLS
 
 SrcXIDTypeClassifier::SrcXIDTypeClassifier()
@@ -33,24 +34,20 @@ SrcXIDTypeClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
         String pattern = cp_shift_spacevec(str_copy);
         if (pattern == "-")
         {
-            if (_rem == -1)
-                _rem = i;
-            else
+            if (_rem != -1)
                 return errh->error("duplicate pattern: ", pattern.c_str());
+            _rem = i;
         }
         else
         {
-            int xid_type = parse_xid_type(pattern);
-            if (xid_type >= 0)
-            {
-                if (xid_type >= CLICK_XIA_XID_TYPE_MAX + 1)
-                    return errh->error("invalid XID type: ", pattern.c_str());
-                if (_map[xid_type] != -1)
-                    return errh->error("duplicate pattern: ", pattern.c_str());
-                _map[xid_type] = i;
-            }
-            else
+            int xid_type;
+            if (!cp_xid_type(pattern, &xid_type))
                 return errh->error("unrecognized XID type: ", pattern.c_str());
+            if (xid_type >= CLICK_XIA_XID_TYPE_MAX + 1)
+                return errh->error("invalid XID type: ", pattern.c_str());
+            if (_map[xid_type] != -1)
+                return errh->error("duplicate pattern: ", pattern.c_str());
+            _map[xid_type] = i;
         }
     }
     return 0;
@@ -65,25 +62,8 @@ SrcXIDTypeClassifier::push(int, Packet *p)
     else
     {
         // no match -- discard packet
+        p->kill();
     }
-}
-
-int
-SrcXIDTypeClassifier::parse_xid_type(const String& str)
-{
-    // TODO: remove duplicate code with cp_xid
-    if (str.compare(String("UNDEF")) == 0)
-       return CLICK_XIA_XID_TYPE_UNDEF;
-    else if (str.compare(String("AD")) == 0)
-       return CLICK_XIA_XID_TYPE_AD;
-    else if (str.compare(String("CID")) == 0)
-       return CLICK_XIA_XID_TYPE_CID;
-    else if (str.compare(String("HID")) == 0)
-       return CLICK_XIA_XID_TYPE_HID;
-    else if (str.compare(String("SID")) == 0)
-       return CLICK_XIA_XID_TYPE_SID;
-    else
-        return -1;
 }
 
 int
@@ -92,9 +72,9 @@ SrcXIDTypeClassifier::match(Packet *p)
     const struct click_xia* hdr = p->xia_header();
     if (!hdr)
         return -1;
-    if (hdr->dnode + hdr->dint >= hdr->dsnode)
-        return -1;
-    int xid_type = hdr->node[hdr->dnode + hdr->dint].xid.type;
+    int xid_type = hdr->node[hdr->dnode - 1].xid.type;
+    //printf("%s\n", XID(hdr->node[hdr->dnode - 1].xid).unparse().c_str());
+    //printf("%d %d\n", hdr->dnode, xid_type);
     if (xid_type < 0 || xid_type >= CLICK_XIA_XID_TYPE_MAX + 1)
         return -1;
     int port = _map[xid_type];

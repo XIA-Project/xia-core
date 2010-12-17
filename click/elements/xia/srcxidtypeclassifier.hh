@@ -1,7 +1,6 @@
 #ifndef CLICK_SRCXIDTYPECLASSIFIER_HH
 #define CLICK_SRCXIDTYPECLASSIFIER_HH
 #include <click/element.hh>
-#include <click/hashtable.hh>
 #include <clicknet/xia.h>
 CLICK_DECLS
 
@@ -18,7 +17,7 @@ Classifies XIA packets by the type of source XID.
 =e
 
 SRCXIDTypeClassifier(AD, HID, -)
-outputs AD packets to port 0, HID packets to port 1, other packets to port 2.
+It outputs AD packets to port 0, HID packets to port 1, and other packets to port 2.
 
 =a IPClassifier, IPFilter
 */
@@ -37,7 +36,6 @@ class SrcXIDTypeClassifier : public Element { public:
     void push(int port, Packet *);
 
 protected:
-    int parse_xid_type(const String& str);
     int match(Packet *);
 
 private:

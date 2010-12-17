@@ -160,7 +160,7 @@ void XIAPrint::print_xids(StringAccum &sa, const struct click_xia *xiah)
         for (size_t j = 0; j < 4; j++)
         {
             if (xiah->node[i].edge[j].idx == CLICK_XIA_XID_EDGE_UNUSED)
-                break;
+                continue;
             sa << ' ' << (int)xiah->node[i].edge[j].idx;
         }
     }

@@ -711,6 +711,7 @@ class WritablePacket : public Packet { public:
     inline click_ip *ip_header() const;
     inline click_ip6 *ip6_header() const;
     inline unsigned char *transport_header() const;
+    inline click_xia *xia_header() const;
     inline click_icmp *icmp_header() const;
     inline click_tcp *tcp_header() const;
     inline click_udp *udp_header() const;
@@ -2278,6 +2279,12 @@ inline click_ip6 *
 WritablePacket::ip6_header() const
 {
     return const_cast<click_ip6 *>(Packet::ip6_header());
+}
+
+inline click_xia *
+WritablePacket::xia_header() const
+{
+    return const_cast<click_xia *>(Packet::xia_header());
 }
 
 inline click_icmp *

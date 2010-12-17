@@ -2003,6 +2003,27 @@ cp_ip_address(const String &str, IPAddress *result  CP_CONTEXT)
 }
 
 bool
+cp_xid_type(const String& str, int* result)
+{
+    if (str.compare(String("UNDEF")) == 0)
+        *result = CLICK_XIA_XID_TYPE_UNDEF;
+    else if (str.compare(String("AD")) == 0)
+        *result = CLICK_XIA_XID_TYPE_AD;
+    else if (str.compare(String("CID")) == 0)
+        *result = CLICK_XIA_XID_TYPE_CID;
+    else if (str.compare(String("HID")) == 0)
+        *result = CLICK_XIA_XID_TYPE_HID;
+    else if (str.compare(String("SID")) == 0)
+        *result = CLICK_XIA_XID_TYPE_SID;
+    else if (!cp_integer(str, result))
+    {
+        click_chatter("unrecognized XID type: %s\n", str.c_str());
+        return false;
+    }
+    return true;
+}
+
+bool
 cp_xid(const String& str, XID* xid  CP_CONTEXT)
 {
   return cp_xid(str, &xid->xid()  CP_PASS_CONTEXT);
@@ -2020,24 +2041,19 @@ cp_xid(const String& str, struct click_xia_xid* xid  CP_CONTEXT)
     String type_str, xid_str;
 
     if (delim == -1)
+    {
+        click_chatter("invalid XID format: %s\n", str.c_str());
         return false;
+    }
 
     type_str = str.substring(0, delim);
     xid_str = str.substring(delim + 1);
     //click_chatter("type %s. %s %d", type_str.c_str(), xid_str.c_str(), xid.type);
     
-    if (type_str.compare(String("UNDEF")) == 0)
-       xid->type = CLICK_XIA_XID_TYPE_UNDEF;
-    else if (type_str.compare(String("AD")) == 0)
-       xid->type = CLICK_XIA_XID_TYPE_AD;
-    else if (type_str.compare(String("CID")) == 0)
-       xid->type = CLICK_XIA_XID_TYPE_CID;
-    else if (type_str.compare(String("HID")) == 0)
-       xid->type = CLICK_XIA_XID_TYPE_HID;
-    else if (type_str.compare(String("SID")) == 0)
-       xid->type = CLICK_XIA_XID_TYPE_SID;
-    else
-        xid->type = CLICK_XIA_XID_TYPE_UNDEF;
+    int xid_type;
+    if (!cp_xid_type(type_str, &xid_type))
+        return false;
+    xid->type = xid_type;
 
     int len = xid_str.length();
     int i = 0;
@@ -2160,14 +2176,23 @@ cp_xid_re(const String& str, Vector<struct click_xia_xid_node>* result  CP_CONTE
                     break;
 
                 click_xia_xid xid;
-                cp_xid(tail, &xid  CP_PASS_CONTEXT);
+                if (!cp_xid(tail, &xid  CP_PASS_CONTEXT))
+                {
+                    click_chatter("unrecognized XID format: %s", tail.c_str());
+                    return false;
+                }
                 fallback.push_back(xid);
             }
+            head = cp_shift_spacevec(str_copy);
         }
 
         // parse the next main node
         click_xia_xid next_xid;
-        cp_xid(cp_shift_spacevec(str_copy), &next_xid  CP_PASS_CONTEXT);
+        if (!cp_xid(head, &next_xid  CP_PASS_CONTEXT))
+        {
+            click_chatter("unrecognized XID format: %s", head.c_str());
+            return false;
+        }
 
         // add the prev main node
         // 1 + 2*|fallback path| nodes before next main node

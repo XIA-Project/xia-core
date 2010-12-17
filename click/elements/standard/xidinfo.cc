@@ -56,7 +56,7 @@ XIDInfo::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 bool
-XIDInfo::query_xid(String s, struct click_xia_xid* store, const Element *e)
+XIDInfo::query_xid(const String& s, struct click_xia_xid* store, const Element *e)
 {
     return NameInfo::query(NameInfo::T_XIA_XID, e, s, store, sizeof(struct click_xia_xid));
 }
