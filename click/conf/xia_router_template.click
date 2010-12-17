@@ -9,7 +9,7 @@ XIDInfo(
 // dumb destination processor
 elementclass Destination {
     $id |
-    input -> Print("packet received by $id") -> XIAPrint()
+    input -> Print("packet received by $id") -> XIAPrint(HLIM true)
     -> Discard;
 };
 
@@ -22,7 +22,7 @@ elementclass Host {
     c[0] -> rt;
     c[1] -> Print("unrecognized XID type") -> Discard;
     rt[0] -> XIANextHop -> rt;
-    rt[1] -> Queue(200) -> [0]output; 
+    rt[1] -> DecXIAHLIM -> Queue(200) -> [0]output; 
     rt[2] -> [1]output;
 };
 
@@ -35,8 +35,8 @@ elementclass Router {
     rt :: StaticXIDLookup($hid0 0, $hid1 1, - 2);
     c[0] -> rt;
     c[1] -> Print("unrecognized XID type") -> Discard;
-    rt[0] -> Queue(200) -> [0]output; 
-    rt[1] -> Queue(200) -> [1]output; 
+    rt[0] -> DecXIAHLIM -> Queue(200) -> [0]output; 
+    rt[1] -> DecXIAHLIM -> Queue(200) -> [1]output; 
     rt[2] -> Print("unroutable XID") -> Discard;
 };
 

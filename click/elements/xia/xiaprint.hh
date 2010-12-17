@@ -41,9 +41,9 @@ If CONTENTS or PAYLOAD printing is on, then MAXLENGTH determines the maximum
 number of bytes to print. -1 means print the entire packet or payload. Default
 is 1500.
 
-=item TTL
+=item HLIM 
 
-Boolean. Determines whether to print each packet's XIA TOS field. Default is
+Boolean. Determines whether to print each packet's XIA hlim field. Default is
 false.
 
 =item LENGTH
@@ -101,7 +101,7 @@ class XIAPrint : public Element { public:
   int _bytes;			// Number of bytes to dump
   bool _print_timestamp : 1;
   bool _print_paint : 1;
-  bool _print_ttl : 1;
+  bool _print_hlim : 1;
   bool _print_len : 1;
   bool _print_aggregate : 1;
   bool _payload : 1;		// '_contents' refers to payload

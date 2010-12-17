@@ -56,7 +56,7 @@ XIAPrint::configure(Vector<String> &conf, ErrorHandler *errh)
   _active = true;
   bool print_time = true;
   bool print_paint = false;
-  bool print_ttl = false;
+  bool print_hlim = false;
   bool print_len = false;
   bool print_aggregate = false;
   bool bcontents;
@@ -70,7 +70,7 @@ XIAPrint::configure(Vector<String> &conf, ErrorHandler *errh)
 		   "NBYTES", 0, cpInteger, &_bytes, // deprecated
 		   "TIMESTAMP", 0, cpBool, &print_time,
 		   "PAINT", 0, cpBool, &print_paint,
-		   "TTL", 0, cpBool, &print_ttl,
+		   "HLIM", 0, cpBool, &print_hlim,
 		   "LENGTH", 0, cpBool, &print_len,
 		   "AGGREGATE", 0, cpBool, &print_aggregate,
 		   "ACTIVE", 0, cpBool, &_active,
@@ -110,7 +110,7 @@ XIAPrint::configure(Vector<String> &conf, ErrorHandler *errh)
 
   _print_timestamp = print_time;
   _print_paint = print_paint;
-  _print_ttl = print_ttl;
+  _print_hlim = print_hlim;
   _print_len = print_len;
   _print_aggregate = print_aggregate;
   _errh = router()->chatter_channel(channel);
@@ -196,7 +196,7 @@ XIAPrint::simple_action(Packet *p)
 
         sa << ", LAST " << (int)xiah->last;
 
-	if (_print_ttl)
+	if (_print_hlim)
 	    sa << ", HLIM " << (int)xiah->hlim;
 	if (_print_len)
 	    sa << ", PLEN " << ntohs(xiah->plen);
