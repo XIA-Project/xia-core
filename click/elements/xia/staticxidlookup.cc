@@ -91,7 +91,7 @@ StaticXIDLookup::lookup(Packet *p)
     if (hdr->last >= (int)hdr->dint)
     {
         // the packet has arrived at the destination.
-        // send the packet to userlevel
+        // send the packet to the destination handler port
         return _dest;
     }
 

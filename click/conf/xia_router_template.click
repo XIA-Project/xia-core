@@ -6,8 +6,8 @@ XIDInfo(
     AD1 AD:1000000000000000000000000000000000000001,
 );
 
-// dumb userlevel processor
-elementclass Userlevel {
+// dumb destination processor
+elementclass Destination {
     $id |
     input -> Print("packet received by $id") -> XIAPrint()
     -> Discard;
@@ -52,8 +52,8 @@ router[0] -> Unqueue -> [0]host0;
 host1[0] -> Unqueue -> [1]router;
 router[1] -> Unqueue -> [0]host1;
 
-host0[1] -> Userlevel(0);
-host1[1] -> Userlevel(1);
+host0[1] -> Destination(host0);
+host1[1] -> Destination(host1);
 
 // send test packets from host0 to host1
 RandomSource(LENGTH 100, HEADROOM 256)
