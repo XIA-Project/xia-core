@@ -83,13 +83,11 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
 
     _xiah->hdr().ver = 1;
     _xiah->hdr().nxt = nxt;
+    _xiah->hdr().plen = 0;
     _xiah->hdr().dsnode = dsnode;
     _xiah->hdr().dnode = dst_nodes.size();
     _xiah->hdr().last = last;
     _xiah->hdr().hlim = hlim;
-    _xiah->hdr().dint = dst_nodes.size() - 1;
-    _xiah->hdr().sint = src_nodes.size() - 1;
-    _xiah->hdr().plen = 0;
 
     size_t node_idx = 0;
     for (int i = 0; i < dst_nodes.size(); i++)
@@ -104,7 +102,16 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
 int
 XIAEncap::initialize(ErrorHandler *)
 {
-  return 0;
+    // do some alignment/packing test
+    assert(sizeof(struct click_xia) == 8);
+    assert(sizeof(struct click_xia_xid) == 21);
+    assert(sizeof(struct click_xia_xid_edge) == 1);
+    assert(sizeof(struct click_xia_xid_node) == 24);
+    struct click_xia hdr;
+    assert(reinterpret_cast<unsigned long>(&(hdr.node[0])) - reinterpret_cast<unsigned long>(&hdr) == 8);
+    assert(reinterpret_cast<unsigned long>(&(hdr.node[1])) - reinterpret_cast<unsigned long>(&hdr) == 8 + 24);
+    (void)hdr;
+    return 0;
 }
 
 

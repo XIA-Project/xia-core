@@ -157,7 +157,7 @@ void XIAPrint::print_xids(StringAccum &sa, const struct click_xia *xiah)
             sa << name;
         else
             sa << XID(xiah->node[i].xid);
-        for (size_t j = 0; j < 4; j++)
+        for (size_t j = 0; j < CLICK_XIA_XID_EDGE_NUM; j++)
         {
             if (xiah->node[i].edge[j].idx == CLICK_XIA_XID_EDGE_UNUSED)
                 continue;

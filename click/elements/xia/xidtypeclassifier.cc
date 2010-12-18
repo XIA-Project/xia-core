@@ -1,0 +1,146 @@
+/*
+ * xidtypeclassifier.{cc,hh} -- simple XIA packet classifier
+ */
+
+#include <click/config.h>
+#include "xidtypeclassifier.hh"
+#include <click/glue.hh>
+#include <click/error.hh>
+#include <click/confparse.hh>
+#include <click/xid.hh>
+CLICK_DECLS
+
+XIDTypeClassifier::XIDTypeClassifier()
+{
+}
+
+XIDTypeClassifier::~XIDTypeClassifier()
+{
+}
+
+int
+XIDTypeClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
+{
+    if (conf.size() != noutputs())
+	return errh->error("need %d arguments, one per output port", noutputs());
+
+    for (int i = 0; i < conf.size(); i++)
+    {
+        String str_copy = conf[i];
+        String type_str = cp_shift_spacevec(str_copy);
+        if (type_str == "-")
+        {
+            struct pattern pat;
+            pat.type = pattern::ANY;
+            pat.src_xid_type = pat.dst_xid_type = 0;
+            _patterns.push_back(pat);
+        }
+        else if (type_str == "src" || type_str == "dst")
+        {
+            String xid_type_str = cp_shift_spacevec(str_copy);
+            int xid_type;
+            if (!cp_xid_type(xid_type_str, &xid_type))
+                return errh->error("unrecognized XID type: ", xid_type_str.c_str());
+            if (xid_type >= CLICK_XIA_XID_TYPE_MAX + 1)
+                return errh->error("invalid XID type: ", xid_type_str.c_str());
+
+            struct pattern pat;
+            if (type_str == "src")
+            {
+                pat.type = pattern::SRC;
+                pat.src_xid_type = xid_type;
+                pat.dst_xid_type = 0;
+            }
+            else
+            {
+                pat.type = pattern::DST;
+                pat.src_xid_type = 0;
+                pat.dst_xid_type = xid_type;
+            }
+            _patterns.push_back(pat);
+        }
+        else if (type_str == "src_and_dst" || type_str == "src_or_dst")
+        {
+            String xid_type_str = cp_shift_spacevec(str_copy);
+            int xid_type0;
+            if (!cp_xid_type(xid_type_str, &xid_type0))
+                return errh->error("unrecognized XID type: ", xid_type_str.c_str());
+            if (xid_type0 >= CLICK_XIA_XID_TYPE_MAX + 1)
+                return errh->error("invalid XID type: ", xid_type_str.c_str());
+            xid_type_str = cp_shift_spacevec(str_copy);
+            int xid_type1;
+            if (!cp_xid_type(xid_type_str, &xid_type1))
+                return errh->error("unrecognized XID type: ", xid_type_str.c_str());
+            if (xid_type1 >= CLICK_XIA_XID_TYPE_MAX + 1)
+                return errh->error("invalid XID type: ", xid_type_str.c_str());
+
+            struct pattern pat;
+            if (type_str == "src_and_dst")
+                pat.type = pattern::SRC_AND_DST;
+            else
+                pat.type = pattern::SRC_OR_DST;
+            pat.src_xid_type = xid_type0;
+            pat.dst_xid_type = xid_type1;
+            _patterns.push_back(pat);
+        }
+        else
+            return errh->error("unrecognized pattern type: ", type_str.c_str());
+    }
+    return 0;
+}
+
+void
+XIDTypeClassifier::push(int, Packet *p)
+{
+    int port = match(p);
+    if (port >= 0)
+        checked_output_push(port, p);
+    else
+    {
+        // no match -- discard packet
+        p->kill();
+    }
+}
+
+int
+XIDTypeClassifier::match(Packet *p)
+{
+    const struct click_xia* hdr = p->xia_header();
+    if (!hdr)
+        return -1;
+    if (hdr->dnode == 0 || hdr->dsnode == 0)
+        return -1;
+    int dst_xid_type = hdr->node[hdr->dnode - 1].xid.type;
+    int src_xid_type = hdr->node[hdr->dsnode - 1].xid.type;
+    for (int i = 0; i < _patterns.size(); i++)
+    {
+        const struct pattern& pat = _patterns[i];
+        switch (pat.type)
+        {
+            case pattern::SRC:
+                if (src_xid_type == pat.src_xid_type)
+                    return i;
+                break;
+            case pattern::DST:
+                if (dst_xid_type == pat.dst_xid_type)
+                    return i;
+                break;
+            case pattern::SRC_AND_DST:
+                if (src_xid_type == pat.src_xid_type && dst_xid_type == pat.dst_xid_type)
+                    return i;
+                break;
+            case pattern::SRC_OR_DST:
+                if (src_xid_type == pat.src_xid_type || dst_xid_type == pat.dst_xid_type)
+                    return i;
+                break;
+            case pattern::ANY:
+                return i;
+                break;
+        }
+    }
+    return -1;
+}
+
+CLICK_ENDDECLS
+EXPORT_ELEMENT(XIDTypeClassifier)
+ELEMENT_MT_SAFE(XIDTypeClassifier)

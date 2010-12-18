@@ -88,7 +88,7 @@ StaticXIDLookup::lookup(Packet *p)
     if (hdr->last >= (int)hdr->dnode)
         return -1;
 
-    if (hdr->last >= (int)hdr->dint)
+    if (hdr->last == (int)hdr->dnode - 1)
     {
         // the packet has arrived at the destination.
         // send the packet to the destination handler port
@@ -101,12 +101,18 @@ StaticXIDLookup::lookup(Packet *p)
     if (last < 0)
         last += hdr->dnode;
     const struct click_xia_xid_edge* edge = hdr->node[last].edge;
-    for (int i = 0; i < 4; i++)
+    for (size_t i = 0; i < CLICK_XIA_XID_EDGE_NUM; i++)
     {
         const struct click_xia_xid_edge& current_edge = edge[i];
         const int& idx = current_edge.idx;
         if (idx == CLICK_XIA_XID_EDGE_UNUSED)
             continue;
+        if (idx <= hdr->last)
+        {
+            // The DAG representaion prohibits non-increasing index
+            click_chatter("invalid idx field: %d (not larger than last field %d)", idx, last);
+            return -1;
+        }
         const struct click_xia_xid_node& node = hdr->node[idx];
         HashTable<XID, int>::const_iterator it = _rt.find(node.xid);
         if (it != _rt.end())

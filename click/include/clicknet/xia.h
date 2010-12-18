@@ -17,10 +17,12 @@
 #define CLICK_XIA_XID_ID_LEN 20
 
 struct click_xia_xid {
-    uint16_t type;
     uint8_t id[CLICK_XIA_XID_ID_LEN];
+    uint8_t type;
 };
 
+#pragma pack(push)
+#pragma pack(1)     // without this, the size of the struct would not be 1 byte
 struct click_xia_xid_edge
 {
 #if CLICK_BYTE_ORDER == CLICK_LITTLE_ENDIAN
@@ -33,12 +35,14 @@ struct click_xia_xid_edge
 #   error "unknown byte order"
 #endif
 };
+#pragma pack(pop)
 
+#define CLICK_XIA_XID_EDGE_NUM (3)
 #define CLICK_XIA_XID_EDGE_UNUSED (127u)
 
 struct click_xia_xid_node {
     click_xia_xid xid;
-    click_xia_xid_edge edge[4];
+    click_xia_xid_edge edge[CLICK_XIA_XID_EDGE_NUM];
 };
 
 struct click_xia_common {
@@ -51,10 +55,10 @@ struct click_xia {
     uint8_t ver;			/* header version */
     uint8_t nxt;			/* next header */
     uint16_t plen;			/* payload length */
-    uint8_t dsnode;			/* total number of all nodes (excl. dummy node) */
-    uint8_t dnode;			/* total number of dest nodes (excl. dummy node) */
-    uint8_t dint;                       /* index of first intent node within dest nodes */
-    uint8_t sint;                       /* index of first intent node within source nodes */
+    uint8_t dsnode;			/* total number of all nodes */
+    uint8_t dnode;			/* total number of dest nodes */
+    //uint8_t dints;
+    //uint8_t sints;
     int8_t last;			/* index of last visited node (note: integral) */
     uint8_t hlim;			/* hop limit */
     click_xia_xid_node node[0];         /* XID node list */

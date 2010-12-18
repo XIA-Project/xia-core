@@ -2081,14 +2081,14 @@ cp_xid_dag(const String& str, Vector<struct click_xia_xid_node>* result  CP_CONT
 {
     String str_copy = str;
 
-    // the first 4 indices are stored after the last node's XID (wrap around)
-    //      0 1 2 3
-    // XID1 4 5 6 7
+    // the first indices are stored after the last node's XID (wrap around)
+    //      0 1 2
+    // XID1 4 5 6
     // XID2
     //     =>
-    // XID1 4 5 6 7
-    // XID2 0 1 2 3
-    for (size_t i = 0; i < 4; i++)
+    // XID1 4 5 6
+    // XID2 0 1 2
+    for (size_t i = 0; i < CLICK_XIA_XID_EDGE_NUM; i++)
     {
         String index_str = cp_shift_spacevec(str_copy);
         int index;
@@ -2119,12 +2119,12 @@ cp_xid_dag(const String& str, Vector<struct click_xia_xid_node>* result  CP_CONT
         }
 
         // parse indices 
-        for (size_t i = 0; i < 4; i++)
+        for (size_t i = 0; i < CLICK_XIA_XID_EDGE_NUM; i++)
         {
             String index_str = cp_shift_spacevec(str_copy);
             if (index_str == "-")
             {
-                for (size_t j = i; j < 4; j++)
+                for (size_t j = i; j < CLICK_XIA_XID_EDGE_NUM; j++)
                     node.edge[i].idx = CLICK_XIA_XID_EDGE_UNUSED;
                 break;
             }
@@ -2200,17 +2200,14 @@ cp_xid_re(const String& str, Vector<struct click_xia_xid_node>* result  CP_CONTE
 
         click_xia_xid_node node;
         memset(&node, 0, sizeof(node));
+        for (size_t k = 0; k < CLICK_XIA_XID_EDGE_NUM; k++)
+            node.edge[k].idx = CLICK_XIA_XID_EDGE_UNUSED;
         node.xid = prev_xid;
         // link to the next main node
         node.edge[0].idx = next_main_idx;
         // link to the next fallback node
         if (fallback.size() > 0)
-        {
             node.edge[1].idx = next_idx + 1;
-            node.edge[2].idx = node.edge[3].idx = CLICK_XIA_XID_EDGE_UNUSED;
-        }
-        else
-            node.edge[1].idx = node.edge[2].idx = node.edge[3].idx = CLICK_XIA_XID_EDGE_UNUSED;
         if (next_idx == -1)
             dummy_src_node = node;
         else
@@ -2221,17 +2218,14 @@ cp_xid_re(const String& str, Vector<struct click_xia_xid_node>* result  CP_CONTE
         {
             click_xia_xid_node node;
             memset(&node, 0, sizeof(node));
+            for (size_t k = 0; k < CLICK_XIA_XID_EDGE_NUM; k++)
+                node.edge[k].idx = CLICK_XIA_XID_EDGE_UNUSED;
             node.xid = fallback[i];
             // link to the next main node (implicit link)
             node.edge[0].idx = next_main_idx;
             // link to the next fallback node
             if (i < fallback.size() - 1)
-            {
                 node.edge[1].idx = next_idx + 1;
-                node.edge[2].idx = node.edge[3].idx = CLICK_XIA_XID_EDGE_UNUSED;
-            }
-            else
-                node.edge[1].idx = node.edge[2].idx = node.edge[3].idx = CLICK_XIA_XID_EDGE_UNUSED;
             result->push_back(node);
             next_idx++;
         }
