@@ -131,7 +131,8 @@ static const StaticNameDB::Entry annotation_entries[] = {
 #endif
     { "REV_RATE", MKAI(REV_RATE) },
     { "SEQUENCE_NUMBER", MKAI(SEQUENCE_NUMBER) },
-    { "WIFI_EXTRA", MKAI(WIFI_EXTRA) }
+    { "WIFI_EXTRA", MKAI(WIFI_EXTRA) },
+    { "XIA_NEXT_PATH", MKAI(XIA_NEXT_PATH) }
 };
 
 bool

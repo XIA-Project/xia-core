@@ -26,7 +26,7 @@
 #include <clicknet/xia.h>
 #include <click/xid.hh>
 #include <click/xiaheader.hh>
-#include <click/standard/xidinfo.hh>
+#include <click/standard/xiaxidinfo.hh>
 
 #if CLICK_USERLEVEL
 # include <stdio.h>
@@ -152,7 +152,7 @@ void XIAPrint::print_xids(StringAccum &sa, const struct click_xia *xiah)
         else
            sa << ' ';
 
-        String name = XIDInfo::revquery_xid(&xiah->node[i].xid, this);
+        String name = XIAXIDInfo::revquery_xid(&xiah->node[i].xid, this);
         if (name.length() != 0)
             sa << name;
         else
@@ -162,6 +162,8 @@ void XIAPrint::print_xids(StringAccum &sa, const struct click_xia *xiah)
             if (xiah->node[i].edge[j].idx == CLICK_XIA_XID_EDGE_UNUSED)
                 continue;
             sa << ' ' << (int)xiah->node[i].edge[j].idx;
+            if (xiah->node[i].edge[j].visited)
+                sa << '*';
         }
     }
 }

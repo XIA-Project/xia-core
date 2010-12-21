@@ -1,26 +1,26 @@
 /*
- * decxiahlim.{cc,hh} -- element decrements XIA packet's hop limit
+ * xiadechlim.{cc,hh} -- element decrements XIA packet's hop limit
  */
 
 #include <click/config.h>
-#include "decxiahlim.hh"
+#include "xiadechlim.hh"
 #include <click/glue.hh>
 #include <click/confparse.hh>
-#include <clicknet/ip.h>
+#include <clicknet/xia.h>
 CLICK_DECLS
 
-DecXIAHLIM::DecXIAHLIM()
+XIADecHLIM::XIADecHLIM()
     : _active(true)
 {
     _drops = 0;
 }
 
-DecXIAHLIM::~DecXIAHLIM()
+XIADecHLIM::~XIADecHLIM()
 {
 }
 
 int
-DecXIAHLIM::configure(Vector<String> &conf, ErrorHandler *errh)
+XIADecHLIM::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     return cp_va_kparse(conf, this, errh,
 			"ACTIVE", 0, cpBool, &_active,
@@ -28,7 +28,7 @@ DecXIAHLIM::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 Packet *
-DecXIAHLIM::simple_action(Packet *p)
+XIADecHLIM::simple_action(Packet *p)
 {
     assert(p->has_network_header());
     if (!_active)
@@ -51,12 +51,12 @@ DecXIAHLIM::simple_action(Packet *p)
 }
 
 void
-DecXIAHLIM::add_handlers()
+XIADecHLIM::add_handlers()
 {
     add_data_handlers("drops", Handler::OP_READ, &_drops);
     add_data_handlers("active", Handler::OP_READ | Handler::OP_WRITE | Handler::CHECKBOX, &_active);
 }
 
 CLICK_ENDDECLS
-EXPORT_ELEMENT(DecXIAHLIM)
-ELEMENT_MT_SAFE(DecXIAHLIM)
+EXPORT_ELEMENT(XIADecHLIM)
+ELEMENT_MT_SAFE(XIADecHLIM)

@@ -1,9 +1,9 @@
 /*
- * xidinfo.{cc,hh} -- element that registers XID as names
+ * xiaxidinfo.{cc,hh} -- element that registers XID as names
  */
 
 #include <click/config.h>
-#include <click/standard/xidinfo.hh>
+#include <click/standard/xiaxidinfo.hh>
 #include <click/nameinfo.hh>
 #include <click/glue.hh>
 #include <click/confparse.hh>
@@ -11,16 +11,16 @@
 #include <click/xiaheader.hh>
 CLICK_DECLS
 
-XIDInfo::XIDInfo()
+XIAXIDInfo::XIAXIDInfo()
 {
 }
 
-XIDInfo::~XIDInfo()
+XIAXIDInfo::~XIAXIDInfo()
 {
 }
 
 int
-XIDInfo::configure(Vector<String> &conf, ErrorHandler *errh)
+XIAXIDInfo::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     int before = errh->nerrors();
 
@@ -56,17 +56,17 @@ XIDInfo::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 bool
-XIDInfo::query_xid(const String& s, struct click_xia_xid* store, const Element *e)
+XIAXIDInfo::query_xid(const String& s, struct click_xia_xid* store, const Element *e)
 {
     return NameInfo::query(NameInfo::T_XIA_XID, e, s, store, sizeof(struct click_xia_xid));
 }
 
 String
-XIDInfo::revquery_xid(const struct click_xia_xid* store, const Element *e)
+XIAXIDInfo::revquery_xid(const struct click_xia_xid* store, const Element *e)
 {
     return NameInfo::revquery(NameInfo::T_XIA_XID, e, store, sizeof(struct click_xia_xid));
 }
 
 CLICK_ENDDECLS
-EXPORT_ELEMENT(XIDInfo)
-ELEMENT_HEADER(<click/standard/xidinfo.hh>)
+EXPORT_ELEMENT(XIAXIDInfo)
+ELEMENT_HEADER(<click/standard/xiaxidinfo.hh>)

@@ -1,5 +1,5 @@
-#ifndef CLICK_XIDINFO_HH
-#define CLICK_XIDINFO_HH
+#ifndef CLICK_XIAXIDINFO_HH
+#define CLICK_XIAXIDINFO_HH
 #include <click/element.hh>
 #include <click/glue.hh>
 #include <click/atomic.hh>
@@ -9,7 +9,7 @@ CLICK_DECLS
 /*
 =c
 
-XIDInfo(NAME0 XID0, ...)
+XIAXIDInfo(NAME0 XID0, ...)
 
 =s xia
 
@@ -26,24 +26,16 @@ Registered names are globally visible in Click.
 XIDAddressInfo(AD0 AD:000102030405060708090a0b0c0d0e0f10111213,
                CID0 CID:000102030405060708090a0b0c0d0e0f10111213)
 
-=h src read/write
-
-Returns or sets the SRC parameter.
-
-=h dst read/write
-
-Returns or sets the DST parameter.
-
 =a
 
 AddressInfo */
 
-class XIDInfo : public Element { public:
+class XIAXIDInfo : public Element { public:
 
-  XIDInfo();
-  ~XIDInfo();
+  XIAXIDInfo();
+  ~XIAXIDInfo();
 
-  const char *class_name() const		{ return "XIDInfo"; }
+  const char *class_name() const		{ return "XIAXIDInfo"; }
 
   int configure_phase() const		{ return CONFIGURE_PHASE_FIRST; }
   int configure(Vector<String> &, ErrorHandler *);

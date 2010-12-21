@@ -31,7 +31,7 @@ XIANextHop::push(int, Packet *p_in)
         last += hdr->dnode;
     struct click_xia_xid_edge* edge = hdr->node[last].edge;
 
-    struct click_xia_xid_edge& current_edge = edge[PAINT_ANNO(p_in)];
+    struct click_xia_xid_edge& current_edge = edge[XIA_NEXT_PATH_ANNO(p_in)];
 
     hdr->last = current_edge.idx;
     current_edge.visited = 1;

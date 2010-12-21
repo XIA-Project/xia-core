@@ -1,5 +1,5 @@
-#ifndef CLICK_DECXIAHLIM_HH
-#define CLICK_DECXIAHLIM_HH
+#ifndef CLICK_XIADECHLIM_HH
+#define CLICK_XIADECHLIM_HH
 #include <click/element.hh>
 #include <click/glue.hh>
 #include <click/atomic.hh>
@@ -7,13 +7,13 @@ CLICK_DECLS
 
 /*
  * =c
- * DecXIAHLIM([keyword])
+ * XIADecHLIM([keyword])
  * =s ip
  * decrements XIA hop limit, drops dead packets
  * =d
  * Expects XIA packet as input.
  * If the hlim is <= 1 (i.e. has expired),
- * DecXIAHLIM sends the packet to output 1 (or discards it if there is no
+ * XIADecHLIM sends the packet to output 1 (or discards it if there is no
  * output 1).
  * Otherwise it decrements the hlim,
  * and sends the packet to output 0.
@@ -31,12 +31,12 @@ CLICK_DECLS
  * =a DecIPTTL 
  */
 
-class DecXIAHLIM : public Element { public:
+class XIADecHLIM : public Element { public:
 
-    DecXIAHLIM();
-    ~DecXIAHLIM();
+    XIADecHLIM();
+    ~XIADecHLIM();
 
-    const char *class_name() const		{ return "DecXIAHLIM"; }
+    const char *class_name() const		{ return "XIADecHLIM"; }
     const char *port_count() const		{ return PORTS_1_1X2; }
     const char *processing() const		{ return PROCESSING_A_AH; }
 

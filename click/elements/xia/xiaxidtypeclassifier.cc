@@ -1,25 +1,26 @@
 /*
- * xidtypeclassifier.{cc,hh} -- simple XIA packet classifier
+ * xiaxidtypeclassifier.{cc,hh} -- simple XIA packet classifier
  */
 
 #include <click/config.h>
-#include "xidtypeclassifier.hh"
+#include "xiaxidtypeclassifier.hh"
 #include <click/glue.hh>
 #include <click/error.hh>
 #include <click/confparse.hh>
 #include <click/xid.hh>
+#include <click/packet_anno.hh>
 CLICK_DECLS
 
-XIDTypeClassifier::XIDTypeClassifier()
+XIAXIDTypeClassifier::XIAXIDTypeClassifier()
 {
 }
 
-XIDTypeClassifier::~XIDTypeClassifier()
+XIAXIDTypeClassifier::~XIAXIDTypeClassifier()
 {
 }
 
 int
-XIDTypeClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
+XIAXIDTypeClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (conf.size() != noutputs())
 	return errh->error("need %d arguments, one per output port", noutputs());
@@ -35,7 +36,7 @@ XIDTypeClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
             pat.src_xid_type = pat.dst_xid_type = 0;
             _patterns.push_back(pat);
         }
-        else if (type_str == "src" || type_str == "dst")
+        else if (type_str == "src" || type_str == "dst" || type_str == "next")
         {
             String xid_type_str = cp_shift_spacevec(str_copy);
             int xid_type;
@@ -50,12 +51,21 @@ XIDTypeClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
                 pat.type = pattern::SRC;
                 pat.src_xid_type = xid_type;
                 pat.dst_xid_type = 0;
+                pat.next_xid_type = 0;
             }
-            else
+            else if (type_str == "dst")
             {
                 pat.type = pattern::DST;
                 pat.src_xid_type = 0;
                 pat.dst_xid_type = xid_type;
+                pat.next_xid_type = 0;
+            }
+            else
+            {
+                pat.type = pattern::NEXT;
+                pat.src_xid_type = 0;
+                pat.dst_xid_type = 0;
+                pat.next_xid_type = xid_type;
             }
             _patterns.push_back(pat);
         }
@@ -81,6 +91,7 @@ XIDTypeClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
                 pat.type = pattern::SRC_OR_DST;
             pat.src_xid_type = xid_type0;
             pat.dst_xid_type = xid_type1;
+            pat.next_xid_type = 0;
             _patterns.push_back(pat);
         }
         else
@@ -90,7 +101,7 @@ XIDTypeClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 void
-XIDTypeClassifier::push(int, Packet *p)
+XIAXIDTypeClassifier::push(int, Packet *p)
 {
     int port = match(p);
     if (port >= 0)
@@ -103,15 +114,32 @@ XIDTypeClassifier::push(int, Packet *p)
 }
 
 int
-XIDTypeClassifier::match(Packet *p)
+XIAXIDTypeClassifier::match(Packet *p)
 {
     const struct click_xia* hdr = p->xia_header();
     if (!hdr)
         return -1;
     if (hdr->dnode == 0 || hdr->dsnode == 0)
         return -1;
-    int dst_xid_type = hdr->node[hdr->dnode - 1].xid.type;
+
     int src_xid_type = hdr->node[hdr->dsnode - 1].xid.type;
+    int dst_xid_type = hdr->node[hdr->dnode - 1].xid.type;
+
+    int next_xid_type = -1;
+    {
+        int last = hdr->last;
+        if (last < 0)
+            last += hdr->dnode;
+        const struct click_xia_xid_edge* edge = hdr->node[last].edge;
+        if (XIA_NEXT_PATH_ANNO(p) < CLICK_XIA_XID_EDGE_NUM)
+        {
+            const struct click_xia_xid_edge& current_edge = edge[XIA_NEXT_PATH_ANNO(p)];
+            if (current_edge.idx != CLICK_XIA_XID_EDGE_UNUSED)
+                if (current_edge.idx < hdr->dnode)
+                    next_xid_type = hdr->node[current_edge.idx].xid.type;
+        }
+    }
+
     for (int i = 0; i < _patterns.size(); i++)
     {
         const struct pattern& pat = _patterns[i];
@@ -133,6 +161,10 @@ XIDTypeClassifier::match(Packet *p)
                 if (src_xid_type == pat.src_xid_type || dst_xid_type == pat.dst_xid_type)
                     return i;
                 break;
+            case pattern::NEXT:
+                if (next_xid_type == pat.next_xid_type)
+                    return i;
+                break;
             case pattern::ANY:
                 return i;
                 break;
@@ -142,5 +174,5 @@ XIDTypeClassifier::match(Packet *p)
 }
 
 CLICK_ENDDECLS
-EXPORT_ELEMENT(XIDTypeClassifier)
-ELEMENT_MT_SAFE(XIDTypeClassifier)
+EXPORT_ELEMENT(XIAXIDTypeClassifier)
+ELEMENT_MT_SAFE(XIAXIDTypeClassifier)

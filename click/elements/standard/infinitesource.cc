@@ -55,6 +55,7 @@ InfiniteSource::configure(Vector<String> &conf, ErrorHandler *errh)
   int limit = -1;
   int burstsize = 1;
   int datasize = -1;
+  int headroom = Packet::default_headroom;
   bool active = true, stop = false;
 
   if (cp_va_kparse(conf, this, errh,
@@ -63,6 +64,7 @@ InfiniteSource::configure(Vector<String> &conf, ErrorHandler *errh)
 		   "BURST", cpkP, cpInteger, &burstsize,
 		   "ACTIVE", cpkP, cpBool, &active,
 		   "LENGTH", 0, cpInteger, &datasize,
+		   "HEADROOM", 0, cpInteger, &headroom,
 		   "DATASIZE", 0, cpInteger, &datasize, // deprecated
 		   "STOP", 0, cpBool, &stop,
 		   cpEnd) < 0)
@@ -72,6 +74,7 @@ InfiniteSource::configure(Vector<String> &conf, ErrorHandler *errh)
 
   _data = data;
   _datasize = datasize;
+  _headroom = headroom;
   _limit = limit;
   _burstsize = burstsize;
   _count = 0;
@@ -148,15 +151,15 @@ InfiniteSource::setup_packet()
 	_packet->kill();
 
     if (_datasize < 0)
-	_packet = Packet::make(_data.data(), _data.length());
+	_packet = Packet::make(_headroom, _data.data(), _data.length(), 0);
     else if (_datasize <= _data.length())
-	_packet = Packet::make(_data.data(), _datasize);
+	_packet = Packet::make(_headroom, _data.data(), _datasize, 0);
     else {
 	// make up some data to fill extra space
 	StringAccum sa;
 	while (sa.length() < _datasize)
 	    sa << _data;
-	_packet = Packet::make(sa.data(), _datasize);
+	_packet = Packet::make(_headroom, sa.data(), _datasize, 0);
     }
 }
 

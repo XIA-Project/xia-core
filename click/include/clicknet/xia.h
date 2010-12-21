@@ -7,14 +7,14 @@
  * 
  */
 
-#define CLICK_XIA_XID_TYPE_UNDEF 0
-#define CLICK_XIA_XID_TYPE_AD 1
-#define CLICK_XIA_XID_TYPE_HID 2
-#define CLICK_XIA_XID_TYPE_CID 3
-#define CLICK_XIA_XID_TYPE_SID 4
-#define CLICK_XIA_XID_TYPE_MAX 4
+#define CLICK_XIA_XID_TYPE_UNDEF    0
+#define CLICK_XIA_XID_TYPE_AD       10
+#define CLICK_XIA_XID_TYPE_HID      11
+#define CLICK_XIA_XID_TYPE_CID      12
+#define CLICK_XIA_XID_TYPE_SID      13
+#define CLICK_XIA_XID_TYPE_MAX      (CLICK_XIA_XID_TYPE_SID)
 
-#define CLICK_XIA_XID_ID_LEN 20
+#define CLICK_XIA_XID_ID_LEN        20
 
 struct click_xia_xid {
     uint8_t id[CLICK_XIA_XID_ID_LEN];
@@ -37,8 +37,8 @@ struct click_xia_xid_edge
 };
 #pragma pack(pop)
 
-#define CLICK_XIA_XID_EDGE_NUM (3)
-#define CLICK_XIA_XID_EDGE_UNUSED (127u)
+#define CLICK_XIA_XID_EDGE_NUM      3
+#define CLICK_XIA_XID_EDGE_UNUSED   127u
 
 struct click_xia_xid_node {
     click_xia_xid xid;

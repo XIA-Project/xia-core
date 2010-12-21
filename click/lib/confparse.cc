@@ -31,7 +31,7 @@
 #include <click/etheraddress.hh>
 #include <click/hashtable.hh>
 #include <click/xid.hh>
-#include <click/standard/xidinfo.hh>
+#include <click/standard/xiaxidinfo.hh>
 #if HAVE_IP6
 # include <click/ip6address.hh>
 # include <click/ip6flowid.hh>
@@ -2033,7 +2033,7 @@ bool
 cp_xid(const String& str, struct click_xia_xid* xid  CP_CONTEXT)
 {
 #ifndef CLICK_TOOL
-    if (XIDInfo::query_xid(str, xid, context))
+    if (XIAXIDInfo::query_xid(str, xid, context))
         return true;
 #endif
 
