@@ -17,10 +17,7 @@ elementclass ContentCache {
     // input: a packet
     // output: a packet (passthru)
 
-    input -> c :: XIAXIDTypeClassifier(src CID, -);
-
-    c[0] -> dup :: Tee(2);
-    c[1] -> output;
+    input -> dup :: Tee(2);
 
     dup[0] -> output;
     dup[1] -> store_to_cache :: Discard;
@@ -43,6 +40,15 @@ elementclass GenericRouting {
     rt[4] -> [4]output;     // update last pointer
     rt[5] -> [5]output;     // failed to route
 };
+
+elementclass GenericPostRouteProcessing {
+    input->XIADecHLIM-> output;
+}
+
+elementclass CIDPostRouteProcessing {
+    // Extend this if you want to do post processing for CID
+    input->Null-> output;
+}
 
 elementclass PerHopProc {
     // input: a packet to process
@@ -69,41 +75,41 @@ elementclass PerHopProc {
     consider_next_path[1] -> [5]output;
 
     c[0] -> rt_AD :: GenericRouting;
-    rt_AD[0] -> XIADecHLIM -> [0]output;
-    rt_AD[1] -> XIADecHLIM -> [1]output;
-    rt_AD[2] -> XIADecHLIM -> [2]output;
-    rt_AD[3] -> XIADecHLIM -> [3]output;
+    rt_AD[0] -> GenericPostRouteProcessing -> [0]output;
+    rt_AD[1] -> GenericPostRouteProcessing -> [1]output;
+    rt_AD[2] -> GenericPostRouteProcessing -> [2]output;
+    rt_AD[3] -> GenericPostRouteProcessing -> [3]output;
     rt_AD[4] -> XIANextHop -> check_dest;
     rt_AD[5] -> consider_next_path;
 
     c[1] -> rt_HID :: GenericRouting;
-    rt_HID[0] -> XIADecHLIM -> [0]output;
-    rt_HID[1] -> XIADecHLIM -> [1]output;
-    rt_HID[2] -> XIADecHLIM -> [2]output;
-    rt_HID[3] -> XIADecHLIM -> [3]output;
+    rt_HID[0] -> GenericPostRouteProcessing -> [0]output;
+    rt_HID[1] -> GenericPostRouteProcessing -> [1]output;
+    rt_HID[2] -> GenericPostRouteProcessing -> [2]output;
+    rt_HID[3] -> GenericPostRouteProcessing -> [3]output;
     rt_HID[4] -> XIANextHop -> check_dest;
     rt_HID[5] -> consider_next_path;
 
     c[2] -> rt_SID :: GenericRouting;
-    rt_SID[0] -> XIADecHLIM -> [0]output;
-    rt_SID[1] -> XIADecHLIM -> [1]output;
-    rt_SID[2] -> XIADecHLIM -> [2]output;
-    rt_SID[3] -> XIADecHLIM -> [3]output;
+    rt_SID[0] -> GenericPostRouteProcessing -> [0]output;
+    rt_SID[1] -> GenericPostRouteProcessing -> [1]output;
+    rt_SID[2] -> GenericPostRouteProcessing -> [2]output;
+    rt_SID[3] -> GenericPostRouteProcessing -> [3]output;
     rt_SID[4] -> XIANextHop -> check_dest;
     rt_SID[5] -> consider_next_path;
 
     c[3] -> rt_CID :: GenericRouting;
-    rt_CID[0] -> XIADecHLIM -> [0]output;
-    rt_CID[1] -> XIADecHLIM -> [1]output;
-    rt_CID[2] -> XIADecHLIM -> [2]output;
-    rt_CID[3] -> XIADecHLIM -> [3]output;
+    rt_CID[0] -> GenericPostRouteProcessing -> CIDPostRouteProcessing-> [0]output;
+    rt_CID[1] -> GenericPostRouteProcessing -> CIDPostRouteProcessing-> [1]output;
+    rt_CID[2] -> GenericPostRouteProcessing -> CIDPostRouteProcessing-> [2]output;
+    rt_CID[3] -> GenericPostRouteProcessing -> CIDPostRouteProcessing-> [3]output;
     rt_CID[4] -> XIANextHop -> check_dest;
     rt_CID[5] -> consider_next_path;
 
     c[4] -> [5]output;
 };
 
-elementclass CachingNode {
+elementclass XIARouteEngine {
     // input: a packet arrived at a node 
     // output[0]: forward to port 0
     // output[1]: forward to port 1
@@ -111,7 +117,11 @@ elementclass CachingNode {
     // output[3]: forward to port 3
     // output[4]: arrived at destination node
 
-    input -> ContentCache -> proc :: PerHopProc;
+    proc :: PerHopProc;
+    input -> c :: XIAXIDTypeClassifier(src CID, -); 
+    // if the source type is CID
+    c[0] -> ContentCache -> proc
+    c[1] -> proc
 
     proc[0] -> Queue(200) -> [0]output;
     proc[1] -> Queue(200) -> [1]output;
@@ -128,7 +138,7 @@ elementclass Host {
     // input: a packet arrived at a node 
     // output[0]: forward to port 0
 
-    n :: CachingNode;
+    n :: XIARouteEngine;
 
     Script(write n/proc/rt_AD/rt.add - 0);
     Script(write n/proc/rt_HID/rt.add - 0);
@@ -152,7 +162,7 @@ elementclass Router {
     // output[0]: forward to port 0 (for $hid)
     // output[1]: forward to port 1 (for other ads)
 
-    n :: CachingNode;
+    n :: XIARouteEngine;
     
     Script(write n/proc/rt_AD/rt.add - 1);
     Script(write n/proc/rt_AD/rt.add $ad 4);
