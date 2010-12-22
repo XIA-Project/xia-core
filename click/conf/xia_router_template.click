@@ -96,7 +96,7 @@ elementclass XIAPacketRoute {
     c[4] -> [2]output;
 };
 
-elementclass Router {
+elementclass RouteEngine {
     $name |
     // input: a packet arrived at a node 
     // output[0]: forward (painted)
@@ -120,7 +120,7 @@ elementclass Host {
     // input: a packet arrived at a node 
     // output[0]: forward to port 0
 
-    n :: Router($hid);
+    n :: RouteEngine($hid);
 
     Script(write n/proc/rt_AD/rt.add - 0);
     Script(write n/proc/rt_HID/rt.add - 0);
@@ -141,7 +141,7 @@ elementclass Router {
     // output[0]: forward to port 0 (for $hid)
     // output[1]: forward to port 1 (for other ads)
 
-    n :: Router($ad);
+    n :: RouteEngine($ad);
     
     Script(write n/proc/rt_AD/rt.add - 1);
     Script(write n/proc/rt_AD/rt.add $ad 4);
