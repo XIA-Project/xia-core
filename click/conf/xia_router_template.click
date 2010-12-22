@@ -122,11 +122,11 @@ elementclass Host {
 
     n :: RouteEngine($hid);
 
-    Script(write n/proc/rt_AD/rt.add - 0);
-    Script(write n/proc/rt_HID/rt.add - 0);
-    Script(write n/proc/rt_HID/rt.add $hid 4);
-    Script(write n/proc/rt_SID/rt.add - 5);
-    Script(write n/proc/rt_CID/rt.add - 5);
+    Script(write n/proc/rt_AD/rt.add - 0);      // default route for AD
+    Script(write n/proc/rt_HID/rt.add - 0);     // default route for HID
+    Script(write n/proc/rt_HID/rt.add $hid 4);  // self HID as destination
+    Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
+    Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
 
     input -> n;
     n[0] -> Queue(200) -> [0]output;
@@ -143,11 +143,11 @@ elementclass Router {
 
     n :: RouteEngine($ad);
     
-    Script(write n/proc/rt_AD/rt.add - 1);
-    Script(write n/proc/rt_AD/rt.add $ad 4);
-    Script(write n/proc/rt_HID/rt.add $hid 0);
-    Script(write n/proc/rt_SID/rt.add - 5);
-    Script(write n/proc/rt_CID/rt.add - 5);
+    Script(write n/proc/rt_AD/rt.add - 1);      // default route for AD
+    Script(write n/proc/rt_AD/rt.add $ad 4);    // self AD as destination
+    Script(write n/proc/rt_HID/rt.add $hid 0);  // forwarding for local HID
+    Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
+    Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
 
     input[0] -> n;
     input[1] -> n;
@@ -192,5 +192,5 @@ gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
 //-> AggregateCounter(COUNT_STOP 1)
 //-> host1;
 
-Script(write gen.active true);
+Script(write gen.active true);  // the packet source should be activated after all other scripts are executed
 
