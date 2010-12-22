@@ -47,7 +47,7 @@ elementclass XIAPacketRoute {
     // input: a packet to process
     // output[0]: forward (painted)
     // output[1]: arrived at destination node
-    // output[2]: declined to route
+    // output[2]: could not route at all (tried all paths)
 
     check_dest :: XIACheckDest();
     consider_first_path :: XIASelectPath(first);
@@ -105,12 +105,12 @@ elementclass RouteEngine {
     srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
     proc :: XIAPacketRoute($name);
 
-    input -> srcTypeClassifier[0] -> SrcTypeCIDPreRouteProc ->proc;
+    input -> srcTypeClassifier[0] -> SrcTypeCIDPreRouteProc -> proc;
     srcTypeClassifier[1] -> proc;
 
     proc[0] -> [0]output; // Forward to other interface
     proc[1] -> [1]output; // Travel up the stack
-    proc[2] -> Discard;  // No route drop
+    proc[2] -> Discard;  // No route drop (future TODO: return an error packet)
 };
 
 // 1-port host node
