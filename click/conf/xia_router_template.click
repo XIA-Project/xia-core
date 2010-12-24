@@ -37,7 +37,7 @@ elementclass XIAPacketRoute {
     // input: a packet to process
     // output[0]: forward (painted)
     // output[1]: arrived at destination node
-    // output[2]: declined to route
+    // output[2]: could not route at all (tried all paths)
 
     check_dest :: XIACheckDest();
     consider_first_path :: XIASelectPath(first);
@@ -95,12 +95,12 @@ elementclass RouteEngine {
     srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
     proc :: XIAPacketRoute($name);
 
-    input -> srcTypeClassifier[0] -> SrcTypeCIDPreRouteProc ->proc;
+    input -> srcTypeClassifier[0] -> SrcTypeCIDPreRouteProc -> proc;
     srcTypeClassifier[1] -> proc;
 
     proc[0] -> [0]output; // Forward to other interface
     proc[1] -> [1]output; // Travel up the stack
-    proc[2] -> Discard;  // No route drop
+    proc[2] -> Discard;  // No route drop (future TODO: return an error packet)
 };
 
 // 1-port host node
@@ -112,11 +112,11 @@ elementclass Host {
 
     n :: RouteEngine($hid);
 
-    Script(write n/proc/rt_AD/rt.add - 0);
-    Script(write n/proc/rt_HID/rt.add - 0);
-    Script(write n/proc/rt_HID/rt.add $hid 4);
-    Script(write n/proc/rt_SID/rt.add - 5);
-    Script(write n/proc/rt_CID/rt.add - 5);
+    Script(write n/proc/rt_AD/rt.add - 0);      // default route for AD
+    Script(write n/proc/rt_HID/rt.add - 0);     // default route for HID
+    Script(write n/proc/rt_HID/rt.add $hid 4);  // self HID as destination
+    Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
+    Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
 
     input -> n;
     n[0] -> Queue(200) -> [0]output;
@@ -133,11 +133,11 @@ elementclass Router {
 
     n :: RouteEngine($ad);
     
-    Script(write n/proc/rt_AD/rt.add - 1);
-    Script(write n/proc/rt_AD/rt.add $ad 4);
-    Script(write n/proc/rt_HID/rt.add $hid 0);
-    Script(write n/proc/rt_SID/rt.add - 5);
-    Script(write n/proc/rt_CID/rt.add - 5);
+    Script(write n/proc/rt_AD/rt.add - 1);      // default route for AD
+    Script(write n/proc/rt_AD/rt.add $ad 4);    // self AD as destination
+    Script(write n/proc/rt_HID/rt.add $hid 0);  // forwarding for local HID
+    Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
+    Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
 
     input[0] -> n;
     input[1] -> n;
