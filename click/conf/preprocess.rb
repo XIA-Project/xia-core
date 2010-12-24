@@ -1,10 +1,20 @@
 #!/usr/bin/env ruby
+
+#
+# takes a input file *.pre
+# expands "include" command and write to *.click
+# 
 cnt =1
 if (ARGV.size!=1)
-    puts "Specify one filename to process"
+    puts "Error: Specify one filename to process"
     exit
 end
 input= ARGV[0]
+
+if (!File.exists?(input))
+    puts "Error: #{input} does not exist"
+    exit
+end
 output= File.basename(ARGV[0], File.extname(ARGV[0]))+".click"
 
 if (File.exists?(output))
@@ -12,6 +22,7 @@ if (File.exists?(output))
     response = $stdin.gets.chomp
     if (response!='y')
         puts "Exiting without rewriting"
+        exit
     end
 end
 
