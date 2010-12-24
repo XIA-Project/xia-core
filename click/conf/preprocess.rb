@@ -3,7 +3,8 @@
 #
 # takes a input file *.pre
 # expands "include" command and write to *.click
-# 
+#
+
 cnt =1
 if (ARGV.size!=1)
     puts "Error: Specify one filename to process"
@@ -29,7 +30,7 @@ end
 output = File.open(output,"w")
 
 File.open(input).each_line do |line|
-  if (line =~/include/)
+  if (line =~/include\b/)
       cols= line.split
       if (cols.size()!=2)
           puts "Illegal use of include in line "+ cnt.to_s
