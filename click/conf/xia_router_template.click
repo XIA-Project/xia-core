@@ -47,7 +47,7 @@ elementclass XIAPacketRoute {
     // input: a packet to process
     // output[0]: forward (painted)
     // output[1]: arrived at destination node
-    // output[2]: could not route at all (tried all paths)
+    // output[2]: declined to route
 
     check_dest :: XIACheckDest();
     consider_first_path :: XIASelectPath(first);
@@ -105,12 +105,12 @@ elementclass RouteEngine {
     srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
     proc :: XIAPacketRoute($name);
 
-    input -> srcTypeClassifier[0] -> SrcTypeCIDPreRouteProc -> proc;
+    input -> srcTypeClassifier[0] -> SrcTypeCIDPreRouteProc ->proc;
     srcTypeClassifier[1] -> proc;
 
     proc[0] -> [0]output; // Forward to other interface
     proc[1] -> [1]output; // Travel up the stack
-    proc[2] -> Discard;  // No route drop (future TODO: return an error packet)
+    proc[2] -> Discard;  // No route drop
 };
 
 // 1-port host node
@@ -122,11 +122,11 @@ elementclass Host {
 
     n :: RouteEngine($hid);
 
-    Script(write n/proc/rt_AD/rt.add - 0);      // default route for AD
-    Script(write n/proc/rt_HID/rt.add - 0);     // default route for HID
-    Script(write n/proc/rt_HID/rt.add $hid 4);  // self HID as destination
-    Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
-    Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
+    Script(write n/proc/rt_AD/rt.add - 0);
+    Script(write n/proc/rt_HID/rt.add - 0);
+    Script(write n/proc/rt_HID/rt.add $hid 4);
+    Script(write n/proc/rt_SID/rt.add - 5);
+    Script(write n/proc/rt_CID/rt.add - 5);
 
     input -> n;
     n[0] -> Queue(200) -> [0]output;
@@ -143,11 +143,11 @@ elementclass Router {
 
     n :: RouteEngine($ad);
     
-    Script(write n/proc/rt_AD/rt.add - 1);      // default route for AD
-    Script(write n/proc/rt_AD/rt.add $ad 4);    // self AD as destination
-    Script(write n/proc/rt_HID/rt.add $hid 0);  // forwarding for local HID
-    Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
-    Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
+    Script(write n/proc/rt_AD/rt.add - 1);
+    Script(write n/proc/rt_AD/rt.add $ad 4);
+    Script(write n/proc/rt_HID/rt.add $hid 0);
+    Script(write n/proc/rt_SID/rt.add - 5);
+    Script(write n/proc/rt_CID/rt.add - 5);
 
     input[0] -> n;
     input[1] -> n;
@@ -156,41 +156,4 @@ elementclass Router {
     sw[1] -> Queue(200) -> [1]output;
     n[1] -> Discard;
 };
-
-// host & router instantiation
-host0 :: Host(HID0);
-host1 :: Host(HID1);
-router0 :: Router(AD0, HID0);
-router1 :: Router(AD1, HID1);
-
-// interconnection -- host - ad
-host0[0] -> Unqueue -> [0]router0;
-router0[0] -> Unqueue -> [0]host0;
-
-host1[0] -> Unqueue -> [0]router1;
-router1[0] -> Unqueue -> [0]host1;
-
-// interconnection -- ad - ad
-router0[1] -> Unqueue -> [1]router1;
-router1[1] -> Unqueue -> [1]router0;
-
-// send test packets from host0 to host1
-gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
--> XIAEncap(
-    NXT 0,
-    DST RE AD1 HID1,
-    SRC RE AD0 HID0)
--> AggregateCounter(COUNT_STOP 1)
--> host0;
-
-// send test packets from host1 to host0
-//gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
-//-> XIAEncap(
-//    NXT 0,
-//    DST RE AD0 HID0,
-//    SRC RE AD1 HID1)
-//-> AggregateCounter(COUNT_STOP 1)
-//-> host1;
-
-Script(write gen.active true);  // the packet source should be activated after all other scripts are executed
 
