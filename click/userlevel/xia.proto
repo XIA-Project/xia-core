@@ -1,0 +1,20 @@
+package xia;
+
+message msg_request {
+  required int32 appid = 1;  // port number?
+  optional bytes xid = 2;
+  optional string data = 3;  // bytes or string?
+  enum MsgType {
+    GETHID = 0;
+    GETCID = 1;
+    CONNECTSID = 2;
+  }
+  optional MsgType type = 4;
+
+}
+
+message msg_response {
+  required int32 appid = 1;
+  repeated bytes xid = 2;   // can be a list of CID's
+  optional string data = 3;  // bytes or string?
+}
