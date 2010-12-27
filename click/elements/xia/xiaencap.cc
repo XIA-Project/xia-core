@@ -55,45 +55,38 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
     if (nxt < 0 || nxt > 255)
         return errh->error("bad next protocol");
 
-    Vector<struct click_xia_xid_node> dst_nodes;
-    Vector<struct click_xia_xid_node> src_nodes;
+    XIAPath dst_path;
+    XIAPath src_path;
 
     String dst_type = cp_shift_spacevec(dst_str);
     if (dst_type == "DAG")
-        cp_xid_dag(dst_str, &dst_nodes, this);
+        dst_path.parse_dag(dst_str, this);
     else if (dst_type == "RE")
-        cp_xid_re(dst_str, &dst_nodes, this);
+        dst_path.parse_re(dst_str, this);
     else
         return errh->error("unrecognized dst type: %s", dst_type.c_str());
 
     String src_type = cp_shift_spacevec(src_str);
     if (src_type == "DAG")
-        cp_xid_dag(src_str, &src_nodes, this);
+        src_path.parse_dag(src_str, this);
     else if (src_type == "RE")
-        cp_xid_re(src_str, &src_nodes, this);
+        src_path.parse_re(src_str, this);
     else
         return errh->error("unrecognized src type: %s", src_type.c_str());
 
     delete _xiah;   // this is safe even when _xiah == NULL
 
-    size_t dsnode = dst_nodes.size() + src_nodes.size();
-    _xiah = new XIAHeader(dsnode);
+    _xiah = new XIAHeader();
     if (!_xiah)
         return errh->error("failed to allocate");
 
-    _xiah->hdr().ver = 1;
     _xiah->hdr().nxt = nxt;
     _xiah->hdr().plen = 0;
-    _xiah->hdr().dsnode = dsnode;
-    _xiah->hdr().dnode = dst_nodes.size();
     _xiah->hdr().last = last;
     _xiah->hdr().hlim = hlim;
 
-    size_t node_idx = 0;
-    for (int i = 0; i < dst_nodes.size(); i++)
-        _xiah->hdr().node[node_idx++] = dst_nodes[i];
-    for (int i = 0; i < src_nodes.size(); i++)
-        _xiah->hdr().node[node_idx++] = src_nodes[i];
+    _xiah->set_dst_path(dst_path);
+    _xiah->set_src_path(dst_path);
 
     return 0;
 }

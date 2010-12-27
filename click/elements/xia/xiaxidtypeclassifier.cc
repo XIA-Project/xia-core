@@ -119,11 +119,11 @@ XIAXIDTypeClassifier::match(Packet *p)
     const struct click_xia* hdr = p->xia_header();
     if (!hdr)
         return -1;
-    if (hdr->dnode == 0 || hdr->dsnode == 0)
+    if (hdr->dnode == 0 || hdr->snode == 0)
         return -1;
 
-    int src_xid_type = hdr->node[hdr->dsnode - 1].xid.type;
     int dst_xid_type = hdr->node[hdr->dnode - 1].xid.type;
+    int src_xid_type = hdr->node[hdr->dnode + hdr->snode - 1].xid.type;
 
     int next_xid_type = -1;
     {

@@ -55,8 +55,8 @@ struct click_xia {
     uint8_t ver;			/* header version */
     uint8_t nxt;			/* next header */
     uint16_t plen;			/* payload length */
-    uint8_t dsnode;			/* total number of all nodes */
     uint8_t dnode;			/* total number of dest nodes */
+    uint8_t snode;			/* total number of src nodes */
     //uint8_t dints;
     //uint8_t sints;
     int8_t last;			/* index of last visited node (note: integral) */

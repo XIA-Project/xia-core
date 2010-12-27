@@ -144,7 +144,7 @@ XIAPrint::cleanup(CleanupStage)
 
 void XIAPrint::print_xids(StringAccum &sa, const struct click_xia *xiah)
 {
-    for (size_t i = 0; i < xiah->dsnode; i++) {
+    for (size_t i = 0; i < xiah->dnode + xiah->snode; i++) {
         if (i == 0)
             sa << "DST DAG ";
         else if (i == xiah->dnode)
@@ -188,7 +188,7 @@ XIAPrint::simple_action(Packet *p)
 	sa << ": ";
 
     const click_xia *xiah = p->xia_header();
-    int hdr_len = XIAHeader::size(xiah->dsnode);
+    int hdr_len = XIAHeader::size(xiah->dnode + xiah->snode);
 
     if (p->network_length() < hdr_len)
         sa << "truncated-xia";
