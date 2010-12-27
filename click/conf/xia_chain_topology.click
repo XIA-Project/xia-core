@@ -189,8 +189,8 @@ router0 :: Router(AD0, HID0);
 router1 :: Router(AD1, HID1);
 
 // interconnection -- host <-> rpc
-host0[1] -> rpc0 -> [1]host0;
-host1[1] -> rpc1 -> [1]host1;
+host0[1] -> Print("packet received by rpc0") -> rpc0 -> [1]host0;
+host1[1] -> Print("packet received by rpc1") -> rpc1 -> [1]host1;
 
 
 // interconnection -- host - ad
