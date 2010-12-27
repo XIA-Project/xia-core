@@ -55,14 +55,15 @@ endif
 
 GENERIC_OBJS = string.o straccum.o nameinfo.o \
 	bitvector.o vectorv.o templatei.o bighashmap_arena.o hashallocator.o \
-	ipaddress.o ipflowid.o etheraddress.o xid.o xiaheader.o \
+	ipaddress.o ipflowid.o etheraddress.o \
 	packet.o \
 	error.o timestamp.o glue.o task.o timer.o atomic.o gaprate.o \
 	element.o \
 	confparse.o variableenv.o lexer.o elemfilter.o routervisitor.o \
 	routerthread.o router.o master.o handlercall.o notifier.o \
 	integers.o md5.o crc32.o in_cksum.o iptable.o \
-	archive.o userutils.o driver.o xia.pb.o\
+	archive.o userutils.o driver.o \
+	xid.o xiaheader.o xia.pb.o \
 	$(EXTRA_DRIVER_OBJS)
 
 EXTRA_DRIVER_OBJS = @EXTRA_DRIVER_OBJS@
@@ -80,7 +81,7 @@ DEPCFLAGS = @DEPCFLAGS@
 DEFS = @DEFS@
 INCLUDES = -I$(top_builddir)/include -I$(top_srcdir)/include \
 	-I$(srcdir) -I$(top_srcdir) @PROPER_INCLUDES@ @PCAP_INCLUDES@
-LDFLAGS = -lprotobuf
+LDFLAGS = @LDFLAGS@ -lprotobuf
 LIBS = @LIBS@ `$(top_builddir)/click-buildtool --otherlibs` $(ELEMENT_LIBS)
 
 CXXCOMPILE = $(CXX) $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CXXFLAGS) $(DEPCFLAGS)
@@ -100,13 +101,10 @@ ELEMENTSCONF = elements_$(MINDRIVER)
 endif
 INSTALLPROGS = $(DRIVER)
 
+all: $(INSTALLPROGS) $(INSTALLLIBS)
+
 xia.pb.cc: xia.proto
 	protoc --cpp_out=. xia.proto
-
-xia.pb.o: xia.pb.cc
-	g++ -c xia.pb.cc -o $@
-
-all: $(INSTALLPROGS) $(INSTALLLIBS)
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(ELEMENTSCONF).mk
