@@ -101,7 +101,7 @@ endif
 INSTALLPROGS = $(DRIVER)
 
 xia.pb.cc: xia.proto
-	protoc --cpp_out=. --python_out=../../pyclient xia.proto
+	protoc --cpp_out=. xia.proto
 
 xia.pb.o: xia.pb.cc
 	g++ -c xia.pb.cc -o $@
