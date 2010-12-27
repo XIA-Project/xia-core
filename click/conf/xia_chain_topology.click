@@ -168,3 +168,59 @@ elementclass RPC {
     input -> [1] r;
 };
 
+
+// aliases for XIDs
+XIAXIDInfo(
+    HID0 HID:0000000000000000000000000000000000000000,
+    HID1 HID:0000000000000000000000000000000000000001,
+    AD0 AD:1000000000000000000000000000000000000000,
+    AD1 AD:1000000000000000000000000000000000000001,
+    CID0 CID:2000000000000000000000000000000000000001,
+);
+
+// host & router instantiation
+host0 :: Host(HID0);
+//dest0 :: Destination(HID0);
+rpc0 :: RPC(2000);
+host1 :: Host(HID1);
+//dest1 :: Destination(HID1);
+rpc1 :: RPC(2001);
+router0 :: Router(AD0, HID0);
+router1 :: Router(AD1, HID1);
+
+// interconnection -- host <-> rpc
+host0[1] -> rpc0 -> [1]host0;
+host1[1] -> rpc1 -> [1]host1;
+
+
+// interconnection -- host - ad
+host0[0] -> Unqueue -> [0]router0;
+router0[0] -> Unqueue -> [0]host0;
+
+host1[0] -> Unqueue -> [0]router1;
+router1[0] -> Unqueue -> [0]host1;
+
+// interconnection -- ad - ad
+router0[1] -> Unqueue -> [1]router1;
+router1[1] -> Unqueue -> [1]router0;
+
+// send test packets from host0 to host1
+gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
+-> XIAEncap(
+    NXT 0,
+    DST RE AD1 HID1,
+    SRC RE AD0 HID0)
+-> AggregateCounter(COUNT_STOP 1)
+-> host0;
+
+// send test packets from host1 to host0
+//gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
+//-> XIAEncap(
+//    NXT 0,
+//    DST RE AD0 HID0,
+//    SRC RE AD1 HID1)
+//-> AggregateCounter(COUNT_STOP 1)
+//-> host1;
+
+Script(write gen.active true);  // the packet source should be activated after all other scripts are executed
+

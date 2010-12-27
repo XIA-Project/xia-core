@@ -17,7 +17,7 @@ class rpc : public Element { public:
     ~rpc();
   
     const char *class_name() const		{ return "rpc"; }
-  const char *port_count() const		{ return "1-10/1-10"; }  //? extend 10 to N
+  const char *port_count() const		{ return "2/2"; }  //? extend 10 to N
   const char *processing() const		{ return "a/h"; }  
 
   //void static_initialize();
