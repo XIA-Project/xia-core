@@ -11,16 +11,19 @@ CLICK_DECLS
 class StringAccum;
 class Element;
 
+
 class XIAPath { public:
     XIAPath();
     XIAPath(const XIAPath& r);
 
     XIAPath& operator=(const XIAPath& r);
 
-    void parse_dag(const String& s, Element* context = NULL);
-    void parse_re(const String& s, Element* context = NULL);
+    bool parse_dag(const String& s, Element* context = NULL);
+    bool parse_re(const String& s, Element* context = NULL);
     void parse_node(const struct click_xia_xid_node* node, size_t n);
 
+    String unparse_dag(Element* context = NULL);
+    String unparse_re(Element* context = NULL);
     size_t unparse_node_size() const;
     size_t unparse_node(struct click_xia_xid_node* node, size_t n) const;
 
@@ -28,83 +31,230 @@ private:
     Vector<struct click_xia_xid_node> _node_list;
 };
 
+
+// A read-only helper class for XIA headers.
 class XIAHeader { public:
+    inline XIAHeader(const XIAHeader& r);
 
-    /** @brief Construct an XIAHeader */
-    XIAHeader(size_t dsnode = 0);
-    XIAHeader(const XIAHeader& r);
-    XIAHeader(const struct click_xia& hdr);
-    XIAHeader(const Packet& p);     // Packet& is used to avoid ambiguity
-    ~XIAHeader();
+    inline XIAHeader(const struct click_xia* hdr);
+    inline XIAHeader(const Packet* p);
 
-    XIAHeader& operator=(const XIAHeader& r);
+    static inline size_t hdr_size(uint8_t dsnode);  // header size with total dsnode nodes
 
-    static size_t size(uint8_t dsnode);
+    inline const struct click_xia* hdr() const;
 
-    const struct click_xia& hdr() const;
-    struct click_xia& hdr();
-    operator struct click_xia() const;
+    inline size_t hdr_size() const;         // header size
 
-    void set_hdr(const struct click_xia* hdr);
+    inline const uint8_t& nxt() const;      // next header type
 
-    size_t size() const;
+    inline uint16_t plen() const;           // payload length (in host byte order)
 
-    void set_dst_path(const XIAPath& path);
-    void set_src_path(const XIAPath& path);
+    inline const int8_t& last() const;      // last visited node
 
-    inline const XIAPath& dst_path() const;
-    inline const XIAPath& src_path() const;
+    inline const uint8_t& hlim() const;     // hop limit
+
+    XIAPath dst_path() const;               // destination path
+    XIAPath src_path() const;               // source path
+
+    inline const uint8_t* payload() const;  // payload
+
+private:
+    const struct click_xia* _hdr;
+
+    inline XIAHeader() : _hdr(NULL) { }     // for helping WritableXIAHeader hide dangerous construction
+
+    friend class WritableXIAHeader;
+};
+
+
+// A partially writable helper class for XIA headers.
+// Paths are not writable because it can change the header size;
+// Use XIAHeaderEncap to change new paths.
+class WritableXIAHeader : public XIAHeader { public:
+    inline WritableXIAHeader(const WritableXIAHeader& r);
+
+    inline WritableXIAHeader(struct click_xia* hdr);
+    inline WritableXIAHeader(Packet* p);
+
+    inline struct click_xia* hdr();
+
+    inline void set_nxt(uint8_t nxt);           // set next header type
+
+    inline void set_plen(uint16_t plen);        // set payload length (in host byte order)
+
+    inline void set_last(int8_t last);          // set last visited node
+
+    inline void set_hlim(uint8_t hlim);         // set hop limit
+
+    inline uint8_t* payload();                  // settable payload
+
+private:
+    // hides all dangerous construction
+    WritableXIAHeader(const XIAHeader&) { assert(false); }
+    WritableXIAHeader(const struct click_xia*) { assert(false); }
+    WritableXIAHeader(const Packet*) { assert(false); }
+};
+
+
+// An XIA header encapsulation helper.
+class XIAHeaderEncap { public:
+    XIAHeaderEncap();
+    XIAHeaderEncap(const XIAHeaderEncap& r);
+    ~XIAHeaderEncap();
+
+    XIAHeaderEncap(const XIAHeader& r);
+
+    const struct click_xia* hdr() const;
+    struct click_xia* hdr();
+
+    size_t hdr_size() const;                    // header size
+
+    void set_nxt(uint8_t nxt);                  // set next header type
+
+    void set_plen(uint16_t plen);               // set payload length
+
+    void set_last(int8_t last);                 // set last visited node
+
+    void set_hlim(uint8_t hlim);                // set hop limit
+
+    void set_dst_path(const XIAPath& path);     // set destination path
+    void set_src_path(const XIAPath& path);     // set source path
+
+    // encapsulate the given path with an XIA header.
+    // update the payload length to the p_in->length() if adjust_plen is true
+    // (i.e. manual set_plen(p_in->length()) invocation is unnecessary)
+    WritablePacket* encap(Packet* p_in, bool adjust_plen = true) const;
 
 protected:
+    void copy_hdr(const struct click_xia* hdr);
     void update_hdr();
 
 private:
     struct click_xia* _hdr;
-
-    XIAPath _dst_path;     // copy of dstination path
-    XIAPath _src_path;      // copy of source path
+    XIAPath _dst_path;
+    XIAPath _src_path;
 };
 
-inline const struct click_xia&
-XIAHeader::hdr() const
-{
-    return *_hdr;
-}
 
-inline struct click_xia&
-XIAHeader::hdr()
+inline
+XIAHeader::XIAHeader(const XIAHeader& r)
+    : _hdr(r._hdr)
 {
-    return *_hdr;
 }
 
 inline
-XIAHeader::operator struct click_xia() const
+XIAHeader::XIAHeader(const struct click_xia* hdr)
+    : _hdr(hdr)
 {
-    return hdr();
+}
+
+inline
+XIAHeader::XIAHeader(const Packet* p)
+    : _hdr(p->xia_header())
+{
+}
+
+inline const struct click_xia*
+XIAHeader::hdr() const
+{
+    return _hdr;
 }
 
 inline size_t
-XIAHeader::size() const
-{
-    return size(_hdr->dnode + _hdr->snode);
-}
-
-inline size_t
-XIAHeader::size(uint8_t dsnode)
+XIAHeader::hdr_size(uint8_t dsnode)
 {
     return sizeof(struct click_xia) + sizeof(struct click_xia_xid_node) * dsnode;
 }
 
-inline const XIAPath&
-XIAHeader::dst_path() const
+inline size_t
+XIAHeader::hdr_size() const
 {
-    return _dst_path;
+    return hdr_size(_hdr->dnode + _hdr->snode);
 }
 
-inline const XIAPath&
-XIAHeader::src_path() const
+inline const uint8_t&
+XIAHeader::nxt() const
 {
-    return _src_path;
+    return _hdr->nxt;
+}
+
+inline uint16_t
+XIAHeader::plen() const
+{
+    return ntohs(_hdr->plen);
+}
+
+inline const int8_t&
+XIAHeader::last() const
+{
+    return _hdr->last;
+}
+
+inline const uint8_t&
+XIAHeader::hlim() const
+{
+    return _hdr->hlim;
+}
+
+inline const uint8_t*
+XIAHeader::payload() const
+{
+    return reinterpret_cast<const uint8_t*>(&_hdr) + hdr_size();
+}
+
+inline
+WritableXIAHeader::WritableXIAHeader(const WritableXIAHeader& r)
+    : XIAHeader(r._hdr)
+{
+}
+
+inline
+WritableXIAHeader::WritableXIAHeader(struct click_xia* hdr)
+    : XIAHeader(hdr)
+{
+}
+
+inline
+WritableXIAHeader::WritableXIAHeader(Packet* p)
+    : XIAHeader(p->xia_header())
+{
+}
+
+inline struct click_xia*
+WritableXIAHeader::hdr()
+{
+    return const_cast<struct click_xia*>(_hdr);
+}
+
+inline void
+WritableXIAHeader::set_nxt(uint8_t nxt)
+{
+    const_cast<struct click_xia*>(_hdr)->nxt = nxt;
+}
+
+inline void
+WritableXIAHeader::set_plen(uint16_t plen)
+{
+    const_cast<struct click_xia*>(_hdr)->plen = htons(plen);
+}
+
+inline void
+WritableXIAHeader::set_last(int8_t last)
+{
+    const_cast<struct click_xia*>(_hdr)->last = last;
+}
+
+inline void
+WritableXIAHeader::set_hlim(uint8_t hlim)
+{
+    const_cast<struct click_xia*>(_hdr)->hlim = hlim;
+}
+
+
+inline uint8_t*
+WritableXIAHeader::payload()
+{
+    return const_cast<uint8_t*>(this->XIAHeader::payload());
 }
 
 CLICK_ENDDECLS

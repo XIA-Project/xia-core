@@ -52,7 +52,7 @@ class XIAEncap : public Element { public:
   Packet *simple_action(Packet *);
 
  private:
-  class XIAHeader* _xiah;
+  class XIAHeaderEncap* _xiah;
 };
 
 CLICK_ENDDECLS

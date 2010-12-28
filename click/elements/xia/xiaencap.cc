@@ -26,7 +26,7 @@ CLICK_DECLS
 XIAEncap::XIAEncap()
     : _xiah(NULL)
 {
-    _xiah = new XIAHeader(0);
+    _xiah = new XIAHeaderEncap();
 }
 
 XIAEncap::~XIAEncap()
@@ -60,33 +60,37 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
 
     String dst_type = cp_shift_spacevec(dst_str);
     if (dst_type == "DAG")
-        dst_path.parse_dag(dst_str, this);
+    {
+        if (!dst_path.parse_dag(dst_str, this))
+            return errh->error("unable to parse DAG: %s", dst_str.c_str());
+    }
     else if (dst_type == "RE")
-        dst_path.parse_re(dst_str, this);
+    {
+        if (!dst_path.parse_re(dst_str, this))
+            return errh->error("unable to parse DAG: %s", dst_str.c_str());
+    }
     else
         return errh->error("unrecognized dst type: %s", dst_type.c_str());
 
     String src_type = cp_shift_spacevec(src_str);
     if (src_type == "DAG")
-        src_path.parse_dag(src_str, this);
+    {
+        if (!src_path.parse_dag(src_str, this))
+            return errh->error("unable to parse DAG: %s", src_str.c_str());
+    }
     else if (src_type == "RE")
-        src_path.parse_re(src_str, this);
+    {
+        if (!src_path.parse_re(src_str, this))
+            return errh->error("unable to parse DAG: %s", src_str.c_str());
+    }
     else
         return errh->error("unrecognized src type: %s", src_type.c_str());
 
-    delete _xiah;   // this is safe even when _xiah == NULL
-
-    _xiah = new XIAHeader();
-    if (!_xiah)
-        return errh->error("failed to allocate");
-
-    _xiah->hdr().nxt = nxt;
-    _xiah->hdr().plen = 0;
-    _xiah->hdr().last = last;
-    _xiah->hdr().hlim = hlim;
-
+    _xiah->set_nxt(nxt);
+    _xiah->set_last(last);
+    _xiah->set_hlim(hlim);
     _xiah->set_dst_path(dst_path);
-    _xiah->set_src_path(dst_path);
+    _xiah->set_src_path(src_path);
 
     return 0;
 }
@@ -95,15 +99,6 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
 int
 XIAEncap::initialize(ErrorHandler *)
 {
-    // do some alignment/packing test
-    assert(sizeof(struct click_xia) == 8);
-    assert(sizeof(struct click_xia_xid) == 21);
-    assert(sizeof(struct click_xia_xid_edge) == 1);
-    assert(sizeof(struct click_xia_xid_node) == 24);
-    struct click_xia hdr;
-    assert(reinterpret_cast<unsigned long>(&(hdr.node[0])) - reinterpret_cast<unsigned long>(&hdr) == 8);
-    assert(reinterpret_cast<unsigned long>(&(hdr.node[1])) - reinterpret_cast<unsigned long>(&hdr) == 8 + 24);
-    (void)hdr;
     return 0;
 }
 
@@ -111,17 +106,7 @@ XIAEncap::initialize(ErrorHandler *)
 Packet *
 XIAEncap::simple_action(Packet *p_in)
 {
-    int header_len = _xiah->size();
-    int payload_len = p_in->length();
-    WritablePacket *p = p_in->push(header_len); // make room for XIA header
-    if (!p) return 0;
-
-    click_xia *xiah = reinterpret_cast<click_xia *>(p->data());
-    memcpy(xiah, &_xiah->hdr(), header_len); // copy the header
-    xiah->plen = htons(payload_len);    // original payload length excluding new header length
-
-    p->set_xia_header(xiah, header_len); // set the network header position (nh)
-    return p;
+    return _xiah->encap(p_in, true);
 }
 
 CLICK_ENDDECLS

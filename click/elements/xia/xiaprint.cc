@@ -21,12 +21,7 @@
 #include <click/straccum.hh>
 #include <click/packet_anno.hh>
 #include <click/router.hh>
-#include <click/nameinfo.hh>
-
-#include <clicknet/xia.h>
-#include <click/xid.hh>
 #include <click/xiaheader.hh>
-#include <click/standard/xiaxidinfo.hh>
 
 #if CLICK_USERLEVEL
 # include <stdio.h>
@@ -144,28 +139,10 @@ XIAPrint::cleanup(CleanupStage)
 
 void XIAPrint::print_xids(StringAccum &sa, const struct click_xia *xiah)
 {
-    for (size_t i = 0; i < xiah->dnode + xiah->snode; i++) {
-        if (i == 0)
-            sa << "DST DAG ";
-        else if (i == xiah->dnode)
-            sa << ", SRC DAG ";
-        else
-           sa << ' ';
-
-        String name = XIAXIDInfo::revquery_xid(&xiah->node[i].xid, this);
-        if (name.length() != 0)
-            sa << name;
-        else
-            sa << XID(xiah->node[i].xid);
-        for (size_t j = 0; j < CLICK_XIA_XID_EDGE_NUM; j++)
-        {
-            if (xiah->node[i].edge[j].idx == CLICK_XIA_XID_EDGE_UNUSED)
-                continue;
-            sa << ' ' << (int)xiah->node[i].edge[j].idx;
-            if (xiah->node[i].edge[j].visited)
-                sa << '*';
-        }
-    }
+    sa << "DST DAG ";
+    sa << XIAHeader(xiah).dst_path().unparse_dag(this);
+    sa << ", SRC DAG ";
+    sa << XIAHeader(xiah).src_path().unparse_dag(this);
 }
 
 Packet *
@@ -188,12 +165,11 @@ XIAPrint::simple_action(Packet *p)
 	sa << ": ";
 
     const click_xia *xiah = p->xia_header();
-    int hdr_len = XIAHeader::size(xiah->dnode + xiah->snode);
+    int hdr_len = XIAHeader::hdr_size(xiah->dnode + xiah->snode);
 
     if (p->network_length() < hdr_len)
         sa << "truncated-xia";
-    else
-    {
+    else {
 	print_xids(sa,xiah);
 
         sa << ", LAST " << (int)xiah->last;
