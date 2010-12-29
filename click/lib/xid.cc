@@ -35,6 +35,11 @@ CLICK_DECLS
     provides methods for unparsing IP addresses
     into ASCII form. */
 
+XID::XID()
+{
+    memset(&_xid, 0, sizeof(_xid));
+}
+
 XID::XID(const String &str)
 {
     parse(str);

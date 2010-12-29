@@ -9,7 +9,7 @@ CLICK_DECLS
 class StringAccum;
 
 class XID { public:
-    inline XID() {}
+    XID();
 
     /** @brief Construct an XID from a struct click_xia_xid. */
     inline XID(const struct click_xia_xid& xid)
