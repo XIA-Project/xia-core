@@ -270,7 +270,7 @@ XIAHeader::hlim() const
 inline const uint8_t*
 XIAHeader::payload() const
 {
-    return reinterpret_cast<const uint8_t*>(&_hdr) + hdr_size();
+    return reinterpret_cast<const uint8_t*>(_hdr) + hdr_size();
 }
 
 inline
