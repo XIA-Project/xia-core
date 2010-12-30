@@ -7,7 +7,6 @@
 #include <click/glue.hh>
 #include <click/xiapath.hh>
 #include <click/confparse.hh>
-#include <click/standard/xiaxidinfo.hh>
 #include <click/straccum.hh>
 #if CLICK_USERLEVEL
 # include <unistd.h>
@@ -310,13 +309,7 @@ XIAPath::unparse_dag(Element* context)
         const struct click_xia_xid_node& current_node = node[wrapped_i];
 
         if (i >= 0) {   // not a source node
-            String name;
-            if (context)
-               name = XIAXIDInfo::revquery_xid(&current_node.xid, context);
-            if (name.length() != 0)
-                sa << name;
-            else
-                sa << XID(current_node.xid);
+            sa << XID(current_node.xid).unparse_pretty(context);
             sa << ' ';
         }
 
@@ -359,13 +352,7 @@ XIAPath::unparse_re(Element* context)
                 size_t next_fallback_node = _nodes[prev_node].edges[1];
                 while (true)
                 {
-                    String name;
-                    if (context)
-                        name = XIAXIDInfo::revquery_xid(&_nodes[next_fallback_node].xid.xid(), context);
-                    if (name.length() != 0)
-                        sa << name;
-                    else
-                        sa << XID(_nodes[next_fallback_node].xid);
+                    sa << _nodes[next_fallback_node].xid.unparse_pretty(context);
                     sa << ' ';
 
                     if (_nodes[next_fallback_node].edges.size() == 1)
@@ -389,13 +376,7 @@ XIAPath::unparse_re(Element* context)
             }
 
             // output primary node
-            String name;
-            if (context)
-                name = XIAXIDInfo::revquery_xid(&_nodes[next_primary_node].xid.xid(), context);
-            if (name.length() != 0)
-                sa << name;
-            else
-                sa << XID(_nodes[next_primary_node].xid);
+            sa << _nodes[next_primary_node].xid.unparse_pretty(context);
             sa << ' ';
 
             prev_node = next_primary_node;

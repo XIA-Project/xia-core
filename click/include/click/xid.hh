@@ -7,6 +7,7 @@
 #include <vector>
 CLICK_DECLS
 class StringAccum;
+class Element;
 
 class XID { public:
     XID();
@@ -30,6 +31,7 @@ class XID { public:
 
     void parse(const String& str);
     String unparse() const;
+    String unparse_pretty(Element* context = NULL) const;
 
   private:
     struct click_xia_xid _xid;
