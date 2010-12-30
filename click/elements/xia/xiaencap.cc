@@ -24,7 +24,7 @@
 CLICK_DECLS
 
 XIAEncap::XIAEncap()
-    : _xiah(NULL)
+    : _xiah(NULL), _contenth(NULL)
 {
     _xiah = new XIAHeaderEncap();
 }
@@ -32,6 +32,7 @@ XIAEncap::XIAEncap()
 XIAEncap::~XIAEncap()
 {
     delete _xiah;
+    delete _contenth;
 }
 
 int
@@ -42,6 +43,7 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
     int nxt = -1;
     int last = -1;
     uint8_t hlim = 250;
+    int packet_offset =-1, chunk_offset =-1, content_length =-1, chunk_length =-1;
 
     if (cp_va_kparse(conf, this, errh,
                    "NXT", cpkP+cpkM, cpNamedInteger, NameInfo::T_IP_PROTO, &nxt,
@@ -49,6 +51,10 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
                    "DST", cpkP+cpkM, cpArgument, &dst_str,
                    "LAST", 0, cpInteger, &last,
                    "HLIM", 0, cpByte, &hlim,
+                   "EXT_C_PACKET_OFFSET", 0, cpInteger, &packet_offset,
+                   "EXT_C_CHUNK_OFFSET", 0, cpInteger, &chunk_offset,
+                   "EXT_C_CONTENT_LENGTH", 0, cpInteger, &content_length,
+                   "EXT_C_CHUNK_LENGTH", 0, cpInteger, &chunk_length,
                    cpEnd) < 0)
         return -1;
 
@@ -92,6 +98,14 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
     _xiah->set_dst_path(dst_path);
     _xiah->set_src_path(src_path);
 
+    if (chunk_length!=-1) {
+        _contenth  = new ContentHeaderEncap(packet_offset, chunk_offset, content_length, chunk_length);
+        _contenth->set_nxt(nxt);
+        _contenth->update();
+        _xiah->set_nxt(CLICK_XIA_NXT_CID);
+        click_chatter("EXT %d %d %d %d\n", packet_offset, chunk_offset, content_length, chunk_length );
+    }
+
     return 0;
 }
 
@@ -106,7 +120,18 @@ XIAEncap::initialize(ErrorHandler *)
 Packet *
 XIAEncap::simple_action(Packet *p_in)
 {
-    return _xiah->encap(p_in, true);
+    WritablePacket *p = NULL;
+    size_t length = p_in->length();
+    if (_contenth) {
+        p = _contenth->encap(p_in);
+        if (p) {
+            _xiah->set_plen(length); // set payload length ignoring the content ext header
+            p = _xiah->encap(p, false);
+        }
+    }
+    else
+        p = _xiah->encap(p_in, true);
+    return p;
 }
 
 CLICK_ENDDECLS

@@ -163,7 +163,7 @@ XIAHeaderEncap::update()
     if (_src_path.unparse_node(new_hdr->node + dnode, snode) != snode)
         assert(false);
 
-    delete _hdr;
+    delete [] reinterpret_cast<uint8_t*>(_hdr);
     _hdr = new_hdr;
 }
 

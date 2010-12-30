@@ -178,14 +178,14 @@ XIAGenericExtHeaderEncap::update()
         // key
         *d++ = (*it).first;
         // value
-        memcpy(d, (*it).second.c_str(), (*it).second.length());
+        memcpy(d, (*it).second.data(), (*it).second.length());
         d += (*it).second.length();
     }
     // padding
     if ((size & 3) != 0)
         memset(d, 0, 4 - (size & 3));
 
-    delete _hdr;
+    delete [] reinterpret_cast<uint8_t*>(_hdr);
     _hdr = new_hdr;
 }
 
@@ -196,6 +196,11 @@ XIAGenericExtHeaderEncap::encap(Packet* p_in) const
     WritablePacket* p = p_in->push(len);
     if (!p)
         return NULL;
+
+    /*
+    for (HashTable<uint8_t, String>::const_iterator it = _map.begin(); it != _map.end(); ++it)
+        click_chatter("%d %d %02hhx %02hhx\n", (*it).first, (*it).second.length(), (*it).second.c_str()[0], (*it).second.c_str()[1]); 
+    */
 
     memcpy(p->data(), _hdr, hlen());  // copy the header
 

@@ -12,10 +12,10 @@ CLICK_DECLS
 
 // A read-only helper class for XIA extension headers.
 class XIAGenericExtHeader { public:
-    XIAGenericExtHeader(const XIAGenericExtHeader& r);
+    XIAGenericExtHeader(const XIAGenericExtHeader& r); // copy constructor
 
-    XIAGenericExtHeader(const struct click_xia_ext* hdr);
-    XIAGenericExtHeader(const Packet* p);
+    XIAGenericExtHeader(const struct click_xia_ext* hdr); 
+    XIAGenericExtHeader(const Packet* p);  // read from packet p->network_header() should point to XIA header
 
     inline const struct click_xia_ext* hdr() const;
 
@@ -30,7 +30,7 @@ class XIAGenericExtHeader { public:
 protected:
     void populate_map();
 
-private:
+protected:
     const struct click_xia_ext* _hdr;
 
     HashTable<uint8_t, String> _map;        // parsed key-value map
@@ -68,7 +68,7 @@ private:
 class XIAGenericExtHeaderEncap { public:
     XIAGenericExtHeaderEncap();
     XIAGenericExtHeaderEncap(const XIAGenericExtHeaderEncap& r);
-    ~XIAGenericExtHeaderEncap();
+    virtual ~XIAGenericExtHeaderEncap();
 
     XIAGenericExtHeaderEncap(const XIAGenericExtHeader& r);
 

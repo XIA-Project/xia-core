@@ -22,6 +22,7 @@
 #include <click/packet_anno.hh>
 #include <click/router.hh>
 #include <click/xiaheader.hh>
+#include <click/xiacontentheader.hh>
 
 #if CLICK_USERLEVEL
 # include <stdio.h>
@@ -199,6 +200,11 @@ XIAPrint::simple_action(Packet *p)
 	if (_print_len)
 	    sa << ", PLEN " << ntohs(xiah->plen);
 
+        if (xiah->nxt == CLICK_XIA_NXT_CID) {
+            ContentHeader chdr(p);
+            sa << ", EXT_CONTENT " << "<OFF " << chdr.offset() << " CHUNK_OFF " 
+               << chdr.chunk_offset() << " LEN " << chdr.length() << " CHUNK_LEN " << chdr.chunk_length() <<"> " ;
+        }
 	// print payload
 	if (_contents > 0) {
 	    // TODO print payload
