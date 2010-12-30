@@ -17,6 +17,8 @@ class XIAPath { public:
 
     XIAPath& operator=(const XIAPath& r);
 
+    void reset();
+
     // parse a DAG string representation
     bool parse_dag(const String& s, Element* context = NULL);
 
@@ -26,6 +28,9 @@ class XIAPath { public:
     // parse a node list (in the XIA header format)
     template <typename InputIterator>
     void parse_node(InputIterator node_begin, InputIterator node_end);
+
+    template <typename InputIterator>
+    void parse_node(InputIterator node_begin, size_t n);
 
     // unparse to a DAG string representation
     String unparse_dag(Element* context = NULL);
@@ -66,7 +71,7 @@ class XIAPath { public:
 
     // connect two nodes with an prioritized edge
     // priority of 0 is the highest
-    bool add_edge(handle_t from_node, handle_t to_node, size_t priority);
+    bool add_edge(handle_t from_node, handle_t to_node, size_t priority = static_cast<size_t>(-1));
 
     // remove a node (will invalidate handles)
     bool remove_node(handle_t node);
@@ -90,8 +95,8 @@ private:
     struct Node {
         XID xid;
         Vector<handle_t> edges;
-        int order;              // the topological order of the node in the graph
-        Node() : order(0) {}
+        size_t order;              // the topological order of the node in the graph
+        Node() : order(static_cast<size_t>(-1)) {}
     };
 
     static const handle_t _npos = static_cast<handle_t>(-1);

@@ -19,7 +19,7 @@ XIAPath
 XIAHeader::dst_path() const
 {
     XIAPath p;
-    p.parse_node(_hdr->node, _hdr->node + _hdr->dnode);
+    p.parse_node(_hdr->node, _hdr->dnode);
     return p;
 }
 
@@ -27,7 +27,7 @@ XIAPath
 XIAHeader::src_path() const
 {
     XIAPath p;
-    p.parse_node(_hdr->node + _hdr->dnode, _hdr->node + _hdr->dnode + _hdr->snode);
+    p.parse_node(_hdr->node + _hdr->dnode, _hdr->snode);
     return p;
 }
 
@@ -140,8 +140,8 @@ XIAHeaderEncap::copy_hdr(const struct click_xia* hdr)
     _hdr = reinterpret_cast<click_xia*>(new uint8_t[size]);
     memcpy(_hdr, hdr, size);
 
-    _dst_path.parse_node(_hdr->node, _hdr->node + hdr->dnode);
-    _src_path.parse_node(_hdr->node + hdr->dnode, _hdr->node + hdr->dnode + hdr->snode);
+    _dst_path.parse_node(_hdr->node, hdr->dnode);
+    _src_path.parse_node(_hdr->node + hdr->dnode, hdr->snode);
 }
 
 void
