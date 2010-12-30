@@ -97,14 +97,13 @@ class XIAHeaderEncap { public:
     void set_dst_path(const XIAPath& path);     // set destination path
     void set_src_path(const XIAPath& path);     // set source path
 
-    // encapsulate the given path with an XIA header.
+    // encapsulate the given packet with an XIA header.
     // update the payload length to the p_in->length() if adjust_plen is true
     // (i.e. manual set_plen(p_in->length()) invocation is unnecessary)
     WritablePacket* encap(Packet* p_in, bool adjust_plen = true) const;
 
 protected:
-    void copy_hdr(const struct click_xia* hdr);
-    void update_hdr();
+    void update();
 
 private:
     struct click_xia* _hdr;
@@ -193,7 +192,7 @@ WritableXIAHeader::WritableXIAHeader(struct click_xia* hdr)
 
 inline
 WritableXIAHeader::WritableXIAHeader(WritablePacket* p)
-    : XIAHeader(p->xia_header())
+    : XIAHeader(p)
 {
 }
 
