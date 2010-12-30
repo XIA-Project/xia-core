@@ -13,7 +13,7 @@
 #endif
 CLICK_DECLS
 
-//#define NDEBUG_XIA
+#define NDEBUG_XIA
 
 XIAPath::XIAPath()
 {
