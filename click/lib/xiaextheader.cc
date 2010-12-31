@@ -27,7 +27,7 @@ XIAGenericExtHeader::XIAGenericExtHeader(const struct click_xia_ext* hdr)
 }
 
 XIAGenericExtHeader::XIAGenericExtHeader(const Packet* p)
-    : _hdr(reinterpret_cast<const struct click_xia_ext*>(XIAHeader(p).payload()))
+    : _hdr(reinterpret_cast<const struct click_xia_ext*>(XIAHeader(p).next_header()))
 {
     populate_map();
 }

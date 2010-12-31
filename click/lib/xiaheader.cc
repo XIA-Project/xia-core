@@ -31,6 +31,19 @@ XIAHeader::src_path() const
     return p;
 }
 
+const uint8_t*
+XIAHeader::payload() const
+{
+    uint8_t nxt = _hdr->nxt;
+    const uint8_t* p = next_header();
+    while (nxt <= CLICK_XIA_NXT_HDR_MAX)
+    {
+        nxt = *p;
+        p += *(p + 1);
+    }
+    return p;
+}
+
 
 XIAHeaderEncap::XIAHeaderEncap()
 {
@@ -40,6 +53,7 @@ XIAHeaderEncap::XIAHeaderEncap()
     _hdr->ver = 1;
     _hdr->last = static_cast<int8_t>(-1);
     _hdr->hlim = static_cast<uint8_t>(250);
+    _hdr->nxt = CLICK_XIA_NXT_NO;
     assert(hdr_size() == size);
 }
 

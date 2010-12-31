@@ -64,8 +64,9 @@ struct click_xia {
     click_xia_xid_node node[0];         /* XID node list */
 };
 
-#define CLICK_XIA_NXT_CID   CLICK_XIA_XID_TYPE_CID  /* CID-source specific key-value list */
-#define CLICK_XIA_NXT_NO    59          /* no next header (as in IPv6) */
+#define CLICK_XIA_NXT_CID       CLICK_XIA_XID_TYPE_CID  /* CID-source specific key-value list */
+#define CLICK_XIA_NXT_HDR_MAX   CLICK_XIA_XID_TYPE_MAX  /* maximum non-upper-layer nxt value */
+#define CLICK_XIA_NXT_NO        59                      /* no next header (as in IPv6) */
 
 // XIA extension header
 struct click_xia_ext {

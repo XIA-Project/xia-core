@@ -30,10 +30,12 @@ class XIAHeader { public:
 
     inline const uint8_t& hlim() const;     // hop limit
 
-    XIAPath dst_path() const;               // destination path
-    XIAPath src_path() const;               // source path
+    XIAPath dst_path() const;               // destination path (expensive call)
+    XIAPath src_path() const;               // source path (expensive call)
 
-    inline const uint8_t* payload() const;  // payload
+    inline const uint8_t* next_header() const;  // next header 
+
+    const uint8_t* payload() const;         // payload (expensive call; need to traverse extension headers)
 
 private:
     const struct click_xia* _hdr;
@@ -173,7 +175,7 @@ XIAHeader::hlim() const
 }
 
 inline const uint8_t*
-XIAHeader::payload() const
+XIAHeader::next_header() const
 {
     return reinterpret_cast<const uint8_t*>(_hdr) + hdr_size();
 }

@@ -46,9 +46,9 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
     int packet_offset =-1, chunk_offset =-1, content_length =-1, chunk_length =-1;
 
     if (cp_va_kparse(conf, this, errh,
-                   "NXT", cpkP+cpkM, cpNamedInteger, NameInfo::T_IP_PROTO, &nxt,
                    "SRC", cpkP+cpkM, cpArgument, &src_str,
                    "DST", cpkP+cpkM, cpArgument, &dst_str,
+                   "NXT", 0, cpInteger, &nxt,
                    "LAST", 0, cpInteger, &last,
                    "HLIM", 0, cpByte, &hlim,
                    "EXT_C_PACKET_OFFSET", 0, cpInteger, &packet_offset,
@@ -58,7 +58,7 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
                    cpEnd) < 0)
         return -1;
 
-    if (nxt < 0 || nxt > 255)
+    if (nxt < -1 || nxt > 255)
         return errh->error("bad next protocol");
 
     XIAPath dst_path;
@@ -92,7 +92,8 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
     else
         return errh->error("unrecognized src type: %s", src_type.c_str());
 
-    _xiah->set_nxt(nxt);
+    if (nxt >= 0)
+        _xiah->set_nxt(nxt);
     _xiah->set_last(last);
     _xiah->set_hlim(hlim);
     _xiah->set_dst_path(dst_path);
@@ -100,7 +101,8 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (chunk_length!=-1) {
         _contenth  = new ContentHeaderEncap(packet_offset, chunk_offset, content_length, chunk_length);
-        _contenth->set_nxt(nxt);
+        if (nxt >= 0)
+            _contenth->set_nxt(nxt);
         _contenth->update();
         _xiah->set_nxt(CLICK_XIA_NXT_CID);
         click_chatter("EXT %d %d %d %d\n", packet_offset, chunk_offset, content_length, chunk_length );
