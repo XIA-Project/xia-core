@@ -44,6 +44,7 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
     int last = -1;
     uint8_t hlim = 250;
     int packet_offset =-1, chunk_offset =-1, content_length =-1, chunk_length =-1;
+    bool is_request =false;
 
     if (cp_va_kparse(conf, this, errh,
                    "SRC", cpkP+cpkM, cpArgument, &src_str,
@@ -51,6 +52,7 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
                    "NXT", 0, cpInteger, &nxt,
                    "LAST", 0, cpInteger, &last,
                    "HLIM", 0, cpByte, &hlim,
+                   "EXT_C_REQUEST", 0, cpBool, &is_request,
                    "EXT_C_PACKET_OFFSET", 0, cpInteger, &packet_offset,
                    "EXT_C_CHUNK_OFFSET", 0, cpInteger, &chunk_offset,
                    "EXT_C_CONTENT_LENGTH", 0, cpInteger, &content_length,
@@ -105,7 +107,14 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
             _contenth->set_nxt(nxt);
         _contenth->update();
         _xiah->set_nxt(CLICK_XIA_NXT_CID);
-        click_chatter("EXT %d %d %d %d\n", packet_offset, chunk_offset, content_length, chunk_length );
+        click_chatter("EXT RESPONSE %d %d %d %d\n", packet_offset, chunk_offset, content_length, chunk_length );
+    } else if (is_request) {
+        _contenth  = ContentHeaderEncap::MakeRequestHeader();
+        if (nxt >= 0)
+            _contenth->set_nxt(nxt);
+        _contenth->update();
+        _xiah->set_nxt(CLICK_XIA_NXT_CID);
+        click_chatter("EXT REQUEST %d %d %d %d\n", packet_offset, chunk_offset, content_length, chunk_length );
     }
 
     return 0;

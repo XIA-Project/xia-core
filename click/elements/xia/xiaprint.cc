@@ -202,8 +202,11 @@ XIAPrint::simple_action(Packet *p)
 
         if (xiah->nxt == CLICK_XIA_NXT_CID) {
             ContentHeader chdr(p);
-            sa << ", EXT_CONTENT " << "<OFF " << chdr.offset() << " CHUNK_OFF " 
+            if (chdr.opcode()==ContentHeader::OP_RESPONSE) 
+            sa << ", EXT_CONTENT " << "<OP RESPONSE OFF " << chdr.offset() << " CHUNK_OFF " 
                << chdr.chunk_offset() << " LEN " << chdr.length() << " CHUNK_LEN " << chdr.chunk_length() <<"> " ;
+            else if (chdr.opcode()==ContentHeader::OP_REQUEST)
+            sa << ", EXT_CONTENT " << "<OP REQUEST> "; 
         }
 	// print payload
 	if (_contents > 0) {

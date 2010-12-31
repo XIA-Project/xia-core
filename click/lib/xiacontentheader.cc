@@ -17,8 +17,17 @@ ContentHeaderEncap::ContentHeaderEncap(uint16_t offset, uint32_t chunk_offset, u
     this->map()[ContentHeader::CHUNK_OFFSET]= String((const char*)&chunk_offset, sizeof(chunk_offset));
     this->map()[ContentHeader::LENGTH]= String((const char*)&length, sizeof(length));
     this->map()[ContentHeader::CHUNK_LENGTH]= String((const char*)&chunk_length, sizeof(chunk_length));
+    char opcode= ContentHeader::OP_RESPONSE;
+    this->map()[ContentHeader::OPCODE]= String((const char*)&opcode, sizeof(uint8_t));
     this->update();
 }
 
+ContentHeaderEncap::ContentHeaderEncap(uint8_t opcode, uint32_t chunk_offset, uint16_t length)
+{
+    this->map()[ContentHeader::CHUNK_OFFSET]= String((const char*)&chunk_offset, sizeof(chunk_offset));
+    this->map()[ContentHeader::LENGTH]= String((const char*)&length, sizeof(length));
+    this->map()[ContentHeader::OPCODE]= String((const char*)&opcode, sizeof(uint8_t));
+    this->update();
+}
 
 CLICK_ENDDECLS
