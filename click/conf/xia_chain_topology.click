@@ -150,9 +150,9 @@ elementclass Router {
 };
 
 elementclass RPC {
-    $port |
+    $port, $cl_bool |
 
-    sock::Socket(TCP, 0.0.0.0,$port, CLIENT false);
+    sock::Socket(TCP, 0.0.0.0,$port, CLIENT $cl_bool);
 
     r::rpc();
 
@@ -161,11 +161,11 @@ elementclass RPC {
     //localHost_in1::TimedSource(INTERVAL 10, DATA "Application1 Request Served!") //Replace TimeSource for HID0
     //localHost_in2::TimedSource(INTERVAL 10, DATA "Application2 Request Served!") //Replace TimeSource for HID0
 
-    sock -> [0] r;
-    r[0] -> sock;
+    sock -> [1] r;
+    r[1] -> sock;
 
-    r[1] -> output;
-    input -> [1] r;
+    r[0] -> output;
+    input -> [0] r;
 };
 
 
@@ -181,10 +181,10 @@ XIAXIDInfo(
 // host & router instantiation
 host0 :: Host(HID0);
 //dest0 :: Destination(HID0);
-rpc0 :: RPC(2000);
+rpc0 :: RPC(2000, false);
 host1 :: Host(HID1);
 //dest1 :: Destination(HID1);
-rpc1 :: RPC(2001);
+rpc1 :: RPC(20001, true);
 router0 :: Router(AD0, HID0);
 router1 :: Router(AD1, HID1);
 
@@ -205,13 +205,13 @@ router0[1] -> Unqueue -> [1]router1;
 router1[1] -> Unqueue -> [1]router0;
 
 // send test packets from host0 to host1
-gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
--> XIAEncap(
-    NXT 0,
-    DST RE AD1 HID1,
-    SRC RE AD0 HID0)
--> AggregateCounter(COUNT_STOP 1)
--> host0;
+//gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
+//-> XIAEncap(
+//    NXT 0,
+//    DST RE AD1 HID1,
+//    SRC RE AD0 HID0)
+//-> AggregateCounter(COUNT_STOP 1)
+//-> host0;
 
 // send test packets from host1 to host0
 //gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
