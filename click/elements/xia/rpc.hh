@@ -8,7 +8,6 @@ CLICK_DECLS
 /*
 =c
 
-RPC([LABEL, MAXLENGTH, I<keywords>])
 */
 
 class rpc : public Element { public:
@@ -17,12 +16,12 @@ class rpc : public Element { public:
     ~rpc();
   
     const char *class_name() const		{ return "rpc"; }
-  const char *port_count() const		{ return "2/2"; }  //? extend 10 to N
+  const char *port_count() const		{ return "2/2"; }  
   const char *processing() const		{ return "a/h"; }  
 
   //void static_initialize();
   int initialize();
-  int configure(Vector<String> &, ErrorHandler *);
+  int configure();
     bool can_live_reconfigure() const		{ return true; }
     void add_handlers();
     void push(int, Packet *);
@@ -30,10 +29,10 @@ class rpc : public Element { public:
   //Packet *simple_action(Packet *);
 
  private:
-    int states ; 
-    char pktdata[][100];
-    bool _active;
-  
+  //  int states ; 
+  //  char pktdata[][100];
+  //    bool _active;
+  int computeOutputPort (int);
 
 };
 
