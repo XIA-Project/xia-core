@@ -9,7 +9,6 @@ XIAXIDInfo(
 
 RandomSource(LENGTH $LENGTH, HEADROOM 256)
 -> XIAEncap(
-    NXT 0,
 //    SRC DAG     0 -
 //        HID0,
 //    DST DAG     1 -
