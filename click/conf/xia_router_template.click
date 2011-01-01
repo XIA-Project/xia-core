@@ -150,9 +150,9 @@ elementclass Router {
 };
 
 elementclass RPC {
-    $port |
+    $port, $isClient|
 
-    sock::Socket(TCP, 0.0.0.0,$port, CLIENT false);
+    sock::Socket(TCP, 0.0.0.0,$port, CLIENT $isClient);
 
     r::rpc();
 
@@ -161,10 +161,10 @@ elementclass RPC {
     //localHost_in1::TimedSource(INTERVAL 10, DATA "Application1 Request Served!") //Replace TimeSource for HID0
     //localHost_in2::TimedSource(INTERVAL 10, DATA "Application2 Request Served!") //Replace TimeSource for HID0
 
-    sock -> [0] r;
-    r[0] -> sock;
+    sock -> [1] r;
+    r[1] -> sock;
 
-    r[1] -> output;
-    input -> [1] r;
+    r[0] -> output;
+    input -> [0] r;
 };
 
