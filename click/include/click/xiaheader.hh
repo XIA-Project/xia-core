@@ -5,32 +5,9 @@
 #include <click/glue.hh>
 #include <clicknet/xia.h>
 #include <click/packet.hh>
-#include <click/vector.hh>
+#include <click/xiapath.hh>
 
 CLICK_DECLS
-class StringAccum;
-class Element;
-
-
-class XIAPath { public:
-    XIAPath();
-    XIAPath(const XIAPath& r);
-
-    XIAPath& operator=(const XIAPath& r);
-
-    bool parse_dag(const String& s, Element* context = NULL);
-    bool parse_re(const String& s, Element* context = NULL);
-    void parse_node(const struct click_xia_xid_node* node, size_t n);
-
-    String unparse_dag(Element* context = NULL);
-    String unparse_re(Element* context = NULL);
-    size_t unparse_node_size() const;
-    size_t unparse_node(struct click_xia_xid_node* node, size_t n) const;
-
-private:
-    Vector<struct click_xia_xid_node> _node_list;
-};
-
 
 // A read-only helper class for XIA headers.
 class XIAHeader { public:
@@ -53,10 +30,12 @@ class XIAHeader { public:
 
     inline const uint8_t& hlim() const;     // hop limit
 
-    XIAPath dst_path() const;               // destination path
-    XIAPath src_path() const;               // source path
+    XIAPath dst_path() const;               // destination path (expensive call)
+    XIAPath src_path() const;               // source path (expensive call)
 
-    inline const uint8_t* payload() const;  // payload
+    inline const uint8_t* next_header() const;  // next header 
+
+    const uint8_t* payload() const;         // payload (expensive call; need to traverse extension headers)
 
 private:
     const struct click_xia* _hdr;
@@ -74,7 +53,7 @@ class WritableXIAHeader : public XIAHeader { public:
     inline WritableXIAHeader(const WritableXIAHeader& r);
 
     inline WritableXIAHeader(struct click_xia* hdr);
-    inline WritableXIAHeader(Packet* p);
+    inline WritableXIAHeader(WritablePacket* p);
 
     inline struct click_xia* hdr();
 
@@ -120,14 +99,13 @@ class XIAHeaderEncap { public:
     void set_dst_path(const XIAPath& path);     // set destination path
     void set_src_path(const XIAPath& path);     // set source path
 
-    // encapsulate the given path with an XIA header.
+    // encapsulate the given packet with an XIA header.
     // update the payload length to the p_in->length() if adjust_plen is true
     // (i.e. manual set_plen(p_in->length()) invocation is unnecessary)
     WritablePacket* encap(Packet* p_in, bool adjust_plen = true) const;
 
 protected:
-    void copy_hdr(const struct click_xia* hdr);
-    void update_hdr();
+    void update();
 
 private:
     struct click_xia* _hdr;
@@ -197,9 +175,9 @@ XIAHeader::hlim() const
 }
 
 inline const uint8_t*
-XIAHeader::payload() const
+XIAHeader::next_header() const
 {
-    return reinterpret_cast<const uint8_t*>(&_hdr) + hdr_size();
+    return reinterpret_cast<const uint8_t*>(_hdr) + hdr_size();
 }
 
 inline
@@ -215,8 +193,8 @@ WritableXIAHeader::WritableXIAHeader(struct click_xia* hdr)
 }
 
 inline
-WritableXIAHeader::WritableXIAHeader(Packet* p)
-    : XIAHeader(p->xia_header())
+WritableXIAHeader::WritableXIAHeader(WritablePacket* p)
+    : XIAHeader(p)
 {
 }
 

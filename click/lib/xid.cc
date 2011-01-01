@@ -22,6 +22,7 @@
 #include <click/confparse.hh>
 #include <click/straccum.hh>
 #include <click/integers.hh>
+#include <click/standard/xiaxidinfo.hh>
 CLICK_DECLS
 
 /** @file xid.hh
@@ -34,6 +35,11 @@ CLICK_DECLS
     The XID type represents an XID address. It
     provides methods for unparsing IP addresses
     into ASCII form. */
+
+XID::XID()
+{
+    memset(&_xid, 0, sizeof(_xid));
+}
 
 XID::XID(const String &str)
 {
@@ -95,6 +101,18 @@ XID::unparse() const
     for (size_t i = 0; i < sizeof(_xid.id); i++)
         c += sprintf(c, "%02x", p[i]);
     return String(buf);
+}
+
+String
+XID::unparse_pretty(Element* context) const
+{
+    String s;
+    if (context)
+       s = XIAXIDInfo::revquery_xid(&_xid, context);
+    if (s.length() != 0)
+        return s;
+    else
+        return unparse();
 }
 
 StringAccum &

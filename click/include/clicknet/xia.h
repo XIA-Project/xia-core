@@ -64,36 +64,47 @@ struct click_xia {
     click_xia_xid_node node[0];         /* XID node list */
 };
 
-#define CLICK_XIA_PROTO_XCMP 0
+#define CLICK_XIA_NXT_CID       CLICK_XIA_XID_TYPE_CID  /* CID-source specific key-value list */
+#define CLICK_XIA_NXT_HDR_MAX   CLICK_XIA_XID_TYPE_MAX  /* maximum non-upper-layer nxt value */
+#define CLICK_XIA_NXT_NO        59                      /* no next header (as in IPv6) */
 
-// XIA control message protocol header (followed by initial packet data)
-struct click_xia_xcmp {
-    uint8_t type;
-    uint8_t code;
-    uint8_t rest[0];
+// XIA extension header
+struct click_xia_ext {
+    uint8_t nxt;			/* next header */
+    uint8_t hlen;			/* header length (not payload length) */
+    uint8_t data[0];                    /* extension data */
 };
 
-// XIA control message protocol header for echo
-struct click_xia_xcmp_sequenced {
-    uint8_t type;
-    uint8_t code;
-    uint16_t identifier;
-    uint16_t sequence;
-    uint8_t rest[0];
-};
-
-#define CLICK_XIA_XCMP_ECHO             0                   /* echo request              */
-#define CLICK_XIA_XCMP_ECHO_REPLY       1                   /* echo reply                */
-#define CLICK_XIA_XCMP_UNREACH          2                   /* dest unreachable          */
-#define   CLICK_XIA_XCMP_UNREACH_XID_TYPE           0       /*   unknown XID type        */
-#define   CLICK_XIA_XCMP_UNREACH_XID                1       /*   unknown XID             */
-#define   CLICK_XIA_XCMP_UNREACH_PROTO              2       /*   unknown protocol        */
-#define   CLICK_XIA_XCMP_UNREACH_FRAG               3       /*   frag required           */
-#define CLICK_XIA_XCMP_TIMXCEED         3                   /* time exceeded             */
-#define CLICK_XIA_XCMP_PARAMPROB        4                   /* bad header                */
-#define   CLICK_XIA_XCMP_PARAMPROB_LENGTH           0       /*   invalid length          */
-#define   CLICK_XIA_XCMP_PARAMPROB_NXIDS            1       /*   invalid number of XIDs  */
-#define   CLICK_XIA_XCMP_PARAMPROB_NDST             2       /*   invalid number of dests */
-#define   CLICK_XIA_XCMP_PARAMPROB_LAST             3       /*   invalid last            */
+//#define CLICK_XIA_PROTO_XCMP 0
+//
+//// XIA control message protocol header (followed by initial packet data)
+//struct click_xia_xcmp {
+//    uint8_t type;
+//    uint8_t code;
+//    uint8_t rest[0];
+//};
+//
+//// XIA control message protocol header for echo
+//struct click_xia_xcmp_sequenced {
+//    uint8_t type;
+//    uint8_t code;
+//    uint16_t identifier;
+//    uint16_t sequence;
+//    uint8_t rest[0];
+//};
+//
+//#define CLICK_XIA_XCMP_ECHO             0                   /* echo request              */
+//#define CLICK_XIA_XCMP_ECHO_REPLY       1                   /* echo reply                */
+//#define CLICK_XIA_XCMP_UNREACH          2                   /* dest unreachable          */
+//#define   CLICK_XIA_XCMP_UNREACH_XID_TYPE           0       /*   unknown XID type        */
+//#define   CLICK_XIA_XCMP_UNREACH_XID                1       /*   unknown XID             */
+//#define   CLICK_XIA_XCMP_UNREACH_PROTO              2       /*   unknown protocol        */
+//#define   CLICK_XIA_XCMP_UNREACH_FRAG               3       /*   frag required           */
+//#define CLICK_XIA_XCMP_TIMXCEED         3                   /* time exceeded             */
+//#define CLICK_XIA_XCMP_PARAMPROB        4                   /* bad header                */
+//#define   CLICK_XIA_XCMP_PARAMPROB_LENGTH           0       /*   invalid length          */
+//#define   CLICK_XIA_XCMP_PARAMPROB_NXIDS            1       /*   invalid number of XIDs  */
+//#define   CLICK_XIA_XCMP_PARAMPROB_NDST             2       /*   invalid number of dests */
+//#define   CLICK_XIA_XCMP_PARAMPROB_LAST             3       /*   invalid last            */
 
 #endif

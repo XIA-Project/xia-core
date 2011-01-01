@@ -22,6 +22,7 @@
 #include <click/packet_anno.hh>
 #include <click/router.hh>
 #include <click/xiaheader.hh>
+#include <click/xiacontentheader.hh>
 
 #if CLICK_USERLEVEL
 # include <stdio.h>
@@ -139,10 +140,30 @@ XIAPrint::cleanup(CleanupStage)
 
 void XIAPrint::print_xids(StringAccum &sa, const struct click_xia *xiah)
 {
-    sa << "DST DAG ";
-    sa << XIAHeader(xiah).dst_path().unparse_dag(this);
-    sa << ", SRC DAG ";
-    sa << XIAHeader(xiah).src_path().unparse_dag(this);
+    XIAHeader h(xiah);
+    XIAPath src, dst;
+
+    src = h.src_path();
+    dst = h.dst_path();
+
+    String s;
+
+    sa << "SRC ";
+   
+    s = src.unparse_re(this);
+    if (s.length() != 0)
+        sa << "RE " << s;
+    else
+        sa << "DAG " << src.unparse_dag(this);
+
+    sa << ", DST ";
+
+    s = dst.unparse_re(this);
+    if (s.length() != 0)
+        sa << "RE " << s;
+    else
+        sa << "DAG " << dst.unparse_dag(this);
+
 }
 
 Packet *
@@ -179,6 +200,14 @@ XIAPrint::simple_action(Packet *p)
 	if (_print_len)
 	    sa << ", PLEN " << ntohs(xiah->plen);
 
+        if (xiah->nxt == CLICK_XIA_NXT_CID) {
+            ContentHeader chdr(p);
+            if (chdr.opcode()==ContentHeader::OP_RESPONSE) 
+            sa << ", EXT_CONTENT " << "<OP RESPONSE OFF " << chdr.offset() << " CHUNK_OFF " 
+               << chdr.chunk_offset() << " LEN " << chdr.length() << " CHUNK_LEN " << chdr.chunk_length() <<"> " ;
+            else if (chdr.opcode()==ContentHeader::OP_REQUEST)
+            sa << ", EXT_CONTENT " << "<OP REQUEST> "; 
+        }
 	// print payload
 	if (_contents > 0) {
 	    // TODO print payload

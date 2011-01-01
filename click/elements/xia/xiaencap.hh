@@ -4,6 +4,7 @@
 #include <click/glue.hh>
 #include <click/atomic.hh>
 #include <clicknet/xia.h>
+#include <click/xiacontentheader.hh>
 CLICK_DECLS
 
 /*
@@ -53,6 +54,7 @@ class XIAEncap : public Element { public:
 
  private:
   class XIAHeaderEncap* _xiah;
+  class ContentHeaderEncap* _contenth;
 };
 
 CLICK_ENDDECLS

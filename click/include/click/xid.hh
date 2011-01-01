@@ -7,9 +7,10 @@
 #include <vector>
 CLICK_DECLS
 class StringAccum;
+class Element;
 
 class XID { public:
-    inline XID() {}
+    XID();
 
     /** @brief Construct an XID from a struct click_xia_xid. */
     inline XID(const struct click_xia_xid& xid)
@@ -30,6 +31,7 @@ class XID { public:
 
     void parse(const String& str);
     String unparse() const;
+    String unparse_pretty(Element* context = NULL) const;
 
   private:
     struct click_xia_xid _xid;

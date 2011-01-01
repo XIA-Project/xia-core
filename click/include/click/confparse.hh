@@ -178,8 +178,6 @@ bool cp_xid_type(const String& str, int* result);
 class XID;
 bool cp_xid(const String& str, struct click_xia_xid* xid  CP_OPT_CONTEXT);
 bool cp_xid(const String& str, XID* xid  CP_OPT_CONTEXT);
-bool cp_xid_dag(const String& str, Vector<struct click_xia_xid_node>* result  CP_OPT_CONTEXT);
-bool cp_xid_re(const String& str, Vector<struct click_xia_xid_node>* result  CP_OPT_CONTEXT);
 
 #if HAVE_IP6
 class IP6Address;
