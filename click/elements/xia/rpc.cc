@@ -3,7 +3,6 @@
 #include <click/glue.hh>
 #include <click/confparse.hh>
 #include <click/error.hh>
-#include "../../userlevel/xia.pb.h"
 #include <string>
 #include <assert.h>
 #include <stdio.h>
@@ -52,21 +51,13 @@ rpc::computeOutputPort (int inputPort)
       return 1;  //might change if multiplexing apps 
 }
 
-void 
-rpc::push(int port, Packet *p)
-{   
-  GOOGLE_PROTOBUF_VERIFY_VERSION;  
-  if (port != 0)  {                                   // from socket
-    xia::msg_request msg;
-    std::string data ((const char*)p->data(), p->length());
-    msg.ParseFromString(data);   
-   
-    // make a header
-    //XIAHeaderEncap encp (&header); // pass in reference of header obj
-
+WritablePacket*
+rpc::generateXIAPacket (xia::msg_request &msg)  {
     WritablePacket *p_click = WritablePacket::make (256, msg.payload().c_str(), msg.payload().length(), 0);  // constructing payload
-    if (!p_click) printf ("error: construct a click packet\n");  
-    
+    if (!p_click) {
+      printf ("error: construct a click packet\n");  
+      return 0;
+    }    
     // src and dest XIA paths
     String source (msg.xiapath_src().c_str());
     String dest (msg.xiapath_dst().c_str());
@@ -82,7 +73,23 @@ rpc::push(int port, Packet *p)
     enc.set_src_path(src_path);
     
     //printf ("payload sent: %s\n", (char*) p_click->data()); // to be removed
-    WritablePacket* p_xia = enc.encap(p_click);
+    return enc.encap(p_click);
+}
+
+
+void 
+rpc::push(int port, Packet *p)
+{   
+  GOOGLE_PROTOBUF_VERIFY_VERSION;  
+  if (port != 0)  {                                   // from socket
+    xia::msg_request msg;
+    std::string data ((const char*)p->data(), p->length());
+    msg.ParseFromString(data);   
+   
+    // make a header
+    //XIAHeaderEncap encp (&header); // pass in reference of header obj
+
+    WritablePacket* p_xia = generateXIAPacket (msg);
     //const click_xia *xiah = p_xia->xia_header();
     //int hrlen = XIAHeader::hdr_size(xiah->dnode + xiah->snode);
     //printf ("hdrlen: %d\n", hrlen);
