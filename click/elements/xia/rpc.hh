@@ -36,6 +36,13 @@ class rpc : public Element { public:
   //    bool _active;
   int computeOutputPort (int);
   WritablePacket* generateXIAPacket (xia::msg_request &msg);
+  char* receive(Packet *p);
+  
+  uint32_t desired_len;
+  uint32_t nread;
+  char * buffer;
+  char * remaining_buffer;
+  uint32_t message_len;
 };
 
 CLICK_ENDDECLS
