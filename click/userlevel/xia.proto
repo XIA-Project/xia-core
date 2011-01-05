@@ -1,11 +1,11 @@
 package xia;
 
 message msg_request {
-  required int32 appid = 1;  // port number?
+  optional int32 appid = 1;  // port number?
   optional bytes xid = 2;
   optional string xiapath_src = 5;
   optional string xiapath_dst = 6;
-  optional string payload = 3;  
+  optional bytes payload = 3;  
   enum MsgType {
     GETHID = 0;
     GETCID = 1;
