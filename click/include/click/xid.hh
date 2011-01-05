@@ -31,7 +31,7 @@ class XID { public:
 
     void parse(const String& str);
     String unparse() const;
-    String unparse_pretty(Element* context = NULL) const;
+    String unparse_pretty(const Element* context = NULL) const;
 
   private:
     struct click_xia_xid _xid;

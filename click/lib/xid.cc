@@ -104,11 +104,13 @@ XID::unparse() const
 }
 
 String
-XID::unparse_pretty(Element* context) const
+XID::unparse_pretty(const Element* context) const
 {
     String s;
+#ifndef CLICK_TOOL
     if (context)
        s = XIAXIDInfo::revquery_xid(&_xid, context);
+#endif
     if (s.length() != 0)
         return s;
     else

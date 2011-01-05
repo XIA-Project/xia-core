@@ -38,8 +38,8 @@ XIAEncap::~XIAEncap()
 int
 XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    String dst_str;
-    String src_str;
+    XIAPath src_path;
+    XIAPath dst_path;
     int nxt = -1;
     int last = -1;
     uint8_t hlim = 250;
@@ -47,8 +47,8 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
     bool is_request =false;
 
     if (cp_va_kparse(conf, this, errh,
-                   "SRC", cpkP+cpkM, cpArgument, &src_str,
-                   "DST", cpkP+cpkM, cpArgument, &dst_str,
+                   "SRC", cpkP+cpkM, cpXIAPath, &src_path,
+                   "DST", cpkP+cpkM, cpXIAPath, &dst_path,
                    "NXT", 0, cpInteger, &nxt,
                    "LAST", 0, cpInteger, &last,
                    "HLIM", 0, cpByte, &hlim,
@@ -60,39 +60,11 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
                    cpEnd) < 0)
         return -1;
 
+    //click_chatter("%s", src_path.unparse().c_str());
+    //click_chatter("%s", dst_path.unparse().c_str());
+
     if (nxt < -1 || nxt > 255)
         return errh->error("bad next protocol");
-
-    XIAPath dst_path;
-    XIAPath src_path;
-
-    String dst_type = cp_shift_spacevec(dst_str);
-    if (dst_type == "DAG")
-    {
-        if (!dst_path.parse_dag(dst_str, this))
-            return errh->error("unable to parse DAG: %s", dst_str.c_str());
-    }
-    else if (dst_type == "RE")
-    {
-        if (!dst_path.parse_re(dst_str, this))
-            return errh->error("unable to parse DAG: %s", dst_str.c_str());
-    }
-    else
-        return errh->error("unrecognized dst type: %s", dst_type.c_str());
-
-    String src_type = cp_shift_spacevec(src_str);
-    if (src_type == "DAG")
-    {
-        if (!src_path.parse_dag(src_str, this))
-            return errh->error("unable to parse DAG: %s", src_str.c_str());
-    }
-    else if (src_type == "RE")
-    {
-        if (!src_path.parse_re(src_str, this))
-            return errh->error("unable to parse DAG: %s", src_str.c_str());
-    }
-    else
-        return errh->error("unrecognized src type: %s", src_type.c_str());
 
     if (nxt >= 0)
         _xiah->set_nxt(nxt);

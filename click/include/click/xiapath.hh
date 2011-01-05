@@ -19,11 +19,14 @@ class XIAPath { public:
 
     void reset();
 
+    // parse a string representation prefixed by its type (DAG or RE)
+    bool parse(const String& s, const Element* context = NULL);
+
     // parse a DAG string representation
-    bool parse_dag(const String& s, Element* context = NULL);
+    bool parse_dag(const String& s, const Element* context = NULL);
 
     // parse a RE string representation
-    bool parse_re(const String& s, Element* context = NULL);
+    bool parse_re(const String& s, const Element* context = NULL);
 
     // parse a node list (in the XIA header format)
     template <typename InputIterator>
@@ -32,11 +35,14 @@ class XIAPath { public:
     template <typename InputIterator>
     void parse_node(InputIterator node_begin, size_t n);
 
+    // unparse to a string representation prefixed by its type
+    String unparse(const Element* context = NULL);
+
     // unparse to a DAG string representation
-    String unparse_dag(Element* context = NULL);
+    String unparse_dag(const Element* context = NULL);
 
     // unparse to a RE string representation
-    String unparse_re(Element* context = NULL);
+    String unparse_re(const Element* context = NULL);
 
     // size of unparsed node list
     size_t unparse_node_size() const;

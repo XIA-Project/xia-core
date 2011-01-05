@@ -1,7 +1,8 @@
-#ifndef CLICK_RPC_HH
-#define CLICK_RPC_HH
+#ifndef CLICK_XIARPC_HH
+#define CLICK_XIARPC_HH
 #include <click/element.hh>
 #include <click/string.hh>
+#include <click/xiapath.hh>
 #include "../../userlevel/xia.pb.h"
 
 //#define NUM_PORTS 10
@@ -12,19 +13,18 @@ CLICK_DECLS
 
 */
 
-class rpc : public Element { public:
+class XIARPC : public Element { public:
 
-    rpc();
-    ~rpc();
+    XIARPC();
+    ~XIARPC();
   
-  const char *class_name() const		{ return "rpc"; }
-  const char *port_count() const		{ return "2/2"; }  
+  const char *class_name() const		{ return "XIARPC"; }
+  const char *port_count() const		{ return "3/3"; }  
   const char *processing() const		{ return "a/h"; }  
 
   //void static_initialize();
   int initialize();
-  int configure();
-  bool can_live_reconfigure() const		{ return true; }
+  int configure(Vector<String> &, ErrorHandler *);
   void add_handlers();
   void push(int, Packet *);
   //Packet *pull (int);
@@ -36,13 +36,16 @@ class rpc : public Element { public:
   //    bool _active;
   int computeOutputPort (int);
   WritablePacket* generateXIAPacket (xia::msg_request &msg);
-  char* receive(Packet *p);
+
+  void append(Packet *p);
+  char* receive(size_t len);
   
-  uint32_t desired_len;
-  uint32_t nread;
-  char * buffer;
-  char * remaining_buffer;
-  uint32_t message_len;
+  char* _buffer;
+  size_t _buffer_size;
+  size_t _buffer_capacity;
+  uint32_t _message_len;
+
+  XIAPath _local_addr;
 };
 
 CLICK_ENDDECLS

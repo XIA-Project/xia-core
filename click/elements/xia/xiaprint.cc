@@ -148,22 +148,8 @@ void XIAPrint::print_xids(StringAccum &sa, const struct click_xia *xiah)
 
     String s;
 
-    sa << "SRC ";
-   
-    s = src.unparse_re(this);
-    if (s.length() != 0)
-        sa << "RE " << s;
-    else
-        sa << "DAG " << src.unparse_dag(this);
-
-    sa << ", DST ";
-
-    s = dst.unparse_re(this);
-    if (s.length() != 0)
-        sa << "RE " << s;
-    else
-        sa << "DAG " << dst.unparse_dag(this);
-
+    sa << "SRC " << src.unparse(this);
+    sa << ", DST " << src.unparse(this);
 }
 
 Packet *

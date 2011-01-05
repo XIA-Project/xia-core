@@ -45,7 +45,20 @@ XIAPath::reset()
 }
 
 bool
-XIAPath::parse_dag(const String& s, Element* context)
+XIAPath::parse(const String& s, const Element* context)
+{
+    String str_copy = s;
+    String type = cp_shift_spacevec(str_copy);
+    if (type == "DAG")
+        return parse_dag(str_copy, context);
+    else if (type == "RE")
+        return parse_re(str_copy, context);
+    else
+        return false;
+}
+
+bool
+XIAPath::parse_dag(const String& s, const Element* context)
 {
     reset();
 
@@ -83,7 +96,11 @@ XIAPath::parse_dag(const String& s, Element* context)
             break;
 
         // parse XID
+#ifndef CLICK_TOOL
         if (!cp_xid(xid_str, &xid, context))
+#else
+        if (!cp_xid(xid_str, &xid))
+#endif
         {
             click_chatter("unrecognized XID format: %s", xid_str.c_str());
             return false;
@@ -128,7 +145,7 @@ XIAPath::parse_dag(const String& s, Element* context)
 }
 
 bool
-XIAPath::parse_re(const String& s, Element* context)
+XIAPath::parse_re(const String& s, const Element* context)
 {
     reset();
 
@@ -158,7 +175,11 @@ XIAPath::parse_re(const String& s, Element* context)
                     break;
 
                 click_xia_xid xid;
+#ifndef CLICK_TOOL
                 if (!cp_xid(tail, &xid, context))
+#else
+                if (!cp_xid(tail, &xid))
+#endif
                 {
                     click_chatter("unrecognized XID format: %s", tail.c_str());
                     return false;
@@ -170,7 +191,11 @@ XIAPath::parse_re(const String& s, Element* context)
 
         // parse the next main node
         click_xia_xid next_xid;
+#ifndef CLICK_TOOL
         if (!cp_xid(head, &next_xid, context))
+#else
+        if (!cp_xid(head, &next_xid))
+#endif
         {
             click_chatter("unrecognized XID format: %s", head.c_str());
             return false;
@@ -287,7 +312,18 @@ template void XIAPath::parse_node(const struct click_xia_xid_node*, size_t);
 template void XIAPath::parse_node(struct click_xia_xid_node*, size_t);
 
 String
-XIAPath::unparse_dag(Element* context)
+XIAPath::unparse(const Element* context)
+{
+    String s = unparse_re(context);
+    if (s.length() != 0)
+        s = String("RE ") + s;
+    else
+        s = String("DAG ") + unparse_dag(context);
+    return s;
+}
+
+String
+XIAPath::unparse_dag(const Element* context)
 {
     // unparsing to DAG string representation requires unparsing to a node list.
     // the graph in XIAPath itself is incompatible to our own DAG because
@@ -331,7 +367,7 @@ XIAPath::unparse_dag(Element* context)
 }
 
 String
-XIAPath::unparse_re(Element* context)
+XIAPath::unparse_re(const Element* context)
 {
     // try to unparse to RE string representation directly from the graph
 

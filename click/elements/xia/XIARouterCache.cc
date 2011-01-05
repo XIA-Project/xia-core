@@ -25,29 +25,18 @@ XIARouterCache::~XIARouterCache(){}
 int 
 XIARouterCache::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-   bool ad_given, hid_given;
-   String sad, shid;   
    String routing_table_name;   
+   Element* routing_table_elem;
 //   std::cout<<"enter configure"<<std::endl;
    if (cp_va_kparse(conf, this, errh,
-		"ROUTETABLENAME", cpkN, cpString, &routing_table_name,
-		"AD", cpkC, &ad_given, cpString, &sad,
-		"HID", cpkC, &hid_given, cpString, &shid,
+                "LOCAL_ADDR", cpkP+cpkM, cpXIAPath, &local_addr,
+		"ROUTETABLENAME", cpkP+cpkM, cpElement, &routing_table_elem,
                 cpEnd) < 0)
     return -1;
-    routeTable = dynamic_cast<XIAXIDRouteTable*>( router()->find( routing_table_name ) );
-    if(ad_given)
-    {
-      std::cout<<"ad: "<<sad.c_str()<<std::endl;
-      ad.parse(sad);
- //     std::cout<<ad.unparse().c_str()<<std::endl;
-    }
-    if(hid_given)
-    {
-      std::cout<<"hid: "<<shid.c_str()<<std::endl;
-      hid.parse(shid);
-    }
+    routeTable = dynamic_cast<XIAXIDRouteTable*>(routing_table_elem);
 //    std::cout<<"pkt size: "<<PKTSIZE<<std::endl;
+    if (!routeTable)
+        return -1;
     return 0;
 }
 int 
@@ -162,7 +151,7 @@ void XIARouterCache::push(int, Packet *p)
 //    std::cout<<"length is "<<length<<std::endl;
 //    std::cout<<"chunkSize is "<<chunkSize<<std::endl;
     
-    if(dstID==hid)
+    if(dstID==local_addr.xid(local_addr.destination_node()))
     {
 //      std::cout<<"dstID is myself"<<std::endl;
       HashTable<XID,CChunk*>::iterator it,oit;
@@ -222,8 +211,9 @@ void XIARouterCache::push(int, Packet *p)
 	WritablePacket *newp = Packet::make(hdrsize, chunk->GetPayload() , chunkSize, 20 );		
 	//build packet	
 	contenth.encap(newp);
+        encap.set_plen(chunkSize);
 	// add XIA header
-	encap.encap( newp );	
+	encap.encap( newp, false );	
 //std::cout<<"made new full-chunk pkt, chunkSize is "<<chunkSize<<", hdrsize is "<<hdrsize<<std::endl;
 	checked_output_push(0 , newp);
 //std::cout<<"have pushed out"<<std::endl;
@@ -342,18 +332,13 @@ void XIARouterCache::push(int, Packet *p)
       XIAHeaderEncap encap;
       XIAHeader hdr(p);
       XIAPath myown_source;  // AD:HID:CID add_node, add_edge
+
+      myown_source = local_addr;
+      handle_t _cid = myown_source.add_node(dstID);
       
-      handle_t _dummy=myown_source.add_node(XID());
-      handle_t _ad = myown_source.add_node(ad); 
-      handle_t _rhid = myown_source.add_node(hid);
-      handle_t _cid=myown_source.add_node(dstID);
-      
-      myown_source.set_source_node(_dummy);
+      myown_source.add_edge(myown_source.source_node(), _cid);
+      myown_source.add_edge(myown_source.destination_node(),_cid);
       myown_source.set_destination_node(_cid);
-      myown_source.add_edge(_dummy,_cid);
-      myown_source.add_edge(_dummy,_ad);
-      myown_source.add_edge(_ad,_rhid);
-      myown_source.add_edge(_rhid,_cid);
       
       encap.set_src_path(myown_source);
       encap.set_dst_path(hdr.src_path());      
@@ -371,8 +356,9 @@ void XIARouterCache::push(int, Packet *p)
 	WritablePacket *newp = Packet::make(hdrsize, pl + cp , l, 20 );	
 	//build packet	
 	contenth.encap(newp);
+        encap.set_plen(l);
 	// add XIA header
-	encap.encap( newp );	
+	encap.encap( newp, false );	
 	checked_output_push(0 , newp);
 	cp += l;
       }

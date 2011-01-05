@@ -1,18 +1,3 @@
-elementclass Destination {
-    $name |
-    input -> Print("packet received by $name") -> XIAPrint(HLIM true) -> output;
-};
-
-elementclass SrcTypeCIDPreRouteProc {
-    // input: a packet
-    // output: a packet (passthru)
-
-    input -> dup :: Tee(2);
-
-    dup[0] -> output;
-    dup[1] -> store_to_cache :: Discard;    // TODO : insert into cache and update route
-};
-
 elementclass GenericRouting4Port {
     // input: a packet to route
     // output[0]: forward to port 0~3 (painted)
@@ -33,7 +18,7 @@ elementclass GenericPostRouteProc {
 }
 
 elementclass XIAPacketRoute {
-    $name |
+    $local_addr |
     // input: a packet to process
     // output[0]: forward (painted)
     // output[1]: arrived at destination node
@@ -44,7 +29,7 @@ elementclass XIAPacketRoute {
     consider_next_path :: XIASelectPath(next);
     c :: XIAXIDTypeClassifier(next AD, next HID, next SID, next CID, -);
 
-    //input -> Print("packet received by $name") -> check_dest;
+    //input -> Print("packet received by $local_addr") -> check_dest;
     input -> check_dest;
 
     check_dest[0] -> [1]output; // arrived at the final destination
@@ -87,84 +72,86 @@ elementclass XIAPacketRoute {
 };
 
 elementclass RouteEngine {
-    $name |
+    $local_addr |
     // input: a packet arrived at a node 
     // output[0]: forward (painted)
-    // output[1]: arrived at destination node
+    // output[1]: arrived at destination node; go to RPC
+    // output[1]: arrived at destination node; go to cache
 
     srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
-    proc :: XIAPacketRoute($name);
+    proc :: XIAPacketRoute($local_addr);
+    dstTypeClassifier :: XIAXIDTypeClassifier(dst CID, -);
 
-    input -> srcTypeClassifier[0] -> SrcTypeCIDPreRouteProc -> proc;
-    srcTypeClassifier[1] -> proc;
+    input[0] -> srcTypeClassifier;
 
-    proc[0] -> [0]output; // Forward to other interface
-    proc[1] -> [1]output; // Travel up the stack
+    srcTypeClassifier[0] -> [2]output;  // To cache (for content caching)
+
+    srcTypeClassifier[1] -> proc;       // Main routing process
+
+    proc[0] -> [0]output;               // Forward to other interface
+
+    proc[1] -> dstTypeClassifier;
+    dstTypeClassifier[1] -> [1]output;  // To RPC
+
+    dstTypeClassifier[0] -> [2]output;  // To cache (for serving content request)
+
     proc[2] -> Discard;  // No route drop (future TODO: return an error packet)
 };
 
 // 1-port host node
 elementclass Host {
-    $hid |
+    $local_addr, $local_hid, $rpc_port |
 
     // input: a packet arrived at a node 
-    // output[0]: forward to port 0
-    // output[1]: to destination handler
+    // output: forward to interface 0
 
     n :: RouteEngine($hid);
+    sock :: Socket(TCP, 0.0.0.0, $rpc_port, CLIENT false);
+    rpc :: XIARPC($local_addr);
+    cache :: XIARouterCache($local_addr, n/proc/rt_CID/rt);
 
     Script(write n/proc/rt_AD/rt.add - 0);      // default route for AD
     Script(write n/proc/rt_HID/rt.add - 0);     // default route for HID
-    Script(write n/proc/rt_HID/rt.add $hid 4);  // self HID as destination
+    Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self HID as destination
     Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
 
     input[0] -> n;
-    input[1] -> n;
-    n[0] -> Queue(200) -> [0]output;
-    n[1] -> [1]output;
+
+    sock -> [0]rpc[0] -> sock;
+    n[1] -> [1]rpc[1] -> n;
+    n[2] -> [0]cache[0] -> n;
+    rpc[2] -> [1]cache[1] -> [2]rpc;
+
+    n -> Queue(200) -> [0]output;
 };
 
 // 2-port router node
 elementclass Router {
-    $ad, $hid |
+    $local_addr, $local_ad |
 
-    // input: a packet arrived at a node 
-    // output[0]: forward to port 0 (for $hid)
-    // output[1]: forward to port 1 (for other ads)
+    // input[0], input[1]: a packet arrived at a node (regardless of interface)
+    // output[0]: forward to interface 0 (for hosts in local ad)
+    // output[1]: forward to interface 1 (for other ads)
 
     n :: RouteEngine($ad);
+    cache :: XIARouterCache($local_addr, n/proc/rt_CID/rt);
     
     Script(write n/proc/rt_AD/rt.add - 1);      // default route for AD
-    Script(write n/proc/rt_AD/rt.add $ad 4);    // self AD as destination
-    Script(write n/proc/rt_HID/rt.add $hid 0);  // forwarding for local HID
+    Script(write n/proc/rt_AD/rt.add $local_ad 4);    // self AD as destination
+    Script(write n/proc/rt_HID/rt.add - 0);     // forwarding for local HID
     Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
 
     input[0] -> n;
     input[1] -> n;
+
     n[0] -> sw :: PaintSwitch
+    n[1] -> Discard;
+    n[2] -> [0]cache[0] -> n;
+    Idle -> [1]cache[1] -> Discard;
+
     sw[0] -> Queue(200) -> [0]output;
     sw[1] -> Queue(200) -> [1]output;
-    n[1] -> Discard;
-};
-
-elementclass RPC {
-    $port, $isClient|
-
-    sock::Socket(TCP, 0.0.0.0,$port, CLIENT $isClient);
-
-    r::rpc();
-
-    //localHost_out:: Print(CONTENTS 'ASCII') -> Discard;  //Replace Print for HID0
-    //localHost_in0::TimedSource(INTERVAL 10, DATA "Application0 Request Served!") //Replace TimeSource for HID0
-    //localHost_in1::TimedSource(INTERVAL 10, DATA "Application1 Request Served!") //Replace TimeSource for HID0
-    //localHost_in2::TimedSource(INTERVAL 10, DATA "Application2 Request Served!") //Replace TimeSource for HID0
-
-    sock -> [1] r;
-    r[1] -> sock;
-
-    r[0] -> output;
-    input -> [0] r;
 };
 

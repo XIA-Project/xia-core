@@ -2077,6 +2077,27 @@ cp_xid(const String& str, struct click_xia_xid* xid  CP_CONTEXT)
     return true;
 }
 
+bool
+cp_xia_path(const String& str, XIAPath* xia_path  CP_CONTEXT)
+{
+    *xia_path = XIAPath();
+    return xia_path->parse(str  CP_PASS_CONTEXT);
+}
+
+bool
+cp_xia_path_dag(const String& str, XIAPath* xia_path  CP_CONTEXT)
+{
+    *xia_path = XIAPath();
+    return xia_path->parse_dag(str  CP_PASS_CONTEXT);
+}
+
+bool
+cp_xia_path_re(const String& str, XIAPath* xia_path  CP_CONTEXT)
+{
+    *xia_path = XIAPath();
+    return xia_path->parse_re(str  CP_PASS_CONTEXT);
+}
+
 
 /** @brief Parse an IP address or prefix from @a str.
  * @param  str  string
@@ -2887,7 +2908,11 @@ const CpVaParseCmd
   cpTimeval		= "timeval",
   cpBandwidth		= "bandwidth_Bps",
   cpIPAddress		= "ip_addr",
+  cpXIDType	        = "xid_type",
   cpXID		        = "xid",
+  cpXIAPath		= "xia_path",
+  cpXIAPathDAG		= "xia_path_dag",
+  cpXIAPathRE		= "xia_path_re",
   cpIPPrefix		= "ip_prefix",
   cpIPAddressOrPrefix	= "ip_addr_or_prefix",
   cpIPAddressList	= "ip_addr_list",
@@ -2950,7 +2975,11 @@ enum {
   cpiTimeval,
   cpiBandwidth,
   cpiIPAddress,
+  cpiXIDType,
   cpiXID,
+  cpiXIAPath,
+  cpiXIAPathDAG,
+  cpiXIAPathRE,
   cpiIPPrefix,
   cpiIPAddressOrPrefix,
   cpiIPAddressList,
@@ -3262,8 +3291,28 @@ default_parsefunc(cp_value *v, const String &arg,
     }
     break;
 
+   case cpiXIDType:
+    if (!cp_xid_type(arg, &v->v.xid_type))
+      goto type_mismatch;
+    break;
+
    case cpiXID:
     if (!cp_xid(arg, &v->v.xid CP_PASS_CONTEXT))
+      goto type_mismatch;
+    break;
+
+   case cpiXIAPath:
+    if (!cp_xia_path(arg, &v->xia_path CP_PASS_CONTEXT))
+      goto type_mismatch;
+    break;
+
+   case cpiXIAPathDAG:
+    if (!cp_xia_path_dag(arg, &v->xia_path CP_PASS_CONTEXT))
+      goto type_mismatch;
+    break;
+
+   case cpiXIAPathRE:
+    if (!cp_xia_path_re(arg, &v->xia_path CP_PASS_CONTEXT))
       goto type_mismatch;
     break;
 
@@ -3523,10 +3572,24 @@ default_storefunc(cp_value *v  CP_CONTEXT)
      break;
    }
 
+   case cpiXIDType: {
+     int* xid_type_store = (int*)v->store;
+     *xid_type_store = v->v.xid_type;
+     break;
+   }
+
    case cpiXID: {
-       unsigned char *addrstore = (unsigned char *)v->store;
-       memcpy(addrstore, &v->v.xid, sizeof(v->v.xid));
-       break;
+     struct click_xia_xid* xid_store = (struct click_xia_xid*)v->store;
+     *xid_store = v->v.xid;
+     break;
+   }
+
+   case cpiXIAPath:
+   case cpiXIAPathDAG:
+   case cpiXIAPathRE: {
+     XIAPath* xia_path_store = (XIAPath*)v->store;
+     *xia_path_store = v->xia_path;
+     break;
    }
 
    case cpiIPAddress:
@@ -4907,7 +4970,11 @@ cp_va_static_initialize()
     cp_register_argtype(cpTimeval, "seconds since the epoch", 0, default_parsefunc, default_storefunc, cpiTimeval);
     cp_register_argtype(cpBandwidth, "bandwidth", 0, default_parsefunc, default_storefunc, cpiBandwidth);
     cp_register_argtype(cpIPAddress, "IP address", 0, default_parsefunc, default_storefunc, cpiIPAddress);
+    cp_register_argtype(cpXIDType, "XID Type", 0, default_parsefunc, default_storefunc, cpiXIDType);
     cp_register_argtype(cpXID, "XID", 0, default_parsefunc, default_storefunc, cpiXID);
+    cp_register_argtype(cpXIAPath, "XIA path", 0, default_parsefunc, default_storefunc, cpiXIAPath);
+    cp_register_argtype(cpXIAPathDAG, "XIA path in DAG", 0, default_parsefunc, default_storefunc, cpiXIAPathDAG);
+    cp_register_argtype(cpXIAPathRE, "XIA path in RE", 0, default_parsefunc, default_storefunc, cpiXIAPathRE);
     cp_register_argtype(cpIPPrefix, "IP address prefix", cpArgStore2, default_parsefunc, default_storefunc, cpiIPPrefix);
     cp_register_argtype(cpIPAddressOrPrefix, "IP address or prefix", cpArgStore2, default_parsefunc, default_storefunc, cpiIPAddressOrPrefix);
     cp_register_argtype(cpIPAddressList, "list of IP addresses", 0, default_parsefunc, default_storefunc, cpiIPAddressList);

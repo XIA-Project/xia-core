@@ -61,12 +61,12 @@ typedef XIAPath::handle_t handle_t;
     XIARouterCache();
     ~XIARouterCache();
     const char *class_name() const		{ return "XIARouterCache"; }
-    const char *port_count() const		{ return "1/-"; }
+    const char *port_count() const		{ return "2/2"; }
     const char *processing() const		{ return PUSH; }
     int configure(Vector<String> &, ErrorHandler *);         
     void push(int port, Packet *);            
   private:
-    XID ad, hid;    
+    XIAPath local_addr;
     XIAXIDRouteTable *routeTable;  //XIAXIDRouteTable 
     HashTable<XID,CChunk*> partialTable;
     HashTable<XID, CChunk*> contentTable;
