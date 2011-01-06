@@ -41,7 +41,7 @@ XIAGenericExtHeader::populate_map()
     _map.clear();
 
     const uint8_t* d = _hdr->data;
-    const uint8_t* end = reinterpret_cast<const uint8_t*>(_hdr) + _hdr->hlen;
+    const uint8_t* end = _hdr->data + _hdr->hlen;
     while (d < end)
     {
         uint8_t kv_len = *d++;
@@ -55,7 +55,7 @@ XIAGenericExtHeader::populate_map()
         if (d + kv_len > end)
         {
             click_chatter("invalid kv_len or hlen");
-std::cout<<"kv_len: "<<(int)kv_len<<",d: "<<(int)d<<",end: "<<(int)end<<std::endl;
+            //std::cout<<"kv_len: "<<(int)kv_len<<",d: "<<(int)d<<",end: "<<(int)end<<std::endl;
             break;
         }
 
