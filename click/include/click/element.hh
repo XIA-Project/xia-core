@@ -607,9 +607,10 @@ Element::Port::pull() const
     Packet *p = _e->pull(_port);
 #endif
 #if CLICK_STATS >= 1
-    if (p)
+    if (p) {
 	++_packets;
-    click_chatter("packet %x pulled from element %s (%s)", p, _e->name().c_str(), _e->class_name());
+        click_chatter("packet %x pulled from element %s (%s)", p, _e->name().c_str(), _e->class_name());
+    }
 #endif
     return p;
 }
