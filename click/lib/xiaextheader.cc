@@ -49,7 +49,7 @@ XIAGenericExtHeader::populate_map()
             break;
         }
 
-        if (d + kv_len >= end)
+        if (d + kv_len > end)
         {
             click_chatter("invalid kv_len or hlen");
             break;
