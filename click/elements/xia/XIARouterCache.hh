@@ -67,7 +67,7 @@ typedef XIAPath::handle_t handle_t;
     int configure(Vector<String> &, ErrorHandler *);         
     void push(int port, Packet *);            
   private:
-    XID ad, hid;    
+    XIAPath local_addr;
     XIAXIDRouteTable *routeTable;  //XIAXIDRouteTable 
     HashTable<XID,CChunk*> partialTable;
     HashTable<XID, CChunk*> contentTable;
