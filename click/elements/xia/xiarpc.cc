@@ -135,7 +135,7 @@ XIARPC::push(int port, Packet *p)
 
     click_chatter("desired len %d\n", _message_len); 
 
-    char* message = receive(NULL); 
+    char* message = receive(_message_len); 
     if (message == NULL)
 	return;
 
