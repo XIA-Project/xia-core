@@ -5,14 +5,14 @@
 #include <clicknet/xia.h>
 #include <click/xid.hh>
 #include <click/hashtable.hh>
-//#include <map>
-#include <list>
-#include <string.h>
-#include <iostream>
-
 #include "xiaxidroutetable.hh"
 #include <click/handlercall.hh>
 #include <click/xiapath.hh>
+
+#include <list>
+#include <string.h>
+#include <stdio.h>
+#include <iostream>
 
 #define CACHESIZE 1024*1024*1024    //in router 
 //#define CLIENTCACHE
@@ -27,7 +27,6 @@ class CPart{
     unsigned int offset;
     unsigned int length;
 };
-
 
 class CChunk{
   public:
@@ -52,10 +51,6 @@ class CChunk{
     
     void Merge(std::list<CPart>::iterator);
 };
-
-
-
-
 
 class XIARouterCache : public Element { 
   public:
@@ -88,7 +83,7 @@ typedef XIAPath::handle_t handle_t;
     int MakeSpace(int);    
     //modify routing table
     void addRoute(const XID &cid) {
-std::cout<<"addRoute"<<std::endl;
+//std::cout<<"addRoute"<<std::endl;
 	String cmd=cid.unparse()+" 4";
 	HandlerCall::call_write(routeTable, "add", cmd);
     }    
