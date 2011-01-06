@@ -85,7 +85,7 @@ XIARPC::generateXIAPacket (xia::msg &msg)  {
 void XIARPC::append(Packet *p)
 {
     size_t required_size = _buffer_size + p->length();
-    if (_buffer_size + p->length() > _buffer_capacity)
+    if (required_size > _buffer_capacity)
     {
         if (required_size == 0)
             _buffer_capacity = 1;
