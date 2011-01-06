@@ -86,7 +86,8 @@ elementclass RouteEngine {
     input[0] -> srcTypeClassifier;
     input[1] -> proc;
 
-    srcTypeClassifier[0] -> [2]output;  // To cache (for content caching)
+    srcTypeClassifier[0] -> cidFork :: Tee(2) -> [2]output;  // To cache (for content caching)
+    cidFork[1] -> proc;                 // Main routing process
 
     srcTypeClassifier[1] -> proc;       // Main routing process
 
