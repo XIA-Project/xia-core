@@ -9,6 +9,9 @@
 #if CLICK_USERLEVEL
 # include <unistd.h>
 #endif
+
+#include <iostream>
+
 CLICK_DECLS
 
 /** @file xiaextheader.hh
@@ -52,6 +55,7 @@ XIAGenericExtHeader::populate_map()
         if (d + kv_len > end)
         {
             click_chatter("invalid kv_len or hlen");
+std::cout<<"kv_len: "<<(int)kv_len<<",d: "<<(int)d<<",end: "<<(int)end<<std::endl;
             break;
         }
 

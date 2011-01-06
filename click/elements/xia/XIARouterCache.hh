@@ -15,7 +15,7 @@
 #include <click/xiapath.hh>
 
 #define CACHESIZE 1024*1024*1024    //in router 
-#define CLIENTCACHE
+//#define CLIENTCACHE
 #define PACKETSIZE 64*1024		
 
 CLICK_DECLS
