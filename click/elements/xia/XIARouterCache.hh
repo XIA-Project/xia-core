@@ -11,12 +11,13 @@
 
 #include "xiaxidroutetable.hh"
 #include <click/handlercall.hh>
-
 #include <click/xiapath.hh>
 
+#define CACHESIZE 1024*1024*1024    //in router 
+//#define CLIENTCACHE
+#define PACKETSIZE 64*1024		
+
 CLICK_DECLS
-
-
 
 class CPart{
   public: 
@@ -66,7 +67,7 @@ typedef XIAPath::handle_t handle_t;
     int configure(Vector<String> &, ErrorHandler *);         
     void push(int port, Packet *);            
   private:
-    XIAPath local_addr;
+    XID ad, hid;    
     XIAXIDRouteTable *routeTable;  //XIAXIDRouteTable 
     HashTable<XID,CChunk*> partialTable;
     HashTable<XID, CChunk*> contentTable;
@@ -74,8 +75,8 @@ typedef XIAPath::handle_t handle_t;
     HashTable<XID, CChunk*> oldPartial;
     
     unsigned int usedSize;
-    static const unsigned int MAXSIZE=1024*1024*1024;
-    static const unsigned int PKTSIZE=100;    
+    static const unsigned int MAXSIZE=CACHESIZE;
+    static const unsigned int PKTSIZE=PACKETSIZE;    
     //lru    
     static const int REFRESH=10000;
     int timer;
