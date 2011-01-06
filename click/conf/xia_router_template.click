@@ -73,16 +73,18 @@ elementclass XIAPacketRoute {
 
 elementclass RouteEngine {
     $local_addr |
-    // input: a packet arrived at a node 
+    // input[0]: a packet arrived at a node from outside (i.e. routing with caching)
+    // input[1]: a packet to send from a node (i.e. routing without caching)
     // output[0]: forward (painted)
     // output[1]: arrived at destination node; go to RPC
-    // output[1]: arrived at destination node; go to cache
+    // output[2]: arrived at destination node; go to cache
 
     srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
     proc :: XIAPacketRoute($local_addr);
     dstTypeClassifier :: XIAXIDTypeClassifier(dst CID, -);
 
     input[0] -> srcTypeClassifier;
+    input[1] -> proc;
 
     srcTypeClassifier[0] -> [2]output;  // To cache (for content caching)
 
@@ -119,8 +121,8 @@ elementclass Host {
     input[0] -> n;
 
     sock -> [0]rpc[0] -> sock;
-    n[1] -> [1]rpc[1] -> n;
-    n[2] -> [0]cache[0] -> n;
+    n[1] -> [1]rpc[1] -> [0]n;
+    n[2] -> [0]cache[0] -> [1]n;
     rpc[2] -> [1]cache[1] -> [2]rpc;
 
     n -> Queue(200) -> [0]output;
@@ -143,12 +145,12 @@ elementclass Router {
     Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
 
-    input[0] -> n;
-    input[1] -> n;
+    input[0] -> [0]n;
+    input[1] -> [0]n;
 
     n[0] -> sw :: PaintSwitch
     n[1] -> Discard;
-    n[2] -> [0]cache[0] -> n;
+    n[2] -> [0]cache[0] -> [1]n;
     Idle -> [1]cache[1] -> Discard;
 
     sw[0] -> Queue(200) -> [0]output;
