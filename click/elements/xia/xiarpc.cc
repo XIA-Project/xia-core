@@ -58,7 +58,7 @@ XIARPC::computeOutputPort (int inputPort)
 }
 
 WritablePacket*
-XIARPC::generateXIAPacket (xia::msg_request &msg)  {
+XIARPC::generateXIAPacket (xia::msg &msg)  {
     WritablePacket *p_click = WritablePacket::make (256, msg.payload().c_str(), msg.payload().length(), 0);  // constructing payload
     if (!p_click) {
       printf ("error: construct a click packet\n");  
@@ -84,9 +84,20 @@ XIARPC::generateXIAPacket (xia::msg_request &msg)  {
 
 void XIARPC::append(Packet *p)
 {
+    size_t required_size = _buffer_size + p->length();
     if (_buffer_size + p->length() > _buffer_capacity)
     {
-        _buffer_capacity <<= 1;
+        if (required_size == 0)
+            _buffer_capacity = 1;
+        else
+        {
+            // next power of 2
+            _buffer_capacity = required_size - 1;
+            for (size_t i = 1; i < sizeof(_buffer_capacity) * 8; i <<= 1)
+                _buffer_capacity = _buffer_capacity | _buffer_capacity >> i;
+            _buffer_capacity++;
+        }
+
         _buffer = (char*)realloc(_buffer, _buffer_capacity);
         assert(_buffer);
     }
@@ -117,7 +128,7 @@ XIARPC::push(int port, Packet *p)
 {   
   if (port == 0)  {                                   // from socket
     click_chatter("RPC at %s: packet from socket", _local_addr.unparse(this).c_str());
-    xia::msg_request msg;
+    xia::msg msg;
 
     append(p);
     p->kill();
@@ -181,7 +192,7 @@ XIARPC::push(int port, Packet *p)
 
     //printf("RPC received payload:\n%spay_len: %d\nheadersize: %d\n", (char*)xiah.payload(), xiah.plen(), xiah.hdr_size());
     //construct protobuf-based msg
-    xia::msg_request msg_protobuf;
+    xia::msg msg_protobuf;
     std::string data_response;
 	   // msg2.set_appid(port/2);
 	   //     msg2.add_xid("00000000000000000000");

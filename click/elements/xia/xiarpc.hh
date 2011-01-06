@@ -23,15 +23,11 @@ class XIARPC : public Element { public:
   void push(int, Packet *);
 
  private:
-  int computeOutputPort (int, int);
+  int computeOutputPort (int);
   WritablePacket* generateXIAPacket (xia::msg &msg);
 
   void append(Packet *p);
-  char* receive(Packet *p);
-  uint32_t desired_len;
-  uint32_t nread;
-  char * buffer;
-  char * remaining_buffer;
+  char* receive(size_t len);
 
   char* _buffer;
   size_t _buffer_size;
