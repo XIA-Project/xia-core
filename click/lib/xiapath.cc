@@ -325,6 +325,9 @@ XIAPath::unparse(const Element* context)
 String
 XIAPath::unparse_dag(const Element* context)
 {
+    if (!is_valid())
+        return "";
+
     // unparsing to DAG string representation requires unparsing to a node list.
     // the graph in XIAPath itself is incompatible to our own DAG because
     // the graph does not enforce a fixed location for the source and destination nodes.
@@ -369,6 +372,9 @@ XIAPath::unparse_dag(const Element* context)
 String
 XIAPath::unparse_re(const Element* context)
 {
+    if (!is_valid())
+        return "";
+
     // try to unparse to RE string representation directly from the graph
 
     StringAccum sa;
