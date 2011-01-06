@@ -23,12 +23,17 @@ XIACheckDest::push(int, Packet *p)
 {
     const struct click_xia* hdr = p->xia_header();
     if (!hdr)
+    {
         p->kill();
+        return;
+    }
+
     if (hdr->last >= (int)hdr->dnode)
     {
         // invalid packet
         click_chatter("packet killed due to invalid last pointer\n");
         p->kill();
+        return;
     }
 
     if (hdr->last == (int)hdr->dnode - 1)

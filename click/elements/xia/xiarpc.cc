@@ -12,7 +12,7 @@ CLICK_DECLS
 
 XIARPC::XIARPC() : _buffer(NULL), _buffer_size(0), _buffer_capacity(0), _message_len(0)
 {
-  
+  GOOGLE_PROTOBUF_VERIFY_VERSION;  
 }
 
 XIARPC::~XIARPC()
@@ -115,7 +115,6 @@ char* XIARPC::receive(size_t len)
 void 
 XIARPC::push(int port, Packet *p)
 {   
-  GOOGLE_PROTOBUF_VERIFY_VERSION;  
   if (port == 0)  {                                   // from socket
     click_chatter("RPC at %s: packet from socket", _local_addr.unparse(this).c_str());
     xia::msg_request msg;
@@ -177,6 +176,8 @@ XIARPC::push(int port, Packet *p)
     //read xia header
     XIAHeader xiah(p);
     std::string payload((const char*)xiah.payload(), xiah.plen());
+    p->kill();
+    p = NULL;
 
     //printf("RPC received payload:\n%spay_len: %d\nheadersize: %d\n", (char*)xiah.payload(), xiah.plen(), xiah.hdr_size());
     //construct protobuf-based msg
