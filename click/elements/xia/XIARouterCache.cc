@@ -256,7 +256,7 @@ void XIARouterCache::push(int port, Packet *p)
 	    partialTable[srcID]=chunk;
 	  }
 	}
-      }  
+      } 
       if(chunkFull)  //have built the whole chunk pkt
       {
 //std::cout<<"chunk is complete"<<std::endl;
@@ -283,7 +283,6 @@ void XIARouterCache::push(int port, Packet *p)
 	content[srcID]=1;
 	addRoute(srcID);
 #endif
-	p->kill();
 #ifndef CLIENTCACHE	
 	delete chunk;
 #endif	
@@ -327,6 +326,7 @@ void XIARouterCache::push(int port, Packet *p)
 	}	
 #endif
       }
+      p->kill();            
     }
     //cache in server, router
     else
@@ -411,9 +411,9 @@ void XIARouterCache::push(int port, Packet *p)
 	    }
 	    timer=0;
 	  }
-	  p->kill();
-//printf("end: dstID is not myself\n");
       }
+      p->kill();
+//printf("end: dstID is not myself\n");
     }
   }
   else if(dst_xid_type==cid_type)  //look_up,  chunk request
@@ -506,6 +506,7 @@ void XIARouterCache::push(int port, Packet *p)
   }  
   else
   {
+    p->kill();
 //std::cout<<"src and dst are not CID"<<std::endl;
   }
 //std::cout<<"leave push"<<std::endl;

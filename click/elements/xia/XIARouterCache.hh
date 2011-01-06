@@ -1,5 +1,6 @@
 #ifndef CLICK_XIAROUTERCACHE_HH
 #define CLICK_XIAROUTERCACHE_HH
+
 #include <click/element.hh>
 #include <click/hashtable.hh>
 #include <clicknet/xia.h>
@@ -93,8 +94,8 @@ typedef XIAPath::handle_t handle_t;
     }    
 };
 
-
 CLICK_ENDDECLS
+
 #endif
 
 
