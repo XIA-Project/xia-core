@@ -130,7 +130,7 @@ elementclass Host {
 
 // 2-port router node
 elementclass Router {
-    $local_addr, $local_ad |
+    $local_addr, $local_ad, $local_hid |
 
     // input[0], input[1]: a packet arrived at a node (regardless of interface)
     // output[0]: forward to interface 0 (for hosts in local ad)
@@ -142,6 +142,7 @@ elementclass Router {
     Script(write n/proc/rt_AD/rt.add - 1);      // default route for AD
     Script(write n/proc/rt_AD/rt.add $local_ad 4);    // self AD as destination
     Script(write n/proc/rt_HID/rt.add - 0);     // forwarding for local HID
+    Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self HID as destination
     Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
 
