@@ -72,7 +72,8 @@ typedef XIAPath::handle_t handle_t;
     HashTable<XID,CChunk*> partialTable;
     HashTable<XID, CChunk*> contentTable;
     
-    HashTable<XID, CChunk*> oldPartial;
+    HashTable<XID, CChunk*> oldPartial; //used in client
+    XID hid;
     
     unsigned int usedSize;
     static const unsigned int MAXSIZE=CACHESIZE;
@@ -83,8 +84,7 @@ typedef XIAPath::handle_t handle_t;
     HashTable<XID, int> partial;
     HashTable<XID, int> content;   
     
-    int MakeSpace(int);
-    
+    int MakeSpace(int);    
     //modify routing table
     void addRoute(const XID &cid) {
 	String cmd=cid.unparse()+" 4";

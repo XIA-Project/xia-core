@@ -35,6 +35,7 @@ XIARouterCache::configure(Vector<String> &conf, ErrorHandler *errh)
    
  //std::cout<<"Route Table Name: "<<routing_table_name.c_str()<<std::endl;
     routeTable = dynamic_cast<XIAXIDRouteTable*>(routing_table_elem);
+    hid=local_addr.xid(local_addr.destination_node());
     /*
     if(routeTable==NULL) std::cout<<"NULL routeTable"<<std::endl;
     if(ad_given)
@@ -125,7 +126,6 @@ XIARouterCache::MakeSpace(int chunkSize)
 
 void XIARouterCache::push(int port, Packet *p)
 {
-  std::cout<<"***********************"<<std::endl;
   std::cout<<"in "<<local_addr.unparse(this).c_str()<<std::endl;
 //  std::cout<<"enter push"<<std::endl;
   const struct click_xia* hdr = p->xia_header();
@@ -156,14 +156,13 @@ void XIARouterCache::push(int port, Packet *p)
     const unsigned char *payload=xhdr.payload();
     int offset=ch.chunk_offset();
     int length=ch.length();
-//    length=500;
     int chunkSize=ch.chunk_length();   
 //    std::cout<<"srcID is CID"<<std::endl;
 //    std::cout<<"offset is "<<offset<<std::endl;
 //    std::cout<<"length is "<<length<<std::endl;
 //    std::cout<<"chunkSize is "<<chunkSize<<std::endl;
     
-    if(dstID==local_addr.xid(local_addr.destination_node()))   //cache in client, should return the whole chunk    
+    if(dstID==hid)   //cache in client, should return the whole chunk    
     {
 //      std::cout<<"dstID is myself"<<std::endl;
       HashTable<XID,CChunk*>::iterator it,oit;
