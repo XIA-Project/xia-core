@@ -5,13 +5,7 @@
 #include <click/xiapath.hh>
 #include "../../userlevel/xia.pb.h"
 
-//#define NUM_PORTS 10
 CLICK_DECLS
-
-/*
-=c
-
-*/
 
 class XIARPC : public Element { public:
 
@@ -27,19 +21,18 @@ class XIARPC : public Element { public:
   int configure(Vector<String> &, ErrorHandler *);
   void add_handlers();
   void push(int, Packet *);
-  //Packet *pull (int);
-  //Packet *simple_action(Packet *);
 
  private:
-  //  int states ; 
-  //  char pktdata[][100];
-  //    bool _active;
-  int computeOutputPort (int);
-  WritablePacket* generateXIAPacket (xia::msg_request &msg);
+  int computeOutputPort (int, int);
+  WritablePacket* generateXIAPacket (xia::msg &msg);
 
   void append(Packet *p);
-  char* receive(size_t len);
-  
+  char* receive(Packet *p);
+  uint32_t desired_len;
+  uint32_t nread;
+  char * buffer;
+  char * remaining_buffer;
+
   char* _buffer;
   size_t _buffer_size;
   size_t _buffer_capacity;
