@@ -149,7 +149,7 @@ void XIAPrint::print_xids(StringAccum &sa, const struct click_xia *xiah)
     String s;
 
     sa << "SRC " << src.unparse(this);
-    sa << ", DST " << src.unparse(this);
+    sa << ", DST " << dst.unparse(this);
 }
 
 Packet *
