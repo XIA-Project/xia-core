@@ -41,7 +41,7 @@ XIAGenericExtHeader::populate_map()
     _map.clear();
 
     const uint8_t* d = _hdr->data;
-    const uint8_t* end = _hdr->data + _hdr->hlen;
+    const uint8_t* end = reinterpret_cast<const uint8_t*>(_hdr) + _hdr->hlen;
     while (d < end)
     {
         uint8_t kv_len = *d++;
@@ -55,7 +55,6 @@ XIAGenericExtHeader::populate_map()
         if (d + kv_len > end)
         {
             click_chatter("invalid kv_len or hlen");
-            //std::cout<<"kv_len: "<<(int)kv_len<<",d: "<<(int)d<<",end: "<<(int)end<<std::endl;
             break;
         }
 
@@ -145,6 +144,7 @@ XIAGenericExtHeaderEncap::update()
     size_t size = sizeof(struct click_xia_ext);
     HashTable<uint8_t, String>::const_iterator it = _map.begin();
     size_t count = 0;
+    size_t padding = 0;
     for (; it != _map.end(); ++it)
     {
         if ((*it).second.length() >= 255 - 1)   // skip too long value
@@ -162,7 +162,10 @@ XIAGenericExtHeaderEncap::update()
         count++;
     }
     if ((size & 3) != 0)
-        size += 4 - (size & 3);   // padding
+    {
+        padding = 4 - (size & 3);
+        size += padding;
+    }
 
     click_xia_ext* new_hdr = reinterpret_cast<struct click_xia_ext*>(new uint8_t[size]);
 
@@ -186,8 +189,7 @@ XIAGenericExtHeaderEncap::update()
         d += (*it).second.length();
     }
     // padding
-    if ((size & 3) != 0)
-        memset(d, 0, 4 - (size & 3));
+    memset(d, 0, padding);
 
     delete [] reinterpret_cast<uint8_t*>(_hdr);
     _hdr = new_hdr;
