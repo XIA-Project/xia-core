@@ -559,6 +559,7 @@ Element::Port::push(Packet* p) const
     assert(_e && p);
 #if CLICK_STATS >= 1
     ++_packets;
+    click_chatter("packet %x pushed to element %s (%s)", p, _e->name().c_str(), _e->class_name());
 #endif
 #if CLICK_STATS >= 2
     ++_e->input(_port)._packets;
@@ -608,6 +609,7 @@ Element::Port::pull() const
 #if CLICK_STATS >= 1
     if (p)
 	++_packets;
+    click_chatter("packet %x pulled from element %s (%s)", p, _e->name().c_str(), _e->class_name());
 #endif
     return p;
 }
