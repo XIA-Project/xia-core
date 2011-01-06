@@ -99,6 +99,7 @@ XIAPath::parse_dag(const String& s, const Element* context)
 #ifndef CLICK_TOOL
         if (!cp_xid(xid_str, &xid, context))
 #else
+        (void)context;
         if (!cp_xid(xid_str, &xid))
 #endif
         {
@@ -178,6 +179,7 @@ XIAPath::parse_re(const String& s, const Element* context)
 #ifndef CLICK_TOOL
                 if (!cp_xid(tail, &xid, context))
 #else
+                (void)context;
                 if (!cp_xid(tail, &xid))
 #endif
                 {
@@ -194,6 +196,7 @@ XIAPath::parse_re(const String& s, const Element* context)
 #ifndef CLICK_TOOL
         if (!cp_xid(head, &next_xid, context))
 #else
+        (void)context;
         if (!cp_xid(head, &next_xid))
 #endif
         {
