@@ -8,13 +8,14 @@
 //#include <map>
 #include <list>
 #include <string.h>
+#include <iostream>
 
 #include "xiaxidroutetable.hh"
 #include <click/handlercall.hh>
 #include <click/xiapath.hh>
 
 #define CACHESIZE 1024*1024*1024    //in router 
-//#define CLIENTCACHE
+#define CLIENTCACHE
 #define PACKETSIZE 64*1024		
 
 CLICK_DECLS
@@ -87,12 +88,13 @@ typedef XIAPath::handle_t handle_t;
     int MakeSpace(int);    
     //modify routing table
     void addRoute(const XID &cid) {
+std::cout<<"addRoute"<<std::endl;
 	String cmd=cid.unparse()+" 4";
 	HandlerCall::call_write(routeTable, "add", cmd);
     }    
     void delRoute(const XID &cid) {
 	String cmd= cid.unparse();
-	HandlerCall::call_write(routeTable, "del", cmd);
+	HandlerCall::call_write(routeTable, "remove", cmd);
     }    
 };
 

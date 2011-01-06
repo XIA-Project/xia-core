@@ -11,7 +11,7 @@
 #include <click/vector.hh>
 #include <click/xid.hh>
 
-//#include <stdio.h>
+#include <stdio.h>
 #include <iostream>
 
 CLICK_DECLS
@@ -126,8 +126,8 @@ XIARouterCache::MakeSpace(int chunkSize)
 
 void XIARouterCache::push(int port, Packet *p)
 {
-  std::cout<<"in "<<local_addr.unparse(this).c_str()<<std::endl;
-//  std::cout<<"enter push"<<std::endl;
+//  std::cout<<"in "<<local_addr.unparse(this).c_str()<<std::endl;
+  std::cout<<"enter push"<<std::endl;
   const struct click_xia* hdr = p->xia_header();
   if (!hdr)
       return ;
@@ -151,16 +151,19 @@ void XIARouterCache::push(int port, Packet *p)
   
   
   if(src_xid_type==cid_type)  //store, this is chunk response
-  {  
+  {
+ std::cout<<"srcID is CID"<<std::endl;
+ std::cout<<"content header"<<std::endl;
     ContentHeader ch(p);  
+ std::cout<<"*************"<<std::endl;
     const unsigned char *payload=xhdr.payload();
     int offset=ch.chunk_offset();
     int length=ch.length();
     int chunkSize=ch.chunk_length();   
 //    std::cout<<"srcID is CID"<<std::endl;
-//    std::cout<<"offset is "<<offset<<std::endl;
-//    std::cout<<"length is "<<length<<std::endl;
-//    std::cout<<"chunkSize is "<<chunkSize<<std::endl;
+    std::cout<<"offset is "<<offset<<std::endl;
+    std::cout<<"length is "<<length<<std::endl;
+    std::cout<<"chunkSize is "<<chunkSize<<std::endl;
     
     if(dstID==hid)   //cache in client, should return the whole chunk    
     {
@@ -246,7 +249,7 @@ void XIARouterCache::push(int port, Packet *p)
 	}	
 	else			//first pkt to the client
 	{
-  //std::cout<<"first pkt of a chunk"<<std::endl;
+  std::cout<<"first pkt of a chunk"<<std::endl;
 	  chunk=new CChunk(srcID, chunkSize);
 	  chunk->fill(payload, offset, length);
 	  if(chunk->full())
@@ -261,22 +264,25 @@ void XIARouterCache::push(int port, Packet *p)
       }  
       if(chunkFull)  //have built the whole chunk pkt
       {
-//std::cout<<"chunk is complete"<<std::endl;
+std::cout<<"chunk is complete"<<std::endl;
 	XIAHeaderEncap encap;
 	XIAHeader hdr(p);
+	
 	encap.set_dst_path(hdr.dst_path());      
 	encap.set_src_path(hdr.src_path());	
+	encap.set_plen(chunkSize);
+	encap.set_nxt(CLICK_XIA_NXT_CID);
+	
 	ContentHeaderEncap  contenth(0, 0, 0, chunkSize);
 	uint16_t hdrsize = encap.hdr_size()+ contenth.hlen();      	
 	//build packet	
 	WritablePacket *newp = Packet::make(hdrsize, chunk->GetPayload() , chunkSize, 20 );	
-	contenth.encap(newp);	
-	// add XIA header
-	encap.set_plen(chunkSize);
-	encap.encap( newp, false );	
+	
+	newp=contenth.encap(newp);		// add XIA header
+	newp=encap.encap( newp, false );	
 //std::cout<<"made new full-chunk pkt, chunkSize is "<<chunkSize<<", hdrsize is "<<hdrsize<<std::endl;
 	checked_output_push(1 , newp);
-//std::cout<<"have pushed out"<<std::endl;
+std::cout<<"have pushed out"<<std::endl;
 #ifdef CLIENTCACHE
 	contentTable[srcID]=chunk;
 	content[srcID]=1;
@@ -331,11 +337,13 @@ void XIARouterCache::push(int port, Packet *p)
     //cache in router
     else
     {
+std::cout<<"dst is not myself"<<std::endl;
       HashTable<XID,CChunk*>::iterator it;
       it=contentTable.find(srcID);  
 //      std::cout<<"dstID is not myself"<<std::endl;
       if(port==1)  //push CID, server get the chunk
       {
+std::cout<<"In server: push CID"<<std::endl;
 	if(it==contentTable.end())
 	{
 	  CChunk *chunk=new CChunk(srcID, chunkSize);
@@ -345,9 +353,10 @@ void XIARouterCache::push(int port, Packet *p)
       }
       else    //router get the chunk packet
       {
+std::cout<<"In router: get a response pkt"<<std::endl;
 	  if(it!=contentTable.end())    //already in contentTable
 	  {
-//printf("found in contentTable\n");
+printf("found in contentTable\n");
 	    content[it->first]=1;
 	  }
 	  else
@@ -355,7 +364,7 @@ void XIARouterCache::push(int port, Packet *p)
 	    it=partialTable.find(srcID);
 	    if(it!=partialTable.end())  //found in partialTable
 	    {
-//printf("found in partialTable\n");
+printf("found in partialTable\n");
 //std::cout<<it->first.c_str()<<" "<<it->second
 	      partial[it->first]=1;
 	      CChunk *chunk=it->second;
@@ -364,13 +373,14 @@ void XIARouterCache::push(int port, Packet *p)
 	      {
 		contentTable[srcID]=chunk;
 		content[srcID]=1;
+		addRoute(srcID);
 		partial.erase(it->first);
 		partialTable.erase(it);
 	      }
 	    }
 	    else                         //first pkt of a chunk
 	    {
-//printf("first pkt of a chunk\n");
+printf("first pkt of a chunk\n");
 	      CChunk *chunk=new CChunk(srcID, chunkSize);
 	      chunk->fill(payload, offset, length);//  allocate space for new chunk	  
 	      
@@ -415,62 +425,70 @@ void XIARouterCache::push(int port, Packet *p)
   }
   else if(dst_xid_type==cid_type)  //look_up,  chunk request
   { 
-//    std::cout<<"dstID is CID"<<std::endl;  
+    std::cout<<"dstID is CID"<<std::endl;  
     HashTable<XID,CChunk*>::iterator it;
     it=contentTable.find(dstID);    
 #ifdef CLIENTCACHE
     if(srcID==hid)
     {
-      content[dstID]=1;
-      XIAHeaderEncap encap;
-      XIAPath srcPath, dstPath;
-      
-      handle_t s_dummy=srcPath.add_node(XID());
-      handle_t s_cid=srcPath.add_node(dstID);
-      srcPath.add_edge(s_dummy, s_cid);
-      
-      handle_t d_dummy=dstPath.add_node(XID());
-      handle_t d_hid=dstPath.add_node(srcID);
-      dstPath.add_edge(d_dummy, d_hid);
-      
-      encap.set_src_path(srcPath);
-      encap.set_dst_path(dstPath);
-      
-      
-      char* pl=it->second->GetPayload();
-      unsigned int s=it->second->GetSize();
-      ContentHeaderEncap  contenth(0, 0, 0, s);
-      uint16_t hdrsize = encap.hdr_size()+ contenth.hlen();  
-      WritablePacket *newp = Packet::make(hdrsize, pl , s, 20 );	
-      contenth.encap(newp);
-      // add XIA header
-      encap.set_plen(s);
-      encap.encap( newp, false );	
-      checked_output_push(1 , newp);
-      
-    }  
+      if(it!=contentTable.end())
+      {
+	content[dstID]=1;
+	
+	XIAHeaderEncap encap;
+	XIAPath srcPath, dstPath;      
+	char* pl=it->second->GetPayload();
+	unsigned int s=it->second->GetSize();
+	
+	handle_t s_dummy=srcPath.add_node(XID());
+	handle_t s_cid=srcPath.add_node(dstID);
+	srcPath.add_edge(s_dummy, s_cid);
+	
+	handle_t d_dummy=dstPath.add_node(XID());
+	handle_t d_hid=dstPath.add_node(srcID);
+	dstPath.add_edge(d_dummy, d_hid);
+	
+	encap.set_src_path(srcPath);
+	encap.set_dst_path(dstPath);
+	encap.set_plen(s);
+	encap.set_nxt(CLICK_XIA_NXT_CID);      
+	
+	ContentHeaderEncap  contenth(0, 0, 0, s);
+	
+	uint16_t hdrsize = encap.hdr_size()+ contenth.hlen();  
+	WritablePacket *newp = Packet::make(hdrsize, pl , s, 20 );
+	
+	newp=contenth.encap(newp);
+	newp=encap.encap( newp, false );	      // add XIA header
+	checked_output_push(1 , newp);
+  std::cout<<"have pushed out"<<std::endl;
+      }
+      p->kill();  
+      return ;
+    }
 #endif
     // server, router
     if(it!=contentTable.end())
     { 
+std::cout<<"look up cache in router or server"<<std::endl;
       XIAHeaderEncap encap;
       XIAHeader hdr(p);
       XIAPath myown_source;  // AD:HID:CID add_node, add_edge
+      char* pl=it->second->GetPayload();
+      unsigned int s=it->second->GetSize();
+ //std::cout<<"chunk size: "<<s<<std::endl;
       
       myown_source = local_addr;
-      handle_t _cid=myown_source.add_node(dstID);
-      
+      handle_t _cid=myown_source.add_node(dstID);      
       myown_source.add_edge(myown_source.source_node(), _cid);
       myown_source.add_edge(myown_source.destination_node(), _cid);
       myown_source.set_destination_node(_cid);
       
       encap.set_src_path(myown_source);
-      encap.set_dst_path(hdr.src_path());      
+      encap.set_dst_path(hdr.src_path());  
+      encap.set_nxt(CLICK_XIA_NXT_CID);
       
       // add content header   dataoffset
-      char* pl=it->second->GetPayload();
-      unsigned int s=it->second->GetSize();
- //std::cout<<"chunk size: "<<s<<std::endl;
       unsigned int cp=0;
       while(cp < s)
       {      
@@ -479,11 +497,11 @@ void XIARouterCache::push(int port, Packet *p)
 	uint16_t hdrsize = encap.hdr_size()+ contenth.hlen();      
 	//build packet	
 	WritablePacket *newp = Packet::make(hdrsize, pl + cp , l, 20 );	
-	contenth.encap(newp);
-	// add XIA header
-	encap.set_plen(l);
-	encap.encap( newp, false );	
+	newp=contenth.encap(newp);	
+	encap.set_plen(l);	// add XIA header
+	newp=encap.encap( newp, false );	
 	checked_output_push(0 , newp);
+std::cout<<"have pushed out"<<std::endl;
 	cp += l;
       }
       p->kill();
@@ -494,6 +512,11 @@ void XIARouterCache::push(int port, Packet *p)
       p->kill();
     }
   }  
+  else
+  {
+std::cout<<"src and dst are not CID"<<std::endl;
+  }
+std::cout<<"leave push"<<std::endl;
 }
 
 CPart::CPart(unsigned int off, unsigned int len)
