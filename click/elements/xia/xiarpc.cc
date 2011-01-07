@@ -7,6 +7,8 @@
 #include <assert.h>
 #include <stdio.h>
 #include <click/xiaheader.hh>
+#include <click/xiacontentheader.hh>
+
 
 CLICK_DECLS
 
@@ -24,7 +26,6 @@ XIARPC::~XIARPC()
 int
 XIARPC::initialize()
 {
-  //  states = 0;
   return 0;
 }
 
@@ -35,78 +36,99 @@ XIARPC::configure(Vector<String> &conf, ErrorHandler *errh)
                    "LOCAL_ADDR", cpkP+cpkM, cpXIAPath, &_local_addr,
                    cpEnd) < 0)
         return -1;
-  // _active = true;
   return 0;
 }
 
-/*Packet *
-XIARPC::simple_action(Packet *p)
-{   printf ("incoming packets: %s", (const char*) p->data());   
-
-    return p;
-    }*/
-
-
-
-
 int 
-XIARPC::computeOutputPort (int inputPort) 
-{  if (inputPort != 0) 
-      return 0;
-   else 
-      return 1;  //might change if multiplexing apps 
+XIARPC::computeOutputPort (int inputPort, int type) 
+{  if (inputPort == 0 && type == xia::msg::CONNECTSID) 
+      return 1;
+   else if (inputPort == 0 && type == xia::msg::GETCID) 
+      return 1;
+   else if (inputPort == 0 && type == xia::msg::PUTCID) 
+      return 2;
+   else if (inputPort == 1 || inputPort == 2)
+      return 0;   
+   else  {
+     printf ("inport: %d, type: %d\n" ,inputPort, type);
+      assert(false);
+   }
 }
+
+
 
 WritablePacket*
-XIARPC::generateXIAPacket (xia::msg &msg)  {
-    WritablePacket *p_click = WritablePacket::make (256, msg.payload().c_str(), msg.payload().length(), 0);  // constructing payload
-    if (!p_click) {
-      printf ("error: construct a click packet\n");  
-      return 0;
-    }    
-    // src and dest XIA paths
-    String source (msg.xiapath_src().c_str());
-    String dest (msg.xiapath_dst().c_str());
-    
-    XIAPath src_path;
-    src_path.parse_re(source);  
-    XIAPath dst_path;
-    dst_path.parse_re(dest);    
+XIARPC::generateXIAPacket (xia::msg &msg_protobuf)  {
+  int pktPayloadSize = msg_protobuf.payload().length();
 
-    XIAHeaderEncap enc;
+  WritablePacket *p_click = WritablePacket::make (256, msg_protobuf.payload().c_str(), pktPayloadSize, 0);  // constructing payload
+  if (!p_click) {
+    printf ("error: construct a click packet\n");  
+    return 0;
+  }    
+  // src and dest XIA paths
+  String source (msg_protobuf.xiapath_src().c_str());
+  String dest (msg_protobuf.xiapath_dst().c_str());
     
-    enc.set_dst_path(dst_path);
-    enc.set_src_path(src_path);
+  XIAPath src_path;
+  src_path.parse_re(source);  
+  XIAPath dst_path;
+  dst_path.parse_re(dest);    
+
+  XIAHeaderEncap enc;
     
-    //printf ("payload sent: %s\n", (char*) p_click->data()); // to be removed
-    return enc.encap(p_click);
+  enc.set_dst_path(dst_path);
+  enc.set_src_path(src_path);
+ 
+
+  // extention header enc
+  //if (msg_protobuf.type == xia::msg::CONNECTSID) 
+  //  ;
+  if (msg_protobuf.type() == xia::msg::GETCID)  {
+    int chunkSize = pktPayloadSize;
+    ContentHeaderEncap  contenth(0, 0, pktPayloadSize, chunkSize);
+    contenth.encap(p_click);
+    enc.set_plen (0); 
+  }
+
+  if (msg_protobuf.type() == xia::msg::PUTCID)  {
+    int chunkSize = pktPayloadSize;
+    ContentHeaderEncap  contenth(0, 0, pktPayloadSize, chunkSize);
+    contenth.encap(p_click);
+    enc.set_plen (0); 
+  }
+
+    
+  //printf ("payload sent: %s\n", (char*) p_click->data()); // to be removed
+  return enc.encap(p_click, false);
 }
 
+
 void XIARPC::append(Packet *p)
-{
+{   printf ("in append: buffer size %d\n", _buffer_size);
     size_t required_size = _buffer_size + p->length();
     if (required_size > _buffer_capacity)
-    {
-        if (required_size == 0)
-            _buffer_capacity = 1;
-        else
-        {
-            // next power of 2
-            _buffer_capacity = required_size - 1;
-            for (size_t i = 1; i < sizeof(_buffer_capacity) * 8; i <<= 1)
-                _buffer_capacity = _buffer_capacity | _buffer_capacity >> i;
-            _buffer_capacity++;
-        }
-
-        _buffer = (char*)realloc(_buffer, _buffer_capacity);
-        assert(_buffer);
-    }
+      {
+	if (required_size == 0)
+	  _buffer_capacity = 1;
+	else 
+	  {
+	    //next power of 2
+	    _buffer_capacity = required_size - 1;
+	    for (size_t i = 1; i < sizeof(_buffer_capacity) * 8; i <<= 1)
+	      _buffer_capacity = _buffer_capacity | _buffer_capacity >> i;
+	    _buffer_capacity++;
+	  }
+	_buffer = (char*)realloc(_buffer, _buffer_capacity);
+	assert(_buffer);
+      }
     memcpy(_buffer + _buffer_size, p->data(), p->length());
     _buffer_size += p->length();
+   printf ("in append: buffer size %d\n", _buffer_size);
 }
 
 char* XIARPC::receive(size_t len)
-{
+{   printf ("in receive:_buffer: %d\n", _buffer_size);
     if (_buffer_size >= len)
     {
         char* ret = (char*)malloc(len);
@@ -116,7 +138,7 @@ char* XIARPC::receive(size_t len)
 
         _buffer_size -= len;
         memmove(_buffer, _buffer + len, _buffer_size);
-
+printf ("in receive: _buffer: %d\n", _buffer_size);
         return ret;
     }
     else
@@ -128,7 +150,6 @@ XIARPC::push(int port, Packet *p)
 {   
   if (port == 0)  {                                   // from socket
     click_chatter("RPC at %s: packet from socket", _local_addr.unparse(this).c_str());
-    xia::msg msg;
 
     append(p);
     p->kill();
@@ -144,12 +165,13 @@ XIARPC::push(int port, Packet *p)
         assert(_message_len != 0);
     }
 
-    click_chatter("desired len %d\n", _message_len); 
+    click_chatter("msg len %d\n", _message_len); 
 
     char* message = receive(_message_len); 
-    if (message == NULL)
+    if (message == NULL) {
+        printf ("msg NULL\n");
 	return;
-
+    }
     std::string data (message, _message_len);
 
     /*
@@ -167,21 +189,22 @@ XIARPC::push(int port, Packet *p)
     //click_chatter("%s", s.c_str());
     
     // if you have read len bytes
-    msg.ParseFromString(data);   
+    xia::msg msg_protobuf;
+    msg_protobuf.ParseFromString(data);   
      
     // make a header
     //XIAHeaderEncap encp (&header); // pass in reference of header obj
 
-    WritablePacket* p_xia = generateXIAPacket (msg);
+    WritablePacket* p_xia = generateXIAPacket (msg_protobuf);
     //const click_xia *xiah = p_xia->xia_header();
     //int hrlen = XIAHeader::hdr_size(xiah->dnode + xiah->snode);
     //printf ("hdrlen: %d\n", hrlen);
+    printf ("type: %d\n", msg_protobuf.type());
 
-
-    int outputPort = 1; //computeOutputPort(port);
+    int outputPort = computeOutputPort(port, msg_protobuf.type()); //computeOutputPort(port);
     output(outputPort).push(p_xia);  
   }  
-  else {
+  else  if (port == 1) {   // from route Engine
     click_chatter("RPC at %s: packet from network", _local_addr.unparse(this).c_str());
 
     //read xia header
@@ -192,10 +215,10 @@ XIARPC::push(int port, Packet *p)
 
     //printf("RPC received payload:\n%spay_len: %d\nheadersize: %d\n", (char*)xiah.payload(), xiah.plen(), xiah.hdr_size());
     //construct protobuf-based msg
+    printf("RPC received payload size: %d\n", xiah.plen());
     xia::msg msg_protobuf;
     std::string data_response;
-	   // msg2.set_appid(port/2);
-	   //     msg2.add_xid("00000000000000000000");
+	  
      msg_protobuf.set_payload(payload);
      msg_protobuf.SerializeToString (&data_response);
      WritablePacket *p2 = WritablePacket::make (256, data_response.c_str(), data_response.length(), 0)->push(4);
@@ -207,7 +230,26 @@ XIARPC::push(int port, Packet *p)
      int outputPort = 0; //computeOutputPort(port);
      output(outputPort).push(p2);
   }
+  else  {   // from cache
+    assert (port ==2);
+    printf ("interface2: from cache\n");
 
+    //read xia header
+    XIAHeader xiah(p);
+    std::string payload((char*)xiah.payload(), xiah.plen());
+
+    printf("RPC received payload size: %d\n", xiah.plen());
+    //construct protobuf-based msg
+    xia::msg msg_protobuf;
+    std::string data_response;
+	 
+    msg_protobuf.set_payload(payload);
+    msg_protobuf.SerializeToString (&data_response);
+    WritablePacket *p2 = WritablePacket::make (256, data_response.c_str(), data_response.length(), 0)->push(4);
+    int32_t size = ntohl(data_response.length());
+    memcpy(p2->data(), &size , 4); 
+    output(0).push(p2);
+  }
 }
 /*
 Packet *
