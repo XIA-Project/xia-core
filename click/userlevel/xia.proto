@@ -11,6 +11,7 @@ message msg {
     GETCID = 1;
     CONNECTSID = 2;
     PUTCID = 3;
+    SERVESID = 4;
   }
   optional MsgType type = 4;
 
