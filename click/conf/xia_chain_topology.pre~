@@ -29,7 +29,6 @@ router0[1] -> Unqueue -> [1]router1;
 router1[1] -> Unqueue -> [1]router0;
 
 // send test packets from host0 to host1
-/*
 gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
 -> RatedUnqueue(5)
 -> XIAEncap(
@@ -37,7 +36,7 @@ gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
     SRC RE AD0 HID0)
 -> AggregateCounter(COUNT_STOP 1)
 -> host0;
-*/
+
 // send test packets from host1 to host0
 //gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
 //-> RatedUnqueue(5)

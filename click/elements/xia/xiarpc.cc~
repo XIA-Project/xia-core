@@ -99,7 +99,7 @@ std::cout<<"in generateXIAPacket"<<std::endl;
   uint16_t hdrsize = enc.hdr_size()+ contenth.hlen(); 
   
   
-  WritablePacket *p_click = WritablePacket::make (256, msg_protobuf.payload().c_str(), pktPayloadSize, 0);  // constructing payload
+  WritablePacket *p_click = WritablePacket::make (hdrsize, msg_protobuf.payload().c_str(), pktPayloadSize, 0);  // constructing payload
    
      
   printf ("data(): %s\n", (char*) p_click->data()  ); 

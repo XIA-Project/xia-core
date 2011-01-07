@@ -337,8 +337,8 @@ void XIARouterCache::push(int port, Packet *p)
       it=contentTable.find(srcID);  
       if(port==1)  //push CID, server get the chunk
       {
-std::cout<<"In server: push CID"<<std::endl;
-std::cout<<"payload:"<<payload<<std::endl;
+//std::cout<<"In server: push CID"<<std::endl;
+//std::cout<<"payload:"<<payload<<std::endl;
 	if(it==contentTable.end())
 	{
 	  CChunk *chunk=new CChunk(srcID, chunkSize);
@@ -471,7 +471,7 @@ std::cout<<"payload:"<<payload<<std::endl;
       XIAHeader hdr(p);
       XIAPath myown_source;  // AD:HID:CID add_node, add_edge
       char* pl=it->second->GetPayload();
-std::cout<<"payload: "<<pl<<std::endl;
+//std::cout<<"payload: "<<pl<<std::endl;
       unsigned int s=it->second->GetSize();
  //std::cout<<"chunk size: "<<s<<std::endl;      
       myown_source = local_addr;
