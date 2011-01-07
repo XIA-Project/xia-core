@@ -77,6 +77,7 @@ XIARPC::generateXIAPacket (xia::msg &msg_protobuf)  {
 
   XIAHeaderEncap enc;
     
+  //printf ("dest:%s, src: %s\n", dest.c_str(), source.c_str());
   enc.set_dst_path(dst_path);
   enc.set_src_path(src_path);
  
@@ -97,8 +98,6 @@ XIARPC::generateXIAPacket (xia::msg &msg_protobuf)  {
     contenth.encap(p_click);
     enc.set_plen (0); 
   }
-
-    
   //printf ("payload sent: %s\n", (char*) p_click->data()); // to be removed
   return enc.encap(p_click, false);
 }
@@ -174,33 +173,27 @@ XIARPC::push(int port, Packet *p)
     }
     std::string data (message, _message_len);
 
-    /*
+    
     std::string s;
     for (int i=0;i<desired_len;i++) {
 	char buf[3];
 	sprintf(buf, "%02hhx", (unsigned char)(message[i]));
 	s += buf;
     }
-    */
 
     free(message);
     _message_len = 0;
 
-    //click_chatter("%s", s.c_str());
+    click_chatter("%s", s.c_str());
     
     // if you have read len bytes
     xia::msg msg_protobuf;
     msg_protobuf.ParseFromString(data);   
      
-    // make a header
-    //XIAHeaderEncap encp (&header); // pass in reference of header obj
 
     WritablePacket* p_xia = generateXIAPacket (msg_protobuf);
-    //const click_xia *xiah = p_xia->xia_header();
-    //int hrlen = XIAHeader::hdr_size(xiah->dnode + xiah->snode);
-    //printf ("hdrlen: %d\n", hrlen);
     printf ("type: %d\n", msg_protobuf.type());
-
+    
     int outputPort = computeOutputPort(port, msg_protobuf.type()); //computeOutputPort(port);
     output(outputPort).push(p_xia);  
   }  
