@@ -584,6 +584,7 @@ CChunk::fill(const unsigned char *_payload, unsigned int offset, unsigned int le
     {
 //std::cout<<"push back"<<std::endl;  
 	memcpy(off, _payload, length);    
+	
 	parts.push_back(p);
     }
     else                //not empty
