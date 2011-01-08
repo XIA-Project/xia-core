@@ -173,7 +173,7 @@ XIAXIDInfo(
     CID1 CID:2000000000000000000000000000000000000002,
 );
 
-print::XIAPrint(LENGTH true)
+//print::XIAPrint(LENGTH true)
 
 //Idle->rt :: XIAXIDRouteTable->Discard
 //cache::XIARouterCache(RE AD0 HID0, rt)
@@ -181,25 +181,29 @@ print::XIAPrint(LENGTH true)
 //router::Router(RE AD0 RHID0, AD0, RHID0)
 //Idle->[1]router
 
-//host0 :: Host(RE AD0 HID0, HID0, 2000);
-//router0 :: Router(RE AD0 RHID0, AD0, RHID0);
-//router1 :: Router(RE AD1 RHID1, AD1, RHID1);
-host1:: Host(RE AD1 HID1, HID1, 2001);
+
 
 //host0->Print("host output:")->print->Discard;
 //Idle->host0;
 
+host0 :: Host(RE AD0 HID0, HID0, 2000);
+router0 :: Router(RE AD0 RHID0, AD0, RHID0);
+router1 :: Router(RE AD1 RHID1, AD1, RHID1);
+host1:: Host(RE AD1 HID1, HID1, 2001);
+
+host0[0] -> Unqueue -> Print("(1)")->XIAPrint()->[0]router0;
+router0[0] -> Unqueue -> Print("(6)")->XIAPrint()->[0]host0;
+
+router0[1] -> Unqueue -> Print("(2)")->XIAPrint()-> [1]router1;
+router1[1] -> Unqueue -> Print("(5)")->XIAPrint()->[1]router0;
+
+router1[0]-> Unqueue -> Print("(3)")->XIAPrint()-> host1
+host1-> Unqueue ->Print("(4)")->XIAPrint()->[0]router1
+
+//Idle->[0]router1
+//router1[0]->Print("Router1 output")->print->Discard;
+
 /*
-host0[0] -> Unqueue -> [0]router0;
-router0[0] -> Unqueue -> [0]host0;
-
-router0[1] -> Unqueue -> [1]router1;
-router1[1] -> Unqueue -> [1]router0;
-
-Idle->[0]router1
-router1[0]->Print("Router1 output")->print->Discard;
-*/
-
 genReq :: InfiniteSource(LENGTH 500, ACTIVE false, HEADROOM 256)
 -> RatedUnqueue(1)
 -> XIAEncap(
@@ -209,10 +213,12 @@ genReq :: InfiniteSource(LENGTH 500, ACTIVE false, HEADROOM 256)
 ->Print("input request")->XIAPrint(LENGTH true)
 ->host1
 
+
 host1->Print("host output")->print->Discard;
 
 
 Script(write genReq.active true)
+*/
 
 
 /*

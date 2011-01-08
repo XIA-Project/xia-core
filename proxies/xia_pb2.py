@@ -29,6 +29,10 @@ _MSG_MSGTYPE = descriptor.EnumDescriptor(
       name='PUTCID', index=3, number=3,
       options=None,
       type=None),
+    descriptor.EnumValueDescriptor(
+      name='SERVESID', index=4, number=4,
+      options=None,
+      type=None),
   ],
   options=None,
 )
