@@ -30,9 +30,9 @@ def read_write(bsoc, soc_rpc, max_idling=20):
 				    print "payload len (recv): %d" % len(msg_response.payload)
 				    print "payload (recv): %s" % msg_response.payload
 				    #out.send(msg_response.payload) # add http header and send to browser
-				    getCID('','0000000000000000000000000000000000000000',bsoc, soc_rpc)
+				    #getCID('','0000000000000000000000000000000000000000',bsoc, soc_rpc)
 			    #else:
-				    #out.send(data)  # ???
+				    out.send(msg_response.payload)  # ???
 				    #print "out(soc_rpc): %d" % soc_rpc.fileno() 
 			    count = 0
             else:
@@ -104,7 +104,8 @@ def xiaHandler(control, payload, bsock, sock_rpc):
 		getSID(control[4:], payload);
 	elif control.find('cid') == 0:
 		print "cid request"
-		getCID(control[4:], payload, bsock, sock_rpc);
+		getCID('','0000000000000000000000000000000000000000',bsock, sock_rpc)
+		#getCID(control[4:], payload, bsock, sock_rpc);
 	elif control.find('socket') == 0:
 		getSocket(control[7:], payload, bsock, sock_rpc);
 		
