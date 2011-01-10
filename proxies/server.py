@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import socket
 import sys
 import xia_pb2
@@ -55,12 +57,6 @@ def main():
     sock_rpc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock_rpc.connect(('',2001))
     print 'connected'
-    size = sock_rpc.recv(4)
-    size = struct.unpack('!i', size)[0]
-    print "size of protobuf msg: %d" % size
-    data = sock_rpc.recv(size)
-    msg_request = xia_pb2.msg()
-    msg_request.ParseFromString(data)
     f = open ("image.jpg", 'r')
     while True:
         chunk = f.read(chunksize)
@@ -70,9 +66,18 @@ def main():
 #       return
     print "putcid done"
     f.close()
+    
+    
     time.sleep(1)
-    if (msg_request.type == xia_pb2.msg.CONNECTSID):
-        print "SIDRequest comes"
+    while True:        
+        size = sock_rpc.recv(4)
+        size = struct.unpack('!i', size)[0]
+        print "size of protobuf msg: %d" % size
+        data = sock_rpc.recv(size)
+        msg_request = xia_pb2.msg()
+        msg_request.ParseFromString(data)
+        if (msg_request.type == xia_pb2.msg.CONNECTSID):
+            print "SIDRequest comes"
         serveSIDRequest(msg_request, sock_rpc)
 
 
