@@ -44,12 +44,9 @@ def printFunc(value):
 	print value
 	return
 
-def getSID(SID, payload):
-	print "in getSID function"
-	return
 
-def getSocket(netloc, payload, bsoc, sock_rpc):
-	print "in getSocket function - net location = " + netloc  
+def sendSIDRequest(netloc, payload, bsoc, sock_rpc):
+	print "in SID function - net location = " + netloc  
 	msg = xia_pb2.msg()
         #msg.appid = bsoc.fileno()  # change 0 -> bsoc
 	#print "bsoc: %d" % bsoc.fileno()
@@ -71,10 +68,10 @@ def getSocket(netloc, payload, bsoc, sock_rpc):
 
 
 def getCID(netloc, CID, bsoc, sock_rpc):
-	global hasGotCID
-	if (hasGotCID == 1):
-		return
-	hasGotCID = 1;
+#############	global hasGotCID
+	#if (hasGotCID == 1):
+	#	return
+	#hasGotCID = 1;
 	print "in getCID function - net location = " + netloc  
 	msg = xia_pb2.msg()
         # msg.appid = bsoc.fileno()  
@@ -101,12 +98,12 @@ def xiaHandler(control, payload, bsock, sock_rpc):
 	control=control[4:]
 	if control.find('sid') == 0:
 		print "SID request"
-		getSID(control[4:], payload);
+		sendSIDRequest(control[4:], payload);
 	elif control.find('cid') == 0:
 		print "cid request"
 		getCID('','0000000000000000000000000000000000000000',bsock, sock_rpc)
 		#getCID(control[4:], payload, bsock, sock_rpc);
 	elif control.find('socket') == 0:
-		getSocket(control[7:], payload, bsock, sock_rpc);
+		sendSIDRequest(control[7:], payload, bsock, sock_rpc);
 		
 	return;
