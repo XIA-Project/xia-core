@@ -79,7 +79,7 @@ XIARPC::generateXIAPacket (xia::msg &msg_protobuf)  {
 
   XIAHeaderEncap enc;
     
-  printf ("dest:%s, src: %s\n", dest.c_str(), source.c_str());
+  //printf ("dest:%s, src: %s\n", dest.c_str(), source.c_str());
   enc.set_dst_path(dst_path);
   enc.set_src_path(src_path);
   enc.set_plen (pktPayloadSize); 
@@ -99,7 +99,7 @@ XIARPC::generateXIAPacket (xia::msg &msg_protobuf)  {
 
 
 void XIARPC::append(Packet *p)
-{   printf ("in append: buffer size %d\n", _buffer_size);
+{  
     size_t required_size = _buffer_size + p->length();
     if (required_size > _buffer_capacity)
       {
@@ -118,11 +118,11 @@ void XIARPC::append(Packet *p)
       }
     memcpy(_buffer + _buffer_size, p->data(), p->length());
     _buffer_size += p->length();
-   printf ("in append: buffer size %d\n", _buffer_size);
+   
 }
 
 char* XIARPC::receive(size_t len)
-{   printf ("in receive:_buffer: %d\n", _buffer_size);
+{  
     if (_buffer_size >= len)
     {
         char* ret = (char*)malloc(len);
@@ -132,7 +132,7 @@ char* XIARPC::receive(size_t len)
 
         _buffer_size -= len;
         memmove(_buffer, _buffer + len, _buffer_size);
-printf ("in receive: _buffer: %d\n", _buffer_size);
+
         return ret;
     }
     else
@@ -168,18 +168,18 @@ XIARPC::push(int port, Packet *p)
     }
     std::string data (message, _message_len);
 
-    
+    /*
     std::string s;
     for (int i=0;i<desired_len;i++) {
 	char buf[3];
 	sprintf(buf, "%02hhx", (unsigned char)(message[i]));
 	s += buf;
-    }
+	}*/
 
     free(message);
     _message_len = 0;
 
-    click_chatter("%s", s.c_str());
+    //click_chatter("%s", s.c_str());
     
     // if you have read len bytes
     xia::msg msg_protobuf;
@@ -187,7 +187,7 @@ XIARPC::push(int port, Packet *p)
      
 
     WritablePacket* p_xia = generateXIAPacket (msg_protobuf);
-    printf ("type: %d\npayload: %s", msg_protobuf.type(), msg_protobuf.payload().c_str());
+    //printf ("type: %d\npayload: %s", msg_protobuf.type(), msg_protobuf.payload().c_str());
     
     int outputPort = computeOutputPort(port, msg_protobuf.type()); //computeOutputPort(port);
     output(outputPort).push(p_xia);  
@@ -201,7 +201,7 @@ XIARPC::push(int port, Packet *p)
     p = NULL;
 
     //construct protobuf-based msg
-    printf("RPC received payload size: %d\n", xiah.plen());
+    //printf("RPC received payload size: %d\n", xiah.plen());
     xia::msg msg_protobuf;
     std::string data;
      
@@ -216,7 +216,7 @@ XIARPC::push(int port, Packet *p)
     msg_protobuf.SerializeToString (&data);
     WritablePacket *p2 = WritablePacket::make (256, data.c_str(), data.length(), 0)->push(4);
     int32_t size = htonl(data.length());
-    printf ("size of connectsid message: %d(htonl), %d\n", size, data.length());
+    //printf ("size of connectsid message: %d(htonl), %d\n", size, data.length());
     memcpy(p2->data(), &size , 4); 
     //WritablePacket *p2 = WritablePacket::make (256, payload, xiah.plen(),0);
     int outputPort = 0; //computeOutputPort(port);
@@ -230,7 +230,7 @@ XIARPC::push(int port, Packet *p)
     XIAHeader xiah(p);
     std::string payload((char*)xiah.payload(), xiah.plen());
 
-    printf("RPC received payload size: %d\n", xiah.plen());
+    //printf("RPC received payload size: %d\n", xiah.plen());
     //construct protobuf-based msg
     xia::msg msg_protobuf;
     std::string data_response;

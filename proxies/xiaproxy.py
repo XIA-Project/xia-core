@@ -98,7 +98,7 @@ def xiaHandler(control, payload, bsock, sock_rpc):
 	control=control[4:]
 	if control.find('sid') == 0:
 		print "SID request"
-		sendSIDRequest(control[4:], payload);
+		sendSIDRequest(control[4:], payload,bsock, sock_rpc);
 	elif control.find('cid') == 0:
 		print "cid request"
 		getCID('','0000000000000000000000000000000000000000',bsock, sock_rpc)
