@@ -16,7 +16,7 @@ def putCID(chunk, sock_rpc):
     msg_putCID.xiapath_dst = 'CID:0000000000000000000000000000000000000000'
     chunk_http ='HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nLast-Modified: Sat, 08 Jan 2011 21:08:31 GMT\nETag: "48917-39ed-4990ddae564ac"\nAccept-Ranges: bytes\nContent-Length: 14829\nConnection: close\nContent-Type: image/jpeg\n\n' +chunk + '\r\n\r\n'
     msg_putCID.payload = chunk_http
-    print chunk
+    #print chunk
     serialized_msg = msg_putCID.SerializeToString()
     size = struct.pack('!i', len(serialized_msg))
     sock_rpc.send(size)
@@ -43,7 +43,7 @@ def serveSIDRequest(msg_protobuf, sock_rpc):
     #    payload += chunk
     #    return
     payload_http = 'HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nLast-Modified: Sat, 08 Jan 2011 21:08:31 GMT\nETag: "43127-76-4995c231bf691"\nAccept-Ranges: bytes\nContent-Length: 118\nConnection: close\nContent-Type: text/html\n\n' + payload + '\r\n\r\n'    #add http header
-    print "payload:" + payload_http
+    #print "payload:" + payload_http
     msg_serveSID.payload = payload_http
     serialized_msg = msg_serveSID.SerializeToString()
     size = struct.pack('!i', len(serialized_msg))

@@ -28,7 +28,7 @@ def read_write(bsoc, soc_rpc, max_idling=20):
                     if data:
 			    if (i == soc_rpc): #and (msg_response.appid == bsoc.fileno())):
 				    print "payload len (recv): %d" % len(msg_response.payload)
-				    print "payload (recv): %s" % msg_response.payload
+				    print "payload (recv): %s" % repr(msg_response.payload)
 				    #out.send(msg_response.payload) # add http header and send to browser
 				    #getCID('','0000000000000000000000000000000000000000',bsoc, soc_rpc)
 			    #else:
