@@ -1,8 +1,8 @@
-GENERATED=xia_chain_topology.click testrpc0.click
+GENERATED=xia_chain_topology.click
 
 all: $(GENERATED)
 
-%.click: %.pre
+%.click: %.pre xia_router_template.click
 	#$(RM) -f $@
 	./preprocess.rb $<
 
