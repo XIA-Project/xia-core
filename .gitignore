@@ -3,6 +3,8 @@
 *.pyc
 core
 *~
+tags
+cscope.out
 
 
 ## click
