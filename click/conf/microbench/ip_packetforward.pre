@@ -1,27 +1,16 @@
 include ../xia_router_template.click
 
-XIAXIDInfo(
-    AD0 AD:0000000000000000000000000000000000000000,
-    AD1 AD:0000000000000000000000000000000000000001,
-);
+host0 :: IPRouter4Port(192.168.0.1);
 
-
-host0 :: Router4Port(RE AD0);
-
-Script(write host0/n/proc/rt_AD/rt.add - 5);
-Script(write host0/n/proc/rt_HID/rt.add - 5);
-Script(write host0/n/proc/rt_SID/rt.add - 5);
-Script(write host0/n/proc/rt_CID/rt.add - 5);
-
-Script(write host0/n/proc/rt_AD/rt.add AD0 4);
-Script(write host0/n/proc/rt_AD/rt.add AD1 0);
+Script(write host0/rt.add 192.168.0.0/24 0);
+Script(write host0/rt.add 0.0.0.0/0.0.0.0 1);
 
 
 define($COUNT 10000000);
 
 gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
 -> Script(TYPE PACKET, write gen.active false)       // stop source after exactly 1 packet
--> XIAEncap(DST RE AD1, SRC RE AD0)
+-> IPEncap(9, 192.168.10.10, 192.168.0.10)
 -> Clone($COUNT)
 -> Unqueue
 -> host0 

@@ -1,4 +1,4 @@
-GENERATED=xia_packetforward.click
+GENERATED=xia_packetforward.click ip_packetforward.click
 
 all: $(GENERATED)
 
