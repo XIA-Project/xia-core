@@ -172,11 +172,10 @@ elementclass Router4Port {
     n :: RouteEngine($local_addr);
     cache :: XIARouterCache($local_addr, n/proc/rt_CID/rt);
     
-    Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
-    Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
-
     input[0] -> [0]n;
     input[1] -> [0]n;
+    input[2] -> [0]n;
+    input[3] -> [0]n;
 
     n[0] -> sw :: PaintSwitch
     n[1] -> Discard;
