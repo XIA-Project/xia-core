@@ -18,15 +18,15 @@ router0 :: Router(RE AD0 RHID0, AD0, RHID0);
 router1 :: Router(RE AD1 RHID1, AD1, RHID1);
 
 // interconnection -- host - ad
-host0[0] -> Unqueue -> [0]router0;
-router0[0] -> Unqueue -> [0]host0;
+host0[0] -> DelayShaper(2) ->  BandwidthRatedUnqueue(131072B/s) -> [0]router0;
+router0[0] -> DelayShaper(2) ->  BandwidthRatedUnqueue(131072B/s) -> [0]host0;
 
-host1[0] -> Unqueue -> [0]router1;
-router1[0] -> Unqueue -> [0]host1;
+host1[0] -> DelayShaper(2) ->  BandwidthRatedUnqueue(131072B/s) -> [0]router1;
+router1[0] -> DelayShaper(2) ->  BandwidthRatedUnqueue(131072B/s) ->[0]host1;
 
 // interconnection -- ad - ad
-router0[1] -> Unqueue -> [1]router1;
-router1[1] -> Unqueue -> [1]router0;
+router0[1] -> DelayShaper(2) ->  BandwidthRatedUnqueue(131072B/s) ->[1]router1;
+router1[1] -> DelayShaper(2) ->  BandwidthRatedUnqueue(131072B/s) ->[1]router0;
 
 // send test packets from host0 to host1
 /*
