@@ -7,12 +7,14 @@
 #include <click/packet.hh>
 CLICK_DECLS
 
-Clone::Clone() :_packet(0)
+Clone::Clone() :_packet(0), _count(0)
 {
 }
 
 Clone::~Clone()
 {
+    if (_packet)
+        _packet->kill();
 }
 
 int
@@ -38,6 +40,8 @@ Clone::push(int /*port*/, Packet *p)
 Packet* Clone::pull(int /*port*/)
 {
     if (_packet==NULL) return NULL;
+    _count--;
+    if (_count<0) return NULL;
     return _packet->clone();
 }
 
