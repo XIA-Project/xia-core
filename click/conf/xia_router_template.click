@@ -15,10 +15,13 @@ elementclass GenericRouting4Port {
 
 elementclass GenericPostRouteProc {
     input -> XIADecHLIM -> output;
-}
+};
 
 elementclass XIAPacketRoute {
     $local_addr |
+
+    // $local_addr: the full address of the node (only used for debugging)
+
     // input: a packet to process
     // output[0]: forward (painted)
     // output[1]: arrived at destination node
@@ -60,7 +63,7 @@ elementclass XIAPacketRoute {
 
 
     // change this if you want to do CID post route processing for any reason
-    CIDPostRouteProc :: Null ; 
+    CIDPostRouteProc :: Null;
 
     //  Next destination is CID
     c[3] -> rt_CID :: GenericRouting4Port;
@@ -73,7 +76,10 @@ elementclass XIAPacketRoute {
 
 elementclass RouteEngine {
     $local_addr |
-    // input[0]: a packet arrived at a node from outside (i.e. routing with caching)
+
+    // $local_addr: the full address of the node (only used for debugging)
+
+    // input[0]: a packet arrived at the node from outside (i.e. routing with caching)
     // input[1]: a packet to send from a node (i.e. routing without caching)
     // output[0]: forward (painted)
     // output[1]: arrived at destination node; go to RPC
@@ -105,7 +111,11 @@ elementclass RouteEngine {
 elementclass Host {
     $local_addr, $local_hid, $rpc_port |
 
-    // input: a packet arrived at a node 
+    // $local_addr: the full address of the node
+    // $local_hid:  the HID of the node
+    // $rpc_port:   the TCP port number to use for RPC
+
+    // input: a packet arrived at the node
     // output: forward to interface 0
 
     n :: RouteEngine($local_addr);
@@ -133,13 +143,17 @@ elementclass Host {
 elementclass Router {
     $local_addr, $local_ad, $local_hid |
 
-    // input[0], input[1]: a packet arrived at a node
+    // $local_addr: the full address of the node
+    // $local_ad:   the AD of the node and the local network
+    // $local_hid:  the HID of the node (used for "bound" content source)
+
+    // input[0], input[1]: a packet arrived at the node
     // output[0]: forward to interface 0 (for hosts in local ad)
     // output[1]: forward to interface 1 (for other ads)
 
     n :: RouteEngine($local_addr);
     cache :: XIARouterCache($local_addr, n/proc/rt_CID/rt);
-    
+
     Script(write n/proc/rt_AD/rt.add - 1);      // default route for AD
     Script(write n/proc/rt_AD/rt.add $local_ad 4);    // self AD as destination
     Script(write n/proc/rt_HID/rt.add - 0);     // forwarding for local HID
@@ -163,7 +177,9 @@ elementclass Router {
 elementclass Router4Port {
     $local_addr |
 
-    // input[0], input[1], input[2], input[3]: a packet arrived at a node
+    // $local_addr: the full address of the node
+
+    // input[0], input[1], input[2], input[3]: a packet arrived at the node
     // output[0]: forward to interface 0
     // output[1]: forward to interface 1
     // output[2]: forward to interface 2
@@ -171,7 +187,7 @@ elementclass Router4Port {
 
     n :: RouteEngine($local_addr);
     cache :: XIARouterCache($local_addr, n/proc/rt_CID/rt);
-    
+
     input[0] -> [0]n;
     input[1] -> [0]n;
     input[2] -> [0]n;
@@ -191,7 +207,11 @@ elementclass Router4Port {
 // 2-port IP router node (caution: simplified version for forwarding experiments)
 elementclass IPRouter {
     $local_addr, $local_net |
-    // input[0], input[1]: a packet arrived at a node
+
+    // $local_addr: the full address of the node
+    // $local_net:  the local network (e.g. 192.168.0.0/24)
+
+    // input[0], input[1]: a packet arrived at the node
     // output[0]: forward to interface 0 (for hosts in local network)
     // output[1]: forward to interface 1 (for other networks)
 
@@ -202,15 +222,15 @@ elementclass IPRouter {
     input[0] -> rt;
     input[1] -> rt;
 
-    rt[0] -> Paint(0) -> fwd;
-    rt[1] -> Paint(1) -> fwd;
+    rt[0] -> Paint(0) -> dt;
+    rt[1] -> Paint(1) -> dt;
 
-    fwd -> dt -> fr -> sw :: PaintSwitch;
+    dt -> fr -> sw :: PaintSwitch;
 
     dt[1] -> Print("time exceeded") -> Discard; // ICMPError($local_addr, timeexceeded) -> sw;
     fr[1] -> Print("need fragmentation") -> Discard; // ICMPError($local_addr, unreachable, needfrag) -> sw;
 
-    sw[0] -> Queue(200) -> output[0];
-    sw[1] -> Queue(200) -> output[1];
+    sw[0] -> Queue(200) -> [0]output;
+    sw[1] -> Queue(200) -> [1]output;
 };
 
