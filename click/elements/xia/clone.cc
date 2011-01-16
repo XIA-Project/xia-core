@@ -7,12 +7,24 @@
 #include <click/packet.hh>
 CLICK_DECLS
 
-Clone::Clone()
+Clone::Clone() :_packet(0)
 {
 }
 
 Clone::~Clone()
 {
+}
+
+int
+Clone::configure(Vector<String> &conf, ErrorHandler *errh)
+{
+    int count;
+    if (cp_va_kparse(conf, this, errh,
+                   "COUNT", cpkP+cpkM, cpInteger, &count,
+                   cpEnd) < 0)
+        return -1;
+    _count = count;
+    return 0;
 }
 
 void

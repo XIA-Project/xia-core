@@ -15,9 +15,11 @@ class Clone : public Element { public:
     const char *port_count() const	{ return "1/1"; }
     const char *processing() const	{ return "h/l"; }
     void push(int, Packet *);
+    int configure(Vector<String> &conf, ErrorHandler *errh);
     Packet * pull(int);
     private:
     Packet *_packet;
+    int _count;
 };
 CLICK_ENDDECLS
 #endif
