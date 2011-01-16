@@ -42,7 +42,7 @@ Packet* Clone::pull(int /*port*/)
     if (_packet==NULL) return NULL;
     _count--;
     if (_count<0) return NULL;
-    return _packet->clone();
+    return _packet->clone()->uniqueify();
 }
 
 
