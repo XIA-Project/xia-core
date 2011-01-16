@@ -39,7 +39,8 @@ clickdatadir = $(datadir)/click
 
 DRIVERS = @DRIVERS@
 OTHER_TARGETS = @OTHER_TARGETS@
-ALL_TARGETS = $(DRIVERS) $(OTHER_TARGETS)
+CLICK_CONF = conf
+ALL_TARGETS = $(DRIVERS) $(OTHER_TARGETS) $(CLICK_CONF)
 
 all: $(ALL_TARGETS) Makefile
 
@@ -55,6 +56,8 @@ exopc: Makefile click-buildtool stamp-h
 	@cd exopc && $(MAKE) all
 tools: Makefile
 	@cd tools && $(MAKE) all
+conf: Makefile
+	@cd conf && $(MAKE) all
 
 install: Makefile click-buildtool click-compile stamp-h installch
 	@for d in $(ALL_TARGETS); do (cd $$d && $(MAKE) install) || exit 1; done
@@ -227,4 +230,5 @@ distdir: $(srcdir)/configure
 	bsdmodule exopc linuxmodule ns tools userlevel \
 	clean distclean dist distdir \
 	install install-doc install-lib install-man install-local install-include install-local-include \
-	uninstall uninstall-local uninstall-local-include
+	uninstall uninstall-local uninstall-local-include \
+	conf

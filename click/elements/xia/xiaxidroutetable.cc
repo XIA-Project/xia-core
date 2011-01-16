@@ -50,9 +50,9 @@ XIAXIDRouteTable::set_handler(const String &conf, Element *e, void *thunk, Error
 
     bool add_mode = !thunk;
     if (add_mode)
-        click_chatter("XIAXIDRouteTable: adding %s to %s\n", conf.c_str(), e->name().c_str());
+        click_chatter("XIAXIDRouteTable: adding %-10s to %s\n", conf.c_str(), e->name().c_str());
     else
-        click_chatter("XIAXIDRouteTable: setting %s for %s\n", conf.c_str(), e->name().c_str());
+        click_chatter("XIAXIDRouteTable: setting %-10s for %s\n", conf.c_str(), e->name().c_str());
 
     String str_copy = conf;
 
@@ -92,7 +92,7 @@ XIAXIDRouteTable::remove_handler(const String &conf, Element *e, void *, ErrorHa
 {
     XIAXIDRouteTable* table = static_cast<XIAXIDRouteTable*>(e);
 
-    click_chatter("XIAXIDRouteTable: removing %s from %s\n", conf.c_str(), e->name().c_str());
+    click_chatter("XIAXIDRouteTable: removing %-10s from %s\n", conf.c_str(), e->name().c_str());
 
     String str_copy = conf;
 

@@ -1,8 +1,12 @@
-GENERATED=xia_chain_topology.click testrpc0.click
+GENERATED=xia_chain_topology.click
 
-all: $(GENERATED)
+all: $(GENERATED) microbench
 
-%.click: %.pre
+%.click: %.pre xia_router_template.click
 	#$(RM) -f $@
 	./preprocess.rb $<
+
+.PHONY: microbench
+microbench:
+	@cd microbench && make
 
