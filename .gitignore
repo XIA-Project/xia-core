@@ -3,6 +3,7 @@
 *.pyc
 core
 *~
+*.sw?
 tags
 cscope.out
 
@@ -33,4 +34,9 @@ installch
 /click/etc/pkg-config.mk
 /click/tools/*
 /click/userlevel/*
+/click/conf/xia_chain_topology.click
+
+
+## proxy
+/proxies/xia_pb2.py
 
