@@ -3,7 +3,7 @@ GENERATED=xia_packetforward.click ip_packetforward.click xia_packetforward_fallb
 
 all: $(GENERATED)
 
-%.click: %.pre ../xia_router_template.click
+%.click: %.pre ../xia_router_template.click packetforward_common.click
 	#$(RM) -f $@
 	../preprocess.rb $<
 

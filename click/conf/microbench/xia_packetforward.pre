@@ -1,9 +1,5 @@
 include ../xia_router_template.click
-
-XIAXIDInfo(
-    AD0 AD:0000000000000000000000000000000000000000,
-    AD1 AD:0000000000000000000000000000000000000001,
-);
+include packetforward_common.click
 
 
 host0 :: Router4Port(RE AD0);
@@ -16,8 +12,6 @@ Script(write host0/n/proc/rt_CID/rt.add - 5);
 Script(write host0/n/proc/rt_AD/rt.add AD0 4);
 Script(write host0/n/proc/rt_AD/rt.add AD1 0);
 
-
-define($COUNT 10000000);
 
 gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
 -> Script(TYPE PACKET, write gen.active false)       // stop source after exactly 1 packet
