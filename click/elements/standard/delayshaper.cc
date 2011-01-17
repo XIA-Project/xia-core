@@ -73,9 +73,16 @@ DelayShaper::pull(int)
 {
     // read a packet
     if (!_p && (_p = input(0).pull())) {
+      
+       //click_chatter("Time got %f\n", _p->timestamp_anno().sec());
+      
 	if (!_p->timestamp_anno().sec()) // get timestamp if not set
 	    _p->timestamp_anno().assign_now();
+	//click_chatter("Time assigned %d\n", _p->timestamp_anno().sec());
+	
 	_p->timestamp_anno() += _delay;
+	
+	//click_chatter("Time set.. delay %d\n", _p->timestamp_anno().sec());
     }
 
     if (_p) {

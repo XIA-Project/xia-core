@@ -10,6 +10,8 @@
 #include <click/xiacontentheader.hh>
 
 
+#include <iostream>
+
 CLICK_DECLS
 
 XIARPC::XIARPC() : _buffer(NULL), _buffer_size(0), _buffer_capacity(0), _message_len(0)
@@ -240,7 +242,10 @@ XIARPC::push(int port, Packet *p)
     WritablePacket *p2 = WritablePacket::make (256, data_response.c_str(), data_response.length(), 0)->push(4);
     int32_t size = ntohl(data_response.length());
     memcpy(p2->data(), &size , 4); 
+std::cout<<"In RPC"<<std::endl;
+std::cout<<"pushed payload: "<<p2->data()<<std::endl;
     output(0).push(p2);
+    p->kill();
   }
 }
 /*

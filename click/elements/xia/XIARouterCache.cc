@@ -277,6 +277,9 @@ void XIARouterCache::push(int port, Packet *p)
 	newp=contenth.encap(newp);		// add XIA header
 	newp=encap.encap( newp, false );	
 //std::cout<<"made new full-chunk pkt, chunkSize is "<<chunkSize<<", hdrsize is "<<hdrsize<<std::endl;
+std::cout<<"In client"<<std::endl;
+std::cout<<"payload: "<<chunk->GetPayload()<<std::endl;
+std::cout<<"pushed to rpc"<<std::endl;
 	checked_output_push(1 , newp);
 //std::cout<<"have pushed out"<<std::endl;
 #ifdef CLIENTCACHE
@@ -335,10 +338,11 @@ void XIARouterCache::push(int port, Packet *p)
 //std::cout<<"dst is not myself"<<std::endl;
       HashTable<XID,CChunk*>::iterator it;
       it=contentTable.find(srcID);  
-      if(port==1)  //push CID, server get the chunk
+      if(port==1)  //put CID, server get the chunk
       {
 std::cout<<"In server: push CID"<<std::endl;
 std::cout<<"payload:"<<payload<<std::endl;
+std::cout<<"payload length: "<<length<<std::endl;
 	if(it==contentTable.end())
 	{
 	  CChunk *chunk=new CChunk(srcID, chunkSize);
@@ -349,7 +353,8 @@ std::cout<<"payload:"<<payload<<std::endl;
       }
       else    //router get the chunk packet
       {
-//std::cout<<"In router: get a response pkt"<<std::endl;
+std::cout<<"In router: get a response pkt"<<std::endl;
+std::cout<<"payload:"<<payload<<std::endl;
 	  if(it!=contentTable.end())    //already in contentTable
 	  {
 //printf("found in contentTable\n");
@@ -457,7 +462,9 @@ std::cout<<"payload:"<<payload<<std::endl;
 	newp=contenth.encap(newp);
 	newp=encap.encap( newp, false );	      // add XIA header
 	checked_output_push(1 , newp);
-//  std::cout<<"have pushed out"<<std::endl;
+std::cout<<"In client"<<std::endl;
+std::cout<<"payload: "<<pl<<std::endl;
+std::cout<<"have pushed out"<<std::endl;
       }
       p->kill();  
       return ;
@@ -466,14 +473,14 @@ std::cout<<"payload:"<<payload<<std::endl;
     // server, router
     if(it!=contentTable.end())
     { 
-//std::cout<<"look up cache in router or server"<<std::endl;
+std::cout<<"look up cache in router or server"<<std::endl;
       XIAHeaderEncap encap;
       XIAHeader hdr(p);
       XIAPath myown_source;  // AD:HID:CID add_node, add_edge
       char* pl=it->second->GetPayload();
 std::cout<<"payload: "<<pl<<std::endl;
       unsigned int s=it->second->GetSize();
- //std::cout<<"chunk size: "<<s<<std::endl;      
+std::cout<<"chunk size: "<<s<<std::endl;      
       myown_source = local_addr;
       handle_t _cid=myown_source.add_node(dstID);      
       myown_source.add_edge(myown_source.source_node(), _cid);
