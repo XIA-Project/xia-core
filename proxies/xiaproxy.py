@@ -77,14 +77,23 @@ def getCID(CID, sock_rpc):
 	data = sock_rpc.recv(4)
 	size = struct.unpack('!i', data)[0]
 	data = sock_rpc.recv(size)
+
+	#data2 = sock_rpc.recv(4)
+	#size2 = struct.unpack('!i', data2)[0]
+	#data3 = sock_rpc.recv(size2)
+
 	msg_response = xia_pb2.msg()
 	msg_response.ParseFromString(data) 
 	payload =  msg_response.payload
 	print 'here here here:' + str (len(payload))
+	###print payload
+	
 	return payload
 
 
 def xiaHandler(control, payload, bsock, sock_rpc):
+	if payload.find('GET /favicon.ico') != -1:
+			return
 	print "in XIA code\n" + control + "\n" + payload
 	control=control[4:]
 	if control.find('sid') == 0:
@@ -99,11 +108,12 @@ def xiaHandler(control, payload, bsock, sock_rpc):
 		for i in range (0, num):
 			print i
 			payload_cid += getCID(control[6+i*40+i:46+i*40+i], sock_rpc)
-		
-#		payload_cid += getCID(CID[1], sock_rpc)
+			
 		length = len (payload_cid)
 		print length
-		header = 'HTTP/1.1 200 OK\nETag: "48917-39ed-4990ddae564c"\nAccept-Ranges: bytes\nContent-Length: ' + str(length) + '\nContent-Type: image/jpeg\n\n'  # todo: avoid hard code 
+		#header = 'HTTP/1.1 200 OK\nETag: "48917-39ed-4990ddae564c"\nAccept-Ranges: bytes\nContent-Length: ' + str(length) + '\nContent-Type: image/jpeg\n\n'  # todo: avoid hard code 
+		header2 = 'HTTP/1.1 200 OK\nETag: "48917-39ed-4990ddae564c"\nAccept-Ranges: bytes\nContent-Length: 14829\nContent-Type: image/jpeg\n\n'  # todo: avoid hard code 
+		header = ''
 		#getCID(control[4:], payload, bsock, sock_rpc);
 		payload_http = header + payload_cid
 		bsock.send(payload_http)

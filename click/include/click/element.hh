@@ -559,7 +559,6 @@ Element::Port::push(Packet* p) const
     assert(_e && p);
 #if CLICK_STATS >= 1
     ++_packets;
-    click_chatter("packet %x pushed to element %s (%s)", p, _e->name().c_str(), _e->class_name());
 #endif
 #if CLICK_STATS >= 2
     ++_e->input(_port)._packets;
@@ -571,6 +570,9 @@ Element::Port::push(Packet* p) const
     _owner->_child_cycles += x;
 #else
     _e->push(_port, p);
+#endif
+#if CLICK_STATS >= 3
+    click_chatter("packet %x pushed to element %s (%s)", p, _e->name().c_str(), _e->class_name());
 #endif
 }
 
@@ -609,8 +611,10 @@ Element::Port::pull() const
 #if CLICK_STATS >= 1
     if (p) {
 	++_packets;
-        click_chatter("packet %x pulled from element %s (%s)", p, _e->name().c_str(), _e->class_name());
     }
+#endif
+#if CLICK_STATS >= 3
+    click_chatter("packet %x pulled from element %s (%s)", p, _e->name().c_str(), _e->class_name());
 #endif
     return p;
 }

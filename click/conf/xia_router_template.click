@@ -131,8 +131,12 @@ elementclass Host {
 
     input[0] -> n;
 
+    srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
+
     sock -> [0]rpc[0] -> sock;
-    n[1] -> [1]rpc[1] -> [0]n;
+    n[1] -> srcTypeClassifier[1] -> [1]rpc[1] -> [0]n;
+    srcTypeClassifier[0] -> Discard;    // do not send CID responses directly to RPC;
+                                        // they must be served by cache using the following connection only
     n[2] -> [0]cache[0] -> [1]n;
     rpc[2] -> [1]cache[1] -> [2]rpc;
 
@@ -217,7 +221,8 @@ elementclass IPRouter4Port {
     // output[2]: forward to interface 2
     // output[3]: forward to interface 3
 
-    rt :: RangeIPLookup;   // fastest IP lookup elem in Click
+    rt :: RangeIPLookup;    // fastest lookup for large table
+    //rt :: DirectIPLookup;   // 5% faster than RangeIPLookup for very small table
     dt :: DecIPTTL;
     fr :: IPFragmenter(1500);
 

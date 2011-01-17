@@ -1,5 +1,6 @@
 #!/bin/bash
 
+make clean || exit 1
 make -C ../.. || exit 1
 
 sudo opcontrol --no-vmlinux || exit 1
@@ -13,8 +14,10 @@ function run {
 }
 
 run ip_packetforward
-run xia_packetforward
+run xia_packetforward_no_fallback
 run xia_packetforward_fallback1
 run xia_packetforward_fallback2
 run xia_packetforward_update
+run xia_packetforward_content_request
+run xia_packetforward_content_response
 

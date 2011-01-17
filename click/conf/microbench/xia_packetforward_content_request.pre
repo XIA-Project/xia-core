@@ -5,7 +5,8 @@ include xia_packetforward_common.click
 
 gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
 -> Script(TYPE PACKET, write gen.active false)       // stop source after exactly 1 packet
--> XIAEncap(SRC RE AD0, DST RE AD0 AD1)
+-> XIAEncap(SRC RE AD0, DST RE ( AD1 ) CID0,
+            EXT_C_REQUEST true)
 -> XIAPacketForward;
 
 Script(write gen.active true);

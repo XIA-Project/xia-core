@@ -140,22 +140,6 @@ XIAXIDTypeClassifier::match(Packet *p)
         }
     }
 
-    // uncomment this part when performing forwarding experiments
-    /*
-    if (_patterns.size() == 2)
-    {
-        // src/dst type comparison
-        return 1;   // not matched
-    }
-    else if (_patterns.size() == 5)
-    {
-        // next XID type comparison
-        return 0;   // AD
-    }
-    else
-        assert(false);
-    */
-
     for (int i = 0; i < _patterns.size(); i++)
     {
         const struct pattern& pat = _patterns[i];
