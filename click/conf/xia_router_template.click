@@ -136,7 +136,7 @@ elementclass Host {
     sock -> [0]rpc[0] -> sock;
     n[1] -> srcTypeClassifier[1] -> [1]rpc[1] -> [0]n;
     srcTypeClassifier[0] -> Discard;    // do not send CID responses directly to RPC;
-                                        // it must be served by cache using the following connection
+                                        // they must be served by cache using the following connection only
     n[2] -> [0]cache[0] -> [1]n;
     rpc[2] -> [1]cache[1] -> [2]rpc;
 

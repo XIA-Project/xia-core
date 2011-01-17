@@ -1,38 +1,16 @@
 include ../xia_router_template.click
 include packetforward_common.click
-
-
-host0 :: Router4Port(RE AD0);
-
-Script(write host0/n/proc/rt_AD/rt.add - 5);
-Script(write host0/n/proc/rt_HID/rt.add - 5);
-Script(write host0/n/proc/rt_SID/rt.add - 5);
-Script(write host0/n/proc/rt_CID/rt.add - 5);
-
-Script(write host0/n/proc/rt_AD/rt.add AD0 4);
-Script(write host0/n/proc/rt_AD/rt.add AD1 0);
+include xia_packetforward_common.click
 
 
 gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
 -> Script(TYPE PACKET, write gen.active false)       // stop source after exactly 1 packet
--> XIAEncap(DST DAG     2 1 0 
-                    AD1 2 -     // 0 
-                    AD2 2 -     // 1
-                    AD3        // 2
-    ,SRC RE AD0)
--> Clone($COUNT)
--> Unqueue
--> host0 
--> Unqueue
--> AggregateCounter(COUNT_STOP $COUNT)
--> Discard;
-
-Idle -> [1]host0;
-Idle -> [2]host0;
-Idle -> [3]host0;
-host0[1] -> Discard;
-host0[2] -> Discard;
-host0[3] -> Discard;
+-> XIAEncap(SRC RE AD0, DST DAG     2 1 0   // -1
+                                AD1 2 -     //  0 
+                                AD2 2 -     //  1
+                                AD3         //  2
+)
+-> XIAPacketForward;
 
 Script(write gen.active true);
 
