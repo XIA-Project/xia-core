@@ -13,5 +13,5 @@ all: $(GENERATED)
 
 clean:
 	$(RM) $(GENERATED)
-	$(RM) *_oprof
-	$(RM) *_timing
+	#$(RM) *_oprof
+	#$(RM) *_timing

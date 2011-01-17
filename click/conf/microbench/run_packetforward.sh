@@ -1,5 +1,6 @@
 #!/bin/bash
 
+make clean || exit 1
 make -C ../.. || exit 1
 
 sudo opcontrol --no-vmlinux || exit 1
