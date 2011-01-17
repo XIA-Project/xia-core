@@ -18,6 +18,8 @@ def putCID(chunk, sock_rpc):
     msg_putCID.xiapath_dst = 'CID:' + CID[cid_i]
     cid_i = cid_i + 1
     msg_putCID.payload = chunk
+    #msg_putCID.payload = "i'm a fake pic" + CID[cid_i]
+    #print  msg_putCID.xiapath_dst, msg_putCID.payload
     serialized_msg = msg_putCID.SerializeToString()
     size = struct.pack('!i', len(serialized_msg))
     sock_rpc.send(size)
