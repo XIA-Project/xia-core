@@ -153,7 +153,7 @@ XIAHeaderEncap::encap(Packet* p_in, bool adjust_plen) const
     if (adjust_plen)
         reinterpret_cast<struct click_xia*>(p->data())->plen = htons(payload_len);
     p->set_xia_header(reinterpret_cast<struct click_xia*>(p->data()), header_len);
-    Timestamp now = Timestamp::now();
+    Timestamp now = Timestamp::now();   
     p->timestamp_anno() = now;
 
     return p;
