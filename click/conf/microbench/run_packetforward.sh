@@ -1,16 +1,14 @@
 #!/bin/bash
 
-make clean || exit 1
-make -C ../.. || exit 1
-
-sudo opcontrol --no-vmlinux || exit 1
+make -C ../.. distclean
+pushd ../.. && CXXFLAGS="-g -O2 -fno-omit-frame-pointer" ./configure && popd
+make -j4 -C ../.. || exit 1
 
 function run {
-	sudo opcontrol --reset || exit 1
-	sudo opcontrol --start || exit 1
-	/usr/bin/time ./click $1.click >& output_$1_timing || exit 1
-	sudo opcontrol --shutdown || exit 1
-	opreport --demangle=smart --symbols click >& output_$1_oprof || exit 1
+	echo $1
+	sync
+	./perf record -g /usr/bin/time ../../userlevel/click $1.click >& output_$1_timing
+	./perf report -g flat,0 >& output_$1_perf
 }
 
 run ip_packetforward
@@ -18,6 +16,10 @@ run xia_packetforward_no_fallback
 run xia_packetforward_fallback1
 run xia_packetforward_fallback2
 run xia_packetforward_update
-run xia_packetforward_content_request
+run xia_packetforward_content_request_miss
+run xia_packetforward_content_request_hit
 run xia_packetforward_content_response
+
+
+pushd ../.. && ./configure && popd
 

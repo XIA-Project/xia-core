@@ -10,7 +10,9 @@ gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
                                 AD2 2 -     //  1
                                 AD3         //  2
 )
--> XIAPacketForward;
+-> fwd :: XIAPacketForward;
+
+Idle -> [1]fwd;
 
 Script(write gen.active true);
 

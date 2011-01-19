@@ -6,7 +6,9 @@ include ip_packetforward_common.click
 gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
 -> Script(TYPE PACKET, write gen.active false)       // stop source after exactly 1 packet
 -> IPEncap(9, 192.168.10.10, 192.168.0.10)
--> IPPacketForward;
+-> fwd :: IPPacketForward;
+
+Idle -> [1]fwd;
 
 Script(write gen.active true);
 

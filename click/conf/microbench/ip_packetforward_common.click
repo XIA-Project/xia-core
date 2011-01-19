@@ -12,6 +12,8 @@ elementclass IPPacketForward {
     -> AggregateCounter(COUNT_STOP $COUNT)
     -> Discard;
 
+    input[1] -> host0;
+
     Idle -> [1]host0;
     Idle -> [2]host0;
     Idle -> [3]host0;

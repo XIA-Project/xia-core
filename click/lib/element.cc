@@ -432,7 +432,7 @@ Element::~Element()
 #if CLICK_STATS >= 2
     if (_calls) {
         StringAccum sa;
-        sa << _calls << ' ' << (_self_cycles - _child_cycles) << ' ' << name();
+        sa << _calls << ' ' << _self_cycles << ' ' << _child_cycles << ' ' << name();
         click_chatter("%s", sa.take_string().c_str());
     }
 #endif
