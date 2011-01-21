@@ -32,11 +32,11 @@ elementclass XIAPacketRoute {
     consider_next_path :: XIASelectPath(next);
     c :: XIAXIDTypeClassifier(next AD, next HID, next SID, next CID, -);
 
-    //input -> Print("packet received by $local_addr") -> check_dest;
-    input -> check_dest;
+    //input -> Print("packet received by $local_addr") -> consider_first_path;
+    input -> consider_first_path;
 
-    check_dest[0] -> [1]output; // arrived at the final destination
-    check_dest[1] -> consider_first_path;
+    check_dest[0] -> [1]output;             // arrived at the final destination
+    check_dest[1] -> consider_first_path;   // reiterate paths with new last pointer
 
     consider_first_path[0] -> c;
     consider_first_path[1] -> [2]output;
