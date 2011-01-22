@@ -1,4 +1,4 @@
-include xia_router_template.click
+include xia_router_template.inc
 
 // aliases for XIDs
 XIAXIDInfo(

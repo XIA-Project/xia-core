@@ -31,6 +31,7 @@
 # include <signal.h>
 # include <click/master.hh>
 # include <click/userutils.hh>
+# include <time.h>
 #endif
 CLICK_DECLS
 
@@ -49,6 +50,7 @@ static const StaticNameDB::Entry instruction_entries[] = {
     { "pause", Script::INSN_WAIT_STEP },
     { "print", Script::INSN_PRINT },
     { "printn", Script::INSN_PRINTN },
+    { "print_cputime", Script::INSN_PRINT_CPUTIME },
     { "read", Script::INSN_READ },
     { "readq", Script::INSN_READQ },
     { "return", Script::INSN_RETURN },
@@ -238,6 +240,7 @@ Script::configure(Vector<String> &conf, ErrorHandler *errh)
 	case INSN_READQ:
 	case INSN_PRINT:
 	case INSN_PRINTN:
+	case INSN_PRINT_CPUTIME:
 	case INSN_GOTO:
 	    add_insn(insn, 0, 0, conf[i]);
 	    break;
@@ -458,6 +461,15 @@ Script::step(int nsteps, int step_type, int njumps, ErrorHandler *errh)
 #endif
 	    break;
 	}
+
+	case INSN_PRINT_CPUTIME: {
+            struct timespec ts;
+            if (clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts) == 0)
+                click_chatter("CPUTIME %llu", static_cast<uint64_t>(ts.tv_sec) * 1000000000Lu + ts.tv_nsec);
+            else
+                click_chatter("CPUTIME 0");
+	    break;
+        }
 
 	case INSN_READ:
 	case INSN_READQ: {

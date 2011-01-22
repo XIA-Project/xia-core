@@ -16,13 +16,11 @@ function run {
 }
 
 run ip_packetforward
-run xia_packetforward_no_fallback
+run xia_packetforward_fallback0
 run xia_packetforward_fallback1
 run xia_packetforward_fallback2
-run xia_packetforward_update
-run xia_packetforward_content_request_miss
-run xia_packetforward_content_request_hit
-run xia_packetforward_content_response
+run xia_packetforward_viapoint
+run xia_packetforward_cid_rep
 
 
 pushd ../.. && ./configure && popd

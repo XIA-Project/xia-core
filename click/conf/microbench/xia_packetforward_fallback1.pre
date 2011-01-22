@@ -1,14 +1,17 @@
-include ../xia_router_template.click
-include packetforward_common.click
-include xia_packetforward_common.click
+include ../xia_router_template.inc
+include common.inc
 
 
-gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
+gen :: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE)
 -> Script(TYPE PACKET, write gen.active false)       // stop source after exactly 1 packet
--> XIAEncap(SRC RE UNROUTABLE_AD0, DST RE ( RANDOM_ID ) UNROUTABLE_AD1)
+-> XIAEncap(SRC RE UNROUTABLE_AD0, DST RE ( RANDOM_ID ) ARB_RANDOM_ID)
 -> fwd :: XIAPacketForward;
 
 Idle -> [1]fwd;
+Idle -> [2]fwd;
 
 Script(write gen.active true);
+
+define($AD_RT_SIZE 351611);
+define($CID_RT_SIZE 351611);
 

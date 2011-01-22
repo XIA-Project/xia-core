@@ -86,6 +86,10 @@ printed.  For example, assuming the 'c.count' read handler returns "0":
 
 Like C<print>, but does not append a newline.
 
+=item 'C<print_cputime>'
+
+Prints the current CPU time of the process.
+
 =item 'C<read> HANDLER [ARGS]', 'C<readq> HANDLER [ARGS]'
 
 Call a read handler and print the handler name and result to standard error.  (In the kernel, the result is printed to the system log.)  For example, the
@@ -398,7 +402,7 @@ class Script : public Element { public:
 
     enum Insn {
 	INSN_INITIAL, INSN_WAIT_STEP, INSN_WAIT_TIME, // order required
-	INSN_PRINT, INSN_PRINTN, INSN_READ, INSN_READQ, INSN_WRITE, INSN_WRITEQ,
+	INSN_PRINT, INSN_PRINTN, INSN_PRINT_CPUTIME, INSN_READ, INSN_READQ, INSN_WRITE, INSN_WRITEQ,
 	INSN_SET, insn_setq, insn_init, insn_initq, insn_export, insn_exportq,
 	INSN_SAVE, INSN_APPEND,
 	INSN_STOP, INSN_END, INSN_EXIT, INSN_LABEL, INSN_GOTO, INSN_RETURN,

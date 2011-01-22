@@ -2,7 +2,7 @@ GENERATED=xia_chain_topology.click
 
 all: $(GENERATED) microbench
 
-%.click: %.pre xia_router_template.click
+%.click: %.pre xia_router_template.inc
 	./preprocess.rb $<
 
 .PHONY: microbench
