@@ -329,7 +329,7 @@ String
 XIAPath::unparse_dag(const Element* context)
 {
     if (!is_valid())
-        return "";
+        return "(invalid)";
 
     // unparsing to DAG string representation requires unparsing to a node list.
     // the graph in XIAPath itself is incompatible to our own DAG because
@@ -376,7 +376,7 @@ String
 XIAPath::unparse_re(const Element* context)
 {
     if (!is_valid())
-        return "";
+        return "(invalid)";
 
     // try to unparse to RE string representation directly from the graph
 
@@ -564,7 +564,7 @@ XIAPath::is_valid() const
         if (_nodes[i].edges.size() == 0 && i != static_cast<int>(_dst))
             return false;
         // too high outdegree?
-        if (_nodes[i].edges.size() >= CLICK_XIA_XID_EDGE_NUM)
+        if (_nodes[i].edges.size() > CLICK_XIA_XID_EDGE_NUM)
             return false;
 
         for (int j = 0; j < _nodes[i].edges.size(); j++)

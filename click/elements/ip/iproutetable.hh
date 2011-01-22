@@ -203,6 +203,7 @@ class IPRouteTable : public Element { public:
     static int ctrl_handler(const String&, Element*, void*, ErrorHandler*);
     static int lookup_handler(int operation, String&, Element*, const Handler*, ErrorHandler*);
     static String table_handler(Element*, void*);
+    static int load_routes_handler(const String&, Element*, void*, ErrorHandler*);
 
   private:
 

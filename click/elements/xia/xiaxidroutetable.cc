@@ -8,6 +8,8 @@
 #include <click/error.hh>
 #include <click/confparse.hh>
 #include <click/packet_anno.hh>
+#include <fstream>
+#include <stdlib.h>
 CLICK_DECLS
 
 XIAXIDRouteTable::XIAXIDRouteTable()
@@ -41,6 +43,8 @@ XIAXIDRouteTable::add_handlers()
     add_write_handler("add", set_handler, 0);
     add_write_handler("set", set_handler, (void*)1);
     add_write_handler("remove", remove_handler, 0);
+    add_write_handler("load", load_routes_handler, 0);
+    add_write_handler("generate", generate_routes_handler, 0);
 }
 
 int
@@ -49,10 +53,12 @@ XIAXIDRouteTable::set_handler(const String &conf, Element *e, void *thunk, Error
     XIAXIDRouteTable* table = static_cast<XIAXIDRouteTable*>(e);
 
     bool add_mode = !thunk;
+    /*
     if (add_mode)
         click_chatter("XIAXIDRouteTable: adding %-10s to %s\n", conf.c_str(), e->name().c_str());
     else
         click_chatter("XIAXIDRouteTable: setting %-10s for %s\n", conf.c_str(), e->name().c_str());
+    */
 
     String str_copy = conf;
 
@@ -92,7 +98,7 @@ XIAXIDRouteTable::remove_handler(const String &conf, Element *e, void *, ErrorHa
 {
     XIAXIDRouteTable* table = static_cast<XIAXIDRouteTable*>(e);
 
-    click_chatter("XIAXIDRouteTable: removing %-10s from %s\n", conf.c_str(), e->name().c_str());
+    //click_chatter("XIAXIDRouteTable: removing %-10s from %s\n", conf.c_str(), e->name().c_str());
 
     String str_copy = conf;
 
@@ -121,6 +127,84 @@ XIAXIDRouteTable::remove_handler(const String &conf, Element *e, void *, ErrorHa
             return errh->error("nonexistent XID: ", xid_str.c_str());
         table->_rt.erase(it);
     }
+    return 0;
+}
+
+int
+XIAXIDRouteTable::load_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh)
+{
+    std::ifstream in_f(conf.c_str());
+    if (!in_f.is_open())
+    {
+        errh->error("could not open file: %s", conf.c_str());
+        return -1;
+    }
+
+    int c = 0;
+    while (!in_f.eof())
+    {
+        char buf[1024];
+        in_f.getline(buf, sizeof(buf));
+
+        if (strlen(buf) == 0)
+            continue;
+
+        if (set_handler(buf, e, 0, errh) != 0)
+            return -1;
+
+        c++;
+    }
+    click_chatter("loaded %d entries", c);
+
+    return 0;
+}
+
+int
+XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh)
+{
+    XIAXIDRouteTable* table = dynamic_cast<XIAXIDRouteTable*>(e);
+    assert(table);
+
+    String conf_copy = conf;
+
+    String xid_type_str = cp_shift_spacevec(conf_copy);
+    int xid_type;
+    if (!cp_xid_type(xid_type_str, &xid_type))
+        return errh->error("invalid XID type: ", xid_type_str.c_str());
+
+    String count_str = cp_shift_spacevec(conf_copy);
+    int count;
+    if (!cp_integer(count_str, &count))
+        return errh->error("invalid entry count: ", count_str.c_str());
+
+    String port_str = cp_shift_spacevec(conf_copy);
+    int port;
+    if (!cp_integer(port_str, &port))
+        return errh->error("invalid port: ", port_str.c_str());
+
+    unsigned short xsubi[3];
+    xsubi[0] = 1;
+    xsubi[1] = 2;
+    xsubi[2] = 3;
+
+    struct click_xia_xid xid_d;
+    xid_d.type = xid_type;
+
+    for (int i = 0; i < count; i++)
+    {
+        uint8_t* xid = xid_d.id;
+        const uint8_t* xid_end = xid + CLICK_XIA_XID_ID_LEN;
+
+        while (xid != xid_end)
+        {
+            *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(xsubi));
+            xid += sizeof(uint32_t);
+        }
+
+        table->_rt[XID(xid_d)] = port;
+    }
+
+    click_chatter("generated %d entries", count);
     return 0;
 }
 

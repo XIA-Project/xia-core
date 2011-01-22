@@ -104,7 +104,7 @@ elementclass RouteEngine {
 
     dstTypeClassifier[0] -> [2]output;  // To cache (for serving content request)
 
-    proc[2] -> Discard;  // No route drop (future TODO: return an error packet)
+    proc[2] -> XIAPrint() -> Discard;  // No route drop (future TODO: return an error packet)
 };
 
 // 1-port host node
@@ -208,6 +208,40 @@ elementclass Router4Port {
     sw[3] -> Queue(200) -> [3]output;
 };
 
+// 4-port router node with "dummy cache" (for microbench)
+elementclass Router4PortDummyCache {
+    $local_addr |
+
+    // $local_addr: the full address of the node
+
+    // input[0], input[1], input[2], input[3]: a packet arrived at the node
+    // output[0]: forward to interface 0
+    // output[1]: forward to interface 1
+    // output[2]: forward to interface 2
+    // output[3]: forward to interface 3
+
+    n :: RouteEngine($local_addr);
+    //cache :: XIARouterCache($local_addr, n/proc/rt_CID/rt);
+    cache :: Queue(200);
+
+    input[0] -> [0]n;
+    input[1] -> [0]n;
+    input[2] -> [0]n;
+    input[3] -> [0]n;
+
+    n[0] -> sw :: PaintSwitch
+    n[1] -> Discard;
+    //n[2] -> [0]cache[0] -> [1]n;
+    //Idle -> [1]cache[1] -> Discard;
+    Idle -> [1]n;
+    n[2] -> cache -> Unqueue -> Discard;
+
+    sw[0] -> Queue(200) -> [0]output;
+    sw[1] -> Queue(200) -> [1]output;
+    sw[2] -> Queue(200) -> [2]output;
+    sw[3] -> Queue(200) -> [3]output;
+};
+
 // IP router node (caution: simplified version for forwarding experiments)
 elementclass IPRouter4Port {
     $local_addr |
@@ -221,8 +255,9 @@ elementclass IPRouter4Port {
     // output[2]: forward to interface 2
     // output[3]: forward to interface 3
 
-    rt :: RangeIPLookup;    // fastest lookup for large table
+    //rt :: RangeIPLookup;    // fastest lookup for large table
     //rt :: DirectIPLookup;   // 5% faster than RangeIPLookup for very small table
+    rt :: RadixIPLookup;    // fastest to setup, most generous (no limits in numbers)
     dt :: DecIPTTL;
     fr :: IPFragmenter(1500);
 
