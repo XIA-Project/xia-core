@@ -38,7 +38,7 @@ elementclass IPPacketForward {
     host0
     -> Unqueue
     //-> PrintStats
-    -> AggregateCounter(COUNT_STOP $COUNT)
+    -> AggregateCounter(COUNT_STOP $COUNT, PRINT_CPUTIME true)
     -> Discard;
 
     Idle -> [1]host0;
@@ -82,7 +82,7 @@ elementclass XIAPacketForward {
 
     host0 -> Unqueue
     //-> PrintStats
-    -> AggregateCounter(COUNT_STOP $COUNT)
+    -> AggregateCounter(COUNT_STOP $COUNT, PRINT_CPUTIME true)
     -> Discard;
 
     Idle -> [1]host0;

@@ -1,25 +1,22 @@
 #!/bin/bash
 
-make -C .. clean
-make -C ../.. distclean
-pushd ../.. && CXXFLAGS="-g -O2 -fno-omit-frame-pointer" ./configure --enable-task-heap && popd
-make -j4 -C ../.. || exit 1
-
 function run {
 	echo $1 $2
-	rm -f output_$1_$2_timing
-	rm -f output_$1_$2_perf
 	sync
-	sleep 10
-	./perf record -g /usr/bin/time ../../userlevel/click CID_RT_SIZE=$2 $1.click >& output_$1_$2_timing
-	./perf report -g flat,0 >& output_$1_$2_perf
+	for ITER in 0 1 2 3 4; do
+		echo $ITER
+		if [ -e "output_$1_$2_timing_$ITER" ]; then
+			echo skipping
+			continue
+		fi
+		sleep 3
+		./perf record -g /usr/bin/time ../../userlevel/click CID_RT_SIZE=$2 $1.click >& output_$1_$2_timing_$ITER
+		./perf report -g flat,0 >& output_$1_$2_perf_$ITER
+	done
 }
 
-for SIZE in 1 1000 351611 1000000 10000000 20000000 40000000; do
+for SIZE in 10000 30000 100000 300000 1000000 3000000 10000000 30000000; do
 	run xia_tablesize_cid $SIZE
 	run xia_tablesize_ad $SIZE
 done
-
-
-pushd ../.. && ./configure && popd
 

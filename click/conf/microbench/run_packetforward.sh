@@ -1,10 +1,5 @@
 #!/bin/bash
 
-make -C .. clean
-make -C ../.. distclean
-pushd ../.. && CXXFLAGS="-g -O2 -fno-omit-frame-pointer" ./configure --enable-task-heap && popd
-make -j4 -C ../.. || exit 1
-
 function run {
 	echo $1
 	rm -f output_$1_timing
@@ -21,7 +16,4 @@ run xia_packetforward_fallback1
 run xia_packetforward_fallback2
 run xia_packetforward_viapoint
 run xia_packetforward_cid_rep
-
-
-pushd ../.. && ./configure && popd
 
