@@ -74,6 +74,7 @@ typedef XIAPath::handle_t handle_t;
   private:
     XIAPath local_addr;
     XIAXIDRouteTable *routeTable;  //XIAXIDRouteTable 
+    bool cache_content_from_network;
     HashTable<XID,CChunk*> partialTable;
     HashTable<XID, CChunk*> contentTable;
     

@@ -17,6 +17,7 @@ XIARouterCache::XIARouterCache()
 {
   timer=0;
  // oldPartial=contentTable;
+  cache_content_from_network = true;
 }
 XIARouterCache::~XIARouterCache(){}
 
@@ -28,6 +29,7 @@ XIARouterCache::configure(Vector<String> &conf, ErrorHandler *errh)
    if (cp_va_kparse(conf, this, errh,
                 "LOCAL_ADDR", cpkP+cpkM, cpXIAPath, &local_addr,
 		"ROUTETABLENAME", cpkP+cpkM, cpElement, &routing_table_elem,
+                "CACHE_CONTENT_FROM_NETWORK", 0, cpBool, &cache_content_from_network,
                 cpEnd) < 0)
     return -1;   
  //std::cout<<"Route Table Name: "<<routing_table_name.c_str()<<std::endl;
@@ -283,9 +285,14 @@ void XIARouterCache::push(int port, Packet *p)
 	checked_output_push(1 , newp);
 //std::cout<<"have pushed out"<<std::endl;
 #ifdef CLIENTCACHE
-	contentTable[srcID]=chunk;
-	content[srcID]=1;
-	addRoute(srcID);
+        if (cache_content_from_network)
+        {
+            contentTable[srcID]=chunk;
+            content[srcID]=1;
+            addRoute(srcID);
+        }
+        else
+            delete chunk;
 #endif
 #ifndef CLIENTCACHE	
 	delete chunk;
