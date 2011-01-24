@@ -49,8 +49,9 @@ static const StaticNameDB::Entry instruction_entries[] = {
     { "loop", Script::INSN_LOOP_PSEUDO },
     { "pause", Script::INSN_WAIT_STEP },
     { "print", Script::INSN_PRINT },
+    { "print_realtime", Script::INSN_PRINT_REALTIME },
+    { "print_usertime", Script::INSN_PRINT_USERTIME },
     { "printn", Script::INSN_PRINTN },
-    { "print_cputime", Script::INSN_PRINT_CPUTIME },
     { "read", Script::INSN_READ },
     { "readq", Script::INSN_READQ },
     { "return", Script::INSN_RETURN },
@@ -212,6 +213,7 @@ Script::configure(Vector<String> &conf, ErrorHandler *errh)
 	if (!insn_name)		// ignore as benign
 	    continue;
 	else if (!NameInfo::query_int(NameInfo::T_SCRIPT_INSN, this, insn_name, &insn)) {
+            click_chatter("[%s] %d\n", insn_name.c_str(), insn);
 	    errh->error("syntax error at %<%s%>", insn_name.c_str());
 	    continue;
 	}
@@ -240,7 +242,8 @@ Script::configure(Vector<String> &conf, ErrorHandler *errh)
 	case INSN_READQ:
 	case INSN_PRINT:
 	case INSN_PRINTN:
-	case INSN_PRINT_CPUTIME:
+	case INSN_PRINT_REALTIME:
+	case INSN_PRINT_USERTIME:
 	case INSN_GOTO:
 	    add_insn(insn, 0, 0, conf[i]);
 	    break;
@@ -462,12 +465,21 @@ Script::step(int nsteps, int step_type, int njumps, ErrorHandler *errh)
 	    break;
 	}
 
-	case INSN_PRINT_CPUTIME: {
+	case INSN_PRINT_REALTIME: {
+            struct timeval tv;
+            if (gettimeofday(&tv, NULL) == 0)
+                click_chatter("REALTIME %llu", static_cast<uint64_t>(tv.tv_sec) * 1000000000Lu + static_cast<uint64_t>(tv.tv_usec) * 1000);
+            else
+                click_chatter("REALTIME 0");
+	    break;
+        }
+
+	case INSN_PRINT_USERTIME: {
             struct timespec ts;
             if (clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts) == 0)
-                click_chatter("CPUTIME %llu", static_cast<uint64_t>(ts.tv_sec) * 1000000000Lu + ts.tv_nsec);
+                click_chatter("USERTIME %llu", static_cast<uint64_t>(ts.tv_sec) * 1000000000Lu + ts.tv_nsec);
             else
-                click_chatter("CPUTIME 0");
+                click_chatter("USERTIME 0");
 	    break;
         }
 

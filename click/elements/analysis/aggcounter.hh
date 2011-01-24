@@ -97,7 +97,7 @@ them.
 String. This banner is written to the head of any output file. It should
 probably begin with a comment character, like '!' or '#'. Default is empty.
 
-=item PRINT_CPUTIME
+=item PRINT_USERTIME
 
 Boolean.  If true, print the CPU time of the process when accepting the first
 packet and when calling the handler.
@@ -232,7 +232,7 @@ class AggregateCounter : public Element { public:
     bool _use_extra_length : 1;
     bool _frozen;
     bool _active;
-    bool _print_cputime;
+    bool _print_usertime;
 
     Node *_root;
     Node *_free;
