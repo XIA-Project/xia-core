@@ -29,7 +29,7 @@ XIARouterCache::configure(Vector<String> &conf, ErrorHandler *errh)
    if (cp_va_kparse(conf, this, errh,
                 "LOCAL_ADDR", cpkP+cpkM, cpXIAPath, &local_addr,
 		"ROUTETABLENAME", cpkP+cpkM, cpElement, &routing_table_elem,
-                "CACHE_CONTENT_FROM_NETWORK", 0, cpBool, &cache_content_from_network,
+                "CACHE_CONTENT_FROM_NETWORK", cpkP, cpBool, &cache_content_from_network,
                 cpEnd) < 0)
     return -1;   
  //std::cout<<"Route Table Name: "<<routing_table_name.c_str()<<std::endl;
