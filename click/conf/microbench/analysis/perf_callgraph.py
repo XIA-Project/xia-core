@@ -89,7 +89,7 @@ def parse(seq, stop_symbols):
 
 # stop symbols for click router
 stop_symbols = []
-f = open('../../../xia-core/click/userlevel/elements.conf')
+f = open('../../../userlevel/elements.conf')
 for line in f.readlines():
     mat = re.match(r'^.+-(.+)?$', line.strip())
     if mat is not None:

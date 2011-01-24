@@ -4,7 +4,7 @@ all: $(GENERATED)
 
 %.pdf: %.py common.py
 	./$<
-	cp $@ ../../paper/fig
+	cp $@ ../../../../../xia-doc/paper/fig
 
 clean:
 	rm -f $(GENERATED)

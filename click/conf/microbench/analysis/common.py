@@ -10,7 +10,7 @@ rc('font', **{'family' : 'sans-serif', 'serif': ['arial']})
 
 import re
 
-data_path_prefix = '../../../xia-core/click/conf/microbench/'
+data_path_prefix = '../'
 packet = int(re.search(r'define\(\$COUNT\s+(\d+)\)', open(data_path_prefix + 'common.inc').read()).group(1))
 
 # excution time pattern
