@@ -7,18 +7,17 @@
  * 
  */
 
-#define CLICK_XIA_XID_TYPE_UNDEF    0
-#define CLICK_XIA_XID_TYPE_AD       10
-#define CLICK_XIA_XID_TYPE_HID      11
-#define CLICK_XIA_XID_TYPE_CID      12
-#define CLICK_XIA_XID_TYPE_SID      13
-#define CLICK_XIA_XID_TYPE_MAX      (CLICK_XIA_XID_TYPE_SID)
+#define CLICK_XIA_XID_TYPE_UNDEF    (0)
+#define CLICK_XIA_XID_TYPE_AD       (10)
+#define CLICK_XIA_XID_TYPE_HID      (11)
+#define CLICK_XIA_XID_TYPE_CID      (12)
+#define CLICK_XIA_XID_TYPE_SID      (13)
 
 #define CLICK_XIA_XID_ID_LEN        20
 
 struct click_xia_xid {
+    uint32_t type;
     uint8_t id[CLICK_XIA_XID_ID_LEN];
-    uint8_t type;
 };
 
 #pragma pack(push)
@@ -37,7 +36,7 @@ struct click_xia_xid_edge
 };
 #pragma pack(pop)
 
-#define CLICK_XIA_XID_EDGE_NUM      3
+#define CLICK_XIA_XID_EDGE_NUM      4
 #define CLICK_XIA_XID_EDGE_UNUSED   127u
 
 struct click_xia_xid_node {
@@ -64,8 +63,8 @@ struct click_xia {
     click_xia_xid_node node[0];         /* XID node list */
 };
 
-#define CLICK_XIA_NXT_CID       CLICK_XIA_XID_TYPE_CID  /* CID-source specific key-value list */
-#define CLICK_XIA_NXT_HDR_MAX   CLICK_XIA_XID_TYPE_MAX  /* maximum non-upper-layer nxt value */
+#define CLICK_XIA_NXT_CID       12  /* CID-source specific key-value list */
+#define CLICK_XIA_NXT_HDR_MAX   CLICK_XIA_NXT_CID  /* maximum non-upper-layer nxt value */
 #define CLICK_XIA_NXT_NO        59                      /* no next header (as in IPv6) */
 
 // XIA extension header

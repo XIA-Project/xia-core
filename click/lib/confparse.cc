@@ -2003,18 +2003,18 @@ cp_ip_address(const String &str, IPAddress *result  CP_CONTEXT)
 }
 
 bool
-cp_xid_type(const String& str, int* result)
+cp_xid_type(const String& str, uint32_t* result)
 {
     if (str.compare(String("UNDEF")) == 0)
-        *result = CLICK_XIA_XID_TYPE_UNDEF;
+        *result = htonl(CLICK_XIA_XID_TYPE_UNDEF);
     else if (str.compare(String("AD")) == 0)
-        *result = CLICK_XIA_XID_TYPE_AD;
+        *result = htonl(CLICK_XIA_XID_TYPE_AD);
     else if (str.compare(String("CID")) == 0)
-        *result = CLICK_XIA_XID_TYPE_CID;
+        *result = htonl(CLICK_XIA_XID_TYPE_CID);
     else if (str.compare(String("HID")) == 0)
-        *result = CLICK_XIA_XID_TYPE_HID;
+        *result = htonl(CLICK_XIA_XID_TYPE_HID);
     else if (str.compare(String("SID")) == 0)
-        *result = CLICK_XIA_XID_TYPE_SID;
+        *result = htonl(CLICK_XIA_XID_TYPE_SID);
     else if (!cp_integer(str, result))
     {
         click_chatter("unrecognized XID type: %s\n", str.c_str());
@@ -2051,7 +2051,7 @@ cp_xid(const String& str, struct click_xia_xid* xid  CP_CONTEXT)
     xid_str = str.substring(delim + 1);
     //click_chatter("type %s. %s %d", type_str.c_str(), xid_str.c_str(), xid.type);
     
-    int xid_type;
+    uint32_t xid_type;
     if (!cp_xid_type(type_str, &xid_type))
         return false;
     xid->type = xid_type;
@@ -3573,7 +3573,7 @@ default_storefunc(cp_value *v  CP_CONTEXT)
    }
 
    case cpiXIDType: {
-     int* xid_type_store = (int*)v->store;
+     uint32_t* xid_type_store = (uint32_t*)v->store;
      *xid_type_store = v->v.xid_type;
      break;
    }

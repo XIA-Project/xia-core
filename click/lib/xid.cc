@@ -65,7 +65,7 @@ void
 XID::parse(const String& str)
 {
     if (!cp_xid(str, this))
-        _xid.type = CLICK_XIA_XID_TYPE_UNDEF;
+        _xid.type = htonl(CLICK_XIA_XID_TYPE_UNDEF);
 }
 
 /** @brief Unparses this address into a String.
@@ -78,7 +78,7 @@ XID::unparse() const
     const unsigned char *p = _xid.id;
     char buf[48];
     char *c = buf;
-    switch (_xid.type) {
+    switch (ntohl(_xid.type)) {
         case CLICK_XIA_XID_TYPE_UNDEF:
            c += sprintf(c, "UNDEF");
            break;
@@ -95,7 +95,7 @@ XID::unparse() const
            c += sprintf(c, "SID");
            break;
         default:
-           c += sprintf(c, "%02x", _xid.type);
+           c += sprintf(c, "%x", _xid.type);
     }
     c += sprintf(c, ":");
     for (size_t i = 0; i < sizeof(_xid.id); i++)

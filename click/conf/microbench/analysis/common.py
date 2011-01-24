@@ -15,8 +15,8 @@ packet = int(re.search(r'define\(\$COUNT\s+(\d+)\)', open(data_path_prefix + 'co
 
 # excution time pattern
 total_time_pat = re.compile(r'^([\d.]+)user .*?$')
-first_packet_cputime_pat = re.compile(r'^FIRST_PACKET CPUTIME (\d+)$')
-handler_call_cputime_pat = re.compile(r'^HANDLER_CALL CPUTIME (\d+)$')
+first_packet_usertime_pat = re.compile(r'^FIRST_PACKET USERTIME (\d+)$')
+handler_call_usertime_pat = re.compile(r'^HANDLER_CALL USERTIME (\d+)$')
 
 def get_total_runtime(path):
     t = 0
@@ -32,10 +32,10 @@ def get_processing_time(path):
     t = 0
 
     for line in open(path).readlines():
-        mat = first_packet_cputime_pat.match(line)
+        mat = first_packet_usertime_pat.match(line)
         if mat is not None:
             t -= float(mat.group(1)) / 1000000000.
-        mat = handler_call_cputime_pat.match(line)
+        mat = handler_call_usertime_pat.match(line)
         if mat is not None:
             t += float(mat.group(1)) / 1000000000.
 
@@ -47,6 +47,7 @@ dataset = {
     'FB0': data_path_prefix + 'output_xia_packetforward_fallback0',
     'FB1': data_path_prefix + 'output_xia_packetforward_fallback1',
     'FB2': data_path_prefix + 'output_xia_packetforward_fallback2',
+    'FB3': data_path_prefix + 'output_xia_packetforward_fallback3',
     'FB0-VIA': data_path_prefix + 'output_xia_packetforward_viapoint',
     'CID-REQ-M': data_path_prefix + 'output_xia_packetforward_cid_req_miss',
     'CID-REQ-H': data_path_prefix + 'output_xia_packetforward_cid_req_hit',
@@ -86,4 +87,7 @@ dataset = {
     'TABLESIZE_AD_10000000': data_path_prefix + 'output_xia_tablesize_ad_10000000',
     'TABLESIZE_AD_30000000': data_path_prefix + 'output_xia_tablesize_ad_30000000',
 }
+
+#iter_max = 10
+iter_max = 1
 

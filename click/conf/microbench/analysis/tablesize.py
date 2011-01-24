@@ -16,7 +16,6 @@ for family_name in family_names:
     y_lower_err_values[family_name] = []
     y_upper_err_values[family_name] = []
     for x_value in x_values:
-        iter_max = 5
         pps_min = None
         pps_max = None
         pps_avg = 0

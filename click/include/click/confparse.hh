@@ -175,7 +175,7 @@ bool cp_ip_prefix(const String& str, IPAddress* result_addr, IPAddress* result_m
 bool cp_ip_prefix(const String& str, unsigned char* result_addr, unsigned char* result_mask  CP_OPT_CONTEXT);
 bool cp_ip_address_list(const String& str, Vector<IPAddress>* result  CP_OPT_CONTEXT);
 
-bool cp_xid_type(const String& str, int* result);
+bool cp_xid_type(const String& str, uint32_t* result);
 class XID;
 bool cp_xid(const String& str, struct click_xia_xid* xid  CP_OPT_CONTEXT);
 bool cp_xid(const String& str, XID* xid  CP_OPT_CONTEXT);
@@ -424,7 +424,7 @@ struct cp_value {
 	double d;
 #endif
 	unsigned char address[16];
-        int xid_type;
+        uint32_t xid_type;
 	struct click_xia_xid xid;
 	int is[4];
 #ifndef CLICK_TOOL

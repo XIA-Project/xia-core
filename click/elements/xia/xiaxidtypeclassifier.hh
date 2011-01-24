@@ -42,9 +42,9 @@ protected:
     struct pattern 
     {
         enum { SRC = 0, DST, SRC_AND_DST, SRC_OR_DST, NEXT, ANY } type;
-        uint8_t src_xid_type;
-        uint8_t dst_xid_type;
-        uint8_t next_xid_type;
+        uint32_t src_xid_type;
+        uint32_t dst_xid_type;
+        uint32_t next_xid_type;
     };
 
 private:

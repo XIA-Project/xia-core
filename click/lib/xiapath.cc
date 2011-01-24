@@ -712,13 +712,13 @@ struct XIASelfTest {
         // alignment/packing test
         {
             assert(sizeof(struct click_xia) == 8);
-            assert(sizeof(struct click_xia_xid) == 21);
+            assert(sizeof(struct click_xia_xid) == 24);
             assert(sizeof(struct click_xia_xid_edge) == 1);
-            assert(sizeof(struct click_xia_xid_node) == 24);
+            assert(sizeof(struct click_xia_xid_node) == 28);
             struct click_xia hdr;
             assert(reinterpret_cast<unsigned long>(&(hdr.node[0])) - reinterpret_cast<unsigned long>(&hdr) == 8);
-            assert(reinterpret_cast<unsigned long>(&(hdr.node[1])) - reinterpret_cast<unsigned long>(&hdr) == 8 + 24);
-            assert(reinterpret_cast<unsigned long>(&(hdr.node[2])) - reinterpret_cast<unsigned long>(&hdr) == 8 + 48);
+            assert(reinterpret_cast<unsigned long>(&(hdr.node[1])) - reinterpret_cast<unsigned long>(&hdr) == 8 + 28);
+            assert(reinterpret_cast<unsigned long>(&(hdr.node[2])) - reinterpret_cast<unsigned long>(&hdr) == 8 + 56);
 
             assert(sizeof(struct click_xia_ext) == 2);
             struct click_xia_ext ext_hdr;

@@ -168,7 +168,7 @@ XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *
     String conf_copy = conf;
 
     String xid_type_str = cp_shift_spacevec(conf_copy);
-    int xid_type;
+    uint32_t xid_type;
     if (!cp_xid_type(xid_type_str, &xid_type))
         return errh->error("invalid XID type: ", xid_type_str.c_str());
 

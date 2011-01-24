@@ -39,11 +39,9 @@ XIAXIDTypeClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
         else if (type_str == "src" || type_str == "dst" || type_str == "next")
         {
             String xid_type_str = cp_shift_spacevec(str_copy);
-            int xid_type;
+            uint32_t xid_type;
             if (!cp_xid_type(xid_type_str, &xid_type))
                 return errh->error("unrecognized XID type: ", xid_type_str.c_str());
-            if (xid_type >= CLICK_XIA_XID_TYPE_MAX + 1)
-                return errh->error("invalid XID type: ", xid_type_str.c_str());
 
             struct pattern pat;
             if (type_str == "src")
@@ -72,17 +70,13 @@ XIAXIDTypeClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
         else if (type_str == "src_and_dst" || type_str == "src_or_dst")
         {
             String xid_type_str = cp_shift_spacevec(str_copy);
-            int xid_type0;
+            uint32_t xid_type0;
             if (!cp_xid_type(xid_type_str, &xid_type0))
                 return errh->error("unrecognized XID type: ", xid_type_str.c_str());
-            if (xid_type0 >= CLICK_XIA_XID_TYPE_MAX + 1)
-                return errh->error("invalid XID type: ", xid_type_str.c_str());
             xid_type_str = cp_shift_spacevec(str_copy);
-            int xid_type1;
+            uint32_t xid_type1;
             if (!cp_xid_type(xid_type_str, &xid_type1))
                 return errh->error("unrecognized XID type: ", xid_type_str.c_str());
-            if (xid_type1 >= CLICK_XIA_XID_TYPE_MAX + 1)
-                return errh->error("invalid XID type: ", xid_type_str.c_str());
 
             struct pattern pat;
             if (type_str == "src_and_dst")
@@ -122,10 +116,10 @@ XIAXIDTypeClassifier::match(Packet *p)
     if (hdr->dnode == 0 || hdr->snode == 0)
         return -1;
 
-    int dst_xid_type = hdr->node[hdr->dnode - 1].xid.type;
-    int src_xid_type = hdr->node[hdr->dnode + hdr->snode - 1].xid.type;
+    uint32_t dst_xid_type = hdr->node[hdr->dnode - 1].xid.type;
+    uint32_t src_xid_type = hdr->node[hdr->dnode + hdr->snode - 1].xid.type;
 
-    int next_xid_type = -1;
+    uint32_t next_xid_type = -1;
     {
         int last = hdr->last;
         if (last < 0)

@@ -2,6 +2,7 @@ GENERATED=ip_packetforward.click \
 	  xia_packetforward_fallback0.click \
 	  xia_packetforward_fallback1.click \
 	  xia_packetforward_fallback2.click \
+	  xia_packetforward_fallback3.click \
 	  xia_packetforward_viapoint.click \
 	  xia_packetforward_cid_req_miss.click \
 	  xia_packetforward_cid_req_hit.click \
@@ -16,5 +17,5 @@ all: $(GENERATED)
 
 clean:
 	$(RM) $(GENERATED)
-	#$(RM) *_perf
-	#$(RM) *_timing
+	#$(RM) *_perf_*
+	#$(RM) *_timing_*

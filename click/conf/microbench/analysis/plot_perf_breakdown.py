@@ -11,17 +11,20 @@ task_colors = ['0.4', '0.6', '0.2', '0.8', '1']
 symbol_task_mappings = [
     (re.compile(r'^Clone::.*$'), 'I/O'),
     (re.compile(r'^Discard::.*$'), 'I/O'),
-    (re.compile(r'^<>_int_malloc$'), 'I/O'),
-    (re.compile(r'^<>_int_free$'), 'I/O'),
-    (re.compile(r'^<>__malloc$'), 'I/O'),
-    (re.compile(r'^<>cfree$'), 'I/O'),
+    #(re.compile(r'^<>_int_malloc$'), 'I/O'),
+    #(re.compile(r'^<>_int_free$'), 'I/O'),
+    #(re.compile(r'^<>__malloc$'), 'I/O'),
+    #(re.compile(r'^<>cfree$'), 'I/O'),
     (re.compile(r'^IPRandomize::.*$'), 'I/O'),
     (re.compile(r'^XIARandomize::.*$'), 'I/O'),
-    (re.compile(r'^<>__drand48_iterate$'), 'I/O'),
-    (re.compile(r'^<>nrand48_r$'), 'I/O'),
+    #(re.compile(r'^<>__drand48_iterate$'), 'I/O'),
+    #(re.compile(r'^<>nrand48_r$'), 'I/O'),
     (re.compile(r'^AggregateCounter::.*$'), 'I/O'),
     (re.compile(r'^PrintStats::.*$'), 'I/O'),
     (re.compile(r'^AddressInfo::.*$'), 'I/O'),
+    (re.compile(r'^InfiniteSource::.*$'), 'I/O'),
+    (re.compile(r'^XIAEncap::.*$'), 'I/O'),
+    (re.compile(r'^IPEncap::.*$'), 'I/O'),
 
     (re.compile(r'^Unqueue::.*$'), 'Queueing'),
     (re.compile(r'^FullNoteQueue::.*$'), 'Queueing'),
@@ -40,7 +43,7 @@ symbol_task_mappings = [
     (re.compile(r'^XIADecHLIM::.*$'), 'Routing'),
     (re.compile(r'^XIANextHop::.*$'), 'Routing'),
 
-    #(re.compile(r'^XIARouterCache::.*$'), 'Content cache'),
+    #(re.compile(r'^XIARouterCache::.*$'), 'Routing'),
 
     (re.compile(r'^<>.*$'), 'Misc'),
 ]
@@ -48,41 +51,51 @@ symbol_task_mappings = [
 
 def plot(output, data_names):
     plot_data = {}
+    sample_data = {}
     for task in tasks:
         plot_data[task] = {}
+        sample_data[task] = {}
 
     processing_times = {}
 
     for data_name in data_names:
-        user_time = get_total_runtime(dataset[data_name] + '_timing')
-        processing_times[data_name] = user_time * 1000000000 / packet
+        for task in tasks:
+            plot_data[task][data_name] = 0.
 
-        perf_results = perf_callgraph.parse(open(dataset[data_name] + '_perf').readlines(), perf_callgraph.stop_symbols)
+        for iter_i in range(0, iter_max):
+            for task in tasks:
+                sample_data[task][data_name] = 0.
 
-        for symbol, rate in perf_results:
-            found = False
+            user_time = get_total_runtime(dataset[data_name] + '_timing' + '_%d' % iter_i)
+            processing_times[data_name] = user_time * 1000000000 / packet
 
-            for pat, task in symbol_task_mappings:
-                mat = pat.match(symbol)
-                if mat is None: continue
+            perf_results = perf_callgraph.parse(open(dataset[data_name] + '_perf' + '_%d' % iter_i).readlines(), perf_callgraph.stop_symbols)
 
-                if task is None:
+            for symbol, sample in perf_results:
+                found = False
+
+                for pat, task in symbol_task_mappings:
+                    mat = pat.match(symbol)
+                    if mat is None: continue
+
+                    if task is None:
+                        found = True
+                        break
+
+                    sample_data[task][data_name] += sample
                     found = True
                     break
 
-                plot_data[task][data_name] = plot_data[task].get(data_name, 0) + rate
-                found = True
+                if not found:
+                    assert False, 'cannot translate %s into a task name in %s iteration %d' % (symbol, dataset[data_name], iter_i)
 
-            if not found:
-                assert False, 'cannot translate %s into a task name' % symbol
-
-        time_sum = 0
-        for task in tasks:
-            time_sum += plot_data[task].get(data_name, 0)
-        time_scale = processing_times[data_name] / time_sum
-        #print time_scale       # this should be similar across exps on an identical HW
-        for task in tasks:
-            plot_data[task][data_name] = plot_data[task].get(data_name, 0) * time_scale
+            time_sum = 0
+            for task in tasks:
+                time_sum += sample_data[task][data_name]
+            time_scale = processing_times[data_name] / time_sum
+            #print time_scale       # this should be similar across exps on an identical HW
+            for task in tasks:
+                plot_data[task][data_name] += sample_data[task][data_name] * time_scale / iter_max
 
     height = 0.6
 

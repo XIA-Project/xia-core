@@ -143,7 +143,7 @@ void XIARouterCache::push(int port, Packet *p)
   uint8_t src_xid_type = _srcID.type;
   XID srcID(_srcID);
 //  std::cout<<"srcID: "<<srcID.unparse().c_str()<<std::endl;
-  int cid_type;  
+  uint32_t cid_type;
   cp_xid_type("CID", &cid_type);   
   
   

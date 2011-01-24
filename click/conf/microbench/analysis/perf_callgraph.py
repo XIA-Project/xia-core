@@ -40,16 +40,16 @@ def parse(seq, stop_symbols):
             mat = minor_symbol_pat.match(line)
             if mat is not None:
                 symbol = mat.group(1)
-                if symbol.startswith('0x') and not symbol.startswith('0x7f'):
-                    if symbol in symbol_map:
-                        symbol = symbol_map[symbol]
-                    else:
-                        # try to resolve the symbol
-                        cmd = 'addr2line -e ../../../xia-core/click/userlevel/click -f -C %s' % symbol
-                        p = subprocess.Popen(cmd.split(' '), stdout=subprocess.PIPE)
-                        symbol_map[symbol] = resolved_symbol = p.stdout.readline().strip()
-                        p.wait()
-                        symbol = resolved_symbol
+                #if symbol.startswith('0x') and not symbol.startswith('0x7f'):
+                #    if symbol in symbol_map:
+                #        symbol = symbol_map[symbol]
+                #    else:
+                #        # try to resolve the symbol
+                #        cmd = 'addr2line -e ../../../userlevel/click -f -C %s' % symbol
+                #        p = subprocess.Popen(cmd.split(' '), stdout=subprocess.PIPE)
+                #        symbol_map[symbol] = resolved_symbol = p.stdout.readline().strip()
+                #        p.wait()
+                #        symbol = resolved_symbol
                 if last_sample is not None:
                     callgraph.append(symbol)
                     for pat in stop_symbols:
