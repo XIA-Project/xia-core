@@ -136,11 +136,11 @@ void XIARouterCache::push(int port, Packet *p)
   XIAHeader xhdr(p);
   
   struct click_xia_xid _dstID =  hdr->node[hdr->dnode - 1].xid;
-  uint8_t dst_xid_type = _dstID.type;
+  uint32_t dst_xid_type = _dstID.type;
   XID dstID(_dstID);
 // std::cout<<"dstID: "<<dstID.unparse().c_str()<<std::endl;
   struct click_xia_xid _srcID = hdr->node[hdr->dnode + hdr->snode - 1].xid;
-  uint8_t src_xid_type = _srcID.type;
+  uint32_t src_xid_type = _srcID.type;
   XID srcID(_srcID);
 //  std::cout<<"srcID: "<<srcID.unparse().c_str()<<std::endl;
   uint32_t cid_type;
