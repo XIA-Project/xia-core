@@ -17,6 +17,7 @@ class IP6RouteTable : public Element { public:
     static int remove_route_handler(const String&, Element*, void*, ErrorHandler*);
     static int ctrl_handler(const String&, Element*, void*, ErrorHandler*);
     static String table_handler(Element*, void*);
+    static int generate_routes_handler(const String &, Element *, void *, ErrorHandler *);
 
 };
 

@@ -1432,7 +1432,7 @@ Optional Features:
   --disable-xia           do not include XIA elements
   --disable-icmp          do not include ICMP elements
   --disable-ip            do not include IP elements
-  --enable-ip6            include IPv6 elements (EXPERIMENTAL)
+  --disable-ip6           do not include IPv6 elements (EXPERIMENTAL)
   --enable-ipsec          include IP security elements
   --enable-local          include local elements
   --enable-radio          include radio elements (EXPERIMENTAL)
@@ -6270,7 +6270,7 @@ fi
 if test "${enable_ip6+set}" = set; then :
   enableval=$enable_ip6;
 else
-  enable_ip6=NO
+  enable_ip6=yes
 fi
 test "x$enable_all_elements" = xyes -a "x$enable_ip6" = xNO && enable_ip6=yes
 if test "x$enable_ip6" = xyes; then

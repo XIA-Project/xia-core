@@ -25,6 +25,7 @@
 #include <click/error.hh>
 #include <click/glue.hh>
 #include "ip6routetable.hh"
+#include <stdlib.h>
 CLICK_DECLS
 
 void *
@@ -123,6 +124,52 @@ IP6RouteTable::table_handler(Element *e, void *)
 {
     IP6RouteTable *r = static_cast<IP6RouteTable*>(e);
     return r->dump_routes();
+}
+
+int
+IP6RouteTable::generate_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh)
+{
+    IP6RouteTable* table = dynamic_cast<IP6RouteTable*>(e);
+    assert(table);
+
+    String conf_copy = conf;
+
+    String count_str = cp_shift_spacevec(conf_copy);
+    int count;
+    if (!cp_integer(count_str, &count))
+        return errh->error("invalid entry count: ", count_str.c_str());
+
+    String port_str = cp_shift_spacevec(conf_copy);
+    int port;
+    if (!cp_integer(port_str, &port))
+        return errh->error("invalid port: ", port_str.c_str());
+
+    IP6Address gw("::0");
+
+    unsigned short xsubi[3];
+    xsubi[0] = 1;
+    xsubi[1] = 2;
+    xsubi[2] = 3;
+
+    for (int i = 0; i < count - 1; i++)
+    {
+        struct click_in6_addr addr;
+        addr.in6_u.u6_addr32[0] = static_cast<uint32_t>(nrand48(xsubi));
+        addr.in6_u.u6_addr32[1] = static_cast<uint32_t>(nrand48(xsubi));
+        addr.in6_u.u6_addr32[2] = static_cast<uint32_t>(nrand48(xsubi));
+        addr.in6_u.u6_addr32[3] = static_cast<uint32_t>(nrand48(xsubi));
+        int prefix_len = 8 + (addr.in6_u.u6_addr8[15] % 17);    // 8--24
+        IP6Address mask = IP6Address::make_prefix(prefix_len);
+
+        if (table->add_route(IP6Address(addr) & mask, mask, gw, port, errh))
+            return -1;
+    }
+
+    if (table->add_route(IP6Address("::0"), IP6Address("::0"), gw, port, errh))
+        return -1;
+
+    click_chatter("generated %d entries", count);
+    return 0;
 }
 
 CLICK_ENDDECLS
