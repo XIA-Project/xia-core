@@ -99,7 +99,7 @@ XIAXIDTypeClassifier::push(int, Packet *p)
 {
     int port = match(p);
     if (port >= 0)
-        checked_output_push(port, p);
+        output(port).push(p);
     else
     {
         // no match -- discard packet
@@ -111,10 +111,12 @@ int
 XIAXIDTypeClassifier::match(Packet *p)
 {
     const struct click_xia* hdr = p->xia_header();
+    /*
     if (!hdr)
         return -1;
     if (hdr->dnode == 0 || hdr->snode == 0)
         return -1;
+    */
 
     uint32_t dst_xid_type = hdr->node[hdr->dnode - 1].xid.type;
     uint32_t src_xid_type = hdr->node[hdr->dnode + hdr->snode - 1].xid.type;

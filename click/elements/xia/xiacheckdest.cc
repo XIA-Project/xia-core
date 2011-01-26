@@ -22,6 +22,7 @@ void
 XIACheckDest::push(int, Packet *p)
 {
     const struct click_xia* hdr = p->xia_header();
+    /*
     if (!hdr)
     {
         p->kill();
@@ -35,11 +36,12 @@ XIACheckDest::push(int, Packet *p)
         p->kill();
         return;
     }
+    */
 
     if (hdr->last == (int)hdr->dnode - 1)
-        checked_output_push(0, p);
+        output(0).push(p);
     else
-        checked_output_push(1, p);
+        output(1).push(p);
 }
 
 CLICK_ENDDECLS

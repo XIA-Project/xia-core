@@ -4,8 +4,8 @@ import perf_callgraph
 import re
 
 # task
-tasks = ['Mem Alloc/Copy', 'Queueing', 'Classification', 'Routing', 'Misc']
-task_colors = ['0.4', '0.6', '0.2', '0.8', '1']
+tasks = ['Mem Alloc/Copy', 'Classification', 'Routing', 'Queueing', 'Misc']
+task_colors = ['0.4', '0.2', '0.8', '0.6', '1']
 
 # symbol name to task mapping
 symbol_task_mappings = [
@@ -128,7 +128,7 @@ def plot(output, data_names):
     x_max = max(last_left) * 1.18
     ax.set_xlim(0, x_max)
     ax.set_ylim(-0.3, len(data_names) - 0.1)
-    ax.set_xticks(range(0, x_max, 200))
+    ax.set_xticks(range(0, int(x_max), 200))
     ax.legend(loc='upper right')
 
     plt.savefig(output, format='pdf', bbox_inches='tight')

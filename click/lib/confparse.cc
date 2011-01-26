@@ -2026,7 +2026,11 @@ cp_xid_type(const String& str, uint32_t* result)
 bool
 cp_xid(const String& str, XID* xid  CP_CONTEXT)
 {
-  return cp_xid(str, &xid->xid()  CP_PASS_CONTEXT);
+    struct click_xia_xid xid_c;
+    if (!cp_xid(str, &xid_c  CP_PASS_CONTEXT))
+        return false;
+    *xid = xid_c;
+    return true;
 }
 
 bool

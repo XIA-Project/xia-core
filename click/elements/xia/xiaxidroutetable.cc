@@ -213,7 +213,7 @@ XIAXIDRouteTable::push(int, Packet *p)
 {
     int port = lookup_route(p);
     if (port >= 0)
-        checked_output_push(port, p);
+        output(port).push(p);
     else
     {
         // no match -- discard packet
@@ -225,6 +225,7 @@ int
 XIAXIDRouteTable::lookup_route(Packet *p)
 {
     const struct click_xia* hdr = p->xia_header();
+    /*
     if (!hdr)
         return -1;
     if (hdr->last >= (int)hdr->dnode)
@@ -238,6 +239,7 @@ XIAXIDRouteTable::lookup_route(Packet *p)
         click_chatter("invalid last pointer (already arrived at dest)\n");
         return -1;
     }
+    */
 
     int last = hdr->last;
     if (last < 0)
@@ -250,12 +252,14 @@ XIAXIDRouteTable::lookup_route(Packet *p)
         // unused edge -- use default route
         return _rem;
     }
+    /*
     if (idx <= hdr->last)
     {
         // The DAG representaion prohibits non-increasing index
         click_chatter("invalid idx field: %d (not larger than last field %d)", idx, last);
         return -1;
     }
+    */
     const struct click_xia_xid_node& node = hdr->node[idx];
     HashTable<XID, int>::const_iterator it = _rt.find(node.xid);
     if (it != _rt.end())

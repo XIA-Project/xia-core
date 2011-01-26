@@ -15,12 +15,13 @@ class XID { public:
     /** @brief Construct an XID from a struct click_xia_xid. */
     inline XID(const struct click_xia_xid& xid)
 	: _xid(xid) {
+        calc_hash();
     }
 
     XID(const String& str);
 
     inline const struct click_xia_xid& xid() const;
-    inline struct click_xia_xid& xid();
+    //inline struct click_xia_xid& xid();
 
     inline operator struct click_xia_xid() const;
 
@@ -29,12 +30,18 @@ class XID { public:
     bool operator==(const XID&) const;
     bool operator!=(const XID&) const;
 
+    XID& operator=(const XID&);
+    XID& operator=(const struct click_xia_xid&);
+
     void parse(const String& str);
     String unparse() const;
     String unparse_pretty(const Element* context = NULL) const;
 
+    void calc_hash();
+
   private:
     struct click_xia_xid _xid;
+    uint32_t _hash;
 };
 
 
@@ -46,11 +53,14 @@ XID::xid() const
 }
 
 /** @brief Return a struct click_xia_xid corresponding to the address. */
+// this is disabled to guarantee a correct _hash value
+/*
 inline struct click_xia_xid&
 XID::xid() 
 {
     return _xid;
 }
+*/
 
 /** @brief Return a struct click_xia_xid corresponding to the address. */
 inline
@@ -70,7 +80,7 @@ StringAccum& operator<<(StringAccum&, const XID&);
 inline uint32_t
 XID::hashcode() const
 {
-    return String::hashcode(_xid.id, _xid.id + sizeof(_xid.id));
+    return _hash;
 }
 
 CLICK_ENDDECLS

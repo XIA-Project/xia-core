@@ -39,6 +39,7 @@ for family_name in family_names:
         y_values[family_name].append(pps_avg / 1000000) # Mpkt/sec
         y_lower_err_values[family_name].append((pps_avg - pps_min) / 1000000)
         y_upper_err_values[family_name].append((pps_max - pps_avg) / 1000000)
+        print '%s x=%f y=%f' % (family_name, x_value, y_values[family_name][-1])
 
 fig = plt.figure(figsize=(7, 7 * 0.6))
 ax = fig.add_subplot(111)
