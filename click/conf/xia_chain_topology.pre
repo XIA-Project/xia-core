@@ -18,15 +18,15 @@ router0 :: Router(RE AD0 RHID0, AD0, RHID0);
 router1 :: Router(RE AD1 RHID1, AD1, RHID1);
 
 // interconnection -- host - ad
-host0[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.05, 10240000 B/s) -> [0]router0;
-router0[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.05, 10240000 B/s) -> [0]host0;
+host0[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) -> [0]router0;
+router0[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) -> [0]host0;
 
-host1[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.05, 10240000 B/s) -> [0]router1;
-router1[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.05, 10240000 B/s) ->[0]host1;
+host1[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) -> [0]router1;
+router1[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) ->[0]host1;
 
 // interconnection -- ad - ad
-router0[1] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.05, 10240000 B/s) ->[1]router1;
-router1[1] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.05, 10240000 B/s) ->[1]router0;
+router0[1] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) ->[1]router1;
+router1[1] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) ->[1]router0;
 
 // send test packets from host0 to host1
 /*

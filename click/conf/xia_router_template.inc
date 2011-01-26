@@ -109,7 +109,7 @@ elementclass RouteEngine {
 
 // 1-port host node
 elementclass Host {
-    $local_addr, $local_hid, $rpc_port |
+    $local_addr, $local_hid, $rpc_port, $enable_local_cache |
 
     // $local_addr: the full address of the node
     // $local_hid:  the HID of the node
@@ -121,7 +121,7 @@ elementclass Host {
     n :: RouteEngine($local_addr);
     sock :: Socket(TCP, 0.0.0.0, $rpc_port, CLIENT false);
     rpc :: XIARPC($local_addr);
-    cache :: XIARouterCache($local_addr, n/proc/rt_CID/rt);
+    cache :: XIARouterCache($local_addr, n/proc/rt_CID/rt, $enable_local_cache);
 
     Script(write n/proc/rt_AD/rt.add - 0);      // default route for AD
     Script(write n/proc/rt_HID/rt.add - 0);     // default route for HID
