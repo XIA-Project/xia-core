@@ -2,7 +2,6 @@ import socket, select, xia_pb2
 import struct, time
 
 #CID = ['0000000000000000000000000000000000000000', '0000000000000000000000000000000000000001', '0000000000000000000000000000000000000010','0000000000000000000000000000000000000011','0000000000000000000000000000000000000100', '0000000000000000000000000000000000000101', '0000000000000000000000000000000000000110','0000000000000000000000000000000000000111','0000000000000000000000000000000000001000', '0000000000000000000000000000000000001001', '0000000000000000000000000000000000001010', '0000000000000000000000000000000000001011']
-http_header = ''
 timestamps = [0, 0, 0, 0, 0, 0]
 stamp_i = 0
 
@@ -32,16 +31,21 @@ def read_write(bsoc, soc_rpc, max_idling=20):
 				    print "payload len (recv): %d" % len(msg_response.payload)
 				    #print "payload (recv): %s" % msg_response.payload
 				    print len(msg_response.payload)
-				    #payload_http = 'HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nLast-Modified: Sat, 08 Jan 2011 21:08:31 GMT\nCache-Control: no-cache\nAccept-Ranges: bytes\nContent-Length: ' + str(len(msg_response.payload)) +  '\nConnection: close\nContent-Type: text/html\n\n' + msg_response.payload + '\r\n\r\n'
-				    global http_header
-				    http_header = msg_response.payload
-				    print "SID response: " + http_header
+				    SIDResponse = msg_response.payload
 				    print "%.6f" % time.time()
 				    global stamp_i
 				    timestamps[stamp_i] = time.time()
 				    stamp_i = stamp_i + 1 
-				    payload = getCID ('0000000000000000000000000000000000000000', soc_rpc)
-				    out.send(http_header + payload)  
+				    rt = msg_response.payload.find('CID')
+				    print rt
+				    if (rt!= -1):
+					    http_header = SIDResponse[0:rt]
+					    print '!!'+ http_header
+					    print SIDResponse[rt+4:rt+44]
+					    payload = getCID (SIDResponse[rt+4:rt+44], soc_rpc)
+					    out.send (http_header+payload)
+				    else:
+					    out.send(SIDResponse)  
 			    count = 0
             else:
                 print "\t" "idle", count
@@ -137,12 +141,12 @@ def xiaHandler(control, payload, bsock, sock_rpc):
 		header2 = ''
 		payload_http =  payload_cid
 		bsock.send(payload_http)
-		for i in range (0, 6):
+		for i in range (0, stamp_i):
 			print "%.6f" % timestamps[i]
-		for i in range (1, 6):
+		for i in range (1, stamp_i):
 			interval = timestamps[i] - timestamps[i-1]
 			print "%.6f" % interval
-		interval = timestamps[5] - timestamps[0]
+		interval = timestamps[stamp_i-1] - timestamps[0]
 		print "Completion time: %.6f" % interval
 		global stamp_i
 		stamp_i = 0

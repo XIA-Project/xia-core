@@ -33,7 +33,7 @@ def serveSIDRequest(msg_protobuf, sock_rpc):
     msg_serveSID.type = xia_pb2.msg.SERVESID
     msg_serveSID.xiapath_src = msg_protobuf.xiapath_dst
     msg_serveSID.xiapath_dst = msg_protobuf.xiapath_src
-    msg_serveSID.payload = 'HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nLast-Modified: Sat, 08 Jan 2011 21:08:31 GMT\nCache-Control: no-cache\nAccept-Ranges: bytes\nContent-Length: ' + str(length) + '\nConnection: close\nContent-Type: text/html\n\n'
+    msg_serveSID.payload = 'HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nLast-Modified: Sat, 08 Jan 2011 21:08:31 GMT\nCache-Control: no-cache\nAccept-Ranges: bytes\nContent-Length: ' + str(length) + '\nConnection: close\nContent-Type: text/html\n\n'+'CID:0000000000000000000000000000000000000000'
     serialized_msg = msg_serveSID.SerializeToString()
     size = struct.pack('!i', len(serialized_msg))
     sock_rpc.send(size)
