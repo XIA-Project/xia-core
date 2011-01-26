@@ -33,19 +33,6 @@ def serveSIDRequest(msg_protobuf, sock_rpc):
     msg_serveSID.type = xia_pb2.msg.SERVESID
     msg_serveSID.xiapath_src = msg_protobuf.xiapath_dst
     msg_serveSID.xiapath_dst = msg_protobuf.xiapath_src
-    
-    #sock_apache = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    #sock_apache.connect(('127.0.0.1', 80))
-    #sock_apache.close()    
-    #while True:
-    #    chunk = f.read(chunksize)
-    #    if (chunk == ''):
-    #        break;
-    #    print chunk
-    #    payload += chunk
-    #    return
-    #payload_http = 'HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nLast-Modified: Sat, 08 Jan 2011 21:08:31 GMT\nETag: "43127-76-4995c231bf691"\nAccept-Ranges: bytes\nContent-Length: 127\nConnection: close\nContent-Type: text/html\n\n' + payload + '\r\n\r\n'    #add http header
-    #print "payload len: %d" % len(payload)
     msg_serveSID.payload = 'HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nLast-Modified: Sat, 08 Jan 2011 21:08:31 GMT\nCache-Control: no-cache\nAccept-Ranges: bytes\nContent-Length: ' + str(length) + '\nConnection: close\nContent-Type: text/html\n\n'
     serialized_msg = msg_serveSID.SerializeToString()
     size = struct.pack('!i', len(serialized_msg))
@@ -55,9 +42,9 @@ def serveSIDRequest(msg_protobuf, sock_rpc):
     return
 
 def main():
-    #global cid_i
     sock_rpc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock_rpc.connect(('',2001))
+    sock_rpc.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1 )
     print 'connected'
     f = open ("index0.html", 'r')
     chunk = f.read(chunksize)

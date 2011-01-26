@@ -156,5 +156,5 @@ if __name__ == '__main__':
 	# Connect to rpc socket and send data
         #sock_rpc.setblocking(0)
 	sock_rpc.connect(('', 2000)) #change: 80 -> 2000
-	print "sock_rpc: %d" % sock_rpc.fileno();
+	sock_rpc.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1 )
         BaseHTTPServer.test(ProxyHandler, ThreadingHTTPServer)

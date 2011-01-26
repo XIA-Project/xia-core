@@ -137,6 +137,8 @@ def xiaHandler(control, payload, bsock, sock_rpc):
 		header2 = ''
 		payload_http =  payload_cid
 		bsock.send(payload_http)
+		for i in range (0, 6):
+			print "%.6f" % timestamps[i]
 		for i in range (1, 6):
 			interval = timestamps[i] - timestamps[i-1]
 			print "%.6f" % interval
