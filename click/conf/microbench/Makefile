@@ -1,4 +1,5 @@
 GENERATED=ip_packetforward.click \
+          ip6_packetforward.click \
 	  xia_packetforward_fallback0.click \
 	  xia_packetforward_fallback1.click \
 	  xia_packetforward_fallback2.click \

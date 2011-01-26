@@ -247,7 +247,6 @@ elementclass IPRouter4Port {
     $local_addr |
 
     // $local_addr: the full address of the node
-    // $local_net:  the local network (e.g. 192.168.0.0/24)
 
     // input[0], input[1], input[2], input[3]: a packet arrived at the node
     // output[0]: forward to interface 0
@@ -275,6 +274,41 @@ elementclass IPRouter4Port {
 
     dt[1] -> Print("time exceeded") -> Discard; // ICMPError($local_addr, timeexceeded) -> sw;
     fr[1] -> Print("need fragmentation") -> Discard; // ICMPError($local_addr, unreachable, needfrag) -> sw;
+
+    sw[0] -> Queue(200) -> [0]output;
+    sw[1] -> Queue(200) -> [1]output;
+    sw[2] -> Queue(200) -> [2]output;
+    sw[3] -> Queue(200) -> [3]output;
+};
+
+// IPv6 router node (caution: simplified version for forwarding experiments)
+elementclass IP6Router4Port {
+    $local_addr |
+
+    // $local_addr: the full address of the node
+
+    // input[0], input[1], input[2], input[3]: a packet arrived at the node
+    // output[0]: forward to interface 0
+    // output[1]: forward to interface 1
+    // output[2]: forward to interface 2
+    // output[3]: forward to interface 3
+
+    rt :: LookupIP6Route;
+    dt :: DecIP6HLIM;
+
+    input[0] -> rt;
+    input[1] -> rt;
+    input[2] -> rt;
+    input[3] -> rt;
+
+    rt[0] -> Paint(0) -> dt;
+    rt[1] -> Paint(1) -> dt;
+    rt[2] -> Paint(2) -> dt;
+    rt[3] -> Paint(3) -> dt;
+
+    dt -> sw :: PaintSwitch;
+
+    dt[1] -> Print("time exceeded") -> Discard; // ICMPError($local_addr, timeexceeded) -> sw;
 
     sw[0] -> Queue(200) -> [0]output;
     sw[1] -> Queue(200) -> [1]output;

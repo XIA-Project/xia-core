@@ -23,5 +23,5 @@ Script(write gen_init.active true);
 Script(write gen.active true);
 
 define($AD_RT_SIZE 351611);
-define($CID_RT_SIZE 351611);
+define($CID_RT_SIZE 10);
 

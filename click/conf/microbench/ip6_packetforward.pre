@@ -4,14 +4,8 @@ include common.inc
 
 gen :: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE)
 -> Script(TYPE PACKET, write gen.active false)       // stop source after exactly 1 packet
--> XIAEncap(SRC RE UNROUTABLE_AD0, DST RE RANDOM_ID)
--> fwd :: XIAPacketForward;
-
-Idle -> [1]fwd;
-Idle -> [2]fwd;
+-> IP6Encap(9, UNROUTABLE_IP6, RANDOM_IP6)
+-> fwd :: IP6PacketForward;
 
 Script(write gen.active true);
-
-define($AD_RT_SIZE 351611);
-define($CID_RT_SIZE 10);
 

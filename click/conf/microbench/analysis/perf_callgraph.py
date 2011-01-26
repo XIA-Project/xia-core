@@ -10,6 +10,8 @@ empty_pat = re.compile(r'^$')
 """Parses `perf report -g flat,0` output of a patched perf program and
 collapses callgraph using stop symbols."""
 
+verbose = False
+
 def parse(seq, stop_symbols):
     it = seq.__iter__()
     line_no = 0
@@ -64,8 +66,9 @@ def parse(seq, stop_symbols):
             if mat is not None:
                 if last_sample is not None:
                     if not callgraph[-1].startswith('0x7f'):
-                        print 'no stop symbol included: near line %d' % line_no
-                        print '  ' + '\n  '.join(callgraph) + '\n'
+                        if verbose:
+                            print 'no stop symbol included: near line %d' % line_no
+                            print '  ' + '\n  '.join(callgraph) + '\n'
                         symbol = '<>' + callgraph[0]
                         stats[symbol] = stats.get(symbol, 0) + last_sample
                     else:
@@ -96,12 +99,14 @@ for line in f.readlines():
         pat = r'^%s::.+$' % re.escape(mat.group(1))
         stop_symbols.append(re.compile(pat))
 f.close()
-print 'found %d elements for stop symbols' % len(stop_symbols)
+if verbose:
+    print 'found %d elements for stop symbols' % len(stop_symbols)
 
 
 if __name__ == '__main__':
     import sys
     f = open(sys.argv[1])
+    verbose = True
     result = parse(f.readlines(), stop_symbols)
     for symbol, sample in result:
         print '%20d %s' % (sample, symbol)

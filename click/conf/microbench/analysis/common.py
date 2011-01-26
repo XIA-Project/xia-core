@@ -53,22 +53,22 @@ dataset = {
     'CID-REQ-H': data_path_prefix + 'output_xia_packetforward_cid_req_hit',
     'CID-REP': data_path_prefix + 'output_xia_packetforward_cid_rep',
 
-    'TABLESIZE_CID_1': data_path_prefix + 'output_xia_tablesize_cid_1',
-    'TABLESIZE_CID_3': data_path_prefix + 'output_xia_tablesize_cid_3',
-    'TABLESIZE_CID_10': data_path_prefix + 'output_xia_tablesize_cid_10',
-    'TABLESIZE_CID_30': data_path_prefix + 'output_xia_tablesize_cid_30',
-    'TABLESIZE_CID_100': data_path_prefix + 'output_xia_tablesize_cid_100',
-    'TABLESIZE_CID_300': data_path_prefix + 'output_xia_tablesize_cid_300',
-    'TABLESIZE_CID_1000': data_path_prefix + 'output_xia_tablesize_cid_1000',
-    'TABLESIZE_CID_3000': data_path_prefix + 'output_xia_tablesize_cid_3000',
-    'TABLESIZE_CID_10000': data_path_prefix + 'output_xia_tablesize_cid_10000',
-    'TABLESIZE_CID_30000': data_path_prefix + 'output_xia_tablesize_cid_30000',
-    'TABLESIZE_CID_100000': data_path_prefix + 'output_xia_tablesize_cid_100000',
-    'TABLESIZE_CID_300000': data_path_prefix + 'output_xia_tablesize_cid_300000',
-    'TABLESIZE_CID_1000000': data_path_prefix + 'output_xia_tablesize_cid_1000000',
-    'TABLESIZE_CID_3000000': data_path_prefix + 'output_xia_tablesize_cid_3000000',
-    'TABLESIZE_CID_10000000': data_path_prefix + 'output_xia_tablesize_cid_10000000',
-    'TABLESIZE_CID_30000000': data_path_prefix + 'output_xia_tablesize_cid_30000000',
+    'TABLESIZE_HID_1': data_path_prefix + 'output_xia_tablesize_cid_1',
+    'TABLESIZE_HID_3': data_path_prefix + 'output_xia_tablesize_cid_3',
+    'TABLESIZE_HID_10': data_path_prefix + 'output_xia_tablesize_cid_10',
+    'TABLESIZE_HID_30': data_path_prefix + 'output_xia_tablesize_cid_30',
+    'TABLESIZE_HID_100': data_path_prefix + 'output_xia_tablesize_cid_100',
+    'TABLESIZE_HID_300': data_path_prefix + 'output_xia_tablesize_cid_300',
+    'TABLESIZE_HID_1000': data_path_prefix + 'output_xia_tablesize_cid_1000',
+    'TABLESIZE_HID_3000': data_path_prefix + 'output_xia_tablesize_cid_3000',
+    'TABLESIZE_HID_10000': data_path_prefix + 'output_xia_tablesize_cid_10000',
+    'TABLESIZE_HID_30000': data_path_prefix + 'output_xia_tablesize_cid_30000',
+    'TABLESIZE_HID_100000': data_path_prefix + 'output_xia_tablesize_cid_100000',
+    'TABLESIZE_HID_300000': data_path_prefix + 'output_xia_tablesize_cid_300000',
+    'TABLESIZE_HID_1000000': data_path_prefix + 'output_xia_tablesize_cid_1000000',
+    'TABLESIZE_HID_3000000': data_path_prefix + 'output_xia_tablesize_cid_3000000',
+    'TABLESIZE_HID_10000000': data_path_prefix + 'output_xia_tablesize_cid_10000000',
+    'TABLESIZE_HID_30000000': data_path_prefix + 'output_xia_tablesize_cid_30000000',
 
     'TABLESIZE_AD_1': data_path_prefix + 'output_xia_tablesize_ad_1',
     'TABLESIZE_AD_3': data_path_prefix + 'output_xia_tablesize_ad_3',
@@ -89,5 +89,5 @@ dataset = {
 }
 
 #iter_max = 10
-iter_max = 1
+iter_max = 5
 

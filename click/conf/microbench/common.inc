@@ -1,7 +1,10 @@
 define($COUNT 100000000);
-define($IP_RANDOMIZE_MAX_CYCLE 351611);
+define($IP_RT_SIZE 351611);
+define($IP_RANDOMIZE_MAX_CYCLE $IP_RT_SIZE);
+define($IP6_RT_SIZE $IP_RT_SIZE);
+define($IP6_RANDOMIZE_MAX_CYCLE $IP_RT_SIZE);
 //define($AD_RT_SIZE 351611);
-//define($CID_RT_SIZE 351611);
+//define($CID_RT_SIZE 10);
 define($AD_RANDOMIZE_MAX_CYCLE $AD_RT_SIZE);
 define($CID_RANDOMIZE_MAX_CYCLE $CID_RT_SIZE);
 define($PAYLOAD_SIZE 64);
@@ -9,6 +12,9 @@ define($HEADROOM_SIZE 148);
 
 AddressInfo(
     RANDOM_IP 0.0.0.0,
+    UNROUTABLE_IP 192.168.10.10,
+    RANDOM_IP6 0::0,
+    UNROUTABLE_IP6 1234::5678,
 );
 
 XIAXIDInfo(
@@ -32,6 +38,34 @@ elementclass IPPacketForward {
     -> Clone($COUNT)
     -> Unqueue
     -> IPRandomize(MAX_CYCLE $IP_RANDOMIZE_MAX_CYCLE)
+    //-> Print
+    -> host0;
+
+    host0
+    -> Unqueue
+    //-> PrintStats
+    -> AggregateCounter(COUNT_STOP $COUNT, PRINT_USERTIME true)
+    -> Discard;
+
+    Idle -> [1]host0;
+    Idle -> [2]host0;
+    Idle -> [3]host0;
+    host0[1] -> Discard;
+    host0[2] -> Discard;
+    host0[3] -> Discard;
+};
+
+elementclass IP6PacketForward {
+    host0 :: IP6Router4Port(192.168.0.1);
+
+    //Script(write host0/rt.add 192.168.0.0/24 0);
+    //Script(write host0/rt.add 0.0.0.0/0.0.0.0 1);
+    Script(print_usertime, write host0/rt.generate $IP6_RT_SIZE 0, print_usertime);
+
+    input[0]
+    -> Clone($COUNT)
+    -> Unqueue
+    -> IP6Randomize(MAX_CYCLE $IP6_RANDOMIZE_MAX_CYCLE)
     //-> Print
     -> host0;
 

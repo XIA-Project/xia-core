@@ -4,27 +4,27 @@ import perf_callgraph
 import re
 
 # task
-tasks = ['I/O', 'Queueing', 'Classification', 'Routing', 'Misc']
+tasks = ['Mem Alloc/Copy', 'Queueing', 'Classification', 'Routing', 'Misc']
 task_colors = ['0.4', '0.6', '0.2', '0.8', '1']
 
 # symbol name to task mapping
 symbol_task_mappings = [
-    (re.compile(r'^Clone::.*$'), 'I/O'),
-    (re.compile(r'^Discard::.*$'), 'I/O'),
-    #(re.compile(r'^<>_int_malloc$'), 'I/O'),
-    #(re.compile(r'^<>_int_free$'), 'I/O'),
-    #(re.compile(r'^<>__malloc$'), 'I/O'),
-    #(re.compile(r'^<>cfree$'), 'I/O'),
-    (re.compile(r'^IPRandomize::.*$'), 'I/O'),
-    (re.compile(r'^XIARandomize::.*$'), 'I/O'),
-    #(re.compile(r'^<>__drand48_iterate$'), 'I/O'),
-    #(re.compile(r'^<>nrand48_r$'), 'I/O'),
-    (re.compile(r'^AggregateCounter::.*$'), 'I/O'),
-    (re.compile(r'^PrintStats::.*$'), 'I/O'),
-    (re.compile(r'^AddressInfo::.*$'), 'I/O'),
-    (re.compile(r'^InfiniteSource::.*$'), 'I/O'),
-    (re.compile(r'^XIAEncap::.*$'), 'I/O'),
-    (re.compile(r'^IPEncap::.*$'), 'I/O'),
+    (re.compile(r'^Clone::.*$'), 'Mem Alloc/Copy'),
+    (re.compile(r'^Discard::.*$'), 'Mem Alloc/Copy'),
+    #(re.compile(r'^<>_int_malloc$'), 'Mem Alloc/Copy'),
+    #(re.compile(r'^<>_int_free$'), 'Mem Alloc/Copy'),
+    #(re.compile(r'^<>__malloc$'), 'Mem Alloc/Copy'),
+    #(re.compile(r'^<>cfree$'), 'Mem Alloc/Copy'),
+    (re.compile(r'^IPRandomize::.*$'), 'Mem Alloc/Copy'),
+    (re.compile(r'^XIARandomize::.*$'), 'Mem Alloc/Copy'),
+    #(re.compile(r'^<>__drand48_iterate$'), 'Mem Alloc/Copy'),
+    #(re.compile(r'^<>nrand48_r$'), 'Mem Alloc/Copy'),
+    (re.compile(r'^AggregateCounter::.*$'), 'Mem Alloc/Copy'),
+    (re.compile(r'^PrintStats::.*$'), 'Mem Alloc/Copy'),
+    (re.compile(r'^AddressInfo::.*$'), 'Mem Alloc/Copy'),
+    (re.compile(r'^InfiniteSource::.*$'), 'Mem Alloc/Copy'),
+    (re.compile(r'^XIAEncap::.*$'), 'Mem Alloc/Copy'),
+    (re.compile(r'^IPEncap::.*$'), 'Mem Alloc/Copy'),
 
     (re.compile(r'^Unqueue::.*$'), 'Queueing'),
     (re.compile(r'^FullNoteQueue::.*$'), 'Queueing'),
@@ -61,13 +61,14 @@ def plot(output, data_names):
     for data_name in data_names:
         for task in tasks:
             plot_data[task][data_name] = 0.
+        processing_times[data_name] = []
 
         for iter_i in range(0, iter_max):
             for task in tasks:
                 sample_data[task][data_name] = 0.
 
             user_time = get_total_runtime(dataset[data_name] + '_timing' + '_%d' % iter_i)
-            processing_times[data_name] = user_time * 1000000000 / packet
+            processing_times[data_name].append(user_time * 1000000000 / packet)
 
             perf_results = perf_callgraph.parse(open(dataset[data_name] + '_perf' + '_%d' % iter_i).readlines(), perf_callgraph.stop_symbols)
 
@@ -92,7 +93,7 @@ def plot(output, data_names):
             time_sum = 0
             for task in tasks:
                 time_sum += sample_data[task][data_name]
-            time_scale = processing_times[data_name] / time_sum
+            time_scale = processing_times[data_name][-1] / time_sum
             #print time_scale       # this should be similar across exps on an identical HW
             for task in tasks:
                 plot_data[task][data_name] += sample_data[task][data_name] * time_scale / iter_max
@@ -124,14 +125,15 @@ def plot(output, data_names):
             last_left[i] += widths[i]
 
     ax.xaxis.grid(zorder=1)
-    ax.set_xlim(0, max(last_left) * 1.12)
+    x_max = max(last_left) * 1.18
+    ax.set_xlim(0, x_max)
     ax.set_ylim(-0.3, len(data_names) - 0.1)
+    ax.set_xticks(range(0, x_max, 200))
     ax.legend(loc='upper right')
 
     plt.savefig(output, format='pdf', bbox_inches='tight')
 
-    min_time = min(processing_times.values())
     print 'processing time'
-    for data_name in data_names:
-        print '%-10s: %f (%f)' % (data_name, processing_times[data_name], processing_times[data_name] * 100. / min_time)
+    for i, data_name in enumerate(data_names):
+        print '%-10s: %f (%f)' % (data_name, last_left[i], last_left[i] * 100. / last_left[0])
 

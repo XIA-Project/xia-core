@@ -2,10 +2,14 @@
 
 from common import *
 
-family_names = ('CID', 'AD')
-markers = {'CID': 'o', 'AD': 'x'}
-linestyles = {'CID': '-', 'AD': '--'}
-x_values = (10000, 30000, 100000, 300000, 1000000, 3000000, 10000000, 30000000)
+family_names = ('AD', 'HID')
+labels = {'HID': 'HID routing', 'AD': 'AD routing'}
+markers = {'HID': 'x', 'AD': 'o'}
+linestyles = {'HID': '-', 'AD': '-'}
+x_values = {
+    'HID': (10000, 30000, 100000, 300000, 1000000, 3000000, 10000000, 30000000),
+    'AD': (351611, ),
+}
 x_ticks = (10000, 30000, 100000, 300000, 1000000, 3000000, 10000000, 30000000)
 x_ticklabels = ('10 K', '30 K', '100 K', '300 K', '1 M', '3 M', '10 M', '30 M')
 y_values = {}
@@ -15,12 +19,16 @@ for family_name in family_names:
     y_values[family_name] = []
     y_lower_err_values[family_name] = []
     y_upper_err_values[family_name] = []
-    for x_value in x_values:
+    for x_value in x_values[family_name]:
         pps_min = None
         pps_max = None
         pps_avg = 0
         for iter_i in range(0, iter_max):
-            t = get_processing_time(dataset['TABLESIZE_' + family_name + '_%d' % x_value] + '_timing' + '_%d' % iter_i)
+            if family_name != 'AD':
+                data_name = 'TABLESIZE_' + family_name + '_%d' % x_value
+            else:
+                data_name = 'FB0'
+            t = get_processing_time(dataset[data_name] + '_timing' + '_%d' % iter_i)
             pps = packet / t
             if pps_min is None or pps_min > pps:
                 pps_min = pps
@@ -36,20 +44,28 @@ fig = plt.figure(figsize=(7, 7 * 0.6))
 ax = fig.add_subplot(111)
 
 for family_name in family_names:
-    #ax.plot(x_values, y_values[family_name], label=family_name, marker=markers[family_name], linestyle=linestyles[family_name], color='0')
-    ax.semilogx(x_values, y_values[family_name], label=family_name, marker=markers[family_name], linestyle=linestyles[family_name], color='0')
+    #ax.plot(x_values[family_name], y_values[family_name], label=family_name, marker=markers[family_name], linestyle=linestyles[family_name], color='0')
+    ax.semilogx(x_values[family_name], y_values[family_name], label=labels[family_name], marker=markers[family_name], linestyle=linestyles[family_name], color='0')
     yerr = (y_lower_err_values[family_name], y_upper_err_values[family_name])
-    ax.errorbar(x_values, y_values[family_name], yerr=yerr, linestyle=linestyles[family_name], color='0')
+    ax.errorbar(x_values[family_name], y_values[family_name], yerr=yerr, linestyle=linestyles[family_name], color='0')
 
-ax.set_xlabel('CID routing table size (number of entries)')
+ax.set_xlabel('Routing table size (number of entries)')
 ax.set_ylabel('Packet processing throughput (Mpkt/sec)')
 ax.set_xticks(x_ticks)
 ax.set_xticklabels(x_ticklabels)
 ax.set_xlim(xmin=6000, xmax=48000000)
-ax.set_ylim(ymin=1.1, ymax=2.1)
+ax.set_ylim(ymin=1.1, ymax=2.0)
 ax.set_yticks((1.2, 1.4, 1.6, 1.8, 2.0))
-ax.grid()
-ax.legend(loc='upper right')
+#ax.grid()
+ax.legend(loc='lower left').draw_frame(False)
+
+cache_size = 2 * 6000 * 1000
+#min_rt_entry_size = (4 + 20) + 8 + 8        # (XID type, ID), port, chain pointer
+min_rt_entry_size = 64                      # adds more bytes to take into account low load factor
+vline_x = 1. * cache_size / min_rt_entry_size
+ax.axvline(x=vline_x, linestyle=':', color='0');
+ax.annotate('Running out of L2 caches', xy=(vline_x, 1.85), textcoords='offset points',
+            xytext=(35, -7), arrowprops=dict(arrowstyle="<-"))
 
 plt.savefig('tablesize.pdf', format='pdf', bbox_inches='tight')
 
