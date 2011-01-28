@@ -140,8 +140,9 @@ XID::unparse_pretty(const Element* context) const
 void
 XID::calc_hash()
 {
-    const char* p = reinterpret_cast<const char*>(&_xid);
-    _hash = String::hashcode(p, p + sizeof(_xid));
+    //const char* p = reinterpret_cast<const char*>(&_xid);
+    //_hash = String::hashcode(p, p + sizeof(_xid));
+    memcpy(&_hash, _xid.id, sizeof(_hash));
 }
 
 StringAccum &
