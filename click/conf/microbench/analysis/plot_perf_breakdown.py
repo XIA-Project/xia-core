@@ -4,7 +4,7 @@ import perf_callgraph
 import re
 
 # task
-tasks = ['Mem Alloc/Copy', 'Classification', 'Routing', 'Queueing', 'Misc']
+tasks = ['Mem Alloc/Copy', 'Classification', 'Forwarding', 'Queueing', 'Misc']
 task_colors = ['0.4', '0.2', '0.8', '0.6', '1']
 
 # symbol name to task mapping
@@ -31,19 +31,19 @@ symbol_task_mappings = [
 
     (re.compile(r'^XIAXIDTypeClassifier::.*$'), 'Classification'),
 
-    (re.compile(r'^Paint::.*$'), 'Routing'),
-    (re.compile(r'^PaintSwitch::.*$'), 'Routing'),
-    (re.compile(r'^RangeIPLookup::.*$'), 'Routing'),
-    (re.compile(r'^RadixIPLookup::.*$'), 'Routing'),
-    (re.compile(r'^DecIPTTL::.*$'), 'Routing'),
-    (re.compile(r'^IPFragmenter::.*$'), 'Routing'),
-    (re.compile(r'^XIACheckDest::.*$'), 'Routing'),
-    (re.compile(r'^XIAXIDRouteTable::.*$'), 'Routing'),
-    (re.compile(r'^XIASelectPath::.*$'), 'Routing'),
-    (re.compile(r'^XIADecHLIM::.*$'), 'Routing'),
-    (re.compile(r'^XIANextHop::.*$'), 'Routing'),
+    (re.compile(r'^Paint::.*$'), 'Forwarding'),
+    (re.compile(r'^PaintSwitch::.*$'), 'Forwarding'),
+    (re.compile(r'^RangeIPLookup::.*$'), 'Forwarding'),
+    (re.compile(r'^RadixIPLookup::.*$'), 'Forwarding'),
+    (re.compile(r'^DecIPTTL::.*$'), 'Forwarding'),
+    (re.compile(r'^IPFragmenter::.*$'), 'Forwarding'),
+    (re.compile(r'^XIACheckDest::.*$'), 'Forwarding'),
+    (re.compile(r'^XIAXIDRouteTable::.*$'), 'Forwarding'),
+    (re.compile(r'^XIASelectPath::.*$'), 'Forwarding'),
+    (re.compile(r'^XIADecHLIM::.*$'), 'Forwarding'),
+    (re.compile(r'^XIANextHop::.*$'), 'Forwarding'),
 
-    #(re.compile(r'^XIARouterCache::.*$'), 'Routing'),
+    #(re.compile(r'^XIARouterCache::.*$'), 'Forwarding'),
 
     (re.compile(r'^<>.*$'), 'Misc'),
 ]

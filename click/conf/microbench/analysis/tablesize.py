@@ -2,8 +2,8 @@
 
 from common import *
 
-family_names = ('AD', 'HID')
-labels = {'HID': 'HID routing', 'AD': 'AD routing'}
+family_names = ('HID',)
+labels = {'HID': 'HID forwarding', 'AD': 'AD forwarding'}
 markers = {'HID': 'x', 'AD': 'o'}
 linestyles = {'HID': '-', 'AD': '-'}
 x_values = {
@@ -50,7 +50,7 @@ for family_name in family_names:
     yerr = (y_lower_err_values[family_name], y_upper_err_values[family_name])
     ax.errorbar(x_values[family_name], y_values[family_name], yerr=yerr, linestyle=linestyles[family_name], color='0')
 
-ax.set_xlabel('Routing table size (number of entries)')
+ax.set_xlabel('HID forwarding table size (number of entries)')
 ax.set_ylabel('Packet processing throughput (Mpkt/sec)')
 ax.set_xticks(x_ticks)
 ax.set_xticklabels(x_ticklabels)
@@ -58,7 +58,7 @@ ax.set_xlim(xmin=6000, xmax=48000000)
 ax.set_ylim(ymin=1.1, ymax=2.0)
 ax.set_yticks((1.2, 1.4, 1.6, 1.8, 2.0))
 #ax.grid()
-ax.legend(loc='lower left').draw_frame(False)
+#ax.legend(loc='lower left').draw_frame(False)
 
 cache_size = 2 * 6000 * 1000
 #min_rt_entry_size = (4 + 20) + 8 + 8        # (XID type, ID), port, chain pointer
