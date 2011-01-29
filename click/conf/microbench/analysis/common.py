@@ -88,6 +88,6 @@ dataset = {
     'TABLESIZE_AD_30000000': data_path_prefix + 'output_xia_tablesize_ad_30000000',
 }
 
-#iter_max = 10
-iter_max = 5
+iter_max = 10
+#iter_max = 5
 

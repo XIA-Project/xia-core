@@ -125,7 +125,7 @@ def plot(output, data_names):
             last_left[i] += widths[i]
 
     ax.xaxis.grid(zorder=1)
-    x_max = max(last_left) * 1.18
+    x_max = max(last_left) * 1.16
     ax.set_xlim(0, x_max)
     ax.set_ylim(-0.3, len(data_names) - 0.1)
     ax.set_xticks(range(0, int(x_max), 200))
