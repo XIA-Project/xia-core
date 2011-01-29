@@ -48,6 +48,7 @@ XID::XID(const String &str)
 }
 
 
+#ifndef CLICK_XID_CMP_OPTIMIZATION
 /** @brief Return if the addresses are the same. */
 bool
 XID::operator==(const XID& rhs) const
@@ -61,12 +62,15 @@ XID::operator!=(const XID& rhs) const
 {
     return _hash != rhs._hash || memcmp(&_xid, &rhs._xid, sizeof(_xid)) != 0;
 }
+#endif
 
 XID&
 XID::operator=(const XID& rhs)
 {
     _xid = rhs._xid;
+#ifndef CLICK_XID_CMP_OPTIMIZATION
     _hash = rhs._hash;
+#endif
     return *this;
 }
 
@@ -137,13 +141,14 @@ XID::unparse_pretty(const Element* context) const
         return unparse();
 }
 
+#ifndef CLICK_XID_CMP_OPTIMIZATION
 void
 XID::calc_hash()
 {
-    //const char* p = reinterpret_cast<const char*>(&_xid);
-    //_hash = String::hashcode(p, p + sizeof(_xid));
-    memcpy(&_hash, _xid.id, sizeof(_hash));
+    const char* p = reinterpret_cast<const char*>(&_xid);
+    _hash = String::hashcode(p, p + sizeof(_xid));
 }
+#endif
 
 StringAccum &
 operator<<(StringAccum &sa, const XID& xid)
