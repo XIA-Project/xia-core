@@ -9,15 +9,12 @@ CLICK_DECLS
 class StringAccum;
 class Element;
 
-//#define CLICK_XID_CMP_OPTIMIZATION
-
 class XID { public:
     XID();
 
     /** @brief Construct an XID from a struct click_xia_xid. */
     inline XID(const struct click_xia_xid& xid)
 	: _xid(xid) {
-        calc_hash();
     }
 
     XID(const String& str);
@@ -29,13 +26,8 @@ class XID { public:
 
     inline uint32_t hashcode() const;
 
-#ifndef CLICK_XID_CMP_OPTIMIZATION
-    bool operator==(const XID&) const;
-    bool operator!=(const XID&) const;
-#else
     inline bool operator==(const XID&) const;
     inline bool operator!=(const XID&) const;
-#endif
 
     XID& operator=(const XID&);
     XID& operator=(const struct click_xia_xid&);
@@ -44,17 +36,8 @@ class XID { public:
     String unparse() const;
     String unparse_pretty(const Element* context = NULL) const;
 
-#ifndef CLICK_XID_CMP_OPTIMIZATION
-    void calc_hash();
-#else
-    void calc_hash() {}
-#endif
-
   private:
     struct click_xia_xid _xid;
-#ifndef CLICK_XID_CMP_OPTIMIZATION
-    uint32_t _hash;
-#endif
 };
 
 
@@ -90,33 +73,35 @@ StringAccum& operator<<(StringAccum&, const XID&);
  *
  * returns the first 32 bit of XID. This hash function assumes that XIDs are generated cryptographically 
  */
-#ifndef CLICK_XID_CMP_OPTIMIZATION
 inline uint32_t
 XID::hashcode() const
 {
-    return _hash;
+    return reinterpret_cast<const uint32_t*>(&_xid)[4]; // pick some word in the middle
 }
-#else
-inline uint32_t
-XID::hashcode() const
-{
-    return *reinterpret_cast<const uint32_t*>(_xid.id);
-}
+
+/** @brief Return if the addresses are the same. */
 inline bool
 XID::operator==(const XID& rhs) const
 {
-    return reinterpret_cast<const uint64_t*>(&_xid)[0] == reinterpret_cast<const uint64_t*>(&rhs._xid)[0] &&
-           reinterpret_cast<const uint64_t*>(&_xid)[1] == reinterpret_cast<const uint64_t*>(&rhs._xid)[1] &&
-           reinterpret_cast<const uint64_t*>(&_xid)[2] == reinterpret_cast<const uint64_t*>(&rhs._xid)[2];
+    return reinterpret_cast<const uint32_t*>(&_xid)[0] == reinterpret_cast<const uint32_t*>(&rhs._xid)[0] &&
+           reinterpret_cast<const uint32_t*>(&_xid)[1] == reinterpret_cast<const uint32_t*>(&rhs._xid)[1] &&
+           reinterpret_cast<const uint32_t*>(&_xid)[2] == reinterpret_cast<const uint32_t*>(&rhs._xid)[2] &&
+           reinterpret_cast<const uint32_t*>(&_xid)[3] == reinterpret_cast<const uint32_t*>(&rhs._xid)[3] &&
+           reinterpret_cast<const uint32_t*>(&_xid)[4] == reinterpret_cast<const uint32_t*>(&rhs._xid)[4] &&
+           reinterpret_cast<const uint32_t*>(&_xid)[5] == reinterpret_cast<const uint32_t*>(&rhs._xid)[5];
 }
+
+/** @brief Return if the addresses are different. */
 inline bool
 XID::operator!=(const XID& rhs) const
 {
-    return reinterpret_cast<const uint64_t*>(&_xid)[0] != reinterpret_cast<const uint64_t*>(&rhs._xid)[0] ||
-           reinterpret_cast<const uint64_t*>(&_xid)[1] != reinterpret_cast<const uint64_t*>(&rhs._xid)[1] ||
-           reinterpret_cast<const uint64_t*>(&_xid)[2] != reinterpret_cast<const uint64_t*>(&rhs._xid)[2];
+    return reinterpret_cast<const uint32_t*>(&_xid)[0] != reinterpret_cast<const uint32_t*>(&rhs._xid)[0] ||
+           reinterpret_cast<const uint32_t*>(&_xid)[1] != reinterpret_cast<const uint32_t*>(&rhs._xid)[1] ||
+           reinterpret_cast<const uint32_t*>(&_xid)[2] != reinterpret_cast<const uint32_t*>(&rhs._xid)[2] ||
+           reinterpret_cast<const uint32_t*>(&_xid)[3] != reinterpret_cast<const uint32_t*>(&rhs._xid)[3] ||
+           reinterpret_cast<const uint32_t*>(&_xid)[4] != reinterpret_cast<const uint32_t*>(&rhs._xid)[4] ||
+           reinterpret_cast<const uint32_t*>(&_xid)[5] != reinterpret_cast<const uint32_t*>(&rhs._xid)[5];
 }
-#endif
 
 CLICK_ENDDECLS
 #endif

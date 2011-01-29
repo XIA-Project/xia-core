@@ -39,7 +39,6 @@ CLICK_DECLS
 XID::XID()
 {
     memset(&_xid, 0, sizeof(_xid));
-    calc_hash();
 }
 
 XID::XID(const String &str)
@@ -48,29 +47,10 @@ XID::XID(const String &str)
 }
 
 
-#ifndef CLICK_XID_CMP_OPTIMIZATION
-/** @brief Return if the addresses are the same. */
-bool
-XID::operator==(const XID& rhs) const
-{
-    return _hash == rhs._hash && memcmp(&_xid, &rhs._xid, sizeof(_xid)) == 0;
-}
-
-/** @brief Return if the addresses are different. */
-bool
-XID::operator!=(const XID& rhs) const
-{
-    return _hash != rhs._hash || memcmp(&_xid, &rhs._xid, sizeof(_xid)) != 0;
-}
-#endif
-
 XID&
 XID::operator=(const XID& rhs)
 {
     _xid = rhs._xid;
-#ifndef CLICK_XID_CMP_OPTIMIZATION
-    _hash = rhs._hash;
-#endif
     return *this;
 }
 
@@ -78,7 +58,6 @@ XID&
 XID::operator=(const struct click_xia_xid& rhs)
 {
     _xid = rhs;
-    calc_hash();
     return *this;
 }
 
@@ -87,7 +66,6 @@ XID::parse(const String& str)
 {
     if (!cp_xid(str, this))
         _xid.type = htonl(CLICK_XIA_XID_TYPE_UNDEF);
-    calc_hash();
 }
 
 /** @brief Unparses this address into a String.
@@ -140,15 +118,6 @@ XID::unparse_pretty(const Element* context) const
     else
         return unparse();
 }
-
-#ifndef CLICK_XID_CMP_OPTIMIZATION
-void
-XID::calc_hash()
-{
-    const char* p = reinterpret_cast<const char*>(&_xid);
-    _hash = String::hashcode(p, p + sizeof(_xid));
-}
-#endif
 
 StringAccum &
 operator<<(StringAccum &sa, const XID& xid)
