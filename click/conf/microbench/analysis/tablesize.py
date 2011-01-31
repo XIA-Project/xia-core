@@ -55,8 +55,8 @@ ax.set_ylabel('Packet processing throughput (Mpkt/sec)')
 ax.set_xticks(x_ticks)
 ax.set_xticklabels(x_ticklabels)
 ax.set_xlim(xmin=6000, xmax=48000000)
-ax.set_ylim(ymin=0, ymax=2.4)
-ax.set_yticks((0.0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4))
+ax.set_ylim(ymin=0, ymax=2.5)
+ax.set_yticks((0.0, 0.5, 1.0, 1.5, 2.0, 2.5))
 ax.yaxis.grid()
 #ax.grid()
 #ax.legend(loc='lower left').draw_frame(False)
@@ -67,8 +67,8 @@ min_rt_entry_size = 64                      # adds more bytes to take into accou
 vline_x = 1. * cache_size / min_rt_entry_size
 print 'cache limit: %f' % vline_x
 ax.axvline(x=vline_x, linestyle=':', color='0');
-ax.annotate('Running out of L2 cache', xy=(vline_x, 1.10), textcoords='offset points',
-            xytext=(35, -7), arrowprops=dict(arrowstyle="<-"))
+ax.annotate('Running out of L2 cache', xy=(vline_x, 0.75), textcoords='offset points',
+            xytext=(35, -6), arrowprops=dict(arrowstyle="<-"))
 
 plt.savefig('tablesize.pdf', format='pdf', bbox_inches='tight')
 
