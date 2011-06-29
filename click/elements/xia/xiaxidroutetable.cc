@@ -8,8 +8,10 @@
 #include <click/error.hh>
 #include <click/confparse.hh>
 #include <click/packet_anno.hh>
+#if CLICK_USERLAND
 #include <fstream>
 #include <stdlib.h>
+#endif
 CLICK_DECLS
 
 XIAXIDRouteTable::XIAXIDRouteTable()
@@ -130,6 +132,7 @@ XIAXIDRouteTable::remove_handler(const String &conf, Element *e, void *, ErrorHa
     return 0;
 }
 
+#if CLICK_USERLAND
 int
 XIAXIDRouteTable::load_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh)
 {
@@ -158,11 +161,16 @@ XIAXIDRouteTable::load_routes_handler(const String &conf, Element *e, void *, Er
 
     return 0;
 }
+#endif
 
 int
 XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh)
 {
+#if CLICK_USERLAND
     XIAXIDRouteTable* table = dynamic_cast<XIAXIDRouteTable*>(e);
+#else
+    XIAXIDRouteTable* table = reinterpret_cast<XIAXIDRouteTable*>(e);
+#endif
     assert(table);
 
     String conf_copy = conf;
@@ -197,7 +205,11 @@ XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *
 
         while (xid != xid_end)
         {
+#if CLICK_USERLAND
             *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(xsubi));
+#else
+            *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(random32());
+#endif
             xid += sizeof(uint32_t);
         }
 

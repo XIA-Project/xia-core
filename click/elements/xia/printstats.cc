@@ -8,7 +8,9 @@
 #include <click/error.hh>
 #include <click/confparse.hh>
 #include <clicknet/ip.h>
+#if CLICK_USERLAND
 #include <stdlib.h>
+#endif
 CLICK_DECLS
 
 PrintStats::PrintStats()
@@ -19,7 +21,11 @@ PrintStats::PrintStats()
     _bps = true;
 
     struct timeval tv;
+#if CLICK_USERLAND
     gettimeofday(&tv, NULL);
+#else
+    do_gettimeofday(&tv);
+#endif
     _last_time = static_cast<uint64_t>(tv.tv_sec) * 1000000 + tv.tv_usec;
 
     _num_packets = 0;
@@ -51,7 +57,11 @@ PrintStats::simple_action(Packet *p)
     {
         //click_chatter(".");
         struct timeval tv;
+#if CLICK_USERLAND
         gettimeofday(&tv, NULL);
+#else
+        do_gettimeofday(&tv);
+#endif
         uint64_t current_time = static_cast<uint64_t>(tv.tv_sec) * 1000000 + tv.tv_usec;
         uint64_t diff = current_time - _last_time;
         if (diff > static_cast<uint64_t>(_interval))

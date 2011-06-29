@@ -25,7 +25,9 @@
 #include <click/error.hh>
 #include <click/glue.hh>
 #include "ip6routetable.hh"
+#if CLICK_USERLEVEL
 #include <stdlib.h>
+#endif
 CLICK_DECLS
 
 void *
@@ -126,6 +128,7 @@ IP6RouteTable::table_handler(Element *e, void *)
     return r->dump_routes();
 }
 
+#if CLICK_USERLEVEL
 int
 IP6RouteTable::generate_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh)
 {
@@ -171,6 +174,7 @@ IP6RouteTable::generate_routes_handler(const String &conf, Element *e, void *, E
     click_chatter("generated %d entries", count);
     return 0;
 }
+#endif
 
 CLICK_ENDDECLS
 ELEMENT_PROVIDES(IP6RouteTable)

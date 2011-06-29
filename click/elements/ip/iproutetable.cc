@@ -26,7 +26,9 @@
 #include <click/straccum.hh>
 #include <click/router.hh>
 #include "iproutetable.hh"
+#if CLICK_USERLEVEL
 #include <fstream>
+#endif
 CLICK_DECLS
 
 bool
@@ -293,6 +295,7 @@ IPRouteTable::lookup_handler(int, String& s, Element* e, const Handler*, ErrorHa
 	return errh->error("expected IP address");
 }
 
+#if CLICK_USERLEVEL
 int
 IPRouteTable::load_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh)
 {
@@ -321,6 +324,7 @@ IPRouteTable::load_routes_handler(const String &conf, Element *e, void *, ErrorH
 
     return 0;
 }
+#endif
 
 void
 IPRouteTable::add_handlers()
@@ -331,7 +335,9 @@ IPRouteTable::add_handlers()
     add_write_handler("ctrl", ctrl_handler, 0);
     add_read_handler("table", table_handler, 0, Handler::EXPENSIVE);
     set_handler("lookup", Handler::OP_READ | Handler::READ_PARAM, lookup_handler);
+#if CLICK_USERLEVEL
     add_write_handler("load", load_routes_handler, 0);
+#endif
 }
 
 CLICK_ENDDECLS

@@ -10,10 +10,12 @@
 #include <click/handlercall.hh>
 #include <click/xiapath.hh>
 
+#if CLICK_USERLAND
 #include <list>
 #include <string.h>
 #include <stdio.h>
 #include <iostream>
+#endif
 
 #define CACHESIZE 1024*1024*1024    //in router 
 #define CLIENTCACHE

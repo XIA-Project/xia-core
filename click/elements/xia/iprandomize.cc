@@ -8,7 +8,12 @@
 #include <click/error.hh>
 #include <click/confparse.hh>
 #include <clicknet/ip.h>
+#if CLICK_USERLAND
 #include <stdlib.h>
+#elif CLICK_LINUXMODULE
+#else
+ XXX
+#endif
 CLICK_DECLS
 
 IPRandomize::IPRandomize()
@@ -44,7 +49,13 @@ IPRandomize::simple_action(Packet *p_in)
 
     if (hdr->ip_src.s_addr == 0)
     {
+#if CLICK_USERLAND
         hdr->ip_src.s_addr = static_cast<uint32_t>(nrand48(_xsubi));
+#elif CLICK_LINUXMODULE
+        hdr->ip_src.s_addr = static_cast<uint32_t>(random32());
+#else
+	XXX
+#endif
 
         if (++_current_cycle == _max_cycle)
         {
@@ -56,7 +67,13 @@ IPRandomize::simple_action(Packet *p_in)
     }
     if (hdr->ip_dst.s_addr == 0)
     {
+#if CLICK_USERLAND
         hdr->ip_dst.s_addr = static_cast<uint32_t>(nrand48(_xsubi));
+#elif CLICK_LINUXMODULE
+        hdr->ip_dst.s_addr = static_cast<uint32_t>(random32());
+#else
+	XXX
+#endif
 
         if (++_current_cycle == _max_cycle)
         {
