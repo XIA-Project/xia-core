@@ -4,7 +4,6 @@
 #include <click/string.hh>
 #include <click/glue.hh>
 #include <clicknet/xia.h>
-//#include <vector>
 CLICK_DECLS
 class StringAccum;
 class Element;

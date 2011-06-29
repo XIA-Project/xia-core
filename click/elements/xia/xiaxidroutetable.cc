@@ -8,7 +8,7 @@
 #include <click/error.hh>
 #include <click/confparse.hh>
 #include <click/packet_anno.hh>
-#if CLICK_USERLAND
+#if CLICK_USERLEVEL
 #include <fstream>
 #include <stdlib.h>
 #endif
@@ -132,7 +132,7 @@ XIAXIDRouteTable::remove_handler(const String &conf, Element *e, void *, ErrorHa
     return 0;
 }
 
-#if CLICK_USERLAND
+#if CLICK_USERLEVEL
 int
 XIAXIDRouteTable::load_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh)
 {
@@ -166,7 +166,7 @@ XIAXIDRouteTable::load_routes_handler(const String &conf, Element *e, void *, Er
 int
 XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh)
 {
-#if CLICK_USERLAND
+#if CLICK_USERLEVEL
     XIAXIDRouteTable* table = dynamic_cast<XIAXIDRouteTable*>(e);
 #else
     XIAXIDRouteTable* table = reinterpret_cast<XIAXIDRouteTable*>(e);
@@ -205,7 +205,7 @@ XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *
 
         while (xid != xid_end)
         {
-#if CLICK_USERLAND
+#if CLICK_USERLEVEL
             *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(xsubi));
 #else
             *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(random32());

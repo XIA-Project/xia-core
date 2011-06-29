@@ -10,7 +10,7 @@
 #include <click/handlercall.hh>
 #include <click/xiapath.hh>
 
-#if CLICK_USERLAND
+#if CLICK_USERLEVEL
 #include <list>
 #include <string.h>
 #include <stdio.h>

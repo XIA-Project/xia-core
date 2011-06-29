@@ -9,7 +9,7 @@
 #include <click/confparse.hh>
 #include <clicknet/ip6.h>
 #include <click/ip6address.hh>
-#if CLICK_USERLAND
+#if CLICK_USERLEVEL
 #include <stdlib.h>
 //#elif CLICK_LINUXMODULE
 #endif
@@ -51,7 +51,7 @@ IP6Randomize::simple_action(Packet *p_in)
         hdr->ip6_src.in6_u.u6_addr32[2] == 0 &&
         hdr->ip6_src.in6_u.u6_addr32[3] == 0)
     {
-#if CLICK_USERLAND
+#if CLICK_USERLEVEL
         hdr->ip6_src.in6_u.u6_addr32[0] = static_cast<uint32_t>(nrand48(_xsubi));
         hdr->ip6_src.in6_u.u6_addr32[1] = static_cast<uint32_t>(nrand48(_xsubi));
         hdr->ip6_src.in6_u.u6_addr32[2] = static_cast<uint32_t>(nrand48(_xsubi));
@@ -78,7 +78,7 @@ IP6Randomize::simple_action(Packet *p_in)
         hdr->ip6_dst.in6_u.u6_addr32[2] == 0 &&
         hdr->ip6_dst.in6_u.u6_addr32[3] == 0)
     {
-#if CLICK_USERLAND
+#if CLICK_USERLEVEL
         hdr->ip6_dst.in6_u.u6_addr32[0] = static_cast<uint32_t>(nrand48(_xsubi));
         hdr->ip6_dst.in6_u.u6_addr32[1] = static_cast<uint32_t>(nrand48(_xsubi));
         hdr->ip6_dst.in6_u.u6_addr32[2] = static_cast<uint32_t>(nrand48(_xsubi));

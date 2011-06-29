@@ -8,7 +8,7 @@
 #include <click/error.hh>
 #include <click/confparse.hh>
 #include <clicknet/xia.h>
-#if CLICK_USERLAND
+#if CLICK_USERLEVEL
 #include <stdlib.h>
 #endif
 CLICK_DECLS
@@ -62,7 +62,7 @@ XIARandomize::simple_action(Packet *p_in)
 
             while (xid != xid_end)
             {
-#if CLICK_USERLAND
+#if CLICK_USERLEVEL
                 *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(_xsubi_det));
 #else
                 *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(random32());
@@ -86,7 +86,7 @@ XIARandomize::simple_action(Packet *p_in)
 
             while (xid != xid_end)
             {
-#if CLICK_USERLAND
+#if CLICK_USERLEVEL
                 *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(_xsubi_arb));
 #else
                 *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(random32());

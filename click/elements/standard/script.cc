@@ -49,7 +49,7 @@ static const StaticNameDB::Entry instruction_entries[] = {
     { "loop", Script::INSN_LOOP_PSEUDO },
     { "pause", Script::INSN_WAIT_STEP },
     { "print", Script::INSN_PRINT },
-#if CLICK_USERLAND
+#if CLICK_USERLEVEL
     { "print_realtime", Script::INSN_PRINT_REALTIME },
     { "print_usertime", Script::INSN_PRINT_USERTIME },
 #endif
@@ -469,7 +469,7 @@ Script::step(int nsteps, int step_type, int njumps, ErrorHandler *errh)
 
 	case INSN_PRINT_REALTIME: {
             struct timeval tv;
-#if CLICK_USERLAND
+#if CLICK_USERLEVEL
             if (gettimeofday(&tv, NULL) == 0)
                 click_chatter("REALTIME %llu", static_cast<uint64_t>(tv.tv_sec) * 1000000000Lu + static_cast<uint64_t>(tv.tv_usec) * 1000);
             else
@@ -480,7 +480,7 @@ Script::step(int nsteps, int step_type, int njumps, ErrorHandler *errh)
 
 	case INSN_PRINT_USERTIME: {
             struct timespec ts;
-#if CLICK_USERLAND
+#if CLICK_USERLEVEL
             if (clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts) == 0)
                 click_chatter("USERTIME %llu", static_cast<uint64_t>(ts.tv_sec) * 1000000000Lu + ts.tv_nsec);
             else
