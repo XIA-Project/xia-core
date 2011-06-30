@@ -24,6 +24,7 @@ LIB_CXX_OBJS = string.o straccum.o nameinfo.o \
 	routerthread.o router.o master.o handlercall.o notifier.o \
 	integers.o iptable.o \
 	driver.o ino.o \
+	xid.o xiapath.o xiaheader.o xiaextheader.o xiacontentheader.o  \
 	$(EXTRA_DRIVER_OBJS)
 
 EXTRA_DRIVER_OBJS = @EXTRA_DRIVER_OBJS@

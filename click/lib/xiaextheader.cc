@@ -8,9 +8,9 @@
 #include <click/xiaextheader.hh>
 #if CLICK_USERLEVEL
 # include <unistd.h>
+#include <iostream>
 #endif
 
-#include <iostream>
 
 CLICK_DECLS
 

@@ -45,7 +45,9 @@ XIAXIDRouteTable::add_handlers()
     add_write_handler("add", set_handler, 0);
     add_write_handler("set", set_handler, (void*)1);
     add_write_handler("remove", remove_handler, 0);
+#if CLICK_USERLEVEL
     add_write_handler("load", load_routes_handler, 0);
+#endif
     add_write_handler("generate", generate_routes_handler, 0);
 }
 

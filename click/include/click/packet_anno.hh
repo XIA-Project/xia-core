@@ -128,9 +128,9 @@
 # endif
 #endif
 
-// bytes 48-48
-#define XIA_NEXT_PATH_ANNO_OFFSET      48
-#define XIA_NEXT_PATH_ANNO_SIZE        1
+// bytes 20-27
+#define XIA_NEXT_PATH_ANNO_OFFSET      20
+#define XIA_NEXT_PATH_ANNO_SIZE        8
 #  define XIA_NEXT_PATH_ANNO(p)	((p)->anno_u8(XIA_NEXT_PATH_ANNO_OFFSET))
 #  define SET_XIA_NEXT_PATH_ANNO(p, v) ((p)->set_anno_u8(XIA_NEXT_PATH_ANNO_OFFSET, (v)))
 
