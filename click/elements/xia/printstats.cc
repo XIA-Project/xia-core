@@ -53,7 +53,11 @@ PrintStats::simple_action(Packet *p)
     ++_num_packets;
     _num_bits += p->length() * 8;
 
-    if (_num_packets % _check_packet == 0)
+#if USERLAND
+    if (_num_packets %_check_packet  == 0) 
+#else
+    if (((int32_t)_num_packets) % (int32_t)_check_packet  == 0) 
+#endif
     {
         //click_chatter(".");
         struct timeval tv;
