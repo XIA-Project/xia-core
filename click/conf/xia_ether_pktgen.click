@@ -1,7 +1,7 @@
-define($COUNT 100000);
-define($PAYLOAD_SIZE 1400);
+define($COUNT 1000000);
+define($PAYLOAD_SIZE 1300);
 define($HEADROOM_SIZE 148);
-define($OUTDEVICE eth7);
+define($OUTDEVICE eth2);
 
 // aliases for XIDs
 XIAXIDInfo(
@@ -17,10 +17,12 @@ XIAXIDInfo(
 
 gen :: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE)
 -> Script(TYPE PACKET, write gen.active false)       // stop source after exactly 1 packet
+-> Unqueue()
 -> XIAEncap(
     DST RE  HID1,
     SRC RE  HID0)
 -> EtherEncap(0x9999, 00:1a:92:9b:4a:77 ,00:15:17:51:d3:d4)
 -> Clone($COUNT)
--> Unqueue
 -> ToDevice($OUTDEVICE);
+
+Script(write gen.active true);
