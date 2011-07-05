@@ -330,13 +330,23 @@ XIAXIDInfo(
 
 // router instantiation
 router0 :: RouterDummyCache(RE AD0 RHID0, AD0, RHID0);
+toh :: ToHost;
 
+c0 :: Classifier(12/9999, -);
+c1 :: Classifier(12/9999, -);
 
 todevice0 :: ToDevice(eth0);
 todevice1 :: ToDevice(eth1);
-PollDevice(eth0) -> [0]router0;
-PollDevice(eth1) -> [1]router0;
-router0[0] -> todevice0;
-router0[1] -> todevice1; 
+PollDevice(eth0) -> c0;
+c0[0] -> Strip(14) -> [0]router0; // XIA packet 
+PollDevice(eth1) -> c1;
+c1[0] -> Strip(14) -> [1]router0; // XIA packet 
 
+c0[1] -> toh;
+c1[1] -> toh;
+router0[0] -> EtherEncap(0x9999, 00:15:17:51:d3:d4, 00:1A:92:9B:4A:77)-> todevice0;
+router0[1] -> EtherEncap(0x9999, 00:15:17:51:d3:d5, 00:1B:21:01:39:95)-> todevice1; 
+
+Script(write router0/n/proc/rt_HID/rt.add HID0 0);     // no default route for CID; consider other path
+Script(write router0/n/proc/rt_HID/rt.add HID1 1);     // no default route for CID; consider other path
 
