@@ -26,6 +26,7 @@ Clone::configure(Vector<String> &conf, ErrorHandler *errh)
                    cpEnd) < 0)
         return -1;
     _count = count;
+    click_chatter("Packet cloning %d packets", count);
     return 0;
 }
 
@@ -40,8 +41,9 @@ Clone::push(int /*port*/, Packet *p)
 Packet* Clone::pull(int /*port*/)
 {
     if (_packet==NULL) return NULL;
-    _count--;
     if (_count<0) return NULL;
+    _count--;
+    if (_count<0) click_chatter("No more packet cloning");
     return _packet->clone()->uniqueify();
 }
 

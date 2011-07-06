@@ -18,10 +18,8 @@ XIAXIDInfo(
 gen :: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE)
 -> Script(TYPE PACKET, write gen.active false)       // stop source after exactly 1 packet
 -> Unqueue()
--> XIAEncap(
-    DST RE  HID1,
-    SRC RE  HID0)
--> EtherEncap(0x9999, 00:1a:92:9b:4a:77 ,00:15:17:51:d3:d4)
+-> UDPIPEncap(10.0.1.2, 5002, 10.0.2.2, 5002)
+-> EtherEncap(0x0800, 00:1a:92:9b:4a:77 ,00:15:17:51:d3:d4)
 -> Clone($COUNT)
 -> ToDevice($OUTDEVICE);
 
