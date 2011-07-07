@@ -121,7 +121,7 @@ elementclass Host {
     n :: RouteEngine($local_addr);
     sock :: Socket(TCP, 0.0.0.0, $rpc_port, CLIENT false);
     rpc :: XIARPC($local_addr);
-    cache :: XIARouterCache($local_addr, n/proc/rt_CID/rt, $enable_local_cache);
+    cache :: XIATransport($local_addr, n/proc/rt_CID/rt, $enable_local_cache);
 
     Script(write n/proc/rt_AD/rt.add - 0);      // default route for AD
     Script(write n/proc/rt_HID/rt.add - 0);     // default route for HID
@@ -156,7 +156,7 @@ elementclass Router {
     // output[1]: forward to interface 1 (for other ads)
 
     n :: RouteEngine($local_addr);
-    cache :: XIARouterCache($local_addr, n/proc/rt_CID/rt);
+    cache :: XIATransport($local_addr, n/proc/rt_CID/rt);
 
     Script(write n/proc/rt_AD/rt.add - 1);      // default route for AD
     Script(write n/proc/rt_AD/rt.add $local_ad 4);    // self AD as destination
@@ -190,7 +190,7 @@ elementclass Router4Port {
     // output[3]: forward to interface 3
 
     n :: RouteEngine($local_addr);
-    cache :: XIARouterCache($local_addr, n/proc/rt_CID/rt);
+    cache :: XIATransport($local_addr, n/proc/rt_CID/rt);
 
     input[0] -> [0]n;
     input[1] -> [0]n;
@@ -221,7 +221,7 @@ elementclass Router4PortDummyCache {
     // output[3]: forward to interface 3
 
     n :: RouteEngine($local_addr);
-    //cache :: XIARouterCache($local_addr, n/proc/rt_CID/rt);
+    //cache :: XIATransport($local_addr, n/proc/rt_CID/rt);
     cache :: Queue(200);
 
     input[0] -> [0]n;
