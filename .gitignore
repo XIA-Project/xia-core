@@ -6,6 +6,8 @@ core
 *.sw?
 tags
 cscope.out
+*.o.cmd
+*.ko
 
 
 ## click

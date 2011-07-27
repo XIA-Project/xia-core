@@ -12,3 +12,5 @@ microbench:
 clean:
 	$(RM) $(GENERATED)
 	@cd microbench && make clean
+
+install:

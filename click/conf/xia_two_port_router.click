@@ -107,40 +107,40 @@ elementclass RouteEngine {
     proc[2] -> XIAPrint() -> Discard;  // No route drop (future TODO: return an error packet)
 };
 
-// 1-port host node
-elementclass Host {
-    $local_addr, $local_hid, $rpc_port, $enable_local_cache |
+// 2-port dummy router node
+elementclass RouterDummyCache {
+    $local_addr, $local_ad, $local_hid |
 
     // $local_addr: the full address of the node
-    // $local_hid:  the HID of the node
-    // $rpc_port:   the TCP port number to use for RPC
+    // $local_ad:   the AD of the node and the local network
+    // $local_hid:  the HID of the node (used for "bound" content source)
 
-    // input: a packet arrived at the node
-    // output: forward to interface 0
+    // input[0], input[1]: a packet arrived at the node
+    // output[0]: forward to interface 0 (for hosts in local ad)
+    // output[1]: forward to interface 1 (for other ads)
 
     n :: RouteEngine($local_addr);
-    sock :: Socket(TCP, 0.0.0.0, $rpc_port, CLIENT false);
-    rpc :: XIARPC($local_addr);
-    cache :: XIATransport($local_addr, n/proc/rt_CID/rt, $enable_local_cache);
+    cache :: Queue(200);
 
-    Script(write n/proc/rt_AD/rt.add - 0);      // default route for AD
-    Script(write n/proc/rt_HID/rt.add - 0);     // default route for HID
+    Script(write n/proc/rt_AD/rt.add - 1);      // default route for AD
+    Script(write n/proc/rt_AD/rt.add $local_ad 4);    // self AD as destination
+    Script(write n/proc/rt_HID/rt.add - 0);     // forwarding for local HID
     Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self HID as destination
     Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
 
-    input[0] -> n;
+    input[0] -> [0]n;
+    input[1] -> [0]n;
 
-    srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
+    n[0] -> sw :: PaintSwitch
+    n[1] -> Discard;
+    //n[2] -> [0]cache[0] -> [1]n;
+    //Idle -> [1]cache[1] -> Discard;
+    Idle -> [1]n;
+    n[2] -> cache -> Unqueue -> Discard;
 
-    sock -> [0]rpc[0] -> sock;
-    n[1] -> srcTypeClassifier[1] -> [1]rpc[1] -> [0]n;
-    srcTypeClassifier[0] -> Discard;    // do not send CID responses directly to RPC;
-                                        // they must be served by cache using the following connection only
-    n[2] -> [0]cache[0] -> [1]n;
-    rpc[2] -> [1]cache[1] -> [2]rpc;
-
-    n -> Queue(200) -> [0]output;
+    sw[0] -> Queue(200) -> [0]output;
+    sw[1] -> Queue(200) -> [1]output;
 };
 
 // 2-port router node
@@ -315,4 +315,43 @@ elementclass IP6Router4Port {
     sw[2] -> Queue(200) -> [2]output;
     sw[3] -> Queue(200) -> [3]output;
 };
+
+
+// aliases for XIDs
+XIAXIDInfo(
+    HID0 HID:0000000000000000000000000000000000000000,
+    HID1 HID:0000000000000000000000000000000000000001,
+    AD0 AD:1000000000000000000000000000000000000000,
+    AD1 AD:1000000000000000000000000000000000000001,
+    RHID0 HID:0000000000000000000000000000000000000002,
+    RHID1 HID:0000000000000000000000000000000000000003,
+    CID0 CID:2000000000000000000000000000000000000001,
+);
+
+// router instantiation
+router0 :: RouterDummyCache(RE AD0 RHID0, AD0, RHID0);
+toh :: ToHost;
+
+c0 :: Classifier(12/9999, -);
+c1 :: Classifier(12/9999, -);
+
+todevice0 :: ToDevice(eth0);
+todevice1 :: ToDevice(eth1);
+PollDevice(eth0) -> c0;
+c0[0] -> Strip(14) -> MarkXIAHeader() -> [0]router0; // XIA packet 
+PollDevice(eth1) -> c1;
+c1[0] -> Strip(14) -> MarkXIAHeader() -> [1]router0; // XIA packet 
+
+c0[1] -> toh;
+c1[1] -> toh;
+router0[0]
+//-> XIAPrint() 
+-> EtherEncap(0x9999, 00:15:17:51:d3:d4, 00:1A:92:9B:4A:77) -> todevice0;
+
+router0[1]
+//-> XIAPrint() 
+-> EtherEncap(0x9999, 00:15:17:51:d3:d5, 00:1B:21:01:39:95) -> todevice1; 
+
+Script(write router0/n/proc/rt_HID/rt.add HID0 0);     // no default route for CID; consider other path
+Script(write router0/n/proc/rt_HID/rt.add HID1 1);     // no default route for CID; consider other path
 

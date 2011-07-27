@@ -103,7 +103,8 @@ XIAXIDTypeClassifier::push(int, Packet *p)
     else
     {
         // no match -- discard packet
-        p->kill();
+        if (p)
+            p->kill();
     }
 }
 
@@ -111,8 +112,10 @@ int
 XIAXIDTypeClassifier::match(Packet *p)
 {
     const struct click_xia* hdr = p->xia_header();
+
     /*
-    if (!hdr)
+    if (p==NULL) return -1;
+    if (!hdr) 
         return -1;
     if (hdr->dnode == 0 || hdr->snode == 0)
         return -1;
