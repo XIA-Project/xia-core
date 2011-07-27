@@ -1,0 +1,33 @@
+diff -Naur ixgbe-2.0.44.14-no-X520-T2/src/ixgbe_api.c ixgbe-2.0.44.14/src/ixgbe_api.c
+--- ixgbe-2.0.44.14-no-X520-T2/src/ixgbe_api.c	2010-08-18 15:27:28.000000000 -0400
++++ ixgbe-2.0.44.14/src/ixgbe_api.c	2011-07-27 12:18:23.000000000 -0400
+@@ -101,6 +101,7 @@
+ 		case IXGBE_DEV_ID_82599_SFP:
+ 		case IXGBE_DEV_ID_82599_SFP_EM:
+ 		case IXGBE_DEV_ID_82599_CX4:
++		case IXGBE_DEV_ID_82599_T3_LOM:
+ 			hw->mac.type = ixgbe_mac_82599EB;
+ 			break;
+ 		default:
+diff -Naur ixgbe-2.0.44.14-no-X520-T2/src/ixgbe_main.c ixgbe-2.0.44.14/src/ixgbe_main.c
+--- ixgbe-2.0.44.14-no-X520-T2/src/ixgbe_main.c	2010-08-18 15:27:28.000000000 -0400
++++ ixgbe-2.0.44.14/src/ixgbe_main.c	2011-07-27 12:18:11.000000000 -0400
+@@ -103,6 +103,7 @@
+ 	{PCI_DEVICE(PCI_VENDOR_ID_INTEL, IXGBE_DEV_ID_82599_KX4_MEZZ)},
+ 	{PCI_DEVICE(PCI_VENDOR_ID_INTEL, IXGBE_DEV_ID_82599_CX4)},
+ 	{PCI_DEVICE(PCI_VENDOR_ID_INTEL, IXGBE_DEV_ID_82599_COMBO_BACKPLANE)},
++	{PCI_DEVICE(PCI_VENDOR_ID_INTEL, IXGBE_DEV_ID_82599_T3_LOM)},
+ 	/* required last entry */
+ 	{0, }
+ };
+diff -Naur ixgbe-2.0.44.14-no-X520-T2/src/ixgbe_type.h ixgbe-2.0.44.14/src/ixgbe_type.h
+--- ixgbe-2.0.44.14-no-X520-T2/src/ixgbe_type.h	2010-08-18 15:27:28.000000000 -0400
++++ ixgbe-2.0.44.14/src/ixgbe_type.h	2011-07-27 12:17:33.000000000 -0400
+@@ -54,6 +54,7 @@
+ #define IXGBE_DEV_ID_82599_SFP 0x10FB
+ #define IXGBE_DEV_ID_82599_SFP_EM 0x1507
+ #define IXGBE_DEV_ID_82599_XAUI_LOM 0x10FC
++#define IXGBE_DEV_ID_82599_T3_LOM 0x151c
+ 
+ /* General Registers */
+ #define IXGBE_CTRL      0x00000
