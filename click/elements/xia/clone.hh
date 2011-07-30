@@ -20,6 +20,7 @@ class Clone : public Element { public:
     private:
     Packet *_packet;
     int _count;
+    bool _first_replacement;
 };
 CLICK_ENDDECLS
 #endif

@@ -7,7 +7,7 @@
 #include <click/packet.hh>
 CLICK_DECLS
 
-Clone::Clone() :_packet(0), _count(0)
+Clone::Clone() :_packet(0), _count(0), _first_replacement(true)
 {
 }
 
@@ -33,9 +33,15 @@ Clone::configure(Vector<String> &conf, ErrorHandler *errh)
 void
 Clone::push(int /*port*/, Packet *p)
 {
-    if (_packet==NULL)
-        _packet = p;
-    return;
+    if (_packet) {
+        if (_first_replacement) {
+            click_chatter("Replacing the template packet for cloning");
+            _first_replacement = false;
+        }
+        _packet->kill();
+    }
+
+    _packet = p;
 }
 
 Packet* Clone::pull(int /*port*/)
