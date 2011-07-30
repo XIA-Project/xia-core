@@ -33,5 +33,7 @@ gen2 :: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SI
 -> td2 :: MQToDevice($OUTDEVICE, QUEUE 1, BURST 32);
 StaticThreadSched(td2 1);
 
+MQPollDevice($OUTDEVICE) -> Discard;
+
 Script(write gen1.active true);
 Script(write gen2.active true);
