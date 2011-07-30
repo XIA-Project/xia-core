@@ -7,39 +7,5 @@ core
 tags
 cscope.out
 *.o.cmd
+*.ko.cmd
 *.ko
-
-
-## click
-# from click/.gitignore (don't modify)
-config.cache
-config.h
-config.log
-config.mk
-config.status
-click-buildtool
-click-compile
-elementmap
-elementmap.xml
-Makefile
-stamp-h
-stamp-egroup
-bin
-man
-autom4te*
-+*
-depcomp
-installch
-# our entires to reduce accidental additions of build files
-/click/include/click/config-*.h
-/click/include/click/pathvars.h
-/click/etc/pkg-config.mk
-/click/tools/*
-/click/userlevel/*
-!/click/userlevel/Makefile.in
-/click/conf/xia_chain_topology.click
-
-
-## proxy
-/proxies/xia_pb2.py
-
