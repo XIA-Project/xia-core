@@ -17,6 +17,10 @@ end
 puts "define ($COUNT " + (CONF[:PKT_COUNT]/num_threads).to_i().to_s()  + ");"
 puts "define ($PAYLOAD_SIZE " + (CONF[:IP_PKT_SIZE]-28).to_i().to_s()  + ");"
 
+puts ""
+puts ""
+puts "MQPollDevice($OUTDEVICE) -> Discard;"
+
 1.upto(num_threads) do |n|
   puts ""
   puts ""
@@ -34,9 +38,9 @@ puts "define ($PAYLOAD_SIZE " + (CONF[:IP_PKT_SIZE]-28).to_i().to_s()  + ");"
   puts "StaticThreadSched(td#{n} #{n-1}, clone#{n} #{n-1});"
 
   puts ""
-  puts "Script(write gen#{n}.active true);"
 end
 
-puts ""
-puts ""
-puts "MQPollDevice($OUTDEVICE) -> Discard;"
+
+1.upto(num_threads) do |n|
+  puts "Script(write gen#{n}.active true);"
+end
