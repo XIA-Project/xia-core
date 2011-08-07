@@ -52,7 +52,8 @@ Packet* Clone::pull(int /*port*/)
     _count--;
 
     if (_count<=0) click_chatter("No more packet cloning");
-    return _packet->clone()->uniqueify();
+    //return _packet->clone()->uniqueify();
+    return _packet->clone();
 }
 
 

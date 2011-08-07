@@ -20,7 +20,34 @@ sudo rmmod ixgbe
 
 ################
 
-sudo modprobe ixgbe RSS=4,4,4,4
+sudo modprobe ixgbe RSS=6,6,6,6
+
+
+#sudo ethtool -A eth2 autoneg off
+#sudo ethtool -A eth2 tx off
+#sudo ethtool -A eth2 rx off
+#sudo ethtool -A eth3 autoneg off
+#sudo ethtool -A eth3 tx off
+#sudo ethtool -A eth3 rx off
+#sudo ethtool -A eth4 autoneg off
+#sudo ethtool -A eth4 tx off
+#sudo ethtool -A eth4 rx off
+#sudo ethtool -A eth5 autoneg off
+#sudo ethtool -A eth5 tx off
+#sudo ethtool -A eth5 rx off
+#
+#sudo ethtool -A eth2 autoneg off
+#sudo ethtool -A eth2 tx off
+#sudo ethtool -A eth2 rx off
+#sudo ethtool -A eth3 autoneg off
+#sudo ethtool -A eth3 tx off
+#sudo ethtool -A eth3 rx off
+#sudo ethtool -A eth4 autoneg off
+#sudo ethtool -A eth4 tx off
+#sudo ethtool -A eth4 rx off
+#sudo ethtool -A eth5 autoneg off
+#sudo ethtool -A eth5 tx off
+#sudo ethtool -A eth5 rx off
 
 sudo ifup eth2 2> /dev/null &
 sudo ifup eth3 2> /dev/null  &
