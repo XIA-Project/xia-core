@@ -180,7 +180,7 @@ EOD;
 	}
         for ($q = 0; $q < $nq_per_device*$nifs; $q++) {
 	    if ($q==0) {
-	        print "out$i :: CPUQueue(200);\n"
+	        print "out$i :: IsoCPUQueue(200);\n"
   	    }
 	    print "out$i -> tod_${devname}_${q} :: MQToDevice($devname, QUEUE $q, BURST 32) \n";	
 	}
@@ -200,13 +200,15 @@ EOD;
 
 for ($k = 0; $k < $nq_per_device*$nifs; $k++) {
     my $thread = $k;
-    my $devname = $ifs->[$k/$nq_per_device]->[0];
+    my $polldevname = $ifs->[$k/$nq_per_device]->[0];
 
-    my $str= "StaticThreadSched(pd_${devname}_${k} $thread," ;
+    my $str= "StaticThreadSched(pd_${polldevname}_${k} $thread" ;
     for($i = 0; $i < $nifs; $i++){
-        $str .= ", tod_${devname}_${k} $thread";
+        my $todevname = $ifs->[$i]->[0];
+        $str .= ", tod_${todevname}_${k} $thread";
     }
     $str .= ");\n";
+    print "$str";
 }
 
 # Local delivery path.

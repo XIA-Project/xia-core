@@ -26,7 +26,7 @@ c0 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800, -);
 pd_eth3_0:: MQPollDevice(eth3, QUEUE 0, BURST 32, PROMISC true) -> c0; 
 pd_eth3_1:: MQPollDevice(eth3, QUEUE 1, BURST 32, PROMISC true) -> c0; 
 pd_eth3_2:: MQPollDevice(eth3, QUEUE 2, BURST 32, PROMISC true) -> c0; 
-out0 :: CPUQueue(200);
+out0 :: IsoCPUQueue(200);
 out0 -> tod_eth3_0 :: MQToDevice(eth3, QUEUE 0, BURST 32) 
 out0 -> tod_eth3_1 :: MQToDevice(eth3, QUEUE 1, BURST 32) 
 out0 -> tod_eth3_2 :: MQToDevice(eth3, QUEUE 2, BURST 32) 
@@ -48,7 +48,7 @@ c1 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800, -);
 pd_eth5_3:: MQPollDevice(eth5, QUEUE 0, BURST 32, PROMISC true) -> c1; 
 pd_eth5_4:: MQPollDevice(eth5, QUEUE 1, BURST 32, PROMISC true) -> c1; 
 pd_eth5_5:: MQPollDevice(eth5, QUEUE 2, BURST 32, PROMISC true) -> c1; 
-out1 :: CPUQueue(200);
+out1 :: IsoCPUQueue(200);
 out1 -> tod_eth5_0 :: MQToDevice(eth5, QUEUE 0, BURST 32) 
 out1 -> tod_eth5_1 :: MQToDevice(eth5, QUEUE 1, BURST 32) 
 out1 -> tod_eth5_2 :: MQToDevice(eth5, QUEUE 2, BURST 32) 
@@ -64,6 +64,12 @@ c1[2] -> Paint(2) -> ip;
 c1[3] -> Print("eth5 non-IP") -> Discard;
 
 
+StaticThreadSched(pd_eth3_0 0, tod_eth3_0 0, tod_eth5_0 0);
+StaticThreadSched(pd_eth3_1 1, tod_eth3_1 1, tod_eth5_1 1);
+StaticThreadSched(pd_eth3_2 2, tod_eth3_2 2, tod_eth5_2 2);
+StaticThreadSched(pd_eth5_3 3, tod_eth3_3 3, tod_eth5_3 3);
+StaticThreadSched(pd_eth5_4 4, tod_eth3_4 4, tod_eth5_4 4);
+StaticThreadSched(pd_eth5_5 5, tod_eth3_5 5, tod_eth5_5 5);
 
 // Local delivery
 toh :: ToHost;
