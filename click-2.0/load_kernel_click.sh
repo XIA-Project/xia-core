@@ -11,11 +11,10 @@ sudo click-uninstall
 #sudo make -s -C `dirname $0`/linuxmodule/ uninstall || exit 1
 #sudo make -s -C `dirname $0`/tools/click-install/ uninstall || exit 1
 
-sudo ifdown eth2 2> /dev/null &
-sudo ifdown eth3 2> /dev/null &
-sudo ifdown eth4 2> /dev/null &
-sudo ifdown eth5 2> /dev/null &
-wait
+sudo ifdown eth2
+sudo ifdown eth3
+sudo ifdown eth4
+sudo ifdown eth5
 
 sudo rmmod ixgbe
 
@@ -49,11 +48,13 @@ sudo modprobe ixgbe RSS=6,6,6,6
 #sudo ethtool -A eth5 tx off
 #sudo ethtool -A eth5 rx off
 
-sudo ifup eth2 2> /dev/null &
-sudo ifup eth3 2> /dev/null &
-sudo ifup eth4 2> /dev/null &
-sudo ifup eth5 2> /dev/null &
-wait
+# these ifup's often cause system crash -- also, interfaces are automatically brought up by modprobe
+#sudo ifup eth2
+#sudo ifup eth3
+#sudo ifup eth4
+#sudo ifup eth5
+
+sudo /etc/init.d/ssh restart	# ensures sshd is running
 
 sudo make -s -C `dirname $0`/linuxmodule/ install-local || exit 1
 sudo make -s -C `dirname $0`/tools/click-install/ install-local || exit 1
