@@ -268,6 +268,19 @@ cp_is_click_id(const String &str)
   return len > 0;
 }
 
+static int
+xvalue(int x)
+{
+    if (x >= '0' && x <= '9')
+        return x - '0';
+    else if (x >= 'A' && x <= 'F')
+        return x - 'A' + 10;
+    else if (x >= 'a' && x <= 'f')
+        return x - 'a' + 10;
+    else
+        return -1;
+}
+
 static const char *
 skip_comment(const char *s, const char *end)
 {

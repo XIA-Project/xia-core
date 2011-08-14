@@ -22,6 +22,7 @@ installch
 # our entires to reduce accidental additions of build files
 include/click/config-*.h
 include/click/pathvars.h
+include/click-linuxmodule/*
 etc/pkg-config.mk
 tools/*
 userlevel/*.a
