@@ -199,12 +199,12 @@ install-local: Makefile $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc all
 install-include:
 	/bin/rm -f .install-include*
 	$(CLICKmkinstalldirs) $(DESTDIR)$(includedir)/click-linuxmodule
-	(cd $(DESTDIR)$(includedir)/click-linuxmodule; find . -type d | grep /) >.install-include0
+	(cd $(DESTDIR)$(includedir)/click-linuxmodule; find . -type d | grep / || true) >.install-include0
 	(cd $(top_builddir)/include/click-linuxmodule; find . -type d | grep /) >.install-include1
 	cat .install-include0 .install-include1 | sort | uniq -u >.install-include2
 	cat .install-include0 .install-include2 | sort | uniq -d | sed 's	^\.\(.*\)	'"$(DESTDIR)$(includedir)/click-linuxmodule"'\1	' | xargs -L 1 /bin/rm -rf
 	cat .install-include1 .install-include2 | sort | uniq -d | sed 's	^\.\(.*\)	'"$(DESTDIR)$(includedir)/click-linuxmodule"'\1	' | xargs -L 1 $(CLICKmkinstalldirs)
-	(cd $(DESTDIR)$(includedir)/click-linuxmodule; find . -type f | grep /) >.install-include0
+	(cd $(DESTDIR)$(includedir)/click-linuxmodule; find . -type f | grep / || true) >.install-include0
 	(cd $(top_builddir)/include/click-linuxmodule; find . -type f | grep /) >.install-include1
 	cat .install-include0 .install-include1 | sort | uniq -u >.install-include2
 	cat .install-include0 .install-include2 | sort | uniq -d | sed 's	^\.\(.*\)	'"$(DESTDIR)$(includedir)/click-linuxmodule"'\1	' | xargs -L 1 /bin/rm -f
