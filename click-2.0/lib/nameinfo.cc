@@ -134,7 +134,8 @@ static const StaticNameDB::Entry annotation_entries[] = {
     { "SEQUENCE_NUMBER", MKAI(SEQUENCE_NUMBER) },
     { "VLAN", MKAI(VLAN_TCI) },
     { "VLAN_TCI", MKAI(VLAN_TCI) },
-    { "WIFI_EXTRA", MKAI(WIFI_EXTRA) }
+    { "WIFI_EXTRA", MKAI(WIFI_EXTRA) },
+    { "XIA_NEXT_PATH", MKAI(XIA_NEXT_PATH) }
 };
 
 bool

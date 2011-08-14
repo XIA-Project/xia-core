@@ -41,6 +41,7 @@ RandomSource::configure(Vector<String> &conf, ErrorHandler *errh)
   int burstsize = 1;
   int datasize = -1;
   bool active = true, stop = false;
+  uint32_t headroom = 36;
 
     if (Args(conf, this, errh)
 	.read_mp("LENGTH", datasize)
@@ -48,6 +49,7 @@ RandomSource::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read_p("BURST", burstsize)
 	.read_p("ACTIVE", active)
 	.read("STOP", stop)
+	.read("HEADROOM", headroom)
 	.complete() < 0)
 	return -1;
     if (datasize < 0 || datasize >= 64*1024)
@@ -61,6 +63,7 @@ RandomSource::configure(Vector<String> &conf, ErrorHandler *errh)
   _count = 0;
   _active = active;
   _stop = stop;
+  _headroom = headroom;
 
   return 0;
 }
@@ -107,7 +110,7 @@ RandomSource::pull(int)
 Packet *
 RandomSource::make_packet()
 {
-    WritablePacket *p = Packet::make(36, (const unsigned char*)0, _datasize, 0);
+    WritablePacket *p = Packet::make(_headroom, (const unsigned char*)0, _datasize, 0);
 
     int i;
     char *d = (char *) p->data();

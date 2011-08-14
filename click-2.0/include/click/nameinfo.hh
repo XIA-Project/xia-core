@@ -59,7 +59,8 @@ class NameInfo { public:
 	T_TCP_FIELDNAME = 0x04030006,	///< TCP field names database
 	T_UDP_FIELDNAME = 0x04030011,	///< UDP field names database
 	T_IP6_ADDR = 0x06000001,	///< IPv6 address names database
-	T_IP6_PREFIX = 0x06000002	///< IPv6 prefix names database
+	T_IP6_PREFIX = 0x06000002,	///< IPv6 prefix names database
+	T_XIA_XID = 0x08000001,	///< XID name database
     };
 
     /** @brief Find or create a name database.

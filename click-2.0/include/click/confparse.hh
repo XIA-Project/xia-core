@@ -4,6 +4,8 @@
 /// @cond never
 #include <click/string.hh>
 #include <click/vector.hh>
+#include <clicknet/xia.h>
+#include <click/xiapath.hh>
 struct in_addr;
 CLICK_DECLS
 class ErrorHandler;
@@ -173,6 +175,15 @@ bool cp_ip_prefix(const String& str, IPAddress* result_addr, IPAddress* result_m
 bool cp_ip_prefix(const String& str, unsigned char* result_addr, unsigned char* result_mask  CP_OPT_CONTEXT);
 bool cp_ip_address_list(const String& str, Vector<IPAddress>* result  CP_OPT_CONTEXT);
 
+bool cp_xid_type(const String& str, uint32_t* result);
+class XID;
+bool cp_xid(const String& str, struct click_xia_xid* xid  CP_OPT_CONTEXT);
+bool cp_xid(const String& str, XID* xid  CP_OPT_CONTEXT);
+class XIAPath;
+bool cp_xia_path(const String& str, XIAPath* xia_path  CP_OPT_CONTEXT);
+bool cp_xia_path_dag(const String& str, XIAPath* xia_path  CP_OPT_CONTEXT);
+bool cp_xia_path_re(const String& str, XIAPath* xia_path  CP_OPT_CONTEXT);
+
 #if HAVE_IP6
 class IP6Address;
 struct click_in6_addr;
@@ -273,6 +284,11 @@ extern const CpVaParseCmd
     cpTimeval,		///< Result storage struct timeval*, parsed by cp_time().
     cpBandwidth,	///< Result storage uint32_t*, parsed by cp_bandwidth().
     cpIPAddress,	///< Result storage IPAddress* or equivalent, parsed by cp_ip_address().
+    cpXIDType,      	///< Result storage int, parsed by cp_xid_type().
+    cpXID,      	///< Result storage struct click_xia_xid or equivalent, parsed by cp_xid().
+    cpXIAPath,      	///< Result storage XIAPath, parsed by XIAPath::parse().
+    cpXIAPathDAG,      	///< Result storage XIAPath, parsed by XIAPath::parse_dag().
+    cpXIAPathRE,      	///< Result storage XIAPath, parsed by XIAPath::parse_re().
     cpIPPrefix,		///< Result storage IPAddress* addr and IPAddress *mask, parsed by cp_ip_prefix().
     cpIPAddressOrPrefix,///< Result storage IPAddress* addr and IPAddress *mask, parsed by cp_ip_prefix().
     cpIPAddressList,	///< Result storage Vector<IPAddress>*, parsed by cp_ip_address_list().
@@ -405,6 +421,8 @@ struct cp_value {
 	double d;
 #endif
 	unsigned char address[16];
+	uint32_t xid_type;
+	struct click_xia_xid xid;
 	int is[4];
 #ifndef CLICK_TOOL
 	Element *element;
@@ -413,6 +431,7 @@ struct cp_value {
     } v, v2;
     String v_string;
     String v2_string;
+    XIAPath xia_path;
 };
 
 enum {

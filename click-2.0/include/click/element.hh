@@ -541,6 +541,9 @@ Element::Port::assign(Element *owner, Element *e, int port, bool isoutput)
 	}
     }
 #endif
+#if CLICK_STATS >= 3
+    click_chatter("packet %x pushed to element %s (%s)", p, _e->name().c_str(), _e->class_name());
+#endif
 }
 
 /** @brief Returns whether this port is active (a push output or a pull input).
@@ -661,8 +664,12 @@ Element::Port::pull() const
 # endif
 #endif
 #if CLICK_STATS >= 1
-    if (p)
+    if (p) {
 	++_packets;
+    }
+#endif
+#if CLICK_STATS >= 3
+    click_chatter("packet %x pulled from element %s (%s)", p, _e->name().c_str(), _e->class_name());
 #endif
     return p;
 }

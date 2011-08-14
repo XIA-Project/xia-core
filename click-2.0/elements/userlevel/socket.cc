@@ -203,6 +203,13 @@ Socket::initialize(ErrorHandler *errh)
   // if a server, then the first arguments should be interpreted as
   // the address/port/file to bind() to, not to connect() to
   if (!_client) {
+#ifdef SO_REUSEADDR
+    int one = 1;
+    if (setsockopt(_fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) < 0)
+      return initialize_socket_error(errh, "setsockopt(SO_REUSEADDR)");
+#else
+    return initialize_socket_error(errh, "REUSEADDR not supported on this platform");
+#endif
     memcpy(&_local, &_remote, _remote_len);
     _local_len = _remote_len;
   }

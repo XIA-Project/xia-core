@@ -771,6 +771,7 @@ enable_aqm
 enable_ethernet
 enable_etherswitch
 enable_grid
+enable_xia
 enable_icmp
 enable_ip
 enable_ip6
@@ -6344,6 +6345,17 @@ else
 fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_grid" = xNO -o "x$enable_grid" = x \) && enable_grid=yes
 if test "x$enable_grid" = xyes; then
+    :
+
+fi
+# Check whether --enable-xia was given.
+if test "${enable_xia+set}" = set; then :
+  enableval=$enable_xia;
+else
+  enable_xia=yes
+fi
+test "x$enable_all_elements" = xyes -a "x$enable_xia" = xNO && enable_xia=yes
+if test "x$enable_xia" = xyes; then
     :
 
 fi

@@ -35,6 +35,10 @@ String. Same as the DATA argument.
 
 Integer. If set, the outgoing packet will have this length.
 
+=item HEADROOM 
+
+Integer. If set, the outgoing packet will have this headroom size.
+
 =item LIMIT
 
 Integer. Same as the LIMIT argument.
@@ -129,6 +133,7 @@ class InfiniteSource : public Element, public ActiveNotifier { public:
     counter_t _limit;
     ucounter_t _count;
     int _datasize;
+    uint32_t _headroom;
     bool _active;
     bool _stop;
     bool _timestamp;

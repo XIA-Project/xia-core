@@ -55,6 +55,7 @@ InfiniteSource::configure(Vector<String> &conf, ErrorHandler *errh)
   counter_t limit = -1;
   int burstsize = 1;
   int datasize = -1;
+  int headroom = Packet::default_headroom;
   bool active = true, stop = false, timestamp = true;
 
   if (Args(conf, this, errh)
@@ -65,6 +66,7 @@ InfiniteSource::configure(Vector<String> &conf, ErrorHandler *errh)
       .read("TIMESTAMP", timestamp)
       .read("LENGTH", datasize)
       .read("DATASIZE", datasize) // deprecated
+      .read("HEADROOM", headroom)
       .read("STOP", stop)
       .complete() < 0)
       return -1;
@@ -73,6 +75,7 @@ InfiniteSource::configure(Vector<String> &conf, ErrorHandler *errh)
 
   _data = data;
   _datasize = datasize;
+  _headroom = headroom;
   _limit = limit;
   _burstsize = burstsize;
   _count = 0;
@@ -152,15 +155,15 @@ InfiniteSource::setup_packet()
 	_packet->kill();
 
     if (_datasize < 0)
-	_packet = Packet::make(_data.data(), _data.length());
+	_packet = Packet::make(_headroom, _data.data(), _data.length(), 0);
     else if (_datasize <= _data.length())
-	_packet = Packet::make(_data.data(), _datasize);
+	_packet = Packet::make(_headroom, _data.data(), _datasize, 0);
     else {
 	// make up some data to fill extra space
 	StringAccum sa;
 	while (sa.length() < _datasize)
 	    sa << _data;
-	_packet = Packet::make(sa.data(), _datasize);
+	_packet = Packet::make(_headroom, sa.data(), _datasize, 0);
     }
 }
 

@@ -62,6 +62,7 @@ AggregateCounter::configure(Vector<String> &conf, ErrorHandler *errh)
     String call_nnz, call_count;
     freeze_nnz = stop_nnz = _call_nnz = (uint32_t)(-1);
     freeze_count = stop_count = _call_count = (uint64_t)(-1);
+    bool print_usertime = false;
 
     if (Args(conf, this, errh)
 	.read("BYTES", bytes)
@@ -74,13 +75,16 @@ AggregateCounter::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read("COUNT_STOP", stop_count)
 	.read("AGGREGATE_CALL", AnyArg(), call_nnz)
 	.read("COUNT_CALL", AnyArg(), call_count)
-	.read("BANNER", _output_banner).complete() < 0)
+	.read("BANNER", _output_banner)
+	.read("PRINT_USERTIME", print_usertime)
+	.complete() < 0)
 	return -1;
 
     _bytes = bytes;
     _ip_bytes = ip_bytes;
     _use_packet_count = packet_count;
     _use_extra_length = extra_length;
+    _print_usertime = print_usertime;
 
     if ((freeze_nnz != (uint32_t)(-1)) + (stop_nnz != (uint32_t)(-1)) + ((bool)call_nnz) > 1)
 	return errh->error("'AGGREGATE_FREEZE', 'AGGREGATE_STOP', and 'AGGREGATE_CALL' are mutually exclusive");
@@ -244,9 +248,21 @@ AggregateCounter::update(Packet *p, bool frozen)
 	_num_nonzero++;
     }
 
+    if (_print_usertime && _count == 0 && amount != 0) {
+        struct timespec ts;
+        if (clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts) == 0)
+            click_chatter("FIRST_PACKET USERTIME %llu", static_cast<uint64_t>(ts.tv_sec) * 1000000000Lu + ts.tv_nsec);
+    }
+
     n->count += amount;
     _count += amount;
     if (_count >= _call_count) {
+        if (_print_usertime) {
+            struct timespec ts;
+            if (clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts) == 0)
+                click_chatter("HANDLER_CALL USERTIME %llu", static_cast<uint64_t>(ts.tv_sec) * 1000000000Lu + ts.tv_nsec);
+        }
+
 	_call_count = (uint64_t)(-1);
 	_call_count_h->call_write();
     }

@@ -70,13 +70,15 @@ GENERIC_OBJS = string.o straccum.o nameinfo.o \
 	routerthread.o router.o master.o timerset.o selectset.o handlercall.o notifier.o \
 	integers.o md5.o crc32.o in_cksum.o iptable.o \
 	archive.o userutils.o driver.o \
+	xid.o xiapath.o xiaheader.o xiaextheader.o xiacontentheader.o xia.pb.o \
 	$(EXTRA_DRIVER_OBJS)
 
 EXTRA_DRIVER_OBJS = @EXTRA_DRIVER_OBJS@
 
 LIBOBJS = $(GENERIC_OBJS) $(STD_ELEMENT_OBJS) clp.o exportstub.o
 STD_ELEMENT_OBJS = addressinfo.o alignmentinfo.o \
-	errorelement.o portinfo.o scheduleinfo.o
+	errorelement.o portinfo.o scheduleinfo.o \
+	xiaxidinfo.o
 OBJS = $(ELEMENT_OBJS) $(ELEMENTSCONF).o click.o
 
 CPPFLAGS = @CPPFLAGS@ -DCLICK_USERLEVEL
@@ -86,7 +88,7 @@ CXXFLAGS = @CXXFLAGS@
 DEFS = @DEFS@
 INCLUDES = -I$(top_builddir)/include -I$(top_srcdir)/include \
 	-I$(srcdir) -I$(top_srcdir) @PROPER_INCLUDES@ @PCAP_INCLUDES@
-LDFLAGS = @LDFLAGS@
+LDFLAGS = @LDFLAGS@ -lprotobuf
 LIBS = @LIBS@ `$(top_builddir)/click-buildtool --otherlibs` $(ELEMENT_LIBS)
 
 CXXCOMPILE = $(CXX) $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CXXFLAGS)
@@ -108,6 +110,9 @@ endif
 INSTALLPROGS = $(DRIVER)
 
 all: $(INSTALLPROGS) $(INSTALLLIBS)
+
+xia.pb.cc: xia.proto
+	protoc --cpp_out=. --python_out=../../proxies xia.proto
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(ELEMENTSCONF).mk
