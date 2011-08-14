@@ -1,0 +1,878 @@
+.\" -*- mode: nroff -*-
+.ds V 1.1
+.ds E " \-\- 
+.if t .ds E \(em
+.de OP
+.BR "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6"
+..
+.de OA
+.IR "\fB\\$1\& \|\fI\\$2" "\\$3" "\\$4" "\\$5" "\\$6"
+..
+.de QO
+.RB ` "\\$1" "'\\$2"
+..
+.de Sp
+.if n .sp
+.if t .sp 0.4
+..
+.de Es
+.Sp
+.RS 5
+.nf
+..
+.de Ee
+.fi
+.RE
+.PP
+..
+.de M
+.BR "\\$1" "(\\$2)\\$3"
+..
+.de Rs
+.RS
+.Sp
+..
+.de Re
+.Sp
+.RE
+..
+.TH CLICK 5 "16/Mar/2004" "Version \*V"
+.SH NAME
+click \- Click configuration language
+'
+.SH DESCRIPTION
+The Click language is used to describe Click router configurations.
+.LP
+Two fundamental statements suffice to describe any router:
+.IR declarations
+introduce elements, and
+.IR connections
+define packet flow between them.  If you
+think of a Click router configuration as a directed graph of elements,
+declarations list the graph's vertices and connections list its edges.
+.LP
+A declaration looks like this:
+.Rs
+.IR "name" " :: " "class" ( "config" );
+.Re
+This introduces an element called
+.IR name
+that has element class
+.IR class
+and configuration arguments
+.IR config .
+.LP
+A connection looks like this:
+.Rs
+.IR "name1" " [" "port1" "] -> [" "port2" "] " "name2" ;
+.Re
+This says that
+.IR name1 "'s output port " port1
+connects
+.IR name2 "'s input port " port2 .
+The two
+.IR name s
+must refer to previously declared elements, and the two
+.IR port s
+must be nonnegative integers.
+.LP
+Each element must be declared exactly once before being used in
+any connection.  It is an error to declare an element name more than
+once in the same scope.  It is not an error to repeat a connection,
+however.
+.LP
+Lexically, Click identifiers, such as element names and class names,
+are sequences of letters, numbers, underscores, at-signs, and slashes
+that do not begin or end with a slash.  Configuration strings are
+sequences of characters delimited by parentheses, possibly including
+balanced parentheses and quoted strings.  The semicolons that
+terminate statements are generally optional (in some cases described
+later they are required to avoid ambiguity).  Lexical issues are
+described in more depth below.
+.LP
+Any configuration can be completely defined with these statements.
+The rest of the Click language offers extensive shorthand and
+abstraction features that simplify router programming.
+'
+.SH "SHORTHAND"
+.SS "Declaration shorthand"
+'
+Declarations can omit empty configuration strings entirely, and can
+declare multiple elements using a comma-separated list of names:
+.Rs
+.IR "name" " :: " "class" ;
+.br
+.IR "name1" ", " "name2" ", ..., " "nameN" " ::"
+.IR "class" ( "config" );
+.Re
+You may also declare an element without specifying its name, in which case the
+system will choose an element name for you.  Such elements are called
+.IR anonymous .
+For example:
+.Rs
+.IR class "(" config ");"
+.Re
+is equivalent to
+.Rs
+.IR generatedname " :: " class ( config );
+.Re
+The
+.I generatedname
+has the form
+.RI ` class "@" number ',
+where the
+.IR number
+is chosen to make the name unique. These numbers are predictable: when the
+system parses a Click file twice, that file's anonymous elements will get
+the same generated name. Users may also declare elements with names
+like
+.RI ` class "@" number ',
+though we suggest that users avoid the `@'
+character in their element names.
+'
+.SS "Connection shorthand"
+'
+Connections can be strung together into a single statement if the
+output element of one is the same as the input element of the other:
+.Rs
+.IR "n1" " [" "p1" "] -> [" "p2" "] " "x"
+.RI "[" "p3" "] -> [" "p4" "] " "n2" ;
+.Re
+means
+.Rs
+.IR "n1" " [" "p1" "] -> [" "p2" "] " "x" ;
+.br
+.IR "x" " [" "p3" "] -> [" "p4" "] " "n2" ;
+.Re
+If a port number is missing, [0] is implied.  These two lines are equivalent:
+.Rs
+.IR "n1" " [0] -> [0] " "n2" ;
+.br
+.IR "n1" " -> " "n2" ;
+.Re
+.PP
+Elements may also be declared inside connections, either with names or
+anonymously.  For instance,
+.Rs
+.RI "... -> [" "p1" "] " "name" " ::"
+.IR "class" ( "config" ") [" "p2" "] -> ...;"
+.Re
+is equivalent to
+.Rs
+.IR "name" " :: " "class" ( "config" );
+.br
+.RI "... -> [" "p1" "] " "name" " [" "p2" "] -> ...;"
+.Re
+and
+.Rs
+.RI "... -> [" p1 "] " class ( config )
+.RI "[" p2 "] -> ...;"
+.Re
+is equivalent to
+.Rs
+.IR generatedname " :: " class ( config );
+.br
+.RI "... -> [" p1 "] " generatedname " [" p2 "] -> ...;"
+.Re
+.SS "Many-to-one connections"
+'
+It is sometimes useful to connect many elements to the same port, for
+example a Discard.  This is concisely specified with a many-to-one
+connection:
+.Rs
+.IR "n1" ", " "n2" ", " "n3" " -> " "x" ;
+.Re
+is equivalent to
+.Rs
+.IR "n1" " -> " x ";"
+.br
+.IR "n2" " -> " x ";"
+.br
+.IR "n3" " -> " x ";"
+.Re
+Port numbers are supported:
+.Rs
+.IR "n1" " [\fIp1\fR], " "n2" " [\fIp2\fR] -> [\fIp3\fR] " "x" ;
+.Re
+is equivalent to
+.Rs
+.IR "n1" " [\fIp1\fR] -> [\fIp3\fR] " "x" ;
+.br
+.IR "n2" " [\fIp2\fR] -> [\fIp3\fR] " "x" ;
+.Re
+One-to-many connections are also allowed (the comma-separated
+list is on the right).
+.LP
+Declarations may occur within a many-to-one connection, but in this
+context each declaration applies only to one name.  For example
+.Rs
+.IR "n1" ", " "n2" " :: " "class" " -> " "n3" ";"
+.Re
+means
+.Rs
+.IR "n2" " :: " "class" ";"
+.br
+.IR "n1" " -> " "n3" ";"
+.br
+.IR "n2" " -> " "n3" ";"
+.Re
+Note that
+.IR n1
+was not declared.
+'
+.SS "Many-to-many connections"
+'
+A many-to-many connection describes how many outputs connect to many
+inputs.  One example might be connecting a simple Classifier.  This code:
+.Rs
+.IR c " :: Classifier(00/01, 00/02, 00/03);"
+.br
+.IR next " :: " class ";"
+.Sp
+.br
+.IR c " [0] -> Paint(0) -> " "next" ";"
+.br
+.IR c " [1] -> Paint(1) -> " "next" ";"
+.br
+.IR c " [2] -> Paint(2) -> " "next" ";"
+.Re
+can instead be written like this, using the `=>' many-to-many connector:
+.Rs
+.IR c " [0], " c " [1], " c " [2] => Paint(0), Paint(1), Paint(2) -> " next ";"
+.Re
+or, even more concisely, either of the following:
+.Rs
+.IR c " [0,1,2] => Paint(0), Paint(1), Paint(2) -> " next ";"
+.br
+.IR c " => Paint(0), Paint(1), Paint(2) -> " next ";"
+.Re
+A many-to-many connection matches output ports to input ports.  There
+must be as many ports on the left as on the right.  However, if one
+side has exactly one element and no port, the connection assigns that
+element's ports sequentially starting from 0.
+'
+.SS "Element groups"
+'
+Element groups cleanly express small detours from a connection path.
+For example, consider:
+.Rs
+.IR c " :: Classifier(00/01);"
+.br
+.IR x " -> " c " -> " y ;
+.br
+.IR c " [1] -> Paint(1) -> " y ;
+.Re
+Expressing the detour with an element group preserves the
+configuration's overall linear flow:
+.Rs
+.IR x " -> " c " :: Classifier(00/01) => (
+.br
+.RI "\~\~\~\~input [0] -> output;"
+.br
+.RI "\~\~\~\~input [1] -> Paint(1) -> output"
+.br
+.RI ") -> " y ";"
+.Re
+An element group is one or more Click statements enclosed in parentheses.
+Within the parentheses, the special pseudoelements "input" and
+"output" refer to connections from outside the group.  Click expands
+the group at parse time, so connections through "input" and "output"
+have no run-time overhead.  The following five lines are equivalent:
+.Rs
+.IR x " -> " y ";"
+.br
+.IR x " -> ( input -> output ) -> " y ";"
+.br
+.IR x " -> ( [0] -> [0] ) -> " y ";"
+.br
+.IR x " -> (->) -> " y ";"
+.br
+.IR x " -> ( [0]->[0]; [1]->[1] ) => ( [0]->[0]; [1]->[1] ) -> " y ";"
+.Re
+Lines three through five use the fact that Click infers "input" at the
+beginning of a connection, and "output" at the end of a connection,
+when element names are missing.  (This language feature
+can require explicit semicolons to avoid ambiguity.)  Line five also
+uses the fact that connections may be repeated without error (the line
+expands to "\fIx\fR -> \fIy\fR; \fIx\fR -> \fIy\fR").  It is an error
+to use an "input" pseudoelement's input ports or an "output"
+pseudoelement's output ports.
+.LP
+Element groups have implicit, overridable port specifications that
+list all their ports in sequential order.  For example, these three
+lines are equivalent:
+.Rs
+.IR x " => ( [0]->[0]; [1]->[1] ) -> " "y" ";"
+.br
+.IR x " => [0,1] ( [0]->[0]; [1]->[1] ) [0,1] -> " "y" ";"
+.br
+.IR x " -> " y "; " x " [1] -> " y ";"
+.Re
+It is an error to define an element group with nonsequential ports, or
+to leave one or more of its ports unconnected:
+.Rs
+.IR x " => [0] ( [0]->[0]; [1]->Idle ) -> " "y" "; /* Error! */"
+.br
+.IR x " => ( [0]->[0]; [2]->Idle ) -> " "y" "; /* Error! */"
+.Re
+.LP
+An element group does not define a new scope.  Its contents may refer
+to elements declared outside of the group, and declarations inside the
+group are visible after the group closes.  This differs from compound
+elements, described next, which have a related syntax but additionally
+introduce a new scope.
+'
+.SH "COMPOUND ELEMENTS"
+'
+A
+.I compound element
+is a scoped collection of elements that behaves like a single element.
+A compound element can be used anywhere an element class is
+expected (that is, in a declaration or connection). Syntactically, a
+compound element is a set of Click statements enclosed in braces `{ }'.
+Inside the braces, the special names `input' and `output' represent
+connections from or to the outside. Before a router is put on line,
+compound elements are systematically expanded until none remain; thus, they
+have no run-time overhead.
+.PP
+Here are some examples. This code, with a compound element,
+.Rs
+a -> { input -> X -> output } -> b;
+.Re
+expands to
+.Rs
+a -> X -> b;
+.Re
+Here is a more complicated example, with multiple ports:
+.Rs
+compound :: {
+.br
+\%  input -> X -> output;
+.br
+\%  input [1] -> Y -> [1] output;
+.br
+};
+.br
+a -> compound -> b;
+.br
+c -> [1] compound [1] -> d;
+.Re
+expands to
+.Rs
+a -> X -> b;
+.br
+c -> Y -> d;
+.Re
+.PP
+The "input" and "output" pseudoelements incur no run-time overhead.
+.PP
+The actual expansions will differ from these examples because the elements
+will have different names. A prefix is prepended to the components' names,
+providing locality relative to other names in the configuration. The new
+names have the form
+.RI ` "compoundname" / "componentname" ',
+where
+.I compoundname
+is the name of the compound element being expanded, and
+.I componentname
+is the name of the component element inside that compound. For example,
+.Rs
+compound :: { input -> x :: X -> output };
+.br
+a -> compound -> b;
+.Re
+is really expanded to
+.Rs
+a -> compound/x :: X -> b;
+.Re
+For this purpose, anonymous compound elements are given constructed names
+like
+.RI `@ number '.
+Nothing prevents a user from declaring an element named like a compound
+element component. We suggest that users generally avoid using the "/"
+character in their element names.
+.PP
+It is an error to use an "input" pseudoelement's input ports or an
+"output" pseudoelement's output ports. It is also an error to leave an
+intermediate port unused\*Efor example, to use "input [0]" and "input [2]"
+but not "input [1]".
+'
+.SS "The `elementclass' statement"
+'
+The `elementclass' statement lets the user name a frequently-occurring
+compound element, and use the name as if it were a primitive element class.
+Syntactically, it looks like this:
+.Rs
+elementclass
+.I identifier
+.I compoundelement
+;
+.Re
+After this statement, every occurrence of the
+.I identifier
+will be replaced with the
+.IR compoundelement .
+For example, this code, with an `elementclass':
+.Rs
+elementclass MyQueue {
+.br
+\%  input -> Queue -> Shaper(1000) -> output;
+.br
+}
+.br
+q :: MyQueue;
+.br
+a -> q -> b;
+.Re
+is equivalent to this code, without it:
+.Rs
+q :: { input -> Queue -> Shaper(1000) -> output };
+.br
+a -> q -> b;
+.Re
+which roughly expands to:
+.Rs
+a -> Queue -> Shaper(1000) -> b;
+.Re
+.PP
+The user can declare element classes that have the names of previously
+existing element classes:
+.Rs
+elementclass Queue {
+.br
+\%  input -> Queue -> Shaper(1000) -> output;
+.br
+}
+.Re
+Element classes are nonrecursive and lexically scoped, so the `Queue'
+inside this definition refers to the original `Queue'. The scope of an
+element class definition extends from immediately after its closing right
+brace to the end of the enclosing scope.
+.PP
+A variant of the elementclass statement makes synonyms for preexisting
+element classes. For example, this statement
+.Rs
+elementclass MyQueue Queue;
+.Re
+makes MyQueue a synonym for Queue.
+'
+.SS "Configuration parameters"
+'
+Compound elements may take configuration parameters, which are expanded
+into the configuration strings of its components. The parameters are named
+at the beginning of the compound element. Each parameter looks like a Perl
+variable\*Ea dollar sign followed by one or more letters, numbers, and
+underscores. For example, this compound element
+.Rs
+{ $a, $b | ... }
+.Re
+takes two configuration parameters, named `$a' and `$b'. Keyword arguments
+are also supported. For example, this compound element
+.Rs
+{ COUNT $count | ... }
+.Re
+takes a COUNT keyword parameter. Mismatched configuration parameters cause
+errors; for example:
+.Rs
+\%{ $a, $b | ... } (1)         // Error: too few arguments
+.br
+\%{ $a, $b | ... } (1, 2, 3)   // Error: too many arguments
+.br
+\%{ COUNT $count | ... } (1)   // Error: missing 'COUNT' parameter
+.Re
+The special keyword `__REST__' matches any additional arguments supplied to
+the compound element. For example:
+.Rs
+\%{ $a, COUNT $count, __REST__ $rest | ... }
+.br
+\%           (1, 2, COUNT 3, FOO 4)
+.Re
+This compound element will be expanded with `$a' set to `1', `$count' set
+to `3', and `$rest' set to `2, FOO 4'.
+.PP
+In a compound element definition, all positional parameters must precede
+any keyword parameters, and `__REST__', if present, must appear last of
+all.
+.PP
+As the compound is expanded, its components' configuration strings are
+searched for references to the parameters. Any such references are replaced
+with the supplied arguments. For example, this code:
+.Rs
+\&... -> { $a | input ->
+.br
+\%           A(1, $a, 3) -> output } (100) -> ...
+.Re
+expands to this:
+.Rs
+\&... -> A(1, 100, 3) -> ...
+.Re
+You can avoid substitution by putting the dollar sign inside single quotes.
+.PP
+Use braces, like `${a}', to avoid including following letters in a variable
+name. Click also supports the shell-like `${VAR-DEFAULT}' syntax, which
+substitutes the value of `$VAR', or `DEFAULT' if that variable was not set.
+See also PARAMETER DEFINITIONS, below.
+'
+.SS "Overloading"
+'
+A single compound element may contain multiple overloaded definitions
+separated from one another by two vertical bars "\f(CW||\fR". Different
+definitions may have different numbers of input ports, different numbers of
+output ports, or different sets of configuration arguments. For example,
+this extended MyQueue compound element takes an optional capacity argument,
+just like Queue itself:
+.Rs
+elementclass MyQueue {
+.br
+\%  input -> Queue -> Shaper(1000) -> output;
+.br
+\%||
+.br
+\%  $cap | input -> Queue($cap)
+.br
+\%               -> Shaper(1000) -> output;
+.br
+}
+.Re
+For each use of an overloaded compound element, Click will choose the first
+definition that matches the provided number of input ports, number of
+output ports, and configuration arguments. It is an error if no definition
+matches these properties exactly.
+.PP
+It is also possible to extend an existing element class with new overloaded
+definitions with "\f(CW...\fR". For example, this definition introduces a
+two-argument version of Queue:
+.Rs
+elementclass Queue {
+.br
+\%  $cap, $rate | input -> Queue($cap)
+.br
+\%                -> Shaper($rate) -> output;
+.br
+\%|| ...
+.br
+}
+.Re
+(The ellipsis in this example must be typed verbatim.) The overloadings
+visible at a given declaration are those that lexically precede that
+declaration. For example, the following example is an error since the
+two-argument version of Test is not visible at the declaration where it is
+required:
+.Rs
+elementclass Test { $a | /* nothing */ }
+.br
+test :: Test(1, 2);
+.br
+elementclass Test { $a, $b | /* nothing */ || ... }
+.Re
+'
+.SH "CONFIGURATION STRINGS"
+'
+Click configuration strings are comma-separated lists of arguments, where
+each argument is a space-separated list of objects. This section describes
+some common object types. See the element documentation for argument types
+expected by a particular element.
+.PP
+Configuration strings may contain comments (`// ... EOL' and `/* ... */'),
+which are replaced with single space characters. Inside single- or
+double-quoted strings, commas, spaces, and comment-starting sequences lose
+their regular meaning and are treated as normal characters.
+.PP
+The most common object types are:
+.TP 3
+\(bu
+.B Strings.
+Any sequence of characters.  Single- or double-quoted strings are allowed
+(and required, if the string contains a space or comma).  Inside
+double-quoted strings, backslash substitutions are performed; see below.
+You can concatenate strings by juxtaposing them.  For example, `a"b"c' is
+equivalent to `abc'.
+.TP
+\(bu
+.B Booleans.
+`0', `false', and `no' mean false; `1', `true', and `yes' mean true.
+.TP
+\(bu
+.B Integers
+preceded by an optional `+' or `\-' sign. Decimal, octal (first digit `0'),
+and hexadecimal (starting with `0x') are allowed.
+.TP
+\(bu
+.B Real numbers
+in decimal notation.
+.TP
+\(bu
+.B Times and delays
+in decimal real notation, followed by an optional unit: `s'/`sec', `ms',
+`us', `ns', `m'/`min', `h'/`hr'.
+.TP
+\(bu
+.B Bandwidths
+in decimal real notation, followed by an optional unit: `bps' or `Bps' for
+bits or bytes per second, with an optional SI prefix `k', `M', or `G'.  The
+default unit is generally `Bps'.
+.TP
+\(bu
+.B IP addresses
+in the conventional `n.n.n.n' form (for example, `18.26.4.15').
+.TP
+\(bu
+.B IP network prefixes
+in the CIDR form `n.n.n.n/k' (for example, `18.26.4/24').
+.TP
+\(bu
+.B IPv6 addresses
+in any of the conventional forms (for example, `::',
+`1080::8:800:200C:417A', or `::18.26.4.15').
+.TP
+\(bu
+.B Ethernet addresses
+in the standard `x-x-x-x-x-x' form (for example,
+`0-a0-c9-9c-fd-9c'), or the more conventional `x:x:x:x:x:x' form.
+.TP
+\(bu
+.B Element names.
+.PD
+.PP
+Some elements, like
+.IR Classifier ,
+take arguments that don't fit any of these types. See the element
+documentation for details.
+.PP
+If the last argument in a configuration string is empty (containing only
+whitespace and comments), then it is ignored.  Thus, `Element(1, )',
+`Element(1, /* comment */)', and `Element(1)' behave exactly alike.
+.PP
+Configuration strings may also contain parameter references, such as
+`$interface'. The parameter values are substituted in. Parameters may be
+defined either by compound element arguments, by explicit `define'
+statements, or on the command line.
+'
+.SS "Backslash Substitutions"
+.PP
+The following backslash substitutions are performed inside double quotes.
+Additionally, as a special case, a bare data substitution sequence `\e<
+\&... >' acts as if it were enclosed in double quotes.  (Inside single
+quotes, `\e< ... >' is not special.)
+.TP 4
+1.
+'
+C-like substitutions. Specifically, `\ea', `\eb', `\et', `\en', `\ev',
+`\ef', `\er', `\e\e', and `\e[1, 2, or 3 octal digits]' have their C
+meanings.  `\ex[any number of hex digits]' is replaced with the byte
+defined by the last 2 hex digits.
+.TP 4
+2.
+Data substitutions. An escape sequence `\e< ... hex digits and spaces ...
+>' is replaced with the data represented by the hex digits. For example,
+the sequence `\e< 48 45 4c 4C 4f >' is replaced with `HELLO'.
+.TP
+3.
+Backlash-newline sequences (`\e[LF]', `\e[CR]', or `\e[CR][LF]') are removed.
+.TP
+4.
+Any other `\e[CHAR]' sequence is replaced with `[CHAR]'.
+'
+.SH "REQUIREMENTS"
+'
+The `require' statement is used to link a configuration with optional
+packages and libraries. Its argument is a comma-separated list of
+requirements.
+.PP
+Packages, which are dynamic objects including new compiled element
+definitions, are included with `require(package)' declarations:
+.Rs
+require(package fastclassifier, package specialcode);
+.Re
+Installation programs can use the package names to find and upload any
+necessary package code. The required package names are also checked against
+a list of currently active packages when a configuration is installed. If
+any required packages are unavailable, an error is reported.
+.PP
+Libraries, which are Click configuration files that (for instance) might
+declare new compound element definitions, are included with
+`require(library)' declarations:
+.Rs
+require(library mycompounds.click);
+.Re
+Installation programs search CLICKPATH for the named library
+file. `require(library)' can only be used at file scope, and a given
+library file is included at most once, no matter how many times it is
+mentioned in `require' statements.
+'
+.SH "PARAMETER DEFINITIONS"
+'
+Parameters are defined using the `define' statement. Its argument is a
+comma-separated list of pairs, each pair consisting of a configuration
+variable and a value:
+.Rs
+define($DEVNAME eth0, $COUNT 1);
+.Re
+This sets the `$DEVNAME' parameter to `eth0' and the `$COUNT' parameter to
+`1'. Definitions are lexically scoped, so definitions inside a compound
+element are not visible outside it. However, all definitions in a given
+scope take place simultaneously, regardless of their ordering. The
+following two configurations have the same effect:
+.Rs
+1) define($a 2); Message($a)
+.br
+2) Message($a); define($a 2)
+.Re
+It is an error to define a parameter more than once in any single
+scope. Click programs such as
+.M click 1
+and
+.M click-install 1
+allow parameters to specified on the command line; these override any
+global parameters with the same names.
+'
+.SH "LEXICAL ISSUES"
+'
+Click identifiers are nonempty sequences of letters, numbers, underscores
+`_', at-signs `@', and slashes `/' that do not begin or end with a slash.
+The system uses `@' and `/' for special purposes: `@' in constructed names
+for anonymous elements and prefixes, and `/' in names for components of
+compound elements. Users are discouraged from using these characters in
+their own identifiers. Identifiers are case-sensitive. No component of an
+identifier may consist solely of numbers; for example, `1/x' is an illegal
+identifier.
+.PP
+The keywords `elementclass', `require', `provide', and `define'
+may not be used as identifiers. The normal identifiers `input' and `output'
+have special meaning inside compound element definitions.
+.PP
+The following characters and multi-character sequences are single Click
+tokens:
+.RS
+->\~\~=>\~\~::\~\~;\~\~,\~\~(\~\~)\~\~[\~\~]\~\~{\~\~}\~\~|\~\~||\~\~...
+.RE
+.PP
+Whitespace (using the C definition) and comments separate Click tokens.
+Click uses C++-style comments: from `//' to the end of the line, or from
+`/*' to the next `*/'. Either form of comment terminates an identifier, so
+this Click fragment
+.RS
+an/identifier/with/slashes//too/many
+.RE
+has an identifier `an/identifier/with/slashes' and a comment
+`//too/many'. No identifier contains two consecutive slashes.
+.PP
+Parameters, which are used in compound elements, look like Perl variables. A
+parameter consists of a dollar sign `$' followed by one or more letters,
+numbers, and underscores.
+.PP
+A configuration string starts immediately following a left parenthesis `(',
+and continues up to the next unbalanced right parenthesis `)'. However,
+parentheses inside single or double quotes or comments do not affect
+balancing. Here are several examples; in each case, the configuration
+string consists of the text between the `#' marks (including the `#' marks
+themselves).
+.Rs
+C1(#simple string#)
+.br
+C2(#string with (balanced parens)#)
+.br
+C3(#string with ")quoted" paren#)
+.br
+C4(#// end-of-line comment)
+.br
+\%   still going!#)
+.br
+C5(#/* slash-star comment) */ and backslash \e#)
+.Re
+.PP
+A Click program may contain C preprocessor-style line directives. These
+lines start with `#' and have the form `# \fIlinenumber\fP
+"\fIfilename\fP"' or `#line \fIlinenumber\fP "\fIfilename\fP"'; they change
+the filenames and line numbers used for error messages. The filename
+portion is optional. Line directives are not recognized inside
+configuration strings.
+'
+.SH "ARCHIVES"
+Many Click programs also accept
+.M ar 1
+archives as configurations. The archive must contain a member called
+`config', which is treated as a Click-language configuration. The archive
+may also contain package code required by the configuration. The
+.M click-install 1
+and
+.M click 1
+programs will decompose the archive and install any package code before
+installing the configuration itself. The
+.M click.o 8
+kernel module will not accept archives; use
+.M click-install 1 .
+'
+.SH "BNF GRAMMAR"
+'
+.IR stmts " ::= " stmts " " stmt " | " empty
+.br
+.IR stmt " ::= " connection
+.br
+.RI "    | " elementclassstmt " | " requirestmt
+.br
+.RI "    | " definestmt " | "";"""
+.br
+.IR connection " ::= " elements " " opt-conntail " | " conntail
+.br
+.IR opt-conntail " ::= " conntail " | " empty
+.br
+.IR conntail " ::= " arrow " " elements " " opt-conntail " | " arrow
+.br
+.IR arrow " ::= ""->"" | ""=>"""
+.br
+.IR elements " ::= " element " | " elements " "","" " element
+.br
+.IR element " ::= " opt-port " " element-reference " " opt-port
+.br
+.IR element-reference " ::= " element-name
+.br
+.RI "    | " element-name " ""::"" " class " " opt-config
+.br
+.RI "    | " class " " opt-config
+.br
+.RI "    | " group
+.br
+.IR element-name " ::= identifier"
+.br
+.IR opt-port " ::= ""["" " ports " ""]"" | " empty
+.br
+.IR ports " ::= portnumber | " ports " "","" portnumber"
+.br
+.IR opt-config " ::= ""("" configstring "")"" | " empty
+.br
+.IR class " ::= identifier | ""{"" " compounds " ""}"""
+.br
+.RI "    | ""{"" " compounds " ""||"" ""..."" ""}"""
+.br
+.IR compounds " ::= " compound " | " compounds " ""||"" " compound
+.br
+.IR compound " ::= " stmts " | " opt-formals " ""|"" " stmts
+.br
+.IR opt-formals " ::= " formals " | " empty
+.br
+.IR formals " ::= " formal " | " formals " "","" " formal
+.br
+.IR formal " ::= parameter | identifier parameter"
+.br
+.IR group " ::= ""("" " stmts " "")"""
+.br
+.IR elementclassstmt " ::= ""elementclass"" identifier " class
+.br
+.IR requirestmt " ::= ""require"" ""("" configstring "")"""
+.br
+.IR definestmt " ::= ""define"" ""("" configstring "")"""
+.br
+.IR empty " ::= "
+'
+.SH "SEE ALSO"
+.M click 1 ,
+.M click-install 1 ,
+.M click.o 8
+'
+.SH AUTHOR
+.na
+Eddie Kohler, kohler@cs.ucla.edu
+.br
+http://www.pdos.lcs.mit.edu/click/
+'

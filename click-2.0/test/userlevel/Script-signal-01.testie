@@ -1,0 +1,20 @@
+%info
+Test that all Script-installed signal handlers execute when a signal is
+received.
+
+%script
+/bin/sh THING
+
+%file THING
+click -e "
+  Script(TYPE SIGNAL INT, print >>OUT 'Hello', stop);
+  Script(TYPE SIGNAL INT, print >>OUT 'Goodbye');
+  Script(print >RUNNING \$\$, wait 100ms, stop);
+" &
+
+while ! [ -f RUNNING ]; do click -e "Script(wait 1ms, stop)"; done
+kill -INT `cat RUNNING`
+
+%expect OUT
+Hello
+Goodbye

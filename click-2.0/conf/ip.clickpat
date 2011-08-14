@@ -1,0 +1,74 @@
+// ip.clickpat
+
+// Patterns for the Click pattern optimizer (click-xform) that change
+// common sequences of IP-related elements into single combination elements.
+
+// To transform a router configuration according to these patterns, run
+//     % click-xform -p ip.clickpat ROUTER > TRANSFORMED-ROUTER
+
+elementclass IPOutput {
+  input -> DropBroadcasts
+	-> cp :: PaintTee($paint)
+	-> gw :: IPGWOptions($my_ip)
+	-> FixIPSrc($my_ip)
+	-> dt :: DecIPTTL
+	-> fr :: IPFragmenter($mtu)
+	-> output;
+  cp[1] -> [1]output;
+  gw[1] -> [2]output;
+  dt[1] -> [3]output;
+  fr[1] -> [4]output;
+}
+
+elementclass IPOutput_Replacement {
+  input -> combo :: IPOutputCombo($paint, $my_ip, $mtu) -> output;
+  combo[1] -> [1]output;
+  combo[2] -> [2]output;
+  combo[3] -> [3]output;
+  combo[4] -> fr :: IPFragmenter($mtu) -> [0]output;
+  fr[1] -> [4]output;
+}
+
+
+// remove redundant GetIPAddresses
+elementclass RedundantGetIPAddress {
+  input -> CheckIPHeader($bad_addrs)
+	-> GetIPAddress(16)
+	-> output;
+}
+
+elementclass RedundantGetIPAddress_Replacement {
+  input -> CheckIPHeader($bad_addrs)
+	-> output;
+}
+
+
+// first, case where no one else gets in at the Strip
+elementclass IPInput {
+  input -> Paint($paint)
+	-> Strip(14)
+	-> CheckIPHeader($bad_addrs)
+	-> output;
+}
+
+elementclass IPInput_Replacement {
+  input -> IPInputCombo($paint, $bad_addrs) -> output;
+}
+
+
+// second, case where someone does get in at the Strip
+elementclass IPInput2 {
+  input -> Paint($paint)
+	-> s :: Strip(14)
+	-> CheckIPHeader($bad_addrs)
+	-> output;
+  input[1] -> s;
+}
+
+elementclass IPInput2_Replacement {
+  input -> IPInputCombo($paint, $bad_addrs) -> output;
+  input[1] -> Strip(14)
+	-> CheckIPHeader($bad_addrs)
+	-> GetIPAddress(16)
+	-> output;
+}

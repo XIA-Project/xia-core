@@ -1,0 +1,22 @@
+/* Process this file with configure to produce config-ns.h. -*- mode: c -*- */
+#ifndef CLICK_CONFIG_NS_H
+#define CLICK_CONFIG_NS_H
+
+#ifdef __cplusplus
+
+/* Define macros that surround Click declarations. */
+#define CLICK_DECLS		namespace Click {
+#define CLICK_ENDDECLS		}
+#define CLICK_USING_DECLS	using namespace Click;
+#define CLICK_NAME(name)	::Click::name
+
+#endif /* __cplusplus */
+
+/* The ns driver probably can't use clock_gettime. */
+#define HAVE_USE_CLOCK_GETTIME 0
+
+/* Include userlevel configuration. */
+#define CLICK_USERLEVEL 1
+#include <click/config-userlevel.h>
+
+#endif /* CLICK_CONFIG_NS_H */

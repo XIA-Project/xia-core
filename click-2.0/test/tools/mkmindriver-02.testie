@@ -1,0 +1,33 @@
+%require
+click-buildtool provides linuxmodule
+
+%script
+click-mkmindriver -E Print -p foo --no-check -k -
+mv elements_foo.conf elements_foo.conf~
+sort elements_foo.conf~ > elements_foo.conf
+
+%stdin
+FromDevice(eth0) -> BandwidthShaper -> ToHostSniffers(eth1);
+
+%expect stderr
+Creating elements_foo.conf...
+Build 'fooclick.ko' with 'make MINDRIVER=foo'.
+
+%expect elements_foo.conf
+elements/ip/ipnameinfo.cc	"elements/ip/ipnameinfo.hh"	IPNameInfo-IPNameInfo IPNameInfo-!si IPNameInfo-!sc
+elements/linuxmodule/anydevice.cc	"elements/linuxmodule/anydevice.hh"	
+elements/linuxmodule/fromdevice.cc	"elements/linuxmodule/fromdevice.hh"	FromDevice-FromDevice FromDevice-!si FromDevice-!sc
+elements/linuxmodule/tohost.cc	"elements/linuxmodule/tohost.hh"	ToHost-ToHost ToHost-!si ToHost-!sc
+elements/linuxmodule/tohostsniffers.cc	"elements/linuxmodule/tohostsniffers.hh"	ToHostSniffers-ToHostSniffers
+elements/standard/addressinfo.cc	<click/standard/addressinfo.hh>	AddressInfo-AddressInfo
+elements/standard/align.cc	"elements/standard/align.hh"	Align-Align
+elements/standard/alignmentinfo.cc	<click/standard/alignmentinfo.hh>	AlignmentInfo-AlignmentInfo
+elements/standard/bandwidthshaper.cc	"elements/standard/bandwidthshaper.hh"	BandwidthShaper-BandwidthShaper
+elements/standard/errorelement.cc	<click/standard/errorelement.hh>	ErrorElement-Error
+elements/standard/portinfo.cc	<click/standard/portinfo.hh>	PortInfo-PortInfo
+elements/standard/print.cc	"elements/standard/print.hh"	Print-Print
+elements/standard/scheduleinfo.cc	<click/standard/scheduleinfo.hh>	ScheduleInfo-ScheduleInfo
+elements/standard/shaper.cc	"elements/standard/shaper.hh"	Shaper-Shaper
+
+%ignorex
+#.*

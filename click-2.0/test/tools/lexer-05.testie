@@ -1,0 +1,73 @@
+%info
+Check element groups
+%script
+fix () {
+	perl -e 'undef($/); $_ = <STDIN>; s/\n    / /g; print;' | sort
+}
+
+click -qo- A.click | fix > AO_USERLEVEL
+click-flatten A.click | fix > AO_TOOL
+
+click -qo- AX.click | fix > AXO_USERLEVEL
+click-flatten AX.click | fix > AXO_TOOL
+
+click -qo- AY.click | fix > AYO_USERLEVEL
+click-flatten AY.click | fix > AYO_TOOL
+
+# 'g :: (...)' no longer supported
+# click -qo- AZ.click | fix > AZO_USERLEVEL
+
+click -qo- B.click | fix > BO_USERLEVEL
+click-flatten B.click | fix > BO_TOOL
+
+%file AX.click
+a, b, c, d :: Idle;
+a [0,1,2] => c, b, d;
+
+%file A.click
+a, b, c, d :: Idle;
+a [0,1,2] => ( -> c ), ( -> b ), d;
+
+%file AY.click
+a, d :: Idle;
+a => (-> c :: Idle), (-> b :: Idle), d;
+
+%file AZ.click
+a, d :: Idle;
+g :: (-> c :: Idle);
+g2 :: (-> b :: Idle);
+a => g, g2, d;
+
+%expect AO_USERLEVEL AO_TOOL AXO_USERLEVEL AXO_TOOL AYO_USERLEVEL AYO_TOOL
+a -> c;
+a :: Idle;
+a [1] -> b;
+a [2] -> d;
+b :: Idle;
+c :: Idle;
+d :: Idle;
+
+%file B.click
+analyzer, x1, x2 :: Idle;
+x1 -> analyzer -> x2;
+c :: Idle =>
+         [1] analyzer [1],
+         (-> c2 :: Idle => (->), Paint(1) ->)
+-> post_classification :: Idle;
+
+%expect BO_USERLEVEL BO_TOOL
+Paint@{{\d+}} :: Paint(1);
+analyzer :: Idle;
+analyzer [1] -> post_classification;
+c -> [1] analyzer;
+c :: Idle;
+c [1] -> c2 -> post_classification;
+c2 :: Idle;
+c2 [1] -> Paint@{{\d+}} -> post_classification;
+post_classification :: Idle;
+x1 -> analyzer -> x2;
+x1 :: Idle;
+x2 :: Idle;
+
+%ignorex
+#.*
