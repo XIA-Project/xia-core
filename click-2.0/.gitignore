@@ -32,6 +32,7 @@ userlevel/*.pb.*
 userlevel/click
 userlevel/elements.*
 linuxmodule/*.mod.c
+linuxmodule/.install-include*
 linuxmodule/.tmp_versions/*
 linuxmodule/elements.*
 linuxmodule/ksyms.c

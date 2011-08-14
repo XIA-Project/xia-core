@@ -55,8 +55,8 @@ sudo ifup eth4 2> /dev/null &
 sudo ifup eth5 2> /dev/null  &
 wait
 
-sudo make -s -C `dirname $0`/linuxmodule/ install || exit 1
-sudo make -s -C `dirname $0`/tools/click-install/ install || exit 1
+sudo make -s -C `dirname $0`/linuxmodule/ install-local || exit 1
+sudo make -s -C `dirname $0`/tools/click-install/ install-local || exit 1
 
 ################
 
