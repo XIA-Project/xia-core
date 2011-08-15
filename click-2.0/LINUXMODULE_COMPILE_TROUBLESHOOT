@@ -12,3 +12,10 @@ linuxmodule/*.o)
 
    This is caused by 64 bit modulo operation on non-64 bit machines.
 Replace it with 32bit operation.
+
+
+Kernel config
+ 1. CONFIG_CC_STACKPROTECTOR=n
+
+   The Click module turns it off with -fno-stack-protector and causes inconsistecy (though not critical).
+
