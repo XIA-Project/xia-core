@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-KERNEL_MODULE = 0
+KERNEL_MODULE = 1
 traffic_matrix = [ [:eth2, :eth4], [:eth3, :eth5], [:eth4, :eth2], [:eth5, :eth3] ]
 
 

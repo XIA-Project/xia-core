@@ -1,7 +1,7 @@
 define($COUNT 50000000);
 define($PAYLOAD_SIZE 1300);
 define($HEADROOM_SIZE 148);
-define($OUTDEVICE eth1, $INDEVICE eth2, $DST_ETHER 00:1b:21:a3:d7:45);
+define($OUTDEVICE eth3, $INDEVICE eth5, $DST_ETHER 00:1b:21:a3:d7:45);
 
 // aliases for XIDs
 XIAXIDInfo(
