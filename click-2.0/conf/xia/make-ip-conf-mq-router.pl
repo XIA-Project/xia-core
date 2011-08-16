@@ -54,6 +54,8 @@ if ($#ARGV >= 0) {
   }
 }
 
+print "#!/usr/local/sbin/click-install -ut${nq_per_device}\n";
+
 # Static routes to hosts/networks beyond adjacent networks specified in $ifs.
 # One line per route, containing:
 #   The destination address (host or network);
