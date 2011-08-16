@@ -1,0 +1,7 @@
+SCRIPT GENERATOR
+make-ip-conf-mq-router.pl : Generates multiqueue router
+make-ip-router-tester.rb: Generates packets (low speed) for testing if the router configuration is working
+
+AUTOGEN SCRIPTS that works
+ip_mq_router4port.click  : Four port IP router (multiqueue version).
+ip-test-router4.click : Tests 4 port router. eth2->eth4, eth3->eth5 and vice versa.

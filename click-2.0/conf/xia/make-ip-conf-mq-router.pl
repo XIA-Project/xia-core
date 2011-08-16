@@ -33,11 +33,18 @@ use Switch;
 #  The netmask on that interface; and
 #  The router's Ethernet address on that interface.
 # This setup for blackisle -> plebic -> darkstar.
-my $ifs = [ [ "eth3", 2, "10.1.0.1", "255.255.255.0", "00:1b:21:a3:d7:45" ],
-            [ "eth5", 2, "192.168.0.1", "255.0.0.0", "00:1b:21:a3:d7:0b" ]
+my $ifs = [
+            #[ "eth2", 2, "10.0.0.1", "255.255.255.0", "00:1b:21:bb:10:6c" ],
+ 	    #[ "eth3", 2, "10.0.1.1", "255.255.255.0", "00:1b:21:bb:10:6d" ],
+            #[ "eth4", 2, "10.0.2.1", "255.255.255.0", "00:1b:21:a3:d6:a8" ],
+            #[ "eth5", 2, "10.0.3.1", "255.255.255.0", "00:1b:21:a3:d6:a9" ]
+            [ "eth2", 2, "10.0.0.1", "255.255.255.0", "eth2" ],
+ 	    [ "eth3", 2, "10.0.1.1", "255.255.255.0", "eth3" ],
+            [ "eth4", 2, "10.0.2.1", "255.255.255.0", "eth4" ],
+            [ "eth5", 2, "10.0.3.1", "255.255.255.0", "eth5" ]
            ];
 
-my $nq_per_device = 3;
+my $nq_per_device = 6;
 
 # This used for testing purposes at MIT.
 if ($#ARGV >= 0) {
@@ -175,10 +182,10 @@ c$i :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800, -);
 
 EOD;
         for ($k = 0; $k < $nq_per_device; $k++) {
-            my $thread_id = $k+$i*$nq_per_device;
+            my $thread_id = $k;
 	    print "pd_${devname}_${thread_id}:: $fromdevice($devname, QUEUE $k, BURST 32, PROMISC true) -> c$i; \n";
 	}
-        for ($q = 0; $q < $nq_per_device*$nifs; $q++) {
+        for ($q = 0; $q < $nq_per_device; $q++) {
 	    if ($q==0) {
 	        print "out$i :: IsoCPUQueue(200);\n"
   	    }
@@ -198,13 +205,20 @@ EOD;
     }
 }
 
-for ($k = 0; $k < $nq_per_device*$nifs; $k++) {
+for ($k = 0; $k < $nq_per_device; $k++) {
     my $thread = $k;
-    my $polldevname = $ifs->[$k/$nq_per_device]->[0];
 
-    my $str= "StaticThreadSched(pd_${polldevname}_${k} $thread" ;
+    my $str= "StaticThreadSched(";
+
     for($i = 0; $i < $nifs; $i++){
         my $todevname = $ifs->[$i]->[0];
+        my $polldevname = $ifs->[$i]->[0];
+
+	if ($i==0) {
+	    $str .= "  pd_${polldevname}_${k} $thread";
+	} else {
+            $str .= ", pd_${polldevname}_${k} $thread";
+	}
         $str .= ", tod_${todevname}_${k} $thread";
     }
     $str .= ");\n";
