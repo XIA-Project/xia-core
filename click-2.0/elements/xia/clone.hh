@@ -3,8 +3,6 @@
 #define CLICK_CLONE_HH
 #include <click/element.hh>
 #include <click/task.hh>
-#include <click/notifier.hh>
-#include <click/ipflowid.hh>
 
 CLICK_DECLS
 
@@ -18,9 +16,9 @@ class Clone : public Element { public:
     int configure(Vector<String> &conf, ErrorHandler *errh);
     Packet * pull(int);
     private:
-    Packet *_packet;
+    Vector<Packet *> _packets;
     int _count;
-    bool _first_replacement;
+    int _next;
 };
 CLICK_ENDDECLS
 #endif
