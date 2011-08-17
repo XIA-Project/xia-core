@@ -7,14 +7,15 @@
 #include <click/packet.hh>
 CLICK_DECLS
 
-Clone::Clone() :_packet(0), _count(0), _first_replacement(true)
+Clone::Clone() : _count(0), _next(0)
 {
 }
 
 Clone::~Clone()
 {
-    if (_packet)
-        _packet->kill();
+    for (size_t i = 0; i < _packets.size(); i++)
+        _packets[i]->kill();
+    _packets.clear();
 }
 
 int
@@ -33,30 +34,27 @@ Clone::configure(Vector<String> &conf, ErrorHandler *errh)
 void
 Clone::push(int /*port*/, Packet *p)
 {
-    if (_packet) {
-        if (_first_replacement) {
-            click_chatter("Replacing the template packet for cloning");
-            _first_replacement = false;
-        }
-        _packet->kill();
-    }
+    if (_packets.size() == 65536)
+        click_chatter("Using more than 65536 packets for cloning; is the code correct?");
 
-    _packet = p;
+    _packets.push_back(p);
 }
 
 Packet* Clone::pull(int /*port*/)
 {
-    if (_packet==NULL) return NULL;
+    if (_packets.size() == 0) return NULL;
     if (_count<=0) return NULL;
 
     _count--;
 
     if (_count<=0) click_chatter("No more packet cloning");
     //return _packet->clone()->uniqueify();
-    return _packet->clone();
+    if (++_next >= _packets.size())
+        _next = 0;
+    return _packets[_next]->clone();
 }
 
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(Clone)
-ELEMENT_MT_SAFE(Clone)
+//ELEMENT_MT_SAFE(Clone)
