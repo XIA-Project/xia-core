@@ -14,7 +14,7 @@ linuxmodule/*.o)
 Replace it with 32bit operation.
 
 
-Kernel config
+Kernel config (also check out click's INSTALL file -- e.g., CONFIG_PREEMPT)
  1. CONFIG_CC_STACKPROTECTOR=n
 
    The Click module turns it off with -fno-stack-protector and causes inconsistecy (though not critical).
