@@ -113,7 +113,7 @@ click_sched(void *thunk)
     }
 #endif
 
-    printk("<1>click: starting router thread pid %d (%p)\n", current->pid, rt);
+    printk("<1>click: starting router thread (%d) pid %d (%p)\n", rt->thread_id(), current->pid, rt);
 
     // add pid to thread list
     SOFT_SPIN_LOCK(&click_thread_lock);

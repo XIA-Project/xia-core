@@ -84,7 +84,7 @@ static const Clp_Option options[] = {
   { "uid", 'U', UID_OPT, Clp_ValString, 0 },
   { "user", 0, UID_OPT, Clp_ValString, 0 },
   { "gid", 0, GID_OPT, Clp_ValString, 0 },
-  { "cpu", 0, CPU_OPT, Clp_ValUnsigned, 0 },
+  { "cpu", 'c', CPU_OPT, Clp_ValUnsigned, Clp_Optional },
 #endif
   { "uninstall", 'u', UNINSTALL_OPT, 0, Clp_Negate },
   { "verbose", 'V', VERBOSE_OPT, 0, Clp_Negate },
@@ -127,7 +127,7 @@ Options:\n\
   -U, --user USER[:GROUP]  Set owning user [root].\n\
   -j, --threads N          Use N threads (multithreaded Click only).\n\
   -G, --greedy             Make Click thread take up an entire CPU.\n\
-      --cpu N              Click thread runs on CPU N.\n");
+  -c, --cpu N              Click thread runs on CPU N.\n");
 # if HAVE_LINUXMODULE_2_6
   printf("\
   -m, --map                Print load map to the standard output.\n");
@@ -436,7 +436,10 @@ particular purpose.\n");
     }
 
      case CPU_OPT:
-      cpu = clp->val.i;
+      if (clp->have_val)
+          cpu = clp->val.i;
+      else
+          cpu = 0;
       break;
 #endif
 

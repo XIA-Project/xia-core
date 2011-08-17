@@ -1,4 +1,4 @@
-#!/usr/local/sbin/click-install -ut12
+#!/usr/local/sbin/click-install -uct12
 
 require(library xia_router_template.click); 
 require(library xia_address.click); 
@@ -76,13 +76,17 @@ c_eth3[1] -> toh;
 c_eth4[1] -> toh;
 c_eth5[1] -> toh;
 router0[0] 
--> XIAPrint() -> encap0::EtherEncap(0x9999, 00:15:17:51:d3:d4, 00:1A:92:9B:4A:77); 
+//-> XIAPrint() 
+-> encap0::EtherEncap(0x9999, 00:15:17:51:d3:d4, 00:1A:92:9B:4A:77); 
 router0[1] 
--> XIAPrint() -> encap1::EtherEncap(0x9999, 00:15:17:51:d3:d4, 00:1A:92:9B:4A:77); 
+//-> XIAPrint() 
+-> encap1::EtherEncap(0x9999, 00:15:17:51:d3:d4, 00:1A:92:9B:4A:77); 
 router0[2] 
--> XIAPrint() -> encap2::EtherEncap(0x9999, 00:15:17:51:d3:d4, 00:1A:92:9B:4A:77); 
+//-> XIAPrint() 
+-> encap2::EtherEncap(0x9999, 00:15:17:51:d3:d4, 00:1A:92:9B:4A:77); 
 router0[3] 
--> XIAPrint() -> encap3::EtherEncap(0x9999, 00:15:17:51:d3:d4, 00:1A:92:9B:4A:77); 
+//-> XIAPrint() 
+-> encap3::EtherEncap(0x9999, 00:15:17:51:d3:d4, 00:1A:92:9B:4A:77); 
 
  encap0 -> tod_eth2_0 :: MQToDevice(eth2, QUEUE 0, BURST 32) 
  encap0 -> tod_eth2_1 :: MQToDevice(eth2, QUEUE 1, BURST 32) 

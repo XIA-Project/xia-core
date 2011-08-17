@@ -44,7 +44,7 @@ my $ifs = [
             [ "eth5", 2, "10.0.3.1", "255.255.255.0", "eth5" ]
            ];
 
-my $nq_per_device = 6;
+my $nq_per_device = 12;
 
 # This used for testing purposes at MIT.
 if ($#ARGV >= 0) {
@@ -54,7 +54,7 @@ if ($#ARGV >= 0) {
   }
 }
 
-print "#!/usr/local/sbin/click-install -ut${nq_per_device}\n";
+print "#!/usr/local/sbin/click-install -uct${nq_per_device}c0\n";
 
 # Static routes to hosts/networks beyond adjacent networks specified in $ifs.
 # One line per route, containing:
@@ -146,7 +146,7 @@ print "ip :: Strip(14)
 
 # Link-level devices, classification, and ARP
 print "\n// ARP responses are copied to each ARPQuerier and the host.\n";
-printf("arpt :: Tee(%d);\n", $nifs + 1);
+printf("//arpt :: Tee(%d);\n", $nifs + 1);
 for($i = 0; $i < $nifs; $i++){
     my $devname = $ifs->[$i]->[0];
     my $ip = $ifs->[$i]->[2];
@@ -170,9 +170,10 @@ c$i :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800, -);
 $fromdevice($devname) -> c$i;
 out$i :: Queue(200) -> todevice$i :: ToDevice($devname);
 c$i\[0] -> ar$i :: ARPResponder($ip $ena) -> out$i;
-arpq$i :: ARPQuerier($ip, $ena) -> out$i;
-c$i\[1] -> arpt;
-arpt[$i] -> [1]arpq$i;
+//arpq$i :: ARPQuerier($ip, $ena) -> out$i;
+//c$i\[1] -> arpt;
+//arpt[$i] -> [1]arpq$i;
+c$i\[1] -> Discard; //ARP response
 c$i\[2] -> Paint($paint) -> ip;
 c$i\[3] -> Print("$devname non-IP") -> Discard;
 
@@ -196,9 +197,10 @@ EOD;
         print <<"EOD;";
 
 c$i\[0] -> ar$i :: ARPResponder($ip $ena) -> out$i;
-arpq$i :: ARPQuerier($ip, $ena) -> out$i;
-c$i\[1] -> arpt;
-arpt[$i] -> [1]arpq$i;
+//arpq$i :: ARPQuerier($ip, $ena) -> out$i;
+//c$i\[1] -> arpt;
+//arpt[$i] -> [1]arpq$i;
+c$i\[1] -> Discard; //ARP response
 c$i\[2] -> Paint($paint) -> ip;
 c$i\[3] -> Print("$devname non-IP") -> Discard;
 
@@ -230,7 +232,7 @@ for ($k = 0; $k < $nq_per_device; $k++) {
 # Local delivery path.
 print "\n// Local delivery\n";
 print "toh :: $local_host;\n";
-print "arpt[$nifs] -> toh;\n";
+print "//arpt[$nifs] -> toh;\n";
 if ($handle_pings) {
     print <<"EOD;";
 rt[0] -> IPReassembler -> ping_ipc :: IPClassifier(icmp type echo, -);
@@ -255,7 +257,9 @@ rt[$i1] -> DropBroadcasts
     -> FixIPSrc($ipa)
     -> dt$i :: DecIPTTL
     -> fr$i :: IPFragmenter(1500)
-    -> [0]arpq$i;
+    //-> [0]arpq$i;
+    -> EtherEncap(0x0800, 00:1:1:1:1:1, 0:2:2:2:2:2) 
+    -> out$i;
 dt$i\[1] -> ICMPError($ipa, timeexceeded) -> rt;
 fr$i\[1] -> ICMPError($ipa, unreachable, needfrag) -> rt;
 gio$i\[1] -> ICMPError($ipa, parameterproblem) -> rt;

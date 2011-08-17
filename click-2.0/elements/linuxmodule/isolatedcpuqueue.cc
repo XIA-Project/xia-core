@@ -53,7 +53,7 @@ IsoCPUQueue::deq(int n)
   if (_q[n]._head != _q[n]._tail) {
     Packet *p = _q[n]._q[_q[n]._head];
     _q[n]._head = next_i(_q[n]._head);
-    click_chatter("IsoCPUQueue CPU %d deq", n);
+    //click_chatter("IsoCPUQueue CPU %d deq", n);
     return p;
   } else
     return NULL;

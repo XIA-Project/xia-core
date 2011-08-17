@@ -588,6 +588,10 @@ RouterThread::driver()
 	// run occasional tasks: timers, select, etc.
 	iter++;
 
+	if ( iter % (1048576 * 16) == 10) {
+            click_chatter("thread %d scheduled on CPU %d", thread_id(), click_current_processor() );
+ 	}
+
 	// run task requests
 	if (_pending_head)
 	    process_pending();

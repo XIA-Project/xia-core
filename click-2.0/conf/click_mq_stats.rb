@@ -1,7 +1,6 @@
-
 require 'interface_stat.rb'
 
-#cnt = `cat /proc/click/td*/count| wc`
+#cnt = `cat /proc/click/tod*/count| wc`
 
 if __FILE__== $0
   if ARGV.size != 1
@@ -11,9 +10,9 @@ if __FILE__== $0
   time_interval= ARGV[0].to_i
 
   report_interval = 1
-  total_prev = `cat /proc/click/td*/count | awk '{SUM+=$1} END {print SUM}'`
+  total_prev = `cat /proc/click/tod*/count | awk '{SUM+=$1} END {print SUM}'`
   total_prev = total_prev.to_i
-  total_prev_drop = `cat /proc/click/td*/drops | awk '{SUM+=$1} END {print SUM}'`
+  total_prev_drop = `cat /proc/click/tod*/drops | awk '{SUM+=$1} END {print SUM}'`
   total_prev_drop = total_prev_drop.to_i
   start = Time.new
   prev = start
@@ -24,9 +23,9 @@ if __FILE__== $0
 
   while (timediff+ report_interval/2 < time_interval)
     sleep(report_interval)
-    total = `cat /proc/click/td*/count | awk '{SUM+=$1} END {print SUM}'`
+    total = `cat /proc/click/tod*/count | awk '{SUM+=$1} END {print SUM}'`
     total = total.to_i()
-    total_drop = `cat /proc/click/td*/drops | awk '{SUM+=$1} END {print SUM}'`
+    total_drop = `cat /proc/click/tod*/drops | awk '{SUM+=$1} END {print SUM}'`
     total_drop = total_drop.to_i
     now = Time.new
     timediff= now -start

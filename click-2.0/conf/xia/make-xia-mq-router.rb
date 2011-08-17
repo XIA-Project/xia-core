@@ -6,7 +6,7 @@ BURST = 32
 NTHREADS = 12
 PORTS = [:eth2, :eth3, :eth4, :eth5].map{|s| s.to_s()}.sort()
 
-puts "#!/usr/local/sbin/click-install -ut#{NTHREADS}"
+puts "#!/usr/local/sbin/click-install -uct#{NTHREADS}"
 puts ""
 
 # Template and address
