@@ -436,8 +436,11 @@ MQToDevice::queue_packet(Packet *p)
     else
 #endif
 	{
-	    ret = _dev->hard_start_xmit(skb1, _dev);
-	    _hard_start++;
+	    //ret = _dev->hard_start_xmit(skb1, _dev); 
+	    /* if a packet is sent in non-polling mode the ported ixgbe driver dies */
+	    if (_hard_start++ ==1)
+	        printk("<1>MQToDevice %s polling not enabled! Dropping packet\n", _dev->name);
+	    kfree_skb(skb1);
 	}
     if (ret != 0) {
 	if (++_rejected == 1)

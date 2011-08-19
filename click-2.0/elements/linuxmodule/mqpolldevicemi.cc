@@ -360,8 +360,10 @@ click_chatter("mq_rx_refill");
 
     /* Retrieve the ether header. */
     skb_push(skb, 14);
+#if PACKET_TYPE_MASK
     if (skb->pkt_type == PACKET_HOST)
       skb->pkt_type |= PACKET_CLEAN;
+#endif
 
     Packet *p = Packet::make(skb); 
    
