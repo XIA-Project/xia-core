@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 
+IXGBE=`dirname $0`/../ixgbe-3.4.24
+
 echo compiling
 make -s -C `dirname $0`/ -j24 || exit 1
+make -s -C `dirname $0`/$IXGBE/src/ -j24 || exit 1
 sync
 
 
@@ -19,7 +22,8 @@ sudo rmmod ixgbe
 
 
 echo loading nic module
-sudo modprobe ixgbe RSS=12,12,12,12 FdirMode=0,0,0,0
+#sudo modprobe ixgbe RSS=12,12,12,12 FdirMode=0,0,0,0
+sudo insmod $IXGBE/src/ixgbe.ko RSS=12,12,12,12 FdirMode=0,0,0,0
 
 
 echo installing click module
@@ -27,20 +31,25 @@ sudo make -s -C `dirname $0`/linuxmodule/ install-local || exit 1
 sudo make -s -C `dirname $0`/tools/click-install/ install-local || exit 1
 
 
-echo compacting click module '(<64 MB)'
-MODPREFIX=/usr/local/lib
-sudo objcopy --only-keep-debug $MODPREFIX/click.ko $MODPREFIX/click.ko.dbg
-sudo objcopy --strip-debug $MODPREFIX/click.ko
-sudo objcopy --add-gnu-debuglink=$MODPREFIX/click.ko.dbg $MODPREFIX/click.ko
+#echo compacting click module '(<64 MB)'
+#MODPREFIX=/usr/local/lib
+#sudo objcopy --only-keep-debug $MODPREFIX/click.ko $MODPREFIX/click.ko.dbg
+#sudo objcopy --strip-debug $MODPREFIX/click.ko
+#sudo objcopy --add-gnu-debuglink=$MODPREFIX/click.ko.dbg $MODPREFIX/click.ko
+
 
 echo turning off flow control
-until sudo ethtool -A eth2 autoneg off rx off tx off > /dev/null; do echo -n .; sleep 0.1; done
-until sudo ethtool -A eth3 autoneg off rx off tx off > /dev/null; do echo -n .; sleep 0.1; done
-until sudo ethtool -A eth4 autoneg off rx off tx off > /dev/null; do echo -n .; sleep 0.1; done
-until sudo ethtool -A eth5 autoneg off rx off tx off > /dev/null; do echo -n .; sleep 0.1; done
-echo
+sudo ethtool -A eth2 autoneg off rx off tx off > /dev/null
+sudo ethtool -A eth3 autoneg off rx off tx off > /dev/null
+sudo ethtool -A eth4 autoneg off rx off tx off > /dev/null
+sudo ethtool -A eth5 autoneg off rx off tx off > /dev/null
+#until sudo ethtool -A eth2 autoneg off rx off tx off > /dev/null; do echo -n .; sleep 0.1; done
+#until sudo ethtool -A eth3 autoneg off rx off tx off > /dev/null; do echo -n .; sleep 0.1; done
+#until sudo ethtool -A eth4 autoneg off rx off tx off > /dev/null; do echo -n .; sleep 0.1; done
+#until sudo ethtool -A eth5 autoneg off rx off tx off > /dev/null; do echo -n .; sleep 0.1; done
+#echo
 
 
-echo use: sudo click-install -t NUM-THREADS CONF-FILE
+echo use: sudo click-install -c -j NUM-THREADS CONF-FILE
 echo
 
