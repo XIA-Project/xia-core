@@ -138,7 +138,7 @@ you include a ToDevice for the same device. Try adding\n\
 		return errh->error("MQPollDevice detected wrong version of polling patch");
 	}
 	/* sleep for sec */
-	ssleep(5);
+	//ssleep(5);
     }
 
     ScheduleInfo::initialize_task(this, &_task, _dev != 0, errh);
