@@ -73,10 +73,15 @@ static const char ixgbe_driver_string[] =
 
 #define VMDQ_TAG
 
+#define CLICKMQ "-CLICKMQ"
+#ifndef HAVE_TX_MQ
+#warning "HAVE_TX_MQ is disabled"
+#endif
+
 #define MAJ 3
 #define MIN 4
 #define BUILD 24
-#define DRV_VERSION __stringify(MAJ) "." __stringify(MIN) "." __stringify(BUILD) DRIVERNAPI DRV_HW_PERF FPGA VMDQ_TAG
+#define DRV_VERSION __stringify(MAJ) "." __stringify(MIN) "." __stringify(BUILD) DRIVERNAPI DRV_HW_PERF FPGA VMDQ_TAG CLICKMQ
 const char ixgbe_driver_version[] = DRV_VERSION;
 static const char ixgbe_copyright[] =
 				"Copyright (c) 1999-2011 Intel Corporation.";
@@ -136,6 +141,22 @@ MODULE_LICENSE("GPL");
 MODULE_VERSION(DRV_VERSION);
 
 #define DEFAULT_DEBUG_LEVEL_SHIFT 3
+
+/* Click polling */
+static int ixgbe_poll_on(struct net_device *dev);
+static int ixgbe_poll_off(struct net_device *dev);
+static int ixgbe_tx_pqueue(struct net_device *dev, struct sk_buff *skb);
+static int ixgbe_tx_start(struct net_device *dev);
+static int ixgbe_rx_refill(struct net_device *dev, struct sk_buff **);
+static int ixgbe_tx_eob(struct net_device *dev);
+static struct sk_buff *ixgbe_tx_clean(struct net_device *dev);
+static struct sk_buff *ixgbe_rx_poll(struct net_device *dev, int *want);
+static int ixgbe_mq_tx_pqueue(struct net_device *dev, unsigned int queue_num, struct sk_buff *skb);
+static int ixgbe_mq_tx_start(struct net_device *dev, unsigned int queue_num);
+static int ixgbe_mq_rx_refill(struct net_device *dev, unsigned int queue_num, struct sk_buff **);
+static int ixgbe_mq_tx_eob(struct net_device *dev, unsigned int queue_num);
+static struct sk_buff *ixgbe_mq_tx_clean(struct net_device *dev, unsigned int queue_num);
+static struct sk_buff *ixgbe_mq_rx_poll(struct net_device *dev, unsigned int queue_num, int *want);
 
 static inline void ixgbe_disable_sriov(struct ixgbe_adapter *adapter)
 {
@@ -262,6 +283,9 @@ static inline void ixgbe_irq_rearm_queues(struct ixgbe_adapter *adapter,
 					  u64 qmask)
 {
 	u32 mask;
+
+	if (adapter->netdev->polling)
+		return;
 
 	switch (adapter->hw.mac.type) {
 	case ixgbe_mac_82598EB:
@@ -2121,6 +2145,9 @@ void ixgbe_irq_enable_queues(struct ixgbe_adapter *adapter, u64 qmask)
 	u32 mask;
 	struct ixgbe_hw *hw = &adapter->hw;
 
+	if (adapter->netdev->polling)
+		return;
+
 	switch (hw->mac.type) {
 	case ixgbe_mac_82598EB:
 		mask = (IXGBE_EIMS_RTX_QUEUE & qmask);
@@ -2173,6 +2200,9 @@ static irqreturn_t ixgbe_msix_clean_rings(int irq, void *data)
 	struct ixgbe_adapter  *adapter = q_vector->adapter;
 	struct ixgbe_ring  *ring;
 	bool clean_complete = true;
+
+	if (adapter->netdev->polling)
+		return IRQ_HANDLED;
 
 	if (!q_vector->tx.ring && !q_vector->rx.ring)
 		return IRQ_HANDLED;
@@ -2229,6 +2259,9 @@ static int ixgbe_poll(struct napi_struct *napi, int budget)
 	struct ixgbe_ring *ring;
 	int per_ring_budget;
 	bool clean_complete = true;
+
+	if (adapter->netdev->polling)
+		return budget;
 
 	if (adapter->flags & IXGBE_FLAG_DCA_ENABLED)
 		ixgbe_update_dca(q_vector);
@@ -2470,6 +2503,9 @@ static irqreturn_t ixgbe_intr(int irq, void *data)
 	struct ixgbe_hw *hw = &adapter->hw;
 	struct ixgbe_q_vector *q_vector = adapter->q_vector[0];
 	u32 eicr;
+
+	if (adapter->netdev->polling)
+		return IRQ_HANDLED;
 
 	/*
 	 * Workaround of Silicon errata #26 on 82598.  Mask the interrupt
@@ -8444,6 +8480,24 @@ static int __devinit ixgbe_probe(struct pci_dev *pdev,
 		goto err_sw_init;
 	}
 
+	/* maz Click - polling extensions */
+	netdev->polling = 0;
+	netdev->poll_off = ixgbe_poll_off;
+	netdev->poll_on = ixgbe_poll_on;
+	netdev->rx_poll = ixgbe_rx_poll;
+	netdev->rx_refill = ixgbe_rx_refill;
+	netdev->tx_queue = ixgbe_tx_pqueue;
+	netdev->tx_eob = ixgbe_tx_eob;
+	netdev->tx_start = ixgbe_tx_start;
+	netdev->tx_clean = ixgbe_tx_clean;
+	netdev->mq_rx_poll = ixgbe_mq_rx_poll;
+	netdev->mq_rx_refill = ixgbe_mq_rx_refill;
+	netdev->mq_tx_queue = ixgbe_mq_tx_pqueue;
+	netdev->mq_tx_eob = ixgbe_mq_tx_eob;
+	netdev->mq_tx_start = ixgbe_mq_tx_start;
+	netdev->mq_tx_clean = ixgbe_mq_tx_clean;
+	/* Click - polling */
+
 	/*
 	 * check_options must be called before setup_link to set up
 	 * hw->fc completely
@@ -9047,6 +9101,398 @@ static int ixgbe_notify_dca(struct notifier_block *nb, unsigned long event,
 	return ret_val ? NOTIFY_BAD : NOTIFY_DONE;
 }
 #endif
+
+/*******************************************/
+/***** click polling extension *************/
+/*******************************************/
+static int ixgbe_poll_on (struct net_device *dev)
+{
+	if (!dev->polling) {
+		struct ixgbe_adapter *adapter = netdev_priv(dev);
+		unsigned long flags;
+		u64 qmask = ~0;
+
+		printk("ixgbe_poll_on\n");
+
+		local_irq_save(flags);
+		local_irq_disable();
+		ixgbe_irq_disable_queues(adapter, qmask);
+		ixgbe_napi_disable_all(adapter);
+		dev->polling = 2;
+		local_irq_restore(flags);
+	}
+
+	return 0;
+}
+
+static int ixgbe_poll_off(struct net_device *dev)
+{
+	if (dev->polling) {
+		struct ixgbe_adapter *adapter = netdev_priv(dev);
+		unsigned long flags;
+		u64 qmask = ~0;
+
+		local_irq_save(flags);
+		local_irq_disable();
+		dev->polling = 0;
+		ixgbe_irq_enable_queues(adapter, qmask);
+		ixgbe_napi_enable_all(adapter);
+		local_irq_restore(flags);
+
+		printk("ixgbe_poll_off\n");
+	}
+
+	return 0;
+}
+
+static struct sk_buff *ixgbe_rx_poll(struct net_device *dev, int *want)
+{
+	return ixgbe_mq_rx_poll(dev, 0, want);
+}
+
+static struct sk_buff *ixgbe_mq_rx_poll(struct net_device *dev, unsigned int queue_num, int *want)
+{
+	struct ixgbe_adapter *adapter = netdev_priv(dev);
+	struct pci_dev *pdev = adapter->pdev;
+	union ixgbe_adv_rx_desc *rx_desc; //adv desc used instead of the leagacy_rx_desc
+	struct ixgbe_ring *rx_ring = adapter->rx_ring[queue_num];
+	struct sk_buff *skb_head = NULL, **skb;
+	int got, next;
+	u32 len, staterr;
+
+	skb = &skb_head;
+
+	for( got = 0, next = (rx_ring->next_to_clean + 1) % rx_ring->count;
+			got < *want && next != rx_ring->next_to_use;
+			got++, rx_ring->next_to_clean = next,
+			next = (rx_ring->next_to_clean + 1) % rx_ring->count) {
+
+		int i = rx_ring->next_to_clean;
+		rx_desc =  IXGBE_RX_DESC_ADV(rx_ring, i);
+		staterr = le32_to_cpu(rx_desc->wb.upper.status_error); //adv rx_desc is used
+		if(!(staterr & IXGBE_RXD_STAT_DD)) {
+			//printk(KERN_INFO "rx_poll got nothing\n");
+			break;
+		}
+		//printk(KERN_INFO "rx_poll got dma=%p, i=%d\n", (void *)rx_ring->rx_buffer_info[i].dma, i);
+
+		//prefetch(rx_ring->rx_buffer_info[i].skb->data - NET_IP_ALIGN);
+		pci_unmap_page(pdev, rx_ring->rx_buffer_info[i].dma,
+				PAGE_SIZE, PCI_DMA_FROMDEVICE);
+
+		//printk(KERN_INFO "rx_poll got skb=%p, skb->data=%p\n", rx_ring->rx_buffer_info[i].skb, rx_ring->rx_buffer_info[i].skb->data);
+		*skb = rx_ring->rx_buffer_info[i].skb;
+		rx_ring->rx_buffer_info[i].skb = NULL;
+
+		if(!(staterr & IXGBE_RXD_STAT_EOP) ||
+				(staterr & IXGBE_RXDADV_ERR_FRAME_ERR_MASK)) {
+			printk(KERN_INFO "IXGBE_RXD_STAT_EOP or IXGBE_RXDADV_ERR_FRAME_ERR_MASK\n");
+			rx_desc->wb.upper.status_error = 0;
+			dev_kfree_skb(*skb);
+			*skb = NULL;
+			got--;
+			continue;
+		}
+
+		len = le16_to_cpu(rx_desc->wb.upper.length);
+		rx_desc->wb.upper.status_error = 0;
+
+		//printk(KERN_INFO "length of polled pkt=%d\n", len);
+		//skb_put(*skb, len - ETH_FCS_LEN);
+
+		skb_put(*skb, len);
+		//ixgbe_rx_checksum(adapter, staterr, *skb);
+		skb_pull(*skb, dev->hard_header_len);
+
+		/* update rx ring stats for each queue */
+		rx_ring->stats.packets++;
+		rx_ring->stats.bytes += len;
+
+		skb = &((*skb)->next);
+		*skb = NULL;
+	} //end for
+
+	*want = got;
+
+	return skb_head;
+}
+
+static int ixgbe_rx_refill(struct net_device *dev, struct sk_buff **skbs)
+{
+	return ixgbe_mq_rx_refill(dev, 0, skbs);
+}
+
+static int ixgbe_mq_rx_refill(struct net_device *dev, unsigned int queue_num, struct sk_buff **skbs)
+{
+	struct ixgbe_adapter *adapter = netdev_priv(dev);
+	struct ixgbe_ring *rx_ring = adapter->rx_ring[queue_num]; //get ring number
+	struct pci_dev *pdev = adapter->pdev;
+	union ixgbe_adv_rx_desc *rx_desc;
+	struct sk_buff *skb;
+	int next;
+
+	/*
+	 * Update statistics counters, check link.
+	 * do_poll_watchdog is set by the timer interrupt ixgbe_watchdog(),
+	 * but we don't want to do the work in an interrupt (since it may
+	 * happen while polling code is active), so defer it to here.
+	 */
+
+	if (!netif_carrier_ok(dev))
+		return 0;
+
+	if(skbs == 0)
+		return ixgbe_desc_unused(rx_ring);
+
+	for( next = (rx_ring->next_to_use + 1) % rx_ring->count;
+			next != rx_ring->next_to_clean;
+			rx_ring->next_to_use = next,
+			next = (rx_ring->next_to_use + 1) % rx_ring->count ) {
+		int i = rx_ring->next_to_use;
+		if(rx_ring->rx_buffer_info[i].skb != NULL)
+			break;
+
+		if(!(skb = *skbs))
+			break;
+		*skbs = skb->next;
+		skb->next = NULL;
+		skb->dev = dev;
+
+		rx_ring->rx_buffer_info[i].skb = skb;
+		//no length in IXGBE buffer_info
+		//rx_ring->rx_buffer_info[i].length = adapter->rx_buffer_len;
+		//we may have to get rid of NET_IP_ALIGN, and in poll too, in e1000_click
+		//this is not set for pci_map_single
+		rx_ring->rx_buffer_info[i].dma =
+			pci_map_single(pdev,
+					skb->data,
+					rx_ring->rx_buf_len + NET_IP_ALIGN,
+					//rx_ring->rx_buf_len,
+					PCI_DMA_FROMDEVICE);
+
+		rx_desc =  IXGBE_RX_DESC_ADV(rx_ring, i);
+		rx_desc->read.pkt_addr = cpu_to_le64(rx_ring->rx_buffer_info[i].dma);
+		//rx_desc->wb.upper.status_error = 0;
+		//printk(KERN_INFO "rx_refill set dma=%p, i=%d\n", (void *)rx_ring->rx_buffer_info[i].dma, i);
+
+		//wmb();
+		//next and rx_ring->next_to_use will be the same here looking at one beyond what's availabe to hw
+		//writel(next, adapter->hw.hw_addr + rx_ring->tail);
+
+	}
+	writel(rx_ring->next_to_use, rx_ring->tail);
+	IXGBE_WRITE_FLUSH(&adapter->hw);
+	return ixgbe_desc_unused(rx_ring);
+}
+
+static int ixgbe_tx_eob(struct net_device *dev)
+{
+	return ixgbe_mq_tx_eob(dev, 0);
+}
+
+static int ixgbe_mq_tx_eob(struct net_device *dev, unsigned int queue_num)
+{
+	struct ixgbe_adapter *adapter = netdev_priv(dev);
+	struct ixgbe_ring *tx_ring = adapter->tx_ring[queue_num];
+
+	writel(tx_ring->next_to_use, tx_ring->tail);
+	IXGBE_WRITE_FLUSH(&adapter->hw);
+	return 0;
+}
+
+static int ixgbe_tx_start(struct net_device *dev)
+{
+	return ixgbe_mq_tx_start(dev, 0);
+}
+
+static int ixgbe_mq_tx_start(struct net_device *dev, unsigned int queue_num)
+{
+	/*   printk("ixgbe_tx_start called\n"); */
+	ixgbe_mq_tx_eob(dev, queue_num);
+	return 0;
+}
+
+static int ixgbe_tx_pqueue(struct net_device *netdev, struct sk_buff *skb)
+{
+	return ixgbe_mq_tx_pqueue(netdev, 0, skb);
+}
+
+static int ixgbe_mq_tx_pqueue(struct net_device *netdev, unsigned int queue_num, struct sk_buff *skb)
+{
+	/*
+	 * This function is a streamlined version of
+	 * return ixgbe_xmit_frame(skb, netdev);
+	 */
+	struct ixgbe_adapter *adapter = netdev_priv(netdev);
+	struct ixgbe_ring *tx_ring = adapter->tx_ring[queue_num];
+	unsigned int len = skb->len;
+	//unsigned int txd_needed;
+	unsigned int tx_flags = 0;
+	//unsigned long flags = 0;
+	__be16 protocol = skb->protocol;
+
+	union ixgbe_adv_tx_desc *tx_desc = NULL;
+	struct ixgbe_tx_buffer *tx_buffer_info;
+	u32 olinfo_status = 0, cmd_type_len = 0, txd_cmd, paylen;
+	u8 hdr_len;
+	unsigned int i, offset;
+
+	if (skb->len <= 0) {
+		dev_kfree_skb(skb);
+		return NETDEV_TX_OK;
+	}
+	if(!netif_carrier_ok(netdev)) {
+		netif_stop_queue(netdev);
+		return -1;
+	}
+
+	//txd_needed = TXD_USE_COUNT(skb->len);
+
+
+	//spin_lock_irqsave(&tx_ring->tx_lock, flags);
+	//might +1 would be enough
+	//if (IXGBE_DESC_UNUSED(tx_ring) < (txd_needed + 1)) {
+	if (unlikely(ixgbe_desc_unused(tx_ring) < 1)) {
+		adapter->tx_busy++;
+		//adapter->net_stats.tx_dropped++;
+		//netif_stop_queue(netdev);
+		//spin_unlock_irqrestore(&tx_ring->tx_lock, flags);
+		return -1;
+	}
+	//spin_unlock_irqrestore(&tx_ring->tx_lock, flags);
+
+
+	/*this part is from tx_queue */
+	txd_cmd = IXGBE_TXD_CMD_EOP | IXGBE_TXD_CMD_RS | IXGBE_TXD_CMD_IFCS;
+
+	cmd_type_len |= IXGBE_ADVTXD_DTYP_DATA;
+
+	cmd_type_len |= IXGBE_ADVTXD_DCMD_IFCS | IXGBE_ADVTXD_DCMD_DEXT;
+
+	if (skb->protocol == ntohs(ETH_P_IP))
+		tx_flags |= IXGBE_TX_FLAGS_IPV4;
+
+	if (ixgbe_tx_csum(tx_ring, skb, tx_flags, protocol)) {
+		olinfo_status |= IXGBE_TXD_POPTS_TXSM << IXGBE_ADVTXD_POPTS_SHIFT;
+	}
+	hdr_len = 0;
+	paylen = skb->len;
+	olinfo_status |= ((paylen - hdr_len) << IXGBE_ADVTXD_PAYLEN_SHIFT);
+
+	i = tx_ring->next_to_use;
+	tx_buffer_info = &tx_ring->tx_buffer_info[i];
+	tx_desc = IXGBE_TX_DESC_ADV(tx_ring, i);
+	tx_buffer_info->length = len;
+	offset = 0;
+	tx_buffer_info->dma =
+		pci_map_page(adapter->pdev, virt_to_page(skb->data + offset),
+				(unsigned long) (skb->data + offset) & ~PAGE_MASK, len,
+				PCI_DMA_TODEVICE);
+
+	tx_buffer_info->time_stamp = jiffies;
+
+	tx_desc->read.buffer_addr = cpu_to_le64(tx_buffer_info->dma);
+	tx_desc->read.cmd_type_len =
+		cpu_to_le32(cmd_type_len | tx_buffer_info->length);
+	tx_desc->read.olinfo_status = cpu_to_le32(olinfo_status);
+	tx_desc->read.cmd_type_len |= cpu_to_le32(txd_cmd);
+	tx_ring->tx_buffer_info[i].skb = skb;
+
+	i++;
+	if (i >= tx_ring->count)
+		i = 0;
+
+	/* Move the HW Tx Tail Pointer */
+	tx_ring->next_to_use = i;
+
+	netdev->trans_start = jiffies;
+
+	return 0;
+}
+
+#define IXGBE_TX_QUEUE_WAKE 16
+
+static struct sk_buff * ixgbe_tx_clean(struct net_device *netdev)
+{
+	return ixgbe_mq_tx_clean(netdev, 0);
+}
+
+static struct sk_buff * ixgbe_mq_tx_clean(struct net_device *netdev, unsigned int queue_num)
+{
+	/*
+	 * This function is a streamlined version of
+	 * return ixgbe_clean_tx_irq(adapter, 1);
+	 */
+
+	struct ixgbe_adapter *adapter = netdev_priv(netdev);
+	struct pci_dev *pdev = adapter->pdev;
+	//struct ixgbe_tx_buffer *tx_buffer_info;
+	unsigned int i;
+	union ixgbe_adv_tx_desc *tx_desc;
+	struct sk_buff *skb_head, *skb_last;
+	struct ixgbe_ring *tx_ring = adapter->tx_ring[queue_num];
+
+	skb_head = skb_last = 0;
+
+	i = tx_ring->next_to_clean;
+	tx_desc = IXGBE_TX_DESC_ADV(tx_ring, i);
+	while (tx_desc->wb.status & cpu_to_le32(IXGBE_TXD_STAT_DD)) {
+		if(tx_ring->tx_buffer_info[i].dma != 0) {
+			pci_unmap_page(pdev, tx_ring->tx_buffer_info[i].dma,
+					tx_ring->tx_buffer_info[i].length,
+					PCI_DMA_TODEVICE);
+			tx_ring->tx_buffer_info[i].dma = 0;
+		}
+
+		if(tx_ring->tx_buffer_info[i].skb != NULL) {
+			struct sk_buff *skb = tx_ring->tx_buffer_info[i].skb;
+			if (skb_head == 0) {
+				skb_head = skb;
+				skb_last = skb;
+				skb_last->next = NULL;
+			} else {
+				skb_last->next = skb;
+				skb->next = NULL;
+				skb_last = skb;
+			}
+			tx_ring->tx_buffer_info[i].skb = NULL;
+		}
+
+		/* update stats for this tx ring */
+		tx_ring->stats.bytes += tx_ring->tx_buffer_info[i].length;
+		tx_ring->stats.packets++;
+
+		i = (i + 1) % tx_ring->count;
+
+		tx_desc->wb.status = 0;
+		tx_desc = IXGBE_TX_DESC_ADV(tx_ring, i);
+
+	}//end while
+
+	tx_ring->next_to_clean = i;
+
+	//#define TX_WAKE_THRESHOLD (DESC_NEEDED * 2)
+
+	//#define IXGBE_TX_QUEUE_WAKE 16
+	if (skb_head && netif_carrier_ok(netdev) &&
+			(ixgbe_desc_unused(tx_ring) >= IXGBE_TX_QUEUE_WAKE)) {
+		//(IXGBE_DESC_UNUSED(tx_ring) >= TX_WAKE_THRESHOLD)) {
+		/* Make sure that anybody stopping the queue after this
+		 * sees the new next_to_clean.
+		 */
+		//smp_mb();
+		/* Multi queue stuff should go here but we don't support it yet,look at ixgbe_clean_tx_irq */
+		if (netif_queue_stopped(netdev) &&
+				!test_bit(__IXGBE_DOWN, &adapter->state)) {
+			//netif_wake_queue(netdev);
+			netif_start_queue(netdev);
+			adapter->restart_queue++;
+		}
+	}
+
+	return skb_head;
+}
+
 module_exit(ixgbe_exit_module);
 
 /* ixgbe_main.c */
