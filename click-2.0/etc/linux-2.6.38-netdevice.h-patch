@@ -1,0 +1,65 @@
+--- linux-source-2.6.38/include/linux/netdevice.h	2011-03-14 21:20:32.000000000 -0400
++++ netdevice.h	2011-08-19 20:45:03.000000000 -0400
+@@ -1124,6 +1124,52 @@
+ 	/* GARP */
+ 	struct garp_port __rcu	*garp_port;
+ 
++       /* Click polling support */
++       /*
++        * polling is < 0 if the device does not support polling, == 0 if the
++        * device supports polling but interrupts are on, and > 0 if polling
++        * is on.
++        */
++       int                     polling;
++       int                     (*poll_on)(struct net_device *);
++       int                     (*poll_off)(struct net_device *);
++       /*
++        * rx_poll returns to caller a linked list of sk_buff objects received
++        * by the device. on call, the want argument specifies the number of
++        * packets wanted. on return, the want argument specifies the number
++        * of packets actually returned.
++        */
++	struct sk_buff *	(*rx_poll)(struct net_device*, int *want);
++	struct sk_buff *	(*mq_rx_poll)(struct net_device*, unsigned int, int *want);
++       /* refill rx dma ring using the given sk_buff list. returns 0 if
++        * successful, or if there are more entries need to be cleaned,
++        * returns the number of dirty entries. the ptr to the sk_buff list is
++        * updated by the driver to point to any unused skbs.
++        */
++	int			(*rx_refill)(struct net_device*, struct sk_buff**);
++	int			(*mq_rx_refill)(struct net_device*, unsigned int, struct sk_buff**);
++       /*
++        * place sk_buff on the transmit ring. returns 0 if successful, 1
++        * otherwise
++        */
++	int			(*tx_queue)(struct net_device *, struct sk_buff *);
++	int			(*mq_tx_queue)(struct net_device *, unsigned int, struct sk_buff *);
++       /*
++        * clean tx dma ring. returns the list of skb objects cleaned
++        */
++	struct sk_buff*		(*tx_clean)(struct net_device *);
++	struct sk_buff*		(*mq_tx_clean)(struct net_device *, unsigned int);
++       /*
++        * start transmission. returns 0 if successful, 1 otherwise
++        */
++	int			(*tx_start)(struct net_device *);
++	int			(*mq_tx_start)(struct net_device *, unsigned int);
++       /*
++        * tell device the end of a batch of packets
++        */
++	int			(*tx_eob)(struct net_device *);
++	int			(*mq_tx_eob)(struct net_device *, unsigned int);
++
+ 	/* class/net/name entry */
+ 	struct device		dev;
+ 	/* space for optional device, statistics, and wireless sysfs groups */
+@@ -1389,6 +1435,9 @@
+ extern void		synchronize_net(void);
+ extern int 		register_netdevice_notifier(struct notifier_block *nb);
+ extern int		unregister_netdevice_notifier(struct notifier_block *nb);
++extern int		register_net_in(struct notifier_block *nb); /* Click */
++extern int		unregister_net_in(struct notifier_block *nb); /* Click */
++extern int		ptype_dispatch(struct sk_buff *skb, unsigned short type); /* Click */
+ extern int		init_dummy_netdev(struct net_device *dev);
+ extern void		netdev_resync_ops(struct net_device *dev);
+ 
