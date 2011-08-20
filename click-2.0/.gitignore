@@ -37,6 +37,7 @@ linuxmodule/.tmp_versions/*
 linuxmodule/elements.*
 linuxmodule/ksyms.c
 linuxmodule/Module.symvers
+linuxmodule/modules.order
 
 conf/xia_chain_topology.click
 

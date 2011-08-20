@@ -4,7 +4,9 @@ IXGBE=`dirname $0`/../ixgbe-3.4.24
 
 echo compiling
 make -s -C `dirname $0`/ -j24 || exit 1
-make -s -C `dirname $0`/$IXGBE/src/ -j24 || exit 1
+pushd `dirname $0`/$IXGBE/src/
+./compile.sh || exit 1
+popd
 sync
 
 
