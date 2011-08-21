@@ -340,6 +340,8 @@ cleanup_module()
     // filesystem interface
     cleanup_clickfs();
 
+    click_cleanup_sched();
+
     // extra packages, global handlers, packets
     click_cleanup_packages();
     Router::static_cleanup();
@@ -347,7 +349,8 @@ cleanup_module()
 
     // config manager, thread manager, sk_buff manager
     click_cleanup_config();
-    click_cleanup_sched();
+    // shouldn't this be cleaned earlier to prevent threads from accessing other data?
+    //click_cleanup_sched();
     skbmgr_cleanup();
 
     cp_va_static_cleanup();
