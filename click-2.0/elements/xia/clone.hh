@@ -19,6 +19,7 @@ class Clone : public Element { public:
     Vector<Packet *> _packets;
     int _count;
     int _next;
+    bool _shared_skbs;
 };
 CLICK_ENDDECLS
 #endif

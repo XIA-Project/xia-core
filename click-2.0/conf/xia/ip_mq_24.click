@@ -2,7 +2,7 @@
 define ($DST_MAC 00:15:17:51:d3:d4);
 define ($DST_MAC1 00:25:17:51:d3:d4);
 define ($HEADROOM_SIZE 256);
-define ($BURST 64);
+define ($BURST 32);
 define ($SRC_PORT 5012);
 define ($DST_PORT 5002);
 define ($PKT_COUNT 5000000000);
@@ -19,14 +19,14 @@ elementclass gen_sub {
 
     gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE)
     -> Script(TYPE PACKET, write gen1.active false)       // stop source after exactly 1 packet
-    -> Unqueue()
+    -> unq :: Unqueue()
     -> UDPIPEncap($eth_from, $SRC_PORT, $eth_to, $DST_PORT)
     -> EtherEncap(0x0800, $SRC_MAC1 , $DST_MAC1)
     -> CheckIPHeader(14)
     -> IPPrint(gen1_eth2)
-    -> clone1 ::Clone($COUNT)
+    -> clone1 ::Clone($COUNT, SHARED_SKBS true)
     -> td1 :: MQToDevice($eth_from, QUEUE $queue, BURST $BURST);
-    StaticThreadSched(td1 $cpu, clone1 $cpu);
+    StaticThreadSched(gen1 $cpu, unq $cpu, td1 $cpu);
 
     Script(write gen1.active true);
 }

@@ -22,11 +22,14 @@ int
 Clone::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     int count;
+    bool shared_skbs = false;
     if (cp_va_kparse(conf, this, errh,
                    "COUNT", cpkP+cpkM, cpInteger, &count,
+                   "SHARED_SKBS", 0, cpBool, &shared_skbs,
                    cpEnd) < 0)
         return -1;
     _count = count;
+    _shared_skbs = shared_skbs;
     click_chatter("Packet cloning %d packets", count);
     return 0;
 }
@@ -51,7 +54,17 @@ Packet* Clone::pull(int /*port*/)
     //return _packet->clone()->uniqueify();
     if (++_next >= _packets.size())
         _next = 0;
-    return _packets[_next]->clone();
+    if (!_shared_skbs)
+        return _packets[_next]->clone();
+    else {
+#if CLICK_LINUXMODULE
+        atomic_inc(&_packets[_next]->skb()->users);
+        return _packets[_next];
+#else
+        // SHARED_SKBS is not effective for userlevel
+        return _packets[_next]->clone();
+#endif
+    }
 }
 
 
