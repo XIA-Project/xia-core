@@ -3,7 +3,7 @@
 IXGBE=`dirname $0`/../ixgbe-3.4.24
 
 echo compiling
-make -s -C `dirname $0`/ -j24 || exit 1
+make -j24 -s -C `dirname $0`/ || exit 1
 pushd `dirname $0`/$IXGBE/src/
 ./compile.sh || exit 1
 popd
@@ -29,8 +29,8 @@ sudo insmod $IXGBE/src/ixgbe.ko RSS=12,12,12,12 FdirMode=0,0,0,0
 
 
 echo installing click module
-sudo make -s -C `dirname $0`/linuxmodule/ install-local || exit 1
-sudo make -s -C `dirname $0`/tools/click-install/ install-local || exit 1
+sudo make -j24 -s -C `dirname $0`/linuxmodule/ install-local || exit 1
+sudo make -j24 -s -C `dirname $0`/tools/click-install/ install-local || exit 1
 
 
 #echo compacting click module '(<64 MB)'
