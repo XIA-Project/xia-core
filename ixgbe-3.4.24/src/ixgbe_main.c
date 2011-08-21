@@ -145,12 +145,6 @@ MODULE_VERSION(DRV_VERSION);
 /* Click polling */
 static int ixgbe_poll_on(struct net_device *dev);
 static int ixgbe_poll_off(struct net_device *dev);
-static int ixgbe_tx_pqueue(struct net_device *dev, struct sk_buff *skb);
-static int ixgbe_tx_start(struct net_device *dev);
-static int ixgbe_rx_refill(struct net_device *dev, struct sk_buff **);
-static int ixgbe_tx_eob(struct net_device *dev);
-static struct sk_buff *ixgbe_tx_clean(struct net_device *dev);
-static struct sk_buff *ixgbe_rx_poll(struct net_device *dev, int *want);
 static int ixgbe_mq_tx_pqueue(struct net_device *dev, unsigned int queue_num, struct sk_buff *skb);
 static int ixgbe_mq_tx_start(struct net_device *dev, unsigned int queue_num);
 static int ixgbe_mq_rx_refill(struct net_device *dev, unsigned int queue_num, struct sk_buff **);
@@ -462,6 +456,9 @@ static void ixgbe_tx_timeout(struct net_device *netdev)
 struct ixgbe_adapter *adapter = netdev_priv(netdev);
 	bool real_tx_hang = false;
 	int i;
+
+	if (adapter->netdev->polling)
+		return;
 
 #define TX_TIMEO_LIMIT 16000
 	for (i = 0; i < adapter->num_tx_queues; i++) {
@@ -7732,6 +7729,9 @@ netdev_tx_t ixgbe_xmit_frame_ring(struct sk_buff *skb,
 	__be16 protocol = skb->protocol;
 	u8 hdr_len = 0;
 
+	if (adapter->netdev->polling)
+		goto out_drop;
+
 	/*
 	 * need: 1 descriptor per page * PAGE_SIZE/IXGBE_MAX_DATA_PER_TXD,
 	 *       + 1 desc for skb_head_len/IXGBE_MAX_DATA_PER_TXD,
@@ -7972,6 +7972,9 @@ static void ixgbe_netpoll(struct net_device *netdev)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 	int i;
+
+	if (adapter->netdev->polling)
+		return;
 
 	/* if interface is down do nothing */
 	if (test_bit(__IXGBE_DOWN, &adapter->state))
@@ -8484,12 +8487,6 @@ static int __devinit ixgbe_probe(struct pci_dev *pdev,
 	netdev->polling = 0;
 	netdev->poll_off = ixgbe_poll_off;
 	netdev->poll_on = ixgbe_poll_on;
-	netdev->rx_poll = ixgbe_rx_poll;
-	netdev->rx_refill = ixgbe_rx_refill;
-	netdev->tx_queue = ixgbe_tx_pqueue;
-	netdev->tx_eob = ixgbe_tx_eob;
-	netdev->tx_start = ixgbe_tx_start;
-	netdev->tx_clean = ixgbe_tx_clean;
 	netdev->mq_rx_poll = ixgbe_mq_rx_poll;
 	netdev->mq_rx_refill = ixgbe_mq_rx_refill;
 	netdev->mq_tx_queue = ixgbe_mq_tx_pqueue;
@@ -9109,17 +9106,17 @@ static int ixgbe_poll_on (struct net_device *dev)
 {
 	if (!dev->polling) {
 		struct ixgbe_adapter *adapter = netdev_priv(dev);
-		unsigned long flags;
+		//unsigned long flags;
 		u64 qmask = ~0;
 
 		printk("ixgbe_poll_on\n");
 
-		local_irq_save(flags);
-		local_irq_disable();
-		ixgbe_irq_disable_queues(adapter, qmask);
-		ixgbe_napi_disable_all(adapter);
+		//local_irq_save(flags);
+		//local_irq_disable();
 		dev->polling = 2;
-		local_irq_restore(flags);
+		ixgbe_irq_disable_queues(adapter, qmask);
+		//ixgbe_napi_disable_all(adapter);
+		//local_irq_restore(flags);
 	}
 
 	return 0;
@@ -9129,25 +9126,20 @@ static int ixgbe_poll_off(struct net_device *dev)
 {
 	if (dev->polling) {
 		struct ixgbe_adapter *adapter = netdev_priv(dev);
-		unsigned long flags;
+		//unsigned long flags;
 		u64 qmask = ~0;
 
-		local_irq_save(flags);
-		local_irq_disable();
+		//local_irq_save(flags);
+		//local_irq_disable();
 		dev->polling = 0;
 		ixgbe_irq_enable_queues(adapter, qmask);
-		ixgbe_napi_enable_all(adapter);
-		local_irq_restore(flags);
+		//ixgbe_napi_enable_all(adapter);
+		//local_irq_restore(flags);
 
 		printk("ixgbe_poll_off\n");
 	}
 
 	return 0;
-}
-
-static struct sk_buff *ixgbe_rx_poll(struct net_device *dev, int *want)
-{
-	return ixgbe_mq_rx_poll(dev, 0, want);
 }
 
 static struct sk_buff *ixgbe_mq_rx_poll(struct net_device *dev, unsigned int queue_num, int *want)
@@ -9159,6 +9151,9 @@ static struct sk_buff *ixgbe_mq_rx_poll(struct net_device *dev, unsigned int que
 	struct sk_buff *skb_head = NULL, **skb;
 	int got, next;
 	u32 len, staterr;
+
+	if (adapter->flags & IXGBE_FLAG_DCA_ENABLED)
+		ixgbe_update_dca(rx_ring->q_vector);
 
 	skb = &skb_head;
 
@@ -9215,11 +9210,6 @@ static struct sk_buff *ixgbe_mq_rx_poll(struct net_device *dev, unsigned int que
 	*want = got;
 
 	return skb_head;
-}
-
-static int ixgbe_rx_refill(struct net_device *dev, struct sk_buff **skbs)
-{
-	return ixgbe_mq_rx_refill(dev, 0, skbs);
 }
 
 static int ixgbe_mq_rx_refill(struct net_device *dev, unsigned int queue_num, struct sk_buff **skbs)
@@ -9285,11 +9275,6 @@ static int ixgbe_mq_rx_refill(struct net_device *dev, unsigned int queue_num, st
 	return ixgbe_desc_unused(rx_ring);
 }
 
-static int ixgbe_tx_eob(struct net_device *dev)
-{
-	return ixgbe_mq_tx_eob(dev, 0);
-}
-
 static int ixgbe_mq_tx_eob(struct net_device *dev, unsigned int queue_num)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(dev);
@@ -9300,21 +9285,11 @@ static int ixgbe_mq_tx_eob(struct net_device *dev, unsigned int queue_num)
 	return 0;
 }
 
-static int ixgbe_tx_start(struct net_device *dev)
-{
-	return ixgbe_mq_tx_start(dev, 0);
-}
-
 static int ixgbe_mq_tx_start(struct net_device *dev, unsigned int queue_num)
 {
 	/*   printk("ixgbe_tx_start called\n"); */
 	ixgbe_mq_tx_eob(dev, queue_num);
 	return 0;
-}
-
-static int ixgbe_tx_pqueue(struct net_device *netdev, struct sk_buff *skb)
-{
-	return ixgbe_mq_tx_pqueue(netdev, 0, skb);
 }
 
 static int ixgbe_mq_tx_pqueue(struct net_device *netdev, unsigned int queue_num, struct sk_buff *skb)
@@ -9410,13 +9385,6 @@ static int ixgbe_mq_tx_pqueue(struct net_device *netdev, unsigned int queue_num,
 	return 0;
 }
 
-#define IXGBE_TX_QUEUE_WAKE 16
-
-static struct sk_buff * ixgbe_tx_clean(struct net_device *netdev)
-{
-	return ixgbe_mq_tx_clean(netdev, 0);
-}
-
 static struct sk_buff * ixgbe_mq_tx_clean(struct net_device *netdev, unsigned int queue_num)
 {
 	/*
@@ -9431,6 +9399,9 @@ static struct sk_buff * ixgbe_mq_tx_clean(struct net_device *netdev, unsigned in
 	union ixgbe_adv_tx_desc *tx_desc;
 	struct sk_buff *skb_head, *skb_last;
 	struct ixgbe_ring *tx_ring = adapter->tx_ring[queue_num];
+
+	if (adapter->flags & IXGBE_FLAG_DCA_ENABLED)
+		ixgbe_update_dca(tx_ring->q_vector);
 
 	skb_head = skb_last = 0;
 
@@ -9473,7 +9444,7 @@ static struct sk_buff * ixgbe_mq_tx_clean(struct net_device *netdev, unsigned in
 
 	//#define TX_WAKE_THRESHOLD (DESC_NEEDED * 2)
 
-	//#define IXGBE_TX_QUEUE_WAKE 16
+	#define IXGBE_TX_QUEUE_WAKE 16
 	if (skb_head && netif_carrier_ok(netdev) &&
 			(ixgbe_desc_unused(tx_ring) >= IXGBE_TX_QUEUE_WAKE)) {
 		//(IXGBE_DESC_UNUSED(tx_ring) >= TX_WAKE_THRESHOLD)) {
