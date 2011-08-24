@@ -1,6 +1,5 @@
 require 'interface_stat.rb'
 
-#cnt = `cat /proc/click/tod*/count| wc`
 
 if __FILE__== $0
   if ARGV.size != 1
@@ -9,35 +8,77 @@ if __FILE__== $0
   end
   time_interval= ARGV[0].to_i
 
+  cnt = `cat /proc/click/tod*/count 2>/dev/null| wc`
+  cmd = "cat /proc/click/tod*/count 2>/dev/null"
+  cmd_drop = "cat /proc/click/tod*/drop 2>/dev/null"
+  
+  if (cnt==0)
+    cmd = "cat /click/ge*/gen_sub*/td*/count 2>/dev/null"
+    cmd_drops = "cat /click/ge*/gen_sub*/td*/drops 2>/dev/null"
+  end
+  
+  cmd_rx = "cat /proc/click/pd*/count 2>/dev/null"
+  cmd_rx_drop = "cat /proc/click/pd*/drop 2>/dev/null"
+
+
   report_interval = 1
-  total_prev = `cat /proc/click/tod*/count | awk '{SUM+=$1} END {print SUM}'`
-  total_prev = total_prev.to_i
-  total_prev_drop = `cat /proc/click/tod*/drops | awk '{SUM+=$1} END {print SUM}'`
-  total_prev_drop = total_prev_drop.to_i
+  total_prev = `#{cmd} | awk '{SUM+=$1} END {print SUM}'`
+  total_prev = total_prev.to_f
+  total_prev_drop = `#{cmd_drop} | awk '{SUM+=$1} END {print SUM}'`
+  total_prev_drop = total_prev_drop.to_f
+
+  total_prev_rx = `#{cmd_rx} | awk '{SUM+=$1} END {print SUM}'`
+  total_prev_rx = total_prev_rx.to_f
+  total_prev_rx_drop = `#{cmd_rx_drop} | awk '{SUM+=$1} END {print SUM}'`
+  total_prev_rx_drop = total_prev_rx_drop.to_f
   start = Time.new
   prev = start
   now = start
   tx = 0
   tx_drop =0
-  timediff = 0 
+  rx = 0
+  rx_drop =0
+  total_duration = 0 
 
-  while (timediff+ report_interval/2 < time_interval)
+  while (total_duration+ report_interval/2 < time_interval)
     sleep(report_interval)
-    total = `cat /proc/click/tod*/count | awk '{SUM+=$1} END {print SUM}'`
-    total = total.to_i()
-    total_drop = `cat /proc/click/tod*/drops | awk '{SUM+=$1} END {print SUM}'`
-    total_drop = total_drop.to_i
+    total = `#{cmd} | awk '{SUM+=$1} END {print SUM}'`
+    total = total.to_f()
+    total_drop = `#{cmd_drop}  | awk '{SUM+=$1} END {print SUM}'`
+    total_drop = total_drop.to_f
+
+    total_rx = `#{cmd_rx} | awk '{SUM+=$1} END {print SUM}'`
+    total_rx = total_rx.to_f()
+    total_rx_drop = `#{cmd_rx_drop}  | awk '{SUM+=$1} END {print SUM}'`
+    total_rx_drop = total_rx_drop.to_f
+
+    # time 
     now = Time.new
-    timediff= now -start
-    duration = now -prev
-    diff = diff(total, total_prev)
-    diff_drop = diff(total_drop, total_prev_drop)
-    tx+= diff
-    tx_drop+= diff_drop
-    puts "TX pkts/sec " + (diff.to_f()/duration).to_s()  + " drop " + (diff_drop.to_f()/duration).to_s + " Duration " + duration.to_s() + " sec "
-    prev = now
+    total_duration= now -start
+    interval = now -prev
+
+    # TX
+    sent = diff(total, total_prev)
+    sent_drop = diff(total_drop, total_prev_drop)
+    tx+= sent
+    tx_drop+= sent_drop
+    puts "TX pkts/sec " + (sent.to_f()/interval).to_s()  + " drop " + (sent_drop.to_f()/interval).to_s + " Duration " + interval.to_s() + " sec "
     total_prev = total
     total_prev_drop = total_drop
+
+    # RX
+    recv= diff(total_rx, total_prev_rx)
+    recv_drop = diff(total_rx_drop, total_prev_rx_drop)
+    rx+= sent
+    rx_drop+= recv_drop
+    puts "RX pkts/sec " + (recv.to_f()/interval).to_s()  + " drop " + (recv_drop.to_f()/interval).to_s + " Duration " + interval.to_s() + " sec "
+
+    total_prev_rx = total_rx
+    total_prev_rx_drop = total_rx_drop
+
+    prev = now
+
   end
   puts "TX pkts/sec  " + (tx.to_f()/(now-start)).to_s() + " Drop " +(tx_drop/(now-start)).to_s() + " Duration " + (now-start).to_s() + " sec"
+  puts "RX pkts/sec  " + (rx.to_f()/(now-start)).to_s() + " Drop " +(rx_drop/(now-start)).to_s() + " Duration " + (now-start).to_s() + " sec"
 end
