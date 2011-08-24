@@ -9124,6 +9124,7 @@ static int ixgbe_poll_on (struct net_device *dev)
 
 static int ixgbe_poll_off(struct net_device *dev)
 {
+#if 0
 	if (dev->polling) {
 		struct ixgbe_adapter *adapter = netdev_priv(dev);
 		//unsigned long flags;
@@ -9135,9 +9136,15 @@ static int ixgbe_poll_off(struct net_device *dev)
 		ixgbe_irq_enable_queues(adapter, qmask);
 		//ixgbe_napi_enable_all(adapter);
 		//local_irq_restore(flags);
-
 		printk("ixgbe_poll_off\n");
+		
+		/* This doesn't work either */
+		//ixgbe_down(adapter);
+		//ixgbe_reset(adapter);
+
+		printk("ixgbe_poll_off returning\n");
 	}
+#endif
 
 	return 0;
 }
