@@ -82,6 +82,8 @@ class RecycledSkbPool { public:
 #endif
 #if DEBUG_SKBMGR
   int _allocated;
+  int _empty_bucket;
+  int _no_bucket;
   int _freed;
   int _recycle_freed;
   int _recycle_allocated;
@@ -180,6 +182,8 @@ RecycledSkbPool::initialize()
   _freed = 0;
   _recycle_allocated = 0;
   _allocated = 0;
+  _empty_bucket = 0;
+  _no_bucket = 0;
 #endif
 }
 
@@ -195,8 +199,8 @@ RecycledSkbPool::cleanup()
 #endif
 #if DEBUG_SKBMGR
   if (_freed > 0 || _allocated > 0)
-    printk ("poll %p: %d/%d freed, %d/%d allocated\n", this,
-	    _freed, _recycle_freed, _allocated, _recycle_allocated);
+    printk ("poll %p: %d/%d freed, %d/%d allocated empty_bucket %d no_bucket %d\n", this,
+	    _freed, _recycle_freed, _allocated, _recycle_allocated, _empty_bucket, _no_bucket);
 #endif
   unlock();
 }
@@ -281,7 +285,7 @@ RecycledSkbPool::recycle(struct sk_buff *skbs)
     struct sk_buff *skb = skbs;
     skbs = skbs->next;
 
-#if HAVE_SKB_RECYCLE_CHECK
+#if HAVE_SKB_RECYCLE_CHECK	
     // where should sk_buff go?
 # if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
     unsigned char *skb_end = skb_end_pointer(skb);
@@ -332,6 +336,11 @@ RecycledSkbPool::allocate(unsigned headroom, unsigned size, int want, int *store
   if (bucket >= 0) {
     lock();
     RecycledSkbBucket &buck = _buckets[bucket];
+#if DEBUG_SKBMGR
+    if (buck.empty()) {
+      _empty_bucket++;
+    }
+#endif
     while (got < want && !buck.empty()) {
       struct sk_buff *skb = _buckets[bucket].deq();
 #if DEBUG_SKBMGR
@@ -343,6 +352,10 @@ RecycledSkbPool::allocate(unsigned headroom, unsigned size, int want, int *store
       got++;
     }
     unlock();
+  } else {
+#if DEBUG_SKBMGR
+    _no_bucket++;
+#endif
   }
 
   size = size_to_higher_bucket_size(headroom + size);

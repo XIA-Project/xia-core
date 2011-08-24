@@ -125,6 +125,7 @@ click_sched(void *thunk)
     rt->driver();
 
     // release master (preserved in click_init_sched)
+    printk("<1>click: stopping router thread (%d) pid %d (%p)\n", rt->thread_id(), current->pid, rt);
     click_master->unuse();
 
     // remove pid from thread list
@@ -146,6 +147,7 @@ click_sched(void *thunk)
 static int
 kill_router_threads()
 {
+    click_chatter("Deleting placeholder_router %p", (void*)placeholder_router);
     delete placeholder_router;
     if (click_router)
 	click_router->set_runcount(Router::STOP_RUNCOUNT);
@@ -421,7 +423,7 @@ click_cleanup_sched()
 	delete click_thread_tasks;
 	click_thread_tasks = 0;
 	click_master->unuse();
-	click_master = 0;
+	//click_master = 0;
 	return 0;
     }
 }

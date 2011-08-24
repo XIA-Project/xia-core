@@ -25,6 +25,9 @@
 #include <click/error.hh>
 #include <click/handlercall.hh>
 #include <click/heap.hh>
+#if CLICK_LINUXMODULE
+#include <linuxmodule/modulepriv.hh>
+#endif
 #if CLICK_USERLEVEL
 # include <fcntl.h>
 # include <click/userutils.hh>
@@ -41,7 +44,7 @@ extern "C" { static void sighandler(int signo); }
 Master::Master(int nthreads)
     : _routers(0)
 {
-    _refcount = 0;
+    atomic_set(&_refcount, 0);
     _master_paused = 0;
 
     _nthreads = nthreads + 1;
@@ -71,7 +74,7 @@ Master::Master(int nthreads)
 Master::~Master()
 {
     lock_master();
-    _refcount++;
+    atomic_inc(&_refcount);
     while (_routers) {
 	Router *r = _routers;
 	r->use();
@@ -80,11 +83,13 @@ Master::~Master()
 	r->unuse();
 	lock_master();
     }
-    _refcount--;
+    //_refcount--;
+    atomic_dec(&_refcount);
     unlock_master();
 
-    if (_refcount > 0)
-	click_chatter("deleting master while ref count = %d", _refcount);
+    int refcount =atomic_read(&_refcount) ;
+    if (refcount > 0)
+	click_chatter("deleting master while ref count = %d", refcount);
 
 #if CLICK_USERLEVEL
     signal_thread = 0;
@@ -98,7 +103,9 @@ void
 Master::use()
 {
     lock_master();
-    _refcount++;
+    click_chatter("Master b incr refcount %d\n", _refcount);
+    atomic_inc(&_refcount);
+    click_chatter("Master a incr refcount %d\n", _refcount);
     unlock_master();
 }
 
@@ -106,11 +113,16 @@ void
 Master::unuse()
 {
     lock_master();
-    _refcount--;
-    bool del = (_refcount <= 0);
+    //_refcount--;
+    atomic_dec(&_refcount);
+    click_chatter("Master decr refcount %d\n", _refcount);
+    bool del = (atomic_read(&_refcount) <= 0);
     unlock_master();
-    if (del)
+    if (del) {
 	delete this;
+	click_chatter("Master deleted\n");
+	click_master = 0;
+    }
 }
 
 void
@@ -151,7 +163,8 @@ Master::register_router(Router *router)
 {
     lock_master();
     assert(router && router->_master == 0 && router->_running == Router::RUNNING_INACTIVE && !router->_next_router);
-    _refcount++;		// balanced in unregister_router()
+    atomic_inc(&_refcount);		// balanced in unregister_router()
+    click_chatter("%s incr master _refcount %d router(%p)", __FUNCTION__, atomic_read(&_refcount), (void *)router);
     router->_master = this;
     router->_next_router = _routers;
     _routers = router;
@@ -245,6 +258,7 @@ Master::kill_router(Router *router)
 void
 Master::unregister_router(Router *router)
 {
+    bool del;
     assert(router);
     lock_master();
 
@@ -261,11 +275,19 @@ Master::unregister_router(Router *router)
 		pprev = &r->_next_router;
 	    }
 	*pprev = 0;
-	_refcount--;		// balanced in register_router()
+	//_refcount--;		// balanced in register_router()
+        atomic_dec(&_refcount);		// balanced in unregister_router()
+	click_chatter("%s decr master _refcount %d router (%p)", __FUNCTION__, atomic_read(&_refcount), (void *)router);
+        del = (atomic_read(&_refcount) <= 0);
 	router->_master = 0;
     }
 
     unlock_master();
+    if (del) {
+	delete this;
+	click_chatter("Master deleted\n");
+	click_master = 0;
+    }
 }
 
 bool

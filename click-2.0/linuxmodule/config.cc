@@ -106,8 +106,11 @@ kill_router()
 {
     if (click_router) {
 	click_config_generation++;
+        click_chatter("unuse()ing click_router (%p)", (void *)click_router);
 	click_router->unuse();
 	click_router = 0;
+    } else {
+        click_chatter("kill_router: click_router already null. Check if this is an error");
     }
 }
 
@@ -188,6 +191,7 @@ click_init_config()
 void
 click_cleanup_config()
 {
+    click_chatter("kill_router called %s", __FUNCTION__);
     kill_router();
     click_unexport_elements();
     delete current_config;

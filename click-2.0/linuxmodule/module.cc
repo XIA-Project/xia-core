@@ -338,19 +338,26 @@ cleanup_module()
     extern size_t click_dmalloc_curnew; /* glue.cc */
 
     // filesystem interface
+    printk("<1>click cleanup_clickfs");
     cleanup_clickfs();
 
+    printk("<1>click cleanup_sched");
     click_cleanup_sched();
 
     // extra packages, global handlers, packets
+    printk("<1>click cleanup_packages");
     click_cleanup_packages();
+    printk("<1>click cleanup_router");
     Router::static_cleanup();
+    printk("<1>click cleanup_pacet");
     Packet::static_cleanup();
 
     // config manager, thread manager, sk_buff manager
+    printk("<1>click config");
     click_cleanup_config();
     // shouldn't this be cleaned earlier to prevent threads from accessing other data?
     //click_cleanup_sched();
+    printk("<1>click skbmgr");
     skbmgr_cleanup();
 
     cp_va_static_cleanup();

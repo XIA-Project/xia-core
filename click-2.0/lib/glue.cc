@@ -34,6 +34,7 @@
 #elif CLICK_LINUXMODULE
 # if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 0)
 #  include <click/cxxprotect.h>
+#  include <linux/kallsyms.h>
 CLICK_CXX_PROTECT
 #  include <linux/vmalloc.h>
 CLICK_CXX_UNPROTECT
@@ -194,12 +195,15 @@ struct task_struct *clickfs_task;
 struct Chunk {
     uint32_t magic;
     uint32_t where;
+    void* caller;
+    void* caller1;
+    void* caller2;
     size_t size;
     Chunk *prev;
     Chunk *next;
 };
 static Chunk chunks = {
-    CHUNK_MAGIC, 0, 0, &chunks, &chunks
+    CHUNK_MAGIC, 0, 0, 0, 0, 0, &chunks, &chunks
 };
 
 static char *
@@ -233,6 +237,9 @@ operator new(size_t sz) throw ()
     Chunk *c = (Chunk *)v;
     c->magic = CHUNK_MAGIC;
     c->size = sz;
+    c->caller =  __builtin_return_address(0);
+    c->caller1 =  __builtin_return_address(1);
+    c->caller2 =  __builtin_return_address(2);
     c->where = click_dmalloc_where;
     c->prev = &chunks;
     c->next = chunks.next;
@@ -266,6 +273,9 @@ operator new[](size_t sz) throw ()
     Chunk *c = (Chunk *)v;
     c->magic = CHUNK_MAGIC;
     c->size = sz;
+    c->caller =  __builtin_return_address(0);
+    c->caller1 =  __builtin_return_address(1);
+    c->caller2 =  __builtin_return_address(2);
     c->where = click_dmalloc_where;
     c->prev = &chunks;
     c->next = chunks.next;
@@ -346,14 +356,23 @@ operator delete[](void *addr)
 void
 click_dmalloc_cleanup()
 {
+
 # if CLICK_DMALLOC
   while (chunks.next != &chunks) {
+    char *modname = NULL;
+    const char *name = NULL;
+    unsigned long kaoffset, kasize;
+    char namebuf[KSYM_SYMBOL_LEN];  
+
     Chunk *c = chunks.next;
     chunks.next = c->next;
     c->next->prev = &chunks;
 
-    click_chatter("  chunk at %p size %d alloc[%s] data ",
-		  (void *)(c + 1), c->size, printable_where(c));
+    click_chatter("  chunk at %p size %d alloc[%s] caller %p %p %p data ",
+		  (void *)(c + 1), c->size, c->caller, c->caller1, c->caller2, printable_where(c));
+   // name = sprint_symbol(namebuf, (unsigned long)c->caller); 
+   // click_chatter("namebuf %s modname %s", namebuf, modname);
+   
     unsigned char *d = (unsigned char *)(c + 1);
     for (int i = 0; i < 20 && i < c->size; i++)
       click_chatter("%02x", d[i]);
@@ -386,7 +405,7 @@ click_lalloc(size_t size)
 	click_dmalloc_curnew++;
 # if CLICK_DMALLOC
 	click_dmalloc_curmem += size;
-	click_dmalloc_totalmem += size;
+	//click_dmalloc_totalmem += size;
 # endif
     } else
 	click_dmalloc_failnew++;

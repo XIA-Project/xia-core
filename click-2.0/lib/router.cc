@@ -148,8 +148,12 @@ Router::~Router()
 	delete ns;
     }
     delete _name_info;
-    if (_master)
+
+    if (_master) {
 	_master->unregister_router(this);
+    } else {
+        click_chatter("Unregister router didn't get called because _master is NULL\n");
+    }
 }
 
 /** @brief  Decrement the router's reference count.

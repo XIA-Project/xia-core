@@ -62,7 +62,7 @@ class Master { public:
 
     // ROUTERS
     Router *_routers;
-    int _refcount;
+    atomic_t _refcount;
     void register_router(Router*);
     void prepare_router(Router*);
     void run_router(Router*, bool foreground);
@@ -174,8 +174,10 @@ TimerSet::next_timer_delay(bool more_tasks, Timestamp &t) const
 inline void
 Master::set_stopper(int s)
 {
-    for (RouterThread **t = _threads; t != _threads + _nthreads; ++t)
-	(*t)->_stop_flag = s;
+    for (RouterThread **t = _threads; t != _threads + _nthreads; ++t) {
+	if ((*t)->_stop_flag==0)
+		(*t)->_stop_flag = s;
+    }
 }
 
 inline void
