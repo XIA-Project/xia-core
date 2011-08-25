@@ -251,6 +251,7 @@ MQPollDevice::run_task(Task *)
      * Skbmgr adds 64 bytes of headroom and tailroom, so back request off to
      * 1536.
      */
+    //nskbs = min(512,nskbs);
     struct sk_buff *new_skbs = skbmgr_allocate_skbs(_headroom, 1536, &nskbs);
 //    struct sk_buff *new_skbs = skbmgr_allocate_skbs(_headroom, 270, &nskbs);
 
@@ -277,7 +278,9 @@ MQPollDevice::run_task(Task *)
 
   for (int i = 0; i < got; i++) {
     skb = skb_list;
+    assert(skb_list!=NULL);
     skb_list = skb_list->next;
+    assert(skb!=NULL);
     skb->next = NULL;
  
     if (skb_list) {
