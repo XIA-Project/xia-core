@@ -1,3 +1,4 @@
+#!/usr/bin/env ruby
 require 'interface_stat.rb'
 
 

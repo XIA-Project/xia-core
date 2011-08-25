@@ -16,7 +16,7 @@
  * notice is a summary of the Click LICENSE file; the license in that file is
  * legally binding.
  */
-
+//#define USELOCK
 #include <click/config.h>
 
 #include <click/glue.hh>
@@ -34,9 +34,11 @@ CLICK_CXX_UNPROTECT
 #include <click/cxxunprotect.h>
 
 #define DEBUG_SKBMGR 1
+//#define DEBUG_SKBMGR 0
 
 class RecycledSkbBucket { public:
-  static const int SIZE = 62;
+  //static const int SIZE = 62;
+  static const int SIZE = 256;
 
   void initialize();
   void cleanup();
@@ -56,7 +58,7 @@ class RecycledSkbBucket { public:
   static int next_i(int i)	{ return (i == SIZE - 1 ? 0 : i + 1); }
   friend class RecycledSkbPool;
 
-};
+} ____cacheline_aligned;
 
 class RecycledSkbPool { public:
 
@@ -84,12 +86,13 @@ class RecycledSkbPool { public:
   int _allocated;
   int _empty_bucket;
   int _no_bucket;
+  int _recycle_free_bucket_negative;
+  int _recycle_check_failed;
   int _freed;
   int _recycle_freed;
   int _recycle_allocated;
-  int _pad[1];
 #else
-  int _pad[5];
+  int _pad[8];
 #endif
 
   inline void lock();
@@ -105,7 +108,7 @@ class RecycledSkbPool { public:
   friend struct sk_buff *skbmgr_allocate_skbs(unsigned, unsigned, int *);
   friend void skbmgr_recycle_skbs(struct sk_buff *);
 
-};
+} ____cacheline_aligned;
 
 void
 RecycledSkbBucket::initialize()
@@ -180,6 +183,8 @@ RecycledSkbPool::initialize()
 #if DEBUG_SKBMGR
   _recycle_freed = 0;
   _freed = 0;
+  _recycle_free_bucket_negative = 0;
+  _recycle_check_failed = 0;
   _recycle_allocated = 0;
   _allocated = 0;
   _empty_bucket = 0;
@@ -198,9 +203,11 @@ RecycledSkbPool::cleanup()
   _consumers = 0;
 #endif
 #if DEBUG_SKBMGR
-  if (_freed > 0 || _allocated > 0)
+  if (_freed > 0 || _allocated > 0)  {
     printk ("poll %p: %d/%d freed, %d/%d allocated empty_bucket %d no_bucket %d\n", this,
 	    _freed, _recycle_freed, _allocated, _recycle_allocated, _empty_bucket, _no_bucket);
+    printk("_recycle_check_failed %d _recycle_free_bucket_negative %d\n",  _recycle_check_failed, _recycle_free_bucket_negative);
+  }
 #endif
   unlock();
 }
@@ -296,7 +303,9 @@ RecycledSkbPool::recycle(struct sk_buff *skbs)
 
     // try to put in that bucket
     if (bucket >= 0) {
+#ifdef USELOCK
       lock();
+#endif 
       int tail = _buckets[bucket]._tail;
       int next = _buckets[bucket].next_i(tail);
       if (next != _buckets[bucket]._head) {
@@ -305,12 +314,23 @@ RecycledSkbPool::recycle(struct sk_buff *skbs)
 	  _buckets[bucket]._skbs[tail] = skb;
 	  _buckets[bucket]._tail = next;
 	  skb = 0;
-	}
 # if DEBUG_SKBMGR
-        _recycle_freed++;
+          _recycle_freed++;
 # endif
+	} else {
+# if DEBUG_SKBMGR
+          _recycle_check_failed++;
+# endif
+        }
       }
+#ifdef USELOCK
       unlock();
+#endif
+    } else {
+# if DEBUG_SKBMGR
+	  if ( _recycle_free_bucket_negative++%1024*1024==0)
+		click_chatter("WARNING: _recycle_free_bucket_negative (%d)", skb_end - skb->head);
+# endif
     }
 #endif
 
@@ -334,7 +354,9 @@ RecycledSkbPool::allocate(unsigned headroom, unsigned size, int want, int *store
   int got = 0;
 
   if (bucket >= 0) {
+#ifdef USELOCK
     lock();
+#endif
     RecycledSkbBucket &buck = _buckets[bucket];
 #if DEBUG_SKBMGR
     if (buck.empty()) {
@@ -351,7 +373,9 @@ RecycledSkbPool::allocate(unsigned headroom, unsigned size, int want, int *store
       prev = &skb->next;
       got++;
     }
+#ifdef USELOCK
     unlock();
+#endif
   } else {
 #if DEBUG_SKBMGR
     _no_bucket++;
@@ -414,6 +438,7 @@ skbmgr_allocate_skbs(unsigned headroom, unsigned size, int *want)
   int bucket = RecycledSkbPool::size_to_higher_bucket(headroom + size);
 
   int w = *want;
+#ifdef USELOCK
   if (pool[producer].bucket(bucket).size() < w) {
     if (pool[cpu]._last_producer < 0 ||
 	pool[pool[cpu]._last_producer].bucket(bucket).size() < w)
@@ -421,6 +446,7 @@ skbmgr_allocate_skbs(unsigned headroom, unsigned size, int *want)
     if (pool[cpu]._last_producer >= 0)
       producer = pool[cpu]._last_producer;
   }
+#endif
   sk_buff *skb = pool[producer].allocate(headroom, size, w, want);
   click_put_processor();
   return skb;
