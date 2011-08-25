@@ -655,6 +655,7 @@ freebsd_srcdir
 FINDELEMFLAGS
 element_groups
 linux_srcdir
+moduleinstpath
 linux_builddir
 INCLUDE_KSYMS
 LINUXMODULE_FIXINCLUDES
@@ -6174,6 +6175,7 @@ linux_system_map_boot=no
 if test "x$linuxpath" = xNONE -o "x$linuxpath" = xyes; then
     if uname -r 2>/dev/null | grep '^2\.6' >/dev/null 2>&1; then
 	linuxpath=/lib/modules/"`uname -r`"/build
+	moduleinstpath=/lib/modules/"`uname -r`"/kernel
 	linux_system_map_boot="`uname -r`"
     else
 	linuxpath=/usr/src/linux
@@ -6254,6 +6256,7 @@ Are you sure $linuxpath contains a Linux kernel build?
 =========================================" "$LINENO" 5
 	    fi
 fi
+
 
 
 
@@ -7157,7 +7160,7 @@ else
 
 	    	    ac_cv_endian=0
 	    cat > conftest.$ac_ext <<EOF
-#line 7160 "configure"
+#line 7163 "configure"
 #include "confdefs.h"
 #include <$endian_hdr>
 #ifdef __BYTE_ORDER

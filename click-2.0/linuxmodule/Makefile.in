@@ -15,6 +15,7 @@ linux_builddir = @linux_builddir@
 linux_srcdir = @linux_srcdir@
 linux_makeargs = @linux_makeargs@
 
+
 LIB_CXX_OBJS = string.o straccum.o nameinfo.o \
 	bitvector.o vectorv.o templatei.o bighashmap_arena.o hashallocator.o \
 	ipaddress.o ipflowid.o etheraddress.o \
@@ -59,6 +60,7 @@ ifeq (@LINUXMODULE_2_6@,1)
 ## LINUX 2.6								##
 
 KERNELPATH = @linux_builddir@
+MODULEINSTPATH = @moduleinstpath@
 
 ifeq ($(KBUILD_EXTMOD),)
 top_srcdir := @top_srcdir@
@@ -196,6 +198,8 @@ install-local: Makefile $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc all
 	$(CLICKmkinstalldirs) $(DESTDIR)$(libdir)
 	for i in $(patsubst %.o,%.ko,$(INSTALLOBJS)); do $(CLICK_BUILD_INSTALL_DATA) $$i $(DESTDIR)$(libdir)/$$i; done
 	$(CLICK_BUILD_INSTALL_DATA) Module.symvers $(DESTDIR)$(libdir)/click.symvers
+	cp click.ko $(MODULEINSTPATH)/drivers
+	/sbin/depmod -a || true
 install-include:
 	/bin/rm -f .install-include*
 	$(CLICKmkinstalldirs) $(DESTDIR)$(includedir)/click-linuxmodule

@@ -199,6 +199,7 @@ linux_system_map_boot=no
 if test "x$linuxpath" = xNONE -o "x$linuxpath" = xyes; then
     if uname -r 2>/dev/null | grep '^2\.6' >/dev/null 2>&1; then
 	linuxpath=/lib/modules/"`uname -r`"/build
+	moduleinstpath=/lib/modules/"`uname -r`"/kernel
 	linux_system_map_boot="`uname -r`"
     else
 	linuxpath=/usr/src/linux
@@ -285,6 +286,7 @@ Are you sure $linuxpath contains a Linux kernel build?
 fi
 
 AC_SUBST(linux_builddir)
+AC_SUBST(moduleinstpath)
 AC_SUBST(linux_srcdir)
 AC_DEFINE_UNQUOTED(LINUX_SRCDIR, "${linux_srcdir}")
 
