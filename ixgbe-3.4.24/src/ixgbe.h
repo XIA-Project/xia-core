@@ -359,6 +359,7 @@ struct ixgbe_ring {
 
 	u16 next_to_use;
 	u16 next_to_clean;
+	u16 last_notified;
 
 	u8 dcb_tc;
 	struct ixgbe_queue_stats stats;
@@ -454,6 +455,14 @@ static inline u16 ixgbe_desc_unused(struct ixgbe_ring *ring)
 	u16 ntu = ring->next_to_use;
 
 	return ((ntc > ntu) ? 0 : ring->count) + ntc - ntu - 1;
+}
+
+static inline u16 ixgbe_desc_unnotified(struct ixgbe_ring *ring)
+{
+	u16 ntu = ring->next_to_use;
+	u16 ltn = ring->last_notified;
+
+	return ((ntu > ltn) ? 0 : ring->count) + ntu - ltn;
 }
 
 #define IXGBE_RX_DESC_ADV(R, i)	    \

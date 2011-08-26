@@ -4597,6 +4597,7 @@ void ixgbe_clean_rx_ring(struct ixgbe_ring *rx_ring)
 
 	rx_ring->next_to_clean = 0;
 	rx_ring->next_to_use = 0;
+	rx_ring->last_notified = 0;
 }
 
 /**
@@ -4627,6 +4628,7 @@ static void ixgbe_clean_tx_ring(struct ixgbe_ring *tx_ring)
 
 	tx_ring->next_to_use = 0;
 	tx_ring->next_to_clean = 0;
+	tx_ring->last_notified = 0;
 }
 
 /**
@@ -6058,6 +6060,7 @@ int ixgbe_setup_tx_resources(struct ixgbe_ring *tx_ring)
 
 	tx_ring->next_to_use = 0;
 	tx_ring->next_to_clean = 0;
+	tx_ring->last_notified = 0;
 	return 0;
 
 err:
@@ -6126,6 +6129,7 @@ int ixgbe_setup_rx_resources(struct ixgbe_ring *rx_ring)
 
 	rx_ring->next_to_clean = 0;
 	rx_ring->next_to_use = 0;
+	rx_ring->last_notified = 0;
 
 	return 0;
 err:
@@ -7177,6 +7181,8 @@ static void ixgbe_service_timer(unsigned long data)
 
 	/* poll faster when waiting for link */
 	if (adapter->flags & IXGBE_FLAG_NEED_LINK_UPDATE)
+		next_event_offset = HZ / 10;
+	else if (adapter->netdev->polling)
 		next_event_offset = HZ / 10;
 	else
 		next_event_offset = HZ * 2;
@@ -9165,7 +9171,15 @@ static struct sk_buff *ixgbe_mq_rx_poll(struct net_device *dev, unsigned int que
 	if (adapter->flags & IXGBE_FLAG_DCA_ENABLED)
 		ixgbe_update_dca(rx_ring->q_vector);
 
+	//if (!(le32_to_cpu(IXGBE_RX_DESC_ADV(rx_ring, (rx_ring->next_to_clean + 16) % rx_ring->count)->wb.upper.status_error) & IXGBE_RXD_STAT_DD)) {
+	//	*want = 0;
+	//	return NULL;
+	//}
+
 	skb = &skb_head;
+
+	__builtin_prefetch(*skb, 1, 0);
+	__builtin_prefetch(IXGBE_RX_DESC_ADV(rx_ring, rx_ring->next_to_clean), 1, 0);
 
 	for( got = 0, next = (rx_ring->next_to_clean + 1) % rx_ring->count;
 			got < *want && next != rx_ring->next_to_use;
@@ -9174,19 +9188,23 @@ static struct sk_buff *ixgbe_mq_rx_poll(struct net_device *dev, unsigned int que
 
 		int i = rx_ring->next_to_clean;
 
-		__builtin_prefetch(rx_ring->rx_buffer_info[next].skb);
-
 		rx_desc =  IXGBE_RX_DESC_ADV(rx_ring, i);
 		staterr = le32_to_cpu(rx_desc->wb.upper.status_error); //adv rx_desc is used
 		if(!(staterr & IXGBE_RXD_STAT_DD)) {
 			//printk(KERN_INFO "rx_poll got nothing\n");
 			break;
 		}
+		__builtin_prefetch(IXGBE_RX_DESC_ADV(rx_ring, next), 1, 0);
+		__builtin_prefetch(rx_ring->rx_buffer_info[next].skb, 1, 0);
 		//printk(KERN_INFO "rx_poll got dma=%p, i=%d\n", (void *)rx_ring->rx_buffer_info[i].dma, i);
 
 		//prefetch(rx_ring->rx_buffer_info[i].skb->data - NET_IP_ALIGN);
-		pci_unmap_page(pdev, rx_ring->rx_buffer_info[i].dma,
-				PAGE_SIZE, PCI_DMA_FROMDEVICE);
+		//pci_unmap_page(pdev, rx_ring->rx_buffer_info[i].dma,
+		//		PAGE_SIZE, PCI_DMA_FROMDEVICE);
+		dma_unmap_single(rx_ring->dev,
+				rx_ring->rx_buffer_info[i].dma,
+				rx_ring->rx_buf_len,
+				DMA_FROM_DEVICE);
 
 		//printk(KERN_INFO "rx_poll got skb=%p, skb->data=%p\n", rx_ring->rx_buffer_info[i].skb, rx_ring->rx_buffer_info[i].skb->data);
 		*skb = rx_ring->rx_buffer_info[i].skb;
@@ -9216,6 +9234,54 @@ static struct sk_buff *ixgbe_mq_rx_poll(struct net_device *dev, unsigned int que
 		rx_ring->stats.packets++;
 		rx_ring->stats.bytes += len;
 
+		struct ixgbe_ring *tx_ring = adapter->tx_ring[queue_num];
+		if (test_bit(__IXGBE_TX_FDIR_INIT_DONE, &tx_ring->state) &&
+			tx_ring->atr_sample_rate &&
+			++tx_ring->atr_count >= tx_ring->atr_sample_rate) {
+
+			tx_ring->atr_count = 0;
+
+			static int c = 0;
+			if (!c) {
+				printk(KERN_INFO "ATR capable - protocol %d\n", ntohs((*skb)->protocol));
+				c = 1;
+			}
+			//if ((*skb)->protocol == __constant_htons(ETH_P_IP)) {
+			{
+				//struct iphdr *ipv4 = ip_hdr(*skb);
+				struct iphdr *ipv4 = (char*)(*skb)->data;
+				static int c1 = 0;
+				if (!c1) {
+					printk(KERN_INFO "ATR ip - protocol %d ihl %d\n", ipv4->protocol, ipv4->ihl);
+					c1 = 1;
+				}
+				if (ipv4->protocol == IPPROTO_UDP) {
+					union ixgbe_atr_hash_dword input = { .dword = 0 };
+					union ixgbe_atr_hash_dword common = { .dword = 0 };
+
+					struct udphdr *uh = (char*)ipv4 + ipv4->ihl * 4;
+
+					static int c2 = 0;
+					if (!c2) {
+						printk(KERN_INFO "ATR udp port %d %d\n", ntohs(uh->source), ntohs(uh->dest));
+						c2 = 1;
+					}
+
+					input.formatted.vlan_id = 0;
+
+					common.port.src ^= uh->source ^ __constant_htons(ETH_P_IP);
+					common.port.dst ^= uh->dest;
+
+					input.formatted.flow_type = IXGBE_ATR_FLOW_TYPE_UDPV4;
+					common.ip ^= ipv4->saddr ^ ipv4->daddr;
+					int fdir_queue_num = ntohs(uh->dest) % adapter->num_rx_queues;
+					ixgbe_fdir_add_signature_filter_82599(&adapter->hw,
+									      input, common, fdir_queue_num);
+				}
+			}
+		}
+
+		//__builtin_prefetch((*skb)->data);
 		skb = &((*skb)->next);
 		*skb = NULL;
 	} //end for
@@ -9233,6 +9299,7 @@ static int ixgbe_mq_rx_refill(struct net_device *dev, unsigned int queue_num, st
 	union ixgbe_adv_rx_desc *rx_desc;
 	struct sk_buff *skb;
 	int next;
+	int org_next_to_use = rx_ring->next_to_use;
 
 	/*
 	 * Update statistics counters, check link.
@@ -9244,8 +9311,11 @@ static int ixgbe_mq_rx_refill(struct net_device *dev, unsigned int queue_num, st
 	if (!netif_carrier_ok(dev))
 		return 0;
 
-	if(skbs == 0)
+	if (skbs == 0)
 		return ixgbe_desc_unused(rx_ring);
+
+	__builtin_prefetch(*skbs, 1, 0);
+	__builtin_prefetch(IXGBE_RX_DESC_ADV(rx_ring, rx_ring->next_to_use), 1, 0);
 
 	for( next = (rx_ring->next_to_use + 1) % rx_ring->count;
 			next != rx_ring->next_to_clean;
@@ -9260,6 +9330,7 @@ static int ixgbe_mq_rx_refill(struct net_device *dev, unsigned int queue_num, st
 			break;
 
 		*skbs = skb->next;
+		__builtin_prefetch(skb->next, 1, 0);
 		skb->next = NULL;
 		skb->dev = dev;
 
@@ -9268,12 +9339,17 @@ static int ixgbe_mq_rx_refill(struct net_device *dev, unsigned int queue_num, st
 		//rx_ring->rx_buffer_info[i].length = adapter->rx_buffer_len;
 		//we may have to get rid of NET_IP_ALIGN, and in poll too, in e1000_click
 		//this is not set for pci_map_single
+		//rx_ring->rx_buffer_info[i].dma =
+		//	pci_map_single(pdev,
+		//			skb->data,
+		//			rx_ring->rx_buf_len + NET_IP_ALIGN,
+		//			//rx_ring->rx_buf_len,
+		//			PCI_DMA_FROMDEVICE);
 		rx_ring->rx_buffer_info[i].dma =
-			pci_map_single(pdev,
+			dma_map_single(rx_ring->dev,
 					skb->data,
-					rx_ring->rx_buf_len + NET_IP_ALIGN,
-					//rx_ring->rx_buf_len,
-					PCI_DMA_FROMDEVICE);
+					rx_ring->rx_buf_len,
+					DMA_FROM_DEVICE);
 
 		rx_desc =  IXGBE_RX_DESC_ADV(rx_ring, i);
 		rx_desc->read.pkt_addr = cpu_to_le64(rx_ring->rx_buffer_info[i].dma);
@@ -9283,10 +9359,13 @@ static int ixgbe_mq_rx_refill(struct net_device *dev, unsigned int queue_num, st
 		//wmb();
 		//next and rx_ring->next_to_use will be the same here looking at one beyond what's availabe to hw
 		//writel(next, adapter->hw.hw_addr + rx_ring->tail);
-
+		__builtin_prefetch(IXGBE_RX_DESC_ADV(rx_ring, next), 1, 0);
 	}
-	writel(rx_ring->next_to_use, rx_ring->tail);
-	IXGBE_WRITE_FLUSH(&adapter->hw);
+	//if (ixgbe_desc_unnotified(rx_ring) >= 32) {
+		writel(rx_ring->next_to_use, rx_ring->tail);
+		rx_ring->last_notified = rx_ring->next_to_use;
+		IXGBE_WRITE_FLUSH(&adapter->hw);
+	//}
 	return ixgbe_desc_unused(rx_ring);
 }
 
