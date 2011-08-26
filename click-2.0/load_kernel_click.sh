@@ -5,7 +5,8 @@ IXGBE=`dirname $0`/../ixgbe-3.4.24
 echo compiling
 make -j24 -s -C `dirname $0`/ || exit 1
 pushd `dirname $0`/$IXGBE/src/
-./compile.sh || exit 1
+#./compile.sh || exit 1
+sudo ./compile.sh install || exit 1
 popd
 sync
 
@@ -58,6 +59,10 @@ sudo ifconfig eth2 promisc
 sudo ifconfig eth3 promisc
 sudo ifconfig eth4 promisc
 sudo ifconfig eth5 promisc
+#sudo ethtool -G eth2 rx 4096
+#sudo ethtool -G eth3 rx 4096
+#sudo ethtool -G eth4 rx 4096
+#sudo ethtool -G eth5 rx 4096
 
 echo use: sudo click-install -c -j NUM-THREADS CONF-FILE
 echo
