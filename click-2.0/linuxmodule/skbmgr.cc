@@ -309,6 +309,7 @@ RecycledSkbPool::recycle(struct sk_buff *skbs)
       int tail = _buckets[bucket]._tail;
       int next = _buckets[bucket].next_i(tail);
       if (next != _buckets[bucket]._head) {
+	//if (jiffies % 1000 != 0 && skb_recycle_check(skb, 0)) {	// NUMA test
 	// Note: skb_recycle_fast will free the skb if it cannot recycle it
 	if (skb_recycle_check(skb, 0)) {
 	  _buckets[bucket]._skbs[tail] = skb;

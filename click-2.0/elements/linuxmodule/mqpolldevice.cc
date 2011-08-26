@@ -286,12 +286,16 @@ MQPollDevice::run_task(Task *)
     if (skb_list) {
       // prefetch annotation area, and first 2 cache
       // lines that contain ethernet and ip headers.
-# if __i386__ && HAVE_INTEL_CPU
-      asm volatile("prefetcht0 %0" : : "m" (skb_list->cb[0]));
-      // asm volatile("prefetcht0 %0" : : "m" (*(skb_list->data)));
-      asm volatile("prefetcht0 %0" : : "m" (*(skb_list->data+32)));
-# endif
+//# if __i386__ && HAVE_INTEL_CPU
+//      asm volatile("prefetcht0 %0" : : "m" (skb_list->cb[0]));
+//      // asm volatile("prefetcht0 %0" : : "m" (*(skb_list->data)));
+//      asm volatile("prefetcht0 %0" : : "m" (*(skb_list->data+32)));
+//# endif
+	__builtin_prefetch(skb_list);
+	__builtin_prefetch(&skb_list->cb[0]);
+	__builtin_prefetch(&skb_list->destructor);
     }
+    __builtin_prefetch(skb->data);
 
     /* Retrieve the ether header. */
     skb_push(skb, 14);

@@ -848,6 +848,10 @@ void ixgbe_alloc_rx_buffers(struct ixgbe_ring *rx_ring, u16 cleaned_count)
 	struct ixgbe_rx_buffer *bi;
 	u16 i = rx_ring->next_to_use;
 
+#ifdef CLICKMQ
+	return;
+#endif
+
 	/* nothing to do or no valid netdev defined */
 	if (!cleaned_count || !netdev_ring(rx_ring))
 		return;
@@ -3258,8 +3262,6 @@ void ixgbe_configure_rx_ring(struct ixgbe_adapter *adapter,
 	IXGBE_WRITE_REG(hw, IXGBE_RXDCTL(reg_idx), rxdctl);
 
 	ixgbe_rx_desc_queue_enable(adapter, ring);
-	/* IF MQPolldevice is used, do not do ixgbe_alloc_rx_buffer for NUMA aware skb alloc */
-	//ixgbe_alloc_rx_buffers(ring, ixgbe_desc_unused(ring));
 }
 
 static void ixgbe_setup_psrtype(struct ixgbe_adapter *adapter)
@@ -9171,6 +9173,9 @@ static struct sk_buff *ixgbe_mq_rx_poll(struct net_device *dev, unsigned int que
 			next = (rx_ring->next_to_clean + 1) % rx_ring->count) {
 
 		int i = rx_ring->next_to_clean;
+
+		__builtin_prefetch(rx_ring->rx_buffer_info[next].skb);
+
 		rx_desc =  IXGBE_RX_DESC_ADV(rx_ring, i);
 		staterr = le32_to_cpu(rx_desc->wb.upper.status_error); //adv rx_desc is used
 		if(!(staterr & IXGBE_RXD_STAT_DD)) {
@@ -9247,11 +9252,13 @@ static int ixgbe_mq_rx_refill(struct net_device *dev, unsigned int queue_num, st
 			rx_ring->next_to_use = next,
 			next = (rx_ring->next_to_use + 1) % rx_ring->count ) {
 		int i = rx_ring->next_to_use;
+
 		if(rx_ring->rx_buffer_info[i].skb != NULL)
 			break;
 
 		if(!(skb = *skbs))
 			break;
+
 		*skbs = skb->next;
 		skb->next = NULL;
 		skb->dev = dev;
