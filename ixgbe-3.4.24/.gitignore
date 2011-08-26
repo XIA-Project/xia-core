@@ -2,3 +2,4 @@ src/.tmp_versions
 src/Module.symvers
 src/ixgbe.mod.c
 src/modules.order
+src/ixgbe.7.gz

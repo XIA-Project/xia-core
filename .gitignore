@@ -9,3 +9,5 @@ cscope.out
 *.o.cmd
 *.ko.cmd
 *.ko
+perf.data
+perf.data.old
