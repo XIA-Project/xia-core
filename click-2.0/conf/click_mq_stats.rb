@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
-require 'interface_stat.rb'
+
+require File.dirname(__FILE__) + '/interface_stat.rb'
 
 
 if __FILE__== $0
@@ -70,7 +71,7 @@ if __FILE__== $0
     # RX
     recv= diff(total_rx, total_prev_rx)
     recv_drop = diff(total_rx_drop, total_prev_rx_drop)
-    rx+= sent
+    rx+= recv 
     rx_drop+= recv_drop
     puts "RX pkts/sec " + (recv.to_f()/interval).to_s()  + " drop " + (recv_drop.to_f()/interval).to_s + " Duration " + interval.to_s() + " sec "
 
@@ -80,6 +81,6 @@ if __FILE__== $0
     prev = now
 
   end
-  puts "TX pkts/sec  " + (tx.to_f()/(now-start)).to_s() + " Drop " +(tx_drop/(now-start)).to_s() + " Duration " + (now-start).to_s() + " sec"
-  puts "RX pkts/sec  " + (rx.to_f()/(now-start)).to_s() + " Drop " +(rx_drop/(now-start)).to_s() + " Duration " + (now-start).to_s() + " sec"
+  puts "TX pkts/sec  " + (tx.to_f()/(now-start)).to_s() + " Drop " +(tx_drop.to_f()/(now-start)).to_s() + " Duration " + (now-start).to_s() + " sec"
+  puts "RX pkts/sec  " + (rx.to_f()/(now-start)).to_s() + " Drop " +(rx_drop.to_f()/(now-start)).to_s() + " Duration " + (now-start).to_s() + " sec"
 end
