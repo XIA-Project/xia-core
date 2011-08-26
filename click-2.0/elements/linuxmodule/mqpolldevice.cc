@@ -162,6 +162,7 @@ MQPollDevice::reset_counts()
 {
   _npackets = 0;
   _empty_polls = 0;
+  _last_nskbs = 0;
 
   for(int i=0; i<_burst; i++)
     _ppolledin[i] = 0;
@@ -239,10 +240,13 @@ MQPollDevice::run_task(Task *)
 # endif
 
   int nskbs = got;
-  if (got == 0)
+  if (got == 0) {
       nskbs = _dev->mq_rx_refill(_dev, _queue, 0);
+      _last_nskbs = nskbs;
+}
 
   if (nskbs > 0) {
+  //if (nskbs >= 16) {
     /*
      * Need to allocate 1536+16 == 1552 bytes per packet.
      * "Extra 16 bytes in the SKB for eepro100 RxFD -- perhaps there
@@ -291,11 +295,11 @@ MQPollDevice::run_task(Task *)
 //      // asm volatile("prefetcht0 %0" : : "m" (*(skb_list->data)));
 //      asm volatile("prefetcht0 %0" : : "m" (*(skb_list->data+32)));
 //# endif
-	__builtin_prefetch(skb_list);
-	__builtin_prefetch(&skb_list->cb[0]);
-	__builtin_prefetch(&skb_list->destructor);
+	//__builtin_prefetch(skb_list);
+	//__builtin_prefetch(&skb_list->cb[0]);
+	//__builtin_prefetch(&skb_list->destructor);	// for faster skb_orphan() in Packet::make()
     }
-    __builtin_prefetch(skb->data);
+    //__builtin_prefetch(skb->data);
 
     /* Retrieve the ether header. */
     skb_push(skb, 14);
@@ -402,6 +406,7 @@ MQPollDevice_read_calls(Element *f, void *)
   ret = String(kw->_npackets) + " packets received\n" +
     String(kw->_buffers_reused) + " buffers reused\n" +
     String(kw->_empty_polls) + " empty polls\n" +
+    String(kw->_last_nskbs) + " last nskbs\n" +
 #if CLICK_DEVICE_STATS
     String(kw->_time_poll) + " cycles poll\n" +
     String(kw->_time_refill) + " cycles refill\n" +
@@ -421,7 +426,8 @@ MQPollDevice_read_calls(Element *f, void *)
 #endif
   ret += "Polled in-->\n";
   for (int i=0; i<kw->_burst; i++)
-    ret += String(i+1)+":\t"+String(kw->_ppolledin[i])+"\n";
+    if (kw->_ppolledin[i] != 0)
+      ret += String(i+1)+":\t"+String(kw->_ppolledin[i])+"\n";
   return ret;
 }
 

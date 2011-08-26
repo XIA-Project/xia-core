@@ -122,6 +122,7 @@ class MQPollDevice : public AnyTaskDevice { public:
   Vector<uint32_t> _ppolledin;
   uint32_t _npackets;
   uint32_t _empty_polls;
+  uint32_t _last_nskbs;
 #if CLICK_DEVICE_STATS
   uint64_t _time_poll;
   uint64_t _time_allocskb;
