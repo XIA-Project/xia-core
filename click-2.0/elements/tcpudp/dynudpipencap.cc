@@ -36,6 +36,8 @@ int
 DynamicUDPIPEncap::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     bool do_cksum = true;
+    bool change_ip = false;
+
     _interval = 0;
     if (Args(conf, this, errh)
 	.read_mp("SRC", _saddr)
@@ -44,11 +46,13 @@ DynamicUDPIPEncap::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read_mp("DPORT", IPPortArg(IP_PROTO_UDP), _dport)
 	.read_p("CHECKSUM", do_cksum)
 	.read_p("INTERVAL", _interval)
+	.read("CHANGE_IP", change_ip)
 	.complete() < 0)
 	return -1;
 
   _id = 0;
   _cksum = do_cksum;
+  _change_ip = change_ip;
   _count = 0;
 
 #ifdef CLICK_LINUXMODULE
@@ -115,6 +119,10 @@ DynamicUDPIPEncap::simple_action(Packet *p_in)
   if (old_count == _interval-1 && _interval > 0) {
     _sport ++;
     _dport ++;
+    if (_change_ip) {
+	    _saddr.s_addr = htonl(ntohl(_saddr.s_addr)+1);
+	    _daddr.s_addr = htonl(ntohl(_daddr.s_addr)+1);
+    }
     _count = 0;
   }
   return p;

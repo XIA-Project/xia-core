@@ -39,6 +39,7 @@ class DynamicUDPIPEncap : public Element {
   uint16_t _sport;
   uint16_t _dport;
   bool _cksum : 1;
+  bool _change_ip : 1;
   bool _aligned : 1;
   atomic_uint32_t _id;
   atomic_uint32_t _count;
