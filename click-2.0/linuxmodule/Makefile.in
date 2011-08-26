@@ -103,8 +103,10 @@ LINUXCFLAGS = $(shell echo "$(CPPFLAGS) $(CFLAGS) $(LINUXINCLUDE)" \
 	-e "s,-Iinclude2 ,-I$(linux_builddir)/include2 ",g \
 	-e s,-Iinclude/,-I$(linux_srcdir)include/,g @LINUX_FIXINCLUDES_PROGRAM@)
 CLICKCPPFLAGS = @CPPFLAGS@ -DCLICK_LINUXMODULE
-CLICKCFLAGS = @CFLAGS_NDEBUG@
-CLICKCXXFLAGS = @CXXFLAGS_NDEBUG@
+#CLICKCFLAGS = @CFLAGS_NDEBUG@
+#CLICKCXXFLAGS = @CXXFLAGS_NDEBUG@
+CLICKCFLAGS = @CFLAGS@
+CLICKCXXFLAGS = @CXXFLAGS@
 CLICKDEPCFLAGS = -Wp,-MD,$(depfile)
 
 CLICKDEFS = @DEFS@
@@ -198,7 +200,11 @@ install-local: Makefile $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc all
 	$(CLICKmkinstalldirs) $(DESTDIR)$(libdir)
 	for i in $(patsubst %.o,%.ko,$(INSTALLOBJS)); do $(CLICK_BUILD_INSTALL_DATA) $$i $(DESTDIR)$(libdir)/$$i; done
 	$(CLICK_BUILD_INSTALL_DATA) Module.symvers $(DESTDIR)$(libdir)/click.symvers
-	cp click.ko $(MODULEINSTPATH)/drivers
+	cp -f $(DESTDIR)$(libdir)/$(DRIVER).ko $(DESTDIR)$(libdir)/$(DRIVER).ko.dbg
+	objcopy --keep-file-symbols --strip-debug $(DESTDIR)$(libdir)/$(DRIVER).ko
+	cp -f $(DESTDIR)$(libdir)/click.ko $(MODULEINSTPATH)/drivers/
+	cp -f $(DESTDIR)$(libdir)/click.ko.dbg $(MODULEINSTPATH)/drivers/
+	cp -f $(DESTDIR)$(libdir)/proclikefs.ko $(MODULEINSTPATH)/drivers/
 	/sbin/depmod -a || true
 install-include:
 	/bin/rm -f .install-include*
