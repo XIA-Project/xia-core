@@ -37,8 +37,7 @@ CLICK_CXX_UNPROTECT
 //#define DEBUG_SKBMGR 0
 
 class RecycledSkbBucket { public:
-  //static const int SIZE = 62;
-  static const int SIZE = 256;
+  static const int SIZE = 62 - 2;	// -2 for _head/_tail
 
   void initialize();
   void cleanup();
@@ -58,7 +57,7 @@ class RecycledSkbBucket { public:
   static int next_i(int i)	{ return (i == SIZE - 1 ? 0 : i + 1); }
   friend class RecycledSkbPool;
 
-} ____cacheline_aligned;
+} ____cacheline_aligned_in_smp;
 
 class RecycledSkbPool { public:
 
@@ -108,7 +107,7 @@ class RecycledSkbPool { public:
   friend struct sk_buff *skbmgr_allocate_skbs(unsigned, unsigned, int *);
   friend void skbmgr_recycle_skbs(struct sk_buff *);
 
-} ____cacheline_aligned;
+} ____cacheline_aligned_in_smp;
 
 void
 RecycledSkbBucket::initialize()
@@ -309,9 +308,9 @@ RecycledSkbPool::recycle(struct sk_buff *skbs)
       int tail = _buckets[bucket]._tail;
       int next = _buckets[bucket].next_i(tail);
       if (next != _buckets[bucket]._head) {
-	//if (jiffies % 1000 != 0 && skb_recycle_check(skb, 0)) {	// NUMA test
 	// Note: skb_recycle_fast will free the skb if it cannot recycle it
-	if (skb_recycle_check(skb, 0)) {
+	//if (skb_recycle_check(skb, 0)) {
+	if (jiffies % 1000 != 0 && skb_recycle_check(skb, 0)) {	// NUMA test
 	  _buckets[bucket]._skbs[tail] = skb;
 	  _buckets[bucket]._tail = next;
 	  skb = 0;
@@ -385,7 +384,8 @@ RecycledSkbPool::allocate(unsigned headroom, unsigned size, int want, int *store
 
   size = size_to_higher_bucket_size(headroom + size);
   while (got < want) {
-    struct sk_buff *skb = alloc_skb(size, GFP_ATOMIC);
+    //struct sk_buff *skb = alloc_skb(size, GFP_ATOMIC);
+    struct sk_buff *skb = __alloc_skb(size, GFP_ATOMIC, 0, numa_node_id());	// NUMA-aware
 #if DEBUG_SKBMGR
     _allocated++;
 #endif
