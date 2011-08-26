@@ -98,7 +98,7 @@ class IPEncap : public Element { public:
 
   Packet *simple_action(Packet *);
 
- private:
+ protected:
 
   click_ip _iph;
   atomic_uint32_t _id;
