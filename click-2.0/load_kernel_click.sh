@@ -14,7 +14,7 @@ echo compiling and installing
 sudo make -j24 -s -C `dirname $0`/linuxmodule/ install-local || exit 1
 sudo make -j24 -s -C `dirname $0`/tools/click-install/ install-local || exit 1
 
-pushd `dirname $0`/$IXGBE/src/ > /dev/null
+pushd $IXGBE/src/ > /dev/null
 sudo ./compile.sh install || exit 1
 popd > /dev/null
 

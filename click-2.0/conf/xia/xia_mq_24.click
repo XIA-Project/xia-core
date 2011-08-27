@@ -26,7 +26,7 @@ elementclass gen_sub {
            DST RE  $hid_from,
            SRC RE  $hid_to)
     -> XIAPrint($eth_from)
-    -> DynamicIPEncap(4, $eth_from, $eth_to)
+    -> DynamicIPEncap(0x99, $eth_from, $eth_to)
     -> EtherEncap(0x0800, $SRC_MAC1 , $DST_MAC1)
     -> CheckIPHeader(14)
     -> IPPrint($eth_from)
