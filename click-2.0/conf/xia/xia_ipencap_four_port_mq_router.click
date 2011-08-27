@@ -6,11 +6,12 @@ require(library xia_address.click);
 // router instantiation
 //router0 :: Router4PortDummyCache(RE AD0 RHID0, AD0, RHID0);
 router0 :: Router4PortDummyCache(RE AD0 RHID0);
-toh :: ToHost; 
-c_eth2 :: Classifier(21/99, -);
-c_eth3 :: Classifier(21/99, -);
-c_eth4 :: Classifier(21/99, -);
-c_eth5 :: Classifier(21/99, -);
+//toh :: ToHost; 
+toh :: Counter -> Discard; 
+c_eth2 :: Classifier(23/99, -);
+c_eth3 :: Classifier(23/99, -);
+c_eth4 :: Classifier(23/99, -);
+c_eth5 :: Classifier(23/99, -);
 
 pd_eth2_0:: MQPollDevice(eth2, QUEUE 0, BURST 32, PROMISC true) -> c_eth2; 
 pd_eth2_1:: MQPollDevice(eth2, QUEUE 1, BURST 32, PROMISC true) -> c_eth2; 
