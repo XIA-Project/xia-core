@@ -37,7 +37,7 @@ CLICK_CXX_UNPROTECT
 //#define DEBUG_SKBMGR 0
 
 class RecycledSkbBucket { public:
-  static const int SIZE = 62 - 2;	// -2 for _head/_tail
+  static const int SIZE = 64 - 2;	// -2 for _head/_tail
 
   void initialize();
   void cleanup();
