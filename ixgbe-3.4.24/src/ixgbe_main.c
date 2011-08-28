@@ -9274,8 +9274,8 @@ static struct sk_buff *ixgbe_mq_rx_poll(struct net_device *dev, unsigned int que
 			__builtin_prefetch(bi + ixgbe_prefetch_ahead * ixgbe_bi_per_cache_line, 1, 0);
 
 		// check status if the entry has been used by the device
-		staterr = le32_to_cpu(rx_desc->wb.upper.status_error);
-		if (!(staterr & IXGBE_RXD_STAT_DD))
+		staterr = rx_desc->wb.upper.status_error;
+		if (!(staterr & le32_to_cpu(IXGBE_RXD_STAT_DD)))
 			break;
 
 		if (unlikely(queue_num == 0 && debug_cnt))
@@ -9286,8 +9286,10 @@ static struct sk_buff *ixgbe_mq_rx_poll(struct net_device *dev, unsigned int que
 
 		// release resources from device/driver
 		dma_unmap_single(dma_dev, bi->dma, rx_buf_len, DMA_FROM_DEVICE);
+		//dma_unmap_page(dma_dev, bi->dma, rx_buf_len, DMA_FROM_DEVICE);
 		*skb = bi->skb;
 		bi->skb = NULL;
+		(*skb)->dev = dev;	// not sure if necessary
 
 		// prefetch for skb update lookup
 		__builtin_prefetch(&(*skb)->next, 1, 0);	// for *skb = ...
@@ -9295,7 +9297,7 @@ static struct sk_buff *ixgbe_mq_rx_poll(struct net_device *dev, unsigned int que
 		__builtin_prefetch(&(*skb)->len, 1, 0);		// for skb_put(), skb_pull()
 		__builtin_prefetch(&(*skb)->data, 1, 0);	// for skb_pull()
 
-		if (unlikely(!(staterr & IXGBE_RXD_STAT_EOP) || (staterr & IXGBE_RXDADV_ERR_FRAME_ERR_MASK))) {
+		if (unlikely(!(staterr & le32_to_cpu(IXGBE_RXD_STAT_EOP)) || (staterr & le32_to_cpu(IXGBE_RXDADV_ERR_FRAME_ERR_MASK)))) {
 			printk(KERN_INFO "IXGBE_RXD_STAT_EOP or IXGBE_RXDADV_ERR_FRAME_ERR_MASK\n");
 			dev_kfree_skb(*skb);
 			continue;
@@ -9339,15 +9341,23 @@ static struct sk_buff *ixgbe_mq_rx_poll(struct net_device *dev, unsigned int que
 	hard_header_len = dev->hard_header_len;
 	cur_skb = skb_head;
 	for (i = 0; i < got; i++) {
-		skb_put(cur_skb, len_arr[i]);
-		skb_pull(cur_skb, hard_header_len);
-
 		__builtin_prefetch(cur_skb->data, 1, 0);					// for click
 		__builtin_prefetch(cur_skb->data + L1_CACHE_BYTES, 1, 0);	// for click
 
+		skb_put(cur_skb, len_arr[i]);
+		skb_pull(cur_skb, hard_header_len);
+
+		//static u32 k = 0;
+		//if (k++ % 5000000 == 0) {
+		//	printk(KERN_INFO "ixgbe_mq_rx_poll: len: %hu ethertype: %04hx ip_tot_len: %hu\n",
+		//			cur_skb->len,
+		//			ntohs(*(u16*)(cur_skb->data - 14 + 12)),
+		//			ntohs(((struct iphdr*)(cur_skb->data))->tot_len));
+		//}
+
 		// ATR for multiqueue
 		if (test_bit(__IXGBE_TX_FDIR_INIT_DONE, &tx_ring->state) && tx_ring->atr_sample_rate) {
-			if (jiffies % 100 == 0) {	// slows down ATR sampling for high-speed traffic
+			if (unlikely(jiffies % 100 == 0)) {	// slows down ATR sampling for high-speed traffic
 				tx_ring->atr_count++;	
 				if (tx_ring->atr_count >= tx_ring->atr_sample_rate) {
 					tx_ring->atr_count = 0;
@@ -9426,7 +9436,11 @@ static int ixgbe_mq_rx_refill(struct net_device *dev, unsigned int queue_num, st
 		// allocate resources for device/driver
 		bi->skb = skb;
 		bi->dma = dma_map_single(dma_dev, skb->data, rx_buf_len, DMA_FROM_DEVICE);
+		//bi->dma = dma_map_page(dma_dev, virt_to_page(skb->data), (unsigned long)skb->data & ~PAGE_MASK, rx_buf_len, DMA_FROM_DEVICE);
+		if (unlikely(dma_mapping_error(dma_dev, bi->dma)))
+			rx_ring->rx_stats.alloc_rx_buff_failed++;
 		rx_desc->read.pkt_addr = cpu_to_le64(bi->dma);
+		rx_desc->read.hdr_addr = 0;	// without this, garbage data may appear in skb->data
 
 		// proceed to next entry
 		rx_desc++;
