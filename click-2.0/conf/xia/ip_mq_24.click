@@ -70,6 +70,40 @@ elementclass gen1 {
     gen_sub($eth_from, $eth_to, 11, 23);
 }
 
+elementclass gen_b {
+    $eth_from, $eth_to |
+
+    gen_sub($eth_from, $eth_to, 0, 0);
+    gen_sub($eth_from, $eth_to, 1, 1);
+    gen_sub($eth_from, $eth_to, 2, 2);
+    gen_sub($eth_from, $eth_to, 3, 3);
+    gen_sub($eth_from, $eth_to, 4, 4);
+    gen_sub($eth_from, $eth_to, 5, 5);
+    gen_sub($eth_from, $eth_to, 6, 6);
+    gen_sub($eth_from, $eth_to, 7, 7);
+    gen_sub($eth_from, $eth_to, 8, 8);
+    gen_sub($eth_from, $eth_to, 9, 9);
+    gen_sub($eth_from, $eth_to, 10, 10);
+    gen_sub($eth_from, $eth_to, 11, 11);
+    gen_sub($eth_from, $eth_to, 12, 12);
+    gen_sub($eth_from, $eth_to, 13, 13);
+    gen_sub($eth_from, $eth_to, 14, 14);
+    gen_sub($eth_from, $eth_to, 15, 15);
+    gen_sub($eth_from, $eth_to, 16, 16);
+    gen_sub($eth_from, $eth_to, 17, 17);
+    gen_sub($eth_from, $eth_to, 18, 18);
+    gen_sub($eth_from, $eth_to, 19, 19);
+    gen_sub($eth_from, $eth_to, 20, 20);
+    gen_sub($eth_from, $eth_to, 21, 21);
+    gen_sub($eth_from, $eth_to, 22, 22);
+    gen_sub($eth_from, $eth_to, 23, 23);
+}
+
+//gen_b(eth2, eth4);
+//gen_b(eth3, eth5);
+//gen_b(eth4, eth2);
+//gen_b(eth5, eth3);
+
 gen0(eth2, eth4);
 gen1(eth3, eth5);
 gen0(eth4, eth2);
