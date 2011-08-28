@@ -9117,15 +9117,23 @@ static int ixgbe_poll_on (struct net_device *dev)
 		struct ixgbe_adapter *adapter = netdev_priv(dev);
 		//unsigned long flags;
 		u64 qmask = ~0;
+		int i;
 
 		printk("ixgbe_poll_on\n");
 
-		//local_irq_save(flags);
-		//local_irq_disable();
-		dev->polling = 2;
+		// turn off flow control
+		//adapter->hw.fc.disable_fc_autoneg = false;
+		//adapter->hw.fc.requested_mode = ixgbe_fc_none;
+		//adapter->last_lfc_mode = ixgbe_fc_none;
+		//ixgbe_reinit_locked(adapter);
+
+		// disable interrupts
 		ixgbe_irq_disable_queues(adapter, qmask);
-		//ixgbe_napi_disable_all(adapter);
-		//local_irq_restore(flags);
+
+		// clean rings
+		//ixgbe_clean_all_rx_rings(adapter);	// this is probably race condition free because we disabled ixgbe_alloc_rx_buffers()
+
+		dev->polling = 2;
 	}
 
 	return 0;
@@ -9207,6 +9215,8 @@ static void ixgbe_mq_atr(struct net_device *dev, struct sk_buff* skb, unsigned i
 static const int ixgbe_rx_desc_per_cache_line = L1_CACHE_BYTES / sizeof(union ixgbe_adv_rx_desc);
 static const int ixgbe_bi_per_cache_line = L1_CACHE_BYTES / sizeof(struct ixgbe_rx_buffer);
 static const int ixgbe_prefetch_ahead = 1;
+static const int ixgbe_rx_ring_gap = 128;
+static const int ixgbe_rx_ring_notify = 32;
 
 static struct sk_buff *ixgbe_mq_rx_poll(struct net_device *dev, unsigned int queue_num, int *want)
 {
@@ -9255,8 +9265,13 @@ static struct sk_buff *ixgbe_mq_rx_poll(struct net_device *dev, unsigned int que
 	i = rx_ring->next_to_clean;
 	rx_desc = IXGBE_RX_DESC_ADV(rx_ring, i);
 	bi = &rx_ring->rx_buffer_info[i];
-	if (likely(rx_ring->next_to_use < count))
-		bi_stop = &rx_ring->rx_buffer_info[rx_ring->next_to_use];
+	if (likely(rx_ring->next_to_use < count)) {
+		//bi_stop = &rx_ring->rx_buffer_info[rx_ring->next_to_use];
+		if ((rx_ring->last_notified - i + count) % count < ixgbe_rx_ring_gap)
+			bi_stop = bi;
+		else
+			bi_stop = &rx_ring->rx_buffer_info[(rx_ring->last_notified - ixgbe_rx_ring_gap + count) % count];
+	}
 	else
 		return NULL;	// endless loop mode is not supported
 
@@ -9269,7 +9284,7 @@ static struct sk_buff *ixgbe_mq_rx_poll(struct net_device *dev, unsigned int que
 	while (bi != bi_stop && got < max_get) {
 		// prefetch for this loop
 		if ((long)rx_desc % ixgbe_rx_desc_per_cache_line == 0)
-			__builtin_prefetch(rx_desc + ixgbe_prefetch_ahead * ixgbe_rx_desc_per_cache_line, 0, 0);	// don't need to modify
+			__builtin_prefetch(rx_desc + ixgbe_prefetch_ahead * ixgbe_rx_desc_per_cache_line, 1, 0);
 		if ((long)bi % ixgbe_bi_per_cache_line == 0)
 			__builtin_prefetch(bi + ixgbe_prefetch_ahead * ixgbe_bi_per_cache_line, 1, 0);
 
@@ -9285,8 +9300,14 @@ static struct sk_buff *ixgbe_mq_rx_poll(struct net_device *dev, unsigned int que
 		rmb();	
 
 		// release resources from device/driver
-		dma_unmap_single(dma_dev, bi->dma, rx_buf_len, DMA_FROM_DEVICE);
-		//dma_unmap_page(dma_dev, bi->dma, rx_buf_len, DMA_FROM_DEVICE);
+		//if (bi->dma_mem == NULL) {
+			dma_unmap_single(dma_dev, bi->dma, rx_buf_len, DMA_FROM_DEVICE);
+			//dma_unmap_page(dma_dev, bi->dma, rx_buf_len, DMA_FROM_DEVICE);
+			bi->dma = 0;
+		//}
+		//else {
+		//	memcpy(bi->skb->data, bi->dma_mem, rx_buf_len);
+		//}
 		*skb = bi->skb;
 		bi->skb = NULL;
 		(*skb)->dev = dev;	// not sure if necessary
@@ -9341,19 +9362,30 @@ static struct sk_buff *ixgbe_mq_rx_poll(struct net_device *dev, unsigned int que
 	hard_header_len = dev->hard_header_len;
 	cur_skb = skb_head;
 	for (i = 0; i < got; i++) {
+		char *p, *end;
 		__builtin_prefetch(cur_skb->data, 1, 0);					// for click
 		__builtin_prefetch(cur_skb->data + L1_CACHE_BYTES, 1, 0);	// for click
 
 		skb_put(cur_skb, len_arr[i]);
 		skb_pull(cur_skb, hard_header_len);
 
-		//static u32 k = 0;
-		//if (k++ % 5000000 == 0) {
-		//	printk(KERN_INFO "ixgbe_mq_rx_poll: len: %hu ethertype: %04hx ip_tot_len: %hu\n",
-		//			cur_skb->len,
-		//			ntohs(*(u16*)(cur_skb->data - 14 + 12)),
-		//			ntohs(((struct iphdr*)(cur_skb->data))->tot_len));
+		////int r = 0;
+		//p = (char *)cur_skb;
+		//end = (char *)cur_skb + sizeof(struct sk_buff);
+		//while (p < end) {
+		//	__builtin_prefetch(p, 1, 3);
+		//	//r += *p;
+		//	p += L1_CACHE_BYTES;
 		//}
+		////cur_skb->protocol = r;
+
+		static int k = 0;
+		if (queue_num == 0 && k++ % 100000 == 0) {
+			printk(KERN_INFO "ixgbe_mq_rx_poll: len: %hu ethertype: %04hx ip_tot_len: %hu\n",
+					cur_skb->len,
+					ntohs(*(u16*)(cur_skb->data - 14 + 12)),
+					ntohs(((struct iphdr*)(cur_skb->data))->tot_len));
+		}
 
 		// ATR for multiqueue
 		if (test_bit(__IXGBE_TX_FDIR_INIT_DONE, &tx_ring->state) && tx_ring->atr_sample_rate) {
@@ -9395,7 +9427,7 @@ static int ixgbe_mq_rx_refill(struct net_device *dev, unsigned int queue_num, st
 
 	if (!skbs) {
 		// a RouteBricks hack to obtain the total number of entries to fill in
-		return ixgbe_desc_unused(rx_ring);
+		return max((int)ixgbe_desc_unused(rx_ring) - ixgbe_rx_ring_gap, 0);
 	}
 
 	// bring some frequently used variables
@@ -9409,7 +9441,7 @@ static int ixgbe_mq_rx_refill(struct net_device *dev, unsigned int queue_num, st
 		i = 0;	// we will exit the endless loop mode
 	rx_desc = IXGBE_RX_DESC_ADV(rx_ring, i);
 	bi = &rx_ring->rx_buffer_info[i];
-	bi_stop = &rx_ring->rx_buffer_info[(rx_ring->next_to_clean + count - 1) % count];
+	bi_stop = &rx_ring->rx_buffer_info[(rx_ring->next_to_clean + count - 1 - ixgbe_rx_ring_gap) % count];
 
 	i -= count;
 
@@ -9435,12 +9467,19 @@ static int ixgbe_mq_rx_refill(struct net_device *dev, unsigned int queue_num, st
 
 		// allocate resources for device/driver
 		bi->skb = skb;
-		bi->dma = dma_map_single(dma_dev, skb->data, rx_buf_len, DMA_FROM_DEVICE);
+		//if (bi->dma_mem == NULL) {
+		//	// TODO: clean up
+		//	bi->dma_mem = kzalloc_node(rx_buf_len, GFP_ATOMIC, queue_num % 2);
+		//	bi->dma = dma_map_single(dma_dev, bi->dma_mem, rx_buf_len, DMA_FROM_DEVICE);
+			bi->dma = dma_map_single(dma_dev, skb->data, rx_buf_len, DMA_FROM_DEVICE);
+		//}
 		//bi->dma = dma_map_page(dma_dev, virt_to_page(skb->data), (unsigned long)skb->data & ~PAGE_MASK, rx_buf_len, DMA_FROM_DEVICE);
 		if (unlikely(dma_mapping_error(dma_dev, bi->dma)))
 			rx_ring->rx_stats.alloc_rx_buff_failed++;
 		rx_desc->read.pkt_addr = cpu_to_le64(bi->dma);
-		rx_desc->read.hdr_addr = 0;	// without this, garbage data may appear in skb->data
+		rx_desc->read.hdr_addr = 0;	// DD bit is hidden in the lowest bit of hdr_addr :(
+		//wmb();
+		//__builtin___clear_cache(rx_desc, rx_desc + 1);
 
 		// proceed to next entry
 		rx_desc++;
@@ -9463,16 +9502,21 @@ static int ixgbe_mq_rx_refill(struct net_device *dev, unsigned int queue_num, st
 			debug_cnt--;
 		}
 
-		// ensures all data are written before the device sees the data
-		wmb();
+		if ((i - rx_ring->last_notified + count) % count >= ixgbe_rx_ring_notify) {
+			// ensures all data are written before the device sees the data
+			wmb();
 
-		// notify the device of the queue tail (the location just beyond the valid empty entry)
-		writel(i, rx_ring->tail);
+			// notify the device of the queue tail (the location just beyond the valid empty entry)
+			//writel(i, rx_ring->tail);
+			rx_ring->last_notified = (i / ixgbe_rx_ring_notify) * ixgbe_rx_ring_notify;
+			writel(rx_ring->last_notified, rx_ring->tail);
 
-		// we do not need to call IXGBE_WRITE_FLUSH()
+			// we do not need to call IXGBE_WRITE_FLUSH()
+			//IXGBE_WRITE_FLUSH(&adapter->hw);
+		}
 	}
 
-	return ixgbe_desc_unused(rx_ring);
+	return max((int)ixgbe_desc_unused(rx_ring) - ixgbe_rx_ring_gap, 0);
 }
 
 static int ixgbe_mq_tx_eob(struct net_device *dev, unsigned int queue_num)
@@ -9577,13 +9621,13 @@ static int ixgbe_mq_tx_pqueue(struct net_device *netdev, unsigned int queue_num,
 	tx_desc->read.cmd_type_len |= cpu_to_le32(txd_cmd);
 	tx_ring->tx_buffer_info[i].skb = skb;
 
-	//static u32 k = 0;
-	//if (k++ % 5000000 == 0) {
-	//	printk(KERN_INFO "ixgbe_mq_tx_pqueue: len: %hu ethertype: %04hx ip_tot_len: %hu\n",
-	//			skb->len,
-	//			ntohs(*(u16*)(skb->data + 12)),
-	//			ntohs(((struct iphdr*)(skb->data + 14))->tot_len));
-	//}
+	static int k = 0;
+	if (queue_num == 0 && k++ % 100000 == 0) {
+		printk(KERN_INFO "ixgbe_mq_tx_pqueue: len: %hu ethertype: %04hx ip_tot_len: %hu\n",
+				skb->len,
+				ntohs(*(u16*)(skb->data + 12)),
+				ntohs(((struct iphdr*)(skb->data + 14))->tot_len));
+	}
 
 	i++;
 	if (i >= tx_ring->count)
