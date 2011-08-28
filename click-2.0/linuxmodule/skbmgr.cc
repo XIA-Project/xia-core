@@ -167,7 +167,6 @@ RecycledSkbPool::unlock()
 {
   clear_bit(0, &_lock);
 }
-#endif
 
 
 void
