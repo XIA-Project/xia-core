@@ -9225,7 +9225,7 @@ static struct sk_buff *ixgbe_mq_rx_poll(struct net_device *dev, unsigned int que
 
 	u32 staterr;
 	u16 len;
-	u16 hard_header_len = dev->hard_header_len;
+	u16 hard_header_len;
 	u16 got;
 	u16 max_get;
 
@@ -9336,6 +9336,7 @@ static struct sk_buff *ixgbe_mq_rx_poll(struct net_device *dev, unsigned int que
 	*skb = NULL;	// the last sk_buff's next should be NULL
 
 	// prepare sk_buffs for click uses
+	hard_header_len = dev->hard_header_len;
 	cur_skb = skb_head;
 	for (i = 0; i < got; i++) {
 		skb_put(cur_skb, len_arr[i]);
@@ -9378,6 +9379,9 @@ static int ixgbe_mq_rx_refill(struct net_device *dev, unsigned int queue_num, st
 	struct sk_buff *skb;
 
 	static int debug_cnt = 5;
+
+	if (!netif_carrier_ok(dev))
+		return 0;
 
 	if (!skbs) {
 		// a RouteBricks hack to obtain the total number of entries to fill in
