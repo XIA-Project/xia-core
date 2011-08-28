@@ -30,8 +30,8 @@ echo loading nic module
 #sudo modprobe ixgbe RSS=12,12,12,12 FdirMode=0,0,0,0
 #sudo insmod $IXGBE/src/ixgbe.ko RSS=12,12,12,12 FdirMode=2,2,2,2
 #sudo insmod $IXGBE/src/ixgbe.ko RSS=6,6,6,6 FdirMode=0,0,0,0 DCA=0,0,0,0 #-> distributes IP packet
-sudo insmod $IXGBE/src/ixgbe.ko RSS=12,12,12,12 FdirMode=0,0,0,0 DCA=0,0,0,0 #-> distributes IP packet
-#sudo insmod $IXGBE/src/ixgbe.ko FdirMode=1,1,1,1 DCA=0,0,0,0 #-> distributes IP packet
+#sudo insmod $IXGBE/src/ixgbe.ko RSS=12,12,12,12 FdirMode=0,0,0,0 DCA=0,0,0,0 #-> distributes IP packet
+sudo insmod $IXGBE/src/ixgbe.ko FdirMode=1,1,1,1 DCA=0,0,0,0	# use ATR for distributing IP packets into multiple queues; avoid DCA that may waste memory bandwidth
 #sudo insmod $IXGBE/src/ixgbe.ko  FdirMode=2,2,2,2
 
 
@@ -59,14 +59,23 @@ sudo ifconfig eth2 promisc &
 sudo ifconfig eth3 promisc &
 sudo ifconfig eth4 promisc &
 sudo ifconfig eth5 promisc &
-#sudo ethtool -G eth2 rx 256 tx 256 &
-#sudo ethtool -G eth3 rx 256 tx 256 &
-#sudo ethtool -G eth4 rx 256 tx 256 &
-#sudo ethtool -G eth5 rx 256 tx 256 &
-#sudo ethtool -G eth2 rx 4096 tx 4096 &
-#sudo ethtool -G eth3 rx 4096 tx 4096 &
-#sudo ethtool -G eth4 rx 4096 tx 4096 &
-#sudo ethtool -G eth5 rx 4096 tx 4096 &
+#sudo ethtool -G eth2 rx 256 tx 512 &
+#sudo ethtool -G eth3 rx 256 tx 512 &
+#sudo ethtool -G eth4 rx 256 tx 512 &
+#sudo ethtool -G eth5 rx 256 tx 512 &
+#sudo ethtool -G eth2 rx 512 tx 512 &
+#sudo ethtool -G eth3 rx 512 tx 512 &
+#sudo ethtool -G eth4 rx 512 tx 512 &
+#sudo ethtool -G eth5 rx 512 tx 512 &
+# around the optimal size
+sudo ethtool -G eth2 rx 1024 tx 512 &
+sudo ethtool -G eth3 rx 1024 tx 512 &
+sudo ethtool -G eth4 rx 1024 tx 512 &
+sudo ethtool -G eth5 rx 1024 tx 512 &
+#sudo ethtool -G eth2 rx 4096 tx 512 &
+#sudo ethtool -G eth3 rx 4096 tx 512 &
+#sudo ethtool -G eth4 rx 4096 tx 512 &
+#sudo ethtool -G eth5 rx 4096 tx 512 &
 #sudo ethtool -K eth2 rx off tx off sg off tso off gso off gro off lro off rxvlan off txvlan off rxhash off &
 wait
 
