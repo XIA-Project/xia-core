@@ -283,6 +283,24 @@ RecycledSkbPool::find_producer(int cpu, int bucket)
 
 #endif
 
+#ifdef skb_recycle_check
+#undef skb_recycle_check
+#endif
+
+#define skb_recycle_check __skb_recycle_check_quick
+
+static bool
+__skb_recycle_check_quick(struct sk_buff *skb, int skb_size)
+{
+    if (skb_shared(skb) || skb_cloned(skb))
+        return false;
+    if (skb->destructor)    // maybe unsafe to recycle in this way
+        return false;
+
+    skb->data = skb->head + NET_SKB_PAD;
+    skb->tail = skb->data - skb->head;
+    return true;
+}
 
 void
 RecycledSkbPool::recycle(struct sk_buff *skbs)
@@ -385,7 +403,7 @@ RecycledSkbPool::allocate(unsigned headroom, unsigned size, int want, int *store
   size = size_to_higher_bucket_size(headroom + size);
   while (got < want) {
     //struct sk_buff *skb = alloc_skb(size, GFP_ATOMIC);
-    struct sk_buff *skb = __alloc_skb(size, GFP_ATOMIC, 0, numa_node_id());	// NUMA-aware
+    struct sk_buff *skb = __alloc_skb(size, GFP_ATOMIC, 0, numa_node_id());	// NUMA-aware (may not be necessary because alloc_skb() does this internally)
 #if DEBUG_SKBMGR
     _allocated++;
 #endif
