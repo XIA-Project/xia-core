@@ -9491,6 +9491,7 @@ static int ixgbe_mq_tx_pqueue(struct net_device *netdev, unsigned int queue_num,
 	//unsigned int txd_needed;
 	unsigned int tx_flags = 0;
 	//unsigned long flags = 0;
+
 	__be16 protocol = skb->protocol;
 
 	union ixgbe_adv_tx_desc *tx_desc = NULL;
@@ -9550,6 +9551,8 @@ static int ixgbe_mq_tx_pqueue(struct net_device *netdev, unsigned int queue_num,
 		pci_map_page(adapter->pdev, virt_to_page(skb->data + offset),
 				(unsigned long) (skb->data + offset) & ~PAGE_MASK, len,
 				PCI_DMA_TODEVICE);
+	//tx_buffer_info->dma =
+	//	pci_map_single(adapter->pdev, skb->data + offset, len, PCI_DMA_TODEVICE);
 
 	tx_buffer_info->time_stamp = jiffies;
 
@@ -9559,6 +9562,14 @@ static int ixgbe_mq_tx_pqueue(struct net_device *netdev, unsigned int queue_num,
 	tx_desc->read.olinfo_status = cpu_to_le32(olinfo_status);
 	tx_desc->read.cmd_type_len |= cpu_to_le32(txd_cmd);
 	tx_ring->tx_buffer_info[i].skb = skb;
+
+	//static u32 k = 0;
+	//if (k++ % 5000000 == 0) {
+	//	printk(KERN_INFO "ixgbe_mq_tx_pqueue: len: %hu ethertype: %04hx ip_tot_len: %hu\n",
+	//			skb->len,
+	//			ntohs(*(u16*)(skb->data + 12)),
+	//			ntohs(((struct iphdr*)(skb->data + 14))->tot_len));
+	//}
 
 	i++;
 	if (i >= tx_ring->count)
@@ -9600,6 +9611,9 @@ static struct sk_buff * ixgbe_mq_tx_clean(struct net_device *netdev, unsigned in
 			pci_unmap_page(pdev, tx_ring->tx_buffer_info[i].dma,
 					tx_ring->tx_buffer_info[i].length,
 					PCI_DMA_TODEVICE);
+			//pci_unmap_single(pdev, tx_ring->tx_buffer_info[i].dma,
+			//		tx_ring->tx_buffer_info[i].length,
+			//		PCI_DMA_TODEVICE);
 			tx_ring->tx_buffer_info[i].dma = 0;
 		}
 
