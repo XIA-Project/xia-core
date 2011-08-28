@@ -266,6 +266,7 @@ struct ixgbe_rx_buffer {
 	struct page *page;
 	dma_addr_t page_dma;
 	unsigned int page_offset;
+	//void *dma_mem;
 };
 
 struct ixgbe_queue_stats {

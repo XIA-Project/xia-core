@@ -33,8 +33,8 @@ CLICK_CXX_PROTECT
 CLICK_CXX_UNPROTECT
 #include <click/cxxunprotect.h>
 
-#define DEBUG_SKBMGR 1
-//#define DEBUG_SKBMGR 0
+//#define DEBUG_SKBMGR 1
+#define DEBUG_SKBMGR 0
 
 class RecycledSkbBucket { public:
   static const int SIZE = 64 - 2;	// -2 for _head/_tail
@@ -167,6 +167,7 @@ RecycledSkbPool::unlock()
 {
   clear_bit(0, &_lock);
 }
+#endif
 
 
 void
@@ -194,7 +195,9 @@ RecycledSkbPool::initialize()
 void
 RecycledSkbPool::cleanup()
 {
+#ifdef USELOCK
   lock();
+#endif
   for (int i = 0; i < NBUCKETS; i++)
     _buckets[i].cleanup();
 #if __MTCLICK__
@@ -208,7 +211,9 @@ RecycledSkbPool::cleanup()
     printk("_recycle_check_failed %d _recycle_free_bucket_negative %d\n",  _recycle_check_failed, _recycle_free_bucket_negative);
   }
 #endif
+#ifdef USELOCK
   unlock();
+#endif
 }
 
 inline RecycledSkbBucket &
@@ -283,11 +288,11 @@ RecycledSkbPool::find_producer(int cpu, int bucket)
 
 #endif
 
-//#ifdef skb_recycle_check
-//#undef skb_recycle_check
-//#endif
-//
-//#define skb_recycle_check __skb_recycle_check_quick
+#ifdef skb_recycle_check
+#undef skb_recycle_check
+#endif
+
+#define skb_recycle_check __skb_recycle_check_quick
 
 static bool
 __skb_recycle_check_quick(struct sk_buff *skb, int skb_size)
@@ -296,6 +301,12 @@ __skb_recycle_check_quick(struct sk_buff *skb, int skb_size)
         return false;
     if (skb->destructor)    // maybe unsafe to recycle in this way
         return false;
+
+    skb->next = skb->prev = NULL;
+    skb->sk = NULL;
+    skb->dev = NULL;
+    skb->len = skb->data_len = 0;
+    skb->mac_len = skb->hdr_len = 0;
 
     skb->data = skb->head + NET_SKB_PAD;
     skb->tail = skb->data - skb->head;
@@ -327,8 +338,8 @@ RecycledSkbPool::recycle(struct sk_buff *skbs)
       int next = _buckets[bucket].next_i(tail);
       if (next != _buckets[bucket]._head) {
 	// Note: skb_recycle_fast will free the skb if it cannot recycle it
-	//if (skb_recycle_check(skb, 0)) {
-	if (jiffies % 1000 != 0 && skb_recycle_check(skb, 0)) {	// NUMA test
+	if (skb_recycle_check(skb, 0)) {
+	//if (jiffies % 1000 != 0 && skb_recycle_check(skb, 0)) {	// NUMA test
 	  _buckets[bucket]._skbs[tail] = skb;
 	  _buckets[bucket]._tail = next;
 	  skb = 0;
@@ -402,8 +413,8 @@ RecycledSkbPool::allocate(unsigned headroom, unsigned size, int want, int *store
 
   size = size_to_higher_bucket_size(headroom + size);
   while (got < want) {
-    //struct sk_buff *skb = alloc_skb(size, GFP_ATOMIC);
-    struct sk_buff *skb = __alloc_skb(size, GFP_ATOMIC, 0, numa_node_id());	// NUMA-aware (may not be necessary because alloc_skb() does this internally)
+    struct sk_buff *skb = alloc_skb(size, GFP_ATOMIC);
+    //struct sk_buff *skb = __alloc_skb(size, GFP_ATOMIC, 0, numa_node_id());	// NUMA-aware (may not be necessary because alloc_skb() does this internally)
 #if DEBUG_SKBMGR
     _allocated++;
 #endif
@@ -467,7 +478,7 @@ skbmgr_allocate_skbs(unsigned headroom, unsigned size, int *want)
   }
 #endif
   sk_buff *skb = pool[producer].allocate(headroom, size, w, want);
-  click_put_processor();
+  //click_put_processor();
   return skb;
 #else
   return pool.allocate(headroom, size, *want, want);
@@ -480,7 +491,7 @@ skbmgr_recycle_skbs(struct sk_buff *skbs)
 #if __MTCLICK__
   click_processor_t cpu = click_get_processor();
   pool[cpu].recycle(skbs);
-  click_put_processor();
+ // click_put_processor();
 #else
   pool.recycle(skbs);
 #endif
