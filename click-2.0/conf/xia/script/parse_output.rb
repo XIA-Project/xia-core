@@ -54,33 +54,17 @@ def parse_result(output_to_file)
       length = length.to_i()
       output.puts "#{proto} #{length} #{perf/1e6} #{perf*length*8/1e9}"
     end
+    output.close if (output_to_file)
   end
 end
 
 def generate_graph()
-  #$proto.each do |p|
-     #file = Tempfile.new('xia-exp')
-     file = File.new('xia-performance.gnuplot', 'w')
-     file.puts("set term pdf size 5.00in, 3.00in
-		\nset output \"forwarding_performance.pdf\"
-		\nset xlabel \"Packet size (bytes)\"
-		\nset ylabel \"Performance  (Million pps)\"
-		\nset y2label \"Performance (Gbis)\"
-		")
-     
-     file.puts("set y2tics
-		\nset ytics nomirror
-		\nplot 'IP' u 2:3 w lp lw 2 title \"IP forwarding (Mpps)\" axis x1y1, 'IP' u 2:4 w lp lw 3 title \"IP forwarding (Gbps)\" axis x1y2,  'XIA' u 2:3 w lp lw 2 title \"XIA forwarding (Mpps)\" axis x1y1, 'XIA' u 2:4 w lp lw 3 title \"XIA forwarding (Gbps)\" axis x1y2
-		")
-     file.close
-     p file.path
-     p "gnuplot #{file.path}"
-     #file.unlink
-  #end
+   #system("bash -c \"gnuplot xia-performance.gnuplot\"")
+   system("gnuplot", "xia-performance.gnuplot")
 end
 
 if __FILE__==$0
-    output_to_file = (ARGV.size)
+    output_to_file = (ARGV.size>0)
     Dir.chdir("output")
     parse_result(output_to_file)
     if (output_to_file)
