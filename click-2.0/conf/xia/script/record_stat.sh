@@ -29,7 +29,7 @@ do
   ethtool $dev, "${OUTDIR}/ethtool-begin-${dev}-${POSTFIX}"
 done
 
-${DIR}/../../click_mq_stats.rb 30  > ${OUTDIR}/stat-${POSTFIX} 
+${DIR}/../../click_mq_stats.rb 120  > ${OUTDIR}/stat-${POSTFIX} 
 
 for i in $(seq 2 5)
 do
