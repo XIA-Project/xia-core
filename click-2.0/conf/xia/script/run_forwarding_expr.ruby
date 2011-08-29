@@ -21,53 +21,53 @@ class Flags
   end
 end
 
-Flags.set(:BACKGROUND_EXIT)
+Flags.set(:BACKGROUND)
 
 ROUTER="ng2.nan.cs.cmu.edu"
 PACKETGEN ="ng3.nan.cs.cmu.edu"
 LOCAL = "localhost"
 
-def run_command(machine, cmd, mode = Flags::BACKGROUND_EXIT)
-  if (mode & Flags::BACKGROUND_EXIT)
-    cmd = "\"#{cmd.to_s} & exit \""
+def run_command(machine, cmd, mode = Flags::BACKGROUND)
+  if (mode & Flags::BACKGROUND != 0)
+    cmd = "-f \"#{cmd.to_s} \""
   else
     cmd = "\"#{cmd.to_s} ; exit\""
   end
   ssh = "ssh #{machine} #{cmd}"
   puts ssh
-  system(#{ssh})
+  system(ssh)
 end
 
-def load_click(machine)
-  run_command(machine, LOAD_CLICK_CMD)
+def load_click(machine, mode)
+  run_command(machine, LOAD_CLICK_CMD, mode)
 end
 
 def collect_stats(machine, size)
-  run_command (machine, "#{RECORD_STAT_SCRIPT} #{size}", 0) 
+  run_command(machine, "#{RECORD_STAT_SCRIPT} #{size}", 0) 
 end
 
 if __FILE__ ==$0
-  #pkt_size = [ 64, 128, 256, 1024, 1500]
-  pkt_size = [90]
-  type = [:XIA, :IP]
+  pkt_size = [ 90, 128, 256, 1024, 1500]
+  type = [ :IP]
 
   pkt_size.each do |size|
     type.each do |t|
       pktgen_script, router_script, hdr_size = SCRIPT[t]
-      load_click(ROUTER)
-      load_click(PACKETGEN)
-      sleep(10)
+      load_click(ROUTER, Flags::BACKGROUND)
+      load_click(PACKETGEN, 0)
+      # cool off for the next 60 sec
+      sleep(60)
 
       # run router
       run_command(ROUTER, router_script)
       # run packet gen
       run_command(PACKETGEN, "#{pktgen_script} #{(size-hdr_size)}")
       
-      sleep(20)
-      collect_stats(ROUTER, "#{type.to_s}-#{size}")  
+      sleep(10)
+      collect_stats(ROUTER, "#{t.to_s}-#{size}")  
       sleep(3)
+
     end
   end
 end
-
 

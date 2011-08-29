@@ -10,27 +10,29 @@ fi
 
 DIR=`dirname \`readlink -m $0\``
 OUTDIR=${DIR}/output
-mkdir ${OUTDIR} -f 2&>1 > /dev/null
+mkdir ${OUTDIR} &> /dev/null
 OUTDIR=${OUTDIR}/$1
-mkdir ${OUTDIR} -f 2&>1 > /dev/null
-OUTFILE=${OUTDIR}/`date +%b%d-%H:%M:%S`
+mkdir ${OUTDIR} &> /dev/null
+POSTFIX=`date +%b%d-%H:%M:%S`
 interval=$2
 
 function ethtool {
-  dev= $1
+  dev=$1
   outfile=$2
-  sudo ethtool -S $dev 2&>1 > $outfile
+  date +%b%d-%H:%M:%S > $outfile
+  sudo ethtool -S $dev &>> $outfile
 }
 
 for i in $(seq 2 5)
 do
-  ethtool($dev, ethtool-start-$dev-$OUTFILE)
+  dev="eth$i"
+  ethtool $dev, "${OUTDIR}/ethtool-begin-${dev}-${POSTFIX}"
 done
 
-${DIR}/../../click_mq_stats.rb 60 2&>1  > stat-${OUTFILE} 
+${DIR}/../../click_mq_stats.rb 30  > ${OUTDIR}/stat-${POSTFIX} 
 
 for i in $(seq 2 5)
 do
-  dev=eth$i
-  ethtool($dev, ethtool-end-$dev-$OUTFILE)
+  dev="eth$i"
+  ethtool $dev, "${OUTDIR}/ethtool-end-${dev}-${POSTFIX}"
 done
