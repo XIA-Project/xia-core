@@ -287,6 +287,13 @@ IXGBE_PARAM(FdirMode, "Flow Director filtering modes:\n"
 	              "\t\t\t0 = Filtering off\n"
 	              "\t\t\t1 = Signature Hashing filters (SW ATR)\n"
 	              "\t\t\t2 = Perfect Filters");
+/* Flow Director Optional Number of Queues
+ *
+ * Valid Range: 1-64
+ *
+ * Default Value: 12 
+ */
+IXGBE_PARAM(FdirQueues, "Number of FdirQueues");
 
 #define IXGBE_FDIR_FILTER_OFF				0
 #define IXGBE_FDIR_FILTER_HASH				1
@@ -1012,6 +1019,25 @@ void __devinit ixgbe_check_options(struct ixgbe_adapter *adapter)
 
 	}
 #ifdef HAVE_TX_MQ
+	{
+		unsigned int fdir_num_queues;
+		static struct ixgbe_option opt = {
+			.type = range_option,
+			.name = "Flow Director filtering mode queue size",
+			.err = "using default of "
+				__MODULE_STRING(12),
+			.def = 12,
+			.arg = {.r = {.min = 1,
+				      .max = IXGBE_MAX_FDIR_INDICES}}
+		};
+		if (num_FdirQueues > bd) {
+			fdir_num_queues = FdirQueues[bd];
+			ixgbe_validate_option(&fdir_num_queues, &opt);
+			feature[RING_F_FDIR].indices = fdir_num_queues;
+			printk("FdirQueues %d\n", fdir_num_queues);
+		} 
+
+	}
 	{ /* Flow Director filtering mode */
 		unsigned int fdir_filter_mode;
 		static struct ixgbe_option opt = {
@@ -1026,7 +1052,10 @@ void __devinit ixgbe_check_options(struct ixgbe_adapter *adapter)
 
 		*aflags &= ~IXGBE_FLAG_FDIR_HASH_CAPABLE;
 		*aflags &= ~IXGBE_FLAG_FDIR_PERFECT_CAPABLE;
-		feature[RING_F_FDIR].indices = IXGBE_MAX_FDIR_INDICES;
+		if (feature[RING_F_FDIR].indices==0) {
+			feature[RING_F_FDIR].indices = IXGBE_MAX_FDIR_INDICES;
+			printk("FdirMode Queues %d\n", feature[RING_F_FDIR].indices);
+		}
 
 		if (adapter->hw.mac.type == ixgbe_mac_82598EB)
 			goto no_flow_director;
