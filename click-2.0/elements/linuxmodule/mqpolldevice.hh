@@ -152,6 +152,8 @@ class MQPollDevice : public AnyTaskDevice { public:
 
     unsigned _headroom;
 
+    struct sk_buff *_free_skb_list;
+
 };
 
 #endif 

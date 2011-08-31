@@ -88,14 +88,14 @@ MQPollDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 			cpEnd) < 0)
 	return -1;
 
-#if HAVE_LINUX_POLLING
+#if HAVE_LINUX_MQ_POLLING
     //if (find_device(&poll_device_map, errh) < 0)
     //	return -1;
     net_device* dev = lookup_device(errh);
     if (!dev) return -1;
     set_device(dev, &poll_device_map, anydev_from_device);
-    if (_dev && (!_dev->poll_on || _dev->polling < 0))
-	return errh->error("device '%s' not pollable, use FromDevice instead", _devname.c_str());
+//    if (_dev && (!_dev->poll_on || _dev->is_polling(_dev, _queue) < 0))
+//	return errh->error("device '%s' not pollable, use FromDevice instead", _devname.c_str());
     for (int i=0; i<_burst; i++)
 	_ppolledin.push_back(0);
 #endif
@@ -114,7 +114,7 @@ MQPollDevice::initialize(ErrorHandler *errh)
     if (AnyDevice::initialize_keywords(errh) < 0)
 	return -1;
 
-#if HAVE_LINUX_POLLING
+#if HAVE_LINUX_MQ_POLLING
     // check for duplicate readers
     if (ifindex() >= 0) {
 	void *&used = router()->force_attachment("device_reader_" + String(ifindex()) + "_queue_" + String(_queue));
@@ -130,16 +130,16 @@ you include a ToDevice for the same device. Try adding\n\
 	*/
     }
 
-    if (_queue == 0) {
-	if (_dev && !_dev->polling) {
-	    /* turn off interrupt if interrupts weren't already off */
-	    _dev->poll_on(_dev);
-	    if (_dev->polling != 2)
-		return errh->error("MQPollDevice detected wrong version of polling patch");
-	}
+    //if (_queue == 0) {
+	//if (_dev && !_dev->is_polling(_dev, _queue)) {
+	//    /* turn off interrupt if interrupts weren't already off */
+	//    _dev->poll_on(_dev, _queue);
+	//    if (_dev->polling != 2)
+	//	return errh->error("MQPollDevice detected wrong version of polling patch");
+	//}
 	/* sleep for sec */
 	//ssleep(5);
-    }
+    //}
 
     ScheduleInfo::initialize_task(this, &_task, _dev != 0, errh);
 #if HAVE_STRIDE_SCHED
@@ -153,6 +153,8 @@ you include a ToDevice for the same device. Try adding\n\
 #else
     errh->warning("can't get packets: not compiled with polling extensions");
 #endif
+
+    _free_skb_list = NULL;
 
     return 0;
 }
@@ -190,7 +192,7 @@ MQPollDevice::reset_counts()
 void
 MQPollDevice::cleanup(CleanupStage)
 {
-#if HAVE_LINUX_POLLING
+#if HAVE_LINUX_MQ_POLLING
     net_device *had_dev = _dev;
 
     // call clear_device first so we can check poll_device_map for
@@ -199,17 +201,20 @@ MQPollDevice::cleanup(CleanupStage)
 
     unsigned long lock_flags;
     poll_device_map.lock(false, lock_flags);
-    if (had_dev && had_dev->polling > 0 && !poll_device_map.lookup(had_dev, 0))
-	if (_queue == 0)
-	    had_dev->poll_off(had_dev);
+    if (had_dev && had_dev->is_polling(had_dev, _queue) > 0 && !poll_device_map.lookup(had_dev, 0))
+	//if (_queue == 0)
+	    had_dev->poll_off(had_dev, _queue);
     poll_device_map.unlock(false, lock_flags);
 #endif
+
+    skbmgr_recycle_skbs(_free_skb_list);
+    _free_skb_list = NULL;
 }
 
 bool
 MQPollDevice::run_task(Task *)
 {
-#if HAVE_LINUX_POLLING
+#if HAVE_LINUX_MQ_POLLING
   struct sk_buff *skb_list, *skb;
   int got=0;
 # if CLICK_DEVICE_STATS
@@ -219,8 +224,17 @@ MQPollDevice::run_task(Task *)
 
   SET_STATS(low00, low10, time_now);
 
+  if (_dev && !_dev->is_polling(_dev, _queue))
+    _dev->poll_on(_dev, _queue);
+
+  if (!_free_skb_list) {
+      int nskbs = _burst;
+      _free_skb_list = skbmgr_allocate_skbs(_headroom, 1536, &nskbs);
+  }
+
   got = _burst;
-  skb_list = _dev->mq_rx_poll(_dev, _queue, &got);
+  //skb_list = _dev->mq_rx_poll(_dev, _queue, &got);
+  skb_list = _dev->mq_rx_poll_and_refill(_dev, _queue, &_free_skb_list, &got);
 
   if (got == 0)
     _empty_polls++;
@@ -240,10 +254,10 @@ MQPollDevice::run_task(Task *)
 # endif
 
   int nskbs = got;
-  if (got == 0) {
-      nskbs = _dev->mq_rx_refill(_dev, _queue, 0);
-      _last_nskbs = nskbs;
-}
+//  if (got == 0) {
+//      nskbs = _dev->mq_rx_refill(_dev, _queue, 0);
+//      _last_nskbs = nskbs;
+//}
 
   if (nskbs > 0) {
   //if (nskbs >= 16) {
@@ -265,7 +279,15 @@ MQPollDevice::run_task(Task *)
 	              _perfcnt1_allocskb, _perfcnt2_allocskb, _time_allocskb);
 # endif
 
-    nskbs = _dev->mq_rx_refill(_dev, _queue, &new_skbs);
+    if (!_free_skb_list)
+        _free_skb_list = new_skbs;
+    else {
+        skb = _free_skb_list;
+        while (skb->next)
+            skb = skb->next;
+        skb->next = new_skbs;
+    }
+    //nskbs = _dev->mq_rx_refill(_dev, _queue, &new_skbs);
 
 # if CLICK_DEVICE_STATS
     if (_activations > 0) 
@@ -273,11 +295,11 @@ MQPollDevice::run_task(Task *)
 	              _perfcnt1_refill, _perfcnt2_refill, _time_refill);
 # endif
 
-    if (new_skbs) {
-	for (struct sk_buff *skb = new_skbs; skb; skb = skb->next)
-	    _buffers_reused++;
-	skbmgr_recycle_skbs(new_skbs);
-    }
+    //if (new_skbs) {
+    //    for (struct sk_buff *skb = new_skbs; skb; skb = skb->next)
+    //        _buffers_reused++;
+    //    skbmgr_recycle_skbs(new_skbs);
+    //}
   }
 
   for (int i = 0; i < got; i++) {
@@ -341,38 +363,38 @@ MQPollDevice::run_task(Task *)
   return got > 0;
 #else
   return false;
-#endif /* HAVE_LINUX_POLLING */
+#endif /* HAVE_LINUX_MQ_POLLING */
 }
 
 void
 MQPollDevice::change_device(net_device *dev)
 {
-#if HAVE_LINUX_POLLING
+#if HAVE_LINUX_MQ_POLLING
     if (_dev == dev)		// no op
 	return;
 
     //if (_queue == 0) {
     _task.strong_unschedule();
 
-    if (dev && (!dev->poll_on || dev->polling < 0)) {
+    if (dev && (!dev->poll_on || dev->is_polling(dev, _queue) < 0)) {
 	click_chatter("%s: device '%s' does not support polling", declaration().c_str(), _devname.c_str());
 	dev = 0;
     }
 
     if (_dev)
-	_dev->poll_off(_dev);
+	_dev->poll_off(_dev, _queue);
 
     set_device(dev, &poll_device_map, true);
 
-    if (_dev && !_dev->polling)
-	_dev->poll_on(_dev);
+    if (_dev && !_dev->is_polling(_dev, _queue))
+	_dev->poll_on(_dev, _queue);
 
     if (_dev)
 	_task.strong_reschedule();
     //}
 #else
     (void) dev;
-#endif /* HAVE_LINUX_POLLING */
+#endif /* HAVE_LINUX_MQ_POLLING */
 }
 
 extern "C" {

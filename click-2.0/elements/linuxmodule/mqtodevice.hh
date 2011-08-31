@@ -155,8 +155,8 @@ class MQToDevice : public AnyTaskDevice { public:
   uint32_t _busy_returns;
   uint32_t _too_short;
 
-#if HAVE_LINUX_POLLING
-  bool polling() const			{ return _dev && _dev->polling > 0; }
+#if HAVE_LINUX_MQ_POLLING
+  bool polling() const			{ return _dev && _dev->is_polling(_dev, _queue) > 0; }
 #else
   bool polling() const			{ return false; }
 #endif

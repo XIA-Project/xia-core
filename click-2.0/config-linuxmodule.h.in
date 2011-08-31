@@ -64,6 +64,9 @@
 /* Define if your Linux kernel has polling extensions. */
 #undef HAVE_LINUX_POLLING
 
+/* Define if your Linux kernel has polling extensions. */
+#undef HAVE_LINUX_MQ_POLLING
+
 /* Define if your Linux kernel has read_net_skbcount. */
 #undef HAVE_LINUX_READ_NET_SKBCOUNT
 

@@ -264,8 +264,8 @@ MQToDevice::run_task(Task *)
     SET_STATS(low00, low10, time_now);
 #endif
     
-#if HAVE_LINUX_POLLING
-    bool is_polling = (_dev->polling > 0);
+#if HAVE_LINUX_MQ_POLLING
+    bool is_polling = (_dev->is_polling(_dev, _queue) > 0);
     struct sk_buff *clean_skbs;
     if (is_polling)
 	clean_skbs = _dev->mq_tx_clean(_dev, _queue);
@@ -304,7 +304,7 @@ MQToDevice::run_task(Task *)
 	sent++;
     }
 
-#if HAVE_LINUX_POLLING
+#if HAVE_LINUX_MQ_POLLING
     if (is_polling && sent > 0)
 	_dev->mq_tx_eob(_dev, _queue);
 
@@ -327,7 +327,7 @@ MQToDevice::run_task(Task *)
     if (busy && sent == 0)
 	_busy_returns++;
 
-#if HAVE_LINUX_POLLING
+#if HAVE_LINUX_MQ_POLLING
     if (is_polling) {
 	if (busy && sent == 0) {
 	    _dev_idle++;
@@ -364,7 +364,7 @@ MQToDevice::run_task(Task *)
     bool reschedule = (busy || sent > 0 || _signal.active());
 #endif
     
-#if HAVE_LINUX_POLLING
+#if HAVE_LINUX_MQ_POLLING
     if (is_polling) {
 	// 8.Dec.07: Do not recycle skbs until after unlocking the device, to
 	// avoid deadlock.  After initial patch by Joonwoo Park.
@@ -390,13 +390,15 @@ MQToDevice::run_task(Task *)
 	// only if polling.
 	adjust_tickets(sent);
     }
-#endif /* HAVE_LINUX_POLLING */
+    else
+	reschedule = true;
+#endif /* HAVE_LINUX_MQ_POLLING */
 
     // 5.Feb.2007: Incorporate a version of a patch from Jason Park.  If the
     // device is "busy", perhaps there is no carrier!  Don't spin on no
     // carrier; instead, rely on Linux's notifer_hook to wake us up again.
-    if (busy && sent == 0 && !netif_carrier_ok(_dev))
-	reschedule = false;
+//    if (busy && sent == 0 && !netif_carrier_ok(_dev))
+//	reschedule = false;
     
     if (reschedule)
 	_task.fast_reschedule();
@@ -431,8 +433,8 @@ MQToDevice::queue_packet(Packet *p)
     skb1->dev = _dev;
     
     int ret;
-#if HAVE_LINUX_POLLING
-    if (_dev->polling > 0)
+#if HAVE_LINUX_MQ_POLLING
+    if (_dev->is_polling(_dev, _queue) > 0)
 	ret = _dev->mq_tx_queue(_dev, _queue, skb1);
     else
 #endif

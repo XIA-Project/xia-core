@@ -360,7 +360,7 @@ struct ixgbe_ring {
 
 	u16 next_to_use;
 	u16 next_to_clean;
-	u16 last_notified;
+	//u16 last_notified;
 
 	u8 dcb_tc;
 	struct ixgbe_queue_stats stats;
@@ -372,6 +372,10 @@ struct ixgbe_ring {
 	unsigned int size;		/* length in bytes */
 	dma_addr_t dma;			/* phys. address of descriptor ring */
 	struct ixgbe_q_vector *q_vector; /* backpointer to host q_vector */
+
+	u8 polling;
+	void **buffer;
+	dma_addr_t *buffer_dma;
 } ____cacheline_internodealigned_in_smp;
 
 enum ixgbe_ring_f_enum {
@@ -456,14 +460,6 @@ static inline u16 ixgbe_desc_unused(struct ixgbe_ring *ring)
 	u16 ntu = ring->next_to_use;
 
 	return ((ntc > ntu) ? 0 : ring->count) + ntc - ntu - 1;
-}
-
-static inline u16 ixgbe_desc_unnotified(struct ixgbe_ring *ring)
-{
-	u16 ntu = ring->next_to_use;
-	u16 ltn = ring->last_notified;
-
-	return ((ntu > ltn) ? 0 : ring->count) + ntu - ltn;
 }
 
 #define IXGBE_RX_DESC_ADV(R, i)	    \
