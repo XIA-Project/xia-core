@@ -683,6 +683,8 @@ struct ixgbe_adapter {
 	struct hlist_head fdir_filter_list;
 	union ixgbe_atr_input fdir_mask;
 	int fdir_filter_count;
+
+	volatile unsigned long reconfigure_lock;
 };
 
 struct ixgbe_fdir_filter {

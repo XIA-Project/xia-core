@@ -225,7 +225,10 @@ MQPollDevice::run_task(Task *)
   SET_STATS(low00, low10, time_now);
 
   if (_dev && !_dev->is_polling(_dev, _queue))
-    _dev->poll_on(_dev, _queue);
+    if (_dev->poll_on(_dev, _queue) != 0) {
+        _task.fast_reschedule();
+        return false;
+    }
 
   if (!_free_skb_list) {
       int nskbs = _burst;
