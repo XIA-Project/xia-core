@@ -7,7 +7,7 @@ sudo click-uninstall
 
 
 echo stopping interfaces
-(sudo ifdown eth2; sudo ifdown eth3; sudo ifdown eth4; sudo ifdown eth5) &
+(sudo ifdown eth2; sudo ifdown eth3; sudo ifdown eth4; sudo ifdown eth5; sudo ifdown eth6; sudo ifdown eth7) &
 
 
 echo compiling and installing
@@ -27,12 +27,8 @@ sudo rmmod ixgbe
 
 
 echo loading nic module
-#sudo modprobe ixgbe RSS=12,12,12,12 FdirMode=0,0,0,0
-#sudo insmod $IXGBE/src/ixgbe.ko RSS=12,12,12,12 FdirMode=2,2,2,2
-#sudo insmod $IXGBE/src/ixgbe.ko RSS=6,6,6,6 FdirMode=0,0,0,0 DCA=0,0,0,0 #-> distributes IP packet
-#sudo insmod $IXGBE/src/ixgbe.ko RSS=12,12,12,12 FdirMode=0,0,0,0 DCA=0,0,0,0 #-> distributes IP packet
-sudo insmod $IXGBE/src/ixgbe.ko FdirMode=1,1,1,1 DCA=0,0,0,0	# use ATR for distributing IP packets into multiple queues; avoid DCA that may waste memory bandwidth
-#sudo insmod $IXGBE/src/ixgbe.ko  FdirMode=2,2,2,2
+QCOUNT=1
+sudo insmod $IXGBE/src/ixgbe.ko RSS=$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT FdirMode=1,1,1,1,1,1 FdirQueues=$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT DCA=0,0,0,0,0,0
 
 
 ##echo compacting click module '(<64 MB)'
@@ -42,23 +38,23 @@ sudo insmod $IXGBE/src/ixgbe.ko FdirMode=1,1,1,1 DCA=0,0,0,0	# use ATR for distr
 #sudo objcopy --add-gnu-debuglink=$MODPREFIX/click.ko.dbg $MODPREFIX/click.ko
 
 
-echo turning off flow control
-sudo ethtool -A eth2 autoneg off rx off tx off > /dev/null &
-sudo ethtool -A eth3 autoneg off rx off tx off > /dev/null &
-sudo ethtool -A eth4 autoneg off rx off tx off > /dev/null &
-sudo ethtool -A eth5 autoneg off rx off tx off > /dev/null &
+#echo turning off flow control
+#sudo ethtool -A eth2 autoneg off rx off tx off > /dev/null &
+#sudo ethtool -A eth3 autoneg off rx off tx off > /dev/null &
+#sudo ethtool -A eth4 autoneg off rx off tx off > /dev/null &
+#sudo ethtool -A eth5 autoneg off rx off tx off > /dev/null &
 #until sudo ethtool -A eth2 autoneg off rx off tx off > /dev/null; do echo -n .; sleep 0.1; done
 #until sudo ethtool -A eth3 autoneg off rx off tx off > /dev/null; do echo -n .; sleep 0.1; done
 #until sudo ethtool -A eth4 autoneg off rx off tx off > /dev/null; do echo -n .; sleep 0.1; done
 #until sudo ethtool -A eth5 autoneg off rx off tx off > /dev/null; do echo -n .; sleep 0.1; done
 #echo
 
-wait
-sleep 1
-sudo ifconfig eth2 promisc &
-sudo ifconfig eth3 promisc &
-sudo ifconfig eth4 promisc &
-sudo ifconfig eth5 promisc &
+#wait
+#sleep 1
+#sudo ifconfig eth2 promisc &
+#sudo ifconfig eth3 promisc &
+#sudo ifconfig eth4 promisc &
+#sudo ifconfig eth5 promisc &
 #sudo ethtool -G eth2 rx 256 tx 512 &
 #sudo ethtool -G eth3 rx 256 tx 512 &
 #sudo ethtool -G eth4 rx 256 tx 512 &
@@ -68,15 +64,18 @@ sudo ifconfig eth5 promisc &
 #sudo ethtool -G eth4 rx 512 tx 512 &
 #sudo ethtool -G eth5 rx 512 tx 512 &
 # around the optimal size
-sudo ethtool -G eth2 rx 1024 tx 512 &
-sudo ethtool -G eth3 rx 1024 tx 512 &
-sudo ethtool -G eth4 rx 1024 tx 512 &
-sudo ethtool -G eth5 rx 1024 tx 512 &
+#sudo ethtool -G eth2 rx 1024 tx 512 &
+#sudo ethtool -G eth3 rx 1024 tx 512 &
+#sudo ethtool -G eth4 rx 1024 tx 512 &
+#sudo ethtool -G eth5 rx 1024 tx 512 &
 #sudo ethtool -G eth2 rx 4096 tx 512 &
 #sudo ethtool -G eth3 rx 4096 tx 512 &
 #sudo ethtool -G eth4 rx 4096 tx 512 &
 #sudo ethtool -G eth5 rx 4096 tx 512 &
-#sudo ethtool -K eth2 rx off tx off sg off tso off gso off gro off lro off rxvlan off txvlan off rxhash off &
+#sudo ethtool -G eth2 rx 65528 tx 512 &
+#sudo ethtool -G eth3 rx 65528 tx 512 &
+#sudo ethtool -G eth4 rx 65528 tx 512 &
+#sudo ethtool -G eth5 rx 65528 tx 512 &
 wait
 
 echo use: sudo click-install -c -j NUM-THREADS CONF-FILE
