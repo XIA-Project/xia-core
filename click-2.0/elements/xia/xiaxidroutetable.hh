@@ -45,9 +45,7 @@ protected:
 
     static int set_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
     static int remove_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
-#if CLICK_USERLEVEL
     static int load_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
-#endif
     static int generate_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
 
 private:

@@ -13,8 +13,8 @@ define($HEADROOM_SIZE 148);
 AddressInfo(
     RANDOM_IP 0.0.0.0,
     UNROUTABLE_IP 192.168.10.10,
-    RANDOM_IP6 0::0,
-    UNROUTABLE_IP6 1234::5678,
+    //RANDOM_IP6 0::0,
+    //UNROUTABLE_IP6 1234::5678,
 );
 
 XIAXIDInfo(
@@ -32,7 +32,8 @@ elementclass IPPacketForward {
 
     //Script(write host0/rt.add 192.168.0.0/24 0);
     //Script(write host0/rt.add 0.0.0.0/0.0.0.0 1);
-    Script(print_usertime, write host0/rt.load ip_routes.txt, print_usertime);
+    //Script(print_usertime, write host0/rt.load ip_routes.txt, print_usertime);
+    Script(write host0/rt.load /home/dongsuh/xia-core/click-2.0/conf/microbench/ip_routes.txt);
 
     input[0]
     -> Clone($COUNT)
@@ -42,9 +43,9 @@ elementclass IPPacketForward {
     -> host0;
 
     host0
-    -> Unqueue
+    -> Unqueue(LIMIT $COUNT)
     //-> PrintStats
-    -> AggregateCounter(COUNT_STOP $COUNT, PRINT_USERTIME true)
+    //-> AggregateCounter(COUNT_STOP $COUNT, PRINT_USERTIME true)
     -> Discard;
 
     Idle -> [1]host0;
@@ -70,9 +71,9 @@ elementclass IP6PacketForward {
     -> host0;
 
     host0
-    -> Unqueue
+    -> Unqueue(LIMIT $COUNT)
     //-> PrintStats
-    -> AggregateCounter(COUNT_STOP $COUNT, PRINT_USERTIME true)
+    //-> AggregateCounter(COUNT_STOP $COUNT, PRINT_USERTIME true)
     -> Discard;
 
     Idle -> [1]host0;
@@ -92,9 +93,11 @@ elementclass XIAPacketForward {
     Script(write host0/n/proc/rt_CID/rt.add - 5);
 
     Script(write host0/n/proc/rt_AD/rt.add SELF_AD 4);
-    Script(print_usertime, write host0/n/proc/rt_AD/rt.generate AD $AD_RT_SIZE 0, print_usertime);
+    //Script(print_usertime, write host0/n/proc/rt_AD/rt.generate AD $AD_RT_SIZE 0, print_usertime);
+    Script(write host0/n/proc/rt_AD/rt.generate AD $AD_RT_SIZE 0);
 
-    Script(print_usertime, write host0/n/proc/rt_CID/rt.generate CID $CID_RT_SIZE 0, print_usertime);
+    //Script(print_usertime, write host0/n/proc/rt_CID/rt.generate CID $CID_RT_SIZE 0, print_usertime);
+    Script(write host0/n/proc/rt_CID/rt.generate CID $CID_RT_SIZE 0);
 
     input[0]
     -> Clone($COUNT)
@@ -114,9 +117,9 @@ elementclass XIAPacketForward {
     -> XIARandomize(XID_TYPE AD, MAX_CYCLE $AD_RANDOMIZE_MAX_CYCLE)
     -> host0;
 
-    host0 -> Unqueue
+    host0 -> Unqueue (LIMIT $COUNT)
     //-> PrintStats
-    -> AggregateCounter(COUNT_STOP $COUNT, PRINT_USERTIME true)
+    //-> AggregateCounter(COUNT_STOP $COUNT, PRINT_USERTIME true)
     -> Discard;
 
     Idle -> [1]host0;
