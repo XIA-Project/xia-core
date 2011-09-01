@@ -71,9 +71,9 @@ elementclass IP6PacketForward {
     -> host0;
 
     host0
-    -> Unqueue
+    -> Unqueue(LIMIT $COUNT)
     //-> PrintStats
-    -> AggregateCounter(COUNT_STOP $COUNT, PRINT_USERTIME true)
+    //-> AggregateCounter(COUNT_STOP $COUNT, PRINT_USERTIME true)
     -> Discard;
 
     Idle -> [1]host0;
@@ -93,9 +93,11 @@ elementclass XIAPacketForward {
     Script(write host0/n/proc/rt_CID/rt.add - 5);
 
     Script(write host0/n/proc/rt_AD/rt.add SELF_AD 4);
-    Script(print_usertime, write host0/n/proc/rt_AD/rt.generate AD $AD_RT_SIZE 0, print_usertime);
+    //Script(print_usertime, write host0/n/proc/rt_AD/rt.generate AD $AD_RT_SIZE 0, print_usertime);
+    Script(write host0/n/proc/rt_AD/rt.generate AD $AD_RT_SIZE 0);
 
-    Script(print_usertime, write host0/n/proc/rt_CID/rt.generate CID $CID_RT_SIZE 0, print_usertime);
+    //Script(print_usertime, write host0/n/proc/rt_CID/rt.generate CID $CID_RT_SIZE 0, print_usertime);
+    Script(write host0/n/proc/rt_CID/rt.generate CID $CID_RT_SIZE 0);
 
     input[0]
     -> Clone($COUNT)
@@ -115,9 +117,9 @@ elementclass XIAPacketForward {
     -> XIARandomize(XID_TYPE AD, MAX_CYCLE $AD_RANDOMIZE_MAX_CYCLE)
     -> host0;
 
-    host0 -> Unqueue
+    host0 -> Unqueue (LIMIT $COUNT)
     //-> PrintStats
-    -> AggregateCounter(COUNT_STOP $COUNT, PRINT_USERTIME true)
+    //-> AggregateCounter(COUNT_STOP $COUNT, PRINT_USERTIME true)
     -> Discard;
 
     Idle -> [1]host0;

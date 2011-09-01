@@ -10,11 +10,11 @@ if __FILE__== $0
   end
   time_interval= ARGV[0].to_i
 
-  cnt = `cat /proc/click/tod*/count 2>/dev/null| wc`
+  cnt =`cat /proc/click/tod*/count 2>/dev/null| wc`
   cmd = "cat /proc/click/tod*/count 2>/dev/null"
   cmd_drop = "cat /proc/click/tod*/drop 2>/dev/null"
   
-  if (cnt==0)
+  if (cnt.to_i()==0)
     cmd = "cat /click/ge*/gen_sub*/td*/count 2>/dev/null"
     cmd_drops = "cat /click/ge*/gen_sub*/td*/drops 2>/dev/null"
   end

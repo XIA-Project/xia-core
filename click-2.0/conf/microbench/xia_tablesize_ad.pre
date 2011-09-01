@@ -1,5 +1,8 @@
-include ../xia_router_template.inc
-include common.inc
+//include ../xia_router_template.inc
+//include common.inc
+
+require(library ../xia_router_template.inc)
+require(library common.inc)
 
 
 gen :: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE)
@@ -13,4 +16,5 @@ Idle -> [2]fwd;
 Script(write gen.active true);
 
 define($AD_RT_SIZE 351611);
+define($CID_RT_SIZE 0);
 
