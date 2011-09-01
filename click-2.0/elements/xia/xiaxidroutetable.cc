@@ -45,9 +45,7 @@ XIAXIDRouteTable::add_handlers()
     add_write_handler("add", set_handler, 0);
     add_write_handler("set", set_handler, (void*)1);
     add_write_handler("remove", remove_handler, 0);
-#if CLICK_USERLEVEL
     add_write_handler("load", load_routes_handler, 0);
-#endif
     add_write_handler("generate", generate_routes_handler, 0);
 }
 
@@ -134,10 +132,10 @@ XIAXIDRouteTable::remove_handler(const String &conf, Element *e, void *, ErrorHa
     return 0;
 }
 
-#if CLICK_USERLEVEL
 int
 XIAXIDRouteTable::load_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh)
 {
+#if CLICK_USERLEVEL
     std::ifstream in_f(conf.c_str());
     if (!in_f.is_open())
     {
@@ -162,8 +160,44 @@ XIAXIDRouteTable::load_routes_handler(const String &conf, Element *e, void *, Er
     click_chatter("loaded %d entries", c);
 
     return 0;
-}
+#elif CLICK_LINUXMODLE
+    int c = 0;
+    char buf[1024];
+
+    mm_segment_t old_fs = get_fs();
+    set_fs(KERNEL_DS);
+    struct file * filp = file_open(conf.c_str(), O_RDONLY, 0);
+    if (filp==NULL)
+    {
+        errh->error("could not open file: %s", conf.c_str());
+        return -1;
+    }
+    loff_t file_size = vfs_llseek(filp, (loff_t)0, SEEK_END);
+    loff_t curpos = 0;
+    while (curpos < file_size)	{
+	file_read(filp, curpos, buf, 1020);
+	char * eol = strchr(buf, '\n');	
+	if (eol==NULL) {
+            click_chatter("Error at %s %d\n", __FUNCTION__, __LINE__);
+	    break;
+	}
+	curpos+=(eol+1-buf);
+        eol[1] = '\0';
+        if (strlen(buf) == 0)
+            continue;
+
+        if (set_handler(buf, e, 0, errh) != 0) {
+            click_chatter("Error at %s %d\n", __FUNCTION__, __LINE__);
+            return -1;
+	}
+        c++;
+    }
+    set_fs(old_fs);
+
+    click_chatter("XIA routing table loaded %d entries", c);
+    return 0;
 #endif
+}
 
 int
 XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh)

@@ -30,6 +30,11 @@ void proclikefs_put_super(struct super_block *);
 struct file_operations *proclikefs_new_file_operations(struct proclikefs_file_system *);
 struct inode_operations *proclikefs_new_inode_operations(struct proclikefs_file_system *);
 
+struct file* file_open(const char* path, int flags, int rights);
+void file_close(struct file* file);
+int file_read(struct file* file, unsigned long long offset, unsigned char* data, unsigned int size); 
+int file_write(struct file* file, unsigned long long offset, unsigned char* data, unsigned int size);
+
 #ifdef __cplusplus
 }
 #endif

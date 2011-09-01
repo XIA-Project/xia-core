@@ -28,6 +28,12 @@
 #include "iproutetable.hh"
 #if CLICK_USERLEVEL
 #include <fstream>
+#elif CLICK_LINUXMODULE
+#include <click/cxxprotect.h>
+CLICK_CXX_PROTECT
+#include "proclikefs.h"
+CLICK_CXX_UNPROTECT
+# include <click/cxxunprotect.h>
 #endif
 CLICK_DECLS
 
@@ -295,10 +301,10 @@ IPRouteTable::lookup_handler(int, String& s, Element* e, const Handler*, ErrorHa
 	return errh->error("expected IP address");
 }
 
-#if CLICK_USERLEVEL
 int
 IPRouteTable::load_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh)
 {
+#if CLICK_USERLEVEL
     std::ifstream in_f(conf.c_str());
     if (!in_f.is_open())
     {
@@ -323,9 +329,45 @@ IPRouteTable::load_routes_handler(const String &conf, Element *e, void *, ErrorH
     click_chatter("loaded %d entries", c);
 
     return 0;
-}
+#elif CLICK_LINUXMODULE
+    int c = 0;
+    char buf[1024];
+
+    mm_segment_t old_fs = get_fs();
+    set_fs(KERNEL_DS);
+    struct file * filp = file_open(conf.c_str(), O_RDONLY, 0);
+    if (filp==NULL)
+    {
+        errh->error("could not open file: %s", conf.c_str());
+        return -1;
+    }
+    loff_t file_size = vfs_llseek(filp, (loff_t)0, SEEK_END);
+    loff_t curpos = 0;
+    while (curpos < file_size)	{
+	file_read(filp, curpos, buf, 1020);
+	char * eol = strchr(buf, '\n');	
+	if (eol==NULL) {
+            click_chatter("Error at %s %d\n", __FUNCTION__, __LINE__);
+	    break;
+	}
+	curpos+=(eol+1-buf);
+        eol[1] = '\0';
+        if (strlen(buf) == 0)
+            continue;
+
+        if (add_route_handler(buf, e, 0, errh) != 0) {
+            click_chatter("Error at %s %d\n", __FUNCTION__, __LINE__);
+            return -1;
+	}
+        c++;
+    }
+    set_fs(old_fs);
+
+    click_chatter("IP routing table loaded %d entries", c);
+    return 0;
 #endif
 
+}
 void
 IPRouteTable::add_handlers()
 {
@@ -335,9 +377,7 @@ IPRouteTable::add_handlers()
     add_write_handler("ctrl", ctrl_handler, 0);
     add_read_handler("table", table_handler, 0, Handler::EXPENSIVE);
     set_handler("lookup", Handler::OP_READ | Handler::READ_PARAM, lookup_handler);
-#if CLICK_USERLEVEL
     add_write_handler("load", load_routes_handler, 0);
-#endif
 }
 
 CLICK_ENDDECLS
