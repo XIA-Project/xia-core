@@ -29,11 +29,19 @@ class XIARandomize : public Element { public:
     Packet *simple_action(Packet *);
 
 private:
+#if CLICK_LINUXMODULE
+    struct rnd_state _deterministic;
+#else
     unsigned short _xsubi_det[3];
+#endif
     int _max_cycle;
     int _current_cycle;
 
+#if CLICK_LINUXMODULE
+    struct rnd_state _arbitrary;
+#else
     unsigned short _xsubi_arb[3];
+#endif
 
     int _xid_type;
 };

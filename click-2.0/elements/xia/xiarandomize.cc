@@ -17,16 +17,28 @@ XIARandomize::XIARandomize()
 {
     assert(CLICK_XIA_XID_ID_LEN % sizeof(uint32_t) == 0);
 
+#if CLICK_USERLEVEL
     _xsubi_det[0] = 1;
     _xsubi_det[1] = 2;
     _xsubi_det[2] = 3;
+#elif CLICK_LINUXMODULE
+    _deterministic.s1 = 1;
+    _deterministic.s2 = 2;
+    _deterministic.s3=  3;
+#endif
 
     _current_cycle = 0;
     _max_cycle = 1000000000;
 
+#if CLICK_USERLEVEL
     _xsubi_arb[0] = 4;
     _xsubi_arb[1] = 5;
     _xsubi_arb[2] = 6;
+#elif CLICK_LINUXMODULE
+    _arbitrary.s1 = 4;
+    _arbitrary.s2 = 5;
+    _arbitrary.s3 = 6;
+#endif
 }
 
 XIARandomize::~XIARandomize()
@@ -64,19 +76,25 @@ XIARandomize::simple_action(Packet *p_in)
             {
 #if CLICK_USERLEVEL
                 *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(_xsubi_det));
-#else
-                *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(random32());
+#elif CLICK_LINUXMODULE
+                *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(prandom32(&_deterministic));
 #endif
                 xid += sizeof(uint32_t);
             }
 
             if (++_current_cycle == _max_cycle)
-            {
-                _xsubi_det[0] = 1;
-                _xsubi_det[1] = 2;
-                _xsubi_det[2] = 3;
-                _current_cycle = 0;
-            }
+	    {
+#if CLICK_USERLEVEL
+		    _xsubi_det[0] = 1;
+		    _xsubi_det[1] = 2;
+		    _xsubi_det[2] = 3;
+#elif CLICK_LINUXMODULE
+		    _deterministic.s1 = 1;
+		    _deterministic.s2 = 2;
+		    _deterministic.s3 = 3;
+#endif
+		    _current_cycle = 0;
+	    }
         }
         else if (node.xid.type == 2)
         {
@@ -88,8 +106,8 @@ XIARandomize::simple_action(Packet *p_in)
             {
 #if CLICK_USERLEVEL
                 *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(_xsubi_arb));
-#else
-                *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(random32());
+#elif CLICK_LINUXMODULE
+                *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(prandom32(&_arbitrary));
 #endif
                 xid += sizeof(uint32_t);
             }

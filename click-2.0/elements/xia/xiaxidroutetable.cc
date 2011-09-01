@@ -192,10 +192,17 @@ XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *
     if (!cp_integer(port_str, &port))
         return errh->error("invalid port: ", port_str.c_str());
 
+#if CLICK_USERLEVEL
     unsigned short xsubi[3];
     xsubi[0] = 1;
     xsubi[1] = 2;
     xsubi[2] = 3;
+#else
+    struct rnd_state state;
+    state.s1= 1;
+    state.s2= 2;
+    state.s3= 3;
+#endif
 
     struct click_xia_xid xid_d;
     xid_d.type = xid_type;
@@ -210,7 +217,7 @@ XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *
 #if CLICK_USERLEVEL
             *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(xsubi));
 #else
-            *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(random32());
+            *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(prandom32(&state));
 #endif
             xid += sizeof(uint32_t);
         }
