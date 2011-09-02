@@ -9411,10 +9411,10 @@ static int ixgbe_poll_off(struct net_device *dev, unsigned int queue_num)
 	if (queue_num >= adapter->num_rx_queues)
 		return -1;
 
-	if (test_and_set_bit(1, &adapter->reconfigure_lock)) {
-		// poll_on/off is done one-by-one, just for safety (need checking)
-		return -1;
-	}
+	//if (test_and_set_bit(1, &adapter->reconfigure_lock)) {
+	//	// poll_on/off is done one-by-one, just for safety (need checking)
+	//	return -1;
+	//}
 
 	cpu_id = raw_smp_processor_id();
 
@@ -9431,7 +9431,7 @@ static int ixgbe_poll_off(struct net_device *dev, unsigned int queue_num)
 		rx_ring->owner_cpu = tx_ring->owner_cpu = -1;
 	}
 
-	clear_bit(1, &adapter->reconfigure_lock);
+	//clear_bit(1, &adapter->reconfigure_lock);
 
 	return 0;
 }
