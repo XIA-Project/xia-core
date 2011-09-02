@@ -21,7 +21,7 @@ IsoCPUQueue::configure(Vector<String> &conf, ErrorHandler *errh)
 		   "CAPACITY", cpkP, cpUnsigned, &new_capacity,
 		   cpEnd) < 0)
     return -1;
-  _capacity = (new_capacity+7)/8*8;
+  _capacity = (new_capacity+7)/8*8-1;
   return 0;
 }
 
@@ -32,6 +32,7 @@ IsoCPUQueue::initialize(ErrorHandler *errh)
     if (!(_q[i]._q = new Packet*[_capacity+1]))
       return errh->error("out of memory!");
     _q[i]._drops = 0;
+    _q[i]._head = _q[i]._tail = 0; 
   }
   return 0;
 }

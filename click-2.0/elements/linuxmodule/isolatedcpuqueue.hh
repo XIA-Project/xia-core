@@ -25,8 +25,7 @@ class IsoCPUQueue : public Element {
     uint32_t _head;
     uint32_t _tail;
     uint64_t _drops;
-    unsigned char _pad[40];
-  } __attribute__((packed));
+  } ____cacheline_aligned_in_smp;
   struct _qstruct _q[NUM_CLICK_CPUS];
 
   unsigned _capacity;
