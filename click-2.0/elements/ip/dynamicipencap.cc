@@ -31,7 +31,8 @@ DynamicIPEncap::simple_action(Packet *p_in)
   ip->ip_sum = click_in_cksum((unsigned char *) ip, sizeof(click_ip));
 #endif
   _iph.ip_dst.s_addr = htonl(ntohl(_iph.ip_dst.s_addr)+1);
-  _iph.ip_src.s_addr = htonl(ntohl(_iph.ip_src.s_addr)+1);
+  // if both are modified, it will confuse fdir atr's hashing
+  //_iph.ip_src.s_addr = htonl(ntohl(_iph.ip_src.s_addr)+1);
   return p_out;
 }
 CLICK_ENDDECLS
