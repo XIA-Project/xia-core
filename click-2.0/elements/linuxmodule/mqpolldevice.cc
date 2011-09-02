@@ -216,7 +216,6 @@ MQPollDevice::run_task(Task *)
 {
 #if HAVE_LINUX_MQ_POLLING
   struct sk_buff *skb_list, *skb;
-  int got=0;
 # if CLICK_DEVICE_STATS
   uint64_t time_now;
   unsigned low00, low10;
@@ -235,84 +234,23 @@ MQPollDevice::run_task(Task *)
       _free_skb_list = skbmgr_allocate_skbs(_headroom, 1536, &nskbs);
   }
 
-  got = _burst;
-  //skb_list = _dev->mq_rx_poll(_dev, _queue, &got);
-  skb_list = _dev->mq_rx_poll_and_refill(_dev, _queue, &_free_skb_list, &got);
+  int want = _burst;
+  skb_list = _dev->mq_rx_poll_and_refill(_dev, _queue, &_free_skb_list, &want);
 
-  if (got == 0)
-    _empty_polls++;
-  else
-    _ppolledin[got-1]++;
+//# if CLICK_DEVICE_STATS
+//  if (got > 0 || _activations > 0) {
+//    GET_STATS_RESET(low00, low10, time_now,
+//		    _perfcnt1_poll, _perfcnt2_poll, _time_poll);
+//# endif
 
-# if CLICK_DEVICE_STATS
-  if (got > 0 || _activations > 0) {
-    GET_STATS_RESET(low00, low10, time_now,
-		    _perfcnt1_poll, _perfcnt2_poll, _time_poll);
-
-    if (got == 0)
-      _empty_polls++;
-    else
-      _activations++;
-  }
-# endif
-
-  int nskbs = got;
-//  if (got == 0) {
-//      nskbs = _dev->mq_rx_refill(_dev, _queue, 0);
-//      _last_nskbs = nskbs;
-//}
-
-  if (nskbs > 0) {
-  //if (nskbs >= 16) {
-    /*
-     * Need to allocate 1536+16 == 1552 bytes per packet.
-     * "Extra 16 bytes in the SKB for eepro100 RxFD -- perhaps there
-     * should be some callback to the device driver to query for the
-     * desired packet size."
-     * Skbmgr adds 64 bytes of headroom and tailroom, so back request off to
-     * 1536.
-     */
-    //nskbs = min(512,nskbs);
-    struct sk_buff *new_skbs = skbmgr_allocate_skbs(_headroom, 1536, &nskbs);
-//    struct sk_buff *new_skbs = skbmgr_allocate_skbs(_headroom, 270, &nskbs);
-
-# if CLICK_DEVICE_STATS
-    if (_activations > 0)
-      GET_STATS_RESET(low00, low10, time_now, 
-	              _perfcnt1_allocskb, _perfcnt2_allocskb, _time_allocskb);
-# endif
-
-    if (!_free_skb_list)
-        _free_skb_list = new_skbs;
-    else {
-        skb = _free_skb_list;
-        while (skb->next)
-            skb = skb->next;
-        skb->next = new_skbs;
-    }
-    //nskbs = _dev->mq_rx_refill(_dev, _queue, &new_skbs);
-
-# if CLICK_DEVICE_STATS
-    if (_activations > 0) 
-      GET_STATS_RESET(low00, low10, time_now, 
-	              _perfcnt1_refill, _perfcnt2_refill, _time_refill);
-# endif
-
-    //if (new_skbs) {
-    //    for (struct sk_buff *skb = new_skbs; skb; skb = skb->next)
-    //        _buffers_reused++;
-    //    skbmgr_recycle_skbs(new_skbs);
-    //}
-  }
-
-  for (int i = 0; i < got; i++) {
+  int got = 0;
+  while (skb_list) {
     skb = skb_list;
-    assert(skb_list!=NULL);
     skb_list = skb_list->next;
-    assert(skb!=NULL);
     skb->next = NULL;
+    got++;
  
-    if (skb_list) {
+    //if (skb_list) {
       // prefetch annotation area, and first 2 cache
       // lines that contain ethernet and ip headers.
 //# if __i386__ && HAVE_INTEL_CPU
@@ -323,7 +261,7 @@ MQPollDevice::run_task(Task *)
 	//__builtin_prefetch(skb_list);
 	//__builtin_prefetch(&skb_list->cb[0]);
 	//__builtin_prefetch(&skb_list->destructor);	// for faster skb_orphan() in Packet::make()
-    }
+    //}
     //__builtin_prefetch(skb->data);
 
     /* Retrieve the ether header. */
@@ -350,6 +288,62 @@ MQPollDevice::run_task(Task *)
 # endif
   }
 
+  if (!got)
+    _empty_polls++;
+  else {
+    _ppolledin[got-1]++;
+    //_activations++;
+  }
+
+  int nskbs = got;
+//  if (got == 0) {
+//      nskbs = _dev->mq_rx_refill(_dev, _queue, 0);
+//      _last_nskbs = nskbs;
+//}
+
+  if (nskbs > 0) {
+  //if (nskbs >= 16) {
+    /*
+     * Need to allocate 1536+16 == 1552 bytes per packet.
+     * "Extra 16 bytes in the SKB for eepro100 RxFD -- perhaps there
+     * should be some callback to the device driver to query for the
+     * desired packet size."
+     * Skbmgr adds 64 bytes of headroom and tailroom, so back request off to
+     * 1536.
+     */
+    //nskbs = min(512,nskbs);
+    struct sk_buff *new_skbs = skbmgr_allocate_skbs(_headroom, 1536, &nskbs);
+//    struct sk_buff *new_skbs = skbmgr_allocate_skbs(_headroom, 270, &nskbs);
+
+//# if CLICK_DEVICE_STATS
+//    if (_activations > 0)
+//      GET_STATS_RESET(low00, low10, time_now, 
+//	              _perfcnt1_allocskb, _perfcnt2_allocskb, _time_allocskb);
+//# endif
+
+    if (!_free_skb_list)
+        _free_skb_list = new_skbs;
+    else {
+        skb = _free_skb_list;
+        while (skb->next)
+            skb = skb->next;
+        skb->next = new_skbs;
+    }
+    //nskbs = _dev->mq_rx_refill(_dev, _queue, &new_skbs);
+
+# if CLICK_DEVICE_STATS
+    if (_activations > 0) 
+      GET_STATS_RESET(low00, low10, time_now, 
+	              _perfcnt1_refill, _perfcnt2_refill, _time_refill);
+# endif
+
+    //if (new_skbs) {
+    //    for (struct sk_buff *skb = new_skbs; skb; skb = skb->next)
+    //        _buffers_reused++;
+    //    skbmgr_recycle_skbs(new_skbs);
+    //}
+  }
+
 # if CLICK_DEVICE_STATS
   if (_activations > 0) {
     GET_STATS_RESET(low00, low10, time_now, 
@@ -361,7 +355,7 @@ MQPollDevice::run_task(Task *)
   }
 # endif
 
-  adjust_tickets(got);
+  adjust_tickets(want);
   _task.fast_reschedule();
   return got > 0;
 #else

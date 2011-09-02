@@ -4652,6 +4652,8 @@ void ixgbe_clean_rx_ring(struct ixgbe_ring *rx_ring)
 
 	rx_ring->next_to_clean = 0;
 	rx_ring->next_to_use = 0;
+	rx_ring->last_poll = 0;
+	rx_ring->no_poll_until = 0;
 	rx_ring->last_report = 0;
 }
 
@@ -4683,6 +4685,8 @@ static void ixgbe_clean_tx_ring(struct ixgbe_ring *tx_ring)
 
 	tx_ring->next_to_use = 0;
 	tx_ring->next_to_clean = 0;
+	tx_ring->last_poll = 0;
+	tx_ring->no_poll_until = 0;
 	tx_ring->last_report = 0;
 }
 
@@ -6144,6 +6148,8 @@ int ixgbe_setup_tx_resources(struct ixgbe_ring *tx_ring)
 
 	tx_ring->next_to_use = 0;
 	tx_ring->next_to_clean = 0;
+	tx_ring->last_poll = jiffies;
+	tx_ring->no_poll_until = jiffies;
 	tx_ring->last_report = jiffies;
 	return 0;
 
@@ -6250,6 +6256,8 @@ int ixgbe_setup_rx_resources(struct ixgbe_ring *rx_ring)
 
 	rx_ring->next_to_clean = 0;
 	rx_ring->next_to_use = 0;
+	rx_ring->last_poll = jiffies;
+	rx_ring->no_poll_until = jiffies;
 	rx_ring->last_report = jiffies;
 	return 0;
 err:
@@ -9278,9 +9286,9 @@ static int ixgbe_notify_dca(struct notifier_block *nb, unsigned long event,
 /*******************************************/
 
 static const int ixgbe_rx_desc_per_cache_line = L1_CACHE_BYTES / sizeof(union ixgbe_adv_rx_desc);
-static const int ixgbe_prefetch_ahead = 2;
+static const int ixgbe_prefetch_ahead = 1;
 
-#define IXGBE_RX_QUEUE_WAKE 64
+#define IXGBE_RX_QUEUE_WAKE 128 
 #define IXGBE_TX_QUEUE_WAKE 16
 
 
@@ -9472,6 +9480,8 @@ static void ixgbe_mq_atr(struct net_device *dev, struct sk_buff* skb, unsigned i
 	}
 }
 
+//#define PREALLOC_DMA
+
 static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsigned int queue_num, struct sk_buff **skbs, int *want)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(dev);
@@ -9483,6 +9493,7 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 	u16 rx_buf_len;
 
 	u16 i;
+	//u16 rdh;
 	union ixgbe_adv_rx_desc *rx_desc;
 	struct ixgbe_rx_buffer *bi;
 	struct ixgbe_rx_buffer *bi_stop;
@@ -9495,11 +9506,17 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 	u16 got;
 	u16 max_get;
 
-	u16 len_arr[64];
+	u16 len_arr[128];
 
+#ifdef PREALLOC_DMA
 	struct sk_buff *skb_head;
 	struct sk_buff *cur_skb;
 	struct sk_buff *prev_skb;
+#else
+	struct sk_buff *skb_head;
+	struct sk_buff *cur_skb;
+	struct sk_buff **pcur_skb;
+#endif
 
 	static int debug_cnt = 100;
 
@@ -9543,11 +9560,21 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 		return NULL;
 	}
 
+	//if ((long)(rx_ring->no_poll_until - jiffies) > 0) {
+	//	*want = 0;
+	//	return NULL;
+	//}
+
 	// cannot spare too many packets at once (cache issue)
 	if (*want >= sizeof(len_arr) / sizeof(len_arr[0]))
 		max_get = sizeof(len_arr) / sizeof(len_arr[0]);
 	else
 		max_get = *want;
+
+	//if ((IXGBE_READ_REG(&adapter->hw, IXGBE_RDH(rx_ring->reg_idx)) - rx_ring->next_to_clean + rx_ring->count) % rx_ring->count < 32) {
+	//	*want = 0;
+	//	return NULL;
+	//}
 
 	// bring some frequently used variables
 	dma_dev = rx_ring->dev;
@@ -9555,19 +9582,26 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 	rx_buf_len = rx_ring->rx_buf_len;
 
 	i = rx_ring->next_to_clean;
+	//rdh = IXGBE_READ_REG(&adapter->hw, IXGBE_RDH(rx_ring->reg_idx));
 	rx_desc = IXGBE_RX_DESC_ADV(rx_ring, i);
 	bi = &rx_ring->rx_buffer_info[i];
 	buffer = &rx_ring->buffer[i];
 	buffer_dma = &rx_ring->buffer_dma[i];
 	bi_stop = &rx_ring->rx_buffer_info[rx_ring->next_to_use];
+	//bi_stop = &rx_ring->rx_buffer_info[rdh];
 
 	i -= count;	// for faster zero-test at the end of the ring
 
 	got = 0;
 	hard_header_len = dev->hard_header_len;
 
+#ifdef PREALLOC_DMA
 	skb_head = cur_skb = *skbs;
 	prev_skb = NULL;
+#else
+	skb_head = cur_skb = NULL;
+	pcur_skb = &skb_head;
+#endif
 
 	// regular status report
 	if (jiffies - rx_ring->last_report >= 1 * HZ) {
@@ -9590,35 +9624,44 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 			);
 	}
 
-	__builtin_prefetch(rx_desc, 1, 0);
-	__builtin_prefetch((char*)*buffer + 0 * L1_CACHE_BYTES, 0, 0);
-	__builtin_prefetch((char*)*buffer + 1 * L1_CACHE_BYTES, 0, 0);
+	//__builtin_prefetch(rx_desc, 1, 0);
+	//__builtin_prefetch((char*)*buffer + 0 * L1_CACHE_BYTES, 0, 0);
+	//__builtin_prefetch((char*)*buffer + 1 * L1_CACHE_BYTES, 0, 0);
+	//__builtin_prefetch((char*)*buffer + 2 * L1_CACHE_BYTES, 0, 0);
+	//__builtin_prefetch((char*)*buffer + 3 * L1_CACHE_BYTES, 0, 0);
 
-	while (bi != bi_stop && got < *want && cur_skb) {
-		// prefetch for this loop
-		if ((long)rx_desc % ixgbe_rx_desc_per_cache_line == 0)
-			__builtin_prefetch(rx_desc + ixgbe_prefetch_ahead * ixgbe_rx_desc_per_cache_line, 1, 0);
+	while (bi != bi_stop && got < max_get) {
+#ifdef PREALLOC_DMA
+		if (!cur_skb)
+			break;
+#else
+		if (!*skbs)
+			break;
+#endif
+		//// prefetch for this loop
+		//if ((long)rx_desc % ixgbe_rx_desc_per_cache_line == 0)
+		//	__builtin_prefetch(rx_desc + ixgbe_prefetch_ahead * ixgbe_rx_desc_per_cache_line, 1, 0);
 
-		if (likely((u16)(i + 1) != 0)) {
-			__builtin_prefetch((char*)*(buffer + 1) + 0 * L1_CACHE_BYTES, 0, 0);
-			__builtin_prefetch((char*)*(buffer + 1) + 1 * L1_CACHE_BYTES, 0, 0);
-			__builtin_prefetch((char*)*(buffer + 1) + 2 * L1_CACHE_BYTES, 0, 0);
-			__builtin_prefetch((char*)*(buffer + 1) + 3 * L1_CACHE_BYTES, 0, 0);
-		}
-		else {
-			__builtin_prefetch((char*)rx_ring->buffer[0] + 0 * L1_CACHE_BYTES, 0, 0);
-			__builtin_prefetch((char*)rx_ring->buffer[0] + 1 * L1_CACHE_BYTES, 0, 0);
-			__builtin_prefetch((char*)rx_ring->buffer[0] + 2 * L1_CACHE_BYTES, 0, 0);
-			__builtin_prefetch((char*)rx_ring->buffer[0] + 3 * L1_CACHE_BYTES, 0, 0);
-		}
+		//if (likely((u16)(i + 1) != 0)) {
+		//	__builtin_prefetch((char*)*(buffer + 1) + 0 * L1_CACHE_BYTES, 0, 0);
+		//	__builtin_prefetch((char*)*(buffer + 1) + 1 * L1_CACHE_BYTES, 0, 0);
+		//	__builtin_prefetch((char*)*(buffer + 1) + 2 * L1_CACHE_BYTES, 0, 0);
+		//	__builtin_prefetch((char*)*(buffer + 1) + 3 * L1_CACHE_BYTES, 0, 0);
+		//}
+		//else {
+		//	__builtin_prefetch((char*)rx_ring->buffer[0] + 0 * L1_CACHE_BYTES, 0, 0);
+		//	__builtin_prefetch((char*)rx_ring->buffer[0] + 1 * L1_CACHE_BYTES, 0, 0);
+		//	__builtin_prefetch((char*)rx_ring->buffer[0] + 2 * L1_CACHE_BYTES, 0, 0);
+		//	__builtin_prefetch((char*)rx_ring->buffer[0] + 3 * L1_CACHE_BYTES, 0, 0);
+		//}
 
 		// check status if the entry has been used by the device
 		staterr = rx_desc->wb.upper.status_error;
 		if (!(staterr & le32_to_cpu(IXGBE_RXD_STAT_DD)))
 			break;
 
-		if (unlikely(queue_num == 0 && debug_cnt))
-			printk(KERN_INFO "ixgbe_mq_rx_poll: retrieving %hu\n", i + count);
+		//if (unlikely(queue_num == 0 && debug_cnt))
+		//	printk(KERN_INFO "ixgbe_mq_rx_poll: retrieving %hu\n", i + count);
 
 		// ensure to ummap page AFTER checking staterr
 		rmb();	
@@ -9633,12 +9676,34 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 		// obtain length
 		len_arr[got] = len = le16_to_cpu(rx_desc->wb.upper.length);
 
+#ifdef PREALLOC_DMA
 		// bring the packet data to skb
 		memcpy(cur_skb->data, *buffer, len);
+		got++;
 
 		// prepare the desc for future packet retrieval
 		rx_desc->read.pkt_addr = cpu_to_le64(*buffer_dma);
 		rx_desc->read.hdr_addr = 0;
+
+		prev_skb = cur_skb;
+		cur_skb = cur_skb->next;
+#else
+		if (bi->skb) {
+			dma_unmap_single(rx_ring->dev, bi->dma, rx_ring->rx_buf_len, DMA_FROM_DEVICE);
+			cur_skb = *pcur_skb = bi->skb;
+			pcur_skb = &cur_skb->next;
+			got++;
+		}
+
+		bi->dma = dma_map_single(rx_ring->dev, (*skbs)->data, rx_ring->rx_buf_len, DMA_FROM_DEVICE);
+		bi->skb = *skbs;
+
+		rx_desc->read.pkt_addr = cpu_to_le64(bi->dma);
+		rx_desc->read.hdr_addr = 0;
+
+		*skbs = bi->skb->next;
+		bi->skb->next = NULL;
+#endif
 
 		if (0) {
 			static int k = 0;
@@ -9651,10 +9716,10 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 		}
 
 		// prefetch for skb update lookup
-		__builtin_prefetch(&cur_skb->next, 1, 0);	// for *skb = ...
-		__builtin_prefetch(&cur_skb->tail, 1, 0);	// for skb_put()
-		__builtin_prefetch(&cur_skb->len, 1, 0);		// for skb_put(), skb_pull()
-		__builtin_prefetch(&cur_skb->data, 1, 0);	// for skb_pull()
+		//__builtin_prefetch(&cur_skb->next, 1, 0);	// for *skb = ...
+		//__builtin_prefetch(&cur_skb->tail, 1, 0);	// for skb_put()
+		//__builtin_prefetch(&cur_skb->len, 1, 0);		// for skb_put(), skb_pull()
+		//__builtin_prefetch(&cur_skb->data, 1, 0);	// for skb_pull()
 
 		// update stats
 		rx_ring->stats.packets++;
@@ -9666,9 +9731,6 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 		i++;
 		buffer++;
 		buffer_dma++;
-		prev_skb = cur_skb;
-		cur_skb = cur_skb->next;
-		got++;
 		if (unlikely(!i)) {
 			rx_desc = IXGBE_RX_DESC_ADV(rx_ring, 0);
 			bi = rx_ring->rx_buffer_info;
@@ -9699,17 +9761,31 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 		rx_ring->next_to_use = (i - 1 + count) % count;
 	}
 
+#ifdef PREALLOC_DMA
 	if (prev_skb)
 		prev_skb->next = NULL;
 	*skbs = cur_skb;
+#else
+	*pcur_skb = NULL;
+#endif
 
 	*want = got;
+	//*want = (rdh - i + count) % count;
+
+	//if (got) {
+	//	unsigned long now = jiffies;
+	//	unsigned long delay = (now - rx_ring->last_poll) * max_get / got;
+	//	if (delay >= HZ / 1000)
+	//		delay = HZ / 1000;
+	//	rx_ring->no_poll_until = now + delay;
+	//	rx_ring->last_poll = now;
+	//}
 
 	// prepare sk_buffs for click uses
 	cur_skb = skb_head;
 	for (i = 0; i < got; i++) {
-		__builtin_prefetch(cur_skb->data, 1, 0);					// for click
-		__builtin_prefetch(cur_skb->data + L1_CACHE_BYTES, 1, 0);	// for click
+		//__builtin_prefetch(cur_skb->data, 1, 0);					// for click
+		//__builtin_prefetch(cur_skb->data + L1_CACHE_BYTES, 1, 0);	// for click
 
 		skb_put(cur_skb, len_arr[i]);
 		skb_pull(cur_skb, hard_header_len);
@@ -9831,8 +9907,13 @@ static int ixgbe_mq_tx_pqueue(struct net_device *netdev, unsigned int queue_num,
 
 	tx_buffer_info->time_stamp = jiffies;
 
+#ifdef PREALLOC_DMA
 	memcpy(tx_ring->buffer[i], skb->data, skb->len);
 	tx_desc->read.buffer_addr = cpu_to_le64(tx_ring->buffer_dma[i]);
+#else
+	tx_ring->tx_buffer_info[i].dma = dma_map_single(tx_ring->dev, skb->data, skb->len, DMA_TO_DEVICE);
+	tx_desc->read.buffer_addr = cpu_to_le64(tx_ring->tx_buffer_info[i].dma);
+#endif
 	tx_desc->read.cmd_type_len =
 		cpu_to_le32(cmd_type_len | tx_buffer_info->length);
 	tx_desc->read.olinfo_status = cpu_to_le32(olinfo_status);
@@ -9920,6 +10001,10 @@ static struct sk_buff * ixgbe_mq_tx_clean(struct net_device *netdev, unsigned in
 				skb->next = NULL;
 				skb_last = skb;
 			}
+#ifndef PREALLOC_DMA
+			dma_unmap_single(tx_ring->dev, tx_ring->tx_buffer_info[i].dma, skb->len, DMA_TO_DEVICE);
+			tx_ring->tx_buffer_info[i].dma = 0;
+#endif
 			tx_ring->tx_buffer_info[i].skb = NULL;
 		}
 

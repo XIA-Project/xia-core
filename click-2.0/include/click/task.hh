@@ -349,7 +349,11 @@ class Task : private TaskLink { public:
     friend class RouterThread;
     friend class Master;
 
-};
+}
+#ifdef CLICK_LINUXMODULE
+____cacheline_aligned_in_smp
+#endif
+;
 
 
 // need RouterThread's definition for inline functions

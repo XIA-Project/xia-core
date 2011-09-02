@@ -302,11 +302,16 @@ MQToDevice::run_task(Task *)
 	if (busy)
 	    break;
 	sent++;
+
+#if HAVE_LINUX_MQ_POLLING
+        if (is_polling && _npackets % _burst == 0)
+            _dev->mq_tx_eob(_dev, _queue);
+#endif
     }
 
 #if HAVE_LINUX_MQ_POLLING
-    if (is_polling && sent > 0)
-	_dev->mq_tx_eob(_dev, _queue);
+//    if (is_polling && sent > 0)
+//	_dev->mq_tx_eob(_dev, _queue);
 
     // If Linux tried to send a packet, but saw tbusy, it will
     // have left it on the queue. It'll just sit there forever
@@ -420,7 +425,8 @@ MQToDevice::queue_packet(Packet *p)
 	    if (++_too_short == 1)
 		printk("<1>MQToDevice %s packet too small (len %d, tailroom %d), had to copy\n", skb1->len, skb_tailroom(skb1));
 	    struct sk_buff *nskb = skb_copy_expand(skb1, skb_headroom(skb1), skb_tailroom(skb1) + 60 - skb1->len, GFP_ATOMIC);
-	    kfree_skb(skb1);
+	    //kfree_skb(skb1);
+	    skbmgr_recycle_skbs(skb1);
 	    if (!nskb)
 		return -1;
 	    skb1 = nskb;
@@ -443,12 +449,14 @@ MQToDevice::queue_packet(Packet *p)
 	    /* if a packet is sent in non-polling mode the ported ixgbe driver dies */
 	    if (_hard_start++ ==1)
 	        printk("<1>MQToDevice %s polling not enabled! Dropping packet\n", _dev->name);
-	    kfree_skb(skb1);
+	    //kfree_skb(skb1);
+	    skbmgr_recycle_skbs(skb1);
 	}
     if (ret != 0) {
 	if (++_rejected == 1)
 	    printk("<1>MQToDevice %s rejected a packet!\n", _dev->name);
-	kfree_skb(skb1);
+	//kfree_skb(skb1);
+        skbmgr_recycle_skbs(skb1);
     }
     return ret;
 }
