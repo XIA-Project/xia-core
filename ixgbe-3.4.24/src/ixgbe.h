@@ -373,6 +373,7 @@ struct ixgbe_ring {
 	dma_addr_t dma;			/* phys. address of descriptor ring */
 	struct ixgbe_q_vector *q_vector; /* backpointer to host q_vector */
 
+	int owner_cpu;
 	u8 polling;
 	void **buffer;
 	dma_addr_t *buffer_dma;

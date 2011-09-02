@@ -4653,7 +4653,6 @@ void ixgbe_clean_rx_ring(struct ixgbe_ring *rx_ring)
 	rx_ring->next_to_clean = 0;
 	rx_ring->next_to_use = 0;
 	rx_ring->last_report = 0;
-	//rx_ring->last_notified = 0;
 }
 
 /**
@@ -4685,7 +4684,6 @@ static void ixgbe_clean_tx_ring(struct ixgbe_ring *tx_ring)
 	tx_ring->next_to_use = 0;
 	tx_ring->next_to_clean = 0;
 	tx_ring->last_report = 0;
-	//tx_ring->last_notified = 0;
 }
 
 /**
@@ -4738,45 +4736,34 @@ void ixgbe_down(struct ixgbe_adapter *adapter)
 	u32 rxctrl;
 	int i;
 
-	printk(KERN_INFO "ixgbe_down 0\n");
-
 	/* signal that we are down to the interrupt handler */
 	set_bit(__IXGBE_DOWN, &adapter->state);
-
-	printk(KERN_INFO "ixgbe_down 1\n");
 
 	/* disable receives */
 	rxctrl = IXGBE_READ_REG(hw, IXGBE_RXCTRL);
 	IXGBE_WRITE_REG(hw, IXGBE_RXCTRL, rxctrl & ~IXGBE_RXCTRL_RXEN);
-	printk(KERN_INFO "ixgbe_down 2\n");
 
 	/* disable all enabled rx queues */
 	for (i = 0; i < adapter->num_rx_queues; i++)
 		/* this call also flushes the previous write */
 		ixgbe_disable_rx_queue(adapter, adapter->rx_ring[i]);
 
-	printk(KERN_INFO "ixgbe_down 3\n");
 	usleep_range(10000, 20000);
 
 	netif_tx_stop_all_queues(netdev);
-	printk(KERN_INFO "ixgbe_down 4\n");
 
 	/* call carrier off first to avoid false dev_watchdog timeouts */
 	netif_carrier_off(netdev);
 	netif_tx_disable(netdev);
-	printk(KERN_INFO "ixgbe_down 5\n");
 
 	ixgbe_irq_disable(adapter);
-	printk(KERN_INFO "ixgbe_down 6\n");
 
 	ixgbe_napi_disable_all(adapter);
-	printk(KERN_INFO "ixgbe_down 7\n");
 
 	adapter->flags2 &= ~(IXGBE_FLAG2_FDIR_REQUIRES_REINIT |
 			     IXGBE_FLAG2_RESET_REQUESTED);
 	adapter->flags &= ~IXGBE_FLAG_NEED_LINK_UPDATE;
 
-	printk(KERN_INFO "ixgbe_down 8\n");
 	del_timer_sync(&adapter->service_timer);
 
 	/* disable receive for all VFs and wait one second */
@@ -4792,14 +4779,12 @@ void ixgbe_down(struct ixgbe_adapter *adapter)
 		ixgbe_disable_tx_rx(adapter);
 	}
 
-	printk(KERN_INFO "ixgbe_down 9\n");
 	/* disable transmits in the hardware now that interrupts are off */
 	for (i = 0; i < adapter->num_tx_queues; i++) {
 		u8 reg_idx = adapter->tx_ring[i]->reg_idx;
 		IXGBE_WRITE_REG(hw, IXGBE_TXDCTL(reg_idx), IXGBE_TXDCTL_SWFLSH);
 	}
 
-	printk(KERN_INFO "ixgbe_down 10\n");
 	/* Disable the Tx DMA engine on 82599 and X540 */
 	switch (hw->mac.type) {
 	case ixgbe_mac_82599EB:
@@ -4812,26 +4797,22 @@ void ixgbe_down(struct ixgbe_adapter *adapter)
 		break;
 	}
 
-	printk(KERN_INFO "ixgbe_down 11\n");
 #ifdef HAVE_PCI_ERS
 	if (!pci_channel_offline(adapter->pdev))
 #endif
 		ixgbe_reset(adapter);
-	printk(KERN_INFO "ixgbe_down 12\n");
+
 	/* power down the optics */
 	if ((hw->phy.multispeed_fiber) ||
 	    ((hw->mac.ops.get_media_type(hw) == ixgbe_media_type_fiber) &&
 	     (hw->mac.type == ixgbe_mac_82599EB)))
 		ixgbe_disable_tx_laser(hw);
 
-	printk(KERN_INFO "ixgbe_down 13\n");
 	ixgbe_clean_all_tx_rings(adapter);
-	printk(KERN_INFO "ixgbe_down 14\n");
 	ixgbe_clean_all_rx_rings(adapter);
 
 	/* since we reset the hardware DCA settings were cleared */
 	ixgbe_setup_dca(adapter);
-	printk(KERN_INFO "ixgbe_down 15\n");
 }
 
 
@@ -5590,6 +5571,7 @@ static int ixgbe_alloc_queues(struct ixgbe_adapter *adapter)
 		ring->dev = pci_dev_to_dev(adapter->pdev);
 		ring->netdev = adapter->netdev;
 		ring->numa_node = adapter->node;
+		ring->owner_cpu = -1;
 
 		adapter->tx_ring[i] = ring;
 	}
@@ -5621,6 +5603,7 @@ static int ixgbe_alloc_queues(struct ixgbe_adapter *adapter)
 		ring->dev = pci_dev_to_dev(adapter->pdev);
 		ring->netdev = adapter->netdev;
 		ring->numa_node = adapter->node;
+		ring->owner_cpu = -1;
 
 		adapter->rx_ring[i] = ring;
 	}
@@ -6162,7 +6145,6 @@ int ixgbe_setup_tx_resources(struct ixgbe_ring *tx_ring)
 	tx_ring->next_to_use = 0;
 	tx_ring->next_to_clean = 0;
 	tx_ring->last_report = jiffies;
-	//tx_ring->last_notified = 0;
 	return 0;
 
 err:
@@ -6269,7 +6251,6 @@ int ixgbe_setup_rx_resources(struct ixgbe_ring *rx_ring)
 	rx_ring->next_to_clean = 0;
 	rx_ring->next_to_use = 0;
 	rx_ring->last_report = jiffies;
-	//rx_ring->last_notified = 0;
 	return 0;
 err:
 	for (i = 0; i < rx_ring->count; i++) {
@@ -9295,6 +9276,14 @@ static int ixgbe_notify_dca(struct notifier_block *nb, unsigned long event,
 /*******************************************/
 /***** click polling extension *************/
 /*******************************************/
+
+static const int ixgbe_rx_desc_per_cache_line = L1_CACHE_BYTES / sizeof(union ixgbe_adv_rx_desc);
+static const int ixgbe_prefetch_ahead = 2;
+
+#define IXGBE_RX_QUEUE_WAKE 64
+#define IXGBE_TX_QUEUE_WAKE 16
+
+
 static int ixgbe_is_polling(struct net_device *dev, unsigned int queue_num)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(dev);
@@ -9313,55 +9302,68 @@ static int ixgbe_poll_on(struct net_device *dev, unsigned int queue_num)
 	struct ixgbe_ring *rx_ring = adapter->rx_ring[queue_num];
 	struct ixgbe_ring *tx_ring = adapter->tx_ring[queue_num];
 
+	int cpu_id;
+
 	if (queue_num >= adapter->num_rx_queues)
 		return -1;
+
+	if (test_and_set_bit(1, &adapter->reconfigure_lock)) {
+		// poll_on/off is done one-by-one, just for safety (need checking)
+		return -1;
+	}
+
+	cpu_id = raw_smp_processor_id();
+
+	if (rx_ring->owner_cpu != -1 && rx_ring->owner_cpu != cpu_id) {
+		printk(KERN_INFO "ixgbe_poll_on: device %s queue %d is already occupied by CPU %d, not CPU %d!\n",
+				dev->name, queue_num, rx_ring->owner_cpu, cpu_id);
+		clear_bit(1, &adapter->reconfigure_lock);
+		return -1;
+	}
+
+	// assign rings to the current cpu 
+	rx_ring->owner_cpu = tx_ring->owner_cpu = cpu_id;
 
 	if (!rx_ring->polling) {
 		u16 i;
 		int nid;
-		//unsigned long flags;
-		u64 qmask;
+		u32 rxctrl;
 		
-		// pending poll_on?
-		if (test_and_set_bit(1, &adapter->reconfigure_lock)) {
+		// disable RX; if not, the devive may change RDH while initialization
+		rxctrl = IXGBE_READ_REG(&adapter->hw, IXGBE_RXCTRL);
+		IXGBE_WRITE_REG(&adapter->hw, IXGBE_RXCTRL, rxctrl & ~IXGBE_RXCTRL_RXEN);
+
+		// assign rings to the current node
+		nid = cpu_to_node(cpu_id);
+		rx_ring->numa_node = tx_ring->numa_node = nid;
+
+		// free and realloc rx resources to bind them to the current node
+		ixgbe_free_rx_resources(rx_ring);
+		if (ixgbe_setup_rx_resources(rx_ring)) {
+			printk(KERN_INFO "ixgbe_poll_on: ixgbe_setup_rx_resources failed\n");
+			clear_bit(1, &adapter->reconfigure_lock);
 			return -1;
 		}
 
-		nid = cpu_to_node(raw_smp_processor_id());
-		rx_ring->numa_node = tx_ring->numa_node = nid;
-
-		printk(KERN_INFO "ixgbe_poll_on: device %s, adapter node %d, queue %d, cpu %d, node %d\n",
-				dev->name, adapter->node, queue_num, raw_smp_processor_id(), nid);
-
-		// disable queue interrupts
-		printk(KERN_INFO "ixgbe_poll_on: ixgbe_free_rx_resources\n");
-		ixgbe_free_rx_resources(rx_ring);
-		printk(KERN_INFO "ixgbe_poll_on: ixgbe_setup_rx_resources\n");
-		if (ixgbe_setup_rx_resources(rx_ring))
-			printk(KERN_INFO "ixgbe_poll_on: ixgbe_setup_rx_resources failed\n");
-		//printk(KERN_INFO "ixgbe_poll_on: ixgbe_configure_rx_resources\n");
-		//ixgbe_configure_rx_ring(adapter, rx_ring);
-		//qmask = ((u64)1 << rx_ring->q_vector->v_idx);
-		//ixgbe_irq_disable_queues(adapter, qmask);
-
-		printk(KERN_INFO "ixgbe_poll_on: ixgbe_free_tx_resources\n");
+		// free and realloc tx resources to bind them to the current node
 		ixgbe_free_tx_resources(tx_ring);
-		printk(KERN_INFO "ixgbe_poll_on: ixgbe_setup_tx_resources\n");
-		if (ixgbe_setup_tx_resources(tx_ring))
+		if (ixgbe_setup_tx_resources(tx_ring)) {
 			printk(KERN_INFO "ixgbe_poll_on: ixgbe_setup_tx_resources failed\n");
-		//printk(KERN_INFO "ixgbe_poll_on: ixgbe_configure_tx_resources\n");
-		//ixgbe_configure_tx_ring(adapter, tx_ring);
-		//qmask = ((u64)1 << tx_ring->q_vector->v_idx);
-		//ixgbe_irq_disable_queues(adapter, qmask);
+			clear_bit(1, &adapter->reconfigure_lock);
+			return -1;
+		}
 
-		//ixgbe_configure_rx(adapter);
-		//ixgbe_configure_tx(adapter);
-		//ixgbe_configure(adapter);
-
+		// inform the device of the new rx/tx ring
 		ixgbe_configure_rx_ring(adapter, rx_ring);
 		ixgbe_configure_tx_ring(adapter, tx_ring);
 
-		//printk(KERN_INFO "ixgbe_poll_on: filling desc\n");
+		// update DCA, in case it is used
+		if (adapter->flags & IXGBE_FLAG_DCA_ENABLED) {
+			ixgbe_update_dca(rx_ring->q_vector);
+			ixgbe_update_dca(tx_ring->q_vector);
+		}
+
+		// initialize descs
 		for (i = 0; i < rx_ring->count; i++) {
 			IXGBE_RX_DESC_ADV(rx_ring, i)->read.pkt_addr = cpu_to_le64(rx_ring->buffer_dma[i]);
 			IXGBE_RX_DESC_ADV(rx_ring, i)->read.hdr_addr = 0;
@@ -9369,15 +9371,21 @@ static int ixgbe_poll_on(struct net_device *dev, unsigned int queue_num)
 		wmb();
 		rx_ring->next_to_use = rx_ring->count - 1;
 		writel(rx_ring->next_to_use, rx_ring->tail);
-
 		IXGBE_WRITE_FLUSH(&adapter->hw);
-		IXGBE_READ_REG(&adapter->hw, IXGBE_RDH(rx_ring->reg_idx));
-		IXGBE_READ_REG(&adapter->hw, IXGBE_RDT(rx_ring->reg_idx));
 
+		// re-enable RX
+		rxctrl |= IXGBE_RXCTRL_RXEN;
+		ixgbe_enable_rx_dma(&adapter->hw, rxctrl);
+
+		// done!
 		rx_ring->polling = tx_ring->polling = 1;
 
-		clear_bit(1, &adapter->reconfigure_lock);
+		printk(KERN_INFO "ixgbe_poll_on: device %s, adapter node %d, queue %d, cpu %d, node %d\n",
+				dev->name, adapter->node, queue_num, cpu_id, nid);
+
 	}
+
+	clear_bit(1, &adapter->reconfigure_lock);
 
 	return 0;
 }
@@ -9389,43 +9397,38 @@ static int ixgbe_poll_off(struct net_device *dev, unsigned int queue_num)
 	struct ixgbe_ring *rx_ring = adapter->rx_ring[queue_num];
 	struct ixgbe_ring *tx_ring = adapter->tx_ring[queue_num];
 
+	int cpu_id;
+
 	if (queue_num >= adapter->num_rx_queues)
 		return -1;
 
+	if (test_and_set_bit(1, &adapter->reconfigure_lock)) {
+		// poll_on/off is done one-by-one, just for safety (need checking)
+		return -1;
+	}
+
+	cpu_id = raw_smp_processor_id();
+
+	if (rx_ring->owner_cpu != cpu_id) {
+		printk(KERN_INFO "ixgbe_poll_on: device %s queue %d is not owned by by CPU %d, but by CPU %d!\n",
+				dev->name, queue_num, cpu_id, rx_ring->owner_cpu);
+		clear_bit(1, &adapter->reconfigure_lock);
+		return -1;
+	}
+
 	if (rx_ring->polling) {
+		// unbind rings from this processor
 		rx_ring->polling = tx_ring->polling = 0;
+		rx_ring->owner_cpu = tx_ring->owner_cpu = -1;
 	}
 
-	// the code below is not safe; race condition between linux kernel code and click is suspected
-#if 0
-	if (dev->polling) {
-		struct ixgbe_adapter *adapter = netdev_priv(dev);
-		//unsigned long flags;
-		u64 qmask = ~0;
-
-		//local_irq_save(flags);
-		//local_irq_disable();
-		dev->polling = 0;
-		ixgbe_irq_enable_queues(adapter, qmask);
-		//ixgbe_napi_enable_all(adapter);
-		//local_irq_restore(flags);
-		printk("ixgbe_poll_off\n");
-		
-		/* This doesn't work either */
-		//ixgbe_down(adapter);
-		//ixgbe_reset(adapter);
-
-		printk("ixgbe_poll_off returning\n");
-	}
-#endif
+	clear_bit(1, &adapter->reconfigure_lock);
 
 	return 0;
 }
 
 static void ixgbe_mq_atr(struct net_device *dev, struct sk_buff* skb, unsigned int arrived_queue_num)
 {
-	// this has not been tested since the UDP part is removed
-
 	struct ixgbe_adapter *adapter = netdev_priv(dev);
 
 	struct iphdr *ipv4;
@@ -9450,6 +9453,7 @@ static void ixgbe_mq_atr(struct net_device *dev, struct sk_buff* skb, unsigned i
 		c2 = 1;
 	}
 
+	// caution: hashed destination addresses should be well distributed over queues
 	fdir_queue_num = ntohl(ipv4->daddr) % adapter->num_rx_queues;
 
 	if (fdir_queue_num != arrived_queue_num) {
@@ -9460,17 +9464,13 @@ static void ixgbe_mq_atr(struct net_device *dev, struct sk_buff* skb, unsigned i
 		input.formatted.flow_type = IXGBE_ATR_FLOW_TYPE_IPV4;
 
 		common.port.src ^= __constant_htons(ETH_P_IP);
+
+		// caution: the xor value of src/dest addresses should be distinct
 		common.ip ^= ipv4->saddr ^ ipv4->daddr;
 
 		ixgbe_fdir_add_signature_filter_82599(&adapter->hw, input, common, fdir_queue_num);
 	}
 }
-
-static const int ixgbe_rx_desc_per_cache_line = L1_CACHE_BYTES / sizeof(union ixgbe_adv_rx_desc);
-static const int ixgbe_bi_per_cache_line = L1_CACHE_BYTES / sizeof(struct ixgbe_rx_buffer);
-static const int ixgbe_prefetch_ahead = 1;
-static const int ixgbe_rx_ring_gap = 128;
-static const int ixgbe_rx_ring_notify = 32;
 
 static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsigned int queue_num, struct sk_buff **skbs, int *want)
 {
@@ -9486,41 +9486,23 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 	union ixgbe_adv_rx_desc *rx_desc;
 	struct ixgbe_rx_buffer *bi;
 	struct ixgbe_rx_buffer *bi_stop;
+	void **buffer;
+	dma_addr_t *buffer_dma;
 
 	u32 staterr;
 	u16 len;
 	u16 hard_header_len;
 	u16 got;
-	//u16 max_get;
+	u16 max_get;
 
-	//u16 len_arr[64];
+	u16 len_arr[64];
 
-	//struct sk_buff *skb_head;
-	//struct sk_buff *skb_next;
-	//struct sk_buff *skb_head;
-	//struct sk_buff **skb;
 	struct sk_buff *skb_head;
 	struct sk_buff *cur_skb;
 	struct sk_buff *prev_skb;
 
 	static int debug_cnt = 100;
 
-	// DCA rather degrades performance
-	//if (adapter->flags & IXGBE_FLAG_DCA_ENABLED)
-	//	ixgbe_update_dca(rx_ring->q_vector);
-
-	//// cannot spare too many packets at once (cache issue)
-	//if (*want >= sizeof(len_arr) / sizeof(len_arr[0]))
-	//	max_get = sizeof(len_arr) / sizeof(len_arr[0]);
-	//else
-	//	max_get = *want;
-
-	//__builtin_prefetch(IXGBE_RX_DESC_ADV(rx_ring, rx_ring->next_to_clean), 0, 0);
-	//if (!(IXGBE_RX_DESC_ADV(rx_ring, (rx_ring->next_to_clean + 16) % rx_ring->count)->wb.upper.status_error & le32_to_cpu(IXGBE_RXD_STAT_DD))) {
-	//	*want = 0;
-	//	return NULL;
-	//}
-	
 	if (!want) {
 		if (unlikely(queue_num == 0 && debug_cnt)) {
 			printk(KERN_INFO "ixgbe_mq_rx_poll: invalid want\n");
@@ -9543,7 +9525,7 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 		return NULL;
 	}
 
-	if(!netif_carrier_ok(dev)) {
+	if (!netif_carrier_ok(dev)) {
 		if (unlikely(queue_num == 0 && debug_cnt)) {
 			printk(KERN_INFO "ixgbe_mq_rx_poll: no carrier\n");
 			debug_cnt--;
@@ -9561,6 +9543,12 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 		return NULL;
 	}
 
+	// cannot spare too many packets at once (cache issue)
+	if (*want >= sizeof(len_arr) / sizeof(len_arr[0]))
+		max_get = sizeof(len_arr) / sizeof(len_arr[0]);
+	else
+		max_get = *want;
+
 	// bring some frequently used variables
 	dma_dev = rx_ring->dev;
 	count = rx_ring->count;
@@ -9569,20 +9557,11 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 	i = rx_ring->next_to_clean;
 	rx_desc = IXGBE_RX_DESC_ADV(rx_ring, i);
 	bi = &rx_ring->rx_buffer_info[i];
-	//if (rx_ring->next_to_use < count) {
-	//	bi_stop = &rx_ring->rx_buffer_info[rx_ring->next_to_use];
-	//	//if ((rx_ring->last_notified - i + count) % count < ixgbe_rx_ring_gap)
-	//	//	bi_stop = bi;
-	//	//else
-	//	//	bi_stop = &rx_ring->rx_buffer_info[(rx_ring->last_notified - ixgbe_rx_ring_gap + count) % count];
-	//}
-	//else {
-	//	*want = 0;
-	//	return NULL;	// endless loop mode is not supported
-	//}
-	bi_stop = &rx_ring->rx_buffer_info[(rx_ring->next_to_clean - 1 + count) % count];
+	buffer = &rx_ring->buffer[i];
+	buffer_dma = &rx_ring->buffer_dma[i];
+	bi_stop = &rx_ring->rx_buffer_info[rx_ring->next_to_use];
 
-	i -= count;
+	i -= count;	// for faster zero-test at the end of the ring
 
 	got = 0;
 	hard_header_len = dev->hard_header_len;
@@ -9590,7 +9569,8 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 	skb_head = cur_skb = *skbs;
 	prev_skb = NULL;
 
-	if (queue_num == 0 && jiffies - rx_ring->last_report >= 1 * HZ) {
+	// regular status report
+	if (jiffies - rx_ring->last_report >= 1 * HZ) {
 		u16 rdh;
 		u16 rdt;
 
@@ -9610,27 +9590,26 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 			);
 	}
 
-	//int current_head = IXGBE_READ_REG(&adapter->hw, IXGBE_RDH(rx_ring->reg_idx)) / 16 * 16;
-	//bi_stop = &rx_ring->rx_buffer_info[current_head];
-	//bi_stop = &rx_ring->rx_buffer_info[(rx_ring->last_notified + ixgbe_rx_ring_gap) % count];
-	//__builtin_prefetch(rx_desc, 0, 0);
-	//bi_stop = &rx_ring->rx_buffer_info[(rx_ring->next_to_clean + 16) % count];
-	//bi_stop = NULL;
-	//
-
 	__builtin_prefetch(rx_desc, 1, 0);
-	__builtin_prefetch(bi, 1, 0);
+	__builtin_prefetch((char*)*buffer + 0 * L1_CACHE_BYTES, 0, 0);
+	__builtin_prefetch((char*)*buffer + 1 * L1_CACHE_BYTES, 0, 0);
 
 	while (bi != bi_stop && got < *want && cur_skb) {
 		// prefetch for this loop
 		if ((long)rx_desc % ixgbe_rx_desc_per_cache_line == 0)
 			__builtin_prefetch(rx_desc + ixgbe_prefetch_ahead * ixgbe_rx_desc_per_cache_line, 1, 0);
-		if ((long)bi % ixgbe_bi_per_cache_line == 0)
-			__builtin_prefetch(bi + ixgbe_prefetch_ahead * ixgbe_bi_per_cache_line, 1, 0);
 
-		if (!rx_ring->buffer[(i + count) % count]) {
-			printk(KERN_INFO "BUG: Null buffer: %hu\n", i + count);
-			break;
+		if (likely((u16)(i + 1) != 0)) {
+			__builtin_prefetch((char*)*(buffer + 1) + 0 * L1_CACHE_BYTES, 0, 0);
+			__builtin_prefetch((char*)*(buffer + 1) + 1 * L1_CACHE_BYTES, 0, 0);
+			__builtin_prefetch((char*)*(buffer + 1) + 2 * L1_CACHE_BYTES, 0, 0);
+			__builtin_prefetch((char*)*(buffer + 1) + 3 * L1_CACHE_BYTES, 0, 0);
+		}
+		else {
+			__builtin_prefetch((char*)rx_ring->buffer[0] + 0 * L1_CACHE_BYTES, 0, 0);
+			__builtin_prefetch((char*)rx_ring->buffer[0] + 1 * L1_CACHE_BYTES, 0, 0);
+			__builtin_prefetch((char*)rx_ring->buffer[0] + 2 * L1_CACHE_BYTES, 0, 0);
+			__builtin_prefetch((char*)rx_ring->buffer[0] + 3 * L1_CACHE_BYTES, 0, 0);
 		}
 
 		// check status if the entry has been used by the device
@@ -9644,27 +9623,22 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 		// ensure to ummap page AFTER checking staterr
 		rmb();	
 
-		// release resources from device/driver
-		////if (bi->dma_mem == NULL) {
-		//	dma_unmap_single(dma_dev, bi->dma, rx_buf_len, DMA_FROM_DEVICE);
-		//	//dma_unmap_page(dma_dev, bi->dma, rx_buf_len, DMA_FROM_DEVICE);
-		//	bi->dma = 0;
-		//}
-		//else {
-		//	memcpy(bi->skb->data, bi->dma_mem, rx_buf_len);
-		//}
+		// check validity
+		if (likely(!(staterr & le32_to_cpu(IXGBE_RXD_STAT_EOP))) || unlikely((staterr & le32_to_cpu(IXGBE_RXDADV_ERR_FRAME_ERR_MASK)))) {
+			printk(KERN_INFO "IXGBE_RXD_STAT_EOP or IXGBE_RXDADV_ERR_FRAME_ERR_MASK\n");
+			//dev_kfree_skb(*skb);
+			continue;
+		}
 
 		// obtain length
-		len = le16_to_cpu(rx_desc->wb.upper.length);
-		memcpy(cur_skb->data, rx_ring->buffer[(i + count) % count], len);
+		len_arr[got] = len = le16_to_cpu(rx_desc->wb.upper.length);
 
-		//wmb();
+		// bring the packet data to skb
+		memcpy(cur_skb->data, *buffer, len);
 
-		rx_desc->read.pkt_addr = cpu_to_le64(rx_ring->buffer_dma[(i + count) % count]);
+		// prepare the desc for future packet retrieval
+		rx_desc->read.pkt_addr = cpu_to_le64(*buffer_dma);
 		rx_desc->read.hdr_addr = 0;
-
-		skb_put(cur_skb, len);
-		skb_pull(cur_skb, hard_header_len);
 
 		if (0) {
 			static int k = 0;
@@ -9673,6 +9647,80 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 						cur_skb->len,
 						ntohs(*(u16*)(cur_skb->data -14 + 12)),
 						ntohs(((struct iphdr*)(cur_skb->data -14 + 14))->tot_len));
+			}
+		}
+
+		// prefetch for skb update lookup
+		__builtin_prefetch(&cur_skb->next, 1, 0);	// for *skb = ...
+		__builtin_prefetch(&cur_skb->tail, 1, 0);	// for skb_put()
+		__builtin_prefetch(&cur_skb->len, 1, 0);		// for skb_put(), skb_pull()
+		__builtin_prefetch(&cur_skb->data, 1, 0);	// for skb_pull()
+
+		// update stats
+		rx_ring->stats.packets++;
+		rx_ring->stats.bytes += len;
+
+		// proceed to next entry
+		rx_desc++;
+		bi++;
+		i++;
+		buffer++;
+		buffer_dma++;
+		prev_skb = cur_skb;
+		cur_skb = cur_skb->next;
+		got++;
+		if (unlikely(!i)) {
+			rx_desc = IXGBE_RX_DESC_ADV(rx_ring, 0);
+			bi = rx_ring->rx_buffer_info;
+			buffer = rx_ring->buffer;
+			buffer_dma = rx_ring->buffer_dma;
+			i -= rx_ring->count;
+		}
+
+		if ((i + count) % IXGBE_RX_QUEUE_WAKE == 0) {
+			wmb();
+			writel(rx_ring->next_to_use, rx_ring->tail);
+
+			//IXGBE_WRITE_FLUSH(&adapter->hw);
+			//IXGBE_READ_REG(&adapter->hw, IXGBE_RDH(rx_ring->reg_idx));
+			//IXGBE_READ_REG(&adapter->hw, IXGBE_RDT(rx_ring->reg_idx));
+		}
+	}
+
+	i += count;
+
+	if (unlikely(queue_num == 0 && debug_cnt && got)) {
+		printk(KERN_INFO "ixgbe_mq_rx_poll: ending at %hu; got %d\n", i, got);
+		debug_cnt--;
+	}
+
+	if (rx_ring->next_to_clean != i) {
+		rx_ring->next_to_clean = i;
+		rx_ring->next_to_use = (i - 1 + count) % count;
+	}
+
+	if (prev_skb)
+		prev_skb->next = NULL;
+	*skbs = cur_skb;
+
+	*want = got;
+
+	// prepare sk_buffs for click uses
+	cur_skb = skb_head;
+	for (i = 0; i < got; i++) {
+		__builtin_prefetch(cur_skb->data, 1, 0);					// for click
+		__builtin_prefetch(cur_skb->data + L1_CACHE_BYTES, 1, 0);	// for click
+
+		skb_put(cur_skb, len_arr[i]);
+		skb_pull(cur_skb, hard_header_len);
+
+		if (0) {
+			static int k = 0;
+			if (queue_num == 0 && k++ % 1000000 == 0) {
+				printk(KERN_INFO "ixgbe_mq_rx_poll: len: %hu ethertype: %04hx ip_tot_len: %hu\n",
+						cur_skb->len,
+						ntohs(*(u16*)(cur_skb->data - 14 + 12)),
+						ntohs(((struct iphdr*)(cur_skb->data))->tot_len));
 			}
 		}
 
@@ -9687,108 +9735,8 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 			}
 		}
 
-		prev_skb = cur_skb;
 		cur_skb = cur_skb->next;
-
-		// prefetch for skb update lookup
-		//__builtin_prefetch(&(*skb)->next, 1, 0);	// for *skb = ...
-		//__builtin_prefetch(&(*skb)->tail, 1, 0);	// for skb_put()
-		//__builtin_prefetch(&(*skb)->len, 1, 0);		// for skb_put(), skb_pull()
-		//__builtin_prefetch(&(*skb)->data, 1, 0);	// for skb_pull()
-
-		if (!(staterr & le32_to_cpu(IXGBE_RXD_STAT_EOP)) || (staterr & le32_to_cpu(IXGBE_RXDADV_ERR_FRAME_ERR_MASK))) {
-			printk(KERN_INFO "IXGBE_RXD_STAT_EOP or IXGBE_RXDADV_ERR_FRAME_ERR_MASK\n");
-			//dev_kfree_skb(*skb);
-			continue;
-		}
-
-		// update stats
-		rx_ring->stats.packets++;
-		rx_ring->stats.bytes += len;
-
-		// proceed to next entry
-		rx_desc++;
-		bi++;
-		i++;
-		if (unlikely(!i)) {
-			rx_desc = IXGBE_RX_DESC_ADV(rx_ring, 0);
-			bi = rx_ring->rx_buffer_info;
-			i -= rx_ring->count;
-		}
-		//writel(i + rx_ring->count, rx_ring->tail);
-
-		got++;
-
-		//if (!len)
-		//	break;
 	}
-
-	i += count;
-
-	if (unlikely(queue_num == 0 && debug_cnt && got)) {
-		printk(KERN_INFO "ixgbe_mq_rx_poll: ending at %hu; got %d\n", i, got);
-		debug_cnt--;
-	}
-
-	if (rx_ring->next_to_clean != i) {
-		rx_ring->next_to_clean = i;
-		rx_ring->next_to_use = (i - 1 + count) % count;
-		wmb();
-		writel(rx_ring->next_to_use, rx_ring->tail);
-
-		IXGBE_WRITE_FLUSH(&adapter->hw);
-		IXGBE_READ_REG(&adapter->hw, IXGBE_RDH(rx_ring->reg_idx));
-		IXGBE_READ_REG(&adapter->hw, IXGBE_RDT(rx_ring->reg_idx));
-	}
-
-	if (prev_skb)
-		prev_skb->next = NULL;
-	*skbs = cur_skb;
-
-	*want = got;
-
-	// prepare sk_buffs for click uses
-	//hard_header_len = dev->hard_header_len;
-	//cur_skb = skb_head;
-	//for (i = 0; i < got; i++) {
-	//	char *p, *end;
-	//	//__builtin_prefetch(cur_skb->data, 1, 0);					// for click
-	//	//__builtin_prefetch(cur_skb->data + L1_CACHE_BYTES, 1, 0);	// for click
-
-	//	skb_put(cur_skb, len_arr[i]);
-	//	skb_pull(cur_skb, hard_header_len);
-
-	//	////int r = 0;
-	//	//p = (char *)cur_skb;
-	//	//end = (char *)cur_skb + sizeof(struct sk_buff);
-	//	//while (p < end) {
-	//	//	__builtin_prefetch(p, 1, 3);
-	//	//	//r += *p;
-	//	//	p += L1_CACHE_BYTES;
-	//	//}
-	//	////cur_skb->protocol = r;
-
-	//	static int k = 0;
-	//	if (queue_num == 0 && k++ % 1000000 == 0) {
-	//		printk(KERN_INFO "ixgbe_mq_rx_poll: len: %hu ethertype: %04hx ip_tot_len: %hu\n",
-	//				cur_skb->len,
-	//				ntohs(*(u16*)(cur_skb->data - 14 + 12)),
-	//				ntohs(((struct iphdr*)(cur_skb->data))->tot_len));
-	//	}
-
-	//	// ATR for multiqueue
-	//	if (test_bit(__IXGBE_TX_FDIR_INIT_DONE, &tx_ring->state) && tx_ring->atr_sample_rate) {
-	//		if (unlikely(jiffies % 100 == 0)) {	// slows down ATR sampling for high-speed traffic
-	//			tx_ring->atr_count++;	
-	//			if (tx_ring->atr_count >= tx_ring->atr_sample_rate) {
-	//				tx_ring->atr_count = 0;
-	//				ixgbe_mq_atr(dev, cur_skb, queue_num);
-	//			}
-	//		}
-	//	}
-
-	//	cur_skb = cur_skb->next;
-	//}
 
 	if (!got)
 		return NULL;
@@ -9808,8 +9756,8 @@ static int ixgbe_mq_tx_eob(struct net_device *dev, unsigned int queue_num)
 	writel(tx_ring->next_to_use, tx_ring->tail);
 
 	IXGBE_WRITE_FLUSH(&adapter->hw);
-	IXGBE_READ_REG(&adapter->hw, IXGBE_TDH(tx_ring->reg_idx));
-	IXGBE_READ_REG(&adapter->hw, IXGBE_TDT(tx_ring->reg_idx));
+	//IXGBE_READ_REG(&adapter->hw, IXGBE_TDH(tx_ring->reg_idx));
+	//IXGBE_READ_REG(&adapter->hw, IXGBE_TDT(tx_ring->reg_idx));
 	return 0;
 }
 
@@ -9825,130 +9773,11 @@ static int ixgbe_mq_tx_start(struct net_device *dev, unsigned int queue_num)
 	return 0;
 }
 
-//static struct sk_buff *ixgbe_mq_tx_queue_and_clean(struct net_device *dev, unsigned int queue_num, struct sk_buff **skbs, int *want)
-//{
-//	struct ixgbe_adapter *adapter = netdev_priv(netdev);
-//	struct ixgbe_ring *tx_ring = adapter->tx_ring[queue_num];
-//	unsigned int len = skb->len;
-//	//unsigned int txd_needed;
-//	//unsigned int tx_flags = 0;
-//	//unsigned long flags = 0;
-//
-//	//__be16 protocol = skb->protocol;
-//
-//	union ixgbe_adv_tx_desc *tx_desc = NULL;
-//	struct ixgbe_tx_buffer *tx_buffer_info;
-//	u32 olinfo_status = 0, cmd_type_len = 0, txd_cmd, paylen;
-//	u8 hdr_len;
-//	unsigned int i, offset;
-//
-//	if (queue_num >= adapter->num_rx_queues)
-//		return NULL;
-//
-//	if (!tx_ring->polling) {
-//		return NULL;
-//	}
-//
-//	if(!netif_carrier_ok(netdev)) {
-//		//netif_stop_queue(netdev);
-//		return NULL;
-//	}
-//
-//	if (!skbs)
-//		return NULL;
-//
-//	if ((*skbs)->next) {
-//		// multiple skbs are not implemented yet
-//		return NULL;
-//	}
-//
-//	//if (skb->len <= 0) {
-//	//	dev_kfree_skb(skb);
-//	//	return NETDEV_TX_OK;
-//	//}
-//
-//	//txd_needed = TXD_USE_COUNT(skb->len);
-//
-//
-//	//spin_lock_irqsave(&tx_ring->tx_lock, flags);
-//	//might +1 would be enough
-//	//if (IXGBE_DESC_UNUSED(tx_ring) < (txd_needed + 1)) {
-//	if (unlikely(ixgbe_desc_unused(tx_ring) < 1)) {
-//		adapter->tx_busy++;
-//		//adapter->net_stats.tx_dropped++;
-//		//netif_stop_queue(netdev);
-//		//spin_unlock_irqrestore(&tx_ring->tx_lock, flags);
-//		return -1;
-//	}
-//	//spin_unlock_irqrestore(&tx_ring->tx_lock, flags);
-//
-//
-//	/*this part is from tx_queue */
-//	txd_cmd = IXGBE_TXD_CMD_EOP | IXGBE_TXD_CMD_RS | IXGBE_TXD_CMD_IFCS;
-//
-//	cmd_type_len |= IXGBE_ADVTXD_DTYP_DATA;
-//
-//	cmd_type_len |= IXGBE_ADVTXD_DCMD_IFCS | IXGBE_ADVTXD_DCMD_DEXT;
-//
-//	//if (skb->protocol == ntohs(ETH_P_IP))
-//	//	tx_flags |= IXGBE_TX_FLAGS_IPV4;
-//
-//	//if (ixgbe_tx_csum(tx_ring, skb, tx_flags, protocol)) {
-//	//	olinfo_status |= IXGBE_TXD_POPTS_TXSM << IXGBE_ADVTXD_POPTS_SHIFT;
-//	//}
-//	hdr_len = 0;
-//	paylen = skb->len;
-//	olinfo_status |= ((paylen - hdr_len) << IXGBE_ADVTXD_PAYLEN_SHIFT);
-//
-//	i = tx_ring->next_to_use;
-//	tx_buffer_info = &tx_ring->tx_buffer_info[i];
-//	tx_desc = IXGBE_TX_DESC_ADV(tx_ring, i);
-//	tx_buffer_info->length = len;
-//	offset = 0;
-//
-//	tx_buffer_info->time_stamp = jiffies;
-//
-//	memcpy(tx_ring->buffer[i], skb->data, skb->len);
-//	tx_desc->read.buffer_addr = cpu_to_le64(tx_ring->buffer_dma[i]);
-//	tx_desc->read.cmd_type_len =
-//		cpu_to_le32(cmd_type_len | tx_buffer_info->length);
-//	tx_desc->read.olinfo_status = cpu_to_le32(olinfo_status);
-//	tx_desc->read.cmd_type_len |= cpu_to_le32(txd_cmd);
-//
-//	{
-//		static int k = 0;
-//		if (queue_num == 0 && k++ % 1000000 == 0) {
-//			printk(KERN_INFO "ixgbe_mq_tx_pqueue: len: %hu ethertype: %04hx ip_tot_len: %hu\n",
-//					skb->len,
-//					ntohs(*(u16*)(skb->data + 12)),
-//					ntohs(((struct iphdr*)(skb->data + 14))->tot_len));
-//		}
-//	}
-//
-//	i++;
-//	if (i >= tx_ring->count)
-//		i = 0;
-//
-//	/* Move the HW Tx Tail Pointer */
-//	tx_ring->next_to_use = i;
-//
-//	netdev->trans_start = jiffies;
-//
-//	return 0;
-//}
-
-
-
 static int ixgbe_mq_tx_pqueue(struct net_device *netdev, unsigned int queue_num, struct sk_buff *skb)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 	struct ixgbe_ring *tx_ring = adapter->tx_ring[queue_num];
 	unsigned int len = skb->len;
-	//unsigned int txd_needed;
-	//unsigned int tx_flags = 0;
-	//unsigned long flags = 0;
-
-	//__be16 protocol = skb->protocol;
 
 	union ixgbe_adv_tx_desc *tx_desc = NULL;
 	struct ixgbe_tx_buffer *tx_buffer_info;
@@ -9964,7 +9793,6 @@ static int ixgbe_mq_tx_pqueue(struct net_device *netdev, unsigned int queue_num,
 	}
 
 	if(!netif_carrier_ok(netdev)) {
-		//netif_stop_queue(netdev);
 		return -1;
 	}
 
@@ -9973,10 +9801,6 @@ static int ixgbe_mq_tx_pqueue(struct net_device *netdev, unsigned int queue_num,
 		return NETDEV_TX_OK;
 	}
 
-	//txd_needed = TXD_USE_COUNT(skb->len);
-
-
-	//spin_lock_irqsave(&tx_ring->tx_lock, flags);
 	//might +1 would be enough
 	//if (IXGBE_DESC_UNUSED(tx_ring) < (txd_needed + 1)) {
 	if (unlikely(ixgbe_desc_unused(tx_ring) < 1)) {
@@ -9986,7 +9810,6 @@ static int ixgbe_mq_tx_pqueue(struct net_device *netdev, unsigned int queue_num,
 		//spin_unlock_irqrestore(&tx_ring->tx_lock, flags);
 		return -1;
 	}
-	//spin_unlock_irqrestore(&tx_ring->tx_lock, flags);
 
 
 	/*this part is from tx_queue */
@@ -9996,12 +9819,6 @@ static int ixgbe_mq_tx_pqueue(struct net_device *netdev, unsigned int queue_num,
 
 	cmd_type_len |= IXGBE_ADVTXD_DCMD_IFCS | IXGBE_ADVTXD_DCMD_DEXT;
 
-	//if (skb->protocol == ntohs(ETH_P_IP))
-	//	tx_flags |= IXGBE_TX_FLAGS_IPV4;
-
-	//if (ixgbe_tx_csum(tx_ring, skb, tx_flags, protocol)) {
-	//	olinfo_status |= IXGBE_TXD_POPTS_TXSM << IXGBE_ADVTXD_POPTS_SHIFT;
-	//}
 	hdr_len = 0;
 	paylen = skb->len;
 	olinfo_status |= ((paylen - hdr_len) << IXGBE_ADVTXD_PAYLEN_SHIFT);
@@ -10047,17 +9864,11 @@ static int ixgbe_mq_tx_pqueue(struct net_device *netdev, unsigned int queue_num,
 static struct sk_buff * ixgbe_mq_tx_clean(struct net_device *netdev, unsigned int queue_num)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
-	//struct pci_dev *pdev = adapter->pdev;
-	//struct ixgbe_tx_buffer *tx_buffer_info;
 	unsigned int i;
 	union ixgbe_adv_tx_desc *tx_desc;
 	struct sk_buff *skb_head, *skb_last;
 	struct ixgbe_ring *tx_ring = adapter->tx_ring[queue_num];
 	u16 count;
-
-	// DCA rather degrades performance
-	//if (adapter->flags & IXGBE_FLAG_DCA_ENABLED)
-	//	ixgbe_update_dca(tx_ring->q_vector);
 
 	if (queue_num >= adapter->num_rx_queues)
 		return NULL;
@@ -10072,7 +9883,7 @@ static struct sk_buff * ixgbe_mq_tx_clean(struct net_device *netdev, unsigned in
 
 	count = tx_ring->count;
 
-	if (queue_num == 0 && jiffies - tx_ring->last_report >= 1 * HZ) {
+	if (jiffies - tx_ring->last_report >= 1 * HZ) {
 		u16 tdh;
 		u16 tdt;
 
@@ -10125,20 +9936,14 @@ static struct sk_buff * ixgbe_mq_tx_clean(struct net_device *netdev, unsigned in
 
 	tx_ring->next_to_clean = i;
 
-	//#define TX_WAKE_THRESHOLD (DESC_NEEDED * 2)
-
-	#define IXGBE_TX_QUEUE_WAKE 16
 	if (skb_head && netif_carrier_ok(netdev) &&
 			(ixgbe_desc_unused(tx_ring) >= IXGBE_TX_QUEUE_WAKE)) {
-		//(IXGBE_DESC_UNUSED(tx_ring) >= TX_WAKE_THRESHOLD)) {
 		/* Make sure that anybody stopping the queue after this
 		 * sees the new next_to_clean.
 		 */
-		//smp_mb();
 		/* Multi queue stuff should go here but we don't support it yet,look at ixgbe_clean_tx_irq */
 		if (netif_queue_stopped(netdev) &&
 				!test_bit(__IXGBE_DOWN, &adapter->state)) {
-			//netif_wake_queue(netdev);
 			netif_start_queue(netdev);
 			adapter->restart_queue++;
 		}
