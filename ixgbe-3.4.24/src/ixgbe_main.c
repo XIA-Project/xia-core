@@ -9518,21 +9518,21 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 	struct sk_buff **pcur_skb;
 #endif
 
-	static int debug_cnt = 100;
+	//static int debug_cnt = 100;
 
 	if (!want) {
-		if (unlikely(queue_num == 0 && debug_cnt)) {
-			printk(KERN_INFO "ixgbe_mq_rx_poll: invalid want\n");
-			debug_cnt--;
-		}
+		//if (unlikely(queue_num == 0 && debug_cnt)) {
+		//	printk(KERN_INFO "ixgbe_mq_rx_poll: invalid want\n");
+		//	debug_cnt--;
+		//}
 		return NULL;
 	}
 
 	if (!skbs) {
-		if (unlikely(queue_num == 0 && debug_cnt)) {
-			printk(KERN_INFO "ixgbe_mq_rx_poll: invalid skbs\n");
-			debug_cnt--;
-		}
+		//if (unlikely(queue_num == 0 && debug_cnt)) {
+		//	printk(KERN_INFO "ixgbe_mq_rx_poll: invalid skbs\n");
+		//	debug_cnt--;
+		//}
 		*want = 0;
 		return NULL;
 	}
@@ -9543,19 +9543,19 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 	}
 
 	if (!netif_carrier_ok(dev)) {
-		if (unlikely(queue_num == 0 && debug_cnt)) {
-			printk(KERN_INFO "ixgbe_mq_rx_poll: no carrier\n");
-			debug_cnt--;
-		}
+		//if (unlikely(queue_num == 0 && debug_cnt)) {
+		//	printk(KERN_INFO "ixgbe_mq_rx_poll: no carrier\n");
+		//	debug_cnt--;
+		//}
 		*want = 0;
 		return NULL;
 	}
 
 	if (!rx_ring->polling) {
-		if (unlikely(queue_num == 0 && debug_cnt)) {
-			printk(KERN_INFO "ixgbe_mq_rx_poll: not polling\n");
-			debug_cnt--;
-		}
+		//if (unlikely(queue_num == 0 && debug_cnt)) {
+		//	printk(KERN_INFO "ixgbe_mq_rx_poll: not polling\n");
+		//	debug_cnt--;
+		//}
 		*want = 0;
 		return NULL;
 	}
@@ -9751,10 +9751,10 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 
 	i += count;
 
-	if (unlikely(queue_num == 0 && debug_cnt && got)) {
-		printk(KERN_INFO "ixgbe_mq_rx_poll: ending at %hu; got %d\n", i, got);
-		debug_cnt--;
-	}
+	//if (unlikely(queue_num == 0 && debug_cnt && got)) {
+	//	printk(KERN_INFO "ixgbe_mq_rx_poll: ending at %hu; got %d\n", i, got);
+	//	debug_cnt--;
+	//}
 
 	if (rx_ring->next_to_clean != i) {
 		rx_ring->next_to_clean = i;
