@@ -15,6 +15,12 @@ if __FILE__== $0
   cmd_drop = "cat /proc/click/tod*/drop 2>/dev/null"
   
   if (cnt.to_i()==0)
+    cnt =`cat /proc/click/td*/count 2>/dev/null| wc`
+    cmd = "cat /proc/click/td*/count 2>/dev/null"
+    cmd_drop = "cat /proc/click/td*/drop 2>/dev/null"
+  end
+
+  if (cnt.to_i()==0)
     cmd = "cat /click/ge*/gen_sub*/td*/count 2>/dev/null"
     cmd_drops = "cat /click/ge*/gen_sub*/td*/drops 2>/dev/null"
   end
