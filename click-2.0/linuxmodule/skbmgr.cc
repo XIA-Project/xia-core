@@ -287,11 +287,11 @@ RecycledSkbPool::find_producer(int cpu, int bucket)
 
 #endif
 
-//#ifdef skb_recycle_check
-//#undef skb_recycle_check
-//#endif
-//
-//#define skb_recycle_check __skb_recycle_check_quick
+#ifdef skb_recycle_check
+#undef skb_recycle_check
+#endif
+
+#define skb_recycle_check __skb_recycle_check_quick
 
 static bool
 __skb_recycle_check_quick(struct sk_buff *skb, int skb_size)
