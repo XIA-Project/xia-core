@@ -4652,6 +4652,7 @@ void ixgbe_clean_rx_ring(struct ixgbe_ring *rx_ring)
 
 	rx_ring->next_to_clean = 0;
 	rx_ring->next_to_use = 0;
+	rx_ring->last_report = 0;
 	//rx_ring->last_notified = 0;
 }
 
@@ -4683,6 +4684,7 @@ static void ixgbe_clean_tx_ring(struct ixgbe_ring *tx_ring)
 
 	tx_ring->next_to_use = 0;
 	tx_ring->next_to_clean = 0;
+	tx_ring->last_report = 0;
 	//tx_ring->last_notified = 0;
 }
 
@@ -6159,6 +6161,7 @@ int ixgbe_setup_tx_resources(struct ixgbe_ring *tx_ring)
 
 	tx_ring->next_to_use = 0;
 	tx_ring->next_to_clean = 0;
+	tx_ring->last_report = jiffies;
 	//tx_ring->last_notified = 0;
 	return 0;
 
@@ -6265,8 +6268,8 @@ int ixgbe_setup_rx_resources(struct ixgbe_ring *rx_ring)
 
 	rx_ring->next_to_clean = 0;
 	rx_ring->next_to_use = 0;
+	rx_ring->last_report = jiffies;
 	//rx_ring->last_notified = 0;
-
 	return 0;
 err:
 	for (i = 0; i < rx_ring->count; i++) {
@@ -9338,8 +9341,8 @@ static int ixgbe_poll_on(struct net_device *dev, unsigned int queue_num)
 			printk(KERN_INFO "ixgbe_poll_on: ixgbe_setup_rx_resources failed\n");
 		//printk(KERN_INFO "ixgbe_poll_on: ixgbe_configure_rx_resources\n");
 		//ixgbe_configure_rx_ring(adapter, rx_ring);
-		qmask = ((u64)1 << rx_ring->q_vector->v_idx);
-		ixgbe_irq_disable_queues(adapter, qmask);
+		//qmask = ((u64)1 << rx_ring->q_vector->v_idx);
+		//ixgbe_irq_disable_queues(adapter, qmask);
 
 		printk(KERN_INFO "ixgbe_poll_on: ixgbe_free_tx_resources\n");
 		ixgbe_free_tx_resources(tx_ring);
@@ -9348,12 +9351,15 @@ static int ixgbe_poll_on(struct net_device *dev, unsigned int queue_num)
 			printk(KERN_INFO "ixgbe_poll_on: ixgbe_setup_tx_resources failed\n");
 		//printk(KERN_INFO "ixgbe_poll_on: ixgbe_configure_tx_resources\n");
 		//ixgbe_configure_tx_ring(adapter, tx_ring);
-		qmask = ((u64)1 << tx_ring->q_vector->v_idx);
-		ixgbe_irq_disable_queues(adapter, qmask);
+		//qmask = ((u64)1 << tx_ring->q_vector->v_idx);
+		//ixgbe_irq_disable_queues(adapter, qmask);
 
 		//ixgbe_configure_rx(adapter);
 		//ixgbe_configure_tx(adapter);
-		ixgbe_configure(adapter);
+		//ixgbe_configure(adapter);
+
+		ixgbe_configure_rx_ring(adapter, rx_ring);
+		ixgbe_configure_tx_ring(adapter, tx_ring);
 
 		//printk(KERN_INFO "ixgbe_poll_on: filling desc\n");
 		for (i = 0; i < rx_ring->count; i++) {
@@ -9363,9 +9369,10 @@ static int ixgbe_poll_on(struct net_device *dev, unsigned int queue_num)
 		wmb();
 		rx_ring->next_to_use = rx_ring->count - 1;
 		writel(rx_ring->next_to_use, rx_ring->tail);
-		//IXGBE_WRITE_REG(&adapter->hw, IXGBE_RDH(rx_ring->reg_idx), 0);
-		//IXGBE_WRITE_REG(&adapter->hw, IXGBE_RDT(rx_ring->reg_idx), rx_ring->count - 1);
+
 		IXGBE_WRITE_FLUSH(&adapter->hw);
+		IXGBE_READ_REG(&adapter->hw, IXGBE_RDH(rx_ring->reg_idx));
+		IXGBE_READ_REG(&adapter->hw, IXGBE_RDT(rx_ring->reg_idx));
 
 		rx_ring->polling = tx_ring->polling = 1;
 
@@ -9583,13 +9590,23 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 	skb_head = cur_skb = *skbs;
 	prev_skb = NULL;
 
-	static int k = 0;
-	if (queue_num == 0 && k++ % 191919 == 0) {
-		printk(KERN_INFO "ixgbe_mq_rx_poll: bi %lx bi_stop %lx got %d want %d cur_skb %lx next_to_clean %hu next_to_use %hu RDH %hu RDT %hu\n",
-				(unsigned long)bi, (unsigned long)bi_stop, got, *want, (unsigned long)cur_skb,
-				rx_ring->next_to_clean, rx_ring->next_to_use, 
-				IXGBE_READ_REG(&adapter->hw, IXGBE_RDH(rx_ring->reg_idx)),
-				IXGBE_READ_REG(&adapter->hw, IXGBE_RDT(rx_ring->reg_idx))
+	if (queue_num == 0 && jiffies - rx_ring->last_report >= 1 * HZ) {
+		u16 rdh;
+		u16 rdt;
+
+		rx_ring->last_report = jiffies;
+
+		rdh = IXGBE_READ_REG(&adapter->hw, IXGBE_RDH(rx_ring->reg_idx));
+		rdt = IXGBE_READ_REG(&adapter->hw, IXGBE_RDT(rx_ring->reg_idx));
+
+		// free: how many descs the device can use for RX --- preferably a large value (>=256)
+		// to clean: how many descs the CPU should retrieve from the device --- preferably some not too small number (16~32)
+		// lagging: how many descs are unnoticed by the device yet --- preferably some not too small number (16~32)
+		printk(KERN_INFO "%s-rx-%d: free: %hu, to clean: %hu, lagging: %hu\n",
+				dev->name, queue_num,
+				(rdt - rdh + count) % count,
+				(rdh - rx_ring->next_to_clean + count) % count,
+				(rx_ring->next_to_use - rdt + count) % count
 			);
 	}
 
@@ -9713,11 +9730,16 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 		debug_cnt--;
 	}
 
-	rx_ring->next_to_clean = i;
-	rx_ring->next_to_use = (i - 1 + count) % count;
-	wmb();
-	writel(rx_ring->next_to_use, rx_ring->tail);
-	IXGBE_WRITE_FLUSH(&adapter->hw);
+	if (rx_ring->next_to_clean != i) {
+		rx_ring->next_to_clean = i;
+		rx_ring->next_to_use = (i - 1 + count) % count;
+		wmb();
+		writel(rx_ring->next_to_use, rx_ring->tail);
+
+		IXGBE_WRITE_FLUSH(&adapter->hw);
+		IXGBE_READ_REG(&adapter->hw, IXGBE_RDH(rx_ring->reg_idx));
+		IXGBE_READ_REG(&adapter->hw, IXGBE_RDT(rx_ring->reg_idx));
+	}
 
 	if (prev_skb)
 		prev_skb->next = NULL;
@@ -9784,7 +9806,10 @@ static int ixgbe_mq_tx_eob(struct net_device *dev, unsigned int queue_num)
 
 	wmb();
 	writel(tx_ring->next_to_use, tx_ring->tail);
+
 	IXGBE_WRITE_FLUSH(&adapter->hw);
+	IXGBE_READ_REG(&adapter->hw, IXGBE_TDH(tx_ring->reg_idx));
+	IXGBE_READ_REG(&adapter->hw, IXGBE_TDT(tx_ring->reg_idx));
 	return 0;
 }
 
@@ -10028,6 +10053,7 @@ static struct sk_buff * ixgbe_mq_tx_clean(struct net_device *netdev, unsigned in
 	union ixgbe_adv_tx_desc *tx_desc;
 	struct sk_buff *skb_head, *skb_last;
 	struct ixgbe_ring *tx_ring = adapter->tx_ring[queue_num];
+	u16 count;
 
 	// DCA rather degrades performance
 	//if (adapter->flags & IXGBE_FLAG_DCA_ENABLED)
@@ -10042,6 +10068,29 @@ static struct sk_buff * ixgbe_mq_tx_clean(struct net_device *netdev, unsigned in
 
 	if(!netif_carrier_ok(netdev)) {
 		return NULL;
+	}
+
+	count = tx_ring->count;
+
+	if (queue_num == 0 && jiffies - tx_ring->last_report >= 1 * HZ) {
+		u16 tdh;
+		u16 tdt;
+
+		tx_ring->last_report = jiffies;
+
+		tdh = IXGBE_READ_REG(&adapter->hw, IXGBE_TDH(tx_ring->reg_idx));
+		tdt = IXGBE_READ_REG(&adapter->hw, IXGBE_TDT(tx_ring->reg_idx));
+
+		// pending: how many descs the device should do TX --- preferably some moderate value (~64)
+		// to clean: how many descs the CPU should clean up from the device --- preferably some not too small number (16~32)
+		// lagging: how many descs are unnoticed by the device yet --- preferably some not too small number (16~32)
+
+		printk(KERN_INFO "%s-tx-%d: pending: %hu, to clean: %hu, lagging: %hu\n",
+				netdev->name, queue_num,
+				(tdt - tdh + count) % count,
+				(tdh - tx_ring->next_to_clean + count) % count,
+				(tx_ring->next_to_use - tdt + count) % count
+			);
 	}
 
 	skb_head = skb_last = 0;

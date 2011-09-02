@@ -376,6 +376,7 @@ struct ixgbe_ring {
 	u8 polling;
 	void **buffer;
 	dma_addr_t *buffer_dma;
+	unsigned long last_report;
 } ____cacheline_internodealigned_in_smp;
 
 enum ixgbe_ring_f_enum {
