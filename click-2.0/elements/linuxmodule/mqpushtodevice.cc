@@ -142,6 +142,7 @@ MQPushToDevice::initialize(ErrorHandler *errh)
 {
     _capacity = _burst;
     _q.q = new Packet*[_capacity+1];
+    memset(_q.q, sizeof(Packet*) * (_capacity+1));
     _q.head = _q.tail = 0;
     if (AnyDevice::initialize_keywords(errh) < 0)
 	return -1;
@@ -235,6 +236,7 @@ MQPushToDevice::deq()
 {
   if (_q.head != _q.tail) {
     Packet *p = _q.q[_q.head];
+    _q.q[_q.head] = NULL;
     _q.head = next_i(_q.head);
     return p;
   } else
@@ -301,6 +303,7 @@ MQPushToDevice::push(int port, Packet *p)
 		    p = peek();
 		    if (p==NULL) {
 			//click_chatter("MQPushToDevice wasn't able to find packets to send something wrong");
+                        break;  // this should not happen usually
 		    }
 		    _npackets++;
 

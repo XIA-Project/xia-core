@@ -179,7 +179,7 @@ class MQPushToDevice : public AnyTaskDevice { public:
  
    
   int queue_packet(Packet *p);
-  int size() { int offset= _q.tail-_q.head; if (offset<0) offset = _capacity +1 + offset; return offset; };
+  int size() { int32_t offset= _q.tail-_q.head; if (offset<0) offset = _capacity +1 + offset; return offset; };
   int next_i(int i) const { return (i!=_capacity ? i+1 : 0); }
   Packet * peek();
   Packet * deq();
