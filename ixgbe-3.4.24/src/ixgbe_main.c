@@ -4618,7 +4618,8 @@ void ixgbe_clean_rx_ring(struct ixgbe_ring *rx_ring)
 			struct sk_buff *skb = rx_buffer_info->skb;
 			rx_buffer_info->skb = NULL;
 			/* We need to clean up RSC frag lists */
-			skb = ixgbe_merge_active_tail(skb);
+			if (ring_is_rsc_enabled(rx_ring))
+			    skb = ixgbe_merge_active_tail(skb);
 			ixgbe_close_active_frag_list(skb);
 			if (IXGBE_RSC_CB(skb)->delay_unmap) {
 				dma_unmap_single(dev,
@@ -9450,33 +9451,59 @@ static void ixgbe_mq_atr(struct net_device *dev, struct sk_buff* skb, unsigned i
 		c1 = 1;
 	}
 
-	// skb->protocol is often zero if the packet is just received
-	//if (skb->protocol != __constant_htons(ETH_P_IP))
-	//	return;
+	if (skb->protocol == __constant_htons(ETH_P_IP)) {
+		ipv4 = (struct iphdr *)(skb->data);
 
-	ipv4 = (struct iphdr *)(skb->data);
+		if (!c2) {
+			printk(KERN_INFO "ATR ip - ihl %d\n", ipv4->ihl);
+			c2 = 1;
+		}
 
-	if (!c2) {
-		printk(KERN_INFO "ATR ip - ihl %d\n", ipv4->ihl);
-		c2 = 1;
-	}
+		// caution: hashed destination addresses should be well distributed over queues
+		fdir_queue_num = ntohl(ipv4->daddr) % adapter->num_rx_queues;
 
-	// caution: hashed destination addresses should be well distributed over queues
-	fdir_queue_num = ntohl(ipv4->daddr) % adapter->num_rx_queues;
+		if (fdir_queue_num != arrived_queue_num) {
+			union ixgbe_atr_hash_dword input = { .dword = 0 };
+			union ixgbe_atr_hash_dword common = { .dword = 0 };
 
-	if (fdir_queue_num != arrived_queue_num) {
-		union ixgbe_atr_hash_dword input = { .dword = 0 };
-		union ixgbe_atr_hash_dword common = { .dword = 0 };
+			input.formatted.vlan_id = 0;
+			input.formatted.flow_type = IXGBE_ATR_FLOW_TYPE_IPV4;
 
-		input.formatted.vlan_id = 0;
-		input.formatted.flow_type = IXGBE_ATR_FLOW_TYPE_IPV4;
+			common.port.src ^= __constant_htons(ETH_P_IP);
 
-		common.port.src ^= __constant_htons(ETH_P_IP);
+			// caution: the xor value of src/dest addresses should be distinct
+			common.ip ^= ipv4->saddr ^ ipv4->daddr;
 
-		// caution: the xor value of src/dest addresses should be distinct
-		common.ip ^= ipv4->saddr ^ ipv4->daddr;
+			ixgbe_fdir_add_signature_filter_82599(&adapter->hw, input, common, fdir_queue_num);
+		}
+	} else if (skb->protocol == __constant_htons(ETH_P_IPV6)) {
+		struct ipv6hdr *ipv6;
+		ipv6 = (struct ipv6hdr *)(skb->data);
 
-		ixgbe_fdir_add_signature_filter_82599(&adapter->hw, input, common, fdir_queue_num);
+		// caution: hashed destination addresses should be well distributed over queues
+		fdir_queue_num = ntohl(ipv6->saddr.s6_addr32[1]) % adapter->num_rx_queues;
+
+		if (fdir_queue_num != arrived_queue_num) {
+			union ixgbe_atr_hash_dword input = { .dword = 0 };
+			union ixgbe_atr_hash_dword common = { .dword = 0 };
+
+			input.formatted.vlan_id = 0;
+			input.formatted.flow_type = IXGBE_ATR_FLOW_TYPE_IPV6;
+
+			common.port.src ^= __constant_htons(ETH_P_IPV6);
+
+			// caution: the xor value of src/dest addresses should be distinct
+			common.ip ^= ipv6->saddr.s6_addr32[0] ^
+				ipv6->saddr.s6_addr32[1] ^
+				ipv6->saddr.s6_addr32[2] ^
+				ipv6->saddr.s6_addr32[3] ^
+				ipv6->daddr.s6_addr32[0] ^
+				ipv6->daddr.s6_addr32[1] ^
+				ipv6->daddr.s6_addr32[2] ^
+				ipv6->daddr.s6_addr32[3];
+
+			ixgbe_fdir_add_signature_filter_82599(&adapter->hw, input, common, fdir_queue_num);
+		}
 	}
 }
 
