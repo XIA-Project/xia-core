@@ -25,18 +25,18 @@ pd_eth2_11:: MQPollDevice(eth2, QUEUE 11, BURST 32, PROMISC true) -> Discard;
 //pd_eth2_22:: MQPollDevice(eth2, QUEUE 22, BURST 32, PROMISC true) -> Discard; 
 //pd_eth2_23:: MQPollDevice(eth2, QUEUE 23, BURST 32, PROMISC true) -> Discard; 
 
-//pd_eth3_0:: MQPollDevice(eth3, QUEUE 0, BURST 32, PROMISC true) -> Discard; 
-//pd_eth3_1:: MQPollDevice(eth3, QUEUE 1, BURST 32, PROMISC true) -> Discard; 
-//pd_eth3_2:: MQPollDevice(eth3, QUEUE 2, BURST 32, PROMISC true) -> Discard; 
-//pd_eth3_3:: MQPollDevice(eth3, QUEUE 3, BURST 32, PROMISC true) -> Discard; 
-//pd_eth3_4:: MQPollDevice(eth3, QUEUE 4, BURST 32, PROMISC true) -> Discard; 
-//pd_eth3_5:: MQPollDevice(eth3, QUEUE 5, BURST 32, PROMISC true) -> Discard; 
-//pd_eth3_6:: MQPollDevice(eth3, QUEUE 6, BURST 32, PROMISC true) -> Discard; 
-//pd_eth3_7:: MQPollDevice(eth3, QUEUE 7, BURST 32, PROMISC true) -> Discard; 
-//pd_eth3_8:: MQPollDevice(eth3, QUEUE 8, BURST 32, PROMISC true) -> Discard; 
-//pd_eth3_9:: MQPollDevice(eth3, QUEUE 9, BURST 32, PROMISC true) -> Discard; 
-//pd_eth3_10:: MQPollDevice(eth3, QUEUE 10, BURST 32, PROMISC true) -> Discard; 
-//pd_eth3_11:: MQPollDevice(eth3, QUEUE 11, BURST 32, PROMISC true) -> Discard; 
+pd_eth3_0:: MQPollDevice(eth3, QUEUE 0, BURST 32, PROMISC true) -> Discard; 
+pd_eth3_1:: MQPollDevice(eth3, QUEUE 1, BURST 32, PROMISC true) -> Discard; 
+pd_eth3_2:: MQPollDevice(eth3, QUEUE 2, BURST 32, PROMISC true) -> Discard; 
+pd_eth3_3:: MQPollDevice(eth3, QUEUE 3, BURST 32, PROMISC true) -> Discard; 
+pd_eth3_4:: MQPollDevice(eth3, QUEUE 4, BURST 32, PROMISC true) -> Discard; 
+pd_eth3_5:: MQPollDevice(eth3, QUEUE 5, BURST 32, PROMISC true) -> Discard; 
+pd_eth3_6:: MQPollDevice(eth3, QUEUE 6, BURST 32, PROMISC true) -> Discard; 
+pd_eth3_7:: MQPollDevice(eth3, QUEUE 7, BURST 32, PROMISC true) -> Discard; 
+pd_eth3_8:: MQPollDevice(eth3, QUEUE 8, BURST 32, PROMISC true) -> Discard; 
+pd_eth3_9:: MQPollDevice(eth3, QUEUE 9, BURST 32, PROMISC true) -> Discard; 
+pd_eth3_10:: MQPollDevice(eth3, QUEUE 10, BURST 32, PROMISC true) -> Discard; 
+pd_eth3_11:: MQPollDevice(eth3, QUEUE 11, BURST 32, PROMISC true) -> Discard; 
 //pd_eth3_12:: MQPollDevice(eth3, QUEUE 12, BURST 32, PROMISC true) -> Discard; 
 //pd_eth3_13:: MQPollDevice(eth3, QUEUE 13, BURST 32, PROMISC true) -> Discard; 
 //pd_eth3_14:: MQPollDevice(eth3, QUEUE 14, BURST 32, PROMISC true) -> Discard; 
@@ -50,18 +50,18 @@ pd_eth2_11:: MQPollDevice(eth2, QUEUE 11, BURST 32, PROMISC true) -> Discard;
 //pd_eth3_22:: MQPollDevice(eth3, QUEUE 22, BURST 32, PROMISC true) -> Discard; 
 //pd_eth3_23:: MQPollDevice(eth3, QUEUE 23, BURST 32, PROMISC true) -> Discard; 
 
-//pd_eth4_0:: MQPollDevice(eth4, QUEUE 0, BURST 32, PROMISC true) -> Discard; 
-//pd_eth4_1:: MQPollDevice(eth4, QUEUE 1, BURST 32, PROMISC true) -> Discard; 
-//pd_eth4_2:: MQPollDevice(eth4, QUEUE 2, BURST 32, PROMISC true) -> Discard; 
-//pd_eth4_3:: MQPollDevice(eth4, QUEUE 3, BURST 32, PROMISC true) -> Discard; 
-//pd_eth4_4:: MQPollDevice(eth4, QUEUE 4, BURST 32, PROMISC true) -> Discard; 
-//pd_eth4_5:: MQPollDevice(eth4, QUEUE 5, BURST 32, PROMISC true) -> Discard; 
-//pd_eth4_6:: MQPollDevice(eth4, QUEUE 6, BURST 32, PROMISC true) -> Discard; 
-//pd_eth4_7:: MQPollDevice(eth4, QUEUE 7, BURST 32, PROMISC true) -> Discard; 
-//pd_eth4_8:: MQPollDevice(eth4, QUEUE 8, BURST 32, PROMISC true) -> Discard; 
-//pd_eth4_9:: MQPollDevice(eth4, QUEUE 9, BURST 32, PROMISC true) -> Discard; 
-//pd_eth4_10:: MQPollDevice(eth4, QUEUE 10, BURST 32, PROMISC true) -> Discard; 
-//pd_eth4_11:: MQPollDevice(eth4, QUEUE 11, BURST 32, PROMISC true) -> Discard; 
+pd_eth4_0:: MQPollDevice(eth4, QUEUE 0, BURST 32, PROMISC true) -> Discard; 
+pd_eth4_1:: MQPollDevice(eth4, QUEUE 1, BURST 32, PROMISC true) -> Discard; 
+pd_eth4_2:: MQPollDevice(eth4, QUEUE 2, BURST 32, PROMISC true) -> Discard; 
+pd_eth4_3:: MQPollDevice(eth4, QUEUE 3, BURST 32, PROMISC true) -> Discard; 
+pd_eth4_4:: MQPollDevice(eth4, QUEUE 4, BURST 32, PROMISC true) -> Discard; 
+pd_eth4_5:: MQPollDevice(eth4, QUEUE 5, BURST 32, PROMISC true) -> Discard; 
+pd_eth4_6:: MQPollDevice(eth4, QUEUE 6, BURST 32, PROMISC true) -> Discard; 
+pd_eth4_7:: MQPollDevice(eth4, QUEUE 7, BURST 32, PROMISC true) -> Discard; 
+pd_eth4_8:: MQPollDevice(eth4, QUEUE 8, BURST 32, PROMISC true) -> Discard; 
+pd_eth4_9:: MQPollDevice(eth4, QUEUE 9, BURST 32, PROMISC true) -> Discard; 
+pd_eth4_10:: MQPollDevice(eth4, QUEUE 10, BURST 32, PROMISC true) -> Discard; 
+pd_eth4_11:: MQPollDevice(eth4, QUEUE 11, BURST 32, PROMISC true) -> Discard; 
 //pd_eth4_12:: MQPollDevice(eth4, QUEUE 12, BURST 32, PROMISC true) -> Discard; 
 //pd_eth4_13:: MQPollDevice(eth4, QUEUE 13, BURST 32, PROMISC true) -> Discard; 
 //pd_eth4_14:: MQPollDevice(eth4, QUEUE 14, BURST 32, PROMISC true) -> Discard; 
@@ -75,18 +75,18 @@ pd_eth2_11:: MQPollDevice(eth2, QUEUE 11, BURST 32, PROMISC true) -> Discard;
 //pd_eth4_22:: MQPollDevice(eth4, QUEUE 22, BURST 32, PROMISC true) -> Discard; 
 //pd_eth4_23:: MQPollDevice(eth4, QUEUE 23, BURST 32, PROMISC true) -> Discard; 
 
-//pd_eth5_0:: MQPollDevice(eth5, QUEUE 0, BURST 32, PROMISC true) -> Discard; 
-//pd_eth5_1:: MQPollDevice(eth5, QUEUE 1, BURST 32, PROMISC true) -> Discard; 
-//pd_eth5_2:: MQPollDevice(eth5, QUEUE 2, BURST 32, PROMISC true) -> Discard; 
-//pd_eth5_3:: MQPollDevice(eth5, QUEUE 3, BURST 32, PROMISC true) -> Discard; 
-//pd_eth5_4:: MQPollDevice(eth5, QUEUE 4, BURST 32, PROMISC true) -> Discard; 
-//pd_eth5_5:: MQPollDevice(eth5, QUEUE 5, BURST 32, PROMISC true) -> Discard; 
-//pd_eth5_6:: MQPollDevice(eth5, QUEUE 6, BURST 32, PROMISC true) -> Discard; 
-//pd_eth5_7:: MQPollDevice(eth5, QUEUE 7, BURST 32, PROMISC true) -> Discard; 
-//pd_eth5_8:: MQPollDevice(eth5, QUEUE 8, BURST 32, PROMISC true) -> Discard; 
-//pd_eth5_9:: MQPollDevice(eth5, QUEUE 9, BURST 32, PROMISC true) -> Discard; 
-//pd_eth5_10:: MQPollDevice(eth5, QUEUE 10, BURST 32, PROMISC true) -> Discard; 
-//pd_eth5_11:: MQPollDevice(eth5, QUEUE 11, BURST 32, PROMISC true) -> Discard; 
+pd_eth5_0:: MQPollDevice(eth5, QUEUE 0, BURST 32, PROMISC true) -> Discard; 
+pd_eth5_1:: MQPollDevice(eth5, QUEUE 1, BURST 32, PROMISC true) -> Discard; 
+pd_eth5_2:: MQPollDevice(eth5, QUEUE 2, BURST 32, PROMISC true) -> Discard; 
+pd_eth5_3:: MQPollDevice(eth5, QUEUE 3, BURST 32, PROMISC true) -> Discard; 
+pd_eth5_4:: MQPollDevice(eth5, QUEUE 4, BURST 32, PROMISC true) -> Discard; 
+pd_eth5_5:: MQPollDevice(eth5, QUEUE 5, BURST 32, PROMISC true) -> Discard; 
+pd_eth5_6:: MQPollDevice(eth5, QUEUE 6, BURST 32, PROMISC true) -> Discard; 
+pd_eth5_7:: MQPollDevice(eth5, QUEUE 7, BURST 32, PROMISC true) -> Discard; 
+pd_eth5_8:: MQPollDevice(eth5, QUEUE 8, BURST 32, PROMISC true) -> Discard; 
+pd_eth5_9:: MQPollDevice(eth5, QUEUE 9, BURST 32, PROMISC true) -> Discard; 
+pd_eth5_10:: MQPollDevice(eth5, QUEUE 10, BURST 32, PROMISC true) -> Discard; 
+pd_eth5_11:: MQPollDevice(eth5, QUEUE 11, BURST 32, PROMISC true) -> Discard; 
 //pd_eth5_12:: MQPollDevice(eth5, QUEUE 12, BURST 32, PROMISC true) -> Discard; 
 //pd_eth5_13:: MQPollDevice(eth5, QUEUE 13, BURST 32, PROMISC true) -> Discard; 
 //pd_eth5_14:: MQPollDevice(eth5, QUEUE 14, BURST 32, PROMISC true) -> Discard; 
@@ -112,7 +112,7 @@ pd_eth2_7 14,
 pd_eth2_8 16,
 pd_eth2_9 18,
 pd_eth2_10 20,
-pd_eth2_11 22
+pd_eth2_11 22,
 //pd_eth2_12 12,
 //pd_eth2_13 13,
 //pd_eth2_14 14,
@@ -126,18 +126,18 @@ pd_eth2_11 22
 //pd_eth2_22 22,
 //pd_eth2_23 23,
 //
-//pd_eth3_0 0,
-//pd_eth3_1 1,
-//pd_eth3_2 2,
-//pd_eth3_3 3,
-//pd_eth3_4 4,
-//pd_eth3_5 5,
-//pd_eth3_6 6,
-//pd_eth3_7 7,
-//pd_eth3_8 8,
-//pd_eth3_9 9,
-//pd_eth3_10 10,
-//pd_eth3_11 11,
+pd_eth3_0 0,
+pd_eth3_1 2,
+pd_eth3_2 4,
+pd_eth3_3 6,
+pd_eth3_4 8,
+pd_eth3_5 10,
+pd_eth3_6 12,
+pd_eth3_7 14,
+pd_eth3_8 16,
+pd_eth3_9 18,
+pd_eth3_10 20,
+pd_eth3_11 22,
 //pd_eth3_12 12,
 //pd_eth3_13 13,
 //pd_eth3_14 14,
@@ -151,18 +151,18 @@ pd_eth2_11 22
 //pd_eth3_22 22,
 //pd_eth3_23 23,
 //
-//pd_eth4_0 0,
-//pd_eth4_1 1,
-//pd_eth4_2 2,
-//pd_eth4_3 3,
-//pd_eth4_4 4,
-//pd_eth4_5 5,
-//pd_eth4_6 6,
-//pd_eth4_7 7,
-//pd_eth4_8 8,
-//pd_eth4_9 9,
-//pd_eth4_10 10,
-//pd_eth4_11 11,
+pd_eth4_0 1,
+pd_eth4_1 3,
+pd_eth4_2 5,
+pd_eth4_3 7,
+pd_eth4_4 9,
+pd_eth4_5 11,
+pd_eth4_6 13,
+pd_eth4_7 15,
+pd_eth4_8 17,
+pd_eth4_9 19,
+pd_eth4_10 21,
+pd_eth4_11 23,
 //pd_eth4_12 12,
 //pd_eth4_13 13,
 //pd_eth4_14 14,
@@ -176,18 +176,18 @@ pd_eth2_11 22
 //pd_eth4_22 22,
 //pd_eth4_23 23,
 //
-//pd_eth5_0 0,
-//pd_eth5_1 1,
-//pd_eth5_2 2,
-//pd_eth5_3 3,
-//pd_eth5_4 4,
-//pd_eth5_5 5,
-//pd_eth5_6 6,
-//pd_eth5_7 7,
-//pd_eth5_8 8,
-//pd_eth5_9 9,
-//pd_eth5_10 10, 
-//pd_eth5_11 11,
+pd_eth5_0 1,
+pd_eth5_1 3,
+pd_eth5_2 5,
+pd_eth5_3 7,
+pd_eth5_4 9,
+pd_eth5_5 11,
+pd_eth5_6 13,
+pd_eth5_7 15,
+pd_eth5_8 17,
+pd_eth5_9 19,
+pd_eth5_10 21,
+pd_eth5_11 23,
 //pd_eth5_12 12,
 //pd_eth5_13 13,
 //pd_eth5_14 14,
