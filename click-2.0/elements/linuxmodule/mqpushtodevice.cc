@@ -142,7 +142,7 @@ MQPushToDevice::initialize(ErrorHandler *errh)
 {
     _capacity = _burst;
     _q.q = new Packet*[_capacity+1];
-    memset(_q.q, sizeof(Packet*) * (_capacity+1));
+    memset(_q.q, 0, (sizeof(Packet*) * (_capacity+1)));
     _q.head = _q.tail = 0;
     if (AnyDevice::initialize_keywords(errh) < 0)
 	return -1;
@@ -288,6 +288,8 @@ MQPushToDevice::push(int port, Packet *p)
     else
 	clean_skbs = 0;
 #endif
+
+    if (p==NULL) return;
  
     if (!enq(p))  {
 	//click_chatter("MQPushToDevice wasn't able to find enq");
@@ -300,9 +302,9 @@ MQPushToDevice::push(int port, Packet *p)
 #if CLICK_DEVICE_THESIS_STATS && !CLICK_DEVICE_STATS
 		    click_cycles_t before_pull_cycles = click_get_cycles();
 #endif
-		    p = peek();
+		    p = deq();
 		    if (p==NULL) {
-			//click_chatter("MQPushToDevice wasn't able to find packets to send something wrong");
+			click_chatter("MQPushToDevice wasn't able to find packets to send something wrong");
                         break;  // this should not happen usually
 		    }
 		    _npackets++;
@@ -317,7 +319,6 @@ MQPushToDevice::push(int port, Packet *p)
 
 		    if (busy)
 			    break;
-		    deq();
 		    sent++;
 
 #if HAVE_LINUX_MQ_POLLING
@@ -343,6 +344,7 @@ MQPushToDevice::queue_packet(Packet *p)
 	    if (++_too_short == 1)
 		printk("<1>MQPushToDevice %s packet too small (len %d, tailroom %d), had to copy\n", skb1->len, skb_tailroom(skb1));
 	    struct sk_buff *nskb = skb_copy_expand(skb1, skb_headroom(skb1), skb_tailroom(skb1) + 60 - skb1->len, GFP_ATOMIC);
+            //p->kill();
 	    kfree_skb(skb1);
 	    //skbmgr_recycle_skbs(skb1);
 	    if (!nskb)
@@ -368,12 +370,14 @@ MQPushToDevice::queue_packet(Packet *p)
 	    if (_hard_start++ ==1)
 	        printk("<1>MQPushToDevice %s polling not enabled! Dropping packet\n", _dev->name);
 	    kfree_skb(skb1);
+            //p->kill();
 	    //skbmgr_recycle_skbs(skb1);
 	}
     if (ret != 0) {
 	if (++_rejected == 1)
 	    printk("<1>MQPushToDevice %s rejected a packet!\n", _dev->name);
 	kfree_skb(skb1);
+        //p->kill();
         //skbmgr_recycle_skbs(skb1);
     }
     return ret;

@@ -9814,6 +9814,8 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 		//__builtin_prefetch(cur_skb->data, 1, 0);					// for click
 		//__builtin_prefetch(cur_skb->data + L1_CACHE_BYTES, 1, 0);	// for click
 
+		if (cur_skb==NULL)
+		     printk("<1> ERROR packet is NULL %s:%d got %d, i %d, (skb_head==NULL) %d", __FUNCTION__, __LINE__, got, i, (skb_head==NULL));
 		skb_put(cur_skb, len_arr[i]);
 		skb_pull(cur_skb, hard_header_len);
 
