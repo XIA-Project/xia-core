@@ -5035,8 +5035,8 @@ static inline bool ixgbe_set_fdir_queues(struct ixgbe_adapter *adapter)
 	if ((adapter->flags & IXGBE_FLAG_RSS_ENABLED) &&
 	    (adapter->flags & IXGBE_FLAG_FDIR_HASH_CAPABLE)) {
 #ifdef HAVE_TX_MQ
-		//adapter->num_tx_queues = f_fdir->indices;
-		adapter->num_tx_queues = (int)num_online_cpus();
+		adapter->num_tx_queues = f_fdir->indices;
+		//adapter->num_tx_queues = (int)num_online_cpus();
 #endif
 		adapter->num_rx_queues = f_fdir->indices;
 		ret = true;
