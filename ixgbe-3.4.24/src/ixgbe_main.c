@@ -5577,6 +5577,7 @@ static int ixgbe_alloc_queues(struct ixgbe_adapter *adapter)
 		ring->netdev = adapter->netdev;
 		ring->numa_node = adapter->node;
 		ring->owner_cpu = -1;
+		ring->polling = 0;
 
 		adapter->tx_ring[i] = ring;
 	}
@@ -5609,6 +5610,7 @@ static int ixgbe_alloc_queues(struct ixgbe_adapter *adapter)
 		ring->netdev = adapter->netdev;
 		ring->numa_node = adapter->node;
 		ring->owner_cpu = -1;
+		ring->polling = 0;
 
 		adapter->rx_ring[i] = ring;
 	}
@@ -9290,7 +9292,7 @@ static const int ixgbe_rx_desc_per_cache_line = L1_CACHE_BYTES / sizeof(union ix
 static const int ixgbe_prefetch_ahead = 1;
 
 #define IXGBE_RX_QUEUE_WAKE 128 
-#define IXGBE_TX_QUEUE_WAKE 16
+#define IXGBE_TX_QUEUE_WAKE 128
 
 
 static int ixgbe_is_polling(struct net_device *dev, unsigned int queue_num)
@@ -9378,7 +9380,8 @@ static int ixgbe_poll_on(struct net_device *dev, unsigned int queue_num)
 			IXGBE_RX_DESC_ADV(rx_ring, i)->read.hdr_addr = 0;
 		}
 		wmb();
-		rx_ring->next_to_use = rx_ring->count - 1;
+		//rx_ring->next_to_use = rx_ring->count - 1;
+		rx_ring->next_to_use = rx_ring->count - IXGBE_RX_QUEUE_WAKE;
 		writel(rx_ring->next_to_use, rx_ring->tail);
 		IXGBE_WRITE_FLUSH(&adapter->hw);
 
@@ -9418,12 +9421,12 @@ static int ixgbe_poll_off(struct net_device *dev, unsigned int queue_num)
 
 	cpu_id = raw_smp_processor_id();
 
-	if (rx_ring->owner_cpu != cpu_id) {
-		printk(KERN_INFO "ixgbe_poll_on: device %s queue %d is not owned by by CPU %d, but by CPU %d!\n",
-				dev->name, queue_num, cpu_id, rx_ring->owner_cpu);
-		clear_bit(1, &adapter->reconfigure_lock);
-		return -1;
-	}
+	//if (rx_ring->owner_cpu != cpu_id) {
+	//	printk(KERN_INFO "ixgbe_poll_on: device %s queue %d is not owned by by CPU %d, but by CPU %d!\n",
+	//			dev->name, queue_num, cpu_id, rx_ring->owner_cpu);
+	//	clear_bit(1, &adapter->reconfigure_lock);
+	//	return -1;
+	//}
 
 	if (rx_ring->polling) {
 		// unbind rings from this processor
@@ -9507,7 +9510,27 @@ static void ixgbe_mq_atr(struct net_device *dev, struct sk_buff* skb, unsigned i
 	}
 }
 
-//#define PREALLOC_DMA
+#define PREALLOC_DMA
+
+static inline void memcpy_aligned(void *to, const void *from, size_t len)
+{
+	if (len <= 64) {
+		memcpy(to, from, 64);
+	} else if (len <= 128) {
+		memcpy(to, from, 128);
+	} else {
+		int offset;
+
+		for (offset = 0; offset < len; offset += 64) {
+			if (offset + 128 < len) {
+				__builtin_prefetch((uint8_t *)from + offset + 128, 0, 0);
+				__builtin_prefetch((uint8_t *)to + offset + 128, 1, 0);
+			}
+
+			memcpy((uint8_t *)to + offset, (uint8_t *)from + offset, 64);
+		}
+	}
+}
 
 static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsigned int queue_num, struct sk_buff **skbs, int *want)
 {
@@ -9544,6 +9567,8 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 	struct sk_buff *cur_skb;
 	struct sk_buff **pcur_skb;
 #endif
+
+	ktime_t curr;
 
 	//static int debug_cnt = 100;
 
@@ -9587,7 +9612,7 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 		return NULL;
 	}
 
-	ktime_t curr = ktime_get();
+	curr = ktime_get();
 	if (ktime_to_ns(ktime_sub(rx_ring-> no_poll_until, curr)) > 0) {
 		*want = 0;
 		return NULL;
@@ -9603,6 +9628,10 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 	//	*want = 0;
 	//	return NULL;
 	//}
+	if (!(IXGBE_RX_DESC_ADV(rx_ring, (rx_ring->next_to_clean + max_get - 1) % rx_ring->count)->wb.upper.status_error & le32_to_cpu(IXGBE_RXD_STAT_DD))) {
+		*want = 0;
+		return NULL;
+	}
 
 	// bring some frequently used variables
 	dma_dev = rx_ring->dev;
@@ -9632,7 +9661,7 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 #endif
 
 	// regular status report
-	if (jiffies - rx_ring->last_report >= 1 * HZ) {
+	if (jiffies - rx_ring->last_report >= 2 * HZ) {
 		u16 rdh;
 		u16 rdt;
 
@@ -9706,7 +9735,7 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 
 #ifdef PREALLOC_DMA
 		// bring the packet data to skb
-		memcpy(cur_skb->data, *buffer, len);
+		memcpy_aligned(cur_skb->data, *buffer, len);
 		got++;
 
 		// prepare the desc for future packet retrieval
@@ -9769,11 +9798,12 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 
 		if ((i + count) % IXGBE_RX_QUEUE_WAKE == 0) {
 			wmb();
+			rx_ring->next_to_use = ((i + count) - IXGBE_RX_QUEUE_WAKE + count) % count;
 			writel(rx_ring->next_to_use, rx_ring->tail);
 
 			//IXGBE_WRITE_FLUSH(&adapter->hw);
 			//IXGBE_READ_REG(&adapter->hw, IXGBE_RDH(rx_ring->reg_idx));
-			//IXGBE_READ_REG(&adapter->hw, IXGBE_RDT(rx_ring->reg_idx));
+			IXGBE_READ_REG(&adapter->hw, IXGBE_RDT(rx_ring->reg_idx));
 		}
 	}
 
@@ -9786,7 +9816,6 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 
 	if (rx_ring->next_to_clean != i) {
 		rx_ring->next_to_clean = i;
-		rx_ring->next_to_use = (i - 1 + count) % count;
 	}
 
 #ifdef PREALLOC_DMA
@@ -9801,7 +9830,7 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 	//*want = (rdh - i + count) % count;
 
 	//if (got) 
-        {
+	{
 		const u64 delay = 1000 * 2; // 2 usec delay
 		rx_ring->last_poll = ktime_get();
 		rx_ring->no_poll_until =  ktime_add_ns(rx_ring->last_poll, delay);
@@ -9817,6 +9846,7 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 		     printk("<1> ERROR packet is NULL %s:%d got %d, i %d, (skb_head==NULL) %d", __FUNCTION__, __LINE__, got, i, (skb_head==NULL));
 		skb_put(cur_skb, len_arr[i]);
 		skb_pull(cur_skb, hard_header_len);
+		cur_skb->protocol = *(u16*)(cur_skb->data - 2);
 
 		if (0) {
 			static int k = 0;
@@ -9859,9 +9889,9 @@ static int ixgbe_mq_tx_eob(struct net_device *dev, unsigned int queue_num)
 	wmb();
 	writel(tx_ring->next_to_use, tx_ring->tail);
 
-	IXGBE_WRITE_FLUSH(&adapter->hw);
+	//IXGBE_WRITE_FLUSH(&adapter->hw);
 	//IXGBE_READ_REG(&adapter->hw, IXGBE_TDH(tx_ring->reg_idx));
-	//IXGBE_READ_REG(&adapter->hw, IXGBE_TDT(tx_ring->reg_idx));
+	IXGBE_READ_REG(&adapter->hw, IXGBE_TDT(tx_ring->reg_idx));
 	return 0;
 }
 
@@ -9936,7 +9966,7 @@ static int ixgbe_mq_tx_pqueue(struct net_device *netdev, unsigned int queue_num,
 	tx_buffer_info->time_stamp = jiffies;
 
 #ifdef PREALLOC_DMA
-	memcpy(tx_ring->buffer[i], skb->data, skb->len);
+	memcpy_aligned(tx_ring->buffer[i], skb->data, skb->len);
 	tx_desc->read.buffer_addr = cpu_to_le64(tx_ring->buffer_dma[i]);
 #else
 	tx_ring->tx_buffer_info[i].dma = dma_map_single(tx_ring->dev, skb->data, skb->len, DMA_TO_DEVICE);
@@ -9964,6 +9994,8 @@ static int ixgbe_mq_tx_pqueue(struct net_device *netdev, unsigned int queue_num,
 
 	/* Move the HW Tx Tail Pointer */
 	tx_ring->next_to_use = i;
+	if (i % IXGBE_TX_QUEUE_WAKE == 0)
+		ixgbe_mq_tx_eob(netdev, queue_num);
 
 	netdev->trans_start = jiffies;
 
@@ -9992,7 +10024,7 @@ static struct sk_buff * ixgbe_mq_tx_clean(struct net_device *netdev, unsigned in
 
 	count = tx_ring->count;
 
-	if (jiffies - tx_ring->last_report >= 1 * HZ) {
+	if (jiffies - tx_ring->last_report >= 2 * HZ) {
 		u16 tdh;
 		u16 tdt;
 
@@ -10049,18 +10081,18 @@ static struct sk_buff * ixgbe_mq_tx_clean(struct net_device *netdev, unsigned in
 
 	tx_ring->next_to_clean = i;
 
-	if (skb_head && netif_carrier_ok(netdev) &&
-			(ixgbe_desc_unused(tx_ring) >= IXGBE_TX_QUEUE_WAKE)) {
-		/* Make sure that anybody stopping the queue after this
-		 * sees the new next_to_clean.
-		 */
-		/* Multi queue stuff should go here but we don't support it yet,look at ixgbe_clean_tx_irq */
-		if (netif_queue_stopped(netdev) &&
-				!test_bit(__IXGBE_DOWN, &adapter->state)) {
-			netif_start_queue(netdev);
-			adapter->restart_queue++;
-		}
-	}
+	//if (skb_head && netif_carrier_ok(netdev) &&
+	//		(ixgbe_desc_unused(tx_ring) >= IXGBE_TX_QUEUE_WAKE)) {
+	//	/* Make sure that anybody stopping the queue after this
+	//	 * sees the new next_to_clean.
+	//	 */
+	//	/* Multi queue stuff should go here but we don't support it yet,look at ixgbe_clean_tx_irq */
+	//	if (netif_queue_stopped(netdev) &&
+	//			!test_bit(__IXGBE_DOWN, &adapter->state)) {
+	//		netif_start_queue(netdev);
+	//		adapter->restart_queue++;
+	//	}
+	//}
 
 	return skb_head;
 }
