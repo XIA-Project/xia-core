@@ -20,9 +20,10 @@ echo compiling and installing
 
 echo loading nic module
 wait
-QCOUNT=12
+QCOUNT=3
+DELAY=4500
 #sudo insmod $IXGBE/src/ixgbe.ko RSS=$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT FdirMode=0,0,0,0,0,0 DCA=0,0,0,0,0,0
-sudo insmod $IXGBE/src/ixgbe.ko RSS=$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT FdirMode=1,1,1,1,1,1 FdirQueues=$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT DCA=0,0,0,0,0,0
+sudo insmod $IXGBE/src/ixgbe.ko RSS=$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT FdirMode=1,1,1,1,1,1 FdirQueues=$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT DCA=0,0,0,0,0,0 PollDelay=$DELAY,$DELAY,$DELAY,$DELAY,$DELAY,$DELAY
 
 
 wait

@@ -287,6 +287,14 @@ IXGBE_PARAM(FdirMode, "Flow Director filtering modes:\n"
 	              "\t\t\t0 = Filtering off\n"
 	              "\t\t\t1 = Signature Hashing filters (SW ATR)\n"
 	              "\t\t\t2 = Perfect Filters");
+
+/* Delay between polling (unit ns)
+ *
+ *  Default: 2 usec (2000ns)
+ */
+IXGBE_PARAM(PollDelay, "Delay between polling");
+
+
 /* Flow Director Optional Number of Queues
  *
  * Valid Range: 1-64
@@ -1019,6 +1027,26 @@ void __devinit ixgbe_check_options(struct ixgbe_adapter *adapter)
 
 	}
 #ifdef HAVE_TX_MQ
+	{
+		unsigned int delay;
+		static struct ixgbe_option opt = {
+			.type = range_option,
+			.name = "Delay between consecutive polls (ns)",
+			.err = "using default of "
+				__MODULE_STRING(2000),
+			.def = 2000,
+			.arg = {.r = {.min = 0,
+				      .max = 10000000}}
+		};
+		if (num_PollDelay > bd) {
+			delay = PollDelay[bd];
+			ixgbe_validate_option(&delay, &opt);
+			adapter->poll_delay = delay;
+		}  else {
+			adapter->poll_delay = 2000;
+		}
+		printk("PollDelay %llu nsec\n", adapter->poll_delay);
+	}
 	{
 		unsigned int fdir_num_queues;
 		static struct ixgbe_option opt = {

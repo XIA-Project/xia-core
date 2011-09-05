@@ -609,6 +609,7 @@ struct ixgbe_adapter {
 	int max_msix_q_vectors;         /* true count of q_vectors for device */
 	struct ixgbe_ring_feature ring_feature[RING_F_ARRAY_SIZE];
 	struct msix_entry *msix_entries;
+	u64 poll_delay;
 
 	u32 alloc_rx_page_failed;
 	u32 alloc_rx_buff_failed;

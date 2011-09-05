@@ -9832,7 +9832,7 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 
 	//if (got) 
 	{
-		const u64 delay = 1000 * 2; // 2 usec delay
+		const u64 delay = adapter->poll_delay; 
 		rx_ring->last_poll = ktime_get();
 		rx_ring->no_poll_until =  ktime_add_ns(rx_ring->last_poll, delay);
 	}
