@@ -4653,8 +4653,8 @@ void ixgbe_clean_rx_ring(struct ixgbe_ring *rx_ring)
 
 	rx_ring->next_to_clean = 0;
 	rx_ring->next_to_use = 0;
-	rx_ring->last_poll = 0;
-	rx_ring->no_poll_until = 0;
+	rx_ring->last_poll = ktime_set(0,0);
+	rx_ring->no_poll_until = ktime_set(0,0);
 	rx_ring->last_report = 0;
 }
 
@@ -4686,8 +4686,8 @@ static void ixgbe_clean_tx_ring(struct ixgbe_ring *tx_ring)
 
 	tx_ring->next_to_use = 0;
 	tx_ring->next_to_clean = 0;
-	tx_ring->last_poll = 0;
-	tx_ring->no_poll_until = 0;
+	tx_ring->last_poll = ktime_set(0,0);
+	tx_ring->no_poll_until = ktime_set(0,0);
 	tx_ring->last_report = 0;
 }
 
@@ -6149,8 +6149,8 @@ int ixgbe_setup_tx_resources(struct ixgbe_ring *tx_ring)
 
 	tx_ring->next_to_use = 0;
 	tx_ring->next_to_clean = 0;
-	tx_ring->last_poll = jiffies;
-	tx_ring->no_poll_until = jiffies;
+	tx_ring->last_poll = ktime_get();
+	tx_ring->no_poll_until = ktime_get();
 	tx_ring->last_report = jiffies;
 	return 0;
 
@@ -6257,8 +6257,8 @@ int ixgbe_setup_rx_resources(struct ixgbe_ring *rx_ring)
 
 	rx_ring->next_to_clean = 0;
 	rx_ring->next_to_use = 0;
-	rx_ring->last_poll = jiffies;
-	rx_ring->no_poll_until = jiffies;
+	rx_ring->last_poll = ktime_get();
+	rx_ring->no_poll_until = ktime_get();
 	rx_ring->last_report = jiffies;
 	return 0;
 err:
@@ -9587,10 +9587,11 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 		return NULL;
 	}
 
-	//if ((long)(rx_ring->no_poll_until - jiffies) > 0) {
-	//	*want = 0;
-	//	return NULL;
-	//}
+	ktime_t curr = ktime_get();
+	if (ktime_to_ns(ktime_sub(rx_ring-> no_poll_until, curr)) > 0) {
+		*want = 0;
+		return NULL;
+	}
 
 	// cannot spare too many packets at once (cache issue)
 	if (*want >= sizeof(len_arr) / sizeof(len_arr[0]))
@@ -9799,14 +9800,12 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 	*want = got;
 	//*want = (rdh - i + count) % count;
 
-	//if (got) {
-	//	unsigned long now = jiffies;
-	//	unsigned long delay = (now - rx_ring->last_poll) * max_get / got;
-	//	if (delay >= HZ / 1000)
-	//		delay = HZ / 1000;
-	//	rx_ring->no_poll_until = now + delay;
-	//	rx_ring->last_poll = now;
-	//}
+	//if (got) 
+        {
+		const u64 delay = 1000 * 2; // 2 usec delay
+		rx_ring->last_poll = ktime_get();
+		rx_ring->no_poll_until =  ktime_add_ns(rx_ring->last_poll, delay);
+	}
 
 	// prepare sk_buffs for click uses
 	cur_skb = skb_head;

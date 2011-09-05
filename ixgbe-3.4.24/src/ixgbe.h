@@ -375,8 +375,8 @@ struct ixgbe_ring {
 
 	int owner_cpu;
 	u8 polling;
-	unsigned long last_poll;
-	unsigned long no_poll_until;
+	ktime_t last_poll;
+	ktime_t no_poll_until;
 	void **buffer;
 	dma_addr_t *buffer_dma;
 	unsigned long last_report;
