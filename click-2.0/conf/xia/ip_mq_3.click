@@ -1,4 +1,4 @@
-#!/usr/local/sbin/click-install -uct24
+#!/usr/local/sbin/click-install -uct12
 define ($DST_MAC 00:15:17:51:d3:d4);
 define ($DST_MAC1 00:25:17:51:d3:d4);
 define ($HEADROOM_SIZE 256);
@@ -19,7 +19,7 @@ elementclass gen_sub {
     //pd1 :: MQPollDevice($eth_from, QUEUE $queue, PROMISC true) -> Discard;
     //StaticThreadSched(pd1 $cpu);
 
-    gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 240)
+    gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 12)
     //-> Script(TYPE PACKET, write gen1.active false)       // stop source after exactly 1 packet
     //-> unq :: Unqueue()
     //-> DynamicUDPIPEncap($eth_from, $SRC_PORT, $eth_to, $DST_PORT, INTERVAL 1, CHANGE_IP 1)
@@ -104,13 +104,24 @@ elementclass gen_b {
 //gen_b(eth4, eth2);
 //gen_b(eth5, eth3);
 
-gen0(eth2, eth4);
-gen1(eth3, eth5);
-gen0(eth4, eth2);
-gen1(eth5, eth3);
+//gen0(eth2, eth4);
+//gen1(eth3, eth5);
+//gen0(eth4, eth2);
+//gen1(eth5, eth3);
 
-//gen_sub(eth2, eth4, 0, 0);
-//gen_sub(eth4, eth2, 0, 1);
-//gen_sub(eth3, eth5, 0, 2);
-//gen_sub(eth5, eth3, 0, 3);
+gen_sub(eth2, eth3, 0, 0);
+gen_sub(eth2, eth4, 1, 1);
+gen_sub(eth2, eth5, 2, 2);
+
+gen_sub(eth3, eth2, 0, 3);
+gen_sub(eth3, eth4, 1, 4);
+gen_sub(eth3, eth5, 2, 5);
+
+gen_sub(eth4, eth2, 0, 6);
+gen_sub(eth4, eth3, 1, 7);
+gen_sub(eth4, eth5, 2, 8);
+
+gen_sub(eth5, eth2, 0, 9);
+gen_sub(eth5, eth3, 1, 10);
+gen_sub(eth5, eth4, 2, 11);
 
