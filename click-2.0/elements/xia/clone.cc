@@ -54,11 +54,15 @@ Packet* Clone::pull(int /*port*/)
     //return _packet->clone()->uniqueify();
     if (++_next >= _packets.size())
         _next = 0;
+
     if (!_shared_skbs)
         return _packets[_next]->clone();
     else {
 #if CLICK_LINUXMODULE
-        atomic_inc(&_packets[_next]->skb()->users);
+        __builtin_prefetch(_packets[_next]->skb()->data + 0, 0, 0);
+        __builtin_prefetch(_packets[_next]->skb()->data + 64, 0, 0);
+        //atomic_inc(&_packets[_next]->skb()->users);
+        (*(int*)&_packets[_next]->skb()->users)++;
         return _packets[_next];
 #else
         // SHARED_SKBS is not effective for userlevel
