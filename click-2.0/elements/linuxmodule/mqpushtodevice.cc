@@ -82,7 +82,6 @@ inline void
 MQPushToDevice::tx_wake_queue(net_device *dev) 
 {
     //click_chatter("%{element}::%s for dev %s\n", this, __func__, dev->name);
-    _task.reschedule();
 }
 
 #if HAVE_CLICK_KERNEL_TX_NOTIFY
@@ -167,15 +166,6 @@ MQPushToDevice::initialize(ErrorHandler *errh)
     registered_tx_notifiers++;
 #endif
 
-    ScheduleInfo::initialize_task(this, &_task, _dev != 0, errh);
-    _signal = Notifier::upstream_empty_signal(this, 0, &_task);
-
-#if HAVE_STRIDE_SCHED
-    // user specifies max number of tickets; we start with default
-    _max_tickets = _task.tickets();
-    _task.set_tickets(Task::DEFAULT_TICKETS);
-#endif
-
     reset_counts();
     return 0;
 }
@@ -250,6 +240,7 @@ bool MQPushToDevice::enq(Packet *p)
     if (next != _q.head) {
 	_q.q[_q.tail] = p;
 	_q.tail = next;
+	return true;
     } else 
 	return false;
 
@@ -280,6 +271,8 @@ MQPushToDevice::push(int port, Packet *p)
     SET_STATS(low00, low10, time_now);
 #endif
     
+    if (p==NULL) return;
+
 #if HAVE_LINUX_MQ_POLLING
     bool is_polling = (_dev->is_polling(_dev, _queue) > 0);
     struct sk_buff *clean_skbs;
@@ -289,22 +282,18 @@ MQPushToDevice::push(int port, Packet *p)
 	clean_skbs = 0;
 #endif
 
-    if (p==NULL) return;
- 
     if (!enq(p))  {
-	//click_chatter("MQPushToDevice wasn't able to find enq");
-	p->kill();
+        struct sk_buff *skb1 = p->skb();
+	kfree_skb(skb1);
     }
      
     if (size()>=_burst)  {
-	    /* try to send from click */
 	    while (sent < _burst) {
 #if CLICK_DEVICE_THESIS_STATS && !CLICK_DEVICE_STATS
 		    click_cycles_t before_pull_cycles = click_get_cycles();
 #endif
 		    p = deq();
 		    if (p==NULL) {
-			click_chatter("MQPushToDevice wasn't able to find packets to send something wrong");
                         break;  // this should not happen usually
 		    }
 		    _npackets++;
@@ -317,8 +306,9 @@ MQPushToDevice::push(int port, Packet *p)
 		    GET_STATS_RESET(low00, low10, time_now, 
 				    _perfcnt1_queue, _perfcnt2_queue, _time_queue);
 
-		    if (busy)
+		    if (busy) {
 			    break;
+		    }
 		    sent++;
 
 #if HAVE_LINUX_MQ_POLLING
@@ -326,6 +316,25 @@ MQPushToDevice::push(int port, Packet *p)
 			    _dev->mq_tx_eob(_dev, _queue);
 #endif
 	    }
+    }
+#if HAVE_LINUX_MQ_POLLING
+    if (is_polling) {
+	// 8.Dec.07: Do not recycle skbs until after unlocking the device, to
+	// avoid deadlock.  After initial patch by Joonwoo Park.
+	if (clean_skbs) {
+# if CLICK_DEVICE_STATS
+	    if (_activations > 1)
+		GET_STATS_RESET(low00, low10, time_now, 
+				_perfcnt1_clean, _perfcnt2_clean, _time_clean);
+# endif
+	    skbmgr_recycle_skbs(clean_skbs);
+# if CLICK_DEVICE_STATS
+	    if (_activations > 1)
+		GET_STATS_RESET(low00, low10, time_now, 
+				_perfcnt1_freeskb, _perfcnt2_freeskb, _time_freeskb);
+# endif
+	}
+#endif
     }
 }
 
@@ -372,6 +381,7 @@ MQPushToDevice::queue_packet(Packet *p)
 	    kfree_skb(skb1);
             //p->kill();
 	    //skbmgr_recycle_skbs(skb1);
+	    return 0;
 	}
     if (ret != 0) {
 	if (++_rejected == 1)
@@ -386,13 +396,7 @@ MQPushToDevice::queue_packet(Packet *p)
 void
 MQPushToDevice::change_device(net_device *dev)
 {
-    if (dev != _dev)
-	_task.strong_unschedule();
-    
     set_device(dev, &to_device_map, true);
-
-    if (_dev)
-	_task.strong_reschedule();
 }
 
 extern "C" {
@@ -499,7 +503,6 @@ MQPushToDevice::add_handlers()
     add_read_handler("clean_dma_cycles", MQPushToDevice_read_stats, (void *)H_TIME_CLEAN);
 #endif
     add_write_handler("reset_counts", MQPushToDevice_write_stats, 0, Handler::BUTTON);
-    add_task_handlers(&_task);
 }
 
 ELEMENT_REQUIRES(AnyDevice linuxmodule)

@@ -104,7 +104,7 @@ Resets counters to zero when written.
 #include "elements/linuxmodule/anydevice.hh"
 #include <click/notifier.hh>
 
-class MQPushToDevice : public AnyTaskDevice { public:
+class MQPushToDevice : public AnyDevice { public:
   
   MQPushToDevice();
   ~MQPushToDevice();
@@ -116,7 +116,6 @@ class MQPushToDevice : public AnyTaskDevice { public:
   const char *port_count() const	{ return PORTS_1_0; }
   const char *processing() const	{ return PUSH; }
   
-  int configure_phase() const		{ return CONFIGURE_PHASE_TODEVICE; }
   int configure(Vector<String> &, ErrorHandler *);
   int initialize(ErrorHandler *);
   void cleanup(CleanupStage);
