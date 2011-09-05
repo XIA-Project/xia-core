@@ -9510,7 +9510,8 @@ static void ixgbe_mq_atr(struct net_device *dev, struct sk_buff* skb, unsigned i
 	}
 }
 
-#define PREALLOC_DMA
+#define PREALLOC_DMA_RX
+#define PREALLOC_DMA_TX
 
 static inline void memcpy_aligned(void *to, const void *from, size_t len)
 {
@@ -9558,7 +9559,7 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 
 	u16 len_arr[128];
 
-#ifdef PREALLOC_DMA
+#ifdef PREALLOC_DMA_RX
 	struct sk_buff *skb_head;
 	struct sk_buff *cur_skb;
 	struct sk_buff *prev_skb;
@@ -9652,7 +9653,7 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 	got = 0;
 	hard_header_len = dev->hard_header_len;
 
-#ifdef PREALLOC_DMA
+#ifdef PREALLOC_DMA_RX
 	skb_head = cur_skb = *skbs;
 	prev_skb = NULL;
 #else
@@ -9688,7 +9689,7 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 	//__builtin_prefetch((char*)*buffer + 3 * L1_CACHE_BYTES, 0, 0);
 
 	while (bi != bi_stop && got < max_get) {
-#ifdef PREALLOC_DMA
+#ifdef PREALLOC_DMA_RX
 		if (!cur_skb)
 			break;
 #else
@@ -9733,7 +9734,7 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 		// obtain length
 		len_arr[got] = len = le16_to_cpu(rx_desc->wb.upper.length);
 
-#ifdef PREALLOC_DMA
+#ifdef PREALLOC_DMA_RX
 		// bring the packet data to skb
 		memcpy_aligned(cur_skb->data, *buffer, len);
 		got++;
@@ -9818,7 +9819,7 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 		rx_ring->next_to_clean = i;
 	}
 
-#ifdef PREALLOC_DMA
+#ifdef PREALLOC_DMA_RX
 	if (prev_skb)
 		prev_skb->next = NULL;
 	*skbs = cur_skb;
@@ -9965,7 +9966,7 @@ static int ixgbe_mq_tx_pqueue(struct net_device *netdev, unsigned int queue_num,
 
 	tx_buffer_info->time_stamp = jiffies;
 
-#ifdef PREALLOC_DMA
+#ifdef PREALLOC_DMA_TX
 	memcpy_aligned(tx_ring->buffer[i], skb->data, skb->len);
 	tx_desc->read.buffer_addr = cpu_to_le64(tx_ring->buffer_dma[i]);
 #else
@@ -10061,7 +10062,7 @@ static struct sk_buff * ixgbe_mq_tx_clean(struct net_device *netdev, unsigned in
 				skb->next = NULL;
 				skb_last = skb;
 			}
-#ifndef PREALLOC_DMA
+#ifndef PREALLOC_DMA_TX
 			dma_unmap_single(tx_ring->dev, tx_ring->tx_buffer_info[i].dma, skb->len, DMA_TO_DEVICE);
 			tx_ring->tx_buffer_info[i].dma = 0;
 #endif
