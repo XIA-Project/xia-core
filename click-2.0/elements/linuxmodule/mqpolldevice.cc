@@ -65,6 +65,7 @@ MQPollDevice::static_cleanup()
 
 MQPollDevice::MQPollDevice()
 {
+    _free_skb_list = NULL;
 }
 
 MQPollDevice::~MQPollDevice()
@@ -153,8 +154,6 @@ you include a ToDevice for the same device. Try adding\n\
 #else
     errh->warning("can't get packets: not compiled with polling extensions");
 #endif
-
-    _free_skb_list = NULL;
 
     return 0;
 }
