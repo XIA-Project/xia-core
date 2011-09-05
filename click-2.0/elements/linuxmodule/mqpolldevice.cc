@@ -354,7 +354,7 @@ MQPollDevice::run_task(Task *)
   }
 # endif
 
-  adjust_tickets(want);
+  //adjust_tickets(want);
   _task.fast_reschedule();
   return got > 0;
 #else

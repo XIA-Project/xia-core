@@ -5035,7 +5035,8 @@ static inline bool ixgbe_set_fdir_queues(struct ixgbe_adapter *adapter)
 	if ((adapter->flags & IXGBE_FLAG_RSS_ENABLED) &&
 	    (adapter->flags & IXGBE_FLAG_FDIR_HASH_CAPABLE)) {
 #ifdef HAVE_TX_MQ
-		adapter->num_tx_queues = f_fdir->indices;
+		//adapter->num_tx_queues = f_fdir->indices;
+		adapter->num_tx_queues = (int)num_online_cpus();
 #endif
 		adapter->num_rx_queues = f_fdir->indices;
 		ret = true;
@@ -9561,8 +9562,8 @@ static void ixgbe_mq_atr(struct net_device *dev, struct sk_buff* skb, unsigned i
 	}
 }
 
-#define PREALLOC_DMA_RX
-#define PREALLOC_DMA_TX
+//#define PREALLOC_DMA_RX
+//#define PREALLOC_DMA_TX
 
 static inline void memcpy_aligned(void *to, const void *from, size_t len)
 {

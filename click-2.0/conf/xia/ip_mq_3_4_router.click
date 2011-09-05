@@ -1,4 +1,4 @@
-#!/usr/local/sbin/click-install -uct4
+#!/usr/local/sbin/click-install -uct12
 
 //eth2 10.0.0.1 eth2 
 //eth3 10.0.1.1 eth3 
@@ -6,12 +6,9 @@
 //eth5 10.0.3.1 eth5 
 
 elementclass router {
-    $eth_idx, $from_eth, $from_queue0, $from_queue1, $from_queue2, $from_queue3, $to_queue, $ip, $cpu |
+    $eth_idx, $from_eth, $from_queue, $to_queue, $ip, $cpu |
 
-    pd0 :: MQPollDevice($from_eth, QUEUE $from_queue0, BURST 32, PROMISC true);
-    pd1 :: MQPollDevice($from_eth, QUEUE $from_queue1, BURST 32, PROMISC true);
-    pd2 :: MQPollDevice($from_eth, QUEUE $from_queue2, BURST 32, PROMISC true);
-    pd3 :: MQPollDevice($from_eth, QUEUE $from_queue3, BURST 32, PROMISC true);
+    pd :: MQPollDevice($from_eth, QUEUE $from_queue, BURST 32, PROMISC true);
     td_eth2 :: MQPushToDevice(eth2, QUEUE $to_queue, BURST 32);
     td_eth3 :: MQPushToDevice(eth3, QUEUE $to_queue, BURST 32);
     td_eth4 :: MQPushToDevice(eth4, QUEUE $to_queue, BURST 32);
@@ -41,10 +38,7 @@ elementclass router {
             131.179.80.139/255.255.255.255 131.179.80.139 4);
 
     c :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800, -);
-    pd0 -> c;
-    pd1 -> c;
-    pd2 -> c;
-    pd3 -> c;
+    pd -> c;
     //c[0] -> ar :: ARPResponder($ip $from_eth) -> td;
     c[0] -> Discard;
     c[1] -> Discard; //ARP response
@@ -115,14 +109,22 @@ elementclass router {
     gio3[1] -> ICMPError(10.0.3.1, parameterproblem) -> rt;
     cp3[1] -> ICMPError(10.0.3.1, redirect, host) -> rt;
 
-    StaticThreadSched(pd0 $cpu, pd1 $cpu, pd2 $cpu, pd3 $cpu);
+    StaticThreadSched(pd $cpu);
 }
 
-router(1, eth2, 0, 1, 2, 3, 0, 10.0.0.1, 0);
+router(1, eth2, 0, 0, 10.0.0.1, 0);
+router(1, eth2, 1, 1, 10.0.0.1, 1);
+router(1, eth2, 2, 2, 10.0.0.1, 2);
 
-router(2, eth3, 0, 1, 2, 3, 1, 10.0.1.1, 1);
+router(2, eth3, 0, 3, 10.0.1.1, 3);
+router(2, eth3, 1, 4, 10.0.1.1, 4);
+router(2, eth3, 2, 5, 10.0.1.1, 5);
 
-router(3, eth4, 0, 1, 2, 3, 2, 10.0.2.1, 2);
+router(3, eth4, 0, 6, 10.0.2.1, 6);
+router(3, eth4, 1, 7, 10.0.2.1, 7);
+router(3, eth4, 2, 8, 10.0.2.1, 8);
 
-router(4, eth5, 0, 1, 2, 3, 3, 10.0.3.1, 3);
+router(4, eth5, 0, 9, 10.0.3.1, 9);
+router(4, eth5, 1, 10, 10.0.3.1, 10);
+router(4, eth5, 2, 11, 10.0.3.1, 11);
 
