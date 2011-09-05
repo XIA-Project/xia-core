@@ -9424,7 +9424,6 @@ static int ixgbe_poll_on(struct net_device *dev, unsigned int queue_num)
 		tx_ring->owner_cpu = cpu_id;
 
 		if (!tx_ring->polling) {
-			u16 i;
 			int nid;
 			
 			// assign rings to the current node
@@ -9912,7 +9911,8 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 		}
 
 		// ATR for multiqueue
-		if (test_bit(__IXGBE_TX_FDIR_INIT_DONE, &tx_ring->state) && tx_ring->atr_sample_rate) {
+		if (adapter->num_rx_queues <= adapter->num_tx_queues &&
+			test_bit(__IXGBE_TX_FDIR_INIT_DONE, &tx_ring->state) && tx_ring->atr_sample_rate) {
 			if (unlikely(jiffies % 100 == 0)) {	// slows down ATR sampling for high-speed traffic
 				tx_ring->atr_count++;	
 				if (tx_ring->atr_count >= tx_ring->atr_sample_rate) {
@@ -9936,7 +9936,7 @@ static int ixgbe_mq_tx_eob(struct net_device *dev, unsigned int queue_num)
 	struct ixgbe_adapter *adapter = netdev_priv(dev);
 	struct ixgbe_ring *tx_ring = adapter->tx_ring[queue_num];
 
-	if (queue_num >= adapter->num_rx_queues)
+	if (queue_num >= adapter->num_tx_queues)
 		return -1;
 
 	wmb();
@@ -9952,7 +9952,7 @@ static int ixgbe_mq_tx_start(struct net_device *dev, unsigned int queue_num)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(dev);
 
-	if (queue_num >= adapter->num_rx_queues)
+	if (queue_num >= adapter->num_tx_queues)
 		return -1;
 
 	/*   printk("ixgbe_tx_start called\n"); */
@@ -9972,7 +9972,7 @@ static int ixgbe_mq_tx_pqueue(struct net_device *netdev, unsigned int queue_num,
 	u8 hdr_len;
 	unsigned int i, offset;
 
-	if (queue_num >= adapter->num_rx_queues)
+	if (queue_num >= adapter->num_tx_queues)
 		return -1;
 
 	if (!tx_ring->polling) {
@@ -10064,7 +10064,7 @@ static struct sk_buff * ixgbe_mq_tx_clean(struct net_device *netdev, unsigned in
 	struct ixgbe_ring *tx_ring = adapter->tx_ring[queue_num];
 	u16 count;
 
-	if (queue_num >= adapter->num_rx_queues)
+	if (queue_num >= adapter->num_tx_queues)
 		return NULL;
 
 	if (!tx_ring->polling) {

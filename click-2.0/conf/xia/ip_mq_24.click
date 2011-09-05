@@ -16,8 +16,8 @@ define ($PAYLOAD_SIZE 44);
 elementclass gen_sub {
     $eth_from, $eth_to, $queue, $cpu |
 
-    pd1 :: MQPollDevice($eth_from, QUEUE $queue, PROMISC true) -> Discard;
-    StaticThreadSched(pd1 $cpu);
+    //pd1 :: MQPollDevice($eth_from, QUEUE $queue, PROMISC true) -> Discard;
+    //StaticThreadSched(pd1 $cpu);
 
     gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 240)
     //-> Script(TYPE PACKET, write gen1.active false)       // stop source after exactly 1 packet

@@ -378,7 +378,7 @@ MQPushToDevice::queue_packet(Packet *p)
     
     int ret;
 #if HAVE_LINUX_MQ_POLLING
-    if (_dev->is_polling(_dev, _queue) > 0)
+    if (_dev->is_polling(_dev, _queue + 1024) > 0)
 	ret = _dev->mq_tx_queue(_dev, _queue, skb1);
     else
 #endif
