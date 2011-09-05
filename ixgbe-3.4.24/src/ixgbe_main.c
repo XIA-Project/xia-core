@@ -9298,106 +9298,163 @@ static const int ixgbe_prefetch_ahead = 1;
 static int ixgbe_is_polling(struct net_device *dev, unsigned int queue_num)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(dev);
-	struct ixgbe_ring *rx_ring = adapter->rx_ring[queue_num];
 
-	if (queue_num >= adapter->num_rx_queues)
-		return -1;
+	if (queue_num < 1024) {
+		struct ixgbe_ring *rx_ring = adapter->rx_ring[queue_num];
 
-	return rx_ring->polling;
+		if (queue_num >= adapter->num_rx_queues)
+			return -1;
+
+		return rx_ring->polling;
+	}
+	else {
+		struct ixgbe_ring *tx_ring = adapter->tx_ring[queue_num - 1024];
+
+		if (queue_num - 1024 >= adapter->num_tx_queues)
+			return -1;
+
+		return tx_ring->polling;
+	}
 }
 
 static int ixgbe_poll_on(struct net_device *dev, unsigned int queue_num)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(dev);
 
-	struct ixgbe_ring *rx_ring = adapter->rx_ring[queue_num];
-	struct ixgbe_ring *tx_ring = adapter->tx_ring[queue_num];
+	if (queue_num < 1024) {
+		struct ixgbe_ring *rx_ring = adapter->rx_ring[queue_num];
 
-	int cpu_id;
+		int cpu_id;
 
-	if (queue_num >= adapter->num_rx_queues)
-		return -1;
+		if (queue_num >= adapter->num_rx_queues)
+			return -1;
 
-	if (test_and_set_bit(1, &adapter->reconfigure_lock)) {
-		// poll_on/off is done one-by-one, just for safety (need checking)
-		return -1;
-	}
+		if (test_and_set_bit(1, &adapter->reconfigure_lock)) {
+			// poll_on/off is done one-by-one, just for safety (need checking)
+			return -1;
+		}
 
-	cpu_id = raw_smp_processor_id();
+		cpu_id = raw_smp_processor_id();
 
-	if (rx_ring->owner_cpu != -1 && rx_ring->owner_cpu != cpu_id) {
-		printk(KERN_INFO "ixgbe_poll_on: device %s queue %d is already occupied by CPU %d, not CPU %d!\n",
-				dev->name, queue_num, rx_ring->owner_cpu, cpu_id);
+		if (rx_ring->owner_cpu != -1 && rx_ring->owner_cpu != cpu_id) {
+			printk(KERN_INFO "ixgbe_poll_on: device %s rx queue %d is already occupied by CPU %d, not CPU %d!\n",
+					dev->name, queue_num, rx_ring->owner_cpu, cpu_id);
+			clear_bit(1, &adapter->reconfigure_lock);
+			return -1;
+		}
+
+		// assign rings to the current cpu 
+		rx_ring->owner_cpu = cpu_id;
+
+		if (!rx_ring->polling) {
+			u16 i;
+			int nid;
+			u32 rxctrl;
+			
+			// disable RX; if not, the devive may change RDH while initialization
+			rxctrl = IXGBE_READ_REG(&adapter->hw, IXGBE_RXCTRL);
+			IXGBE_WRITE_REG(&adapter->hw, IXGBE_RXCTRL, rxctrl & ~IXGBE_RXCTRL_RXEN);
+
+			// assign rings to the current node
+			nid = cpu_to_node(cpu_id);
+			rx_ring->numa_node = nid;
+
+			// free and realloc rx resources to bind them to the current node
+			ixgbe_free_rx_resources(rx_ring);
+			if (ixgbe_setup_rx_resources(rx_ring)) {
+				printk(KERN_INFO "ixgbe_poll_on: ixgbe_setup_rx_resources failed\n");
+				clear_bit(1, &adapter->reconfigure_lock);
+				return -1;
+			}
+
+			// inform the device of the new rx/tx ring
+			ixgbe_configure_rx_ring(adapter, rx_ring);
+
+			// update DCA, in case it is used
+			if (adapter->flags & IXGBE_FLAG_DCA_ENABLED)
+				ixgbe_update_dca(rx_ring->q_vector);
+
+			// initialize descs
+			for (i = 0; i < rx_ring->count; i++) {
+				IXGBE_RX_DESC_ADV(rx_ring, i)->read.pkt_addr = cpu_to_le64(rx_ring->buffer_dma[i]);
+				IXGBE_RX_DESC_ADV(rx_ring, i)->read.hdr_addr = 0;
+			}
+			wmb();
+			//rx_ring->next_to_use = rx_ring->count - 1;
+			rx_ring->next_to_use = rx_ring->count - IXGBE_RX_QUEUE_WAKE;
+			writel(rx_ring->next_to_use, rx_ring->tail);
+			IXGBE_WRITE_FLUSH(&adapter->hw);
+
+			// re-enable RX
+			rxctrl |= IXGBE_RXCTRL_RXEN;
+			ixgbe_enable_rx_dma(&adapter->hw, rxctrl);
+
+			// done!
+			rx_ring->polling = 1;
+
+			printk(KERN_INFO "ixgbe_poll_on: device %s, adapter node %d, rx queue %d, cpu %d, node %d\n",
+					dev->name, adapter->node, queue_num, cpu_id, nid);
+		}
+
 		clear_bit(1, &adapter->reconfigure_lock);
-		return -1;
 	}
+	else {
+		struct ixgbe_ring *tx_ring = adapter->tx_ring[queue_num - 1024];
 
-	// assign rings to the current cpu 
-	rx_ring->owner_cpu = tx_ring->owner_cpu = cpu_id;
+		int cpu_id;
 
-	if (!rx_ring->polling) {
-		u16 i;
-		int nid;
-		u32 rxctrl;
-		
-		// disable RX; if not, the devive may change RDH while initialization
-		rxctrl = IXGBE_READ_REG(&adapter->hw, IXGBE_RXCTRL);
-		IXGBE_WRITE_REG(&adapter->hw, IXGBE_RXCTRL, rxctrl & ~IXGBE_RXCTRL_RXEN);
+		if (queue_num - 1024 >= adapter->num_tx_queues)
+			return -1;
 
-		// assign rings to the current node
-		nid = cpu_to_node(cpu_id);
-		rx_ring->numa_node = tx_ring->numa_node = nid;
+		if (test_and_set_bit(1, &adapter->reconfigure_lock)) {
+			// poll_on/off is done one-by-one, just for safety (need checking)
+			return -1;
+		}
 
-		// free and realloc rx resources to bind them to the current node
-		ixgbe_free_rx_resources(rx_ring);
-		if (ixgbe_setup_rx_resources(rx_ring)) {
-			printk(KERN_INFO "ixgbe_poll_on: ixgbe_setup_rx_resources failed\n");
+		cpu_id = raw_smp_processor_id();
+
+		if (tx_ring->owner_cpu != -1 && tx_ring->owner_cpu != cpu_id) {
+			printk(KERN_INFO "ixgbe_poll_on: device %s tx queue %d is already occupied by CPU %d, not CPU %d!\n",
+					dev->name, queue_num - 1024, tx_ring->owner_cpu, cpu_id);
 			clear_bit(1, &adapter->reconfigure_lock);
 			return -1;
 		}
 
-		// free and realloc tx resources to bind them to the current node
-		ixgbe_free_tx_resources(tx_ring);
-		if (ixgbe_setup_tx_resources(tx_ring)) {
-			printk(KERN_INFO "ixgbe_poll_on: ixgbe_setup_tx_resources failed\n");
-			clear_bit(1, &adapter->reconfigure_lock);
-			return -1;
+		// assign rings to the current cpu 
+		tx_ring->owner_cpu = cpu_id;
+
+		if (!tx_ring->polling) {
+			u16 i;
+			int nid;
+			
+			// assign rings to the current node
+			nid = cpu_to_node(cpu_id);
+			tx_ring->numa_node = nid;
+
+			// free and realloc tx resources to bind them to the current node
+			ixgbe_free_tx_resources(tx_ring);
+			if (ixgbe_setup_tx_resources(tx_ring)) {
+				printk(KERN_INFO "ixgbe_poll_on: ixgbe_setup_tx_resources failed\n");
+				clear_bit(1, &adapter->reconfigure_lock);
+				return -1;
+			}
+
+			// inform the device of the new tx ring
+			ixgbe_configure_tx_ring(adapter, tx_ring);
+
+			// update DCA, in case it is used
+			if (adapter->flags & IXGBE_FLAG_DCA_ENABLED)
+				ixgbe_update_dca(tx_ring->q_vector);
+
+			// done!
+			tx_ring->polling = 1;
+
+			printk(KERN_INFO "ixgbe_poll_on: device %s, adapter node %d, tx queue %d, cpu %d, node %d\n",
+					dev->name, adapter->node, queue_num - 1024, cpu_id, nid);
 		}
 
-		// inform the device of the new rx/tx ring
-		ixgbe_configure_rx_ring(adapter, rx_ring);
-		ixgbe_configure_tx_ring(adapter, tx_ring);
-
-		// update DCA, in case it is used
-		if (adapter->flags & IXGBE_FLAG_DCA_ENABLED) {
-			ixgbe_update_dca(rx_ring->q_vector);
-			ixgbe_update_dca(tx_ring->q_vector);
-		}
-
-		// initialize descs
-		for (i = 0; i < rx_ring->count; i++) {
-			IXGBE_RX_DESC_ADV(rx_ring, i)->read.pkt_addr = cpu_to_le64(rx_ring->buffer_dma[i]);
-			IXGBE_RX_DESC_ADV(rx_ring, i)->read.hdr_addr = 0;
-		}
-		wmb();
-		//rx_ring->next_to_use = rx_ring->count - 1;
-		rx_ring->next_to_use = rx_ring->count - IXGBE_RX_QUEUE_WAKE;
-		writel(rx_ring->next_to_use, rx_ring->tail);
-		IXGBE_WRITE_FLUSH(&adapter->hw);
-
-		// re-enable RX
-		rxctrl |= IXGBE_RXCTRL_RXEN;
-		ixgbe_enable_rx_dma(&adapter->hw, rxctrl);
-
-		// done!
-		rx_ring->polling = tx_ring->polling = 1;
-
-		printk(KERN_INFO "ixgbe_poll_on: device %s, adapter node %d, queue %d, cpu %d, node %d\n",
-				dev->name, adapter->node, queue_num, cpu_id, nid);
-
+		clear_bit(1, &adapter->reconfigure_lock);
 	}
-
-	clear_bit(1, &adapter->reconfigure_lock);
 
 	return 0;
 }
@@ -9406,35 +9463,30 @@ static int ixgbe_poll_off(struct net_device *dev, unsigned int queue_num)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(dev);
 
-	struct ixgbe_ring *rx_ring = adapter->rx_ring[queue_num];
-	struct ixgbe_ring *tx_ring = adapter->tx_ring[queue_num];
+	if (queue_num < 1024) {
+		struct ixgbe_ring *rx_ring = adapter->rx_ring[queue_num];
 
-	int cpu_id;
+		if (queue_num >= adapter->num_rx_queues)
+			return -1;
 
-	if (queue_num >= adapter->num_rx_queues)
-		return -1;
-
-	//if (test_and_set_bit(1, &adapter->reconfigure_lock)) {
-	//	// poll_on/off is done one-by-one, just for safety (need checking)
-	//	return -1;
-	//}
-
-	cpu_id = raw_smp_processor_id();
-
-	//if (rx_ring->owner_cpu != cpu_id) {
-	//	printk(KERN_INFO "ixgbe_poll_on: device %s queue %d is not owned by by CPU %d, but by CPU %d!\n",
-	//			dev->name, queue_num, cpu_id, rx_ring->owner_cpu);
-	//	clear_bit(1, &adapter->reconfigure_lock);
-	//	return -1;
-	//}
-
-	if (rx_ring->polling) {
-		// unbind rings from this processor
-		rx_ring->polling = tx_ring->polling = 0;
-		rx_ring->owner_cpu = tx_ring->owner_cpu = -1;
+		if (rx_ring->polling) {
+			// unbind ring from this processor
+			rx_ring->polling = 0;
+			rx_ring->owner_cpu = -1;
+		}
 	}
+	else {
+		struct ixgbe_ring *tx_ring = adapter->tx_ring[queue_num - 1024];
 
-	//clear_bit(1, &adapter->reconfigure_lock);
+		if (queue_num - 1024 >= adapter->num_tx_queues)
+			return -1;
+
+		if (tx_ring->polling) {
+			// unbind ring from this processor
+			tx_ring->polling = 0;
+			tx_ring->owner_cpu = -1;
+		}
+	}
 
 	return 0;
 }

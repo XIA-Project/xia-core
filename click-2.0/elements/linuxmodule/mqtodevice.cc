@@ -207,6 +207,9 @@ MQToDevice::reset_counts()
 void
 MQToDevice::cleanup(CleanupStage stage)
 {
+    if (_dev && _dev->is_polling(_dev, _queue + 1024) > 0)
+        _dev->poll_off(_dev, _queue + 1024);
+
 #if HAVE_CLICK_KERNEL_TX_NOTIFY
     if (stage >= CLEANUP_INITIALIZED) {
 	registered_tx_notifiers--;
@@ -265,12 +268,17 @@ MQToDevice::run_task(Task *)
 #endif
     
 #if HAVE_LINUX_MQ_POLLING
-    bool is_polling = (_dev->is_polling(_dev, _queue) > 0);
+    bool is_polling = (_dev->is_polling(_dev, _queue + 1024) > 0);
     struct sk_buff *clean_skbs;
     if (is_polling)
 	clean_skbs = _dev->mq_tx_clean(_dev, _queue);
-    else
-	clean_skbs = 0;
+    else {
+        if (_dev->poll_on(_dev, _queue + 1024) != 0) {
+            _task.fast_reschedule();
+            return false;
+        }
+	//clean_skbs = 0;
+    }
 #endif
   
     /* try to send from click */
