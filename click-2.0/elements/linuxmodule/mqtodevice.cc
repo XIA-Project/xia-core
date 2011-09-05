@@ -304,8 +304,9 @@ MQToDevice::run_task(Task *)
 	sent++;
 
 #if HAVE_LINUX_MQ_POLLING
-        if (is_polling && _npackets % _burst == 0)
-            _dev->mq_tx_eob(_dev, _queue);
+        // eob is handled by driver automatically
+        //if (is_polling && _npackets % _burst == 0)
+        //    _dev->mq_tx_eob(_dev, _queue);
 #endif
     }
 
