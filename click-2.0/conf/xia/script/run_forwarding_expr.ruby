@@ -48,8 +48,8 @@ end
 
 if __FILE__ ==$0
   #pkt_size = [90, 256, 1024, 1500]
-  pkt_size = [256, 512, 1024, 1500]
-  type = [:XIA]
+  pkt_size = [64]
+  type = [:IP]
 
   pkt_size.each do |size|
     type.each do |t|
