@@ -45,6 +45,7 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
     uint8_t hlim = 250;
     int packet_offset =-1, chunk_offset =-1, content_length =-1, chunk_length =-1;
     bool is_request =false;
+    bool is_dynamic =false;
 
     if (cp_va_kparse(conf, this, errh,
                    "SRC", cpkP+cpkM, cpXIAPath, &src_path,
@@ -52,6 +53,7 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
                    "NXT", 0, cpInteger, &nxt,
                    "LAST", 0, cpInteger, &last,
                    "HLIM", 0, cpByte, &hlim,
+		   "DYNAMIC", 0, cpBool, &is_dynamic,
                    "EXT_C_REQUEST", 0, cpBool, &is_request,
                    "EXT_C_PACKET_OFFSET", 0, cpInteger, &packet_offset,
                    "EXT_C_CHUNK_OFFSET", 0, cpInteger, &chunk_offset,
@@ -88,6 +90,7 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
         _xiah->set_nxt(CLICK_XIA_NXT_CID);
         click_chatter("EXT REQUEST %d %d %d %d\n", packet_offset, chunk_offset, content_length, chunk_length );
     }
+    _is_dynamic = is_dynamic;
 
     return 0;
 }
@@ -112,8 +115,16 @@ XIAEncap::simple_action(Packet *p_in)
             p = _xiah->encap(p, false);
         }
     }
-    else
+    else {
+ 	if (_is_dynamic) {
+	    if (_xiah->dst_path().unparse_node_size()>1)
+	      _xiah->dst_path().incr(2);
+	    else if (_xiah->dst_path().unparse_node_size()==1)
+	      _xiah->src_path().incr(1);
+            _xiah->update();
+	}
         p = _xiah->encap(p_in, true);
+    }
     return p;
 }
 

@@ -19,7 +19,7 @@ class XID { public:
     XID(const String& str);
 
     inline const struct click_xia_xid& xid() const;
-    //inline struct click_xia_xid& xid();
+    inline struct click_xia_xid& xid();
 
     inline operator struct click_xia_xid() const;
 
@@ -49,13 +49,13 @@ XID::xid() const
 
 /** @brief Return a struct click_xia_xid corresponding to the address. */
 // this is disabled to guarantee a correct _hash value
-/*
+
 inline struct click_xia_xid&
 XID::xid() 
 {
     return _xid;
 }
-*/
+
 
 /** @brief Return a struct click_xia_xid corresponding to the address. */
 inline

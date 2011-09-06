@@ -91,6 +91,9 @@ class XIAPath { public:
     // set the destination node
     void set_destination_node(handle_t node);
 
+    // increment the XID whose order is order
+    void incr(size_t order);
+
     // debug
     void dump_state() const;
 

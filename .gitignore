@@ -11,3 +11,7 @@ cscope.out
 *.ko
 perf.data
 perf.data.old
+ethtool-*
+stat-*
+asm
+*.asm

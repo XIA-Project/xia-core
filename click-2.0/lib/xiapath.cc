@@ -673,6 +673,22 @@ XIAPath::remove_edge(size_t from_node, size_t to_node)
 }
 
 void
+XIAPath::incr(size_t order)
+{
+    int i=0; 
+    if (!const_cast<XIAPath*>(this)->topological_ordering())
+	return;
+    for (; i < _nodes.size(); i++)
+    {
+	if (_nodes[i].order ==order)
+	    break;
+    }
+    if (_nodes[i].order!= order)
+        return;
+    _nodes[i].xid.xid().id[0]=1 +_nodes[i].xid.xid().id[0];
+}
+
+void
 XIAPath::set_source_node(handle_t node)
 {
     _src = node;

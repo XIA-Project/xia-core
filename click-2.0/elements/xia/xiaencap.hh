@@ -55,6 +55,7 @@ class XIAEncap : public Element { public:
  private:
   class XIAHeaderEncap* _xiah;
   class ContentHeaderEncap* _contenth;
+  bool _is_dynamic;
 };
 
 CLICK_ENDDECLS
