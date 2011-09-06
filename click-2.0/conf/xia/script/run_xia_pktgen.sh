@@ -8,4 +8,4 @@ then
   exit $E_BADARGS
 fi
 DIR=`dirname \`readlink -m $0\``
-sudo click-install -uct24 PAYLOAD_SIZE=$1 -f ${DIR}/../xia_mq_24.click
+sudo click-install -uct24 PAYLOAD_SIZE=$1 -f ${DIR}/../xia_mq_ipencap_24.click
