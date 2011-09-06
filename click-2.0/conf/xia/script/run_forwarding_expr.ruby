@@ -47,23 +47,24 @@ def collect_stats(machine, size)
 end
 
 if __FILE__ ==$0
-  pkt_size = [90]
-  type = [:XIA, :IP]
+  #pkt_size = [90, 256, 1024, 1500]
+  pkt_size = [256, 512, 1024, 1500]
+  type = [:XIA]
 
   pkt_size.each do |size|
     type.each do |t|
       pktgen_script, router_script, hdr_size = SCRIPT[t]
-      load_click(ROUTER, Flags::BACKGROUND)
+      load_click(ROUTER, 0)
+      sleep(1)
       load_click(PACKETGEN, 0)
-      # cool off for the next 60 sec
-      sleep(60)
+      sleep(3)
 
       # run router
       run_command(ROUTER, router_script)
       # run packet gen
       run_command(PACKETGEN, "#{pktgen_script} #{(size-hdr_size)}")
       
-      sleep(30)
+      sleep(20)
       collect_stats(ROUTER, "#{t.to_s}-#{size}")  
       sleep(3)
 
