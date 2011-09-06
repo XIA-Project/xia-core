@@ -20,6 +20,7 @@ set y2tics
 set ytics nomirror
 set key box
 #set key at graph 0.99,0.65
+set y2range [0:12.8]
 
-plot './relay_result' u 1:2 w lp ls 1 title "pps" axis x1y1, './relay_result' u ($1):($2*64*8/1e9) w lp ls 2 title "Gbps" axis x1y2
+plot  './relay_result' u ($1):($2*64*8/1e9) w lp ls 2 title "Actual performance" axis x1y2, './relay_result' u 1:($1*$3) title "linear scaling" ls 4 w lp
 		
