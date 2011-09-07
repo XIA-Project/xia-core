@@ -1,0 +1,8 @@
+=norotate
+xlabel=port configuration
+ylabel=pps
+1 8813606.70760255
+2-same-slot 9101717.64704387
+2-different-slot 14549054.614246
+3 13172165.3914409
+4 12386996.6972542
