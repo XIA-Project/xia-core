@@ -24,6 +24,7 @@ elementclass gen_sub {
     StaticThreadSched(pd1 $cpu);
 
     input -> XIAPrint($eth_from) ->Print(MAXLENGTH 64)
+    -> DynamicIPEncap(0x99, $eth_from, $eth_to)
     -> EtherEncap($ETH_P_IPV6, $SRC_MAC1 , $DST_MAC1)
     -> clone1 ::Clone($COUNT, SHARED_SKBS true)
     -> td1 :: MQToDevice($eth_from, QUEUE $queue, BURST $BURST);
@@ -35,7 +36,7 @@ elementclass nofb {
     gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 240)
     -> XIAEncap(
            DST RE  $hid_to,
-           SRC RE  $hid_from, DYNAMIC true) -> output
+           SRC RE  $hid_from, DYNAMIC false) -> output
     Script(write gen1.active true);
     StaticThreadSched(gen1 $cpu);
 }
@@ -80,7 +81,7 @@ elementclass fb1 {
     gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 240)
     -> XIAEncap(
            SRC RE  $hid_from,
-           DST RE  ( $fb ) $intent, DYNAMIC true) -> output
+           DST RE  ( $fb ) $intent, DYNAMIC false) -> output
     Script(write gen1.active true);
     StaticThreadSched(gen1 $cpu);
 }
@@ -128,7 +129,7 @@ elementclass fb2 {
 	 		$fb2	  	2 -	// 0
 		 	$fb1		2 -     // 1
 		 	$intent			// 2
-		, DYNAMIC true		)	
+		, DYNAMIC false		)	
      -> output
     Script(write gen1.active true);
     StaticThreadSched(gen1 $cpu);
@@ -178,7 +179,7 @@ elementclass fb3 {
 	 		$fb2	  	3 -	// 1
 		 	$fb1		3 -     // 2
 		 	$intent			// 3
-		, DYNAMIC true		)	
+		, DYNAMIC false		)	
      -> output
     Script(write gen1.active true);
     StaticThreadSched(gen1 $cpu);

@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-#
+require File.dirname(__FILE__) + '/interface_stat_all.rb'
 
 def netstat(device)
   stats = [Time.new]
@@ -32,19 +32,16 @@ def ifconfig(device)
   return stats
 end
 
-def diff(a,b)
-  d = a-b
-  if (a-b <0)
-    d+= 2**32 
-  end
-  return d
-end
 
 report_interval = 1
 
 if __FILE__== $0
-  if ARGV.size != 2
-     puts "Usage: #{$0} <device> <time_interval> "
+  if ARGV.size != 2 
+     time_interval = 10
+     if (ARGV.size==1)
+        time_interval= ARGV[0].to_i
+     end
+     report_all_interface_stats(time_interval, report_interval);
      exit
   end
   device = ARGV[0] 

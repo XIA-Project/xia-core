@@ -28,6 +28,7 @@ class Pathname
 end
 
 $proto = ["IP", "XIA"]
+
 def calc_avg_performance(file)
   tx = []
   file.each_line do |l|
@@ -37,7 +38,7 @@ def calc_avg_performance(file)
     end
   end 
   #tx.sort! { |x,y| y<=>x }
-  return tx[20..[tx.size-1, 50].min].avg
+  return tx[20..[tx.size-5, 110].min].avg
 end
 
 def parse_result(output_to_file)

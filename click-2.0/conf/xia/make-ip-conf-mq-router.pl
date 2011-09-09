@@ -39,9 +39,11 @@ my $ifs = [
             #[ "eth4", 2, "10.0.2.1", "255.255.255.0", "00:1b:21:a3:d6:a8" ],
             #[ "eth5", 2, "10.0.3.1", "255.255.255.0", "00:1b:21:a3:d6:a9" ]
             [ "eth2", 2, "10.0.0.1", "255.255.255.0", "eth2" ],
- 	    [ "eth3", 2, "10.0.1.1", "255.255.255.0", "eth3" ],
+ 	  #  [ "eth3", 2, "10.0.1.1", "255.255.255.0", "eth3" ],
             [ "eth4", 2, "10.0.2.1", "255.255.255.0", "eth4" ],
-            [ "eth5", 2, "10.0.3.1", "255.255.255.0", "eth5" ]
+          #  [ "eth5", 2, "10.0.3.1", "255.255.255.0", "eth5" ],
+            [ "eth6", 2, "10.0.4.1", "255.255.255.0", "eth6" ]
+          #  [ "eth7", 2, "10.0.5.1", "255.255.255.0", "eth7" ]
            ];
 
 my $nq_per_device = 12;
@@ -63,7 +65,8 @@ print "#!/usr/local/sbin/click-install -uct${nq_per_device}\n";
 #   The gateway IP address (next hop);
 #   The output network interface name.
 # A default route (mask 0.0.0.0) can be specified as the last entry.
-my $srts = [ ["131.179.80.139", "255.255.255.255","131.179.80.139", "eth5" ]];
+#my $srts = [ ["131.179.80.139", "255.255.255.255","131.179.80.139", "eth5" ]];
+my $srts = [ ];
 
 # Set to, e.g., "Print(toh) -> Discard" for user-level.
 my $local_host = "ToHost";
@@ -142,7 +145,7 @@ for ($i = 0; $i < $nsrts; $i++) {
 print "\n// Shared IP input path and routing table\n";
 print "ip :: Strip(14)
     -> CheckIPHeader(INTERFACES ", join(' ', @interfaces), ")
-    -> rt :: StaticIPLookup(\n\t", join(",\n\t", @routes), ");\n";
+    -> rt :: RadixIPLookup(\n\t", join(",\n\t", @routes), ");\n";
 
 # Link-level devices, classification, and ARP
 print "\n// ARP responses are copied to each ARPQuerier and the host.\n";

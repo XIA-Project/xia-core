@@ -21,13 +21,25 @@ if __FILE__== $0
   end
 
   if (cnt.to_i()==0)
+    cnt =`cat /click/ge*/gen_sub*/td*/count 2>/dev/null| wc`
     cmd = "cat /click/ge*/gen_sub*/td*/count 2>/dev/null"
     cmd_drops = "cat /click/ge*/gen_sub*/td*/drops 2>/dev/null"
   end
-  
+
+  if (cnt.to_i()==0)
+    cmd = "cat /click/router@*/td*/count  2>/dev/null"
+    cmd_drops = "cat /click/router@*/td*/drops 2>/dev/null"
+  end
+ 
+  rx_q_cnt = 0 
+  rx_q_cnt =`cat /proc/click/pd*/count 2>/dev/null| wc`
   cmd_rx = "cat /proc/click/pd*/count 2>/dev/null"
   cmd_rx_drop = "cat /proc/click/pd*/drop 2>/dev/null"
 
+  if (rx_q_cnt==0) 
+     cmd_rx = "cat /proc/click/router*/pd*/count 2>/dev/null"
+     cmd_rx_drop = "cat /proc/click/router*/pd*/drop 2>/dev/null"
+  end
 
   report_interval = 1
   total_prev = `#{cmd} | awk '{SUM+=$1} END {print SUM}'`
