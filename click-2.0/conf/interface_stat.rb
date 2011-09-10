@@ -66,10 +66,10 @@ if __FILE__== $0
      timediff= last[0][0]-first[0][0] 
 
      rx += diff(last[0][1], prev[0][1])
-     puts  "#{device} RX " + diff(last[0][1], prev[0][1]).to_s() +" TX "  + diff(last[0][2], prev[0][2]).to_s()
      tx += diff(last[0][2], prev[0][2])
      rxp+= diff(last[0][3], prev[0][3])
      txp+= diff(last[0][4], prev[0][4])
+     puts  "#{device} RX " + diff(last[0][3], prev[0][3]).to_s() +" TX "  + diff(last[0][4], prev[0][4]).to_s()
 
      rxp_netstat+= diff(last[1][3], prev[1][3])
      txp_netstat+= diff(last[1][4], prev[1][4])

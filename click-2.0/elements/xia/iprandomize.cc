@@ -70,7 +70,12 @@ IPRandomize::simple_action(Packet *p_in)
 #if CLICK_USERLEVEL
         hdr->ip_dst.s_addr = static_cast<uint32_t>(nrand48(_xsubi));
 #elif CLICK_LINUXMODULE
-        hdr->ip_dst.s_addr = static_cast<uint32_t>(random32());
+        uint32_t rand = static_cast<uint32_t>(random32());
+        if (rand>>24 >=224) {
+	   char* msb =(char*)(&rand); 
+	   *msb= (char)(rand % 223+1);
+        }
+        hdr->ip_dst.s_addr = rand;
 #else
 	XXX
 #endif

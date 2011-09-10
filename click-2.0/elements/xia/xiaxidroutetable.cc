@@ -256,7 +256,15 @@ XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *
             xid += sizeof(uint32_t);
         }
 
-        table->_rt[XID(xid_d)] = port;
+	/* random generation from 0 to |port|-1 */
+#if CLICK_LINUXMODULE
+	if (port<0) {
+	    u32 rand = random32();	
+	    rand = rand % (-port);
+            table->_rt[XID(xid_d)] = rand;
+	} else
+#endif
+            table->_rt[XID(xid_d)] = port;
     }
 
     click_chatter("generated %d entries", count);

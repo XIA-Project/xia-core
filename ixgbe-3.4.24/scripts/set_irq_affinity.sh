@@ -1,3 +1,4 @@
+#!/bin/bash
 # setting up irq affinity according to /proc/interrupts
 # 2008-11-25 Robert Olsson
 # 2009-02-19 updated by Jesse Brandeburg
