@@ -53,6 +53,8 @@
 
 #include "kcompat.h"
 
+#define CLICK_NAPI
+
 #ifdef HAVE_SCTP
 #include <linux/sctp.h>
 #endif
@@ -438,6 +440,9 @@ struct ixgbe_q_vector {
 	u32 eitr;
 
 	char name[IFNAMSIZ + 9];
+#ifdef CLICK_NAPI 
+	int need_poll; 
+#endif
 #ifdef CONFIG_IXGBE_NAPI
 	struct napi_struct napi;
 #endif

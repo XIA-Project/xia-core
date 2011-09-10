@@ -294,7 +294,7 @@ static inline void ixgbe_irq_rearm_queues(struct ixgbe_adapter *adapter,
 {
 	u32 mask;
 
-#ifdef CLICKMQ
+#if defined(CLICKMQ) && !defined(CLICK_NAPI)   
 	return;
 #endif
 
@@ -2180,7 +2180,7 @@ void ixgbe_irq_enable_queues(struct ixgbe_adapter *adapter, u64 qmask)
 	u32 mask;
 	struct ixgbe_hw *hw = &adapter->hw;
 
-#ifdef CLICKMQ
+#if defined(CLICKMQ) && !defined(CLICK_NAPI)
 	return;
 #endif
 
@@ -2272,12 +2272,16 @@ static irqreturn_t ixgbe_msix_clean_rings(int irq, void *data)
 {
 	struct ixgbe_q_vector *q_vector = data;
 
-#ifdef CLICKMQ
-	return IRQ_HANDLED;
-#endif
-
 	if (!q_vector->tx.ring && !q_vector->rx.ring)
 		return IRQ_HANDLED;
+
+#ifdef CLICKMQ
+#ifdef CLICK_NAPI
+	/* EIAM disabled interrupts (on this vector) for us ??? Is this true? */
+        q_vector->need_poll = 1;
+#endif
+	return IRQ_HANDLED;
+#endif
 
 	/* EIAM disabled interrupts (on this vector) for us */
 	napi_schedule(&q_vector->napi);
@@ -2446,6 +2450,9 @@ static int ixgbe_request_msix_irqs(struct ixgbe_adapter *adapter)
 			/* skip this unused q_vector */
 			continue;
 		}
+#ifdef CLICK_NAPI
+		q_vector->need_poll = 0;
+#endif
 		err = request_irq(adapter->msix_entries[vector].vector,
 				  &ixgbe_msix_clean_rings, 0, q_vector->name,
 				  q_vector);
@@ -2460,6 +2467,8 @@ static int ixgbe_request_msix_irqs(struct ixgbe_adapter *adapter)
 			/* assign the mask for this irq */
 			irq_set_affinity_hint(adapter->msix_entries[vector].vector,
 			                      q_vector->affinity_mask);
+			//irq_set_affinity(adapter->msix_entries[vector].vector,
+			 //                     q_vector->affinity_mask);  // irq_set_affinity is not exported from kernel
 		}
 #endif /* HAVE_IRQ_AFFINITY_HINT */
 	}
@@ -2500,7 +2509,7 @@ static inline void ixgbe_irq_enable(struct ixgbe_adapter *adapter, bool queues, 
 	u64 qmask = ~0;
 	u32 mask = (IXGBE_EIMS_ENABLE_MASK & ~IXGBE_EIMS_RTX_QUEUE);
 
-#ifdef CLICKMQ
+#if  defined(CLICKMQ)  && !defined(CLICK_NAPI)
 	//queues = false;
 #endif
 
@@ -5758,6 +5767,12 @@ static int ixgbe_alloc_q_vectors(struct ixgbe_adapter *adapter)
 		if (!alloc_cpumask_var(&q_vector->affinity_mask, GFP_KERNEL))
 			goto err_out;
 		cpumask_set_cpu(v_idx, q_vector->affinity_mask);
+		{
+		/* */
+		char buf[256];
+		cpumask_scnprintf(buf, 256, q_vector->affinity_mask);
+	        printk("Q_vector %d CPU mask %s\n", v_idx, buf);
+		}
 #endif
 #ifndef IXGBE_NO_LRO
 		if (v_idx < rx_vectors) {
@@ -6152,8 +6167,10 @@ int ixgbe_setup_tx_resources(struct ixgbe_ring *tx_ring)
 
 	tx_ring->next_to_use = 0;
 	tx_ring->next_to_clean = 0;
+#ifndef CLICK_NAPI
 	tx_ring->last_poll = ktime_get();
 	tx_ring->no_poll_until = ktime_get();
+#endif
 	tx_ring->last_report = jiffies;
 	return 0;
 
@@ -6260,8 +6277,10 @@ int ixgbe_setup_rx_resources(struct ixgbe_ring *rx_ring)
 
 	rx_ring->next_to_clean = 0;
 	rx_ring->next_to_use = 0;
+#ifndef CLICK_NAPI
 	rx_ring->last_poll = ktime_get();
 	rx_ring->no_poll_until = ktime_get();
+#endif
 	rx_ring->last_report = jiffies;
 	return 0;
 err:
@@ -9396,7 +9415,17 @@ static int ixgbe_poll_on(struct net_device *dev, unsigned int queue_num)
 			printk(KERN_INFO "ixgbe_poll_on: device %s, adapter node %d, rx queue %d, cpu %d, node %d\n",
 					dev->name, adapter->node, queue_num, cpu_id, nid);
 		}
-
+#ifdef CLICK_NAPI
+		{
+			int polling_rings= 0;
+			int i;
+			for (i=0;i<adapter->num_rx_queues;i++) {
+				if (adapter->rx_ring[i]->polling==1)	polling_rings++;
+			}
+			if (polling_rings == adapter->num_rx_queues)	
+				ixgbe_up_complete(adapter);
+		}
+#endif
 		clear_bit(1, &adapter->reconfigure_lock);
 	}
 	else {
@@ -9621,7 +9650,9 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 	struct sk_buff **pcur_skb;
 #endif
 
+#ifndef CLICK_NAPI
 	ktime_t curr;
+#endif
 
 	//static int debug_cnt = 100;
 
@@ -9665,13 +9696,19 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 		return NULL;
 	}
 
+#ifdef CLICK_NAPI
+	if (rx_ring->q_vector->need_poll!=1) {
+		return NULL;
+	}
+#else
 	curr = ktime_get();
 	if (ktime_to_ns(ktime_sub(rx_ring-> no_poll_until, curr)) > 0) {
 		*want = 0;
 		return NULL;
 	}
+#endif
 
-	// cannot spare too many packets at once (cache issue)
+	// cannot spare too many packets at once (cache issue) 
 	if (*want >= sizeof(len_arr) / sizeof(len_arr[0]))
 		max_get = sizeof(len_arr) / sizeof(len_arr[0]);
 	else
@@ -9681,10 +9718,12 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 	//	*want = 0;
 	//	return NULL;
 	//}
+#if 0
 	if (!(IXGBE_RX_DESC_ADV(rx_ring, (rx_ring->next_to_clean + max_get - 1) % rx_ring->count)->wb.upper.status_error & le32_to_cpu(IXGBE_RXD_STAT_DD))) {
 		*want = 0;
 		return NULL;
 	}
+#endif 
 
 	// bring some frequently used variables
 	dma_dev = rx_ring->dev;
@@ -9713,6 +9752,7 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 	pcur_skb = &skb_head;
 #endif
 
+#ifdef DEBUG
 	// regular status report
 	if (jiffies - rx_ring->last_report >= 2 * HZ) {
 		u16 rdh;
@@ -9734,6 +9774,7 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 			);
 	}
 
+#endif
 	//__builtin_prefetch(rx_desc, 1, 0);
 	//__builtin_prefetch((char*)*buffer + 0 * L1_CACHE_BYTES, 0, 0);
 	//__builtin_prefetch((char*)*buffer + 1 * L1_CACHE_BYTES, 0, 0);
@@ -9882,15 +9923,18 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 	*want = got;
 	//*want = (rdh - i + count) % count;
 
+#ifndef CLICK_NAPI
 	//if (got) 
 	{
 		const u64 delay = adapter->poll_delay; 
 		rx_ring->last_poll = ktime_get();
 		rx_ring->no_poll_until =  ktime_add_ns(rx_ring->last_poll, delay);
 	}
+#endif
 
 	// prepare sk_buffs for click uses
 	cur_skb = skb_head;
+
 	for (i = 0; i < got; i++) {
 		//__builtin_prefetch(cur_skb->data, 1, 0);					// for click
 		//__builtin_prefetch(cur_skb->data + L1_CACHE_BYTES, 1, 0);	// for click
@@ -9911,6 +9955,7 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 			}
 		}
 
+#ifdef USE_FDIR_QUEUE
 		// ATR for multiqueue
 		if (adapter->num_rx_queues <= adapter->num_tx_queues &&
 			test_bit(__IXGBE_TX_FDIR_INIT_DONE, &tx_ring->state) && tx_ring->atr_sample_rate) {
@@ -9922,12 +9967,23 @@ static struct sk_buff *ixgbe_mq_rx_poll_and_refill(struct net_device *dev, unsig
 				}
 			}
 		}
+#endif
 
 		cur_skb = cur_skb->next;
 	}
 
-	if (!got)
+	if (!got) {
+#ifdef CLICK_NAPI
+		rx_ring->q_vector->need_poll=0;
+		/* If all work done, exit the polling mode */
+		if (adapter->rx_itr_setting & 1)
+			ixgbe_set_itr(rx_ring->q_vector);
+		if (!test_bit(__IXGBE_DOWN, &adapter->state))
+			ixgbe_irq_enable_queues(adapter,
+					((u64)1 << rx_ring->q_vector->v_idx));
+#endif
 		return NULL;
+	}
 	else
 		return skb_head;
 }
@@ -10078,6 +10134,7 @@ static struct sk_buff * ixgbe_mq_tx_clean(struct net_device *netdev, unsigned in
 
 	count = tx_ring->count;
 
+#ifdef DEBUG
 	if (jiffies - tx_ring->last_report >= 2 * HZ) {
 		u16 tdh;
 		u16 tdt;
@@ -10098,6 +10155,7 @@ static struct sk_buff * ixgbe_mq_tx_clean(struct net_device *netdev, unsigned in
 				(tx_ring->next_to_use - tdt + count) % count
 			);
 	}
+#endif
 
 	skb_head = skb_last = 0;
 
