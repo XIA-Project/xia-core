@@ -13,7 +13,7 @@ c1[1]   -> ARPResponder(eth4 eth4) -> Q_eth4;
   	 c1[2]	-> host1 :: ToHost(eth4);
   	 ip1[1]	-> host1;
 
-ICMPPingSource(eth2, eth4) // send ICMP Request
+ICMPPingSource(eth2, eth4, INTERVAL 0.1) // send ICMP Request
   -> IPPrint("OUT eth2")
   -> EtherEncap(0x0800, 00:1:1:1:1:1, 0:2:2:2:2:2)
   -> Q_eth2

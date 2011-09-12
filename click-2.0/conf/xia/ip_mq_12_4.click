@@ -1,4 +1,4 @@
-#!/usr/local/sbin/click-install -uct24
+#!/usr/local/sbin/click-install -uct12
 define ($DST_MAC 00:15:17:51:d3:d4);
 define ($DST_MAC1 00:25:17:51:d3:d4);
 define ($HEADROOM_SIZE 256);
@@ -9,7 +9,7 @@ define ($PKT_COUNT 5000000000);
 define ($SRC_MAC 00:1a:92:9b:4a:77);
 define ($SRC_MAC1 00:1a:92:9b:4a:71);
 define ($COUNT 1000000000);
-define ($PAYLOAD_SIZE 44);
+define ($PAYLOAD_SIZE 30);
 //define ($PAYLOAD_SIZE 228);
 //define ($PAYLOAD_SIZE 484);
 
@@ -24,6 +24,7 @@ elementclass gen_sub {
     //-> unq :: Unqueue()
     //-> DynamicUDPIPEncap($eth_from, $SRC_PORT, $eth_to, $DST_PORT, INTERVAL 1, CHANGE_IP 1)
     -> DynamicIPEncap(4, $eth_from, $eth_to)
+    //-> DynamicIPEncap(4, $eth_from, 224.10.0.1)
     -> EtherEncap(0x0800, $SRC_MAC1 , $DST_MAC1)
     -> CheckIPHeader(14)
     -> IPPrint($eth_from)
@@ -105,9 +106,9 @@ elementclass gen_b {
 //gen_b(eth5, eth3);
 
 gen0(eth2, eth4);
-gen1(eth3, eth5);
+gen0(eth3, eth5);
 gen0(eth4, eth2);
-gen1(eth5, eth3);
+gen0(eth5, eth3);
 
 //gen_sub(eth2, eth4, 0, 0);
 //gen_sub(eth4, eth2, 0, 1);
