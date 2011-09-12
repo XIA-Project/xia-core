@@ -43,12 +43,20 @@ if len(sys.argv) < 3:
 
 num_rx_queues = int(sys.argv[1])
 num_tx_queues = int(sys.argv[2])
-postfix = '1'
+
 
 assert 0 <= num_rx_queues <= 16
 
 num_ifs = get_num_interfaces()
 num_cpus = get_num_cpus()
+
+interfaces = sys.argv[3:len(sys.argv)]
+if (len(interfaces)>0):
+	print 'using interfaces %s' % interfaces
+else :
+	interfaces = map(lambda (i):'xge%d' % i,  range(num_ifs))
+
+postfix = '1'
 
 execute('lsmod | grep ps_ixgbe > /dev/null && sudo rmmod ps_ixgbe')
 execute('insmod ./ps_ixgbe.ko RXQ=%s TXQ=%s InterruptThrottleRate=%s' % 
@@ -59,13 +67,13 @@ execute('insmod ./ps_ixgbe.ko RXQ=%s TXQ=%s InterruptThrottleRate=%s' %
 
 time.sleep(3)
 
-for i in range(num_ifs):
-	ifname = 'xge%d' % i
+i= 0
+for ifname in interfaces:
 	print 'setting %s...' % ifname,
 	
 	execute('ethtool -A %s autoneg off rx off tx off' % ifname)
 	execute('ifconfig %s 10.0.%d.%s mtu 1500 netmask 255.255.255.0' % (ifname, i, postfix))
-
+	i+=1
 	print 'OK'
 	print execute('./affinity.py %s' % ifname).strip()
 

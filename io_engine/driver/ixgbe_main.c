@@ -6762,7 +6762,7 @@ static int __devinit ixgbe_probe(struct pci_dev *pdev,
 		hw->mac.ops.get_bus_info(hw);
 
 
-	strcpy(netdev->name, "xge%d");
+	strcpy(netdev->name, "eth%d");
 	err = register_netdev(netdev);
 	if (err)
 		goto err_register;
