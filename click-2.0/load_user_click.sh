@@ -29,6 +29,6 @@ sudo ./install.py $QCOUNT $QCOUNT
 popd
 
 
-echo use: userlevel/click click-install -j NUM-THREADS CONF-FILE
+echo use: userlevel/click -j NUM-THREADS CONF-FILE
 echo
 
