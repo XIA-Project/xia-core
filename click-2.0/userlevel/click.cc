@@ -657,7 +657,7 @@ particular purpose.\n");
     }
 #if HAVE_MULTITHREAD
     // affinity begin
-    int num_cpus = sysconf(_SC_NPROCESSORS_ONLN);
+    unsigned int num_cpus = sysconf(_SC_NPROCESSORS_ONLN);
     cpu_set_t *cmask;
     cmask = CPU_ALLOC(num_cpus);
     if (cmask) {
