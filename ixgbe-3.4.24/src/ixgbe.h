@@ -53,7 +53,7 @@
 
 #include "kcompat.h"
 
-#define CLICK_NAPI
+#undef CLICK_NAPI
 
 #ifdef HAVE_SCTP
 #include <linux/sctp.h>
