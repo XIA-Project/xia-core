@@ -656,9 +656,30 @@ particular purpose.\n");
       hotswap_thunk_router->activate(false, errh);
     }
 #if HAVE_MULTITHREAD
+    // affinity begin
+    int num_cpus = sysconf(_SC_NPROCESSORS_ONLN);
+    cpu_set_t *cmask;
+    cmask = CPU_ALLOC(num_cpus);
+    if (cmask) {
+        CPU_ZERO_S(num_cpus, cmask);
+        CPU_SET_S(0, num_cpus, cmask);
+        // click thread 0 uses per-process affinity because it is not a pthread but just a main process
+        sched_setaffinity(0, num_cpus, cmask);
+        CPU_FREE(cmask);
+    }
+    // affinity end
     for (int t = 1; t < nthreads; ++t) {
 	pthread_t p;
 	pthread_create(&p, 0, thread_driver, router->master()->thread(t));
+        // affinity begin
+        cmask = CPU_ALLOC(num_cpus);
+        if (cmask) {
+            CPU_ZERO_S(num_cpus, cmask);
+            CPU_SET_S(t % num_cpus, num_cpus, cmask);
+            pthread_setaffinity_np(p, num_cpus, cmask);
+            CPU_FREE(cmask);
+        }
+        // affinity end
 	other_threads.push_back(p);
     }
 #endif

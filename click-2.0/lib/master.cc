@@ -293,7 +293,7 @@ Master::kill_router(Router *router)
 void
 Master::unregister_router(Router *router)
 {
-    bool del;
+    bool del = false;
     assert(router);
     lock_master();
 
