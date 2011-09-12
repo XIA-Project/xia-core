@@ -19,6 +19,8 @@ class DynamicIPEncap : public IPEncap { public:
   bool can_live_reconfigure() const		{ return true; }
 
   Packet *simple_action(Packet *);
+  uint32_t _max_count;
+  uint32_t _count;
 };
 
 CLICK_ENDDECLS

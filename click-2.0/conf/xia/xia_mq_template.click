@@ -23,7 +23,8 @@ elementclass gen_sub {
     //pd1 :: MQPollDevice($eth_from, QUEUE $queue, PROMISC true) -> Discard;
     //StaticThreadSched(pd1 $cpu);
 
-    input -> XIAPrint($eth_from) ->Print(MAXLENGTH 64)
+    input 
+    //-> XIAPrint($eth_from) 
     -> DynamicIPEncap(0x99, $eth_from, $eth_to)
     -> EtherEncap($ETH_P_IP, $SRC_MAC1 , $DST_MAC1)
     -> clone1 ::Clone($COUNT, SHARED_SKBS true)
@@ -49,8 +50,9 @@ elementclass rgen_sub {
 
     input ->
     -> MarkXIAHeader()
+    -> Clone($COUNT)
     -> XIARandomize(XID_TYPE AD, MAX_CYCLE $AD_RANDOMIZE_MAX_CYCLE)
-    -> DynamicIPEncap(0x99, $eth_from, $eth_to)
+    -> DynamicIPEncap(0x99, $eth_from, $eth_to, COUNT 120)
     -> EtherEncap($ETH_P_IP, $SRC_MAC1 , $DST_MAC1)
     -> td1 :: MQToDevice($eth_from, QUEUE $queue, BURST $BURST);
     StaticThreadSched(td1 $cpu);
@@ -59,9 +61,11 @@ elementclass rgen_sub {
 elementclass rnofb {
     $hid_from, $hid_to, $cpu |
     gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE)
+    -> Script(TYPE PACKET, write gen1.active false)
     -> XIAEncap(
            DST RE  $hid_to,
-           SRC RE  $hid_from, DYNAMIC false) -> output
+           SRC RE  $hid_from, DYNAMIC false) 
+    -> output
     Script(write gen1.active true);
     StaticThreadSched(gen1 $cpu);
 }
@@ -120,7 +124,7 @@ elementclass gen_nofb_0 {
 }
 
 elementclass gen_nofb_1 {
-    $hid_from, $hid_to, $eth_from |
+    $hid_from, $hid_to, $eth_from, $eth_to |
 
     nofb($hid_from, $hid_to, 12) -> gen_sub($eth_from, $eth_to, 0, 12) 
     nofb($hid_from, $hid_to, 13) -> gen_sub($eth_from, $eth_to, 1, 13) 
@@ -132,8 +136,8 @@ elementclass gen_nofb_1 {
     nofb($hid_from, $hid_to, 19) -> gen_sub($eth_from, $eth_to, 7, 19) 
     nofb($hid_from, $hid_to, 20) -> gen_sub($eth_from, $eth_to, 8, 20) 
     nofb($hid_from, $hid_to, 21) -> gen_sub($eth_from, $eth_to, 9, 21) 
-    nofb($hid_from, $hid_to,  22) -> gen_sub($eth_from,$eth_to, 10, 22)
-    nofb($hid_from, $hid_to,  23) -> gen_sub($eth_from,$eth_to, 11, 23)
+    nofb($hid_from, $hid_to, 22) -> gen_sub($eth_from,$eth_to, 10, 22)
+    nofb($hid_from, $hid_to, 23) -> gen_sub($eth_from,$eth_to, 11, 23)
 }
 
 elementclass rfb1 {
@@ -308,7 +312,7 @@ elementclass rgen_fb2_1 {
                                         
 
 elementclass gen_fb2_0 {
-    $hid_from, $intent, $fb1, $fb2, $eth_from |
+    $hid_from, $intent, $fb1, $fb2, $eth_from, $eth_to |
 
     fb2($hid_from, $intent, $fb1, $fb2 , 0) -> gen_sub($eth_from,$eth_to,  0, 0 )
     fb2($hid_from, $intent, $fb1, $fb2 , 1) -> gen_sub($eth_from,$eth_to,  1, 1 )

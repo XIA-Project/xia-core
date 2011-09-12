@@ -16,7 +16,28 @@ DynamicIPEncap::~DynamicIPEncap()
 int
 DynamicIPEncap::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-  return IPEncap::configure(conf, errh);
+  int count;
+  Vector<String> ipencap;
+  Vector<String> mine;
+  
+  for (Vector<String>::iterator it = conf.begin(); it< conf.end() ; it ++) {
+    if ((*it).starts_with(String("COUNT"))) {
+	click_chatter((*it).c_str());
+	mine.push_back(*it);
+	continue;
+    }
+    ipencap.push_back(*it);
+  }
+  int ret =  IPEncap::configure(ipencap, errh);
+  if (ret<0) return ret;
+
+  if (cp_va_kparse(mine, this, errh,
+                 "COUNT", 0, cpUnsigned, &count,
+                 cpEnd) < 0)
+      return -1;
+  _max_count = count;
+  _count = 0;
+  return 0;
 }
 
 Packet *
@@ -30,7 +51,10 @@ DynamicIPEncap::simple_action(Packet *p_in)
 #else
   ip->ip_sum = click_in_cksum((unsigned char *) ip, sizeof(click_ip));
 #endif
-  _iph.ip_dst.s_addr = htonl(ntohl(_iph.ip_dst.s_addr)+1);
+  if (_count == _max_count )
+     _count = 0;
+  _iph.ip_dst.s_addr = htonl(ntohl(_iph.ip_dst.s_addr)+_count);
+  _count++;
   // if both are modified, it will confuse fdir atr's hashing
   //_iph.ip_src.s_addr = htonl(ntohl(_iph.ip_src.s_addr)+1);
   return p_out;
