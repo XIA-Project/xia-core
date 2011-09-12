@@ -4,15 +4,15 @@ elementclass GenericRouting4Port {
     // output[1]: need to update "last" pointer
     // output[2]: no match
 
-    input -> rt :: XIAXIDRouteTable;
-    rt[0] -> Paint(0) -> [0]output;
-    rt[1] -> Paint(1) -> [0]output;
-    rt[2] -> Paint(2) -> [0]output;
-    rt[3] -> Paint(3) -> [0]output;
-    rt[4] -> [1]output;
-    rt[5] -> [2]output;
-};
-
+    input ->  rt :: XIAXIDRouteTable;
+    rt[0] ->  Paint(0) -> [0]output;
+    rt[1] ->  Paint(1) -> [0]output;
+    rt[2] ->  Paint(2) -> [0]output;
+    rt[3] ->  Paint(3) -> [0]output;
+    rt[4] ->  [1]output;
+    rt[5] ->  [2]output;
+};            
+              
 elementclass GenericPostRouteProc {
     input -> XIADecHLIM -> output;
 };
@@ -33,7 +33,9 @@ elementclass XIAPacketRoute {
     c :: XIAXIDTypeClassifier(next AD, next HID, next SID, next CID, -);
 
     //input -> Print("packet received by $local_addr") -> consider_first_path;
-    input -> consider_first_path;
+    input 
+//	-> XIAPrint("consider first_path")
+	-> consider_first_path;
 
     check_dest[0] -> [1]output;             // arrived at the final destination
     check_dest[1] -> consider_first_path;   // reiterate paths with new last pointer
@@ -66,10 +68,18 @@ elementclass XIAPacketRoute {
     CIDPostRouteProc :: Null;
 
     //  Next destination is CID
-    c[3] -> rt_CID :: GenericRouting4Port;
-    rt_CID[0] -> GenericPostRouteProc -> CIDPostRouteProc -> [0]output;
-    rt_CID[1] -> XIANextHop -> check_dest;
-    rt_CID[2] -> consider_next_path;
+    c[3] 
+//	-> XIAPrint("CID")
+	-> rt_CID :: GenericRouting4Port;
+    rt_CID[0] 
+//	-> XIAPrint("CID success")
+	-> GenericPostRouteProc -> CIDPostRouteProc -> [0]output;
+    rt_CID[1] 
+//	-> XIAPrint("CID thisnode")
+	-> XIANextHop -> check_dest;
+    rt_CID[2] 
+//	-> XIAPrint("CID failed")
+	-> consider_next_path;
 
     c[4] -> [2]output;
 };
@@ -92,7 +102,10 @@ elementclass RouteEngine {
     input[0] -> srcTypeClassifier;
     input[1] -> proc;
 
-    srcTypeClassifier[0] -> cidFork :: Tee(2) -> [2]output;  // To cache (for content caching)
+    srcTypeClassifier[0] 
+//	-> XIAPrint(Content) 
+	-> cidFork :: Tee(2) -> [2]output;  // To cache (for content caching)
+
     cidFork[1] -> proc;                 // Main routing process
 
     srcTypeClassifier[1] -> proc;       // Main routing process
@@ -104,7 +117,7 @@ elementclass RouteEngine {
 
     dstTypeClassifier[0] -> [2]output;  // To cache (for serving content request)
 
-    proc[2] -> XIAPrint() -> Discard;  // No route drop (future TODO: return an error packet)
+    proc[2] -> XIAPrint(NoRoute) -> Discard;  // No route drop (future TODO: return an error packet)
 };
 
 // 2-port dummy router node
@@ -244,6 +257,44 @@ elementclass Router4PortFastPath {
     sw[1] -> [2]fp[2] -> [1]output;
     sw[2] -> [3]fp[3] -> [2]output;
     sw[3] -> [4]fp[4] -> [3]output;
+};
+
+// 4-port router node with "dummy cache" (for microbench)
+elementclass Router4PortDummyCacheNoQueue {
+    $local_addr |
+
+    // $local_addr: the full address of the node
+
+    // input[0], input[1], input[2], input[3]: a packet arrived at the node
+    // output[0]: forward to interface 0
+    // output[1]: forward to interface 1
+    // output[2]: forward to interface 2
+    // output[3]: forward to interface 3
+
+    n :: RouteEngine($local_addr);
+    //cache :: XIATransport($local_addr, n/proc/rt_CID/rt);
+    //cache :: Queue(200);
+
+    Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
+    Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
+
+    input[0] -> [0]n;
+    input[1] -> [0]n;
+    input[2] -> [0]n;
+    input[3] -> [0]n;
+
+    n[0] -> sw :: PaintSwitch
+    n[1] -> Discard;
+    //n[2] -> [0]cache[0] -> [1]n;
+    //Idle -> [1]cache[1] -> Discard;
+    Idle -> [1]n;
+    //n[2] -> cache -> Unqueue -> Discard;
+    n[2]-> Discard;
+
+    sw[0] -> [0]output;
+    sw[1] -> [1]output;
+    sw[2] -> [2]output;
+    sw[3] -> [3]output;
 };
 
 // 4-port router node with "dummy cache" (for microbench)
