@@ -21,16 +21,16 @@ echo compiling and installing
 echo loading nic module
 wait
 QCOUNT=12
-DELAY=500
+DELAY=0
 INT=956
 #sudo insmod $IXGBE/src/ixgbe.ko RSS=$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT FdirMode=0,0,0,0,0,0 DCA=0,0,0,0,0,0 InterruptThrottleRate=$INT,$INT,$INT,$INT,$INT,$INT
-sudo insmod $IXGBE/src/ixgbe.ko RSS=$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT FdirMode=0,0,0,0,0,0 DCA=0,0,0,0,0,0 #InterruptThrottleRate=$INT,$INT,$INT,$INT,$INT,$INT
+sudo insmod $IXGBE/src/ixgbe.ko RSS=$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT FdirMode=0,0,0,0,0,0 DCA=0,0,0,0,0,0 PollDelay=$DELAY,$DELAY,$DELAY,$DELAY,$DELAY,$DELAY #InterruptThrottleRate=$INT,$INT,$INT,$INT,$INT,$INT
 #sudo insmod $IXGBE/src/ixgbe.ko RSS=$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT FdirMode=1,1,1,1,1,1 FdirQueues=$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT,$QCOUNT DCA=0,0,0,0,0,0 PollDelay=$DELAY,$DELAY,$DELAY,$DELAY,$DELAY,$DELAY
 
 
 wait
-RXQSIZE=4096
-TXQSIZE=4096
+RXQSIZE=4048
+TXQSIZE=4048
 sudo ethtool -G eth2 rx $RXQSIZE tx $TXQSIZE &
 sudo ethtool -G eth3 rx $RXQSIZE tx $TXQSIZE &
 sudo ethtool -G eth4 rx $RXQSIZE tx $TXQSIZE &

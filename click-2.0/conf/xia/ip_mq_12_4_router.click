@@ -8,14 +8,14 @@
 elementclass router {
     $eth_idx, $from_eth, $from_queue0, $from_queue1, $from_queue2, $from_queue3, $to_queue, $ip, $cpu |
 
-    pd0 :: MQPollDevice($from_eth, QUEUE $from_queue0, BURST 32, PROMISC true);
-    pd1 :: MQPollDevice($from_eth, QUEUE $from_queue1, BURST 32, PROMISC true);
-    pd2 :: MQPollDevice($from_eth, QUEUE $from_queue2, BURST 32, PROMISC true);
-    pd3 :: MQPollDevice($from_eth, QUEUE $from_queue3, BURST 32, PROMISC true);
-    td_eth2 :: MQPushToDevice(eth2, QUEUE $to_queue, BURST 32);
-    td_eth3 :: MQPushToDevice(eth3, QUEUE $to_queue, BURST 32);
-    td_eth4 :: MQPushToDevice(eth4, QUEUE $to_queue, BURST 32);
-    td_eth5 :: MQPushToDevice(eth5, QUEUE $to_queue, BURST 32);
+    pd0 :: MQPollDevice($from_eth, QUEUE $from_queue0, BURST 64, PROMISC true);
+    pd1 :: MQPollDevice($from_eth, QUEUE $from_queue1, BURST 64, PROMISC true);
+    pd2 :: MQPollDevice($from_eth, QUEUE $from_queue2, BURST 64, PROMISC true);
+    pd3 :: MQPollDevice($from_eth, QUEUE $from_queue3, BURST 64, PROMISC true);
+    td_eth2 :: MQPushToDevice(eth2, QUEUE $to_queue, BURST 64);
+    td_eth3 :: MQPushToDevice(eth3, QUEUE $to_queue, BURST 64);
+    td_eth4 :: MQPushToDevice(eth4, QUEUE $to_queue, BURST 64);
+    td_eth5 :: MQPushToDevice(eth5, QUEUE $to_queue, BURST 64);
 
     ip :: Strip(14)
         -> CheckIPHeader(INTERFACES 10.0.0.1/255.255.255.0 10.0.1.1/255.255.255.0 10.0.2.1/255.255.255.0 10.0.3.1/255.255.255.0)
@@ -52,8 +52,8 @@ elementclass router {
     c[3] -> Discard;
 
     // Local delivery
-    toh :: ToHost;
-    rt[0] -> EtherEncap(0x0800, 1:1:1:1:1:1, 2:2:2:2:2:2) -> toh;
+    toh :: Discard;
+    rt[0] ->  toh;
 
     // Forwarding path for eth2
     rt[1] -> DropBroadcasts

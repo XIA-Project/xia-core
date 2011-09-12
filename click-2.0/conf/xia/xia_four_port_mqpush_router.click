@@ -3,8 +3,8 @@
 require(library xia_router_template.click); 
 require(library xia_address.click); 
 
-router0 :: Router4PortFastPath(RE AD0 RHID0);
-toh :: Counter -> Discard; 
+router0 :: Router4PortDummyCacheNoQueue(RE AD0 RHID0);
+toh ::Discard; 
 c_eth2 :: Classifier(23/99, -);
 c_eth3 :: Classifier(23/99, -);
 c_eth4 :: Classifier(23/99, -);
@@ -18,8 +18,8 @@ pd_eth2_4:: MQPollDevice(eth2, QUEUE 4, BURST 32, PROMISC true) -> Paint(1, 17 )
 pd_eth2_5:: MQPollDevice(eth2, QUEUE 5, BURST 32, PROMISC true) -> Paint(1, 17 ) -> c_eth2; 
 pd_eth2_6:: MQPollDevice(eth2, QUEUE 6, BURST 32, PROMISC true) -> Paint(1, 17 ) -> c_eth2; 
 pd_eth2_7:: MQPollDevice(eth2, QUEUE 7, BURST 32, PROMISC true) -> Paint(1, 17 ) -> c_eth2; 
-pd_eth2_8:: MQPollDevice(eth2, QUEUE 8, BURST 32, PROMISC true) -> Paint( 2, 17) -> c_eth2; 
-pd_eth2_9:: MQPollDevice(eth2, QUEUE 9, BURST 32, PROMISC true) -> Paint( 2, 17) -> c_eth2; 
+pd_eth2_8:: MQPollDevice(eth2, QUEUE 8, BURST 32, PROMISC true) -> Paint(2, 17) -> c_eth2; 
+pd_eth2_9:: MQPollDevice(eth2, QUEUE 9, BURST 32, PROMISC true) -> Paint(2, 17) -> c_eth2; 
 pd_eth2_10:: MQPollDevice(eth2, QUEUE 10, BURST 32, PROMISC true)-> Paint(2, 17 )  -> c_eth2; 
 pd_eth2_11:: MQPollDevice(eth2, QUEUE 11, BURST 32, PROMISC true)-> Paint(2, 17 )  -> c_eth2; 
 
@@ -65,7 +65,7 @@ pd_eth5_9:: MQPollDevice(eth5, QUEUE 9, BURST 32, PROMISC true)  -> Paint(11, 17
 pd_eth5_10:: MQPollDevice(eth5, QUEUE 10, BURST 32, PROMISC true)-> Paint(11, 17 ) -> c_eth5; 
 pd_eth5_11:: MQPollDevice(eth5, QUEUE 11, BURST 32, PROMISC true)-> Paint(11, 17 ) -> c_eth5; 
 
-c_eth2[0] -> Strip(34) -> MarkXIAHeader() -> [0]router0; // XIA packet  
+c_eth2[0] -> Strip(34) -> MarkXIAHeader() ->[0]router0; // XIA packet  
 c_eth3[0] -> Strip(34) -> MarkXIAHeader() -> [1]router0; // XIA packet  
 c_eth4[0] -> Strip(34) -> MarkXIAHeader() -> [2]router0; // XIA packet  
 c_eth5[0] -> Strip(34) -> MarkXIAHeader() -> [3]router0; // XIA packet  

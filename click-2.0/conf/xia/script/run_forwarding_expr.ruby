@@ -8,7 +8,7 @@ XIA_ROUTER_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_xia_ro
 XIA_PKT_GEN_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_xia_pktgen.sh"
 RECORD_STAT_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/record_stat.sh"
 
-SCRIPT = {:XIA => [ XIA_PKT_GEN_SCRIPT, XIA_ROUTER_SCRIPT, 20+64], :IP=>[IP_PKT_GEN_SCRIPT, IP_ROUTER_SCRIPT, 20]}
+SCRIPT = {:XIA => [ XIA_PKT_GEN_SCRIPT, XIA_ROUTER_SCRIPT, 20+64+14], :IP=>[IP_PKT_GEN_SCRIPT, IP_ROUTER_SCRIPT, 20+14]}
 
 class Flags
   @flag_bit = 0
@@ -47,8 +47,10 @@ def collect_stats(machine, size)
 end
 
 if __FILE__ ==$0
-  #pkt_size = [90, 256, 1024, 1500]
-  pkt_size = [64]
+  exp_name = "routingtable"
+  pkt_size = [128, 256, 512, 1024, 1500]
+  #pkt_size = [64]
+  #type = [:IP, :XIA]
   type = [:IP]
 
   pkt_size.each do |size|
@@ -60,12 +62,13 @@ if __FILE__ ==$0
       sleep(3)
 
       # run router
-      run_command(ROUTER, router_script)
+      run_command(ROUTER, router_script, 0)
+      sleep(3)
       # run packet gen
       run_command(PACKETGEN, "#{pktgen_script} #{(size-hdr_size)}")
       
-      sleep(20)
-      collect_stats(ROUTER, "#{t.to_s}-#{size}")  
+      sleep(10)
+      collect_stats(ROUTER, "#{t.to_s}-#{size}-#{exp_name}")  
       sleep(3)
 
     end
