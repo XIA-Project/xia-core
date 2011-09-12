@@ -25,15 +25,15 @@ XIAFastPath::initialize(ErrorHandler *)
     return 0;
 }
 
-const char * XIAFastPath::getkey(Packet *p)
+const uint8_t* XIAFastPath::getkey(Packet *p)
 {
     return XIAHeader(p).payload()+ _offset;
 }
 
-void XIAFastPath::update_cacheline(struct bucket *buck,  const char * key, int port)
+void XIAFastPath::update_cacheline(struct bucket *buck,  const uint8_t *key, int port)
 {
     int empty = 0;
-    u8 max_counter = -1;
+    uint8_t max_counter = -1;
     for (int i=0;i<KEYSIZE;i++) {
 	if (max_counter< buck->counter[i]) {
 	    max_counter = buck->counter[i];
@@ -46,7 +46,7 @@ void XIAFastPath::update_cacheline(struct bucket *buck,  const char * key, int p
     buck->item[empty].port = port;
 }
 
-int XIAFastPath::lookup(struct bucket *buck,  const char * key)
+int XIAFastPath::lookup(struct bucket *buck,  const uint8_t *key)
 {
     int port = 0;
     for (int i=0;i<KEYSIZE;i++) {
@@ -71,11 +71,12 @@ int XIAFastPath::configure(Vector<String> &conf, ErrorHandler *errh)
  
    _bucket_size = bucket_size;  
    _offset = offset;
+   return 0;
 }
 
 void XIAFastPath::push(int port, Packet * p)
 {
-    const char * key = getkey(p);
+    const uint8_t *key = getkey(p);
     uint32_t index = *(uint32_t*)key % _bucket_size;
 
     if (port==0) {

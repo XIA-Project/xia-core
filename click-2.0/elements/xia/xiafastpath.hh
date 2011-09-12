@@ -8,13 +8,13 @@ CLICK_DECLS
 #define ASSOCIATIVITY 8
 
 struct item {
-    char key[KEYSIZE];
-    u8 port;
+    uint8_t key[KEYSIZE];
+    uint8_t port;
 };
 
 struct bucket {
     struct item item[ASSOCIATIVITY];
-    u8 counter[ASSOCIATIVITY];
+    uint8_t counter[ASSOCIATIVITY];
 };
 
 class XIAFastPath : public Element { public:
@@ -33,9 +33,9 @@ class XIAFastPath : public Element { public:
     uint32_t _bucket_size;
     uint32_t _offset;
     
-    void update_cacheline(struct bucket *buck,  const char * key, int port);
-    const char * getkey(Packet *p);
-    int lookup(struct bucket *buck,  const char * key);
+    void update_cacheline(struct bucket *buck,  const uint8_t *key, int port);
+    const uint8_t *getkey(Packet *p);
+    int lookup(struct bucket *buck,  const uint8_t *key);
 };
 CLICK_ENDDECLS
 #endif

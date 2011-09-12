@@ -62,7 +62,11 @@ class Master { public:
 
     // ROUTERS
     Router *_routers;
+#if CLICK_LINUXMODULE
     atomic_t _refcount;
+#else
+    atomic_uint32_t _refcount;
+#endif
     void register_router(Router*);
     void prepare_router(Router*);
     void run_router(Router*, bool foreground);
