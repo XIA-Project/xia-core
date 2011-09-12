@@ -13,7 +13,7 @@ Clone::Clone() : _count(0), _next(0)
 
 Clone::~Clone()
 {
-    for (size_t i = 0; i < _packets.size(); i++)
+    for (int i = 0; i < _packets.size(); i++)
         _packets[i]->kill();
     _packets.clear();
 }

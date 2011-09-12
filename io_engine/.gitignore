@@ -1,0 +1,5 @@
+/driver/.tmp_versions
+/driver/Module.symvers
+/driver/modules.order
+/driver/ps_ixgbe.mod.c
+/lib/libps.a
