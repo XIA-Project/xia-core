@@ -51,6 +51,7 @@ protected:
 private:
     HashTable<XID, int> _rt;
     int _rem;
+    uint32_t _drops;
 };
 
 CLICK_ENDDECLS

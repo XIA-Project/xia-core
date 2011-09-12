@@ -14,7 +14,7 @@
 #endif
 CLICK_DECLS
 
-XIAXIDRouteTable::XIAXIDRouteTable()
+XIAXIDRouteTable::XIAXIDRouteTable(): _drops(0)
 {
 }
 
@@ -47,6 +47,8 @@ XIAXIDRouteTable::add_handlers()
     add_write_handler("remove", remove_handler, 0);
     add_write_handler("load", load_routes_handler, 0);
     add_write_handler("generate", generate_routes_handler, 0);
+    add_data_handlers("drops", Handler::OP_READ, &_drops);
+
 }
 
 int
@@ -233,13 +235,13 @@ XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *
     xsubi[2] = 3;
 #else
     struct rnd_state state;
-    state.s1= 1;
-    state.s2= 2;
-    state.s3= 3;
+    prandom32_seed(&state, 1239);
 #endif
 
     struct click_xia_xid xid_d;
     xid_d.type = xid_type;
+
+   if (port<0) click_chatter("Random %d ports", -port);
 
     for (int i = 0; i < count; i++)
     {
@@ -252,6 +254,8 @@ XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *
             *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(xsubi));
 #else
             *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(prandom32(&state));
+            if (i%5000==0)
+                    click_chatter("random value %x", *reinterpret_cast<uint32_t*>(xid));
 #endif
             xid += sizeof(uint32_t);
         }
@@ -262,6 +266,8 @@ XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *
 	    u32 rand = random32();	
 	    rand = rand % (-port);
             table->_rt[XID(xid_d)] = rand;
+	    if (i%5000 == 0) 
+    		click_chatter("Random port for XID %s #%d: %d ",XID(xid_d).unparse_pretty(e).c_str(), i, rand);
 	} else
 #endif
             table->_rt[XID(xid_d)] = port;
@@ -280,6 +286,7 @@ XIAXIDRouteTable::push(int, Packet *p)
     else
     {
         // no match -- discard packet
+	_drops++;
         p->kill();
     }
 }

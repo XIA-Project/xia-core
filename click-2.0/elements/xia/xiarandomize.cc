@@ -22,9 +22,7 @@ XIARandomize::XIARandomize()
     _xsubi_det[1] = 2;
     _xsubi_det[2] = 3;
 #elif CLICK_LINUXMODULE
-    _deterministic.s1 = 1;
-    _deterministic.s2 = 2;
-    _deterministic.s3=  3;
+    prandom32_seed(&_deterministic, 1239);
 #endif
 
     _current_cycle = 0;
@@ -35,9 +33,7 @@ XIARandomize::XIARandomize()
     _xsubi_arb[1] = 5;
     _xsubi_arb[2] = 6;
 #elif CLICK_LINUXMODULE
-    _arbitrary.s1 = 4;
-    _arbitrary.s2 = 5;
-    _arbitrary.s3 = 6;
+    prandom32_seed(&_arbitrary, 123999);
 #endif
 }
 
@@ -89,9 +85,7 @@ XIARandomize::simple_action(Packet *p_in)
 		    _xsubi_det[1] = 2;
 		    _xsubi_det[2] = 3;
 #elif CLICK_LINUXMODULE
-		    _deterministic.s1 = 1;
-		    _deterministic.s2 = 2;
-		    _deterministic.s3 = 3;
+		    prandom32_seed(&_deterministic, 0);
 #endif
 		    _current_cycle = 0;
 	    }
