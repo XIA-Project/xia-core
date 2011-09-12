@@ -19,7 +19,7 @@ elementclass router {
 
     ip :: Strip(14)
         -> CheckIPHeader(INTERFACES 10.0.0.1/255.255.255.0 10.0.1.1/255.255.255.0 10.0.2.1/255.255.255.0 10.0.3.1/255.255.255.0)
-        -> rt :: SortedIPLookup(
+        -> rt :: RadixIPLookup(
             10.0.0.1/32 0,
             10.0.0.255/32 0,
             10.0.0.0/32 0,

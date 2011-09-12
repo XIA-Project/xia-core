@@ -37,7 +37,7 @@ class PSToDevice : public Element { public:
     PSToDevice();
     ~PSToDevice();
 
-    const char *class_name() const		{ return "PSToDevice"; }
+    const char *class_name() const		{ return "MQToDevice"; }
     const char *port_count() const		{ return "1/0"; }
     const char *processing() const		{ return "l/h"; }
     const char *flags() const			{ return "S2"; }

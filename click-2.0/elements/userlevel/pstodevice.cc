@@ -187,6 +187,6 @@ PSToDevice::add_handlers()
 }
 
 CLICK_ENDDECLS
-EXPORT_ELEMENT(PSToDevice)
+EXPORT_ELEMENT(PSToDevice PSToDevice-PSToDevice)
 ELEMENT_LIBS(-lps)
 

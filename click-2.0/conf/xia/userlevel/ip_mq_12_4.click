@@ -27,7 +27,7 @@ elementclass gen_sub {
     -> CheckIPHeader(14)
     -> IPPrint($eth_from)
     -> clone1 ::Clone($COUNT, SHARED_SKBS true)
-    -> td1 :: PSToDevice($eth_from, QUEUE $queue, BURST $BURST);
+    -> td1 :: MQToDevice($eth_from, QUEUE $queue, BURST $BURST);
     //StaticThreadSched(gen1 $cpu, unq $cpu, td1 $cpu);
     StaticThreadSched(gen1 $cpu,  td1 $cpu);
 
