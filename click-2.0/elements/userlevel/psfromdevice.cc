@@ -29,6 +29,7 @@ PSFromDevice::~PSFromDevice()
 int
 PSFromDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    bool promisc= false;
     _burst = 64;
     _headroom = Packet::default_headroom;
     _headroom += (4 - (_headroom + 2) % 4) % 4; // default 4/2 alignment
@@ -36,6 +37,7 @@ PSFromDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read_mp("DEVNAME", _ifname)
 	.read_mp("QUEUE", _queue_num)
 	.read("BURST", _burst)
+	.read("PROMISC", promisc)
 	.read("HEADROOM", _headroom)
 	.complete() < 0)
 	return -1;
@@ -198,6 +200,6 @@ PSFromDevice::add_handlers()
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel)
-EXPORT_ELEMENT(PSFromDevice)
+EXPORT_ELEMENT(PSFromDevice PSFromDevice-PSFromDevice)
 ELEMENT_LIBS(-lps)
 

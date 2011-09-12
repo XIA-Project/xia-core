@@ -1,4 +1,5 @@
 #include <click/config.h>
+#include <click/glue.hh>
 #include "isolatedcpuqueue.hh"
 #include <click/error.hh>
 #include <click/confparse.hh>
@@ -64,7 +65,11 @@ IsoCPUQueue::deq(int n)
 void
 IsoCPUQueue::push(int, Packet *p)
 {
+#if CLICK_USERLEVEL
+    int n = click_current_thread_id;
+#else
     int n = click_current_processor();
+#endif
     int next = next_i(_q[n]._tail);
     if (next != _q[n]._head) {
 	_q[n]._q[_q[n]._tail] = p;
@@ -79,7 +84,11 @@ Packet *
 IsoCPUQueue::pull(int /*port*/)
 {
     Packet *p = NULL;
+#if CLICK_USERLEVEL
+    int n = click_current_thread_id;
+#else
     int n = click_current_processor();
+#endif
     p = deq(n);
     return p;
 }

@@ -47,7 +47,7 @@ class PSFromDevice : public Element { public:
     PSFromDevice();
     ~PSFromDevice();
 
-    const char *class_name() const	{ return "PSFromDevice"; }
+    const char *class_name() const	{ return "MQPollDevice"; }
     const char *port_count() const	{ return "0/1"; }
     const char *processing() const	{ return PUSH; }
 
