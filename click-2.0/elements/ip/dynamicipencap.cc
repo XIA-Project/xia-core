@@ -16,7 +16,7 @@ DynamicIPEncap::~DynamicIPEncap()
 int
 DynamicIPEncap::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-  IPEncap::configure(conf, errh);
+  return IPEncap::configure(conf, errh);
 }
 
 Packet *
