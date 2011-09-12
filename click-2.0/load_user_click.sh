@@ -13,8 +13,8 @@ echo stopping interfaces and unloading driver
 
 
 echo compiling driver and io_engine lib
-(sudo make -j24 -C $IO_ENGINE/driver all install || exit 1)
-(make -C $IO_ENGINE/lib || exit 1)
+(make -j24 -s -C $IO_ENGINE/driver || exit 1)
+(make -j24 -s -C $IO_ENGINE/lib || exit 1)
 
 
 echo compiling click
