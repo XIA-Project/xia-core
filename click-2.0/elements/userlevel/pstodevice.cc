@@ -1,14 +1,9 @@
 #include <click/config.h>
 #include "pstodevice.hh"
 #include <click/error.hh>
-#include <click/etheraddress.hh>
 #include <click/args.hh>
 #include <click/router.hh>
 #include <click/standard/scheduleinfo.hh>
-#include <click/packet_anno.hh>
-#include <click/straccum.hh>
-#include <stdio.h>
-#include <unistd.h>
 extern "C" {
 #include <ps.h>
 }
@@ -21,6 +16,9 @@ PSToDevice::PSToDevice()
     _handle = NULL;
     _chunk = NULL;
     _pulls = 0;
+    _chunks = 0;
+    _packets = 0;
+    _bytes = 0;
 }
 
 PSToDevice::~PSToDevice()
@@ -99,6 +97,7 @@ PSToDevice::initialize(ErrorHandler *errh)
 void
 PSToDevice::cleanup(CleanupStage)
 {
+    click_chatter("PSToDevice: %s-%u: pulls %Lu chunks %Lu packets %Lu bytes %Lu\n", _ifname.c_str(), _queue_num, _pulls, _chunks, _packets, _bytes);
     if (_chunk) {
         ps_free_chunk(_chunk);
         delete _chunk;
@@ -119,6 +118,7 @@ PSToDevice::run_task(Task *)
     int count = 0;
 
     while (count < _burst) {
+        _pulls++;
         Packet *p = input(0).pull();
         if (!p)
             break;
@@ -130,6 +130,8 @@ PSToDevice::run_task(Task *)
 
         _in_chunk_next_idx++;
         _in_chunk_next_off += ALIGN(p->length(), 64);
+        _packets++;
+        _bytes += p->length();
 
         if (_in_chunk_next_idx == _burst) {
             _chunk->cnt = _burst;
@@ -138,6 +140,7 @@ PSToDevice::run_task(Task *)
 
             _in_chunk_next_idx = 0;
             _in_chunk_next_off = 0;
+            _chunks++;
         }
 
         p->kill();
@@ -156,12 +159,18 @@ PSToDevice::selected(int, int)
 }
 
 String
-PSToDevice::read_param(Element *e, void *thunk)
+PSToDevice::read_handler(Element *e, void *thunk)
 {
     PSToDevice *td = (PSToDevice *)e;
     switch((uintptr_t) thunk) {
     case 0:
 	return String(td->_pulls);
+    case 1:
+	return String(td->_chunks);
+    case 2:
+	return String(td->_packets);
+    case 3:
+	return String(td->_bytes);
     default:
 	return String();
     }
@@ -171,9 +180,13 @@ void
 PSToDevice::add_handlers()
 {
     add_task_handlers(&_task);
-    add_read_handler("pulls", read_param, 0);
+    add_read_handler("pulls", read_handler, (void *)0);
+    add_read_handler("chunks", read_handler, (void *)1);
+    add_read_handler("packets", read_handler, (void *)2);
+    add_read_handler("bytes", read_handler, (void *)3);
 }
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(PSToDevice)
 ELEMENT_LIBS(-lps)
+

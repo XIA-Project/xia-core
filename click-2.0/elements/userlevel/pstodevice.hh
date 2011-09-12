@@ -3,7 +3,6 @@
 #include <click/element.hh>
 #include <click/string.hh>
 #include <click/task.hh>
-#include <click/timer.hh>
 #include <click/notifier.hh>
 CLICK_DECLS
 
@@ -48,12 +47,8 @@ class PSToDevice : public Element { public:
     void cleanup(CleanupStage);
     void add_handlers();
 
-    String ifname() const			{ return _ifname; }
-
     bool run_task(Task *);
     void selected(int, int);
-
-    static String read_param(Element *e, void *thunk);
 
   private:
     Task _task;
@@ -68,7 +63,12 @@ class PSToDevice : public Element { public:
     int _in_chunk_next_idx;
     int _in_chunk_next_off;
 
-    int _pulls;
+    uint64_t _pulls;
+    uint64_t _chunks;
+    uint64_t _packets;
+    uint64_t _bytes;
+
+    static String read_handler(Element *e, void *thunk);
 };
 
 CLICK_ENDDECLS
