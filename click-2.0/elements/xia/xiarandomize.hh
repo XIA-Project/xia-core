@@ -44,6 +44,7 @@ private:
 #endif
 
     int _xid_type;
+    int _offset;
 };
 
 CLICK_ENDDECLS

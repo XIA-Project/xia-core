@@ -52,17 +52,17 @@ elementclass gen_sub {
 elementclass gen {
     $dev|
     gen_sub($dev, 0, 0, 0);
-    //gen_sub($dev, 1, 1, 1000);
-    //gen_sub($dev, 2, 2, 2000);
-    //gen_sub($dev, 3, 3, 3000);
-    //gen_sub($dev, 4, 4, 4000);
-    //gen_sub($dev, 5, 5, 5000);
-    //gen_sub($dev, 6, 6, 6000);
-    //gen_sub($dev, 7, 7, 7000);
-    //gen_sub($dev, 8, 8, 8000);
-    //gen_sub($dev, 9, 9, 9000);
-    //gen_sub($dev, 10, 10, 10000);
-    //gen_sub($dev, 11, 11, 11000);
+    gen_sub($dev, 1, 1, 1000);
+    gen_sub($dev, 2, 2, 2000);
+    gen_sub($dev, 3, 3, 3000);
+    gen_sub($dev, 4, 4, 4000);
+    gen_sub($dev, 5, 5, 5000);
+    gen_sub($dev, 6, 6, 6000);
+    gen_sub($dev, 7, 7, 7000);
+    gen_sub($dev, 8, 8, 8000);
+    gen_sub($dev, 9, 9, 9000);
+    gen_sub($dev, 10, 10, 10000);
+    gen_sub($dev, 11, 11, 11000);
 }
 
 //gen(eth2)
@@ -70,7 +70,7 @@ elementclass gen {
 //gen(eth4)
 //gen(eth5)
 gen(xge0)
-//gen(xge1)
-//gen(xge2)
-//gen(xge3)
+gen(xge1)
+gen(xge2)
+gen(xge3)
 

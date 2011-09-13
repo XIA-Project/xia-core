@@ -44,10 +44,24 @@ XIARandomize::~XIARandomize()
 int
 XIARandomize::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    return cp_va_kparse(conf, this, errh,
+    int offset=0;
+    int multiplier =0; 
+
+    if (cp_va_kparse(conf, this, errh,
                         "XID_TYPE", cpkP+cpkM, cpXIDType, &_xid_type,
 			"MAX_CYCLE", 0, cpInteger, &_max_cycle,
-			cpEnd);
+			"OFFSET", 0, cpInteger, &offset,
+			"MULTIPLIER", 0, cpInteger, &multiplier,
+			cpEnd)<0) 
+	return -1;
+    _offset = offset *multiplier;
+
+    for (int i=0;i<_offset;i++) {
+        nrand48(_xsubi_det);
+        nrand48(_xsubi_arb);
+    }
+    _current_cycle = _offset;
+    return 0;
 }
 
 Packet *
@@ -80,14 +94,18 @@ XIARandomize::simple_action(Packet *p_in)
 
             if (++_current_cycle == _max_cycle)
 	    {
+		    _current_cycle = 0;
 #if CLICK_USERLEVEL
 		    _xsubi_det[0] = 1;
 		    _xsubi_det[1] = 2;
 		    _xsubi_det[2] = 3;
+		    for (int i=0;i<_offset;i++) {
+	 		nrand48(_xsubi_det);
+		    }
+		    _current_cycle = _offset;
 #elif CLICK_LINUXMODULE
 		    prandom32_seed(&_deterministic, 0);
 #endif
-		    _current_cycle = 0;
 	    }
         }
         else if (node.xid.type == 2)

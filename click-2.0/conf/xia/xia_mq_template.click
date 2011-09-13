@@ -10,9 +10,6 @@ define ($PKT_COUNT 5000000000);
 define ($SRC_MAC 00:1a:92:9b:4a:77);
 define ($SRC_MAC1 00:1a:92:9b:4a:71);
 define ($COUNT 1000000000);
-define ($PAYLOAD_SIZE 36);
-//define ($PAYLOAD_SIZE 228);
-//define ($PAYLOAD_SIZE 484);
 
 define ($ETH_P_IPV6 0x86DD)
 define ($ETH_P_IP 0x0800)
@@ -50,18 +47,17 @@ elementclass rgen_sub {
 
     input ->
     -> MarkXIAHeader()
-    -> Clone($COUNT)
-    -> XIARandomize(XID_TYPE AD, MAX_CYCLE $AD_RANDOMIZE_MAX_CYCLE)
+    -> XIARandomize(XID_TYPE AD, MAX_CYCLE $AD_RANDOMIZE_MAX_CYCLE, OFFSET 1000, MULTIPLIER $queue)
     -> DynamicIPEncap(0x99, $eth_from, $eth_to, COUNT 120)
     -> EtherEncap($ETH_P_IP, $SRC_MAC1 , $DST_MAC1)
+    -> clone::Clone($COUNT)
     -> td1 :: MQToDevice($eth_from, QUEUE $queue, BURST $BURST);
-    StaticThreadSched(td1 $cpu);
+    StaticThreadSched(td1 $cpu, clone $cpu);
 }
 
 elementclass rnofb {
     $hid_from, $hid_to, $cpu |
-    gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE)
-    -> Script(TYPE PACKET, write gen1.active false)
+    gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 1000)
     -> XIAEncap(
            DST RE  $hid_to,
            SRC RE  $hid_from, DYNAMIC false) 
