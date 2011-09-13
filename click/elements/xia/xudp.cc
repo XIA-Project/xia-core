@@ -81,10 +81,13 @@ void XUDP::push(int port, Packet *p_in)
 							XID xid(xid_string);
 
 							XIDtoPort.set(xid,_sport);//TODO: Maybe change the mapping to XID->DAGinfo?
-
+							
+							//Set source DAG info
 							DAGinfo daginfo;
 							daginfo.port=_sport;
-							daginfo.src_path=_local_addr;//TODO: Create the source DAG as _local_address:xid
+							String str_local_addr=_local_addr.unparse_re();
+							str_local_addr=str_local_addr+" "+xid_string;//Make source DAG _local_addr:SID
+							daginfo.src_path.parse_re(str_local_addr);//TODO: Check
 							daginfo.nxt=-1;
 							daginfo.last=-1;
 							daginfo.hlim=250;
@@ -108,13 +111,14 @@ void XUDP::push(int port, Packet *p_in)
 
 					case CLICKCONNECTPORT://Connect
 						{
-							String xiapath_string((const char*)p->data(),(int)p->length());
+							String dest((const char*)p->data(),(int)p->length());
 							
-							XIAPath dest_path();//TODO: What does the DAG look like?Need a way to put the DAG here!
+							XIAPath dst_path;
+							dst_path.parse(dest); //TODO: Check 
 
                             DAGinfo daginfo=portToDAGinfo.get(_sport);
 
-							daginfo.dst_path=_local_addr;//TODO: This is wrong! Need a way to put the DAG here!
+							daginfo.dst_path=dst_path;
 
 							portToDAGinfo.set(_sport,daginfo);
     						portRxSeqNo.set(_sport,portRxSeqNo.get(_sport)+1);//Increment counter
@@ -132,20 +136,23 @@ void XUDP::push(int port, Packet *p_in)
 				const click_udp * udp_header=p->udp_header();
 
 				unsigned short _sport=udp_header->uh_sport;
-
-				//TODO:Strip all headers and push XIA ones
 				
                 //Find DAG info for that stream
-				DAGinfo di=portToDAGinfo.get(_sport);
+				DAGinfo daginfo=portToDAGinfo.get(_sport);
 				
 				//Add XIA headers
 				class XIAHeaderEncap* _xiah=new XIAHeaderEncap();
-				if (di.nxt >= 0)
+				if (daginfo.nxt >= 0)
 					_xiah->set_nxt(-1);
 				_xiah->set_last(-1);
 				_xiah->set_hlim(250);
-				_xiah->set_dst_path(di.dst_path);
-				_xiah->set_src_path(di.src_path);
+				_xiah->set_dst_path(daginfo.dst_path);
+				_xiah->set_src_path(daginfo.src_path);
+				
+				p->pull(p->transport_header_offset());//Remove IP header
+				p_in->pull(8); //Remove UDP header
+				
+				//Might need to remove more if another header is required (eg some control/DAG info)
 				
 				WritablePacket *p = NULL;
                 p = _xiah->encap(p_in, true);

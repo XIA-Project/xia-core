@@ -14,7 +14,7 @@
 
 //Socket library side: Control address/info
 #define MYADDRESS "127.0.0.1"
-#define MYPORT "25555"
+#define MYPORT "0"//Chooses random port
 
 //Click side: Control/data address/info
 //The actual IPs don't matter, it just has to be in the correct subnet
@@ -23,12 +23,12 @@
 #define CLICKBINDPORT "2"
 #define CLICKCLOSEPORT "3"
 #define CLICKCONNECTPORT "4"
-
-
 #define CLICKCONTROLPORT "5"
 
+
+#define CLICKGETCIDPORT "100"
 #define CLICKDATAADDRESS "127.0.0.1" 
-#define CLICKDATAPORT "10"
+#define CLICKDATAPORT "1000"
 
 //TODO: set xia.click sorter to sort based on these ports. Use all higher destination ports for data and set destination port=source port
 
