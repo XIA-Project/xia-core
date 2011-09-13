@@ -1,6 +1,7 @@
 #ifndef CLICK_IPRANDOMIZE_HH
 #define CLICK_IPRANDOMIZE_HH
 #include <click/element.hh>
+#include "../ip/iproutetable.hh"
 CLICK_DECLS
 
 /*
@@ -32,6 +33,7 @@ private:
     unsigned short _xsubi[3];
     int _max_cycle;
     int _current_cycle;
+    IPRouteTable *_routeTable;
 };
 
 CLICK_ENDDECLS

@@ -77,6 +77,7 @@ PSToDevice::initialize(ErrorHandler *errh)
     for (int i = 0; i < num_devices; i++) {
         if (!strcmp(devices[i].name, _ifname.c_str())) {
             _chunk->queue.ifindex = i;
+	    click_chatter("%s ifindex %d", _ifname.c_str(), _chunk->queue.ifindex);
             break;
         }
     }
