@@ -20,6 +20,7 @@ class Clone : public Element { public:
     int _count;
     int _next;
     bool _shared_skbs;
+    int _wait_until;
 };
 CLICK_ENDDECLS
 #endif

@@ -7,7 +7,7 @@
 #include <click/packet.hh>
 CLICK_DECLS
 
-Clone::Clone() : _count(0), _next(0)
+Clone::Clone() : _count(0), _next(0), _wait_until(0)
 {
 }
 
@@ -22,14 +22,18 @@ int
 Clone::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     int count;
+    int waituntil;
     bool shared_skbs = false;
     if (cp_va_kparse(conf, this, errh,
                    "COUNT", cpkP+cpkM, cpInteger, &count,
                    "SHARED_SKBS", 0, cpBool, &shared_skbs,
+                   "WAITUNTIL", 0, cpInteger, &waituntil,
                    cpEnd) < 0)
         return -1;
     _count = count;
     _shared_skbs = shared_skbs;
+
+    if (waituntil>0) _wait_until = waituntil;
     click_chatter("Packet cloning %d packets", count);
     return 0;
 }
@@ -45,7 +49,7 @@ Clone::push(int /*port*/, Packet *p)
 
 Packet* Clone::pull(int /*port*/)
 {
-    if (_packets.size() == 0) return NULL;
+    if (_packets.size() < _wait_until) return NULL;
     if (_count<=0) return NULL;
 
     _count--;
