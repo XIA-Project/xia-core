@@ -34,7 +34,7 @@ int Xsocket()
 	struct addrinfo hints, *servinfo, *p;
 	int rv;
 	int numbytes;
-	struct sockaddr_in their_addr;
+	struct sockaddr_in their_addr,sin;
 	char buf[MAXBUFLEN];
 	socklen_t addr_len;
 	char s[INET6_ADDRSTRLEN];
@@ -45,12 +45,12 @@ int Xsocket()
 	hints.ai_socktype = SOCK_DGRAM;
 	//hints.ai_flags = AI_PASSIVE; // Listen only on the Tun interface IP
 
-	//TODO: Use a random port rather than MYPORT
+	//MYPORT=0 will choose a random port
 	int port=atoi(MYPORT);
-	char* sport=MYPORT;
+    char* sport=MYPORT;
 
 	//Open a port and listen on it
-	if ((rv =getaddrinfo(MYADDRESS, sport, &hints, &servinfo)) != 0) {
+	if ((rv =getaddrinfo(MYADDRESS, "0", &hints, &servinfo)) != 0) {
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 		return -1;
 	}
@@ -80,6 +80,17 @@ int Xsocket()
 
 		break;
 	}
+	
+	//find local port
+	len = sizeof(sin);
+	getsockname(sd,(struct sockaddr *)&sin,&len);
+
+	memset(&in,0,sizeof(in));
+	in.s_addr = sin.sin_addr.s_addr;
+
+	port= ntohs(sin.sin_port));
+	close(sd);
+	return 0;
 
 	if (p == NULL) {
 		fprintf(stderr, "Xsocket listener: failed to bind socket\n");
