@@ -1,9 +1,9 @@
 #include <click/config.h>
 #include "xiafastpath.hh"
+#include <click/glue.hh>
+#include <click/error.hh>
 #include <click/nameinfo.hh>
 #include <click/confparse.hh>
-#include <click/error.hh>
-#include <click/glue.hh>
 #include <clicknet/xia.h>
 #include <click/xiaheader.hh>
 CLICK_DECLS
@@ -90,5 +90,5 @@ void XIAFastPath::push(int port, Packet * p)
 }
 
 CLICK_ENDDECLS
-EXPORT_ELEMENT(XIAEncap)
-ELEMENT_MT_SAFE(XIAEncap)
+EXPORT_ELEMENT(XIAFastPath)
+ELEMENT_MT_SAFE(XIAFastPath)
