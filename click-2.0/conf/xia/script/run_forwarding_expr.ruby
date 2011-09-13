@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 # This script assumes that you have the following files in both ROTUER and PACKETGEN machines
-LOAD_CLICK_CMD = "/home/dongsuh/xia-core/click-2.0/load_kernel_click.sh"
+LOAD_CLICK_CMD = "/home/dongsuh/xia-core/click-2.0/load_user_click.sh"
 IP_ROUTER_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_ip_router.sh"
 IP_PKT_GEN_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_ip_pktgen.sh"
 XIA_ROUTER_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_xia_router.sh" 
@@ -47,8 +47,8 @@ def collect_stats(machine, size)
 end
 
 if __FILE__ ==$0
-  exp_name = "routingtable"
-  pkt_size = [128, 256, 512, 1024, 1500]
+  exp_name = "routingtable-userlevel"
+  pkt_size = [ 128, 256, 512, 1024, 1500]
   #pkt_size = [64]
   #type = [:IP, :XIA]
   type = [:IP]
@@ -62,7 +62,7 @@ if __FILE__ ==$0
       sleep(3)
 
       # run router
-      run_command(ROUTER, router_script, 0)
+      run_command(ROUTER, router_script)
       sleep(3)
       # run packet gen
       run_command(PACKETGEN, "#{pktgen_script} #{(size-hdr_size)}")

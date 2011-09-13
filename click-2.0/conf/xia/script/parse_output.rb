@@ -28,6 +28,7 @@ class Pathname
 end
 
 $proto = ["IP", "XIA"]
+$postfix = "routingtable-userlevel"
 
 def calc_avg_performance(file)
   tx = []
@@ -48,7 +49,8 @@ def parse_result(output_to_file)
     if (output_to_file) 
 	output = File.new(p, "w")
     end
-    Pathname.glob("#{p}-*").sort {|x,y| x.to_s.split('-')[1].to_i() <=>  y.to_s.split('-')[1].to_i()}.each do |f|
+    file_glob = "#{p}-*-#{$postfix}"
+    Pathname.glob(file_glob).sort {|x,y| x.to_s.split('-')[1].to_i() <=>  y.to_s.split('-')[1].to_i()}.each do |f|
       proto, length = f.basename().to_s.split('-')
       statfile = f.most_recent_file(/stat-/)
       perf = calc_avg_performance(statfile)

@@ -25,7 +25,7 @@ echo loading driver
 wait
 QCOUNT=12
 pushd $IO_ENGINE/driver
-sudo ./install.py $QCOUNT $QCOUNT eth2 eth3 eth4 eth5 eth6 eth7
+sudo ./install.py $QCOUNT $QCOUNT 
 popd
 
 
