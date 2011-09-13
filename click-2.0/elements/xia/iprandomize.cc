@@ -16,7 +16,7 @@
 #endif
 CLICK_DECLS
 
-IPRandomize::IPRandomize()
+IPRandomize::IPRandomize() :_routeTable(0)
 {
     _xsubi[0] = 1;
     _xsubi[1] = 2;
@@ -33,9 +33,16 @@ IPRandomize::~IPRandomize()
 int
 IPRandomize::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    Element* routing_table_elem;
     return cp_va_kparse(conf, this, errh,
+			"ROUTETABLENAME", 0, cpElement, &routing_table_elem,
 			"MAX_CYCLE", 0, cpInteger, &_max_cycle,
 			cpEnd);
+#if USERLEVEL
+    _routeTable = dynamic_cast<IPRouteTable*>(routing_table_elem);
+#else
+    _routeTable = reinterpret_cast<IPRouteTable*>(routing_table_elem);
+#endif
 }
 
 Packet *
@@ -93,6 +100,14 @@ IPRandomize::simple_action(Packet *p_in)
 
     // TODO: need to update checksum
 
+    if (_routeTable) { 
+	    IPAddress gw;
+	    int port = _routeTable->lookup_route(IPAddress(hdr->ip_dst), gw);
+	    if (port<0)  {
+		    p->kill();
+		    return NULL;
+	    }
+    }
     return p;
 }
 

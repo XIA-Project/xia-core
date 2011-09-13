@@ -6,11 +6,12 @@ def netstat_all()
   result = `netstat -i `
   t = Time.new
   result.each_line do |line|
-     next if !(line=~/eth/)
-     next if (line=~/eth0/)
-     next if (line=~/eth1/)
-     next if (line=~/eth6/)
-     next if (line=~/eth7/)
+     #next if !(line=~/eth/)
+     #next if (line=~/eth0/)
+     #next if (line=~/eth1/)
+     #next if (line=~/eth6/)
+     #next if (line=~/eth7/)
+     next if !(line=~/xge/)
      cols = line.split()
      dev_stats = [t]
      dev_stats[1]= cols[0].to_s() # dev
