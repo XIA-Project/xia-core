@@ -25,7 +25,7 @@ elementclass gen_sub {
     -> DynamicIPEncap(4, $eth_from, $eth_to)
     -> EtherEncap(0x0800, $SRC_MAC1 , $DST_MAC1)
     -> CheckIPHeader(14)
-    -> IPPrint($eth_from)
+    //-> IPPrint($eth_from)
     -> clone1 ::Clone($COUNT, SHARED_SKBS true)
     -> td1 :: MQToDevice($eth_from, QUEUE $queue, BURST $BURST);
     //StaticThreadSched(gen1 $cpu, unq $cpu, td1 $cpu);

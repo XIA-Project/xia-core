@@ -34,15 +34,24 @@ int
 IPRandomize::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     Element* routing_table_elem;
-    return cp_va_kparse(conf, this, errh,
+    int ret = cp_va_kparse(conf, this, errh,
 			"ROUTETABLENAME", 0, cpElement, &routing_table_elem,
 			"MAX_CYCLE", 0, cpInteger, &_max_cycle,
+			"OFFSET", 0, cpInteger, &_offset,
 			cpEnd);
-#if USERLEVEL
+    if (ret<0) return ret;
+#if CLICK_USERLEVEL
     _routeTable = dynamic_cast<IPRouteTable*>(routing_table_elem);
+    click_chatter("route table %x", _routeTable);
 #else
     _routeTable = reinterpret_cast<IPRouteTable*>(routing_table_elem);
 #endif
+    for (int i=0;i<_offset;i++) {
+	    nrand48(_xsubi);
+    }
+    _current_cycle = _offset;
+
+    return 0;
 }
 
 Packet *
@@ -70,6 +79,10 @@ IPRandomize::simple_action(Packet *p_in)
             _xsubi[1] = 2;
             _xsubi[2] = 3;
             _current_cycle = 0;
+	    for (int i=0;i<_offset;i++) {
+	      nrand48(_xsubi);
+	    }
+	    _current_cycle = _offset;
         }
     }
     if (hdr->ip_dst.s_addr == 0)
@@ -93,6 +106,10 @@ IPRandomize::simple_action(Packet *p_in)
             _xsubi[1] = 2;
             _xsubi[2] = 3;
             _current_cycle = 0;
+	    for (int i=0;i<_offset;i++) {
+	      nrand48(_xsubi);
+	    }
+	    _current_cycle = _offset;
         }
 
         p->set_dst_ip_anno(IPAddress(hdr->ip_dst));  // route table lookup relies on this

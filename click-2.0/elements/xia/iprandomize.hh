@@ -33,6 +33,7 @@ private:
     unsigned short _xsubi[3];
     int _max_cycle;
     int _current_cycle;
+    int _offset;
     IPRouteTable *_routeTable;
 };
 
