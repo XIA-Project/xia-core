@@ -46,10 +46,18 @@ elementclass XIAPacketRoute {
     consider_next_path[1] -> [2]output;
 
     //  Next destination is AD
-    c[0] -> rt_AD :: GenericRouting4Port;
-    rt_AD[0] -> GenericPostRouteProc -> [0]output;
-    rt_AD[1] -> XIANextHop -> check_dest;
-    rt_AD[2] -> consider_next_path;
+    c[0] 
+//	-> XIAPrint("AD routing")
+	-> rt_AD :: GenericRouting4Port;
+    rt_AD[0] 
+//	-> XIAPrint("AD success")
+	-> GenericPostRouteProc -> [0]output;
+    rt_AD[1] 
+	-> XIAPrint("AD nexthop")
+	-> XIANextHop -> check_dest;
+    rt_AD[2] 
+	-> XIAPrint("AD fail nextpath")
+	-> consider_next_path;
 
     //  Next destination is HID
     c[1] -> rt_HID :: GenericRouting4Port;

@@ -27,8 +27,9 @@ class Pathname
   end
 end
 
-$proto = ["IP", "XIA"]
-$postfix = "routingtable-userlevel"
+#$proto = ["IP", "XIA"]
+$proto = [ "XIA"]
+$postfix = "FB1"
 
 def calc_avg_performance(file)
   tx = []
