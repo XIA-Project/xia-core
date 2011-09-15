@@ -166,5 +166,5 @@ Script(write router0/n/proc/rt_HID/rt.add HID4 2);  // xge2's address
 Script(write router0/n/proc/rt_HID/rt.add HID5 3);  // xge3's address 
 
 Script(write router0/n/proc/rt_AD/rt.generate AD $AD_RT_SIZE -4);
-Script(write router0/n/proc/rt_AD/rt.add SELFAD $AD_RT_SIZE 4); // self
+Script(write router0/n/proc/rt_AD/rt.add SELF_AD 4); // self
 //Script(write router0/n/proc/rt_AD/rt.debug 100);
