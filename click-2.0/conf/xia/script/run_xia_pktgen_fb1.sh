@@ -9,4 +9,4 @@ then
 fi
 DIR=`dirname \`readlink -m $0\``
 #sudo click-install -uct24 PAYLOAD_SIZE=$1 -f ${DIR}/../xia_mq_ipencap_24.click
-${DIR}/../../../userlevel/click PAYLOAD_SIZE=$1 -j 12  ${DIR}/../userlevel/xia_mq_24_rand.click
+${DIR}/../../../userlevel/click -j 12 PAYLOAD_SIZE=$1  ${DIR}/../userlevel/xia_mq_24_fb1_rand.click

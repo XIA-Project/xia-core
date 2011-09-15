@@ -5,7 +5,7 @@ define($AD_RT_SIZE 351611);
 
 // router instantiation
 //router0 :: Router4PortDummyCache(RE AD0 RHID0, AD0, RHID0);
-router0 :: Router4PortDummyCache(RE AD0 RHID0);
+router0 :: Router4PortDummyCache(RE ADSELF RHID0);
 //toh :: ToHost; 
 toh :: Counter -> XIAPrint(toh)-> Discard; 
 c_xge0 :: Classifier(23/99, -);
@@ -166,4 +166,5 @@ Script(write router0/n/proc/rt_HID/rt.add HID4 2);  // xge2's address
 Script(write router0/n/proc/rt_HID/rt.add HID5 3);  // xge3's address 
 
 Script(write router0/n/proc/rt_AD/rt.generate AD $AD_RT_SIZE -4);
+Script(write router0/n/proc/rt_AD/rt.add SELFAD $AD_RT_SIZE 4); // self
 //Script(write router0/n/proc/rt_AD/rt.debug 100);
