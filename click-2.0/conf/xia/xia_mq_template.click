@@ -424,4 +424,37 @@ elementclass rgen_fb3_1 {
     rfb3($hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 21) -> rgen_sub($eth_from, $eth_to, 9, 21) 
     rfb3($hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 22) -> rgen_sub($eth_from, $eth_to, 10, 22)
     rfb3($hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 23) -> rgen_sub($eth_from, $eth_to, 11, 23)
-}                                       
+}
+                                       
+elementclass via {
+    $hid_from, $intent, $viapoint, $cpu |
+    gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 1000, BURST 100)
+    -> XIAEncap(
+           SRC RE  $hid_from,
+   	   DST DAG  0 -  		// -1
+		$viapoint 1 - 		//  
+	        $intent -
+	, DYNAMIC false)	
+     -> output
+    Script(write gen1.active true);
+    StaticThreadSched(gen1 $cpu);
+}
+
+elementclass rgen_via_0 {
+    $hid_from, $eth_from, $eth_to |
+
+    via($hid_from,  SELFAD , RANDOM_ID, 0) 
+			-> MarkXIAHeader() -> XIAPrint()  
+					   ->  rgen_sub($eth_from, $eth_to, 0, 0 )
+    via($hid_from,  SELFAD , RANDOM_ID, 1) ->  rgen_sub($eth_from, $eth_to, 1, 1 )
+    via($hid_from,  SELFAD , RANDOM_ID, 2) ->  rgen_sub($eth_from, $eth_to, 2, 2 )
+    via($hid_from,  SELFAD , RANDOM_ID, 3) ->  rgen_sub($eth_from, $eth_to, 3, 3 )
+    via($hid_from,  SELFAD , RANDOM_ID, 4) ->  rgen_sub($eth_from, $eth_to, 4, 4 )
+    via($hid_from,  SELFAD , RANDOM_ID, 5) ->  rgen_sub($eth_from, $eth_to, 5, 5 )
+    via($hid_from,  SELFAD , RANDOM_ID, 6) ->  rgen_sub($eth_from, $eth_to, 6, 6 )
+    via($hid_from,  SELFAD , RANDOM_ID, 7) ->  rgen_sub($eth_from, $eth_to, 7, 7 )
+    via($hid_from,  SELFAD , RANDOM_ID, 8) ->  rgen_sub($eth_from, $eth_to, 8, 8 )
+    via($hid_from,  SELFAD , RANDOM_ID, 9) ->  rgen_sub($eth_from, $eth_to, 9, 9 )
+    via($hid_from,  SELFAD , RANDOM_ID, 10) -> rgen_sub($eth_from,$eth_to, 10, 10 )
+    via($hid_from,  SELFAD , RANDOM_ID, 11) -> rgen_sub($eth_from,$eth_to, 11, 11 )
+}
