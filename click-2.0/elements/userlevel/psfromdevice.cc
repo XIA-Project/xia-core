@@ -10,6 +10,7 @@ extern "C" {
 
 CLICK_DECLS
 
+void destructor(unsigned char *, size_t);
 PSFromDevice::PSFromDevice()
     : _task(this)
 {
@@ -161,15 +162,24 @@ PSFromDevice::run_task(Task *)
     }
 
     _chunks++;
-    for (int i = 0; i < _chunk->cnt; i++) {
-        Packet *p = Packet::make(_headroom, _chunk->buf + _chunk->info[i].offset, _chunk->info[i].len, 0);
-        output(0).push(p);
+    for (int i = 0; i < ret; i++) {
+        //Packet *p = Packet::make(_headroom, _chunk->buf + _chunk->info[i].offset, _chunk->info[i].len, 0);
+	    if (_chunk->info[i].len>0) {
+		    Packet *p = Packet::make((unsigned char *)(_chunk->buf + _chunk->info[i].offset), _chunk->info[i].len, &destructor);
+		    output(0).push(p);
+	    }
         _bytes += _chunk->info[i].len;
     }
     _packets += _chunk->cnt;
 
     return _chunk->cnt > 0;
 }
+
+void destructor(unsigned char *, size_t) 
+{
+    return;
+}
+
 
 String
 PSFromDevice::read_handler(Element* e, void *thunk)

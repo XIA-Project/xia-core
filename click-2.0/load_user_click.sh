@@ -4,8 +4,11 @@ IO_ENGINE=`dirname $0`/../io_engine
 
 
 echo unloading click
-killall click
+killall click 
+killall click >& /dev/null
+killall click >& /dev/null
 
+sleep 2
 
 echo stopping interfaces and unloading driver
 (sudo ifdown eth2; sudo ifdown eth3; sudo ifdown eth4; sudo ifdown eth5; sudo ifdown eth6; sudo ifdown eth7; sudo rmmod ixgbe) &
