@@ -49,7 +49,7 @@ Clone::push(int /*port*/, Packet *p)
 
 Packet* Clone::pull(int /*port*/)
 {
-    if (_packets.size() < _wait_until) return NULL;
+    if (_packets.size()==0 || _packets.size() < _wait_until) return NULL;
     if (_count<=0) return NULL;
 
     _count--;
