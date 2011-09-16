@@ -42,7 +42,9 @@ elementclass XIAPacketRoute {
 
     consider_first_path[0] -> c;
     consider_first_path[1] -> [2]output;
-    consider_next_path[0] -> c;
+    consider_next_path[0] 
+//	-> XIAPrint("consider next")
+	-> c;
     consider_next_path[1] -> [2]output;
 
     //  Next destination is AD
@@ -53,10 +55,10 @@ elementclass XIAPacketRoute {
 //	-> XIAPrint("AD success")
 	-> GenericPostRouteProc -> [0]output;
     rt_AD[1] 
-	-> XIAPrint("AD nexthop")
+//	-> XIAPrint("AD nexthop")
 	-> XIANextHop -> check_dest;
     rt_AD[2] 
-	-> XIAPrint("AD fail nextpath")
+//	-> XIAPrint("AD fail nextpath")
 	-> consider_next_path;
 
     //  Next destination is HID
