@@ -427,13 +427,14 @@ elementclass rgen_fb3_1 {
 }
                                        
 elementclass via {
-    $hid_from, $intent, $viapoint, $cpu |
+    $hid_from, $viapoint, $intent,  $cpu |
     gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 1000, BURST 100)
     -> XIAEncap(
            SRC RE  $hid_from,
    	   DST DAG  0 -  		// -1
-		$viapoint 1 - 		//  
+	        $viapoint 1 - 		//  
 	        $intent -
+	   
 	, DYNAMIC false)	
      -> output
     Script(write gen1.active true);

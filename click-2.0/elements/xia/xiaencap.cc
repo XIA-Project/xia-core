@@ -24,7 +24,7 @@
 CLICK_DECLS
 
 XIAEncap::XIAEncap()
-    : _xiah(NULL), _contenth(NULL)
+    : _xiah(NULL), _contenth(NULL), _is_dynamic(false)
 {
     _xiah = new XIAHeaderEncap();
 }
