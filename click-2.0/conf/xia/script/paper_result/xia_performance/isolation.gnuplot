@@ -1,6 +1,6 @@
 #!/usr/bin/env gnuplot 
 		
-set term pdf size 2.50in, 2.50in
+set term pdf size 3.00in, 2.50in
 		
 set output "isolation.pdf"
 set xlabel "Fraction of Resource\n Allocated to Content Principal"
