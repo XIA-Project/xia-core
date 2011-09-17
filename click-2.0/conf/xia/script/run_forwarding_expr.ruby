@@ -10,16 +10,18 @@ XIA_PKT_GEN_FB1_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_x
 XIA_PKT_GEN_FB2_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_xia_pktgen_fb2.sh"
 XIA_PKT_GEN_FB3_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_xia_pktgen_fb3.sh"
 XIA_PKT_GEN_VIA_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_xia_pktgen_via.sh"
+XIA_PKT_GEN_ISO_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_xia_pktgen_iso.sh"
 RECORD_STAT_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/record_stat.sh"
 
 RESET_CLICK_CMD = "killall click"
 
 SETUP = [ 
-	{:NAME => "XIA-%d-FB0", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>98},
+#	{:NAME => "XIA-%d-FB0", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>98},
 #	{:NAME => "XIA-%d-FB3", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_FB3_SCRIPT, :PKT_OVERHEAD =>182},
 #	{:NAME => "XIA-%d-FB2", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_FB2_SCRIPT, :PKT_OVERHEAD =>154},
 #	{:NAME => "XIA-%d-FB1", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_FB1_SCRIPT, :PKT_OVERHEAD =>126},
 #	{:NAME => "IP-%d-NOCP", :ROUTER => IP_ROUTER_SCRIPT, :PKTGEN => IP_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>34},
+	{:NAME => "XIA-%d-isolation-%d", :ROUTER => XIA_ROUTER_SCRIPT, :PKTGEN =>XIA_PKT_GEN_ISO_SCRIPT, :PKT_OVERHEAD =>126},
 #	{:NAME => "XIA-%d-VIA", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_VIA_SCRIPT, :PKT_OVERHEAD =>126}
 	]
 class Flags
@@ -88,12 +90,21 @@ if __FILE__ ==$0
     end
     pkt_size.push(1500)	
 
+    if (setup[:NAME]=="XIA-%d-isolation-%d")
+      pkt_size =  (1..11).to_a
+    end
+   
     p setup[:NAME]    
     p pkt_size
 
-   
     pkt_size.each do |size|
-        exp_name = setup[:NAME] % size
+        if (setup[:NAME]=="XIA-%d-isolation-%d")
+	  isolate = size
+          size = 256
+          exp_name = setup[:NAME] % [size , isolate]
+        else
+          exp_name = setup[:NAME] % size
+        end
         payload_size = size - overhead
 
         reset_click(ROUTER, 0)
@@ -104,7 +115,11 @@ if __FILE__ ==$0
         run_command(ROUTER, router_script)
         sleep(3)
         # run packet gen
-        run_command(PACKETGEN, "#{pktgen_script} #{payload_size}")
+        if (setup[:NAME]=="XIA-%d-isolation-%d")
+          run_command(PACKETGEN, "#{pktgen_script} #{payload_size} #{isolate}")
+        else
+          run_command(PACKETGEN, "#{pktgen_script} #{payload_size}")
+        end
         
         sleep(10)
         collect_stats(ROUTER, "#{exp_name}")  

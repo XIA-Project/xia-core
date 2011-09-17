@@ -23,17 +23,17 @@ function ethtool {
   sudo ethtool -S $dev &>> $outfile
 }
 
-for i in $(seq 2 5)
+for i in $(seq 0 3)
 do
-  dev="eth$i"
-  ethtool $dev, "${OUTDIR}/ethtool-begin-${dev}-${POSTFIX}"
+  dev="xge$i"
+  ethtool $dev "${OUTDIR}/ethtool-begin-${dev}-${POSTFIX}"
 done
 
 #${DIR}/../../click_mq_stats.rb 120  > ${OUTDIR}/stat-${POSTFIX} 
 ${DIR}/../../interface_stat.rb 120  > ${OUTDIR}/stat-${POSTFIX} 
 
-for i in $(seq 2 5)
+for i in $(seq 0 3)
 do
-  dev="eth$i"
-  ethtool $dev, "${OUTDIR}/ethtool-end-${dev}-${POSTFIX}"
+  dev="xge$i"
+  ethtool $dev "${OUTDIR}/ethtool-end-${dev}-${POSTFIX}"
 done

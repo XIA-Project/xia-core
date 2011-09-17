@@ -78,7 +78,7 @@ c_xge2[1] -> toh;
 c_xge3[1] -> toh;
 
 router0[0] 
-//-> XIAPrint() 
+//-> XIAPrint(input) 
 -> Unstrip(20)
 -> encap0::EtherEncap(0x0800, 00:15:17:51:d3:d4, 00:1A:92:9B:4A:77); 
 router0[1] 
@@ -165,6 +165,25 @@ Script(write router0/n/proc/rt_HID/rt.add HID3 1);  // xge1's address
 Script(write router0/n/proc/rt_HID/rt.add HID4 2);  // xge2's address 
 Script(write router0/n/proc/rt_HID/rt.add HID5 3);  // xge3's address 
 
+Script(write router0/n/proc/rt_AD/rt.add AD0 0);  // for isolation experiment
+Script(write router0/n/proc/rt_AD/rt.add AD1 1);  // 
+Script(write router0/n/proc/rt_AD/rt.add AD2 2);  // 
+Script(write router0/n/proc/rt_AD/rt.add AD3 3);  // 
+Script(write router0/n/proc/rt_AD/rt.add AD4 0);  // for isolation experiment
+Script(write router0/n/proc/rt_AD/rt.add AD5 1);  // 
+Script(write router0/n/proc/rt_AD/rt.add AD6 2);  // 
+Script(write router0/n/proc/rt_AD/rt.add AD7 3);  // 
+Script(write router0/n/proc/rt_AD/rt.add AD8 0);  // for isolation experiment
+Script(write router0/n/proc/rt_AD/rt.add AD9 1);  // 
+Script(write router0/n/proc/rt_AD/rt.add AD10 2);  // 
+Script(write router0/n/proc/rt_AD/rt.add AD11 3);  // 
+
+
+Script(write router0/n/proc/rt_CID/rt.add - 5);   
+Script(write router0/n/proc/rt_AD/rt.add - 5);   
+Script(write router0/n/proc/rt_AD/rt.add SELF_AD 4);   
+Script(write router0/n/proc/rt_SID/rt.add - 5);   
+Script(write router0/n/proc/rt_HID/rt.add - 5);   
+
 Script(write router0/n/proc/rt_AD/rt.generate AD $AD_RT_SIZE -4);
-Script(write router0/n/proc/rt_AD/rt.add SELF_AD 4); // self
 //Script(write router0/n/proc/rt_AD/rt.debug 100);
