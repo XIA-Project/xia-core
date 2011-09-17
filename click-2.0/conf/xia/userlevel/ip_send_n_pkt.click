@@ -23,7 +23,7 @@ elementclass gen_sub {
     //-> unq :: Unqueue()
     //-> DynamicUDPIPEncap($eth_from, $SRC_PORT, $eth_to, $DST_PORT, INTERVAL 1, CHANGE_IP 1)
     //-> DynamicIPEncap(4, $eth_from, $eth_to)
-    -> IPEncap(0x90, 63.0.0.1, 63.0.0.15)
+    -> IPEncap(0x90, 10.0.0.1, 10.0.2.15)
     -> EtherEncap(0x0800, $SRC_MAC1 , $DST_MAC1)
     -> CheckIPHeader(14)
     -> IPPrint($eth_from)
