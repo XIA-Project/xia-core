@@ -2,13 +2,6 @@
 
   * Ubuntu (preferably >= 11.04)
 
-1. Some variables
-
-  $ GUEST_IP=10.253.254.210
-  $ MASTER_IP=128.2.208.168
-  $ CLICK_PATH=~/click
-  $ NFS=SOME-PATH...
-
 
 Guest machine preparation
 =========================
@@ -24,23 +17,20 @@ Guest machine preparation
 
 3. Create a virtual machine image with a guest OS installed (this takes around 11 minutes)
 
-  $ sudo vmbuilder kvm ubuntu --rootsize=1024 --swapsize=0 --ssh-key=id_rsa_vm.pub --addpkg=openssh-server --hostname=guest --user=xia --pass=xia --rootpass=xia --suite=natty
+  $ sudo vmbuilder kvm ubuntu --rootsize=1024 --swapsize=0 --ssh-key=id_rsa_vm.pub --addpkg=openssh-server --addpkg=libprotobuf6 --hostname=guest --user=xia --pass=xia --rootpass=xia --suite=natty
 
 
 Click on host
 =============
 
-1. Build click on a host machine
+1. Build click on a host machine (as referred in common.sh)
 
-  $ pushd $CLICK_PATH
   $ ./configure --enable-userlevel
   $ make -j24
-  $ popd
 
 2. Execute click
-  $ killall click; $CLICK_PATH/userlevel/click $CLICK_PATH/conf/xia/vm_hostA.conf &
-    or
-  $ killall click; $CLICK_PATH/userlevel/click $CLICK_PATH/conf/xia/vm_hostB.conf &
+
+  $ ./run_host_click.sh
 
 
 Click on guest
@@ -52,37 +42,20 @@ Click on guest
 
 2. Power on the guest
 
-  $ ./run_guest.sh
+  $ ./start_local_guest.sh
 
-3. Copy click binary and script to the guest (after the guest is powered on)
+3. Copy click to the guest and run it (after the guest is powered on)
 
-  $ scp -i id_rsa_vm $CLICK_PATH/userlevel/click -P 5555 $CLICK_PATH/conf/xia/vm_guest.conf root@127.0.0.1:~/
-
-4. Create a output sink
-
-  $ netcat -u -l 50000 | tee output_from_guest
-
-5. Execute click
-
-  $ ./ssh_to_local_guest.sh bash -c "killall click; ./click vm_guest.conf 2>&1 | netcat -u $MASTER_IP 50000 &"
+  $ ./run_guest_click.sh
 
 
 Live migration
 ==============
-1. Power on the guest VM waiting for migration (executed at host B)
-
-  $ $NFS/run_guest_incoming.sh
-
-2. Begin migration from A to B (executed at A)
+1. Begin migration from A to B (can be executed on any host)
 
   $ ./migrate_to_hostB.sh
 
-3. Check status (executed at A)
+2. Begin migration from B to A (can be executed on any host)
 
-  $ ./status.sh
-
-4. Clean up the source VM after migration succeeds (executed at A)
-
-  $ killall kvm
-
+  $ ./migrate_to_hostA.sh
 
