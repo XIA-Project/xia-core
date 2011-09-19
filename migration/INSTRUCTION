@@ -36,7 +36,7 @@ Click on host
 Click on guest
 ==============
 
-1. load KVM (not required but better for performance)
+1. Load KVM (not required but better for performance)
 
   $ sudo modprobe kvm-intel
 
@@ -47,6 +47,14 @@ Click on guest
 3. Copy click to the guest and run it (after the guest is powered on)
 
   $ ./run_guest_click.sh
+
+
+Click on client
+===============
+
+1. Run ping client
+
+ $ sudo userlevel/click conf/xia/xia_ping_client.click
 
 
 Live migration
