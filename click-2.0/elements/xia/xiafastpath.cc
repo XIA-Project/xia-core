@@ -65,7 +65,7 @@ int XIAFastPath::configure(Vector<String> &conf, ErrorHandler *errh)
     int bucket_size = 0;
     if (cp_va_kparse(conf, this, errh,
                    "KEY_OFFSET", 0, cpInteger, &offset,
-                   "BUCKET_SIZE", 0, cpInteger, &bucket_size,
+                   "BUCKET_SIZE", cpkM, cpInteger, &bucket_size,
                    cpEnd) < 0)
         return -1;
  

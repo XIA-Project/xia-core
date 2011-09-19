@@ -233,6 +233,7 @@ elementclass rfb2 {
 		 	$fb1		2 -     // 1
 		 	$intent			// 2
 		, DYNAMIC false		)	
+     -> XIAInsertHash()
      -> output
     Script(write gen1.active true);
     StaticThreadSched(gen1 $cpu);
@@ -394,7 +395,7 @@ elementclass rgen_fb3_0 {
     $hid_from, $eth_from, $eth_to |
 
     rfb3($hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 0) 
-	-> MarkXIAHeader() -> XIAPrint()  
+//	-> MarkXIAHeader() -> XIAPrint()  
 	->  rgen_sub($eth_from, $eth_to, 0, 0 )
     rfb3($hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 1) ->  rgen_sub($eth_from, $eth_to, 1, 1 )
     rfb3($hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 2) ->  rgen_sub($eth_from, $eth_to, 2, 2 )
@@ -445,7 +446,7 @@ elementclass rgen_via_0 {
     $hid_from, $eth_from, $eth_to |
 
     via($hid_from,  SELFAD , RANDOM_ID, 0) 
-			-> MarkXIAHeader() -> XIAPrint()  
+//			-> MarkXIAHeader() -> XIAPrint()  
 					   ->  rgen_sub($eth_from, $eth_to, 0, 0 )
     via($hid_from,  SELFAD , RANDOM_ID, 1) ->  rgen_sub($eth_from, $eth_to, 1, 1 )
     via($hid_from,  SELFAD , RANDOM_ID, 2) ->  rgen_sub($eth_from, $eth_to, 2, 2 )
