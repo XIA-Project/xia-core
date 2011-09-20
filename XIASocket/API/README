@@ -1,0 +1,25 @@
+Compile as:
+
+gcc X* Server.c -o xs
+OR
+gcc X* Client.c -o xc
+OR
+gcc X* program.c -o output_filename
+
+The loopback folder contains examples of the loopback test. 
+Xsocket.h contains IP fields which need to be defined before 
+compiling. These fields depend on the IP of the fake interface.
+The client and the server require different IP settings in
+Xsocket.h for the loopback test, and are hence in different 
+folders.
+
+To run the loopback test:
+1. click click/conf/xsocket_loopback.click
+2. XIASocket/API/loopback/server/xs
+3. XIASocket/API/loopback/client/xc
+
+TODO:
+1. Make a Makefile
+2. sendto and recvfrom aren't very useful, as DAG formats aren't 
+   clear. 
+   
