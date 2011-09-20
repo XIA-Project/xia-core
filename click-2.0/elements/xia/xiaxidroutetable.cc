@@ -233,6 +233,7 @@ XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *
     xsubi[0] = 1;
     xsubi[1] = 2;
     xsubi[2] = 3;
+    unsigned short xsubi_next[3];
 #else
     struct rnd_state state;
     prandom32_seed(&state, 1239);
@@ -247,11 +248,22 @@ XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *
     {
         uint8_t* xid = xid_d.id;
         const uint8_t* xid_end = xid + CLICK_XIA_XID_ID_LEN;
+#define PURE_RANDOM
+#ifdef PURE_RANDOM
+	uint32_t seed = i;
+	memcpy(&xsubi_next[1], &seed, 2);
+	memcpy(&xsubi_next[2], &(reinterpret_cast<char *>(&seed)[2]), 2);
+	xsubi_next[0]= xsubi_next[2]+ xsubi_next[1];
+#endif
 
         while (xid != xid_end)
         {
 #if CLICK_USERLEVEL
+#ifdef PURE_RANDOM
+ 	    *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(xsubi_next));
+#else
             *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(xsubi));
+#endif
 #else
             *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(prandom32(&state));
             if (i%5000==0)

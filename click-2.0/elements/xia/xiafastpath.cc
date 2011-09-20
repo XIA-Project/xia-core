@@ -8,20 +8,26 @@
 #include <click/xiaheader.hh>
 CLICK_DECLS
 
-XIAFastPath::XIAFastPath() :_bucket(0), _offset(0)
+XIAFastPath::XIAFastPath() : _offset(0)
 {
+    memset(_buckets, 0, sizeof(struct bucket*) * NUM_CLICK_CPUS);
+    
 }
 
 XIAFastPath::~XIAFastPath()
 {
-    if (_bucket) delete[] _bucket;
+    for (int i=0;i<NUM_CLICK_CPUS;i++) {
+	if (_buckets[i]) delete[] _buckets[i];
+    }
 }
 
 int
 XIAFastPath::initialize(ErrorHandler *)
 {
-    _bucket = new struct bucket[_bucket_size];
-    memset(_bucket, 0, _bucket_size * sizeof(struct bucket));
+    for (int i=0;i<NUM_CLICK_CPUS;i++) {
+        _buckets[i] = new struct bucket[_bucket_size];
+        memset(_buckets[i], 0, _bucket_size * sizeof(struct bucket));
+    }
     return 0;
 }
 
@@ -34,7 +40,7 @@ void XIAFastPath::update_cacheline(struct bucket *buck,  const uint8_t *key, int
 {
     int empty = 0;
     uint8_t max_counter = -1;
-    for (int i=0;i<KEYSIZE;i++) {
+    for (int i=0;i<ASSOCIATIVITY;i++) {
 	if (max_counter< buck->counter[i]) {
 	    max_counter = buck->counter[i];
 	    empty = i;
@@ -49,7 +55,7 @@ void XIAFastPath::update_cacheline(struct bucket *buck,  const uint8_t *key, int
 int XIAFastPath::lookup(struct bucket *buck,  const uint8_t *key)
 {
     int port = 0;
-    for (int i=0;i<KEYSIZE;i++) {
+    for (int i=0;i<ASSOCIATIVITY;i++) {
 	if (memcmp(key, buck->item[i].key , KEYSIZE)==0) {
 	    port = buck->item[i].port;
 	    buck->counter[i]=0;
@@ -76,15 +82,23 @@ int XIAFastPath::configure(Vector<String> &conf, ErrorHandler *errh)
 
 void XIAFastPath::push(int port, Packet * p)
 {
+
+#if CLICK_USERLEVEL
+    int thread_id = click_current_thread_id;
+#else
+    int thread_id = click_current_processor();
+#endif
     const uint8_t *key = getkey(p);
+ 
     uint32_t index = *(uint32_t*)key % _bucket_size;
+    //click_chatter("fastpath_key %02x%02x%02x%02x, bucket_index %u", key[0], key[1], key[2],  key[3], index);
 
     if (port==0) {
-	int outport = lookup(&_bucket[index], key);
+	int outport = lookup(&_buckets[thread_id][index], key);
 	output(outport).push(p);
     } else {
 	/* Cache result */
-	update_cacheline(&_bucket[index], key, port);
+	update_cacheline(&_buckets[thread_id][index], key, port);
 	output(port).push(p);
     }
 }

@@ -25,7 +25,12 @@ class IsoCPUQueue : public Element {
     int _head;
     int _tail;
     uint64_t _drops;
-  } ____cacheline_aligned_in_smp;
+  }
+#if CLICK_LINUXMODULE
+ ____cacheline_aligned_in_smp;
+#else
+  __attribute__ ((aligned (64)));
+#endif
   struct _qstruct _q[NUM_CLICK_CPUS];
 
   int _capacity;

@@ -1,6 +1,7 @@
 #ifndef CLICK_XIARANDOMIZE_HH
 #define CLICK_XIARANDOMIZE_HH
 #include <click/element.hh>
+#include <click/zipf.h>
 CLICK_DECLS
 
 /*
@@ -45,6 +46,8 @@ private:
 
     int _xid_type;
     int _offset;
+    Zipf _zipf;
+    static int* _zipf_cache;
 };
 
 CLICK_ENDDECLS

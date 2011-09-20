@@ -12,8 +12,9 @@
 #include <stdlib.h>
 #endif
 CLICK_DECLS
+#define PURE_RANDOM
 
-XIARandomize::XIARandomize()
+XIARandomize::XIARandomize() : _zipf(1.3)
 {
     assert(CLICK_XIA_XID_ID_LEN % sizeof(uint32_t) == 0);
 
@@ -29,16 +30,22 @@ XIARandomize::XIARandomize()
     _max_cycle = 1000000000;
 
 #if CLICK_USERLEVEL
-    _xsubi_arb[0] = 4;
-    _xsubi_arb[1] = 5;
-    _xsubi_arb[2] = 6;
+    _xsubi_arb[0] = 7 * click_current_thread_id + 1;
+    _xsubi_arb[1] = 5 * click_current_thread_id - 1;
+    _xsubi_arb[2] = 3 * click_current_thread_id + 1;
 #elif CLICK_LINUXMODULE
     prandom32_seed(&_arbitrary, 123999);
 #endif
 }
 
+int * XIARandomize::_zipf_cache;
+
 XIARandomize::~XIARandomize()
 {
+    if (_zipf_cache) {
+        delete[] _zipf_cache;
+ 	_zipf_cache = NULL;
+    }
 }
 
 int
@@ -61,17 +68,28 @@ XIARandomize::configure(Vector<String> &conf, ErrorHandler *errh)
         nrand48(_xsubi_arb);
     }
     _current_cycle = _offset;
+    _zipf = Zipf(1.2, _max_cycle-1);
+
+    if (_zipf_cache ==0) {
+	_zipf_cache = new int[_max_cycle*100];
+	//_zipf_arbit = Zipf(1.2, 1000000000);
+	for (int i=0;i<_max_cycle*100;i++) {
+	    _zipf_cache[i] = _zipf.next();
+	}
+    }
     return 0;
 }
 
 Packet *
 XIARandomize::simple_action(Packet *p_in)
 {
+    unsigned short xsubi_next[3];
     WritablePacket *p = p_in->uniqueify();
     if (!p)
         return 0;
 
     click_xia *hdr = p->xia_header();
+    int seed  = _zipf_cache[_current_cycle]; /* zipf */
 
     for (size_t i = 0; i < hdr->dnode + hdr->snode; i++)
     {
@@ -81,18 +99,29 @@ XIARandomize::simple_action(Packet *p_in)
             node.xid.type = _xid_type;
             uint8_t* xid = node.xid.id;
             const uint8_t* xid_end = xid + CLICK_XIA_XID_ID_LEN;
+#ifdef PURE_RANDOM
+	    //uint32_t seed  = static_cast<uint32_t>(nrand48(_xsubi_det)) % _max_cycle; /* uniform */
+	    assert(seed<_max_cycle);
+	    memcpy(&xsubi_next[1], &seed, 2);
+	    memcpy(&xsubi_next[2], &(reinterpret_cast<char *>(&seed)[2]), 2);
+	    xsubi_next[0]= xsubi_next[2]+ xsubi_next[1];
+#endif
 
             while (xid != xid_end)
             {
 #if CLICK_USERLEVEL
-                *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(_xsubi_det));
+#ifdef PURE_RANDOM
+		*reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(xsubi_next));
+#else
+		*reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(_xsubi_det));
+#endif
 #elif CLICK_LINUXMODULE
-                *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(prandom32(&_deterministic));
+		*reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(prandom32(&_deterministic));
 #endif
                 xid += sizeof(uint32_t);
             }
 
-            if (++_current_cycle == _max_cycle)
+            if (++_current_cycle == _max_cycle*100)
 	    {
 		    _current_cycle = 0;
 #if CLICK_USERLEVEL
@@ -113,11 +142,21 @@ XIARandomize::simple_action(Packet *p_in)
             node.xid.type = _xid_type;
             uint8_t* xid = node.xid.id;
             const uint8_t* xid_end = xid + CLICK_XIA_XID_ID_LEN;
+#ifdef PURE_RANDOM
+	    seed  +=  (i+1)* 13 + _max_cycle;
+	    memcpy(&xsubi_next[1], &seed, 2);
+	    memcpy(&xsubi_next[2], &(reinterpret_cast<char *>(&seed)[2]), 2);
+	    xsubi_next[0]= xsubi_next[2]+ xsubi_next[1];
+#endif
 
             while (xid != xid_end)
             {
 #if CLICK_USERLEVEL
-                *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(_xsubi_arb));
+#ifdef PURE_RANDOM
+		*reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(xsubi_next));
+#else
+		*reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(_xsubi_arb));
+#endif
 #elif CLICK_LINUXMODULE
                 *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(prandom32(&_arbitrary));
 #endif
