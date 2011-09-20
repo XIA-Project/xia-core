@@ -47,7 +47,7 @@ private:
     int _xid_type;
     int _offset;
     Zipf _zipf;
-    static int* _zipf_cache;
+    static uint32_t* _zipf_cache;
 };
 
 CLICK_ENDDECLS

@@ -38,7 +38,7 @@ XIARandomize::XIARandomize() : _zipf(1.3)
 #endif
 }
 
-int * XIARandomize::_zipf_cache;
+uint32_t * XIARandomize::_zipf_cache;
 
 XIARandomize::~XIARandomize()
 {
@@ -71,7 +71,7 @@ XIARandomize::configure(Vector<String> &conf, ErrorHandler *errh)
     _zipf = Zipf(1.2, _max_cycle-1);
 
     if (_zipf_cache ==0) {
-	_zipf_cache = new int[_max_cycle*100];
+	_zipf_cache = new uint32_t[_max_cycle*100];
 	//_zipf_arbit = Zipf(1.2, 1000000000);
 	for (int i=0;i<_max_cycle*100;i++) {
 	    _zipf_cache[i] = _zipf.next();
@@ -89,7 +89,7 @@ XIARandomize::simple_action(Packet *p_in)
         return 0;
 
     click_xia *hdr = p->xia_header();
-    int seed  = _zipf_cache[_current_cycle]; /* zipf */
+    uint32_t seed  = _zipf_cache[_current_cycle]; /* zipf */
 
     for (size_t i = 0; i < hdr->dnode + hdr->snode; i++)
     {
@@ -103,7 +103,7 @@ XIARandomize::simple_action(Packet *p_in)
 	    //uint32_t seed  = static_cast<uint32_t>(nrand48(_xsubi_det)) % _max_cycle; /* uniform */
 	    assert(seed<_max_cycle);
 	    memcpy(&xsubi_next[1], &seed, 2);
-	    memcpy(&xsubi_next[2], &(reinterpret_cast<char *>(&seed)[2]), 2);
+	    memcpy(&xsubi_next[2], reinterpret_cast<char *>(&seed)+2 , 2);
 	    xsubi_next[0]= xsubi_next[2]+ xsubi_next[1];
 #endif
 

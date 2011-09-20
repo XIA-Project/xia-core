@@ -232,6 +232,46 @@ elementclass Router4Port {
     sw[3] -> IsoCPUQueue(200) -> [3]output;
 };
 
+elementclass Router4PortFastPathWithQueue {
+    $local_addr, $bucket_size, $hash_offset |
+
+    // $local_addr: the full address of the node
+    // $hash_offset: key location
+
+    // input[0], input[1], input[2], input[3]: a packet arrived at the node
+    // output[0]: forward to interface 0
+    // output[1]: forward to interface 1
+    // output[2]: forward to interface 2
+    // output[3]: forward to interface 3
+
+    n :: RouteEngine($local_addr);
+    //cache :: XIATransport($local_addr, n/proc/rt_CID/rt);
+    //cache :: Queue(200);
+    fp :: XIAFastPath(BUCKET_SIZE $bucket_size, KEY_OFFSET $HASH_OFFSET);
+
+    input[0] -> [0]fp; 
+    input[1] -> [0]fp;
+    input[2] -> [0]fp;
+    input[3] -> [0]fp;
+
+    fp[0] // -> XIAPrint("SlowPath") 
+    -> [0]n;
+
+    n[0] -> sw :: PaintSwitch
+    n[1] -> Discard;
+    //n[2] -> [0]cache[0] -> [1]n;
+    //Idle -> [1]cache[1] -> Discard;
+    Idle -> [1]n;
+    //n[2] -> cache -> Unqueue -> Discard;
+    n[2]-> Discard;
+
+    sw[0] -> [1]fp[1] -> IsoCPUQueue(200) -> [0]output;
+    sw[1] -> [2]fp[2] -> IsoCPUQueue(200) -> [1]output;
+    sw[2] -> [3]fp[3] -> IsoCPUQueue(200) -> [2]output;
+    sw[3] -> [4]fp[4] -> IsoCPUQueue(200) -> [3]output;
+};
+
+
 elementclass Router4PortFastPath {
     $local_addr |
 
@@ -246,7 +286,7 @@ elementclass Router4PortFastPath {
     n :: RouteEngine($local_addr);
     //cache :: XIATransport($local_addr, n/proc/rt_CID/rt);
     //cache :: Queue(200);
-    fp :: XIAFastPath(BUCKET_SIZE 1024, OFFSET 0);
+    fp :: XIAFastPath(BUCKET_SIZE 1024, KEY_OFFSET 0);
 
     input[0] -> [0]fp; 
     input[1] -> [0]fp;
