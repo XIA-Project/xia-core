@@ -1,6 +1,5 @@
 #include <click/config.h>
 #include <click/glue.hh>
-//#include <click/routerthread.hh>
 #include "isolatedcpuqueue.hh"
 #include <click/error.hh>
 #include <click/confparse.hh>

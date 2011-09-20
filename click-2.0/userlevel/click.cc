@@ -33,16 +33,9 @@
 #include <sys/stat.h>
 #include <sys/resource.h>
 #include <fcntl.h>
-#include <sched.h>
-#include <stdlib.h>
 #if HAVE_EXECINFO_H
 # include <execinfo.h>
 #endif
-
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
-#include <sched.h>
 
 #include <click/lexer.hh>
 #include <click/routerthread.hh>
