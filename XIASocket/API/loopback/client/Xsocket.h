@@ -13,12 +13,12 @@
 #include <arpa/inet.h>
 
 //Socket library side: Control address/info
-#define MYADDRESS "172.0.0.1" 
+#define MYADDRESS "192.0.0.1" 
 #define MYPORT "0"//Chooses random port
 
 //Click side: Control/data address/info
 //The actual IPs don't matter, it just has to be in the correct subnet
-#define CLICKCONTROLADDRESS "172.0.0.2" 
+#define CLICKCONTROLADDRESS "192.0.0.2" 
 #define CLICKOPENPORT "5001"
 #define CLICKBINDPORT "5002"
 #define CLICKCLOSEPORT "5003"
@@ -27,7 +27,7 @@
 
 
 #define CLICKGETCIDPORT "5006"
-#define CLICKDATAADDRESS "172.0.0.2" 
+#define CLICKDATAADDRESS "192.0.0.2" 
 #define CLICKDATAPORT "10000"
 
 //TODO: set xia.click sorter to sort based on these ports. Use all higher destination ports for data and set destination port=source port

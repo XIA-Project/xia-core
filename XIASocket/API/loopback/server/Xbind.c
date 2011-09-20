@@ -1,7 +1,7 @@
 #include "Xsocket.h"
 
 
-int Xconnect(int sockfd, char* dest_DAG)
+int Xbind(int sockfd, char* SID)
 {
 	//Setup to listen for control info
 
@@ -14,14 +14,14 @@ int Xconnect(int sockfd, char* dest_DAG)
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_DGRAM;
 
-	if ((rv = getaddrinfo(CLICKCONTROLADDRESS, CLICKCONNECTPORT, &hints, &servinfo)) != 0) {
+	if ((rv = getaddrinfo(CLICKCONTROLADDRESS, CLICKBINDPORT, &hints, &servinfo)) != 0) {
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 		return -1;
 	}
 
     p=servinfo;
     
-	if ((numbytes = sendto(sockfd, dest_DAG, strlen(dest_DAG), 0,
+	if ((numbytes = sendto(sockfd, SID, strlen(SID), 0,
 					p->ai_addr, p->ai_addrlen)) == -1) {
 		perror("Xbind(): sendto failed");
 		return(-1);

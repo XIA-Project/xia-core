@@ -59,38 +59,45 @@ void XUDP::push(int port, Packet *p_in)
 				click_ip * ih=p->ip_header();
 				unsigned short _dport=uh->uh_dport;
 				unsigned short _sport=uh->uh_sport;
+				//click_chatter("control:%d",ntohs(_dport));
 
 				//Depending on destination port it could be open/close/bind call
-				switch(_dport){
+				switch(ntohs(_dport)){
 					case CLICKOPENPORT: //Open socket. Reply with a packet with the destination port=source port
 						{
+		    				
 							portRxSeqNo.set(_sport,1);
-							uh->uh_dport=_sport;
-							struct in_addr temp;
-							temp=ih->ip_src;
-							ih->ip_src=ih->ip_dst;
-							ih->ip_dst=temp;
 							portTxSeqNo.set(_sport,1);
-							output(0).push(p);
+							p->pull(p->transport_header_offset());//Remove IP header
+            				p_in->pull(8); //Remove UDP header
+							output(1).push(UDPIPEncap(p,_sport));
 						}
 						break;
 
 					case CLICKBINDPORT: //Bind XID
 						{
-							String xid_string((const char*)p->data(),(int)p->length());
-							XID xid(xid_string);
-
-							XIDtoPort.set(xid,_sport);//TODO: Maybe change the mapping to XID->DAGinfo?
+						    //Remove UDP/IP headers
+  							p->pull(p->transport_header_offset());//Remove IP header
+            				p_in->pull(8); //Remove UDP header
+            				
+            				//get source DAG
+							String sdag_string((const char*)p->data(),(const char*)p->end_data());
+							//click_chatter("\nbind requested to %s, length=%d\n",sdag_string.c_str(),(int)p->length());
 							
 							//Set source DAG info
 							DAGinfo daginfo;
 							daginfo.port=_sport;
-							String str_local_addr=_local_addr.unparse_re();
-							str_local_addr=str_local_addr+" "+xid_string;//Make source DAG _local_addr:SID
-							daginfo.src_path.parse_re(str_local_addr);//TODO: Check
+							//String str_local_addr=_local_addr.unparse();
+							//str_local_addr=str_local_addr+" "+xid_string;//Make source DAG _local_addr:SID
+							daginfo.src_path.parse(sdag_string);//TODO: Check
 							daginfo.nxt=-1;
 							daginfo.last=-1;
 							daginfo.hlim=250;
+							
+							XID	source_xid = daginfo.src_path.xid(daginfo.src_path.destination_node());
+							//XID xid(xid_string);
+							//TODO: Add a check to see if XID is already being used
+							XIDtoPort.set(source_xid,_sport);//TODO: Maybe change the mapping to XID->DAGinfo?
 
 							portToDAGinfo.set(_sport,daginfo);
 
@@ -111,16 +118,34 @@ void XUDP::push(int port, Packet *p_in)
 
 					case CLICKCONNECTPORT://Connect
 						{
-							String dest((const char*)p->data(),(int)p->length());
-							
+			                //Remove UDP/IP headers
+  							p->pull(p->transport_header_offset());//Remove IP header
+            				p_in->pull(8); //Remove UDP header
+						
+							String dest((const char*)p->data(),(const char*)p->end_data());
+							//click_chatter("\nconnect requested to %s, length=%d\n",dest.c_str(),(int)p->length());
 							XIAPath dst_path;
 							dst_path.parse(dest); //TODO: Check 
+							
 
-                            DAGinfo daginfo=portToDAGinfo.get(_sport);
+                            DAGinfo *daginfo=portToDAGinfo.get_pointer(_sport);
+                            
+                            if(!daginfo)//No local SID bound yet, so bind one
+                            {
+                            
+                            daginfo=new DAGinfo();
+							daginfo->port=_sport;
+							String str_local_addr=_local_addr.unparse_re();
+							String xid_string="SID:200000000000000000000000000000000f000001";//TODO: Make this random
+							str_local_addr=str_local_addr+" "+xid_string;//Make source DAG _local_addr:SID
+							daginfo->src_path.parse_re(str_local_addr);//TODO: Check
+							daginfo->nxt=-1;
+							daginfo->last=-1;
+							daginfo->hlim=250;
+                            }
 
-							daginfo.dst_path=dst_path;
+							daginfo->dst_path=dst_path;
 
-							portToDAGinfo.set(_sport,daginfo);
     						portRxSeqNo.set(_sport,portRxSeqNo.get(_sport)+1);//Increment counter
 						}					
 					
@@ -157,7 +182,7 @@ void XUDP::push(int port, Packet *p_in)
 				WritablePacket *p = NULL;
                 p = _xiah->encap(p_in, true);
 
-				output(1).push(p);
+				output(0).push(p);
 			}
 
 			break;
@@ -167,7 +192,9 @@ void XUDP::push(int port, Packet *p_in)
 				//Extract the SID/CID 
 				XIAHeader x_hdr(p->xia_header());
 			    XIAPath dst_path=x_hdr.dst_path();
-                XID	_destination_xid = dst_path.xid(dst_path.destination_node());          
+                XID	_destination_xid = dst_path.xid(dst_path.destination_node());    
+                //TODO:Use source AND destination XID to find port, if not found use source
+                //TODO:pass dag back to recvfrom      
 
 				unsigned short _dport= XIDtoPort.get(_destination_xid);
 				
@@ -176,7 +203,7 @@ void XUDP::push(int port, Packet *p_in)
    				daginfo.dst_path=x_hdr.src_path();
    				portToDAGinfo.set(_dport,daginfo);
                 			
-				output(2).push(UDPIPEncap(p,_dport));
+				output(1).push(UDPIPEncap(p,_dport));
 			}
 
 			break;

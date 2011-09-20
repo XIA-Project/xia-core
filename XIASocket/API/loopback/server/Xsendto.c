@@ -1,11 +1,11 @@
 /*
-* send like datagram sending function for XIA
-* IMPORTANT: Works for datagrams only
+* sendto like datagram sending function for XIA
 */
 
 #include "Xsocket.h"
 
-int Xsend(int sockfd,char *buf, size_t len, int flags)
+int Xsendto(int sockfd,char *buf, size_t len, int flags,
+		const struct sockaddr *dest_addr, socklen_t addrlen)
 {
 
 	struct addrinfo hints, *servinfo,*p;
@@ -13,6 +13,7 @@ int Xsend(int sockfd,char *buf, size_t len, int flags)
 	int numbytes;
 	socklen_t addr_len;
 
+	//TODO: Modify buf to add headers from dest_addr and addrlen. Change type from sockaddr to DAG 
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_INET;

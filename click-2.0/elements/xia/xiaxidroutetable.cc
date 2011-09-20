@@ -301,6 +301,8 @@ XIAXIDRouteTable::push(int, Packet *p)
     {
         // no match -- discard packet
 	_drops++;
+        if (_drops == 1)
+            click_chatter("Dropping a packet with no match (last message)\n");
         p->kill();
     }
 }

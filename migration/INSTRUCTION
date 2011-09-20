@@ -10,6 +10,7 @@ Guest machine preparation
 
   $ sudo aptitude -R install qemu-kvm		# for qemu/kvm
   $ sudo aptitude -R install python-vm-builder	# for vmbuilder
+  $ suod aptitude -R rsync
 
 2. Generate an SSH key pair that root @ guest will accept
 
@@ -17,7 +18,7 @@ Guest machine preparation
 
 3. Create a virtual machine image with a guest OS installed (this takes around 11 minutes)
 
-  $ sudo vmbuilder kvm ubuntu --rootsize=1024 --swapsize=0 --ssh-key=id_rsa_vm.pub --addpkg=openssh-server --addpkg=libprotobuf6 --hostname=guest --user=xia --pass=xia --rootpass=xia --suite=natty
+  $ sudo vmbuilder kvm ubuntu --rootsize=1024 --swapsize=0 --ssh-key=id_rsa_vm.pub --addpkg=openssh-server --addpkg=rsync --addpkg=psmisc --addpkg=libprotobuf6 --hostname=guest --user=xia --pass=xia --rootpass=xia --suite=natty
 
 
 Click on host

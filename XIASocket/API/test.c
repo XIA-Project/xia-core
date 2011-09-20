@@ -9,6 +9,12 @@ int main(int argc, char *argv[])
 {
 	int sock;
 	char buf[MAXBUFLEN];
+	
+	if (argc < 2) {
+		fprintf(stderr, "ERROR, no port provided\n");
+		exit(0);
+	}
+	
 	sock=Xsocket("Source_DAG");
 	if (sock==-1)
 	{
