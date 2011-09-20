@@ -1,6 +1,6 @@
-require(library xia_router_template.click); 
-require(library xia_address.click); 
-require(library xia_vm_common.click); 
+require(library xia_router_template.click);
+require(library xia_address.click);
+require(library xia_vm_common.click);
 
 to_tap0 :: Queue() -> ToDevice(tap0);
 
