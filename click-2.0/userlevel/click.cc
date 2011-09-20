@@ -38,10 +38,6 @@
 #if HAVE_EXECINFO_H
 # include <execinfo.h>
 #endif
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
-#include <sched.h>
 
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
