@@ -1,11 +1,12 @@
 /*
-* recv like datagram receiving function for XIA
-* IMPORTANT: works for datagrams only
+* recvfrom like datagram receiving function for XIA
+* does not fill in DAG fields yet
 */
 
 #include "Xsocket.h"
 
-int Xrecv(int sockfd, void *buf, size_t len, int flags)
+int Xrecvfrom(int sockfd, void *buf, size_t len, int flags,
+                        struct sockaddr *src_addr, socklen_t *addrlen)
 {
 	struct addrinfo hints, *servinfo,*p;
 	int rv;

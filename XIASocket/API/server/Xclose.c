@@ -1,10 +1,7 @@
 #include "Xsocket.h"
 
-
-int Xconnect(int sockfd, char* dest_DAG)
+int Xclose(int sockfd)
 {
-	//Setup to listen for control info
-
    	struct addrinfo hints, *servinfo, *p;
 	int rv;
 	int numbytes;
@@ -14,20 +11,19 @@ int Xconnect(int sockfd, char* dest_DAG)
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_DGRAM;
 
-	if ((rv = getaddrinfo(CLICKCONTROLADDRESS, CLICKBINDPORT, &hints, &servinfo)) != 0) {
+	if ((rv = getaddrinfo(CLICKCONTROLADDRESS, CLICKCLOSEPORT, &hints, &servinfo)) != 0) {
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 		return -1;
 	}
 
     p=servinfo;
-    
-	if ((numbytes = sendto(sockfd, dest_DAG, strlen(dest_DAG), 0,
+    char *buf="close socket";
+	if ((numbytes = sendto(sockfd, buf, strlen(buf), 0,
 					p->ai_addr, p->ai_addrlen)) == -1) {
-		perror("Xbind(): sendto failed");
+		perror("Xclose(): sendto failed");
 		return(-1);
 	}
 	freeaddrinfo(servinfo);
-
-	return 0;
+    close(sockfd);
 }
 

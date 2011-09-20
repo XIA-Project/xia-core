@@ -50,7 +50,7 @@ int Xsocket()
     char* sport=MYPORT;
 
 	//Open a port and listen on it
-	if ((rv =getaddrinfo(MYADDRESS, "0", &hints, &servinfo)) != 0) {
+	if ((rv =getaddrinfo(MYADDRESS, MYPORT, &hints, &servinfo)) != 0) {
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 		return -1;
 	}
@@ -82,15 +82,15 @@ int Xsocket()
 	}
 	
 	//find local port
-	len = sizeof(sin);
-	getsockname(sd,(struct sockaddr *)&sin,&len);
+	int len = sizeof(sin);
+	getsockname(sockfd,(struct sockaddr *)&sin,&len);
 
-	memset(&in,0,sizeof(in));
-	in.s_addr = sin.sin_addr.s_addr;
+	//memset(&in,0,sizeof(in));
+	//in.s_addr = sin.sin_addr.s_addr;
 
-	port= ntohs(sin.sin_port));
-	close(sd);
-	return 0;
+	port= ntohs(sin.sin_port);
+	//close(sockfd);
+	//return 0;
 
 	if (p == NULL) {
 		fprintf(stderr, "Xsocket listener: failed to bind socket\n");
@@ -98,7 +98,7 @@ int Xsocket()
 	}
 
 	freeaddrinfo(servinfo);
-	//printf("Xsocket listener: waiting to recvfrom...\n");
+	//printf("Xsocket listener: Sending...\n");
 
 	//Send a control packet
 
@@ -119,6 +119,8 @@ int Xsocket()
 		return(-1);
 	}
 	freeaddrinfo(servinfo);
+	
+    //printf("Xsocket listener: Sent. waiting to recvfrom...\n");
 
    
 	//Process the reply
@@ -133,7 +135,7 @@ int Xsocket()
 	//When Click was able to open a connection it returns the same port number 
 
 	int src_port=ntohs(their_addr.sin_port);
-	//printf("rx port:%d\n", src_port);
+	//printf("rx port:%d, tx port%d\n", src_port,port);
 
 	//port=1245;//TODO remove and use the same value as earlier in actual CLick
 

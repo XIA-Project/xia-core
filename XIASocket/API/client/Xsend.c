@@ -5,7 +5,7 @@
 
 #include "Xsocket.h"
 
-int Xsendto(int sockfd,char *buf, size_t len, int flags)
+int Xsend(int sockfd,char *buf, size_t len, int flags)
 {
 
 	struct addrinfo hints, *servinfo,*p;
@@ -13,7 +13,6 @@ int Xsendto(int sockfd,char *buf, size_t len, int flags)
 	int numbytes;
 	socklen_t addr_len;
 
-	//TODO: Modify buf to add headers from dest_addr and addrlen. Change type from sockaddr to DAG 
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_INET;
