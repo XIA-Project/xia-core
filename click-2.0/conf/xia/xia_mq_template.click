@@ -22,9 +22,10 @@ elementclass gen_sub {
 
     input 
     //-> XIAPrint($eth_from) 
-    -> DynamicIPEncap(0x99, $eth_from, $eth_to)
+    -> DynamicIPEncap(0x99, $eth_from, $eth_to, COUNT 120)
+    //-> IPEncap(0x99, $eth_from, $eth_to)
     -> EtherEncap($ETH_P_IP, $SRC_MAC1 , $DST_MAC1)
-    -> clone1 ::Clone($COUNT, SHARED_SKBS true, WAITUNTIL 240)
+    //-> clone1 ::Clone($COUNT, SHARED_SKBS true, WAITUNTIL 240)
     -> td1 :: MQToDevice($eth_from, QUEUE $queue, BURST $BURST);
     StaticThreadSched(td1 $cpu);
 }
@@ -34,7 +35,12 @@ elementclass nofb {
     gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 240, BURST 20)
     -> XIAEncap(
            DST RE  $hid_to,
-           SRC RE  $hid_from, DYNAMIC false) -> output
+           SRC RE  $hid_from, DYNAMIC false) 
+    -> MarkXIAHeader()
+    -> XIAInsertHash()
+    -> XIAPrint("XX" ,PAYLOAD HEX, LENGTH true, MAXLENGTH 256)
+    -> Print(MAXLENGTH 256)
+    -> output
     Script(write gen1.active true);
     StaticThreadSched(gen1 $cpu);
 }
@@ -43,22 +49,25 @@ elementclass rgen_sub {
     $eth_from, $eth_to, $queue, $cpu | 
 
     input ->
-    -> MarkXIAHeader()
-    -> XIARandomize(XID_TYPE AD, MAX_CYCLE $AD_RANDOMIZE_MAX_CYCLE, OFFSET 1000, MULTIPLIER $queue)
-    -> DynamicIPEncap(0x99, $eth_from, $eth_to, COUNT 120)
-    -> EtherEncap($ETH_P_IP, $SRC_MAC1 , $DST_MAC1)
-    -> clone::Clone($COUNT, WAITUNTIL 1000)
+    //-> MarkXIAHeader()
+    -> XIARandomize(XID_TYPE AD, MAX_CYCLE $AD_RANDOMIZE_MAX_CYCLE)
+    //-> Print(MAXLENGTH 256)
     -> td1 :: MQToDevice($eth_from, QUEUE $queue, BURST $BURST);
 
-    StaticThreadSched(td1 $cpu, clone $cpu);
+    //StaticThreadSched(td1 $cpu, clone $cpu);
+    StaticThreadSched(td1 $cpu);
 }
 
 elementclass rnofb {
-    $hid_from, $hid_to, $cpu |
-    gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 1000, BURST 100)
+    $eth_from, $eth_to, $hid_from, $hid_to, $cpu |
+    gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 120, BURST 120)
     -> XIAEncap(
            DST RE  $hid_to,
            SRC RE  $hid_from, DYNAMIC false) 
+    -> DynamicIPEncap(0x99, $eth_from, $eth_to, COUNT 120)
+    -> EtherEncap($ETH_P_IP, $SRC_MAC1 , $DST_MAC1)
+    -> MarkXIAHeader(34)
+    -> Clone($COUNT)
     -> output
     Script(write gen1.active true);
     StaticThreadSched(gen1 $cpu);
@@ -67,18 +76,18 @@ elementclass rnofb {
 elementclass rgen_nofb_0 {
     $hid_from,  $eth_from, $eth_to |
 
-    rnofb($hid_from, RANDOM_ID, 0) -> rgen_sub($eth_from,  $eth_to, 0, 0 )
-    rnofb($hid_from, RANDOM_ID, 1) -> rgen_sub($eth_from,  $eth_to, 1, 1 )
-    rnofb($hid_from, RANDOM_ID, 2) -> rgen_sub($eth_from,  $eth_to, 2, 2 )
-    rnofb($hid_from, RANDOM_ID, 3) -> rgen_sub($eth_from,  $eth_to, 3, 3 )
-    rnofb($hid_from, RANDOM_ID, 4) -> rgen_sub($eth_from,  $eth_to, 4, 4 )
-    rnofb($hid_from, RANDOM_ID, 5) -> rgen_sub($eth_from,  $eth_to, 5, 5 )
-    rnofb($hid_from, RANDOM_ID, 6) -> rgen_sub($eth_from,  $eth_to, 6, 6 )
-    rnofb($hid_from, RANDOM_ID, 7) -> rgen_sub($eth_from,  $eth_to, 7, 7 )
-    rnofb($hid_from, RANDOM_ID, 8) -> rgen_sub($eth_from,  $eth_to, 8, 8 )
-    rnofb($hid_from, RANDOM_ID, 9) -> rgen_sub($eth_from,  $eth_to, 9, 9 )
-    rnofb($hid_from, RANDOM_ID, 10) -> rgen_sub($eth_from, $eth_to, 10, 10 )
-    rnofb($hid_from, RANDOM_ID, 11) -> rgen_sub($eth_from, $eth_to, 11, 11 )
+    rnofb($eth_from,  $eth_to, $hid_from, RANDOM_ID, 0) -> rgen_sub($eth_from,  $eth_to, 0, 0 )
+    rnofb($eth_from,  $eth_to, $hid_from, RANDOM_ID, 1) -> rgen_sub($eth_from,  $eth_to, 1, 1 )
+    rnofb($eth_from,  $eth_to, $hid_from, RANDOM_ID, 2) -> rgen_sub($eth_from,  $eth_to, 2, 2 )
+    rnofb($eth_from,  $eth_to, $hid_from, RANDOM_ID, 3) -> rgen_sub($eth_from,  $eth_to, 3, 3 )
+    rnofb($eth_from,  $eth_to, $hid_from, RANDOM_ID, 4) -> rgen_sub($eth_from,  $eth_to, 4, 4 )
+    rnofb($eth_from,  $eth_to, $hid_from, RANDOM_ID, 5) -> rgen_sub($eth_from,  $eth_to, 5, 5 )
+    rnofb($eth_from,  $eth_to, $hid_from, RANDOM_ID, 6) -> rgen_sub($eth_from,  $eth_to, 6, 6 )
+    rnofb($eth_from,  $eth_to, $hid_from, RANDOM_ID, 7) -> rgen_sub($eth_from,  $eth_to, 7, 7 )
+    rnofb($eth_from,  $eth_to, $hid_from, RANDOM_ID, 8) -> rgen_sub($eth_from,  $eth_to, 8, 8 )
+    rnofb($eth_from,  $eth_to, $hid_from, RANDOM_ID, 9) -> rgen_sub($eth_from,  $eth_to, 9, 9 )
+    rnofb($eth_from,  $eth_to, $hid_from, RANDOM_ID, 10) -> rgen_sub($eth_from, $eth_to, 10, 10 )
+    rnofb($eth_from,  $eth_to, $hid_from, RANDOM_ID, 11) -> rgen_sub($eth_from, $eth_to, 11, 11 )
 }
 
 elementclass rgen_nofb_1 {
@@ -135,11 +144,16 @@ elementclass gen_nofb_1 {
 }
 
 elementclass rfb1 {
-    $hid_from, $intent, $fb, $cpu |
-    gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 1000, BURST 100)
+    $eth_from, $eth_to, $hid_from, $intent, $fb, $cpu |
+    gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 120, BURST 120)
     -> XIAEncap(
            SRC RE  $hid_from,
-           DST RE  ( $fb ) $intent, DYNAMIC false) -> output
+           DST RE  ( $fb ) $intent, DYNAMIC false) 
+    -> DynamicIPEncap(0x99, $eth_from, $eth_to, COUNT 120)
+    -> EtherEncap($ETH_P_IP, $SRC_MAC1 , $DST_MAC1)
+    -> MarkXIAHeader(34)
+    -> Clone($COUNT)
+    -> output
     Script(write gen1.active true);
     StaticThreadSched(gen1 $cpu);
 }
@@ -149,7 +163,10 @@ elementclass fb1 {
     gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 240, BURST 20)
     -> XIAEncap(
            SRC RE  $hid_from,
-           DST RE  ( $fb ) $intent, DYNAMIC false) -> output
+           DST RE  ( $fb ) $intent, DYNAMIC false) 
+    -> MarkXIAHeader()
+    -> XIAInsertHash()
+    -> output
     Script(write gen1.active true);
     StaticThreadSched(gen1 $cpu);
 }
@@ -157,18 +174,18 @@ elementclass fb1 {
 elementclass rgen_fb1_0 {
     $hid_from, $eth_from, $eth_to |
 
-    rfb1($hid_from, ARB_RANDOM_ID, RANDOM_ID, 0) -> rgen_sub($eth_from, $eth_to, 0, 0 )
-    rfb1($hid_from, ARB_RANDOM_ID, RANDOM_ID, 1) -> rgen_sub($eth_from, $eth_to, 1, 1 )
-    rfb1($hid_from, ARB_RANDOM_ID, RANDOM_ID, 2) -> rgen_sub($eth_from, $eth_to, 2, 2 )
-    rfb1($hid_from, ARB_RANDOM_ID, RANDOM_ID, 3) -> rgen_sub($eth_from, $eth_to, 3, 3 )
-    rfb1($hid_from, ARB_RANDOM_ID, RANDOM_ID, 4) -> rgen_sub($eth_from, $eth_to, 4, 4 )
-    rfb1($hid_from, ARB_RANDOM_ID, RANDOM_ID, 5) -> rgen_sub($eth_from, $eth_to, 5, 5 )
-    rfb1($hid_from, ARB_RANDOM_ID, RANDOM_ID, 6) -> rgen_sub($eth_from, $eth_to, 6, 6 )
-    rfb1($hid_from, ARB_RANDOM_ID, RANDOM_ID, 7) -> rgen_sub($eth_from, $eth_to, 7, 7 )
-    rfb1($hid_from, ARB_RANDOM_ID, RANDOM_ID, 8) -> rgen_sub($eth_from, $eth_to, 8, 8 )
-    rfb1($hid_from, ARB_RANDOM_ID, RANDOM_ID, 9) -> rgen_sub($eth_from, $eth_to, 9, 9 )
-    rfb1($hid_from, ARB_RANDOM_ID, RANDOM_ID, 10) -> rgen_sub($eth_from,$eth_to, 10, 10 )
-    rfb1($hid_from, ARB_RANDOM_ID, RANDOM_ID, 11) -> rgen_sub($eth_from,$eth_to, 11, 11 )
+    rfb1($eth_from, $eth_to, $hid_from, ARB_RANDOM_ID, RANDOM_ID, 0)  -> rgen_sub($eth_from, $eth_to, 0, 0 )
+    rfb1($eth_from, $eth_to, $hid_from, ARB_RANDOM_ID, RANDOM_ID, 1)  -> rgen_sub($eth_from, $eth_to, 1, 1 )
+    rfb1($eth_from, $eth_to, $hid_from, ARB_RANDOM_ID, RANDOM_ID, 2)  -> rgen_sub($eth_from, $eth_to, 2, 2 )
+    rfb1($eth_from, $eth_to, $hid_from, ARB_RANDOM_ID, RANDOM_ID, 3)  -> rgen_sub($eth_from, $eth_to, 3, 3 )
+    rfb1($eth_from, $eth_to, $hid_from, ARB_RANDOM_ID, RANDOM_ID, 4)  -> rgen_sub($eth_from, $eth_to, 4, 4 )
+    rfb1($eth_from, $eth_to, $hid_from, ARB_RANDOM_ID, RANDOM_ID, 5)  -> rgen_sub($eth_from, $eth_to, 5, 5 )
+    rfb1($eth_from, $eth_to, $hid_from, ARB_RANDOM_ID, RANDOM_ID, 6)  -> rgen_sub($eth_from, $eth_to, 6, 6 )
+    rfb1($eth_from, $eth_to, $hid_from, ARB_RANDOM_ID, RANDOM_ID, 7)  -> rgen_sub($eth_from, $eth_to, 7, 7 )
+    rfb1($eth_from, $eth_to, $hid_from, ARB_RANDOM_ID, RANDOM_ID, 8)  -> rgen_sub($eth_from, $eth_to, 8, 8 )
+    rfb1($eth_from, $eth_to, $hid_from, ARB_RANDOM_ID, RANDOM_ID, 9)  -> rgen_sub($eth_from, $eth_to, 9, 9 )
+    rfb1($eth_from, $eth_to, $hid_from, ARB_RANDOM_ID, RANDOM_ID, 10) -> rgen_sub($eth_from, $eth_to, 10, 10 )
+    rfb1($eth_from, $eth_to, $hid_from, ARB_RANDOM_ID, RANDOM_ID, 11) -> rgen_sub($eth_from, $eth_to, 11, 11 )
 }
 
 elementclass rgen_fb1_1 {
@@ -224,8 +241,8 @@ elementclass gen_fb1_1 {
 }
 
 elementclass rfb2 {
-    $hid_from, $intent, $fb1, $fb2, $cpu |
-    gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 1000, BURST 100)
+    $eth_from, $eth_to, $hid_from, $intent, $fb1, $fb2, $cpu |
+    gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 120, BURST 120)
     -> XIAEncap(
            SRC RE  $hid_from,
    	   DST DAG 			2 1 0 - // -1
@@ -233,8 +250,11 @@ elementclass rfb2 {
 		 	$fb1		2 -     // 1
 		 	$intent			// 2
 		, DYNAMIC false		)	
-     -> XIAInsertHash()
-     -> output
+    -> DynamicIPEncap(0x99, $eth_from, $eth_to, COUNT 120)
+    -> EtherEncap($ETH_P_IP, $SRC_MAC1 , $DST_MAC1)
+    -> MarkXIAHeader(34)
+    -> Clone($COUNT)
+    -> output
     Script(write gen1.active true);
     StaticThreadSched(gen1 $cpu);
 }
@@ -249,7 +269,9 @@ elementclass fb2 {
 		 	$fb1		2 -     // 1
 		 	$intent			// 2
 		, DYNAMIC false		)	
-     -> output
+    -> MarkXIAHeader()
+    -> XIAInsertHash()
+    -> output
     Script(write gen1.active true);
     StaticThreadSched(gen1 $cpu);
 }
@@ -257,21 +279,21 @@ elementclass fb2 {
 elementclass rgen_fb2_0 {
     $hid_from, $eth_from, $eth_to |
 
-    rfb2($hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 0) 
+    rfb2($eth_from,  $eth_to, $hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 0) 
 //				-> MarkXIAHeader() -> XIAPrint()  
 								  -> rgen_sub($eth_from,  $eth_to,  0, 0 )
-    rfb2($hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 1)  -> rgen_sub($eth_from,  $eth_to,  1, 1 )
-    rfb2($hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 2)  -> rgen_sub($eth_from,  $eth_to,  2, 2 )
-    rfb2($hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 3)  -> rgen_sub($eth_from,  $eth_to,  3, 3 )
-    rfb2($hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 4)  -> rgen_sub($eth_from,  $eth_to,  4, 4 )
-    rfb2($hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 5)  -> rgen_sub($eth_from,  $eth_to,  5, 5 )
-    rfb2($hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 6)  -> rgen_sub($eth_from,  $eth_to,  6, 6 )
-    rfb2($hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 7)  -> rgen_sub($eth_from,  $eth_to,  7, 7 )
-    rfb2($hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 8)  -> rgen_sub($eth_from,  $eth_to,  8, 8 )
-    rfb2($hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 9)  -> rgen_sub($eth_from,  $eth_to,  9, 9 )
-    rfb2($hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 10) -> rgen_sub($eth_from,  $eth_to, 10, 10 )
-    rfb2($hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 11) -> rgen_sub($eth_from,  $eth_to, 11, 11 )
-}                      
+    rfb2($eth_from,  $eth_to, $hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 1)  -> rgen_sub($eth_from,  $eth_to,  1, 1 )
+    rfb2($eth_from,  $eth_to, $hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 2)  -> rgen_sub($eth_from,  $eth_to,  2, 2 )
+    rfb2($eth_from,  $eth_to, $hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 3)  -> rgen_sub($eth_from,  $eth_to,  3, 3 )
+    rfb2($eth_from,  $eth_to, $hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 4)  -> rgen_sub($eth_from,  $eth_to,  4, 4 )
+    rfb2($eth_from,  $eth_to, $hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 5)  -> rgen_sub($eth_from,  $eth_to,  5, 5 )
+    rfb2($eth_from,  $eth_to, $hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 6)  -> rgen_sub($eth_from,  $eth_to,  6, 6 )
+    rfb2($eth_from,  $eth_to, $hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 7)  -> rgen_sub($eth_from,  $eth_to,  7, 7 )
+    rfb2($eth_from,  $eth_to, $hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 8)  -> rgen_sub($eth_from,  $eth_to,  8, 8 )
+    rfb2($eth_from,  $eth_to, $hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 9)  -> rgen_sub($eth_from,  $eth_to,  9, 9 )
+    rfb2($eth_from,  $eth_to, $hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 10) -> rgen_sub($eth_from,  $eth_to, 10, 10 )
+    rfb2($eth_from,  $eth_to, $hid_from, ARB_RANDOM_ID, ARB_RANDOM_ID, RANDOM_ID , 11) -> rgen_sub($eth_from,  $eth_to, 11, 11 )
+}        
                   
 elementclass rgen_fb2_1 {
     $hid_from, $eth_from, $eth_to |
@@ -326,8 +348,8 @@ elementclass gen_fb2_1 {
 }
 
 elementclass rfb3 {
-    $hid_from, $intent, $fb1, $fb2, $fb3, $cpu |
-    gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 1000, BURST 100)
+    $eth_from, $eth_to, $hid_from, $intent, $fb1, $fb2, $fb3, $cpu |
+    gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 120, BURST 120)
     -> XIAEncap(
            SRC RE  $hid_from,
    	   DST DAG 			3 2 1 0 // -1
@@ -335,23 +357,29 @@ elementclass rfb3 {
 	 		$fb2	  	3 -	// 1
 		 	$fb1		3 -     // 2
 		 	$intent			// 3
-		, DYNAMIC false		)	
-     -> output
+	 	, DYNAMIC false		)	
+    -> DynamicIPEncap(0x99, $eth_from, $eth_to, COUNT 120)
+    -> EtherEncap($ETH_P_IP, $SRC_MAC1 , $DST_MAC1)
+    -> MarkXIAHeader(34)
+    -> Clone($COUNT)
+    -> output
     Script(write gen1.active true);
     StaticThreadSched(gen1 $cpu);
 }
 
 elementclass fb3 {
     $hid_from, $intent, $fb1, $fb2, $fb3, $cpu |
-    gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 240, BURST 100)
+    gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 24000000, BURST 256)
     -> XIAEncap(
            SRC RE  $hid_from,
-   	   DST DAG 			3 2 1 0 // -1
-	 		$fb3	  	3 -	// 0
-	 		$fb2	  	3 -	// 1
-		 	$fb1		3 -     // 2
-		 	$intent			// 3
-		, DYNAMIC false		)	
+           DST DAG 			3 2 1 0 // -1
+         		$fb3	  	3 -	// 0
+         		$fb2	  	3 -	// 1
+        	 	$fb1		3 -     // 2
+        	 	$intent			// 3
+         	, DYNAMIC false		)	
+    //-> MarkXIAHeader()
+    //-> XIAInsertHash()
      -> output
     Script(write gen1.active true);
     StaticThreadSched(gen1 $cpu);
@@ -394,20 +422,20 @@ elementclass gen_fb3_1 {
 elementclass rgen_fb3_0 {
     $hid_from, $eth_from, $eth_to |
 
-    rfb3($hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 0) 
+    rfb3($eth_from, $eth_to, $hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 0) 
 //	-> MarkXIAHeader() -> XIAPrint()  
 	->  rgen_sub($eth_from, $eth_to, 0, 0 )
-    rfb3($hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 1) ->  rgen_sub($eth_from, $eth_to, 1, 1 )
-    rfb3($hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 2) ->  rgen_sub($eth_from, $eth_to, 2, 2 )
-    rfb3($hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 3) ->  rgen_sub($eth_from, $eth_to, 3, 3 )
-    rfb3($hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 4) ->  rgen_sub($eth_from, $eth_to, 4, 4 )
-    rfb3($hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 5) ->  rgen_sub($eth_from, $eth_to, 5, 5 )
-    rfb3($hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 6) ->  rgen_sub($eth_from, $eth_to, 6, 6 )
-    rfb3($hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 7) ->  rgen_sub($eth_from, $eth_to, 7, 7 )
-    rfb3($hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 8) ->  rgen_sub($eth_from, $eth_to, 8, 8 )
-    rfb3($hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 9) ->  rgen_sub($eth_from, $eth_to, 9, 9 )
-    rfb3($hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 10) -> rgen_sub($eth_from,$eth_to, 10, 10 )
-    rfb3($hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 11) -> rgen_sub($eth_from,$eth_to, 11, 11 )
+    rfb3($eth_from, $eth_to, $hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 1) ->  rgen_sub($eth_from, $eth_to, 1, 1 )
+    rfb3($eth_from, $eth_to, $hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 2) ->  rgen_sub($eth_from, $eth_to, 2, 2 )
+    rfb3($eth_from, $eth_to, $hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 3) ->  rgen_sub($eth_from, $eth_to, 3, 3 )
+    rfb3($eth_from, $eth_to, $hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 4) ->  rgen_sub($eth_from, $eth_to, 4, 4 )
+    rfb3($eth_from, $eth_to, $hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 5) ->  rgen_sub($eth_from, $eth_to, 5, 5 )
+    rfb3($eth_from, $eth_to, $hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 6) ->  rgen_sub($eth_from, $eth_to, 6, 6 )
+    rfb3($eth_from, $eth_to, $hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 7) ->  rgen_sub($eth_from, $eth_to, 7, 7 )
+    rfb3($eth_from, $eth_to, $hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 8) ->  rgen_sub($eth_from, $eth_to, 8, 8 )
+    rfb3($eth_from, $eth_to, $hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 9) ->  rgen_sub($eth_from, $eth_to, 9, 9 )
+    rfb3($eth_from, $eth_to, $hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 10) -> rgen_sub($eth_from, $eth_to, 10, 10 )
+    rfb3($eth_from, $eth_to, $hid_from,  ARB_RANDOM_ID, ARB_RANDOM_ID, ARB_RANDOM_ID , RANDOM_ID, 11) -> rgen_sub($eth_from, $eth_to, 11, 11 )
 }
 
 elementclass rgen_fb3_1 {
@@ -428,8 +456,8 @@ elementclass rgen_fb3_1 {
 }
                                        
 elementclass via {
-    $hid_from, $viapoint, $intent,  $cpu |
-    gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 1000, BURST 100)
+    $eth_from, $eth_to, $hid_from, $viapoint, $intent,  $cpu |
+    gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 120, BURST 120)
     -> XIAEncap(
            SRC RE  $hid_from,
    	   DST DAG  0 -  		// -1
@@ -437,7 +465,11 @@ elementclass via {
 	        $intent -
 	   
 	, DYNAMIC false)	
-     -> output
+    -> DynamicIPEncap(0x99, $eth_from, $eth_to, COUNT 120)
+    -> EtherEncap($ETH_P_IP, $SRC_MAC1 , $DST_MAC1)
+    -> MarkXIAHeader(34)
+    -> Clone($COUNT)
+    -> output
     Script(write gen1.active true);
     StaticThreadSched(gen1 $cpu);
 }
@@ -445,18 +477,18 @@ elementclass via {
 elementclass rgen_via_0 {
     $hid_from, $eth_from, $eth_to |
 
-    via($hid_from,  SELFAD , RANDOM_ID, 0) 
+    via($eth_from, $eth_to, $hid_from,  SELFAD , RANDOM_ID, 0) 
 //			-> MarkXIAHeader() -> XIAPrint()  
 					   ->  rgen_sub($eth_from, $eth_to, 0, 0 )
-    via($hid_from,  SELFAD , RANDOM_ID, 1) ->  rgen_sub($eth_from, $eth_to, 1, 1 )
-    via($hid_from,  SELFAD , RANDOM_ID, 2) ->  rgen_sub($eth_from, $eth_to, 2, 2 )
-    via($hid_from,  SELFAD , RANDOM_ID, 3) ->  rgen_sub($eth_from, $eth_to, 3, 3 )
-    via($hid_from,  SELFAD , RANDOM_ID, 4) ->  rgen_sub($eth_from, $eth_to, 4, 4 )
-    via($hid_from,  SELFAD , RANDOM_ID, 5) ->  rgen_sub($eth_from, $eth_to, 5, 5 )
-    via($hid_from,  SELFAD , RANDOM_ID, 6) ->  rgen_sub($eth_from, $eth_to, 6, 6 )
-    via($hid_from,  SELFAD , RANDOM_ID, 7) ->  rgen_sub($eth_from, $eth_to, 7, 7 )
-    via($hid_from,  SELFAD , RANDOM_ID, 8) ->  rgen_sub($eth_from, $eth_to, 8, 8 )
-    via($hid_from,  SELFAD , RANDOM_ID, 9) ->  rgen_sub($eth_from, $eth_to, 9, 9 )
-    via($hid_from,  SELFAD , RANDOM_ID, 10) -> rgen_sub($eth_from,$eth_to, 10, 10 )
-    via($hid_from,  SELFAD , RANDOM_ID, 11) -> rgen_sub($eth_from,$eth_to, 11, 11 )
+    via($eth_from, $eth_to, $hid_from,  SELFAD , RANDOM_ID, 1) ->  rgen_sub($eth_from, $eth_to, 1, 1 )
+    via($eth_from, $eth_to, $hid_from,  SELFAD , RANDOM_ID, 2) ->  rgen_sub($eth_from, $eth_to, 2, 2 )
+    via($eth_from, $eth_to, $hid_from,  SELFAD , RANDOM_ID, 3) ->  rgen_sub($eth_from, $eth_to, 3, 3 )
+    via($eth_from, $eth_to, $hid_from,  SELFAD , RANDOM_ID, 4) ->  rgen_sub($eth_from, $eth_to, 4, 4 )
+    via($eth_from, $eth_to, $hid_from,  SELFAD , RANDOM_ID, 5) ->  rgen_sub($eth_from, $eth_to, 5, 5 )
+    via($eth_from, $eth_to, $hid_from,  SELFAD , RANDOM_ID, 6) ->  rgen_sub($eth_from, $eth_to, 6, 6 )
+    via($eth_from, $eth_to, $hid_from,  SELFAD , RANDOM_ID, 7) ->  rgen_sub($eth_from, $eth_to, 7, 7 )
+    via($eth_from, $eth_to, $hid_from,  SELFAD , RANDOM_ID, 8) ->  rgen_sub($eth_from, $eth_to, 8, 8 )
+    via($eth_from, $eth_to, $hid_from,  SELFAD , RANDOM_ID, 9) ->  rgen_sub($eth_from, $eth_to, 9, 9 )
+    via($eth_from, $eth_to, $hid_from,  SELFAD , RANDOM_ID, 10) -> rgen_sub($eth_from, $eth_to, 10, 10 )
+    via($eth_from, $eth_to, $hid_from,  SELFAD , RANDOM_ID, 11) -> rgen_sub($eth_from, $eth_to, 11, 11 )
 }

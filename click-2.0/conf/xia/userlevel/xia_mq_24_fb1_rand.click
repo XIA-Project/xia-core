@@ -4,7 +4,7 @@ require(library ../xia_address.click);
 
 define($AD_RT_SIZE 351611);
 define($AD_RANDOMIZE_MAX_CYCLE $AD_RT_SIZE);
-define($PAYLOAD_SIZE 30);
+define($PAYLOAD_SIZE 2);
 
 rgen_fb1_0(HID2, xge0, xge2);
 rgen_fb1_0(HID3, xge1, xge3);

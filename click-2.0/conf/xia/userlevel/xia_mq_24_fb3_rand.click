@@ -1,7 +1,7 @@
 define($AD_RT_SIZE 351611);
 define($AD_RANDOMIZE_MAX_CYCLE $AD_RT_SIZE);
 
-define($PAYLOAD_SIZE 30);
+define($PAYLOAD_SIZE 74);
 
 require(library ../xia_mq_template.click);
 require(library ../xia_address.click);
