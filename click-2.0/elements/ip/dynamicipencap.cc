@@ -18,12 +18,13 @@ DynamicIPEncap::configure(Vector<String> &conf, ErrorHandler *errh)
 {
   int count;
   Vector<String> ipencap;
-  Vector<String> mine;
-  
+  Vector<String> config_mine;
+ 
+  /* IP encap configuration */ 
   for (Vector<String>::iterator it = conf.begin(); it< conf.end() ; it ++) {
     if ((*it).starts_with(String("COUNT"))) {
 	click_chatter((*it).c_str());
-	mine.push_back(*it);
+	config_mine.push_back(*it);
 	continue;
     }
     ipencap.push_back(*it);
@@ -31,7 +32,8 @@ DynamicIPEncap::configure(Vector<String> &conf, ErrorHandler *errh)
   int ret =  IPEncap::configure(ipencap, errh);
   if (ret<0) return ret;
 
-  if (cp_va_kparse(mine, this, errh,
+  /* DynamicIPEncap configuation */
+  if (cp_va_kparse(config_mine, this, errh,
                  "COUNT", 0, cpUnsigned, &count,
                  cpEnd) < 0)
       return -1;

@@ -33,7 +33,7 @@ IPRandomize::~IPRandomize()
 int
 IPRandomize::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    Element* routing_table_elem;
+    Element* routing_table_elem = NULL;
     int ret = cp_va_kparse(conf, this, errh,
 			"ROUTETABLENAME", 0, cpElement, &routing_table_elem,
 			"MAX_CYCLE", 0, cpInteger, &_max_cycle,
@@ -42,7 +42,7 @@ IPRandomize::configure(Vector<String> &conf, ErrorHandler *errh)
     if (ret<0) return ret;
 #if CLICK_USERLEVEL
     _routeTable = dynamic_cast<IPRouteTable*>(routing_table_elem);
-    click_chatter("route table %x", _routeTable);
+    click_chatter("route table %x", _routeTable); 
 #else
     _routeTable = reinterpret_cast<IPRouteTable*>(routing_table_elem);
 #endif
