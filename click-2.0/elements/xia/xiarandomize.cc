@@ -44,7 +44,7 @@ XIARandomize::XIARandomize() : _zipf(1.3)
 #endif
 }
 
-uint32_t * XIARandomize::_zipf_cache;
+uint32_t * XIARandomize::_zipf_cache = NULL;
 
 XIARandomize::~XIARandomize()
 {
@@ -82,6 +82,9 @@ XIARandomize::configure(Vector<String> &conf, ErrorHandler *errh)
 	for (int i=0;i<_max_cycle*100;i++) {
 	    _zipf_cache[i] = _zipf.next();
 	}
+	for (int i=0;i<_max_cycle*100;i++) {
+	    assert(_zipf_cache[i]< _max_cycle);
+	}
     }
     return 0;
 }
@@ -95,6 +98,8 @@ XIARandomize::simple_action(Packet *p_in)
         return 0;
 
     click_xia *hdr = p->xia_header();
+
+    assert(_zipf_cache);
     uint32_t seed  = _zipf_cache[_current_cycle]; /* zipf */
 
     for (size_t i = 0; i < hdr->dnode + hdr->snode; i++)

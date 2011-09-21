@@ -5,6 +5,7 @@ LOAD_CLICK_CMD = "/home/dongsuh/xia-core/click-2.0/load_user_click.sh"
 IP_ROUTER_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_ip_router.sh"
 IP_PKT_GEN_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_ip_pktgen.sh"
 XIA_ROUTER_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_xia_router.sh" 
+XIA_FP_ROUTER_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_xia_fp_router.sh" 
 XIA_PKT_GEN_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_xia_pktgen.sh"
 XIA_PKT_GEN_FB1_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_xia_pktgen_fb1.sh"
 XIA_PKT_GEN_FB2_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_xia_pktgen_fb2.sh"
@@ -16,12 +17,19 @@ RECORD_STAT_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/record_st
 RESET_CLICK_CMD = "killall click"
 
 SETUP = [ 
-#	{:NAME => "XIA-%d-FB0", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>98},
+	{:NAME => "XIA-%d-FB0-SP", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>98},
+	{:NAME => "XIA-%d-FB0-FP", :ROUTER =>XIA_FP_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>98},
+	{:NAME => "XIA-%d-FB1-SP", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_FB1_SCRIPT, :PKT_OVERHEAD =>126},
+	{:NAME => "XIA-%d-FB1-FP", :ROUTER =>XIA_FP_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_FB1_SCRIPT, :PKT_OVERHEAD =>126},
+	{:NAME => "XIA-%d-FB2-SP", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_FB2_SCRIPT, :PKT_OVERHEAD =>154},
+	{:NAME => "XIA-%d-FB2-FP", :ROUTER =>XIA_FP_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_FB2_SCRIPT, :PKT_OVERHEAD =>154},
+	{:NAME => "XIA-%d-FB3-SP", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_FB3_SCRIPT, :PKT_OVERHEAD =>182},
+	{:NAME => "XIA-%d-FB3-FP", :ROUTER =>XIA_FP_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_FB3_SCRIPT, :PKT_OVERHEAD =>182},
 #	{:NAME => "XIA-%d-FB3", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_FB3_SCRIPT, :PKT_OVERHEAD =>182},
 #	{:NAME => "XIA-%d-FB2", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_FB2_SCRIPT, :PKT_OVERHEAD =>154},
 #	{:NAME => "XIA-%d-FB1", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_FB1_SCRIPT, :PKT_OVERHEAD =>126},
 #	{:NAME => "IP-%d-NOCP", :ROUTER => IP_ROUTER_SCRIPT, :PKTGEN => IP_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>34},
-	{:NAME => "XIA-%d-isolation-%d", :ROUTER => XIA_ROUTER_SCRIPT, :PKTGEN =>XIA_PKT_GEN_ISO_SCRIPT, :PKT_OVERHEAD =>126},
+#	{:NAME => "XIA-%d-isolation-%d", :ROUTER => XIA_ROUTER_SCRIPT, :PKTGEN =>XIA_PKT_GEN_ISO_SCRIPT, :PKT_OVERHEAD =>126},
 #	{:NAME => "XIA-%d-VIA", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_VIA_SCRIPT, :PKT_OVERHEAD =>126}
 	]
 class Flags
@@ -53,7 +61,7 @@ def run_command(machine, cmd, mode = Flags::BACKGROUND)
 end
 
 def load_click(machine, mode)
-  run_command(machine, LOAD_CLICK_CMD, mode)
+#  run_command(machine, LOAD_CLICK_CMD, mode)
 end
 
 def reset_click(machine, mode)
@@ -92,6 +100,9 @@ if __FILE__ ==$0
 
     if (setup[:NAME]=="XIA-%d-isolation-%d")
       pkt_size =  (1..11).to_a
+    end
+    if (setup[:NAME]=~/-FP/ || setup[:NAME]=~/-SP/)
+      pkt_size =  [256]
     end
    
     p setup[:NAME]    

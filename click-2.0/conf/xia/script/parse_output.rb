@@ -19,19 +19,23 @@ class Pathname
   # is specified, only return files where filename =~ _matching_.
   #
   # Returns nil if no files (or no matching files) are found.
-  def most_recent_file(matching=/./)
+  def most_recent_file(matching=/./, return_array = false)
     return self unless self.directory?
     files = self.entries.collect { |file| self+file }.sort { |file1,file2| file1.mtime <=> file2.mtime }
     files.reject! { |file| ((file.file? and file.to_s =~ matching) ? false : true) }
-    files.last
+    if (return_array)
+      return files
+    else
+      return files.last
+    end
   end
 end
 
 #$proto = ["IP", "XIA"]
 $proto = [ "XIA"]
-$postfix = "FB1"
+$postfix = "FB2-SP"
 
-def calc_avg_performance(file)
+def calc_avg_performance(file, return_array=false)
   tx = []
   file.each_line do |l|
     cols = l.split
@@ -40,7 +44,12 @@ def calc_avg_performance(file)
     end
   end 
   #tx.sort! { |x,y| y<=>x }
-  return tx[20..[tx.size-5, 110].min].avg
+  if (return_array)
+    return tx[20..[tx.size-5, 110].min]
+  else
+    return tx[20..[tx.size-5, 110].min].avg
+  end
+
 end
 
 def parse_result(output_to_file)
