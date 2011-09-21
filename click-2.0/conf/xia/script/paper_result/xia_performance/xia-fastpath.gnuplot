@@ -1,6 +1,6 @@
 #!/usr/bin/env gnuplot 
 		
-set term pdf size 3.30in, 1.55in
+set term pdf size 3.00in, 1.55in
 		
 set output "fastpath_performance.pdf"
 set xlabel "XIA Packet types"
@@ -26,5 +26,7 @@ set grid
 set key box
 set key  enhanced  bottom right spacing 0.85
 		
-plot 'fastpath' u  6:xticlabel(3) w lp ls 2 title "Fast Path", \
-     'fastpath' u  15:xticlabel(3) w lp ls 8 title "w/o Fast Path"  
+plot 'fastpath' u  6:xticlabel(3) w lp ls 2 title "XIA Fast Path", \
+     'fastpath' u  0:6:($8*256*8/1000):($9*256*8/1000) w errorbars ls 2 notitle , \
+     'fastpath' u  15:xticlabel(3) w lp ls 8 title "XIA w/o Fast Path"  ,\
+     'fastpath' u  0:15:($17*256*8/1000):($18*256*8/1000) w errorbars ls 8 notitle 
