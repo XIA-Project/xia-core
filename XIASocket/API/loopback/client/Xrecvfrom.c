@@ -15,8 +15,6 @@ int Xrecvfrom(int sockfd, void *buf, size_t len, int flags,
     char UDPbuf[MAXBUFLEN];
 	struct sockaddr_in their_addr;
 
-	//TODO: Modify buf to add headers from dest_addr and addrlen. Change type from sockaddr to DAG 
-
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_DGRAM;

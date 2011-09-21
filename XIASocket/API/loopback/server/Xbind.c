@@ -1,15 +1,14 @@
 #include "Xsocket.h"
 
 
-int Xbind(int sockfd, char* SID)
+int Xbind(int sockfd, char* Sdag)
 {
-	//Setup to listen for control info
 
    	struct addrinfo hints, *servinfo, *p;
 	int rv;
 	int numbytes;
 	
-    //Send a control packet to inform Click of socket closing
+    //Send a control packet to inform Click of bind request
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_DGRAM;
@@ -21,7 +20,7 @@ int Xbind(int sockfd, char* SID)
 
     p=servinfo;
     
-	if ((numbytes = sendto(sockfd, SID, strlen(SID), 0,
+	if ((numbytes = sendto(sockfd, Sdag, strlen(Sdag), 0,
 					p->ai_addr, p->ai_addrlen)) == -1) {
 		perror("Xbind(): sendto failed");
 		return(-1);

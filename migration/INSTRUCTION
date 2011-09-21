@@ -3,14 +3,14 @@
   * Ubuntu (preferably >= 11.04)
 
 
-Guest machine preparation
-=========================
+Host/Guest machine preparation
+==============================
 
 1. Install necessary packages to both host machines
 
   $ sudo aptitude -R install qemu-kvm		# for qemu/kvm
   $ sudo aptitude -R install python-vm-builder	# for vmbuilder
-  $ suod aptitude -R rsync
+  $ sudo aptitude -R rsync
 
 2. Generate an SSH key pair that root @ guest will accept
 
@@ -19,6 +19,24 @@ Guest machine preparation
 3. Create a virtual machine image with a guest OS installed (this takes around 11 minutes)
 
   $ sudo vmbuilder kvm ubuntu --rootsize=1024 --swapsize=0 --ssh-key=id_rsa_vm.pub --addpkg=openssh-server --addpkg=rsync --addpkg=psmisc --addpkg=libprotobuf6 --hostname=guest --user=xia --pass=xia --rootpass=xia --suite=natty
+
+4. Prepare a bridge
+
+  If /etc/network/interfaces contained the following:
+
+auto eth0
+iface eth0 inet dhcp
+  hwaddress ether ...
+
+  Replace it with the following:
+
+auto br0
+iface br0 inet dhcp
+  hwaddress ether ...
+  bridge_ports eth0
+  post-up brctl setageing br0 0  # always broadcast
+
+  $ sudo ifup br0
 
 
 Click on host

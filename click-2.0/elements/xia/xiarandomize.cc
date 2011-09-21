@@ -30,9 +30,15 @@ XIARandomize::XIARandomize() : _zipf(1.3)
     _max_cycle = 1000000000;
 
 #if CLICK_USERLEVEL
+#if HAVE_MULTITHREAD
     _xsubi_arb[0] = 7 * click_current_thread_id + 1;
     _xsubi_arb[1] = 5 * click_current_thread_id - 1;
     _xsubi_arb[2] = 3 * click_current_thread_id + 1;
+#else
+    _xsubi_arb[0] = 0;
+    _xsubi_arb[1] = 1;
+    _xsubi_arb[2] = 2;
+#endif
 #elif CLICK_LINUXMODULE
     prandom32_seed(&_arbitrary, 123999);
 #endif

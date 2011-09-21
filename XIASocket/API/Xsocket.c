@@ -137,7 +137,6 @@ int Xsocket()
 	int src_port=ntohs(their_addr.sin_port);
 	//printf("rx port:%d, tx port%d\n", src_port,port);
 
-	//port=1245;//TODO remove and use the same value as earlier in actual CLick
 
 	if (src_port==port)
 		return sockfd;

@@ -65,10 +65,14 @@ IsoCPUQueue::deq(int n)
 void
 IsoCPUQueue::push(int, Packet *p)
 {
+#if HAVE_MULTITHREAD
 #if CLICK_USERLEVEL
     int n = click_current_thread_id;
 #else
     int n = click_current_processor();
+#endif
+#else
+    int n = 0;
 #endif
     int next = next_i(_q[n]._tail);
     if (next != _q[n]._head) {
@@ -84,10 +88,14 @@ Packet *
 IsoCPUQueue::pull(int /*port*/)
 {
     Packet *p = NULL;
+#if HAVE_MULTITHREAD
 #if CLICK_USERLEVEL
     int n = click_current_thread_id;
 #else
     int n = click_current_processor();
+#endif
+#else
+    int n = 0;
 #endif
     p = deq(n);
     return p;

@@ -17,16 +17,7 @@ int main(int argc, char *argv[])
 {
 	int sock, length, n;
 	char buf[1024];
-/*
-	if (argc < 3) {
-		fprintf(stderr, "ERROR, provide MYADDRESS and CLICKCONTROLADDRESS\n");
-		exit(0);
-	}
-	
-	//Set some variables
-	strcpy(MYADDRESS,argv[1]);
-	strcpy(CLICKCONTROLADDRESS,argv[2]);
-*/
+
 	sock=Xsocket();
 	if (sock < 0) error("Opening socket");
 	

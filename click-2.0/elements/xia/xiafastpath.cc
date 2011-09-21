@@ -83,10 +83,14 @@ int XIAFastPath::configure(Vector<String> &conf, ErrorHandler *errh)
 void XIAFastPath::push(int port, Packet * p)
 {
 
+#if HAVE_MULTITHREAD
 #if CLICK_USERLEVEL
     int thread_id = click_current_thread_id;
 #else
     int thread_id = click_current_processor();
+#endif
+#else
+    int thread_id = 0;
 #endif
     const uint8_t *key = getkey(p);
  

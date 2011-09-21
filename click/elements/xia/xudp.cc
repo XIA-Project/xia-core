@@ -28,7 +28,7 @@ XUDP::configure(Vector<String> &conf, ErrorHandler *errh)
 				"API_IP", cpkP+cpkM, cpIPAddress, &_APIaddr,
 				cpEnd) < 0)
 		return -1;
-
+    
 	_local_addr = local_addr;
 	_local_hid = local_addr.xid(local_addr.destination_node());
 	return 0;
@@ -89,7 +89,7 @@ void XUDP::push(int port, Packet *p_in)
 							daginfo.port=_sport;
 							//String str_local_addr=_local_addr.unparse();
 							//str_local_addr=str_local_addr+" "+xid_string;//Make source DAG _local_addr:SID
-							daginfo.src_path.parse(sdag_string);//TODO: Check
+							daginfo.src_path.parse(sdag_string);
 							daginfo.nxt=-1;
 							daginfo.last=-1;
 							daginfo.hlim=250;
@@ -97,7 +97,7 @@ void XUDP::push(int port, Packet *p_in)
 							XID	source_xid = daginfo.src_path.xid(daginfo.src_path.destination_node());
 							//XID xid(xid_string);
 							//TODO: Add a check to see if XID is already being used
-							XIDtoPort.set(source_xid,_sport);//TODO: Maybe change the mapping to XID->DAGinfo?
+							XIDtoPort.set(source_xid,_sport);//Maybe change the mapping to XID->DAGinfo?
 
 							portToDAGinfo.set(_sport,daginfo);
 
@@ -123,28 +123,39 @@ void XUDP::push(int port, Packet *p_in)
             				p_in->pull(8); //Remove UDP header
 						
 							String dest((const char*)p->data(),(const char*)p->end_data());
-							//click_chatter("\nconnect requested to %s, length=%d\n",dest.c_str(),(int)p->length());
+							//click_chatter("\nconnect to %s, length=%d\n",dest.c_str(),(int)p->length());
 							XIAPath dst_path;
-							dst_path.parse(dest); //TODO: Check 
+							dst_path.parse(dest); 
 							
 
                             DAGinfo *daginfo=portToDAGinfo.get_pointer(_sport);
                             
                             if(!daginfo)//No local SID bound yet, so bind one
                             {
+							
                             
                             daginfo=new DAGinfo();
 							daginfo->port=_sport;
 							String str_local_addr=_local_addr.unparse_re();
-							String xid_string="SID:200000000000000000000000000000000f000001";//TODO: Make this random
+							
+							String rand(click_random(1000000, 9999999));
+							String xid_string="SID:20000ff00000000000000000000000000"+rand;
 							str_local_addr=str_local_addr+" "+xid_string;//Make source DAG _local_addr:SID
-							daginfo->src_path.parse_re(str_local_addr);//TODO: Check
+                            
+							daginfo->src_path.parse_re(str_local_addr);
+							
 							daginfo->nxt=-1;
 							daginfo->last=-1;
 							daginfo->hlim=250;
-                            }
 
+							XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+													
+							XIDtoPort.set(source_xid,_sport);//Maybe change the mapping to XID->DAGinfo?
+							portToDAGinfo.set(_sport,*daginfo);
+                            }
+                            daginfo=portToDAGinfo.get_pointer(_sport);
 							daginfo->dst_path=dst_path;
+							//click_chatter("\nbound to %s\n",portToDAGinfo.get_pointer(_sport)->src_path.unparse().c_str());
 
     						portRxSeqNo.set(_sport,portRxSeqNo.get(_sport)+1);//Increment counter
 						}					
@@ -163,16 +174,16 @@ void XUDP::push(int port, Packet *p_in)
 				unsigned short _sport=udp_header->uh_sport;
 				
                 //Find DAG info for that stream
-				DAGinfo daginfo=portToDAGinfo.get(_sport);
+				DAGinfo *daginfo=portToDAGinfo.get_pointer(_sport);
 				
 				//Add XIA headers
 				class XIAHeaderEncap* _xiah=new XIAHeaderEncap();
-				if (daginfo.nxt >= 0)
+				if (daginfo->nxt >= 0)
 					_xiah->set_nxt(-1);
 				_xiah->set_last(-1);
 				_xiah->set_hlim(250);
-				_xiah->set_dst_path(daginfo.dst_path);
-				_xiah->set_src_path(daginfo.src_path);
+				_xiah->set_dst_path(daginfo->dst_path);
+				_xiah->set_src_path(daginfo->src_path);
 				
 				p->pull(p->transport_header_offset());//Remove IP header
 				p_in->pull(8); //Remove UDP header
@@ -193,8 +204,8 @@ void XUDP::push(int port, Packet *p_in)
 				XIAHeader x_hdr(p->xia_header());
 			    XIAPath dst_path=x_hdr.dst_path();
                 XID	_destination_xid = dst_path.xid(dst_path.destination_node());    
-                //TODO:Use source AND destination XID to find port, if not found use source
-                //TODO:pass dag back to recvfrom      
+                //TODO:In case of stream use source AND destination XID to find port, if not found use source. No TCP like protocol exists though
+                //TODO:pass dag back to recvfrom. But what format?
 
 				unsigned short _dport= XIDtoPort.get(_destination_xid);
 				

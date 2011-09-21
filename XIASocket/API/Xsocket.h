@@ -30,7 +30,7 @@
 #define CLICKDATAADDRESS "172.0.0.2" 
 #define CLICKDATAPORT "10000"
 
-//TODO: set xia.click sorter to sort based on these ports. Use all higher destination ports for data and set destination port=source port
+//set xia.click sorter to sort based on these ports. 
 
 
 #define ATTEMPTS 3 //Number of attempts at opening a socket 

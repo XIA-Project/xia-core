@@ -18,7 +18,7 @@ fromhost_cl0[1]
 
 //Control in
 sorter0[0]
-->xudp0::XUDP(RE $AD0 $HID0, 192.0.0.2,192.0.0.1);
+->xudp0::XUDP(RE $AD1 $HID1, 192.0.0.2,192.0.0.1);
 
 //socket side in
 sorter0[1]
@@ -47,7 +47,7 @@ fromhost_cl1[1]
 //Control in
 sorter1[0]
 //->Print(Gotsomething,MAXLENGTH 100, CONTENTS ASCII)
-->xudp1::XUDP(RE $AD1 $HID1, 172.0.0.2,172.0.0.1);;
+->xudp1::XUDP(RE $AD0 $HID0, 172.0.0.2,172.0.0.1);;
 
 //socket side in
 sorter1[1]
