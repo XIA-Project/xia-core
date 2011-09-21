@@ -20,5 +20,9 @@ while true; do
 	sleep 0.1
 done
 
+#echo send an update to guest
+#ssh $HOST_A_IP "$COMMON_PREFIX/ssh_to_local_guest.sh \"ifconfig eth1 down; ifconfig eth1 up\""
+ssh $HOST_A_IP "sudo $CLICK_PATH/userlevel/click $CLICK_PATH/conf/xia/xia_vm_ping_update_hostA.click"
+
 #echo done
 
