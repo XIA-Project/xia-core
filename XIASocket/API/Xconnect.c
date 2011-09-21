@@ -3,13 +3,12 @@
 
 int Xconnect(int sockfd, char* dest_DAG)
 {
-	//Setup to listen for control info
 
    	struct addrinfo hints, *servinfo, *p;
 	int rv;
 	int numbytes;
 	
-    //Send a control packet to inform Click of socket closing
+    //Send a control packet to inform Click of connect request
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_DGRAM;
