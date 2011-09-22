@@ -80,7 +80,11 @@ XIARandomize::configure(Vector<String> &conf, ErrorHandler *errh)
 	_zipf_cache = new uint32_t[_max_cycle*100];
 	//_zipf_arbit = Zipf(1.2, 1000000000);
 	for (int i=0;i<_max_cycle*100;i++) {
-	    _zipf_cache[i] = _zipf.next();
+		uint32_t v;
+		do {
+			v = _zipf.next();
+		} while (v >= _max_cycle);
+	    _zipf_cache[i] = v;
 	}
 	for (int i=0;i<_max_cycle*100;i++) {
 	    assert(_zipf_cache[i]< _max_cycle);
