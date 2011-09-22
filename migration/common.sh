@@ -16,6 +16,11 @@ INCOMING_ARGS="-incoming tcp:0.0.0.0:6666"
 HOST_A_IP="128.2.208.168"
 HOST_B_IP="128.2.208.169"
 
-#CLICK_PATH=~/xia-core/click-2.0
-CLICK_PATH=/mnt/home-xia-router0/$USER/xia-core/click-2.0
+if [ "`hostname`" == "xia-router0" ]; then
+	CLICK_PATH=/mnt/home-xia-router0/$USER/xia-core/click-2.0
+elif [ "`hostname`" == "xia-router1" ]; then
+	CLICK_PATH=/mnt/home-xia-router0/$USER/xia-core/click-2.0
+else
+	CLICK_PATH=~/xia-core/click-2.0
+fi
 

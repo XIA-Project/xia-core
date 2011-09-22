@@ -4,11 +4,11 @@ require(library xia_vm_common.click);
 
 router :: RouteEngine(RE AD1 HID1);
 
-//from_eth0 :: FromDevice(eth0, PROMISC true);
-from_eth0 :: FromDevice(br0, PROMISC true); // if client runs on RHID0
+from_eth0 :: FromDevice(eth0, PROMISC true);
+//from_eth0 :: FromDevice(br0, PROMISC true); // if client runs on RHID0
 
-//to_eth0 :: Queue() -> ToDevice(eth0);
-to_eth0 :: Queue() -> ToDevice(br0); // if client runs on RHID0
+to_eth0 :: Queue() -> ToDevice(eth0);
+//to_eth0 :: Queue() -> ToDevice(br0); // if client runs on RHID0
 
 from_eth0
 -> c0 :: Classifier(12/9999) -> Strip(14) -> MarkXIAHeader() -> [0]router;

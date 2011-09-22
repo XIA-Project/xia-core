@@ -52,6 +52,7 @@ dataset = {
     'CID-REQ-M': data_path_prefix + 'output_xia_packetforward_cid_req_miss',
     'CID-REQ-H': data_path_prefix + 'output_xia_packetforward_cid_req_hit',
     'CID-REP': data_path_prefix + 'output_xia_packetforward_cid_rep',
+    'FB3-FP': data_path_prefix + 'output_xia_packetforward_fallback3_fastpath',
 
     'TABLESIZE_HID_1': data_path_prefix + 'output_xia_tablesize_cid_1',
     'TABLESIZE_HID_3': data_path_prefix + 'output_xia_tablesize_cid_3',
@@ -88,6 +89,7 @@ dataset = {
     'TABLESIZE_AD_30000000': data_path_prefix + 'output_xia_tablesize_ad_30000000',
 }
 
-iter_max = 10
+#iter_max = 10
 #iter_max = 5
+iter_max = 1
 
