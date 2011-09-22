@@ -28,7 +28,7 @@ set key box
 set key enhanced top right spacing 0.85
 		
 plot 'ip' u 2:3 w lp ls 1 title "IP" axis x1y1, \
-     'fb0' u 2:3 w lp ls 3 title "XIA" axis x1y1,  \
+     'fb0' u 2:3 w lp ls 3 title "XIA FB0" axis x1y1,  \
      'fb1' u 2:3 w lp ls 5 title "XIA FB1" axis x1y1,  \
      'fb2' u 2:3 w lp ls 7 title "XIA FB2" axis x1y1,  \
      'fb3' u 2:3 w lp ls 9 title "XIA FB3" axis x1y1, \

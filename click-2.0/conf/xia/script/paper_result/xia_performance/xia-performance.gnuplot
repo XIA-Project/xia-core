@@ -32,7 +32,7 @@ set key  enhanced  bottom right spacing 0.85
 #     'fb2' u 2:($3*($2+24)*8/1000) w lp ls 8 title "XIA FB2" ,  \
 #     'fb3' u 2:($3*($2+24)*8/1000) w lp ls 10 title "XIA FB3"
 plot 'ip' u  2:4 w lp ls 2 title "IP" , \
-     'fb0' u 2:4 w lp ls 4 title "XIA",  \
+     'fb0' u 2:4 w lp ls 4 title "XIA FB0",  \
      'fb1' u 2:4 w lp ls 6 title "XIA FB1",  \
      'fb2' u 2:4 w lp ls 8 title "XIA FB2" ,  \
      'fb3' u 2:4 w lp ls 10 title "XIA FB3", \
