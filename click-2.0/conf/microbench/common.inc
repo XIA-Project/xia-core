@@ -153,7 +153,7 @@ elementclass XIAPacketForwardFastPath {
     Script(print_usertime, write host0/n/proc/rt_CID/rt.generate CID $CID_RT_SIZE 0, print_usertime);
     //Script(write host0/n/proc/rt_CID/rt.generate CID $CID_RT_SIZE 0);
 
-    fastpath :: XIAFastPath(BUCKET_SIZE 1024, KEY_OFFSET -52);   // - 28 (src dag) - 24 (start of last dest dag node xid)
+    fastpath :: XIAFastPath(BUCKET_SIZE 512, KEY_OFFSET -52);   // - 28 (src dag) - 24 (start of last dest dag node xid)
 
     input[0]
     -> Clone($COUNT)
