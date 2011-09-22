@@ -1,8 +1,5 @@
-//include ../xia_router_template.inc
-//include common.inc
-
-require(library ../xia_router_template.inc)
-require(library common.inc)
+require(library ../xia_router_template.inc);
+require(library common.inc);
 
 
 gen :: InfiniteSource(LENGTH $PAYLOAD_SIZE_IP, ACTIVE false, HEADROOM $HEADROOM_SIZE_IP)

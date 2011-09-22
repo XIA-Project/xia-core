@@ -1,5 +1,5 @@
-include ../xia_router_template.inc
-include common.inc
+require(library ../xia_router_template.inc);
+require(library common.inc);
 
 
 gen :: InfiniteSource(LENGTH $PAYLOAD_SIZE_XIA_XID5, ACTIVE false, HEADROOM $HEADROOM_SIZE_XIA_XID5)
@@ -11,7 +11,7 @@ gen :: InfiniteSource(LENGTH $PAYLOAD_SIZE_XIA_XID5, ACTIVE false, HEADROOM $HEA
                     ARB_RANDOM_ID 3 -       //  2
                     ARB_RANDOM_ID           //  3
 )
--> fwd :: XIAPacketForward;
+-> fwd :: XIAPacketForwardFastPath;
 
 Idle -> [1]fwd;
 Idle -> [2]fwd;

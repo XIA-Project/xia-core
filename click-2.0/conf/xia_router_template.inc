@@ -255,8 +255,8 @@ elementclass IPRouter4Port {
     // output[3]: forward to interface 3
 
     //rt :: RangeIPLookup;    // fastest lookup for large table
-    //rt :: DirectIPLookup;   // 5% faster than RangeIPLookup for very small table
-    rt :: RadixIPLookup;    // fastest to setup, most generous (no limits in numbers)
+    rt :: DirectIPLookup;   // 5% faster than RangeIPLookup for very small table
+    //rt :: RadixIPLookup;    // fastest to setup, most generous (no limits in numbers)
     dt :: DecIPTTL;
     fr :: IPFragmenter(1500);
 

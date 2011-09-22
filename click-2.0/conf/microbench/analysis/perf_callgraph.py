@@ -3,7 +3,8 @@ import subprocess
 
 comment_pat = re.compile(r'^(#.*|No kallsyms.+|.+without symbols)$')
 major_pat = re.compile(r'^([\.\d]+)%\s+(\S+)\s+(\S+)\s+\[(.+)\]\s+(.+)$')
-minor_sample_pat = re.compile(r'^([\.\d]+)$')
+#minor_sample_pat = re.compile(r'^([\.\d]+)$')
+minor_sample_pat = re.compile(r'^([\.\d]+)%$')
 minor_symbol_pat = re.compile(r'^(\S.*\S)$')
 empty_pat = re.compile(r'^$')
 
@@ -36,7 +37,8 @@ def parse(seq, stop_symbols):
 
             mat = minor_sample_pat.match(line)
             if mat is not None:
-                last_sample = int(mat.group(1))
+                #last_sample = int(mat.group(1))
+                last_sample = float(mat.group(1))
                 continue
 
             mat = minor_symbol_pat.match(line)
