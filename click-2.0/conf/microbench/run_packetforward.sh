@@ -3,9 +3,9 @@
 function run {
 	echo $1
 	sync
-	#for ITER in 0 1 2 3 4 5 6 7 8 9; do
+	for ITER in 0 1 2 3 4 5 6 7 8 9; do
 	#for ITER in 0 1 2 3 4; do
-	for ITER in 0; do
+	#for ITER in 0; do
 		echo $ITER
 		if [ -e "output_$1_timing_$ITER" ]; then
 			echo skipping

@@ -3,3 +3,4 @@ all: xia-performance-pps.gnuplot xia-performance.gnuplot isolation.gnuplot isola
 	./xia-performance-pps.gnuplot
 	./xia-performance.gnuplot
 	./isolation.gnuplot
+	perl bargraph.pl -pdf  isolation.bargarph > isolation-bar.pdf
