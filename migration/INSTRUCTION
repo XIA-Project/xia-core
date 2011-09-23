@@ -20,69 +20,40 @@ Host/Guest machine preparation
 
   $ sudo vmbuilder kvm ubuntu --rootsize=1024 --swapsize=0 --ssh-key=id_rsa_vm.pub --addpkg=openssh-server --addpkg=rsync --addpkg=psmisc --addpkg=libprotobuf6 --hostname=guest --user=xia --pass=xia --rootpass=xia --suite=natty
 
-4. Prepare a bridge
-
-  If /etc/network/interfaces contained the following:
-
-auto eth0
-iface eth0 inet dhcp
-  hwaddress ether ...
-
-  Replace it with the following:
-
-auto br0
-iface br0 inet dhcp
-  hwaddress ether ...
-  bridge_ports eth0
-  post-up brctl setageing br0 0  # always broadcast
-
-  $ sudo ifup br0
-
 
 Click on host
 =============
 
-1. Build click on a host machine (as referred in common.sh)
-
-  $ ./configure --enable-userlevel
-  $ make -j24
-
-2. Execute click
-
-  $ ./run_host_click.sh
+1. Build userlevel click on a host machine (which is referred to by common.sh)
 
 
 Click on guest
 ==============
 
-1. Load KVM (not required but better for performance)
-
-  $ sudo modprobe kvm-intel
-
-2. Power on the guest
+1. Power on the guest
 
   $ ./start_local_guest.sh
 
-3. Copy click to the guest and run it (after the guest is powered on)
+2. Copy click to the guest and run it
 
-  $ ./run_guest_click.sh
+  $ ./run_ping_server.sh
 
 
 Click on client
 ===============
 
-1. Run ping client
+1. Run ping client (on an external client machine, as specified in xia-core/click-2.0/conf/xia/xia_vm_common.click)
 
- $ sudo userlevel/click conf/xia/xia_ping_client.click
+ $ ./run_ping_client.sh
 
 
 Live migration
 ==============
-1. Begin migration from A to B (can be executed on any host)
+1. Begin migration from A to B (can be executed on either host)
 
   $ ./migrate_to_hostB.sh
 
-2. Begin migration from B to A (can be executed on any host)
+2. Begin migration from B to A (can be executed on either host)
 
   $ ./migrate_to_hostA.sh
 
