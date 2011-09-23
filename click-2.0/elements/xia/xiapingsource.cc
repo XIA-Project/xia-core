@@ -88,7 +88,7 @@ XIAPingSource::push(int, Packet *p)
                 reinterpret_cast<const struct click_xia_xid_node*>(hdr.payload()),
                 reinterpret_cast<const struct click_xia_xid_node*>(hdr.payload() + hdr.plen())
             );
-            click_chatter("updating XIAPingSource with new address %s\n", new_path.unparse(this).c_str());
+            click_chatter("%u: updating XIAPingSource with new address %s\n", p->timestamp_anno().usecval(), new_path.unparse(this).c_str());
             _dst_path = new_path;
             break;
         }
