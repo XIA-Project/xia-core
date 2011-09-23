@@ -135,8 +135,9 @@ FromDevice *
 ToDevice::find_fromdevice() const
 {
     Router *r = router();
+    FromDevice *fd;
     for (int ei = 0; ei < r->nelements(); ++ei)
-	if (FromDevice *fd = (FromDevice *) r->element(ei)->cast("FromDevice"))
+	if ((fd = (FromDevice *) r->element(ei)->cast("FromDevice")) && (fd->ifname() == _ifname))
 	    return fd;
     return 0;
 }

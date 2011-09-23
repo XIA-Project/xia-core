@@ -1,3 +1,6 @@
+# change the username if not available
+USER=hlim
+
 COMMON_PREFIX=/mnt/home-xia-router0/$USER/xia-core/migration
 IMAGE_PATH=`ls $COMMON_PREFIX/ubuntu-kvm/*.qcow2`
 
@@ -6,10 +9,10 @@ COMMON_ARGS="
 	-smp 1
 	-drive file=$IMAGE_PATH
 	-monitor tcp:0.0.0.0:4444,server,nowait
-	-net nic,vlan=0,macaddr=00:11:22:33:44:55
+	-net nic,vlan=0
 	-net user,vlan=0,hostfwd=tcp:0.0.0.0:5555-:22
-	-net nic,vlan=1,macaddr=52:54:00:11:22:33
-	-net tap,vlan=1,script=$COMMON_PREFIX/tap-up.sh,downscript=$COMMON_PREFIX/tap-down.sh
+	-net nic,vlan=1,macaddr=00:11:22:33:44:55
+	-net tap,vlan=1,ifname=tap0,script=$COMMON_PREFIX/tap-up.sh,downscript=$COMMON_PREFIX/tap-down.sh
 	-nographic"
 INCOMING_ARGS="-incoming tcp:0.0.0.0:6666"
 

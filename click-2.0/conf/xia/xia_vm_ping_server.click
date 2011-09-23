@@ -15,12 +15,12 @@ router[0]
 -> sw :: PaintSwitch;
 
 sw[0]
--> XIAPrint("xia_vm_ping_server:to_other")
+//-> XIAPrint("xia_vm_ping_server:to_other")
 -> EtherEncap(0x9999, GUEST, CLIENT) -> to_eth1;
 
 router[1]
 -> XIAPingResponder(RE AD0 RHID0 HID0)
--> XIAPrint("xia_vm_ping_server:resp")
+//-> XIAPrint("xia_vm_ping_server:resp")
 -> [1]router;
 
 router[2]
