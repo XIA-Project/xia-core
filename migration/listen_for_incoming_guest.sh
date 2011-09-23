@@ -6,6 +6,7 @@ source $PREFIX/common.sh
 
 $PREFIX/stop_local_guest.sh
 sleep 1
+
 nohup sudo kvm $COMMON_ARGS $INCOMING_ARGS > /dev/null &
-disown
+sleep 1
 

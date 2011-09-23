@@ -49,8 +49,8 @@ XIAPingResponder::push(int, Packet *p_in)
                 break;
             }
 
-            click_chatter("PING received; client seq = %u\n",
-                    *(uint32_t*)(hdr.payload() + 0));
+            //click_chatter("PING received; client seq = %u\n",
+            //        *(uint32_t*)(hdr.payload() + 0));
 
             WritablePacket *p = Packet::make(256, NULL, 8, 0);
             
