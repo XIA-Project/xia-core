@@ -35,12 +35,12 @@ class XIAPingSource : public Element { public:
 
   const char *class_name() const		{ return "XIAPingSource"; }
   const char *port_count() const		{ return "0-1/1"; }
-  const char *processing() const		{ return PUSH; }
+  const char *processing() const		{ return "h/l"; }
 
   int configure(Vector<String> &, ErrorHandler *);
   int initialize(ErrorHandler *);
 
-  void run_timer(Timer *);
+  Packet *pull(int);
   void push(int, Packet *);
 
  private:
@@ -49,7 +49,7 @@ class XIAPingSource : public Element { public:
   XIAPath _src_path;
   XIAPath _dst_path;
   uint32_t _count;
-  uint32_t _interval;
+  uint32_t _print_every;
 };
 
 CLICK_ENDDECLS

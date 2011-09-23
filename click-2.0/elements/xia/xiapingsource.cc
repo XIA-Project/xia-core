@@ -8,7 +8,6 @@
 CLICK_DECLS
 
 XIAPingSource::XIAPingSource()
-    : _timer(this)
 {
     _count = 0;
 }
@@ -20,12 +19,12 @@ XIAPingSource::~XIAPingSource()
 int
 XIAPingSource::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    _interval = 1000;
+	_print_every = 1;
 
     if (cp_va_kparse(conf, this, errh,
                    "SRC", cpkP+cpkM, cpXIAPath, &_src_path,
                    "DST", cpkP+cpkM, cpXIAPath, &_dst_path,
-                   "INTERVAL", 0, cpSecondsAsMilli, &_interval,
+                   "PRINT_EVERY", 0, cpInteger, &_print_every,
                    cpEnd) < 0)
         return -1;
 
@@ -35,19 +34,14 @@ XIAPingSource::configure(Vector<String> &conf, ErrorHandler *errh)
 int
 XIAPingSource::initialize(ErrorHandler *)
 {
-    _timer.initialize(this);
-    _timer.schedule_after_msec(_interval);
-
     return 0;
 }
 
-void
-XIAPingSource::run_timer(Timer *) {
-    _timer.reschedule_after_msec(_interval);
-
+Packet *
+XIAPingSource::pull(int) {
     WritablePacket *p = Packet::make(256, NULL, 8, 0);
     
-    *(uint32_t*)(p->data() + 0) = _count++;
+    *(uint32_t*)(p->data() + 0) = _count;
     *(uint32_t*)(p->data() + 4) = 0;
 
     XIAHeaderEncap encap;
@@ -55,7 +49,12 @@ XIAPingSource::run_timer(Timer *) {
     encap.set_dst_path(_dst_path);
     encap.set_src_path(_src_path);
 
-    output(0).push(encap.encap(p));
+	if (_count % _print_every == 0)
+		click_chatter("%u: PING sent; client seq = %u\n", Timestamp::now().usecval(), _count);
+
+	_count++;
+
+	return encap.encap(p);
 }
 
 void
@@ -73,9 +72,12 @@ XIAPingSource::push(int, Packet *p)
         // PONG
         if (hdr.plen() != 8)
             click_chatter("invalid PONG message length\n");
-        else
-            click_chatter("PONG received; client seq = %u, server seq = %u\n",
-                    *(uint32_t*)(hdr.payload() + 0), *(uint32_t*)(hdr.payload() + 4));
+        else {
+			uint32_t cli_seq = *(uint32_t*)(hdr.payload() + 0);
+			uint32_t svr_seq = *(uint32_t*)(hdr.payload() + 4);
+			if (cli_seq % _print_every == 0)
+				click_chatter("%u: PONG received; client seq = %u, server seq = %u\n", p->timestamp_anno().usecval(), cli_seq, svr_seq);
+		}
         break;
 
     case 102:
