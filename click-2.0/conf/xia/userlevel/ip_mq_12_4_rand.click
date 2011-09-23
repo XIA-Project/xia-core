@@ -1,15 +1,17 @@
 //#!/usr/local/sbin/click-install -uct12
 define ($DST_MAC 00:15:17:51:d3:d4);
 define ($DST_MAC1 00:25:17:51:d3:d4);
-define ($HEADROOM_SIZE 256);
-define ($BURST 32);
+define ($HEADROOM_SIZE 0);
+define ($BURST 64);
 define ($SRC_PORT 5012);
 define ($DST_PORT 5002);
 define ($PKT_COUNT 5000000000);
 define ($SRC_MAC 00:1a:92:9b:4a:77);
 define ($SRC_MAC1 00:1a:92:9b:4a:71);
 define ($COUNT 2000000000);
-define ($PAYLOAD_SIZE 30);
+//define ($PAYLOAD_SIZE 30);
+define ($PAYLOAD_SIZE 64);
+//define ($PAYLOAD_SIZE 222);
 //define ($PAYLOAD_SIZE 228);
 //define ($PAYLOAD_SIZE 484);
 
@@ -23,26 +25,20 @@ AddressInfo(
     //UNROUTABLE_IP6 1234::5678,
 );
 
-Idle()-> route::DirectIPLookup()
-route[0]->Discard
-
-Script(write route.load /home/dongsuh/xia-core/click-2.0/conf/xia/ip_routes_4_gen.txt);
-
 
 elementclass gen_sub {
     $dev, $queue, $cpu, $offset|
 
-
-    gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 1000)
+    gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 100000000, BURST 64)
+    -> Strip(34)
     -> IPEncap(9, UNROUTABLE_IP, RANDOM_IP)
-    //-> IPEncap(9, UNROUTABLE_IP, 253.0.0.1)
-    -> CheckIPHeader()
+    -> MarkIPHeader()
+    -> IPRandomize(MAX_CYCLE $IP_RANDOMIZE_MAX_CYCLE, OFFSET $offset)
     -> EtherEncap(0x0800, $SRC_MAC1 , $DST_MAC1)
-    -> IPRandomize(MAX_CYCLE $IP_RANDOMIZE_MAX_CYCLE, ROUTETABLENAME route, OFFSET $offset)
-    -> clone ::Clone($COUNT, SHARED_SKBS false)
+    //-> clone ::Clone($COUNT, SHARED_SKBS false)
     -> tod :: MQToDevice($dev, QUEUE $queue, BURST $BURST) 
 
-    StaticThreadSched(clone $cpu);
+    //StaticThreadSched(clone $cpu);
     StaticThreadSched(tod $cpu);
 
     StaticThreadSched(gen1 $cpu);

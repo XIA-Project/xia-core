@@ -150,6 +150,7 @@ elementclass rfb1 {
            SRC RE  $hid_from,
            DST RE  ( $fb ) $intent, DYNAMIC false) 
     -> DynamicIPEncap(0x99, $eth_from, $eth_to, COUNT 120)
+    //-> IPEncap(0x99, $eth_from, $eth_to)
     -> EtherEncap($ETH_P_IP, $SRC_MAC1 , $DST_MAC1)
     -> MarkXIAHeader(34)
     -> Clone($COUNT)
@@ -251,6 +252,7 @@ elementclass rfb2 {
 		 	$intent			// 2
 		, DYNAMIC false		)	
     -> DynamicIPEncap(0x99, $eth_from, $eth_to, COUNT 120)
+    //-> IPEncap(0x99, $eth_from, $eth_to)
     -> EtherEncap($ETH_P_IP, $SRC_MAC1 , $DST_MAC1)
     -> MarkXIAHeader(34)
     -> Clone($COUNT)

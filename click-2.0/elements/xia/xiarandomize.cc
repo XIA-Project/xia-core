@@ -86,9 +86,9 @@ XIARandomize::configure(Vector<String> &conf, ErrorHandler *errh)
 		} while (v >= _max_cycle);
 	    _zipf_cache[i] = v;
 	}
-	for (int i=0;i<_max_cycle*100;i++) {
+    }
+    for (int i=0;i<_max_cycle*100;i++) {
 	    assert(_zipf_cache[i]< _max_cycle);
-	}
     }
     return 0;
 }

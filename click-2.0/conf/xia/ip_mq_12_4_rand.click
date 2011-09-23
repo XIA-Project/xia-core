@@ -1,4 +1,4 @@
-#!/usr/local/sbin/click-install -uct12
+//#!/usr/local/sbin/click-install -uct12
 define ($DST_MAC 00:15:17:51:d3:d4);
 define ($DST_MAC1 00:25:17:51:d3:d4);
 define ($HEADROOM_SIZE 256);
@@ -31,9 +31,9 @@ elementclass gen_sub {
     -> Script(TYPE PACKET, write gen1.active false)       // stop source after exactly 1 packet
     -> IPEncap(9, UNROUTABLE_IP, RANDOM_IP)
     -> CheckIPHeader()
-    -> IPPrint($eth_from)
     -> clone1 ::Clone($COUNT, SHARED_SKBS false)
     -> IPRandomize(MAX_CYCLE $IP_RANDOMIZE_MAX_CYCLE)
+    -> IPPrint($eth_from)
     -> EtherEncap(0x0800, $SRC_MAC1 , $DST_MAC1)
     -> td1 :: MQToDevice($eth_from, QUEUE $queue, BURST $BURST);
     StaticThreadSched(gen1 $cpu,  td1 $cpu);
