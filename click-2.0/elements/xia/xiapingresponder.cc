@@ -49,8 +49,7 @@ XIAPingResponder::push(int, Packet *p_in)
                 break;
             }
 
-            //click_chatter("PING received; client seq = %u\n",
-            //        *(uint32_t*)(hdr.payload() + 0));
+            click_chatter("%u: PING received; client seq = %u\n", p_in->timestamp_anno().usecval(), *(uint32_t*)(hdr.payload() + 0));
 
             WritablePacket *p = Packet::make(256, NULL, 8, 0);
             
@@ -64,6 +63,8 @@ XIAPingResponder::push(int, Packet *p_in)
 
             _connected = true;
             _last_client = hdr.src_path();
+
+            click_chatter("%u: PONG sent; client seq = %u, server seq = %u\n", Timestamp::now().usecval(), *(uint32_t*)(p->data() + 0), *(uint32_t*)(p->data() + 4));
 
             output(0).push(encap.encap(p));
             break;
@@ -82,7 +83,7 @@ XIAPingResponder::push(int, Packet *p_in)
                 reinterpret_cast<const struct click_xia_xid_node*>(hdr.payload()),
                 reinterpret_cast<const struct click_xia_xid_node*>(hdr.payload() + hdr.plen())
             );
-            click_chatter("updating XIAPingResponder with new address %s\n", new_path.unparse(this).c_str());
+            click_chatter("%u: updating XIAPingResponder with new address %s\n", p_in->timestamp_anno().usecval(), new_path.unparse(this).c_str());
             _src_path = new_path;
 
             if (_connected)
