@@ -6,8 +6,12 @@ def parse_fp_result(proto)
   pwd = Pathname.getwd() 
   line = 0
   #["SP", "FP"].each do |p|
-    file_glob = "#{proto}-192-*P"
-    Pathname.glob(file_glob).sort {|x,y| x.to_s.split('-')[2]+x.to_s.split('-')[3] <=>  y.to_s.split('-')[2].to_s() + y.to_s.split('-')[3].to_s()}.each do |f|
+    file_glob = "#{proto}-*-SP-ONLY"
+    Pathname.glob(file_glob).sort {|x,y| if (x.to_s.split('-')[2]!=y.to_s.split('-')[2].to_s())  
+					    x.to_s.split('-')[2]<=> y.to_s.split('-')[2].to_s()
+					 else 
+					    x.to_s.split('-')[1].to_i<=> y.to_s.split('-')[1].to_i()
+					  end }.each do |f|
       proto, length, fb, fastpath = f.basename().to_s.split('-')
       statfiles = f.most_recent_file(/stat-/, true)
       count=0
@@ -25,10 +29,11 @@ def parse_fp_result(proto)
       end
       next if (perfs.empty?())
       length = length.to_i()
+      next if (length>320)
       perf = perfs.avg
-      output.print "#{proto} #{fastpath} #{p} #{fb} #{length} #{perf/1e6} #{perf*length*8/1e9} #{count} #{perfs.min/1e6} #{perfs.max/1e6} "
+      output.puts "#{proto} #{fastpath} #{p} #{fb} #{length} #{perf/1e6} #{perf*length*8/1e9} #{count} #{perfs.min/1e6} #{perfs.max/1e6}"
       line +=1
-      puts "" if (line%2==0) 
+      #puts "" if (line%2==0) 
    # end
   end
 end
