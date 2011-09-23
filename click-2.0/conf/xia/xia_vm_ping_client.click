@@ -25,7 +25,7 @@ sw[1]
 -> EtherEncap(0x9999, CLIENT, RHID1) -> to_eth0;
 
 router[1]
--> XIAPingSource(RE AD1 HID1, RE AD0 RHID0 HID0, PRINT_EVERY 1000)
+-> XIAPingSource(RE AD1 HID1, RE AD0 RHID0 HID0, PRINT_EVERY 1)
 -> RatedUnqueue(RATE 1000)
 //-> XIAPrint("xia_vm_ping_client:gen")
 -> [0]router;
