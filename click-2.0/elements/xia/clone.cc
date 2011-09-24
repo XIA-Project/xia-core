@@ -7,7 +7,7 @@
 #include <click/packet.hh>
 CLICK_DECLS
 
-Clone::Clone() : _count(0), _next(0), _wait_until(0)
+Clone::Clone() : _count(0), _next(0), _wait_until(0), _active(true)
 {
 }
 
@@ -28,6 +28,7 @@ Clone::configure(Vector<String> &conf, ErrorHandler *errh)
                    "COUNT", cpkP+cpkM, cpInteger, &count,
                    "SHARED_SKBS", 0, cpBool, &shared_skbs,
                    "WAITUNTIL", 0, cpInteger, &waituntil,
+                   "ACTIVE", 0, cpBool, &_active,
                    cpEnd) < 0)
         return -1;
     _count = count;
@@ -51,6 +52,7 @@ Packet* Clone::pull(int /*port*/)
 {
     if (_packets.size()==0 || _packets.size() < _wait_until) return NULL;
     if (_count<=0) return NULL;
+    if (!_active) return NULL;
 
     _count--;
 
@@ -73,6 +75,22 @@ Packet* Clone::pull(int /*port*/)
         return _packets[_next]->clone();
 #endif
     }
+}
+
+void
+Clone::add_handlers()
+{
+    add_write_handler("active", set_handler, 0);
+}
+
+int
+Clone::set_handler(const String &conf, Element *e, void * /*thunk*/, ErrorHandler * /*errh*/)
+{
+    Clone* table = static_cast<Clone*>(e);
+
+    if (conf=="true") table->_active = true;
+
+    return 0;
 }
 
 

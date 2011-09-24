@@ -15,12 +15,15 @@ class Clone : public Element { public:
     void push(int, Packet *);
     int configure(Vector<String> &conf, ErrorHandler *errh);
     Packet * pull(int);
+    void add_handlers();
+    static int set_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
     private:
     Vector<Packet *> _packets;
     int _count;
     int _next;
     bool _shared_skbs;
     int _wait_until;
+    bool _active;
 };
 CLICK_ENDDECLS
 #endif
