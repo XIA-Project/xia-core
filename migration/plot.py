@@ -104,9 +104,6 @@ def process(f_client, f_server):
             seq = int(mat.group(2)) - client_first_seq
             seq2 = int(mat.group(3)) - server_first_seq
             if t >= 0: client_pong[current_pong_src].append((t, seq, seq2))
-            if last_reception > 0 and t - last_reception > 0.100 and freeze_t is None:
-                freeze_t = last_reception
-            else: last_reception = t
             if last < t: last = t
 
         mat = pat_server_ping.match(line)
@@ -115,6 +112,9 @@ def process(f_client, f_server):
             seq = int(mat.group(2)) - client_first_seq
             if t >= 0: server_ping[current_ping_dst].append((t, seq))
             if last < t: last = t
+            if last_reception > 0 and t - last_reception > 0.100 and freeze_t is None:
+                freeze_t = last_reception
+            else: last_reception = t
 
         mat = pat_server_pong.match(line)
         if mat is not None:
@@ -123,6 +123,9 @@ def process(f_client, f_server):
             seq2 = int(mat.group(3)) - server_first_seq
             if t >= 0: server_pong[current_pong_src].append((t, seq, seq2))
             if last < t: last = t
+            if last_reception > 0 and t - last_reception > 0.100 and freeze_t is None:
+                freeze_t = last_reception
+            else: last_reception = t
 
         mat = pat_client_update.match(line)
         if mat is not None:
