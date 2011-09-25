@@ -29,6 +29,10 @@ TimestampAccum::~TimestampAccum()
 {
 }
 
+void TimestampAccum::cleanup(CleanupStage) 
+{
+    click_chatter("name %s count %u time %lf avg %lf", name().c_str(),  _count, _usec_accum*1000000, _usec_accum*1000000 / _count);
+}
 int
 TimestampAccum::initialize(ErrorHandler *)
 {

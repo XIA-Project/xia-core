@@ -66,18 +66,11 @@ IsoCPUPush::deq(int n)
 
 
 void
-IsoCPUPush::push(int, Packet *p)
+IsoCPUPush::push(int port, Packet *p)
 {
-#if HAVE_MULTITHREAD
-#if CLICK_USERLEVEL
-    int n = click_current_thread_id;
-#else
-    int n = click_current_processor();
-#endif
-#else
-    int n = 0;
-#endif
+    int n = port;
     int next = next_i(_q[n]._tail);
+
     if (next != _q[n]._head) {
 	_q[n]._q[_q[n]._tail] = p;
         asm __volatile__("": : :"memory");
@@ -88,21 +81,26 @@ IsoCPUPush::push(int, Packet *p)
 	click_chatter("Drop IsoCPUPush");
     }
 
-    bool ready = true;
-    for (int i=0;i<ninputs();i++) {
-    	if (is_empty(i)) ready = false;
-    }
-    if (!ready) return;
+    if (port==0) {
+	do {
+	    bool ready = true;
+	    for (int i=0;i<ninputs();i++) {
+		if (is_empty(i)) ready = false;
+	    }
+	    if (!ready) return;
 
-    Packet *pout = NULL;
-    for (int i=0;i<ninputs();i++)  {
-    	Packet *current = deq(i);
-    	if (pout==NULL && PAINT_ANNO(current)!=10) 
-	    pout = current;
-	 else
-	    current->kill();
+	    Packet *pout = NULL;
+	    for (int i=0;i<ninputs();i++)  {
+		Packet *current = deq(i);
+		if (!current) click_chatter("is_empty %d", is_empty(i));
+		if (pout==NULL && PAINT_ANNO(current)!=10) 
+		    pout = current;
+		else
+		    current->kill();
+	    }
+	    if (pout) output(0).push(pout);
+	} while (true);
     }
-    if (pout) output(0).push(pout);
 
 }
 
