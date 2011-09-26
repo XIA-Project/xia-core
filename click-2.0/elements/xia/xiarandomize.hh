@@ -2,6 +2,7 @@
 #define CLICK_XIARANDOMIZE_HH
 #include <click/element.hh>
 #include <click/zipf.h>
+#include <click/atomic.hh>
 CLICK_DECLS
 
 /*
@@ -48,6 +49,7 @@ private:
     int _offset;
     Zipf _zipf;
     static uint32_t* _zipf_cache;
+    static atomic_uint32_t _zipf_cache_lock;
 };
 
 CLICK_ENDDECLS

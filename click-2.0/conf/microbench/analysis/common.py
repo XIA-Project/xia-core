@@ -17,6 +17,7 @@ packet = int(re.search(r'define\(\$COUNT\s+(\d+)\)', open(data_path_prefix + 'co
 total_time_pat = re.compile(r'^([\d.]+)user .*?$')
 first_packet_usertime_pat = re.compile(r'^FIRST_PACKET USERTIME (\d+)$')
 handler_call_usertime_pat = re.compile(r'^HANDLER_CALL USERTIME (\d+)$')
+mpps_pat = re.compile(r'^Mpps: ([\d.]+)$')
 
 def get_total_runtime(path):
     t = 0
@@ -41,6 +42,16 @@ def get_processing_time(path):
 
     return t
 
+def get_pps(path):
+    values = []
+
+    for line in open(path).readlines():
+        mat = mpps_pat.match(line)
+        if mat is not None:
+            values.append(float(mat.group(1)) * 1000000.)
+
+    return sum(values[1:-1]) / (len(values) - 2)
+
 # dataset
 dataset = {
     'IP': data_path_prefix + 'output_ip_packetforward',
@@ -48,7 +59,7 @@ dataset = {
     'FB1': data_path_prefix + 'output_xia_packetforward_fallback1',
     'FB2': data_path_prefix + 'output_xia_packetforward_fallback2',
     'FB3': data_path_prefix + 'output_xia_packetforward_fallback3',
-    'FB0-VIA': data_path_prefix + 'output_xia_packetforward_viapoint',
+    'VIA': data_path_prefix + 'output_xia_packetforward_viapoint',
     'CID-REQ-M': data_path_prefix + 'output_xia_packetforward_cid_req_miss',
     'CID-REQ-H': data_path_prefix + 'output_xia_packetforward_cid_req_hit',
     'CID-REP': data_path_prefix + 'output_xia_packetforward_cid_rep',

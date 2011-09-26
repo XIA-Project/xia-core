@@ -45,6 +45,7 @@ XIARandomize::XIARandomize() : _zipf(1.3)
 }
 
 uint32_t * XIARandomize::_zipf_cache = NULL;
+atomic_uint32_t XIARandomize::_zipf_cache_lock;
 
 XIARandomize::~XIARandomize()
 {
@@ -76,7 +77,7 @@ XIARandomize::configure(Vector<String> &conf, ErrorHandler *errh)
     _current_cycle = _offset;
     _zipf = Zipf(1.2, _max_cycle-1);
 
-    if (_zipf_cache ==0) {
+    if (_zipf_cache_lock.swap(1) == 0) {
 	_zipf_cache = new uint32_t[_max_cycle*100];
 	//_zipf_arbit = Zipf(1.2, 1000000000);
 	for (int i=0;i<_max_cycle*100;i++) {
@@ -86,9 +87,14 @@ XIARandomize::configure(Vector<String> &conf, ErrorHandler *errh)
 		} while (v >= _max_cycle);
 	    _zipf_cache[i] = v;
 	}
+        _zipf_cache_lock = 0;
     }
+    else
+        while (_zipf_cache_lock.value() == 1)
+            ;
+
     for (int i=0;i<_max_cycle*100;i++) {
-	    assert(_zipf_cache[i]< _max_cycle);
+            assert(_zipf_cache[i]< _max_cycle);
     }
     return 0;
 }
