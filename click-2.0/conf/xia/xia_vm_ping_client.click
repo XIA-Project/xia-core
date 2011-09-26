@@ -2,13 +2,18 @@ require(library xia_router_template.click);
 require(library xia_address.click);
 require(library xia_vm_common.click);
 
+define($ONEWAYDELAY 12500us);
+
 router :: RouteEngine(RE AD1 HID1);
 
 from_eth0 :: FromDevice(eth0, PROMISC true);
 
-to_eth0 :: Queue() -> ToDevice(eth0);
+to_eth0 ::
+Queue() -> DelayUnqueue($ONEWAYDELAY)
+-> Queue() -> ToDevice(eth0);
 
 from_eth0
+-> Queue() -> DelayUnqueue($ONEWAYDELAY)
 -> c0 :: Classifier(12/9999) -> Strip(14) -> MarkXIAHeader() -> [0]router;
 
 Idle -> [1]router;
