@@ -24,25 +24,34 @@
 
 int main(int argc, char *argv[])
 {
-	int sock, length, n;
-	char buf[1024],sDAG[1024];
-
+	int sock, dlen, n;
+	char buf[1024],theirDAG[1024];
+	char* reply="Got your message";
+	
+    //Open socket
 	sock=Xsocket();
 	if (sock < 0) error("Opening socket");
 	
-	//Make the DAG
+	//Make the sDAG (the one the server listens on)
 	char * dag = malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,SID0) + 1);
     sprintf(dag, "RE %s %s %s", AD0, HID0,SID0); 
     //printf("\nListening on RE %s %s %s", AD0, HID0,SID0);
 
-	
+	//Bind to the DAG
 	Xbind(sock,dag);
     printf("\nListening...\n");
+    
     while (1) {
-		n = Xrecvfrom(sock,buf,1024,0,sDAG,&length);
-		if (n < 0) error("recvfrom");
-		printf("Received a datagram from:%s\n",sDAG);
+        //Receive packet
+		n = Xrecvfrom(sock,buf,1024,0,theirDAG,&dlen);
+		if (n < 0) 
+		    error("recvfrom");
+		printf("Received a datagram from:%s\n",theirDAG);
 		write(1,buf,n);
+		
+		//Reply to client
+		Xsendto(sock,reply,strlen(reply),0,theirDAG,strlen(theirDAG));
+		
 	}
 	return 0;
 }
