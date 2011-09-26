@@ -26,9 +26,10 @@
 #define CLICKCONTROLPORT "5005"
 
 
-#define CLICKGETCIDPORT "5006"
 #define CLICKDATAADDRESS "172.0.0.2" 
 #define CLICKDATAPORT "10000"
+#define CLICKGETCIDPORT "10002"
+#define CLICKSENDTOPORT "10001"
 
 //set xia.click sorter to sort based on these ports. 
 
@@ -37,14 +38,13 @@
 #define MAXBUFLEN 2000
 
 //Function list
-extern int Xsendto(int sockfd,char *buf, size_t len, int flags,const struct sockaddr *dest_addr, socklen_t addrlen);
-extern int Xrecvfrom(int sockfd, void *buf, size_t len, int flags,struct sockaddr *src_addr, socklen_t *addrlen);
-
+extern int Xsendto  (int sockfd,void *buf, size_t len, int flags,char * dDAG, size_t dlen);
+extern int Xrecvfrom(int sockfd,void *buf, size_t len, int flags,char * dDAG, size_t *dlen);
 extern int Xsocket();
 extern int Xbind(int sockfd, char* SID);
 extern int Xclose(int sock);
 extern int Xrecv(int sockfd, void *buf, size_t len, int flags);
-extern int Xsend(int sockfd,char *buf, size_t len, int flags);
+extern int Xsend(int sockfd,void *buf, size_t len, int flags);
 
 
 #endif

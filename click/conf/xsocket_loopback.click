@@ -32,6 +32,13 @@ cIP0
 -> ToHost(fake0)
 cIP0[1]->Print(bad,MAXLENGTH 100, CONTENTS ASCII)->Discard();
 
+//To connect to forwarding instead of loopback
+//xudp0[0]->Packet forwarding module
+//Packet forwarding module->[2]xudp0;
+
+
+
+
 //loopback side
 
 fake1::FromHost(fake1,172.0.0.1/24) 
@@ -64,6 +71,6 @@ cIP1
 cIP1[1]->Print(bad,MAXLENGTH 100, CONTENTS ASCII)->Discard();
 
 //Connect the loopback
-xudp0[0]->[2]xudp1;
-xudp1[0]->[2]xudp0;
+xudp0[2]->[2]xudp1;
+xudp1[2]->[2]xudp0;
 

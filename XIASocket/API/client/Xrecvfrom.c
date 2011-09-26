@@ -1,11 +1,12 @@
 /*
-* recv like datagram receiving function for XIA
-* IMPORTANT: works for datagrams only
+* recvfrom like datagram receiving function for XIA
+* does not fill in DAG fields yet
 */
 
 #include "Xsocket.h"
 
-int Xrecv(int sockfd, void *buf, size_t len, int flags)
+int Xrecvfrom(int sockfd, void *buf, size_t len, int flags,
+                        char* sDAG, size_t* slen)
 {
 	struct addrinfo hints, *servinfo,*p;
 	int rv;
@@ -13,7 +14,6 @@ int Xrecv(int sockfd, void *buf, size_t len, int flags)
 	socklen_t addr_len;
     char UDPbuf[MAXBUFLEN];
 	struct sockaddr_in their_addr;
-
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_INET;
@@ -29,7 +29,6 @@ int Xrecv(int sockfd, void *buf, size_t len, int flags)
 	}
 	int src_port=ntohs(their_addr.sin_port);
 	
-	//Check if it's a control message
 	while(src_port==atoi(CLICKCONTROLPORT))
 	{
     	//Do what is necessary, maybe close socket
@@ -49,11 +48,20 @@ int Xrecv(int sockfd, void *buf, size_t len, int flags)
 	    
 	    }
 	}
-	short int paylen=0;
-	memcpy (&paylen, UDPbuf+2,2);
-	paylen=ntohs(paylen);
-	int offset=numbytes-paylen;
-	strncpy(buf, UDPbuf+offset, paylen);
+	
+	//TODO: Copy Xdata to buf, and headers to their src_addr
+	//memcpy(buf, c+Xheader_size, numbytes-Xheader_size);
+	short int paylen=0,i=0;
+	char* tmpbuf=(char*)UDPbuf;
+	while(tmpbuf[i]!='^')
+	    i++;
+    paylen=numbytes-i-1;
+	//memcpy (&paylen, UDPbuf+2,2);
+	//paylen=ntohs(paylen);
+	int offset=i+1;
+	memcpy(buf, UDPbuf+offset, paylen);
+	strncpy(sDAG, UDPbuf, i);
+	*slen=i;
 	
 	return paylen;
 }
