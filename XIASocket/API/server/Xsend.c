@@ -5,7 +5,7 @@
 
 #include "Xsocket.h"
 
-int Xsend(int sockfd,char *buf, size_t len, int flags)
+int Xsend(int sockfd,void *buf, size_t len, int flags)
 {
 
 	struct addrinfo hints, *servinfo,*p;
@@ -27,5 +27,5 @@ int Xsend(int sockfd,char *buf, size_t len, int flags)
 	p=servinfo;
 
 	numbytes = sendto(sockfd, buf, strlen(buf), flags, p->ai_addr, p->ai_addrlen);
-	return numbytes;
+	return strlen(buf);
 }

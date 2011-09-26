@@ -10,12 +10,14 @@
 #include <click/xiapath.hh>
 #include <clicknet/xia.h>
 #include "xiacontentmodule.hh"
+#include "xiaxidroutetable.hh"
 #include <clicknet/udp.h>
 #include <click/string.hh>
 #if CLICK_USERLEVEL
 #include <list>
 #include <stdio.h>
 #include <iostream>
+#include "../../userlevel/xia.pb.h"
 
 #endif
 
@@ -27,7 +29,8 @@
 #define CLICKCONNECTPORT 5004
 #define CLICKCONTROLPORT 5005
 
-#define CLICKGETCIDPORT 5006
+#define CLICKGETCIDPORT 10002
+#define CLICKSENDTOPORT 10001
 #define CLICKDATAPORT 10000
 
 
@@ -38,10 +41,12 @@ XUDP:
 input port[0]:  control port
 input port[1]:  Socket Rx data port
 input port[2]:  Network Rx data port
+input port[3]:  in from cache
 
-
-output[0]: Network Tx data port 
+output[3]: To cache for putCID
+output[2]: Network Tx data port 
 output[1]: Socket Tx data port
+
 Might need other things to handle chunking
 */
 
@@ -52,7 +57,7 @@ class XUDP : public Element {
     XUDP();
     ~XUDP();
     const char *class_name() const		{ return "XUDP"; }
-    const char *port_count() const		{ return "3/2"; }
+    const char *port_count() const		{ return "4/4"; }
     const char *processing() const		{ return PUSH; }
     int configure(Vector<String> &, ErrorHandler *);         
     void push(int port, Packet *);            
@@ -64,7 +69,7 @@ class XUDP : public Element {
     XID _local_hid;
     XIAPath _local_addr;
     
-    Packet* UDPIPEncap(Packet *, int);
+    Packet* UDPIPEncap(Packet *, int,int);
     
     struct DAGinfo{
     unsigned short port;
@@ -85,6 +90,18 @@ class XUDP : public Element {
     struct in_addr _APIaddr;
     atomic_uint32_t _id;
     bool _cksum;
+    XIAXIDRouteTable *_routeTable;
+    
+    //modify routing table
+    void addRoute(const XID &sid) {
+        String cmd=sid.unparse()+" 4";
+        HandlerCall::call_write(_routeTable, "add", cmd);
+    }   
+        
+    void delRoute(const XID &sid) {
+        String cmd= sid.unparse();
+        HandlerCall::call_write(_routeTable, "remove", cmd);
+    }
 
 };
 

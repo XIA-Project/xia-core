@@ -49,11 +49,24 @@ int Xrecv(int sockfd, void *buf, size_t len, int flags)
 	    
 	    }
 	}
-	short int paylen=0;
+	/*short int paylen=0;
 	memcpy (&paylen, UDPbuf+2,2);
 	paylen=ntohs(paylen);
 	int offset=numbytes-paylen;
 	strncpy(buf, UDPbuf+offset, paylen);
+	
+	return paylen;*/
+	
+	short int paylen=0,i=0;
+	char* tmpbuf=(char*)UDPbuf;
+	while(tmpbuf[i]!='^')
+	    i++;
+    paylen=numbytes-i-1;
+	//memcpy (&paylen, UDPbuf+2,2);
+	//paylen=ntohs(paylen);
+	int offset=i+1;
+	memcpy(buf, UDPbuf+offset, paylen);
+	//strncpy(sDAG, UDPbuf, i);
 	
 	return paylen;
 }
