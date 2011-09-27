@@ -66,7 +66,7 @@ void XUDP::push(int port, Packet *p_in)
 			{
 				//Extract the destination port 
 				click_udp * uh=p->udp_header();
-				click_ip * ih=p->ip_header();
+				
 				unsigned short _dport=uh->uh_dport;
 				unsigned short _sport=uh->uh_sport;
 				//click_chatter("control:%d",ntohs(_dport));
@@ -186,7 +186,7 @@ void XUDP::push(int port, Packet *p_in)
     			
     			//Extract the destination port 
 				const click_udp * uh=p->udp_header();
-				const click_ip * ih=p->ip_header();
+				
 				unsigned short _dport=uh->uh_dport;
 				unsigned short _sport=uh->uh_sport;
 				//click_chatter("data:%d",ntohs(_dport));
@@ -288,8 +288,53 @@ void XUDP::push(int port, Packet *p_in)
     		    	    }
     		    	    break;
     		    	    
-    		    	case CLICKGETCIDPORT:
+    		    	case CLICKPUTCIDPORT:
     		    	    {
+    		    	       //The source DAG should end with a CID
+    		    	       //Remove UDP/IP headers
+  							p->pull(p->transport_header_offset());//Remove IP header
+            				p_in->pull(8); //Remove UDP header
+						
+							String s((const char*)p->data(),(const char*)p->end_data());
+							
+							int carat=s.find_left('^');
+							String src=s.substring(0,carat);
+							//click_chatter("carat:%d",carat);
+							p->pull(carat+1);
+							int pktPayloadSize=s.length()-carat-1;
+							
+							
+							XIAPath src_path;
+							src_path.parse(src); 
+							 		    	     
+							//Make a random destination DAG 		    	  
+                            String dst_local_addr=_local_addr.unparse_re();							 		    	   
+    					  	String rand(click_random(1000000, 9999999));
+	   						String xid_string="SID:20000ff00000000000000000000000000"+rand;
+	   						dst_local_addr=dst_local_addr+" "+xid_string;//Make source DAG _local_addr:SID
+                               
+	   						XIAPath dst_path;
+	   						dst_path.parse_re(dst_local_addr);
+	   						
+    		        		
+    		        		//Add XIA headers
+    		        		class XIAHeaderEncap* _xiah=new XIAHeaderEncap();
+        		        	_xiah->set_last(-1);
+		        		    _xiah->set_hlim(250);
+    		        		_xiah->set_dst_path(src_path);
+    		        		_xiah->set_src_path(src_path);
+    		        		_xiah->set_nxt(CLICK_XIA_NXT_CID);
+     		        		
+    		        		//Might need to remove more if another header is required (eg some control/DAG info)
+		        		    
+    		        		WritablePacket *p = NULL;
+    		        		int chunkSize = pktPayloadSize;
+                            ContentHeaderEncap  contenth(0, 0, pktPayloadSize, chunkSize);
+                            p = contenth.encap(p_in); 
+                            p = _xiah->encap(p, true);
+                            
+                            click_chatter("sent packet to cache");
+    		        		output(3).push(p);
     		    	    }
     		    	    break;
     		    	    

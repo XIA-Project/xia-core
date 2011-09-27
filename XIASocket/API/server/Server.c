@@ -34,8 +34,15 @@ int main(int argc, char *argv[])
 	
 	//Make the sDAG (the one the server listens on)
 	char * dag = malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,SID0) + 1);
-    sprintf(dag, "RE %s %s %s", AD0, HID0,SID0); 
+    sprintf(dag, "RE %s %s %s", AD0, HID0,SID0);
+     
     //printf("\nListening on RE %s %s %s", AD0, HID0,SID0);
+    
+    //Make a CID entry
+    char * cdag = malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,CID0) + 1);
+    sprintf(cdag, "RE %s %s %s", AD0, HID0,CID0); 
+    char* data="Some value stored for CID0";
+    XputCID(sock,data,strlen(data),0,cdag,strlen(cdag));
 
 	//Bind to the DAG
 	Xbind(sock,dag);
