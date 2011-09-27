@@ -103,6 +103,10 @@ elementclass gen_b {
 //gen_b(eth4, eth2);
 //gen_b(eth5, eth3);
 
+//gen0(eth2, eth4);
+//gen0(eth3, eth5);
+//gen0(eth5, eth3);
+//gen0(eth4, eth2);
 gen0(xge0, xge2);
 gen0(xge1, xge3);
 gen0(xge2, xge0);

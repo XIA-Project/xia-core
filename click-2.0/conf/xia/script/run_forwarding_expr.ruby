@@ -32,9 +32,9 @@ SETUP = [
 #	{:NAME => "XIA-%d-FB3", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_FB3_SCRIPT, :PKT_OVERHEAD =>182},
 #	{:NAME => "XIA-%d-FB2", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_FB2_SCRIPT, :PKT_OVERHEAD =>154},
 #	{:NAME => "XIA-%d-FB1", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_FB1_SCRIPT, :PKT_OVERHEAD =>126},
-#	{:NAME => "IP-%d-SP-ONLY", :ROUTER => IP_ROUTER_SCRIPT, :PKTGEN => IP_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>34},
+	{:NAME => "IP-%d-SP-ONLY", :ROUTER => IP_ROUTER_SCRIPT, :PKTGEN => IP_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>34},
 #	{:NAME => "XIA-%d-isolation-%d", :ROUTER => XIA_ROUTER_SCRIPT, :PKTGEN =>XIA_PKT_GEN_ISO_SCRIPT, :PKT_OVERHEAD =>126},
-	{:NAME => "XIA-%d-VIA-SP-ONLY", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_VIA_SCRIPT, :PKT_OVERHEAD =>126}
+#	{:NAME => "XIA-%d-VIA-SP-ONLY", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_VIA_SCRIPT, :PKT_OVERHEAD =>126}
 	]
 class Flags
   @flag_bit = 0
@@ -65,7 +65,7 @@ def run_command(machine, cmd, mode = Flags::BACKGROUND)
 end
 
 def load_click(machine, mode)
-#  run_command(machine, LOAD_CLICK_CMD, mode)
+  #run_command(machine, LOAD_CLICK_CMD, mode)
 end
 
 def reset_click(machine, mode)
@@ -92,6 +92,7 @@ if __FILE__ ==$0
     pktgen_script = setup[:PKTGEN] 
    
     min_pktsize = (overhead+63)/64  * 64
+    min_pktsize = 320+64
     size = min_pktsize
     pkt_size = []
 
@@ -99,17 +100,17 @@ if __FILE__ ==$0
  	pkt_size.push(size)	
 	size+=64
     end
-    while (size<=400)
+    while (size<1500)
  	pkt_size.push(size)	
 	size+=128
     end
-    #pkt_size.push(1500)	
+    pkt_size.push(1500)	
 
     if (setup[:NAME]=="XIA-%d-isolation-%d")
       pkt_size =  (1..11).to_a
     end
-    #if (setup[:NAME]=~/-FP/ || (setup[:NAME]=~/-SP/ && (!(setup[:NAME]=~/-ONLY/))))
-    if (setup[:NAME]=~/-FP/ || (setup[:NAME]=~/-SP/))
+    if (setup[:NAME]=~/-FP/ || (setup[:NAME]=~/-SP/ && (!(setup[:NAME]=~/-ONLY/))))
+    #if (setup[:NAME]=~/-FP/ || (setup[:NAME]=~/-SP/))
       pkt_size =  [192, 192, 192]
     end
    
@@ -134,8 +135,10 @@ if __FILE__ ==$0
         run_command(ROUTER, router_script)
         sleep(3)
         reset_click(ROUTER, 0)
-        sleep(3)
+        sleep(1)
         run_command(ROUTER, router_script)
+
+        sleep(5)
 
         # run packet gen
         if (setup[:NAME]=="XIA-%d-isolation-%d")
