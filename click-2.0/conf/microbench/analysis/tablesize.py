@@ -7,11 +7,14 @@ labels = {'HID': 'HID forwarding', 'AD': 'AD forwarding'}
 markers = {'HID': 'x', 'AD': 'o'}
 linestyles = {'HID': '-', 'AD': '-'}
 x_values = {
-    'HID': (10000, 30000, 100000, 300000, 1000000, 3000000, 10000000, 30000000),
+    #'HID': (10000, 30000, 100000, 300000, 1000000, 3000000, 10000000, 30000000),
+    'HID': (10000, 30000, 100000, 300000, 1000000, 3000000, 10000000),
     'AD': (351611, ),
 }
-x_ticks = (10000, 30000, 100000, 300000, 1000000, 3000000, 10000000, 30000000)
-x_ticklabels = ('10 K', '30 K', '100 K', '300 K', '1 M', '3 M', '10 M', '30 M')
+#x_ticks = (10000, 30000, 100000, 300000, 1000000, 3000000, 10000000, 30000000)
+#x_ticklabels = ('10 K', '30 K', '100 K', '300 K', '1 M', '3 M', '10 M', '30 M')
+x_ticks = (10000, 30000, 100000, 300000, 1000000, 3000000, 10000000)
+x_ticklabels = ('10 K', '30 K', '100 K', '300 K', '1 M', '3 M', '10 M')
 y_values = {}
 y_lower_err_values = {}
 y_upper_err_values = {}
@@ -28,8 +31,9 @@ for family_name in family_names:
                 data_name = 'TABLESIZE_' + family_name + '_%d' % x_value
             else:
                 data_name = 'FB0'
-            t = get_processing_time(dataset[data_name] + '_timing' + '_%d' % iter_i)
-            pps = packet / t
+            #t = get_processing_time(dataset[data_name] + '_timing' + '_%d' % iter_i)
+            #pps = packet / t
+            pps = get_pps(dataset[data_name] + '_timing' + '_%d' % iter_i)
             if pps_min is None or pps_min > pps:
                 pps_min = pps
             if pps_max is None or pps_max < pps:

@@ -6,7 +6,7 @@
 #include "Xsocket.h"
 
 int Xrecvfrom(int sockfd, void *buf, size_t len, int flags,
-                        struct sockaddr *src_addr, socklen_t *addrlen)
+                        char* sDAG, size_t* slen)
 {
 	struct addrinfo hints, *servinfo,*p;
 	int rv;
@@ -51,7 +51,17 @@ int Xrecvfrom(int sockfd, void *buf, size_t len, int flags,
 	
 	//TODO: Copy Xdata to buf, and headers to their src_addr
 	//memcpy(buf, c+Xheader_size, numbytes-Xheader_size);
-	memcpy(buf, UDPbuf, numbytes);
+	short int paylen=0,i=0;
+	char* tmpbuf=(char*)UDPbuf;
+	while(tmpbuf[i]!='^')
+	    i++;
+    paylen=numbytes-i-1;
+	//memcpy (&paylen, UDPbuf+2,2);
+	//paylen=ntohs(paylen);
+	int offset=i+1;
+	memcpy(buf, UDPbuf+offset, paylen);
+	strncpy(sDAG, UDPbuf, i);
+	*slen=i;
 	
-	return numbytes;
+	return paylen;
 }

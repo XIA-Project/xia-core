@@ -2,7 +2,7 @@ require(library ../xia_router_template.inc);
 require(library common.inc);
 
 
-gen :: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE)
+gen :: InfiniteSource(LENGTH $PAYLOAD_SIZE_XIA_XID2, ACTIVE false, HEADROOM $HEADROOM_SIZE_XIA_XID2)
 -> Script(TYPE PACKET, write gen.active false)       // stop source after exactly 1 packet
 -> XIAEncap(SRC RE UNROUTABLE_AD0, DST RE RANDOM_ID)
 -> [1]fwd :: XIAPacketForward;
