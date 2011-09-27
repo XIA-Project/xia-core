@@ -11,12 +11,13 @@ function run {
 			continue
 		fi
 		sleep 3
-		./perf record -g /usr/bin/time ../../userlevel/click CID_RT_SIZE=$2 $1.click >& output_$1_$2_timing_$ITER
-		./perf report -g flat,0 >& output_$1_$2_perf_$ITER
+		perf record -g /usr/bin/time ../../userlevel/click CID_RT_SIZE=$2 $1.click >& output_$1_$2_timing_$ITER
+		perf report -g flat,0 >& output_$1_$2_perf_$ITER
 	done
 }
 
-for SIZE in 10000 30000 100000 300000 1000000 3000000 10000000 30000000; do
+#for SIZE in 10000 30000 100000 300000 1000000 3000000 10000000 30000000; do
+for SIZE in 10000 30000 100000 300000 1000000 3000000 10000000; do
 	run xia_tablesize_cid $SIZE
 done
 

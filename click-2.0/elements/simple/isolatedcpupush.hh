@@ -21,11 +21,11 @@ class IsoCPUPush : public Element {
 
   int next_i(int i) const { return (i!=_capacity ? i+1 : 0); }
   int prev_i(int i) const { return (i!=0 ? i-1 : _capacity); }
-  bool is_full(int n) const { int next = next_i(_q[n]._tail); return (next == _q[n]._head); }
-  
-  bool is_empty(int n) const { return (_q[n]._head == _q[n]._tail); }
-  Packet *deq(int);
 
+  bool is_full(int n) const { int next = next_i(_q[n]._tail); return (next == _q[n]._head); }
+  bool is_empty(int n) const { return (_q[n]._head == _q[n]._tail); }
+
+  Packet *deq(int);
   static String read_handler(Element *, void *);
 
  public:

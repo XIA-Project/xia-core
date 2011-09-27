@@ -60,6 +60,7 @@ class CChunk{
 
 class XIAContentModule {
     friend class XIATransport;
+    friend class XIACache;
     public:
     typedef XIAPath::handle_t handle_t;        
     XIAContentModule(XIATransport* transport);

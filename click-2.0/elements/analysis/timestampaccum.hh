@@ -46,6 +46,7 @@ class TimestampAccum : public Element { public:
 
     Packet *simple_action(Packet *);
 
+    void cleanup(CleanupStage);
   private:
 
     double _usec_accum;
