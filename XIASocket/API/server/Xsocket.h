@@ -28,7 +28,7 @@
 
 #define CLICKDATAADDRESS "172.0.0.2" 
 #define CLICKDATAPORT "10000"
-#define CLICKGETCIDPORT "10002"
+#define CLICKPUTCIDPORT "10002"
 #define CLICKSENDTOPORT "10001"
 
 //set xia.click sorter to sort based on these ports. 
@@ -45,6 +45,8 @@ extern int Xbind(int sockfd, char* SID);
 extern int Xclose(int sock);
 extern int Xrecv(int sockfd, void *buf, size_t len, int flags);
 extern int Xsend(int sockfd,void *buf, size_t len, int flags);
+extern int XgetCID(int sockfd, char* dDAG, size_t dlen);
+extern int XputCID(int sockfd,void *buf, size_t len, int flags,char* sDAG, size_t dlen);
 
 
 #endif
