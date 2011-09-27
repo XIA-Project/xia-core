@@ -182,7 +182,7 @@ void XUDP::push(int port, Packet *p_in)
 
 		case 1: //packet from Socket API
 			{
-    			click_chatter("Got packet from socket");
+    			click_chatter("\nGot packet from socket");
     			
     			//Extract the destination port 
 				const click_udp * uh=p->udp_header();
@@ -204,7 +204,7 @@ void XUDP::push(int port, Packet *p_in)
 		        		    _xiah->set_hlim(250);
     		        		_xiah->set_dst_path(daginfo->dst_path);
     		        		_xiah->set_src_path(daginfo->src_path);
-       						click_chatter("\nsent packet to %s, from %s\n",daginfo->dst_path.unparse_re().c_str(),daginfo->src_path.unparse_re().c_str());
+       						click_chatter("sent packet to %s, from %s\n",daginfo->dst_path.unparse_re().c_str(),daginfo->src_path.unparse_re().c_str());
     		        		
     		        		p->pull(p->transport_header_offset());//Remove IP header
     		        		p_in->pull(8); //Remove UDP header
@@ -265,7 +265,7 @@ void XUDP::push(int port, Packet *p_in)
                             daginfo=portToDAGinfo.get_pointer(_sport);
     						portRxSeqNo.set(_sport,portRxSeqNo.get(_sport)+1);//Increment counter
     						
-    						click_chatter("\nsent packet to %s, from %s\n",dest.c_str(),daginfo->src_path.unparse_re().c_str());
+    						click_chatter("sent packet to %s, from %s\n",dest.c_str(),daginfo->src_path.unparse_re().c_str());
     		        		
     		        		//Add XIA headers
     		        		class XIAHeaderEncap* _xiah=new XIAHeaderEncap();
@@ -280,10 +280,26 @@ void XUDP::push(int port, Packet *p_in)
     		        		//Might need to remove more if another header is required (eg some control/DAG info)
 		        		    
     		        		WritablePacket *p = NULL;
-                            p = _xiah->encap(p_in, true);
+                            
                             
                             //click_chatter("Sent packet to network");
+                             struct click_xia_xid _xid=dst_path.xid(dst_path.destination_node()).xid();
+                             //printf("DSTTYPE:%s",dst_path.xid(dst_path.destination_node()).unparse().c_str());
+                             //printf("DSTTYPE:%s",dst_path.xid(dst_path.destination_node()).unparse().c_str());
+                            
+                            if(ntohl(_xid.type)==CLICK_XIA_XID_TYPE_CID)
+                            {
+                               ContentHeaderEncap  contenth(0, 0, 0, 0);
+                               p = contenth.encap(p_in); 
+                               p = _xiah->encap(p, true);
+    		        		}
+    		        		else
+    		        		{
+    		        		    p = _xiah->encap(p_in, true);
+    		        		}
     		        		output(2).push(p);
+    		        		
+    		        		
     		    	        
     		    	    }
     		    	    break;
@@ -307,10 +323,19 @@ void XUDP::push(int port, Packet *p_in)
 							XIAPath src_path;
 							src_path.parse(src); 
 							 		    	     
-							//Make a random destination DAG 		    	  
+							/*TODO: The destination dag of the incoming packet is local_addr:XID 
+							* Thus the cache thinks it is destined for local_addr and delivers to socket
+							* This must be ignored. Options
+							* 1. Use an invalid SID (done below)
+							* 2. The cache should only store the CID responses and not forward them to
+							*    local_addr when the source and the destination HIDs are the same.
+							* 3. Use the socket SID on which putCID was issued. This will
+							*    result in a reply going to the same socket on which the putCID was issued.
+							*    Use the response to return 1 to the putCID call to indicate success.
+							*    Need to add daginfo/ephemeral SID generation for this to work.
+							*/
                             String dst_local_addr=_local_addr.unparse_re();							 		    	   
-    					  	String rand(click_random(1000000, 9999999));
-	   						String xid_string="SID:20000ff00000000000000000000000000"+rand;
+	   						String xid_string="SID:0000000000000000000000000000000000000000";
 	   						dst_local_addr=dst_local_addr+" "+xid_string;//Make source DAG _local_addr:SID
                                
 	   						XIAPath dst_path;
@@ -321,7 +346,7 @@ void XUDP::push(int port, Packet *p_in)
     		        		class XIAHeaderEncap* _xiah=new XIAHeaderEncap();
         		        	_xiah->set_last(-1);
 		        		    _xiah->set_hlim(250);
-    		        		_xiah->set_dst_path(src_path);
+    		        		_xiah->set_dst_path(dst_path);
     		        		_xiah->set_src_path(src_path);
     		        		_xiah->set_nxt(CLICK_XIA_NXT_CID);
      		        		
@@ -378,7 +403,7 @@ void XUDP::push(int port, Packet *p_in)
 				}
 				else
 				{
-				    click_chatter("Packet to unknown SID");
+				    click_chatter("Packet to unknown %s",_destination_xid.unparse().c_str());
 				    p->kill();
 				}
 			}
@@ -418,7 +443,7 @@ void XUDP::push(int port, Packet *p_in)
 			}
 			else
 			{
-	   		    click_chatter("Packet to unknown SID");
+	   		    click_chatter("Packet to unknown %s",_destination_xid.unparse().c_str());
 			    p->kill();
 			}            
             

@@ -81,6 +81,7 @@ XIACache::configure(Vector<String> &conf, ErrorHandler *errh)
 void XIACache::push(int port, Packet *p)
 {
     const struct click_xia* hdr = p->xia_header();
+    //click_chatter("XIACache activity");
 
     if (!hdr) return;
     if (hdr->dnode == 0 || hdr->snode == 0) return;
@@ -104,12 +105,18 @@ void XIACache::push(int port, Packet *p)
    	_content_module->cache_incoming(p, srcID, dstHID, port);
    	}
     else if(dst_xid_type==_cid_type)  //look_up,  chunk request
-   	_content_module->process_request(p, srcID, dstID);
+    {
+    __srcID = hdr->node[hdr->dnode + hdr->snode - 2].xid;
+    
+    XID srcHID(__srcID);
+    //std::cout<<"srcID "<<srcHID.unparse().c_str()<<std::endl;
+   	_content_module->process_request(p, srcHID, dstID);
+   	}
     else
     {
 	p->kill();
 #if DEBUG_PACKET
-	click_chatter("src and dst are not CID");
+	//click_chatter("src and dst are not CID");
 #endif
     }
 }

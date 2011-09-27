@@ -102,7 +102,7 @@ elementclass RouteEngine {
     proc[1] -> dstTypeClassifier;
     dstTypeClassifier[1] -> [1]output;  // To RPC
 
-    dstTypeClassifier[0] -> [2]output;  // To cache (for serving content request)
+    dstTypeClassifier[0] ->[2]output;  // To cache (for serving content request)
 
     proc[2] -> XIAPrint() -> Discard;  // No route drop (future TODO: return an error packet)
 };
@@ -156,7 +156,7 @@ elementclass Router {
     // output[1]: forward to interface 1 (for other ads)
 
     n :: RouteEngine($local_addr);
-    cache :: XIATransport($local_addr, n/proc/rt_CID/rt);
+    cache :: XIACache($local_addr, n/proc/rt_CID/rt);
 
     Script(write n/proc/rt_AD/rt.add - 1);      // default route for AD
     Script(write n/proc/rt_AD/rt.add $local_ad 4);    // self AD as destination
@@ -190,7 +190,7 @@ elementclass Router4Port {
     // output[3]: forward to interface 3
 
     n :: RouteEngine($local_addr);
-    cache :: XIATransport($local_addr, n/proc/rt_CID/rt);
+    cache :: XIACache($local_addr, n/proc/rt_CID/rt);
 
     input[0] -> [0]n;
     input[1] -> [0]n;
@@ -221,7 +221,7 @@ elementclass Router4PortDummyCache {
     // output[3]: forward to interface 3
 
     n :: RouteEngine($local_addr);
-    //cache :: XIATransport($local_addr, n/proc/rt_CID/rt);
+    //cache :: XIACache($local_addr, n/proc/rt_CID/rt);
     cache :: Queue(200);
 
     input[0] -> [0]n;
