@@ -12,8 +12,8 @@ XIAXIDInfo(
 );
 
 // host & router instantiation
-host0 :: Host(RE AD0 HID0, HID0, 2000);
-host1 :: Host(RE AD1 HID1, HID1, 2001);
+host0 :: Host(RE AD0 HID0, HID0, 2000, true);
+host1 :: Host(RE AD1 HID1, HID1, 2001, true);
 router0 :: Router(RE AD0 RHID0, AD0, RHID0);
 router1 :: Router(RE AD1 RHID1, AD1, RHID1);
 
