@@ -58,11 +58,11 @@ int main(int argc, char *argv[])
 		    memcpy (payload_new, &seq_c, 4);
             memcpy (payload_new+4, &seq_s, 4);
             fprintf(fp, "%lld: PING received; client seq = %d\n",current_time, seq_c);
-            printf("%lld: PING received; client seq = %d\n",current_time, seq_c);
+            //printf("%lld: PING received; client seq = %d\n",current_time, seq_c);
             gettimeofday(&tv, NULL);
             current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
             fprintf(fp, "%lld: PONG sent; client seq = %d, server seq = %d\n",current_time,seq_c, seq_s);              
-            printf("%lld: PONG sent; client seq = %d, server seq = %d\n",current_time,seq_c, seq_s);              
+            //printf("%lld: PONG sent; client seq = %d, server seq = %d\n",current_time,seq_c, seq_s);              
             Xsend(sock,payload_new,8,0);
        		seq_s++;
        		n=0;

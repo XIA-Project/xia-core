@@ -42,7 +42,7 @@ int Xrecvfrom(int sockfd, void *buf, size_t len, int flags,
     		if ((numbytes = recvfrom(sockfd, UDPbuf, MAXBUFLEN-1 , flags,
 					(struct sockaddr *)&their_addr, &addr_len)) == -1) 
 			{
-	    	    perror("Xrecvfrom: recvfrom");
+	    	    //perror("Xrecvfrom: recvfrom");
         		return -1;
            	}
 	    

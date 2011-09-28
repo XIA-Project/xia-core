@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
 		memcpy (payload_new, &seq_client_, 4);
 		Xsend(sock,payload_new,4,0);
         fprintf(fp, "%lld: PING sent; client seq = %d\n",current_time, seq_client_);  // modify payload
-        printf("%lld: PING sent; client seq = %d\n",current_time, seq_client_);  // modify payload         
+        //printf("%lld: PING sent; client seq = %d\n",current_time, seq_client_);  // modify payload         
         seq_client_++;
                  
 		//Or use Xsendto()
@@ -76,21 +76,25 @@ int main(int argc, char *argv[])
 
 		//Process reply from server
 		//n = Xrecvfrom(sock,reply,1024,0,theirDAG,&dlen);
-		n = Xrecv(sock,reply,1024,0);
-		while(n>0)
-	    {   
-	        gettimeofday(&tv, NULL);
-            current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
-	        memcpy (&seq_c,reply, 4);
-	        memcpy (&seq_s,reply+4, 4);   
-	        fprintf(fp, "%lld: PONG received; client seq = %d, server seq = %d\n",current_time, seq_c, seq_s);
-	        printf("%lld: PONG received; client seq = %d, server seq = %d\n",current_time, seq_c, seq_s);
-	        rx++;
-	        n=0;
-	        n = Xrecv(sock,reply,1024,0);
-	    }   
-	    //Sleep for x microseconds between pings
-		usleep(10000);
+		int j=0;
+		for(j=0;j<100;j++)
+		{
+    		n = Xrecv(sock,reply,1024,0);
+    		while(n>0)
+    	    {   
+    	        gettimeofday(&tv, NULL);
+                current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
+    	        memcpy (&seq_c,reply, 4);
+    	        memcpy (&seq_s,reply+4, 4);   
+    	        fprintf(fp, "%lld: PONG received; client seq = %d, server seq = %d\n",current_time, seq_c, seq_s);
+    	        //printf("%lld: PONG received; client seq = %d, server seq = %d\n",current_time, seq_c, seq_s);
+    	        rx++;
+    	        n=0;
+    	        n = Xrecv(sock,reply,1024,0);
+    	    }   
+    	    //Sleep for x microseconds between pings
+    		usleep(100);
+    	}
 
 	}
 	
@@ -104,7 +108,7 @@ int main(int argc, char *argv[])
         memcpy (&seq_c,reply, 4);
         memcpy (&seq_s,reply+4, 4);   
         fprintf(fp, "%lld: PONG received; client seq = %d, server seq = %d\n",current_time, seq_c, seq_s);
-        printf("%lld: PONG received; client seq = %d, server seq = %d\n",current_time, seq_c, seq_s);
+        //printf("%lld: PONG received; client seq = %d, server seq = %d\n",current_time, seq_c, seq_s);
         rx++;
         n=0;
     }
