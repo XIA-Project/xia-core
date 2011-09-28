@@ -26,6 +26,6 @@ int Xsend(int sockfd,void *buf, size_t len, int flags)
 
 	p=servinfo;
 
-	numbytes = sendto(sockfd, buf, strlen(buf), flags, p->ai_addr, p->ai_addrlen);
+	numbytes = sendto(sockfd, buf, len, flags, p->ai_addr, p->ai_addrlen);
 	return strlen(buf);
 }

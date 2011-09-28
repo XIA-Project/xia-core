@@ -17,8 +17,12 @@ int XputCID(int sockfd,void *buf, size_t len, int flags,
     
     //Should probably check if the sDAG ends with a CID
     
-    char * s = malloc(snprintf(NULL, 0, "%s^%s",sDAG, (char*)buf) + 1);
-    sprintf(s, "%s^%s", sDAG,  (char*)buf);
+    char*s=malloc(MAXBUFLEN);
+    strcpy(s,sDAG);
+    int i=strlen(sDAG);
+    s[i]='^';
+    int offset=i+1;
+    memcpy(s+offset, buf, len);
 
     
 	struct addrinfo hints, *servinfo,*p;

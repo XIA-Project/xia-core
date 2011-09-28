@@ -10,8 +10,6 @@
 #include "xiatransport.hh"
 #include "xudp.hh"
 
-//TODO: Add content support
-
 CLICK_DECLS
 XUDP::XUDP()
 {

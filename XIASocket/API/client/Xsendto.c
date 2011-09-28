@@ -15,9 +15,12 @@ int Xsendto(int sockfd,void *buf, size_t len, int flags,
      * since we need to use strings and UDP packets, this will do for now.
      */
     
-    char * s = malloc(snprintf(NULL, 0, "%s^%s",dDAG, (char*)buf) + 1);
-    sprintf(s, "%s^%s", dDAG,  (char*)buf);
-
+    char*s=malloc(MAXBUFLEN);
+    strcpy(s,dDAG);
+    int i=strlen(dDAG);
+    s[i]='^';
+    int offset=i+1;
+    memcpy(s+offset, buf, len);
     
 	struct addrinfo hints, *servinfo,*p;
 	int rv;
@@ -37,6 +40,6 @@ int Xsendto(int sockfd,void *buf, size_t len, int flags,
 
 	p=servinfo;
 
-	numbytes = sendto(sockfd, s, strlen(s), flags, p->ai_addr, p->ai_addrlen);
+	numbytes = sendto(sockfd, s, len+i+1, flags, p->ai_addr, p->ai_addrlen);
 	return numbytes;
 }
