@@ -1,7 +1,4 @@
-/* Creates a datagram server.  The port 
- *    number is passed as an argument.  This
- *       server runs forever */
-
+/* XIA ping server*/
 #include <sys/types.h>
 #include <stdlib.h>
 #include <unistd.h>

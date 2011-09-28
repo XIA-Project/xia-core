@@ -1,4 +1,7 @@
-/* UDP client in the internet domain */
+/*XIA Ping client*/
+
+//TODO: Run the ping sender and ping receiver on different threads, so that Xrecv is running all the time, but send is scheduled
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -86,8 +89,7 @@ int main(int argc, char *argv[])
 	        n=0;
 	        n = Xrecv(sock,reply,1024,0);
 	    }   
-
-		//printf("Received a datagram from:%s\n",theirDAG);
+	    //Sleep for x microseconds between pings
 		usleep(10000);
 
 	}

@@ -1,4 +1,4 @@
-/* UDP client in the internet domain */
+/*XIA Client. Does getCID, connects to servers on SIDs etc*/
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>

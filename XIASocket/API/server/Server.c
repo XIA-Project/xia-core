@@ -1,6 +1,4 @@
-/* Creates a datagram server.  The port 
- *    number is passed as an argument.  This
- *       server runs forever */
+/*XIA Server. Does putCID, listens on SIDs etc*/
 
 #include <sys/types.h>
 #include <stdlib.h>
