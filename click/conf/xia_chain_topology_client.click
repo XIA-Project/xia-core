@@ -335,8 +335,8 @@ router0 :: Router(RE AD0 RHID0, AD0, RHID0);
 //router1 :: Router(RE AD1 RHID1, AD1, RHID1);
 
 // interconnection -- host - ad
-host0[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) -> [0]router0;
-router0[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) -> [0]host0;
+host0[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> Unqueue() -> [0]router0;
+router0[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> Unqueue() -> [0]host0;
 
 //host1[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) -> [0]router1;
 //router1[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) ->[0]host1;
@@ -348,11 +348,11 @@ router0[1] ->  Script(TYPE PACKET, print "host0 output0", print_realtime)
 //-> Socket(UDP, 198.133.224.187, 8027);
 //-> Socket(TCP, 128.2.208.168, 8027, CLIENT true);
 //-> s1::Socket(TCP, 0.0.0.0, 8028, CLIENT false);
--> s1::Socket(UDP, 198.133.224.187, 8027, 0.0.0.0, 8027, SNAPLEN 50000);
-
-//s2::Socket(TCP, 0.0.0.0, 8027, CLIENT false) 
-s2::Socket(UDP, 0.0.0.0, 8028, SNAPLEN 50000)
+-> s1::Socket(UDP, 128.2.209.187, 5027, 198.133.224.187, 8027, SNAPLEN 50000, CLIENT true)
 -> MarkXIAHeader() -> Print(in)->XIAPrint(in)-> Script(TYPE PACKET, print "host0 output0", print_realtime) ->[1]router0;
+//s2::Socket(TCP, 0.0.0.0, 8027, CLIENT false) 
+//s2::Socket(UDP, 0.0.0.0, 8028, SNAPLEN 50000)
+//s1
 
 // send test packets from host0 to host1
 /*
