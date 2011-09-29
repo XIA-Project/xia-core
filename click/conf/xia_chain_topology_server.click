@@ -335,16 +335,18 @@ host1 :: Host(RE AD1 HID1, HID1, 2001, true);
 router1 :: Router(RE AD1 RHID1, AD1, RHID1);
 
 // interconnection -- host - ad
-//host0[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) -> [0]router0;
-//router0[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) -> [0]host0;
+//host0[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> Unqueue() -> [0]router0;
+//router0[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> Unqueue() -> [0]host0;
 
-host1[0] ->  Script(TYPE PACKET, print "host1 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) -> [0]router1;
-router1[0] ->  Script(TYPE PACKET, print "host1 input0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) ->[0]host1;
+host1[0] ->  Script(TYPE PACKET, print "host1 output0", print_realtime) -> Unqueue() -> [0]router1;
+router1[0] ->  Script(TYPE PACKET, print "host1 input0", print_realtime) -> Unqueue() ->[0]host1;
 
 // interconnection -- ad - ad
-Socket(UDP, 0.0.0.0, 8027) -> MarkXIAHeader() -> XIAPrint() ->
+
+router1[1] ->  Script(TYPE PACKET, print "router1 output1", print_realtime) 
+-> Socket(UDP, 198.133.224.187, 8027, 128.2.209.187, 5027, CLIENT true, SNAPLEN 50000)
+-> MarkXIAHeader() -> XIAPrint() ->
 Script(TYPE PACKET, print "router1 input1", print_realtime) ->[1]router1;
-router1[1] ->  Script(TYPE PACKET, print "router1 output1", print_realtime) -> Socket(UDP, 128.2.209.187, 8028);
 
 // send test packets from host0 to host1
 /*
