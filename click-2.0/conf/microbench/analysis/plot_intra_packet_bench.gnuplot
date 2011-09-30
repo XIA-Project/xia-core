@@ -1,4 +1,4 @@
-set terminal pdf enhanced dashed size 3.3in, 2in
+set terminal pdf enhanced dashed size 3in, 2in
 #set xlabel 
 set yrange [0:2]
 set ylabel "Normalized Processing Time"

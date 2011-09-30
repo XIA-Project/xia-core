@@ -1,10 +1,11 @@
 #!/usr/bin/env gnuplot 
 		
-set term pdf dashed size 3.00in, 1.55in
+set term pdf dashed size 3.00in, 2.00in
 		
 set output "fastpath_performance.pdf"
-set xlabel "XIA Packet types"
+#set xlabel "XIA Packet types"
 set ylabel "Performance (Gbps)"
+set xrange [-0.3:3.3]
 		
 		
 set style  line 1 lt 6 lc rgb "red"  linewidth 4  pointtype 1 pointsize 0.4
