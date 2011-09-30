@@ -107,41 +107,7 @@ elementclass RouteEngine {
     proc[2] -> XIAPrint() -> Discard;  // No route drop (future TODO: return an error packet)
 };
 
-// 1-port host node
-elementclass Host0 {
-    $local_addr, $local_hid, $rpc_port, $enable_local_cache |
 
-    // $local_addr: the full address of the node
-    // $local_hid:  the HID of the node
-    // $rpc_port:   the TCP port number to use for RPC
-
-    // input: a packet arrived at the node
-    // output: forward to interface 0
-
-    n :: RouteEngine($local_addr);
-    sock :: Socket(TCP, 0.0.0.0, $rpc_port, CLIENT false);
-    rpc :: XIARPC($local_addr);
-    cache :: XIATransport($local_addr, n/proc/rt_CID/rt, $enable_local_cache);
-
-    Script(write n/proc/rt_AD/rt.add - 0);      // default route for AD
-    Script(write n/proc/rt_HID/rt.add - 0);     // default route for HID
-    Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self HID as destination
-    Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
-    Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
-
-    input[0] -> n;
-
-    srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
-
-    sock  -> Queue (1000000) ->  RatedUnqueue (1000)-> [0]rpc[0] -> sock;
-    n[1] -> srcTypeClassifier[1] -> [1]rpc[1] -> [0]n;
-    srcTypeClassifier[0] -> Discard;    // do not send CID responses directly to RPC;
-                                        // they must be served by cache using the following connection only
-    n[2] -> [0]cache[0] -> [1]n;
-    rpc[2] -> [1]cache[1] -> [2]rpc;
-
-    n -> Queue(200) -> [0]output;
-};
 
 
 elementclass Host {
@@ -230,7 +196,7 @@ elementclass Router {
 
 // 4-port router node; AD & HID tables need to be set manually using Script()
 elementclass Router4Port {
-    $local_addr |
+    $local_addr, $local_ad, $local_hid, $ad0, $ad2 |
 
     // $local_addr: the full address of the node
 
@@ -240,13 +206,23 @@ elementclass Router4Port {
     // output[2]: forward to interface 2
     // output[3]: forward to interface 3
 
+
     n :: RouteEngine($local_addr);
     cache :: XIATransport($local_addr, n/proc/rt_CID/rt);
+
+    Script(write n/proc/rt_AD/rt.add $ad0 1);     
+    Script(write n/proc/rt_AD/rt.add $ad2 2);     
+    Script(write n/proc/rt_AD/rt.add $local_ad 4);    // self AD as destination
+    Script(write n/proc/rt_HID/rt.add - 0);     // forwarding for local HID
+    Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self HID as destination
+    Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
+    Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
+
 
     input[0] -> [0]n;
     input[1] -> [0]n;
     input[2] -> [0]n;
-    input[3] -> [0]n;
+  //  input[3] -> [0]n;
 
     n[0] -> sw :: PaintSwitch
     n[1] -> Discard;
@@ -256,7 +232,7 @@ elementclass Router4Port {
     sw[0] -> Queue(200) -> [0]output;
     sw[1] -> Queue(200) -> [1]output;
     sw[2] -> Queue(200) -> [2]output;
-    sw[3] -> Queue(200) -> [3]output;
+    //sw[3] -> Queue(200) -> [3]output;
 };
 
 // 4-port router node with "dummy cache" (for microbench)
@@ -368,6 +344,75 @@ elementclass IP6Router4Port {
 };
 
 
+// 1-port host node
+elementclass Host0 {
+    $local_addr, $local_hid, $rpc_port, $enable_local_cache |
+
+    // $local_addr: the full address of the node
+    // $local_hid:  the HID of the node
+    // $rpc_port:   the TCP port number to use for RPC
+
+    // input: a packet arrived at the node
+    // output: forward to interface 0
+
+    n :: RouteEngine($local_addr);
+    sock :: Socket(TCP, 0.0.0.0, $rpc_port, CLIENT false);
+    rpc :: XIARPC($local_addr);
+    cache :: XIATransport($local_addr, n/proc/rt_CID/rt, $enable_local_cache);
+
+    Script(write n/proc/rt_AD/rt.add - 0);      // default route for AD
+    Script(write n/proc/rt_HID/rt.add - 0);     // default route for HID
+    Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self HID as destination
+    Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
+    Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
+
+    input[0] -> n;
+
+    srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
+
+    sock  -> Queue (1000000) ->  RatedUnqueue (1000)-> [0]rpc[0] -> sock;
+    n[1] -> srcTypeClassifier[1] -> [1]rpc[1] -> [0]n;
+    srcTypeClassifier[0] -> Discard;    // do not send CID responses directly to RPC;
+                                        // they must be served by cache using the following connection only
+    n[2] -> [0]cache[0] -> [1]n;
+    rpc[2] -> [1]cache[1] -> [2]rpc;
+
+    n -> Queue(200) -> [0]output;
+};
+
+// 1-port host node
+elementclass Host00 {
+    $local_addr, $local_hid, $rpc_port, $enable_local_cache |
+
+    // $local_addr: the full address of the node
+    // $local_hid:  the HID of the node
+    // $rpc_port:   the TCP port number to use for RPC
+
+    // input: a packet arrived at the node
+    // output: forward to interface 0
+
+    n :: RouteEngine($local_addr);
+    sock :: Socket(TCP, 0.0.0.0, $rpc_port, CLIENT false);
+    rpc :: XIARPC($local_addr);
+    cache :: XIATransport($local_addr, n/proc/rt_CID/rt, $enable_local_cache);
+
+    Script(write n/proc/rt_AD/rt.add - 0);      // default route for AD
+    Script(write n/proc/rt_HID/rt.add - 0);     // default route for HID
+    Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self HID as destination
+    Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
+    Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
+
+    input[0] -> n;
+
+    srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
+
+    sock  -> Queue (1000000) ->  RatedUnqueue (1000)-> [0]rpc[0] -> Discard;
+    n[2] -> [0]cache[0] -> [1]n;
+    rpc[2] -> [1]cache[1] -> [2]rpc;
+
+    n -> Queue(200) -> [0]output;
+};
+
 // aliases for XIDs
 XIAXIDInfo(
     HID0 HID:0000000000000000000000000000000000000000,
@@ -382,26 +427,32 @@ XIAXIDInfo(
 );
 
 // host & router instantiation
-host0 :: Host0(RE AD0 HID0, HID0, 2000, 0);
+sock :: Socket(TCP, 0.0.0.0, 2000, CLIENT false);
+rpc :: XIARPC(RE AD0 HID0);
+//host0 :: Host00(RE AD0 HID0, HID0, 2000, 0);
 host1 :: Host(RE AD1 HID1, HID1, 2001, 0);
 router0 :: Router(RE AD0 RHID0, AD0, RHID0);
-router1 :: Router(RE AD1 RHID1, AD1, RHID1);
+router1 :: Router4Port(RE AD1 RHID1,AD1, RHID1, AD0, AD2);
 router2 :: Router(RE AD2 RHID2, AD2, RHID2);
 
-
-router2[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) -> [0]host0;
+//router2[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) -> [0]host0;
 
 // interconnection -- host - ad
-host0[0] ->   Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) -> [0]router0;
-router0[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) -> [0]host0;
+sock  -> Queue (1000000) ->  RatedUnqueue (1000)-> [0]rpc[1] -> Queue (1000000)  -> LinkUnqueue(0.000, 1 GB/s) -> [0]router0;
+router0[0] ->  LinkUnqueue(0.005, 1 GB/s) -> [1]rpc;
+rpc[0] -> Discard;
+rpc[2] -> Queue (1000000) -> LinkUnqueue(0.015, 1 GB/s) -> [0]router2; //0.025
+router2[0] -> LinkUnqueue(0.015, 1 GB/s) -> [2]rpc;
 
-host1[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) -> [0]router1;
-router1[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) ->[0]host1;
+
+host1[0] -> LinkUnqueue(0.005, 1 GB/s) -> [0]router1;
+router1[0] -> LinkUnqueue(0.005, 1 GB/s) ->[0]host1;
 
 // interconnection -- ad - ad
-router0[1] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) ->[1]router1;
-router1[1] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) ->[1]router0;
-
+router0[1] -> LinkUnqueue(0.005, 1 GB/s) ->[1]router1;
+router1[1] -> LinkUnqueue(0.005, 1 GB/s) ->[1]router0;
+router2[1]  -> LinkUnqueue(0.005, 1 GB/s) ->[2]router1;
+router1[2] -> LinkUnqueue(0.005, 1 GB/s) ->[1]router2;
 // send test packets from host0 to host1
 /*
 gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
