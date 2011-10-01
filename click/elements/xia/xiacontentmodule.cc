@@ -16,17 +16,20 @@ XIAContentModule::~XIAContentModule()
 
 void XIAContentModule::process_request(Packet *p, const XID &srcID, const XID & dstCID)
 { 
-    //    std::cout<<"dstID is CID"<<std::endl;  
+    //click_chatter("CM:process request");
+    //std::cout<<"dstID is CID"<<std::endl;  
     HashTable<XID,CChunk*>::iterator it;
     it=_contentTable.find(dstCID);    
 #ifdef CLIENTCACHE
     if(srcID==_transport->local_hid())
     {
+    //click_chatter("Check local");
 	if(it!=_contentTable.end())
 	{
 	    content[dstCID]=1;
 
 	    XIAHeaderEncap encap;
+    	XIAHeader hdr(p);
 	    XIAPath srcPath, dstPath;      
 	    char* pl=it->second->GetPayload();
 	    unsigned int s=it->second->GetSize();
@@ -36,8 +39,9 @@ void XIAContentModule::process_request(Packet *p, const XID &srcID, const XID & 
 	    srcPath.add_edge(s_dummy, s_cid);
 
 	    handle_t d_dummy=dstPath.add_node(XID());
-	    handle_t d_hid=dstPath.add_node(srcID);
-	    dstPath.add_edge(d_dummy, d_hid);
+	    XID	_destination_xid = hdr.src_path().xid(hdr.src_path().destination_node());   //Find the last node of the source, it can be a HID or SID 
+	    handle_t d_xid=dstPath.add_node(_destination_xid);
+	    dstPath.add_edge(d_dummy, d_xid);
 
 	    encap.set_src_path(srcPath);
 	    encap.set_dst_path(dstPath);
@@ -101,7 +105,7 @@ void XIAContentModule::process_request(Packet *p, const XID &srcID, const XID & 
     }
     else  //printf("dstID is not found in cache, pkt killed\n");
     {
-	//      std::cout<<"not found, kill pkt"<<std::endl;
+	      //std::cout<<"not found, kill pkt"<<std::endl;
 	p->kill();
     }
 }  
@@ -111,6 +115,7 @@ void XIAContentModule::cache_incoming(Packet *p, const XID& srcCID, const XID& d
 {
     XIAHeader xhdr(p);  // parse xia header and locate nodes and payload
     ContentHeader ch(p);  
+    //click_chatter("CM:cache incoming");
 
     const unsigned char *payload=xhdr.payload();
     int offset=ch.chunk_offset();
@@ -119,6 +124,7 @@ void XIAContentModule::cache_incoming(Packet *p, const XID& srcCID, const XID& d
 
     if(dstID==_transport->local_hid())   // cache in client, should return the whole chunk    
     {
+    //click_chatter("CID response reached destination");
 	HashTable<XID,CChunk*>::iterator it,oit;
 	bool chunkFull=false;
 	CChunk* chunk;
@@ -170,6 +176,7 @@ void XIAContentModule::cache_incoming(Packet *p, const XID& srcCID, const XID& d
 	}
 #endif
 	it=_partialTable.find(srcCID);
+	//click_chatter("check table");
 	if(it!=_partialTable.end()) //already in partial table
 	{
 	    //std::cout<<"found in partial table"<<std::endl;
@@ -183,6 +190,7 @@ void XIAContentModule::cache_incoming(Packet *p, const XID& srcCID, const XID& d
 	}
 	else
 	{	
+	    //std::cout<<"not found in partial table"<<std::endl;
 	    oit=oldPartial.find(srcCID);
 	    if(oit!=oldPartial.end())  //already in old partial table
 	    {
@@ -200,7 +208,7 @@ void XIAContentModule::cache_incoming(Packet *p, const XID& srcCID, const XID& d
 	    }	
 	    else			//first pkt to the client
 	    {
-		//  std::cout<<"first pkt of a chunk"<<std::endl;
+		  //std::cout<<"first pkt of a chunk"<<std::endl;
 		chunk=new CChunk(srcCID, chunkSize);
 		chunk->fill(payload, offset, length);
 		if(chunk->full())
@@ -290,6 +298,7 @@ void XIAContentModule::cache_incoming(Packet *p, const XID& srcCID, const XID& d
 	    }	
 #endif
 	}
+
 	p->kill();            
     }
     //cache in server, router
@@ -349,6 +358,7 @@ void XIAContentModule::cache_incoming(Packet *p, const XID& srcCID, const XID& d
 
 		    if(chunk->full())
 		    {
+		    //click_chatter("chunk is complete");
 			_contentTable[srcCID]=chunk;
 			content[srcCID]=1;
 			//modify routing table	  //add

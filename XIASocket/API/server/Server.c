@@ -1,6 +1,4 @@
-/* Creates a datagram server.  The port 
- *    number is passed as an argument.  This
- *       server runs forever */
+/*XIA Server. Does putCID, listens on SIDs etc*/
 
 #include <sys/types.h>
 #include <stdlib.h>
@@ -32,11 +30,20 @@ int main(int argc, char *argv[])
 	sock=Xsocket();
 	if (sock < 0) error("Opening socket");
 	
+	
+	//Make a CID entry
+    char * cdag = malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,CID0) + 1);
+    sprintf(cdag, "RE %s %s %s", AD0, HID0,CID0); 
+    char* data="Some value stored for CID0";
+    XputCID(sock,data,strlen(data),0,cdag,strlen(cdag));
+    
+	
 	//Make the sDAG (the one the server listens on)
 	char * dag = malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,SID0) + 1);
     sprintf(dag, "RE %s %s %s", AD0, HID0,SID0); 
     //printf("\nListening on RE %s %s %s", AD0, HID0,SID0);
-
+    
+    
 	//Bind to the DAG
 	Xbind(sock,dag);
     printf("\nListening...\n");

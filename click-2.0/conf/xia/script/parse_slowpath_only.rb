@@ -17,7 +17,7 @@ def parse_fp_result(proto)
       count=0
       perfs = []
       #p statfiles
-      while ((statfile = statfiles.pop()) && count<10)
+      while ((statfile = statfiles.pop()) && count<1)
         #p statfile
         perf = calc_avg_performance(statfile, true)
         if (perf==nil || perf.include?(0.0)) # failed experiment
@@ -29,7 +29,6 @@ def parse_fp_result(proto)
       end
       next if (perfs.empty?())
       length = length.to_i()
-      next if (length>320)
       perf = perfs.avg
       output.puts "#{proto} #{fastpath} #{p} #{fb} #{length} #{perf/1e6} #{perf*length*8/1e9} #{count} #{perfs.min/1e6} #{perfs.max/1e6}"
       line +=1
@@ -41,4 +40,5 @@ end
 if __FILE__==$0
     Dir.chdir("output")
     parse_fp_result("XIA")
+    parse_fp_result("IP")
 end
