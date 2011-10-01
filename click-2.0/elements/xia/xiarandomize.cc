@@ -111,6 +111,7 @@ XIARandomize::simple_action(Packet *p_in)
 
     assert(_zipf_cache);
     uint32_t seed  = _zipf_cache[_current_cycle]; /* zipf */
+    //uint32_t seed  = rand() % _max_cycle;    /* uniform */
 
     for (size_t i = 0; i < hdr->dnode + hdr->snode; i++)
     {
