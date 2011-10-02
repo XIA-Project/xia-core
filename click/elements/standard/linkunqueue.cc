@@ -214,6 +214,20 @@ LinkUnqueue::write_handler(const String &, Element *e, void *, ErrorHandler *)
     return 0;
 }
 
+int LinkUnqueue::change_param(const String &conf, Element *e, void *vparam,
+                ErrorHandler *errh)
+{
+    LinkUnqueue *u = (LinkUnqueue *)e;
+    Timestamp _latency;
+    if (cp_va_kparse(conf, u, errh,
+		     "LATENCY", cpkP+cpkM, cpTimestamp, &_latency,
+		     cpEnd) < 0)
+	return -1;
+    
+    u->_latency=_latency;
+    return 0;
+}
+
 void
 LinkUnqueue::add_handlers()
 {
@@ -221,6 +235,7 @@ LinkUnqueue::add_handlers()
     add_read_handler("bandwidth", read_param, (void *)H_BANDWIDTH, Handler::CALM);
     add_read_handler("size", read_param, (void *)H_SIZE);
     add_write_handler("reset", write_handler, 0, Handler::BUTTON);
+    add_write_handler("lat", change_param, 0);
     add_task_handlers(&_task);
 }
 

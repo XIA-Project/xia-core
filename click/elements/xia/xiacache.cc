@@ -121,6 +121,34 @@ void XIACache::push(int port, Packet *p)
     }
 }
 
+enum {H_MOVE};
+
+int XIACache::write_param(const String &conf, Element *e, void *vparam,
+                ErrorHandler *errh)
+{
+    XIACache *f = (XIACache *)e;
+    switch((int)vparam) {
+        case H_MOVE: {
+            XIAPath local_addr;
+            if (cp_va_kparse(conf, f, errh,
+				"LOCAL_ADDR", cpkP+cpkM, cpXIAPath, &local_addr,
+				cpEnd) < 0)
+		    return -1;
+            f->_local_addr = local_addr;
+            //click_chatter("%s",local_addr.unparse().c_str());
+            f->_local_hid = local_addr.xid(local_addr.destination_node());
+            
+            
+        } break;
+
+        default: break;
+    }
+    return 0;
+}
+
+void XIACache::add_handlers() {
+    add_write_handler("local_addr", write_param, (void *)H_MOVE);
+}
 
 
 CLICK_ENDDECLS

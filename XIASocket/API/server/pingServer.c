@@ -18,7 +18,9 @@
 #define CID0 "CID:2000000000000000000000000000000000000001"
 #define SID0 "SID:0f00000000000000000000000000000000000055"
 
-#define TOTALPINGS 100
+#define TOTALPINGS 4000
+#define MIGRATEPOINT 2000
+
 
 int main(int argc, char *argv[])
 {
@@ -43,12 +45,12 @@ int main(int argc, char *argv[])
 	//Bind to the DAG
 	Xbind(sock,dag);
     printf("\nListening...\n");
-    
+    Xaccept(sock);
     while (seq_s<TOTALPINGS) {
         //Receive packet
-        gettimeofday(&tv, NULL);
-        current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
 		n = Xrecv(sock,payload_new,1024,0);
+		gettimeofday(&tv, NULL);
+        current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
 		//n = Xrecvfrom(sock,payload_new,1024,0,theirDAG,&dlen);
 		if(n>0)
 		{
@@ -57,13 +59,19 @@ int main(int argc, char *argv[])
 		    
 		    memcpy (payload_new, &seq_c, 4);
             memcpy (payload_new+4, &seq_s, 4);
+            gettimeofday(&tv, NULL);
+            current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
+            if(seq_c==MIGRATEPOINT)
+              	fprintf(fp, "%lld: updating XIAPingResponder with new address something something\n",current_time);  // modify payload
             fprintf(fp, "%lld: PING received; client seq = %d\n",current_time, seq_c);
             //printf("%lld: PING received; client seq = %d\n",current_time, seq_c);
+            
+            Xsend(sock,payload_new,8,0);
             gettimeofday(&tv, NULL);
             current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
             fprintf(fp, "%lld: PONG sent; client seq = %d, server seq = %d\n",current_time,seq_c, seq_s);              
             //printf("%lld: PONG sent; client seq = %d, server seq = %d\n",current_time,seq_c, seq_s);              
-            Xsend(sock,payload_new,8,0);
+
        		seq_s++;
        		n=0;
 	    }	

@@ -88,6 +88,7 @@ class LinkUnqueue : public Element, public Storage { public:
     void delay_by_bandwidth(Packet *, const Timestamp &) const;
     static String read_param(Element *, void *);
     static int write_handler(const String &, Element *, void *, ErrorHandler *);
+    static int change_param(const String &conf, Element *e, void *vparam, ErrorHandler *errh);
 
 };
 

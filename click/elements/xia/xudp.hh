@@ -27,7 +27,7 @@
 #define CLICKBINDPORT 5002
 #define CLICKCLOSEPORT 5003
 #define CLICKCONNECTPORT 5004
-#define CLICKCONTROLPORT 5005
+#define CLICKACCEPTPORT 5005
 
 #define CLICKPUTCIDPORT 10002
 #define CLICKSENDTOPORT 10001
@@ -63,11 +63,14 @@ class XUDP : public Element {
     void push(int port, Packet *);            
     XID local_hid() { return _local_hid; };
     XIAPath local_addr() { return _local_addr; };
+    void add_handlers();
+    static int write_param(const String &, Element *, void *vparam, ErrorHandler *);
 
   private:
     uint32_t _cid_type;
     XID _local_hid;
     XIAPath _local_addr;
+    bool isConnected;
     
     Packet* UDPIPEncap(Packet *, int,int);
     
@@ -79,6 +82,8 @@ class XUDP : public Element {
     int nxt;
     int last;
     uint8_t hlim;
+    bool isConnected;
+    bool initialized;
     } ;
     
     HashTable<XID, unsigned short> XIDtoPort;
@@ -104,6 +109,7 @@ class XUDP : public Element {
     }
 
 };
+
 
 CLICK_ENDDECLS
 

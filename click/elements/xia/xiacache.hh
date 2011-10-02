@@ -43,6 +43,8 @@ class XIACache : public Element {
     void push(int port, Packet *);            
     XID local_hid() { return _local_hid; };
     XIAPath local_addr() { return _local_addr; };
+    void add_handlers();
+    static int write_param(const String &, Element *, void *vparam, ErrorHandler *);
 
   private:
     uint32_t _cid_type;

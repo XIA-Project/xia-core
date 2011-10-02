@@ -10,11 +10,14 @@
 #include "xiatransport.hh"
 #include "xudp.hh"
 
+#define DEBUG 0
+
 CLICK_DECLS
 XUDP::XUDP()
 {
   GOOGLE_PROTOBUF_VERIFY_VERSION;  
     _id=0;
+    isConnected=false;
 }
 
 	int
@@ -55,15 +58,15 @@ XUDP::~XUDP()
 
 
 
-void XUDP::push(int port, Packet *p_in)
+void XUDP::push(int port, Packet *p_input)
 {
-	WritablePacket *p = p_in->uniqueify();
+	WritablePacket *p_in = p_input->uniqueify();
 	//Depending on which port it arrives at it could be control/API traffic/Data traffic
 	switch(port){
 		case 0: //Control traffic
 			{
 				//Extract the destination port 
-				click_udp * uh=p->udp_header();
+				click_udp * uh=p_in->udp_header();
 				
 				unsigned short _dport=uh->uh_dport;
 				unsigned short _sport=uh->uh_sport;
@@ -76,21 +79,21 @@ void XUDP::push(int port, Packet *p_in)
 		    				
 							portRxSeqNo.set(_sport,1);
 							portTxSeqNo.set(_sport,1);
-							p->pull(p->transport_header_offset());//Remove IP header
+							p_in->pull(p_in->transport_header_offset());//Remove IP header
             				p_in->pull(8); //Remove UDP header
-							output(1).push(UDPIPEncap(p,_sport,_sport));
+							output(1).push(UDPIPEncap(p_in,_sport,_sport));
 						}
 						break;
 
 					case CLICKBINDPORT: //Bind XID
 						{
 						    //Remove UDP/IP headers
-  							p->pull(p->transport_header_offset());//Remove IP header
+  							p_in->pull(p_in->transport_header_offset());//Remove IP header
             				p_in->pull(8); //Remove UDP header
             				
             				//get source DAG
-							String sdag_string((const char*)p->data(),(const char*)p->end_data());
-							//click_chatter("\nbind requested to %s, length=%d\n",sdag_string.c_str(),(int)p->length());
+							String sdag_string((const char*)p_in->data(),(const char*)p_in->end_data());
+							//click_chatter("\nbind requested to %s, length=%d\n",sdag_string.c_str(),(int)p_in->length());
 							
 							//Set source DAG info
 							DAGinfo daginfo;
@@ -101,6 +104,8 @@ void XUDP::push(int port, Packet *p_in)
 							daginfo.nxt=-1;
 							daginfo.last=-1;
 							daginfo.hlim=250;
+							daginfo.isConnected=false;
+							daginfo.initialized=false;
 							
 							XID	source_xid = daginfo.src_path.xid(daginfo.src_path.destination_node());
 							//XID xid(xid_string);
@@ -131,23 +136,26 @@ void XUDP::push(int port, Packet *p_in)
 					case CLICKCONNECTPORT://Connect
 						{
 			                //Remove UDP/IP headers
-  							p->pull(p->transport_header_offset());//Remove IP header
+  							p_in->pull(p_in->transport_header_offset());//Remove IP header
             				p_in->pull(8); //Remove UDP header
+            				isConnected=true;
 						
-							String dest((const char*)p->data(),(const char*)p->end_data());
-							//click_chatter("\nconnect to %s, length=%d\n",dest.c_str(),(int)p->length());
+							String dest((const char*)p_in->data(),(const char*)p_in->end_data());
+							//click_chatter("\nconnect to %s, length=%d\n",dest.c_str(),(int)p_in->length());
 							XIAPath dst_path;
 							dst_path.parse(dest); 
 							
 
                             DAGinfo *daginfo=portToDAGinfo.get_pointer(_sport);
                             
-                            if(!daginfo)//No local SID bound yet, so bind one
+                            if(!daginfo)//No local SID bound yet, so bind ephemeral one
                             {
 							
                             daginfo=new DAGinfo();
 							daginfo->port=_sport;
 							String str_local_addr=_local_addr.unparse_re();
+							daginfo->isConnected=true;
+							daginfo->initialized=true;
 							
 							String rand(click_random(1000000, 9999999));
 							String xid_string="SID:20000ff00000000000000000000000000"+rand;
@@ -165,12 +173,23 @@ void XUDP::push(int port, Packet *p_in)
 							addRoute(source_xid);
 							portToDAGinfo.set(_sport,*daginfo);
                             }
+                            
+
+							
                             daginfo=portToDAGinfo.get_pointer(_sport);
 							daginfo->dst_path=dst_path;
 							//click_chatter("\nbound to %s\n",portToDAGinfo.get_pointer(_sport)->src_path.unparse().c_str());
 
     						portRxSeqNo.set(_sport,portRxSeqNo.get(_sport)+1);//Increment counter
-						}					
+						}		
+						break;
+					case CLICKACCEPTPORT://Accept
+    					DAGinfo *daginfo=portToDAGinfo.get_pointer(_sport);
+					    daginfo->isConnected=true;
+					    isConnected=true;
+					    p_in->kill();
+					    break;
+							
 					
 				}
 				//TODO: Send a confirmation to API for control messages
@@ -180,10 +199,11 @@ void XUDP::push(int port, Packet *p_in)
 
 		case 1: //packet from Socket API
 			{
-    			click_chatter("\nGot packet from socket");
+			    if (DEBUG)
+        			click_chatter("\nGot packet from socket");
     			
     			//Extract the destination port 
-				const click_udp * uh=p->udp_header();
+				const click_udp * uh=p_in->udp_header();
 				
 				unsigned short _dport=uh->uh_dport;
 				unsigned short _sport=uh->uh_sport;
@@ -191,8 +211,44 @@ void XUDP::push(int port, Packet *p_in)
     			switch(ntohs(_dport)){
     	    		case CLICKDATAPORT:
     	          		{
+    	          		    if(!isConnected)
+    	          		        click_chatter("Not 'connect'ed");
+    	          		    else
+    	          		    {
                             //Find DAG info for that stream
     		        		DAGinfo *daginfo=portToDAGinfo.get_pointer(_sport);
+    		        		
+
+							
+							//Recalculate source path
+                            XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+                            String str_local_addr=_local_addr.unparse_re()+" "+source_xid.unparse();
+                            //Make source DAG _local_addr:SID
+                            if(isConnected)
+                            if(daginfo->src_path.unparse_re()!=str_local_addr)
+                            {
+                                //Moved!
+							    daginfo->src_path.parse_re(str_local_addr);
+							    //Send a control packet to transport on the other side
+							    //TODO: Change this to a proper format rather than use presence of extension header=1 to denote mobility
+							    class XIAHeaderEncap* _xiah=new XIAHeaderEncap();
+							    String str="MOVED";
+    		        		    WritablePacket *p2 = WritablePacket::make (256, str.c_str(), str.length(),0);
+    		        			_xiah->set_nxt(22);
+        		        		_xiah->set_last(-1);
+    		        		    _xiah->set_hlim(250);
+        		        		_xiah->set_dst_path(daginfo->dst_path);
+        		        		_xiah->set_src_path(daginfo->src_path);
+        		        		
+        		        		//Might need to remove more if another header is required (eg some control/DAG info)
+		        		    
+        		        		WritablePacket *p = NULL;
+                                p = _xiah->encap(p2, true);
+                            
+                                //click_chatter("Sent packet to network");
+        		        		output(2).push(p);
+    		        		}
+							
     		        		
     		        		//Add XIA headers
     		        		class XIAHeaderEncap* _xiah=new XIAHeaderEncap();
@@ -202,9 +258,11 @@ void XUDP::push(int port, Packet *p_in)
 		        		    _xiah->set_hlim(250);
     		        		_xiah->set_dst_path(daginfo->dst_path);
     		        		_xiah->set_src_path(daginfo->src_path);
-       						click_chatter("sent packet to %s, from %s\n",daginfo->dst_path.unparse_re().c_str(),daginfo->src_path.unparse_re().c_str());
+       						
+       						if (DEBUG)
+        			            click_chatter("sent packet to %s, from %s\n",daginfo->dst_path.unparse_re().c_str(),daginfo->src_path.unparse_re().c_str());
     		        		
-    		        		p->pull(p->transport_header_offset());//Remove IP header
+    		        		p_in->pull(p_in->transport_header_offset());//Remove IP header
     		        		p_in->pull(8); //Remove UDP header
         		        		
     		        		//Might need to remove more if another header is required (eg some control/DAG info)
@@ -214,21 +272,22 @@ void XUDP::push(int port, Packet *p_in)
                             
                             //click_chatter("Sent packet to network");
     		        		output(2).push(p);
+    		        		}
     		    		}
     		    		break;
     		    	
     		    	case CLICKSENDTOPORT:
     		    	    {
     		    	        //Remove UDP/IP headers
-  							p->pull(p->transport_header_offset());//Remove IP header
+  							p_in->pull(p_in->transport_header_offset());//Remove IP header
             				p_in->pull(8); //Remove UDP header
 						
-							String s((const char*)p->data(),(const char*)p->end_data());
+							String s((const char*)p_in->data(),(const char*)p_in->end_data());
 							
 							int carat=s.find_left('^');
 							String dest=s.substring(0,carat);
 							//click_chatter("carat:%d",carat);
-							p->pull(carat+1);
+							p_in->pull(carat+1);
 							
 							XIAPath dst_path;
 							dst_path.parse(dest); 
@@ -259,11 +318,16 @@ void XUDP::push(int port, Packet *p_in)
 	    						addRoute(source_xid);
 	    						portToDAGinfo.set(_sport,*daginfo);
                             }
+                            //Recalculate source path
+                            XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+                            String str_local_addr=_local_addr.unparse_re()+" "+source_xid.unparse();//Make source DAG _local_addr:SID
+							daginfo->src_path.parse_re(str_local_addr);
     
                             daginfo=portToDAGinfo.get_pointer(_sport);
     						portRxSeqNo.set(_sport,portRxSeqNo.get(_sport)+1);//Increment counter
     						
-    						click_chatter("sent packet to %s, from %s\n",dest.c_str(),daginfo->src_path.unparse_re().c_str());
+    						if (DEBUG)
+        			            click_chatter("sent packet to %s, from %s\n",dest.c_str(),daginfo->src_path.unparse_re().c_str());
     		        		
     		        		//Add XIA headers
     		        		class XIAHeaderEncap* _xiah=new XIAHeaderEncap();
@@ -306,15 +370,15 @@ void XUDP::push(int port, Packet *p_in)
     		    	    {
     		    	       //The source DAG should end with a CID
     		    	       //Remove UDP/IP headers
-  							p->pull(p->transport_header_offset());//Remove IP header
+  							p_in->pull(p_in->transport_header_offset());//Remove IP header
             				p_in->pull(8); //Remove UDP header
 						
-							String s((const char*)p->data(),(const char*)p->end_data());
+							String s((const char*)p_in->data(),(const char*)p_in->end_data());
 							
 							int carat=s.find_left('^');
 							String src=s.substring(0,carat);
 							//click_chatter("carat:%d",carat);
-							p->pull(carat+1);
+							p_in->pull(carat+1);
 							int pktPayloadSize=s.length()-carat-1;
 							
 							
@@ -356,7 +420,8 @@ void XUDP::push(int port, Packet *p_in)
                             p = contenth.encap(p_in); 
                             p = _xiah->encap(p, true);
                             
-                            click_chatter("sent packet to cache");
+                            if (DEBUG)
+        			            click_chatter("sent packet to cache");
     		        		output(3).push(p);
     		    	    }
     		    	    break;
@@ -368,9 +433,10 @@ void XUDP::push(int port, Packet *p_in)
 
 		case 2://Packet from network layer
 			{
-			    click_chatter("Got packet from network");
+			    if (DEBUG)
+        			click_chatter("Got packet from network");
 				//Extract the SID/CID 
-				XIAHeader xiah(p->xia_header());
+				XIAHeader xiah(p_in->xia_header());
 			    XIAPath dst_path=xiah.dst_path();
                 XID	_destination_xid = dst_path.xid(dst_path.destination_node());    
                 //TODO:In case of stream use source AND destination XID to find port, if not found use source. No TCP like protocol exists though
@@ -383,26 +449,42 @@ void XUDP::push(int port, Packet *p_in)
 				{
                 //TODO: Refine the way we change DAG in case of migration. Use some control bits. Add verification
    				DAGinfo daginfo=portToDAGinfo.get(_dport);
-   				daginfo.dst_path=xiah.src_path();
-   				portToDAGinfo.set(_dport,daginfo);
+   			
+   				if(daginfo.initialized==false)
+   				{
+       				daginfo.dst_path=xiah.src_path();
+       				daginfo.initialized=true;
+       				portToDAGinfo.set(_dport,daginfo);
+   				}
+   				if(xiah.nxt()==22&&daginfo.isConnected==true)
+   				{
+       				//Verify mobility info
+       				daginfo.dst_path=xiah.src_path();
+       				portToDAGinfo.set(_dport,daginfo);
+       				p_in->kill();
+       				click_chatter("Sender moved, update to the new DAG");
+   				}
    				//ENDTODO
-   				
-   				//Unparse dag info
-   				String src_path=xiah.src_path().unparse();
-                String payload((const char*)xiah.payload(), xiah.plen());
-                String str=src_path;
-                str=str+String("^");
-                str=str+payload;
-                WritablePacket *p2 = WritablePacket::make (256, str.c_str(), str.length(),0);
-   				
-			    click_chatter("Sent packet to socket");                			
-				output(1).push(UDPIPEncap(p2,_dport,_dport));
-				p->kill();
+   				else
+   				{
+       				//Unparse dag info
+       				String src_path=xiah.src_path().unparse();
+                    String payload((const char*)xiah.payload(), xiah.plen());
+                    String str=src_path;
+                    str=str+String("^");
+                    str=str+payload;
+                    WritablePacket *p2 = WritablePacket::make (256, str.c_str(), str.length(),0);
+           				
+    			    if (DEBUG)
+            			click_chatter("Sent packet to socket");                			
+    				output(1).push(UDPIPEncap(p2,_dport,_dport));
+    				p_in->kill();
+				}
 				}
 				else
 				{
 				    click_chatter("Packet to unknown %s",_destination_xid.unparse().c_str());
-				    p->kill();
+				    p_in->kill();
 				}
 			}
 
@@ -411,9 +493,10 @@ void XUDP::push(int port, Packet *p_in)
 		case 3://Packet from cache
             {
                    
-            click_chatter("Got packet from cache");
+            if (DEBUG)
+        			click_chatter("Got packet from cache");
         	//Extract the SID/CID 
-			XIAHeader xiah(p->xia_header());
+			XIAHeader xiah(p_in->xia_header());
 		    XIAPath dst_path=xiah.dst_path();
             XID	_destination_xid = dst_path.xid(dst_path.destination_node());    
 
@@ -435,14 +518,15 @@ void XUDP::push(int port, Packet *p_in)
                 str=str+payload;
                 WritablePacket *p2 = WritablePacket::make (256, str.c_str(), str.length(),0);
                 
-			    click_chatter("Sent packet to socket");                			
+			    if (DEBUG)
+        			click_chatter("Sent packet to socket");                			
 				output(1).push(UDPIPEncap(p2,_dport,_dport));
-				p->kill();
+				p_in->kill();
 			}
 			else
 			{
 	   		    click_chatter("Packet to unknown %s",_destination_xid.unparse().c_str());
-			    p->kill();
+			    p_in->kill();
 			}            
             
           }
@@ -504,6 +588,35 @@ XUDP::UDPIPEncap(Packet *p_in,int sport, int dport)
 	}
 
 	return p;
+}
+
+
+enum {H_MOVE};
+
+int XUDP::write_param(const String &conf, Element *e, void *vparam,
+                ErrorHandler *errh)
+{
+    XUDP *f = (XUDP *)e;
+    switch((int)vparam) {
+        case H_MOVE: {
+            XIAPath local_addr;
+            if (cp_va_kparse(conf, f, errh,
+				"LOCAL_ADDR", cpkP+cpkM, cpXIAPath, &local_addr,
+				cpEnd) < 0)
+		    return -1;
+            f->_local_addr = local_addr;
+            click_chatter("Moved to %s",local_addr.unparse().c_str());
+            f->_local_hid = local_addr.xid(local_addr.destination_node());
+            
+        } break;
+
+        default: break;
+    }
+    return 0;
+}
+
+void XUDP::add_handlers() {
+    add_write_handler("local_addr", write_param, (void *)H_MOVE);
 }
 
 

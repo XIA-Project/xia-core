@@ -50,14 +50,16 @@ int main(int argc, char *argv[])
     
     while (1) {
         //Receive packet
-		n = Xrecvfrom(sock,buf,1024,0,theirDAG,&dlen);
+		//n = Xrecvfrom(sock,buf,1024,0,theirDAG,&dlen);
+		n = Xrecv(sock,buf,1024,0);
 		if (n < 0) 
 		    error("recvfrom");
 		printf("Received a datagram from:%s\n",theirDAG);
 		write(1,buf,n);
 		
 		//Reply to client
-		Xsendto(sock,reply,strlen(reply),0,theirDAG,strlen(theirDAG));
+		//Xsendto(sock,reply,strlen(reply),0,theirDAG,strlen(theirDAG));
+		Xsend(sock,reply,strlen(reply),0);
 		
 	}
 	return 0;
