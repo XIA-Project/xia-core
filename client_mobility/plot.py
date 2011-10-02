@@ -123,7 +123,7 @@ def process(f_client, f_server):
 
         t = int(mat.group(1)) / 1000000.
         #if server_first_t is None:
-        server_first_t = discover_server_first_t()
+#        server_first_t = discover_server_first_t()
         t -= client_first_t
 
         if last_reception > 0 and t - last_reception > 0.100 and freeze_t is None:
@@ -222,12 +222,14 @@ def process(f_client, f_server):
     #    f.write('%f 100000\n' % client_update[0])
     #f.write('\n\n')
 
-    xmin = freeze_t - (client_update[0] - freeze_t) / 2.
-    xmax = client_update[0] + (client_update[0] - freeze_t) / 2.
+  #  xmin = freeze_t - (client_update[0] - freeze_t) / 2.
+  #  xmax = client_update[0] + (client_update[0] - freeze_t) / 2.
+    xmin = client_update[0] - 0.5
+    xmax = client_update[0] + 0.55
     scale = 1000
     print 'set xrange [%f:%f]' % (0, (xmax - xmin) * scale)
     print 'offset = %f' % (xmin * scale)
-    print 'freeze = %f' % ((freeze_t - xmin) * scale)
+  #  print 'freeze = %f' % ((freeze_t - xmin) * scale)
     print 'server_update = %f' % ((server_update[0] - xmin) * scale)
     print 'client_update = %f' % ((client_update[0] - xmin) * scale)
 

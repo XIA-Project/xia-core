@@ -438,11 +438,11 @@ router2 :: Router(RE AD2 RHID2, AD2, RHID2);
 //router2[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) -> [0]host0;
 
 // interconnection -- host - ad
-sock  -> Queue (1000000) ->  RatedUnqueue (1000)-> [0]rpc[1] -> Queue (1000000)  -> LinkUnqueue(0.000, 1 GB/s) -> [0]router0;
-router0[0] ->  LinkUnqueue(0.005, 1 GB/s) -> [1]rpc;
+sock  -> Queue (1000000) ->  RatedUnqueue (1000)-> [0]rpc[1] -> Queue ()  -> LinkUnqueue(0.065, 1 GB/s) -> [0]router0;
+router0[0] ->  LinkUnqueue(0.065, 1 GB/s) -> [1]rpc;
 rpc[0] -> Discard;
-rpc[2] -> Queue (1000000) -> LinkUnqueue(0.015, 1 GB/s) -> [0]router2; //0.025
-router2[0] -> LinkUnqueue(0.015, 1 GB/s) -> [2]rpc;
+rpc[2] -> Queue () -> LinkUnqueue(0.002, 1 GB/s) -> [0]router2; //0.025
+router2[0] -> LinkUnqueue(0.002, 1 GB/s) -> [2]rpc;
 
 
 host1[0] -> LinkUnqueue(0.005, 1 GB/s) -> [0]router1;
