@@ -46,7 +46,7 @@ xmin= 400
 xmax= 700
 ymin = 1.80
 ymax = 2.08
-rtt = 25	# the actual RTT was somewat longer than intended (25 ms)
+rtt = 27	# the actual RTT was somewat longer than intended (25 ms)
 
 ##################
 
@@ -72,25 +72,31 @@ set label "Client rebind\n(3G->WiFi)" right at client_update-10, (ymin + (ymax -
 set label 'Server rebind' left at server_update+10, (ymin + (ymax - ymin) * 0.06) font "times,6"
 
 
-#set style line 100 linewidth 2 linetype 1 linecolor rgb "#000000" 
+set style line 100 linewidth 2 linetype 1 linecolor rgb "#000000" 
 #set arrow from freeze-rtt/2, (ymin + (ymax - ymin) * 0.85) to client_update, (ymin + (ymax - ymin) * 0.85) heads linestyle 100
 #set label '(1000 ms)' center at (freeze + server_update) / 2, (ymin + (ymax - ymin) * 0.80)		# XXX: HARDCODED
 
-#set style line 101 linewidth 2 linetype 1 linecolor rgb "#000000" 
+set style line 101 linewidth 2 linetype 1 linecolor rgb "#000000" 
 #set label 'Service rebind' right at server_update - 60, (ymin + (ymax - ymin) * 0.70)
-#set arrow from server_update - 60, (ymin + (ymax - ymin) * 0.70) to server_update, (ymin + (ymax - ymin) * 0.70) head linestyle 101
+set arrow from server_update + 60, (ymin + (ymax - ymin) * 0.10) to server_update, (ymin + (ymax - ymin) * 0.10) head linestyle 101
 
-#set style line 102 linewidth 2 linetype 1 linecolor rgb "#000000" 
+set style line 102 linewidth 2 linetype 1 linecolor rgb "#000000" 
 #set label 'Client rebind' right at server_update - 60, (ymin + (ymax - ymin) * 0.55)
-#set arrow from server_update - 60, (ymin + (ymax - ymin) * 0.55) to client_update, (ymin + (ymax - ymin) * 0.55) head linestyle 102
+set arrow from client_update - 60, (ymin + (ymax - ymin) * 0.78) to client_update, (ymin + (ymax - ymin) * 0.78) head linestyle 102
 
-#set style arrow 8 heads size screen 0.008,90 ls 2
-#set style line 10000 linewidth 3 linetype 1 linecolor rgb "#000000"
+set style arrow 8 heads size screen 0.008,90 ls 2
+set style line 10000 linewidth 3 linetype 1 linecolor rgb "#000000"
 # left RTT
+set arrow from client_update-75,1.881  to client_update,1.881 heads arrowstyle 8 linestyle 10000
+set label ' 0.5 RTT1' left at  client_update-78,1.87
 #set arrow from freeze-rtt/2, (ymin + (ymax - ymin) * 0.35) to freeze, (ymin + (ymax - ymin) * 0.35) heads arrowstyle 8 linestyle 10000
 #set label ' 0.5 RTT1' left at freeze-rtt/2, (ymin + (ymax - ymin) * 0.28)
 #set label ' (in-flight packets)' left at freeze-rtt/2, (ymin + (ymax - ymin) * 0.20)
 # right RTT
+set arrow from client_update, 2.005 to client_update + rtt, 2.005 heads arrowstyle 8 linestyle 10000
+set label ' RTT2' left at server_update + 2, 2.04
+set arrow from server_update + 5, 2.04 to client_update + rtt/2, 2.005
+
 #set arrow from server_update, (ymin + (ymax - ymin) * 0.37) to server_update + rtt, (ymin + (ymax - ymin) * 0.37) heads arrowstyle 8 linestyle 10000
 #set arrow from client_update, (ymin + (ymax - ymin) * 0.32) to client_update + rtt, (ymin + (ymax - ymin) * 0.32) heads arrowstyle 8 linestyle 10000
 #set label ' 0.5 RTT2' left at client_update + rtt, (ymin + (ymax - ymin) * 0.35)
