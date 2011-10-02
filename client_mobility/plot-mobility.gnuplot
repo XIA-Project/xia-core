@@ -1,6 +1,6 @@
 #!/usr/bin/env gnuplot
 
-set terminal pdf enhanced dashed size 3,2.5
+set terminal pdf enhanced dashed size 3,2.0
 set output "mobility-req.pdf"
 
 set ytics nomirror
@@ -15,10 +15,10 @@ set xlabel "Elapsed time (milliseconds)"
 #set ylabel "Processing rate (qps)"
 set ylabel "Sequence # (K)"
 
-set label "(1) Responses for \nrequests made from 3G" left at 590, 1.86 font "times,4"
-set label "(2) Responses for \nrequests made from 3G \nsent to 3G (lost)" left at 590, 1.93 font "times,4"
-set label "(3) Responses for \nrequests made from 3G \nsent to WiFi" left at 590, 1.987 font "times,4"
-set label "(4) Responses for \nrequests made from WiFi" left at 590, 2.03 font "times,4"
+set label "(1) Responses for \nrequests made from 3G" left at 580, 1.86 font "times,4.5"
+set label "(2) Responses for \nrequests made from 3G \nsent to 3G (lost)" left at 580, 1.93 font "times,4.5"
+set label "(3) Responses for \nrequests made from 3G sent to WiFi" left at 580, 1.987 font "times,4.5"
+set label "(4) Responses for \nrequests made from WiFi" left at 580, 2.03 font "times,4.5"
 
 set ytics 0.1
 set nokey
@@ -45,7 +45,7 @@ client_update = 500.000000
 xmin= 400
 xmax= 700
 ymin = 1.80
-ymax = 2.1
+ymax = 2.08
 rtt = 25	# the actual RTT was somewat longer than intended (25 ms)
 
 ##################
@@ -69,7 +69,7 @@ set arrow from client_update,ymin to client_update,ymax nohead linestyle 1002
 
 # horizontal labels
 set label "Client rebind\n(3G->WiFi)" right at client_update-10, (ymin + (ymax - ymin) * 0.90) font "times,6"
-set label 'Server rebind' left at server_update+10, (ymin + (ymax - ymin) * 0.09) font "times,6"
+set label 'Server rebind' left at server_update+10, (ymin + (ymax - ymin) * 0.06) font "times,6"
 
 
 #set style line 100 linewidth 2 linetype 1 linecolor rgb "#000000" 
