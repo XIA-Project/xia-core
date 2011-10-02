@@ -31,6 +31,8 @@ rtt = 25 + 2	# the actual RTT was somewat longer than intended (25 ms)
 
 set yrange [ymin:ymax]
 
+set object 1 rect from 0,(12.845-0.0125) to 10000,12.845 fc rgb "gold" 
+
 # vertical lines
 set style line 1000 linewidth 4 linetype 2 linecolor rgb "#ff0000" 
 set arrow from freeze,ymin to freeze,ymax nohead linestyle 1000

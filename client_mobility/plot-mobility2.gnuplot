@@ -51,10 +51,10 @@ rtt = 27	# the actual RTT was somewat longer than intended (25 ms)
 set xrange [xmin:xmax]
 set yrange [ymin:ymax]
 
-set label "(1) 3G\n-> 3G" left at 280, 1.872 font ",5"
-set label "(2) 3G\n-> 3G (lost)" left at 280, 1.93 font ",5"
-set label "(3) 3G\n-> WiFi" left at 280, 1.977 font ",5"
-set label "(4) WiFi\n-> WiFi" left at 280, 2.022 font ",5"
+set label "(1) 3G->3G" left at 280, 1.864 font ",5"
+set label "(2) 3G->3G\n     (lost)" left at 280, 1.93 font ",5"
+set label "(3) 3G->WiFi" left at 280, 1.977 font ",5"
+set label "(4) WiFi->WiFi" left at 280, 2.022 font ",5"
 
 
 set object 1 rect from xmin,1.881 to xmax,1.951 fc rgb "gold" 
