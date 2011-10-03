@@ -4,7 +4,7 @@ import perf_callgraph
 import re
 
 # task
-tasks = ['Classification', 'Fast', 'Slow-Lookup', 'Slow-Other', 'Queueing', 'Misc', 'Mem Alloc/Copy', None]
+tasks = ['Classification', 'Fast Path', 'Lookup (Slow)', 'Other', 'Queueing', 'Misc', 'Mem Alloc/Copy', None]
 ignored_tasks = ['Mem Alloc/Copy', None]
 task_colors = ['0.2', '1', '0.6', '0.4', '0.8']
 
@@ -35,23 +35,23 @@ symbol_task_mappings = [
 
     (re.compile(r'^XIAXIDTypeClassifier::.*$'), 'Classification'),
 
-    (re.compile(r'^Paint::.*$'), 'Slow-Other'),
-    (re.compile(r'^PaintSwitch::.*$'), 'Slow-Other'),
-    (re.compile(r'^RangeIPLookup::.*$'), 'Slow-Lookup'),
-    (re.compile(r'^RadixIPLookup::.*$'), 'Slow-Lookup'),
-    (re.compile(r'^DirectIPLookup::.*$'), 'Slow-Lookup'),
-    (re.compile(r'^DecIPTTL::.*$'), 'Slow-Other'),
-    (re.compile(r'^IPFragmenter::.*$'), 'Slow-Other'),
-    (re.compile(r'^XIACheckDest::.*$'), 'Slow-Other'),
-    (re.compile(r'^XIAXIDRouteTable::.*$'), 'Slow-Lookup'),
-    (re.compile(r'^XIASelectPath::.*$'), 'Slow-Other'),
-    (re.compile(r'^XIADecHLIM::.*$'), 'Slow-Other'),
-    (re.compile(r'^XIANextHop::.*$'), 'Slow-Other'),
-    (re.compile(r'^Element::push\(.*\)$'), 'Slow-Other'),
+    (re.compile(r'^Paint::.*$'), 'Other'),
+    (re.compile(r'^PaintSwitch::.*$'), 'Other'),
+    (re.compile(r'^RangeIPLookup::.*$'), 'Lookup (Slow)'),
+    (re.compile(r'^RadixIPLookup::.*$'), 'Lookup (Slow)'),
+    (re.compile(r'^DirectIPLookup::.*$'), 'Lookup (Slow)'),
+    (re.compile(r'^DecIPTTL::.*$'), 'Other'),
+    (re.compile(r'^IPFragmenter::.*$'), 'Other'),
+    (re.compile(r'^XIACheckDest::.*$'), 'Other'),
+    (re.compile(r'^XIAXIDRouteTable::.*$'), 'Lookup (Slow)'),
+    (re.compile(r'^XIASelectPath::.*$'), 'Other'),
+    (re.compile(r'^XIADecHLIM::.*$'), 'Other'),
+    (re.compile(r'^XIANextHop::.*$'), 'Other'),
+    (re.compile(r'^Element::push\(.*\)$'), 'Other'),
 
-    (re.compile(r'^XIAFastPath::.*$'), 'Fast'),
+    (re.compile(r'^XIAFastPath::.*$'), 'Fast Path'),
 
-    #(re.compile(r'^XIARouterCache::.*$'), 'Slow-Other'),
+    #(re.compile(r'^XIARouterCache::.*$'), 'Other'),
 
     (re.compile(r'^<>__memset_sse2$'), 'Mem Alloc/Copy'),
     (re.compile(r'^<>memcpy$'), 'Mem Alloc/Copy'),
@@ -68,7 +68,7 @@ symbol_task_mappings = [
     (re.compile(r'^<>0x7ff.*$'), None),
     (re.compile(r'^<>0xfff.*$'), None),
     (re.compile(r'^<>_Z.*$'), None),
-    (re.compile(r'^<>.*$'), 'Slow-Other'),
+    (re.compile(r'^<>.*$'), 'Other'),
     #(re.compile(r'^<>.*$'), None),
 ]
 
