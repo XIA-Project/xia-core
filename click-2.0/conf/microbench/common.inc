@@ -1,4 +1,5 @@
-define($COUNT 10000000);
+//define($COUNT 10000000);	// for intra-parallelism tests
+define($COUNT 100000000);	// for all others
 define($IP_RT_SIZE 351611);
 define($IP_RANDOMIZE_MAX_CYCLE $IP_RT_SIZE);
 define($IP6_RT_SIZE $IP_RT_SIZE);
