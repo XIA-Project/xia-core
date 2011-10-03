@@ -58,18 +58,19 @@ set label "(4) WiFi->WiFi" left at 280, 2.022 font ",5"
 
 
 set object 1 rect from xmin,1.881 to xmax,1.951 fc rgb "gold" 
-set style fill pattern 2 noborder 
-set object 2 rect from xmin,1.951 to xmax,2.0  fc rgb "grey"
+#set style fill pattern 2 noborder 
+set object 2 rect from xmin,1.951 to xmax,2.0  fc rgb "white"
 
 # vertical lines
 #set style line 1000 linewidth 4 linetype 2 linecolor rgb "#ff0000" 
 #set arrow from freeze,ymin to freeze,ymax nohead linestyle 1000
 
-set style line 1001 linewidth 6 linetype 3 linecolor rgb "#6a5acd"
-set arrow from server_update,ymin to server_update,ymax nohead linestyle 1001
+set style line 1001 linewidth 4 linetype 3 linecolor rgb "#6a5acd"
+set arrow from client_update,ymin to client_update,ymax nohead linestyle 1001
 
-set style line 1002 linewidth 6 linetype 1 linecolor rgb "#ff0000"
-set arrow from client_update,ymin to client_update,ymax nohead linestyle 1002
+set style line 1002 linewidth 4 linetype 1 linecolor rgb "#00ff00"
+set arrow from server_update,ymin to server_update,ymax nohead linestyle 1002
+
 
 # horizontal labels
 
@@ -95,9 +96,9 @@ set label ' 1 RTT (3G) ' right at  client_update,1.905 font ",5"
 #set label ' 0.5 RTT1' left at freeze-rtt/2, (ymin + (ymax - ymin) * 0.28)
 #set label ' (in-flight packets)' left at freeze-rtt/2, (ymin + (ymax - ymin) * 0.20)
 # right RTT
-set arrow from client_update, 1.93 to client_update + rtt, 1.93 heads arrowstyle 8 linestyle 10000
+set arrow from client_update, 1.94 to client_update + rtt, 1.94 heads arrowstyle 8 linestyle 10000
 set label ' 1 RTT (WiFi)' left at server_update + 1, 1.89 font ",5"
-set arrow from server_update + 20, 1.90 to client_update + rtt*3/4, 1.93 linestyle 101
+set arrow from server_update + 20, 1.90 to client_update + rtt*3/4, 1.94 linestyle 101
 
 #set arrow from server_update, (ymin + (ymax - ymin) * 0.37) to server_update + rtt, (ymin + (ymax - ymin) * 0.37) heads arrowstyle 8 linestyle 10000
 #set arrow from client_update, (ymin + (ymax - ymin) * 0.32) to client_update + rtt, (ymin + (ymax - ymin) * 0.32) heads arrowstyle 8 linestyle 10000
