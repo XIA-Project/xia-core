@@ -11,7 +11,7 @@ rc('font', **{'family' : 'sans-serif', 'serif': ['arial']})
 import re
 
 data_path_prefix = '../'
-packet = int(re.search(r'define\(\$COUNT\s+(\d+)\)', open(data_path_prefix + 'common.inc').read()).group(1))
+packet = int(re.match(r'.*^define\(\$COUNT\s+(\d+)\).*', open(data_path_prefix + 'common.inc').read(), re.MULTILINE | re.DOTALL).group(1))
 
 # excution time pattern
 total_time_pat = re.compile(r'^([\d.]+)user .*?$')
