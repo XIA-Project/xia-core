@@ -107,7 +107,7 @@ set label ' 1 RTT (3G) ' right at  client_update-10,1.900 font "Helvetica,5"
 ##set label '(27 ms)' left at client_update + rtt, (ymin + (ymax - ymin) * 0.27)
 
 set label 'Req sent' font ",5.7" left at 17, (ymin + (ymax - ymin) * 0.442) textcolor rgb "blue"
-set label 'Req recv' font ",5.7" left at 77, (ymin + (ymax - ymin) * 0.095) textcolor rgb "violet"
+set label 'Resp recv' font ",5.7" left at 77, (ymin + (ymax - ymin) * 0.095) textcolor rgb "violet"
 
 # right RTT
 set arrow from client_update, 1.94 to client_update + rtt, 1.94 heads arrowstyle 8 linestyle 10000

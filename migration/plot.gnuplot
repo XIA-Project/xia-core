@@ -75,7 +75,7 @@ set label ' 0.5 RTT' font "Helvetica,5" left at server_update + rtt/2, (ymin + (
 #set label '(27 ms)' font "Helvetica,5" left at client_update + rtt, (ymin + (ymax - ymin) * 0.14)		# XXX: HARDCODED
 
 set label 'Req sent' font ",5" left at 10, (ymin + (ymax - ymin) * 0.45) textcolor rgb "blue"
-set label 'Req recv' font ",5" left at 10, (ymin + (ymax - ymin) * 0.15) textcolor rgb "violet"
+set label 'Resp recv' font ",5" left at 10, (ymin + (ymax - ymin) * 0.15) textcolor rgb "violet"
 
 plot "plot.dat" \
             index 1 using ($1 * 1000 - offset):($2 / 1000) axes x1y1 with points ls 7 ps 0.20 lt 3 title "Sent by client", \
