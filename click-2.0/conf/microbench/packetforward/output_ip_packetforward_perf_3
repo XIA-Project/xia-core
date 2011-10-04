@@ -1,0 +1,1315 @@
+Failed to open /usr/bin/time, continuing without symbols
+/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.14 with build id d53b9c6a59cff0662f38ff332028cd460f4436a7 not found, continuing without symbols
+# Events: 47K cycles
+#
+# Overhead  Command        Shared Object                                                                                 Symbol
+# ........  .......  ...................  .....................................................................................
+#
+    18.45%    click  libc-2.13.so         [.] memcpy
+            18.43%
+                memcpy
+
+             0.01%
+                memcpy
+                (nil)
+
+    12.91%    click  click                [.] DirectIPLookup::lookup_route(IPAddress, IPAddress&) const
+            12.91%
+                DirectIPLookup::lookup_route(IPAddress, IPAddress&) const
+
+     9.55%    click  libc-2.13.so         [.] _int_malloc
+             9.55%
+                _int_malloc
+
+     5.96%    click  click                [.] RouterThread::driver()
+             5.96%
+                RouterThread::driver()
+
+     5.10%    click  click                [.] Unqueue::run_task(Task*)
+             5.10%
+                Unqueue::run_task(Task*)
+
+     4.47%    click  click                [.] Element::push(int, Packet*)
+             4.47%
+                Element::push(int, Packet*)
+
+     3.59%    click  libc-2.13.so         [.] _int_free
+             3.59%
+                _int_free
+
+     3.49%    click  click                [.] Packet::expensive_uniqueify(int, int, bool)
+             3.49%
+                Packet::expensive_uniqueify(int, int, bool)
+
+     3.34%    click  click                [.] Packet::clone()
+             3.34%
+                Packet::clone()
+
+     2.52%    click  click                [.] AggregateCounter::push(int, Packet*)
+             2.52%
+                AggregateCounter::push(int, Packet*)
+
+     2.29%    click  click                [.] FullNoteQueue::pull(int)
+             2.29%
+                FullNoteQueue::pull(int)
+
+     2.17%    click  click                [.] Clone::pull(int)
+             2.17%
+                Clone::pull(int)
+
+     2.17%    click  click                [.] PrintStats::simple_action(Packet*)
+             2.17%
+                PrintStats::simple_action(Packet*)
+
+     1.89%    click  click                [.] IPRandomize::simple_action(Packet*)
+             1.89%
+                IPRandomize::simple_action(Packet*)
+
+     1.88%    click  libc-2.13.so         [.] cfree
+             1.88%
+                cfree
+
+     1.80%    click  libc-2.13.so         [.] __malloc
+             1.80%
+                __malloc
+
+     1.77%    click  click                [.] PaintSwitch::push(int, Packet*)
+             1.77%
+                PaintSwitch::push(int, Packet*)
+
+     1.60%    click  click                [.] DirectIPLookup::push(int, Packet*)
+             1.60%
+                DirectIPLookup::push(int, Packet*)
+
+     1.57%    click  libstdc++.so.6.0.14  [.] 0x7e5d7         
+             0.19%
+                0x7f048d2efe0d
+
+             0.19%
+                0x7f048d28bab0
+
+             0.13%
+                0x7f048d2ee0e0
+
+             0.11%
+                0x7f048d28bfc0
+
+             0.11%
+                0x7f048d28be30
+
+             0.11%
+                0x7f048d2eff29
+
+             0.10%
+                0x7f048d2eff20
+
+             0.10%
+                0x7f048d2ee0a0
+
+             0.09%
+                0x7f048d28c560
+
+             0.09%
+                0x7f048d2efe70
+
+             0.09%
+                0x7f048d2efe05
+
+             0.08%
+                0x7f048d2efdfa
+
+             0.08%
+                0x7f048d2efdf0
+
+             0.07%
+                0x7f048d2efe76
+
+             0.00%
+                0x7f048d2b45da
+                (nil)
+
+             0.00%
+                0x7f048d2b45d7
+                (nil)
+
+             0.00%
+                0x7f048d2b4644
+                (nil)
+
+             0.00%
+                0x7f048d2b4637
+                (nil)
+
+             0.00%
+                0x7f048d2aef5d
+
+             0.00%
+                0x7f048d2aef17
+
+             0.00%
+                0x7f048d2b45c9
+                (nil)
+
+             0.00%
+                0x7f048d2b46ec
+                0x11
+
+             0.00%
+                0x7f048d2b46a0
+                0x11
+
+             0.00%
+                0x7f048d2b464e
+                (nil)
+
+             0.00%
+                0x7f048d2b46c5
+                0x12
+
+             0.00%
+                0x7f048d2b46c5
+                0x10
+
+             0.00%
+                0x7f048d2b4614
+                (nil)
+
+             0.00%
+                0x7f048d2b45c1
+                (nil)
+
+     1.48%    click  libc-2.13.so         [.] nrand48_r
+             0.84%
+                nrand48_r
+                0x1e327a0
+
+             0.64%
+                nrand48_r
+
+     1.45%    click  click                [.] Packet::alloc_data(unsigned int, unsigned int, unsigned int)
+             1.45%
+                Packet::alloc_data(unsigned int, unsigned int, unsigned int)
+
+     1.39%    click  libc-2.13.so         [.] __drand48_iterate
+             1.39%
+                __drand48_iterate
+                0x1e327a0
+
+     1.34%    click  click                [.] FullNoteQueue::push(int, Packet*)
+             1.34%
+                FullNoteQueue::push(int, Packet*)
+
+     1.21%    click  click                [.] DecIPTTL::simple_action(Packet*)
+             1.21%
+                DecIPTTL::simple_action(Packet*)
+
+     1.16%    click  click                [.] WritablePacket::recycle(WritablePacket*)
+             1.16%
+                WritablePacket::recycle(WritablePacket*)
+
+     1.01%    click  click                [.] IPFragmenter::push(int, Packet*)
+             1.01%
+                IPFragmenter::push(int, Packet*)
+
+     0.91%    click  click                [.] Packet::~Packet()
+             0.91%
+                Packet::~Packet()
+
+     0.78%    click  click                [.] AggregateCounter::find_node(unsigned int, bool)
+             0.78%
+                AggregateCounter::find_node(unsigned int, bool)
+
+     0.43%    click  libc-2.13.so         [.] nrand48
+             0.43%
+                nrand48
+
+     0.32%    click  click                [.] WritablePacket::pool_allocate(bool)
+             0.32%
+                WritablePacket::pool_allocate(bool)
+
+     0.32%    click  click                [.] Discard::push(int, Packet*)
+             0.32%
+                Discard::push(int, Packet*)
+
+     0.28%    click  click                [.] Paint::simple_action(Packet*)
+             0.28%
+                Paint::simple_action(Packet*)
+
+     0.16%    click  [nfsd]               [k] 0xffffffff8103701a
+             0.01%
+                0xffffffff815c81b0
+                __memset_sse2
+                0x800000000
+
+             0.01%
+                0xffffffff812db4e7
+                0xffffffff8110ec08
+                0xffffffff8114658a
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                __memset_sse2
+                0x800000000
+
+             0.01%
+                0xffffffff81146561
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                __memset_sse2
+                0x800000000
+
+             0.00%
+                0xffffffff8110ec17
+                0xffffffff8114658a
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                memcpy
+                (nil)
+
+             0.00%
+                0xffffffff8108e199
+                0xffffffff8108e251
+                0xffffffff81169a46
+                0xffffffff8116c576
+                0xffffffff8116ceeb
+                0xffffffff8116e53c
+                0xffffffff8116561d
+                0xffffffff811ac3e9
+                0xffffffff8116523a
+                0xffffffff81166adc
+                0xffffffff81014ffa
+                0xffffffff8100c31c
+                __execve
+                0x4018eb
+
+             0.00%
+                0xffffffff815c81b0
+                DirectIPLookup::Table::add_route(IPRoute const&, bool, IPRoute*, ErrorHandler*)
+
+             0.00%
+                0xffffffff810d39a1
+                0xffffffff810d508c
+                0xffffffff81074918
+                0xffffffff81095894
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                RouterThread::driver()
+
+             0.00%
+                0xffffffff8100c880
+                cfree
+
+             0.00%
+                0xffffffffa001f193
+                0xffffffffa00210e9
+                0xffffffff810cf554
+                0xffffffff810d1ff0
+                0xffffffff8100e872
+                0xffffffff815cf99d
+                0xffffffff815c7f13
+                Clone::pull(int)
+
+             0.00%
+                0xffffffff810544c6
+                0xffffffff81054843
+                0xffffffff8105ea94
+                0xffffffff8107493d
+                0xffffffff81095894
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                memcpy
+
+             0.00%
+                0xffffffff8105e085
+                0xffffffff81074985
+                0xffffffff810956e6
+                0xffffffff810958e8
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                DirectIPLookup::lookup_route(IPAddress, IPAddress&) const
+
+             0.00%
+                0xffffffff814d2a30
+                0xffffffff814d3165
+                0xffffffffa002684f
+                0xffffffff814d3368
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cf9a6
+                0xffffffff815c7f13
+                RouterThread::driver()
+
+             0.00%
+                0xffffffff81037bad
+                0xffffffff815c79ce
+                0xffffffff8105ea13
+                0xffffffff8107493d
+                0xffffffff81095894
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                DirectIPLookup::lookup_route(IPAddress, IPAddress&) const
+
+             0.00%
+                0xffffffff8105428b
+                0xffffffff8105481b
+                0xffffffff8105ea94
+                0xffffffff8107493d
+                0xffffffff81095894
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                __drand48_iterate
+                0x1e327a0
+
+             0.00%
+                0xffffffff810d3a3e
+                0xffffffff810d508c
+                0xffffffff81074918
+                0xffffffff81095894
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                nrand48_r
+                0x1e327a0
+
+             0.00%
+                0xffffffff814c72e0
+                0xffffffffa0025f01
+                0xffffffffa0026713
+                0xffffffff814d3368
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cf9a6
+                0xffffffff815c7f13
+                RouterThread::driver()
+
+             0.00%
+                0xffffffff8105e513
+                0xffffffff8105e81f
+                0xffffffff81074908
+                0xffffffff81095894
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                _int_malloc
+
+             0.00%
+                0xffffffff8104d3d6
+                0xffffffff8105e553
+                0xffffffff8105e81f
+                0xffffffff81074908
+                0xffffffff81095894
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                DirectIPLookup::lookup_route(IPAddress, IPAddress&) const
+
+             0.00%
+                0xffffffff8104a8d9
+                0xffffffff8105481b
+                0xffffffff8105ea94
+                0xffffffff8107493d
+                0xffffffff81095894
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                memcpy
+
+             0.00%
+                0xffffffff81069956
+                0xffffffff8107c267
+                0xffffffff8107c466
+                0xffffffff8100bec2
+                __getrusage
+
+             0.00%
+                0xffffffff814d105b
+                0xffffffff814d2a63
+                0xffffffffa00507c8
+                0xffffffffa0050a3a
+                0xffffffff814d1b3f
+                0xffffffff814d2a88
+                0xffffffff814d2bf0
+                0xffffffff814d3165
+                0xffffffffa002684f
+                0xffffffff814d3368
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cf9a6
+                0xffffffff815c7f13
+                nrand48_r
+                0x1e327a0
+
+             0.00%
+                0xffffffff814c6920
+                0xffffffff814d1b32
+                0xffffffff814d2a88
+                0xffffffff814d2bf0
+                0xffffffff814d3165
+                0xffffffffa002684f
+                0xffffffff814d3368
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cf9a6
+                0xffffffff815c7f13
+                __malloc
+
+             0.00%
+                0xffffffff81158768
+                0xffffffff81112abd
+                0xffffffff8113aaf1
+                0xffffffff811295bc
+                0xffffffff8112efa8
+                0xffffffff8113087d
+                0xffffffff811319d6
+                0xffffffff8100bec2
+                __munmap
+
+             0.00%
+                0xffffffff81544d6c
+                0xffffffff814e9d79
+                0xffffffff81545196
+                0xffffffff81503883
+                0xffffffff81504176
+                0xffffffff81532deb
+                0xffffffff815331df
+                0xffffffff814d1d56
+                0xffffffff814d2a88
+                0xffffffffa00507c8
+                0xffffffffa0050a3a
+                0xffffffff814d1b3f
+                0xffffffff814d2a88
+                0xffffffff814d2bf0
+                0xffffffff814d3165
+                0xffffffffa002684f
+                0xffffffff814d3368
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cf9a6
+                0xffffffff815c7f13
+                Unqueue::run_task(Task*)
+
+             0.00%
+                0xffffffff815c7f14
+                memcpy
+
+             0.00%
+                0xffffffff8114ebe0
+                0xffffffff8115270d
+                0xffffffff814c7363
+                0xffffffff814c7904
+                0xffffffffa0025f01
+                0xffffffffa0026713
+                0xffffffff814d3368
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cf9a6
+                0xffffffff815c7f13
+                memcpy
+
+             0.00%
+                0xffffffff8114ec05
+                0xffffffff8114ee73
+                0xffffffff8114f8bf
+                0xffffffff814c6b84
+                0xffffffff8159629d
+                0xffffffff814d1b32
+                0xffffffff814d2a88
+                0xffffffff814d2bf0
+                0xffffffff814d3165
+                0xffffffffa002684f
+                0xffffffff814d3368
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cf9a6
+                0xffffffff815c7f13
+                RouterThread::driver()
+
+             0.00%
+                0xffffffff814d1d0c
+                0xffffffff814d2a88
+                0xffffffff814d2bf0
+                0xffffffff814d3165
+                0xffffffffa002684f
+                0xffffffff814d3368
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cf9a6
+                0xffffffff815c7f13
+                __drand48_iterate
+                0x1e327a0
+
+             0.00%
+                0xffffffff8103701a
+                0xffffffff8101bad8
+                0xffffffff8101b43a
+                0xffffffff811004de
+                0xffffffff8105eaa3
+                0xffffffff8107493d
+                0xffffffff81095894
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                IPFragmenter::push(int, Packet*)
+
+             0.00%
+                0xffffffff812d82b8
+                0xffffffff81089089
+                0xffffffff810895fd
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                WritablePacket::recycle(WritablePacket*)
+
+             0.00%
+                0xffffffffa002637b
+                0xffffffff814d3368
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cf9a6
+                0xffffffff815c7f13
+                FullNoteQueue::pull(int)
+
+             0.00%
+                0xffffffff81506270
+                0xffffffff81506b9c
+                0xffffffff814d1d56
+                0xffffffff814d2a88
+                0xffffffffa00507c8
+                0xffffffffa0056418
+                0xffffffffa0056d6e
+                0xffffffff814fefb4
+                0xffffffff814ff083
+                0xffffffffa0050a15
+                0xffffffff814d1b3f
+                0xffffffff814d2a88
+                0xffffffff814d2bf0
+                0xffffffff814d3165
+                0xffffffffa002684f
+                0xffffffff814d3368
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cf9a6
+                0xffffffff815c7f13
+                Packet::expensive_uniqueify(int, int, bool)
+
+             0.00%
+                0xffffffffa00f4eb6
+                0xffffffff810cf554
+                0xffffffff810d1ea7
+                0xffffffff8100e872
+                0xffffffff815cf99d
+                0xffffffff815c7f13
+                DecIPTTL::simple_action(Packet*)
+
+             0.00%
+                0xffffffff810958e0
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                memcpy
+
+             0.00%
+                0xffffffff81089f24
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                DirectIPLookup::lookup_route(IPAddress, IPAddress&) const
+
+             0.00%
+                0xffffffff81037bad
+                0xffffffff815c7b25
+                0xffffffff81073911
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cfa90
+                0xffffffff8100c893
+                DirectIPLookup::lookup_route(IPAddress, IPAddress&) const
+
+             0.00%
+                0xffffffffa00f4eb6
+                0xffffffff810cf554
+                0xffffffff810d1ea7
+                0xffffffff8100e872
+                0xffffffff815cf99d
+                0xffffffff815c7f13
+                memcpy
+
+             0.00%
+                0xffffffff81095340
+                0xffffffff8109544f
+                0xffffffff81089e71
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                DirectIPLookup::lookup_route(IPAddress, IPAddress&) const
+
+             0.00%
+                0xffffffff810fed20
+                0xffffffff815c4fff
+                0xffffffff815c7fb6
+                memcpy
+
+             0.00%
+                0xffffffff810546ca
+                0xffffffff8105cf38
+                0xffffffff8105d0c9
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cfa90
+                0xffffffff8100c893
+                RouterThread::driver()
+
+             0.00%
+                0xffffffff8100e8c9
+                0xffffffff8106b645
+                0xffffffff815cfa90
+                0xffffffff8100c893
+                DirectIPLookup::lookup_route(IPAddress, IPAddress&) const
+
+             0.00%
+                0xffffffff810522ed
+                0xffffffff8105d895
+                0xffffffff8107d7a4
+                0xffffffff8107e052
+                0xffffffff8107e14b
+                0xffffffff8107e460
+                0xffffffff81073a04
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cfa90
+                0xffffffff8100c893
+                0x7f048d2efe76
+
+             0.00%
+                0xffffffff8108a004
+                0xffffffff810738f4
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cfa90
+                0xffffffff8100c893
+                __malloc
+
+             0.00%
+                0xffffffff8145e903
+                0xffffffff8143b9ed
+                0xffffffff810cf554
+                0xffffffff810d1ea7
+                0xffffffff8100e872
+                0xffffffff815cf99d
+                0xffffffff815c7f13
+                PaintSwitch::push(int, Packet*)
+
+             0.00%
+                0xffffffff81037bd9
+                0xffffffff815c781e
+                0xffffffff810d4281
+                0xffffffff810d49f6
+                0xffffffff810d543d
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cfa90
+                0xffffffff8100c893
+                memcpy
+
+             0.00%
+                0xffffffff814e4930
+                0xffffffff814e4fdd
+                0xffffffff814c3404
+                0xffffffff8159637c
+                0xffffffff814d1b32
+                0xffffffff814d2a88
+                0xffffffff814d2bf0
+                0xffffffff814d3165
+                0xffffffffa002684f
+                0xffffffff814d3368
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cf9a6
+                0xffffffff815c7f13
+                _int_malloc
+
+             0.00%
+                0xffffffff815cf995
+                0xffffffff815c7f13
+                _int_free
+
+             0.00%
+                0xffffffff8145e903
+                0xffffffff8143b9ed
+                0xffffffff810cf554
+                0xffffffff810d1ea7
+                0xffffffff8100e872
+                0xffffffff815cf99d
+                0xffffffff815c7f13
+                _int_free
+
+             0.00%
+                0xffffffff810d4f2b
+                0xffffffff8106b55b
+                0xffffffff815cf986
+                0xffffffff815c7f13
+                DirectIPLookup::lookup_route(IPAddress, IPAddress&) const
+
+             0.00%
+                0xffffffff8145e903
+                0xffffffff8143b9ed
+                0xffffffff810cf554
+                0xffffffff810d1ea7
+                0xffffffff8100e872
+                0xffffffff815cf99d
+                0xffffffff815c7f13
+                DirectIPLookup::push(int, Packet*)
+
+             0.00%
+                0xffffffff810cf554
+                0xffffffff810d1ea7
+                0xffffffff8100e872
+                0xffffffff815cf99d
+                0xffffffff815c7f13
+                memcpy
+
+             0.00%
+                0xffffffff813dc36c
+                0xffffffffa011fb53
+                0xffffffffa00f4f44
+                0xffffffff810cf554
+                0xffffffff810d1ea7
+                0xffffffff8100e872
+                0xffffffff815cf99d
+                0xffffffff815c7f13
+                Unqueue::run_task(Task*)
+
+             0.00%
+                0xffffffff81158313
+                0xffffffff8115ab5f
+                0xffffffff81134d70
+                0xffffffff81129546
+                0xffffffff8112efa8
+                0xffffffff8113087d
+                0xffffffff811319d6
+                0xffffffff8100bec2
+                __munmap
+
+             0.00%
+                0xffffffffa0026361
+                0xffffffff814d3368
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cf9a6
+                0xffffffff815c7f13
+                WritablePacket::recycle(WritablePacket*)
+
+             0.00%
+                0xffffffff810d1f84
+                0xffffffff8100e872
+                0xffffffff815cf99d
+                0xffffffff815c7f13
+                memcpy
+
+             0.00%
+                0xffffffff812db4e7
+                0xffffffff8110ec08
+                0xffffffff8114658a
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                DirectIPLookup::Table::add_route(IPRoute const&, bool, IPRoute*, ErrorHandler*)
+
+             0.00%
+                0xffffffff812db4e7
+                0xffffffff8110ec08
+                0xffffffff8114658a
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                memcpy
+                (nil)
+
+             0.00%
+                0xffffffff81134c71
+                0xffffffff8112a8e1
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                memcpy
+                (nil)
+
+             0.00%
+                0xffffffff8110f5b8
+                0xffffffff8110f8f8
+                0xffffffff81112b0f
+                0xffffffff8113aaf1
+                0xffffffff811295bc
+                0xffffffff8112efa8
+                0xffffffff8113087d
+                0xffffffff811319d6
+                0xffffffff8100bec2
+                __munmap
+
+             0.00%
+                0xffffffff8110f4cc
+                0xffffffff8110f8f8
+                0xffffffff81112b0f
+                0xffffffff8113aaf1
+                0xffffffff811295bc
+                0xffffffff8112efa8
+                0xffffffff8113087d
+                0xffffffff811319d6
+                0xffffffff8100bec2
+                __munmap
+
+             0.00%
+                0xffffffff8112c37f
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                memcpy
+                (nil)
+
+             0.00%
+                0xffffffff811073b7
+                0xffffffff811086b7
+                0xffffffff8115f4b2
+                0xffffffff8115fc93
+                0xffffffff8115fda1
+                0xffffffff8100bec2
+                __libc_read
+
+             0.00%
+                0xffffffff812db75d
+                0xffffffff8110874b
+                0xffffffff8115f4b2
+                0xffffffff8115fc93
+                0xffffffff8115fda1
+                0xffffffff8100bec2
+                __libc_read
+
+             0.00%
+                0xffffffff8145e903
+                0xffffffff8143b9ed
+                0xffffffff810cf554
+                0xffffffff810d1ea7
+                0xffffffff8100e872
+                0xffffffff815cf99d
+                0xffffffff815c7f13
+                memcpy
+
+             0.00%
+                0xffffffff8110ec17
+                0xffffffff811441e5
+                0xffffffff8104318b
+                0xffffffff81128085
+                0xffffffff8112c490
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                0x401051
+
+             0.00%
+                0xffffffff814f0aa3
+                0xffffffff81073a04
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cfa90
+                0xffffffff8100c893
+                DirectIPLookup::lookup_route(IPAddress, IPAddress&) const
+
+             0.00%
+                0xffffffff8103701a
+                0xffffffff8101dd97
+                0xffffffff8101dfdb
+                0xffffffff8101f8a4
+                0xffffffff810fffec
+                0xffffffff81100040
+                0xffffffff81053375
+                0xffffffff815c5163
+                0xffffffff815c5c6d
+                0xffffffff815c4a79
+                0xffffffff815c4bfd
+                0xffffffff810b7b7b
+                0xffffffff8105e30b
+                0xffffffff81166950
+                0xffffffff81014ffa
+                0xffffffff8100c31c
+                __execve
+                0x4018eb
+
+             0.00%
+                0xffffffff810614e0
+                0xffffffff8105dd77
+                0xffffffff8100bdc3
+                __GI___fork
+                0x401051
+
+             0.00%
+                0xffffffff8103701a
+                0xffffffff8101dd97
+                0xffffffff8101dfdb
+                0xffffffff8101f8a4
+                0xffffffff810fffec
+                0xffffffff81100040
+                0xffffffff81053375
+                0xffffffff8105dd77
+                0xffffffff8100bdc3
+                __GI___fork
+                0x401051
+
+     0.10%    click  click                [.] DirectIPLookup::Table::add_route(IPRoute const&, bool, IPRoute*, ErrorHandler*)
+             0.09%
+                DirectIPLookup::Table::add_route(IPRoute const&, bool, IPRoute*, ErrorHandler*)
+                (nil)
+
+             0.01%
+                DirectIPLookup::Table::add_route(IPRoute const&, bool, IPRoute*, ErrorHandler*)
+
+     0.10%    click  click                [.] _ZdaPv@plt
+             0.10%
+                _ZdaPv@plt
+
+     0.10%    click  click                [.] _Znam@plt
+             0.10%
+                _Znam@plt
+
+     0.09%    click  click                [.] nrand48@plt
+             0.09%
+                nrand48@plt
+
+     0.09%    click  click                [.] DirectIPLookup::Table::find_entry(unsigned int, unsigned int) const
+             0.09%
+                DirectIPLookup::Table::find_entry(unsigned int, unsigned int) const
+                (nil)
+
+     0.08%    click  click                [.] memcpy@plt
+             0.08%
+                memcpy@plt
+
+     0.06%    click  click                [.] IPAddressArg::basic_parse(char const*, char const*, unsigned char*, int&)
+             0.06%
+                IPAddressArg::basic_parse(char const*, char const*, unsigned char*, int&)
+                (nil)
+
+     0.05%    click  click                [.] cp_shift_spacevec(String&)
+             0.05%
+                cp_shift_spacevec(String&)
+
+     0.05%    click  click                [.] String::equals(char const*, int) const
+             0.05%
+                String::equals(char const*, int) const
+
+     0.04%    click  libc-2.13.so         [.] __memset_sse2
+             0.03%
+                __memset_sse2
+                0x800000000
+
+             0.01%
+                __memset_sse2
+
+     0.04%    click  click                [.] IPPrefixArg::parse(String const&, IPAddress&, IPAddress&, ArgContext const&) const
+             0.04%
+                IPPrefixArg::parse(String const&, IPAddress&, IPAddress&, ArgContext const&) const
+                (nil)
+
+             0.00%
+                IPPrefixArg::parse(String const&, IPAddress&, IPAddress&, ArgContext const&) const
+
+     0.04%    click  click                [.] NameInfo::namedb(unsigned int, unsigned long, String const&, NameDB*)
+             0.04%
+                NameInfo::namedb(unsigned int, unsigned long, String const&, NameDB*)
+
+             0.00%
+                NameInfo::namedb(unsigned int, unsigned long, String const&, NameDB*)
+                0x1
+
+     0.04%    click  click                [.] String::compare(char const*, int) const
+             0.03%
+                String::compare(char const*, int) const
+                0x1
+
+             0.00%
+                String::compare(char const*, int) const
+
+     0.03%    click  click                [.] AddressInfo::query_netdevice(String const&, unsigned char*, int, int, Element const*)
+             0.03%
+                AddressInfo::query_netdevice(String const&, unsigned char*, int, int, Element const*)
+
+     0.03%    click  click                [.] IntArg::parse(char const*, char const*, bool, int, unsigned int*, int)
+             0.03%
+                IntArg::parse(char const*, char const*, bool, int, unsigned int*, int)
+
+             0.00%
+                IntArg::parse(char const*, char const*, bool, int, unsigned int*, int)
+                (nil)
+
+     0.03%    click  click                [.] skip_spacevec_item(char const*, char const*)
+             0.03%
+                skip_spacevec_item(char const*, char const*)
+
+     0.02%    click  click                [.] DynamicNameDB::find(String const&, bool)
+             0.02%
+                DynamicNameDB::find(String const&, bool)
+
+     0.02%    click  click                [.] NameInfo::getdb(unsigned int, Element const*, unsigned long, bool)
+             0.01%
+                NameInfo::getdb(unsigned int, Element const*, unsigned long, bool)
+
+             0.01%
+                NameInfo::getdb(unsigned int, Element const*, unsigned long, bool)
+                0x1
+
+     0.02%    click  libc-2.13.so         [.] __strlen_sse42
+             0.01%
+                __strlen_sse42
+                0x7f0400000001
+
+             0.01%
+                __strlen_sse42
+
+     0.02%    click  click                [.] cp_ip_route(String, IPRoute*, bool, Element*)
+             0.02%
+                cp_ip_route(String, IPRoute*, bool, Element*)
+
+     0.02%    click  click                [.] IntArg::span(char const*, char const*, bool, int&)
+             0.02%
+                IntArg::span(char const*, char const*, bool, int&)
+
+     0.01%    click  click                [.] cp_skip_comment_space(char const*, char const*)
+             0.01%
+                cp_skip_comment_space(char const*, char const*)
+
+     0.01%    click  click                [.] IPRouteTable::run_command(int, String const&, Vector<IPRoute>*, ErrorHandler*)
+             0.01%
+                IPRouteTable::run_command(int, String const&, Vector<IPRoute>*, ErrorHandler*)
+
+     0.01%    click  click                [.] NameInfo::query(unsigned int, Element const*, String const&, void*, unsigned long)
+             0.01%
+                NameInfo::query(unsigned int, Element const*, String const&, void*, unsigned long)
+                0x1
+
+             0.00%
+                NameInfo::query(unsigned int, Element const*, String const&, void*, unsigned long)
+
+     0.01%     time  [nfsd]               [k] 0xffffffff8103701a
+             0.01%
+                0xffffffff8112ea66
+                0xffffffff81010d5e
+                0xffffffff8112ebe8
+                0xffffffff811313ad
+                0xffffffff8113167a
+                0xffffffff810108a9
+                0xffffffff8100bec2
+                __mmap
+
+             0.00%
+                0xffffffff815c81b0
+                buffered_vfprintf
+                __fprintf_chk
+
+             0.00%
+                0xffffffff81100a40
+                0xffffffff81101a0a
+                0xffffffff8116667a
+                0xffffffff81166ca1
+                0xffffffff811abf67
+                0xffffffff8116523a
+                0xffffffff81166adc
+                0xffffffff81014ffa
+                0xffffffff8100c31c
+                __execve
+
+             0.00%
+                0xffffffff81067655
+                0xffffffff81068cf3
+                0xffffffff8100bec2
+                __GI_wait4
+
+             0.00%
+                0xffffffff8103701a
+                0xffffffff8101dd97
+                0xffffffff8101dfdb
+                0xffffffff8101f8a4
+                0xffffffff810fffec
+                0xffffffff81101b02
+                0xffffffff8116667a
+                0xffffffff81166ca1
+                0xffffffff811abf67
+                0xffffffff8116523a
+                0xffffffff81166adc
+                0xffffffff81014ffa
+                0xffffffff8100c31c
+                __execve
+
+             0.00%
+                0xffffffff8103701a
+                0xffffffff8101dd97
+                0xffffffff8101dfdb
+                0xffffffff8101f8a4
+                0xffffffff810fffec
+                0xffffffff81100040
+                0xffffffff81053375
+                0xffffffff815c5163
+                0xffffffff810677c5
+                0xffffffff81068cf3
+                0xffffffff8100bec2
+                __GI_wait4
+
+     0.01%    click  click                [.] Element::name() const
+             0.01%
+                Element::name() const
+
+     0.01%    click  libc-2.13.so         [.] __GI__dl_addr
+             0.01%
+                __GI__dl_addr
+                0x7f048ca07000
+
+     0.01%    click  libc-2.13.so         [.] isspace
+             0.01%
+                isspace
+
+     0.01%    click  libc-2.13.so         [.] __memchr
+             0.01%
+                __memchr
+                (nil)
+
+     0.01%    click  click                [.] IPRouteTable::load_routes_handler(String const&, Element*, void*, ErrorHandler*)
+             0.01%
+                IPRouteTable::load_routes_handler(String const&, Element*, void*, ErrorHandler*)
+
+     0.01%    click  click                [.] SelectSet::run_selects(RouterThread*)
+             0.01%
+                SelectSet::run_selects(RouterThread*)
+
+     0.01%    click  click                [.] IPAddressArg::parse(String const&, IPAddress&, ArgContext const&)
+             0.00%
+                IPAddressArg::parse(String const&, IPAddress&, ArgContext const&)
+                (nil)
+
+             0.00%
+                IPAddressArg::parse(String const&, IPAddress&, ArgContext const&)
+
+     0.00%    click  click                [.] _ZNSi7getlineEPclc@plt
+             0.00%
+                _ZNSi7getlineEPclc@plt
+
+     0.00%    click  click                [.] String::create_memo(char*, int, int)
+             0.00%
+                String::create_memo(char*, int, int)
+
+     0.00%    click  click                [.] IPAddress::mask_to_prefix_len() const
+             0.00%
+                IPAddress::mask_to_prefix_len() const
+                (nil)
+
+     0.00%    click  libc-2.13.so         [.] __strchr_sse42
+             0.00%
+                __strchr_sse42
+
+     0.00%    click  click                [.] DirectIPLookup::Table::vport_find(IPAddress, short)
+             0.00%
+                DirectIPLookup::Table::vport_find(IPAddress, short)
+                (nil)
+
+     0.00%    click  libc-2.13.so         [.] vfprintf
+             0.00%
+                vfprintf
+                __GI___vsprintf_chk
+                0x12
+
+     0.00%    click  libc-2.13.so         [.] ___printf_fp
+             0.00%
+                ___printf_fp
+                vfprintf
+                __GI___vsprintf_chk
+                0x12
+
+     0.00%    click  click                [.] String::delete_memo(String::memo_t*)
+             0.00%
+                String::delete_memo(String::memo_t*)
+
+     0.00%    click  click                [.] AddressInfo::query_ip(String, unsigned char*, Element const*)
+             0.00%
+                AddressInfo::query_ip(String, unsigned char*, Element const*)
+
+     0.00%    click  click                [.] IPRouteTable::add_route_handler(String const&, Element*, void*, ErrorHandler*)
+             0.00%
+                IPRouteTable::add_route_handler(String const&, Element*, void*, ErrorHandler*)
+
+     0.00%    click  click                [.] isspace@plt
+             0.00%
+                isspace@plt
+
+     0.00%    click  click                [.] DynamicNameDB::sort()
+             0.00%
+                DynamicNameDB::sort()
+
+     0.00%    click  [unknown]            [.] 0xffffffffff600407
+             0.00%
+                0xffffffffff600407
+
+     0.00%    click  click                [.] String::substring(int, int) const
+             0.00%
+                String::substring(int, int) const
+
+     0.00%    click  click                [.] String::find_right(char, int) const
+             0.00%
+                String::find_right(char, int) const
+
+
+
+#
+# (For a higher level overview, try: perf report --sort comm,dso)
+#
