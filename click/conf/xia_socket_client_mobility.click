@@ -380,11 +380,48 @@ elementclass EndHost {
     //For get and put cid
     xudp[3] -> [1]cache[1] -> [3]xudp;
     
-    
-    n -> Queue(200) -> [0]output;
+    sw::Switch(0);
+    n -> sw;
+    sw[0]->Queue(200) -> [0]output;
+    sw[1]->Queue(200) -> [1]output;
     
 };
 
+// 2-port router node
+elementclass Router1 {
+    $local_addr, $local_ad, $local_hid |
+
+    // $local_addr: the full address of the node
+    // $local_ad:   the AD of the node and the local network
+    // $local_hid:  the HID of the node (used for "bound" content source)
+
+    // input[0], input[1]: a packet arrived at the node
+    // output[0]: forward to interface 0 (for hosts in local ad)
+    // output[1]: forward to interface 1 (for other ads)
+
+    n :: RouteEngine($local_addr);
+    cache :: XIACache($local_addr, n/proc/rt_CID/rt);
+
+    Script(write n/proc/rt_AD/rt.add - 1);      // default route for AD
+    Script(write n/proc/rt_AD/rt.add $local_ad 4);    // self AD as destination
+    Script(write n/proc/rt_HID/rt.add - 0);     // forwarding for local HID
+    Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self HID as destination
+    Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
+    Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
+
+    input[0] -> [0]n;
+    input[1] -> [0]n;
+
+    n[0] -> sw :: PaintSwitch
+    n[1] -> Discard;
+    n[2] -> [0]cache[0] -> [1]n;
+    Idle -> [1]cache[1] -> Discard;
+    swi::Switch(0);
+    sw[0] -> swi;
+    swi[0]->Queue(200) -> [0]output;
+    swi[1]->Queue(200) -> [2]output;
+    sw[1] -> Queue(200) -> [1]output;
+};
 
 // aliases for XIDs
 XIAXIDInfo(
@@ -405,25 +442,24 @@ host1 :: EndHost (RE AD1 HID1, HID1, fake1,192.0.0.2,192.0.0.1,21:11:11:11:11:11
 //host0 :: Host(RE AD0 HID0, HID0, 2000);
 //host1 :: Host(RE AD1 HID1, HID1, 2001);
 router0 :: Router(RE AD0 RHID0, AD0, RHID0);
-router1 :: Router(RE AD1 RHID1, AD1, RHID1);
+router1 :: Router1(RE AD1 RHID1, AD1, RHID1);
 
 // interconnection -- server host - ad
-host0[0] ->  dl3::LinkUnqueue(0.005, 1 GB/s) -> [0]router0;
-router0[0]  -> LinkUnqueue(0.005, 1 GB/s) -> [0]host0;
-
+host0[0] ->  Unqueue() -> [0]router0;
+router0[0]  -> Unqueue() -> [0]host0;
+host0[1]->Discard;
 // interconnection -- client host - ad
-3g_s0::PullSwitch(0);
-w_s0::PullSwitch(-1);
-3g_s1::PullSwitch(0);
-w_s1::PullSwitch(-1);
-host1[0] ->  3g_s0->LinkUnqueue(0.065, 1 GB/s) -> [0]router1;
-host1[0] ->  w_s0->LinkUnqueue(0.002, 1 GB/s) -> [0]router1;
-router1[0] -> 3g_s1 ->dl1::LinkUnqueue(0.065, 1 GB/s) ->[0]host1;
-router1[0] -> w_s1 ->LinkUnqueue(0.002, 1 GB/s) ->[0]host1;
+//3g_s0::PullSwitch(0);
+//w_s0::PullSwitch(-1);
+s1::Switch(0);
+host1[0] ->DelayUnqueue(0.075) -> [0]router1;
+host1[1] ->DelayUnqueue(0.012) -> [0]router1;
+router1[0] ->DelayUnqueue(0.075) ->s1->[0]host1;
+router1[2] ->DelayUnqueue(0.012) ->[0]host1;
 
 // interconnection -- ad - ad
-router0[1] ->  dl2::LinkUnqueue(0.005, 1 GB/s) ->[1]router1;
-router1[1] ->  LinkUnqueue(0.005, 1 GB/s) ->[1]router0;
+router0[1] ->  Unqueue() ->[1]router1;
+router1[1] ->  Unqueue() ->[1]router0;
 
 
 // send test packets from host0 to host1
@@ -447,22 +483,23 @@ gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
 
 //Script(write gen.active true);  // the packet source should be activated after all other scripts are executed
 move :: Script(TYPE PASSIVE,
+        write s1.switch -1,
+        
+        //write dl1.delay 20,
         write host1/xudp.local_addr RE AD2 HID1,
         write host1/cache.local_addr RE AD2 HID1,
-        
+        write host1/sw.switch 1,
+        write router1/swi.switch 1,
         write router1/n/proc/rt_AD/rt.remove AD1 4,    
         write router1/n/proc/rt_AD/rt.add AD2 4,
         write router1/cache.local_addr RE AD2 HID1,
         
         //Clear all packets on the 3g downlink
-        write dl1.reset,
-        write dl2.reset,
-        write dl3.reset,
+        //write dl1.reset,
+        //write dl2.reset,
+        //write dl3.reset,
         //Switch 3g off and wifi on
-        //write 3g_s0.switch -1,
-        //write w_s0.switch 0,
-        //write 3g_s1.switch -1,
-        //write w_s1.switch 0,
+        
     );
 
 

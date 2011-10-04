@@ -25,11 +25,12 @@
 #define CID0 "CID:2000000000000000000000000000000000000001"
 #define SID0 "SID:0f00000000000000000000000000000000000055"
 
+//Change in ping server as well
 #define TOTALPINGS 4000
 #define MIGRATEPOINT 2000
 
-//Play with the below values to get 1000pps
-#define RECVLOOPCOUNT 25
+//Play with the below values to get 1000pps. 10 and 10 are quite close
+#define RECVLOOPCOUNT 11
 #define RECVLOOPWAIT 10
 
 #define ENDTIMEOUT 15 //in seconds
