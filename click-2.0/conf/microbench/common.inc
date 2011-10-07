@@ -119,7 +119,9 @@ elementclass XIAPacketForward {
     input[1]
     -> Clone($COUNT)
     -> Unqueue
-    -> XIARandomize(XID_TYPE CID, MAX_CYCLE $CID_RANDOMIZE_MAX_CYCLE)
+    // the following must be disabled for packetforward tests
+    // because this will corrupt the shared _zipf_cache in XIARandomize
+    //-> XIARandomize(XID_TYPE CID, MAX_CYCLE $CID_RANDOMIZE_MAX_CYCLE)
     //-> XIAPrint
     -> host0;
 

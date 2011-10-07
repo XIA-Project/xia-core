@@ -1,0 +1,117 @@
+register_router incr master _refcount 1 router(0x24a2db0)
+Packet cloning 100000000 packets
+route table 0
+USERTIME 33185864
+loaded 351611 entries
+USERTIME 458370693
+FIRST_PACKET USERTIME 458421896
+thread 0 scheduled on CPU 0
+Mpps: 0.969163
+Mbps: 1380.088349
+Mpps: 1.835942
+Mbps: 2614.381485
+Mpps: 1.831550
+Mbps: 2608.127872
+Mpps: 1.843136
+Mbps: 2624.625959
+Mpps: 1.831732
+Mbps: 2608.385851
+Mpps: 1.834692
+Mbps: 2612.601952
+Mpps: 1.832598
+Mbps: 2609.619122
+Mpps: 1.840131
+Mbps: 2620.346883
+Mpps: 1.832937
+Mbps: 2610.102232
+Mpps: 1.836274
+Mbps: 2614.854356
+Mpps: 1.824460
+Mbps: 2598.030496
+Mpps: 1.838132
+Mbps: 2617.500306
+Mpps: 1.839554
+Mbps: 2619.525027
+Mpps: 1.840604
+Mbps: 2621.019694
+Mpps: 1.831700
+Mbps: 2608.340462
+Mpps: 1.837416
+Mbps: 2616.480705
+Mpps: 1.841117
+Mbps: 2621.750773
+Mpps: 1.844221
+Mbps: 2626.170043
+Mpps: 1.842802
+Mbps: 2624.149547
+Mpps: 1.835627
+Mbps: 2613.932776
+Mpps: 1.837664
+Mbps: 2616.834109
+Mpps: 1.834045
+Mbps: 2611.679563
+Mpps: 1.842163
+Mbps: 2623.240734
+Mpps: 1.829493
+Mbps: 2605.198139
+Mpps: 1.844634
+Mbps: 2626.758628
+Mpps: 1.842494
+Mbps: 2623.711981
+Mpps: 1.832824
+Mbps: 2609.941973
+Mpps: 1.840020
+Mbps: 2620.187774
+Mpps: 1.839754
+Mbps: 2619.809365
+Mpps: 1.834460
+Mbps: 2612.271254
+Mpps: 1.834650
+Mbps: 2612.542036
+Mpps: 1.830481
+Mbps: 2606.604925
+Mpps: 1.841729
+Mbps: 2622.622328
+Mpps: 1.839563
+Mbps: 2619.537074
+Mpps: 1.834410
+Mbps: 2612.199375
+Mpps: 1.839735
+Mbps: 2619.782856
+Mpps: 1.840761
+Mbps: 2621.244042
+Mpps: 1.836623
+Mbps: 2615.351415
+Mpps: 1.834576
+Mbps: 2612.436592
+Mpps: 1.833011
+Mbps: 2610.207488
+Mpps: 1.835223
+Mbps: 2613.357118
+Mpps: 1.834115
+Mbps: 2611.780156
+Mpps: 1.841185
+Mbps: 2621.847316
+Mpps: 1.836043
+Mbps: 2614.525488
+Mpps: 1.838114
+Mbps: 2617.473844
+Mpps: 1.837653
+Mbps: 2616.817278
+Mpps: 1.834708
+Mbps: 2612.623522
+Mpps: 1.837923
+Mbps: 2617.202038
+Mpps: 1.837438
+Mbps: 2616.511954
+Mpps: 1.839182
+Mbps: 2618.995071
+No more packet cloning
+HANDLER_CALL USERTIME 54785663046
+unregister_router decr master _refcount 0 router (0x24a2db0)
+Master deleted
+Command terminated by signal 11
+54.75user 0.04system 0:54.93elapsed 99%CPU (0avgtext+0avgdata 249680maxresident)k
+12160inputs+16outputs (0major+17754minor)pagefaults 0swaps
+[ perf record: Woken up 14 times to write data ]
+[ perf record: Captured and wrote 3.372 MB perf.data (~147307 samples) ]

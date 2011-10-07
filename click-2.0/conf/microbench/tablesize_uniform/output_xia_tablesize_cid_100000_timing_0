@@ -1,0 +1,124 @@
+register_router incr master _refcount 1 router(0x1630190)
+Packet cloning 100000000 packets
+Packet cloning 100000000 packets
+XIAXIDRouteTable: configuring fwd/host0/n/proc/rt_AD/rt
+XIAXIDRouteTable: configuring fwd/host0/n/proc/rt_HID/rt
+XIAXIDRouteTable: configuring fwd/host0/n/proc/rt_SID/rt
+XIAXIDRouteTable: configuring fwd/host0/n/proc/rt_CID/rt
+USERTIME 11702903226
+generated 351611 entries
+USERTIME 11791358198
+USERTIME 11791373786
+generated 100000 entries
+USERTIME 11811508172
+FIRST_PACKET USERTIME 11811543373
+thread 0 scheduled on CPU 0
+Mpps: 0.080266
+Mbps: 101.455680
+Mpps: 1.602447
+Mbps: 2025.493333
+Mpps: 1.603266
+Mbps: 2026.527631
+Mpps: 1.604802
+Mbps: 2028.469180
+Mpps: 1.603158
+Mbps: 2026.391180
+Mpps: 1.612622
+Mbps: 2038.354609
+Mpps: 1.598122
+Mbps: 2020.026065
+Mpps: 1.597221
+Mbps: 2018.887136
+Mpps: 1.606916
+Mbps: 2031.142035
+Mpps: 1.595681
+Mbps: 2016.941350
+Mpps: 1.607756
+Mbps: 2032.203349
+Mpps: 1.606289
+Mbps: 2030.349223
+Mpps: 1.604701
+Mbps: 2028.342231
+Mpps: 1.599637
+Mbps: 2021.940615
+Mpps: 1.599477
+Mbps: 2021.738487
+Mpps: 1.602842
+Mbps: 2025.991678
+Mpps: 1.602171
+Mbps: 2025.144476
+Mpps: 1.606784
+Mbps: 2030.975591
+Mpps: 1.602654
+Mbps: 2025.754650
+Mpps: 1.600679
+Mbps: 2023.257861
+Mpps: 1.612061
+Mbps: 2037.644844
+Mpps: 1.598219
+Mbps: 2020.148746
+Mpps: 1.606624
+Mbps: 2030.773284
+Mpps: 1.605273
+Mbps: 2029.065073
+Mpps: 1.605393
+Mbps: 2029.216544
+Mpps: 1.605736
+Mbps: 2029.649909
+Mpps: 1.606503
+Mbps: 2030.619950
+Mpps: 1.601407
+Mbps: 2024.178038
+Mpps: 1.600031
+Mbps: 2022.438831
+Mpps: 1.602098
+Mbps: 2025.052008
+Mpps: 1.602961
+Mbps: 2026.142691
+Mpps: 1.604984
+Mbps: 2028.700332
+Mpps: 1.602944
+Mbps: 2026.121580
+Mpps: 1.602764
+Mbps: 2025.894262
+Mpps: 1.604220
+Mbps: 2027.733751
+Mpps: 1.605089
+Mbps: 2028.832210
+Mpps: 1.608899
+Mbps: 2033.648517
+Mpps: 1.603331
+Mbps: 2026.610486
+Mpps: 1.603140
+Mbps: 2026.368440
+Mpps: 1.608814
+Mbps: 2033.540549
+Mpps: 1.609755
+Mbps: 2034.730467
+Mpps: 1.605124
+Mbps: 2028.876173
+Mpps: 1.596787
+Mbps: 2018.339102
+Mpps: 1.603640
+Mbps: 2027.000480
+Mpps: 1.606351
+Mbps: 2030.427498
+Mpps: 1.601372
+Mbps: 2024.134278
+Mpps: 1.606423
+Mbps: 2030.518826
+Mpps: 1.600411
+Mbps: 2022.919486
+Mpps: 1.599678
+Mbps: 2021.992366
+Mpps: 1.603959
+Mbps: 2027.403632
+No more packet cloning
+HANDLER_CALL USERTIME 74036205732
+unregister_router decr master _refcount 0 router (0x1630190)
+Master deleted
+Command terminated by signal 11
+73.90user 0.17system 1:14.23elapsed 99%CPU (0avgtext+0avgdata 1350832maxresident)k
+0inputs+24outputs (0major+85002minor)pagefaults 0swaps
+[ perf record: Woken up 19 times to write data ]
+[ perf record: Captured and wrote 4.567 MB perf.data (~199548 samples) ]

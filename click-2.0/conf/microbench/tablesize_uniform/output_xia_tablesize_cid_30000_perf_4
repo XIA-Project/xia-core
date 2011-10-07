@@ -1,0 +1,1773 @@
+Failed to open /usr/bin/time, continuing without symbols
+/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.14 with build id d53b9c6a59cff0662f38ff332028cd460f4436a7 not found, continuing without symbols
+# Events: 71K cycles
+#
+# Overhead  Command        Shared Object                                                                                                                                                                                                                                                                                                                          Symbol
+# ........  .......  ...................  ..............................................................................................................................................................................................................................................................................................................................
+#
+    12.37%    click  libc-2.13.so         [.] memcpy
+            12.37%
+                memcpy
+
+    11.85%    click  click                [.] XIAXIDRouteTable::lookup_route(Packet*)
+            11.85%
+                XIAXIDRouteTable::lookup_route(Packet*)
+
+     6.66%    click  libm-2.13.so         [.] __ieee754_log
+             6.66%
+                __ieee754_log
+
+     6.26%    click  libc-2.13.so         [.] _int_malloc
+             6.26%
+                _int_malloc
+
+     4.48%    click  libm-2.13.so         [.] __ieee754_exp
+             4.48%
+                __ieee754_exp
+
+     4.26%    click  click                [.] Element::push(int, Packet*)
+             4.26%
+                Element::push(int, Packet*)
+
+     4.05%    click  click                [.] RouterThread::driver()
+             4.05%
+                RouterThread::driver()
+
+     3.90%    click  click                [.] XIARandomize::simple_action(Packet*)
+             3.90%
+                XIARandomize::simple_action(Packet*)
+
+     3.58%    click  click                [.] Unqueue::run_task(Task*)
+             3.58%
+                Unqueue::run_task(Task*)
+
+     3.32%    click  click                [.] XIAXIDTypeClassifier::match(Packet*)
+             3.32%
+                XIAXIDTypeClassifier::match(Packet*)
+
+     2.57%    click  libc-2.13.so         [.] nrand48_r
+             1.78%
+                nrand48_r
+                0xba97a0
+
+             0.78%
+                nrand48_r
+
+             0.01%
+                nrand48_r
+                0x7fff99bdb148
+
+     2.39%    click  libc-2.13.so         [.] _int_free
+             2.39%
+                _int_free
+
+     2.16%    click  libc-2.13.so         [.] __drand48_iterate
+             2.16%
+                __drand48_iterate
+                0xba97a0
+
+             0.01%
+                __drand48_iterate
+                0x7fff99bdb148
+
+     2.11%    click  click                [.] Packet::expensive_uniqueify(int, int, bool)
+             2.11%
+                Packet::expensive_uniqueify(int, int, bool)
+
+     1.98%    click  click                [.] Packet::clone()
+             1.98%
+                Packet::clone()
+
+     1.90%    click  click                [.] FullNoteQueue::pull(int)
+             1.90%
+                FullNoteQueue::pull(int)
+
+     1.64%    click  libc-2.13.so         [.] cfree
+             1.64%
+                cfree
+
+     1.55%    click  click                [.] AggregateCounter::push(int, Packet*)
+             1.55%
+                AggregateCounter::push(int, Packet*)
+
+     1.54%    click  click                [.] XIARandomize::configure(Vector<String>&, ErrorHandler*)
+             1.54%
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+     1.42%    click  click                [.] PrintStats::simple_action(Packet*)
+             1.42%
+                PrintStats::simple_action(Packet*)
+
+     1.41%    click  libc-2.13.so         [.] __random
+             1.41%
+                __random
+
+     1.33%    click  click                [.] XIAXIDTypeClassifier::push(int, Packet*)
+             1.33%
+                XIAXIDTypeClassifier::push(int, Packet*)
+
+     1.30%    click  libstdc++.so.6.0.14  [.] 0x55ab0         
+             0.36%
+                0x7f0f91fdb0a0
+
+             0.15%
+                0x7f0f91f78e30
+
+             0.15%
+                0x7f0f91fdce0d
+
+             0.07%
+                0x7f0f91fdb0e0
+
+             0.07%
+                0x7f0f91fdcdfa
+
+             0.06%
+                0x7f0f91fdce76
+
+             0.06%
+                0x7f0f91fdce70
+
+             0.06%
+                0x7f0f91fdcf20
+
+             0.06%
+                0x7f0f91f78fc0
+
+             0.06%
+                0x7f0f91fdcf29
+
+             0.05%
+                0x7f0f91f79560
+
+             0.05%
+                0x7f0f91fdcdf0
+
+             0.05%
+                0x7f0f91fdce05
+
+             0.05%
+                0x7f0f91f78ab0
+
+     1.29%    click  libc-2.13.so         [.] __malloc
+             1.29%
+                __malloc
+
+     1.26%    click  libc-2.13.so         [.] nrand48
+             1.26%
+                nrand48
+
+     1.23%    click  click                [.] Clone::pull(int)
+             1.23%
+                Clone::pull(int)
+
+     1.20%    click  libc-2.13.so         [.] __random_r
+             1.20%
+                __random_r
+
+     1.11%    click  click                [.] XIASelectPath::push(int, Packet*)
+             1.11%
+                XIASelectPath::push(int, Packet*)
+
+     1.08%    click  click                [.] XIAXIDRouteTable::push(int, Packet*)
+             1.08%
+                XIAXIDRouteTable::push(int, Packet*)
+
+     1.06%    click  click                [.] PaintSwitch::push(int, Packet*)
+             1.06%
+                PaintSwitch::push(int, Packet*)
+
+     0.96%    click  click                [.] FullNoteQueue::push(int, Packet*)
+             0.96%
+                FullNoteQueue::push(int, Packet*)
+
+     0.77%    click  click                [.] WritablePacket::recycle(WritablePacket*)
+             0.77%
+                WritablePacket::recycle(WritablePacket*)
+
+     0.74%    click  click                [.] Packet::alloc_data(unsigned int, unsigned int, unsigned int)
+             0.74%
+                Packet::alloc_data(unsigned int, unsigned int, unsigned int)
+
+     0.57%    click  click                [.] XIADecHLIM::simple_action(Packet*)
+             0.57%
+                XIADecHLIM::simple_action(Packet*)
+
+     0.53%    click  click                [.] Packet::~Packet()
+             0.53%
+                Packet::~Packet()
+
+     0.52%    click  click                [.] AggregateCounter::find_node(unsigned int, bool)
+             0.52%
+                AggregateCounter::find_node(unsigned int, bool)
+
+     0.43%    click  libm-2.13.so         [.] __GI___exp
+             0.43%
+                __GI___exp
+
+     0.41%    click  libm-2.13.so         [.] __log
+             0.41%
+                __log
+
+     0.34%    click  libc-2.13.so         [.] rand
+             0.34%
+                rand
+
+     0.31%    click  click                [.] nrand48@plt
+             0.31%
+                nrand48@plt
+
+     0.27%    click  [exportfs]           [k] 0xffffffff8103701a
+             0.05%
+                0xffffffff812db4e7
+                0xffffffff8110ec08
+                0xffffffff8114658a
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.03%
+                0xffffffff815c81b0
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.02%
+                0xffffffff8110ec17
+                0xffffffff8114658a
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff8110ceb1
+                0xffffffff8110e1a0
+                0xffffffff8110ec08
+                0xffffffff8114658a
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff812db4e7
+                0xffffffff8110ec08
+                0xffffffff8114658a
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIAXIDRouteTable::generate_routes_handler(String const&, Element*, void*, ErrorHandler*)
+
+             0.00%
+                0xffffffff81157e8c
+                0xffffffff81159bfd
+                0xffffffff8115a8d6
+                0xffffffff8112a7ea
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff81159bcb
+                0xffffffff8115a8d6
+                0xffffffff8112a7ea
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff81037bad
+                0xffffffff815c79ce
+                0xffffffff8112a8b5
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff815cb514
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff81146545
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff8100c880
+                memcpy
+
+             0.00%
+                0xffffffff8108e180
+                0xffffffff8108e251
+                0xffffffff81169a46
+                0xffffffff8116c576
+                0xffffffff8116ceeb
+                0xffffffff8116e53c
+                0xffffffff8116561d
+                0xffffffff811ac3e9
+                0xffffffff8116523a
+                0xffffffff81166adc
+                0xffffffff81014ffa
+                0xffffffff8100c31c
+                __execve
+                0x4018eb
+
+             0.00%
+                0xffffffff81159bf2
+                0xffffffff8115a8d6
+                0xffffffff8112a7ea
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff8110ce47
+                0xffffffff8110e1a0
+                0xffffffff8110ec08
+                0xffffffff8114658a
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff815cb611
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff8112a33b
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff8110b7dd
+                0xffffffff8110e260
+                0xffffffff8110ec08
+                0xffffffff8114658a
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff81159812
+                0xffffffff81159be2
+                0xffffffff8115a8d6
+                0xffffffff8112a7ea
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff81504147
+                0xffffffff815063bf
+                0xffffffff81506b9c
+                0xffffffff814d1d56
+                0xffffffff814d2a88
+                0xffffffff814d2bf0
+                0xffffffff814d3165
+                0xffffffffa002f84f
+                0xffffffff814d3368
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cf9a6
+                0xffffffff815c7f13
+                __ieee754_exp
+
+             0.00%
+                0xffffffff814a7d69
+                0xffffffff814d3346
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cf9a6
+                0xffffffff815c7f13
+                __ieee754_log
+
+             0.00%
+                0xffffffff8100c880
+                __drand48_iterate
+
+             0.00%
+                0xffffffff8114659f
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff8110eb66
+                0xffffffff8114658a
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff81113295
+                0xffffffff81134cad
+                0xffffffff8112a8e1
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff812d7060
+                0xffffffff812d8215
+                0xffffffff8108901b
+                0xffffffff810895ab
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                cfree
+
+             0.00%
+                0xffffffff81158918
+                0xffffffff81112ea2
+                0xffffffff81112f68
+                0xffffffff8111329d
+                0xffffffff81134cad
+                0xffffffff8112a8e1
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff815c7e00
+                memcpy
+
+             0.00%
+                0xffffffff81090490
+                0xffffffff8107497d
+                0xffffffff810956e6
+                0xffffffff810958e8
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                XIAXIDTypeClassifier::match(Packet*)
+
+             0.00%
+                0xffffffff8110def7
+                0xffffffff8110ec08
+                0xffffffff8114658a
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff814c6f50
+                0xffffffff814c6c96
+                0xffffffff814c6dd6
+                0xffffffff8159626a
+                0xffffffff814d1c65
+                0xffffffff814d2a88
+                0xffffffff814d2bf0
+                0xffffffff814d3165
+                0xffffffffa002f84f
+                0xffffffff814d3368
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cf9a6
+                0xffffffff815c7f13
+                __GI___exp
+
+             0.00%
+                0xffffffff8105428b
+                0xffffffff8105481b
+                0xffffffff8105ea94
+                0xffffffff8107493d
+                0xffffffff81095894
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                AggregateCounter::push(int, Packet*)
+
+             0.00%
+                0xffffffff815cfa3c
+                0xffffffff8100c893
+                memcpy
+
+             0.00%
+                0xffffffff8104a168
+                0xffffffff81054839
+                0xffffffff8105ea94
+                0xffffffff8107493d
+                0xffffffff81095894
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                XIAXIDRouteTable::lookup_route(Packet*)
+
+             0.00%
+                0xffffffff81037bad
+                0xffffffff815c79ce
+                0xffffffff81089dcd
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                _int_malloc
+
+             0.00%
+                0xffffffff8105e070
+                0xffffffff810956e6
+                0xffffffff810958e8
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                XIAXIDTypeClassifier::push(int, Packet*)
+
+             0.00%
+                0xffffffffa00e7eb6
+                0xffffffff810cf554
+                0xffffffff810d1ea7
+                0xffffffff8100e872
+                0xffffffff815cf99d
+                0xffffffff815c7f13
+                __random
+
+             0.00%
+                0xffffffff8110eb89
+                0xffffffff8114658a
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff8110dd9f
+                0xffffffff8110ec08
+                0xffffffff8114658a
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff810fa506
+                0xffffffff81074938
+                0xffffffff81095894
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                __malloc
+
+             0.00%
+                0xffffffff8108956d
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                WritablePacket::pool_allocate(bool)
+
+             0.00%
+                0xffffffff8114fe55
+                0xffffffff814c6cc7
+                0xffffffff814c6dd6
+                0xffffffff8159626a
+                0xffffffff814d1c65
+                0xffffffff814d2a88
+                0xffffffff814d2bf0
+                0xffffffff814d3165
+                0xffffffffa002f84f
+                0xffffffff814d3368
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cf9a6
+                0xffffffff815c7f13
+                __ieee754_exp
+
+             0.00%
+                0xffffffff8104d403
+                0xffffffff8105e553
+                0xffffffff8105e81f
+                0xffffffff81074908
+                0xffffffff81095894
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                nrand48
+
+             0.00%
+                0xffffffff8109052f
+                0xffffffff8107497d
+                0xffffffff810956e6
+                0xffffffff810958e8
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                __malloc
+
+             0.00%
+                0xffffffff815cb563
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff81127908
+                0xffffffff810d8657
+                0xffffffff8105e55b
+                0xffffffff8105e81f
+                0xffffffff81074908
+                0xffffffff81095894
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                XIAXIDRouteTable::lookup_route(Packet*)
+
+             0.00%
+                0xffffffff8110df0c
+                0xffffffff8110ec08
+                0xffffffff8114658a
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff81037bad
+                0xffffffff815c79ce
+                0xffffffff81089dcd
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                nrand48@plt
+
+             0.00%
+                0xffffffff8110cea2
+                0xffffffff8110e1a0
+                0xffffffff8110ec08
+                0xffffffff8114658a
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff8106b6d0
+                0xffffffff8107490d
+                0xffffffff81095894
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                memcpy
+
+             0.00%
+                0xffffffff8100c4d8
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff81054460
+                0xffffffff8105ea94
+                0xffffffff8107493d
+                0xffffffff81095894
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                XIAXIDRouteTable::push(int, Packet*)
+
+             0.00%
+                0xffffffff8114658d
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff81112981
+                0xffffffff81112eeb
+                0xffffffff81112f68
+                0xffffffff8111329d
+                0xffffffff81134cad
+                0xffffffff8112a8e1
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff81037bad
+                0xffffffff815c79ce
+                0xffffffff81010f3a
+                0xffffffff81090514
+                0xffffffff8107497d
+                0xffffffff810956e6
+                0xffffffff810958e8
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                Unqueue::run_task(Task*)
+
+             0.00%
+                0xffffffff810fa583
+                0xffffffff81074938
+                0xffffffff81095894
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                _int_malloc
+
+             0.00%
+                0xffffffff8106b541
+                0xffffffff815c7f13
+                __ieee754_exp
+
+             0.00%
+                0xffffffff81121004
+                0xffffffff81122261
+                0xffffffff8112262d
+                0xffffffff8110dedf
+                0xffffffff8110ec08
+                0xffffffff8114658a
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff8104a4e6
+                0xffffffff8105ea23
+                0xffffffff8107493d
+                0xffffffff81095894
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                memcpy
+
+             0.00%
+                0xffffffff81121985
+                0xffffffff81112e97
+                0xffffffff81112f68
+                0xffffffff8111329d
+                0xffffffff81134cad
+                0xffffffff8112a8e1
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff81157edb
+                0xffffffff8115a8d6
+                0xffffffff8112a7ea
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff81157e95
+                0xffffffff81159bfd
+                0xffffffff8115a8d6
+                0xffffffff8112a7ea
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff810905bf
+                0xffffffff8107497d
+                0xffffffff810956e6
+                0xffffffff810958e8
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                XIARandomize::simple_action(Packet*)
+
+             0.00%
+                0xffffffff8115b2f7
+                0xffffffff81159bc3
+                0xffffffff8115a8d6
+                0xffffffff8112a7ea
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff811219a0
+                0xffffffff81112e97
+                0xffffffff81112f68
+                0xffffffff8111329d
+                0xffffffff81134cad
+                0xffffffff8112a8e1
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff8114659c
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff810953c0
+                0xffffffff81089e71
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                FullNoteQueue::push(int, Packet*)
+
+             0.00%
+                0xffffffff810953c0
+                0xffffffff81089e71
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                Packet::clone()
+
+             0.00%
+                0xffffffff810953c0
+                0xffffffff81089e71
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                AggregateCounter::push(int, Packet*)
+
+             0.00%
+                0xffffffff8100e890
+                0xffffffff815cfa90
+                0xffffffff8100c893
+                Element::push(int, Packet*)
+
+             0.00%
+                0xffffffff81143f20
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff8115a890
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff8110dee5
+                0xffffffff8110ec08
+                0xffffffff8114658a
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff810953c0
+                0xffffffff81089e71
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                Packet::~Packet()
+
+             0.00%
+                0xffffffff815c8434
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff81157ef4
+                0xffffffff81159bfd
+                0xffffffff8115a8d6
+                0xffffffff8112a7ea
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff811588da
+                0xffffffff81112ea2
+                0xffffffff81112f68
+                0xffffffff8111329d
+                0xffffffff81134cad
+                0xffffffff8112a8e1
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff81157ef8
+                0xffffffff81159bfd
+                0xffffffff8115a8d6
+                0xffffffff8112a7ea
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIARandomize::configure(Vector<String>&, ErrorHandler*)
+
+             0.00%
+                0xffffffff814dc62f
+                0xffffffff81532ca8
+                0xffffffff815331df
+                0xffffffff814d1d56
+                0xffffffff814d2a88
+                0xffffffff814d2bf0
+                0xffffffff814d3165
+                0xffffffffa002f84f
+                0xffffffff814d3368
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cf9a6
+                0xffffffff815c7f13
+                Packet::~Packet()
+
+             0.00%
+                0xffffffff8145e903
+                0xffffffff8143b9ed
+                0xffffffff810cf554
+                0xffffffff810d1ea7
+                0xffffffff8100e872
+                0xffffffff815cf99d
+                0xffffffff815c7f13
+                XIASelectPath::push(int, Packet*)
+
+             0.00%
+                0xffffffff81121990
+                0xffffffff81112aad
+                0xffffffff8113aaf1
+                0xffffffff811295bc
+                0xffffffff81131aba
+                0xffffffff81061677
+                0xffffffff81067eba
+                0xffffffff8106803f
+                0xffffffff81068a18
+                0xffffffff810786a7
+                0xffffffff8100b0df
+                0xffffffff8100b895
+                0xffffffff815c801c
+
+             0.00%
+                0xffffffff8110ec17
+                0xffffffff8114658a
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                XIAXIDRouteTable::generate_routes_handler(String const&, Element*, void*, ErrorHandler*)
+
+             0.00%
+                0xffffffff8112100d
+                0xffffffff811219b9
+                0xffffffff8110e6aa
+                0xffffffff8110f5b8
+                0xffffffff8110f8f8
+                0xffffffff81112b0f
+                0xffffffff8113aaf1
+                0xffffffff811295bc
+                0xffffffff81131aba
+                0xffffffff81061677
+                0xffffffff81067eba
+                0xffffffff8106803f
+                0xffffffff81068a18
+                0xffffffff810786a7
+                0xffffffff8100b0df
+                0xffffffff8100b895
+                0xffffffff815c801c
+
+             0.00%
+                0xffffffff81112958
+                0xffffffff81112eeb
+                0xffffffff81112f68
+                0xffffffff8111329d
+                0xffffffff81134cad
+                0xffffffff8112a8e1
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::set(HashContainer_iterator<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >&, HashTable<Pair<XID const, int>, void>::elt*, bool)
+                0x7f0f7ef49238
+
+             0.00%
+                0xffffffff8110f479
+                0xffffffff8110f8f8
+                0xffffffff81112b0f
+                0xffffffff8113aaf1
+                0xffffffff811295bc
+                0xffffffff81131aba
+                0xffffffff81061677
+                0xffffffff81067eba
+                0xffffffff8106803f
+                0xffffffff81068a18
+                0xffffffff810786a7
+                0xffffffff8100b0df
+                0xffffffff8100b895
+                0xffffffff815c801c
+
+             0.00%
+                0xffffffff81158313
+                0xffffffff8115ab5f
+                0xffffffff81134d70
+                0xffffffff81129546
+                0xffffffff81131aba
+                0xffffffff81061677
+                0xffffffff81067eba
+                0xffffffff8106803f
+                0xffffffff81068a18
+                0xffffffff810786a7
+                0xffffffff8100b0df
+                0xffffffff8100b895
+                0xffffffff815c801c
+
+             0.00%
+                0xffffffff812db4e7
+                0xffffffff8110ec08
+                0xffffffff8114658a
+                0xffffffff8112a7c9
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::rehash(unsigned long)
+
+             0.00%
+                0xffffffff8113aa90
+                0xffffffff811295bc
+                0xffffffff81131aba
+                0xffffffff81061677
+                0xffffffff81067eba
+                0xffffffff8106803f
+                0xffffffff81068a18
+                0xffffffff810786a7
+                0xffffffff8100b0df
+                0xffffffff8100b895
+                0xffffffff815c801c
+
+             0.00%
+                0xffffffff81157ef8
+                0xffffffff81159bfd
+                0xffffffff8115a8d6
+                0xffffffff8112a7ea
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::set(HashContainer_iterator<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >&, HashTable<Pair<XID const, int>, void>::elt*, bool)
+                0x7f0f929cad60
+
+             0.00%
+                0xffffffff81134d16
+                0xffffffff81129546
+                0xffffffff81131aba
+                0xffffffff81061677
+                0xffffffff81067eba
+                0xffffffff8106803f
+                0xffffffff81068a18
+                0xffffffff810786a7
+                0xffffffff8100b0df
+                0xffffffff8100b895
+                0xffffffff815c801c
+
+             0.00%
+                0xffffffff8114fecf
+                0xffffffff811092b7
+                0xffffffff81109367
+                0xffffffff8148ab91
+                0xffffffff811901ad
+                0xffffffff812b640b
+                0xffffffff812b6d8e
+                0xffffffff812b7124
+                0xffffffff812b9a7f
+                0xffffffff812b9b10
+                0xffffffff813dbc7f
+                0xffffffff813d27a5
+                0xffffffff813dbae7
+                0xffffffff812bf585
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cf9a6
+                0xffffffff815c7f13
+                Packet::expensive_uniqueify(int, int, bool)
+
+             0.00%
+                0xffffffff8110c8b3
+                0xffffffff8110f4b7
+                0xffffffff8110f8f8
+                0xffffffff81112b0f
+                0xffffffff8113aaf1
+                0xffffffff811295bc
+                0xffffffff81131aba
+                0xffffffff81061677
+                0xffffffff81067eba
+                0xffffffff8106803f
+                0xffffffff81068a18
+                0xffffffff810786a7
+                0xffffffff8100b0df
+                0xffffffff8100b895
+                0xffffffff815c801c
+
+             0.00%
+                0xffffffff8110f8e3
+                0xffffffff81112b0f
+                0xffffffff8113aaf1
+                0xffffffff811295bc
+                0xffffffff81131aba
+                0xffffffff81061677
+                0xffffffff81067eba
+                0xffffffff8106803f
+                0xffffffff81068a18
+                0xffffffff810786a7
+                0xffffffff8100b0df
+                0xffffffff8100b895
+                0xffffffff815c801c
+
+             0.00%
+                0xffffffff810d4f2b
+                0xffffffff8106b55b
+                0xffffffff815cf986
+                0xffffffff815c7f13
+                nrand48@plt
+
+             0.00%
+                0xffffffff8110e6cb
+                0xffffffff8110f5b8
+                0xffffffff8110f8f8
+                0xffffffff81112b0f
+                0xffffffff8113aaf1
+                0xffffffff811295bc
+                0xffffffff81131aba
+                0xffffffff81061677
+                0xffffffff81067eba
+                0xffffffff8106803f
+                0xffffffff81068a18
+                0xffffffff810786a7
+                0xffffffff8100b0df
+                0xffffffff8100b895
+                0xffffffff815c801c
+
+             0.00%
+                0xffffffffa00e7eb6
+                0xffffffff810cf554
+                0xffffffff810d1ea7
+                0xffffffff8100e872
+                0xffffffff815cf99d
+                0xffffffff815c7f13
+                memcpy
+
+             0.00%
+                0xffffffff8110c898
+                0xffffffff8110f4b7
+                0xffffffff8110f8f8
+                0xffffffff81112b0f
+                0xffffffff8113aaf1
+                0xffffffff811295bc
+                0xffffffff81131aba
+                0xffffffff81061677
+                0xffffffff81067eba
+                0xffffffff8106803f
+                0xffffffff81068a18
+                0xffffffff810786a7
+                0xffffffff8100b0df
+                0xffffffff8100b895
+                0xffffffff815c801c
+
+             0.00%
+                0xffffffff8114fd51
+                0xffffffff8114ff30
+                0xffffffff811092b7
+                0xffffffff81109367
+                0xffffffff81191491
+                0xffffffff8148abf2
+                0xffffffff811903fb
+                0xffffffff8148ab99
+                0xffffffff811901ad
+                0xffffffff812b640b
+                0xffffffff812b6d8e
+                0xffffffff812b7124
+                0xffffffff812b9a7f
+                0xffffffff812b9b10
+                0xffffffff813dbc7f
+                0xffffffff813d27a5
+                0xffffffff813dbae7
+                0xffffffff812bf585
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cf9a6
+                0xffffffff815c7f13
+                _Znam@plt
+
+             0.00%
+                0xffffffff81158378
+                0xffffffff8115ab5f
+                0xffffffff81134d70
+                0xffffffff81129546
+                0xffffffff81131aba
+                0xffffffff81061677
+                0xffffffff81067eba
+                0xffffffff8106803f
+                0xffffffff81068a18
+                0xffffffff810786a7
+                0xffffffff8100b0df
+                0xffffffff8100b895
+                0xffffffff815c801c
+
+             0.00%
+                0xffffffff8145e903
+                0xffffffff8143b9ed
+                0xffffffff810cf554
+                0xffffffff810d1ea7
+                0xffffffff8100e872
+                0xffffffff815cf99d
+                0xffffffff815c7f13
+                XIAXIDRouteTable::lookup_route(Packet*)
+
+             0.00%
+                0xffffffff8115b2f3
+                0xffffffff811586df
+                0xffffffff81112abd
+                0xffffffff8113aaf1
+                0xffffffff8112f028
+                0xffffffff8113087d
+                0xffffffff811319d6
+                0xffffffff8100bec2
+                __munmap
+
+             0.00%
+                0xffffffff8110f571
+                0xffffffff8110f8f8
+                0xffffffff81112b0f
+                0xffffffff8113aaf1
+                0xffffffff811295bc
+                0xffffffff81131aba
+                0xffffffff81061677
+                0xffffffff81067eba
+                0xffffffff8106803f
+                0xffffffff81068a18
+                0xffffffff810786a7
+                0xffffffff8100b0df
+                0xffffffff8100b895
+                0xffffffff815c801c
+
+             0.00%
+                0xffffffff8110e52d
+                0xffffffff8110f5b8
+                0xffffffff8110f8f8
+                0xffffffff81112b0f
+                0xffffffff8113aaf1
+                0xffffffff811295bc
+                0xffffffff81131aba
+                0xffffffff81061677
+                0xffffffff81067eba
+                0xffffffff8106803f
+                0xffffffff81068a18
+                0xffffffff810786a7
+                0xffffffff8100b0df
+                0xffffffff8100b895
+                0xffffffff815c801c
+
+             0.00%
+                0xffffffff8110e6d8
+                0xffffffff8110f5b8
+                0xffffffff8110f8f8
+                0xffffffff81112b94
+                0xffffffff8113aaf1
+                0xffffffff8112987a
+                0xffffffff81131aba
+                0xffffffff81061677
+                0xffffffff81067eba
+                0xffffffff8106803f
+                0xffffffff81068a18
+                0xffffffff810786a7
+                0xffffffff8100b0df
+                0xffffffff8100b895
+                0xffffffff815c801c
+
+             0.00%
+                0xffffffff8115832a
+                0xffffffff8115ab5f
+                0xffffffff81134d70
+                0xffffffff81129546
+                0xffffffff81131aba
+                0xffffffff81061677
+                0xffffffff81067eba
+                0xffffffff8106803f
+                0xffffffff81068a18
+                0xffffffff810786a7
+                0xffffffff8100b0df
+                0xffffffff8100b895
+                0xffffffff815c801c
+
+             0.00%
+                0xffffffff813db9c7
+                0xffffffff812bf585
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cf9a6
+                0xffffffff815c7f13
+                XIAXIDRouteTable::push(int, Packet*)
+
+             0.00%
+                0xffffffffa00e7eb6
+                0xffffffff810cf554
+                0xffffffff810d1ea7
+                0xffffffff8100e872
+                0xffffffff815cf99d
+                0xffffffff815c7f13
+                Unqueue::run_task(Task*)
+
+             0.00%
+                0xffffffff8110f52c
+                0xffffffff8110f8f8
+                0xffffffff81112b0f
+                0xffffffff8113aaf1
+                0xffffffff811295bc
+                0xffffffff81131aba
+                0xffffffff81061677
+                0xffffffff81067eba
+                0xffffffff8106803f
+                0xffffffff81068a18
+                0xffffffff810786a7
+                0xffffffff8100b0df
+                0xffffffff8100b895
+                0xffffffff815c801c
+
+             0.00%
+                0xffffffff81453f37
+                0xffffffff8143b9ed
+                0xffffffff810cf554
+                0xffffffff810d1ea7
+                0xffffffff8100e872
+                0xffffffff815cf99d
+                0xffffffff815c7f13
+                Element::push(int, Packet*)
+
+             0.00%
+                0xffffffff81453f37
+                0xffffffff8143b9ed
+                0xffffffff810cf554
+                0xffffffff810d1ea7
+                0xffffffff8100e872
+                0xffffffff815cf99d
+                0xffffffff815c7f13
+                XIASelectPath::push(int, Packet*)
+
+             0.00%
+                0xffffffff8110e515
+                0xffffffff8110f5b8
+                0xffffffff8110f8f8
+                0xffffffff81112b0f
+                0xffffffff8113aaf1
+                0xffffffff811295bc
+                0xffffffff81131aba
+                0xffffffff81061677
+                0xffffffff81067eba
+                0xffffffff8106803f
+                0xffffffff81068a18
+                0xffffffff810786a7
+                0xffffffff8100b0df
+                0xffffffff8100b895
+                0xffffffff815c801c
+
+             0.00%
+                0xffffffff81157e7f
+                0xffffffff81159bfd
+                0xffffffff8115a8d6
+                0xffffffff8112a7ea
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                _int_malloc
+
+             0.00%
+                0xffffffff8110e508
+                0xffffffff8110f5b8
+                0xffffffff8110f8f8
+                0xffffffff81112b0f
+                0xffffffff8113aaf1
+                0xffffffff811295bc
+                0xffffffff81131aba
+                0xffffffff81061677
+                0xffffffff81067eba
+                0xffffffff8106803f
+                0xffffffff81068a18
+                0xffffffff810786a7
+                0xffffffff8100b0df
+                0xffffffff8100b895
+                0xffffffff815c801c
+
+             0.00%
+                0xffffffff810d4f10
+                0xffffffff815cf986
+                0xffffffff815c7f13
+                memcpy
+
+             0.00%
+                0xffffffff8108c15e
+                0xffffffff8105ea0b
+                0xffffffff8107493d
+                0xffffffff81095894
+                0xffffffff810895d2
+                0xffffffff81089e27
+                0xffffffff815cfa8b
+                0xffffffff8100c893
+                XIAXIDRouteTable::lookup_route(Packet*)
+
+             0.00%
+                0xffffffff814f0b44
+                0xffffffff81073a04
+                0xffffffff8106b428
+                0xffffffff8100cddc
+                0xffffffff8100e8f5
+                0xffffffff8106b645
+                0xffffffff815cfa90
+                0xffffffff8100c893
+                __GI___exp
+
+             0.00%
+                0xffffffff8100e8e9
+                0xffffffff8106b645
+                0xffffffff815cfa90
+                0xffffffff8100c893
+                Unqueue::run_task(Task*)
+
+             0.00%
+                0xffffffff81037bad
+                0xffffffff815c79ce
+                0xffffffff8112754a
+                0xffffffff8112a417
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                0x400af8
+
+             0.00%
+                0xffffffff8103701a
+                0xffffffff8101dd97
+                0xffffffff8101dfdb
+                0xffffffff8101f8a4
+                0xffffffff810fffec
+                0xffffffff81100040
+                0xffffffff81053375
+                0xffffffff815c5163
+                0xffffffff815c5c6d
+                0xffffffff815c4a79
+                0xffffffff815c4bfd
+                0xffffffff810b7b7b
+                0xffffffff8105e30b
+                0xffffffff81166950
+                0xffffffff81014ffa
+                0xffffffff8100c31c
+                __execve
+                0x4018eb
+
+             0.00%
+                0xffffffff8105dd92
+                0xffffffff8100bdc3
+                __GI___fork
+                0x401051
+
+             0.00%
+                0xffffffff8103701a
+                0xffffffff8101dd97
+                0xffffffff8101dfdb
+                0xffffffff8101f8a4
+                0xffffffff810fffec
+                0xffffffff81100040
+                0xffffffff81053375
+                0xffffffff8105dd77
+                0xffffffff8100bdc3
+                __GI___fork
+                0x401051
+
+     0.24%    click  click                [.] Discard::push(int, Packet*)
+             0.24%
+                Discard::push(int, Packet*)
+
+     0.23%    click  click                [.] Paint::simple_action(Packet*)
+             0.23%
+                Paint::simple_action(Packet*)
+
+     0.23%    click  click                [.] WritablePacket::pool_allocate(bool)
+             0.23%
+                WritablePacket::pool_allocate(bool)
+
+     0.20%    click  click                [.] Zipf::uDoub()
+             0.20%
+                Zipf::uDoub()
+
+     0.20%    click  libm-2.13.so         [.] finite
+             0.20%
+                finite
+
+     0.15%    click  click                [.] NullElement::simple_action(Packet*)
+             0.15%
+                NullElement::simple_action(Packet*)
+
+     0.11%    click  libm-2.13.so         [.] __isnan
+             0.11%
+                __isnan
+
+     0.09%    click  click                [.] rand@plt
+             0.09%
+                rand@plt
+
+     0.06%    click  click                [.] _ZdaPv@plt
+             0.06%
+                _ZdaPv@plt
+
+     0.06%    click  click                [.] XIAXIDRouteTable::generate_routes_handler(String const&, Element*, void*, ErrorHandler*)
+             0.06%
+                XIAXIDRouteTable::generate_routes_handler(String const&, Element*, void*, ErrorHandler*)
+
+     0.05%    click  click                [.] log@plt
+             0.05%
+                log@plt
+
+     0.05%    click  click                [.] exp@plt
+             0.05%
+                exp@plt
+
+     0.05%    click  click                [.] memcpy@plt
+             0.05%
+                memcpy@plt
+
+     0.05%    click  click                [.] _Znam@plt
+             0.05%
+                _Znam@plt
+
+     0.04%    click  click                [.] HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::rehash(unsigned long)
+             0.04%
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::rehash(unsigned long)
+
+     0.03%    click  click                [.] HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::set(HashContainer_iterator<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >&, HashTable<Pair<XID const, int>, void>::elt*, bool)
+             0.00%
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::set(HashContainer_iterator<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >&, HashTable<Pair<XID const, int>, void>::elt*, bool)
+                0x10298d8
+
+             0.00%
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::set(HashContainer_iterator<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >&, HashTable<Pair<XID const, int>, void>::elt*, bool)
+                0x7f0f7f563c08
+
+             0.00%
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::set(HashContainer_iterator<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >&, HashTable<Pair<XID const, int>, void>::elt*, bool)
+                0x7f0f7ef34b80
+
+             0.00%
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::set(HashContainer_iterator<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >&, HashTable<Pair<XID const, int>, void>::elt*, bool)
+                0x7f0f7eed3dd8
+
+             0.00%
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::set(HashContainer_iterator<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >&, HashTable<Pair<XID const, int>, void>::elt*, bool)
+                0x7f0f7ee924b8
+
+             0.00%
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::set(HashContainer_iterator<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >&, HashTable<Pair<XID const, int>, void>::elt*, bool)
+                0x7f0f7eef4668
+
+             0.00%
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::set(HashContainer_iterator<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >&, HashTable<Pair<XID const, int>, void>::elt*, bool)
+                0x7f0f7ee71288
+
+             0.00%
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::set(HashContainer_iterator<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >&, HashTable<Pair<XID const, int>, void>::elt*, bool)
+                0x7f0f7ef147b0
+
+             0.00%
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::set(HashContainer_iterator<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >&, HashTable<Pair<XID const, int>, void>::elt*, bool)
+                0x7f0f7eeb3200
+
+             0.00%
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::set(HashContainer_iterator<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >&, HashTable<Pair<XID const, int>, void>::elt*, bool)
+                0x7f0f7ee2e538
+
+             0.00%
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::set(HashContainer_iterator<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >&, HashTable<Pair<XID const, int>, void>::elt*, bool)
+                0x7f0f7ee4fed8
+
+             0.00%
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::set(HashContainer_iterator<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >&, HashTable<Pair<XID const, int>, void>::elt*, bool)
+                0x7f0f7ef54790
+
+             0.00%
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::set(HashContainer_iterator<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >&, HashTable<Pair<XID const, int>, void>::elt*, bool)
+                0x7f0f7eff41e0
+
+             0.00%
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::set(HashContainer_iterator<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >&, HashTable<Pair<XID const, int>, void>::elt*, bool)
+
+             0.00%
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::set(HashContainer_iterator<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >&, HashTable<Pair<XID const, int>, void>::elt*, bool)
+                0x7f0f7efd4450
+
+             0.00%
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::set(HashContainer_iterator<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >&, HashTable<Pair<XID const, int>, void>::elt*, bool)
+                0x7f0f7efb4828
+
+             0.00%
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::set(HashContainer_iterator<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >&, HashTable<Pair<XID const, int>, void>::elt*, bool)
+                0x7f0f7ef94ad8
+
+             0.00%
+                HashContainer<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >::set(HashContainer_iterator<HashTable<Pair<XID const, int>, void>::elt, HashContainer_adapter<HashTable<Pair<XID const, int>, void>::elt> >&, HashTable<Pair<XID const, int>, void>::elt*, bool)
+                0x7f0f7ef74950
+
+     0.01%    click  libm-2.13.so         [.] __mul
+             0.01%
+                __mul
+
+     0.01%    click  ld-2.13.so           [.] _dl_lookup_symbol_x
+             0.01%
+                _dl_lookup_symbol_x
+                _dl_relocate_object
+                dl_main
+                _dl_sysdep_start
+
+     0.01%     time  [exportfs]           [k] 0xffffffff8103701a
+             0.00%
+                0xffffffff81122233
+                0xffffffff8112262d
+                0xffffffff8110dedf
+                0xffffffff8110ec08
+                0xffffffff811441e5
+                0xffffffff8110b26e
+                0xffffffff8110b2c6
+                0xffffffff8112af50
+                0xffffffff8112c4ba
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                0xffffffff812dcd96
+                0xffffffff811aa6fd
+                0xffffffff811ad1a8
+                0xffffffff8116523a
+                0xffffffff81166adc
+                0xffffffff81014ffa
+                0xffffffff8100c31c
+                0x7f166bc1f957
+
+             0.00%
+                0xffffffff812d58a4
+                0xffffffff812d58de
+                0xffffffff8110739e
+                0xffffffff81108c7b
+                0xffffffff81127424
+                0xffffffff8112a417
+                0xffffffff8112c3c8
+                0xffffffff815cb692
+                0xffffffff815c81d5
+                __strchrnul
+                buffered_vfprintf
+                __fprintf_chk
+
+             0.00%
+                0xffffffff8103701a
+                0xffffffff8101dd97
+                0xffffffff8101dfdb
+                0xffffffff8101f8a4
+                0xffffffff810fffec
+                0xffffffff81101b02
+                0xffffffff8116667a
+                0xffffffff81166ca1
+                0xffffffff811abf67
+                0xffffffff8116523a
+                0xffffffff81166adc
+                0xffffffff81014ffa
+                0xffffffff8100c31c
+                __execve
+
+             0.00%
+                0xffffffff8103701a
+                0xffffffff8101dd97
+                0xffffffff8101dfdb
+                0xffffffff8101f8a4
+                0xffffffff810fffec
+                0xffffffff81100040
+                0xffffffff81053375
+                0xffffffff815c5163
+                0xffffffff810677c5
+                0xffffffff81068cf3
+                0xffffffff8100bec2
+                __GI_wait4
+
+     0.00%    click  click                [.] SelectSet::run_selects(RouterThread*)
+             0.00%
+                SelectSet::run_selects(RouterThread*)
+
+     0.00%    click  libm-2.13.so         [.] add_magnitudes
+             0.00%
+                add_magnitudes
+
+     0.00%    click  libm-2.13.so         [.] norm
+             0.00%
+                norm
+                0x3ff0000000000000
+
+     0.00%    click  libm-2.13.so         [.] __mpexp
+             0.00%
+                __mpexp
+                (nil)
+
+     0.00%    click  click                [.] HashTable<Pair<XID const, int>, void>::~HashTable()
+             0.00%
+                HashTable<Pair<XID const, int>, void>::~HashTable()
+
+     0.00%    click  click                [.] String::equals(char const*, int) const
+             0.00%
+                String::equals(char const*, int) const
+
+     0.00%    click  libm-2.13.so         [.] __cpy
+             0.00%
+                __cpy
+                (nil)
+
+
+
+#
+# (For a higher level overview, try: perf report --sort comm,dso)
+#

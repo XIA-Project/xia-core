@@ -1,0 +1,125 @@
+register_router incr master _refcount 1 router(0x1ed7000)
+Packet cloning 100000000 packets
+Packet cloning 100000000 packets
+XIAXIDRouteTable: configuring fwd/host0/n/proc/rt_AD/rt
+XIAXIDRouteTable: configuring fwd/host0/n/proc/rt_HID/rt
+XIAXIDRouteTable: configuring fwd/host0/n/proc/rt_SID/rt
+XIAXIDRouteTable: configuring fwd/host0/n/proc/rt_CID/rt
+USERTIME 5179327693
+generated 351611 entries
+USERTIME 5266707411
+USERTIME 5266725610
+generated 10 entries
+USERTIME 5266756752
+FIRST_PACKET USERTIME 5266790323
+thread 0 scheduled on CPU 0
+Mpps: 0.161310
+Mbps: 203.896323
+Mpps: 1.081665
+Mbps: 1367.224048
+Mpps: 1.084817
+Mbps: 1371.208633
+Mpps: 1.087373
+Mbps: 1374.439663
+Mpps: 1.086459
+Mbps: 1373.283870
+Mpps: 1.086376
+Mbps: 1373.178691
+Mpps: 1.086755
+Mbps: 1373.657722
+Mpps: 1.087426
+Mbps: 1374.506173
+Mpps: 1.087382
+Mbps: 1374.450872
+Mpps: 1.087733
+Mbps: 1374.894898
+Mpps: 1.086351
+Mbps: 1373.148110
+Mpps: 1.087435
+Mbps: 1374.517383
+Mpps: 1.087369
+Mbps: 1374.434432
+Mpps: 1.086820
+Mbps: 1373.740579
+Mpps: 1.085611
+Mbps: 1372.212693
+Mpps: 1.082223
+Mbps: 1367.929837
+Mpps: 1.088391
+Mbps: 1375.726161
+Mpps: 1.088208
+Mbps: 1375.494863
+Mpps: 1.087153
+Mbps: 1374.160990
+Mpps: 1.087159
+Mbps: 1374.169207
+Mpps: 1.087543
+Mbps: 1374.654909
+Mpps: 1.087617
+Mbps: 1374.748353
+Mpps: 1.087773
+Mbps: 1374.944999
+Mpps: 1.083124
+Mbps: 1369.069217
+Mpps: 1.082852
+Mbps: 1368.725277
+Mpps: 1.081622
+Mbps: 1367.170811
+Mpps: 1.081312
+Mbps: 1366.778312
+Mpps: 1.085895
+Mbps: 1372.571802
+Mpps: 1.087055
+Mbps: 1374.037752
+Mpps: 1.086710
+Mbps: 1373.601744
+Mpps: 1.082417
+Mbps: 1368.174888
+Mpps: 1.083659
+Mbps: 1369.744999
+Mpps: 1.084381
+Mbps: 1370.656988
+Mpps: 1.084044
+Mbps: 1370.232034
+Mpps: 1.088136
+Mbps: 1375.403562
+Mpps: 1.087593
+Mbps: 1374.716954
+Mpps: 1.086255
+Mbps: 1373.025800
+Mpps: 1.087893
+Mbps: 1375.096822
+Mpps: 1.087432
+Mbps: 1374.513646
+Mpps: 1.086864
+Mbps: 1373.795823
+Mpps: 1.087009
+Mbps: 1373.978756
+Mpps: 1.087365
+Mbps: 1374.429949
+Mpps: 1.088135
+Mbps: 1375.402066
+Mpps: 1.085082
+Mbps: 1371.544148
+Mpps: 1.087389
+Mbps: 1374.459092
+Mpps: 1.083273
+Mbps: 1369.257568
+Mpps: 1.085217
+Mbps: 1371.714573
+Mpps: 1.081503
+Mbps: 1367.019994
+Mpps: 1.086098
+Mbps: 1372.827465
+Mpps: 1.087571
+Mbps: 1374.689295
+No more packet cloning
+HANDLER_CALL USERTIME 97153215679
+unregister_router decr master _refcount 0 router (0x1ed7000)
+Master deleted
+click: ../lib/routerthread.cc:128: RouterThread::~RouterThread(): Assertion `!active()' failed.
+Command terminated by signal 6
+97.10user 0.07system 1:37.39elapsed 99%CPU (0avgtext+0avgdata 625168maxresident)k
+0inputs+24outputs (0major+39682minor)pagefaults 0swaps
+[ perf record: Woken up 25 times to write data ]
+[ perf record: Captured and wrote 6.039 MB perf.data (~263846 samples) ]
