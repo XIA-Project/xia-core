@@ -126,8 +126,8 @@ enum {H_MOVE};
 int XIACache::write_param(const String &conf, Element *e, void *vparam,
                 ErrorHandler *errh)
 {
-    XIACache *f = (XIACache *)e;
-    switch((int)vparam) {
+    XIACache *f = static_cast<XIACache *>(e);
+    switch(reinterpret_cast<intptr_t>(vparam)) {
         case H_MOVE: {
             XIAPath local_addr;
             if (cp_va_kparse(conf, f, errh,

@@ -596,8 +596,8 @@ enum {H_MOVE};
 int XUDP::write_param(const String &conf, Element *e, void *vparam,
                 ErrorHandler *errh)
 {
-    XUDP *f = (XUDP *)e;
-    switch((int)vparam) {
+    XUDP *f = static_cast<XUDP *>(e);
+    switch(reinterpret_cast<intptr_t>(vparam)) {
         case H_MOVE: {
             XIAPath local_addr;
             if (cp_va_kparse(conf, f, errh,
