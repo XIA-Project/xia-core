@@ -14,4 +14,4 @@ pc: pingClient.c
 	gcc $(CFLAGS) -o $@ $< ../API/libXsocket.a
 
 clean:
-	rm xs ps pc xc
+	rm -f xs ps pc xc
