@@ -52,10 +52,10 @@ rtt = 27	# the actual RTT was somewat longer than intended (25 ms)
 set xrange [xmin:xmax]
 set yrange [ymin:ymax]
 
-set label "(1) 3G->3G" left at 275, 1.864 font "Helvetica,5" 
-set label "(2) 3G->3G (lost)" left at 275, 1.913 font "Helvetica,5"
-set label "(3) 3G->WiFi" left at 275, 1.976 font "Helvetica,5"
-set label "(4) WiFi->WiFi" left at 275, 2.020 font "Helvetica,5"
+set label "(1) From: 3G\n     To: 3G" left at 275, 1.866 font "Helvetica,5" 
+set label "(2) From:3G\n     To:3G (lost)" left at 275, 1.915 font "Helvetica,5"
+set label "(3) From:3G\n     To:WiFi" left at 275, 1.978 font "Helvetica,5"
+set label "(4) From:WiFi\n     To:WiFi" left at 275, 2.022 font "Helvetica,5"
 
 
 set object 1 rect from xmin,1.881 to xmax,1.951 lw 0 fc rgb "gold" 

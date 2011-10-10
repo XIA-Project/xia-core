@@ -1,0 +1,19 @@
+
+./sample
+The folder contains examples of the client-server
+An ini configuration file is needed for the library.
+The library looks for the XSOCKCONF environment variable
+to find the ini file, but defaults to the
+default ini file: xsockconf.ini.
+
+The .ini file contains IP fields which need to be defined before
+compiling. These fields depend on the IP of the fake interface.
+The client and the server require different IP settings in
+Xsocket.h for the loopback test, and are hence in different
+folders.
+
+To run the loopback test:
+1. sudo userlevel/click conf/xia_chain_topology_socket.click
+2. XIASocket/API/server/xs
+3. XIASocket/API/client/xc
+	

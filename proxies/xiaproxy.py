@@ -8,11 +8,13 @@ stamp_i = 0
 
 def timeout(CID, sock_rpc,  timeout_duration):
     ready = select.select([sock_rpc], [], [], timeout_duration)
+    payload = None
     if ready[0]:
         data = sock_rpc.recv(4)
         size = struct.unpack('!i', data)[0]
 	print "receive picture size", size
 	data = sock_rpc.recv(size)
+	print "receive %d" % len(data)
         msg_response = xia_pb2.msg()
 	msg_response.ParseFromString(data) 
 	payload =  msg_response.payload
@@ -21,7 +23,7 @@ def timeout(CID, sock_rpc,  timeout_duration):
 	global stamp_i
 	timestamps[stamp_i] = time.time()
 	stamp_i = stamp_i + 1 
-    else :
+    elif CID!=None:
         print 'timeout:'
         #sock_rpc.send('timeout')
         payload = getCID (CID, sock_rpc, True)
@@ -46,6 +48,8 @@ def read_write(bsoc, soc_rpc, max_idling=20):
                         out = soc_rpc
                     data = i.recv(4)
 		    print "sizesizesize: %d" % len(data)
+		    if (len(data)!=4):
+		    	continue
                     size = struct.unpack('!i', data)[0]
 		    data = i.recv(size)
 		    
@@ -67,7 +71,15 @@ def read_write(bsoc, soc_rpc, max_idling=20):
 					    http_header = SIDResponse[0:rt]
 					    #print '!!'+ http_header
 					    #print SIDResponse[rt+4:rt+44]
-					    payload = getCID (SIDResponse[rt+4:rt+44], soc_rpc, False)
+					    requestCID(SIDResponse[rt+4:rt+44], soc_rpc, True)
+					    cnt=1
+					    while ((cnt+1)*44 <=len(SIDResponse)-rt):
+					    	requestCID (SIDResponse[rt+44+4:rt+44+44], soc_rpc, True)
+						cnt+=1
+					    payload = timeout(None, soc_rpc, 1.0)
+					    for i in range(0,cnt-1):
+					    	timeout(None, soc_rpc, 1.0)
+
 					    out.send (http_header+payload)
 				    else:
 					    out.send(SIDResponse)  
@@ -96,8 +108,7 @@ def sendSIDRequest(netloc, payload, bsoc, sock_rpc):
 	
 	return
 
-
-def getCID(CID, sock_rpc, fallback):
+def requestCID(CID, sock_rpc, fallback):
 	print "in getCID function"  
 	print CID
 	print "%.6f" % time.time()
@@ -116,6 +127,7 @@ def getCID(CID, sock_rpc, fallback):
 	#print ''.join(map(lambda x: '%02x' % ord(x), serialized_msg))
         size = struct.pack('!i', len(serialized_msg))
         #print "payload len %d " % len(payload)
+	print msg.xiapath_dst
 	print "protobufmsg len %d " % len(serialized_msg)
 
         sock_rpc.send(size)
@@ -124,10 +136,12 @@ def getCID(CID, sock_rpc, fallback):
 	#size = struct.unpack('!i', data)[0]
 	#print "receive picture size", size
 	#data = sock_rpc.recv(size)
-	data = timeout(CID, sock_rpc, 0.12)
-
 
 	
+
+def getCID(CID, sock_rpc, fallback):
+	requestCID(CID, sock_rpc, fallback)
+	data = timeout(CID, sock_rpc, 0.12)
 	return data
 
 
@@ -156,7 +170,7 @@ def xiaHandler(control, payload, bsock, sock_rpc):
 			payload_cid += getCID(control[6+i*40+i:46+i*40+i], sock_rpc, False)
 			
 		length = len (payload_cid)
-		print length
+		print "payload_cid length %d " % length
 		#header = 'HTTP/1.1 200 OK\nETag: "48917-39ed-4990ddae564c"\nAccept-Ranges: bytes\nContent-Length: ' + str(length) + '\nContent-Type: image/jpeg\n\n'  # todo: avoid hard code 
 		#header = 'HTTP/1.1 200 OK\nAccept-Ranges: bytes\nCache-Control: no-cache\nContent-Length: 14829\nContent-Type: image/jpeg\n\n'  # todo: avoid hard code 
 		header2 = ''
