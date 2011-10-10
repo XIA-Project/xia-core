@@ -54,6 +54,7 @@ extern int Xsend(int sockfd,void *buf, size_t len, int flags);
 extern int XgetCID(int sockfd, char* dDAG, size_t dlen);
 extern int XputCID(int sockfd,void *buf, size_t len, int flags,char* sDAG, size_t dlen);
 extern int Xaccept(int sockfd);
+extern void error(const char *msg);
 #ifdef __cplusplus
 }
 #endif

@@ -35,7 +35,6 @@ extern "C" {
 
 	int Xsocket()
 	{
-
 		//Setup to listen for control info
 		char* str=(char*)"open";//TODO: Not necessary. Maybe more useful data could be sent in the open control packet?
 		struct addrinfo hints, *servinfo, *p;
@@ -153,12 +152,20 @@ extern "C" {
 
 } /* extern C */
 
+struct __XSocketConf* get_conf() 
+{
+	if (__XSocketConf::initialized==0) {
+	    __InitXSocket();
+	}
+	return &_conf;
+}
 
 __InitXSocket::__InitXSocket() 
 {
 	int n;
 	const char * inifile = getenv("XSOCKCONF");
 
+	__XSocketConf::initialized=1;
 	memset(_conf.api_addr, 0, __IP_ADDR_LEN);
 	memset(_conf.click_dataaddr, 0, __IP_ADDR_LEN);
 	memset(_conf.click_controladdr, 0, __IP_ADDR_LEN);
@@ -178,10 +185,10 @@ __InitXSocket::__InitXSocket()
 	n = ini_gets(section_name, "api_addr", DEFAULT_MYADDRESS, _conf.api_addr, __IP_ADDR_LEN, inifile);
 	n = ini_gets(section_name, "click_dataaddr", DEFAULT_CLICKDATAADDRESS, _conf.click_dataaddr, __IP_ADDR_LEN , inifile);
 	n = ini_gets(section_name, "click_controladdr", DEFAULT_CLICKCONTROLADDRESS, _conf.click_controladdr, __IP_ADDR_LEN, inifile);
-	print_conf();
+	//print_conf();
 }
 
-static struct __InitXSocket _init;
+//static struct __InitXSocket _init;
 struct __XSocketConf _conf;
 
 void __InitXSocket::print_conf() 
@@ -190,4 +197,4 @@ void __InitXSocket::print_conf()
 	printf("click_controladdr %s\n",  _conf.click_controladdr);
 	printf("click_dataaddr %s\n",  _conf.click_dataaddr);
 }
-
+int  __XSocketConf::initialized=0;
