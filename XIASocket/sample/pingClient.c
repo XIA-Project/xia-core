@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
         current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
 		memcpy (payload_new, &seq_client_, 4);
 		Xsend(sock,payload_new,4,0);
-        fprintf(fp, "%lld: PING sent; client seq = %d\n",current_time, seq_client_);  // modify payload
+        fprintf(fp, "%lu: PING sent; client seq = %d\n",current_time, seq_client_);  // modify payload
         //printf("%lld: PING sent; client seq = %d\n",current_time, seq_client_);  // modify payload         
         seq_client_++;
                  
@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
                 current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
     	        memcpy (&seq_c,reply, 4);
     	        memcpy (&seq_s,reply+4, 4);   
-    	        fprintf(fp, "%lld: PONG received; client seq = %d, server seq = %d\n",current_time, seq_c, seq_s);
+    	        fprintf(fp, "%lu: PONG received; client seq = %d, server seq = %d\n",current_time, seq_c, seq_s);
     	        //printf("%lld: PONG received; client seq = %d, server seq = %d\n",current_time, seq_c, seq_s);
     	        rx++;
     	        n=0;
@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
         current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
         memcpy (&seq_c,reply, 4);
         memcpy (&seq_s,reply+4, 4);   
-        fprintf(fp, "%lld: PONG received; client seq = %d, server seq = %d\n",current_time, seq_c, seq_s);
+        fprintf(fp, "%lu: PONG received; client seq = %d, server seq = %d\n",current_time, seq_c, seq_s);
         //printf("%lld: PONG received; client seq = %d, server seq = %d\n",current_time, seq_c, seq_s);
         rx++;
         n=0;

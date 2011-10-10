@@ -23,7 +23,8 @@ void error(const char *);
 
 int main(int argc, char *argv[])
 {
-	int sock, n,dlen;
+	int sock, n;
+	size_t dlen;
 	char reply[128];
 	char buffer[2048],theirDAG[1024];    
 
