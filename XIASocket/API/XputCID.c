@@ -5,7 +5,7 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 
-int XputCID(int sockfd,void *buf, size_t len, int flags,
+int XputCID(int sockfd, const void *buf, size_t len, int flags,
 		char* sDAG, size_t dlen)
 {
 

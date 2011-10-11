@@ -2699,10 +2699,10 @@ extern int Xsocket();
 extern int Xconnect(int sockfd, char* dest_DAG);
 extern int Xbind(int sockfd, char* SID);
 extern int Xclose(int sock);
-extern int Xrecv(int sockfd, void *buf, size_t len, int flags);
-extern int Xsend(int sockfd,void *buf, size_t len, int flags);
+extern int Xrecv(int sockfd, void *rbuf, size_t len, int flags);
+extern int Xsend(int sockfd, const void *wbuf, size_t len, int flags);
 extern int XgetCID(int sockfd, char* dDAG, size_t dlen);
-extern int XputCID(int sockfd,void *buf, size_t len, int flags,char* sDAG, size_t dlen);
+extern int XputCID(int sockfd, const void *wbuf, size_t len, int flags,char* sDAG, size_t dlen);
 extern int Xaccept(int sockfd);
 
 
@@ -3019,7 +3019,6 @@ SWIGINTERN PyObject *_wrap_Xsendto(PyObject *SWIGUNUSEDPARM(self), PyObject *arg
   size_t arg6 ;
   int val1 ;
   int ecode1 = 0 ;
-  int res2 ;
   size_t val3 ;
   int ecode3 = 0 ;
   int val4 ;
@@ -3043,9 +3042,8 @@ SWIGINTERN PyObject *_wrap_Xsendto(PyObject *SWIGUNUSEDPARM(self), PyObject *arg
     SWIG_exception_fail(SWIG_ArgError(ecode1), "in method '" "Xsendto" "', argument " "1"" of type '" "int""'");
   } 
   arg1 = (int)(val1);
-  res2 = SWIG_ConvertPtr(obj1,SWIG_as_voidptrptr(&arg2), 0, 0);
-  if (!SWIG_IsOK(res2)) {
-    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "Xsendto" "', argument " "2"" of type '" "void const *""'"); 
+  {
+    arg2 = (const void*)PyString_AsString(obj1);
   }
   ecode3 = SWIG_AsVal_size_t(obj2, &val3);
   if (!SWIG_IsOK(ecode3)) {
@@ -3256,39 +3254,49 @@ SWIGINTERN PyObject *_wrap_Xrecv(PyObject *SWIGUNUSEDPARM(self), PyObject *args)
   int arg4 ;
   int val1 ;
   int ecode1 = 0 ;
-  int res2 ;
-  size_t val3 ;
-  int ecode3 = 0 ;
   int val4 ;
   int ecode4 = 0 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
   PyObject * obj2 = 0 ;
-  PyObject * obj3 = 0 ;
   int result;
   
-  if (!PyArg_ParseTuple(args,(char *)"OOOO:Xrecv",&obj0,&obj1,&obj2,&obj3)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"OOO:Xrecv",&obj0,&obj1,&obj2)) SWIG_fail;
   ecode1 = SWIG_AsVal_int(obj0, &val1);
   if (!SWIG_IsOK(ecode1)) {
     SWIG_exception_fail(SWIG_ArgError(ecode1), "in method '" "Xrecv" "', argument " "1"" of type '" "int""'");
   } 
   arg1 = (int)(val1);
-  res2 = SWIG_ConvertPtr(obj1,SWIG_as_voidptrptr(&arg2), 0, 0);
-  if (!SWIG_IsOK(res2)) {
-    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "Xrecv" "', argument " "2"" of type '" "void *""'"); 
+  {
+    if (!PyInt_Check(obj1)) {
+      PyErr_SetString(PyExc_ValueError, "Expecting an integer");
+      return NULL;
+    }
+    arg3 = PyInt_AsLong(obj1);
+    if (arg3<0) {
+      PyErr_SetString(PyExc_ValueError, "Positive integer expected");
+      return NULL;
+    }
+    arg2= (void*)malloc(arg3);
+    
   }
-  ecode3 = SWIG_AsVal_size_t(obj2, &val3);
-  if (!SWIG_IsOK(ecode3)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "Xrecv" "', argument " "3"" of type '" "size_t""'");
-  } 
-  arg3 = (size_t)(val3);
-  ecode4 = SWIG_AsVal_int(obj3, &val4);
+  ecode4 = SWIG_AsVal_int(obj2, &val4);
   if (!SWIG_IsOK(ecode4)) {
     SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "Xrecv" "', argument " "4"" of type '" "int""'");
   } 
   arg4 = (int)(val4);
   result = (int)Xrecv(arg1,arg2,arg3,arg4);
   resultobj = SWIG_From_int((int)(result));
+  {
+    Py_XDECREF(resultobj);
+    if (result < 0) {
+      free(arg2);
+      PyErr_SetFromErrno(PyExc_IOError);
+      return NULL;
+    }
+    resultobj = PyString_FromStringAndSize(arg2, result);
+    free(arg2);
+  }
   return resultobj;
 fail:
   return NULL;
@@ -3303,7 +3311,6 @@ SWIGINTERN PyObject *_wrap_Xsend(PyObject *SWIGUNUSEDPARM(self), PyObject *args)
   int arg4 ;
   int val1 ;
   int ecode1 = 0 ;
-  int res2 ;
   size_t val3 ;
   int ecode3 = 0 ;
   int val4 ;
@@ -3320,9 +3327,8 @@ SWIGINTERN PyObject *_wrap_Xsend(PyObject *SWIGUNUSEDPARM(self), PyObject *args)
     SWIG_exception_fail(SWIG_ArgError(ecode1), "in method '" "Xsend" "', argument " "1"" of type '" "int""'");
   } 
   arg1 = (int)(val1);
-  res2 = SWIG_ConvertPtr(obj1,SWIG_as_voidptrptr(&arg2), 0, 0);
-  if (!SWIG_IsOK(res2)) {
-    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "Xsend" "', argument " "2"" of type '" "void *""'"); 
+  {
+    arg2 = (const void*)PyString_AsString(obj1);
   }
   ecode3 = SWIG_AsVal_size_t(obj2, &val3);
   if (!SWIG_IsOK(ecode3)) {
@@ -3334,7 +3340,7 @@ SWIGINTERN PyObject *_wrap_Xsend(PyObject *SWIGUNUSEDPARM(self), PyObject *args)
     SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "Xsend" "', argument " "4"" of type '" "int""'");
   } 
   arg4 = (int)(val4);
-  result = (int)Xsend(arg1,arg2,arg3,arg4);
+  result = (int)Xsend(arg1,(void const *)arg2,arg3,arg4);
   resultobj = SWIG_From_int((int)(result));
   return resultobj;
 fail:
@@ -3395,7 +3401,6 @@ SWIGINTERN PyObject *_wrap_XputCID(PyObject *SWIGUNUSEDPARM(self), PyObject *arg
   size_t arg6 ;
   int val1 ;
   int ecode1 = 0 ;
-  int res2 ;
   size_t val3 ;
   int ecode3 = 0 ;
   int val4 ;
@@ -3419,9 +3424,8 @@ SWIGINTERN PyObject *_wrap_XputCID(PyObject *SWIGUNUSEDPARM(self), PyObject *arg
     SWIG_exception_fail(SWIG_ArgError(ecode1), "in method '" "XputCID" "', argument " "1"" of type '" "int""'");
   } 
   arg1 = (int)(val1);
-  res2 = SWIG_ConvertPtr(obj1,SWIG_as_voidptrptr(&arg2), 0, 0);
-  if (!SWIG_IsOK(res2)) {
-    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "XputCID" "', argument " "2"" of type '" "void *""'"); 
+  {
+    arg2 = (const void*)PyString_AsString(obj1);
   }
   ecode3 = SWIG_AsVal_size_t(obj2, &val3);
   if (!SWIG_IsOK(ecode3)) {
@@ -3443,7 +3447,7 @@ SWIGINTERN PyObject *_wrap_XputCID(PyObject *SWIGUNUSEDPARM(self), PyObject *arg
     SWIG_exception_fail(SWIG_ArgError(ecode6), "in method '" "XputCID" "', argument " "6"" of type '" "size_t""'");
   } 
   arg6 = (size_t)(val6);
-  result = (int)XputCID(arg1,arg2,arg3,arg4,arg5,arg6);
+  result = (int)XputCID(arg1,(void const *)arg2,arg3,arg4,arg5,arg6);
   resultobj = SWIG_From_int((int)(result));
   if (alloc5 == SWIG_NEWOBJ) free((char*)buf5);
   return resultobj;
