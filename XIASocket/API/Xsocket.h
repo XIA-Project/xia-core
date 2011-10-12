@@ -22,18 +22,18 @@ extern "C" {
 //Click side: Control/data address/info
 //The actual IPs don't matter, it just has to be in the correct subnet
 #define DEFAULT_CLICKCONTROLADDRESS "192.0.0.2" 
-#define CLICKOPENPORT "5001"
-#define CLICKBINDPORT "5002"
+#define CLICKCONTROLPORT "5001"
+//#define CLICKOPENPORT "5001"
+//#define CLICKBINDPORT "5002"
 #define CLICKCLOSEPORT "5003"
-#define CLICKCONNECTPORT "5004"
-#define CLICKACCEPTPORT "5005"
-#define CLICKCONTROLPORT "5010"
+//#define CLICKCONNECTPORT "5004"
+//#define CLICKACCEPTPORT "5005"
 
 
 #define DEFAULT_CLICKDATAADDRESS "192.0.0.2" 
 #define CLICKDATAPORT "10000"
-#define CLICKPUTCIDPORT "10002"
-#define CLICKSENDTOPORT "10001"
+//#define CLICKPUTCIDPORT "10002"
+//#define CLICKSENDTOPORT "10001"
 
 
 //set xia.click sorter to sort based on these ports. 
@@ -43,8 +43,8 @@ extern "C" {
 #define MAXBUFLEN 2000
 
 //Function list
-extern int Xsendto(int sockfd, const void *buf, size_t len, int flags,char * dDAG, size_t dlen);
-extern int Xrecvfrom(int sockfd, void *buf, size_t len, int flags,char * dDAG, size_t *dlen);
+extern int Xsendto(int sockfd,const void *buf, size_t len, int flags,char * dDAG, size_t dlen);
+extern int Xrecvfrom(int sockfd,void *buf, size_t len, int flags,char * dDAG, size_t *dlen);
 extern int Xsocket();
 extern int Xconnect(int sockfd, char* dest_DAG);
 extern int Xbind(int sockfd, char* SID);

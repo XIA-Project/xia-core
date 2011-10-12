@@ -3,6 +3,7 @@
 */
 
 #include "Xsocket.h"
+#include "Xinit.h"
 
 int XgetCID(int sockfd, char* dDAG, size_t dlen)
 {

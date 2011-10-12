@@ -6,13 +6,16 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 
-int Xsend(int sockfd, void *buf, size_t len, int flags)
+int Xsend(int sockfd,void *buf, size_t len, int flags)
 {
 
 	struct addrinfo hints, *servinfo,*p;
 	int rv;
 	int numbytes;
 
+	//char buffer[MAXBUFLEN];
+	//struct sockaddr_in their_addr;
+	//socklen_t addr_len;
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_INET;
@@ -26,6 +29,41 @@ int Xsend(int sockfd, void *buf, size_t len, int flags)
 
 	p=servinfo;
 
-	numbytes = sendto(sockfd, buf, len, flags, p->ai_addr, p->ai_addrlen);
-	return strlen((char*)buf);
+        // protobuf message
+        xia::XSocketMsg xia_socket_msg;
+
+        xia_socket_msg.set_type(xia::XSOCKET_DATA);
+	xia_socket_msg.set_payload((const char*)buf);
+
+	std::string p_buf;
+	xia_socket_msg.SerializeToString(&p_buf);
+
+
+	if ((numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0, p->ai_addr, p->ai_addrlen)) == -1) {
+		perror("Xsend(): sendto failed");
+		return(-1);
+	}
+	freeaddrinfo(servinfo);
+      
+      /*
+        //Process the reply
+        addr_len = sizeof their_addr;
+        if ((numbytes = recvfrom(sockfd, buffer, MAXBUFLEN-1 , 0,
+                                        (struct sockaddr *)&their_addr, &addr_len)) == -1) {
+                        perror("Xsend(): recvfrom");
+                        return -1;
+        }
+
+	//protobuf message parsing
+	xia_socket_msg.ParseFromString(buffer);
+
+	if (xia_socket_msg.type() == xia::XSOCKET_DATA) {
+
+ 		return numbytes;
+	}
+
+        return -1; 
+      */
+        return numbytes;
+
 }

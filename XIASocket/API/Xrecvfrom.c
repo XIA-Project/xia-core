@@ -26,27 +26,28 @@ int Xrecvfrom(int sockfd, void *buf, size_t len, int flags,
 		return -1;
 	}
 	int src_port=ntohs(their_addr.sin_port);
-	
+
 	while(src_port==atoi(CLICKCONTROLPORT))
 	{
-    	//Do what is necessary, maybe close socket
-    	if(strcmp((char *)buf,"close")==0)
-    	{
-    	    Xclose(sockfd);
-    	    return -1;
-    	}
-    	else
-        {
-    		if ((numbytes = recvfrom(sockfd, UDPbuf, MAXBUFLEN-1 , flags,
+    		//Do what is necessary, maybe close socket
+    		if(strcmp((char *)buf,"close")==0)
+    		{
+    	    		Xclose(sockfd);
+    	    		return -1;
+    		}
+    		else
+        	{
+    			if ((numbytes = recvfrom(sockfd, UDPbuf, MAXBUFLEN-1 , flags,
 					(struct sockaddr *)&their_addr, &addr_len)) == -1) 
 			{
-	    	    //perror("Xrecvfrom: recvfrom");
-        		return -1;
-           	}
+	    	    		//perror("Xrecvfrom: recvfrom");
+        			return -1;
+			}         		
 	    
-	    }
+	   	 }	
 	}
-	
+
+
 	//TODO: Copy Xdata to buf, and headers to their src_addr
 	//memcpy(buf, c+Xheader_size, numbytes-Xheader_size);
 	short int paylen=0,i=0;
@@ -60,6 +61,6 @@ int Xrecvfrom(int sockfd, void *buf, size_t len, int flags,
 	memcpy(buf, UDPbuf+offset, paylen);
 	strncpy(sDAG, UDPbuf, i);
 	*slen=i;
-	
+		
 	return paylen;
 }

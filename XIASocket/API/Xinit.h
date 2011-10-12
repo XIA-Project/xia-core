@@ -1,5 +1,8 @@
 #ifndef XINIT_H
 #define XINIT_H
+
+#include "xia.pb.h"
+
 #define __IP_ADDR_LEN 64
 
 class  __InitXSocket {

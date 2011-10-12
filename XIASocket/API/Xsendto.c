@@ -9,19 +9,15 @@ int Xsendto(int sockfd,const void *buf, size_t len, int flags,
 		char* dDAG, size_t dlen)
 {
 
-    /*
-     * This is an ugly way to do things. This essentially concatenates the dDAG and buf
-     * using a ^ to demarcate the two. As long as the DAG contains no ^ it should be fine.
-     * Ideally you want to pass some data structure with the required information, but 
-     * since we need to use strings and UDP packets, this will do for now.
+
+    /* === New version
+     * Now, dDAG and buf are contained in the google protobuffer message (encapsulated within UDP),
+     * then passed to the Click UDP.
      */
     
-    char*s=(char*)malloc(MAXBUFLEN);
-    strcpy(s,dDAG);
-    int i=strlen(dDAG);
-    s[i]='^';
-    int offset=i+1;
-    memcpy(s+offset, buf, len);
+	//char buffer[MAXBUFLEN];
+	//struct sockaddr_in their_addr;
+	//socklen_t addr_len;
     
 	struct addrinfo hints, *servinfo,*p;
 	int rv;
@@ -33,13 +29,49 @@ int Xsendto(int sockfd,const void *buf, size_t len, int flags,
 	hints.ai_socktype = SOCK_DGRAM;
 
 
-	if ((rv = getaddrinfo(CLICKDATAADDRESS, CLICKSENDTOPORT, &hints, &servinfo)) != 0) {
+	if ((rv = getaddrinfo(CLICKDATAADDRESS, CLICKDATAPORT, &hints, &servinfo)) != 0) {
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 		return -1;
 	}
 
 	p=servinfo;
 
-	numbytes = sendto(sockfd, s, len+i+1, flags, p->ai_addr, p->ai_addrlen);
+        // protobuf message
+        xia::XSocketMsg xia_socket_msg;
+
+        xia_socket_msg.set_type(xia::XSOCKET_SENDTO);
+	xia_socket_msg.set_ddag(dDAG);
+	xia_socket_msg.set_payload((const char*)buf);
+
+	std::string p_buf;
+	xia_socket_msg.SerializeToString(&p_buf);
+
+
+	if ((numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0, p->ai_addr, p->ai_addrlen)) == -1) {
+		perror("Xsendto(): sendto failed");
+		return(-1);
+	}
+	freeaddrinfo(servinfo);
+    
+     /*	 
+       //Process the reply
+        addr_len = sizeof their_addr;
+        if ((numbytes = recvfrom(sockfd, buffer, MAXBUFLEN-1 , 0,
+                                        (struct sockaddr *)&their_addr, &addr_len)) == -1) {
+                        perror("Xsendto(): recvfrom");
+                        return -1;
+        }
+
+	//protobuf message parsing
+	xia_socket_msg.ParseFromString(buffer);
+
+	if (xia_socket_msg.type() == xia::XSOCKET_SENDTO) {
+
+ 		return numbytes;
+	}
+        return -1; 
+      */
+
 	return numbytes;
+
 }
