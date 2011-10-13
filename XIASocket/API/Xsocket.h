@@ -15,29 +15,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-//Socket library side: Control address/info
-#define DEFAULT_MYADDRESS "192.0.0.1" 
-#define MYPORT "0"//Chooses random port
-
-//Click side: Control/data address/info
-//The actual IPs don't matter, it just has to be in the correct subnet
-#define DEFAULT_CLICKCONTROLADDRESS "192.0.0.2" 
-#define CLICKCONTROLPORT "5001"
-//#define CLICKOPENPORT "5001"
-//#define CLICKBINDPORT "5002"
-#define CLICKCLOSEPORT "5003"
-//#define CLICKCONNECTPORT "5004"
-//#define CLICKACCEPTPORT "5005"
-
-
-#define DEFAULT_CLICKDATAADDRESS "192.0.0.2" 
-#define CLICKDATAPORT "10000"
-//#define CLICKPUTCIDPORT "10002"
-//#define CLICKSENDTOPORT "10001"
-
-
-//set xia.click sorter to sort based on these ports. 
-
 
 #define ATTEMPTS 3 //Number of attempts at opening a socket 
 #define MAXBUFLEN 2000
@@ -56,6 +33,8 @@ extern int XgetCID(int sockfd, char* dDAG, size_t dlen);
 extern int XputCID(int sockfd, const void *buf, size_t len, int flags,char* sDAG, size_t dlen);
 extern int Xaccept(int sockfd);
 extern void error(const char *msg);
+extern void set_conf(const char *filename, const char *sectioname);
+extern void print_conf();
 #ifdef __cplusplus
 }
 #endif

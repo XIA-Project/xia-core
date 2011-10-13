@@ -155,57 +155,75 @@ extern "C" {
  			return sockfd;
 		}
 
-                close(sockfd);
-                return -1; 
+		close(sockfd);
+		return -1; 
 
-        }
+    }
+	//void *__dso_handle = NULL;
+			
+    void set_conf(const char *filename, const char* sectionname)
+    {
+        __InitXSocket::read_conf(filename, sectionname);
+    }
 
 } /* extern C */
 
 struct __XSocketConf* get_conf() 
 {
-        if (__XSocketConf::initialized==0) {
-            __InitXSocket();
-        }
-        return &_conf;
+	if (__XSocketConf::initialized==0) {
+		__InitXSocket();
+	}
+	return &_conf;
 }
 
 __InitXSocket::__InitXSocket() 
 {
-        int n;
-        const char * inifile = getenv("XSOCKCONF");
+	const char * inifile = getenv("XSOCKCONF");
 
-        __XSocketConf::initialized=1;
-        memset(_conf.api_addr, 0, __IP_ADDR_LEN);
-        memset(_conf.click_dataaddr, 0, __IP_ADDR_LEN);
-        memset(_conf.click_controladdr, 0, __IP_ADDR_LEN);
+	memset(_conf.api_addr, 0, __IP_ADDR_LEN);
+	memset(_conf.click_dataaddr, 0, __IP_ADDR_LEN);
+	memset(_conf.click_controladdr, 0, __IP_ADDR_LEN);
 
-        if (inifile==NULL) {
-                inifile = "xsockconf.ini";
-        }
-    //printf("ini_file %s\n", inifile);
-        char *section_name = NULL;
-        char buf[PATH_MAX+1];
+	if (inifile==NULL) {
+		inifile = "xsockconf.ini";
+	}
+	const char *section_name = NULL;
+	char buf[PATH_MAX+1];
 
-        if (readlink("/proc/self/exe", buf, sizeof(buf)-1)!=-1) {
-                section_name = basename(buf);
-        //printf("section_name %s\n", section_name);
-        }
+	if (readlink("/proc/self/exe", buf, sizeof(buf)-1)!=-1) {
+		section_name = basename(buf);
+	}
 
-        n = ini_gets(section_name, "api_addr", DEFAULT_MYADDRESS, _conf.api_addr, __IP_ADDR_LEN, inifile);
-        n = ini_gets(section_name, "click_dataaddr", DEFAULT_CLICKDATAADDRESS, _conf.click_dataaddr, __IP_ADDR_LEN , inifile);
-        n = ini_gets(section_name, "click_controladdr", DEFAULT_CLICKCONTROLADDRESS, _conf.click_controladdr, __IP_ADDR_LEN, inifile);
-        //print_conf();
+	const char * section_name_env  = getenv("XSOCKCONF_SECTION");
+	if (section_name_env) 
+		section_name = section_name_env;
+
+	read_conf(inifile, section_name);
 }
 
-//static struct __InitXSocket _init;
+void __InitXSocket::read_conf(const char *inifile, const char *section_name) 
+{
+	__XSocketConf::initialized=1;
+
+	int n = ini_gets(section_name, "api_addr", DEFAULT_MYADDRESS, _conf.api_addr, __IP_ADDR_LEN, inifile);
+	n = ini_gets(section_name, "click_dataaddr", DEFAULT_CLICKDATAADDRESS, _conf.click_dataaddr, __IP_ADDR_LEN , inifile);
+	n = ini_gets(section_name, "click_controladdr", DEFAULT_CLICKCONTROLADDRESS, _conf.click_controladdr, __IP_ADDR_LEN, inifile);
+
+}
+
 struct __XSocketConf _conf;
+
+void print_conf()
+{
+	__InitXSocket::print_conf();
+}
+
 
 void __InitXSocket::print_conf() 
 {
-        printf("api_addr %s\n", _conf.api_addr);
-        printf("click_controladdr %s\n",  _conf.click_controladdr);
-        printf("click_dataaddr %s\n",  _conf.click_dataaddr);
+	printf("api_addr %s\n", _conf.api_addr);
+	printf("click_controladdr %s\n",  _conf.click_controladdr);
+	printf("click_dataaddr %s\n",  _conf.click_dataaddr);
 }
 int  __XSocketConf::initialized=0;
 

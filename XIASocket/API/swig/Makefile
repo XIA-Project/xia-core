@@ -1,3 +1,5 @@
+all: _xsocket.so
+
 _xsocket.so: ../libXsocket.so xsocket.i
 	swig -python xsocket.i 
 	gcc -I/usr/include/python2.7 -fpic -c xsocket_wrap.c 

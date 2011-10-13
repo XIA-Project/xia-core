@@ -111,4 +111,12 @@ def Xaccept(*args):
   return _xsocket.Xaccept(*args)
 Xaccept = _xsocket.Xaccept
 
+def set_conf(*args):
+  return _xsocket.set_conf(*args)
+set_conf = _xsocket.set_conf
+
+def print_conf():
+  return _xsocket.print_conf()
+print_conf = _xsocket.print_conf
+
 

@@ -1,4 +1,6 @@
 import xsocket
+import os
+import sys
 from ctypes import *
 
 HID0= "HID:0000000000000000000000000000000000000000"
@@ -10,7 +12,11 @@ RHID1="HID:0000000000000000000000000000000000000003"
 CID0= "CID:2000000000000000000000000000000000000001"
 SID0= "SID:0f00000000000000000000000000000000000055"
 
-sock=xsocket.Xsocket();
+xsocket.set_conf("xsockconf_python.ini","pingClient.py")
+xsocket.print_conf()
+
+sock=xsocket.Xsocket()
+
 if (sock<0):
 	print "error opening socket"
 	exit(-1)
@@ -24,4 +30,4 @@ xsocket.Xsend(sock, payload, len(payload),0)
 #xsocket.Xsend(sock, payload, 10,0)
 
 reply = xsocket.Xrecv(sock,1024,0)
-print "payload: %s reply: %s" % (payload, reply)
+print "payload: %s reply: %s %d" % (payload, reply, len(reply))

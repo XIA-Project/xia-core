@@ -4,6 +4,7 @@
 */
 
 #include "Xsocket.h"
+#include "Xinit.h"
 
 int Xrecv(int sockfd, void *buf, size_t len, int flags)
 {

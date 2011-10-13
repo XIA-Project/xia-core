@@ -2693,17 +2693,7 @@ static swig_module_info swig_module = {swig_types, 2, 0, 0, 0, 0};
 #define SWIG_as_voidptrptr(a) ((void)SWIG_as_voidptr(*a),(void**)(a)) 
 
 
-extern int Xsendto(int sockfd,const void *buf, size_t len, int flags,char * dDAG, size_t dlen);
-extern int Xrecvfrom(int sockfd,void *buf, size_t len, int flags,char * dDAG, size_t *dlen);
-extern int Xsocket();
-extern int Xconnect(int sockfd, char* dest_DAG);
-extern int Xbind(int sockfd, char* SID);
-extern int Xclose(int sock);
-extern int Xrecv(int sockfd, void *rbuf, size_t len, int flags);
-extern int Xsend(int sockfd, const void *wbuf, size_t len, int flags);
-extern int XgetCID(int sockfd, char* dDAG, size_t dlen);
-extern int XputCID(int sockfd, const void *wbuf, size_t len, int flags,char* sDAG, size_t dlen);
-extern int Xaccept(int sockfd);
+#include  "../Xsocket.h"
 
 
 #include <limits.h>
@@ -3479,6 +3469,54 @@ fail:
 }
 
 
+SWIGINTERN PyObject *_wrap_set_conf(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  char *arg1 = (char *) 0 ;
+  char *arg2 = (char *) 0 ;
+  int res1 ;
+  char *buf1 = 0 ;
+  int alloc1 = 0 ;
+  int res2 ;
+  char *buf2 = 0 ;
+  int alloc2 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OO:set_conf",&obj0,&obj1)) SWIG_fail;
+  res1 = SWIG_AsCharPtrAndSize(obj0, &buf1, NULL, &alloc1);
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "set_conf" "', argument " "1"" of type '" "char *""'");
+  }
+  arg1 = (char *)(buf1);
+  res2 = SWIG_AsCharPtrAndSize(obj1, &buf2, NULL, &alloc2);
+  if (!SWIG_IsOK(res2)) {
+    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "set_conf" "', argument " "2"" of type '" "char *""'");
+  }
+  arg2 = (char *)(buf2);
+  set_conf(arg1,arg2);
+  resultobj = SWIG_Py_Void();
+  if (alloc1 == SWIG_NEWOBJ) free((char*)buf1);
+  if (alloc2 == SWIG_NEWOBJ) free((char*)buf2);
+  return resultobj;
+fail:
+  if (alloc1 == SWIG_NEWOBJ) free((char*)buf1);
+  if (alloc2 == SWIG_NEWOBJ) free((char*)buf2);
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_print_conf(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  
+  if (!PyArg_ParseTuple(args,(char *)":print_conf")) SWIG_fail;
+  print_conf();
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
 static PyMethodDef SwigMethods[] = {
 	 { (char *)"SWIG_PyInstanceMethod_New", (PyCFunction)SWIG_PyInstanceMethod_New, METH_O, NULL},
 	 { (char *)"Xsendto", _wrap_Xsendto, METH_VARARGS, NULL},
@@ -3492,6 +3530,8 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"XgetCID", _wrap_XgetCID, METH_VARARGS, NULL},
 	 { (char *)"XputCID", _wrap_XputCID, METH_VARARGS, NULL},
 	 { (char *)"Xaccept", _wrap_Xaccept, METH_VARARGS, NULL},
+	 { (char *)"set_conf", _wrap_set_conf, METH_VARARGS, NULL},
+	 { (char *)"print_conf", _wrap_print_conf, METH_VARARGS, NULL},
 	 { NULL, NULL, 0, NULL }
 };
 
