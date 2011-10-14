@@ -65,7 +65,9 @@ int main(int argc, char *argv[])
 		gettimeofday(&tv, NULL);
         current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
 		memcpy (payload_new, &seq_client_, 4);
+
 		Xsend(sock,payload_new,4,0);
+
         fprintf(fp, "%lu: PING sent; client seq = %d\n",current_time, seq_client_);  // modify payload
         //printf("%lld: PING sent; client seq = %d\n",current_time, seq_client_);  // modify payload         
         seq_client_++;

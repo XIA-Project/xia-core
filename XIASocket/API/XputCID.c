@@ -19,9 +19,9 @@ int XputCID(int sockfd, const void *buf, size_t len, int flags,
 	int rv;
 	int numbytes;
 	
-	char buffer[MAXBUFLEN];
-	struct sockaddr_in their_addr;
-	socklen_t addr_len;
+	//char buffer[MAXBUFLEN];
+	//struct sockaddr_in their_addr;
+	//socklen_t addr_len;
 
 
 	memset(&hints, 0, sizeof hints);
@@ -39,9 +39,12 @@ int XputCID(int sockfd, const void *buf, size_t len, int flags,
         // protobuf message
         xia::XSocketMsg xia_socket_msg;
 
-        xia_socket_msg.set_type(xia::XSOCKET_PUTCID);
-	xia_socket_msg.set_sdag(sDAG);
-	xia_socket_msg.set_payload((const char*)buf);
+        xia_socket_msg.set_type(xia::XPUTCID);
+
+        xia::X_Putcid_Msg *x_putcid_msg = xia_socket_msg.mutable_x_putcid();
+	x_putcid_msg->set_sdag(sDAG);
+        x_putcid_msg->set_payload((const char*)buf);
+
 
 	std::string p_buf;
 	xia_socket_msg.SerializeToString(&p_buf);
@@ -53,7 +56,7 @@ int XputCID(int sockfd, const void *buf, size_t len, int flags,
 	}
 	freeaddrinfo(servinfo);
 
-    
+    /*
         //Process the reply
         addr_len = sizeof their_addr;
         if ((numbytes = recvfrom(sockfd, buffer, MAXBUFLEN-1 , 0,
@@ -71,4 +74,9 @@ int XputCID(int sockfd, const void *buf, size_t len, int flags,
 	}
 
         return -1; 
+        return -1; 
+      */
+
+	return numbytes;
+
 }
