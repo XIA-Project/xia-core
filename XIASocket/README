@@ -14,6 +14,27 @@ folders.
 
 To run the loopback test:
 1. sudo userlevel/click conf/xia_chain_topology_socket.click
-2. XIASocket/API/server/xs
-3. XIASocket/API/client/xc
-	
+2. sample/xs
+3. sample/xc
+
+To run a ping test
+1. sudo userlevel/click conf/xia_chain_topology_socket.click
+2. sample/ps
+3. sample/pc
+
+
+Python API example:
+
+sample/pingClient.py
+
+
+libXsocket needs a configuration file. 
+Default is xsockconf.ini but one can set a environment variable XSOCKCONF to change the file.
+Under the file, you need to define address to use to talk to the host in click. 
+Each section name (e.g., [ps] in xsockconf.ini) in the ini file should be the exe filename (in C/C++).
+Or in the program you can specify the section to look by setting the environment variable 
+Or you can set the configuration use set_conf(char *inifile, char *sectioname)
+When using python you can  to use set_conf or the environment variable, XSOCKCONF_SECTION.
+Examples ini files are xsockconf.ini and python/xsockconf_python.ini
+
+
