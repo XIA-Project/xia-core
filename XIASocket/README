@@ -1,6 +1,6 @@
 
 ./sample
-The folder contains examples of the client-server
+This folder contains examples of the client-server
 An ini configuration file is needed for the library.
 The library looks for the XSOCKCONF environment variable
 to find the ini file, but defaults to the
