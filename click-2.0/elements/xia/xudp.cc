@@ -83,7 +83,7 @@ void XUDP::push(int port, Packet *p_input)
 				xia_socket_msg.ParseFromString(p_buf);
 
 				switch(xia_socket_msg.type()) {
-					case xia::XSOCKET_OPEN:
+					case xia::XSOCKET:
 					   {
 						//Open socket. 
 						//click_chatter("\n\nOK: SOCKET OPEN !!!\\n");
@@ -94,12 +94,17 @@ void XUDP::push(int port, Packet *p_input)
 						output(1).push(UDPIPEncap(p_in,_sport,_sport));	
                                             }
 					break;
-					case xia::XSOCKET_BIND:
+					case xia::XBIND:
 					   {
 						//Bind XID
 						//click_chatter("\n\nOK: SOCKET BIND !!!\\n");
             					//get source DAG from protobuf message
-						String sdag_string(xia_socket_msg.sdag().c_str());
+						
+
+        					xia::X_Bind_Msg *x_bind_msg = xia_socket_msg.mutable_x_bind();
+
+						String sdag_string(x_bind_msg->sdag().c_str());
+
 						//String sdag_string((const char*)p_in->data(),(const char*)p_in->end_data());
 						//click_chatter("\nbind requested to %s, length=%d\n",sdag_string.c_str(),(int)p_in->length());
 							
@@ -127,10 +132,10 @@ void XUDP::push(int port, Packet *p_input)
 						portRxSeqNo.set(_sport,portRxSeqNo.get(_sport)+1);//Increment counter
 
 						// (for Ack purpose) Reply with a packet with the destination port=source port		
-						output(1).push(UDPIPEncap(p_in,_sport,_sport));
+						//output(1).push(UDPIPEncap(p_in,_sport,_sport));
 						break;
                                             }
-					case xia::XSOCKET_CLOSE:
+					case xia::XCLOSE:
 					   {
 						// Close port
 						//click_chatter("\n\nOK: SOCKET CLOSE !!!\\n");
@@ -142,10 +147,10 @@ void XUDP::push(int port, Packet *p_input)
 						portTxSeqNo.erase(_sport);
 
 						// (for Ack purpose) Reply with a packet with the destination port=source port		
-						output(1).push(UDPIPEncap(p_in,_sport,_sport));
+						//output(1).push(UDPIPEncap(p_in,_sport,_sport));
 					    }
 					break;
-					case xia::XSOCKET_CONNECT:
+					case xia::XCONNECT:
                                             {
 						//click_chatter("\n\nOK: SOCKET CONNECT !!!\\n");
             				
@@ -153,7 +158,10 @@ void XUDP::push(int port, Packet *p_input)
 						//String dest((const char*)p_in->data(),(const char*)p_in->end_data());
 						//click_chatter("\nconnect to %s, length=%d\n",dest.c_str(),(int)p_in->length());
 
-						String dest(xia_socket_msg.ddag().c_str());
+        					xia::X_Connect_Msg *x_connect_msg = xia_socket_msg.mutable_x_connect();
+
+						String dest(x_connect_msg->ddag().c_str());
+
 						//String sdag_string((const char*)p_in->data(),(const char*)p_in->end_data());
 						//click_chatter("\nbind requested to %s, length=%d\n",sdag_string.c_str(),(int)p_in->length());
 							
@@ -194,10 +202,10 @@ void XUDP::push(int port, Packet *p_input)
     						portRxSeqNo.set(_sport,portRxSeqNo.get(_sport)+1);//Increment counter
 
 						// (for Ack purpose) Reply with a packet with the destination port=source port		
-						output(1).push(UDPIPEncap(p_in,_sport,_sport));
+						//output(1).push(UDPIPEncap(p_in,_sport,_sport));
 					   }
 					break;
-					case xia::XSOCKET_ACCEPT:
+					case xia::XACCEPT:
 					   {
 						//click_chatter("\n\nOK: SOCKET ACCEPT !!!\\n");
     						DAGinfo *daginfo=portToDAGinfo.get_pointer(_sport);
@@ -206,7 +214,7 @@ void XUDP::push(int port, Packet *p_input)
 					    	//p_in->kill();
 
 						// (for Ack purpose) Reply with a packet with the destination port=source port		
-						output(1).push(UDPIPEncap(p_in,_sport,_sport));
+						//output(1).push(UDPIPEncap(p_in,_sport,_sport));
 					   }
 					break;
 					default:
@@ -239,14 +247,17 @@ void XUDP::push(int port, Packet *p_input)
 				xia_socket_msg.ParseFromString(p_buf);
 
 				switch(xia_socket_msg.type()) { 
-					case xia::XSOCKET_DATA:
+					case xia::XSEND:
 					   {
     	          		    		if(!isConnected) {
     	          		        		click_chatter("Not 'connect'ed");
     	          		    		} else {
 
 							//click_chatter("\n\nOK: SOCKET DATA !!!\\n");
-							String pktPayload(xia_socket_msg.payload().c_str());
+
+        						xia::X_Send_Msg *x_send_msg = xia_socket_msg.mutable_x_send();
+
+							String pktPayload(x_send_msg->payload().c_str());
 	
 							int pktPayloadSize=pktPayload.length();
 
@@ -296,7 +307,7 @@ void XUDP::push(int port, Packet *p_input)
         			            				click_chatter("sent packet to %s, from %s\n",daginfo->dst_path.unparse_re().c_str(),daginfo->src_path.unparse_re().c_str());
 
 
-    		        					WritablePacket *just_payload_part= WritablePacket::make(p_in->headroom()+1, (const void*)xia_socket_msg.payload().c_str(), pktPayloadSize, p_in->tailroom());
+    		        					WritablePacket *just_payload_part= WritablePacket::make(p_in->headroom()+1, (const void*)x_send_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
 		       
     		        					WritablePacket *p = NULL;
                            					p = _xiah->encap(just_payload_part, true);
@@ -321,11 +332,16 @@ void XUDP::push(int port, Packet *p_input)
 						}
 					    }
 					break;
-					case xia::XSOCKET_SENDTO:
+					case xia::XSENDTO:
 					   {
 						//click_chatter("\n\nOK: SOCKET SENDTO !!!\\n");
-						String dest(xia_socket_msg.ddag().c_str());	
-						String pktPayload(xia_socket_msg.payload().c_str());
+
+        					xia::X_Sendto_Msg *x_sendto_msg = xia_socket_msg.mutable_x_sendto();
+	
+						String dest(x_sendto_msg->ddag().c_str());
+						String pktPayload(x_sendto_msg->payload().c_str());
+
+						
 	
 						int dag_size = dest.length();
 						int pktPayloadSize=pktPayload.length();
@@ -381,7 +397,7 @@ void XUDP::push(int port, Packet *p_input)
     		        			_xiah->set_src_path(daginfo->src_path);
     		        		
      		        		
- 						WritablePacket *just_payload_part= WritablePacket::make(p_in->headroom()+dag_size+1, (const void*)xia_socket_msg.payload().c_str(), pktPayloadSize, p_in->tailroom());
+ 						WritablePacket *just_payload_part= WritablePacket::make(p_in->headroom()+dag_size+1, (const void*)x_sendto_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
    
     		        			WritablePacket *p = NULL;
                             
@@ -414,11 +430,14 @@ void XUDP::push(int port, Packet *p_input)
     		        		
 					   }
 					break;
-					case xia::XSOCKET_PUTCID:
+					case xia::XPUTCID:
 					   {
 						//click_chatter("\n\nOK: SOCKET PUTCID !!!\\n");
-						String src(xia_socket_msg.sdag().c_str());	
-						String pktPayload(xia_socket_msg.payload().c_str());
+        					xia::X_Putcid_Msg *x_putcid_msg = xia_socket_msg.mutable_x_putcid();
+	
+						String src(x_putcid_msg->sdag().c_str());
+						String pktPayload(x_putcid_msg->payload().c_str());
+
 
 						//int dag_size = src.length();	
 						int pktPayloadSize=pktPayload.length();
@@ -456,7 +475,7 @@ void XUDP::push(int port, Packet *p_input)
      		        		
     		        			//Might need to remove more if another header is required (eg some control/DAG info)
 
-						WritablePacket *just_payload_part= WritablePacket::make(256, (const void*)xia_socket_msg.payload().c_str(), pktPayloadSize, 0);			       
+						WritablePacket *just_payload_part= WritablePacket::make(256, (const void*)x_putcid_msg->payload().c_str(), pktPayloadSize, 0);			       
 
     		        			WritablePacket *p = NULL;
     		        			int chunkSize = pktPayloadSize;
@@ -468,6 +487,7 @@ void XUDP::push(int port, Packet *p_input)
         				            click_chatter("sent packet to cache");
     		   		     		output(3).push(p);
 
+						/*
 						// (for Ack purpose) Reply with a packet with the destination port=source port		
         					xia::XSocketMsg xia_socket_msg_response;
 
@@ -476,7 +496,8 @@ void XUDP::push(int port, Packet *p_input)
 						std::string p_buf1;
 						xia_socket_msg.SerializeToString(&p_buf1);
 						WritablePacket *reply= WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
-						output(1).push(UDPIPEncap(reply,_sport,_sport)); 
+						output(1).push(UDPIPEncap(reply,_sport,_sport));
+						*/ 
 
 					    }
 					break;										

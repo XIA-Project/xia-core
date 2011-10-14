@@ -128,7 +128,7 @@ extern "C" {
 		p=servinfo;
 
 		// protobuf message
-                xia_socket_msg.set_type(xia::XSOCKET_OPEN);
+                xia_socket_msg.set_type(xia::XSOCKET);
 		std::string p_buf;
 		xia_socket_msg.SerializeToString(&p_buf);
 
@@ -138,6 +138,7 @@ extern "C" {
 			return(-1);
 		}
 		freeaddrinfo(servinfo);
+
 
                 //Process the reply
                 addr_len = sizeof their_addr;
@@ -151,7 +152,7 @@ extern "C" {
 		//protobuf message parsing
 		xia_socket_msg.ParseFromString(buf);
 
-		if (xia_socket_msg.type() == xia::XSOCKET_OPEN) {
+		if (xia_socket_msg.type() == xia::XSOCKET) {
  			return sockfd;
 		}
 

@@ -9,9 +9,9 @@ int Xconnect(int sockfd, char* dest_DAG)
 	int rv;
 	int numbytes;
 
-	char buf[MAXBUFLEN];
-	struct sockaddr_in their_addr;
-	socklen_t addr_len;
+	//char buf[MAXBUFLEN];
+	//struct sockaddr_in their_addr;
+	//socklen_t addr_len;
 	
     //Send a control packet to inform Click of connect request
 	memset(&hints, 0, sizeof hints);
@@ -28,8 +28,11 @@ int Xconnect(int sockfd, char* dest_DAG)
         // protobuf message
         xia::XSocketMsg xia_socket_msg;
 
-        xia_socket_msg.set_type(xia::XSOCKET_CONNECT);
-	xia_socket_msg.set_ddag(dest_DAG);
+        xia_socket_msg.set_type(xia::XCONNECT);
+
+        xia::X_Connect_Msg *x_connect_msg = xia_socket_msg.mutable_x_connect();
+	x_connect_msg->set_ddag(dest_DAG);
+
 	std::string p_buf;
 	xia_socket_msg.SerializeToString(&p_buf);
 
@@ -41,6 +44,7 @@ int Xconnect(int sockfd, char* dest_DAG)
 	}
 	freeaddrinfo(servinfo);
 
+/*
         //Process the reply
         addr_len = sizeof their_addr;
         if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
@@ -57,6 +61,9 @@ int Xconnect(int sockfd, char* dest_DAG)
 	}
 
         return -1; 
+      */
+
+	return numbytes;
     
 }
 

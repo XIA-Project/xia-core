@@ -9,9 +9,9 @@ int Xbind(int sockfd, char* Sdag)
 	int rv;
 	int numbytes;
 
-	char buf[MAXBUFLEN];
-	struct sockaddr_in their_addr;
-	socklen_t addr_len;
+	//char buf[MAXBUFLEN];
+	//struct sockaddr_in their_addr;
+	//socklen_t addr_len;
     
         //Send a control packet to inform Click of bind request
 	memset(&hints, 0, sizeof hints);
@@ -29,8 +29,12 @@ int Xbind(int sockfd, char* Sdag)
         // protobuf message
         xia::XSocketMsg xia_socket_msg;
 
-        xia_socket_msg.set_type(xia::XSOCKET_BIND);
-	xia_socket_msg.set_sdag(Sdag);
+        xia_socket_msg.set_type(xia::XBIND);
+
+        xia::X_Bind_Msg *x_bind_msg = xia_socket_msg.mutable_x_bind();
+
+	x_bind_msg->set_sdag(Sdag);
+
 	std::string p_buf;
 	xia_socket_msg.SerializeToString(&p_buf);
 
@@ -42,7 +46,7 @@ int Xbind(int sockfd, char* Sdag)
 	}
 	freeaddrinfo(servinfo);
 
-    
+/*    
         //Process the reply
         addr_len = sizeof their_addr;
         if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
@@ -58,7 +62,9 @@ int Xbind(int sockfd, char* Sdag)
 	}
 
         return -1; 
+      */
 
+	return numbytes;
 
 }
 

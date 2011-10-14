@@ -39,9 +39,11 @@ int Xsendto(int sockfd,const void *buf, size_t len, int flags,
         // protobuf message
         xia::XSocketMsg xia_socket_msg;
 
-        xia_socket_msg.set_type(xia::XSOCKET_SENDTO);
-	xia_socket_msg.set_ddag(dDAG);
-	xia_socket_msg.set_payload((const char*)buf);
+        xia_socket_msg.set_type(xia::XSENDTO);
+
+        xia::X_Sendto_Msg *x_sendto_msg = xia_socket_msg.mutable_x_sendto();
+	x_sendto_msg->set_ddag(dDAG);
+        x_sendto_msg->set_payload((const char*)buf);
 
 	std::string p_buf;
 	xia_socket_msg.SerializeToString(&p_buf);

@@ -49,6 +49,7 @@ int main(int argc, char *argv[])
     while (seq_s<TOTALPINGS) {
         //Receive packet
 		n = Xrecv(sock,payload_new,1024,0);
+
 		gettimeofday(&tv, NULL);
         current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
 		//n = Xrecvfrom(sock,payload_new,1024,0,theirDAG,&dlen);

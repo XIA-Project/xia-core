@@ -32,8 +32,10 @@ int Xsend(int sockfd,void *buf, size_t len, int flags)
         // protobuf message
         xia::XSocketMsg xia_socket_msg;
 
-        xia_socket_msg.set_type(xia::XSOCKET_DATA);
-	xia_socket_msg.set_payload((const char*)buf);
+        xia_socket_msg.set_type(xia::XSEND);
+
+        xia::X_Send_Msg *x_send_msg = xia_socket_msg.mutable_x_send();
+        x_send_msg->set_payload((const char*)buf);
 
 	std::string p_buf;
 	xia_socket_msg.SerializeToString(&p_buf);

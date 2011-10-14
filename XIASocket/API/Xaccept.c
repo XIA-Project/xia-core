@@ -7,9 +7,9 @@ int Xaccept(int sockfd)
 	int rv;
 	int numbytes;
 
-	char buf[MAXBUFLEN];
-	struct sockaddr_in their_addr;
-	socklen_t addr_len;
+	//char buf[MAXBUFLEN];
+	//struct sockaddr_in their_addr;
+	//socklen_t addr_len;
 	
     //Send a control packet 
 	memset(&hints, 0, sizeof hints);
@@ -26,7 +26,7 @@ int Xaccept(int sockfd)
         // protobuf message
         xia::XSocketMsg xia_socket_msg;
 
-        xia_socket_msg.set_type(xia::XSOCKET_ACCEPT);
+        xia_socket_msg.set_type(xia::XACCEPT);
 	std::string p_buf;
 	xia_socket_msg.SerializeToString(&p_buf);
 
@@ -36,7 +36,8 @@ int Xaccept(int sockfd)
 		return(-1);
 	}
 	freeaddrinfo(servinfo);
-    
+ 
+/*   
         //Process the reply
         addr_len = sizeof their_addr;
         if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
@@ -53,6 +54,9 @@ int Xaccept(int sockfd)
 	}
 
         return -1; 
+      */
+
+	return numbytes;
 
 }
 
