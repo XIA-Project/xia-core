@@ -1,0 +1,12 @@
+$TTL 1D
+$ORIGIN example.com.
+@	IN	SOA	@ ns (
+			1
+			8H
+			15M
+			1W
+			1D)
+	IN	NS	@
+	IN	A	127.0.0.100
+	IN	TXT	"hello man"
+	IN	XIA	AD:sampleAD1 HID:sampleHID1 SID:sampleSID1
