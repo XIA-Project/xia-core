@@ -36,6 +36,7 @@ int main(int argc, char *argv[])
 	
     //Open socket
 	sock=Xsocket();
+	print_conf(); /* For Debugging configuartion */
 	if (sock < 0) error("Opening socket");
 	
 	//Make the sDAG (the one the server listens on)

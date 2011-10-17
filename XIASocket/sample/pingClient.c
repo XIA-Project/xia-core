@@ -42,6 +42,7 @@ int main(int argc, char *argv[])
     
 	//Open socket
 	sock=Xsocket();
+	print_conf();
 	if (sock < 0) 
 		error("Opening socket");
 		
