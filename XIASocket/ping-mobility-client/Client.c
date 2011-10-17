@@ -23,7 +23,8 @@ void error(const char *);
 
 int main(int argc, char *argv[])
 {
-	int sock, n,dlen;
+	int sock, n;
+	size_t dlen;
 	char reply[128];
 	char buffer[2048],theirDAG[1024];    
 
@@ -36,7 +37,7 @@ int main(int argc, char *argv[])
 	//Xbind(sock,"RE AD:1000000000000000000000000000000000000009 HID:1500000000000000000000000000000000000055 SID:1f00000000000000000000000000000000000055");
 
 	//Make the dDAG (the one you want to send packets to)
-	char * dag = malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,SID0) + 1);
+	char * dag = (char*)malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,SID0) + 1);
 	sprintf(dag, "RE %s %s %s", AD0, HID0,SID0);
 
 	//Use connect if you want to use Xsend instead of Xsendto
@@ -44,7 +45,7 @@ int main(int argc, char *argv[])
 	//Xconnect(sock,dag);//Use with Xrecv
 
 	//Try a getCID
-	char * cdag = malloc(snprintf(NULL, 0, "RE ( %s %s ) %s", AD0, HID0,CID0) + 1);
+	char * cdag = (char*)malloc(snprintf(NULL, 0, "RE ( %s %s ) %s", AD0, HID0,CID0) + 1);
 	sprintf(cdag, "RE ( %s %s ) %s", AD0, HID0,CID0); 
 	XgetCID(sock,cdag,strlen(cdag));
 	n = Xrecvfrom(sock,reply,128,0,theirDAG,&dlen);
