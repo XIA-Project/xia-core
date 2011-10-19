@@ -15,6 +15,10 @@ enum XSocketCallType {
   XRECVFROM = 10;
 
   XSOCKET_REQUEST_FAILED = 11;
+
+  XGETSOCKETIDLIST = 12;
+  XGETSOCKETINFO = 13;
+
 }
 
 
@@ -32,6 +36,9 @@ message XSocketMsg {
   optional X_Send_Msg x_send= 10;
   optional X_Recv_Msg x_recv= 11;
   optional X_Recvfrom_Msg x_recvfrom= 12;  
+
+  optional X_Getsocketidlist_Msg x_getsocketidlist = 13;
+  optional X_Getsocketinfo_Msg x_getsocketinfo = 14;
 
 }
  
@@ -80,8 +87,21 @@ message X_Recv_Msg {
 message X_Recvfrom_Msg {
   optional string temp = 1; // currently not used
 }
-  
+ 
+ 
+message X_Getsocketidlist_Msg {
+  optional int32 size = 1; // number of active sockets
+  repeated int32 id = 2;   // active socket ids (_sport)
+}
 
+message X_Getsocketinfo_Msg {
+  required int32 id = 1; // socket id to examine
+  optional int32 port = 2;
+  optional string status = 3;
+  optional string temp = 4;	
+  optional string xiapath_src = 5;
+  optional string xiapath_dst = 6;
+}
 
 
 

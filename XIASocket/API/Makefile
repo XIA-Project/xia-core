@@ -4,7 +4,7 @@ LD=g++
 CFLAGS=-c -Wall -I../minini
 LDFLAGS =  -lprotobuf
 SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XgetCID.c XputCID.c Xrecv.c\
-	Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c ../minini/minIni.c
+        Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c Xgetsocketidlist.c Xgetsocketinfo.c ../minini/minIni.c
 
 SHARED_OBJECTS=$(SOURCES:.c=.shared.o) xia.pb.shared.o
 STATIC_OBJECTS=$(SOURCES:.c=.o) xia.pb.o
@@ -33,3 +33,4 @@ libXsocket.so: $(SHARED_OBJECTS)
 clean:
 	rm -f *.o *.a *.so *.shared.o xia.pb.*
 	make -C swig clean
+

@@ -217,6 +217,48 @@ void XUDP::push(int port, Packet *p_input)
 						//output(1).push(UDPIPEncap(p_in,_sport,_sport));
 					   }
 					break;
+
+					case xia::XGETSOCKETIDLIST:
+					   {
+						//Open socket. 
+						//click_chatter("\n\nOK: SOCKET OPEN !!!\\n");
+						int size = (int)portToDAGinfo.size();
+						//printf("size=%d \n", size);
+        					xia::XSocketMsg xia_socket_msg;
+        					xia_socket_msg.set_type(xia::XGETSOCKETIDLIST);
+        					xia::X_Getsocketidlist_Msg *x_getsocketidlist_msg = xia_socket_msg.mutable_x_getsocketidlist();
+						x_getsocketidlist_msg->set_size(size);
+						int index = 0;
+   						for (HashTable<unsigned short, DAGinfo>::iterator iter = portToDAGinfo.begin(); iter != portToDAGinfo.end(); ++iter ) {
+							//printf("key=%d  \n", iter->first);
+							//x_getsocketidlist_msg->set_id(index, (int)iter->first);
+							x_getsocketidlist_msg->add_id((int)iter->first);
+							index++;
+						}
+						std::string p_buf;
+						xia_socket_msg.SerializeToString(&p_buf);
+						WritablePacket *reply= WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
+						output(1).push(UDPIPEncap(reply,_sport,_sport));
+                                            }
+					break;
+
+					case xia::XGETSOCKETINFO:
+					   {
+        					xia::X_Getsocketinfo_Msg *x_getsocketinfo_msg = xia_socket_msg.mutable_x_getsocketinfo();
+						int sockid = x_getsocketinfo_msg->id();	
+						HashTable<unsigned short, DAGinfo>::iterator iter = portToDAGinfo.find(sockid);
+
+        					xia_socket_msg.set_type(xia::XGETSOCKETINFO);
+
+						x_getsocketinfo_msg->set_port((int)iter->second.port);
+
+						std::string p_buf;
+						xia_socket_msg.SerializeToString(&p_buf);
+						WritablePacket *reply= WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
+						output(1).push(UDPIPEncap(reply,_sport,_sport));
+                                            }
+					break;
+
 					default:
 						click_chatter("\n\nERROR: CONTROL TRAFFIC !!!\n\n");
 					break;

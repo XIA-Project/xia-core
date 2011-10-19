@@ -19,6 +19,17 @@ extern "C" {
 #define ATTEMPTS 3 //Number of attempts at opening a socket 
 #define MAXBUFLEN 2000
 
+struct DAGinfo{
+    unsigned short port;
+    //XID xid;
+    //XIAPath src_path;
+    //XIAPath dst_path;
+    int nxt;
+    int last;
+    uint8_t hlim;
+    int isConnected;
+} ;
+
 //Function list
 extern int Xsendto(int sockfd,const void *buf, size_t len, int flags,char * dDAG, size_t dlen);
 extern int Xrecvfrom(int sockfd,void *buf, size_t len, int flags,char * dDAG, size_t *dlen);
@@ -32,6 +43,8 @@ extern int Xsend(int sockfd,void *buf, size_t len, int flags);
 extern int XgetCID(int sockfd, char* dDAG, size_t dlen);
 extern int XputCID(int sockfd, const void *buf, size_t len, int flags,char* sDAG, size_t dlen);
 extern int Xaccept(int sockfd);
+extern int Xgetsocketidlist(int sockfd, int *socket_list);
+extern int Xgetsocketinfo(int sockfd1, int sockfd2, struct DAGinfo *info);
 extern void error(const char *msg);
 extern void set_conf(const char *filename, const char *sectioname);
 extern void print_conf();
