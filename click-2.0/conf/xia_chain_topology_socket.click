@@ -435,5 +435,5 @@ gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
 //-> AggregateCounter(COUNT_STOP 1)
 //-> host1;
 
-Script(write gen.active true);  // the packet source should be activated after all other scripts are executed
+//Script(write gen.active true);  // the packet source should be activated after all other scripts are executed
 
