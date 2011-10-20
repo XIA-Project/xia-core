@@ -1,7 +1,7 @@
 .PHONY: clean
 
 CFLAGS=-I../API
-LDFLAGS =  -lprotobuf
+LDFLAGS =  -lprotobuf -lpthread
 
 all: xs ps xc pc
 
