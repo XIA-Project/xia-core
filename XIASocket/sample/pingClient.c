@@ -39,7 +39,8 @@ int main(int argc, char *argv[])
     FILE *fp;
     
     fp=fopen("output_client","w");
-    
+    if (fp==NULL) error("Error opening output file"); 
+
 	//Open socket
 	sock=Xsocket();
 	print_conf();
