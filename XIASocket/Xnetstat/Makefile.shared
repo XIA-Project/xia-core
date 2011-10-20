@@ -1,0 +1,12 @@
+.PHONY: clean
+
+CFLAGS=-I../API
+LDFLAGS =  -lprotobuf
+
+all: xnetstat
+
+xnetstat: Xnetstat.c
+	gcc $(CFLAGS) $(LDFLAGS) -o $@ $< -L../API/ -lXsocket
+
+clean:
+	rm -f xnetstat
