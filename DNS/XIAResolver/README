@@ -1,0 +1,18 @@
+dns resolving library for XIP enabled dns server
+
+nameserver list to be stored in /etc/resolv.xiaconf
+	sample /etc/resolv.xiaconf
+	--------
+	# xia resolving server list					<-- comment starting with #
+	nameserver 127.0.0.1						<-- nameserver
+	--------
+
+host list to be stored in /etc/hosts_xia
+	smaple /etc/host_xia
+	--------
+	# xia host list								<-- comment starting with #
+	sample.com RE AD:### HID:### SID:###		<-- DAG followed by domain name
+	--------
+note that /etc/host_xia format is different from original /etc/host
+in the domain name comes before DAG
+(for simplicity in parsing, since DAG contains white space)
