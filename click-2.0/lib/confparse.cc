@@ -1669,6 +1669,8 @@ cp_xid_type(const String& str, uint32_t* result)
         *result = htonl(CLICK_XIA_XID_TYPE_HID);
     else if (str.compare(String("SID")) == 0)
         *result = htonl(CLICK_XIA_XID_TYPE_SID);
+    else if (str.compare(String("IP")) == 0)
+        *result = htonl(CLICK_XIA_XID_TYPE_IP);
     else if (!cp_integer(str, result))      // TODO: apply htonl (also change xiarandomize.cc)
     {
         click_chatter("unrecognized XID type: %s\n", str.c_str());

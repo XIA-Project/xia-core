@@ -14,29 +14,30 @@
 
 int main(int argc, char *argv[])
 {
-	int xnet_sockid;  // socket for this Xnetstat
-	int num_active_sockets;
-	int socket_list[MAXSOCKETS];
-        struct DAGinfo info;
+        int xnet_sockid;  // socket for this Xnetstat
+        int num_active_sockets;
+        int socket_list[MAXSOCKETS];
+        struct Netinfo info;
 
-	//Open socket
-	xnet_sockid=Xsocket();
-	if (xnet_sockid < 0) error("Opening socket");
-		
-	num_active_sockets = Xgetsocketidlist(xnet_sockid, socket_list);
+        //Open socket
+        xnet_sockid=Xsocket();
+        if (xnet_sockid < 0) error("Opening socket");
 
-	int i;
-	for(i= 0; i<num_active_sockets; i++) { 
+        num_active_sockets = Xgetsocketidlist(xnet_sockid, socket_list);
 
-		//printf("sockid=%d \n", socket_list[i]);
-		Xgetsocketinfo(xnet_sockid, socket_list[i], &info);
-		printf("port=%d \n", info.port);
-	}
+        int i;
 
-	//print(Xgetsocketinfo(sockid));
+        printf("Proto\t SrcDAG\t DstDAG\t Status \n");
+        for(i= 0; i<num_active_sockets; i++) { 
 
-	Xclose(xnet_sockid);
-	
-	return 1;
+                Xgetsocketinfo(xnet_sockid, socket_list[i], &info);
+                printf("%s\t %s\t %s\t %s \n", info.protocol, info.src_path, info.dst_path, info.status);
+        }
+
+
+        Xclose(xnet_sockid);
+
+        return 1;
 }
+
 

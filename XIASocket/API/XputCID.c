@@ -5,8 +5,8 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 
-int XputCID(int sockfd, const void *buf, size_t len, int flags,
-		char* sDAG, size_t dlen)
+int XputCID(int sockfd, const void *buf, size_t len, int /*flags*/,
+		char* sDAG, size_t /*dlen*/)
 {
 
 
@@ -43,7 +43,8 @@ int XputCID(int sockfd, const void *buf, size_t len, int flags,
 
         xia::X_Putcid_Msg *x_putcid_msg = xia_socket_msg.mutable_x_putcid();
 	x_putcid_msg->set_sdag(sDAG);
-        x_putcid_msg->set_payload((const char*)buf);
+	//printf("PUTCID len %d\n", len);
+        x_putcid_msg->set_payload((const char*)buf, len);
 
 
 	std::string p_buf;

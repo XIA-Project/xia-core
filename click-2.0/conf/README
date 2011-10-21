@@ -4,6 +4,9 @@ Configuration files
 Emulation of a simple topology 
     xia_chain_topology_socket.click
 
+IPv4 principal tester
+    xia_ipv4.click
+
 Stand-alone Ethernet XIA Router
 	xia_two_port_router.click
 

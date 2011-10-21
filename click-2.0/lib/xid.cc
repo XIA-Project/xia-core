@@ -94,6 +94,9 @@ XID::unparse() const
         case CLICK_XIA_XID_TYPE_SID:
            c += sprintf(c, "SID");
            break;
+        case CLICK_XIA_XID_TYPE_IP:
+           c += sprintf(c, "IP");
+	   break;
         default:
            c += sprintf(c, "%x", _xid.type);
     }
