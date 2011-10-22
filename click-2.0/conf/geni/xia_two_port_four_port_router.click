@@ -177,6 +177,45 @@ elementclass Router {
     sw[1] -> Queue(200) -> [1]output;
 };
 
+
+// 2-port router node
+elementclass RouterDummyCache {
+    $local_addr, $local_ad, $local_hid |
+
+    // $local_addr: the full address of the node
+    // $local_ad:   the AD of the node and the local network
+    // $local_hid:  the HID of the node (used for "bound" content source)
+
+    // input[0], input[1]: a packet arrived at the node
+    // output[0]: forward to interface 0 (for hosts in local ad)
+    // output[1]: forward to interface 1 (for other ads)
+
+    n :: RouteEngine($local_addr);
+    //cache :: XIACache($local_addr, n/proc/rt_CID/rt);
+	cache :: Queue(200);
+
+    Script(write n/proc/rt_AD/rt.add - 1);      // default route for AD
+    Script(write n/proc/rt_AD/rt.add $local_ad 4);    // self AD as destination
+    Script(write n/proc/rt_HID/rt.add - 0);     // forwarding for local HID
+    Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self HID as destination
+    Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
+    Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
+
+    input[0] -> [0]n;
+    input[1] -> [0]n;
+
+    n[0] -> sw :: PaintSwitch
+    n[1] -> Discard;
+    //n[2] -> [0]cache[0] -> [1]n;
+    //Idle -> [1]cache[1] -> Discard;
+    Idle -> [1]n;
+    n[2] -> cache -> Unqueue -> Discard;
+
+    sw[0] -> Queue(200) -> [0]output;
+    sw[1] -> Queue(200) -> [1]output;
+};
+
+
 // 4-port router node; AD & HID tables need to be set manually using Script()
 elementclass Router4Port {
     $local_addr |
