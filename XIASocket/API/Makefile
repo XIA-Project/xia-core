@@ -1,7 +1,7 @@
 .PHONY: clean
 CC=g++
 LD=g++
-CFLAGS=-c -Wall -I../minini
+CFLAGS=-c -Wall -Wextra -I../minini
 LDFLAGS =  -lprotobuf
 SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XgetCID.c XputCID.c Xrecv.c\
         Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c Xgetsocketidlist.c Xgetsocketinfo.c ../minini/minIni.c
