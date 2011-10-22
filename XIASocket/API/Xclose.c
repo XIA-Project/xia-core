@@ -33,7 +33,7 @@ int Xclose(int sockfd)
         xia::X_Close_Msg *x_close_msg = xia_socket_msg.mutable_x_close();
 
 	const char *message="close socket"; // well... not necessary though.. 
-	x_close_msg->set_payload(message);
+	x_close_msg->set_payload(message, strlen(message));
 
 	std::string p_buf;
 	xia_socket_msg.SerializeToString(&p_buf);

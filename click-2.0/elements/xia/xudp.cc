@@ -104,7 +104,7 @@ void XUDP::push(int port, Packet *p_input)
 
 			    xia::X_Bind_Msg *x_bind_msg = xia_socket_msg.mutable_x_bind();
 
-			    String sdag_string(x_bind_msg->sdag().c_str());
+			    String sdag_string(x_bind_msg->sdag().c_str(), x_bind_msg->sdag().size());
 
 			    //String sdag_string((const char*)p_in->data(),(const char*)p_in->end_data());
 			    //click_chatter("\nbind requested to %s, length=%d\n",sdag_string.c_str(),(int)p_in->length());
@@ -381,7 +381,7 @@ void XUDP::push(int port, Packet *p_input)
 
 			    xia::X_Sendto_Msg *x_sendto_msg = xia_socket_msg.mutable_x_sendto();
 
-			    String dest(x_sendto_msg->ddag().c_str());
+			    String dest(x_sendto_msg->ddag().c_str(), x_sendto_msg->ddag().size());
 			    String pktPayload(x_sendto_msg->payload().c_str(), x_sendto_msg->payload().size());
 
 

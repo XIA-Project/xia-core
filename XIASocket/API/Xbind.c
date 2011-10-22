@@ -33,7 +33,7 @@ int Xbind(int sockfd, char* Sdag)
 
         xia::X_Bind_Msg *x_bind_msg = xia_socket_msg.mutable_x_bind();
 
-	x_bind_msg->set_sdag(Sdag);
+	x_bind_msg->set_sdag(Sdag, strlen(Sdag));
 
 	std::string p_buf;
 	xia_socket_msg.SerializeToString(&p_buf);
