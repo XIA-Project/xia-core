@@ -331,7 +331,7 @@ elementclass EndHost {
     xudp::XUDP($local_addr, $CLICK_IP,$API_IP,n/proc/rt_SID/rt);
     
     //Create kernel TAP interface which responds to ARP
-    fake0::FromHost($fake,$API_IP/24,HEADROOM 256) 
+    fake0::FromHost($fake,$API_IP/24,HEADROOM 256, MTU 65535) 
     -> fromhost_cl :: Classifier(12/0806, 12/0800);
     fromhost_cl[0] -> ARPResponder(0.0.0.0/0 $ether_addr) -> ToHost($fake);
 
