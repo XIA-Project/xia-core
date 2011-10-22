@@ -300,7 +300,7 @@ void XUDP::push(int port, Packet *p_input)
 
 				xia::X_Send_Msg *x_send_msg = xia_socket_msg.mutable_x_send();
 
-				String pktPayload(x_send_msg->payload().c_str());
+				String pktPayload(x_send_msg->payload().c_str(), x_send_msg->payload().size());
 
 				int pktPayloadSize=pktPayload.length();
 
@@ -382,7 +382,7 @@ void XUDP::push(int port, Packet *p_input)
 			    xia::X_Sendto_Msg *x_sendto_msg = xia_socket_msg.mutable_x_sendto();
 
 			    String dest(x_sendto_msg->ddag().c_str());
-			    String pktPayload(x_sendto_msg->payload().c_str());
+			    String pktPayload(x_sendto_msg->payload().c_str(), x_sendto_msg->payload().size());
 
 
 
@@ -478,13 +478,13 @@ void XUDP::push(int port, Packet *p_input)
 			    //click_chatter("\n\nOK: SOCKET PUTCID !!!\\n");
 			    xia::X_Putcid_Msg *x_putcid_msg = xia_socket_msg.mutable_x_putcid();
 
-			    String src(x_putcid_msg->sdag().c_str());
-			    String pktPayload(x_putcid_msg->payload().c_str());
+			    String src(x_putcid_msg->sdag().c_str(), x_putcid_msg->sdag().size());
+			    String pktPayload(x_putcid_msg->payload().c_str(), x_putcid_msg->payload().size());
 
 
 			    //int dag_size = src.length();	
 			    int pktPayloadSize=pktPayload.length();
-			    //click_chatter("\n PUTCID sdag:%s, payload:%s, length=%d\n",xia_socket_msg.sdag().c_str(), xia_socket_msg.payload().c_str(), pktPayloadSize);
+			    //click_chatter("\n PUTCID sdag:%s, length=%d len=%d\n",x_putcid_msg->sdag().c_str(), pktPayloadSize, x_putcid_msg->payload().size());
 
 			    XIAPath src_path;
 			    src_path.parse(src); 
@@ -736,9 +736,8 @@ int XUDP::write_param(const String &conf, Element *e, void *vparam,
 	    click_chatter("Moved to %s",local_addr.unparse().c_str());
 	    f->_local_hid = local_addr.xid(local_addr.destination_node());
 
-        } 
+	} 
 	break;
-
 	default: break;
     }
     return 0;
