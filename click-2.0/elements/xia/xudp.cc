@@ -120,6 +120,7 @@ void XUDP::push(int port, Packet *p_input)
 			    daginfo.hlim=250;
 			    daginfo.isConnected=false;
 			    daginfo.initialized=false;
+			    daginfo.sdag = sdag_string;
 
 			    XID	source_xid = daginfo.src_path.xid(daginfo.src_path.destination_node());
 			    //XID xid(xid_string);
@@ -178,6 +179,7 @@ void XUDP::push(int port, Packet *p_input)
 				String str_local_addr=_local_addr.unparse_re();
 				daginfo->isConnected=true;
 				daginfo->initialized=true;
+                                daginfo->ddag= dest;
 
 				String rand(click_random(1000000, 9999999));
 				String xid_string="SID:20000ff00000000000000000000000000"+rand;
@@ -245,19 +247,30 @@ void XUDP::push(int port, Packet *p_input)
 
 		    case xia::XGETSOCKETINFO:
 			{
-			    xia::X_Getsocketinfo_Msg *x_getsocketinfo_msg = xia_socket_msg.mutable_x_getsocketinfo();
+        		    xia::X_Getsocketinfo_Msg *x_getsocketinfo_msg = xia_socket_msg.mutable_x_getsocketinfo();
 			    int sockid = x_getsocketinfo_msg->id();	
 			    HashTable<unsigned short, DAGinfo>::iterator iter = portToDAGinfo.find(sockid);
 
-			    xia_socket_msg.set_type(xia::XGETSOCKETINFO);
+        		    xia_socket_msg.set_type(xia::XGETSOCKETINFO);
+    			    x_getsocketinfo_msg->set_port((int)iter->second.port);
+					
+			   //x_getsocketinfo_msg->set_xid((char*)iter->second.xid);
+			    x_getsocketinfo_msg->set_xiapath_src((iter->second.sdag).c_str(), strlen((iter->second.sdag).c_str()) );
+			    x_getsocketinfo_msg->set_xiapath_dst((iter->second.ddag).c_str(), strlen((iter->second.ddag).c_str()));
 
-			    x_getsocketinfo_msg->set_port((int)iter->second.port);
+			    const char* proto = "XUDP";
+			    x_getsocketinfo_msg->set_protocol(proto); // need to refine later
+			    if ((int)iter->second.isConnected == 1) {	
+				const char* status= "Connected";	
+				x_getsocketinfo_msg->set_status(status, strlen(status));
+			    }
 
 			    std::string p_buf;
 			    xia_socket_msg.SerializeToString(&p_buf);
+
 			    WritablePacket *reply= WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
 			    output(1).push(UDPIPEncap(reply,_sport,_sport));
-			}
+                         }
 			break;
 
 		    default:

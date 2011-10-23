@@ -97,10 +97,11 @@ message X_Getsocketidlist_Msg {
 message X_Getsocketinfo_Msg {
   required int32 id = 1; // socket id to examine
   optional int32 port = 2;
-  optional string status = 3;
-  optional string temp = 4;	
-  optional string xiapath_src = 5;
-  optional string xiapath_dst = 6;
+  optional bytes status = 3;
+  optional bytes xid = 4;	
+  optional bytes xiapath_src = 5;
+  optional bytes xiapath_dst = 6;
+  optional bytes protocol = 7;	
 }
 
 

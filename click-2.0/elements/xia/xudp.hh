@@ -90,6 +90,8 @@ class XUDP : public Element {
     uint8_t hlim;
     bool isConnected;
     bool initialized;
+    String sdag;
+    String ddag;
     } ;
     
     HashTable<XID, unsigned short> XIDtoPort;

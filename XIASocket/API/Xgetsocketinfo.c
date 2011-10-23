@@ -1,7 +1,8 @@
 #include "Xsocket.h"
 #include "Xinit.h"
+#include <string.h>
 
-int Xgetsocketinfo(int sockfd1, int sockfd2, struct DAGinfo *info)
+int Xgetsocketinfo(int sockfd1, int sockfd2, struct Netinfo *info)
 {
    	struct addrinfo hints, *servinfo, *p;
 	int rv;
@@ -49,14 +50,45 @@ int Xgetsocketinfo(int sockfd1, int sockfd2, struct DAGinfo *info)
                         return -1;
         }
 
-	//protobuf message parsing
-	xia_socket_msg.Clear();
-	xia_socket_msg.ParseFromString(buf);
 
-	if (xia_socket_msg.type() == xia::XGETSOCKETINFO) {
-		xia::X_Getsocketinfo_Msg *x_getsocketinfo_msg = xia_socket_msg.mutable_x_getsocketinfo();
-		int port = x_getsocketinfo_msg->port();
-		info->port = port;
+	// HACK: due to protobuf null-terminated character handling issue
+	std::string pp_buf;
+	int inx;
+	char tbuf[MAXBUFLEN];
+
+	for(inx=0; inx< numbytes; inx++) {
+		if (buf[inx] == '\0') {
+			tbuf[inx] = '@'; // hack...
+		} else {
+			tbuf[inx] = buf[inx];
+		}
+	}
+	tbuf[numbytes] = '\0';
+
+	pp_buf = tbuf;
+
+	for(inx=0; inx< numbytes; inx++) {
+		if (pp_buf[inx] == '@') {
+			pp_buf[inx] = '\0'; // hack...
+		}
+	}
+
+	//protobuf message parsing
+	//xia_socket_msg.Clear();
+
+        // protobuf message
+        xia::XSocketMsg xia_socket_msg1;
+	xia_socket_msg1.ParseFromString(pp_buf);
+
+	if (xia_socket_msg1.type() == xia::XGETSOCKETINFO) {
+		xia::X_Getsocketinfo_Msg *x_getsocketinfo_msg = xia_socket_msg1.mutable_x_getsocketinfo();
+		info->port = x_getsocketinfo_msg->port(); 
+
+		strcpy(info->src_path, x_getsocketinfo_msg->xiapath_src().c_str());
+		strcpy(info->dst_path, x_getsocketinfo_msg->xiapath_dst().c_str());
+		strcpy(info->status, x_getsocketinfo_msg->status().c_str());
+		strcpy(info->protocol, x_getsocketinfo_msg->protocol().c_str());
+
  		return 1;
 	}
 
