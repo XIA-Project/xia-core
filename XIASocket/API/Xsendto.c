@@ -5,8 +5,9 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 
-int Xsendto(int sockfd,const void *buf, size_t len, int flags,
-		char* dDAG, size_t dlen)
+/* dDAG is a NULL terminated string */
+int Xsendto(int sockfd,const void *buf, size_t len, int /*flags*/,
+		char* dDAG, size_t /*dlen*/)
 {
 
 
@@ -42,8 +43,8 @@ int Xsendto(int sockfd,const void *buf, size_t len, int flags,
         xia_socket_msg.set_type(xia::XSENDTO);
 
         xia::X_Sendto_Msg *x_sendto_msg = xia_socket_msg.mutable_x_sendto();
-	x_sendto_msg->set_ddag(dDAG, strlen(dDAG));
-        x_sendto_msg->set_payload((const char*)buf, strlen((const char*)buf));
+	x_sendto_msg->set_ddag(dDAG);
+        x_sendto_msg->set_payload((const char*)buf, len);
 
 	std::string p_buf;
 	xia_socket_msg.SerializeToString(&p_buf);
