@@ -12,7 +12,9 @@ RHID0="HID:0000000000000000000000000000000000000002"
 RHID1="HID:0000000000000000000000000000000000000003"
 CID0= "CID:2000000000000000000000000000000000000001"
 SID1= "SID:0f00000000000000000000000000000000000055"
-
+SID0= "SID:0f00000000000000000000000000000000000056"
+IP1 = "IP:4500000000010000FAFA00000000000001000002"
+IP0 = "IP:4500000000010000FAFA000000000000121A045C"
 
 def check_for_and_process_CIDs(message, browser_socket):
     rt = message.find('CID') 
@@ -32,10 +34,14 @@ def sendSIDRequest(netloc, payload, browser_socket):
         print "error opening socket"
         return
 
-    dag = "RE %s %s %s" % (AD1, HID1, SID1) # Need a SID?
+    #dag = "RE %s %s %s" % (AD1, HID1, SID1) # Need a SID?
+    ddag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, SID1)
+    sdag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP0, HID0, SID0)
+
+    xsocket.Xbind(sock, sdag)
 
     # Connect to service
-    xsocket.Xconnect(sock, dag)
+    xsocket.Xconnect(sock, ddag)
     # Send request
     xsocket.Xsend(sock, payload, len(payload), 0)
     # Receive reply

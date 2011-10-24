@@ -395,7 +395,7 @@ iprouter[1] -> Script(TYPE PACKET, print "iprouter output1", print_realtime) -> 
 -> EtherEncap(0x0800, 00:00:C0:3B:71:EE, 00:00:C0:3B:71:EF)
 -> AggregateCounter(COUNT_STOP 2)
 -> [0]iprouter; */
-
+/*
 ipgen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
 -> RatedUnqueue(5)
 -> XIAEncap(
@@ -407,7 +407,7 @@ ipgen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
 	       HID1		  	// 2
         , DYNAMIC false		) 
 -> AggregateCounter(COUNT_STOP 2)
--> host0;
+-> host0; */
 
 
-Script(write ipgen.active true);
+//Script(write ipgen.active true);
