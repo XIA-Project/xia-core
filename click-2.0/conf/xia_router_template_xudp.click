@@ -156,7 +156,7 @@ elementclass Router {
     // output[1]: forward to interface 1 (for other ads)
 
     n :: RouteEngine($local_addr);
-    cache :: XIACache($local_addr, n/proc/rt_CID/rt);
+    cache :: XIACache($local_addr, n/proc/rt_CID/rt, PACKET_SIZE 1400); // specify XIA packet size (including the XIA + content header)
 
     Script(write n/proc/rt_AD/rt.add - 1);      // default route for AD
     Script(write n/proc/rt_AD/rt.add $local_ad 4);    // self AD as destination
@@ -190,7 +190,7 @@ elementclass Router4Port {
     // output[3]: forward to interface 3
 
     n :: RouteEngine($local_addr);
-    cache :: XIACache($local_addr, n/proc/rt_CID/rt);
+    cache :: XIACache($local_addr, n/proc/rt_CID/rt, PACKET_SIZE 1400);
 
     input[0] -> [0]n;
     input[1] -> [0]n;
@@ -363,7 +363,7 @@ elementclass EndHost {
     //xudp[2]->Packet forwarding module
     //Packet forwarding module->[2]xudp0;
 
-    cache :: XIACache($local_addr, n/proc/rt_CID/rt, $enable_local_cache);
+    cache :: XIACache($local_addr, n/proc/rt_CID/rt, $enable_local_cache, PACKET_SIZE 1400);
 
     Script(write n/proc/rt_AD/rt.add - 0);      // default route for AD
     Script(write n/proc/rt_HID/rt.add - 0);     // default route for HID

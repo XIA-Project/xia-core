@@ -12,7 +12,7 @@
 
 #define CACHESIZE 1024*1024*1024    //in router 
 #define CLIENTCACHE
-#define PACKETSIZE 64*1024		
+#define PACKETSIZE 1024		
 
 CLICK_DECLS
 class XIAContentModule;
@@ -79,7 +79,7 @@ class XIAContentModule {
 
     unsigned int usedSize;
     static const unsigned int MAXSIZE=CACHESIZE;
-    static const unsigned int PKTSIZE=PACKETSIZE;    
+    static unsigned int PKTSIZE;    
     //lru    
     static const int REFRESH=10000;
     int _timer;

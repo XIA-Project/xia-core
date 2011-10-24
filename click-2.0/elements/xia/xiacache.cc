@@ -14,6 +14,7 @@
 
 
 CLICK_DECLS
+
 XIACache::XIACache()
 {
     cp_xid_type("CID", &_cid_type);   
@@ -38,12 +39,14 @@ XIACache::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     Element* routing_table_elem;
     XIAPath local_addr;
+    int pkt_size=0;
     bool cache_content_from_network =true;
 
     if (cp_va_kparse(conf, this, errh,
 		"LOCAL_ADDR", cpkP+cpkM, cpXIAPath, &local_addr,
 		"ROUTETABLENAME", cpkP+cpkM, cpElement, &routing_table_elem,
 		"CACHE_CONTENT_FROM_NETWORK", cpkP, cpBool, &cache_content_from_network,
+		"PACKET_SIZE", 0, cpInteger, &pkt_size,
 		cpEnd) < 0)
 	return -1;   
 #if USERLEVEL
@@ -54,6 +57,7 @@ XIACache::configure(Vector<String> &conf, ErrorHandler *errh)
     _local_addr = local_addr;
     _local_hid = local_addr.xid(local_addr.destination_node());
 
+    if (pkt_size) XIAContentModule::PKTSIZE= pkt_size;
     _content_module->_cache_content_from_network = true;
     /*
        std::cout<<"Route Table Name: "<<routing_table_name.c_str()<<std::endl;
@@ -98,20 +102,20 @@ void XIACache::push(int port, Packet *p)
 
     if(src_xid_type==_cid_type)  //store, this is chunk response
     {
-    //std::cout<<"Something at "<<_local_hid.unparse().c_str()<<std::endl;
-    __dstID =  hdr->node[hdr->dnode - 2].xid;
-    XID dstHID(__dstID);
-    //std::cout<<"dstID "<<dstID.unparse().c_str()<<std::endl;
-   	_content_module->cache_incoming(p, srcID, dstHID, port);
-   	}
+	//std::cout<<"Something at "<<_local_hid.unparse().c_str()<<std::endl;
+	__dstID =  hdr->node[hdr->dnode - 2].xid;
+	XID dstHID(__dstID);
+	//std::cout<<"dstID "<<dstID.unparse().c_str()<<std::endl;
+	_content_module->cache_incoming(p, srcID, dstHID, port);
+    }
     else if(dst_xid_type==_cid_type)  //look_up,  chunk request
     {
-    __srcID = hdr->node[hdr->dnode + hdr->snode - 2].xid;
-    
-    XID srcHID(__srcID);
-    //std::cout<<"srcID "<<srcHID.unparse().c_str()<<std::endl;
-   	_content_module->process_request(p, srcHID, dstID);
-   	}
+	__srcID = hdr->node[hdr->dnode + hdr->snode - 2].xid;
+
+	XID srcHID(__srcID);
+	//std::cout<<"srcID "<<srcHID.unparse().c_str()<<std::endl;
+	_content_module->process_request(p, srcHID, dstID);
+    }
     else
     {
 	p->kill();
