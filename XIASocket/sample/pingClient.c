@@ -83,7 +83,6 @@ int main(int argc, char *argv[]) {
 	    n = Xrecv(sock,reply,1024,0);
 	    while(n>0)
 	    {   
-        printf("received pong\n");
 		gettimeofday(&tv, NULL);
 		current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
 		memcpy (&seq_c,reply, 4);
