@@ -2,8 +2,7 @@
 
 import socket
 import sys
-import xia_pb2
-import struct
+i -port struct
 import time
 import os
 import xsocket
