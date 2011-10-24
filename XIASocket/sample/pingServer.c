@@ -61,7 +61,6 @@ int main(int argc, char *argv[])
 	//n = Xrecvfrom(sock,payload_new,1024,0,theirDAG,&dlen);
 	if(n>0)
 	{
-
 	    memcpy (&seq_c,payload_new, 4);
 
 	    memcpy (payload_new, &seq_c, 4);
