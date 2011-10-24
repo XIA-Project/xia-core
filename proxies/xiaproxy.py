@@ -45,7 +45,9 @@ def sendSIDRequest(netloc, payload, browser_socket):
     # Send request
     xsocket.Xsend(sock, payload, len(payload), 0)
     # Receive reply
+    print 'sendSIDRequest: about to receive reply'
     reply = xsocket.Xrecv(sock, 1024, 0)
+    print 'sendSIDRequest: received reply'
     xsocket.Xclose(sock)
     # Pass reply up to browswer if it's a normal HTTP message
     # Otherwise request the CIDs
@@ -73,7 +75,7 @@ def requestCID(CID, fallback):
     xsocket.XgetCID(sock, content_dag, len(content_dag))
 
     # Get content
-    data = xsocket.Xrecv(sock, 1024, 0)
+    data = xsocket.Xrecv(sock, 65521, 0)
     print 'Retrieved content:\n%s' % data
 
     xsocket.Xclose(sock)
@@ -107,11 +109,6 @@ def xiaHandler(control, payload, browser_socket):
             
         length = len (recombined_content)
         print "recombined_content length %d " % length
-        #header = 'HTTP/1.1 200 OK\nETag: "48917-39ed-4990ddae564c"\nAccept-Ranges: bytes\nContent-Length: ' + str(length) + '\nContent-Type: image/jpeg\n\n'  # todo: avoid hard code 
-        #header = 'HTTP/1.1 200 OK\nAccept-Ranges: bytes\nCache-Control: no-cache\nContent-Length: 14829\nContent-Type: image/jpeg\n\n'  # todo: avoid hard code 
-        #header2 = ''
-        #payload_http =  recombined_content
-
         browser_socket.send(recombined_content)
     return;
 
