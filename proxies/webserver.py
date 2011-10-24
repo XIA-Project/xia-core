@@ -2,7 +2,7 @@
 
 import socket
 import sys
-i -port struct
+import struct
 import time
 import os
 import xsocket
