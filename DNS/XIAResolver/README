@@ -16,3 +16,4 @@ host list to be stored in /etc/hosts_xia
 note that /etc/host_xia format is different from original /etc/host
 in the domain name comes before DAG
 (for simplicity in parsing, since DAG contains white space)
+
