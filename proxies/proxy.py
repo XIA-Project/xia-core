@@ -79,7 +79,7 @@ class ProxyHandler (BaseHTTPServer.BaseHTTPRequestHandler):
 			header+="%s: %s\r\n" % key_val
 
 		header+="\r\n"
-		xiaHandler(netloc, header, self.connection, sock_rpc)
+		xiaHandler(netloc, header, self.connection)
 		return
 	
         if scm != 'http' or fragment or not netloc:
@@ -152,9 +152,5 @@ if __name__ == '__main__':
             del argv[2:]
         else:
             print "Any clients will be served..."
-	sock_rpc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	# Connect to rpc socket and send data
-        #sock_rpc.setblocking(0)
-	sock_rpc.connect(('', 2000)) #change: 80 -> 2000
-	sock_rpc.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1 )
         BaseHTTPServer.test(ProxyHandler, ThreadingHTTPServer)
