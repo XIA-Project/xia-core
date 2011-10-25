@@ -20,7 +20,7 @@ AD0=  "AD:1000000000000000000000000000000000000000"
 AD1=  "AD:1000000000000000000000000000000000000001"
 RHID0="HID:0000000000000000000000000000000000000002"
 RHID1="HID:0000000000000000000000000000000000000003"
-SID1= "SID:0f00000000000000000000000000000000000055"
+SID1= "SID:0f00000000000000000000000000000000000056"
 CID0= "CID:2000000000000000000000000000000000000001"
 CID_TEST_HTML = "CID:0000000000000000000000000000000000000000"
 
@@ -67,7 +67,7 @@ def main():
     f.close()
 
     # Put content 'image.jpg'
-    f = open("icon_edit.gif", 'r')
+    f = open("image.jpg", 'r')
     chunk = f.read(chunksize)
     while chunk != '':
         putCID(chunk)
@@ -84,9 +84,9 @@ def main():
     dag = "RE %s %s %s" % (AD1, HID1, SID1) # dag to listen on
     xsocket.Xbind(listen_sock, dag)
     print 'Listening on %s' % dag
-    xsocket.Xaccept(listen_sock)
 
     while True:
+        xsocket.Xaccept(listen_sock)
         incoming_data = xsocket.Xrecv(listen_sock, 1024, 0)
         print incoming_data
         serveSIDRequest(incoming_data, listen_sock)
