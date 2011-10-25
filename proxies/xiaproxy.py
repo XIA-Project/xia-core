@@ -205,11 +205,11 @@ def xiaHandler(control, payload, browser_socket):
         print "%.6f" % time.time()
         if control.find('image.jpg') != -1: # TODO: why?
             payload = 'image.jpg'
-    found = control.find('video');
-    if(found != -1):
-        sendVideoSIDRequest(control[4:], payload, browser_socket);
-    else:
-        sendSIDRequest(control[4:], payload, browser_socket);
+        found = control.find('video');
+        if(found != -1):
+            sendVideoSIDRequest(control[4:], payload, browser_socket);
+        else:
+            sendSIDRequest(control[4:], payload, browser_socket);
     elif control.find('cid') == 0:
         print "cid request"
         num = int(control[4])
@@ -223,5 +223,5 @@ def xiaHandler(control, payload, browser_socket):
         length = len (recombined_content)
         print "recombined_content length %d " % length
         browser_socket.send(recombined_content)
-    return;
+    return
 
