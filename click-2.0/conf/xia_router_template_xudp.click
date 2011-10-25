@@ -212,7 +212,7 @@ elementclass DualRouter {
 
     arpt :: Tee(2);
 
-    c0 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/FA, 12/9999, -);
+    c0 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/FA, 12/9999, 12/0800 !23/FA, -);
 
     input[0] -> c0;
     out0 :: Queue(200) -> [0]output;
@@ -222,9 +222,10 @@ elementclass DualRouter {
     arpt[0] -> [1]arpq0;
     c0[2] -> Paint(1) -> Strip(14) -> MarkIPHeader -> StripIPHeader -> MarkXIAHeader -> [0]n;
     c0[3] -> Paint(1) -> Strip(14) -> [0]n;
-    c0[4] -> [0]n; // Print("eth0 non-IP") -> Discard;
+    c0[4] -> Print("eth0 non-IP/XIA") -> Discard;
+    c0[5] -> [0]n; // Print("eth0 non-IP") -> Discard;
 
-    c1 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/FA, 12/9999, -);
+    c1 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/FA, 12/9999, 12/0800 !23/FA, -);
 
     input[1] -> c1;
     out1 :: Queue(200) -> [1]output;
@@ -234,7 +235,8 @@ elementclass DualRouter {
     arpt[1] -> [1]arpq1;
     c1[2] -> Paint(2) -> Strip(14) -> MarkIPHeader -> StripIPHeader -> MarkXIAHeader -> [0]n;
     c1[3] -> Paint(2) -> Strip(14) -> [0]n;
-    c1[4] -> [0]n; //Print("eth1 non-IP") -> Discard;
+    c1[4] -> Discard; //Print("eth1 non-IP/XIA") -> Discard;
+    c1[5] -> [0]n; // Print("eth0 non-IP") -> Discard;
 
     dstTypeC :: XIAXIDTypeClassifier(next IP, -);
     swIP :: PaintSwitch;
