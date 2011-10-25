@@ -22,7 +22,8 @@
 
 int main(int argc, char *argv[])
 {
-    int sock, dlen, n;
+    int sock, n;
+    size_t dlen;
     char buf[1024],theirDAG[1024];
     char* reply="Got your message";
 
@@ -50,16 +51,16 @@ int main(int argc, char *argv[])
 
     while (1) {
 	//Receive packet
-	//n = Xrecvfrom(sock,buf,1024,0,theirDAG,&dlen);
-	n = Xrecv(sock,buf,1024,0);
+	n = Xrecvfrom(sock,buf,1024,0,theirDAG,&dlen);
+	//n = Xrecv(sock,buf,1024,0);
 	if (n < 0) 
 	    error("recvfrom");
-	printf("Received a datagram from:%s\n",theirDAG);
+	printf("\nReceived a datagram from:%s len %d strlen %d\n",theirDAG, dlen, strlen(theirDAG));
 	write(1,buf,n);
 
 	//Reply to client
-	//Xsendto(sock,reply,strlen(reply),0,theirDAG,strlen(theirDAG));
-	Xsend(sock,reply,strlen(reply),0);
+	Xsendto(sock,reply,strlen(reply)+1,0,theirDAG,strlen(theirDAG));
+	//Xsend(sock,reply,strlen(reply),0);
 
     }
     return 0;

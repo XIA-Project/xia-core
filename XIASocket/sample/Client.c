@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
 	//Xsend(sock,buffer,strlen(buffer),0);
 	//Or use Xsendto()
 
-	Xsendto(sock,buffer,strlen(buffer),0,dag,strlen(dag));
+	Xsendto(sock,buffer,strlen(buffer),0,dag,strlen(dag)+1);
 	printf("Sent\n");
 
 
