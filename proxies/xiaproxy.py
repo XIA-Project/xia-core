@@ -183,7 +183,7 @@ def requestCID(CID, fallback):
     # Get content
     try:
         data = xsocket.Xrecv(sock, 65521, 0)
-        print 'Retrieved content:\n%s' % data
+        #print 'Retrieved content:\n%s' % data
     except (KeyboardInterrupt, SystemExit), e:
         sys.exit()
     finally:
@@ -211,14 +211,17 @@ def xiaHandler(control, payload, browser_socket):
         else:
             sendSIDRequest(control[4:], payload, browser_socket);
     elif control.find('cid') == 0:
-        print "cid request"
-        num = int(control[4])
-        print "num %d" % num
+        print "CID request:\n%s" % control
+        control_array = control.split('.')
+        num_chunks = int(control_array[1])
+        print "num chunks: %d" % num_chunks
+        print 'CID list: %s' %control_array[2]
        
         # The browser might be requesting a list of chunks; if so, we'll recombine them into one object
         recombined_content = ''
-        for i in range (0, num):
-            recombined_content += requestCID(control[6+i*40+i:46+i*40+i], True)  #TODO: don't require fallback
+        for i in range (0, num_chunks):
+            print 'CID to fetch: %s' % control_array[2][i*40:40+i*40]
+            recombined_content += requestCID(control_array[2][i*40:40+i*40], True)  #TODO: don't require fallback
             
         length = len (recombined_content)
         print "recombined_content length %d " % length
