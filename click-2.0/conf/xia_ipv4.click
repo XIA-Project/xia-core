@@ -334,7 +334,8 @@ XIAXIDInfo(
     RHID0 HID:0000000000000000000000000000000000000002,
     RHID1 HID:0000000000000000000000000000000000000003,
     CID0 CID:2000000000000000000000000000000000000001,
-    RIP1 IP:4500000000010000FAFA00000000000001000002,
+    IPID1 IP:1.0.0.2,
+    //RIP1 IP:4500000000010000FAFA00000000000001000002,
     //RIP1 IP:123456789ABCDEF13579ACE2468BDF124578ABDE,
 );
 
@@ -395,6 +396,7 @@ iprouter[1] -> Script(TYPE PACKET, print "iprouter output1", print_realtime) -> 
 -> EtherEncap(0x0800, 00:00:C0:3B:71:EE, 00:00:C0:3B:71:EF)
 -> AggregateCounter(COUNT_STOP 2)
 -> [0]iprouter; */
+
 /*
 ipgen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
 -> RatedUnqueue(5)
@@ -403,7 +405,7 @@ ipgen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
     DST DAG			0 1 -	// -1
     	       AD1	       	2 -	// 0
     	       //IPXID(1.0.0.2) 	2 -	// 1
-	       RIP1 		2 -	// 1
+	       IPID1 		2 -	// 1
 	       HID1		  	// 2
         , DYNAMIC false		) 
 -> AggregateCounter(COUNT_STOP 2)
