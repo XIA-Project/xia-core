@@ -1,6 +1,8 @@
 /* XIA video server*/
 /* Meant to run for one time service
-TODO: change it to multiple thread model*/
+TODO: change it to multiple thread model
+Changed to multiple threads now
+*/
 
 #include <sys/types.h>
 #include <stdlib.h>
@@ -133,9 +135,9 @@ int main(int argc, char *argv[])
     		Xaccept(sock);
 		printf("accept\n");
 
+		// As soon as, we receive message, 
+		// we should 
 	
-		// should send http header 
-		// followed by list of CIDs
         
 		//Receive packet
 		n = Xrecv(sock,SIDReq,1024,0);
