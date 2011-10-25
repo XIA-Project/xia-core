@@ -46,11 +46,17 @@ def sendSIDRequest(netloc, payload, browser_socket):
     xsocket.Xconnect(sock, ddag)
     # Send request
     xsocket.Xsend(sock, payload, len(payload), 0)
+
     # Receive reply
-    print 'sendSIDRequest: about to receive reply'
-    reply = xsocket.Xrecv(sock, 1024, 0)
-    print 'sendSIDRequest: received reply'
-    xsocket.Xclose(sock)
+    try:
+        print 'sendSIDRequest: about to receive reply'
+        reply = xsocket.Xrecv(sock, 1024, 0)
+        print 'sendSIDRequest: received reply'
+    except (KeyboardInterrupt, SystemExit), e:
+        sys.exit()
+    finally:
+        xsocket.Xclose(sock)
+
     # Pass reply up to browswer if it's a normal HTTP message
     # Otherwise request the CIDs
     contains_CIDs = check_for_and_process_CIDs(reply, browser_socket)
@@ -80,10 +86,13 @@ def requestCID(CID, fallback):
     xsocket.XgetCID(sock, content_dag, len(content_dag))
 
     # Get content
-    data = xsocket.Xrecv(sock, 65521, 0)
-    print 'Retrieved content:\n%s' % data
-
-    xsocket.Xclose(sock)
+    try:
+        data = xsocket.Xrecv(sock, 65521, 0)
+        print 'Retrieved content:\n%s' % data
+    except (KeyboardInterrupt, SystemExit), e:
+        sys.exit()
+    finally:
+        xsocket.Xclose(sock)
 
     return data
 
