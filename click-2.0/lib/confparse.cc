@@ -1720,6 +1720,22 @@ cp_xid(const String& str, struct click_xia_xid* xid  CP_CONTEXT)
     int i = 0;
     //click_chatter("size xid %d %s\n", sizeof(xid.xid), xid_str.c_str());
 
+    if(xid->type == htonl(CLICK_XIA_XID_TYPE_IP)) {
+	memset(xid->id,0,sizeof(xid->id));
+	xid->id[0] = 0x45;
+	xid->id[5] = 0x01;
+	xid->id[8] = 0xFA;
+	xid->id[9] = 0xFA;
+
+	unsigned short a, b, c, d;
+	sscanf(xid_str.c_str(), "%hu.%hu.%hu.%hu", &a, &b, &c, &d );
+	xid->id[16] = a;
+	xid->id[17] = b;
+	xid->id[18] = c;
+	xid->id[19] = d;
+	return true;
+    }
+
     for (size_t d = 0; d < sizeof(xid->id); d++) {
         if (i < len - 1 && isxdigit(xid_str[i]) && isxdigit(xid_str[i + 1])) {
            // can read two chars

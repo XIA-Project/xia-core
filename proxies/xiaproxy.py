@@ -12,7 +12,9 @@ RHID0="HID:0000000000000000000000000000000000000002"
 RHID1="HID:0000000000000000000000000000000000000003"
 CID0= "CID:2000000000000000000000000000000000000001"
 SID1= "SID:0f00000000000000000000000000000000000055"
-
+SID0= "SID:0f00000000000000000000000000000000000056"
+IP1 = "IP:1.0.0.2"
+IP0 = "IP:18.26.4.30"
 
 def check_for_and_process_CIDs(message, browser_socket):
     rt = message.find('CID') 
@@ -32,10 +34,16 @@ def sendSIDRequest(netloc, payload, browser_socket):
         print "error opening socket"
         return
 
-    dag = "RE %s %s %s" % (AD1, HID1, SID1) # Need a SID?
+    #dag = "RE %s %s %s" % (AD1, HID1, SID1) # Need a SID?
+    ddag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, SID1)
+    #ddag = "DAG 0 - \n %s 1 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP1, HID1, SID1)
+    sdag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP0, HID0, SID0)    
+    #sdag = "DAG 0 - \n %s 1 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP0, HID0, SID0)
+
+    xsocket.Xbind(sock, sdag)
 
     # Connect to service
-    xsocket.Xconnect(sock, dag)
+    xsocket.Xconnect(sock, ddag)
     # Send request
     xsocket.Xsend(sock, payload, len(payload), 0)
     # Receive reply
@@ -62,10 +70,13 @@ def requestCID(CID, fallback):
         return
 
     # Request content
-    content_dag = 'CID:%s' % CID
-    if fallback:
-        content_dag = 'RE %s %s %s' % (AD1, HID1, content_dag)
+    content_dag = 'CID:%s' % CID    
+    content_dag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, content_dag)
+    sdag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP0, HID0, SID0)       
+    #if fallback:
+    #    content_dag = 'RE %s %s %s' % (AD1, HID1, content_dag)
     print 'Retrieving content with ID: \n%s' % content_dag
+    xsocket.Xbind(sock, sdag);
     xsocket.XgetCID(sock, content_dag, len(content_dag))
 
     # Get content

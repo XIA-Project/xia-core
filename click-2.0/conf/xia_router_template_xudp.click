@@ -30,7 +30,7 @@ elementclass XIAPacketRoute {
     check_dest :: XIACheckDest();
     consider_first_path :: XIASelectPath(first);
     consider_next_path :: XIASelectPath(next);
-    c :: XIAXIDTypeClassifier(next AD, next HID, next SID, next CID, -);
+    c :: XIAXIDTypeClassifier(next AD, next HID, next SID, next CID, next IP, -);
 
     //input -> Print("packet received by $local_addr") -> consider_first_path;
     input -> consider_first_path;
@@ -71,7 +71,14 @@ elementclass XIAPacketRoute {
     rt_CID[1] -> XIANextHop -> check_dest;
     rt_CID[2] -> consider_next_path;
 
-    c[4] -> [2]output;
+
+    // Next destination is an IPv4 path
+    c[4] -> rt_IP :: GenericRouting4Port;
+    rt_IP[0] -> GenericPostRouteProc -> [0]output;
+    rt_IP[1] -> XIANextHop -> check_dest;
+    rt_IP[2] -> consider_next_path;
+
+    c[5] -> [2]output;
 };
 
 elementclass RouteEngine {
@@ -175,6 +182,77 @@ elementclass Router {
 
     sw[0] -> Queue(200) -> [0]output;
     sw[1] -> Queue(200) -> [1]output;
+};
+
+// 2-port XIA and IP speaking router node
+elementclass DualRouter {
+    $local_addr, $local_ad, $local_hid, $host_hid, $local_ip, $local_mac |
+    
+    // $local_addr: the full address of the node
+    // $local_ad:   the AD of the node and the local network
+    // $local_hid:  the HID of the node (used for "bound" content source)
+    // $local_ip:   the IPv4 address of the node
+    // $local_mac:  the MAC address of the node
+
+    // input[0], input[1]: a packet arrived at the node
+    // output[0] is plugged into a host that only speaks XIA
+    // output[1] is plugged into the broader internet and speaks XIA / IP
+
+    n :: RouteEngine($local_addr);
+    cache :: XIACache($local_addr, n/proc/rt_CID/rt);
+
+    Script(write n/proc/rt_AD/rt.add - 5);      // default route for AD
+    Script(write n/proc/rt_AD/rt.add $local_ad 4);    // self AD as destination
+    Script(write n/proc/rt_HID/rt.add - 5);     // forwarding for local HID
+    Script(write n/proc/rt_HID/rt.add $host_hid 0);     // forwarding for local HID
+    Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self HID as destination
+    Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
+    Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
+    Script(write n/proc/rt_IP/rt.add - 1);	// default route for IP traffice
+
+    arpt :: Tee(2);
+
+    c0 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/FA, 12/9999, -);
+
+    input[0] -> c0;
+    out0 :: Queue(200) -> [0]output;
+    c0[0] -> ar0 :: ARPResponder(0.0.0.0/0 $local_mac) -> out0;
+    arpq0 :: ARPQuerier($local_ip, $local_mac) -> out0;
+    c0[1] -> arpt;
+    arpt[0] -> [1]arpq0;
+    c0[2] -> Paint(1) -> Strip(14) -> MarkIPHeader -> StripIPHeader -> MarkXIAHeader -> [0]n;
+    c0[3] -> Paint(1) -> Strip(14) -> [0]n;
+    c0[4] -> [0]n; // Print("eth0 non-IP") -> Discard;
+
+    c1 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/FA, 12/9999, -);
+
+    input[1] -> c1;
+    out1 :: Queue(200) -> [1]output;
+    c1[0] -> ar1 :: ARPResponder(0.0.0.0/0 $local_mac) -> out1;
+    arpq1 :: ARPQuerier($local_ip, $local_mac) -> out1;
+    c1[1] -> arpt;
+    arpt[1] -> [1]arpq1;
+    c1[2] -> Paint(2) -> Strip(14) -> MarkIPHeader -> StripIPHeader -> MarkXIAHeader -> [0]n;
+    c1[3] -> Paint(2) -> Strip(14) -> [0]n;
+    c1[4] -> [0]n; //Print("eth1 non-IP") -> Discard;
+
+    dstTypeC :: XIAXIDTypeClassifier(next IP, -);
+    swIP :: PaintSwitch;
+    swXIA :: PaintSwitch;
+
+    n[0] -> dstTypeC;
+    dstTypeC[0] -> XIAIPEncap(SRC $local_ip) -> swIP;
+    dstTypeC[1] -> swXIA;    
+
+    n[1] -> Discard;
+    n[2] -> [0]cache[0] -> [1]n;
+    Idle -> [1]cache[1] -> Discard;
+
+    swIP[0] -> arpq0;
+    swIP[1] -> arpq1;
+
+    swXIA[0] -> out0;
+    swXIA[1] -> out1;
 };
 
 // 4-port router node; AD & HID tables need to be set manually using Script()
@@ -370,7 +448,8 @@ elementclass EndHost {
     Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self HID as destination
     Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
-    
+    Script(write n/proc/rt_IP/rt.add - 0); 	// default route for IPv4    
+
     input[0] -> n;
     srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
     n[1] -> srcTypeClassifier[1] -> [2]xudp[2] -> [0]n;

@@ -6,6 +6,9 @@ tester: getXIPinfo_test.c getXIPinfo
 getXIPinfo: getXIPinfo.c
 	gcc -ggdb -c getXIPinfo.c -Wall -Werror
 
+python-wrapper: getXIPinfo.c
+	gcc -shared getXIPinfo.c -o ./python_wrapper/getXIPinfo.so -Wall -Werror
+
 clean:
 	rm tester
 	rm *.o

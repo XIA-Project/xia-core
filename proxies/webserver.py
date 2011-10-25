@@ -67,7 +67,7 @@ def main():
     f.close()
 
     # Put content 'image.jpg'
-    f = open("image.jpg", 'r')
+    f = open("icon_edit.gif", 'r')
     chunk = f.read(chunksize)
     while chunk != '':
         putCID(chunk)
