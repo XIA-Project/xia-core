@@ -7,10 +7,11 @@ import time
 import os
 import xsocket
 from ctypes import *
+import hashlib
 
-chunksize = 65536
-CID = ['0000000000000000000000000000000000000000', '0000000000000000000000000000000000000001', '0000000000000000000000000000000000000010','0000000000000000000000000000000000000011','0000000000000000000000000000000000000100', '0000000000000000000000000000000000000101', '0000000000000000000000000000000000000110','0000000000000000000000000000000000000111','0000000000000000000000000000000000001000', '0000000000000000000000000000000000001001', '0000000000000000000000000000000000001010', '0000000000000000000000000000000000001011']
-cid_i = 0
+chunksize = 1000
+#CID = ['0000000000000000000000000000000000000000', '0000000000000000000000000000000000000001', '0000000000000000000000000000000000000010','0000000000000000000000000000000000000011','0000000000000000000000000000000000000100', '0000000000000000000000000000000000000101', '0000000000000000000000000000000000000110','0000000000000000000000000000000000000111','0000000000000000000000000000000000001000', '0000000000000000000000000000000000001001', '0000000000000000000000000000000000001010', '0000000000000000000000000000000000001011']
+#cid_i = -1
 length = 0
 
 # Pretend a magic naming service gives us XIDs...
@@ -22,25 +23,30 @@ RHID0="HID:0000000000000000000000000000000000000002"
 RHID1="HID:0000000000000000000000000000000000000003"
 SID1= "SID:0f00000000000000000000000000000000000056"
 CID0= "CID:2000000000000000000000000000000000000001"
-CID_TEST_HTML = "CID:0000000000000000000000000000000000000000"
+CID_TEST_HTML = ""  # we set this when we 'put' the hmtl page
 
 def putCID(chunk):
-    global cid_i
-    #TODO: Actually compute hashes, don't use global array
+    #global cid_i
+    #cid_i += 1
+
+    # Hash the content to get CID
+    m = hashlib.sha1()
+    m.update(chunk)
+    cid = m.hexdigest()
+
     sock = xsocket.Xsocket()
     if (sock<0):
         print "error opening socket"
         return
     
     # Put the content chunk
-    content_dag = 'RE %s %s CID:%s' % (AD1, HID1, CID[cid_i])
+    content_dag = 'RE %s %s CID:%s' % (AD1, HID1, cid)
     xsocket.XputCID(sock, chunk, len(chunk), 0, content_dag, len(content_dag))
 
     print 'put content %s (length %s)' % (content_dag, len(chunk))
     xsocket.Xclose(sock)
 
-    cid_i += 1
-    return
+    return cid
 
 def serveSIDRequest(request, sock):
     # For now, regardless of what was requested, we respond
@@ -53,25 +59,38 @@ def serveSIDRequest(request, sock):
 
 def main():
     global AD1, HID1, SID1
+    global length
+    global CID_TEST_HTML
 
     # Set up connection with click via Xsocket API
     xsocket.set_conf("xsockconf_python.ini", "webserver.py")
     xsocket.print_conf()  #for debugging
 
-    # Put content 'test.html'
-    f = open("test.html", 'r')
-    chunk = f.read(chunksize)
-    global length
-    length = len(chunk)
-    putCID(chunk)
-    f.close()
-
-    # Put content 'image.jpg'
+    # Put content 'image.jpg' and make a corresponding list of CIDs
+    # (if image is chunked it might have multiple CIDs)
+    image_cid_list = []
     f = open("image.jpg", 'r')
     chunk = f.read(chunksize)
     while chunk != '':
-        putCID(chunk)
+        image_cid_list.append(putCID(chunk))
         chunk = f.read(chunksize)
+    f.close()
+
+    # Build 'test.html' file
+    num_image_chunks = len(image_cid_list)
+    image_cid_list_string = ''
+    for cid in image_cid_list:
+        image_cid_list_string += cid
+    f = open("test.html", 'w')
+    f.write('<html><body><h1>It works!</h1>\n<h2><img src="http://xia.cid.%s.%s" /></h2><ul class="left-nav">\n\n</body></html>' % (num_image_chunks, image_cid_list_string))
+
+    # Put content 'test.html'
+    # TODO: Silly to write file then read it again; we do it
+    # for now so we can see the actual file for debugging
+    f = open("test.html", 'r')
+    chunk = f.read(chunksize)
+    length = len(chunk)
+    CID_TEST_HTML = 'CID:' + putCID(chunk)
     f.close()
     
     time.sleep(1) #necessary?
