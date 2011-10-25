@@ -284,7 +284,7 @@ elementclass IPRouter {
     //FromDevice(eth1) -> c1;
     input[1] -> c1;
     out1 :: Queue(200) -> [1]output; //todevice1 :: ToDevice(eth1);
-    c1[0] -> ar1 :: ARPResponder(1.0.0.1 00:00:C0:CA:68:EF) -> out1;
+    c1[0] -> ar1 :: ARPResponder(1.0.0.1 18.26.4.0/16 00:00:C0:CA:68:EF) -> out1;
     arpq1 :: ARPQuerier(1.0.0.1, 00:00:C0:CA:68:EF) -> out1;
     c1[1] -> arpt;
     arpt[1] -> [1]arpq1;

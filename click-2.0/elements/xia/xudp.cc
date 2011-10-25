@@ -325,7 +325,8 @@ void XUDP::push(int port, Packet *p_input)
 				String str_local_addr=_local_addr.unparse_re()+" "+source_xid.unparse();
 				//Make source DAG _local_addr:SID
 				if(isConnected) {
-				    if(daginfo->src_path.unparse_re()!=str_local_addr) {
+				    String dagstr = daginfo->src_path.unparse_re();
+				    if(dagstr.length() !=0 && dagstr !=str_local_addr) {
 					//Moved!
 					daginfo->src_path.parse_re(str_local_addr);
 					//Send a control packet to transport on the other side
@@ -432,11 +433,13 @@ void XUDP::push(int port, Packet *p_input)
 				portToDAGinfo.set(_sport,*daginfo);
 			    }
 
-			    //Recalculate source path
-			    XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
-			    String str_local_addr=_local_addr.unparse_re()+" "+source_xid.unparse();//Make source DAG _local_addr:SID
-			    daginfo->src_path.parse_re(str_local_addr);
-
+			    if(daginfo->src_path.unparse_re().length() !=0) {
+			      //Recalculate source path
+			      XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+			      String str_local_addr=_local_addr.unparse_re()+" "+source_xid.unparse();//Make source DAG _local_addr:SID			    
+			      daginfo->src_path.parse(str_local_addr);
+			    }
+			    
 			    daginfo=portToDAGinfo.get_pointer(_sport);
 			    portRxSeqNo.set(_sport,portRxSeqNo.get(_sport)+1);//Increment counter
 
