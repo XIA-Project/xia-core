@@ -61,6 +61,7 @@ int Xrecvfrom(int sockfd, void *buf, size_t len, int flags,
 	int offset=i+1;
 	memcpy(buf, UDPbuf+offset, paylen);
 	strncpy(sDAG, UDPbuf, i);
+	sDAG[i]=0; /* Make DAG a null terminated string */
 	*slen=i;
 		
 	return paylen;
