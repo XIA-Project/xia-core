@@ -1,0 +1,28 @@
+video streaming on local browser (e.g., your laptop and no geni host)
+for that, 
+
+first on your client/laptop modify your .ssh/config in following way
+
+Host emulab
+ Hostname ops.emulab.net
+ LocalForward 2222 pg56.emulab.net:22
+ user ashokana
+
+Host client
+ Hostname localhost
+ HostKeyAlias pg56.emulab.net
+ port 2222
+ ForwardX11 yes
+ ForwardX11Trusted yes
+ LocalForward 7500 pg56.emulab.net:8000
+
+
+then, 
+
+ssh username@emulab first
+followed by, mberman@client
+
+set your browser, to use localhost, 7500
+
+then you can do streaming, or image loading.. 
+
