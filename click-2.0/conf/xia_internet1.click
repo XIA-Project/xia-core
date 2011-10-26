@@ -10,5 +10,5 @@ host1[0] ->  Script(TYPE PACKET, print "host1 output0", print_realtime) -> LinkU
 router1[0] ->  Script(TYPE PACKET, print "router1 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) -> [0]host1;
 
 // interconnection -- ad - ad
-router1[1] -> Script(TYPE PACKET, print "REAL Ethernet OUTPUT", print_realtime) -> ToDevice(eth0);
+router1[1] -> ToDevice(eth0);
 FromDevice(eth0) -> [1]router1;
