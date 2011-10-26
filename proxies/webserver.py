@@ -9,7 +9,7 @@ import xsocket
 from ctypes import *
 import hashlib
 
-chunksize = 1000
+chunksize = 1200
 #CID = ['0000000000000000000000000000000000000000', '0000000000000000000000000000000000000001', '0000000000000000000000000000000000000010','0000000000000000000000000000000000000011','0000000000000000000000000000000000000100', '0000000000000000000000000000000000000101', '0000000000000000000000000000000000000110','0000000000000000000000000000000000000111','0000000000000000000000000000000000001000', '0000000000000000000000000000000000001001', '0000000000000000000000000000000000001010', '0000000000000000000000000000000000001011']
 #cid_i = -1
 length = 0
@@ -22,6 +22,7 @@ AD1=  "AD:1000000000000000000000000000000000000001"
 RHID0="HID:0000000000000000000000000000000000000002"
 RHID1="HID:0000000000000000000000000000000000000003"
 SID1= "SID:0f00000000000000000000000000000000000056"
+#SID1= "SID:0f03333333333333333333333333330000000055"
 CID0= "CID:2000000000000000000000000000000000000001"
 CID_TEST_HTML = ""  # we set this when we 'put' the hmtl page
 
@@ -52,7 +53,7 @@ def serveSIDRequest(request, sock):
     # For now, regardless of what was requested, we respond
     # with an HTTP message directing the browser to request
     # the html file at CID_TEST_HTML
-    response = 'HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nLast-Modified: Sat, 08 Jan 2011 21:08:31 GMT\nCache-Control: no-cache\nAccept-Ranges: bytes\nContent-Length: ' + str(length) + '\nConnection: close\nContent-Type: text/html\n\n'+ CID_TEST_HTML
+    response = 'HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/html\n\n'+ CID_TEST_HTML
     print 'Response:\n%s' % response
     xsocket.Xsend(sock, response, len(response), 0)
     return
@@ -79,6 +80,7 @@ def main():
     # Build 'test.html' file
     num_image_chunks = len(image_cid_list)
     image_cid_list_string = ''
+
     for cid in image_cid_list:
         image_cid_list_string += cid
     f = open("test.html", 'w')
@@ -87,12 +89,19 @@ def main():
     # Put content 'test.html'
     # TODO: Silly to write file then read it again; we do it
     # for now so we can see the actual file for debugging
-    f = open("test.html", 'r')
+    print "webpage"
+    f = open("xia.html", 'r')
     chunk = f.read(chunksize)
-    length = len(chunk)
-    CID_TEST_HTML = 'CID:' + putCID(chunk)
+
+    while chunk != '':
+        cid = putCID(chunk)
+        CID_TEST_HTML += 'CID:' 
+	CID_TEST_HTML  += cid
+	CID_TEST_HTML  += '\t'
+        chunk = f.read(chunksize)
     f.close()
     
+    print "end webpage"
     time.sleep(1) #necessary?
 
     # Now listen for connections from clients
