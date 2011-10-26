@@ -53,18 +53,29 @@ def check_for_and_process_CIDlist(message, browser_socket):
     print "NO CID present"
     return False
 
-def process_more_CIDlist(message, browser_socket, moresock):
+def process_more_CIDlist(message, browser_socket, moresock, socks):
     rt = message.find('CID') 
     #print rt
+    cidlist = list()
     while(rt != -1):
 	#print "requesting for CID", message[rt+4:rt+44]
 	CID = message[rt+4:rt+44]
 	content_dag = 'CID:%s' % CID
         content_dag = 'RE %s %s %s' % (AD0, HID0, content_dag)
-        xsocket.XgetCID(moresock, content_dag, len(content_dag))
-        content = xsocket.Xrecv(moresock, 65521, 0)
-	browser_socket.send(content)
+        cidlist.append(content_dag)
+        #xsocket.XgetCID(moresock, content_dag, len(content_dag))
+        #content = xsocket.Xrecv(moresock, 65521, 0)
+	#browser_socket.send(content)
 	rt = message.find('CID', rt+44)
+    ## issue multiple request
+    ## and receive multiple content
+    ## first issue all the requests
+    for i in range(len(cidlist)):
+	xsocket.XgetCID(socks[i], cidlist[i], len(cidlist[i]))
+    ## then retrieve them
+    for i in range(len(cidlist)):
+        content = xsocket.Xrecv(socks[i], 1024, 0)
+	browser_socket.send(content)
     return True
  
 def sendVideoSIDRequest(netloc, payload, browser_socket):
@@ -97,13 +108,21 @@ def sendVideoSIDRequest(netloc, payload, browser_socket):
 	#print "foundvalue", found
 	test = "hello world"
         moresock = xsocket.Xsocket()
+	## assume at most 30 sockets
+	socks = list()
+	for i in range(30):
+		sockcid = xsocket.Xsocket()
+		socks.append(sockcid)
 	while(found != -1):
 		#if found
 		## send data to server
 		xsocket.Xsend(sock, test, len(test), 0)
 		reply = xsocket.Xrecv(sock, 65521, 0)
-		process_more_CIDlist(reply, browser_socket, moresock)
+		process_more_CIDlist(reply, browser_socket, moresock, socks)
 		found = reply.find('more')
+	xsocket.Xclose(moresock)
+	for i in range(30):
+		xsocket.Xclose(socks[i])
     else:
 	browser_socket.send(reply)
     
