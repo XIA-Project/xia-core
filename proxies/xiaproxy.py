@@ -13,6 +13,7 @@ RHID1="HID:0000000000000000000000000000000000000003"
 CID0= "CID:2000000000000000000000000000000000000001"
 SID0= "SID:0f00000000000000000000000000000000000055"
 SID1= "SID:0f00000000000000000000000000000000000056"
+#SID1= "SID:0f03333333333333333333333333330000000055"
 IP1 = "IP:128.2.208.167"
 IP0 = "IP:128.2.208.168"
 
@@ -22,9 +23,23 @@ def check_for_and_process_CIDs(message, browser_socket):
     if (rt!= -1):
         http_header = message[0:rt]
         content = requestCID(message[rt+4:rt+44], True)
-        browser_socket.send(content)
+	## this was the first occurrence
+	browser_socket.send(http_header)
+	browser_socket.send(content)
+	## now keep finding CID and sending content
+	#print "length received ",len(message)
+	rt = message.find('CID', rt+44)
+	print rt
+	while(rt != -1):
+		print "requesting for CID", message[rt+4:rt+44]
+		content = requestCID(message[rt+4:rt+44], True)
+		browser_socket.send(content)
+		rt = message.find('CID', rt+44)
+	print "no more CID\n\n"
         return True
+    print "NO CID present"
     return False
+
 
 def check_for_and_process_CIDlist(message, browser_socket):
     rt = message.find('CID') 
@@ -33,17 +48,20 @@ def check_for_and_process_CIDlist(message, browser_socket):
         http_header = message[0:rt]
         content = requestVideoCID(message[rt+4:rt+44], True)
 	## this was the first occurrence
+	print header
+	print content
 	browser_socket.send(http_header)
 	browser_socket.send(content)
 	## now keep finding CID and sending content
 	#print "length received ",len(message)
 	rt = message.find('CID', rt+44)
 	while(rt != -1):
-		#print "requesting for CID", message[rt+4:rt+44]
+		print "requesting for CID", message[rt+4:rt+44]
 		content = requestVideoCID(message[rt+4:rt+44], True)
 		browser_socket.send(content)
 		rt = message.find('CID', rt+44)
         return True
+    print "NO CID present"
     return False
 
 def process_more_CIDlist(message, browser_socket, moresock):
@@ -78,7 +96,7 @@ def sendVideoSIDRequest(netloc, payload, browser_socket):
     print 'sendSIDRequest: about to receive reply'
 
     reply = xsocket.Xrecv(sock, 65521, 0)
-    print 'sendSIDRequest: received reply\n'
+    print "sendSIDRequest: received reply %s\n" % reply
     #,reply
     # Pass reply up to browswer if it's a normal HTTP message
     # Otherwise request the CIDs
@@ -123,15 +141,17 @@ def requestVideoCID(CID, fallback):
 
 
 def sendSIDRequest(netloc, payload, browser_socket):
-    print "in SID function - net location = " + netloc  
+    sid = "SID:"+netloc[0:40]
+    if (len(sid)!=len(SID1)):
+        sid = SID1
+    print "in SID function - net location = " + netloc + " sid: " + sid
 
     sock = xsocket.Xsocket()
     if (sock<0):
         print "error opening socket"
         return
 
-    #dag = "RE %s %s %s" % (AD1, HID1, SID1) # Need a SID?
-    ddag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, SID1)
+    ddag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, sid)
     #ddag = "DAG 0 - \n %s 1 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP1, HID1, SID1)
     sdag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP0, HID0, SID0)    
     #sdag = "DAG 0 - \n %s 1 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP0, HID0, SID0)
@@ -147,7 +167,7 @@ def sendSIDRequest(netloc, payload, browser_socket):
     try:
         print 'sendSIDRequest: about to receive reply'
         reply = xsocket.Xrecv(sock, 65521, 0)
-        print 'sendSIDRequest: received reply'
+        print "sendSIDRequest: received reply %s" % reply
     except (KeyboardInterrupt, SystemExit), e:
         sys.exit()
     finally:
@@ -156,6 +176,7 @@ def sendSIDRequest(netloc, payload, browser_socket):
     # Otherwise request the CIDs
     contains_CIDs = check_for_and_process_CIDs(reply, browser_socket)
     if not contains_CIDs:
+    	print("sending reply to browser")
         browser_socket.send(reply)
     
     return
@@ -183,7 +204,7 @@ def requestCID(CID, fallback):
     # Get content
     try:
         data = xsocket.Xrecv(sock, 65521, 0)
-        #print 'Retrieved content:\n%s' % data
+        print 'Retrieved content:\n len %d' % len(data)
     except (KeyboardInterrupt, SystemExit), e:
         sys.exit()
     finally:
@@ -194,7 +215,7 @@ def requestCID(CID, fallback):
 
 def xiaHandler(control, payload, browser_socket):
     xsocket.set_conf("xsockconf_python.ini", "xiaproxy.py")
-    xsocket.print_conf()  #for debugging
+    #xsocket.print_conf()  #for debugging
 
     if payload.find('GET /favicon.ico') != -1:
                     return
@@ -202,7 +223,7 @@ def xiaHandler(control, payload, browser_socket):
     control=control[4:]  # remove the 'xia.' prefix
     if control.find('sid') == 0:
         print "SID request"
-        print "%.6f" % time.time()
+        #print "%.6f" % time.time()
         if control.find('image.jpg') != -1: # TODO: why?
             payload = 'image.jpg'
         found = control.find('video');
