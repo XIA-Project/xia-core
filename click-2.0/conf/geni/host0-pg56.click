@@ -2,7 +2,7 @@ require(library xia_two_port_four_port_router.click);
 
 
 // host instantiation
-host0 :: EndHost (RE AD0 HID0, HID0, fake0,172.0.0.2,172.0.0.1,11:11:11:11:11:11,1);
+host0 :: EndHost (RE AD0 HID0, HID0, fake0,172.0.0.2,172.0.0.1,11:11:11:11:11:11,0);
 //router1 :: Router4PortDummyCache(RE AD1 RHID1, AD1, RHID1); // if router does not understand CID pricipal
 
 c0 :: Classifier(12/9999);
