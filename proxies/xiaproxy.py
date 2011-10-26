@@ -37,8 +37,8 @@ def check_for_and_process_CIDlist(message, browser_socket):
         http_header = message[0:rt]
         content = requestVideoCID(message[rt+4:rt+44], True)
 	## this was the first occurrence
-	print header
-	print content
+	#print header
+	#print content
 	browser_socket.send(http_header)
 	browser_socket.send(content)
 	## now keep finding CID and sending content
@@ -61,7 +61,7 @@ def process_more_CIDlist(message, browser_socket, moresock, socks):
 	#print "requesting for CID", message[rt+4:rt+44]
 	CID = message[rt+4:rt+44]
 	content_dag = 'CID:%s' % CID
-        content_dag = 'RE %s %s %s' % (AD0, HID0, content_dag)
+        content_dag = 'RE %s %s %s' % (AD1, HID1, content_dag)
         cidlist.append(content_dag)
         #xsocket.XgetCID(moresock, content_dag, len(content_dag))
         #content = xsocket.Xrecv(moresock, 65521, 0)
@@ -85,7 +85,7 @@ def sendVideoSIDRequest(netloc, payload, browser_socket):
     if (sock<0):
         print "error opening socket"
         return
-    dag = "RE %s %s %s" % (AD0, HID0, SID0) # Need a SID?
+    dag = "RE %s %s %s" % (AD1, HID1, SID1) # Need a SID?
     print "Connecting to ",dag	
     xsocket.Xconnect(sock, dag)
     print "Connected. OK\n"
@@ -137,7 +137,7 @@ def requestVideoCID(CID, fallback):
     # Request content
     content_dag = 'CID:%s' % CID
     if fallback:
-        content_dag = 'RE %s %s %s' % (AD0, HID0, content_dag)
+        content_dag = 'RE %s %s %s' % (AD1, HID1, content_dag)
     #print 'Retrieving content with ID: \n%s' % content_dag
     xsocket.XgetCID(sock, content_dag, len(content_dag))
     # Get content
