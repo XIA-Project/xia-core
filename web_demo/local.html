@@ -6,13 +6,15 @@
 	border-width:	1px;
 	border-style:	solid;
 	border-color:	lightgrey;
-	width: 900px;
+	width: 1100px;
 	margin-left: 1em;
 	left: 10px;
 	padding-left: 2em;
 	padding-bottom: 2em;}
 h1 {color: #aa1111;}
 h2 { padding-left: 1em; }
+id { padding-left: 1em; font: arial; font-size: 11pt; color: #aa1111;}
+fb { padding-left: 1em; font: arial; font-size: 11pt; font-weight: bold; color: #aa1111;}
 
 </style>
 <body>
@@ -22,15 +24,27 @@ h2 { padding-left: 1em; }
 <p>
 <h2>Multiple types of identifiers</h2>
 <ul>
-<li>Host Identifiers </li>
-<li>Service Identifiers</li>
-<li>Content Identifiers</li>
+<li>Network (Domain) and Host Identifiers    </li> 
+<id>AD:06088766ef5729c6e10b6dbf076f9c708e9855fc</id> 
+<br>
+<id>HID:71c3dd5af38bcd2cfede5b943c3358d4ef4285f8</id> 
+<li>Service Identifiers </li>
+<id>SID:f0afa824a36f2a2d95c67ff60f61200e48006625</id> 
+<br><id>Talking to a service</id>
+<li>Content Identifiers </li>
+<id>CID:95c52e5d05fffc44a2a3ab1c466e2cd8749d9d7d</id> 
+<br><id>Fetching content (a chunk)</id>
+<li>Define your own! </li>
+<id> Define your own semantics of operating on this type</id><br>
+<id> Intrinsic security requirement </id>
 </ul>
 
 <h2>Backwards-compatible paths</h2>
 <ul>
-<li>Service Identifiers with fallback</li>
+<li>Service Identifiers with fallback </li>
+<id><fb> (HID:71c3dd5af38bcd2cfede5b943c3358d4ef4285f8) </fb>SID:f0afa824a36f2a2d95c67ff60f61200e48006625</id> 
 <li> Content Identifiers with fallback</li>
+<id> <fb>(HID:71c3dd5af38bcd2cfede5b943c3358d4ef4285f8) </fb> CID:06088766ef5729c6e10b6dbf076f9c708e9855fc</id> </li>
 </ul>
 
 </div>
