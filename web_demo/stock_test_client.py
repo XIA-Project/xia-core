@@ -1,5 +1,6 @@
+#!/usr/bin/python
 from xsocket import *
-from stock_address import *
+from xia_address import *
 
 set_conf("xsockconf_python.ini","stock_test_client.py")
 print_conf()
@@ -11,7 +12,7 @@ if (sock<0):
 	exit(-1)
 
 # Make the sDAG (the one the server listens on)
-dag = "RE %s %s %s" % (AD1, HID1, SID)
+dag = "RE %s %s %s" % (AD1, HID1, SID_STOCK)
 Xconnect(sock, dag)
 msg = "hi"
 #Xsendto(sock, msg ,len(msg),0, dag, len(dag)+1);

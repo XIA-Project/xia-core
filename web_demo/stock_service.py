@@ -1,6 +1,6 @@
 #!/usr/bin/python
 import xsocket 
-from stock_address import * 
+from xia_address import * 
 import random
 import sys
 
@@ -57,7 +57,7 @@ while(True):
         	exit(-1)
         
         # Make the sDAG (the one the server listens on)
-        dag = "RE %s %s %s" % (AD1, HID1, SID)
+        dag = "RE %s %s %s" % (AD1, HID1, SID_STOCK)
         
         # Bind to the DAG
         ret= xsocket.Xbind(sock,dag);
