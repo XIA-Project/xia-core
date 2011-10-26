@@ -1,0 +1,162 @@
+<html>
+<head>
+<meta content="text/html; charset=ISO-8859-1" http-equiv="Content-Type">
+<link rel="icon" href="/favicon.ico" type="image/ico">
+<title>Example - Stock Ticker</title>
+<script language="javascript" type="text/javascript" src="stock-ticker.js"></script>
+
+<script language="javascript" type="text/javascript">
+<!--
+var stock = "http://www.cs.cmu.edu/afs/cs.cmu.edu/user/dongsuh/www/stock";
+var page = "http://www.cs.cmu.edu/afs/cs.cmu.edu/user/dongsuh/www/news_feed";
+var stock_element = 'stock'
+var pos = 0
+function load()
+{
+	ajax(page,'text');
+	ajax(stock,stock_element);
+	shift();
+}
+
+function shift() 
+{
+	var div = document.getElementById(stock_element);
+	pos = pos - 5
+	if (pos<= -1000) 
+	{
+	   pos = 0;
+	   div.appendChild(div.firstChild);
+	   div.firstChild.offsetWidth = div.firstChild.offsetWidth;
+	}
+	div.style.left = ( pos+ 'px');    
+	setTimeout("shift()", 100);
+}
+function ajax(url,target) {
+    // native XMLHttpRequest object
+    //document.getElementById(target).innerHTML = 'Loading...';
+    if (window.XMLHttpRequest) {
+	var req = new XMLHttpRequest();
+	req.onreadystatechange = function() {ajaxDone(req, target);};
+	req.open("GET", url, true);
+	req.send(null);
+	// IE/Windows ActiveX version
+    } else if (window.ActiveXObject) {
+	var req = new ActiveXObject("Microsoft.XMLDOM");
+	if (req) {
+	    req.onreadystatechange = function() {ajaxDone(req, target);};
+	    req.open("GET", url, true);
+	    req.send(null);
+	}
+    }
+    if (url== page)
+    	setTimeout("ajax(page,'text')", 500);
+    if (url== stock)
+    	setTimeout("ajax(stock,stock_element)", 1000);
+}
+
+function ajaxDone(req, target) {
+    // only if req is "loaded"
+    if (req.readyState == 4) {
+	// only if "OK"
+	if (req.status == 200 || req.status == 304) {
+	    results = req.responseText;
+	    document.getElementById(target).innerHTML = results;
+	} else {
+	    document.getElementById(target).innerHTML="ajax error:\n" +
+		req.statusText;
+	}
+    }
+}
+
+var ticker = null; /* ticker object */
+
+function setTickerSpeed()
+{
+	ticker.changeInterval(document.forms.frmTickerSpeed.speed.value);
+}
+
+function startticker()
+{
+	ticker = new Ticker('ticker', 'tickerID', 1, document.forms.frmTickerSpeed.speed.value);
+
+	ticker.start();
+}
+// -->
+</script>
+<style type="text/css">
+#main #content {margin-right: 2em;}
+.ticker
+{
+	position:		relative;
+	visibility:		hidden;
+	left:			0px; 
+	top:			0px; 
+	border-width:	1px;
+	border-style:	solid;
+	font-size:		12px; 
+	font-weight:	bold; 
+	width:			100%;
+}
+
+.clstsu
+{
+	color:			green; 
+	cursor:			hand;
+	cursor:			pointer; 
+	padding-bottom:	2px; 
+	padding-left:	2em;
+	padding-right:	2em;
+	margin:			0px;
+}
+
+.clstst
+{
+	color:			black; 
+	cursor:			hand;
+	cursor:			pointer; 
+	padding-bottom:	2px; 
+	padding-left:	2em;
+	padding-right:	2em;
+	margin:			0px;
+}
+
+.clstsd
+{
+	color:			red; 
+	cursor:			hand;
+	cursor:			pointer; 
+	padding-bottom:	2px; 
+	padding-left:	2em;
+	padding-right:	2em;
+	margin:			0px;
+}
+
+.clstimg
+{
+	height: 12px;
+	width:  18px;
+}
+</style>
+</head>
+<body onload="load()" style =" overflow-x: hidden;">
+<div id="main">
+
+<p> <h1>Video</h1> </p>
+<p>
+<div id="video" style="width: 700px; height: 300px">  
+</div>
+<p> <h1>Service</h1> </p>
+<p>
+<div id="text" style="width: 700px; height: 100px">  
+</div> 
+</body>
+
+<h2>My Faivor Stock</h2>
+<div id="stock"style= "position: relative; width: 3000px; overflow: hidden; height:17px; border-style:solid; visibility: visible ;" > 
+</div>
+
+
+<!--/noindex-->
+</body>
+</html>
+

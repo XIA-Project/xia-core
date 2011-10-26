@@ -1,0 +1,13 @@
+		<span class="clstsu">A 12.45    <img alt="" class="clstimg" src="uptick.gif" WIDTH="18" HEIGHT="8">+1</span>
+		<span class="clstsd">AA 12.45   <img alt="" class="clstimg" src="dwntick.gif" WIDTH="18" HEIGHT="8">-1</span>
+		<span class="clstsu">AAA 12.45  <img alt="" class="clstimg" src="uptick.gif" WIDTH="18" HEIGHT="8">+.50</span>
+
+		<span class="clstsu">B 12.45    <img alt="" class="clstimg" src="uptick.gif" WIDTH="18" HEIGHT="8">+.33</span>
+		<span class="clstsd">BB 12.45   <img alt="" class="clstimg" src="dwntick.gif" WIDTH="18" HEIGHT="8">-10</span>
+		<span class="clstsu">BBB 12.45  <img alt="" class="clstimg" src="uptick.gif" WIDTH="18" HEIGHT="8">+.1</span>
+		<span class="clstsu">C 12.45    <img alt="" class="clstimg" src="uptick.gif" WIDTH="18" HEIGHT="8">+1</span>
+		<span class="clstsd">DDD 12.45  <img alt="" class="clstimg" src="dwntick.gif" WIDTH="18" HEIGHT="8">-1</span>
+
+		<span class="clstsu">EE 12.45   <img alt="" class="clstimg" src="uptick.gif" WIDTH="18" HEIGHT="8">+1</span>
+		<span class="clstsu">FFFF 12.45 <img alt="" class="clstimg" src="uptick.gif" WIDTH="18" HEIGHT="8">+1</span>
+		<span class="clstsd">G 66.32525 <img alt="" class="clstimg" src="dwntick.gif" WIDTH="18" HEIGHT="8">-.23</span>
