@@ -58,7 +58,7 @@ XIACache::configure(Vector<String> &conf, ErrorHandler *errh)
     _local_hid = local_addr.xid(local_addr.destination_node());
 
     if (pkt_size) XIAContentModule::PKTSIZE= pkt_size;
-    _content_module->_cache_content_from_network = true;
+    _content_module->_cache_content_from_network = cache_content_from_network;
     /*
        std::cout<<"Route Table Name: "<<routing_table_name.c_str()<<std::endl;
        if(routeTable==NULL) 
