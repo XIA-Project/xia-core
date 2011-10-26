@@ -1,7 +1,9 @@
 /* XIA video server*/
-/* Meant to run for one time service
-TODO: change it to multiple thread model
-Changed to multiple threads now
+/* Changes
+ * used 1024 byte chunks
+ * Runs for 1.5 min video, may also work with lower resolution video and bit longer
+ * seems to have some issue currently ... for multiple clients
+ * so first trying to do iterative with hacky way
 */
 
 #include <sys/types.h>
@@ -36,7 +38,7 @@ Changed to multiple threads now
 #define TOTALPINGS 4000
 #define MIGRATEPOINT 2000
 
-#define CHUNKSIZE (8192)
+#define CHUNKSIZE (1024)
 using namespace std;
 
 int main(int argc, char *argv[])
@@ -103,6 +105,7 @@ int main(int argc, char *argv[])
 	string http_header = "HTTP/1.0 200 OK\r\nDate: Tue, 01 Mar 2011 06:14:58 GMT\r\nConnection: close\r\nContent-type: video/ogg\r\nServer: lighttpd/1.4.26\r\n\r\n";
 
 	string message = http_header + CIDls;
+	//cout << "Message is " << message << "\n";
 		
 	//cout << "length of message " << message.length() << "\n";
 	// send http header
@@ -146,14 +149,45 @@ int main(int argc, char *argv[])
 			
 			int last_loc = 0;
 			while(last_loc < message.length()) {
-				string submessage = message.substr(last_loc, 8192);
+				// Need to be careful about last location
+				//int more_length = last_loc + 8192;
+				//if(more_length > message.length()) 
+				//	more_length = message.length();
+				string submessage = message.substr(last_loc, 800);
+
+				int store_loc = last_loc;
+				
 				int rpos = submessage.rfind("CID");
+							
 				submessage = submessage.substr(0,rpos);
+
 				last_loc = last_loc + rpos;
+
+				
+				int pos = submessage.find("CID");
+				if(pos == -1){
+					// this is the last CID
+					submessage = message.substr(store_loc, 1024);	
+					last_loc = message.length();
+					printf("exiting \n");
+				}
 				if(last_loc < message.length())
 					submessage = submessage + " more";
+
+
+				// check whether it is a last CID
+				// if it is, then we should return full string 
+
+
+				//printf(" %d %d\n", pos, submessage.length());
+			
+				//cout << "Sending message " << 	submessage << "\n";
 				Xsend(sock, (void *) submessage.c_str(), submessage.length(), 0);
-		
+
+				if(last_loc == message.length()){
+					break;	
+				}
+					
 				Xrecv(sock, SIDReq, 1024, 0);
 			}
 		
@@ -194,8 +228,18 @@ int main(int argc, char *argv[])
 				Xsend(sock, (void *)CIDlist[i].c_str(), CIDlist[i].length(), 0);
 				cout << "sending " << CIDlist[i] << "\n";
 
-			}*/	
+			}*/
+
+			// AA:: multiple requests don't seem to work	
        			n=0;
+			// Hack:: closing socket and reopening it for next listening
+			Xclose(sock);
+			sock=Xsocket();
+			if (sock < 0) {
+				error("Opening a new socket for service");
+				exit(-1);
+			}
+			Xbind(sock,dag);
 	    	}	
 	}
 	return 0;
