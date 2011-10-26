@@ -18,6 +18,7 @@ length = 0
 from xia_address import *
 
 CID_TEST_HTML = ""  # we set this when we 'put' the hmtl page
+CID_XIA_HTML = ""  # we set this when we 'put' the hmtl page
 
 def putCID(chunk):
     #global cid_i
@@ -43,10 +44,14 @@ def putCID(chunk):
     return cid
 
 def serveSIDRequest(request, sock):
-    # For now, regardless of what was requested, we respond
-    # with an HTTP message directing the browser to request
-    # the html file at CID_TEST_HTML
-    response = 'HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/html\n\n'+ CID_TEST_HTML
+    # Respond with either CID_TEST_HTML or CID_XIA_HTML
+    # TODO: This code should be better
+    if request.find('test') >= 0:
+        CID = CID_TEST_HTML
+    elif request.find('xia') >= 0:
+        CID = CID_XIA_HTML
+    
+    response = 'HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/html\n\n'+ CID
     print 'Response:\n%s' % response
     xsocket.Xsend(sock, response, len(response), 0)
     return
@@ -54,7 +59,7 @@ def serveSIDRequest(request, sock):
 def main():
     global AD1, HID1, SID1
     global length
-    global CID_TEST_HTML
+    global CID_TEST_HTML, CID_XIA_HTML
 
     # Set up connection with click via Xsocket API
     xsocket.set_conf("xsockconf_python.ini", "webserver.py")
@@ -82,19 +87,34 @@ def main():
     # Put content 'test.html'
     # TODO: Silly to write file then read it again; we do it
     # for now so we can see the actual file for debugging
-    print "webpage"
-    f = open("xia.html", 'r')
+    print "test.html"
+    f = open("test.html", 'r')
     chunk = f.read(chunksize)
 
     while chunk != '':
         cid = putCID(chunk)
         CID_TEST_HTML += 'CID:' 
 	CID_TEST_HTML  += cid
-	CID_TEST_HTML  += '\t'
+        chunk = f.read(chunksize)
+    f.close()
+    print "end test.html"
+
+    # Put content 'xia.html'
+    # TODO: Silly to write file then read it again; we do it
+    # for now so we can see the actual file for debugging
+    print "xia.html"
+    f = open("xia.html", 'r')
+    chunk = f.read(chunksize)
+
+    while chunk != '':
+        cid = putCID(chunk)
+        CID_XIA_HTML += 'CID:' 
+	CID_XIA_HTML  += cid
+	CID_XIA_HTML  += '\t'
         chunk = f.read(chunksize)
     f.close()
     
-    print "end webpage"
+    print "end xia.html"
     time.sleep(1) #necessary?
 
     # Now listen for connections from clients
