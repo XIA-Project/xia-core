@@ -236,7 +236,7 @@ elementclass DualRouter {
     c1[2] -> Paint(2) -> Strip(14) -> MarkIPHeader -> StripIPHeader -> MarkXIAHeader -> [0]n;
     c1[3] -> Paint(2) -> Strip(14) -> [0]n;
     c1[4] -> Discard; //Print("eth1 non-IP/XIA") -> Discard;
-    c1[5] -> [0]n; // Print("eth0 non-IP") -> Discard;
+    c1[5] -> Discard; //[0]n; // Print("eth0 non-IP") -> Discard;
 
     dstTypeC :: XIAXIDTypeClassifier(next IP, -);
     swIP :: PaintSwitch;
