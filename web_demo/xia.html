@@ -12,27 +12,28 @@ var stock_element = 'stock'
 var pos = 0
 var stock_timer = null
 var news_timer = null
+var update_interval = 1000
 function load()
 {
 	ajax(page,'text');
 	ajax(stock,stock_element);
 	shift();
-	if (news_timer==null) news_timer = setTimeout("update_news()", 5000);
-    	if (stock_timer==null) stock_timer = setTimeout("update_stock()", 5000);
+	if (news_timer==null) news_timer = setTimeout("update_news()", update_interval);
+    	if (stock_timer==null) stock_timer = setTimeout("update_stock()", update_interval);
 }
 
 function update_stock()
 {
    clearTimeout(stock_timer) 
    ajax(stock,stock_element);
-   stock_timer = setTimeout("update_stock()", 5000);
+   stock_timer = setTimeout("update_stock()", update_interval);
 }
 
 function update_news()
 {
    clearTimeout(news_timer) 
    ajax(page,'text')
-   news_timer = setTimeout("update_news()", 5000);
+   news_timer = setTimeout("update_news()", update_interval);
 
 }
 

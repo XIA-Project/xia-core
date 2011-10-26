@@ -6,7 +6,7 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 
-int Xsend(int sockfd,void *buf, size_t len, int /*flags*/)
+int Xsend(int sockfd,const void *buf, size_t len, int /*flags*/)
 {
 
 	struct addrinfo hints, *servinfo,*p;
