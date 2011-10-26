@@ -5,4 +5,4 @@ cd ../
 sudo ./click-2.0/userlevel/click ./click-2.0/conf/xia_internet1.click &
 cd ./proxies
 sudo ifconfig fake1 mtu 65521
-python ./webserver &
+python ./webserver.py &
