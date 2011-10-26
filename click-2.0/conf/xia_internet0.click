@@ -10,12 +10,12 @@ host0[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkU
 router0[0] ->  Script(TYPE PACKET, print "router0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) -> [0]host0;
 
 // interconnection -- ad - ad
-router0[1] -> Script(TYPE PACKET, print "REAL Ethernet OUTPUT", print_realtime) -> IPPrint(CONTENTS HEX) -> ToDevice(eth0);
+router0[1] -> Script(TYPE PACKET, print "REAL Ethernet OUTPUT", print_realtime) -> ToDevice(eth0);
 
 FromDevice(eth0) -> [1]router0;
 
 XIAXIDInfo(
-IPID2 IP:172.16.71.128
+IPID2 IP:128.2.208.168
 );
 
 // send test packets from host0 to host1
@@ -32,4 +32,4 @@ ipgen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
 -> host0;
 
 
-Script(write ipgen.active true);
+//Script(write ipgen.active true);
