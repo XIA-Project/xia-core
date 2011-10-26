@@ -172,7 +172,7 @@ def requestCID(CID, fallback):
 
     # Request content
     content_dag = 'CID:%s' % CID    
-    content_dag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, content_dag)
+    content_dag = "DAG 3 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, content_dag)
     sdag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP0, HID0, SID0)       
     #if fallback:
     #    content_dag = 'RE %s %s %s' % (AD1, HID1, content_dag)
