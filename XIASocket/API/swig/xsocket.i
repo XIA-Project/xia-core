@@ -36,7 +36,7 @@
 }
 
 extern int Xsendto(int sockfd,const void *buf, size_t len, int flags,char * dDAG, size_t dlen);
-extern int Xrecvfrom(int sockfd,void *buf, size_t len, int flags,char * dDAG, size_t *dlen);
+extern int Xrecvfrom(int sockfd,void *rbuf, size_t len, int flags,char * dDAG, size_t *dlen);
 extern int Xsocket();
 extern int Xconnect(int sockfd, char* dest_DAG);
 extern int Xbind(int sockfd, char* SID);

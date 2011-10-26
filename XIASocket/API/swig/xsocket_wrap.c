@@ -3075,9 +3075,6 @@ SWIGINTERN PyObject *_wrap_Xrecvfrom(PyObject *SWIGUNUSEDPARM(self), PyObject *a
   size_t *arg6 = (size_t *) 0 ;
   int val1 ;
   int ecode1 = 0 ;
-  int res2 ;
-  size_t val3 ;
-  int ecode3 = 0 ;
   int val4 ;
   int ecode4 = 0 ;
   int res5 ;
@@ -3090,41 +3087,54 @@ SWIGINTERN PyObject *_wrap_Xrecvfrom(PyObject *SWIGUNUSEDPARM(self), PyObject *a
   PyObject * obj2 = 0 ;
   PyObject * obj3 = 0 ;
   PyObject * obj4 = 0 ;
-  PyObject * obj5 = 0 ;
   int result;
   
-  if (!PyArg_ParseTuple(args,(char *)"OOOOOO:Xrecvfrom",&obj0,&obj1,&obj2,&obj3,&obj4,&obj5)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"OOOOO:Xrecvfrom",&obj0,&obj1,&obj2,&obj3,&obj4)) SWIG_fail;
   ecode1 = SWIG_AsVal_int(obj0, &val1);
   if (!SWIG_IsOK(ecode1)) {
     SWIG_exception_fail(SWIG_ArgError(ecode1), "in method '" "Xrecvfrom" "', argument " "1"" of type '" "int""'");
   } 
   arg1 = (int)(val1);
-  res2 = SWIG_ConvertPtr(obj1,SWIG_as_voidptrptr(&arg2), 0, 0);
-  if (!SWIG_IsOK(res2)) {
-    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "Xrecvfrom" "', argument " "2"" of type '" "void *""'"); 
+  {
+    if (!PyInt_Check(obj1)) {
+      PyErr_SetString(PyExc_ValueError, "Expecting an integer");
+      return NULL;
+    }
+    arg3 = PyInt_AsLong(obj1);
+    if (arg3<0) {
+      PyErr_SetString(PyExc_ValueError, "Positive integer expected");
+      return NULL;
+    }
+    arg2= (void*)malloc(arg3);
+    
   }
-  ecode3 = SWIG_AsVal_size_t(obj2, &val3);
-  if (!SWIG_IsOK(ecode3)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "Xrecvfrom" "', argument " "3"" of type '" "size_t""'");
-  } 
-  arg3 = (size_t)(val3);
-  ecode4 = SWIG_AsVal_int(obj3, &val4);
+  ecode4 = SWIG_AsVal_int(obj2, &val4);
   if (!SWIG_IsOK(ecode4)) {
     SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "Xrecvfrom" "', argument " "4"" of type '" "int""'");
   } 
   arg4 = (int)(val4);
-  res5 = SWIG_AsCharPtrAndSize(obj4, &buf5, NULL, &alloc5);
+  res5 = SWIG_AsCharPtrAndSize(obj3, &buf5, NULL, &alloc5);
   if (!SWIG_IsOK(res5)) {
     SWIG_exception_fail(SWIG_ArgError(res5), "in method '" "Xrecvfrom" "', argument " "5"" of type '" "char *""'");
   }
   arg5 = (char *)(buf5);
-  res6 = SWIG_ConvertPtr(obj5, &argp6,SWIGTYPE_p_size_t, 0 |  0 );
+  res6 = SWIG_ConvertPtr(obj4, &argp6,SWIGTYPE_p_size_t, 0 |  0 );
   if (!SWIG_IsOK(res6)) {
     SWIG_exception_fail(SWIG_ArgError(res6), "in method '" "Xrecvfrom" "', argument " "6"" of type '" "size_t *""'"); 
   }
   arg6 = (size_t *)(argp6);
   result = (int)Xrecvfrom(arg1,arg2,arg3,arg4,arg5,arg6);
   resultobj = SWIG_From_int((int)(result));
+  {
+    Py_XDECREF(resultobj);
+    if (result < 0) {
+      free(arg2);
+      PyErr_SetFromErrno(PyExc_IOError);
+      return NULL;
+    }
+    resultobj = PyString_FromStringAndSize(arg2, result);
+    free(arg2);
+  }
   if (alloc5 == SWIG_NEWOBJ) free((char*)buf5);
   return resultobj;
 fail:
