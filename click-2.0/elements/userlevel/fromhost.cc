@@ -176,6 +176,12 @@ FromHost::setup_tun(ErrorHandler *errh)
 	up = "";
     }
 #endif
+    if (_mtu_out) {
+	sa.clear();
+	sa << "/sbin/ifconfig " << _dev_name << " mtu " << _mtu_out  << " 2>/dev/null";
+	if (system(sa.c_str()) != 0)
+	    return errh->error("%s: %<%s%> failed", _dev_name.c_str(), sa.c_str());
+    }
 
     // calculate maximum packet size needed to receive data from
     // tun/tap.
