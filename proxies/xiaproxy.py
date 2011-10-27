@@ -35,6 +35,7 @@ def check_for_and_process_CIDlist(message, browser_socket):
     print rt
     if (rt!= -1):
         http_header = message[0:rt]
+	print "Sending first chunk \n";
         content = requestVideoCID(message[rt+4:rt+44], True)
 	## this was the first occurrence
 	#print header
@@ -77,9 +78,36 @@ def process_more_CIDlist(message, browser_socket, moresock, socks):
         content = xsocket.Xrecv(socks[i], 1024, 0)
 	browser_socket.send(content)
     return True
+
+def process_videoCIDlist(message, browser_socket, socks):
+    rt = message.find('CID') 
+    #print rt
+    cidlist = list()
+    while(rt != -1):
+	#print "requesting for CID", message[rt+4:rt+44]
+	CID = message[rt+4:rt+44]
+	content_dag = 'CID:%s' % CID
+        content_dag = 'RE %s %s %s' % (AD1, HID1, content_dag)
+        cidlist.append(content_dag)
+        #xsocket.XgetCID(moresock, content_dag, len(content_dag))
+        #content = xsocket.Xrecv(moresock, 65521, 0)
+	#browser_socket.send(content)
+	rt = message.find('CID', rt+44)
+    ## issue multiple request
+    ## and receive multiple content
+    ## first issue all the requests
+    for i in range(len(cidlist)):
+	xsocket.XgetCID(socks[i], cidlist[i], len(cidlist[i]))
+    ## then retrieve them
+    for i in range(len(cidlist)):
+        content = xsocket.Xrecv(socks[i], 1024, 0)
+	browser_socket.send(content)
+    return True
+
+
  
 def sendVideoSIDRequest(netloc, payload, browser_socket):
-    print "in SID function - net location = ",netloc  
+    print "Debugging: in SID function - net location = ",netloc  
 
     sock = xsocket.Xsocket()
     if (sock<0):
@@ -89,44 +117,46 @@ def sendVideoSIDRequest(netloc, payload, browser_socket):
     print "Connecting to ",dag	
     xsocket.Xconnect(sock, dag)
     print "Connected. OK\n"
-
-    # Send request
-    xsocket.Xsend(sock, payload, len(payload), 0)
+    # Send request for number of chunks
+    asknumchunks = "numchunks";
+    xsocket.Xsend(sock, asknumchunks, len(asknumchunks), 0)
+    #xsocket.Xsend(sock, payload, len(payload), 0)
     # Receive reply
     print 'sendSIDRequest: about to receive reply'
-
     reply = xsocket.Xrecv(sock, 65521, 0)
-    print "sendSIDRequest: received reply %s\n" % reply
-    #,reply
-    # Pass reply up to browswer if it's a normal HTTP message
-    # Otherwise request the CIDs
-    contains_CIDs = check_for_and_process_CIDlist(reply, browser_socket)
-    if contains_CIDs:
-	#see if it has more
-	#print "Reached here\n"
-    	found = reply.find('more')
-	#print "foundvalue", found
-	test = "hello world"
-        moresock = xsocket.Xsocket()
-	## assume at most 30 sockets
-	socks = list()
-	for i in range(30):
-		sockcid = xsocket.Xsocket()
-		socks.append(sockcid)
-	while(found != -1):
-		#if found
-		## send data to server
-		xsocket.Xsend(sock, test, len(test), 0)
-		reply = xsocket.Xrecv(sock, 65521, 0)
-		process_more_CIDlist(reply, browser_socket, moresock, socks)
-		found = reply.find('more')
-	xsocket.Xclose(moresock)
-	for i in range(30):
-		xsocket.Xclose(socks[i])
-    else:
-	browser_socket.send(reply)
-    
     xsocket.Xclose(sock)
+    numchunks = int(reply)
+    print "sendSIDRequest: received reply for number of chunks ",numchunks
+
+    ## return ogg header
+    http_header = "HTTP/1.0 200 OK\r\nDate: Tue, 01 Mar 2011 06:14:58 GMT\r\nConnection: close\r\nContent-type: video/ogg\r\nServer: lighttpd/1.4.26\r\n\r\n"
+
+    browser_socket.send(http_header)
+
+    ## next get chunks, at most 20 in a go
+    threshold = 20
+    socks = list()
+    for i in range(threshold):
+	sockcid = xsocket.Xsocket()
+	socks.append(sockcid)
+    num_iterations = (numchunks/threshold) + 1
+    for i in range(num_iterations):
+        st_cid = i * threshold
+        end_cid = (i+1) * threshold
+        if(end_cid > numchunks):
+		end_cid = numchunks
+        cidreqrange = str(st_cid) + ":" + str(end_cid)
+	#print "Requesting for ",cidreqrange
+        sock = xsocket.Xsocket()
+        xsocket.Xconnect(sock, dag)
+	xsocket.Xsend(sock, cidreqrange, len(cidreqrange), 0)
+	reply = xsocket.Xrecv(sock, 1024, 0)
+	xsocket.Xclose(sock)
+	#print reply
+	process_videoCIDlist(reply, browser_socket, socks)
+	## process CIDs 
+    for i in range(threshold):
+	xsocket.Xclose(socks[i])
     return
 
 def requestVideoCID(CID, fallback):
