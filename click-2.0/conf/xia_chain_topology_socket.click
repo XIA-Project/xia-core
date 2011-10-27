@@ -10,7 +10,7 @@ router0 :: Router(RE AD0 RHID0, AD0, RHID0);
 router1 :: Router(RE AD1 RHID1, AD1, RHID1);
 
 // interconnection -- host - ad
-host0[0] ->  XIAPrint("h0->r0") -> LinkUnqueue(0.005, 1 GB/s) -> [0]router0;
+host0[0] ->  XIAPrint("h0->r0") -> c::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)-> LinkUnqueue(0.005, 1 GB/s) -> [0]router0;
 router0[0] -> XIAPrint("r0->h0")-> LinkUnqueue(0.005, 1 GB/s) -> [0]host0;
 
 host1[0] -> XIAPrint("h1->r1")-> LinkUnqueue(0.005, 1 GB/s) -> [0]router1;
@@ -20,3 +20,4 @@ router1[0]-> XIAPrint("r1->h1")->  LinkUnqueue(0.005, 1 GB/s) ->[0]host1;
 router0[1] ->  XIAPrint("r0->r1")  -> LinkUnqueue(0.005, 1 GB/s) ->[1]router1;
 router1[1] ->  XIAPrint("r1->r0")  -> LinkUnqueue(0.005, 1 GB/s) ->[1]router0;
 
+ControlSocket(tcp, 7777);
