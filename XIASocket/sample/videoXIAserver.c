@@ -2,6 +2,7 @@
 /* Changes
  * used 1024 byte chunks
  * Runs for 1.5 min video, may also work with lower resolution video and bit longer
+ *** Making it stateless
  * seems to have some issue currently ... for multiple clients
  * so first trying to do iterative with hacky way
 */
@@ -122,118 +123,57 @@ int main(int argc, char *argv[])
 	//Make the sDAG (the one the server listens on)
 	char * dag =(char*) malloc(snprintf(NULL, 0, "RE %s %s %s", AD1, HID1,SID0) + 1);
     	sprintf(dag, "RE %s %s %s", AD1, HID1,SID0);
-    
-	// limit the message by 65521
-	//message = message.substr(0, 8192);
-	// find the last occurrence of CID
-	//int rpos = message.rfind("CID");
-	//message = message.substr(0,rpos);
-
-	//cout << message << "\n";	
-
+   
+	// initalize
+	for(int i = 0; i < 1024; i++)
+		SIDReq[i] = '\0';
+ 
 	//Bind to the DAG
 	Xbind(sock,dag);
     	while (1) {
-    	
 		printf("\nListening...\n");
     		Xaccept(sock);
 		printf("accept\n");
-
-		// As soon as, we receive message, 
-		// we should 
-	
         
 		//Receive packet
 		n = Xrecv(sock,SIDReq,1024,0);
-		if(n>0)
-		{
+		
+		if(n>0) {
 			
-			int last_loc = 0;
-			while(last_loc < message.length()) {
-				// Need to be careful about last location
-				//int more_length = last_loc + 8192;
-				//if(more_length > message.length()) 
-				//	more_length = message.length();
-				string submessage = message.substr(last_loc, 800);
-
-				int store_loc = last_loc;
-				
-				int rpos = submessage.rfind("CID");
-							
-				submessage = submessage.substr(0,rpos);
-
-				last_loc = last_loc + rpos;
-
-				
-				int pos = submessage.find("CID");
-				if(pos == -1){
-					// this is the last CID
-					submessage = message.substr(store_loc, 1024);	
-					last_loc = message.length();
-					printf("exiting \n");
-				}
-				if(last_loc < message.length())
-					submessage = submessage + " more";
-
-
-				// check whether it is a last CID
-				// if it is, then we should return full string 
-
-
-				//printf(" %d %d\n", pos, submessage.length());
+			string SIDReqStr(SIDReq);
+			cout << "Got request: " << SIDReqStr << "\n";
+			// if the request is about number of chunks return number of chunks
+			// since this is first time, you would return along with header
+			int found = SIDReqStr.find("numchunks");
 			
-				//cout << "Sending message " << 	submessage << "\n";
-				Xsend(sock, (void *) submessage.c_str(), submessage.length(), 0);
+			if(found != -1){
+				//cout << " Request asks for number of chunks \n";
+				stringstream yy;
+				yy<<CIDlist.size();
+				string cidlistlen = yy.str();
+				Xsend(sock,(void *) cidlistlen.c_str(), cidlistlen.length(), 0);
+			} else {
+				// the request would have two parameters
+				// start-offset:end-offset
+				int findpos = SIDReqStr.find(":");
+				// split around this position
+				string str = SIDReqStr.substr(0,findpos);
+				int start_offset = atoi(str.c_str()); 
+				str = SIDReqStr.substr(findpos + 1);
+				int end_offset = atoi(str.c_str());
 
-				if(last_loc == message.length()){
-					break;	
+				// construct the string from CIDlist
+				// return the list of CIDs
+				string requestedCIDlist = "";
+				// not including end_offset
+				for(int i = start_offset; i < end_offset; i++){
+					requestedCIDlist += CIDlist[i] + " ";
 				}
-					
-				Xrecv(sock, SIDReq, 1024, 0);
+				Xsend(sock, (void *)requestedCIDlist.c_str(), requestedCIDlist.length(), 0);
+				//cout << "sending " << requestedCIDlist << "\n";
 			}
-		
-		
-
-			//Xsend(sock, (void *) info.c_str(), info.length(), 0);
-			//Xrecv(sock, SIDReq, 1024, 0);
-			// get ack
-
-			// send that many messages
-			//int num_iter = (message.length()/65521)+1; 
-
-			//cout << "Sending CID list \n";
-			
-			//for(int i = 0; i < 1; i++){
-			//	int st_pos = i * 65521;
-			//	int end_pos = (i+1) * 8192;
-			//	if(end_pos > message.length()) {
-			//		end_pos = message.length()+1;
-			//	}
-			//	int diff = (end_pos - st_pos);
-			//	printf(" length of message %d\n", diff);
-			//	string mstr = message.substr(st_pos, end_pos);
-				
-			//	Xsend(sock, (void *) mstr.c_str(), diff, 0);
-				// get ack
-			//	Xrecv(sock, SIDReq, 1024, 0);
-			//}
-			
-			/*
-		        stringstream yy;
-			yy<<CIDlist.size();
-			string cidlistlen = yy.str();
-			Xsend(sock,(void *) cidlistlen.c_str(), cidlistlen.length(), 0);
-		
-			for(int i = 0; i < CIDlist.size(); i++){
-				Xrecv(sock, SIDReq, 1024, 0);
-				Xsend(sock, (void *)CIDlist[i].c_str(), CIDlist[i].length(), 0);
-				cout << "sending " << CIDlist[i] << "\n";
-
-			}*/
-
-			// AA:: multiple requests don't seem to work	
        			n=0;
-			// Hack:: closing socket and reopening it for next listening
+			// closing socket and reopening it for next listening
 			Xclose(sock);
 			sock=Xsocket();
 			if (sock < 0) {
