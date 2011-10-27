@@ -15,6 +15,7 @@ h1 {color: #aa1111;}
 h2 { padding-left: 1em; }
 id { padding-left: 1em; font: arial; font-size: 11pt; color: #aa1111;}
 fb { padding-left: 1em; font: arial; font-size: 11pt; font-weight: bold; color: #aa1111;}
+a { padding-left: 1.5em; font: arial; font-size: 12pt; }
 
 </style>
 <body>
@@ -30,7 +31,7 @@ fb { padding-left: 1em; font: arial; font-size: 11pt; font-weight: bold; color: 
 <id>HID:71c3dd5af38bcd2cfede5b943c3358d4ef4285f8</id> 
 <li>Service Identifiers </li>
 <id>SID:f0afa824a36f2a2d95c67ff60f61200e48006625</id> 
-<br><id>Talking to a service</id>
+<br><id>Talking to a service</id> 
 <li>Content Identifiers </li>
 <id>CID:95c52e5d05fffc44a2a3ab1c466e2cd8749d9d7d</id> 
 <br><id>Fetching content (a chunk)</id>
@@ -43,17 +44,18 @@ fb { padding-left: 1em; font: arial; font-size: 11pt; font-weight: bold; color: 
 <ul>
 <li>Service Identifiers with fallback </li>
 <id><fb> (HID:71c3dd5af38bcd2cfede5b943c3358d4ef4285f8) </fb>SID:f0afa824a36f2a2d95c67ff60f61200e48006625</id> 
+<br>
+<a href=http://xia.sid.test/>http://demo.xia.org/service/simple_web</a>
 <li> Content Identifiers with fallback</li>
-<id> <fb>(HID:71c3dd5af38bcd2cfede5b943c3358d4ef4285f8) </fb> CID:06088766ef5729c6e10b6dbf076f9c708e9855fc</id> </li>
+<id> <fb>(HID:71c3dd5af38bcd2cfede5b943c3358d4ef4285f8) </fb> CID:06088766ef5729c6e10b6dbf076f9c708e9855fc</id> </li> 
+<br>
+<a href=http://xia.cid.test/>http://demo.xia.org/content/simple_html</a>
 </ul>
 
-<h2>Example Web Services on XIA</h2>
+<h2>Using Multiple Principals in XIA</h2>
 <ul>
-<li> Service
-<a href=http://xia.sid.f0afa824af2a2d95c67ff60f61200e48006625/>http://xia_demo.xia.org [<fb> (HID:71c3dd5af38bcd2cfede5b943c3358d4ef4285f8) </fb>SID:f0afa824a36f2a2d95c67ff60f61200e48006625]</a>
-</li>
-<li> Video 
-<a href=../XIASocket/sample/video.html>http://video_demo.xia.org [SID:f0afa824a36f2a2d95c67ff60f61200e48006625]</a></li>
+<li> 
+<a href=http://xia.sid.f0afa824af2a2d95c67ff60f61200e48006625/>http://demo.xia.org </a><id>[(HID:71c3dd5af38bcd2cfede5b943c3358d4ef4285f8) SID:f0afa824a36f2a2d95c67ff60f61200e48006625]</id>
 </ul>
 
 </div>
@@ -61,18 +63,23 @@ fb { padding-left: 1em; font: arial; font-size: 11pt; font-weight: bold; color: 
 <h1>Network Evolution</h1>
 <p>
 <ul>
-<li> In-network content caching</li>
+<li> In-network content caching</li> 
+<a href=http://xia.sid.f0afa824af2a2d95c67ff60f61200e48006625/>http://demo.xia.org </a><id>[(HID:71c3dd5af38bcd2cfede5b943c3358d4ef4285f8) SID:f0afa824a36f2a2d95c67ff60f61200e48006625] </id>
+<p>
 <li>Anycast for service</li>
 </ul>
 </div>
+
 <div id="box">
 <h1>Other Benefits</h1>
 <p>
 <ul>
-<li>Mobility (Service migration and Client Mobility) </li>
-<li>In-network Caching</li>
+<li>*-Mobility (Service and end-host Mobility) </li>
+Service migration example:
+<a href=http://xia.sid.f0afa824af2a2d95c67ff60f61200e48006625/>http://demo.xia.org </a><id>[(HID:71c3dd5af38bcd2cfede5b943c3358d4ef4285f8) </fb>SID:f0afa824a36f2a2d95c67ff60f61200e48006625]</id>
 </ul>
 </div>
+
 </div>
 </body>
 </html>

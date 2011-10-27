@@ -58,7 +58,6 @@ function shift()
 function ajax(url,target) {
     // native XMLHttpRequest object
     //document.getElementById(target).innerHTML = 'Loading...';
-    req_timestamp = time.getTime();
     if (window.XMLHttpRequest) {
 	var req = new XMLHttpRequest();
 	req.onreadystatechange = function() {ajaxDone(req, target);};
@@ -80,10 +79,9 @@ function ajaxDone(req, target) {
     if (req.readyState == 4) {
 	// only if "OK"
 	if (req.status == 200 || req.status == 304) {
-	    var now = time.getTime();
 	    results = req.responseText;
 	    document.getElementById(target).innerHTML = results;
-            document.getElementById("rtt").innerHTML = "Response Time: "+ (now-req_timestamp); // + " " + req_timestamp + " "+ now;
+            document.getElementById("rtt").innerHTML = "Response Time: "+ time.getTime()-req_timestamp;
             document.getElementById("last_response").innerHTML = "Last Response: " +new Date().toLocaleTimeString();
 	} else {
 	    document.getElementById(target).innerHTML="ajax error:"+req.status + req.statusText +req.responseText;;
@@ -96,12 +94,6 @@ function ajaxDone(req, target) {
 </script>
 <style type="text/css">
 #main #content {margin-right: 2em;}
-html {
-        background: #f8f8f8 url(corner.png) no-repeat right bottom;
-        height: 100%;
-        margin: 0;
-        padding: 0;
-}
 .ticker
 {
 	position:		relative;
@@ -158,20 +150,26 @@ html {
 <body onload="load()" style =" overflow-x: hidden;">
 <div id="main">
 
+<!--
 <p> <h1>Video</h1> </p>
 <p>
-<video tabindex="0" src="http://xia.sid.video"  controls="true" type="video/ogg" width="640" height="360"><i>You need a HTML5 &lt;video&gt; capable browser to view this movie.</i></video>
+<div id="video" style="width: 700px; height: 300px">  
+</div>
+<p> <h1>Service</h1> </p>
+<p>
+<div id="text" style="width: 700px; height: 100px">  
+</div> 
+-->
 
 <h1>My Favorite Stock</h1>
 <div id="stock"style= "position: relative; width: 3000px; overflow: hidden; height:17px; border-style:solid; visibility: visible ;" > 
 </div>
+
 <div id="rtt">
-
 </div>
+
 <div id="last_response">
-
 </div>
-
 
 <!--/noindex-->
 </body>
