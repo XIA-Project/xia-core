@@ -43,7 +43,7 @@ def update_stockfeed(stock):
     return feed
 
 
-stock_name= ["ADA",  "BQB", "CKK", "GPR", "HER", "HUR", "KOY", "LUR", "UAX", "YRY" ]
+stock_name= ["ADA",  "BQB", "CKK", "GPR", "HER", "HUR", "KOY", "LUR", "XIA", "YRY" ]
 stock = map(lambda name: Stock(name), stock_name)
 xsocket.set_conf("xsockconf_python.ini","stock_service.py")
 xsocket.print_conf()
