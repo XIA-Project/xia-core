@@ -4,5 +4,5 @@ while true;
 do
         sleep 1
 		
-        echo `python read_stats.py`
+        echo `python ~/xia-core/click-2.0/conf/geni/stats/read_stats.py`
 done;
