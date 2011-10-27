@@ -216,7 +216,7 @@ elementclass DualRouter {
 
     input[0] -> c0;
     out0 :: Queue(200) -> [0]output;
-    c0[0] -> ar0 :: ARPResponder(0.0.0.0/0 $local_mac) -> out0;
+    c0[0] -> Discard; //ar0 :: ARPResponder($local_ip/32 $local_mac) -> out0;
     arpq0 :: ARPQuerier($local_ip, $local_mac) -> out0;
     c0[1] -> arpt;
     arpt[0] -> [1]arpq0;
@@ -229,7 +229,7 @@ elementclass DualRouter {
 
     input[1] -> c1;
     out1 :: Queue(200) -> [1]output;
-    c1[0] -> ar1 :: ARPResponder(0.0.0.0/0 $local_mac) -> out1;
+    c1[0] -> Discard; //ar1 :: ARPResponder($local_ip/32 $local_mac) -> out1;
     arpq1 :: ARPQuerier($local_ip, $local_mac) -> out1;
     c1[1] -> arpt;
     arpt[1] -> [1]arpq1;
