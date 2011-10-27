@@ -106,10 +106,12 @@ class XIAPrint : public Element { public:
   bool _print_aggregate : 1;
   bool _payload : 1;		// '_contents' refers to payload
   unsigned _contents : 2;	// Whether to dump packet contents
+  
 
 #if CLICK_USERLEVEL
   String _outfilename;
   FILE *_outfile;
+  
 #endif
   ErrorHandler *_errh;
 

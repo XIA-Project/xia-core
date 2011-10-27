@@ -25,11 +25,15 @@ c1[0] -> Strip(14) -> MarkXIAHeader() -> [1]router0; // XIA packet
 
 router0[0]
 //-> XIAPrint() 
--> EtherEncap(0x9999, 00:24:e8:30:2d:96, 00:1B:21:3A:D5:75) -> todevice0;
+-> EtherEncap(0x9999, 00:24:e8:30:2d:96, 00:1B:21:3A:D5:75) 
+-> c::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
+-> todevice0;
 
 router0[1]
 //-> XIAPrint() 
 -> EtherEncap(0x9999, 00:1b:21:3a:d7:50, 00:24:E8:30:AD:59) -> todevice1; 
+
+ControlSocket(tcp, 7777);
 
 
 //Script(write gen.active true);  // the packet source should be activated after all other scripts are executed
