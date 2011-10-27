@@ -46,12 +46,15 @@ def putCID(chunk):
 def serveSIDRequest(request, sock):
     # Respond with either CID_TEST_HTML or CID_XIA_HTML
     # TODO: This code should be better
-    if request.find('test') >= 0:
-        CID = CID_TEST_HTML
-    elif request.find('xia') >= 0:
-        CID = CID_XIA_HTML
     
-    response = 'HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/html\n\n'+ CID
+    # To prevent cid referenced before assignment
+    cid = CID_XIA_HTML
+    if request.find('test') >= 0:
+        cid = CID_TEST_HTML
+    elif request.find('xia') >= 0:  
+        cid = CID_XIA_HTML
+    
+    response = 'HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/html\n\n'+ cid
     print 'Response:\n%s' % response
     xsocket.Xsend(sock, response, len(response), 0)
     return
