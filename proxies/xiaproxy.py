@@ -113,7 +113,7 @@ def sendVideoSIDRequest(netloc, payload, browser_socket):
     if (sock<0):
         print "error opening socket"
         return
-    dag = "RE %s %s %s" % (AD1, HID1, SID1) # Need a SID?
+    dag = "RE %s %s %s" % (AD1, HID1, SID_VIDEO) # Need a SID?
     print "Connecting to ",dag	
     xsocket.Xconnect(sock, dag)
     print "Connected. OK\n"
