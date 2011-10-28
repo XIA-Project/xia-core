@@ -51,11 +51,11 @@ def serveSIDRequest(request, sock):
     cid = CID_SIMPLE_HTML
     if request.find('simple.html') >= 0:
         cid = CID_SIMPLE_HTML
-    elif request.find('xia.html') >= 0:  
+    elif request.find('demo.html') >= 0:  
         cid = CID_DEMO_HTML
     
     response = 'HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/html\n\n'+ cid
-    print 'Response:\n%s' % response
+    print 'Webserver Response:\n%s' % response
     xsocket.Xsend(sock, response, len(response), 0)
     return
 
@@ -141,8 +141,8 @@ def main():
 
     while True:
         xsocket.Xaccept(listen_sock)
-        incoming_data = xsocket.Xrecv(listen_sock, 1024, 0)
-        print incoming_data
+        incoming_data = xsocket.Xrecv(listen_sock, 2000, 0)
+        print "webserver got %s" % incoming_data
         serveSIDRequest(incoming_data, listen_sock)
     
 

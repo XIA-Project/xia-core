@@ -11,7 +11,7 @@ def check_for_and_process_CIDs(message, browser_socket):
     print rt
     if (rt!= -1):
         http_header = message[0:rt]
-        content = requestCID(message[rt+4:rt+44], True)
+        content = requestCID(message[rt+4:rt+44])
 	## this was the first occurrence
 	browser_socket.send(http_header)
 	browser_socket.send(content)
@@ -21,7 +21,7 @@ def check_for_and_process_CIDs(message, browser_socket):
 	print rt
 	while(rt != -1):
 		print "requesting for CID", message[rt+4:rt+44]
-		content = requestCID(message[rt+4:rt+44], True)
+		content = requestCID(message[rt+4:rt+44])
 		browser_socket.send(content)
 		rt = message.find('CID', rt+44)
 	print "no more CID\n\n"
@@ -282,7 +282,7 @@ def xiaHandler(control, path, payload, browser_socket):
         recombined_content = ''
         for i in range (0, num_chunks):
             print 'CID to fetch: %s' % control_array[2][i*40:40+i*40]
-            recombined_content += requestCID(control_array[2][i*40:40+i*40], True)  #TODO: don't require fallback
+            recombined_content += requestCID(control_array[2][i*40:40+i*40])
             
         length = len (recombined_content)
         print "recombined_content length %d " % length
