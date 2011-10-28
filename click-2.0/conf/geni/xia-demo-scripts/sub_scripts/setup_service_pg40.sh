@@ -3,10 +3,16 @@
 sudo killall -9 stock_service.py
 sudo killall -9 webserver.py
 sudo killall -9 vs
-cd ~/xia-core/proxies
-sleep 3
-./webserver.py &
+
+sleep 1
 cd ~/xia-core/web_demo
 ./stock_service.py &
+
+sleep 1
 cd ~/xia-core/XIASocket/sample
 ./vs video.ogv &
+
+sleep 10
+
+cd ~/xia-core/proxies
+./webserver.py &
