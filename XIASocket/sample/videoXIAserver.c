@@ -34,8 +34,7 @@
 #define RHID0 "HID:0000000000000000000000000000000000000002"
 #define RHID1 "HID:0000000000000000000000000000000000000003"
 #define CID0 "CID:2000000000000000000000000000000000000001"
-//#define SID0 "SID:0f00000000000000000000000000000000000055"
-#define SID0 "SID:1f10000001111111111111111111111110000056"
+#define SID_VIDEO "SID:1f10000001111111111111111111111110000056"
 #define DEBUG
 #define TOTALPINGS 4000
 #define MIGRATEPOINT 2000
@@ -121,8 +120,8 @@ int main(int argc, char *argv[])
 	}
 	
 	//Make the sDAG (the one the server listens on)
-	char * dag =(char*) malloc(snprintf(NULL, 0, "RE %s %s %s", AD1, HID1,SID0) + 1);
-    	sprintf(dag, "RE %s %s %s", AD1, HID1,SID0);
+	char * dag =(char*) malloc(snprintf(NULL, 0, "RE %s %s %s", AD1, HID1,SID_VIDEO) + 1);
+    	sprintf(dag, "RE %s %s %s", AD1, HID1,SID_VIDEO);
    
 	// initalize
 	for(int i = 0; i < 1024; i++)
