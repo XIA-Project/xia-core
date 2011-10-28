@@ -102,18 +102,17 @@ void XIACache::push(int port, Packet *p)
 
     if(src_xid_type==_cid_type)  //store, this is chunk response
     {
-	//std::cout<<"Something at "<<_local_hid.unparse().c_str()<<std::endl;
 	__dstID =  hdr->node[hdr->dnode - 2].xid;
 	XID dstHID(__dstID);
-	//std::cout<<"dstID "<<dstID.unparse().c_str()<<std::endl;
-	_content_module->cache_incoming(p, srcID, dstHID, port);
+	_content_module->cache_incoming(p, srcID, dstHID, port); // This may generate chunk response to port 1 (end-host/application)
     }
     else if(dst_xid_type==_cid_type)  //look_up,  chunk request
     {
 	__srcID = hdr->node[hdr->dnode + hdr->snode - 2].xid;
 
 	XID srcHID(__srcID);
-	//std::cout<<"srcID "<<srcHID.unparse().c_str()<<std::endl;
+
+	/* this sends chunk response to output 0 (network) or to 1 (application, if the request came from application and content is locally cached)  */
 	_content_module->process_request(p, srcHID, dstID);
     }
     else

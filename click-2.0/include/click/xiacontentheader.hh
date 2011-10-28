@@ -29,13 +29,13 @@ class ContentHeader : public XIAGenericExtHeader { public:
     
 
     enum { OPCODE, OFFSET, CHUNK_OFFSET, LENGTH, CHUNK_LENGTH}; 
-    enum { OP_REQUEST=1, OP_RESPONSE};
+    enum { OP_REQUEST=1, OP_RESPONSE, OP_LOCAL_PUTCID};
 };
 
 class ContentHeaderEncap : public XIAGenericExtHeaderEncap { public:
 
     /* data length contained in the packet*/
-    ContentHeaderEncap(uint16_t offset, uint32_t chunk_offset, uint16_t length, uint32_t chunk_length);
+    ContentHeaderEncap(uint16_t offset, uint32_t chunk_offset, uint16_t length, uint32_t chunk_length, char opcode= ContentHeader::OP_RESPONSE);
 
     ContentHeaderEncap(uint8_t opcode, uint32_t chunk_offset=0, uint16_t length=0);
 

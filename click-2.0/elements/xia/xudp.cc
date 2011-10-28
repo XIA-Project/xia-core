@@ -58,7 +58,11 @@ XUDP::~XUDP()
 }
 
 
-
+/* port 0: control (from application)
+   port 1: data (from application)
+   port 2: packets from the network 
+   port 3: packets from cache
+*/
 void XUDP::push(int port, Packet *p_input)
 {    
     WritablePacket *p_in = p_input->uniqueify();
@@ -107,7 +111,8 @@ void XUDP::push(int port, Packet *p_input)
 			    String sdag_string(x_bind_msg->sdag().c_str(), x_bind_msg->sdag().size());
 
 			    //String sdag_string((const char*)p_in->data(),(const char*)p_in->end_data());
-			    //click_chatter("\nbind requested to %s, length=%d\n",sdag_string.c_str(),(int)p_in->length());
+			    if (DEBUG)
+			    click_chatter("\nbind requested to %s, length=%d\n",sdag_string.c_str(),(int)p_in->length());
 
 			    //Set source DAG info
 			    DAGinfo daginfo;
@@ -391,13 +396,11 @@ void XUDP::push(int port, Packet *p_input)
 			break;
 		    case xia::XSENDTO:
 			{
-			    //click_chatter("\n\nOK: SOCKET SENDTO !!!\\n");
 
 			    xia::X_Sendto_Msg *x_sendto_msg = xia_socket_msg.mutable_x_sendto();
 
-			    String dest(x_sendto_msg->ddag().c_str(), x_sendto_msg->ddag().size());
+			    String dest(x_sendto_msg->ddag().c_str());
 			    String pktPayload(x_sendto_msg->payload().c_str(), x_sendto_msg->payload().size());
-
 
 
 			    int dag_size = dest.length();
@@ -508,27 +511,21 @@ void XUDP::push(int port, Packet *p_input)
 			    /*TODO: The destination dag of the incoming packet is local_addr:XID 
 			     * Thus the cache thinks it is destined for local_addr and delivers to socket
 			     * This must be ignored. Options
-			     * 1. Use an invalid SID (done below)
+			     * 1. Use an invalid SID
 			     * 2. The cache should only store the CID responses and not forward them to
 			     *    local_addr when the source and the destination HIDs are the same.
 			     * 3. Use the socket SID on which putCID was issued. This will
 			     *    result in a reply going to the same socket on which the putCID was issued.
 			     *    Use the response to return 1 to the putCID call to indicate success.
 			     *    Need to add daginfo/ephemeral SID generation for this to work.
+			     * 4. Special OPCODE in content extension header and treat it specially in content module (done below)
 			     */
-			    String dst_local_addr=_local_addr.unparse_re();							 		    	   
-			    String xid_string="SID:0000000000000000000000000000000000000000";
-			    dst_local_addr=dst_local_addr+" "+xid_string;//Make source DAG _local_addr:SID
-
-			    XIAPath dst_path;
-			    dst_path.parse_re(dst_local_addr);
-
 
 			    //Add XIA headers
 			    class XIAHeaderEncap* _xiah=new XIAHeaderEncap();
 			    _xiah->set_last(-1);
 			    _xiah->set_hlim(250);
-			    _xiah->set_dst_path(dst_path);
+			    _xiah->set_dst_path(_local_addr);
 			    _xiah->set_src_path(src_path);
 			    _xiah->set_nxt(CLICK_XIA_NXT_CID);
 
@@ -538,7 +535,7 @@ void XUDP::push(int port, Packet *p_input)
 
 			    WritablePacket *p = NULL;
 			    int chunkSize = pktPayloadSize;
-			    ContentHeaderEncap  contenth(0, 0, pktPayloadSize, chunkSize);
+			    ContentHeaderEncap  contenth(0, 0, pktPayloadSize, chunkSize, ContentHeader::OP_LOCAL_PUTCID);
 			    p = contenth.encap(just_payload_part); 
 			    p = _xiah->encap(p, true);
 
@@ -608,6 +605,7 @@ void XUDP::push(int port, Packet *p_input)
 			String src_path=xiah.src_path().unparse();
 			String payload((const char*)xiah.payload(), xiah.plen());
 			String str=src_path;
+			if (DEBUG) click_chatter("src_path %s (len %d)", src_path.c_str(), strlen(src_path.c_str()));
 			str=str+String("^");
 			str=str+payload;
 			WritablePacket *p2 = WritablePacket::make (256, str.c_str(), str.length(),0);
@@ -660,9 +658,9 @@ void XUDP::push(int port, Packet *p_input)
 		    WritablePacket *p2 = WritablePacket::make (256, str.c_str(), str.length(),0);
 
 		    if (DEBUG)
-			click_chatter("Sent packet to socket"); 
+			click_chatter("Sent packet to socket: sport %d dport %d", _dport, _dport); 
 
-
+		    
 		    output(1).push(UDPIPEncap(p2,_dport,_dport));
 		    p_in->kill();
 		}
