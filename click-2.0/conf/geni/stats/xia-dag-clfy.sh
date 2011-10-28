@@ -12,6 +12,9 @@ prev_sid=${arr[1]}
 prev_cid=${arr[2]}
 prev_hid=${arr[3]}
 
+clfy=1
+echo $clfy
+
 while true;
 do
         sleep 1
@@ -34,10 +37,23 @@ do
 		sid=`expr $cur_sid - $prev_sid`
 		hid=`expr $cur_hid - $prev_hid`
 		
-        prev_total=$cur_total
-		prev_sid=$cur_sid
-		prev_cid=$cur_cid
-		prev_hid=$cur_hid
-
-        echo $total $cid $sid $hid 
+		
+		if [ "$sid" -gt "$cid" ]; then
+			if [  "$clfy" == 1 ]; then
+				clfy=1
+			else
+				clfy=1
+				echo $clfy
+			fi
+		elif [ "$cid" -gt "$sid" ]; then
+			if [  "$clfy" == 2 ]; then
+				clfy=2
+			else
+				clfy=2
+				echo $clfy
+			fi  
+		else 
+			clfy=$clfy
+		fi
+		
 done;

@@ -37,7 +37,7 @@ router1[0]
 router1[1]
 //-> XIAPrint() 
 -> EtherEncap(0x9999, 00:24:E8:30:AD:59, 00:1b:21:3a:d7:50) 
--> c::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -) 
+-> c::XIAXIDTypeCounter(src AD, src HID, src SID, src CID, src IP, -)
 -> todevice1; 
 
 

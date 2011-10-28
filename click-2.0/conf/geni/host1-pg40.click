@@ -18,7 +18,7 @@ host1[0]
 //-> XIAPrint() 
 -> EtherEncap(0x9999, 00:1B:21:3A:D5:99, 00:1B:21:3A:0E:D0) 
 //-> Print() 
--> c::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -) 
+-> c::XIAXIDTypeCounter(src AD, src HID, src SID, src CID, src IP, -)
 -> todevice0;
 
 ControlSocket(tcp, 7777);
