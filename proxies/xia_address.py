@@ -45,9 +45,9 @@ def dag_from_url(url):
         # if this is the case, don't include the page name in the
         # service name
         sid_request_segments = url_segments[0].split('/')
-        primary_XID = xid_from_name(sid_request_segments[0][4:])
+        primary_XID = xid_from_name(sid_request_segments[0][4:], 'SID')
     elif url_segments[0][0:3] == 'cid':
-        primary_XID = xid_from_name(url_segments[0][4:])
+        primary_XID = xid_from_name(url_segments[0][4:], 'CID')
     else:
         print 'ERROR: dag_from_url: unsupported primary intent principal type'
         return
@@ -66,7 +66,8 @@ def dag_from_url(url):
         for j in range(0, final_node_num+1):
             dag += ' %i' % j
         for i in range(0, len(fallback_segments)):
-            node_xid = xid_from_name(fallback_segments[i].split('.')[1])
+            node_segments = fallback_segments[i].split('.')
+            node_xid = xid_from_name(node_segments[1], node_segments[0].upper())
             dag += ' - \n %s' % (node_xid) # Add next node XID
             if i != len(fallback_segments) - 1: # last node has no outgoing edges
                 for j in range(i+1,  final_node_num+1): # add outgoing edges
@@ -85,5 +86,9 @@ def dag_from_url(url):
 
         return dag
     
-def xid_from_name(name):
-   return XIDS[name] # TODO check if name is in dict
+def xid_from_name(name, xid_type='SID'):
+    try:
+        return XIDS[name] # If name is in XIDS, it must be human readable, so translate to XID
+    except KeyError:
+        print 'WARNING: xid_from_name: name not found in dict XIDS. Could be an error.'
+        return '%s:%s' % (xid_type, name) # If not, just return name, as it may already be an XID (but could be a typo)
