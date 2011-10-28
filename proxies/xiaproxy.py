@@ -178,18 +178,18 @@ def requestVideoCID(CID, fallback):
 
 
 
-def sendSIDRequest(netloc, payload, browser_socket):
-    sid = "SID:"+netloc[0:40]
-    if (len(sid)!=len(SID1)):
-        sid = SID1
-    print "in SID function - net location = " + netloc + " sid: " + sid
+def sendSIDRequest(ddag, payload, browser_socket):
+    #sid = "SID:"+netloc[0:40]
+    #if (len(sid)!=len(SID1)):
+    #    sid = SID1
+    #print "in SID function - net location = " + netloc + " sid: " + sid
 
     sock = xsocket.Xsocket()
     if (sock<0):
         print "error opening socket"
         return
 
-    ddag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, sid)
+    #ddag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, sid)
     #ddag = "DAG 0 - \n %s 1 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP1, HID1, SID1)
     sdag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP0, HID0, SID0)    
     #sdag = "DAG 0 - \n %s 1 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP0, HID0, SID0)
@@ -219,7 +219,7 @@ def sendSIDRequest(netloc, payload, browser_socket):
     
     return
 
-def requestCID(CID, fallback):
+def requestCID(CID):
     # TODO: fix issue where bare CIDs crash click
     print "in getCID function"  
     print CID
@@ -233,8 +233,6 @@ def requestCID(CID, fallback):
     content_dag = 'CID:%s' % CID    
     content_dag = "DAG 3 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, content_dag)
     sdag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP0, HID0, SID0)       
-    #if fallback:
-    #    content_dag = 'RE %s %s %s' % (AD1, HID1, content_dag)
     print 'Retrieving content with ID: \n%s' % content_dag
     xsocket.Xbind(sock, sdag);
     xsocket.XgetCID(sock, content_dag, len(content_dag))
@@ -251,24 +249,28 @@ def requestCID(CID, fallback):
     return data
 
 
-def xiaHandler(control, payload, browser_socket):
+def xiaHandler(control, path, payload, browser_socket):
+    print "in XIA code\n" + control + "\n" + payload
+    
+    # Configure XSocket
     xsocket.set_conf("xsockconf_python.ini", "xiaproxy.py")
     #xsocket.print_conf()  #for debugging
+    control=control[4:]  # remove the 'xia.' prefix
+
 
     if payload.find('GET /favicon.ico') != -1:
                     return
-    print "in XIA code\n" + control + "\n" + payload
-    control=control[4:]  # remove the 'xia.' prefix
     if control.find('sid') == 0:
         print "SID request"
-        #print "%.6f" % time.time()
         if control.find('image.jpg') != -1: # TODO: why?
             payload = 'image.jpg'
         found = control.find('video');
         if(found != -1):
             sendVideoSIDRequest(control[4:], payload, browser_socket);
         else:
-            sendSIDRequest(control[4:], payload, browser_socket);
+            # Do some URL processing 
+            ddag = dag_from_url(control + path)
+            sendSIDRequest(ddag, payload, browser_socket);
     elif control.find('cid') == 0:
         print "CID request:\n%s" % control
         control_array = control.split('.')

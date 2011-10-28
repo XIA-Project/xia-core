@@ -5,21 +5,23 @@ ad1=  "AD:1000000000000000000000000000000000000001",
 rhid0="HID:0000000000000000000000000000000000000002",
 rhid1="HID:0000000000000000000000000000000000000003",
 sid0= "SID:0f00000000000000000000000000000000000055",
-sid1= "SID:1f10000001111111111111111111111110000056",
+ip1="IP:128.2.208.167",
+ip0="IP:128.2.208.168",
+xiaweb= "SID:1f10000001111111111111111111111110000056",
 sid_stock= "SID:0f03333333333333333333333333330000000055")
 
-HID0= XIDS['hid0'] # "HID:0000000000000000000000000000000000000000"
-HID1= XIDS['hid1']#"HID:0000000000000000000000000000000000000001"
-AD0=  XIDS['ad0'] #"AD:1000000000000000000000000000000000000000"
-AD1=  XIDS['ad1'] #"AD:1000000000000000000000000000000000000001"
-RHID0=XIDS['rhid0'] #"HID:0000000000000000000000000000000000000002"
-RHID1=XIDS['rhid1'] #"HID:0000000000000000000000000000000000000003"
-SID0= XIDS['sid0'] #"SID:0f00000000000000000000000000000000000055"
-SID1= XIDS['sid1'] #"SID:1f10000001111111111111111111111110000056"
-SID_STOCK= XIDS['sid_stock']#"SID:0f03333333333333333333333333330000000055"
+HID0= XIDS['hid0'] 
+HID1= XIDS['hid1']
+AD0=  XIDS['ad0'] 
+AD1=  XIDS['ad1'] 
+RHID0=XIDS['rhid0'] 
+RHID1=XIDS['rhid1'] 
+SID0= XIDS['sid0'] 
+SID1= XIDS['xiaweb'] 
+SID_STOCK= XIDS['sid_stock']
 
-IP1 = "IP:128.2.208.167"
-IP0 = "IP:128.2.208.168"
+IP1 = XIDS['ip1']
+IP0 = XIDS['ip0']
 
 
 
@@ -32,11 +34,16 @@ IP0 = "IP:128.2.208.168"
 def dag_from_url(url): 
     #url_segments[0] = primary intent
     #url_segments[1] = fallback (if supplied)
-    url_segments = url.split('.fallback.')
+    url_segments = url.split('fallback')
 
     # First segment is primary intent
     if url_segments[0][0:3] == 'sid':
-        primary_XID = xid_from_name(url_segments[0][4:])
+        # If we're routing to a service, the service might be a
+        # webserver, so we may have specified a page to retrieve;
+        # if this is the case, don't include the page name in the
+        # service name
+        sid_request_segments = url_segments[0].split('/')
+        primary_XID = xid_from_name(sid_request_segments[0][4:])
     elif url_segments[0][0:3] == 'cid':
         primary_XID = xid_from_name(url_segments[0][4:])
     else:
@@ -48,24 +55,33 @@ def dag_from_url(url):
     # a URL format, we need better code here
     if len(url_segments) > 1:
         # Fallback provided
-        #url_segments[1] = url_segments[1:-1] # strip off parens
+        url_segments[1] = url_segments[1][1:-1] # strip off parens
 
-        #fallback_segments[0] = 'ad'
-        #fallback_segments[1] = 'ad_name'
-        #fallback_segments[2] = 'hid'
-        #fallback_segments[3] = 'hid_name'
-        #fallback_segments[4] = 'cid' or 'sid'
-        #fallback_segments[5] = 'cid/sid name'
-        fallback_segments = url_segments[1].split('.')
+        fallback_segments = url_segments[1].split(':')
+        final_node_num = len(fallback_segments) - 1
 
-        ad = xid_from_name(fallback_segments[1])
-        hid = xid_from_name(fallback_segments[3])
+        dag = 'DAG'
+        for j in range(0, final_node_num+1):
+            dag += ' %i' % j
+        for i in range(0, len(fallback_segments)):
+            node_xid = xid_from_name(fallback_segments[i].split('.')[1])
+            dag += ' - \n %s' % (node_xid) # Add next node XID
+            if i != len(fallback_segments) - 1: # last node has no outgoing edges
+                for j in range(i+1,  final_node_num+1): # add outgoing edges
+                    dag += ' %i' % j
+                #dag += '%i %i' % (final_node_num, i+1) # Add outgoing edges
 
-        # NOTE: we are hard-coding in IP1 node even though it's not specified in URL
-        return "DAG 3 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (ad, IP1, hid, primary_XID)
+        print dag
+        return dag
     else:
         # No fallback
-        return 'RE %s' % primary_XID
+        # Use magic nameservice to get a fallback
+        dag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, primary_XID)
+
+        # Don't use nameservice
+        # dag = 'RE %s' % primary_XID
+
+        return dag
     
 def xid_from_name(name):
    return XIDS[name] # TODO check if name is in dict

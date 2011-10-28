@@ -79,7 +79,7 @@ class ProxyHandler (BaseHTTPServer.BaseHTTPRequestHandler):
 			header+="%s: %s\r\n" % key_val
 
 		header+="\r\n"
-		xiaHandler(netloc, header, self.connection)
+		xiaHandler(netloc, path, header, self.connection)
 		return
 	
         if scm != 'http' or fragment or not netloc:

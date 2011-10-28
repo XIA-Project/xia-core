@@ -17,8 +17,8 @@ length = 0
 # Pretend a magic naming service gives us XIDs...
 from xia_address import *
 
-CID_TEST_HTML = ""  # we set this when we 'put' the hmtl page
-CID_XIA_HTML = ""  # we set this when we 'put' the hmtl page
+CID_SIMPLE_HTML = ""  # we set this when we 'put' the hmtl page
+CID_DEMO_HTML = ""  # we set this when we 'put' the hmtl page
 
 def putCID(chunk):
     #global cid_i
@@ -44,15 +44,15 @@ def putCID(chunk):
     return cid
 
 def serveSIDRequest(request, sock):
-    # Respond with either CID_TEST_HTML or CID_XIA_HTML
+    # Respond with either CID_DEMO_HTML or CID_DEMO_HTML
     # TODO: This code should be better
     
     # To prevent cid referenced before assignment
-    cid = CID_XIA_HTML
-    if request.find('test') >= 0:
-        cid = CID_TEST_HTML
-    elif request.find('xia') >= 0:  
-        cid = CID_XIA_HTML
+    cid = CID_SIMPLE_HTML
+    if request.find('simple.html') >= 0:
+        cid = CID_SIMPLE_HTML
+    elif request.find('xia.html') >= 0:  
+        cid = CID_DEMO_HTML
     
     response = 'HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/html\n\n'+ cid
     print 'Response:\n%s' % response
@@ -62,7 +62,7 @@ def serveSIDRequest(request, sock):
 def main():
     global AD1, HID1, SID1
     global length
-    global CID_TEST_HTML, CID_XIA_HTML
+    global CID_SIMPLE_HTML, CID_DEMO_HTML
 
     # Set up connection with click via Xsocket API
     xsocket.set_conf("xsockconf_python.ini", "webserver.py")
@@ -78,46 +78,56 @@ def main():
         chunk = f.read(chunksize)
     f.close()
 
-    # Build 'test.html' file
+    # Build 'simple.html' file
     num_image_chunks = len(image_cid_list)
     image_cid_list_string = ''
 
     for cid in image_cid_list:
         image_cid_list_string += cid
-    f = open("test.html", 'w')
+    f = open("simple.html", 'w')
     f.write('<html><body><h1>It works!</h1>\n<h2><img src="http://xia.cid.%s.%s" /></h2><ul class="left-nav">\n\n</body></html>' % (num_image_chunks, image_cid_list_string))
 
-    # Put content 'test.html'
+    # Put content 'simple.html'
     # TODO: Silly to write file then read it again; we do it
     # for now so we can see the actual file for debugging
-    print "test.html"
-    f = open("test.html", 'r')
+    print "simple.html"
+    f = open("simple.html", 'r')
     chunk = f.read(chunksize)
 
     while chunk != '':
         cid = putCID(chunk)
-        CID_TEST_HTML += 'CID:' 
-	CID_TEST_HTML  += cid
+        CID_SIMPLE_HTML += 'CID:' 
+	CID_SIMPLE_HTML  += cid
         chunk = f.read(chunksize)
     f.close()
-    print "end test.html"
+    print "end simple.html"
 
-    # Put content 'xia.html'
-    # TODO: Silly to write file then read it again; we do it
-    # for now so we can see the actual file for debugging
-    print "xia.html"
-    f = open("xia.html", 'r')
+    # Put content 'demo.html'
+    print "demo.html"
+    f = open("demo.html", 'r')
     chunk = f.read(chunksize)
 
     while chunk != '':
         cid = putCID(chunk)
-        CID_XIA_HTML += 'CID:' 
-	CID_XIA_HTML  += cid
-	CID_XIA_HTML  += '\t'
+        CID_DEMO_HTML += 'CID:' 
+	CID_DEMO_HTML  += cid
+	CID_DEMO_HTML  += '\t'
         chunk = f.read(chunksize)
     f.close()
     
-    print "end xia.html"
+    print "end demo.html"
+    
+    # Put content 'plane.jpg'
+    print "plane.jpg"
+    f = open("plane.jpg", 'r')
+    chunk = f.read(chunksize)
+
+    while chunk != '':
+        cid = putCID(chunk)
+        chunk = f.read(chunksize)
+    f.close()
+    print "end plane.jpg"
+
     time.sleep(1) #necessary?
 
     # Now listen for connections from clients

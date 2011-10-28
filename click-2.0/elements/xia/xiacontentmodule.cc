@@ -142,38 +142,38 @@ void XIAContentModule::cache_incoming(Packet *p, const XID& srcCID, const XID& d
 	    _timer++;
 	    if(_timer>=REFRESH)
 	    {
-		_timer=0;
+		    _timer=0;
 
-		for(it=oldPartial.begin();it!=oldPartial.end();it++)
-		{
-		    chunk=it->second;
-		    delete chunk;
-		}
-		oldPartial.clear();	  
-		oldPartial=_partialTable;	  
-		for(it=_partialTable.begin();it!=_partialTable.end();it++)
-		{
-		    chunk=it->second;
-		    delete chunk;
-		}
-		_partialTable.clear();	
-		cit=_contentTable.begin();
-		while(cit!=_contentTable.end())
-		{
-		    if( content[cit->first]==0 )
+		    for(it=oldPartial.begin();it!=oldPartial.end();it++)
 		    {
-			HashTable<XID, CChunk*>::iterator pit=cit;
-			cit++;
-			oldPartial[pit->first]=pit->second;
-			delRoute(cit->first);
-			content.erase(pit->first);
-			_contentTable.erase(pit);
+		        chunk=it->second;
+		        delete chunk;
 		    }
-		    else
+		    oldPartial.clear();	  
+		    oldPartial=_partialTable;	  
+		    for(it=_partialTable.begin();it!=_partialTable.end();it++)
 		    {
-			content[cit->first]=0;
+		        chunk=it->second;
+		        delete chunk;
 		    }
-		}
+		    _partialTable.clear();	
+		    cit=_contentTable.begin();
+		    while(cit!=_contentTable.end())
+		    {
+		        if( content[cit->first]==0 )
+		        {
+		    	HashTable<XID, CChunk*>::iterator pit=cit;
+		    	cit++;
+		    	oldPartial[pit->first]=pit->second;
+		    	delRoute(cit->first);
+		    	content.erase(pit->first);
+		    	_contentTable.erase(pit);
+		        }
+		        else
+		        {
+		    	content[cit->first]=0;
+		        }
+		    }
 	    }
 	    return ;
 	}
@@ -187,8 +187,8 @@ void XIAContentModule::cache_incoming(Packet *p, const XID& srcCID, const XID& d
 	    chunk->fill(payload, offset, length);
 	    if(chunk->full())
 	    {
-		chunkFull=true;
-		_partialTable.erase(it);
+		    chunkFull=true;
+		    _partialTable.erase(it);
 	    }	
 	}
 	else
@@ -197,31 +197,31 @@ void XIAContentModule::cache_incoming(Packet *p, const XID& srcCID, const XID& d
 	    oit=oldPartial.find(srcCID);
 	    if(oit!=oldPartial.end())  //already in old partial table
 	    {
-		chunk=oit->second;
-		chunk->fill(payload, offset, length);
-		oldPartial.erase(oit);
-		if(chunk->full())
-		{
-		    chunkFull=true;
-		}
-		else
-		{
-		    _partialTable[srcCID]=chunk;
-		}
+		    chunk=oit->second;
+		    chunk->fill(payload, offset, length);
+		    oldPartial.erase(oit);
+		    if(chunk->full())
+		    {
+		        chunkFull=true;
+		    }
+		    else
+		    {
+		        _partialTable[srcCID]=chunk;
+		    }
 	    }	
 	    else			//first pkt to the client
 	    {
-		//std::cout<<"first pkt of a chunk"<<std::endl;
-		chunk=new CChunk(srcCID, chunkSize);
-		chunk->fill(payload, offset, length);
-		if(chunk->full())
-		{
-		    chunkFull=true;
-		}
-		else
-		{
-		    _partialTable[srcCID]=chunk;
-		}
+		    //std::cout<<"first pkt of a chunk"<<std::endl;
+		    chunk=new CChunk(srcCID, chunkSize);
+		    chunk->fill(payload, offset, length);
+		    if(chunk->full())
+		    {
+		        chunkFull=true;
+		    }
+		    else
+		    {
+		        _partialTable[srcCID]=chunk;
+		    }
 	    }
 	} 
 	if(chunkFull)  //have built the whole chunk pkt
