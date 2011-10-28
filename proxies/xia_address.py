@@ -90,5 +90,5 @@ def xid_from_name(name, xid_type='SID'):
     try:
         return XIDS[name] # If name is in XIDS, it must be human readable, so translate to XID
     except KeyError:
-        print 'WARNING: xid_from_name: name not found in dict XIDS. Could be an error.'
+        print 'WARNING: xid_from_name: \'%s\' not found in dict XIDS. Could be an error.' % name
         return '%s:%s' % (xid_type, name) # If not, just return name, as it may already be an XID (but could be a typo)
