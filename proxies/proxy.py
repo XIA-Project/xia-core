@@ -122,7 +122,7 @@ class ProxyHandler (BaseHTTPServer.BaseHTTPRequestHandler):
                         out = soc
                     data = i.recv(8192)
                     if data:
-                        print data
+                        #print data
                         out.send(data)
                         count = 0
             else:
