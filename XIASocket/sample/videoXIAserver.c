@@ -172,6 +172,8 @@ int main(int argc, char *argv[])
 				//cout << "sending " << requestedCIDlist << "\n";
 			}
        			n=0;
+			for(int i = 0; i < 1024; i++)
+				SIDReq[i] = '\0';
 			// closing socket and reopening it for next listening
 			Xclose(sock);
 			sock=Xsocket();
