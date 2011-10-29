@@ -1727,12 +1727,14 @@ cp_xid(const String& str, struct click_xia_xid* xid  CP_CONTEXT)
 	xid->id[8] = 0xFA;
 	xid->id[9] = 0xFA;
 
-	unsigned short a, b, c, d;
-	sscanf(xid_str.c_str(), "%hu.%hu.%hu.%hu", &a, &b, &c, &d );
-	xid->id[16] = a;
-	xid->id[17] = b;
-	xid->id[18] = c;
-	xid->id[19] = d;
+	IPAddress ip;
+	IPAddressArg().parse(xid_str,ip CP_PASS_CONTEXT);       
+	uint32_t uintip = ip;
+
+	xid->id[16] = *(((unsigned char*)&uintip)+0);   
+        xid->id[17] = *(((unsigned char*)&uintip)+1);
+        xid->id[18] = *(((unsigned char*)&uintip)+2);
+	xid->id[19] = *(((unsigned char*)&uintip)+3); 
 	return true;
     }
 

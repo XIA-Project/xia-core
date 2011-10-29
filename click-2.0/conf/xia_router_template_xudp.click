@@ -208,7 +208,8 @@ elementclass DualRouter {
     Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self HID as destination
     Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
-    Script(write n/proc/rt_IP/rt.add - 1);	// default route for IP traffice
+    Script(write n/proc/rt_IP/rt.add IP:$local_ip 4); // self IP as destination
+    Script(write n/proc/rt_IP/rt.add - 1);	// default route for IP traffic
 
     arpt :: Tee(2);
 
