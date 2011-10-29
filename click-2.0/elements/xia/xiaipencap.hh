@@ -6,6 +6,7 @@
 #include <clicknet/ip.h>
 #include <clicknet/xia.h>
 #include <click/xid.hh>
+#include <clicknet/udp.h>
 CLICK_DECLS
 
 /*
@@ -21,7 +22,7 @@ CLICK_DECLS
  *
  * =a ICMPError */
 
-#define IP_XID_PROTO 250
+#define IP_XID_UDP_PORT 1001
 
 class XIAIPEncap : public Element {
 
@@ -32,19 +33,28 @@ public:
   const char *class_name() const		{ return "XIAIPEncap"; }
   const char *port_count() const		{ return PORTS_1_1; }
   const char *processing() const		{ return AGNOSTIC; }
+  const char *flags() const                     { return "A"; }
+
   int configure(Vector<String> &, ErrorHandler *);
-  int initialize(ErrorHandler *);
+  bool can_live_reconfigure() const { return true; }
   void add_handlers();
 
   Packet *simple_action(Packet *);
 
-protected:
-  click_ip _iph;
-  atomic_uint32_t _id;
+private:
+    struct in_addr _saddr;
+    struct in_addr _daddr;
+    uint16_t _sport;
+    uint16_t _dport;
+    bool _cksum;
+    bool _use_dst_anno;
+#if HAVE_FAST_CHECKSUM && FAST_CHECKSUM_ALIGNED
+    bool _aligned;
+    bool _checked_aligned;
+#endif
+    atomic_uint32_t _id;
 
-  inline void update_cksum(click_ip *, int) const;
-  static String read_handler(Element *, void *);
-
+    static String read_handler(Element *, void *);
 };
 
 CLICK_ENDDECLS
