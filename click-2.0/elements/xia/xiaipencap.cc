@@ -13,7 +13,12 @@
 CLICK_DECLS
 
 XIAIPEncap::XIAIPEncap()
+    : _cksum(true), _use_dst_anno(false)
 {
+    _id = 0;
+#if HAVE_FAST_CHECKSUM && FAST_CHECKSUM_ALIGNED
+    _checked_aligned = false;
+#endif
 }
 
 XIAIPEncap::~XIAIPEncap()
@@ -23,113 +28,41 @@ XIAIPEncap::~XIAIPEncap()
 int
 XIAIPEncap::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-  click_ip iph;
-  memset(&iph, 0, sizeof(click_ip));
-  iph.ip_v = 4;
-  iph.ip_hl = sizeof(click_ip) >> 2;
-  iph.ip_ttl = 250;
-  int proto = IP_XID_PROTO, tos = -1, dscp = -1;
-  bool ce = false, df = false;
-  String ect_str, dst_str;
+    IPAddress saddr;
+    uint16_t sport = IP_XID_UDP_PORT, dport = IP_XID_UDP_PORT;
+    bool cksum;
+    String daddr_str;
 
     if (Args(conf, this, errh)
-	.read("PROTO", NamedIntArg(NameInfo::T_IP_PROTO), proto)
-	.read_mp("SRC", iph.ip_src)
-	.read("DST", AnyArg(), dst_str)
-	.read("TOS", tos)
-	.read("TTL", iph.ip_ttl)
-	.read("DSCP", dscp)
-	.read("ECT", KeywordArg(), ect_str)
-	.read("CE", ce)
-	.read("DF", df)
+	.read_mp("SRC", saddr)
+	.read("SPORT", IPPortArg(IP_PROTO_UDP), sport)
+	.read("DST", AnyArg(), daddr_str)
+	.read("DPORT", IPPortArg(IP_PROTO_UDP), dport)
+	.read_p("CHECKSUM", BoolArg(), cksum)
 	.complete() < 0)
 	return -1;
 
-  if (proto < 0 || proto > 255)
-      return errh->error("bad IP protocol");
-  iph.ip_p = proto;
+    _use_dst_anno = false;
 
-  bool use_dst_anno = false;//dst_str == "DST_ANNO";
-  /*if (use_dst_anno)
-      iph.ip_dst.s_addr = 0;
-  else if (!IPAddressArg().parse(dst_str, iph.ip_dst, this))
-      return errh->error("DST argument should be IP address or 'DST_ANNO'");
-  */
+    _saddr = saddr;
+    _sport = htons(sport);
+    _dport = htons(dport);
 
-  int ect = 0;
-  if (ect_str) {
-    bool x;
-    if (BoolArg().parse(ect_str, x))
-      ect = x;
-    else if (ect_str == "2")
-      ect = 2;
-    else
-      return errh->error("bad ECT value '%s'", ect_str.c_str());
-  }
-
-  if (tos >= 0 && dscp >= 0)
-    return errh->error("cannot set both TOS and DSCP");
-  else if (tos >= 0 && (ect || ce))
-    return errh->error("cannot set both TOS and ECN bits");
-  if (tos >= 256 || tos < -1)
-    return errh->error("TOS too large; max 255");
-  else if (dscp >= 63 || dscp < -1)
-    return errh->error("DSCP too large; max 63");
-  if (ect && ce)
-    return errh->error("can set at most one ECN option");
-
-  if (tos >= 0)
-    iph.ip_tos = tos;
-  else if (dscp >= 0)
-    iph.ip_tos = (dscp << 2);
-  if (ect)
-    iph.ip_tos |= (ect == 1 ? IP_ECN_ECT1 : IP_ECN_ECT2);
-  if (ce)
-    iph.ip_tos |= IP_ECN_CE;
-  if (df)
-    iph.ip_off |= htons(IP_DF);
-  _iph = iph;
-
-  // set the checksum field so we can calculate the checksum incrementally
-#if HAVE_FAST_CHECKSUM
-  _iph.ip_sum = ip_fast_csum((unsigned char *) &_iph, sizeof(click_ip) >> 2);
-#else
-  _iph.ip_sum = click_in_cksum((unsigned char *) &_iph, sizeof(click_ip));
+#if HAVE_FAST_CHECKSUM && FAST_CHECKSUM_ALIGNED
+    if (!_checked_aligned) {
+	int ans, c, o;
+	ans = AlignmentInfo::query(this, 0, c, o);
+	_aligned = (ans && c == 4 && o == 0);
+	if (!_aligned)
+	    errh->warning("IP header unaligned, cannot use fast IP checksum");
+	if (!ans)
+	    errh->message("(Try passing the configuration through %<click-align%>.)");
+	_checked_aligned = true;
+    }
 #endif
 
-  // store information about use_dst_anno in the otherwise useless
-  // _iph.ip_len field
-  _iph.ip_len = (use_dst_anno ? 1 : 0);
-
-  return 0;
+    return 0;
 }
-
-
-int
-XIAIPEncap::initialize(ErrorHandler *)
-{
-  _id = 0;
-  return 0;
-}
-
-
-inline void
-XIAIPEncap::update_cksum(click_ip *ip, int off) const
-{
-#if HAVE_INDIFFERENT_ALIGNMENT
-    click_update_in_cksum(&ip->ip_sum, 0, ((uint16_t *) ip)[off/2]);
-#else
-    const uint8_t *u = (const uint8_t *) ip;
-# if CLICK_BYTE_ORDER == CLICK_BIG_ENDIAN
-    click_update_in_cksum(&ip->ip_sum, 0, u[off]*256 + u[off+1]);
-# else
-    click_update_in_cksum(&ip->ip_sum, 0, u[off] + u[off+1]*256);
-# endif
-#endif
-}
-
-
-
 
 Packet *
 XIAIPEncap::simple_action(Packet *p_in)
@@ -148,56 +81,88 @@ XIAIPEncap::simple_action(Packet *p_in)
   }
   
   long storedip = *(long*)&node.xid.id[16];
-  _iph.ip_dst.s_addr = storedip; 
-  
-  WritablePacket *p = p_in->push(sizeof(click_ip));
-  if (!p) return 0;
+  _daddr.s_addr = storedip; 
 
+ WritablePacket *p = p_in->push(sizeof(click_udp) + sizeof(click_ip));
   click_ip *ip = reinterpret_cast<click_ip *>(p->data());
-  memcpy(ip, &_iph, sizeof(click_ip));
+  click_udp *udp = reinterpret_cast<click_udp *>(ip + 1);
 
-  p->set_dst_ip_anno(IPAddress(ip->ip_dst));
-  update_cksum(ip, 16);
-  update_cksum(ip, 18);
-
-
+#if !HAVE_INDIFFERENT_ALIGNMENT
+  assert((uintptr_t)ip % 4 == 0);
+#endif
+  // set up IP header
+  ip->ip_v = 4;
+  ip->ip_hl = sizeof(click_ip) >> 2;
   ip->ip_len = htons(p->length());
   ip->ip_id = htons(_id.fetch_and_add(1));
-  update_cksum(ip, 2);
-  update_cksum(ip, 4);
+  ip->ip_p = IP_PROTO_UDP;
+  ip->ip_src = _saddr;
+  if (_use_dst_anno)
+      ip->ip_dst = p->dst_ip_anno();
+  else {
+      ip->ip_dst = _daddr;
+      p->set_dst_ip_anno(IPAddress(_daddr));
+  }
+  ip->ip_tos = 0;
+  ip->ip_off = 0;
+  ip->ip_ttl = 250;
 
+  ip->ip_sum = 0;
+#if HAVE_FAST_CHECKSUM && FAST_CHECKSUM_ALIGNED
+  if (_aligned)
+    ip->ip_sum = ip_fast_csum((unsigned char *)ip, sizeof(click_ip) >> 2);
+  else
+    ip->ip_sum = click_in_cksum((unsigned char *)ip, sizeof(click_ip));
+#elif HAVE_FAST_CHECKSUM
+  ip->ip_sum = ip_fast_csum((unsigned char *)ip, sizeof(click_ip) >> 2);
+#else
+  ip->ip_sum = click_in_cksum((unsigned char *)ip, sizeof(click_ip));
+#endif
 
   p->set_ip_header(ip, sizeof(click_ip));
+
+  // set up UDP header
+  udp->uh_sport = _sport;
+  udp->uh_dport = _dport;
+  uint16_t len = p->length() - sizeof(click_ip);
+  udp->uh_ulen = htons(len);
+  udp->uh_sum = 0;
+  if (_cksum) {
+    unsigned csum = click_in_cksum((unsigned char *)udp, len);
+    udp->uh_sum = click_in_cksum_pseudohdr(csum, ip, len);
+  }
 
   return p;
 }
 
 
-
-String
-XIAIPEncap::read_handler(Element *e, void *thunk)
+String XIAIPEncap::read_handler(Element *e, void *thunk)
 {
-  XIAIPEncap *ipe = static_cast<XIAIPEncap *>(e);
-  switch ((intptr_t)thunk) {
-    case 0:
-      return IPAddress(ipe->_iph.ip_src).unparse();
-    case 1:
-      if (ipe->_iph.ip_len == 1)
-	  return "DST_ANNO";
-      else
-	  return IPAddress(ipe->_iph.ip_dst).unparse();
-    default:
-      return "<error>";
-  }
+    XIAIPEncap *u = static_cast<XIAIPEncap *>(e);
+    switch ((uintptr_t) thunk) {
+      case 0:
+	return IPAddress(u->_saddr).unparse();
+      case 1:
+	return String(ntohs(u->_sport));
+      case 2:
+	return IPAddress(u->_daddr).unparse();
+      case 3:
+	return String(ntohs(u->_dport));
+      default:
+	return String();
+    }
 }
 
-void
-XIAIPEncap::add_handlers()
+void XIAIPEncap::add_handlers()
 {
-    add_read_handler("src", read_handler, 0, Handler::CALM);
-    add_write_handler("src", reconfigure_keyword_handler, "1 SRC");
-    add_read_handler("dst", read_handler, 1, Handler::CALM);
+    add_read_handler("src", read_handler, (void *) 0);
+    add_write_handler("src", reconfigure_keyword_handler, "0 SRC");
+    add_read_handler("sport", read_handler, (void *) 1);
+    add_write_handler("sport", reconfigure_keyword_handler, "1 SPORT");
+    add_read_handler("dst", read_handler, (void *) 2);
     add_write_handler("dst", reconfigure_keyword_handler, "2 DST");
+    add_read_handler("dport", read_handler, (void *) 3);
+    add_write_handler("dport", reconfigure_keyword_handler, "3 DPORT");
 }
 
 

@@ -62,8 +62,9 @@ def process_more_CIDlist(message, browser_socket, moresock, socks):
 	#print "requesting for CID", message[rt+4:rt+44]
 	CID = message[rt+4:rt+44]
 	content_dag = 'CID:%s' % CID
-        content_dag = 'RE %s %s %s' % (AD1, HID1, content_dag)
-        cidlist.append(content_dag)
+        #content_dag = 'RE %s %s %s' % (AD1, HID1, content_dag)
+        content_dag = 'DAG 2 0 - \n %s 2 1 - \n %s 2 - \n %s' % (AD1, HID1, content_dag)
+	cidlist.append(content_dag)
         #xsocket.XgetCID(moresock, content_dag, len(content_dag))
         #content = xsocket.Xrecv(moresock, 65521, 0)
 	#browser_socket.send(content)
@@ -87,8 +88,9 @@ def process_videoCIDlist(message, browser_socket, socks):
 	#print "requesting for CID", message[rt+4:rt+44]
 	CID = message[rt+4:rt+44]
 	content_dag = 'CID:%s' % CID
-        content_dag = 'RE %s %s %s' % (AD1, HID1, content_dag)
-        cidlist.append(content_dag)
+        #content_dag = 'RE %s %s %s' % (AD1, HID1, content_dag)
+        content_dag = 'DAG 2 0 - \n %s 2 1 - \n %s 2 - \n %s' % (AD1, HID1, content_dag)
+	cidlist.append(content_dag)
         #xsocket.XgetCID(moresock, content_dag, len(content_dag))
         #content = xsocket.Xrecv(moresock, 65521, 0)
 	#browser_socket.send(content)
