@@ -11,6 +11,7 @@ sleep 2
 
 #setup visualizer
 for host in pg56 pg55 pg42 pg40
+do
 ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_visualizer_${host}.sh"
 done
 
