@@ -1,7 +1,7 @@
 #!/bin/bash
 sudo echo Testing
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.
-firefox &
+#firefox &
 cd ../
 sudo ./click-2.0/userlevel/click ./click-2.0/conf/xia_internet0.click &
 cd ./proxies

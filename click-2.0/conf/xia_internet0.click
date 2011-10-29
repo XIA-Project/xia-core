@@ -15,7 +15,7 @@ router0[1] -> ToDevice(eth0);
 FromDevice(eth0) -> [1]router0;
 
 XIAXIDInfo(
-IPID2 IP:128.2.208.168
+IPID2 IP:128.2.208.167
 );
 
 // send test packets from host0 to host1
