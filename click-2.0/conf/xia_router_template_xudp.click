@@ -251,7 +251,7 @@ elementclass DualRouter {
     n[2] -> [0]cache[0] -> [1]n;
     Idle -> [1]cache[1] -> Discard;
 
-    dip :: DirectIPLookup(0.0.0.0/0 $local_ip 0);
+    dip :: DirectIPLookup(0.0.0.0/0 $local_ip:gw 0);
     swIP[0] -> arpq0;
     swIP[1] -> dip -> arpq1;
 
