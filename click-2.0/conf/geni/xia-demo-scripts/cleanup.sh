@@ -18,3 +18,5 @@ for host in pg40
 do
 ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/kill_service_${host}.sh"
 done
+
+echo "Ready!"

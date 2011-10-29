@@ -9,6 +9,7 @@ done
 
 #setup BBN visualizer DB
 for host in pg56 
+do
 ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_visualizer_DB_${host}.sh"
 done
 
