@@ -164,10 +164,10 @@ def sendVideoSIDRequest(netloc, payload, browser_socket):
     numchunks = int(reply)
     print "sendSIDRequest: received reply for number of chunks ",numchunks
 
+    ## may be send http header along with first content
     ## return ogg header
     http_header = "HTTP/1.0 200 OK\r\nDate: Tue, 01 Mar 2011 06:14:58 GMT\r\nConnection: close\r\nContent-type: video/ogg\r\nServer: lighttpd/1.4.26\r\n\r\n"
 
-    send_to_browser(http_header, browser_socket)
 
     ## next get chunks, at most 20 in a go
     threshold = 20
@@ -189,6 +189,8 @@ def sendVideoSIDRequest(netloc, payload, browser_socket):
 	reply = recv_with_timeout(sock) # = xsocket.Xrecv(sock, 1024, 0)
 	xsocket.Xclose(sock)
 	#print reply
+	if(i == 0):
+    		send_to_browser(http_header, browser_socket)
 	ret = process_videoCIDlist(reply, browser_socket, socks)
 	if (ret==False):
 	    break;
