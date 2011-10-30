@@ -29,7 +29,7 @@ class ContentHeader : public XIAGenericExtHeader { public:
     
 
     enum { OPCODE, OFFSET, CHUNK_OFFSET, LENGTH, CHUNK_LENGTH}; 
-    enum { OP_REQUEST=1, OP_RESPONSE, OP_LOCAL_PUTCID};
+    enum { OP_REQUEST=1, OP_RESPONSE, OP_LOCAL_PUTCID, OP_REDUNDANT_REQUEST};
 };
 
 class ContentHeaderEncap : public XIAGenericExtHeaderEncap { public:
@@ -40,6 +40,7 @@ class ContentHeaderEncap : public XIAGenericExtHeaderEncap { public:
     ContentHeaderEncap(uint8_t opcode, uint32_t chunk_offset=0, uint16_t length=0);
 
     static ContentHeaderEncap* MakeRequestHeader() { return new ContentHeaderEncap(ContentHeader::OP_REQUEST,0,0); };
+    static ContentHeaderEncap* MakeRPTRequestHeader() { return new ContentHeaderEncap(ContentHeader::OP_REDUNDANT_REQUEST,0,0); };
     static ContentHeaderEncap* MakeRequestHeader( uint32_t chunk_offset, uint16_t length ) 
                         { return new ContentHeaderEncap(ContentHeader::OP_REQUEST,chunk_offset, length); };
 

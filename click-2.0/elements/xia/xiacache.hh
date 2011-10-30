@@ -17,8 +17,6 @@
 #include <iostream>
 #endif
 
-#define DEBUG_PACKET 1
-
 CLICK_DECLS
 
 /**

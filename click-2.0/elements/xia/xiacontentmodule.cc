@@ -58,14 +58,14 @@ void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID 
     HashTable<XID,CChunk*>::iterator it;
     it=_contentTable.find(dstCID);    
 #ifdef CLIENTCACHE
-    if(srcHID==_transport->local_hid())
-    {
-	if(it!=_contentTable.end())
-	{
-	    content[dstCID]=1;
-
+    if(srcHID==_transport->local_hid()) {
+        ContentHeader ch(p);  
+	if(it!=_contentTable.end() && (content[dstCID]=1)  /* This is an intended assignemnt */
+		&& (ch.opcode()==ContentHeader::OP_REQUEST))  /* Filter out redundant request for RPT reliability */
+	{ 
 	    XIAHeaderEncap encap;
 	    XIAHeader hdr(p);
+
 	    XIAPath srcPath, dstPath;      
 	    char* pl=it->second->GetPayload();
 	    unsigned int s=it->second->GetSize();
@@ -400,7 +400,7 @@ void XIAContentModule::cache_incoming(Packet *p, const XID& srcCID, const XID& d
     ContentHeader ch(p);  
     bool local_putcid = (ch.opcode() == ContentHeader::OP_LOCAL_PUTCID);
 
-    if (CACHE_DEBUG)
+    if (CACHE_DEBUG>1)
 	click_chatter("--Cache incoming--%s %s", srcCID.unparse().c_str(), _transport->local_hid().unparse().c_str());
 
     if(local_putcid || dstHID==_transport->local_hid())   

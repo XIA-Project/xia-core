@@ -11,6 +11,7 @@
 #include "xudp.hh"
 
 #define DEBUG 0
+#define GETCID_REDUNDANCY 3 /* TODO: don't hardcode this value, make it configurable from Xsocket API */
 
 CLICK_DECLS
 
@@ -460,7 +461,7 @@ void XUDP::push(int port, Packet *p_input)
 			    xiah.set_src_path(daginfo->src_path);
 
 
-			    WritablePacket *just_payload_part= WritablePacket::make(p_in->headroom()+dag_size+1, (const void*)x_sendto_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
+			    WritablePacket *just_payload_part= WritablePacket::make(p_in->headroom()+dag_size*2+64, (const void*)x_sendto_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
 
 			    WritablePacket *p = NULL;
 
@@ -470,13 +471,23 @@ void XUDP::push(int port, Packet *p_input)
 			    //printf("DSTTYPE:%s",dst_path.xid(dst_path.destination_node()).unparse().c_str());
 
 			    if(ntohl(_xid.type)==CLICK_XIA_XID_TYPE_CID) {
-				ContentHeaderEncap  contenth(0, 0, 0, 0);
-				p = contenth.encap(just_payload_part); 
+				/* content request (getCID) */
+				ContentHeaderEncap *chdr = ContentHeaderEncap::MakeRequestHeader(); 
+				p = chdr->encap(just_payload_part); 
 				p = xiah.encap(p, true);
+				delete chdr;
+			        output(2).push(p);
+				chdr = ContentHeaderEncap::MakeRPTRequestHeader(); 
+				for (int i=0;i<GETCID_REDUNDANCY-1;i++) {
+				    Packet *rp = chdr->encap(just_payload_part->clone()); 
+				    rp = xiah.encap(rp, true);
+				    output(2).push(rp);
+				}
+			        delete chdr;
 			    } else {
 				p = xiah.encap(just_payload_part, true);
+			       output(2).push(p);
 			    }
-			    output(2).push(p);
 
 			    // (for Ack purpose) Reply with a packet with the destination port=source port	
 			    // protobuf message

@@ -85,7 +85,6 @@ XIACache::configure(Vector<String> &conf, ErrorHandler *errh)
 void XIACache::push(int port, Packet *p)
 {
     const struct click_xia* hdr = p->xia_header();
-    //click_chatter("XIACache activity");
 
     if (!hdr) return;
     if (hdr->dnode == 0 || hdr->snode == 0) return;
@@ -119,7 +118,7 @@ void XIACache::push(int port, Packet *p)
     {
 	p->kill();
 #if DEBUG_PACKET
-	//click_chatter("src and dst are not CID");
+	click_chatter("src and dst are not CID");
 #endif
     }
 }

@@ -22,8 +22,6 @@
 
 #endif
 
-#define DEBUG_PACKET 1
-
 #define CLICKCONTROLPORT 5001
 //#define CLICKOPENPORT 5001
 #define CLICKBINDPORT 5002
