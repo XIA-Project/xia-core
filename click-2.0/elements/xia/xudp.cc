@@ -10,8 +10,8 @@
 #include "xiatransport.hh"
 #include "xudp.hh"
 
-#define DEBUG 0
-#define GETCID_REDUNDANCY 3 /* TODO: don't hardcode this value, make it configurable from Xsocket API */
+#define DEBUG 1
+#define GETCID_REDUNDANCY 1 /* TODO: don't hardcode this value, make it configurable from Xsocket API */
 
 CLICK_DECLS
 
@@ -136,6 +136,7 @@ void XUDP::push(int port, Packet *p_input)
 
 			    portToDAGinfo.set(_sport,daginfo);
 			    //click_chatter("Bound");
+		            click_chatter("set %d %d",_sport, __LINE__);
 
 			    portRxSeqNo.set(_sport,portRxSeqNo.get(_sport)+1);//Increment counter
 
@@ -171,41 +172,49 @@ void XUDP::push(int port, Packet *p_input)
 			    String dest(x_connect_msg->ddag().c_str());
 
 			    //String sdag_string((const char*)p_in->data(),(const char*)p_in->end_data());
-			    //click_chatter("\nbind requested to %s, length=%d\n",sdag_string.c_str(),(int)p_in->length());
+			    //click_chatter("\nconnect requested to %s, length=%d\n",dest.c_str(),(int)p_in->length());
 
 			    XIAPath dst_path;
 			    dst_path.parse(dest); 			
 
 			    DAGinfo *daginfo=portToDAGinfo.get_pointer(_sport);
+			    //click_chatter("connect %d %x",_sport, daginfo);
 
 			    if(!daginfo) {
+				//click_chatter("Create DAGINFO connect %d %x",_sport, daginfo);
 				//No local SID bound yet, so bind ephemeral one
 				daginfo=new DAGinfo();
-				daginfo->port=_sport;
-				String str_local_addr=_local_addr.unparse_re();
-				daginfo->isConnected=true;
-				daginfo->initialized=true;
-                                daginfo->ddag= dest;
+			    }
 
+			    daginfo->dst_path=dst_path;
+			    daginfo->port=_sport;
+			    daginfo->isConnected=true;
+			    daginfo->initialized=true;
+			    daginfo->ddag= dest;
+
+			    String str_local_addr=_local_addr.unparse_re();
+			    //String dagstr = daginfo->src_path.unparse_re();
+
+			    /* Use src_path set by Xbind() if exists */
+			    if(daginfo->sdag.length() ==0) {
 				String rand(click_random(1000000, 9999999));
 				String xid_string="SID:20000ff00000000000000000000000000"+rand;
 				str_local_addr=str_local_addr+" "+xid_string;//Make source DAG _local_addr:SID
-
 				daginfo->src_path.parse_re(str_local_addr);
-
-				daginfo->nxt=-1;
-				daginfo->last=-1;
-				daginfo->hlim=250;
-
-				XID source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
-
-				XIDtoPort.set(source_xid,_sport);//Maybe change the mapping to XID->DAGinfo?
-				addRoute(source_xid);
-				portToDAGinfo.set(_sport,*daginfo);
 			    }
 
-			    daginfo=portToDAGinfo.get_pointer(_sport);
-			    daginfo->dst_path=dst_path;
+			    daginfo->nxt=-1;
+			    daginfo->last=-1;
+			    daginfo->hlim=250;
+
+			    XID source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+
+			    XIDtoPort.set(source_xid,_sport);//Maybe change the mapping to XID->DAGinfo?
+			    addRoute(source_xid);
+			    portToDAGinfo.set(_sport,*daginfo);
+			    //click_chatter("set %d %x",_sport, daginfo);
+
+			    //daginfo=portToDAGinfo.get_pointer(_sport);
 			    //click_chatter("\nbound to %s\n",portToDAGinfo.get_pointer(_sport)->src_path.unparse().c_str());
 
 			    portRxSeqNo.set(_sport,portRxSeqNo.get(_sport)+1);//Increment counter
@@ -312,100 +321,96 @@ void XUDP::push(int port, Packet *p_input)
 		switch(xia_socket_msg.type()) { 
 		    case xia::XSEND:
 			{
-			    if(!isConnected) {
-				click_chatter("Not 'connect'ed");
-			    } else {
+			    //click_chatter("\n\nOK: SOCKET DATA !!!\\n");
 
-				//click_chatter("\n\nOK: SOCKET DATA !!!\\n");
+			    xia::X_Send_Msg *x_send_msg = xia_socket_msg.mutable_x_send();
 
-				xia::X_Send_Msg *x_send_msg = xia_socket_msg.mutable_x_send();
+			    String pktPayload(x_send_msg->payload().c_str(), x_send_msg->payload().size());
 
-				String pktPayload(x_send_msg->payload().c_str(), x_send_msg->payload().size());
-
-				int pktPayloadSize=pktPayload.length();
-
-				//Find DAG info for that stream
-				DAGinfo *daginfo=portToDAGinfo.get_pointer(_sport);
+			    int pktPayloadSize=pktPayload.length();
+			    //click_chatter("pkt %s port %d", pktPayload.c_str(), _sport);
+			    //Find DAG info for that stream
+			    DAGinfo *daginfo=portToDAGinfo.get_pointer(_sport);
+			    if(daginfo && isConnected && daginfo->isConnected) {
 
 				//Recalculate source path
 				XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
 				String str_local_addr=_local_addr.unparse_re()+" "+source_xid.unparse();
 				//Make source DAG _local_addr:SID
-				if(isConnected) {
-				    String dagstr = daginfo->src_path.unparse_re();
-				    if(dagstr.length() !=0 && dagstr !=str_local_addr) {
-					//Moved!
-					daginfo->src_path.parse_re(str_local_addr);
-					//Send a control packet to transport on the other side
-					//TODO: Change this to a proper format rather than use presence of extension header=1 to denote mobility
-					XIAHeaderEncap xiah;
-					String str="MOVED";
-					WritablePacket *p2 = WritablePacket::make (256, str.c_str(), str.length(),0);
-					xiah.set_nxt(22);
-					xiah.set_last(-1);
-					xiah.set_hlim(250);
-					xiah.set_dst_path(daginfo->dst_path);
-					xiah.set_src_path(daginfo->src_path);
-
-					//Might need to remove more if another header is required (eg some control/DAG info)
-
-					WritablePacket *p = NULL;
-					p = xiah.encap(p2, true);
-
-					//click_chatter("Sent packet to network");
-					output(2).push(p);
-				    }
-
-
-				    //Add XIA headers
+				String dagstr = daginfo->src_path.unparse_re();
+				if(dagstr.length() !=0 && dagstr !=str_local_addr) {
+				    //Moved!
+				    daginfo->src_path.parse_re(str_local_addr);
+				    //Send a control packet to transport on the other side
+				    //TODO: Change this to a proper format rather than use presence of extension header=1 to denote mobility
 				    XIAHeaderEncap xiah;
-				    if (daginfo->nxt >= 0) {
-					xiah.set_nxt(-1);
-				    }
+				    String str="MOVED";
+				    WritablePacket *p2 = WritablePacket::make (256, str.c_str(), str.length(),0);
+				    xiah.set_nxt(22);
 				    xiah.set_last(-1);
 				    xiah.set_hlim(250);
 				    xiah.set_dst_path(daginfo->dst_path);
 				    xiah.set_src_path(daginfo->src_path);
 
-				    if (DEBUG)
-					click_chatter("sent packet to %s, from %s\n",daginfo->dst_path.unparse_re().c_str(),daginfo->src_path.unparse_re().c_str());
-
-
-				    WritablePacket *just_payload_part= WritablePacket::make(p_in->headroom()+1, (const void*)x_send_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
+				    //Might need to remove more if another header is required (eg some control/DAG info)
 
 				    WritablePacket *p = NULL;
-				    p = xiah.encap(just_payload_part, true);
+				    p = xiah.encap(p2, true);
 
 				    //click_chatter("Sent packet to network");
 				    output(2).push(p);
-
-				    // (for Ack purpose) Reply with a packet with the destination port=source port	
-				    // protobuf message
-				    /*
-				       xia::XSocketMsg xia_socket_msg_response;
-
-				       xia_socket_msg_response.set_type(xia::XSOCKET_SENDTO);
-
-				       std::string p_buf2;
-				       xia_socket_msg.SerializeToString(&p_buf2);
-				       WritablePacket *reply= WritablePacket::make(256, p_buf2.c_str(), p_buf2.size(), 0);
-				       output(1).push(UDPIPEncap(reply,_sport,_sport));    
-				     */	
-
 				}
-			    }
+
+
+				//Add XIA headers
+				XIAHeaderEncap xiah;
+				if (daginfo->nxt >= 0) {
+				    xiah.set_nxt(-1);
+				}
+				xiah.set_last(-1);
+				xiah.set_hlim(250);
+				xiah.set_dst_path(daginfo->dst_path);
+				xiah.set_src_path(daginfo->src_path);
+
+				if (DEBUG)
+				    click_chatter("sent packet to %s, from %s\n",daginfo->dst_path.unparse_re().c_str(),daginfo->src_path.unparse_re().c_str());
+
+
+				WritablePacket *just_payload_part= WritablePacket::make(p_in->headroom()+1, (const void*)x_send_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
+
+				WritablePacket *p = NULL;
+				p = xiah.encap(just_payload_part, true);
+
+				//click_chatter("Sent packet to network");
+				output(2).push(p);
+
+				// (for Ack purpose) Reply with a packet with the destination port=source port	
+				// protobuf message
+				/*
+				   xia::XSocketMsg xia_socket_msg_response;
+
+				   xia_socket_msg_response.set_type(xia::XSOCKET_SENDTO);
+
+				   std::string p_buf2;
+				   xia_socket_msg.SerializeToString(&p_buf2);
+				   WritablePacket *reply= WritablePacket::make(256, p_buf2.c_str(), p_buf2.size(), 0);
+				   output(1).push(UDPIPEncap(reply,_sport,_sport));    
+				 */	
+
+			    } else
+				click_chatter("Not 'connect'ed");
 			}
 			break;
-		    case xia::XSENDTO:
-			{
+		case xia::XSENDTO:
+		{
 
-			    xia::X_Sendto_Msg *x_sendto_msg = xia_socket_msg.mutable_x_sendto();
+		    xia::X_Sendto_Msg *x_sendto_msg = xia_socket_msg.mutable_x_sendto();
 
-			    String dest(x_sendto_msg->ddag().c_str());
-			    String pktPayload(x_sendto_msg->payload().c_str(), x_sendto_msg->payload().size());
+		    String dest(x_sendto_msg->ddag().c_str());
+		    String pktPayload(x_sendto_msg->payload().c_str(), x_sendto_msg->payload().size());
 
 
-			    int dag_size = dest.length();
+		    int dag_size = dest.length();
 			    int pktPayloadSize=pktPayload.length();
 			    //click_chatter("\n SENDTO ddag:%s, payload:%s, length=%d\n",xia_socket_msg.ddag().c_str(), xia_socket_msg.payload().c_str(), pktPayloadSize);
 
