@@ -29,11 +29,14 @@ def putCID(chunk):
     m.update(chunk)
     cid = m.hexdigest()
 
+    print 'waiting to get socket'
     sock = xsocket.Xsocket()
     if (sock<0):
         print "error opening socket"
         return
+    print 'got socket'
     
+    print 'waiting to put content'
     # Put the content chunk
     content_dag = 'RE %s %s CID:%s' % (AD1, HID1, cid)
     xsocket.XputCID(sock, chunk, len(chunk), 0, content_dag, len(content_dag))
@@ -59,15 +62,11 @@ def serveSIDRequest(request, sock):
     xsocket.Xsend(sock, response, len(response), 0)
     return
 
-def main():
-    global AD1, HID1, SID1
+
+def put_content():
     global length
     global CID_SIMPLE_HTML, CID_DEMO_HTML
-
-    # Set up connection with click via Xsocket API
-    xsocket.set_conf("xsockconf_python.ini", "webserver.py")
-    xsocket.print_conf()  #for debugging
-
+    
     # Put content 'image.jpg' and make a corresponding list of CIDs
     # (if image is chunked it might have multiple CIDs)
     image_cid_list = []
@@ -128,9 +127,24 @@ def main():
     f.close()
     print "end plane.jpg"
 
+
+def main():
+    global AD1, HID1, SID1
+
+    print 'starting webserver'
+    # Set up connection with click via Xsocket API
+    xsocket.set_conf("xsockconf_python.ini", "webserver.py")
+    xsocket.print_conf()  #for debugging
+
+    try:
+        sys.argv.index('-r') # don't republish content if we're restarting but didn't restart click
+        print 'Restarting webserver. Don\'t republish content'
+    except:
+        put_content() # '-r' not found, so do publish content
     time.sleep(1) #necessary?
 
     # Now listen for connections from clients
+    print 'webserver.py: Waiting to get socket to listen on'
     listen_sock = xsocket.Xsocket()
     if (listen_sock<0):
         print 'error opening socket'
@@ -140,10 +154,15 @@ def main():
     print 'Listening on %s' % dag
 
     while True:
-        xsocket.Xaccept(listen_sock)
-        incoming_data = xsocket.Xrecv(listen_sock, 2000, 0)
-        print "webserver got %s" % incoming_data
-        serveSIDRequest(incoming_data, listen_sock)
+        try:   
+            xsocket.Xaccept(listen_sock)
+            incoming_data = xsocket.Xrecv(listen_sock, 2000, 0)
+            print "webserver got %s" % incoming_data
+            serveSIDRequest(incoming_data, listen_sock)
+        except (KeyboardInterrupt, SystemExit), e:
+            print 'Closing webserver'
+            xsocket.Xclose(sock)
+            sys.exit()
     
 
 
