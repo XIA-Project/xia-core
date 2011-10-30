@@ -62,7 +62,7 @@ int Xclose(int sockfd)
 
         return -1;
  */
-
+ 	close(sockfd);
 	return numbytes;
 }
 

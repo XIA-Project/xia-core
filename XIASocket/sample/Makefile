@@ -3,7 +3,7 @@
 CFLAGS=-I../API
 LDFLAGS =  -lprotobuf -lpthread
 
-all: xs ps xc pc vs
+all: xs ps xc pc vs ../API/libXsocket.a
 
 xs: Server.c 
 	gcc $(CFLAGS) -o $@ $< ../API/libXsocket.a $(LDFLAGS) 

@@ -48,12 +48,14 @@ class CChunk{
 	{
 	    return payload;
 	}
+	XID id() { return xid; };
     private:
 	XID xid;
 	bool complete;
 	unsigned int size;
 	char* payload;
 	CPartList parts;
+	bool deleted;
 
 	void Merge(CPartList::iterator);
 };
@@ -68,6 +70,9 @@ class XIAContentModule {
     void cache_incoming(Packet *p, const XID &, const XID &, int port);
     void process_request(Packet *p, const XID &, const XID &);
 
+    protected:
+    void cache_incoming_local(Packet *p, const XID& srcCID, bool local_putcid);
+    void cache_incoming_forward(Packet *p, const XID& srcCID);
     private:
     XIATransport* _transport;
     XIAPath _local_addr;
@@ -75,13 +80,14 @@ class XIAContentModule {
     bool _cache_content_from_network;
     HashTable<XID,CChunk*> _partialTable;
     HashTable<XID, CChunk*>_contentTable;
-    HashTable<XID, CChunk*> oldPartial; //used in client
+    HashTable<XID, CChunk*>_oldPartial; /* only used in client. When refresh timer is
+	fired,  _oldPartial is cleared and everything in _partialTable goes to _oldPartial.
+	It takes two timers to clear on-going partial chunk transfers.  */
 
     unsigned int usedSize;
     static const unsigned int MAXSIZE=CACHESIZE;
     static unsigned int PKTSIZE;    
     //lru    
-    //static const int REFRESH=3;
     static const int REFRESH=10000;
     int _timer;
     HashTable<XID, int> partial;

@@ -208,11 +208,12 @@ elementclass DualRouter {
     Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self HID as destination
     Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
-    Script(write n/proc/rt_IP/rt.add - 1);	// default route for IP traffice
+    Script(write n/proc/rt_IP/rt.add IP:$local_ip 4); // self IP as destination
+    Script(write n/proc/rt_IP/rt.add - 1);	// default route for IP traffic
 
     arpt :: Tee(2);
 
-    c0 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/FA, 12/9999, 12/0800 !23/FA, -);
+    c0 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/9999, -);
 
     input[0] -> c0;
     out0 :: Queue(200) -> [0]output;
@@ -220,12 +221,12 @@ elementclass DualRouter {
     arpq0 :: ARPQuerier($local_ip, $local_mac) -> out0;
     c0[1] -> arpt;
     arpt[0] -> [1]arpq0;
-    c0[2] -> Paint(1) -> Strip(14) -> MarkIPHeader -> StripIPHeader -> MarkXIAHeader -> [0]n;
+    c0[2] -> Paint(1) -> Strip(14) -> MarkIPHeader -> StripIPHeader -> Strip(8) -> MarkXIAHeader -> [0]n;
     c0[3] -> Paint(1) -> Strip(14) -> [0]n;
-    c0[4] -> Print("eth0 non-IP/XIA") -> Discard;
-    c0[5] -> [0]n; // Print("eth0 non-IP") -> Discard;
+    //c0[4] -> Print("eth0 non-IP/XIA") -> Discard;
+    c0[4] -> [0]n; // Print("eth0 non-IP") -> Discard;
 
-    c1 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/FA, 12/9999, 12/0800 !23/FA, -);
+    c1 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/9999, -);
 
     input[1] -> c1;
     out1 :: Queue(200) -> [1]output;
@@ -233,10 +234,10 @@ elementclass DualRouter {
     arpq1 :: ARPQuerier($local_ip, $local_mac) -> out1;
     c1[1] -> arpt;
     arpt[1] -> [1]arpq1;
-    c1[2] -> Paint(2) -> Strip(14) -> MarkIPHeader -> StripIPHeader -> MarkXIAHeader -> [0]n;
+    c1[2] -> Paint(2) -> Strip(14) -> MarkIPHeader -> StripIPHeader -> Strip(8) -> MarkXIAHeader -> [0]n;
     c1[3] -> Paint(2) -> Strip(14) -> [0]n;
-    c1[4] -> Discard; //Print("eth1 non-IP/XIA") -> Discard;
-    c1[5] -> Discard; //[0]n; // Print("eth0 non-IP") -> Discard;
+    //c1[4] -> IPPrint(CONTENTS HEX) -> Print("non-IP/XIA") -> Discard;
+    c1[4] -> Discard;
 
     dstTypeC :: XIAXIDTypeClassifier(next IP, -);
     swIP :: PaintSwitch;
@@ -250,8 +251,9 @@ elementclass DualRouter {
     n[2] -> [0]cache[0] -> [1]n;
     Idle -> [1]cache[1] -> Discard;
 
+    dip :: DirectIPLookup(0.0.0.0/0 $local_ip:gw 0);
     swIP[0] -> arpq0;
-    swIP[1] -> arpq1;
+    swIP[1] -> dip -> arpq1;
 
     swXIA[0] -> out0;
     swXIA[1] -> out1;
