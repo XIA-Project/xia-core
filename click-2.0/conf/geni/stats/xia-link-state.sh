@@ -34,10 +34,35 @@ do
 		sid=`expr $cur_sid - $prev_sid`
 		hid=`expr $cur_hid - $prev_hid`
 		
-        prev_total=$cur_total
-		prev_sid=$cur_sid
-		prev_cid=$cur_cid
-		prev_hid=$cur_hid
+		if [  "$total" -lt 0 ]; then
+				total=0
+				prev_total=0
+		else 
+			prev_total=$cur_total
+		fi
+
+		if [  "$cid" -lt 0 ]; then
+				cid=0
+				prev_cid=0
+		else 
+			prev_cid=$cur_cid
+		fi
+		
+		if [  "$sid" -lt 0 ]; then
+				sid=0
+				prev_sid=0
+		else 
+			prev_sid=$cur_sid
+		fi
+
+		if [  "$hid" -lt 0 ]; then
+				hid=0
+				prev_hid=0
+		else 
+			prev_hid=$cur_hid
+		fi												
+		
+
 
         echo $total $cid $sid $hid 
 done;
