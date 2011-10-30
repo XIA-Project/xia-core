@@ -10,8 +10,7 @@ killall -9 webserver.py
 ./stock_service.py &
 cd ../XIASocket/sample/
 ./vs video.ogv &
-
-sleep 10  # need this otherwise it doesn't work
+sleep 1  # need this otherwise it doesn't work
 
 cd ../../proxies
 ./webserver.py &

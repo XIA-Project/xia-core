@@ -283,6 +283,7 @@ void XUDP::push(int port, Packet *p_input)
 			break;
 
 		}
+		p_in->kill();
 	    }
 	    break;
 
@@ -336,19 +337,19 @@ void XUDP::push(int port, Packet *p_input)
 					daginfo->src_path.parse_re(str_local_addr);
 					//Send a control packet to transport on the other side
 					//TODO: Change this to a proper format rather than use presence of extension header=1 to denote mobility
-					class XIAHeaderEncap* _xiah=new XIAHeaderEncap();
+					XIAHeaderEncap xiah;
 					String str="MOVED";
 					WritablePacket *p2 = WritablePacket::make (256, str.c_str(), str.length(),0);
-					_xiah->set_nxt(22);
-					_xiah->set_last(-1);
-					_xiah->set_hlim(250);
-					_xiah->set_dst_path(daginfo->dst_path);
-					_xiah->set_src_path(daginfo->src_path);
+					xiah.set_nxt(22);
+					xiah.set_last(-1);
+					xiah.set_hlim(250);
+					xiah.set_dst_path(daginfo->dst_path);
+					xiah.set_src_path(daginfo->src_path);
 
 					//Might need to remove more if another header is required (eg some control/DAG info)
 
 					WritablePacket *p = NULL;
-					p = _xiah->encap(p2, true);
+					p = xiah.encap(p2, true);
 
 					//click_chatter("Sent packet to network");
 					output(2).push(p);
@@ -356,14 +357,14 @@ void XUDP::push(int port, Packet *p_input)
 
 
 				    //Add XIA headers
-				    class XIAHeaderEncap* _xiah=new XIAHeaderEncap();
+				    XIAHeaderEncap xiah;
 				    if (daginfo->nxt >= 0) {
-					_xiah->set_nxt(-1);
+					xiah.set_nxt(-1);
 				    }
-				    _xiah->set_last(-1);
-				    _xiah->set_hlim(250);
-				    _xiah->set_dst_path(daginfo->dst_path);
-				    _xiah->set_src_path(daginfo->src_path);
+				    xiah.set_last(-1);
+				    xiah.set_hlim(250);
+				    xiah.set_dst_path(daginfo->dst_path);
+				    xiah.set_src_path(daginfo->src_path);
 
 				    if (DEBUG)
 					click_chatter("sent packet to %s, from %s\n",daginfo->dst_path.unparse_re().c_str(),daginfo->src_path.unparse_re().c_str());
@@ -372,7 +373,7 @@ void XUDP::push(int port, Packet *p_input)
 				    WritablePacket *just_payload_part= WritablePacket::make(p_in->headroom()+1, (const void*)x_send_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
 
 				    WritablePacket *p = NULL;
-				    p = _xiah->encap(just_payload_part, true);
+				    p = xiah.encap(just_payload_part, true);
 
 				    //click_chatter("Sent packet to network");
 				    output(2).push(p);
@@ -450,13 +451,13 @@ void XUDP::push(int port, Packet *p_input)
 				click_chatter("sent packet to %s, from %s\n",dest.c_str(),daginfo->src_path.unparse_re().c_str());
 
 			    //Add XIA headers
-			    class XIAHeaderEncap* _xiah=new XIAHeaderEncap();
+			    XIAHeaderEncap xiah;
 			    if (daginfo->nxt >= 0)
-				_xiah->set_nxt(-1);
-			    _xiah->set_last(-1);
-			    _xiah->set_hlim(250);
-			    _xiah->set_dst_path(dst_path);
-			    _xiah->set_src_path(daginfo->src_path);
+				xiah.set_nxt(-1);
+			    xiah.set_last(-1);
+			    xiah.set_hlim(250);
+			    xiah.set_dst_path(dst_path);
+			    xiah.set_src_path(daginfo->src_path);
 
 
 			    WritablePacket *just_payload_part= WritablePacket::make(p_in->headroom()+dag_size+1, (const void*)x_sendto_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
@@ -471,9 +472,9 @@ void XUDP::push(int port, Packet *p_input)
 			    if(ntohl(_xid.type)==CLICK_XIA_XID_TYPE_CID) {
 				ContentHeaderEncap  contenth(0, 0, 0, 0);
 				p = contenth.encap(just_payload_part); 
-				p = _xiah->encap(p, true);
+				p = xiah.encap(p, true);
 			    } else {
-				p = _xiah->encap(just_payload_part, true);
+				p = xiah.encap(just_payload_part, true);
 			    }
 			    output(2).push(p);
 
@@ -522,12 +523,12 @@ void XUDP::push(int port, Packet *p_input)
 			     */
 
 			    //Add XIA headers
-			    class XIAHeaderEncap* _xiah=new XIAHeaderEncap();
-			    _xiah->set_last(-1);
-			    _xiah->set_hlim(250);
-			    _xiah->set_dst_path(_local_addr);
-			    _xiah->set_src_path(src_path);
-			    _xiah->set_nxt(CLICK_XIA_NXT_CID);
+			    XIAHeaderEncap xiah;
+			    xiah.set_last(-1);
+			    xiah.set_hlim(250);
+			    xiah.set_dst_path(_local_addr);
+			    xiah.set_src_path(src_path);
+			    xiah.set_nxt(CLICK_XIA_NXT_CID);
 
 			    //Might need to remove more if another header is required (eg some control/DAG info)
 
@@ -537,7 +538,7 @@ void XUDP::push(int port, Packet *p_input)
 			    int chunkSize = pktPayloadSize;
 			    ContentHeaderEncap  contenth(0, 0, pktPayloadSize, chunkSize, ContentHeader::OP_LOCAL_PUTCID);
 			    p = contenth.encap(just_payload_part); 
-			    p = _xiah->encap(p, true);
+			    p = xiah.encap(p, true);
 
 			    if (DEBUG)
 				click_chatter("sent packet to cache");
@@ -562,6 +563,7 @@ void XUDP::push(int port, Packet *p_input)
 			break;
 
 		} // inner switch   			
+		p_in->kill();
 	    } // outer switch
 	    break;
 
@@ -595,7 +597,6 @@ void XUDP::push(int port, Packet *p_input)
 			//Verify mobility info
 			daginfo.dst_path=xiah.src_path();
 			portToDAGinfo.set(_dport,daginfo);
-			p_in->kill();
 			click_chatter("Sender moved, update to the new DAG");
 		    }
 		    //ENDTODO
@@ -611,18 +612,15 @@ void XUDP::push(int port, Packet *p_input)
 			WritablePacket *p2 = WritablePacket::make (256, str.c_str(), str.length(),0);
 
 			if (DEBUG)
-			    click_chatter("Sent packet to socket");                			
+			    click_chatter("Sent packet to socket with port %d", _dport);                			
 			output(1).push(UDPIPEncap(p2,_dport,_dport));
-
-
-			p_in->kill();
 		    }
 		}
 		else
 		{
 		    click_chatter("Packet to unknown %s",_destination_xid.unparse().c_str());
-		    p_in->kill();
 		}
+		p_in->kill();
 	    }
 
 	    break;
@@ -662,14 +660,13 @@ void XUDP::push(int port, Packet *p_input)
 
 		    
 		    output(1).push(UDPIPEncap(p2,_dport,_dport));
-		    p_in->kill();
 		}
 		else
 		{
 		    click_chatter("Packet to unknown %s",_destination_xid.unparse().c_str());
-		    p_in->kill();
 		}            
 
+		 p_in->kill();
 	    }
 	    break;
 

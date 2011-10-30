@@ -15,7 +15,6 @@ var pos = 0
 var stock_timer = null
 var news_timer = null
 var update_interval = 1000
-var time = new Date();
 var req_timestamp = null
 
 function load()
@@ -40,7 +39,6 @@ function update_news()
    clearTimeout(news_timer) 
    ajax(page,'text')
    news_timer = setTimeout("update_news()", update_interval);
-
 }
 
 function shift() 
@@ -60,7 +58,6 @@ function shift()
 function ajax(url,target) {
     // native XMLHttpRequest object
     //document.getElementById(target).innerHTML = 'Loading...';
-    req_timestamp = time.getTime();
     if (window.XMLHttpRequest) {
 	var req = new XMLHttpRequest();
 	req.onreadystatechange = function() {ajaxDone(req, target);};
@@ -75,6 +72,8 @@ function ajax(url,target) {
 	    req.send(null);
 	}
     }
+    req_timestamp = new Date().getTime();
+    //console.log("Response sent at "+ req_timestamp);
 }
 
 function ajaxDone(req, target) {
@@ -82,11 +81,14 @@ function ajaxDone(req, target) {
     if (req.readyState == 4) {
 	// only if "OK"
 	if (req.status == 200 || req.status == 304) {
-	    var now = time.getTime();
+	    var now = new Date().getTime();
 	    results = req.responseText;
+	    response_time = req.getAllResponseHeaders();
+	    console.log("header " +response_time);
 	    document.getElementById(target).innerHTML = results;
             document.getElementById("rtt").innerHTML = "Response Time: "+ (now-req_timestamp); // + " " + req_timestamp + " "+ now;
             document.getElementById("last_response").innerHTML = "Last Response: " +new Date().toLocaleTimeString();
+	    //console.log("Response recv at "+ now);
 	} else {
 	    document.getElementById(target).innerHTML="ajax error:"+req.status + req.statusText +req.responseText;;
             document.getElementById("rtt").innerHTML = "Response Time: undefined" ;

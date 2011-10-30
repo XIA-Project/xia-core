@@ -15,6 +15,20 @@ XIAContentModule::XIAContentModule(XIATransport *transport)
 
 XIAContentModule::~XIAContentModule() 
 {
+    HashTable<XID,CChunk*>::iterator it;
+    CChunk * chunk = NULL;
+    for(it=_partialTable.begin();it!=_partialTable.end();it++) {
+	chunk=it->second;
+	delete chunk;
+    }
+    for(it=_oldPartial.begin();it!=_oldPartial.end();it++) {
+	chunk=it->second;
+	delete chunk;
+    }
+    for(it=_contentTable.begin();it!=_contentTable.end();it++) {
+	chunk=it->second;
+	delete chunk;
+    }
 } 
 
 Packet * XIAContentModule::makeChunkResponse(CChunk * chunk, Packet *p_in) 
@@ -252,56 +266,21 @@ void XIAContentModule::cache_incoming_local(Packet *p, const XID& srcCID, bool l
     CChunk* chunk;
 #ifdef CLIENTCACHE
     HashTable<XID,CChunk*>::iterator cit;
+    _timer++;
     cit=_contentTable.find(srcCID);
-    if(cit!=_contentTable.end()) {
+    if(cit!=_contentTable.end()) { // content exists alreaady
 	if (!local_putcid)
 	    content[srcCID]=1;	
 	p->kill();
 
-	_timer++;
-	if(_timer>=REFRESH)
-	{
-	    _timer=0;
-
-	    for(it=_oldPartial.begin();it!=_oldPartial.end();it++)
-	    {
-		chunk=it->second;
-		delete chunk;
-	    }
-	    _oldPartial.clear();	  
-	    _oldPartial=_partialTable;	  
-	    for(it=_partialTable.begin();it!=_partialTable.end();it++)
-	    {
-		chunk=it->second;
-		delete chunk;
-	    }
-	    _partialTable.clear();	
-	    cit=_contentTable.begin();
-	    while(cit!=_contentTable.end())
-	    {
-		if( content[cit->first]==0 )
-		{
-		    HashTable<XID, CChunk*>::iterator pit=cit;
-		    cit++;
-		    _oldPartial[pit->first]=pit->second;
-		    delRoute(pit->first);
-		    content.erase(pit->first);
-		    _contentTable.erase(pit);
-		}
-		else
-		{
-		    if (content[cit->first]!=ContentHeader::OP_LOCAL_PUTCID)
-			content[cit->first]=0;
-		    cit++;
-		}
-	    }
+	if(_timer>=REFRESH) {
+	    cache_management();
 	}
-	return ;
+	return;
     }
 #endif
     it=_partialTable.find(srcCID);
-    if(it!=_partialTable.end()) //already in partial table
-    {
+    if(it!=_partialTable.end()) { //already in partial table 
 	//std::cout<<"found in partial table"<<std::endl;
 	chunk=it->second;
 	chunk->fill(payload, offset, length);
@@ -311,8 +290,7 @@ void XIAContentModule::cache_incoming_local(Packet *p, const XID& srcCID, bool l
 	    _partialTable.erase(it);
 	}	
     }
-    else
-    {	
+    else {	
 	//std::cout<<"not found in partial table"<<std::endl;
 	oit=_oldPartial.find(srcCID);
 	if(oit!=_oldPartial.end())  //already in old partial table
@@ -329,30 +307,23 @@ void XIAContentModule::cache_incoming_local(Packet *p, const XID& srcCID, bool l
 		_partialTable[srcCID]=chunk;
 	    }
 	}	
-	else			//first pkt to the client
-	{
+	else {			//first pkt to the client
 	    //std::cout<<"first pkt of a chunk"<<std::endl;
 	    chunk=new CChunk(srcCID, chunkSize);
 	    chunk->fill(payload, offset, length);
 	    if(chunk->full())
-	    {
 		chunkFull=true;
-	    }
 	    else
-	    {
 		_partialTable[srcCID]=chunk;
-	    }
 	}
     } 
-    if(chunkFull)  //have built the whole chunk pkt
-    {
+    if(chunkFull) { //have built the whole chunk pkt
 	if (!local_putcid) { /* sendout response to upper layer (application) */
 	    Packet *newp = makeChunkResponse(chunk, p);
 	    _transport->checked_output_push(1 , newp);
 	}
 #ifdef CLIENTCACHE
-	if (local_putcid || _cache_content_from_network)
-	{
+	if (local_putcid || _cache_content_from_network) {
 	    _contentTable[srcCID]=chunk;
 	    if (local_putcid) {
 		assert(ContentHeader::OP_LOCAL_PUTCID>1);
@@ -372,50 +343,54 @@ void XIAContentModule::cache_incoming_local(Packet *p, const XID& srcCID, bool l
 	delete chunk;
 #endif	
     }
-    // delete too old partial content
-    _timer++;
     if(_timer>=REFRESH)
     {
-	if (!local_putcid) content[srcCID]=1;	
 	_timer=0;
-
-	for(it=_oldPartial.begin();it!=_oldPartial.end();it++)
-	{
-	    chunk=it->second;
-	    if (CACHE_DEBUG)
-		click_chatter("oldPartial %s delete CID %s",_transport->local_hid().unparse().c_str(), chunk->id().unparse().c_str());
-	    delete chunk;
-	}
-	_oldPartial.clear();	
-	_oldPartial=_partialTable;	 
-	/* Never delete chunk in the _partialTable here 
-	   because the chunks are still used in the _oldPartialTable
-	   This have created a bug before.  */
-	_partialTable.clear();
-#ifdef CLIENTCACHE	
-	cit=_contentTable.begin();
-	while(cit!=_contentTable.end())
-	{
-	    if( content[cit->first]==0 )
-	    {
-		HashTable<XID, CChunk*>::iterator pit=cit;
-		cit++;
-		_oldPartial[pit->first]=pit->second;
-		delRoute(pit->first);
-		content.erase(pit->first);
-		_contentTable.erase(pit);
-	    }
-	    else
-	    {
-		if (content[cit->first]!=ContentHeader::OP_LOCAL_PUTCID)
-		    content[cit->first]=0;
-		cit++;
-	    }
-	}	
-#endif
+	//trigger cache_management();
+        cache_management();
     }
 
     p->kill();            
+}
+
+void XIAContentModule::cache_management()
+{
+    HashTable<XID,CChunk*>::iterator cit;
+    HashTable<XID,CChunk*>::iterator it;
+    CChunk *chunk = NULL;
+
+    for(it=_oldPartial.begin();it!=_oldPartial.end();it++)
+    {
+	chunk=it->second;
+	if (CACHE_DEBUG)
+	    click_chatter("oldPartial %s delete CID %s",_transport->local_hid().unparse().c_str(), chunk->id().unparse().c_str());
+	delete chunk;
+    }
+    _oldPartial.clear();	
+    _oldPartial=_partialTable;	 
+    /* Never delete chunk in the _partialTable here 
+       because the chunks are still used in the _oldPartialTable
+       This have created a bug before.  */
+    _partialTable.clear();
+#ifdef CLIENTCACHE	
+    cit=_contentTable.begin();
+    while(cit!=_contentTable.end())
+    {
+	if( content[cit->first]==0 ) {
+	    HashTable<XID, CChunk*>::iterator pit=cit;
+	    cit++;
+	    _oldPartial[pit->first]=pit->second;
+	    delRoute(pit->first);
+	    content.erase(pit->first);
+	    _contentTable.erase(pit);
+	}
+	else {
+	    if (content[cit->first]!=ContentHeader::OP_LOCAL_PUTCID)
+		content[cit->first]=0;
+	    cit++;
+	}
+    }
+#endif	
 }
 
 /* source ID is the content */
@@ -429,14 +404,14 @@ void XIAContentModule::cache_incoming(Packet *p, const XID& srcCID, const XID& d
 	click_chatter("--Cache incoming--%s %s", srcCID.unparse().c_str(), _transport->local_hid().unparse().c_str());
 
     if(local_putcid || dstHID==_transport->local_hid())   
-        // cache in client: if it is local putCID() then store content. Otherwise, should return the whole chunk if possible
+	// cache in client: if it is local putCID() then store content. Otherwise, should return the whole chunk if possible
 	cache_incoming_local(p, srcCID, local_putcid);
     else
-        // cache in server, router
+	// cache in server, router
 	cache_incoming_forward(p, srcCID);
 }
 
-int 
+    int 
 XIAContentModule::MakeSpace(int chunkSize)
 {
     while( usedSize + chunkSize > MAXSIZE) {
@@ -514,6 +489,7 @@ CChunk::CChunk(XID _xid, int chunkSize): deleted(false)
 
 CChunk::~CChunk()
 {
+    /* TODO: Memory leak prevention -- CPartList has to be deallocated */
     delete payload; 
 }
 
@@ -554,7 +530,7 @@ void CChunk::Merge(CPartList::iterator it)
     }  
 }
 
-    int 
+int 
 CChunk::fill(const unsigned char *_payload, unsigned int offset, unsigned int length)
 {
     //  std::cout<<"enter fill, payload is "<<_payload<<std::endl;
@@ -629,7 +605,7 @@ CChunk::fill(const unsigned char *_payload, unsigned int offset, unsigned int le
 }
 
 
-    bool
+bool
 CChunk::full()
 {
     if(complete==true) return true;

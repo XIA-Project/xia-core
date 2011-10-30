@@ -54,7 +54,7 @@ class CChunk{
 	bool complete;
 	unsigned int size;
 	char* payload;
-	CPartList parts;
+	CPartList parts; 
 	bool deleted;
 
 	void Merge(CPartList::iterator);
@@ -73,6 +73,7 @@ class XIAContentModule {
     protected:
     void cache_incoming_local(Packet *p, const XID& srcCID, bool local_putcid);
     void cache_incoming_forward(Packet *p, const XID& srcCID);
+    void cache_management();
     private:
     XIATransport* _transport;
     XIAPath _local_addr;

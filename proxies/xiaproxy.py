@@ -127,7 +127,11 @@ def process_videoCIDlist(message, browser_socket, socks):
     ## then retrieve them
     for i in range(len(cidlist)):
         content = recv_with_timeout(socks[i]) # = xsocket.Xrecv(socks[i], 1024, 0)
-	browser_socket.send(content)
+	try:
+	    browser_socket.send(content)
+	except:
+	    browser_socket.close()
+	    return False	
     return True
 
 
@@ -179,7 +183,9 @@ def sendVideoSIDRequest(netloc, payload, browser_socket):
 	reply = recv_with_timeout(sock) # = xsocket.Xrecv(sock, 1024, 0)
 	xsocket.Xclose(sock)
 	#print reply
-	process_videoCIDlist(reply, browser_socket, socks)
+	ret = process_videoCIDlist(reply, browser_socket, socks)
+	if (ret==False):
+	    break;
 	## process CIDs 
     for i in range(threshold):
 	xsocket.Xclose(socks[i])
