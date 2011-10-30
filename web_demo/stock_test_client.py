@@ -22,4 +22,5 @@ stock_feed = Xrecv(sock, 15000,0);
 #stock_feed = Xrecvfrom(sock, 15000,0);
 
 print stock_feed
+print len(stock_feed)
 

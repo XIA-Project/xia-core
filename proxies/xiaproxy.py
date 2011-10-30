@@ -226,6 +226,7 @@ def sendSIDRequest(ddag, payload, browser_socket):
 
     xsocket.Xbind(sock, sdag)
 
+    rtt = time.time() 
     # Connect to service
     xsocket.Xconnect(sock, ddag)
     # Send request
@@ -239,8 +240,10 @@ def sendSIDRequest(ddag, payload, browser_socket):
     # Otherwise request the CIDs
     contains_CIDs = check_for_and_process_CIDs(reply, browser_socket)
     if not contains_CIDs:
+	rtt = int((time.time()-rtt) *1000)
+	# Use last modified field to embedd RTT info
+        reply = reply.replace("\n\n", ("\nLast-Modified:%d\n\n" % rtt)) 
         browser_socket.send(reply)
-    
     return
 
 def requestCID(CID):
