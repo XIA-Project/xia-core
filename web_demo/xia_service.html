@@ -81,7 +81,11 @@ function ajaxDone(req, target) {
 	if (req.status == 200 || req.status == 304) {
 	    results = req.responseText;
 	    document.getElementById(target).innerHTML = results;
-            document.getElementById("rtt").innerHTML = "Response Time: "+ time.getTime()-req_timestamp;
+	    header_rtt = req.getResponseHeader("Last-Modified"); // we use Last-Modified to get rtt
+	    //console.log("header " + header_rtt);
+	    results = results.toString().replace(/ /g, ' &nbsp ');
+	    document.getElementById(target).innerHTML = results;
+            document.getElementById("rtt").innerHTML = "RTT (proxy to service): "+ header_rtt + " ms";
             document.getElementById("last_response").innerHTML = "Last Response: " +new Date().toLocaleTimeString();
 	} else {
 	    document.getElementById(target).innerHTML="ajax error:"+req.status + req.statusText +req.responseText;;
