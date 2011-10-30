@@ -7,6 +7,15 @@ from ctypes import *
 # Pretend a magic naming service givs us a dag for netloc...
 from xia_address import *
 
+def send_to_browser(data, browser_socket):
+    try:
+        browser_socket.send(data)
+        return True
+    except:
+        print 'ERROR: xiaproxy.py: send_to_browser: error sending data to browser'
+        browser_socket.close()
+        return False
+
 def recv_with_timeout(sock, timeout=5):
     # Make socket non-blocking
     try:
@@ -37,8 +46,8 @@ def check_for_and_process_CIDs(message, browser_socket):
         http_header = message[0:rt]
         content = requestCID(message[rt+4:rt+44])
 	## this was the first occurrence
-	browser_socket.send(http_header)
-	browser_socket.send(content)
+	send_to_browser(http_header, browser_socket)
+	send_to_browser(content, browser_socket)
 	## now keep finding CID and sending content
 	#print "length received ",len(message)
 	rt = message.find('CID', rt+44)
@@ -46,7 +55,7 @@ def check_for_and_process_CIDs(message, browser_socket):
 	while(rt != -1):
 		print "requesting for CID", message[rt+4:rt+44]
 		content = requestCID(message[rt+4:rt+44])
-		browser_socket.send(content)
+		send_to_browser(content, browser_socket)
 		rt = message.find('CID', rt+44)
 	print "no more CID\n\n"
         return True
@@ -64,15 +73,15 @@ def check_for_and_process_CIDlist(message, browser_socket):
 	## this was the first occurrence
 	#print header
 	#print content
-	browser_socket.send(http_header)
-	browser_socket.send(content)
+	send_to_browser(http_header, browser_socket)
+	send_to_browser(content, browser_socket)
 	## now keep finding CID and sending content
 	#print "length received ",len(message)
 	rt = message.find('CID', rt+44)
 	while(rt != -1):
 		print "requesting for CID", message[rt+4:rt+44]
 		content = requestVideoCID(message[rt+4:rt+44], True)
-		browser_socket.send(content)
+		send_to_browser(content, browser_socket)
 		rt = message.find('CID', rt+44)
         return True
     print "NO CID present"
@@ -101,7 +110,7 @@ def process_more_CIDlist(message, browser_socket, moresock, socks):
     ## then retrieve them
     for i in range(len(cidlist)):
         content = recv_with_timeout(socks[i]) # = xsocket.Xrecv(socks[i], 1024, 0)
-	browser_socket.send(content)
+	send_to_browser(content, browser_socket)
     return True
 
 def process_videoCIDlist(message, browser_socket, socks):
@@ -123,15 +132,12 @@ def process_videoCIDlist(message, browser_socket, socks):
     ## and receive multiple content
     ## first issue all the requests
     for i in range(len(cidlist)):
-	xsocket.XgetCID(socks[i], cidlist[i], len(cidlist[i]))
+        xsocket.XgetCID(socks[i], cidlist[i], len(cidlist[i]))
     ## then retrieve them
     for i in range(len(cidlist)):
         content = recv_with_timeout(socks[i]) # = xsocket.Xrecv(socks[i], 1024, 0)
-	try:
-	    browser_socket.send(content)
-	except:
-	    browser_socket.close()
-	    return False	
+        if not send_to_browser(content, browser_socket):
+            return False        
     return True
 
 
@@ -161,7 +167,7 @@ def sendVideoSIDRequest(netloc, payload, browser_socket):
     ## return ogg header
     http_header = "HTTP/1.0 200 OK\r\nDate: Tue, 01 Mar 2011 06:14:58 GMT\r\nConnection: close\r\nContent-type: video/ogg\r\nServer: lighttpd/1.4.26\r\n\r\n"
 
-    browser_socket.send(http_header)
+    send_to_browser(http_header, browser_socket)
 
     ## next get chunks, at most 20 in a go
     threshold = 20
@@ -243,7 +249,7 @@ def sendSIDRequest(ddag, payload, browser_socket):
 	rtt = int((time.time()-rtt) *1000)
 	# Use last modified field to embedd RTT info
         reply = reply.replace("\n\n", ("\nLast-Modified:%d\n\n" % rtt)) 
-        browser_socket.send(reply)
+        send_to_browser(reply, browser_socket)
     return
 
 def requestCID(CID):
@@ -308,6 +314,6 @@ def xiaHandler(control, path, payload, browser_socket):
             
         length = len (recombined_content)
         print "recombined_content length %d " % length
-        browser_socket.send(recombined_content)
+        send_to_browser(recombined_content, browser_socket)
     return
 
