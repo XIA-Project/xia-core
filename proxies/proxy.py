@@ -85,7 +85,7 @@ class ProxyHandler (BaseHTTPServer.BaseHTTPRequestHandler):
         if scm != 'http' or fragment or not netloc:
             self.send_error(400, "bad url %s" % self.path)
             return
-        #self.connection.close()  # don't serve other requests than XIA
+        self.connection.close()  # don't serve other requests than XIA
 
     def _read_write(self, soc, max_idling=20):
         iw = [self.connection, soc]
