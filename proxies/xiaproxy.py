@@ -1,4 +1,4 @@
-import socket, select
+import socket, select, random
 import struct, time, signal, os, sys
 import fcntl
 import xsocket
@@ -49,7 +49,7 @@ def recv_with_timeout(sock, timeout=5):
 
 def check_for_and_process_CIDs(message, browser_socket):
     rt = message.find('CID') 
-    print rt
+    #print rt
     if (rt!= -1):
         http_header = message[0:rt]
         print "requesting for CID", message[rt+4:rt+44]
@@ -65,7 +65,6 @@ def check_for_and_process_CIDs(message, browser_socket):
 	## now keep finding CID and sending content
 	#print "length received ",len(message)
 	rt = message.find('CID', rt+44)
-	print rt
 	while(rt != -1):
 		print "requesting for CID", message[rt+4:rt+44]
 		try:
@@ -78,7 +77,7 @@ def check_for_and_process_CIDs(message, browser_socket):
 		rt = message.find('CID', rt+44)
 	print "no more CID\n\n"
         return True
-    print "NO CID present"
+    #print "NO CID present"
     return False
 
 
@@ -282,7 +281,10 @@ def requestVideoCID(CID, fallback):
         return  None
     return data
 
-
+def getrandSID():
+    sid = "SID:"+ ("%040d"% int(random.random()*1e40))
+    assert len(sid)==44
+    return  sid
 
 def sendSIDRequest(ddag, payload, browser_socket):
     # Create socket
@@ -295,7 +297,8 @@ def sendSIDRequest(ddag, payload, browser_socket):
 
     #ddag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, sid)
     #ddag = "DAG 0 - \n %s 1 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP1, HID1, SID1)
-    sdag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP0, HID0, SID0)    
+    sid = getrandSID()
+    sdag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP0, HID0, sid)    
     #sdag = "DAG 0 - \n %s 1 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP0, HID0, SID0)
 
     try:
@@ -312,10 +315,12 @@ def sendSIDRequest(ddag, payload, browser_socket):
     # Receive reply and close socket
     try:
         reply= recv_with_timeout(sock) # Use default timeout
-        print reply
-    except:
+	if (reply.find("span")<0):
+            print "Potentially non-ASCII payload from SID (len %d) " % len(reply)
+    except IOError:
+	print "Unexpected error:", sys.exc_info()[0]
         xsocket.Xclose(sock)
-    	print "Closing browser socket"
+    	print "sendSIDRequest() Closing browser socket "
     	browser_socket.close()
 	return 
     xsocket.Xclose(sock)
@@ -343,7 +348,8 @@ def requestCID(CID):
     # Request content
     content_dag = 'CID:%s' % CID    
     content_dag = "DAG 3 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, content_dag)
-    sdag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP0, HID0, SID0)       
+    sid = getrandSID()
+    sdag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP0, HID0, sid)       
     
     print 'Retrieving content with ID: \n%s' % content_dag
     try:
@@ -355,11 +361,12 @@ def requestCID(CID):
     # Get content and close socket
     data = recv_with_timeout(sock) # Use default timeout
     xsocket.Xclose(sock)
+    print "got CID value " +data[0:10]
     return data
 
 
 def xiaHandler(control, path, payload, browser_socket):
-    print "in XIA code\n" + control + "\n" + payload
+    #print "in XIA code\n" + control + "\n" + payload
     
     # Configure XSocket
     xsocket.set_conf("xsockconf_python.ini", "xiaproxy.py")
@@ -370,7 +377,7 @@ def xiaHandler(control, path, payload, browser_socket):
     if payload.find('GET /favicon.ico') != -1:
                     return
     if control.find('sid') == 0:
-        print "SID request"
+        #print "SID request"
         if control.find('image.jpg') != -1: # TODO: why?
             payload = 'image.jpg'
         found = control.find('video');

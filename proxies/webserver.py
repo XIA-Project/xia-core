@@ -144,18 +144,18 @@ def main():
         put_content() # '-r' not found, so do publish content
     time.sleep(1) #necessary?
 
-    # Now listen for connections from clients
-    print 'webserver.py: Waiting to get socket to listen on'
-    listen_sock = xsocket.Xsocket()
-    if (listen_sock<0):
-        print 'error opening socket'
-        return
-    dag = "RE %s %s %s" % (AD1, HID1, SID1) # dag to listen on
-    xsocket.Xbind(listen_sock, dag)
-    print 'Listening on %s' % dag
-
     while True:
         try:   
+            # Now listen for connections from clients
+            print 'webserver.py: Waiting to get socket to listen on'
+            listen_sock = xsocket.Xsocket()
+            if (listen_sock<0):
+                print 'error opening socket'
+                return
+            dag = "RE %s %s %s" % (AD1, HID1, SID1) # dag to listen on
+            xsocket.Xbind(listen_sock, dag)
+            print 'Listening on %s' % dag
+
             xsocket.Xaccept(listen_sock)
             incoming_data = xsocket.Xrecv(listen_sock, 2000, 0)
             print "webserver got %s" % incoming_data
