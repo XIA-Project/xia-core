@@ -52,4 +52,5 @@ Script(write router1/n/proc/rt_AD/rt.add AD_CMU 1);
 Script(write router1/n/proc/rt_HID/rt.add HID1 2);  
 Script(write router1/n/proc/rt_AD/rt.add AD1 4);  
 Script(write router1/n/proc/rt_HID/rt.add RHID2 4);  
-
+Script(write router1/n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
+Script(write router1/n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
