@@ -33,7 +33,7 @@ def putCID(chunk):
     sock = xsocket.Xsocket()
     if (sock<0):
         print "error opening socket"
-        return
+        exit(-1)
     print 'got socket'
     
     print 'waiting to put content'
@@ -42,6 +42,7 @@ def putCID(chunk):
     xsocket.XputCID(sock, chunk, len(chunk), 0, content_dag, len(content_dag))
 
     print 'put content %s (length %s)' % (content_dag, len(chunk))
+    print cid
     xsocket.Xclose(sock)
 
     return cid
