@@ -30,6 +30,7 @@ def recv_with_timeout(sock, timeout=5):
     try:
         while (time.time() - start_time < timeout and not received_data):
             try:
+	    	select.select([sock], [], [], 0.02)
                 reply = xsocket.Xrecv(sock, 65521, 0)
                 received_data = True
             except IOError:
@@ -39,6 +40,11 @@ def recv_with_timeout(sock, timeout=5):
     except (KeyboardInterrupt, SystemExit), e:
         xsocket.Xclose(sock)
         sys.exit()
+
+    if (not received_data):
+        print "Recieved nothing"
+    	raise IOError
+
     return reply
 
 def check_for_and_process_CIDs(message, browser_socket):
@@ -46,7 +52,13 @@ def check_for_and_process_CIDs(message, browser_socket):
     print rt
     if (rt!= -1):
         http_header = message[0:rt]
-        content = requestCID(message[rt+4:rt+44])
+        print "requesting for CID", message[rt+4:rt+44]
+	try:
+           content = requestCID(message[rt+4:rt+44])
+	except:
+	   print "closing browser_socket"
+	   browser_socket.close() 
+	   return True
 	## this was the first occurrence
 	send_to_browser(http_header, browser_socket)
 	send_to_browser(content, browser_socket)
@@ -56,7 +68,12 @@ def check_for_and_process_CIDs(message, browser_socket):
 	print rt
 	while(rt != -1):
 		print "requesting for CID", message[rt+4:rt+44]
-		content = requestCID(message[rt+4:rt+44])
+		try:
+		    content = requestCID(message[rt+4:rt+44])
+		except:
+		    print "closing browser_socket"
+		    browser_socket.close() 
+		    return True
 		send_to_browser(content, browser_socket)
 		rt = message.find('CID', rt+44)
 	print "no more CID\n\n"
@@ -72,6 +89,10 @@ def check_for_and_process_CIDlist(message, browser_socket):
         http_header = message[0:rt]
 	print "Sending first chunk \n";
         content = requestVideoCID(message[rt+4:rt+44], True)
+	if (content==None):
+            print "closing browser socket"
+            browser_socket.close()
+	    return False
 	## this was the first occurrence
 	#print header
 	#print content
@@ -83,6 +104,10 @@ def check_for_and_process_CIDlist(message, browser_socket):
 	while(rt != -1):
 		print "requesting for CID", message[rt+4:rt+44]
 		content = requestVideoCID(message[rt+4:rt+44], True)
+	        if (content==None):
+                    print "closing browser socket"
+                    browser_socket.close()
+	            return False
 		send_to_browser(content, browser_socket)
 		rt = message.find('CID', rt+44)
         return True
@@ -114,7 +139,12 @@ def process_more_CIDlist(message, browser_socket, moresock, socks):
             print 'ERROR: xiaproxy.py: process_more_CIDlist: error requesting CID %s' % cidlist[i]
     ## then retrieve them
     for i in range(len(cidlist)):
-        content = recv_with_timeout(socks[i]) # = xsocket.Xrecv(socks[i], 1024, 0)
+        try:
+            content = recv_with_timeout(socks[i]) # = xsocket.Xrecv(socks[i], 1024, 0)
+	except:
+	    print "closing browser socket"
+	    browser_socket.close()
+	    return False	
         send_to_browser(content, browser_socket)
     return True
 
@@ -143,7 +173,12 @@ def process_videoCIDlist(message, browser_socket, socks):
             print 'ERROR: xiaproxy.py: process_videoCIDlist: error requesting CID %s' % cidlist[i]
     ## then retrieve them
     for i in range(len(cidlist)):
-        content = recv_with_timeout(socks[i]) # = xsocket.Xrecv(socks[i], 1024, 0)
+        try:
+            content = recv_with_timeout(socks[i]) # = xsocket.Xrecv(socks[i], 1024, 0)
+	except:
+	    browser_socket.close()
+	    print "closing browser socket"
+	    return False
         if not send_to_browser(content, browser_socket):
             return False        
     return True
@@ -167,7 +202,14 @@ def sendVideoSIDRequest(netloc, payload, browser_socket):
     #xsocket.Xsend(sock, payload, len(payload), 0)
     # Receive reply
     print 'sendSIDRequest: about to receive reply'
-    reply = recv_with_timeout(sock) # = xsocket.Xrecv(sock, 65521, 0)
+    try:
+        reply = recv_with_timeout(sock) # = xsocket.Xrecv(sock, 65521, 0)
+    except:
+        xsocket.Xclose(sock)
+    	print "closing browser socket"
+	browser_socket.close()
+	return
+
     xsocket.Xclose(sock)
     numchunks = int(reply)
     print "sendSIDRequest: received reply for number of chunks ",numchunks
@@ -178,7 +220,7 @@ def sendVideoSIDRequest(netloc, payload, browser_socket):
 
 
     ## next get chunks, at most 20 in a go
-    threshold = 20
+    threshold = 1
     socks = list()
     for i in range(threshold):
 	sockcid = xsocket.Xsocket()
@@ -190,14 +232,21 @@ def sendVideoSIDRequest(netloc, payload, browser_socket):
         if(end_cid > numchunks):
             end_cid = numchunks
         cidreqrange = str(st_cid) + ":" + str(end_cid)
-        #print "Requesting for ",cidreqrange
+        print "Requesting for ",cidreqrange
         try:
             sock = xsocket.Xsocket()
             xsocket.Xconnect(sock, dag)
             xsocket.Xsend(sock, cidreqrange, len(cidreqrange), 0)
         except:
             print 'ERROR: xiaproxy.py: sendVideoSIDRequest: error requesting cidreqrange %s' % cidreqrange
-	reply = recv_with_timeout(sock) # = xsocket.Xrecv(sock, 1024, 0)
+	
+	try:
+	    reply= recv_with_timeout(sock) # = xsocket.Xrecv(sock, 1024, 0)
+    	except:
+     	    print "closing browser socket"
+	    browser_socket.close()
+	    break;
+
 	xsocket.Xclose(sock)
 	#print reply
 	if(i == 0):
@@ -225,9 +274,12 @@ def requestVideoCID(CID, fallback):
     except:
         print 'ERROR: xiaproxy.py: requestVideoCID: error requesting CID \n%s' % content_dag
     # Get content
-    data = recv_with_timeout(sock) # = xsocket.Xrecv(sock, 65521, 0)
-    #print 'Retrieved content:\n%s' % data
-    xsocket.Xclose(sock)
+    try:
+        data = recv_with_timeout(sock) # = xsocket.Xrecv(sock, 65521, 0)
+        #print 'Retrieved content:\n%s' % data
+        xsocket.Xclose(sock)
+    except:
+        return  None
     return data
 
 
@@ -239,7 +291,7 @@ def sendSIDRequest(ddag, payload, browser_socket):
         print "ERROR: xiaproxy.py: sendSIDRequest: could not open socket"
         return
 
-
+    print "sendSIDRequest()"
 
     #ddag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, sid)
     #ddag = "DAG 0 - \n %s 1 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP1, HID1, SID1)
@@ -258,7 +310,14 @@ def sendSIDRequest(ddag, payload, browser_socket):
         print 'ERROR: xiaproxy.py: sendSIDRequest: error binding to sdag, connecting to ddag, or sending SID request:\n%s' % payload
 
     # Receive reply and close socket
-    reply = recv_with_timeout(sock) # Use default timeout
+    try:
+        reply= recv_with_timeout(sock) # Use default timeout
+        print reply
+    except:
+        xsocket.Xclose(sock)
+    	print "Closing browser socket"
+    	browser_socket.close()
+	return 
     xsocket.Xclose(sock)
 
     # Pass reply up to browswer if it's a normal HTTP message
@@ -296,7 +355,6 @@ def requestCID(CID):
     # Get content and close socket
     data = recv_with_timeout(sock) # Use default timeout
     xsocket.Xclose(sock)
-
     return data
 
 
@@ -333,7 +391,12 @@ def xiaHandler(control, path, payload, browser_socket):
         recombined_content = ''
         for i in range (0, num_chunks):
             print 'CID to fetch: %s' % control_array[2][i*40:40+i*40]
-            recombined_content += requestCID(control_array[2][i*40:40+i*40])
+	    try:
+                recombined_content += requestCID(control_array[2][i*40:40+i*40])
+	    except:
+	        print "Closing browser_socket"
+	    	browser_socket.close()
+	        return
             
         length = len (recombined_content)
         print "recombined_content length %d " % length
