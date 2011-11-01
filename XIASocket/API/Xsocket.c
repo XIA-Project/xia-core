@@ -31,133 +31,88 @@ extern "C" {
 
         void error(const char *msg)
         {
-                perror(msg);
-                exit(0);
+			perror(msg);
+			exit(0);
         }
 
         int Xsocket()
         {
-                //Setup to listen for control info
-                //char* str=(char*)"open";//TODO: Not necessary. Maybe more useful data could be sent in the open control packet?
-                struct addrinfo hints, *servinfo, *p;
-                int rv;
-                int numbytes;
-                struct sockaddr_in their_addr,sin;
-                char buf[MAXBUFLEN];
-                socklen_t addr_len;
-                //char s[INET6_ADDRSTRLEN];
-                int sockfd,tries;
+			//Setup to listen for control info
+			//char* str=(char*)"open";//TODO: Not necessary. Maybe more useful data could be sent in the open control packet?
+			struct sockaddr_in my_addr, their_addr;
+			int rv;
+			int numbytes;
+			char buf[MAXBUFLEN];
+			socklen_t addr_len;
+			//char s[INET6_ADDRSTRLEN];
+			int sockfd,tries;
 
-                memset(&hints, 0, sizeof hints);
-                hints.ai_family = AF_INET;
-                hints.ai_socktype = SOCK_DGRAM;
-                //hints.ai_flags = AI_PASSIVE; // Listen only on the Tun interface IP
+			// protobuf message
+			xia::XSocketMsg xia_socket_msg;
 
-                // protobuf message
-                xia::XSocketMsg xia_socket_msg;
+			int port;
 
-		//char p_buf[MAXBUFLEN];
+			if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+				perror("Xsocket listener: socket");
+				return -1;
+			}
 
-                //MYPORT=0 will choose a random port
-                int port=atoi(MYPORT);
-                //char* sport=MYPORT;
+			//If port is in use, try next port until success, or max ATTEMPTS reached
+			rv=-1;
+			for (tries=0;tries<ATTEMPTS;tries++)
+			{
+				port=1024 + rand() % (65535 - 1024);
+				my_addr.sin_family = PF_INET;
+				my_addr.sin_addr.s_addr = inet_addr(MYADDRESS);
+				my_addr.sin_port = htons(port);
+				rv=bind(sockfd, (const struct sockaddr *)&my_addr, sizeof(my_addr));
+				if (rv != -1)
+					break;
+			}
 
-                //Open a port and listen on it
-                if ((rv =getaddrinfo(MYADDRESS, MYPORT, &hints, &servinfo)) != 0) {
-                        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-                        return -1;
-                }
+			if (rv == -1) {
+				close(sockfd);
+				perror("Xsocket listener: bind");
+				return -1;
+			}
 
-                // loop through all the results and bind to the first we can
-                for(p = servinfo; p != NULL; p = p->ai_next) {
-                        if ((sockfd = socket(p->ai_family, p->ai_socktype,
-                                                        p->ai_protocol)) == -1) {
-                                perror("Xsocket listener: socket");
-                                continue;
-                        }
+			//printf("Xsocket listener: Sending...\n");
 
-                        //If port is in use, try next port until success, or max ATTEMPTS reached
-                        rv=-1;
-                        for (tries=0;tries<ATTEMPTS&&rv==-1;tries++,port++)
-                        {
-                                rv=bind(sockfd, p->ai_addr, p->ai_addrlen);
+			//Send a control packet
+			their_addr.sin_family = PF_INET;
+			their_addr.sin_addr.s_addr = inet_addr(CLICKCONTROLADDRESS);
+			their_addr.sin_port = htons(atoi(CLICKCONTROLPORT));
 
-                        }
-                        port--;
+			// protobuf message
+			xia_socket_msg.set_type(xia::XSOCKET);
+			std::string p_buf;
+			xia_socket_msg.SerializeToString(&p_buf);
 
-                        if (rv== -1) {
-                                close(sockfd);
-                                perror("Xsocket listener: bind");
-                                continue;
-                        }
-
-                        break;
-                }
-
-                //find local port
-                socklen_t len = sizeof(sin);
-                getsockname(sockfd,(struct sockaddr *)&sin,&len);
-
-                //memset(&in,0,sizeof(in));
-                //in.s_addr = sin.sin_addr.s_addr;
-
-                port= ntohs(sin.sin_port);
-                //close(sockfd);
-                //return 0;
-
-                if (p == NULL) {
-                        fprintf(stderr, "Xsocket listener: failed to bind socket\n");
-                        return -1;
-                }
-
-                freeaddrinfo(servinfo);
-                //printf("Xsocket listener: Sending...\n");
-
-                //Send a control packet
-
-                memset(&hints, 0, sizeof hints);
-                hints.ai_family = AF_INET;
-                hints.ai_socktype = SOCK_DGRAM;
+			if ((numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0,
+							(const struct sockaddr *)&their_addr, sizeof(their_addr))) == -1) {
+				perror("Xsocket(): sendto failed");
+				return(-1);
+			}
 
 
-		if ((rv = getaddrinfo(CLICKCONTROLADDRESS, CLICKCONTROLPORT, &hints, &servinfo)) != 0) {
-			fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-			return -1;
-		}
+			//Process the reply
+			addr_len = sizeof their_addr;
+			if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
+							(struct sockaddr *)&their_addr, &addr_len)) == -1) {
+				perror("Xsocket: recvfrom");
+				return -1;
+			}
+			//buf[numbytes] = '\0';
 
-		p=servinfo;
+			//protobuf message parsing
+			xia_socket_msg.ParseFromString(buf);
 
-		// protobuf message
-                xia_socket_msg.set_type(xia::XSOCKET);
-		std::string p_buf;
-		xia_socket_msg.SerializeToString(&p_buf);
+			if (xia_socket_msg.type() == xia::XSOCKET) {
+				return sockfd;
+			}
 
-		if ((numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0,
-						p->ai_addr, p->ai_addrlen)) == -1) {
-			perror("Xsocket(): sendto failed");
-			return(-1);
-		}
-		freeaddrinfo(servinfo);
-
-
-                //Process the reply
-                addr_len = sizeof their_addr;
-                if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
-                                                (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-                        perror("Xsocket: recvfrom");
-                        return -1;
-                }
-                //buf[numbytes] = '\0';
-
-		//protobuf message parsing
-		xia_socket_msg.ParseFromString(buf);
-
-		if (xia_socket_msg.type() == xia::XSOCKET) {
- 			return sockfd;
-		}
-
-		close(sockfd);
-		return -1; 
+			close(sockfd);
+			return -1; 
 
     }
 	//void *__dso_handle = NULL;
