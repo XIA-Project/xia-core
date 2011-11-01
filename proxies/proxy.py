@@ -64,11 +64,11 @@ class ProxyHandler (BaseHTTPServer.BaseHTTPRequestHandler):
             self.connection.close()
 
     def do_GET(self):
-        print "Get request:"
         (scm, netloc, path, params, query, fragment) = urlparse.urlparse(
             self.path, 'http')
-	print "netloc=" + netloc
 	if netloc.find('xia') == 0:
+        	print "Get request:"
+		print "netloc=" + netloc
 		header = "%s %s %s\r\n" % (
                     self.command,
                     urlparse.urlunparse(('', '', path, params, query, '')),
@@ -85,26 +85,7 @@ class ProxyHandler (BaseHTTPServer.BaseHTTPRequestHandler):
         if scm != 'http' or fragment or not netloc:
             self.send_error(400, "bad url %s" % self.path)
             return
-        soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            if self._connect_to(netloc, soc):
-                self.log_request()
-                soc.send("%s %s %s\r\n" % (
-                    self.command,
-                    urlparse.urlunparse(('', '', path, params, query, '')),
-                    self.request_version))
-                self.headers['Connection'] = 'close'
-                del self.headers['Proxy-Connection']
-                for key_val in self.headers.items():
-						print("%s: %s\r\n" % key_val)
-						soc.send("%s: %s\r\n" % key_val)
-                soc.send("\r\n")
-                self._read_write(soc)
-					
-        finally:
-            print "\t" "bye"
-            soc.close()
-            self.connection.close()
+        #self.connection.close()  # don't serve other requests than XIA
 
     def _read_write(self, soc, max_idling=20):
         iw = [self.connection, soc]
