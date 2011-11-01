@@ -111,7 +111,7 @@ elementclass RouteEngine {
 
     dstTypeClassifier[0] ->[2]output;  // To cache (for serving content request)
 
-    proc[2] -> XIAPrint() -> Discard;  // No route drop (future TODO: return an error packet)
+    proc[2] -> XIAPrint("Drop") -> Discard;  // No route drop (future TODO: return an error packet)
 };
 
 // 1-port host node
@@ -413,7 +413,8 @@ elementclass EndHost {
     xudp::XUDP($local_addr, $CLICK_IP,$API_IP,n/proc/rt_SID/rt);
     
     //Create kernel TAP interface which responds to ARP
-    fake0::FromHost($fake,$API_IP/24,HEADROOM 256, MTU 65521) 
+    fake0::FromHost($fake, $API_IP/24, CLICK_XUDP_ADDR $CLICK_IP ,HEADROOM 256, MTU 65521) 
+    //-> Print()
     -> fromhost_cl :: Classifier(12/0806, 12/0800);
     fromhost_cl[0] -> ARPResponder(0.0.0.0/0 $ether_addr) -> ToHost($fake);
 
@@ -456,7 +457,7 @@ elementclass EndHost {
 
     input[0] -> n;
     srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
-    n[1] -> srcTypeClassifier[1] -> [2]xudp[2] -> [0]n;
+    n[1] -> srcTypeClassifier[1] -> [2]xudp[2] ->  [0]n;
     srcTypeClassifier[0] -> Discard;    // do not send CID responses directly to RPC;
     
     n[2] -> [0]cache[0] -> [1]n;
@@ -464,7 +465,7 @@ elementclass EndHost {
     xudp[3] -> [1]cache[1] -> [3]xudp;
     
     
-    n -> Queue(200) -> [0]output;
+    n ->  Queue(200) -> [0]output;
     
 };
 

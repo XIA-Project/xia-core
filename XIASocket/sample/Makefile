@@ -5,15 +5,15 @@ LDFLAGS =  -lprotobuf -lpthread
 
 all: xs ps xc pc vs ../API/libXsocket.a
 
-xs: Server.c 
+xs: Server.c  ../API/libXsocket.a
 	gcc $(CFLAGS) -o $@ $< ../API/libXsocket.a $(LDFLAGS) 
-ps: pingServer.c
+ps: pingServer.c ../API/libXsocket.a
 	gcc $(CFLAGS) -o $@ $< ../API/libXsocket.a $(LDFLAGS) 
-xc: Client.c                                                 
+xc: Client.c  ../API/libXsocket.a
 	gcc $(CFLAGS) -o $@ $< ../API/libXsocket.a $(LDFLAGS) 
-pc: pingClient.c                                             
+pc: pingClient.c  ../API/libXsocket.a
 	gcc $(CFLAGS) -o $@ $< ../API/libXsocket.a $(LDFLAGS) 
-vs: videoXIAserver.c
+vs: videoXIAserver.c ../API/libXsocket.a
 	g++ $(CFLAGS) -o $@ $< ../API/libXsocket.a $(LDFLAGS)
 
 clean:
