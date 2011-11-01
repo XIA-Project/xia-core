@@ -220,7 +220,7 @@ def sendVideoSIDRequest(netloc, payload, browser_socket):
 
 
     ## next get chunks, at most 20 in a go
-    threshold = 1
+    threshold = 20
     socks = list()
     for i in range(threshold):
 	sockcid = xsocket.Xsocket()
