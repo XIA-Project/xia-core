@@ -89,7 +89,7 @@ class XIAContentModule {
     static const unsigned int MAXSIZE=CACHESIZE;
     static unsigned int PKTSIZE;    
     //lru    
-    static const int REFRESH=10000;
+    static const int REFRESH=1000000;
     int _timer;
     HashTable<XID, int> partial;
     HashTable<XID, int> content;   
@@ -99,6 +99,7 @@ class XIAContentModule {
     //modify routing table
     void addRoute(const XID &cid) {
 	String cmd=cid.unparse()+" 4";
+	click_chatter("Add route %s", cid.unparse().c_str());
 	HandlerCall::call_write(_routeTable, "add", cmd);
     } 
 
