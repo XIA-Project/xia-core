@@ -79,6 +79,7 @@ class XUDP : public Element {
     Packet* UDPIPEncap(Packet *, int,int);
     
     struct DAGinfo{
+    DAGinfo(): port(0), isConnected(false), initialized(false) {};
     unsigned short port;
     XID xid;
     XIAPath src_path;
