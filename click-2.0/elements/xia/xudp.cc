@@ -10,7 +10,7 @@
 #include "xiatransport.hh"
 #include "xudp.hh"
 
-#define DEBUG 1
+#define DEBUG 0
 #define GETCID_REDUNDANCY 1 /* TODO: don't hardcode this value, make it configurable from Xsocket API */
 
 CLICK_DECLS
@@ -136,7 +136,7 @@ void XUDP::push(int port, Packet *p_input)
 
 			    portToDAGinfo.set(_sport,daginfo);
 			    //click_chatter("Bound");
-		            click_chatter("set %d %d",_sport, __LINE__);
+		            //click_chatter("set %d %d",_sport, __LINE__);
 
 			    portRxSeqNo.set(_sport,portRxSeqNo.get(_sport)+1);//Increment counter
 

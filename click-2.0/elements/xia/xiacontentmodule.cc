@@ -274,6 +274,7 @@ void XIAContentModule::cache_incoming_local(Packet *p, const XID& srcCID, bool l
 	p->kill();
 
 	if(_timer>=REFRESH) {
+	    _timer = 0;
 	    cache_management();
 	}
 	return;

@@ -1,6 +1,5 @@
 require(library xia_two_port_four_port_router.click); 
 
-
 // router instantiation
 router0 :: Router(RE AD0 RHID0, AD0, RHID0);
 //router0 :: Router4Port(RE AD0 RHID0);

@@ -1,3 +1,5 @@
+require(library ../xia/xia_address.click); 
+
 elementclass GenericRouting4Port {
     // input: a packet to route
     // output[0]: forward to port 0~3 (painted)
@@ -104,7 +106,7 @@ elementclass RouteEngine {
 
     dstTypeClassifier[0] ->[2]output;  // To cache (for serving content request)
 
-    proc[2] -> XIAPrint() -> Discard;  // No route drop (future TODO: return an error packet)
+    proc[2] -> XIAPrint("Drop") -> Discard;  // No route drop (future TODO: return an error packet)
 };
 
 // 1-port host node
@@ -370,8 +372,7 @@ elementclass EndHost {
     xudp::XUDP($local_addr, $CLICK_IP,$API_IP,n/proc/rt_SID/rt);
     
     //Create kernel TAP interface which responds to ARP
-    //fake0::FromHost($fake,$API_IP/24,HEADROOM 256) 
-    fake0::FromHost($fake,$API_IP/24,HEADROOM 256, MTU 65521) 
+	fake0::FromHost($fake, $API_IP/24, CLICK_XUDP_ADDR $CLICK_IP ,HEADROOM 256, MTU 65521) 
     -> fromhost_cl :: Classifier(12/0806, 12/0800);
     fromhost_cl[0] -> ARPResponder(0.0.0.0/0 $ether_addr) -> ToHost($fake);
 
@@ -427,23 +428,4 @@ elementclass EndHost {
 
 
 
-// host & router instantiation
-//host0 :: EndHost (RE AD0 HID0, HID0, fake0,172.0.0.2,172.0.0.1,11:11:11:11:11:11,1);
-//host1 :: EndHost (RE AD1 HID1, HID1, fake1,192.0.0.2,192.0.0.1,21:11:11:11:11:11,0);
-//host2 :: EndHost (RE AD1 HID2, HID2, fake2,182.0.0.2,182.0.0.1,31:11:11:11:11:11,1);
-//router0 :: Router(RE AD0 RHID0, AD0, RHID0);
-//router1 :: Router(RE AD1 RHID1, AD1, RHID1);
-
-// aliases for XIDs
-XIAXIDInfo(
-    HID0 HID:0000000000000000000000000000000000000000,
-    HID1 HID:0000000000000000000000000000000000000001,
-    HID2 HID:0000000000000000000000000000000000000002,
-    AD0 AD:1000000000000000000000000000000000000000,
-    AD1 AD:1000000000000000000000000000000000000001,
-    RHID0 HID:0000000000000000000000000000000000000002,
-    RHID1 HID:0000000000000000000000000000000000000003,
-    CID0 CID:2000000000000000000000000000000000000001,
-    SID0 SID:0f00000000000000000000000000000000000055,
-);
 

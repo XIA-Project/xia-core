@@ -7,7 +7,7 @@ do
 ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_click_end_host_evolve_${host}.sh"
 done
 
-sleep 2
+sleep 1
 
 #setup visualizer
 for host in pg56 pg55 pg42 pg40

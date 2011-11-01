@@ -17,7 +17,7 @@ extern "C" {
 #endif
 
 #define ATTEMPTS 3 //Number of attempts at opening a socket 
-#define MAXBUFLEN 2000
+#define MAXBUFLEN 2000 // Note that this limits the size of chunk we can receive
 
 struct Netinfo{
     unsigned short port;
