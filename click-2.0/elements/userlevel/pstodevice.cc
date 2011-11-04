@@ -98,7 +98,8 @@ PSToDevice::initialize(ErrorHandler *errh)
 void
 PSToDevice::cleanup(CleanupStage)
 {
-    click_chatter("PSToDevice: %s-%u: pulls %Lu chunks %Lu packets %Lu bytes %Lu\n", _ifname.c_str(), _queue_num, _pulls, _chunks, _packets, _bytes);
+    // the following message is disabled because %Lu generated assertion failure in ErrorHandler::vxformat()
+    //click_chatter("PSToDevice: %s-%u: pulls %Lu chunks %Lu packets %Lu bytes %Lu\n", _ifname.c_str(), _queue_num, _pulls, _chunks, _packets, _bytes);
     if (_chunk) {
         ps_free_chunk(_chunk);
         delete _chunk;
