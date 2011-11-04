@@ -4,3 +4,5 @@ Run these two command, and you'll be able to run an XIA network locally with a w
 ./start_demo_service.sh
 
 On your browser, set the proxy to 127.0.0.1:8080.  If you're using firefox foxyproxy plug-in might be useful.  It provides url matching to support multiple proxies. You can insert a pattern like xia.* to go tthrough our proxy.  
+
+You then open up local.html and click on links.
