@@ -76,6 +76,7 @@ def report_all_interface_stats(time_interval, report_interval)
 end
 
 if __FILE__== $0
+  STDOUT.sync = true
   if ARGV.size == 0
      puts "Usage: #{$0} <time_interval> "
      exit
