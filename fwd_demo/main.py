@@ -5,6 +5,7 @@ import os
 import time
 import fcntl
 import subprocess
+import fileinput
 
 # for plotting
 import matplotlib
@@ -53,6 +54,14 @@ class Main(QDialog, Ui_Main):
         self.reset_monitor()
         self.reset_tgen()
 
+
+    def read_ip_performance():
+ 	ip ={}
+	for line in fileinput.input("ip"):
+            _, size, pps, gbps = line.split(' ')
+	    ip[int(size)] = float(gbps)
+	self.reference_ip_gbps = ip
+
     def on_draw(self):
         self.axes.clear()
 
@@ -63,7 +72,12 @@ class Main(QDialog, Ui_Main):
         if self.times:
             xs = map(lambda t: t - self.times[0], self.times)
             gbps = map(lambda pps: pps * self.ps * 8. / 1000000000, self.pps)
-            self.axes.plot(xs, gbps)
+	    if self.reference_ip_gbps[self.ps]:
+	        ip_gbps = map(lambda t: self.reference_ip_gbps[self.ps], self.times)
+                self.axes.plot(xs, gbps, 'k--', xs, ip_gbps)
+		self.axes.legend(('XIA', 'IP'))
+	    else:
+                self.axes.plot(xs, gbps)
 
             duration = 120
             if len(self.times) >= duration:
