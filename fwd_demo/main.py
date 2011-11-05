@@ -38,16 +38,13 @@ class Main(QDialog, Ui_Main):
         self.monitor_p = None
         self.monitor_output_buf = ''
 
-        dpi = 70
+        dpi = 70.
         self.fig = Figure((self.frame_plot.width() / dpi, self.frame_plot.height() / dpi), dpi=dpi)
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setParent(self.frame_plot)
 
         self.axes = self.fig.add_subplot(111)
         #self.mpl_toolbar = NavigationToolbar(self.canvas, self.frame_plot)
-        self.axes.grid(True)
-        self.axes.set_xlabel('Elapsed Time')
-        self.axes.set_ylabel('Forwarding Speed (Gbps)')
 
         self.times = []
         self.pps = []
@@ -58,9 +55,14 @@ class Main(QDialog, Ui_Main):
 
     def on_draw(self):
         self.axes.clear()
+
+        self.axes.grid(True)
+        self.axes.set_xlabel('Elapsed Time')
+        self.axes.set_ylabel('Forwarding Speed (Gbps)')
+
         if self.times:
             xs = map(lambda t: t - self.times[0], self.times)
-            gbps = map(lambda pps: pps * self.ps, self.pps)
+            gbps = map(lambda pps: pps * self.ps * 8. / 1000000000, self.pps)
             self.axes.plot(xs, gbps)
 
             duration = 120
