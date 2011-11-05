@@ -78,24 +78,39 @@ XIARandomize::configure(Vector<String> &conf, ErrorHandler *errh)
     _zipf = Zipf(1.2, _max_cycle-1);
 
     if (_zipf_cache_lock.swap(1) == 0) {
-	_zipf_cache = new uint32_t[_max_cycle*100];
-	//_zipf_arbit = Zipf(1.2, 1000000000);
-	for (int i=0;i<_max_cycle*100;i++) {
-		uint32_t v;
-		do {
-			v = _zipf.next();
-		} while (v >= _max_cycle);
-	    _zipf_cache[i] = v;
-	}
+        if (!_zipf_cache) {
+            click_chatter("generating zipf cache of size %d\n", _max_cycle*100);
+            _zipf_cache = new uint32_t[_max_cycle*100];
+            //_zipf_arbit = Zipf(1.2, 1000000000);
+            for (int i=0;i<_max_cycle*100;i++) {
+                    uint32_t v;
+                    do {
+                            v = _zipf.next();
+                    } while (v >= _max_cycle);
+                _zipf_cache[i] = v;
+            }
+        }
+        else
+            click_chatter("zipf cache seems already created\n");
+
+        asm volatile ("" : : : "memory");
         _zipf_cache_lock = 0;
     }
-    else
-        while (_zipf_cache_lock.value() == 1)
-            ;
+    else {
+        if (_zipf_cache_lock.value() == 1) {
+            click_chatter("waiting for the other thread to create zipf cache\n");
+            while (_zipf_cache_lock.value() == 1)
+                ;
+        }
+        else
+            click_chatter("zipf cache seems already created\n");
+    }
 
+    /*
     for (int i=0;i<_max_cycle*100;i++) {
             assert(_zipf_cache[i]< _max_cycle);
     }
+    */
     return 0;
 }
 
