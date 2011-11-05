@@ -1,0 +1,17 @@
+\input{common}
+
+\begin{document}
+\thispagestyle{empty}
+\begin{tikzpicture}
+  \entrynode{A}
+  \Vertex[x=4,y=0,L=Int]{B}
+  \Vertex[x=2,y=-1.2,L=FB1]{C}
+  \tikzstyle{EdgeStyle}=[->]
+  \Edge(A)(B)
+  \tikzstyle{EdgeStyle}=[dashed, bend right, ->]
+  \Edge(A)(C)
+  \tikzstyle{EdgeStyle}=[bend right, ->]
+  \Edge(C)(B)
+\end{tikzpicture}
+\end{document}
+

@@ -1,0 +1,20 @@
+\input{common}
+
+\begin{document}
+\thispagestyle{empty}
+\begin{tikzpicture}
+  \entrynode{A}
+  \Vertex[x=4,y=0,L=Int]{B}
+  \Vertex[x=2,y=-1.2,L=FB1]{C}
+  \Vertex[x=2,y=-2.4,L=FB2]{D}
+  \tikzstyle{EdgeStyle}=[->]
+  \Edge(A)(B)
+  \tikzstyle{EdgeStyle}=[dashed, bend right, ->]
+  \Edge(A)(C)
+  \Edge(A)(D)
+  \tikzstyle{EdgeStyle}=[bend right, ->]
+  \Edge(C)(B)
+  \Edge(D)(B)
+\end{tikzpicture}
+\end{document}
+

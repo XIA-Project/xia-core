@@ -1,0 +1,25 @@
+\documentclass[10pt]{article}
+
+\usepackage{tikz}
+\usepackage{tkz-graph}
+\usetikzlibrary{shapes,arrows}
+
+\newcommand{\entrynode}[1]{
+  \SetVertexNormal[Shape      = circle,
+                   FillColor  = black,
+                   LineWidth  = 0pt,
+                   MinSize    = 0pt]
+  \Vertex[L={\tiny\,}]{#1}
+  \SetVertexNormal[Shape      = circle,
+                   FillColor  = white,
+                   LineWidth  = 2pt]
+}
+
+\SetUpEdge[lw         = 1.5pt,
+           color      = black,
+           labelcolor = white,
+           labeltext  = red,
+           labelstyle = {sloped,draw,text=blue}]
+
+\tikzset{node distance = 2cm}
+

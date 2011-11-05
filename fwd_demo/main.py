@@ -1,4 +1,4 @@
-from PyQt4.QtGui import QDialog
+from PyQt4.QtGui import QDialog, QPixmap
 from PyQt4.QtCore import QTimer
 from ui_main import Ui_Main
 import os
@@ -36,10 +36,7 @@ class Main(QDialog, Ui_Main):
         self.timer.timeout.connect(self.timer_timeout)
         self.timer.start(100)
 
-        self.monitor_p = None
-        self.monitor_output_buf = ''
-
-        dpi = 70.
+        dpi = 72.
         self.fig = Figure((self.frame_plot.width() / dpi, self.frame_plot.height() / dpi), dpi=dpi)
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setParent(self.frame_plot)
@@ -47,42 +44,45 @@ class Main(QDialog, Ui_Main):
         self.axes = self.fig.add_subplot(111)
         #self.mpl_toolbar = NavigationToolbar(self.canvas, self.frame_plot)
 
-        self.times = []
-        self.pps = []
-        self.ps = 0
+        self.read_ip_performance()
 
+        self.monitor_p = None
+        self.monitor_output_buf = ''
         self.reset_monitor()
+
         self.reset_tgen()
 
+        self.on_draw()
 
-    def read_ip_performance():
- 	ip ={}
-	for line in fileinput.input("ip"):
+
+    def read_ip_performance(self):
+        ip ={}
+        for line in fileinput.input("ip"):
             _, size, pps, gbps = line.split(' ')
-	    ip[int(size)] = float(gbps)
-	self.reference_ip_gbps = ip
+            ip[int(size)] = float(gbps)
+        self.reference_ip_gbps = ip
 
     def on_draw(self):
         self.axes.clear()
 
         self.axes.grid(True)
-        self.axes.set_xlabel('Elapsed Time')
+        self.axes.set_xlabel('Time (seconds)')
         self.axes.set_ylabel('Forwarding Speed (Gbps)')
+
+        duration = 60   # 1 minutes
+        self.axes.set_xlim([0, duration])
+        self.axes.set_ylim([0, 30]) # 30 Gbps
 
         if self.times:
             xs = map(lambda t: t - self.times[0], self.times)
-            gbps = map(lambda pps: pps * self.ps * 8. / 1000000000, self.pps)
-	    if self.reference_ip_gbps[self.ps]:
-	        ip_gbps = map(lambda t: self.reference_ip_gbps[self.ps], self.times)
-                self.axes.plot(xs, gbps, 'k--', xs, ip_gbps)
-		self.axes.legend(('XIA', 'IP'))
-	    else:
-                self.axes.plot(xs, gbps)
+            self.axes.plot(xs, self.gbps_xia, 'k-', linewidth=2)
+            self.axes.plot(xs, self.gbps_ip, 'b--', linewidth=2)
+            self.axes.legend(('XIA', 'IP'), loc='lower left')
 
-            duration = 120
-            if len(self.times) >= duration:
-                del self.times[:-duration]
-                del self.pps[:-duration]
+            while self.times[-1] - self.times[0] > duration:
+                del self.times[0]
+                del self.gbps_xia[0]
+                del self.gbps_ip[0]
 
         self.canvas.draw()
 
@@ -123,9 +123,11 @@ class Main(QDialog, Ui_Main):
         self.reset_tgen()
 
     def calc_payload_size(self, fb, ps):
-        return ps - (14 + 20 + 8 + 28 * fb + 28)   # Ethernet + IP + XIA_fixed + XIA_dest_addr + XIA_src_addr
+        return ps - (14 + 20 + 8 + 28 * (1 + fb) + 28)   # Ethernet + IP + XIA_fixed + XIA_dest_addr + XIA_src_addr
 
     def timer_timeout(self):
+        if self.suspend_until > time.time():
+            return
         if self.monitor_p:
             try:
                 self.monitor_output_buf += os.read(self.monitor_fd, 1024)
@@ -135,17 +137,27 @@ class Main(QDialog, Ui_Main):
 
         if '\n' in self.monitor_output_buf:
             line, _, self.monitor_output_buf = self.monitor_output_buf.partition('\n')
-            print line
+            #print line
             if line.startswith('TX pps '):
                 pps = float(line.rpartition(' ')[2])
                 self.times.append(time.time())
-                self.pps.append(pps)
+                self.gbps_xia.append(pps * self.ps * 8. / 1000000000)
+                if self.ps in self.reference_ip_gbps:
+                    self.gbps_ip.append(self.reference_ip_gbps[self.ps])
+                else:
+                    self.gbps_ip.append(0)
                 self.on_draw()
 
     def reset_router(self):
         os.system('ssh -f xia-router0 "killall click; xia-core/click-2.0/conf/xia/script/run_xia_router.sh"')
 
     def reset_monitor(self):
+        self.times = []
+        self.gbps_xia = []
+        self.gbps_ip = []
+        self.ps = 0
+        self.suspend_until = 0
+
         if self.monitor_p:
             self.monitor_p.terminate()
         self.monitor_p = subprocess.Popen('ssh xia-router0 "killall ruby; xia-core/click-2.0/conf/interface_stat_all.rb 100000"', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
@@ -170,10 +182,18 @@ class Main(QDialog, Ui_Main):
                     sel_ps = int(name.rpartition('_')[2])
                     break
 
+        self.label_DAG.setPixmap(QPixmap('fig/dag_fb%d.png' % sel_fb))
+        self.label_DAG.resize(self.label_DAG.pixmap().size());
+
+        self.label_Header.setPixmap(QPixmap('fig/hdr_fb%d.png' % sel_fb))
+        self.label_Header.resize(self.label_Header.pixmap().size());
+
         self.ps = sel_ps
 
         payload_size = self.calc_payload_size(sel_fb, sel_ps)
         assert payload_size >= 0
 
         os.system('ssh -f xia-router1 "killall click; xia-core/click-2.0/conf/xia/script/run_xia_pktgen_anyfb.py %d %d"' % (sel_fb, payload_size))
+
+        #self.suspend_until = time.time() + 5
 

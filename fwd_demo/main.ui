@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>732</width>
-    <height>577</height>
+    <width>731</width>
+    <height>684</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -16,22 +16,12 @@
   <property name="modal">
    <bool>false</bool>
   </property>
-  <widget class="QGraphicsView" name="graphicsView_DAG">
-   <property name="geometry">
-    <rect>
-     <x>9</x>
-     <y>29</y>
-     <width>261</width>
-     <height>221</height>
-    </rect>
-   </property>
-  </widget>
   <widget class="QLabel" name="label">
    <property name="geometry">
     <rect>
      <x>10</x>
      <y>10</y>
-     <width>261</width>
+     <width>171</width>
      <height>17</height>
     </rect>
    </property>
@@ -42,7 +32,7 @@
     </sizepolicy>
    </property>
    <property name="text">
-    <string>Current Destination XIP Address</string>
+    <string>Destination XIP Address</string>
    </property>
    <property name="scaledContents">
     <bool>false</bool>
@@ -54,10 +44,10 @@
   <widget class="QLabel" name="label_2">
    <property name="geometry">
     <rect>
-     <x>290</x>
+     <x>200</x>
      <y>10</y>
-     <width>251</width>
-     <height>17</height>
+     <width>341</width>
+     <height>20</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -70,7 +60,7 @@
     <enum>QFrame::Plain</enum>
    </property>
    <property name="text">
-    <string>Packet Format</string>
+    <string>Packet Header</string>
    </property>
    <property name="scaledContents">
     <bool>false</bool>
@@ -79,21 +69,11 @@
     <set>Qt::AlignCenter</set>
    </property>
   </widget>
-  <widget class="QGraphicsView" name="graphicsView_Packet">
-   <property name="geometry">
-    <rect>
-     <x>290</x>
-     <y>30</y>
-     <width>251</width>
-     <height>221</height>
-    </rect>
-   </property>
-  </widget>
   <widget class="QGroupBox" name="groupBox">
    <property name="geometry">
     <rect>
      <x>560</x>
-     <y>10</y>
+     <y>30</y>
      <width>161</width>
      <height>101</height>
     </rect>
@@ -192,9 +172,9 @@
    <property name="geometry">
     <rect>
      <x>560</x>
-     <y>120</y>
+     <y>150</y>
      <width>161</width>
-     <height>161</height>
+     <height>141</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -210,7 +190,7 @@
     <property name="geometry">
      <rect>
       <x>20</x>
-      <y>40</y>
+      <y>20</y>
       <width>114</width>
       <height>22</height>
      </rect>
@@ -219,10 +199,23 @@
      <string>128 bytes</string>
     </property>
     <property name="checked">
-     <bool>false</bool>
+     <bool>true</bool>
     </property>
    </widget>
    <widget class="QRadioButton" name="radioButton_PS_256">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>60</y>
+      <width>114</width>
+      <height>22</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>256 bytes</string>
+    </property>
+   </widget>
+   <widget class="QRadioButton" name="radioButton_PS_576">
     <property name="geometry">
      <rect>
       <x>20</x>
@@ -232,10 +225,10 @@
      </rect>
     </property>
     <property name="text">
-     <string>256 bytes</string>
+     <string>576 bytes</string>
     </property>
    </widget>
-   <widget class="QRadioButton" name="radioButton_PS_512">
+   <widget class="QRadioButton" name="radioButton_PS_1088">
     <property name="geometry">
      <rect>
       <x>20</x>
@@ -245,20 +238,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>512 bytes</string>
-    </property>
-   </widget>
-   <widget class="QRadioButton" name="radioButton_PS_1024">
-    <property name="geometry">
-     <rect>
-      <x>20</x>
-      <y>120</y>
-      <width>114</width>
-      <height>22</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>1024 bytes</string>
+     <string>1088 bytes</string>
     </property>
    </widget>
    <widget class="QLabel" name="label_4">
@@ -286,24 +266,24 @@
      <bool>true</bool>
     </property>
    </widget>
-   <widget class="QRadioButton" name="radioButton_PS_1514">
+   <widget class="QRadioButton" name="radioButton_PS_1500">
     <property name="geometry">
      <rect>
       <x>20</x>
-      <y>140</y>
+      <y>120</y>
       <width>114</width>
       <height>22</height>
      </rect>
     </property>
     <property name="text">
-     <string>1514 bytes</string>
+     <string>1500 bytes</string>
     </property>
    </widget>
    <widget class="QRadioButton" name="radioButton_PS_192">
     <property name="geometry">
      <rect>
       <x>20</x>
-      <y>60</y>
+      <y>40</y>
       <width>114</width>
       <height>22</height>
      </rect>
@@ -315,28 +295,12 @@
      <bool>false</bool>
     </property>
    </widget>
-   <widget class="QRadioButton" name="radioButton_PS_90">
-    <property name="geometry">
-     <rect>
-      <x>20</x>
-      <y>20</y>
-      <width>114</width>
-      <height>22</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>90 bytes</string>
-    </property>
-    <property name="checked">
-     <bool>true</bool>
-    </property>
-   </widget>
   </widget>
   <widget class="QLabel" name="label_5">
    <property name="geometry">
     <rect>
      <x>230</x>
-     <y>280</y>
+     <y>390</y>
      <width>261</width>
      <height>17</height>
     </rect>
@@ -361,7 +325,7 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>540</y>
+     <y>650</y>
      <width>111</width>
      <height>27</height>
     </rect>
@@ -377,7 +341,7 @@
    <property name="geometry">
     <rect>
      <x>300</x>
-     <y>540</y>
+     <y>650</y>
      <width>181</width>
      <height>27</height>
     </rect>
@@ -390,7 +354,7 @@
    <property name="geometry">
     <rect>
      <x>130</x>
-     <y>540</y>
+     <y>650</y>
      <width>161</width>
      <height>27</height>
     </rect>
@@ -406,7 +370,7 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>300</y>
+     <y>410</y>
      <width>711</width>
      <height>231</height>
     </rect>
@@ -416,6 +380,32 @@
    </property>
    <property name="frameShadow">
     <enum>QFrame::Raised</enum>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label_Header">
+   <property name="geometry">
+    <rect>
+     <x>230</x>
+     <y>30</y>
+     <width>281</width>
+     <height>301</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Header</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label_DAG">
+   <property name="geometry">
+    <rect>
+     <x>30</x>
+     <y>110</y>
+     <width>151</width>
+     <height>141</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>DAG</string>
    </property>
   </widget>
  </widget>
