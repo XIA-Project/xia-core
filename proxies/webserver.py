@@ -19,6 +19,7 @@ from xia_address import *
 
 CID_SIMPLE_HTML = ""  # we set this when we 'put' the hmtl page
 CID_DEMO_HTML = ""  # we set this when we 'put' the hmtl page
+CID_ONLY_STOCK_SEVICE_HTML = ""  # we set this when we 'put' the hmtl page
 
 def putCID(chunk):
     #global cid_i
@@ -48,7 +49,7 @@ def putCID(chunk):
     return cid
 
 def serveSIDRequest(request, sock):
-    # Respond with either CID_DEMO_HTML or CID_DEMO_HTML
+    # Respond with either CID_DEMO_HTML or CID_DEMO_HTML or CID_ONLY_STOCK_SEVICE_HTML
     # TODO: This code should be better
     
     # To prevent cid referenced before assignment
@@ -57,6 +58,8 @@ def serveSIDRequest(request, sock):
         cid = CID_SIMPLE_HTML
     elif request.find('demo.html') >= 0:  
         cid = CID_DEMO_HTML
+    elif request.find('xia_service.html') >= 0:  
+        cid = CID_ONLY_STOCK_SEVICE_HTML
     
     response = 'HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/html\n\n'+ cid
     print 'Webserver Response:\n%s' % response
@@ -66,7 +69,7 @@ def serveSIDRequest(request, sock):
 
 def put_content():
     global length
-    global CID_SIMPLE_HTML, CID_DEMO_HTML
+    global CID_SIMPLE_HTML, CID_DEMO_HTML, CID_ONLY_STOCK_SEVICE_HTML
     
     # Put content 'image.jpg' and make a corresponding list of CIDs
     # (if image is chunked it might have multiple CIDs)
@@ -127,6 +130,22 @@ def put_content():
         chunk = f.read(chunksize)
     f.close()
     print "end plane.jpg"
+
+
+    # Put content 'xia_service.html'
+    print "xia_service.html"
+    f = open("xia_service.html", 'r')
+    chunk = f.read(chunksize)
+
+    while chunk != '':
+        cid = putCID(chunk)
+        CID_ONLY_STOCK_SEVICE_HTML += 'CID:' 
+	CID_ONLY_STOCK_SEVICE_HTML  += cid
+	CID_ONLY_STOCK_SEVICE_HTML  += '\t'
+        chunk = f.read(chunksize)
+    f.close()
+    
+    print "end xia_service.html"
 
 
 def main():

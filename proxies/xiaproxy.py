@@ -294,6 +294,7 @@ def sendSIDRequest(ddag, payload, browser_socket):
         return
 
     print "sendSIDRequest()"
+    print ddag
 
     #ddag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, sid)
     #ddag = "DAG 0 - \n %s 1 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP1, HID1, SID1)
@@ -347,7 +348,7 @@ def requestCID(CID):
 
     # Request content
     content_dag = 'CID:%s' % CID    
-    content_dag = "DAG 3 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, content_dag)
+    content_dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, content_dag)
     sid = getrandSID()
     sdag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP0, HID0, sid)       
     

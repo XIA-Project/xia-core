@@ -1,5 +1,6 @@
 XIDS = dict(hid0="HID:0000000000000000000000000000000000000000",
 hid1= "HID:0000000000000000000000000000000000000001",
+hid2= "HID:000000000000000000000000000000eeeeee0000",
 ad0=  "AD:1000000000000000000000000000000000000000",
 ad1=  "AD:1000000000000000000000000000000000000001",
 rhid0="HID:0000000000000000000000000000000000000002",
@@ -14,6 +15,7 @@ sid_stock= "SID:0f03333333333333333333333333330000000055")
 SID_VIDEO= XIDS['video'] 
 HID0= XIDS['hid0'] 
 HID1= XIDS['hid1']
+HID2= XIDS['hid2']
 AD0=  XIDS['ad0'] 
 AD1=  XIDS['ad1'] 
 RHID0=XIDS['rhid0'] 
@@ -63,14 +65,17 @@ def dag_from_url(url):
         final_node_num = len(fallback_segments) - 1
 
         dag = 'DAG'
-        for j in range(0, final_node_num+1):
+	# we need to go for the iterative refinement (rather than kind of source routing....)
+	dag += ' %i' % int(final_node_num)
+        for j in range(0, final_node_num):
             dag += ' %i' % j
         for i in range(0, len(fallback_segments)):
             node_segments = fallback_segments[i].split('.')
             node_xid = xid_from_name(node_segments[1], node_segments[0].upper())
             dag += ' - \n %s' % (node_xid) # Add next node XID
             if i != len(fallback_segments) - 1: # last node has no outgoing edges
-                for j in range(i+1,  final_node_num+1): # add outgoing edges
+		dag += ' %i' % int(final_node_num)
+                for j in range(i+1,  final_node_num): # add outgoing edges
                     dag += ' %i' % j
                 #dag += '%i %i' % (final_node_num, i+1) # Add outgoing edges
 
@@ -79,7 +84,8 @@ def dag_from_url(url):
     else:
         # No fallback
         # Use magic nameservice to get a fallback
-        dag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, primary_XID)
+        #dag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, primary_XID)
+	dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, primary_XID)
 
         # Don't use nameservice
         # dag = 'RE %s' % primary_XID

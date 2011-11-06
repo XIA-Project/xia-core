@@ -3,7 +3,7 @@
 CFLAGS=-I../API
 LDFLAGS =  -lprotobuf -lpthread
 
-all: xs ps xc pc vs ../API/libXsocket.a
+all: xs ps xc pc vs ps_beacon pc_beacon ../API/libXsocket.a
 
 xs: Server.c  ../API/libXsocket.a
 	gcc $(CFLAGS) -o $@ $< ../API/libXsocket.a $(LDFLAGS) 
@@ -16,6 +16,12 @@ pc: pingClient.c  ../API/libXsocket.a
 vs: videoXIAserver.c ../API/libXsocket.a
 	g++ $(CFLAGS) -o $@ $< ../API/libXsocket.a $(LDFLAGS)
 
+ps_beacon: pingServer_beacon.c ../API/libXsocket.a
+	gcc $(CFLAGS) -o $@ $< ../API/libXsocket.a $(LDFLAGS)
+
+pc_beacon: pingClient_beacon.c ../API/libXsocket.a
+	gcc $(CFLAGS) -o $@ $< ../API/libXsocket.a $(LDFLAGS)
+
 clean:
-	rm -f xs ps pc xc vs
+	rm -f xs ps pc xc vs ps_beacon pc_beacon
 
