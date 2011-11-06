@@ -10,7 +10,7 @@ Host xia-router1
   Hostname ng3.nan.cs.cmu.edu
   User USERNAME
 
- $ sudo aptitude install python-qt4
+ $ sudo aptitude install python-qt4 python-matplotlib
 
  * run ./load_user_click.sh in ~/xia-core/click-2.0 on both xia-router0/1
 
