@@ -1,6 +1,6 @@
 To run a demo:
 
- # add xia-router0 and xia-router1 in ~/.ssh/config
+ * add xia-router0 and xia-router1 in ~/.ssh/config
 
 Host xia-router0
   Hostname ng2.nan.cs.cmu.edu
@@ -11,6 +11,9 @@ Host xia-router1
   User USERNAME
 
  $ sudo aptitude install python-qt4
+
+ * run ./load_user_click.sh in ~/xia-core/click-2.0 on both xia-router0/1
+
  $ ./launch.py
 
 
