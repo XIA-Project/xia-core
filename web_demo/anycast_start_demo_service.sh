@@ -23,7 +23,7 @@ cd ../XIASocket/sample/
 sleep 1  # need this otherwise it doesn't work
 
 cd ../../proxies
-./webserver.py $@ >& /dev/null &
+./webserver.py $@ &
 ./webserver_replicate.py $@  &
 sleep 1
 ./proxy.py 15000 127.0.0.1  &
