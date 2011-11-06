@@ -1,0 +1,38 @@
+To run a demo:
+
+ # add xia-router0 and xia-router1 in ~/.ssh/config
+
+Host xia-router0
+  Hostname ng2.nan.cs.cmu.edu
+  User USERNAME
+
+Host xia-router1
+  Hostname ng3.nan.cs.cmu.edu
+  User USERNAME
+
+ $ sudo aptitude install python-qt4
+ $ ./launch.py
+
+
+To modify the UI:
+
+ $ sudo aptitude install qt4-designer pyqt4-dev-tools
+ $ designer-qt4 main.ui
+ $ make
+
+
+To modify DAG previews:
+
+ $ sudo aptitude install texlive texlive-extra-utils rubber pgf imagemagick # more texlive- packages may need
+ $ cd fig
+ $ vi/emacs dag_fb*.tex
+ $ make
+ 
+
+To modify packet header previews:
+
+ $ sudo aptitude install inkscape lmodern
+ $ cd fig
+ $ inkscape hdr_fb*.svg
+ $ make
+

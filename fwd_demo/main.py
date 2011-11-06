@@ -31,11 +31,13 @@ class Main(QDialog, Ui_Main):
         self.pushButton_Router.clicked.connect(self.reset_router)
         self.pushButton_Monitor.clicked.connect(self.reset_monitor)
         self.pushButton_TGen.clicked.connect(self.reset_tgen)
+        self.checkBox_IP.clicked.connect(self.show_ip)
 
         self.timer = QTimer()
         self.timer.timeout.connect(self.timer_timeout)
         self.timer.start(100)
 
+        self.show_ip_performance = False
         dpi = 72.
         self.fig = Figure((self.frame_plot.width() / dpi, self.frame_plot.height() / dpi), dpi=dpi)
         self.canvas = FigureCanvas(self.fig)
@@ -62,6 +64,9 @@ class Main(QDialog, Ui_Main):
             ip[int(size)] = float(gbps)
         self.reference_ip_gbps = ip
 
+    def show_ip(self, value):
+        self.show_ip_performance = value
+
     def on_draw(self):
         self.axes.clear()
 
@@ -76,8 +81,11 @@ class Main(QDialog, Ui_Main):
         if self.times:
             xs = map(lambda t: t - self.times[0], self.times)
             self.axes.plot(xs, self.gbps_xia, 'k-', linewidth=2)
-            self.axes.plot(xs, self.gbps_ip, 'b--', linewidth=2)
-            self.axes.legend(('XIA', 'IP'), loc='lower left')
+            if self.show_ip_performance:
+                self.axes.plot(xs, self.gbps_ip, 'b--', linewidth=2)
+                self.axes.legend(('XIA', 'IP'), loc='lower left')
+            else:
+                self.axes.legend(('XIA',), loc='lower left')
 
             while self.times[-1] - self.times[0] > duration:
                 del self.times[0]

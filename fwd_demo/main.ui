@@ -299,7 +299,7 @@
   <widget class="QLabel" name="label_5">
    <property name="geometry">
     <rect>
-     <x>230</x>
+     <x>10</x>
      <y>390</y>
      <width>261</width>
      <height>17</height>
@@ -406,6 +406,19 @@
    </property>
    <property name="text">
     <string>DAG</string>
+   </property>
+  </widget>
+  <widget class="QCheckBox" name="checkBox_IP">
+   <property name="geometry">
+    <rect>
+     <x>520</x>
+     <y>390</y>
+     <width>201</width>
+     <height>21</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Show IP forwarding speed</string>
    </property>
   </widget>
  </widget>

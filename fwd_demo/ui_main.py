@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'main.ui'
 #
-# Created: Sat Nov  5 11:57:14 2011
+# Created: Sun Nov  6 14:18:09 2011
 #      by: PyQt4 UI code generator 4.8.5
 #
 # WARNING! All changes made in this file will be lost!
@@ -127,7 +127,7 @@ class Ui_Main(object):
         self.radioButton_PS_192.setChecked(False)
         self.radioButton_PS_192.setObjectName(_fromUtf8("radioButton_PS_192"))
         self.label_5 = QtGui.QLabel(Main)
-        self.label_5.setGeometry(QtCore.QRect(230, 390, 261, 17))
+        self.label_5.setGeometry(QtCore.QRect(10, 390, 261, 17))
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -164,6 +164,10 @@ class Ui_Main(object):
         self.label_DAG.setGeometry(QtCore.QRect(30, 110, 151, 141))
         self.label_DAG.setText(QtGui.QApplication.translate("Main", "DAG", None, QtGui.QApplication.UnicodeUTF8))
         self.label_DAG.setObjectName(_fromUtf8("label_DAG"))
+        self.checkBox_IP = QtGui.QCheckBox(Main)
+        self.checkBox_IP.setGeometry(QtCore.QRect(520, 390, 201, 21))
+        self.checkBox_IP.setText(QtGui.QApplication.translate("Main", "Show IP forwarding speed", None, QtGui.QApplication.UnicodeUTF8))
+        self.checkBox_IP.setObjectName(_fromUtf8("checkBox_IP"))
 
         self.retranslateUi(Main)
         QtCore.QMetaObject.connectSlotsByName(Main)
