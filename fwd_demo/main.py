@@ -74,7 +74,7 @@ class Main(QDialog, Ui_Main):
         self.axes.set_xlabel('Time (seconds)')
         self.axes.set_ylabel('Forwarding Speed (Gbps)')
 
-        duration = 60   # 1 minutes
+        duration = 120   # 2 minutes
         self.axes.set_xlim([0, duration])
         self.axes.set_ylim([0, 30]) # 30 Gbps
 
@@ -166,6 +166,9 @@ class Main(QDialog, Ui_Main):
         self.ps = 0
         self.suspend_until = 0
 
+        self.restart_monitor()
+
+    def restart_monitor(self):
         if self.monitor_p:
             self.monitor_p.terminate()
         self.monitor_p = subprocess.Popen('ssh xia-router0 "killall ruby; xia-core/click-2.0/conf/interface_stat_all.rb 100000"', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
@@ -204,4 +207,5 @@ class Main(QDialog, Ui_Main):
         os.system('ssh -f xia-router1 "killall click; xia-core/click-2.0/conf/xia/script/run_xia_pktgen_anyfb.py %d %d"' % (sel_fb, payload_size))
 
         #self.suspend_until = time.time() + 5
+        self.restart_monitor()
 
