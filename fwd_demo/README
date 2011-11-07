@@ -1,6 +1,9 @@
 To run a demo:
 
  * add xia-router0 and xia-router1 in ~/.ssh/config
+   (ssh should be configured to use a public key so that
+    you can connect to servers using "ssh xia-router0" or "ssh xia-router1"
+    WITHOUT ANY PASSWORD)
 
 Host xia-router0
   Hostname ng2.nan.cs.cmu.edu
@@ -26,7 +29,8 @@ To modify the UI:
 
 To modify DAG previews:
 
- $ sudo aptitude install texlive texlive-extra-utils rubber pgf imagemagick # more texlive- packages may need
+ $ sudo aptitude install texlive texlive-extra-utils rubber pgf imagemagick
+     # more texlive- packages may need
  $ cd fig
  $ vi/emacs dag_fb*.tex
  $ make
