@@ -43,13 +43,13 @@ while True:
 			prev_total = cur_total
 			#print 'SERVER DOWN!!!! \n'
 			tn = telnetlib.Telnet(HOST, PORT)
-			tn.write("WRITE router1/n/proc/rt_SID/rt.add SID11 0" + "\n")
-			tn.write("WRITE router1/n/proc/rt_SID/rt.add SID6 0" + "\n")
+			tn.write("WRITE router1/n/proc/rt_SID/rt.set SID11 0" + "\n")
+			tn.write("WRITE router1/n/proc/rt_SID/rt.set SID6 0" + "\n")
 			
-			tn.write("WRITE router1/n/proc/rt_CID/rt.add CID20 0" + "\n")
-			tn.write("WRITE router1/n/proc/rt_CID/rt.add CID21 0" + "\n")
-			tn.write("WRITE router1/n/proc/rt_CID/rt.add CID22 0" + "\n")
-			tn.write("WRITE router1/n/proc/rt_CID/rt.add CID23 0" + "\n")
+			tn.write("WRITE router1/n/proc/rt_CID/rt.set CID20 0" + "\n")
+			tn.write("WRITE router1/n/proc/rt_CID/rt.set CID21 0" + "\n")
+			tn.write("WRITE router1/n/proc/rt_CID/rt.set CID22 0" + "\n")
+			tn.write("WRITE router1/n/proc/rt_CID/rt.set CID23 0" + "\n")
 			tn.write("quit\n")
 		
 	else:
@@ -58,13 +58,13 @@ while True:
 			idle = 0
 			#print 'SERVER DOWN!!!! \n'
 			tn = telnetlib.Telnet(HOST, PORT)
-			tn.write("WRITE router1/n/proc/rt_SID/rt.add SID11 2" + "\n")
-			tn.write("WRITE router1/n/proc/rt_SID/rt.add SID6 2" + "\n")
+			tn.write("WRITE router1/n/proc/rt_SID/rt.set SID11 2" + "\n")
+			tn.write("WRITE router1/n/proc/rt_SID/rt.set SID6 2" + "\n")
 			
-			tn.write("WRITE router1/n/proc/rt_CID/rt.add CID20 2" + "\n")
-			tn.write("WRITE router1/n/proc/rt_CID/rt.add CID21 2" + "\n")
-			tn.write("WRITE router1/n/proc/rt_CID/rt.add CID22 2" + "\n")
-			tn.write("WRITE router1/n/proc/rt_CID/rt.add CID23 2" + "\n")
+			tn.write("WRITE router1/n/proc/rt_CID/rt.set CID20 2" + "\n")
+			tn.write("WRITE router1/n/proc/rt_CID/rt.set CID21 2" + "\n")
+			tn.write("WRITE router1/n/proc/rt_CID/rt.set CID22 2" + "\n")
+			tn.write("WRITE router1/n/proc/rt_CID/rt.set CID23 2" + "\n")
 			tn.write("quit\n")	
 		else:
 			prev_total = cur_total
