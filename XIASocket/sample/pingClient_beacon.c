@@ -53,8 +53,8 @@ int main(int argc, char *argv[]) {
     //Xbind(sock,"RE AD:1000000000000000000000000000000000000009 HID:1500000000000000000000000000000000000055 SID:1f00000000000000000000000000000000000055");
 
     //Make the dDAG (the one you want to send packets to)
-    char * dag = (char*)malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,SID0) + 1);
-    sprintf(dag, "RE %s %s %s", AD0, HID0,SID0);
+    char * dag = (char*)malloc(snprintf(NULL, 0, "RE %s %s %s", AD1, RHID1,SID0) + 1);
+    sprintf(dag, "RE %s %s %s", AD1, RHID1,SID0);
 
     //Use connect if you want to use Xsend instead of Xsendto
     //printf("\nConnecting...\n");
