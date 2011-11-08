@@ -1,9 +1,9 @@
 #! /bin/bash
 
 cd ./bind-9.8.1
-#./configure
-#make
-#sudo make install
+./configure
+make
+sudo make install
 
 cd ../XIAResolver
 make
