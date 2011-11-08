@@ -153,7 +153,7 @@ def main():
 
     print 'starting webserver'
     # Set up connection with click via Xsocket API
-    xsocket.set_conf("xsockconf_python.ini", "webserver_replicate.py")
+    xsocket.set_conf("xsockconf_python.ini", "webserver_replicate_cmu.py")
     xsocket.print_conf()  #for debugging
 
     try:
