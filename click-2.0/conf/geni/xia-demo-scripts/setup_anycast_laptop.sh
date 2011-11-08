@@ -35,6 +35,12 @@ ssh -A mberman@pg42.emulab.net -f "~/xia-core/click-2.0/conf/geni/xia-demo-scrip
 
 
 
+sudo killall -9 updateForwardingRate.py
+
+sleep 1
+sh ~/xia-core/click-2.0/conf/geni/stats/xia-link-state-cmu.sh | ~/vis-scripts/updateForwardingRate.py R1-CMU utah &
+
+
 echo "Ready!"
 
 

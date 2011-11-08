@@ -26,8 +26,10 @@ c0[0]
 // To GENI
 router2[1]
 ->  XIAPrint("AD_CMU->pg42")
+-> c::XIAXIDTypeCounter(src AD, src HID, src SID, src CID, src IP, -)
 -> Socket(UDP, 64.57.23.133, 9999, 128.2.208.168, 9999, SNAPLEN 9000) // pg42.emulab.net
 
+ControlSocket(tcp, 7777);
 
 
 // interconnection -- host - ad

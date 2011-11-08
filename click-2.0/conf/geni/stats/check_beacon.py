@@ -9,6 +9,8 @@ CNT_INDEX= 2
 
 prev_total = 0
 
+idle = 0
+
 while True:
 	time.sleep(1)
 	
@@ -31,24 +33,43 @@ while True:
   		#output = "0 0 0 0"
   		cur_total=0
   
-	if (eval('cur_total - prev_total') > 0):
-		prev_total = cur_total
-		total = eval('cur_total - prev_total')
-		#print 'cumulative_pkts: %s  \n' % cur_total 
+  	if (idle == 0):	
+		if (eval('cur_total - prev_total') > 0):
+			prev_total = cur_total
+			total = eval('cur_total - prev_total')
+			#print 'cumulative_pkts: %s  \n' % cur_total 
+		else:
+			idle = 1
+			prev_total = cur_total
+			#print 'SERVER DOWN!!!! \n'
+			tn = telnetlib.Telnet(HOST, PORT)
+			tn.write("WRITE router1/n/proc/rt_SID/rt.add SID11 0" + "\n")
+			tn.write("WRITE router1/n/proc/rt_SID/rt.add SID6 0" + "\n")
+			
+			tn.write("WRITE router1/n/proc/rt_CID/rt.add CID20 0" + "\n")
+			tn.write("WRITE router1/n/proc/rt_CID/rt.add CID21 0" + "\n")
+			tn.write("WRITE router1/n/proc/rt_CID/rt.add CID22 0" + "\n")
+			tn.write("WRITE router1/n/proc/rt_CID/rt.add CID23 0" + "\n")
+			tn.write("quit\n")
+		
 	else:
-		#print 'SERVER DOWN!!!! \n'
-		tn = telnetlib.Telnet(HOST, PORT)
-		tn.write("WRITE router1/n/proc/rt_SID/rt.add SID11 0" + "\n")
-		tn.write("WRITE router1/n/proc/rt_SID/rt.add SID6 0" + "\n")
-		
-		tn.write("WRITE router1/n/proc/rt_CID/rt.add CID6 20" + "\n")
-		tn.write("WRITE router1/n/proc/rt_CID/rt.add CID6 21" + "\n")
-		tn.write("WRITE router1/n/proc/rt_CID/rt.add CID6 22" + "\n")
-		tn.write("WRITE router1/n/proc/rt_CID/rt.add CID6 23" + "\n")
-		tn.write("quit\n")
-		break
-		
-		
+		if (eval('cur_total - prev_total') > 0):
+			prev_total = cur_total
+			idle = 0
+			#print 'SERVER DOWN!!!! \n'
+			tn = telnetlib.Telnet(HOST, PORT)
+			tn.write("WRITE router1/n/proc/rt_SID/rt.add SID11 2" + "\n")
+			tn.write("WRITE router1/n/proc/rt_SID/rt.add SID6 2" + "\n")
+			
+			tn.write("WRITE router1/n/proc/rt_CID/rt.add CID20 2" + "\n")
+			tn.write("WRITE router1/n/proc/rt_CID/rt.add CID21 2" + "\n")
+			tn.write("WRITE router1/n/proc/rt_CID/rt.add CID22 2" + "\n")
+			tn.write("WRITE router1/n/proc/rt_CID/rt.add CID23 2" + "\n")
+			tn.write("quit\n")	
+		else:
+			prev_total = cur_total
+	
+	
 
 
 
