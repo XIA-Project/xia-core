@@ -29,7 +29,7 @@ while(True):
         #n = xsocket.Xrecvfrom(sock, 1500, 0, replyto, dlen)
         n = xsocket.Xrecv(sock, 1500, 0)
         hello_message = "<html><body><h1>Hello World!</h1></body></html>"
-	http_header = "HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/plain\n\n"
+	http_header = "HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type:  text/html\n\n"
         #xsocket.Xsendto(sock, stock_feed, len(stock_feed), 0, replyto, dlen)
 	response = http_header+ hello_message
 	print "response len %d" % len(response)

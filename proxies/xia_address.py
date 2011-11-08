@@ -89,12 +89,16 @@ def dag_from_url(url):
         return dag
     else:
         # No fallback
-        # Use magic nameservice to get a fallback
-        #dag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, primary_XID)
-	dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, primary_XID)
+        # Hack: for the demo, we want to show the case where the request fails without fallback 
+        if sid_request_segments[0][4:] == 'hello':
+        	dag = "DAG 0 - \n %s" % (primary_XID)
+        else:
+        	# Use magic nameservice to get a fallback
+        	#dag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, primary_XID)
+		dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, primary_XID)
 
-        # Don't use nameservice
-        # dag = 'RE %s' % primary_XID
+       		# Don't use nameservice
+        	# dag = 'RE %s' % primary_XID
 
         return dag
     
