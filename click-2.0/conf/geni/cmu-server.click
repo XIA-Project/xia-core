@@ -22,7 +22,7 @@ c0[1] -> Strip(14) -> MarkIPHeader()
 
 // To GENI
 router2[1]
--> Socket(UDP, 64.57.23.165, 8027, 128.2.208.168, 9999, SNAPLEN 9000) // pg40.emulab.net
+-> Socket(UDP, 64.57.23.133, 8027, 128.2.208.168, 9999, SNAPLEN 9000) // pg42.emulab.net
 
 
 

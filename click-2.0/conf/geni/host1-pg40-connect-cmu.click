@@ -11,7 +11,9 @@ todevice0 :: ToDevice(eth3);
 
 // From device (GENI)
 FromDevice(eth3, PROMISC true) -> c0;
-c0[0] -> Strip(14) -> MarkXIAHeader() -> [0]router1; // XIA packet 
+c0[0] -> Strip(14) -> MarkXIAHeader() 
+->  XIAPrint("pg42->pg40")
+-> [0]router1; // XIA packet 
 
 // From Internet (CMU)
 c0[1] -> Strip(14) -> MarkIPHeader()
@@ -36,6 +38,7 @@ router1[0]
 
 // To CMU
 router1[1]
+->  XIAPrint("pg40->CMU")
 -> Socket(UDP, 128.2.208.168, 9999, 0.0.0.0, 9999, SNAPLEN 9000) // ng2.nan.cs.cmu.edu
 
 // To host1
