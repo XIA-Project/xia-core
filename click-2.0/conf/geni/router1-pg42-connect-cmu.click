@@ -104,6 +104,13 @@ Script(write router1/n/proc/rt_HID/rt.add - 0);
 Script(write router1/n/proc/rt_HID/rt.add RHID1 4); 
  
 Script(write router1/n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
+
+
+Script(write router1/n/proc/rt_CID/rt.add CID20 2);     // hack: due to the current hardcoded fallback from proxy
+Script(write router1/n/proc/rt_CID/rt.add CID21 2);     // hack: due to the current hardcoded fallback from proxy
+Script(write router1/n/proc/rt_CID/rt.add CID22 2);     // hack: due to the current hardcoded fallback from proxy
+Script(write router1/n/proc/rt_CID/rt.add CID23 2);     // hack: due to the current hardcoded fallback from proxy
+
 Script(write router1/n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
 
 

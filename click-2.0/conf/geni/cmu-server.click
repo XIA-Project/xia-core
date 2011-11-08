@@ -42,3 +42,7 @@ router2[0]
 -> LinkUnqueue(0.005, 1 GB/s) -> [0]host2;
 
 
+Script(write router2/n/proc/rt_CID/rt.add CID20 0);     // hack: due to the current hardcoded fallback from proxy
+Script(write router2/n/proc/rt_CID/rt.add CID21 0);     // hack: due to the current hardcoded fallback from proxy
+Script(write router2/n/proc/rt_CID/rt.add CID22 0);     // hack: due to the current hardcoded fallback from proxy
+Script(write router2/n/proc/rt_CID/rt.add CID23 0);     // hack: due to the current hardcoded fallback from proxy

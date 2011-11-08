@@ -38,7 +38,13 @@ while True:
 	else:
 		#print 'SERVER DOWN!!!! \n'
 		tn = telnetlib.Telnet(HOST, PORT)
+		tn.write("WRITE router1/n/proc/rt_SID/rt.add SID11 0" + "\n")
 		tn.write("WRITE router1/n/proc/rt_SID/rt.add SID6 0" + "\n")
+		
+		tn.write("WRITE router1/n/proc/rt_CID/rt.add CID6 20" + "\n")
+		tn.write("WRITE router1/n/proc/rt_CID/rt.add CID6 21" + "\n")
+		tn.write("WRITE router1/n/proc/rt_CID/rt.add CID6 22" + "\n")
+		tn.write("WRITE router1/n/proc/rt_CID/rt.add CID6 23" + "\n")
 		tn.write("quit\n")
 		break
 		
