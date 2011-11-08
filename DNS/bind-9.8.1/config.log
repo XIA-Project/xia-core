@@ -706,8 +706,8 @@ configure:20581: $? = 0
 configure:20588: result: yes
 configure:20596: checking for sysctlbyname
 configure:20596: gcc -o conftest -g -O2  -D_GNU_SOURCE  conftest.c  >&5
-/tmp/ccmWleR0.o: In function `main':
-/home/onhachoe/Desktop/bind9/bind-9.8.1/conftest.c:62: undefined reference to `sysctlbyname'
+/tmp/ccQQHloD.o: In function `main':
+/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/conftest.c:62: undefined reference to `sysctlbyname'
 collect2: ld returned 1 exit status
 configure:20596: $? = 1
 configure: failed program was:
@@ -1230,8 +1230,8 @@ configure: failed program was:
 configure:20902: result: no
 configure:20921: checking for kqueue
 configure:20921: gcc -o conftest -g -O2  -D_GNU_SOURCE  conftest.c  >&5
-/tmp/ccrSNZ1W.o: In function `main':
-/home/onhachoe/Desktop/bind9/bind-9.8.1/conftest.c:70: undefined reference to `kqueue'
+/tmp/ccYY9gPJ.o: In function `main':
+/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/conftest.c:70: undefined reference to `kqueue'
 collect2: ld returned 1 exit status
 configure:20921: $? = 1
 configure: failed program was:
@@ -1774,8 +1774,8 @@ configure:22039: checking for /dev/random
 configure:22053: result: yes
 configure:22083: checking for arc4random
 configure:22083: gcc -o conftest -g -O2  -D_GNU_SOURCE  conftest.c  >&5
-/tmp/cctS2Lq8.o: In function `main':
-/home/onhachoe/Desktop/bind9/bind-9.8.1/conftest.c:74: undefined reference to `arc4random'
+/tmp/ccRS7sIX.o: In function `main':
+/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/conftest.c:74: undefined reference to `arc4random'
 collect2: ld returned 1 exit status
 configure:22083: $? = 1
 configure: failed program was:
@@ -2568,8 +2568,8 @@ configure: failed program was:
 configure:24565: result: not match any subspecies; assume standard definition
 configure:24572: checking for getipnodebyname
 configure:24572: gcc -o conftest -g -O2  -D_GNU_SOURCE  conftest.c  >&5
-/tmp/cc4vHmuC.o: In function `main':
-/home/onhachoe/Desktop/bind9/bind-9.8.1/conftest.c:83: undefined reference to `getipnodebyname'
+/tmp/ccXtbx1N.o: In function `main':
+/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/conftest.c:83: undefined reference to `getipnodebyname'
 collect2: ld returned 1 exit status
 configure:24572: $? = 1
 configure: failed program was:
@@ -2693,8 +2693,8 @@ configure:24718: $? = 0
 configure:24718: result: yes
 configure:24733: checking for strlcpy
 configure:24733: gcc -o conftest -g -O2  -D_GNU_SOURCE  conftest.c  >&5
-/tmp/ccdeufoc.o: In function `main':
-/home/onhachoe/Desktop/bind9/bind-9.8.1/conftest.c:86: undefined reference to `strlcpy'
+/tmp/ccxvtLJm.o: In function `main':
+/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/conftest.c:86: undefined reference to `strlcpy'
 collect2: ld returned 1 exit status
 configure:24733: $? = 1
 configure: failed program was:
@@ -2790,8 +2790,8 @@ configure: failed program was:
 configure:24733: result: no
 configure:24742: checking for strlcat
 configure:24742: gcc -o conftest -g -O2  -D_GNU_SOURCE  conftest.c  >&5
-/tmp/ccVdO5Nh.o: In function `main':
-/home/onhachoe/Desktop/bind9/bind-9.8.1/conftest.c:86: undefined reference to `strlcat'
+/tmp/ccnwY4es.o: In function `main':
+/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/conftest.c:86: undefined reference to `strlcat'
 collect2: ld returned 1 exit status
 configure:24742: $? = 1
 configure: failed program was:
@@ -3503,6 +3503,7 @@ config.status:1250: creating lib/tests/include/tests/Makefile
 config.status:1250: creating unit/Makefile
 config.status:1250: creating unit/unittest.sh
 config.status:1250: creating config.h
+config.status:1429: config.h is unchanged
 config.status:1443: executing chmod commands
 
 ## ---------------- ##
@@ -3681,15 +3682,15 @@ ARFLAGS='cruv'
 ATFBIN=''
 ATFBUILD=''
 ATFLIBS=''
-BIND9_BIND9_BUILDINCLUDE='-I/home/onhachoe/Desktop/bind9/bind-9.8.1/lib/bind9/include'
+BIND9_BIND9_BUILDINCLUDE='-I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/bind9/include'
 BIND9_CONFIGARGS='CONFIGARGS=defaults'
 BIND9_CO_RULE='.c.o:'
-BIND9_DNS_BUILDINCLUDE='-I/home/onhachoe/Desktop/bind9/bind-9.8.1/lib/dns/include'
-BIND9_ISCCC_BUILDINCLUDE='-I/home/onhachoe/Desktop/bind9/bind-9.8.1/lib/isccc/include'
-BIND9_ISCCFG_BUILDINCLUDE='-I/home/onhachoe/Desktop/bind9/bind-9.8.1/lib/isccfg/include'
-BIND9_ISC_BUILDINCLUDE='-I/home/onhachoe/Desktop/bind9/bind-9.8.1/lib/isc/include'
-BIND9_LWRES_BUILDINCLUDE='-I/home/onhachoe/Desktop/bind9/bind-9.8.1/lib/lwres/include'
-BIND9_TOP_BUILDDIR='/home/onhachoe/Desktop/bind9/bind-9.8.1'
+BIND9_DNS_BUILDINCLUDE='-I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/dns/include'
+BIND9_ISCCC_BUILDINCLUDE='-I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/isccc/include'
+BIND9_ISCCFG_BUILDINCLUDE='-I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/isccfg/include'
+BIND9_ISC_BUILDINCLUDE='-I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/isc/include'
+BIND9_LWRES_BUILDINCLUDE='-I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/lwres/include'
+BIND9_TOP_BUILDDIR='/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1'
 BIND9_VERSION='VERSION=9.8.1'
 BUILD_CC='gcc'
 BUILD_CFLAGS='-g -O2'
@@ -3943,8 +3944,8 @@ target_alias=''
 ## File substitutions. ##
 ## ------------------- ##
 
-BIND9_MAKE_INCLUDES='/home/onhachoe/Desktop/bind9/bind-9.8.1/make/includes'
-BIND9_MAKE_RULES='/home/onhachoe/Desktop/bind9/bind-9.8.1/make/rules'
+BIND9_MAKE_INCLUDES='/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/make/includes'
+BIND9_MAKE_RULES='/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/make/rules'
 DLZ_DRIVER_RULES='/dev/null'
 LIBBIND9_API='./lib/bind9/api'
 LIBDNS_API='./lib/dns/api'

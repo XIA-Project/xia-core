@@ -90,7 +90,7 @@ DESTDIR =
 
 
 
-top_builddir =	/home/onhachoe/Desktop/bind9/bind-9.8.1
+top_builddir =	/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1
 
 ###
 ### All

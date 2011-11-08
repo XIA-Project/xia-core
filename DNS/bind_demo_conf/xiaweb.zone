@@ -1,0 +1,12 @@
+$TTL 1D
+$ORIGIN	xiaweb.
+@	IN	SOA	@	ns	(
+					1
+					8H
+					15M
+					1W
+					1D
+					)
+	IN	NS	@
+	IN	A	0.0.0.0
+	IN	XIA	SID:f0afa824a36f2a2d95c67ff60f61200e48006625
