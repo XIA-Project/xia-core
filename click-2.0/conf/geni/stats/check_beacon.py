@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import getpass
 import sys
 import telnetlib
@@ -93,6 +95,5 @@ while True:
 			tn.write("WRITE router1/n/proc/rt_CID/rt.set CID23 0" + "\n")
 			tn.write("quit\n")		
 	
-
 
 

@@ -39,7 +39,7 @@ def putCID(chunk):
     
     print 'waiting to put content'
     # Put the content chunk
-    content_dag = 'RE %s %s CID:%s' % (AD_CMU, HID2, cid)
+    content_dag = 'RE %s %s CID:%s' % (AD1, HID1, cid)
     xsocket.XputCID(sock, chunk, len(chunk), 0, content_dag, len(content_dag))
 
     print 'put content %s (length %s)' % (content_dag, len(chunk))
@@ -92,11 +92,11 @@ def put_content():
 
 
 def main():
-    global AD_CMU, HID2, SID_STOCK_INFO
+    global AD1, HID1, SID_STOCK_INFO
 
     print 'starting webserver'
     # Set up connection with click via Xsocket API
-    xsocket.set_conf("xsockconf_python.ini", "webserver_replicate_cmu.py")
+    xsocket.set_conf("xsockconf_python.ini", "webserver_replicate_geni.py")
     xsocket.print_conf()  #for debugging
 
     try:
@@ -114,7 +114,7 @@ def main():
             if (listen_sock<0):
                 print 'error opening socket'
                 return
-            dag = "RE %s %s %s" % (AD_CMU, HID2, SID_STOCK_INFO) # dag to listen on
+            dag = "RE %s %s %s" % (AD1, HID1, SID_STOCK_INFO) # dag to listen on
             xsocket.Xbind(listen_sock, dag)
             print 'Listening on %s' % dag
 
