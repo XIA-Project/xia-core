@@ -149,7 +149,7 @@ def put_content():
 
 
 def main():
-    global AD_CMU, HID2, SID1
+    global AD_CMU, HID2, SID_STOCK_INFO
 
     print 'starting webserver'
     # Set up connection with click via Xsocket API
@@ -171,7 +171,7 @@ def main():
             if (listen_sock<0):
                 print 'error opening socket'
                 return
-            dag = "RE %s %s %s" % (AD_CMU, HID2, SID1) # dag to listen on
+            dag = "RE %s %s %s" % (AD_CMU, HID2, SID_STOCK_INFO) # dag to listen on
             xsocket.Xbind(listen_sock, dag)
             print 'Listening on %s' % dag
 
