@@ -27,15 +27,15 @@ int Xsendto(int sockfd,const void *buf, size_t len, int /*flags*/,
 {
 
 
-    /* === New version
-     * Now, dDAG and buf are contained in the google protobuffer message (encapsulated within UDP),
-     * then passed to the Click UDP.
-     */
-    
+	/* === New version
+	 * Now, dDAG and buf are contained in the google protobuffer message (encapsulated within UDP),
+	 * then passed to the Click UDP.
+	 */
+
 	//char buffer[MAXBUFLEN];
 	//struct sockaddr_in their_addr;
 	//socklen_t addr_len;
-    
+
 	struct addrinfo hints, *servinfo,*p;
 	int rv;
 	int numbytes;
@@ -53,25 +53,26 @@ int Xsendto(int sockfd,const void *buf, size_t len, int /*flags*/,
 
 	p=servinfo;
 
-        // protobuf message
-        xia::XSocketMsg xia_socket_msg;
+	// protobuf message
+	xia::XSocketMsg xia_socket_msg;
 
-        xia_socket_msg.set_type(xia::XSENDTO);
+	xia_socket_msg.set_type(xia::XSENDTO);
 
-        xia::X_Sendto_Msg *x_sendto_msg = xia_socket_msg.mutable_x_sendto();
+	xia::X_Sendto_Msg *x_sendto_msg = xia_socket_msg.mutable_x_sendto();
 	x_sendto_msg->set_ddag(dDAG);
-        x_sendto_msg->set_payload((const char*)buf, len);
+	x_sendto_msg->set_payload((const char*)buf, len);
 
 	std::string p_buf;
 	xia_socket_msg.SerializeToString(&p_buf);
 
+	numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0, p->ai_addr, p->ai_addrlen);
+	freeaddrinfo(servinfo);
 
-	if ((numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0, p->ai_addr, p->ai_addrlen)) == -1) {
+	if (numbytes == -1) {
 		perror("Xsendto(): sendto failed");
 		return(-1);
 	}
-	freeaddrinfo(servinfo);
-    
+
      /*	 
        //Process the reply
         addr_len = sizeof their_addr;

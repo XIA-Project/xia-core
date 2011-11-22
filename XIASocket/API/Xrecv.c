@@ -27,7 +27,7 @@ int Xrecv(int sockfd, void *buf, size_t len, int flags)
 	struct addrinfo hints;
 	int numbytes;
 	socklen_t addr_len;
-    char UDPbuf[MAXBUFLEN];
+	char UDPbuf[MAXBUFLEN];
 	struct sockaddr_in their_addr;
 
 
@@ -47,22 +47,22 @@ int Xrecv(int sockfd, void *buf, size_t len, int flags)
 	//Check if it's a control message
 	while(src_port==atoi(CLICKCONTROLPORT))
 	{
-    	//Do what is necessary, maybe close socket
-    	if(strcmp((char *)buf,"close")==0)
-    	{
-    	    Xclose(sockfd);
-    	    return -1;
-    	}
-    	else
-        {
-    		if ((numbytes = recvfrom(sockfd, UDPbuf, MAXBUFLEN-1 , flags,
+		//Do what is necessary, maybe close socket
+		if(strcmp((char *)buf,"close")==0)
+		{
+			Xclose(sockfd);
+			return -1;
+		}
+		else
+		{
+			if ((numbytes = recvfrom(sockfd, UDPbuf, MAXBUFLEN-1 , flags,
 					(struct sockaddr *)&their_addr, &addr_len)) == -1) 
 			{
-	    	    //perror("Xrecv: recvfrom");
-        		return -1;
-           	}
-	    
-	    }
+				//perror("Xrecv: recvfrom");
+				return -1;
+		   	}
+
+		}
 	}
 	/*short int paylen=0;
 	memcpy (&paylen, UDPbuf+2,2);
@@ -75,8 +75,8 @@ int Xrecv(int sockfd, void *buf, size_t len, int flags)
 	short int paylen=0,i=0;
 	char* tmpbuf=(char*)UDPbuf;
 	while(tmpbuf[i]!='^')
-	    i++;
-    paylen=numbytes-i-1;
+		i++;
+	paylen=numbytes-i-1;
 	//memcpy (&paylen, UDPbuf+2,2);
 	//paylen=ntohs(paylen);
 	int offset=i+1;

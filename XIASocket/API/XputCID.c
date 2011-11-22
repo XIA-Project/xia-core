@@ -26,11 +26,11 @@ int XputCID(int sockfd, const void *buf, size_t len, int /*flags*/,
 {
 
 
-    /* === New version
-     * Now, the DAG and data are contained in the google protobuffer message (encapsulated within UDP),
-     * then passed to the Click UDP.
-     */
-    
+	/* === New version
+	 * Now, the DAG and data are contained in the google protobuffer message (encapsulated within UDP),
+	 * then passed to the Click UDP.
+	 */
+
 	struct addrinfo hints, *servinfo,*p;
 	int rv;
 	int numbytes;
@@ -52,26 +52,27 @@ int XputCID(int sockfd, const void *buf, size_t len, int /*flags*/,
 
 	p=servinfo;
 
-        // protobuf message
-        xia::XSocketMsg xia_socket_msg;
+	// protobuf message
+	xia::XSocketMsg xia_socket_msg;
 
-        xia_socket_msg.set_type(xia::XPUTCID);
+	xia_socket_msg.set_type(xia::XPUTCID);
 
-        xia::X_Putcid_Msg *x_putcid_msg = xia_socket_msg.mutable_x_putcid();
+	xia::X_Putcid_Msg *x_putcid_msg = xia_socket_msg.mutable_x_putcid();
 	x_putcid_msg->set_sdag(sDAG);
 	//printf("PUTCID len %d\n", len);
-        x_putcid_msg->set_payload((const char*)buf, len);
+	x_putcid_msg->set_payload((const char*)buf, len);
 
 
 	std::string p_buf;
 	xia_socket_msg.SerializeToString(&p_buf);
 
+	numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0, p->ai_addr, p->ai_addrlen);
+	freeaddrinfo(servinfo);
 
-	if ((numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0, p->ai_addr, p->ai_addrlen)) == -1) {
+	if (numbytes == -1) {
 		perror("XputCID(): sendto failed");
 		return(-1);
 	}
-	freeaddrinfo(servinfo);
 
     /*
         //Process the reply

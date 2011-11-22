@@ -28,7 +28,7 @@ int Xgetsocketinfo(int sockfd1, int sockfd2, struct Netinfo *info)
 	struct sockaddr_in their_addr;
 	socklen_t addr_len;
 	
-    //Send a control packet 
+	//Send a control packet 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_DGRAM;
@@ -40,22 +40,24 @@ int Xgetsocketinfo(int sockfd1, int sockfd2, struct Netinfo *info)
 
 	p=servinfo;
 
-        // protobuf message
-        xia::XSocketMsg xia_socket_msg;
+	// protobuf message
+	xia::XSocketMsg xia_socket_msg;
 
-        xia_socket_msg.set_type(xia::XGETSOCKETINFO);
+	xia_socket_msg.set_type(xia::XGETSOCKETINFO);
 	xia::X_Getsocketinfo_Msg *x_getsocketinfo_msg = xia_socket_msg.mutable_x_getsocketinfo();
 	x_getsocketinfo_msg->set_id(sockfd2);
 
 	std::string p_buf;
 	xia_socket_msg.SerializeToString(&p_buf);
 
-	if ((numbytes = sendto(sockfd1, p_buf.c_str(), p_buf.size(), 0,
-					p->ai_addr, p->ai_addrlen)) == -1) {
+	numbytes = sendto(sockfd1, p_buf.c_str(), p_buf.size(), 0,
+					p->ai_addr, p->ai_addrlen);
+	freeaddrinfo(servinfo);
+
+	if (numbytes == -1) {
 		perror("Xgetsocketinfo(): sendto failed");
 		return(-1);
 	}
-	freeaddrinfo(servinfo);
  
 
         //Process the reply
@@ -92,8 +94,8 @@ int Xgetsocketinfo(int sockfd1, int sockfd2, struct Netinfo *info)
 	//protobuf message parsing
 	//xia_socket_msg.Clear();
 
-        // protobuf message
-        xia::XSocketMsg xia_socket_msg1;
+	// protobuf message
+	xia::XSocketMsg xia_socket_msg1;
 	xia_socket_msg1.ParseFromString(pp_buf);
 
 	if (xia_socket_msg1.type() == xia::XGETSOCKETINFO) {
@@ -108,7 +110,7 @@ int Xgetsocketinfo(int sockfd1, int sockfd2, struct Netinfo *info)
  		return 1;
 	}
 
-        return -1; 
+	return -1; 
 
 }
 

@@ -28,7 +28,7 @@ int Xclose(int sockfd)
 	//struct sockaddr_in their_addr;
 	//socklen_t addr_len;
 	
-    //Send a control packet to inform Click of socket closing
+	//Send a control packet to inform Click of socket closing
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_DGRAM;
@@ -38,15 +38,15 @@ int Xclose(int sockfd)
 		return -1;
 	}
 
-    p=servinfo;
+	p=servinfo;
 
 
-        // protobuf message
-        xia::XSocketMsg xia_socket_msg;
+	// protobuf message
+	xia::XSocketMsg xia_socket_msg;
 
-        xia_socket_msg.set_type(xia::XCLOSE);
+	xia_socket_msg.set_type(xia::XCLOSE);
 
-        xia::X_Close_Msg *x_close_msg = xia_socket_msg.mutable_x_close();
+	xia::X_Close_Msg *x_close_msg = xia_socket_msg.mutable_x_close();
 
 	const char *message="close socket"; // well... not necessary though.. 
 	x_close_msg->set_payload(message);  /* null terminated string */
@@ -54,12 +54,13 @@ int Xclose(int sockfd)
 	std::string p_buf;
 	xia_socket_msg.SerializeToString(&p_buf);
 
+	numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0, p->ai_addr, p->ai_addrlen);
+	freeaddrinfo(servinfo);
 
-	if ((numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0, p->ai_addr, p->ai_addrlen)) == -1) {
+	if (numbytes == -1) {
 		perror("Xclose(): sendto failed");
 		return(-1);
 	}
-	freeaddrinfo(servinfo);
 
 /*
         //Process the reply
