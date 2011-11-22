@@ -45,7 +45,7 @@ def update_stockfeed(stock):
 
 stock_name= ["ADA",  "BQB", "CKK", "GPR", "HER", "IAK", "KOY", "LUR", "XIA", "YRY" ]
 stock = map(lambda name: Stock(name), stock_name)
-xsocket.set_conf("xsockconf_python.ini","stock_service_replicate.py")
+xsocket.set_conf("xsockconf_python.ini","stock_service_replicate_geni.py")
 xsocket.print_conf()
 
 while(True):
@@ -57,7 +57,7 @@ while(True):
         	exit(-1)
         
         # Make the sDAG (the one the server listens on)
-        dag = "RE %s %s %s" % (AD_CMU, HID2, SID_STOCK)
+        dag = "RE %s %s %s" % (AD1, HID1, SID_STOCK_REPLICATE)
         
         # Bind to the DAG
         ret= xsocket.Xbind(sock,dag);

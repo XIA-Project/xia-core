@@ -39,7 +39,7 @@ def putCID(chunk):
     
     print 'waiting to put content'
     # Put the content chunk
-    content_dag = 'RE %s %s CID:%s' % (AD_CMU, HID2, cid)
+    content_dag = 'RE %s %s CID:%s' % (AD1, HID1, cid)
     xsocket.XputCID(sock, chunk, len(chunk), 0, content_dag, len(content_dag))
 
     print 'put content %s (length %s)' % (content_dag, len(chunk))
@@ -74,63 +74,6 @@ def put_content():
     # Put content 'image.jpg' and make a corresponding list of CIDs
     # (if image is chunked it might have multiple CIDs)
     image_cid_list = []
-    f = open("image.jpg", 'r')
-    chunk = f.read(chunksize)
-    while chunk != '':
-        image_cid_list.append(putCID(chunk))
-        chunk = f.read(chunksize)
-    f.close()
-
-    # Build 'simple.html' file
-    num_image_chunks = len(image_cid_list)
-    image_cid_list_string = ''
-
-    for cid in image_cid_list:
-        image_cid_list_string += cid
-    f = open("simple.html", 'w')
-    f.write('<html><body><h1>It works!</h1>\n<h2><img src="http://xia.cid.%s.%s" /></h2><ul class="left-nav">\n\n</body></html>' % (num_image_chunks, image_cid_list_string))
-
-    # Put content 'simple.html'
-    # TODO: Silly to write file then read it again; we do it
-    # for now so we can see the actual file for debugging
-    print "simple.html"
-    f = open("simple.html", 'r')
-    chunk = f.read(chunksize)
-
-    while chunk != '':
-        cid = putCID(chunk)
-        CID_SIMPLE_HTML += 'CID:' 
-	CID_SIMPLE_HTML  += cid
-        chunk = f.read(chunksize)
-    f.close()
-    print "end simple.html"
-
-    # Put content 'demo.html'
-    print "demo.html"
-    f = open("demo.html", 'r')
-    chunk = f.read(chunksize)
-
-    while chunk != '':
-        cid = putCID(chunk)
-        CID_DEMO_HTML += 'CID:' 
-	CID_DEMO_HTML  += cid
-	CID_DEMO_HTML  += '\t'
-        chunk = f.read(chunksize)
-    f.close()
-    
-    print "end demo.html"
-    
-    # Put content 'plane.jpg'
-    print "plane.jpg"
-    f = open("plane.jpg", 'r')
-    chunk = f.read(chunksize)
-
-    while chunk != '':
-        cid = putCID(chunk)
-        chunk = f.read(chunksize)
-    f.close()
-    print "end plane.jpg"
-
 
     # Put content 'xia_service.html'
     print "xia_service.html"
@@ -149,11 +92,11 @@ def put_content():
 
 
 def main():
-    global AD_CMU, HID2, SID1
+    global AD1, HID1, SID_STOCK_INFO
 
     print 'starting webserver'
     # Set up connection with click via Xsocket API
-    xsocket.set_conf("xsockconf_python.ini", "webserver_replicate.py")
+    xsocket.set_conf("xsockconf_python.ini", "webserver_replicate_geni.py")
     xsocket.print_conf()  #for debugging
 
     try:
@@ -166,12 +109,12 @@ def main():
     while True:
         try:   
             # Now listen for connections from clients
-            print 'webserver_replicate.py: Waiting to get socket to listen on'
+            print 'webserver_replicate_cmu.py: Waiting to get socket to listen on'
             listen_sock = xsocket.Xsocket()
             if (listen_sock<0):
                 print 'error opening socket'
                 return
-            dag = "RE %s %s %s" % (AD_CMU, HID2, SID1) # dag to listen on
+            dag = "RE %s %s %s" % (AD1, HID1, SID_STOCK_INFO) # dag to listen on
             xsocket.Xbind(listen_sock, dag)
             print 'Listening on %s' % dag
 

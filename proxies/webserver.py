@@ -181,7 +181,7 @@ def main():
             serveSIDRequest(incoming_data, listen_sock)
         except (KeyboardInterrupt, SystemExit), e:
             print 'Closing webserver'
-            xsocket.Xclose(sock)
+            xsocket.Xclose(listen_sock)
             sys.exit()
     
 

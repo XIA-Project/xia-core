@@ -57,7 +57,7 @@ while(True):
         	exit(-1)
         
         # Make the sDAG (the one the server listens on)
-        dag = "RE %s %s %s" % (AD_CMU, HID2, SID_STOCK)
+        dag = "RE %s %s %s" % (AD_CMU, HID2, SID_STOCK_REPLICATE)
         
         # Bind to the DAG
         ret= xsocket.Xbind(sock,dag);

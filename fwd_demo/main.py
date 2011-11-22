@@ -75,9 +75,6 @@ class Main(QDialog, Ui_Main):
         self.axes.set_ylabel('Forwarding Speed (Gbps)')
 
         duration = 120   # 2 minutes
-        self.axes.set_xlim([0, duration])
-        self.axes.set_ylim([0, 30]) # 30 Gbps
-
         if self.times:
             xs = map(lambda t: t - self.times[0], self.times)
             self.axes.plot(xs, self.gbps_xia, 'k-', linewidth=2)
@@ -91,6 +88,9 @@ class Main(QDialog, Ui_Main):
                 del self.times[0]
                 del self.gbps_xia[0]
                 del self.gbps_ip[0]
+
+        self.axes.set_xlim([0, duration])
+        self.axes.set_ylim([0, 30]) # 30 Gbps
 
         self.canvas.draw()
 
