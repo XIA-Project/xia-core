@@ -58,6 +58,7 @@ extern "C" {
 			}
 
 			//If port is in use, try next port until success, or max ATTEMPTS reached
+			srand(time(NULL));
 			rv=-1;
 			for (tries=0;tries<ATTEMPTS;tries++)
 			{
@@ -161,9 +162,9 @@ void __InitXSocket::read_conf(const char *inifile, const char *section_name)
 {
 	__XSocketConf::initialized=1;
 
-	int n = ini_gets(section_name, "api_addr", DEFAULT_MYADDRESS, _conf.api_addr, __IP_ADDR_LEN, inifile);
-	n = ini_gets(section_name, "click_dataaddr", DEFAULT_CLICKDATAADDRESS, _conf.click_dataaddr, __IP_ADDR_LEN , inifile);
-	n = ini_gets(section_name, "click_controladdr", DEFAULT_CLICKCONTROLADDRESS, _conf.click_controladdr, __IP_ADDR_LEN, inifile);
+	ini_gets(section_name, "api_addr", DEFAULT_MYADDRESS, _conf.api_addr, __IP_ADDR_LEN, inifile);
+	ini_gets(section_name, "click_dataaddr", DEFAULT_CLICKDATAADDRESS, _conf.click_dataaddr, __IP_ADDR_LEN , inifile);
+	ini_gets(section_name, "click_controladdr", DEFAULT_CLICKCONTROLADDRESS, _conf.click_controladdr, __IP_ADDR_LEN, inifile);
 
 }
 
