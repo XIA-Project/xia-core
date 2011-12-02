@@ -50,7 +50,7 @@ xsocket.print_conf()
 
 while(True):
     try:
-        sock=xsocket.Xsocket()
+        sock=xsocket.Xsocket(0)
         
         if (sock<0):
         	print "error opening socket"

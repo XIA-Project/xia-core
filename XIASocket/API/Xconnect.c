@@ -24,10 +24,9 @@ int Xconnect(int sockfd, char* dest_DAG)
    	struct addrinfo hints, *servinfo, *p;
 	int rv;
 	int numbytes;
-
-	//char buf[MAXBUFLEN];
-	//struct sockaddr_in their_addr;
-	//socklen_t addr_len;
+	char buf[MAXBUFLEN];
+	struct sockaddr_in their_addr;
+	socklen_t addr_len;
 	
 	//Send a control packet to inform Click of connect request
 	memset(&hints, 0, sizeof hints);
@@ -52,7 +51,7 @@ int Xconnect(int sockfd, char* dest_DAG)
 	std::string p_buf;
 	xia_socket_msg.SerializeToString(&p_buf);
 
-
+	// In Xtransport: send SYN to destination server
 	numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0,
 					p->ai_addr, p->ai_addrlen);
 	freeaddrinfo(servinfo);
@@ -62,26 +61,25 @@ int Xconnect(int sockfd, char* dest_DAG)
 		return(-1);
 	}
 
-/*
-        //Process the reply
+
+        // Waiting for SYNACK from destination server
         addr_len = sizeof their_addr;
         if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
                                         (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-                        perror("Xbind: recvfrom");
+                        perror("Xconnect: recvfrom");
                         return -1;
         }
-
-	//protobuf message parsing
-	xia_socket_msg.ParseFromString(buf);
-
-	if (xia_socket_msg.type() == xia::XSOCKET_CONNECT) {
+        
+        /*
+	int src_port=ntohs(their_addr.sin_port);
+	printf ("src_port=%d \n", src_port);
+	if (src_port==atoi(CLICKCONNECTPORT)) {
  		return 0;
 	}
+	*/
+	
+        return 0; 	    
 
-        return -1; 
-      */
-
-	return numbytes;
 
 }
 

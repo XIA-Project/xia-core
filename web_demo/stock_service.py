@@ -3,7 +3,8 @@ import xsocket
 from xia_address import * 
 import random
 import sys
-
+import os
+import time
 
 class Stock:
     def __init__(self, name):
@@ -12,11 +13,13 @@ class Stock:
 	self.price = self.begin
 	self.delta = 0
     def update(self):
+    	#random.seed(time.time())
         rate_change = random.uniform(0.8, 1.2) 
     	self.delta = self.begin - self.begin * rate_change
     	self.price = self.begin + self.delta
 
 def update_stock(stock):
+    random.seed(time.time())
     for s in stock:
         s.update()
 
@@ -48,9 +51,9 @@ stock = map(lambda name: Stock(name), stock_name)
 xsocket.set_conf("xsockconf_python.ini","stock_service.py")
 xsocket.print_conf()
 
-while(True):
-    try:
-        sock=xsocket.Xsocket()
+#while(True):
+try:
+        sock=xsocket.Xsocket(0)
         
         if (sock<0):
         	print "error opening socket"
@@ -64,19 +67,31 @@ while(True):
         print "listening on %s" % dag
         print "bind returns %d socket %d" % (ret, sock)
         
-        xsocket.Xaccept(sock);
-    	replyto =  None
-	dlen = None
-        #n = xsocket.Xrecvfrom(sock, 1500, 0, replyto, dlen)
-        n = xsocket.Xrecv(sock, 1500, 0)
-        stock_feed = update_stockfeed(stock)
-	http_header = "HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/plain\n\n"
-        #xsocket.Xsendto(sock, stock_feed, len(stock_feed), 0, replyto, dlen)
-	response = http_header+ stock_feed
-	print "response len %d" % len(response)
-        xsocket.Xsend(sock, response, len(response), 0)
-        xsocket.Xclose(sock)
-    except (KeyboardInterrupt, SystemExit), e:
+        while(True):
+        
+        	accept_sock = xsocket.Xaccept(sock);
+        	
+        	child_pid = os.fork()
+  
+  	  	if child_pid == 0:     
+    			replyto =  None
+			dlen = None
+        		#n = xsocket.Xrecvfrom(sock, 1500, 0, replyto, dlen)
+        		
+        		n = xsocket.Xrecv(accept_sock, 1500, 0)
+        		
+        		stock_feed = update_stockfeed(stock)
+			http_header = "HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/plain\n\n"
+        		#xsocket.Xsendto(sock, stock_feed, len(stock_feed), 0, replyto, dlen)
+			response = http_header+ stock_feed
+			print "response len %d" % len(response)
+			
+        		xsocket.Xsend(accept_sock, response, len(response), 0)
+        		
+        		xsocket.Xclose(accept_sock)
+        		os._exit(0)
+        		
+except (KeyboardInterrupt, SystemExit), e:
             sys.exit()
 
 xsocket.Xclose(sock)

@@ -127,6 +127,7 @@ class FromHost : public Element { public:
     int _mtu_out;
     String _dev_name;
     String _click_xudp_addr;
+    String _click_xtransport_addr;
 
     EtherAddress _macaddr;
 

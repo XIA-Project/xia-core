@@ -75,8 +75,8 @@ def Xrecvfrom(*args):
   return _xsocket.Xrecvfrom(*args)
 Xrecvfrom = _xsocket.Xrecvfrom
 
-def Xsocket():
-  return _xsocket.Xsocket()
+def Xsocket(*args):
+  return _xsocket.Xsocket(*args)
 Xsocket = _xsocket.Xsocket
 
 def Xconnect(*args):

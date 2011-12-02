@@ -3146,10 +3146,19 @@ fail:
 
 SWIGINTERN PyObject *_wrap_Xsocket(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
+  int arg1 ;
+  int val1 ;
+  int ecode1 = 0 ;
+  PyObject * obj0 = 0 ;
   int result;
   
-  if (!PyArg_ParseTuple(args,(char *)":Xsocket")) SWIG_fail;
-  result = (int)Xsocket();
+  if (!PyArg_ParseTuple(args,(char *)"O:Xsocket",&obj0)) SWIG_fail;
+  ecode1 = SWIG_AsVal_int(obj0, &val1);
+  if (!SWIG_IsOK(ecode1)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode1), "in method '" "Xsocket" "', argument " "1"" of type '" "int""'");
+  } 
+  arg1 = (int)(val1);
+  result = (int)Xsocket(arg1);
   resultobj = SWIG_From_int((int)(result));
   return resultobj;
 fail:

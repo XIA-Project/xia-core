@@ -24,9 +24,9 @@ int Xclose(int sockfd)
 	int rv;
 	int numbytes;
 
-	//char buf[MAXBUFLEN];
-	//struct sockaddr_in their_addr;
-	//socklen_t addr_len;
+	char buf[MAXBUFLEN];
+	struct sockaddr_in their_addr;
+	socklen_t addr_len;
 	
 	//Send a control packet to inform Click of socket closing
 	memset(&hints, 0, sizeof hints);
@@ -79,7 +79,9 @@ int Xclose(int sockfd)
 
         return -1;
  */
- 	close(sockfd);
+ 
+
+ 	//close(sockfd);
 	return numbytes;
 }
 

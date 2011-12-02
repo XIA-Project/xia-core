@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
     if (fp==NULL) error("Error opening output file"); 
 
     //Open socket
-    sock=Xsocket();
+    sock=Xsocket(XSOCK_DGRAM);
     print_conf();
     if (sock < 0) 
 	error("Opening socket");

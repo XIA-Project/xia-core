@@ -51,7 +51,7 @@ extern "C" {
 			exit(0);
         }
 
-        int Xsocket()
+        int Xsocket(int transport_type) // 0: Reliable transport, 1: Unreliable transport
         {
 			//Setup to listen for control info
 			//char* str=(char*)"open";//TODO: Not necessary. Maybe more useful data could be sent in the open control packet?
@@ -74,11 +74,12 @@ extern "C" {
 			}
 
 			//If port is in use, try next port until success, or max ATTEMPTS reached
-			srand(time(NULL));
+			srand((unsigned)time(0));
 			rv=-1;
 			for (tries=0;tries<ATTEMPTS;tries++)
 			{
-				port=1024 + rand() % (65535 - 1024);
+				int rn = rand();
+				port=1024 + rn % (65535 - 1024); 
 				my_addr.sin_family = PF_INET;
 				my_addr.sin_addr.s_addr = inet_addr(MYADDRESS);
 				my_addr.sin_port = htons(port);
@@ -92,7 +93,7 @@ extern "C" {
 				perror("Xsocket listener: bind");
 				return -1;
 			}
-
+			
 			//printf("Xsocket listener: Sending...\n");
 
 			//Send a control packet
@@ -102,6 +103,10 @@ extern "C" {
 
 			// protobuf message
 			xia_socket_msg.set_type(xia::XSOCKET);
+			
+			xia::X_Socket_Msg *x_socket_msg = xia_socket_msg.mutable_x_socket();
+			x_socket_msg->set_type(transport_type);		
+			
 			std::string p_buf;
 			xia_socket_msg.SerializeToString(&p_buf);
 

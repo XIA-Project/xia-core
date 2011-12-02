@@ -43,7 +43,8 @@ message XSocketMsg {
 }
  
 message X_Socket_Msg {
-  optional string temp = 1; // currently not used
+  required int32 type = 1; // Indicating the type of tranport (0: Reliable transport, 1: Unreliable transport)
+  optional string temp = 2; // currently not used
 }
 
 message X_Bind_Msg {

@@ -31,7 +31,7 @@ def putCID(chunk):
     cid = m.hexdigest()
 
     print 'waiting to get socket'
-    sock = xsocket.Xsocket()
+    sock = xsocket.Xsocket(0)
     if (sock<0):
         print "error opening socket"
         exit(-1)
@@ -163,24 +163,36 @@ def main():
         put_content() # '-r' not found, so do publish content
     time.sleep(1) #necessary?
 
-    while True:
-        try:   
+    #while True:
+    try:   
             # Now listen for connections from clients
             print 'webserver.py: Waiting to get socket to listen on'
-            listen_sock = xsocket.Xsocket()
+            listen_sock = xsocket.Xsocket(0)
             if (listen_sock<0):
                 print 'error opening socket'
                 return
             dag = "RE %s %s %s" % (AD1, HID1, SID1) # dag to listen on
             xsocket.Xbind(listen_sock, dag)
             print 'Listening on %s' % dag
-
-            xsocket.Xaccept(listen_sock)
-            incoming_data = xsocket.Xrecv(listen_sock, 2000, 0)
-            print "webserver got %s" % incoming_data
-            serveSIDRequest(incoming_data, listen_sock)
-        except (KeyboardInterrupt, SystemExit), e:
+            
+            
+            while(True):
+        
+        	accept_sock = xsocket.Xaccept(listen_sock);
+        	
+        	child_pid = os.fork()
+  
+  	  	if child_pid == 0:  
+  	  	
+  	  		incoming_data = xsocket.Xrecv(accept_sock, 2000, 0)
+            		print "webserver got %s" % incoming_data
+            		serveSIDRequest(incoming_data, accept_sock)
+            		xsocket.Xclose(accept_sock)
+        		os._exit(0)
+            		
+    except (KeyboardInterrupt, SystemExit), e:
             print 'Closing webserver'
+            
             xsocket.Xclose(listen_sock)
             sys.exit()
     

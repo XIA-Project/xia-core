@@ -31,7 +31,7 @@ def putCID(chunk):
     cid = m.hexdigest()
 
     print 'waiting to get socket'
-    sock = xsocket.Xsocket()
+    sock = xsocket.Xsocket(0)
     if (sock<0):
         print "error opening socket"
         exit(-1)
@@ -110,7 +110,7 @@ def main():
         try:   
             # Now listen for connections from clients
             print 'webserver_replicate_cmu.py: Waiting to get socket to listen on'
-            listen_sock = xsocket.Xsocket()
+            listen_sock = xsocket.Xsocket(0)
             if (listen_sock<0):
                 print 'error opening socket'
                 return

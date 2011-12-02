@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
     }
 
     //Open socket
-    sock=Xsocket();
+    sock=Xsocket(XSOCK_DGRAM);
     print_conf(); /* For Debugging configuartion */
     if (sock < 0) error("Opening socket");
 

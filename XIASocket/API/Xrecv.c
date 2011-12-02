@@ -35,11 +35,12 @@ int Xrecv(int sockfd, void *buf, size_t len, int flags)
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_DGRAM;
 
+	//printf("(%s) recv \n", _conf.api_addr);
 
 	addr_len = sizeof their_addr;
 	if ((numbytes = recvfrom(sockfd, UDPbuf, MAXBUFLEN-1 , flags,
 					(struct sockaddr *)&their_addr, &addr_len)) == -1) {
-		//perror("Xrecv: recvfrom");
+		perror("Xrecv: recvfrom");
 		return -1;
 	}
 	int src_port=ntohs(their_addr.sin_port);
@@ -54,16 +55,18 @@ int Xrecv(int sockfd, void *buf, size_t len, int flags)
 			return -1;
 		}
 		else
-		{
+		{ 
 			if ((numbytes = recvfrom(sockfd, UDPbuf, MAXBUFLEN-1 , flags,
 					(struct sockaddr *)&their_addr, &addr_len)) == -1) 
 			{
-				//perror("Xrecv: recvfrom");
+				perror("Xrecv: recvfrom");
 				return -1;
 		   	}
+		   	
 
 		}
 	}
+	
 	/*short int paylen=0;
 	memcpy (&paylen, UDPbuf+2,2);
 	paylen=ntohs(paylen);

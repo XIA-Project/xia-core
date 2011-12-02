@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
     char buffer[2048],theirDAG[1024];    
 
     //Open socket
-    sock=Xsocket();
+    sock=Xsocket(XSOCK_STREAM);
     if (sock < 0) 
 	error("Opening socket");
 
@@ -41,8 +41,9 @@ int main(int argc, char *argv[])
     sprintf(dag, "RE %s %s %s", AD0, HID0,SID0);
 
     //Use connect if you want to use Xsend instead of Xsendto
-    //printf("\nConnecting...\n");
-    //Xconnect(sock,dag);//Use with Xrecv
+    printf("\nTry connecting...\n");
+    Xconnect(sock,dag);//Use with Xrecv
+    printf("\nConnected.\n");
 
     //Try a getCID
     char * cdag = malloc(snprintf(NULL, 0, "RE ( %s %s ) %s", AD0, HID0,CID0) + 1);
@@ -69,17 +70,19 @@ int main(int argc, char *argv[])
 	fgets(buffer,2048,stdin);
 	if (buffer[0]=='0'&&strlen(buffer)==2)
 	    break;
-
+	    
 	//Use Xconnect() with Xsend()
-	//Xsend(sock,buffer,strlen(buffer),0);
+	Xsend(sock,buffer,strlen(buffer),0);
+	
 	//Or use Xsendto()
 
-	Xsendto(sock,buffer,strlen(buffer),0,dag,strlen(dag)+1);
+	//Xsendto(sock,buffer,strlen(buffer),0,dag,strlen(dag)+1);
 	printf("Sent\n");
 
 
 	//Process reply from server
-	n = Xrecvfrom(sock,reply,128,0,theirDAG,&dlen);
+	//n = Xrecvfrom(sock,reply,128,0,theirDAG,&dlen);
+	n = Xrecv(sock,reply,128,0);
 	if (n < 0) 
 	    error("recvfrom");
 	//printf("Received a datagram from:%s\n",theirDAG);
