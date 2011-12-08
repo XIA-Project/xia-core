@@ -14,7 +14,7 @@ host0[0] //->  XIAPrint("h0->r0")
 -> c::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)-> LinkUnqueue(0.005, 1 GB/s) -> [0]router0;
 
 router0[0] //-> XIAPrint("r0->h0")
--> LinkUnqueue(0.005, 1 GB/s) -> RandomSample(0.98)-> [0]host0;
+-> LinkUnqueue(0.005, 1 GB/s) -> RandomSample(1.0)-> [0]host0;
 
 //RandomSample(1)->
 

@@ -16,7 +16,9 @@
 #define AD1   "AD:1000000000000000000000000000000000000001"
 #define RHID0 "HID:0000000000000000000000000000000000000002"
 #define RHID1 "HID:0000000000000000000000000000000000000003"
-#define CID0 "CID:2000000000000000000000000000000000000001"
+#define CID0 "CID:2000000000000000000000000000000000000000"
+#define CID1 "CID:2000000000000000000000000000000000000001"
+#define CID2 "CID:2000000000000000000000000000000000000002"
 #define SID0 "SID:0f00000000000000000000000000000000000055"
 
 void error(const char *);
@@ -27,6 +29,8 @@ int main(int argc, char *argv[])
     size_t dlen;
     char reply[128];
     char buffer[2048],theirDAG[1024];    
+    
+    struct cDAGvec cDAGv[3];
 
     //Open socket
     sock=Xsocket(XSOCK_STREAM);
@@ -45,23 +49,61 @@ int main(int argc, char *argv[])
     Xconnect(sock,dag);//Use with Xrecv
     printf("\nConnected.\n");
 
-    //Try a getCID
-    char * cdag = malloc(snprintf(NULL, 0, "RE ( %s %s ) %s", AD0, HID0,CID0) + 1);
-    sprintf(cdag, "RE ( %s %s ) %s", AD0, HID0,CID0); 
-    XgetCID(sock,cdag,strlen(cdag));
+    //Try getCID for CID0, CID1, and CID2
+    char * cdag0 = malloc(snprintf(NULL, 0, "RE ( %s %s ) %s", AD0, HID0,CID0) + 1);
+    sprintf(cdag0, "RE ( %s %s ) %s", AD0, HID0,CID0); 
+    char * cdag1 = malloc(snprintf(NULL, 0, "RE ( %s %s ) %s", AD0, HID0,CID1) + 1);
+    sprintf(cdag1, "RE ( %s %s ) %s", AD0, HID0,CID1); 
+    char * cdag2 = malloc(snprintf(NULL, 0, "RE ( %s %s ) %s", AD0, HID0,CID2) + 1);
+    sprintf(cdag2, "RE ( %s %s ) %s", AD0, HID0,CID2);
+    
+    cDAGv[0].cDAG = cdag0;
+    cDAGv[0].dlen = strlen(cdag0);
+    cDAGv[1].cDAG = cdag1;
+    cDAGv[1].dlen = strlen(cdag1);
+    cDAGv[2].cDAG = cdag2;
+    cDAGv[2].dlen = strlen(cdag2);
+
+     
+    //printf("cDAGList=%s \n", cdagList);
+    XgetCIDList(sock, cDAGv, 3);
+    
+    //printf("Hello \n");
+    n = Xrecvfrom(sock,reply,128,0,theirDAG,&dlen);
+    if (n < 0) 
+	error("recvfrom");
+    write(1,reply,n);
+    
+    printf("\n");
+    n = Xrecvfrom(sock,reply,128,0,theirDAG,&dlen);
+    if (n < 0) 
+	error("recvfrom");
+    write(1,reply,n);
+    
+    printf("\n");
     n = Xrecvfrom(sock,reply,128,0,theirDAG,&dlen);
     if (n < 0) 
 	error("recvfrom");
     write(1,reply,n);
 
     //Try the same getCID again (for debugging purposes)
-    XgetCID(sock,cdag,strlen(cdag));
+    XgetCIDList(sock, cDAGv, 3);
+    printf("\n");
     n = Xrecvfrom(sock,reply,128,0,theirDAG,&dlen);
     if (n < 0) 
 	error("recvfrom");
-    printf("\n");
     write(1,reply,n);
-
+    printf("\n");
+    n = Xrecvfrom(sock,reply,128,0,theirDAG,&dlen);
+    if (n < 0) 
+	error("recvfrom");
+    write(1,reply,n);
+    
+    printf("\n");
+    n = Xrecvfrom(sock,reply,128,0,theirDAG,&dlen);
+    if (n < 0) 
+	error("recvfrom");
+    write(1,reply,n);
 
     while(1)
     {

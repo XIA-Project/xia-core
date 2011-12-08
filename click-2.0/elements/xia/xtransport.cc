@@ -13,6 +13,7 @@
 
 
 
+
 #define DEBUG 0
 #define GETCID_REDUNDANCY 1 /* TODO: don't hardcode this value, make it configurable from Xsocket API */
 
@@ -191,7 +192,7 @@ XTRANSPORT::run_timer(Timer *timer)
   if (earlist_pending_expiry > now) {
   	_timer.reschedule_at(earlist_pending_expiry);
   }
- printf("hi 2 \n"); 
+ 
 }
 
 
@@ -812,68 +813,18 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 			    WritablePacket *p = NULL;
 
-			    //click_chatter("Sent packet to network");
-			    struct click_xia_xid _xid=dst_path.xid(dst_path.destination_node()).xid();
-			    //printf("DSTTYPE:%s",dst_path.xid(dst_path.destination_node()).unparse().c_str());
-			    //printf("DSTTYPE:%s",dst_path.xid(dst_path.destination_node()).unparse().c_str());
-
-			    if(ntohl(_xid.type)==CLICK_XIA_XID_TYPE_CID) {
-				/* content request (getCID) */
-				xiah.set_nxt(CLICK_XIA_NXT_CID);
-				ContentHeaderEncap *chdr = ContentHeaderEncap::MakeRequestHeader(); 
-				p = chdr->encap(just_payload_part); 
-				p = xiah.encap(p, true);
-				delete chdr;
+			    //p = xiah.encap(just_payload_part, true);
+			    //printf("payload=%s len=%d \n", x_sendto_msg->payload().c_str(), pktPayloadSize);		
 				
-				XID	source_sid = daginfo->src_path.xid(daginfo->src_path.destination_node());
-				XID	destination_cid = dst_path.xid(dst_path.destination_node()); 
-				
-				XIDpair xid_pair;
-			    	xid_pair.set_src(source_sid);
-			    	xid_pair.set_dst(destination_cid);
-				
-			    	// Map the src & dst XID pair to source port
-			    	XIDpairToPort.set(xid_pair,_sport);
-				
-			    	// Store the packet into buffer
-			    	WritablePacket *copy_req_pkt = copy_cid_req_packet(p);
-			    	daginfo->XIDtoCIDreqPkt.set(destination_cid, copy_req_pkt);
-			    	
-			    	// Set timer 
-			    	Timestamp cid_req_expiry  = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
-			    	daginfo->XIDtoExpiryTime.set(destination_cid, cid_req_expiry);
-			    	daginfo->XIDtoTimerOn.set(destination_cid, true);
-			    	
-		   		if (! _timer.scheduled() || _timer.expiry() >= cid_req_expiry )
- 					_timer.reschedule_at(cid_req_expiry);					
-				
-				portToDAGinfo.set(_sport,*daginfo);
-				
-			        output(2).push(p);
-			        
-			        /*
-				chdr = ContentHeaderEncap::MakeRPTRequestHeader(); 
-				for (int i=0;i<GETCID_REDUNDANCY-1;i++) {
-				    Packet *rp = chdr->encap(just_payload_part->clone()); 
-				    rp = xiah.encap(rp, true);
-				    output(2).push(rp);
-				}
-			        delete chdr;
-			        */
-			    } else {
-				//p = xiah.encap(just_payload_part, true);
-				//printf("payload=%s len=%d \n", x_sendto_msg->payload().c_str(), pktPayloadSize);		
-				
-				//Add XIA Transport headers
-			    	TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDGRAMHeader(0); // length 
-			    	p = thdr->encap(just_payload_part); 
-			    	p = xiah.encap(p, false);
-			    	xiah.set_plen(pktPayloadSize);
-			    	delete thdr;			
+			    //Add XIA Transport headers
+			    TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDGRAMHeader(0); // length 
+			    p = thdr->encap(just_payload_part); 
+			    p = xiah.encap(p, false);
+			    xiah.set_plen(pktPayloadSize);
+			    delete thdr;			
 			    			       
-			       output(2).push(p);
-			    }
-
+			    output(2).push(p);
+			    
 			    // (for Ack purpose) Reply with a packet with the destination port=source port	
 			    // protobuf message
 			    /*
@@ -889,6 +840,136 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 			}
 			break;
+			
+		case xia::XGETCID:
+		{
+
+		    xia::X_Getcid_Msg *x_getcid_msg = xia_socket_msg.mutable_x_getcid();
+
+	            int numCids = x_getcid_msg->numcids();
+		    String dest_list(x_getcid_msg->cdaglist().c_str()); // Content-DAGs each concatenated using '^'
+		    String pktPayload(x_getcid_msg->payload().c_str(), x_getcid_msg->payload().size());
+		    int pktPayloadSize=pktPayload.length();
+
+		    int start_index =0;
+		    int end_index = 0;	
+		    // send CID-Requests 
+		    for (int i=0; i < numCids; i++) {
+		    	end_index=dest_list.find_left("^", start_index);
+		    	//printf("Start=%d  End=%d \n", start_index, end_index);
+		    	String dest;
+	    	
+		    	if (end_index > 0) {
+		    		// there's more CID requests followed
+		    		dest=dest_list.substring(start_index, end_index - start_index);
+		    		start_index = end_index+1;
+		    	
+		    	} else {
+		    		// this is the last CID request in this batch.
+		    		dest=dest_list.substring(start_index);
+		    	}
+
+		    	int dag_size = dest.length();
+			
+			//printf("CID-Request for %s  (size=%d) \n", dest.c_str(), dag_size);
+			//printf("\n\n (%s) hi 3 \n\n", (_local_addr.unparse()).c_str());
+			XIAPath dst_path;
+			dst_path.parse(dest); 
+
+			//Find DAG info for this DGRAM
+			DAGinfo *daginfo=portToDAGinfo.get_pointer(_sport);
+
+			if(!daginfo) {
+				//No local SID bound yet, so bind one  
+				daginfo=new DAGinfo();
+			}
+			    
+			if (daginfo->initialized==false) {
+				daginfo->initialized=true;
+				daginfo->port=_sport;
+				String str_local_addr=_local_addr.unparse_re();
+
+				String rand(click_random(1000000, 9999999));
+				String xid_string="SID:20000ff00000000000000000000000000"+rand;
+				str_local_addr=str_local_addr+" "+xid_string;//Make source DAG _local_addr:SID
+
+				daginfo->src_path.parse_re(str_local_addr);
+				
+				daginfo->last=-1;
+				daginfo->hlim=250;
+
+				XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+
+				XIDtoPort.set(source_xid,_sport);//Maybe change the mapping to XID->DAGinfo?
+				addRoute(source_xid);
+			}
+		    
+			if(daginfo->src_path.unparse_re().length() !=0) {
+			      //Recalculate source path
+			      XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+			      String str_local_addr=_local_addr.unparse_re()+" "+source_xid.unparse();//Make source DAG _local_addr:SID			    
+			      daginfo->src_path.parse(str_local_addr);
+			}
+			    
+			portToDAGinfo.set(_sport,*daginfo);
+			    
+			daginfo=portToDAGinfo.get_pointer(_sport);
+			    //portRxSeqNo.set(_sport,portRxSeqNo.get(_sport)+1);//Increment counter
+
+			    if (DEBUG)
+				click_chatter("sent packet to %s, from %s\n",dest.c_str(),daginfo->src_path.unparse_re().c_str());
+
+			//Add XIA headers
+			XIAHeaderEncap xiah;
+			xiah.set_nxt(CLICK_XIA_NXT_CID);
+			xiah.set_last(-1);
+			xiah.set_hlim(250);
+			xiah.set_dst_path(dst_path);
+			xiah.set_src_path(daginfo->src_path);
+			xiah.set_plen(pktPayloadSize);
+	
+			WritablePacket *just_payload_part= WritablePacket::make(p_in->headroom()+1, (const void*)x_getcid_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
+
+			WritablePacket *p = NULL;
+
+			//Add Content header
+			ContentHeaderEncap *chdr = ContentHeaderEncap::MakeRequestHeader(); 
+			p = chdr->encap(just_payload_part); 
+			p = xiah.encap(p, true);
+			delete chdr;
+				
+			XID	source_sid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+			XID	destination_cid = dst_path.xid(dst_path.destination_node()); 
+		
+			XIDpair xid_pair;
+			xid_pair.set_src(source_sid);
+			xid_pair.set_dst(destination_cid);
+				
+			// Map the src & dst XID pair to source port
+			XIDpairToPort.set(xid_pair,_sport);
+			
+			// Store the packet into buffer
+			WritablePacket *copy_req_pkt = copy_cid_req_packet(p);
+			daginfo->XIDtoCIDreqPkt.set(destination_cid, copy_req_pkt);
+			    	
+			// Set timer 
+			Timestamp cid_req_expiry  = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
+			daginfo->XIDtoExpiryTime.set(destination_cid, cid_req_expiry);
+			daginfo->XIDtoTimerOn.set(destination_cid, true);
+			    	
+		   	if (! _timer.scheduled() || _timer.expiry() >= cid_req_expiry )
+ 					_timer.reschedule_at(cid_req_expiry);					
+				
+			portToDAGinfo.set(_sport,*daginfo);
+			
+			output(2).push(p);	 
+		    
+		    }
+        		
+
+			}
+			break;			
+			
 		    case xia::XPUTCID:
 			{
 			    //click_chatter("\n\nOK: SOCKET PUTCID !!!\\n");

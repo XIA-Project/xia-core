@@ -69,7 +69,9 @@ message X_Putcid_Msg {
 }
 
 message X_Getcid_Msg {
-  optional string temp = 1; // currently not used
+  required int32 numcids = 1; // the number of Content-DAGs requested
+  required string cdaglist = 2; // Content-DAGs each concatenated using '^'
+  optional bytes payload = 3; // data
 }
 
 message X_Sendto_Msg {

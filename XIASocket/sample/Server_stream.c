@@ -16,7 +16,9 @@
 #define AD1   "AD:1000000000000000000000000000000000000001"
 #define RHID0 "HID:0000000000000000000000000000000000000002"
 #define RHID1 "HID:0000000000000000000000000000000000000003"
-#define CID0 "CID:2000000000000000000000000000000000000001"
+#define CID0 "CID:2000000000000000000000000000000000000000"
+#define CID1 "CID:2000000000000000000000000000000000000001"
+#define CID2 "CID:2000000000000000000000000000000000000002"
 #define SID0 "SID:0f00000000000000000000000000000000000055"
 
 
@@ -35,11 +37,22 @@ int main(int argc, char *argv[])
 
 
     //Make a CID entry
-    char * cdag = (char*)malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,CID0) + 1);
-    sprintf(cdag, "RE %s %s %s", AD0, HID0,CID0); 
-    char* data="Some value stored for CID0";
-    XputCID(sock,data,strlen(data),0,cdag,strlen(cdag));
+    char * cdag0 = (char*)malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,CID0) + 1);
+    sprintf(cdag0, "RE %s %s %s", AD0, HID0,CID0); 
+    char* data0="Some value stored for CID0";
+    XputCID(sock,data0,strlen(data0),0,cdag0,strlen(cdag0));
+    
+    //Make another CID entry
+    char * cdag1 = (char*)malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,CID1) + 1);
+    sprintf(cdag1, "RE %s %s %s", AD0, HID0,CID1); 
+    char* data1="Other value stored for CID1";
+    XputCID(sock,data1,strlen(data1),0,cdag1,strlen(cdag1));    
 
+    //Make another CID entry
+    char * cdag2 = (char*)malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,CID2) + 1);
+    sprintf(cdag2, "RE %s %s %s", AD0, HID0,CID2); 
+    char* data2="Other value stored for CID2";
+    XputCID(sock,data2,strlen(data2),0,cdag2,strlen(cdag2));
 
     //Make the sDAG (the one the server listens on)
     char * dag = (char*) malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,SID0) + 1);

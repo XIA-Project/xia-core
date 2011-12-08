@@ -50,6 +50,12 @@ struct Netinfo{
     char protocol[20];
 } ;
 
+
+struct cDAGvec {
+	char* cDAG;
+	size_t dlen; 
+};
+
 //Function list
 extern int Xsendto(int sockfd,const void *buf, size_t len, int flags,char * dDAG, size_t dlen);
 extern int Xrecvfrom(int sockfd,void *buf, size_t len, int flags,char * dDAG, size_t *dlen);
@@ -60,7 +66,8 @@ extern int Xclose(int sock);
 extern int Xrecv(int sockfd, void *buf, size_t len, int flags);
 //extern int Xsend(int sockfd,const void *buf, size_t len, int flags);
 extern int Xsend(int sockfd,const void *buf, size_t len, int flags);
-extern int XgetCID(int sockfd, char* dDAG, size_t dlen);
+extern int XgetCID(int sockfd, char* cDAG, size_t dlen);
+extern int XgetCIDList(int sockfd, const struct cDAGvec *cDAGv, int numCIDs);
 extern int XputCID(int sockfd, const void *buf, size_t len, int flags,char* sDAG, size_t dlen);
 extern int Xaccept(int sockfd);
 extern int Xgetsocketidlist(int sockfd, int *socket_list);
