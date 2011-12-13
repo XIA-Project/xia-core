@@ -15,23 +15,26 @@
 */
 
 /*
-* GetCID request
+* ReadCID
 */
 
 #include "Xsocket.h"
 #include "Xinit.h"
 
-int XgetCID(int sockfd, char* cDAG, size_t dlen)
-{
-        
-	//char buffer[MAXBUFLEN];
-	//struct sockaddr_in their_addr;
-	//socklen_t addr_len;
+// Called after XgetCID(), it reads the content of the requested CID (specified as cDAG) into buf
+// Return value: number of bytes, -1: failed 
 
+int XreadCID(int sockfd, void *buf, size_t len, int flags, char * cDAG, size_t dlen)
+{
+	char buffer[2048];
+	struct sockaddr_in their_addr;
+	socklen_t addr_len;
+	char statusbuf[2048];
+	char UDPbuf[MAXBUFLEN];
+	
 	struct addrinfo hints, *servinfo,*p;
 	int rv;
 	int numbytes;
-	const char *buf="CID request";//Maybe send more useful information here.
 	int numCIDs = 1;
 
 	memset(&hints, 0, sizeof hints);
@@ -49,13 +52,12 @@ int XgetCID(int sockfd, char* cDAG, size_t dlen)
 	// protobuf message
 	xia::XSocketMsg xia_socket_msg;
 
-	xia_socket_msg.set_type(xia::XGETCID);
+	xia_socket_msg.set_type(xia::XREADCID);
 
-	xia::X_Getcid_Msg *x_getcid_msg = xia_socket_msg.mutable_x_getcid();
+	xia::X_Readcid_Msg *x_readcid_msg = xia_socket_msg.mutable_x_readcid();
   
-  	x_getcid_msg->set_numcids(numCIDs);
-	x_getcid_msg->set_cdaglist(cDAG);
-	x_getcid_msg->set_payload((const char*)buf, strlen(buf)+1);
+  	x_readcid_msg->set_numcids(numCIDs);
+	x_readcid_msg->set_cdaglist(cDAG);
 
 	std::string p_buf;
 	xia_socket_msg.SerializeToString(&p_buf);
@@ -64,30 +66,33 @@ int XgetCID(int sockfd, char* cDAG, size_t dlen)
 	freeaddrinfo(servinfo);
 
 	if (numbytes == -1) {
-		perror("Xgetcid(): getcid failed");
+		perror("XreadCID(): XreadCID failed");
 		return(-1);
 	}
 
-     /*	 
+
+
+     	 
        //Process the reply
-        addr_len = sizeof their_addr;
-        if ((numbytes = recvfrom(sockfd, buffer, MAXBUFLEN-1 , 0,
-                                        (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-                        perror("Xgetcid(): recvfrom");
-                        return -1;
-        }
-
-	//protobuf message parsing
-	xia_socket_msg.ParseFromString(buffer);
-
-	if (xia_socket_msg.type() == xia::XSOCKET_SENDTO) {
-
- 		return numbytes;
+	addr_len = sizeof their_addr;
+	if ((numbytes = recvfrom(sockfd, UDPbuf, MAXBUFLEN-1 , 0,
+					(struct sockaddr *)&their_addr, &addr_len)) == -1) {
+		perror("XreadCID(): recvfrom");
+		return -1;
 	}
-        return -1; 
-      */
-
-	return numbytes;    
+	
+      	short int paylen=0,i=0;
+	char* tmpbuf=(char*)UDPbuf;
+	while(tmpbuf[i]!='^')
+		i++;
+	paylen=numbytes-i-1;
+	//memcpy (&paylen, UDPbuf+2,2);
+	//paylen=ntohs(paylen);
+	int offset=i+1;
+	memcpy(buf, UDPbuf+offset, paylen);
+	//strncpy(sDAG, UDPbuf, i);
+	
+	return paylen;
     
 }
 

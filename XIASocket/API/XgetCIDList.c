@@ -15,13 +15,15 @@
 */
 
 /*
-* GetCID request
+* GetCIDList request
 */
 
 #include "Xsocket.h"
 #include "Xinit.h"
 
-int XgetCID(int sockfd, char* cDAG, size_t dlen)
+ 
+    
+int XgetCIDList(int sockfd, const struct cDAGvec *cDAGv, int numCIDs)
 {
         
 	//char buffer[MAXBUFLEN];
@@ -32,7 +34,20 @@ int XgetCID(int sockfd, char* cDAG, size_t dlen)
 	int rv;
 	int numbytes;
 	const char *buf="CID request";//Maybe send more useful information here.
-	int numCIDs = 1;
+	size_t cdagListsize = 0;
+	
+	for (int i=0; i< numCIDs; i++) {
+		cdagListsize += (cDAGv[i].dlen + 1);
+	}
+	char * cdagList = (char *) malloc (cdagListsize + 1);
+    	memset (cdagList, 0, cdagListsize);
+    	
+    	strcpy(cdagList, cDAGv[0].cDAG);
+    	for (int i=1; i< numCIDs; i++) {
+    		strcat(cdagList, "^");
+		strcat(cdagList, cDAGv[i].cDAG);
+	}
+
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_INET;
@@ -54,7 +69,7 @@ int XgetCID(int sockfd, char* cDAG, size_t dlen)
 	xia::X_Getcid_Msg *x_getcid_msg = xia_socket_msg.mutable_x_getcid();
   
   	x_getcid_msg->set_numcids(numCIDs);
-	x_getcid_msg->set_cdaglist(cDAG);
+	x_getcid_msg->set_cdaglist(cdagList);
 	x_getcid_msg->set_payload((const char*)buf, strlen(buf)+1);
 
 	std::string p_buf;

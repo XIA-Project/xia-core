@@ -19,6 +19,8 @@ enum XSocketCallType {
   XGETSOCKETIDLIST = 12;
   XGETSOCKETINFO = 13;
 
+  XGETCIDSTATUS = 14;
+  XREADCID = 15;
 }
 
 
@@ -39,6 +41,9 @@ message XSocketMsg {
 
   optional X_Getsocketidlist_Msg x_getsocketidlist = 13;
   optional X_Getsocketinfo_Msg x_getsocketinfo = 14;
+
+  optional X_Getcidstatus_Msg x_getcidstatus= 15;
+  optional X_Readcid_Msg x_readcid= 16;
 
 }
  
@@ -73,6 +78,21 @@ message X_Getcid_Msg {
   required string cdaglist = 2; // Content-DAGs each concatenated using '^'
   optional bytes payload = 3; // data
 }
+
+message X_Getcidstatus_Msg {
+  required int32 numcids = 1; // the number of Content-DAGs requested
+  required string cdaglist = 2; // Content-DAGs each concatenated using '^'
+  required string status_list = 3; // Status for CID requests each concatenated using '^'
+  optional bytes payload = 4; // data
+}
+
+message X_Readcid_Msg {
+  required int32 numcids = 1; // the number of Content-DAGs requested
+  required string cdaglist = 2; // Content-DAGs each concatenated using '^'
+  optional string status_list = 3; // Status for CID requests each concatenated using '^'
+  optional bytes payload = 4; // data
+}
+
 
 message X_Sendto_Msg {
   required string ddag = 1; // dest dag

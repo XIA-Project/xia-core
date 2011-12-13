@@ -27,6 +27,7 @@
 using namespace std;
 
 
+
 #endif
 
 #define CLICKCONTROLPORT 5001
@@ -42,6 +43,10 @@ using namespace std;
 
 
 #define MAX_WIN_SIZE 100
+
+#define WAITING_FOR_CHUNK 0
+#define READY_TO_READ 1
+#define REQUEST_FAILED -1
 
 
 CLICK_DECLS
@@ -81,6 +86,7 @@ class XTRANSPORT : public Element {
     
     WritablePacket* copy_packet(Packet *);
     WritablePacket* copy_cid_req_packet(Packet *);
+    WritablePacket* copy_cid_response_packet(Packet *);
     
   private:
     Timer _timer;
@@ -110,7 +116,7 @@ class XTRANSPORT : public Element {
     uint8_t hlim;
     bool isConnected;
     bool initialized;
-    int sock_type; // 0: Reliable transport, 1: Unreliable transport
+    int sock_type; // 0: Reliable transport (SID), 1: Unreliable transport (SID), 2: Content Chunk transport (CID)
     String sdag;
     String ddag;
     //Vector<WritablePacket*> pkt_buf;
@@ -119,6 +125,9 @@ class XTRANSPORT : public Element {
     HashTable<XID, WritablePacket*> XIDtoCIDreqPkt;
     HashTable<XID, Timestamp> XIDtoExpiryTime;
     HashTable<XID, bool> XIDtoTimerOn;
+    HashTable<XID, int> XIDtoStatus; // Content-chunk request status... 1: waiting to be read, 0: waiting for chunk response, -1: failed
+    HashTable<XID, bool> XIDtoReadReq; // Indicates whether ReadCID() is called for a specific CID
+    HashTable<XID, WritablePacket*> XIDtoCIDresponsePkt;
     uint32_t seq_num;
     uint32_t ack_num;
     uint32_t base; // the sequence # of the oldest unacked packet

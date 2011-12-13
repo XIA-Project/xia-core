@@ -248,6 +248,34 @@ XTRANSPORT::copy_cid_req_packet(Packet *p) {
 	return copy;
 	
 }    	    
+
+
+WritablePacket * 
+XTRANSPORT::copy_cid_response_packet(Packet *p) {
+
+	XIAHeader xiahdr(p);
+	XIAHeaderEncap xiah;
+	
+	xiah.set_nxt(xiahdr.nxt());
+	xiah.set_last(xiahdr.last());
+	xiah.set_hlim(xiahdr.hlim());
+	xiah.set_dst_path(xiahdr.dst_path());
+	xiah.set_src_path(xiahdr.src_path());
+	xiah.set_plen(xiahdr.plen());
+	
+	WritablePacket *copy = WritablePacket::make(256, xiahdr.payload(), xiahdr.plen(), 20);
+	
+	ContentHeader chdr(p);
+	ContentHeaderEncap *new_chdr = new ContentHeaderEncap(chdr.opcode(), chdr.chunk_offset(), chdr.length());
+	
+	copy = new_chdr->encap(copy);
+	copy = xiah.encap(copy,false);
+	delete new_chdr;
+	xiah.set_plen(xiahdr.plen());
+
+	return copy;
+	
+}    
     	
 
 /* port 0: control (from application)
@@ -951,6 +979,12 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			// Store the packet into buffer
 			WritablePacket *copy_req_pkt = copy_cid_req_packet(p);
 			daginfo->XIDtoCIDreqPkt.set(destination_cid, copy_req_pkt);
+			
+			// Set the status of CID request
+			daginfo->XIDtoStatus.set(destination_cid, WAITING_FOR_CHUNK);
+			
+			// Set the status of ReadCID reqeust
+			daginfo->XIDtoReadReq.set(destination_cid, false);
 			    	
 			// Set timer 
 			Timestamp cid_req_expiry  = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
@@ -968,7 +1002,213 @@ void XTRANSPORT::push(int port, Packet *p_input)
         		
 
 			}
-			break;			
+			break;		
+			
+			
+		case xia::XGETCIDSTATUS:
+		{
+
+		    xia::X_Getcidstatus_Msg *x_getcidstatus_msg = xia_socket_msg.mutable_x_getcidstatus();
+
+	            int numCids = x_getcidstatus_msg->numcids();
+		    String dest_list(x_getcidstatus_msg->cdaglist().c_str()); // Content-DAGs each concatenated using '^'
+		    String status_list(x_getcidstatus_msg->status_list().c_str()); // Status for CID requests each concatenated using '^'
+		    String pktPayload(x_getcidstatus_msg->payload().c_str(), x_getcidstatus_msg->payload().size());
+		    int pktPayloadSize=pktPayload.length();
+		    
+		    // for status report back via protobuf
+		    char statusbuf[2048];
+
+		    int start_index =0;
+		    int end_index = 0;	
+		    // send CID-Requests 
+		    for (int i=0; i < numCids; i++) {
+		    	end_index=dest_list.find_left("^", start_index);
+		    	//printf("Start=%d  End=%d \n", start_index, end_index);
+		    	String dest;
+	    	
+		    	if (end_index > 0) {
+		    		// there's more CID requests followed
+		    		dest=dest_list.substring(start_index, end_index - start_index);
+		    		start_index = end_index+1;
+		    	
+		    	} else {
+		    		// this is the last CID request in this batch.
+		    		dest=dest_list.substring(start_index);
+		    	}
+
+		    	int dag_size = dest.length();
+			
+			//printf("CID-Request for %s  (size=%d) \n", dest.c_str(), dag_size);
+			//printf("\n\n (%s) hi 3 \n\n", (_local_addr.unparse()).c_str());
+			XIAPath dst_path;
+			dst_path.parse(dest); 
+
+			//Find DAG info for this DGRAM
+			DAGinfo *daginfo=portToDAGinfo.get_pointer(_sport);
+			
+			XID	source_sid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+			XID	destination_cid = dst_path.xid(dst_path.destination_node()); 
+			
+			// Check the status of CID request
+			HashTable<XID, int>::iterator it;
+		    	it = daginfo->XIDtoStatus.find(destination_cid);
+		    	
+			    
+		    	if(it != daginfo->XIDtoStatus.end()) {
+		    		// There is an entry
+		    		int status = it->second;
+		    		
+		    		if(status == WAITING_FOR_CHUNK) {
+		    			if(i==0) {
+		    				strcpy(statusbuf, "WAITING");
+		    			} else {
+		    				strcat(statusbuf, "^WAITING");
+		    			}
+		    		} else if(status == READY_TO_READ) {
+		    			if(i==0) {
+		    				strcpy(statusbuf, "READY");
+		    			} else {
+		    				strcat(statusbuf, "^READY");
+		    			}
+		    			
+		    		} else if(status == REQUEST_FAILED) {
+		    			if(i==0) {
+		    				strcpy(statusbuf, "FAILED");
+		    			} else {
+		    				strcat(statusbuf, "^FAILED");
+		    			}
+		    			
+		    		}
+		    		
+		    	} else {
+		    		// Status query for the CID that was not requested...
+		    		if(i==0) {
+		    			strcpy(statusbuf, "FAILED");
+		    		} else {
+		    			strcat(statusbuf, "^FAILED");
+		    		}
+		    	}
+					
+		    
+		    }
+		    
+		    // Send back the report 
+		    
+		    x_getcidstatus_msg->set_status_list(statusbuf);
+		    
+		    const char *buf="CID request status response";
+		    x_getcidstatus_msg->set_payload((const char*)buf, strlen(buf)+1);  
+
+		    std::string p_buf;
+		    xia_socket_msg.SerializeToString(&p_buf);
+
+		    WritablePacket *reply= WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
+		    output(1).push(UDPIPEncap(reply,_sport,_sport));
+       		
+			}
+			break;	
+			
+			
+		case xia::XREADCID:
+		{
+
+		    xia::X_Readcid_Msg *x_readcid_msg = xia_socket_msg.mutable_x_readcid();
+
+	            int numCids = x_readcid_msg->numcids();
+		    String dest_list(x_readcid_msg->cdaglist().c_str()); // Content-DAGs each concatenated using '^'
+		    
+		    WritablePacket *copy; 
+		    
+		    int start_index =0;
+		    int end_index = 0;	
+		    // send CID-Requests 
+		    for (int i=0; i < numCids; i++) {
+		    	end_index=dest_list.find_left("^", start_index);
+		    	//printf("Start=%d  End=%d \n", start_index, end_index);
+		    	String dest;
+	    	
+		    	if (end_index > 0) {
+		    		// there's more CID requests followed
+		    		dest=dest_list.substring(start_index, end_index - start_index);
+		    		start_index = end_index+1;
+		    	
+		    	} else {
+		    		// this is the last CID request in this batch.
+		    		dest=dest_list.substring(start_index);
+		    	}
+
+		    	int dag_size = dest.length();
+			
+			//printf("CID-Request for %s  (size=%d) \n", dest.c_str(), dag_size);
+			//printf("\n\n (%s) hi 3 \n\n", (_local_addr.unparse()).c_str());
+			XIAPath dst_path;
+			dst_path.parse(dest); 
+
+			//Find DAG info for this DGRAM
+			DAGinfo *daginfo=portToDAGinfo.get_pointer(_sport);
+			
+			XID	source_sid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+			XID	destination_cid = dst_path.xid(dst_path.destination_node()); 
+			
+			// Update the status of ReadCID reqeust
+			daginfo->XIDtoReadReq.set(destination_cid, true);
+			portToDAGinfo.set(_sport,*daginfo);
+			
+			// Check the status of CID request
+			HashTable<XID, int>::iterator it;
+		    	it = daginfo->XIDtoStatus.find(destination_cid);
+		    	
+			if(it != daginfo->XIDtoStatus.end()) {
+		    		// There is an entry
+		    		int status = it->second;
+		    		
+		    		if(status != READY_TO_READ) {
+		    			// Do nothing
+		    			
+		    		} else {
+		    			// Send the buffered pkt to upper layer
+		    			
+		    			daginfo->XIDtoReadReq.set(destination_cid, false);
+		    			portToDAGinfo.set(_sport,*daginfo);
+		    			
+		    			HashTable<XID, WritablePacket*>::iterator it2;
+					it2 = daginfo->XIDtoCIDresponsePkt.find(destination_cid);
+					copy = copy_cid_response_packet(it2->second);
+					
+					XIAHeader xiah(copy->xia_header());
+		    			
+		    			//Unparse dag info
+		    			String src_path=xiah.src_path().unparse();
+		    			String payload((const char*)xiah.payload(), xiah.plen());
+		    			String str=src_path;
+
+		    			str=str+String("^");
+  	            			str=str+payload;
+		    
+		    			WritablePacket *p2 = WritablePacket::make (256, str.c_str(), str.length(),0);
+
+		    			//printf("FROM CACHE. data length = %d  \n", str.length());
+		    			if (DEBUG)
+						click_chatter("Sent packet to socket: sport %d dport %d", _sport, _sport); 
+
+		    
+			    		output(1).push(UDPIPEncap(p2,_sport,_sport));
+			    		
+			    		it2->second->kill();
+			    		daginfo->XIDtoCIDresponsePkt.erase(it2);
+				
+					portToDAGinfo.set(_sport,*daginfo);
+					
+		    		}
+		    		
+		    	}		
+		    
+		    }
+		    
+       		
+			}
+			break;								
 			
 		    case xia::XPUTCID:
 			{
@@ -1387,24 +1627,56 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		    	daginfo->XIDtoTimerOn.erase(it3);
 		    }
 		    
+		    // Update the status of CID request
+		    daginfo->XIDtoStatus.set(source_cid, READY_TO_READ);
 		    
-		    portToDAGinfo.set(_dport,*daginfo);
+		    // Check if the ReadCID() was called for this CID
+		    HashTable<XID, bool>::iterator it4;
+		    it4 = daginfo->XIDtoReadReq.find(source_cid);
+		    	
+		    if(it4 != daginfo->XIDtoReadReq.end()) {
+		    	// There is an entry
+		    	bool read_cid_req = it4->second;
+		    	
+		    	if (read_cid_req == true) {
+		    		// Send pkt up
+		    		daginfo->XIDtoReadReq.erase(it4);
+		    		
+		    		portToDAGinfo.set(_dport,*daginfo);
+		    		
+		    		//Unparse dag info
+		    		String src_path=xiah.src_path().unparse();
+		    		String payload((const char*)xiah.payload(), xiah.plen());
+		    		String str=src_path;
 
-		    //Unparse dag info
-		    String src_path=xiah.src_path().unparse();
-		    String payload((const char*)xiah.payload(), xiah.plen());
-		    String str=src_path;
+		    		str=str+String("^");
+  	            		str=str+payload;
+		    
+		    		WritablePacket *p2 = WritablePacket::make (256, str.c_str(), str.length(),0);
 
-		    str=str+String("^");
-		    str=str+payload;
-
-		    WritablePacket *p2 = WritablePacket::make (256, str.c_str(), str.length(),0);
-		    //printf("FROM CACHE. data length = %d  \n", str.length());
-		    if (DEBUG)
-			click_chatter("Sent packet to socket: sport %d dport %d", _dport, _dport); 
+		    		//printf("FROM CACHE. data length = %d  \n", str.length());
+		    		if (DEBUG)
+					click_chatter("Sent packet to socket: sport %d dport %d", _dport, _dport); 
 
 		    
-		    output(1).push(UDPIPEncap(p2,_sport,_dport));
+		    		output(1).push(UDPIPEncap(p2,_sport,_dport));
+		    	
+		    	} else {
+		    		// Store the packet into temp buffer (until ReadCID() is called for this CID)
+				WritablePacket *copy_response_pkt = copy_cid_response_packet(p_in);
+				daginfo->XIDtoCIDresponsePkt.set(source_cid, copy_response_pkt);
+				
+				portToDAGinfo.set(_dport,*daginfo);
+		    	}
+		    	
+		    } else {
+		    	WritablePacket *copy_response_pkt = copy_cid_response_packet(p_in);
+			daginfo->XIDtoCIDresponsePkt.set(source_cid, copy_response_pkt);
+			portToDAGinfo.set(_dport,*daginfo);
+		    
+		    }
+		     
+		    
 		}
 		else
 		{

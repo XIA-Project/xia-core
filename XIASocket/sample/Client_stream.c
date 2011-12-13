@@ -64,45 +64,63 @@ int main(int argc, char *argv[])
     cDAGv[2].cDAG = cdag2;
     cDAGv[2].dlen = strlen(cdag2);
 
+
+    int chunk_sock=Xsocket(XSOCK_CHUNK);
      
     //printf("cDAGList=%s \n", cdagList);
-    XgetCIDList(sock, cDAGv, 3);
+    XgetCIDList(chunk_sock, cDAGv, 3);
+    
+    int status = XgetCIDStatus(chunk_sock, cDAGv[0].cDAG, cDAGv[0].dlen);
+    printf ("\nCID1 request STATUS=%d \n", status);
+    
+    status = XgetCIDListStatus(chunk_sock, cDAGv, 3);
+    printf ("CID request STATUS=%d (%d, %d, %d) \n", status, cDAGv[0].status, cDAGv[1].status, cDAGv[2].status);
     
     //printf("Hello \n");
-    n = Xrecvfrom(sock,reply,128,0,theirDAG,&dlen);
+    n = XreadCID(chunk_sock, reply,128,0, cDAGv[0].cDAG, cDAGv[0].dlen);
+    //n = Xrecvfrom(sock,reply,128,0,theirDAG,&dlen);
     if (n < 0) 
-	error("recvfrom");
+	error("XreadCID");
     write(1,reply,n);
     
     printf("\n");
-    n = Xrecvfrom(sock,reply,128,0,theirDAG,&dlen);
+    n = XreadCID(chunk_sock, reply,128,0, cDAGv[1].cDAG, cDAGv[1].dlen);
     if (n < 0) 
-	error("recvfrom");
+	error("XreadCID");
     write(1,reply,n);
     
     printf("\n");
-    n = Xrecvfrom(sock,reply,128,0,theirDAG,&dlen);
+    n = XreadCID(chunk_sock, reply,128,0, cDAGv[2].cDAG, cDAGv[2].dlen);
     if (n < 0) 
-	error("recvfrom");
+	error("XreadCID");
     write(1,reply,n);
 
     //Try the same getCID again (for debugging purposes)
-    XgetCIDList(sock, cDAGv, 3);
-    printf("\n");
-    n = Xrecvfrom(sock,reply,128,0,theirDAG,&dlen);
+    XgetCIDList(chunk_sock, cDAGv, 3);
+    
+    status = XgetCIDStatus(chunk_sock, cDAGv[0].cDAG, cDAGv[0].dlen);
+    printf ("\nCID1 request STATUS=%d \n", status);
+    
+    status = XgetCIDListStatus(chunk_sock, cDAGv, 3);
+    printf ("CID request STATUS=%d (%d, %d, %d) \n", status, cDAGv[0].status, cDAGv[1].status, cDAGv[2].status);
+    
+    //printf("Hello \n");
+    n = XreadCID(chunk_sock, reply,128,0, cDAGv[0].cDAG, cDAGv[0].dlen);
+    //n = Xrecvfrom(sock,reply,128,0,theirDAG,&dlen);
     if (n < 0) 
-	error("recvfrom");
-    write(1,reply,n);
-    printf("\n");
-    n = Xrecvfrom(sock,reply,128,0,theirDAG,&dlen);
-    if (n < 0) 
-	error("recvfrom");
+	error("XreadCID");
     write(1,reply,n);
     
     printf("\n");
-    n = Xrecvfrom(sock,reply,128,0,theirDAG,&dlen);
+    n = XreadCID(chunk_sock, reply,128,0, cDAGv[1].cDAG, cDAGv[1].dlen);
     if (n < 0) 
-	error("recvfrom");
+	error("XreadCID");
+    write(1,reply,n);
+    
+    printf("\n");
+    n = XreadCID(chunk_sock, reply,128,0, cDAGv[2].cDAG, cDAGv[2].dlen);
+    if (n < 0) 
+	error("XreadCID");
     write(1,reply,n);
 
     while(1)

@@ -15,24 +15,31 @@
 */
 
 /*
-* GetCID request
+* GetCIDStatus
 */
 
 #include "Xsocket.h"
 #include "Xinit.h"
 
-int XgetCID(int sockfd, char* cDAG, size_t dlen)
+// Called after XgetCID(), it checks whether the requested CID is waiting to be read or still on the way
+// Return value: 1: waiting to be read, 0: waiting for chunk response, -1: failed 
+
+int XgetCIDStatus(int sockfd, char* cDAG, size_t dlen)
 {
         
-	//char buffer[MAXBUFLEN];
-	//struct sockaddr_in their_addr;
-	//socklen_t addr_len;
+	char buffer[2048];
+	struct sockaddr_in their_addr;
+	socklen_t addr_len;
+	char statusbuf[2048];
 
 	struct addrinfo hints, *servinfo,*p;
 	int rv;
 	int numbytes;
-	const char *buf="CID request";//Maybe send more useful information here.
+	const char *buf="CID request status query";//Maybe send more useful information here.
 	int numCIDs = 1;
+	int status = WAITING_FOR_CHUNK;
+	
+	strcpy(statusbuf, "WAITING");
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_INET;
@@ -49,13 +56,14 @@ int XgetCID(int sockfd, char* cDAG, size_t dlen)
 	// protobuf message
 	xia::XSocketMsg xia_socket_msg;
 
-	xia_socket_msg.set_type(xia::XGETCID);
+	xia_socket_msg.set_type(xia::XGETCIDSTATUS);
 
-	xia::X_Getcid_Msg *x_getcid_msg = xia_socket_msg.mutable_x_getcid();
+	xia::X_Getcidstatus_Msg *x_getcidstatus_msg = xia_socket_msg.mutable_x_getcidstatus();
   
-  	x_getcid_msg->set_numcids(numCIDs);
-	x_getcid_msg->set_cdaglist(cDAG);
-	x_getcid_msg->set_payload((const char*)buf, strlen(buf)+1);
+  	x_getcidstatus_msg->set_numcids(numCIDs);
+	x_getcidstatus_msg->set_cdaglist(cDAG);
+	x_getcidstatus_msg->set_status_list(statusbuf);
+	x_getcidstatus_msg->set_payload((const char*)buf, strlen(buf)+1);
 
 	std::string p_buf;
 	xia_socket_msg.SerializeToString(&p_buf);
@@ -64,30 +72,41 @@ int XgetCID(int sockfd, char* cDAG, size_t dlen)
 	freeaddrinfo(servinfo);
 
 	if (numbytes == -1) {
-		perror("Xgetcid(): getcid failed");
+		perror("XgetCIDStatus(): XgetCIDStatus failed");
 		return(-1);
 	}
 
-     /*	 
+     	 
        //Process the reply
         addr_len = sizeof their_addr;
         if ((numbytes = recvfrom(sockfd, buffer, MAXBUFLEN-1 , 0,
                                         (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-                        perror("Xgetcid(): recvfrom");
+                        perror("XgetCIDStatus(): recvfrom");
                         return -1;
         }
 
 	//protobuf message parsing
-	xia_socket_msg.ParseFromString(buffer);
+	xia::XSocketMsg xia_socket_msg1;
+	xia_socket_msg1.ParseFromString(buffer);
 
-	if (xia_socket_msg.type() == xia::XSOCKET_SENDTO) {
-
- 		return numbytes;
+	if (xia_socket_msg1.type() == xia::XGETCIDSTATUS) {
+		
+		    xia::X_Getcidstatus_Msg *x_getcidstatus_msg1 = xia_socket_msg1.mutable_x_getcidstatus();
+		    strcpy(statusbuf,  x_getcidstatus_msg1->status_list().c_str()); 
+		    
+		    if (strcmp(statusbuf, "WAITING") == 0) {
+		    	return WAITING_FOR_CHUNK;
+		    
+		    } else if (strcmp(statusbuf, "READY") == 0) {
+		    	return READY_TO_READ;
+		    	
+		    } else if (strcmp(statusbuf, "FAILED") == 0) {
+		    	return REQUEST_FAILED;
+		    }
 	}
-        return -1; 
-      */
-
-	return numbytes;    
+	
+        return REQUEST_FAILED; 
+      
     
 }
 
