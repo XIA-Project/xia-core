@@ -37,7 +37,7 @@ extern "C" {
 
 #define XSOCK_STREAM 0 // Reliable transport (SID)
 #define XSOCK_DGRAM 1 // Unreliable transport (SID)
-#define XSOCK_CHUNK 1 // Content Chunk transport (CID)
+#define XSOCK_CHUNK 2 // Content Chunk transport (CID)
 
 #define WAITING_FOR_CHUNK 0
 #define READY_TO_READ 1
@@ -59,7 +59,7 @@ struct Netinfo{
 struct cDAGvec {
 	char* cDAG;
 	size_t dlen; 
-	int status; // 1: waiting to be read, 0: waiting for chunk response, -1: failed
+	int status; // 1: ready to be read, 0: waiting for chunk response, -1: failed
 };
 
 //Function list

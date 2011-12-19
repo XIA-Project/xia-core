@@ -70,14 +70,14 @@ int Xconnect(int sockfd, char* dest_DAG)
                         return -1;
         }
         
-        /*
-	int src_port=ntohs(their_addr.sin_port);
-	printf ("src_port=%d \n", src_port);
-	if (src_port==atoi(CLICKCONNECTPORT)) {
- 		return 0;
+
+	//printf("Xconnect return:%s \n", buf);		    
+	if (strcmp(buf, "^Connetion-failed^") == 0) {
+		return -1;	    
+	} else {
+		return 0; 
 	}
-	*/
-	
+        
         return 0; 	    
 
 

@@ -102,6 +102,9 @@ XTRANSPORT::run_timer(Timer *timer)
   		
   		// check if synack waiting
   		if (daginfo->synack_waiting == true && daginfo->expiry <= now ) {
+  		   
+  		    if (daginfo->num_connect_tries <= MAX_CONNECT_TRIES) {
+  		
  			//printf("SYN RETRANSMIT! \n"); 		
 		 	copy = copy_packet(daginfo->syn_pkt);
   			// retransmit syn
@@ -111,7 +114,23 @@ XTRANSPORT::run_timer(Timer *timer)
 			    
 			daginfo->timer_on = true;
     			daginfo->synack_waiting = true;			    
-			daginfo->expiry = now + Timestamp::make_msec(_ackdelay_ms);    	
+			daginfo->expiry = now + Timestamp::make_msec(_ackdelay_ms);  
+			daginfo->num_connect_tries++;  	
+			
+		    } else {
+		    	// Stop sending the connection request & Report the failure to the application
+		    	daginfo->timer_on = false;
+		    	daginfo->synack_waiting = false;
+		    	
+		    	String str=String("^Connetion-failed^");
+			WritablePacket *ppp = WritablePacket::make (256, str.c_str(), str.length(),0);			
+
+			if (DEBUG)
+			    click_chatter("Sent packet to socket with port %d", _sport);                			
+			output(1).push(UDPIPEncap(ppp,_sport,_sport));
+		    	
+		    	
+		    }
   		
   		} else if (daginfo->dataack_waiting == true && daginfo->expiry <= now ) {
  			//printf("DATA RETRANSMIT at (%f) from (%s) \n", (daginfo->expiry).doubleval(), (_local_addr.unparse()).c_str() ); 			
@@ -322,6 +341,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
     			    daginfo.synack_waiting=false;
     			    daginfo.dataack_waiting=false;
     			    daginfo.teardown_waiting=false;
+    			    daginfo.num_connect_tries=0; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
 			  
 			    //Set the socket_type (reliable or not) in DAGinfo
 			    daginfo.sock_type=sock_type;
@@ -445,6 +465,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			    daginfo->base = 0;
 			    daginfo->next_seqnum = 0; 
 			    daginfo->expected_seqnum = 0;
+			    daginfo->num_connect_tries++; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
 			    		    
 
 			    String str_local_addr=_local_addr.unparse_re();
@@ -749,7 +770,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				//click_chatter("Sent packet to network");
 				XIAHeader xiah1(p);
 				String pld((char *)xiah1.payload(), xiah1.plen());
-				printf("\n\n (%s) send (timer set at %f) =%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (daginfo->expiry).doubleval(), pld.c_str(), xiah1.plen());
+				//printf("\n\n (%s) send (timer set at %f) =%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (daginfo->expiry).doubleval(), pld.c_str(), xiah1.plen());
 				output(2).push(p);
 
 				// (for Ack purpose) Reply with a packet with the destination port=source port	

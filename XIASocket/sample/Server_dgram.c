@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
     char * cdag = (char*)malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,CID0) + 1);
     sprintf(cdag, "RE %s %s %s", AD0, HID0,CID0); 
     char* data="Some value stored for CID0";
-    //XputCID(sock,data,strlen(data),0,cdag,strlen(cdag));
+    XputCID(sock,data,strlen(data),0,cdag,strlen(cdag));
 
 
     //Make the sDAG (the one the server listens on)

@@ -39,7 +39,7 @@ int Xrecvfrom(int sockfd, void *buf, size_t len, int flags,
     addr_len = sizeof their_addr;
     if ((numbytes = recvfrom(sockfd, UDPbuf, MAXBUFLEN-1 , flags,
 		    (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-	perror("Xrecvfrom: recvfrom");
+	//perror("Xrecvfrom: recvfrom");
 	return -1;
     }
     int src_port=ntohs(their_addr.sin_port);

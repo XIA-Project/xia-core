@@ -44,6 +44,8 @@ using namespace std;
 
 #define MAX_WIN_SIZE 100
 
+#define MAX_CONNECT_TRIES 30
+
 #define WAITING_FOR_CHUNK 0
 #define READY_TO_READ 1
 #define REQUEST_FAILED -1
@@ -119,6 +121,7 @@ class XTRANSPORT : public Element {
     int sock_type; // 0: Reliable transport (SID), 1: Unreliable transport (SID), 2: Content Chunk transport (CID)
     String sdag;
     String ddag;
+    int num_connect_tries; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
     //Vector<WritablePacket*> pkt_buf;
     WritablePacket *syn_pkt;
     WritablePacket *sent_pkt[MAX_WIN_SIZE];
