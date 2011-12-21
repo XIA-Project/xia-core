@@ -6,16 +6,16 @@
 #include <arpa/inet.h>
 #include <errno.h>
 
-#include "getXIPinfo.h"
+#include "XgetDAGbyname.h"
+
+static char DAG[256];
 
 /*
  * get xia destination DAG
  * returns
- * >0 successful, number of RR's returned
- * -1 no entry found [DNS_NOENTRY]
- * -2 connection failure [DNS_FAILURE]
+ * DAG if successful, NULL otherwise
  */
-int getXIPinfo(XIP_info_t **results, char *host) {
+const char *XgetDAGbyname(char *name) {
 	int dns_sock;
 	struct sockaddr_in dns_addr;
 	char dns_serv[256];
@@ -26,14 +26,12 @@ int getXIPinfo(XIP_info_t **results, char *host) {
 	char *query_buf_offset = query_buf;
 	char *response_buf_offset = response_buf;
 	socklen_t dns_addr_len;
-	int i;
 	char line[512];
 	char *linend;
-	XIP_info_t *answer;
 
 	// first look at /etc/hosts_xia for possible entry
 	FILE *hostsfp = fopen(ETC_HOSTS, "r");
-	int answer_cnt=0;
+	int answer_found = 0;
 	if (hostsfp != NULL) {
 		while (fgets(line, 511, hostsfp) != NULL) {
 			linend = line+strlen(line)-1;
@@ -43,19 +41,16 @@ int getXIPinfo(XIP_info_t **results, char *host) {
 			*(linend+1) = '\0';
 			if (line[0] == '#') {
 				continue;
-			} else if (!strncmp(line, host, strlen(host))
-					   && line[strlen(host)] == ' ') {
-				answer = malloc(sizeof(XIP_info_t));
-				strncpy(answer->dag, line+strlen(host)+1, strlen(line)-strlen(host)-1);
-				answer->dag[strlen(line)-strlen(host)-1] = '\0';
-				answer->next = *results;
-				*results = answer;
-				answer_cnt++;
+			} else if (!strncmp(line, name, strlen(name))
+					   && line[strlen(name)] == ' ') {
+				strncpy(DAG, line+strlen(name)+1, strlen(line)-strlen(name)-1);
+				DAG[strlen(line)-strlen(name)-1] = '\0';
+        answer_found = 1;
 			}
 		}
 		fclose(hostsfp);
-		if (answer_cnt > 0) {
-			return answer_cnt;
+		if (answer_found) {
+      return DAG;
 		}
 	}
 
@@ -63,7 +58,7 @@ int getXIPinfo(XIP_info_t **results, char *host) {
 	FILE *resolvfp = fopen(RESOLV_CONF, "r");
 	char nameserver[256];
 	if (resolvfp == NULL) {
-		return DNS_FAILURE;
+    return NULL;
 	} else {
 		while (fgets(line, 255, resolvfp ) != NULL) {
 			linend = line+strlen(line)-1;
@@ -104,9 +99,9 @@ int getXIPinfo(XIP_info_t **results, char *host) {
 	query_header.arcount = 0;
 
 	// init dns query question
-	query_question.qname = malloc(strlen(host)+2);
-	memset(query_question.qname, 0, strlen(host)+2);
-	nameconv_dnstonorm(query_question.qname, host);
+	query_question.qname = malloc(strlen(name)+2);
+	memset(query_question.qname, 0, strlen(name)+2);
+	nameconv_dnstonorm(query_question.qname, name);
 	query_question.qtype = htons(RR_XIA);
 	query_question.qclass = htons(1);
 
@@ -125,12 +120,12 @@ int getXIPinfo(XIP_info_t **results, char *host) {
 	// send query to dns server
 	if (sendto(dns_sock, query_buf, query_buf_offset-query_buf, 0,
 				(struct sockaddr *) &dns_addr, sizeof(dns_addr)) == -1) {
-		return DNS_FAILURE;
+		return NULL;
 	}
 	// receive response from dns server
 	if (recvfrom(dns_sock, response_buf, 1024, 0,
 				(struct sockaddr *) &dns_addr, &dns_addr_len) == -1) {
-		return DNS_FAILURE;
+		return NULL;
 	}
 
 	// parse out response header data
@@ -140,15 +135,14 @@ int getXIPinfo(XIP_info_t **results, char *host) {
 
 	// no answer found
 	if (ntohs(response_header->ancount) == 0) {
-		return DNS_NOENTRY;
+		return NULL;
 	}
 
 	response_buf_offset += strlen(response_buf_offset)+1;
 	response_buf_offset += 2*sizeof(short);
 
 	// store each XIP info as XIP_info_t linked list
-	for (i=0; i<ntohs(response_header->ancount); i++) {
-		answer = malloc(sizeof(XIP_info_t));
+	if (ntohs(response_header->ancount)) {
 		short rdlength;
 		// offset according to name format
 		// case 1: pointer
@@ -163,27 +157,11 @@ int getXIPinfo(XIP_info_t **results, char *host) {
 		response_buf_offset += 4*sizeof(short);
 		rdlength = ntohs(*((unsigned short *)(response_buf_offset)));
 		response_buf_offset += sizeof(short);
-		memcpy(answer->dag, response_buf_offset, rdlength);
-		answer->dag[rdlength] = '\0';
-		answer->next = *results;
-		*results = answer;
+		memcpy(DAG, response_buf_offset, rdlength);
+		DAG[rdlength] = '\0';
+    return DAG;
 	}
-
-	return ntohs(response_header->ancount);
-}
-
-/*
- * free XIP_info_t data structure allocated by getXIPinfo()
- */
-void freeXIPinfo(XIP_info_t **result) {
-	XIP_info_t *record, *tmp;
-	record = *result;
-	while (record != NULL) {
-		tmp = record->next;
-		free(record);
-		record = tmp;
-	}
-	*result = NULL;
+  return NULL;
 }
 
 void nameconv_dnstonorm(char *dst, char *src) {

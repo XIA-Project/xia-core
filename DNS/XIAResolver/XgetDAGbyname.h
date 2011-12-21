@@ -5,11 +5,6 @@
 #define ETC_HOSTS "/etc/hosts_xia"
 #define RESOLV_CONF "/etc/resolv.xiaconf"
 
-typedef struct XIP_info {
-    char dag[256];
-    struct XIP_info *next;
-} XIP_info_t;
-
 // DNS query header
 typedef struct dns_message_header {
     short id;			// identification
@@ -46,6 +41,6 @@ typedef struct dns_rr {
     char *rdata;		// record data
 } dns_rr_t;
 
-int getXIPinfo(XIP_info_t **result, char *host);
-void freeXIPinfo(XIP_info_t **result);
+const char *XgetDAGbyname(char *name);
 void nameconv_dnstonorm(char *dst, char *src);
+int aaa();
