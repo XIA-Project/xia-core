@@ -4,7 +4,7 @@
 core
 *~
 *.sw?
-!*.swf # allow flash files (for visualizer)
+!/visualizations/local_click/Visualizer.swf
 tags
 cscope.out
 *.o.cmd
