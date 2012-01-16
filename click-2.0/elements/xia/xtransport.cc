@@ -66,7 +66,8 @@ XTRANSPORT::~XTRANSPORT()
     portRxSeqNo.clear();
     portTxSeqNo.clear();
     XIDpairToPort.clear();
-
+	hlim.clear();
+	nxt_xport.clear();
 }
 
 
@@ -156,6 +157,8 @@ XTRANSPORT::run_timer(Timer *timer)
 			portRxSeqNo.erase(_sport);                
 			portTxSeqNo.erase(_sport);
 			portToActive.erase(_sport);
+			hlim.erase(_sport);
+			nxt_xport.erase(_sport);
   		}
   		
   		 	
@@ -350,6 +353,9 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			    portToDAGinfo.set(_sport, daginfo);
 			    
 			    portToActive.set(_sport, true);
+
+				hlim.set(_sport, 250);
+				nxt_xport.set(_sport, CLICK_XIA_NXT_TRN);
 			    
 			    //portRxSeqNo.set(_sport,1);
 			    //portTxSeqNo.set(_sport,1);
@@ -358,7 +364,71 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			    
 
 			    // (for Ack purpose) Reply with a packet with the destination port=source port		
-			    output(1).push(UDPIPEncap(p_in,_sport,_sport));	
+				ReturnResult(_sport, xia::XSOCKET, 0);
+			    // output(1).push(UDPIPEncap(p_in,_sport,_sport));	
+			}
+			break;
+			case xia::XSETSOCKOPT:
+			{
+				// click_chatter("\nSet Socket Option\n");
+			    xia::X_Setsockopt_Msg *x_sso_msg = xia_socket_msg.mutable_x_setsockopt();
+
+				switch (x_sso_msg->opt_type()) 
+				{
+					// FIXME: need real opt type for protobufs
+					case 1:
+					{
+						int hl = x_sso_msg->int_opt();
+						hlim.set(_sport, hl);
+						//click_chatter("sso:hlim:%d\n",hl);
+					}
+					break;
+
+					case 2:
+					{
+						int nxt = x_sso_msg->int_opt();
+						nxt_xport.set(_sport, nxt);
+					}
+					break;
+					
+					default:
+						// unsupported option
+						break;
+				}
+				ReturnResult(_sport, xia::XSETSOCKOPT);
+			}
+			break;
+			case xia::XGETSOCKOPT:
+			{
+				// click_chatter("\nGet Socket Option\n");
+			    xia::X_Getsockopt_Msg *x_sso_msg = xia_socket_msg.mutable_x_getsockopt();
+
+				// click_chatter("opt = %d\n", x_sso_msg->opt_type());
+				switch (x_sso_msg->opt_type()) 
+				{
+					// FIXME: need real opt type for protobufs
+					case 1:
+					{
+						x_sso_msg->set_int_opt(hlim.get(_sport));
+						//click_chatter("gso:hlim:%d\n", hlim.get(_sport));
+					}
+					break;
+					
+					case 2:
+					{
+						x_sso_msg->set_int_opt(nxt_xport.get(_sport));
+					}
+					break;
+
+					default:
+						// unsupported option
+						break;
+				}
+			    std::string p_buf;
+			    xia_socket_msg.SerializeToString(&p_buf);
+
+			    WritablePacket *reply= WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
+			    output(1).push(UDPIPEncap(reply,_sport,_sport));
 			}
 			break;
 		    case xia::XBIND:
@@ -383,7 +453,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			    daginfo->src_path.parse(sdag_string);
 			    daginfo->nxt=-1;
 			    daginfo->last=-1;
-			    daginfo->hlim=250;
+			    daginfo->hlim=hlim.get(_sport);
 			    daginfo->isConnected=false;
 			    daginfo->initialized=true;
 			    daginfo->sdag = sdag_string;
@@ -404,7 +474,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			    //portRxSeqNo.set(_sport,portRxSeqNo.get(_sport)+1);//Increment counter
 
 			    // (for Ack purpose) Reply with a packet with the destination port=source port		
-			    //output(1).push(UDPIPEncap(p_in,_sport,_sport));
+				ReturnResult(_sport, xia::XBIND);
 			    break;
 			}
 		    case xia::XCLOSE:
@@ -425,6 +495,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			    portToDAGinfo.set(_sport,*daginfo);
 			    
 			    // (for Ack purpose) Reply with a packet with the destination port=source port		
+				ReturnResult(_sport, xia::XCLOSE);
 			    //output(1).push(UDPIPEncap(p_in,_sport,_sport));
 			}
 			break;
@@ -481,8 +552,8 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 			    daginfo->nxt=-1;
 			    daginfo->last=-1;
-			    daginfo->hlim=250;
-
+			    daginfo->hlim=hlim.get(_sport);
+	
 			    XID source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
 			    XID destination_xid = daginfo->dst_path.xid(daginfo->dst_path.destination_node());
 			    
@@ -506,7 +577,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			    XIAHeaderEncap xiah;
 			    xiah.set_nxt(CLICK_XIA_NXT_TRN);
 			    xiah.set_last(-1);
-			    xiah.set_hlim(250);
+			    xiah.set_hlim(hlim.get(_sport));
 			    xiah.set_dst_path(dst_path);
 			    xiah.set_src_path(daginfo->src_path);
 
@@ -555,6 +626,8 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		    case xia::XACCEPT:
 			{
 			    //click_chatter("\n\nOK: SOCKET ACCEPT !!!\\n");
+				hlim.set(_sport, 250);
+				nxt_xport.set(_sport, CLICK_XIA_NXT_TRN);
 			    
 			    if (!pending_connection_buf.empty()) {
 			    
@@ -564,6 +637,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			    	daginfo.seq_num = 0;
 			    	daginfo.ack_num = 0;
 			    	daginfo.base = 0;
+					daginfo.hlim = hlim.get(_sport);
 			    	daginfo.next_seqnum = 0; 
 			    	daginfo.expected_seqnum = 0;
 			    	
@@ -585,14 +659,12 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			    	
 			    	pending_connection_buf.pop();
 			
+					ReturnResult(_sport, xia::XACCEPT);
 			    } else {
+					// FIXME: what error code should be returned?
+					ReturnResult(_sport, xia::XACCEPT, -1, ECONNABORTED);
 			    	click_chatter("\n Xaccept: error\n");
 			    }
-			    
-			       
-
-			    // (for Ack purpose) Reply with a packet with the destination port=source port		
-			    //output(1).push(UDPIPEncap(p_in,_sport,_sport));
 			}
 			break;
 
@@ -681,7 +753,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		switch(xia_socket_msg.type()) { 
 		    case xia::XSEND:
 			{
-			    //click_chatter("\n\nOK: SOCKET DATA !!!\\n");
+			    //click_chatter("\nOK: SOCKET DATA !!!\n");
 
 			    xia::X_Send_Msg *x_send_msg = xia_socket_msg.mutable_x_send();
 
@@ -711,7 +783,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				    WritablePacket *p2 = WritablePacket::make (256, str.c_str(), str.length(),0);
 				    xiah.set_nxt(22);
 				    xiah.set_last(-1);
-				    xiah.set_hlim(250);
+				    xiah.set_hlim(hlim.get(_sport));
 				    xiah.set_dst_path(daginfo->dst_path);
 				    xiah.set_src_path(daginfo->src_path);
 
@@ -729,7 +801,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				XIAHeaderEncap xiah;
 				xiah.set_nxt(CLICK_XIA_NXT_TRN);
 				xiah.set_last(-1);
-				xiah.set_hlim(250);
+				xiah.set_hlim(hlim.get(_sport));
 				xiah.set_dst_path(daginfo->dst_path);
 				xiah.set_src_path(daginfo->src_path);
 				xiah.set_plen(pktPayloadSize);
@@ -774,20 +846,11 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				output(2).push(p);
 
 				// (for Ack purpose) Reply with a packet with the destination port=source port	
-				// protobuf message
-				/*
-				   xia::XSocketMsg xia_socket_msg_response;
-
-				   xia_socket_msg_response.set_type(xia::XSOCKET_SENDTO);
-
-				   std::string p_buf2;
-				   xia_socket_msg.SerializeToString(&p_buf2);
-				   WritablePacket *reply= WritablePacket::make(256, p_buf2.c_str(), p_buf2.size(), 0);
-				   output(1).push(UDPIPEncap(reply,_sport,_sport));    
-				 */	
-
-			    } else
-				click_chatter("Not 'connect'ed: you may need to use 'sendto()'");
+				ReturnResult(_sport, xia::XSEND);
+			    } else {
+					ReturnResult(_sport, xia::XSEND, -1, ENOTCONN);
+					click_chatter("Not 'connect'ed: you may need to use 'sendto()'");
+				}
 			}
 			break;
 		case xia::XSENDTO:
@@ -826,7 +889,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				daginfo->src_path.parse_re(str_local_addr);
 				
 				daginfo->last=-1;
-				daginfo->hlim=250;
+				daginfo->hlim=hlim.get(_sport);
 
 				XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
 
@@ -851,42 +914,45 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 			    //Add XIA headers
 			    XIAHeaderEncap xiah;
-			    xiah.set_nxt(CLICK_XIA_NXT_TRN);
+				
 			    xiah.set_last(-1);
-			    xiah.set_hlim(250);
+			    xiah.set_hlim(hlim.get(_sport));
 			    xiah.set_dst_path(dst_path);
 			    xiah.set_src_path(daginfo->src_path);
-			    xiah.set_plen(pktPayloadSize);
 	
 			    WritablePacket *just_payload_part= WritablePacket::make(p_in->headroom()+1, (const void*)x_sendto_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
 
 			    WritablePacket *p = NULL;
 
-			    //p = xiah.encap(just_payload_part, true);
-			    //printf("payload=%s len=%d \n", x_sendto_msg->payload().c_str(), pktPayloadSize);		
+				// FIXME: shouldn't be a raw number
+				if (daginfo->sock_type == 3) {
+			    	xiah.set_nxt(nxt_xport.get(_sport));
+			
+					// FIXME: should this be 0 or the size of the header we're adding?
+					xiah.set_plen(pktPayloadSize);
+
+
+			    	p = xiah.encap(just_payload_part, false);
+
+				} else {
+			    	xiah.set_nxt(CLICK_XIA_NXT_TRN);
+			    	xiah.set_plen(pktPayloadSize);
+
+			    	//p = xiah.encap(just_payload_part, true);
+			    	//printf("payload=%s len=%d \n", x_sendto_msg->payload().c_str(), pktPayloadSize);		
 				
-			    //Add XIA Transport headers
-			    TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDGRAMHeader(0); // length 
-			    p = thdr->encap(just_payload_part); 
-			    p = xiah.encap(p, false);
-			    xiah.set_plen(pktPayloadSize);
-			    delete thdr;			
+			    	//Add XIA Transport headers
+			    	TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDGRAMHeader(0); // length 
+			    	p = thdr->encap(just_payload_part); 
+			    	p = xiah.encap(p, false);
+			    	xiah.set_plen(pktPayloadSize);
+			    	delete thdr;			
+				}
 			    			       
 			    output(2).push(p);
 			    
 			    // (for Ack purpose) Reply with a packet with the destination port=source port	
-			    // protobuf message
-			    /*
-			       xia::XSocketMsg xia_socket_msg_response;
-
-			       xia_socket_msg_response.set_type(xia::XSOCKET_SENDTO);
-
-			       std::string p_buf2;
-			       xia_socket_msg.SerializeToString(&p_buf2);
-			       WritablePacket *reply= WritablePacket::make(256, p_buf2.c_str(), p_buf2.size(), 0);
-			       output(1).push(UDPIPEncap(reply,_sport,_sport));    
-			     */		        		
-
+				ReturnResult(_sport, xia::XSENDTO);
 			}
 			break;
 			
@@ -945,7 +1011,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				daginfo->src_path.parse_re(str_local_addr);
 				
 				daginfo->last=-1;
-				daginfo->hlim=250;
+				daginfo->hlim=hlim.get(_sport);
 
 				XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
 
@@ -972,7 +1038,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			XIAHeaderEncap xiah;
 			xiah.set_nxt(CLICK_XIA_NXT_CID);
 			xiah.set_last(-1);
-			xiah.set_hlim(250);
+			xiah.set_hlim(hlim.get(_sport));
 			xiah.set_dst_path(dst_path);
 			xiah.set_src_path(daginfo->src_path);
 			xiah.set_plen(pktPayloadSize);
@@ -1263,7 +1329,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			    //Add XIA headers
 			    XIAHeaderEncap xiah;
 			    xiah.set_last(-1);
-			    xiah.set_hlim(250);
+			    xiah.set_hlim(hlim.get(_sport));
 			    xiah.set_dst_path(_local_addr);
 			    xiah.set_src_path(src_path);
 			    xiah.set_nxt(CLICK_XIA_NXT_CID);
@@ -1710,6 +1776,22 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
     }
 
+}
+
+void XTRANSPORT::ReturnResult(int sport, xia::XSocketCallType type, int rc, int err)
+{
+//	click_chatter("sport=%d type=%d rc=%d err=%d\n", sport, type, rc, err);
+	xia::XSocketMsg xia_socket_msg_response;
+	xia_socket_msg_response.set_type(xia::XRESULT);
+	xia::X_Result_Msg *x_result = xia_socket_msg_response.mutable_x_result();
+	x_result->set_type(type);
+	x_result->set_return_code(rc);
+	x_result->set_err_code(err);
+
+	std::string p_buf;
+	xia_socket_msg_response.SerializeToString(&p_buf);
+	WritablePacket *reply= WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
+	output(1).push(UDPIPEncap(reply,sport,sport));
 }
 
 Packet *
