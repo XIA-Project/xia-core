@@ -2,10 +2,12 @@
 CC=g++
 LD=g++
 CFLAGS=-c -Wall -Wextra -I../minini
-LDFLAGS =  -lprotobuf
-SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XgetCID.c  XgetCIDList.c  XgetCIDStatus.c  XgetCIDListStatus.c XreadCID.c  XputCID.c Xrecv.c\
-        Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c Xgetsocketidlist.c Xgetsocketinfo.c ../minini/minIni.c
-
+LDFLAGS =-lprotobuf
+SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XgetCID.c  XgetCIDList.c  \
+		XgetCIDStatus.c  XgetCIDListStatus.c XreadCID.c  XputCID.c Xrecv.c \
+        Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c Xgetsocketidlist.c  \
+		Xsetsockopt.c Xutil.c Xgetsocketinfo.c \
+		../minini/minIni.c 
 SHARED_OBJECTS=$(SOURCES:.c=.shared.o) xia.pb.shared.o
 STATIC_OBJECTS=$(SOURCES:.c=.o) xia.pb.o
 
@@ -30,7 +32,11 @@ libXsocket.a: $(STATIC_OBJECTS)
 libXsocket.so: $(SHARED_OBJECTS) 
 	$(LD) -shared -o $@ $(SHARED_OBJECTS) $(LDFLAGS) -lc  -l dl
 
+doc: Xdoc.h $(SOURCES)
+	doxygen XsocketsAPI.cfg
+
 clean:
 	rm -f *.o *.a *.so *.shared.o xia.pb.*
+	rm -rf doc
 	make -C swig clean
 
