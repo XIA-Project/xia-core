@@ -1,3 +1,4 @@
+/* ts=4 */
 /*
 ** Copyright 2011 Carnegie Mellon University
 **
@@ -13,73 +14,67 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
+/*!
+** @file Xconnect.c
+** @brief implements Xclose
+*/
 
 #include "Xsocket.h"
 #include "Xinit.h"
+#include "Xutil.h"
 
-
+/*!
+** @brief Close an Xsocket.
+**
+** Connect to a remote XIA SID socket.
+** This is only valid on sockets create with the XSOCK_STREAM transport 
+** type.
+**
+** @param sockfd	The control socket
+** @param dest_DAG	The DAG of the remote service to connect to.
+**
+** @returns 0 on success
+** @returns -1 on error with errno set
+*/
 int Xconnect(int sockfd, char* dest_DAG)
 {
+	int rc;
 
-   	struct addrinfo hints, *servinfo, *p;
-	int rv;
 	int numbytes;
 	char buf[MAXBUFLEN];
 	struct sockaddr_in their_addr;
 	socklen_t addr_len;
 	
-	//Send a control packet to inform Click of connect request
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_DGRAM;
+	// FIXME: should we be checking to ensure the dest dag is a SID?
+	// FIXME: check to ensure sockfd is a stream socket
 
-	if ((rv = getaddrinfo(CLICKCONTROLADDRESS, CLICKCONTROLPORT, &hints, &servinfo)) != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XCONNECT);
+
+	xia::X_Connect_Msg *x_connect_msg = xsm.mutable_x_connect();
+	x_connect_msg->set_ddag(dest_DAG);
+
+	// In Xtransport: send SYN to destination server
+	if ((rc = click_control(sockfd, &xsm)) < 0)
+		return -1;
+
+	// Waiting for SYNACK from destination server
+
+	// FIXME: make this use protobufs
+#if 1	
+	addr_len = sizeof their_addr;
+	if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
+			(struct sockaddr *)&their_addr, &addr_len)) == -1) {
+		perror("Xconnect: recvfrom");
 		return -1;
 	}
 
-	p=servinfo;
-
-	// protobuf message
-	xia::XSocketMsg xia_socket_msg;
-
-	xia_socket_msg.set_type(xia::XCONNECT);
-
-	xia::X_Connect_Msg *x_connect_msg = xia_socket_msg.mutable_x_connect();
-	x_connect_msg->set_ddag(dest_DAG);
-
-	std::string p_buf;
-	xia_socket_msg.SerializeToString(&p_buf);
-
-	// In Xtransport: send SYN to destination server
-	numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0,
-					p->ai_addr, p->ai_addrlen);
-	freeaddrinfo(servinfo);
-
-	if (numbytes == -1) {
-		perror("Xconnect(): sendto failed");
-		return(-1);
-	}
-
-
-        // Waiting for SYNACK from destination server
-        addr_len = sizeof their_addr;
-        if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
-                                        (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-                        perror("Xconnect: recvfrom");
-                        return -1;
-        }
-        
-
-	//printf("Xconnect return:%s \n", buf);		    
+	// printf("Xconnect return:%s \n", buf);		    
 	if (strcmp(buf, "^Connetion-failed^") == 0) {
 		return -1;	    
 	} else {
 		return 0; 
 	}
-        
-        return 0; 	    
-
-
+#endif
 }
 

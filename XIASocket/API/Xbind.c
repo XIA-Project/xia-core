@@ -1,3 +1,4 @@
+/* ts=4 */
 /*
 ** Copyright 2011 Carnegie Mellon University
 **
@@ -13,76 +14,57 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
+/*!
+** @file Xbind.c
+** @brief implements Xbind
+*/
 
 #include "Xsocket.h"
 #include "Xinit.h"
+#include "Xutil.h"
+#include <errno.h>
 
-
+/*!
+** @brief Bind an Xsocket to a DAG.
+**
+** Causes click to tear down the underlying XIA socket and also closes the UDP
+** socket used to talk to click.
+**
+** @param sockfd	The control socket
+** @param sDAG		The source service (local) DAG
+**
+** @returns 0 on success
+** @returns -1 on error with errno set
+*/
 int Xbind(int sockfd, char* Sdag)
 {
+	xia::XSocketCallType type;
+	int rc;
 
-   	struct addrinfo hints, *servinfo, *p;
-	int rv;
-	int numbytes;
-
-	//char buf[MAXBUFLEN];
-	//struct sockaddr_in their_addr;
-	//socklen_t addr_len;
- 
-	//Send a control packet to inform Click of bind request
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_DGRAM;
-
-
-	if ((rv = getaddrinfo(CLICKCONTROLADDRESS, CLICKCONTROLPORT, &hints, &servinfo)) != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+	if (!Sdag) {
+		LOG("Sdag is NULL!");
+		errno = EFAULT;
 		return -1;
 	}
 
-	p=servinfo;
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XBIND);
 
-	// protobuf message
-	xia::XSocketMsg xia_socket_msg;
-
-	xia_socket_msg.set_type(xia::XBIND);
-
-	xia::X_Bind_Msg *x_bind_msg = xia_socket_msg.mutable_x_bind();
-
+	xia::X_Bind_Msg *x_bind_msg = xsm.mutable_x_bind();
 	x_bind_msg->set_sdag(Sdag);
 
-	std::string p_buf;
-	xia_socket_msg.SerializeToString(&p_buf);
+	if ((rc = click_control(sockfd, &xsm)) < 0)
+		return -1;
 
+	// process the reply from click
+	rc = click_reply2(sockfd, &type);
 
-	numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0,
-					p->ai_addr, p->ai_addrlen);
-	freeaddrinfo(servinfo);
-
-	if (numbytes == -1) {
-		perror("Xbind(): sendto failed");
-		return(-1);
+	if (type != xia::XBIND) {
+		// something bad happened
+		LOGF("Expected type %d, got %d", xia::XBIND, type);
+		// what do we do in this case?
 	}
 
-/*    
-        //Process the reply
-        addr_len = sizeof their_addr;
-        if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
-                                        (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-                        perror("Xbind: recvfrom");
-                        return -1;
-        }
-
-	//protobuf message parsing
-	xia_socket_msg.ParseFromString(buf);
-	if (xia_socket_msg.type() == xia::XSOCKET_BIND) {
- 		return 0;
-	}
-
-        return -1; 
-      */
-
-	return numbytes;
-
+	// if rc is negative, errno will be set with an appropriate error code
+	return rc;
 }
-

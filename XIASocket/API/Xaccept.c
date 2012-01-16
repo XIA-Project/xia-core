@@ -1,3 +1,4 @@
+/* ts=4 */
 /*
 ** Copyright 2011 Carnegie Mellon University
 **
@@ -13,89 +14,79 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
+/*!
+** @file Xaccept.c
+** @brief implements Xaccept
+*/
 
 #include "Xsocket.h"
 #include "Xinit.h"
+#include "Xutil.h"
 
+/*!
+** @brief The Xaccept system call is is only valid with Xsockets created with
+** the XSOCK_STREAM tranport type. It accepts the first availble connection
+** request for the listening socket, sockfd, creates a new connected socket, 
+** and returns a new Xsocket descriptor referring to that socket. The newly 
+** created socket is not in the listening state. The original socket 
+** sockfd is unaffected by this call.
+
+** @note Unlike standard sockets, there is currently no Xlisten function. 
+** Callers must create the listening socet by calling Xsocket with the 
+** XSOCK_STREAM transport_type and bind it to a source DAG with Xbind. XAccept
+** may then be called to wait for connections.
+**
+** @param sockfd	The control socket
+**
+** @returns a non-negative integer that is the new Xsocket id
+** @returns -1 on error with errno set
+*/
 int Xaccept(int sockfd)
 {
 	// Xaccept accepts the connection, creates new socket, and returns it.
 
-   	struct addrinfo hints, *servinfo, *p;
 	int rv;
 	int numbytes;
 	char buf[MAXBUFLEN];
-	struct sockaddr_in my_addr, their_addr;
+	struct sockaddr_in their_addr;
 	socklen_t addr_len;
-	int new_sockfd,tries;
+	int new_sockfd;
+	xia::XSocketCallType type;
 	
-        // Wait for connection from client
-        addr_len = sizeof their_addr;
-        if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
-                                        (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-                        perror("Xaccept: error 1");
-                        return -1;
-        }
+	// Wait for connection from client
+	addr_len = sizeof their_addr;
+	if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
+                    (struct sockaddr *)&their_addr, &addr_len)) == -1) {
+		perror("Xaccept: error 1");
+		return -1;
+	}
         
-        /*
-	int src_port=ntohs(their_addr.sin_port);
-	//printf ("src_port=%d \n", src_port);
-	if (src_port!=atoi(CLICKACCEPTPORT)) {
-		perror("Xaccept: error 2");
- 		return -1;
-	}	
-	*/
-	
 	// Create new socket (this is a socket between API and Xtransport)
-	int port;
 
 	if ((new_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		perror("Xsocket listener: socket");
 		return -1;
 	}
 
-	//If port is in use, try next port until success, or max ATTEMPTS reached
-	srand((unsigned)time(0));
-	rv=-1;
-	for (tries=0;tries<ATTEMPTS;tries++)
-	{
-		int rn = rand();
-		port=1025 + rn % (65535 - 1024); 
-		my_addr.sin_family = PF_INET;
-		my_addr.sin_addr.s_addr = inet_addr(MYADDRESS);
-		my_addr.sin_port = htons(port);
-		rv=bind(new_sockfd, (const struct sockaddr *)&my_addr, sizeof(my_addr));
-		if (rv != -1)
-			break;
-	}
+	rv = bind_to_random_port(new_sockfd);
 	if (rv == -1) {
 		close(new_sockfd);
 		perror("Xsocket listener: bind");
 		return -1;
 	}	
-	//printf("my port=%d \n", port);
 	
 	// Do actual binding in Xtransport
-	their_addr.sin_family = PF_INET;
-	their_addr.sin_addr.s_addr = inet_addr(CLICKCONTROLADDRESS);
-	their_addr.sin_port = htons(atoi(CLICKCONTROLPORT));	
-	
-	// protobuf message
-	xia::XSocketMsg xia_socket_msg;
 
+	xia::XSocketMsg xia_socket_msg;
 	xia_socket_msg.set_type(xia::XACCEPT);
-	std::string p_buf;
-	xia_socket_msg.SerializeToString(&p_buf);
-		
-	
-	if ((numbytes = sendto(new_sockfd, p_buf.c_str(), p_buf.size(), 0,
-					(const struct sockaddr *)&their_addr, sizeof(their_addr))) == -1) {
-		perror("Xaccept(): error 3");
-		return(-1);
-	}	
-	 
+
+	click_control(new_sockfd, &xia_socket_msg);
+
+	if (click_reply2(new_sockfd, &type) < 0) {
+		close(new_sockfd);
+		perror("XAccept failure: ");
+		return -1;
+	}
 
 	return new_sockfd;
-
 }
-

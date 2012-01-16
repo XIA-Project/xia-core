@@ -1,3 +1,4 @@
+/* ts=4 */
 /*
 ** Copyright 2011 Carnegie Mellon University
 **
@@ -21,68 +22,52 @@
 
 #include "Xsocket.h"
 #include "Xinit.h"
+#include "Xutil.h"
+#include "errno.h"
 
-int Xsend(int sockfd,const void *buf, size_t len, int /*flags*/)
+int Xsend(int sockfd, const void *buf, size_t len, int /*flags*/)
 {
+	xia::XSocketCallType type;
+	int rc;
 
-	struct addrinfo hints, *servinfo,*p;
-	int rv;
-	int numbytes;
+	if (len == 0)
+		return 0;
 
-	//char buffer[MAXBUFLEN];
-	//struct sockaddr_in their_addr;
-	//socklen_t addr_len;
-
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_DGRAM;
-
-
-	if ((rv = getaddrinfo(CLICKDATAADDRESS, CLICKDATAPORT, &hints, &servinfo)) != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+	if (!buf) {
+		LOG("buffer pointer is null!\n");
+		errno = EFAULT;
 		return -1;
 	}
 
-	p=servinfo;
+	// FIXME: validate socket
 
-	// protobuf message
-	xia::XSocketMsg xia_socket_msg;
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XSEND);
 
-	xia_socket_msg.set_type(xia::XSEND);
-
-	xia::X_Send_Msg *x_send_msg = xia_socket_msg.mutable_x_send();
+	xia::X_Send_Msg *x_send_msg = xsm.mutable_x_send();
 	x_send_msg->set_payload((const char*)buf, len);
 
-	std::string p_buf;
-	xia_socket_msg.SerializeToString(&p_buf);
+	// send the protobuf containing the user data to click
+	if ((rc = click_data(sockfd, &xsm)) < 0)
+		return -1;
 
-	numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0, p->ai_addr, p->ai_addrlen);
-	freeaddrinfo(servinfo);
+	// process the reply from click
+	rc = click_reply2(sockfd, &type);
 
-	if (numbytes == -1) {
-		perror("Xsend(): sendto failed");
-		return(-1);
+	if (type != xia::XSEND) {
+		// something bad happened
+		LOGF("Expected type %d, got %d", xia::XSEND, type);
+		// what do we do in this case?
 	}
 
-      /*
-        //Process the reply
-        addr_len = sizeof their_addr;
-        if ((numbytes = recvfrom(sockfd, buffer, MAXBUFLEN-1 , 0,
-                                        (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-                        perror("Xsend(): recvfrom");
-                        return -1;
-        }
-
-	//protobuf message parsing
-	xia_socket_msg.ParseFromString(buffer);
-
-	if (xia_socket_msg.type() == xia::XSOCKET_DATA) {
-
- 		return numbytes;
+	if (rc < 0) {
+		// if negative, errno will be set with an appropriate error code
+		return -1;
+	}else if (rc == 0) {
+		// everything went fine, tell caller we sent the whole buffer
+		return len;
 	}
 
-        return -1; 
-      */
-	return numbytes;
-
+	// not sure we'll ever get here
+	return rc;
 }
