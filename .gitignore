@@ -4,6 +4,7 @@
 core
 *~
 *.sw?
+!/visualizations/local_click/Visualizer.swf
 tags
 cscope.out
 *.o.cmd
