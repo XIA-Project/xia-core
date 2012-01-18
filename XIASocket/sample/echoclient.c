@@ -182,8 +182,9 @@ char *randomString(char *buf, int size)
 
 	if (!(--refresh)) {
 		// refresh rand every now and then so it doesn't degenerate too much
+		//  use a prime number to keep it interesting
 		srand(time(NULL));
-		refresh = 1000;
+		refresh = 997;
 	}
 	for (i = 0; i < size - 1; i ++) {
 		buf[i] = filler[rand() % samples];
@@ -221,7 +222,7 @@ int process(int sock)
 	say("Xsock %4d received %d bytes\n", sock, received);
 
 	if (sent != received || strcmp(buf1, buf2) != 0)
-		warn("Xsock %4d received data different from sent data! (bytes sent/recv'd: %d/%d\n", 
+		warn("Xsock %4d received data different from sent data! (bytes sent/recv'd: %d/%d)\n", 
 				sock, sent, received);
 
 	return 0;
