@@ -231,7 +231,7 @@ XTRANSPORT::copy_packet(Packet *p) {
 	TransportHeader thdr(p);
 	TransportHeaderEncap *new_thdr = new TransportHeaderEncap(thdr.type(), thdr.pkt_info(), thdr.seq_num(), thdr.ack_num(), thdr.length());
 	
-	WritablePacket *copy = WritablePacket::make(256, xiahdr.payload(), xiahdr.plen(), 20);
+	WritablePacket *copy = WritablePacket::make(256, thdr.payload(), xiahdr.plen()-thdr.hlen(), 20);
 	
 	copy = new_thdr->encap(copy);
 	copy = xiah.encap(copy,false);
