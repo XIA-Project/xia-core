@@ -455,9 +455,13 @@ elementclass EndHost {
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
     Script(write n/proc/rt_IP/rt.add - 0); 	// default route for IPv4    
 
+    c :: Classifier(01/0F, -); // XCMP
+    x :: XCMP($local_addr);
+
     input[0] -> n;
     srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
-    n[1] -> srcTypeClassifier[1] -> [2]xtransport[2] ->  [0]n;
+    n[1] -> c[1] -> srcTypeClassifier[1] -> [2]xtransport[2] ->  [0]n;
+    c[0] -> IPPrint("going into XCMP Module", CONTENTS HEX) -> x -> [0]n;
     srcTypeClassifier[0] -> Discard;    // do not send CID responses directly to RPC;
     
     n[2] -> [0]cache[0] -> [1]n;
