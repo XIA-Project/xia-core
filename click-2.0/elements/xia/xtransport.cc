@@ -67,6 +67,7 @@ XTRANSPORT::~XTRANSPORT()
     portTxSeqNo.clear();
     XIDpairToPort.clear();
 	hlim.clear();
+	xcmp_listeners.clear();
 	nxt_xport.clear();
 }
 
@@ -159,6 +160,7 @@ XTRANSPORT::run_timer(Timer *timer)
 			portToActive.erase(_sport);
 			hlim.erase(_sport);
 			nxt_xport.erase(_sport);
+			xcmp_listeners.remove(_sport);
   		}
   		
   		 	
@@ -234,12 +236,13 @@ XTRANSPORT::copy_packet(Packet *p) {
 	TransportHeader thdr(p);
 	TransportHeaderEncap *new_thdr = new TransportHeaderEncap(thdr.type(), thdr.pkt_info(), thdr.seq_num(), thdr.ack_num(), thdr.length());
 	
-	WritablePacket *copy = WritablePacket::make(256, xiahdr.payload(), xiahdr.plen(), 20);
+	WritablePacket *copy = WritablePacket::make(256, thdr.payload(), xiahdr.plen()-thdr.hlen(), 20);
 	
 	copy = new_thdr->encap(copy);
+
 	copy = xiah.encap(copy,false);
 	delete new_thdr;
-	xiah.set_plen(xiahdr.plen());
+//////	xiah.set_plen(xiahdr.plen());
 
 	return copy;
 }    		
@@ -388,6 +391,10 @@ void XTRANSPORT::push(int port, Packet *p_input)
 					{
 						int nxt = x_sso_msg->int_opt();
 						nxt_xport.set(_sport, nxt);
+						if (nxt == CLICK_XIA_NXT_XCMP)
+							xcmp_listeners.push_back(_sport);
+						else
+							xcmp_listeners.remove(_sport);
 					}
 					break;
 					
@@ -587,14 +594,18 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 			    WritablePacket *p = NULL;			    
 			     
-			    xiah.set_plen(strlen(dummy));
-				
+//////			    xiah.set_plen(strlen(dummy));
+//////				
 			    TransportHeaderEncap *thdr = TransportHeaderEncap::MakeSYNHeader( 0, -1, 0); // #seq, #ack, length
 			    
 			    p = thdr->encap(just_payload_part); 
+
+				thdr->update();
+				xiah.set_plen(strlen(dummy) + thdr->hlen()); // XIA payload = transport header + transport layer data
+
 			    p = xiah.encap(p, false);
 			    delete thdr;
-			    xiah.set_plen(strlen(dummy));
+//////			    xiah.set_plen(strlen(dummy));
 			    
 			    // Set timer 
 			    daginfo->timer_on = true;
@@ -817,8 +828,12 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				//Add XIA Transport headers
 			    	TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDATAHeader(daginfo->next_seqnum, daginfo->ack_num, 0 ); // #seq, #ack, length 	
 			    	p = thdr->encap(just_payload_part); 
+
+					thdr->update();
+					xiah.set_plen(pktPayloadSize + thdr->hlen()); // XIA payload = transport header + transport-layer data
+
 			    	p = xiah.encap(p, false);
-			    	xiah.set_plen(pktPayloadSize);
+//////			    	xiah.set_plen(pktPayloadSize);
 			    	delete thdr;
 			    	
 			    	// Store the packet into buffer
@@ -944,8 +959,12 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			    	//Add XIA Transport headers
 			    	TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDGRAMHeader(0); // length 
 			    	p = thdr->encap(just_payload_part); 
+
+					thdr->update();
+					xiah.set_plen(pktPayloadSize + thdr->hlen()); // XIA payload = transport header + transport-layer data
+
 			    	p = xiah.encap(p, false);
-			    	xiah.set_plen(pktPayloadSize);
+//////			    	xiah.set_plen(pktPayloadSize);
 			    	delete thdr;			
 				}
 			    			       
@@ -1394,7 +1413,28 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		//printf("\n\n (%s) Received=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), pld.c_str(), xiah.plen());
 
 		TransportHeader thdr(p_in);
-		if (thdr.type() == TransportHeader::XSOCK_STREAM) {
+
+		if (xiah.nxt() == CLICK_XIA_NXT_XCMP) {
+			// strip off the header and make a writable packet
+
+			String src_path=xiah.src_path().unparse();
+			String payload((const char*)thdr.payload(), xiah.plen()- thdr.hlen());
+			String str=src_path;
+			str=str+String("^");
+			str=str+payload;
+			WritablePacket *xcmp_pkt = WritablePacket::make (256, str.c_str(), str.length(),0);
+
+			list<int>::iterator i;
+
+			for (i = xcmp_listeners.begin(); i != xcmp_listeners.end(); i++) {
+				int port = *i;
+				output(1).push(UDPIPEncap(xcmp_pkt, port, port));
+			}
+			p_in->kill();
+			break;
+
+
+		} else if (thdr.type() == TransportHeader::XSOCK_STREAM) {
 					
 			if (thdr.pkt_info() == TransportHeader::SYN) {
 				// Connection request from client...
@@ -1444,9 +1484,13 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			    	//click_chatter("Sent packet to network");
 
 			    	TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeSYNACKHeader( 0, 0, 0); // #seq, #ack, length 
+
+					thdr_new->update();
+					xiah_new.set_plen(strlen(dummy) + thdr_new->hlen()); // XIA payload = transport header + transport-layer data
+
 			    	p = thdr_new->encap(just_payload_part); 
 			    	p = xiah_new.encap(p, false);
-			    	xiah_new.set_plen(strlen(dummy));
+//////			    	xiah_new.set_plen(strlen(dummy));
 			    	delete thdr_new;
 			    	XIAHeader xiah1(p);
 			        //String pld((char *)xiah1.payload(), xiah1.plen());	
@@ -1526,9 +1570,13 @@ void XTRANSPORT::push(int port, Packet *p_input)
 	
 				    	TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeACKHeader( 0, daginfo->expected_seqnum, 0); // #seq, #ack, length 
 				    	p = thdr_new->encap(just_payload_part); 
+
+					thdr_new->update();
+					xiah_new.set_plen(strlen(dummy) + thdr_new->hlen()); // XIA payload = transport header + transport-layer data
+
 				    	p = xiah_new.encap(p, false);
 				    	delete thdr_new;
-				  	xiah_new.set_plen(strlen(dummy));
+//////				  	xiah_new.set_plen(strlen(dummy));
 				  	XIAHeader xiah1(p);
 				  	String pld((char *)xiah1.payload(), xiah1.plen());
 				  	//printf("\n\n (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), pld.c_str(), xiah1.plen());
@@ -1605,8 +1653,8 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		} else if (thdr.type() == TransportHeader::XSOCK_DGRAM) {
 
 			_dport= XIDtoPort.get(_destination_xid);
-		}
-		
+
+		}	
 
 	
 
@@ -1634,7 +1682,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		    	
 			//Unparse dag info
 			String src_path=xiah.src_path().unparse();
-			String payload((const char*)xiah.payload(), xiah.plen());
+			String payload((const char*)thdr.payload(), xiah.plen()- thdr.hlen());
 			String str=src_path;
 			if (DEBUG) click_chatter("src_path %s (len %d)", src_path.c_str(), strlen(src_path.c_str()));
 			str=str+String("^");

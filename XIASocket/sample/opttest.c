@@ -1,4 +1,5 @@
 #include "Xsocket.h"
+#include <time.h>
 //#include "Xinit.h"
 //#include "Xutil.h"
 
@@ -10,10 +11,11 @@ typedef struct {
 
 testdata data[10];
 
-int main(int argc, char *argv[])
+int main()
 {
-	int i;
-	int ttl;
+	unsigned i;
+
+	socklen_t len;
 
 	printf("[s|g]etsockopt test\n");
 
@@ -34,7 +36,7 @@ int main(int argc, char *argv[])
 	}
 
 	for (i = 0; i < sizeof(data) / sizeof(testdata); i++) {
-		int len = sizeof(int);
+		len = sizeof(int);
 		if (Xgetsockopt(data[i].sock, XOPT_HLIM, (void *)&data[i].ttl_out, &len) < 0) {
 			printf("error getting ttl\n");
 			exit(-1);
@@ -50,7 +52,7 @@ int main(int argc, char *argv[])
 
 	int sock = Xsocket(XSOCK_RAW);
 	int nxt = XPROTO_XCMP;
-	int len = sizeof(int);
+	len = sizeof(int);
 
 	if (sock < 0) {
 		printf("error creating raw socket\n");
