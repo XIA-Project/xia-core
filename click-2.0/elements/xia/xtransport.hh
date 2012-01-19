@@ -156,6 +156,7 @@ class XTRANSPORT : public Element {
     HashTable<unsigned short, bool> portToActive;
     HashTable<unsigned short, int> hlim;
 	HashTable<unsigned short, int> nxt_xport;
+	list<int> xcmp_listeners;
     queue<DAGinfo> pending_connection_buf;
     
     struct in_addr _CLICKaddr;
