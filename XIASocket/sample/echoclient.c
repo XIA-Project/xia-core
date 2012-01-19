@@ -14,6 +14,9 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
+
+// FIXME: clean up the duplicate loop code
+// TODO: add option for a static buffer instead of creating random data for perf testing
 #include <stdio.h>
 #include <stdarg.h>
 #include <time.h>
@@ -33,17 +36,19 @@
 
 // FIXME: clean up globals and move into a structure or similar
 // global configuration options
-int verbose = 1;
-int delay = -1;
-int loops = 1;
-int  pktSize = 512;
-int reconnect = 0;
-int threads = 1;
+int verbose = 1;	// display all messages
+int delay = -1;		// don't delay between loops
+int loops = 1;		// only do 1 pass
+int  pktSize = 512;	// default pkt size
+int reconnect = 0;	// don't reconnect between loops
+int threads = 1;	// just a single thread
 
 char *sdag;
 
 /*
 ** simple code to create a formatted DAG
+**
+** The dag should be free'd by the calling code when no longer needed
 */
 char *createDAG(const char *ad, const char *host, const char *service)
 {
@@ -59,7 +64,7 @@ char *createDAG(const char *ad, const char *host, const char *service)
 void help(const char *name)
 {
 	printf("\n%s (%s)\n", TITLE, VERSION);
-	printf("usage: %s [-q] -[l loops] [-s size] [-d delay]i [-r recon]\n", name);
+	printf("usage: %s [-q] -[l loops] [-s size] [-d delay] [-r recon] [-t threads]\n", name);
 	printf("where:\n");
 	printf(" -q         : quiet mode\n");
 	printf(" -l loops   : loop <loops> times and exit\n");
@@ -94,7 +99,7 @@ void getConfig(int argc, char** argv)
 			case 'd':
 				// pause for <delay> hundredths of a second between operations
 				// if 0, pause for a random period between 0 and 1 second
-				delay = atoi(optarg);
+				delay = atoi(optarg) * 10000; // convert to hundredths
 				if (delay < 0) delay = 0;
 				break;
 			case 'l':
@@ -242,7 +247,7 @@ void pausex()
 		t = rand() % 1000000;
 	else
 		// pause for the specfied number of hundredths of a second
-		t = delay * 10000;
+		t = delay;
 	usleep(t);
 }
 
@@ -343,8 +348,8 @@ int main(int argc, char **argv)
 
 		for (int i = 0; i < threads; i++) {
 			pthread_create(&clients[i], NULL, mainLoop, NULL);
+			pausex();
 		}
-		// start them all at once (more or less)
 		for (int i = 0; i < threads; i++) {
 			pthread_join(clients[i], NULL);
 		}
