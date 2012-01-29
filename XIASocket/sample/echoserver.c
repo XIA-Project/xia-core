@@ -27,12 +27,15 @@
 #define HID0 "HID:0000000000000000000000000000000000000000"
 #define AD0   "AD:1000000000000000000000000000000000000000"
 #define SID0 "SID:0f00000000000000000000000000000000000777"
+#define SID1 "SID:0f00000000000000000000000000000000001777"
 
 // if no data is received from the client for this number of seconds, close the socket
 #define WAIT_FOR_DATA	20
 
 // global configuration options
 int verbose = 1;
+int stream = 1;
+int dgram = 1;
 
 /*
 ** simple code to create a formatted DAG
@@ -55,7 +58,9 @@ void help(const char *name)
 	printf("\n%s (%s)\n", TITLE, VERSION);
 	printf("usage: %s [-q] \n", name);
 	printf("where:\n");
-	printf(" -q         : quiet mode\n");
+	printf(" -q : quiet mode\n");
+	printf(" -s : stream echo\n");
+	printf(" -d : datagram echo\n");
 	printf("\n");
 	exit(0);
 }
@@ -66,14 +71,22 @@ void help(const char *name)
 void getConfig(int argc, char** argv)
 {
 	int c;
+	int s = 0;
+	int d = 0;
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "hq")) != -1) {
+	while ((c = getopt(argc, argv, "hqsd")) != -1) {
 		switch (c) {
 			case 'q':
 				// turn off info messages
 				verbose = 0;
+				break;
+			case 's':
+				s = 1;
+				break;
+			case 'd':
+				d = 1;
 				break;
 			case '?':
 			case 'h':
@@ -81,6 +94,11 @@ void getConfig(int argc, char** argv)
 				// Help Me!
 				help(basename(argv[0]));
 		}
+	}
+
+	if (s || d) {
+		stream = s;
+		dgram = d;
 	}
 }
 
@@ -146,6 +164,8 @@ void process(int sock)
    	while (1) {
 		memset(buf, 0, sizeof(buf));
 
+	tv.tv_sec = WAIT_FOR_DATA;
+	tv.tv_usec = 0;
 		 if ((n = select(sock + 1, &fds, NULL, NULL, &tv)) < 0) {
 			 warn("%5d Select failed, closing...\n", pid);
 			 break;
@@ -177,23 +197,20 @@ void process(int sock)
 	Xclose(sock);
 }
 
-
-int main(int argc, char *argv[])
+void echo_stream()
 {
 	int acceptor, sock;
 	char *dag;
 
-	getConfig(argc, argv);
-
-	say ("\n%s (%s): started\n", TITLE, VERSION);
+	say("Stream service started\n");
 
 	if (!(dag = createDAG(AD0, HID0, SID0))) {
-		die(-1, "unable to create DAG\n");
+		die(-1, "unable to create DAG: %s\n", dag);
 	}
 	say("Created DAG: \n%s\n", dag);
 
 	if ((acceptor = Xsocket(XSOCK_STREAM)) < 0) {
-		die(-2, "unable to create the server socket\n");
+		die(-2, "unable to create the stream socket\n");
 	}
 
 	if (Xbind(acceptor, dag) < 0) {
@@ -215,7 +232,7 @@ int main(int argc, char *argv[])
 
 		if (pid == 0) {  
 			process(sock);
-			return 0;
+			exit(0);
 
 		} else {
 			// FIXME: we need to close the socket in the main process or the file
@@ -228,5 +245,71 @@ int main(int argc, char *argv[])
 
 	free(dag);
 	Xclose(acceptor);
+}
+
+void echo_dgram()
+{
+	int sock;
+	char *dag;
+	char buf[2048];
+	char cdag[1024]; // client's dag
+	size_t dlen;
+	int n;
+
+	say("Datagram service started\n");
+
+	if (!(dag = createDAG(AD0, HID0, SID1))) {
+		die(-1, "unable to create DAG: %s\n", dag);
+	}
+	say("Created DAG: \n%s\n", dag);
+
+	if ((sock = Xsocket(XSOCK_DGRAM)) < 0) {
+		die(-2, "unable to create the datagram socket\n");
+	}
+
+	if (Xbind(sock, dag) < 0) {
+		die(-3, "unable to bind to the dag\n");
+	}
+
+	pid_t pid = fork();
+	if (pid == 0) {
+		while (1) {
+			say("Dgram Server waiting\n");
+
+			memset(buf, 0, sizeof(buf));
+			if ((n = Xrecvfrom(sock, buf, sizeof(buf), 0, cdag, &dlen)) < 0) {
+				warn("Recv error on socket %d, closing connection\n", pid);
+				break;
+			}
+			
+			say("dgram received %d bytes\n", n);
+
+			if ((n = Xsendto(sock, buf, n, 0, cdag, dlen)) < 0) {
+				warn("%5d send error\n", pid);
+				break;
+			}
+
+			say("dgram sent %d bytes\n", n);
+		}
+
+		free(dag);
+		Xclose(sock);
+	}
+}
+
+int main(int argc, char *argv[])
+{
+	getConfig(argc, argv);
+
+	say ("\n%s (%s): started\n", TITLE, VERSION);
+
+	// if configured, fork off a process to handle datagram connections
+	if (dgram)
+		echo_dgram();
+
+	// if configured, fork off processes as needed to handle stream connections
+	if (stream)
+		echo_stream();
+
 	return 0;
 }
