@@ -214,7 +214,6 @@ int process(int sock)
 		size = pktSize;
 	randomString(buf1, size);
 
-//	say("%d %s\n", strlen(buf1), buf1);
 	if ((sent = Xsend(sock, buf1, size, 0)) < 0)
 		die(-4, "Send error %d on socket %d\n", errno, sock);
 
@@ -280,41 +279,35 @@ void *mainLoop(void * /* dummy */)
 {
 	int ssock;
 	int count = 0;
+	int printcount = 1;
+
+	if (loops == 1)
+		printcount = 0;
 
 	ssock = connectToServer();
 
-	if (loops == 0) {
-	// loop forever or until we error out
-		while(process(ssock) == 0) {
-			pausex();
-			if (reconnect != 0) {
-				if (++count == reconnect) {
-					// time to close and reopen the socket
-					Xclose(ssock);
-					say("Xsock %4d closed\n", ssock);
-					ssock = connectToServer();
-					count = 0;
-				}
-			}
-		}
-	} else {
-		// loop for the specified number of times
-		for (int i = 0; i < loops; i++) {
-			if (process(ssock) != 0)
-				break;
-			pausex();
-			if (reconnect != 0) {
-				if (++count == reconnect) {
-					// time to close and reopen the socket
-					Xclose(ssock);
-					say("Xsock %4d closed\n", ssock);
-					ssock = connectToServer();
-					count = 0;
-				}
-			}
-		}
-	}
+	for (;;) {
 
+		if (printcount)
+			printf("Xsock %4d loop #%d\n", ssock, count);
+
+		if (process(ssock) != 0) 
+			break;
+		
+		pausex();
+		
+		count++;
+		if (reconnect != 0) {
+			if (count % reconnect == 0) {
+				// time to close and reopen the socket
+				Xclose(ssock);
+				say("Xsock %4d closed\n", ssock);
+				ssock = connectToServer();
+			}
+		}
+		if (loops > 0 && count == loops)
+				break;
+	}
 	Xclose(ssock);
 	say("Xsock %4d closed\n", ssock);
 
@@ -348,7 +341,6 @@ int main(int argc, char **argv)
 
 		for (int i = 0; i < threads; i++) {
 			pthread_create(&clients[i], NULL, mainLoop, NULL);
-			pausex();
 		}
 		for (int i = 0; i < threads; i++) {
 			pthread_join(clients[i], NULL);
