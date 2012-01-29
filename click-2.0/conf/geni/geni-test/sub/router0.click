@@ -8,43 +8,71 @@ router0 :: Router(RE AD0 RHID0, AD0, RHID0);
 //router0 :: Router4PortDummyCache(RE AD0 RHID0, AD0, RHID0); // if router does not understand CID pricipal
 
 
-c0 :: Classifier(12/9999);
-c1 :: Classifier(12/9999);
+// Interface0 (eth2)
+c0 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
+xarpq0 :: XARPQuerier(RHID0, 00:04:23:b7:1e:20);
+xarpr0 :: XARPResponder(RHID0 00:04:23:b7:1e:20);
+todevice0 :: ToDevice(eth2);
+fromdevice0 :: FromDevice(eth2, PROMISC true);
 
-todevice0 :: ToDevice(eth5);
-todevice1 :: ToDevice(eth2);
 
-FromDevice(eth5, PROMISC true)  -> c0;
+// Interface1 (eth4)
+c1 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
+xarpq1 :: XARPQuerier(RHID0, 00:04:23:b7:21:04);
+xarpr1 :: XARPResponder(RHID0 00:04:23:b7:21:04);
+todevice1 :: ToDevice(eth4);
+fromdevice1 :: FromDevice(eth4, PROMISC true);
 
-c0[0] -> Strip(14) -> MarkXIAHeader() 
+
+// On receiving a packet from Interface0
+fromdevice0 -> c0;
+
+// On receiving an XIP packet
+c0[2] -> Strip(14) -> MarkXIAHeader() 
 -> Print()
 ->  XIAPrint("h0->r0")
 -> [0]router0; // XIA packet 
 
+// On receiving XARP response
+c0[1] -> [1]xarpq0 -> todevice0;
 
-FromDevice(eth2, PROMISC true) -> c1;
+// On receiving XARP query
+c0[0] -> xarpr0 -> todevice0;
 
-c1[0] -> Strip(14) -> MarkXIAHeader() 
+// Sending an XIP packet (via XARP if necessary) to Interface0
+router0[0]
+-> Print()
+->  XIAPrint("r0->h0")
+-> c::XIAXIDTypeCounter(src AD, src HID, src SID, src CID, src IP, -) 
+-> [0]xarpq0
+-> todevice0;
+
+
+
+
+// On receiving a packet from Interface1
+fromdevice1 -> c1;
+
+// On receiving an XIP packet
+c1[2] -> Strip(14) -> MarkXIAHeader() 
 -> Print()
 ->  XIAPrint("r1->r0")
 -> [1]router0; // XIA packet 
 
-//Idle -> [2]router0[2] -> Discard; 
-//Idle -> [3]router0[3] -> Discard; 
+// On receiving XARP response
+c1[1] -> [1]xarpq1 -> todevice1;
 
+// On receiving XARP query
+c1[0] -> xarpr1 -> todevice1;
 
-router0[0]
--> Print()
-->  XIAPrint("r0->h0")
--> EtherEncap(0x9999,  00:04:23:b7:1a:bd, 00:04:23:b7:17:da) 
--> c::XIAXIDTypeCounter(src AD, src HID, src SID, src CID, src IP, -) 
--> todevice0;
-
-
+// Sending an XIP packet (via XARP if necessary) to Interface1
 router0[1]
 -> Print()
 ->  XIAPrint("r0->r1")
--> EtherEncap(0x9999, 00:04:23:b7:1a:be,  00:04:23:b7:3e:a3) -> todevice1; 
+-> c::XIAXIDTypeCounter(src AD, src HID, src SID, src CID, src IP, -) 
+-> [0]xarpq1
+-> todevice1;
+
 
 
 

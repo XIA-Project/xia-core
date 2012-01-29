@@ -23,6 +23,7 @@
 #include <click/straccum.hh>
 #include <click/integers.hh>
 #include <click/standard/xiaxidinfo.hh>
+#include <click/args.hh>
 CLICK_DECLS
 
 /** @file xid.hh
@@ -127,6 +128,34 @@ operator<<(StringAccum &sa, const XID& xid)
 {
     return sa << xid.unparse();
 }
+
+
+
+bool
+XIDArg::parse(const String &str, XID &value, const ArgContext &args)
+{
+
+    XID xid_tmp;
+    if (!cp_xid(str, &xid_tmp))
+        (xid_tmp.xid()).type = htonl(CLICK_XIA_XID_TYPE_UNDEF);
+        
+    value = xid_tmp;
+    
+    return true;
+
+}
+
+bool
+XIDArg::parse(const String &str, Args &args, unsigned char *value)
+{
+    XID *s = args.slot(*reinterpret_cast<XID *>(value));
+    return s && parse(str, *s, args);
+}
+
+
+
+
+
 
 
 CLICK_ENDDECLS

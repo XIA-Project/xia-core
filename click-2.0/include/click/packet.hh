@@ -5,6 +5,7 @@
 #include <click/glue.hh>
 #include <click/timestamp.hh>
 #include <clicknet/xia.h>
+#include <click/xid.hh>
 #if CLICK_LINUXMODULE
 # include <click/skbmgr.hh>
 #else
@@ -314,7 +315,7 @@ class Packet { public:
     //@{
 
     enum {
-	anno_size = 48			///< Size of annotation area.
+	anno_size = 80			///< Size of annotation area.
     };
 
     /** @brief Return the timestamp annotation. */
@@ -389,8 +390,21 @@ class Packet { public:
 
     enum {
 	dst_ip_anno_offset = 0, dst_ip_anno_size = 4,
-	dst_ip6_anno_offset = 0, dst_ip6_anno_size = 16
+	dst_ip6_anno_offset = 0, dst_ip6_anno_size = 16,
+	nexthop_neighbor_xid_anno_offset = 56, nexthop_neighbor_xid_anno_size = 24
     };
+    
+
+    /** @brief Return the nexthop_neighbor_xid annotation.
+     *
+     * The value is taken from the address annotation area. */
+    inline XID nexthop_neighbor_xid_anno() const;
+
+    /** @brief Set the destination IPv4 address annotation.
+     *
+     * The value is stored in the address annotation area. */
+    inline void set_nexthop_neighbor_xid_anno(XID x);
+
 
     /** @brief Return the destination IPv4 address annotation.
      *
@@ -1683,6 +1697,28 @@ Packet::change_headroom_and_length(uint32_t headroom, uint32_t length)
     }
 }
 #endif
+
+    
+inline XID
+Packet::nexthop_neighbor_xid_anno() const
+{
+    struct click_xia_xid xid;
+    xid.type = xanno()->u32[nexthop_neighbor_xid_anno_offset / 4];
+    
+    for (size_t d = 0; d < sizeof(xid.id); d++) {
+    	xid.id[d] = xanno()->u8[nexthop_neighbor_xid_anno_offset + 4 + d];
+    }
+    
+    //return XID ( (const click_xia_xid&) (&(xanno()->u8[nexthop_neighbor_xid_anno_offset])) );
+    return XID ( xid );
+}
+
+inline void
+Packet::set_nexthop_neighbor_xid_anno(XID x)
+{
+    memcpy(xanno()+nexthop_neighbor_xid_anno_offset , &(x.xid()), nexthop_neighbor_xid_anno_size);
+}
+
 
 inline IPAddress
 Packet::dst_ip_anno() const

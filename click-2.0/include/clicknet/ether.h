@@ -29,6 +29,8 @@ struct click_ether {
 #define ETHERTYPE_PPPOE_DISC	0x8863
 #define ETHERTYPE_PPPOE_SESSION	0x8864
 #define ETHERTYPE_GRID		0x7fff	/* wvlan_cs driver won't transmit frames with high bit of protocol number set */
+#define ETHERTYPE_XARP		0x9990   
+#define ETHERTYPE_XIP		0x9999   
 
 struct click_arp {		/* Offsets relative to ARP (Ethernet) header */
     uint16_t	ar_hrd;		/* 0-1 (14-15)  hardware address format      */
@@ -58,6 +60,39 @@ struct click_ether_arp {
     uint8_t	arp_tha[6];	/* 18-23 (32-37)  target hardware address    */
     uint8_t	arp_tpa[4];	/* 24-27 (38-41)  target protocol address    */
 };
+
+
+struct click_xarp {		/* Offsets relative to XARP (Ethernet) header */
+    uint16_t	ar_hrd;		/* 0-1 (14-15)  hardware address format      */
+#define XARPHRD_ETHER    1	/*		  Ethernet 10Mbps	     */
+#define XARPHRD_IEEE802	6	/*		  token ring     	     */
+#define XARPHRD_ARCNET	7	/*		  Arcnet         	     */
+#define XARPHRD_FRELAY	15	/*		  frame relay    	     */
+#define XARPHRD_STRIP	23	/*		  Ricochet Starmode Radio    */
+#define XARPHRD_IEEE1394	24	/*		  IEEE 1394 (FireWire)	     */
+#define XARPHRD_80211    801	/*		  IEEE 802.11 (wifi)	     */
+    uint16_t	ar_pro;		/* 2-3 (16-17)  protocol address format      */
+    uint8_t	ar_hln;		/* 4   (18)     hardware address length      */
+    uint8_t	ar_pln;		/* 5   (19)     protocol address length      */
+    uint16_t	ar_op;		/* 6-7 (20-21)  opcode (command)	     */
+#define XARPOP_REQUEST   1	/*		  XARP request		     */
+#define XARPOP_REPLY	2	/*		  XARP reply		     */
+#define XARPOP_REVREQUEST 3	/*		  reverse request: hw->proto */
+#define XARPOP_REVREPLY	4	/*		  reverse reply		     */
+#define XARPOP_INVREQUEST 8	/*		  peer identification req    */
+#define XARPOP_INVREPLY	9	/*		  peer identification reply  */
+};
+
+struct click_ether_xarp {
+    struct click_xarp ea_hdr;	/* 0-7   (14-21)  fixed-size XARP header	     */
+    uint8_t	xarp_sha[6];	/* 8-13  (22-27)  sender hardware address    */
+    uint8_t	xarp_spa[24];	/* 14-17 (28-31)  sender protocol address    */
+    uint8_t	xarp_tha[6];	/* 18-23 (32-37)  target hardware address    */
+    uint8_t	xarp_tpa[24];	/* 24-27 (38-41)  target protocol address    */
+};
+
+
+
 
 
 /* Ethernet with VLAN (802.1q) */

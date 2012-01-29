@@ -5,25 +5,39 @@ require(library ../../../xia_address.click);
 host0 :: EndHost (RE AD0 HID0, HID0, fake0,172.0.0.2,172.0.0.1,11:11:11:11:11:11,0);
 //router1 :: Router4PortDummyCache(RE AD1 RHID1, AD1, RHID1); // if router does not understand CID pricipal
 
-c0 :: Classifier(12/9999);
 
+// Interface0 (eth2)
+c0 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
+xarpq0 :: XARPQuerier(HID0, 00:04:23:b7:17:6c);
+xarpr0 :: XARPResponder(HID0 00:04:23:b7:17:6c);
 todevice0 :: ToDevice(eth2);
+fromdevice0 :: FromDevice(eth2, PROMISC true);
 
-FromDevice(eth2) -> c0;
 
-c0[0] -> Strip(14) -> MarkXIAHeader() 
+// On receiving a packet from Interface0
+fromdevice0 -> c0;
+
+// On receiving an XIP packet
+c0[2] -> Strip(14) -> MarkXIAHeader() 
 -> Print()
 -> XIAPrint("r0->h0")
--> [0]host0; // XIA packet 
+-> [0]host0; // XIA packet
 
+// On receiving XARP response
+c0[1] -> [1]xarpq0 -> todevice0;
 
+// On receiving XARP query
+c0[0] -> xarpr0 -> todevice0;
+
+// Sending an XIP packet (via XARP if necessary) to Interface0
 host0[0]
 -> Print()
 -> XIAPrint("h0->r0")
-//-> EtherEncap(0x9999, 00:04:23:b7:17:da, 00:04:23:b7:1a:bd)  
--> EtherEncap(0x9999, 00:04:23:b7:17:da, 00:04:23:b7:1a:be) 
--> c::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
+-> c::XIAXIDTypeCounter(src AD, src HID, src SID, src CID, src IP, -) 
+-> [0]xarpq0
 -> todevice0;
+
+
 
 ControlSocket(tcp, 7777);
 

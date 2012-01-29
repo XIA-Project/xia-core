@@ -8,47 +8,75 @@ router1 :: Router(RE AD1 RHID1, AD1, RHID1);
 //router1 :: Router4PortDummyCache(RE AD1 RHID1, AD1, RHID1); // if router does not understand CID pricipal
 
 
-c0 :: Classifier(12/9999);
-c1 :: Classifier(12/9999);
-//c2 :: Classifier(12/9999);
-
-todevice0 :: ToDevice(eth2);
-todevice1 :: ToDevice(eth3);
-//todevice2 :: ToDevice(eth0);
-
-FromDevice(eth2, PROMISC true) 
-//-> XIAPrint() 
--> c0;
-c0[0] -> Strip(14) -> MarkXIAHeader() -> [0]router1; // XIA packet 
+// Interface0 (eth4)
+c0 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
+xarpq0 :: XARPQuerier(RHID2, 00:04:23:b7:41:50);
+xarpr0 :: XARPResponder(RHID2 00:04:23:b7:41:50);
+todevice0 :: ToDevice(eth4);
+fromdevice0 :: FromDevice(eth4, PROMISC true);
 
 
-FromDevice(eth3, PROMISC true) 
-//-> XIAPrint()
--> c1;
-c1[0] -> Strip(14) -> MarkXIAHeader() -> [1]router1; // XIA packet 
+// Interface1 (eth2)
+c1 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
+xarpq1 :: XARPQuerier(RHID1, 00:04:23:b7:3f:ce);
+xarpr1 :: XARPResponder(RHID1 00:04:23:b7:3f:ce);
+todevice1 :: ToDevice(eth2);
+fromdevice1 :: FromDevice(eth2, PROMISC true);
 
-//FromDevice(eth0, PROMISC true) -> c2;
-//c2[0] -> Strip(14) -> MarkXIAHeader() -> [2]router1; // XIA packet 
 
-//Idle -> [3]router1[3] -> Discard; 
+// On receiving a packet from Interface0
+fromdevice0 -> c0;
 
-router1[0]
-//-> XIAPrint() 
--> EtherEncap(0x9999, 00:04:23:b7:3e:a2, 00:04:23:b7:13:1c) -> todevice0;
+// On receiving an XIP packet
+c0[2] -> Strip(14) -> MarkXIAHeader() 
+-> Print()
+->  XIAPrint("h1->r1")
+-> [0]router0; // XIA packet 
 
-router1[1]
-//-> XIAPrint() 
--> EtherEncap(0x9999, 00:04:23:b7:3e:a3, 00:04:23:b7:1a:be) 
--> c::XIAXIDTypeCounter(src AD, src HID, src SID, src CID, src IP, -)
--> todevice1; 
+// On receiving XARP response
+c0[1] -> [1]xarpq0 -> todevice0;
+
+// On receiving XARP query
+c0[0] -> xarpr0 -> todevice0;
+
+// Sending an XIP packet (via XARP if necessary) to Interface0
+router0[0]
+-> Print()
+->  XIAPrint("r1->h1")
+-> c::XIAXIDTypeCounter(src AD, src HID, src SID, src CID, src IP, -) 
+-> [0]xarpq0
+-> todevice0;
+
+
+
+
+// On receiving a packet from Interface1
+fromdevice1 -> c1;
+
+// On receiving an XIP packet
+c1[2] -> Strip(14) -> MarkXIAHeader() 
+-> Print()
+->  XIAPrint("r0->r1")
+-> [1]router0; // XIA packet 
+
+// On receiving XARP response
+c1[1] -> [1]xarpq1 -> todevice1;
+
+// On receiving XARP query
+c1[0] -> xarpr1 -> todevice1;
+
+// Sending an XIP packet (via XARP if necessary) to Interface1
+router0[1]
+-> Print()
+->  XIAPrint("r1->r0")
+-> c::XIAXIDTypeCounter(src AD, src HID, src SID, src CID, src IP, -) 
+-> [0]xarpq1
+-> todevice1;
+
+
 
 
 ControlSocket(tcp, 7777);
-
-
-//router1[2]
-//-> XIAPrint() 
-//-> EtherEncap(0x9999, 00:03:47:73:b8:dc, 00:02:b3:35:e6:29) -> todevice2;
 
 
 //Script(write gen.active true);  // the packet source should be activated after all other scripts are executed
