@@ -250,7 +250,15 @@ XARPQuerier::send_query_for(const Packet *p, bool ether_dhost_valid)
     memcpy(ea->xarp_sha, _my_en.data(), 6);
     memcpy(ea->xarp_spa, _my_xid.data(), 24);
     memset(ea->xarp_tha, 0, 6);
+        
     XID want_xid = p->nexthop_neighbor_xid_anno();
+    
+   
+    //XID x_tmp("HID:0000000000000000000000000000000000000003");	
+    //want_xid = x_tmp;
+    //printf("\n %s \n", want_xid.unparse().c_str());
+    
+    
     //IPAddress want_ip = p->dst_ip_anno();
     memcpy(ea->xarp_tpa, want_xid.data(), 24);
 
@@ -290,7 +298,15 @@ XARPQuerier::handle_xip(Packet *p, bool response)
 	q->ether_header()->ether_type = htons(ETHERTYPE_XIP);
 
     //IPAddress dst_ip = q->dst_ip_anno();
+    
     XID nexthop_neighbor_xid = q->nexthop_neighbor_xid_anno();
+    
+    //XID x_tmp("HID:0000000000000000000000000000000000000003");			
+    //p->set_nexthop_neighbor_xid_anno(x_tmp);
+    //nexthop_neighbor_xid = x_tmp;
+    //printf("\n %s \n", nexthop_neighbor_xid.unparse().c_str());
+    
+    
     EtherAddress *dst_eth = reinterpret_cast<EtherAddress *>(q->ether_header()->ether_dhost);
     int r;
 
