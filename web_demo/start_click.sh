@@ -15,7 +15,7 @@ help ()
 {
 	cat << EOH
 
-usage: $NAME -[qv]
+usage: $NAME [-qv]
 where:
   -q runs click silently (default)
   -v prints click debug messages to stdout
