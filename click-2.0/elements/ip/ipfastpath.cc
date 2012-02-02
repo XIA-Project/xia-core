@@ -84,4 +84,3 @@ void IPFastPath::push(int port, Packet * p)
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(IPFastPath)
-ELEMENT_MT_SAFE(IPFastPath)

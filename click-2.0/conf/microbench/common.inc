@@ -192,3 +192,34 @@ elementclass XIAPacketForwardFastPath {
     host0[3] -> Discard;
 };
 
+elementclass IPPacketForwardFastPath {
+    host0 :: IPRouter4Port(192.168.0.1);
+
+    //Script(write host0/rt.add 192.168.0.0/24 0);
+    //Script(write host0/rt.add 0.0.0.0/0.0.0.0 1);
+    Script(print_usertime, write host0/rt.load ip_routes.txt, print_usertime);
+    //Script(write host0/rt.load /home/dongsuh/xia-core/click-2.0/conf/microbench/ip_routes.txt);
+
+    fastpath :: IPFastPath(BUCKET_SIZE 512);
+
+    input[0]
+    -> Clone($COUNT)
+    -> Unqueue
+    -> IPRandomize(MAX_CYCLE $IP_RANDOMIZE_MAX_CYCLE)
+    -> fastpath
+    //-> Print
+    -> host0;
+
+    host0 -> Unqueue (LIMIT $COUNT) -> [1]fastpath;
+    fastpath[1]
+    -> PrintStats
+    -> AggregateCounter(COUNT_STOP $COUNT, PRINT_USERTIME true)
+    -> Discard;
+
+    Idle -> [1]host0;
+    Idle -> [2]host0;
+    Idle -> [3]host0;
+    host0[1] -> Discard;
+    host0[2] -> Discard;
+    host0[3] -> Discard;
+};

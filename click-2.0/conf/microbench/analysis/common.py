@@ -55,6 +55,7 @@ def get_pps(path):
 # dataset
 dataset = {
     'IP': data_path_prefix + 'output_ip_packetforward',
+    'IP-FP': data_path_prefix + 'output_ip_packetforward_fastpath',
     'FB0': data_path_prefix + 'output_xia_packetforward_fallback0',
     'FB1': data_path_prefix + 'output_xia_packetforward_fallback1',
     'FB2': data_path_prefix + 'output_xia_packetforward_fallback2',

@@ -19,7 +19,7 @@ class IPFastPath : public Element { public:
     IPFastPath();
     ~IPFastPath();
     const char *class_name() const      { return "IPFastPath"; }
-    const char *port_count() const      { return "n/n"; }
+    const char *port_count() const      { return "-/-"; }
     const char *processing() const      { return PUSH; }
     void push(int, Packet *);
     int configure(Vector<String> &conf, ErrorHandler *errh);
