@@ -1,10 +1,10 @@
 #!/usr/bin/env gnuplot 
 		
-set term pdf size 3.30in, 1.25in
+set term pdf size 3.30in, 1.15in
 		
-set output "forwarding_performance_tput.pdf"
+set output "forwarding_performance.pdf"
 set xlabel "Packet size (bytes)"
-set ylabel "Throughput(Gbps)"
+set ylabel "Goodput (Gbps)"
 		
 		
 set style  line 1 lt 6 lc rgb "red"  linewidth 4  pointtype 1 pointsize 0.4
@@ -31,10 +31,10 @@ set key  enhanced  bottom right spacing 0.85
 #     'fb1' u 2:($3*($2+24)*8/1000) w lp ls 6 title "XIA FB1",  \
 #     'fb2' u 2:($3*($2+24)*8/1000) w lp ls 8 title "XIA FB2" ,  \
 #     'fb3' u 2:($3*($2+24)*8/1000) w lp ls 10 title "XIA FB3"
-plot 'ip' u  2:4 w lp ls 2 title "IP" , \
-     'fb0' u 2:4 w lp ls 4 title "XIA FB0",  \
-     'fb1' u 2:4 w lp ls 6 title "XIA FB1",  \
-     'fb2' u 2:4 w lp ls 8 title "XIA FB2" ,  \
-     'fb3' u 2:4 w lp ls 10 title "XIA FB3", \
-     'via' u 2:4 w lp ls 12 title "XIA VIA" axis x1y1
+plot 'ip' u  2:($3*8*($2-34)/1000) w lp ls 2 title "IP" , \
+     'fb0' u 2:($3*8*($2-98)/1000) w lp ls 4 title "XIA FB0",  \
+     'fb1' u 2:($3*8*($2-126)/1000) w lp ls 6 title "XIA FB1",  \
+     'fb2' u 2:($3*8*($2-154)/1000) w lp ls 8 title "XIA FB2" ,  \
+     'fb3' u 2:($3*8*($2-182)/1000) w lp ls 10 title "XIA FB3", \
+     'via' u 2:($3*8*($2-126)/1000) w lp ls 12 title "XIA VIA" axis x1y1
 		
