@@ -40,9 +40,19 @@ a { padding-left: 1.5em; font: arial; font-size: 12pt; }
 <id> Intrinsic security requirement </id>
 </ul>
 
+
 <h2>Backwards-compatible paths</h2>
+
+<ul>
+<li> Service Identifier without fallback
+<br>
+<a href=http://xia.sid.hello>http://xia.sid.hello</a>
+</ul>
+
 <ul>
 <li>Service Identifiers with fallback </li>
+<a href=http://xia.sid.hello/fallback(ad.ad1:hid.hid1:sid.hello)>http://xia.sid.hello/fallback(ad.ad1:hid.hid1:sid.hello)</a>
+<br>
 <id><fb> (HID:71c3dd5af38bcd2cfede5b943c3358d4ef4285f8) </fb>SID:f0afa824a36f2a2d95c67ff60f61200e48006625</id> 
 <br>
 <a href=http://xia.sid.xiaweb/simple.html/fallback(ad.ad1:hid.hid1:sid.xiaweb)>http://xia.sid.xiaweb/simple.html/fallback(ad.ad1:hid.hid1:sid.xiaweb)</a><!--http://demo.xia.org/service/simple_web</a>-->
@@ -51,7 +61,7 @@ a { padding-left: 1.5em; font: arial; font-size: 12pt; }
 <li> Content Identifiers with fallback</li>
 <id> <fb>(HID:71c3dd5af38bcd2cfede5b943c3358d4ef4285f8) </fb> CID:06088766ef5729c6e10b6dbf076f9c708e9855fc</id> </li> 
 <br>
-<a href=http://xia.cid.1.aa2fe45640e694c06dcc3331ed91998c8eb4879a>http://xia.cid.1.aa2fe45640e694c06dcc3331ed91998c8eb4879a</a>
+<a href=http://xia.cid.1.aa2fe45640e694c06dcc3331ed91998c8eb4879a/fallback(ad.ad1:hid.hid1:cid.1.aa2fe45640e694c06dcc3331ed91998c8eb4879a)>http://xia.cid.1.aa2fe45640e694c06dcc3331ed91998c8eb4879a/fallback(ad.ad1:hid.hid1:cid.1.aa2fe45640e694c06dcc3331ed91998c8eb4879a)</a>
 </ul>
 
 <h2>Using Multiple Principals in XIA</h2>
@@ -70,7 +80,7 @@ local alternative <a href=demo.html>http://demo.xia.org </a>  </id>
 <a href=http://xia.sid.xiaweb/demo.html/fallback(ad.ad1:hid.hid1:sid.xiaweb)>http://xia.sid.xiaweb/demo.html/fallback(ad.ad1:hid.hid1:sid.xiaweb)</a><id>[(HID:71c3dd5af38bcd2cfede5b943c3358d4ef4285f8) SID:f0afa824a36f2a2d95c67ff60f61200e48006625] </id>
 <p>
 <li>Anycast for service</li>
-<a href=http://xia.sid.xiaweb/xia_service.html/fallback(ad.ad_cmu:hid.hid2:sid.xiaweb)>http://xia.sid.xiaweb/xia_service.html/fallback(ad.ad_cmu:hid.hid2:sid.xiaweb)</a><id>[(HID:71c3dd5af38bcd2cfede5b943c3358d4ef4285f8) SID:f0afa824a36f2a2d95c67ff60f61200e48006625] </id>
+<a href=http://xia.sid.stock_info/xia_service.html/fallback(ad.ad_cmu:hid.hid2:sid.stock_info)>http://xia.sid.stock_info/xia_service.html/fallback(ad.ad_cmu:hid.hid2:sid.stock_info)</a><id>[(HID:71c3dd5af38bcd2cfede5b943c3358d4ef4285f8) SID:0f03333333333333333333333333330000000059] </id>
 </div>
 
 <div id="box">

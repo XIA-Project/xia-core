@@ -75,8 +75,8 @@ def Xrecvfrom(*args):
   return _xsocket.Xrecvfrom(*args)
 Xrecvfrom = _xsocket.Xrecvfrom
 
-def Xsocket():
-  return _xsocket.Xsocket()
+def Xsocket(*args):
+  return _xsocket.Xsocket(*args)
 Xsocket = _xsocket.Xsocket
 
 def Xconnect(*args):
@@ -102,6 +102,23 @@ Xsend = _xsocket.Xsend
 def XgetCID(*args):
   return _xsocket.XgetCID(*args)
 XgetCID = _xsocket.XgetCID
+
+def XgetCIDList(*args):
+  return _xsocket.XgetCIDList(*args)
+XgetCIDList = _xsocket.XgetCIDList
+
+def XgetCIDStatus(*args):
+  return _xsocket.XgetCIDStatus(*args)
+XgetCIDStatus = _xsocket.XgetCIDStatus
+
+def XgetCIDListStatus(*args):
+  return _xsocket.XgetCIDListStatus(*args)
+XgetCIDListStatus = _xsocket.XgetCIDListStatus
+
+def XreadCID(*args):
+  return _xsocket.XreadCID(*args)
+XreadCID = _xsocket.XreadCID
+
 
 def XputCID(*args):
   return _xsocket.XputCID(*args)

@@ -50,14 +50,14 @@ xsocket.print_conf()
 
 while(True):
     try:
-        sock=xsocket.Xsocket()
+        sock=xsocket.Xsocket(0)
         
         if (sock<0):
         	print "error opening socket"
         	exit(-1)
         
         # Make the sDAG (the one the server listens on)
-        dag = "RE %s %s %s" % (AD1, HID2, SID_STOCK)
+        dag = "RE %s %s %s" % (AD_CMU, HID2, SID_STOCK)
         
         # Bind to the DAG
         ret= xsocket.Xbind(sock,dag);

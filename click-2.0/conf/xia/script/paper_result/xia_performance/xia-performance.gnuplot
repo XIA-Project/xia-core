@@ -1,10 +1,10 @@
 #!/usr/bin/env gnuplot 
 		
-set term pdf size 3.30in, 1.55in
+set term pdf size 3.30in, 1.25in
 		
-set output "forwarding_performance.pdf"
+set output "forwarding_performance_tput.pdf"
 set xlabel "Packet size (bytes)"
-set ylabel "Performance (Gbps)"
+set ylabel "Throughput(Gbps)"
 		
 		
 set style  line 1 lt 6 lc rgb "red"  linewidth 4  pointtype 1 pointsize 0.4

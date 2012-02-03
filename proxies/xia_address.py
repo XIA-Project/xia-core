@@ -12,7 +12,10 @@ ip1="IP:128.2.208.167",
 ip0="IP:71.206.239.67",
 xiaweb= "SID:f0afa824a36f2a2d95c67ff60f61200e48006625",
 video= "SID:1f10000001111111111111111111111110000056",
-sid_stock= "SID:0f03333333333333333333333333330000000055")
+sid_stock= "SID:0f03333333333333333333333333330000000055",
+stock_info= "SID:0f03333333333333333333333333330000000058",
+sid_stock_replicate= "SID:0f03333333333333333333333333330000000059",
+hello= "SID:0f03333333333333333322222222220000000099")
 
 SID_VIDEO= XIDS['video'] 
 HID0= XIDS['hid0'] 
@@ -27,6 +30,9 @@ RHID2=XIDS['rhid2']
 SID0= XIDS['sid0'] 
 SID1= XIDS['xiaweb'] 
 SID_STOCK= XIDS['sid_stock']
+SID_HELLO= XIDS['hello']
+SID_STOCK_INFO= XIDS['stock_info']
+SID_STOCK_REPLICATE= XIDS['sid_stock_replicate']
 
 IP1 = XIDS['ip1']
 IP0 = XIDS['ip0']
@@ -87,12 +93,16 @@ def dag_from_url(url):
         return dag
     else:
         # No fallback
-        # Use magic nameservice to get a fallback
-        #dag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, primary_XID)
-	dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, primary_XID)
+        # Hack: for the demo, we want to show the case where the request fails without fallback 
+        if sid_request_segments[0][4:] == 'hello':
+        	dag = "DAG 0 - \n %s" % (primary_XID)
+        else:
+        	# Use magic nameservice to get a fallback
+        	#dag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, primary_XID)
+		dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, primary_XID)
 
-        # Don't use nameservice
-        # dag = 'RE %s' % primary_XID
+       		# Don't use nameservice
+        	# dag = 'RE %s' % primary_XID
 
         return dag
     

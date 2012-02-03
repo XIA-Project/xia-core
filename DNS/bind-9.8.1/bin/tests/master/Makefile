@@ -42,27 +42,27 @@ top_srcdir =	../../..
 # latter case, because there are no machine-generated OS-specific
 # headers.
 
-ISC_INCLUDES = -I/home/onhachoe/Desktop/bind9/bind-9.8.1/lib/isc/include \
+ISC_INCLUDES = -I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/isc/include \
 	-I${top_srcdir}/lib/isc \
 	-I${top_srcdir}/lib/isc/include \
 	-I${top_srcdir}/lib/isc/unix/include \
 	-I${top_srcdir}/lib/isc/nothreads/include \
 	-I${top_srcdir}/lib/isc/x86_32/include
 
-ISCCC_INCLUDES = -I/home/onhachoe/Desktop/bind9/bind-9.8.1/lib/isccc/include \
+ISCCC_INCLUDES = -I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/isccc/include \
        -I${top_srcdir}/lib/isccc/include
 
-ISCCFG_INCLUDES = -I/home/onhachoe/Desktop/bind9/bind-9.8.1/lib/isccfg/include \
+ISCCFG_INCLUDES = -I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/isccfg/include \
        -I${top_srcdir}/lib/isccfg/include
 
-DNS_INCLUDES = -I/home/onhachoe/Desktop/bind9/bind-9.8.1/lib/dns/include \
+DNS_INCLUDES = -I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/dns/include \
 	-I${top_srcdir}/lib/dns/include
 
-LWRES_INCLUDES = -I/home/onhachoe/Desktop/bind9/bind-9.8.1/lib/lwres/include \
+LWRES_INCLUDES = -I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/lwres/include \
 	-I${top_srcdir}/lib/lwres/unix/include \
 	-I${top_srcdir}/lib/lwres/include
 
-BIND9_INCLUDES = -I/home/onhachoe/Desktop/bind9/bind-9.8.1/lib/bind9/include \
+BIND9_INCLUDES = -I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/bind9/include \
 	-I${top_srcdir}/lib/bind9/include
 
 TEST_INCLUDES = \
@@ -134,7 +134,7 @@ DESTDIR =
 
 
 
-top_builddir =	/home/onhachoe/Desktop/bind9/bind-9.8.1
+top_builddir =	/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1
 
 ###
 ### All

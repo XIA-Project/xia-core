@@ -1,4 +1,20 @@
 /*
+** Copyright 2011 Carnegie Mellon University
+**
+** Licensed under the Apache License, Version 2.0 (the "License");
+** you may not use this file except in compliance with the License.
+** You may obtain a copy of the License at
+**
+**    http://www.apache.org/licenses/LICENSE-2.0
+**
+** Unless required by applicable law or agreed to in writing, software
+** distributed under the License is distributed on an "AS IS" BASIS,
+** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+** See the License for the specific language governing permissions and
+** limitations under the License.
+*/
+
+/*
  * recvfrom like datagram receiving function for XIA
  * does not fill in DAG fields yet
  */
@@ -23,7 +39,7 @@ int Xrecvfrom(int sockfd, void *buf, size_t len, int flags,
     addr_len = sizeof their_addr;
     if ((numbytes = recvfrom(sockfd, UDPbuf, MAXBUFLEN-1 , flags,
 		    (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-	perror("Xrecvfrom: recvfrom");
+	//perror("Xrecvfrom: recvfrom");
 	return -1;
     }
     int src_port=ntohs(their_addr.sin_port);

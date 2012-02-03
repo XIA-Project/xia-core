@@ -44,11 +44,13 @@ using namespace std;
 
 int main(int argc, char *argv[])
 {
-	int sock, dlen, n;
+	int sock, dlen, n, acceptSock;
 	char SIDReq[1024];
 	unsigned char chunk[CHUNKSIZE];
 	string fileName;
 	vector<string> CIDlist;
+	pid_t pid;
+	
 	if(argc!=2)
 	{
 		error("no video file!\n");
@@ -62,11 +64,22 @@ int main(int argc, char *argv[])
 		error("no video file!\n");
 		exit(1);
 	}	
-	sock=Xsocket();
+	sock=Xsocket(XSOCK_STREAM);
 	if (sock < 0) {
 		 error("Opening socket for putting content");
 		 exit(-1);
 	}
+	
+	//Make the sDAG (the one the server listens on)
+	char * dag =(char*) malloc(snprintf(NULL, 0, "RE %s %s %s", AD1, HID1,SID_VIDEO) + 1);
+    	sprintf(dag, "RE %s %s %s", AD1, HID1,SID_VIDEO);
+   
+	// initalize
+	for(int i = 0; i < 1024; i++)
+		SIDReq[i] = '\0';
+ 
+	//Bind to the DAG
+	Xbind(sock,dag);	
 
 	int chunkIndex=0;
 	while(1)
@@ -113,77 +126,69 @@ int main(int argc, char *argv[])
 	// send list of CIDs 
 	// the proxy should fetch each of these CID
 	
-	sock=Xsocket();
-	if (sock < 0) {
-		error("Opening socket for service");
-		exit(-1);
-	}
-	
-	//Make the sDAG (the one the server listens on)
-	char * dag =(char*) malloc(snprintf(NULL, 0, "RE %s %s %s", AD1, HID1,SID_VIDEO) + 1);
-    	sprintf(dag, "RE %s %s %s", AD1, HID1,SID_VIDEO);
-   
-	// initalize
-	for(int i = 0; i < 1024; i++)
-		SIDReq[i] = '\0';
- 
-	//Bind to the DAG
-	Xbind(sock,dag);
+
+
     	while (1) {
 		printf("\nListening...\n");
-    		Xaccept(sock);
+    		acceptSock = Xaccept(sock);
 		printf("accept\n");
         
-		//Receive packet
-		n = Xrecv(sock,SIDReq,1024,0);
+    		pid = fork();
+    
+    		if (pid == 0) {  
+    			// child  
+    			    
+				//Receive packet
+				n = Xrecv(acceptSock,SIDReq,1024,0);
 		
-		if(n>0) {
+				if(n>0) {
 			
-			string SIDReqStr(SIDReq);
-			cout << "Got request: " << SIDReqStr << "\n";
-			// if the request is about number of chunks return number of chunks
-			// since this is first time, you would return along with header
-			int found = SIDReqStr.find("numchunks");
+					string SIDReqStr(SIDReq);
+					cout << "Got request: " << SIDReqStr << "\n";
+					// if the request is about number of chunks return number of chunks
+					// since this is first time, you would return along with header
+					int found = SIDReqStr.find("numchunks");
 			
-			if(found != -1){
-				//cout << " Request asks for number of chunks \n";
-				stringstream yy;
-				yy<<CIDlist.size();
-				string cidlistlen = yy.str();
-				Xsend(sock,(void *) cidlistlen.c_str(), cidlistlen.length(), 0);
-			} else {
-				// the request would have two parameters
-				// start-offset:end-offset
-				int findpos = SIDReqStr.find(":");
-				// split around this position
-				string str = SIDReqStr.substr(0,findpos);
-				int start_offset = atoi(str.c_str()); 
-				str = SIDReqStr.substr(findpos + 1);
-				int end_offset = atoi(str.c_str());
+					if(found != -1){
+						//cout << " Request asks for number of chunks \n";
+						stringstream yy;
+						yy<<CIDlist.size();
+						string cidlistlen = yy.str();
+						Xsend(acceptSock,(void *) cidlistlen.c_str(), cidlistlen.length(), 0);
+					} else {
+						// the request would have two parameters
+						// start-offset:end-offset
+						int findpos = SIDReqStr.find(":");
+						// split around this position
+						string str = SIDReqStr.substr(0,findpos);
+						int start_offset = atoi(str.c_str()); 
+						str = SIDReqStr.substr(findpos + 1);
+						int end_offset = atoi(str.c_str());
 
-				// construct the string from CIDlist
-				// return the list of CIDs
-				string requestedCIDlist = "";
-				// not including end_offset
-				for(int i = start_offset; i < end_offset; i++){
-					requestedCIDlist += CIDlist[i] + " ";
+						// construct the string from CIDlist
+						// return the list of CIDs
+						string requestedCIDlist = "";
+						// not including end_offset
+						for(int i = start_offset; i < end_offset; i++){
+							requestedCIDlist += CIDlist[i] + " ";
+						}		
+						Xsend(acceptSock, (void *)requestedCIDlist.c_str(), requestedCIDlist.length(), 0);
+						//cout << "sending " << requestedCIDlist << "\n";
+					}
+       					n=0;
+					for(int i = 0; i < 1024; i++)
+					
+						SIDReq[i] = '\0';
 				}
-				Xsend(sock, (void *)requestedCIDlist.c_str(), requestedCIDlist.length(), 0);
-				//cout << "sending " << requestedCIDlist << "\n";
-			}
-       			n=0;
-			for(int i = 0; i < 1024; i++)
-				SIDReq[i] = '\0';
-			// closing socket and reopening it for next listening
-			Xclose(sock);
-			sock=Xsocket();
-			if (sock < 0) {
-				error("Opening a new socket for service");
-				exit(-1);
-			}
-			Xbind(sock,dag);
+				Xclose(acceptSock);
+				_exit(0);
 	    	}	
+	    	    	
 	}
+	
+	Xclose(sock);
+	
+	
 	return 0;
 }
 

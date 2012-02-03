@@ -18,6 +18,7 @@ function run {
 }
 
 run ip_packetforward
+run ip_packetforward_fastpath
 run xia_packetforward_fallback0
 run xia_packetforward_fallback1
 run xia_packetforward_fallback2

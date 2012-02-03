@@ -30,7 +30,8 @@
 void error(const char *);
 
 int main(int argc, char *argv[]) {
-    int sock, n,dlen,i,seq_client_=0,seq_c,seq_s,rx=0;
+    int sock, n,i,seq_client_=0,seq_c=0,seq_s=0,rx=0;
+    size_t dlen;
     char reply[1024];
     char payload_new[2048],theirDAG[1024];    
     struct timeval tv;
@@ -41,7 +42,7 @@ int main(int argc, char *argv[]) {
     //if (fp==NULL) error("Error opening output file"); 
 
     //Open socket
-    sock=Xsocket();
+    sock=Xsocket(XSOCK_DGRAM);
     print_conf();
     if (sock < 0) 
 	error("Opening socket");
@@ -53,19 +54,19 @@ int main(int argc, char *argv[]) {
     //Xbind(sock,"RE AD:1000000000000000000000000000000000000009 HID:1500000000000000000000000000000000000055 SID:1f00000000000000000000000000000000000055");
 
     //Make the dDAG (the one you want to send packets to)
+    //char * dag = (char*)malloc(snprintf(NULL, 0, "RE %s %s %s", AD1, RHID1,SID0) + 1);
+    //sprintf(dag, "RE %s %s %s", AD1, RHID1,SID0);
     char * dag = (char*)malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,SID0) + 1);
     sprintf(dag, "RE %s %s %s", AD0, HID0,SID0);
 
-    //Use connect if you want to use Xsend instead of Xsendto
-    //printf("\nConnecting...\n");
-    Xconnect(sock,dag);//Use with Xrecv
+  
     while (1) {
-	//Use Xconnect() with Xsend()
+	
 	gettimeofday(&tv, NULL);
 	current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
 	memcpy (payload_new, &seq_client_, 4);
 
-	Xsend(sock,payload_new,4,0);
+	Xsendto(sock, payload_new,4,0,dag,strlen(dag));
 
 	//fprintf(fp, "%lu: PING sent; client seq = %d\n",current_time, seq_client_);  // modify payload
 	//printf("%lld: PING sent; client seq = %d\n",current_time, seq_client_);  // modify payload         

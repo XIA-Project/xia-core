@@ -3146,10 +3146,19 @@ fail:
 
 SWIGINTERN PyObject *_wrap_Xsocket(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
+  int arg1 ;
+  int val1 ;
+  int ecode1 = 0 ;
+  PyObject * obj0 = 0 ;
   int result;
   
-  if (!PyArg_ParseTuple(args,(char *)":Xsocket")) SWIG_fail;
-  result = (int)Xsocket();
+  if (!PyArg_ParseTuple(args,(char *)"O:Xsocket",&obj0)) SWIG_fail;
+  ecode1 = SWIG_AsVal_int(obj0, &val1);
+  if (!SWIG_IsOK(ecode1)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode1), "in method '" "Xsocket" "', argument " "1"" of type '" "int""'");
+  } 
+  arg1 = (int)(val1);
+  result = (int)Xsocket(arg1);
   resultobj = SWIG_From_int((int)(result));
   return resultobj;
 fail:
@@ -3392,6 +3401,144 @@ fail:
 }
 
 
+SWIGINTERN PyObject *_wrap_XgetCIDStatus(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  int arg1 ;
+  char *arg2 = (char *) 0 ;
+  size_t arg3 ;
+  int val1 ;
+  int ecode1 = 0 ;
+  int res2 ;
+  char *buf2 = 0 ;
+  int alloc2 = 0 ;
+  size_t val3 ;
+  int ecode3 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  PyObject * obj2 = 0 ;
+  int result;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OOO:XgetCIDStatus",&obj0,&obj1,&obj2)) SWIG_fail;
+  ecode1 = SWIG_AsVal_int(obj0, &val1);
+  if (!SWIG_IsOK(ecode1)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode1), "in method '" "XgetCIDStatus" "', argument " "1"" of type '" "int""'");
+  } 
+  arg1 = (int)(val1);
+  res2 = SWIG_AsCharPtrAndSize(obj1, &buf2, NULL, &alloc2);
+  if (!SWIG_IsOK(res2)) {
+    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "XgetCIDStatus" "', argument " "2"" of type '" "char *""'");
+  }
+  arg2 = (char *)(buf2);
+  ecode3 = SWIG_AsVal_size_t(obj2, &val3);
+  if (!SWIG_IsOK(ecode3)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "XgetCIDStatus" "', argument " "3"" of type '" "size_t""'");
+  } 
+  arg3 = (size_t)(val3);
+  result = (int)XgetCIDStatus(arg1,arg2,arg3);
+  resultobj = SWIG_From_int((int)(result));
+  if (alloc2 == SWIG_NEWOBJ) free((char*)buf2);
+  return resultobj;
+fail:
+  if (alloc2 == SWIG_NEWOBJ) free((char*)buf2);
+  return NULL;
+}
+
+
+
+SWIGINTERN PyObject *_wrap_XgetCIDList(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+ // need to fill in here
+  return NULL;
+}
+
+SWIGINTERN PyObject *_wrap_XgetCIDListStatus(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+ // need to fill in here
+  return NULL;
+}
+
+
+
+SWIGINTERN PyObject *_wrap_XreadCID(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  int arg1 ;
+  void *arg2 = (void *) 0 ;
+  size_t arg3 ;
+  int arg4 ;
+  char *arg5 = (char *) 0 ;
+  size_t arg6 = (size_t) 0 ;
+  int val1 ;
+  int ecode1 = 0 ;
+  int val4 ;
+  int ecode4 = 0 ;
+  int res5 ;
+  char *buf5 = 0 ;
+  int alloc5 = 0 ;
+  size_t val6 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  PyObject * obj2 = 0 ;
+  PyObject * obj3 = 0 ;
+  PyObject * obj4 = 0 ;
+  int result;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OOOOO:XreadCID",&obj0,&obj1,&obj2,&obj3,&obj4)) SWIG_fail;
+  ecode1 = SWIG_AsVal_int(obj0, &val1);
+  if (!SWIG_IsOK(ecode1)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode1), "in method '" "XreadCID" "', argument " "1"" of type '" "int""'");
+  } 
+  arg1 = (int)(val1);
+  {
+    if (!PyInt_Check(obj1)) {
+      PyErr_SetString(PyExc_ValueError, "Expecting an integer");
+      return NULL;
+    }
+    arg3 = PyInt_AsLong(obj1);
+    if (arg3<0) {
+      PyErr_SetString(PyExc_ValueError, "Positive integer expected");
+      return NULL;
+    }
+    arg2= (void*)malloc(arg3);
+    
+  }
+  
+  ecode4 = SWIG_AsVal_int(obj2, &val4);
+  if (!SWIG_IsOK(ecode4)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "XreadCID" "', argument " "4"" of type '" "int""'");
+  } 
+  arg4 = (int)(val4);
+   
+  res5 = SWIG_AsCharPtrAndSize(obj3, &buf5, NULL, &alloc5);
+  if (!SWIG_IsOK(res5)) {
+    SWIG_exception_fail(SWIG_ArgError(res5), "in method '" "XreadCID" "', argument " "5"" of type '" "char *""'");
+  }
+  arg5 = (char *)(buf5);
+  
+  arg6 = PyInt_AsLong(obj4);
+    if (arg6<0) {
+      PyErr_SetString(PyExc_ValueError, "Positive integer expected");
+      return NULL;
+    }
+    
+  
+  result = (int)XreadCID(arg1,arg2,arg3,arg4,arg5,arg6);
+  resultobj = SWIG_From_int((int)(result));
+  {
+    Py_XDECREF(resultobj);
+    if (result < 0) {
+      free(arg2);
+      PyErr_SetFromErrno(PyExc_IOError);
+      return NULL;
+    }
+    resultobj = PyString_FromStringAndSize(arg2, result);
+    free(arg2);
+  }
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+
+
 SWIGINTERN PyObject *_wrap_XputCID(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   int arg1 ;
@@ -3539,6 +3686,10 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"Xrecv", _wrap_Xrecv, METH_VARARGS, NULL},
 	 { (char *)"Xsend", _wrap_Xsend, METH_VARARGS, NULL},
 	 { (char *)"XgetCID", _wrap_XgetCID, METH_VARARGS, NULL},
+	 { (char *)"XgetCIDList", _wrap_XgetCIDList, METH_VARARGS, NULL},
+	 { (char *)"XgetCIDStatus", _wrap_XgetCIDStatus, METH_VARARGS, NULL},
+	 { (char *)"XgetCIDListStatus", _wrap_XgetCIDListStatus, METH_VARARGS, NULL},
+	 { (char *)"XreadCID", _wrap_XreadCID, METH_VARARGS, NULL},
 	 { (char *)"XputCID", _wrap_XputCID, METH_VARARGS, NULL},
 	 { (char *)"Xaccept", _wrap_Xaccept, METH_VARARGS, NULL},
 	 { (char *)"set_conf", _wrap_set_conf, METH_VARARGS, NULL},

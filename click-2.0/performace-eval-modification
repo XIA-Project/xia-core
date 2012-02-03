@@ -1,0 +1,348 @@
+diff --git a/click-2.0/conf/microbench/analysis/common.py b/click-2.0/conf/microbench/analysis/common.py
+index db6b2de..8e41b70 100755
+--- a/click-2.0/conf/microbench/analysis/common.py
++++ b/click-2.0/conf/microbench/analysis/common.py
+@@ -64,6 +64,14 @@ dataset = {
+     'CID-REQ-H': data_path_prefix + 'output_xia_packetforward_cid_req_hit',
+     'CID-REP': data_path_prefix + 'output_xia_packetforward_cid_rep',
+     'FB3-FP': data_path_prefix + 'output_xia_packetforward_fallback3_fastpath',
++    'FB0-INTRA-1': data_path_prefix + 'output_xia_packetforward_fallback0_intra',
++    'FB1-INTRA-1': data_path_prefix + 'output_xia_packetforward_fallback1_intra',
++    'FB2-INTRA-1': data_path_prefix + 'output_xia_packetforward_fallback2_intra',
++    'FB3-INTRA-1': data_path_prefix + 'output_xia_packetforward_fallback3_intra',
++    'FB0-INTRA-4': data_path_prefix + 'output_xia_packetforward_fallback0_intra_4',
++    'FB1-INTRA-4': data_path_prefix + 'output_xia_packetforward_fallback1_intra_4',
++    'FB2-INTRA-4': data_path_prefix + 'output_xia_packetforward_fallback2_intra_4',
++    'FB3-INTRA-4': data_path_prefix + 'output_xia_packetforward_fallback3_intra_4',
+ 
+     'TABLESIZE_HID_1': data_path_prefix + 'output_xia_tablesize_cid_1',
+     'TABLESIZE_HID_3': data_path_prefix + 'output_xia_tablesize_cid_3',
+@@ -100,7 +108,7 @@ dataset = {
+     'TABLESIZE_AD_30000000': data_path_prefix + 'output_xia_tablesize_ad_30000000',
+ }
+ 
+-iter_max = 10
++#iter_max = 10
+ #iter_max = 5
+-#iter_max = 1
++iter_max = 1
+ 
+diff --git a/click-2.0/conf/microbench/analysis/plot_perf_breakdown.py b/click-2.0/conf/microbench/analysis/plot_perf_breakdown.py
+index 4e49537..fb02302 100644
+--- a/click-2.0/conf/microbench/analysis/plot_perf_breakdown.py
++++ b/click-2.0/conf/microbench/analysis/plot_perf_breakdown.py
+@@ -6,7 +6,8 @@ import re
+ # task
+ tasks = ['Classification', 'Fast Path', 'Lookup (Slow)', 'Other', 'Queueing', 'Misc', 'Mem Alloc/Copy', None]
+ ignored_tasks = ['Mem Alloc/Copy', None]
+-task_colors = ['0.2', '1', '0.6', '0.4', '0.8']
++#ignored_tasks = [None]
++task_colors = ['0.2', '1', '0.6', '0.4', '0.8', '0.2', '0.6']
+ 
+ # symbol name to task mapping
+ symbol_task_mappings = [
+@@ -65,6 +66,15 @@ symbol_task_mappings = [
+     (re.compile(r'^RouterThread::driver\(.*\)$'), None),
+     (re.compile(r'^XIAPrint::.*$'), None),
+ 
++    ####
++    (re.compile(r'^Barrier::.*$'), 'Queueing'),
++    (re.compile(r'^StaticThreadSched::.*$'), 'Queueing'),
++    (re.compile(r'^ScheduleInfo::.*$'), 'Queueing'),
++    (re.compile(r'^IsoCPUPush::.*$'), 'Queueing'),
++    (re.compile(r'^SimpleQueue::.*$'), 'Queueing'),
++    (re.compile(r'^StoreIPAddress::.*$'), None),
++    ####
++
+     (re.compile(r'^<>0x7ff.*$'), None),
+     (re.compile(r'^<>0xfff.*$'), None),
+     (re.compile(r'^<>_Z.*$'), None),
+diff --git a/click-2.0/conf/microbench/prepare.sh b/click-2.0/conf/microbench/prepare.sh
+index 028049e..beb8a6e 100755
+--- a/click-2.0/conf/microbench/prepare.sh
++++ b/click-2.0/conf/microbench/prepare.sh
+@@ -2,6 +2,6 @@
+ 
+ make -C .. clean
+ make -C ../.. distclean
+-pushd ../.. && CPPFLAGS="-g -O2 -fno-omit-frame-pointer" ./conf_user_click_nomt.sh --enable-task-heap && popd
++pushd ../.. && CPPFLAGS="-g -O2 -fno-omit-frame-pointer" ./conf_user_click.sh --enable-task-heap && popd
+ make -j4 -C ../.. || exit 1
+ 
+diff --git a/click-2.0/conf/microbench/run_packetforward.sh b/click-2.0/conf/microbench/run_packetforward.sh
+index 0ce3d6c..17f97b7 100755
+--- a/click-2.0/conf/microbench/run_packetforward.sh
++++ b/click-2.0/conf/microbench/run_packetforward.sh
+@@ -1,28 +1,39 @@
+ #!/bin/bash
+ 
+ function run {
+-	echo $1
++	if [ "$3" != "" ]; then NAME=$3; else NAME=$2; fi
++	echo $NAME
+ 	sync
+-	for ITER in 0 1 2 3 4 5 6 7 8 9; do
++	#for ITER in 0 1 2 3 4 5 6 7 8 9; do
+ 	#for ITER in 0 1 2 3 4; do
+-	#for ITER in 0; do
++	for ITER in 0; do
+ 		echo $ITER
+-		if [ -e "output_$1_timing_$ITER" ]; then
++		if [ -e "output_${NAME}_timing_$ITER" ]; then
+ 			echo skipping
+ 			continue
+ 		fi
+ 		sleep 3
+-		perf record -g /usr/bin/time ../../userlevel/click $1.click >& output_$1_timing_$ITER
+-		perf report -g flat,0 >& output_$1_perf_$ITER
++		perf record -g /usr/bin/time ../../userlevel/click -j $1 $2.click >& output_${NAME}_timing_$ITER
++		perf report -g flat,0 >& output_${NAME}_perf_$ITER
+ 	done
+ }
+ 
+-run ip_packetforward
+-run xia_packetforward_fallback0
+-run xia_packetforward_fallback1
+-run xia_packetforward_fallback2
+-run xia_packetforward_fallback3
+-run xia_packetforward_viapoint
+-#run xia_packetforward_cid_rep
+-run xia_packetforward_fallback3_fastpath
++run 1 ip_packetforward
++run 1 xia_packetforward_fallback0
++run 1 xia_packetforward_fallback1
++run 1 xia_packetforward_fallback2
++run 1 xia_packetforward_fallback3
++run 1 xia_packetforward_viapoint
++#run 1 xia_packetforward_cid_rep
++run 1 xia_packetforward_fallback3_fastpath
++
++run 1 xia_packetforward_fallback0_intra
++run 1 xia_packetforward_fallback1_intra
++run 1 xia_packetforward_fallback2_intra
++run 1 xia_packetforward_fallback3_intra
++
++run 8 xia_packetforward_fallback0_intra xia_packetforward_fallback0_intra_4
++run 8 xia_packetforward_fallback1_intra xia_packetforward_fallback1_intra_4
++run 8 xia_packetforward_fallback2_intra xia_packetforward_fallback2_intra_4
++run 8 xia_packetforward_fallback3_intra xia_packetforward_fallback3_intra_4
+ 
+diff --git a/click-2.0/conf/xia/xia_vm_common.click b/click-2.0/conf/xia/xia_vm_common.click
+index beb3d38..ad5656b 100644
+--- a/click-2.0/conf/xia/xia_vm_common.click
++++ b/click-2.0/conf/xia/xia_vm_common.click
+@@ -2,8 +2,8 @@ AddressInfo(
+     RHID0 00:0f:b5:3f:54:6d,
+     RHID1 00:0f:b5:9a:8b:2f,
+     GUEST 00:11:22:33:44:55,
+-    #GUEST_AT_RHID0 52:54:75:00:00:00,
+-    #GUEST_AT_RHID1 52:54:76:00:00:00,
++    GUEST_AT_RHID0 52:54:75:00:00:00,
++    GUEST_AT_RHID1 52:54:76:00:00:00,
+     CLIENT 00:24:e8:31:d0:4f,
+ );
+ 
+diff --git a/click-2.0/conf/xia/xia_vm_ping_server.click b/click-2.0/conf/xia/xia_vm_ping_server.click
+index f1ab088..c1ce298 100644
+--- a/click-2.0/conf/xia/xia_vm_ping_server.click
++++ b/click-2.0/conf/xia/xia_vm_ping_server.click
+@@ -1,36 +1,19 @@
+-require(library xia_router_template.click);
++require(library xia_router_template_xudp.click);
+ require(library xia_address.click);
+ require(library xia_vm_common.click);
+ 
+-router :: RouteEngine(RE AD0 RHID0 HID0);
++host :: EndHost (RE AD_CMU RHID0, RHID0, fake0,192.0.0.2,192.0.0.1,11:11:11:11:11:11,0);
+ 
+ from_eth1 :: FromDevice(eth1, PROMISC true);
+ 
+-to_eth1 :: Queue() -> ToDevice(eth1);
+-
+ from_eth1
+--> c0 :: Classifier(12/9999) -> Strip(14) -> MarkXIAHeader() -> [0]router
+-
+-router[0]
+--> sw :: PaintSwitch;
++-> c0 :: Classifier(12/9999) -> Strip(14) -> MarkXIAHeader() -> [0]host
+ 
+-sw[0]
++host[0]
+ //-> XIAPrint("xia_vm_ping_server:to_other")
+--> EtherEncap(0x9999, GUEST, CLIENT) -> to_eth1;
+-
+-router[1]
+--> XIAPingResponder(RE AD0 RHID0 HID0)
+-//-> XIAPrint("xia_vm_ping_server:resp")
+--> [1]router;
++-> EtherEncap(0x9999, GUEST, CLIENT) -> ToDevice(eth1);
+ 
+-router[2]
+--> XIAPrint("xia_vm_ping_server:no_cache")
+--> Discard;
+ 
+-Script(write router/proc/rt_AD/rt.add AD0 4);
+-Script(write router/proc/rt_AD/rt.add - 0);
+-Script(write router/proc/rt_HID/rt.add RHID0 4);
+-Script(write router/proc/rt_HID/rt.add RHID1 4);
+-Script(write router/proc/rt_HID/rt.add HID0 4);
+-Script(write router/proc/rt_HID/rt.add - 0);
++Script(write host/n/proc/rt_AD/rt.add AD_CMU 4);
++Script(write host/n/proc/rt_HID/rt.add RHID1 4);
+ 
+diff --git a/click-2.0/conf/xia/xia_vm_relay_hostA.click b/click-2.0/conf/xia/xia_vm_relay_hostA.click
+index 07a8be3..96d5fca 100644
+--- a/click-2.0/conf/xia/xia_vm_relay_hostA.click
++++ b/click-2.0/conf/xia/xia_vm_relay_hostA.click
+@@ -5,13 +5,19 @@ require(library xia_vm_common.click);
+ router :: RouteEngine(RE AD1 HID1);
+ 
+ from_eth0 :: FromDevice(eth0, PROMISC true);
+-to_eth0 :: Queue() -> ToDevice(eth0);
++//to_eth0 :: Queue() -> ToDevice(eth0);
+ 
+ from_tap0 :: FromDevice(tap0, PROMISC true);
+ to_tap0 :: Queue() -> ToDevice(tap0);
+ 
+ from_eth0
+--> c0 :: Classifier(12/9999) -> Strip(14) -> MarkXIAHeader() -> [0]router;
++-> c0 :: Classifier(12/0800) -> Strip(14) 
++-> MarkIPHeader()
++-> c_ip::IPClassifier(udp port 9999, udp port 9998)
++-> StripIPHeader()
++-> MarkXIAHeader() -> XIAPrint("From Mbone")-> [0]router;
++
++c_ip[1]-> MarkXIAHeader() -> XIAPrint("From r1") -> [0]router;
+ 
+ from_tap0
+ -> c1 :: Classifier(12/9999) -> Strip(14) -> MarkXIAHeader() -> [0]router;
+@@ -22,16 +28,16 @@ router[0]
+ -> sw :: PaintSwitch;
+ 
+ sw[0]
+-//-> XIAPrint("xia_vm_hostA_relay:to_client")
+--> EtherEncap(0x9999, RHID0, CLIENT) -> to_eth0;
++-> XIAPrint("xia_vm_hostA_relay:to_Xbone")
++-> Socket(UDP, 64.57.23.165 , 9999, 0.0.0.0, 9999, SNAPLEN 9000)
+ 
+ sw[1]
+-//-> XIAPrint("xia_vm_hostA_relay:to_guest")
++-> XIAPrint("xia_vm_hostA_relay:to_guest")
+ -> EtherEncap(0x9999, RHID0, GUEST) -> to_tap0;
+ 
+ sw[2]
+-//-> XIAPrint("xia_vm_hostA_relay:to_rhid1")
+--> EtherEncap(0x9999, RHID0, RHID1) -> to_eth0;
++-> XIAPrint("xia_vm_hostA_relay:to_rhid1")
++-> Socket(UDP, 128.2.208.169 , 9998, 0.0.0.0, 9998, SNAPLEN 9000)
+ 
+ router[1]
+ -> XIAPrint("xia_vm_hostA_relay:no_cache")
+@@ -41,10 +47,13 @@ router[2]
+ -> XIAPrint("xia_vm_hostA_relay:no_cache")
+ -> Discard;
+ 
+-Script(write router/proc/rt_AD/rt.add AD0 4);
+-Script(write router/proc/rt_AD/rt.add AD1 4);
+-Script(write router/proc/rt_HID/rt.add RHID0 4);
++Script(write router/proc/rt_AD/rt.add AD_CMU 4); // self
++Script(write router/proc/rt_AD/rt.add - 0);  // XBone
++Script(write router/proc/rt_HID/rt.add RHID0 4); // self
+ Script(write router/proc/rt_HID/rt.add RHID1 2);
+-Script(write router/proc/rt_HID/rt.add HID0 1);
+-Script(write router/proc/rt_HID/rt.add HID1 0);
++Script(write router/proc/rt_HID/rt.add VM_HID 1); 
++Script(write router/proc/rt_HID/rt.add HID1 0); // ? Client
++
++Script(write router/proc/rt_SID/rt.add - 5);
++Script(write router/proc/rt_CID/rt.add - 5);
+ 
+diff --git a/click-2.0/elements/ip/decipttl.cc b/click-2.0/elements/ip/decipttl.cc
+index cdc8dca..6d3c369 100644
+--- a/click-2.0/elements/ip/decipttl.cc
++++ b/click-2.0/elements/ip/decipttl.cc
+@@ -62,6 +62,7 @@ DecIPTTL::simple_action(Packet *p)
+ 	click_ip *ip = q->ip_header();
+ 	--ip->ip_ttl;
+ 
++#if 0
+ 	// 19.Aug.1999 - incrementally update IP checksum as suggested by SOSP
+ 	// reviewers, according to RFC1141, as updated by RFC1624.
+ 	// new_sum = ~(~old_sum + ~old_halfword + new_halfword)
+@@ -71,7 +72,7 @@ DecIPTTL::simple_action(Packet *p)
+ 	//         = ~(~old_sum + 0xFEFF)
+ 	unsigned long sum = (~ntohs(ip->ip_sum) & 0xFFFF) + 0xFEFF;
+ 	ip->ip_sum = ~htons(sum + (sum >> 16));
+-
++#endif 
+ 	return q;
+     }
+ }
+diff --git a/click-2.0/elements/standard/infinitesource.cc b/click-2.0/elements/standard/infinitesource.cc
+index 5ce1c48..c915c72 100644
+--- a/click-2.0/elements/standard/infinitesource.cc
++++ b/click-2.0/elements/standard/infinitesource.cc
+@@ -124,7 +124,9 @@ InfiniteSource::run_task(Task *)
+ 	_task.fast_reschedule();
+     else if (_stop && _limit >= 0 && _count >= (ucounter_t) _limit)
+ 	router()->please_stop_driver();
+-    return n > 0;
++    //return n > 0;
++    _task.fast_reschedule();
++    return true;
+ }
+ 
+ Packet *
+diff --git a/click-2.0/elements/standard/unqueue.cc b/click-2.0/elements/standard/unqueue.cc
+index 336bee6..4c3a994 100644
+--- a/click-2.0/elements/standard/unqueue.cc
++++ b/click-2.0/elements/standard/unqueue.cc
+@@ -68,8 +68,8 @@ Unqueue::run_task(Task *)
+     int worked = 0, limit = _burst;
+     if (_limit >= 0 && _count + limit >= (uint32_t) _limit) {
+ 	limit = _limit - _count;
+-	if (limit <= 0)
+-	    return false;
++	//if (limit <= 0)
++	//    return false;
+     }
+ 
+     while (worked < limit && _active) {
+@@ -83,9 +83,10 @@ Unqueue::run_task(Task *)
+ 	    break;
+     }
+ 
+-    _task.fast_reschedule();
+   out:
+-    return worked > 0;
++    _task.fast_reschedule();
++    return true;
++    //return worked > 0;
+ }
+ 
+ #if 0 && defined(CLICK_LINUXMODULE)
+diff --git a/migration/common.sh b/migration/common.sh
+index 84a8711..48603d9 100644
+--- a/migration/common.sh
++++ b/migration/common.sh
+@@ -1,5 +1,5 @@
+ # change the username if not available
+-USER=hlim
++USER=dongsuh
+ 
+ COMMON_PREFIX=/mnt/home-xia-router0/$USER/xia-core/migration
+ IMAGE_PATH=`ls $COMMON_PREFIX/ubuntu-kvm/*.qcow2`
+diff --git a/migration/run_ping_server.sh b/migration/run_ping_server.sh
+index 0a5e1cd..677d102 100755
+--- a/migration/run_ping_server.sh
++++ b/migration/run_ping_server.sh
+@@ -4,7 +4,7 @@ PREFIX=`dirname $0`
+ PREFIX=`readlink -f $PREFIX`
+ source $PREFIX/common.sh
+ 
+-rsync -avz --progress -e "ssh -i $PREFIX/id_rsa_vm -p 5555" $CLICK_PATH/userlevel/click $CLICK_PATH/conf/xia/{xia_router_template.click,xia_address.click,xia_vm_common.click,xia_vm_ping_server.click} root@127.0.0.1:~/
++rsync -avz --progress -e "ssh -i $PREFIX/id_rsa_vm -p 5555" $CLICK_PATH/userlevel/click $CLICK_PATH/conf/xia/{xia_router_template.click,xia_address.click,xia_vm_common.click,xia_vm_ping_server.click} $PREFIX/../web_demo root@127.0.0.1:~/
+ 
+-ssh -i $PREFIX/id_rsa_vm -p 5555 root@127.0.0.1 "ifconfig eth1 up 0.0.0.0; killall click; ./click xia_vm_ping_server.click > output_server 2>&1" &
++#ssh -i $PREFIX/id_rsa_vm -p 5555 root@127.0.0.1 "ifconfig eth1 up 0.0.0.0; killall click; ./click xia_vm_ping_server.click > output_server 2>&1" &
+ 

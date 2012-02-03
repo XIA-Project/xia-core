@@ -18,13 +18,14 @@
 #define CID0 "CID:2000000000000000000000000000000000000001"
 #define SID0 "SID:0f00000000000000000000000000000000000055"
 
-#define TOTALPINGS 4000
+#define TOTALPINGS 500
 #define MIGRATEPOINT 2000
 
 
 int main(int argc, char *argv[])
 {
-    int sock, dlen, n, seq_c,seq_s;
+    int sock, n, seq_c,seq_s;
+    size_t dlen;
     char payload_new[1024],theirDAG[1024];
     char* reply[1024];
     struct timeval tv;
@@ -37,7 +38,7 @@ int main(int argc, char *argv[])
     }
 
     //Open socket
-    sock=Xsocket();
+    sock=Xsocket(XSOCK_DGRAM);
     print_conf(); /* For Debugging configuartion */
     if (sock < 0) error("Opening socket");
 
@@ -47,18 +48,18 @@ int main(int argc, char *argv[])
 
     //Bind to the DAG
     Xbind(sock,dag);
-    printf("\nListening...\n");
-    Xaccept(sock);
+    //printf("\nListening...\n");
+    //Xaccept(sock);
 
     seq_s = 0;
 
     while (seq_s<TOTALPINGS) {
 	//Receive packet
-	n = Xrecv(sock,payload_new,1024,0);
+	n = Xrecvfrom(sock,payload_new,1024,0,theirDAG,&dlen);
 
 	gettimeofday(&tv, NULL);
 	current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
-	//n = Xrecvfrom(sock,payload_new,1024,0,theirDAG,&dlen);
+	
 	if(n>0)
 	{
 	    memcpy (&seq_c,payload_new, 4);
@@ -72,7 +73,7 @@ int main(int argc, char *argv[])
 	    fprintf(fp, "%lu: PING received; client seq = %d\n",current_time, seq_c);
 	    //printf("%lld: PING received; client seq = %d\n",current_time, seq_c);
 
-	    Xsend(sock,payload_new,8,0);
+	    Xsendto(sock, payload_new,8,0,theirDAG,strlen(theirDAG));
 	    gettimeofday(&tv, NULL);
 	    current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
 	    fprintf(fp, "%lu: PONG sent; client seq = %d, server seq = %d\n",current_time,seq_c, seq_s);              

@@ -1,0 +1,12 @@
+$TTL 1D
+$ORIGIN	sidstock.
+@	IN	SOA	@	ns	(
+					1
+					8H
+					15M
+					1W
+					1D
+					)
+	IN	NS	@
+	IN	A	0.0.0.0
+	IN	XIA	SID:0f03333333333333333333333333330000000055

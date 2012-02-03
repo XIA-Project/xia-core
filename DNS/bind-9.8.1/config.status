@@ -448,7 +448,7 @@ Copyright (C) 2010 Free Software Foundation, Inc.
 This config.status script is free software; the Free Software Foundation
 gives unlimited permission to copy, distribute and modify it."
 
-ac_pwd='/home/onhachoe/Desktop/bind9/bind-9.8.1'
+ac_pwd='/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1'
 srcdir='.'
 INSTALL='/usr/bin/install -c'
 test -n "$AWK" || AWK=awk
@@ -548,7 +548,7 @@ _ASBOX
 #
 # INIT-COMMANDS
 #
-atfdir=/home/onhachoe/Desktop/bind9/bind-9.8.1/unit/atf
+atfdir=/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/unit/atf
 
 
 # Handling of arguments.
@@ -771,8 +771,8 @@ fi
 
 echo 'BEGIN {' >"$tmp/subs1.awk" &&
 cat >>"$tmp/subs1.awk" <<\_ACAWK &&
-F["BIND9_MAKE_INCLUDES"]="/home/onhachoe/Desktop/bind9/bind-9.8.1/make/includes"
-F["BIND9_MAKE_RULES"]="/home/onhachoe/Desktop/bind9/bind-9.8.1/make/rules"
+F["BIND9_MAKE_INCLUDES"]="/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/make/includes"
+F["BIND9_MAKE_RULES"]="/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/make/rules"
 F["LIBISC_API"]="./lib/isc/api"
 F["LIBISCCC_API"]="./lib/isccc/api"
 F["LIBISCCFG_API"]="./lib/isccfg/api"
@@ -803,13 +803,13 @@ S["SO_CFLAGS"]="-fPIC"
 S["SO"]="so"
 S["BIND9_CONFIGARGS"]="CONFIGARGS=defaults"
 S["BIND9_VERSION"]="VERSION=9.8.1"
-S["BIND9_BIND9_BUILDINCLUDE"]="-I/home/onhachoe/Desktop/bind9/bind-9.8.1/lib/bind9/include"
-S["BIND9_LWRES_BUILDINCLUDE"]="-I/home/onhachoe/Desktop/bind9/bind-9.8.1/lib/lwres/include"
-S["BIND9_DNS_BUILDINCLUDE"]="-I/home/onhachoe/Desktop/bind9/bind-9.8.1/lib/dns/include"
-S["BIND9_ISCCFG_BUILDINCLUDE"]="-I/home/onhachoe/Desktop/bind9/bind-9.8.1/lib/isccfg/include"
-S["BIND9_ISCCC_BUILDINCLUDE"]="-I/home/onhachoe/Desktop/bind9/bind-9.8.1/lib/isccc/include"
-S["BIND9_ISC_BUILDINCLUDE"]="-I/home/onhachoe/Desktop/bind9/bind-9.8.1/lib/isc/include"
-S["BIND9_TOP_BUILDDIR"]="/home/onhachoe/Desktop/bind9/bind-9.8.1"
+S["BIND9_BIND9_BUILDINCLUDE"]="-I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/bind9/include"
+S["BIND9_LWRES_BUILDINCLUDE"]="-I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/lwres/include"
+S["BIND9_DNS_BUILDINCLUDE"]="-I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/dns/include"
+S["BIND9_ISCCFG_BUILDINCLUDE"]="-I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/isccfg/include"
+S["BIND9_ISCCC_BUILDINCLUDE"]="-I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/isccc/include"
+S["BIND9_ISC_BUILDINCLUDE"]="-I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/isc/include"
+S["BIND9_TOP_BUILDDIR"]="/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1"
 S["UNITTESTS"]=""
 S["ATFLIBS"]=""
 S["ATFBIN"]=""

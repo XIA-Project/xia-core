@@ -2,6 +2,7 @@
 #define CLICK_IPRANDOMIZE_HH
 #include <click/element.hh>
 #include "../ip/iproutetable.hh"
+#include <click/zipf.h>
 CLICK_DECLS
 
 /*
@@ -35,6 +36,10 @@ private:
     int _current_cycle;
     int _offset;
     IPRouteTable *_routeTable;
+    Zipf _zipf;
+    static uint32_t* _zipf_cache;
+    static uint32_t* _ip_cache;
+    static bool _ip_cache_initialized;
 };
 
 CLICK_ENDDECLS

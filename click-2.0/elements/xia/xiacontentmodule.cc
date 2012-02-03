@@ -333,7 +333,9 @@ void XIAContentModule::cache_incoming_local(Packet *p, const XID& srcCID, bool l
 	    else {
 		content[srcCID]= 1;
 	    }
+	    
 	    addRoute(srcCID);
+	    
 	}
 	else { 
 	    if (CACHE_DEBUG)

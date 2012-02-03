@@ -24,13 +24,14 @@
 #define CID0 "CID:2000000000000000000000000000000000000001"
 #define SID0 "SID:0f00000000000000000000000000000000000055"
 
-#define TOTALPINGS 100
-#define MIGRATEPOINT 5
+#define TOTALPINGS 500
+#define MIGRATEPOINT 2000
 
 void error(const char *);
 
 int main(int argc, char *argv[]) {
-    int sock, n,dlen,i,seq_client_=0,seq_c,seq_s,rx=0;
+    int sock, n,i,seq_client_=0,seq_c=0,seq_s=0,rx=0;
+    size_t dlen;
     char reply[1024];
     char payload_new[2048],theirDAG[1024];    
     struct timeval tv;
@@ -41,7 +42,7 @@ int main(int argc, char *argv[]) {
     if (fp==NULL) error("Error opening output file"); 
 
     //Open socket
-    sock=Xsocket();
+    sock=Xsocket(XSOCK_DGRAM);
     print_conf();
     if (sock < 0) 
 	error("Opening socket");
@@ -56,32 +57,21 @@ int main(int argc, char *argv[]) {
     char * dag = (char*)malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,SID0) + 1);
     sprintf(dag, "RE %s %s %s", AD0, HID0,SID0);
 
-    //Use connect if you want to use Xsend instead of Xsendto
-    //printf("\nConnecting...\n");
-    Xconnect(sock,dag);//Use with Xrecv
+    
     for (i=0;i<TOTALPINGS;i++) {
 	//Use Xconnect() with Xsend()
 	gettimeofday(&tv, NULL);
 	current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
 	memcpy (payload_new, &seq_client_, 4);
 
-	Xsend(sock,payload_new,4,0);
+	Xsendto(sock, payload_new,4,0,dag,strlen(dag));
 
 	fprintf(fp, "%lu: PING sent; client seq = %d\n",current_time, seq_client_);  // modify payload
 	//printf("%lld: PING sent; client seq = %d\n",current_time, seq_client_);  // modify payload         
 	seq_client_++;
 
-	//Or use Xsendto()
-	//Xsendto(sock,payload_new,4,0,dag,strlen(dag));
-	//printf("Sent\n");
-
-	//Process reply from server
-	//n = Xrecvfrom(sock,reply,1024,0,theirDAG,&dlen);
-	int j=0;
-	for(j=0;j<100;j++)
-	{
-	    n = Xrecv(sock,reply,1024,0);
-	    while(n>0)
+        n = Xrecvfrom(sock,reply,1024,0,theirDAG,&dlen);
+	if(n>0)
 	    {   
 		gettimeofday(&tv, NULL);
 		current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
@@ -91,11 +81,9 @@ int main(int argc, char *argv[]) {
 		//printf("%lld: PONG received; client seq = %d, server seq = %d\n",current_time, seq_c, seq_s);
 		rx++;
 		n=0;
-		n = Xrecv(sock,reply,1024,0);
 	    }   
 	    //Sleep for x microseconds between pings
 	    usleep(100);
-	}
 
     }
 
@@ -103,7 +91,7 @@ int main(int argc, char *argv[]) {
     if(rx<TOTALPINGS)  
 	do
 	{   
-	    n = Xrecv(sock,reply,1024,0);
+	    n = Xrecvfrom(sock,reply,1024,0,theirDAG,&dlen);
 	    gettimeofday(&tv, NULL);
 	    current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
 	    memcpy (&seq_c,reply, 4);

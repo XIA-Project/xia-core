@@ -1,3 +1,19 @@
+/*
+** Copyright 2011 Carnegie Mellon University
+**
+** Licensed under the Apache License, Version 2.0 (the "License");
+** you may not use this file except in compliance with the License.
+** You may obtain a copy of the License at
+**
+**    http://www.apache.org/licenses/LICENSE-2.0
+**
+** Unless required by applicable law or agreed to in writing, software
+** distributed under the License is distributed on an "AS IS" BASIS,
+** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+** See the License for the specific language governing permissions and
+** limitations under the License.
+*/
+
 /* 
  * Creates an XIA socket. 
  * When called it creates a socket to connect to Click using UDP packets. 
@@ -35,7 +51,7 @@ extern "C" {
 			exit(0);
         }
 
-        int Xsocket()
+        int Xsocket(int transport_type) // 0: Reliable transport, 1: Unreliable transport
         {
 			//Setup to listen for control info
 			//char* str=(char*)"open";//TODO: Not necessary. Maybe more useful data could be sent in the open control packet?
@@ -58,10 +74,12 @@ extern "C" {
 			}
 
 			//If port is in use, try next port until success, or max ATTEMPTS reached
+			srand((unsigned)time(0));
 			rv=-1;
 			for (tries=0;tries<ATTEMPTS;tries++)
 			{
-				port=1024 + rand() % (65535 - 1024);
+				int rn = rand();
+				port=1024 + rn % (65535 - 1024); 
 				my_addr.sin_family = PF_INET;
 				my_addr.sin_addr.s_addr = inet_addr(MYADDRESS);
 				my_addr.sin_port = htons(port);
@@ -75,7 +93,7 @@ extern "C" {
 				perror("Xsocket listener: bind");
 				return -1;
 			}
-
+			
 			//printf("Xsocket listener: Sending...\n");
 
 			//Send a control packet
@@ -85,6 +103,10 @@ extern "C" {
 
 			// protobuf message
 			xia_socket_msg.set_type(xia::XSOCKET);
+			
+			xia::X_Socket_Msg *x_socket_msg = xia_socket_msg.mutable_x_socket();
+			x_socket_msg->set_type(transport_type);		
+			
 			std::string p_buf;
 			xia_socket_msg.SerializeToString(&p_buf);
 
@@ -161,9 +183,9 @@ void __InitXSocket::read_conf(const char *inifile, const char *section_name)
 {
 	__XSocketConf::initialized=1;
 
-	int n = ini_gets(section_name, "api_addr", DEFAULT_MYADDRESS, _conf.api_addr, __IP_ADDR_LEN, inifile);
-	n = ini_gets(section_name, "click_dataaddr", DEFAULT_CLICKDATAADDRESS, _conf.click_dataaddr, __IP_ADDR_LEN , inifile);
-	n = ini_gets(section_name, "click_controladdr", DEFAULT_CLICKCONTROLADDRESS, _conf.click_controladdr, __IP_ADDR_LEN, inifile);
+	ini_gets(section_name, "api_addr", DEFAULT_MYADDRESS, _conf.api_addr, __IP_ADDR_LEN, inifile);
+	ini_gets(section_name, "click_dataaddr", DEFAULT_CLICKDATAADDRESS, _conf.click_dataaddr, __IP_ADDR_LEN , inifile);
+	ini_gets(section_name, "click_controladdr", DEFAULT_CLICKCONTROLADDRESS, _conf.click_controladdr, __IP_ADDR_LEN, inifile);
 
 }
 

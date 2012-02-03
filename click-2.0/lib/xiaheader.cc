@@ -31,15 +31,17 @@ XIAHeader::src_path() const
     return p;
 }
 
+/* Returns layer 3 payload (this includes transport header) */
 const uint8_t*
 XIAHeader::payload() const
 {
     uint8_t nxt = _hdr->nxt;
     const uint8_t* p = next_header();
-    while (nxt <= CLICK_XIA_NXT_HDR_MAX)
+    while (nxt < CLICK_XIA_NXT_NO)
     {
-        nxt = *p;
-        p += *(p + 1);
+    	const struct click_xia_ext * exthdr = reinterpret_cast<const struct click_xia_ext *>(p);
+        nxt = exthdr->nxt;
+        p += exthdr->hlen;
     }
     return p;
 }

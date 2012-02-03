@@ -14,11 +14,13 @@ enum XSocketCallType {
   XRECV = 9;
   XRECVFROM = 10;
 
-  XSOCKET_REQUEST_FAILED = 11;
+  XREQUESTFAILED = 11;
 
   XGETSOCKETIDLIST = 12;
   XGETSOCKETINFO = 13;
 
+  XGETCIDSTATUS = 14;
+  XREADCID = 15;
 }
 
 
@@ -36,14 +38,20 @@ message XSocketMsg {
   optional X_Send_Msg x_send= 10;
   optional X_Recv_Msg x_recv= 11;
   optional X_Recvfrom_Msg x_recvfrom= 12;  
+  
+  optional X_Requestfailed_Msg x_requestfailed= 13; 
 
-  optional X_Getsocketidlist_Msg x_getsocketidlist = 13;
-  optional X_Getsocketinfo_Msg x_getsocketinfo = 14;
+  optional X_Getsocketidlist_Msg x_getsocketidlist = 14;
+  optional X_Getsocketinfo_Msg x_getsocketinfo = 15;
+
+  optional X_Getcidstatus_Msg x_getcidstatus= 16;
+  optional X_Readcid_Msg x_readcid= 17;
 
 }
  
 message X_Socket_Msg {
-  optional string temp = 1; // currently not used
+  required int32 type = 1; // Indicating the type of tranport (0: Reliable transport, 1: Unreliable transport)
+  optional string temp = 2; // currently not used
 }
 
 message X_Bind_Msg {
@@ -56,6 +64,7 @@ message X_Close_Msg {
 
 message X_Connect_Msg {
   required string ddag = 1; // connect to destination dag 
+  optional int32 status = 2; // Indicating the status (-1: connected, -1: failed) 
 }
 
 message X_Accept_Msg {
@@ -68,8 +77,25 @@ message X_Putcid_Msg {
 }
 
 message X_Getcid_Msg {
-  optional string temp = 1; // currently not used
+  required int32 numcids = 1; // the number of Content-DAGs requested
+  required string cdaglist = 2; // Content-DAGs each concatenated using '^'
+  optional bytes payload = 3; // data
 }
+
+message X_Getcidstatus_Msg {
+  required int32 numcids = 1; // the number of Content-DAGs requested
+  required string cdaglist = 2; // Content-DAGs each concatenated using '^'
+  required string status_list = 3; // Status for CID requests each concatenated using '^'
+  optional bytes payload = 4; // data
+}
+
+message X_Readcid_Msg {
+  required int32 numcids = 1; // the number of Content-DAGs requested
+  required string cdaglist = 2; // Content-DAGs each concatenated using '^'
+  optional string status_list = 3; // Status for CID requests each concatenated using '^'
+  optional bytes payload = 4; // data
+}
+
 
 message X_Sendto_Msg {
   required string ddag = 1; // dest dag
@@ -105,7 +131,10 @@ message X_Getsocketinfo_Msg {
 }
 
 
-
+message X_Requestfailed_Msg {
+  optional int32 type = 1; // Indicating the type of error (to be defined)
+  optional string temp = 2; // currently not used
+}
 
 
 
