@@ -1,8 +1,8 @@
 #ifndef CLICK_IPRANDOMIZE_HH
 #define CLICK_IPRANDOMIZE_HH
 #include <click/element.hh>
-#include <click/zipf.h>
 #include "../ip/iproutetable.hh"
+#include <click/zipf.h>
 CLICK_DECLS
 
 /*
@@ -38,7 +38,8 @@ private:
     IPRouteTable *_routeTable;
     Zipf _zipf;
     static uint32_t* _zipf_cache;
-    static atomic_uint32_t _zipf_cache_lock;
+    static uint32_t* _ip_cache;
+    static bool _ip_cache_initialized;
 };
 
 CLICK_ENDDECLS

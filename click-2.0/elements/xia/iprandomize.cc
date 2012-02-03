@@ -16,10 +16,7 @@
 #endif
 CLICK_DECLS
 
-uint32_t * IPRandomize::_zipf_cache = NULL;
-atomic_uint32_t IPRandomize::_zipf_cache_lock;
-
-IPRandomize::IPRandomize() :_routeTable(0), _zipf(1.2)
+IPRandomize::IPRandomize() :_routeTable(0), _zipf(1.2) 
 {
     _xsubi[0] = 1;
     _xsubi[1] = 2;
@@ -34,8 +31,16 @@ IPRandomize::~IPRandomize()
     if (_zipf_cache) {
         delete[] _zipf_cache;
  	_zipf_cache = NULL;
+	if (_ip_cache) {
+            delete[] _ip_cache;
+ 	    _ip_cache = NULL;
+	}
     }
 }
+
+uint32_t * IPRandomize::_zipf_cache = NULL;
+uint32_t * IPRandomize::_ip_cache = NULL;
+bool IPRandomize::_ip_cache_initialized = false;
 
 int
 IPRandomize::configure(Vector<String> &conf, ErrorHandler *errh)
@@ -57,36 +62,22 @@ IPRandomize::configure(Vector<String> &conf, ErrorHandler *errh)
 	    nrand48(_xsubi);
     }
     _current_cycle = _offset;
+
     _zipf = Zipf(1.2, _max_cycle-1);
 
-    if (_zipf_cache_lock.swap(1) == 0) {
-        if (!_zipf_cache) {
-            click_chatter("generating zipf cache of size %d\n", _max_cycle*100);
-            _zipf_cache = new uint32_t[_max_cycle*100];
-            //_zipf_arbit = Zipf(1.2, 1000000000);
-            for (int i=0;i<_max_cycle*100;i++) {
-                    uint32_t v;
-                    do {
-                            v = _zipf.next();
-                    } while (v >= _max_cycle);
-                _zipf_cache[i] = v;
-            }
-        }
-        else
-            click_chatter("zipf cache seems already created\n");
-
-        asm volatile ("" : : : "memory");
-        _zipf_cache_lock = 0;
+    if (_zipf_cache == NULL) {
+	_zipf_cache = new uint32_t[_max_cycle*100];
+	//_zipf_arbit = Zipf(1.2, 1000000000);
+	for (int i=0;i<_max_cycle*100;i++) {
+		uint32_t v;
+		do {
+			v = _zipf.next();
+		} while (v >= _max_cycle);
+	    _zipf_cache[i] = v;
+	}
+        _ip_cache  = new uint32_t[_max_cycle];
     }
-    else {
-        if (_zipf_cache_lock.value() == 1) {
-            click_chatter("waiting for the other thread to create zipf cache\n");
-            while (_zipf_cache_lock.value() == 1)
-                ;
-        }
-        else
-            click_chatter("zipf cache seems already created\n");
-    }
+    srand(191287);
 
     return 0;
 }
@@ -94,15 +85,40 @@ IPRandomize::configure(Vector<String> &conf, ErrorHandler *errh)
 Packet *
 IPRandomize::simple_action(Packet *p_in)
 {
-    unsigned short xsubi_next[3];
+    //unsigned short xsubi_next[3];
     WritablePacket *p = p_in->uniqueify();
     if (!p)
         return 0;
 
     click_ip *hdr = p->ip_header();
-
     assert(_zipf_cache);
-    uint32_t seed  = _zipf_cache[_current_cycle]; /* zipf */
+    //uint32_t seed  = _zipf_cache[_current_cycle]; /* zipf */
+    if (!_ip_cache_initialized && (click_current_thread_id==1)) {
+
+	if (_routeTable) { 
+	    IPAddress gw;
+	    int port;
+	    uint32_t ip_dst;
+	    Vector<uint32_t> prefix;
+	    for (int i=0;i<1<<24;i++) {
+		uint32_t ip = i<<8;
+		ip_dst = htonl(ip);
+		port = _routeTable->lookup_route(IPAddress(ip_dst), gw);
+		if (port>0) {
+		    prefix.push_back(ip_dst);
+		}
+	    }
+	    for (int i=0;i<_max_cycle;i++) {
+		int index = rand() % prefix.size();
+		uint32_t ip  = prefix[index]; // + htonl(rand()%256);
+		_ip_cache[i] = ip;
+	    }
+	}
+	_ip_cache_initialized = true;
+    } else if (!_ip_cache_initialized) {
+	p->kill();
+	return NULL;
+    }
 
     if (hdr->ip_src.s_addr == 0)
     {
@@ -129,7 +145,12 @@ IPRandomize::simple_action(Packet *p_in)
     if (hdr->ip_dst.s_addr == 0)
     {
 #if CLICK_USERLEVEL
-        hdr->ip_dst.s_addr = static_cast<uint32_t>(nrand48(_xsubi));
+	//assert(seed<_max_cycle);
+	//memcpy(&xsubi_next[1], &seed, 2);
+	//memcpy(&xsubi_next[2], reinterpret_cast<char *>(&seed)+2 , 2);
+	//xsubi_next[0]= xsubi_next[2]+ xsubi_next[1];
+        //hdr->ip_dst.s_addr = static_cast<uint32_t>(nrand48(xsubi_next));
+        hdr->ip_dst.s_addr =  _ip_cache[_zipf_cache[_current_cycle]];
 #elif CLICK_LINUXMODULE
         uint32_t rand = static_cast<uint32_t>(random32());
         if (rand>>24 >=224) {
@@ -154,30 +175,11 @@ IPRandomize::simple_action(Packet *p_in)
         }
 
         p->set_dst_ip_anno(IPAddress(hdr->ip_dst));  // route table lookup relies on this
-
-    } else if (ntohl(hdr->ip_dst.s_addr) == 1) {
-#if CLICK_USERLEVEL
-	assert(seed<_max_cycle);
-	memcpy(&xsubi_next[1], &seed, 2);
-	memcpy(&xsubi_next[2], reinterpret_cast<char *>(&seed)+2 , 2);
-	xsubi_next[0]= xsubi_next[2]+ xsubi_next[1];
-	hdr->ip_dst.s_addr = static_cast<uint32_t>(nrand48(xsubi_next));
-#elif CLICK_LINUXMODULE
-	XXX
-#else
-	XXX
-#endif
-
-	if (++_current_cycle == _max_cycle*100)
-	{
-	    _current_cycle = _offset;
-	}
-
-        p->set_dst_ip_anno(IPAddress(hdr->ip_dst));  // route table lookup relies on this
     }
 
     // TODO: need to update checksum
 
+/*
     if (_routeTable) { 
 	    IPAddress gw;
 	    int port = _routeTable->lookup_route(IPAddress(hdr->ip_dst), gw);
@@ -186,6 +188,7 @@ IPRandomize::simple_action(Packet *p_in)
 		    return NULL;
 	    }
     }
+*/
     return p;
 }
 
