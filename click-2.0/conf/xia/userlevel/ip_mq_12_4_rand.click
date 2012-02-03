@@ -10,7 +10,7 @@ define ($SRC_MAC 00:1a:92:9b:4a:77);
 define ($SRC_MAC1 00:1a:92:9b:4a:71);
 define ($COUNT 2000000000);
 //define ($PAYLOAD_SIZE 30);
-define ($PAYLOAD_SIZE 64);
+define ($PAYLOAD_SIZE 64);      // XXX: shouldn't be 30? (if this default value was used)
 //define ($PAYLOAD_SIZE 222);
 //define ($PAYLOAD_SIZE 228);
 //define ($PAYLOAD_SIZE 484);
@@ -30,7 +30,7 @@ elementclass gen_sub {
     $dev, $queue, $cpu, $offset|
 
     gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 100000000, BURST 64)
-    -> Strip(34)
+    //-> Strip(34)  // no strip; assume PAYLOAD_SIZE is just IP payload
     -> IPEncap(9, UNROUTABLE_IP, RANDOM_IP)
     -> MarkIPHeader()
     -> IPRandomize(MAX_CYCLE $IP_RANDOMIZE_MAX_CYCLE, OFFSET $offset)
