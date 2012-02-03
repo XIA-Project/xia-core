@@ -1,18 +1,21 @@
 #!/usr/bin/env ruby
 
+USER=ENV['USER']
+
 # This script assumes that you have the following files in both ROTUER and PACKETGEN machines
-LOAD_CLICK_CMD = "/home/dongsuh/xia-core/click-2.0/load_user_click.sh"
-IP_ROUTER_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_ip_router.sh"
-IP_PKT_GEN_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_ip_pktgen.sh"
-XIA_ROUTER_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_xia_router.sh" 
-XIA_FP_ROUTER_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_xia_fp_router.sh" 
-XIA_PKT_GEN_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_xia_pktgen.sh"
-XIA_PKT_GEN_FB1_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_xia_pktgen_fb1.sh"
-XIA_PKT_GEN_FB2_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_xia_pktgen_fb2.sh"
-XIA_PKT_GEN_FB3_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_xia_pktgen_fb3.sh"
-XIA_PKT_GEN_VIA_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_xia_pktgen_via.sh"
-XIA_PKT_GEN_ISO_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/run_xia_pktgen_iso.sh"
-RECORD_STAT_SCRIPT = "/home/dongsuh/xia-core/click-2.0/conf/xia/script/record_stat.sh"
+LOAD_CLICK_CMD = "/home/#{USER}/xia-core/click-2.0/load_user_click.sh"
+IP_ROUTER_SCRIPT = "/home/#{USER}/xia-core/click-2.0/conf/xia/script/run_ip_router.sh"
+IP_FP_ROUTER_SCRIPT = "/home/#{USER}/xia-core/click-2.0/conf/xia/script/run_ip_fp_router.sh"
+IP_PKT_GEN_SCRIPT = "/home/#{USER}/xia-core/click-2.0/conf/xia/script/run_ip_pktgen.sh"
+XIA_ROUTER_SCRIPT = "/home/#{USER}/xia-core/click-2.0/conf/xia/script/run_xia_router.sh" 
+XIA_FP_ROUTER_SCRIPT = "/home/#{USER}/xia-core/click-2.0/conf/xia/script/run_xia_fp_router.sh" 
+XIA_PKT_GEN_SCRIPT = "/home/#{USER}/xia-core/click-2.0/conf/xia/script/run_xia_pktgen.sh"
+XIA_PKT_GEN_FB1_SCRIPT = "/home/#{USER}/xia-core/click-2.0/conf/xia/script/run_xia_pktgen_fb1.sh"
+XIA_PKT_GEN_FB2_SCRIPT = "/home/#{USER}/xia-core/click-2.0/conf/xia/script/run_xia_pktgen_fb2.sh"
+XIA_PKT_GEN_FB3_SCRIPT = "/home/#{USER}/xia-core/click-2.0/conf/xia/script/run_xia_pktgen_fb3.sh"
+XIA_PKT_GEN_VIA_SCRIPT = "/home/#{USER}/xia-core/click-2.0/conf/xia/script/run_xia_pktgen_via.sh"
+XIA_PKT_GEN_ISO_SCRIPT = "/home/#{USER}/xia-core/click-2.0/conf/xia/script/run_xia_pktgen_iso.sh"
+RECORD_STAT_SCRIPT = "/home/#{USER}/xia-core/click-2.0/conf/xia/script/record_stat.sh"
 
 RESET_CLICK_CMD = "killall click"
 
@@ -32,7 +35,10 @@ SETUP = [
 #	{:NAME => "XIA-%d-FB3", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_FB3_SCRIPT, :PKT_OVERHEAD =>182},
 #	{:NAME => "XIA-%d-FB2", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_FB2_SCRIPT, :PKT_OVERHEAD =>154},
 #	{:NAME => "XIA-%d-FB1", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_FB1_SCRIPT, :PKT_OVERHEAD =>126},
+#	{:NAME => "IP-%d-SP", :ROUTER => IP_ROUTER_SCRIPT, :PKTGEN => IP_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>34},
 	{:NAME => "IP-%d-SP-ONLY", :ROUTER => IP_ROUTER_SCRIPT, :PKTGEN => IP_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>34},
+#	{:NAME => "IP-%d-FP", :ROUTER => IP_FP_ROUTER_SCRIPT, :PKTGEN => IP_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>34},
+	{:NAME => "IP-%d-FP-ONLY", :ROUTER => IP_FP_ROUTER_SCRIPT, :PKTGEN => IP_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>34},
 #	{:NAME => "XIA-%d-isolation-%d", :ROUTER => XIA_ROUTER_SCRIPT, :PKTGEN =>XIA_PKT_GEN_ISO_SCRIPT, :PKT_OVERHEAD =>126},
 #	{:NAME => "XIA-%d-VIA-SP-ONLY", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_VIA_SCRIPT, :PKT_OVERHEAD =>126}
 	]
@@ -92,7 +98,7 @@ if __FILE__ ==$0
     pktgen_script = setup[:PKTGEN] 
    
     min_pktsize = (overhead+63)/64  * 64
-    min_pktsize = 320+64
+    #min_pktsize = 320+64		# for slowpath vs. fastpath test?
     size = min_pktsize
     pkt_size = []
 
@@ -109,7 +115,7 @@ if __FILE__ ==$0
     if (setup[:NAME]=="XIA-%d-isolation-%d")
       pkt_size =  (1..11).to_a
     end
-    if (setup[:NAME]=~/-FP/ || (setup[:NAME]=~/-SP/ && (!(setup[:NAME]=~/-ONLY/))))
+    if ((setup[:NAME]=~/-FP/ || setup[:NAME]=~/-SP/) && !(setup[:NAME]=~/-ONLY/))
     #if (setup[:NAME]=~/-FP/ || (setup[:NAME]=~/-SP/))
       pkt_size =  [192, 192, 192]
     end
