@@ -7,20 +7,25 @@
 
 CLICK_DECLS
 
-IPFastPath::IPFastPath() :_bucket(0)
+IPFastPath::IPFastPath() 
 {
+    memset(_buckets, 0, sizeof(struct bucket*) * NUM_CLICK_CPUS);
 }
 
 IPFastPath::~IPFastPath()
 {
-    if (_bucket) delete[] _bucket;
+    for (int i=0;i<NUM_CLICK_CPUS;i++) {
+	if (_buckets[i]) delete[] _buckets[i];
+    }
 }
 
 int
 IPFastPath::initialize(ErrorHandler *)
 {
-    _bucket = new struct ipfp_bucket[_bucket_size];
-    memset(_bucket, 0, _bucket_size * sizeof(struct ipfp_bucket));
+    for (int i=0;i<NUM_CLICK_CPUS;i++) {
+        _buckets[i] = new struct ipfp_bucket[_bucket_size];
+        memset(_buckets[i], 0, _bucket_size * sizeof(struct ipfp_bucket));
+    }
     return 0;
 }
 
@@ -70,17 +75,27 @@ void IPFastPath::push(int port, Packet * p)
     const click_ip *iph  = p->ip_header();
     const uint32_t key = iph->ip_dst.s_addr;
     uint32_t index = key % _bucket_size;
+#if HAVE_MULTITHREAD
+#if CLICK_USERLEVEL
+    int thread_id = click_current_thread_id;
+#else
+    int thread_id = click_current_processor();
+#endif
+#else
+    int thread_id = 0;
+#endif
 
     if (port==0) {
         /* Fastpath lookup */ 
-	int outport = lookup(&_bucket[index], key);
+	int outport = lookup(&_buckets[thread_id][index], key);
 	output(outport).push(p);
     } else {
 	/* Cache result */
-	update_cacheline(&_bucket[index], key, port);
+	update_cacheline(&_buckets[thread_id][index], key, port);
 	output(port).push(p);
     }
 }
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(IPFastPath)
+ELEMENT_MT_SAFE(IPFastPath)
