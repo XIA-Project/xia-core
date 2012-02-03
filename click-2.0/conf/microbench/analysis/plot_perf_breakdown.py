@@ -50,6 +50,7 @@ symbol_task_mappings = [
     (re.compile(r'^Element::push\(.*\)$'), 'Other'),
 
     (re.compile(r'^XIAFastPath::.*$'), 'Fast Path'),
+    (re.compile(r'^IPFastPath::.*$'), 'Fast Path'),
 
     #(re.compile(r'^XIARouterCache::.*$'), 'Other'),
 
