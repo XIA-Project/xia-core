@@ -28,6 +28,7 @@ symbol_task_mappings = [
     (re.compile(r'^InfiniteSource::.*$'), None),
     (re.compile(r'^XIAEncap::.*$'), None),
     (re.compile(r'^IPEncap::.*$'), None),
+    (re.compile(r'^ScheduleInfo::query'), None),
 
     (re.compile(r'^Unqueue::.*$'), 'Queueing'),
     (re.compile(r'^FullNoteQueue::.*$'), 'Queueing'),
