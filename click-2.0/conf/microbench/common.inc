@@ -21,6 +21,7 @@ define($PAYLOAD_SIZE_XIA_XID5 10);
 
 AddressInfo(
     RANDOM_IP 0.0.0.0,
+    ZIPF_RANDOM_IP 0.0.0.1,
     UNROUTABLE_IP 192.168.10.10,
     RANDOM_IP6 0::0,
     UNROUTABLE_IP6 1234::5678,
@@ -206,12 +207,13 @@ elementclass IPPacketForwardFastPath {
     -> Clone($COUNT)
     -> Unqueue
     -> IPRandomize(MAX_CYCLE $IP_RANDOMIZE_MAX_CYCLE)
-    -> fastpath
-    //-> Print
+    -> fastpath[0]
+    //-> Print("Slow")
     -> host0;
 
     host0 -> Unqueue (LIMIT $COUNT) -> [1]fastpath;
     fastpath[1]
+    //-> Print("    ")
     -> PrintStats
     -> AggregateCounter(COUNT_STOP $COUNT, PRINT_USERTIME true)
     -> Discard;
