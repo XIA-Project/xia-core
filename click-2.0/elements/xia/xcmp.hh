@@ -32,7 +32,7 @@ class XCMP : public Element { public:
   ~XCMP();
 
   const char *class_name() const		{ return "XCMP"; }
-  const char *port_count() const		{ return PORTS_1_1; }
+  const char *port_count() const		{ return "1/2"; }
   const char *processing() const		{ return PUSH; }
 
   int configure(Vector<String> &, ErrorHandler *);
@@ -41,6 +41,8 @@ class XCMP : public Element { public:
   void push(int, Packet *);
 
  private:
+
+  u_short in_cksum(u_short *, int);
 
   XIAPath _src_path;
   //uint32_t _count;

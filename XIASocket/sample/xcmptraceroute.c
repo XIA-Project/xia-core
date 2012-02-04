@@ -43,7 +43,7 @@
 #include "Xsocket.h"
 
 #include "xip.h"
-#include "XIAResolver/XgetDAGbyname.h"
+#include "XgetDAGbyname.h"
 
 #define	MAXWAIT		10	/* max time to wait for response, sec. */
 #define	MAXPACKET	4096	/* max packet size */
@@ -66,7 +66,7 @@
 
 
 
-
+int ttl = 2;
 
 
 
@@ -199,16 +199,20 @@ char *argv[];
 	//	perror("ping: socket");
 	//	exit(5);
 	//}
+	//printf("opening raw socket\n");
 	if((s = Xsocket(XSOCK_RAW)) < 0) {
 	  perror("ping: socket");
 	  exit(5);
 	}
+	//printf("done\n");
 	
+	//printf("setting socket to XCMP\n");
 	int nxt = XPROTO_XCMP;
 	if (Xsetsockopt(s, XOPT_NEXT_PROTO, (const void*)&nxt, sizeof(nxt)) < 0) {
 	  printf("Xsetsockopt failed on XOPT_NEXT_PROTO\n");
 	  exit(-1);
 	}
+	//printf("done\n");
 	
 	/*
 	int ttl = 1;
@@ -235,7 +239,7 @@ char *argv[];
 	/*} else {
 		printf("PING %s: %d data bytes\n", hostname, datalen );
 	}*/
-	printf("PING %s: %d data bytes\n", to, datalen);
+	printf("TRACEROUTE %s:\n", to);
 
 	setlinebuf( stdout );
 
@@ -272,6 +276,7 @@ char *argv[];
 			continue;
 		}
 		pr_pack( packet, cc, from );
+		if(!strcmp(to,from)) finish();
 		if (npackets && nreceived >= npackets)
 			finish();
 	}
@@ -341,6 +346,14 @@ pinger()
 
 	/* Compute ICMP checksum here */
 	icp->icmp_cksum = in_cksum( icp, cc );
+
+	if(Xsetsockopt(s, XOPT_HLIM, (const void *)&ttl, sizeof(ttl)) < 0) {
+	  printf("Xsetsockop failed on XOPT_HLIM\n");
+	  exit(-1);
+	}
+
+	ttl++;
+
 
 	/* cc = sendto(s, msg, len, flags, to, tolen) */
 	/*i = sendto( s, outpack, cc, 0, &whereto, sizeof(struct sockaddr) );*/
@@ -445,9 +458,9 @@ char *from;
 	//printf("\n");
 
 	if( (!(pingflags & QUIET)) && icp->icmp_type != ICMP_ECHOREPLY )  {
-		printf("%d bytes from %s: icmp_type=%d (%s) icmp_code=%d\n",
-		       cc, from,//inet_ntoa(from->sin_addr),
-		  icp->icmp_type, pr_type(icp->icmp_type), icp->icmp_code);/*DFM*/
+		printf("%s\n",
+		       from//,//inet_ntoa(from->sin_addr),
+		       );//icp->icmp_type, pr_type(icp->icmp_type), icp->icmp_code);/*DFM*/
 		if (pingflags & VERBOSE) {
 			for( i=0; i<12; i++)
 				printf("x%2.2x: x%8.8x\n", i*sizeof(long),
@@ -471,11 +484,11 @@ char *from;
 
 	if(!(pingflags & QUIET)) {
 		if(pingflags != FLOOD) {
-			printf("%d bytes from %s: icmp_seq=%d", cc,
+		  printf("%d bytes from %s: icmp_seq=%d", cc,
 			       //inet_ntoa(from->sin_addr),
-			       from,
-			  icp->icmp_seq );	/* DFM */
-			if (timing) 
+		  	       from,
+		  	  icp->icmp_seq );	/* DFM */
+		  	if (timing) 
 				printf(" time=%d ms\n", triptime );
 			else
 				putchar('\n');
@@ -561,26 +574,25 @@ register struct timeval *out, *in;
  */
 finish()
 {
-	putchar('\n');
+  //putchar('\n');
+  //fflush(stdout);
+	//printf("\n----%s PING Statistics----\n", hostname );
+	//printf("%d packets transmitted, ", ntransmitted );
+	//printf("%d packets received, ", nreceived );
+	//if (ntransmitted)
+	//	if( nreceived > ntransmitted)
+	//		printf("-- somebody's printing up packets!");
+	//	else
+	//		printf("%d%% packet loss", 
+	//		  (int) (((ntransmitted-nreceived)*100) /
+	//		  ntransmitted));
+	//printf("\n");
+	//if (nreceived && timing)
+	//    printf("round-trip (ms)  min/avg/max = %d/%d/%d\n",
+	//	tmin,
+	//	tsum / nreceived,
+	//	tmax );
+  Xclose(s);
 	fflush(stdout);
-	printf("\n----%s PING Statistics----\n", hostname );
-	printf("%d packets transmitted, ", ntransmitted );
-	printf("%d packets received, ", nreceived );
-	if (ntransmitted)
-		if( nreceived > ntransmitted)
-			printf("-- somebody's printing up packets!");
-		else
-			printf("%d%% packet loss", 
-			  (int) (((ntransmitted-nreceived)*100) /
-			  ntransmitted));
-	printf("\n");
-	if (nreceived && timing)
-	    printf("round-trip (ms)  min/avg/max = %d/%d/%d\n",
-		tmin,
-		tsum / nreceived,
-		tmax );
-	fflush(stdout);
-
-	Xclose(s);
 	exit(0);
 }
