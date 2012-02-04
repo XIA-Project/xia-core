@@ -33,12 +33,13 @@ route[4]->Discard
 Script(write route.load /home/dongsuh/xia-core/click-2.0/conf/xia/ip_routes_4_bal.txt);
 
 elementclass gen_sub {
-    $dev, $queue, $cpu, $offset|
+    $dev, $dev2, $queue, $cpu, $offset|
 
     gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 120, BURST 120)
     -> IPEncap(9, UNROUTABLE_IP, RANDOM_IP)
-    -> MarkIPHeader()
+    -> DynamicIPEncap(0x99, $dev, $dev2, COUNT 120)
     -> EtherEncap(0x0800, $SRC_MAC1 , $DST_MAC1)
+    -> MarkIPHeader(34)
     -> clone ::Clone($COUNT, SHARED_SKBS false)
     -> IPRandomize(MAX_CYCLE $IP_RANDOMIZE_MAX_CYCLE, ROUTETABLENAME route, OFFSET 0)
     -> tod :: MQToDevice($dev, QUEUE $queue, BURST $BURST) 
@@ -51,27 +52,27 @@ elementclass gen_sub {
 }
 
 elementclass gen {
-    $dev|
-    gen_sub($dev, 0, 0, 0);
-    gen_sub($dev, 1, 1, 1000);
-    gen_sub($dev, 2, 2, 2000);
-    gen_sub($dev, 3, 3, 3000);
-    gen_sub($dev, 4, 4, 4000);
-    gen_sub($dev, 5, 5, 5000);
-    gen_sub($dev, 6, 6, 6000);
-    gen_sub($dev, 7, 7, 7000);
-    gen_sub($dev, 8, 8, 8000);
-    gen_sub($dev, 9, 9, 9000);
-    gen_sub($dev, 10, 10, 10000);
-    gen_sub($dev, 11, 11, 11000);
+    $dev, $dev2 |
+    gen_sub($dev, $dev2, 0, 0, 0);
+    gen_sub($dev, $dev2, 1, 1, 1000);
+    gen_sub($dev, $dev2, 2, 2, 2000);
+    gen_sub($dev, $dev2, 3, 3, 3000);
+    gen_sub($dev, $dev2, 4, 4, 4000);
+    gen_sub($dev, $dev2, 5, 5, 5000);
+    gen_sub($dev, $dev2, 6, 6, 6000);
+    gen_sub($dev, $dev2, 7, 7, 7000);
+    gen_sub($dev, $dev2, 8, 8, 8000);
+    gen_sub($dev, $dev2, 9, 9, 9000);
+    gen_sub($dev, $dev2, 10, 10, 10000);
+    gen_sub($dev, $dev2, 11, 11, 11000);
 }
 
 //gen(eth2)
 //gen(eth3)
 //gen(eth4)
 //gen(eth5)
-gen(xge0)
-gen(xge1)
-gen(xge2)
-gen(xge3)
+gen(xge0, xge2)
+gen(xge1, xge3)
+gen(xge2, xge0)
+gen(xge3, xge1)
 
