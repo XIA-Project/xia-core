@@ -36,8 +36,8 @@ elementclass gen_sub {
     $dev, $dev2, $queue, $cpu, $offset|
 
     gen1:: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZE, LIMIT 120, BURST 120)
-    -> IPEncap(9, UNROUTABLE_IP, RANDOM_IP)
-    -> DynamicIPEncap(0x99, $dev, $dev2, COUNT 120)
+    -> IPEncap(9, UNROUTABLE_IP, RANDOM_IP)	     // Alternatively you can change UNROUTABLE_IP to RANDOM_IP in the source 
+    -> DynamicIPEncap(0x99, $dev, $dev2, COUNT 120)  // This is to evenly distribute packet for RSS. (Alternative: see above comment)
     -> EtherEncap(0x0800, $SRC_MAC1 , $DST_MAC1)
     -> MarkIPHeader(34)
     -> clone ::Clone($COUNT, SHARED_SKBS false)
