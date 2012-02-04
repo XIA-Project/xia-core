@@ -14,41 +14,51 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
-
-/*
-* sendto like datagram sending function for XIA
+/*!
+** @file Xsend.c
+** @brief implements Xclose
 */
-
-//FIXME: add note indicating that we expect the send to be atomic, and that
-// then entire buffer is sent, and not just a partial one.
-
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
 #include <errno.h>
 
-/* dDAG is a NULL terminated string */
+/*!
+** @brief Sends a datagram to the specified DAG.
+**
+** @param sockfd - The socket to send the data on
+** @param buf - the data to send
+** @param len - lenngth of the data to send @NOTE: currently the
+** Xsendto api is limited to sending at most 1024 bytes.
+** @param flags - (This is not currently used but is kept to be compatible
+** with the standard sendto socket call.
+** @param dDAG address to send the datagram to
+** @param dlen length of the DAG, currently unused
+**
+** @returns number of bytes sent on success
+** @returns -1 on failure with errno set.
+**
+** @warning because the XIA header takes up room in the datagram, this
+** function currently truncates the data to be sent to 1024 bytes. We 
+** should probably add an Xgetsockopt paarameter to allow the user to 
+** determine the maximum buffer size that will fit in the datagram.
+*/
 int Xsendto(int sockfd,const void *buf, size_t len, int /*flags*/,
 		char* dDAG, size_t /*dlen*/)
 {
 	xia::XSocketCallType type;
 	int rc;
 
-	// FIXME: validate the socket!
-
 	if (len == 0)
 		return 0;
+	else if (len > MAX_DGRAM)
+		len = MAX_DGRAM;
 
 	if (!buf || !dDAG) {
 		LOG("null pointer!\n");
 		errno = EFAULT;
 		return -1;
 	}
-
-	/* === New version
-	 * Now, dDAG and buf are contained in the google protobuffer message (encapsulated within UDP),
-	 * then passed to the Click UDP.
-	 */
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XSENDTO);
@@ -63,10 +73,10 @@ int Xsendto(int sockfd,const void *buf, size_t len, int /*flags*/,
 	// process the reply from click
 	rc = click_reply2(sockfd, &type);
 
-	if (type != xia::XSENDTO) {
+	if ( rc >= 0 && type != xia::XSENDTO) {
 		// something bad happened
 		LOGF("Expected type %d, got %d", xia::XSENDTO, type);
-		// what do we do in this case?
+		// FIXME: what do we do in this case?
 	}
 
 	if (rc < 0) {

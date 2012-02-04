@@ -35,10 +35,12 @@ extern "C" {
 #define ATTEMPTS 100	//Number of attempts at opening a socket 
 #define MAXBUFLEN 2000	// Note that this limits the size of chunk we can receive
 
-#define XSOCK_STREAM 0	// Reliable transport (SID)
-#define XSOCK_DGRAM 1	// Unreliable transport (SID)
-#define XSOCK_CHUNK 2	// Content Chunk transport (CID)
+#define MAX_DGRAM 1024	// maximum datagram size that can be sent
+
+#define XSOCK_STREAM 1	// Reliable transport (SID)
+#define XSOCK_DGRAM 2	// Unreliable transport (SID)
 #define XSOCK_RAW	3	// Raw XIA socket
+#define XSOCK_CHUNK 4	// Content Chunk transport (CID)
 
 #define WAITING_FOR_CHUNK 0
 #define READY_TO_READ 1

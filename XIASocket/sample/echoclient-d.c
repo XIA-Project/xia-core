@@ -26,12 +26,12 @@
 #include "Xsocket.h"
 
 #define VERSION "v1.0"
-#define TITLE "XIA Echo Client"
+#define TITLE "XIA Datagram Echo Client"
 
 #define DAG  "RE %s %s %s"
 #define AD0  "AD:1000000000000000000000000000000000000000"
 #define HID0 "HID:0000000000000000000000000000000000000000"
-#define SID0 "SID:0f00000000000000000000000000000000000777"
+#define SID0 "SID:0f00000000000000000000000000000000001777"
 
 
 // FIXME: clean up globals and move into a structure or similar
@@ -206,6 +206,8 @@ int process(int sock)
 {
 	int size;
 	int sent, received;
+	char tdag[1024];
+	size_t dlen;
 	char buf1[2048], buf2[2048];
 
 	if (pktSize == 0)
@@ -214,20 +216,22 @@ int process(int sock)
 		size = pktSize;
 	randomString(buf1, size);
 
-	if ((sent = Xsend(sock, buf1, size, 0)) < 0)
+	if ((sent = Xsendto(sock, buf1, size, 0, sdag, strlen(sdag)+1)) < 0) {
 		die(-4, "Send error %d on socket %d\n", errno, sock);
+	}
 
 	say("Xsock %4d sent %d bytes\n", sock, sent);
 
 	memset(buf2, sizeof(buf2), 0);
-	if ((received = Xrecv(sock, buf2, sizeof(buf2), 0)) < 0)
+	if ((received = Xrecvfrom(sock, buf2, sizeof(buf2), 0, tdag, &dlen)) < 0)
 		die(-5, "Receive error %d on socket %d\n", errno, sock);
 
 	say("Xsock %4d received %d bytes\n", sock, received);
 
-	if (sent != received || strcmp(buf1, buf2) != 0)
+	if (sent != received || strcmp(buf1, buf2) != 0) {
 		warn("Xsock %4d received data different from sent data! (bytes sent/recv'd: %d/%d)\n", 
 				sock, sent, received);
+	}
 
 	return 0;
 }
@@ -256,15 +260,10 @@ void pausex()
 int connectToServer()
 {
 	int ssock;
-	if ((ssock = Xsocket(XSOCK_STREAM)) < 0) {
-		die(-2, "unable to create the server socket\n");
+	if ((ssock = Xsocket(XSOCK_DGRAM)) < 0) {
+		die(-2, "unable to create the socket\n");
 	}
 	say("Xsock %4d created\n", ssock);
-
-	if (Xconnect(ssock, sdag) < 0) 
-		die(-3, "unable to connect to the destination dag\n");
-	
-	say("Xsock %4d connected\n", ssock);
 
 	return ssock;
 }
@@ -281,6 +280,7 @@ void *mainLoop(void * /* dummy */)
 	int count = 0;
 	int printcount = 1;
 
+	// don't bother with the loop count if we are ony doing one operation
 	if (loops == 1)
 		printcount = 0;
 
@@ -297,7 +297,7 @@ void *mainLoop(void * /* dummy */)
 		pausex();
 		
 		count++;
-		if (reconnect != 0) {
+		if (reconnect) {
 			if (count % reconnect == 0) {
 				// time to close and reopen the socket
 				Xclose(ssock);

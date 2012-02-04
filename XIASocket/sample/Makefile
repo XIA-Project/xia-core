@@ -5,8 +5,10 @@ CFLAGS=-I../API
 LDFLAGS =  -lprotobuf -lpthread
 
 all: ../API/libXsocket.a xs_stream xc_stream xs_dgram xc_dgram \
-	ps pc vs ps_beacon pc_beacon echoclient opttest xcmpping \
-	xcmptraceroute
+	ps pc vs ps_beacon pc_beacon echoclient-d echoclient echoserver opttest xcmpping xcmptraceroute
+
+echoclient-d: echoclient-d.c  ../API/libXsocket.a
+	$(CC) -Wall -Wextra $(CFLAGS) -o $@ $< ../API/libXsocket.a $(LDFLAGS) 
 
 echoclient: echoclient.c  ../API/libXsocket.a
 	$(CC) -Wall -Wextra $(CFLAGS) -o $@ $< ../API/libXsocket.a $(LDFLAGS) 
