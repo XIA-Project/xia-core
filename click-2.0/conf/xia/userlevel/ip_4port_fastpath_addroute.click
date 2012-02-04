@@ -9,7 +9,7 @@ fp :: IPFastPath(BUCKET_SIZE 512);
 
 // Shared IP input path and routing table
 ip :: Strip(14)  
-    -> CheckIPHeader2() //INTERFACES 10.0.0.1/255.255.255.0 10.0.1.1/255.255.255.0 10.0.2.1/255.255.255.0 10.0.3.1/255.255.255.0)
+    -> CheckIPHeader2(20) //INTERFACES 10.0.0.1/255.255.255.0 10.0.1.1/255.255.255.0 10.0.2.1/255.255.255.0 10.0.3.1/255.255.255.0)
     -> [0]fp[0] // slow path
     -> rt :: RadixIPLookup(
 	10.0.0.0/255.255.255.0 1,
