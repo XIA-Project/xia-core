@@ -5,15 +5,23 @@
 //xge3 10.0.3.1 xge3 
 define ($BURST 32)
 
+fp :: IPFastPath(BUCKET_SIZE 512);
+
 // Shared IP input path and routing table
 ip :: Strip(14)  
     -> CheckIPHeader2(20) //INTERFACES 10.0.0.1/255.255.255.0 10.0.1.1/255.255.255.0 10.0.2.1/255.255.255.0 10.0.3.1/255.255.255.0)
+    -> [0]fp[0] // slow path
     -> rt :: RadixIPLookup(
 	10.0.0.0/255.255.255.0 1,
 	10.0.1.0/255.255.255.0 2,
 	10.0.2.0/255.255.255.0 3,
 	10.0.3.0/255.255.255.0 4,
 );
+
+rt[1] -> [1]fp;
+rt[2] -> [2]fp;
+rt[3] -> [3]fp;
+rt[4] -> [4]fp;
 
 // ARP responses are copied to each ARPQuerier and the host.
 //arpt :: Tee(5);
@@ -196,7 +204,7 @@ rt[0] -> EtherEncap(0x0800, 1:1:1:1:1:1, 2:2:2:2:2:2) -> toh;
 toh->Discard;
 
 // Forwarding path for xge0
-rt[1] -> DropBroadcasts
+fp[1] -> DropBroadcasts
 //    -> cp0 :: PaintTee(1)
     -> gio0 :: IPGWOptions(10.0.0.1)
     //-> FixIPSrc(10.0.0.1)
@@ -211,7 +219,7 @@ gio0[1] -> ICMPError(10.0.0.1, parameterproblem)-> IPPrint()  -> rt;
 //cp0[1] -> ICMPError(10.0.0.1, redirect, host)-> IPPrint()  -> rt;
 
 // Forwarding path for xge1
-rt[2] -> DropBroadcasts
+fp[2] -> DropBroadcasts
 //    -> cp1 :: PaintTee(2)
     -> gio1 :: IPGWOptions(10.0.1.1)
     //-> FixIPSrc(10.0.1.1)
@@ -226,7 +234,7 @@ gio1[1] -> ICMPError(10.0.1.1, parameterproblem) -> IPPrint()  -> rt;
 //cp1[1] -> ICMPError(10.0.1.1, redirect, host)  -> IPPrint() -> rt;
 
 // Forwarding path for xge2
-rt[3] -> DropBroadcasts
+fp[3] -> DropBroadcasts
 //    -> cp2 :: PaintTee(3)
     -> gio2 :: IPGWOptions(10.0.2.1)
     //-> FixIPSrc(10.0.2.1)
@@ -241,7 +249,7 @@ gio2[1] -> ICMPError(10.0.2.1, parameterproblem) -> rt;
 //cp2[1] -> ICMPError(10.0.2.1, redirect, host) -> rt;
 
 // Forwarding path for xge3
-rt[4] -> DropBroadcasts
+fp[4] -> DropBroadcasts
 //    -> cp3 :: PaintTee(4)
     -> gio3 :: IPGWOptions(10.0.3.1)
     //-> FixIPSrc(10.0.3.1)

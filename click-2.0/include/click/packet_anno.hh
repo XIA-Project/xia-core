@@ -134,10 +134,16 @@
 # endif
 #endif
 
-// bytes 20-27
-#define XIA_NEXT_PATH_ANNO_OFFSET      20
+// bytes 48-55
+#define XIA_NEXT_PATH_ANNO_OFFSET      48
 #define XIA_NEXT_PATH_ANNO_SIZE        8
 #  define XIA_NEXT_PATH_ANNO(p)	((p)->anno_u8(XIA_NEXT_PATH_ANNO_OFFSET))
 #  define SET_XIA_NEXT_PATH_ANNO(p, v) ((p)->set_anno_u8(XIA_NEXT_PATH_ANNO_OFFSET, (v)))
+
+// bytes 56-79
+#define XIA_NEXT_HOP_NEIGHBOR_ANNO_OFFSET      56
+#define XIA_NEXT_HOP_NEIGHBOR_ANNO_SIZE        24
+#define XIA_NEXT_HOP_NEIGHBOR_ANNO(p)	((click_xia_xid *) ((p)->anno_u8() + XIA_NEXT_HOP_NEIGHBOR_ANNO_OFFSET ))
+#define SET_XIA_NEXT_HOP_NEIGHBOR_ANNO(p, v) ((p)->set_anno_u8(XIA_NEXT_HOP_NEIGHBOR_ANNO_OFFSET, (v)))
 
 #endif

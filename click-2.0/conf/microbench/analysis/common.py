@@ -22,6 +22,7 @@ mpps_pat = re.compile(r'^Mpps: ([\d.]+)$')
 def get_total_runtime(path):
     t = 0
 
+    print path
     for line in open(path).readlines():
         mat = total_time_pat.match(line)
         if mat is not None:
@@ -64,6 +65,7 @@ dataset = {
     'CID-REQ-H': data_path_prefix + 'output_xia_packetforward_cid_req_hit',
     'CID-REP': data_path_prefix + 'output_xia_packetforward_cid_rep',
     'FB3-FP': data_path_prefix + 'output_xia_packetforward_fallback3_fastpath',
+    'IP-FP': data_path_prefix + 'output_ip_packetforward_fastpath',
 
     'TABLESIZE_HID_1': data_path_prefix + 'output_xia_tablesize_cid_1',
     'TABLESIZE_HID_3': data_path_prefix + 'output_xia_tablesize_cid_3',
@@ -102,5 +104,5 @@ dataset = {
 
 iter_max = 10
 #iter_max = 5
-#iter_max = 1
+#iter_max = 2
 

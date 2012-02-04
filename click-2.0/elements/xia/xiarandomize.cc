@@ -131,7 +131,7 @@ XIARandomize::simple_action(Packet *p_in)
     for (size_t i = 0; i < hdr->dnode + hdr->snode; i++)
     {
         struct click_xia_xid_node& node = hdr->node[i];
-        if (node.xid.type == 1)
+        if (node.xid.type == 1)  /* Determinstic Random */
         {
             node.xid.type = _xid_type;
             uint8_t* xid = node.xid.id;
@@ -174,7 +174,7 @@ XIARandomize::simple_action(Packet *p_in)
 #endif
 	    }
         }
-        else if (node.xid.type == 2)
+        else if (node.xid.type == 2)  /* Abitrary random */
         {
             node.xid.type = _xid_type;
             uint8_t* xid = node.xid.id;

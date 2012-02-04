@@ -20,7 +20,11 @@ class XID { public:
 
     inline const struct click_xia_xid& xid() const;
     inline struct click_xia_xid& xid();
-
+    
+    inline unsigned char* data();
+    inline const unsigned char* data() const;
+    
+    
     inline operator struct click_xia_xid() const;
 
     inline uint32_t hashcode() const;
@@ -54,6 +58,20 @@ inline struct click_xia_xid&
 XID::xid() 
 {
     return _xid;
+}
+
+/** @brief Return a pointer to the address data. */
+inline const unsigned char*
+XID::data() const
+{
+    return reinterpret_cast<const unsigned char*>(&_xid);
+}
+
+/** @brief Return a pointer to the address data. */
+inline unsigned char*
+XID::data()
+{
+    return reinterpret_cast<unsigned char*>(&_xid);
 }
 
 
@@ -101,6 +119,25 @@ XID::operator!=(const XID& rhs) const
            reinterpret_cast<const uint32_t*>(&_xid)[4] != reinterpret_cast<const uint32_t*>(&rhs._xid)[4] ||
            reinterpret_cast<const uint32_t*>(&_xid)[5] != reinterpret_cast<const uint32_t*>(&rhs._xid)[5];
 }
+
+
+class ArgContext;
+class Args;
+extern const ArgContext blank_args;
+
+/** @class XIDArg
+  @brief Parser class for XIA addresses. */
+  
+struct XIDArg {
+    static bool parse(const String &str, XID &value, const ArgContext &args = blank_args);
+    //static bool parse(const String &str, unsigned char *value, const ArgContext &args = blank_args) {
+	//return parse(str, *reinterpret_cast<EtherAddress *>(value), args);
+    //}
+    static bool parse(const String &str, Args &args, unsigned char *value);
+};
+
+template<> struct DefaultArg<XID> : public XIDArg {};
+
 
 CLICK_ENDDECLS
 #endif

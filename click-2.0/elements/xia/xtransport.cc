@@ -230,13 +230,13 @@ XTRANSPORT::copy_packet(Packet *p) {
 	
 	TransportHeader thdr(p);
 	TransportHeaderEncap *new_thdr = new TransportHeaderEncap(thdr.type(), thdr.pkt_info(), thdr.seq_num(), thdr.ack_num(), thdr.length());
-	
-	WritablePacket *copy = WritablePacket::make(256, xiahdr.payload(), xiahdr.plen(), 20);
-	
+
+	WritablePacket *copy = WritablePacket::make(256, thdr.payload(), xiahdr.plen()-thdr.hlen(), 20);
+
 	copy = new_thdr->encap(copy);
+	
 	copy = xiah.encap(copy,false);
 	delete new_thdr;
-	xiah.set_plen(xiahdr.plen());
 
 	return copy;
 }    		
@@ -514,16 +514,19 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			    const char* dummy= "Connection_request";
 			    WritablePacket *just_payload_part= WritablePacket::make(256, dummy, strlen(dummy), 20);
 
-			    WritablePacket *p = NULL;			    
-			     
-			    xiah.set_plen(strlen(dummy));
+			    WritablePacket *p = NULL;		
 				
 			    TransportHeaderEncap *thdr = TransportHeaderEncap::MakeSYNHeader( 0, -1, 0); // #seq, #ack, length
 			    
-			    p = thdr->encap(just_payload_part); 
+			    p = thdr->encap(just_payload_part);
+			    
+			    thdr->update();
+			    xiah.set_plen(strlen(dummy) + thdr->hlen()); // XIA payload = transport header + transport-layer data
+			    
 			    p = xiah.encap(p, false);
+			    
 			    delete thdr;
-			    xiah.set_plen(strlen(dummy));
+			    
 			    
 			    // Set timer 
 			    daginfo->timer_on = true;
@@ -745,8 +748,12 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				//Add XIA Transport headers
 			    	TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDATAHeader(daginfo->next_seqnum, daginfo->ack_num, 0 ); // #seq, #ack, length 	
 			    	p = thdr->encap(just_payload_part); 
+			    	
+			    	thdr->update();
+			    	xiah.set_plen(pktPayloadSize + thdr->hlen()); // XIA payload = transport header + transport-layer data
+
 			    	p = xiah.encap(p, false);
-			    	xiah.set_plen(pktPayloadSize);
+			    	
 			    	delete thdr;
 			    	
 			    	// Store the packet into buffer
@@ -868,8 +875,12 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			    //Add XIA Transport headers
 			    TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDGRAMHeader(0); // length 
 			    p = thdr->encap(just_payload_part); 
+			    
+			    thdr->update();
+			    xiah.set_plen(pktPayloadSize + thdr->hlen()); // XIA payload = transport header + transport-layer data
+			    
 			    p = xiah.encap(p, false);
-			    xiah.set_plen(pktPayloadSize);
+			    
 			    delete thdr;			
 			    			       
 			    output(2).push(p);
@@ -1379,8 +1390,12 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 			    	TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeSYNACKHeader( 0, 0, 0); // #seq, #ack, length 
 			    	p = thdr_new->encap(just_payload_part); 
+			    	
+			    	thdr_new->update();
+			    	xiah_new.set_plen(strlen(dummy) + thdr_new->hlen()); // XIA payload = transport header + transport-layer data
+			    	
 			    	p = xiah_new.encap(p, false);
-			    	xiah_new.set_plen(strlen(dummy));
+			    	
 			    	delete thdr_new;
 			    	XIAHeader xiah1(p);
 			        //String pld((char *)xiah1.payload(), xiah1.plen());	
@@ -1460,9 +1475,13 @@ void XTRANSPORT::push(int port, Packet *p_input)
 	
 				    	TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeACKHeader( 0, daginfo->expected_seqnum, 0); // #seq, #ack, length 
 				    	p = thdr_new->encap(just_payload_part); 
+				    	
+				    	thdr_new->update();
+				    	xiah_new.set_plen(strlen(dummy) + thdr_new->hlen()); // XIA payload = transport header + transport-layer data
+				    	
 				    	p = xiah_new.encap(p, false);
 				    	delete thdr_new;
-				  	xiah_new.set_plen(strlen(dummy));
+				  
 				  	XIAHeader xiah1(p);
 				  	String pld((char *)xiah1.payload(), xiah1.plen());
 				  	//printf("\n\n (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), pld.c_str(), xiah1.plen());
@@ -1568,7 +1587,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		    	
 			//Unparse dag info
 			String src_path=xiah.src_path().unparse();
-			String payload((const char*)xiah.payload(), xiah.plen());
+			String payload((const char*)thdr.payload(), xiah.plen()- thdr.hlen());
 			String str=src_path;
 			if (DEBUG) click_chatter("src_path %s (len %d)", src_path.c_str(), strlen(src_path.c_str()));
 			str=str+String("^");

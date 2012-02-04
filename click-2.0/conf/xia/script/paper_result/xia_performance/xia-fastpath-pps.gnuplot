@@ -1,10 +1,11 @@
 #!/usr/bin/env gnuplot 
 		
-set term pdf size 3.30in, 1.25in
+set term pdf dashed size 3.00in, 2.00in
 		
-set output "forwarding_performance_tput.pdf"
-set xlabel "Packet size (bytes)"
-set ylabel "Throughput(Gbps)"
+set output "fastpath_performance_pps.pdf"
+#set xlabel "XIA Packet types"
+set ylabel "Performance (Mpps)"
+set xrange [-0.3:3.3]
 		
 		
 set style  line 1 lt 6 lc rgb "red"  linewidth 4  pointtype 1 pointsize 0.4
@@ -19,22 +20,14 @@ set style  line 9 lt 6 lc rgb "green"  linewidth 4  pointtype 5 pointsize 0.4
 set style  line 10 lt 4 lc rgb "green"  linewidth 5  pointtype 5 pointsize 0.4
 set style  line 11 lt 6 lc rgb "purple"  linewidth 4  pointtype 6 pointsize 0.5
 set style  line 12 lt 4 lc rgb "purple"  linewidth 5  pointtype 6 pointsize 0.5
-set yrange [0:30]		
+set yrange [0:15]		
 
 #set ytics nomirror
 set grid
 set key box
 set key  enhanced  bottom right spacing 0.85
 		
-#plot 'ip' u 2:($3*($2+24)*8/1000) w lp ls 2 title "IP" , \
-#     'fb0' u 2:($3*($2+24)*8/1000) w lp ls 4 title "XIA",  \
-#     'fb1' u 2:($3*($2+24)*8/1000) w lp ls 6 title "XIA FB1",  \
-#     'fb2' u 2:($3*($2+24)*8/1000) w lp ls 8 title "XIA FB2" ,  \
-#     'fb3' u 2:($3*($2+24)*8/1000) w lp ls 10 title "XIA FB3"
-plot 'ip' u  2:4 w lp ls 2 title "IP" , \
-     'fb0' u 2:4 w lp ls 4 title "XIA FB0",  \
-     'fb1' u 2:4 w lp ls 6 title "XIA FB1",  \
-     'fb2' u 2:4 w lp ls 8 title "XIA FB2" ,  \
-     'fb3' u 2:4 w lp ls 10 title "XIA FB3", \
-     'via' u 2:4 w lp ls 12 title "XIA VIA" axis x1y1
-		
+plot 'fastpath' u  5:xticlabel(3) w lp ls 1 title "XIA Fast Path", \
+     'fastpath' u  0:5:8:9 w errorbars ls 1 notitle , \
+     'fastpath' u  14:xticlabel(3) w lp ls 12 title "XIA w/o Fast Path"  ,\
+     'fastpath' u  0:14:17:18 w errorbars ls 12 notitle 
