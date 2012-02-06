@@ -198,7 +198,7 @@ toh->Discard;
 // Forwarding path for xge0
 rt[1] -> DropBroadcasts
 //    -> cp0 :: PaintTee(1)
-    -> gio0 :: IPGWOptions(10.0.0.1)
+    //-> gio0 :: IPGWOptions(10.0.0.1)
     //-> FixIPSrc(10.0.0.1)
     -> dt0 :: DecIPTTL
     -> fr0 :: IPFragmenter(1500)
@@ -207,13 +207,13 @@ rt[1] -> DropBroadcasts
     -> out0;
 dt0[1] -> ICMPError(10.0.0.1, timeexceeded) -> IPPrint() -> rt;
 fr0[1] -> ICMPError(10.0.0.1, unreachable, needfrag)-> IPPrint()  -> rt;
-gio0[1] -> ICMPError(10.0.0.1, parameterproblem)-> IPPrint()  -> rt;
+//gio0[1] -> ICMPError(10.0.0.1, parameterproblem)-> IPPrint()  -> rt;
 //cp0[1] -> ICMPError(10.0.0.1, redirect, host)-> IPPrint()  -> rt;
 
 // Forwarding path for xge1
 rt[2] -> DropBroadcasts
 //    -> cp1 :: PaintTee(2)
-    -> gio1 :: IPGWOptions(10.0.1.1)
+   // -> gio1 :: IPGWOptions(10.0.1.1)
     //-> FixIPSrc(10.0.1.1)
     -> dt1 :: DecIPTTL
     -> fr1 :: IPFragmenter(1500)
@@ -222,13 +222,13 @@ rt[2] -> DropBroadcasts
     -> out1;
 dt1[1] -> ICMPError(10.0.1.1, timeexceeded) -> IPPrint()  -> rt;
 fr1[1] -> ICMPError(10.0.1.1, unreachable, needfrag) -> IPPrint()  -> rt;
-gio1[1] -> ICMPError(10.0.1.1, parameterproblem) -> IPPrint()  -> rt;
+//gio1[1] -> ICMPError(10.0.1.1, parameterproblem) -> IPPrint()  -> rt;
 //cp1[1] -> ICMPError(10.0.1.1, redirect, host)  -> IPPrint() -> rt;
 
 // Forwarding path for xge2
 rt[3] -> DropBroadcasts
 //    -> cp2 :: PaintTee(3)
-    -> gio2 :: IPGWOptions(10.0.2.1)
+    //-> gio2 :: IPGWOptions(10.0.2.1)
     //-> FixIPSrc(10.0.2.1)
     -> dt2 :: DecIPTTL
     -> fr2 :: IPFragmenter(1500)
@@ -237,13 +237,13 @@ rt[3] -> DropBroadcasts
     -> out2;
 dt2[1] -> ICMPError(10.0.2.1, timeexceeded) -> rt;
 fr2[1] -> ICMPError(10.0.2.1, unreachable, needfrag) -> rt;
-gio2[1] -> ICMPError(10.0.2.1, parameterproblem) -> rt;
+//gio2[1] -> ICMPError(10.0.2.1, parameterproblem) -> rt;
 //cp2[1] -> ICMPError(10.0.2.1, redirect, host) -> rt;
 
 // Forwarding path for xge3
 rt[4] -> DropBroadcasts
 //    -> cp3 :: PaintTee(4)
-    -> gio3 :: IPGWOptions(10.0.3.1)
+//    -> gio3 :: IPGWOptions(10.0.3.1)
     //-> FixIPSrc(10.0.3.1)
     -> dt3 :: DecIPTTL
     -> fr3 :: IPFragmenter(1500)
@@ -252,7 +252,7 @@ rt[4] -> DropBroadcasts
     -> out3;
 dt3[1] -> ICMPError(10.0.3.1, timeexceeded) -> rt;
 fr3[1] -> ICMPError(10.0.3.1, unreachable, needfrag) -> rt;
-gio3[1] -> ICMPError(10.0.3.1, parameterproblem) -> rt;
+//gio3[1] -> ICMPError(10.0.3.1, parameterproblem) -> rt;
 //cp3[1] -> ICMPError(10.0.3.1, redirect, host) -> rt;
 
 Script(write rt.load /home/dongsuh/xia-core/click-2.0/conf/xia/ip_routes_4_bal.txt);
