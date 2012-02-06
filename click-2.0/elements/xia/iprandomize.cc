@@ -14,6 +14,9 @@
 #else
  XXX
 #endif
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 CLICK_DECLS
 
 IPRandomize::IPRandomize() :_routeTable(0), _zipf(1.2) 
@@ -112,6 +115,11 @@ IPRandomize::simple_action(Packet *p_in)
 		int index = rand() % prefix.size();
 		uint32_t ip  = prefix[index]; // + htonl(rand()%256);
 		_ip_cache[i] = ip;
+		if (i<100) {
+		    struct in_addr addr;
+		    addr.s_addr= ip;
+		    click_chatter("IP addr %i %s ", i, inet_ntoa(addr));
+		}
 	    }
 	}
 	_ip_cache_initialized = true;
