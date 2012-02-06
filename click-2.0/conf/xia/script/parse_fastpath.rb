@@ -36,4 +36,5 @@ end
 if __FILE__==$0
     Dir.chdir("output")
     parse_fp_result("XIA")
+    parse_fp_result("IP")
 end
