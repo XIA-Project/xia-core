@@ -29,8 +29,8 @@ set key  enhanced  bottom right spacing 0.85
 		
 plot 'ip_fastpath' u  (-1):6:($8*$4*8/1000):($9*$4*8/1000):xticlabel(3) w errorbars ls 5 title "IP Fast Path", \
      'ip_fastpath' u  (-1):15:($17*$4*8/1000):($18*$4*8/1000):xticlabel(3) w errorbars ls 10 title "IP w/o Fast Path", \
-     'fastpath' u  6:xticlabel(3) w lp ls 1 title "XIA Fast Path", \
-     'fastpath' u  0:6:($8*$4*8/1000):($9*$4*8/1000) w errorbars ls 1 notitle , \
-     'fastpath' u  15:xticlabel(3) w lp ls 12 title "XIA w/o Fast Path"  ,\
-     'fastpath' u  0:15:($17*$4*8/1000):($18*$4*8/1000) w errorbars ls 12 notitle
+     'fastpath' index 0 u  6:xticlabel(3) w lp ls 1 title "XIA Fast Path", \
+     'fastpath' index 0 u  0:6:($8*$4*8/1000):($9*$4*8/1000) w errorbars ls 1 notitle , \
+     'fastpath' index 0 u  15:xticlabel(3) w lp ls 12 title "XIA w/o Fast Path"  ,\
+     'fastpath' index 0 u  0:15:($17*$4*8/1000):($18*$4*8/1000) w errorbars ls 12 notitle
 
