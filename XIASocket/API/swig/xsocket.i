@@ -35,17 +35,38 @@
     free($1);
 }
 
+/* functions */
 extern int Xsendto(int sockfd,const void *buf, size_t len, int flags,char * dDAG, size_t dlen);
 extern int Xrecvfrom(int sockfd,void *rbuf, size_t len, int flags,char * dDAG, size_t *dlen);
-extern int Xsocket();
+extern int Xsocket(int transport_type); /* 0: Reliable transport (SID), 1: Unreliable transport (SID), 2: Content Chunk transport (CID) */
 extern int Xconnect(int sockfd, char* dest_DAG);
 extern int Xbind(int sockfd, char* SID);
 extern int Xclose(int sock);
 extern int Xrecv(int sockfd, void *rbuf, size_t len, int flags);
-extern int Xsend(int sockfd, const void *wbuf, size_t len, int flags);
-extern int XgetCID(int sockfd, char* dDAG, size_t dlen);
-extern int XputCID(int sockfd, const void *wbuf, size_t len, int flags,char* sDAG, size_t dlen);
+extern int Xsend(int sockfd,const void *buf, size_t len, int flags);
+
+extern int XgetCID(int sockfd, char* cDAG, size_t dlen);
+extern int XgetCIDList(int sockfd, const struct cDAGvec *cDAGv, int numCIDs);
+extern int XgetCIDStatus(int sockfd, char* cDAG, size_t dlen);
+extern int XgetCIDListStatus(int sockfd, struct cDAGvec *cDAGv, int numCIDs);
+extern int XreadCID(int sockfd, void *rbuf, size_t len, int flags, char * cDAG, size_t dlen);
+
+extern int XputCID(int sockfd, const void *buf, size_t len, int flags,char* sDAG, size_t dlen);
 extern int Xaccept(int sockfd);
-extern void set_conf(char *filename, char *sectioname);
+extern int Xgetsocketidlist(int sockfd, int *socket_list);
+extern int Xgetsocketinfo(int sockfd1, int sockfd2, struct Netinfo *info);
+extern void error(const char *msg);
+extern void set_conf(const char *filename, const char *sectioname);
 extern void print_conf();
 
+/* constants */
+#define ATTEMPTS 100 //Number of attempts at opening a socket 
+#define MAXBUFLEN 2000 // Note that this limits the size of chunk we can receive
+
+#define XSOCK_STREAM 0 // Reliable transport (SID)
+#define XSOCK_DGRAM 1 // Unreliable transport (SID)
+#define XSOCK_CHUNK 2 // Content Chunk transport (CID)
+
+#define WAITING_FOR_CHUNK 0
+#define READY_TO_READ 1
+#define REQUEST_FAILED -1

@@ -22,7 +22,7 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 
-int Xrecvfrom(int sockfd, void *buf, size_t len, int flags,
+int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 	char* sDAG, size_t* slen)
 {
     struct addrinfo hints;
@@ -46,7 +46,7 @@ int Xrecvfrom(int sockfd, void *buf, size_t len, int flags,
 
     while(src_port==atoi(CLICKCONTROLPORT)) {
 	//Do what is necessary, maybe close socket
-	if(strcmp((char *)buf,"close")==0) {
+	if(strcmp((char *)rbuf,"close")==0) {
 	    Xclose(sockfd);
 	    return -1;
 	}
@@ -71,7 +71,7 @@ int Xrecvfrom(int sockfd, void *buf, size_t len, int flags,
     //memcpy (&paylen, UDPbuf+2,2);
     //paylen=ntohs(paylen);
     int offset=i+1;
-    memcpy(buf, UDPbuf+offset, paylen);
+    memcpy(rbuf, UDPbuf+offset, paylen);
     strncpy(sDAG, UDPbuf, i);
     sDAG[i]=0; /* Make DAG a null terminated string */
     *slen=i;
