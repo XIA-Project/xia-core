@@ -469,6 +469,10 @@ elementclass EndHost {
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
     Script(write n/proc/rt_IP/rt.add - 0); 	// default route for IPv4    
 
+    // quick fix
+    n[3] -> Discard();
+    Idle() -> [4]xtransport;
+
     input[0] -> n;
     srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
     n[1] -> srcTypeClassifier[1] -> [2]xtransport[2] ->  [0]n;
