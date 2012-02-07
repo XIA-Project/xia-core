@@ -1726,7 +1726,20 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		 p_in->kill();
 	    }
 	    break;
-
+	case 4://Packet with DHCP information
+	    {
+		XIAHeader xiah(p_in->xia_header());
+		String temp = _local_addr.unparse();
+		Vector<String> ids;
+		cp_spacevec(temp, ids);;
+		if (ids.size() < 3) {
+			String new_route((char *)xiah.payload());
+			String new_local_addr = new_route + " " + ids[1];
+			click_chatter("new address is - %s", new_local_addr.c_str());
+			_local_addr.parse(new_local_addr);
+			p_in->kill();
+		}
+	    }
     }
 
 }

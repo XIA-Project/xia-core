@@ -3,7 +3,10 @@
 CFLAGS=-I../API
 LDFLAGS =  -lprotobuf -lpthread
 
-all: xs_stream ps xc_stream pc vs ps_beacon pc_beacon xs_dgram xc_dgram ../API/libXsocket.a
+all: xs_stream ps xc_stream pc vs ps_beacon pc_beacon xs_dgram xc_dgram xsd ../API/libXsocket.a
+
+xsd: xs_dhcp_test.c ../API/libXsocket.a
+	gcc $(CFLAGS) -o $@ $< ../API/libXsocket.a $(LDFLAGS)
 
 xs_stream: Server_stream.c  ../API/libXsocket.a
 	gcc $(CFLAGS) -o $@ $< ../API/libXsocket.a $(LDFLAGS) 

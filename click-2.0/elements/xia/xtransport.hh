@@ -74,7 +74,7 @@ class XTRANSPORT : public Element {
     XTRANSPORT();
     ~XTRANSPORT();
     const char *class_name() const		{ return "XTRANSPORT"; }
-    const char *port_count() const		{ return "4/4"; }
+    const char *port_count() const		{ return "5/4"; }
     const char *processing() const		{ return PUSH; }
     int configure(Vector<String> &, ErrorHandler *);         
     void push(int port, Packet *);            

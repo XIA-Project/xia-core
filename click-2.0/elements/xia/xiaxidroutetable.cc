@@ -295,8 +295,9 @@ void
 XIAXIDRouteTable::push(int, Packet *p)
 {
     int port = lookup_route(p);
-    if (port >= 0)
+    if (port >= 0) {
         output(port).push(p);
+    }
     else
     {
         // no match -- discard packet
