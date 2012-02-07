@@ -48,6 +48,8 @@ protected:
     static int load_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
     static int generate_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
 
+    static String list_routes_handler(Element *e, void *thunk);
+
 private:
     HashTable<XID, int> _rt;
     int _rem;
