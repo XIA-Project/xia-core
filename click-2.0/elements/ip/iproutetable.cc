@@ -321,7 +321,7 @@ IPRouteTable::load_routes_handler(const String &conf, Element *e, void *, ErrorH
         if (strlen(buf) == 0)
             continue;
 
-        if (add_route_handler(buf, e, 0, errh) != 0)
+        if (add_route_handler(buf, e, buf, errh) != 0)
             return -1;
 
         c++;

@@ -24,7 +24,7 @@
 // Called after XgetCID(), it reads the content of the requested CID (specified as cDAG) into buf
 // Return value: number of bytes, -1: failed 
 
-int XreadCID(int sockfd, void *buf, size_t len, int flags, char * cDAG, size_t dlen)
+int XreadCID(int sockfd, void *rbuf, size_t len, int flags, char * cDAG, size_t dlen)
 {
 	char buffer[2048];
 	struct sockaddr_in their_addr;
@@ -89,7 +89,7 @@ int XreadCID(int sockfd, void *buf, size_t len, int flags, char * cDAG, size_t d
 	//memcpy (&paylen, UDPbuf+2,2);
 	//paylen=ntohs(paylen);
 	int offset=i+1;
-	memcpy(buf, UDPbuf+offset, paylen);
+	memcpy(rbuf, UDPbuf+offset, paylen);
 	//strncpy(sDAG, UDPbuf, i);
 	
 	return paylen;
