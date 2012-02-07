@@ -19,6 +19,9 @@ RECORD_STAT_SCRIPT = "/home/#{USER}/xia-core/click-2.0/conf/xia/script/record_st
 
 RESET_CLICK_CMD = "killall click"
 
+# -SP-ONLY for packet size vs. forwarding speed experiments
+# -SP/-FP for slowpath vs. fastpath experiments
+
 SETUP = [ 
 #	{:NAME => "XIA-%d-FB0-SP", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>98},
 #	{:NAME => "XIA-%d-FB0-SP-ONLY", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>98},
@@ -35,10 +38,10 @@ SETUP = [
 #	{:NAME => "XIA-%d-FB3", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_FB3_SCRIPT, :PKT_OVERHEAD =>182},
 #	{:NAME => "XIA-%d-FB2", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_FB2_SCRIPT, :PKT_OVERHEAD =>154},
 #	{:NAME => "XIA-%d-FB1", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_FB1_SCRIPT, :PKT_OVERHEAD =>126},
-#	{:NAME => "IP-%d-SP", :ROUTER => IP_ROUTER_SCRIPT, :PKTGEN => IP_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>54},
-	{:NAME => "IP-%d-SP-ONLY", :ROUTER => IP_ROUTER_SCRIPT, :PKTGEN => IP_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>54},
-#	{:NAME => "IP-%d-FP", :ROUTER => IP_FP_ROUTER_SCRIPT, :PKTGEN => IP_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>54},
-	{:NAME => "IP-%d-FP-ONLY", :ROUTER => IP_FP_ROUTER_SCRIPT, :PKTGEN => IP_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>54},
+	{:NAME => "IP-%d-IP-SP", :ROUTER => IP_ROUTER_SCRIPT, :PKTGEN => IP_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>54},
+	{:NAME => "IP-%d-IP-SP-ONLY", :ROUTER => IP_ROUTER_SCRIPT, :PKTGEN => IP_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>54},
+	{:NAME => "IP-%d-IP-FP", :ROUTER => IP_FP_ROUTER_SCRIPT, :PKTGEN => IP_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>54},
+#	{:NAME => "IP-%d-IP-FP-ONLY", :ROUTER => IP_FP_ROUTER_SCRIPT, :PKTGEN => IP_PKT_GEN_SCRIPT, :PKT_OVERHEAD =>54},
 #	{:NAME => "XIA-%d-isolation-%d", :ROUTER => XIA_ROUTER_SCRIPT, :PKTGEN =>XIA_PKT_GEN_ISO_SCRIPT, :PKT_OVERHEAD =>126},
 #	{:NAME => "XIA-%d-VIA-SP-ONLY", :ROUTER =>XIA_ROUTER_SCRIPT, :PKTGEN => XIA_PKT_GEN_VIA_SCRIPT, :PKT_OVERHEAD =>126}
 	]
@@ -98,18 +101,23 @@ if __FILE__ ==$0
     pktgen_script = setup[:PKTGEN] 
    
     min_pktsize = (overhead+63)/64  * 64
-    #min_pktsize = 320+64		# for slowpath vs. fastpath test?
     size = min_pktsize
     pkt_size = []
 
     while (size<=256)
  	pkt_size.push(size)	
+ 	pkt_size.push(size)	
+ 	pkt_size.push(size)	
 	size+=64
     end
     #while (size<1500)
     #    pkt_size.push(size)	
+    #    pkt_size.push(size)	
+    #    pkt_size.push(size)	
     #    size+=128
     #end
+    #pkt_size.push(1500)	
+    #pkt_size.push(1500)	
     #pkt_size.push(1500)	
 
     if (setup[:NAME]=="XIA-%d-isolation-%d")
