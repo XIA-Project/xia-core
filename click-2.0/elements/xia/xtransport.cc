@@ -27,7 +27,8 @@ XTRANSPORT::XTRANSPORT()
     isConnected=false;
     
     _ackdelay_ms=300;
-    _teardown_wait_ms=240000;
+    //_teardown_wait_ms=240000;
+    _teardown_wait_ms=5000;
 }
 
 
@@ -149,7 +150,8 @@ XTRANSPORT::run_timer(Timer *timer)
   			tear_down = true;
   			daginfo->timer_on = false;
   			portToActive.set(_sport, false);
-  			XID source_xid=portToDAGinfo.get(_sport).xid;
+  			XID source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+  			//printf("\ndelRoute=%s \n", source_xid.unparse().c_str());
 			delRoute(source_xid);
 			XIDtoPort.erase(source_xid);
 			portToDAGinfo.erase(_sport);
@@ -421,6 +423,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			    
 			    if (! _timer.scheduled() || _timer.expiry() >= daginfo->teardown_expiry )
     				_timer.reschedule_at(daginfo->teardown_expiry);
+    				
 				    
 			    portToDAGinfo.set(_sport,*daginfo);
 			    
@@ -962,6 +965,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 				XIDtoPort.set(source_xid,_sport);//Maybe change the mapping to XID->DAGinfo?
 				addRoute(source_xid);
+				
 			}
 		    
 			if(daginfo->src_path.unparse_re().length() !=0) {
@@ -1082,6 +1086,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			XID	source_sid = daginfo->src_path.xid(daginfo->src_path.destination_node());
 			XID	destination_cid = dst_path.xid(dst_path.destination_node()); 
 			
+						
 			// Check the status of CID request
 			HashTable<XID, int>::iterator it;
 		    	it = daginfo->XIDtoStatus.find(destination_cid);

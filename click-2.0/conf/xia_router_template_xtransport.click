@@ -297,6 +297,8 @@ elementclass Router4Port {
     n[1] -> Discard;
     n[2] -> [0]cache[0] -> [1]n;
     Idle -> [1]cache[1] -> Discard;
+    
+    n[3] -> Discard();
 
     sw[0] -> Queue(200) -> [0]output;
     sw[1] -> Queue(200) -> [1]output;
