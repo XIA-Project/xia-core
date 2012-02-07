@@ -48,7 +48,24 @@ XIAXIDRouteTable::add_handlers()
     add_write_handler("load", load_routes_handler, 0);
     add_write_handler("generate", generate_routes_handler, 0);
     add_data_handlers("drops", Handler::OP_READ, &_drops);
+	add_read_handler("list", list_routes_handler, 0);
+}
 
+String
+XIAXIDRouteTable::list_routes_handler(Element *e, void *thunk)
+{
+    XIAXIDRouteTable* table = static_cast<XIAXIDRouteTable*>(e);
+
+	String tbl = e->name() + "\n";
+	tbl += "-;" + String(table->_rem) + "\n";
+
+	HashTable<XID, int>::iterator it = table->_rt.begin();
+	while (it != table->_rt.end()) {
+		tbl += it.key().unparse() +  ";" + String(it.value()) + "\n";
+		it++;
+
+	}
+	return tbl;
 }
 
 int

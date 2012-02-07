@@ -209,7 +209,8 @@ class RouterConfig:
 			# FIXME: should this be case insensitive?
 			if entry.startswith("XIAXIDInfo"):
 				self.handleXIDs(entry)
-			elif entry.find("/Script@") > 0:
+#			elif entry.find("/Script@") > 0:
+			elif entry.find("/cache ::") > 0:
 				# hacky way of finding the devices that are configured
 				self.addDevice(entry)
 			else:
@@ -366,7 +367,7 @@ class XrouteApp:
 		print "XID mappings"
 		print "-" * 80
 		for alias, xid in self.config.aliases().iteritems():
-			print "%8s -> %s" % (alias, xid)
+			print "%-10s -> %s" % (alias, xid)
 
 	#
 	# read the length of data sent by click so we can consume the right
@@ -427,6 +428,19 @@ class XrouteApp:
 			self.checkStatus(True)
 
 	#
+	# display type of click port
+	#
+	# FIXME: can we count on this always being true?
+	#
+	def portType(self, port):
+		pt = ""
+		if port == "4":
+			pt = " (self)"
+		elif port == "5":
+			pt = " (fallback)"
+		return pt
+
+	#
 	# print the specified route table to stdout
 	#
 	def printTable(self, device, table):
@@ -442,15 +456,15 @@ class XrouteApp:
 					xid = "(default)"
 				elif self.options.verbose() == False:
 					xid = self.config.getAlias(xid)
-				text += "%-8s %-48s %s\n" % (table, xid, port)
+				text += "%-8s %-48s %s%s\n" % (table, xid, 
+						port, self.portType(port))
 		return text
 
 	#
 	# format the route table header and loop through the requested XID tables
 	#
 	def getRouteTable(self, device):
-		text = "\n"
-		text += device
+		text  = device
 		text += "\n"
 		text += "%-8s %-48s PORT\n" % ("TYPE", "XID")
 		text +=  "-" * 80
@@ -459,7 +473,6 @@ class XrouteApp:
 		# only print the XID types requested by the user
 		for table in self.types:
 			text += self.printTable(device, table)
-		text += "\n"
 		return text
 
 	#
@@ -585,7 +598,7 @@ class XrouteApp:
 		f.write("# Alias mappings from the xia click configuration\n")
 
 		for alias, xid in sorted(self.config.aliases().iteritems()):
-			f.write("# %10s -> %s\n" % (alias, xid))
+			f.write("# %-10s -> %s\n" % (alias, xid))
 
 		for device in self.devices:
 			f.write("\n")
