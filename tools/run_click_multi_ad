@@ -4,8 +4,7 @@
 #
 # all host and router devices run from the same click instance using
 #  virtual networks for communication
-# host0 and router0 are on the 172.0.0.0/24 network (fake0)
-# host1 and router1 are on the 192.0.0.0/24 network (fake1)
+# this script has 4 ADs with 2 hosts on each
 
 NAME=`basename $0`
 CLICK=../click-2.0/userlevel/click
