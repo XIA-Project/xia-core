@@ -32,5 +32,17 @@ int click_reply(int sockfd, char *buf, int buflen);
 int click_reply2(int sockfd, xia::XSocketCallType *type);
 int bind_to_random_port(int sockfd);
 
+int validateSocket(int sock, int stype, int err);
+
+// socket state functions for internal API use
+// implementation is in state.c
+void allocSocketState(int sock, int tt);
+void freeSocketState(int sock);
+int getSocketType(int sock);
+void setSocketType(int sock, int tt);
+int isConnected(int sock);
+int setConnected(int sock, int conn);
+int getSocketData(int sock, char *buf, unsigned bufLen);
+void setSocketData(int sock, const char *buf, unsigned bufLen);
 
 #endif

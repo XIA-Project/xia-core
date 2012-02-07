@@ -24,33 +24,37 @@
 
 // FIXME: cache info so we don't have to set everything up each time we come in here!
 
+int validateSocket(int sock, int stype, int err)
+{
+	int st = getSocketType(sock);
+	if (st == stype)
+		return 0;
+	else if (st == XSOCK_INVALID)
+		errno = EBADF;
+	else
+		errno = err;
+
+	return -1;
+}
+
 int click_x(int sockfd, int kind, xia::XSocketMsg *xsm)
 {
-   	struct addrinfo hints, *info;
 	int rc;
-	const char *port, *addr;
+	struct sockaddr_in sa;
+	socklen_t slen;
 
 	assert(xsm);
 
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_DGRAM;
-
+	slen = sizeof sa;
+	sa.sin_family = PF_INET;
 	if (kind == DATA) {
-		port = CLICKDATAPORT;
-		addr = CLICKDATAADDRESS;
+		sa.sin_addr.s_addr = inet_addr(CLICKDATAADDRESS);
+		sa.sin_port = htons(atoi(CLICKDATAPORT));
 	} else if (kind == CONTROL) {
-		port = CLICKCONTROLPORT;
-		addr = CLICKCONTROLADDRESS;
+		sa.sin_addr.s_addr = inet_addr(CLICKCONTROLADDRESS);
+		sa.sin_port = htons(atoi(CLICKCONTROLPORT));
 	} else {
 		LOG("invalid click port specified");
-		return -1;
-	}
-
-	// FIXME: gai_strerror is not threadsafe
-	if ((rc = getaddrinfo(addr, port, &hints, &info)) < 0) {
-		LOGF("getaddrinfo: %s", gai_strerror(rc));
-		errno = ECLICKCONTROL;
 		return -1;
 	}
 
@@ -60,7 +64,7 @@ int click_x(int sockfd, int kind, xia::XSocketMsg *xsm)
 	int remaining = p_buf.size();
 	const char *p = p_buf.c_str();
 	while (remaining > 0) {
-		rc = sendto(sockfd, p, remaining, 0, info->ai_addr, info->ai_addrlen);
+		rc = sendto(sockfd, p, remaining, 0, (struct sockaddr *)&sa, slen);
 
 		if (rc == -1) {
 			LOGF("click socket failure: errno = %d", errno);
@@ -82,7 +86,6 @@ int click_x(int sockfd, int kind, xia::XSocketMsg *xsm)
 			}
 		}	
 	}
-	freeaddrinfo(info);
 
 	return  (rc >= 0 ? 0 : -1);
 }
@@ -142,38 +145,11 @@ int click_reply2(int sockfd, xia::XSocketCallType *type)
 	reply.ParseFromString(buf);
 	xia::X_Result_Msg *msg = reply.mutable_x_result();
 
-	// printf(reply.DebugString().c_str());
-
 	*type = msg->type();
 
 	rc = msg->return_code();
 	if (rc == -1)
 		errno = msg->err_code();
-
-	return rc;
-}
-
-int bind_to_random_port(int sockfd)
-{
-	struct sockaddr_in addr;
-	int port;
-	int rc;
-
-	srand((unsigned)time(NULL));
-
-	for (int tries = 0; tries < ATTEMPTS; tries++) {
-		int rn = rand();
-		port=1025 + rn % (65535 - 1024); 
-
-		// printf("trying %d\n", port);
-		addr.sin_family = PF_INET;
-		addr.sin_addr.s_addr = inet_addr(MYADDRESS);
-		addr.sin_port = htons(port);
-
-		rc = bind(sockfd, (const struct sockaddr *)&addr, sizeof(addr));
-		if (rc != -1)
-			break;
-	}
 
 	return rc;
 }
