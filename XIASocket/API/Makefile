@@ -6,7 +6,7 @@ LDFLAGS =-lprotobuf
 SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XgetCID.c  XgetCIDList.c  \
 		XgetCIDStatus.c  XgetCIDListStatus.c XreadCID.c  XputCID.c Xrecv.c \
         Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c Xgetsocketidlist.c  \
-		Xsetsockopt.c Xutil.c Xgetsocketinfo.c \
+		Xsetsockopt.c Xutil.c Xgetsocketinfo.c state.c \
 		../minini/minIni.c 
 SHARED_OBJECTS=$(SOURCES:.c=.shared.o) xia.pb.shared.o
 STATIC_OBJECTS=$(SOURCES:.c=.o) xia.pb.o
