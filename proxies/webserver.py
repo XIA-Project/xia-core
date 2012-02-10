@@ -5,7 +5,7 @@ import sys
 import struct
 import time
 import os
-import xsocket
+from xsocket import *
 from ctypes import *
 import hashlib
 
@@ -31,7 +31,7 @@ def putCID(chunk):
     cid = m.hexdigest()
 
     print 'waiting to get socket'
-    sock = xsocket.Xsocket(xsocket.XSOCK_STREAM)
+    sock = Xsocket(XSOCK_STREAM)
     if (sock<0):
         print "error opening socket"
         exit(-1)
@@ -40,11 +40,11 @@ def putCID(chunk):
     print 'waiting to put content'
     # Put the content chunk
     content_dag = 'RE %s %s CID:%s' % (AD1, HID1, cid)
-    xsocket.XputCID(sock, chunk, len(chunk), 0, content_dag, len(content_dag))
+    XputCID(sock, chunk, len(chunk), 0, content_dag, len(content_dag))
 
     print 'put content %s (length %s)' % (content_dag, len(chunk))
     print cid
-    xsocket.Xclose(sock)
+    Xclose(sock)
 
     return cid
 
@@ -63,7 +63,7 @@ def serveSIDRequest(request, sock):
     
     response = 'HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/html\n\n'+ cid
     print 'Webserver Response:\n%s' % response
-    xsocket.Xsend(sock, response, len(response), 0)
+    Xsend(sock, response, len(response), 0)
     return
 
 
@@ -153,8 +153,8 @@ def main():
 
     print 'starting webserver'
     # Set up connection with click via Xsocket API
-    xsocket.set_conf("xsockconf_python.ini", "webserver.py")
-    xsocket.print_conf()  #for debugging
+    set_conf("xsockconf_python.ini", "webserver.py")
+    print_conf()  #for debugging
 
     try:
         sys.argv.index('-r') # don't republish content if we're restarting but didn't restart click
@@ -167,33 +167,33 @@ def main():
     try:   
             # Now listen for connections from clients
             print 'webserver.py: Waiting to get socket to listen on'
-            listen_sock = xsocket.Xsocket(xsocket.XSOCK_STREAM)
+            listen_sock = Xsocket(XSOCK_STREAM)
             if (listen_sock<0):
                 print 'error opening socket'
                 return
             dag = "RE %s %s %s" % (AD1, HID1, SID1) # dag to listen on
-            xsocket.Xbind(listen_sock, dag)
+            Xbind(listen_sock, dag)
             print 'Listening on %s' % dag
             
             
             while(True):
         
-        	accept_sock = xsocket.Xaccept(listen_sock);
+        	accept_sock = Xaccept(listen_sock);
         	
         	child_pid = os.fork()
   
   	  	if child_pid == 0:  
   	  	
-  	  		incoming_data = xsocket.Xrecv(accept_sock, 2000, 0)
+  	  		incoming_data = Xrecv(accept_sock, 2000, 0)
             		print "webserver got %s" % incoming_data
             		serveSIDRequest(incoming_data, accept_sock)
-            		xsocket.Xclose(accept_sock)
+            		Xclose(accept_sock)
         		os._exit(0)
             		
     except (KeyboardInterrupt, SystemExit), e:
             print 'Closing webserver'
             
-            xsocket.Xclose(listen_sock)
+            Xclose(listen_sock)
             sys.exit()
     
 

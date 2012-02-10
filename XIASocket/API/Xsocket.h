@@ -32,8 +32,6 @@
 extern "C" {
 #endif
 
-/* If you update these constants, remember to change them in
-   swig/xsocket.i as well. (TODO: Is there a better way?) */
 #define ATTEMPTS 100 //Number of attempts at opening a socket 
 #define MAXBUFLEN 2000 // Note that this limits the size of chunk we can receive
 
