@@ -4,7 +4,7 @@ import perf_callgraph
 import re
 
 # task
-tasks = ['Classification', 'Fast Path', 'Lookup (Slow)', 'Other', 'Queueing', 'Misc', 'Mem Alloc/Copy', None]
+tasks = ['Classification', 'Fast-path', 'Lookup (Slow)', 'Other Overhead', 'Queueing', 'Misc', 'Mem Alloc/Copy', None]
 ignored_tasks = ['Mem Alloc/Copy', None]
 task_colors = ['0.2', '1', '0.6', '0.4', '0.8']
 
@@ -36,24 +36,24 @@ symbol_task_mappings = [
 
     (re.compile(r'^XIAXIDTypeClassifier::.*$'), 'Classification'),
 
-    (re.compile(r'^Paint::.*$'), 'Other'),
-    (re.compile(r'^PaintSwitch::.*$'), 'Other'),
+    (re.compile(r'^Paint::.*$'), 'Other Overhead'),
+    (re.compile(r'^PaintSwitch::.*$'), 'Other Overhead'),
     (re.compile(r'^RangeIPLookup::.*$'), 'Lookup (Slow)'),
     (re.compile(r'^RadixIPLookup::.*$'), 'Lookup (Slow)'),
     (re.compile(r'^DirectIPLookup::.*$'), 'Lookup (Slow)'),
-    (re.compile(r'^DecIPTTL::.*$'), 'Other'),
-    (re.compile(r'^IPFragmenter::.*$'), 'Other'),
-    (re.compile(r'^XIACheckDest::.*$'), 'Other'),
+    (re.compile(r'^DecIPTTL::.*$'), 'Other Overhead'),
+    (re.compile(r'^IPFragmenter::.*$'), 'Other Overhead'),
+    (re.compile(r'^XIACheckDest::.*$'), 'Other Overhead'),
     (re.compile(r'^XIAXIDRouteTable::.*$'), 'Lookup (Slow)'),
-    (re.compile(r'^XIASelectPath::.*$'), 'Other'),
-    (re.compile(r'^XIADecHLIM::.*$'), 'Other'),
-    (re.compile(r'^XIANextHop::.*$'), 'Other'),
-    (re.compile(r'^Element::push\(.*\)$'), 'Other'),
+    (re.compile(r'^XIASelectPath::.*$'), 'Other Overhead'),
+    (re.compile(r'^XIADecHLIM::.*$'), 'Other Overhead'),
+    (re.compile(r'^XIANextHop::.*$'), 'Other Overhead'),
+    (re.compile(r'^Element::push\(.*\)$'), 'Other Overhead'),
 
-    (re.compile(r'^XIAFastPath::.*$'), 'Fast Path'),
-    (re.compile(r'^IPFastPath::.*$'), 'Fast Path'),
+    (re.compile(r'^XIAFastPath::.*$'), 'Fast-path'),
+    (re.compile(r'^IPFastPath::.*$'), 'Fast-path'),
 
-    #(re.compile(r'^XIARouterCache::.*$'), 'Other'),
+    #(re.compile(r'^XIARouterCache::.*$'), 'Other Overhead'),
 
     (re.compile(r'^<>__memset_sse2$'), 'Mem Alloc/Copy'),
     (re.compile(r'^<>memcpy$'), 'Mem Alloc/Copy'),
@@ -70,7 +70,7 @@ symbol_task_mappings = [
     (re.compile(r'^<>0x7ff.*$'), None),
     (re.compile(r'^<>0xfff.*$'), None),
     (re.compile(r'^<>_Z.*$'), None),
-    (re.compile(r'^<>.*$'), 'Other'),
+    (re.compile(r'^<>.*$'), 'Other Overhead'),
     #(re.compile(r'^<>.*$'), None),
 ]
 

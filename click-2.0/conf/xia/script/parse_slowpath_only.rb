@@ -17,7 +17,7 @@ def parse_fp_result(proto)
       count=0
       perfs = []
       #p statfiles
-      while ((statfile = statfiles.pop()) && count<1)
+      while ((statfile = statfiles.pop()) && count<10)
         #p statfile
         perf = calc_avg_performance(statfile, true)
         if (perf==nil || perf.include?(0.0)) # failed experiment
@@ -39,6 +39,6 @@ end
 
 if __FILE__==$0
     Dir.chdir("output")
-    parse_fp_result("XIA")
+    #parse_fp_result("XIA")
     parse_fp_result("IP")
 end
