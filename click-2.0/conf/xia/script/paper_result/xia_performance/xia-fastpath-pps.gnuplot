@@ -27,9 +27,9 @@ set grid
 set key box
 set key  enhanced  bottom right spacing 0.85
 		
-plot 'ip_fastpath' u  (-1):5:8:9:xticlabel(3) w errorbars ls 5 title "IP Fast Path", \
-     'ip_fastpath' u  (-1):14:17:18:xticlabel(3) w errorbars ls 10 title "IP w/o Fast Path", \
-     'fastpath' index 0  u  5:xticlabel(3)  w lp ls 1 title "XIA Fast Path", \
+plot 'ip_fastpath' u  (-1):5:8:9:xticlabel(3) w errorbars ls 5 title "IP Fast-path", \
+     'ip_fastpath' u  (-1):14:17:18:xticlabel(3) w errorbars ls 10 title "IP w/o Fast-path", \
+     'fastpath' index 0  u  5:xticlabel(3)  w lp ls 1 title "XIA Fast-path", \
      'fastpath' index 0  u  0:5:8:9 w errorbars ls 1 notitle , \
-     'fastpath' index 0  u  14:xticlabel(3) w lp ls 12 title "XIA w/o Fast Path"  ,\
+     'fastpath' index 0  u  14:xticlabel(3) w lp ls 12 title "XIA w/o Fast-path"  ,\
      'fastpath' index 0  u  0:14:17:18  w errorbars ls 12 notitle
