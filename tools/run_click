@@ -1,0 +1,76 @@
+#!/bin/bash
+
+NAME=`basename $0`
+CLICKPATH=../click-2.0
+CONFPATH=$CLICKPATH/conf
+CLICK=$CLICKPATH/userlevel/click
+
+SINGLE_SCRIPT=xia_chain_topology_socket_reliable_test.click
+MULTI_SCRIPT=xia_test_topology_1.click
+
+# default to the standard click script
+SCRIPT=$SINGLE_SCRIPT
+
+DEFAULT="(default)"
+VERBOSE="1"
+
+help ()
+{
+	cat << EOH
+
+usage: $NAME [-qvs]
+where:
+  -q runs click silently
+  -v prints click debug messages to stdout (default)
+  -s run click using the xia_chain_topology_socket_reliable_test.click
+     config file where both client and cserver networks are run on the
+	 same machine (default)
+  -m run click using the xia_test_topology_1.click config file which
+     provides a 4 router network with 6 HIDs and 3 ADs running on a
+	 single machine
+
+EOH
+	exit 0
+}
+
+while getopts ":qvsmh" opt; do
+	case $opt in
+	    s)
+			SCRIPT=$SINGLE_SCRIPT
+			DEFAULT=""
+			;;
+	    m)
+			SCRIPT=$MULTI_SCRIPT
+			DEFAULT=""
+			;;
+		q)
+			VERBOSE="0"
+			;;
+		v)
+			VERBOSE="1"
+			;;
+		h)
+			help
+			;;
+		\?)
+			printf "\nInvalid option: -$OPTARG\n" >&2
+			help
+			;;
+	esac
+done
+
+SNAME=`basename $SCRIPT .click`
+
+if [ ! -f $CONFPATH/$SCRIPT ]; then
+	printf "\nERROR: unable to locate click conf file: $SNAME\n\n"
+	exit 1
+fi
+
+if [ $VERBOSE -eq "0" ]; then
+	exec &> /dev/null
+fi
+
+printf "\nrunning click using $SNAME $DEFAULT\n\n"
+
+sudo $CLICK -R $CONFPATH/$SCRIPT
+
