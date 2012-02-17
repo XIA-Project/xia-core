@@ -33,7 +33,7 @@ extern "C" {
 #endif
 
 #define ATTEMPTS 100 //Number of attempts at opening a socket 
-#define MAXBUFLEN 2000 // Note that this limits the size of chunk we can receive
+#define MAXBUFLEN 65521 // Note that this limits the size of chunk we can receive TODO: What should this be?
 
 #define XSOCK_STREAM 0 // Reliable transport (SID)
 #define XSOCK_DGRAM 1 // Unreliable transport (SID)

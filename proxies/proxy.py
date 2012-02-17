@@ -67,8 +67,6 @@ class ProxyHandler (BaseHTTPServer.BaseHTTPRequestHandler):
         (scm, netloc, path, params, query, fragment) = urlparse.urlparse(
             self.path, 'http')
 	if netloc.find('xia') == 0:
-        	print "Get request:"
-		print "netloc=" + netloc
 		header = "%s %s %s\r\n" % (
                     self.command,
                     urlparse.urlunparse(('', '', path, params, query, '')),
