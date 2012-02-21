@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2011 Carnegie Mellon University
+# Copyright 2012 Carnegie Mellon University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@
 # in order to use the correct xsockconf.ini file. It would be good to 
 # a) relocate the services into a common directory instead of being scattered
 # throughout the source tree
-# b) no rely on the xsockconf.ini file if possible
+# b) not rely on the xsockconf.ini file if possible
 
 NAME=`basename $0`
 VERBOSE=0
