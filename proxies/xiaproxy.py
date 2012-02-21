@@ -1,5 +1,5 @@
 import socket, select, random
-import struct, time, signal, os, sys
+import struct, time, signal, os, sys, re
 import fcntl
 from xsocket import *
 from ctypes import *
@@ -304,17 +304,18 @@ def xiaHandler(control, path, payload, browser_socket):
     control=control[4:]  # remove the 'xia.' prefix
 
     if payload.find('GET /favicon.ico') != -1:
-        print 'trying to get favicon'
         return
     if control.find('sid') == 0:
         # TODO: is it necessary to handle video service requests separately?
         found_video = control.find('video');
         if(found_video != -1):
-            sendVideoSIDRequest(control[4:], payload, browser_socket);
+            sendVideoSIDRequest(control[4:], payload, browser_socket)
         else:
             # Do some URL processing 
             ddag = dag_from_url(control + path)
-            sendSIDRequest(ddag, payload, browser_socket);
+            # If there's a fallback in the filename, remove it now (TODO: change this when we switch to new URL format)
+            payload = re.sub(r"/fallback\(\S*\)", "", payload)
+            sendSIDRequest(ddag, payload, browser_socket)
     elif control.find('cid') == 0:
         control_array = control.split('.')
         num_chunks = int(control_array[1])
