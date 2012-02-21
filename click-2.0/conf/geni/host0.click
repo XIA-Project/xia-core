@@ -1,4 +1,5 @@
-require(library xia_two_port_four_port_router.click); 
+require(library ../xia_router_template_xtransport.click);
+require(library ../xia/xia_address.click);
 
 // host instantiation
 host0 :: EndHost (RE AD0 HID0, HID0, fake0,172.0.0.2,172.0.0.1,11:11:11:11:11:11,0);
@@ -6,15 +7,15 @@ host0 :: EndHost (RE AD0 HID0, HID0, fake0,172.0.0.2,172.0.0.1,11:11:11:11:11:11
 
 c0 :: Classifier(12/9999);
 
-todevice0 :: ToDevice(eth5);
+todevice0 :: ToDevice(eth2);
 
-FromDevice(eth5) -> c0;
+FromDevice(eth2) -> c0;
 c0[0] -> Strip(14) -> MarkXIAHeader() -> [0]host0; // XIA packet 
 
 
 host0[0]
 //-> XIAPrint() 
--> EtherEncap(0x9999, 00:1B:21:3A:D5:75, 00:24:e8:30:2d:96) 
+-> EtherEncap(0x9999, 00:04:23:b7:17:6c, 00:04:23:b7:1e:20) 
 -> c::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
 -> todevice0;
 

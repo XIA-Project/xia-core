@@ -50,7 +50,7 @@ int Xaccept(int sockfd)
 	int port;
 
 	if ((new_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		perror("Xsocket listener: socket");
+		perror("Xsocket accept listener: socket");
 		return -1;
 	}
 
@@ -70,7 +70,7 @@ int Xaccept(int sockfd)
 	}
 	if (rv == -1) {
 		close(new_sockfd);
-		perror("Xsocket listener: bind");
+		perror("Xsocket accept listener: bind");
 		return -1;
 	}	
 	//printf("my port=%d \n", port);

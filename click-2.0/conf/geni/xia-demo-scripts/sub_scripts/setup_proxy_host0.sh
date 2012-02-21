@@ -3,4 +3,4 @@
 cd ~/xia-core/proxies
 sudo killall -9 proxy.py
 sleep 1
-./proxy.py 15000 >& /dev/null &
+./proxy.py 8080 >& /dev/null &

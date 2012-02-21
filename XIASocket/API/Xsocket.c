@@ -76,8 +76,10 @@ extern "C" {
 			//If port is in use, try next port until success, or max ATTEMPTS reached
 			srand((unsigned)time(0));
 			rv=-1;
+			
 			for (tries=0;tries<ATTEMPTS;tries++)
 			{
+				
 				int rn = rand();
 				port=1024 + rn % (65535 - 1024); 
 				my_addr.sin_family = PF_INET;
@@ -93,6 +95,7 @@ extern "C" {
 				perror("Xsocket listener: bind");
 				return -1;
 			}
+			
 			
 			//printf("Xsocket listener: Sending...\n");
 

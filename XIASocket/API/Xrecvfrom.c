@@ -34,12 +34,13 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
+    
 
 
     addr_len = sizeof their_addr;
     if ((numbytes = recvfrom(sockfd, UDPbuf, MAXBUFLEN-1 , flags,
 		    (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-	//perror("Xrecvfrom: recvfrom");
+	perror("Xrecvfrom1: recvfrom");
 	return -1;
     }
     int src_port=ntohs(their_addr.sin_port);
@@ -47,13 +48,14 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
     while(src_port==atoi(CLICKCONTROLPORT)) {
 	//Do what is necessary, maybe close socket
 	if(strcmp((char *)rbuf,"close")==0) {
+	    printf("Xrecvfrom2: close socket");
 	    Xclose(sockfd);
 	    return -1;
 	}
 	else {
 	    if ((numbytes = recvfrom(sockfd, UDPbuf, MAXBUFLEN-1 , flags,
 			    (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-		//perror("Xrecvfrom: recvfrom");
+		perror("Xrecvfrom3: recvfrom");
 		return -1;
 	    }         		
 
@@ -61,12 +63,14 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
     }
 
 
+
     //TODO: Copy Xdata to buf, and headers to their src_addr
     //memcpy(buf, c+Xheader_size, numbytes-Xheader_size);
     short int paylen=0,i=0;
     char* tmpbuf=(char*)UDPbuf;
-    while(tmpbuf[i]!='^')
+    while(tmpbuf[i]!='^') {
 	i++;
+    }
     paylen=numbytes-i-1;
     //memcpy (&paylen, UDPbuf+2,2);
     //paylen=ntohs(paylen);
@@ -75,6 +79,6 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
     strncpy(sDAG, UDPbuf, i);
     sDAG[i]=0; /* Make DAG a null terminated string */
     *slen=i;
-
+    
     return paylen;
 }

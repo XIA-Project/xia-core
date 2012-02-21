@@ -2,5 +2,5 @@
 
 sudo killall -9 prep1.py
 sleep 1
-cd ~/vis-scripts
+cd ~/xia-core/click-2.0/conf/geni/visualizer-scripts/
 python ./prep1.py
