@@ -2,5 +2,5 @@
 
 cd ~/xia-core/click-2.0 
 sudo killall -9 click 
-sudo userlevel/click conf/geni/router0-pg55-dummy.click &
+sudo userlevel/click conf/geni/host1.click &
 

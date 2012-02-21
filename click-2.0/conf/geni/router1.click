@@ -1,4 +1,5 @@
-require(library xia_two_port_four_port_router.click); 
+require(library ../xia_router_template_xtransport.click);
+require(library ../xia/xia_address.click);
 
 // router instantiation
 router1 :: Router(RE AD1 RHID1, AD1, RHID1);
@@ -10,17 +11,17 @@ c0 :: Classifier(12/9999);
 c1 :: Classifier(12/9999);
 //c2 :: Classifier(12/9999);
 
-todevice0 :: ToDevice(eth2);
-todevice1 :: ToDevice(eth1);
+todevice0 :: ToDevice(eth4);
+todevice1 :: ToDevice(eth2);
 //todevice2 :: ToDevice(eth0);
 
-FromDevice(eth2, PROMISC true) 
+FromDevice(eth4, PROMISC true) 
 //-> XIAPrint() 
 -> c0;
 c0[0] -> Strip(14) -> MarkXIAHeader() -> [0]router1; // XIA packet 
 
 
-FromDevice(eth1, PROMISC true) 
+FromDevice(eth2, PROMISC true) 
 //-> XIAPrint()
 -> c1;
 c1[0] -> Strip(14) -> MarkXIAHeader() -> [1]router1; // XIA packet 
@@ -32,11 +33,11 @@ c1[0] -> Strip(14) -> MarkXIAHeader() -> [1]router1; // XIA packet
 
 router1[0]
 //-> XIAPrint() 
--> EtherEncap(0x9999, 00:1B:21:3A:0E:D0, 00:1B:21:3A:D5:99) -> todevice0;
+-> EtherEncap(0x9999, 00:04:23:b7:41:50, 00:04:23:b7:1d:f4) -> todevice0;
 
 router1[1]
 //-> XIAPrint() 
--> EtherEncap(0x9999, 00:24:E8:30:AD:59, 00:1b:21:3a:d7:50) 
+-> EtherEncap(0x9999, 00:04:23:b7:3f:ce, 00:04:23:b7:21:04) 
 -> c::XIAXIDTypeCounter(src AD, src HID, src SID, src CID, src IP, -)
 -> todevice1; 
 

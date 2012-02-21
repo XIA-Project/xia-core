@@ -49,7 +49,10 @@ def serveHTTPRequest(request, sock):
 
     # If file exists, read it into memory; otherwise return 404 Not Found
     requested_file = request.split(' ')[1][1:]
-    f = None
+    requested_file = requested_file.split('/')[0]
+    f = None    
+    print 'request: %s' %(request)
+    print 'requested file: %s' %(requested_file)
     try:
         f = open(requested_file, 'r')
         file_data = f.read()
@@ -126,7 +129,7 @@ def main():
             child_pid = os.fork()
   
             if child_pid == 0:  
-                incoming_data = Xrecv(accept_sock, 2000, 0)
+                incoming_data = Xrecv(accept_sock, 65521, 0)
                 serveHTTPRequest(incoming_data, accept_sock)
                 Xclose(accept_sock)
                 os._exit(0)

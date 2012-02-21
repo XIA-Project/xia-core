@@ -1,4 +1,5 @@
-require(library xia_two_port_four_port_router.click); 
+require(library ../xia_router_template_xtransport.click);
+require(library ../xia/xia_address.click);
 
 // router instantiation
 
@@ -9,13 +10,13 @@ c0 :: Classifier(12/9999, 12/0800);
 c1 :: Classifier(12/9999, 12/0800);
 c2 :: Classifier(12/9999, 12/0800);
 
-todevice0 :: ToDevice(eth2);
-todevice1 :: ToDevice(eth1);
+todevice0 :: ToDevice(eth4);
+todevice1 :: ToDevice(eth2);
 
-// From device (GENI pg40)
-FromDevice(eth2, PROMISC true) -> c0;
+// From device (GENI pc211)
+FromDevice(eth4, PROMISC true) -> c0;
 c0[0] -> Strip(14) -> MarkXIAHeader() 
-->  XIAPrint("pg40->pg42")
+->  XIAPrint("host1->router1")
 -> [0]router1; // XIA packet
 
 // From Internet (CMU)
@@ -26,14 +27,14 @@ c0[1]
 -> StripIPHeader()
 -> Strip(28)
 -> MarkXIAHeader()
-->  XIAPrint("CMU->pg42")
+->  XIAPrint("CMU->router1")
 ->[2]router1; 
 
 
-// From device (GENI pg55)
-FromDevice(eth1, PROMISC true) -> c1;
+// From device (GENI pc222)
+FromDevice(eth2, PROMISC true) -> c1;
 c1[0] -> Strip(14) -> MarkXIAHeader() 
-->  XIAPrint("pg55->pg42")
+->  XIAPrint("router0->router1")
 -> [1]router1; // XIA packet
 
 // From Internet (CMU)
@@ -44,7 +45,7 @@ c1[1]
 -> StripIPHeader()
 -> Strip(28)
 -> MarkXIAHeader()
-->  XIAPrint("CMU->pg42")
+->  XIAPrint("CMU->router1")
 ->[2]router1; 
 
 
@@ -56,7 +57,7 @@ c2[1]
 -> IPPrint("incoming")
 -> Strip(28)
 -> MarkXIAHeader()
-->  XIAPrint("CMU->pg42")
+->  XIAPrint("CMU->router1")
 -> bc::XIAXIDTypeCounter(src AD, src HID, src SID, src CID, src IP, -) 
 ->[2]router1; 
 
@@ -70,21 +71,21 @@ Idle -> c2[0] -> Discard;
 // To device0 (GENI pg40)
 router1[0]
 //-> XIAPrint() 
--> EtherEncap(0x9999, 00:1B:21:3A:0E:D0, 00:1B:21:3A:D5:99) -> todevice0;
+-> EtherEncap(0x9999, 00:04:23:b7:41:50, 00:04:23:b7:1d:f4) -> todevice0;
 
 
 // To device1 (GENI pg55)
 router1[1]
 //-> XIAPrint() 
--> EtherEncap(0x9999, 00:24:E8:30:AD:59, 00:1b:21:3a:d7:50) 
+-> EtherEncap(0x9999, 00:04:23:b7:3f:ce, 00:04:23:b7:21:04)  
 -> c::XIAXIDTypeCounter(src AD, src HID, src SID, src CID, src IP, -)
 -> todevice1; 
 
 
 // To CMU
 router1[2]
-->  XIAPrint("pg42->CMU")
--> Socket(UDP, 128.2.208.168, 9999, 0.0.0.0, 9999, SNAPLEN 9000) // ng2.nan.cs.cmu.edu
+->  XIAPrint("router1->CMU")
+-> Socket(UDP, 128.2.210.236, 9999, 0.0.0.0, 9999, SNAPLEN 9000) // xia-laptop-dell
 
 
 

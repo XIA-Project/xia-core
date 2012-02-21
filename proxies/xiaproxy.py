@@ -204,11 +204,11 @@ def getrandSID():
     assert len(sid)==44
     return  sid
 
-def sendSIDRequest(ddag, payload, browser_socket):
+def sendSIDRequestXSP(ddag, payload, browser_socket):
     # Create socket
     sock = Xsocket(XSOCK_STREAM)
     if (sock<0):
-        print "ERROR: xiaproxy.py: sendSIDRequest: could not open socket"
+        print "ERROR: xiaproxy.py: sendSIDRequestXSP: could not open socket"
         return
 
     #ddag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, sid)
@@ -226,7 +226,7 @@ def sendSIDRequest(ddag, payload, browser_socket):
         if (status != 0):
         	print "Unexpected error:", sys.exc_info()[0]
         	Xclose(sock)
-    		print "sendSIDRequest() Closing browser socket "
+    		print "sendSIDRequestXSP() Closing browser socket "
     		browser_socket.close()
 		return
 		       
@@ -234,7 +234,7 @@ def sendSIDRequest(ddag, payload, browser_socket):
         Xsend(sock, payload, len(payload), 0)
         
     except:
-        print 'ERROR: xiaproxy.py: sendSIDRequest: error binding to sdag, connecting to ddag, or sending SID request:\n%s' % payload
+        print 'ERROR: xiaproxy.py: sendSIDRequestXSP: error binding to sdag, connecting to ddag, or sending SID request:\n%s' % payload
 
     # Receive reply and close socket
     try:
@@ -242,7 +242,7 @@ def sendSIDRequest(ddag, payload, browser_socket):
     except IOError:
         print "Unexpected error:", sys.exc_info()[0]
         Xclose(sock)
-        print "sendSIDRequest() Closing browser socket "
+        print "sendSIDRequestXSP() Closing browser socket "
         browser_socket.close()
         return 
     Xclose(sock)
@@ -250,9 +250,54 @@ def sendSIDRequest(ddag, payload, browser_socket):
     # Pass reply up to browswer 
     rtt = int((time.time()-rtt) *1000)
     # Use last modified field to embedd RTT info
-    reply = reply.replace("\n\n<html", ("\nLast-Modified:%d\n\n<html" % rtt)) # TODO: a bit of a hack
+    reply = reply.replace("Last-Modified: 100", ("Last-Modified:%d" % rtt)) # TODO: a bit of a hack
     send_to_browser(reply, browser_socket)
     return
+    
+    
+def sendSIDRequestXDP(ddag, payload, browser_socket):
+    # Create socket
+    sock = Xsocket(XSOCK_DGRAM)
+    if (sock<0):
+        print "ERROR: xiaproxy.py: sendSIDRequestXDP: could not open socket"
+        return
+
+    #ddag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, sid)
+    #ddag = "DAG 0 - \n %s 1 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP1, HID1, SID1)
+    sid = getrandSID()
+    sdag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP0, HID0, sid)    
+    #sdag = "DAG 0 - \n %s 1 - \n %s 2 - \n %s 3 - \n %s" % (AD1, IP0, HID0, SID0)
+    replyto =  ''
+    reply_dag = ''
+
+    try:
+
+        rtt = time.time() 
+        
+        # Send request
+        Xsendto(sock, payload, len(payload), 0, ddag, len(ddag)+1)
+        
+    except:
+        print 'ERROR: xiaproxy.py: sendSIDRequestXDP: error binding to sdag, or sending SID request:\n%s' % payload
+
+    # Receive reply and close socket
+    try:
+        (reply, reply_dag) = Xrecvfrom(sock, 65521, 0)
+    except IOError:
+        print "Unexpected error:", sys.exc_info()[0]
+        Xclose(sock)
+        print "sendSIDRequestXDP() Closing browser socket "
+        browser_socket.close()
+        return 
+    Xclose(sock)
+
+    # Pass reply up to browswer 
+    rtt = int((time.time()-rtt) *1000)
+    # Use last modified field to embedd RTT info
+    reply = reply.replace("Last-Modified: 100", ("Last-Modified:%d" % rtt)) # TODO: a bit of a hack
+    send_to_browser(reply, browser_socket)
+    return
+        
 
 def get_content_from_cid_list(cid_list):
     num_cids = len(cid_list) / 40
@@ -310,11 +355,15 @@ def xiaHandler(control, path, payload, browser_socket):
         # TODO: is it necessary to handle video service requests separately?
         found_video = control.find('video');
         if(found_video != -1):
-            sendVideoSIDRequest(control[4:], payload, browser_socket);
+            sendVideoSIDRequest(control[4:], payload, browser_socket)
+        elif(control.find('sid_stock') != -1):
+            # For stock_service, use XDP (for testing purpose)
+            ddag = dag_from_url(control + path)
+            sendSIDRequestXDP(ddag, payload, browser_socket)         
         else:
             # Do some URL processing 
             ddag = dag_from_url(control + path)
-            sendSIDRequest(ddag, payload, browser_socket);
+            sendSIDRequestXSP(ddag, payload, browser_socket)
     elif control.find('cid') == 0:
         control_array = control.split('.')
         num_chunks = int(control_array[1])

@@ -27,7 +27,7 @@ XTRANSPORT::XTRANSPORT()
     isConnected=false;
     
     _ackdelay_ms=300;
-    _teardown_wait_ms=240000;
+    _teardown_wait_ms=120000;
 }
 
 

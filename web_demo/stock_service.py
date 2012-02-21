@@ -5,6 +5,8 @@ import random
 import sys
 import os
 import time
+from xsocket import *
+from ctypes import *
 
 class Stock:
     def __init__(self, name):
@@ -48,12 +50,12 @@ def update_stockfeed(stock):
 
 stock_name= ["ADA",  "BQB", "CKK", "GPR", "HER", "IAK", "KOY", "LUR", "XIA", "YRY" ]
 stock = map(lambda name: Stock(name), stock_name)
-xsocket.set_conf("xsockconf_python.ini","stock_service.py")
-xsocket.print_conf()
+set_conf("xsockconf_python.ini","stock_service.py")
+print_conf()
 
-#while(True):
-try:
-        sock=xsocket.Xsocket(0)
+while(True):
+   try:
+        sock=Xsocket(XSOCK_DGRAM)
         
         if (sock<0):
         	print "error opening socket"
@@ -63,35 +65,32 @@ try:
         dag = "RE %s %s %s" % (AD1, HID1, SID_STOCK)
         
         # Bind to the DAG
-        ret= xsocket.Xbind(sock,dag);
+        ret= Xbind(sock,dag);
         print "listening on %s" % dag
         print "bind returns %d socket %d" % (ret, sock)
-        
-        while(True):
-        
-        	accept_sock = xsocket.Xaccept(sock);
-        	
-        	child_pid = os.fork()
   
-  	  	if child_pid == 0:     
-    			replyto =  None
-			dlen = None
-        		#n = xsocket.Xrecvfrom(sock, 1500, 0, replyto, dlen)
+    			
+  	replyto =  ''
+	data = ''
+
+        (data, replyto) = Xrecvfrom(sock, 65521, 0)
+ 
         		
-        		n = xsocket.Xrecv(accept_sock, 1500, 0)
-        		
-        		stock_feed = update_stockfeed(stock)
-			http_header = "HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/plain\n\n"
-        		#xsocket.Xsendto(sock, stock_feed, len(stock_feed), 0, replyto, dlen)
-			response = http_header+ stock_feed
-			print "response len %d" % len(response)
+        stock_feed = update_stockfeed(stock)
+	http_header = "HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/plain\nLast-Modified: 100\n\n"
+        	
+	response = http_header+ stock_feed
+	print "response len %d" % len(response)
 			
-        		xsocket.Xsend(accept_sock, response, len(response), 0)
-        		
-        		xsocket.Xclose(accept_sock)
-        		os._exit(0)
-        		
-except (KeyboardInterrupt, SystemExit), e:
+	Xsendto(sock, response, len(response), 0, replyto, len(replyto)+1)	
+    
+        		      		
+   except (KeyboardInterrupt, SystemExit), e:
             sys.exit()
 
-xsocket.Xclose(sock)
+Xclose(sock)
+
+
+
+
+
