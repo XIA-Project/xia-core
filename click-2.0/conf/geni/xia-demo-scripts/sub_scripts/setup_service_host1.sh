@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export LD_LIBRARY_PATH=:/usr/local/lib:.
+
 sudo killall -9 stock_service.py
 sudo killall -9 webserver.py
 sudo killall -9 vs
