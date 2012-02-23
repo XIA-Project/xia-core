@@ -14,9 +14,14 @@ todevice0 :: ToDevice(eth2);
 todevice1 :: ToDevice(eth4);
 
 FromDevice(eth2) -> c0;
-c0[0] -> Strip(14) -> MarkXIAHeader() -> [0]router0; // XIA packet 
+c0[0] -> Strip(14) -> MarkXIAHeader() 
+->  XIAPrint("host0->router0")
+-> [0]router0; // XIA packet 
+
 FromDevice(eth4) -> c1;
-c1[0] -> Strip(14) -> MarkXIAHeader() -> [1]router0; // XIA packet 
+c1[0] -> Strip(14) -> MarkXIAHeader() 
+->  XIAPrint("router1->router0")
+-> [1]router0; // XIA packet 
 
 //Idle -> [2]router0[2] -> Discard; 
 //Idle -> [3]router0[3] -> Discard; 
@@ -25,12 +30,14 @@ c1[0] -> Strip(14) -> MarkXIAHeader() -> [1]router0; // XIA packet
 router0[0]
 //-> XIAPrint() 
 -> EtherEncap(0x9999, 00:04:23:b7:1e:20, 00:04:23:b7:17:6c) 
+->  XIAPrint("router0->host0")
 -> c::XIAXIDTypeCounter(src AD, src HID, src SID, src CID, src IP, -) 
 -> todevice0;
 
 
 router0[1]
 //-> XIAPrint() 
+->  XIAPrint("router0->router1")
 -> EtherEncap(0x9999, 00:04:23:b7:21:04, 00:04:23:b7:3f:ce) -> todevice1; 
 
 

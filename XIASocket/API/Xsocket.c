@@ -92,6 +92,7 @@ extern "C" {
 
 			if (rv == -1) {
 				close(sockfd);
+				//printf("\n\nHOST= %s\n\n", MYADDRESS);
 				perror("Xsocket listener: bind");
 				return -1;
 			}

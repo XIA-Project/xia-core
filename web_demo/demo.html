@@ -19,7 +19,7 @@ var req_timestamp = null
 
 function load()
 {
-        document.getElementById("rtt").innerHTML = "Response Time: undefined" ;
+        //document.getElementById("rtt").innerHTML = "Response Time: undefined" ;
 	//ajax(page,'text');
 	ajax(stock,stock_element);
 	shift();
@@ -87,12 +87,12 @@ function ajaxDone(req, target) {
 	    //console.log("header " + header_rtt);
 	    results = results.toString().replace(/ /g, ' &nbsp ');
 	    document.getElementById(target).innerHTML = results;
-            document.getElementById("rtt").innerHTML = "RTT (proxy to service): "+ header_rtt + " ms";
+            //document.getElementById("rtt").innerHTML = "RTT (proxy to service): "+ header_rtt + " ms";
             document.getElementById("last_response").innerHTML = "Last Response: " +new Date().toLocaleTimeString();
 	    //console.log("Response recv at "+ now);
 	} else {
 	    document.getElementById(target).innerHTML="ajax error:"+req.status + req.statusText +req.responseText;;
-            document.getElementById("rtt").innerHTML = "Response Time: undefined" ;
+            //document.getElementById("rtt").innerHTML = "Response Time: undefined" ;
 	}
     }
 }
@@ -165,7 +165,10 @@ html {
 
 <p> <h1>Video</h1> </p>
 <p>
+
+
 <video tabindex="0" src="http://xia.sid.video"  controls="true" type="video/ogg" width="640" height="360"><i>You need a HTML5 &lt;video&gt; capable browser to view this movie.</i></video>
+
 
 <h1>My Favorite Stock</h1>
 <div id="stock"style= "position: relative; width: 3000px; overflow: hidden; height:17px; border-style:solid; visibility: visible ;" > 

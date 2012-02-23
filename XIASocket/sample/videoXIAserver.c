@@ -44,7 +44,7 @@ using namespace std;
 
 int main(int argc, char *argv[])
 {
-	int sock, dlen, n, acceptSock;
+	int sock, dlen, n, acceptSock, chunk_sock;
 	char SIDReq[1024];
 	unsigned char chunk[CHUNKSIZE];
 	string fileName;
@@ -64,6 +64,10 @@ int main(int argc, char *argv[])
 		error("no video file!\n");
 		exit(1);
 	}	
+	
+	
+	chunk_sock=Xsocket(XSOCK_CHUNK);
+	
 	sock=Xsocket(XSOCK_STREAM);
 	if (sock < 0) {
 		 error("Opening socket for putting content");
@@ -105,7 +109,7 @@ int main(int argc, char *argv[])
 		//cout << "putting CID " << cdag << " chunksize: " << size << "\n";
 
     		unsigned char* data=chunk;
-    		XputCID(sock,data,size,0,cdag,strlen(cdag));
+    		XputCID(chunk_sock,data,size,0,cdag,strlen(cdag));
 		chunkIndex++;
 	}
 	close(fid);	
@@ -129,15 +133,11 @@ int main(int argc, char *argv[])
 
 
     	while (1) {
-		printf("\nListening...\n");
+		//printf("\nListening...\n");
     		acceptSock = Xaccept(sock);
-		printf("accept\n");
+		//printf("accept\n");
         
-    		pid = fork();
-    
-    		if (pid == 0) {  
-    			// child  
-    			    
+
 				//Receive packet
 				n = Xrecv(acceptSock,SIDReq,1024,0);
 		
@@ -181,12 +181,12 @@ int main(int argc, char *argv[])
 						SIDReq[i] = '\0';
 				}
 				Xclose(acceptSock);
-				_exit(0);
-	    	}	
+				//_exit(0);
+	
 	    	    	
 	}
 	
-	Xclose(sock);
+	Xclose(sock); // never reach here!
 	
 	
 	return 0;

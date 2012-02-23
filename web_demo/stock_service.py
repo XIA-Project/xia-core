@@ -53,8 +53,7 @@ stock = map(lambda name: Stock(name), stock_name)
 set_conf("xsockconf_python.ini","stock_service.py")
 print_conf()
 
-while(True):
-   try:
+try:
         sock=Xsocket(XSOCK_DGRAM)
         
         if (sock<0):
@@ -66,29 +65,35 @@ while(True):
         
         # Bind to the DAG
         ret= Xbind(sock,dag);
-        print "listening on %s" % dag
-        print "bind returns %d socket %d" % (ret, sock)
-  
-    			
-  	replyto =  ''
-	data = ''
+        print "Stock_servce: listening on %s" % dag
+        print "Stock_servce: bind returns %d socket %d" % (ret, sock)
+        
 
-        (data, replyto) = Xrecvfrom(sock, 65521, 0)
+    	while(True):	
+  		replyto =  ''
+		data = ''
+
+        	(data, replyto) = Xrecvfrom(sock, 2000, 0)
  
         		
-        stock_feed = update_stockfeed(stock)
-	http_header = "HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/plain\nLast-Modified: 100\n\n"
+        	stock_feed = update_stockfeed(stock)
+		http_header = "HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/plain\nLast-Modified: 100\n\n"
         	
-	response = http_header+ stock_feed
-	print "response len %d" % len(response)
+		response = http_header+ stock_feed
+		#print "Stock_servce: response to: %s" % replyto
+		#print "Stock_servce: response: %s" % data
+		print "Stock_servce: response len %d" % len(response)
 			
-	Xsendto(sock, response, len(response), 0, replyto, len(replyto)+1)	
+		Xsendto(sock, response, len(response), 0, replyto, len(replyto)+1)	
     
         		      		
-   except (KeyboardInterrupt, SystemExit), e:
-            sys.exit()
+except (KeyboardInterrupt, SystemExit), e:
+	sys.exit()
+        Xclose(sock)
 
-Xclose(sock)
+
+
+
 
 
 
