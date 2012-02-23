@@ -18,13 +18,17 @@ todevice1 :: ToDevice(eth2);
 FromDevice(eth4, PROMISC true) 
 //-> XIAPrint() 
 -> c0;
-c0[0] -> Strip(14) -> MarkXIAHeader() -> [0]router1; // XIA packet 
+c0[0] -> Strip(14) -> MarkXIAHeader() 
+->  XIAPrint("host1->router1")
+-> [0]router1; // XIA packet 
 
 
 FromDevice(eth2, PROMISC true) 
 //-> XIAPrint()
 -> c1;
-c1[0] -> Strip(14) -> MarkXIAHeader() -> [1]router1; // XIA packet 
+c1[0] -> Strip(14) -> MarkXIAHeader() 
+->  XIAPrint("router0->router1")
+-> [1]router1; // XIA packet 
 
 //FromDevice(eth0, PROMISC true) -> c2;
 //c2[0] -> Strip(14) -> MarkXIAHeader() -> [2]router1; // XIA packet 
@@ -33,10 +37,12 @@ c1[0] -> Strip(14) -> MarkXIAHeader() -> [1]router1; // XIA packet
 
 router1[0]
 //-> XIAPrint() 
+->  XIAPrint("router1->host1")
 -> EtherEncap(0x9999, 00:04:23:b7:41:50, 00:04:23:b7:1d:f4) -> todevice0;
 
 router1[1]
 //-> XIAPrint() 
+->  XIAPrint("router1->router0")
 -> EtherEncap(0x9999, 00:04:23:b7:3f:ce, 00:04:23:b7:21:04) 
 -> c::XIAXIDTypeCounter(src AD, src HID, src SID, src CID, src IP, -)
 -> todevice1; 

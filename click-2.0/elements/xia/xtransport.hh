@@ -152,6 +152,7 @@ class XTRANSPORT : public Element {
     HashTable<unsigned short, int> portTxSeqNo;
     HashTable<unsigned short, int> portAckNo;
     HashTable<unsigned short, bool> portToActive;
+    HashTable<XIDpair , bool> XIDpairToConnectPending;
     queue<DAGinfo> pending_connection_buf;
     
     struct in_addr _CLICKaddr;

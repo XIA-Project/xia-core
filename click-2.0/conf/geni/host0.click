@@ -10,12 +10,15 @@ c0 :: Classifier(12/9999);
 todevice0 :: ToDevice(eth2);
 
 FromDevice(eth2) -> c0;
-c0[0] -> Strip(14) -> MarkXIAHeader() -> [0]host0; // XIA packet 
+c0[0] -> Strip(14) -> MarkXIAHeader() 
+->  XIAPrint("router0->host0")
+-> [0]host0; // XIA packet 
 
 
 host0[0]
 //-> XIAPrint() 
 -> EtherEncap(0x9999, 00:04:23:b7:17:6c, 00:04:23:b7:1e:20) 
+->  XIAPrint("host0->router0")
 -> c::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
 -> todevice0;
 

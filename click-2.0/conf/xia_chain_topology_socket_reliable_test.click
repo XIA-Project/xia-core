@@ -11,17 +11,18 @@ router1 :: Router(RE AD1 RHID1, AD1, RHID1);
 
 // interconnection -- host - ad
 host0[0] 
-//->  XIAPrint("host0->router0") 
+->  XIAPrint("host0->router0") 
 -> c::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)-> LinkUnqueue(0.005, 1 GB/s) -> [0]router0;
 
-router0[0] 
-//-> XIAPrint("router0->host0") 
--> LinkUnqueue(0.005, 1 GB/s) -> RandomSample(1.0)-> [0]host0;
+router0[0]  
+-> LinkUnqueue(0.005, 1 GB/s) -> RandomSample(1.0)
+-> XIAPrint("router0->host0")
+-> [0]host0;
 
 //RandomSample(1)->
 
 host1[0] 
-//-> XIAPrint("host1->router1") 
+-> XIAPrint("host1->router1") 
 -> LinkUnqueue(0.005, 1 GB/s) -> [0]router1;
 
 router1[0] 
@@ -30,11 +31,11 @@ router1[0]
 
 // interconnection -- ad - ad
 router0[1] 
-//->  XIAPrint("router0->router1") 
+->  XIAPrint("router0->router1") 
 -> LinkUnqueue(0.005, 1 GB/s) ->[1]router1;
 
 router1[1] 
-//->  XIAPrint("router1->router0") 
+->  XIAPrint("router1->router0") 
 -> LinkUnqueue(0.005, 1 GB/s) ->[1]router0;
 
 ControlSocket(tcp, 7777);
