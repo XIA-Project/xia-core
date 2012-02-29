@@ -38,6 +38,55 @@ IP1 = XIDS['ip1']
 IP0 = XIDS['ip0']
 
 
+# Extracts a DAG from the given URL in the new format
+def dag_from_url(url):
+    # url_segments[0] = protocol (e.g. http)
+    # url_segments[1] = DAG (e.g. dag/2,0/AD.xxx=0:2,1/HID.xxx=1:2/SID.xxx=2:2)
+    # url_segments[2] = file/argument (e.g. index.html)
+    url_segments = url.split('//')
+    
+    dag_segments = url_segments[1].split('/')  # e.g.: AD.xxx=0:2,1
+    start_node = ''
+    last_node = ''
+    dag_nodes = []
+    id_mappings = {}
+    for segment in dag_segments:
+        # segment_split[0] = principal type and id (e.g. AD.xxx)
+        # segment_split[1] = node id and outgoing edge id's (e.g. 0:2,1)
+        # ** This not true for the "starting node"
+        segment_split = segment.split('=')
+        
+        # Check if this is the starting node or a "normal" node
+        if len(segment_split) == 1:
+            start_node = segment_split[0]
+        elif segment_split[1].split(':')[0] == segment_split[1].split(':')[1]: # Make sure final intent is last
+            print 'here'
+            last_node = segment
+        else:
+            id_mappings[len(dag_nodes)] = segment_split[1].split(':')[0]
+            dag_nodes.append(segment)
+    # Now add the last node to the list
+    id_mappings[len(dag_nodes)] = last_node.split('=')[1].split(':')[0]
+    dag_nodes.append(last_node)
+
+    print start_node
+    print dag_nodes
+    print id_mappings
+
+    # Build the click-formatted DAG
+    dag = 'DAG'
+    for num in start_node.split(','):
+        dag += ' %i' % int(num)
+    for node in dag_nodes:
+        dag += ' -\n'
+        dag += node.split('=')[0].replace('.', ':')
+        for out_edge in node.split('=')[1].split(':')[1].split(','):
+            dag += ' %s' % out_edge
+    # Remove self-edge from intent node (last two characters)
+    dag = dag[0:-2]
+    print dag
+    return dag
+
 
 # Note: this is temporary. Eventually URLs will be formatted
 # differently and name translation will use DNS
@@ -45,7 +94,7 @@ IP0 = XIDS['ip0']
 # Fallbacks are very limited; for a primary intent of an SID,
 # the fallback must be AD:HID:SID; likewise, for CID, fallback
 # must be AD:HID:CID
-def dag_from_url(url): 
+def dag_from_url_old(url): 
     #url_segments[0] = primary intent
     #url_segments[1] = fallback (if supplied)
     url_segments = url.split('fallback')
