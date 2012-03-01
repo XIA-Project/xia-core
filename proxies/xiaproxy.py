@@ -313,29 +313,39 @@ def get_content_from_cid_list(cid_list):
     Xclose(sock)
     return content
 
-def xiaHandler(control, path, payload, browser_socket):
+def xiaHandler(host, path, http_header, browser_socket):
     # Configure XSocket so we can talk to click
     set_conf("xsockconf_python.ini", "xiaproxy.py")
+    print host
+    print path
+    print http_header
     
-    control=control[4:]  # remove the 'xia.' prefix
 
-    if payload.find('GET /favicon.ico') != -1:
+    if http_header.find('GET /favicon.ico') != -1:
         return
-    if control.find('sid') == 0:
+    if host.find('dag') == 0:
+        print 'Found a DAG in xiaproxy'
+        # Get the DAG from the URL
+        ddag = dag_from_url('http://' + host + path)
+        # Remove the DAG from the request so only the requested page remains
+        sendSIDRequest(ddag, http_header, browser_socket)
+    elif host.find('sid') == 4:
+        host=host[4:]  # remove the 'xia.' prefix
         # TODO: is it necessary to handle video service requests separately?
-        found_video = control.find('video');
+        found_video = host.find('video');
         if(found_video != -1):
-            sendVideoSIDRequest(control[4:], payload, browser_socket)
+            sendVideoSIDRequest(host[4:], http_header, browser_socket)
         else:
             # Do some URL processing 
-            ddag = dag_from_url_old(control + path)
+            ddag = dag_from_url_old(host + path)
             # If there's a fallback in the filename, remove it now (TODO: change this when we switch to new URL format)
-            payload = re.sub(r"/fallback\(\S*\)", "", payload)
-            sendSIDRequest(ddag, payload, browser_socket)
-    elif control.find('cid') == 0:
-        control_array = control.split('.')
-        num_chunks = int(control_array[1])
-        recombined_content = get_content_from_cid_list(control_array[2])
+            http_header = re.sub(r"/fallback\(\S*\)", "", http_header)
+            sendSIDRequest(ddag, http_header, browser_socket)
+    elif host.find('cid') == 4:
+        host=host[4:]  # remove the 'xia.' prefix
+        host_array = host.split('.')
+        num_chunks = int(host_array[1])
+        recombined_content = get_content_from_cid_list(host_array[2])
         length = len (recombined_content)
         send_to_browser(recombined_content, browser_socket)
     return

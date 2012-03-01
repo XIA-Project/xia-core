@@ -14,6 +14,7 @@ Any help will be greatly appreciated.		SUZUKI Hisao
 __version__ = "0.2.1"
 
 import BaseHTTPServer, select, socket, SocketServer, urlparse, string
+import re
 import xiaproxy
 import struct
 from xiaproxy import *
@@ -66,7 +67,7 @@ class ProxyHandler (BaseHTTPServer.BaseHTTPRequestHandler):
     def do_GET(self):
         (scm, netloc, path, params, query, fragment) = urlparse.urlparse(
             self.path, 'http')
-	if netloc.find('xia') == 0:
+	if netloc.find('xia') == 0 or netloc.find('dag') == 0:
 		header = "%s %s %s\r\n" % (
                     self.command,
                     urlparse.urlunparse(('', '', path, params, query, '')),
@@ -77,6 +78,14 @@ class ProxyHandler (BaseHTTPServer.BaseHTTPRequestHandler):
 			header+="%s: %s\r\n" % key_val
 
 		header+="\r\n"
+
+		# strip the DAG out of the requested page field in the header
+		header = re.sub(r"/.*//", "/", header)
+
+		print "DAG!@!!"
+		print netloc
+		print path
+		print header
 		xiaHandler(netloc, path, header, self.connection)
 		return
 	

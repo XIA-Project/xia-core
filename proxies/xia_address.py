@@ -40,6 +40,7 @@ IP0 = XIDS['ip0']
 
 # Extracts a DAG from the given URL in the new format
 def dag_from_url(url):
+    print 'getting dag from url: ' + url
     # url_segments[0] = protocol (e.g. http)
     # url_segments[1] = DAG (e.g. dag/2,0/AD.xxx=0:2,1/HID.xxx=1:2/SID.xxx=2:2)
     # url_segments[2] = file/argument (e.g. index.html)
@@ -60,7 +61,6 @@ def dag_from_url(url):
         if len(segment_split) == 1:
             start_node = segment_split[0]
         elif segment_split[1].split(':')[0] == segment_split[1].split(':')[1]: # Make sure final intent is last
-            print 'here'
             last_node = segment
         else:
             id_mappings[len(dag_nodes)] = segment_split[1].split(':')[0]
@@ -68,10 +68,6 @@ def dag_from_url(url):
     # Now add the last node to the list
     id_mappings[len(dag_nodes)] = last_node.split('=')[1].split(':')[0]
     dag_nodes.append(last_node)
-
-    print start_node
-    print dag_nodes
-    print id_mappings
 
     # Build the click-formatted DAG
     dag = 'DAG'
@@ -84,7 +80,6 @@ def dag_from_url(url):
             dag += ' %s' % out_edge
     # Remove self-edge from intent node (last two characters)
     dag = dag[0:-2]
-    print dag
     return dag
 
 
