@@ -38,7 +38,6 @@ def put_chunk(chunk):
     return cid
 
 def put_file(filepath, chunksize):
-    print "cwd: %s" % os.getcwd()
     print "putting file %s" % filepath
     cid_list = []
     try:
@@ -98,25 +97,32 @@ def put_content_in_dir(dir):
         print 'ERROR: webserver.py: put_content_in_dir: Directory "%s" does not exist.' % dir
         return
 
+    # PASS 1:
     # publish each non-html file in the given directory; keep a dictionary 
     # mapping filepath to the corresponding list of CIDs
     cids_by_filename = {}
+    html_files = []
     for root, dirs, files in os.walk(dir):
         for file in files:
-            if file[-5:] != '.html':
+            if file[-5:] != '.html' and file[-9:] != '.htmlTEMP':
                 cids_by_filename[os.path.join(root,file)] = put_file(os.path.join(root, file), 1200)
+            else:
+                html_files.append(os.path.join(root, file))
 
+    print html_files
+    # PASS 2:
     # for each html file, find references to any of the files we just
     # published as content. Replace the reference with the corresponding
-    # CID list, and publish the modified html file. 
+    # CID list. Replace references to other local html files with DAG
+    # pointing to this webserver. Then publish the modified html file. 
     cids_by_filename_to_add = {} # need a temp dict here because we can't add to cids_by_filename while we're iterating through it
-    for root, dirs, files in os.walk(dir):
-        for file in files:
-            if file[-5:] == '.html':
-                # read html file line by line, replacing local filepaths
-                # with CIDs
+    for root, dirs, files in os.walk(dir): # Walk through each directory in 'dir'
+        for file in files: # Look at each file in the directory we're examining now
+            if file[-5:] == '.html': # We only care about html files in PASS 2; we already published everything else
                 with open(os.path.join(root, file), 'r') as orig_html_file:
                     file_data = orig_html_file.read()
+
+                    # Replace links to content we already published with CID lists
                     for key, value in cids_by_filename.iteritems():
                         # build the CID string to replace the filepath
                         cid_string = 'http://xia.cid.%i.' % len(value)
@@ -129,6 +135,16 @@ def put_content_in_dir(dir):
                         file_data = string.replace(file_data, './' + content_path, cid_string)
                         # now match filepaths without "./"
                         file_data = string.replace(file_data, content_path, cid_string)
+
+                    # Replace links to other html files in 'dir' with this webserver's SID
+                    for linked_html_file in html_files:
+                        dag_url = 'http://dag/2,0/%s=0:2,1/%s=1:2/%s=2:2//%s' % (AD1, HID1, SID1, linked_html_file[5:])
+                        
+                        rel_path = os.path.relpath(linked_html_file, root)
+                        # first match filepaths beginning with "./"
+                        file_data = string.replace(file_data, './' + rel_path, dag_url)
+                        # now match filepaths without "./"
+                        file_data = string.replace(file_data, rel_path, dag_url)
 
                     # write modified html
                     with open(os.path.join(root, file+'TEMP'), 'w') as fnew:
