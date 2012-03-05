@@ -149,7 +149,7 @@ void die(int ecode, const char *fmt, ...)
 */
 void process(int sock)
 {
-	char buf[2048];
+	char buf[XIA_MAXBUF + 1];
 	int n;
 	pid_t pid = getpid();
 
@@ -276,6 +276,7 @@ void echo_dgram()
 		while (1) {
 			say("Dgram Server waiting\n");
 
+			dlen = sizeof(cdag);
 			memset(buf, 0, sizeof(buf));
 			if ((n = Xrecvfrom(sock, buf, sizeof(buf), 0, cdag, &dlen)) < 0) {
 				warn("Recv error on socket %d, closing connection\n", pid);

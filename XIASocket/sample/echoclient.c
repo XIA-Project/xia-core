@@ -113,7 +113,7 @@ void getConfig(int argc, char** argv)
 				// if 0, send random sized packets
 				pktSize = atoi(optarg);
 				if (pktSize < 0) pktSize = 0;
-				if (pktSize > 1024) pktSize = 1024;
+				if (pktSize > XIA_MAXBUF) pktSize = XIA_MAXBUF;
 				break;
 			case 'r':
 				// close and reopen the connection every <reconnect> operations
@@ -206,10 +206,10 @@ int process(int sock)
 {
 	int size;
 	int sent, received;
-	char buf1[2048], buf2[2048];
+	char buf1[XIA_MAXBUF + 1], buf2[XIA_MAXBUF + 1];
 
 	if (pktSize == 0)
-		size = (rand() % 1023) + 1;
+		size = (rand() % XIA_MAXBUF) + 1;
 	else
 		size = pktSize;
 	randomString(buf1, size);
@@ -289,7 +289,7 @@ void *mainLoop(void * /* dummy */)
 	for (;;) {
 
 		if (printcount)
-			printf("Xsock %4d loop #%d\n", ssock, count);
+			say("Xsock %4d loop #%d\n", ssock, count);
 
 		if (process(ssock) != 0) 
 			break;
