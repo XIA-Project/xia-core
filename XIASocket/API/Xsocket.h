@@ -51,7 +51,7 @@ extern "C" {
 
 // XIA protocol types
 #define XPROTO_XIA_TRANSPORT	0x0e
-#define XPROTO_XCMP		61
+#define XPROTO_XCMP		0x3d
 
 // error codes
 #define ECLICKCONTROL 9999	// error code for general click communication errors

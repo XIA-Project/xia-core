@@ -36,9 +36,9 @@ XIADecHLIM::simple_action(Packet *p)
     const click_xia *hdr = p->xia_header();
 
     if (hdr->hlim <= 1) {
-	++_drops;
-	checked_output_push(1, p);
-	return 0;
+    	++_drops;
+    	checked_output_push(1, p);
+    	return 0;
     } else {
 	WritablePacket *q = p->uniqueify();
 	if (!q)

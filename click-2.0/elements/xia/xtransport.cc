@@ -501,6 +501,8 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				    
 			    portToDAGinfo.set(_sport,*daginfo);
 			    
+			    xcmp_listeners.remove(_sport);
+			    
 			    // (for Ack purpose) Reply with a packet with the destination port=source port		
 				ReturnResult(_sport, xia::XCLOSE);
 			    //output(1).push(UDPIPEncap(p_in,_sport,_sport));
@@ -1412,17 +1414,22 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		TransportHeader thdr(p_in);
 
 		if (xiah.nxt() == CLICK_XIA_NXT_XCMP) {
+		  // FIXME: This shouldn't strip off the header. raw sockets return raw packets. (Matt): I've tweaked this to work properly
 			// strip off the header and make a writable packet
 
+
 			String src_path=xiah.src_path().unparse();
+			String header((const char*)xiah.hdr(), xiah.hdr_size());
+			//String payload((const char*)xiah.payload(), xiah.plen()+xiah.hdr_size());
 			String payload((const char*)thdr.payload(), xiah.plen()- thdr.hlen());
 			String str=src_path;
 			str=str+String("^");
-			str=str+payload;
+			str=str+header+payload;
+
 			WritablePacket *xcmp_pkt = WritablePacket::make (256, str.c_str(), str.length(),0);
 
 			list<int>::iterator i;
-
+		     
 			for (i = xcmp_listeners.begin(); i != xcmp_listeners.end(); i++) {
 				int port = *i;
 				output(1).push(UDPIPEncap(xcmp_pkt, port, port));
