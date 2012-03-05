@@ -17,6 +17,7 @@
 #include <map>
 #include <pthread.h>
 #include <string.h>
+#include <assert.h>
 #include "Xsocket.h"
 
 using namespace std;
@@ -33,6 +34,7 @@ public:
 	
 	int data(char *buf, unsigned bufLen);
 	void setData(const char *buf, unsigned bufLen);
+	int dataLen() { return m_bufLen; };
 
 	int isConnected() { return m_connected; };
 	void setConnected(int conn) { m_connected = conn; };
@@ -48,6 +50,9 @@ SocketState::SocketState(int tt)
 {
 	::SocketState();
 	m_transportType = tt;
+	m_connected = 0;
+	m_buf = (char *)0;
+	m_bufLen = 0;
 }
 
 SocketState::SocketState()
@@ -93,9 +98,7 @@ void SocketState::setData(const char *buf, unsigned bufLen)
 	if (!buf || bufLen == 0)
 		return;
 
-	if (m_buf || m_bufLen != 0) {
-		// FIXME: this shouldn't happen!!!
-	}
+	assert(!m_buf && m_bufLen == 0);
 
 	m_buf = new char [bufLen];
 	if (!m_buf)
@@ -156,7 +159,6 @@ SocketMap *SocketMap::getMap()
 void SocketMap::add(int sock, int tt)
 {
 	SocketMap *state = getMap();
-
 	pthread_rwlock_wrlock(&rwlock);
 	if (state->sockets[sock] == 0)
 		state->sockets[sock] = new SocketState(tt);
@@ -227,7 +229,7 @@ void setSocketType(int sock, int tt)
 		sstate->setTransportType(tt);
 }
 
-int getSocketData(int sock, char *buf, int bufLen)
+int getSocketData(int sock, char *buf, unsigned bufLen)
 {
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
@@ -236,7 +238,7 @@ int getSocketData(int sock, char *buf, int bufLen)
 		return 0;
 }
 
-void setSocketData(int sock, const char *buf, int bufLen)
+void setSocketData(int sock, const char *buf, unsigned bufLen)
 {
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)

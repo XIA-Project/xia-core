@@ -19,6 +19,7 @@
 ** @brief implements Xaccept
 */
 
+#include <errno.h>
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
@@ -45,33 +46,43 @@ int Xaccept(int sockfd)
 {
 	// Xaccept accepts the connection, creates new socket, and returns it.
 
-	int rv;
 	int numbytes;
 	char buf[MAXBUFLEN];
+	struct sockaddr_in addr;
 	struct sockaddr_in their_addr;
 	socklen_t addr_len;
 	int new_sockfd;
 	xia::XSocketCallType type;
+
+	if (validateSocket(sockfd, XSOCK_STREAM, EOPNOTSUPP) < 0) {
+		LOG("Xaccept is only valid with stream sockets.");
+		return -1;
+	}
 	
 	// Wait for connection from client
 	addr_len = sizeof their_addr;
 	if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
                     (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-		perror("Xaccept: error 1");
+		LOGF("Error reading from socket (%d): %s", sockfd, 
+				strerror(errno));
 		return -1;
 	}
         
 	// Create new socket (this is a socket between API and Xtransport)
 
 	if ((new_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		perror("Xsocket listener: socket");
+		LOGF("Error creating new socket: %s", strerror(errno));
 		return -1;
 	}
 
-	rv = bind_to_random_port(new_sockfd);
-	if (rv == -1) {
+	// bind to an unused random port number
+	addr.sin_family = PF_INET;
+	addr.sin_addr.s_addr = inet_addr(MYADDRESS);
+	addr.sin_port = 0;
+
+	if (bind(new_sockfd, (const struct sockaddr *)&addr, sizeof(addr)) < 0) {
 		close(new_sockfd);
-		perror("Xsocket listener: bind");
+		LOGF("Error binding new socket to local port: %s", strerror(errno));
 		return -1;
 	}	
 	
@@ -80,13 +91,20 @@ int Xaccept(int sockfd)
 	xia::XSocketMsg xia_socket_msg;
 	xia_socket_msg.set_type(xia::XACCEPT);
 
-	click_control(new_sockfd, &xia_socket_msg);
+	if (click_control(new_sockfd, &xia_socket_msg) < 0) {
+		close(new_sockfd);
+		LOGF("Error talking to Click: %s", strerror(errno));
+		return -1;
+	}
 
 	if (click_reply2(new_sockfd, &type) < 0) {
 		close(new_sockfd);
-		perror("XAccept failure: ");
+		LOGF("Error getting status from Click: %s", strerror(errno));
 		return -1;
 	}
+
+	allocSocketState(new_sockfd, XSOCK_STREAM);
+	setConnected(new_sockfd, 1);
 
 	return new_sockfd;
 }

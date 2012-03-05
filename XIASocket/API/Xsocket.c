@@ -19,6 +19,10 @@
  @brief Implements the Xsocket API call.
 */
 
+#include <sys/types.h>
+#include <unistd.h>
+#include <linux/unistd.h>
+
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
@@ -66,6 +70,7 @@ extern "C" {
 	*/
 	int Xsocket(int transport_type)
 	{
+		struct sockaddr_in addr;
 		xia::XSocketCallType type;
 		int rc;
 		int sockfd;
@@ -83,14 +88,18 @@ extern "C" {
 		}
 
 		if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-			perror("Xsocket listener: socket");
+			LOGF("error creating Xsocket: %s", strerror(errno));
 			return -1;
 		}
 
-		// try to bind to an unused random port number
-		if (bind_to_random_port(sockfd) < 0) {
+		// bind to an unused random port number
+		addr.sin_family = PF_INET;
+		addr.sin_addr.s_addr = inet_addr(MYADDRESS);
+		addr.sin_port = 0;
+
+		if (bind(sockfd, (const struct sockaddr *)&addr, sizeof(addr)) < 0) {
 			close(sockfd);
-			perror("Xsocket listener: bind");
+			LOGF("bind error: %s", strerror(errno));
 			return -1;
 		}
 			
@@ -102,29 +111,35 @@ extern "C" {
 		x_socket_msg->set_type(transport_type);		
 		
 		if ((rc = click_control(sockfd, &xsm)) < 0) {
+			LOGF("Error talking to Click: %s", strerror(errno));
 			close(sockfd);
 			return -1;
 		}
 
 		// process the reply from click
-		if ((rc = click_reply2(sockfd, &type)) >= 0) {
+		if ((rc = click_reply2(sockfd, &type)) < 0) {
+			LOGF("Error getting status from Click: %s", strerror(errno));
 
-			if (type != xia::XSOCKET) {
-				// something bad happened
-				LOGF("Expected type %d, got %d", xia::XSOCKET, type);
-				errno = ECLICKCONTROL;
-				rc = -1;
-			}
+		} else if (type != xia::XSOCKET) {
+			// something bad happened
+			LOGF("Expected type %d, got %d", xia::XSOCKET, type);
+			errno = ECLICKCONTROL;
+			rc = -1;
 		}
 
-		if (rc == 0)
+		if (rc == 0) {
+			allocSocketState(sockfd, transport_type);
 			return sockfd;
+		}
 
-		// close the control socket since the underlying socket is no good
+		// close the control socket since the underlying Xsocket is no good
 		close(sockfd);
 		return -1; 
     }
+	
 			
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+	
 	/*!
 	** @brief Specify the location of the XSockets configuration file.
 	**
@@ -139,7 +154,10 @@ extern "C" {
 	*/
     void set_conf(const char *filename, const char* sectionname)
     {
+		pthread_mutex_lock(&lock);
         __InitXSocket::read_conf(filename, sectionname);
+		__XSocketConf::initialized=1;
+		pthread_mutex_unlock(&lock);
     }
 
 } /* extern C */
@@ -152,14 +170,10 @@ extern "C" {
 ** When first called, a mutex is locked and the config setting are loaded from 
 ** file. Subsequent calls do not incur the overhead of a mutex operation.
 **
-** FIXME: should we bother to morph this into a more traditional 
-** singleton object?
-**
 ** @returns pointer to the gobal XSocketConf structure
 */
 struct __XSocketConf* get_conf() 
 {
-	static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 	if (__XSocketConf::initialized == 0) {
 
@@ -169,8 +183,9 @@ struct __XSocketConf* get_conf()
 			__InitXSocket();
 		}
 
+		__XSocketConf::initialized=1;
 		pthread_mutex_unlock(&lock);
-	}
+	}	
 	return &_conf;
 }
 
@@ -219,8 +234,6 @@ __InitXSocket::__InitXSocket()
 */
 void __InitXSocket::read_conf(const char *inifile, const char *section_name) 
 {
-	__XSocketConf::initialized=1;
-
 	ini_gets(section_name, "api_addr", DEFAULT_MYADDRESS, _conf.api_addr, __IP_ADDR_LEN, inifile);
 	ini_gets(section_name, "click_dataaddr", DEFAULT_CLICKDATAADDRESS, _conf.click_dataaddr, __IP_ADDR_LEN , inifile);
 	ini_gets(section_name, "click_controladdr", DEFAULT_CLICKCONTROLADDRESS, _conf.click_controladdr, __IP_ADDR_LEN, inifile);

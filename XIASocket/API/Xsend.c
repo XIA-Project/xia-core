@@ -16,7 +16,7 @@
 */
 /*!
 ** @file Xsend.c
-** @brief implements Xclose
+** @brief implements Xsend
 */
 #include "Xsocket.h"
 #include "Xinit.h"
@@ -29,8 +29,8 @@
 **
 ** @param sockfd - The socket to send the data on
 ** @param buf - the data to send
-** @param len - lenngth of the data to send @NOTE: currently the
-** Xsendto api is limited to sending at most 1024 bytes.
+** @param len - length of the data to send @NOTE: currently the
+** Xsendto api is limited to sending at most XIA_MAXBUF bytes.
 ** @param flags - (This is not currently used but is kept to be compatible
 ** with the standard sendto socket call.
 **
@@ -59,30 +59,46 @@ int Xsend(int sockfd, const void *buf, size_t len, int /*flags*/)
 		return -1;
 	}
 
+	if (validateSocket(sockfd, XSOCK_STREAM, EOPNOTSUPP) < 0) {
+		LOG("Xrecvfrom is only valid with stream sockets.");
+		return -1;
+	}
+
+	if (!isConnected(sockfd)) {
+		LOGF("Socket %d is not connected", sockfd);
+		errno = ENOTCONN;
+		return -1;
+	}
+
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XSEND);
 
 	xia::X_Send_Msg *x_send_msg = xsm.mutable_x_send();
 
-	// we can only send MAX_DGRAM bytes at a time, so will need to loop
+	// we can only send XIA_MAXBUF bytes at a time, so will need to loop
 	// if the user requested a send with a larger size
 	while (len) {
-		count = MIN(len, MAX_DGRAM);
-		LOGF("sending %d bytes %d remaining\n", count, len - count);
+		count = MIN(len, XIA_MAXBUF);
+		// LOGF("sending %d bytes %d remaining\n", count, len - count);
 		x_send_msg->set_payload((const char*)p, count);
 
 		// send the protobuf containing the user data to click
-		if ((rc = click_data(sockfd, &xsm)) < 0)
+		if ((rc = click_data(sockfd, &xsm)) < 0) {
+			LOGF("Error talking to Click: %s", strerror(errno));
 			break;
+		}
 
 		// process the reply from click
-		if((rc = click_reply2(sockfd, &type)) < 0)
+		if ((rc = click_reply2(sockfd, &type)) < 0) {
+			LOGF("Error retreiving data from Click: %s", strerror(errno));
 			break;
+		}
 
 		if (type != xia::XSEND) {
 			LOGF("Expected type %d, got %d", xia::XSEND, type);
 			// what do we do in this case?
-			// we probably sent the data, but can't be sure
+			// we might have sent the data, but can't be sure
+			break;
 		}
 		sent += count;
 		len -= count;
@@ -95,11 +111,7 @@ int Xsend(int sockfd, const void *buf, size_t len, int /*flags*/)
 	else if (rc < 0) {
 		// if negative, errno will be set with an appropriate error code
 		return -1;
-//	}else if (rc == 0) {
-//		// everything went fine, tell caller we sent the whole buffer
-//		return len;
 	}
-
 	// not sure we'll ever get here
 	return rc;
 }

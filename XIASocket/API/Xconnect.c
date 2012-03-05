@@ -19,16 +19,17 @@
 ** @brief implements Xclose
 */
 
+#include <errno.h>
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
 
 /*!
-** @brief Close an Xsocket.
+** @brief Connect to a remote XIA SID socket.
 **
 ** Connect to a remote XIA SID socket.
-** This is only valid on sockets create with the XSOCK_STREAM transport 
-** type.
+** This is only valid on sockets created with the XSOCK_STREAM transport 
+** type. dest_DAG should be an SID.
 **
 ** @param sockfd	The control socket
 ** @param dest_DAG	The DAG of the remote service to connect to.
@@ -45,8 +46,12 @@ int Xconnect(int sockfd, char* dest_DAG)
 	struct sockaddr_in their_addr;
 	socklen_t addr_len;
 	
-	// FIXME: should we be checking to ensure the dest dag is a SID?
-	// FIXME: check to ensure sockfd is a stream socket
+	// FIXME: should we be validating the destination DAG?
+
+	if (validateSocket(sockfd, XSOCK_STREAM, EOPNOTSUPP) < 0) {
+		LOG("Xconnect is only valid with stream sockets.");
+		return -1;
+	}
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XCONNECT);
@@ -55,8 +60,10 @@ int Xconnect(int sockfd, char* dest_DAG)
 	x_connect_msg->set_ddag(dest_DAG);
 
 	// In Xtransport: send SYN to destination server
-	if ((rc = click_control(sockfd, &xsm)) < 0)
+	if ((rc = click_control(sockfd, &xsm)) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
+	}
 
 	// Waiting for SYNACK from destination server
 
@@ -65,14 +72,16 @@ int Xconnect(int sockfd, char* dest_DAG)
 	addr_len = sizeof their_addr;
 	if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
 			(struct sockaddr *)&their_addr, &addr_len)) == -1) {
-		perror("Xconnect: recvfrom");
+		LOGF("Error getting status from Click: %s", strerror(errno));
 		return -1;
 	}
 
-	// printf("Xconnect return:%s \n", buf);		    
 	if (strcmp(buf, "^Connetion-failed^") == 0) {
+		errno = ECONNREFUSED;
+		LOG("Connection Failed");
 		return -1;	    
 	} else {
+		setConnected(sockfd, 1);
 		return 0; 
 	}
 #endif

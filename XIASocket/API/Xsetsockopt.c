@@ -56,7 +56,7 @@ int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen)
 	/* TODO: we may need to check the type of the socket at some point, but for now
 	** treat them all the same as far as options go.
 	*/
-	if (sockfd <= 0) {
+	if (getSocketType(sockfd) == XSOCK_INVALID) {
 		errno = EBADF;
 		return -1;
 	}
@@ -107,9 +107,11 @@ int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen)
 			return -1;
 	}
 
-	if ((rc = click_control(sockfd, &xsm)) >= 0) {
-		rc = click_reply2(sockfd, &type);
-	}
+	if ((rc = click_control(sockfd, &xsm)) < 0)
+		LOGF("Error talking to Click: %s", strerror(errno));
+	else if ((rc = click_reply2(sockfd, &type) ) < 0)
+		LOGF("Error getting status from Click: %s", strerror(errno));
+	
 	return rc;
 }
 
@@ -123,8 +125,6 @@ int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen)
 ** Supported Options:
 **	\n XOPT_HLIM	Retrieves the 'hop limit' element of the XIA header as an integer value
 **	\n XOPT_NEXT_PROTO Gets the next proto field in the XIA header
-**
-** FIXME: do we need to differentiate EINVAL for bad arguments vs incorrect optlen sizes?
 **
 ** @param sockfd	The control socket
 ** @param optname	The socket option to set (currently must be IP_TTL)
@@ -151,7 +151,7 @@ int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen)
 	**
 	** Should we add a validate socket function that takes the expected type?
 	*/ 
-	if (sockfd <= 0) {
+	if (getSocketType(sockfd) == XSOCK_INVALID) {
 		errno = EBADF;
 		return -1;
 	}
@@ -160,8 +160,6 @@ int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen)
 		errno = EINVAL;
 		return -1;
 	}
-
-	// FIXME: can we use xsm for send and reply instead of making 2?
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XGETSOCKOPT);
@@ -177,13 +175,18 @@ int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen)
 				return -1;
 			}
 
-			if (click_control(sockfd, &xsm) < 0)
+			if (click_control(sockfd, &xsm) < 0) {
+				LOGF("Error talking to Click: %s", strerror(errno));
 				return -1;
+			}
 
 			xia::XSocketMsg reply;
-			if (click_reply(sockfd, buf, sizeof(buf)) < 0)
+			if (click_reply(sockfd, buf, sizeof(buf)) < 0) {
+				LOGF("Error getting status from Click: %s", strerror(errno));
 				return -1;
+			}
 			
+			xsm.Clear();
 			xsm.ParseFromString(buf);
 			xia::X_Getsockopt_Msg *msg = xsm.mutable_x_getsockopt();
 
@@ -201,13 +204,18 @@ int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen)
 				return -1;
 			}
 
-			if (click_control(sockfd, &xsm) < 0)
+			if (click_control(sockfd, &xsm) < 0) {
+				LOGF("Error talking to Click: %s", strerror(errno));
 				return -1;
+			}
 
 			xia::XSocketMsg reply;
-			if (click_reply(sockfd, buf, sizeof(buf)) < 0)
+			if (click_reply(sockfd, buf, sizeof(buf)) < 0) {
+				LOGF("Error getting status from Click: %s", strerror(errno));
 				return -1;
+			}
 			
+			xsm.Clear();
 			xsm.ParseFromString(buf);
 			xia::X_Getsockopt_Msg *msg = xsm.mutable_x_getsockopt();
 

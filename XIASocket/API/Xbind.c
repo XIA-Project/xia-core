@@ -27,8 +27,8 @@
 /*!
 ** @brief Bind an Xsocket to a DAG.
 **
-** Causes click to tear down the underlying XIA socket and also closes the UDP
-** socket used to talk to click.
+** Bind the local Xsocket to the specified DAG. DAG should
+** be a SID
 **
 ** @param sockfd	The control socket
 ** @param sDAG		The source service (local) DAG
@@ -47,22 +47,34 @@ int Xbind(int sockfd, char* Sdag)
 		return -1;
 	}
 
+	if (getSocketType(sockfd) == XSOCK_INVALID) {
+		LOG("The socket is not a valid Xsocket");
+		errno = EBADF;
+		return -1;
+	}
+
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XBIND);
 
 	xia::X_Bind_Msg *x_bind_msg = xsm.mutable_x_bind();
 	x_bind_msg->set_sdag(Sdag);
 
-	if ((rc = click_control(sockfd, &xsm)) < 0)
+	if ((rc = click_control(sockfd, &xsm)) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
+	}
 
 	// process the reply from click
-	rc = click_reply2(sockfd, &type);
+	if ((rc = click_reply2(sockfd, &type)) < 0) {
+		LOGF("Error getting status from Click: %s", strerror(errno));
+		return -1;
+	}
 
 	if (type != xia::XBIND) {
 		// something bad happened
 		LOGF("Expected type %d, got %d", xia::XBIND, type);
-		// what do we do in this case?
+		errno = ECLICKCONTROL;
+		rc = -1;
 	}
 
 	// if rc is negative, errno will be set with an appropriate error code

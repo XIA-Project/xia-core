@@ -15,8 +15,8 @@
 ** limitations under the License.
 */
 /*!
-** @file Xsend.c
-** @brief implements Xclose
+** @file Xsendto.c
+** @brief implements Xsendto
 */
 #include "Xsocket.h"
 #include "Xinit.h"
@@ -28,8 +28,8 @@
 **
 ** @param sockfd - The socket to send the data on
 ** @param buf - the data to send
-** @param len - lenngth of the data to send @NOTE: currently the
-** Xsendto api is limited to sending at most 1024 bytes.
+** @param len - lenngth of the data to send @NOTE: the
+** Xsendto api is limited to sending at most XIA_MAXBUF bytes.
 ** @param flags - (This is not currently used but is kept to be compatible
 ** with the standard sendto socket call.
 ** @param dDAG address to send the datagram to
@@ -38,26 +38,32 @@
 ** @returns number of bytes sent on success
 ** @returns -1 on failure with errno set.
 **
-** @warning because the XIA header takes up room in the datagram, this
-** function currently truncates the data to be sent to 1024 bytes. We 
-** should probably add an Xgetsockopt paarameter to allow the user to 
-** determine the maximum buffer size that will fit in the datagram.
 */
+
 int Xsendto(int sockfd,const void *buf, size_t len, int /*flags*/,
 		char* dDAG, size_t /*dlen*/)
 {
-	xia::XSocketCallType type;
 	int rc;
 
 	if (len == 0)
 		return 0;
-	else if (len > MAX_DGRAM)
-		len = MAX_DGRAM;
 
 	if (!buf || !dDAG) {
 		LOG("null pointer!\n");
 		errno = EFAULT;
 		return -1;
+	}
+
+	if (validateSocket(sockfd, XSOCK_DGRAM, EOPNOTSUPP) < 0) {
+		LOGF("Socket %d must be a datagram socket", sockfd);
+		return -1;
+	}
+
+	// if buf is too big, send only what we can
+	if (len > XIA_MAXBUF) {
+		LOGF("truncating... requested size (%d) is larger than XIA_MAXBUF (%d)\n", 
+				len, XIA_MAXBUF);
+		len = XIA_MAXBUF;
 	}
 
 	xia::XSocketMsg xsm;
@@ -67,26 +73,16 @@ int Xsendto(int sockfd,const void *buf, size_t len, int /*flags*/,
 	x_sendto_msg->set_ddag(dDAG);
 	x_sendto_msg->set_payload((const char*)buf, len);
 
-	if ((rc = click_data(sockfd, &xsm)) < 0)
+	if ((rc = click_data(sockfd, &xsm)) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
-
-	// process the reply from click
-	rc = click_reply2(sockfd, &type);
-
-	if ( rc >= 0 && type != xia::XSENDTO) {
-		// something bad happened
-		LOGF("Expected type %d, got %d", xia::XSENDTO, type);
-		// FIXME: what do we do in this case?
 	}
 
-	if (rc < 0) {
-		// if negative, errno will be set with an appropriate error code
-		return -1;
-	}else if (rc == 0) {
-		// everything went fine, tell caller we sent the whole buffer
-		return len;
-	}
+	// because we don't have queueing or seperate control and data sockets, we 
+	// can't get status back reliably on a datagram socket as multiple peers
+	// could be talking to it at the same time and the control messages can get
+	// mixed up with the data packets. So just assume that all went well and tell
+	// the caller we sent the data
 
-	// not sure we'll ever get here
-	return rc;
+	return len;
 }

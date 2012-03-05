@@ -27,8 +27,8 @@
 /*!
 ** @brief Close an Xsocket.
 **
-** Causes click to tear down the underlying XIA socket and also closes the UDP
-** socket used to talk to click.
+** Causes click to tear down the underlying XIA socket and also closes the
+** UDP socket used to talk to click.
 **
 ** @param sockfd	The control socket
 **
@@ -38,29 +38,26 @@
 int Xclose(int sockfd)
 {
 	xia::XSocketCallType type;
-	int xerr = 0;
 	int rc;
+
+	if (getSocketType(sockfd) == XSOCK_INVALID)
+	{
+		LOG("The socket is not a valid Xsocket");
+		errno = EBADF;
+		return -1;
+	}
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XCLOSE);
-	xia::X_Close_Msg *x_close_msg = xsm.mutable_x_close();
-
-	// FIXME: eliminate or make this a debug time option, 
-	// it doesn't do anything
-	const char *message="close socket";
-	x_close_msg->set_payload(message);
 
 	if ((rc = click_control(sockfd, &xsm)) < 0) {
-		// print an error message
-		xerr = ECLICKCONTROL;
-	} else {
-		rc = click_reply2(sockfd, &type);
+		LOGF("Error talking to Click: %s", strerror(errno));
+
+	} else if ((rc = click_reply2(sockfd, &type)) < 0) {
+		LOGF("Error getting status from Click: %s", strerror(errno));
 	}
 
 	close(sockfd);
-
-	if (xerr != 0)
-		errno = ECLICKCONTROL;
+	freeSocketState(sockfd);
 	return rc;
 }
-

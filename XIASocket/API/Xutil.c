@@ -22,7 +22,6 @@
 #define CONTROL 1
 #define DATA 2
 
-// FIXME: cache info so we don't have to set everything up each time we come in here!
 
 int validateSocket(int sock, int stype, int err)
 {
@@ -44,6 +43,9 @@ int click_x(int sockfd, int kind, xia::XSocketMsg *xsm)
 	socklen_t slen;
 
 	assert(xsm);
+
+	// TODO: cache these so we don't have to set everything up each time we
+	// are called
 
 	slen = sizeof sa;
 	sa.sin_family = PF_INET;
@@ -106,10 +108,6 @@ int click_reply(int sockfd, char *buf, int buflen)
 	socklen_t len;
 	int rc;
 
-	sa.sin_family = PF_INET;
-	sa.sin_addr.s_addr = inet_addr(CLICKCONTROLADDRESS);
-	sa.sin_port = htons(atoi(CLICKCONTROLPORT));
-
 	len = sizeof sa;
 
 	memset(buf, 0, buflen);
@@ -128,10 +126,6 @@ int click_reply2(int sockfd, xia::XSocketCallType *type)
 	struct sockaddr_in sa;
 	socklen_t len;
 	int rc;
-
-	sa.sin_family = PF_INET;
-	sa.sin_addr.s_addr = inet_addr(CLICKCONTROLADDRESS);
-	sa.sin_port = htons(atoi(CLICKCONTROLPORT));
 
 	len = sizeof sa;
 
