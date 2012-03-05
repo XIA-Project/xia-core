@@ -52,7 +52,7 @@ XIAXIDRouteTable::add_handlers()
 }
 
 String
-XIAXIDRouteTable::list_routes_handler(Element *e, void *thunk)
+XIAXIDRouteTable::list_routes_handler(Element *e, void * /* thunk */)
 {
     XIAXIDRouteTable* table = static_cast<XIAXIDRouteTable*>(e);
 

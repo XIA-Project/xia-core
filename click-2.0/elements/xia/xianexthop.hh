@@ -13,8 +13,8 @@ XIANextHop()
 adjusts the "last" pointer when the packet has arrived at its next hop
 
 =d
-Adjusts the "last" pointer when the packet has arrived at its next hop
-The packet must be handled by StaticXIDLookup first for painting.
+Adjusts the "last" pointer when the packet has arrived at its next hop.
+The packet must be handled by XIAXIDRouteTable first for painting.
 
 =e
 

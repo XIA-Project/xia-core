@@ -27,7 +27,7 @@ class PrintStats : public Element { public:
 
     Packet *simple_action(Packet *);
 
-private:
+  private:
     int _check_packet;
     int _interval;
     bool _pps;

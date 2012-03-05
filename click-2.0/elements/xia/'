@@ -70,7 +70,7 @@ XIARandomize::configure(Vector<String> &conf, ErrorHandler *errh)
 		return -1;
     _offset = offset *multiplier;
 
-    for (int i = 0; i < _offset; i++) {
+    for (int i=0;i<_offset;i++) {
         nrand48(_xsubi_det);
         nrand48(_xsubi_arb);
     }
@@ -82,7 +82,7 @@ XIARandomize::configure(Vector<String> &conf, ErrorHandler *errh)
             click_chatter("generating zipf cache of size %d\n", _max_cycle*100);
             _zipf_cache = new uint32_t[_max_cycle*100];
             //_zipf_arbit = Zipf(1.2, 1000000000);
-            for (int i = 0; i < _max_cycle * 100; i++) {
+            for (int i=0;i<_max_cycle*100;i++) {
 				uint32_t v;
 				do {
 					v = _zipf.next();
@@ -107,7 +107,7 @@ XIARandomize::configure(Vector<String> &conf, ErrorHandler *errh)
     }
 
     /*
-    for (int i = 0; i < _max_cycle * 100; i++) {
+    for (int i=0;i<_max_cycle*100;i++) {
             assert(_zipf_cache[i]< _max_cycle);
     }
     */
@@ -125,8 +125,8 @@ XIARandomize::simple_action(Packet *p_in)
     click_xia *hdr = p->xia_header();
 
     assert(_zipf_cache);
-    uint32_t seed = _zipf_cache[_current_cycle]; // zipf
-    //uint32_t seed = rand() % _max_cycle;    // uniform
+    uint32_t seed  = _zipf_cache[_current_cycle]; // zipf
+    //uint32_t seed  = rand() % _max_cycle;    // uniform
 
     for (size_t i = 0; i < hdr->dnode + hdr->snode; i++)
     {

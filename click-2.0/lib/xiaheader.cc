@@ -37,8 +37,7 @@ XIAHeader::payload() const
 {
     uint8_t nxt = _hdr->nxt;
     const uint8_t* p = next_header();
-    while (nxt < CLICK_XIA_NXT_NO)
-    {
+    while (nxt < CLICK_XIA_NXT_NO) {
     	const struct click_xia_ext * exthdr = reinterpret_cast<const struct click_xia_ext *>(p);
         nxt = exthdr->nxt;
         p += exthdr->hlen;

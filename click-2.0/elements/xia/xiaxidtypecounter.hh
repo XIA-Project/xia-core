@@ -10,7 +10,7 @@ CLICK_DECLS
 XIAXIDTypeCounter(PATTERN_1, ..., PATTERN_N)
 
 =s ip
-classifies XIA packets by the type of source/destination XID
+counts XIA packets by the type of source/destination XID
 
 =d
 Counts XIA packets by the type of source/destination XID.
@@ -37,7 +37,6 @@ class XIAXIDTypeCounter : public Element { public:
     Packet *simple_action(Packet *);
     void cleanup(CleanupStage);
     void add_handlers();
-
 
 protected:
     int match(Packet *);
