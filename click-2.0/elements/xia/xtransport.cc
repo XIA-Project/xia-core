@@ -66,6 +66,7 @@ XTRANSPORT::~XTRANSPORT()
     portRxSeqNo.clear();
     portTxSeqNo.clear();
     XIDpairToPort.clear();
+
 	hlim.clear();
 	xcmp_listeners.clear();
 	nxt_xport.clear();
@@ -151,7 +152,8 @@ XTRANSPORT::run_timer(Timer *timer)
   			tear_down = true;
   			daginfo->timer_on = false;
   			portToActive.set(_sport, false);
-  			XID source_xid=portToDAGinfo.get(_sport).xid;
+   			XID source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+   			//printf("\ndelRoute=%s \n", source_xid.unparse().c_str());
 			delRoute(source_xid);
 			XIDtoPort.erase(source_xid);
 			portToDAGinfo.erase(_sport);
@@ -242,7 +244,6 @@ XTRANSPORT::copy_packet(Packet *p) {
 
 	copy = xiah.encap(copy,false);
 	delete new_thdr;
-//////	xiah.set_plen(xiahdr.plen());
 
 	return copy;
 }    		
@@ -359,7 +360,6 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 				hlim.set(_sport, 250);
 				nxt_xport.set(_sport, CLICK_XIA_NXT_TRN);
-			    
 			    //portRxSeqNo.set(_sport,1);
 			    //portTxSeqNo.set(_sport,1);
 			    
@@ -594,19 +594,18 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 			    WritablePacket *p = NULL;			    
 			     
-//////			    xiah.set_plen(strlen(dummy));
-//////				
 			    TransportHeaderEncap *thdr = TransportHeaderEncap::MakeSYNHeader( 0, -1, 0); // #seq, #ack, length
 			    
 			    p = thdr->encap(just_payload_part); 
 
 				thdr->update();
-				xiah.set_plen(strlen(dummy) + thdr->hlen()); // XIA payload = transport header + transport layer data
+				xiah.set_plen(strlen(dummy) + thdr->hlen()); // XIA payload = transport header + transport-layer data
 
 			    p = xiah.encap(p, false);
+
 			    delete thdr;
-//////			    xiah.set_plen(strlen(dummy));
 			    
+
 			    // Set timer 
 			    daginfo->timer_on = true;
     			    daginfo->synack_waiting = true;			    
@@ -764,7 +763,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		switch(xia_socket_msg.type()) { 
 		    case xia::XSEND:
 			{
-			    //click_chatter("\nOK: SOCKET DATA !!!\n");
+			    //click_chatter("\n\nOK: SOCKET DATA !!!\n");
 
 			    xia::X_Send_Msg *x_send_msg = xia_socket_msg.mutable_x_send();
 
@@ -833,7 +832,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 					xiah.set_plen(pktPayloadSize + thdr->hlen()); // XIA payload = transport header + transport-layer data
 
 			    	p = xiah.encap(p, false);
-//////			    	xiah.set_plen(pktPayloadSize);
+
 			    	delete thdr;
 			    	
 			    	// Store the packet into buffer
@@ -943,10 +942,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				if (daginfo->sock_type == 3) {
 			    	xiah.set_nxt(nxt_xport.get(_sport));
 			
-					// FIXME: should this be 0 or the size of the header we're adding?
 					xiah.set_plen(pktPayloadSize);
-
-
 			    	p = xiah.encap(just_payload_part, false);
 
 				} else {
@@ -964,14 +960,14 @@ void XTRANSPORT::push(int port, Packet *p_input)
 					xiah.set_plen(pktPayloadSize + thdr->hlen()); // XIA payload = transport header + transport-layer data
 
 			    	p = xiah.encap(p, false);
-//////			    	xiah.set_plen(pktPayloadSize);
 			    	delete thdr;			
 				}
 			    			       
 			    output(2).push(p);
 			    
+				// removed due to multi peer collision problem
 			    // (for Ack purpose) Reply with a packet with the destination port=source port	
-				ReturnResult(_sport, xia::XSENDTO);
+//				ReturnResult(_sport, xia::XSENDTO);
 			}
 			break;
 			
@@ -1036,6 +1032,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 				XIDtoPort.set(source_xid,_sport);//Maybe change the mapping to XID->DAGinfo?
 				addRoute(source_xid);
+
 			}
 		    
 			if(daginfo->src_path.unparse_re().length() !=0) {
@@ -1156,6 +1153,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			XID	source_sid = daginfo->src_path.xid(daginfo->src_path.destination_node());
 			XID	destination_cid = dst_path.xid(dst_path.destination_node()); 
 			
+
 			// Check the status of CID request
 			HashTable<XID, int>::iterator it;
 		    	it = daginfo->XIDtoStatus.find(destination_cid);
@@ -1298,7 +1296,6 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		    			if (DEBUG)
 						click_chatter("Sent packet to socket: sport %d dport %d", _sport, _sport); 
 
-		    
 			    		output(1).push(UDPIPEncap(p2,_sport,_sport));
 			    		
 			    		it2->second->kill();
@@ -1484,13 +1481,13 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			    	//click_chatter("Sent packet to network");
 
 			    	TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeSYNACKHeader( 0, 0, 0); // #seq, #ack, length 
+			    	p = thdr_new->encap(just_payload_part); 
 
 					thdr_new->update();
 					xiah_new.set_plen(strlen(dummy) + thdr_new->hlen()); // XIA payload = transport header + transport-layer data
 
-			    	p = thdr_new->encap(just_payload_part); 
 			    	p = xiah_new.encap(p, false);
-//////			    	xiah_new.set_plen(strlen(dummy));
+
 			    	delete thdr_new;
 			    	XIAHeader xiah1(p);
 			        //String pld((char *)xiah1.payload(), xiah1.plen());	
@@ -1576,7 +1573,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 				    	p = xiah_new.encap(p, false);
 				    	delete thdr_new;
-//////				  	xiah_new.set_plen(strlen(dummy));
+
 				  	XIAHeader xiah1(p);
 				  	String pld((char *)xiah1.payload(), xiah1.plen());
 				  	//printf("\n\n (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), pld.c_str(), xiah1.plen());
@@ -1653,8 +1650,8 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		} else if (thdr.type() == TransportHeader::XSOCK_DGRAM) {
 
 			_dport= XIDtoPort.get(_destination_xid);
-
 		}	
+
 
 	
 
@@ -1821,9 +1818,21 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		 p_in->kill();
 	    }
 	    break;
-
+    case 4://Packet with DHCP information
+ 	    {
+	 		XIAHeader xiah(p_in->xia_header());
+ 			String temp = _local_addr.unparse();
+ 			Vector<String> ids;
+	 		cp_spacevec(temp, ids);;
+ 			if (ids.size() < 3) {
+ 				String new_route((char *)xiah.payload());
+ 				String new_local_addr = new_route + " " + ids[1];
+	 			click_chatter("new address is - %s", new_local_addr.c_str());
+ 				_local_addr.parse(new_local_addr);
+ 				p_in->kill();
+ 			}
+ 	    }
     }
-
 }
 
 void XTRANSPORT::ReturnResult(int sport, xia::XSocketCallType type, int rc, int err)
