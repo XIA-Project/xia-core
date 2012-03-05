@@ -1,10 +1,11 @@
 elementclass GenericRouting4Port {
+    $local_addr |
     // input: a packet to route
     // output[0]: forward to port 0~3 (painted)
     // output[1]: need to update "last" pointer
     // output[2]: no match
 
-    input -> rt :: XIAXIDRouteTable;
+    input -> rt :: XIAXIDRouteTable($local_addr);
     rt[0] -> Paint(0) -> [0]output;
     rt[1] -> Paint(1) -> [0]output;
     rt[2] -> Paint(2) -> [0]output;
@@ -12,10 +13,16 @@ elementclass GenericRouting4Port {
     rt[4] -> [1]output;
     rt[5] -> [2]output;
     rt[6] -> [3]output;			// hack to use 6th port for DHCP
+    
+    rt[7] -> broadcast_pkt_Fork :: Tee(4) -> Paint(0) -> [0]output;     // outgoing broadcast packet
+    broadcast_pkt_Fork[1] -> Paint(1) -> [0]output;   
+    broadcast_pkt_Fork[2] -> Paint(2) -> [0]output; 
+    broadcast_pkt_Fork[3] -> Paint(3) -> [0]output;   
+    
 };
-
+ 
 elementclass GenericPostRouteProc {
-    input -> XIADecHLIM -> output;
+    input -> XIADecHLIM -> output; 
 };
 
 elementclass XIAPacketRoute {
@@ -45,19 +52,19 @@ elementclass XIAPacketRoute {
     consider_next_path[1] -> [2]output;
 
     //  Next destination is AD
-    c[0] -> rt_AD :: GenericRouting4Port;
+    c[0] -> rt_AD :: GenericRouting4Port($local_addr);
     rt_AD[0] -> GenericPostRouteProc -> [0]output;
     rt_AD[1] -> XIANextHop -> check_dest;
     rt_AD[2] -> consider_next_path;
 
     //  Next destination is HID
-    c[1] -> rt_HID :: GenericRouting4Port;
+    c[1] -> rt_HID :: GenericRouting4Port($local_addr);
     rt_HID[0] -> GenericPostRouteProc -> [0]output;
     rt_HID[1] -> XIANextHop -> check_dest;
     rt_HID[2] -> consider_next_path;
 
     //  Next destination is SID
-    c[2] -> rt_SID :: GenericRouting4Port;
+    c[2] -> rt_SID :: GenericRouting4Port($local_addr);
     rt_SID[0] -> GenericPostRouteProc -> [0]output;
     rt_SID[1] -> XIANextHop -> check_dest;
     rt_SID[2] -> consider_next_path;
@@ -68,14 +75,14 @@ elementclass XIAPacketRoute {
     CIDPostRouteProc :: Null;
 
     //  Next destination is CID
-    c[3] -> rt_CID :: GenericRouting4Port;
+    c[3] -> rt_CID :: GenericRouting4Port($local_addr);
     rt_CID[0] -> GenericPostRouteProc -> CIDPostRouteProc -> [0]output;
     rt_CID[1] -> XIANextHop -> check_dest;
     rt_CID[2] -> consider_next_path;
 
 
     // Next destination is an IPv4 path
-    c[4] -> rt_IP :: GenericRouting4Port;
+    c[4] -> rt_IP :: GenericRouting4Port($local_addr);
     rt_IP[0] -> GenericPostRouteProc -> [0]output;
     rt_IP[1] -> XIANextHop -> check_dest;
     rt_IP[2] -> consider_next_path;
@@ -179,7 +186,7 @@ elementclass Router {
     Script(write n/proc/rt_AD/rt.add - 1);      // default route for AD
     Script(write n/proc/rt_AD/rt.add $local_ad 4);    // self AD as destination
     Script(write n/proc/rt_HID/rt.add - 0);     // forwarding for local HID
-    Script(write n/proc/rt_HID/rt.add HID:1111111111111111111111111111111111111111 5)  // drop broadcast packet
+    Script(write n/proc/rt_HID/rt.add HID:1111111111111111111111111111111111111111 5)  // drop broadcast packet ; to be fixed!!!
     Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self HID as destination
     Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
@@ -414,9 +421,107 @@ elementclass IP6Router4Port {
     sw[3] -> Queue(200) -> [3]output;
 };
 
+
+
+
+// 4-port router node with XRoute running
+elementclass XRouter4Port {
+    $local_addr, $local_ad, $local_hid, $fake, $CLICK_IP, $API_IP, $ether_addr |
+
+
+    // $local_addr: the full address of the node
+
+    // input[0], input[1], input[2], input[3]: a packet arrived at the node
+    // output[0]: forward to interface 0
+    // output[1]: forward to interface 1
+    // output[2]: forward to interface 2
+    // output[3]: forward to interface 3
+    
+    
+    n :: RouteEngine($local_addr);
+    xtransport::XTRANSPORT($local_addr, $CLICK_IP, $API_IP, n/proc/rt_SID/rt);
+    
+    //Create kernel TAP interface which responds to ARP
+    fake0::FromHost($fake, $API_IP/24, CLICK_XTRANSPORT_ADDR $CLICK_IP ,HEADROOM 256, MTU 65521) 
+    //-> Print()
+    -> fromhost_cl :: Classifier(12/0806, 12/0800);
+    fromhost_cl[0] -> ARPResponder(0.0.0.0/0 $ether_addr) -> ToHost($fake);
+
+    //Classifier to sort between control/normal
+    fromhost_cl[1]
+    ->StripToNetworkHeader()
+    ->sorter::IPClassifier(dst udp port 5001 or 5002 or 5003 or 5004 or 5005 or 5006,
+                           dst udp port 10000 or 10001 or 10002);
+
+    //Control in
+    sorter[0]
+    ->[0]xtransport;
+
+    //socket side data in
+    sorter[1]
+    ->[1]xtransport;
+
+    //socket side out
+    xtransport[1]->
+    cIP::CheckIPHeader();
+    cIP
+    ->EtherEncap(0x0800, $ether_addr, 11:11:11:11:11:11)
+    -> ToHost($fake)
+    cIP[1]->Print(bad,MAXLENGTH 100, CONTENTS ASCII)->Discard();
+
+    xtransport[0]-> Discard;//Port 0 is unused for now.
+    
+    //To connect to forwarding instead of loopback
+    //xtransport[2]->Packet forwarding module
+    //Packet forwarding module->[2]xtransport0;
+
+    cache :: XIACache($local_addr, n/proc/rt_CID/rt, PACKET_SIZE 1400);
+
+    //Script(write n/proc/rt_AD/rt.add - 0);      // default route for AD
+    //Script(write n/proc/rt_HID/rt.add - 0);     // default route for HID
+    Script(write n/proc/rt_AD/rt.add $local_ad 4);    // self AD as destination
+    Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self RHID as destination
+    Script(write n/proc/rt_HID/rt.add BHID 7);  // outgoing broadcast packet
+    Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
+    Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
+    //Script(write n/proc/rt_IP/rt.add - 0); 	// default route for IPv4    
+
+    // quick fix
+    n[3] -> Discard();
+    Idle() -> [4]xtransport;
+    
+    
+    input[0] -> [0]n;
+    input[1] -> [0]n;
+    input[2] -> [0]n;
+    input[3] -> [0]n;
+
+    n[0] -> sw :: PaintSwitch
+    srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
+    n[1] -> srcTypeClassifier[1] -> [2]xtransport[2] ->  [0]n;
+    srcTypeClassifier[0] -> Discard;    // do not send CID responses directly to RPC;
+    
+    n[2] -> [0]cache[0] -> [1]n;
+    //For get and put cid
+    xtransport[3] -> [1]cache[1] -> [3]xtransport;
+    
+    
+    sw[0] -> Queue(200) -> [0]output;
+    sw[1] -> Queue(200) -> [1]output;
+    sw[2] -> Queue(200) -> [2]output;
+    sw[3] -> Queue(200) -> [3]output; 
+    
+        
+};
+
+
+
+
+
 // 1-port endhost node with sockets
 elementclass EndHost {
-    $local_addr, $local_hid,$fake,$CLICK_IP,$API_IP, $ether_addr, $enable_local_cache |
+    $local_addr, $local_hid, $fake, $CLICK_IP, $API_IP, $ether_addr, $enable_local_cache |
+
 
     // $local_addr: the full address of the node
     // $local_hid:  the HID of the node
@@ -542,7 +647,7 @@ elementclass DHCPEndHost {
     Script(write n/proc/rt_HID/rt.add HID:1111111111111111111111111111111111111111 4);  // route for broadcast packet
     Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self HID as destination
     Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
-    Script(write n/proc/rt_SID/rt.add SID:0000000000000000000000000000000000001111 6);  // route DHCP packet
+    Script(write n/proc/rt_SID/rt.add SID:1110000000000000000000000000000000001111 6);  // route DHCP packet
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
     Script(write n/proc/rt_IP/rt.add - 0); 	// default route for IPv4    
 

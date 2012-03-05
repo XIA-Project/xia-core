@@ -1,4 +1,4 @@
-require(library xia_two_port_four_port_router.click); 
+require(library ../xia_router_template_xtransport.click);
 require(library ../xia/xia_address.click);
 
 

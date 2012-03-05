@@ -46,6 +46,42 @@ def recv_with_timeout(sock, timeout=5):
     	raise IOError
 
     return reply
+    
+    
+
+def recvfrom_with_timeout(sock, timeout=3):
+    # Make socket non-blocking
+    try:
+        fcntl.fcntl(sock, fcntl.F_SETFL, os.O_NONBLOCK)
+    except IOError:
+        print "ERROR: xiaproxy.py: recv_with_timeout: could not make socket nonblocking"
+    
+    # Receive data
+    start_time = time.time()   # current time in seconds since the epoch
+    received_data = False
+    reply = '<html><head><title>XIA Error</title></head><body><p>&nbsp;</p><p>&nbsp;</p><p style="text-align: center; font-family: Tahoma, Geneva, sans-serif; font-size: xx-large; color: #666;">Sorry, something went wrong.</p><p>&nbsp;</p><p style="text-align: center; color: #999; font-family: Tahoma, Geneva, sans-serif;"><a href="mailto:xia-dev@cs.cmu.edu">Report a bug</a></p></body></html>'
+    reply_dag = ''
+    try:
+        while (time.time() - start_time < timeout and not received_data):
+            try:
+	    	select.select([sock], [], [], 0.02)
+                (reply, reply_dag) = Xrecvfrom(sock, 65521, 0)
+                received_data = True
+            except IOError:
+                received_data = False
+            except:
+                print 'ERROR: xiaproxy.py: recv_with_timeout: error receiving data from socket'
+    except (KeyboardInterrupt, SystemExit), e:
+        Xclose(sock)
+        sys.exit()
+
+    if (not received_data):
+        print "Recieved nothing"
+    	raise IOError
+
+    return reply, reply_dag    
+    
+    
 
 def check_for_and_process_CIDs(message, browser_socket):
     rt = message.find('cid')
@@ -115,7 +151,7 @@ def sendVideoSIDRequest(netloc, payload, browser_socket):
     if (status != 0):
        	print "Unexpected error:", sys.exc_info()[0]
        	Xclose(sock)
-    	print "sendSIDRequest() Closing browser socket "
+    	print "sendSIDRequestXSP() Closing browser socket "
     	browser_socket.close()
 	return
     
@@ -125,7 +161,7 @@ def sendVideoSIDRequest(netloc, payload, browser_socket):
     Xsend(sock, asknumchunks, len(asknumchunks), 0)
     #Xsend(sock, payload, len(payload), 0)
     # Receive reply
-    print 'sendSIDRequest: about to receive reply'
+    print 'sendSIDRequestXSP: about to receive reply'
     try:
         reply = recv_with_timeout(sock) # = Xrecv(sock, 65521, 0)
     except:
@@ -136,7 +172,7 @@ def sendVideoSIDRequest(netloc, payload, browser_socket):
 
     Xclose(sock)
     numchunks = int(reply)
-    print "sendSIDRequest: received reply for number of chunks ",numchunks
+    print "sendSIDRequestXSP: received reply for number of chunks ",numchunks
 
     ## may be send http header along with first content
     ## return ogg header
@@ -164,7 +200,7 @@ def sendVideoSIDRequest(netloc, payload, browser_socket):
             if (status != 0):
             	print "Unexpected error:", sys.exc_info()[0]
         	Xclose(sock)
-    		print "sendSIDRequest() Closing browser socket "
+    		print "sendSIDRequestXSP() Closing browser socket "
     		browser_socket.close()
 		return
             
@@ -220,11 +256,11 @@ def getrandSID():
     assert len(sid)==44
     return  sid
 
-def sendSIDRequest(ddag, payload, browser_socket):
+def sendSIDRequestXSP(ddag, payload, browser_socket):
     # Create socket
     sock = Xsocket(XSOCK_STREAM)
     if (sock<0):
-        print "ERROR: xiaproxy.py: sendSIDRequest: could not open socket"
+        print "ERROR: xiaproxy.py: sendSIDRequestXSP: could not open socket"
         return
 
     sid = getrandSID()
@@ -239,7 +275,7 @@ def sendSIDRequest(ddag, payload, browser_socket):
         if (status != 0):
         	print "Unexpected error:", sys.exc_info()[0]
         	Xclose(sock)
-    		print "sendSIDRequest() Closing browser socket "
+    		print "sendSIDRequestXSP() Closing browser socket "
     		browser_socket.close()
 		return
 		       
@@ -247,7 +283,7 @@ def sendSIDRequest(ddag, payload, browser_socket):
         Xsend(sock, payload, len(payload), 0)
         
     except:
-        print 'ERROR: xiaproxy.py: sendSIDRequest: error binding to sdag, connecting to ddag, or sending SID request:\n%s' % payload
+        print 'ERROR: xiaproxy.py: sendSIDRequestXSP: error binding to sdag, connecting to ddag, or sending SID request:\n%s' % payload
 
     # Receive reply and close socket
     try:
@@ -255,7 +291,7 @@ def sendSIDRequest(ddag, payload, browser_socket):
     except IOError:
         print "Unexpected error:", sys.exc_info()[0]
         Xclose(sock)
-        print "sendSIDRequest() Closing browser socket "
+        print "sendSIDRequestXSP() Closing browser socket "
         browser_socket.close()
         return 
     Xclose(sock)
@@ -265,9 +301,59 @@ def sendSIDRequest(ddag, payload, browser_socket):
         # Pass reply up to browswer 
         rtt = int((time.time()-rtt) *1000)
         # Use last modified field to embedd RTT info
-        reply = reply.replace("\n\n<html", ("\nLast-Modified:%d\n\n<html" % rtt)) # TODO: a bit of a hack
+        reply = reply.replace("Last-Modified: 100", ("Last-Modified:%d" % rtt)) # TODO: a bit of a hack
         send_to_browser(reply, browser_socket)
     return
+
+
+
+
+
+# This fuction is just for testing purpose
+def sendSIDRequestXDP(ddag, payload, browser_socket):
+    # Create socket
+    sock = Xsocket(XSOCK_DGRAM)
+    if (sock<0):
+        print "ERROR: xiaproxy.py: sendSIDRequestXDP: could not open socket"
+        return
+
+    sid = getrandSID()
+    sdag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP0, HID0, sid)    
+    replyto =  ''
+    reply_dag = ''
+
+    try:
+
+        rtt = time.time() 
+        
+        # Send request
+        Xsendto(sock, payload, len(payload), 0, ddag, len(ddag)+1)
+        
+    except:
+        print 'ERROR: xiaproxy.py: sendSIDRequestXDP: error binding to sdag, or sending SID request:\n%s' % payload
+
+    # Receive reply and close socket
+    try:
+        
+        (reply, reply_dag) = recvfrom_with_timeout(sock) # Use default timeout
+        #print "xiaproxy.py: reponse: %s" % reply
+    except IOError:
+        print "Unexpected error:", sys.exc_info()[0]
+        Xclose(sock)
+        print "sendSIDRequestXDP() Closing browser socket "
+        browser_socket.close()
+        return 
+    Xclose(sock)
+    
+    # Pass reply up to browswer 
+    rtt = int((time.time()-rtt) *1000)
+    # Use last modified field to embedd RTT info
+    reply = reply.replace("Last-Modified: 100", ("Last-Modified:%d" % rtt)) # TODO: a bit of a hack
+    send_to_browser(reply, browser_socket)
+    return    
+       
+
+
 
 
 def get_content_from_cid_list(cid_list):
@@ -328,19 +414,25 @@ def xiaHandler(host, path, http_header, browser_socket):
         # Get the DAG from the URL
         ddag = dag_from_url('http://' + host + path)
         # Remove the DAG from the request so only the requested page remains
-        sendSIDRequest(ddag, http_header, browser_socket)
+        sendSIDRequestXSP(ddag, http_header, browser_socket)
     elif host.find('sid') == 4:
         host=host[4:]  # remove the 'xia.' prefix
         # TODO: is it necessary to handle video service requests separately?
-        found_video = host.find('video');
+        found_video = host.find('video')
         if(found_video != -1):
             sendVideoSIDRequest(host[4:], http_header, browser_socket)
+        elif(host.find('sid_stock') != -1):
+            # For stock_service, use XDP (for testing purpose)
+            ddag = dag_from_url_old(host + path)
+            # If there's a fallback in the filename, remove it now (TODO: change this when we switch to new URL format)
+            http_header = re.sub(r"/fallback\(\S*\)", "", http_header)
+            sendSIDRequestXDP(ddag, http_header, browser_socket)               
         else:
             # Do some URL processing 
             ddag = dag_from_url_old(host + path)
             # If there's a fallback in the filename, remove it now (TODO: change this when we switch to new URL format)
             http_header = re.sub(r"/fallback\(\S*\)", "", http_header)
-            sendSIDRequest(ddag, http_header, browser_socket)
+            sendSIDRequestXSP(ddag, http_header, browser_socket)
     elif host.find('cid') == 4:
         host=host[4:]  # remove the 'xia.' prefix
         host_array = host.split('.')

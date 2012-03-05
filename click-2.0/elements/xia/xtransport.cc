@@ -27,7 +27,7 @@ XTRANSPORT::XTRANSPORT()
     isConnected=false;
     
     _ackdelay_ms=300;
-    _teardown_wait_ms=240000;
+    _teardown_wait_ms= 240000;
 }
 
 
@@ -154,13 +154,12 @@ XTRANSPORT::run_timer(Timer *timer)
   			XID source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
   			
   			// HACK: fix with new PUTCID api
-  			struct click_xia_xid __srcXID = source_xid;
-  			if (ntohl(__srcXID.type) != CLICK_XIA_XID_TYPE_CID) {
-  				delRoute(source_xid);
-  			}
+  			//struct click_xia_xid __srcXID = source_xid;
+  			//if (ntohl(__srcXID.type) != CLICK_XIA_XID_TYPE_CID) {
+  			//	delRoute(source_xid);
+  			//}
   			
-  			
-			XIDtoPort.erase(source_xid);
+			//XIDtoPort.erase(source_xid);
 			portToDAGinfo.erase(_sport);
 			portRxSeqNo.erase(_sport);                
 			portTxSeqNo.erase(_sport);
@@ -1667,7 +1666,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		{
 
 			if (!_dport) {
-		    		click_chatter("Packet to unknown %s",_destination_xid.unparse().c_str());
+		    		click_chatter("Case 1. Packet to unknown %s, dest_port=%d, sendToApp=%d",_destination_xid.unparse().c_str(), _dport, sendToApplication );
 		    	}
 		}
 		p_in->kill();
@@ -1784,7 +1783,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		}
 		else
 		{
-		    click_chatter("Packet to unknown %s",destination_sid.unparse().c_str());
+		    click_chatter("Case 2. Packet to unknown %s",destination_sid.unparse().c_str());
 		}            
 
 		 p_in->kill();
