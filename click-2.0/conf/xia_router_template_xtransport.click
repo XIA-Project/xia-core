@@ -5,7 +5,7 @@ elementclass GenericRouting4Port {
     // output[1]: need to update "last" pointer
     // output[2]: no match
 
-    input -> rt :: XIAXIDRouteTable($local_addr);
+    input -> rt :: XIAXIDRouteTable;
     rt[0] -> Paint(0) -> [0]output;
     rt[1] -> Paint(1) -> [0]output;
     rt[2] -> Paint(2) -> [0]output;
