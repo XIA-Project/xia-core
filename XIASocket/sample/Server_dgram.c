@@ -23,7 +23,7 @@
 
 int main(int argc, char *argv[])
 {
-    int sock, n, acceptSock;
+    int sock, n, chunkSock, acceptSock;
     size_t dlen;
     char buf[1024],theirDAG[1024];
     //char* reply="Got your message";
@@ -34,13 +34,16 @@ int main(int argc, char *argv[])
     sock=Xsocket(XSOCK_DGRAM);
     if (sock < 0) error("Opening socket");
 
+    chunkSock=Xsocket(XSOCK_CHUNK);
+    if (chunkSock < 0) error("Opening socket");
+
     //print_conf(); //for debugging purpose
     
     //Make a CID entry
     char * cdag = (char*)malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,CID0) + 1);
     sprintf(cdag, "RE %s %s %s", AD0, HID0,CID0); 
     char* data="Some value stored for CID0";
-    XputCID(sock,data,strlen(data),0,cdag,strlen(cdag));
+    XputCID(chunkSock,data,strlen(data),0,cdag,strlen(cdag));
 
 
     //Make the sDAG (the one the server listens on)
@@ -55,6 +58,7 @@ int main(int argc, char *argv[])
     while (1) {
     			//Receive packet
     			memset(&buf[0], 0, sizeof(buf));
+			dlen = sizeof(theirDAG);
 			n = Xrecvfrom(sock,buf,1024,0,theirDAG,&dlen);
 			
 			//n = Xrecv(acceptSock,buf,1024,0);
