@@ -55,6 +55,7 @@ int main(int argc, char *argv[])
 
     while (seq_s<TOTALPINGS) {
 	//Receive packet
+        dlen=sizeof(theirDAG);
 	n = Xrecvfrom(sock,payload_new,1024,0,theirDAG,&dlen);
 
 	gettimeofday(&tv, NULL);
