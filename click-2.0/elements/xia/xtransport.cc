@@ -1897,7 +1897,6 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			_local_addr.parse(new_local_addr);
 			p_in->kill();
 		}
-	    }
  	    }
     }
 }
