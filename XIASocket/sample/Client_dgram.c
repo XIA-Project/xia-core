@@ -94,6 +94,7 @@ int main(int argc, char *argv[])
 
 
 	//Process reply from server
+	dlen =  sizeof(theirDAG);
 	n = Xrecvfrom(sock,reply,128,0,theirDAG,&dlen);
 	//n = Xrecv(sock,reply,128,0);
 	if (n < 0) 
