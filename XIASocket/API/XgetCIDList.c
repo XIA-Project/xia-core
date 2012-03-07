@@ -25,7 +25,6 @@
     
 int XgetCIDList(int sockfd, const struct cDAGvec *cDAGv, int numCIDs)
 {
-        
 	//char buffer[MAXBUFLEN];
 	//struct sockaddr_in their_addr;
 	//socklen_t addr_len;
@@ -36,6 +35,29 @@ int XgetCIDList(int sockfd, const struct cDAGvec *cDAGv, int numCIDs)
 	const char *buf="CID request";//Maybe send more useful information here.
 	size_t cdagListsize = 0;
 	
+	
+	// If the CID list is too long for a UDP packet to click, replace with multiple calls
+	if (numCIDs > 300) //TODO: Make this more precise once carrots go away
+	{
+		numbytes = 0;
+		int i;
+		for (i = 0; i < numCIDs; i += 300)
+		{
+			int num = (numCIDs-i > 300) ? 300 : numCIDs-i;
+			int rv = XgetCIDList(sockfd, &cDAGv[i], num);
+
+			if (rv == -1) {
+				perror("Xgetcid(): getcid failed");
+				return(-1);
+			} else {
+				numbytes += rv;
+			}
+		}
+
+		return numbytes;
+	}
+	
+
 	for (int i=0; i< numCIDs; i++) {
 		cdagListsize += (cDAGv[i].dlen + 1);
 	}

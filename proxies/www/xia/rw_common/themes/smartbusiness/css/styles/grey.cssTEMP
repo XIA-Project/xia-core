@@ -1,0 +1,98 @@
+body {
+	background: #7f7f7f;
+}
+
+a:link, a:visited {
+	color: #000000;
+}
+
+a:hover, a:active {
+	color: #b3b3b3;
+	text-decoration: none;
+}
+
+#pageHeader {
+	background: no-repeat url(http://xia.cid.11.810901779902b605d1ba51a1ecca9cac91b7fda37dfeb999bc85ce04043d7f559ae841f329e1440cb9808481533d7671d935f2c3210b532c9b2b00f4c5924956535e23b9462aa79be8c9b77c3d378dffc6e1a00e4124bf475a165856a5e1fd5ec07977510be10cc9b7f6fb4c0c061e202a1d025b1743a937ec9b7b658d302a60717df39478fa786733717c6144e2961a6b650aa4295d561eaa74639fb5de79d895698026a56445939047a17ed8e5753b537bb7dcb793497a10e47dac37e4fdae9a409afce4cbf2fc0fb88231363d5aaa9b4c730a0f8c9f7a9ec317bf);
+}
+
+#pageHeader h2 {
+	color: #000000;
+}
+
+#sidebarContainer .sideHeader {
+	color: #56595e;
+}
+
+#navcontainer #current {
+	background: no-repeat url(http://xia.cid.3.f378e9b528b8845dee3956c896f4ef168f396bcf709e1c9b7b9bea7664403f52089be1735f20e40aa45c99e8b230e1b28fc63a7162ddbf6c12056d8f);
+}
+
+#navcontainer .currentAncestor {
+	background: no-repeat url(http://xia.cid.3.f378e9b528b8845dee3956c896f4ef168f396bcf709e1c9b7b9bea7664403f52089be1735f20e40aa45c99e8b230e1b28fc63a7162ddbf6c12056d8f);
+}
+
+#navcontainer a {
+	background: no-repeat url(http://xia.cid.2.23c8dd58c50d2900166dce78ad50164cff38055a39f911fe7b6e8992bf0c8285c7de339bb49423de);
+}
+
+#navcontainer a:hover {
+	background: no-repeat url(http://xia.cid.3.f378e9b528b8845dee3956c896f4ef168f396bcf709e1c9b7b9bea7664403f52089be1735f20e40aa45c99e8b230e1b28fc63a7162ddbf6c12056d8f);
+}
+
+#navcontainer ul ul a {
+	background: no-repeat left center url(http://xia.cid.3.9f6afc0f14d63f40130b85d207670c07c428086a2b656a6f5432f108c98a1f948880bbb207e1cccd086b986f9b15b8f4897e13677436afedf5afb6ed);
+}
+
+#navcontainer ul ul a:hover{
+	background: no-repeat left center url(http://xia.cid.1.2daa50cec23d526e721c3fcd525e812c13d55b81);
+}
+
+#navcontainer ul ul #current{
+	color: #333333;
+	background: no-repeat left center url(http://xia.cid.1.2daa50cec23d526e721c3fcd525e812c13d55b81);
+}
+
+#navcontainer ul ul .currentAncestor {
+	color: #333333;
+	background: no-repeat left center url(http://xia.cid.1.2daa50cec23d526e721c3fcd525e812c13d55b81);}
+
+#navcontainer ul ul ul a{
+	background: no-repeat left center url(http://xia.cid.3.9f6afc0f14d63f40130b85d207670c07c428086a2b656a6f5432f108c98a1f948880bbb207e1cccd086b986f9b15b8f4897e13677436afedf5afb6ed);
+}
+
+#navcontainer ul ul ul a:hover{
+	background: no-repeat left center url(http://xia.cid.1.2daa50cec23d526e721c3fcd525e812c13d55b81);
+}
+
+.blog-archive-month {
+	color: #000000;
+}
+
+.blog-entry-title a {
+	color: #000000;
+}
+
+.blog-entry-title a:hover {
+	color: #b3b3b3;
+}
+
+.album-title {
+	color: #000000;
+}
+
+.photo-navigation {
+	background: #e6e6e6;
+	color: #000000;
+}
+
+.photo-frame{
+	background: #e6e6e6;
+}
+
+.photo-title {
+	color: #000000;
+}
+
+.movie-page-title {
+	color: #000000;
+}

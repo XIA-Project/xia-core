@@ -1,0 +1,32 @@
+#sidebarContainer {
+	float: right;
+}
+
+#container #contentTop {
+	background: url(http://xia.cid.1.86103d240676c7e5cfc88152c594313fc39ab848) no-repeat;
+}
+
+#container {
+	background: url(http://xia.cid.1.437c4c1b3109f62094586d550fe29448619abb6c) repeat-y;
+}
+
+#footer {
+	background: url(http://xia.cid.1.a47d2bb9a3b714540adc53b5f5ed9710faee5402) no-repeat;
+}
+
+#contentContainer {
+	float: left;
+}
+
+#contentContainer #content {
+	padding: 0 13px 20px 30px;
+}
+
+#sidebarContainer #sidebar, #sidebarContainer .sideHeader {
+	padding-right: 40px;
+	padding-left: 20px;
+}
+
+#navcontainer {
+	margin-left: 4px;
+}

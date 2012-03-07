@@ -82,10 +82,6 @@ class ProxyHandler (BaseHTTPServer.BaseHTTPRequestHandler):
 		# strip the DAG out of the requested page field in the header
 		header = re.sub(r"/.*//", "/", header)
 
-		print "DAG!@!!"
-		print netloc
-		print path
-		print header
 		xiaHandler(netloc, path, header, self.connection)
 		return
 	

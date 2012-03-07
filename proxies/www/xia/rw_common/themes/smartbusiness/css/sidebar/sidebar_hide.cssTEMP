@@ -1,0 +1,25 @@
+#container {
+	background: #FFFFFF url(http://xia.cid.1.94cb0918efec9a9b4b3c804acda80ce548ab431f) repeat-y;
+}
+
+#container #contentTop {
+	background: url(http://xia.cid.1.0380a660e568ef9b1fe5134c27c3b2364f53476f) no-repeat;
+}
+
+#sidebarContainer {
+	display: none;
+}
+
+#contentContainer {
+	width: 100%;
+	border: none;
+	margin: 0;
+}
+
+#contentContainer #content {
+	padding: 0 40px 0 35px;
+}
+
+#footer {
+	background: no-repeat url(http://xia.cid.1.243bec6160d70c135bde83866ead4c2a6014a858);
+}

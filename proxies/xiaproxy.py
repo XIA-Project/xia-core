@@ -145,7 +145,6 @@ def sendVideoSIDRequest(netloc, payload, browser_socket):
         print "error opening socket"
         return
     dag = "RE %s %s %s" % (AD1, HID1, SID_VIDEO) # Need a SID?
-    print "Connecting to ",dag	
   
     status = Xconnect(sock, dag)
     if (status != 0):
@@ -402,9 +401,6 @@ def get_content_from_cid_list(cid_list):
 def xiaHandler(host, path, http_header, browser_socket):
     # Configure XSocket so we can talk to click
     set_conf("xsockconf_python.ini", "xiaproxy.py")
-    print host
-    print path
-    print http_header
     
 
     if http_header.find('GET /favicon.ico') != -1:

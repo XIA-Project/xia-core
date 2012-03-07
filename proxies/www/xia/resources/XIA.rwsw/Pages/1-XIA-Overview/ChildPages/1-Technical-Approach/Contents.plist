@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>SandwichFillings</key>
+	<array>
+		<dict>
+			<key>Dictionary</key>
+			<dict>
+				<key>BrowserTitle</key>
+				<string>XIA Technical Approach</string>
+				<key>ID</key>
+				<string>page6</string>
+				<key>MostRecentlySelectedStyleName</key>
+				<string>Theme Default</string>
+				<key>PageTitle</key>
+				<string>Technical Approach</string>
+				<key>PluginClassName</key>
+				<string>RWStyledPlugin</string>
+				<key>PluginMetadata</key>
+				<dict>
+					<key>Author</key>
+					<string>Realmac Software</string>
+					<key>Name</key>
+					<string>Styled Text</string>
+				</dict>
+				<key>PublishingManifest</key>
+				<dict>
+					<key>CreationDate</key>
+					<date>2012-02-19T05:01:22Z</date>
+					<key>DigestAlgorithm</key>
+					<string>MD5</string>
+					<key>DocumentGUID</key>
+					<string>126727B7-F448-4242-8994-9DFD61F8DFB7</string>
+					<key>PageDigests</key>
+					<dict>
+						<key>files/image002.jpg</key>
+						<dict>
+							<key>Digest</key>
+							<data>
+							+7bybthmCqZVfTlNsoHa
+							eA==
+							</data>
+							<key>Size</key>
+							<integer>16666</integer>
+						</dict>
+						<key>files/image004.jpg</key>
+						<dict>
+							<key>Digest</key>
+							<data>
+							jcC/9Y9BP8ASmRZEBcsa
+							lg==
+							</data>
+							<key>Size</key>
+							<integer>10557</integer>
+						</dict>
+						<key>files/image006.jpg</key>
+						<dict>
+							<key>Digest</key>
+							<data>
+							Nu4GQeX/6GN95cxFjc2O
+							iw==
+							</data>
+							<key>Size</key>
+							<integer>16125</integer>
+						</dict>
+						<key>technical-approach.html</key>
+						<dict>
+							<key>Digest</key>
+							<data>
+							euZWWxj5wQlS9Yr3tQtv
+							uA==
+							</data>
+							<key>Size</key>
+							<integer>26303</integer>
+						</dict>
+					</dict>
+					<key>PageID</key>
+					<string>page6</string>
+					<key>SiteRoot</key>
+					<string>technical</string>
+					<key>Version</key>
+					<integer>3</integer>
+				</dict>
+			</dict>
+			<key>Files</key>
+			<array/>
+			<key>Subsandwiches</key>
+			<array>
+				<string>Data</string>
+				<string>PageAttributes</string>
+			</array>
+		</dict>
+	</array>
+	<key>Type</key>
+	<string>Page</string>
+</dict>
+</plist>

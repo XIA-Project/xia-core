@@ -1,0 +1,92 @@
+body {
+	background: #3d5bac;
+}
+
+a:link, a:visited {
+	color: #2c2991;
+	text-decoration: underline;
+}
+
+a:hover, a:active {
+	color: #7c9cbc;
+	text-decoration: none;
+}
+
+#pageHeader h2 {
+	color: #25386a;
+}
+
+#sidebarContainer .sideHeader {
+	color: #325484;
+}
+
+#navcontainer #current {
+	background: no-repeat url(http://xia.cid.2.23c8dd58c50d2900166dce78ad50164cff38055a39f911fe7b6e8992bf0c8285c7de339bb49423de);
+}
+
+#navcontainer .currentAncestor {
+	background: no-repeat url(http://xia.cid.2.23c8dd58c50d2900166dce78ad50164cff38055a39f911fe7b6e8992bf0c8285c7de339bb49423de);
+}
+
+#navcontainer a {
+	background: no-repeat url(http://xia.cid.3.f378e9b528b8845dee3956c896f4ef168f396bcf709e1c9b7b9bea7664403f52089be1735f20e40aa45c99e8b230e1b28fc63a7162ddbf6c12056d8f);
+}
+
+#navcontainer a:hover {
+	background: no-repeat url(http://xia.cid.2.23c8dd58c50d2900166dce78ad50164cff38055a39f911fe7b6e8992bf0c8285c7de339bb49423de);
+}
+
+#navcontainer ul ul a {
+	background: url(http://xia.cid.1.2daa50cec23d526e721c3fcd525e812c13d55b81) no-repeat left center;
+}
+
+#navcontainer ul ul a:hover{
+	background: no-repeat left center url(http://xia.cid.3.9f6afc0f14d63f40130b85d207670c07c428086a2b656a6f5432f108c98a1f948880bbb207e1cccd086b986f9b15b8f4897e13677436afedf5afb6ed);
+	color: #3e5dae;
+}
+
+#navcontainer ul ul #current{
+	background: url(http://xia.cid.3.9f6afc0f14d63f40130b85d207670c07c428086a2b656a6f5432f108c98a1f948880bbb207e1cccd086b986f9b15b8f4897e13677436afedf5afb6ed) left center no-repeat;
+	color: #3e5dae;
+}
+
+#navcontainer ul ul .currentAncestor {
+	background: url(http://xia.cid.3.9f6afc0f14d63f40130b85d207670c07c428086a2b656a6f5432f108c98a1f948880bbb207e1cccd086b986f9b15b8f4897e13677436afedf5afb6ed) left center no-repeat;
+	color: #3e5dae;
+}
+
+#navcontainer ul ul ul a{
+	background: url(http://xia.cid.1.2daa50cec23d526e721c3fcd525e812c13d55b81) no-repeat left center;
+}
+
+#navcontainer ul ul ul a:hover{
+	background: no-repeat left center url(http://xia.cid.3.9f6afc0f14d63f40130b85d207670c07c428086a2b656a6f5432f108c98a1f948880bbb207e1cccd086b986f9b15b8f4897e13677436afedf5afb6ed);
+}
+.blog-archive-month {
+	color: #3357ac;
+}
+
+.blog-entry-title a {
+	color: #3357ac;
+}
+
+.blog-entry-title a:hover {
+	color: #7c9cbc;
+}
+
+.blog-entry-category {
+	color: #2c258f;
+}
+
+.album-title {
+	color: #3357ac;
+}
+
+.photo-navigation {
+	color: #3c59aa;
+	background: #e7ecfb;
+}
+
+.photo-frame{
+	background: #e7ecfb;
+}
