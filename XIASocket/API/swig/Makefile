@@ -8,3 +8,4 @@ xsocket_wrap.c: xsocket.i
 	swig -python xsocket.i 
 clean: 
 	rm -f *.so *.o *.pyc
+	rm xsocket_wrap.c
