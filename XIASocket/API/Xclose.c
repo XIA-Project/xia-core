@@ -14,74 +14,50 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
+/*!
+** @file Xclose.c
+** @brief implements Xclose
+*/
 
 #include "Xsocket.h"
 #include "Xinit.h"
+#include "Xutil.h"
+#include <errno.h>
 
+/*!
+** @brief Close an Xsocket.
+**
+** Causes click to tear down the underlying XIA socket and also closes the
+** UDP socket used to talk to click.
+**
+** @param sockfd	The control socket
+**
+** @returns 0 on success
+** @returns -1 on error with errno set
+*/
 int Xclose(int sockfd)
 {
-   	struct addrinfo hints, *servinfo, *p;
-	int rv;
-	int numbytes;
+	xia::XSocketCallType type;
+	int rc;
 
-	char buf[MAXBUFLEN];
-	struct sockaddr_in their_addr;
-	socklen_t addr_len;
-	
-	//Send a control packet to inform Click of socket closing
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_DGRAM;
-
-	if ((rv = getaddrinfo(CLICKCONTROLADDRESS, CLICKCONTROLPORT, &hints, &servinfo)) != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+	if (getSocketType(sockfd) == XSOCK_INVALID)
+	{
+		LOG("The socket is not a valid Xsocket");
+		errno = EBADF;
 		return -1;
 	}
 
-	p=servinfo;
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XCLOSE);
 
+	if ((rc = click_control(sockfd, &xsm)) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
 
-	// protobuf message
-	xia::XSocketMsg xia_socket_msg;
-
-	xia_socket_msg.set_type(xia::XCLOSE);
-
-	xia::X_Close_Msg *x_close_msg = xia_socket_msg.mutable_x_close();
-
-	const char *message="close socket"; // well... not necessary though.. 
-	x_close_msg->set_payload(message);  /* null terminated string */
-
-	std::string p_buf;
-	xia_socket_msg.SerializeToString(&p_buf);
-
-	numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0, p->ai_addr, p->ai_addrlen);
-	freeaddrinfo(servinfo);
-
-	if (numbytes == -1) {
-		perror("Xclose(): sendto failed");
-		return(-1);
+	} else if ((rc = click_reply2(sockfd, &type)) < 0) {
+		LOGF("Error getting status from Click: %s", strerror(errno));
 	}
 
-/*
-        //Process the reply
-        addr_len = sizeof their_addr;
-        if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
-                                        (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-                        perror("Xclose(): recvfrom");
-                        return -1;
-        }
-
-	//protobuf message parsing
-	xia_socket_msg.ParseFromString(buf);
-	if (xia_socket_msg.type() == xia::XSOCKET_CLOSE) {
- 		return close(sockfd);;
-	}
-
-        return -1;
- */
- 
-
- 	close(sockfd);
-	return numbytes;
+	close(sockfd);
+	freeSocketState(sockfd);
+	return rc;
 }
-

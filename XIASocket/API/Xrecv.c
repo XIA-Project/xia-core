@@ -13,78 +13,99 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
-
-/*
-* recv like datagram receiving function for XIA
-* IMPORTANT: works for datagrams only
+/*!
+** @file Xrecv.c
+** @brief implements Xrecv
 */
 
+#include <errno.h>
 #include "Xsocket.h"
 #include "Xinit.h"
+#include "Xutil.h"
 
-int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
+/*!
+** @brief receives data on an Xsocket. Xconnect must be called before
+** using this function.
+**
+** @param sockfd - The socket to receive with
+** @param rbuf - where to put the received data
+** @param len - maximum amount of data to receive. the amount of data
+** returned may be less than len bytes.
+** @param flags - (This is not currently used but is kept to be compatible
+** with the standard sendto socket call.
+**
+** NOTE: in cases where more data is received than specified by the caller,
+** the excess data will be stored in the socket state structure and will 
+** be returned from there rather than from Click. Once the socket state
+** is drained, requests will be sent through to Click again.
+**
+** @returns number of bytes received
+** @returns -1 on failure with errno set.
+*/
+int Xrecv(int sockfd, void *rbuf, size_t len, int  /*flags */)
 {
 	struct addrinfo hints;
 	int numbytes;
 	socklen_t addr_len;
 	char UDPbuf[MAXBUFLEN];
+	
 	struct sockaddr_in their_addr;
 
+	if (len == 0)
+		return 0;
+
+	if (!rbuf) {
+		LOG("buffer pointer is null!\n");
+		errno = EFAULT;
+		return -1;
+	}
+
+	if (validateSocket(sockfd, XSOCK_STREAM, EOPNOTSUPP) < 0) {
+		LOGF("Socket %d must be a stream socket", sockfd);
+		return -1;
+	}
+
+	if (!isConnected(sockfd)) {
+		LOGF("Socket %d is not connected", sockfd);
+		errno = ENOTCONN;
+		return -1;
+	}
+
+	// see if we have bytes leftover from a previous Xrecv call
+	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len)) > 0)
+		return numbytes;
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_DGRAM;
 
-	//printf("(%s) recv \n", _conf.api_addr);
-
 	addr_len = sizeof their_addr;
-	if ((numbytes = recvfrom(sockfd, UDPbuf, MAXBUFLEN-1 , flags,
+	if ((numbytes = recvfrom(sockfd, UDPbuf, MAXBUFLEN-1 , 0,
 					(struct sockaddr *)&their_addr, &addr_len)) == -1) {
-		perror("Xrecv1: recvfrom");
+		LOGF("Error retreiving data from Click: %s", strerror(errno));
 		return -1;
 	}
-	int src_port=ntohs(their_addr.sin_port);
 	
-	//Check if it's a control message
-	while(src_port==atoi(CLICKCONTROLPORT))
-	{
-		//Do what is necessary, maybe close socket
-		if(strcmp((char *)rbuf,"close")==0)
-		{
-			Xclose(sockfd);
-			return -1;
-		}
-		else
-		{ 
-			if ((numbytes = recvfrom(sockfd, UDPbuf, MAXBUFLEN-1 , flags,
-					(struct sockaddr *)&their_addr, &addr_len)) == -1) 
-			{
-				perror("Xrecv2: recvfrom");
-				return -1;
-		   	}
-		   	
+	// FIXME: make this use protobufs
+	size_t paylen = 0, i = 0;
+	char *tmpbuf = (char*)UDPbuf;
 
-		}
-	}
-	
-	/*short int paylen=0;
-	memcpy (&paylen, UDPbuf+2,2);
-	paylen=ntohs(paylen);
-	int offset=numbytes-paylen;
-	strncpy(buf, UDPbuf+offset, paylen);
-	
-	return paylen;*/
-	
-	short int paylen=0,i=0;
-	char* tmpbuf=(char*)UDPbuf;
-	while(tmpbuf[i]!='^')
+	while (tmpbuf[i] != '^')
 		i++;
-	paylen=numbytes-i-1;
-	//memcpy (&paylen, UDPbuf+2,2);
-	//paylen=ntohs(paylen);
-	int offset=i+1;
-	memcpy(rbuf, UDPbuf+offset, paylen);
-	//strncpy(sDAG, UDPbuf, i);
-	
+	paylen = numbytes - i - 1;
+	int offset= i + 1;
+
+	if (paylen <= len)
+		memcpy(rbuf, UDPbuf + offset, paylen);
+	else {
+		// we got back more data than the caller requested
+		// stash the extra away for subsequent Xrecv calls
+		memcpy(rbuf, UDPbuf + offset, len);
+		paylen -= len;
+		offset += len;
+		setSocketData(sockfd, UDPbuf + offset, paylen);
+		paylen = len;
+	}
+
 	return paylen;
 }

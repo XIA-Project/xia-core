@@ -13,87 +13,88 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
-
-/*
-* ReadCID
+/*!
+** @file XreadCID.c
+** @brief implements XreadCID
 */
 
+#include<errno.h>
 #include "Xsocket.h"
 #include "Xinit.h"
+#include "Xutil.h"
 
-// Called after XgetCID(), it reads the content of the requested CID (specified as cDAG) into buf
-// Return value: number of bytes, -1: failed 
-
-int XreadCID(int sockfd, void *rbuf, size_t len, int flags, char * cDAG, size_t dlen)
+/*!
+** @brief Reads the contents of the specified CID into rbuf. Must be called
+** after XgetCID() or XgetCIDList().
+**
+** @param sockfd - the control socket (must be of type XSOCK_CHUNK)
+** @param rbuf - buffer to receive the data
+** @param len - length of rbuf
+** @param flags - currently unused
+** @param cDAG - the CID to retrieve
+** @param dlen - length of cDAG (currently unused)
+**
+** @returns number of bytes in the CID
+** @returns -1 on error with errno set
+*/
+int XreadCID(int sockfd, void *rbuf, size_t len, int /* flags */, 
+		char * cDAG, size_t /* dlen */)
 {
-	char buffer[2048];
-	struct sockaddr_in their_addr;
-	socklen_t addr_len;
-	char statusbuf[2048];
+	int rc;
 	char UDPbuf[MAXBUFLEN];
-	
-	struct addrinfo hints, *servinfo,*p;
-	int rv;
-	int numbytes;
-	int numCIDs = 1;
 
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_DGRAM;
-
-
-	if ((rv = getaddrinfo(CLICKDATAADDRESS, CLICKDATAPORT, &hints, &servinfo)) != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+	if (validateSocket(sockfd, XSOCK_CHUNK, EAFNOSUPPORT) < 0) {
+		LOGF("Socket %d must be a chunk socket\n", sockfd);
 		return -1;
 	}
 
-	p=servinfo;
+	if (len == 0)
+		return 0;
 
-	// protobuf message
-	xia::XSocketMsg xia_socket_msg;
+	if (!rbuf || !cDAG) {
+		LOG("null pointer error!");
+		errno = EFAULT;
+		return -1;
+	}
 
-	xia_socket_msg.set_type(xia::XREADCID);
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XREADCID);
 
-	xia::X_Readcid_Msg *x_readcid_msg = xia_socket_msg.mutable_x_readcid();
+	xia::X_Readcid_Msg *x_readcid_msg = xsm.mutable_x_readcid();
   
-  	x_readcid_msg->set_numcids(numCIDs);
+  	x_readcid_msg->set_numcids(1);
 	x_readcid_msg->set_cdaglist(cDAG);
 
 	std::string p_buf;
-	xia_socket_msg.SerializeToString(&p_buf);
+	xsm.SerializeToString(&p_buf);
 
-	numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0, p->ai_addr, p->ai_addrlen);
-	freeaddrinfo(servinfo);
-
-	if (numbytes == -1) {
-		perror("XreadCID(): XreadCID failed");
-		return(-1);
-	}
-
-
-
-     	 
-       //Process the reply
-	addr_len = sizeof their_addr;
-	if ((numbytes = recvfrom(sockfd, UDPbuf, MAXBUFLEN-1 , 0,
-					(struct sockaddr *)&their_addr, &addr_len)) == -1) {
-		perror("XreadCID(): recvfrom");
+	if ((rc = click_data(sockfd, &xsm)) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
-	
-      	short int paylen=0,i=0;
-	char* tmpbuf=(char*)UDPbuf;
-	while(tmpbuf[i]!='^')
+
+	if ((rc = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) < 0) {
+		LOGF("Error retrieving status from Click: %s", strerror(errno));
+		return -1;
+	}
+
+	// FIXME: change protobuf so we don't need the ^ hack
+
+	size_t paylen = 0, i = 0;
+	char *tmpbuf = (char*)UDPbuf;
+	while (tmpbuf[i] != '^')
 		i++;
-	paylen=numbytes-i-1;
-	//memcpy (&paylen, UDPbuf+2,2);
-	//paylen=ntohs(paylen);
-	int offset=i+1;
-	memcpy(rbuf, UDPbuf+offset, paylen);
-	//strncpy(sDAG, UDPbuf, i);
-	
+	paylen = rc - i - 1;
+	int offset = i + 1;
+
+	if (paylen > len) {
+		LOGF("CID is %d bytes, but rbuf is only %d bytes", paylen, len);
+		errno = EFAULT;
+		return -1;
+	}
+
+	memcpy(rbuf, UDPbuf + offset, paylen);
 	return paylen;
-    
 }
 
 

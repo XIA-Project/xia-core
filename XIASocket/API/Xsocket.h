@@ -32,16 +32,29 @@
 extern "C" {
 #endif
 
-#define ATTEMPTS 100 //Number of attempts at opening a socket 
-#define MAXBUFLEN 65521 // Note that this limits the size of chunk we can receive TODO: What should this be?
+#define MAXBUFLEN 65000 // Note that this limits the size of chunk we can receive TODO: What should this be?
+#define XIA_MAXBUF MAXBUFLEN
 
-#define XSOCK_STREAM 0 // Reliable transport (SID)
-#define XSOCK_DGRAM 1 // Unreliable transport (SID)
-#define XSOCK_CHUNK 2 // Content Chunk transport (CID)
+#define XSOCK_INVALID -1 // invalid socket type	
+#define XSOCK_STREAM 1	// Reliable transport (SID)
+#define XSOCK_DGRAM 2	// Unreliable transport (SID)
+#define XSOCK_RAW	3	// Raw XIA socket
+#define XSOCK_CHUNK 4	// Content Chunk transport (CID)
 
 #define WAITING_FOR_CHUNK 0
 #define READY_TO_READ 1
 #define REQUEST_FAILED -1
+
+// Xsetsockopt options
+#define XOPT_HLIM		1	// Hop Limit / TTL
+#define XOPT_NEXT_PROTO	2	// change the next proto field of the XIA header
+
+// XIA protocol types
+#define XPROTO_XIA_TRANSPORT	0x0e
+#define XPROTO_XCMP		0x3d
+
+// error codes
+#define ECLICKCONTROL 9999	// error code for general click communication errors
 
 struct Netinfo{
     unsigned short port;
@@ -86,6 +99,9 @@ extern int Xgetsocketinfo(int sockfd1, int sockfd2, struct Netinfo *info);
 extern void error(const char *msg);
 extern void set_conf(const char *filename, const char *sectioname);
 extern void print_conf();
+
+extern int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen);
+extern int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen);
 #ifdef __cplusplus
 }
 #endif

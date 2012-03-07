@@ -13,82 +13,69 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
-
-/*
-* GetCID request
+/*!
+** @file XgetCID.c
+** @brief implements XgetCID
 */
 
+#include<errno.h>
 #include "Xsocket.h"
 #include "Xinit.h"
+#include "Xutil.h"
 
-int XgetCID(int sockfd, char* cDAG, size_t dlen)
+/*!
+** @brief Bring a content chunk local to this machine.
+**
+** @param sockfd - the control socket (must be of type XSOCK_CHUNK)
+** @param cDAG - Content ID of this chunk
+** @param dlen - length of sDAG (currently not used)
+**
+** @returns 0 on success
+** @returns -1 on error with errno set
+*/
+int XgetCID(int sockfd, char* cDAG, size_t /* dlen */)
 {
-        
-	//char buffer[MAXBUFLEN];
-	//struct sockaddr_in their_addr;
-	//socklen_t addr_len;
-
-	struct addrinfo hints, *servinfo,*p;
-	int rv;
-	int numbytes;
+	int rc;
 	const char *buf="CID request";//Maybe send more useful information here.
-	int numCIDs = 1;
 
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_DGRAM;
-
-
-	if ((rv = getaddrinfo(CLICKDATAADDRESS, CLICKDATAPORT, &hints, &servinfo)) != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+	if (validateSocket(sockfd, XSOCK_CHUNK, EAFNOSUPPORT) < 0) {
+		LOGF("Socket %d must be a chunk socket", sockfd);
 		return -1;
 	}
 
-	p=servinfo;
+	if (!cDAG) {
+		LOG("cDAG is null!");
+		errno = EFAULT;
+		return -1;
+	}
 
 	// protobuf message
-	xia::XSocketMsg xia_socket_msg;
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XGETCID);
 
-	xia_socket_msg.set_type(xia::XGETCID);
-
-	xia::X_Getcid_Msg *x_getcid_msg = xia_socket_msg.mutable_x_getcid();
+	xia::X_Getcid_Msg *x_getcid_msg = xsm.mutable_x_getcid();
   
-  	x_getcid_msg->set_numcids(numCIDs);
+  	x_getcid_msg->set_numcids(1);
 	x_getcid_msg->set_cdaglist(cDAG);
 	x_getcid_msg->set_payload((const char*)buf, strlen(buf)+1);
 
 	std::string p_buf;
-	xia_socket_msg.SerializeToString(&p_buf);
+	xsm.SerializeToString(&p_buf);
 
-	numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0, p->ai_addr, p->ai_addrlen);
-	freeaddrinfo(servinfo);
-
-	if (numbytes == -1) {
-		perror("Xgetcid(): getcid failed");
-		return(-1);
+	if ((rc = click_data(sockfd, &xsm)) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
+		return -1;
 	}
 
-     /*	 
-       //Process the reply
-        addr_len = sizeof their_addr;
-        if ((numbytes = recvfrom(sockfd, buffer, MAXBUFLEN-1 , 0,
-                                        (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-                        perror("Xgetcid(): recvfrom");
-                        return -1;
-        }
-
-	//protobuf message parsing
-	xia_socket_msg.ParseFromString(buffer);
-
-	if (xia_socket_msg.type() == xia::XSOCKET_SENDTO) {
-
- 		return numbytes;
+#if 0	
+	// process the reply from click
+	if ((rc = click_reply2(sockfd, &type)) < 0) {
+		LOGF("Error getting status from Click: %s", strerror(errno));
+		return -1;
 	}
-        return -1; 
-      */
+#endif
 
-	return numbytes;    
-    
+	return 0;
 }
 
 

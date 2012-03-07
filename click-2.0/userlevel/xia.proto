@@ -1,5 +1,8 @@
 package xia;
 
+// FIXME: consider starting enums at 1 instead of 0
+// anything with a 0 value doesn't show in the protobug debug string which
+// makes debugging difficult
 
 enum XSocketCallType {
   XSOCKET = 0;
@@ -21,8 +24,10 @@ enum XSocketCallType {
 
   XGETCIDSTATUS = 14;
   XREADCID = 15;
+  XSETSOCKOPT = 16;
+  XGETSOCKOPT = 17;
+  XRESULT = 18;
 }
-
 
 message XSocketMsg {
   required XSocketCallType type = 1; // XIA Socket call type
@@ -47,6 +52,10 @@ message XSocketMsg {
   optional X_Getcidstatus_Msg x_getcidstatus= 16;
   optional X_Readcid_Msg x_readcid= 17;
 
+  optional X_Setsockopt_Msg x_setsockopt = 18;
+  optional X_Getsockopt_Msg x_getsockopt = 19;
+
+  optional X_Result_Msg x_result = 20;
 }
  
 message X_Socket_Msg {
@@ -130,6 +139,23 @@ message X_Getsocketinfo_Msg {
   optional bytes protocol = 7;	
 }
 
+message X_Setsockopt_Msg {
+	required int32 opt_type = 1;
+	optional int32 int_opt = 2;
+	// we will likely have to add other optional fields as we add options in the future
+}
+
+message X_Getsockopt_Msg {
+	required int32 opt_type = 1;
+	optional int32 int_opt = 2;
+	// we will likely have to add other optional fields as we add options in the future
+}
+
+message X_Result_Msg {
+	required XSocketCallType type = 1; // XIA Socket call type
+	required int32 return_code = 2;	// same as a normal socket return code
+	optional int32 err_code = 3;	// if ret_code is -1, contains related errno value
+}
 
 message X_Requestfailed_Msg {
   optional int32 type = 1; // Indicating the type of error (to be defined)
