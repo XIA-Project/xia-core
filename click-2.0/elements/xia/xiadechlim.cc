@@ -38,17 +38,18 @@ XIADecHLIM::simple_action(Packet *p)
 	const click_xia *hdr = p->xia_header();
 
 	if (hdr->hlim <= 1) {
-		++_drops;
-		checked_output_push(1, p);
-		return NULL;
-	} else {
-		WritablePacket *q = p->uniqueify();
-		if (!q)
-			return NULL;
-		click_xia *hdr = q->xia_header();
-		--hdr->hlim;
-		return q;
-	}
+    	++_drops;
+    	checked_output_push(1, p);
+    	return 0;
+    } else {
+	WritablePacket *q = p->uniqueify();
+	if (!q)
+	    return 0;
+	click_xia *hdr = q->xia_header();
+	--hdr->hlim;
+
+	return q;
+    }
 }
 
 void

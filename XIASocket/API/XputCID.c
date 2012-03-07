@@ -13,88 +13,70 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
-
-/*
-* sendto like datagram sending function for XIA
+/*!
+** @file XputCID.c
+** @brief implements XputCID
 */
 
+#include <errno.h>
 #include "Xsocket.h"
 #include "Xinit.h"
+#include "Xutil.h"
 
+/*!
+** @brief Make a content chunk available to clients.
+**
+** @param sockfd - the control socket (must be of type XSOCK_CHUNK)
+** @param buf - the content chunk
+** @param len - length of the content
+** @param flags - not ucrrently used
+** @param cDAG - Content ID of this chunk
+** @param dlen - length of cDAG (currently not used)
+**
+** @returns 0 on success
+** @returns -1 on error with errno set
+*/
 int XputCID(int sockfd, const void *buf, size_t len, int /*flags*/,
-		char* sDAG, size_t /*dlen*/)
+		char* cDAG, size_t /*dlen*/)
 {
-
-
-	/* === New version
-	 * Now, the DAG and data are contained in the google protobuffer message (encapsulated within UDP),
-	 * then passed to the Click UDP.
-	 */
-
-	struct addrinfo hints, *servinfo,*p;
-	int rv;
-	int numbytes;
+	int rc;
 	
-	//char buffer[MAXBUFLEN];
-	//struct sockaddr_in their_addr;
-	//socklen_t addr_len;
-
-
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_DGRAM;
-
-
-	if ((rv = getaddrinfo(CLICKDATAADDRESS, CLICKDATAPORT, &hints, &servinfo)) != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+	if (validateSocket(sockfd, XSOCK_CHUNK, EAFNOSUPPORT) < 0) {
+		LOGF("Socket %d must be a chunk socket", sockfd);
 		return -1;
 	}
 
-	p=servinfo;
+	if (len == 0)
+		return 0;
 
-	// protobuf message
-	xia::XSocketMsg xia_socket_msg;
+	if (!buf || !cDAG) {
+		LOG("null pointer error!");
+		errno = EFAULT;
+		return -1;
+	}
 
-	xia_socket_msg.set_type(xia::XPUTCID);
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XPUTCID);
 
-	xia::X_Putcid_Msg *x_putcid_msg = xia_socket_msg.mutable_x_putcid();
-	x_putcid_msg->set_sdag(sDAG);
-	//printf("PUTCID len %d\n", len);
+	xia::X_Putcid_Msg *x_putcid_msg = xsm.mutable_x_putcid();
+	x_putcid_msg->set_sdag(cDAG);
 	x_putcid_msg->set_payload((const char*)buf, len);
 
-
 	std::string p_buf;
-	xia_socket_msg.SerializeToString(&p_buf);
+	xsm.SerializeToString(&p_buf);
 
-	numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0, p->ai_addr, p->ai_addrlen);
-	freeaddrinfo(servinfo);
-
-	if (numbytes == -1) {
-		perror("XputCID(): sendto failed");
-		return(-1);
+	if ((rc = click_data(sockfd, &xsm)) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
+		return -1;
 	}
 
-    /*
-        //Process the reply
-        addr_len = sizeof their_addr;
-        if ((numbytes = recvfrom(sockfd, buffer, MAXBUFLEN-1 , 0,
-                                        (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-                        perror("XputCID(): recvfrom");
-                        return -1;
-        }
-
-	//protobuf message parsing
-	xia_socket_msg.ParseFromString(buffer);
-
-	if (xia_socket_msg.type() == xia::XSOCKET_PUTCID) {
-
- 		return numbytes;
+#if 0	
+	// process the reply from click
+	if ((rc = click_reply2(sockfd, &type)) < 0) {
+		LOGF("Error getting status from Click: %s", strerror(errno));
+		return -1;
 	}
+#endif
 
-        return -1; 
-        return -1; 
-      */
-
-	return numbytes;
-
+	return 0;
 }

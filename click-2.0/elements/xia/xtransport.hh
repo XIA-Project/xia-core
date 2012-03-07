@@ -89,6 +89,8 @@ class XTRANSPORT : public Element {
     WritablePacket* copy_packet(Packet *);
     WritablePacket* copy_cid_req_packet(Packet *);
     WritablePacket* copy_cid_response_packet(Packet *);
+
+	void ReturnResult(int sport, xia::XSocketCallType type, int rc = 0, int err = 0);
     
   private:
     Timer _timer;
@@ -153,6 +155,9 @@ class XTRANSPORT : public Element {
     HashTable<unsigned short, int> portAckNo;
     HashTable<unsigned short, bool> portToActive;
     HashTable<XIDpair , bool> XIDpairToConnectPending;
+	HashTable<unsigned short, int> nxt_xport;
+	list<int> xcmp_listeners;
+    HashTable<unsigned short, int> hlim;
     queue<DAGinfo> pending_connection_buf;
     
     struct in_addr _CLICKaddr;

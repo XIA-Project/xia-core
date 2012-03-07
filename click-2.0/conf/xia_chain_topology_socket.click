@@ -1,4 +1,4 @@
-require(library xia_router_template_xudp.click);
+require(library xia_router_template_xtransport.click);
 require(library xia_address.click);
 
 // host & router instantiation
@@ -21,3 +21,9 @@ router0[1] ->  XIAPrint("r0->r1")  -> LinkUnqueue(0.005, 1 GB/s) ->[1]router1;
 router1[1] ->  XIAPrint("r1->r0")  -> LinkUnqueue(0.005, 1 GB/s) ->[1]router0;
 
 ControlSocket(tcp, 7777);
+
+/*ping :: XCMPPingSource(SRC RE AD0 HID0, DST RE AD1 HID1)
+-> RatedUnqueue(5)
+-> AggregateCounter(COUNT_STOP 5)
+-> host0;*/
+

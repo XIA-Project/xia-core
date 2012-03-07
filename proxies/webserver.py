@@ -24,7 +24,7 @@ def put_chunk(chunk):
     m.update(chunk)
     cid = m.hexdigest()
 
-    sock = Xsocket(XSOCK_STREAM)
+    sock = Xsocket(XSOCK_CHUNK)
     if (sock<0):
         print "webserver.py: put_chunk: error opening socket"
         exit(-1)

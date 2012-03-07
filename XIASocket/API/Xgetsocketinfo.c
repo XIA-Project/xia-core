@@ -14,8 +14,10 @@
 ** limitations under the License.
 */
 
+#include <errno.h>
 #include "Xsocket.h"
 #include "Xinit.h"
+#include "Xutil.h"
 #include <string.h>
 
 int Xgetsocketinfo(int sockfd1, int sockfd2, struct Netinfo *info)
@@ -27,6 +29,12 @@ int Xgetsocketinfo(int sockfd1, int sockfd2, struct Netinfo *info)
 	char buf[MAXBUFLEN];
 	struct sockaddr_in their_addr;
 	socklen_t addr_len;
+
+	if (getSocketType(sockfd1) == XSOCK_INVALID || 
+		getSocketType(sockfd2) == XSOCK_INVALID) {
+		errno = EBADF;
+		return -1;
+	}
 	
 	//Send a control packet 
 	memset(&hints, 0, sizeof hints);

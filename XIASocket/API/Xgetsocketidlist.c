@@ -13,71 +13,74 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
+/*!
+** @file Xgetsocketidlist.c
+** @brief implements Xgetsocketidlist
+*/
 
+#include <errno.h>
 #include "Xsocket.h"
 #include "Xinit.h"
+#include "Xutil.h"
 
+/*!
+** @brief Retrieve a list of open Xsockets.
+**
+** @param sockfd The control socket
+** @param socket_list On output, contains a list of Xsocket ids that
+** click knows about
+**
+** @returns the number of sockets added to the list
+** @returns -1 on error with errno set
+**
+** FIXME: this should take a length so we know how big socket_list is
+*/
 int Xgetsocketidlist(int sockfd, int *socket_list)
 {
-   	struct addrinfo hints, *servinfo, *p;
-	int rv;
-	int numbytes;
-
+	int rc;
 	char buf[MAXBUFLEN];
-	struct sockaddr_in their_addr;
-	socklen_t addr_len;
+
+	if (getSocketType(sockfd) == XSOCK_INVALID) {
+		LOGF("%d is not a valid Xsocket", sockfd);
+		errno = EBADF;
+		return -1;
+	}
 	
-	//Send a control packet 
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_DGRAM;
-
-	if ((rv = getaddrinfo(CLICKCONTROLADDRESS, CLICKCONTROLPORT, &hints, &servinfo)) != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+	if (!socket_list) {
+		LOG("socket_list pointer is null!\n");
+		errno = EFAULT;
 		return -1;
 	}
 
-	p=servinfo;
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XGETSOCKETIDLIST);
 
-	// protobuf message
-	xia::XSocketMsg xia_socket_msg;
-
-	xia_socket_msg.set_type(xia::XGETSOCKETIDLIST);
-	std::string p_buf;
-	xia_socket_msg.SerializeToString(&p_buf);
-
-	numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0,
-					p->ai_addr, p->ai_addrlen);
-
-	freeaddrinfo(servinfo);
-	if (numbytes == -1) {
-		perror("Xgetsocketidlist(): sendto failed");
-		return(-1);
-	}
- 
-   
-	//Process the reply
-	addr_len = sizeof their_addr;
-	if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
-			(struct sockaddr *)&their_addr, &addr_len)) == -1) {
-		perror("Xgetsocketidlist(): recvfrom");
+	// send the protobuf containing the user data to click
+	if ((rc = click_control(sockfd, &xsm)) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
 
-	//protobuf message parsing
-	xia_socket_msg.Clear();
-	xia_socket_msg.ParseFromString(buf);
-
-	if (xia_socket_msg.type() == xia::XGETSOCKETIDLIST) {
-		xia::X_Getsocketidlist_Msg *x_getsocketidlist_msg = xia_socket_msg.mutable_x_getsocketidlist();
-		int num_sockets = x_getsocketidlist_msg->size();
-		for(int i = 0; i < num_sockets; i++) {
-			socket_list[i] = x_getsocketidlist_msg->id(i);
-		}
- 		return num_sockets;
+	// process the reply from click
+	if ((rc = click_reply(sockfd, buf, sizeof(buf) - 1)) < 0) {
+		LOGF("Error retreiving data from Click: %s", strerror(errno));
+		return -1;
 	}
 
-	return -1; 
+	xsm.Clear();
+	xsm.ParseFromString(buf);
 
+	if (xsm.type() != xia::XGETSOCKETIDLIST) {
+		LOGF("Expected type %d, got %d", xia::XGETSOCKETIDLIST, xsm.type());
+		return -1; 
+	}
+
+	xia::X_Getsocketidlist_Msg *x_getsocketidlist_msg = xsm.mutable_x_getsocketidlist();
+	int num_sockets = x_getsocketidlist_msg->size();
+
+	for(int i = 0; i < num_sockets; i++) {
+		socket_list[i] = x_getsocketidlist_msg->id(i);
+	}
+
+	return num_sockets;
 }
-

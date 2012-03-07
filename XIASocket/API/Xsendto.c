@@ -1,3 +1,4 @@
+/* ts=4 */
 /*
 ** Copyright 2011 Carnegie Mellon University
 **
@@ -13,85 +14,75 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
-
-/*
-* sendto like datagram sending function for XIA
+/*!
+** @file Xsendto.c
+** @brief implements Xsendto
 */
-
 #include "Xsocket.h"
 #include "Xinit.h"
+#include "Xutil.h"
+#include <errno.h>
 
-/* dDAG is a NULL terminated string */
+/*!
+** @brief Sends a datagram to the specified DAG.
+**
+** @param sockfd - The socket to send the data on
+** @param buf - the data to send
+** @param len - lenngth of the data to send @NOTE: the
+** Xsendto api is limited to sending at most XIA_MAXBUF bytes.
+** @param flags - (This is not currently used but is kept to be compatible
+** with the standard sendto socket call.
+** @param dDAG address to send the datagram to
+** @param dlen length of the DAG, currently unused
+**
+** @returns number of bytes sent on success
+** @returns -1 on failure with errno set.
+**
+*/
+
 int Xsendto(int sockfd,const void *buf, size_t len, int /*flags*/,
 		char* dDAG, size_t /*dlen*/)
 {
+	int rc;
 
+	if (len == 0)
+		return 0;
 
-	/* === New version
-	 * Now, dDAG and buf are contained in the google protobuffer message (encapsulated within UDP),
-	 * then passed to the Click UDP.
-	 */
-
-	//char buffer[MAXBUFLEN];
-	//struct sockaddr_in their_addr;
-	//socklen_t addr_len;
-
-	struct addrinfo hints, *servinfo,*p;
-	int rv;
-	int numbytes;
-	
-
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_DGRAM;
-
-
-	if ((rv = getaddrinfo(CLICKDATAADDRESS, CLICKDATAPORT, &hints, &servinfo)) != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+	if (!buf || !dDAG) {
+		LOG("null pointer!\n");
+		errno = EFAULT;
 		return -1;
 	}
 
-	p=servinfo;
+	if (validateSocket(sockfd, XSOCK_DGRAM, EOPNOTSUPP) < 0) {
+		LOGF("Socket %d must be a datagram socket", sockfd);
+		return -1;
+	}
 
-	// protobuf message
-	xia::XSocketMsg xia_socket_msg;
+	// if buf is too big, send only what we can
+	if (len > XIA_MAXBUF) {
+		LOGF("truncating... requested size (%d) is larger than XIA_MAXBUF (%d)\n", 
+				len, XIA_MAXBUF);
+		len = XIA_MAXBUF;
+	}
 
-	xia_socket_msg.set_type(xia::XSENDTO);
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XSENDTO);
 
-	xia::X_Sendto_Msg *x_sendto_msg = xia_socket_msg.mutable_x_sendto();
+	xia::X_Sendto_Msg *x_sendto_msg = xsm.mutable_x_sendto();
 	x_sendto_msg->set_ddag(dDAG);
 	x_sendto_msg->set_payload((const char*)buf, len);
 
-	std::string p_buf;
-	xia_socket_msg.SerializeToString(&p_buf);
-
-	numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0, p->ai_addr, p->ai_addrlen);
-	freeaddrinfo(servinfo);
-
-	if (numbytes == -1) {
-		perror("Xsendto(): sendto failed");
-		return(-1);
+	if ((rc = click_data(sockfd, &xsm)) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
+		return -1;
 	}
 
-     /*	 
-       //Process the reply
-        addr_len = sizeof their_addr;
-        if ((numbytes = recvfrom(sockfd, buffer, MAXBUFLEN-1 , 0,
-                                        (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-                        perror("Xsendto(): recvfrom");
-                        return -1;
-        }
+	// because we don't have queueing or seperate control and data sockets, we 
+	// can't get status back reliably on a datagram socket as multiple peers
+	// could be talking to it at the same time and the control messages can get
+	// mixed up with the data packets. So just assume that all went well and tell
+	// the caller we sent the data
 
-	//protobuf message parsing
-	xia_socket_msg.ParseFromString(buffer);
-
-	if (xia_socket_msg.type() == xia::XSOCKET_SENDTO) {
-
- 		return numbytes;
-	}
-        return -1; 
-      */
-
-	return numbytes;
-
+	return len;
 }

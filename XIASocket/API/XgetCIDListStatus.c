@@ -13,152 +13,158 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
-
-/*
-* GetCIDLISTStatus
+/*!
+** @file XgetCIDListStatus.c
+** @brief implements XgetCIDListStatus
 */
 
+#include <errno.h>
 #include "Xsocket.h"
 #include "Xinit.h"
+#include "Xutil.h"
 
-// Called after XgetCID(), it checks whether each of the requested CIDs is waiting to be read or still on the way
-// int status in cDAGvec struct will be set by this call
-// Return value: 1: (all) waiting to be read, 0: (any) waiting for chunk response, -1: failed 
-
+/*!
+** @brief Checks the status of the specified CID. Should be called after
+** calling XgetCID or XgetCIDList.
+** It checks whether each of the requested CIDs is waiting to be read or still
+** on the way.
+**
+** @param sockfd - the control socket (must be of type XSOCK_CHUNK)
+** @param cDAGv - CIDs to check. On return contains the status for each of the
+** specified CIDs.
+** @param numCIDs - number of CIDs in cDAGv
+**
+** @returns 1 if all CIDs in cDAGv are ready to be read
+** @returns 0 if all CIDs in cDAGv are valid but one or more are in 
+** waiting state
+** @returns -1 on socket error with or if an invalid CID was specified
+*/
 int XgetCIDListStatus(int sockfd, struct cDAGvec *cDAGv, int numCIDs)
 {
-        
-	char buffer[2048];
-	struct sockaddr_in their_addr;
-	socklen_t addr_len;
-	char statusbuf[2048];
+	int rc;
+	char buffer[MAXBUFLEN];
+	char *statusbuf, *cdagList;
 	
-	struct addrinfo hints, *servinfo,*p;
-	int rv;
-	int numbytes;
 	const char *buf="CID list request status query";//Maybe send more useful information here.
 	size_t cdagListsize = 0;
-	int status = WAITING_FOR_CHUNK;
+
+	if (validateSocket(sockfd, XSOCK_CHUNK, EAFNOSUPPORT) < 0) {
+		LOGF("Socket %d must be a chunk socket\n", sockfd);
+		return -1;
+	}
 	
-	for (int i=0; i< numCIDs; i++) {
+	if (numCIDs == 0)
+		return 0;
+
+	if (!cDAGv) {
+		LOG("cDAGv is null!");
+		errno = EFAULT;
+		return -1;
+	}
+
+	for (int i = 0; i < numCIDs; i++) {
 		cdagListsize += (cDAGv[i].dlen + 1);
 	}
-	char * cdagList = (char *) malloc (cdagListsize + 1);
-    	memset (cdagList, 0, cdagListsize);
+
+	// FIXME: make this code use lists in the protobuf
+
+	if ((cdagList = (char *)calloc(cdagListsize + 1, 1)) == NULL)
+		return -1;
+	if ((statusbuf = (char *)calloc(numCIDs, 12)) == NULL) {
+		free(cdagList);
+		return -1;
+	}
     	
-    	strcpy(statusbuf, "WAITING");
-    	
-    	strcpy(cdagList, cDAGv[0].cDAG);
-    	for (int i=1; i< numCIDs; i++) {
-    		strcat(cdagList, "^");
+   	strcpy(statusbuf, "WAITING");
+   	strcpy(cdagList, cDAGv[0].cDAG);
+
+   	for (int i = 1; i < numCIDs; i++) {
+   		strcat(cdagList, "^");
 		strcat(cdagList, cDAGv[i].cDAG);
 		
 		strcat(statusbuf, "^");
 		strcat(statusbuf, "WAITING");
 	}
 
-
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_DGRAM;
-
-
-	if ((rv = getaddrinfo(CLICKDATAADDRESS, CLICKDATAPORT, &hints, &servinfo)) != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-		return -1;
-	}
-
-	p=servinfo;
-
 	// protobuf message
-	xia::XSocketMsg xia_socket_msg;
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XGETCIDSTATUS);
 
-	xia_socket_msg.set_type(xia::XGETCIDSTATUS);
-
-	xia::X_Getcidstatus_Msg *x_getcidstatus_msg = xia_socket_msg.mutable_x_getcidstatus();
+	xia::X_Getcidstatus_Msg *x_getcidstatus_msg = xsm.mutable_x_getcidstatus();
   
   	x_getcidstatus_msg->set_numcids(numCIDs);
 	x_getcidstatus_msg->set_cdaglist(cdagList);
 	x_getcidstatus_msg->set_status_list(statusbuf);
-	x_getcidstatus_msg->set_payload((const char*)buf, strlen(buf)+1);
+	x_getcidstatus_msg->set_payload((const char*)buf, strlen(buf) + 1);
 
 	std::string p_buf;
-	xia_socket_msg.SerializeToString(&p_buf);
+	xsm.SerializeToString(&p_buf);
 
-	numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0, p->ai_addr, p->ai_addrlen);
-	freeaddrinfo(servinfo);
-
-	if (numbytes == -1) {
-		perror("XXgetCIDListStatus(): XgetCIDListStatus failed");
-		return(-1);
+	if ((rc = click_data(sockfd, &xsm)) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
+		free(statusbuf);
+		free(cdagList);
+		return -1;
+	}
+     	 
+	if ((rc = click_reply(sockfd, buffer, sizeof(buffer))) < 0) {
+		LOGF("Error retrieving status from Click: %s", strerror(errno));
+		free(statusbuf);
+		free(cdagList);
+		return -1;
 	}
 
-     	 
-       //Process the reply
-        addr_len = sizeof their_addr;
-        if ((numbytes = recvfrom(sockfd, buffer, MAXBUFLEN-1 , 0,
-                                        (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-                        perror("XgetCIDListStatus(): recvfrom");
-                        return -1;
-        }
-
-	//protobuf message parsing
 	xia::XSocketMsg xia_socket_msg1;
 	xia_socket_msg1.ParseFromString(buffer);
 
 	if (xia_socket_msg1.type() == xia::XGETCIDSTATUS) {
 		
-		    xia::X_Getcidstatus_Msg *x_getcidstatus_msg1 = xia_socket_msg1.mutable_x_getcidstatus();
-		    strcpy(statusbuf,  x_getcidstatus_msg1->status_list().c_str()); 
+		xia::X_Getcidstatus_Msg *x_getcidstatus_msg1 = xia_socket_msg1.mutable_x_getcidstatus();
+		strcpy(statusbuf, x_getcidstatus_msg1->status_list().c_str()); 
 		    
-		    char status_tmp[100];
-		    char * start = statusbuf;
-		    char * pch;
-		    int status_for_all = READY_TO_READ;
-		    
-		    for (int i=0; i< numCIDs; i++) {
-		    	pch = strchr(start,'^');
-		    	if (pch!=NULL) {
-		    		// there's more CID status followed
-		    		strncpy (status_tmp, start, pch - statusbuf);
-		    		status_tmp[pch - start]='\0';
-		    		start = pch+1;
+		char status_tmp[100];
+		char *start = statusbuf;
+		char *pch;
+		int status_for_all = READY_TO_READ;
+		
+		for (int i = 0; i < numCIDs; i++) {
+			pch = strchr(start,'^');
+			if (pch != NULL) {
+				// there's more CID status followed
+				strncpy (status_tmp, start, pch - statusbuf);
+				status_tmp[pch - start]='\0';
+				start = pch + 1;
 		    	
-		    	} else {
-		    		// this is the last CID status in this batch.
-		    		strcpy (status_tmp, start);
-		    	}
+			} else {
+				// this is the last CID status in this batch.
+				strcpy (status_tmp, start);
+			}
 		    	
 			if (strcmp(status_tmp, "WAITING") == 0) {
 				cDAGv[i].status = WAITING_FOR_CHUNK;
 				
 				if (status_for_all != REQUEST_FAILED) { 
 					status_for_all = WAITING_FOR_CHUNK;
-		    		}
+				}
 		    		
-		    	} else if (strcmp(status_tmp, "READY") == 0) {
-		    		cDAGv[i].status = READY_TO_READ;
+			} else if (strcmp(status_tmp, "READY") == 0) {
+				cDAGv[i].status = READY_TO_READ;
 		    	
-		    	} else if (strcmp(status_tmp, "FAILED") == 0) {
-		    		cDAGv[i].status = REQUEST_FAILED;
-		    		status_for_all = REQUEST_FAILED;
-		    	
-		    	} else {
-		    		cDAGv[i].status = REQUEST_FAILED;
-		    		status_for_all = REQUEST_FAILED;
-		    	}
-		    	
-		    }
+			} else if (strcmp(status_tmp, "FAILED") == 0) {
+				cDAGv[i].status = REQUEST_FAILED;
+				status_for_all = REQUEST_FAILED;
+			
+			} else {
+				cDAGv[i].status = REQUEST_FAILED;
+				status_for_all = REQUEST_FAILED;
+			}
+		}
 		    
-		    return status_for_all;
-		    
-	}
+		rc = status_for_all;
+	} else
+		rc = -1;
 	
-        return REQUEST_FAILED; 
-      
-    
+	free(statusbuf);
+	free(cdagList);
+	return rc; 
 }
-
-
-
-
