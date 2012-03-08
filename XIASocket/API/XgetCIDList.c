@@ -22,6 +22,8 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
+
+#define MAX_CIDS 50
     
 /*!
 ** @brief Load a list of CIDs to the local machine.
@@ -54,13 +56,13 @@ int XgetCIDList(int sockfd, const struct cDAGvec *cDAGv, int numCIDs)
 	}
 	
 	// If the CID list is too long for a UDP packet to click, replace with multiple calls
-	if (numCIDs > 300) //TODO: Make this more precise once carrots go away
+	if (numCIDs > MAX_CIDS) //TODO: Make this more precise once carrots go away
 	{
 		rc = 0;
 		int i;
-		for (i = 0; i < numCIDs; i += 300)
+		for (i = 0; i < numCIDs; i += MAX_CIDS)
 		{
-			int num = (numCIDs-i > 300) ? 300 : numCIDs-i;
+			int num = (numCIDs-i > MAX_CIDS) ? MAX_CIDS : numCIDs-i;
 			int rv = XgetCIDList(sockfd, &cDAGv[i], num);
 
 			if (rv == -1) {
