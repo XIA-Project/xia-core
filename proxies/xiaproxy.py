@@ -30,7 +30,7 @@ def recv_with_timeout(sock, timeout=5):
     try:
         while (time.time() - start_time < timeout and not received_data):
             try:
-	    	select.select([sock], [], [], 0.02)
+                select.select([sock], [], [], 0.02)
                 reply = Xrecv(sock, 65521, 0)
                 received_data = True
             except IOError:
@@ -43,7 +43,7 @@ def recv_with_timeout(sock, timeout=5):
 
     if (not received_data):
         print "Recieved nothing"
-    	raise IOError
+        raise IOError
 
     return reply
     
@@ -64,22 +64,48 @@ def recvfrom_with_timeout(sock, timeout=3):
     try:
         while (time.time() - start_time < timeout and not received_data):
             try:
-	    	select.select([sock], [], [], 0.02)
+                select.select([sock], [], [], 0.02)
                 (reply, reply_dag) = Xrecvfrom(sock, 65521, 0)
                 received_data = True
             except IOError:
                 received_data = False
             except:
-                print 'ERROR: xiaproxy.py: recv_with_timeout: error receiving data from socket'
+                print 'ERROR: xiaproxy.py: recvfrom_with_timeout: error receiving data from socket'
     except (KeyboardInterrupt, SystemExit), e:
         Xclose(sock)
         sys.exit()
 
     if (not received_data):
         print "Recieved nothing"
-    	raise IOError
+        raise IOError
 
     return reply, reply_dag    
+
+
+def readcid_with_timeout(sock, cid, timeout=5):
+    # Receive data
+    start_time = time.time()   # current time in seconds since the epoch
+    received_data = False
+    reply = '<html><head><title>XIA Error</title></head><body><p>&nbsp;</p><p>&nbsp;</p><p style="text-align: center; font-family: Tahoma, Geneva, sans-serif; font-size: xx-large; color: #666;">Sorry, something went wrong.</p><p>&nbsp;</p><p style="text-align: center; color: #999; font-family: Tahoma, Geneva, sans-serif;"><a href="mailto:xia-dev@cs.cmu.edu">Report a bug</a></p></body></html>'
+    try:
+        while (time.time() - start_time < timeout and not received_data):
+            try:
+                if XgetCIDStatus(sock, cid, len(cid)) == 1:
+                    reply = XreadCID(sock, 65521, 0, cid, len(cid))
+                    received_data = True
+            except IOError:
+                received_data = False
+            except:
+                print 'ERROR: xiaproxy.py: readcid_with_timeout: error receiving data from socket'
+    except (KeyboardInterrupt, SystemExit), e:
+        Xclose(sock)
+        sys.exit()
+
+    if (not received_data):
+        print "Recieved nothing"
+        raise IOError
+
+    return reply
     
     
 
@@ -125,8 +151,7 @@ def process_videoCIDlist(message, browser_socket, socks):
     ## then retrieve them
     for i in range(len(cidlist)):
         try:
-            #content = recv_with_timeout(socks[i]) # = Xrecv(socks[i], 1024, 0)
-            content = XreadCID(socks[i], 65521, 0, cidlist[i], len(cidlist[i]))
+            content = readcid_with_timeout(socks[i], cidlist[i], 2)
 	except:
 	    browser_socket.close()
 	    print "closing browser socket6"
@@ -242,9 +267,7 @@ def requestVideoCID(CID, fallback):
         print 'ERROR: xiaproxy.py: requestVideoCID: error requesting CID \n%s' % content_dag
     # Get content
     try:
-        #data = recv_with_timeout(sock) # = Xrecv(sock, 65521, 0)
-        data = XreadCID(sock, 65521, 0, content_dag, len(content_dag))
-        #print 'Retrieved content:\n%s' % data
+        data = readcid_with_timeout(sock, content_dag)
         Xclose(sock)
     except:
         return  None
@@ -392,7 +415,7 @@ def get_content_from_cid_list(cid_list):
     # read CIDs as they become available
     content = ""
     for i in range(0, num_cids):
-        data = XreadCID(sock, 65521, 0, cids[i].cDAG, cids[i].dlen)
+        data = readcid_with_timeout(sock, cids[i].cDAG)
         content += data
 
     Xclose(sock)
@@ -406,7 +429,6 @@ def xiaHandler(host, path, http_header, browser_socket):
     if http_header.find('GET /favicon.ico') != -1:
         return
     if host.find('dag') == 0:
-        print 'Found a DAG in xiaproxy'
         # Get the DAG from the URL
         ddag = dag_from_url('http://' + host + path)
         # Remove the DAG from the request so only the requested page remains
@@ -434,7 +456,7 @@ def xiaHandler(host, path, http_header, browser_socket):
         host_array = host.split('.')
         num_chunks = int(host_array[1])
         recombined_content = get_content_from_cid_list(host_array[2])
-        length = len (recombined_content)
+        length = len(recombined_content)
         send_to_browser(recombined_content, browser_socket)
     return
 

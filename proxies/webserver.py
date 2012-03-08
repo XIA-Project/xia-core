@@ -33,7 +33,7 @@ def put_chunk(chunk):
     content_dag = 'RE %s %s CID:%s' % (AD1, HID1, cid)  # TODO: test DAG format instead of RE
     XputCID(sock, chunk, len(chunk), 0, content_dag, len(content_dag))
 
-    print 'put content %s (length %s)' % (content_dag, len(chunk))
+    #print 'put content %s (length %s)' % (content_dag, len(chunk))
     Xclose(sock)
     return cid
 
@@ -78,13 +78,14 @@ def serveHTTPRequest(request, sock):
         response_data = cid_string
         http_msg_type = 'HTTP/1.1 200 OK\n'
     except KeyError:
-        print 'ERROR: webserver.py: serverHTTPRequest: Could not find requested file: %s' % requested_file
+        print 'WARNING: webserver.py: serverHTTPRequest: Could not find requested file: %s' % requested_file
         response_data = '<html><body><h1>Sorry, we can\'t find that page.</h1></body></html>'
         http_msg_type = "HTTP/1.1 404 Not Found\n"
 
     # Send response
     response = http_msg_type + http_header + response_data
     Xsend(sock, response, len(response), 0)
+
 
 # Chunk and publish all files in the local www directory.
 # If the file is an html file and contains images also stored in
@@ -97,64 +98,71 @@ def put_content_in_dir(dir):
         print 'ERROR: webserver.py: put_content_in_dir: Directory "%s" does not exist.' % dir
         return
 
+    # All files with extentions listed below won't be processed on the first pass;
+    # they will be processed in successive passes in the order listed
+    link_files_type_order = ['.css', '.html']
+
     # PASS 1:
-    # publish each non-html file in the given directory; keep a dictionary 
-    # mapping filepath to the corresponding list of CIDs
+    # publish each file in the given directory whose type does not appear in 
+    # link_files_type_order; keep a dictionary mapping filepath to the corresponding
+    # list of CIDs
     cids_by_filename = {}
-    html_files = []
+    files_with_links = []
     for root, dirs, files in os.walk(dir):
         for file in files:
-            if file[-5:] != '.html' and file[-9:] != '.htmlTEMP':
+            if link_files_type_order.count(os.path.splitext(file)[1]) == 0 and link_files_type_order.count(os.path.splitext(file)[1][:-4]) == 0:
                 cids_by_filename[os.path.join(root,file)] = put_file(os.path.join(root, file), 1200)
             else:
-                html_files.append(os.path.join(root, file))
+                files_with_links.append(os.path.join(root, file))
 
-    print html_files
-    # PASS 2:
-    # for each html file, find references to any of the files we just
+    # PASSES 2 through N:
+    # Process files that might contain links to other files one type at a time.
+    # find references to any of the files we have already
     # published as content. Replace the reference with the corresponding
     # CID list. Replace references to other local html files with DAG
-    # pointing to this webserver. Then publish the modified html file. 
-    cids_by_filename_to_add = {} # need a temp dict here because we can't add to cids_by_filename while we're iterating through it
-    for root, dirs, files in os.walk(dir): # Walk through each directory in 'dir'
-        for file in files: # Look at each file in the directory we're examining now
-            if file[-5:] == '.html': # We only care about html files in PASS 2; we already published everything else
-                with open(os.path.join(root, file), 'r') as orig_html_file:
-                    file_data = orig_html_file.read()
+    # pointing to this webserver. Then publish the modified file. 
+    for file_type in link_files_type_order:
+        cids_by_filename_to_add = {} # need a temp dict here because we can't add to cids_by_filename while we're iterating through it
+        for root, dirs, files in os.walk(dir): # Walk through each directory in 'dir'
+            for file in files: # Look at each file in the directory we're examining now
+                if os.path.splitext(file)[1] == file_type: # We only care about files of type file_type in this pass
+                    with open(os.path.join(root, file), 'r') as orig_html_file:
+                        file_data = orig_html_file.read()
 
-                    # Replace links to content we already published with CID lists
-                    for key, value in cids_by_filename.iteritems():
-                        # build the CID string to replace the filepath
-                        cid_string = 'http://xia.cid.%i.' % len(value)
-                        for cid in value:
-                            cid_string += cid
-                       
-                        content_path  = os.path.relpath(key, root)
+                        # Replace links to content we already published with CID lists
+                        for key, value in cids_by_filename.iteritems():
+                            # build the CID string to replace the filepath
+                            cid_string = 'http://xia.cid.%i.' % len(value)
+                            for cid in value:
+                                cid_string += cid
+                           
+                            content_path  = os.path.relpath(key, root)
+                            
+                            # first match filepaths beginning with "./"
+                            file_data = string.replace(file_data, './' + content_path, cid_string)
+                            # now match filepaths without "./"
+                            file_data = string.replace(file_data, content_path, cid_string)
+
+                        # Replace links to other html files in 'dir' with this webserver's SID
+                        for linked_html_file in files_with_links:
+                            dag_url = 'http://dag/2,0/%s=0:2,1/%s=1:2/%s=2:2//%s' % (AD1, HID1, SID1, linked_html_file[5:])
+                            
+                            rel_path = os.path.relpath(linked_html_file, root)
+                            # first match filepaths beginning with "./"
+                            file_data = string.replace(file_data, './' + rel_path, dag_url)
+                            # now match filepaths without "./"
+                            file_data = string.replace(file_data, rel_path, dag_url)
+
+                        # write modified html
+                        with open(os.path.join(root, file+'TEMP'), 'w') as fnew:
+                            fnew.write(file_data)
+                        fnew.closed
                         
-                        # first match filepaths beginning with "./"
-                        file_data = string.replace(file_data, './' + content_path, cid_string)
-                        # now match filepaths without "./"
-                        file_data = string.replace(file_data, content_path, cid_string)
-
-                    # Replace links to other html files in 'dir' with this webserver's SID
-                    for linked_html_file in html_files:
-                        dag_url = 'http://dag/2,0/%s=0:2,1/%s=1:2/%s=2:2//%s' % (AD1, HID1, SID1, linked_html_file[5:])
-                        
-                        rel_path = os.path.relpath(linked_html_file, root)
-                        # first match filepaths beginning with "./"
-                        file_data = string.replace(file_data, './' + rel_path, dag_url)
-                        # now match filepaths without "./"
-                        file_data = string.replace(file_data, rel_path, dag_url)
-
-                    # write modified html
-                    with open(os.path.join(root, file+'TEMP'), 'w') as fnew:
-                        fnew.write(file_data)
-                    fnew.closed
-                    
-                    # publish the modified HTML file
-                    cids_by_filename_to_add[os.path.join(root,file)] = put_file(os.path.join(root, file+'TEMP'), 1200)
-                orig_html_file.closed
-    cids_by_filename = dict(cids_by_filename.items() + cids_by_filename_to_add.items());
+                        # publish the modified HTML file
+                        cids_by_filename_to_add[os.path.join(root,file)] = put_file(os.path.join(root, file+'TEMP'), 1200)
+                        os.remove(os.path.join(root, file+'TEMP'))
+                    orig_html_file.closed
+        cids_by_filename = dict(cids_by_filename.items() + cids_by_filename_to_add.items());
 
 
 def main():
@@ -163,12 +171,8 @@ def main():
 
     # TODO: When new put_chunk API is ready and we have persistent caching, we can eliminate
     # this and make a separate 'content publishing' app.
-    try:
-        sys.argv.index('-r') # don't republish content if we're restarting but didn't restart click
-        print 'Restarting webserver. Don\'t republish content'
-    except:
-        put_content_in_dir('./www') # '-r' not found, so do publish content
-
+    put_content_in_dir('./www') 
+        
     try:   
         # Listen for connections from clients
         listen_sock = Xsocket(XSOCK_STREAM)

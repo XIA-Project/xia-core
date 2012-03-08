@@ -40,7 +40,6 @@ IP0 = XIDS['ip0']
 
 # Extracts a DAG from the given URL in the new format
 def dag_from_url(url):
-    print 'getting dag from url: ' + url
     # url_segments[0] = protocol (e.g. http)
     # url_segments[1] = DAG (e.g. dag/2,0/AD.xxx=0:2,1/HID.xxx=1:2/SID.xxx=2:2)
     # url_segments[2] = file/argument (e.g. index.html)
