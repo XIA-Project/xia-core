@@ -81,8 +81,8 @@
         $2 (dlen): a size_t to be filled in with the length of the sender's DAG */
 %typemap (in) (int flags, char * dDAG, size_t *dlen)
 {
-    $1 = (int) PyLong_AsLong($input);  // TODO: There's no reason to mess with "flags", but we need at least one python input. Bettery way?
-    $2 = (void*)malloc(4096);  // TODO: 4096 is arbitrary; is this big enough?
+    $1 = (int) PyLong_AsLong($input);  /*TODO: There's no reason to mess with "flags", but we need at least one python input. Bettery way? */
+    $2 = (void*)malloc(4096);  /* TODO: 4096 is arbitrary; is this big enough? */
     $3 = (size_t*)malloc(sizeof(size_t));
 }
 

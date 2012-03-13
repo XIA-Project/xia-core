@@ -1,4 +1,4 @@
-.PHONY: clean
+.PHONY: clean doc
 CC=g++
 LD=g++
 CFLAGS=-c -Wall -Wextra -I../minini
@@ -12,7 +12,7 @@ SHARED_OBJECTS=$(SOURCES:.c=.shared.o) xia.pb.shared.o
 STATIC_OBJECTS=$(SOURCES:.c=.o) xia.pb.o
 
 all: xia.pb.cc  libXsocket.a libXsocket.so
-	make -C swig all
+	make -C python all
 
 xia.pb.cc: xia.proto
 	protoc --cpp_out=.  xia.proto
@@ -34,9 +34,10 @@ libXsocket.so: $(SHARED_OBJECTS)
 
 doc: Xdoc.h $(SOURCES)
 	doxygen XsocketsAPI.cfg
+	make -C python doc
 
 clean:
 	rm -f *.o *.a *.so *.shared.o xia.pb.*
 	rm -rf doc
-	make -C swig clean
+	make -C python clean
 

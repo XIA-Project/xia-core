@@ -1,1 +1,1 @@
-../XIASocket/API/swig/xsocket.py
+../XIASocket/API/python/xsocket.py
