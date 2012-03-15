@@ -76,7 +76,7 @@ int Xconnect(int sockfd, char* dest_DAG)
 		return -1;
 	}
 
-	if (strcmp(buf, "^Connetion-failed^") == 0) {
+	if (strcmp(buf, "^Connection-failed^") == 0) {
 		errno = ECONNREFUSED;
 		LOG("Connection Failed");
 		return -1;	    
