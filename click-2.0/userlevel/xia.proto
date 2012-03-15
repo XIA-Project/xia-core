@@ -86,23 +86,19 @@ message X_Putcid_Msg {
 }
 
 message X_Getcid_Msg {
-  required int32 numcids = 1; // the number of Content-DAGs requested
-  required string cdaglist = 2; // Content-DAGs each concatenated using '^'
-  optional bytes payload = 3; // data
+  repeated string dag = 1;
+  optional bytes payload = 2; // data
 }
 
 message X_Getcidstatus_Msg {
-  required int32 numcids = 1; // the number of Content-DAGs requested
-  required string cdaglist = 2; // Content-DAGs each concatenated using '^'
-  required string status_list = 3; // Status for CID requests each concatenated using '^'
-  optional bytes payload = 4; // data
+  repeated string dag = 1;
+  repeated string status = 2;
+  optional bytes payload = 3; // data
 }
 
 message X_Readcid_Msg {
-  required int32 numcids = 1; // the number of Content-DAGs requested
-  required string cdaglist = 2; // Content-DAGs each concatenated using '^'
-  optional string status_list = 3; // Status for CID requests each concatenated using '^'
-  optional bytes payload = 4; // data
+  required string dag = 1;
+  optional bytes payload = 2;
 }
 
 

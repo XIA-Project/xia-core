@@ -62,8 +62,7 @@ int XreadCID(int sockfd, void *rbuf, size_t len, int /* flags */,
 
 	xia::X_Readcid_Msg *x_readcid_msg = xsm.mutable_x_readcid();
   
-  	x_readcid_msg->set_numcids(1);
-	x_readcid_msg->set_cdaglist(cDAG);
+	x_readcid_msg->set_dag(cDAG);
 
 	std::string p_buf;
 	xsm.SerializeToString(&p_buf);
@@ -78,7 +77,7 @@ int XreadCID(int sockfd, void *rbuf, size_t len, int /* flags */,
 		return -1;
 	}
 
-	// FIXME: change protobuf so we don't need the ^ hack
+	// FIXME: change to protobuf so we don't need the ^ hack
 
 	size_t paylen = 0, i = 0;
 	char *tmpbuf = (char*)UDPbuf;

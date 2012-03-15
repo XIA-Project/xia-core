@@ -40,24 +40,50 @@
 */
 int XgetCIDStatus(int sockfd, char* cDAG, size_t /* dlen */)
 {
-	int rc;
-	char statusbuf[2048];
-	const char *buf = "CID request status query"; //Maybe send more useful information here.
+	struct cDAGvec dv;
 
-	char buffer[2048];
+	dv.cDAG = cDAG;
+	dv.dlen = strlen(cDAG);
+
+	return XgetCIDListStatus(sockfd, &dv, 1);
+}
+
+/*!
+** @brief Checks the status of the specified CID. Should be called after
+** calling XgetCID or XgetCIDList.
+** It checks whether each of the requested CIDs is waiting to be read or still
+** on the way.
+**
+** @param sockfd - the control socket (must be of type XSOCK_CHUNK)
+** @param cDAGv - CIDs to check. On return contains the status for each of the
+** specified CIDs.
+** @param numCIDs - number of CIDs in cDAGv
+**
+** @returns 1 if all CIDs in cDAGv are ready to be read
+** @returns 0 if all CIDs in cDAGv are valid but one or more are in 
+** waiting state
+** @returns -1 on socket error with or if an invalid CID was specified
+*/
+int XgetCIDListStatus(int sockfd, struct cDAGvec *cDAGv, int numCIDs)
+{
+	int rc;
+	char buffer[MAXBUFLEN];
+	
+	const char *buf="CID list request status query";//Maybe send more useful information here.
 
 	if (validateSocket(sockfd, XSOCK_CHUNK, EAFNOSUPPORT) < 0) {
-		LOGF("Socket %d must be a chunk socket", sockfd);
+		LOGF("Socket %d must be a chunk socket\n", sockfd);
 		return -1;
 	}
 	
-	if (!cDAG) {
-		LOG("cDAG is null!");
+	if (numCIDs == 0)
+		return 0;
+
+	if (!cDAGv) {
+		LOG("cDAGv is null!");
 		errno = EFAULT;
 		return -1;
 	}
-
-	strcpy(statusbuf, "WAITING");
 
 	// protobuf message
 	xia::XSocketMsg xsm;
@@ -65,10 +91,21 @@ int XgetCIDStatus(int sockfd, char* cDAG, size_t /* dlen */)
 
 	xia::X_Getcidstatus_Msg *x_getcidstatus_msg = xsm.mutable_x_getcidstatus();
   
-  	x_getcidstatus_msg->set_numcids(1);
-	x_getcidstatus_msg->set_cdaglist(cDAG);
-	x_getcidstatus_msg->set_status_list(statusbuf);
-	x_getcidstatus_msg->set_payload((const char*)buf, strlen(buf)+1);
+	for (int i = 0; i < numCIDs; i++) {
+		if (cDAGv[i].cDAG) {
+			x_getcidstatus_msg->add_dag(cDAGv[i].cDAG);
+		} else {
+			LOGF("cDAGv[%d] is NULL", i);
+		}
+	}
+
+	if (x_getcidstatus_msg->dag_size() == 0) {
+		LOG("no dags were specified!");
+		errno = EFAULT;
+		return -1;
+	}
+
+	x_getcidstatus_msg->set_payload((const char*)buf, strlen(buf) + 1);
 
 	std::string p_buf;
 	xsm.SerializeToString(&p_buf);
@@ -77,7 +114,7 @@ int XgetCIDStatus(int sockfd, char* cDAG, size_t /* dlen */)
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
-
+     	 
 	if ((rc = click_reply(sockfd, buffer, sizeof(buffer))) < 0) {
 		LOGF("Error retrieving status from Click: %s", strerror(errno));
 		return -1;
@@ -89,17 +126,36 @@ int XgetCIDStatus(int sockfd, char* cDAG, size_t /* dlen */)
 	if (xia_socket_msg1.type() == xia::XGETCIDSTATUS) {
 		
 		xia::X_Getcidstatus_Msg *x_getcidstatus_msg1 = xia_socket_msg1.mutable_x_getcidstatus();
-		strcpy(statusbuf,  x_getcidstatus_msg1->status_list().c_str()); 
 		    
-		if (strcmp(statusbuf, "WAITING") == 0)
-			return WAITING_FOR_CHUNK;
-		    
-		else if (strcmp(statusbuf, "READY") == 0)
-			return READY_TO_READ;
+		char status_tmp[100];
+		int status_for_all = READY_TO_READ;
+		
+		for (int i = 0; i < numCIDs; i++) {
+			strcpy(status_tmp, x_getcidstatus_msg1->status(i).c_str());
 		    	
-		else if (strcmp(statusbuf, "FAILED") == 0)
-			return REQUEST_FAILED;
-	}
+			if (strcmp(status_tmp, "WAITING") == 0) {
+				cDAGv[i].status = WAITING_FOR_CHUNK;
+				
+				if (status_for_all != REQUEST_FAILED) { 
+					status_for_all = WAITING_FOR_CHUNK;
+				}
+		    		
+			} else if (strcmp(status_tmp, "READY") == 0) {
+				cDAGv[i].status = READY_TO_READ;
+		    	
+			} else if (strcmp(status_tmp, "FAILED") == 0) {
+				cDAGv[i].status = REQUEST_FAILED;
+				status_for_all = REQUEST_FAILED;
+			
+			} else {
+				cDAGv[i].status = REQUEST_FAILED;
+				status_for_all = REQUEST_FAILED;
+			}
+		}
+		    
+		rc = status_for_all;
+	} else
+		rc = -1;
 	
-	return REQUEST_FAILED;
+	return rc; 
 }

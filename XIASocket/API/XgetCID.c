@@ -15,10 +15,10 @@
 */
 /*!
 ** @file XgetCID.c
-** @brief implements XgetCID
+** @brief implements XgetCID and XgetCIDList
 */
 
-#include<errno.h>
+#include <errno.h>
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
@@ -35,6 +35,26 @@
 */
 int XgetCID(int sockfd, char* cDAG, size_t /* dlen */)
 {
+	struct cDAGvec dv;
+
+	dv.cDAG = cDAG;
+	dv.dlen = strlen(cDAG);
+
+	return XgetCIDList(sockfd, &dv, 1);
+}
+
+/*!
+** @brief Load a list of CIDs to the local machine.
+**
+** @param sockfd - the control socket (must be of type XSOCK_CHUNK)
+** @param cDAGv - list of CIDs to retrieve
+** @param numCIDs - number of CIDs in cDAGv
+**
+** @returns 0 on success
+** @returns -1 on error with errno set
+*/
+int XgetCIDList(int sockfd, const struct cDAGvec *cDAGv, int numCIDs)
+{
 	int rc;
 	const char *buf="CID request";//Maybe send more useful information here.
 
@@ -43,20 +63,56 @@ int XgetCID(int sockfd, char* cDAG, size_t /* dlen */)
 		return -1;
 	}
 
-	if (!cDAG) {
-		LOG("cDAG is null!");
+	if (numCIDs == 0)
+		return 0;
+
+	if (!cDAGv) {
+		LOG("null pointer error!");
 		errno = EFAULT;
 		return -1;
 	}
+	
+	// If the CID list is too long for a UDP packet to click, replace with multiple calls
+	if (numCIDs > 300) //TODO: Make this more precise
+	{
+		rc = 0;
+		int i;
+		for (i = 0; i < numCIDs; i += 300)
+		{
+			int num = (numCIDs-i > 300) ? 300 : numCIDs-i;
+			int rv = XgetCIDList(sockfd, &cDAGv[i], num);
 
-	// protobuf message
+			if (rv == -1) {
+				perror("Xgetcid(): getcid failed");
+				return(-1);
+			} else {
+				rc += rv;
+			}
+		}
+
+		return rc;
+	}
+	
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XGETCID);
 
 	xia::X_Getcid_Msg *x_getcid_msg = xsm.mutable_x_getcid();
   
-  	x_getcid_msg->set_numcids(1);
-	x_getcid_msg->set_cdaglist(cDAG);
+	for (int i = 0; i < numCIDs; i++) {
+		if (cDAGv[i].cDAG != NULL)
+			x_getcid_msg->add_dag(cDAGv[i].cDAG);
+		else {
+			LOGF("NULL pointer at cDAGv[%d]\n", i);
+		}
+	}
+
+	if (x_getcid_msg->dag_size() == 0) {
+		// FIXME: what error should this relate to?
+		errno = EFAULT;
+		LOG("No dags specified\n");
+		return -1;
+	}
+
 	x_getcid_msg->set_payload((const char*)buf, strlen(buf)+1);
 
 	std::string p_buf;
@@ -77,7 +133,3 @@ int XgetCID(int sockfd, char* cDAG, size_t /* dlen */)
 
 	return 0;
 }
-
-
-
-

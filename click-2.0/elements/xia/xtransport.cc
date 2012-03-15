@@ -126,7 +126,7 @@ XTRANSPORT::run_timer(Timer *timer)
 		    	daginfo->timer_on = false;
 		    	daginfo->synack_waiting = false;
 		    	
-		    	String str=String("^Connetion-failed^");
+		    	String str=String("^Connection-failed^");
 			WritablePacket *ppp = WritablePacket::make (256, str.c_str(), str.length(),0);			
 
 			if (DEBUG)
@@ -991,28 +991,13 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 		    xia::X_Getcid_Msg *x_getcid_msg = xia_socket_msg.mutable_x_getcid();
 
-	            int numCids = x_getcid_msg->numcids();
-		    String dest_list(x_getcid_msg->cdaglist().c_str()); // Content-DAGs each concatenated using '^'
 		    String pktPayload(x_getcid_msg->payload().c_str(), x_getcid_msg->payload().size());
 		    int pktPayloadSize=pktPayload.length();
 
-		    int start_index =0;
-		    int end_index = 0;	
 		    // send CID-Requests 
-		    for (int i=0; i < numCids; i++) {
-		    	end_index=dest_list.find_left("^", start_index);
-		    	//printf("Start=%d  End=%d \n", start_index, end_index);
-		    	String dest;
-	    	
-		    	if (end_index > 0) {
-		    		// there's more CID requests followed
-		    		dest=dest_list.substring(start_index, end_index - start_index);
-		    		start_index = end_index+1;
-		    	
-		    	} else {
-		    		// this is the last CID request in this batch.
-		    		dest=dest_list.substring(start_index);
-		    	}
+
+	    	    for (int i = 0; i < x_getcid_msg->dag_size(); i++) {
+			String dest = x_getcid_msg->dag(i).c_str();
 
 		    	int dag_size = dest.length();
 			
@@ -1128,32 +1113,16 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 		    xia::X_Getcidstatus_Msg *x_getcidstatus_msg = xia_socket_msg.mutable_x_getcidstatus();
 
-	            int numCids = x_getcidstatus_msg->numcids();
-		    String dest_list(x_getcidstatus_msg->cdaglist().c_str()); // Content-DAGs each concatenated using '^'
-		    String status_list(x_getcidstatus_msg->status_list().c_str()); // Status for CID requests each concatenated using '^'
+		    int numCids = x_getcidstatus_msg->dag_size();
 		    String pktPayload(x_getcidstatus_msg->payload().c_str(), x_getcidstatus_msg->payload().size());
 		    int pktPayloadSize=pktPayload.length();
-		    
-		    // for status report back via protobuf
-		    char statusbuf[2048];
 
-		    int start_index =0;
-		    int end_index = 0;	
+		    // for status report back via protobuf
+		    char statusbuf[32];
+
 		    // send CID-Requests 
 		    for (int i=0; i < numCids; i++) {
-		    	end_index=dest_list.find_left("^", start_index);
-		    	//printf("Start=%d  End=%d \n", start_index, end_index);
-		    	String dest;
-	    	
-		    	if (end_index > 0) {
-		    		// there's more CID requests followed
-		    		dest=dest_list.substring(start_index, end_index - start_index);
-		    		start_index = end_index+1;
-		    	
-		    	} else {
-		    		// this is the last CID request in this batch.
-		    		dest=dest_list.substring(start_index);
-		    	}
+			String dest = x_getcidstatus_msg->dag(i).c_str();
 
 		    	int dag_size = dest.length();
 			
@@ -1179,42 +1148,21 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		    		int status = it->second;
 		    		
 		    		if(status == WAITING_FOR_CHUNK) {
-		    			if(i==0) {
-		    				strcpy(statusbuf, "WAITING");
-		    			} else {
-		    				strcat(statusbuf, "^WAITING");
-		    			}
+				    x_getcidstatus_msg->add_status("WAITING");
 		    		} else if(status == READY_TO_READ) {
-		    			if(i==0) {
-		    				strcpy(statusbuf, "READY");
-		    			} else {
-		    				strcat(statusbuf, "^READY");
-		    			}
+				    x_getcidstatus_msg->add_status("READY");
 		    			
 		    		} else if(status == REQUEST_FAILED) {
-		    			if(i==0) {
-		    				strcpy(statusbuf, "FAILED");
-		    			} else {
-		    				strcat(statusbuf, "^FAILED");
-		    			}
-		    			
+				    x_getcidstatus_msg->add_status("FAILED");
 		    		}
 		    		
 		    	} else {
 		    		// Status query for the CID that was not requested...
-		    		if(i==0) {
-		    			strcpy(statusbuf, "FAILED");
-		    		} else {
-		    			strcat(statusbuf, "^FAILED");
-		    		}
+				x_getcidstatus_msg->add_status("FAILED");
 		    	}
-					
-		    
 		    }
 		    
 		    // Send back the report 
-		    
-		    x_getcidstatus_msg->set_status_list(statusbuf);
 		    
 		    const char *buf="CID request status response";
 		    x_getcidstatus_msg->set_payload((const char*)buf, strlen(buf)+1);  
@@ -1234,30 +1182,10 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 		    xia::X_Readcid_Msg *x_readcid_msg = xia_socket_msg.mutable_x_readcid();
 
-	            int numCids = x_readcid_msg->numcids();
-		    String dest_list(x_readcid_msg->cdaglist().c_str()); // Content-DAGs each concatenated using '^'
+			String dest = x_readcid_msg->dag().c_str();
+		    int dag_size = dest.length();
 		    
 		    WritablePacket *copy; 
-		    
-		    int start_index =0;
-		    int end_index = 0;	
-		    // send CID-Requests 
-		    for (int i=0; i < numCids; i++) {
-		    	end_index=dest_list.find_left("^", start_index);
-		    	//printf("Start=%d  End=%d \n", start_index, end_index);
-		    	String dest;
-	    	
-		    	if (end_index > 0) {
-		    		// there's more CID requests followed
-		    		dest=dest_list.substring(start_index, end_index - start_index);
-		    		start_index = end_index+1;
-		    	
-		    	} else {
-		    		// this is the last CID request in this batch.
-		    		dest=dest_list.substring(start_index);
-		    	}
-
-		    	int dag_size = dest.length();
 			
 			//printf("CID-Request for %s  (size=%d) \n", dest.c_str(), dag_size);
 			//printf("\n\n (%s) hi 3 \n\n", (_local_addr.unparse()).c_str());
@@ -1321,9 +1249,6 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		    		}
 		    		
 		    	}		
-		    
-		    }
-		    
        		
 			}
 			break;								
