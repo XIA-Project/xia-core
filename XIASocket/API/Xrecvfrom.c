@@ -15,7 +15,7 @@
 */
 /*!
 ** @file Xrecvfrom.c
-** @brief implements Xrecvfrom
+** @brief implements Xrecvfrom()
 */
 
 /*
@@ -29,23 +29,33 @@
 #include "Xutil.h"
 
 /*!
-** @brief receives datagram data on an Xsocket. Must be callsed with a socket
-** of type XSOCK_DGRAM.
+** @brief receives datagram data on an Xsocket.
 **
-** @param sockfd - The socket to receive with
-** @param rbuf - where to put the received data
-** @param len - maximum amount of data to receive. the amount of data
-** returned may be less than len bytes.
-** @param flags - (This is not currently used but is kept to be compatible
-** with the standard sendto socket call.
-** @param sDAG - on success, receives the DAG of the sender
-** @param slen - contians the size of sDAG when called, replaced with the length
-** of the received sDAG on return
+** Xrecvfrom() recrieves data from an Xsocket of type XSOCK_DGRAM. Unlike the 
+** standard recvfrom API, it will not work with socket of type XSOCK_STREAM.
+**
+** XrecvFrom() does not currently have a non-blocking mode, and will block
+** until a data is available on sockfd. However, the standard socket API
+** calls select and poll may be used with the Xsocket. Either function
+** will deliver a readable event when a new connection is attempted and
+** you may then call XrecvFrom() to get the data.
 **
 ** NOTE: in cases where more data is received than specified by the caller,
 ** the excess data will be stored in the socket state structure and will 
 ** be returned from there rather than from Click. Once the socket state
 ** is drained, requests will be sent through to Click again.
+**
+** @param sockfd - The socket to receive with
+** @param rbuf - where to put the received data
+** @param len - maximum amount of data to receive. The amount of data
+** returned may be less than len bytes.
+** @param flags - (This is not currently used but is kept to be compatible
+** with the standard sendto socket call.
+** @param sDAG - on success, contains the DAG of the sender
+** @param slen - contians the size of sDAG when called, replaced with the length
+** of the received sDAG on return. slen MUST be set to the size of sDAG before
+** calling XrecvFrom(). If slen is smaller than the length of the source DAG,
+** the returned DAG is truncated and slen will contain length of the actual DAG.
 **
 ** @returns number of bytes received
 ** @returns -1 on failure with errno set.
@@ -112,13 +122,15 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 	}
 
 	if (i + 1 > *slen) {
-		LOGF("sDAG buffer is not large enough: has %d, needs %d\n", *slen, i + 1);
-		errno = EFAULT;
-		return -1;
+		LOGF("sDAG buffer is not large enough, sDAG has been truncated: has %d, needs %d\n", *slen, i + 1);
+//		errno = EFAULT;
+//		return -1;
 	}
     	
-	strncpy(sDAG, UDPbuf, i);
-    sDAG[i] = 0;
+	// leave room for the null terminator, truncate the DAG if necessary
+	int sz = MIN(i, *slen - 1);
+	strncpy(sDAG, UDPbuf, sz);
+    sDAG[sz] = 0;
     *slen = i;
 
     return paylen;

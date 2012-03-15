@@ -13,6 +13,10 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
+/*!
+  @file Xutil.h
+  @brief header for internal helper functions
+*/  
 #ifndef _Xutil_h
 #define _Xutil_h
 

@@ -16,7 +16,7 @@
 */
 /*!
 ** @file Xsend.c
-** @brief implements Xsend
+** @brief implements Xsend()
 */
 #include "Xsocket.h"
 #include "Xinit.h"
@@ -24,34 +24,33 @@
 #include "errno.h"
 
 /*!
-** @brief Sends data to a remote socket. Xconnect must be called before
-** using this function.
+** @brief Send a message on an Xsocket
+**
+** The Xsend() call may be used only when the socket is in a connected state
+** (so that the intended recipient is know). It only works with an Xsocket of
+** type XSOCK_STREAM that has previously been connecteted with Xaccept()
+** or Xconnect().
 **
 ** @param sockfd - The socket to send the data on
 ** @param buf - the data to send
 ** @param len - length of the data to send @NOTE: currently the
-** Xsendto api is limited to sending at most XIA_MAXBUF bytes.
+** Xsend api is limited to sending at most XIA_MAXBUF bytes.
 ** @param flags - (This is not currently used but is kept to be compatible
 ** with the standard sendto socket call.
 **
 ** @returns number of bytes sent on success
-** @returns -1 on failure with errno set.
-**
-** FIXME: what should we return if we need to look and some data is sent, 
-** but a subsequent internal send errors out? Using the number of bytes 
-** already sent. It doesn't feel right though.
+** @returns -1 on failure with errno set to an error compatible with those
+** returned by the standard send call.
 */
-
 int Xsend(int sockfd, const void *buf, size_t len, int /*flags*/)
 {
 	xia::XSocketCallType type;
 	int rc;
-	int count;
-	int sent = 0;
-	const char *p = (const char *)buf;
 
 	if (len == 0)
 		return 0;
+
+	len = MIN(len, XIA_MAXBUF);
 
 	if (!buf) {
 		LOG("buffer pointer is null!\n");
@@ -74,44 +73,25 @@ int Xsend(int sockfd, const void *buf, size_t len, int /*flags*/)
 	xsm.set_type(xia::XSEND);
 
 	xia::X_Send_Msg *x_send_msg = xsm.mutable_x_send();
+	x_send_msg->set_payload(buf, len);
 
-	// we can only send XIA_MAXBUF bytes at a time, so will need to loop
-	// if the user requested a send with a larger size
-	while (len) {
-		count = MIN(len, XIA_MAXBUF);
-		// LOGF("sending %d bytes %d remaining\n", count, len - count);
-		x_send_msg->set_payload((const char*)p, count);
-
-		// send the protobuf containing the user data to click
-		if ((rc = click_data(sockfd, &xsm)) < 0) {
-			LOGF("Error talking to Click: %s", strerror(errno));
-			break;
-		}
-
-		// process the reply from click
-		if ((rc = click_reply2(sockfd, &type)) < 0) {
-			LOGF("Error retreiving data from Click: %s", strerror(errno));
-			break;
-		}
-
-		if (type != xia::XSEND) {
-			LOGF("Expected type %d, got %d", xia::XSEND, type);
-			// what do we do in this case?
-			// we might have sent the data, but can't be sure
-			break;
-		}
-		sent += count;
-		len -= count;
-		p += count;
-	}
-
-	if (sent)
-		return sent;
-
-	else if (rc < 0) {
-		// if negative, errno will be set with an appropriate error code
+	// send the protobuf containing the user data to click
+	if ((rc = click_data(sockfd, &xsm)) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
-	// not sure we'll ever get here
-	return rc;
+
+	// process the reply from click
+	if ((rc = click_reply2(sockfd, &type)) < 0) {
+		LOGF("Error retreiving data from Click: %s", strerror(errno));
+		return -1;
+	}
+
+	if (type != xia::XSEND) {
+		LOGF("Expected type %d, got %d", xia::XSEND, type);
+		// what do we do in this case?
+		// we might have sent the data, but can't be sure
+	}
+
+	return len;
 }

@@ -13,7 +13,10 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
-
+/*!
+  @file Xutil.c
+  @brief Impliments internal socket helper functions
+*/
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"

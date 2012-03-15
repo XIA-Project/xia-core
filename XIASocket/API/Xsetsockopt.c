@@ -16,7 +16,7 @@
 */
 /*!
 ** @file Xsetsockopt.c
-** @brief implements Xsetsockopt and Xgetsockopt
+** @brief implements Xsetsockopt() and Xgetsockopt()
 */
 
 #include "Xsocket.h"

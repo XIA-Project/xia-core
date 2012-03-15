@@ -15,7 +15,7 @@
 */
 /*!
 ** @file XreadCID.c
-** @brief implements XreadCID
+** @brief implements XreadCID()
 */
 
 #include<errno.h>

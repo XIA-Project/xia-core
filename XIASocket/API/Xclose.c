@@ -16,7 +16,7 @@
 */
 /*!
 ** @file Xclose.c
-** @brief implements Xclose
+** @brief implements Xclose()
 */
 
 #include "Xsocket.h"
@@ -27,13 +27,14 @@
 /*!
 ** @brief Close an Xsocket.
 **
-** Causes click to tear down the underlying XIA socket and also closes the
-** UDP socket used to talk to click.
+** Causes the XIA transport to tear down the underlying XIA socket state and
+** also closes the UDP control socket used to talk to the transport.
 **
 ** @param sockfd	The control socket
 **
 ** @returns 0 on success
-** @returns -1 on error with errno set
+** @returns -1 on error with errno set to a value compatible with the standard
+** close API call.
 */
 int Xclose(int sockfd)
 {

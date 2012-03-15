@@ -16,7 +16,7 @@
 */
 /*!
 ** @file Xbind.c
-** @brief implements Xbind
+** @brief implements Xbind()
 */
 
 #include "Xsocket.h"
@@ -27,22 +27,29 @@
 /*!
 ** @brief Bind an Xsocket to a DAG.
 **
-** Bind the local Xsocket to the specified DAG. DAG should
-** be a SID
+** Assign the specified DAG to to the Xoscket referred to by sockfd. The DAG
+** should be a valid SID.
+** 
+** It is necessary to assign a local DAG using Xbind() before an XSOCK_STREAM
+** socket may receive connections (see accept()).
+**
+** An un-bound Xsocket will be given a random local SID that is currently not
+** available to the application.
 **
 ** @param sockfd	The control socket
 ** @param sDAG		The source service (local) DAG
 **
 ** @returns 0 on success
-** @returns -1 on error with errno set
+** @returns -1 on error with errno set to an error compatible with those
+** retuned by the standard bind call.
 */
-int Xbind(int sockfd, char* Sdag)
+int Xbind(int sockfd, char* sDAG)
 {
 	xia::XSocketCallType type;
 	int rc;
 
-	if (!Sdag) {
-		LOG("Sdag is NULL!");
+	if (!sDAG) {
+		LOG("sDAG is NULL!");
 		errno = EFAULT;
 		return -1;
 	}
@@ -57,7 +64,7 @@ int Xbind(int sockfd, char* Sdag)
 	xsm.set_type(xia::XBIND);
 
 	xia::X_Bind_Msg *x_bind_msg = xsm.mutable_x_bind();
-	x_bind_msg->set_sdag(Sdag);
+	x_bind_msg->set_sdag(sDAG);
 
 	if ((rc = click_control(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
