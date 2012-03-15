@@ -115,8 +115,6 @@ class XARPResponder : public Element { public:
   private:
 
     struct Entry {
-	//IPAddress dst;
-	//IPAddress mask;
 	XID xida;
 	EtherAddress ena;
     };

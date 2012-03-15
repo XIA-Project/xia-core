@@ -1,20 +1,7 @@
-// -*- c-basic-offset: 4 -*-
 /*
  * xarpresponder.{cc,hh} -- element that responds to XARP queries
- * Robert Morris
- *
- * Copyright (c) 1999-2000 Massachusetts Institute of Technology
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, subject to the conditions
- * listed in the Click LICENSE file. These conditions include: you must
- * preserve this copyright notice, and you cannot mention the copyright
- * holders in advertising related to the Software without their permission.
- * The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
- * notice is a summary of the Click LICENSE file; the license in that file is
- * legally binding.
  */
+// Modified from original ARP code 
 
 #include <click/config.h>
 #include "xarpresponder.hh"
@@ -59,43 +46,7 @@ XARPResponder::add(Vector<Entry> &v, const String &arg, ErrorHandler *errh) cons
     }
     
     v.back().ena = ena; 
-    return 0;
-
-/*
-    for (int i = 0; i < words.size(); ++i) {
-    	IPAddress addr, mask;
-	if (IPPrefixArg(true).parse(words[i], addr, mask, this)) {
-	    v.push_back(Entry());
-	    v.back().dst = addr & mask;
-	    v.back().mask = mask;
-	} else if (EtherAddressArg().parse(words[i], ena, this)) {
-	    if (have_ena) {
-		v.resize(old_vsize);
-		return errh->error("more than one ETH");
-	    }
-	    have_ena = true;
-	} else {
-	    v.resize(old_vsize);
-	    return errh->error("expected IP/MASK ETH");
-	}
-    }
-
-    // check for an argument that is both IP address and Ethernet address
-    for (int i = 0; !have_ena && i < words.size(); ++i)
-	if (EtherAddressArg().parse(words[i], ena, this))
-	    have_ena = true;
-
-    if (v.size() == old_vsize)
-	return errh->error("missing IP/MASK");
-    if (!have_ena) {
-	v.resize(old_vsize);
-	return errh->error("missing ETH");
-    }
-    for (int i = old_vsize; i < v.size(); ++i)
-	v[i].ena = ena;
-    return 0;
-    */
-    
+    return 0;  
 }
 
 int
@@ -108,10 +59,6 @@ XARPResponder::entry_compare(const void *ap, const void *bp, void *user_data)
 
     if (ea.xida == eb.xida)
 	return b - a;		// keep later match
-   // else if ((ea.dst & eb.mask) == eb.dst)
-	//return -1;
-    //else if ((eb.dst & ea.mask) == ea.dst)
-	//return 1;
     else
 	return a - b;
 }
@@ -202,7 +149,6 @@ XARPResponder::simple_action(Packet *p)
 	&& ea->ea_hdr.ar_hrd == htons(XARPHRD_ETHER)
 	&& ea->ea_hdr.ar_pro == htons(ETHERTYPE_XIP)
 	&& ea->ea_hdr.ar_op == htons(XARPOP_REQUEST)) {
-	//IPAddress ipa((const unsigned char *) ea->xarp_tpa);
 		
 	struct click_xia_xid xid_tmp;
     	memcpy( &(xid_tmp.type), ea->xarp_tpa, 4); 
@@ -236,16 +182,12 @@ int
 XARPResponder::lookup_handler(int, String &str, Element *e, const Handler *, ErrorHandler *errh)
 {
     XARPResponder *ar = static_cast<XARPResponder *>(e);
-    //IPAddress a;
     XID xid(str);
-    //if (IPAddressArg().parse(str, a, ar)) {
 	if (const EtherAddress *ena = ar->lookup(xid))
 	    str = ena->unparse();
 	else
 	    str = String();
 	return 0;
-    //} else
-    //	return errh->error("expected IP address");
 }
 
 int
@@ -265,10 +207,6 @@ int
 XARPResponder::remove_handler(const String &s, Element *e, void *, ErrorHandler *errh)
 {
     XARPResponder *ar = static_cast<XARPResponder *>(e);
-    //IPAddress addr, mask;
-    //if (!IPPrefixArg(true).parse(s, addr, mask, ar))
-	//return errh->error("expected IP/MASK");
-    //addr &= mask;
     XID xid(s);
     for (Vector<Entry>::iterator it = ar->_v.begin(); it != ar->_v.end(); ++it)
 	if (it->xida == xid) {
