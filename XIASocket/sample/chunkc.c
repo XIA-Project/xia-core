@@ -199,8 +199,12 @@ int main(int argc, char **argv)
 
      
 	say("requesting list of CIDs\n");
-    if (XgetCIDList(sock, dagv, numCids) < 0)
+    if (XgetCIDList(sock, dagv, numCids - 1) < 0)
 		die(-4, "Unable to get CID list\n");
+
+	say("requesting single CID\n");
+    if( XgetCID(sock, dagv[numCids - 1].cDAG, dagv[numCids - 1].dlen) < 0)
+		die(-4, "Unable to get CID\n");
 
 	doCIDStatus(sock, dagv);
     
