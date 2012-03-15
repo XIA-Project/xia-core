@@ -251,7 +251,7 @@ void echo_dgram()
 {
 	int sock;
 	char *dag;
-	char buf[2048];
+	char buf[XIA_MAXBUF];
 	char cdag[1024]; // client's dag
 	size_t dlen;
 	int n;

@@ -1,9 +1,9 @@
 /*!
+  @file Xdoc.h
+  @brief dummy file to contain main API documentation
+*/  
+/*!
   @mainpage
-
-  @note Doxygen is assuming we have C++ code instead of C and is doing
-  some odd things. If we like this, we'll need to figure out how to 
-  bend it to our will.
 
 <h1>XSocket API</h1>
 
@@ -17,31 +17,36 @@ extendeding them to work with the XIA naming and routing schemes.
 These functions are used by the user process to send or receive packets 
 and to do other socket operations. For more information see their 
 respective descriptions.
-`
+
 Xsocket() creates a socket, Xconnect() connects a socket to a remote DAG, 
-the Xbind() function binds a socket to a local DAG, listen(2) and 
+the Xbind() function binds a socket to a local DAG,
 Xaccept() is used to get a new socket with a new incoming connection.
 
 Xsend() and Xsendto() send data over a socket, while Xrecv() and 
 Xrecvfrom() receive data from a socket. Although there is not currently a
-select method for Xsockets, the standard select() socket function can be 
-used with Xsockets to check for arriving data or a readiness to send data.
+select  or poll method for Xsockets, the standard select() and poll()
+socket function can be used with Xsockets to check for arriving data or
+a readiness to send data.
 
-Xgetsocketinfo() is similar to the traditional getsockname and 
-getpeername functions returning information about the requested socket. 
 Xgetsockopt() and Xsetsockopt() are used to set or get socket layer or 
 protocol options. 
 
-XputCID() and XgetCID() are used to send and receive chunks of content.
+XallocCacheSlice() reserves a block of memory in the local machine's 
+content cache for published chunks of content. XfreeCacheSlice() disconnects
+from the reserved slice and potentially releases the content depending on
+how the slice was allocated.
+
+XputChunk() places a single chunk of content into a cache slicei so that it
+is available on the network. XputFile() and XputBuffer() place one or more
+chunks of content into the slice. XfreeChunkStatus() releases the status
+array allocated by the XputFile() and XputBuffer() functions.
+
+XrequestChunk() and XrequestChunks() bring one or more chunks of content from
+the network to the local machine. XgetChunkStatus() and XgetChunkStatuses()
+check to see if the requested content is available to be read. XreadChunk()
+is then used to get the content into the application. 
 
 Xclose() is used to close a socket.
-
-@note what is the purpose of Xgetsocketidlist()?
-
-<h2>Maybe add some description of how Xsockets currently work</h2>
-@note we can add links to external sites, or example code if we want.
-We're not constrained to a single main documentation page.
-links to other files here.
 
 @warning 
 In the current implementation, the socket used by the API is a normal UDP 
@@ -51,40 +56,40 @@ Attempting to pass a socket created with the the normal socket function
 to the Xsocket API will have similar results. Currently the only standard
 socket function that will work correctly is select().
 
-@note Do we want to document our Google protobuf usage, and if so, do we
-want to include the class definitions for it in this document? I'm
-assuming this documentation is geared toward users, not implementers 
-so it should be omitted.
-
 <h2>XIA Function List</h2>
 - <a href="Xsocket_8h.html#func-members">Full API list</a>
-- Xsocket() Create an XIA socket
-- Xbind() Bind a socket to a DAG
-- Xconnect() Connect to a remote DAG
-- Xclose() Close the Xsocket
+<h3>General Xsocket Functions</h3>
+- Xsocket() create an XIA socket
+- Xbind() bind a socket to a DAG
+- Xclose() close the Xsocket
 - Xsetsockopt() set socket options
 - Xgetsockopt() get socket options
+<h3>Stream Oriented Functions</h3>
+- Xaccept() wait for stream connections
+- Xconnect() connect to a remote DAG
 - Xsend() send data
-- Xsendto() send datagram data
 - Xrecv() receive data
+<h3>Datagram Oriented Functions</h3>
+- Xsendto() send datagram data
 - Xrecvfrom() receive datagram data
-- XgetCID() get a vector of chunks of content
-- XputCID() make a vector of data chunks available
-- Xgetsocketinfo() get information about an Xsocket
-- Xgetsocketidlist() what is this for?
+<h3>Content (Chunk) Oriented Functions</h3>
+- XallocCacheSlice() allocate a space in the local content cache
+- XfreeCacheSlice() release the reserved local cache space
+- XputChunk() make a single chunk of content available
+- XputFile() make a file available as one or more chunks
+- XputBuffer() make a block of memory available as one or more chunks
+- XfreeChunkStatus() frees the chunk status array allocated by XputFile() and XputBuffer()
+- XrequestChunk(), XrequestChunks() bring one or more chunks of content from
+the network to the local machine
+- XgetChunkStatus(), XgetChunkStatuses() get the rediness status of one or more
+chunks of content
+- XreadChunk() load a single chunk into memory
 
-<h3>Unimplemented Features</h3>
-@note Do we want to include a list of standard socket library features 
-that will not be implemented, or just list things that we plan to add 
-at some point in the future?
 
-- listen
-- poll
-- select (XIA) implementation
-- non-blocking sockets
-- shutdown
-- read, write
-- ioctl
-- the flags parameter is currently ignored in all functions
+@todo add description of DAGs (who can provide?)
+@todo add description of how to build an xsocket app including description
+of the xsocketini.conf file 
+@todo add description of chunking and how it works
+@todo what's missing, what needs to be cleaned up more?
 */
 

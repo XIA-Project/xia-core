@@ -16,7 +16,7 @@
 */
 /*!
 ** @file Xconnect.c
-** @brief implements Xclose
+** @brief implements Xconnect()
 */
 
 #include <errno.h>
@@ -25,19 +25,24 @@
 #include "Xutil.h"
 
 /*!
-** @brief Connect to a remote XIA SID socket.
+** @brief Initiate a connection on an Xsocket of type XSOCK_STREAM
 **
-** Connect to a remote XIA SID socket.
-** This is only valid on sockets created with the XSOCK_STREAM transport 
-** type. dest_DAG should be an SID.
+** The Xconnect() call connects the socket referred to by sockfd to the
+** SID specified by dDAG.a It is only valid for use with socket created
+** with the XSOCK_STREAM Xsocket type.
+**
+** @note Xconnect() differs from the standard connect API in that it does
+** not currently support use with Xsockets created with the XSOCK_DGRAM
+** socket type.
 **
 ** @param sockfd	The control socket
-** @param dest_DAG	The DAG of the remote service to connect to.
+** @param dDAG	The DAG (SID) of the remote service to connect to.
 **
 ** @returns 0 on success
-** @returns -1 on error with errno set
+** @returns -1 on error with errno set to an error compatible with those
+** returned by the standard connect call.
 */
-int Xconnect(int sockfd, char* dest_DAG)
+int Xconnect(int sockfd, const char* dDAG)
 {
 	int rc;
 
@@ -57,7 +62,7 @@ int Xconnect(int sockfd, char* dest_DAG)
 	xsm.set_type(xia::XCONNECT);
 
 	xia::X_Connect_Msg *x_connect_msg = xsm.mutable_x_connect();
-	x_connect_msg->set_ddag(dest_DAG);
+	x_connect_msg->set_ddag(dDAG);
 
 	// In Xtransport: send SYN to destination server
 	if ((rc = click_control(sockfd, &xsm)) < 0) {

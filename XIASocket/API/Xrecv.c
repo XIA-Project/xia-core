@@ -15,7 +15,7 @@
 */
 /*!
 ** @file Xrecv.c
-** @brief implements Xrecv
+** @brief implements Xrecv()
 */
 
 #include <errno.h>
@@ -24,23 +24,34 @@
 #include "Xutil.h"
 
 /*!
-** @brief receives data on an Xsocket. Xconnect must be called before
-** using this function.
+** @brief Receive data from an Xsocket
+**
+** Xrecv() retrieves data from a connected Xsocket of type XSOCK_STREAM.
+** sockfd must have previously been connected via Xaccept() or
+** Xconnect().
+**
+** Xrecv() does not currently have a non-blocking mode, and will block
+** until a data is available on sockfd. However, the standard socket API
+** calls select and poll may be used with the Xsocket. Either function
+** will deliver a readable event when a new connection is attempted and
+** you may then call Xrecv() to get the data.
+**
+** NOTE: in cases where more data is received than specified by the caller,
+** the excess data will be stored at the API level. Subsequent Xrecv calls
+** return the stored data until it is drained, and will then resume requesting
+** data from the transport.
 **
 ** @param sockfd - The socket to receive with
 ** @param rbuf - where to put the received data
 ** @param len - maximum amount of data to receive. the amount of data
 ** returned may be less than len bytes.
 ** @param flags - (This is not currently used but is kept to be compatible
-** with the standard sendto socket call.
+** with the standard sendto socket call).
 **
-** NOTE: in cases where more data is received than specified by the caller,
-** the excess data will be stored in the socket state structure and will 
-** be returned from there rather than from Click. Once the socket state
-** is drained, requests will be sent through to Click again.
-**
-** @returns number of bytes received
-** @returns -1 on failure with errno set.
+** @returns the number of bytes received, which may be less than the number
+** requested by the caller
+** @returns -1 on failure with errno set to an error compatible with the standard
+** recv call.
 */
 int Xrecv(int sockfd, void *rbuf, size_t len, int  /*flags */)
 {

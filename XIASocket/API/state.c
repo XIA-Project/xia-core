@@ -14,6 +14,10 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
+/*!
+  @file state.c
+  @brief implements internal socket state functionality.
+*/
 #include <map>
 #include <pthread.h>
 #include <string.h>

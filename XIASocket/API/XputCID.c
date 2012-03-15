@@ -15,7 +15,7 @@
 */
 /*!
 ** @file XputCID.c
-** @brief implements XputCID
+** @brief implements XputCID()
 */
 
 #include <errno.h>

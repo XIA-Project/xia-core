@@ -15,7 +15,7 @@
 */
 /*!
 ** @file XgetCID.c
-** @brief implements XgetCID and XgetCIDList
+** @brief implements XgetCID() and XgetCIDList()
 */
 
 #include <errno.h>

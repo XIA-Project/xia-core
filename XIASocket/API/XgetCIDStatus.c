@@ -15,7 +15,7 @@
 */
 /*!
 ** @file XgetCIDStatus.c
-** @brief implements XgetCIDStatus
+** @brief implements XgetCIDStatus() and XgetCIDListStatus()
 */
 
 #include <errno.h>

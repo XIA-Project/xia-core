@@ -109,7 +109,7 @@ void getConfig(int argc, char** argv)
 				if (loops < 0) loops = 0;
 				break;
 			case 's':
-				// send pacets of size <size> maximum is 1024
+				// send pacets of size <size>
 				// if 0, send random sized packets
 				pktSize = atoi(optarg);
 				if (pktSize < 0) pktSize = 0;

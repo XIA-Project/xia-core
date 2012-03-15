@@ -16,7 +16,7 @@
 */
 /*!
 ** @file Xsendto.c
-** @brief implements Xsendto
+** @brief implements Xsendto()
 */
 #include "Xsocket.h"
 #include "Xinit.h"
@@ -24,7 +24,17 @@
 #include <errno.h>
 
 /*!
-** @brief Sends a datagram to the specified DAG.
+** @brief Sends a datagram message on an Xsocket
+**
+** Xsendto sends a datagram to the specified address. This address should
+** be a valid SID.
+** 
+** @note Unlike a standard socket, Xsendto() is only valid on Xsockets of
+** type XSOCK_DGRAM.
+**
+** If the buffer is too large, Xsendto() will truncate the message and
+** send what it can. This is different from the standard sendto which returns
+** an error.
 **
 ** @param sockfd - The socket to send the data on
 ** @param buf - the data to send
@@ -32,14 +42,14 @@
 ** Xsendto api is limited to sending at most XIA_MAXBUF bytes.
 ** @param flags - (This is not currently used but is kept to be compatible
 ** with the standard sendto socket call.
-** @param dDAG address to send the datagram to
+** @param dDAG - address (SID) to send the datagram to
 ** @param dlen length of the DAG, currently unused
 **
 ** @returns number of bytes sent on success
-** @returns -1 on failure with errno set.
+** @returns -1 on failure with errno setC to an error compatible with those
+** returned by the standard sendto call.
 **
 */
-
 int Xsendto(int sockfd,const void *buf, size_t len, int /*flags*/,
 		char* dDAG, size_t /*dlen*/)
 {

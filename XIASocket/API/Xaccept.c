@@ -16,7 +16,7 @@
 */
 /*!
 ** @file Xaccept.c
-** @brief implements Xaccept
+** @brief implements Xaccept()
 */
 
 #include <errno.h>
@@ -25,22 +25,32 @@
 #include "Xutil.h"
 
 /*!
-** @brief The Xaccept system call is is only valid with Xsockets created with
+** @brief Accept a conection from a remote Xsocket
+**
+** The Xaccept system call is is only valid with Xsockets created with
 ** the XSOCK_STREAM tranport type. It accepts the first availble connection
 ** request for the listening socket, sockfd, creates a new connected socket, 
 ** and returns a new Xsocket descriptor referring to that socket. The newly 
 ** created socket is not in the listening state. The original socket 
 ** sockfd is unaffected by this call.
-
+**
+** Xaccept does not currently have a non-blocking mode, and will block
+** until a connection is made. However, the standard socket API calls select
+** and poll may be used with the Xsocket. Either function will deliver a
+** readable event when a new connection is attempted and you may then call
+** Xaccept() to get a socket for that connection. 
+**
 ** @note Unlike standard sockets, there is currently no Xlisten function. 
-** Callers must create the listening socet by calling Xsocket with the 
-** XSOCK_STREAM transport_type and bind it to a source DAG with Xbind. XAccept
+** Callers must create the listening socket by calling Xsocket with the 
+** XSOCK_STREAM transport_type and bind it to a source DAG with Xbind(). XAccept
 ** may then be called to wait for connections.
 **
-** @param sockfd	The control socket
+** @param sockfd	an Xsocket() previously created with the XSOCK_STREAM type,
+** and bound to a local DAG with Xbind()
 **
 ** @returns a non-negative integer that is the new Xsocket id
-** @returns -1 on error with errno set
+** @returns -1 on error with errno set to an error compatible with those
+** returned by the standard accept call.
 */
 int Xaccept(int sockfd)
 {
