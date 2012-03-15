@@ -46,7 +46,7 @@ extern "C" {
 #define REQUEST_FAILED -1
 
 // Xsetsockopt options
-#define XOPT_HLIM		1	// Hop Limit / TTL
+#define XOPT_HLIM		1	// Hop Limit TTL
 #define XOPT_NEXT_PROTO	2	// change the next proto field of the XIA header
 
 // XIA protocol types
@@ -55,6 +55,11 @@ extern "C" {
 
 // error codes
 #define ECLICKCONTROL 9999	// error code for general click communication errors
+
+#define MAX(x, y) (((x) > (y)) ? (x) : (y))
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+
+
 
 struct Netinfo{
     unsigned short port;

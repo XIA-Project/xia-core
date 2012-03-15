@@ -199,7 +199,6 @@ class XARPQuerier : public Element { public:
     XID       _my_bcast_xid;
     uint32_t _poll_timeout_j;
     int _broadcast_poll;
-    
 
     // statistics
     atomic_uint32_t _xarp_queries;

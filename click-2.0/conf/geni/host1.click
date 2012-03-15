@@ -18,7 +18,7 @@ c0[0] -> Strip(14) -> MarkXIAHeader()
 
 host1[0]
 //-> XIAPrint() 
--> EtherEncap(0x9999, 00:04:23:b7:1d:f4, 00:04:23:b7:41:50) 
+-> EtherEncap(0x9999, 00:04:23:b7:19:02, 00:04:23:b7:40:76) 
 //-> Print() 
 ->  XIAPrint("host1->router1")
 -> c::XIAXIDTypeCounter(src AD, src HID, src SID, src CID, src IP, -)

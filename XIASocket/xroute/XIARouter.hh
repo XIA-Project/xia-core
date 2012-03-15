@@ -80,6 +80,7 @@ public:
 	int setRoute(std::string &xid, unsigned short port, std::string &next, unsigned long flags);
 	int delRoute(std::string &xid);
 
+	const char *cserror();
 private:
 	bool _connected;
 	std::string _router;

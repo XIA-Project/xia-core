@@ -5,7 +5,16 @@ elementclass GenericRouting4Port {
     // output[1]: need to update "last" pointer
     // output[2]: no match
 
-    input -> rt :: XIAXIDRouteTable;
+    rt :: XIAXIDRouteTable($local_addr);
+
+    // previously painted according to the incoming inteface number	
+    input -> sw :: PaintSwitch
+    sw[0] -> [0]rt;
+    sw[1] -> [1]rt;
+    sw[2] -> [2]rt;
+    sw[3] -> [3]rt;
+    sw[4] -> [4]rt;
+ 
     rt[0] -> Paint(0) -> [0]output;
     rt[1] -> Paint(1) -> [0]output;
     rt[2] -> Paint(2) -> [0]output;
@@ -186,7 +195,7 @@ elementclass Router {
     Script(write n/proc/rt_AD/rt.add - 1);      // default route for AD
     Script(write n/proc/rt_AD/rt.add $local_ad 4);    // self AD as destination
     Script(write n/proc/rt_HID/rt.add - 0);     // forwarding for local HID
-    Script(write n/proc/rt_HID/rt.add HID:1111111111111111111111111111111111111111 5)  // drop broadcast packet ; to be fixed!!!
+    Script(write n/proc/rt_HID/rt.add BHID 7);  // outgoing broadcast packet
     Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self HID as destination
     Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
@@ -424,7 +433,7 @@ elementclass IP6Router4Port {
 
 
 
-// 4-port router node with XRoute running
+// 4-port router node with XRoute process running
 elementclass XRouter4Port {
     $local_addr, $local_ad, $local_hid, $fake, $CLICK_IP, $API_IP, $ether_addr |
 
@@ -491,17 +500,17 @@ elementclass XRouter4Port {
     Idle() -> [4]xtransport;
     
     
-    input[0] -> [0]n;
-    input[1] -> [0]n;
-    input[2] -> [0]n;
-    input[3] -> [0]n;
+    input[0] -> Paint(0) -> [0]n;
+    input[1] -> Paint(1) -> [0]n;
+    input[2] -> Paint(2) -> [0]n;
+    input[3] -> Paint(3) -> [0]n;
 
     n[0] -> sw :: PaintSwitch
     srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
-    n[1] -> srcTypeClassifier[1] -> [2]xtransport[2] ->  [0]n;
+    n[1] -> srcTypeClassifier[1] -> [2]xtransport[2] -> Paint(4) -> [0]n;
     srcTypeClassifier[0] -> Discard;    // do not send CID responses directly to RPC;
     
-    n[2] -> [0]cache[0] -> [1]n;
+    n[2] -> [0]cache[0] -> Paint(4) -> [1]n;
     //For get and put cid
     xtransport[3] -> [1]cache[1] -> [3]xtransport;
     
@@ -572,6 +581,7 @@ elementclass EndHost {
     Script(write n/proc/rt_AD/rt.add - 0);      // default route for AD
     Script(write n/proc/rt_HID/rt.add - 0);     // default route for HID
     Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self HID as destination
+    Script(write n/proc/rt_HID/rt.add BHID 7);  // outgoing broadcast packet
     Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
     Script(write n/proc/rt_IP/rt.add - 0); 	// default route for IPv4    
@@ -580,9 +590,10 @@ elementclass EndHost {
     n[3] -> Discard();
     Idle() -> [4]xtransport;
 
-    input[0] -> n;
+    input[0] -> Paint(0) -> [0]n;  
+    
     srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
-    n[1] -> srcTypeClassifier[1] -> [2]xtransport[2] ->  [0]n;
+    n[1] -> srcTypeClassifier[1] -> [2]xtransport[2] -> Paint(4) ->  [0]n;
     srcTypeClassifier[0] -> Discard;    // do not send CID responses directly to RPC;
     
     n[2] -> [0]cache[0] -> [1]n;

@@ -311,7 +311,7 @@ XARPQuerier::handle_xip(Packet *p, bool response)
     int r;
 
     // Easy case: requires only read lock
-  retry_read_lock:
+    retry_read_lock:
     r = _xarpt->lookup(nexthop_neighbor_xid, dst_eth, _poll_timeout_j);
     if (r >= 0) {
 	assert(!dst_eth->is_broadcast());

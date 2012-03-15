@@ -10,11 +10,11 @@ c0 :: Classifier(12/9999, 12/0800);
 c1 :: Classifier(12/9999, 12/0800);
 c2 :: Classifier(12/9999, 12/0800);
 
-todevice0 :: ToDevice(eth4);
-todevice1 :: ToDevice(eth2);
+todevice0 :: ToDevice(eth2);
+todevice1 :: ToDevice(eth3);
 
 // From device (GENI pc211)
-FromDevice(eth4, PROMISC true) -> c0;
+FromDevice(eth2, PROMISC true) -> c0;
 c0[0] -> Strip(14) -> MarkXIAHeader() 
 ->  XIAPrint("host1->router1")
 -> [0]router1; // XIA packet
@@ -32,7 +32,7 @@ c0[1]
 
 
 // From device (GENI pc222)
-FromDevice(eth2, PROMISC true) -> c1;
+FromDevice(eth3, PROMISC true) -> c1;
 c1[0] -> Strip(14) -> MarkXIAHeader() 
 ->  XIAPrint("router0->router1")
 -> [1]router1; // XIA packet
@@ -71,13 +71,13 @@ Idle -> c2[0] -> Discard;
 // To device0 (GENI pg40)
 router1[0]
 //-> XIAPrint() 
--> EtherEncap(0x9999, 00:04:23:b7:41:50, 00:04:23:b7:1d:f4) -> todevice0;
+-> EtherEncap(0x9999, 00:04:23:b7:40:76, 00:04:23:b7:19:02) -> todevice0;
 
 
 // To device1 (GENI pg55)
 router1[1]
 //-> XIAPrint() 
--> EtherEncap(0x9999, 00:04:23:b7:3f:ce, 00:04:23:b7:21:04)  
+-> EtherEncap(0x9999, 00:04:23:b7:40:77, 00:04:23:b7:1a:be)  
 -> c::XIAXIDTypeCounter(src AD, src HID, src SID, src CID, src IP, -)
 -> todevice1; 
 

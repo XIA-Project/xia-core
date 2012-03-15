@@ -105,35 +105,36 @@ int XIARouter::getRoutes(std::string xidtype, std::vector<XIARouteEntry> &xrt)
 		if (start < current || current < len) {
 			line = result.substr(start, current - start);
 
-			if (n > 0) {
-				// FIXME: first line of the result is a header, we should just eliminate
-				// it in the click side
-				XIARouteEntry entry;
-				unsigned start, next;
-				string s;
-				int port;
+			XIARouteEntry entry;
+			unsigned start, next;
+			string s;
+			int port;
 
-				start = 0;
-				next = line.find(";");
-				entry.xid = line.substr(start, next - start);
+			start = 0;
+			next = line.find(",");
+			entry.xid = line.substr(start, next - start);
 
-				start = next + 1;
-				s = line.substr(start, line.length() - start);
-				port = atoi(s.c_str());
-				entry.port = port;
+			start = next + 1;
+			next = line.find(",", start);
+			s = line.substr(start, next - start);
+			port = atoi(s.c_str());
+			entry.port = port;
 
-				// FIXME: test code - replace with real stuff
-				entry.nextHop = "AD:1111222233334444555566667777888899990000";
-				entry.flags = 5;
-				xrt.push_back(entry);
-			}
+			start = next + 1;
+			next = line.find(",", start);
+			entry.nextHop = line.substr(start, next - start);
+
+			start = next + 1;
+			s = line.substr(start, line.length() - start);
+			entry.flags = atoi(s.c_str());
+
+			xrt.push_back(entry);
 			n++;
 		}
 		current++;
 	}
 
-	// return one less because of the header field we skipped
-	return n - 1;
+	return n;
 }
 
 std::string XIARouter::itoa(unsigned i)
@@ -146,7 +147,7 @@ std::string XIARouter::itoa(unsigned i)
 	return s;
 }
 
-int XIARouter::updateRoute(string cmd, std::string &xid, unsigned short port, std::string &next, unsigned long /* flags */)
+int XIARouter::updateRoute(string cmd, std::string &xid, unsigned short port, std::string &next, unsigned long flags)
 {
 	string xidtype;
 	unsigned n;
@@ -170,12 +171,14 @@ int XIARouter::updateRoute(string cmd, std::string &xid, unsigned short port, st
 	xidtype = xid.substr(0, n);
 
 	std::string table = _router + "/n/proc/rt_" + xidtype + "/rt";
-	std::string entry = xid + " " + itoa(port);
 
-	// FIXME: will need to add logic here to differentiate remove from set/add once
-	// the click changes are made
+	std::string entry;
 
-//	printf("%s ::: %s ::: %s\n", cmd.c_str(), tablec_str(), entry.c_str());
+	// remove command only takes an xid
+	if (cmd == "remove") 
+		entry = xid;
+	else
+		entry = xid + "," + itoa(port) + "," + next + "," + itoa(flags);
 
 	if ((_cserr = _cs.write(table, cmd, entry)) != 0)
 		return XR_CLICK_ERROR;
@@ -185,17 +188,46 @@ int XIARouter::updateRoute(string cmd, std::string &xid, unsigned short port, st
 
 int XIARouter::addRoute(std::string &xid, unsigned short port, std::string &next, unsigned long flags)
 {
-	return updateRoute("add", xid, port, next, flags);
+	return updateRoute("add4", xid, port, next, flags);
 }
 
 int XIARouter::setRoute(std::string &xid, unsigned short port, std::string &next, unsigned long flags)
 {
-	return updateRoute("set", xid, port, next, flags);
+	return updateRoute("set4", xid, port, next, flags);
 }
 
 int XIARouter::delRoute(std::string &xid)
 {
 	string next = "";
 	return updateRoute("remove", xid, 0, next, 0);
+}
+
+const char *XIARouter::cserror()
+{
+	switch(_cserr) {
+		case ControlSocketClient::no_err:
+			return "no error";
+		case ControlSocketClient::sys_err:
+			return "O/S or networking error, check errno for more information";
+		case ControlSocketClient::init_err:
+			return "tried to perform operation on an unconfigured ControlSocketClient";
+		case ControlSocketClient::reinit_err:
+			return "tried to re-configure the client before close()ing it";
+		case ControlSocketClient::no_element:
+			return "specified element does not exist";
+		case ControlSocketClient::no_handler:
+			return "specified handler does not exist";
+		case ControlSocketClient::handler_no_perm:
+			return "router denied access to the specified handler";
+		case ControlSocketClient::handler_err:
+			return "handler returned an error";
+		case ControlSocketClient::handler_bad_format:
+			return "bad format in calling handler";
+		case ControlSocketClient::click_err:
+			return "unexpected response or error from the router";
+		case ControlSocketClient::too_short:
+			return "user buffer was too short";
+	}
+	return "unknown";
 }
 

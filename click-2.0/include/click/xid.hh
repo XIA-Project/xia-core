@@ -12,7 +12,9 @@ class XID { public:
     XID();
 
     /** @brief Construct an XID from a struct click_xia_xid. */
-    XID(const struct click_xia_xid& xid) : _xid(xid) { }
+    inline XID(const struct click_xia_xid& xid)
+	: _xid(xid) {
+    }
 
     XID(const String& str);
 
@@ -37,9 +39,12 @@ class XID { public:
     String unparse() const;
     String unparse_pretty(const Element* context = NULL) const;
 
+	bool valid() { return (ntohl(_xid.type) != CLICK_XIA_XID_TYPE_UNDEF); };
+
   private:
     struct click_xia_xid _xid;
 };
+
 
 /** @brief Return a struct click_xia_xid corresponding to the address. */
 inline const struct click_xia_xid&
@@ -50,6 +55,7 @@ XID::xid() const
 
 /** @brief Return a struct click_xia_xid corresponding to the address. */
 // this is disabled to guarantee a correct _hash value
+
 inline struct click_xia_xid&
 XID::xid() 
 {
@@ -70,6 +76,7 @@ XID::data()
     return reinterpret_cast<unsigned char*>(&_xid);
 }
 
+
 /** @brief Return a struct click_xia_xid corresponding to the address. */
 inline
 XID::operator struct click_xia_xid() const
@@ -78,6 +85,7 @@ XID::operator struct click_xia_xid() const
 }
 
 StringAccum& operator<<(StringAccum&, const XID&);
+
 
 /** @brief Hash function.
  * @return The hash value of this XID.
@@ -114,6 +122,7 @@ XID::operator!=(const XID& rhs) const
            reinterpret_cast<const uint32_t*>(&_xid)[5] != reinterpret_cast<const uint32_t*>(&rhs._xid)[5];
 }
 
+
 class ArgContext;
 class Args;
 extern const ArgContext blank_args;
@@ -130,6 +139,7 @@ struct XIDArg {
 };
 
 template<> struct DefaultArg<XID> : public XIDArg {};
+
 
 CLICK_ENDDECLS
 #endif

@@ -1708,15 +1708,20 @@ Packet::nexthop_neighbor_xid_anno() const
     for (size_t d = 0; d < sizeof(xid.id); d++) {
     	xid.id[d] = xanno()->u8[nexthop_neighbor_xid_anno_offset + 4 + d];
     }
-    
-    //return XID ( (const click_xia_xid&) (&(xanno()->u8[nexthop_neighbor_xid_anno_offset])) );
     return XID ( xid );
 }
 
 inline void
 Packet::set_nexthop_neighbor_xid_anno(XID x)
-{
-    memcpy(xanno()+nexthop_neighbor_xid_anno_offset , &(x.xid()), nexthop_neighbor_xid_anno_size);
+{   
+    struct click_xia_xid xid_temp;
+    xid_temp = x.xid();
+    
+    xanno()->u32[nexthop_neighbor_xid_anno_offset / 4] = xid_temp.type;
+    
+    for (size_t d = 0; d < sizeof(xid_temp.id); d++) {
+    	xanno()->u8[nexthop_neighbor_xid_anno_offset + 4 + d] = xid_temp.id[d];
+    }
 }
 
 

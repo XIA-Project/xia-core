@@ -19,12 +19,11 @@
 #include <fcntl.h>
 using namespace std;
 
-
 #define HELLO_INTERVAL 1
-#define LSA_INTERVAL 2
-#define CALC_DIJKSTRA_INTERVAL 3
+#define LSA_INTERVAL 3
+#define CALC_DIJKSTRA_INTERVAL 4
+#define MAX_HOP_COUNT 50
 #define MAX_SEQNUM 100000
-
 
 #define AD0   "AD:1000000000000000000000000000000000000000"
 #define AD1   "AD:1000000000000000000000000000000000000001"
@@ -44,7 +43,7 @@ using namespace std;
 typedef struct {
 	std::string dest;	// destination AD or HID
 	std::string nextHop;	// nexthop HID
-	unsigned short port;	// outgoing port
+	int port;		// interface (outgoing port)
 	unsigned long  flags;	// flag 
 } RouteEntry;
 
@@ -52,6 +51,7 @@ typedef struct {
 	std::string AD;		// neigbor AD
 	std::string HID;	// neighbor HID
 	int cost; 		// link cost
+	int port;		// interface (outgoing port)
 } NeighborEntry;
 
 
@@ -94,6 +94,9 @@ typedef struct RouteState {
 
 void listRoutes(std::string xidType);
 
+// returns an interface number to a neighbor HID
+int interfaceNumber(std::string xidType, std::string xid);
+
 // initialize the route state
 void initRouteState();
 
@@ -111,6 +114,9 @@ int processLSA(const char* lsa_msg);
 
 // compute the shortest path (Dijkstra)
 void calcShortestPath();
+
+// update the click routing table
+void updateClickRoutingTable();
 
 // print routing table
 void printRoutingTable();
