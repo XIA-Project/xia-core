@@ -14,8 +14,8 @@
 ** limitations under the License.
 */
 /*!
-** @file XgetCIDStatus.c
-** @brief implements XgetCIDStatus() and XgetCIDListStatus()
+** @file XgetChunkStatus.c
+** @brief implements XgetChunkStatus() and XgetChunkStatuses()
 */
 
 #include <errno.h>
@@ -38,14 +38,14 @@
 ** @returns 0 waiting for chunk response
 ** @returns -1 on error with errno set
 */
-int XgetCIDStatus(int sockfd, char* cDAG, size_t /* dlen */)
+int XgetChunkStatus(int sockfd, char* cDAG, size_t /* dlen */)
 {
 	struct cDAGvec dv;
 
 	dv.cDAG = cDAG;
 	dv.dlen = strlen(cDAG);
 
-	return XgetCIDListStatus(sockfd, &dv, 1);
+	return XgetChunkStatuses(sockfd, &dv, 1);
 }
 
 /*!
@@ -64,7 +64,7 @@ int XgetCIDStatus(int sockfd, char* cDAG, size_t /* dlen */)
 ** waiting state
 ** @returns -1 on socket error with or if an invalid CID was specified
 */
-int XgetCIDListStatus(int sockfd, struct cDAGvec *cDAGv, int numCIDs)
+int XgetChunkStatuses(int sockfd, struct cDAGvec *cDAGv, int numCIDs)
 {
 	int rc;
 	char buffer[MAXBUFLEN];
@@ -87,25 +87,25 @@ int XgetCIDListStatus(int sockfd, struct cDAGvec *cDAGv, int numCIDs)
 
 	// protobuf message
 	xia::XSocketMsg xsm;
-	xsm.set_type(xia::XGETCIDSTATUS);
+	xsm.set_type(xia::XGETCHUNKSTATUS);
 
-	xia::X_Getcidstatus_Msg *x_getcidstatus_msg = xsm.mutable_x_getcidstatus();
+	xia::X_Getchunkstatus_Msg *x_getchunkstatus_msg = xsm.mutable_x_getchunkstatus();
   
 	for (int i = 0; i < numCIDs; i++) {
 		if (cDAGv[i].cDAG) {
-			x_getcidstatus_msg->add_dag(cDAGv[i].cDAG);
+			x_getchunkstatus_msg->add_dag(cDAGv[i].cDAG);
 		} else {
 			LOGF("cDAGv[%d] is NULL", i);
 		}
 	}
 
-	if (x_getcidstatus_msg->dag_size() == 0) {
+	if (x_getchunkstatus_msg->dag_size() == 0) {
 		LOG("no dags were specified!");
 		errno = EFAULT;
 		return -1;
 	}
 
-	x_getcidstatus_msg->set_payload((const char*)buf, strlen(buf) + 1);
+	x_getchunkstatus_msg->set_payload((const char*)buf, strlen(buf) + 1);
 
 	std::string p_buf;
 	xsm.SerializeToString(&p_buf);
@@ -123,15 +123,15 @@ int XgetCIDListStatus(int sockfd, struct cDAGvec *cDAGv, int numCIDs)
 	xia::XSocketMsg xia_socket_msg1;
 	xia_socket_msg1.ParseFromString(buffer);
 
-	if (xia_socket_msg1.type() == xia::XGETCIDSTATUS) {
+	if (xia_socket_msg1.type() == xia::XGETCHUNKSTATUS) {
 		
-		xia::X_Getcidstatus_Msg *x_getcidstatus_msg1 = xia_socket_msg1.mutable_x_getcidstatus();
+		xia::X_Getchunkstatus_Msg *x_getchunkstatus_msg1 = xia_socket_msg1.mutable_x_getchunkstatus();
 		    
 		char status_tmp[100];
 		int status_for_all = READY_TO_READ;
 		
 		for (int i = 0; i < numCIDs; i++) {
-			strcpy(status_tmp, x_getcidstatus_msg1->status(i).c_str());
+			strcpy(status_tmp, x_getchunkstatus_msg1->status(i).c_str());
 		    	
 			if (strcmp(status_tmp, "WAITING") == 0) {
 				cDAGv[i].status = WAITING_FOR_CHUNK;

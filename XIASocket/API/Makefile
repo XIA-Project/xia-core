@@ -3,8 +3,8 @@ CC=g++
 LD=g++
 CFLAGS=-c -Wall -Wextra -I../minini
 LDFLAGS =-lprotobuf
-SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XgetCID.c  \
-		XgetCIDStatus.c  XreadCID.c  XputCID.c Xrecv.c \
+SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XrequestChunk.c  \
+		XgetChunkStatus.c  XreadChunk.c  XputChunk.c Xrecv.c \
         Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c   \
 		Xsetsockopt.c Xutil.c state.c Xinit.c \
 		../minini/minIni.c 

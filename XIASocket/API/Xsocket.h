@@ -49,6 +49,39 @@ extern "C" {
 #define READY_TO_READ 1
 #define REQUEST_FAILED -1
 
+/* Cache policy */
+#define DEFAULT					(POLICY_LRU | POLICY_RETAIN_ON_EXIT)
+#define POLICY_LRU				0x00000001
+#define POLICY_FIFO				0x00000002
+#define POLICY_REMOVE_ON_EXIT	0x00001000
+#define POLICY_RETAIN_ON_EXIT	0x00002000
+
+#define CID_HASH_SIZE 40
+
+/* CID cache context */
+struct CIDContext_t {
+    int sockfd;
+    int contextID;
+	unsigned cachePolicy;
+    unsigned cacheSize;
+	unsigned ttl;
+} ;
+
+struct cStat_t {
+	int size;
+	char CID[CID_HASH_SIZE];
+//	int type;
+//	FILE *fd;
+	int32_t ttl;
+	struct timeval timestamp;
+};
+
+struct cDAGvec {
+	char* cDAG;
+	size_t dlen; 
+	int status; // 1: ready to be read, 0: waiting for chunk response, -1: failed
+};
+
 // Xsetsockopt options
 #define XOPT_HLIM		1	// Hop Limit TTL
 #define XOPT_NEXT_PROTO	2	// change the next proto field of the XIA header
@@ -60,29 +93,12 @@ extern "C" {
 // error codes
 #define ECLICKCONTROL 9999	// error code for general click communication errors
 
+#ifndef MAX
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
+#endif
+#ifndef MIN
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
-
-
-
-struct Netinfo{
-    unsigned short port;
-    char xid[MAXBUFLEN];
-    char src_path[MAXBUFLEN];
-    char dst_path[MAXBUFLEN];
-    int nxt;
-    int last;
-    uint8_t hlim;
-    char status[20];
-    char protocol[20];
-} ;
-
-
-struct cDAGvec {
-	char* cDAG;
-	size_t dlen; 
-	int status; // 1: ready to be read, 0: waiting for chunk response, -1: failed
-};
+#endif
 
 //Function list
 extern int Xsendto(int sockfd,const void *buf, size_t len, int flags,char * dDAG, size_t dlen);
@@ -94,13 +110,19 @@ extern int Xclose(int sock);
 extern int Xrecv(int sockfd, void *rbuf, size_t len, int flags);
 extern int Xsend(int sockfd, const void *buf, size_t len, int flags);
 
-extern int XgetCID(int sockfd, char* cDAG, size_t dlen);
-extern int XgetCIDList(int sockfd, const struct cDAGvec *cDAGv, int numCIDs);
-extern int XgetCIDStatus(int sockfd, char* cDAG, size_t dlen);
-extern int XgetCIDListStatus(int sockfd, struct cDAGvec *cDAGv, int numCIDs);
-extern int XreadCID(int sockfd, void *rbuf, size_t len, int flags, char * cDAG, size_t dlen);
+extern int XrequestChunk(int sockfd, char* cDAG, size_t dlen);
+extern int XrequestChunks(int sockfd, const struct cDAGvec *cDAGv, int numCIDs);
+extern int XgetChunkStatus(int sockfd, char* cDAG, size_t dlen);
+extern int XgetChunkStatuses(int sockfd, struct cDAGvec *cDAGv, int numCIDs);
+extern int XreadChunk(int sockfd, void *rbuf, size_t len, int flags, char * cDAG, size_t dlen);
 
-extern int XputCID(int sockfd, const void *buf, size_t len, int flags,char* sDAG, size_t dlen);
+extern struct CIDContext_t *XallocCacheSlice(unsigned policy, unsigned size);
+extern int XfreeCacheSlice(CIDContext_t *ctx);
+extern int XputChunk(const struct CIDContext_t *ctx, const char *data, unsigned length, unsigned TTL, struct cStat_t *cStat);
+extern int XputFile(struct CIDContext_t *ctx, FILE *, unsigned chunkSize, unsigned TTL, struct cStat_t *cStat, unsigned numcStat);
+extern int XputBuffer(struct CIDContext_t *ctx, const char *, unsigned size, unsigned chunkSize, unsigned TTL, struct cStat_t *cStat, unsigned numcStat);
+extern int XremoveChunk(struct CIDContext_t *, struct cStat_t *cStat);
+
 extern int Xaccept(int sockfd);
 extern void error(const char *msg);
 extern void set_conf(const char *filename, const char *sectioname);

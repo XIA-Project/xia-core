@@ -14,8 +14,8 @@
 ** limitations under the License.
 */
 /*!
-** @file XreadCID.c
-** @brief implements XreadCID()
+** @file XreadChunk.c
+** @brief implements XreadChunk()
 */
 
 #include<errno.h>
@@ -25,7 +25,7 @@
 
 /*!
 ** @brief Reads the contents of the specified CID into rbuf. Must be called
-** after XgetCID() or XgetCIDList().
+** after XrequestChunk() or XrequestChunks().
 **
 ** @param sockfd - the control socket (must be of type XSOCK_CHUNK)
 ** @param rbuf - buffer to receive the data
@@ -37,7 +37,7 @@
 ** @returns number of bytes in the CID
 ** @returns -1 on error with errno set
 */
-int XreadCID(int sockfd, void *rbuf, size_t len, int /* flags */, 
+int XreadChunk(int sockfd, void *rbuf, size_t len, int /* flags */, 
 		char * cDAG, size_t /* dlen */)
 {
 	int rc;
@@ -58,11 +58,11 @@ int XreadCID(int sockfd, void *rbuf, size_t len, int /* flags */,
 	}
 
 	xia::XSocketMsg xsm;
-	xsm.set_type(xia::XREADCID);
+	xsm.set_type(xia::XREADCHUNK);
 
-	xia::X_Readcid_Msg *x_readcid_msg = xsm.mutable_x_readcid();
+	xia::X_Readchunk_Msg *x_readchunk_msg = xsm.mutable_x_readchunk();
   
-	x_readcid_msg->set_dag(cDAG);
+	x_readchunk_msg->set_dag(cDAG);
 
 	std::string p_buf;
 	xsm.SerializeToString(&p_buf);
