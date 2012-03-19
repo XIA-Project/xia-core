@@ -13,6 +13,7 @@
 #include "xiaxidroutetable.hh"
 #include <clicknet/udp.h>
 #include <click/string.hh>
+#include <elements/ipsec/sha1_impl.hh>
 #if CLICK_USERLEVEL
 #include <list>
 #include <stdio.h>
@@ -50,6 +51,7 @@ using namespace std;
 #define READY_TO_READ 1
 #define REQUEST_FAILED -1
 
+#define HASH_KEYSIZE 20
 
 CLICK_DECLS
 
