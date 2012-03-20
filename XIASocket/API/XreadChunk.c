@@ -31,14 +31,14 @@
 ** @param rbuf - buffer to receive the data
 ** @param len - length of rbuf
 ** @param flags - currently unused
-** @param cDAG - the CID to retrieve
-** @param dlen - length of cDAG (currently unused)
+** @param cid - the CID to retrieve
+** @param cidLen - length of cDAG (currently unused)
 **
 ** @returns number of bytes in the CID
 ** @returns -1 on error with errno set
 */
 int XreadChunk(int sockfd, void *rbuf, size_t len, int /* flags */, 
-		char * cDAG, size_t /* dlen */)
+		char * cid, size_t /* cidLen */)
 {
 	int rc;
 	char UDPbuf[MAXBUFLEN];
@@ -51,7 +51,7 @@ int XreadChunk(int sockfd, void *rbuf, size_t len, int /* flags */,
 	if (len == 0)
 		return 0;
 
-	if (!rbuf || !cDAG) {
+	if (!rbuf || !cid) {
 		LOG("null pointer error!");
 		errno = EFAULT;
 		return -1;
@@ -62,7 +62,7 @@ int XreadChunk(int sockfd, void *rbuf, size_t len, int /* flags */,
 
 	xia::X_Readchunk_Msg *x_readchunk_msg = xsm.mutable_x_readchunk();
   
-	x_readchunk_msg->set_dag(cDAG);
+	x_readchunk_msg->set_dag(cid);
 
 	std::string p_buf;
 	xsm.SerializeToString(&p_buf);

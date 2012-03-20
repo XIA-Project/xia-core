@@ -50,7 +50,7 @@ extern "C" {
 #define REQUEST_FAILED -1
 
 /* Cache policy */
-#define DEFAULT					(POLICY_LRU | POLICY_RETAIN_ON_EXIT)
+#define POLICY_DEFAULT			(POLICY_LRU | POLICY_RETAIN_ON_EXIT)
 #define POLICY_LRU				0x00000001
 #define POLICY_FIFO				0x00000002
 #define POLICY_REMOVE_ON_EXIT	0x00001000
@@ -58,29 +58,29 @@ extern "C" {
 
 #define CID_HASH_SIZE 40
 
+#define DEFAULT_CHUNK_SIZE	2000
+
 /* CID cache context */
-struct CIDContext_t {
+typedef struct {
     int sockfd;
     int contextID;
 	unsigned cachePolicy;
     unsigned cacheSize;
 	unsigned ttl;
-} ;
+} ChunkContext;
 
-struct cStat_t {
+typedef struct {
 	int size;
-	char CID[CID_HASH_SIZE];
-//	int type;
-//	FILE *fd;
+	char cid[CID_HASH_SIZE];
 	int32_t ttl;
 	struct timeval timestamp;
-};
+} ChunkInfo;
 
-struct cDAGvec {
-	char* cDAG;
-	size_t dlen; 
+typedef struct {
+	char* cid;
+	size_t cidLen; 
 	int status; // 1: ready to be read, 0: waiting for chunk response, -1: failed
-};
+} ChunkStatus;
 
 // Xsetsockopt options
 #define XOPT_HLIM		1	// Hop Limit TTL
@@ -110,18 +110,19 @@ extern int Xclose(int sock);
 extern int Xrecv(int sockfd, void *rbuf, size_t len, int flags);
 extern int Xsend(int sockfd, const void *buf, size_t len, int flags);
 
-extern int XrequestChunk(int sockfd, char* cDAG, size_t dlen);
-extern int XrequestChunks(int sockfd, const struct cDAGvec *cDAGv, int numCIDs);
-extern int XgetChunkStatus(int sockfd, char* cDAG, size_t dlen);
-extern int XgetChunkStatuses(int sockfd, struct cDAGvec *cDAGv, int numCIDs);
-extern int XreadChunk(int sockfd, void *rbuf, size_t len, int flags, char * cDAG, size_t dlen);
+extern int XrequestChunk(int sockfd, char* cid, size_t cidLen);
+extern int XrequestChunks(int sockfd, const ChunkStatus *chunks, int numChunks);
+extern int XgetChunkStatus(int sockfd, char* cid, size_t cidLen);
+extern int XgetChunkStatuses(int sockfd, ChunkStatus *statusList, int numCids);
+extern int XreadChunk(int sockfd, void *rbuf, size_t len, int flags, char *cid, size_t cidLen);
 
-extern struct CIDContext_t *XallocCacheSlice(unsigned policy, unsigned size);
-extern int XfreeCacheSlice(CIDContext_t *ctx);
-extern int XputChunk(const struct CIDContext_t *ctx, const char *data, unsigned length, unsigned TTL, struct cStat_t *cStat);
-extern int XputFile(struct CIDContext_t *ctx, FILE *, unsigned chunkSize, unsigned TTL, struct cStat_t *cStat, unsigned numcStat);
-extern int XputBuffer(struct CIDContext_t *ctx, const char *, unsigned size, unsigned chunkSize, unsigned TTL, struct cStat_t *cStat, unsigned numcStat);
-extern int XremoveChunk(struct CIDContext_t *, struct cStat_t *cStat);
+extern ChunkContext *XallocCacheSlice(unsigned policy, unsigned ttl, unsigned size);
+extern int XfreeCacheSlice(ChunkContext *ctx);
+extern int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkInfo *info);
+extern int XputFile(ChunkContext *ctx, const char *fname, unsigned chunkSize, ChunkInfo **infoList);
+extern int XputBuffer(ChunkContext *ctx, const char *, unsigned size, unsigned chunkSize, ChunkInfo **infoList);
+extern int XremoveChunk(ChunkContext *ctx, const char *cid);
+extern void XfreeChunkInfo(ChunkInfo *infoList);
 
 extern int Xaccept(int sockfd);
 extern void error(const char *msg);

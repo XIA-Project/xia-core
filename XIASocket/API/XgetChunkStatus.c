@@ -38,14 +38,14 @@
 ** @returns 0 waiting for chunk response
 ** @returns -1 on error with errno set
 */
-int XgetChunkStatus(int sockfd, char* cDAG, size_t /* dlen */)
+int XgetChunkStatus(int sockfd, char* cid, size_t /* cidLen */)
 {
-	struct cDAGvec dv;
+	ChunkStatus cs;
 
-	dv.cDAG = cDAG;
-	dv.dlen = strlen(cDAG);
+	cs.cid = cid;
+	cs.cidLen = strlen(cid);
 
-	return XgetChunkStatuses(sockfd, &dv, 1);
+	return XgetChunkStatuses(sockfd, &cs, 1);
 }
 
 /*!
@@ -64,7 +64,7 @@ int XgetChunkStatus(int sockfd, char* cDAG, size_t /* dlen */)
 ** waiting state
 ** @returns -1 on socket error with or if an invalid CID was specified
 */
-int XgetChunkStatuses(int sockfd, struct cDAGvec *cDAGv, int numCIDs)
+int XgetChunkStatuses(int sockfd, ChunkStatus *statusList, int numCIDs)
 {
 	int rc;
 	char buffer[MAXBUFLEN];
@@ -79,8 +79,8 @@ int XgetChunkStatuses(int sockfd, struct cDAGvec *cDAGv, int numCIDs)
 	if (numCIDs == 0)
 		return 0;
 
-	if (!cDAGv) {
-		LOG("cDAGv is null!");
+	if (!statusList) {
+		LOG("statusList is null!");
 		errno = EFAULT;
 		return -1;
 	}
@@ -92,8 +92,8 @@ int XgetChunkStatuses(int sockfd, struct cDAGvec *cDAGv, int numCIDs)
 	xia::X_Getchunkstatus_Msg *x_getchunkstatus_msg = xsm.mutable_x_getchunkstatus();
   
 	for (int i = 0; i < numCIDs; i++) {
-		if (cDAGv[i].cDAG) {
-			x_getchunkstatus_msg->add_dag(cDAGv[i].cDAG);
+		if (statusList[i].cid) {
+			x_getchunkstatus_msg->add_dag(statusList[i].cid);
 		} else {
 			LOGF("cDAGv[%d] is NULL", i);
 		}
@@ -134,21 +134,21 @@ int XgetChunkStatuses(int sockfd, struct cDAGvec *cDAGv, int numCIDs)
 			strcpy(status_tmp, x_getchunkstatus_msg1->status(i).c_str());
 		    	
 			if (strcmp(status_tmp, "WAITING") == 0) {
-				cDAGv[i].status = WAITING_FOR_CHUNK;
+				statusList[i].status = WAITING_FOR_CHUNK;
 				
 				if (status_for_all != REQUEST_FAILED) { 
 					status_for_all = WAITING_FOR_CHUNK;
 				}
 		    		
 			} else if (strcmp(status_tmp, "READY") == 0) {
-				cDAGv[i].status = READY_TO_READ;
+				statusList[i].status = READY_TO_READ;
 		    	
 			} else if (strcmp(status_tmp, "FAILED") == 0) {
-				cDAGv[i].status = REQUEST_FAILED;
+				statusList[i].status = REQUEST_FAILED;
 				status_for_all = REQUEST_FAILED;
 			
 			} else {
-				cDAGv[i].status = REQUEST_FAILED;
+				statusList[i].status = REQUEST_FAILED;
 				status_for_all = REQUEST_FAILED;
 			}
 		}

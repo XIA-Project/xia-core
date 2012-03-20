@@ -27,33 +27,33 @@
 ** @brief Bring a content chunk local to this machine.
 **
 ** @param sockfd - the control socket (must be of type XSOCK_CHUNK)
-** @param cDAG - Content ID of this chunk
-** @param dlen - length of sDAG (currently not used)
+** @param cid - Content ID of this chunk
+** @param cidLen - length of sDAG (currently not used)
 **
 ** @returns 0 on success
 ** @returns -1 on error with errno set
 */
-int XrequestChunk(int sockfd, char* cDAG, size_t /* dlen */)
+int XrequestChunk(int sockfd, char* cid, size_t /* cidLen */)
 {
-	struct cDAGvec dv;
+	ChunkStatus cs;
 
-	dv.cDAG = cDAG;
-	dv.dlen = strlen(cDAG);
+	cs.cid = cid;
+	cs.cidLen = strlen(cid);
 
-	return XrequestChunks(sockfd, &dv, 1);
+	return XrequestChunks(sockfd, &cs, 1);
 }
 
 /*!
 ** @brief Load a list of CIDs to the local machine.
 **
 ** @param sockfd - the control socket (must be of type XSOCK_CHUNK)
-** @param cDAGv - list of CIDs to retrieve
-** @param numDAGs - number of DAGs in cDAGv
+** @param chunks - list of CIDs to retrieve
+** @param numChunks - number of CIDs in the chunk list
 **
 ** @returns 0 on success
 ** @returns -1 on error with errno set
 */
-int XrequestChunks(int sockfd, const struct cDAGvec *cDAGv, int numDAGs)
+int XrequestChunks(int sockfd, const ChunkStatus *chunks, int numChunks)
 {
 	int rc;
 	const char *buf="Chunk request";//Maybe send more useful information here.
@@ -63,24 +63,24 @@ int XrequestChunks(int sockfd, const struct cDAGvec *cDAGv, int numDAGs)
 		return -1;
 	}
 
-	if (numDAGs == 0)
+	if (numChunks == 0)
 		return 0;
 
-	if (!cDAGv) {
+	if (!chunks) {
 		LOG("null pointer error!");
 		errno = EFAULT;
 		return -1;
 	}
 	
 	// If the DAG list is too long for a UDP packet to click, replace with multiple calls
-	if (numDAGs > 300) //TODO: Make this more precise
+	if (numChunks > 300) //TODO: Make this more precise
 	{
 		rc = 0;
 		int i;
-		for (i = 0; i < numDAGs; i += 300)
+		for (i = 0; i < numChunks; i += 300)
 		{
-			int num = (numDAGs-i > 300) ? 300 : numDAGs-i;
-			int rv = XrequestChunks(sockfd, &cDAGv[i], num);
+			int num = (numChunks-i > 300) ? 300 : numChunks-i;
+			int rv = XrequestChunks(sockfd, &chunks[i], num);
 
 			if (rv == -1) {
 				perror("XrequestChunk(): requestChunk failed");
@@ -98,9 +98,9 @@ int XrequestChunks(int sockfd, const struct cDAGvec *cDAGv, int numDAGs)
 
 	xia::X_Requestchunk_Msg *x_requestchunk_msg = xsm.mutable_x_requestchunk();
   
-	for (int i = 0; i < numDAGs; i++) {
-		if (cDAGv[i].cDAG != NULL)
-			x_requestchunk_msg->add_dag(cDAGv[i].cDAG);
+	for (int i = 0; i < numChunks; i++) {
+		if (chunks[i].cid != NULL)
+			x_requestchunk_msg->add_dag(chunks[i].cid);
 		else {
 			LOGF("NULL pointer at cDAGv[%d]\n", i);
 		}

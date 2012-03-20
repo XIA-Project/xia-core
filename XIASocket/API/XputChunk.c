@@ -17,9 +17,11 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
+#include <sys/stat.h>
+#include <errno.h>
 
 /**
- * @brief Initialize Context for PutCID operation.
+ * @brief Initialize Context for the XputChunk,XputFile,XputBuffer functions.
  *
  * Init a context to store meta data, e.g. cache policy.
  * Serve as an application handler when putting content.
@@ -30,12 +32,13 @@
  * unique ID.
  *
  * @param policy Policy to use for the local cache(defined in Xsocket.h)
+ * @param ttl Time to live in seconds; 0 means permanent(differ by policy)
  * @param size Max size for the local cache 
  *
  * @return A struct that contains PutCID context
  *
  * */
-struct CIDContext_t *XallocCacheSlice(unsigned policy, unsigned ttl, unsigned size) {
+ChunkContext *XallocCacheSlice(unsigned policy, unsigned ttl, unsigned size) {
     int sockfd = Xsocket(XSOCK_CHUNK);
     if(sockfd < 0) {
         LOG("Unable to allocate the cache slice.\n");
@@ -45,8 +48,9 @@ struct CIDContext_t *XallocCacheSlice(unsigned policy, unsigned ttl, unsigned si
 		// FIXME: validate the parameters
 		// FIXME: contextID is going to need to be somethign else so we can have multiple ones
 		// FIXME: add protobuf for this instead of rolling it up with the putChunk call
+		// FIXME: should this also take chunk size?
 
-        struct CIDContext_t *newCtx = (struct CIDContext_t *)malloc(sizeof(struct CIDContext_t));
+        ChunkContext *newCtx = (ChunkContext *)malloc(sizeof(ChunkContext));
 
         newCtx->contextID = getpid();
         newCtx->cachePolicy = policy;
@@ -64,7 +68,7 @@ struct CIDContext_t *XallocCacheSlice(unsigned policy, unsigned ttl, unsigned si
 ** @warning This does not yet exist on the click side!
 **
 */
-int XfreeCacheSlice(struct CIDContext_t *ctx)
+int XfreeCacheSlice(ChunkContext *ctx)
 {
 	if (!ctx)
 		return 0;
@@ -82,85 +86,65 @@ int XfreeCacheSlice(struct CIDContext_t *ctx)
  * @param ctx Pointer to a context
  * @param data Data to put
  * @param length Length of the data buffer
- * @param TTL Time to live in seconds; 0 means permanent(differ by policy)
- * @param cStat Struct to hold metadata returned from PutCID
+ * @param info Struct to hold metadata returned from PutCID
  *
  * @return 0 on success; -1 on error
  *
  */
-// FIXME: set errno on errors
-//  use Xutil to send recv buffers for cleaner code
-// return error if cstat is null (or why would we let it be?)
-// what's going on with ttl changing? (testCID app)
-
-int XputChunk(const struct CIDContext_t *ctx, const char *data, unsigned length, struct cStat_t *cStat)
+int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkInfo *info)
 {
-    if(ctx == NULL) {
-        return -1;
-    }
-    int contextID = ctx->contextID;
-    int sockfd = ctx->sockfd;
-    int cacheSize = ctx->cacheSize;
-    int cachePolicy = ctx->cachePolicy;
-    int retVal;
-	int ttl = ctx->ttl;
+    int rc;
     char buffer[MAXBUFLEN];
-    socklen_t addrLen;
-    struct addrinfo hints, *servInfo;
-    struct sockaddr_in theirAddr;
-    memset(&hints , 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
 
-    if ((retVal = getaddrinfo(CLICKDATAADDRESS,
-                              CLICKDATAPORT, &hints, &servInfo)) != 0) {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(retVal));
+// FIXME: set errno on errors
+// FIXME: make sure data will fit in a chunk
+
+    if(ctx == NULL || data == NULL || info == NULL) {
+		errno = EFAULT;
+		LOG("NULL pointer");
         return -1;
     }
+
+	if (length == 0)
+		return 0;
+
+//	LOGF("new Chunk of size %d\n", length);
 
     //Build request
-    xia::XSocketMsg _socketMsg;
-    _socketMsg.set_type(xia::XPUTCHUNK);
-    xia::X_Putchunk_Msg *_msg = _socketMsg.mutable_x_putchunk();
-    _msg->set_contextid(contextID);
+    xia::XSocketMsg xsm;
+    xsm.set_type(xia::XPUTCHUNK);
+
+    xia::X_Putchunk_Msg *_msg = xsm.mutable_x_putchunk();
+
+    _msg->set_contextid(ctx->contextID);
     _msg->set_payload((const char *)data, length);
-    fprintf(stderr, "DATA: %s,[size]%d\n", data, length);
-    _msg->set_ttl(ttl);
-    _msg->set_cachesize(cacheSize);
-    _msg->set_cachepolicy(cachePolicy);
+    _msg->set_ttl(ctx->ttl);
+    _msg->set_cachesize(ctx->cacheSize);
+    _msg->set_cachepolicy(ctx->cachePolicy);
 
-    std::string pBuf;
-    _socketMsg.SerializeToString(&pBuf);
-    if((retVal = sendto(sockfd, pBuf.c_str(), pBuf.size(), 0,
-                        servInfo->ai_addr, servInfo->ai_addrlen)) < 0) {
-        fprintf(stderr, "XputChunk send failed\n");
-        return -1;
-    }
-    freeaddrinfo(servInfo);
+	if ((rc = click_data(ctx->sockfd, &xsm)) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
+		return -1;
+	}
 
-    //Process reply
-    addrLen = sizeof(theirAddr);
-    bzero(buffer, MAXBUFLEN);
-    if((retVal = recvfrom(sockfd, buffer, MAXBUFLEN - 1, 0,
-                          (struct sockaddr *)&theirAddr, &addrLen)) < 0) {
-        fprintf(stderr, "XputChunk recv failed\n");
-        return -1;
-    }
+	// process the reply from click
+	if ((rc = click_reply(ctx->sockfd, buffer, sizeof(buffer))) < 0) {
+		LOGF("Error getting status from Click: %s", strerror(errno));
+		return -1;
+	}
+
     xia::XSocketMsg _socketMsgReply;
-    std::string bufStr(buffer, retVal);
+    std::string bufStr(buffer, rc);
     _socketMsgReply.ParseFromString(bufStr);
     if(_socketMsgReply.type() == xia::XPUTCHUNK) {
-        if(cStat != NULL) {
-            xia::X_Putchunk_Msg *_msgReply = _socketMsgReply.mutable_x_putchunk();
-            cStat->size = _msgReply->payload().size();
-            strcpy(cStat->CID, _msgReply->cid().c_str());
-            cStat->ttl= _msgReply->ttl();
-            cStat->timestamp.tv_sec=_msgReply->timestamp();
-            cStat->timestamp.tv_usec = 0;
-        }
+		xia::X_Putchunk_Msg *_msgReply = _socketMsgReply.mutable_x_putchunk();
+		info->size = _msgReply->payload().size();
+		strcpy(info->cid, _msgReply->cid().c_str());
+		info->ttl= _msgReply->ttl();
+		info->timestamp.tv_sec=_msgReply->timestamp();
+		info->timestamp.tv_usec = 0;
         return 0;
     } else {
-printf("got an error!!!\n");
         return -1;
     }
 }
@@ -171,120 +155,182 @@ printf("got an error!!!\n");
  * This function is only a wrapper. It chops the file and hand them to XputChunk().
  *
  * @param ctx Pointer to a context
- * @param fp Pointer to FILE
+ * @param fname File to send
  * @param chunkSize Size to chop the FILE into
- * @param hash If NULL, hash is calculated as SHA1 digest. (Recommemded)
- *             If not NULL, all file chunks will have the same hash as supplied.
- *             This is ususally not desirable.
- * @param TTL Time to live for each chunk in seconds; 
- *            0 means permanent(differ by policy)
- * @param cStat Array of struct to hold metadata returned from PutCID
- * @param numcStat Length of cStat. If chunks put is larger than numcStat, extra cStat
- *                 will be truncated.
+ * @param info Array of struct to hold metadata returned from PutCID
  *
  * @return On success, the number of chunks published; -1 on error
  */
-// FIXME: validate ctx, fp, chunksize > 0, cstat not null, numcstat at least as big as needed
-// stat the file and figure out how many chunks there will be, ensure cstat is at least that big
-// or.... let this code create the cstat array, and add a routine for the caller to free it
+int XputFile(ChunkContext *ctx, const char *fname, unsigned chunkSize, ChunkInfo **info)
+{
+	FILE *fp;
+	struct stat fs;
+	ChunkInfo *infoList;
+	unsigned numChunks;
+	unsigned i;
+	int rc;
+	int count;
+	char *buf;
 
-int XputFile(struct CIDContext_t *ctx, FILE *fp, unsigned chunkSize, unsigned TTL, struct cStat_t *cStat, unsigned numcStat){
-    if(fp==NULL || chunkSize <=0 ){
-        return -1;
-    }
-    unsigned numChunk=0;
-    int retVal=-1;
-    unsigned numRead;
-    char *buffer=(char *)malloc(chunkSize*sizeof(char));
-    while(1){
-        numRead=fread(buffer, sizeof(char), chunkSize, fp);
-		printf("read %d bytes\n", numRead);
-        if(ferror(fp)!=0){
-            fprintf(stderr, "XputFile I/O failed\n");
-            retVal=-1;
-            break;
-        }
-        if(numRead>0){
-            if(numChunk<numcStat){
-                retVal=XputChunk(ctx, buffer, numRead, TTL, &cStat[numChunk++]);
-				printf("XputChunk returns %d\n", retVal);
-            }else{
-                retVal=XputChunk(ctx, buffer, numRead, TTL, NULL);
-				printf("XputChunk 2 (why would we do this?) returns %d\n", retVal);
-            }
-//            numChunk++;
-            if(retVal<0){
-                fprintf(stderr, "XputFile Chunk[%d] failed\n", numChunk);
-                break;
-            }
-        }
-        if(feof(fp)){
-            retVal=numChunk;
-            break;
-        }
-    }
-    free(buffer);
-    return retVal;
+	if (ctx == NULL) {
+		errno = EFAULT;
+		return -1;
+	}
+
+	if (fname == NULL) {
+		errno = EFAULT;
+		return -1;
+	}
+
+	if (chunkSize == 0)
+		chunkSize =  DEFAULT_CHUNK_SIZE;
+	else if (chunkSize > XIA_MAXBUF)
+		chunkSize = XIA_MAXBUF;
+
+	if (stat(fname, &fs) != 0)
+		return -1;
+
+	if (!(fp= fopen(fname, "rb")))
+		return -1;
+
+	numChunks = fs.st_size / chunkSize;
+	if (fs.st_size % chunkSize)
+		numChunks ++;
+
+	if (!(infoList = (ChunkInfo*)calloc(numChunks, chunkSize))) {
+		fclose(fp);
+		return -1;
+	}
+
+	if (!(buf = (char*)malloc(chunkSize))) {
+		free(infoList);
+		fclose(fp);
+		return -1;
+	}
+
+	i = 0;
+	while (!feof(fp)) {
+	
+		if ((count = fread(buf, sizeof(char), chunkSize, fp)) > 0) {
+
+			if ((rc = XputChunk(ctx, buf, count, &infoList[i])) < 0)
+				break;
+			i++;
+		}
+	}
+
+	if (i != numChunks) {
+		// FIXME: something happened, what do we want to do in this case?
+		rc = -1;
+	}
+	else
+		rc = i;
+
+	*info = infoList;
+	fclose(fp);
+	free(buf);
+
+	return rc;
+}
+
+
+int XputBuffer(ChunkContext *ctx, const char *data, unsigned len, unsigned chunkSize, ChunkInfo **info)
+{
+	ChunkInfo *infoList;
+	unsigned numChunks;
+	unsigned i;
+	int rc;
+	int count;
+	char *buf;
+	const char *p;
+
+	if (ctx == NULL || data == NULL) {
+		errno = EFAULT;
+		return -1;
+	}
+
+	if (chunkSize == 0)
+		chunkSize =  DEFAULT_CHUNK_SIZE;
+	else if (chunkSize > XIA_MAXBUF)
+		chunkSize = XIA_MAXBUF;
+
+	numChunks = len / chunkSize;
+	if (len % chunkSize)
+		numChunks ++;
+
+	if (!(infoList = (ChunkInfo*)calloc(numChunks, chunkSize))) {
+		return -1;
+	}
+
+	if (!(buf = (char*)malloc(chunkSize))) {
+		free(infoList);
+		return -1;
+	}
+
+	p = data;
+	for (i = 0; i < numChunks; i++) {
+		count = MIN(len, chunkSize);
+
+		if ((rc = XputChunk(ctx, p, count, &infoList[i])) < 0)
+			break;
+		len -= count;
+		p += chunkSize;
+	}
+
+	if (i != numChunks) {
+		// FIXME: something happened, what do we want to do in this case?
+		rc = -1;
+	}
+	else
+		rc = i;
+
+	*info = infoList;
+	free(buf);
+
+	return rc;
 }
 
 /**
  * @brief Remove a published content from local cache
  * 
  * @param ctx Pointer to a context
- * @param cStat Struct that hold CID to remove
+ * @param info Struct that hold CID to remove
  *
  * @return 0 on success; -1 on error
  *
  */
-int XremoveChunk(struct CIDContext_t *ctx, struct cStat_t *cStat)
+int XremoveChunk(ChunkContext *ctx, const char *cid)
 {
-    if(cStat == NULL || ctx == NULL) {
-        return -1;
-    }
-    int sockfd = ctx->sockfd;
-    char hashBuf[1024];
-    int retVal;
     char buffer[2048];
-    socklen_t addrLen;
-    struct addrinfo hints, *servInfo;
-    struct sockaddr_in theirAddr;
-    memset(&hints , 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
+    int rc;
 
-    if ((retVal = getaddrinfo(CLICKDATAADDRESS,
-                              CLICKDATAPORT, &hints, &servInfo)) != 0) {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(retVal));
+    if(cid == NULL || ctx == NULL) {
+		errno = EFAULT;
         return -1;
     }
 
-    strcpy(hashBuf, cStat->CID);
-    xia::XSocketMsg _socketMsg;
-    _socketMsg.set_type(xia::XREMOVECHUNK);
-    xia::X_Removechunk_Msg *_msg = _socketMsg.mutable_x_removechunk();
+    xia::XSocketMsg xsm;
+    xsm.set_type(xia::XREMOVECHUNK);
+    xia::X_Removechunk_Msg *_msg = xsm.mutable_x_removechunk();
+
     _msg->set_contextid(ctx->contextID);
-    _msg->set_cid(hashBuf);
+    _msg->set_cid(cid);
 
-    std::string pBuf;
-    _socketMsg.SerializeToString(&pBuf);
-    if((retVal = sendto(sockfd, pBuf.c_str(), pBuf.size(), 0,
-                        servInfo->ai_addr, servInfo->ai_addrlen)) < 0) {
-        fprintf(stderr, "XremoveChunk send failed\n");
-        freeaddrinfo(servInfo);
-        return -1;
-    }
-    freeaddrinfo(servInfo);
+	if ((rc = click_data(ctx->sockfd, &xsm)) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
+		return -1;
+	}
 
-    //Process reply
-    addrLen = sizeof(theirAddr);
-    if((retVal = recvfrom(sockfd, buffer, MAXBUFLEN - 1, 0,
-                          (struct sockaddr *)&theirAddr, &addrLen)) < 0) {
-        fprintf(stderr, "XremoveChunk recv failed\n");
-        return -1;
-    }
+	// process the reply from click
+	if ((rc = click_reply(ctx->sockfd, buffer, sizeof(buffer))) < 0) {
+		LOGF("Error getting status from Click: %s", strerror(errno));
+		return -1;
+	}
+
     xia::XSocketMsg _socketMsgReply;
-    std::string bufStr(buffer, retVal);
+    std::string bufStr(buffer, rc);
     _socketMsgReply.ParseFromString(bufStr);
+
     if(_socketMsgReply.type() == xia::XREMOVECHUNK) {
         xia::X_Removechunk_Msg *_msgReply = _socketMsgReply.mutable_x_removechunk();
         return _msgReply->status();
@@ -292,3 +338,11 @@ int XremoveChunk(struct CIDContext_t *ctx, struct cStat_t *cStat)
         return -1;
     }
 }
+
+
+void XfreeChunkInfo(ChunkInfo *infop)
+{
+	if (infop)
+		free(infop);
+}
+
