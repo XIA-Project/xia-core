@@ -131,6 +131,8 @@ extern void print_conf();
 
 extern int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen);
 extern int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen);
+
+extern int XupdateAD(int sockfd, char *newad);
 #ifdef __cplusplus
 }
 #endif

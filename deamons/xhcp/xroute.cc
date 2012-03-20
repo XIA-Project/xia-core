@@ -514,14 +514,14 @@ void initRouteState()
     	sprintf(route_state.ddag, "RE %s %s", BHID, SID_XROUTE);	
 
 	// make the src DAG (the one the routing process listens on)
-    	route_state.sdag = (char*) malloc(snprintf(NULL, 0, "RE %s %s %s", AD3, RHID3, SID_XROUTE) + 1);
-    	sprintf(route_state.sdag, "RE %s %s %s", AD3, RHID3, SID_XROUTE); 
+    	route_state.sdag = (char*) malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, RHID0, SID_XROUTE) + 1);
+    	sprintf(route_state.sdag, "RE %s %s %s", AD0, RHID0, SID_XROUTE); 
     		
     	// store myAD and myHID
-    	route_state.myAD = (char*)malloc(snprintf(NULL, 0, "%s", AD3) + 1);
-    	sprintf(route_state.myAD, "%s", AD3);
-     	route_state.myHID = (char*)malloc(snprintf(NULL, 0, "%s", RHID3) + 1);
-    	sprintf(route_state.myHID, "%s", RHID3);   	
+    	route_state.myAD = (char*)malloc(snprintf(NULL, 0, "%s", AD0) + 1);
+    	sprintf(route_state.myAD, "%s", AD0);
+     	route_state.myHID = (char*)malloc(snprintf(NULL, 0, "%s", RHID0) + 1);
+    	sprintf(route_state.myHID, "%s", RHID0);   	
 	
 	route_state.num_neighbors = 0; // number of neighbor routers
 	route_state.lsa_seq = 0;	// LSA sequence number of this router
@@ -553,7 +553,7 @@ int main()
 		return -1;
 	}
 
-	xr.setRouter("router3");
+	xr.setRouter("router0");
 	listRoutes("AD");
 	
     	// initialize the route states (e.g., set HELLO/LSA timer, etc)

@@ -22,8 +22,7 @@ enum XSocketCallType {
   XREQUESTFAILED = 17;
   XRESULT = 18;
 
-//  XGETSOCKETIDLIST = 19;
-//  XGETSOCKETINFO = 20;
+  XCHANGEAD = 19;
 }
 
 message XSocketMsg {
@@ -50,8 +49,7 @@ message XSocketMsg {
   optional X_Requestfailed_Msg x_requestfailed= 18; 
   optional X_Result_Msg x_result = 19;
 
-//  optional X_Getsocketidlist_Msg x_getsocketidlist = 20;
-//  optional X_Getsocketinfo_Msg x_getsocketinfo = 21;
+  optional X_Changead_Msg x_changead = 20;	
 }
  
 message X_Socket_Msg {
@@ -149,20 +147,9 @@ message X_Requestfailed_Msg {
   optional string temp = 2; // currently not used
 }
 
-//message X_Getsocketidlist_Msg {
-//  optional int32 size = 1; // number of active sockets
-//  repeated int32 id = 2;   // active socket ids (_sport)
-//}
-//
-//message X_Getsocketinfo_Msg {
-//  required int32 id = 1; // socket id to examine
-//  optional int32 port = 2;
-//  optional bytes status = 3;
-//  optional bytes xid = 4;	
-//  optional bytes xiapath_src = 5;
-//  optional bytes xiapath_dst = 6;
-//  optional bytes protocol = 7;	
-//}
+message X_Changead_Msg {
+  required string dag = 1;
+}
 
 /**************************************************/
 

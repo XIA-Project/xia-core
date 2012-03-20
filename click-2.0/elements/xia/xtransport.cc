@@ -25,6 +25,7 @@ XTRANSPORT::XTRANSPORT()
 
 	_ackdelay_ms = 300;
 	_teardown_wait_ms = 240000;
+	cp_xid_type("SID", &_sid_type); 
 }
 
 
@@ -452,6 +453,18 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			daginfo->initialized = true;
 			daginfo->sdag = sdag_string;
 
+			//Check if binding to full DAG or just to SID only
+			Vector<XIAPath::handle_t> xids = daginfo->src_path.next_nodes( daginfo->src_path.source_node() );			
+			XID front_xid = daginfo->src_path.xid( xids[0] );
+			struct click_xia_xid head_xid = front_xid.xid();
+			uint32_t head_xid_type = head_xid.type;
+			if(head_xid_type == _sid_type) {
+				daginfo->full_src_dag = false; 
+			} else {
+				daginfo->full_src_dag = true;
+			}
+
+			
 			XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
 			//XID xid(xid_string);
 			//TODO: Add a check to see if XID is already being used
@@ -715,6 +728,20 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		}
 		break;
 #endif
+
+		case xia::XCHANGEAD:
+		{
+			xia::X_Changead_Msg *x_changead_msg = xia_socket_msg.mutable_x_changead();
+			String tmp = _local_addr.unparse();
+			Vector<String> ids;
+			cp_spacevec(tmp, ids);
+			String new_route(x_changead_msg->dag().c_str());
+			String new_local_addr = "RE " + new_route + " " + ids[ids.size()-1];
+			//click_chatter("new address is - %s", new_local_addr.c_str());
+			_local_addr.parse(new_local_addr);
+		}
+		break;
+		
 		default:
 			click_chatter("\n\nERROR: CONTROL TRAFFIC !!!\n\n");
 			break;
@@ -790,7 +817,17 @@ void XTRANSPORT::push(int port, Packet *p_input)
 					//click_chatter("Sent packet to network");
 					output(2).push(p);
 				}
-
+				
+				// Case of initial binding to only SID
+				if(daginfo->full_src_dag == false) {
+					daginfo->full_src_dag = true;
+					String str_local_addr = _local_addr.unparse_re();
+					XID front_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+					String xid_string = front_xid.unparse();
+					str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
+					daginfo->src_path.parse_re(str_local_addr);
+				}
+			
 				//Add XIA headers
 				XIAHeaderEncap xiah;
 				xiah.set_nxt(CLICK_XIA_NXT_TRN);
@@ -877,6 +914,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 			if (daginfo->initialized == false) {
 				daginfo->initialized = true;
+				daginfo->full_src_dag = true;
 				daginfo->port = _sport;
 				String str_local_addr = _local_addr.unparse_re();
 
@@ -894,6 +932,18 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				XIDtoPort.set(source_xid, _sport); //Maybe change the mapping to XID->DAGinfo?
 				addRoute(source_xid);
 			}
+			
+			// Case of initial binding to only SID
+			if(daginfo->full_src_dag == false) {
+				printf("\n\n\n FIX BINDING \n\n\n");
+				daginfo->full_src_dag = true;
+				String str_local_addr = _local_addr.unparse_re();
+				XID front_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+				String xid_string = front_xid.unparse();
+				str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
+				daginfo->src_path.parse_re(str_local_addr);
+			}
+			
 
 			if(daginfo->src_path.unparse_re().length() != 0) {
 				//Recalculate source path
@@ -908,7 +958,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			//portRxSeqNo.set(_sport,portRxSeqNo.get(_sport)+1);//Increment counter
 
 			if (DEBUG)
-				click_chatter("sent packet to %s, from %s\n", dest.c_str(), daginfo->src_path.unparse_re().c_str());
+				click_chatter("sent packet from %s, to %s\n", daginfo->src_path.unparse_re().c_str(), dest.c_str());
 
 			//Add XIA headers
 			XIAHeaderEncap xiah;
@@ -985,6 +1035,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 				if (daginfo->initialized == false) {
 					daginfo->initialized = true;
+					daginfo->full_src_dag = true;
 					daginfo->port = _sport;
 					String str_local_addr = _local_addr.unparse_re();
 
@@ -1003,7 +1054,17 @@ void XTRANSPORT::push(int port, Packet *p_input)
 					addRoute(source_xid);
 
 				}
-
+				
+				// Case of initial binding to only SID
+				if(daginfo->full_src_dag == false) {
+					daginfo->full_src_dag = true;
+					String str_local_addr = _local_addr.unparse_re();
+					XID front_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+					String xid_string = front_xid.unparse();
+					str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
+					daginfo->src_path.parse_re(str_local_addr);
+				}
+				
 				if(daginfo->src_path.unparse_re().length() != 0) {
 					//Recalculate source path
 					XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());

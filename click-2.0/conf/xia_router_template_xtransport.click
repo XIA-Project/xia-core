@@ -600,8 +600,12 @@ elementclass EndHost {
     //For get and put cid
     xtransport[3] -> [1]cache[1] -> [3]xtransport;
     
+    n[0] -> sw :: PaintSwitch
     
-    n ->  Queue(200) -> [0]output;
+    sw[0] -> Queue(200) -> [0]output;
+    sw[1] -> Discard();
+    sw[2] -> Discard();
+    sw[3] -> Discard();
     
 };
 
