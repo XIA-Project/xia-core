@@ -133,6 +133,7 @@ extern int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t op
 extern int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen);
 
 extern int XupdateAD(int sockfd, char *newad);
+extern int XreadLocalHostAddr(int sockfd, char *localhostAD, char *localhostHID);
 #ifdef __cplusplus
 }
 #endif

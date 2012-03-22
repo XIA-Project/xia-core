@@ -24,22 +24,14 @@ using namespace std;
 #define CALC_DIJKSTRA_INTERVAL 4
 #define MAX_HOP_COUNT 50
 #define MAX_SEQNUM 100000
+#define MAX_XID_SIZE 100
 
 #define HELLO 0
 #define LSA 1
 #define HOST_REGISTER 2
 
-#define AD0   "AD:1000000000000000000000000000000000000000"
-#define AD1   "AD:1000000000000000000000000000000000000001"
-#define AD2   "AD:1000000000000000000000000000000000000002"
-#define AD3   "AD:1000000000000000000000000000000000000003"
-#define RHID0 "HID:1100000000000000000000000000000000000000"
-#define RHID1 "HID:1100000000000000000000000000000000000001"
-#define RHID2 "HID:1100000000000000000000000000000000000002"
-#define RHID3 "HID:1100000000000000000000000000000000000003"
 
 #define BHID "HID:1111111111111111111111111111111111111111"
-
 #define SID_XROUTE "SID:1110000000000000000000000000000000001112"
 
 
@@ -77,8 +69,8 @@ typedef struct RouteState {
 	
 	char * sdag; // src DAG: this router
 	char * ddag; // dest DAG: broadcast HELLO/LSA to other routers
-	char * myAD; // this router AD
-	char * myHID; // this router HID
+	char myAD[MAX_XID_SIZE]; // this router AD
+	char myHID[MAX_XID_SIZE]; // this router HID
 	
 	int num_neighbors; // number of neighbor routers
 	int lsa_seq;	// LSA sequence number of this router
