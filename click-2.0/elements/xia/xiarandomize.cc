@@ -51,7 +51,7 @@ XIARandomize::~XIARandomize()
 {
     if (_zipf_cache) {
         delete[] _zipf_cache;
- 	_zipf_cache = NULL;
+		_zipf_cache = NULL;
     }
 }
 
@@ -62,15 +62,15 @@ XIARandomize::configure(Vector<String> &conf, ErrorHandler *errh)
     int multiplier =0; 
 
     if (cp_va_kparse(conf, this, errh,
-                        "XID_TYPE", cpkP+cpkM, cpXIDType, &_xid_type,
+			"XID_TYPE", cpkP+cpkM, cpXIDType, &_xid_type,
 			"MAX_CYCLE", 0, cpInteger, &_max_cycle,
 			"OFFSET", 0, cpInteger, &offset,
 			"MULTIPLIER", 0, cpInteger, &multiplier,
 			cpEnd)<0) 
-	return -1;
+		return -1;
     _offset = offset *multiplier;
 
-    for (int i=0;i<_offset;i++) {
+    for (int i = 0; i < _offset; i++) {
         nrand48(_xsubi_det);
         nrand48(_xsubi_arb);
     }
@@ -82,11 +82,11 @@ XIARandomize::configure(Vector<String> &conf, ErrorHandler *errh)
             click_chatter("generating zipf cache of size %d\n", _max_cycle*100);
             _zipf_cache = new uint32_t[_max_cycle*100];
             //_zipf_arbit = Zipf(1.2, 1000000000);
-            for (int i=0;i<_max_cycle*100;i++) {
-                    uint32_t v;
-                    do {
-                            v = _zipf.next();
-                    } while (v >= _max_cycle);
+            for (int i = 0; i < _max_cycle * 100; i++) {
+				uint32_t v;
+				do {
+					v = _zipf.next();
+				} while (v >= (uint32_t)_max_cycle);
                 _zipf_cache[i] = v;
             }
         }
@@ -107,7 +107,7 @@ XIARandomize::configure(Vector<String> &conf, ErrorHandler *errh)
     }
 
     /*
-    for (int i=0;i<_max_cycle*100;i++) {
+    for (int i = 0; i < _max_cycle * 100; i++) {
             assert(_zipf_cache[i]< _max_cycle);
     }
     */
@@ -125,74 +125,72 @@ XIARandomize::simple_action(Packet *p_in)
     click_xia *hdr = p->xia_header();
 
     assert(_zipf_cache);
-    uint32_t seed  = _zipf_cache[_current_cycle]; /* zipf */
-    //uint32_t seed  = rand() % _max_cycle;    /* uniform */
+    uint32_t seed = _zipf_cache[_current_cycle]; // zipf
+    //uint32_t seed = rand() % _max_cycle;    // uniform
 
     for (size_t i = 0; i < hdr->dnode + hdr->snode; i++)
     {
         struct click_xia_xid_node& node = hdr->node[i];
-        if (node.xid.type == 1)  /* Determinstic Random */
-        {
+        if (node.xid.type == 1) {
+			// Determinstic Random
             node.xid.type = _xid_type;
             uint8_t* xid = node.xid.id;
             const uint8_t* xid_end = xid + CLICK_XIA_XID_ID_LEN;
 #ifdef PURE_RANDOM
-	    //uint32_t seed  = static_cast<uint32_t>(nrand48(_xsubi_det)) % _max_cycle; /* uniform */
-	    assert(seed<_max_cycle);
-	    memcpy(&xsubi_next[1], &seed, 2);
-	    memcpy(&xsubi_next[2], reinterpret_cast<char *>(&seed)+2 , 2);
-	    xsubi_next[0]= xsubi_next[2]+ xsubi_next[1];
+			//uint32_t seed  = static_cast<uint32_t>(nrand48(_xsubi_det)) % _max_cycle; /* uniform */
+			assert(seed < (uint32_t)_max_cycle);
+			memcpy(&xsubi_next[1], &seed, 2);
+			memcpy(&xsubi_next[2], reinterpret_cast<char *>(&seed)+2 , 2);
+			xsubi_next[0]= xsubi_next[2]+ xsubi_next[1];
 #endif
 
-            while (xid != xid_end)
-            {
+            while (xid != xid_end) {
 #if CLICK_USERLEVEL
 #ifdef PURE_RANDOM
-		*reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(xsubi_next));
+				*reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(xsubi_next));
 #else
-		*reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(_xsubi_det));
+				*reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(_xsubi_det));
 #endif
 #elif CLICK_LINUXMODULE
-		*reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(prandom32(&_deterministic));
+				*reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(prandom32(&_deterministic));
 #endif
                 xid += sizeof(uint32_t);
             }
 
-            if (++_current_cycle == _max_cycle*100)
-	    {
-		    _current_cycle = 0;
+            if (++_current_cycle == _max_cycle*100) {
+				_current_cycle = 0;
 #if CLICK_USERLEVEL
-		    _xsubi_det[0] = 1;
-		    _xsubi_det[1] = 2;
-		    _xsubi_det[2] = 3;
-		    for (int i=0;i<_offset;i++) {
-	 		nrand48(_xsubi_det);
-		    }
-		    _current_cycle = _offset;
+				_xsubi_det[0] = 1;
+				_xsubi_det[1] = 2;
+				_xsubi_det[2] = 3;
+
+				for (int i = 0; i < _offset; i++)
+					nrand48(_xsubi_det);
+				_current_cycle = _offset;
 #elif CLICK_LINUXMODULE
-		    prandom32_seed(&_deterministic, 0);
+				prandom32_seed(&_deterministic, 0);
 #endif
-	    }
+			}
         }
-        else if (node.xid.type == 2)  /* Abitrary random */
+        else if (node.xid.type == 2)
         {
+			// Abitrary random
             node.xid.type = _xid_type;
             uint8_t* xid = node.xid.id;
             const uint8_t* xid_end = xid + CLICK_XIA_XID_ID_LEN;
 #ifdef PURE_RANDOM
-	    seed  +=  (i+1)* 13 + _max_cycle;
-	    memcpy(&xsubi_next[1], &seed, 2);
-	    memcpy(&xsubi_next[2], &(reinterpret_cast<char *>(&seed)[2]), 2);
-	    xsubi_next[0]= xsubi_next[2]+ xsubi_next[1];
+			seed  +=  (i+1)* 13 + _max_cycle;
+			memcpy(&xsubi_next[1], &seed, 2);
+			memcpy(&xsubi_next[2], &(reinterpret_cast<char *>(&seed)[2]), 2);
+			xsubi_next[0]= xsubi_next[2]+ xsubi_next[1];
 #endif
 
-            while (xid != xid_end)
-            {
+            while (xid != xid_end) {
 #if CLICK_USERLEVEL
 #ifdef PURE_RANDOM
-		*reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(xsubi_next));
+				*reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(xsubi_next));
 #else
-		*reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(_xsubi_arb));
+				*reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(_xsubi_arb));
 #endif
 #elif CLICK_LINUXMODULE
                 *reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(prandom32(&_arbitrary));

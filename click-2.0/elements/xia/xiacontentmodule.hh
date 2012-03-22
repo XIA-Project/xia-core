@@ -7,12 +7,18 @@
 #include <clicknet/xia.h>
 #include <click/hashtable.hh>
 #include <click/xiapath.hh>
+#include <map>
+
 #include "xiaxidroutetable.hh"
 #include "xiatransport.hh"
 
 #define CACHESIZE 1024*1024*1024    //only for router cache (endhost cahe is virtually unlimited, but is periodically refreshed)
 #define CLIENTCACHE
 #define PACKETSIZE 1024		
+
+#define POLICY_FIFO 1
+
+#define HASH_KEYSIZE 20
 
 CLICK_DECLS
 class XIAContentModule;
@@ -60,6 +66,21 @@ class CChunk{
 	void Merge(CPartList::iterator);
 };
 
+/* Client local cache*/
+struct contentMeta{
+    int ttl;
+    struct timeval timestamp;
+    int chunkSize;
+};
+
+struct cacheMeta{
+    int curSize;
+    int maxSize;
+    int policy;
+    HashTable <XID, struct contentMeta*> *contentMetaTable;
+};
+
+
 class XIAContentModule {
     friend class XIATransport;
     friend class XIACache;
@@ -73,6 +94,7 @@ class XIAContentModule {
     protected:
     void cache_incoming_local(Packet *p, const XID& srcCID, bool local_putcid);
     void cache_incoming_forward(Packet *p, const XID& srcCID);
+    void cache_incoming_remove(Packet *p, const XID& srcCID);
     void cache_management();
     private:
     XIATransport* _transport;
@@ -85,6 +107,8 @@ class XIAContentModule {
 	fired,  _oldPartial is cleared and everything in _partialTable goes to _oldPartial.
 	It takes two timers to clear on-going partial chunk transfers.  */
 
+    HashTable<int, cacheMeta*> _cacheMetaTable;
+    
     unsigned int usedSize;
     static const unsigned int MAXSIZE=CACHESIZE;
     static unsigned int PKTSIZE;    
@@ -95,6 +119,11 @@ class XIAContentModule {
     HashTable<XID, int> content;   
     Packet *makeChunkResponse(CChunk * chunk, Packet *p_in);
     int MakeSpace(int);    
+
+    //Cache Policy
+    void applyLocalCachePolicy(int);
+    const XID* findOldestContent(int);
+    bool isExpiredContent(struct contentMeta* cm);
 
     //modify routing table
     void addRoute(const XID &cid) {

@@ -31,9 +31,11 @@ class Pathname
   end
 end
 
-#$proto = ["IP", "XIA"]
-$proto = [ "XIA"]
-$postfix = "FB2-SP"
+##$proto = ["IP", "XIA"]
+#$proto = [ "XIA"]
+#$postfix = "FB2-SP"
+$proto = ["IP"]
+$postfix = "IP-SP-ONLY"
 
 def calc_avg_performance(file, return_array=false)
   tx = []

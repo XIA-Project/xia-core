@@ -12,36 +12,35 @@ CLICK_DECLS
 /*
  * =c
  * XIAIPEncap()
- * =s ip
- * Ecapsulates an XIA IP XID Packet into an IP Packet
- * =d
  *
+ * =s ip
+ * Encapsulates an XIA packet into an IP Packet
+ *
+ * =d
  *
  * =n
  *
- *
- * =a ICMPError */
+ * =a IPEncap */
 
 #define IP_XID_UDP_PORT 1001
 
-class XIAIPEncap : public Element {
+class XIAIPEncap : public Element { public:
 
-public:
-  XIAIPEncap();
-  ~XIAIPEncap();
-
-  const char *class_name() const		{ return "XIAIPEncap"; }
-  const char *port_count() const		{ return PORTS_1_1; }
-  const char *processing() const		{ return AGNOSTIC; }
-  const char *flags() const                     { return "A"; }
-
-  int configure(Vector<String> &, ErrorHandler *);
-  bool can_live_reconfigure() const { return true; }
-  void add_handlers();
-
-  Packet *simple_action(Packet *);
-
-private:
+    XIAIPEncap();
+    ~XIAIPEncap();
+  
+    const char *class_name() const		{ return "XIAIPEncap"; }
+    const char *port_count() const		{ return PORTS_1_1; }
+    const char *processing() const		{ return AGNOSTIC; }
+    const char *flags() const             { return "A"; }
+  
+    int configure(Vector<String> &, ErrorHandler *);
+    bool can_live_reconfigure() const { return true; }
+    void add_handlers();
+  
+    Packet *simple_action(Packet *);
+  
+  private:
     struct in_addr _saddr;
     struct in_addr _daddr;
     uint16_t _sport;

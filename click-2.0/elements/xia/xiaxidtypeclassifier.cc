@@ -23,56 +23,53 @@ int
 XIAXIDTypeClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (conf.size() != noutputs())
-	return errh->error("need %d arguments, one per output port", noutputs());
+		return errh->error("need %d arguments, one per output port", noutputs());
 
-    for (int i = 0; i < conf.size(); i++)
-    {
+    for (int i = 0; i < conf.size(); i++) {
         String str_copy = conf[i];
         String type_str = cp_shift_spacevec(str_copy);
-        if (type_str == "-")
-        {
+
+        if (type_str == "-") {
             struct pattern pat;
             pat.type = pattern::ANY;
             pat.src_xid_type = pat.dst_xid_type = 0;
+
             _patterns.push_back(pat);
         }
-        else if (type_str == "src" || type_str == "dst" || type_str == "next")
-        {
+        else if (type_str == "src" || type_str == "dst" || type_str == "next") {
             String xid_type_str = cp_shift_spacevec(str_copy);
             uint32_t xid_type;
             if (!cp_xid_type(xid_type_str, &xid_type))
                 return errh->error("unrecognized XID type: ", xid_type_str.c_str());
 
             struct pattern pat;
-            if (type_str == "src")
-            {
+            if (type_str == "src") {
                 pat.type = pattern::SRC;
                 pat.src_xid_type = xid_type;
                 pat.dst_xid_type = 0;
                 pat.next_xid_type = 0;
             }
-            else if (type_str == "dst")
-            {
+            else if (type_str == "dst") {
                 pat.type = pattern::DST;
                 pat.src_xid_type = 0;
                 pat.dst_xid_type = xid_type;
                 pat.next_xid_type = 0;
             }
-            else
-            {
+            else {
                 pat.type = pattern::NEXT;
                 pat.src_xid_type = 0;
                 pat.dst_xid_type = 0;
                 pat.next_xid_type = xid_type;
             }
+
             _patterns.push_back(pat);
         }
-        else if (type_str == "src_and_dst" || type_str == "src_or_dst")
-        {
+        else if (type_str == "src_and_dst" || type_str == "src_or_dst") {
             String xid_type_str = cp_shift_spacevec(str_copy);
             uint32_t xid_type0;
             if (!cp_xid_type(xid_type_str, &xid_type0))
                 return errh->error("unrecognized XID type: ", xid_type_str.c_str());
+
             xid_type_str = cp_shift_spacevec(str_copy);
             uint32_t xid_type1;
             if (!cp_xid_type(xid_type_str, &xid_type1))
@@ -86,6 +83,7 @@ XIAXIDTypeClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
             pat.src_xid_type = xid_type0;
             pat.dst_xid_type = xid_type1;
             pat.next_xid_type = 0;
+
             _patterns.push_back(pat);
         }
         else
@@ -100,8 +98,7 @@ XIAXIDTypeClassifier::push(int, Packet *p)
     int port = match(p);
     if (port >= 0)
         output(port).push(p);
-    else
-    {
+    else {
         // no match -- discard packet
         if (p)
             p->kill();
@@ -113,6 +110,7 @@ XIAXIDTypeClassifier::match(Packet *p)
 {
     const struct click_xia* hdr = p->xia_header();
 
+	// commented out for microbenchmarks
     /*
     if (p==NULL) return -1;
     if (!hdr) 
@@ -125,6 +123,7 @@ XIAXIDTypeClassifier::match(Packet *p)
     uint32_t src_xid_type = hdr->node[hdr->dnode + hdr->snode - 1].xid.type;
 
     uint32_t next_xid_type = -1;
+
     {
         int last = hdr->last;
         if (last < 0)
@@ -139,11 +138,11 @@ XIAXIDTypeClassifier::match(Packet *p)
         }
     }
 
-    for (int i = 0; i < _patterns.size(); i++)
-    {
+	// test all patterns
+	// TODO: group patterns to avoid the switch jump
+    for (int i = 0; i < _patterns.size(); i++) {
         const struct pattern& pat = _patterns[i];
-        switch (pat.type)
-        {
+        switch (pat.type) {
             case pattern::SRC:
                 if (src_xid_type == pat.src_xid_type)
                     return i;

@@ -39,9 +39,13 @@ XIAHeader::payload() const
     const uint8_t* p = next_header();
     while (nxt < CLICK_XIA_NXT_NO)
     {
-    	const struct click_xia_ext * exthdr = reinterpret_cast<const struct click_xia_ext *>(p);
-        nxt = exthdr->nxt;
-        p += exthdr->hlen;
+		const struct click_xia_ext * exthdr = reinterpret_cast<const struct click_xia_ext *>(p);
+		nxt = exthdr->nxt;
+		if (exthdr->hlen == 0) {
+			click_chatter("ERROR: xia header length = 0!\n");
+			break;
+		}
+		p += exthdr->hlen;
     }
     return p;
 }

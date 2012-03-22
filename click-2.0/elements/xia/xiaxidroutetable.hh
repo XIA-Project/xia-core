@@ -4,6 +4,7 @@
 #include <click/hashtable.hh>
 #include <clicknet/xia.h>
 #include <click/xid.hh>
+#include <click/xiapath.hh>
 CLICK_DECLS
 
 /*
@@ -26,32 +27,46 @@ so use the XIACheckDest element before using this element.
 =a StaticIPLookup, IPRouteTable
 */
 
+typedef struct {
+	int	port;
+	unsigned flags;
+	XID *nexthop;
+} XIARouteData;
+
 class XIAXIDRouteTable : public Element { public:
 
     XIAXIDRouteTable();
     ~XIAXIDRouteTable();
 
     const char *class_name() const		{ return "XIAXIDRouteTable"; }
-    const char *port_count() const		{ return "1/-"; }
+    const char *port_count() const		{ return "-/-"; }
     const char *processing() const		{ return PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *);
     void add_handlers();
 
-    void push(int port, Packet *);
+    void push(int in_ether_port, Packet *);
 
 protected:
-    int lookup_route(Packet *);
+    int lookup_route(int in_ether_port, Packet *);
 
     static int set_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
+    static int set_handler4(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
     static int remove_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
     static int load_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
     static int generate_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
 
+    static String list_routes_handler(Element *e, void *thunk);
+
 private:
-    HashTable<XID, int> _rt;
-    int _rem;
+	HashTable<XID, XIARouteData*> _rts;
+	XIARouteData _rtdata;
     uint32_t _drops;
+
+    XIAPath _local_addr;
+    XID _local_hid;
+    XID _bcast_xid;
+    int _bcast_port, _my_port;
 };
 
 CLICK_ENDDECLS

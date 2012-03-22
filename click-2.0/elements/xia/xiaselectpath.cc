@@ -1,5 +1,5 @@
 /*
- * xiaselectpath.{cc,hh} -- select path to process
+ * xiaselectpath.{cc,hh} -- select a path to process
  */
 
 #include <click/config.h>
@@ -43,16 +43,15 @@ XIASelectPath::configure(Vector<String> &conf, ErrorHandler *errh)
 void
 XIASelectPath::push(int, Packet *p)
 {
-    if (_first)
-    {
+    if (_first) {
         SET_XIA_NEXT_PATH_ANNO(p, 0);
         output(0).push(p);
     }
-    else
-    {
+    else {
         int next = XIA_NEXT_PATH_ANNO(p) + 1;
         SET_XIA_NEXT_PATH_ANNO(p, next);
 
+		// had any path to consider?
         if (next < CLICK_XIA_XID_EDGE_NUM)
             output(0).push(p);
         else

@@ -10,7 +10,7 @@ done
 #setup BBN visualizer DB
 for host in pc201
 do
-ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_visualizer_DB_${host}.sh"
+ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_visualizer_DB_host0.sh"
 done
 
 echo "Ready!"

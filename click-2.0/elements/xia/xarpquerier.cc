@@ -4,7 +4,7 @@
  *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
  * Copyright (c) 2005 Regents of the University of California
- * Copyright (c) 2008-2009 Meraki, Inc.
+ * Copyright (c) 2008-2009 Meraki, Inc. 
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -92,7 +92,6 @@ XARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
     if (conf.size() == 1)
 	conf.push_back(conf[0]);
     if (Args(conf, this, errh)
-	//.read_mp("IP", IPPrefixArg(true), _my_ip, my_mask)
 	.read_mp("XID", _my_xid)
 	.read_mp("ETH", _my_en)
 	.complete() < 0)
@@ -101,16 +100,10 @@ XARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
     _my_xid_configured = true;	
 
     if (!have_broadcast) {
-    	//const char* dummy= "";
-    	String _bcast_xid("HID:1111111111111111111111111111111111111111");  // may need to fix this later
+    	String _bcast_xid("HID:1111111111111111111111111111111111111111");  // Broadcast HID
         _my_bcast_xid.parse(_bcast_xid);
-    	
-	//_my_bcast_ip = _my_ip | ~my_mask;
-	//if (_my_bcast_ip == _my_ip)
-	//    _my_bcast_ip = 0xFFFFFFFFU;
     }
     
-
     _broadcast_poll = broadcast_poll;
     if ((uint32_t) poll_timeout.sec() >= (uint32_t) 0xFFFFFFFFU / CLICK_HZ)
 	_poll_timeout_j = 0;
@@ -146,29 +139,21 @@ XARPQuerier::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
     if (conf.size() == 1)
 	conf.push_back(conf[0]);
     if (Args(conf, this, errh)
-	//.read_mp("IP", IPPrefixArg(true), my_ip, my_mask)
 	.read_mp("XID", my_xid)
 	.read_mp("ETH", my_en)
 	.complete() < 0)
 	return -1;
     if (!have_broadcast) {
-	//const char* dummy= "";
-    	String _bcast_xid("HID:1111111111111111111111111111111111111111");  // may need to fix this later
+    	String _bcast_xid("HID:1111111111111111111111111111111111111111");  // Broadcast HID
         _my_bcast_xid.parse(_bcast_xid);
-    	
-	//_my_bcast_ip = _my_ip | ~my_mask;
-	//if (_my_bcast_ip == _my_ip)
-	//    _my_bcast_ip = 0xFFFFFFFFU;
     }
 
     if ((my_xid != _my_xid || my_en != _my_en) && _my_xarpt)
 	_xarpt->clear();
 
-    //_my_ip = my_ip;
     _my_xid = my_xid;
     _my_en = my_en;
-    //_my_bcast_ip = my_bcast_ip;
-    String _bcast_xid("HID:1111111111111111111111111111111111111111");  // may need to fix this later
+    String _bcast_xid("HID:1111111111111111111111111111111111111111");  // Broadcast HID
     _my_bcast_xid.parse(_bcast_xid);
     if (_my_xarpt && have_capacity)
 	_xarpt->set_capacity(capacity);
@@ -223,7 +208,6 @@ void
 XARPQuerier::send_query_for(const Packet *p, bool ether_dhost_valid)
 {
     // Uses p's XIP and Ethernet headers.
-
     static_assert(Packet::default_headroom >= sizeof(click_ether), "Packet::default_headroom must be at least 14.");
     WritablePacket *q = Packet::make(Packet::default_headroom - sizeof(click_ether),
 				     NULL, sizeof(click_ether) + sizeof(click_ether_xarp), 0);
@@ -253,13 +237,6 @@ XARPQuerier::send_query_for(const Packet *p, bool ether_dhost_valid)
         
     XID want_xid = p->nexthop_neighbor_xid_anno();
     
-   
-    //XID x_tmp("HID:0000000000000000000000000000000000000003");	
-    //want_xid = x_tmp;
-    //printf("\n %s \n", want_xid.unparse().c_str());
-    
-    
-    //IPAddress want_ip = p->dst_ip_anno();
     memcpy(ea->xarp_tpa, want_xid.data(), 24);
 
     q->set_timestamp_anno(p->timestamp_anno());
@@ -296,22 +273,14 @@ XARPQuerier::handle_xip(Packet *p, bool response)
 	return;
     } else
 	q->ether_header()->ether_type = htons(ETHERTYPE_XIP);
-
-    //IPAddress dst_ip = q->dst_ip_anno();
     
     XID nexthop_neighbor_xid = q->nexthop_neighbor_xid_anno();
-    
-    //XID x_tmp("HID:0000000000000000000000000000000000000003");			
-    //p->set_nexthop_neighbor_xid_anno(x_tmp);
-    //nexthop_neighbor_xid = x_tmp;
-    //printf("\n %s \n", nexthop_neighbor_xid.unparse().c_str());
-    
-    
+
     EtherAddress *dst_eth = reinterpret_cast<EtherAddress *>(q->ether_header()->ether_dhost);
     int r;
 
     // Easy case: requires only read lock
-  retry_read_lock:
+    retry_read_lock:
     r = _xarpt->lookup(nexthop_neighbor_xid, dst_eth, _poll_timeout_j);
     if (r >= 0) {
 	assert(!dst_eth->is_broadcast());
@@ -320,20 +289,8 @@ XARPQuerier::handle_xip(Packet *p, bool response)
 	// ... and send packet below.
     } else if (nexthop_neighbor_xid == _my_bcast_xid) {
 	memset(dst_eth, 0xff, 6);
-	// ... and send packet below.
-  // } else if (dst_ip.is_multicast()) {
-	//uint8_t *dst_addr = q->ether_header()->ether_dhost;
-	//dst_addr[0] = 0x01;
-	//dst_addr[1] = 0x00;
-	//dst_addr[2] = 0x5E;
-	//uint32_t addr = ntohl(dst_ip.addr());
-	//dst_addr[3] = (addr >> 16) & 0x7F;
-	//dst_addr[4] = addr >> 8;
-	//dst_addr[5] = addr;
-	// ... and send packet below.
     } else {
 	// Zero or unknown address: do not send the packet.
-	//if (!nexthop_neighbor_xid) {
 	if (false) {
 	    if (!_zero_warned) {
 		click_chatter("%s: would query for 0; missing nexthop_neighbor_xid annotation?", declaration().c_str());
@@ -374,11 +331,8 @@ XARPQuerier::handle_response(Packet *p)
 
     click_ether *ethh = (click_ether *) p->data();
     click_ether_xarp *xarph = (click_ether_xarp *) (ethh + 1);
-    //IPAddress ipa = IPAddress(xarph->xarp_spa);
-    //XID xida = (click_xia_xid *) (xarph->xarp_spa);
     
     struct click_xia_xid xid_tmp;
-    //xid_tmp.type = (uint32_t) xarph->xarp_spa; 
     memcpy( &(xid_tmp.type), xarph->xarp_spa, 4); 
     for (size_t d = 0; d < sizeof(xid_tmp.id); d++) {
     	xid_tmp.id[d] = xarph->xarp_spa[4 + d];
@@ -462,8 +416,6 @@ XARPQuerier::add_handlers()
     add_data_handlers("queries", Handler::OP_READ, &_xarp_queries);
     add_data_handlers("responses", Handler::OP_READ, &_xarp_responses);
     add_data_handlers("drops", Handler::OP_READ, &_drops);
-    //add_data_handlers("broadcast", Handler::OP_READ | Handler::OP_WRITE, &_my_bcast_xid);
-    //add_data_handlers("xid", Handler::OP_READ | Handler::OP_WRITE, &_my_xid);
     add_write_handler("insert", write_handler, h_insert);
     add_write_handler("delete", write_handler, h_delete);
     add_write_handler("clear", write_handler, h_clear);

@@ -142,8 +142,7 @@ class XARPTable : public Element { public:
     static String read_handler(Element *e, void *user_data);
     static int write_handler(const String &str, Element *e, void *user_data, ErrorHandler *errh);
 
-    struct XARPEntry {		// This structure is now larger than I'd like
-	//IPAddress _ip;		// (40B) but probably still fine.
+    struct XARPEntry {		
 	XID _xid;
 	XARPEntry *_hashnext;
 	EtherAddress _eth;

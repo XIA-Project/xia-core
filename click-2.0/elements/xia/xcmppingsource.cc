@@ -50,7 +50,7 @@ XCMPPingSource::pull(int) {
     *(uint16_t*)(p->data() + 6) = _count; // SEQ_NUM
 
     XIAHeaderEncap encap;
-    encap.set_nxt(15);   // XCMP
+    encap.set_nxt(CLICK_XIA_NXT_XCMP);   // XCMP
     encap.set_dst_path(_dst_path);
     encap.set_src_path(_src_path);
 
@@ -67,7 +67,7 @@ XCMPPingSource::push(int, Packet *p)
 {
     XIAHeader hdr(p);
 
-    if(hdr.nxt() != 15) { // not XCMP
+    if(hdr.nxt() != CLICK_XIA_NXT_XCMP) { // not XCMP
       p->kill();
       return;
     }
@@ -76,35 +76,16 @@ XCMPPingSource::push(int, Packet *p)
 
     switch (*payload) {
     case 8: // PING
-        click_chatter("ignoring PING at XCMPPingSource\n");
-        break;
-
+      click_chatter("ignoring PING at XCMPPingSource\n");
+      break;
+      
     case 0: // PONG
-        if (hdr.plen() != 8)
-	  click_chatter("invalid PONG message length\n");
-        else {
-	  uint16_t cli_seq = *(uint16_t*)(hdr.payload() + 6);
-	  //if (cli_seq % _print_every == 0)
-	  click_chatter("%u: PONG received; client seq = %u\n", p->timestamp_anno().usecval(), cli_seq);
-	}
-        break;
-
-	/*    case 102:
-        // UPDATE
-        {
-            XIAPath new_path;
-            new_path.parse_node(
-                reinterpret_cast<const struct click_xia_xid_node*>(hdr.payload()),
-                reinterpret_cast<const struct click_xia_xid_node*>(hdr.payload() + hdr.plen())
-            );
-            click_chatter("%u: updating XCMPPingSource with new address %s\n", p->timestamp_anno().usecval(), new_path.unparse(this).c_str());
-            _dst_path = new_path;
-            break;
-	    }*/
+      click_chatter("%u: PONG received; client seq = %u\n", p->timestamp_anno().usecval(), *(uint16_t *)(hdr.payload()+6));
+      break;
 
     default:
-        click_chatter("invalid message type\n");
-        break;
+      click_chatter("invalid message type\n");
+      break;
     }
 
     p->kill();

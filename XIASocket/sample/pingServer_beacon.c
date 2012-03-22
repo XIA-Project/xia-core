@@ -53,7 +53,8 @@ int main(int argc, char *argv[])
 
     while (1) {
 	//Receive packet
-	n = Xrecvfrom(sock,payload_new,1024,0,theirDAG,&dlen);
+        dlen = sizeof(theirDAG);
+        n = Xrecvfrom(sock,payload_new,1024,0,theirDAG,&dlen);
 
 	gettimeofday(&tv, NULL);
 	current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;

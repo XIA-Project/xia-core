@@ -38,7 +38,8 @@ XIAPingSource::initialize(ErrorHandler *)
 }
 
 Packet *
-XIAPingSource::pull(int) {
+XIAPingSource::pull(int)
+{
     WritablePacket *p = Packet::make(256, NULL, 8, 0);
     
     *(uint32_t*)(p->data() + 0) = _count;
@@ -63,39 +64,39 @@ XIAPingSource::push(int, Packet *p)
     XIAHeader hdr(p);
 
     switch (hdr.nxt()) {
-    case 100:
-        // PING
-        click_chatter("ignoring PING at XIAPingSource\n");
-        break;
+		case 100:
+			// PING
+			click_chatter("ignoring PING at XIAPingSource\n");
+			break;
 
-    case 101:
-        // PONG
-        if (hdr.plen() != 8)
-            click_chatter("invalid PONG message length\n");
-        else {
-			uint32_t cli_seq = *(uint32_t*)(hdr.payload() + 0);
-			uint32_t svr_seq = *(uint32_t*)(hdr.payload() + 4);
-			if (cli_seq % _print_every == 0)
-				click_chatter("%u: PONG received; client seq = %u, server seq = %u\n", p->timestamp_anno().usecval(), cli_seq, svr_seq);
-		}
-        break;
+		case 101:
+			// PONG
+			if (hdr.plen() != 8)
+				click_chatter("invalid PONG message length\n");
+			else {
+				uint32_t cli_seq = *(uint32_t*)(hdr.payload() + 0);
+				uint32_t svr_seq = *(uint32_t*)(hdr.payload() + 4);
+				if (cli_seq % _print_every == 0)
+					click_chatter("%u: PONG received; client seq = %u, server seq = %u\n", p->timestamp_anno().usecval(), cli_seq, svr_seq);
+			}
+			break;
 
-    case 102:
-        // UPDATE
-        {
-            XIAPath new_path;
-            new_path.parse_node(
-                reinterpret_cast<const struct click_xia_xid_node*>(hdr.payload()),
-                reinterpret_cast<const struct click_xia_xid_node*>(hdr.payload() + hdr.plen())
-            );
-            click_chatter("%u: updating XIAPingSource with new address %s\n", p->timestamp_anno().usecval(), new_path.unparse(this).c_str());
-            _dst_path = new_path;
-            break;
-        }
+		case 102:
+			// UPDATE
+			{
+				XIAPath new_path;
+				new_path.parse_node(
+					reinterpret_cast<const struct click_xia_xid_node*>(hdr.payload()),
+					reinterpret_cast<const struct click_xia_xid_node*>(hdr.payload() + hdr.plen())
+				);
+				click_chatter("%u: updating XIAPingSource with new address %s\n", p->timestamp_anno().usecval(), new_path.unparse(this).c_str());
+				_dst_path = new_path;
+				break;
+			}
 
-    default:
-        click_chatter("invalid message type\n");
-        break;
+		default:
+			click_chatter("invalid message type\n");
+			break;
     }
 
     p->kill();

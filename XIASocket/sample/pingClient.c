@@ -70,7 +70,8 @@ int main(int argc, char *argv[]) {
 	//printf("%lld: PING sent; client seq = %d\n",current_time, seq_client_);  // modify payload         
 	seq_client_++;
 
-        n = Xrecvfrom(sock,reply,1024,0,theirDAG,&dlen);
+	dlen = sizeof(theirDAG);
+    n = Xrecvfrom(sock,reply,1024,0,theirDAG,&dlen);
 	if(n>0)
 	    {   
 		gettimeofday(&tv, NULL);
@@ -91,6 +92,7 @@ int main(int argc, char *argv[]) {
     if(rx<TOTALPINGS)  
 	do
 	{   
+		dlen = sizeof(theirDAG);
 	    n = Xrecvfrom(sock,reply,1024,0,theirDAG,&dlen);
 	    gettimeofday(&tv, NULL);
 	    current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;

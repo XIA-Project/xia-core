@@ -1,0 +1,181 @@
+<html>
+<head>
+<meta content="text/html; charset=ISO-8859-1" http-equiv="Content-Type">
+<link rel="icon" href="/favicon.ico" type="image/ico">
+<title>Example - Stock Ticker</title>
+
+<script language="javascript" type="text/javascript">
+<!--
+var stock = "http://xia.sid.sid_stock_replicate/fallback(ad.ad_cmu:hid.hid2:sid.sid_stock_replicate)";
+var page = "http://xia.sid.sid_stock_replicate/fallback(ad.ad_cmu:hid.hid2:sid.sid_stock_replicate)";
+var stock_element = 'stock'
+var pos = 0
+var stock_timer = null
+var news_timer = null
+var update_interval = 1000
+var time = new Date();
+var req_timestamp = null
+
+function load()
+{
+        document.getElementById("rtt").innerHTML = "Response Time: undefined" ;
+	//ajax(page,'text');
+	ajax(stock,stock_element);
+	shift();
+	//if (news_timer==null) news_timer = setTimeout("update_news()", update_interval);
+    	if (stock_timer==null) stock_timer = setTimeout("update_stock()", update_interval);
+}
+
+function update_stock()
+{
+   clearTimeout(stock_timer) 
+   ajax(stock,stock_element);
+   stock_timer = setTimeout("update_stock()", update_interval);
+}
+
+function update_news()
+{
+   clearTimeout(news_timer) 
+   ajax(page,'text')
+   news_timer = setTimeout("update_news()", update_interval);
+
+}
+
+function shift() 
+{
+	var div = document.getElementById(stock_element);
+	pos = pos - 5
+	if (pos<= -1000) 
+	{
+	   pos = 0;
+	   div.appendChild(div.firstChild);
+	   div.firstChild.offsetWidth = div.firstChild.offsetWidth;
+	}
+	div.style.left = ( pos+ 'px');    
+	setTimeout("shift()", 200);
+}
+
+function ajax(url,target) {
+    // native XMLHttpRequest object
+    //document.getElementById(target).innerHTML = 'Loading...';
+    if (window.XMLHttpRequest) {
+	var req = new XMLHttpRequest();
+	req.onreadystatechange = function() {ajaxDone(req, target);};
+	req.open("GET", url, true);
+	req.send(null);
+	// IE/Windows ActiveX version
+    } else if (window.ActiveXObject) {
+	var req = new ActiveXObject("Microsoft.XMLDOM");
+	if (req) {
+	    req.onreadystatechange = function() {ajaxDone(req, target);};
+	    req.open("GET", url, true);
+	    req.send(null);
+	}
+    }
+}
+
+function ajaxDone(req, target) {
+    // only if req is "loaded"
+    if (req.readyState == 4) {
+	// only if "OK"
+	if (req.status == 200 || req.status == 304) {
+	    results = req.responseText;
+	    document.getElementById(target).innerHTML = results;
+	    header_rtt = req.getResponseHeader("Last-Modified"); // we use Last-Modified to get rtt
+	    //console.log("header " + header_rtt);
+	    results = results.toString().replace(/ /g, ' &nbsp ');
+	    document.getElementById(target).innerHTML = results;
+            document.getElementById("rtt").innerHTML = "RTT (proxy to service): "+ header_rtt + " ms";
+            document.getElementById("last_response").innerHTML = "Last Response: " +new Date().toLocaleTimeString();
+	} else {
+	    document.getElementById(target).innerHTML="ajax error:"+req.status + req.statusText +req.responseText;;
+            document.getElementById("rtt").innerHTML = "Response Time: undefined" ;
+	}
+    }
+}
+
+// -->
+</script>
+<style type="text/css">
+#main #content {margin-right: 2em;}
+.ticker
+{
+	position:		relative;
+	visibility:		hidden;
+	left:			0px; 
+	top:			0px; 
+	border-width:	1px;
+	border-style:	solid;
+	font-size:		12px; 
+	font-weight:	bold; 
+	width:			100%;
+}
+
+.clstsu
+{
+	color:			green; 
+	cursor:			hand;
+	cursor:			pointer; 
+	padding-bottom:	2px; 
+	padding-left:	2em;
+	padding-right:	2em;
+	margin:			0px;
+}
+
+.clstst
+{
+	color:			black; 
+	cursor:			hand;
+	cursor:			pointer; 
+	padding-bottom:	2px; 
+	padding-left:	2em;
+	padding-right:	2em;
+	margin:			0px;
+}
+
+.clstsd
+{
+	color:			red; 
+	cursor:			hand;
+	cursor:			pointer; 
+	padding-bottom:	2px; 
+	padding-left:	2em;
+	padding-right:	2em;
+	margin:			0px;
+}
+
+.clstimg
+{
+	height: 12px;
+	width:  18px;
+}
+</style>
+</head>
+<body onload="load()" style =" overflow-x: hidden;">
+<div id="main">
+
+<!--
+<p> <h1>Video</h1> </p>
+<p>
+<div id="video" style="width: 700px; height: 300px">  
+</div>
+<p> <h1>Service</h1> </p>
+<p>
+<div id="text" style="width: 700px; height: 100px">  
+</div> 
+-->
+
+<h1>My Favorite Stock</h1>
+<div id="stock"style= "position: relative; width: 3000px; overflow: hidden; height:17px; border-style:solid; visibility: visible ;" > 
+</div>
+
+<div id="rtt">
+</div>
+
+<div id="last_response">
+</div>
+
+<!--/noindex-->
+</body>
+</html>
+

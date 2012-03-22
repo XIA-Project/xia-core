@@ -109,7 +109,7 @@ elementclass RouteEngine {
     proc[1] -> dstTypeClassifier;
     dstTypeClassifier[1] -> [1]output;  // To RPC
 
-    dstTypeClassifier[0] ->[2]output;  // To cache (for serving content request)
+    dstTypeClassifier[0] -> [2]output;  // To cache (for serving content request)
 
     proc[2] -> XIAPrint("Drop") -> Discard;  // No route drop (future TODO: return an error packet)
 };
@@ -129,7 +129,7 @@ elementclass Host {
     sock :: Socket(TCP, 0.0.0.0, $rpc_port, CLIENT false);
     rpc :: XIARPC($local_addr);
     cache :: XIATransport($local_addr, n/proc/rt_CID/rt, $enable_local_cache);
-
+    
     Script(write n/proc/rt_AD/rt.add - 0);      // default route for AD
     Script(write n/proc/rt_HID/rt.add - 0);     // default route for HID
     Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self HID as destination
@@ -146,6 +146,7 @@ elementclass Host {
                                         // they must be served by cache using the following connection only
     n[2] -> [0]cache[0] -> [1]n;
     rpc[2] -> [1]cache[1] -> [2]rpc;
+
 
     n -> Queue(200) -> [0]output;
 };
@@ -411,6 +412,7 @@ elementclass EndHost {
     
     n :: RouteEngine($local_addr);
     xudp::XUDP($local_addr, $CLICK_IP,$API_IP,n/proc/rt_SID/rt);
+
     
     //Create kernel TAP interface which responds to ARP
     fake0::FromHost($fake, $API_IP/24, CLICK_XUDP_ADDR $CLICK_IP ,HEADROOM 256, MTU 65521) 
@@ -455,9 +457,13 @@ elementclass EndHost {
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
     Script(write n/proc/rt_IP/rt.add - 0); 	// default route for IPv4    
 
+    c :: Classifier(01/0F, -); // XCMP
+    x :: XCMP($local_addr);
+
     input[0] -> n;
     srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
-    n[1] -> srcTypeClassifier[1] -> [2]xudp[2] ->  [0]n;
+    n[1] -> Print("completely out of routing") -> c[1] -> srcTypeClassifier[1] -> [2]xudp[2] ->  [0]n;
+    c[0] -> x -> [0]n;
     srcTypeClassifier[0] -> Discard;    // do not send CID responses directly to RPC;
     
     n[2] -> [0]cache[0] -> [1]n;

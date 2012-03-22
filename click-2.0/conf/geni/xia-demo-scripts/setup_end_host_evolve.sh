@@ -1,30 +1,46 @@
 #!/bin/bash
 
 
+# for host0
+for host in pc201
+do
 #setup click
-for host in pg56 pg55 pg42 pg40
-do
-ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_click_end_host_evolve_${host}.sh"
-done
-
-sleep 1
-
+ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_click_end_host_evolve_host0.sh"
 #setup visualizer
-for host in pg56 pg55 pg42 pg40
-do
-ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_visualizer_${host}.sh"
-done
-
+ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_visualizer_host0.sh"
 # client-side proxy
-for host in pg56
-do
-ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_proxy_${host}.sh"
+ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_proxy_host0.sh"
 done
 
-# service
-for host in pg40
+# for router0
+for host in pc222
 do
-ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_service_${host}.sh"
+#setup click
+ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_click_end_host_evolve_router0.sh"
+#setup visualizer
+ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_visualizer_router0.sh"
 done
+
+# for router1
+for host in pc211
+do
+#setup click
+ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_click_end_host_evolve_router1.sh"
+#setup visualizer
+ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_visualizer_router1.sh"
+done
+
+# for host1
+for host in pc204
+do
+#setup click
+ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_click_end_host_evolve_host1.sh"
+#setup visualizer
+ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_visualizer_host1.sh"
+# setup service
+ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_service_host1.sh"
+done
+
+
 
 echo "Ready!"

@@ -1,16 +1,18 @@
-.PHONY: clean
+.PHONY: clean doc
 CC=g++
 LD=g++
 CFLAGS=-c -Wall -Wextra -I../minini
-LDFLAGS =  -lprotobuf
-SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XgetCID.c  XgetCIDList.c  XgetCIDStatus.c  XgetCIDListStatus.c XreadCID.c  XputCID.c Xrecv.c\
-        Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c Xgetsocketidlist.c Xgetsocketinfo.c ../minini/minIni.c
-
+LDFLAGS =-lprotobuf
+SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XrequestChunk.c  \
+		XgetChunkStatus.c  XreadChunk.c  XputChunk.c Xrecv.c \
+        Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c   \
+		Xsetsockopt.c Xutil.c state.c Xinit.c XupdateAD.c \
+		../minini/minIni.c 
 SHARED_OBJECTS=$(SOURCES:.c=.shared.o) xia.pb.shared.o
 STATIC_OBJECTS=$(SOURCES:.c=.o) xia.pb.o
 
 all: xia.pb.cc  libXsocket.a libXsocket.so
-	make -C swig all
+	make -C python all
 
 xia.pb.cc: xia.proto
 	protoc --cpp_out=.  xia.proto
@@ -30,7 +32,12 @@ libXsocket.a: $(STATIC_OBJECTS)
 libXsocket.so: $(SHARED_OBJECTS) 
 	$(LD) -shared -o $@ $(SHARED_OBJECTS) $(LDFLAGS) -lc  -l dl
 
+doc: Xdoc.h $(SOURCES)
+	doxygen XsocketsAPI.cfg
+	make -C python doc
+
 clean:
 	rm -f *.o *.a *.so *.shared.o xia.pb.*
-	make -C swig clean
+	rm -rf doc
+	make -C python clean
 

@@ -13,6 +13,10 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
+/*!
+  @file Xsocket.h
+  @brief Xsocket API header file
+*/
 
 #ifndef XSOCKET_H
 #define XSOCKET_H
@@ -32,60 +36,103 @@
 extern "C" {
 #endif
 
-#define ATTEMPTS 100 //Number of attempts at opening a socket 
-#define MAXBUFLEN 2000 // Note that this limits the size of chunk we can receive
+#define MAXBUFLEN 65000 // Note that this limits the size of chunk we can receive TODO: What should this be?
+#define XIA_MAXBUF MAXBUFLEN
 
-#define XSOCK_STREAM 0 // Reliable transport (SID)
-#define XSOCK_DGRAM 1 // Unreliable transport (SID)
-#define XSOCK_CHUNK 2 // Content Chunk transport (CID)
+#define XSOCK_INVALID -1 // invalid socket type	
+#define XSOCK_STREAM 1	// Reliable transport (SID)
+#define XSOCK_DGRAM 2	// Unreliable transport (SID)
+#define XSOCK_RAW	3	// Raw XIA socket
+#define XSOCK_CHUNK 4	// Content Chunk transport (CID)
 
 #define WAITING_FOR_CHUNK 0
 #define READY_TO_READ 1
 #define REQUEST_FAILED -1
 
-struct Netinfo{
-    unsigned short port;
-    char xid[MAXBUFLEN];
-    char src_path[MAXBUFLEN];
-    char dst_path[MAXBUFLEN];
-    int nxt;
-    int last;
-    uint8_t hlim;
-    char status[20];
-    char protocol[20];
-} ;
+/* Cache policy */
+#define POLICY_DEFAULT			(POLICY_LRU | POLICY_RETAIN_ON_EXIT)
+#define POLICY_LRU				0x00000001
+#define POLICY_FIFO				0x00000002
+#define POLICY_REMOVE_ON_EXIT	0x00001000
+#define POLICY_RETAIN_ON_EXIT	0x00002000
 
+#define CID_HASH_SIZE 40
 
-struct cDAGvec {
-	char* cDAG;
-	size_t dlen; 
+#define DEFAULT_CHUNK_SIZE	2000
+
+/* CID cache context */
+typedef struct {
+    int sockfd;
+    int contextID;
+	unsigned cachePolicy;
+    unsigned cacheSize;
+	unsigned ttl;
+} ChunkContext;
+
+typedef struct {
+	int size;
+	char cid[CID_HASH_SIZE];
+	int32_t ttl;
+	struct timeval timestamp;
+} ChunkInfo;
+
+typedef struct {
+	char* cid;
+	size_t cidLen; 
 	int status; // 1: ready to be read, 0: waiting for chunk response, -1: failed
-};
+} ChunkStatus;
+
+// Xsetsockopt options
+#define XOPT_HLIM		1	// Hop Limit TTL
+#define XOPT_NEXT_PROTO	2	// change the next proto field of the XIA header
+
+// XIA protocol types
+#define XPROTO_XIA_TRANSPORT	0x0e
+#define XPROTO_XCMP		0x3d
+
+// error codes
+#define ECLICKCONTROL 9999	// error code for general click communication errors
+
+#ifndef MAX
+#define MAX(x, y) (((x) > (y)) ? (x) : (y))
+#endif
+#ifndef MIN
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+#endif
 
 //Function list
 extern int Xsendto(int sockfd,const void *buf, size_t len, int flags,char * dDAG, size_t dlen);
-extern int Xrecvfrom(int sockfd,void *buf, size_t len, int flags,char * dDAG, size_t *dlen);
-extern int Xsocket(int transport_type); // 0: Reliable transport (SID), 1: Unreliable transport (SID), 2: Content Chunk transport (CID)
-extern int Xconnect(int sockfd, char* dest_DAG);
+extern int Xrecvfrom(int sockfd,void *rbuf, size_t len, int flags, char * sDAG, size_t *dlen);
+extern int Xsocket(int transport_type);
+extern int Xconnect(int sockfd, const char* dDAG);
 extern int Xbind(int sockfd, char* SID);
 extern int Xclose(int sock);
-extern int Xrecv(int sockfd, void *buf, size_t len, int flags);
-//extern int Xsend(int sockfd,const void *buf, size_t len, int flags);
-extern int Xsend(int sockfd,const void *buf, size_t len, int flags);
+extern int Xrecv(int sockfd, void *rbuf, size_t len, int flags);
+extern int Xsend(int sockfd, const void *buf, size_t len, int flags);
 
-extern int XgetCID(int sockfd, char* cDAG, size_t dlen);
-extern int XgetCIDList(int sockfd, const struct cDAGvec *cDAGv, int numCIDs);
-extern int XgetCIDStatus(int sockfd, char* cDAG, size_t dlen);
-extern int XgetCIDListStatus(int sockfd, struct cDAGvec *cDAGv, int numCIDs);
-extern int XreadCID(int sockfd, void *buf, size_t len, int flags, char * cDAG, size_t dlen);
+extern int XrequestChunk(int sockfd, char* cid, size_t cidLen);
+extern int XrequestChunks(int sockfd, const ChunkStatus *chunks, int numChunks);
+extern int XgetChunkStatus(int sockfd, char* cid, size_t cidLen);
+extern int XgetChunkStatuses(int sockfd, ChunkStatus *statusList, int numCids);
+extern int XreadChunk(int sockfd, void *rbuf, size_t len, int flags, char *cid, size_t cidLen);
 
-extern int XputCID(int sockfd, const void *buf, size_t len, int flags,char* sDAG, size_t dlen);
+extern ChunkContext *XallocCacheSlice(unsigned policy, unsigned ttl, unsigned size);
+extern int XfreeCacheSlice(ChunkContext *ctx);
+extern int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkInfo *info);
+extern int XputFile(ChunkContext *ctx, const char *fname, unsigned chunkSize, ChunkInfo **infoList);
+extern int XputBuffer(ChunkContext *ctx, const char *, unsigned size, unsigned chunkSize, ChunkInfo **infoList);
+extern int XremoveChunk(ChunkContext *ctx, const char *cid);
+extern void XfreeChunkInfo(ChunkInfo *infoList);
+
 extern int Xaccept(int sockfd);
-extern int Xgetsocketidlist(int sockfd, int *socket_list);
-extern int Xgetsocketinfo(int sockfd1, int sockfd2, struct Netinfo *info);
 extern void error(const char *msg);
 extern void set_conf(const char *filename, const char *sectioname);
 extern void print_conf();
+
+extern int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen);
+extern int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen);
+
+extern int XupdateAD(int sockfd, char *newad);
 #ifdef __cplusplus
 }
 #endif

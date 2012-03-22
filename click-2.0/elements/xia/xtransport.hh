@@ -13,6 +13,7 @@
 #include "xiaxidroutetable.hh"
 #include <clicknet/udp.h>
 #include <click/string.hh>
+#include <elements/ipsec/sha1_impl.hh>
 #if CLICK_USERLEVEL
 #include <list>
 #include <stdio.h>
@@ -50,6 +51,7 @@ using namespace std;
 #define READY_TO_READ 1
 #define REQUEST_FAILED -1
 
+#define HASH_KEYSIZE 20
 
 CLICK_DECLS
 
@@ -74,7 +76,7 @@ class XTRANSPORT : public Element {
     XTRANSPORT();
     ~XTRANSPORT();
     const char *class_name() const		{ return "XTRANSPORT"; }
-    const char *port_count() const		{ return "4/4"; }
+    const char *port_count() const		{ return "5/4"; }
     const char *processing() const		{ return PUSH; }
     int configure(Vector<String> &, ErrorHandler *);         
     void push(int port, Packet *);            
@@ -89,6 +91,8 @@ class XTRANSPORT : public Element {
     WritablePacket* copy_packet(Packet *);
     WritablePacket* copy_cid_req_packet(Packet *);
     WritablePacket* copy_cid_response_packet(Packet *);
+
+	void ReturnResult(int sport, xia::XSocketCallType type, int rc = 0, int err = 0);
     
   private:
     Timer _timer;
@@ -96,7 +100,7 @@ class XTRANSPORT : public Element {
     unsigned _ackdelay_ms;
     unsigned _teardown_wait_ms;
     
-    uint32_t _cid_type;
+    uint32_t _cid_type, _sid_type;
     XID _local_hid;
     XIAPath _local_addr;
     bool isConnected;
@@ -108,7 +112,7 @@ class XTRANSPORT : public Element {
     Packet* UDPIPEncap(Packet *, int,int);
     
     struct DAGinfo{
-    DAGinfo(): port(0), isConnected(false), initialized(false), timer_on(false), synack_waiting(false), dataack_waiting(false), teardown_waiting(false) {};
+    DAGinfo(): port(0), isConnected(false), initialized(false), full_src_dag(false), timer_on(false), synack_waiting(false), dataack_waiting(false), teardown_waiting(false) {};
     unsigned short port;
     XID xid;
     XIAPath src_path;
@@ -118,6 +122,7 @@ class XTRANSPORT : public Element {
     uint8_t hlim;
     bool isConnected;
     bool initialized;
+    bool full_src_dag; // bind to full dag or just to SID  
     int sock_type; // 0: Reliable transport (SID), 1: Unreliable transport (SID), 2: Content Chunk transport (CID)
     String sdag;
     String ddag;
@@ -152,6 +157,10 @@ class XTRANSPORT : public Element {
     HashTable<unsigned short, int> portTxSeqNo;
     HashTable<unsigned short, int> portAckNo;
     HashTable<unsigned short, bool> portToActive;
+    HashTable<XIDpair , bool> XIDpairToConnectPending;
+	HashTable<unsigned short, int> nxt_xport;
+	list<int> xcmp_listeners;
+    HashTable<unsigned short, int> hlim;
     queue<DAGinfo> pending_connection_buf;
     
     struct in_addr _CLICKaddr;

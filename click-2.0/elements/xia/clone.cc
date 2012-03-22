@@ -31,10 +31,12 @@ Clone::configure(Vector<String> &conf, ErrorHandler *errh)
                    "ACTIVE", 0, cpBool, &_active,
                    cpEnd) < 0)
         return -1;
+
     _count = count;
     _shared_skbs = shared_skbs;
 
-    if (waituntil>0) _wait_until = waituntil;
+    if (waituntil > 0)
+		_wait_until = waituntil;
     click_chatter("Packet cloning %d packets", count);
     return 0;
 }
@@ -50,14 +52,18 @@ Clone::push(int /*port*/, Packet *p)
 
 Packet* Clone::pull(int /*port*/)
 {
-    if (_packets.size()==0 || _packets.size() < _wait_until) return NULL;
-    if (_count<=0) return NULL;
-    if (!_active) return NULL;
+    if (_packets.size() == 0 || _packets.size() < _wait_until)
+		return NULL;
+    if (_count <= 0)
+		return NULL;
+    if (!_active)
+		return NULL;
 
     _count--;
 
-    if (_count<=0) click_chatter("No more packet cloning");
-    //return _packet->clone()->uniqueify();
+    if (_count <= 0)
+		click_chatter("No more packet cloning");
+		//return _packet->clone()->uniqueify();
     if (++_next >= _packets.size())
         _next = 0;
 
@@ -88,11 +94,11 @@ Clone::set_handler(const String &conf, Element *e, void * /*thunk*/, ErrorHandle
 {
     Clone* table = static_cast<Clone*>(e);
 
-    if (conf=="true") table->_active = true;
+    if (conf == "true")
+		table->_active = true;
 
     return 0;
 }
-
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(Clone)

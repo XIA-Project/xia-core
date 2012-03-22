@@ -1,3 +1,7 @@
+/*
+ * xiainserthash.{cc,hh} -- inserts a hash of the partial DAG address in the payload
+ */
+
 #include <click/config.h>
 #include "xiainserthash.hh"
 #include "xiafastpath.hh"
@@ -38,10 +42,10 @@ Packet * XIAInsertHash::simple_action(Packet *p)
     int hdr_size = hdr.hdr_size();
 
     // enough space in packt?
-    assert(hdr.plen()>= KEYSIZE+ _offset);
+    assert(hdr.plen() >= KEYSIZE + _offset);
 
     SHA1_init(&sha_ctx);
-    SHA1_update(&sha_ctx, (unsigned char *) &hdr.hdr()->last, hdr_size - offsetof(struct click_xia, last) );     
+    SHA1_update(&sha_ctx, (unsigned char *)&hdr.hdr()->last, hdr_size - offsetof(struct click_xia, last));
     SHA1_final(digest, &sha_ctx);
 
     memcpy(hdr.payload() + _offset, digest, KEYSIZE);

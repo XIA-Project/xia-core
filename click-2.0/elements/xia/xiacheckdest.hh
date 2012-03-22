@@ -10,7 +10,7 @@ CLICK_DECLS
 =c
 XIACheckDest()
 
-=s ip
+=s xip
 checks if the packet has arrived at the destination
 
 =d
@@ -36,7 +36,7 @@ class XIACheckDest : public Element { public:
 
     void push(int port, Packet *);
 
-protected:
+  protected:
     int lookup(Packet *);
 };
 

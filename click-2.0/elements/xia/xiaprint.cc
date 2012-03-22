@@ -1,16 +1,5 @@
 /*
  * xiaprint.{cc,hh} -- element prints packet contents to system log
- * Dongsu Han
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, subject to the conditions
- * listed in the Click LICENSE file. These conditions include: you must
- * preserve this copyright notice, and you cannot mention the copyright
- * holders in advertising related to the Software without their permission.
- * The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
- * notice is a summary of the Click LICENSE file; the license in that file is
- * legally binding.
  */
 
 #include <click/config.h>
@@ -33,7 +22,7 @@ CLICK_DECLS
 XIAPrint::XIAPrint()
 {
 #if CLICK_USERLEVEL
-  _outfile = 0;
+    _outfile = 0;
 #endif
 }
 
@@ -44,21 +33,21 @@ XIAPrint::~XIAPrint()
 int
 XIAPrint::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-  _bytes = 1500;
-  String contents = "no";
-  String payload = "no";
-  _label = "";
-  _payload = false;
-  _active = true;
-  bool print_time = true;
-  bool print_paint = false;
-  bool print_hlim = false;
-  bool print_len = false;
-  bool print_aggregate = false;
-  bool bcontents;
-  String channel;
-
-  if (cp_va_kparse(conf, this, errh,
+    _bytes = 1500;
+    String contents = "no";
+    String payload = "no";
+    _label = "";
+    _payload = false;
+    _active = true;
+    bool print_time = true;
+    bool print_paint = false;
+    bool print_hlim = false;
+    bool print_len = false;
+    bool print_aggregate = false;
+    bool bcontents;
+    String channel;
+  
+    if (cp_va_kparse(conf, this, errh,
 		   "LABEL", cpkP, cpString, &_label,
 		   "CONTENTS", 0, cpWord, &contents,
 		   "PAYLOAD", 0, cpWord, &payload,
@@ -75,57 +64,57 @@ XIAPrint::configure(Vector<String> &conf, ErrorHandler *errh)
 #endif
 		   "CHANNEL", 0, cpWord, &channel,
 		   cpEnd) < 0)
-    return -1;
+		return -1;
 
-  if (cp_bool(contents, &bcontents))
-      _contents = bcontents;
-  else if ((contents = contents.upper()), contents == "NONE")
-      _contents = 0;
-  else if (contents == "HEX")
-      _contents = 1;
-  else if (contents == "ASCII")
-      _contents = 2;
-  else
-      return errh->error("bad contents value '%s'; should be 'NONE', 'HEX', or 'ASCII'", contents.c_str());
+	if (cp_bool(contents, &bcontents))
+		_contents = bcontents;
+	else if ((contents = contents.upper()), contents == "NONE")
+		_contents = 0;
+	else if (contents == "HEX")
+		_contents = 1;
+	else if (contents == "ASCII")
+		_contents = 2;
+	else
+		return errh->error("bad contents value '%s'; should be 'NONE', 'HEX', or 'ASCII'", contents.c_str());
 
-  int payloadv;
-  payload = payload.upper();
-  if (payload == "NO" || payload == "FALSE")
-    payloadv = 0;
-  else if (payload == "YES" || payload == "TRUE" || payload == "HEX")
-    payloadv = 1;
-  else if (payload == "ASCII")
-    payloadv = 2;
-  else
-    return errh->error("bad payload value '%s'; should be 'false', 'hex', or 'ascii'", contents.c_str());
-
-  if (payloadv > 0 && _contents > 0)
-    return errh->error("specify at most one of PAYLOAD and CONTENTS");
-  else if (payloadv > 0)
-    _contents = payloadv, _payload = true;
-
-  _print_timestamp = print_time;
-  _print_paint = print_paint;
-  _print_hlim = print_hlim;
-  _print_len = print_len;
-  _print_aggregate = print_aggregate;
-  _errh = router()->chatter_channel(channel);
-  return 0;
+    int payloadv;
+    payload = payload.upper();
+    if (payload == "NO" || payload == "FALSE")
+    	payloadv = 0;
+    else if (payload == "YES" || payload == "TRUE" || payload == "HEX")
+    	payloadv = 1;
+    else if (payload == "ASCII")
+    	payloadv = 2;
+    else
+    	return errh->error("bad payload value '%s'; should be 'false', 'hex', or 'ascii'", contents.c_str());
+  
+    if (payloadv > 0 && _contents > 0)
+    	return errh->error("specify at most one of PAYLOAD and CONTENTS");
+    else if (payloadv > 0)
+    	_contents = payloadv, _payload = true;
+  
+    _print_timestamp = print_time;
+    _print_paint = print_paint;
+    _print_hlim = print_hlim;
+    _print_len = print_len;
+    _print_aggregate = print_aggregate;
+    _errh = router()->chatter_channel(channel);
+    return 0;
 }
 
 int
 XIAPrint::initialize(ErrorHandler *errh)
 {
 #if CLICK_USERLEVEL
-  if (_outfilename) {
-    _outfile = fopen(_outfilename.c_str(), "wb");
-    if (!_outfile)
-      return errh->error("%s: %s", _outfilename.c_str(), strerror(errno));
-  }
+    if (_outfilename) {
+    	_outfile = fopen(_outfilename.c_str(), "wb");
+    	if (!_outfile)
+        	return errh->error("%s: %s", _outfilename.c_str(), strerror(errno));
+    }
 #else
-  (void) errh;
+    (void) errh;
 #endif
-  return 0;
+    return 0;
 }
 
 void
@@ -133,7 +122,7 @@ XIAPrint::cleanup(CleanupStage)
 {
 #if CLICK_USERLEVEL
     if (_outfile)
-	fclose(_outfile);
+		fclose(_outfile);
     _outfile = 0;
 #endif
 }
@@ -156,20 +145,20 @@ Packet *
 XIAPrint::simple_action(Packet *p)
 {
     if (!_active || !p->has_network_header())
-	return p;
+		return p;
 
     StringAccum sa;
 
     if (_label)
-	sa << _label << ": ";
+		sa << _label << ": ";
     if (_print_timestamp)
-	sa << p->timestamp_anno() << ": ";
+		sa << p->timestamp_anno() << ": ";
     if (_print_aggregate)
-	sa << '#' << AGGREGATE_ANNO(p);
+		sa << '#' << AGGREGATE_ANNO(p);
     if (_print_paint)
-	sa << (_print_aggregate ? "." : "paint ") << (int)PAINT_ANNO(p);
+		sa << (_print_aggregate ? "." : "paint ") << (int)PAINT_ANNO(p);
     if (_print_aggregate || _print_paint)
-	sa << ": ";
+		sa << ": ";
 
     const click_xia *xiah = p->xia_header();
     int hdr_len = XIAHeader::hdr_size(xiah->dnode + xiah->snode);
@@ -177,34 +166,36 @@ XIAPrint::simple_action(Packet *p)
     if (p->network_length() < hdr_len)
         sa << "truncated-xia";
     else {
-	print_xids(sa,xiah);
+		print_xids(sa,xiah);
 
         sa << ", LAST " << (int)xiah->last;
 
-	if (_print_hlim)
-	    sa << ", HLIM " << (int)xiah->hlim;
-	if (_print_len)
-	    sa << ", PLEN " << ntohs(xiah->plen);
+		if (_print_hlim)
+			sa << ", HLIM " << (int)xiah->hlim;
+		if (_print_len)
+			sa << ", PLEN " << ntohs(xiah->plen);
 
         if (xiah->nxt == CLICK_XIA_NXT_CID) {
             ContentHeader chdr(p);
-            if (chdr.opcode()==ContentHeader::OP_RESPONSE) 
+            if (chdr.opcode() == ContentHeader::OP_RESPONSE) 
             sa << ", EXT_CONTENT " << "<OP RESPONSE OFF " << chdr.offset() << " CHUNK_OFF " 
                << chdr.chunk_offset() << " LEN " << chdr.length() << " CHUNK_LEN " << chdr.chunk_length() <<"> " ;
-            else if (chdr.opcode()==ContentHeader::OP_REQUEST)
+            else if (chdr.opcode() == ContentHeader::OP_REQUEST)
             sa << ", EXT_CONTENT " << "<OP REQUEST> "; 
         }
-	// print payload
-	if (_contents > 0) {
-	    // TODO print payload
-	}
+
+		// print payload
+		if (_contents > 0) {
+			// TODO: print payload
+		}
     }
 
     sa << '\n';
+
 #if CLICK_USERLEVEL
     if (_outfile) {
-	sa << '\n';
-	ignore_result(fwrite(sa.data(), 1, sa.length(), _outfile));
+		sa << '\n';
+		ignore_result(fwrite(sa.data(), 1, sa.length(), _outfile));
     } else
 #endif
 	_errh->message("%s", sa.c_str());

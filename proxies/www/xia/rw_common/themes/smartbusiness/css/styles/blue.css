@@ -1,0 +1,92 @@
+body {
+	background: #3d5bac;
+}
+
+a:link, a:visited {
+	color: #2c2991;
+	text-decoration: underline;
+}
+
+a:hover, a:active {
+	color: #7c9cbc;
+	text-decoration: none;
+}
+
+#pageHeader h2 {
+	color: #25386a;
+}
+
+#sidebarContainer .sideHeader {
+	color: #325484;
+}
+
+#navcontainer #current {
+	background: no-repeat url(../../images/button_over.png);
+}
+
+#navcontainer .currentAncestor {
+	background: no-repeat url(../../images/button_over.png);
+}
+
+#navcontainer a {
+	background: no-repeat url(../../images/button_normal.png);
+}
+
+#navcontainer a:hover {
+	background: no-repeat url(../../images/button_over.png);
+}
+
+#navcontainer ul ul a {
+	background: url(../../images/sub_bullet_blue.png) no-repeat left center;
+}
+
+#navcontainer ul ul a:hover{
+	background: no-repeat left center url(../../images/sub_bullet_grey.png);
+	color: #3e5dae;
+}
+
+#navcontainer ul ul #current{
+	background: url(../../images/sub_bullet_grey.png) left center no-repeat;
+	color: #3e5dae;
+}
+
+#navcontainer ul ul .currentAncestor {
+	background: url(../../images/sub_bullet_grey.png) left center no-repeat;
+	color: #3e5dae;
+}
+
+#navcontainer ul ul ul a{
+	background: url(../../images/sub_bullet_blue.png) no-repeat left center;
+}
+
+#navcontainer ul ul ul a:hover{
+	background: no-repeat left center url(../../images/sub_bullet_grey.png);
+}
+.blog-archive-month {
+	color: #3357ac;
+}
+
+.blog-entry-title a {
+	color: #3357ac;
+}
+
+.blog-entry-title a:hover {
+	color: #7c9cbc;
+}
+
+.blog-entry-category {
+	color: #2c258f;
+}
+
+.album-title {
+	color: #3357ac;
+}
+
+.photo-navigation {
+	color: #3c59aa;
+	background: #e7ecfb;
+}
+
+.photo-frame{
+	background: #e7ecfb;
+}

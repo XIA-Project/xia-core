@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Creator</key>
+	<string>RapidWeaver</string>
+	<key>Minimum Application Version</key>
+	<string>4.3.9</string>
+	<key>SandwichFillings</key>
+	<array>
+		<dict>
+			<key>Dictionary</key>
+			<dict>
+				<key>PublishingManifest</key>
+				<dict/>
+				<key>SiteAttributes</key>
+				<dict>
+					<key>AddCopyrightMailTo</key>
+					<false/>
+					<key>BaseURL</key>
+					<string>http://www.cs.cmu.edu/afs/cs/project/xia/www-test/</string>
+					<key>ConsolidateCommonFilesMode</key>
+					<integer>0</integer>
+					<key>ContactText</key>
+					<string>Contact Me</string>
+					<key>CopyrightText</key>
+					<string>eXpressive Internet Architecture Workshop</string>
+					<key>CopyrightTextUsed</key>
+					<true/>
+					<key>CruftlessLinksEnabled</key>
+					<false/>
+					<key>DirectoryIndexFilenames</key>
+					<array>
+						<string>index.htm</string>
+						<string>index.html</string>
+						<string>index.php</string>
+					</array>
+					<key>EmailAddress</key>
+					<string>amiller@cs.cmu.edu</string>
+					<key>FavIconUsed</key>
+					<false/>
+					<key>LogoUsed</key>
+					<false/>
+					<key>ObfuscateEmailAddress</key>
+					<true/>
+					<key>PreviewAfterExportRelativeToBaseURL</key>
+					<false/>
+					<key>ProcessPHP</key>
+					<false/>
+					<key>PublishingSettings</key>
+					<dict>
+						<key>publisher</key>
+						<string>FTP</string>
+						<key>settings</key>
+						<dict>
+							<key>anonymous</key>
+							<false/>
+							<key>enablePublicKeyAuthentication</key>
+							<false/>
+							<key>passiveMode</key>
+							<true/>
+							<key>path</key>
+							<string>http://www.cs.cmu.edu/afs/cs/project/xia/www-test/</string>
+							<key>privateKeyPassphraseSaveInKeychain</key>
+							<false/>
+							<key>privateKeyPath</key>
+							<string></string>
+							<key>publicKeyPath</key>
+							<string></string>
+							<key>saveInKeychain</key>
+							<false/>
+							<key>server</key>
+							<string>1/afs/cs.cmu.edu/project/xia/www-test</string>
+							<key>sftp</key>
+							<false/>
+							<key>user</key>
+							<string>amiller</string>
+						</dict>
+					</dict>
+					<key>PublishingSettingsConfigured</key>
+					<false/>
+					<key>ShowBreadcrumbTrail</key>
+					<false/>
+					<key>ShowTidiedCode</key>
+					<false/>
+					<key>SloganText</key>
+					<string>Changing the world, one site at a time…</string>
+					<key>SloganUsed</key>
+					<false/>
+					<key>ThemeName</key>
+					<string>Dark Dash Original</string>
+					<key>TitleText</key>
+					<string>eXpressive Internet Architecture  </string>
+					<key>TitleTextUsed</key>
+					<true/>
+					<key>UUID</key>
+					<string>E50C82EF-E112-4B61-8006-C3A95FFEECAB</string>
+					<key>WebClipIconUsed</key>
+					<false/>
+				</dict>
+			</dict>
+			<key>Files</key>
+			<array>
+				<string>README.txt</string>
+			</array>
+			<key>Subsandwiches</key>
+			<array>
+				<string>DefaultPageAttributes</string>
+				<string>Pages</string>
+			</array>
+		</dict>
+	</array>
+	<key>Type</key>
+	<string>RapidWeaver Document</string>
+</dict>
+</plist>
