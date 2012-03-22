@@ -32,11 +32,13 @@ def createHID():
 # make a short hostname
 #
 def getHostname():
+	global hostname
 	if (len(hostname) == 0):
-		(name, tail) = split(socket.gethostname(), ".", 1)
-		return name
-	else:
-		return hostname
+		hostname = socket.gethostname()
+	dot = hostname.find(".")
+	if (dot >= 0):
+		hostname = hostname[:dot]
+	return hostname
 	
 #
 # get a list of the interfaces and associated mac addresses on this machine
@@ -79,7 +81,7 @@ def makeXIAAddrConfig(hid):
 		sys.exit(-1)
 
 	xchg = {}
-	xchg['HNAME'] = hostname
+	xchg['HNAME'] = getHostname()
 	xchg['HID'] = hid
 
 	s = Template(text)
@@ -87,7 +89,6 @@ def makeXIAAddrConfig(hid):
 	f.write(newtext)
 	f.close()
 
-# 
 #
 # Fill in the host template file
 #
@@ -113,7 +114,7 @@ def makeHostConfig(hid):
 		sys.exit(-1)
 
 	xchg = {}
-	xchg['HNAME'] = hostname
+	xchg['HNAME'] = getHostname()
 	xchg['ADNAME'] = adname
 	xchg['HID'] = hid
 	xchg['IFACE'] = interfaces[0][0]
@@ -158,7 +159,7 @@ def makeRouterConfig(hid):
 
 	xchg = {}
 	xchg['ADNAME'] = adname
-	xchg['HNAME'] = hostname
+	xchg['HNAME'] = getHostname()
 	xchg['HID'] = hid
 
 	newtext = tpl.substitute(xchg)
@@ -198,7 +199,6 @@ def getOptions():
 	global nodetype
 	global adname
 	try:
-		# FIXME: make the option names more meaningful
 		shortopt = "hrn:a:"
 		opts, args = getopt.getopt(sys.argv[1:], shortopt, 
 			["help", "router", "name=", "ad="])
@@ -219,7 +219,6 @@ def getOptions():
 			nodetype = "router"
 		else:
 		 	assert False, "unhandled option"
-
 
 #
 # display helpful information
