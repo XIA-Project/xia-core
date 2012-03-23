@@ -1,0 +1,49 @@
+require(library ../../../xia_router_template_xtransport.click);
+require(library ../../../xia_address.click);
+
+// router instantiation
+router0 :: XRouter4Port(RE $ADNAME $HID, $ADNAME, $HID, fake0, 172.0.0.2, 172.0.0.1, 21:11:11:11:11:11);
+
+######
+// Interface$NUM ($IFACE)
+c$NUM :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
+xarpq$NUM :: XARPQuerier($HID, $MAC);
+xarpr$NUM :: XARPResponder($HID $MAC);
+todevice$NUM :: ToDevice($IFACE);
+fromdevice$NUM :: FromDevice($IFACE, PROMISC true);
+queue$NUMa :: Queue;
+queue$NUMb :: Queue;
+unqueue$NUM :: Unqueue;
+mux$NUM :: DRRSched(2);
+
+// On receiving a packet from Interface$NUM
+fromdevice$NUM -> c$NUM;
+
+// On receiving an XIP packet
+c$NUM[2] -> Strip(14) -> MarkXIAHeader() 
+	//-> Print()
+	//-> XIAPrint("h0->r0")
+	-> [$NUM]router0; // XIA packet
+
+	// On receiving XARP response
+	c$NUM[1] -> [1]xarpq$NUM;
+	xarpq$NUM -> queue$NUMa -> [0]mux$NUM;
+	mux$NUM -> todevice$NUM;
+
+	// On receiving XARP query
+	c$NUM[0] -> xarpr$NUM;
+	xarpr$NUM -> queue$NUMb -> [1]mux$NUM;
+
+	// Sending an XIP packet (via XARP if necessary) to Interface0
+	router0[$NUM]
+	//-> Print()
+	//-> XIAPrint("r0->h0")
+	-> cnt$NUM::XIAXIDTypeCounter(src AD, src HID, src SID, src CID, src IP, -) 
+	-> unqueue$NUM
+	-> [0]xarpq$NUM
+
+######
+	Idle -> [$NUM]router0[$NUM] -> Discard;
+######
+
+	ControlSocket(tcp, 7777);

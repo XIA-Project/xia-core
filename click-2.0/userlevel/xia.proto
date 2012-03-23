@@ -23,6 +23,7 @@ enum XSocketCallType {
   XRESULT = 18;
 
   XCHANGEAD = 19;
+  XREADLOCALHOSTADDR = 20;  
 }
 
 message XSocketMsg {
@@ -50,6 +51,7 @@ message XSocketMsg {
   optional X_Result_Msg x_result = 19;
 
   optional X_Changead_Msg x_changead = 20;	
+  optional X_ReadLocalHostAddr_Msg x_readlocalhostaddr = 21;  
 }
  
 message X_Socket_Msg {
@@ -149,6 +151,11 @@ message X_Requestfailed_Msg {
 
 message X_Changead_Msg {
   required string dag = 1;
+}
+
+message X_ReadLocalHostAddr_Msg {
+  optional string ad = 1;
+  optional string hid = 2;
 }
 
 /**************************************************/

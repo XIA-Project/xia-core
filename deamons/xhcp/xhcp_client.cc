@@ -15,7 +15,6 @@ char *adv_selfdag = NULL;
 char *adv_gwdag = NULL;
 
 
-
 XIARouter xr;
 
 void listRoutes(std::string xidType)
@@ -52,10 +51,8 @@ int main(int argc, char *argv[]) {
 	char *gw_dag = (char *)malloc(XHCP_MAX_DAG_LENGTH);
 	char *pseudo_gw_router_dag; // dag for host_register_message (broadcast message), but only the gw router will accept it
 	string host_register_message;
-	char *myHID;
-	
-	myHID = (char*)malloc(snprintf(NULL, 0, "%s", HID0) + 1);
-    	sprintf(myHID, "%s", HID0);
+	char mydummyAD[MAX_XID_SIZE];
+	char myHID[MAX_XID_SIZE]; 	
 
     	// make the response message dest DAG (intended destination: gw router who is running the routing process)
     	pseudo_gw_router_dag = (char*)malloc(snprintf(NULL, 0, "RE %s %s", BHID, SID_XROUTE) + 1);
@@ -67,11 +64,15 @@ int main(int argc, char *argv[]) {
 		return -1;
 	}
 	
-	xr.setRouter("host_0a");
+	xr.setRouter("host0");
 			
 	// Xsocket init
 	int sockfd = Xsocket(XSOCK_DGRAM);
 	if (sockfd < 0) { error("Opening Xsocket"); }
+	
+    	// read the localhost HID 
+    	if ( XreadLocalHostAddr(sockfd, mydummyAD, myHID) < 0 )
+    		error("Reading localhost address");   	
 
 	sprintf(sdag, "RE %s", SID_XHCP);
 	Xbind(sockfd, sdag);

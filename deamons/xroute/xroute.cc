@@ -89,7 +89,7 @@ int sendHello(){
 	hello.append(route_state.myHID);
 	hello.append("^");
 	strcpy (buffer, hello.c_str());
-	
+
 	Xsendto(route_state.sock, buffer, strlen(buffer), 0, route_state.ddag, strlen(route_state.ddag)+1);
 	return 1;
 }
@@ -508,6 +508,7 @@ void updateClickRoutingTable() {
 			printf("error setting route %d\n", rc);
 
   	}
+  	//listRoutes("HID");
 	//listRoutes("AD");
 }
 
@@ -520,15 +521,13 @@ void initRouteState()
     	route_state.ddag = (char*)malloc(snprintf(NULL, 0, "RE %s %s", BHID, SID_XROUTE) + 1);
     	sprintf(route_state.ddag, "RE %s %s", BHID, SID_XROUTE);	
 
+    	// read the localhost AD and HID
+    	if ( XreadLocalHostAddr(route_state.sock, route_state.myAD, route_state.myHID) < 0 )
+    		error("Reading localhost address");
+
 	// make the src DAG (the one the routing process listens on)
-    	route_state.sdag = (char*) malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, RHID0, SID_XROUTE) + 1);
-    	sprintf(route_state.sdag, "RE %s %s %s", AD0, RHID0, SID_XROUTE); 
-    		
-    	// store myAD and myHID
-    	route_state.myAD = (char*)malloc(snprintf(NULL, 0, "%s", AD0) + 1);
-    	sprintf(route_state.myAD, "%s", AD0);
-     	route_state.myHID = (char*)malloc(snprintf(NULL, 0, "%s", RHID0) + 1);
-    	sprintf(route_state.myHID, "%s", RHID0);   	
+    	route_state.sdag = (char*) malloc(snprintf(NULL, 0, "RE %s %s %s", route_state.myAD, route_state.myHID, SID_XROUTE) + 1);
+    	sprintf(route_state.sdag, "RE %s %s %s", route_state.myAD, route_state.myHID, SID_XROUTE); 
 	
 	route_state.num_neighbors = 0; // number of neighbor routers
 	route_state.lsa_seq = 0;	// LSA sequence number of this router
@@ -540,9 +539,6 @@ void initRouteState()
 	signal(SIGALRM, timeout_handler);  
 	alarm(HELLO_INTERVAL); 	
 }
-
-
-
 
 int main()
 {
@@ -562,14 +558,14 @@ int main()
 
 	xr.setRouter("router0");
 	listRoutes("AD");
-	
-    	// initialize the route states (e.g., set HELLO/LSA timer, etc)
-    	initRouteState();
 
     	// open socket for route process
     	route_state.sock=Xsocket(XSOCK_DGRAM);
     	if (route_state.sock < 0) 
     		error("Opening socket");
+
+    	// initialize the route states (e.g., set HELLO/LSA timer, etc)
+    	initRouteState();
    
     	// bind to the src DAG
     	Xbind(route_state.sock, route_state.sdag);

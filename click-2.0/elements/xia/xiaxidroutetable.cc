@@ -444,6 +444,7 @@ XIAXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
     			// Make a new entry for this newly discovered neighbor
        			XIARouteData *xrd1 = new XIARouteData();
 			xrd1->port = in_ether_port;
+			xrd1->nexthop = new XID(source_hid);
 			_rts[source_hid] = xrd1;
     		}
     		return _my_port;

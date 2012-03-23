@@ -10,17 +10,17 @@
 int main(int argc, char *argv[]) {
 	char pkt[XHCP_MAX_PACKET_SIZE];
 	char ddag[XHCP_MAX_DAG_LENGTH];
-	char *myAD, *gw_router_hid;
+	char myAD[MAX_XID_SIZE]; 
+	char gw_router_hid[MAX_XID_SIZE];
 	// Xsocket init
 	int sockfd = Xsocket(XSOCK_DGRAM);
 	if (sockfd < 0) { error("Opening Xsocket"); }
 	// dag init
 	sprintf(ddag, "RE %s %s", BHID, SID_XHCP);
-    	// store myAD and myHID
-    	myAD = (char*)malloc(snprintf(NULL, 0, "%s", AD0) + 1);
-    	sprintf(myAD, "%s", AD0);
-     	gw_router_hid = (char*)malloc(snprintf(NULL, 0, "%s", RHID0) + 1);
-    	sprintf(gw_router_hid, "%s", RHID0);
+	
+    	// read the localhost AD and HID (currently, XHCP server running on gw router)
+    	if ( XreadLocalHostAddr(sockfd, myAD, gw_router_hid) < 0 )
+    		error("Reading localhost address");
  
 	xhcp_pkt beacon_pkt;
 	beacon_pkt.seq_num = 0;

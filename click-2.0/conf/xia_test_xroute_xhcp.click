@@ -2,9 +2,9 @@ require(library xia_router_template_xtransport.click);
 require(library xia_address.click);
 
 // host & router instantiation
-host_0a :: EndHost (RE AD_INIT HID0, HID0, fake0,172.0.0.2,172.0.0.1,01:11:11:11:11:11,0);
+host_0a :: EndHost (RE AD_INIT HID0, HID0, fake0,182.0.0.2,182.0.0.1,01:11:11:11:11:11,0);
 host_0b :: EndHost (RE AD_INIT HID1, HID1, fake1,195.0.0.2,195.0.0.1,11:11:11:11:11:11,1);
-router0 :: XRouter4Port(RE AD0 RHID0, AD0, RHID0, fake2, 182.0.0.2, 182.0.0.1, 21:11:11:11:11:11);
+router0 :: XRouter4Port(RE AD0 RHID0, AD0, RHID0, fake2, 172.0.0.2, 172.0.0.1, 21:11:11:11:11:11);
 
 host_1a :: EndHost (RE AD_INIT HID2, HID2, fake3,173.0.0.2,173.0.0.1,31:11:11:11:11:11,0);
 host_1b :: EndHost (RE AD_INIT HID3, HID3, fake4,193.0.0.2,193.0.0.1,41:11:11:11:11:11,1);

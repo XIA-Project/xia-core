@@ -741,6 +741,26 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			_local_addr.parse(new_local_addr);
 		}
 		break;
+		case xia::XREADLOCALHOSTADDR:
+		{
+			// read the localhost AD and HID
+			String local_addr = _local_addr.unparse();
+			size_t AD_found_start = local_addr.find_left("AD:");
+			size_t AD_found_end = local_addr.find_left(" ", AD_found_start);
+			String AD_str = local_addr.substring(AD_found_start, AD_found_end - AD_found_start);
+			String HID_str = _local_hid.unparse();
+			// return a packet containing localhost AD and HID
+			xia::XSocketMsg _Response;
+			_Response.set_type(xia::XREADLOCALHOSTADDR);
+			xia::X_ReadLocalHostAddr_Msg *_msg = _Response.mutable_x_readlocalhostaddr();
+			_msg->set_ad(AD_str.c_str());
+			_msg->set_hid(HID_str.c_str());
+			std::string p_buf1;
+			_Response.SerializeToString(&p_buf1);
+			WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
+			output(1).push(UDPIPEncap(reply, _sport, _sport));
+		}
+		break;		
 		
 		default:
 			click_chatter("\n\nERROR: CONTROL TRAFFIC !!!\n\n");
@@ -935,7 +955,6 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			
 			// Case of initial binding to only SID
 			if(daginfo->full_src_dag == false) {
-				printf("\n\n\n FIX BINDING \n\n\n");
 				daginfo->full_src_dag = true;
 				String str_local_addr = _local_addr.unparse_re();
 				XID front_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
@@ -1451,7 +1470,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 		bool sendToApplication = true;
 		//String pld((char *)xiah.payload(), xiah.plen());
-		//printf("\n\n (%s) Received=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), pld.c_str(), xiah.plen());
+		//printf("\n\n 1. (%s) Received=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), pld.c_str(), xiah.plen());
 
 		TransportHeader thdr(p_in);
 
