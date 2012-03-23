@@ -110,9 +110,9 @@ extern int Xclose(int sock);
 extern int Xrecv(int sockfd, void *rbuf, size_t len, int flags);
 extern int Xsend(int sockfd, const void *buf, size_t len, int flags);
 
-extern int XrequestChunk(int sockfd, char* cid, size_t cidLen);
+extern int XrequestChunk(int sockfd, char* dag, size_t dagLen);
 extern int XrequestChunks(int sockfd, const ChunkStatus *chunks, int numChunks);
-extern int XgetChunkStatus(int sockfd, char* cid, size_t cidLen);
+extern int XgetChunkStatus(int sockfd, char* dag, size_t dagLen);
 extern int XgetChunkStatuses(int sockfd, ChunkStatus *statusList, int numCids);
 extern int XreadChunk(int sockfd, void *rbuf, size_t len, int flags, char *cid, size_t cidLen);
 
