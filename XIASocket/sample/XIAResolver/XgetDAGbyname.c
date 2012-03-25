@@ -15,7 +15,7 @@ const char *XgetDAGbyname(char *name) {
   char line[512];
   char *linend;
   
-  // first look at /etc/hosts_xia for possible entry
+  // look for an hosts_xia file locally
   FILE *hostsfp = fopen(ETC_HOSTS, "r");
   int answer_found = 0;
   if (hostsfp != NULL) {

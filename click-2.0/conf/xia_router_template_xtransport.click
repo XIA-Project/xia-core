@@ -29,9 +29,11 @@ elementclass GenericRouting4Port {
     broadcast_pkt_Fork[3] -> Paint(3) -> [0]output;   
     
 };
- 
+
 elementclass GenericPostRouteProc {
-    input -> XIADecHLIM -> output; 
+    decH :: XIADecHLIM;
+    input -> decH[0] -> output;
+    decH[1] -> [1]output;
 };
 
 elementclass XIAPacketRoute {
@@ -60,21 +62,24 @@ elementclass XIAPacketRoute {
     consider_next_path[0] -> c;
     consider_next_path[1] -> [2]output;
 
+    GPRP :: GenericPostRouteProc;
+    x :: XCMP($local_addr);
+
     //  Next destination is AD
     c[0] -> rt_AD :: GenericRouting4Port($local_addr);
-    rt_AD[0] -> GenericPostRouteProc -> [0]output;
+    rt_AD[0] -> GPRP;
     rt_AD[1] -> XIANextHop -> check_dest;
     rt_AD[2] -> consider_next_path;
 
     //  Next destination is HID
     c[1] -> rt_HID :: GenericRouting4Port($local_addr);
-    rt_HID[0] -> GenericPostRouteProc -> [0]output;
+    rt_HID[0] -> GPRP;
     rt_HID[1] -> XIANextHop -> check_dest;
     rt_HID[2] -> consider_next_path;
 
     //  Next destination is SID
     c[2] -> rt_SID :: GenericRouting4Port($local_addr);
-    rt_SID[0] -> GenericPostRouteProc -> [0]output;
+    rt_SID[0] -> GPRP;
     rt_SID[1] -> XIANextHop -> check_dest;
     rt_SID[2] -> consider_next_path;
     rt_SID[3] -> [3]output;				// hack to use DHCP functionality
@@ -85,16 +90,22 @@ elementclass XIAPacketRoute {
 
     //  Next destination is CID
     c[3] -> rt_CID :: GenericRouting4Port($local_addr);
-    rt_CID[0] -> GenericPostRouteProc -> CIDPostRouteProc -> [0]output;
+    GPRP_CID :: GenericPostRouteProc;
+    rt_CID[0] -> GPRP_CID -> CIDPostRouteProc -> [0]output;
     rt_CID[1] -> XIANextHop -> check_dest;
     rt_CID[2] -> consider_next_path;
+    GPRP_CID[1] -> [0]x;
 
 
     // Next destination is an IPv4 path
     c[4] -> rt_IP :: GenericRouting4Port($local_addr);
-    rt_IP[0] -> GenericPostRouteProc -> [0]output;
+    rt_IP[0] -> GPRP;
     rt_IP[1] -> XIANextHop -> check_dest;
     rt_IP[2] -> consider_next_path;
+
+    GPRP[0] -> [0]output;
+    GPRP[1] -> Print("TIME EXCEEDED") -> x[0] -> consider_first_path;
+    x[1] -> Discard;
 
     c[5] -> [2]output;
 
@@ -200,11 +211,17 @@ elementclass Router {
     Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
 
+    c :: Classifier(01/3D, -); // XCMP
+    x :: XCMP($local_addr);
+
     input[0] -> [0]n;
     input[1] -> [0]n;
 
     n[0] -> sw :: PaintSwitch
-    n[1] -> Discard;
+    n[1] -> c[1] -> Discard;
+    c[0] -> IPPrint("going into XCMP Module", CONTENTS HEX) -> x;
+    x[0] -> [0]n; // new (response) XCMP packets destined for some other machine
+    x[1] -> Discard; // XCMP packet actually destined for this router??
     n[2] -> [0]cache[0] -> [1]n;
     Idle -> [1]cache[1] -> Discard;
 
@@ -586,6 +603,9 @@ elementclass EndHost {
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
     Script(write n/proc/rt_IP/rt.add - 0); 	// default route for IPv4    
 
+    c :: Classifier(01/3D, -); // XCMP
+    x :: XCMP($local_addr);
+
     // quick fix
     n[3] -> Discard();
     Idle() -> [4]xtransport;
@@ -593,7 +613,11 @@ elementclass EndHost {
     input[0] -> Paint(0) -> [0]n;  
     
     srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
-    n[1] -> srcTypeClassifier[1] -> [2]xtransport[2] -> Paint(4) ->  [0]n;
+    n[1] -> c[1] -> srcTypeClassifier[1] -> [2]xtransport[2] -> Paint(4) ->  [0]n;
+    c[0] -> IPPrint("going into XCMP Module", CONTENTS HEX) -> x;
+    x[0] -> [0]n; // new (response) XCMP packets destined for some other machine
+    x[1] -> Print("XCMP going to XTransport") -> [2]xtransport; // XCMP packets destined for this machine
+
     srcTypeClassifier[0] -> Discard;    // do not send CID responses directly to RPC;
     
     n[2] -> [0]cache[0] -> [1]n;
