@@ -27,18 +27,18 @@
 ** @brief Bring a content chunk local to this machine.
 **
 ** @param sockfd - the control socket (must be of type XSOCK_CHUNK)
-** @param cid - Content ID of this chunk
-** @param cidLen - length of sDAG (currently not used)
+** @param dag - Content ID of this chunk
+** @param dagLen - length of sDAG (currently not used)
 **
 ** @returns 0 on success
 ** @returns -1 on error with errno set
 */
-int XrequestChunk(int sockfd, char* cid, size_t /* cidLen */)
+int XrequestChunk(int sockfd, char* dag, size_t /* dagLen */)
 {
 	ChunkStatus cs;
 
-	cs.cid = cid;
-	cs.cidLen = strlen(cid);
+	cs.cid = dag;
+	cs.cidLen = strlen(dag);
 
 	return XrequestChunks(sockfd, &cs, 1);
 }
