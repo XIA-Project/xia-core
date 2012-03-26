@@ -11,47 +11,47 @@ from xsocket import *
 from ctypes import *
 import hashlib
 
-chunksize = 1200
+#chunksize = 1200
 cids_by_filename = {}
 
 # Pretend a magic naming service gives us XIDs...
 from xia_address import *
 
 # TODO: This should eventually be replaced by the put_chunk API
-def put_chunk(chunk):
-    # Hash the content to get CID
-    m = hashlib.sha1()
-    m.update(chunk)
-    cid = m.hexdigest()
+#def put_chunk(chunk):
+#    # Hash the content to get CID
+#    m = hashlib.sha1()
+#    m.update(chunk)
+#    cid = m.hexdigest()
+#
+#    sock = Xsocket(XSOCK_CHUNK)
+#    if (sock<0):
+#        print "webserver.py: put_chunk: error opening socket"
+#        exit(-1)
+#    
+#    # Put the content chunk
+#    content_dag = 'RE %s %s CID:%s' % (AD1, HID1, cid)  # TODO: test DAG format instead of RE
+#    XputCID(sock, chunk, len(chunk), 0, content_dag, len(content_dag))
+#
+#    #print 'put content %s (length %s)' % (content_dag, len(chunk))
+#    Xclose(sock)
+#    return cid
 
-    sock = Xsocket(XSOCK_CHUNK)
-    if (sock<0):
-        print "webserver.py: put_chunk: error opening socket"
-        exit(-1)
-    
-    # Put the content chunk
-    content_dag = 'RE %s %s CID:%s' % (AD1, HID1, cid)  # TODO: test DAG format instead of RE
-    XputCID(sock, chunk, len(chunk), 0, content_dag, len(content_dag))
-
-    #print 'put content %s (length %s)' % (content_dag, len(chunk))
-    Xclose(sock)
-    return cid
-
-def put_file(filepath, chunksize):
-    print "putting file %s" % filepath
-    cid_list = []
-    try:
-        f = open(filepath, 'r')
-        chunk = f.read(chunksize)
-        while chunk != '':
-            cid_list.append(put_chunk(chunk))
-            chunk = f.read(chunksize)
-    except IOError:
-        print "IOERROR: webserver.py: put_file: error reading file %s" % filepath
-    finally:
-        if f:
-            f.close()
-    return cid_list
+#def put_file(filepath, chunksize):
+#    print "putting file %s" % filepath
+#    cid_list = []
+#    try:
+#        f = open(filepath, 'r')
+#        chunk = f.read(chunksize)
+#        while chunk != '':
+#            cid_list.append(put_chunk(chunk))
+#            chunk = f.read(chunksize)
+#    except IOError:
+#        print "IOERROR: webserver.py: put_file: error reading file %s" % filepath
+#    finally:
+#        if f:
+#            f.close()
+#    return cid_list
     
 
 def serveHTTPRequest(request, sock):
@@ -69,11 +69,12 @@ def serveHTTPRequest(request, sock):
 
     # If file exists in cids_by_filename, return its CID (list); otherwise return 404 Not Found
     requested_file = './www/' + request.split(' ')[1][1:]
+    print 'requested file: %s' % requested_file
     try:
         cid_list = cids_by_filename[requested_file]
         cid_string = 'cid.%i.' % len(cid_list)
-        for cid in cid_list:
-            cid_string += cid
+        for cid_info in cid_list:
+            cid_string += cid_info.cid
 
         response_data = cid_string
         http_msg_type = 'HTTP/1.1 200 OK\n'
@@ -84,6 +85,7 @@ def serveHTTPRequest(request, sock):
 
     # Send response
     response = http_msg_type + http_header + response_data
+    print 'REsponse: \n %s' % response
     Xsend(sock, response, len(response), 0)
 
 
@@ -98,6 +100,9 @@ def put_content_in_dir(dir):
         print 'ERROR: webserver.py: put_content_in_dir: Directory "%s" does not exist.' % dir
         return
 
+    # Allocate a local cache slice for the webserver
+    chunk_context = XallocCacheSlice(POLICY_DEFAULT, 0, 0)
+
     # All files with extentions listed below won't be processed on the first pass;
     # they will be processed in successive passes in the order listed
     link_files_type_order = ['.css', '.html']
@@ -111,7 +116,7 @@ def put_content_in_dir(dir):
     for root, dirs, files in os.walk(dir):
         for file in files:
             if link_files_type_order.count(os.path.splitext(file)[1]) == 0 and link_files_type_order.count(os.path.splitext(file)[1][:-4]) == 0:
-                cids_by_filename[os.path.join(root,file)] = put_file(os.path.join(root, file), 1200)
+                cids_by_filename[os.path.join(root,file)] = XputFile(chunk_context, os.path.join(root, file), 0)
             else:
                 files_with_links.append(os.path.join(root, file))
 
@@ -133,8 +138,8 @@ def put_content_in_dir(dir):
                         for key, value in cids_by_filename.iteritems():
                             # build the CID string to replace the filepath
                             cid_string = 'http://xia.cid.%i.' % len(value)
-                            for cid in value:
-                                cid_string += cid
+                            for cid_info in value:
+                                cid_string += cid_info.cid
                            
                             content_path  = os.path.relpath(key, root)
                             
@@ -159,7 +164,7 @@ def put_content_in_dir(dir):
                         fnew.closed
                         
                         # publish the modified HTML file
-                        cids_by_filename_to_add[os.path.join(root,file)] = put_file(os.path.join(root, file+'TEMP'), 1200)
+                        cids_by_filename_to_add[os.path.join(root,file)] = XputFile(chunk_context, os.path.join(root, file+'TEMP'), 0)
                         os.remove(os.path.join(root, file+'TEMP'))
                     orig_html_file.closed
         cids_by_filename = dict(cids_by_filename.items() + cids_by_filename_to_add.items());
@@ -186,6 +191,7 @@ def main():
         # TODO: use threads instead of processes?
         while(True):
             accept_sock = Xaccept(listen_sock);
+            print 'connection accepted'
             child_pid = os.fork()
   
             if child_pid == 0:  

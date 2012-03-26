@@ -31,19 +31,19 @@
 ** way.
 **
 ** @param sockfd - the control socket (must be of type XSOCK_CHUNK)
-** @param cDAG - Content ID of this chunk
-** @param dlen - length of cDAG (currently not used)
+** @param dag - Content ID of this chunk
+** @param dagLen - length of cDAG (currently not used)
 **
 ** @returns 1 CID is waiting to be read
 ** @returns 0 waiting for chunk response
 ** @returns -1 on error with errno set
 */
-int XgetChunkStatus(int sockfd, char* cid, size_t /* cidLen */)
+int XgetChunkStatus(int sockfd, char* dag, size_t /* dagLen */)
 {
 	ChunkStatus cs;
 
-	cs.cid = cid;
-	cs.cidLen = strlen(cid);
+	cs.cid = dag;
+	cs.cidLen = strlen(dag);
 
 	return XgetChunkStatuses(sockfd, &cs, 1);
 }

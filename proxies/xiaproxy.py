@@ -90,8 +90,8 @@ def readcid_with_timeout(sock, cid, timeout=5):
     try:
         while (time.time() - start_time < timeout and not received_data):
             try:
-                if XgetCIDStatus(sock, cid, len(cid)) == 1:
-                    reply = XreadCID(sock, 65521, 0, cid, len(cid))
+                if XgetChunkStatus(sock, cid, len(cid)) == 1:
+                    reply = XreadChunk(sock, 65521, 0, cid, len(cid))
                     received_data = True
             except IOError:
                 received_data = False
@@ -136,7 +136,7 @@ def process_videoCIDlist(message, browser_socket, socks):
         #content_dag = 'RE %s %s %s' % (AD1, HID1, content_dag)
         content_dag = 'DAG 2 0 - \n %s 2 1 - \n %s 2 - \n %s' % (AD1, HID1, content_dag)
 	cidlist.append(content_dag)
-        #XgetCID(moresock, content_dag, len(content_dag))
+        #XrequestChunk(moresock, content_dag, len(content_dag))
         #content = Xrecv(moresock, 65521, 0)
 	#browser_socket.send(content)
 	rt = message.find('CID', rt+44)
@@ -145,7 +145,7 @@ def process_videoCIDlist(message, browser_socket, socks):
     ## first issue all the requests
     for i in range(len(cidlist)):
         try:
-            XgetCID(socks[i], cidlist[i], len(cidlist[i]))
+            XrequestChunk(socks[i], cidlist[i], len(cidlist[i]))
         except:
             print 'ERROR: xiaproxy.py: process_videoCIDlist: error requesting CID %s' % cidlist[i]
     ## then retrieve them
@@ -262,7 +262,7 @@ def requestVideoCID(CID, fallback):
         content_dag = 'RE %s %s %s' % (AD1, HID1, content_dag)
     #print 'Retrieving content with ID: \n%s' % content_dag
     try:
-        XgetCID(sock, content_dag, len(content_dag))
+        XrequestChunk(sock, content_dag, len(content_dag))
     except:
         print 'ERROR: xiaproxy.py: requestVideoCID: error requesting CID \n%s' % content_dag
     # Get content
@@ -279,6 +279,7 @@ def getrandSID():
     return  sid
 
 def sendSIDRequestXSP(ddag, payload, browser_socket):
+    print 'Sending SID Request to %s' % ddag
     # Create socket
     sock = Xsocket(XSOCK_STREAM)
     if (sock<0):
@@ -309,6 +310,7 @@ def sendSIDRequestXSP(ddag, payload, browser_socket):
 
     # Receive reply and close socket
     try:
+        print 'Trying to receiv CIDs from webserver'
         reply= recv_with_timeout(sock) # Use default timeout
     except IOError:
         print "Unexpected error:", sys.exc_info()[0]
@@ -381,16 +383,16 @@ def sendSIDRequestXDP(ddag, payload, browser_socket):
 def get_content_from_cid_list(cid_list):
     num_cids = len(cid_list) / 40
     
-    # make a list of cDAGvecs
-    cids = cDAGvecArray(num_cids) # list()
+    # make a list of ChunkStatuss
+    cids = ChunkStatusArray(num_cids) # list()
     for i in range(0, num_cids):
         content_dag = 'CID:%s' % cid_list[i*40:40+i*40]
         content_dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, content_dag)
-        cDAGinfo = cDAGvec()
-        cDAGinfo.cDAG = content_dag
-        cDAGinfo.dlen = len(content_dag)
-        cDAGinfo.status = 0
-        cids[i] = cDAGinfo
+        chunk_info = ChunkStatus()
+        chunk_info.cDAG = content_dag
+        chunk_info.dlen = len(content_dag)
+        chunk_info.status = 0
+        cids[i] = chunk_info
 
     # make a socket
     sock = Xsocket(XSOCK_CHUNK)
@@ -408,7 +410,7 @@ def get_content_from_cid_list(cid_list):
 
     # request the list of CIDs
     try:
-        XgetCIDList(sock, cids, num_cids)
+        XrequestChunks(sock, cids, num_cids)
     except:
         print 'ERROR: xiaproxy.py: get_content_from_cid_list: Error requesting CID list'
 

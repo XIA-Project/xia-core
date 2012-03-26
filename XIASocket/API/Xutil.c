@@ -29,7 +29,7 @@
 int validateSocket(int sock, int stype, int err)
 {
 	int st = getSocketType(sock);
-	if (st == stype)
+	if (st == stype || st == XSOCK_RAW)
 		return 0;
 	else if (st == XSOCK_INVALID)
 		errno = EBADF;
