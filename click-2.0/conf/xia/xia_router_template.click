@@ -4,13 +4,22 @@ elementclass GenericRouting4Port {
     // output[1]: need to update "last" pointer
     // output[2]: no match
 
+    x :: XCMP;
+
     input ->  rt :: XIAXIDRouteTable;
-    rt[0] ->  Paint(0) -> [0]output;
-    rt[1] ->  Paint(1) -> [0]output;
-    rt[2] ->  Paint(2) -> [0]output;
-    rt[3] ->  Paint(3) -> [0]output;
+    rt[0] ->  t0 :: Tee -> Paint(0) -> [0]output;
+    rt[1] ->  t1 :: Tee -> Paint(1) -> [0]output;
+    rt[2] ->  t2 :: Tee -> Paint(2) -> [0]output;
+    rt[3] ->  t3 :: Tee -> Paint(3) -> [0]output;
     rt[4] ->  [1]output;
     rt[5] ->  [2]output;
+
+    t0[1] -> CheckPaint(0) -> x;
+    t1[1] -> CheckPaint(1) -> x;
+    t2[1] -> CheckPaint(2) -> x;
+    t3[1] -> CheckPaint(3) -> x;
+
+    x -> [0]output;
 };            
               
 elementclass GenericPostRouteProc {

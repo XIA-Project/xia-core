@@ -28,6 +28,12 @@ XCMP(RE AD0 HID0)
 
 */
 
+// used for XCMP XID Unreachable
+#define ARP_TIMEOUT 65
+
+// used for XCMP Redirect
+#define REDIRECT_BASE 70
+
 class XCMP : public Element { public:
 
     XCMP();

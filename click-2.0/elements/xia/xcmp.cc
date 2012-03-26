@@ -52,50 +52,127 @@ XCMP::push(int, Packet *p_in)
     XIAHeader hdr(p_in);
     const uint8_t *payload = hdr.payload();
 
-	// first check to see if this packet hop-limit has expired
+	// check if this packet is painted for redirection
+    if(p_in->anno_u8(PAINT_ANNO_OFFSET) >= REDIRECT_BASE) { // need to send XCMP REDIRECT
+        if(DEBUG)
+		    click_chatter("%s: %u: %s sent me a packet that should route on its local network\n", _src_path.unparse().c_str(),p_in->timestamp_anno().usecval(),hdr.src_path().unparse());
+      
+		// create the XCMP Redirect Message
+		char msg[256];
+		msg[0] = 5; // Redirect (type)
+		msg[1] = 1; // Redirect for host (code)
+		
+		// copy in the XIA header and the first 8 bytes of the datagram.
+		// strictly speaking, this first 8 bytes don't get us anything,
+		// but for the sake of similarity to ICMP we include them.
+		memcpy(&msg[8], hdr.hdr(), hdr.hdr_size()); // copy XIP header
+		memcpy(&msg[8+hdr.hdr_size()], hdr.payload(), 8); // copy first 8 bytes of datagram
+		
+		// recompute the checksum
+		uint16_t checksum = in_cksum((u_short *)msg, hdr.hdr_size()+16);
+		memcpy(&msg[2], &checksum, 2);
+		
+		// create the actual redirect packet
+		WritablePacket *p = Packet::make(256, msg, hdr.plen(), 0);
+		
+		// encap this in XCMP
+		XIAHeaderEncap encap;
+		encap.set_nxt(CLICK_XIA_NXT_XCMP);   // XCMP
+		encap.set_dst_path(hdr.src_path());
+		encap.set_src_path(_src_path);
+		
+		if(DEBUG)
+		    click_chatter("%s: %u: Dest Unreachable sent\n", _src_path.unparse().c_str(),Timestamp::now().usecval());
+		
+		// send this out to the network, kill the packet and exit
+		output(0).push(encap.encap(p));
+		p_in->kill();
+		return;
+    }
+
+	// check to see if this packet can't make it to its destination
+	// we need to send a DESTINATION XID Unreachable message to the src
+    if(p_in->anno_u8(PAINT_ANNO_OFFSET) == ARP_TIMEOUT) { // need to send a DESTINATION XID UNREACHABLE MESSAGE
+	    if(DEBUG)
+		    click_chatter("%s: %u: Dest (D: %s) Unreachable\n", _src_path.unparse().c_str(),p_in->timestamp_anno().usecval(),hdr.dst_path().unparse());
+      
+		// create a Destination XID Unreachable message
+		char msg[256];
+		msg[0] = 3; // Dest Unreachable (type)
+		msg[1] = 1; // Host (??) unreachable (code)
+		
+		// copy in the XIA header and the first 8 bytes of the datagram.
+		// strictly speaking, this first 8 bytes don't get us anything,
+		// but for the sake of similarity to ICMP we include them.
+		memcpy(&msg[8], hdr.hdr(), hdr.hdr_size()); // copy XIP header
+		memcpy(&msg[8+hdr.hdr_size()], hdr.payload(), 8); // copy first 8 bytes of datagram
+		
+		// recompute the checksum
+		uint16_t checksum = in_cksum((u_short *)msg, hdr.hdr_size()+16);
+		memcpy(&msg[2], &checksum, 2);
+      
+		// create the actual xid unreachable packet
+		WritablePacket *p = Packet::make(256, msg, hdr.plen(), 0);
+		
+		// encap this in XCMP
+		XIAHeaderEncap encap;
+		encap.set_nxt(CLICK_XIA_NXT_XCMP);   // XCMP
+		encap.set_dst_path(hdr.src_path());
+		encap.set_src_path(_src_path);
+      
+		if(DEBUG)
+		    click_chatter("%s: %u: Dest Unreachable sent\n", _src_path.unparse().c_str(),Timestamp::now().usecval());
+      
+		// send this out to the network, kill the packet, and exit
+		output(0).push(encap.encap(p));
+		p_in->kill();
+		return;
+    }
+
+	// check to see if this packet hop-limit has expired
     if(hdr.hlim() <= 1) { // need to send a TIME EXCEEDED MESSAGE
-	  if(DEBUG)
-		  click_chatter("%s: %u: HLIM Exceeded\n", _src_path.unparse().c_str(),p_in->timestamp_anno().usecval());
+	    if(DEBUG)
+		    click_chatter("%s: %u: HLIM Exceeded\n", _src_path.unparse().c_str(),p_in->timestamp_anno().usecval());
       
-	  // create an xcmp message stating time exceeded
-      char msg[256];
-      msg[0] = 11; // TIME EXCEEDED (type)
-      msg[1] = 0; // TTL exceeded in transit (code)
-      
-	  // copy in the XIA header and the first 8 bytes of the datagram.
-	  // strictly speaking, this first 8 bytes don't get us anything,
-	  // but for the sake of similarity to ICMP we include them.
-      memcpy(&msg[8], hdr.hdr(), hdr.hdr_size()); // copy XIP header
-      memcpy(&msg[8+hdr.hdr_size()], hdr.payload(), 8); // copy first 8 bytes of datagram
-      
-	  // update the checksum
-      uint16_t checksum = in_cksum((u_short *)msg, hdr.hdr_size()+16);
-      memcpy(&msg[2], &checksum, 2);
-      
-	  // create a packet to store the message in
-      WritablePacket *p = Packet::make(256, msg, hdr.plen(), 0);
-      
-	  // encapsulate the packet within XCMP
-      XIAHeaderEncap encap;
-      encap.set_nxt(CLICK_XIA_NXT_XCMP);   // XCMP
-      encap.set_dst_path(hdr.src_path());
-      encap.set_src_path(_src_path);
-      
-	  if(DEBUG)
-          click_chatter("%s: %u: TIME EXCEEDED sent\n", _src_path.unparse().c_str(),Timestamp::now().usecval());
-      
-	  // send the packet out, kill the original packet, and exit
-      output(0).push(encap.encap(p));
-      p_in->kill();
-      return;
+		// create an xcmp message stating time exceeded
+		char msg[256];
+		msg[0] = 11; // TIME EXCEEDED (type)
+		msg[1] = 0; // TTL exceeded in transit (code)
+		
+		// copy in the XIA header and the first 8 bytes of the datagram.
+		// strictly speaking, this first 8 bytes don't get us anything,
+		// but for the sake of similarity to ICMP we include them.
+		memcpy(&msg[8], hdr.hdr(), hdr.hdr_size()); // copy XIP header
+		memcpy(&msg[8+hdr.hdr_size()], hdr.payload(), 8); // copy first 8 bytes of datagram
+		
+		// update the checksum
+		uint16_t checksum = in_cksum((u_short *)msg, hdr.hdr_size()+16);
+		memcpy(&msg[2], &checksum, 2);
+		
+		// create a packet to store the message in
+		WritablePacket *p = Packet::make(256, msg, hdr.plen(), 0);
+		
+		// encapsulate the packet within XCMP
+		XIAHeaderEncap encap;
+		encap.set_nxt(CLICK_XIA_NXT_XCMP);   // XCMP
+		encap.set_dst_path(hdr.src_path());
+		encap.set_src_path(_src_path);
+		
+		if(DEBUG)
+            click_chatter("%s: %u: TIME EXCEEDED sent\n", _src_path.unparse().c_str(),Timestamp::now().usecval());
+		
+		// send the packet out, kill the original packet, and exit
+		output(0).push(encap.encap(p));
+		p_in->kill();
+		return;
     }
 
 
 	// now we know that this packet is not expired
 	// check if the packet is even XCMP related
     if(hdr.nxt() != CLICK_XIA_NXT_XCMP) { // not XCMP
-      p_in->kill();
-      return;
+        p_in->kill();
+		return;
     }
 
 	// now we know the packet is an XCMP packet
