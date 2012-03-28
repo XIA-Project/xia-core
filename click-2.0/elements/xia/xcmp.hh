@@ -7,6 +7,9 @@
 #include <click/xiapath.hh>
 CLICK_DECLS
 
+// used for XCMP XID Unreachable
+#define XARP_TIMEOUT 65
+
 /*
 =c
 

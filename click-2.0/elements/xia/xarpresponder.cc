@@ -44,7 +44,6 @@ XARPResponder::~XARPResponder()
 int
 XARPResponder::add(Vector<Entry> &v, const String &arg, ErrorHandler *errh) const
 {
-    int old_vsize = v.size();
     Vector<String> words;
     cp_spacevec(arg, words);
 
@@ -52,8 +51,14 @@ XARPResponder::add(Vector<Entry> &v, const String &arg, ErrorHandler *errh) cons
     EtherAddress ena;
     bool have_ena = false;
     
+    if (cp_va_kparse(words, this, errh,
+	             "XID", cpkP + cpkM, cpXID, &_my_xid,
+	             "ETH", cpkP + cpkM, cpEtherAddress, &_my_en,
+	             cpEnd) < 0)
+	return -1;    
+    
     v.push_back(Entry());
-    v.back().xida.parse(words[0]);
+    v.back().xida = _my_xid;    
     
     if (EtherAddressArg().parse(words[1], ena, this)) {
     	have_ena = true;
