@@ -308,7 +308,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		//Extract the destination port
 		click_udp * uh = p_in->udp_header();
 
-		unsigned short _dport = uh->uh_dport;
+		//unsigned short _dport = uh->uh_dport;
 		unsigned short _sport = uh->uh_sport;
 		//click_chatter("control sport:%d, dport:%d",ntohs(_sport), ntohs(_dport));
 
@@ -916,8 +916,6 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 			String dest(x_sendto_msg->ddag().c_str());
 			String pktPayload(x_sendto_msg->payload().c_str(), x_sendto_msg->payload().size());
-
-			int dag_size = dest.length();
 			int pktPayloadSize = pktPayload.length();
 			//click_chatter("\n SENDTO ddag:%s, payload:%s, length=%d\n",xia_socket_msg.ddag().c_str(), xia_socket_msg.payload().c_str(), pktPayloadSize);
 
@@ -1036,9 +1034,6 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 			for (int i = 0; i < x_requestchunk_msg->dag_size(); i++) {
 				String dest = x_requestchunk_msg->dag(i).c_str();
-
-				int dag_size = dest.length();
-
 				//printf("CID-Request for %s  (size=%d) \n", dest.c_str(), dag_size);
 				//printf("\n\n (%s) hi 3 \n\n", (_local_addr.unparse()).c_str());
 				XIAPath dst_path;
@@ -1159,17 +1154,10 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 			int numCids = x_getchunkstatus_msg->dag_size();
 			String pktPayload(x_getchunkstatus_msg->payload().c_str(), x_getchunkstatus_msg->payload().size());
-			int pktPayloadSize = pktPayload.length();
-
-			// for status report back via protobuf
-			char statusbuf[32];
 
 			// send CID-Requests
 			for (int i = 0; i < numCids; i++) {
 				String dest = x_getchunkstatus_msg->dag(i).c_str();
-
-				int dag_size = dest.length();
-
 				//printf("CID-Request for %s  (size=%d) \n", dest.c_str(), dag_size);
 				//printf("\n\n (%s) hi 3 \n\n", (_local_addr.unparse()).c_str());
 				XIAPath dst_path;
@@ -1223,10 +1211,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			xia::X_Readchunk_Msg *x_readchunk_msg = xia_socket_msg.mutable_x_readchunk();
 
 			String dest = x_readchunk_msg->dag().c_str();
-			int dag_size = dest.length();
-
 			WritablePacket *copy;
-
 			//printf("CID-Request for %s  (size=%d) \n", dest.c_str(), dag_size);
 			//printf("\n\n (%s) hi 3 \n\n", (_local_addr.unparse()).c_str());
 			XIAPath dst_path;
@@ -1323,9 +1308,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			output(3).push(p);
 
 			// (for Ack purpose) Reply with a packet with the destination port=source port
-			struct timeval timestamp;
 			xia::XSocketMsg _socketResponse;
-
 			_socketResponse.set_type(xia::XREMOVECHUNK);
 			xia::X_Removechunk_Msg *_msg = _socketResponse.mutable_x_removechunk();
 			_msg->set_contextid(contextID);
@@ -1724,6 +1707,12 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		} else if (thdr.type() == TransportHeader::XSOCK_DGRAM) {
 
 			_dport = XIDtoPort.get(_destination_xid);
+			DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
+			// check if _destination_sid is of XSOCK_DGRAM
+			if (daginfo->sock_type != XSOCKET_DGRAM) {
+				sendToApplication = false;
+			}
+			
 		}
 
 		if(_dport && sendToApplication)

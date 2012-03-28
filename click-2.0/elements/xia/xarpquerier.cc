@@ -91,11 +91,20 @@ XARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
     IPAddress my_mask;
     if (conf.size() == 1)
 	conf.push_back(conf[0]);
+	
+    if (cp_va_kparse(conf, this, errh,
+	             "XID", cpkP + cpkM, cpXID, &_my_xid,
+	             "ETH", cpkP + cpkM, cpEtherAddress, &_my_en,
+	             cpEnd) < 0)
+	return -1;
+	
+    /*	
     if (Args(conf, this, errh)
 	.read_mp("XID", _my_xid)
 	.read_mp("ETH", _my_en)
 	.complete() < 0)
 	return -1;
+    */
 
     _my_xid_configured = true;	
 
@@ -138,11 +147,21 @@ XARPQuerier::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
     EtherAddress my_en;
     if (conf.size() == 1)
 	conf.push_back(conf[0]);
+	
+    if (cp_va_kparse(conf, this, errh,
+	             "XID", cpkP + cpkM, cpXID, &_my_xid,
+	             "ETH", cpkP + cpkM, cpEtherAddress, &_my_en,
+	             cpEnd) < 0)
+	return -1;
+	
+    /*	
     if (Args(conf, this, errh)
-	.read_mp("XID", my_xid)
-	.read_mp("ETH", my_en)
+	.read_mp("XID", _my_xid)
+	.read_mp("ETH", _my_en)
 	.complete() < 0)
 	return -1;
+    */
+	
     if (!have_broadcast) {
     	String _bcast_xid("HID:1111111111111111111111111111111111111111");  // Broadcast HID
         _my_bcast_xid.parse(_bcast_xid);
@@ -243,7 +262,8 @@ XARPQuerier::send_query_for(const Packet *p, bool ether_dhost_valid)
     SET_VLAN_TCI_ANNO(q, VLAN_TCI_ANNO(p));
 
     _xarp_queries++;
-    output(noutputs() - 1).push(q);
+    //output(noutputs() - 1).push(q);
+    output(0).push(q);
 }
 
 /*
@@ -357,6 +377,7 @@ XARPQuerier::handle_response(Packet *p)
     }
 }
 
+
 void
 XARPQuerier::push(int port, Packet *p)
 {
@@ -366,6 +387,17 @@ XARPQuerier::push(int port, Packet *p)
 	handle_response(p);
 	p->kill();
     }
+}
+
+
+/*
+ * If xarp query timer expires, it sends 'xarp query timeout message' to XCMP module (via output port 1) 
+ */
+void
+XARPQuerier::xarp_query_timeout(Packet *p)
+{
+    // Do nothing
+    output(noutputs() - 1).push(p);
 }
 
 String

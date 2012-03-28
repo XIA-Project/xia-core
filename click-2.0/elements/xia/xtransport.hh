@@ -42,6 +42,11 @@ using namespace std;
 #define CLICKSENDTOPORT 10001
 #define CLICKDATAPORT 10000
 
+#define XSOCKET_INVALID -1 // invalid socket type	
+#define XSOCKET_STREAM 1	// Reliable transport (SID)
+#define XSOCKET_DGRAM 2	// Unreliable transport (SID)
+#define XSOCKET_RAW	3	// Raw XIA socket
+#define XSOCKET_CHUNK 4	// Content Chunk transport (CID)
 
 #define MAX_WIN_SIZE 100
 
