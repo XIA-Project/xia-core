@@ -98,7 +98,7 @@ int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkI
 
 	if (length > XIA_MAXCHUNK) {
 		errno = EMSGSIZE;
-		LOG("Chunk size of %d is too large\n", length);
+		LOGF("Chunk size of %d is too large\n", length);
 		return -1;
 	}
 
