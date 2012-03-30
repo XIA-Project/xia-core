@@ -7,6 +7,9 @@
 #include <click/xiapath.hh>
 CLICK_DECLS
 
+// used for XCMP XID Unreachable
+#define XARP_TIMEOUT 65
+
 /*
 =c
 
@@ -18,37 +21,36 @@ Responds to various XCMP requests
 
 =d
 
-Responds to various XCMP requests
+Responds to various XCMP requests. Output 0 sends packets out to the network.
+Output 1 sends packets up to the local host
 
 =e
 
-XCMP(RE AD0 RHID0 HID0)
+An XCMP responder for host AD0 HID0
+XCMP(RE AD0 HID0)
 
 */
 
 class XCMP : public Element { public:
 
-  XCMP();
-  ~XCMP();
+    XCMP();
+    ~XCMP();
 
-  const char *class_name() const		{ return "XCMP"; }
-  const char *port_count() const		{ return "1/2"; }
-  const char *processing() const		{ return PUSH; }
+    const char *class_name() const		{ return "XCMP"; }
+    const char *port_count() const		{ return "1/2"; }
+    const char *processing() const		{ return PUSH; }
 
-  int configure(Vector<String> &, ErrorHandler *);
-  int initialize(ErrorHandler *);
+    int configure(Vector<String> &, ErrorHandler *);
+    int initialize(ErrorHandler *);
 
-  void push(int, Packet *);
+    void push(int, Packet *);
 
- private:
-
-  u_short in_cksum(u_short *, int);
-
-  XIAPath _src_path;
-  //uint32_t _count;
-
-  //bool _connected;
-  //XIAPath _last_client;
+  private:
+    // ICMP-style checksum
+    u_short in_cksum(u_short *, int);
+    
+    // source XIAPath of the local host
+    XIAPath _src_path;
 };
 
 CLICK_ENDDECLS

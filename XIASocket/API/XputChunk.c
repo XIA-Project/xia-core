@@ -48,7 +48,6 @@ ChunkContext *XallocCacheSlice(unsigned policy, unsigned ttl, unsigned size) {
 		// FIXME: validate the parameters
 		// FIXME: contextID is going to need to be somethign else so we can have multiple ones
 		// FIXME: add protobuf for this instead of rolling it up with the putChunk call
-		// FIXME: should this also take chunk size?
 
         ChunkContext *newCtx = (ChunkContext *)malloc(sizeof(ChunkContext));
 
@@ -96,8 +95,12 @@ int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkI
     int rc;
     char buffer[MAXBUFLEN];
 
-// FIXME: set errno on errors
-// FIXME: make sure data will fit in a chunk
+
+	if (length > XIA_MAXCHUNK) {
+		errno = EMSGSIZE;
+		LOGF("Chunk size of %d is too large\n", length);
+		return -1;
+	}
 
     if(ctx == NULL || data == NULL || info == NULL) {
 		errno = EFAULT;
@@ -107,8 +110,6 @@ int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkI
 
 	if (length == 0)
 		return 0;
-
-//	LOGF("new Chunk of size %d\n", length);
 
     //Build request
     xia::XSocketMsg xsm;

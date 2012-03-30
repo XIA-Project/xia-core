@@ -1,5 +1,5 @@
 /*
- *			P I N G . C
+ *			X C M P T R A C E R O U T E . C
  *
  * Using the InterNet Control Message Protocol (ICMP) "ECHO" facility,
  * measure round-trip-delays and packet loss across network paths.
@@ -20,6 +20,8 @@
  *	More statistics could always be gathered.
  *	This program has to run SUID to ROOT to access the ICMP socket.
  */
+
+// modified from PING source code to act as a rudimentery traceroute for XIA
 
 #include <stdio.h>
 #include <errno.h>
@@ -64,6 +66,7 @@
 #define CID1 "CID:2000000000000000000000000000000000000001"
 #define SID0 "SID:0f00000000000000000000000000000000000055"
 
+typedef void (*sighandler_t)(int);
 
 
 int ttl = 2;
@@ -78,12 +81,11 @@ int s;			/* Socket file descriptor */
 struct hostent *hp;	/* Pointer to host info */
 struct timezone tz;	/* leftover */
 
-//struct sockaddr whereto;/* Who to ping */
 char whereto[1024];/* Who to ping */
 int datalen;		/* How much data */
 
 char usage[] =
-"Usage:  ping [-dfqrv] host [packetsize [count [preload]]]\n";
+"Usage: xcmptraceroute [-dfqrv] host [packetsize [count [preload]]]\n";
 
 char *hostname;
 char hnamebuf[MAXHOSTNAMELEN];
@@ -107,10 +109,8 @@ char *inet_ntoa();
 main(argc, argv)
 char *argv[];
 {
-  //struct sockaddr_in from;
-  char from[1024];
+    char from[1024];
 	char **av = argv;
-	//	struct sockaddr_in *to = (struct sockaddr_in *) &whereto;
 	char *to = (char *)whereto;
 	int on = 1;
 	struct protoent *proto;
@@ -141,7 +141,6 @@ char *argv[];
 		exit(1);
 	}
 
-	//bzero((char *)&whereto, sizeof(struct sockaddr) );
 	bzero((char *)whereto, 1024);
 	
 	const char *tmp;
@@ -150,26 +149,6 @@ char *argv[];
 	  exit(-1);
 	}
 	strncpy((char *)whereto,tmp,1024);
-	//strncpy((char *)whereto,av[0],1024);
-
-	//sprintf(whereto, "RE %s %s", AD0, HID0);
-
-	/*to->sin_family = AF_INET;
-	to->sin_addr.s_addr = inet_addr(av[0]);
-	if(to->sin_addr.s_addr != (unsigned)-1) {
-		strcpy(hnamebuf, av[0]);
-		hostname = hnamebuf;
-	} else {
-		hp = gethostbyname(av[0]);
-		if (hp) {
-			to->sin_family = hp->h_addrtype;
-			bcopy(hp->h_addr, (caddr_t)&to->sin_addr, hp->h_length);
-			hostname = hp->h_name;
-		} else {
-			printf("%s: unknown host %s\n", argv[0], av[0]);
-			exit(1);
-		}
-		}*/
 
 	if( argc >= 2 )
 		datalen = atoi( av[1] );
@@ -190,61 +169,22 @@ char *argv[];
 
 	ident = getpid() & 0xFFFF;
 
-	/*	if ((proto = getprotobyname("icmp")) == NULL) {
-		fprintf(stderr, "icmp: unknown protocol\n");
-		exit(10);
-		}*/
-
-	//if ((s = socket(AF_INET, SOCK_RAW, proto->p_proto)) < 0) {
-	//	perror("ping: socket");
-	//	exit(5);
-	//}
-	//printf("opening raw socket\n");
 	if((s = Xsocket(XSOCK_RAW)) < 0) {
 	  perror("ping: socket");
 	  exit(5);
 	}
-	//printf("done\n");
-	
-	//printf("setting socket to XCMP\n");
+
 	int nxt = XPROTO_XCMP;
 	if (Xsetsockopt(s, XOPT_NEXT_PROTO, (const void*)&nxt, sizeof(nxt)) < 0) {
 	  printf("Xsetsockopt failed on XOPT_NEXT_PROTO\n");
 	  exit(-1);
 	}
-	//printf("done\n");
-	
-	/*
-	int ttl = 1;
-	if(Xsetsockopt(s, XOPT_HLIM, (const void *)&ttl, sizeof(ttl)) < 0) {
-	  printf("Xsetsockop failed on XOPT_HLIM\n");
-	  exit(-1);
-	  }*/
-	
-
-	  /*if (options & SO_DEBUG) {
-		if(pingflags & VERBOSE)
-			printf("...debug on.\n");
-		setsockopt(s, SOL_SOCKET, SO_DEBUG, &on, sizeof(on));
-	}
-	if (options & SO_DONTROUTE) {
-		if(pingflags & VERBOSE)
-			printf("...no routing.\n");
-		setsockopt(s, SOL_SOCKET, SO_DONTROUTE, &on, sizeof(on));
-		}*/
-
-	/*/if(to->sin_family == AF_INET) {
-		printf("PING %s (%s): %d data bytes\n", hostname,
-		inet_ntoa(to->sin_addr), datalen);*/	/* DFM */
-	/*} else {
-		printf("PING %s: %d data bytes\n", hostname, datalen );
-	}*/
 	printf("TRACEROUTE %s:\n", to);
 
 	setlinebuf( stdout );
 
-	signal( SIGINT, finish );
-	signal(SIGALRM, catcher);
+	signal( SIGINT, (sighandler_t)finish );
+	signal(SIGALRM, (sighandler_t)catcher);
 
 	/* fire off them quickies */
 	for(i=0; i < preload; i++)
@@ -255,7 +195,6 @@ char *argv[];
 
 	for (;;) {
 		int len = sizeof (packet);
-		//		int fromlen = sizeof (from);
 		size_t fromlen = sizeof (from);
 		int cc;
 		struct timeval timeout;
@@ -266,7 +205,7 @@ char *argv[];
 
 		if(pingflags & FLOOD) {
 			pinger();
-			if( select(32, &fdmask, 0, 0, &timeout) == 0)
+			if( select(32, (fd_set *)&fdmask, 0, 0, &timeout) == 0)
 				continue;
 		}
 		if ( (cc=Xrecvfrom(s, packet, len, 0, from, &fromlen)) < 0) {
@@ -308,7 +247,7 @@ catcher()
 				waittime = 1;
 		} else
 			waittime = MAXWAIT;
-		signal(SIGALRM, finish);
+		signal(SIGALRM,(sighandler_t) finish);
 		alarm(waittime);
 	}
 }
@@ -321,6 +260,8 @@ catcher()
  * and the sequence number is an ascending integer.  The first 8 bytes
  * of the data portion are used to hold a UNIX "timeval" struct in VAX
  * byte-order, to compute the round-trip time.
+ *
+ * we also keep incrmenting the packet TTL in order to emulate traceroute
  */
 pinger()
 {
@@ -347,6 +288,8 @@ pinger()
 	/* Compute ICMP checksum here */
 	icp->icmp_cksum = in_cksum( icp, cc );
 
+	
+	// Set the TTL on the packet so we can use this like traceroute
 	if(Xsetsockopt(s, XOPT_HLIM, (const void *)&ttl, sizeof(ttl)) < 0) {
 	  printf("Xsetsockop failed on XOPT_HLIM\n");
 	  exit(-1);
@@ -355,8 +298,6 @@ pinger()
 	ttl++;
 
 
-	/* cc = sendto(s, msg, len, flags, to, tolen) */
-	/*i = sendto( s, outpack, cc, 0, &whereto, sizeof(struct sockaddr) );*/
 	i = Xsendto(s, outpack, cc, 0, whereto, strlen(whereto));
 
 	if( i < 0 || i != cc )  {
@@ -418,10 +359,8 @@ pr_pack( buf, cc, from )
 char *buf;
 int cc;
 char *from;
-//struct sockaddr_in *from;
 {
-  //struct ip *ip;
-  struct xip *xp;
+    struct xip *xp;
 	register struct icmp *icp;
 	register long *lp = (long *) packet;
 	register int i;
@@ -429,42 +368,29 @@ char *from;
 	struct timeval *tp;
 	int hlen, triptime;
 
-	//from->sin_addr.s_addr = ntohl( from->sin_addr.s_addr );
 	gettimeofday( &tv, &tz );
 
-	//ip = (struct ip *) buf;
 	xp = (struct xip *) buf;
 	
-	//hlen = ip->ip_hl << 2;
-	//hlen = sizeof(struct click_xia) + sizeof(struct click_xia_xid_node) * (xp->dnode+xp->snode);
 	hlen = sizeof(struct xip) + sizeof(struct xia_xid_node) * (xp->dnode+xp->snode);
 	
-	//printf("hlen = %d cc = %d\n", hlen, cc);
-	//printf("v = %d nxt = %d dnode = %d snode = %d\n", xp->ver, xp->nxt, xp->dnode, xp->snode);
-
 	if (cc < hlen + ICMP_MINLEN) {
 		if (pingflags & VERBOSE)
 			printf("packet too short (%d bytes) from %s\n", cc,
-			       //inet_ntoa(from->sin_addr)); /* DFM */
-			       from); /* DFM */
+				   from); /* DFM */
 		return;
 	}
 	cc -= hlen;
 	icp = (struct icmp *)(buf + hlen);
 	
-	//int u;
-	//printf("printing buff:\n");
-	//for (u=0;u<8;u++) printf("%02x ",((char *)icp)[u]);
-	//printf("\n");
-
 	if( (!(pingflags & QUIET)) && icp->icmp_type != ICMP_ECHOREPLY )  {
 		printf("%s\n",
-		       from//,//inet_ntoa(from->sin_addr),
-		       );//icp->icmp_type, pr_type(icp->icmp_type), icp->icmp_code);/*DFM*/
+		       from
+		       );
 		if (pingflags & VERBOSE) {
 			for( i=0; i<12; i++)
-				printf("x%2.2x: x%8.8x\n", i*sizeof(long),
-				  *lp++);
+			    printf("x%2.2x: x%8.8x\n", (unsigned int)(i*sizeof(long)),
+					   (unsigned int)*lp++);
 		}
 		return;
 	}
@@ -485,7 +411,6 @@ char *from;
 	if(!(pingflags & QUIET)) {
 		if(pingflags != FLOOD) {
 		  printf("%d bytes from %s: icmp_seq=%d", cc,
-			       //inet_ntoa(from->sin_addr),
 		  	       from,
 		  	  icp->icmp_seq );	/* DFM */
 		  	if (timing) 
@@ -523,11 +448,9 @@ int len;
 	 *  16 bits.
 				  */
 	while( nleft > 1 )  {
-	  //printf("%hu ",*w);
 		sum += *w++;
 		nleft -= 2;
 	}
-	//printf("\n");
 
 	/* mop up an odd byte, if necessary */
 	if( nleft == 1 ) {
@@ -566,33 +489,11 @@ register struct timeval *out, *in;
 /*
  *			F I N I S H
  *
- * Print out statistics, and give up.
- * Heavily buffered STDIO is used here, so that all the statistics
- * will be written with 1 sys-write call.  This is nice when more
- * than one copy of the program is running on a terminal;  it prevents
- * the statistics output from becomming intermingled.
+ * Just clean up
  */
 finish()
 {
-  //putchar('\n');
-  //fflush(stdout);
-	//printf("\n----%s PING Statistics----\n", hostname );
-	//printf("%d packets transmitted, ", ntransmitted );
-	//printf("%d packets received, ", nreceived );
-	//if (ntransmitted)
-	//	if( nreceived > ntransmitted)
-	//		printf("-- somebody's printing up packets!");
-	//	else
-	//		printf("%d%% packet loss", 
-	//		  (int) (((ntransmitted-nreceived)*100) /
-	//		  ntransmitted));
-	//printf("\n");
-	//if (nreceived && timing)
-	//    printf("round-trip (ms)  min/avg/max = %d/%d/%d\n",
-	//	tmin,
-	//	tsum / nreceived,
-	//	tmax );
-  Xclose(s);
+    Xclose(s);
 	fflush(stdout);
 	exit(0);
 }

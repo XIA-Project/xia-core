@@ -27,6 +27,16 @@ def createHID():
 	hid = "HID:00000000"
 	id = uuid.uuid1(uuid.getnode())
 	return hid + id.hex
+	
+	
+#
+# create a globally unique AD based off of our mac address
+#
+def createAD():
+	ad = "AD:10000000"
+	id = uuid.uuid1(uuid.getnode())
+	return ad + id.hex
+	
 
 #
 # make a short hostname
@@ -135,7 +145,7 @@ def makeHostConfig(hid):
 #  router (depends on the number of interfaces)
 # footer - boilerplate
 
-def makeRouterConfig(hid):
+def makeRouterConfig(ad, hid):
 
 	interfaces = getInterfaces()
 	if (len(interfaces) < 2):
@@ -158,7 +168,7 @@ def makeRouterConfig(hid):
 	tpl = Template(header)
 
 	xchg = {}
-	xchg['ADNAME'] = adname
+	xchg['ADNAME'] = ad
 	xchg['HNAME'] = getHostname()
 	xchg['HID'] = hid
 
@@ -197,7 +207,7 @@ def makeRouterConfig(hid):
 def getOptions():
 	global hostname
 	global nodetype
-	global adname
+	global ad
 	try:
 		shortopt = "hrn:a:"
 		opts, args = getopt.getopt(sys.argv[1:], shortopt, 
@@ -212,7 +222,7 @@ def getOptions():
 		if o in ("-h", "--help"):
 			help()
 		elif o in ("-a", "--ad"):
-			adname = a
+			ad = a
 		elif o in ("-n", "--name"):
 			hostname = a
 		elif o in ("-r", "--router"):
@@ -246,6 +256,7 @@ where:
 #
 def main():
 
+	ad = createAD()
 	getOptions()
 
 	hid = createHID()
@@ -254,7 +265,7 @@ def main():
 	if (nodetype == "host"):
 		makeHostConfig(hid)
 	else:
-		makeRouterConfig(hid)
+		makeRouterConfig(ad, hid)
 
 if __name__ == "__main__":
     main()
