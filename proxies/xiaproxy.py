@@ -17,11 +17,11 @@ def send_to_browser(data, browser_socket):
         return False
 
 def recv_with_timeout(sock, timeout=5):
-    # Make socket non-blocking
-    try:
-        fcntl.fcntl(sock, fcntl.F_SETFL, os.O_NONBLOCK)
-    except IOError:
-        print "ERROR: xiaproxy.py: recv_with_timeout: could not make socket nonblocking"
+    ## Make socket non-blocking
+    #try:
+    #    fcntl.fcntl(sock, fcntl.F_SETFL, os.O_NONBLOCK)
+    #except IOError:
+    #    print "ERROR: xiaproxy.py: recv_with_timeout: could not make socket nonblocking"
     
     # Receive data
     start_time = time.time()   # current time in seconds since the epoch
@@ -114,7 +114,7 @@ def check_for_and_process_CIDs(message, browser_socket):
     if (rt!= -1):
         http_header = message[0:rt]
         try:
-            content = get_content_from_cid_list(message[rt:].split('.')[2])
+            content = get_content_from_cid_list_temp(message[rt:].split('.')[2])
         except:
             print "ERROR: xiaproxy.py: check_for_and_process_CIDs: Couldn't retrieve content. Closing browser_socket"
             browser_socket.close()
@@ -312,6 +312,7 @@ def sendSIDRequestXSP(ddag, payload, browser_socket):
     try:
         print 'Trying to receiv CIDs from webserver'
         reply= recv_with_timeout(sock) # Use default timeout
+        print 'Reply: \n %s' % reply
     except IOError:
         print "Unexpected error:", sys.exc_info()[0]
         Xclose(sock)
@@ -377,22 +378,60 @@ def sendSIDRequestXDP(ddag, payload, browser_socket):
     return    
        
 
+# As the name suggests, this function is only temporary; ultimately we want to use XrequestChunkList
+# instead of repeated calls to XrequestChunk
+def get_content_from_cid_list_temp(cid_list):
+    num_cids = len(cid_list) / 40
+    
+
+    # make a socket
+    sock = Xsocket(XSOCK_CHUNK)
+    if (sock<0):
+        print "ERROR: xiaproxy.py: get_content_from_cid_list: error opening socket"
+        return
+
+    # create and bind to ephemeral SID
+    sid = getrandSID()
+    sdag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (AD0, IP0, HID0, sid)       
+    try:
+        Xbind(sock, sdag);
+    except:
+        print 'ERROR: xiaproxy.py: get_content_from_cid_list: Error binding to sdag'
+
+    # request each chunk of content individually
+    content = ""
+    for i in range(0, num_cids):
+        content_dag = 'CID:%s' % cid_list[i*40:40+i*40]
+        content_dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, content_dag)
+        try:
+            XrequestChunk(sock, content_dag, len(content_dag))
+        except:
+            print 'ERROR: xiaproxy.py: get_content_from_cid_list_temp: Problem requesting chunk\n%s' % content_dag
+        content += readcid_with_timeout(sock, content_dag)
+
+    Xclose(sock)
+    return content
 
 
-
+# Due to API changes, this function isn't working yet; use get_content_from_cid_list_temp for now.
+# There is a problem with ChunkStatuasArray's (the python wrapper for ChunkStatus*)
 def get_content_from_cid_list(cid_list):
     num_cids = len(cid_list) / 40
     
     # make a list of ChunkStatuss
     cids = ChunkStatusArray(num_cids) # list()
+    cids_temp = [] # quick workaround since th ChunkStatusArray seems to have stopped working
+    statuses_temp = []
     for i in range(0, num_cids):
         content_dag = 'CID:%s' % cid_list[i*40:40+i*40]
         content_dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 2 - \n %s 3 - \n %s" % (AD1, IP1, HID1, content_dag)
+        cids_temp.append(content_dag)
         chunk_info = ChunkStatus()
         chunk_info.cDAG = content_dag
         chunk_info.dlen = len(content_dag)
         chunk_info.status = 0
         cids[i] = chunk_info
+        statuses_temp.append(chunk_info)
 
     # make a socket
     sock = Xsocket(XSOCK_CHUNK)
@@ -457,7 +496,7 @@ def xiaHandler(host, path, http_header, browser_socket):
         host=host[4:]  # remove the 'xia.' prefix
         host_array = host.split('.')
         num_chunks = int(host_array[1])
-        recombined_content = get_content_from_cid_list(host_array[2])
+        recombined_content = get_content_from_cid_list_temp(host_array[2])
         length = len(recombined_content)
         send_to_browser(recombined_content, browser_socket)
     return
