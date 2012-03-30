@@ -102,7 +102,7 @@ int XrequestChunks(int sockfd, const ChunkStatus *chunks, int numChunks)
 		if (chunks[i].cid != NULL)
 			x_requestchunk_msg->add_dag(chunks[i].cid);
 		else {
-			LOGF("NULL pointer at cDAGv[%d]\n", i);
+			LOGF("NULL pointer at chunks[%d]\n", i);
 		}
 	}
 

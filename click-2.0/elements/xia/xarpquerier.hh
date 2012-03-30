@@ -214,6 +214,7 @@ class XARPQuerier : public Element { public:
     //void handle_ip(Packet *p, bool response);
     void handle_xip(Packet *p, bool response);
     void handle_response(Packet *p);
+    void xarp_query_timeout(Packet *p);
 
     static void expire_hook(Timer *, void *);
     static String read_table(Element *, void *);

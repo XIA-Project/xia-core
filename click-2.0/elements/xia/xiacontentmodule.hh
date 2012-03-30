@@ -134,6 +134,7 @@ class XIAContentModule {
 
     void delRoute(const XID &cid) {
 	String cmd= cid.unparse();
+	click_chatter("Del route %s", cid.unparse().c_str());
 	HandlerCall::call_write(_routeTable, "remove", cmd);
     }    
 };

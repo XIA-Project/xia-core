@@ -460,6 +460,7 @@ void XIAContentModule::cache_incoming_remove(Packet *p, const XID& srcCID){
             click_chatter("RMCID Request [%s] Size: %d\n", _contentTable.find(srcCID)->first.unparse().c_str(), 
                             chunkSize);
             }
+            delRoute(srcCID);
             _contentTable.erase(srcCID);
             free(cPtr);
             if(CACHE_DEBUG){
@@ -581,6 +582,7 @@ XIAContentModule::MakeSpace(int chunkSize)
         iter=_contentTable.begin();
         usedSize-=iter->second->GetSize();
         //modify routing table	   //delete
+
         delRoute(iter->first);
         CChunk *t=iter->second;
         _contentTable.erase(iter);
