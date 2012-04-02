@@ -70,14 +70,14 @@ int main(int argc, char *argv[])
 	    gettimeofday(&tv, NULL);
 	    current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
 	    if(seq_c==MIGRATEPOINT)
-		fprintf(fp, "%lu: updating XIAPingResponder with new address something something\n",current_time);  // modify payload
-	    fprintf(fp, "%lu: PING received; client seq = %d\n",current_time, seq_c);
+		fprintf(fp, "%llu: updating XIAPingResponder with new address something something\n",current_time);  // modify payload
+	    fprintf(fp, "%llu: PING received; client seq = %d\n",current_time, seq_c);
 	    //printf("%lld: PING received; client seq = %d\n",current_time, seq_c);
 
 	    Xsendto(sock, payload_new,8,0,theirDAG,strlen(theirDAG));
 	    gettimeofday(&tv, NULL);
 	    current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
-	    fprintf(fp, "%lu: PONG sent; client seq = %d, server seq = %d\n",current_time,seq_c, seq_s);              
+	    fprintf(fp, "%llu: PONG sent; client seq = %d, server seq = %d\n",current_time,seq_c, seq_s);              
 	    //printf("%lld: PONG sent; client seq = %d, server seq = %d\n",current_time,seq_c, seq_s);              
 
 	    seq_s++;
