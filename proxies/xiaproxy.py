@@ -1,6 +1,6 @@
 import socket, select, random
 import struct, time, signal, os, sys, re
-import fcntl
+#import fcntl
 from xsocket import *
 from ctypes import *
 
@@ -51,10 +51,10 @@ def recv_with_timeout(sock, timeout=5):
 
 def recvfrom_with_timeout(sock, timeout=3):
     # Make socket non-blocking
-    try:
-        fcntl.fcntl(sock, fcntl.F_SETFL, os.O_NONBLOCK)
-    except IOError:
-        print "ERROR: xiaproxy.py: recv_with_timeout: could not make socket nonblocking"
+#    try:
+#        fcntl.fcntl(sock, fcntl.F_SETFL, os.O_NONBLOCK)
+#    except IOError:
+#        print "ERROR: xiaproxy.py: recv_with_timeout: could not make socket nonblocking"
     
     # Receive data
     start_time = time.time()   # current time in seconds since the epoch
