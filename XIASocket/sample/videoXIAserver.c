@@ -25,12 +25,13 @@
 */
 
 #include <stdio.h>
+#include <stdarg.h>
+#include <stdlib.h>
 #include <pthread.h>
 #include <vector>
 #include <sstream>
 #include <iostream>
 #include "Xsocket.h"
-#include "common.h"
 
 #define DEBUG
 
