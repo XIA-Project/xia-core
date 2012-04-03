@@ -35,27 +35,6 @@ int main(int argc, char *argv[])
     sock=Xsocket(XSOCK_STREAM);
     if (sock < 0) error("Opening socket");
 
-    chunkSock=Xsocket(XSOCK_CHUNK);
-    if (chunkSock < 0) error("Opening socket");
-
-    //Make a CID entry
-    char * cdag0 = (char*)malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,CID0) + 1);
-    sprintf(cdag0, "RE %s %s %s", AD0, HID0,CID0); 
-    char* data0="Some value stored for CID0";
-    XputCID(chunkSock,data0,strlen(data0),0,cdag0,strlen(cdag0));
-    
-    //Make another CID entry
-    char * cdag1 = (char*)malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,CID1) + 1);
-    sprintf(cdag1, "RE %s %s %s", AD0, HID0,CID1); 
-    char* data1="Other value stored for CID1";
-    XputCID(chunkSock,data1,strlen(data1),0,cdag1,strlen(cdag1));    
-
-    //Make another CID entry
-    char * cdag2 = (char*)malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,CID2) + 1);
-    sprintf(cdag2, "RE %s %s %s", AD0, HID0,CID2); 
-    char* data2="Other value stored for CID2";
-    XputCID(chunkSock,data2,strlen(data2),0,cdag2,strlen(cdag2));
-
     //Make the sDAG (the one the server listens on)
     char * dag = (char*) malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,SID0) + 1);
     sprintf(dag, "RE %s %s %s", AD0, HID0,SID0); 

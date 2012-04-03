@@ -34,18 +34,6 @@ int main(int argc, char *argv[])
     sock=Xsocket(XSOCK_DGRAM);
     if (sock < 0) error("Opening socket");
 
-    chunkSock=Xsocket(XSOCK_CHUNK);
-    if (chunkSock < 0) error("Opening socket");
-
-    //print_conf(); //for debugging purpose
-    
-    //Make a CID entry
-    char * cdag = (char*)malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,CID0) + 1);
-    sprintf(cdag, "RE %s %s %s", AD0, HID0,CID0); 
-    char* data="Some value stored for CID0";
-    XputCID(chunkSock,data,strlen(data),0,cdag,strlen(cdag));
-
-
     //Make the sDAG (the one the server listens on)
     char * dag = (char*) malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,SID0) + 1);
     sprintf(dag, "RE %s %s %s", AD0, HID0,SID0); 

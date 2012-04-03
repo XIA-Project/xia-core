@@ -14,7 +14,7 @@
    this means the caller of the Python function no longer has access to
    the C function's return value, the status code, we do an error check
    here instead. */
-%typemap(argout) (void *rbuf, size_t len, int flags,char * dDAG, size_t *dlen) 
+%typemap(argout) (void *rbuf, size_t len, int flags, char * sDAG, size_t *dlen) 
 {
     Py_XDECREF($result);
     if (result < 0) {
@@ -79,7 +79,7 @@
    C function will be generated:
         $1 (dDAG): a buffer to be filled in with the sender's DAG
         $2 (dlen): a size_t to be filled in with the length of the sender's DAG */
-%typemap (in) (int flags, char * dDAG, size_t *dlen)
+%typemap (in) (int flags, char * sDAG, size_t *dlen)
 {
     $1 = (int) PyLong_AsLong($input);  /*TODO: There's no reason to mess with "flags", but we need at least one python input. Better way? */
     $2 = (void*)malloc(4096);  /* TODO: 4096 is arbitrary; is this big enough? */
@@ -165,4 +165,4 @@
    array of ChunkStatus's or ChunkInfo's to a C function. */
 %include "carrays.i"
 %array_class(ChunkStatus, ChunkStatusArray);
-%array_class(ChunkInfo, ChunkInfoArray);
+/*%array_class(ChunkInfo, ChunkInfoArray);*/
