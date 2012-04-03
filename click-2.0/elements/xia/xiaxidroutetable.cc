@@ -46,6 +46,7 @@ XIAXIDRouteTable::configure(Vector<String> &conf, ErrorHandler *errh)
     String broadcast_xid("HID:1111111111111111111111111111111111111111");  // broadcast HID
     _bcast_xid.parse(broadcast_xid);    
     
+	_redirect_port = 8; // this port will be used to inform xcmp that the sender should be told about a redirect
     _bcast_port = 7;  // this port will duplicate the packet and send each to every interface
     _my_port = 4; // this port will update the last-pointer in DAG or send the packet to the upper layer    
 
@@ -384,6 +385,11 @@ void
 XIAXIDRouteTable::push(int in_ether_port, Packet *p)
 {
     int port = lookup_route(in_ether_port, p);
+	if(port == in_ether_port) { // need to inform XCMP that this is a redirect
+	  Packet *q = p->clone();
+	  q->set_anno_u8(PAINT_ANNO_OFFSET,q->anno_u8(PAINT_ANNO_OFFSET)+REDIRECT_BASE);
+	  output(_redirect_port).push(q);
+	}
     if (port >= 0) {
         output(port).push(p);
     }

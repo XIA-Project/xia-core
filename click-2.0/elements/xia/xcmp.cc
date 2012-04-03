@@ -9,6 +9,7 @@
 #include <click/error.hh>
 #include <click/glue.hh>
 #include <click/xiaheader.hh>
+#include <click/packet_anno.hh>
 CLICK_DECLS
 
 #define DEBUG 0
@@ -55,18 +56,27 @@ XCMP::push(int, Packet *p_in)
 	// check if this packet is painted for redirection
     if(p_in->anno_u8(PAINT_ANNO_OFFSET) >= REDIRECT_BASE) { // need to send XCMP REDIRECT
         if(DEBUG)
-		    click_chatter("%s: %u: %s sent me a packet that should route on its local network\n", _src_path.unparse().c_str(),p_in->timestamp_anno().usecval(),hdr.src_path().unparse());
+		    click_chatter("%s: %u: %s sent me a packet that should route on its local network\n", _src_path.unparse().c_str(),p_in->timestamp_anno().usecval(),hdr.src_path().unparse().c_str());
       
 		// create the XCMP Redirect Message
 		char msg[256];
 		msg[0] = 5; // Redirect (type)
 		msg[1] = 1; // Redirect for host (code)
+
+		// get the next hop information stored in the packet annotation
+		XID x = p_in->nexthop_neighbor_xid_anno();
+		struct click_xia_xid xid_temp;
+		xid_temp = x.xid();
+		
+		// copy the correct route redirect address into the packet
+		memcpy(&msg[4], &xid_temp, sizeof(struct click_xia_xid));
 		
 		// copy in the XIA header and the first 8 bytes of the datagram.
 		// strictly speaking, this first 8 bytes don't get us anything,
 		// but for the sake of similarity to ICMP we include them.
-		memcpy(&msg[8], hdr.hdr(), hdr.hdr_size()); // copy XIP header
-		memcpy(&msg[8+hdr.hdr_size()], hdr.payload(), 8); // copy first 8 bytes of datagram
+		memcpy(&msg[4+sizeof(struct click_xia_xid)], hdr.hdr(), hdr.hdr_size()); // copy XIP header
+		memcpy(&msg[4+sizeof(struct click_xia_xid)+hdr.hdr_size()], 
+			   hdr.payload(), 8); // copy first 8 bytes of datagram
 		
 		// recompute the checksum
 		uint16_t checksum = in_cksum((u_short *)msg, hdr.hdr_size()+16);
@@ -82,8 +92,11 @@ XCMP::push(int, Packet *p_in)
 		encap.set_src_path(_src_path);
 		
 		if(DEBUG)
-		    click_chatter("%s: %u: Dest Unreachable sent\n", _src_path.unparse().c_str(),Timestamp::now().usecval());
+		    click_chatter("%s: %u: Redirect sent\n", _src_path.unparse().c_str(),Timestamp::now().usecval());
 		
+		// paint the packet so the route engine knows where to send it
+		p->set_anno_u8(PAINT_ANNO_OFFSET,p_in->anno_u8(PAINT_ANNO_OFFSET)-REDIRECT_BASE);
+
 		// send this out to the network, kill the packet and exit
 		output(0).push(encap.encap(p));
 		p_in->kill();
@@ -94,7 +107,7 @@ XCMP::push(int, Packet *p_in)
 	// we need to send a DESTINATION XID Unreachable message to the src
     if(p_in->anno_u8(PAINT_ANNO_OFFSET) == ARP_TIMEOUT) { // need to send a DESTINATION XID UNREACHABLE MESSAGE
 	    if(DEBUG)
-		    click_chatter("%s: %u: Dest (D: %s) Unreachable\n", _src_path.unparse().c_str(),p_in->timestamp_anno().usecval(),hdr.dst_path().unparse());
+		    click_chatter("%s: %u: Dest (D: %s) Unreachable\n", _src_path.unparse().c_str(),p_in->timestamp_anno().usecval(),hdr.dst_path().unparse().c_str());
       
 		// create a Destination XID Unreachable message
 		char msg[256];
@@ -123,8 +136,11 @@ XCMP::push(int, Packet *p_in)
 		if(DEBUG)
 		    click_chatter("%s: %u: Dest Unreachable sent\n", _src_path.unparse().c_str(),Timestamp::now().usecval());
       
-		// send this out to the network, kill the packet, and exit
-		output(0).push(encap.encap(p));
+		// clear the paint
+		p->set_anno_u8(PAINT_ANNO_OFFSET,0);
+
+		// send this up to host, kill the packet, and exit
+		output(1).push(encap.encap(p));
 		p_in->kill();
 		return;
     }
@@ -229,6 +245,9 @@ XCMP::push(int, Packet *p_in)
 	    if(DEBUG)
 		    click_chatter("%s: %u: PONG recieved; client seq = %u\n", _src_path.unparse().c_str(), Timestamp::now().usecval(), *(uint16_t*)(payload + 6));
 
+		// clear the paint
+		p_in->set_anno_u8(PAINT_ANNO_OFFSET,0);
+
 		// send pong up to local host
 		output(1).push(p_in);
         break;
@@ -237,7 +256,22 @@ XCMP::push(int, Packet *p_in)
 	    if(DEBUG)
 		    click_chatter("%s: %u: Received TIME EXCEEDED\n", _src_path.unparse().c_str(), Timestamp::now().usecval());
 
+		// clear the paint
+		p_in->set_anno_u8(PAINT_ANNO_OFFSET,0);
+
 		// send Time EXCEEDED up to local host
+		output(1).push(p_in);
+		break;
+		
+	case 5: // redirect
+	    if(DEBUG)
+		    click_chatter("%s: %u: Received REDIRECT\n", _src_path.unparse().c_str(), Timestamp::now().usecval());
+		
+		// paint the packet so the upper level routing process
+		// knows to update its table
+		p_in->set_anno_u8(PAINT_ANNO_OFFSET,1);
+		
+		// send the Route Update to Host
 		output(1).push(p_in);
 		break;
 
