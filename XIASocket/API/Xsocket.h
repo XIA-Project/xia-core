@@ -133,8 +133,14 @@ extern void print_conf();
 extern int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen);
 extern int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen);
 
-extern int XupdateAD(int sockfd, char *newad);
+extern char *XgetDAGbyName(const char *name);
+extern int XregisterName(char *name, char *DAG);
+
 extern int XreadLocalHostAddr(int sockfd, char *localhostAD, char *localhostHID);
+extern int XupdateAD(int sockfd, char *newad);
+extern int XupdateNameServerDAG(int sockfd, char *nsDAG);
+extern int XreadNameServerDAG(int sockfd, char *nsDAG);
+
 #ifdef __cplusplus
 }
 #endif

@@ -7,6 +7,7 @@
 #include <click/sync.hh>
 #include <click/timer.hh>
 #include "xarptable.hh"
+#include "xcmp.hh"
 CLICK_DECLS
 
 /*

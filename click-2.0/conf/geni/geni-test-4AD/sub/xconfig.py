@@ -27,16 +27,6 @@ def createHID():
 	hid = "HID:00000000"
 	id = uuid.uuid1(uuid.getnode())
 	return hid + id.hex
-	
-	
-#
-# create a globally unique AD based off of our mac address
-#
-def createAD():
-	ad = "AD:10000000"
-	id = uuid.uuid1(uuid.getnode())
-	return ad + id.hex
-	
 
 #
 # make a short hostname
@@ -130,6 +120,17 @@ def makeHostConfig(hid):
 	xchg['IFACE'] = interfaces[0][0]
 	xchg['MAC'] = interfaces[0][1]
 
+	# create $MAC0 thru $MAC3 replacements (not sure if needed for hosts??)
+	i = 0
+	while i < 4 and i < len(interfaces):
+		repl = 'MAC' + str(i)
+		xchg[repl] = interfaces[i][1]
+		i += 1
+	while i < 4:
+		repl = 'MAC' + str(i)
+		xchg[repl] = "00:00:00:00:00:00"
+		i += 1
+
 	s = Template(text)
 	newtext = s.substitute(xchg)
 	f.write(newtext)
@@ -145,7 +146,7 @@ def makeHostConfig(hid):
 #  router (depends on the number of interfaces)
 # footer - boilerplate
 
-def makeRouterConfig(ad, hid):
+def makeRouterConfig(hid):
 
 	interfaces = getInterfaces()
 	if (len(interfaces) < 2):
@@ -168,10 +169,21 @@ def makeRouterConfig(ad, hid):
 	tpl = Template(header)
 
 	xchg = {}
-	xchg['ADNAME'] = ad
+	xchg['ADNAME'] = adname
 	xchg['HNAME'] = getHostname()
 	xchg['HID'] = hid
 
+	# create $MAC0 thru $MAC3 replacements
+	i = 0
+	while i < 4 and i < len(interfaces):
+		repl = 'MAC' + str(i)
+		xchg[repl] = interfaces[i][1]
+		i += 1
+	while i < 4:
+		repl = 'MAC' + str(i)
+		xchg[repl] = "00:00:00:00:00:00"
+		i += 1
+	 	
 	newtext = tpl.substitute(xchg)
 
 	i = 0
@@ -180,8 +192,8 @@ def makeRouterConfig(ad, hid):
 		xchg['IFACE'] = interfaces[i][0]
 		xchg['MAC'] = interfaces[i][1]
 		xchg['NUM'] = i
-		xchg['NUMa'] = str(i) + "a"
-		xchg['NUMb'] = str(i) + "b"
+#		xchg['NUMa'] = str(i) + "a"
+#		xchg['NUMb'] = str(i) + "b"
 		i += 1
 
 		newtext += tpl.substitute(xchg)
@@ -207,7 +219,7 @@ def makeRouterConfig(ad, hid):
 def getOptions():
 	global hostname
 	global nodetype
-	global ad
+	global adname
 	try:
 		shortopt = "hrn:a:"
 		opts, args = getopt.getopt(sys.argv[1:], shortopt, 
@@ -222,7 +234,7 @@ def getOptions():
 		if o in ("-h", "--help"):
 			help()
 		elif o in ("-a", "--ad"):
-			ad = a
+			adname = a
 		elif o in ("-n", "--name"):
 			hostname = a
 		elif o in ("-r", "--router"):
@@ -256,7 +268,6 @@ where:
 #
 def main():
 
-	ad = createAD()
 	getOptions()
 
 	hid = createHID()
@@ -265,7 +276,7 @@ def main():
 	if (nodetype == "host"):
 		makeHostConfig(hid)
 	else:
-		makeRouterConfig(ad, hid)
+		makeRouterConfig(hid)
 
 if __name__ == "__main__":
     main()

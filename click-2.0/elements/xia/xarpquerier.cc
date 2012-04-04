@@ -33,6 +33,7 @@
 #include <click/packet_anno.hh>
 #include <click/xid.hh>
 #include <clicknet/xia.h>
+#include <click/packet_anno.hh>
 CLICK_DECLS
 
 XARPQuerier::XARPQuerier()
@@ -396,7 +397,10 @@ XARPQuerier::push(int port, Packet *p)
 void
 XARPQuerier::xarp_query_timeout(Packet *p)
 {
-    // Do nothing
+    // Paint the packet with the XARP_timeout color	
+    int anno = PAINT_ANNO_OFFSET;
+    int color = XARP_TIMEOUT;
+    p->set_anno_u8(anno, color);
     output(noutputs() - 1).push(p);
 }
 
