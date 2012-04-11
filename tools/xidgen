@@ -51,13 +51,13 @@ if args.xtype == None:
 	args.xtype = "SID"
 xid = createXID(args.xtype)
 
-fname = args.header[0]
 define = '\n#define ' +  args.xtype + '0 "' + xid + '"\n'
 
-if fname == None:
+if args.header == None:
 	print define
 else:
 	try:
+		fname = args.header[0]
 		f = open(fname, 'w')
 		f.write(define)
 		f.close
