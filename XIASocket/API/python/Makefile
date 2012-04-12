@@ -16,3 +16,4 @@ clean:
 	make -C doc clean
 	rm -f *.so *.o *.pyc
 	rm xsocket_wrap.c
+	rm xsocket.py

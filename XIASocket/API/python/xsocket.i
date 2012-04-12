@@ -157,6 +157,39 @@
 
 
 
+/* ===== XreadLocalHostAddr ===== */
+/* The "in" map: python users don't pass in pointers for localhostAD or
+   localhostHID, so we allocate them here and pass them to the C function. */
+%typemap (in) (int sockfd, char *localhostAD, char *localhostHID)
+{
+    $1 = (int) PyLong_AsLong($input);  /*TODO: There's no reason to mess with "sockfd", but we need at least one python input. Better way? */
+    $2 = (char*)malloc(44); /* "AD:" + 40-byte XID + null byte */
+    $3 = (char*)malloc(45); /* "HID:" + 40-byte XID + null byte */
+}
+
+%typemap (argout) (int sockfd, char *localhostAD, char *localhostHID)
+{
+    Py_XDECREF($result);
+    if (result < 0) {
+        free($2);
+        free($3);
+        PyErr_SetFromErrno(PyExc_IOError);
+        return NULL;
+    }
+    
+    PyObject *ad, *hid, *return_tuple;
+    ad = PyString_FromStringAndSize($2, 44);
+    hid = PyString_FromStringAndSize($3, 45);
+    return_tuple = PyTuple_New(2);
+    PyTuple_SetItem(return_tuple, 0, ad);
+    PyTuple_SetItem(return_tuple, 1, hid);
+    $result = return_tuple;
+    free($2);
+    free($3);
+}
+
+
+
 /* Include all of the structs, constants, and function signatures
    in Xsocket.h in our python wrapper */
 %include "../Xsocket.h"
