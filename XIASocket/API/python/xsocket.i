@@ -178,8 +178,8 @@
     }
     
     PyObject *ad, *hid, *return_tuple;
-    ad = PyString_FromStringAndSize($2, 44);
-    hid = PyString_FromStringAndSize($3, 45);
+    ad = PyString_FromStringAndSize($2, 43);  /* don't give the null byte to python */
+    hid = PyString_FromStringAndSize($3, 44);
     return_tuple = PyTuple_New(2);
     PyTuple_SetItem(return_tuple, 0, ad);
     PyTuple_SetItem(return_tuple, 1, hid);

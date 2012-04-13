@@ -465,7 +465,6 @@ def get_content_from_cid_list(cid_list):
 def xiaHandler(host, path, http_header, browser_socket):
     # Configure XSocket so we can talk to click
     set_conf("xsockconf_python.ini", "xiaproxy.py")
-    
 
     if http_header.find('GET /favicon.ico') != -1:
         return
@@ -499,5 +498,8 @@ def xiaHandler(host, path, http_header, browser_socket):
         recombined_content = get_content_from_cid_list_temp(host_array[2])
         length = len(recombined_content)
         send_to_browser(recombined_content, browser_socket)
+    else:
+        ddag = XgetDAGbyName(host)
+        sendSIDRequestXSP(ddag, http_header, browser_socket)
     return
 
