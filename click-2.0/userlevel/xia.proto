@@ -24,6 +24,8 @@ enum XSocketCallType {
 
   XCHANGEAD = 19;
   XREADLOCALHOSTADDR = 20;  
+  XUPDATENAMESERVERDAG = 21;
+  XREADNAMESERVERDAG = 22;
 }
 
 message XSocketMsg {
@@ -52,6 +54,8 @@ message XSocketMsg {
 
   optional X_Changead_Msg x_changead = 20;	
   optional X_ReadLocalHostAddr_Msg x_readlocalhostaddr = 21;  
+  optional X_Updatenameserverdag_Msg x_updatenameserverdag = 22;  
+  optional X_ReadNameServerDag_Msg x_readnameserverdag = 23;  
 }
  
 message X_Socket_Msg {
@@ -157,6 +161,15 @@ message X_ReadLocalHostAddr_Msg {
   optional string ad = 1;
   optional string hid = 2;
 }
+
+message X_Updatenameserverdag_Msg {
+  required string dag = 1;
+}
+
+message X_ReadNameServerDag_Msg {
+  optional string dag = 1;
+}
+  
 
 /**************************************************/
 

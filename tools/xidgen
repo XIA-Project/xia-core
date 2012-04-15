@@ -1,0 +1,65 @@
+#!/usr/bin/python
+#ts=4
+#
+# Copyright 2011 Carnegie Mellon University
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+import uuid
+import argparse
+
+# create a globally unique XID based off of our mac address and the creation
+# time.
+# using this method of generating a uuid can expose our mac address and the time
+# time the uuid was generated. However since this is being used for a network
+# address, it shouldn't be a problem
+#
+def createXID(prefix):
+	id = uuid.uuid1(uuid.getnode()).hex
+	# reverse the uuid string so the changing chars are at the tail
+	id = id[::-1]
+
+	return prefix + ":00000000" + id
+
+
+# argparse uses -h for help, so we can't use it for the hid option - grrrrr
+parser = argparse.ArgumentParser(description='Create a unique XIA identifier.',
+		epilog='Copy/paste the result into your application code')
+parser.add_argument('-v', '--version', action='version', version='%(prog)s 1.0')
+parser.add_argument('-H', '--hid', dest='xtype', action='store_const', const="HID",
+		help='create a HID')
+parser.add_argument('-A', '--ad',  dest='xtype', action='store_const', const="AD",
+		help='create an AD')
+parser.add_argument('-S', '--sid', dest='xtype', action='store_const', const="SID",
+		help='create a SID (default option)')
+parser.add_argument('-f', '--file', dest='header', nargs=1, metavar='fname',
+		help='create a C/C++ header file named <fname> contining the XID.')
+args = parser.parse_args()
+
+if args.xtype == None:
+	args.xtype = "SID"
+xid = createXID(args.xtype)
+
+define = '\n#define ' +  args.xtype + '0 "' + xid + '"\n'
+
+if args.header == None:
+	print define
+else:
+	try:
+		fname = args.header[0]
+		f = open(fname, 'w')
+		f.write(define)
+		f.close
+	except:
+		print 'error creating file ' + fname

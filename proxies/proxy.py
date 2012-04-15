@@ -67,7 +67,7 @@ class ProxyHandler (BaseHTTPServer.BaseHTTPRequestHandler):
     def do_GET(self):
         (scm, netloc, path, params, query, fragment) = urlparse.urlparse(
             self.path, 'http')
-	if netloc.find('xia') == 0 or netloc.find('dag') == 0:
+	if netloc.find('xia') == 0 or netloc.find('dag') == 0 or netloc.find('xia') > 0: # TODO: Better check here
 		header = "%s %s %s\r\n" % (
                     self.command,
                     urlparse.urlunparse(('', '', path, params, query, '')),

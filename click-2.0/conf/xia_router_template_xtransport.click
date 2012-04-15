@@ -28,8 +28,8 @@ elementclass GenericRouting4Port {
     broadcast_pkt_Fork[2] -> Paint(2) -> [0]output; 
     broadcast_pkt_Fork[3] -> Paint(3) -> [0]output;   
 
-	rt[8] -> x::XCMP($local_addr) -> [0]output; // needs a redirect message
-	x[1] -> Discard;
+    rt[8] -> x::XCMP($local_addr) -> [0]output; // needs a redirect message
+    x[1] -> Discard;
 };
 
 elementclass GenericPostRouteProc {
@@ -209,6 +209,7 @@ elementclass Router {
     
     Script(write n/proc/rt_AD/rt.add - 1);      // default route for AD
     Script(write n/proc/rt_AD/rt.add $local_ad 4);    // self AD as destination
+    Script(write n/proc/rt_HID/rt.add - 0); 	// default route for HID
     Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self RHID as destination
     Script(write n/proc/rt_HID/rt.add BHID 7);  // outgoing broadcast packet
     Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
@@ -506,9 +507,9 @@ elementclass XRouter2Port {
     //Packet forwarding module->[2]xtransport0;
 
 
-    //Script(write n/proc/rt_AD/rt.add - 0);      // default route for AD
-    //Script(write n/proc/rt_HID/rt.add - 0);     // default route for HID
+    Script(write n/proc/rt_AD/rt.add - 1);      // default route for AD
     Script(write n/proc/rt_AD/rt.add $local_ad 4);    // self AD as destination
+    Script(write n/proc/rt_HID/rt.add - 0); 	// default route for HID
     Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self RHID as destination
     Script(write n/proc/rt_HID/rt.add BHID 7);  // outgoing broadcast packet
     Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
@@ -520,7 +521,7 @@ elementclass XRouter2Port {
     Idle() -> [4]xtransport;
     
 
- 	// set up XCMP elements
+    // set up XCMP elements
     c :: Classifier(01/3D, -); // XCMP
     x :: XCMP($local_addr);
     
@@ -529,10 +530,6 @@ elementclass XRouter2Port {
     c0 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
     xarpq0 :: XARPQuerier($local_hid, $mac0);
     xarpr0 :: XARPResponder($local_hid $mac0);        
-    queue0a :: Queue;
-    queue0b :: Queue;
-    unqueue0 :: Unqueue;
-    mux0 :: DRRSched(2);   
     
     // On receiving a packet from Interface0	
     input[0] -> c0; 
@@ -540,44 +537,38 @@ elementclass XRouter2Port {
     // Receiving an XIA packet
     c0[2] -> Strip(14) -> MarkXIAHeader() -> Paint(0) -> [0]n; 
      
+    out0 :: Queue(200) -> [0]output;
+
     // On receiving XARP response
-    c0[1] -> [1]xarpq0;
-    xarpq0 -> queue0a -> [0]mux0;
-    mux0 -> [0]output;
+    c0[1] -> [1]xarpq0 -> out0;
   
     // On receiving XARP query
-    c0[0] -> xarpr0;
-    xarpr0 -> queue0b -> [1]mux0;      
+    c0[0] -> xarpr0 -> out0;
     
     // XAPR timeout to XCMP
     xarpq0[1] -> Paint(65) -> x;
     
     
         
-    
+
     // setup XARP module1
     c1 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
     xarpq1 :: XARPQuerier($local_hid, $mac1);
     xarpr1 :: XARPResponder($local_hid $mac1);        
-    queue1a :: Queue;
-    queue1b :: Queue;
-    unqueue1 :: Unqueue;
-    mux1 :: DRRSched(2);
     
     // On receiving a packet from Interface1	
     input[1] -> c1; 
     
     // Receiving an XIA packet
     c1[2] -> Strip(14) -> MarkXIAHeader() -> Paint(1) -> [0]n; 
+
+    out1 :: Queue(200) -> [1]output;
      
     // On receiving XARP response
-    c1[1] -> [1]xarpq1;
-    xarpq1 -> queue1a -> [0]mux1;
-    mux1 -> [1]output;
+    c1[1] -> [1]xarpq1 -> out1;
   
     // On receiving XARP query
-    c1[0] -> xarpr1;
-    xarpr1 -> queue1b -> [1]mux1;     
+    c1[0] -> xarpr1 -> out1;
     
     // XAPR timeout to XCMP
     xarpq1[1] -> Paint(65) -> x; 
@@ -597,8 +588,8 @@ elementclass XRouter2Port {
 
 
     // Sending an XIP packet (via XARP if necessary)
-    sw[0] -> Queue(200) -> unqueue0 -> [0]xarpq0;
-    sw[1] -> Queue(200) -> unqueue1 -> [0]xarpq1;    
+    sw[0] -> [0]xarpq0;
+    sw[1] -> [0]xarpq1;    
     sw[2] -> Discard;
     sw[3] -> Discard;
 
@@ -673,7 +664,7 @@ elementclass XRouter4Port {
     Idle() -> [4]xtransport;
     
 
- 	// set up XCMP elements
+    // set up XCMP elements
     c :: Classifier(01/3D, -); // XCMP
     x :: XCMP($local_addr);
 
@@ -683,28 +674,23 @@ elementclass XRouter4Port {
     c0 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
     xarpq0 :: XARPQuerier($local_hid, $mac0);
     xarpr0 :: XARPResponder($local_hid $mac0);        
-    queue0a :: Queue;
-    queue0b :: Queue;
-    unqueue0 :: Unqueue;
-    mux0 :: DRRSched(2);   
     
     // On receiving a packet from Interface0	
     input[0] -> c0; 
     
     // Receiving an XIA packet
     c0[2] -> Strip(14) -> MarkXIAHeader() -> Paint(0) -> [0]n; 
+
+    out0 :: Queue(200) -> [0]output;
      
     // On receiving XARP response
-    c0[1] -> [1]xarpq0;
-    xarpq0 -> queue0a -> [0]mux0;
-    mux0 -> [0]output;
+    c0[1] -> [1]xarpq0 -> out0;
   
     // On receiving XARP query
-    c0[0] -> xarpr0;
-    xarpr0 -> queue0b -> [1]mux0;      
+    c0[0] -> xarpr0 -> out0;
     
     // XAPR timeout to XCMP
-    xarpq0[1] -> Paint(65) -> Discard; 
+    xarpq0[1] -> Paint(65) -> x; 
     
     
     
@@ -713,58 +699,48 @@ elementclass XRouter4Port {
     c1 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
     xarpq1 :: XARPQuerier($local_hid, $mac1);
     xarpr1 :: XARPResponder($local_hid $mac1);        
-    queue1a :: Queue;
-    queue1b :: Queue;
-    unqueue1 :: Unqueue;
-    mux1 :: DRRSched(2);
     
     // On receiving a packet from Interface1	
     input[1] -> c1; 
     
     // Receiving an XIA packet
     c1[2] -> Strip(14) -> MarkXIAHeader() -> Paint(1) -> [0]n; 
+    
+    out1 :: Queue(200) -> [1]output;
      
     // On receiving XARP response
-    c1[1] -> [1]xarpq1;
-    xarpq1 -> queue1a -> [0]mux1;
-    mux1 -> [1]output;
+    c1[1] -> [1]xarpq1 -> out1;
   
     // On receiving XARP query
-    c1[0] -> xarpr1;
-    xarpr1 -> queue1b -> [1]mux1; 
+    c1[0] -> xarpr1 -> out1;
     
     // XAPR timeout to XCMP
-    xarpq1[1] -> Paint(65) -> Discard; 
+    xarpq1[1] -> Paint(65) -> x; 
     
     
-        
 
+        
     // setup XARP module2
     c2 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
     xarpq2 :: XARPQuerier($local_hid, $mac2);
     xarpr2 :: XARPResponder($local_hid $mac2);        
-    queue2a :: Queue;
-    queue2b :: Queue;
-    unqueue2 :: Unqueue;
-    mux2 :: DRRSched(2);  
     
     // On receiving a packet from Interface2	
     input[2] -> c2; 
     
     // Receiving an XIA packet
     c2[2] -> Strip(14) -> MarkXIAHeader() -> Paint(2) -> [0]n; 
+
+    out2 :: Queue(200) -> [2]output;
      
     // On receiving XARP response
-    c2[1] -> [1]xarpq2;
-    xarpq2 -> queue2a -> [0]mux2;
-    mux2 -> [2]output;
+    c2[1] -> [1]xarpq2 -> out2;
   
     // On receiving XARP query
-    c2[0] -> xarpr2;
-    xarpr2 -> queue2b -> [1]mux2;     
+    c2[0] -> xarpr2 -> out2;
     
     // XAPR timeout to XCMP
-    xarpq2[1] -> Paint(65) -> Discard; 
+    xarpq2[1] -> Paint(65) -> x; 
     
         
         
@@ -773,28 +749,23 @@ elementclass XRouter4Port {
     c3 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
     xarpq3 :: XARPQuerier($local_hid, $mac3);
     xarpr3 :: XARPResponder($local_hid $mac3);        
-    queue3a :: Queue;
-    queue3b :: Queue;
-    unqueue3 :: Unqueue;
-    mux3 :: DRRSched(2);    
 
     // On receiving a packet from Interface3	
     input[3] -> c3; 
     
     // Receiving an XIA packet
     c3[2] -> Strip(14) -> MarkXIAHeader() -> Paint(3) -> [0]n; 
+
+    out3 :: Queue(200) -> [3]output;
      
     // On receiving XARP response
-    c3[1] -> [1]xarpq3;
-    xarpq3 -> queue3a -> [0]mux3;
-    mux3 -> [3]output;
+    c3[1] -> [1]xarpq3 -> out3;
   
     // On receiving XARP query
-    c3[0] -> xarpr3;
-    xarpr3 -> queue3b -> [1]mux3;  
+    c3[0] -> xarpr3 -> out3;
 
     // XAPR timeout to XCMP
-    xarpq3[1] -> Paint(65) -> Discard; 
+    xarpq3[1] -> Paint(65) -> x; 
     
     
     
@@ -813,10 +784,10 @@ elementclass XRouter4Port {
     
     
     // Sending an XIP packet (via XARP if necessary)
-    sw[0] -> Queue(200) -> unqueue0 -> [0]xarpq0;
-    sw[1] -> Queue(200) -> unqueue1 -> [0]xarpq1;
-    sw[2] -> Queue(200) -> unqueue2 -> [0]xarpq2;
-    sw[3] -> Queue(200) -> unqueue3 -> [0]xarpq3;
+    sw[0] -> [0]xarpq0;
+    sw[1] -> [0]xarpq1;
+    sw[2] -> [0]xarpq2;
+    sw[3] -> [0]xarpq3;
     
         
 };
@@ -884,7 +855,7 @@ elementclass EndHost {
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
     Script(write n/proc/rt_IP/rt.add - 0); 	// default route for IPv4    
 
-	// setup XCMP
+    // setup XCMP
     c :: Classifier(01/3D, -); // XCMP
     x :: XCMP($local_addr);
 
@@ -897,25 +868,20 @@ elementclass EndHost {
     c0 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
     xarpq0 :: XARPQuerier($local_hid, $mac);
     xarpr0 :: XARPResponder($local_hid $mac);        
-    queue0a :: Queue;
-    queue0b :: Queue;
-    unqueue0 :: Unqueue;
-    mux0 :: DRRSched(2); 
     
     // On receiving a packet from Interface0	
     input[0] -> c0; 
     
     // Receiving an XIA packet
     c0[2] -> Strip(14) -> MarkXIAHeader() -> Paint(0) -> [0]n; 
+
+    out0 :: Queue(200) -> [0]output;
      
     // On receiving XARP response
-    c0[1] -> [1]xarpq0;
-    xarpq0 -> queue0a -> [0]mux0;
-    mux0 -> [0]output;
+    c0[1] -> [1]xarpq0 -> out0;
   
     // On receiving XARP query
-    c0[0] -> xarpr0;
-    xarpr0 -> queue0b -> [1]mux0;
+    c0[0] -> xarpr0 -> out0;
 
     // XAPR timeout to XCMP
     xarpq0[1] -> Paint(65) -> x; 
@@ -927,7 +893,7 @@ elementclass EndHost {
     c[0] -> IPPrint("going into XCMP Module", CONTENTS HEX) -> x;
     x[0] -> [0]n; // new (response) XCMP packets destined for some other machine
     x[1] -> rsw :: PaintSwitch -> Print("XCMP going to XTransport") -> [2]xtransport; // XCMP packets destined for this machine
-	rsw[1] -> Discard; // should be doing a route update here...
+    rsw[1] -> Discard; // should be doing a route update here...
 
     srcTypeClassifier[0] -> Discard;    // do not send CID responses directly to RPC;
     
@@ -938,81 +904,11 @@ elementclass EndHost {
     n[0] -> sw :: PaintSwitch
     
     // Sending an XIP packet (via XARP if necessary)
-    sw[0] -> Queue(200) -> unqueue0 -> [0]xarpq0;
+    sw[0] -> [0]xarpq0;
     sw[1] -> Discard();
     sw[2] -> Discard();
     sw[3] -> Discard();
     
 };
 
-// 1-port dhcp enabled endhost node with sockets
-elementclass DHCPEndHost {
-    $local_hid, $fake,$CLICK_IP,$API_IP, $ether_addr, $enable_local_cache |
 
-    // $rpc_port:   the TCP port number to use for RPC
-
-    // input: a packet arrived at the node
-    // output: forward to interface 0
-    
-    n :: RouteEngine(RE $local_hid);
-    xtransport::XTRANSPORT(RE $local_hid, $CLICK_IP,$API_IP,n/proc/rt_SID/rt);
-    
-    //Create kernel TAP interface which responds to ARP
-    fake0::FromHost($fake, $API_IP/24, CLICK_XTRANSPORT_ADDR $CLICK_IP ,HEADROOM 256, MTU 65521) 
-    //-> Print()
-    -> fromhost_cl :: Classifier(12/0806, 12/0800);
-    fromhost_cl[0] -> ARPResponder(0.0.0.0/0 $ether_addr) -> ToHost($fake);
-
-    //Classifier to sort between control/normal
-    fromhost_cl[1]
-    ->StripToNetworkHeader()
-    ->sorter::IPClassifier(dst udp port 5001 or 5002 or 5003 or 5004 or 5005 or 5006,
-                           dst udp port 10000 or 10001 or 10002);
-
-    //Control in
-    sorter[0]
-    ->[0]xtransport;
-
-    //socket side data in
-    sorter[1]
-    ->[1]xtransport;
-
-    //socket side out
-    xtransport[1]->
-    cIP::CheckIPHeader();
-    cIP
-    ->EtherEncap(0x0800, $ether_addr, 11:11:11:11:11:11)
-    -> ToHost($fake)
-    cIP[1]->Print(bad,MAXLENGTH 100, CONTENTS ASCII)->Discard();
-
-    xtransport[0]-> Discard;//Port 0 is unused for now.
-    
-    //To connect to forwarding instead of loopback
-    //xtransport[2]->Packet forwarding module
-    //Packet forwarding module->[2]xtransport0;
-
-    cache :: XIACache(RE $local_hid, n/proc/rt_CID/rt, $enable_local_cache, PACKET_SIZE 1400);
-
-    Script(write n/proc/rt_AD/rt.add - 0);      // default route for AD
-    Script(write n/proc/rt_HID/rt.add - 0);     // default route for HID
-    Script(write n/proc/rt_HID/rt.add HID:1111111111111111111111111111111111111111 4);  // route for broadcast packet
-    Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self HID as destination
-    Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
-    Script(write n/proc/rt_SID/rt.add SID:1110000000000000000000000000000000001111 6);  // route DHCP packet
-    Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
-    Script(write n/proc/rt_IP/rt.add - 0); 	// default route for IPv4    
-
-    n[3] -> [4]xtransport;
-
-    input[0] -> n;
-    srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
-    n[1] -> srcTypeClassifier[1] -> [2]xtransport[2] ->  [0]n;
-    srcTypeClassifier[0] -> Discard;    // do not send CID responses directly to RPC;
-    
-    n[2] -> [0]cache[0] -> [1]n;
-    //For get and put cid
-    xtransport[3] -> [1]cache[1] -> [3]xtransport;
-        
-    n ->  Queue(200) -> [0]output;
-    
-};

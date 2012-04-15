@@ -761,7 +761,30 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			output(1).push(UDPIPEncap(reply, _sport, _sport));
 		}
 		break;		
-		
+		case xia::XUPDATENAMESERVERDAG:
+		{
+			xia::X_Updatenameserverdag_Msg *x_updatenameserverdag_msg = xia_socket_msg.mutable_x_updatenameserverdag();
+			String ns_dag(x_updatenameserverdag_msg->dag().c_str());
+			//click_chatter("new nameserver address is - %s", ns_dag.c_str());
+			_nameserver_addr.parse(ns_dag);
+		}
+		break;
+		case xia::XREADNAMESERVERDAG:
+		{
+			// read the nameserver DAG
+			String ns_addr = _nameserver_addr.unparse();
+			// return a packet containing the nameserver DAG
+			xia::XSocketMsg _Response;
+			_Response.set_type(xia::XREADNAMESERVERDAG);
+			xia::X_ReadNameServerDag_Msg *_msg = _Response.mutable_x_readnameserverdag();
+			_msg->set_dag(ns_addr.c_str());
+			std::string p_buf1;
+			_Response.SerializeToString(&p_buf1);
+			WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
+			output(1).push(UDPIPEncap(reply, _sport, _sport));
+		}
+		break;	
+						
 		default:
 			click_chatter("\n\nERROR: CONTROL TRAFFIC !!!\n\n");
 			break;
@@ -1200,9 +1223,9 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 			std::string p_buf;
 			xia_socket_msg.SerializeToString(&p_buf);
-
+		
 			WritablePacket *reply = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
-			output(1).push(UDPIPEncap(reply, _sport, _sport));
+			output(1).push(UDPIPEncap(reply, _sport, _sport));	
 		}
 		break;
 
@@ -1272,6 +1295,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 					portToDAGinfo.set(_sport, *daginfo);
 				}
 			}
+
 		}
 		break;
 

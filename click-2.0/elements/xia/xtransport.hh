@@ -109,6 +109,7 @@ class XTRANSPORT : public Element {
     XID _local_hid;
     XIAPath _local_addr;
     bool isConnected;
+    XIAPath _nameserver_addr;
 
     // protobuf message
     xia::XSocketMsg xia_socket_msg;

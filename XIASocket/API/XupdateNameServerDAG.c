@@ -3,10 +3,10 @@
 #include "Xinit.h"
 #include "Xutil.h"
 
-int XupdateAD(int sockfd, char *newad) {
+int XupdateNameServerDAG(int sockfd, char *nsDAG) {
   int rc;
 
-  if (!newad) {
+  if (!nsDAG) {
     LOG("new ad is NULL!");
     errno = EFAULT;
     return -1;
@@ -19,10 +19,10 @@ int XupdateAD(int sockfd, char *newad) {
   }
 
   xia::XSocketMsg xsm;
-  xsm.set_type(xia::XCHANGEAD);
+  xsm.set_type(xia::XUPDATENAMESERVERDAG);
 
-  xia::X_Changead_Msg *x_changead_msg = xsm.mutable_x_changead();
-  x_changead_msg->set_dag(newad);
+  xia::X_Updatenameserverdag_Msg *x_updatenameserverdag_msg = xsm.mutable_x_updatenameserverdag();
+  x_updatenameserverdag_msg->set_dag(nsDAG);
   
   if ((rc = click_control(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
@@ -33,7 +33,7 @@ int XupdateAD(int sockfd, char *newad) {
 }
 
 
-int XreadLocalHostAddr(int sockfd, char *localhostAD, char *localhostHID) {
+int XreadNameServerDAG(int sockfd, char *nsDAG) {
   	int rc;
   	char UDPbuf[MAXBUFLEN];
   	
@@ -44,7 +44,7 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, char *localhostHID) {
  	}
 
  	xia::XSocketMsg xsm;
-  	xsm.set_type(xia::XREADLOCALHOSTADDR);
+  	xsm.set_type(xia::XREADNAMESERVERDAG);
   
   	if ((rc = click_control(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
@@ -58,13 +58,14 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, char *localhostHID) {
 
 	xia::XSocketMsg xsm1;
 	xsm1.ParseFromString(UDPbuf);
-	if (xsm1.type() == xia::XREADLOCALHOSTADDR) {
-		xia::X_ReadLocalHostAddr_Msg *_msg = xsm1.mutable_x_readlocalhostaddr();
-		strcpy(localhostAD, (_msg->ad()).c_str() );
-		strcpy(localhostHID, (_msg->hid()).c_str() );
+	if (xsm1.type() == xia::XREADNAMESERVERDAG) {
+		xia::X_ReadNameServerDag_Msg *_msg = xsm1.mutable_x_readnameserverdag();
+		strcpy(nsDAG, (_msg->dag()).c_str() );
 	} else {
 		rc = -1;
 	}	
 	return rc;
 	 
 }
+
+
