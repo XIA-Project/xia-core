@@ -1,0 +1,19 @@
+require(library ../../../xia_router_template_xtransport.click);
+require(library ../../../xia_address.click);
+
+// host instantiation
+host0 :: EndHost (RE $ADNAME $HID, $HID, fake0, 172.0.0.2, 172.0.0.1, 01:11:11:11:11:11, 0, $MAC0);
+
+// Interface0 ($IFACE)
+todevice0 :: ToDevice($IFACE);
+fromdevice0 :: FromDevice($IFACE, PROMISC true);
+
+
+// On receiving a packet from Interface0
+fromdevice0 -> [0]host0;
+
+// Sending an XIP packet (via XARP if necessary) to Interface0
+host0[0] -> todevice0
+
+	ControlSocket(tcp, 7777);
+
