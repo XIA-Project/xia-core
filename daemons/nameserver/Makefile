@@ -4,12 +4,12 @@ CFLAGS=-I../../XIASocket/API -ggdb
 LDFLAGS=-lprotobuf -lpthread
 SOURCES=ns.cc ../../XIASocket/API/libXsocket.a
 
-all: ns
+all: xnameservice
 
-ns: $(SOURCES)
+xnameservice: $(SOURCES)
 	$(CC) -o $@ $(CFLAGS) $(SOURCES) $(LDFLAGS)	
 
 clean:
-	rm ns
+	rm xnameservice
 	
 	

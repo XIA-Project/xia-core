@@ -10,49 +10,9 @@ import string
 from xsocket import *
 from ctypes import *
 import hashlib
-
-#chunksize = 1200
-cids_by_filename = {}
-
-# Pretend a magic naming service gives us XIDs...
 from xia_address import *
 
-# TODO: This should eventually be replaced by the put_chunk API
-#def put_chunk(chunk):
-#    # Hash the content to get CID
-#    m = hashlib.sha1()
-#    m.update(chunk)
-#    cid = m.hexdigest()
-#
-#    sock = Xsocket(XSOCK_CHUNK)
-#    if (sock<0):
-#        print "webserver.py: put_chunk: error opening socket"
-#        exit(-1)
-#    
-#    # Put the content chunk
-#    content_dag = 'RE %s %s CID:%s' % (AD1, HID1, cid)  # TODO: test DAG format instead of RE
-#    XputCID(sock, chunk, len(chunk), 0, content_dag, len(content_dag))
-#
-#    #print 'put content %s (length %s)' % (content_dag, len(chunk))
-#    Xclose(sock)
-#    return cid
-
-#def put_file(filepath, chunksize):
-#    print "putting file %s" % filepath
-#    cid_list = []
-#    try:
-#        f = open(filepath, 'r')
-#        chunk = f.read(chunksize)
-#        while chunk != '':
-#            cid_list.append(put_chunk(chunk))
-#            chunk = f.read(chunksize)
-#    except IOError:
-#        print "IOERROR: webserver.py: put_file: error reading file %s" % filepath
-#    finally:
-#        if f:
-#            f.close()
-#    return cid_list
-    
+cids_by_filename = {}
 
 def serveHTTPRequest(request, sock):
     global cids_by_filename
@@ -85,8 +45,7 @@ def serveHTTPRequest(request, sock):
 
     # Send response
     response = http_msg_type + http_header + response_data
-    print 'REsponse: \n %s' % response
-    Xsend(sock, response, len(response), 0)
+    Xsend(sock, response, 0)
 
 
 # Chunk and publish all files in the local www directory.
@@ -174,19 +133,27 @@ def main():
     # Set up connection with click via Xsocket API
     set_conf("xsockconf_python.ini", "webserver.py")
 
-    # TODO: When new put_chunk API is ready and we have persistent caching, we can eliminate
+    # TODO: When we have persistent caching, we can eliminate
     # this and make a separate 'content publishing' app.
     put_content_in_dir('./www') 
         
     try:   
-        # Listen for connections from clients
+        # Create socket for listening for connections
         listen_sock = Xsocket(XSOCK_STREAM)
         if (listen_sock<0):
             print 'webserver.py: main: error opening socket'
             return
-        dag = "RE %s %s %s" % (AD1, HID1, SID1) # dag to listen on
-        Xbind(listen_sock, dag)
-        print 'Listening on %s' % dag
+
+        # Get local AD and HID; build DAG to listen on
+        (myAD, myHID) = XreadLocalHostAddr(listen_sock)
+        mySID = SID1 # TODO: eventually this should come from a public key
+        listen_dag_re = "RE %s %s %s" % (myAD, myHID, mySID) # dag to listen on; TODO: fix Xbind so this can be DAG format, not just RE
+        listen_dag = "DAG 2 0 - \n %s 2 1 - \n %s 2 - \n %s" % (myAD, myHID, mySID)       
+        Xbind(listen_sock, listen_dag_re)
+        print 'Listening on %s' % listen_dag
+
+        # Publish DAG to naming service
+        XregisterName("www_s.xiaweb.com.xia", listen_dag)
         
         # TODO: use threads instead of processes?
         while(True):

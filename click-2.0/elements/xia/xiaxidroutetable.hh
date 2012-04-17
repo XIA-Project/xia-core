@@ -5,6 +5,7 @@
 #include <clicknet/xia.h>
 #include <click/xid.hh>
 #include <click/xiapath.hh>
+#include "xcmp.hh"
 CLICK_DECLS
 
 /*
@@ -66,7 +67,7 @@ private:
     XIAPath _local_addr;
     XID _local_hid;
     XID _bcast_xid;
-    int _bcast_port, _my_port;
+    int _redirect_port, _bcast_port, _my_port;
 };
 
 CLICK_ENDDECLS
