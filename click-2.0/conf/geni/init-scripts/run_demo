@@ -41,12 +41,12 @@ stop_services()
 	printf "Stopping XIA Demo Services\n"
 	for node in $CLIENTS
 	do
-		ssh -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/web_demo_proxy_stop.sh"
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/web_demo_proxy_stop.sh"
 	done
 
 	for node in $SERVERS
 	do
-		ssh -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/web_demo_service_stop.sh"
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/web_demo_service_stop.sh"
 	done	
 	printf "Stopped XIA Demo Services\n"
 }
@@ -57,13 +57,13 @@ start_services()
 
 	for node in $SERVERS
 	do
-		ssh -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/web_demo_service_start.sh"
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/web_demo_service_start.sh"
 	done	
 	
 	sleep 1
 	for node in $CLIENTS
 	do
-		ssh -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/web_demo_proxy_start.sh"
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/web_demo_proxy_start.sh"
 	done
 	
 	printf "Started XIA Demo Services\n"
