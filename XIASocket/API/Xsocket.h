@@ -138,6 +138,8 @@ extern char *XgetDAGbyName(const char *name);
 extern int XregisterName(const char *name, const char *DAG);
 
 extern int XreadLocalHostAddr(int sockfd, char *localhostAD, char *localhostHID);
+
+/* internal only functions */
 extern int XupdateAD(int sockfd, char *newad);
 extern int XupdateNameServerDAG(int sockfd, char *nsDAG);
 extern int XreadNameServerDAG(int sockfd, char *nsDAG);
