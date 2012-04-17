@@ -45,8 +45,7 @@ def serveHTTPRequest(request, sock):
 
     # Send response
     response = http_msg_type + http_header + response_data
-    print 'REsponse: \n %s' % response
-    Xsend(sock, response, len(response), 0)
+    Xsend(sock, response, 0)
 
 
 # Chunk and publish all files in the local www directory.

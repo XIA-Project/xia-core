@@ -52,7 +52,7 @@ Functions
 
 	TODO: finish
 
-.. function:: XgetChunkStatus(sockfd, dag, dag_len)
+.. function:: XgetChunkStatus(sockfd, dag)
 
 	TODO: finish
 
@@ -74,11 +74,11 @@ Functions
 
 	Return the value associated with *optname*.
 
-.. function:: XputBuffer(context, data, size, chunk_size)
+.. function:: XputBuffer(context, data, chunk_size)
 
 	TODO: finish
 
-.. function:: XputChunk(context, data, length)
+.. function:: XputChunk(context, data)
 
 	TODO: finish
 
@@ -86,14 +86,14 @@ Functions
 
 	TODO: finish
 
-.. function:: XreadChunk(sockfd, len, flags, cDAG, dlen)
+.. function:: XreadChunk(sockfd, length, flags, content_dag)
 
 	TODO: finish
-	Read a content chunk with address *cDAG* (of length *dlen*, currently unused) over control socket *sockfd* (must be of type XSOCK_CHUNK). *len* is the maximum size of the content. *flags* currently unused. Return the chunk.
+	Read a content chunk with address *cDAG* over control socket *sockfd* (must be of type XSOCK_CHUNK). *flags* currently unused. Return the chunk.
 
-.. function:: Xrecv(sockfd, len, flags)
+.. function:: Xrecv(sockfd, length, flags)
 
-	Read at most *len* bytes from *sockfd*. *flags* not currently used. Return the received data.
+	Read at most *length* bytes from *sockfd*. *flags* not currently used. Return the received data.
 
 	.. note:: In cases where more data is received than specified by the caller, the excess data will be stored in the socket state structure and will be returned from there rather than from Click. Once the socket state is drained, requests will be sent through to Click again.
 
@@ -119,9 +119,16 @@ Functions
 
 	Retrieves at most *length* bytes of data from *sockfd*, which must be of type XSOCK_DGRAM. Unlike the standard recvfrom API, it will not work with sockets of type XSOCK_STREAM.
 
-	:func:`XrecvFrom` does not currently have a non-blocking mode, and will block until a data is available on sockfd. However, the standard socket API calls select and poll may be used with the Xsocket. Either function will deliver a readable event when a new connection is attempted and you may then call :func:XrecvFrom` to get the data.
+	:func:`XrecvFrom` does not currently have a non-blocking mode, and will block until a data is available on sockfd. However, the standard socket API calls select and poll may be used with the Xsocket. Either function will deliver a readable event when a new connection is attempted and you may then call :func:`XrecvFrom` to get the data.
 
 	.. note:: In cases where more data is received than specified by *length*, the excess data will be stored in the socket state structure and will be returned from there rather than from Click. Once the socket state is drained, requests will be sent through to Click again.
+
+	Return a tuple containing the data received and the sender's dag. Example use:
+
+	.. code-block:: python
+
+		sock = Xsocket(XSOCK_DGRAM)
+		(data, sender_dag) = Xrecvfrom(sock, XIA_MAXBUF, 0)
 
 .. function:: XregisterName(name, DAG)
 
@@ -131,7 +138,7 @@ Functions
 
 	TODO: finish
 
-.. function:: XrequestChunk(sockfd, dag, dag_length)
+.. function:: XrequestChunk(sockfd, dag)
 
 	TODO: finish
 
@@ -139,9 +146,9 @@ Functions
 
 	TODO: finish
 
-.. function:: Xsend(sockfd, data, len, flags)
+.. function:: Xsend(sockfd, data, flags)
 
-	Send *data* of length *len* bytes over *sockfd* (currently :func:`Xsend` is limited to sending at most XIA_MAXBUF bytes). *flags* not currently used. The :func:`Xsend` call may be used only when the socket is in a connected state (so that the intended recipient is known). It only works with an Xsocket of type XSOCK_STREAM that has previously been connecteted with :func:`Xaccept` or :func:`Xconnect`.
+	Send *data* over *sockfd* (currently :func:`Xsend` is limited to sending at most XIA_MAXBUF bytes). *flags* not currently used. The :func:`Xsend` call may be used only when the socket is in a connected state (so that the intended recipient is known). It only works with an Xsocket of type XSOCK_STREAM that has previously been connecteted with :func:`Xaccept` or :func:`Xconnect`.
 
 	Return the number of bytes sent on success, -1 on error.
 
