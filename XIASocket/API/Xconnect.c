@@ -28,7 +28,7 @@
 ** @brief Initiate a connection on an Xsocket of type XSOCK_STREAM
 **
 ** The Xconnect() call connects the socket referred to by sockfd to the
-** SID specified by dDAG.a It is only valid for use with socket created
+** SID specified by dDAG. It is only valid for use with sockets created
 ** with the XSOCK_STREAM Xsocket type.
 **
 ** @note Xconnect() differs from the standard connect API in that it does

@@ -27,7 +27,7 @@
 ** @brief Send a message on an Xsocket
 **
 ** The Xsend() call may be used only when the socket is in a connected state
-** (so that the intended recipient is know). It only works with an Xsocket of
+** (so that the intended recipient is known). It only works with an Xsocket of
 ** type XSOCK_STREAM that has previously been connecteted with Xaccept()
 ** or Xconnect().
 **

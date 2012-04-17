@@ -28,7 +28,7 @@
 ** @brief Accept a conection from a remote Xsocket
 **
 ** The Xaccept system call is is only valid with Xsockets created with
-** the XSOCK_STREAM tranport type. It accepts the first availble connection
+** the XSOCK_STREAM transport type. It accepts the first available connection
 ** request for the listening socket, sockfd, creates a new connected socket, 
 ** and returns a new Xsocket descriptor referring to that socket. The newly 
 ** created socket is not in the listening state. The original socket 
