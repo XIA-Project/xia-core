@@ -19,6 +19,9 @@ ext = "template"
 nodetype = "host"
 hostname = ""
 adname = "AD_INIT"
+nameserver = "no"
+nameserver_ad = "AD_NAMESERVER"
+nameserver_hid = "HID_NAMESERVER"
 
 #
 # create a globally unique HID based off of our mac address
@@ -27,6 +30,14 @@ def createHID():
 	hid = "HID:00000000"
 	id = uuid.uuid1(uuid.getnode())
 	return hid + id.hex
+	
+#
+# create a globally unique AD based off of router's mac address
+#
+def createAD():
+	ad = "AD:10000000"
+	id = uuid.uuid1(uuid.getnode())
+	return ad + id.hex	
 
 #
 # make a short hostname
@@ -116,7 +127,12 @@ def makeHostConfig(hid):
 	xchg = {}
 	xchg['HNAME'] = getHostname()
 	xchg['ADNAME'] = adname
-	xchg['HID'] = hid
+		
+	if (nameserver == "no"):
+		xchg['HID'] = hid
+	else:
+		xchg['HID'] = nameserver_hid	
+	
 	xchg['IFACE'] = interfaces[0][0]
 	xchg['MAC'] = interfaces[0][1]
 
@@ -146,7 +162,7 @@ def makeHostConfig(hid):
 #  router (depends on the number of interfaces)
 # footer - boilerplate
 
-def makeRouterConfig(hid):
+def makeRouterConfig(ad, hid):
 
 	interfaces = getInterfaces()
 	if (len(interfaces) < 2):
@@ -169,7 +185,10 @@ def makeRouterConfig(hid):
 	tpl = Template(header)
 
 	xchg = {}
-	xchg['ADNAME'] = adname
+	if (nameserver == "no"):
+		xchg['ADNAME'] = ad
+	else:
+		xchg['ADNAME'] = nameserver_ad		
 	xchg['HNAME'] = getHostname()
 	xchg['HID'] = hid
 
@@ -220,10 +239,11 @@ def getOptions():
 	global hostname
 	global nodetype
 	global adname
+	global nameserver 
 	try:
-		shortopt = "hrn:a:"
+		shortopt = "hrni:a:"
 		opts, args = getopt.getopt(sys.argv[1:], shortopt, 
-			["help", "router", "name=", "ad="])
+			["help", "router", "nameserver", "id=", "ad="])
 	except getopt.GetoptError, err:
 		# print	 help information and exit:
 		print str(err) # will print something like "option -a not recognized"
@@ -235,10 +255,12 @@ def getOptions():
 			help()
 		elif o in ("-a", "--ad"):
 			adname = a
-		elif o in ("-n", "--name"):
+		elif o in ("-i", "--id"):
 			hostname = a
 		elif o in ("-r", "--router"):
 			nodetype = "router"
+		elif o in ("-n", "--nameserver"):
+			nameserver = "yes"			
 		else:
 		 	assert False, "unhandled option"
 
@@ -247,19 +269,22 @@ def getOptions():
 #
 def help():
 	print """
-usage: xconfig [-h] [-r] [-n hostname]
+usage: xconfig [-h] [-r] [-h hostname]
 where:
   -h            : get help
   --help
 
-  -n <name>     : set HID name tp <name>
-  --name=<name>
+  -i <name>     : set HID name tp <name>
+  --id=<name>
 
   -a <name>     : set AD name to <name>
   --ad=<name>
 
   -r            : do router config instead of host
   --router
+  
+  -n            : indicate that this needs to use nameserver AD and HID
+  --nameserver  
 """
 	sys.exit()
 
@@ -276,7 +301,8 @@ def main():
 	if (nodetype == "host"):
 		makeHostConfig(hid)
 	else:
-		makeRouterConfig(hid)
+		ad = createAD()
+		makeRouterConfig(ad, hid)
 
 if __name__ == "__main__":
     main()
