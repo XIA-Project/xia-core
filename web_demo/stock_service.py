@@ -59,9 +59,13 @@ try:
         if (sock<0):
         	print "error opening socket"
         	exit(-1)
-        
+
+        # Get local AD and HID; build DAG to listen on
+        (myAD, myHID) = XreadLocalHostAddr(sock)  
         # Make the sDAG (the one the server listens on)
-        dag = "RE %s %s %s" % (AD1, HID1, SID_STOCK)
+        dag = "RE %s %s %s" % (myAD, myHID, SID_STOCK)        
+        # Publish DAG to naming service
+        XregisterName("www_s.stock.com.xia", dag)
         
         # Bind to the DAG
         ret= Xbind(sock,dag);
@@ -72,19 +76,18 @@ try:
     	while(True):	
   		replyto =  ''
 		data = ''
-
+		
         	(data, replyto) = Xrecvfrom(sock, 2000, 0)
  
-        		
         	stock_feed = update_stockfeed(stock)
 		http_header = "HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/plain\nLast-Modified: 100\n\n"
         	
 		response = http_header+ stock_feed
-		#print "Stock_servce: response to: %s" % replyto
-		#print "Stock_servce: response: %s" % data
+		print "Stock_servce: response to: %s" % replyto
+		print "Stock_servce: response: %s" % data
 		print "Stock_servce: response len %d" % len(response)
 			
-		Xsendto(sock, response, len(response), 0, replyto, len(replyto)+1)	
+		Xsendto(sock, response, 0, replyto)	
     
         		      		
 except (KeyboardInterrupt, SystemExit), e:

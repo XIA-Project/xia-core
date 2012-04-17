@@ -17,9 +17,13 @@ try:
         if (sock<0):
         	print "error opening socket"
         	exit(-1)
-        
+
+        # Get local AD and HID; build DAG to listen on
+        (myAD, myHID) = XreadLocalHostAddr(sock)  
         # Make the sDAG (the one the server listens on)
-        dag = "RE %s %s %s" % (AD1, HID1, SID_HELLO)
+        dag = "RE %s %s %s" % (myAD, myHID, SID_HELLO)        
+        # Publish DAG to naming service
+        XregisterName("www_s.hello.com.xia", dag)
         
         # Bind to the DAG
         ret= Xbind(sock,dag);
@@ -46,7 +50,7 @@ try:
 			response = http_header+ hello_message
 			#print "response len %d" % len(response)
 			
-        		Xsend(accept_sock, response, len(response), 0)
+        		Xsend(accept_sock, response, 0)
         		
         		Xclose(accept_sock)
         		os._exit(0)
