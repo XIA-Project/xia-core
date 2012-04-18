@@ -25,9 +25,6 @@
 #include <click/xiapath.hh>
 CLICK_DECLS
 
-// used for XCMP XID Unreachable
-#define XARP_TIMEOUT 65
-
 /*
 =c
 
@@ -50,7 +47,7 @@ XCMP(RE AD0 HID0)
 */
 
 // used for XCMP XID Unreachable
-#define ARP_TIMEOUT 65
+#define XARP_TIMEOUT 65
 
 // used for XCMP Redirect
 #define REDIRECT_BASE 70

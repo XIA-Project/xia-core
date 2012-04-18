@@ -14,13 +14,14 @@ elementclass GenericRouting4Port {
     sw[2] -> [2]rt;
     sw[3] -> [3]rt;
     sw[4] -> [4]rt;
+	sw[5] -> [5]rt;
  
     rt[0] -> Paint(0) -> [0]output;
     rt[1] -> Paint(1) -> [0]output;
     rt[2] -> Paint(2) -> [0]output;
     rt[3] -> Paint(3) -> [0]output;
-    rt[4] -> [1]output;
-    rt[5] -> [2]output;
+    rt[4] -> [1]output; // destined for local host --> continue eval of dag
+    rt[5] -> [2]output; // don't know where this packet should go --> eval fallbacks
     rt[6] -> [3]output;			// hack to use 6th port for DHCP
     
     rt[7] -> broadcast_pkt_Fork :: Tee(4) -> Paint(0) -> [0]output;     // outgoing broadcast packet
@@ -28,7 +29,7 @@ elementclass GenericRouting4Port {
     broadcast_pkt_Fork[2] -> Paint(2) -> [0]output; 
     broadcast_pkt_Fork[3] -> Paint(3) -> [0]output;   
 
-    rt[8] -> x::XCMP($local_addr) -> [0]output; // needs a redirect message
+    rt[8] -> x::XCMP($local_addr) -> MarkXIAHeader() -> Paint(4) -> [4]output; // need to reprocess redirect
     x[1] -> Discard;
 };
 
@@ -72,12 +73,14 @@ elementclass XIAPacketRoute {
     rt_AD[0] -> GPRP;
     rt_AD[1] -> XIANextHop -> check_dest;
     rt_AD[2] -> consider_next_path;
+	rt_AD[4] -> consider_first_path; // possible xcmp redirect message
 
     //  Next destination is HID
     c[1] -> rt_HID :: GenericRouting4Port($local_addr);
     rt_HID[0] -> GPRP;
     rt_HID[1] -> XIANextHop -> check_dest;
     rt_HID[2] -> consider_next_path;
+	rt_HID[4] -> consider_first_path; // possible xcmp redirect message
 
     //  Next destination is SID
     c[2] -> rt_SID :: GenericRouting4Port($local_addr);
@@ -85,6 +88,7 @@ elementclass XIAPacketRoute {
     rt_SID[1] -> XIANextHop -> check_dest;
     rt_SID[2] -> consider_next_path;
     rt_SID[3] -> [3]output;				// hack to use DHCP functionality
+	rt_SID[4] -> consider_first_path; // possible xcmp redirect message
 
 
     // change this if you want to do CID post route processing for any reason
@@ -96,6 +100,7 @@ elementclass XIAPacketRoute {
     rt_CID[0] -> GPRP_CID -> CIDPostRouteProc -> [0]output;
     rt_CID[1] -> XIANextHop -> check_dest;
     rt_CID[2] -> consider_next_path;
+	rt_CID[4] -> consider_first_path; // possible xcmp redirect message
     GPRP_CID[1] -> [0]x;
 
 
@@ -104,6 +109,7 @@ elementclass XIAPacketRoute {
     rt_IP[0] -> GPRP;
     rt_IP[1] -> XIANextHop -> check_dest;
     rt_IP[2] -> consider_next_path;
+	rt_IP[4] -> consider_first_path; // possible xcmp redirect message
 
     GPRP[0] -> [0]output;
     GPRP[1] -> Print("TIME EXCEEDED") -> x[0] -> consider_first_path;
@@ -148,7 +154,11 @@ elementclass RouteEngine {
 
     dstTypeClassifier[0] ->[2]output;  // To cache (for serving content request)
 
-    proc[2] -> XIAPrint("Drop") -> Discard;  // No route drop (future TODO: return an error packet)
+	x :: XCMP($local_addr);
+
+    proc[2] -> Paint(65) -> x -> MarkXIAHeader() -> Paint(5) -> proc; 
+	//XIAPrint("Drop") -> Discard;  // No route drop (future TODO: return an error packet)
+	x[1] -> Discard;
   
     // hack to use DHCP functionality
     proc[3] -> [3]output;
@@ -191,7 +201,7 @@ elementclass Host {
 };
 
 
-// 2-port router node (DEPRECIATED: please use XRouter4Port or XRouter2Port)
+// 2-port router node (DEPRECATED: please use XRouter4Port or XRouter2Port)
 elementclass Router {
     $local_addr, $local_ad, $local_hid |
 
@@ -455,7 +465,7 @@ elementclass IP6Router4Port {
 
 
 
-// 2-port router node
+// 2-port router node : DEPRECATED
 elementclass XRouter2Port {
     $local_addr, $local_ad, $local_hid, $fake, $CLICK_IP, $API_IP, $ether_addr, $mac0, $mac1 |
 
@@ -546,7 +556,7 @@ elementclass XRouter2Port {
     c0[0] -> xarpr0 -> out0;
     
     // XAPR timeout to XCMP
-    xarpq0[1] -> Paint(65) -> x;
+    xarpq0[1] -> x;
     
     
         
@@ -571,7 +581,7 @@ elementclass XRouter2Port {
     c1[0] -> xarpr1 -> out1;
     
     // XAPR timeout to XCMP
-    xarpq1[1] -> Paint(65) -> x; 
+    xarpq1[1] -> x; 
     
      
 
@@ -652,6 +662,7 @@ elementclass XRouter4Port {
 
     //Script(write n/proc/rt_AD/rt.add - 0);      // default route for AD
     //Script(write n/proc/rt_HID/rt.add - 0);     // default route for HID
+	//Script(write n/proc/rt_HID/rt.add HID1 0); // useful for testing xcmp redirect
     Script(write n/proc/rt_AD/rt.add $local_ad 4);    // self AD as destination
     Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self RHID as destination
     Script(write n/proc/rt_HID/rt.add BHID 7);  // outgoing broadcast packet
@@ -690,7 +701,7 @@ elementclass XRouter4Port {
     c0[0] -> xarpr0 -> out0;
     
     // XAPR timeout to XCMP
-    xarpq0[1] -> Paint(65) -> x; 
+    xarpq0[1] -> x; 
     
     
     
@@ -715,7 +726,7 @@ elementclass XRouter4Port {
     c1[0] -> xarpr1 -> out1;
     
     // XAPR timeout to XCMP
-    xarpq1[1] -> Paint(65) -> x; 
+    xarpq1[1] -> x; 
     
     
 
@@ -740,7 +751,7 @@ elementclass XRouter4Port {
     c2[0] -> xarpr2 -> out2;
     
     // XAPR timeout to XCMP
-    xarpq2[1] -> Paint(65) -> x; 
+    xarpq2[1] -> x; 
     
         
         
@@ -765,7 +776,7 @@ elementclass XRouter4Port {
     c3[0] -> xarpr3 -> out3;
 
     // XAPR timeout to XCMP
-    xarpq3[1] -> Paint(65) -> x; 
+    xarpq3[1] -> x; 
     
     
     
@@ -884,15 +895,16 @@ elementclass EndHost {
     c0[0] -> xarpr0 -> out0;
 
     // XAPR timeout to XCMP
-    xarpq0[1] -> Paint(65) -> x; 
+    xarpq0[1] -> x; 
 
     
     
     srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
     n[1] -> c[1] -> srcTypeClassifier[1] -> [2]xtransport[2] -> Paint(4) ->  [0]n;
-    c[0] -> IPPrint("going into XCMP Module", CONTENTS HEX) -> x;
-    x[0] -> [0]n; // new (response) XCMP packets destined for some other machine
-    x[1] -> rsw :: PaintSwitch -> Print("XCMP going to XTransport") -> [2]xtransport; // XCMP packets destined for this machine
+    c[0] -> x; //IPPrint("going into XCMP Module", CONTENTS HEX) -> x;
+    x[0] -> Paint(4) -> [0]n; // new (response) XCMP packets destined for some other machine
+    x[1] -> rsw :: PaintSwitch -> //Print("XCMP going to XTransport") -> 
+		 [2]xtransport; // XCMP packets destined for this machine
     rsw[1] -> Discard; // should be doing a route update here...
 
     srcTypeClassifier[0] -> Discard;    // do not send CID responses directly to RPC;

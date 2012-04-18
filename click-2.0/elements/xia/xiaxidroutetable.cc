@@ -385,7 +385,8 @@ void
 XIAXIDRouteTable::push(int in_ether_port, Packet *p)
 {
     int port = lookup_route(in_ether_port, p);
-	if(port == in_ether_port) { // need to inform XCMP that this is a redirect
+	if(port == in_ether_port && in_ether_port !=4 && in_ether_port !=5) { // need to inform XCMP that this is a redirect
+	  // ports 4 and 5 are "local" and "discard" so we shouldn't send a redirect in that case
 	  Packet *q = p->clone();
 	  q->set_anno_u8(PAINT_ANNO_OFFSET,q->anno_u8(PAINT_ANNO_OFFSET)+REDIRECT_BASE);
 	  output(_redirect_port).push(q);
@@ -396,10 +397,13 @@ XIAXIDRouteTable::push(int in_ether_port, Packet *p)
     else
     {
         // no match -- discard packet
-	_drops++;
-        if (_drops == 1)
-            click_chatter("Dropping a packet with no match (last message)\n");
-        p->kill();
+	  // Matt :: I think we should actually pass this out output 5.
+	  // let the routing engine handle the dropping.
+	  //_drops++;
+	  //if (_drops == 1)
+      //      click_chatter("Dropping a packet with no match (last message)\n");
+      //  p->kill();
+	  output(5).push(p);
     }
 }
 

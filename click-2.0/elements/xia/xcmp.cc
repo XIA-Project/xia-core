@@ -27,7 +27,7 @@
 #include <click/packet_anno.hh>
 CLICK_DECLS
 
-#define DEBUG 0
+#define DEBUG 1
 
 // no initialization needed
 XCMP::XCMP()
@@ -68,10 +68,13 @@ XCMP::push(int, Packet *p_in)
     XIAHeader hdr(p_in);
     const uint8_t *payload = hdr.payload();
 
+	//if(DEBUG)
+	//  click_chatter("XCMP: paint = %d\n",p_in->anno_u8(PAINT_ANNO_OFFSET));
+
 	// check if this packet is painted for redirection
     if(p_in->anno_u8(PAINT_ANNO_OFFSET) >= REDIRECT_BASE) { // need to send XCMP REDIRECT
         if(DEBUG)
-		    click_chatter("%s: %u: %s sent me a packet that should route on its local network\n", _src_path.unparse().c_str(),p_in->timestamp_anno().usecval(),hdr.src_path().unparse().c_str());
+		    click_chatter("%s: %u: %s sent me a packet that should route on its local network (Dst: %s)\n", _src_path.unparse().c_str(),p_in->timestamp_anno().usecval(),hdr.src_path().unparse().c_str(),hdr.dst_path().unparse().c_str());
       
 		// create the XCMP Redirect Message
 		char msg[256];
@@ -98,7 +101,7 @@ XCMP::push(int, Packet *p_in)
 		memcpy(&msg[2], &checksum, 2);
 		
 		// create the actual redirect packet
-		WritablePacket *p = Packet::make(256, msg, hdr.plen(), 0);
+		WritablePacket *p = Packet::make(256, msg, 4+sizeof(struct click_xia_xid)+hdr.hdr_size()+8, 0);
 		
 		// encap this in XCMP
 		XIAHeaderEncap encap;
@@ -112,6 +115,9 @@ XCMP::push(int, Packet *p_in)
 		// paint the packet so the route engine knows where to send it
 		p->set_anno_u8(PAINT_ANNO_OFFSET,p_in->anno_u8(PAINT_ANNO_OFFSET)-REDIRECT_BASE);
 
+		// if(DEBUG)
+		//    click_chatter("%s: %u: Redirect paint color: %d\n", _src_path.unparse().c_str(),Timestamp::now().usecval(),p->anno_u8(PAINT_ANNO_OFFSET));
+
 		// send this out to the network, kill the packet and exit
 		output(0).push(encap.encap(p));
 		p_in->kill();
@@ -120,9 +126,15 @@ XCMP::push(int, Packet *p_in)
 
 	// check to see if this packet can't make it to its destination
 	// we need to send a DESTINATION XID Unreachable message to the src
-    if(p_in->anno_u8(PAINT_ANNO_OFFSET) == ARP_TIMEOUT) { // need to send a DESTINATION XID UNREACHABLE MESSAGE
+    if(p_in->anno_u8(PAINT_ANNO_OFFSET) == XARP_TIMEOUT) { // need to send a DESTINATION XID UNREACHABLE MESSAGE
+	    if(hdr.nxt() == CLICK_XIA_NXT_XCMP && ((unsigned char *)hdr.payload())[0] == 3) { // can't deliever an unreachable?
+		    // drop this packet to avoid infinite packet generation
+		    p_in->kill();
+			return;
+		}
+
 	    if(DEBUG)
-		    click_chatter("%s: %u: Dest (D: %s) Unreachable\n", _src_path.unparse().c_str(),p_in->timestamp_anno().usecval(),hdr.dst_path().unparse().c_str());
+		  click_chatter("%s: %u: Dest (S: %s , D: %s) Unreachable\n", _src_path.unparse().c_str(),p_in->timestamp_anno().usecval(),hdr.src_path().unparse().c_str(),hdr.dst_path().unparse().c_str());
       
 		// create a Destination XID Unreachable message
 		char msg[256];
@@ -140,7 +152,7 @@ XCMP::push(int, Packet *p_in)
 		memcpy(&msg[2], &checksum, 2);
       
 		// create the actual xid unreachable packet
-		WritablePacket *p = Packet::make(256, msg, hdr.plen(), 0);
+		WritablePacket *p = Packet::make(256, msg, 4+sizeof(struct click_xia_xid)+hdr.hdr_size()+8, 0);
 		
 		// encap this in XCMP
 		XIAHeaderEncap encap;
@@ -149,13 +161,13 @@ XCMP::push(int, Packet *p_in)
 		encap.set_src_path(_src_path);
       
 		if(DEBUG)
-		    click_chatter("%s: %u: Dest Unreachable sent\n", _src_path.unparse().c_str(),Timestamp::now().usecval());
+		  click_chatter("%s: %u: Dest Unreachable sent to %s\n", _src_path.unparse().c_str(),Timestamp::now().usecval(), hdr.src_path().unparse().c_str());
       
 		// clear the paint
 		p->set_anno_u8(PAINT_ANNO_OFFSET,0);
 
-		// send this up to host, kill the packet, and exit
-		output(1).push(encap.encap(p));
+		// send this out to the network, kill the packet, and exit
+		output(0).push(encap.encap(p));
 		p_in->kill();
 		return;
     }
@@ -181,7 +193,7 @@ XCMP::push(int, Packet *p_in)
 		memcpy(&msg[2], &checksum, 2);
 		
 		// create a packet to store the message in
-		WritablePacket *p = Packet::make(256, msg, hdr.plen(), 0);
+		WritablePacket *p = Packet::make(256, msg, 4+sizeof(struct click_xia_xid)+hdr.hdr_size()+8, 0);
 		
 		// encapsulate the packet within XCMP
 		XIAHeaderEncap encap;
@@ -212,6 +224,11 @@ XCMP::push(int, Packet *p_in)
 	WritablePacket *p;
 	XIAHeaderEncap encap;
 	uint16_t checksum;
+
+	const uint8_t *pay;
+	XID *newroute;
+	XIAHeader *badhdr;
+	
 
 	// what type is it?
     switch (*payload) {
@@ -277,11 +294,37 @@ XCMP::push(int, Packet *p_in)
 		// send Time EXCEEDED up to local host
 		output(1).push(p_in);
 		break;
+
+	case 3: // XID unreachable
+	    if(DEBUG)
+		    click_chatter("%s: %u: Received UNREACHABLE\n", _src_path.unparse().c_str(), Timestamp::now().usecval());
+		
+		// clear the paint
+		p_in->set_anno_u8(PAINT_ANNO_OFFSET,0);
+		
+		// send the unreachable up to local host
+		output(1).push(p_in);
+		break;
 		
 	case 5: // redirect
 	    if(DEBUG)
 		    click_chatter("%s: %u: Received REDIRECT\n", _src_path.unparse().c_str(), Timestamp::now().usecval());
+    
+		//XIAHeader hdr(p_in);
+		//const uint8_t *payload = hdr.payload();
+		//const uint8_t *pay;
+		//XID *newroute;
+		//XIAHeader *badhdr;
+
+		pay = payload;
+		newroute = new XID((const struct click_xia_xid &)(pay[4]));
+		badhdr = new XIAHeader((const struct click_xia *)(&pay[4+sizeof(struct click_xia_xid)]));
+		if(DEBUG)
+		    click_chatter("%s: %u: REDIRECT INFO: %s told me (%s) that in order to send to %s, I should first send to %s\n",_src_path.unparse().c_str(),Timestamp::now().usecval(),hdr.src_path().unparse().c_str(),hdr.dst_path().unparse().c_str(),badhdr->dst_path().unparse().c_str(),newroute->unparse().c_str());
 		
+		delete newroute;
+		delete badhdr;
+
 		// paint the packet so the upper level routing process
 		// knows to update its table
 		p_in->set_anno_u8(PAINT_ANNO_OFFSET,1);

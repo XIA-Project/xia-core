@@ -360,7 +360,24 @@ char *from;
 	xp = (struct xip *) buf;
 	
    	hlen = sizeof(struct xip) + sizeof(struct xia_xid_node) * (xp->dnode+xp->snode);
-	
+
+	/*
+	  // print out packet
+	char b[5000];
+	char *bf = b;
+	int j;
+	char *d = buf;
+	for (j = 0; j < cc; j++, d++) {
+	  if ((j % 24) == 0) {
+		*bf++ = '\n'; *bf++ = ' '; *bf++ = ' ';
+	  } else if ((j % 4) == 0)
+		*bf++ = ' ';
+	  sprintf(bf, "%02x", *d & 0xff);
+	  bf += 2;
+	}
+	printf("%s\n",b);
+	*/
+
 	if (cc < hlen + ICMP_MINLEN) {
 		if (pingflags & VERBOSE)
 			printf("packet too short (%d bytes) from %s\n", cc,
