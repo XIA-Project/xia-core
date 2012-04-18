@@ -47,6 +47,19 @@ tar zxf xia-v0.9a.tar.gz
 cd xia-core/tools/
 ./buildxia
 
+# Delete xsockconf.ini files that are not for GENI XIA-prototype
+cd ~/
+cd xia-core/XIASocket/sample
+rm xsockconf.ini
+
+cd ~/
+cd xia-core/proxies
+rm xsockconf_python.ini
+
+cd ~/
+cd xia-core/web_demo
+rm xsockconf_python.ini
+
 # Generate host/router click script
 cd ~/
 cd xia-core/click-2.0/conf/geni/init-scripts/template
