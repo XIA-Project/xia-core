@@ -34,12 +34,12 @@
 ** client or server application must generate the full DAG that is passed
 ** to this API call.
 **
-** @param sockfd - the control socket (must be of type XSOCK_CHUNK)
-** @param rbuf - buffer to receive the data
-** @param len - length of rbuf
-** @param flags - currently unused
-** @param cid - the CID to retrieve. cid should be a full DAG, not a fragment.
-** @param cidLen - length of cid (currently unused)
+** @param sockfd the control socket (must be of type XSOCK_CHUNK)
+** @param rbuf buffer to receive the data
+** @param len length of rbuf
+** @param flags currently unused
+** @param cid the CID to retrieve. cid should be a full DAG, not a fragment.
+** @param cidLen length of cid (currently unused)
 **
 ** @returns number of bytes in the CID
 ** @returns -1 on error with errno set

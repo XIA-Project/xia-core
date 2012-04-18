@@ -41,11 +41,11 @@
 ** return the stored data until it is drained, and will then resume requesting
 ** data from the transport.
 **
-** @param sockfd - The socket to receive with
-** @param rbuf - where to put the received data
-** @param len - maximum amount of data to receive. the amount of data
+** @param sockfd The socket to receive with
+** @param rbuf where to put the received data
+** @param len maximum amount of data to receive. the amount of data
 ** returned may be less than len bytes.
-** @param flags - (This is not currently used but is kept to be compatible
+** @param flags (This is not currently used but is kept to be compatible
 ** with the standard sendto socket call).
 **
 ** @returns the number of bytes received, which may be less than the number

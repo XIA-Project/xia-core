@@ -29,20 +29,20 @@
 ** Xsendto sends a datagram to the specified address. The final intent of
 ** the address should be a valid SID.
 ** 
-** @note Unlike a standard socket, Xsendto() is only valid on Xsockets of
+** Unlike a standard socket, Xsendto() is only valid on Xsockets of
 ** type XSOCK_DGRAM.
 **
 ** If the buffer is too large, Xsendto() will truncate the message and
 ** send what it can. This is different from the standard sendto which returns
 ** an error.
 **
-** @param sockfd - The socket to send the data on
-** @param buf - the data to send
-** @param len - lenngth of the data to send @NOTE: the
+** @param sockfd The socket to send the data on
+** @param buf the data to send
+** @param len lenngth of the data to send. The
 ** Xsendto api is limited to sending at most XIA_MAXBUF bytes.
-** @param flags - (This is not currently used but is kept to be compatible
+** @param flags (This is not currently used but is kept to be compatible
 ** with the standard sendto socket call.
-** @param dDAG - address (SID) to send the datagram to
+** @param dDAG address (SID) to send the datagram to
 ** @param dlen length of the DAG, currently unused
 **
 ** @returns number of bytes sent on success

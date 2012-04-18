@@ -35,10 +35,10 @@
 ** XrequestChunks(). Otherwise the content chunk will never be loaded into
 ** the content cache and will result in a REQUEST_FAILED error.
 **
-** @param sockfd - the control socket (must be of type XSOCK_CHUNK)
-** @param dag - Content ID of the chunk to check. This should be a full dag
+** @param sockfd the control socket (must be of type XSOCK_CHUNK)
+** @param dag Content ID of the chunk to check. This should be a full dag
 ** for the desired chunk, not just the CID.
-** @param dagLen - length of dag (currently not used)
+** @param dagLen length of dag (currently not used)
 **
 ** @returns READY_TO_READ if the requested chunk is ready to be read.
 ** @returns WAITING_FOR_CHUNK if the requested chunk is still in transit.

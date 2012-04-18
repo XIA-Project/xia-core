@@ -45,14 +45,14 @@
 ** be returned from there rather than from Click. Once the socket state
 ** is drained, requests will be sent through to Click again.
 **
-** @param sockfd - The socket to receive with
-** @param rbuf - where to put the received data
-** @param len - maximum amount of data to receive. The amount of data
+** @param sockfd The socket to receive with
+** @param rbuf where to put the received data
+** @param len maximum amount of data to receive. The amount of data
 ** returned may be less than len bytes.
-** @param flags - (This is not currently used but is kept to be compatible
+** @param flags (This is not currently used but is kept to be compatible
 ** with the standard sendto socket call.
-** @param sDAG - on success, contains the DAG of the sender
-** @param slen - contians the size of sDAG when called, replaced with the length
+** @param sDAG on success, contains the DAG of the sender
+** @param slen contians the size of sDAG when called, replaced with the length
 ** of the received sDAG on return. slen MUST be set to the size of sDAG before
 ** calling XrecvFrom(). If slen is smaller than the length of the source DAG,
 ** the returned DAG is truncated and slen will contain length of the actual DAG.

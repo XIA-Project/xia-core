@@ -46,10 +46,10 @@ typedef struct ns_pkt {
 ** The memory returned is dynamically allocated and should be released with a
 ** call to free() when the caller is done with it.
 **
-** @NOTE  This is a very simple implementation of the name query function.
+** This is a very simple implementation of the name query function.
 ** It will be replaces in a future release.
 **
-** @param name - The name of an XIA service or host. 
+** @param name The name of an XIA service or host. 
 **
 ** @returns a character point to the dag on success
 ** @returns NULL on failure
@@ -138,7 +138,7 @@ char *XgetDAGbyName(const char *name) {
 ** The memory returned is dynamically allocated and should be released with a
 ** call to free() when the caller is done with it.
 **
-** @NOTE  This is a very simple implementation and will be replaced in a 
+** This is a very simple implementation and will be replaced in a 
 ** future release. This version does not check correctness of the name or dag,
 ** nor does it check to ensure that the client is allowed to bind to name.
 **

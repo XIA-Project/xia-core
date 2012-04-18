@@ -111,8 +111,8 @@ int XfreeCacheSlice(ChunkContext *ctx)
 ** If the chunk causes the cache slice to grow too large, the oldest content 
 ** chunk(s) will be reoved to make enough space for this chunk.
 **
-** @param ctx - Pointer to the cache slice where this chunk will be stored
-** @param data - The data to published. The size of data must be less than 
+** @param ctx Pointer to the cache slice where this chunk will be stored
+** @param data The data to published. The size of data must be less than 
 ** XIA_MAXCHUNK or an error will be returned.
 ** @param length Length of the data buffer
 ** @param info Struct to hold metadata returned, include the chunk identifier (CID)
@@ -195,11 +195,11 @@ int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkI
 ** If the file causes the cache slice to grow too large, the oldest content 
 ** chunk(s) will be reoved to make enough space for the new chunk(s).
 **
-** @param ctx - Pointer to the cache slice where this chunk will be stored
-** @param fname - The file to publish.
-** @param chunkSize - The maximum requested size of each chunk. This value
+** @param ctx Pointer to the cache slice where this chunk will be stored
+** @param fname The file to publish.
+** @param chunkSize The maximum requested size of each chunk. This value
 ** must not be larger than XIA_MAXCHUNK or an error will be returned.
-** @param info - a pointer to an array of ChunkInfo structures. The memory for
+** @param info a pointer to an array of ChunkInfo structures. The memory for
 ** this array is allocated by the XputFile() function on success and should
 ** be free'd with the XfreeChunkInfo() function when it is no longer needed.
 **
@@ -295,12 +295,12 @@ int XputFile(ChunkContext *ctx, const char *fname, unsigned chunkSize, ChunkInfo
 ** If the file causes the cache slice to grow too large, the oldest content 
 ** chunk(s) will be reoved to make enough space for the new chunk(s).
 **
-** @param ctx - Pointer to the cache slice where this chunk will be stored
-** @param data - The data buffer to be published
-** @param len - length of the data buffer
-** @param chunkSize - The maximum requested size of each chunk. This value
+** @param ctx Pointer to the cache slice where this chunk will be stored
+** @param data The data buffer to be published
+** @param len length of the data buffer
+** @param chunkSize The maximum requested size of each chunk. This value
 ** must not be larger than XIA_MAXCHUNK or an error will be returned.
-** @param info - a pointer to an array of ChunkInfo structures. The memory for
+** @param info a pointer to an array of ChunkInfo structures. The memory for
 ** this array is allocated by the XputBuffer() function on success and should
 ** be free'd with the XfreeChunkInfo() function when it is no longer needed.
 **
@@ -374,8 +374,8 @@ int XputBuffer(ChunkContext *ctx, const char *data, unsigned len, unsigned chunk
 ** the value returned from one of the Xput... functions, a full DAG will not be
 ** recognized as a valid identifier.
 ** 
-** @param ctx - The cache slice containing the content.
-** @param cid - The CID to remove. This should only be the 40 character
+** @param ctx The cache slice containing the content.
+** @param cid The CID to remove. This should only be the 40 character
 ** hash identifier of the CID, not the entire DAG.
 **
 ** @returns 0 on success
@@ -429,7 +429,7 @@ int XremoveChunk(ChunkContext *ctx, const char *cid)
 ** ChunkInfo array returned from XputFile() or XputBuffer() to release the
 ** memory. 
 **
-** @param infop - The memory to free
+** @param infop The memory to free
 **
 ** @returns void
 **

@@ -31,11 +31,11 @@
 ** type XSOCK_STREAM that has previously been connecteted with Xaccept()
 ** or Xconnect().
 **
-** @param sockfd - The socket to send the data on
-** @param buf - the data to send
-** @param len - length of the data to send @NOTE: currently the
+** @param sockfd The socket to send the data on
+** @param buf the data to send
+** @param len length of the data to send. Currently the
 ** Xsend api is limited to sending at most XIA_MAXBUF bytes.
-** @param flags - (This is not currently used but is kept to be compatible
+** @param flags (This is not currently used but is kept to be compatible
 ** with the standard sendto socket call.
 **
 ** @returns number of bytes sent on success

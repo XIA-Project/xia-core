@@ -36,9 +36,9 @@
 **
 ** XrequestChunk() is a simple wrapper around the XrequestChunks() API call.
 **
-** @param sockfd - the control socket (must be of type XSOCK_CHUNK)
-** @param dag - Content ID of this chunk
-** @param dagLen - length of dag (currently not used)
+** @param sockfd the control socket (must be of type XSOCK_CHUNK)
+** @param dag Content ID of this chunk
+** @param dagLen length of dag (currently not used)
 **
 ** @returns 0 on success
 ** @returns -1 if the requested chunk could not be located or a socket error
@@ -68,9 +68,9 @@ int XrequestChunk(int sockfd, char* dag, size_t /* dagLen */)
 **
 ** XrequestChunk() can be used when only a single chunk is requested.
 **
-** @param sockfd - the control socket (must be of type XSOCK_CHUNK)
-** @param chunks - A list of content DAGs to retrieve
-** @param numChunks - number of CIDs in the chunk list
+** @param sockfd the control socket (must be of type XSOCK_CHUNK)
+** @param chunks A list of content DAGs to retrieve
+** @param numChunks number of CIDs in the chunk list
 **
 ** @returns 0 on success
 ** @returns -1 if one or more of the requested chunks could not be located 
