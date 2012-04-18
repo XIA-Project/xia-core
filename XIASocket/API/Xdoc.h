@@ -65,7 +65,7 @@ socket function that will work correctly is select().
 - Xsetsockopt() set socket options
 - Xgetsockopt() get socket options
 - XgetDAGbyName() convert a name to DAG that can be used by other Xsocket functions
-- XgetLocalHostAddr() look up the AD and HID of the local host
+- XreadLocalHostAddr() look up the AD and HID of the local host
 - XregisterName() register our service/host name with the nameserver
 <h3>Stream Oriented Functions</h3>
 - Xaccept() wait for stream connections

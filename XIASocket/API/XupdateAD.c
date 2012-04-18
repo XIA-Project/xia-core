@@ -60,8 +60,6 @@ int XupdateAD(int sockfd, char *newad) {
 ** so that they can be used for creating DAGs or for other purposes in user
 ** applications.
 **
-** @warning This function should implement buffer lengths to avoid overrun errors!
-**
 ** @param sockfd an Xsocket (may be of any type XSOCK_STREAM, etc...)
 ** @param localhostAD buffer to receive the AD for this host
 ** @param lenAD size of the localhostAD buffer
