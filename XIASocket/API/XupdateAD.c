@@ -62,15 +62,17 @@ int XupdateAD(int sockfd, char *newad) {
 **
 ** @warning This function should implement buffer lengths to avoid overrun errors!
 **
-** @param sockfd - an Xsocket (may be of any type XSOCK_STREAM, etc...)
-** @param localhostAD - buffer to receive the AD for this host
-** @param localhostHID - buffer to receive the HID for this host
+** @param sockfd an Xsocket (may be of any type XSOCK_STREAM, etc...)
+** @param localhostAD buffer to receive the AD for this host
+** @param lenAD size of the localhostAD buffer
+** @param localhostHID buffer to receive the HID for this host
+** @param lenHID size of the localhostHID buffer
 **
 ** @returns 0 on success
 ** @returns -1 on failure with errno set
 **
 */
-int XreadLocalHostAddr(int sockfd, char *localhostAD, char *localhostHID) {
+int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *localhostHID, unsigned lenHID) {
   	int rc;
   	char UDPbuf[MAXBUFLEN];
   	
@@ -97,8 +99,8 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, char *localhostHID) {
 	xsm1.ParseFromString(UDPbuf);
 	if (xsm1.type() == xia::XREADLOCALHOSTADDR) {
 		xia::X_ReadLocalHostAddr_Msg *_msg = xsm1.mutable_x_readlocalhostaddr();
-		strcpy(localhostAD, (_msg->ad()).c_str() );
-		strcpy(localhostHID, (_msg->hid()).c_str() );
+		strncpy(localhostAD, (_msg->ad()).c_str(), lenAD);
+		strncpy(localhostHID, (_msg->hid()).c_str(), lenHID);
 		rc = 0;
 	} else {
 		rc = -1;
