@@ -19,10 +19,7 @@
 
 #include "Xsocket.h"
 
-#define HID0 "HID:0000000000000000000000000000000000000000"
-#define AD0  "AD:1000000000000000000000000000000000000000"
-#define SID0 "SID:0f00000000000000000000000000000123456789"
-#define DAG  "RE %s %s %s"
+#define SNAME "tod_s.testbed.xia"
 
 int main()
 {
@@ -30,7 +27,6 @@ int main()
 	int rc;
 	size_t len;
 	char buf[2048];
-	char dag[512];
 	char server[512];
 
     // create a datagram socket
@@ -39,8 +35,14 @@ int main()
 		exit(1);
 	}
 
-    // make the DAG of the time server
-    sprintf(dag, DAG, AD0, HID0, SID0); 
+    // lookup the xia service 
+    char *dag = XgetDAGbyName(SNAME);
+	if (dag == NULL) {
+		printf("unable to locate: %s\n", SNAME);
+		exit(1);
+	}
+
+	printf("attempting to connect to:\n", dag);
 
 	// the server doesn't care what we send in the request
 	strcpy(buf, "hello");
@@ -58,6 +60,7 @@ int main()
 		printf("error sending request to the time server\n");
 	}
 
+	free(dag);
 	Xclose(sock);
 	return 0;
 }

@@ -256,7 +256,7 @@ int main(int argc, char *argv[])
 		 die(-1, "Unable to create the listening socket\n");
 
     	// read the localhost AD and HID
-    	if ( XreadLocalHostAddr(sock, myAD, myHID) < 0 )
+    	if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID)) < 0 )
     		error("Reading localhost address");		 
 
 	// create the dag we will listen for incoming connections on

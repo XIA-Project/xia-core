@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
     if (sock < 0) error("Opening socket");
  
     // read the localhost AD and HID
-    if ( XreadLocalHostAddr(sock, myAD, myHID) < 0 )
+    if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID)) < 0 )
     	error("Reading localhost address");
 
     // make the src DAG (the one the server listens on)

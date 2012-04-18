@@ -20,22 +20,9 @@
 #include <time.h>
 #include "Xsocket.h"
 
-#define HID0 "HID:0000000000000000000000000000000000000000"
-#define AD0  "AD:1000000000000000000000000000000000000000"
 #define SID0 "SID:0f00000000000000000000000000000123456789"
 #define DAG  "RE %s %s %s"
-
-char *prettydag(char *dag)
-{
-	char *p = dag;
-
-	while(*p) {
-		if (*p == ' ')
-			*p = '\n';
-		p++;
-	}
-	return dag;
-}
+#define SNAME "tod_s.testbed.xia"
 
 int main()
 {
@@ -47,15 +34,28 @@ int main()
 	time_t now;
 	struct tm *t;
 
+	char ad[128], hid[128];
+
     // create a datagram socket
     if ((sock = Xsocket(XSOCK_DGRAM)) < 0) {
 		printf("error: unable to create the listening socket.\n");
 		exit(1);
 	}
 
+    // read the localhost AD and HID
+    if ( XreadLocalHostAddr(sock, ad, sizeof(ad), hid, sizeof(hid)) < 0 ) {
+    	printf("error: Reading localhost address");
+		exit(1);
+	}
+
     // make the DAG we will listen on
-    sprintf(dag, DAG, AD0, HID0, SID0); 
-    printf("Listening on %s\n", dag);
+    sprintf(dag, DAG, ad, hid, SID0); 
+
+    //Register this service name to the name server
+    if (XregisterName(SNAME, dag) < 0) {
+    	printf("error: unable to register name/dag combo");
+		exit(1);
+	}
 
     // bind to the DAG
     if (Xbind(sock, dag) < 0) {
@@ -81,7 +81,7 @@ int main()
 		now = time(NULL);
 		t = gmtime(&now);
 		strftime(buf, sizeof(buf), "%c %Z", t);
-		printf("handling request from: (%s)\n", prettydag(client));
+		printf("handling request from: (%s)\n", client);
 			
 		//Reply to client
 		if (Xsendto(sock, buf, strlen(buf) + 1, 0, client, strlen(client)) < 0)
