@@ -9,15 +9,18 @@ sudo killall -9 webserver.py
 
 sleep 1
 cd ~/xia-core/web_demo
+rm xsockconf_python.ini
 ./stock_service.py >& /dev/null &
 ./hello_service.py >& /dev/null &
 
 sleep 1
 cd ~/xia-core/XIASocket/sample
+rm xsockconf.ini
 ./vs video.ogv >& /dev/null &
 
 sleep 1
 
 cd ~/xia-core/proxies
+rm xsockconf_python.ini
 ./webserver.py >& /dev/null &
 

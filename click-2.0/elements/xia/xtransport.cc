@@ -1487,8 +1487,8 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 			String src_path = xiah.src_path().unparse();
 			String header((const char*)xiah.hdr(), xiah.hdr_size());
-			//String payload((const char*)xiah.payload(), xiah.plen()+xiah.hdr_size());
-			String payload((const char*)thdr.payload(), xiah.plen() - thdr.hlen());
+			String payload((const char*)xiah.payload(), xiah.plen());//+xiah.hdr_size());
+			//String payload((const char*)thdr.payload(), xiah.plen() - thdr.hlen());
 			String str = src_path;
 			str = str + String("^");
 			str = str + header + payload;

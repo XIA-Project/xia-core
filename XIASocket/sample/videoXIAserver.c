@@ -44,7 +44,7 @@
 #define DAG "RE %s %s %s"
 
 #define CHUNKSIZE (1024)
-
+#define SNAME "www_s.video.com.xia"
 
 using namespace std;
 
@@ -242,6 +242,8 @@ int main(int argc, char *argv[])
 {
 	char *dag;
 	int sock, acceptSock;
+	char myAD[1024]; 
+        char myHID[1024];   
 
 	getConfig(argc, argv);
 
@@ -249,20 +251,30 @@ int main(int argc, char *argv[])
 	if (uploadContent(videoname.c_str()) != 0)
 		die(-1, "Unable to upload the video %s\n", videoname.c_str());
 
-
-	// create the dag we will listen for incoming connections on
-	if (!(dag = createDAG(AD1, HID1, SID_VIDEO)))
-		die(-1, "Unable to create DAG: %s\n", dag);
-
 	// create a socket, and listen for incoming connections
 	if ((sock = Xsocket(XSOCK_STREAM)) < 0)
 		 die(-1, "Unable to create the listening socket\n");
+
+    	// read the localhost AD and HID
+    	if ( XreadLocalHostAddr(sock, myAD, myHID) < 0 )
+    		error("Reading localhost address");		 
+
+	// create the dag we will listen for incoming connections on
+	if (!(dag = createDAG(myAD, myHID, SID_VIDEO)))
+		die(-1, "Unable to create DAG: %s\n", dag); 
+
+	// register this service name to the name server 
+    	char * sname = (char*) malloc(snprintf(NULL, 0, "%s", SNAME) + 1);
+    	sprintf(sname, "%s", SNAME);  	
+    	if (XregisterName(sname, dag) < 0 )
+    		error("name register");		   
     
 	if(Xbind(sock,dag) < 0)
 		 die(-1, "Unable to bind to the dag: %s\n", dag);
 
 	// we're done with this
 	free(dag);
+	
 
    	while (1) {
 		say("\nListening...\n");

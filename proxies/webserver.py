@@ -13,6 +13,9 @@ import hashlib
 from xia_address import *
 
 cids_by_filename = {}
+myAD = {}
+myHID = {} 
+mySID = {}
 
 def serveHTTPRequest(request, sock):
     global cids_by_filename
@@ -96,7 +99,9 @@ def put_content_in_dir(dir):
                         # Replace links to content we already published with CID lists
                         for key, value in cids_by_filename.iteritems():
                             # build the CID string to replace the filepath
-                            cid_string = 'http://xia.cid.%i.' % len(value)
+                            cid_string = 'xia.cid.%i.%s.%s.' % (len(value), myAD, myHID)
+                            cid_string = cid_string.replace(':', '.')
+                            cid_string = "http://%s" % cid_string
                             for cid_info in value:
                                 cid_string += cid_info.cid
                            
@@ -109,7 +114,7 @@ def put_content_in_dir(dir):
 
                         # Replace links to other html files in 'dir' with this webserver's SID
                         for linked_html_file in files_with_links:
-                            dag_url = 'http://dag/2,0/%s=0:2,1/%s=1:2/%s=2:2//%s' % (AD1, HID1, SID1, linked_html_file[5:])
+                            dag_url = 'http://dag/2,0/%s=0:2,1/%s=1:2/%s=2:2//%s' % (myAD, myHID, mySID, linked_html_file[5:])
                             
                             rel_path = os.path.relpath(linked_html_file, root)
                             # first match filepaths beginning with "./"
@@ -130,12 +135,9 @@ def put_content_in_dir(dir):
 
 
 def main():
+    global myAD, myHID, mySID
     # Set up connection with click via Xsocket API
     set_conf("xsockconf_python.ini", "webserver.py")
-
-    # TODO: When we have persistent caching, we can eliminate
-    # this and make a separate 'content publishing' app.
-    put_content_in_dir('./www') 
         
     try:   
         # Create socket for listening for connections
@@ -147,6 +149,11 @@ def main():
         # Get local AD and HID; build DAG to listen on
         (myAD, myHID) = XreadLocalHostAddr(listen_sock)
         mySID = SID1 # TODO: eventually this should come from a public key
+
+        # TODO: When we have persistent caching, we can eliminate
+    	# this and make a separate 'content publishing' app.
+    	put_content_in_dir('./www')         
+        
         listen_dag_re = "RE %s %s %s" % (myAD, myHID, mySID) # dag to listen on; TODO: fix Xbind so this can be DAG format, not just RE
         listen_dag = "DAG 2 0 - \n %s 2 1 - \n %s 2 - \n %s" % (myAD, myHID, mySID)       
         Xbind(listen_sock, listen_dag_re)
@@ -154,7 +161,12 @@ def main():
 
         # Publish DAG to naming service
         XregisterName("www_s.xiaweb.com.xia", listen_dag)
-        
+
+	# This is just for web demo.... publishing a CID
+	imageCID = "CID:aa2fe45640e694c06dcc3331ed91998c8eb4879a"
+        image_dag = "DAG 2 0 - \n %s 2 1 - \n %s 2 - \n %s" % (myAD, myHID, imageCID)       
+        XregisterName("www_c.airplane.com.xia", image_dag) 
+       
         # TODO: use threads instead of processes?
         while(True):
             accept_sock = Xaccept(listen_sock);
