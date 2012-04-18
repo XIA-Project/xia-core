@@ -148,12 +148,12 @@ def main():
 
         # Get local AD and HID; build DAG to listen on
         (myAD, myHID) = XreadLocalHostAddr(listen_sock)
-        
+        mySID = SID1 # TODO: eventually this should come from a public key
+
         # TODO: When we have persistent caching, we can eliminate
     	# this and make a separate 'content publishing' app.
     	put_content_in_dir('./www')         
         
-        mySID = SID1 # TODO: eventually this should come from a public key
         listen_dag_re = "RE %s %s %s" % (myAD, myHID, mySID) # dag to listen on; TODO: fix Xbind so this can be DAG format, not just RE
         listen_dag = "DAG 2 0 - \n %s 2 1 - \n %s 2 - \n %s" % (myAD, myHID, mySID)       
         Xbind(listen_sock, listen_dag_re)
@@ -161,7 +161,12 @@ def main():
 
         # Publish DAG to naming service
         XregisterName("www_s.xiaweb.com.xia", listen_dag)
-        
+
+	# This is just for web demo.... publishing a CID
+	imageCID = "CID:aa2fe45640e694c06dcc3331ed91998c8eb4879a"
+        image_dag = "DAG 2 0 - \n %s 2 1 - \n %s 2 - \n %s" % (myAD, myHID, imageCID)       
+        XregisterName("www_c.airplane.com.xia", image_dag) 
+       
         # TODO: use threads instead of processes?
         while(True):
             accept_sock = Xaccept(listen_sock);
