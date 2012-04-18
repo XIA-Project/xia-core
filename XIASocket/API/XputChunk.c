@@ -13,6 +13,11 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
+/*!
+** @file XputChunk.c
+** @brief implements XputChunk(), XputFile(), XputBuffer(), XremoveChunk(), 
+** XallocCacheSlice(),XfreeCacheSlice(), and XfreeChunkInfo()
+*/
 
 #include "Xsocket.h"
 #include "Xinit.h"
@@ -20,24 +25,33 @@
 #include <sys/stat.h>
 #include <errno.h>
 
-/**
- * @brief Initialize Context for the XputChunk,XputFile,XputBuffer functions.
- *
- * Init a context to store meta data, e.g. cache policy.
- * Serve as an application handler when putting content.
- * This can replace the old socket() call, because we don't
- * really need a socket, but an identifier to the application.
- *
- * The identifier uses getpid(), but can be replaced by any
- * unique ID.
- *
- * @param policy Policy to use for the local cache(defined in Xsocket.h)
- * @param ttl Time to live in seconds; 0 means permanent(differ by policy)
- * @param size Max size for the local cache 
- *
- * @return A struct that contains PutCID context
- *
- * */
+/*!
+** @brief Allocate content cache space for use by the XputChunk(), 
+** XputFile(), and XputBuffer() functions.
+**
+** Allocate a slice of content cache storage in the local machine to
+** store content we make available. Multiple cache slices may be allocated
+** by a single application for different purposes. Once the cache slice is
+** full, old content will be purged on a FIFO basis to make room for new
+** content chunks.`
+**
+** @param policy Policy to use for the local cache (not currently used, the
+** always uses a FIFO policy at this time).
+** @param ttl Time to live in seconds; 0 means permanent. Once the TTL is
+** elapsed content will be automatically flushed from the cache. Content may
+** be flushed before th TTL expires if the cache becomes full.
+** @param size Max size for the cache slice 
+**
+** @returns A struct that contains the cache slice context.
+** @returns NULL if the slice can't be allocated.
+** 
+** @warning, As currently implemented, this function uses the process id
+** as the the cache slice identifier. This needs to be changed so that an
+** can create multiple slices.
+**
+** @note, we may want to consider using 0 to specify an slice with no upper bound.
+**
+*/
 ChunkContext *XallocCacheSlice(unsigned policy, unsigned ttl, unsigned size) {
     int sockfd = Xsocket(XSOCK_CHUNK);
     if(sockfd < 0) {
@@ -45,7 +59,6 @@ ChunkContext *XallocCacheSlice(unsigned policy, unsigned ttl, unsigned size) {
         return NULL;
     } else {
 
-		// FIXME: validate the parameters
 		// FIXME: contextID is going to need to be somethign else so we can have multiple ones
 		// FIXME: add protobuf for this instead of rolling it up with the putChunk call
 
@@ -62,34 +75,52 @@ ChunkContext *XallocCacheSlice(unsigned policy, unsigned ttl, unsigned size) {
 }
 
 /*!
-** @brief Release a cache slice
+** @brief Release a cache slice.
 **
-** @warning This does not yet exist on the click side!
+** This function closes the socket used to communicate with the click
+** and frees the ChunkContext that was allocated.
 **
+** @param ctx - the cache slice to free
+**
+** @returns 0 on success
+** @returns -1 on error with errno set.
+**
+** @note This does not tear down the content cache itself. It will live until
+** the content in it expires. To clear the cache in the current release, 
+** XremoveChunk() can be called for each chunk of data.
 */
 int XfreeCacheSlice(ChunkContext *ctx)
 {
 	if (!ctx)
 		return 0;
 
-	// FIXME: what kind of teardown has to happen inside of click?????
-
 	int rc = Xclose(ctx->sockfd);
 	free(ctx);
 	return rc;
 }
 
-/**
- * @brief Publish content from a buffer.
- * 
- * @param ctx Pointer to a context
- * @param data Data to put
- * @param length Length of the data buffer
- * @param info Struct to hold metadata returned from PutCID
- *
- * @return 0 on success; -1 on error
- *
- */
+/*!
+** @brief Publish a single chunk of content.
+**
+** XputChunk() makes a single chunk of data available on the network.
+** On success, the CID of the chunk is set to the 40 character hash of the
+** content data. The CID is not a full DAG, and must be converted to a DAG
+** before the client applicatation can request it, otherwise an error will
+** occur.
+**
+** If the chunk causes the cache slice to grow too large, the oldest content 
+** chunk(s) will be reoved to make enough space for this chunk.
+**
+** @param ctx - Pointer to the cache slice where this chunk will be stored
+** @param data - The data to published. The size of data must be less than 
+** XIA_MAXCHUNK or an error will be returned.
+** @param length Length of the data buffer
+** @param info Struct to hold metadata returned, include the chunk identifier (CID)
+**
+** @returns 0 on success
+** @returns -1 on error
+**
+**/
 int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkInfo *info)
 {
     int rc;
@@ -150,18 +181,33 @@ int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkI
     }
 }
 
-/**
- * @brief Publish content from a FILE.
- * 
- * This function is only a wrapper. It chops the file and hand them to XputChunk().
- *
- * @param ctx Pointer to a context
- * @param fname File to send
- * @param chunkSize Size to chop the FILE into
- * @param info Array of struct to hold metadata returned from PutCID
- *
- * @return On success, the number of chunks published; -1 on error
- */
+/*!
+** @brief Publish a file by breaking it into one or more content chunks.
+**
+** XputFile() calls XputChunk() internally and has the same requiremts as that 
+** function.
+**
+** On success, the CID of the chunk is set to the 40 character hash of the
+** content data. The CID is not a full DAG, and must be converted to a DAG
+** before the client applicatation can request it, otherwise an error will
+** occur.
+**
+** If the file causes the cache slice to grow too large, the oldest content 
+** chunk(s) will be reoved to make enough space for the new chunk(s).
+**
+** @param ctx - Pointer to the cache slice where this chunk will be stored
+** @param fname - The file to publish.
+** @param chunkSize - The maximum requested size of each chunk. This value
+** must not be larger than XIA_MAXCHUNK or an error will be returned.
+** @param info - a pointer to an array of ChunkInfo structures. The memory for
+** this array is allocated by the XputFile() function on success and should
+** be free'd with the XfreeChunkInfo() function when it is no longer needed.
+**
+** @returns The number of chunks created on success with info pointing to an 
+** allocated array of ChunkInfo structures.
+** @returns -1 on error
+**
+**/
 int XputFile(ChunkContext *ctx, const char *fname, unsigned chunkSize, ChunkInfo **info)
 {
 	FILE *fp;
@@ -235,6 +281,34 @@ int XputFile(ChunkContext *ctx, const char *fname, unsigned chunkSize, ChunkInfo
 }
 
 
+/*!
+** @brief Publish a file by breaking it into one or more content chunks.
+**
+** XputBuffer() calls XputChunk() internally and has the same requiremts as that 
+** function.
+**
+** On success, the CID of the chunk is set to the 40 character hash of the
+** content data. The CID is not a full DAG, and must be converted to a DAG
+** before the client applicatation can request it, otherwise an error will
+** occur.
+**
+** If the file causes the cache slice to grow too large, the oldest content 
+** chunk(s) will be reoved to make enough space for the new chunk(s).
+**
+** @param ctx - Pointer to the cache slice where this chunk will be stored
+** @param data - The data buffer to be published
+** @param len - length of the data buffer
+** @param chunkSize - The maximum requested size of each chunk. This value
+** must not be larger than XIA_MAXCHUNK or an error will be returned.
+** @param info - a pointer to an array of ChunkInfo structures. The memory for
+** this array is allocated by the XputBuffer() function on success and should
+** be free'd with the XfreeChunkInfo() function when it is no longer needed.
+**
+** @returns The number of chunks created on success with info pointing to an 
+** allocated array of ChunkInfo structures.
+** @returns -1 on error
+**
+**/
 int XputBuffer(ChunkContext *ctx, const char *data, unsigned len, unsigned chunkSize, ChunkInfo **info)
 {
 	ChunkInfo *infoList;
@@ -291,15 +365,23 @@ int XputBuffer(ChunkContext *ctx, const char *data, unsigned len, unsigned chunk
 	return rc;
 }
 
-/**
- * @brief Remove a published content from local cache
- * 
- * @param ctx Pointer to a context
- * @param info Struct that hold CID to remove
- *
- * @return 0 on success; -1 on error
- *
- */
+/*!
+** @brief Remove a chunk of content from the cache.
+**
+** This function will remove the specified CID from the content cache. A
+** successful return code will be returned regardless of whether or not the 
+** chunk was already expired out of the cache. The CID parameter must be
+** the value returned from one of the Xput... functions, a full DAG will not be
+** recognized as a valid identifier.
+** 
+** @param ctx - The cache slice containing the content.
+** @param cid - The CID to remove. This should only be the 40 character
+** hash identifier of the CID, not the entire DAG.
+**
+** @returns 0 on success
+** returns -1 on error
+**
+*/
 int XremoveChunk(ChunkContext *ctx, const char *cid)
 {
     char buffer[2048];
@@ -340,7 +422,18 @@ int XremoveChunk(ChunkContext *ctx, const char *cid)
     }
 }
 
-
+/*!
+** @brief Delete an array of ChunkInfo structures.
+**
+** This function should be called when the application is done with the
+** ChunkInfo array returned from XputFile() or XputBuffer() to release the
+** memory. 
+**
+** @param infop - The memory to free
+**
+** @returns void
+**
+*/
 void XfreeChunkInfo(ChunkInfo *infop)
 {
 	if (infop)

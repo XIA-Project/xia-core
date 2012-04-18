@@ -27,15 +27,23 @@
 ** @brief Reads the contents of the specified CID into rbuf. Must be called
 ** after XrequestChunk() or XrequestChunks().
 **
+** the CID specified in cid must be a full DAG, not a fragment such as is
+** returned by XputChunk. For instance: "RE ( AD:AD0 HID:HID0 ) CID:<hash>"
+** where <hash> is the 40 character hash of the content chunk generated 
+** by the sender. The XputChunk() API call only returns <hash>. Either the 
+** client or server application must generate the full DAG that is passed
+** to this API call.
+**
 ** @param sockfd - the control socket (must be of type XSOCK_CHUNK)
 ** @param rbuf - buffer to receive the data
 ** @param len - length of rbuf
 ** @param flags - currently unused
-** @param cid - the CID to retrieve
-** @param cidLen - length of cDAG (currently unused)
+** @param cid - the CID to retrieve. cid should be a full DAG, not a fragment.
+** @param cidLen - length of cid (currently unused)
 **
 ** @returns number of bytes in the CID
 ** @returns -1 on error with errno set
+**
 */
 int XreadChunk(int sockfd, void *rbuf, size_t len, int /* flags */, 
 		char * cid, size_t /* cidLen */)
@@ -95,7 +103,4 @@ int XreadChunk(int sockfd, void *rbuf, size_t len, int /* flags */,
 	memcpy(rbuf, UDPbuf + offset, paylen);
 	return paylen;
 }
-
-
-
 

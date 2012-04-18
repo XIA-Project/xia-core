@@ -25,18 +25,26 @@
 
 
 /*!
-** @brief Checks the status of the specified CID. Should be called after
-** calling XgetCID or XgetCIDList.
-** It checks whether the requested CID is waiting to be read or still on the 
-** way.
+** @brief Checks the status of the specified CID. 
+**
+** XgetChunkStatus returns an integer indicating if the specified content 
+** chunk is available to be read. It is a simple wrapper around the 
+** XgetChunkStatusesi() function which does the actual work.
+**
+** @note This function Should be called after calling XrequestChunk() or 
+** XrequestChunks(). Otherwise the content chunk will never be loaded into
+** the content cache and will result in a REQUEST_FAILED error.
 **
 ** @param sockfd - the control socket (must be of type XSOCK_CHUNK)
-** @param dag - Content ID of this chunk
-** @param dagLen - length of cDAG (currently not used)
+** @param dag - Content ID of the chunk to check. This should be a full dag
+** for the desired chunk, not just the CID.
+** @param dagLen - length of dag (currently not used)
 **
-** @returns 1 CID is waiting to be read
-** @returns 0 waiting for chunk response
-** @returns -1 on error with errno set
+** @returns READY_TO_READ if the requested chunk is ready to be read.
+** @returns WAITING_FOR_CHUNK if the requested chunk is still in transit.
+** @returns REQUEST_FAILED if the specified chunk has not been requested,
+** or if a socket error occurs. In that case errno is set with the appropriate code.
+** @returns INVALID_HASH if the CID hash does not match the content payload.
 */
 int XgetChunkStatus(int sockfd, char* dag, size_t /* dagLen */)
 {
@@ -48,21 +56,29 @@ int XgetChunkStatus(int sockfd, char* dag, size_t /* dagLen */)
 	return XgetChunkStatuses(sockfd, &cs, 1);
 }
 
-/*!
-** @brief Checks the status of the specified CID. Should be called after
-** calling XgetCID or XgetCIDList.
-** It checks whether each of the requested CIDs is waiting to be read or still
-** on the way.
+/*
+** @brief Checks the status for each of the requested CIDs.
+**
+** XgetChunkStatuses updates the cDAGv list with the status for each
+** of the requested CIDs. An overall status value is returned, and
+** the cDAGv list can be examined to check the status of each individual CID.
+**
+** @note This function Should be called after calling XrequestChunk() or 
+** XrequestChunks(). Otherwise the content chunk will never be loaded into
+** the content cache and will result in a REQUEST_FAILED error.
 **
 ** @param sockfd - the control socket (must be of type XSOCK_CHUNK)
-** @param cDAGv - CIDs to check. On return contains the status for each of the
-** specified CIDs.
+** @param cDAGv - list of CIDs to check. On return, also  contains the status for 
+** each of the specified CIDs.
 ** @param numCIDs - number of CIDs in cDAGv
 **
-** @returns 1 if all CIDs in cDAGv are ready to be read
-** @returns 0 if all CIDs in cDAGv are valid but one or more are in 
-** waiting state
-** @returns -1 on socket error with or if an invalid CID was specified
+** @returns READY_TO_READ if all of the CIDs in cDAGv are ready to be read
+** @returns WAITING_FOR_CHUNK if one or more of the requested chunks is still 
+** in transit.
+** @returns REQUEST_FAILED if one of the specified chunks has not been requested,
+** or if a socket error occurs. In that case errno is set with the appropriate code.
+** @returns INVALID_HASH if the CID hash of one or more of the requested does 
+** not match the content payload.
 */
 int XgetChunkStatuses(int sockfd, ChunkStatus *statusList, int numCIDs)
 {

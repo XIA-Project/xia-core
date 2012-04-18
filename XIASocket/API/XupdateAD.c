@@ -15,8 +15,8 @@
 ** limitations under the License.
 */
 /*!
- @file XgetDAGbyName.c
- @brief Implements XgetDAGbyName() and XregisterName
+ @file XupdateAD.c
+ @brief Implements XreadLocalHostAddr()
 */
 #include <errno.h>
 #include "Xsocket.h"
@@ -99,6 +99,7 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, char *localhostHID) {
 		xia::X_ReadLocalHostAddr_Msg *_msg = xsm1.mutable_x_readlocalhostaddr();
 		strcpy(localhostAD, (_msg->ad()).c_str() );
 		strcpy(localhostHID, (_msg->hid()).c_str() );
+		rc = 0;
 	} else {
 		rc = -1;
 	}	

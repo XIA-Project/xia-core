@@ -38,7 +38,7 @@ how the slice was allocated.
 
 XputChunk() places a single chunk of content into a cache slicei so that it
 is available on the network. XputFile() and XputBuffer() place one or more
-chunks of content into the slice. XfreeChunkStatus() releases the status
+chunks of content into the slice. XfreeChunkInfo() releases the status
 array allocated by the XputFile() and XputBuffer() functions.
 
 XrequestChunk() and XrequestChunks() bring one or more chunks of content from
@@ -78,7 +78,7 @@ socket function that will work correctly is select().
 - XputChunk() make a single chunk of content available
 - XputFile() make a file available as one or more chunks
 - XputBuffer() make a block of memory available as one or more chunks
-- XfreeChunkStatus() frees the chunk status array allocated by XputFile() and XputBuffer()
+- XfreeChunkInfo() frees the chunk status array allocated by XputFile() and XputBuffer()
 - XrequestChunk(), XrequestChunks() bring one or more chunks of content from
 the network to the local machine
 - XgetChunkStatus(), XgetChunkStatuses() get the rediness status of one or more

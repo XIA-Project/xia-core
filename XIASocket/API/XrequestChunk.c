@@ -24,14 +24,26 @@
 #include "Xutil.h"
 
 /*!
-** @brief Bring a content chunk local to this machine.
+** @brief request that a content chunk be loaded into the local machine's
+** content cache.
+**
+** XrequestChunk() is called by a client application to load a content chunk 
+** into the XIA content cache. It does not return the requested data, it only
+** causes the chunk to be loaded into the local content cache. XgetChunkStatus() 
+** may be called to get the status of the chunk to determine when it becomes 
+** available. Once the chunk is ready to be read, XreadChunk() should be called 
+** get the actual content chunk data.
+**
+** XrequestChunk() is a simple wrapper around the XrequestChunks() API call.
 **
 ** @param sockfd - the control socket (must be of type XSOCK_CHUNK)
 ** @param dag - Content ID of this chunk
-** @param dagLen - length of sDAG (currently not used)
+** @param dagLen - length of dag (currently not used)
 **
 ** @returns 0 on success
-** @returns -1 on error with errno set
+** @returns -1 if the requested chunk could not be located or a socket error
+** occurred. If the error is a socket error, errno set will be set with an 
+** appropriate code.
 */
 int XrequestChunk(int sockfd, char* dag, size_t /* dagLen */)
 {
@@ -44,14 +56,26 @@ int XrequestChunk(int sockfd, char* dag, size_t /* dagLen */)
 }
 
 /*!
-** @brief Load a list of CIDs to the local machine.
+** @brief request that a list of content chunks be loaded into the local 
+** machine's content cache.
+**
+** XrequestChunks() is called by a client application to load a content chunk 
+** into the XIA content cache. It does not return the requested data, it only
+** causes the chunk to be loaded into the local content cache. XgetChunkStatuses() 
+** may be called to get the status of the chunk to determine when it becomes 
+** available. Once the chunk is ready to be read, XreadChunk() should be called 
+** get the actual content chunk data.
+**
+** XrequestChunk() can be used when only a single chunk is requested.
 **
 ** @param sockfd - the control socket (must be of type XSOCK_CHUNK)
-** @param chunks - list of CIDs to retrieve
+** @param chunks - A list of content DAGs to retrieve
 ** @param numChunks - number of CIDs in the chunk list
 **
 ** @returns 0 on success
-** @returns -1 on error with errno set
+** @returns -1 if one or more of the requested chunks could not be located 
+** or a socket error occurred. If the error is a socket error, errno set 
+** will be set with an appropriate code.
 */
 int XrequestChunks(int sockfd, const ChunkStatus *chunks, int numChunks)
 {
