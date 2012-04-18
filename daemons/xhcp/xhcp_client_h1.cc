@@ -73,7 +73,7 @@ int main(int argc, char *argv[]) {
 	if (sockfd < 0) { error("Opening Xsocket"); }
 	
     	// read the localhost HID 
-    	if ( XreadLocalHostAddr(sockfd, mydummyAD, myHID) < 0 )
+    	if ( XreadLocalHostAddr(sockfd, mydummyAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE) < 0 )
     		error("Reading localhost address");   	
 
 	sprintf(sdag, "RE %s", SID_XHCP);

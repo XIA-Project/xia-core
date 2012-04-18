@@ -522,7 +522,7 @@ void initRouteState()
     	sprintf(route_state.ddag, "RE %s %s", BHID, SID_XROUTE);	
 
     	// read the localhost AD and HID
-    	if ( XreadLocalHostAddr(route_state.sock, route_state.myAD, route_state.myHID) < 0 )
+    	if ( XreadLocalHostAddr(route_state.sock, route_state.myAD, MAX_XID_SIZE, route_state.myHID, MAX_XID_SIZE) < 0 )
     		error("Reading localhost address");
 
 	// make the src DAG (the one the routing process listens on)

@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
 	if (sock < 0) { error("Opening Xsocket"); }
 	
     	// read the localhost HID 
-    	if ( XreadLocalHostAddr(sock, myAD, myHID) < 0 )
+    	if ( XreadLocalHostAddr(sock, myAD, NS_MAX_DAG_LENGTH, myHID, NS_MAX_DAG_LENGTH) < 0 )
     		error("Reading localhost address");   	
 
 	// make the src DAG (the one the nameserver process listens on)

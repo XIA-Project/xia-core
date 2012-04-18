@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
 	sprintf(ddag, "RE %s %s", BHID, SID_XHCP);
 	
     	// read the localhost AD and HID (currently, XHCP server running on gw router)
-    	if ( XreadLocalHostAddr(sockfd, myAD, gw_router_hid) < 0 )
+    	if ( XreadLocalHostAddr(sockfd, myAD, MAX_XID_SIZE, gw_router_hid, MAX_XID_SIZE) < 0 )
     		error("Reading localhost address");
     		
         //Make the DAG for name server (currently, NS DAG is fixed as AD0:HID0:SID_NS)
