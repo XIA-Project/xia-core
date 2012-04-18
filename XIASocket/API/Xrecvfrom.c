@@ -31,8 +31,8 @@
 /*!
 ** @brief receives datagram data on an Xsocket.
 **
-** Xrecvfrom() recrieves data from an Xsocket of type XSOCK_DGRAM. Unlike the 
-** standard recvfrom API, it will not work with socket of type XSOCK_STREAM.
+** Xrecvfrom() retrieves data from an Xsocket of type XSOCK_DGRAM. Unlike the 
+** standard recvfrom API, it will not work with sockets of type XSOCK_STREAM.
 **
 ** XrecvFrom() does not currently have a non-blocking mode, and will block
 ** until a data is available on sockfd. However, the standard socket API

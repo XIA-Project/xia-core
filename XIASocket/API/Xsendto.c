@@ -26,8 +26,8 @@
 /*!
 ** @brief Sends a datagram message on an Xsocket
 **
-** Xsendto sends a datagram to the specified address. This address should
-** be a valid SID.
+** Xsendto sends a datagram to the specified address. The final intent of
+** the address should be a valid SID.
 ** 
 ** @note Unlike a standard socket, Xsendto() is only valid on Xsockets of
 ** type XSOCK_DGRAM.
@@ -46,7 +46,7 @@
 ** @param dlen length of the DAG, currently unused
 **
 ** @returns number of bytes sent on success
-** @returns -1 on failure with errno setC to an error compatible with those
+** @returns -1 on failure with errno set to an error compatible with those
 ** returned by the standard sendto call.
 **
 */

@@ -19,78 +19,55 @@
 # the locaitons of the various service executables makes this script fragile
 # as they all currently have to run from the directory they are located in
 # in order to use the correct xsockconf.ini file. It would be good to 
-# a) relocate the daemons into a common directory instead of being scattered
+# a) relocate the services into a common directory instead of being scattered
 # throughout the source tree
 # b) not rely on the xsockconf.ini file if possible
 
 NAME=`basename $0`
 VERBOSE=0
 
-# this is a particular list of daemons for the default 4-node-chain topology (host0 -- router0 -- router1 -- host1)
-DAEMONS="xroute_r0 xroute_r1 xhcp_server_r0 xhcp_server_r1 xhcp_client_h0 xhcp_client_h1 ns"
+CLIENTS="pc268"
+SERVERS="pc349"
 
 # hacky way of finding the root of the XIA source tree
 # assumes this script is in a directory off the parent of the XIA tree
-# and that the daemons it starts are rooted off of the same location
+# and that the services it starts are rooted off of the same location
 #  so XIADIR would be /xia-core assuming the script were /xia-core/tools/run_demo
 XIADIR=$(dirname $(dirname $(cd ${0%/*} && echo $PWD/${0##*/})))
 
-is_running()
-{
-	RUNNING=`ps ao args | grep $1 | grep -v grep`
-	[ "$RUNNING" != "" ]
-}
 
-check_daemons()
+stop_services()
 {
-	printf "XIA Demo Service Status\n"
-	for svc in "click" $DAEMONS
+	printf "Stopping XIA Demo Services\n"
+	for node in $CLIENTS
 	do
-		status="stopped"
-		is_running $svc
-		[ $? -eq 0 ] && status="running"
-		printf "%-16s: %s\n" $svc $status
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/web_demo_proxy_stop.sh"
 	done
-}
 
-stop_daemons()
-{
-	printf "Stopping bootstraping processes\n"
-	for svc in $DAEMONS
+	for node in $SERVERS
 	do
-		killall -9 $svc &> /dev/null
-	done
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/web_demo_service_stop.sh"
+	done	
+	printf "Stopped XIA Demo Services\n"
 }
 
-start_daemons()
+start_services()
 {
-	printf "Starting XIA bootstraping processes\n"
+	printf "Starting XIA Demo Services\n"
 
-	is_running "click"
-	if [ $? -ne 0 ]; then
-		printf "Click is not running, aborting...\n"
-		exit 1
-	fi
-
-	if [ $VERBOSE -eq 0 ]; then
-		exec &> /dev/null
-	fi
-
-	cd $XIADIR/daemons/xroute
-	./xroute_r0 &
-	./xroute_r1 & 
-	sleep 2
+	for node in $SERVERS
+	do
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/web_demo_service_start.sh"
+	done	
 	
-	cd $XIADIR/daemons/xhcp
-	./xhcp_server_r0 &
-	./xhcp_server_r1 &
-	sleep 1 
-	./xhcp_client_h0 &
-	./xhcp_client_h1 &
-	sleep 2 
-		
-	cd $XIADIR/daemons/nameserver
-	./xnameservice &
+	sleep 1
+	for node in $CLIENTS
+	do
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/web_demo_proxy_start.sh"
+	done
+	
+	printf "Started XIA Demo Services\n"
+
 }
 
 help ()
@@ -102,10 +79,9 @@ where:
   -q runs click silently
   -v prints click debug messages to stdout (default)
 
-  start   - starts the bootstraping processes if not already running
-  stop    - stops the bootstraping processes
-  restart - stops then starts the bootstraping processes
-  check   - print service status
+  start   - starts the demo services if not already running
+  stop    - stops the demo services
+  restart - stops then starts the demo services
 
 EOH
 	exit 0
@@ -133,18 +109,15 @@ shift $((OPTIND-1))
 
 case $1 in
 	start)
-		start_daemons
+		start_services
 		;;
 	stop)
-		stop_daemons
+		stop_services
 		;;
 	restart|reload)
-		stop_daemons
+		stop_services
 		sleep 1
-		start_daemons
-		;;
-	check)
-		check_daemons
+		start_services
 		;;
 	*)
 		printf "\nInvalid command: -$1\n" >&2

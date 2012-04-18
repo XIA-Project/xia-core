@@ -55,6 +55,7 @@ using namespace std;
 #define WAITING_FOR_CHUNK 0
 #define READY_TO_READ 1
 #define REQUEST_FAILED -1
+#define INVALID_HASH -2
 
 #define HASH_KEYSIZE 20
 

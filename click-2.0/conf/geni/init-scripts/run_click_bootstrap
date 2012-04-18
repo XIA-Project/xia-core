@@ -1,0 +1,164 @@
+#!/bin/bash
+#
+# Copyright 2012 Carnegie Mellon University
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+NAME=`basename $0`
+VERBOSE=0
+
+# this is an example setting for the default 4-node-chain topology (host0 -- router0 -- router1 -- host1)
+# You can modify the list below according to your GENI topology.
+HOSTS="pc268 pc349"
+ROUTERS="pc357 pc280"
+
+ROUTER_OF_NAMESERVER="pc357"
+NAMESERVER="pc268"
+
+# hacky way of finding the root of the XIA source tree
+# assumes this script is in a directory off the parent of the XIA tree
+# and that the daemons it starts are rooted off of the same location
+#  so XIADIR would be /xia-core assuming the script were /xia-core/tools/run_demo
+XIADIR=$(dirname $(dirname $(cd ${0%/*} && echo $PWD/${0##*/})))
+
+
+stop_click_bootstrap()
+{
+	printf "Stopping Click and all XIA bootstraping processes\n"
+	for node in $HOSTS
+	do
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/bootstrap_stop.sh"
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/click_stop.sh"
+	done
+
+	for node in $ROUTERS
+	do
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/bootstrap_stop.sh"
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/click_stop.sh"
+	done
+	printf "Stopped Click and all XIA bootstraping processes\n"
+}
+
+start_click_bootstrap()
+{
+	# 0. Use the predefined AD and HID for nameserver 
+	for node in $ROUTER_OF_NAMESERVER
+	do
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/set_ad_for_nameserver.sh"
+	done
+	for node in $NAMESERVER
+	do
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/set_hid_for_nameserver.sh"
+	done	
+
+	printf "Running Click\n"
+	for node in $HOSTS
+	do
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/click_host_start.sh"
+	done
+
+	for node in $ROUTERS
+	do
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/click_router_start.sh"
+	done
+
+        sleep 2
+
+	printf "Starting XIA bootstraping processes\n"
+	
+	# 1. Run AD-routing at routers
+	for node in $ROUTERS
+	do
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/xroute_start.sh"
+	done
+	sleep 2
+	
+	# 2. Run XHCP server at routers
+	for node in $ROUTERS
+	do
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/xhcp_server_start.sh"
+	done
+	sleep 1 
+	
+	# 3. Run XHCP client at hosts
+	for node in $HOSTS
+	do
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/xhcp_client_start.sh"
+	done
+	sleep 2 	
+
+	# 4. Run XNameService at hosts
+	for node in $NAMESERVER
+	do
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/xnameservice_start.sh"
+	done
+	printf "Started XIA bootstraping processes\n"
+}
+
+help ()
+{
+	cat << EOH
+
+usage: $NAME [-qv] [start|stop|restart]
+where:
+  -q runs click silently
+  -v prints click debug messages to stdout (default)
+
+  start   - run Click and start the bootstraping processes if not already running
+  stop    - stops Click and the bootstraping processes
+  restart - stops then starts Click and the bootstraping processes
+
+EOH
+	exit 0
+}
+
+while getopts ":qvh" opt; do
+	case $opt in
+		q)
+			VERBOSE="0"
+			;;
+		v)
+			VERBOSE="1"
+			;;
+		h)
+			help
+			;;
+		\?)
+			printf "\nInvalid option: -$OPTARG\n" >&2
+			help
+			;;
+	esac
+done
+
+shift $((OPTIND-1))
+
+case $1 in
+	start)
+		start_click_bootstrap
+		;;
+	stop)
+		stop_click_bootstrap
+		;;
+	restart|reload)
+		stop_click_bootstrap
+		sleep 1
+		start_click_bootstrap
+		;;
+	*)
+		printf "\nInvalid command: -$1\n" >&2
+		help
+		;;
+esac
+

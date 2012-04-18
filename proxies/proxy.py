@@ -82,7 +82,7 @@ class ProxyHandler (BaseHTTPServer.BaseHTTPRequestHandler):
 		# strip the DAG out of the requested page field in the header
 		header = re.sub(r"/.*//", "/", header)
 
-		xiaHandler(netloc, path, header, self.connection)
+		xia_handler(netloc, path, header, self.connection)
 		return
 	
         if scm != 'http' or fragment or not netloc:

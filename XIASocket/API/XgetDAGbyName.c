@@ -1,3 +1,23 @@
+/* ts=4 */
+/*
+** Copyright 2011 Carnegie Mellon University
+**
+** Licensed under the Apache License, Version 2.0 (the "License");
+** you may not use this file except in compliance with the License.
+** You may obtain a copy of the License at
+**
+**    http://www.apache.org/licenses/LICENSE-2.0
+**
+** Unless required by applicable law or agreed to in writing, software
+** distributed under the License is distributed on an "AS IS" BASIS,
+** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+** See the License for the specific language governing permissions and
+** limitations under the License.
+*/
+/*!
+ @file XgetDAGbyName.c
+ @brief Implements XgetDAGbyName() and XregisterName
+*/
 #include <errno.h>
 #include "Xsocket.h"
 #include "Xinit.h"
@@ -18,8 +38,22 @@ typedef struct ns_pkt {
 } ns_pkt;
 
 
-/*
-   This is a very simple version of name query function; will be replaced.
+/*!
+** @brief Lookup a DAG based using a host or service name.
+**
+** The name should be a string such as www_s.example.xia or host.example.xia. 
+** By convention services are indicated by '_s' appended to the service name.
+** The memory returned is dynamically allocated and should be released with a
+** call to free() when the caller is done with it.
+**
+** @NOTE  This is a very simple implementation of the name query function.
+** It will be replaces in a future release.
+**
+** @param name - The name of an XIA service or host. 
+**
+** @returns a character point to the dag on success
+** @returns NULL on failure
+**
 */
 char *XgetDAGbyName(const char *name) {
     int sock;
@@ -96,12 +130,31 @@ char *XgetDAGbyName(const char *name) {
 }
 
 
-int XregisterName(char *name, char *DAG) {
+/*!
+** @brief Register a service or hostname with the name server.
+**
+** Register a host or service name with the XIA nameserver.
+** By convention services are indicated by '_s' appended to the service name.
+** The memory returned is dynamically allocated and should be released with a
+** call to free() when the caller is done with it.
+**
+** @NOTE  This is a very simple implementation and will be replaced in a 
+** future release. This version does not check correctness of the name or dag,
+** nor does it check to ensure that the client is allowed to bind to name.
+**
+** @param name - The name of an XIA service or host.
+** @param DAG  - the DAG to be bound to name.
+**
+** @returns 0 on success
+** @returns -1 on failure with errno set
+**
+*/
+int XregisterName(const char *name, const char *DAG) {
     int sock;
     char pkt[NS_MAX_PACKET_SIZE],ddag[NS_MAX_PACKET_SIZE], ns_dag[NS_MAX_PACKET_SIZE];  
     char _name[NS_MAX_DAG_LENGTH], _dag[NS_MAX_DAG_LENGTH];    
     int result;
-    
+
     //Open socket
     sock=Xsocket(XSOCK_DGRAM);
     
@@ -146,7 +199,7 @@ int XregisterName(char *name, char *DAG) {
 	case NS_TYPE_RESPONSE:
 		sprintf(_name, "%s", tmp_name);
 		sprintf(_dag, "%s", tmp_dag);
-		result = 1;
+		result = 0;
 		break;
 	case NS_TYPE_RESPONSE_ERROR:
 		result = -1;
@@ -164,7 +217,4 @@ int XregisterName(char *name, char *DAG) {
     
     return result;
 }
-
-
-	
 	

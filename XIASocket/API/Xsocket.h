@@ -49,6 +49,7 @@ extern "C" {
 #define WAITING_FOR_CHUNK 0
 #define READY_TO_READ 1
 #define REQUEST_FAILED -1
+#define INVALID_HASH -2
 
 /* Cache policy */
 #define POLICY_LRU				0x00000001
@@ -134,9 +135,11 @@ extern int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t op
 extern int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen);
 
 extern char *XgetDAGbyName(const char *name);
-extern int XregisterName(char *name, char *DAG);
+extern int XregisterName(const char *name, const char *DAG);
 
 extern int XreadLocalHostAddr(int sockfd, char *localhostAD, char *localhostHID);
+
+/* internal only functions */
 extern int XupdateAD(int sockfd, char *newad);
 extern int XupdateNameServerDAG(int sockfd, char *nsDAG);
 extern int XreadNameServerDAG(int sockfd, char *nsDAG);

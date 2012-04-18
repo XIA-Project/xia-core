@@ -23,7 +23,7 @@ DAEMONS="xroute_r0 xroute_r1 xhcp_server_r0 xhcp_server_r1 xhcp_client_h0 xhcp_c
 # hacky way of finding the root of the XIA source tree
 # assumes this script is in a directory off the parent of the XIA tree
 # and that the daemons it starts are rooted off of the same location
-#  so XIADIR would be /xia-core assuming the script were /xia-core/tools/run_demo
+#  so XIADIR would be /xia-core assuming the script were /xia-core/tools/xianet
 XIADIR=$(dirname $(dirname $(cd ${0%/*} && echo $PWD/${0##*/})))
 
 # click parameters
@@ -121,7 +121,9 @@ help ()
 {
 	cat << EOH
 
-usage: $NAME [-qv] [start|stop|restart]
+Start or stop the XIA network services.
+
+usage: $NAME [-qv] [start|stop|restart|check]
 where:
   -q run silently (default)
   -v prints debug messages to stdout
@@ -171,7 +173,7 @@ case $1 in
 		check_daemons
 		;;
 	*)
-		printf "\nInvalid command: -$1\n" >&2
+		printf "\nInvalid command\n" >&2
 		help
 		;;
 esac

@@ -27,8 +27,8 @@
 /*!
 ** @brief Bind an Xsocket to a DAG.
 **
-** Assign the specified DAG to to the Xoscket referred to by sockfd. The DAG
-** should be a valid SID.
+** Assign the specified DAG to to the Xsocket referred to by sockfd. The DAG's
+** final intent should be a valid SID.
 ** 
 ** It is necessary to assign a local DAG using Xbind() before an XSOCK_STREAM
 ** socket may receive connections (see accept()).

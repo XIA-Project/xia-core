@@ -1,3 +1,23 @@
+/* ts=4 */
+/*
+** Copyright 2011 Carnegie Mellon University
+**
+** Licensed under the Apache License, Version 2.0 (the "License");
+** you may not use this file except in compliance with the License.
+** You may obtain a copy of the License at
+**
+**    http://www.apache.org/licenses/LICENSE-2.0
+**
+** Unless required by applicable law or agreed to in writing, software
+** distributed under the License is distributed on an "AS IS" BASIS,
+** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+** See the License for the specific language governing permissions and
+** limitations under the License.
+*/
+/*!
+ @file XgetDAGbyName.c
+ @brief Implements XgetDAGbyName() and XregisterName
+*/
 #include <errno.h>
 #include "Xsocket.h"
 #include "Xinit.h"
@@ -33,6 +53,23 @@ int XupdateAD(int sockfd, char *newad) {
 }
 
 
+/*!
+** @brief retrieve the AD and HID associated with this socket.
+**
+** The HID and AD are assigned by the XIA stack. This call retrieves them
+** so that they can be used for creating DAGs or for other purposes in user
+** applications.
+**
+** @warning This function should implement buffer lengths to avoid overrun errors!
+**
+** @param sockfd - an Xsocket (may be of any type XSOCK_STREAM, etc...)
+** @param localhostAD - buffer to receive the AD for this host
+** @param localhostHID - buffer to receive the HID for this host
+**
+** @returns 0 on success
+** @returns -1 on failure with errno set
+**
+*/
 int XreadLocalHostAddr(int sockfd, char *localhostAD, char *localhostHID) {
   	int rc;
   	char UDPbuf[MAXBUFLEN];

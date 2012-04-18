@@ -87,6 +87,7 @@
 }
 
 
+
 /* ===== XputChunk ===== */
 /* The "in" map: python users don't pass a ChunkInfo pointer;
    we make one here */
@@ -191,8 +192,67 @@
 
 
 /* Include all of the structs, constants, and function signatures
-   in Xsocket.h in our python wrapper */
+   in Xsocket.h in our python wrapper 
+   NOTE: It matters to swig where everything else in this file is
+   with relation to this include, so don't move it. */
 %include "../Xsocket.h"
+
+
+/* ===== Xsend ===== */
+/* eliminate the need for python users to pass the length of the data, since we can calculate it */
+%pythoncode %{
+def Xsend(sock, data, flags):
+    return _xsocket.Xsend(sock, data, len(data), flags)
+%}
+
+/* ===== Xsendto ===== */
+/* eliminate the need for python users to pass the length of the data or the DAG, 
+   since we can calculate it */
+%pythoncode %{
+def Xsendto(sock, data, flags, dest_dag):
+    return _xsocket.Xsendto(sock, data, len(data), flags, dest_dag, len(dest_dag))
+%}
+
+/* ===== XgetChunkStatus ===== */
+/* eliminate the need for python users to pass the length of the data or the DAG, 
+   since we can calculate it */
+%pythoncode %{
+def XgetChunkStatus(sock, dag):
+    return _xsocket.XgetChunkStatus(sock, dag, len(dag))
+%}
+
+/* ===== XreadChunk ===== */
+/* eliminate the need for python users to pass the length of the data or the DAG, 
+   since we can calculate it */
+%pythoncode %{
+def XreadChunk(sock, length, flags, dag):
+    return _xsocket.XreadChunk(sock, length, flags, dag, len(dag))
+%}
+
+/* ===== XrequestChunk ===== */
+/* eliminate the need for python users to pass the length of the data or the DAG, 
+   since we can calculate it */
+%pythoncode %{
+def XrequestChunk(sock, dag):
+    return _xsocket.XrequestChunk(sock, dag, len(dag))
+%}
+
+/* ===== XputBuffer ===== */
+/* eliminate the need for python users to pass the length of the data or the DAG, 
+   since we can calculate it */
+%pythoncode %{
+def XputBuffer(context, data, chunk_size):
+    return _xsocket.XputBuffer(context, data, len(data), chunk_size)
+%}
+
+/* ===== XputChunk ===== */
+/* eliminate the need for python users to pass the length of the data or the DAG, 
+   since we can calculate it */
+%pythoncode %{
+def XputChunk(context, data):
+    return _xsocket.XputChunk(context, data, len(data))
+%}
+
 
 /* The next two lines make it possible for python code to pass an
    array of ChunkStatus's or ChunkInfo's to a C function. */
