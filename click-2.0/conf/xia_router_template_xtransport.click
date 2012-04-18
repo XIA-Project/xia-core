@@ -234,7 +234,7 @@ elementclass Router {
 
     n[0] -> sw :: PaintSwitch
     n[1] -> c[1] -> Discard;
-    c[0] -> IPPrint("going into XCMP Module", CONTENTS HEX) -> x;
+    c[0] -> x; //IPPrint("going into XCMP Module", CONTENTS HEX) -> x;
     x[0] -> [0]n; // new (response) XCMP packets destined for some other machine
     x[1] -> Discard; // XCMP packet actually destined for this router??
     n[2] -> [0]cache[0] -> [1]n;
@@ -589,7 +589,7 @@ elementclass XRouter2Port {
     srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
     n[1] -> c[1] -> srcTypeClassifier[1] -> [2]xtransport[2] -> Paint(4) -> [0]n;
     srcTypeClassifier[0] -> Discard;    // do not send CID responses directly to RPC;
-    c[0] -> IPPrint("going into XCMP Module", CONTENTS HEX) -> x;
+    c[0] -> x; //IPPrint("going into XCMP Module", CONTENTS HEX) -> x;
     x[0] -> [0]n; // new (response) XCMP packets destined for some other machine
     x[1] -> Discard; // XCMP packet actually destined for this router??
     n[2] -> [0]cache[0] -> Paint(4) -> [1]n;
@@ -786,7 +786,7 @@ elementclass XRouter4Port {
     srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
     n[1] -> c[1] -> srcTypeClassifier[1] -> [2]xtransport[2] -> Paint(4) -> [0]n;
     srcTypeClassifier[0] -> Discard;    // do not send CID responses directly to RPC;
-    c[0] -> IPPrint("going into XCMP Module", CONTENTS HEX) -> x;
+    c[0] -> x; //IPPrint("going into XCMP Module", CONTENTS HEX) -> x;
     x[0] -> [0]n; // new (response) XCMP packets destined for some other machine
     x[1] -> Discard; // XCMP packet actually destined for this router??
     n[2] -> [0]cache[0] -> Paint(4) -> [1]n;

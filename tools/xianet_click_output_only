@@ -65,11 +65,11 @@ start_daemons()
 {
 	printf "Starting XIA network processes\n"
 
-	is_running "click"
-	if [ $? -eq 0 ]; then
-		printf "Click is already running, aborting...\n"
-		exit 1
-	fi
+	#is_running "click"
+	#if [ $? -eq 0 ]; then
+	#	printf "Click is already running, aborting...\n"
+	#	exit 1
+	#fi
 
 	if [[ `whoami` != "root" ]]; then
 		printf "\n ERROR: $NAME must be run as root\n\n"
@@ -110,7 +110,7 @@ start_daemons()
 	./xhcp_server_r1 > /dev/null 2>&1 &
 	sleep 1 
 	./xhcp_client_h0 > /dev/null 2>&1 &
-	#./xhcp_client_h1 > /dev/null 2>&1 &
+	./xhcp_client_h1 > /dev/null 2>&1 &
 	sleep 2 
 		
 	cd $XIADIR/daemons/nameserver
