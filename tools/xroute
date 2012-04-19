@@ -144,7 +144,7 @@ where:
   --add=<entry>      format of entry is the same as above except the add/del
                      prefix is not used
 
-  -r <entry>       : add a route, can be specified multipe times
+  -r <entry>       : remove a route, can be specified multipe times
   --remove=<entry>   format of entry is the same as above except the add/del
                      prefix is not used
 """
