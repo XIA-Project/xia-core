@@ -69,7 +69,7 @@ ChunkContext *XallocCacheSlice(unsigned policy, unsigned ttl, unsigned size) {
         newCtx->cacheSize = size;
 		newCtx->ttl = ttl;
         newCtx->sockfd = sockfd;
-        LOGF("New CTX: sock,policy,size=%d,%d,%d\n", sockfd, policy, size);
+//        LOGF("New CTX: sock,policy,size=%d,%d,%d\n", sockfd, policy, size);
         return newCtx;
     }
 }
