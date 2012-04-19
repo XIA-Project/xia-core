@@ -42,12 +42,8 @@ int main()
 		exit(1);
 	}
 
-	printf("attempting to connect to:\n", dag);
-
 	// the server doesn't care what we send in the request
-	strcpy(buf, "hello");
-
-	if ((rc = Xsendto(sock, buf, strlen(buf), 0, dag, strlen(dag) + 1)) >= 0) {
+	if ((rc = Xsendto(sock, "hello", strlen("hello"), 0, dag, strlen(dag) + 1)) >= 0) {
 
 		len = sizeof(server);
 		if (( rc = Xrecvfrom(sock, buf, sizeof(buf), 0, server, &len)) < 0) {

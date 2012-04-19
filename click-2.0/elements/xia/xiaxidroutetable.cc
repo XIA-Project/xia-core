@@ -384,27 +384,69 @@ XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *
 void
 XIAXIDRouteTable::push(int in_ether_port, Packet *p)
 {
-    int port = lookup_route(in_ether_port, p);
-	if(port == in_ether_port && in_ether_port !=4 && in_ether_port !=5) { // need to inform XCMP that this is a redirect
+    int port;
+    if(in_ether_port == 6) {
+	// if this is an XCMP redirect packet
+	port = process_xcmp_redirect(p);
+    } else {    
+    	port = lookup_route(in_ether_port, p);
+    }
+
+    if(port == in_ether_port && in_ether_port !=4 && in_ether_port !=5) { // need to inform XCMP that this is a redirect
 	  // ports 4 and 5 are "local" and "discard" so we shouldn't send a redirect in that case
 	  Packet *q = p->clone();
 	  q->set_anno_u8(PAINT_ANNO_OFFSET,q->anno_u8(PAINT_ANNO_OFFSET)+REDIRECT_BASE);
 	  output(_redirect_port).push(q);
-	}
+    }
     if (port >= 0) {
         output(port).push(p);
     }
     else
     {
         // no match -- discard packet
-	  // Matt :: I think we should actually pass this out output 5.
+	  // Output 9 is for dropping packets.
 	  // let the routing engine handle the dropping.
 	  //_drops++;
 	  //if (_drops == 1)
       //      click_chatter("Dropping a packet with no match (last message)\n");
       //  p->kill();
-	  output(5).push(p);
+	  output(9).push(p);
     }
+}
+
+int
+XIAXIDRouteTable::process_xcmp_redirect(Packet *p)
+{
+   XIAHeader hdr(p->xia_header());
+   const uint8_t *pay = hdr.payload();
+   XID *newroute;
+   XIAHeader *badhdr;
+   newroute = new XID((const struct click_xia_xid &)(pay[4]));
+   badhdr = new XIAHeader((const struct click_xia*)(&pay[4+sizeof(struct click_xia_xid)]));
+   //XIAHeader xiah(badhdr);
+
+   XIAPath dst_path = badhdr->dst_path();
+   XID dst_xid = dst_path.xid(dst_path.destination_node());
+
+   // route update (dst, out, newroute, )
+   HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(dst_xid);
+   if (it != _rts.end())
+   {
+   	(*it).second->nexthop = newroute;
+   }
+   else
+   {
+    	// Make a new entry for this XID
+       	XIARouteData *xrd1 = new XIARouteData();
+	xrd1->port = _rtdata.port;
+	xrd1->nexthop = newroute;
+	_rts[dst_xid] = xrd1;
+   }   
+
+   //delete newroute;
+   delete badhdr;
+   
+   return -1;
 }
 
 int

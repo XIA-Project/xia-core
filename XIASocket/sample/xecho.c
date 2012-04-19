@@ -23,11 +23,8 @@
 #define VERSION "v1.0"
 #define TITLE "XIA Echo Client"
 
-#define DAG  "RE %s %s %s"
-#define AD0  "AD:1000000000000000000000000000000000000000"
-#define HID0 "HID:0000000000000000000000000000000000000000"
-#define S_SID "SID:0f00000000000000000000000000000000000777"
-#define D_SID "SID:0f00000000000000000000000000000000001777"
+#define STREAM_NAME "www_s.stream_echo.aaa.xia"
+#define DGRAM_NAME  "www_s.dgram_echo.aaa.xia"
 
 void help()
 {
@@ -41,7 +38,7 @@ void help()
 void echo_dgram()
 {
 	int sock;
-	char dag[512];
+	char *dag;
 	char sdag[512];
 	char buf[2048];
 	char reply[2048];
@@ -53,8 +50,11 @@ void echo_dgram()
 		exit(1);
 	}
 
-	// make the dag for the datagram echo server
-	sprintf(dag, DAG, AD0, HID0, D_SID);
+    // lookup the xia service 
+    if (!(dag = XgetDAGbyName(DGRAM_NAME))) {
+		printf("unable to locate: %s\n", DGRAM_NAME);
+		exit(1);
+	}
 
 	while(1) {
 		printf("\nPlease enter the message (blank line to exit):\n");
@@ -85,7 +85,7 @@ void echo_dgram()
 void echo_stream()
 {
 	int sock;
-	char dag[512];
+	char *dag;
 	char buf[2048];
 	char reply[2048];
 	int ns, nr;
@@ -95,8 +95,11 @@ void echo_stream()
 		exit(1);
 	}
 
-	// make the dag for the stream echo server
-	sprintf(dag, DAG, AD0, HID0, S_SID);
+    // lookup the xia service 
+    if (!(dag = XgetDAGbyName(STREAM_NAME))) {
+		printf("unable to locate: %s\n", STREAM_NAME);
+		exit(1);
+	}
 
 	if (Xconnect(sock, dag) < 0) {
 		printf("can't connect to %s\n", dag);

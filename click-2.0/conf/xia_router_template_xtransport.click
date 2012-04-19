@@ -13,8 +13,9 @@ elementclass GenericRouting4Port {
     sw[1] -> [1]rt;
     sw[2] -> [2]rt;
     sw[3] -> [3]rt;
-    sw[4] -> [4]rt;
-	sw[5] -> [5]rt;
+    sw[4] -> [4]rt;  
+    sw[5] -> [5]rt;
+    sw[6] -> [6]rt;  // input port for XCMP redirect packet
  
     rt[0] -> Paint(0) -> [0]output;
     rt[1] -> Paint(1) -> [0]output;
@@ -31,6 +32,7 @@ elementclass GenericRouting4Port {
 
     rt[8] -> x::XCMP($local_addr) -> MarkXIAHeader() -> Paint(4) -> [4]output; // need to reprocess redirect
     x[1] -> Discard;
+    rt[9] -> Discard; // packet dropping (e.g., incoming XCMP redirect packets will be dropped after being procecced) 
 };
 
 elementclass GenericPostRouteProc {
@@ -905,7 +907,7 @@ elementclass EndHost {
     x[0] -> Paint(4) -> [0]n; // new (response) XCMP packets destined for some other machine
     x[1] -> rsw :: PaintSwitch -> //Print("XCMP going to XTransport") -> 
 		 [2]xtransport; // XCMP packets destined for this machine
-    rsw[1] -> Discard; // should be doing a route update here...
+    rsw[1] -> Paint(6) -> [0]n; // XCMP redirect packet, so a route update will be done.
 
     srcTypeClassifier[0] -> Discard;    // do not send CID responses directly to RPC;
     

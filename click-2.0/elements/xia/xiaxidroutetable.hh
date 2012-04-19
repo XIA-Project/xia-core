@@ -50,6 +50,7 @@ class XIAXIDRouteTable : public Element { public:
 
 protected:
     int lookup_route(int in_ether_port, Packet *);
+    int process_xcmp_redirect(Packet *);
 
     static int set_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
     static int set_handler4(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
