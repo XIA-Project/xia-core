@@ -10,15 +10,7 @@
 #include <string.h>
 #include "Xsocket.h"
 
-#define HID0 "HID:0000000000000000000000000000000000000000"
-#define HID1 "HID:0000000000000000000000000000000000000001"
-#define AD0   "AD:1000000000000000000000000000000000000000"
-#define AD1   "AD:1000000000000000000000000000000000000001"
-#define RHID0 "HID:0000000000000000000000000000000000000002"
-#define RHID1 "HID:0000000000000000000000000000000000000003"
-#define CID0 "CID:2000000000000000000000000000000000000000"
-#define CID1 "CID:2000000000000000000000000000000000000001"
-#define SID0 "SID:0f00000000000000000000000000000000000055"
+#define SNAME "www_s.dgram_echo.aaa.xia"
 
 void error(const char *);
 
@@ -34,14 +26,10 @@ int main(int argc, char *argv[])
     if (sock < 0) 
 	error("Opening socket");
 	
-    //print_conf(); //for debugging purpose
-
-    //XBind is optional. If not done an ephemeral port will be bound 
-    //Xbind(sock,"RE AD:1000000000000000000000000000000000000009 HID:1500000000000000000000000000000000000055 SID:1f00000000000000000000000000000000000055");
-
-    //Make the dDAG (the one you want to send packets to)
-    char * dag = malloc(snprintf(NULL, 0, "RE %s %s %s", AD0, HID0,SID0) + 1);
-    sprintf(dag, "RE %s %s %s", AD0, HID0,SID0);
+    //Name query to the name server
+    char * sname = (char*) malloc(snprintf(NULL, 0, "%s", SNAME) + 1);
+    sprintf(sname, "%s", SNAME);      
+    char * dag = XgetDAGbyName(sname);
 
     while(1)
     {

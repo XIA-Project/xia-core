@@ -28,10 +28,7 @@
 #define VERSION "v1.0"
 #define TITLE "XIA Echo Client"
 
-#define DAG  "RE %s %s %s"
-#define AD0  "AD:1000000000000000000000000000000000000000"
-#define HID0 "HID:0000000000000000000000000000000000000000"
-#define SID0 "SID:0f00000000000000000000000000000000000777"
+#define STREAM_NAME "www_s.stream_echo.aaa.xia"
 
 
 // FIXME: clean up globals and move into a structure or similar
@@ -44,19 +41,6 @@ int reconnect = 0;	// don't reconnect between loops
 int threads = 1;	// just a single thread
 
 char *sdag;
-
-/*
-** simple code to create a formatted DAG
-**
-** The dag should be free'd by the calling code when no longer needed
-*/
-char *createDAG(const char *ad, const char *host, const char *service)
-{
-	int len = snprintf(NULL, 0, DAG, ad, host, service) + 1;
-    char * dag = (char*)malloc(len);
-    sprintf(dag, DAG, ad, host, service);
-	return dag;
-}
 
 /*
 ** display cmd line options and exit
@@ -324,11 +308,8 @@ int main(int argc, char **argv)
 
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 
-	// create the DAG of the echo server
-	if (!(sdag = createDAG(AD0, HID0, SID0))) {
-		die(-1, "unable to create DAG\n");
-	}
-	say("Created DAG: \n%s\n", sdag);
+    if(!(sdag = XgetDAGbyName(STREAM_NAME)))
+		die(-1, "Unable to lookup name: %s\n", STREAM_NAME);
 
 	if (threads == 1)
 		// just do it

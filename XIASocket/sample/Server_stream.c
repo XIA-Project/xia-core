@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include "Xsocket.h"
 
-#define SID0 "SID:0f00000000000000000000000000000000000055"
+#define SID0 "SID:0f00000000000000000000000000000000001777"
 
 #define SNAME "www_s.stream_echo.aaa.xia"
 
