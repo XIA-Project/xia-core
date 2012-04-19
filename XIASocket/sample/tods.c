@@ -81,7 +81,7 @@ int main()
 		now = time(NULL);
 		t = gmtime(&now);
 		strftime(buf, sizeof(buf), "%c %Z", t);
-		printf("handling request from: (%s)\n", client);
+		printf("request from: (%s)\n", client);
 			
 		//Reply to client
 		if (Xsendto(sock, buf, strlen(buf) + 1, 0, client, strlen(client)) < 0)

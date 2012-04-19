@@ -23,11 +23,10 @@
 #define VERSION "v1.0"
 #define TITLE "XIA Echo Server"
 
+#define MAX_XID_SIZE 100
 #define DAG  "RE %s %s %s"
-#define HID0 "HID:0000000000000000000000000000000000000000"
-#define AD0   "AD:1000000000000000000000000000000000000000"
-#define SID0 "SID:0f00000000000000000000000000000000000777"
-#define SID1 "SID:0f00000000000000000000000000000000001777"
+#define SNAME "ccp_s.testbed.xia"
+#define SID  "SID:0f00000000000000000000000000000000000999"
 
 // if no data is received from the client for this number of seconds, close the socket
 #define WAIT_FOR_DATA	20
@@ -199,19 +198,27 @@ void process(int sock)
 
 void echo_stream()
 {
+	char myAD[MAX_XID_SIZE];
+	char myHID[MAX_XID_SIZE];
 	int acceptor, sock;
 	char *dag;
 
 	say("Stream service started\n");
 
-	if (!(dag = createDAG(AD0, HID0, SID0))) {
+	if ((acceptor = Xsocket(XSOCK_STREAM)) < 0)
+		die(-2, "unable to create the stream socket\n");
+
+    // read the localhost AD and HID
+    if ( XreadLocalHostAddr(acceptor, myAD, sizeof(myAD), myHID, sizeof(myHID)) < 0 )
+    	die(-1, "Reading localhost address\n");
+
+	if (!(dag = createDAG(myAD, myHID, SID_STREAM)))
 		die(-1, "unable to create DAG: %s\n", dag);
-	}
 	say("Created DAG: \n%s\n", dag);
 
-	if ((acceptor = Xsocket(XSOCK_STREAM)) < 0) {
-		die(-2, "unable to create the stream socket\n");
-	}
+    if (XregisterName(STREAM_NAME, dag) < 0 )
+    	die(-1, "error registering name: %s\n", DGRAM_NAME);
+	say("registered name: \n%s\n", DGRAM_NAME);
 
 	if (Xbind(acceptor, dag) < 0) {
 		die(-3, "unable to bind to the dag\n");
@@ -253,19 +260,27 @@ void echo_dgram()
 	char *dag;
 	char buf[XIA_MAXBUF];
 	char cdag[1024]; // client's dag
+	char myAD[MAX_XID_SIZE];
+	char myHID[MAX_XID_SIZE];
 	size_t dlen;
 	int n;
 
 	say("Datagram service started\n");
 
-	if (!(dag = createDAG(AD0, HID0, SID1))) {
+	if ((sock = Xsocket(XSOCK_DGRAM)) < 0)
+		die(-2, "unable to create the datagram socket\n");
+
+    // read the localhost AD and HID
+    if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID)) < 0 )
+    	die(-1, "Reading localhost address\n");
+
+	if (!(dag = createDAG(myAD, myHID, SID_DGRAM)))
 		die(-1, "unable to create DAG: %s\n", dag);
-	}
 	say("Created DAG: \n%s\n", dag);
 
-	if ((sock = Xsocket(XSOCK_DGRAM)) < 0) {
-		die(-2, "unable to create the datagram socket\n");
-	}
+    if (XregisterName(DGRAM_NAME, dag) < 0 )
+    	die(-1, "error registering name: %s\n", DGRAM_NAME);
+	say("registered name: \n%s\n", DGRAM_NAME);
 
 	if (Xbind(sock, dag) < 0) {
 		die(-3, "unable to bind to the dag\n");
