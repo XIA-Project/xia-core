@@ -53,7 +53,7 @@ cd xia-core/XIASocket/sample
 rm xsockconf.ini
 
 cd ~/
-cd xia-core/proxies
+cd xia-core/web
 rm xsockconf_python.ini
 
 cd ~/
