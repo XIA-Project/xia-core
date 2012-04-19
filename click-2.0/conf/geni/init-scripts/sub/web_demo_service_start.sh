@@ -20,7 +20,7 @@ rm xsockconf.ini
 
 sleep 1
 
-cd ~/xia-core/proxies
+cd ~/xia-core/web
 rm xsockconf_python.ini
 ./webserver.py >& /dev/null &
 

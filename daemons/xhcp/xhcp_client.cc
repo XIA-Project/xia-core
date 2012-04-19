@@ -10,6 +10,8 @@
 #include "xhcp.hh"
 #include "XIARouter.hh"
 
+#define DEFAULT_HOSTNAME "www_h.hostxxx.com.xia" // used if not provided by user (via command-line)
+
 unsigned int quit_flag = 0;
 char *adv_selfdag = NULL;
 char *adv_gwdag = NULL;
@@ -41,6 +43,7 @@ int main(int argc, char *argv[]) {
 	char pkt[XHCP_MAX_PACKET_SIZE];
 	char sdag[XHCP_MAX_DAG_LENGTH];
 	char ddag[XHCP_MAX_DAG_LENGTH];
+	char hdag[XHCP_MAX_DAG_LENGTH];
 	char buffer[XHCP_MAX_PACKET_SIZE]; 	
 	string myAD(""), myGWRHID(""), myNS_DAG("");
 	string default_AD("AD:-"), default_HID("HID:-"), empty_str("HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
@@ -54,7 +57,24 @@ int main(int argc, char *argv[]) {
 	char *pseudo_gw_router_dag; // dag for host_register_message (broadcast message), but only the gw router will accept it
 	string host_register_message;
 	char mydummyAD[MAX_XID_SIZE];
+	char myrealAD[MAX_XID_SIZE];
 	char myHID[MAX_XID_SIZE]; 	
+        char *hostname;
+
+ 	// set hostname (check if hostname is provided)
+	if ( argc < 2 ) {
+		hostname = (char*) malloc(snprintf(NULL, 0, "%s", DEFAULT_HOSTNAME) + 1);
+                sprintf(hostname, "%s", DEFAULT_HOSTNAME);
+        } else {
+		std::string commandline_input = argv[1];
+  		if (commandline_input.find("www_h.") != string::npos) {	
+			hostname = (char*) malloc(snprintf(NULL, 0, "%s", argv[1]) + 1);
+                	sprintf(hostname, "%s", argv[1]);
+ 		} else {
+			hostname = (char*) malloc(snprintf(NULL, 0, "%s", DEFAULT_HOSTNAME) + 1);
+                	sprintf(hostname, "%s", DEFAULT_HOSTNAME);
+		}
+        }
 
     	// make the response message dest DAG (intended destination: gw router who is running the routing process)
     	pseudo_gw_router_dag = (char*)malloc(snprintf(NULL, 0, "RE %s %s", BHID, SID_XROUTE) + 1);
@@ -76,6 +96,7 @@ int main(int argc, char *argv[]) {
     	if ( XreadLocalHostAddr(sockfd, mydummyAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE) < 0 )
     		error("Reading localhost address");   	
 
+	// make the src DAG (Actual AD will be updated when receiving XHCP beacons from an XHCP server)
 	sprintf(sdag, "RE %s", SID_XHCP);
 	Xbind(sockfd, sdag);
 	
@@ -87,7 +108,8 @@ int main(int argc, char *argv[]) {
 		3. update HID table:
 			(gwRHID, 0, gwRHID, -)
 			(default, 0, gwRHID, -)	
-		4. store Name-Server-DAG information	
+		4. store Name-Server-DAG information
+                5. register hostname to the name server  	
 	*/
 	
 	// main looping
@@ -200,7 +222,19 @@ int main(int argc, char *argv[]) {
 			Xsendto(sockfd, buffer, strlen(buffer), 0, pseudo_gw_router_dag, strlen(pseudo_gw_router_dag)+1);
 			first_beacon_reception = false;
 			beacon_reception_count= 0;
-		}		
+		}
+
+		//Register this hostname to the name server
+                if (beacon_reception_count == XHCP_CLIENT_NAME_REGISTER_WAIT) {    
+    			// read the localhost HID 
+    			if ( XreadLocalHostAddr(sockfd, myrealAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE) < 0 )
+    				error("Reading localhost address"); 
+    			// make the host DAG 
+        		sprintf(hdag, "RE %s %s", myrealAD, myHID);  
+    			if (XregisterName(hostname, hdag) < 0 )
+    			error("name register");
+		}   
+		
 	}	
 	return 0;
 }

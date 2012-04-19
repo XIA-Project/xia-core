@@ -40,8 +40,8 @@ sudo python setup.py install
 
 # Download XIA-prototype
 cd ~/
-sudo wget http://www.xia.cs.cmu.edu/wiki/xia-proto/xia-v0.9a.tar.gz 
-tar zxf xia-v0.9a.tar.gz
+sudo wget http://www.xia.cs.cmu.edu/wiki/xia-proto/xia-v0.91.tar.gz 
+tar zxf xia-v0.91.tar.gz
 
 # Build XIA-prototype
 cd xia-core/tools/
@@ -53,7 +53,7 @@ cd xia-core/XIASocket/sample
 rm xsockconf.ini
 
 cd ~/
-cd xia-core/proxies
+cd xia-core/web
 rm xsockconf_python.ini
 
 cd ~/
