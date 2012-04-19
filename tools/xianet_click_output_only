@@ -109,8 +109,8 @@ start_daemons()
 	./xhcp_server_r0 > /dev/null 2>&1 &
 	./xhcp_server_r1 > /dev/null 2>&1 &
 	sleep 1 
-	./xhcp_client_h0 > /dev/null 2>&1 &
-	./xhcp_client_h1 > /dev/null 2>&1 &
+	./xhcp_client_h0 www_h.host0.com.xia > /dev/null 2>&1 &
+	./xhcp_client_h1 www_h.host1.com.xia > /dev/null 2>&1 &
 	sleep 2 
 		
 	cd $XIADIR/daemons/nameserver
