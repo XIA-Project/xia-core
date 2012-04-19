@@ -115,10 +115,11 @@
         return NULL;
     }
     $result = SWIG_NewPointerObj(SWIG_as_voidptr($2), SWIGTYPE_p_ChunkInfo, 0 |  0 );
+    free($2);
 }
 
 
-/* ===== XputFile ===== */
+/* ===== XputFile and XputBuffer ===== */
 /* The "in" map: python users don't pass a ChunkInfo list pointer;
    we make one here */
 %typemap (in) (unsigned chunkSize, ChunkInfo **infoList)
@@ -154,6 +155,7 @@
     }
     
     $result = chunkInfoTuple;
+    free ($2);
 }
 
 
@@ -161,32 +163,34 @@
 /* ===== XreadLocalHostAddr ===== */
 /* The "in" map: python users don't pass in pointers for localhostAD or
    localhostHID, so we allocate them here and pass them to the C function. */
-%typemap (in) (int sockfd, char *localhostAD, char *localhostHID)
+%typemap (in) (int sockfd, char *localhostAD, unsigned lenAD, char *localhostHID, unsigned lenHID)
 {
     $1 = (int) PyLong_AsLong($input);  /*TODO: There's no reason to mess with "sockfd", but we need at least one python input. Better way? */
     $2 = (char*)malloc(44); /* "AD:" + 40-byte XID + null byte */
-    $3 = (char*)malloc(45); /* "HID:" + 40-byte XID + null byte */
+    $3 = 44;
+    $4 = (char*)malloc(45); /* "HID:" + 40-byte XID + null byte */
+    $5 = 45;
 }
 
-%typemap (argout) (int sockfd, char *localhostAD, char *localhostHID)
+%typemap (argout) (int sockfd, char *localhostAD, unsigned lenAD, char *localhostHID, unsigned lenHID)
 {
     Py_XDECREF($result);
     if (result < 0) {
         free($2);
-        free($3);
+        free($4);
         PyErr_SetFromErrno(PyExc_IOError);
         return NULL;
     }
     
     PyObject *ad, *hid, *return_tuple;
     ad = PyString_FromStringAndSize($2, 43);  /* don't give the null byte to python */
-    hid = PyString_FromStringAndSize($3, 44);
+    hid = PyString_FromStringAndSize($4, 44);
     return_tuple = PyTuple_New(2);
     PyTuple_SetItem(return_tuple, 0, ad);
     PyTuple_SetItem(return_tuple, 1, hid);
     $result = return_tuple;
     free($2);
-    free($3);
+    free($4);
 }
 
 
