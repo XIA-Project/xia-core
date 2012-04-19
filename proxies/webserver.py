@@ -163,7 +163,7 @@ def main():
         XregisterName("www_s.xiaweb.com.xia", listen_dag)
 
 	# This is just for web demo.... publishing a CID
-	imageCID = "CID:aa2fe45640e694c06dcc3331ed91998c8eb4879a"
+        imageCID = "CID:aa2fe45640e694c06dcc3331ed91998c8eb4879a"
         image_dag = "DAG 2 0 - \n %s 2 1 - \n %s 2 - \n %s" % (myAD, myHID, imageCID)       
         XregisterName("www_c.airplane.com.xia", image_dag) 
        

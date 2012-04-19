@@ -275,7 +275,6 @@ def send_sid_request(ddag, payload, browser_socket, transport_proto=XSP):
     try:
         if transport_proto == XSP:
             # Connect to service
-            print 'hi 0'
             Xbind(sock, sdag)
             status = Xconnect(sock, ddag)
             if (status != 0):
@@ -424,7 +423,6 @@ def xia_handler(host, path, http_header, browser_socket):
         elif host.find('www_s.') != -1:     	
             send_sid_request(ddag, http_header, browser_socket)
         elif host.find('www_c.') != -1:     	
-            print 'ddag=%s' % ddag
     	    # Extract dst AD, HID, and CID from ddag	
     	    start_index = ddag.find('AD:')
             dstAD = ddag[start_index:start_index+3+40] 
@@ -432,7 +430,6 @@ def xia_handler(host, path, http_header, browser_socket):
             dstHID = ddag[start_index:start_index+4+40]  
             start_index = ddag.find('CID:')
             dstCID = ddag[start_index+4:start_index+4+40] 
-	    print 'dstCID=%s' % dstCID
             recombined_content = get_content_from_cid_list(dstAD, dstHID, dstCID)
             length = len(recombined_content)
             send_to_browser(recombined_content, browser_socket)

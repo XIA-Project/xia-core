@@ -18,7 +18,7 @@ NAME=`basename $0`
 VERBOSE=0
 
 # this is a particular list of daemons for the default 4-node-chain topology (host0 -- router0 -- router1 -- host1)
-DAEMONS="xroute_r0 xroute_r1 xhcp_server_r0 xhcp_server_r1 xhcp_client_h0 xhcp_client_h1 ns"
+DAEMONS="xroute_r0 xroute_r1 xhcp_server_r0 xhcp_server_r1 xhcp_client_h0 xhcp_client_h1 xnameservice"
 
 # hacky way of finding the root of the XIA source tree
 # assumes this script is in a directory off the parent of the XIA tree
@@ -114,7 +114,7 @@ start_daemons()
 	sleep 2 
 		
 	cd $XIADIR/daemons/nameserver
-	./ns &
+	./xnameservice &
 }
 
 help ()
