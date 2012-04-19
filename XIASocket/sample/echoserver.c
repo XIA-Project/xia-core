@@ -25,8 +25,10 @@
 
 #define MAX_XID_SIZE 100
 #define DAG  "RE %s %s %s"
-#define SNAME "ccp_s.testbed.xia"
-#define SID  "SID:0f00000000000000000000000000000000000999"
+#define STREAM_NAME "www_s.stream_echo.aaa.xia"
+#define DGRAM_NAME "www_s.dgram_echo.aaa.xia"
+#define SID_STREAM  "SID:0f00000000000000000000000000000000000888"
+#define SID_DGRAM   "SID:0f00000000000000000000000000000000008888"
 
 // if no data is received from the client for this number of seconds, close the socket
 #define WAIT_FOR_DATA	20
