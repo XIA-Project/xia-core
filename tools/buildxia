@@ -1,4 +1,5 @@
 #!/bin/sh
+# build all of the XIA components
 
 XIADIR=$(dirname $(dirname $(cd ${0%/*} && echo $PWD/${0##*/})))
 
@@ -12,6 +13,9 @@ make
 cd $XIADIR/XIASocket/sample
 make
 
+cd $XIADIR/example
+make
+
 cd $XIADIR/daemons/xroute
 make
 
@@ -20,4 +24,6 @@ make
 
 cd $XIADIR/daemons/nameserver
 make
+
+cd $XIADIR
 
