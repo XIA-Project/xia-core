@@ -9,7 +9,6 @@ class Principal
 {
 public:
 	static const std::size_t ID_LEN = 20;
-	friend class Graph;
 
 public:
 	Principal();
