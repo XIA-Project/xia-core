@@ -9,11 +9,14 @@ CLICK_DECLS
  * =c
  * XIASelectPath(MODE mode)
  * mode is "first" or "next".
+ *
  * =s ip
- * selects a path to the next XID (i.e. main or fallback)
+ * selects a path to the next XID (i.e., main or next fallback)
+ *
  * =d
- * Selects a path to the next XID (i.e. main or fallback).
- * If there is no more path to consider, output the packet to port 1
+ * Selects a path to the next XID.  If MODE is first, the main path is selected.  If MODE is next, the next fallback is selected.
+ * When this succeeds, output the packet to port 0.
+ * If there is no more path to consider, output the packet to port 1.
  * 
  * =a
  */

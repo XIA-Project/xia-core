@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>SandwichFillings</key>
+	<array>
+		<dict>
+			<key>Dictionary</key>
+			<dict>
+				<key>BrowserTitle</key>
+				<string>XIA Events and News</string>
+				<key>ID</key>
+				<string>page3</string>
+				<key>MostRecentlySelectedStyleName</key>
+				<string>Theme Default</string>
+				<key>PageTitle</key>
+				<string>Events and News </string>
+				<key>PluginClassName</key>
+				<string>RWStyledPlugin</string>
+				<key>PluginMetadata</key>
+				<dict>
+					<key>Author</key>
+					<string>Realmac Software</string>
+					<key>Name</key>
+					<string>Styled Text</string>
+				</dict>
+				<key>PublishingManifest</key>
+				<dict>
+					<key>CreationDate</key>
+					<date>2011-10-20T15:57:43Z</date>
+					<key>DigestAlgorithm</key>
+					<string>MD5</string>
+					<key>DocumentGUID</key>
+					<string>126727B7-F448-4242-8994-9DFD61F8DFB7</string>
+					<key>PageDigests</key>
+					<dict>
+						<key>events-news.html</key>
+						<dict>
+							<key>Digest</key>
+							<data>
+							bl6GxAEyNY0I8hfjDlk7
+							dw==
+							</data>
+							<key>Size</key>
+							<integer>6271</integer>
+						</dict>
+						<key>files/dsc07537-2.jpg</key>
+						<dict>
+							<key>Digest</key>
+							<data>
+							zyEPWwrAa+nVMnvdMwP7
+							fg==
+							</data>
+							<key>Size</key>
+							<integer>77958</integer>
+						</dict>
+						<key>files/room.jpg</key>
+						<dict>
+							<key>Digest</key>
+							<data>
+							Azn4GHG0tRfx1PKoCnrn
+							ew==
+							</data>
+							<key>Size</key>
+							<integer>57337</integer>
+						</dict>
+						<key>files/stairs-3-2.jpg</key>
+						<dict>
+							<key>Digest</key>
+							<data>
+							lMZ3uqWjH9KVc3xv3K5r
+							EQ==
+							</data>
+							<key>Size</key>
+							<integer>78542</integer>
+						</dict>
+					</dict>
+					<key>PageID</key>
+					<string>page3</string>
+					<key>Version</key>
+					<integer>3</integer>
+				</dict>
+			</dict>
+			<key>Files</key>
+			<array/>
+			<key>Subsandwiches</key>
+			<array>
+				<string>ChildPages</string>
+				<string>Data</string>
+				<string>PageAttributes</string>
+			</array>
+		</dict>
+	</array>
+	<key>Type</key>
+	<string>Page</string>
+</dict>
+</plist>

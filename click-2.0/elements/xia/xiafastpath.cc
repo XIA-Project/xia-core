@@ -1,3 +1,6 @@
+/*
+ * xiafastpath.{cc,hh} -- a fast-path implementation for XIA packets
+ */
 #include <click/config.h>
 #include "xiafastpath.hh"
 #include <click/glue.hh>
@@ -11,20 +14,19 @@ CLICK_DECLS
 XIAFastPath::XIAFastPath() : _offset(0)
 {
     memset(_buckets, 0, sizeof(struct bucket*) * NUM_CLICK_CPUS);
-    
 }
 
 XIAFastPath::~XIAFastPath()
 {
-    for (int i=0;i<NUM_CLICK_CPUS;i++) {
-	if (_buckets[i]) delete[] _buckets[i];
-    }
+    for (int i = 0; i < NUM_CLICK_CPUS; i++)
+		if (_buckets[i])
+			delete[] _buckets[i];
 }
 
 int
 XIAFastPath::initialize(ErrorHandler *)
 {
-    for (int i=0;i<NUM_CLICK_CPUS;i++) {
+    for (int i = 0; i < NUM_CLICK_CPUS; i++) {
         _buckets[i] = new struct bucket[_bucket_size];
         memset(_buckets[i], 0, _bucket_size * sizeof(struct bucket));
     }
@@ -33,19 +35,19 @@ XIAFastPath::initialize(ErrorHandler *)
 
 const uint8_t* XIAFastPath::getkey(Packet *p)
 {
-    return XIAHeader(p).payload()+ _offset;
+    return XIAHeader(p).payload() + _offset;
 }
 
-void XIAFastPath::update_cacheline(struct bucket *buck,  const uint8_t *key, int port)
+void XIAFastPath::update_cacheline(struct bucket *buck, const uint8_t *key, int port)
 {
     int empty = 0;
     uint8_t max_counter = -1;
-    for (int i=0;i<ASSOCIATIVITY;i++) {
-	if (max_counter< buck->counter[i]) {
-	    max_counter = buck->counter[i];
-	    empty = i;
-	}
-	buck->counter[i]++;
+    for (int i = 0; i < ASSOCIATIVITY; i++) {
+		if (max_counter< buck->counter[i]) {
+			max_counter = buck->counter[i];
+			empty = i;
+		}
+		buck->counter[i]++;
     }
     buck->counter[empty] = 0;
     memcpy(buck->item[empty].key, key, KEYSIZE);
@@ -55,8 +57,8 @@ void XIAFastPath::update_cacheline(struct bucket *buck,  const uint8_t *key, int
 int XIAFastPath::lookup(struct bucket *buck,  const uint8_t *key)
 {
     int port = 0;
-    for (int i=0;i<ASSOCIATIVITY;i++) {
-	if (memcmp(key, buck->item[i].key , KEYSIZE)==0) {
+    for (int i = 0;i < ASSOCIATIVITY; i++) {
+	if (memcmp(key, buck->item[i].key, KEYSIZE) == 0) {
 	    port = buck->item[i].port;
 	    buck->counter[i]=0;
 	} else 
@@ -82,7 +84,6 @@ int XIAFastPath::configure(Vector<String> &conf, ErrorHandler *errh)
 
 void XIAFastPath::push(int port, Packet * p)
 {
-
 #if HAVE_MULTITHREAD
 #if CLICK_USERLEVEL
     int thread_id = click_current_thread_id;
@@ -98,12 +99,12 @@ void XIAFastPath::push(int port, Packet * p)
     //click_chatter("fastpath_key %02x%02x%02x%02x, bucket_index %u", key[0], key[1], key[2],  key[3], index);
 
     if (port==0) {
-	int outport = lookup(&_buckets[thread_id][index], key);
-	output(outport).push(p);
+		int outport = lookup(&_buckets[thread_id][index], key);
+		output(outport).push(p);
     } else {
-	/* Cache result */
-	update_cacheline(&_buckets[thread_id][index], key, port);
-	output(port).push(p);
+		// Cache result
+		update_cacheline(&_buckets[thread_id][index], key, port);
+		output(port).push(p);
     }
 }
 

@@ -7,6 +7,7 @@
 #include <click/sync.hh>
 #include <click/timer.hh>
 #include "xarptable.hh"
+#include "xcmp.hh"
 CLICK_DECLS
 
 /*
@@ -199,7 +200,6 @@ class XARPQuerier : public Element { public:
     XID       _my_bcast_xid;
     uint32_t _poll_timeout_j;
     int _broadcast_poll;
-    
 
     // statistics
     atomic_uint32_t _xarp_queries;
@@ -215,6 +215,7 @@ class XARPQuerier : public Element { public:
     //void handle_ip(Packet *p, bool response);
     void handle_xip(Packet *p, bool response);
     void handle_response(Packet *p);
+    void xarp_query_timeout(Packet *p);
 
     static void expire_hook(Timer *, void *);
     static String read_table(Element *, void *);

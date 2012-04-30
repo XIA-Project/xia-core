@@ -1,0 +1,180 @@
+#!/bin/bash
+#
+# Copyright 2012 Carnegie Mellon University
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+NAME=`basename $0`
+VERBOSE=0
+
+# this is a particular list of daemons for the default 4-node-chain topology (host0 -- router0 -- router1 -- host1)
+DAEMONS="xroute_r0 xroute_r1 xhcp_server_r0 xhcp_server_r1 xhcp_client_h0 xhcp_client_h1 xnameservice"
+
+# hacky way of finding the root of the XIA source tree
+# assumes this script is in a directory off the parent of the XIA tree
+# and that the daemons it starts are rooted off of the same location
+#  so XIADIR would be /xia-core assuming the script were /xia-core/tools/xianet
+XIADIR=$(dirname $(dirname $(cd ${0%/*} && echo $PWD/${0##*/})))
+
+# click parameters
+CLICKPATH=$XIADIR/click-2.0
+CONFPATH=$CLICKPATH/conf
+CLICK=$CLICKPATH/userlevel/click
+SCRIPT=xia_chain_topology_socket_reliable_test.click
+
+
+is_running()
+{
+	RUNNING=`ps ao args | grep $1 | grep -v grep`
+	[ "$RUNNING" != "" ]
+}
+
+check_daemons()
+{
+	printf "XIA Demo Service Status\n"
+	for svc in "click" $DAEMONS
+	do
+		status="stopped"
+		is_running $svc
+		[ $? -eq 0 ] && status="running"
+		printf "%-16s: %s\n" $svc $status
+	done
+}
+
+stop_daemons()
+{
+	printf "Stopping xia network processes\n"
+	for svc in $DAEMONS "click"
+	do
+		printf "stopping: %s\n" $svc
+		killall -9 $svc &> /dev/null
+	done
+}
+
+start_daemons()
+{
+	printf "Starting XIA network processes\n"
+
+	is_running "click"
+	if [ $? -eq 0 ]; then
+		printf "Click is already running, aborting...\n"
+		exit 1
+	fi
+
+	if [[ `whoami` != "root" ]]; then
+		printf "\n ERROR: $NAME must be run as root\n\n"
+		exit 1
+	fi
+
+	SNAME=`basename $SCRIPT .click`
+
+	if [ ! -f $CONFPATH/$SCRIPT ]; then
+		printf "\nERROR: unable to locate click conf file: $SNAME\n\n"
+		exit 1
+	fi
+
+	exec 3>&1  # save stdout handle
+	if [ $VERBOSE -eq 0 ]; then
+		exec &> /dev/null
+	fi
+
+	$CLICK -R $CONFPATH/$SCRIPT &
+	sleep 2
+
+
+	is_running "click"
+	if [ $? -ne 0 ]; then
+		# put stdout handle back in case we were in silent mode
+		exec 1>&3
+		printf "Click is not running, aborting...\n"
+		exit 1
+	fi
+
+	cd $XIADIR/daemons/xroute
+	./xroute_r0 &
+	./xroute_r1 & 
+	sleep 2
+	
+	cd $XIADIR/daemons/xhcp
+	./xhcp_server_r0 &
+	./xhcp_server_r1 &
+	sleep 1 
+	./xhcp_client_h0 www_h.host0.com.xia  &
+	./xhcp_client_h1 www_h.host1.com.xia &
+	sleep 2 
+		
+	cd $XIADIR/daemons/nameserver
+	./xnameservice &
+}
+
+help ()
+{
+	cat << EOH
+
+Start or stop the XIA network services.
+
+usage: $NAME [-qv] [start|stop|restart|check]
+where:
+  -q run silently (default)
+  -v prints debug messages to stdout
+
+  start   - starts the xia network processes if not already running
+  stop    - stops the xia processes
+  restart - stops then starts the xia processes
+  check   - print service status
+
+EOH
+	exit 0
+}
+
+while getopts ":qvh" opt; do
+	case $opt in
+		q)
+			VERBOSE="0"
+			;;
+		v)
+			VERBOSE="1"
+			;;
+		h)
+			help
+			;;
+		\?)
+			printf "\nInvalid option: -$OPTARG\n" >&2
+			help
+			;;
+	esac
+done
+
+shift $((OPTIND-1))
+
+case $1 in
+	start)
+		start_daemons
+		;;
+	stop)
+		stop_daemons
+		;;
+	restart|reload)
+		stop_daemons
+		sleep 1
+		start_daemons
+		;;
+	check)
+		check_daemons
+		;;
+	*)
+		printf "\nInvalid command\n" >&2
+		help
+		;;
+esac
+

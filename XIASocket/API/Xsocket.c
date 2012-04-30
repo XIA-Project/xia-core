@@ -1,3 +1,4 @@
+/* ts=4 */
 /*
 ** Copyright 2011 Carnegie Mellon University
 **
@@ -13,199 +14,113 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
+/*!
+ @file Xsocket.c
+ @brief Implements Xsocket()
+*/
 
-/* 
- * Creates an XIA socket. 
- * When called it creates a socket to connect to Click using UDP packets. 
- * It first opens a socket and listens on some random port. Nextit sends
- * an open request to Click, from that socket. It waits (blocking) for a 
- * reply from Click. The control info is encoded in the google protobuffer message (encapsulated within UDP message).
- *
- * On success the return packet's UDP source port is the same as the 
- * destination port. On failure, source port is 0
- * 
- * Arguments:
- * char* sDAG : This is registered to allow reverse traffic
- * TODO: Add XID type
- *
- * Return values:
- * sockfd if successful
- * -1 on failure
- *
- */
+#include <sys/types.h>
+#include <unistd.h>
+#include <linux/unistd.h>
 
 #include "Xsocket.h"
 #include "Xinit.h"
+#include "Xutil.h"
 #include <stdlib.h>
-#include "minIni.h"
 #include <libgen.h>
 #include <limits.h>
+#include <pthread.h>
+#include <errno.h>
 
-using namespace std;
-
-extern "C" {
-
-        void error(const char *msg)
-        {
-			perror(msg);
-			exit(0);
-        }
-
-        int Xsocket(int transport_type) // 0: Reliable transport, 1: Unreliable transport
-        {
-			//Setup to listen for control info
-			//char* str=(char*)"open";//TODO: Not necessary. Maybe more useful data could be sent in the open control packet?
-			struct sockaddr_in my_addr, their_addr;
-			int rv;
-			int numbytes;
-			char buf[MAXBUFLEN];
-			socklen_t addr_len;
-			//char s[INET6_ADDRSTRLEN];
-			int sockfd,tries;
-
-			// protobuf message
-			xia::XSocketMsg xia_socket_msg;
-
-			int port;
-
-			if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-				perror("Xsocket listener: socket");
-				return -1;
-			}
-
-			//If port is in use, try next port until success, or max ATTEMPTS reached
-			srand((unsigned)time(0));
-			rv=-1;
-			
-			for (tries=0;tries<ATTEMPTS;tries++)
-			{
-				
-				int rn = rand();
-				port=1024 + rn % (65535 - 1024); 
-				my_addr.sin_family = PF_INET;
-				my_addr.sin_addr.s_addr = inet_addr(MYADDRESS);
-				my_addr.sin_port = htons(port);
-				rv=bind(sockfd, (const struct sockaddr *)&my_addr, sizeof(my_addr));
-				if (rv != -1)
-					break;
-			}
-
-			if (rv == -1) {
-				close(sockfd);
-				//printf("\n\nHOST= %s\n\n", MYADDRESS);
-				perror("Xsocket listener: bind");
-				return -1;
-			}
-			
-			
-			//printf("Xsocket listener: Sending...\n");
-
-			//Send a control packet
-			their_addr.sin_family = PF_INET;
-			their_addr.sin_addr.s_addr = inet_addr(CLICKCONTROLADDRESS);
-			their_addr.sin_port = htons(atoi(CLICKCONTROLPORT));
-
-			// protobuf message
-			xia_socket_msg.set_type(xia::XSOCKET);
-			
-			xia::X_Socket_Msg *x_socket_msg = xia_socket_msg.mutable_x_socket();
-			x_socket_msg->set_type(transport_type);		
-			
-			std::string p_buf;
-			xia_socket_msg.SerializeToString(&p_buf);
-
-			if ((numbytes = sendto(sockfd, p_buf.c_str(), p_buf.size(), 0,
-							(const struct sockaddr *)&their_addr, sizeof(their_addr))) == -1) {
-				perror("Xsocket(): sendto failed");
-				return(-1);
-			}
-
-
-			//Process the reply
-			addr_len = sizeof their_addr;
-			if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
-							(struct sockaddr *)&their_addr, &addr_len)) == -1) {
-				perror("Xsocket: recvfrom");
-				return -1;
-			}
-			//buf[numbytes] = '\0';
-
-			//protobuf message parsing
-			xia_socket_msg.ParseFromString(buf);
-
-			if (xia_socket_msg.type() == xia::XSOCKET) {
-				return sockfd;
-			}
-
-			close(sockfd);
-			return -1; 
-
-    }
-	//void *__dso_handle = NULL;
-			
-    void set_conf(const char *filename, const char* sectionname)
-    {
-        __InitXSocket::read_conf(filename, sectionname);
-    }
-
-} /* extern C */
-
-struct __XSocketConf* get_conf() 
+/*!
+** @brief Create an XIA socket
+**
+** Creates an XIA socket of the specified type. 
+**
+** @param transport_type Valid values are: 
+**	\n XSOCK_STREAM for reliable communications (SID)
+**	\n XSOCK_DGRAM for a ligher weight connection, but with 
+**	unguranteed delivery (SID)
+**	\n XSOCK_CHUNK for getting/putting content chunks (CID)
+**	\n XSOCK_RAW for a raw socket that can have direct edits made to the header
+**
+** @returns socket id on success. 
+** @returns -1 on failure with errno set to an error compatible with those
+** from the standard socket call.
+**
+** @warning In the current implementation, the returned socket is 
+** a normal UDP socket that is used to communicate with the click
+** transport layer. Using this socket with normal unix socket
+** calls (aside from select and poll) will cause unexpected behaviors. 
+** Attempting to pass a socket created with the the standard socket function
+** to the Xsocket API will have similar results.
+**
+*/
+int Xsocket(int transport_type)
 {
-	if (__XSocketConf::initialized==0) {
-		__InitXSocket();
-	}
-	return &_conf;
-}
+	struct sockaddr_in addr;
+	xia::XSocketCallType type;
+	int rc;
+	int sockfd;
 
-__InitXSocket::__InitXSocket() 
-{
-	const char * inifile = getenv("XSOCKCONF");
-
-	memset(_conf.api_addr, 0, __IP_ADDR_LEN);
-	memset(_conf.click_dataaddr, 0, __IP_ADDR_LEN);
-	memset(_conf.click_controladdr, 0, __IP_ADDR_LEN);
-
-	if (inifile==NULL) {
-		inifile = "xsockconf.ini";
-	}
-	const char *section_name = NULL;
-	char buf[PATH_MAX+1];
-
-	if (readlink("/proc/self/exe", buf, sizeof(buf)-1)!=-1) {
-		section_name = basename(buf);
+	switch (transport_type) {
+		case XSOCK_STREAM:
+		case XSOCK_DGRAM:
+		case XSOCK_CHUNK:
+		case XSOCK_RAW:
+			break;
+		default:
+			// invalid socket type requested
+			errno = EAFNOSUPPORT;
+			return -1;
 	}
 
-	const char * section_name_env  = getenv("XSOCKCONF_SECTION");
-	if (section_name_env) 
-		section_name = section_name_env;
+	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+		LOGF("error creating Xsocket: %s", strerror(errno));
+		return -1;
+	}
 
-	read_conf(inifile, section_name);
+	// bind to an unused random port number
+	addr.sin_family = PF_INET;
+	addr.sin_addr.s_addr = inet_addr(MYADDRESS);
+	addr.sin_port = 0;
+
+	if (bind(sockfd, (const struct sockaddr *)&addr, sizeof(addr)) < 0) {
+		close(sockfd);
+		LOGF("bind error: %s", strerror(errno));
+		return -1;
+	}
+		
+	// protobuf message
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XSOCKET);
+		
+	xia::X_Socket_Msg *x_socket_msg = xsm.mutable_x_socket();
+	x_socket_msg->set_type(transport_type);		
+	
+	if ((rc = click_control(sockfd, &xsm)) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
+		close(sockfd);
+		return -1;
+	}
+
+	// process the reply from click
+	if ((rc = click_reply2(sockfd, &type)) < 0) {
+		LOGF("Error getting status from Click: %s", strerror(errno));
+
+	} else if (type != xia::XSOCKET) {
+		// something bad happened
+		LOGF("Expected type %d, got %d", xia::XSOCKET, type);
+		errno = ECLICKCONTROL;
+		rc = -1;
+	}
+
+	if (rc == 0) {
+		allocSocketState(sockfd, transport_type);
+		return sockfd;
+	}
+
+	// close the control socket since the underlying Xsocket is no good
+	close(sockfd);
+	return -1; 
 }
-
-void __InitXSocket::read_conf(const char *inifile, const char *section_name) 
-{
-	__XSocketConf::initialized=1;
-
-	ini_gets(section_name, "api_addr", DEFAULT_MYADDRESS, _conf.api_addr, __IP_ADDR_LEN, inifile);
-	ini_gets(section_name, "click_dataaddr", DEFAULT_CLICKDATAADDRESS, _conf.click_dataaddr, __IP_ADDR_LEN , inifile);
-	ini_gets(section_name, "click_controladdr", DEFAULT_CLICKCONTROLADDRESS, _conf.click_controladdr, __IP_ADDR_LEN, inifile);
-
-}
-
-struct __XSocketConf _conf;
-
-void print_conf()
-{
-	__InitXSocket::print_conf();
-}
-
-
-void __InitXSocket::print_conf() 
-{
-	printf("api_addr %s\n", _conf.api_addr);
-	printf("click_controladdr %s\n",  _conf.click_controladdr);
-	printf("click_dataaddr %s\n",  _conf.click_dataaddr);
-}
-int  __XSocketConf::initialized=0;
-

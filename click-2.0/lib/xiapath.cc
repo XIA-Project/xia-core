@@ -67,16 +67,13 @@ XIAPath::parse_dag(const String& s, const Element* context)
     // parse pointers from the source node
     Node src_node;
     src_node.xid = XID();
-    for (size_t i = 0; i < CLICK_XIA_XID_EDGE_NUM; i++)
-    {
+    for (size_t i = 0; i < CLICK_XIA_XID_EDGE_NUM; i++) {
         String index_str = cp_shift_spacevec(str_copy);
         if (index_str == "-")
             break;
-        else
-        {
+        else {
             int index;
-            if (!cp_integer(index_str, &index))
-            {
+            if (!cp_integer(index_str, &index)) {
                 click_chatter("cannot parse index: %s", index_str.c_str());
                 return false;
             }
@@ -86,8 +83,7 @@ XIAPath::parse_dag(const String& s, const Element* context)
 
     // parse nodes with pointers (the destination node does not have pointers, though)
     bool end = false;
-    while (!end)
-    {
+    while (!end) {
         struct click_xia_xid xid;
         Node node;
 
@@ -97,34 +93,29 @@ XIAPath::parse_dag(const String& s, const Element* context)
 
         // parse XID
 #ifndef CLICK_TOOL
-        if (!cp_xid(xid_str, &xid, context))
+        if (!cp_xid(xid_str, &xid, context)) {
 #else
         (void)context;
-        if (!cp_xid(xid_str, &xid))
+        if (!cp_xid(xid_str, &xid)) {
 #endif
-        {
             click_chatter("unrecognized XID format: %s", xid_str.c_str());
             return false;
         }
         node.xid = XID(xid);
 
         // parse indices 
-        for (size_t i = 0; i < CLICK_XIA_XID_EDGE_NUM; i++)
-        {
+        for (size_t i = 0; i < CLICK_XIA_XID_EDGE_NUM; i++) {
             String index_str = cp_shift_spacevec(str_copy);
-            if (index_str == "")
-            {
+            if (index_str == "") {
                 // no pointers means we hit the destination node
                 end = true;
                 break;
             }
             if (index_str == "-")
                 break;
-            else
-            {
+            else {
                 int index;
-                if (!cp_integer(index_str, &index))
-                {
+                if (!cp_integer(index_str, &index)) {
                     click_chatter("cannot parse index: %s", index_str.c_str());
                     return false;
                 }
@@ -159,15 +150,13 @@ XIAPath::parse_re(const String& s, const Element* context)
 
     // parse iterations: ( ("(" fallback path ")")? main node )+
     int next_idx = -1;
-    while (true)
-    {
+    while (true) {
         String head = cp_shift_spacevec(str_copy);
         if (head.length() == 0)
             break;
 
         Vector<struct click_xia_xid> fallback;
-        if (head == "(")
-        {
+        if (head == "(") {
             // parse fallback path for the next main node
             while (true)
             {
@@ -177,12 +166,11 @@ XIAPath::parse_re(const String& s, const Element* context)
 
                 click_xia_xid xid;
 #ifndef CLICK_TOOL
-                if (!cp_xid(tail, &xid, context))
+                if (!cp_xid(tail, &xid, context)) {
 #else
                 (void)context;
-                if (!cp_xid(tail, &xid))
+                if (!cp_xid(tail, &xid)) {
 #endif
-                {
                     click_chatter("unrecognized XID format: %s", tail.c_str());
                     return false;
                 }
@@ -194,12 +182,11 @@ XIAPath::parse_re(const String& s, const Element* context)
         // parse the next main node
         click_xia_xid next_xid;
 #ifndef CLICK_TOOL
-        if (!cp_xid(head, &next_xid, context))
+        if (!cp_xid(head, &next_xid, context)) {
 #else
         (void)context;
-        if (!cp_xid(head, &next_xid))
+        if (!cp_xid(head, &next_xid)) {
 #endif
-        {
             click_chatter("unrecognized XID format: %s", head.c_str());
             return false;
         }
@@ -221,8 +208,7 @@ XIAPath::parse_re(const String& s, const Element* context)
             _nodes.push_back(node);
         next_idx++;
 
-        for (int i = 0; i < fallback.size(); i++)
-        {
+        for (int i = 0; i < fallback.size(); i++) {
             Node node;
             node.xid = fallback[i];
             // link to the next main node (implicit link)
@@ -236,8 +222,7 @@ XIAPath::parse_re(const String& s, const Element* context)
 
         prev_xid = next_xid;
     }
-    if (next_idx == -1)
-    {
+    if (next_idx == -1) {
         click_chatter("empty path");
         return false;
     }
@@ -274,8 +259,7 @@ XIAPath::parse_node(InputIterator node_begin, InputIterator node_end)
 
         graph_node.xid = (*current_node).xid;
 
-        for (size_t j = 0; j < CLICK_XIA_XID_EDGE_NUM; j++)
-        {
+        for (size_t j = 0; j < CLICK_XIA_XID_EDGE_NUM; j++) {
             size_t idx = (*current_node).edge[j].idx;
             if (idx == CLICK_XIA_XID_EDGE_UNUSED)
                 continue;
@@ -356,8 +340,7 @@ XIAPath::unparse_dag(const Element* context)
         }
 
         if (i < static_cast<int>(n) - 1) {  // not a destination node
-            for (size_t j = 0; j < CLICK_XIA_XID_EDGE_NUM; j++)
-            {
+            for (size_t j = 0; j < CLICK_XIA_XID_EDGE_NUM; j++) {
                 size_t idx = current_node.edge[j].idx;
                 if (idx != CLICK_XIA_XID_EDGE_UNUSED)
                     sa << (int)idx << ' ';
@@ -382,33 +365,27 @@ XIAPath::unparse_re(const Element* context)
 
     StringAccum sa;
     size_t prev_node = _src;
-    while (true)
-    {
+    while (true) {
         if (_nodes[prev_node].edges.size() == 0)    // destination
             break;
-        else if (_nodes[prev_node].edges.size() == 1 || _nodes[prev_node].edges.size() == 2)
-        {
+        else if (_nodes[prev_node].edges.size() == 1 || _nodes[prev_node].edges.size() == 2) {
             size_t next_primary_node = _nodes[prev_node].edges[0];
 
-            if (_nodes[prev_node].edges.size() == 2)
-            {
+            if (_nodes[prev_node].edges.size() == 2) {
                 // output fallback nodes
                 sa << "( ";
                 size_t next_fallback_node = _nodes[prev_node].edges[1];
-                while (true)
-                {
+                while (true) {
                     sa << _nodes[next_fallback_node].xid.unparse_pretty(context);
                     sa << ' ';
 
-                    if (_nodes[next_fallback_node].edges.size() == 1)
-                    {
+                    if (_nodes[next_fallback_node].edges.size() == 1) {
                         if (_nodes[next_fallback_node].edges[0] == next_primary_node)
                             break;
                         else
                             return "";     // unable to represent in RE
                     }
-                    else if (_nodes[next_fallback_node].edges.size() == 2)
-                    {
+                    else if (_nodes[next_fallback_node].edges.size() == 2) {
                         if (_nodes[next_fallback_node].edges[0] == next_primary_node)
                             next_fallback_node = _nodes[next_fallback_node].edges[1];
                         else
@@ -454,29 +431,23 @@ XIAPath::unparse_node(struct click_xia_xid_node* node, size_t n) const
     if (total_n == 0)
         return 0;
 
-    for (int i = 0; i < _nodes.size(); i++)
-    {
+    for (int i = 0; i < _nodes.size(); i++) {
         size_t order = _nodes[i].order;
         size_t index;
-        if (order == 0)
-        {
+        if (order == 0) {
             // poiters from source node are stored at the destination node
             index = total_n - 1;
         }
         else
             index = order - 1;
         
-        if (index < n)  // if the output buffer space is available
-        {
+        if (index < n) {  // if the output buffer space is available
             if (order > 0) // not a source node
                 node[index].xid = _nodes[i].xid.xid();
 
-            if (order < total_n) // not a destination node
-            {
-                for (int j = 0; j < CLICK_XIA_XID_EDGE_NUM; j++)
-                {
-                    if (j < _nodes[i].edges.size())
-                    {
+            if (order < total_n) { // not a destination node
+                for (int j = 0; j < CLICK_XIA_XID_EDGE_NUM; j++) {
+                    if (j < _nodes[i].edges.size()) {
                         size_t next_node_order = _nodes[_nodes[i].edges[j]].order - 1; 
                         assert(next_node_order < total_n);
                         node[index].edge[j].idx = next_node_order;
@@ -512,14 +483,12 @@ XIAPath::topological_ordering()
 
     size_t next_order = 0;
     int num_processed = 0;
-    while (!q.empty())
-    {
+    while (!q.empty()) {
         int next_node = q.back();
         q.pop_back();
         _nodes[next_node].order = next_order++;
 
-        for (int i = 0; i < _nodes[next_node].edges.size(); i++)
-        {
+        for (int i = 0; i < _nodes[next_node].edges.size(); i++) {
             // update inorder of next nodes
             if (--indegree[_nodes[next_node].edges[i]] == 0)
                 q.push_back(_nodes[next_node].edges[i]);
@@ -528,8 +497,7 @@ XIAPath::topological_ordering()
         num_processed++;
     }
 
-    if (num_processed != _nodes.size())
-    {
+    if (num_processed != _nodes.size()) {
         // the graph could not be ordered (i.e. not a DAG)
         return false;
     }
@@ -558,8 +526,7 @@ XIAPath::is_valid() const
     for (int i = 0; i < _nodes.size(); i++)
         indegree[i] = 0;
 
-    for (int i = 0; i < _nodes.size(); i++)
-    {
+    for (int i = 0; i < _nodes.size(); i++) {
         // incorrect destination node?
         if (_nodes[i].edges.size() == 0 && i != static_cast<int>(_dst))
             return false;
@@ -571,8 +538,7 @@ XIAPath::is_valid() const
             indegree[_nodes[i].edges[j]]++;
     }
 
-    for (int i = 0; i < _nodes.size(); i++)
-    {
+    for (int i = 0; i < _nodes.size(); i++) {
         // incorrect source node?
         if (indegree[i] == 0 && i != static_cast<int>(_src))
             return false;
@@ -634,20 +600,16 @@ bool
 XIAPath::remove_node(handle_t node)
 {
     _nodes.erase(&_nodes[node]);
-    for (int i = 0; i < _nodes.size(); i++)
-    {
+    for (int i = 0; i < _nodes.size(); i++) {
         int num_edges =_nodes[i].edges.size(); 
-        for (int j = 0; j < num_edges; j++)
-        {
-            if (_nodes[i].edges[j] == node)
-            {
+        for (int j = 0; j < num_edges; j++) {
+            if (_nodes[i].edges[j] == node) {
                 // remove all incoming edges
                 _nodes[i].edges.erase(&_nodes[i].edges[j]);
                 j--;
                 num_edges--;
             }
-            else if (_nodes[i].edges[j] > node)
-            {
+            else if (_nodes[i].edges[j] > node) {
                 // adjust edge handle
                 _nodes[i].edges[j]--;
             }
@@ -664,8 +626,7 @@ bool
 XIAPath::remove_edge(size_t from_node, size_t to_node)
 {
     for (int i = 0; i < _nodes[from_node].edges.size(); i++)
-        if (_nodes[from_node].edges[i] == to_node)
-        {
+        if (_nodes[from_node].edges[i] == to_node) {
             _nodes[from_node].edges.erase(&_nodes[from_node].edges[i]);
             break;
         }
@@ -677,11 +638,10 @@ XIAPath::incr(size_t order)
 {
     int i=0; 
     if (!const_cast<XIAPath*>(this)->topological_ordering())
-	return;
-    for (; i < _nodes.size(); i++)
-    {
-	if (_nodes[i].order ==order)
-	    break;
+		return;
+    for (; i < _nodes.size(); i++) {
+		if (_nodes[i].order ==order)
+			break;
     }
     if (_nodes[i].order!= order)
         return;
@@ -706,8 +666,7 @@ XIAPath::dump_state() const
 #ifndef NDEBUG_XIA
     StringAccum sa;
     sa << "_nodes =\n";
-    for (int i = 0; i < _nodes.size(); i++)
-    {
+    for (int i = 0; i < _nodes.size(); i++) {
         sa << i << ": ";
         sa << _nodes[i].xid << ' ';
         for (int j = 0; j < _nodes[i].edges.size(); j++)

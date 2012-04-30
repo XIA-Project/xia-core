@@ -1,0 +1,35 @@
+Sample Xsocket applications
+
+Ensure that . is in your LD_LIBRARY_PATH by running the following shell command
+or by adding it to your .profile
+export LD_LIBRARY_PATH=LD_LIBRARY_PATH:.
+
+Most of the samples display help when run with the -h command line parameter.
+
+
+ccp - a very simple (and insecure) file copy client that uses chunking
+ccps - server that ccp talks to
+
+echoserver - multi threaded echo server using stream and datagram sockets.
+echoclient - multi threaded stream oriented echoclient for load testing.
+echoclient-d - multi thread load client using datagram sockets
+
+xecho - interactive echo client that can do stream or datagram connections
+
+todc - simple time of day client
+tods - simple time of day server
+
+xcmpping.c Xsockets implementation of ping
+xcmptraceroute.c Xosckets implementation of traceroute
+
+ps_echo - stream echo client in python
+pd_echo - datagram echo client in python
+p_echo  - datagram echo server in python
+
+IMPORTANT: If you write your own programs that will run using the tools/xianet
+configuration, you must add an entry to the xsockconf.ini configuration file to 
+specify which network host the application will run on. If not configured, all
+applications will use the 172.0.0.* network to communicate with click and will
+end up running on the virtual Host0 host. As configured here, the server example
+programs run on AD0:HID0 while the client applications run on AD1:HID1.
+

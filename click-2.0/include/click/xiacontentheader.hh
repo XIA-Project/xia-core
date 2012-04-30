@@ -27,15 +27,37 @@ class ContentHeader : public XIAGenericExtHeader { public:
     uint16_t length() { if (!exists(LENGTH)) return 0; return *(const uint16_t*)_map[LENGTH].data();};  
     uint32_t chunk_length() { if (!exists(CHUNK_LENGTH)) return 0; return *(const uint32_t*)_map[CHUNK_LENGTH].data();};  
     
-
-    enum { OPCODE, OFFSET, CHUNK_OFFSET, LENGTH, CHUNK_LENGTH}; 
-    enum { OP_REQUEST=1, OP_RESPONSE, OP_LOCAL_PUTCID, OP_REDUNDANT_REQUEST};
+    uint32_t contextID() { 
+        if (!exists(CONTEXT_ID)) 
+            return 0; 
+        return *(const uint32_t*)_map[CONTEXT_ID].data();
+    };  
+    uint32_t ttl() { 
+        if (!exists(TTL)) 
+            return 0; 
+        return *(const uint32_t*)_map[TTL].data();
+    };  
+    uint32_t cacheSize() { 
+        if (!exists(CACHE_SIZE)) 
+            return 0; 
+        return *(const uint32_t*)_map[CACHE_SIZE].data();
+    };  
+    uint32_t cachePolicy() { 
+        if (!exists(CACHE_POLICY)) 
+            return 0; 
+        return *(const uint32_t*)_map[CACHE_POLICY].data();
+    };  
+    
+    enum { OPCODE, OFFSET, CHUNK_OFFSET, LENGTH, CHUNK_LENGTH, CONTEXT_ID, TTL, CACHE_SIZE, CACHE_POLICY}; 
+    enum { OP_REQUEST=1, OP_RESPONSE, OP_LOCAL_PUTCID, OP_REDUNDANT_REQUEST, OP_LOCAL_REMOVECID};
 };
 
 class ContentHeaderEncap : public XIAGenericExtHeaderEncap { public:
 
     /* data length contained in the packet*/
-    ContentHeaderEncap(uint16_t offset, uint32_t chunk_offset, uint16_t length, uint32_t chunk_length, char opcode= ContentHeader::OP_RESPONSE);
+    ContentHeaderEncap(uint16_t offset, uint32_t chunk_offset, uint16_t length, 
+            uint32_t chunk_length, char opcode= ContentHeader::OP_RESPONSE, 
+            uint32_t contextID=0, uint32_t ttl = 86400, uint32_t cacheSize=1024, uint32_t cachePolicy=0);
 
     ContentHeaderEncap(uint8_t opcode, uint32_t chunk_offset=0, uint16_t length=0);
 

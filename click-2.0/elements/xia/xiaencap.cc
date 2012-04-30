@@ -1,17 +1,5 @@
 /*
- * xiancap.{cc,hh} -- element encapsulates packet in XIA header
- * Dongsu Han 
- *
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, subject to the conditions
- * listed in the Click LICENSE file. These conditions include: you must
- * preserve this copyright notice, and you cannot mention the copyright
- * holders in advertising related to the Software without their permission.
- * The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
- * notice is a summary of the Click LICENSE file; the license in that file is
- * legally binding.
+ * xiancap.{cc,hh} -- element encapsulating packets in an XIA header
  */
 
 #include <click/config.h>
@@ -43,7 +31,10 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
     int nxt = -1;
     int last = -1;
     uint8_t hlim = 250;
-    int packet_offset =-1, chunk_offset =-1, content_length =-1, chunk_length =-1;
+    int packet_offset = -1;
+	int chunk_offset = -1;
+	int content_length = -1;
+	int chunk_length = -1;
     bool is_request =false;
     bool is_dynamic =false;
 
@@ -53,7 +44,7 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
                    "NXT", 0, cpInteger, &nxt,
                    "LAST", 0, cpInteger, &last,
                    "HLIM", 0, cpByte, &hlim,
-		   "DYNAMIC", 0, cpBool, &is_dynamic,
+                   "DYNAMIC", 0, cpBool, &is_dynamic,
                    "EXT_C_REQUEST", 0, cpBool, &is_request,
                    "EXT_C_PACKET_OFFSET", 0, cpInteger, &packet_offset,
                    "EXT_C_CHUNK_OFFSET", 0, cpInteger, &chunk_offset,
@@ -95,13 +86,11 @@ XIAEncap::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-
 int
 XIAEncap::initialize(ErrorHandler *)
 {
     return 0;
 }
-
 
 Packet *
 XIAEncap::simple_action(Packet *p_in)
@@ -111,19 +100,20 @@ XIAEncap::simple_action(Packet *p_in)
     if (_contenth) {
         p = _contenth->encap(p_in);
         if (p) {
-            _xiah->set_plen(length); // set payload length ignoring the content ext header
+			// set payload length ignoring the content ext header
+            _xiah->set_plen(length);
             p = _xiah->encap(p, false);
         }
     }
     else {
- 	if (_is_dynamic) {
-	    if (_xiah->dst_path().unparse_node_size()>1)
-	      _xiah->dst_path().incr(2);
-	    else if (_xiah->dst_path().unparse_node_size()==1)
-	      _xiah->src_path().incr(1);
-            _xiah->update();
-	}
-        p = _xiah->encap(p_in, true);
+		if (_is_dynamic) {
+			if (_xiah->dst_path().unparse_node_size() > 1)
+				_xiah->dst_path().incr(2);
+			else if (_xiah->dst_path().unparse_node_size() == 1)
+				_xiah->src_path().incr(1);
+			_xiah->update();
+		}
+		p = _xiah->encap(p_in, true);
     }
     return p;
 }

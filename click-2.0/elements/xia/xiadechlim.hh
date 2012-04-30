@@ -8,11 +8,15 @@ CLICK_DECLS
 /*
  * =c
  * XIADecHLIM([keyword])
- * =s ip
- * decrements XIA hop limit, drops dead packets
+ *
+ * =s xip
+ *
+ * decrements XIA hop limit, drops expired packets
+ *
  * =d
+ *
  * Expects XIA packet as input.
- * If the hlim is <= 1 (i.e. has expired),
+ * If the hlim is <= 1 (i.e., the packet has expired),
  * XIADecHLIM sends the packet to output 1 (or discards it if there is no
  * output 1).
  * Otherwise it decrements the hlim,
@@ -45,11 +49,9 @@ class XIADecHLIM : public Element { public:
 
     Packet *simple_action(Packet *);
 
-  private:
-
+private:
     atomic_uint32_t _drops;
     bool _active;
-
 };
 
 CLICK_ENDDECLS

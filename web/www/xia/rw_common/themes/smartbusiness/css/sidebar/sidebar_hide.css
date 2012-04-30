@@ -1,0 +1,25 @@
+#container {
+	background: #FFFFFF url(../../images/content_hide_bg.png) repeat-y;
+}
+
+#container #contentTop {
+	background: url(../../images/content_top_hide.png) no-repeat;
+}
+
+#sidebarContainer {
+	display: none;
+}
+
+#contentContainer {
+	width: 100%;
+	border: none;
+	margin: 0;
+}
+
+#contentContainer #content {
+	padding: 0 40px 0 35px;
+}
+
+#footer {
+	background: no-repeat url(../../images/footer_sidehide_bg.png);
+}

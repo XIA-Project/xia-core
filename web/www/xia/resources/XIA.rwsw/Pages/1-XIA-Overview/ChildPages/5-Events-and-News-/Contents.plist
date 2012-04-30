@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>SandwichFillings</key>
+	<array>
+		<dict>
+			<key>Dictionary</key>
+			<dict>
+				<key>BrowserTitle</key>
+				<string>XIA Events and News</string>
+				<key>ID</key>
+				<string>page3</string>
+				<key>MostRecentlySelectedStyleName</key>
+				<string>Theme Default</string>
+				<key>PageTitle</key>
+				<string>Events and News </string>
+				<key>PluginClassName</key>
+				<string>RWStyledPlugin</string>
+				<key>PluginMetadata</key>
+				<dict>
+					<key>Author</key>
+					<string>Realmac Software</string>
+					<key>Name</key>
+					<string>Styled Text</string>
+				</dict>
+				<key>PublishingManifest</key>
+				<dict>
+					<key>CreationDate</key>
+					<date>2012-02-19T05:01:22Z</date>
+					<key>DigestAlgorithm</key>
+					<string>MD5</string>
+					<key>DocumentGUID</key>
+					<string>126727B7-F448-4242-8994-9DFD61F8DFB7</string>
+					<key>PageDigests</key>
+					<dict>
+						<key>events-news.html</key>
+						<dict>
+							<key>Digest</key>
+							<data>
+							8c+TXItNbQg8UEXVTEuE
+							Nw==
+							</data>
+							<key>Size</key>
+							<integer>5636</integer>
+						</dict>
+					</dict>
+					<key>PageID</key>
+					<string>page3</string>
+					<key>SiteRoot</key>
+					<string>Events-News</string>
+					<key>Version</key>
+					<integer>3</integer>
+				</dict>
+			</dict>
+			<key>Files</key>
+			<array/>
+			<key>Subsandwiches</key>
+			<array>
+				<string>ChildPages</string>
+				<string>Data</string>
+				<string>PageAttributes</string>
+			</array>
+		</dict>
+	</array>
+	<key>Type</key>
+	<string>Page</string>
+</dict>
+</plist>

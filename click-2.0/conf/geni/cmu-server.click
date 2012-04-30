@@ -1,4 +1,4 @@
-require(library xia_two_port_four_port_router.click); 
+require(library ../xia_router_template_xtransport.click);
 require(library ../xia/xia_address.click);
 
 
@@ -27,7 +27,7 @@ c0[0]
 router2[1]
 ->  XIAPrint("AD_CMU->router1")
 -> c::XIAXIDTypeCounter(src AD, src HID, src SID, src CID, src IP, -)
--> Socket(UDP, 155.98.39.11, 9999, 0.0.0.0, 9999, SNAPLEN 9000) // DestIP, DestPort, SrcIP, SrcPort  pg42.emulab.net
+-> Socket(UDP, 155.98.39.123, 9999, 0.0.0.0, 9999, SNAPLEN 9000) // DestIP, DestPort, SrcIP, SrcPort  pg42.emulab.net
 
 ControlSocket(tcp, 7777);
 

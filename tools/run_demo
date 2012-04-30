@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2011 Carnegie Mellon University
+# Copyright 2012 Carnegie Mellon University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,10 +21,12 @@
 # in order to use the correct xsockconf.ini file. It would be good to 
 # a) relocate the services into a common directory instead of being scattered
 # throughout the source tree
-# b) no rely on the xsockconf.ini file if possible
+# b) not rely on the xsockconf.ini file if possible
 
 NAME=`basename $0`
 VERBOSE=0
+
+SERVICES="proxy.py webserver.py vs hello_service.py stock_service.py"
 
 # hacky way of finding the root of the XIA source tree
 # assumes this script is in a directory off the parent of the XIA tree
@@ -32,23 +34,42 @@ VERBOSE=0
 #  so XIADIR would be /xia-core assuming the script were /xia-core/tools/run_demo
 XIADIR=$(dirname $(dirname $(cd ${0%/*} && echo $PWD/${0##*/})))
 
-stop_demo()
+is_running()
 {
-	printf "Stopping XIA Demo Services\n"
-	exec 3>&1 4>&2 &> /dev/null
-	killall -9 proxy.py 
-	killall -9 webserver.py
-	killall -9 vs
-	killall -9 hello_service.py
-	killall -9 stock_service.py
-	exec 1>&3 2>&4 3>&- 4>&-
+	RUNNING=`ps ao args | grep $1 | grep -v grep`
+	[ "$RUNNING" != "" ]
 }
 
-start_demo()
+check_services()
+{
+	printf "XIA Demo Service Status\n"
+	for svc in "click" $SERVICES
+	do
+		status="stopped"
+		is_running $svc
+		[ $? -eq 0 ] && status="running"
+		printf "%-16s: %s\n" $svc $status
+	done
+}
+
+stop_services()
+{
+	printf "Stopping XIA Demo Services\n"
+	for svc in $SERVICES
+	do
+		killall -9 $svc &> /dev/null
+	done
+}
+
+start_services()
 {
 	printf "Starting XIA Demo Services\n"
 
-	# FIXME: add check to see if click is running
+	is_running "click"
+	if [ $? -ne 0 ]; then
+		printf "Click is not running, aborting...\n"
+		exit 1
+	fi
 
 	if [ $VERBOSE -eq 0 ]; then
 		exec &> /dev/null
@@ -62,7 +83,7 @@ start_demo()
 	./vs video.ogv &
 	sleep 1  # need this otherwise it doesn't work
 
-	cd $XIADIR/proxies
+	cd $XIADIR/web
 	./webserver.py &
 	sleep 1
 	./proxy.py 8080 127.0.0.1 &
@@ -80,6 +101,7 @@ where:
   start   - starts the demo services if not already running
   stop    - stops the demo services
   restart - stops then starts the demo services
+  check   - print service status
 
 EOH
 	exit 0
@@ -107,15 +129,18 @@ shift $((OPTIND-1))
 
 case $1 in
 	start)
-		start_demo
+		start_services
 		;;
 	stop)
-		stop_demo
+		stop_services
 		;;
 	restart|reload)
-		stop_demo
+		stop_services
 		sleep 1
-		start_demo
+		start_services
+		;;
+	check)
+		check_services
 		;;
 	*)
 		printf "\nInvalid command: -$1\n" >&2

@@ -39,6 +39,8 @@ class XID { public:
     String unparse() const;
     String unparse_pretty(const Element* context = NULL) const;
 
+	bool valid() { return (ntohl(_xid.type) != CLICK_XIA_XID_TYPE_UNDEF); };
+
   private:
     struct click_xia_xid _xid;
 };

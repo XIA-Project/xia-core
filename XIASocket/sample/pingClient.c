@@ -13,7 +13,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include "Xsocket.h"
-#include <fcntl.h>
+//#include <fcntl.h>
 
 #define HID0 "HID:0000000000000000000000000000000000000000"
 #define HID1 "HID:0000000000000000000000000000000000000001"
@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
 	error("Opening socket");
 
     //Make it non-blocking
-    fcntl(sock, F_SETFL, O_NONBLOCK);
+//    fcntl(sock, F_SETFL, O_NONBLOCK);
 
     //XBind is optional. If not done an ephemeral port will be bound 
     //Xbind(sock,"RE AD:1000000000000000000000000000000000000009 HID:1500000000000000000000000000000000000055 SID:1f00000000000000000000000000000000000055");
@@ -66,18 +66,19 @@ int main(int argc, char *argv[]) {
 
 	Xsendto(sock, payload_new,4,0,dag,strlen(dag));
 
-	fprintf(fp, "%lu: PING sent; client seq = %d\n",current_time, seq_client_);  // modify payload
+	fprintf(fp, "%llu: PING sent; client seq = %d\n",current_time, seq_client_);  // modify payload
 	//printf("%lld: PING sent; client seq = %d\n",current_time, seq_client_);  // modify payload         
 	seq_client_++;
 
-        n = Xrecvfrom(sock,reply,1024,0,theirDAG,&dlen);
+	dlen = sizeof(theirDAG);
+    n = Xrecvfrom(sock,reply,1024,0,theirDAG,&dlen);
 	if(n>0)
 	    {   
 		gettimeofday(&tv, NULL);
 		current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
 		memcpy (&seq_c,reply, 4);
 		memcpy (&seq_s,reply+4, 4);   
-		fprintf(fp, "%lu: PONG received; client seq = %d, server seq = %d\n",current_time, seq_c, seq_s);
+		fprintf(fp, "%llu: PONG received; client seq = %d, server seq = %d\n",current_time, seq_c, seq_s);
 		//printf("%lld: PONG received; client seq = %d, server seq = %d\n",current_time, seq_c, seq_s);
 		rx++;
 		n=0;
@@ -87,16 +88,17 @@ int main(int argc, char *argv[]) {
 
     }
 
-    fcntl(sock, F_SETFL, fcntl(sock, F_GETFL) & ~O_NONBLOCK);
+//    fcntl(sock, F_SETFL, fcntl(sock, F_GETFL) & ~O_NONBLOCK);
     if(rx<TOTALPINGS)  
 	do
 	{   
+		dlen = sizeof(theirDAG);
 	    n = Xrecvfrom(sock,reply,1024,0,theirDAG,&dlen);
 	    gettimeofday(&tv, NULL);
 	    current_time = (uint64_t)(tv.tv_sec) * 1000000 + tv.tv_usec;
 	    memcpy (&seq_c,reply, 4);
 	    memcpy (&seq_s,reply+4, 4);   
-	    fprintf(fp, "%lu: PONG received; client seq = %d, server seq = %d\n",current_time, seq_c, seq_s);
+	    fprintf(fp, "%llu: PONG received; client seq = %d, server seq = %d\n",current_time, seq_c, seq_s);
 	    //printf("%lld: PONG received; client seq = %d, server seq = %d\n",current_time, seq_c, seq_s);
 	    rx++;
 	    n=0;

@@ -1,0 +1,144 @@
+<head><title>Welcome to the XIA World!</title></head>
+<html>
+<style type="text/css">
+#main #content {margin-right: 12em;}
+#box {  
+	border-width:	1px;
+	border-style:	solid;
+	border-color:	lightgrey;
+	width: 1100px;
+	margin-left: 1em;
+	left: 10px;
+	padding-left: 2em;
+	padding-bottom: 2em;}
+h1 {color: #aa1111;}
+h2 { padding-left: 1em; }
+id { padding-left: 1em; font: arial; font-size: 11pt; color: #aa1111;}
+fb { padding-left: 1em; font: arial; font-size: 11pt; font-weight: bold; color: #aa1111;}
+a { padding-left: 1.5em; font: arial; font-size: 12pt; }
+
+</style>
+<body>
+<div id="main">
+<div id="box">
+<h1>End-point Evolution</h1>
+<p>
+<h2>Multiple types of identifiers</h2>
+<ul>
+<li>Network (Domain) and Host Identifiers    </li> 
+<id>AD:06088766ef5729c6e10b6dbf076f9c708e9855fc</id> 
+<br>
+<id>HID:71c3dd5af38bcd2cfede5b943c3358d4ef4285f8</id> 
+<li>Service Identifiers </li>
+<id>SID:f0afa824a36f2a2d95c67ff60f61200e48006625</id> 
+<br><id>Talk to any server offering the service</id> 
+<li>Content Identifiers </li>
+<id>CID:95c52e5d05fffc44a2a3ab1c466e2cd8749d9d7d</id> 
+<br><id>Fetch a piece of content</id>
+<li>Define your own! </li>
+<id> Define your own semantics of operating on this type</id><br>
+<id> Intrinsic security requirement </id>
+</ul>
+
+
+<h2>Backwards-compatible paths</h2>
+
+<ul>
+<li> Service Identifier without fallback
+<br>
+<a href=http://dag/0/SID.0f03333333333333333322222222220000000099=0:0//simple.html>http://dag/0/SID:0f03333333333333333322222222220000000099=0:0</a>
+</ul>
+
+<ul>
+<li>Service Identifiers with fallback </li>
+<br>
+<a href=http://www_s.xiaweb.com.xia/simple.html>http://www_s.xiaweb.com.xia/simple.html</a>
+<br>
+<br>
+<a href=http://dag/2,0/AD.1000000000000000000000000000000000000001=0:2,1/HID.0000000000000000000000000000000000000001=1:2/SID:f0afa824a36f2a2d95c67ff60f61200e48006625=2:2//simple.html>http://dag/2,0/AD.1000000000000000000000000000000000000001=0:2,1/HID.0000000000000000000000000000000000000001=1:2/SID:f0afa824a36f2a2d95c67ff60f61200e48006625=2:2//simple.html</a>
+<br>
+<br>
+<id> (HID:0000000000000000000000000000000000000001) <fb>SID:f0afa824a36f2a2d95c67ff60f61200e48006625</fb></id> 
+<br>
+<br>
+<br>
+<br>
+<a href=http://www_s.xiaweb.com.xia/xia/index.html>http://www_s.xiaweb.com.xia/xia/index.html</a>
+<br>
+<br>
+<a href=http://dag/2,0/AD.1000000000000000000000000000000000000001=0:2,1/HID.0000000000000000000000000000000000000001=1:2/SID:f0afa824a36f2a2d95c67ff60f61200e48006625=2:2//xia/index.html>http://dag/2,0/AD.1000000000000000000000000000000000000001=0:2,1/HID.0000000000000000000000000000000000000001=1:2/SID:f0afa824a36f2a2d95c67ff60f61200e48006625=2:2//xia/index.html</a>
+<br>
+<br>
+<id> (HID:0000000000000000000000000000000000000001) <fb>SID:f0afa824a36f2a2d95c67ff60f61200e48006625</fb></id> 
+<br>
+<br>
+<br>
+<li> Content Identifiers with fallback</li>
+<a href=http://xia.cid.1.aa2fe45640e694c06dcc3331ed91998c8eb4879a/fallback(ad.ad1:hid.hid1:cid.1.aa2fe45640e694c06dcc3331ed91998c8eb4879a)>http://xia.cid.1.aa2fe45640e694c06dcc3331ed91998c8eb4879a/fallback(ad.ad1:hid.hid1:cid.1.aa2fe45640e694c06dcc3331ed91998c8eb4879a)</a>
+<br>
+<br>
+<id> (HID:71c3dd5af38bcd2cfede5b943c3358d4ef4285f8) <fb>CID:06088766ef5729c6e10b6dbf076f9c708e9855fc</fb></id> </li> 
+</ul>
+
+<h2>Using Multiple Principals in XIA</h2>
+<ul>
+<li> 
+<br>
+<a href=http://www_s.xiaweb.com.xia/demo.html>http://www_s.xiaweb.com.xia/demo.html</a>
+<br>
+<br>
+<a href=http://dag/2,0/AD.1000000000000000000000000000000000000001=0:2,1/HID.0000000000000000000000000000000000000001=1:2/SID:f0afa824a36f2a2d95c67ff60f61200e48006625=2:2//demo.html>http://dag/2,0/AD.1000000000000000000000000000000000000001=0:2,1/HID.0000000000000000000000000000000000000001=1:2/SID:f0afa824a36f2a2d95c67ff60f61200e48006625=2:2//demo.html</a><id>
+<br>
+<br>
+(HID:71c3dd5af38bcd2cfede5b943c3358d4ef4285f8) <fb>SID:f0afa824a36f2a2d95c67ff60f61200e48006625</fb></id>
+<br>
+(local alternative <a href=demo.html>http://demo.xia.org </a>)  </id>
+</ul>
+
+</div>
+<div id="box">
+<h1>Network Evolution</h1>
+<p>
+<ul>
+<li> In-network content caching</li> 
+<br>
+<a href=http://www_s.xiaweb.com.xia/demo.html>http://www_s.xiaweb.com.xia/demo.html</a>
+<br>
+<br>
+<a href=http://dag/2,0/AD.1000000000000000000000000000000000000001=0:2,1/HID.0000000000000000000000000000000000000001=1:2/SID:f0afa824a36f2a2d95c67ff60f61200e48006625=2:2//demo.html>http://dag/2,0/AD.1000000000000000000000000000000000000001=0:2,1/HID.0000000000000000000000000000000000000001=1:2/SID:f0afa824a36f2a2d95c67ff60f61200e48006625=2:2//demo.html</a><id>
+<br>
+<br>
+(HID:71c3dd5af38bcd2cfede5b943c3358d4ef4285f8) <fb> SID:f0afa824a36f2a2d95c67ff60f61200e48006625</fb></id>
+<p>
+<li>Anycast for service</li>
+<br>
+<a href=http://www_s.xiaweb.com.xia/xia_service.html>http://www_s.xiaweb.com.xia/xia_service.html</a>
+<br>
+<br>
+<a href=http://dag/2,0/AD.1008888888888777777333555555555555500001=0:2,1/HID.000000000000000000000000000000eeeeee0000=1:2/SID:0f03333333333333333333333333330000000058=2:2//xia_service.html>http://dag/2,0/AD.1008888888888777777333555555555555500001=0:2,1/HID.000000000000000000000000000000eeeeee0000=1:2/SID:0f03333333333333333333333333330000000058=2:2//xia_service.html</a><id>
+<br>
+<br>
+(HID:000000000000000000000000000000eeeeee0000) <fb> SID:0f03333333333333333333333333330000000058</fb></id>
+</div>
+
+<div id="box">
+<h1>Other Benefits</h1>
+<p>
+<ul>
+<li>*-Mobility (Service and end-host Mobility) </li>
+Service migration example:
+<br>
+<br>
+<a href=http://www_s.xiaweb.com.xia/demo.html>http://www_s.xiaweb.com.xia/demo.html</a>
+<br>
+<br>
+<a href=http://dag/2,0/AD.1000000000000000000000000000000000000001=0:2,1/HID.0000000000000000000000000000000000000001=1:2/SID:f0afa824a36f2a2d95c67ff60f61200e48006625=2:2//demo.html>http://dag/2,0/AD.1000000000000000000000000000000000000001=0:2,1/HID.0000000000000000000000000000000000000001=1:2/SID:f0afa824a36f2a2d95c67ff60f61200e48006625=2:2//demo.html</a><id>
+<br>
+<br>
+(HID:0000000000000000000000000000000000000001) <fb> SID:f0afa824a36f2a2d95c67ff60f61200e48006625</fb></id>
+</ul>
+</div>
+
+</div>
+</body>
+</html>

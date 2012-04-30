@@ -15,7 +15,7 @@ pretty-prints XIA packets
 =d
 
 Expects XIA packets as input.  Should be placed downstream of a
-CheckXIAHeader or equivalent element.
+MarkXIAHeader or equivalent element.
 
 Prints out XIA packets in a human-readable tcpdump-like format, preceded by
 the LABEL text.
@@ -80,43 +80,40 @@ Boolean.  If false, then don't print messages.  Default is true.
 
 class XIAPrint : public Element { public:
 
-  XIAPrint();
-  ~XIAPrint();
-
-  const char *class_name() const		{ return "XIAPrint"; }
-  const char *port_count() const		{ return PORTS_1_1; }
-  const char *processing() const		{ return AGNOSTIC; }
-
-  int configure(Vector<String> &, ErrorHandler *);
-  int initialize(ErrorHandler *);
-  void cleanup(CleanupStage);
-  void add_handlers();
-
-  Packet *simple_action(Packet *);
-
- private:
-
-  bool _active;
-  String _label;
-  int _bytes;			// Number of bytes to dump
-  bool _print_timestamp : 1;
-  bool _print_paint : 1;
-  bool _print_hlim : 1;
-  bool _print_len : 1;
-  bool _print_aggregate : 1;
-  bool _payload : 1;		// '_contents' refers to payload
-  unsigned _contents : 2;	// Whether to dump packet contents
+    XIAPrint();
+    ~XIAPrint();
   
-
+    const char *class_name() const		{ return "XIAPrint"; }
+    const char *port_count() const		{ return PORTS_1_1; }
+    const char *processing() const		{ return AGNOSTIC; }
+  
+    int configure(Vector<String> &, ErrorHandler *);
+    int initialize(ErrorHandler *);
+    void cleanup(CleanupStage);
+    void add_handlers();
+  
+    Packet *simple_action(Packet *);
+  
+  private:
+    bool _active;
+    String _label;
+    int _bytes;			// Number of bytes to dump
+    bool _print_timestamp : 1;
+    bool _print_paint : 1;
+    bool _print_hlim : 1;
+    bool _print_len : 1;
+    bool _print_aggregate : 1;
+    bool _payload : 1;		// '_contents' refers to payload
+    unsigned _contents : 2;	// Whether to dump packet contents
+  
 #if CLICK_USERLEVEL
-  String _outfilename;
-  FILE *_outfile;
-  
+    String _outfilename;
+    FILE *_outfile;
 #endif
-  ErrorHandler *_errh;
 
-  void print_xids(StringAccum &sa, const struct click_xia *xiah);
+    ErrorHandler *_errh;
 
+    void print_xids(StringAccum &sa, const struct click_xia *xiah);
 };
 
 CLICK_ENDDECLS

@@ -3,6 +3,21 @@
 #include <click/element.hh>
 #include "xiafastpath.hh"
 
+/*
+=c
+XIAInsertHash([KEY_OFFSET])
+
+=s xia
+inserts a hash of the partial DAG address into the payload
+
+=d
+
+=item KEY_OFFSET
+
+Specifies the location in the payload that will be used to store a hash. Defaults to 0 (the start of the payload).
+
+*/
+
 CLICK_DECLS
 class XIAInsertHash : public Element { public:
     XIAInsertHash();
@@ -13,7 +28,7 @@ class XIAInsertHash : public Element { public:
     Packet * simple_action( Packet *);
     int configure(Vector<String> &conf, ErrorHandler *errh);
    
-    private:
+  private:
     uint32_t _offset;
 };
 

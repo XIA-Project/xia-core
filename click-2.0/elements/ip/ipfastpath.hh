@@ -2,6 +2,18 @@
 #define CLICK_IPFASTPATH_HH
 #include <click/element.hh>
 
+/*
+=c
+IPFastPath()
+
+=s ip
+caches the forwarding result of IP addresses.
+
+=e
+
+*/
+
+// the number of items per hash bucket
 #define IP_ASSOCIATIVITY 2
 
 struct iplookup_result {
@@ -14,9 +26,9 @@ struct ipfp_bucket {
     uint8_t counter[IP_ASSOCIATIVITY];
 }
 #if CLICK_LINUXMODULE
- ____cacheline_aligned_in_smp;
+____cacheline_aligned_in_smp;
 #else
-  __attribute__ ((aligned (64)));
+__attribute__ ((aligned (64)));
 #endif
 
 CLICK_DECLS
@@ -31,7 +43,7 @@ class IPFastPath : public Element { public:
    
     int initialize(ErrorHandler *);
 
-    private:
+  private:
     struct ipfp_bucket* _buckets[NUM_CLICK_CPUS];
     uint32_t _bucket_size;
     

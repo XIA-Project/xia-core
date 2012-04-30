@@ -306,15 +306,13 @@ IPRouteTable::load_routes_handler(const String &conf, Element *e, void *, ErrorH
 {
 #if CLICK_USERLEVEL
     std::ifstream in_f(conf.c_str());
-    if (!in_f.is_open())
-    {
+    if (!in_f.is_open()) {
         errh->error("could not open file: %s", conf.c_str());
         return -1;
     }
 
     int c = 0;
-    while (!in_f.eof())
-    {
+    while (!in_f.eof()) {
         char buf[1024];
         in_f.getline(buf, sizeof(buf));
 
@@ -336,21 +334,20 @@ IPRouteTable::load_routes_handler(const String &conf, Element *e, void *, ErrorH
     mm_segment_t old_fs = get_fs();
     set_fs(KERNEL_DS);
     struct file * filp = file_open(conf.c_str(), O_RDONLY, 0);
-    if (filp==NULL)
-    {
+    if (filp == NULL) {
         errh->error("could not open file: %s", conf.c_str());
         return -1;
     }
     loff_t file_size = vfs_llseek(filp, (loff_t)0, SEEK_END);
     loff_t curpos = 0;
-    while (curpos < file_size)	{
-	file_read(filp, curpos, buf, 1020);
-	char * eol = strchr(buf, '\n');	
-	if (eol==NULL) {
-            click_chatter("Error at %s %d\n", __FUNCTION__, __LINE__);
-	    break;
-	}
-	curpos+=(eol+1-buf);
+    while (curpos < file_size){
+		file_read(filp, curpos, buf, 1020);
+		char * eol = strchr(buf, '\n');	
+		if (eol==NULL) {
+				click_chatter("Error at %s %d\n", __FUNCTION__, __LINE__);
+			break;
+		}
+		curpos+=(eol+1-buf);
         eol[1] = '\0';
         if (strlen(buf) == 0)
             continue;
@@ -358,8 +355,8 @@ IPRouteTable::load_routes_handler(const String &conf, Element *e, void *, ErrorH
         if (add_route_handler(buf, e, 0, errh) != 0) {
             click_chatter("Error at %s %d\n", __FUNCTION__, __LINE__);
             return -1;
-	}
-        c++;
+		}
+			c++;
     }
     set_fs(old_fs);
 

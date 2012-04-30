@@ -19,7 +19,7 @@ PATTERN is (src TYPE | dst TYPE | src_and_dst SRCTYPE DSTTYPE | src_or_dst SRCTY
 =e
 
 XIAXIDTypeClassifier(src AD, dst HID, -)
-It outputs packets from AD to port 0, HID packets towards HID to port 1, and other packets to port 2.
+It outputs packets from AD to port 0, HID packets destined for HID to port 1, and other packets to port 2.
 
 =a IPClassifier, IPFilter
 */

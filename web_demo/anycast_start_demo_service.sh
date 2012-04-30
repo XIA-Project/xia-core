@@ -22,7 +22,7 @@ cd ../XIASocket/sample/
 ./vs video.ogv &
 sleep 1  # need this otherwise it doesn't work
 
-cd ../../proxies
+cd ../../web
 ./webserver.py $@ &
 ./webserver_replicate.py $@  &
 sleep 1

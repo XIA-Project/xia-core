@@ -1,6 +1,5 @@
 /*
  * markxiaheader.{cc,hh} -- element sets XIA Header annotation
- *
  */
 
 #include <click/config.h>
@@ -21,18 +20,20 @@ MarkXIAHeader::~MarkXIAHeader()
 int
 MarkXIAHeader::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-  _offset = 0;
-  return cp_va_kparse(conf, this, errh,
-		      "OFFSET", cpkP, cpUnsigned, &_offset,
-		      cpEnd);
+    _offset = 0;
+    return cp_va_kparse(conf, this, errh,
+  		      "OFFSET", cpkP, cpUnsigned, &_offset,
+  		      cpEnd);
 }
 
 Packet *
 MarkXIAHeader::simple_action(Packet *p)
 {
-  const click_xia *xiah = reinterpret_cast<const click_xia *>(p->data() + _offset);
-  p->set_xia_header(xiah, XIAHeader::hdr_size(xiah->dnode + xiah->snode));
-  return p;
+    const click_xia *xiah = reinterpret_cast<const click_xia *>(p->data() + _offset);
+
+    p->set_xia_header(xiah, XIAHeader::hdr_size(xiah->dnode + xiah->snode));
+
+    return p;
 }
 
 CLICK_ENDDECLS

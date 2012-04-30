@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>SandwichFillings</key>
+	<array>
+		<dict>
+			<key>Dictionary</key>
+			<dict>
+				<key>BrowserTitle</key>
+				<string>XIA Team</string>
+				<key>ID</key>
+				<string>page2</string>
+				<key>MostRecentlySelectedStyleName</key>
+				<string>Custom Style</string>
+				<key>PageTitle</key>
+				<string>XIA Team </string>
+				<key>PluginClassName</key>
+				<string>RWStyledPlugin</string>
+				<key>PluginMetadata</key>
+				<dict>
+					<key>Author</key>
+					<string>Realmac Software</string>
+					<key>Name</key>
+					<string>Styled Text</string>
+				</dict>
+				<key>PublishingManifest</key>
+				<dict>
+					<key>CreationDate</key>
+					<date>2011-10-27T15:14:40Z</date>
+					<key>DigestAlgorithm</key>
+					<string>MD5</string>
+					<key>DocumentGUID</key>
+					<string>126727B7-F448-4242-8994-9DFD61F8DFB7</string>
+					<key>PageDigests</key>
+					<dict>
+						<key>XIA-team.html</key>
+						<dict>
+							<key>Digest</key>
+							<data>
+							kkbGiy0OpKHH5wT5D/Oh
+							Qw==
+							</data>
+							<key>Size</key>
+							<integer>12908</integer>
+						</dict>
+						<key>files/pasted-graphic-1.jpg</key>
+						<dict>
+							<key>Digest</key>
+							<data>
+							sEGG1kzRMDkMwX0v+ui6
+							nw==
+							</data>
+							<key>Size</key>
+							<integer>3266</integer>
+						</dict>
+						<key>files/pasted-graphic-3.jpg</key>
+						<dict>
+							<key>Digest</key>
+							<data>
+							fT8CdE3hzYc+XWy9DBuC
+							TA==
+							</data>
+							<key>Size</key>
+							<integer>5789</integer>
+						</dict>
+						<key>files/pasted-graphic.jpg</key>
+						<dict>
+							<key>Digest</key>
+							<data>
+							y82Q0IWtlvP68Qqf2NVw
+							Wg==
+							</data>
+							<key>Size</key>
+							<integer>5603</integer>
+						</dict>
+					</dict>
+					<key>PageID</key>
+					<string>page2</string>
+					<key>Version</key>
+					<integer>3</integer>
+				</dict>
+			</dict>
+			<key>Files</key>
+			<array/>
+			<key>Subsandwiches</key>
+			<array>
+				<string>Data</string>
+				<string>PageAttributes</string>
+			</array>
+		</dict>
+	</array>
+	<key>Type</key>
+	<string>Page</string>
+</dict>
+</plist>

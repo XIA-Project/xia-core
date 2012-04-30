@@ -1,0 +1,27 @@
+Tools for building and runing XIA
+
+for help on the scripts here, use the -h parameter on the command line
+
+buildxia - build all the XIA components, can be run from anywhere in the XIA tree
+
+xidgen - simple tool to create a unique 40 character XID
+
+xroute - view/edit the XIA route tables. Route changes are not permanent and will be
+reset the next time the network is restarted. Unless you know what you are doing,
+avoid making changes!
+
+xianet - start the XIA network components.
+
+run_demo - start the XIA web demo processes.
+
+xianet_click_output_only - start the xia services, but don't check to see if click is
+already running. Should be used in conjunction with run_click in verbose mode to enable
+debug messages to the console.
+
+run_click - start the click process, but not the other XIA services. Can be used in
+conjunction with xia_click_output_only script for debug purposes
+
+run_bootstrap - older version of xianet, kept for historical purposes
+
+create_redirect_routes - for test purposes
+

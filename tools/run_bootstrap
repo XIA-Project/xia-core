@@ -1,0 +1,154 @@
+#!/bin/bash
+#
+# Copyright 2012 Carnegie Mellon University
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+# FIXME:
+# the locaitons of the various service executables makes this script fragile
+# as they all currently have to run from the directory they are located in
+# in order to use the correct xsockconf.ini file. It would be good to 
+# a) relocate the daemons into a common directory instead of being scattered
+# throughout the source tree
+# b) not rely on the xsockconf.ini file if possible
+
+NAME=`basename $0`
+VERBOSE=0
+
+# this is a particular list of daemons for the default 4-node-chain topology (host0 -- router0 -- router1 -- host1)
+DAEMONS="xroute_r0 xroute_r1 xhcp_server_r0 xhcp_server_r1 xhcp_client_h0 xhcp_client_h1 xnameservice"
+
+# hacky way of finding the root of the XIA source tree
+# assumes this script is in a directory off the parent of the XIA tree
+# and that the daemons it starts are rooted off of the same location
+#  so XIADIR would be /xia-core assuming the script were /xia-core/tools/run_demo
+XIADIR=$(dirname $(dirname $(cd ${0%/*} && echo $PWD/${0##*/})))
+
+is_running()
+{
+	RUNNING=`ps ao args | grep $1 | grep -v grep`
+	[ "$RUNNING" != "" ]
+}
+
+check_daemons()
+{
+	printf "XIA Demo Service Status\n"
+	for svc in "click" $DAEMONS
+	do
+		status="stopped"
+		is_running $svc
+		[ $? -eq 0 ] && status="running"
+		printf "%-16s: %s\n" $svc $status
+	done
+}
+
+stop_daemons()
+{
+	printf "Stopping bootstraping processes\n"
+	for svc in $DAEMONS
+	do
+		killall -9 $svc &> /dev/null
+	done
+}
+
+start_daemons()
+{
+	printf "Starting XIA bootstraping processes\n"
+
+	is_running "click"
+	if [ $? -ne 0 ]; then
+		printf "Click is not running, aborting...\n"
+		exit 1
+	fi
+
+	if [ $VERBOSE -eq 0 ]; then
+		exec &> /dev/null
+	fi
+
+	cd $XIADIR/daemons/xroute
+	./xroute_r0 &
+	./xroute_r1 & 
+	sleep 2
+	
+	cd $XIADIR/daemons/xhcp
+	./xhcp_server_r0 &
+	./xhcp_server_r1 &
+	sleep 1 
+	./xhcp_client_h0 www_h.host0.com.xia &
+	./xhcp_client_h1 www_h.host1.com.xia &
+	sleep 2 
+		
+	cd $XIADIR/daemons/nameserver
+	./xnameservice &
+}
+
+help ()
+{
+	cat << EOH
+
+usage: $NAME [-qv] [start|stop|restart]
+where:
+  -q runs click silently
+  -v prints click debug messages to stdout (default)
+
+  start   - starts the bootstraping processes if not already running
+  stop    - stops the bootstraping processes
+  restart - stops then starts the bootstraping processes
+  check   - print service status
+
+EOH
+	exit 0
+}
+
+while getopts ":qvh" opt; do
+	case $opt in
+		q)
+			VERBOSE="0"
+			;;
+		v)
+			VERBOSE="1"
+			;;
+		h)
+			help
+			;;
+		\?)
+			printf "\nInvalid option: -$OPTARG\n" >&2
+			help
+			;;
+	esac
+done
+
+shift $((OPTIND-1))
+
+case $1 in
+	start)
+		start_daemons
+		;;
+	stop)
+		stop_daemons
+		;;
+	restart|reload)
+		stop_daemons
+		sleep 1
+		start_daemons
+		;;
+	check)
+		check_daemons
+		;;
+	*)
+		printf "\nInvalid command: -$1\n" >&2
+		help
+		;;
+esac
+

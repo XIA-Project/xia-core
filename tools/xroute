@@ -130,9 +130,12 @@ where:
 
   -f <file>        : read add/delete commands from a config file
   --file=<file>      commands are in the form of:
-                     add router1,AD,AD0,1
-                     add router0,HID,-,0
-                     del host1,CID,CID:0000000000000000000000000000000000000000
+                     add/update:
+                       cmd device,type,xid,port[,nexthop,flags]
+                       add router1,AD,AD0,1
+                       add router0,HID,-,0,HID1,0
+                     delete:
+                       del host1,CID,CID:0000000000000000000000000000000000000000
 
   -d <file>        : dump a command file contining the current route tables
   --dump=<file>      the file format will be the same as the above command
@@ -141,7 +144,7 @@ where:
   --add=<entry>      format of entry is the same as above except the add/del
                      prefix is not used
 
-  -r <entry>       : add a route, can be specified multipe times
+  -r <entry>       : remove a route, can be specified multipe times
   --remove=<entry>   format of entry is the same as above except the add/del
                      prefix is not used
 """
@@ -209,7 +212,6 @@ class RouterConfig:
 			# FIXME: should this be case insensitive?
 			if entry.startswith("XIAXIDInfo"):
 				self.handleXIDs(entry)
-#			elif entry.find("/Script@") > 0:
 			elif entry.find("/cache ::") > 0:
 				# hacky way of finding the devices that are configured
 				self.addDevice(entry)
@@ -450,14 +452,29 @@ class XrouteApp:
 		text = ""
 		routes = data.split("\n")
 		for route in routes:
-			(xid, sep, port) = route.partition(";")
-			if sep != "" and port != "-1":
+			parts = route.split(",")
+
+			if len(parts) != 4:
+				if len(parts) > 1:
+					print "invalid route line: %d %s\n" % (len(parts), route)
+				continue	
+			xid = parts[0]
+			port = parts[1]
+			nexthop = parts[2]
+			flags = int(parts[3])
+
+			if port != -1:
 				if xid == "-":
 					xid = "(default)"
 				elif self.options.verbose() == False:
 					xid = self.config.getAlias(xid)
-				text += "%-8s %-48s %s%s\n" % (table, xid, 
-						port, self.portType(port))
+
+				text += "%-5s %-45s %2s%-11s %08x %s\n" % (table, xid, 
+						port, self.portType(port), flags, nexthop) 
+
+
+#		print "text = %s" % (text)
+
 		return text
 
 	#
@@ -466,8 +483,8 @@ class XrouteApp:
 	def getRouteTable(self, device):
 		text  = device
 		text += "\n"
-		text += "%-8s %-48s PORT\n" % ("TYPE", "XID")
-		text +=  "-" * 80
+		text += "%-5s %-45s %-13s %-8s NEXT HOP\n" % ("TYPE", "XID", "PORT", "FLAGS")
+		text +=  "-" * 120
 		text += "\n"
 
 		# only print the XID types requested by the user
@@ -502,8 +519,7 @@ class XrouteApp:
 			# in case we were passed an alias, try to map to an xid
 			xid = self.config.getXID(xid)
 
-		# FIXME: delete handler needs a bogus port number inside click right now
-		cmd = "%s/n/proc/rt_%s/rt.remove %s 1" % (device, table, xid)
+		cmd = "%s/n/proc/rt_%s/rt.remove %s" % (device, table, xid)
 		self.writeData(cmd)
 		print "%s: deleted route for %s:%s" % (device, table, self.config.getAlias(xid))
 
@@ -514,11 +530,25 @@ class XrouteApp:
 	# only minor error checking is done here, click will do the rest of it
 	#
 	def addRoute(self, text):
-		try:
-			(device, table, xid, port) = text.split(",")
-		except:
+		parts = text.split(",")
+		if len(parts)  < 4 or len(parts) > 6:
 			self.errorExit("Invalid format for add route command")
 
+		device = parts[0]
+		table = parts[1]
+		xid = parts[2]
+		port = parts[3]
+
+		if len(parts) >= 5:
+			nexthop = parts[4]
+		else:
+			nexthop = ""
+
+		if len(parts) == 6:
+			flags = parts[5]
+		else:
+			flags = 0
+			
 		found = False
 		for d in self.devices:
 			if d == device:
@@ -534,7 +564,8 @@ class XrouteApp:
 		if (port == None or port == ""):
 			self.errorExit("port not specified")
 
-		cmd = "%s/n/proc/rt_%s/rt.set %s %s" % (device, table, xid, port)
+		cmd = "%s/n/proc/rt_%s/rt.set4 %s,%s,%s,%s" % (device, table, xid, port, nexthop, flags)
+		print cmd
 
 		self.writeData(cmd)
 		print "%s: added route for %s:%s" % (device, table, self.config.getAlias(xid))

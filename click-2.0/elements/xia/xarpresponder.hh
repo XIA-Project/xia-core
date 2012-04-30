@@ -115,12 +115,12 @@ class XARPResponder : public Element { public:
   private:
 
     struct Entry {
-	//IPAddress dst;
-	//IPAddress mask;
 	XID xida;
 	EtherAddress ena;
     };
     Vector<Entry> _v;
+    EtherAddress _my_en;
+    XID       _my_xid;    
 
     static int entry_compare(const void *a, const void *b, void *user_data);
     int add(Vector<Entry> &v, const String &arg, ErrorHandler *errh) const;

@@ -1,0 +1,98 @@
+body {
+	background: #7f7f7f;
+}
+
+a:link, a:visited {
+	color: #000000;
+}
+
+a:hover, a:active {
+	color: #b3b3b3;
+	text-decoration: none;
+}
+
+#pageHeader {
+	background: no-repeat url(../../images/grey/header_bg.png);
+}
+
+#pageHeader h2 {
+	color: #000000;
+}
+
+#sidebarContainer .sideHeader {
+	color: #56595e;
+}
+
+#navcontainer #current {
+	background: no-repeat url(../../images/button_normal.png);
+}
+
+#navcontainer .currentAncestor {
+	background: no-repeat url(../../images/button_normal.png);
+}
+
+#navcontainer a {
+	background: no-repeat url(../../images/button_over.png);
+}
+
+#navcontainer a:hover {
+	background: no-repeat url(../../images/button_normal.png);
+}
+
+#navcontainer ul ul a {
+	background: no-repeat left center url(../../images/sub_bullet_grey.png);
+}
+
+#navcontainer ul ul a:hover{
+	background: no-repeat left center url(../../images/sub_bullet_blue.png);
+}
+
+#navcontainer ul ul #current{
+	color: #333333;
+	background: no-repeat left center url(../../images/sub_bullet_blue.png);
+}
+
+#navcontainer ul ul .currentAncestor {
+	color: #333333;
+	background: no-repeat left center url(../../images/sub_bullet_blue.png);}
+
+#navcontainer ul ul ul a{
+	background: no-repeat left center url(../../images/sub_bullet_grey.png);
+}
+
+#navcontainer ul ul ul a:hover{
+	background: no-repeat left center url(../../images/sub_bullet_blue.png);
+}
+
+.blog-archive-month {
+	color: #000000;
+}
+
+.blog-entry-title a {
+	color: #000000;
+}
+
+.blog-entry-title a:hover {
+	color: #b3b3b3;
+}
+
+.album-title {
+	color: #000000;
+}
+
+.photo-navigation {
+	background: #e6e6e6;
+	color: #000000;
+}
+
+.photo-frame{
+	background: #e6e6e6;
+}
+
+.photo-title {
+	color: #000000;
+}
+
+.movie-page-title {
+	color: #000000;
+}

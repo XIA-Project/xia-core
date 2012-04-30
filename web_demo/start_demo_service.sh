@@ -16,7 +16,7 @@ cd ../XIASocket/sample/
 ./vs video.ogv &
 sleep 1  # need this otherwise it doesn't work
 
-cd ../../proxies
+cd ../../web
 ./webserver.py $@ &
 sleep 1
 ./proxy.py 8080 127.0.0.1 &

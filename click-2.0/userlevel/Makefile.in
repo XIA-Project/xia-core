@@ -112,7 +112,7 @@ INSTALLPROGS = $(DRIVER)
 all: $(INSTALLPROGS) $(INSTALLLIBS)
 
 xia.pb.cc: xia.proto
-	protoc --cpp_out=. --python_out=../../proxies xia.proto
+	protoc --cpp_out=. --python_out=../../web xia.proto
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(ELEMENTSCONF).mk

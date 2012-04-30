@@ -42,18 +42,15 @@ XIAGenericExtHeader::populate_map()
 
     const uint8_t* d = _hdr->data;
     const uint8_t* end = reinterpret_cast<const uint8_t*>(_hdr) + _hdr->hlen;
-    while (d < end)
-    {
+    while (d < end) {
         uint8_t kv_len = *d++;
 
-        if (!kv_len)
-        {
+        if (!kv_len) {
             // hit padding
             break;
         }
 
-        if (d + kv_len > end)
-        {
+        if (d + kv_len > end) {
             click_chatter("invalid kv_len or hlen");
             break;
         }
@@ -145,24 +142,20 @@ XIAGenericExtHeaderEncap::update()
     HashTable<uint8_t, String>::const_iterator it = _map.begin();
     size_t count = 0;
     size_t padding = 0;
-    for (; it != _map.end(); ++it)
-    {
-        if ((*it).second.length() >= 255 - 1)   // skip too long value
-        {
+    for (; it != _map.end(); ++it) {
+        if ((*it).second.length() >= 255 - 1) {   // skip too long value
             click_chatter("too long value for key %d", (*it).first);
             continue;
         }
         size_t new_size = size + 2 + (*it).second.length();
-        if (new_size >= 255)
-        {
+        if (new_size >= 255) {
             click_chatter("too large key-value map");
             break;
         }
         size = new_size;
         count++;
     }
-    if ((size & 3) != 0)
-    {
+    if ((size & 3) != 0) {
         padding = 4 - (size & 3);
         size += padding;
     }
@@ -176,8 +169,7 @@ XIAGenericExtHeaderEncap::update()
     new_hdr->hlen = size;
 
     uint8_t* d = new_hdr->data;
-    for (it = _map.begin(); it != _map.end() && count > 0; ++it, count--)
-    {
+    for (it = _map.begin(); it != _map.end() && count > 0; ++it, count--) {
         if ((*it).second.length() >= 255 - 1)   // skip too long value
             continue;
         // key-value length

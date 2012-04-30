@@ -8,8 +8,8 @@
 <!--
 //var stock = "http://xia.sid.0f03333333333333333333333333330000000055";
 //var page = "http://xia.sid.0f03333333333333333333333333330000000055";
-var stock = "http://xia.sid.sid_stock";
-var page = "http://xia.sid.sid_stock";
+var stock = "http://www_s.stock.com.xia";
+var page = "http://www_s.stock.com.xia";
 var stock_element = 'stock'
 var pos = 0
 var stock_timer = null
@@ -19,7 +19,7 @@ var req_timestamp = null
 
 function load()
 {
-        //document.getElementById("rtt").innerHTML = "Response Time: undefined" ;
+        document.getElementById("rtt").innerHTML = "Response Time: undefined" ;
 	//ajax(page,'text');
 	ajax(stock,stock_element);
 	shift();
@@ -87,12 +87,12 @@ function ajaxDone(req, target) {
 	    //console.log("header " + header_rtt);
 	    results = results.toString().replace(/ /g, ' &nbsp ');
 	    document.getElementById(target).innerHTML = results;
-            //document.getElementById("rtt").innerHTML = "RTT (proxy to service): "+ header_rtt + " ms";
+            document.getElementById("rtt").innerHTML = "RTT (proxy to service): "+ header_rtt + " ms";
             document.getElementById("last_response").innerHTML = "Last Response: " +new Date().toLocaleTimeString();
 	    //console.log("Response recv at "+ now);
 	} else {
 	    document.getElementById(target).innerHTML="ajax error:"+req.status + req.statusText +req.responseText;;
-            //document.getElementById("rtt").innerHTML = "Response Time: undefined" ;
+            document.getElementById("rtt").innerHTML = "Response Time: undefined" ;
 	}
     }
 }
@@ -167,7 +167,7 @@ html {
 <p>
 
 
-<video tabindex="0" src="http://xia.sid.video"  controls="true" type="video/ogg" width="640" height="360"><i>You need a HTML5 &lt;video&gt; capable browser to view this movie.</i></video>
+<video tabindex="0" src="http://www_s.video.com.xia"  controls="true" type="video/ogg" width="640" height="360"><i>You need a HTML5 &lt;video&gt; capable browser to view this movie.</i></video>
 
 
 <h1>My Favorite Stock</h1>

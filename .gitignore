@@ -16,3 +16,4 @@ ethtool-*
 stat-*
 asm
 *.asm
+*.htmlTEMP

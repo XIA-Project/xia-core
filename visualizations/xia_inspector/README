@@ -1,0 +1,14 @@
+The XIA Inspector colors all XIA dag URLs green and adds a button to the top
+right corner of your web browser; clicking it toggles the inspector. Currently
+the inspector simply shows a graphical representation of any DAG URL under the
+mouse; functionality may be extended in the future.
+
+
+FIREFOX
+1) Install Greasemonkey (https://addons.mozilla.org/en-US/firefox/addon/greasemonkey)
+2) In Firefox, open the file "xia-inspector.user.js". Greasemonkey will prompt you to click "Install"
+3) To allow Greasemonkey to apply the XIA inspector to local html files, type "about:config" in the address bar and change the value of greasemonkey.fileIsGreaseable to true
+
+CHROME
+1) Open the file "xia-inspector.user.js" from Chrome and click "OK" when prompted.
+2) I'm not currently aware of a way to make Chrome apply the XIA inspector to local HTML files

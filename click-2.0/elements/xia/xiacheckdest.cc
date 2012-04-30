@@ -22,6 +22,8 @@ void
 XIACheckDest::push(int, Packet *p)
 {
     const struct click_xia* hdr = p->xia_header();
+
+	// commented out for microbenchmarks
     /*
     if (!hdr)
     {
@@ -38,6 +40,9 @@ XIACheckDest::push(int, Packet *p)
     }
     */
 
+	// The definition of the destination is the node without any outgoing edge,
+	// but we can also determine if the last visited node is pointing to the last node in the destination DAG
+	// because it is a convention to place the destination node at the end of the node list.
     if (hdr->last == (int)hdr->dnode - 1)
         output(0).push(p);
     else

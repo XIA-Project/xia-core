@@ -1,10 +1,10 @@
 /*
  * arptable.{cc,hh} -- XARP resolver element
- * Eddie Kohler
+ * Robert Morris, Eddie Kohler
  *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
  * Copyright (c) 2005 Regents of the University of California
- * Copyright (c) 2008 Meraki, Inc.
+ * Copyright (c) 2008-2009 Meraki, Inc. 
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -16,6 +16,8 @@
  * notice is a summary of the Click LICENSE file; the license in that file is
  * legally binding.
  */
+ 
+// Modified from original ARP table code 
 
 #include <click/config.h>
 #include "xarpquerier.hh"
@@ -271,7 +273,6 @@ XARPTable::reverse_lookup(const EtherAddress &eth)
 {
     _lock.acquire_read();
 
-    //IPAddress ip;
     XID xid;
     for (Table::iterator it = _table.begin(); it; ++it)
 	if (it->_eth == eth) {
@@ -307,7 +308,6 @@ XARPTable::write_handler(const String &str, Element *e, void *user_data, ErrorHa
     XARPTable *xarpt = (XARPTable *) e;
     switch (reinterpret_cast<uintptr_t>(user_data)) {
       case h_insert: {
-	  //IPAddress ip;
 	  XID xid;
 	  EtherAddress eth;
 	  if (Args(xarpt, errh).push_back_words(str)
@@ -319,7 +319,6 @@ XARPTable::write_handler(const String &str, Element *e, void *user_data, ErrorHa
 	  return 0;
       }
       case h_delete: {
-	  //IPAddress ip;
 	  XID xid;
 	  if (Args(xarpt, errh).push_back_words(str)
 	      .read_mp("XID", xid)

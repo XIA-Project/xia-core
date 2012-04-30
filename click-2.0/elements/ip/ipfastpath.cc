@@ -1,3 +1,6 @@
+/*
+ * ipfastpath.{cc,hh} -- a fast-path implementation for IP packets
+ */
 #include <click/config.h>
 #include "ipfastpath.hh"
 #include <click/glue.hh>
@@ -14,15 +17,15 @@ IPFastPath::IPFastPath()
 
 IPFastPath::~IPFastPath()
 {
-    for (int i=0;i<NUM_CLICK_CPUS;i++) {
-	if (_buckets[i]) delete[] _buckets[i];
-    }
+    for (int i = 0; i < NUM_CLICK_CPUS; i++)
+		if (_buckets[i])
+			delete[] _buckets[i];
 }
 
 int
 IPFastPath::initialize(ErrorHandler *)
 {
-    for (int i=0;i<NUM_CLICK_CPUS;i++) {
+    for (int i = 0; i < NUM_CLICK_CPUS; i++) {
         _buckets[i] = new struct ipfp_bucket[_bucket_size];
         memset(_buckets[i], 0, _bucket_size * sizeof(struct ipfp_bucket));
     }
@@ -33,12 +36,12 @@ void IPFastPath::update_cacheline(struct ipfp_bucket *buck,  const uint32_t ipv4
 {
     int empty = 0;
     uint8_t max_counter = -1;
-    for (int i=0;i<IP_ASSOCIATIVITY;i++) {
-	if (max_counter< buck->counter[i]) {
-	    max_counter = buck->counter[i];
-	    empty = i;
-	}
-	buck->counter[i]++;
+    for (int i = 0; i < IP_ASSOCIATIVITY; i++) {
+		if (max_counter < buck->counter[i]) {
+			max_counter = buck->counter[i];
+			empty = i;
+		}
+		buck->counter[i]++;
     }
     buck->counter[empty] = 0;
     buck->item[empty].key = ipv4_dst;
@@ -48,14 +51,14 @@ void IPFastPath::update_cacheline(struct ipfp_bucket *buck,  const uint32_t ipv4
 int IPFastPath::lookup(struct ipfp_bucket *buck,  const uint32_t ipv4_dst)
 {
     int port = 0;
-    for (int i=0;i<IP_ASSOCIATIVITY;i++) {
-	if (buck->item[i].key== ipv4_dst) {
-	    port = buck->item[i].port;
-	    buck->counter[i]=0;
-	} else 
-	    buck->counter[i]++;
-   }
-   return port; 
+    for (int i = 0; i < IP_ASSOCIATIVITY; i++) {
+		if (buck->item[i].key == ipv4_dst) {
+			port = buck->item[i].port;
+			buck->counter[i]=0;
+		} else
+			buck->counter[i]++;
+	}
+	return port; 
 }
 
 int IPFastPath::configure(Vector<String> &conf, ErrorHandler *errh)
@@ -85,14 +88,14 @@ void IPFastPath::push(int port, Packet * p)
     int thread_id = 0;
 #endif
 
-    if (port==0) {
-        /* Fastpath lookup */ 
-	int outport = lookup(&_buckets[thread_id][index], key);
-	output(outport).push(p);
+    if (port == 0) {
+        // Fastpath lookup
+		int outport = lookup(&_buckets[thread_id][index], key);
+		output(outport).push(p);
     } else {
-	/* Cache result */
-	update_cacheline(&_buckets[thread_id][index], key, port);
-	output(port).push(p);
+		// Cache result
+		update_cacheline(&_buckets[thread_id][index], key, port);
+		output(port).push(p);
     }
 }
 

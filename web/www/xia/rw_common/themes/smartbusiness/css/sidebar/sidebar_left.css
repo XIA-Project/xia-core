@@ -1,0 +1,4 @@
+/* This is the default float side for this theme. We only have this file as we need to set a default css file for the theme variations. */
+#sidebarContainer {
+	float: left;
+}

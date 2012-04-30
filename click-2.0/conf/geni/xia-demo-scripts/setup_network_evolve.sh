@@ -2,7 +2,7 @@
 
 
 # for host0
-for host in pc201
+for host in pc328
 do
 #setup click
 ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_click_network_evolve_host0.sh"
@@ -13,7 +13,7 @@ ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/set
 done
 
 # for router0
-for host in pc222
+for host in pc267
 do
 #setup click
 ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_click_network_evolve_router0.sh"
@@ -22,7 +22,7 @@ ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/set
 done
 
 # for router1
-for host in pc211
+for host in pc323
 do
 #setup click
 ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_click_network_evolve_router1.sh"
@@ -31,7 +31,7 @@ ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/set
 done
 
 # for host1
-for host in pc204
+for host in pc333
 do
 #setup click
 ssh -A $host -f "~/xia-core/click-2.0/conf/geni/xia-demo-scripts/sub_scripts/setup_click_network_evolve_host1.sh"

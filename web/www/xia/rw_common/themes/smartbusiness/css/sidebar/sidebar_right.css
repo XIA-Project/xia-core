@@ -1,0 +1,32 @@
+#sidebarContainer {
+	float: right;
+}
+
+#container #contentTop {
+	background: url(../../images/content_top_right.png) no-repeat;
+}
+
+#container {
+	background: url(../../images/content_sideright_bg.png) repeat-y;
+}
+
+#footer {
+	background: url(../../images/footer_sideright_bg.png) no-repeat;
+}
+
+#contentContainer {
+	float: left;
+}
+
+#contentContainer #content {
+	padding: 0 13px 20px 30px;
+}
+
+#sidebarContainer #sidebar, #sidebarContainer .sideHeader {
+	padding-right: 40px;
+	padding-left: 20px;
+}
+
+#navcontainer {
+	margin-left: 4px;
+}

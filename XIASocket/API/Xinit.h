@@ -20,12 +20,12 @@
 #include "xia.pb.h"
 
 //Socket library side: Control address/info
-#define DEFAULT_MYADDRESS "192.0.0.1" 
+#define DEFAULT_MYADDRESS "172.0.0.1" 
 #define MYPORT "0"//Chooses random port
 
 //Click side: Control/data address/info
 //The actual IPs don't matter, it just has to be in the correct subnet
-#define DEFAULT_CLICKCONTROLADDRESS "192.0.0.2" 
+#define DEFAULT_CLICKCONTROLADDRESS "172.0.0.2" 
 #define CLICKCONTROLPORT "5001"
 //#define CLICKOPENPORT "5001"
 #define CLICKBINDPORT "5002"
@@ -34,7 +34,7 @@
 #define CLICKACCEPTPORT "5005"
 
 
-#define DEFAULT_CLICKDATAADDRESS "192.0.0.2" 
+#define DEFAULT_CLICKDATAADDRESS "172.0.0.2" 
 #define CLICKDATAPORT "10000"
 #define CLICKPUTCIDPORT "10002"
 #define CLICKSENDTOPORT "10001"

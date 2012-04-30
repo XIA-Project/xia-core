@@ -1,0 +1,29 @@
+#!/bin/sh
+# build all of the XIA components
+
+XIADIR=$(dirname $(dirname $(cd ${0%/*} && echo $PWD/${0##*/})))
+
+cd $XIADIR/click-2.0
+./conf_user_click.sh
+make -j8
+
+cd $XIADIR/XIASocket/API
+make
+
+cd $XIADIR/XIASocket/sample
+make
+
+cd $XIADIR/example
+make
+
+cd $XIADIR/daemons/xroute
+make
+
+cd $XIADIR/daemons/xhcp
+make
+
+cd $XIADIR/daemons/nameserver
+make
+
+cd $XIADIR
+
