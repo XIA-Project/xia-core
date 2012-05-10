@@ -60,6 +60,8 @@ class Main(QDialog, Ui_Main):
     def read_ip_performance(self):
         ip ={}
         for line in fileinput.input("ip"):
+            if not line.strip():
+                continue
             _, size, pps, gbps = line.split(' ')
             ip[int(size)] = float(gbps)
         self.reference_ip_gbps = ip
