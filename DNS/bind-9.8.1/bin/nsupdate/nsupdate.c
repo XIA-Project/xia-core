@@ -116,6 +116,8 @@ static isc_uint16_t dnsport = DNSDEFAULTPORT;
 #define RESOLV_CONF "/etc/resolv.conf"
 #endif
 
+#define NAMED_DAG "RE AD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 SID:1110000000000000000000000000000000001113"
+
 static isc_boolean_t debugging = ISC_FALSE, ddebugging = ISC_FALSE;
 static isc_boolean_t memdebugging = ISC_FALSE;
 static isc_boolean_t have_ipv4 = ISC_FALSE;
@@ -794,6 +796,8 @@ setup_system(void) {
 	result = isc_net_probeipv6();
 	if (result == ISC_R_SUCCESS)
 		have_ipv6 = ISC_TRUE;
+    /* Don't create IPv6 interface, not relevant to XIA */
+    have_ipv6 = ISC_FALSE;
 
 	if (!have_ipv4 && !have_ipv6)
 		fatal("could not find either IPv4 or IPv6");
@@ -893,7 +897,8 @@ setup_system(void) {
 		attrs |= DNS_DISPATCHATTR_MAKEQUERY;
 		attrs |= DNS_DISPATCHATTR_IPV4;
 		isc_sockaddr_any(&bind_any);
-		result = dns_dispatch_getudp(dispatchmgr, socketmgr, taskmgr,
+        attrs |= DNS_DISPATCHATTR_XDP;
+		result = dns_dispatch_getxdp(dispatchmgr, socketmgr, taskmgr,
 					     &bind_any, PACKETSIZE,
 					     4, 2, 3, 5,
 					     attrs, attrmask, &dispatchv4);
@@ -2153,6 +2158,10 @@ send_update(dns_name_t *zonename, isc_sockaddr_t *master,
 	if (updatemsg->tsigname)
 		updatemsg->tsigname->attributes |= DNS_NAMEATTR_NOCOMPRESS;
 
+    master->type.dag.dag = NAMED_DAG;
+    master->length = sizeof(struct sockaddr_xia);
+    master->type.dag.sa_family = AF_XIADAG;
+
 	result = dns_request_createvia3(requestmgr, updatemsg, srcaddr,
 					master, options, tsigkey, timeout,
 					udp_timeout, udp_retries, global_task,
@@ -2421,6 +2430,10 @@ sendrequest(isc_sockaddr_t *srcaddr, isc_sockaddr_t *destaddr,
 	isc_result_t result;
 	nsu_requestinfo_t *reqinfo;
 
+    destaddr->type.dag.dag = NAMED_DAG;
+    destaddr->length = sizeof(struct sockaddr_xia);
+    destaddr->type.dag.sa_family = AF_XIADAG;
+
 	reqinfo = isc_mem_get(mctx, sizeof(nsu_requestinfo_t));
 	if (reqinfo == NULL)
 		fatal("out of memory");
@@ -2599,6 +2612,10 @@ send_gssrequest(isc_sockaddr_t *srcaddr, isc_sockaddr_t *destaddr,
 	reqinfo->msg = msg;
 	reqinfo->addr = destaddr;
 	reqinfo->context = context;
+
+    destaddr->type.dag.dag = NAMED_DAG;
+    destaddr->length = sizeof(struct sockaddr_xia);
+    destaddr->type.dag.sa_family = AF_XIADAG;
 
 	options |= DNS_REQUESTOPT_TCP;
 	result = dns_request_createvia3(requestmgr, msg, srcaddr, destaddr,

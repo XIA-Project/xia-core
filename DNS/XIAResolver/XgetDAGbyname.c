@@ -6,9 +6,17 @@
 #include <arpa/inet.h>
 #include <errno.h>
 
+#include "Xsocket.h"
 #include "XgetDAGbyname.h"
 
+
+#define HID0 "HID:0000000000000000000000000000000000000000"
+#define AD0 "AD:1000000000000000000000000000000000000000"
+#define SID_BIND "SID:1110000000000000000000000000000000001113"
+
+
 static char DAG[256];
+
 
 /*
  * get xia destination DAG
@@ -17,7 +25,6 @@ static char DAG[256];
  */
 const char *XgetDAGbyname(char *name) {
 	int dns_sock;
-	struct sockaddr_in dns_addr;
 	char dns_serv[256];
 	dns_mh_t query_header;
 	dns_mh_t *response_header;
@@ -25,9 +32,10 @@ const char *XgetDAGbyname(char *name) {
 	char query_buf[1024], response_buf[1024];
 	char *query_buf_offset = query_buf;
 	char *response_buf_offset = response_buf;
-	socklen_t dns_addr_len;
 	char line[512];
 	char *linend;
+    char serv_addr[512];
+    size_t serv_addr_len;
 
 	// first look at /etc/hosts_xia for possible entry
 	FILE *hostsfp = fopen(ETC_HOSTS, "r");
@@ -79,10 +87,12 @@ const char *XgetDAGbyname(char *name) {
 	fclose(resolvfp);
 
 	// dns server connection
-	dns_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	dns_addr.sin_family = AF_INET;
-	dns_addr.sin_port = htons(DNS_DEF_PORT);
-	dns_addr.sin_addr.s_addr = inet_addr(dns_serv);
+    dns_sock = Xsocket(XSOCK_DGRAM);
+    if (dns_sock < 0)
+        return NULL;
+    
+    sprintf(serv_addr, "RE %s %s %s", AD0, HID0, SID_BIND);
+    serv_addr_len = strlen(serv_addr) + 1;
 
 	// init dns query header
 	query_header.qr = 0;			// question
@@ -118,13 +128,14 @@ const char *XgetDAGbyname(char *name) {
 	query_buf_offset += sizeof(short);
 
 	// send query to dns server
-	if (sendto(dns_sock, query_buf, query_buf_offset-query_buf, 0,
-				(struct sockaddr *) &dns_addr, sizeof(dns_addr)) == -1) {
-		return NULL;
-	}
-	// receive response from dns server
-	if (recvfrom(dns_sock, response_buf, 1024, 0,
-				(struct sockaddr *) &dns_addr, &dns_addr_len) == -1) {
+    int bytes_sent;
+    if ((bytes_sent = Xsendto(dns_sock, query_buf, query_buf_offset - query_buf,
+            0, serv_addr, serv_addr_len)) < 0) {
+        return NULL;
+    }
+    // receive response from dns server
+    if (Xrecvfrom(dns_sock, response_buf, 1024, 0, serv_addr,
+            &serv_addr_len) < 0) {
 		return NULL;
 	}
 

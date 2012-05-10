@@ -136,6 +136,8 @@
 
 #define PENDINGOK(x)	(((x) & DNS_DBFIND_PENDINGOK) != 0)
 
+#define XDP_CLIENT(c)   ((c)->udpsocket->methods->gettype((c)->udpsocket))
+
 typedef struct client_additionalctx {
 	ns_client_t *client;
 	dns_rdataset_t *rdataset;
@@ -957,7 +959,7 @@ query_getcachedb(ns_client_t *client, dns_name_t *name, dns_rdatatype_t qtype,
 		check_acl = ISC_TRUE;
 	}
 
-	if (check_acl) {
+	if (!XDP_CLIENT(client) && check_acl) {
 		isc_boolean_t log = ISC_TF((options & DNS_GETDB_NOLOG) == 0);
 		char msg[NS_CLIENT_ACLMSGSIZE("query (cache)")];
 
@@ -4540,7 +4542,13 @@ setup_query_sortlist(ns_client_t *client) {
 	dns_rdatasetorderfunc_t order = NULL;
 	const void *order_arg = NULL;
 
-	isc_netaddr_fromsockaddr(&netaddr, &client->peeraddr);
+	if (XDP_CLIENT(client)) {
+        /* This function searches an ACL to find a priority associated with
+         * this address. We just return the default priority, none */
+        dns_message_setsortorder(client->message, NULL, NULL);
+        return;
+    }
+    isc_netaddr_fromsockaddr(&netaddr, &client->peeraddr);
 	switch (ns_sortlist_setup(client->view->sortlist,
 			       &netaddr, &order_arg)) {
 	case NS_SORTLISTTYPE_1ELEMENT:

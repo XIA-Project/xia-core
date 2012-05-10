@@ -89,6 +89,7 @@
 #endif
 
 #define TCP_CLIENT(c)	(((c)->attributes & NS_CLIENTATTR_TCP) != 0)
+#define XDP_CLIENT(c)   ((c)->udpsocket->methods->gettype((c)->udpsocket))
 
 #define TCP_BUFFER_SIZE			(65535 + 2)
 #define SEND_BUFFER_SIZE		4096
@@ -825,7 +826,13 @@ client_sendpkg(ns_client_t *client, isc_buffer_t *buffer) {
 	if (TCP_CLIENT(client)) {
 		socket = client->tcpsocket;
 		address = NULL;
-	} else {
+    } 
+    else if (XDP_CLIENT(client)) {
+	    socket = client->udpsocket;
+        address = &client->peeraddr;
+        sockflags |= ISC_SOCKFLAG_NORETRY;
+    }
+    else {
 		socket = client->udpsocket;
 		address = &client->peeraddr;
 
@@ -1453,7 +1460,8 @@ client_request(isc_task_t *task, isc_event_t *event) {
 	isc_netaddr_fromsockaddr(&netaddr, &client->peeraddr);
 
 #if NS_CLIENT_DROPPORT
-	if (ns_client_dropport(isc_sockaddr_getport(&client->peeraddr)) ==
+	if (!XDP_CLIENT(client) && 
+        ns_client_dropport(isc_sockaddr_getport(&client->peeraddr)) ==
 	    DROPPORT_REQUEST) {
 		ns_client_log(client, DNS_LOGCATEGORY_SECURITY,
 			      NS_LOGMODULE_CLIENT, ISC_LOG_DEBUG(10),
@@ -1472,8 +1480,8 @@ client_request(isc_task_t *task, isc_event_t *event) {
 	 * Check the blackhole ACL for UDP only, since TCP is done in
 	 * client_newconn.
 	 */
-	if (!TCP_CLIENT(client)) {
-
+	if (!TCP_CLIENT(client) && !XDP_CLIENT(client)) {
+        /* No blackhole filtering of XIA clients */
 		if (ns_g_server->blackholeacl != NULL &&
 		    dns_acl_match(&netaddr, NULL, ns_g_server->blackholeacl,
 				  &ns_g_server->aclenv,
@@ -1868,7 +1876,8 @@ client_request(isc_task_t *task, isc_event_t *event) {
 	 * cache there is no point in setting RA.
 	 */
 	ra = ISC_FALSE;
-	if (client->view->resolver != NULL &&
+	if (!XDP_CLIENT(client) && 
+        client->view->resolver != NULL &&
 	    client->view->recursion == ISC_TRUE &&
 	    ns_client_checkaclsilent(client, NULL,
 				     client->view->recursionacl,
@@ -1894,7 +1903,7 @@ client_request(isc_task_t *task, isc_event_t *event) {
 	/*
 	 * Adjust maximum UDP response size for this client.
 	 */
-	if (client->udpsize > 512) {
+	if (!XDP_CLIENT(client) && client->udpsize > 512) {
 		dns_peer_t *peer = NULL;
 		isc_uint16_t udpsize = view->maxudp;
 		(void) dns_peerlist_peerbyaddr(view->peers, &netaddr, &peer);
@@ -2587,6 +2596,10 @@ ns_clientmgr_createclients(ns_clientmgr_t *manager, unsigned int n,
 					    &client->dispatch);
 			sock = dns_dispatch_getsocket(client->dispatch);
 			isc_socket_attach(sock, &client->udpsocket);
+
+            if (dns_dispatch_getattributes(ifp->udpdispatch) & DNS_DISPATCHATTR_XDP) {
+                client->attributes |= NS_CLIENTATTR_XDP;
+            }
 		}
 		client->manager = manager;
 		ISC_LIST_APPEND(manager->active, client, link);
@@ -2622,6 +2635,10 @@ ns_client_checkaclsilent(ns_client_t *client, isc_netaddr_t *netaddr,
 	isc_result_t result;
 	isc_netaddr_t tmpnetaddr;
 	int match;
+
+    /* Currently no filtering of XIA DAGs */
+    if (XDP_CLIENT(client))
+        return ISC_R_SUCCESS;
 
 	if (acl == NULL) {
 		if (default_allow)

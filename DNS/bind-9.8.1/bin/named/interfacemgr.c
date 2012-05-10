@@ -243,6 +243,52 @@ ns_interface_create(ns_interfacemgr_t *mgr, isc_sockaddr_t *addr,
 }
 
 static isc_result_t
+ns_interface_listenxdp(ns_interface_t *ifp) {
+    isc_result_t result;
+    unsigned int attrs;
+    unsigned int attrmask;
+    
+    attrs = 0;
+    /* Masquerade as UDP socket */
+    attrs |= DNS_DISPATCHATTR_UDP | DNS_DISPATCHATTR_XDP;
+    if (isc_sockaddr_pf(&ifp->addr) == AF_INET)
+        attrs |= DNS_DISPATCHATTR_IPV4;
+    else
+        attrs |= DNS_DISPATCHATTR_IPV6;
+    attrs |= DNS_DISPATCHATTR_NOLISTEN;
+    attrmask = 0;
+    attrmask |= DNS_DISPATCHATTR_UDP | DNS_DISPATCHATTR_TCP;
+    attrmask |= DNS_DISPATCHATTR_IPV4 | DNS_DISPATCHATTR_IPV6;
+    result = dns_dispatch_getxdp(ifp->mgr->dispatchmgr, ns_g_socketmgr,
+                     ns_g_taskmgr, &ifp->addr,
+                     4096, 1000, 32768, 8219, 8237,
+                     attrs, attrmask, &ifp->udpdispatch);
+    if (result != ISC_R_SUCCESS) {
+        isc_log_write(IFMGR_COMMON_LOGARGS, ISC_LOG_ERROR,
+                  "could not listen on UDP socket: %s",
+                  isc_result_totext(result));
+        goto udp_dispatch_failure;
+    }
+
+    result = ns_clientmgr_createclients(ifp->clientmgr, ns_g_cpus,
+                        ifp, ISC_FALSE);
+    if (result != ISC_R_SUCCESS) {
+        UNEXPECTED_ERROR(__FILE__, __LINE__,
+                 "UDP ns_clientmgr_createclients(): %s",
+                 isc_result_totext(result));
+        goto addtodispatch_failure;
+    }
+    return (ISC_R_SUCCESS);
+
+ addtodispatch_failure:
+    dns_dispatch_changeattributes(ifp->udpdispatch, 0,
+                      DNS_DISPATCHATTR_NOLISTEN);
+    dns_dispatch_detach(&ifp->udpdispatch);
+ udp_dispatch_failure:
+    return (result);   
+}
+
+static isc_result_t
 ns_interface_listenudp(ns_interface_t *ifp) {
 	isc_result_t result;
 	unsigned int attrs;
@@ -362,9 +408,16 @@ ns_interface_setup(ns_interfacemgr_t *mgr, isc_sockaddr_t *addr,
 	if (result != ISC_R_SUCCESS)
 		return (result);
 
-	result = ns_interface_listenudp(ifp);
+	/* UDP dispatch now being used for XDP */
+    /*
+    result = ns_interface_listenudp(ifp);
 	if (result != ISC_R_SUCCESS)
 		goto cleanup_interface;
+    */
+
+    result = ns_interface_listenxdp(ifp);
+    if (result != ISC_R_SUCCESS)
+        goto cleanup_interface;
 
 	if (accept_tcp == ISC_TRUE) {
 		result = ns_interface_accepttcp(ifp);

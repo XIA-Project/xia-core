@@ -33,6 +33,16 @@
 
 ISC_LANG_BEGINDECLS
 
+/* TODO is this a good place for this? */
+#ifndef AF_XIADAG
+#define AF_XIADAG 46
+struct sockaddr_xia {
+    sa_family_t sa_family;
+    char *dag;
+};
+#endif
+
+
 struct isc_netaddr {
 	unsigned int family;
 	union {
@@ -41,6 +51,7 @@ struct isc_netaddr {
 #ifdef ISC_PLATFORM_HAVESYSUNH
 		char un[sizeof(((struct sockaddr_un *)0)->sun_path)];
 #endif
+        struct sockaddr_xia dag;
 	} type;
 	isc_uint32_t zone;
 };

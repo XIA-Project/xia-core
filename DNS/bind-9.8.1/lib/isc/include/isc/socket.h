@@ -221,7 +221,9 @@ typedef enum {
 	isc_sockettype_udp = 1,
 	isc_sockettype_tcp = 2,
 	isc_sockettype_unix = 3,
-	isc_sockettype_fdwatch = 4
+	isc_sockettype_fdwatch = 4,
+    isc_sockettype_xdp = 5,
+    isc_sockettype_xcp = 6
 } isc_sockettype_t;
 
 /*@{*/

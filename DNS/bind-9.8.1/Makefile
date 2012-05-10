@@ -74,7 +74,7 @@ DESTDIR =
 
 
 
-top_builddir =	/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1
+top_builddir =	/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1
 
 ###
 ### All
@@ -404,7 +404,7 @@ install:: isc-config.sh installdirs
 
 tags:
 	rm -f TAGS
-	find lib bin -name "*.[ch]" -print |  -
+	find lib bin -name "*.[ch]" -print | /usr/bin/etags -
 
 check: test
 

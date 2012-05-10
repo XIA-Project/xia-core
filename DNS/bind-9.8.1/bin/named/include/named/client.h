@@ -172,6 +172,7 @@ struct ns_client {
 #define NS_CLIENTATTR_FILTER_AAAA	0x40 /*%< suppress AAAAs */
 #define NS_CLIENTATTR_FILTER_AAAA_RC	0x80 /*%< recursing for A against AAAA */
 #endif
+#define NS_CLIENTATTR_XDP       0x100
 
 extern unsigned int ns_client_requests;
 
