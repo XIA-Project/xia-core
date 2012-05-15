@@ -569,6 +569,9 @@ find_udp_dispatch(dns_requestmgr_t *requestmgr, isc_sockaddr_t *srcaddr,
 		case PF_INET6:
 			disp = requestmgr->dispatchv6;
 			break;
+        case AF_XIADAG:
+            disp = requestmgr->dispatchv4;
+            break;
 
 		default:
 			return (ISC_R_NOTIMPLEMENTED);
@@ -588,6 +591,8 @@ find_udp_dispatch(dns_requestmgr_t *requestmgr, isc_sockaddr_t *srcaddr,
 	case PF_INET6:
 		attrs |= DNS_DISPATCHATTR_IPV6;
 		break;
+    case AF_XIADAG:
+        attrs |= DNS_DISPATCHATTR_XDP;
 
 	default:
 		return (ISC_R_NOTIMPLEMENTED);
@@ -597,6 +602,15 @@ find_udp_dispatch(dns_requestmgr_t *requestmgr, isc_sockaddr_t *srcaddr,
 	attrmask |= DNS_DISPATCHATTR_TCP;
 	attrmask |= DNS_DISPATCHATTR_IPV4;
 	attrmask |= DNS_DISPATCHATTR_IPV6;
+    if (isc_sockaddr_pf(srcaddr) == AF_XIADAG) {
+        return (dns_dispatch_getudp(requestmgr->dispatchmgr,
+                requestmgr->socketmgr,
+                requestmgr->taskmgr,
+                srcaddr, 4096,
+                1000, 32768, 16411, 16433,
+                attrs, attrmask,
+                dispatchp));
+    }
 	return (dns_dispatch_getudp(requestmgr->dispatchmgr,
 				    requestmgr->socketmgr,
 				    requestmgr->taskmgr,
@@ -901,7 +915,8 @@ dns_request_createvia3(dns_requestmgr_t *requestmgr, dns_message_t *message,
 
 	req_log(ISC_LOG_DEBUG(3), "dns_request_createvia");
 
-	if (isblackholed(requestmgr->dispatchmgr, destaddr))
+	if (isc_sockaddr_pf(destaddr) != AF_XIADAG && 
+            isblackholed(requestmgr->dispatchmgr, destaddr))
 		return (DNS_R_BLACKHOLED);
 
 	request = NULL;
@@ -997,7 +1012,6 @@ dns_request_createvia3(dns_requestmgr_t *requestmgr, dns_message_t *message,
 	if (result != ISC_R_SUCCESS)
 		goto unlink;
 
-	request->destaddr = *destaddr;
 	if (tcp) {
 		result = isc_socket_connect(socket, destaddr, task,
 					    req_connected, request);

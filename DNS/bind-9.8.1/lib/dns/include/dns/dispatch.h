@@ -133,6 +133,7 @@ struct dns_dispatchevent {
 /*#define DNS_DISPATCHATTR_RANDOMPORT	0x00000100U*/
 #define DNS_DISPATCHATTR_EXCLUSIVE	0x00000200U
 /*@}*/
+#define DNS_DISPATCHATTR_XDP        0x00000400U
 
 isc_result_t
 dns_dispatchmgr_create(isc_mem_t *mctx, isc_entropy_t *entropy,
@@ -236,6 +237,15 @@ dns_dispatchmgr_setstats(dns_dispatchmgr_t *mgr, isc_stats_t *stats);
  *\li	stats is a valid statistics supporting resolver statistics counters
  *	(see dns/stats.h).
  */
+
+isc_result_t
+dns_dispatch_getxdp(dns_dispatchmgr_t *mgr, isc_socketmgr_t *sockmgr,
+            isc_taskmgr_t *taskmgr, isc_sockaddr_t *localaddr,
+            unsigned int buffersize,
+            unsigned int maxbuffers, unsigned int maxrequests,
+            unsigned int buckets, unsigned int increment,
+            unsigned int attributes, unsigned int mask,
+            dns_dispatch_t **dispp);
 
 isc_result_t
 dns_dispatch_getudp(dns_dispatchmgr_t *mgr, isc_socketmgr_t *sockmgr,

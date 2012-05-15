@@ -29,11 +29,20 @@
 #include <sys/un.h>
 #endif
 
+#ifndef AF_XIADAG
+#define AF_XIADAG 46
+struct sockaddr_xia {
+    sa_family_t sa_family;
+    char *dag;
+};
+#endif
+
 struct isc_sockaddr {
 	union {
 		struct sockaddr		sa;
 		struct sockaddr_in	sin;
 		struct sockaddr_in6	sin6;
+        struct sockaddr_xia dag;
 #ifdef ISC_PLATFORM_HAVESYSUNH
 		struct sockaddr_un	sunix;
 #endif

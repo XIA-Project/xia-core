@@ -448,7 +448,7 @@ Copyright (C) 2010 Free Software Foundation, Inc.
 This config.status script is free software; the Free Software Foundation
 gives unlimited permission to copy, distribute and modify it."
 
-ac_pwd='/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1'
+ac_pwd='/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1'
 srcdir='.'
 INSTALL='/usr/bin/install -c'
 test -n "$AWK" || AWK=awk
@@ -548,7 +548,7 @@ _ASBOX
 #
 # INIT-COMMANDS
 #
-atfdir=/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/unit/atf
+atfdir=/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1/unit/atf
 
 
 # Handling of arguments.
@@ -771,8 +771,8 @@ fi
 
 echo 'BEGIN {' >"$tmp/subs1.awk" &&
 cat >>"$tmp/subs1.awk" <<\_ACAWK &&
-F["BIND9_MAKE_INCLUDES"]="/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/make/includes"
-F["BIND9_MAKE_RULES"]="/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/make/rules"
+F["BIND9_MAKE_INCLUDES"]="/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1/make/includes"
+F["BIND9_MAKE_RULES"]="/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1/make/rules"
 F["LIBISC_API"]="./lib/isc/api"
 F["LIBISCCC_API"]="./lib/isccc/api"
 F["LIBISCCFG_API"]="./lib/isccfg/api"
@@ -803,13 +803,13 @@ S["SO_CFLAGS"]="-fPIC"
 S["SO"]="so"
 S["BIND9_CONFIGARGS"]="CONFIGARGS=defaults"
 S["BIND9_VERSION"]="VERSION=9.8.1"
-S["BIND9_BIND9_BUILDINCLUDE"]="-I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/bind9/include"
-S["BIND9_LWRES_BUILDINCLUDE"]="-I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/lwres/include"
-S["BIND9_DNS_BUILDINCLUDE"]="-I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/dns/include"
-S["BIND9_ISCCFG_BUILDINCLUDE"]="-I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/isccfg/include"
-S["BIND9_ISCCC_BUILDINCLUDE"]="-I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/isccc/include"
-S["BIND9_ISC_BUILDINCLUDE"]="-I/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1/lib/isc/include"
-S["BIND9_TOP_BUILDDIR"]="/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1"
+S["BIND9_BIND9_BUILDINCLUDE"]="-I/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1/lib/bind9/include"
+S["BIND9_LWRES_BUILDINCLUDE"]="-I/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1/lib/lwres/include"
+S["BIND9_DNS_BUILDINCLUDE"]="-I/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1/lib/dns/include"
+S["BIND9_ISCCFG_BUILDINCLUDE"]="-I/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1/lib/isccfg/include"
+S["BIND9_ISCCC_BUILDINCLUDE"]="-I/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1/lib/isccc/include"
+S["BIND9_ISC_BUILDINCLUDE"]="-I/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1/lib/isc/include"
+S["BIND9_TOP_BUILDDIR"]="/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1"
 S["UNITTESTS"]=""
 S["ATFLIBS"]=""
 S["ATFBIN"]=""
@@ -827,7 +827,7 @@ S["XSLT_DOCBOOK_STYLE_MAN"]="manpages/docbook.xsl"
 S["XSLT_DOCBOOK_STYLE_XHTML"]="xhtml/docbook.xsl"
 S["XSLT_DOCBOOK_STYLE_HTML"]="html/docbook.xsl"
 S["DOXYGEN"]="doxygen"
-S["XMLLINT"]="/usr/bin/xmllint"
+S["XMLLINT"]="xmllint"
 S["XSLTPROC"]="/usr/bin/xsltproc"
 S["W3M"]="w3m"
 S["PDFLATEX"]="pdflatex"
@@ -949,7 +949,7 @@ S["PKCS11_TOOLS"]=""
 S["USE_PKCS11"]=""
 S["ISC_OPENSSL_INC"]=""
 S["ISC_PLATFORM_OPENSSLHASH"]="#undef ISC_PLATFORM_OPENSSLHASH"
-S["OPENSSL_GOST"]=""
+S["OPENSSL_GOST"]="yes"
 S["OPENSSLLINKSRCS"]="${OPENSSLLINKSRCS}"
 S["OPENSSLLINKOBJS"]="${OPENSSLLINKOBJS}"
 S["DST_OPENSSL_INC"]=""
@@ -965,7 +965,7 @@ S["ISC_PLATFORM_NORETURN_PRE"]="#define ISC_PLATFORM_NORETURN_PRE"
 S["ISC_PLATFORM_HAVELONGLONG"]="#define ISC_PLATFORM_HAVELONGLONG 1"
 S["ISC_SOCKADDR_LEN_T"]=""
 S["PERL"]="/usr/bin/perl"
-S["ETAGS"]=""
+S["ETAGS"]="/usr/bin/etags"
 S["LN"]="ln"
 S["ARFLAGS"]="cruv"
 S["CCOPT"]=""
@@ -1131,6 +1131,7 @@ D["TIME_WITH_SYS_TIME"]=" 1"
 D["HAVE_OPENSSL_DSA"]=" 1"
 D["HAVE_EVP_SHA256"]=" 1"
 D["HAVE_EVP_SHA512"]=" 1"
+D["HAVE_OPENSSL_GOST"]=" 1"
 D["PATH_RANDOMDEV"]=" \"/dev/random\""
 D["HAVE_FLOCKFILE"]=" 1"
 D["HAVE_GETCUNLOCKED"]=" 1"

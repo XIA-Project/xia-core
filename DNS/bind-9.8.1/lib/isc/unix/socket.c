@@ -57,6 +57,9 @@
 #include <isc/util.h>
 #include <isc/xml.h>
 
+#include "Xsocket.h"
+#include <poll.h>
+
 #ifdef ISC_PLATFORM_HAVESYSUNH
 #include <sys/un.h>
 #endif
@@ -93,6 +96,12 @@
 #if defined(SO_BSDCOMPAT) && defined(__linux__)
 #include <sys/utsname.h>
 #endif
+
+#define NAMED_PORT ((in_port_t)53)
+#define MAX_DAG_LEN 1024
+#define AD0 "AD:1000000000000000000000000000000000000000"
+#define HID0 "HID:0000000000000000000000000000000000000000"
+#define SID_BIND "SID:1110000000000000000000000000000000001113"
 
 /*%
  * Choose the most preferable multiplex method.
@@ -1558,7 +1567,9 @@ set_dev_address(isc_sockaddr_t *address, isc__socket_t *sock,
 	} else if (sock->type == isc_sockettype_tcp) {
 		INSIST(address == NULL);
 		dev->address = sock->peer_address;
-	}
+	} else if (sock->type == isc_sockettype_xdp) {
+        dev->address = *address;
+    }
 }
 
 static void
@@ -1618,6 +1629,82 @@ dump_msg(struct msghdr *msg) {
 }
 #endif
 
+/* Emulates nonblocking sockets by checking if there's anything to be
+ * received before actually attempting the recvfrom. */
+int Xrecvfrom_nonblock(int sockfd, char *rbuf, size_t len, int flags,
+        char *sDAG, size_t *dlen)
+{
+    struct pollfd pfd;
+    memset(&pfd, 0, sizeof(struct pollfd));
+    pfd.events = POLLIN;
+    pfd.fd = sockfd;
+
+    if (poll(&pfd, 1, 0) == -1) {
+        perror("poll");
+        return -1;
+    }
+
+    if (pfd.revents & POLLIN)
+        return Xrecvfrom(sockfd, rbuf, len, flags, sDAG, dlen);
+
+    errno = EAGAIN;
+    return -1;
+}
+
+/* Acts as recvmsg but uses Xsockets. Address is set to DAG string */
+ssize_t Xrecvmsg(int sd, struct msghdr *msg, int flags)
+{
+    ssize_t bytes_read;
+    size_t expected_recv_size;
+    ssize_t left2move;
+    char *tmp_buf, *tmp;
+    int i;
+
+    REQUIRE(msg->msg_iov);
+
+    msg->msg_control = NULL;
+    msg->msg_controllen = 0;
+
+    /* Calculate the size of data the caller is expecting. msg_iovlen = number
+     * of iov buffers while msg_iov[i].iov_len is length of iov buffer i */
+    expected_recv_size = 0;
+    for (i = 0; i < msg->msg_iovlen; i++) {
+        expected_recv_size += msg->msg_iov[i].iov_len;
+    }
+
+    if ((tmp_buf = malloc(expected_recv_size)) == NULL)
+        return -1;
+
+    char *dag = malloc(MAX_DAG_LEN * sizeof(char));
+    if (dag == NULL)
+        return -1;
+    int dag_len = MAX_DAG_LEN;
+    bytes_read = Xrecvfrom_nonblock(sd, tmp_buf, expected_recv_size, flags,
+            dag, &dag_len);
+    if (bytes_read < 0)
+        return bytes_read;
+
+    msg->msg_namelen = dag_len;
+    msg->msg_name = dag;
+
+    left2move = bytes_read;
+
+    for (tmp = tmp_buf, i = 0; i < msg->msg_iovlen; i++) {
+        if (left2move <= 0)
+            break;
+        REQUIRE(msg->msg_iov[i].iov_base);
+        memcpy(msg->msg_iov[i].iov_base, tmp,
+                MIN(msg->msg_iov[i].iov_len, left2move));
+        left2move -= msg->msg_iov[i].iov_len;
+        tmp += msg->msg_iov[i].iov_len;
+    }
+
+    free(tmp_buf);
+
+    return bytes_read;
+}
+
+
 #define DOIO_SUCCESS		0	/* i/o ok, event sent */
 #define DOIO_SOFT		1	/* i/o ok, soft error, no event sent */
 #define DOIO_HARD		2	/* i/o error, event sent */
@@ -1640,7 +1727,12 @@ doio_recv(isc__socket_t *sock, isc_socketevent_t *dev) {
 	dump_msg(&msghdr);
 #endif
 
-	cc = recvmsg(sock->fd, &msghdr, 0);
+	if (sock->type == isc_sockettype_xdp) {
+        cc = Xrecvmsg(sock->fd, &msghdr, 0);
+    }
+    else {
+        cc = recvmsg(sock->fd, &msghdr, 0);
+    }
 	recv_errno = errno;
 
 #if defined(ISC_SOCKET_DEBUG)
@@ -1714,6 +1806,7 @@ doio_recv(isc__socket_t *sock, isc_socketevent_t *dev) {
 		if (cc == 0)
 			return (DOIO_EOF);
 		break;
+    case isc_sockettype_xdp:
 	case isc_sockettype_udp:
 		break;
 	case isc_sockettype_fdwatch:
@@ -1739,6 +1832,11 @@ doio_recv(isc__socket_t *sock, isc_socketevent_t *dev) {
 		if (sock->manager->maxudp != 0 && cc > sock->manager->maxudp)
 			return (DOIO_SOFT);
 	}
+    else if (sock->type == isc_sockettype_xdp) {
+        dev->address.length = sizeof(struct sockaddr_xia);
+        dev->address.type.dag.dag = msghdr.msg_name;
+        dev->address.type.dag.sa_family = AF_XIADAG;
+    }
 
 	socket_log(sock, &dev->address, IOEVENT,
 		   isc_msgcat, ISC_MSGSET_SOCKET, ISC_MSG_PKTRECV,
@@ -1762,6 +1860,7 @@ doio_recv(isc__socket_t *sock, isc_socketevent_t *dev) {
 	 */
 	if (sock->type == isc_sockettype_udp)
 		process_cmsg(sock, &msghdr, dev);
+        
 
 	/*
 	 * update the buffers (if any) and the i/o count
@@ -1801,6 +1900,44 @@ doio_recv(isc__socket_t *sock, isc_socketevent_t *dev) {
 	return (DOIO_SUCCESS);
 }
 
+ssize_t Xsendmsg(int fd, struct msghdr *msg, int flags)
+{
+    ssize_t bytes_send;
+    size_t expected_send_size;
+    size_t left2move;
+    char *tmp_buf;
+    char *tmp;
+    int i;
+
+    REQUIRE(msg->msg_iov);
+
+    expected_send_size = 0;
+    for (i = 0; i < msg->msg_iovlen; i++) {
+        expected_send_size += msg->msg_iov[i].iov_len;
+    }
+
+    tmp_buf = malloc(expected_send_size);
+    if (tmp_buf == NULL)
+        return -1;
+    
+    for (tmp = tmp_buf, left2move = expected_send_size, i = 0;
+            i < msg->msg_iovlen; i++) {
+        if (left2move <= 0)
+            break;
+        REQUIRE(msg->msg_iov[i].iov_base);
+        memcpy(tmp, msg->msg_iov[i].iov_base, MIN(msg->msg_iov[i].iov_len, left2move));
+        left2move -= msg->msg_iov[i].iov_len;
+        tmp += msg->msg_iov[i].iov_len;
+    }
+
+    bytes_send = Xsendto(fd, tmp_buf, expected_send_size, flags,
+            (char*)msg->msg_name, msg->msg_namelen);
+
+    free(tmp_buf);
+
+    return bytes_send;
+}
+
 /*
  * Returns:
  *	DOIO_SUCCESS	The operation succeeded.  dev->result contains
@@ -1828,7 +1965,13 @@ doio_send(isc__socket_t *sock, isc_socketevent_t *dev) {
 	build_msghdr_send(sock, dev, &msghdr, iov, &write_count);
 
  resend:
-	cc = sendmsg(sock->fd, &msghdr, 0);
+	if (sock->type == isc_sockettype_xdp) {
+        msghdr.msg_name = (char*)dev->address.type.dag.dag;
+        msghdr.msg_namelen = strlen((char*)dev->address.type.dag.dag);
+        cc = Xsendmsg(sock->fd, &msghdr, 0);
+    }
+    else
+        cc = sendmsg(sock->fd, &msghdr, 0);
 	send_errno = errno;
 
 	/*
@@ -2251,6 +2394,9 @@ opensocket(isc__socketmgr_t *manager, isc__socket_t *sock) {
 		 */
 		INSIST(0);
 		break;
+    case isc_sockettype_xdp:
+        sock->fd = Xsocket(XSOCK_DGRAM);
+        break;
 	}
 	if (sock->fd == -1 && errno == EINTR && tries++ < 42)
 		goto again;
@@ -2268,7 +2414,8 @@ opensocket(isc__socketmgr_t *manager, isc__socket_t *sock) {
 		errno = tmp;
 		sock->fd = new;
 		err = "isc_socket_create: fcntl/reserved";
-	} else if (sock->fd >= 0 && sock->fd < 20) {
+	} else if (sock->type != isc_sockettype_xdp && sock->fd >= 0 && 
+        sock->fd < 20) {
 		int new, tmp;
 		new = fcntl(sock->fd, F_DUPFD, 20);
 		tmp = errno;
@@ -2326,8 +2473,9 @@ opensocket(isc__socketmgr_t *manager, isc__socket_t *sock) {
 			return (ISC_R_UNEXPECTED);
 		}
 	}
-
-	if (make_nonblock(sock->fd) != ISC_R_SUCCESS) {
+    /* XDP sockets always nonblocking */
+	if (sock->type != isc_sockettype_xdp && 
+        make_nonblock(sock->fd) != ISC_R_SUCCESS) {
 		(void)close(sock->fd);
 		return (ISC_R_UNEXPECTED);
 	}
@@ -2540,7 +2688,9 @@ isc__socket_create(isc_socketmgr_t *manager0, int pf, isc_sockettype_t type,
 		return (result);
 
 	switch (sock->type) {
-	case isc_sockettype_udp:
+	case isc_sockettype_xdp:
+        /* Fall through */
+    case isc_sockettype_udp:
 		sock->statsindex =
 			(pf == AF_INET) ? upd4statsindex : upd6statsindex;
 		break;
@@ -4763,7 +4913,7 @@ isc__socket_sendto2(isc_socket_t *sock0, isc_region_t *region,
 	REQUIRE(VALID_SOCKET(sock));
 	REQUIRE((flags & ~(ISC_SOCKFLAG_IMMEDIATE|ISC_SOCKFLAG_NORETRY)) == 0);
 	if ((flags & ISC_SOCKFLAG_NORETRY) != 0)
-		REQUIRE(sock->type == isc_sockettype_udp);
+		REQUIRE(sock->type == isc_sockettype_udp || sock->type == isc_sockettype_xdp);
 	event->ev_sender = sock;
 	event->result = ISC_R_UNEXPECTED;
 	ISC_LIST_INIT(event->bufferlist);
@@ -4996,7 +5146,26 @@ isc__socket_bind(isc_socket_t *sock0, isc_sockaddr_t *sockaddr,
 #ifdef AF_UNIX
  bind_socket:
 #endif
-	if (bind(sock->fd, &sockaddr->type.sa, sockaddr->length) < 0) {
+    if (sock->type == isc_sockettype_xdp) {
+        if (isc_sockaddr_getport(sockaddr) != NAMED_PORT) {
+            /* Only bind named */
+            sock->bound = 1;
+            UNLOCK(&sock->lock);
+            return ISC_R_SUCCESS;
+        }
+        char *dag = (char*)malloc(
+                snprintf(NULL, 0, "RE %s %s %s", AD0, HID0, SID_BIND) + 1);
+        if (dag == NULL) {
+            UNLOCK(&sock->lock);
+            return ISC_R_UNEXPECTED;
+        }
+        sprintf(dag, "RE %s %s %s", AD0, HID0, SID_BIND);
+        if (Xbind(sock->fd, dag) < 0) {
+            UNLOCK(&sock->lock);
+            return ISC_R_UNEXPECTED;
+        }
+    }
+	else if (bind(sock->fd, &sockaddr->type.sa, sockaddr->length) < 0) {
 		inc_stats(sock->manager->stats,
 			  sock->statsindex[STATID_BINDFAIL]);
 

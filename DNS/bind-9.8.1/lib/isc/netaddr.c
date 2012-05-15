@@ -353,7 +353,11 @@ isc_netaddr_fromsockaddr(isc_netaddr_t *t, const isc_sockaddr_t *s) {
 		t->zone = 0;
 		break;
 #endif
-	default:
+    case AF_XIADAG:
+        t->type.dag.sa_family = AF_XIADAG;
+        t->type.dag.dag = s->type.dag.dag;
+        break;
+    default:
 		INSIST(0);
 	}
 }

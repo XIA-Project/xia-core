@@ -93,6 +93,10 @@ isc_sockaddr_compare(const isc_sockaddr_t *a, const isc_sockaddr_t *b,
 		    a->type.sin6.sin6_port != b->type.sin6.sin6_port)
 			return (ISC_FALSE);
 		break;
+    case AF_XIADAG:
+        if (memcmp(a->type.dag.dag, b->type.dag.dag, strlen(a->type.dag.dag)) != 0)
+            return (ISC_FALSE);
+        break;
 	default:
 		if (memcmp(&a->type, &b->type, a->length) != 0)
 			return (ISC_FALSE);
@@ -228,6 +232,11 @@ isc_sockaddr_hash(const isc_sockaddr_t *sockaddr, isc_boolean_t address_only) {
 		}
 		p = ntohs(sockaddr->type.sin6.sin6_port);
 		break;
+    case AF_XIADAG:
+        s = sockaddr->type.dag.dag;
+        length = strlen(sockaddr->type.dag.dag);
+        p = 0;
+        break;
 	default:
 		UNEXPECTED_ERROR(__FILE__, __LINE__,
 				 isc_msgcat_get(isc_msgcat,
@@ -357,6 +366,8 @@ isc_sockaddr_pf(const isc_sockaddr_t *sockaddr) {
 		return (PF_INET);
 	case AF_INET6:
 		return (PF_INET6);
+    case AF_XIADAG:
+        return (AF_XIADAG);
 	default:
 		FATAL_ERROR(__FILE__, __LINE__,
 			    isc_msgcat_get(isc_msgcat, ISC_MSGSET_SOCKADDR,

@@ -32,8 +32,8 @@ CWARNINGS =
 LWRESLIBS =	../../lib/lwres/liblwres.@A@
 DNSLIBS =	../../lib/dns/libdns.@A@ @DNS_CRYPTO_LIBS@
 BIND9LIBS =	../../lib/bind9/libbind9.@A@
-ISCLIBS =	../../lib/isc/libisc.@A@
-ISCNOSYMLIBS =	../../lib/isc/libisc-nosymtbl.@A@
+ISCLIBS =	../../lib/isc/libisc.@A@ /home/isruser/Desktop/xia/release/xia-core/XIASocket/API/libXsocket.a -lprotobuf -lpthread
+ISCNOSYMLIBS =	../../lib/isc/libisc-nosymtbl.@A@ /home/isruser/Desktop/xia/release/xia-core/XIASocket/API/libXsocket.a -lprotobuf -lpthread
 ISCCFGLIBS =	../../lib/isccfg/libisccfg.@A@
 
 LWRESDEPLIBS =	../../lib/lwres/liblwres.@A@

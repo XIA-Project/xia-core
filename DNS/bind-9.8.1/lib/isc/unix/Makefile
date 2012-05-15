@@ -23,7 +23,8 @@ CINCLUDES =	-I${srcdir}/include \
 		-I${srcdir}/../nothreads/include \
 		-I../include \
 		-I${srcdir}/../include \
-		-I${srcdir}/..
+		-I${srcdir}/.. \
+        -I/home/isruser/Desktop/xia/release/xia-core/XIASocket/API
 
 CDEFINES =
 CWARNINGS =
@@ -89,7 +90,7 @@ DESTDIR =
 
 
 
-top_builddir =	/home/onhachoe/Desktop/xia-core/DNS/bind-9.8.1
+top_builddir =	/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1
 
 ###
 ### All
