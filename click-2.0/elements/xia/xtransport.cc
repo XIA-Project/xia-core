@@ -1275,13 +1275,17 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 					//Unparse dag info
 					String src_path = xiah.src_path().unparse();
-					String payload((const char*)xiah.payload(), xiah.plen());
-					String str = src_path;
 
-					str = str + String("^");
-					str = str + payload;
+					xia::XSocketMsg xsm;
+					xsm.set_type(xia::XREADCHUNK);
+					xia::X_Readchunk_Msg *x_readchunk_msg = xsm.mutable_x_readchunk();
+					x_readchunk_msg->set_dag(src_path.c_str());
+					x_readchunk_msg->set_payload((const char *)xiah.payload(), xiah.plen());
 
-					WritablePacket *p2 = WritablePacket::make (256, str.c_str(), str.length(), 0);
+					std::string p_buf;
+					xsm.SerializeToString(&p_buf);
+
+					WritablePacket *p2 = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
 
 					//printf("FROM CACHE. data length = %d  \n", str.length());
 					if (DEBUG)
@@ -1858,13 +1862,17 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 					//Unparse dag info
 					String src_path = xiah.src_path().unparse();
-					String payload((const char*)xiah.payload(), xiah.plen());
-					String str = src_path;
 
-					str = str + String("^");
-					str = str + payload;
+					xia::XSocketMsg xsm;
+					xsm.set_type(xia::XREADCHUNK);
+					xia::X_Readchunk_Msg *x_readchunk_msg = xsm.mutable_x_readchunk();
+					x_readchunk_msg->set_dag(src_path.c_str());
+					x_readchunk_msg->set_payload((const char*)xiah.payload(), xiah.plen());
 
-					WritablePacket *p2 = WritablePacket::make (256, str.c_str(), str.length(), 0);
+					std::string p_buf;
+					xia_socket_msg.SerializeToString(&p_buf);
+
+					WritablePacket *p2 = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
 
 					//printf("FROM CACHE. data length = %d  \n", str.length());
 					if (DEBUG)
