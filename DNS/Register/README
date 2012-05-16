@@ -1,0 +1,7 @@
+This directory provides the XregisterName function along with a small tester
+program. This function allows users to register a name with the currently
+running BIND namserver. It uses the nsupdate command which is compiled along
+with named. named places restrictions on which names can be registered and who
+can register names. These restrictions are based on the zone files in
+/var/named/.
+
