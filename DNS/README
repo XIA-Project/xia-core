@@ -1,0 +1,65 @@
+-------------------
+ Directory Roadmap
+-------------------
+
+./bind-9.8.1/ contains code for the BIND nameserver (its executable is called 
+        named) and associated tools.
+./bind_demo_conf/ contains sample BIND configuration files. named.conf should
+        be placed in /etc/ while the other files go in /var/named
+./demo_setup.sh Will configure and compile the bind nameserver and all
+        necessary tools
+./Register/ contains a function that could be used to register names with BIND
+./XIAResolver/ contains a function (XgetDAGbyName) that communicates with named
+        to get the DAG associated with the given domain name
+
+
+-----------------------------
+ Installing and Running BIND
+-----------------------------
+
+Run ./demo_setup.sh to compile, setup, and run the nameserver. The Xsocket
+library must first be correctly linked into the BIND files. Used the named
+command to start the BIND nameserver in the background (use named -f to start
+in the foreground). This command must be run as root. Various functions of the
+nameserver can be tested using the ./tester scripts in ./Register/ and
+./XIAResolver/. 
+
+
+------------------------
+ Communicating Over XDP
+------------------------
+
+BIND has been editted to communicate over XDP instead of UDP. Sockets usually
+listening on UDP in the named process will now listen over XDP. UDP connections
+are no longer used. Specifically, only the named and nsupdate code, along with
+the underlying socket code has been editted. Other programs using non-XIA
+protocols should still compile and work correctly as long as they're linked
+with the XIA libraries.
+
+To successfully run named, an xsockconf.ini file must be added to the
+/var/named directory (demo_setup.sh does this).
+
+
+---------------------
+ Storing XIA Records
+---------------------
+
+(Details on addition of xia_65532.c and xia_65532.h at
+    bind-9.8.1/lib/dns/rdata/generic)
+
+XIA DAG RR naively stores dag string, nothing special
+using type number 65532 <- temporary
+
+configure, make, make install
+no extra configuration required
+
+sample setup in bind_sample_conf folder
+  - named.conf -> /etc/named.conf
+  - example.com.zone -> /var/example.com.zon
+  - localhost.zone -> /var/localhost.zone
+
+testing getxiadstdagbyname() <- for getting xia destination DAG
+make XIAResolver/
+run XIAResolver/tester
+type 'example.com' for testing <- gets dns RR from local dns server
+                                  (127.0.0.1 #53)
