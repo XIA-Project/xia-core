@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# set this just in case user doesn't have it in their environment
+# can be removed once libraries are installed in correct paths
+LD_LIBRARY_PATH=.
+
 NAME=`basename $0`
 VERBOSE=0
 
