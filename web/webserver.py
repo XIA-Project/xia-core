@@ -118,9 +118,9 @@ def put_content_in_dir(dir):
                             
                             rel_path = os.path.relpath(linked_html_file, root)
                             # first match filepaths beginning with "./"
-                            file_data = string.replace(file_data, './' + rel_path, dag_url)
+                            file_data = string.replace(file_data, '"./' + rel_path + '"', '"' + dag_url + '"')
                             # now match filepaths without "./"
-                            file_data = string.replace(file_data, rel_path, dag_url)
+                            file_data = string.replace(file_data, '"' + rel_path + '"', '"' + dag_url + '"')
 
                         # write modified html
                         with open(os.path.join(root, file+'TEMP'), 'w') as fnew:
