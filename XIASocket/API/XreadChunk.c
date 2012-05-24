@@ -85,14 +85,14 @@ int XreadChunk(int sockfd, void *rbuf, size_t len, int /* flags */,
 		return -1;
 	}
 
-	// FIXME: change to protobuf so we don't need the ^ hack
+	std::string str(UDPbuf, rc);
 
-	size_t paylen = 0, i = 0;
-	char *tmpbuf = (char*)UDPbuf;
-	while (tmpbuf[i] != '^')
-		i++;
-	paylen = rc - i - 1;
-	int offset = i + 1;
+	xsm.Clear();
+	xsm.ParseFromString(str);
+
+	xia::X_Readchunk_Msg *msg = xsm.mutable_x_readchunk();
+	unsigned paylen = msg->payload().size();
+	const char *payload = msg->payload().c_str();
 
 	if (paylen > len) {
 		LOGF("CID is %d bytes, but rbuf is only %d bytes", paylen, len);
@@ -100,7 +100,7 @@ int XreadChunk(int sockfd, void *rbuf, size_t len, int /* flags */,
 		return -1;
 	}
 
-	memcpy(rbuf, UDPbuf + offset, paylen);
+	memcpy(rbuf, payload, paylen);
 	return paylen;
 }
 

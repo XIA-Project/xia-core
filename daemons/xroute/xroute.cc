@@ -89,7 +89,6 @@ int sendHello(){
 	hello.append(route_state.myHID);
 	hello.append("^");
 	strcpy (buffer, hello.c_str());
-
 	Xsendto(route_state.sock, buffer, strlen(buffer), 0, route_state.ddag, strlen(route_state.ddag)+1);
 	return 1;
 }
@@ -135,7 +134,6 @@ int sendLSA() {
 		lsa.append("^");
   	}
 	strcpy (buffer, lsa.c_str());
-	
 	// increase the LSA seq
 	route_state.lsa_seq++;
 	route_state.lsa_seq = route_state.lsa_seq % MAX_SEQNUM;
@@ -206,7 +204,7 @@ int processHello(const char* hello_msg) {
   		neighborHID = msg.substr(start, found-start);
   		start = found+1;  // forward the search point
   	} 	
-	
+
 	// fill in the table
 	map<std::string, NeighborEntry>::iterator it;
 	it=route_state.neighborTable.find(neighborAD);
@@ -313,7 +311,6 @@ int processLSA(const char* lsa_msg) {
   	// First, filter out the LSA originating from myself
   	string myAD = route_state.myAD;
   	if (myAD.compare(destAD) == 0) {
-  		//printf("Drop\n");
   		return 1;
   	}
   	
@@ -361,14 +358,14 @@ int processLSA(const char* lsa_msg) {
  	}
 
 	route_state.networkTable[destAD] = entry;  	
-	//printf("LSA process: dest=%s, seq=%d, num_neighbors=%d \n", (route_state.networkTable[destAD].dest).c_str(), route_state.networkTable[destAD].seq, route_state.networkTable[destAD].num_neighbors );
+	//printf("LSA received: src=%s, seq=%d, num_neighbors=%d \n", (route_state.networkTable[destAD].dest).c_str(), route_state.networkTable[destAD].seq, route_state.networkTable[destAD].num_neighbors );
 	route_state.calc_dijstra_ticks++;
 
 	if (route_state.calc_dijstra_ticks == CALC_DIJKSTRA_INTERVAL) {
 		// Calculate Shortest Path algorithm
 		calcShortestPath();
 		route_state.calc_dijstra_ticks = 0;
-		
+
 		// update Routing table (click routing table as well)	
 		updateClickRoutingTable();
 	}	
@@ -386,23 +383,24 @@ void calcShortestPath() {
 	// first, clear the current routing table
 	route_state.ADrouteTable.clear();
 
-	// check the current networkTable
-	int numNode = (int)(route_state.networkTable.size());
-	map<std::string, NodeStateEntry> table; 
+ 	map<std::string, NodeStateEntry>::iterator it1;
+  	for ( it1=route_state.networkTable.begin() ; it1 != route_state.networkTable.end(); it1++ ) {
+ 		
+ 		// filter out an abnormal case
+ 		if(it1->second.num_neighbors == 0 || (it1->second.dest).empty() ) {
+ 			route_state.networkTable.erase (it1);
+ 		}
+  	}
+  	
+ 	map<std::string, NodeStateEntry> table; 
 	table = route_state.networkTable;
-
-  	map<std::string, NodeStateEntry>::iterator it1;
+  	
   	for ( it1=route_state.networkTable.begin() ; it1 != route_state.networkTable.end(); it1++ ) {
  		// initialize the checking variable
  		it1->second.checked = false;
  		it1->second.cost = 10000000;
- 		
- 		// filter out an abnormal case
- 		if(it1->second.num_neighbors == 0) {
- 			route_state.networkTable.erase (it1);
- 		}
-  	}
-	
+  	}  	
+  	
 	// compute shortest path
 	// initialization
 	string myAD, tempAD;
@@ -418,45 +416,38 @@ void calcShortestPath() {
 		route_state.networkTable[tempAD].cost = 1;
 		route_state.networkTable[tempAD].prevNode = myAD;
 	}
-	
+
 	// loop
 	while (!table.empty()) {
 		int minCost = 10000000;
 		string selectedAD, tmpAD;
-		
 		for ( it1=table.begin() ; it1 != table.end(); it1++ ) {
-			
 			tmpAD = it1->second.dest;
 			if (route_state.networkTable[tmpAD].cost < minCost) {
 				minCost = route_state.networkTable[tmpAD].cost;
 				selectedAD = tmpAD;
 			}
   		}
-  		
+		if(selectedAD.empty()) {
+			return;
+		}		
+		
   		table.erase(selectedAD);
   		route_state.networkTable[selectedAD].checked = true;
  
  		for ( it2=route_state.networkTable[selectedAD].neighbor_list.begin() ; it2 < route_state.networkTable[selectedAD].neighbor_list.end(); it2++ ) {
-	
 			tempAD = (*it2).c_str();
 			if (route_state.networkTable[tempAD].checked != true) {
-				
-				if (route_state.networkTable[tempAD].cost > route_state.networkTable[selectedAD].cost + 1) {
-					
+				if (route_state.networkTable[tempAD].cost > route_state.networkTable[selectedAD].cost + 1) {	
 					route_state.networkTable[tempAD].cost = route_state.networkTable[selectedAD].cost + 1;
 					route_state.networkTable[tempAD].prevNode = selectedAD;
 				}
-				
 			}
-			
 		} 		
-	
-  		
 	}
 
 	string tempAD1, tempAD2;
 	int hop_count;
-	
 	// set up the nexthop
   	for ( it1=route_state.networkTable.begin() ; it1 != route_state.networkTable.end(); it1++ ) {
   	
@@ -474,9 +465,8 @@ void calcShortestPath() {
   				route_state.ADrouteTable[tempAD1].port = route_state.neighborTable[tempAD2].port;
   			}	
   		}
-  		
-  	}	
-	//printRoutingTable();		
+  	}
+	printRoutingTable();		
 }
 
 
@@ -508,8 +498,8 @@ void updateClickRoutingTable() {
 			printf("error setting route %d\n", rc);
 
   	}
-  	//listRoutes("HID");
-	//listRoutes("AD");
+  	listRoutes("HID");
+	listRoutes("AD");
 }
 
 

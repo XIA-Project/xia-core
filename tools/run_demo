@@ -23,6 +23,10 @@
 # throughout the source tree
 # b) not rely on the xsockconf.ini file if possible
 
+# set this just in case user doesn't have it in their environment
+# can be removed once libraries are installed in correct paths
+export LD_LIBRARY_PATH=.
+
 NAME=`basename $0`
 VERBOSE=0
 
