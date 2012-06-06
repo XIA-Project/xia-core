@@ -55,13 +55,9 @@
 */
 int Xrecv(int sockfd, void *rbuf, size_t len, int  /*flags */)
 {
-	struct addrinfo hints;
 	int numbytes;
-	socklen_t addr_len;
 	char UDPbuf[MAXBUFLEN];
 	
-	struct sockaddr_in their_addr;
-
 	if (len == 0)
 		return 0;
 
@@ -86,37 +82,29 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int  /*flags */)
 	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len)) > 0)
 		return numbytes;
 
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_DGRAM;
-
-	addr_len = sizeof their_addr;
-	if ((numbytes = recvfrom(sockfd, UDPbuf, MAXBUFLEN-1 , 0,
-					(struct sockaddr *)&their_addr, &addr_len)) == -1) {
-		LOGF("Error retreiving data from Click: %s", strerror(errno));
+	if ((numbytes = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) < 0) {
+		LOGF("Error retrieving recv data from Click: %s", strerror(errno));
 		return -1;
 	}
-	
-	// FIXME: make this use protobufs
-	size_t paylen = 0, i = 0;
-	char *tmpbuf = (char*)UDPbuf;
 
-	while (tmpbuf[i] != '^')
-		i++;
-	paylen = numbytes - i - 1;
-	int offset= i + 1;
+	std::string str(UDPbuf, numbytes);
+	xia::XSocketMsg xsm;
+
+	xsm.ParseFromString(str);
+
+	xia::X_Recv_Msg *msg = xsm.mutable_x_recv();
+	unsigned paylen = msg->payload().size();
+	const char *payload = msg->payload().c_str();
 
 	if (paylen <= len)
-		memcpy(rbuf, UDPbuf + offset, paylen);
+		memcpy(rbuf, payload, paylen);
 	else {
 		// we got back more data than the caller requested
 		// stash the extra away for subsequent Xrecv calls
-		memcpy(rbuf, UDPbuf + offset, len);
+		memcpy(rbuf, payload, len);
 		paylen -= len;
-		offset += len;
-		setSocketData(sockfd, UDPbuf + offset, paylen);
+		setSocketData(sockfd, payload + len, paylen);
 		paylen = len;
 	}
-
 	return paylen;
 }

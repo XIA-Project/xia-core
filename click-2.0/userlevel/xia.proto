@@ -91,10 +91,13 @@ message X_Send_Msg {
 
 message X_Recv_Msg {
   optional string temp = 1; // currently not used
+  optional string dag = 2;
+  optional bytes payload = 3;
 }
 
 message X_Recvfrom_Msg {
   optional string temp = 1; // currently not used
+  optional bytes payload = 2;
 }
 
 message X_Setsockopt_Msg {
