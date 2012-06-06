@@ -428,6 +428,8 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		break;
 		case xia::XBIND:
 		{
+			int rc = 0, ec = 0;
+
 			//Bind XID
 			//click_chatter("\n\nOK: SOCKET BIND !!!\\n");
 			//get source DAG from protobuf message
@@ -445,43 +447,47 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 			//Set the source DAG in DAGinfo
 			DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
-			daginfo->src_path.parse(sdag_string);
-			daginfo->nxt = -1;
-			daginfo->last = -1;
-			daginfo->hlim = hlim.get(_sport);
-			daginfo->isConnected = false;
-			daginfo->initialized = true;
-			daginfo->sdag = sdag_string;
+			if (daginfo->src_path.parse(sdag_string)) {
+				daginfo->nxt = -1;
+				daginfo->last = -1;
+				daginfo->hlim = hlim.get(_sport);
+				daginfo->isConnected = false;
+				daginfo->initialized = true;
+				daginfo->sdag = sdag_string;
 
-			//Check if binding to full DAG or just to SID only
-			Vector<XIAPath::handle_t> xids = daginfo->src_path.next_nodes( daginfo->src_path.source_node() );			
-			XID front_xid = daginfo->src_path.xid( xids[0] );
-			struct click_xia_xid head_xid = front_xid.xid();
-			uint32_t head_xid_type = head_xid.type;
-			if(head_xid_type == _sid_type) {
-				daginfo->full_src_dag = false; 
-			} else {
-				daginfo->full_src_dag = true;
-			}
+				//Check if binding to full DAG or just to SID only
+				Vector<XIAPath::handle_t> xids = daginfo->src_path.next_nodes( daginfo->src_path.source_node() );			
+				XID front_xid = daginfo->src_path.xid( xids[0] );
+				struct click_xia_xid head_xid = front_xid.xid();
+				uint32_t head_xid_type = head_xid.type;
+				if(head_xid_type == _sid_type) {
+					daginfo->full_src_dag = false; 
+				} else {
+					daginfo->full_src_dag = true;
+				}
 
 			
-			XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
-			//XID xid(xid_string);
-			//TODO: Add a check to see if XID is already being used
+				XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+				//XID xid(xid_string);
+				//TODO: Add a check to see if XID is already being used
 
-			// Map the source XID to source port (for now, for either type of tranports)
-			XIDtoPort.set(source_xid, _sport);
-			addRoute(source_xid);
+				// Map the source XID to source port (for now, for either type of tranports)
+				XIDtoPort.set(source_xid, _sport);
+				addRoute(source_xid);
 
-			portToDAGinfo.set(_sport, *daginfo);
+				portToDAGinfo.set(_sport, *daginfo);
 
-			//click_chatter("Bound");
-			//click_chatter("set %d %d",_sport, __LINE__);
+				//click_chatter("Bound");
+				//click_chatter("set %d %d",_sport, __LINE__);
 
-			//portRxSeqNo.set(_sport,portRxSeqNo.get(_sport)+1);//Increment counter
+				//portRxSeqNo.set(_sport,portRxSeqNo.get(_sport)+1);//Increment counter
+			} else {
+				rc = -1;
+				ec = EADDRNOTAVAIL;
+			}
 
 			// (for Ack purpose) Reply with a packet with the destination port=source port
-			ReturnResult(_sport, xia::XBIND);
+			ReturnResult(_sport, xia::XBIND, rc, ec);
 			break;
 		}
 		case xia::XCLOSE:
@@ -1493,11 +1499,18 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			String header((const char*)xiah.hdr(), xiah.hdr_size());
 			String payload((const char*)xiah.payload(), xiah.plen());//+xiah.hdr_size());
 			//String payload((const char*)thdr.payload(), xiah.plen() - thdr.hlen());
-			String str = src_path;
-			str = str + String("^");
-			str = str + header + payload;
+			String str = header + payload;
 
-			WritablePacket *xcmp_pkt = WritablePacket::make (256, str.c_str(), str.length(), 0);
+			xia::XSocketMsg xsm;
+			xsm.set_type(xia::XRECV);
+			xia::X_Recv_Msg *x_recv_msg = xsm.mutable_x_recv();
+			x_recv_msg->set_dag(src_path.c_str());
+			x_recv_msg->set_payload(str.c_str(), str.length());
+
+			std::string p_buf;
+			xsm.SerializeToString(&p_buf);
+
+			WritablePacket *xcmp_pkt = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
 
 			list<int>::iterator i;
 
@@ -1768,12 +1781,17 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				//Unparse dag info
 				String src_path = xiah.src_path().unparse();
 				String payload((const char*)thdr.payload(), xiah.plen() - thdr.hlen());
-				String str = src_path;
-				if (DEBUG) click_chatter("src_path %s (len %d)", src_path.c_str(), strlen(src_path.c_str()));
-				str = str + String("^");
-				str = str + payload;
-				WritablePacket *p2 = WritablePacket::make (256, str.c_str(), str.length(), 0);
-				//printf("\n\n (%s) Received=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
+
+				xia::XSocketMsg xsm;
+				xsm.set_type(xia::XRECV);
+				xia::X_Recv_Msg *x_recv_msg = xsm.mutable_x_recv();
+				x_recv_msg->set_dag(src_path.c_str());
+				x_recv_msg->set_payload(payload.c_str(), payload.length());
+
+				std::string p_buf;
+				xsm.SerializeToString(&p_buf);
+
+				WritablePacket *p2 = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
 
 				if (DEBUG)
 					click_chatter("Sent packet to socket with port %d", _dport);
