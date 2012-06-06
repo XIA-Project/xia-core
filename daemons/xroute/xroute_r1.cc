@@ -523,7 +523,7 @@ void initRouteState()
 
     	// read the localhost AD and HID
     	if ( XreadLocalHostAddr(route_state.sock, route_state.myAD, MAX_XID_SIZE, route_state.myHID, MAX_XID_SIZE) < 0 )
-    		error("Reading localhost address");
+    		perror("Reading localhost address");
 
 	// make the src DAG (the one the routing process listens on)
     	route_state.sdag = (char*) malloc(snprintf(NULL, 0, "RE %s %s %s", route_state.myAD, route_state.myHID, SID_XROUTE) + 1);
@@ -562,7 +562,7 @@ int main()
     	// open socket for route process
     	route_state.sock=Xsocket(XSOCK_DGRAM);
     	if (route_state.sock < 0) 
-    		error("Opening socket");
+    		perror("Opening socket");
 
     	// initialize the route states (e.g., set HELLO/LSA timer, etc)
     	initRouteState();
@@ -583,7 +583,7 @@ int main()
 			dlen = 1024;
 			n = Xrecvfrom(route_state.sock, recv_message, 1024, 0, theirDAG, &dlen);
 			if (n < 0) {
-	    			error("recvfrom");
+	    			perror("recvfrom");
 			}
 			
 			string msg = recv_message;
@@ -606,7 +606,7 @@ int main()
   						processHostRegister(msg.c_str()); 
 						break;						
 					default:
-						error("unknown routing message");
+						perror("unknown routing message");
 						break;
 				}
   			} 	

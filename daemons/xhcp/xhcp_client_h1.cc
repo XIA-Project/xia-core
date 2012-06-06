@@ -90,11 +90,11 @@ int main(int argc, char *argv[]) {
 			
 	// Xsocket init
 	int sockfd = Xsocket(XSOCK_DGRAM);
-	if (sockfd < 0) { error("Opening Xsocket"); }
+	if (sockfd < 0) { perror("Opening Xsocket"); }
 	
     	// read the localhost HID 
     	if ( XreadLocalHostAddr(sockfd, mydummyAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE) < 0 )
-    		error("Reading localhost address");   	
+    		perror("Reading localhost address");   	
 
 	// make the src DAG (Actual AD will be updated when receiving XHCP beacons from an XHCP server)
 	sprintf(sdag, "RE %s", SID_XHCP);
@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
 		memset(ddag, 0, sizeof(ddag));
 		size_t ddaglen = sizeof(ddag);
 		int rc = Xrecvfrom(sockfd, pkt, XHCP_MAX_PACKET_SIZE, 0, ddag, &ddaglen);
-		if (rc < 0) { error("recvfrom"); }
+		if (rc < 0) { perror("recvfrom"); }
 
 		memset(self_dag, '\0', XHCP_MAX_DAG_LENGTH);
 		memset(gw_dag, '\0', XHCP_MAX_DAG_LENGTH);
@@ -228,11 +228,11 @@ int main(int argc, char *argv[]) {
                 if (beacon_reception_count == XHCP_CLIENT_NAME_REGISTER_WAIT) {    
     			// read the localhost HID 
     			if ( XreadLocalHostAddr(sockfd, myrealAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE) < 0 )
-    				error("Reading localhost address"); 
+    				perror("Reading localhost address"); 
     			// make the host DAG 
         		sprintf(hdag, "RE %s %s", myrealAD, myHID);  
     			if (XregisterName(hostname, hdag) < 0 )
-    			error("name register");
+    			perror("name register");
 		}   
 		
 	}	

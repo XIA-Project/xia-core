@@ -15,13 +15,13 @@ int main(int argc, char *argv[]) {
 	char ns_dag[XHCP_MAX_DAG_LENGTH];
 	// Xsocket init
 	int sockfd = Xsocket(XSOCK_DGRAM);
-	if (sockfd < 0) { error("Opening Xsocket"); }
+	if (sockfd < 0) { perror("Opening Xsocket"); }
 	// dag init
 	sprintf(ddag, "RE %s %s", BHID, SID_XHCP);
 	
     	// read the localhost AD and HID (currently, XHCP server running on gw router)
     	if ( XreadLocalHostAddr(sockfd, myAD, MAX_XID_SIZE, gw_router_hid, MAX_XID_SIZE) < 0 )
-    		error("Reading localhost address");
+    		perror("Reading localhost address");
     		
         //Make the DAG for name server (currently, NS DAG is fixed as AD0:HID0:SID_NS)
         sprintf(ns_dag, "RE %s %s %s", AD0, HID0, SID_NS);    		
