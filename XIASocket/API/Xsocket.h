@@ -127,7 +127,6 @@ extern int XremoveChunk(ChunkContext *ctx, const char *cid);
 extern void XfreeChunkInfo(ChunkInfo *infoList);
 
 extern int Xaccept(int sockfd);
-extern void error(const char *msg);
 extern void set_conf(const char *filename, const char *sectioname);
 extern void print_conf();
 

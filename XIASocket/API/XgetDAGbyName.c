@@ -67,7 +67,7 @@ char *XgetDAGbyName(const char *name) {
     
     //Read the nameserver DAG (the one that the name-query will be sent to)
     if ( XreadNameServerDAG(sock, ns_dag) < 0 )
-    	error("Reading nameserver address");
+        perror("Reading nameserver address");
 
     //Construct a name-query packet	
     ns_pkt query_pkt;
@@ -94,7 +94,7 @@ char *XgetDAGbyName(const char *name) {
     memset(ddag, 0, sizeof(ddag));
     size_t ddaglen = sizeof(ddag);
     int rc = Xrecvfrom(sock, pkt, NS_MAX_PACKET_SIZE, 0, ddag, &ddaglen);
-    if (rc < 0) { error("recvfrom"); }
+    if (rc < 0) { perror("recvfrom"); }
 
     memset(_name, '\0', NS_MAX_DAG_LENGTH);
     memset(_dag, '\0', NS_MAX_DAG_LENGTH);
@@ -160,7 +160,7 @@ int XregisterName(const char *name, const char *DAG) {
     
     //Read the nameserver DAG (the one that the name-registration will be sent to)
     if ( XreadNameServerDAG(sock, ns_dag) < 0 )
-    	error("Reading nameserver address");	
+        perror("Reading nameserver address");
 
     //Construct a registration packet	
     ns_pkt register_pkt;
@@ -187,7 +187,7 @@ int XregisterName(const char *name, const char *DAG) {
     memset(ddag, 0, sizeof(ddag));
     size_t ddaglen = sizeof(ddag);
     int rc = Xrecvfrom(sock, pkt, NS_MAX_PACKET_SIZE, 0, ddag, &ddaglen);
-    if (rc < 0) { error("recvfrom"); }
+    if (rc < 0) { perror("recvfrom"); }
 
     memset(_name, '\0', NS_MAX_DAG_LENGTH);
     memset(_dag, '\0', NS_MAX_DAG_LENGTH);
