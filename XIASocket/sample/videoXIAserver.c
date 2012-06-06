@@ -257,7 +257,7 @@ int main(int argc, char *argv[])
 
     	// read the localhost AD and HID
     	if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID)) < 0 )
-    		error("Reading localhost address");		 
+    		perror("Reading localhost address");		 
 
 	// create the dag we will listen for incoming connections on
 	if (!(dag = createDAG(myAD, myHID, SID_VIDEO)))
@@ -267,7 +267,7 @@ int main(int argc, char *argv[])
     	char * sname = (char*) malloc(snprintf(NULL, 0, "%s", SNAME) + 1);
     	sprintf(sname, "%s", SNAME);  	
     	if (XregisterName(sname, dag) < 0 )
-    		error("name register");		   
+    		perror("name register");		   
     
 	if(Xbind(sock,dag) < 0)
 		 die(-1, "Unable to bind to the dag: %s\n", dag);
