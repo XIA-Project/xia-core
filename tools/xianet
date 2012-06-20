@@ -20,6 +20,7 @@ LD_LIBRARY_PATH=.
 
 NAME=`basename $0`
 VERBOSE=0
+CLICK_ONLY=0
 
 # this is a particular list of daemons for the default 4-node-chain topology (host0 -- router0 -- router1 -- host1)
 DAEMONS="xroute_r0 xroute_r1 xhcp_server_r0 xhcp_server_r1 xhcp_client_h0 xhcp_client_h1 xnameservice"
@@ -93,6 +94,9 @@ start_daemons()
 	fi
 
 	$CLICK -R $CONFPATH/$SCRIPT &
+	if [ $CLICK_ONLY -eq 1 ]; then
+		exit
+	fi
 	sleep 2
 
 
@@ -102,6 +106,10 @@ start_daemons()
 		exec 1>&3
 		printf "Click is not running, aborting...\n"
 		exit 1
+	fi
+
+	if [ $VERBOSE -eq 1 ]; then
+		exec &> /dev/null
 	fi
 
 	cd $XIADIR/daemons/xroute
@@ -127,10 +135,12 @@ help ()
 
 Start or stop the XIA network services.
 
-usage: $NAME [-qv] [start|stop|restart|check]
+usage: $NAME [-cqvV] [start|stop|restart|check]
 where:
+  -c only start click
   -q run silently (default)
-  -v prints debug messages to stdout
+  -v prints click debug messages to stdout
+  -V prints all daemon debug messages to stdout
 
   start   - starts the xia network processes if not already running
   stop    - stops the xia processes
@@ -141,13 +151,19 @@ EOH
 	exit 0
 }
 
-while getopts ":qvh" opt; do
+while getopts ":cqvVh" opt; do
 	case $opt in
+		c)
+			CLICK_ONLY="1"
+			;;
 		q)
-			VERBOSE="0"
+			VERBOSE=0
+			;;
+		V)
+			VERBOSE=2
 			;;
 		v)
-			VERBOSE="1"
+			VERBOSE=1
 			;;
 		h)
 			help
