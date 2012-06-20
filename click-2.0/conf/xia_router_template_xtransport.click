@@ -114,7 +114,7 @@ elementclass XIAPacketRoute {
 	rt_IP[4] -> consider_first_path; // possible xcmp redirect message
 
     GPRP[0] -> [0]output;
-    GPRP[1] -> Print("TIME EXCEEDED") -> x[0] -> consider_first_path;
+    GPRP[1] -> Print("TTL TIME EXCEEDED") -> x[0] -> consider_first_path;
     x[1] -> Discard;
 
     c[5] -> [2]output;
@@ -276,20 +276,30 @@ elementclass DualRouter {
     Script(write n/proc/rt_IP/rt.add IP:$local_ip 4); // self IP as destination
     Script(write n/proc/rt_IP/rt.add - 1);	// default route for IP traffic
 
+	// probably don't need  this
     arpt :: Tee(2);
 
-    c0 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/9999, -);
+   					//ARP query        arp response    IP      UDP   4ID PORT   XIP 
+	c0 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/9999, -);
 
     input[0] -> c0;
     out0 :: Queue(200) -> [0]output;
     c0[0] -> Discard; //ar0 :: ARPResponder($local_ip/32 $local_mac) -> out0;
-    arpq0 :: ARPQuerier($local_ip, $local_mac) -> out0;
+
     c0[1] -> arpt;
-    arpt[0] -> [1]arpq0;
+    arpq0 :: ARPQuerier($local_ip, $local_mac) -> out0;
+    arpt[0] -> [1]arpq0; // arp responses go to port 1 of querier
+	
+	// paint so we know what port it came from; mark ip header for click; strip 8 removes UDP header
     c0[2] -> Paint(1) -> Strip(14) -> MarkIPHeader -> StripIPHeader -> Strip(8) -> MarkXIAHeader -> [0]n;
+
+	// input logic for XIP packets; remove eth frame
     c0[3] -> Paint(1) -> Strip(14) -> [0]n;
-    //c0[4] -> Print("eth0 non-IP/XIA") -> Discard;
+
+	// Why?? probably discard here
     c0[4] -> [0]n; // Print("eth0 non-IP") -> Discard;
+
+
 
     c1 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/9999, -);
 
@@ -308,14 +318,21 @@ elementclass DualRouter {
     swIP :: PaintSwitch;
     swXIA :: PaintSwitch;
 
+	// packet needs forwarding and has been painted w/ out port #
     n[0] -> dstTypeC;
+	// things out 0 have next-hop 4ID
     dstTypeC[0] -> XIAIPEncap(SRC $local_ip) -> swIP;
+	// any other XID
     dstTypeC[1] -> swXIA;    
 
+	// packets delivered locally (XCMP should be here)
     n[1] -> Discard;
     n[2] -> [0]cache[0] -> [1]n;
     Idle -> [1]cache[1] -> Discard;
 
+	// If IP is in our subnet, do an ARP. OW, send to default gateway
+	// dip sets next ip annotation to default gw so arp knows what to query
+	//$eth0:gw?
     dip :: DirectIPLookup(0.0.0.0/0 $local_ip:gw 0);
     swIP[0] -> arpq0;
     swIP[1] -> dip -> arpq1;
@@ -806,6 +823,284 @@ elementclass XRouter4Port {
 };
 
 
+
+// 4-port router node with XRoute process running and IP support
+elementclass DualRouter4Port {
+    $local_addr, $local_ad, $local_hid, $fake, $CLICK_IP, $API_IP, $ether_addr, $ip0, $mac0, $gw0, $ip1, $mac1, $gw1, $ip2, $mac2, $gw2, $ip3, $mac3, $gw3 |
+
+	// TODO: document inputs
+
+
+    // $local_addr: the full address of the node
+
+    // input[0], input[1], input[2], input[3]: a packet arrived at the node
+    // output[0]: forward to interface 0
+    // output[1]: forward to interface 1
+    // output[2]: forward to interface 2
+    // output[3]: forward to interface 3
+    
+    
+    n :: RouteEngine($local_addr);
+    xtransport::XTRANSPORT($local_addr, $CLICK_IP, $API_IP, n/proc/rt_SID/rt);        
+    
+    //Create kernel TAP interface which responds to ARP
+    fake0::FromHost($fake, $API_IP/24, CLICK_XTRANSPORT_ADDR $CLICK_IP ,HEADROOM 256, MTU 65521) 
+    -> Print()
+    -> fromhost_cl :: Classifier(12/0806, 12/0800);
+    fromhost_cl[0] -> ARPResponder(0.0.0.0/0 $ether_addr) -> ToHost($fake);
+
+    //Classifier to sort between control/normal
+    fromhost_cl[1]
+    ->StripToNetworkHeader()
+    ->sorter::IPClassifier(dst udp port 5001 or 5002 or 5003 or 5004 or 5005 or 5006,
+                           dst udp port 10000 or 10001 or 10002);
+
+    //Control in
+    sorter[0]
+    ->[0]xtransport;
+
+    //socket side data in
+    sorter[1]
+    ->[1]xtransport;
+
+    //socket side out
+    xtransport[1]->
+    cIP::CheckIPHeader();
+    cIP
+    ->EtherEncap(0x0800, $ether_addr, 11:11:11:11:11:11)
+    -> ToHost($fake)
+    cIP[1]->Print(bad,MAXLENGTH 100, CONTENTS ASCII)->Discard();
+
+    xtransport[0]-> Discard;//Port 0 is unused for now.
+    
+    //To connect to forwarding instead of loopback
+    //xtransport[2]->Packet forwarding module
+    //Packet forwarding module->[2]xtransport0;
+
+    cache :: XIACache($local_addr, n/proc/rt_CID/rt, PACKET_SIZE 1400);
+
+    //Script(write n/proc/rt_AD/rt.add - 0);      // default route for AD
+    //Script(write n/proc/rt_HID/rt.add - 0);     // default route for HID
+	//Script(write n/proc/rt_HID/rt.add HID1 0); // useful for testing xcmp redirect
+    Script(write n/proc/rt_AD/rt.add $local_ad 4);    // self AD as destination
+    Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self RHID as destination
+    Script(write n/proc/rt_HID/rt.add BHID 7);  // outgoing broadcast packet
+    Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
+    Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
+    Script(write n/proc/rt_IP/rt.add - 3); 	// default route for IPv4    
+
+    // quick fix
+    n[3] -> Discard();
+    Idle() -> [4]xtransport;
+    
+
+    // set up XCMP elements
+    c :: Classifier(01/3D, -); // XCMP
+    x :: XCMP($local_addr);
+
+    
+    
+    // setup XARP module0
+	//			     ARP query        ARP response     IP      UDP   4ID port XARP query       XARP response    XIP	
+    c0 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/9990 20/0001, 12/9990 20/0002, 12/9999);
+
+	// Set up XARP querier and responder
+    xarpq0 :: XARPQuerier($local_hid, $mac0);
+    xarpr0 :: XARPResponder($local_hid $mac0);        
+	// Set up ARP querier and responder
+	arpq0 :: ARPQuerier($ip0, $mac0);
+	arpr0 :: ARPResponder($ip0/32 $mac0);  // TODO: Need the "/32"?
+    
+    // On receiving a packet from Interface0, classify it
+    input[0] -> c0; 
+    out0 :: Queue(200) -> [0]output;
+
+	// Receiving an ARP Query; respond if it's interface0's IP
+	c0[0] -> arpr0 -> out0;  //TODO: Safe? Just discard?
+
+	// Receiving an ARP Response; return it to querier on port 1
+	c0[1] -> [1]arpq0;
+
+	// Receiving an XIA-encapped-in-IP packet; strip the ethernet, IP, and UDP headers, leaving bare XIP packet, then paint so we know which port it came in on
+	c0[2] -> Strip(14) -> MarkIPHeader -> StripIPHeader -> Strip(8) -> MarkXIAHeader -> Paint(0) -> [0]n;
+    
+    // Receiving an XIA packet
+    c0[5] -> Strip(14) -> MarkXIAHeader() -> Paint(0) -> [0]n; 
+
+    // On receiving XARP response
+    c0[4] -> [1]xarpq0 -> out0;
+  
+    // On receiving XARP query
+    c0[3] -> xarpr0 -> out0;
+    
+    // XAPR timeout to XCMP
+    xarpq0[1] -> x; 
+    
+    
+    
+    
+    // setup XARP module1
+	//			     ARP query        ARP response     IP      UDP   4ID port XARP query       XARP response    XIP	
+    c1 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/9990 20/0001, 12/9990 20/0002, 12/9999);
+
+	// Set up XARP querier and responder
+    xarpq1 :: XARPQuerier($local_hid, $mac1);
+    xarpr1 :: XARPResponder($local_hid $mac1);        
+	// Set up ARP querier and responder
+	arpq1 :: ARPQuerier($ip1, $mac1);
+	arpr1 :: ARPResponder($ip1/32 $mac1);  // TODO: Need the "/32"?
+    
+    // On receiving a packet from Interface1, classify it
+    input[1] -> c1; 
+    out1 :: Queue(200) -> [1]output;
+
+	// Receiving an ARP Query; respond if it's interface0's IP
+	c1[0] -> arpr1 -> out1;  //TODO: Safe? Just discard?
+
+	// Receiving an ARP Response; return it to querier on port 1
+	c1[1] -> [1]arpq1;
+
+	// Receiving an XIA-encapped-in-IP packet; strip the ethernet, IP, and UDP headers, leaving bare XIP packet, then paint so we know which port it came in on
+	c1[2] -> Strip(14) -> MarkIPHeader -> StripIPHeader -> Strip(8) -> MarkXIAHeader -> Paint(1) -> [0]n;
+    
+    // Receiving an XIA packet
+    c1[5] -> Strip(14) -> MarkXIAHeader() -> Paint(1) -> [0]n; 
+
+    // On receiving XARP response
+    c1[4] -> [1]xarpq1 -> out1;
+  
+    // On receiving XARP query
+    c1[3] -> xarpr1 -> out1;
+    
+    // XAPR timeout to XCMP
+    xarpq1[1] -> x; 
+    
+    
+
+        
+    // setup XARP module2
+	//			     ARP query        ARP response     IP      UDP   4ID port XARP query       XARP response    XIP	
+    c2 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/9990 20/0001, 12/9990 20/0002, 12/9999);
+
+	// Set up XARP querier and responder
+    xarpq2 :: XARPQuerier($local_hid, $mac2);
+    xarpr2 :: XARPResponder($local_hid $mac2);        
+	// Set up ARP querier and responder
+	arpq2 :: ARPQuerier($ip2, $mac2);
+	arpr2 :: ARPResponder($ip2/32 $mac2);  // TODO: Need the "/32"?
+    
+    // On receiving a packet from Interface1, classify it
+    input[2] -> c2; 
+    out2 :: Queue(200) -> [2]output;
+
+	// Receiving an ARP Query; respond if it's interface0's IP
+	c2[0] -> arpr2 -> out2;  //TODO: Safe? Just discard?
+
+	// Receiving an ARP Response; return it to querier on port 1
+	c2[1] -> [1]arpq2;
+
+	// Receiving an XIA-encapped-in-IP packet; strip the ethernet, IP, and UDP headers, leaving bare XIP packet, then paint so we know which port it came in on
+	c2[2] -> Strip(14) -> MarkIPHeader -> StripIPHeader -> Strip(8) -> MarkXIAHeader -> Paint(2) -> [0]n;
+    
+    // Receiving an XIA packet
+    c2[5] -> Strip(14) -> MarkXIAHeader() -> Paint(2) -> [0]n; 
+
+    // On receiving XARP response
+    c2[4] -> [1]xarpq2 -> out2;
+  
+    // On receiving XARP query
+    c2[3] -> xarpr2 -> out2;
+    
+    // XAPR timeout to XCMP
+    xarpq2[1] -> x; 
+    
+        
+        
+    
+    // setup XARP module3
+	//			     ARP query        ARP response     IP      UDP   4ID port XARP query       XARP response    XIP	
+    c3 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/9990 20/0001, 12/9990 20/0002, 12/9999);
+
+	// Set up XARP querier and responder
+    xarpq3 :: XARPQuerier($local_hid, $mac3);
+    xarpr3 :: XARPResponder($local_hid $mac3);        
+	// Set up ARP querier and responder
+	arpq3 :: ARPQuerier($ip3, $mac3);
+	arpr3 :: ARPResponder($ip3/32 $mac3);  // TODO: Need the "/32"?
+    
+    // On receiving a packet from Interface1, classify it
+    input[3] -> c3; 
+    out3 :: Queue(200) -> [3]output;
+
+	// Receiving an ARP Query; respond if it's interface0's IP
+	c3[0] -> arpr3 -> out3;  //TODO: Safe? Just discard?
+
+	// Receiving an ARP Response; return it to querier on port 1
+	c3[1] -> [1]arpq3;
+
+	// Receiving an XIA-encapped-in-IP packet; strip the ethernet, IP, and UDP headers, leaving bare XIP packet, then paint so we know which port it came in on
+	c3[2] -> Strip(14) -> MarkIPHeader -> StripIPHeader -> Strip(8) -> MarkXIAHeader -> Paint(3) -> [0]n;
+    
+    // Receiving an XIA packet
+    c3[5] -> Strip(14) -> MarkXIAHeader() -> Paint(3) -> [0]n; 
+
+    // On receiving XARP response
+    c3[4] -> [1]xarpq3 -> out3;
+  
+    // On receiving XARP query
+    c3[3] -> xarpr3 -> out3;
+    
+    // XAPR timeout to XCMP
+    xarpq3[1] -> x; 
+    
+    
+    
+
+	// Packet needs forwarding and has been painted w/ output port;
+	// check if it's heading to an XIA network or an IP network
+	dstTypeC :: XIAXIDTypeClassifier(next IP, -);
+	swIP :: PaintSwitch;
+	swXIA :: PaintSwitch;
+
+	n[0] -> dstTypeC;
+
+	// Next hop is a 4ID; source IP address depends on output port
+	dstTypeC[0] -> swIP;
+	// Next hop is any other XID type
+	dstTypeC[1] -> swXIA;
+       
+
+    srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
+    n[1] -> c[1] -> srcTypeClassifier[1] -> [2]xtransport[2] -> Paint(4) -> [0]n;
+    srcTypeClassifier[0] -> Discard;    // do not send CID responses directly to RPC;
+    c[0] -> x; //IPPrint("going into XCMP Module", CONTENTS HEX) -> x;
+    x[0] -> [0]n; // new (response) XCMP packets destined for some other machine
+    x[1] -> Discard; // XCMP packet actually destined for this router??
+    n[2] -> [0]cache[0] -> Paint(4) -> [1]n;
+    //For get and put cid
+    xtransport[3] -> [1]cache[1] -> [3]xtransport;
+    
+    
+	// Sending an XIA-encapped-in-IP packet (via ARP if necessary)
+	// If IP is in our subnet, do an ARP. Otherwise, send to the default gateway
+	// dip sets the next IP annotation to the defualt gw so ARP knows what to query
+	dip0 :: DirectIPLookup(0.0.0.0/0 $gw0 0);
+	dip1 :: DirectIPLookup(0.0.0.0/0 $gw1 0);
+	dip2 :: DirectIPLookup(0.0.0.0/0 $gw2 0);
+	dip3 :: DirectIPLookup(0.0.0.0/0 $gw3 0);
+	swIP[0] -> XIAIPEncap(SRC $ip0) -> dip0 -> arpq0 -> out0;
+	swIP[1] -> XIAIPEncap(SRC $ip1) -> dip1 -> arpq1 -> out1;
+	swIP[2] -> XIAIPEncap(SRC $ip2) -> dip2 -> arpq2 -> out2;
+	swIP[3] -> XIAIPEncap(SRC $ip3) -> dip3 -> arpq3 -> out3;
+
+    // Sending an XIP packet (via XARP if necessary)
+    swXIA[0] -> [0]xarpq0;
+    swXIA[1] -> [0]xarpq1;
+    swXIA[2] -> [0]xarpq2;
+    swXIA[3] -> [0]xarpq3;
+    
+        
+};
 
 
 

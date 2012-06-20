@@ -616,7 +616,9 @@ if __name__=="__main__":
     #else:
     #    HOSTNAME = sys.argv[1]
 
-    HOSTDAG = XgetDAGbyName("www_s.neitris.com.xia")
+    #HOSTDAG = XgetDAGbyName("www_s.neitris.com.xia")
+    HOSTDAG = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 0 - \n %s 3 - \n %s" % (myAD, myIP, myHID, SID)
+    print HOSTDAG
     #readsock = socket(AF_INET, SOCK_STREAM)
     #readsock.connect((HOSTNAME, PORT))
     readsock = Xsocket(XSOCK_STREAM)
