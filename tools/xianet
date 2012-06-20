@@ -40,7 +40,7 @@ SCRIPT=xia_chain_topology_socket_reliable_test.click
 
 is_running()
 {
-	RUNNING=`ps ao args | grep $1 | grep -v grep`
+	RUNNING=`ps a | grep "/$1" | grep -v grep`
 	[ "$RUNNING" != "" ]
 }
 
@@ -56,8 +56,18 @@ check_daemons()
 	done
 }
 
+check_root()
+{
+	if [[ `whoami` != "root" ]]; then
+		printf "\n ERROR: $NAME must be run as root\n\n"
+		exit 1
+	fi
+}
+
 stop_daemons()
 {
+	check_root
+
 	printf "Stopping xia network processes\n"
 	for svc in $DAEMONS "click"
 	do
@@ -76,14 +86,10 @@ start_daemons()
 		exit 1
 	fi
 
-	if [[ `whoami` != "root" ]]; then
-		printf "\n ERROR: $NAME must be run as root\n\n"
-		exit 1
-	fi
-
-	SNAME=`basename $SCRIPT .click`
+	check_root
 
 	if [ ! -f $CONFPATH/$SCRIPT ]; then
+		SNAME=`basename $SCRIPT .click`
 		printf "\nERROR: unable to locate click conf file: $SNAME\n\n"
 		exit 1
 	fi
@@ -135,9 +141,11 @@ help ()
 
 Start or stop the XIA network services.
 
-usage: $NAME [-cqvV] [start|stop|restart|check]
+usage: $NAME [-cqvV] [-s <script>] [start|stop|restart|check]
 where:
   -c only start click
+  -s run click using the specified script
+     (should be located in the $CONFPATH directory)
   -q run silently (default)
   -v prints click debug messages to stdout
   -V prints all daemon debug messages to stdout
@@ -151,10 +159,13 @@ EOH
 	exit 0
 }
 
-while getopts ":cqvVh" opt; do
+while getopts "cs:qvVh" opt; do
 	case $opt in
 		c)
-			CLICK_ONLY="1"
+			CLICK_ONLY=1
+			;;
+		s)
+			SCRIPT=$OPTARG
 			;;
 		q)
 			VERBOSE=0
