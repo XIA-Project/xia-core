@@ -59,7 +59,7 @@ int Xsend(int sockfd, const void *buf, size_t len, int /*flags*/)
 	}
 
 	if (validateSocket(sockfd, XSOCK_STREAM, EOPNOTSUPP) < 0) {
-		LOG("Xrecvfrom is only valid with stream sockets.");
+		LOG("Xsend is only valid with stream sockets.");
 		return -1;
 	}
 
