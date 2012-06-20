@@ -1,12 +1,14 @@
 .PHONY: clean doc
 
+XSOCK_LIB=../libXsocket.so
+
 all: _xsocket.so
 
-_xsocket.so: ../libXsocket.so xsocket_wrap.c 
+_xsocket.so: $(XSOCK_LIB) xsocket_wrap.c 
 	gcc -I/usr/include/python2.7 -fpic -c xsocket_wrap.c 
 	gcc -shared xsocket_wrap.o -lXsocket -o _xsocket.so  -I/usr/include/python2.7 -L../
 
-xsocket_wrap.c: xsocket.i 
+xsocket_wrap.c: xsocket.i $(XSOCK_LIB)
 	swig -python xsocket.i 
 
 doc:
