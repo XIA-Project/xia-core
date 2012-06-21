@@ -1,9 +1,8 @@
 #!/usr/bin/python
-import xsocket 
 from xia_address import * 
 import random
 import sys
-from xsocket import *
+from c_xsocket import *
 from ctypes import *
 
 class Stock:

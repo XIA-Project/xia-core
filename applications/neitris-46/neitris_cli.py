@@ -21,7 +21,7 @@ import struct
 
 import select
 from socket import socket, AF_INET, SOCK_STREAM
-from xsocket import *
+from c_xsocket import *
 
 #import neitris
 

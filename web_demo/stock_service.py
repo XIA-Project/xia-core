@@ -1,11 +1,11 @@
 #!/usr/bin/python
-import xsocket 
+import c_xsocket 
 from xia_address import * 
 import random
 import sys
 import os
 import time
-from xsocket import *
+from c_xsocket import *
 from ctypes import *
 
 class Stock:

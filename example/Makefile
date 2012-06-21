@@ -4,7 +4,7 @@ CC=g++
 CFLAGS=-I../XIASocket/API
 LDFLAGS =  -lprotobuf -lpthread
 APPS = tods todc xecho echoclient-d echoclient echoserver xcmpping xcmptraceroute  ccp ccps
-LIBFILES = libXsocket.a libXsocket.so _xsocket.so xsocket.py
+LIBFILES = libXsocket.a libXsocket.so _c_xsocket.so c_xsocket.py
 
 all: $(LIBFILES) $(APPS)
 
@@ -14,11 +14,11 @@ libXsocket.a:
 libXsocket.so:
 	ln -s ../XIASocket/API/libXsocket.so .
 
-_xsocket.so:
-	ln -s ../XIASocket/API/python/_xsocket.so .
+_c_xsocket.so:
+	ln -s ../XIASocket/API/python/_c_xsocket.so .
 
-xsocket.py:
-	ln -s ../XIASocket/API/python/xsocket.py .
+c_xsocket.py:
+	ln -s ../XIASocket/API/python/c_xsocket.py .
 
 ccps: ccps.c libXsocket.a
 	$(CC) -Wall -Wextra $(CFLAGS) -o $@ $< libXsocket.a $(LDFLAGS) 

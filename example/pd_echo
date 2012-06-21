@@ -18,7 +18,7 @@
 
 # simple XIA echo client using datagram sockets
 
-from xsocket import *
+from c_xsocket import *
 import sys
 
 NAME = "www_s.dgram_echo.aaa.xia"
