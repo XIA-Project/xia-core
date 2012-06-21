@@ -31,7 +31,7 @@ from socket import socket, AF_INET, SOCK_STREAM
 import time
 import pygame, sys,os, pickle
 from pygame.locals import *
-from xsocket import *
+from c_xsocket import *
 
 
     
@@ -616,8 +616,7 @@ if __name__=="__main__":
     #else:
     #    HOSTNAME = sys.argv[1]
 
-    #HOSTDAG = XgetDAGbyName("www_s.neitris.com.xia")
-    HOSTDAG = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 0 - \n %s 3 - \n %s" % (myAD, myIP, myHID, SID)
+    HOSTDAG = XgetDAGbyName("www_s.neitris.com.xia")
     print HOSTDAG
     #readsock = socket(AF_INET, SOCK_STREAM)
     #readsock.connect((HOSTNAME, PORT))

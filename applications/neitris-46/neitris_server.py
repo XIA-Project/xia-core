@@ -21,7 +21,7 @@ import struct
 import sys, time, pygame
 from select import select
 from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
-from xsocket import *
+from c_xsocket import *
 import neitris_utils
 import neitris_cfg
 
