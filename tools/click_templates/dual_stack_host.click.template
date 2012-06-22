@@ -1,0 +1,14 @@
+require(library xia_router_template_xtransport.click);
+require(library xia_address.click);
+
+// router instantiation (the host is actually a DualRouter; we connect port 0 to IP and the others to nothing)
+// TODO: If we ever connect more than one port to IP, we somehow need to tell the router about all of its IP addresses in local_addr
+router0 :: Dual4Port(RE IP:$IPADDR0 $ADNAME $HID, $ADNAME, $HID, fake0, 172.0.0.2, 172.0.0.1, 21:11:11:11:11:11, $IPADDR0, $MAC0, $GWADDR0, $IPADDR1, $MAC1, $GWADDR1, $IPADDR2, $MAC2, $GWADDR2, $IPADDR3, $MAC3, $GWADDR3);
+
+######
+FromDevice($IFACE) -> [$NUM]router0[$NUM] -> ToDevice($IFACE);
+######
+Idle -> [$NUM]router0[$NUM] -> Discard;
+######
+
+ControlSocket(tcp, 7777);

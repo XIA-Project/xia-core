@@ -51,8 +51,8 @@ for SID in SIDS:
 
     # Publish DAG to naming service
     XregisterName("www_s.neitris.com.xia", listen_dag)
+    print 'registered name'
     
-    Xbind(portsock, listen_dag_re)
     mainsocks.append(portsock)
     readsocks.append(portsock)
 

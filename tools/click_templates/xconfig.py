@@ -12,6 +12,7 @@ from string import Template
 # constants
 hostconfig = "host.click"
 routerconfig = "router.click"
+dualhostconfig = "dual_stack_host.click"
 xia_addr = "xia_address.click"
 ext = "template"
 
@@ -72,6 +73,35 @@ def getInterfaces():
 		if (len(addr) != 0):
 			(iface, mac) = addr.split()
 			interfaces.append([iface, mac])
+
+	return interfaces
+
+#
+# get the IP, MAC, and default gateway associated with eth0 (used for dual-stack hosts)
+# TODO: Make this more general / combine with getInterfaces()?
+#
+def getEth0():
+
+	# Get the default gateway  TODO: should there be one per interface?
+	cmdline = subprocess.Popen(
+			"route -n | grep ^0.0.0.0 | tr -s ' ' | cut -d ' ' -f2",
+			shell=True, stdout=subprocess.PIPE)
+	default_gw = cmdline.stdout.read().strip()
+
+
+	# Get the MAC and IP addresses
+	cmdline = subprocess.Popen(
+			"ifconfig | grep -A 1 HWaddr | tr '\n' ' ' | tr -s ' ' | cut -d ' ' -f1,5,7 | sed s/addr://",
+			shell=True, stdout=subprocess.PIPE)
+	result = cmdline.stdout.read().strip()
+
+	interfaces = []
+	addrs = result.split("\n")
+
+	for addr in addrs:
+		if (len(addr) != 0):
+			(iface, mac, ip) = addr.split()
+			interfaces.append([iface, mac, ip, default_gw])
 
 	return interfaces
 
@@ -233,6 +263,92 @@ def makeRouterConfig(ad, hid):
 	f.close()
 
 #
+# fill in the dual-stack host config
+#
+# the router config file is broken into 4 sections
+# header - router definition and include lines
+# used ports - connects used ports to interfaces (currently we just use port 0)
+# extra section - discard mappping for unused ports on the 
+#  router (currently ports 1-3)
+# footer - boilerplate
+
+def makeDualHostConfig(ad, hid):
+
+	interfaces = getEth0()
+
+	try:
+		f = open(dualhostconfig + "." + ext, "r")
+		text = f.read()
+		f.close()
+
+		f = open(dualhostconfig, "w")
+
+	except:
+		print "error opening file for reading and/or writing"
+		sys.exit(-1)
+
+	(header, body, extra, footer) = text.split("######")
+
+	tpl = Template(header)
+
+	xchg = {}
+	if (nameserver == "no"):
+		xchg['ADNAME'] = ad
+		xchg['HID'] = hid
+	else:
+		xchg['ADNAME'] = nameserver_ad		
+		xchg['HID'] = nameserver_hid	
+	xchg['HNAME'] = getHostname()
+
+	# create $MAC0 thru $MAC3 replacements
+	i = 0
+	while i < 4 and i < len(interfaces):
+		repl = 'MAC' + str(i)
+		xchg[repl] = interfaces[i][1]
+		repl = 'IPADDR' + str(i)
+		xchg[repl] = interfaces[i][2]
+		repl = 'GWADDR' + str(i)
+		xchg[repl] = interfaces[i][3]
+		i += 1
+	while i < 4:
+		repl = 'MAC' + str(i)
+		xchg[repl] = "00:00:00:00:00:00"
+		repl = 'IPADDR' + str(i)
+		xchg[repl] = "1.1.1.1"
+		repl = 'GWADDR' + str(i)
+		xchg[repl] = "1.1.1.1"
+		i += 1
+	 	
+	newtext = tpl.substitute(xchg)
+
+	i = 0
+	tpl = Template(body)
+	for (interface, mac, ip, gw) in interfaces:
+		xchg['IFACE'] = interfaces[i][0]
+		xchg['MAC'] = interfaces[i][1]
+		xchg['NUM'] = i
+#		xchg['NUMa'] = str(i) + "a"
+#		xchg['NUMb'] = str(i) + "b"
+		i += 1
+
+		newtext += tpl.substitute(xchg)
+
+		if i >= 4:
+			break
+
+	tpl = Template(extra)
+	while i < 4:
+		xchg['NUM'] = i
+		newtext += tpl.substitute(xchg)
+		i += 1
+
+	tpl = Template(footer)
+	newtext += tpl.substitute(xchg)
+
+	f.write(newtext)
+	f.close()
+
+#
 # parse the command line so we can do stuff
 #
 def getOptions():
@@ -241,9 +357,9 @@ def getOptions():
 	global adname
 	global nameserver 
 	try:
-		shortopt = "hrni:a:"
+		shortopt = "hr4ni:a:"
 		opts, args = getopt.getopt(sys.argv[1:], shortopt, 
-			["help", "router", "nameserver", "id=", "ad="])
+			["help", "router", "dual-host", "nameserver", "id=", "ad="])
 	except getopt.GetoptError, err:
 		# print	 help information and exit:
 		print str(err) # will print something like "option -a not recognized"
@@ -259,6 +375,8 @@ def getOptions():
 			hostname = a
 		elif o in ("-r", "--router"):
 			nodetype = "router"
+		elif o in ("-4", "--dual-host"):
+			nodetype = "dual-host"
 		elif o in ("-n", "--nameserver"):
 			nameserver = "yes"			
 		else:
@@ -271,19 +389,22 @@ def help():
 	print """
 usage: xconfig [-h] [-r] [-h hostname]
 where:
-  -h            : get help
+  -h			: get help
   --help
 
-  -i <name>     : set HID name tp <name>
+  -i <name> 	 : set HID name tp <name>
   --id=<name>
 
-  -a <name>     : set AD name to <name>
+  -a <name>		 : set AD name to <name>
   --ad=<name>
 
-  -r            : do router config instead of host
+  -r			: do router config instead of host
   --router
   
-  -n            : indicate that this needs to use nameserver AD and HID
+  -4			: do a dual-stack host config
+  --dual-host
+  
+  -n			: indicate that this needs to use nameserver AD and HID
   --nameserver  
 """
 	sys.exit()
@@ -300,9 +421,12 @@ def main():
 
 	if (nodetype == "host"):
 		makeHostConfig(hid)
-	else:
+	elif nodetype == "router":
 		ad = createAD()
 		makeRouterConfig(ad, hid)
+	elif nodetype == "dual-host":
+		ad = createAD()
+		makeDualHostConfig(ad, hid)
 
 if __name__ == "__main__":
-    main()
+	main()
