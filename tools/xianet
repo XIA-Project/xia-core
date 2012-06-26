@@ -100,8 +100,6 @@ start_daemons()
 		python xconfig.py $FLAGS
 	fi
 
-	exit 1
-
 	if [ ! -f $CONFPATH/$SCRIPT ]; then
 		SNAME=`basename $SCRIPT .click`
 		printf "\nERROR: unable to locate click conf file: $SNAME\n\n"
