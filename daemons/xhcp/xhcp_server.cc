@@ -24,12 +24,12 @@ int main(int argc, char *argv[]) {
     	if ( XreadLocalHostAddr(sockfd, myAD, MAX_XID_SIZE, gw_router_hid, MAX_XID_SIZE) < 0 )
     		perror("Reading localhost address");
 
-        // set the default name server DAG
-        sprintf(ns_dag, "RE %s %s %s %s", "IP_NS", "AD0", "HID0", "SID_NS");    		
+        // set the default name server DAG   	
+        sprintf(ns_dag, "RE ( %s ) %s %s %s", IP_NS, AD0, HID0, SID_NS);  	
 
-		// read the name server DAG from xia-core/etc/resolv.conf, if present
-		ini_gets(NULL, "nameserver", ns_dag, ns_dag, XHCP_MAX_DAG_LENGTH, "../../etc/resolv.conf");
-
+	// read the name server DAG from xia-core/etc/resolv.conf, if present
+	ini_gets(NULL, "nameserver", ns_dag, ns_dag, XHCP_MAX_DAG_LENGTH, "../../etc/resolv.conf");
+ 
  
 	xhcp_pkt beacon_pkt;
 	beacon_pkt.seq_num = 0;

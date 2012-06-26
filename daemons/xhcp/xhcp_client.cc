@@ -238,7 +238,7 @@ int main(int argc, char *argv[]) {
     			// make the host DAG 
         		sprintf(hdag, "RE %s %s", myrealAD, myHID);  
     			if (XregisterName(hostname, hdag) < 0 )
-    			perror("name register");
+    				perror("name register");
 		}   
 		
 	}	

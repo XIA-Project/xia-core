@@ -93,12 +93,8 @@ class XTRANSPORT : public Element {
     
     int initialize(ErrorHandler *);
     void run_timer(Timer *timer);
-    
-    WritablePacket* copy_packet(Packet *);
-    WritablePacket* copy_cid_req_packet(Packet *);
-    WritablePacket* copy_cid_response_packet(Packet *);
 
-	void ReturnResult(int sport, xia::XSocketCallType type, int rc = 0, int err = 0);
+    void ReturnResult(int sport, xia::XSocketCallType type, int rc = 0, int err = 0);
     
   private:
     Timer _timer;
@@ -186,6 +182,12 @@ class XTRANSPORT : public Element {
         String cmd= sid.unparse();
         HandlerCall::call_write(_routeTable, "remove", cmd);
     }
+ 
+ 
+  public:    
+    WritablePacket* copy_packet(Packet *, struct DAGinfo *);
+    WritablePacket* copy_cid_req_packet(Packet *, struct DAGinfo *);
+    WritablePacket* copy_cid_response_packet(Packet *, struct DAGinfo *);
 
 };
 
