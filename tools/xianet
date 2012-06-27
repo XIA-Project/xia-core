@@ -131,16 +131,22 @@ start_daemons()
 	fi
 
 	cd $XIADIR/daemons/xroute
-	./xroute_r0 &
-	./xroute_r1 & 
+	if [ $DUAL_STACK_HOST -eq 0 ]; then
+		./xroute_r1 &
+	fi
+	./xroute_r0 & 
 	sleep 2
 	
 	cd $XIADIR/daemons/xhcp
+	if [ $DUAL_STACK_HOST -eq 0 ]; then
+		./xhcp_server_r1 &
+	fi
 	./xhcp_server_r0 &
-	./xhcp_server_r1 &
 	sleep 1 
+	if [ $DUAL_STACK_HOST -eq 0 ]; then
+		./xhcp_client_h1 www_h.host1.com.xia &
+	fi
 	./xhcp_client_h0 www_h.host0.com.xia  &
-	./xhcp_client_h1 www_h.host1.com.xia &
 	sleep 2 
 		
 	cd $XIADIR/daemons/nameserver
@@ -192,7 +198,7 @@ while getopts "cs:qvV4nh" opt; do
 			;;
 		4)
 			DUAL_STACK_HOST=1
-			CONFPATH=click_templates
+			CONFPATH=$XIADIR/tools/click_templates
 			SCRIPT=dual_stack_host.click
 			;;
 		n)

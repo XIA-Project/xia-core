@@ -27,8 +27,8 @@ nameserver_hid = "HID_NAMESERVER"
 #
 # create a globally unique HID based off of our mac address
 #
-def createHID():
-	hid = "HID:00000000"
+def createHID(prefix="00000000"):
+	hid = "HID:" + prefix
 	id = uuid.uuid1(uuid.getnode())
 	return hid + id.hex
 	
@@ -272,7 +272,7 @@ def makeRouterConfig(ad, hid):
 #  router (currently ports 1-3)
 # footer - boilerplate
 
-def makeDualHostConfig(ad, hid):
+def makeDualHostConfig(ad, hid, rhid):
 
 	interfaces = getEth0()
 
@@ -298,11 +298,12 @@ def makeDualHostConfig(ad, hid):
 	else:
 		xchg['ADNAME'] = nameserver_ad		
 		xchg['HID'] = nameserver_hid	
+	xchg['RHID'] = rhid
 	xchg['HNAME'] = getHostname()
 
 	# create $MAC0 thru $MAC3 replacements
-	i = 0
-	while i < 4 and i < len(interfaces):
+	i = 0  
+	while i < 3 and i < len(interfaces):  # Only go to 2 because the host is connect to router port 3
 		repl = 'MAC' + str(i)
 		xchg[repl] = interfaces[i][1]
 		repl = 'IPADDR' + str(i)
@@ -310,7 +311,7 @@ def makeDualHostConfig(ad, hid):
 		repl = 'GWADDR' + str(i)
 		xchg[repl] = interfaces[i][3]
 		i += 1
-	while i < 4:
+	while i < 3:
 		repl = 'MAC' + str(i)
 		xchg[repl] = "00:00:00:00:00:00"
 		repl = 'IPADDR' + str(i)
@@ -333,11 +334,11 @@ def makeDualHostConfig(ad, hid):
 
 		newtext += tpl.substitute(xchg)
 
-		if i >= 4:
+		if i >= 3:
 			break
 
 	tpl = Template(extra)
-	while i < 4:
+	while i < 3:
 		xchg['NUM'] = i
 		newtext += tpl.substitute(xchg)
 		i += 1
@@ -417,6 +418,7 @@ def main():
 	getOptions()
 
 	hid = createHID()
+	rhid = createHID("20000000")
 	makeXIAAddrConfig(hid)
 
 	if (nodetype == "host"):
@@ -426,7 +428,7 @@ def main():
 		makeRouterConfig(ad, hid)
 	elif nodetype == "dual-host":
 		ad = createAD()
-		makeDualHostConfig(ad, hid)
+		makeDualHostConfig(ad, hid, rhid)
 
 if __name__ == "__main__":
 	main()
