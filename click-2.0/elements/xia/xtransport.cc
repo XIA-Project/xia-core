@@ -928,12 +928,14 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				//printf("\n\n (%s) send (timer set at %f) =%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (daginfo->expiry).doubleval(), pld.c_str(), xiah1.plen());
 				output(2).push(p);
 
+				// REMOVED STATUS RETURNS AS WE RAN INTO SEQUENCING ERRORS
+				// WHERE IT INTERLEAVED WITH RECEIVE PACKETS
 				// (for Ack purpose) Reply with a packet with the destination port=source port
-				ReturnResult(_sport, xia::XSEND);
+//				ReturnResult(_sport, xia::XSEND);
 
 			} else {
 				
-				ReturnResult(_sport, xia::XSEND, -1, ENOTCONN);
+//				ReturnResult(_sport, xia::XSEND, -1, ENOTCONN);
 				click_chatter("Not 'connect'ed: you may need to use 'sendto()'");
 			}
 		}
@@ -1212,6 +1214,9 @@ void XTRANSPORT::push(int port, Packet *p_input)
 					} else if(status == READY_TO_READ) {
 						x_getchunkstatus_msg->add_status("READY");
 
+					} else if(status == INVALID_HASH) {
+						x_getchunkstatus_msg->add_status("INVALID_HASH");
+
 					} else if(status == REQUEST_FAILED) {
 						x_getchunkstatus_msg->add_status("FAILED");
 					}
@@ -1264,7 +1269,8 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				// There is an entry
 				int status = it->second;
 
-				if(status != READY_TO_READ) {
+				if (status != READY_TO_READ  &&
+				    status != INVALID_HASH) {
 					// Do nothing
 
 				} else {
@@ -1377,7 +1383,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				SHA1_update(&sha_ctx, (unsigned char *)pktPayload.c_str() , pktPayload.length() );
 				SHA1_final(digest, &sha_ctx);
 				for(i = 0; i < HASH_KEYSIZE; i++) {
-					sprintf(hexBuf, "%02X", digest[i]);
+					sprintf(hexBuf, "%02x", digest[i]);
 					src.append(const_cast<char *>(hexBuf), 2);
 				}
 
@@ -1861,8 +1867,28 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				daginfo->XIDtoTimerOn.erase(it3);
 			}
 
+			// compute the hash and verify it matches the CID
+			String hash = "CID:";
+			char hexBuf[3];
+			int i = 0;
+			SHA1_ctx sha_ctx;
+			unsigned char digest[HASH_KEYSIZE];
+			SHA1_init(&sha_ctx);
+			SHA1_update(&sha_ctx, (unsigned char *)xiah.payload(), xiah.plen());
+			SHA1_final(digest, &sha_ctx);
+			for(i = 0; i < HASH_KEYSIZE; i++) {
+				sprintf(hexBuf, "%02x", digest[i]);
+				hash.append(const_cast<char *>(hexBuf), 2);
+			}
+
+			int status = READY_TO_READ;
+			if (hash != source_cid.unparse()) {
+				click_chatter("CID with invalid hash received: %s\n", source_cid.unparse().c_str());
+				status = INVALID_HASH;
+			}
+
 			// Update the status of CID request
-			daginfo->XIDtoStatus.set(source_cid, READY_TO_READ);
+			daginfo->XIDtoStatus.set(source_cid, status);
 
 			// Check if the ReadCID() was called for this CID
 			HashTable<XID, bool>::iterator it4;
