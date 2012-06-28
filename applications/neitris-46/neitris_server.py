@@ -19,11 +19,21 @@
 #
 import struct
 import sys, time, pygame
+import socket
+import fcntl
 from select import select
-from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
-from xsocket import *
+#from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
+from c_xsocket import *
 import neitris_utils
 import neitris_cfg
+
+def get_ip_address(ifname):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    return socket.inet_ntoa(fcntl.ioctl(
+        s.fileno(),
+        0x8915,  # SIOCGIFADDR
+        struct.pack('256s', ifname[:15])
+    )[20:24])
 
 def now():
     return time.strftime("%I:%M:%S%p",time.localtime())
@@ -43,7 +53,7 @@ for SID in SIDS:
 
     # Make a DAG to listen on 
     (myAD, myHID) = XreadLocalHostAddr(portsock)
-    myIP = 'IP:172.16.109.129'
+    myIP = 'IP:' + get_ip_address('eth0')
     listen_dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 0 - \n %s 3 - \n %s" % (myAD, myIP, myHID, SID)
     listen_dag_re = "RE %s %s %s" % (myAD, myHID, SID) 
     Xbind(portsock, listen_dag_re)
@@ -51,8 +61,8 @@ for SID in SIDS:
 
     # Publish DAG to naming service
     XregisterName("www_s.neitris.com.xia", listen_dag)
+    print 'registered name'
     
-    Xbind(portsock, listen_dag_re)
     mainsocks.append(portsock)
     readsocks.append(portsock)
 

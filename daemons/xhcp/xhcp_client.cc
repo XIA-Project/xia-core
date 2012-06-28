@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
 	char hdag[XHCP_MAX_DAG_LENGTH];
 	char buffer[XHCP_MAX_PACKET_SIZE]; 	
 	string myAD(""), myGWRHID(""), myNS_DAG("");
-	string default_AD("AD:-"), default_HID("HID:-"), empty_str("HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+	string default_AD("AD:-"), default_HID("HID:-"), default_4ID("IP:-"), empty_str("HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
 	string AD, gwRHID, nsDAG;
 	int beacon_reception_count=0;
 	int beacon_response_freq = ceil(XHCP_CLIENT_ADVERTISE_INTERVAL/XHCP_SERVER_BEACON_INTERVAL);
@@ -108,8 +108,10 @@ int main(int argc, char *argv[]) {
 		3. update HID table:
 			(gwRHID, 0, gwRHID, -)
 			(default, 0, gwRHID, -)	
-		4. store Name-Server-DAG information
-                5. register hostname to the name server  	
+		4. update 4ID table:
+			(default, 0, gwRHID, -)				
+		5. store Name-Server-DAG information
+                6. register hostname to the name server  	
 	*/
 	
 	// main looping
@@ -184,7 +186,11 @@ int main(int argc, char *argv[]) {
 			
 			// update HID table (default entry)
 			if ((rc = xr.setRoute(default_HID, 0, gwRHID, 0xffff)) != 0)
-				printf("error setting route %d\n", rc);				
+				printf("error setting route %d\n", rc);	
+				
+			// update 4ID table (default entry)
+			if ((rc = xr.setRoute(default_4ID, 0, gwRHID, 0xffff)) != 0)
+				printf("error setting route %d\n", rc);								
 			
 			// update HID table (gateway router HID entry)
 			if ((rc = xr.setRoute(gwRHID, 0, gwRHID, 0xffff)) != 0)
@@ -232,7 +238,7 @@ int main(int argc, char *argv[]) {
     			// make the host DAG 
         		sprintf(hdag, "RE %s %s", myrealAD, myHID);  
     			if (XregisterName(hostname, hdag) < 0 )
-    			perror("name register");
+    				perror("name register");
 		}   
 		
 	}	

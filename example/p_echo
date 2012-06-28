@@ -18,7 +18,7 @@
 
 # simple XIA echo server using datagram sockets
 
-from xsocket import *
+from c_xsocket import *
 import sys
 
 SID = "SID:0f00000000000000000000000000000000001777"

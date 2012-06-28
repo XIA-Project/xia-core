@@ -1,7 +1,7 @@
 import socket, select, random
 import struct, time, signal, os, sys, re
 #import fcntl
-from xsocket import *
+from c_xsocket import *
 from ctypes import *
 from xia_address import *
 

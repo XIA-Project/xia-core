@@ -19,7 +19,7 @@ __version__ = "0.2.1"
 
 import BaseHTTPServer, select, socket, SocketServer, urlparse, string
 import struct
-import xsocket
+import c_xsocket
 import os
 import io
 import sys
@@ -81,8 +81,8 @@ class ProxyHandler (BaseHTTPServer.BaseHTTPRequestHandler):
 
     def do_GET(self):
 
-	xsocket.set_conf("xsockconf_python.ini","videoproxy.py")
-	xsocket.print_conf()
+	c_xsocket.set_conf("xsockconf_python.ini","videoproxy.py")
+	c_xsocket.print_conf()
         print "Get request:"
         (scm, netloc, path, params, query, fragment) = urlparse.urlparse(
             self.path, 'http')
@@ -100,28 +100,28 @@ class ProxyHandler (BaseHTTPServer.BaseHTTPRequestHandler):
 		header+="\r\n"
 
 		## hack for XIA		
-		xsocket.set_conf("xsockconf_python.ini","videoproxy.py")
-		xsocket.print_conf()
+		c_xsocket.set_conf("xsockconf_python.ini","videoproxy.py")
+		c_xsocket.print_conf()
 
-		sock=xsocket.Xsocket()
+		sock=c_xsocket.Xsocket()
 
 		if (sock<0):
 			print "error opening socket"
 			exit(-1)
 
-		sock1=xsocket.Xsocket()
+		sock1=c_xsocket.Xsocket()
 
 		if (sock1<0):
 			print "error opening socket"
 			exit(-1)
 
 		dag = "RE %s %s %s" % (AD0, HID0, SID0)
-		xsocket.Xconnect(sock,dag);  
+		c_xsocket.Xconnect(sock,dag);  
 
 		payload = "hello world"
-		xsocket.Xsend(sock, payload, len(payload),0)
+		c_xsocket.Xsend(sock, payload, len(payload),0)
 
-		reply = xsocket.Xrecv(sock, 1024, 0)
+		reply = c_xsocket.Xrecv(sock, 1024, 0)
 		numcids = int(reply)
 
 		print "number of cids",numcids
@@ -135,13 +135,13 @@ class ProxyHandler (BaseHTTPServer.BaseHTTPRequestHandler):
 		testing = "echo"
 		cidliststr = ""
 		for i in range(numcids):
-			xsocket.Xsend(sock,testing, len(testing), 0);
-			reply = xsocket.Xrecv(sock, 1024, 0)
+			c_xsocket.Xsend(sock,testing, len(testing), 0);
+			reply = c_xsocket.Xrecv(sock, 1024, 0)
 			cid = reply
 			print "trying ",cid
 			dag = "RE %s %s %s" % (AD0, HID0, cid)
-			xsocket.XgetCID(sock1, dag, len(dag))
-			reply = xsocket.Xrecv(sock1, 8192, 0)
+			c_xsocket.XgetCID(sock1, dag, len(dag))
+			reply = c_xsocket.Xrecv(sock1, 8192, 0)
 			#imgfile.write(reply)
 			self.connection.send(reply)
 

@@ -1,2 +1,2 @@
-xsocket.py
-xsocket_wrap.c
+c_xsocket.py
+c_xsocket_wrap.c

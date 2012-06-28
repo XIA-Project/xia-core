@@ -18,7 +18,7 @@
 
 # simple XIA echo client using stream sockets
 
-from xsocket import *
+from c_xsocket import *
 import sys
 
 STREAM_NAME = "www_s.stream_echo.aaa.xia"

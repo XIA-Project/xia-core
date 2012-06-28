@@ -7,7 +7,7 @@ import time
 import datetime
 import os
 import string
-from xsocket import *
+from c_xsocket import *
 from ctypes import *
 import hashlib
 

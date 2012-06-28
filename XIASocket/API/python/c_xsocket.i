@@ -1,4 +1,4 @@
-%module xsocket
+%module c_xsocket
 %{
 #include  "../Xsocket.h"
 %}
@@ -193,6 +193,44 @@
     free($4);
 }
 
+/* ===== Xgetsockopt ===== */
+%typemap (in) (int optname, void* optval, socklen_t* optlen)
+{
+    if (!PyInt_Check($input)) {
+        PyErr_SetString(PyExc_ValueError, "Expecting an integer (optname)");
+        return NULL;
+    }
+    $1 = PyInt_AsLong($input);
+    $2= (void*)malloc(4096); /* TODO: 4096 is arbitrary; better buffer size? */
+    $3 = (socklen_t*)malloc(sizeof(socklen_t));
+    (*$3) = 4096;
+}
+%typemap(argout) (int optname, void* optval, socklen_t* optlen)
+{
+    Py_XDECREF($result);
+    if (result < 0) {
+        free($2);
+        free($3);
+        PyErr_SetFromErrno(PyExc_Exception);
+        return NULL;
+    }
+    $result = PyLong_FromVoidPtr(*(int*)$2);
+    free($2);
+    free($3);
+}
+
+/* ===== Xsetsockopt ===== */
+%typemap (in) (const void* optval, socklen_t optlen)
+{
+    if (!PyInt_Check($input)) {
+        PyErr_SetString(PyExc_ValueError, "Expecting an integer (optval)");
+        return NULL;
+    }
+    $1 = (void*)malloc(sizeof(int));
+    *(int*)($1) = PyInt_AsLong($input);
+    $2 = sizeof(int);
+}
+
 
 
 /* Include all of the structs, constants, and function signatures
@@ -206,7 +244,7 @@
 /* eliminate the need for python users to pass the length of the data, since we can calculate it */
 %pythoncode %{
 def Xsend(sock, data, flags):
-    return _xsocket.Xsend(sock, data, len(data), flags)
+    return _c_xsocket.Xsend(sock, data, len(data), flags)
 %}
 
 /* ===== Xsendto ===== */
@@ -214,7 +252,7 @@ def Xsend(sock, data, flags):
    since we can calculate it */
 %pythoncode %{
 def Xsendto(sock, data, flags, dest_dag):
-    return _xsocket.Xsendto(sock, data, len(data), flags, dest_dag, len(dest_dag))
+    return _c_xsocket.Xsendto(sock, data, len(data), flags, dest_dag, len(dest_dag))
 %}
 
 /* ===== XgetChunkStatus ===== */
@@ -222,7 +260,7 @@ def Xsendto(sock, data, flags, dest_dag):
    since we can calculate it */
 %pythoncode %{
 def XgetChunkStatus(sock, dag):
-    return _xsocket.XgetChunkStatus(sock, dag, len(dag))
+    return _c_xsocket.XgetChunkStatus(sock, dag, len(dag))
 %}
 
 /* ===== XreadChunk ===== */
@@ -230,7 +268,7 @@ def XgetChunkStatus(sock, dag):
    since we can calculate it */
 %pythoncode %{
 def XreadChunk(sock, length, flags, dag):
-    return _xsocket.XreadChunk(sock, length, flags, dag, len(dag))
+    return _c_xsocket.XreadChunk(sock, length, flags, dag, len(dag))
 %}
 
 /* ===== XrequestChunk ===== */
@@ -238,7 +276,7 @@ def XreadChunk(sock, length, flags, dag):
    since we can calculate it */
 %pythoncode %{
 def XrequestChunk(sock, dag):
-    return _xsocket.XrequestChunk(sock, dag, len(dag))
+    return _c_xsocket.XrequestChunk(sock, dag, len(dag))
 %}
 
 /* ===== XputBuffer ===== */
@@ -246,7 +284,7 @@ def XrequestChunk(sock, dag):
    since we can calculate it */
 %pythoncode %{
 def XputBuffer(context, data, chunk_size):
-    return _xsocket.XputBuffer(context, data, len(data), chunk_size)
+    return _c_xsocket.XputBuffer(context, data, len(data), chunk_size)
 %}
 
 /* ===== XputChunk ===== */
@@ -254,7 +292,7 @@ def XputBuffer(context, data, chunk_size):
    since we can calculate it */
 %pythoncode %{
 def XputChunk(context, data):
-    return _xsocket.XputChunk(context, data, len(data))
+    return _c_xsocket.XputChunk(context, data, len(data))
 %}
 
 

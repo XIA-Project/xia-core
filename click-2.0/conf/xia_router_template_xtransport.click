@@ -845,7 +845,7 @@ elementclass DualRouter4Port {
     
     //Create kernel TAP interface which responds to ARP
     fake0::FromHost($fake, $API_IP/24, CLICK_XTRANSPORT_ADDR $CLICK_IP ,HEADROOM 256, MTU 65521) 
-    -> Print()
+    //-> Print()
     -> fromhost_cl :: Classifier(12/0806, 12/0800);
     fromhost_cl[0] -> ARPResponder(0.0.0.0/0 $ether_addr) -> ToHost($fake);
 
@@ -866,10 +866,8 @@ elementclass DualRouter4Port {
     //socket side out
     xtransport[1]->
     cIP::CheckIPHeader();
-    cIP
-    ->EtherEncap(0x0800, $ether_addr, 11:11:11:11:11:11)
-    -> ToHost($fake)
-    cIP[1]->Print(bad,MAXLENGTH 100, CONTENTS ASCII)->Discard();
+    cIP -> EtherEncap(0x0800, $ether_addr, 11:11:11:11:11:11) -> ToHost($fake);
+	cIP[1] -> Discard();
 
     xtransport[0]-> Discard;//Port 0 is unused for now.
     
@@ -884,6 +882,10 @@ elementclass DualRouter4Port {
 	//Script(write n/proc/rt_HID/rt.add HID1 0); // useful for testing xcmp redirect
     Script(write n/proc/rt_AD/rt.add $local_ad 4);    // self AD as destination
     Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self RHID as destination
+    Script(write n/proc/rt_IP/rt.add IP:$ip0 4);  // self as destination for interface 0's IP addr
+    Script(write n/proc/rt_IP/rt.add IP:$ip1 4);  // self as destination for interface 1's IP addr
+    Script(write n/proc/rt_IP/rt.add IP:$ip2 4);  // self as destination for interface 2's IP addr
+    Script(write n/proc/rt_IP/rt.add IP:$ip3 4);  // self as destination for interface 3's IP addr
     Script(write n/proc/rt_HID/rt.add BHID 7);  // outgoing broadcast packet
     Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
@@ -1145,7 +1147,7 @@ elementclass EndHost {
     cIP
     ->EtherEncap(0x0800, $ether_addr, 11:11:11:11:11:11)
     -> ToHost($fake)
-    cIP[1]->Print(bad,MAXLENGTH 100, CONTENTS ASCII)->Discard();
+    cIP[1]->Discard(); //Print(bad,MAXLENGTH 100, CONTENTS ASCII)->Discard();
 
     xtransport[0]-> Discard;//Port 0 is unused for now.
     

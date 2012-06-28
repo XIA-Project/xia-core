@@ -1,6 +1,6 @@
 CC=g++
 LD=g++
-CFLAGS=-I../../XIASocket/API -ggdb
+CFLAGS=-I../../XIASocket/minini -I../../XIASocket/API -ggdb
 LDFLAGS=-lprotobuf -lpthread
 SOURCES_CLIENT_H0=xhcp_client.cc csclient.cc XIARouter.cc ../../XIASocket/API/libXsocket.a
 SOURCES_CLIENT_H1=xhcp_client_h1.cc csclient.cc XIARouter.cc ../../XIASocket/API/libXsocket.a

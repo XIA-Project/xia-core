@@ -2,6 +2,42 @@
 Functions
 ============================
 
+The python Xsocket API consists of the following functions, which to a large degree mimic their C counterparts:
+
+**General Xsocket Functions**
+
+* :func:`Xsocket` create an XIA socket
+* :func:`Xbind` bind a socket to a DAG
+* :func:`Xclose` close the Xsocket
+* :func:`Xsetsockopt` set socket options
+* :func:`Xgetsockopt` get socket options
+* :func:`XgetDAGbyName` convert a name to a DAG that can be used by other Xsocket functions
+* :func:`XreadLocalHostAddr` look up the AD and HID of the local host
+* :func:`XregisterName` register our service/host name with the nameserver
+
+**Stream Oriented Functions**
+
+* :func:`Xaccept` wait for stream connections
+* :func:`Xconnect` connect to a remote DAG
+* :func:`Xsend` send data
+* :func:`Xrecv` receive data
+
+**Datagram Oriented Functions**
+
+* :func:`Xsendto` send datagram data
+* :func:`Xrecvfrom` receive datagram data
+
+**Content (Chunk) Oriented Functions**
+
+* :func:`XallocCacheSlice` allocate space in the local content cache
+* :func:`XfreeCacheSlice` release the reserved local cache space
+* :func:`XputChunk` make a single chunk of content available
+* :func:`XputFile` make a file available as one or more chunks
+* :func:`XputBuffer` make a block of memory available as one or more chunks
+* :func:`XrequestChunk`, :func:`XrequestChunks` bring one or more chunks of content form the network to the local machine
+* :func:`XgetChunkStatus`, :func:`XgetChunkStatuses` get the readiness status of one or more chunks of content
+* :func:`XreadChunk` load a single chunk into memory
+
 .. function:: Xaccept(sockfd)
 	
 	The :func:`Xaccept` system call is is only valid with Xsockets created with the XSOCK_STREAM transport type. It accepts the first available connection request for the listening socket, *sockfd*, creates a new connected socket, and returns a new Xsocket descriptor referring to that socket. The newly created socket is not in the listening state. The original socket *sockfd* is unaffected by this call.
@@ -201,9 +237,9 @@ Functions
 
 	Return the number of bytes sent on success, -1 on error.
 
-.. function:: Xsendto(sockfd, data, len, flags, dDAG, dlen)
+.. function:: Xsendto(sockfd, data, flags, dDAG)
 
-	Send a datagram containing *data* of length *len* bytes to *dDAG* (where the length of *dDAG* is *dlen*). *flags* currently unused. The length of *data* is currently limited to XIA_MAXBUF bytes. 
+	Send a datagram containing *data* to *dDAG*. *flags* currently unused. The length of *data* is currently limited to XIA_MAXBUF bytes. 
 
 	.. note:: Unlike a standard socket, :func:`Xsendto` is only valid on Xsockets of type XSOCK_DGRAM.
 

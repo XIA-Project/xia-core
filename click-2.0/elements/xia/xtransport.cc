@@ -106,7 +106,7 @@ XTRANSPORT::run_timer(Timer *timer)
 				if (daginfo->num_connect_tries <= MAX_CONNECT_TRIES) {
 
 					//printf("SYN RETRANSMIT! \n");
-					copy = copy_packet(daginfo->syn_pkt);
+					copy = copy_packet(daginfo->syn_pkt, daginfo);
 					// retransmit syn
 					XIAHeader xiah(copy);
 					//printf("\n\n (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
@@ -134,7 +134,7 @@ XTRANSPORT::run_timer(Timer *timer)
 				//printf("\n\nDATA RETRANSMIT at from (%s) from_port=%d base=%d next_seq=%d \n\n", (_local_addr.unparse()).c_str(), _sport, daginfo->base, daginfo->next_seqnum );
 				// retransmit data
 				for (unsigned int i = daginfo->base; i < daginfo->next_seqnum; i++) {
-					copy = copy_packet(daginfo->sent_pkt[i % MAX_WIN_SIZE]);
+					copy = copy_packet(daginfo->sent_pkt[i % MAX_WIN_SIZE], daginfo);
 					XIAHeader xiah(copy);
 					//printf("\n\n (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
 					output(2).push(copy);
@@ -186,7 +186,7 @@ XTRANSPORT::run_timer(Timer *timer)
 					//retransmit cid-request
 					HashTable<XID, WritablePacket*>::iterator it3;
 					it3 = daginfo->XIDtoCIDreqPkt.find(requested_cid);
-					copy = copy_cid_req_packet(it3->second);
+					copy = copy_cid_req_packet(it3->second, daginfo);
 					XIAHeader xiah(copy);
 					//printf("\n\n (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
 					output(2).push(copy);
@@ -213,16 +213,29 @@ XTRANSPORT::run_timer(Timer *timer)
 
 
 WritablePacket *
-XTRANSPORT::copy_packet(Packet *p) {
+XTRANSPORT::copy_packet(Packet *p, DAGinfo *daginfo) {  
 
 	XIAHeader xiahdr(p);
 	XIAHeaderEncap xiah;
+	
+	//Recalculate source path
+	XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+	String str_local_addr = _local_addr.unparse_re() + " " + source_xid.unparse();
+	//Make source DAG _local_addr:SID
+	String dagstr = daginfo->src_path.unparse_re();
+
+	//Client Mobility...	
+	if (dagstr.length() != 0 && dagstr != str_local_addr) {
+		//Moved!
+		// 1. Update 'daginfo->src_path'
+		daginfo->src_path.parse_re(str_local_addr);
+	}	
 
 	xiah.set_nxt(xiahdr.nxt());
 	xiah.set_last(xiahdr.last());
 	xiah.set_hlim(xiahdr.hlim());
-	xiah.set_dst_path(xiahdr.dst_path());
-	xiah.set_src_path(xiahdr.src_path());
+	xiah.set_dst_path(daginfo->dst_path);
+	xiah.set_src_path(daginfo->src_path);
 	xiah.set_plen(xiahdr.plen());
 
 	TransportHeader thdr(p);
@@ -240,16 +253,29 @@ XTRANSPORT::copy_packet(Packet *p) {
 
 
 WritablePacket *
-XTRANSPORT::copy_cid_req_packet(Packet *p) {
+XTRANSPORT::copy_cid_req_packet(Packet *p, DAGinfo *daginfo) {
 
 	XIAHeader xiahdr(p);
 	XIAHeaderEncap xiah;
 
+	//Recalculate source path
+	XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+	String str_local_addr = _local_addr.unparse_re() + " " + source_xid.unparse();
+	//Make source DAG _local_addr:SID
+	String dagstr = daginfo->src_path.unparse_re();
+
+	//Client Mobility...	
+	if (dagstr.length() != 0 && dagstr != str_local_addr) {
+		//Moved!
+		// 1. Update 'daginfo->src_path'
+		daginfo->src_path.parse_re(str_local_addr);
+	}	
+
 	xiah.set_nxt(xiahdr.nxt());
 	xiah.set_last(xiahdr.last());
 	xiah.set_hlim(xiahdr.hlim());
-	xiah.set_dst_path(xiahdr.dst_path());
-	xiah.set_src_path(xiahdr.src_path());
+	xiah.set_dst_path(daginfo->dst_path);
+	xiah.set_src_path(daginfo->src_path);
 	xiah.set_plen(xiahdr.plen());
 
 	WritablePacket *copy = WritablePacket::make(256, xiahdr.payload(), xiahdr.plen(), 20);
@@ -266,16 +292,29 @@ XTRANSPORT::copy_cid_req_packet(Packet *p) {
 
 
 WritablePacket *
-XTRANSPORT::copy_cid_response_packet(Packet *p) {
+XTRANSPORT::copy_cid_response_packet(Packet *p, DAGinfo *daginfo) {
 
 	XIAHeader xiahdr(p);
 	XIAHeaderEncap xiah;
 
+	//Recalculate source path
+	XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+	String str_local_addr = _local_addr.unparse_re() + " " + source_xid.unparse();
+	//Make source DAG _local_addr:SID
+	String dagstr = daginfo->src_path.unparse_re();
+
+	//Client Mobility...	
+	if (dagstr.length() != 0 && dagstr != str_local_addr) {
+		//Moved!
+		// 1. Update 'daginfo->src_path'
+		daginfo->src_path.parse_re(str_local_addr);
+	}	
+
 	xiah.set_nxt(xiahdr.nxt());
 	xiah.set_last(xiahdr.last());
 	xiah.set_hlim(xiahdr.hlim());
-	xiah.set_dst_path(xiahdr.dst_path());
-	xiah.set_src_path(xiahdr.src_path());
+	xiah.set_dst_path(daginfo->dst_path);
+	xiah.set_src_path(daginfo->src_path);
 	xiah.set_plen(xiahdr.plen());
 
 	WritablePacket *copy = WritablePacket::make(256, xiahdr.payload(), xiahdr.plen(), 20);
@@ -619,7 +658,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				_timer.reschedule_at(daginfo->expiry);
 
 			// Store the syn packet for potential retransmission
-			daginfo->syn_pkt = copy_packet(p);
+			daginfo->syn_pkt = copy_packet(p, daginfo);
 
 			portToDAGinfo.set(_sport, *daginfo);
 			XIAHeader xiah1(p);
@@ -843,28 +882,11 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				//Make source DAG _local_addr:SID
 				String dagstr = daginfo->src_path.unparse_re();
 
-
+				//Client Mobility...	
 				if (dagstr.length() != 0 && dagstr != str_local_addr) {
 					//Moved!
+					// 1. Update 'daginfo->src_path'
 					daginfo->src_path.parse_re(str_local_addr);
-					//Send a control packet to transport on the other side
-					//TODO: Change this to a proper format rather than use presence of extension header=1 to denote mobility
-					XIAHeaderEncap xiah;
-					String str = "MOVED";
-					WritablePacket *p2 = WritablePacket::make (256, str.c_str(), str.length(), 0);
-					xiah.set_nxt(22);
-					xiah.set_last(-1);
-					xiah.set_hlim(hlim.get(_sport));
-					xiah.set_dst_path(daginfo->dst_path);
-					xiah.set_src_path(daginfo->src_path);
-
-					//Might need to remove more if another header is required (eg some control/DAG info)
-
-					WritablePacket *p = NULL;
-					p = xiah.encap(p2, true);
-
-					//click_chatter("Sent packet to network");
-					output(2).push(p);
 				}
 				
 				// Case of initial binding to only SID
@@ -905,7 +927,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				delete thdr;
 
 				// Store the packet into buffer
-				daginfo->sent_pkt[daginfo->seq_num % MAX_WIN_SIZE] = copy_packet(p);
+				daginfo->sent_pkt[daginfo->seq_num % MAX_WIN_SIZE] = copy_packet(p, daginfo);
 
 				//printf("\n\nSENT DATA at (%s) seq=%d \n\n", dagstr.c_str(), daginfo->seq_num%MAX_WIN_SIZE);
 
@@ -1155,7 +1177,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				XIDpairToPort.set(xid_pair, _sport);
 
 				// Store the packet into buffer
-				WritablePacket *copy_req_pkt = copy_cid_req_packet(p);
+				WritablePacket *copy_req_pkt = copy_cid_req_packet(p, daginfo);
 				daginfo->XIDtoCIDreqPkt.set(destination_cid, copy_req_pkt);
 
 				// Set the status of CID request
@@ -1281,7 +1303,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 					HashTable<XID, WritablePacket*>::iterator it2;
 					it2 = daginfo->XIDtoCIDresponsePkt.find(destination_cid);
-					copy = copy_cid_response_packet(it2->second);
+					copy = copy_cid_response_packet(it2->second, daginfo);
 
 					XIAHeader xiah(copy->xia_header());
 
@@ -1656,6 +1678,9 @@ void XTRANSPORT::push(int port, Packet *p_input)
 					}
 
 					portToDAGinfo.set(_dport, *daginfo);
+					
+					//In case of Client Mobility...	 Update 'daginfo->dst_path'
+					daginfo->dst_path = src_path;			
 
 					// send the cumulative ACK to the sender
 					//Add XIA headers
@@ -1709,6 +1734,9 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				if(it1 != portToActive.end() ) {
 
 					DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
+					
+					//In case of Client Mobility...	 Update 'daginfo->dst_path'
+					daginfo->dst_path = src_path;						
 
 					int expected_seqnum = thdr.ack_num();
 
@@ -1926,14 +1954,14 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 				} else {
 					// Store the packet into temp buffer (until ReadCID() is called for this CID)
-					WritablePacket *copy_response_pkt = copy_cid_response_packet(p_in);
+					WritablePacket *copy_response_pkt = copy_cid_response_packet(p_in, daginfo);
 					daginfo->XIDtoCIDresponsePkt.set(source_cid, copy_response_pkt);
 
 					portToDAGinfo.set(_dport, *daginfo);
 				}
 
 			} else {
-				WritablePacket *copy_response_pkt = copy_cid_response_packet(p_in);
+				WritablePacket *copy_response_pkt = copy_cid_response_packet(p_in, daginfo);
 				daginfo->XIDtoCIDresponsePkt.set(source_cid, copy_response_pkt);
 				portToDAGinfo.set(_dport, *daginfo);
 			}

@@ -5,7 +5,7 @@ import sys
 import struct
 import time
 import os
-import xsocket
+import c_xsocket
 from ctypes import *
 import hashlib
 

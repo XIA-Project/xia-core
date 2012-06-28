@@ -1,5 +1,5 @@
 #!/usr/bin/python
-from xsocket import *
+from c_xsocket import *
 from xia_address import *
 
 set_conf("xsockconf_python.ini","stock_test_client.py")
