@@ -29,7 +29,7 @@
 **
 ** XgetChunkStatus returns an integer indicating if the specified content 
 ** chunk is available to be read. It is a simple wrapper around the 
-** XgetChunkStatusesi() function which does the actual work.
+** XgetChunkStatuses() function which does the actual work.
 **
 ** @note This function Should be called after calling XrequestChunk() or 
 ** XrequestChunks(). Otherwise the content chunk will never be loaded into
@@ -41,10 +41,10 @@
 ** @param dagLen length of dag (currently not used)
 **
 ** @returns READY_TO_READ if the requested chunk is ready to be read.
-** @returns WAITING_FOR_CHUNK if the requested chunk is still in transit.
-** @returns REQUEST_FAILED if the specified chunk has not been requested,
-** or if a socket error occurs. In that case errno is set with the appropriate code.
 ** @returns INVALID_HASH if the CID hash does not match the content payload.
+** @returns WAITING_FOR_CHUNK if the requested chunk is still in transit.
+** @returns REQUEST_FAILED if the specified chunk has not been requested
+** @returns -1 if a socket error occurs. In that case errno is set with the appropriate code.
 */
 int XgetChunkStatus(int sockfd, char* dag, size_t /* dagLen */)
 {
@@ -72,13 +72,14 @@ int XgetChunkStatus(int sockfd, char* dag, size_t /* dagLen */)
 ** each of the specified CIDs.
 ** @param numCIDs - number of CIDs in cDAGv
 **
-** @returns READY_TO_READ if all of the CIDs in cDAGv are ready to be read
-** @returns WAITING_FOR_CHUNK if one or more of the requested chunks is still 
-** in transit.
+** @returns a bitfield indicating the status of the chunks.
+** @returns if return equals READY_TO_READ, all chunks are avilable to read
+** @returns otherwise the return value contains a bitfield of status codes
+** @returns if REQUEST_FAILED is set, one or more of the requested chunks could not be found
+** @returns if WAITING_FOR_CHUNK is set, one or more of the requested chunks is still in transit
+** @returns if INVALID_HASH is set, the content of one or more chunks does not match the hash in the CID
 ** @returns REQUEST_FAILED if one of the specified chunks has not been requested,
-** or if a socket error occurs. In that case errno is set with the appropriate code.
-** @returns INVALID_HASH if the CID hash of one or more of the requested does 
-** not match the content payload.
+** @returns -1  if a socket error occurs. In that case errno is set with the appropriate code.
 */
 int XgetChunkStatuses(int sockfd, ChunkStatus *statusList, int numCIDs)
 {
@@ -152,20 +153,28 @@ int XgetChunkStatuses(int sockfd, ChunkStatus *statusList, int numCIDs)
 			if (strcmp(status_tmp, "WAITING") == 0) {
 				statusList[i].status = WAITING_FOR_CHUNK;
 				
-				if (status_for_all != REQUEST_FAILED) { 
-					status_for_all = WAITING_FOR_CHUNK;
-				}
+				status_for_all &= ~READY_TO_READ;
+				status_for_all |= WAITING_FOR_CHUNK;
+
+			} else if (strcmp(status_tmp, "INVALID_HASH") == 0) {
+				statusList[i].status = INVALID_HASH;
+
+				status_for_all &= ~READY_TO_READ;
+				status_for_all |= INVALID_HASH;
 		    		
 			} else if (strcmp(status_tmp, "READY") == 0) {
 				statusList[i].status = READY_TO_READ;
 		    	
 			} else if (strcmp(status_tmp, "FAILED") == 0) {
 				statusList[i].status = REQUEST_FAILED;
-				status_for_all = REQUEST_FAILED;
+
+				status_for_all &= ~READY_TO_READ;
+				status_for_all |= REQUEST_FAILED;
 			
 			} else {
 				statusList[i].status = REQUEST_FAILED;
-				status_for_all = REQUEST_FAILED;
+				status_for_all &= ~READY_TO_READ;
+				status_for_all |= REQUEST_FAILED;
 			}
 		}
 		    

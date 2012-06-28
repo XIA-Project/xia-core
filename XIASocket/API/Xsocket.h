@@ -46,10 +46,10 @@ extern "C" {
 #define XSOCK_RAW	3	// Raw XIA socket
 #define XSOCK_CHUNK 4	// Content Chunk transport (CID)
 
-#define WAITING_FOR_CHUNK 0
-#define READY_TO_READ 1
-#define REQUEST_FAILED -1
-#define INVALID_HASH -2
+#define REQUEST_FAILED 0x00000001 
+#define WAITING_FOR_CHUNK 0x00000002
+#define READY_TO_READ 0x00000004
+#define INVALID_HASH 0x00000008
 
 /* Cache policy */
 #define POLICY_LRU				0x00000001
