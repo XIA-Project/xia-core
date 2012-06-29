@@ -1721,21 +1721,22 @@ cp_xid(const String& str, struct click_xia_xid* xid  CP_CONTEXT)
     //click_chatter("size xid %d %s\n", sizeof(xid.xid), xid_str.c_str());
 
     if(xid->type == htonl(CLICK_XIA_XID_TYPE_IP)) {
-	memset(xid->id,0,sizeof(xid->id));
-	xid->id[0] = 0x45;
-	xid->id[5] = 0x01;
-	xid->id[8] = 0xFA;
-	xid->id[9] = 0xFA;
+        memset(xid->id,0,sizeof(xid->id));
+        xid->id[0] = 0x45;
+        xid->id[5] = 0x01;
+        xid->id[8] = 0xFA;
+        xid->id[9] = 0xFA;
 
-	IPAddress ip;
-	IPAddressArg().parse(xid_str,ip CP_PASS_CONTEXT);       
-	uint32_t uintip = ip;
+        IPAddress ip;
+        if (IPAddressArg().parse(xid_str,ip CP_PASS_CONTEXT)) {  // if we've already converted this 4ID to hex format, the IP parse will fail and we won't do it again
+        	uint32_t uintip = ip;
 
-	xid->id[16] = *(((unsigned char*)&uintip)+0);   
-        xid->id[17] = *(((unsigned char*)&uintip)+1);
-        xid->id[18] = *(((unsigned char*)&uintip)+2);
-	xid->id[19] = *(((unsigned char*)&uintip)+3); 
-	return true;
+        	xid->id[16] = *(((unsigned char*)&uintip)+0);   
+        	xid->id[17] = *(((unsigned char*)&uintip)+1);
+        	xid->id[18] = *(((unsigned char*)&uintip)+2);
+        	xid->id[19] = *(((unsigned char*)&uintip)+3); 
+        	return true;
+		}
     }
 
     for (size_t d = 0; d < sizeof(xid->id); d++) {
