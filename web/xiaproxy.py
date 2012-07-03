@@ -62,7 +62,7 @@ def readcid_with_timeout(sock, cid, timeout=5):
     try:
         while (time.time() - start_time < timeout and not received_data):
             try:
-                if XgetChunkStatus(sock, cid) == 1:
+                if XgetChunkStatus(sock, cid) & READY_TO_READ == READY_TO_READ:
                     reply = XreadChunk(sock, 65521, 0, cid)
                     received_data = True
             except IOError:
