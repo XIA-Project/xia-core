@@ -29,7 +29,8 @@
 
 #define XHCP_TYPE_AD 1
 #define XHCP_TYPE_GATEWAY_ROUTER_HID 2
-#define XHCP_TYPE_NAME_SERVER_DAG 3
+#define XHCP_TYPE_GATEWAY_ROUTER_4ID 3
+#define XHCP_TYPE_NAME_SERVER_DAG 4
 
 typedef struct xhcp_pkt_entry {
 	short type;

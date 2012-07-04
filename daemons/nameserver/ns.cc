@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
 	char sdag[NS_MAX_DAG_LENGTH];
 	char ddag[NS_MAX_DAG_LENGTH];
 	char _name[NS_MAX_DAG_LENGTH], _dag[NS_MAX_DAG_LENGTH]; 
-	char myAD[NS_MAX_DAG_LENGTH], myHID[NS_MAX_DAG_LENGTH]; 	
+	char myAD[NS_MAX_DAG_LENGTH], myHID[NS_MAX_DAG_LENGTH], my4ID[NS_MAX_DAG_LENGTH];; 	
 	string name_str, dag_str;
 	map<std::string, std::string> name_to_dag_db_table; // map name to dag 
 	bool _error; // check if any error while processing query/register
@@ -50,11 +50,11 @@ int main(int argc, char *argv[]) {
 	if (sock < 0) { perror("Opening Xsocket"); }
 	
     	// read the localhost HID 
-    	if ( XreadLocalHostAddr(sock, myAD, NS_MAX_DAG_LENGTH, myHID, NS_MAX_DAG_LENGTH) < 0 )
+    	if ( XreadLocalHostAddr(sock, myAD, NS_MAX_DAG_LENGTH, myHID, NS_MAX_DAG_LENGTH, my4ID, NS_MAX_DAG_LENGTH) < 0 )
     		perror("Reading localhost address");   	
 
 	// make the src DAG (the one the nameserver process listens on)
-    	sprintf(sdag, "RE %s %s %s", myAD, myHID, SID_NS); 
+    	sprintf(sdag, "RE ( %s ) %s %s %s", my4ID, myAD, myHID, SID_NS); 
     	
 	Xbind(sock, sdag);
 	

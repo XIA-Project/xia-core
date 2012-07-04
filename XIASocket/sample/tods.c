@@ -21,7 +21,7 @@
 #include "Xsocket.h"
 
 #define SID0 "SID:0f00000000000000000000000000000123456789"
-#define DAG  "RE %s %s %s"
+#define DAG  "RE ( %s ) %s %s %s"
 #define SNAME "tod_s.testbed.xia"
 
 int main()
@@ -34,7 +34,7 @@ int main()
 	time_t now;
 	struct tm *t;
 
-	char ad[128], hid[128];
+	char ad[128], hid[128], ip4id[128];
 
     // create a datagram socket
     if ((sock = Xsocket(XSOCK_DGRAM)) < 0) {
@@ -43,13 +43,13 @@ int main()
 	}
 
     // read the localhost AD and HID
-    if ( XreadLocalHostAddr(sock, ad, sizeof(ad), hid, sizeof(hid)) < 0 ) {
+    if ( XreadLocalHostAddr(sock, ad, sizeof(ad), hid, sizeof(hid), ip4id, sizeof(ip4id)) < 0 ) {
     	printf("error: Reading localhost address");
 		exit(1);
 	}
 
     // make the DAG we will listen on
-    sprintf(dag, DAG, ad, hid, SID0); 
+    sprintf(dag, DAG, ip4id, ad, hid, SID0); 
 
     //Register this service name to the name server
     if (XregisterName(SNAME, dag) < 0) {

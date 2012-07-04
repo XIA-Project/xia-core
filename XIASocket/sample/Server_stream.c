@@ -24,18 +24,19 @@ int main(int argc, char *argv[])
     pid_t pid;
     char myAD[1024]; 
     char myHID[1024];    
+    char my4ID[1024]; 
 
     //Open socket
     sock=Xsocket(XSOCK_STREAM);
     if (sock < 0) error("Opening socket");
  
     // read the localhost AD and HID
-    if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID)) < 0 )
+    if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
     	error("Reading localhost address");
 
     // make the src DAG (the one the server listens on)
-    char * dag = (char*) malloc(snprintf(NULL, 0, "RE %s %s %s", myAD, myHID, SID0) + 1);
-    sprintf(dag, "RE %s %s %s", myAD, myHID, SID0);  
+    char * dag = (char*) malloc(snprintf(NULL, 0, "RE ( %s ) %s %s %s", my4ID, myAD, myHID, SID0) + 1);
+    sprintf(dag, "RE ( %s ) %s %s %s", my4ID, myAD, myHID, SID0);  
 
     //Register this service name to the name server
     char * sname = (char*) malloc(snprintf(NULL, 0, "%s", SNAME) + 1);

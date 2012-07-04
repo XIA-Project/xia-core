@@ -88,6 +88,7 @@ class XTRANSPORT : public Element {
     void push(int port, Packet *);            
     XID local_hid() { return _local_hid; };
     XIAPath local_addr() { return _local_addr; };
+    XID local_4id() { return _local_4id; };
     void add_handlers();
     static int write_param(const String &, Element *, void *vparam, ErrorHandler *);
     
@@ -105,6 +106,8 @@ class XTRANSPORT : public Element {
     uint32_t _cid_type, _sid_type;
     XID _local_hid;
     XIAPath _local_addr;
+    XID _local_4id;
+    XID _null_4id;
     bool isConnected;
     XIAPath _nameserver_addr;
 

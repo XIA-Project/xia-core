@@ -497,7 +497,9 @@ elementclass XRouter2Port {
     // output[1]: forward to interface 1 (for other ads)
 
     n :: RouteEngine($local_addr);
-    xtransport::XTRANSPORT($local_addr, $CLICK_IP, $API_IP, n/proc/rt_SID/rt);    
+    
+    // IP:0.0.0.0 indicates NULL 4ID
+    xtransport::XTRANSPORT($local_addr, IP:0.0.0.0, $CLICK_IP,$API_IP,n/proc/rt_SID/rt);       
     cache :: XIACache($local_addr, n/proc/rt_CID/rt, PACKET_SIZE 1400); // specify XIA packet size (including the XIA + content header)
 
 
@@ -640,9 +642,11 @@ elementclass XRouter4Port {
     // output[3]: forward to interface 3
     
     
-    n :: RouteEngine($local_addr);
-    xtransport::XTRANSPORT($local_addr, $CLICK_IP, $API_IP, n/proc/rt_SID/rt);        
+    n :: RouteEngine($local_addr);       
     
+    // IP:0.0.0.0 indicates NULL 4ID
+    xtransport::XTRANSPORT($local_addr, IP:0.0.0.0, $CLICK_IP,$API_IP,n/proc/rt_SID/rt); 
+        
     //Create kernel TAP interface which responds to ARP
     fake0::FromHost($fake, $API_IP/24, CLICK_XTRANSPORT_ADDR $CLICK_IP ,HEADROOM 256, MTU 65521) 
     //-> Print()
@@ -841,7 +845,7 @@ elementclass DualRouter4Port {
     
     
     n :: RouteEngine($local_addr);
-    xtransport::XTRANSPORT($local_addr, $CLICK_IP, $API_IP, n/proc/rt_SID/rt);        
+    xtransport::XTRANSPORT($local_addr, IP:$ip0, $CLICK_IP, $API_IP, n/proc/rt_SID/rt);        
     
     //Create kernel TAP interface which responds to ARP
     fake0::FromHost($fake, $API_IP/24, CLICK_XTRANSPORT_ADDR $CLICK_IP ,HEADROOM 256, MTU 65521) 
@@ -887,6 +891,7 @@ elementclass DualRouter4Port {
     Script(write n/proc/rt_IP/rt.add IP:$ip2 4);  // self as destination for interface 2's IP addr
     Script(write n/proc/rt_IP/rt.add IP:$ip3 4);  // self as destination for interface 3's IP addr
     Script(write n/proc/rt_HID/rt.add BHID 7);  // outgoing broadcast packet
+    Script(write n/proc/rt_AD/rt.add - 5);      // default route for AD
     Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
     Script(write n/proc/rt_IP/rt.add - 3); 	// default route for IPv4    
@@ -1119,7 +1124,9 @@ elementclass EndHost {
     // output: forward to interface 0
     
     n :: RouteEngine($local_addr);
-    xtransport::XTRANSPORT($local_addr, $CLICK_IP,$API_IP,n/proc/rt_SID/rt);   
+    
+    // IP:0.0.0.0 indicates NULL 4ID
+    xtransport::XTRANSPORT($local_addr, IP:0.0.0.0, $CLICK_IP,$API_IP,n/proc/rt_SID/rt);   
     
     //Create kernel TAP interface which responds to ARP
     fake0::FromHost($fake, $API_IP/24, CLICK_XTRANSPORT_ADDR $CLICK_IP ,HEADROOM 256, MTU 65521) 

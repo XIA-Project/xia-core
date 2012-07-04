@@ -71,6 +71,7 @@ typedef struct RouteState {
 	char * ddag; // dest DAG: broadcast HELLO/LSA to other routers
 	char myAD[MAX_XID_SIZE]; // this router AD
 	char myHID[MAX_XID_SIZE]; // this router HID
+	char my4ID[MAX_XID_SIZE]; // not used
 	
 	int num_neighbors; // number of neighbor routers
 	int lsa_seq;	// LSA sequence number of this router
