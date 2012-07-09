@@ -78,7 +78,7 @@ def put_content_in_dir(dir):
     for root, dirs, files in os.walk(dir):
         for file in files:
             if link_files_type_order.count(os.path.splitext(file)[1]) == 0 and link_files_type_order.count(os.path.splitext(file)[1][:-4]) == 0:
-                cids_by_filename[os.path.join(root,file)] = XputFile(chunk_context, os.path.join(root, file), 0)
+                cids_by_filename[os.path.join(root,file)] = XputFile(chunk_context, os.path.join(root, file), XIA_MAXBUF)
             else:
                 files_with_links.append(os.path.join(root, file))
 

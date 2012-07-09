@@ -40,6 +40,7 @@ XIACache::configure(Vector<String> &conf, ErrorHandler *errh)
     Element* routing_table_elem;
     XIAPath local_addr;
     int pkt_size=0;
+	int malicious=0;
     bool cache_content_from_network =true;
 
     if (cp_va_kparse(conf, this, errh,
@@ -47,8 +48,13 @@ XIACache::configure(Vector<String> &conf, ErrorHandler *errh)
 		"ROUTETABLENAME", cpkP+cpkM, cpElement, &routing_table_elem,
 		"CACHE_CONTENT_FROM_NETWORK", cpkP, cpBool, &cache_content_from_network,
 		"PACKET_SIZE", 0, cpInteger, &pkt_size,
+		"MALICIOUS", 0, cpInteger, &malicious,
 		cpEnd) < 0)
 	return -1;   
+
+	// Tell the content module whether or not it is malicious
+	_content_module->malicious = malicious;
+
 #if USERLEVEL
     _content_module->_routeTable = dynamic_cast<XIAXIDRouteTable*>(routing_table_elem);
 #else
@@ -112,6 +118,7 @@ void XIACache::push(int port, Packet *p)
 	XID srcHID(__srcID);
 
 	/* this sends chunk response to output 0 (network) or to 1 (application, if the request came from application and content is locally cached)  */
+	click_chatter("about to process request, malicious is: %i\n", _content_module->malicious);
 	_content_module->process_request(p, srcHID, dstID);
     }
     else

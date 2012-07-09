@@ -91,6 +91,8 @@ class XIAContentModule {
     void cache_incoming(Packet *p, const XID &, const XID &, int port);
     void process_request(Packet *p, const XID &, const XID &);
 
+	int malicious; // Respond to CID requests with bad data if set to 1
+
     protected:
     void cache_incoming_local(Packet *p, const XID& srcCID, bool local_putcid);
     void cache_incoming_forward(Packet *p, const XID& srcCID);

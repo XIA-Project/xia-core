@@ -55,8 +55,26 @@ Packet * XIAContentModule::makeChunkResponse(CChunk * chunk, Packet *p_in)
 
 void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID & dstCID)
 {
+
     HashTable<XID,CChunk*>::iterator it;
-    it=_contentTable.find(dstCID);
+
+	if (malicious &&
+		strcmp(dstCID.unparse().c_str(), "CID:8b35bac835526705709b4a9560e15a9d066a6900") == 0)
+	{
+		// If this router is malicous, then this content 
+		// module reponds to requests for the umbrella image
+		// with the anonymous image instead.
+		// TODO: something more flexible
+		XID fakeCID = XID();
+		fakeCID.parse("CID:5830f441b0895cd2a82d5a13fc64f6e9a5f710ad");
+
+    	it=_contentTable.find(fakeCID);
+	}
+	else
+	{
+    	it=_contentTable.find(dstCID);
+	}
+
 #ifdef CLIENTCACHE
     if(srcHID==_transport->local_hid()) {
         ContentHeader ch(p);
@@ -101,6 +119,7 @@ void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID 
 #endif
     // server, router
     if(it!=_contentTable.end()) {
+		click_chatter("found content\n");
         //std::cout<<"look up cache in router or server"<<std::endl;
         XIAHeaderEncap encap;
         XIAHeader hdr(p);
@@ -133,12 +152,14 @@ void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID 
             encap.set_plen(l);	// add XIA header
             newp=encap.encap( newp, false );
             _transport->checked_output_push(0 , newp);
+			click_chatter("pushed content\n");
             //std::cout<<"have pushed out"<<std::endl;
             cp += l;
         }
         p->kill();
     } else { //printf("dstID is not found in cache, pkt killed\n");
         //std::cout<<"not found, kill pkt"<<std::endl;
+		click_chatter("no content found\n");
         p->kill();
     }
 }
@@ -302,6 +323,7 @@ void XIAContentModule::cache_incoming_local(Packet *p, const XID& srcCID, bool l
             (*cmTable)[srcCID]=ctm;
             
             _contentTable[srcCID]=chunk;
+			click_chatter("Added %s to _contentTable\n", srcCID.unparse().c_str());
             if (local_putcid) {
                 assert(ContentHeader::OP_LOCAL_PUTCID>1);
                 content[srcCID]= ContentHeader::OP_LOCAL_PUTCID;

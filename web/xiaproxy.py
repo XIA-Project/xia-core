@@ -1,6 +1,7 @@
 import socket, select, random
 import struct, time, signal, os, sys, re
-#import fcntl
+import Tkinter
+from tkMessageBox import showwarning
 from c_xsocket import *
 from ctypes import *
 from xia_address import *
@@ -38,8 +39,8 @@ def recv_with_timeout(sock, timeout=5, transport_proto=XSP):
                 received_data = True
             except IOError:
                 received_data = False
-            except:
-                print 'ERROR: xiaproxy.py: recv_with_timeout: error receiving data from socket'
+            except Exception, msg:
+                print 'ERROR: xiaproxy.py: recv_with_timeout: %s' % msg
     except (KeyboardInterrupt, SystemExit), e:
         Xclose(sock)
         sys.exit()
@@ -62,13 +63,16 @@ def readcid_with_timeout(sock, cid, timeout=5):
     try:
         while (time.time() - start_time < timeout and not received_data):
             try:
-                if XgetChunkStatus(sock, cid) & READY_TO_READ == READY_TO_READ:
+                status = XgetChunkStatus(sock, cid)
+                if status & READY_TO_READ == READY_TO_READ or status & INVALID_HASH == INVALID_HASH:
                     reply = XreadChunk(sock, 65521, 0, cid)
                     received_data = True
+                    if status & INVALID_HASH == INVALID_HASH:
+                        result = showwarning("Invalid Content Hash", "Firefox received content that does not match the reqeusted CID.")
             except IOError:
                 received_data = False
-            except:
-                print 'ERROR: xiaproxy.py: readcid_with_timeout: error receiving data from socket'
+            except Exception, msg:
+                print 'ERROR: xiaproxy.py: readcid_with_timeout: %s' % msg
     except (KeyboardInterrupt, SystemExit), e:
         Xclose(sock)
         sys.exit()

@@ -628,10 +628,11 @@ elementclass XRouter2Port {
 
 // 4-port router node with XRoute process running
 elementclass XRouter4Port {
-    $local_addr, $local_ad, $local_hid, $fake, $CLICK_IP, $API_IP, $ether_addr, $mac0, $mac1, $mac2, $mac3 |
+    $local_addr, $local_ad, $local_hid, $fake, $CLICK_IP, $API_IP, $ether_addr, $mac0, $mac1, $mac2, $mac3, $malicious_cache |
 
 
     // $local_addr: the full address of the node
+	// $malicious_cache: if set to 1, the content cache responds with bad content
 
     // input[0], input[1], input[2], input[3]: a packet arrived at the node
     // output[0]: forward to interface 0
@@ -677,7 +678,7 @@ elementclass XRouter4Port {
     //xtransport[2]->Packet forwarding module
     //Packet forwarding module->[2]xtransport0;
 
-    cache :: XIACache($local_addr, n/proc/rt_CID/rt, PACKET_SIZE 1400);
+    cache :: XIACache($local_addr, n/proc/rt_CID/rt, PACKET_SIZE 1400, MALICIOUS $malicious_cache);
 
     //Script(write n/proc/rt_AD/rt.add - 0);      // default route for AD
     //Script(write n/proc/rt_HID/rt.add - 0);     // default route for HID
@@ -826,12 +827,25 @@ elementclass XRouter4Port {
 
 // 4-port router node with XRoute process running and IP support
 elementclass DualRouter4Port {
-    $local_addr, $local_ad, $local_hid, $fake, $CLICK_IP, $API_IP, $ether_addr, $ip0, $mac0, $gw0, $ip1, $mac1, $gw1, $ip2, $mac2, $gw2, $ip3, $mac3, $gw3 |
+    $local_addr, $local_ad, $local_hid, $fake, $CLICK_IP, $API_IP, $ether_addr, $ip_active0, $ip0, $mac0, $gw0, $ip_active1, $ip1, $mac1, $gw1, $ip_active2, $ip2, $mac2, $gw2, $ip_active3, $ip3, $mac3, $gw3 $malicious_cache |
 
-	// TODO: document inputs
-
+	// NOTE: This router assumes that each port is connected to *either* an XIA network *or* an IP network.
+	// If port 0 is connected to an IP network and is asked to send an XIA packet (e.g., a broadcast), the
+	// packet will be dropped, and vice-versa. HOWEVER, incoming packets are currently not filtered. So,
+	// if an XIA packet somehow arrives on an IP port, it will be processed as normal.
 
     // $local_addr: the full address of the node
+	// $local_ad: the node's AD
+	// $local_hid: the node's HID
+	// $fake: the fake interface apps use to communicate with this click element
+	// $CLICK_IP: 
+	// $API_IP: 
+	// $ether_addr:
+	// $ip_activeNUM:  1 = port NUM is connected to an IP network;  0 = port NUM is connected to an XIA network
+	// $ipNUM:  port NUM's IP address (if port NUM isn't connected to IP, this doesn't matter)
+	// $macNUM:  port NUM's MAC address (if port NUM isn't connected to IP, this doesn't matter)
+	// $gwNUM:  port NUM's gateway router's IP address (if port NUM isn't connected to IP, this doesn't matter)
+	// $malicious_cache: if set to 1, the content cache responds with bad content
 
     // input[0], input[1], input[2], input[3]: a packet arrived at the node
     // output[0]: forward to interface 0
@@ -875,7 +889,7 @@ elementclass DualRouter4Port {
     //xtransport[2]->Packet forwarding module
     //Packet forwarding module->[2]xtransport0;
 
-    cache :: XIACache($local_addr, n/proc/rt_CID/rt, PACKET_SIZE 1400);
+    cache :: XIACache($local_addr, n/proc/rt_CID/rt, PACKET_SIZE 1400, MALICIOUS $malicious_cache);
 
     //Script(write n/proc/rt_AD/rt.add - 0);      // default route for AD
     //Script(write n/proc/rt_HID/rt.add - 0);     // default route for HID
@@ -887,9 +901,10 @@ elementclass DualRouter4Port {
     Script(write n/proc/rt_IP/rt.add IP:$ip2 4);  // self as destination for interface 2's IP addr
     Script(write n/proc/rt_IP/rt.add IP:$ip3 4);  // self as destination for interface 3's IP addr
     Script(write n/proc/rt_HID/rt.add BHID 7);  // outgoing broadcast packet
+    Script(write n/proc/rt_AD/rt.add - 5);     // no default route for AD; consider other path
     Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
-    Script(write n/proc/rt_IP/rt.add - 3); 	// default route for IPv4    
+    Script(write n/proc/rt_IP/rt.add - 0); 	// default route for IPv4     TODO: Need real routes somehow
 
     // quick fix
     n[3] -> Discard();
@@ -1081,6 +1096,19 @@ elementclass DualRouter4Port {
     n[2] -> [0]cache[0] -> Paint(4) -> [1]n;
     //For get and put cid
     xtransport[3] -> [1]cache[1] -> [3]xtransport;
+
+
+	// Check to make sure we only send XIA packets out ports connected to XIA networks
+	// and IP packets out ports connected to IP networks. These switches send packets
+	// out output 0 if the port is XIA and output 1 if the port is IP.
+	netTypeSwitchXIA0 :: Switch($ip_active0);
+	netTypeSwitchXIA1 :: Switch($ip_active1);
+	netTypeSwitchXIA2 :: Switch($ip_active2);
+	netTypeSwitchXIA3 :: Switch($ip_active3);
+	netTypeSwitchIP0 :: Switch($ip_active0);
+	netTypeSwitchIP1 :: Switch($ip_active1);
+	netTypeSwitchIP2 :: Switch($ip_active2);
+	netTypeSwitchIP3 :: Switch($ip_active3);
     
     
 	// Sending an XIA-encapped-in-IP packet (via ARP if necessary)
@@ -1090,18 +1118,34 @@ elementclass DualRouter4Port {
 	dip1 :: DirectIPLookup(0.0.0.0/0 $gw1 0);
 	dip2 :: DirectIPLookup(0.0.0.0/0 $gw2 0);
 	dip3 :: DirectIPLookup(0.0.0.0/0 $gw3 0);
-	swIP[0] -> XIAIPEncap(SRC $ip0) -> dip0 -> arpq0 -> out0;
-	swIP[1] -> XIAIPEncap(SRC $ip1) -> dip1 -> arpq1 -> out1;
-	swIP[2] -> XIAIPEncap(SRC $ip2) -> dip2 -> arpq2 -> out2;
-	swIP[3] -> XIAIPEncap(SRC $ip3) -> dip3 -> arpq3 -> out3;
+	swIP[0] -> netTypeSwitchIP0;
+		netTypeSwitchIP0[0] -> Discard;
+		netTypeSwitchIP0[1] -> XIAIPEncap(SRC $ip0) -> dip0 -> arpq0 -> out0;
+	swIP[1] -> netTypeSwitchIP1;
+		netTypeSwitchIP1[0] -> Discard;
+		netTypeSwitchIP1[1] -> XIAIPEncap(SRC $ip1) -> dip1 -> arpq1 -> out1;
+	swIP[2] -> netTypeSwitchIP2;
+		netTypeSwitchIP2[0] -> Discard;
+		netTypeSwitchIP2[1] -> XIAIPEncap(SRC $ip2) -> dip2 -> arpq2 -> out2;
+	swIP[3] -> netTypeSwitchIP3;
+		netTypeSwitchIP3[0] -> Discard;
+		netTypeSwitchIP3[1] -> XIAIPEncap(SRC $ip3) -> dip3 -> arpq3 -> out3;
 
     // Sending an XIP packet (via XARP if necessary)
-    swXIA[0] -> [0]xarpq0;
-    swXIA[1] -> [0]xarpq1;
-    swXIA[2] -> [0]xarpq2;
-    swXIA[3] -> [0]xarpq3;
+    swXIA[0] -> netTypeSwitchXIA0;
+		netTypeSwitchXIA0[0] -> [0]xarpq0;
+		netTypeSwitchXIA0[1] -> Discard;
+    swXIA[1] -> netTypeSwitchXIA1;
+		netTypeSwitchXIA1[0] -> [0]xarpq1;
+		netTypeSwitchXIA1[1] -> Discard;
+    swXIA[2] -> netTypeSwitchXIA2;
+		netTypeSwitchXIA2[0] -> [0]xarpq2;
+		netTypeSwitchXIA2[1] -> Discard;
+    swXIA[3] -> netTypeSwitchXIA3;
+		netTypeSwitchXIA3[0] -> [0]xarpq3; 
+		netTypeSwitchXIA3[1] -> Discard;
     
-        
+    Idle -> [0]xarpq3;    
 };
 
 
@@ -1155,7 +1199,7 @@ elementclass EndHost {
     //xtransport[2]->Packet forwarding module
     //Packet forwarding module->[2]xtransport0;
 
-    cache :: XIACache($local_addr, n/proc/rt_CID/rt, $enable_local_cache, PACKET_SIZE 1400);
+    cache :: XIACache($local_addr, n/proc/rt_CID/rt, $enable_local_cache, PACKET_SIZE 1400, MALICIOUS 0);
 
     Script(write n/proc/rt_AD/rt.add - 0);      // default route for AD
     Script(write n/proc/rt_HID/rt.add - 0);     // default route for HID
