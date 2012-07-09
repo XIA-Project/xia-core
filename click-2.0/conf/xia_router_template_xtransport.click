@@ -831,7 +831,7 @@ elementclass XRouter4Port {
 
 // 4-port router node with XRoute process running and IP support
 elementclass DualRouter4Port {
-    $local_addr, $local_ad, $local_hid, $fake, $CLICK_IP, $API_IP, $ether_addr, $ip_active0, $ip0, $mac0, $gw0, $ip_active1, $ip1, $mac1, $gw1, $ip_active2, $ip2, $mac2, $gw2, $ip_active3, $ip3, $mac3, $gw3 $malicious_cache |
+    $local_addr, $local_ad, $local_hid, $fake, $CLICK_IP, $API_IP, $ether_addr, $ip_active0, $ip0, $mac0, $gw0, $ip_active1, $ip1, $mac1, $gw1, $ip_active2, $ip2, $mac2, $gw2, $ip_active3, $ip3, $mac3, $gw3, $malicious_cache |
 
 	// NOTE: This router assumes that each port is connected to *either* an XIA network *or* an IP network.
 	// If port 0 is connected to an IP network and is asked to send an XIA packet (e.g., a broadcast), the

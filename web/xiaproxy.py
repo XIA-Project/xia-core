@@ -398,7 +398,6 @@ def xia_handler(host, path, http_header, browser_socket):
         send_to_browser(recombined_content, browser_socket)
     else:
         ddag = XgetDAGbyName(host)
-        print ddag
         if ddag == None:
             print 'xiaproxy.py: xia_handler: Could not resolve name %s' % host
             return
