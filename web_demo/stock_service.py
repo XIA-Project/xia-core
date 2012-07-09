@@ -61,9 +61,9 @@ try:
         	exit(-1)
 
         # Get local AD and HID; build DAG to listen on
-        (myAD, myHID) = XreadLocalHostAddr(sock)  
+        (myAD, myHID, my4ID) = XreadLocalHostAddr(sock)  
         # Make the sDAG (the one the server listens on)
-        dag = "RE %s %s %s" % (myAD, myHID, SID_STOCK)        
+        dag = "RE %s %s %s" % (myAD, myHID, SID_STOCK)   # TODO: include 4ID in DAG?
         # Publish DAG to naming service
         XregisterName("www_s.stock.com.xia", dag)
         
