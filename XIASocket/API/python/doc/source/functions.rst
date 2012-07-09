@@ -12,7 +12,7 @@ The python Xsocket API consists of the following functions, which to a large deg
 * :func:`Xsetsockopt` set socket options
 * :func:`Xgetsockopt` get socket options
 * :func:`XgetDAGbyName` convert a name to a DAG that can be used by other Xsocket functions
-* :func:`XreadLocalHostAddr` look up the AD and HID of the local host
+* :func:`XreadLocalHostAddr` look up the AD, HID, and 4ID of the local host
 * :func:`XregisterName` register our service/host name with the nameserver
 
 **Stream Oriented Functions**
@@ -164,13 +164,13 @@ The python Xsocket API consists of the following functions, which to a large deg
 
 .. function:: XreadLocalHostAddr(sockfd)
 
-    Return a tuple containing the HID and AD assigned to the host by the XIA stack. Among other things, this allows the application to share its address with other applications.
+    Return a tuple containing the HID, AD, and 4ID assigned to the host by the XIA stack. Among other things, this allows the application to share its address with other applications.
 
     Example use:
 	.. code-block:: python
 
 		sock = Xsocket(XSOCK_STREAM) # socket may be of any type; XSOCK_STREAM used here as an example
-		(myAD, myHID) = XreadLocalHostAddr(sock)
+		(myAD, myHID, my4ID) = XreadLocalHostAddr(sock)
 
 .. function:: XreadNameServerDAG(sockfd)
 

@@ -146,21 +146,23 @@ def main():
             print 'webserver.py: main: error opening socket'
             return
 
-        # Get local AD and HID; build DAG to listen on
-        (myAD, myHID) = XreadLocalHostAddr(listen_sock)
+        # Get local AD, HID, and 4ID; build DAG to listen on
+        (myAD, myHID, my4ID) = XreadLocalHostAddr(listen_sock)
         mySID = SID1 # TODO: eventually this should come from a public key
 
         # TODO: When we have persistent caching, we can eliminate
     	# this and make a separate 'content publishing' app.
     	put_content_in_dir('./www')         
         
+        print '4ID: %s' % my4ID
         listen_dag_re = "RE %s %s %s" % (myAD, myHID, mySID) # dag to listen on; TODO: fix Xbind so this can be DAG format, not just RE
-        listen_dag = "DAG 2 0 - \n %s 2 1 - \n %s 2 - \n %s" % (myAD, myHID, mySID)       
+        listen_dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 0 - \n %s 3 - \n %s" % (myAD, my4ID, myHID, mySID)
         Xbind(listen_sock, listen_dag_re)
         print 'Listening on %s' % listen_dag
 
         # Publish DAG to naming service
         XregisterName("www_s.xiaweb.com.xia", listen_dag)
+        print 'registered name'
 
 	# This is just for web demo.... publishing a CID
         imageCID = "CID:aa2fe45640e694c06dcc3331ed91998c8eb4879a"

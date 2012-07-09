@@ -497,7 +497,9 @@ elementclass XRouter2Port {
     // output[1]: forward to interface 1 (for other ads)
 
     n :: RouteEngine($local_addr);
-    xtransport::XTRANSPORT($local_addr, $CLICK_IP, $API_IP, n/proc/rt_SID/rt);    
+    
+    // IP:0.0.0.0 indicates NULL 4ID
+    xtransport::XTRANSPORT($local_addr, IP:0.0.0.0, $CLICK_IP,$API_IP,n/proc/rt_SID/rt);       
     cache :: XIACache($local_addr, n/proc/rt_CID/rt, PACKET_SIZE 1400); // specify XIA packet size (including the XIA + content header)
 
 
@@ -641,9 +643,11 @@ elementclass XRouter4Port {
     // output[3]: forward to interface 3
     
     
-    n :: RouteEngine($local_addr);
-    xtransport::XTRANSPORT($local_addr, $CLICK_IP, $API_IP, n/proc/rt_SID/rt);        
+    n :: RouteEngine($local_addr);       
     
+    // IP:0.0.0.0 indicates NULL 4ID
+    xtransport::XTRANSPORT($local_addr, IP:0.0.0.0, $CLICK_IP,$API_IP,n/proc/rt_SID/rt); 
+        
     //Create kernel TAP interface which responds to ARP
     fake0::FromHost($fake, $API_IP/24, CLICK_XTRANSPORT_ADDR $CLICK_IP ,HEADROOM 256, MTU 65521) 
     //-> Print()
@@ -855,7 +859,7 @@ elementclass DualRouter4Port {
     
     
     n :: RouteEngine($local_addr);
-    xtransport::XTRANSPORT($local_addr, $CLICK_IP, $API_IP, n/proc/rt_SID/rt);        
+    xtransport::XTRANSPORT($local_addr, IP:$ip0, $CLICK_IP, $API_IP, n/proc/rt_SID/rt);        
     
     //Create kernel TAP interface which responds to ARP
     fake0::FromHost($fake, $API_IP/24, CLICK_XTRANSPORT_ADDR $CLICK_IP ,HEADROOM 256, MTU 65521) 
@@ -1163,7 +1167,9 @@ elementclass EndHost {
     // output: forward to interface 0
     
     n :: RouteEngine($local_addr);
-    xtransport::XTRANSPORT($local_addr, $CLICK_IP,$API_IP,n/proc/rt_SID/rt);   
+    
+    // IP:0.0.0.0 indicates NULL 4ID
+    xtransport::XTRANSPORT($local_addr, IP:0.0.0.0, $CLICK_IP,$API_IP,n/proc/rt_SID/rt);   
     
     //Create kernel TAP interface which responds to ARP
     fake0::FromHost($fake, $API_IP/24, CLICK_XTRANSPORT_ADDR $CLICK_IP ,HEADROOM 256, MTU 65521) 

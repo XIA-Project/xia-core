@@ -15,6 +15,7 @@
 unsigned int quit_flag = 0;
 char *adv_selfdag = NULL;
 char *adv_gwdag = NULL;
+char *adv_gw4id = NULL;
 char *adv_nsdag = NULL;
 
 
@@ -45,20 +46,22 @@ int main(int argc, char *argv[]) {
 	char ddag[XHCP_MAX_DAG_LENGTH];
 	char hdag[XHCP_MAX_DAG_LENGTH];
 	char buffer[XHCP_MAX_PACKET_SIZE]; 	
-	string myAD(""), myGWRHID(""), myNS_DAG("");
+	string myAD(""), myGWRHID(""), myGWR4ID(""), myNS_DAG("");
 	string default_AD("AD:-"), default_HID("HID:-"), default_4ID("IP:-"), empty_str("HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
-	string AD, gwRHID, nsDAG;
+	string AD, gwRHID, gwR4ID, nsDAG;
 	int beacon_reception_count=0;
 	int beacon_response_freq = ceil(XHCP_CLIENT_ADVERTISE_INTERVAL/XHCP_SERVER_BEACON_INTERVAL);
 	int first_beacon_reception = true;	
 	char *self_dag = (char *)malloc(XHCP_MAX_DAG_LENGTH);
 	char *gw_dag = (char *)malloc(XHCP_MAX_DAG_LENGTH);
+	char *gw_4id = (char *)malloc(XHCP_MAX_DAG_LENGTH);
 	char *ns_dag = (char *)malloc(XHCP_MAX_DAG_LENGTH);
 	char *pseudo_gw_router_dag; // dag for host_register_message (broadcast message), but only the gw router will accept it
 	string host_register_message;
 	char mydummyAD[MAX_XID_SIZE];
 	char myrealAD[MAX_XID_SIZE];
-	char myHID[MAX_XID_SIZE]; 	
+	char myHID[MAX_XID_SIZE]; 
+	char my4ID[MAX_XID_SIZE];	
         char *hostname;
 
  	// set hostname (check if hostname is provided)
@@ -93,7 +96,7 @@ int main(int argc, char *argv[]) {
 	if (sockfd < 0) { perror("Opening Xsocket"); }
 	
     	// read the localhost HID 
-    	if ( XreadLocalHostAddr(sockfd, mydummyAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE) < 0 )
+    	if ( XreadLocalHostAddr(sockfd, mydummyAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE, my4ID, MAX_XID_SIZE) < 0 )
     		perror("Reading localhost address");   	
 
 	// make the src DAG (Actual AD will be updated when receiving XHCP beacons from an XHCP server)
@@ -125,6 +128,7 @@ int main(int argc, char *argv[]) {
 
 		memset(self_dag, '\0', XHCP_MAX_DAG_LENGTH);
 		memset(gw_dag, '\0', XHCP_MAX_DAG_LENGTH);
+		memset(gw_4id, '\0', XHCP_MAX_DAG_LENGTH);
 		memset(ns_dag, '\0', XHCP_MAX_DAG_LENGTH);
 		int i;
 		xhcp_pkt *tmp = (xhcp_pkt *)pkt;
@@ -137,6 +141,9 @@ int main(int argc, char *argv[]) {
 				case XHCP_TYPE_GATEWAY_ROUTER_HID:
 					sprintf(gw_dag, "%s", entry->data);
 					break;
+				case XHCP_TYPE_GATEWAY_ROUTER_4ID:
+					sprintf(gw_4id, "%s", entry->data);
+					break;					
 				case XHCP_TYPE_NAME_SERVER_DAG:
 					sprintf(ns_dag, "%s", entry->data);
 					break;					
@@ -147,23 +154,24 @@ int main(int argc, char *argv[]) {
 			entry = (xhcp_pkt_entry *)((char *)entry + sizeof(entry->type) + strlen(entry->data) + 1);
 		}
 		// validate pkt
-		if (strlen(self_dag) <= 0 || strlen(gw_dag) <= 0 || strlen(ns_dag) <= 0) {
+		if (strlen(self_dag) <= 0 || strlen(gw_dag) <= 0 || strlen(gw_4id) <= 0 || strlen(ns_dag) <= 0) {
 			continue;
 		}
 		if (adv_selfdag != NULL && adv_gwdag != NULL && adv_nsdag != NULL) {
-			if (!strcmp(adv_selfdag, self_dag) && !strcmp(adv_gwdag, gw_dag) && !strcmp(adv_nsdag, ns_dag)) {
+			if (!strcmp(adv_selfdag, self_dag) && !strcmp(adv_gwdag, gw_dag) && !strcmp(adv_gw4id, gw_4id) && !strcmp(adv_nsdag, ns_dag)) {
 				continue;
 			}
 		}
 		
 		AD = self_dag;
 		gwRHID = gw_dag;
+		gwR4ID = gw_4id;
 		nsDAG = ns_dag;
 		
 		// Check if myAD has been changed
 		if(myAD.compare(AD) != 0) {
 			// update new AD information
-			XupdateAD(sockfd, self_dag);
+			XupdateAD(sockfd, self_dag, gw_4id);
 		
 			// delete obsolete myAD entry
 			xr.delRoute(myAD);
@@ -233,12 +241,12 @@ int main(int argc, char *argv[]) {
 		//Register this hostname to the name server
                 if (beacon_reception_count == XHCP_CLIENT_NAME_REGISTER_WAIT) {    
     			// read the localhost HID 
-    			if ( XreadLocalHostAddr(sockfd, myrealAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE) < 0 )
+    			if ( XreadLocalHostAddr(sockfd, myrealAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE, my4ID, MAX_XID_SIZE) < 0 )
     				perror("Reading localhost address"); 
     			// make the host DAG 
-        		sprintf(hdag, "RE %s %s", myrealAD, myHID);  
+        		sprintf(hdag, "RE ( %s ) %s %s", my4ID, myrealAD, myHID);  
     			if (XregisterName(hostname, hdag) < 0 )
-    			perror("name register");
+    				perror("name register");
 		}   
 		
 	}	

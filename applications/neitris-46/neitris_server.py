@@ -52,10 +52,10 @@ for SID in SIDS:
     portsock = Xsocket(XSOCK_STREAM)
 
     # Make a DAG to listen on 
-    (myAD, myHID) = XreadLocalHostAddr(portsock)
+    (myAD, myHID, my4ID) = XreadLocalHostAddr(portsock)  # TODO: uses this 4ID?
     myIP = 'IP:' + get_ip_address('eth0')
     listen_dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 0 - \n %s 3 - \n %s" % (myAD, myIP, myHID, SID)
-    listen_dag_re = "RE %s %s %s" % (myAD, myHID, SID) 
+    listen_dag_re = "RE ( %s ) %s %s %s" % (myIP, myAD, myHID, SID) 
     Xbind(portsock, listen_dag_re)
     print 'Listening on %s' % listen_dag
 

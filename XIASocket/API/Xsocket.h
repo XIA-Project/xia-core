@@ -136,10 +136,10 @@ extern int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen)
 extern char *XgetDAGbyName(const char *name);
 extern int XregisterName(const char *name, const char *DAG);
 
-extern int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *localhostHID, unsigned lenHID);
+extern int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *localhostHID, unsigned lenHID, char *local4ID, unsigned len4ID);
 
 /* internal only functions */
-extern int XupdateAD(int sockfd, char *newad);
+extern int XupdateAD(int sockfd, char *newad, char *new4id);
 extern int XupdateNameServerDAG(int sockfd, char *nsDAG);
 extern int XreadNameServerDAG(int sockfd, char *nsDAG);
 

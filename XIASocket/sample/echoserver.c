@@ -202,6 +202,7 @@ void echo_stream()
 {
 	char myAD[MAX_XID_SIZE];
 	char myHID[MAX_XID_SIZE];
+	char my4ID[MAX_XID_SIZE];
 	int acceptor, sock;
 	char *dag;
 
@@ -210,13 +211,15 @@ void echo_stream()
 	if ((acceptor = Xsocket(XSOCK_STREAM)) < 0)
 		die(-2, "unable to create the stream socket\n");
 
-    // read the localhost AD and HID
-    if ( XreadLocalHostAddr(acceptor, myAD, sizeof(myAD), myHID, sizeof(myHID)) < 0 )
-    	die(-1, "Reading localhost address\n");
+        // read the localhost AD and HID
+    	if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
+    		perror("Reading localhost address");	
 
-	if (!(dag = createDAG(myAD, myHID, SID_STREAM)))
-		die(-1, "unable to create DAG: %s\n", dag);
-	say("Created DAG: \n%s\n", dag);
+    	// make the src DAG (the one the server listens on)
+    	dag = (char*) malloc(snprintf(NULL, 0, "RE ( %s ) %s %s %s", my4ID, myAD, myHID, SID_STREAM) + 1);
+    	sprintf(dag, "RE ( %s ) %s %s %s", my4ID, myAD, myHID, SID_STREAM);  			
+	
+	
 
     if (XregisterName(STREAM_NAME, dag) < 0 )
     	die(-1, "error registering name: %s\n", DGRAM_NAME);
@@ -264,6 +267,7 @@ void echo_dgram()
 	char cdag[1024]; // client's dag
 	char myAD[MAX_XID_SIZE];
 	char myHID[MAX_XID_SIZE];
+	char my4ID[MAX_XID_SIZE];
 	size_t dlen;
 	int n;
 
@@ -272,13 +276,14 @@ void echo_dgram()
 	if ((sock = Xsocket(XSOCK_DGRAM)) < 0)
 		die(-2, "unable to create the datagram socket\n");
 
-    // read the localhost AD and HID
-    if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID)) < 0 )
-    	die(-1, "Reading localhost address\n");
+        // read the localhost AD and HID
+    	if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
+    		perror("Reading localhost address");	
 
-	if (!(dag = createDAG(myAD, myHID, SID_DGRAM)))
-		die(-1, "unable to create DAG: %s\n", dag);
-	say("Created DAG: \n%s\n", dag);
+    	// make the src DAG (the one the server listens on)
+    	dag = (char*) malloc(snprintf(NULL, 0, "RE ( %s ) %s %s %s", my4ID, myAD, myHID, SID_DGRAM) + 1);
+    	sprintf(dag, "RE ( %s ) %s %s %s", my4ID, myAD, myHID, SID_DGRAM);  			
+	
 
     if (XregisterName(DGRAM_NAME, dag) < 0 )
     	die(-1, "error registering name: %s\n", DGRAM_NAME);

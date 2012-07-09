@@ -244,6 +244,7 @@ int main(int argc, char *argv[])
 	int sock, acceptSock;
 	char myAD[1024]; 
         char myHID[1024];   
+	char my4ID[1024];  
 
 	getConfig(argc, argv);
 
@@ -255,13 +256,13 @@ int main(int argc, char *argv[])
 	if ((sock = Xsocket(XSOCK_STREAM)) < 0)
 		 die(-1, "Unable to create the listening socket\n");
 
-    	// read the localhost AD and HID
-    	if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID)) < 0 )
-    		perror("Reading localhost address");		 
+        // read the localhost AD and HID
+    	if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
+    		perror("Reading localhost address");	
 
-	// create the dag we will listen for incoming connections on
-	if (!(dag = createDAG(myAD, myHID, SID_VIDEO)))
-		die(-1, "Unable to create DAG: %s\n", dag); 
+    	// make the src DAG (the one the server listens on)
+    	dag = (char*) malloc(snprintf(NULL, 0, "RE ( %s ) %s %s %s", my4ID, myAD, myHID, SID_VIDEO) + 1);
+    	sprintf(dag, "RE ( %s ) %s %s %s", my4ID, myAD, myHID, SID_VIDEO);  			
 
 	// register this service name to the name server 
     	char * sname = (char*) malloc(snprintf(NULL, 0, "%s", SNAME) + 1);

@@ -10,10 +10,6 @@ XSP=1
 XDP=2
 XCHUNKP=3
 
-myAD = {}
-myHID = {} 
-mySID = {}
-
 def send_to_browser(data, browser_socket):
     try:
         browser_socket.send(data)
@@ -257,8 +253,6 @@ def getrandSID():
     return  sid
 
 def send_sid_request(ddag, payload, browser_socket, transport_proto=XSP):
-    global myAD, myHID
-    
     # Create socket
     if transport_proto == XSP:
         sock = Xsocket(XSOCK_STREAM)
@@ -272,14 +266,9 @@ def send_sid_request(ddag, payload, browser_socket, transport_proto=XSP):
         print "ERROR: xiaproxy.py: send_sid_request: could not open socket"
         return
     
-    (myAD, myHID) = XreadLocalHostAddr(sock)
-    sid = getrandSID()
-    sdag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (myAD, IP0, myHID, sid)    
-
     try:
         if transport_proto == XSP:
             # Connect to service
-            Xbind(sock, sdag)
             status = Xconnect(sock, ddag)
             if (status != 0):
                 print "send_sid_request() Closing browser socket "
@@ -353,14 +342,6 @@ def get_content_from_cid_list(dstAD, dstHID, cid_list):
         print "ERROR: xiaproxy.py: get_content_from_cid_list: error opening socket"
         return
 
-    # create and bind to ephemeral SID
-    sid = getrandSID()
-    sdag = "DAG 0 1 - \n %s 2 - \n %s 2 - \n %s 3 - \n %s" % (myAD, IP0, myHID, sid)       
-    try:
-        Xbind(sock, sdag);
-    except:
-        print 'ERROR: xiaproxy.py: get_content_from_cid_list: Error binding to sdag'
-
     # request the list of CIDs
     try:
         XrequestChunks(sock, cids, num_cids)
@@ -417,6 +398,7 @@ def xia_handler(host, path, http_header, browser_socket):
         send_to_browser(recombined_content, browser_socket)
     else:
         ddag = XgetDAGbyName(host)
+        print ddag
         if ddag == None:
             print 'xiaproxy.py: xia_handler: Could not resolve name %s' % host
             return

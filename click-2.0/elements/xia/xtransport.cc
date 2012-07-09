@@ -33,10 +33,12 @@ int
 XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 {
 	XIAPath local_addr;
+	XID local_4id;
 	Element* routing_table_elem;
 
 	if (cp_va_kparse(conf, this, errh,
 	                 "LOCAL_ADDR", cpkP + cpkM, cpXIAPath, &local_addr,
+	                 "LOCAL_4ID", cpkP + cpkM, cpXID, &local_4id,
 	                 "CLICK_IP", cpkP + cpkM, cpIPAddress, &_CLICKaddr,
 	                 "API_IP", cpkP + cpkM, cpIPAddress, &_APIaddr,
 	                 "ROUTETABLENAME", cpkP + cpkM, cpElement, &routing_table_elem,
@@ -45,6 +47,24 @@ XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 
 	_local_addr = local_addr;
 	_local_hid = local_addr.xid(local_addr.destination_node());
+	_local_4id = local_4id;
+	// IP:0.0.0.0 indicates NULL 4ID
+	_null_4id.parse("IP:0.0.0.0");
+	/*
+	// If a valid 4ID is given, it is included (as a fallback) in the local_addr
+	if(_local_4id != _null_4id) {
+		String str_local_addr = _local_addr.unparse();
+		size_t AD_found_start = str_local_addr.find_left("AD:");
+		size_t AD_found_end = str_local_addr.find_left(" ", AD_found_start);
+		String AD_str = str_local_addr.substring(AD_found_start, AD_found_end - AD_found_start);
+		String HID_str = _local_hid.unparse();
+		String IP4ID_str = _local_4id.unparse();
+		String new_local_addr = "RE ( " + IP4ID_str + " ) " + AD_str + " " + HID_str;
+		//click_chatter("new address is - %s", new_local_addr.c_str());
+		_local_addr.parse(new_local_addr);		
+	}	
+	*/						
+	
 #if USERLEVEL
 	_routeTable = dynamic_cast<XIAXIDRouteTable*>(routing_table_elem);
 #else
@@ -777,13 +797,22 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		case xia::XCHANGEAD:
 		{
 			xia::X_Changead_Msg *x_changead_msg = xia_socket_msg.mutable_x_changead();
-			String tmp = _local_addr.unparse();
-			Vector<String> ids;
-			cp_spacevec(tmp, ids);
-			String new_route(x_changead_msg->dag().c_str());
-			String new_local_addr = "RE " + new_route + " " + ids[ids.size()-1];
-			//click_chatter("new address is - %s", new_local_addr.c_str());
-			_local_addr.parse(new_local_addr);
+			//String tmp = _local_addr.unparse();
+			//Vector<String> ids;
+			//cp_spacevec(tmp, ids);
+			String AD_str(x_changead_msg->ad().c_str());
+			String HID_str = _local_hid.unparse();
+			String IP4ID_str(x_changead_msg->ip4id().c_str());
+			_local_4id.parse(IP4ID_str);
+			String new_local_addr;
+			// If a valid 4ID is given, it is included (as a fallback) in the local_addr
+			if(_local_4id != _null_4id) {			
+				new_local_addr = "RE ( " + IP4ID_str + " ) " + AD_str + " " + HID_str;
+			} else {
+				new_local_addr = "RE " + AD_str + " " + HID_str;
+			}
+			click_chatter("new address is - %s", new_local_addr.c_str());
+			_local_addr.parse(new_local_addr);			
 		}
 		break;
 		case xia::XREADLOCALHOSTADDR:
@@ -794,12 +823,14 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			size_t AD_found_end = local_addr.find_left(" ", AD_found_start);
 			String AD_str = local_addr.substring(AD_found_start, AD_found_end - AD_found_start);
 			String HID_str = _local_hid.unparse();
+			String IP4ID_str = _local_4id.unparse();
 			// return a packet containing localhost AD and HID
 			xia::XSocketMsg _Response;
 			_Response.set_type(xia::XREADLOCALHOSTADDR);
 			xia::X_ReadLocalHostAddr_Msg *_msg = _Response.mutable_x_readlocalhostaddr();
 			_msg->set_ad(AD_str.c_str());
 			_msg->set_hid(HID_str.c_str());
+			_msg->set_ip4id(IP4ID_str.c_str());
 			std::string p_buf1;
 			_Response.SerializeToString(&p_buf1);
 			WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
