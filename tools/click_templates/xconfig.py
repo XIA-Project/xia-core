@@ -23,6 +23,7 @@ adname = "AD_INIT"
 nameserver = "no"
 nameserver_ad = "AD_NAMESERVER"
 nameserver_hid = "HID_NAMESERVER"
+ip_override_addr = None
 
 #
 # create a globally unique HID based off of our mac address
@@ -81,7 +82,6 @@ def getInterfaces():
 # TODO: Make this more general / combine with getInterfaces()?
 #
 def getEth0():
-
 	# Get the default gateway  TODO: should there be one per interface?
 	cmdline = subprocess.Popen(
 			"route -n | grep ^0.0.0.0 | tr -s ' ' | cut -d ' ' -f2",
@@ -101,7 +101,11 @@ def getEth0():
 	for addr in addrs:
 		if (len(addr) != 0):
 			(iface, mac, ip) = addr.split()
-			interfaces.append([iface, mac, ip, default_gw])
+			if ip_override_addr != None:
+				external_ip = ip_override_addr
+			else:
+				external_ip = ip
+			interfaces.append([iface, mac, ip, default_gw, external_ip])
 
 	return interfaces
 
@@ -303,13 +307,15 @@ def makeDualHostConfig(ad, hid, rhid):
 
 	# create $MAC0 thru $MAC3 replacements
 	i = 0  
-	while i < 3 and i < len(interfaces):  # Only go to 2 because the host is connect to router port 3
+	while i < 3 and i < len(interfaces):  # Only go to 2 because the host is connected to router port 3
 		repl = 'MAC' + str(i)
 		xchg[repl] = interfaces[i][1]
 		repl = 'IPADDR' + str(i)
 		xchg[repl] = interfaces[i][2]
 		repl = 'GWADDR' + str(i)
 		xchg[repl] = interfaces[i][3]
+		repl = 'EXT_IPADDR' + str(i)
+		xchg[repl] = interfaces[i][4]
 		i += 1
 	while i < 3:
 		repl = 'MAC' + str(i)
@@ -318,13 +324,15 @@ def makeDualHostConfig(ad, hid, rhid):
 		xchg[repl] = "1.1.1.1"
 		repl = 'GWADDR' + str(i)
 		xchg[repl] = "1.1.1.1"
+		repl = 'EXT_IPADDR' + str(i)
+		xchg[repl] = "1.1.1.1"
 		i += 1
 	 	
 	newtext = tpl.substitute(xchg)
 
 	i = 0
 	tpl = Template(body)
-	for (interface, mac, ip, gw) in interfaces:
+	for (interface, mac, ip, gw, ext_ip) in interfaces:
 		xchg['IFACE'] = interfaces[i][0]
 		xchg['MAC'] = interfaces[i][1]
 		xchg['NUM'] = i
@@ -357,8 +365,9 @@ def getOptions():
 	global nodetype
 	global adname
 	global nameserver 
+	global ip_override_addr
 	try:
-		shortopt = "hr4ni:a:"
+		shortopt = "hr4ni:am:"
 		opts, args = getopt.getopt(sys.argv[1:], shortopt, 
 			["help", "router", "dual-host", "nameserver", "id=", "ad="])
 	except getopt.GetoptError, err:
@@ -378,6 +387,8 @@ def getOptions():
 			nodetype = "router"
 		elif o in ("-4", "--dual-host"):
 			nodetype = "dual-host"
+		elif o in ("-m", "--manual-address"):
+			ip_override_addr = a
 		elif o in ("-n", "--nameserver"):
 			nameserver = "yes"			
 		else:

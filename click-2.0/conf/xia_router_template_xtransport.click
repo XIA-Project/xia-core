@@ -831,7 +831,10 @@ elementclass XRouter4Port {
 
 // 4-port router node with XRoute process running and IP support
 elementclass DualRouter4Port {
-    $local_addr, $local_ad, $local_hid, $fake, $CLICK_IP, $API_IP, $ether_addr, $ip_active0, $ip0, $mac0, $gw0, $ip_active1, $ip1, $mac1, $gw1, $ip_active2, $ip2, $mac2, $gw2, $ip_active3, $ip3, $mac3, $gw3, $malicious_cache |
+    $local_addr, $local_ad, $local_hid, $fake, $CLICK_IP, $API_IP, $ether_addr, $ip_active0, $ip0, $external_ip0, $mac0, $gw0, 
+																				$ip_active1, $ip1, $external_ip1, $mac1, $gw1,
+																				$ip_active2, $ip2, $external_ip2, $mac2, $gw2, 
+																				$ip_active3, $ip3, $external_ip3, $mac3, $gw3, $malicious_cache |
 
 	// NOTE: This router assumes that each port is connected to *either* an XIA network *or* an IP network.
 	// If port 0 is connected to an IP network and is asked to send an XIA packet (e.g., a broadcast), the
@@ -847,6 +850,7 @@ elementclass DualRouter4Port {
 	// $ether_addr:
 	// $ip_activeNUM:  1 = port NUM is connected to an IP network;  0 = port NUM is connected to an XIA network
 	// $ipNUM:  port NUM's IP address (if port NUM isn't connected to IP, this doesn't matter)
+	// $external_ipNUM:  port NUM's public IP address (might be different from $ipNUM if behind a NAT)
 	// $macNUM:  port NUM's MAC address (if port NUM isn't connected to IP, this doesn't matter)
 	// $gwNUM:  port NUM's gateway router's IP address (if port NUM isn't connected to IP, this doesn't matter)
 	// $malicious_cache: if set to 1, the content cache responds with bad content
@@ -859,7 +863,7 @@ elementclass DualRouter4Port {
     
     
     n :: RouteEngine($local_addr);
-    xtransport::XTRANSPORT($local_addr, IP:$ip0, $CLICK_IP, $API_IP, n/proc/rt_SID/rt);        
+    xtransport::XTRANSPORT($local_addr, IP:$external_ip0, $CLICK_IP, $API_IP, n/proc/rt_SID/rt);        
     
     //Create kernel TAP interface which responds to ARP
     fake0::FromHost($fake, $API_IP/24, CLICK_XTRANSPORT_ADDR $CLICK_IP ,HEADROOM 256, MTU 65521) 

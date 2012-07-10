@@ -23,6 +23,7 @@ VERBOSE=0
 CLICK_ONLY=0
 DUAL_STACK_HOST=0
 NAMESERVER=0
+IP_OVERRIDE_ADDR="None"
 
 # this is a particular list of daemons for the default 4-node-chain topology (host0 -- router0 -- router1 -- host1)
 DAEMONS="xroute_r0 xroute_r1 xhcp_server_r0 xhcp_server_r1 xhcp_client_h0 xhcp_client_h1 xnameservice"
@@ -92,8 +93,11 @@ start_daemons()
 
 	if [ $DUAL_STACK_HOST -eq 1 ]; then
 		FLAGS="-4"
+		if [ $IP_OVERRIDE_ADDR != "None" ]; then
+			FLAGS=$FLAGS" -m "$IP_OVERRIDE_ADDR
+		fi
 		if [ $NAMESERVER -eq 1 ]; then
-			FLAGS="-4n"
+			FLAGS=$FLAGS" -n"
 		fi
 
 		cd $XIADIR/tools/click_templates
@@ -159,7 +163,7 @@ help ()
 
 Start or stop the XIA network services.
 
-usage: $NAME [-cqvV4n] [-s <script>] [start|stop|restart|check]
+usage: $NAME [-cqvV4n] [-m <ip-addr>] [-s <script>] [start|stop|restart|check]
 where:
   -c only start click
   -s run click using the specified script
@@ -168,6 +172,7 @@ where:
   -v prints click debug messages to stdout
   -V prints all daemon debug messages to stdout
   -4 generate and use a dual stack host click script
+  -m manually set the node's 4ID IP address
   -n if generating a click script, this node will be the name server
 
   start   - starts the xia network processes if not already running
@@ -179,7 +184,7 @@ EOH
 	exit 0
 }
 
-while getopts "cs:qvV4nh" opt; do
+while getopts "csm:qvV4nh" opt; do
 	case $opt in
 		c)
 			CLICK_ONLY=1
@@ -200,6 +205,9 @@ while getopts "cs:qvV4nh" opt; do
 			DUAL_STACK_HOST=1
 			CONFPATH=$XIADIR/tools/click_templates
 			SCRIPT=dual_stack_host.click
+			;;
+		m)
+			IP_OVERRIDE_ADDR=$OPTARG
 			;;
 		n)
 			NAMESERVER=1
