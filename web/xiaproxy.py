@@ -81,12 +81,12 @@ def readcid_with_timeout(sock, cid, timeout=5):
     
     
 
-def check_for_and_process_CIDs(dstAD, dstHID, message, browser_socket):
+def check_for_and_process_CIDs(dstAD, dst4ID, dstHID, message, browser_socket):
     rt = message.find('cid')
     if (rt!= -1):
         http_header = message[0:rt]
         try:
-            content = get_content_from_cid_list(dstAD, dstHID, message[rt:].split('.')[2])
+            content = get_content_from_cid_list(dstAD, dst4ID, dstHID, message[rt:].split('.')[2])
         except:
             print "ERROR: xiaproxy.py: check_for_and_process_CIDs: Couldn't retrieve content. Closing browser_socket"
             browser_socket.close()
@@ -307,10 +307,12 @@ def send_sid_request(ddag, payload, browser_socket, transport_proto=XSP):
     # Extract dst AD and HID from ddag	
     start_index = ddag.find('AD:')
     dstAD = ddag[start_index:start_index+3+40] 
+    start_index = ddag.find('IP:')
+    dst4ID = ddag[start_index:start_index+3+40] 
     start_index = ddag.find('HID:')
     dstHID = ddag[start_index:start_index+4+40]  
 
-    contains_CID = check_for_and_process_CIDs(dstAD, dstHID, reply, browser_socket)
+    contains_CID = check_for_and_process_CIDs(dstAD, dst4ID, dstHID, reply, browser_socket)
     if not contains_CID:
         # Pass reply up to browswer 
         rtt = int((time.time()-rtt) *1000)
@@ -320,14 +322,14 @@ def send_sid_request(ddag, payload, browser_socket, transport_proto=XSP):
     return
 
 
-def get_content_from_cid_list(dstAD, dstHID, cid_list):
+def get_content_from_cid_list(dstAD, dst4ID, dstHID, cid_list):
     num_cids = len(cid_list) / 40
     
     # make a list of ChunkStatuss
     cids = ChunkStatusArray(num_cids) # list()
     for i in range(0, num_cids):
-        content_dag = 'CID:%s' % cid_list[i*40:40+i*40]
-        content_dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 2 - \n %s 3 - \n %s" % (dstAD, IP1, dstHID, content_dag)
+        cid = 'CID:%s' % cid_list[i*40:40+i*40]
+        content_dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 2 - \n %s 3 - \n %s" % (dstAD, dst4ID, dstHID, cid)
         
         chunk_info = ChunkStatus()
         chunk_info.cid = content_dag
@@ -392,8 +394,9 @@ def xia_handler(host, path, http_header, browser_socket):
         host_array = host.split('.')
         num_chunks = int(host_array[0])
         dstAD = "AD:%s" % host_array[2]
-        dstHID = "HID:%s" % host_array[4]
-        recombined_content = get_content_from_cid_list(dstAD, dstHID, host_array[5])
+        dst4ID = "IP:%s" % host_array[4]
+        dstHID = "HID:%s" % host_array[6]
+        recombined_content = get_content_from_cid_list(dstAD, dst4ID, dstHID, host_array[7])
         length = len(recombined_content)
         send_to_browser(recombined_content, browser_socket)
     else:
@@ -408,14 +411,16 @@ def xia_handler(host, path, http_header, browser_socket):
         elif host.find('www_s.') != -1:     	
             send_sid_request(ddag, http_header, browser_socket)
         elif host.find('www_c.') != -1:     	
-    	    # Extract dst AD, HID, and CID from ddag	
-    	    start_index = ddag.find('AD:')
-            dstAD = ddag[start_index:start_index+3+40] 
-            start_index = ddag.find('HID:')
-            dstHID = ddag[start_index:start_index+4+40]  
-            start_index = ddag.find('CID:')
-            dstCID = ddag[start_index+4:start_index+4+40] 
-            recombined_content = get_content_from_cid_list(dstAD, dstHID, dstCID)
+    	    # Extract dst AD, 4ID, HID, and CID from ddag	
+    	    ad_index = ddag.find('AD:')
+            dstAD = ddag[ad_index:ad_index+3+40] 
+    	    ip_index = ddag.find('IP:')
+            dst4ID = ddag[ip_index:ip_index+3+40] 
+            hid_index = ddag.find('HID:')
+            dstHID = ddag[hid_index:hid_index+4+40]  
+            cid_index = ddag.find('CID:')
+            dstCID = ddag[cid_index+4:cid_index+4+40] 
+            recombined_content = get_content_from_cid_list(dstAD, dst4ID, dstHID, dstCID)
             length = len(recombined_content)
             send_to_browser(recombined_content, browser_socket)
     return

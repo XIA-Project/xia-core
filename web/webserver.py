@@ -13,9 +13,7 @@ import hashlib
 from xia_address import *
 
 cids_by_filename = {}
-myAD = {}
-myHID = {} 
-mySID = {}
+myAD, my4ID, myHID, mySID = ('', '', '', '')
 
 def serveHTTPRequest(request, sock):
     global cids_by_filename
@@ -99,7 +97,7 @@ def put_content_in_dir(dir):
                         # Replace links to content we already published with CID lists
                         for key, value in cids_by_filename.iteritems():
                             # build the CID string to replace the filepath
-                            cid_string = 'xia.cid.%i.%s.%s.' % (len(value), myAD, myHID)
+                            cid_string = 'xia.cid.%i.%s.%s.%s.' % (len(value), myAD, my4ID, myHID)
                             cid_string = cid_string.replace(':', '.')
                             cid_string = "http://%s" % cid_string
                             for cid_info in value:
@@ -114,7 +112,7 @@ def put_content_in_dir(dir):
 
                         # Replace links to other html files in 'dir' with this webserver's SID
                         for linked_html_file in files_with_links:
-                            dag_url = 'http://dag/2,0/%s=0:2,1/%s=1:2/%s=2:2//%s' % (myAD, myHID, mySID, linked_html_file[5:])
+                            dag_url = 'http://dag/3,0,1/%s=0:3,2/%s=1:3,0/%s=2:3/%s=3:3//%s' % (myAD, my4ID, myHID, mySID, linked_html_file[5:])
                             
                             rel_path = os.path.relpath(linked_html_file, root)
                             # first match filepaths beginning with "./"
@@ -135,9 +133,9 @@ def put_content_in_dir(dir):
 
 
 def main():
-    global myAD, myHID, mySID
+    global myAD, myHID, mySID, my4ID
     # Set up connection with click via Xsocket API
-    set_conf("xsockconf_python.ini", "webserver.py")
+    #set_conf("xsockconf_python.ini", "webserver.py")
         
     try:   
         # Create socket for listening for connections
@@ -189,4 +187,3 @@ def main():
 
 if __name__ ==  '__main__':
     main()
-
