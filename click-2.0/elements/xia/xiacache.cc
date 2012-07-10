@@ -118,7 +118,6 @@ void XIACache::push(int port, Packet *p)
 	XID srcHID(__srcID);
 
 	/* this sends chunk response to output 0 (network) or to 1 (application, if the request came from application and content is locally cached)  */
-	click_chatter("about to process request, malicious is: %i\n", _content_module->malicious);
 	_content_module->process_request(p, srcHID, dstID);
     }
     else

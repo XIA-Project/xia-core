@@ -323,7 +323,6 @@ void XIAContentModule::cache_incoming_local(Packet *p, const XID& srcCID, bool l
             (*cmTable)[srcCID]=ctm;
             
             _contentTable[srcCID]=chunk;
-			click_chatter("Added %s to _contentTable\n", srcCID.unparse().c_str());
             if (local_putcid) {
                 assert(ContentHeader::OP_LOCAL_PUTCID>1);
                 content[srcCID]= ContentHeader::OP_LOCAL_PUTCID;
