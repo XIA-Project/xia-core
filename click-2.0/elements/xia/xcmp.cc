@@ -77,7 +77,7 @@ XCMP::push(int, Packet *p_in)
 		    click_chatter("%s: %u: %s sent me a packet that should route on its local network (Dst: %s)\n", _src_path.unparse().c_str(),p_in->timestamp_anno().usecval(),hdr.src_path().unparse().c_str(),hdr.dst_path().unparse().c_str());
       
 		// create the XCMP Redirect Message
-		char msg[256];
+		char msg[512];
 		msg[0] = 5; // Redirect (type)
 		msg[1] = 1; // Redirect for host (code)
 
