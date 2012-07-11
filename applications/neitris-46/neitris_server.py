@@ -19,21 +19,13 @@
 #
 import struct
 import sys, time, pygame
-import socket
+#import socket
 import fcntl
 from select import select
 #from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from c_xsocket import *
 import neitris_utils
 import neitris_cfg
-
-def get_ip_address(ifname):
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    return socket.inet_ntoa(fcntl.ioctl(
-        s.fileno(),
-        0x8915,  # SIOCGIFADDR
-        struct.pack('256s', ifname[:15])
-    )[20:24])
 
 def now():
     return time.strftime("%I:%M:%S%p",time.localtime())
@@ -52,10 +44,9 @@ for SID in SIDS:
     portsock = Xsocket(XSOCK_STREAM)
 
     # Make a DAG to listen on 
-    (myAD, myHID, my4ID) = XreadLocalHostAddr(portsock)  # TODO: uses this 4ID?
-    myIP = 'IP:' + get_ip_address('eth0')
-    listen_dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 0 - \n %s 3 - \n %s" % (myAD, myIP, myHID, SID)
-    listen_dag_re = "RE ( %s ) %s %s %s" % (myIP, myAD, myHID, SID) 
+    (myAD, myHID, my4ID) = XreadLocalHostAddr(portsock) 
+    listen_dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 0 - \n %s 3 - \n %s" % (myAD, my4ID, myHID, SID)
+    listen_dag_re = "RE ( %s ) %s %s %s" % (my4ID, myAD, myHID, SID) 
     Xbind(portsock, listen_dag_re)
     print 'Listening on %s' % listen_dag
 

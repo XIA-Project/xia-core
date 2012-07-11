@@ -50,6 +50,7 @@ background = None
 DONE=0
 
 
+bricks_name = os.path.join(".","bricks.bmp")
 
 brick1_name = os.path.join(".","brick1.bmp")
 brick2_name = os.path.join(".","brick2.bmp")
@@ -93,6 +94,8 @@ donator = pygame.image.load(donator_name)
 updown = pygame.image.load(updown_name)
 dotter = pygame.image.load(dotter_name)
 
+brick_border = pygame.image.load(bricks_name)
+
 brick1 = pygame.image.load(brick1_name)
 brick2 = pygame.image.load(brick2_name)
 brick3 = pygame.image.load(brick3_name)
@@ -110,12 +113,12 @@ dot6 = pygame.image.load(dot6_name)
 dot7 = pygame.image.load(dot7_name)
 
 
-bricks = [brick1, brick2, brick3, brick4, brick5, brick6, brick7,
+bricks = [brick1, brick2, brick3, brick4, brick5, brick6, brick7, brick_border,
           antidote, escalator, zed, reversekeys, rabbit, turtle,
           crystalball, clearscr, donator, swapscr, updown, dotter]
 
     
-dots = [dot1, dot2, dot3, dot4, dot5, dot6, dot7,
+dots = [dot1, dot2, dot3, dot4, dot5, dot6, dot7, brick_border,
           antidote, escalator, zed, reversekeys, rabbit, turtle,
           crystalball, clearscr, donator, swapscr, updown, dotter]
 
@@ -264,10 +267,10 @@ def input(events, matrix):
                     matrix.MoveLeft()
                 elif event.key == KEY_RIGHT:
                     matrix.MoveRight()
+                elif event.key == KEY_RLEFT and pygame.key.get_mods() & KMOD_SHIFT: 
+                    matrix.RotateRight()
                 elif event.key == KEY_RLEFT:
                     matrix.RotateLeft()
-                elif event.key == KEY_RRIGHT:
-                    matrix.RotateRight()
                 elif event.key == KEY_DROP:
                     matrix.Drop()
                     curlines = curlines + matrix.ClearCompleted()

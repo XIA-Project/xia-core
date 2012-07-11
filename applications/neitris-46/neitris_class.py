@@ -35,11 +35,11 @@ class Matrix:
                 self.matrix[i][j] = 0;
 
         for i in range(YMAX):
-            self.matrix[i][0] = 7;
-            self.matrix[i][XMAX-1] = 7;
+            self.matrix[i][0] = 8;
+            self.matrix[i][XMAX-1] = 8;
 
         for j in range(XMAX):
-            self.matrix[YMAX-1][j] = 7;
+            self.matrix[YMAX-1][j] = 8;
 
         self.curshape = Curshape();
         self.curshape.y = -1
