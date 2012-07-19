@@ -33,7 +33,7 @@ using namespace std;
 
 #define BHID "HID:1111111111111111111111111111111111111111"
 #define SID_XROUTE "SID:1110000000000000000000000000000000001112"
-
+#define NULL_4ID "IP:4500000000010000fafa00000000000000000000"
 
 
 typedef struct {
@@ -73,6 +73,8 @@ typedef struct RouteState {
 	char myHID[MAX_XID_SIZE]; // this router HID
 	char my4ID[MAX_XID_SIZE]; // not used
 	
+	int dual_router;   // 0: this router is not a dual XIA-IP router, 1: this router is a dual router
+	std::string dual_router_AD; // AD (with dual router) -- default AD for 4ID traffic	
 	int num_neighbors; // number of neighbor routers
 	int lsa_seq;	// LSA sequence number of this router
 	int hello_seq;  // hello seq number of this router 

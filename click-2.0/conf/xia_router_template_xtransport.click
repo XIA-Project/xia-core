@@ -690,6 +690,7 @@ elementclass XRouter4Port {
     Script(write n/proc/rt_AD/rt.add $local_ad 4);    // self AD as destination
     Script(write n/proc/rt_HID/rt.add $local_hid 4);  // self RHID as destination
     Script(write n/proc/rt_HID/rt.add BHID 7);  // outgoing broadcast packet
+    Script(write n/proc/rt_AD/rt.add - 5);     // no default route for AD; consider other path
     Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
     //Script(write n/proc/rt_IP/rt.add - 0); 	// default route for IPv4    

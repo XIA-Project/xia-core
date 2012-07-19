@@ -99,6 +99,7 @@ int sendLSA() {
 	bzero(buffer, 1024);	
 	/* Message format (delimiter=^)
 		message-type{Hello=0 or LSA=1}
+		router-type{XIA=0 or XIA-IPv4-Dual=1}
 		source-AD
 		source-HID
 		LSA-seq-num
@@ -110,12 +111,15 @@ int sendLSA() {
 		...		
 	*/
 	string lsa;
-	char lsa_seq[10], num_neighbors[10];
+	char lsa_seq[10], num_neighbors[10], is_dual_router[10];
 	
 	sprintf(lsa_seq, "%d", route_state.lsa_seq);
 	sprintf(num_neighbors, "%d", route_state.num_neighbors);
+	sprintf(is_dual_router, "%d", route_state.dual_router);
 	
 	lsa.append("1^");
+	lsa.append(is_dual_router);
+	lsa.append("^");	
 	lsa.append(route_state.myAD);
 	lsa.append("^");
 	lsa.append(route_state.myHID);
@@ -259,14 +263,14 @@ int processLSA(const char* lsa_msg) {
 	char buffer[1024]; 
 	bzero(buffer, 1024);	
 	/* Procedure:
-		0. scan this LSA
+		0. scan this LSA (mark AD with a DualRouter if there)
 		1. filter out the already seen LSA (via LSA-seq for this dest)
 		2. update the network table
 		3. rebroadcast this LSA
 	*/
 	// 0. Read this LSA
 	size_t found, start;
-	string msg, destAD, destHID, lsa_seq, num_neighbors, neighborAD, neighborHID;
+	string msg, routerType, destAD, destHID, lsa_seq, num_neighbors, neighborAD, neighborHID;
 	
 	start = 0;
 	msg = lsa_msg;
@@ -276,7 +280,15 @@ int processLSA(const char* lsa_msg) {
   	if (found!=string::npos) {
   		start = found+1;   // message-type was previously read
   	}
-  	 					
+  	
+	// read routerType
+	found=msg.find("^", start);
+  	if (found!=string::npos) {
+  		routerType = msg.substr(start, found-start);
+  		start = found+1;  // forward the search point
+  	} 
+  	int is_dual_router = atoi(routerType.c_str());	 				
+  	 	 					
 	// read destAD
 	found=msg.find("^", start);
   	if (found!=string::npos) {
@@ -306,7 +318,11 @@ int processLSA(const char* lsa_msg) {
   		start = found+1;  // forward the search point
   	} 	
   	int numNeighbors = atoi(num_neighbors.c_str());
-  	  	
+
+  	// See if this LSA comes from AD with dualRouter  	
+  	if (is_dual_router == 1) {
+  		route_state.dual_router_AD = destAD;
+  	}   
   	
   	// First, filter out the LSA originating from myself
   	string myAD = route_state.myAD;
@@ -487,6 +503,7 @@ void updateClickRoutingTable() {
 
 	int rc, port, flags;
 	string destXID, nexthopXID;
+	string default_AD("AD:-"), default_HID("HID:-"), default_4ID("IP:-"), empty_str("HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
 	
   	map<std::string, RouteEntry>::iterator it1;
   	for ( it1=route_state.ADrouteTable.begin() ; it1 != route_state.ADrouteTable.end(); it1++ ) {
@@ -496,10 +513,15 @@ void updateClickRoutingTable() {
 			
 		if ((rc = xr.setRoute(destXID, port, nexthopXID, 0xffff)) != 0)
 			printf("error setting route %d\n", rc);
-
+		
+		// set default AD for 4ID traffic	
+		if (route_state.dual_router==0 && destXID.compare(route_state.dual_router_AD)==0) {
+			if ((rc = xr.setRoute(default_4ID, port, nexthopXID, 0xffff)) != 0)
+				printf("error setting route %d\n", rc);
+		}	
   	}
-  	listRoutes("HID");
-	listRoutes("AD");
+  	listRoutes("AD");
+	listRoutes("HID");
 }
 
 
@@ -524,6 +546,14 @@ void initRouteState()
 	route_state.hello_seq = 0;  // hello seq number of this router 	
 	route_state.hello_lsa_ratio = ceil(LSA_INTERVAL/HELLO_INTERVAL);
 	route_state.calc_dijstra_ticks = 0;
+
+	route_state.dual_router_AD = "NULL";
+	// mark if this is a dual XIA-IPv4 router
+	if( strcmp(route_state.my4ID, NULL_4ID) != 0 ) {
+		route_state.dual_router = 1;
+	} else {
+		route_state.dual_router = 0;
+	}
 
 	// set timer for HELLO/LSA
 	signal(SIGALRM, timeout_handler);  
