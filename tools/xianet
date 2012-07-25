@@ -21,12 +21,21 @@ LD_LIBRARY_PATH=.
 NAME=`basename $0`
 VERBOSE=0
 CLICK_ONLY=0
+ROUTER=0
+HOST=0
 DUAL_STACK_HOST=0
+LOCAL_CHAIN_TOPOLOGY=0
 NAMESERVER=0
 IP_OVERRIDE_ADDR="None"
+INTERFACE_FILTER="None"
+HOST_INTERFACE="None"
 
-# this is a particular list of daemons for the default 4-node-chain topology (host0 -- router0 -- router1 -- host1)
-DAEMONS="xroute_r0 xroute_r1 xhcp_server_r0 xhcp_server_r1 xhcp_client_h0 xhcp_client_h1 xnameservice"
+DAEMONS=""
+ROUTER_DAEMONS="xroute xhcp_server"
+HOST_DAEMONS="xhcp_client"
+NAMESERVER_DAEMONS="xnameservice"
+DUAL_STACK_DAEMONS="xroute xhcp_server_r0 xhcp_client_h0"
+CHAIN_TOPOLOGY_DAEMONS="xroute_r0 xroute_r1 xhcp_server_r0 xhcp_server_r1 xhcp_client_h0 xhcp_client_h1 xnameservice"
 
 # hacky way of finding the root of the XIA source tree
 # assumes this script is in a directory off the parent of the XIA tree
@@ -91,19 +100,35 @@ start_daemons()
 
 	check_root
 
-	if [ $DUAL_STACK_HOST -eq 1 ]; then
-		FLAGS="-4"
-		if [ $IP_OVERRIDE_ADDR != "None" ]; then
-			FLAGS=$FLAGS" -m "$IP_OVERRIDE_ADDR
-		fi
-		if [ $NAMESERVER -eq 1 ]; then
-			FLAGS=$FLAGS" -n"
-		fi
 
-		cd $XIADIR/tools/click_templates
-		python xconfig.py $FLAGS
+	# 1) GENERATE A CLICK SCRIPT, IF NECESSARY
+	FLAGS=""
+	if [ $ROUTER -eq 1 ]; then
+		FLAGS=$FLAGS" -r"
 	fi
+	#if [ $HOST -eq 1 ]; then    # the python script does a host by default
+	#	FLAGS=$FLAGS" -t"
+	#fi
+	if [ $DUAL_STACK_HOST -eq 1 ]; then
+		FLAGS=$FLAGS" -4"
+	fi
+	if [ $IP_OVERRIDE_ADDR != "None" ]; then
+		FLAGS=$FLAGS" -m "$IP_OVERRIDE_ADDR
+	fi
+	if [ $NAMESERVER -eq 1 ]; then
+		FLAGS=$FLAGS" -n"
+	fi
+	if [ $INTERFACE_FILTER != "None" ]; then
+		FLAGS=$FLAGS" -f "$INTERFACE_FILTER
+	fi
+	if [ $HOST_INTERFACE != "None" ]; then
+		FLAGS=$FLAGS" -I "$HOST_INTERFACE
+	fi
+	cd $XIADIR/tools/click_templates
+	python xconfig.py $FLAGS  # TODO: we maybe be calling this unnecessarily, but that's OK
 
+
+	# 2) START CLICK
 	if [ ! -f $CONFPATH/$SCRIPT ]; then
 		SNAME=`basename $SCRIPT .click`
 		printf "\nERROR: unable to locate click conf file: $SNAME\n\n"
@@ -134,27 +159,56 @@ start_daemons()
 		exec &> /dev/null
 	fi
 
-	cd $XIADIR/daemons/xroute
-	if [ $DUAL_STACK_HOST -eq 0 ]; then
-		./xroute_r1 &
-	fi
-	./xroute_r0 & 
-	sleep 2
-	
-	cd $XIADIR/daemons/xhcp
-	if [ $DUAL_STACK_HOST -eq 0 ]; then
-		./xhcp_server_r1 &
-	fi
-	./xhcp_server_r0 &
-	sleep 1 
-	if [ $DUAL_STACK_HOST -eq 0 ]; then
-		./xhcp_client_h1 www_h.host1.com.xia &
-	fi
-	./xhcp_client_h0 www_h.host0.com.xia  &
-	sleep 2 
+
+	# 3) START DAEMONS
+	if [ $ROUTER -eq 1 ]; then
+		cd $XIADIR/daemons/xroute
+		./xroute & 
+		sleep 2
 		
-	cd $XIADIR/daemons/nameserver
-	./xnameservice &
+		cd $XIADIR/daemons/xhcp
+		./xhcp_server &
+		sleep 1 
+	fi
+	if [ $HOST -eq 1 ]; then    
+		cd $XIADIR/daemons/xhcp
+		./xhcp_client www_h.$(hostname -s).com.xia  &  # TODO: test this
+		sleep 2 
+	fi
+	if [ $DUAL_STACK_HOST -eq 1 ]; then
+		cd $XIADIR/daemons/xroute
+		./xroute_r0 & 
+		sleep 2
+		
+		cd $XIADIR/daemons/xhcp
+		./xhcp_server_r0 &
+		sleep 1 
+		
+		./xhcp_client_h0 www_h.$(hostname -s).com.xia  &  # TODO: test this
+		sleep 2 
+	fi
+	if [ $NAMESERVER -eq 1 ]; then
+		cd $XIADIR/daemons/nameserver
+		./xnameservice &
+	fi
+	if [ $LOCAL_CHAIN_TOPOLOGY -eq 1 ]; then
+		cd $XIADIR/daemons/xroute
+		./xroute_r1 &
+		./xroute_r0 & 
+		sleep 2
+		
+		cd $XIADIR/daemons/xhcp
+		./xhcp_server_r1 &
+		./xhcp_server_r0 &
+		sleep 1 
+			
+		./xhcp_client_h1 www_h.host1.com.xia &
+		./xhcp_client_h0 www_h.host0.com.xia  &
+		sleep 2 
+			
+		cd $XIADIR/daemons/nameserver
+		./xnameservice &
+	fi
 }
 
 help ()
@@ -163,7 +217,7 @@ help ()
 
 Start or stop the XIA network services.
 
-usage: $NAME [-cqvV4n] [-m <ip-addr>] [-s <script>] [start|stop|restart|check]
+usage: $NAME [-cqvV4rtn] [-m <ip-addr>] [-f <filter_str>] [-I <interface>] [-s <script>] [start|stop|restart|check]
 where:
   -c only start click
   -s run click using the specified script
@@ -172,8 +226,12 @@ where:
   -v prints click debug messages to stdout
   -V prints all daemon debug messages to stdout
   -4 generate and use a dual stack host click script
+  -r generate and use a generic router click script (like on GENI)
+  -t generate and use a generic host click script (like on GENI)
   -m manually set the node's 4ID IP address
   -n if generating a click script, this node will be the name server
+  -f if generating a click script don't use interfaces matching these filter strings (comma-separated)
+  -I if generating a click script, use this interface (i.e., pick which interface a host uses)
 
   start   - starts the xia network processes if not already running
   stop    - stops the xia processes
@@ -184,7 +242,7 @@ EOH
 	exit 0
 }
 
-while getopts "csm:qvV4nh" opt; do
+while getopts "cs:qvV4nrthm:f:I:" opt; do
 	case $opt in
 		c)
 			CLICK_ONLY=1
@@ -205,12 +263,32 @@ while getopts "csm:qvV4nh" opt; do
 			DUAL_STACK_HOST=1
 			CONFPATH=$XIADIR/tools/click_templates
 			SCRIPT=dual_stack_host.click
+			DAEMONS=$DAEMONS" "$DUAL_STACK_DAEMONS
+			;;
+		r)
+			ROUTER=1
+			CONFPATH=$XIADIR/tools/click_templates
+			SCRIPT=router.click
+			DAEMONS=$DAEMONS" "$ROUTER_DAEMONS
+			;;
+		t)
+			HOST=1
+			CONFPATH=$XIADIR/tools/click_templates
+			SCRIPT=host.click
+			DAEMONS=$DAEMONS" "$HOST_DAEMONS
+			;;
+		f)
+			INTERFACE_FILTER=$OPTARG
+			;;
+		I)
+			HOST_INTERFACE=$OPTARG
 			;;
 		m)
 			IP_OVERRIDE_ADDR=$OPTARG
 			;;
 		n)
 			NAMESERVER=1
+			DAEMONS=$DAEMONS" "$NAMESERVER_DAEMONS
 			;;
 		h)
 			help
@@ -221,6 +299,12 @@ while getopts "csm:qvV4nh" opt; do
 			;;
 	esac
 done
+
+# By default, use CHAIN_TOPOLOGY_DAEMONS if others were not specified
+if [ "$DAEMONS" == "" ]; then
+	DAEMONS=$CHAIN_TOPOLOGY_DAEMONS
+	LOCAL_CHAIN_TOPOLOGY=1
+fi
 
 shift $((OPTIND-1))
 
