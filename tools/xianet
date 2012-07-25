@@ -187,7 +187,7 @@ start_daemons()
 		./xhcp_client_h0 www_h.$(hostname -s).com.xia  &  # TODO: test this
 		sleep 2 
 	fi
-	if [ $NAMESERVER -eq 1 ]; then
+	if [ $NAMESERVER -eq 1 -a $HOST -eq 1 ]; then
 		cd $XIADIR/daemons/nameserver
 		./xnameservice &
 	fi
