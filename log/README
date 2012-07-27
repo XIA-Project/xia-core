@@ -1,0 +1,5 @@
+Logs go here. For example, you can configure the XIAPrint click module to save
+packet traces to a log as follows:
+
+XIAPrint("<descriptive text>", OUTFILE "<path>/<to>/log/<logname>");
+IPPrint("<descriptive text>", OUTFILE "<path>/<to>/log/<logname>");

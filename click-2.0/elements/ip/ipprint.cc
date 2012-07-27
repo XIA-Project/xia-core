@@ -133,7 +133,7 @@ IPPrint::initialize(ErrorHandler *errh)
 {
 #if CLICK_USERLEVEL
   if (_outfilename) {
-    _outfile = fopen(_outfilename.c_str(), "wb");
+    _outfile = fopen(_outfilename.c_str(), "ab"); //david: was "wb"
     if (!_outfile)
       return errh->error("%s: %s", _outfilename.c_str(), strerror(errno));
   }
