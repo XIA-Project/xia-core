@@ -71,21 +71,43 @@ def ChatRead(PORT, rqueue, readsock):
     Xclose(readsock)
     return
 
+# This modified version of ChatWrite aggregates messages and only calls
+# Xsend once every 0.5 seconds
 def ChatWrite(PORT, wqueue, readsock):
 #    global readsock
 
+    data = ''
+    lastsend = 0  # keep track of when we send messages
     while not DONE:
    
         while not wqueue.empty():
-            data = wqueue.get_nowait()
+            data += wqueue.get_nowait()
 
-            #readsock.send(data)
-            Xsend(readsock, data, 0)
+        # Make sure we don't send more often than 0.5 sec
+        if (time.time() - lastsend < 0.5 or data == ''):
+            continue
+
+        Xsend(readsock, data, 0)
+        lastsend = time.time()
+        data = ''
 
         #time.sleep(0.2)
     #writesock.close()
     return
 
     
-
-
+#def ChatWrite(PORT, wqueue, readsock):
+##    global readsock
+#
+#    while not DONE:
+#   
+#        while not wqueue.empty():
+#            data += wqueue.get_nowait()
+#
+#            #readsock.send(data)
+#            Xsend(readsock, data, 0)
+#            time.sleep(0.5)
+#
+#        #time.sleep(0.2)
+#    #writesock.close()
+#    return
