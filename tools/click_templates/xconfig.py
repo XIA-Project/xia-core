@@ -24,6 +24,8 @@ nameserver = "no"
 nameserver_ad = "AD_NAMESERVER"
 nameserver_hid = "HID_NAMESERVER"
 ip_override_addr = None
+interface_filter = None
+interface = None
 
 #
 # create a globally unique HID based off of our mac address
@@ -56,14 +58,23 @@ def getHostname():
 #
 # get a list of the interfaces and associated mac addresses on this machine
 # 
-# ignore eth0 as it is the control socket for the node, and also ignore any
+# ignore any interfaces matching 'filter' (e.g., eth0 on GENI or wlan0 on the
+# demo Giadas as it is the control socket for the node) and also ignore any
 # fake<n> interfaces as those are internal only
 #
 def getInterfaces():
 
+	filters = ''
+	if interface_filter != None:
+		filter_array = interface_filter.split(",")
+		for filter in filter_array:
+			filters += 'grep -v %s | ' % filter.strip()
+	use_interface = ''
+	if interface != None:
+		use_interface = 'grep %s | ' % interface
+	
 	cmdline = subprocess.Popen(
-			"ifconfig | grep HWaddr | grep -v fake | grep -v eth0 | tr -s ' ' | cut -d ' ' -f1,5",
-#			"ifconfig | grep HWaddr | tr -s ' ' | cut -d ' ' -f1,5", 
+			"ifconfig | grep HWaddr | %s grep -v fake | %s tr -s ' ' | cut -d ' ' -f1,5" % (use_interface, filters),
 			shell=True, stdout=subprocess.PIPE)
 	result = cmdline.stdout.read().strip()
 
@@ -366,10 +377,12 @@ def getOptions():
 	global adname
 	global nameserver 
 	global ip_override_addr
+	global interface_filter
+	global interface
 	try:
-		shortopt = "hr4ni:am:"
+		shortopt = "hr4ni:a:m:f:I:"
 		opts, args = getopt.getopt(sys.argv[1:], shortopt, 
-			["help", "router", "dual-host", "nameserver", "id=", "ad="])
+			["help", "router", "dual-host", "nameserver", "id=", "ad=", "manual-address=", "interface-filter=", "host-interface="])
 	except getopt.GetoptError, err:
 		# print	 help information and exit:
 		print str(err) # will print something like "option -a not recognized"
@@ -389,6 +402,10 @@ def getOptions():
 			nodetype = "dual-host"
 		elif o in ("-m", "--manual-address"):
 			ip_override_addr = a
+		elif o in ("-f", "--interface-filter"):
+			interface_filter = a
+		elif o in ("-I", "--host-interface"):
+			interface = a
 		elif o in ("-n", "--nameserver"):
 			nameserver = "yes"			
 		else:
@@ -399,7 +416,7 @@ def getOptions():
 #
 def help():
 	print """
-usage: xconfig [-h] [-r] [-h hostname]
+usage: xconfig [-h] [-r] [-4] [-n] [-h hostname] [-m ipaddr] [-f if_filter] [-I host-interface]
 where:
   -h			: get help
   --help
@@ -418,6 +435,15 @@ where:
   
   -n			: indicate that this needs to use nameserver AD and HID
   --nameserver  
+  
+  -m			: manually provide IP address
+  --manual-address
+  
+  -f			: a CSV string; any interfaces whose names match one of the strings will be ignored
+  --interface-filter=<filter string>
+  
+  -I			: the network interface a host should use, if it has multiple
+  --host-interface=<interface>
 """
 	sys.exit()
 

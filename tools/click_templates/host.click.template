@@ -1,4 +1,4 @@
-require(library ../../../xia_router_template_xtransport.click);
+require(library ../../click-2.0/conf/xia_router_template_xtransport.click);
 require(library xia_address.click);
 
 // host instantiation
