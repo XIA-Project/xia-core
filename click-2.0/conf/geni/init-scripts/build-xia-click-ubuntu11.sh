@@ -48,7 +48,7 @@ sudo python setup.py install
 
 # Download XIA-prototype from git
 cd ~/
-git clone git@sourcery.cmcl.cs.cmu.edu:xia-core.git
+git clone https://github.com/XIA-Project/xia-core.git
 
 # Build XIA-prototype
 cd xia-core/tools/
@@ -69,7 +69,7 @@ rm xsockconf_python.ini
 
 # Generate host/router click script
 cd ~/
-cd xia-core/tools/click_templates
+cd xia-core/click-2.0/conf/geni/init-scripts/template
 python xconfig.py
 python xconfig.py -r
 
