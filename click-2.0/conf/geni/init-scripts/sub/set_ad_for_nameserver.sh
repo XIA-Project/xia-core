@@ -3,7 +3,7 @@
 export LD_LIBRARY_PATH=:/usr/local/lib:.
 
 cd ~/
-cd xia-core/click-2.0/conf/geni/init-scripts/template
+cd ~/xia-core/tools/click_templates
 python xconfig.py -r -n
 
 
