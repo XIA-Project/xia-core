@@ -74,7 +74,7 @@ def getInterfaces():
 		use_interface = 'grep %s | ' % interface
 	
 	cmdline = subprocess.Popen(
-			"ifconfig | grep HWaddr | %s grep -v fake | grep -v eth0 | %s tr -s ' ' | cut -d ' ' -f1,5" % (use_interface, filters),
+			"ifconfig | grep HWaddr | %s grep -v fake | %s tr -s ' ' | cut -d ' ' -f1,5" % (use_interface, filters),
 			shell=True, stdout=subprocess.PIPE)
 	result = cmdline.stdout.read().strip()
 

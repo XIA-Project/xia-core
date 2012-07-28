@@ -70,8 +70,8 @@ rm xsockconf_python.ini
 # Generate host/router click script
 cd ~/
 cd xia-core/tools/click_templates
-python xconfig.py
-python xconfig.py -r
+python xconfig.py -f eth0
+python xconfig.py -r -f eth0
 
 
 
