@@ -62,7 +62,7 @@ do
 			prev_hid=$cur_hid
 		fi												
 		
+		total=`expr $cid + $sid`
 
-
-        echo $total $cid $sid $hid 
+        echo $total $cid $sid 0 
 done;

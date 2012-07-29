@@ -57,10 +57,12 @@ start_click_bootstrap()
 	for node in $ROUTER_OF_NAMESERVER
 	do
 		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/set_ad_for_nameserver.sh"
+	        #printf "Skipped: set AD for nameserver\n"
 	done
 	for node in $NAMESERVER
 	do
 		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/set_hid_for_nameserver.sh"
+		#printf "Skipped: set HID for nameserver\n"
 	done	
 
 	printf "Running Click\n"

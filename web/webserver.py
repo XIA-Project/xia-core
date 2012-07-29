@@ -164,7 +164,7 @@ def main():
 
 	# This is just for web demo.... publishing a CID
         imageCID = "CID:aa2fe45640e694c06dcc3331ed91998c8eb4879a"
-        image_dag = "DAG 2 0 - \n %s 2 1 - \n %s 2 - \n %s" % (myAD, myHID, imageCID)       
+        image_dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 0 - \n %s 3 - \n %s" % (myAD, my4ID, myHID, imageCID)     
         XregisterName("www_c.airplane.com.xia", image_dag) 
        
         # TODO: use threads instead of processes?

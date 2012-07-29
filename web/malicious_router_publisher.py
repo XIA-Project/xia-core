@@ -10,7 +10,7 @@ chunk_context = XallocCacheSlice(POLICY_DEFAULT, 0, 0)
 
 # Publish the picture
 cid = XputFile(chunk_context, 'anon.jpg', XIA_MAXBUF)
-XputFile(chunk_context, 'www/img/image.jpg', XIA_MAXBUF)  # Publish so that malicious router has a route to this CID
+#XputFile(chunk_context, 'www/img/image.jpg', XIA_MAXBUF)  # Publish so that malicious router has a route to this CID
 
 # Print the CID
 print 'Published chunk with CID %s' % cid[0].cid

@@ -163,9 +163,25 @@ XIAXIDTypeCounter::match(Packet *p)
         return -1;
     */
 
-    uint32_t dst_xid_type = hdr->node[hdr->dnode - 1].xid.type;
-    uint32_t src_xid_type = hdr->node[hdr->dnode + hdr->snode - 1].xid.type;
+    struct click_xia_xid __dstID =  hdr->node[hdr->dnode - 1].xid;
+    uint32_t dst_xid_type = __dstID.type;
+    struct click_xia_xid __srcID = hdr->node[hdr->dnode + hdr->snode - 1].xid;
+    uint32_t src_xid_type = __srcID.type;
 
+    XID dstXID(__dstID);
+    XID srcXID(__srcID);
+
+    // Hack: filtering out daemon traffic (e.g., xroute, xhcp, name-server)
+    if (strcmp(srcXID.unparse().c_str(), "SID:1110000000000000000000000000000000001111") == 0 ||
+        strcmp(srcXID.unparse().c_str(), "SID:1110000000000000000000000000000000001112") == 0 ||
+    	strcmp(srcXID.unparse().c_str(), "SID:1110000000000000000000000000000000001113") == 0 ||
+    	strcmp(dstXID.unparse().c_str(), "SID:1110000000000000000000000000000000001111") == 0 ||
+    	strcmp(dstXID.unparse().c_str(), "SID:1110000000000000000000000000000000001112") == 0 ||
+    	strcmp(dstXID.unparse().c_str(), "SID:1110000000000000000000000000000000001113") == 0 ||
+    	strcmp(dstXID.unparse().c_str(), "HID:1111111111111111111111111111111111111111") == 0) {
+    	return -1;
+    }
+     
     uint32_t next_xid_type = -1;
     {
         int last = hdr->last;
@@ -178,7 +194,7 @@ XIAXIDTypeCounter::match(Packet *p)
                 if (current_edge.idx < hdr->dnode)
                     next_xid_type = hdr->node[current_edge.idx].xid.type;
         }
-    }
+    }   
 
     for (int i = 0; i < _patterns.size(); i++) {
         const struct pattern& pat = _patterns[i];
