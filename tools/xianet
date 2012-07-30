@@ -23,7 +23,7 @@ VERBOSE=0
 CLICK_ONLY=0
 ROUTER=0
 HOST=0
-DUAL_STACK_HOST=0
+DUAL_STACK=0
 LOCAL_CHAIN_TOPOLOGY=0
 NAMESERVER=0
 IP_OVERRIDE_ADDR="None"
@@ -34,7 +34,7 @@ DAEMONS=""
 ROUTER_DAEMONS="xroute xhcp_server"
 HOST_DAEMONS="xhcp_client"
 NAMESERVER_DAEMONS="xnameservice"
-DUAL_STACK_DAEMONS="xroute xhcp_server_r0 xhcp_client_h0"
+DUAL_STACK_HOST_EXTRA_DAEMONS="xroute_r0 xhcp_server_r0"
 CHAIN_TOPOLOGY_DAEMONS="xroute_r0 xroute_r1 xhcp_server_r0 xhcp_server_r1 xhcp_client_h0 xhcp_client_h1 xnameservice"
 
 # hacky way of finding the root of the XIA source tree
@@ -48,6 +48,7 @@ CLICKPATH=$XIADIR/click-2.0
 CONFPATH=$CLICKPATH/conf
 CLICK=$CLICKPATH/userlevel/click
 SCRIPT=xia_chain_topology_socket_reliable_test.click
+SCRIPT_SET=0
 
 
 is_running()
@@ -106,10 +107,10 @@ start_daemons()
 	if [ $ROUTER -eq 1 ]; then
 		FLAGS=$FLAGS" -r"
 	fi
-	#if [ $HOST -eq 1 ]; then    # the python script does a host by default
-	#	FLAGS=$FLAGS" -t"
-	#fi
-	if [ $DUAL_STACK_HOST -eq 1 ]; then
+	if [ $HOST -eq 1 ]; then    
+		FLAGS=$FLAGS" -t"
+	fi
+	if [ $DUAL_STACK -eq 1 ]; then
 		FLAGS=$FLAGS" -4"
 	fi
 	if [ $IP_OVERRIDE_ADDR != "None" ]; then
@@ -225,7 +226,7 @@ where:
   -q run silently (default)
   -v prints click debug messages to stdout
   -V prints all daemon debug messages to stdout
-  -4 generate and use a dual stack host click script
+  -4 generate and use a dual stack click script
   -r generate and use a generic router click script (like on GENI)
   -t generate and use a generic host click script (like on GENI)
   -m manually set the node's 4ID IP address
@@ -249,6 +250,7 @@ while getopts "cs:qvV4nrthm:f:I:" opt; do
 			;;
 		s)
 			SCRIPT=$OPTARG
+			SCRIPT_SET=1
 			;;
 		q)
 			VERBOSE=0
@@ -260,22 +262,13 @@ while getopts "cs:qvV4nrthm:f:I:" opt; do
 			VERBOSE=1
 			;;
 		4)
-			DUAL_STACK_HOST=1
-			CONFPATH=$XIADIR/tools/click_templates
-			SCRIPT=dual_stack_host.click
-			DAEMONS=$DAEMONS" "$DUAL_STACK_DAEMONS
+			DUAL_STACK=1
 			;;
 		r)
 			ROUTER=1
-			CONFPATH=$XIADIR/tools/click_templates
-			SCRIPT=router.click
-			DAEMONS=$DAEMONS" "$ROUTER_DAEMONS
 			;;
 		t)
 			HOST=1
-			CONFPATH=$XIADIR/tools/click_templates
-			SCRIPT=host.click
-			DAEMONS=$DAEMONS" "$HOST_DAEMONS
 			;;
 		f)
 			INTERFACE_FILTER=$OPTARG
@@ -300,11 +293,39 @@ while getopts "cs:qvV4nrthm:f:I:" opt; do
 	esac
 done
 
+if [ $SCRIPT_SET -eq 0 ]; then
+	if [ $HOST -eq 1 ]; then
+		DAEMONS=$DAEMONS" "$HOST_DAEMONS
+		if [ $DUAL_STACK -eq 0 ]; then
+			DAEMONS=$DAEMONS" "$DUAL_STACK_HOST_EXTRA_DAEMONS
+			CONFPATH=$XIADIR/tools/click_templates
+			SCRIPT=host.click
+		else
+			CONFPATH=$XIADIR/tools/click_templates
+			SCRIPT=dual_stack_host.click
+		fi
+	elif [ $ROUTER -eq 1 ]; then
+		DAEMONS=$DAEMONS" "$ROUTER_DAEMONS
+		if [ $DUAL_STACK -eq 0 ]; then
+			CONFPATH=$XIADIR/tools/click_templates
+			SCRIPT=router.click
+		else
+			CONFPATH=$XIADIR/tools/click_templates
+			SCRIPT=dual_stack_router.click
+		fi
+	else
+		SCRIPT=xia_chain_topology_socket_reliable_test.click
+	fi
+fi
+
 # By default, use CHAIN_TOPOLOGY_DAEMONS if others were not specified
 if [ "$DAEMONS" == "" ]; then
 	DAEMONS=$CHAIN_TOPOLOGY_DAEMONS
 	LOCAL_CHAIN_TOPOLOGY=1
 fi
+
+echo "SCRIPT: $SCRIPT"
+echo "DAEMONS: $DAEMONS"
 
 shift $((OPTIND-1))
 
