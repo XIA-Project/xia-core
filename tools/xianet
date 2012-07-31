@@ -172,20 +172,19 @@ start_daemons()
 		sleep 1 
 	fi
 	if [ $HOST -eq 1 ]; then    
+
+		if [ $DUAL_STACK -eq 1 ]; then
+			cd $XIADIR/daemons/xroute
+			./xroute_r0 & 
+			sleep 2
+			
+			cd $XIADIR/daemons/xhcp
+			./xhcp_server_r0 &
+			sleep 1 
+		fi
+		
 		cd $XIADIR/daemons/xhcp
 		./xhcp_client www_h.$(hostname -s).com.xia  &  # TODO: test this
-		sleep 2 
-	fi
-	if [ $DUAL_STACK_HOST -eq 1 ]; then
-		cd $XIADIR/daemons/xroute
-		./xroute_r0 & 
-		sleep 2
-		
-		cd $XIADIR/daemons/xhcp
-		./xhcp_server_r0 &
-		sleep 1 
-		
-		./xhcp_client_h0 www_h.$(hostname -s).com.xia  &  # TODO: test this
 		sleep 2 
 	fi
 	if [ $NAMESERVER -eq 1 -a $HOST -eq 1 ]; then

@@ -913,7 +913,7 @@ elementclass DualRouter4Port {
     Script(write n/proc/rt_AD/rt.add - 5);     // no default route for AD; consider other path
     Script(write n/proc/rt_SID/rt.add - 5);     // no default route for SID; consider other path
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
-    Script(write n/proc/rt_IP/rt.add - 0); 	// default route for IPv4     TODO: Need real routes somehow
+    Script(write n/proc/rt_IP/rt.add - 3); 	// default route for IPv4     TODO: Need real routes somehow
 
     // quick fix
     n[3] -> Discard();
