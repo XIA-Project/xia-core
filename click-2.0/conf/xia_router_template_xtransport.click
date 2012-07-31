@@ -499,7 +499,7 @@ elementclass XRouter2Port {
     n :: RouteEngine($local_addr);
     
     // IP:0.0.0.0 indicates NULL 4ID
-    xtransport::XTRANSPORT($local_addr, IP:0.0.0.0, $CLICK_IP,$API_IP,n/proc/rt_SID/rt);       
+    xtransport::XTRANSPORT($local_addr, IP:0.0.0.0, $CLICK_IP,$API_IP,n/proc/rt_SID/rt, IS_DUAL_STACK_ROUTER 0);       
     cache :: XIACache($local_addr, n/proc/rt_CID/rt, PACKET_SIZE 1400); // specify XIA packet size (including the XIA + content header)
 
 
@@ -646,7 +646,7 @@ elementclass XRouter4Port {
     
     n :: RouteEngine($local_addr);       
     
-    xtransport::XTRANSPORT($local_addr, IP:$external_ip, $CLICK_IP,$API_IP,n/proc/rt_SID/rt); 
+    xtransport::XTRANSPORT($local_addr, IP:$external_ip, $CLICK_IP,$API_IP,n/proc/rt_SID/rt, IS_DUAL_STACK_ROUTER 0); 
         
     //Create kernel TAP interface which responds to ARP
     fake0::FromHost($fake, $API_IP/24, CLICK_XTRANSPORT_ADDR $CLICK_IP ,HEADROOM 256, MTU 65521) 
@@ -865,7 +865,7 @@ elementclass DualRouter4Port {
     
     
     n :: RouteEngine($local_addr);
-    xtransport::XTRANSPORT($local_addr, IP:$external_ip, $CLICK_IP, $API_IP, n/proc/rt_SID/rt);        
+    xtransport::XTRANSPORT($local_addr, IP:$external_ip, $CLICK_IP, $API_IP, n/proc/rt_SID/rt, IS_DUAL_STACK_ROUTER 1);        
     
     //Create kernel TAP interface which responds to ARP
     fake0::FromHost($fake, $API_IP/24, CLICK_XTRANSPORT_ADDR $CLICK_IP ,HEADROOM 256, MTU 65521) 
@@ -1175,7 +1175,7 @@ elementclass EndHost {
     n :: RouteEngine($local_addr);
     
     // IP:0.0.0.0 indicates NULL 4ID
-    xtransport::XTRANSPORT($local_addr, IP:0.0.0.0, $CLICK_IP,$API_IP,n/proc/rt_SID/rt);   
+    xtransport::XTRANSPORT($local_addr, IP:0.0.0.0, $CLICK_IP,$API_IP,n/proc/rt_SID/rt, IS_DUAL_STACK_ROUTER 0);   
     
     //Create kernel TAP interface which responds to ARP
     fake0::FromHost($fake, $API_IP/24, CLICK_XTRANSPORT_ADDR $CLICK_IP ,HEADROOM 256, MTU 65521) 

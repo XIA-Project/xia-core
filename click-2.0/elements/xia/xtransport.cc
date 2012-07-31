@@ -35,6 +35,8 @@ XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	XIAPath local_addr;
 	XID local_4id;
 	Element* routing_table_elem;
+	bool is_dual_stack_router;
+	_is_dual_stack_router = false;
 
 	if (cp_va_kparse(conf, this, errh,
 	                 "LOCAL_ADDR", cpkP + cpkM, cpXIAPath, &local_addr,
@@ -42,6 +44,7 @@ XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	                 "CLICK_IP", cpkP + cpkM, cpIPAddress, &_CLICKaddr,
 	                 "API_IP", cpkP + cpkM, cpIPAddress, &_APIaddr,
 	                 "ROUTETABLENAME", cpkP + cpkM, cpElement, &routing_table_elem,
+	                 "IS_DUAL_STACK_ROUTER", 0, cpInteger, &is_dual_stack_router,
 	                 cpEnd) < 0)
 		return -1;
 
@@ -50,6 +53,9 @@ XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	_local_4id = local_4id;
 	// IP:0.0.0.0 indicates NULL 4ID
 	_null_4id.parse("IP:0.0.0.0");
+	
+	_is_dual_stack_router = is_dual_stack_router;
+	
 	/*
 	// If a valid 4ID is given, it is included (as a fallback) in the local_addr
 	if(_local_4id != _null_4id) {
@@ -860,6 +866,18 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			output(1).push(UDPIPEncap(reply, _sport, _sport));
 		}
 		break;	
+		case xia::XISDUALSTACKROUTER:
+		{
+			// return a packet indicating whether this node is an XIA-IPv4 dual-stack router
+			xia::XSocketMsg _Response;
+			_Response.set_type(xia::XISDUALSTACKROUTER);
+			xia::X_IsDualStackRouter_Msg *_msg = _Response.mutable_x_isdualstackrouter();
+			_msg->set_flag(_is_dual_stack_router);
+			std::string p_buf1;
+			_Response.SerializeToString(&p_buf1);
+			WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
+			output(1).push(UDPIPEncap(reply, _sport, _sport));
+		}		
 						
 		default:
 			click_chatter("\n\nERROR: CONTROL TRAFFIC !!!\n\n");
