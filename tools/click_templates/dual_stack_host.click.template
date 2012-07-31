@@ -6,7 +6,7 @@ host0 :: EndHost (RE ( IP:$EXT_IPADDR0 ) $ADNAME $HID, $HID, fake0, 172.0.0.2,17
 
 // router instantiation
 // TODO: If we ever connect more than one port to IP, we somehow need to tell the router about all of its IP addresses in local_addr
-router0 :: DualRouter4Port(RE ( IP:$EXT_IPADDR0 ) $ADNAME $RHID, $ADNAME, $RHID, fake2, 180.0.0.2, 180.0.0.1, 31:11:11:11:11:11, 1, $IPADDR0, $EXT_IPADDR0, $MAC0, $GWADDR0, 1, $IPADDR1, $EXT_IPADDR1, $MAC1, $GWADDR1, 1, $IPADDR2, $EXT_IPADDR2, $MAC2, $GWADDR2, 0, 1.1.1.1, 1.1.1.1, aa:aa:aa:aa:aa:aa, 1.1.1.2, 0);
+router0 :: DualRouter4Port(RE ( IP:$EXT_IPADDR0 ) $ADNAME $RHID, $ADNAME, $RHID, $EXTERNAL_IP, fake2, 180.0.0.2, 180.0.0.1, 31:11:11:11:11:11, 1, $IPADDR0, $EXT_IPADDR0, $MAC0, $GWADDR0, 1, $IPADDR1, $EXT_IPADDR1, $MAC1, $GWADDR1, 1, $IPADDR2, $EXT_IPADDR2, $MAC2, $GWADDR2, 0, 1.1.1.1, 1.1.1.1, aa:aa:aa:aa:aa:aa, 1.1.1.2, 0);
 
 // connect host and router
 host0[0] -> XIAPrint("host0 to router0") -> LinkUnqueue(0.005, 1 GB/s) -> [3]router0[3] -> XIAPrint("router0 to host0") -> LinkUnqueue(0.005, 1 GB/s) -> [0]host0;
