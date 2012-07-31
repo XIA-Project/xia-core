@@ -499,7 +499,7 @@ elementclass XRouter2Port {
     n :: RouteEngine($local_addr);
     
     // IP:0.0.0.0 indicates NULL 4ID
-    xtransport::XTRANSPORT($local_addr, IP:0.0.0.0, $CLICK_IP,$API_IP,n/proc/rt_SID/rt);       
+    xtransport::XTRANSPORT($local_addr, IP:0.0.0.0, $CLICK_IP,$API_IP,n/proc/rt_SID/rt, IS_DUAL_STACK_ROUTER 0);       
     cache :: XIACache($local_addr, n/proc/rt_CID/rt, PACKET_SIZE 1400); // specify XIA packet size (including the XIA + content header)
 
 
@@ -630,10 +630,11 @@ elementclass XRouter2Port {
 
 // 4-port router node with XRoute process running
 elementclass XRouter4Port {
-    $local_addr, $local_ad, $local_hid, $fake, $CLICK_IP, $API_IP, $ether_addr, $mac0, $mac1, $mac2, $mac3, $malicious_cache |
+    $local_addr, $local_ad, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, $mac0, $mac1, $mac2, $mac3, $malicious_cache |
 
 
     // $local_addr: the full address of the node
+    // $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
 	// $malicious_cache: if set to 1, the content cache responds with bad content
 
     // input[0], input[1], input[2], input[3]: a packet arrived at the node
@@ -645,8 +646,7 @@ elementclass XRouter4Port {
     
     n :: RouteEngine($local_addr);       
     
-    // IP:0.0.0.0 indicates NULL 4ID
-    xtransport::XTRANSPORT($local_addr, IP:0.0.0.0, $CLICK_IP,$API_IP,n/proc/rt_SID/rt); 
+    xtransport::XTRANSPORT($local_addr, IP:$external_ip, $CLICK_IP,$API_IP,n/proc/rt_SID/rt, IS_DUAL_STACK_ROUTER 0); 
         
     //Create kernel TAP interface which responds to ARP
     fake0::FromHost($fake, $API_IP/24, CLICK_XTRANSPORT_ADDR $CLICK_IP ,HEADROOM 256, MTU 65521) 
@@ -832,10 +832,10 @@ elementclass XRouter4Port {
 
 // 4-port router node with XRoute process running and IP support
 elementclass DualRouter4Port {
-    $local_addr, $local_ad, $local_hid, $fake, $CLICK_IP, $API_IP, $ether_addr, $ip_active0, $ip0, $external_ip0, $mac0, $gw0, 
-																				$ip_active1, $ip1, $external_ip1, $mac1, $gw1,
-																				$ip_active2, $ip2, $external_ip2, $mac2, $gw2, 
-																				$ip_active3, $ip3, $external_ip3, $mac3, $gw3, $malicious_cache |
+    $local_addr, $local_ad, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, $ip_active0, $ip0, $external_ip0, $mac0, $gw0, 
+						                        			$ip_active1, $ip1, $external_ip1, $mac1, $gw1,
+								                		$ip_active2, $ip2, $external_ip2, $mac2, $gw2, 
+								                		$ip_active3, $ip3, $external_ip3, $mac3, $gw3, $malicious_cache |
 
 	// NOTE: This router assumes that each port is connected to *either* an XIA network *or* an IP network.
 	// If port 0 is connected to an IP network and is asked to send an XIA packet (e.g., a broadcast), the
@@ -845,6 +845,7 @@ elementclass DualRouter4Port {
     // $local_addr: the full address of the node
 	// $local_ad: the node's AD
 	// $local_hid: the node's HID
+        // $external_ip: the node's IP address (given to XHCP to give to connected hosts)  TODO: should eventually use all 4 individual external IPs
 	// $fake: the fake interface apps use to communicate with this click element
 	// $CLICK_IP: 
 	// $API_IP: 
@@ -864,7 +865,7 @@ elementclass DualRouter4Port {
     
     
     n :: RouteEngine($local_addr);
-    xtransport::XTRANSPORT($local_addr, IP:$external_ip0, $CLICK_IP, $API_IP, n/proc/rt_SID/rt);        
+    xtransport::XTRANSPORT($local_addr, IP:$external_ip, $CLICK_IP, $API_IP, n/proc/rt_SID/rt, IS_DUAL_STACK_ROUTER 1);        
     
     //Create kernel TAP interface which responds to ARP
     fake0::FromHost($fake, $API_IP/24, CLICK_XTRANSPORT_ADDR $CLICK_IP ,HEADROOM 256, MTU 65521) 
@@ -1174,7 +1175,7 @@ elementclass EndHost {
     n :: RouteEngine($local_addr);
     
     // IP:0.0.0.0 indicates NULL 4ID
-    xtransport::XTRANSPORT($local_addr, IP:0.0.0.0, $CLICK_IP,$API_IP,n/proc/rt_SID/rt);   
+    xtransport::XTRANSPORT($local_addr, IP:0.0.0.0, $CLICK_IP,$API_IP,n/proc/rt_SID/rt, IS_DUAL_STACK_ROUTER 0);   
     
     //Create kernel TAP interface which responds to ARP
     fake0::FromHost($fake, $API_IP/24, CLICK_XTRANSPORT_ADDR $CLICK_IP ,HEADROOM 256, MTU 65521) 

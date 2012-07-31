@@ -26,6 +26,8 @@ enum XSocketCallType {
   XREADLOCALHOSTADDR = 20;  
   XUPDATENAMESERVERDAG = 21;
   XREADNAMESERVERDAG = 22;
+  
+  XISDUALSTACKROUTER = 23;
 }
 
 message XSocketMsg {
@@ -55,7 +57,9 @@ message XSocketMsg {
   optional X_Changead_Msg x_changead = 20;	
   optional X_ReadLocalHostAddr_Msg x_readlocalhostaddr = 21;  
   optional X_Updatenameserverdag_Msg x_updatenameserverdag = 22;  
-  optional X_ReadNameServerDag_Msg x_readnameserverdag = 23;  
+  optional X_ReadNameServerDag_Msg x_readnameserverdag = 23; 
+  
+  optional X_IsDualStackRouter_Msg x_isdualstackrouter = 24;   
 }
  
 message X_Socket_Msg {
@@ -173,6 +177,10 @@ message X_Updatenameserverdag_Msg {
 
 message X_ReadNameServerDag_Msg {
   optional string dag = 1;
+}
+
+message X_IsDualStackRouter_Msg {
+  optional int32 flag = 1; // Indicating if this node is an XIA-IPv4 dual-stack router
 }
   
 

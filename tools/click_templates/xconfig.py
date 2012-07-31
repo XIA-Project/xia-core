@@ -270,6 +270,11 @@ def makeRouterConfig(ad, hid):
 	xchg['HNAME'] = getHostname()
 	xchg['HID'] = hid
 
+	if ip_override_addr == None:
+		xchg['EXTERNAL_IP'] = '0.0.0.0'
+	else:
+		xchg['EXTERNAL_IP'] = ip_override_addr
+
 	# create $MAC0 thru $MAC3 replacements
 	i = 0
 	while i < 4 and i < len(interfaces):
@@ -350,6 +355,11 @@ def makeDualHostConfig(ad, hid, rhid):
 		xchg['HID'] = nameserver_hid	
 	xchg['RHID'] = rhid
 	xchg['HNAME'] = getHostname()
+	
+	if ip_override_addr == None:
+		xchg['EXTERNAL_IP'] = '0.0.0.0'
+	else:
+		xchg['EXTERNAL_IP'] = ip_override_addr
 
 	# create $MAC0 thru $MAC3 replacements
 	i = 0  
@@ -450,6 +460,11 @@ def makeDualRouterConfig(ad, rhid):
 		xchg['ADNAME'] = nameserver_ad		
 	xchg['RHID'] = rhid
 	xchg['HNAME'] = getHostname()
+	
+	if ip_override_addr == None:
+		xchg['EXTERNAL_IP'] = '0.0.0.0'
+	else:
+		xchg['EXTERNAL_IP'] = ip_override_addr
 
 	# Handle the pure XIA ports (0-2)
 	i = 0  
@@ -612,8 +627,6 @@ def main():
 	hid = createHID()
 	rhid = createHID("20000000")
 	makeXIAAddrConfig(hid)
-
-	print dual_stack
 
 	if (nodetype == "host"):
 		if dual_stack:

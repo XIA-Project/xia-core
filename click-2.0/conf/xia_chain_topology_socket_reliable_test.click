@@ -5,8 +5,8 @@ require(library xia_address.click);
 host0 :: EndHost (RE AD0 HID0, HID0, fake0,172.0.0.2,172.0.0.1,11:11:11:11:11:11,0, aa:aa:aa:aa:aa:aa);
 host1 :: EndHost (RE AD1 HID1, HID1, fake1,192.0.0.2,192.0.0.1,21:11:11:11:11:11,1, aa:aa:aa:aa:aa:aa);
 
-router0 :: XRouter4Port(RE AD0 RHID0, AD0, RHID0, fake2,180.0.0.2,180.0.0.1,31:11:11:11:11:11, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, 0);
-router1 :: XRouter4Port(RE AD1 RHID1, AD1, RHID1, fake3,181.0.0.2,181.0.0.1,41:11:11:11:11:11, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, 0);
+router0 :: XRouter4Port(RE AD0 RHID0, AD0, RHID0, 0.0.0.0, fake2,180.0.0.2,180.0.0.1,31:11:11:11:11:11, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, 0);
+router1 :: XRouter4Port(RE AD1 RHID1, AD1, RHID1, 0.0.0.0, fake3,181.0.0.2,181.0.0.1,41:11:11:11:11:11, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, 0);
 
 //router0 :: XRouter2Port(RE AD0 RHID0, AD0, RHID0, fake2,180.0.0.2,180.0.0.1,31:11:11:11:11:11, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
 //router1 :: XRouter2Port(RE AD1 RHID1, AD1, RHID1, fake3,181.0.0.2,181.0.0.1,41:11:11:11:11:11, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);

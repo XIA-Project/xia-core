@@ -549,7 +549,7 @@ void initRouteState()
 
 	route_state.dual_router_AD = "NULL";
 	// mark if this is a dual XIA-IPv4 router
-	if( strcmp(route_state.my4ID, NULL_4ID) != 0 ) {
+	if( XisDualStackRouter(route_state.sock) == 1 ) {
 		route_state.dual_router = 1;
 	} else {
 		route_state.dual_router = 0;

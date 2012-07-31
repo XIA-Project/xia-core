@@ -108,6 +108,7 @@ class XTRANSPORT : public Element {
     XIAPath _local_addr;
     XID _local_4id;
     XID _null_4id;
+    bool _is_dual_stack_router;
     bool isConnected;
     XIAPath _nameserver_addr;
 
