@@ -57,22 +57,25 @@ void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID 
 {
 
     HashTable<XID,CChunk*>::iterator it;
+    it=_contentTable.find(dstCID);
 
-	if (malicious &&
+	if (malicious && 
 		strcmp(dstCID.unparse().c_str(), "CID:8b35bac835526705709b4a9560e15a9d066a6900") == 0)
 	{
 		// If this router is malicous, then this content 
 		// module reponds to requests for the umbrella image
-		// with the anonymous image instead.
+		// with the anonymous image instead. (But only every
+		// other time.)
 		// TODO: something more flexible
-		XID fakeCID = XID();
-		fakeCID.parse("CID:5830f441b0895cd2a82d5a13fc64f6e9a5f710ad");
+		if (malicious_this_time)
+		{
+			XID fakeCID = XID();
+			fakeCID.parse("CID:5830f441b0895cd2a82d5a13fc64f6e9a5f710ad");
 
-    	it=_contentTable.find(fakeCID);
-	}
-	else
-	{
-    	it=_contentTable.find(dstCID);
+    		it=_contentTable.find(fakeCID);
+		}
+		
+		malicious_this_time = 1 - malicious_this_time;
 	}
 
 #ifdef CLIENTCACHE
@@ -119,7 +122,6 @@ void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID 
 #endif
     // server, router
     if(it!=_contentTable.end()) {
-		click_chatter("found content\n");
         //std::cout<<"look up cache in router or server"<<std::endl;
         XIAHeaderEncap encap;
         XIAHeader hdr(p);
@@ -152,7 +154,6 @@ void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID 
             encap.set_plen(l);	// add XIA header
             newp=encap.encap( newp, false );
             _transport->checked_output_push(0 , newp);
-			click_chatter("pushed content\n");
             //std::cout<<"have pushed out"<<std::endl;
             cp += l;
         }

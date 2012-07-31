@@ -13,11 +13,13 @@ from string import Template
 hostconfig = "host.click"
 routerconfig = "router.click"
 dualhostconfig = "dual_stack_host.click"
+dualrouterconfig = "dual_stack_router.click"
 xia_addr = "xia_address.click"
 ext = "template"
 
 # default to host mode
 nodetype = "host"
+dual_stack = False
 hostname = ""
 adname = "AD_INIT"
 nameserver = "no"
@@ -62,37 +64,8 @@ def getHostname():
 # demo Giadas as it is the control socket for the node) and also ignore any
 # fake<n> interfaces as those are internal only
 #
-def getInterfaces():
-
-	filters = ''
-	if interface_filter != None:
-		filter_array = interface_filter.split(",")
-		for filter in filter_array:
-			filters += 'grep -v %s | ' % filter.strip()
-	use_interface = ''
-	if interface != None:
-		use_interface = 'grep %s | ' % interface
+def getInterfaces(ignore_interfaces, specific_interface):
 	
-	cmdline = subprocess.Popen(
-			"ifconfig | grep HWaddr | %s grep -v fake | %s tr -s ' ' | cut -d ' ' -f1,5" % (use_interface, filters),
-			shell=True, stdout=subprocess.PIPE)
-	result = cmdline.stdout.read().strip()
-
-	interfaces = []
-	addrs = result.split("\n")
-
-	for addr in addrs:
-		if (len(addr) != 0):
-			(iface, mac) = addr.split()
-			interfaces.append([iface, mac])
-
-	return interfaces
-
-#
-# get the IP, MAC, and default gateway associated with eth0 (used for dual-stack hosts)
-# TODO: Make this more general / combine with getInterfaces()?
-#
-def getEth0():
 	# Get the default gateway  TODO: should there be one per interface?
 	cmdline = subprocess.Popen(
 			"route -n | grep ^0.0.0.0 | tr -s ' ' | cut -d ' ' -f2",
@@ -101,17 +74,44 @@ def getEth0():
 
 
 	# Get the MAC and IP addresses
+	filters = ''
+	if ignore_interfaces != None:
+		filter_array = ignore_interfaces.split(",")
+		for filter in filter_array:
+			filters += 'grep -v %s | ' % filter.strip()
+	use_interface = ''
+	if specific_interface != None:
+		use_interface = 'grep -A 1 %s | ' % specific_interface
+	
 	cmdline = subprocess.Popen(
-			"ifconfig | grep -A 1 HWaddr | tr '\n' ' ' | tr -s ' ' | cut -d ' ' -f1,5,7 | sed s/addr://",
+			"ifconfig | %s grep -v fake | grep -A 1 HWaddr | %s sed 's/ \+/ /g' | sed s/addr://" % (filters, use_interface),  
 			shell=True, stdout=subprocess.PIPE)
 	result = cmdline.stdout.read().strip()
 
-	interfaces = []
-	addrs = result.split("\n")
+	# TODO: eliminate this by making the shell command above smarter
+	addrs = []
+	temp_array = result.split("\n")
+	iface, mac, ip = (None, None, None)
+	for i in range(len(temp_array)):
+		if i % 3 == 0:
+			iface = temp_array[i].split(' ')[0]
+			mac = temp_array[i].split(' ')[4]
+		elif i % 3 == 1:
+			ip = temp_array[i].split(' ')[2]
+			addrs.append([iface, mac, ip])
 
+	#interfaces = []
+	#addrs = result.split("\n")
+	#print addrs
+
+	interfaces = []
+	#for addr in addrs:
+	#	if (len(addr) != 0):
+	#		(iface, mac) = addr.split()
+	#		interfaces.append([iface, mac])
 	for addr in addrs:
 		if (len(addr) != 0):
-			(iface, mac, ip) = addr.split()
+			(iface, mac, ip) = addr#.split()
 			if ip_override_addr != None:
 				external_ip = ip_override_addr
 			else:
@@ -119,6 +119,38 @@ def getEth0():
 			interfaces.append([iface, mac, ip, default_gw, external_ip])
 
 	return interfaces
+
+#
+# get the IP, MAC, and default gateway associated with eth0 (used for dual-stack hosts)
+# TODO: Make this more general / combine with getInterfaces()?
+#
+#def getEth0():
+#	# Get the default gateway  TODO: should there be one per interface?
+#	cmdline = subprocess.Popen(
+#			"route -n | grep ^0.0.0.0 | tr -s ' ' | cut -d ' ' -f2",
+#			shell=True, stdout=subprocess.PIPE)
+#	default_gw = cmdline.stdout.read().strip()
+#
+#
+#	# Get the MAC and IP addresses
+#	cmdline = subprocess.Popen(
+#			"ifconfig | grep -A 1 HWaddr | tr '\n' ' ' | tr -s ' ' | cut -d ' ' -f1,5,7 | sed s/addr://",
+#			shell=True, stdout=subprocess.PIPE)
+#	result = cmdline.stdout.read().strip()
+#
+#	interfaces = []
+#	addrs = result.split("\n")
+#
+#	for addr in addrs:
+#		if (len(addr) != 0):
+#			(iface, mac, ip) = addr.split()
+#			if ip_override_addr != None:
+#				external_ip = ip_override_addr
+#			else:
+#				external_ip = ip
+#			interfaces.append([iface, mac, ip, default_gw, external_ip])
+#
+#	return interfaces
 
 #
 # Fill in the xia_address template file
@@ -150,7 +182,7 @@ def makeXIAAddrConfig(hid):
 #
 def makeHostConfig(hid):
 
-	interfaces = getInterfaces()
+	interfaces = getInterfaces(interface_filter, interface)
 
 	if (len(interfaces) == 0):
 		print "no available interface"
@@ -208,8 +240,9 @@ def makeHostConfig(hid):
 # footer - boilerplate
 
 def makeRouterConfig(ad, hid):
+	global interface_filter, interface
 
-	interfaces = getInterfaces()
+	interfaces = getInterfaces(interface_filter, interface)
 	if (len(interfaces) < 2):
 		print "error, not enough interfaces found for a router"
 		exit(1)
@@ -252,7 +285,7 @@ def makeRouterConfig(ad, hid):
 
 	i = 0
 	tpl = Template(body)
-	for (interface, mac) in interfaces:
+	for interface in interfaces:
 		xchg['IFACE'] = interfaces[i][0]
 		xchg['MAC'] = interfaces[i][1]
 		xchg['NUM'] = i
@@ -288,8 +321,10 @@ def makeRouterConfig(ad, hid):
 # footer - boilerplate
 
 def makeDualHostConfig(ad, hid, rhid):
+	global interface_filter, interface
 
-	interfaces = getEth0()
+	interfaces = getInterfaces(interface_filter, interface) 
+	print 'Making dual stack host config'
 
 	try:
 		f = open(dualhostconfig + "." + ext, "r")
@@ -368,21 +403,136 @@ def makeDualHostConfig(ad, hid, rhid):
 	f.write(newtext)
 	f.close()
 
+
+#
+# fill in the dual-stack router config
+#
+# For now we assume that port 3 is connected to IP and the
+# remaining ports are connected to XIA networks
+#
+# the router config file is broken into 4 sections
+# header - router definition and include lines
+# used ports - connects used ports to interfaces 
+# extra section - discard mappping for unused ports on the router 
+# footer - boilerplate
+
+def makeDualRouterConfig(ad, rhid):
+	global interface_filter, interface
+
+	if interface_filter == None:
+		filter = interface
+	else:
+		filter = '%s,%s' % (interface, interface_filter)
+
+	ip_interface = getInterfaces(None, interface)
+	xia_interfaces = getInterfaces(filter, None) 
+	print 'Making dual stack router config'
+
+	try:
+		f = open(dualrouterconfig + "." + ext, "r")
+		text = f.read()
+		f.close()
+
+		f = open(dualrouterconfig, "w")
+
+	except:
+		print "error opening file for reading and/or writing"
+		sys.exit(-1)
+
+	(header, body, extra, footer) = text.split("######")
+
+	tpl = Template(header)
+
+	xchg = {}
+	if (nameserver == "no"):
+		xchg['ADNAME'] = ad
+	else:
+		xchg['ADNAME'] = nameserver_ad		
+	xchg['RHID'] = rhid
+	xchg['HNAME'] = getHostname()
+
+	# Handle the pure XIA ports (0-2)
+	i = 0  
+	while i < 3 and i < len(xia_interfaces):  # Only go to 2 because port 3 is connected to IP
+		repl = 'IP_ACTIVE' + str(i)
+		xchg[repl] = str(0)
+		repl = 'MAC' + str(i)
+		xchg[repl] = xia_interfaces[i][1]
+		repl = 'IPADDR' + str(i)
+		xchg[repl] = xia_interfaces[i][2]
+		repl = 'GWADDR' + str(i)
+		xchg[repl] = xia_interfaces[i][3]
+		repl = 'EXT_IPADDR' + str(i)
+		xchg[repl] = xia_interfaces[i][4]
+		i += 1
+	while i < 3:
+		repl = 'IP_ACTIVE' + str(i)
+		xchg[repl] = str(0)
+		repl = 'MAC' + str(i)
+		xchg[repl] = "00:00:00:00:00:00"
+		repl = 'IPADDR' + str(i)
+		xchg[repl] = "1.1.1.1"
+		repl = 'GWADDR' + str(i)
+		xchg[repl] = "1.1.1.1"
+		repl = 'EXT_IPADDR' + str(i)
+		xchg[repl] = "1.1.1.1"
+		i += 1
+
+	# Handle the IP port (3)
+	xchg['IP_ACTIVE3'] = str(1)
+	xchg['MAC3'] = ip_interface[0][1];
+	xchg['IPADDR3'] = ip_interface[0][2]
+	xchg['GWADDR3'] = ip_interface[0][3]
+	xchg['EXT_IPADDR3'] = ip_interface[0][4]
+	 	
+	newtext = tpl.substitute(xchg)
+
+	i = 0
+	tpl = Template(body)
+	for (interface, mac, ip, gw, ext_ip) in xia_interfaces:
+		xchg['IFACE'] = xia_interfaces[i][0]
+		xchg['MAC'] = xia_interfaces[i][1]
+		xchg['NUM'] = i
+		i += 1
+
+		newtext += tpl.substitute(xchg)
+
+		if i >= 3:
+			break
+
+	xchg['IFACE'] = ip_interface[0][0]
+	xchg['MAC'] = ip_interface[0][1]
+	xchg['NUM'] = 3
+	newtext += tpl.substitute(xchg)
+
+	tpl = Template(extra)
+	while i < 3:
+		xchg['NUM'] = i
+		newtext += tpl.substitute(xchg)
+		i += 1
+
+	tpl = Template(footer)
+	newtext += tpl.substitute(xchg)
+
+	f.write(newtext)
+	f.close()
+
 #
 # parse the command line so we can do stuff
 #
 def getOptions():
 	global hostname
 	global nodetype
+	global dual_stack
 	global adname
 	global nameserver 
 	global ip_override_addr
 	global interface_filter
 	global interface
 	try:
-		shortopt = "hr4ni:a:m:f:I:"
+		shortopt = "hr4ni:a:m:f:I:t"
 		opts, args = getopt.getopt(sys.argv[1:], shortopt, 
-			["help", "router", "dual-host", "nameserver", "id=", "ad=", "manual-address=", "interface-filter=", "host-interface="])
+			["help", "router", "host", "dual-stack", "nameserver", "id=", "ad=", "manual-address=", "interface-filter=", "host-interface="])
 	except getopt.GetoptError, err:
 		# print	 help information and exit:
 		print str(err) # will print something like "option -a not recognized"
@@ -398,8 +548,10 @@ def getOptions():
 			hostname = a
 		elif o in ("-r", "--router"):
 			nodetype = "router"
-		elif o in ("-4", "--dual-host"):
-			nodetype = "dual-host"
+		elif o in ("-t", "--host"):
+			nodetype = "host"
+		elif o in ("-4", "--dual-stack"):
+			dual_stack = True
 		elif o in ("-m", "--manual-address"):
 			ip_override_addr = a
 		elif o in ("-f", "--interface-filter"):
@@ -416,7 +568,7 @@ def getOptions():
 #
 def help():
 	print """
-usage: xconfig [-h] [-r] [-4] [-n] [-h hostname] [-m ipaddr] [-f if_filter] [-I host-interface]
+usage: xconfig [-h] [-rt] [-4] [-n] [-h hostname] [-m ipaddr] [-f if_filter] [-I host-interface]
 where:
   -h			: get help
   --help
@@ -430,8 +582,11 @@ where:
   -r			: do router config instead of host
   --router
   
-  -4			: do a dual-stack host config
-  --dual-host
+  -t			: do a host config (this is the default)
+  --host
+  
+  -4			: do a dual-stack config
+  --dual-stack
   
   -n			: indicate that this needs to use nameserver AD and HID
   --nameserver  
@@ -458,14 +613,20 @@ def main():
 	rhid = createHID("20000000")
 	makeXIAAddrConfig(hid)
 
+	print dual_stack
+
 	if (nodetype == "host"):
-		makeHostConfig(hid)
+		if dual_stack:
+			ad = createAD()
+			makeDualHostConfig(ad, hid, rhid)
+		else:
+			makeHostConfig(hid)
 	elif nodetype == "router":
 		ad = createAD()
-		makeRouterConfig(ad, hid)
-	elif nodetype == "dual-host":
-		ad = createAD()
-		makeDualHostConfig(ad, hid, rhid)
+		if dual_stack:
+			makeDualRouterConfig(ad, rhid)
+		else:
+			makeRouterConfig(ad, rhid)
 
 if __name__ == "__main__":
 	main()

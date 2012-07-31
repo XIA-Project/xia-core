@@ -253,7 +253,7 @@ int processHello(const char* hello_msg) {
   	}
  	
 	route_state.networkTable[myAD] = entry;  	
-	
+
 	return 1;
 }
 

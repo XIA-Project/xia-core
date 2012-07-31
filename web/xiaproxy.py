@@ -1,5 +1,6 @@
 import socket, select, random
 import struct, time, signal, os, sys, re
+import threading
 import Tkinter
 from tkMessageBox import showwarning
 from c_xsocket import *
@@ -18,6 +19,14 @@ def send_to_browser(data, browser_socket):
         print 'ERROR: xiaproxy.py: send_to_browser: error sending data to browser'
         browser_socket.close()
         return False
+
+def warn_bad_content():
+    #os.system("python bad_content_warning.py")
+    thread = threading.Thread(target=os.system, args=("python bad_content_warning.py",))
+    thread.start()
+    #thread = threading.Thread(target=showwarning, args=("Invalid Content Hash", "Firefox received bad content"))
+    #thread.start()
+    #result = showwarning("Invalid Content Hash", "Firefox received content that does not match the reqeusted CID.")
 
 def recv_with_timeout(sock, timeout=5, transport_proto=XSP):
     # Receive data
@@ -63,9 +72,8 @@ def readcid_with_timeout(sock, cid, timeout=5):
                 if status & READY_TO_READ == READY_TO_READ or status & INVALID_HASH == INVALID_HASH:
                     reply = XreadChunk(sock, 65521, 0, cid)
                     received_data = True
-                    print 'received %s' % cid
                     if status & INVALID_HASH == INVALID_HASH:
-                        result = showwarning("Invalid Content Hash", "Firefox received content that does not match the reqeusted CID.")
+                        warn_bad_content()
             except IOError:
                 received_data = False
             except Exception, msg:
@@ -331,7 +339,6 @@ def get_content_from_cid_list(dstAD, dst4ID, dstHID, cid_list):
     for i in range(0, num_cids):
         cid = 'CID:%s' % cid_list[i*40:40+i*40]
         content_dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 0 - \n %s 3 - \n %s" % (dstAD, dst4ID, dstHID, cid)
-        print content_dag
         
         chunk_info = ChunkStatus()
         chunk_info.cid = content_dag
