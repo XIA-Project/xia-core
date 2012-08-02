@@ -878,6 +878,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
 			output(1).push(UDPIPEncap(reply, _sport, _sport));
 		}		
+		break;
 						
 		default:
 			click_chatter("\n\nERROR: CONTROL TRAFFIC !!!\n\n");
