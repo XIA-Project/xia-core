@@ -29,6 +29,9 @@ NAMESERVER=0
 IP_OVERRIDE_ADDR="None"
 INTERFACE_FILTER="None"
 HOST_INTERFACE="None"
+RUN_VISUALIZER_CLIENT=0
+RUN_VISUALIZER_SERVER=0
+VISUALIZER_SERVER="localhost"
 
 DAEMONS=""
 ROUTER_DAEMONS="xroute xhcp_server"
@@ -36,6 +39,8 @@ HOST_DAEMONS="xhcp_client"
 NAMESERVER_DAEMONS="xnameservice"
 DUAL_STACK_HOST_EXTRA_DAEMONS="xroute_r0 xhcp_server_r0"
 CHAIN_TOPOLOGY_DAEMONS="xroute_r0 xroute_r1 xhcp_server_r0 xhcp_server_r1 xhcp_client_h0 xhcp_client_h1 xnameservice"
+VISUALIZER_CLIENT_DAEMONS="xstats"
+VISUALIZER_SERVER_DAEMONS="statsserver"
 
 # hacky way of finding the root of the XIA source tree
 # assumes this script is in a directory off the parent of the XIA tree
@@ -209,6 +214,16 @@ start_daemons()
 		cd $XIADIR/daemons/nameserver
 		./xnameservice &
 	fi
+	if [ $RUN_VISUALIZER_SERVER -eq 1 ]; then
+		cd $XIADIR/daemons/visualizer
+		./statsserver &
+		sleep 1
+	fi
+	if [ $RUN_VISUALIZER_CLIENT -eq 1 ]; then
+		cd $XIADIR/daemons/visualizer
+		./xstats -s $VISUALIZER_SERVER &
+		sleep 1
+	fi
 }
 
 help ()
@@ -217,7 +232,7 @@ help ()
 
 Start or stop the XIA network services.
 
-usage: $NAME [-cqvV4rtn] [-m <ip-addr>] [-f <filter_str>] [-I <interface>] [-s <script>] [start|stop|restart|check]
+usage: $NAME [-cqvV4rtnZ] [-m <ip-addr>] [-f <filter_str>] [-I <interface>] [-s <script>] [-z <statserver>] [start|stop|restart|check]
 where:
   -c only start click
   -s run click using the specified script
@@ -232,6 +247,8 @@ where:
   -n if generating a click script, this node will be the name server
   -f if generating a click script don't use interfaces matching these filter strings (comma-separated)
   -I if generating a click script, use this interface (i.e., pick which interface a host uses)
+  -z start the visualizer client daemon, using the supplied address for the statserver
+  -Z make this the visualizer server (runs statserver and xstats)
 
   start   - starts the xia network processes if not already running
   stop    - stops the xia processes
@@ -242,7 +259,7 @@ EOH
 	exit 0
 }
 
-while getopts "cs:qvV4nrthm:f:I:" opt; do
+while getopts "cs:qvV4nrthm:f:I:z:Z" opt; do
 	case $opt in
 		c)
 			CLICK_ONLY=1
@@ -281,6 +298,17 @@ while getopts "cs:qvV4nrthm:f:I:" opt; do
 		n)
 			NAMESERVER=1
 			DAEMONS=$DAEMONS" "$NAMESERVER_DAEMONS
+			;;
+		z)
+			RUN_VISUALIZER_CLIENT=1
+			DAEMONS=$DAEMONS" "$VISUALIZER_CLIENT_DAEMONS
+			VISUALIZER_SERVER=$OPTARG
+			;;
+		Z)
+			RUN_VISUALIZER_CLIENT=1
+			RUN_VISUALIZER_SERVER=1
+			DAEMONS=$DAEMONS" "$VISUALIZER_CLIENT_DAEMONS
+			DAEMONS=$DAEMONS" "$VISUALIZER_SERVER_DAEMONS
 			;;
 		h)
 			help
