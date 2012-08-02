@@ -31,7 +31,7 @@ host0[0] -> host0_final_0 -> host0_next_0 -> LinkUnqueue(0.005, 1 GB/s) -> Rando
 router0[0] -> router0_final_0 -> router0_next_0 -> LinkUnqueue(0.005, 1 GB/s) -> [0]host0;
 
 host1[0] -> host1_final_0 -> host1_next_0 -> LinkUnqueue(0.005, 1 GB/s) -> [0]router1;
-router1[0] -> router1_final_0 -> router1_next_1 -> LinkUnqueue(0.005, 1 GB/s) ->[0]host1;
+router1[0] -> router1_final_0 -> router1_next_0 -> LinkUnqueue(0.005, 1 GB/s) ->[0]host1;
 
 // interconnection -- ad - ad
 router0[1] -> router0_final_1 -> router0_next_1 ->  LinkUnqueue(0.005, 1 GB/s) ->[1]router1;
