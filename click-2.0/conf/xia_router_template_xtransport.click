@@ -925,6 +925,18 @@ elementclass DualRouter4Port {
     c :: Classifier(01/3D, -); // XCMP
     x :: XCMP($local_addr);
 
+
+	// set up INPUT counters (only for packets coming from IP networks)
+	// OUTPUT counters are set up below
+	dualrouter_fromip_next_0::XIAXIDTypeCounter(-);
+	dualrouter_fromip_final_0::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
+	dualrouter_fromip_next_1::XIAXIDTypeCounter(-);
+	dualrouter_fromip_final_1::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
+	dualrouter_fromip_next_2::XIAXIDTypeCounter(-);
+	dualrouter_fromip_final_2::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
+	dualrouter_fromip_next_3::XIAXIDTypeCounter(-);
+	dualrouter_fromip_final_3::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
+
     
     
     // setup XARP module0
@@ -949,7 +961,7 @@ elementclass DualRouter4Port {
 	c0[1] -> [1]arpq0;
 
 	// Receiving an XIA-encapped-in-IP packet; strip the ethernet, IP, and UDP headers, leaving bare XIP packet, then paint so we know which port it came in on
-	c0[2] -> Strip(14) -> MarkIPHeader -> StripIPHeader -> Strip(8) -> MarkXIAHeader -> Paint(0) -> [0]n;
+	c0[2] -> Strip(14) -> MarkIPHeader -> StripIPHeader -> Strip(8) -> MarkXIAHeader -> Paint(0) -> dualrouter_fromip_final_0 -> dualrouter_fromip_next_0 -> [0]n;
     
     // Receiving an XIA packet
     c0[5] -> Strip(14) -> MarkXIAHeader() -> Paint(0) -> [0]n; 
@@ -988,7 +1000,7 @@ elementclass DualRouter4Port {
 	c1[1] -> [1]arpq1;
 
 	// Receiving an XIA-encapped-in-IP packet; strip the ethernet, IP, and UDP headers, leaving bare XIP packet, then paint so we know which port it came in on
-	c1[2] -> Strip(14) -> MarkIPHeader -> StripIPHeader -> Strip(8) -> MarkXIAHeader -> Paint(1) -> [0]n;
+	c1[2] -> Strip(14) -> MarkIPHeader -> StripIPHeader -> Strip(8) -> MarkXIAHeader -> Paint(1) -> dualrouter_fromip_final_1 -> dualrouter_fromip_next_1 -> [0]n;
     
     // Receiving an XIA packet
     c1[5] -> Strip(14) -> MarkXIAHeader() -> Paint(1) -> [0]n; 
@@ -1027,7 +1039,7 @@ elementclass DualRouter4Port {
 	c2[1] -> [1]arpq2;
 
 	// Receiving an XIA-encapped-in-IP packet; strip the ethernet, IP, and UDP headers, leaving bare XIP packet, then paint so we know which port it came in on
-	c2[2] -> Strip(14) -> MarkIPHeader -> StripIPHeader -> Strip(8) -> MarkXIAHeader -> Paint(2) -> [0]n;
+	c2[2] -> Strip(14) -> MarkIPHeader -> StripIPHeader -> Strip(8) -> MarkXIAHeader -> Paint(2) -> dualrouter_fromip_final_2 -> dualrouter_fromip_next_2 -> [0]n;
     
     // Receiving an XIA packet
     c2[5] -> Strip(14) -> MarkXIAHeader() -> Paint(2) -> [0]n; 
@@ -1066,7 +1078,7 @@ elementclass DualRouter4Port {
 	c3[1] -> [1]arpq3;
 
 	// Receiving an XIA-encapped-in-IP packet; strip the ethernet, IP, and UDP headers, leaving bare XIP packet, then paint so we know which port it came in on
-	c3[2] -> Strip(14) -> MarkIPHeader -> StripIPHeader -> Strip(8) -> MarkXIAHeader -> Paint(3) -> [0]n;
+	c3[2] -> Strip(14) -> MarkIPHeader -> StripIPHeader -> Strip(8) -> MarkXIAHeader -> Paint(3) -> dualrouter_fromip_final_3 -> dualrouter_fromip_next_3 -> [0]n;
     
     // Receiving an XIA packet
     c3[5] -> Strip(14) -> MarkXIAHeader() -> Paint(3) -> [0]n; 
@@ -1088,8 +1100,26 @@ elementclass DualRouter4Port {
 	dstTypeC :: XIAXIDTypeClassifier(next IP, -);
 	swIP :: PaintSwitch;
 	swXIA :: PaintSwitch;
+	countTee::Tee(2);  // Copy all packets coming out of the route engine so we only need one counter per output port (instead of one for IP and one for XIP per port)
+	swCount :: PaintSwitch; 
 
-	n[0] -> dstTypeC;
+	n[0] -> countTee -> dstTypeC;
+	countTee[1] -> swCount;
+
+
+	dualrouter_final_0::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
+	dualrouter_next_0::XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -)
+	dualrouter_final_1::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
+	dualrouter_next_1::XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -)
+	dualrouter_final_2::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
+	dualrouter_next_2::XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -)
+	dualrouter_final_3::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
+	dualrouter_next_3::XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -)
+	swCount[0] -> dualrouter_final_0 -> dualrouter_next_0 -> Discard;
+	swCount[1] -> dualrouter_final_1 -> dualrouter_next_1 -> Discard;
+	swCount[2] -> dualrouter_final_2 -> dualrouter_next_2 -> Discard;
+	swCount[3] -> dualrouter_final_3 -> dualrouter_next_3 -> Discard;
+
 
 	// Next hop is a 4ID; source IP address depends on output port
 	dstTypeC[0] -> swIP;

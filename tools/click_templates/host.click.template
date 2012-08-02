@@ -4,7 +4,10 @@ require(library xia_address.click);
 // host instantiation
 host0 :: EndHost (RE $ADNAME $HID, $HID, fake0, 172.0.0.2, 172.0.0.1, 01:11:11:11:11:11, 0, $MAC0);
 
-FromDevice($IFACE, PROMISC true) -> XIAPrint("$IFACE -> [0]host0") -> [0]host0[0] -> XIAPrint("host0[0] -> $IFACE") -> ToDevice($IFACE);
+host0_final_0::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
+host0_next_0::XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -)
+
+FromDevice($IFACE, PROMISC true) -> XIAPrint("$IFACE -> [0]host0") -> [0]host0[0] -> XIAPrint("host0[0] -> $IFACE") -> host0_final_0 -> host0_next_0 -> ToDevice($IFACE);
 
 	ControlSocket(tcp, 7777);
 

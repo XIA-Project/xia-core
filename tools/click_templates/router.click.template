@@ -6,10 +6,12 @@ router0 :: XRouter4Port(RE $ADNAME $HID, $ADNAME, $HID, $EXTERNAL_IP, fake0, 172
 
 ######
 
-FromDevice($IFACE, PROMISC true) -> XIAPrint("$IFACE -> [$NUM]router0") -> [$NUM]router0[$NUM] -> XIAPrint("router0[$NUM] -> $IFACE") -> ToDevice($IFACE)
+router0_final_$NUM::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
+router0_next_$NUM::XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -)
+FromDevice($IFACE, PROMISC true) -> XIAPrint("$IFACE -> [$NUM]router0") -> [$NUM]router0[$NUM] -> XIAPrint("router0[$NUM] -> $IFACE") -> router0_final_$NUM -> router0_next_$NUM -> ToDevice($IFACE)
 
 ######
-	Idle -> [$NUM]router0[$NUM] -> Discard;
+	Idle -> [$NUM]router0[$NUM] -> router0_final_$NUM -> router0_next_$NUM -> Discard;
 ######
 
 	ControlSocket(tcp, 7777);
