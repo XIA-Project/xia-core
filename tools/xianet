@@ -322,22 +322,20 @@ done
 
 if [ $SCRIPT_SET -eq 0 ]; then
 	if [ $HOST -eq 1 ]; then
+		CONFPATH=$XIADIR/tools/click_templates
 		DAEMONS=$DAEMONS" "$HOST_DAEMONS
 		if [ $DUAL_STACK -eq 0 ]; then
-			DAEMONS=$DAEMONS" "$DUAL_STACK_HOST_EXTRA_DAEMONS
-			CONFPATH=$XIADIR/tools/click_templates
 			SCRIPT=host.click
 		else
-			CONFPATH=$XIADIR/tools/click_templates
 			SCRIPT=dual_stack_host.click
+			DAEMONS=$DAEMONS" "$DUAL_STACK_HOST_EXTRA_DAEMONS
 		fi
 	elif [ $ROUTER -eq 1 ]; then
+		CONFPATH=$XIADIR/tools/click_templates
 		DAEMONS=$DAEMONS" "$ROUTER_DAEMONS
 		if [ $DUAL_STACK -eq 0 ]; then
-			CONFPATH=$XIADIR/tools/click_templates
 			SCRIPT=router.click
 		else
-			CONFPATH=$XIADIR/tools/click_templates
 			SCRIPT=dual_stack_router.click
 		fi
 	else
