@@ -1,0 +1,137 @@
+#! /usr/bin/python
+#
+# Copyright 2012 Carnegie Mellon University
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+import time
+import BaseHTTPServer
+from optparse import OptionParser
+
+TITLE = "XIAStatsServer/0.1"
+PORT = 8888
+CONNECTIONS = '/connections'
+STATS = '/stats'
+EXPIRED = 10
+
+connections = {}
+stats = {}
+
+
+def say(msg):
+	global options
+
+	if options.verbose:
+		print msg
+
+
+def updateConnections(data):
+	lines = data.split()
+
+	# FIXME: we should really acquire a lock here or change the table update logic
+	# FIXME: make this smarter so I don't do the same loop twice
+
+	for line in lines:
+		(ad, hid, kind, port, next) = line.split(',')
+		key = ('%s:%s') % (ad, hid)
+		connections[key] = []
+
+	for line in lines:
+		(ad, hid, kind, port, next) = line.split(',')
+		key = ('%s:%s') % (ad, hid)
+		connections[key].append({'time': time.time(), 'data': line})
+
+
+def getConnections():
+
+	s = ''
+	expired = time.time() - EXPIRED
+
+	for c in connections.itervalues():
+
+		# remove all expired entries
+		# this still leaves the device key in the hash table, but the list of entries is empty
+		# probably would be good to clean this up at some point, but not worth worrying about right now
+		c[:] = (cc for cc in c if cc['time'] > expired)
+
+		# add any non-expired entries to the result
+		for cc in c:
+			s += cc['data'] + '\n'
+
+	return s
+
+
+def updateStats(data):
+	lines = data.split()
+
+	for line in lines:
+		pass
+
+
+def getStats():
+	return 'stats go here'
+
+
+class XIAStatsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+
+	def do_GET(self):
+		if self.path == CONNECTIONS:
+			self.wfile.write(getConnections())
+		elif self.path == STATS:
+			self.wfile.write(getStats())
+		else:
+			self.send_response(404)
+
+
+	def do_POST(self):
+		print "post"
+		self.wfile.write("post")
+
+
+	def do_PUT(self):
+		content_len = int(self.headers.getheader('content-length'))
+		data = self.rfile.read(content_len)
+
+		if self.path == CONNECTIONS:
+			updateConnections(data)
+			self.send_response(200)
+		elif self.path == STATS:
+			updateStats(data)
+			self.send_error(200)
+		else:
+			self.send_response(404)
+
+
+def main(server_class=BaseHTTPServer.HTTPServer, handler_class=XIAStatsHandler):
+
+	global options
+
+	parser = OptionParser()
+	parser.add_option("-v", "--verbose", dest="verbose", help="print status messages", default=False, action="store_true")
+	parser.add_option("-p", "--port", dest="port", help="Stats server port", default=PORT)
+
+	(options, args) = parser.parse_args()
+
+	say(TITLE)
+
+	server_address = ('', options.port)
+	httpd = server_class(server_address, handler_class)
+	httpd.server_version = TITLE
+	try:
+		httpd.serve_forever()
+	except KeyboardInterrupt:
+		print
+
+if __name__ == '__main__':
+	main()
