@@ -427,7 +427,9 @@ def main():
                 lastRoute = now
                 rts = updateRoutes(click)
                 try:
+                    print 'putting connections at %s' % time.time()
                     req = requests.put(base_url + CONNECT_PATH, data=rts)
+                    print 'put connections at %s' % time.time()
                 except:
                     say ('PUT ' + CONNECT_PATH + ' failed')
 
