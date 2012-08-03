@@ -168,20 +168,30 @@ XIAXIDTypeCounter::match(Packet *p)
     struct click_xia_xid __srcID = hdr->node[hdr->dnode + hdr->snode - 1].xid;
     uint32_t src_xid_type = __srcID.type;
 
+    // hack to the hack. Filter out weird xid types so the following code doesn't smash the stack
+    // for some reason we get garbage data periodically that causes the XID constructor to fail
+    if (__srcID.type > CLICK_XIA_XID_TYPE_IP || __dstID.type > CLICK_XIA_XID_TYPE_IP)
+	return -1;
+
+//    printf ("%08x %08x\n", ntohl(__dstID.type), ntohl(__srcID.type));
+
     XID dstXID(__dstID);
     XID srcXID(__srcID);
 
+    const char *ss = srcXID.unparse().c_str();
+    const char *ds = dstXID.unparse().c_str();
+
     // Hack: filtering out daemon traffic (e.g., xroute, xhcp, name-server)
-    if (strcmp(srcXID.unparse().c_str(), "SID:1110000000000000000000000000000000001111") == 0 ||
-        strcmp(srcXID.unparse().c_str(), "SID:1110000000000000000000000000000000001112") == 0 ||
-    	strcmp(srcXID.unparse().c_str(), "SID:1110000000000000000000000000000000001113") == 0 ||
-    	strcmp(dstXID.unparse().c_str(), "SID:1110000000000000000000000000000000001111") == 0 ||
-    	strcmp(dstXID.unparse().c_str(), "SID:1110000000000000000000000000000000001112") == 0 ||
-    	strcmp(dstXID.unparse().c_str(), "SID:1110000000000000000000000000000000001113") == 0 ||
-    	strcmp(dstXID.unparse().c_str(), "HID:1111111111111111111111111111111111111111") == 0) {
+    if (strcmp(ss, "SID:1110000000000000000000000000000000001111") == 0 ||
+        strcmp(ss, "SID:1110000000000000000000000000000000001112") == 0 ||
+    	strcmp(ss, "SID:1110000000000000000000000000000000001113") == 0 ||
+    	strcmp(ds, "SID:1110000000000000000000000000000000001111") == 0 ||
+    	strcmp(ds, "SID:1110000000000000000000000000000000001112") == 0 ||
+    	strcmp(ds, "SID:1110000000000000000000000000000000001113") == 0 ||
+    	strcmp(ds, "HID:1111111111111111111111111111111111111111") == 0) {
     	return -1;
     }
-     
+
     uint32_t next_xid_type = -1;
     {
         int last = hdr->last;
