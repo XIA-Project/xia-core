@@ -31,6 +31,8 @@ PORT = '8888'
 STATS_HOST = 'localhost'
 CONNECT_PATH = '/connections'
 STATS_PATH = '/stats'
+FINAL_PATH = '/final'
+NEXT_PATH = '/next'
 
 # retrieval intervals
 STATS_INTERVAL = 1
@@ -135,7 +137,7 @@ class ClickControl:
     #
     def readData(self, cmd):
         self.csock.write("READ %s\n" % (cmd))
-        self.checkStatus(True)
+        self.checkStatus(False)
 
         length = self.readLength()
         buf = ""
@@ -192,6 +194,8 @@ class Router:
         self.ad = None
         self.routes = []
         self.connections = []
+        self.nextStats = {}
+        self.finalStats = {}
 
 
     def addRoute(self, r):
@@ -221,6 +225,9 @@ class Router:
             kind = 'XID'
             if next == None:
                 return
+
+        self.nextStats[port] = Stats('next')
+        self.finalStats[port] = Stats('final')
 
         c = Connection(port, kind, next)
         self.addConnection(c)
@@ -347,32 +354,48 @@ class Stats:
         self.last = {}
         self.name = name
         self.timestamp = 0
-        for xid in ('AD', 'HID', 'IP'):
+        for xid in ('AD', 'HID', 'SID', 'CID', 'IP', 'UNKNOWN'):
             self.data[xid] = 0
             self.last[xid] = 0
 
 
     def update(self, text):
         cur = time.time()
-        (ad, hid, ip) = text.split()
+#        print 'stats', text
+        (ad, hid, sid, cid, ip, unknown) = text.split()
         ad = int(ad)
         hid = int(hid)
+        sid = int(sid)
+        cid = int(cid)
         ip = int(ip)
+        unknown = int(unknown)
 
         if self.timestamp != 0:
             elapsed = int(max(1, cur - self.timestamp))
             self.data['AD'] = (ad - self.last['AD']) / elapsed
             self.data['HID'] = (hid - self.last['HID']) / elapsed
+            self.data['SID'] = (sid - self.last['SID']) / elapsed
+            self.data['CID'] = (cid - self.last['CID']) / elapsed
             self.data['IP'] = (ip - self.last['IP']) /elapsed
+            self.data['UNKNOWN'] = (unknown - self.last['UNKNOWN']) / elapsed
 
         self.timestamp = cur
         self.last['AD'] = ad
         self.last['HID'] = hid
+        self.last['SID'] = sid
+        self.last['CID'] = cid
         self.last['IP'] = ip
+        self.last['UNKNOWN'] = unknown
+
+#        print self.last
+#        print self.data
 
 
     def jsonStr(self):
         return dict(name=self.name, ad=self.ad, hid=self.hid, data=self.data)
+
+    def csv(self):
+        return "%d,%d,%d,%d,%d,%d,0,0,0,0,0,0" % (self.data['AD'], self.data['HID'], self.data['SID'], self.data['CID'], self.data['IP'], self.data['UNKNOWN'])
 
 
 #
@@ -388,9 +411,48 @@ def updateRoutes(click):
                 rt = Route(kind, line)
                 device.addRoute(rt)
 
-#    return json.dumps(devices.jsonStr(), cls=ObjEncoder, indent=2)
     return devices.csv()
 
+
+def getCounts(s):
+    ad, hid, sid, cid, ip, unknown = s.splitlines()
+    ad  = ad[7:]
+    hid = hid[7:]
+    sid = sid[7:]
+    cid = cid[7:]
+    ip  = ip[7:]
+    unknown = unknown[7:]
+
+    return "%s %s %s %s %s %s" % (ad, hid, sid, cid, ip, unknown)
+
+
+def updateStats(click, kind):
+    s = ''
+    for device in devices.devices.itervalues():
+        for c in device.connections:
+            counts = getCounts(click.readData("%s_%s_%d.count" % (device.name, kind, c.port)))
+
+            if kind == 'final':
+                device.finalStats[c.port].update(counts)
+                s += '%s,%d,%s\n' % (device.hid, c.port, device.finalStats[c.port].csv())
+            else:
+                device.nextStats[c.port].update(counts)
+                s += '%s,%d,%s\n' % (device.hid, c.port, device.nextStats[c.port].csv())
+
+    # check to see if there is a - next hop IP route, and if so also get dualrouter_next_foo and dualrouter_final_foo
+    # dualrouter_fromip_final_foo, dualrouter_fromip_next_foo
+    return s
+
+
+
+def sendData(path, data):
+    global base_url
+
+#    print path, data
+    try:
+        req = requests.put(base_url + path, data=data)
+    except:
+        say ('PUT ' + path + ' failed')
 
 
 #
@@ -399,6 +461,7 @@ def updateRoutes(click):
 def main():
     global devices
     global options
+    global base_url
 
     parser = OptionParser()
     parser.add_option("-c", "--click", dest="click", help="Click instance address", default=CLICK)
@@ -422,16 +485,16 @@ def main():
             now = time.time()
             if now - lastStat > STATS_INTERVAL:
                 lastStat = now
+                s = updateStats(click, 'final')
+                sendData(FINAL_PATH, s)
+                s = updateStats(click, 'next')
+                sendData(NEXT_PATH, s)
+
 
             if now - lastRoute > ROUTE_INTERVAL:
                 lastRoute = now
                 rts = updateRoutes(click)
-                try:
-                    print 'putting connections at %s' % time.time()
-                    req = requests.put(base_url + CONNECT_PATH, data=rts)
-                    print 'put connections at %s' % time.time()
-                except:
-                    say ('PUT ' + CONNECT_PATH + ' failed')
+                sendData(CONNECT_PATH, rts)
 
             time.sleep(1)
     except KeyboardInterrupt:
