@@ -22,11 +22,13 @@ from optparse import OptionParser
 TITLE = "XIAStatsServer/0.1"
 PORT = 8888
 CONNECTIONS = '/connections'
-STATS = '/stats'
+FINAL = '/final'
+NEXT = '/next'
 EXPIRED = 10
 
 connections = {}
-stats = {}
+final = {}
+next = {}
 
 
 def say(msg):
@@ -77,24 +79,49 @@ def getConnections():
 	return s
 
 
-def updateStats(data):
-	lines = data.split()
+def updateStats(kind, data):
+	global final
+	global next
 
-	for line in lines:
-		pass
+	for line in data.split():
+		(hid, port, counts) = line.split(',', 2)
+		key = ('%s:%s') % (hid, port)
+		if kind == 'final':
+			final[key] = line
+		else:
+			next[key] = line
 
 
-def getStats():
-	return 'stats go here'
+def getStats(kind):
+	global final
+	global next
+	s = ''
+	if kind == 'final':
+		for k, v in final.items():
+			print k
+			s += v + '\n'
+#			del final[k]
+	else:
+		for k, v in next.items():
+			print k
+			s += v + '\n'
+#			del next[k]
+
+	return s
+
+
 
 
 class XIAStatsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
 	def do_GET(self):
+		print 'get: ', self.path
 		if self.path == CONNECTIONS:
 			self.wfile.write(getConnections())
-		elif self.path == STATS:
-			self.wfile.write(getStats())
+		elif self.path == FINAL:
+			self.wfile.write(getStats('final'))
+		elif self.path == NEXT:
+			self.wfile.write(getStats('next'))
 		else:
 			self.send_response(404)
 
@@ -110,12 +137,19 @@ class XIAStatsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
 		if self.path == CONNECTIONS:
 			updateConnections(data)
-			self.send_response(200)
-		elif self.path == STATS:
-			updateStats(data)
-			self.send_error(200)
+
+		elif self.path == FINAL:
+			updateStats('final', data)
+
+		elif self.path == NEXT:
+			updateStats('next', data)
+
 		else:
+			print 'bad request: ', self.path
 			self.send_response(404)
+			return
+
+		self.send_response(200)
 
 
 def main(server_class=BaseHTTPServer.HTTPServer, handler_class=XIAStatsHandler):
