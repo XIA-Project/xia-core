@@ -39,18 +39,23 @@ def say(msg):
 def updateConnections(data):
 	lines = data.split()
 
-	# FIXME: we should really acquire a lock here or change the table update logic
-	# FIXME: make this smarter so I don't do the same loop twice
-
+	key = ''
+	c = []
 	for line in lines:
 		(ad, hid, kind, port, next) = line.split(',')
-		key = ('%s:%s') % (ad, hid)
-		connections[key] = []
+		k = ('%s:%s') % (ad, hid)
 
-	for line in lines:
-		(ad, hid, kind, port, next) = line.split(',')
-		key = ('%s:%s') % (ad, hid)
-		connections[key].append({'time': time.time(), 'data': line})
+		if k != key:
+			if len(c) != 0:
+				connections[key] = c
+				c = []
+			key = k
+
+		c.append({'time': time.time(), 'data': line})
+
+	if key != '':
+		connections[key] = c
+
 
 
 def getConnections():
