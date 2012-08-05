@@ -2,18 +2,18 @@ require(library ../../click-2.0/conf/xia_router_template_xtransport.click);
 require(library xia_address.click);
 
 // router instantiation
-router0 :: XRouter4Port(RE $ADNAME $HID, $ADNAME, $HID, $EXTERNAL_IP, fake0, 172.0.0.2, 172.0.0.1, 21:11:11:11:11:11, $MAC0, $MAC1, $MAC2, $MAC3, 0);
+${HNAME} :: XRouter4Port(RE $ADNAME $HID, $ADNAME, $HID, $EXTERNAL_IP, fake0, 172.0.0.2, 172.0.0.1, 21:11:11:11:11:11, $MAC0, $MAC1, $MAC2, $MAC3, 0);
 
 ######
 
-router0_final_$NUM::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
-router0_next_$NUM::XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -)
-FromDevice($IFACE, PROMISC true) -> XIAPrint("$IFACE -> [$NUM]router0") -> [$NUM]router0[$NUM] -> XIAPrint("router0[$NUM] -> $IFACE") -> router0_final_$NUM -> router0_next_$NUM -> ToDevice($IFACE)
+${HNAME}_final_$NUM::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
+${HNAME}_next_$NUM::XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -)
+FromDevice($IFACE, PROMISC true) -> XIAPrint("$IFACE -> [$NUM]${HNAME}") -> [$NUM]${HNAME}[$NUM] -> XIAPrint("${HNAME}[$NUM] -> $IFACE") -> ${HNAME}_final_$NUM -> ${HNAME}_next_$NUM -> ToDevice($IFACE)
 
 ######
-router0_final_$NUM::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
-router0_next_$NUM::XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -)
-Idle -> [$NUM]router0[$NUM] -> router0_final_$NUM -> router0_next_$NUM -> Discard;
+${HNAME}_final_$NUM::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
+${HNAME}_next_$NUM::XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -)
+Idle -> [$NUM]${HNAME}[$NUM] -> ${HNAME}_final_$NUM -> ${HNAME}_next_$NUM -> Discard;
 ######
 
 	ControlSocket(tcp, 7777);

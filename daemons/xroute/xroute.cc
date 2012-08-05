@@ -560,7 +560,7 @@ void initRouteState()
 	alarm(HELLO_INTERVAL); 	
 }
 
-int main()
+int main(int argc, char *argv[])
 {
 	int rc, x, selectRetVal, n;
     	size_t dlen, found, start;
@@ -576,7 +576,21 @@ int main()
 		return -1;
 	}
 
-	xr.setRouter("router0");
+ 	// set router name
+	if ( argc == 1 ) {
+		xr.setRouter("router0");   // Use the default API address (172.0.0.1)
+    } else if (argc == 2 || argc == 3 ) {
+		char* hostname = (char*) malloc(snprintf(NULL, 0, "%s", argv[1]) + 1);
+    	sprintf(hostname, "%s", argv[1]);
+		xr.setRouter(hostname);
+
+		if (argc == 3) {
+			set_conf("xsockconf.ini", argv[2]);
+		}
+    } else {
+		printf("Expected usage: xroute [<element name> [<API conf name>]]\n");
+	}
+
 	listRoutes("AD");
 
     	// open socket for route process

@@ -15,6 +15,17 @@ int main(int argc, char *argv[]) {
 	char gw_router_hid[MAX_XID_SIZE];
 	char gw_router_4id[MAX_XID_SIZE];
 	char ns_dag[XHCP_MAX_DAG_LENGTH];
+
+
+	if ( argc == 1 ) {
+		// Use deault API configuration
+	} else if ( argc == 2 ) {
+		set_conf("xsockconf.ini", argv[1]);
+	} else {
+		printf("Expceted usage: xhcp_server [<API conf name>]\n");
+	}
+
+
 	// Xsocket init
 	int sockfd = Xsocket(XSOCK_DGRAM);
 	if (sockfd < 0) { perror("Opening Xsocket"); }
