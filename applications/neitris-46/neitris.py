@@ -49,6 +49,7 @@ screen = None
 background = None
 DONE=0
 
+info_name = os.path.join(".","info.png")
 
 bricks_name = os.path.join(".","bricks.bmp")
 
@@ -94,6 +95,7 @@ donator = pygame.image.load(donator_name)
 updown = pygame.image.load(updown_name)
 dotter = pygame.image.load(dotter_name)
 
+info = pygame.image.load(info_name)
 brick_border = pygame.image.load(bricks_name)
 
 brick1 = pygame.image.load(brick1_name)
@@ -320,7 +322,7 @@ def ProcessMsg(rqueue):
             window = None
             screen = None
             #background = None
-            window = pygame.display.set_mode((250*pnr, 600))
+            window = pygame.display.set_mode((250*pnr, 700))
             pygame.display.set_caption('Neitris')
 
 
@@ -328,7 +330,8 @@ def ProcessMsg(rqueue):
             #background = pygame.Surface(screen.get_size())
             #background = background.convert()
             #background.fill((0, 0, 0))
-            
+    
+    
             data = data[1:]
             if players[playerid] == None:
                 victories = 0
@@ -338,7 +341,7 @@ def ProcessMsg(rqueue):
             players={}
             for i in range(pnr):
                 (pid, length) = struct.unpack("!BH",data[:3])
-                playermatrix = neitris_class.Matrix(i*250,0)
+                playermatrix = neitris_class.Matrix(i*250,100)
                 playermatrix.pid = pid
                 playermatrix.name = data[3:(length+3)]
                 playermatrix.active = 1
@@ -569,11 +572,39 @@ def neitris_main_loop(rq, wq):
 
         # Update Screen
         if state_change or flash_powerup:
-
+            
             for p in players:
                 #screen.blit(background, (players[p].srcx, 0))
                 players[p].DrawMatrix(screen, bricks, dots, players,
                                       background)                
+
+            font = pygame.font.Font(None, 25)
+
+            caption_text = '%s and %s are on disjoint XIA networks' % (players[1].name, players[2].name)
+            caption = font.render(caption_text, 1, (159, 218, 238))
+            textpos = caption.get_rect()
+            textsurf = pygame.Surface((500, 100))
+            textpos.centerx = textsurf.get_rect().centerx + 25
+            textpos.centery = 25
+            textsurf.blit(caption, textpos)
+            
+            caption_text1 = 'but can still communicate using fallback IPv4' 
+            caption1 = font.render(caption_text1, 1, (159, 218, 238))
+            textpos1 = caption.get_rect()
+            textpos1.centerx = textsurf.get_rect().centerx + 25
+            textpos1.centery = 45
+            textsurf.blit(caption1, textpos1)
+            
+            caption_text2 = 'addresses (4IDs).'
+            caption2 = font.render(caption_text2, 1, (159, 218, 238))
+            textpos2 = caption.get_rect()
+            textpos2.centerx = textsurf.get_rect().centerx + 25
+            textpos2.centery = 65
+            textsurf.blit(caption2, textpos2)
+
+            screen.blit(textsurf, (0, 0))    
+            screen.blit(info, (30, 20))
+
             pygame.display.flip()
             state_change = 0
             flash_powerup = 0
