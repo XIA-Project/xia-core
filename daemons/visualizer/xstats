@@ -196,6 +196,7 @@ class Router:
         self.connections = []
         self.nextStats = {}
         self.finalStats = {}
+        self.ports = []
 
 
     def addRoute(self, r):
@@ -226,8 +227,12 @@ class Router:
             if next == None:
                 return
 
-        self.nextStats[port] = Stats('next')
-        self.finalStats[port] = Stats('final')
+        if port not in self.nextStats:
+            self.nextStats[port] = Stats('next')
+        if port not in self.finalStats:
+            self.finalStats[port] = Stats('final')
+        if port not in self.ports:
+            self.ports.append(port)
 
         c = Connection(port, kind, next)
         self.addConnection(c)
@@ -359,9 +364,9 @@ class Stats:
             self.last[xid] = 0
 
 
-    def update(self, text):
+    def update(self, text, name):
         cur = time.time()
-#        print 'stats', text
+
         (ad, hid, sid, cid, ip, unknown) = text.split()
         ad = int(ad)
         hid = int(hid)
@@ -386,9 +391,6 @@ class Stats:
         self.last['CID'] = cid
         self.last['IP'] = ip
         self.last['UNKNOWN'] = unknown
-
-#        print self.last
-#        print self.data
 
 
     def jsonStr(self):
@@ -429,15 +431,18 @@ def getCounts(s):
 def updateStats(click, kind):
     s = ''
     for device in devices.devices.itervalues():
-        for c in device.connections:
-            counts = getCounts(click.readData("%s_%s_%d.count" % (device.name, kind, c.port)))
+        for port in device.ports:
+
+            counts = getCounts(click.readData("%s_%s_%d.count" % (device.name, kind, port)))
 
             if kind == 'final':
-                device.finalStats[c.port].update(counts)
-                s += '%s,%d,%s\n' % (device.hid, c.port, device.finalStats[c.port].csv())
+                device.finalStats[port].update(counts, device.name)
+                txt= '%s,%d,%s\n' % (device.hid, port, device.finalStats[port].csv())
+                s += txt
+
             else:
-                device.nextStats[c.port].update(counts)
-                s += '%s,%d,%s\n' % (device.hid, c.port, device.nextStats[c.port].csv())
+                device.nextStats[port].update(counts, device.name)
+                s += '%s,%d,%s\n' % (device.hid, port, device.nextStats[port].csv())
 
     # check to see if there is a - next hop IP route, and if so also get dualrouter_next_foo and dualrouter_final_foo
     # dualrouter_fromip_final_foo, dualrouter_fromip_next_foo
@@ -448,7 +453,6 @@ def updateStats(click, kind):
 def sendData(path, data):
     global base_url
 
-#    print path, data
     try:
         req = requests.put(base_url + path, data=data)
     except:
@@ -489,7 +493,6 @@ def main():
                 sendData(FINAL_PATH, s)
                 s = updateStats(click, 'next')
                 sendData(NEXT_PATH, s)
-
 
             if now - lastRoute > ROUTE_INTERVAL:
                 lastRoute = now
