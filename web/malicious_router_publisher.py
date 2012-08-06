@@ -9,8 +9,10 @@ print XreadLocalHostAddr(sock)
 chunk_context = XallocCacheSlice(POLICY_DEFAULT, 0, 0)
 
 # Publish the picture
-cid = XputFile(chunk_context, 'anon.jpg', XIA_MAXBUF)
+anon_cid = XputFile(chunk_context, 'anon.jpg', XIA_MAXBUF)
+html_cid = XputFile(chunk_context, 'www/simple_malicious_explanation_processed.html', XIA_MAXBUF)
 #XputFile(chunk_context, 'www/img/image.jpg', XIA_MAXBUF)  # Publish so that malicious router has a route to this CID
 
 # Print the CID
-print 'Published chunk with CID %s' % cid[0].cid
+print 'Published image chunk with CID %s' % anon_cid[0].cid
+print 'Published html chunk with CID %s' % html_cid[0].cid

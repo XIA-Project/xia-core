@@ -1,4 +1,27 @@
-<html><body><h1>It works!</h1>
-<h2><img src="img/image.jpg" /></h2><ul class="left-nav">
+<html>
+<head>
+	<style type="text/css">
+		.custom { padding: 0.5em 0.8em 0.8em 2em; 
+			border-radius: 5px 5px; -moz-border-radius: 5px; -webkit-border-radius: 5px; 
+			box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.1); -webkit-box-shadow: 5px 5px rgba(0, 0, 0, 0.1); -moz-box-shadow: 5px 5px rgba(0, 0, 0, 0.1);
+			font-family: Calibri, Tahoma, Geneva, sans-serif;
+			left: 1em; top: 2em; z-index: 99;
+			position: absolute; margin-left: 20; width: 500px; 
+		}
+		.custom img {
+			border: 0; margin: -10px 0 0 -55px;
+			float: left; position: absolute;
+		}
+		.info { background: #9FDAEE; border: 1px solid #2BB0D7;	}
+	</style>
+</head>
+<body>
+	<h1>XIA Demo: Content Retrieval</h1>
+	<span class="custom info" style="left: 20em; top: 6em;"><img src="img/info.png">This image was retrieved using the <em>content principal</em>. The publisher of the web page used the image's <em>content identifier</em> (CID) as the image source:<br/><xmp>
+<img src="http://xia.cid.1.AD.1000000000000000000000000000000000000001
+                          .IP.4500000000010000fafa00000000000000000000
+                          .HID.0000000000000000000000000000000000000001
+                          .8b35bac835526705709b4a9560e15a9d066a6900" /></xmp></span>
+	<h2><img src="img/image.jpg" /></h2><ul class="left-nav">
 
 </body></html>

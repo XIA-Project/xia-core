@@ -207,13 +207,13 @@ int sigwait(const unsigned int *set, int *sig);
 #define HAVE_FCNTL_H 1
 
 /* Define to 1 if you have the <gssapi/gssapi.h> header file. */
-/* #undef HAVE_GSSAPI_GSSAPI_H */
+#define HAVE_GSSAPI_GSSAPI_H 1
 
 /* Define to 1 if you have the <gssapi/gssapi_krb5.h> header file. */
-/* #undef HAVE_GSSAPI_GSSAPI_KRB5_H */
+#define HAVE_GSSAPI_GSSAPI_KRB5_H 1
 
 /* Define to 1 if you have the <gssapi.h> header file. */
-/* #undef HAVE_GSSAPI_H */
+#define HAVE_GSSAPI_H 1
 
 /* Define to 1 if you have the <gssapi_krb5.h> header file. */
 /* #undef HAVE_GSSAPI_KRB5_H */
@@ -225,10 +225,10 @@ int sigwait(const unsigned int *set, int *sig);
 /* #undef HAVE_KERBEROSV5_KRB5_H */
 
 /* Define to 1 if you have the <krb5.h> header file. */
-/* #undef HAVE_KRB5_H */
+#define HAVE_KRB5_H 1
 
 /* Define to 1 if you have the <krb5/krb5.h> header file. */
-/* #undef HAVE_KRB5_KRB5_H */
+#define HAVE_KRB5_KRB5_H 1
 
 /* Define to 1 if you have the `c' library (-lc). */
 /* #undef HAVE_LIBC */
@@ -258,7 +258,7 @@ int sigwait(const unsigned int *set, int *sig);
 /* #undef HAVE_LIBTHR */
 
 /* Define if libxml2 was found */
-/* #undef HAVE_LIBXML2 */
+#define HAVE_LIBXML2 1
 
 /* Define to 1 if you have the <linux/capability.h> header file. */
 #define HAVE_LINUX_CAPABILITY_H 1
@@ -276,7 +276,7 @@ int sigwait(const unsigned int *set, int *sig);
 /* #undef HAVE_NET_IF6_H */
 
 /* Define if your OpenSSL version supports GOST. */
-#define HAVE_OPENSSL_GOST 1
+/* #undef HAVE_OPENSSL_GOST */
 
 /* Define to 1 if you have the <regex.h> header file. */
 #define HAVE_REGEX_H 1

@@ -23,16 +23,16 @@ top_srcdir =	@top_srcdir@
 
 @BIND9_MAKE_INCLUDES@
 
-CINCLUDES =	${DNS_INCLUDES} ${ISC_INCLUDES}
+CINCLUDES =	${DNS_INCLUDES} ${ISC_INCLUDES} -I ${top_srcdir}/../../XIASocket/API
 
 CDEFINES =
 CWARNINGS =
 
-DNSLIBS =	../../../../lib/dns/libdns.@A@ @DNS_CRYPTO_LIBS@
-ISCLIBS =	../../../../lib/isc/libisc.@A@
+DNSLIBS =	../../../../lib/dns/libdns.@A@ @DNS_CRYPTO_LIBS@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
+ISCLIBS =	../../../../lib/isc/libisc.@A@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
 
-DNSDEPLIBS =	../../../../lib/dns/libdns.@A@
-ISCDEPLIBS =	../../../../lib/isc/libisc.@A@
+DNSDEPLIBS =	../../../../lib/dns/libdns.@A@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
+ISCDEPLIBS =	../../../../lib/isc/libisc.@A@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
 
 DEPLIBS =	${DNSDEPLIBS} ${ISCDEPLIBS}
 

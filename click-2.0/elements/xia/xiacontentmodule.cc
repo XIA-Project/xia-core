@@ -58,7 +58,26 @@ void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID 
 
     HashTable<XID,CChunk*>::iterator it;
     it=_contentTable.find(dstCID);
+	
+	// simple.html vs. simple_malicious_explanation.html
+	if (malicious && 
+		strcmp(dstCID.unparse().c_str(), "CID:5351d9e61cb2a4971bf72624b5639104795b5c2a") == 0)
+	{
+		// If this router is malicous, then this content 
+		// module reponds to requests for the simple.html page
+		// with a version explaining CID security (But only every
+		// other time.)
+		// TODO: something more flexible
+		if (malicious_this_time)
+		{
+			XID fakeCID = XID();
+			fakeCID.parse("CID:1e3587a90084561268e6ee372cf6bbe96c886aaf");
 
+    		it=_contentTable.find(fakeCID);
+		}
+	}
+
+	// image.jpg vs. anon.jpg
 	if (malicious && 
 		strcmp(dstCID.unparse().c_str(), "CID:8b35bac835526705709b4a9560e15a9d066a6900") == 0)
 	{

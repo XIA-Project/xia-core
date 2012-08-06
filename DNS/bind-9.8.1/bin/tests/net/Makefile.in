@@ -26,9 +26,9 @@ CINCLUDES =	${TEST_INCLUDES} ${DNS_INCLUDES} ${ISC_INCLUDES}
 CDEFINES =
 CWARNINGS =
 
-ISCLIBS =	../../../lib/isc/libisc.@A@
+ISCLIBS =	../../../lib/isc/libisc.@A@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
 
-ISCDEPLIBS =	../../../lib/isc/libisc.@A@
+ISCDEPLIBS =	../../../lib/isc/libisc.@A@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
 
 DEPLIBS =	${ISCDEPLIBS}
 

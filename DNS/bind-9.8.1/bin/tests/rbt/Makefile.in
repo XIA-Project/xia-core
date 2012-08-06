@@ -28,10 +28,10 @@ CWARNINGS =
 
 # Note that we do not want to use libtool for libt_api
 DNSLIBS =	../../../lib/dns/libdns.@A@ @DNS_CRYPTO_LIBS@
-ISCLIBS =	../../../lib/isc/libisc.@A@
+ISCLIBS =	../../../lib/isc/libisc.@A@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
 
 DNSDEPLIBS =	../../../lib/dns/libdns.@A@
-ISCDEPLIBS =	../../../lib/isc/libisc.@A@
+ISCDEPLIBS =	../../../lib/isc/libisc.@A@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
 
 DEPLIBS =	${DNSDEPLIBS} ${ISCDEPLIBS}
 

@@ -158,13 +158,26 @@ html {
 	height: 12px;
 	width:  18px;
 }
+		
+		.explanation { padding: 0.5em 0.8em 0.8em 2em; border-radius: 5px 5px; -moz-border-radius: 5px; -webkit-border-radius: 5px; 
+			box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.1); -webkit-box-shadow: 5px 5px rgba(0, 0, 0, 0.1); -moz-box-shadow: 5px 5px rgba(0, 0, 0, 0.1);
+			font-family: Calibri, Tahoma, Geneva, sans-serif;
+			left: 1em; top: 2em; z-index: 99;
+			position: absolute; margin-left: 20; width: 500px; 
+			background: #9FDAEE; border: 1px solid #2BB0D7;
+		}
+		.explanation img {
+			border: 0; margin: -10px 0 0 -55px;
+			float: left; position: absolute;
+		}
 </style>
 </head>
 <body onload="load()" style =" overflow-x: hidden;">
 <div id="main">
 
 <p> <h1>Video</h1> </p>
-<p>
+
+<span class="explanation" style="left: 42em; top: 6em;"><img src="img/info.png">The browser loads the video by sending a packet addressed to the video's <em>content identifier</em> (CID). This way, the network knows that the browser is requesting content and can respond with cached copies of the video.<br/><br/>Since some legacy routers might not understand CIDs, the browser includes the <em>host identifier</em> (HID) of a server known to possess the video as a <em>fallback</em>.</span>
 
 
 <video tabindex="0" src="http://www_s.video.com.xia"  controls="true" type="video/ogg" width="640" height="360"><i>You need a HTML5 &lt;video&gt; capable browser to view this movie.</i></video>
@@ -179,6 +192,8 @@ html {
 <div id="last_response">
 
 </div>
+
+<span class="explanation" style="left: 3em; top: 37em; width: 750px;"><img src="img/info.png">The browser updates the stock prices by periodically sending update request packets addressed to a stock service's <em>service identifier</em> (SID). Using an SID allows the network to direct the packet to the "best" instance of the stock service.<br/><br/>Since some legacy routers might not understand SIDs, the browser includes the <em>host identifier</em> (HID) of a server known to host the stock service as a <em>fallback</em>.</span>
 
 
 <!--/noindex-->

@@ -31,13 +31,13 @@ CWARNINGS =
 
 DNSLIBS =	../../lib/dns/libdns.@A@ @DNS_CRYPTO_LIBS@
 ISCCFGLIBS =	../../lib/isccfg/libisccfg.@A@
-ISCLIBS =	../../lib/isc/libisc.@A@
-ISCNOSYMLIBS =	../../lib/isc/libisc-nosymtbl.@A@
+ISCLIBS =	../../lib/isc/libisc.@A@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
+ISCNOSYMLIBS =	../../lib/isc/libisc-nosymtbl.@A@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
 BIND9LIBS =	../../lib/bind9/libbind9.@A@
 
 DNSDEPLIBS =	../../lib/dns/libdns.@A@
 ISCCFGDEPLIBS =	../../lib/isccfg/libisccfg.@A@
-ISCDEPLIBS =	../../lib/isc/libisc.@A@
+ISCDEPLIBS =	../../lib/isc/libisc.@A@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
 BIND9DEPLIBS =	../../lib/bind9/libbind9.@A@
 
 LIBS =		${ISCLIBS} @LIBS@

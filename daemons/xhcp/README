@@ -1,0 +1,3 @@
+xhcp_server [<API conf name>]
+
+xhcp_client [<hostname> [<element name> [<API conf name>]]]

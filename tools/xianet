@@ -27,6 +27,7 @@ DUAL_STACK=0
 LOCAL_CHAIN_TOPOLOGY=0
 NAMESERVER=0
 IP_OVERRIDE_ADDR="None"
+HOSTNAME=""
 INTERFACE_FILTER="None"
 HOST_INTERFACE="None"
 RUN_VISUALIZER_CLIENT=0
@@ -37,8 +38,8 @@ DAEMONS=""
 ROUTER_DAEMONS="xroute xhcp_server"
 HOST_DAEMONS="xhcp_client"
 NAMESERVER_DAEMONS="xnameservice"
-DUAL_STACK_HOST_EXTRA_DAEMONS="xroute_r0 xhcp_server_r0"
-CHAIN_TOPOLOGY_DAEMONS="xroute_r0 xroute_r1 xhcp_server_r0 xhcp_server_r1 xhcp_client_h0 xhcp_client_h1 xnameservice"
+DUAL_STACK_HOST_EXTRA_DAEMONS="xroute xhcp_server"
+CHAIN_TOPOLOGY_DAEMONS="xroute xhcp_server xhcp_client xnameservice"
 VISUALIZER_CLIENT_DAEMONS="xstats"
 VISUALIZER_SERVER_DAEMONS="statsserver"
 
@@ -121,6 +122,9 @@ start_daemons()
 	if [ $IP_OVERRIDE_ADDR != "None" ]; then
 		FLAGS=$FLAGS" -m "$IP_OVERRIDE_ADDR
 	fi
+	if [ "$HOSTNAME" != "" ]; then
+		FLAGS=$FLAGS" -i "\"$HOSTNAME\"
+	fi
 	if [ $NAMESERVER -eq 1 ]; then
 		FLAGS=$FLAGS" -n"
 	fi
@@ -169,7 +173,7 @@ start_daemons()
 	# 3) START DAEMONS
 	if [ $ROUTER -eq 1 ]; then
 		cd $XIADIR/daemons/xroute
-		./xroute & 
+		./xroute $HOSTNAME & 
 		sleep 2
 		
 		cd $XIADIR/daemons/xhcp
@@ -180,17 +184,22 @@ start_daemons()
 
 		if [ $DUAL_STACK -eq 1 ]; then
 			cd $XIADIR/daemons/xroute
-			./xroute_r0 & 
+			./xroute "$HOSTNAME"_router 180 &   # 180 is the name of a section in daemons/xroute/xsockconf.ini
 			sleep 2
 			
 			cd $XIADIR/daemons/xhcp
-			./xhcp_server_r0 &
+			./xhcp_server 180 &
 			sleep 1 
+		
+			cd $XIADIR/daemons/xhcp
+			./xhcp_client www_h.$HOSTNAME.com.xia "$HOSTNAME"_host &
+			sleep 2 
+		else
+			cd $XIADIR/daemons/xhcp
+			./xhcp_client www_h.$HOSTNAME.com.xia $HOSTNAME & 
+			sleep 2 
 		fi
 		
-		cd $XIADIR/daemons/xhcp
-		./xhcp_client www_h.$(hostname -s).com.xia  &  # TODO: test this
-		sleep 2 
 	fi
 	if [ $NAMESERVER -eq 1 -a $HOST -eq 1 ]; then
 		cd $XIADIR/daemons/nameserver
@@ -198,17 +207,17 @@ start_daemons()
 	fi
 	if [ $LOCAL_CHAIN_TOPOLOGY -eq 1 ]; then
 		cd $XIADIR/daemons/xroute
-		./xroute_r1 &
-		./xroute_r0 & 
+		./xroute router0 180 &
+		./xroute router1 181 & 
 		sleep 2
 		
 		cd $XIADIR/daemons/xhcp
-		./xhcp_server_r1 &
-		./xhcp_server_r0 &
+		./xhcp_server 180 &
+		./xhcp_server 181 &
 		sleep 1 
 			
-		./xhcp_client_h1 www_h.host1.com.xia &
-		./xhcp_client_h0 www_h.host0.com.xia  &
+		./xhcp_client www_h.host0.com.xia host0 172 &  # 172 is the name of a section in daemons/xhcp/xsockconf.ini
+		./xhcp_client www_h.host1.com.xia host1 192 &
 		sleep 2 
 			
 		cd $XIADIR/daemons/nameserver
@@ -236,7 +245,7 @@ help ()
 
 Start or stop the XIA network services.
 
-usage: $NAME [-cqvV4rtnZ] [-m <ip-addr>] [-f <filter_str>] [-I <interface>] [-s <script>] [-z <statserver>] [start|stop|restart|check]
+usage: $NAME [-cqvV4rtnZ] [-i <hostname>] [-m <ip-addr>] [-f <filter_str>] [-I <interface>] [-s <script>] [-z <statserver>] [start|stop|restart|check]
 where:
   -c only start click
   -s run click using the specified script
@@ -247,6 +256,7 @@ where:
   -4 generate and use a dual stack click script
   -r generate and use a generic router click script (like on GENI)
   -t generate and use a generic host click script (like on GENI)
+  -i use the supplied name as the click element name and HID shortcut
   -m manually set the node's 4ID IP address
   -n if generating a click script, this node will be the name server
   -f if generating a click script don't use interfaces matching these filter strings (comma-separated)
@@ -263,7 +273,7 @@ EOH
 	exit 0
 }
 
-while getopts "cs:qvV4nrthm:f:I:z:Z" opt; do
+while getopts "cs:qvV4nrthi:m:f:I:z:Z" opt; do
 	case $opt in
 		c)
 			CLICK_ONLY=1
@@ -299,6 +309,9 @@ while getopts "cs:qvV4nrthm:f:I:z:Z" opt; do
 		m)
 			IP_OVERRIDE_ADDR=$OPTARG
 			;;
+		i)
+			HOSTNAME=$OPTARG
+			;;
 		n)
 			NAMESERVER=1
 			DAEMONS=$DAEMONS" "$NAMESERVER_DAEMONS
@@ -326,27 +339,29 @@ done
 
 if [ $SCRIPT_SET -eq 0 ]; then
 	if [ $HOST -eq 1 ]; then
+		CONFPATH=$XIADIR/tools/click_templates
 		DAEMONS=$DAEMONS" "$HOST_DAEMONS
 		if [ $DUAL_STACK -eq 0 ]; then
-			DAEMONS=$DAEMONS" "$DUAL_STACK_HOST_EXTRA_DAEMONS
-			CONFPATH=$XIADIR/tools/click_templates
 			SCRIPT=host.click
 		else
-			CONFPATH=$XIADIR/tools/click_templates
 			SCRIPT=dual_stack_host.click
+			DAEMONS=$DAEMONS" "$DUAL_STACK_HOST_EXTRA_DAEMONS
 		fi
 	elif [ $ROUTER -eq 1 ]; then
+		CONFPATH=$XIADIR/tools/click_templates
 		DAEMONS=$DAEMONS" "$ROUTER_DAEMONS
 		if [ $DUAL_STACK -eq 0 ]; then
-			CONFPATH=$XIADIR/tools/click_templates
 			SCRIPT=router.click
 		else
-			CONFPATH=$XIADIR/tools/click_templates
 			SCRIPT=dual_stack_router.click
 		fi
 	else
 		SCRIPT=xia_chain_topology_socket_reliable_test.click
 	fi
+fi
+
+if [ "$HOSTNAME" == "" ]; then
+	HOSTNAME=$(hostname -s)
 fi
 
 # By default, use CHAIN_TOPOLOGY_DAEMONS if others were not specified
@@ -357,6 +372,7 @@ fi
 
 echo "SCRIPT: $SCRIPT"
 echo "DAEMONS: $DAEMONS"
+echo "HOSTNAME: $HOSTNAME"
 
 shift $((OPTIND-1))
 

@@ -1,5 +1,4 @@
-#! /usr/bin/python
-#
+#! /usr/bin/python #
 # script to generate click host and router config files
 
 import sys
@@ -55,7 +54,7 @@ def getHostname():
 	dot = hostname.find(".")
 	if (dot >= 0):
 		hostname = hostname[:dot]
-	return hostname
+	return ''.join(char for char in hostname if char.isalnum())  # make sure we don't return characters illegal in click element names
 	
 #
 # get a list of the interfaces and associated mac addresses on this machine
@@ -122,37 +121,6 @@ def getInterfaces(ignore_interfaces, specific_interface):
 
 	return interfaces
 
-#
-# get the IP, MAC, and default gateway associated with eth0 (used for dual-stack hosts)
-# TODO: Make this more general / combine with getInterfaces()?
-#
-#def getEth0():
-#	# Get the default gateway  TODO: should there be one per interface?
-#	cmdline = subprocess.Popen(
-#			"route -n | grep ^0.0.0.0 | tr -s ' ' | cut -d ' ' -f2",
-#			shell=True, stdout=subprocess.PIPE)
-#	default_gw = cmdline.stdout.read().strip()
-#
-#
-#	# Get the MAC and IP addresses
-#	cmdline = subprocess.Popen(
-#			"ifconfig | grep -A 1 HWaddr | tr '\n' ' ' | tr -s ' ' | cut -d ' ' -f1,5,7 | sed s/addr://",
-#			shell=True, stdout=subprocess.PIPE)
-#	result = cmdline.stdout.read().strip()
-#
-#	interfaces = []
-#	addrs = result.split("\n")
-#
-#	for addr in addrs:
-#		if (len(addr) != 0):
-#			(iface, mac, ip) = addr.split()
-#			if ip_override_addr != None:
-#				external_ip = ip_override_addr
-#			else:
-#				external_ip = ip
-#			interfaces.append([iface, mac, ip, default_gw, external_ip])
-#
-#	return interfaces
 
 #
 # Fill in the xia_address template file
@@ -701,7 +669,7 @@ def getOptions():
 #
 def help():
 	print """
-usage: xconfig [-h] [-rt] [-4] [-n] [-h hostname] [-m ipaddr] [-f if_filter] [-I host-interface]
+usage: xconfig [-h] [-rt] [-4] [-n] [-i hostname] [-m ipaddr] [-f if_filter] [-I host-interface]
 where:
   -h			: get help
   --help

@@ -62,35 +62,49 @@ int main(int argc, char *argv[]) {
 	char myrealAD[MAX_XID_SIZE];
 	char myHID[MAX_XID_SIZE]; 
 	char my4ID[MAX_XID_SIZE];	
-        char *hostname;
+    char *hostname;
 
- 	// set hostname (check if hostname is provided)
+ 	// set hostname, click element name, and API conf
 	if ( argc < 2 ) {
 		hostname = (char*) malloc(snprintf(NULL, 0, "%s", DEFAULT_HOSTNAME) + 1);
-                sprintf(hostname, "%s", DEFAULT_HOSTNAME);
-        } else {
+		sprintf(hostname, "%s", DEFAULT_HOSTNAME);
+
+		xr.setRouter("host0");
+
+    } else if ( argc == 2 || argc == 3 || argc == 4 ) {
 		std::string commandline_input = argv[1];
-  		if (commandline_input.find("www_h.") != string::npos) {	
+		if (commandline_input.find("www_h.") != string::npos) {	
 			hostname = (char*) malloc(snprintf(NULL, 0, "%s", argv[1]) + 1);
-                	sprintf(hostname, "%s", argv[1]);
- 		} else {
+		    sprintf(hostname, "%s", argv[1]);
+		} else {
 			hostname = (char*) malloc(snprintf(NULL, 0, "%s", DEFAULT_HOSTNAME) + 1);
-                	sprintf(hostname, "%s", DEFAULT_HOSTNAME);
+		    sprintf(hostname, "%s", DEFAULT_HOSTNAME);
 		}
-        }
 
-    	// make the response message dest DAG (intended destination: gw router who is running the routing process)
-    	pseudo_gw_router_dag = (char*)malloc(snprintf(NULL, 0, "RE %s %s", BHID, SID_XROUTE) + 1);
-    	sprintf(pseudo_gw_router_dag, "RE %s %s", BHID, SID_XROUTE);	
+		if ( argc == 3 || argc == 4 ) {
+			char* element_name = (char*)malloc(snprintf(NULL, 0, "%s", argv[2]) + 1);
+			sprintf(element_name, "%s", argv[2]);
+			xr.setRouter(element_name);
+		} else {
+			xr.setRouter("host0");
+		}
+		if ( argc == 4 ) {
+			set_conf("xsockconf.ini", argv[3]);
+		}
+    } else {
+		printf("Expected usage: xhcp_client [<hostname> [<element name> [<API conf name>]]]\n");
+	}
 
-    	// connect to the click route engine
+    // make the response message dest DAG (intended destination: gw router who is running the routing process)
+    pseudo_gw_router_dag = (char*)malloc(snprintf(NULL, 0, "RE %s %s", BHID, SID_XROUTE) + 1);
+    sprintf(pseudo_gw_router_dag, "RE %s %s", BHID, SID_XROUTE);	
+
+    // connect to the click route engine
 	if ((rc = xr.connect()) != 0) {
 		printf("unable to connect to click! (%d)\n", rc);
 		return -1;
 	}
 	
-	xr.setRouter("host0");
-			
 	// Xsocket init
 	int sockfd = Xsocket(XSOCK_DGRAM);
 	if (sockfd < 0) { perror("Opening Xsocket"); }

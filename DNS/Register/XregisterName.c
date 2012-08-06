@@ -41,7 +41,8 @@ int XregisterNameBIND(char *name, char *dag)
     fprintf(tmp, "zone %s\nupdate add %s %d XIA %s\nsend\n", zone, name, TTL,
             dag);
     fflush(tmp);
-
+    printf("zone %s\nupdate add %s %d XIA %s\nsend (filename=%s)\n", zone, name, TTL, dag, tmp_name);
+    
     /* Run nsupdate to add the record */
     sprintf(comm_str, "%s %s", NSUPDATE_COMM, tmp_name);
     ret = -1;

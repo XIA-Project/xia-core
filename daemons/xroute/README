@@ -1,0 +1,7 @@
+xroute takes as input the name of the click element whose routing tables it
+should modify and the name of an API configuration (assumed to be in 
+./xsockconf.ini). If these arguments are not supplied, the defaults element
+name is "router0" and no API configuration is set (the API defaults to 172.0.0.1).
+
+
+	xroute [<element name> [<API conf name>]]

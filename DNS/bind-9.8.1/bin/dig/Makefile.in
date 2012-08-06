@@ -29,17 +29,17 @@ CINCLUDES =	-I${srcdir}/include ${DNS_INCLUDES} ${BIND9_INCLUDES} \
 CDEFINES =	-DVERSION=\"${VERSION}\"
 CWARNINGS =
 
-ISCCFGLIBS =	../../lib/isccfg/libisccfg.@A@
+ISCCFGLIBS =	../../lib/isccfg/libisccfg.@A@ 
 DNSLIBS =	../../lib/dns/libdns.@A@ @DNS_CRYPTO_LIBS@
 BIND9LIBS =	../../lib/bind9/libbind9.@A@
-ISCLIBS =	../../lib/isc/libisc.@A@
-ISCNOSYMLIBS =	../../lib/isc/libisc-nosymtbl.@A@
+ISCLIBS =	../../lib/isc/libisc.@A@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
+ISCNOSYMLIBS =	../../lib/isc/libisc-nosymtbl.@A@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
 LWRESLIBS =	../../lib/lwres/liblwres.@A@
 
 ISCCFGDEPLIBS =	../../lib/isccfg/libisccfg.@A@
 DNSDEPLIBS =	../../lib/dns/libdns.@A@
 BIND9DEPLIBS =	../../lib/bind9/libbind9.@A@
-ISCDEPLIBS =	../../lib/isc/libisc.@A@
+ISCDEPLIBS =	../../lib/isc/libisc.@A@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
 LWRESDEPLIBS =	../../lib/lwres/liblwres.@A@
 
 DEPLIBS =	${DNSDEPLIBS} ${BIND9DEPLIBS} ${ISCDEPLIBS} ${ISCCFGDEPLIBS} \
