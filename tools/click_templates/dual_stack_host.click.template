@@ -13,10 +13,14 @@ ${HNAME}_router :: DualRouter4Port(RE ( IP:$EXTERNAL_IP ) $ADNAME $RHID, $ADNAME
 
 
 // connect host and router
-${HNAME}_host[0] -> XIAPrint("${HNAME}_host to ${HNAME}_router") -> LinkUnqueue(0.005, 1 GB/s) -> [2]${HNAME}_router[2] -> XIAPrint("${HNAME}_router to ${HNAME}_host") -> LinkUnqueue(0.005, 1 GB/s) -> [0]${HNAME}_host;
+${HNAME}_host_final_0::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
+${HNAME}_host_next_0::XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -)
+
+${HNAME}_host[0] -> XIAPrint("${HNAME}_host to ${HNAME}_router") -> LinkUnqueue(0.005, 1 GB/s) -> ${HNAME}_host_final_0 -> ${HNAME}_host_next_0 -> [2]${HNAME}_router[2] -> XIAPrint("${HNAME}_router to ${HNAME}_host") -> LinkUnqueue(0.005, 1 GB/s) -> [0]${HNAME}_host;
 
 
 // connect router's other ports
+// don't put any counters on a dual stack router because dual stack routers already have counters built in
 ######
 FromDevice($IFACE) -> IPPrint("$IFACE to [$NUM]${HNAME}_router") -> [$NUM]${HNAME}_router[$NUM] -> IPPrint("${HNAME}_router[$NUM] to $IFACE") -> ToDevice($IFACE);
 ######
