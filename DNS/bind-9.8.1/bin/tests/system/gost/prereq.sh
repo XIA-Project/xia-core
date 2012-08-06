@@ -16,7 +16,7 @@
 
 # $Id: prereq.sh.in,v 1.4 2010-12-27 13:38:43 marka Exp $
 
-OPENSSL_GOST="yes"
+OPENSSL_GOST=""
 if test -z "$OPENSSL_GOST"
 then
     echo "I:This test requires a openssl version with gost support." >&2

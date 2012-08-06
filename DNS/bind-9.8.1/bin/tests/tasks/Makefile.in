@@ -26,10 +26,10 @@ CINCLUDES =	${TEST_INCLUDES} ${ISC_INCLUDES}
 CDEFINES =
 CWARNINGS =
 
-ISCLIBS =	../../../lib/isc/libisc.@A@ @DNS_CRYPTO_LIBS@
+ISCLIBS =	../../../lib/isc/libisc.@A@ @DNS_CRYPTO_LIBS@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
 TAPIDEPLIBS =	../../../lib/tests/libt_api.@A@
 
-ISCDEPLIBS =	../../../lib/isc/libisc.@A@
+ISCDEPLIBS =	../../../lib/isc/libisc.@A@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
 TAPILIBS =	../../../lib/tests/libt_api.@A@
 
 DEPLIBS =	${TAPIDEPLIBS} ${ISCDEPLIBS}

@@ -43,27 +43,27 @@ VERSION=9.8.1
 # latter case, because there are no machine-generated OS-specific
 # headers.
 
-ISC_INCLUDES = -I/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1/lib/isc/include \
+ISC_INCLUDES = -I/usr0/home/sukbokl/xia-core/DNS/bind-9.8.1/lib/isc/include \
 	-I${top_srcdir}/lib/isc \
 	-I${top_srcdir}/lib/isc/include \
 	-I${top_srcdir}/lib/isc/unix/include \
 	-I${top_srcdir}/lib/isc/nothreads/include \
 	-I${top_srcdir}/lib/isc/x86_32/include
 
-ISCCC_INCLUDES = -I/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1/lib/isccc/include \
+ISCCC_INCLUDES = -I/usr0/home/sukbokl/xia-core/DNS/bind-9.8.1/lib/isccc/include \
        -I${top_srcdir}/lib/isccc/include
 
-ISCCFG_INCLUDES = -I/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1/lib/isccfg/include \
+ISCCFG_INCLUDES = -I/usr0/home/sukbokl/xia-core/DNS/bind-9.8.1/lib/isccfg/include \
        -I${top_srcdir}/lib/isccfg/include
 
-DNS_INCLUDES = -I/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1/lib/dns/include \
+DNS_INCLUDES = -I/usr0/home/sukbokl/xia-core/DNS/bind-9.8.1/lib/dns/include \
 	-I${top_srcdir}/lib/dns/include
 
-LWRES_INCLUDES = -I/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1/lib/lwres/include \
+LWRES_INCLUDES = -I/usr0/home/sukbokl/xia-core/DNS/bind-9.8.1/lib/lwres/include \
 	-I${top_srcdir}/lib/lwres/unix/include \
 	-I${top_srcdir}/lib/lwres/include
 
-BIND9_INCLUDES = -I/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1/lib/bind9/include \
+BIND9_INCLUDES = -I/usr0/home/sukbokl/xia-core/DNS/bind-9.8.1/lib/bind9/include \
 	-I${top_srcdir}/lib/bind9/include
 
 TEST_INCLUDES = \
@@ -73,7 +73,7 @@ CINCLUDES =	${DNS_INCLUDES} ${ISC_INCLUDES}
 CDEFINES =
 CWARNINGS =
 
-LIBS =		-ldl 
+LIBS =		-ldl  -lxml2
 
 SO_TARGETS =    driver.so
 TARGETS =	dlopen ${SO_TARGETS}
@@ -131,7 +131,7 @@ DESTDIR =
 
 
 
-top_builddir =	/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1
+top_builddir =	/usr0/home/sukbokl/xia-core/DNS/bind-9.8.1
 
 ###
 ### All
@@ -199,17 +199,17 @@ install clean distclean maintainer-clean doc docclean man manclean::
 ###     EXT_CFLAGS
 
 CC = 		gcc
-CFLAGS =	-g -O2
+CFLAGS =	-g -O2 -I/usr/include/libxml2
 LDFLAGS =	
 STD_CINCLUDES =	
 STD_CDEFINES =	 -D_GNU_SOURCE
 STD_CWARNINGS =	 -W -Wall -Wmissing-prototypes -Wcast-qual -Wwrite-strings -Wformat -Wpointer-arith -fno-strict-aliasing
 
 BUILD_CC = gcc
-BUILD_CFLAGS = -g -O2
+BUILD_CFLAGS = -g -O2 -I/usr/include/libxml2
 BUILD_CPPFLAGS =  -D_GNU_SOURCE 
 BUILD_LDFLAGS = 
-BUILD_LIBS = -ldl 
+BUILD_LIBS = -ldl  -lxml2
 
 .SUFFIXES:
 .SUFFIXES: .c .o
@@ -388,7 +388,7 @@ XSLTPROC =		/usr/bin/xsltproc --novalid --xinclude --nonet
 PERL =			/usr/bin/perl
 LATEX =			latex
 PDFLATEX =		pdflatex
-W3M =			w3m
+W3M =			/usr/bin/w3m
 
 ###
 ### Script language program used to create internal symbol tables
@@ -434,7 +434,7 @@ ALWAYS_MAKE_SYMTABLE =
 .docbook.8:
 	${XSLTPROC} -o $@ ${top_srcdir}/doc/xsl/isc-manpage.xsl $<
 
-CFLAGS =	-g -O2 -fPIC
+CFLAGS =	-g -O2 -I/usr/include/libxml2 -fPIC
 
 dlopen: ${DLOPENOBJS}
 	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${CFLAGS} ${LDFLAGS} \

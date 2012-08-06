@@ -43,24 +43,25 @@ DLZDRIVER_LIBS =	@DLZ_DRIVER_LIBS@
 CINCLUDES =	-I${srcdir}/include -I${srcdir}/unix/include -I. \
 		${LWRES_INCLUDES} ${DNS_INCLUDES} ${BIND9_INCLUDES} \
 		${ISCCFG_INCLUDES} ${ISCCC_INCLUDES} ${ISC_INCLUDES} \
-		${DLZDRIVER_INCLUDES} ${DBDRIVER_INCLUDES} @DST_OPENSSL_INC@
+		${DLZDRIVER_INCLUDES} ${DBDRIVER_INCLUDES} @DST_OPENSSL_INC@ \
+		-I ${top_srcdir}/../../XIASocket/API
 
 CDEFINES =      @CONTRIB_DLZ@ @USE_PKCS11@ @USE_OPENSSL@
 
 CWARNINGS =
 
 DNSLIBS =	../../lib/dns/libdns.@A@ @DNS_CRYPTO_LIBS@
-ISCCFGLIBS =	../../lib/isccfg/libisccfg.@A@
+ISCCFGLIBS =	../../lib/isccfg/libisccfg.@A@ 
 ISCCCLIBS =	../../lib/isccc/libisccc.@A@
-ISCLIBS =	../../lib/isc/libisc.@A@ /home/isruser/Desktop/xia/release/xia-core/XIASocket/API/libXsocket.a -lprotobuf -lpthread
-ISCNOSYMLIBS =	../../lib/isc/libisc-nosymtbl.@A@ /home/isruser/Desktop/xia/release/xia-core/XIASocket/API/libXsocket.a -lprotobuf -lpthread
+ISCLIBS =	../../lib/isc/libisc.@A@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
+ISCNOSYMLIBS =	../../lib/isc/libisc-nosymtbl.@A@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
 LWRESLIBS =	../../lib/lwres/liblwres.@A@
 BIND9LIBS =	../../lib/bind9/libbind9.@A@
 
 DNSDEPLIBS =	../../lib/dns/libdns.@A@
 ISCCFGDEPLIBS =	../../lib/isccfg/libisccfg.@A@
 ISCCCDEPLIBS =	../../lib/isccc/libisccc.@A@
-ISCDEPLIBS =	../../lib/isc/libisc.@A@
+ISCDEPLIBS =	../../lib/isc/libisc.@A@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
 LWRESDEPLIBS =	../../lib/lwres/liblwres.@A@
 BIND9DEPLIBS =	../../lib/bind9/libbind9.@A@
 

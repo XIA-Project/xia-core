@@ -82,7 +82,7 @@ SRCS =		  \
 		serial.c sha1.c sha2.c sockaddr.c stats.c string.c strtoul.c \
 		symtab.c symtbl-empty.c task.c taskpool.c timer.c version.c
 
-LIBS =		-ldl 
+LIBS =		-ldl  -lxml2
 
 # Note: the order of SUBDIRS is important.
 # Attempt to disable parallel processing.
@@ -136,7 +136,7 @@ DESTDIR =
 
 
 
-top_builddir =	/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1
+top_builddir =	/usr0/home/sukbokl/xia-core/DNS/bind-9.8.1
 
 ###
 ### All
@@ -204,17 +204,17 @@ install clean distclean maintainer-clean doc docclean man manclean::
 ###     EXT_CFLAGS
 
 CC = 		gcc
-CFLAGS =	-g -O2
+CFLAGS =	-g -O2 -I/usr/include/libxml2
 LDFLAGS =	
 STD_CINCLUDES =	
 STD_CDEFINES =	 -D_GNU_SOURCE
 STD_CWARNINGS =	 -W -Wall -Wmissing-prototypes -Wcast-qual -Wwrite-strings -Wformat -Wpointer-arith -fno-strict-aliasing
 
 BUILD_CC = gcc
-BUILD_CFLAGS = -g -O2
+BUILD_CFLAGS = -g -O2 -I/usr/include/libxml2
 BUILD_CPPFLAGS =  -D_GNU_SOURCE 
 BUILD_LDFLAGS = 
-BUILD_LIBS = -ldl 
+BUILD_LIBS = -ldl  -lxml2
 
 .SUFFIXES:
 .SUFFIXES: .c .o
@@ -393,7 +393,7 @@ XSLTPROC =		/usr/bin/xsltproc --novalid --xinclude --nonet
 PERL =			/usr/bin/perl
 LATEX =			latex
 PDFLATEX =		pdflatex
-W3M =			w3m
+W3M =			/usr/bin/w3m
 
 ###
 ### Script language program used to create internal symbol tables

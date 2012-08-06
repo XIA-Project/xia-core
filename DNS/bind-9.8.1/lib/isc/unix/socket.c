@@ -101,7 +101,7 @@
 #define MAX_DAG_LEN 1024
 #define AD0 "AD:1000000000000000000000000000000000000000"
 #define HID0 "HID:0000000000000000000000000000000000000000"
-#define SID_BIND "SID:1110000000000000000000000000000000001113"
+#define SID_BIND "SID:1110000000000000000000000000000000001114"
 
 /*%
  * Choose the most preferable multiplex method.
@@ -1686,6 +1686,8 @@ ssize_t Xrecvmsg(int sd, struct msghdr *msg, int flags)
 
     msg->msg_namelen = dag_len;
     msg->msg_name = dag;
+              
+        printf("\nReceived a datagram (data=%s) (len=%d) from:%s \n",tmp_buf, (int)bytes_read, dag);
 
     left2move = bytes_read;
 
@@ -1698,7 +1700,7 @@ ssize_t Xrecvmsg(int sd, struct msghdr *msg, int flags)
         left2move -= msg->msg_iov[i].iov_len;
         tmp += msg->msg_iov[i].iov_len;
     }
-
+    
     free(tmp_buf);
 
     return bytes_read;
@@ -2396,6 +2398,19 @@ opensocket(isc__socketmgr_t *manager, isc__socket_t *sock) {
 		break;
     case isc_sockettype_xdp:
         sock->fd = Xsocket(XSOCK_DGRAM);
+        
+        
+        printf("Xsocket open (fd=%d)\n", sock->fd);
+     char myAD[1024]; 
+    char myHID[1024];    
+    char my4ID[1024]; 
+    if ( XreadLocalHostAddr(sock->fd, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 ) {
+    	printf("ERROR 1\n");
+    }     
+        printf("Xsocket open: AD=%s HID=%s\n", myAD, myHID);        
+        
+        
+        
         break;
 	}
 	if (sock->fd == -1 && errno == EINTR && tries++ < 42)

@@ -44,56 +44,57 @@ VERSION=9.8.1
 # latter case, because there are no machine-generated OS-specific
 # headers.
 
-ISC_INCLUDES = -I/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1/lib/isc/include \
+ISC_INCLUDES = -I/usr0/home/sukbokl/xia-core/DNS/bind-9.8.1/lib/isc/include \
 	-I${top_srcdir}/lib/isc \
 	-I${top_srcdir}/lib/isc/include \
 	-I${top_srcdir}/lib/isc/unix/include \
 	-I${top_srcdir}/lib/isc/nothreads/include \
 	-I${top_srcdir}/lib/isc/x86_32/include
 
-ISCCC_INCLUDES = -I/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1/lib/isccc/include \
+ISCCC_INCLUDES = -I/usr0/home/sukbokl/xia-core/DNS/bind-9.8.1/lib/isccc/include \
        -I${top_srcdir}/lib/isccc/include
 
-ISCCFG_INCLUDES = -I/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1/lib/isccfg/include \
+ISCCFG_INCLUDES = -I/usr0/home/sukbokl/xia-core/DNS/bind-9.8.1/lib/isccfg/include \
        -I${top_srcdir}/lib/isccfg/include
 
-DNS_INCLUDES = -I/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1/lib/dns/include \
+DNS_INCLUDES = -I/usr0/home/sukbokl/xia-core/DNS/bind-9.8.1/lib/dns/include \
 	-I${top_srcdir}/lib/dns/include
 
-LWRES_INCLUDES = -I/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1/lib/lwres/include \
+LWRES_INCLUDES = -I/usr0/home/sukbokl/xia-core/DNS/bind-9.8.1/lib/lwres/include \
 	-I${top_srcdir}/lib/lwres/unix/include \
 	-I${top_srcdir}/lib/lwres/include
 
-BIND9_INCLUDES = -I/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1/lib/bind9/include \
+BIND9_INCLUDES = -I/usr0/home/sukbokl/xia-core/DNS/bind-9.8.1/lib/bind9/include \
 	-I${top_srcdir}/lib/bind9/include
 
 TEST_INCLUDES = \
 	-I${top_srcdir}/lib/tests/include
 
 CINCLUDES =	${LWRES_INCLUDES} ${DNS_INCLUDES} ${BIND9_INCLUDES} \
-		${ISC_INCLUDES} ${ISCCFG_INCLUDES} 
+		${ISC_INCLUDES} ${ISCCFG_INCLUDES} -I/usr/include \
+		 -I ${top_srcdir}/../../XIASocket/API
 
-CDEFINES =	
+CDEFINES =	-DGSSAPI
 CWARNINGS =
 
 LWRESLIBS =	../../lib/lwres/liblwres.a
-DNSLIBS =	../../lib/dns/libdns.a  -lcrypto
+DNSLIBS =	../../lib/dns/libdns.a  -lgssapi_krb5 -lcrypto
 BIND9LIBS =	../../lib/bind9/libbind9.a
-ISCLIBS =	../../lib/isc/libisc.a /home/isruser/Desktop/xia/release/xia-core/XIASocket/API/libXsocket.a -lprotobuf -lpthread
-ISCNOSYMLIBS =	../../lib/isc/libisc-nosymtbl.a /home/isruser/Desktop/xia/release/xia-core/XIASocket/API/libXsocket.a -lprotobuf -lpthread
+ISCLIBS =	../../lib/isc/libisc.a ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
+ISCNOSYMLIBS =	../../lib/isc/libisc-nosymtbl.a ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
 ISCCFGLIBS =	../../lib/isccfg/libisccfg.a
 
 LWRESDEPLIBS =	../../lib/lwres/liblwres.a
 DNSDEPLIBS =	../../lib/dns/libdns.a
 BIND9DEPLIBS =	../../lib/bind9/libbind9.a
-ISCDEPLIBS =	../../lib/isc/libisc.a
+ISCDEPLIBS =	../../lib/isc/libisc.a ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
 ISCCFGDEPLIBS =	../../lib/isccfg/libisccfg.a
 
 DEPLIBS =	${DNSDEPLIBS} ${BIND9DEPLIBS} ${ISCDEPLIBS} ${ISCCFGDEPLIBS}
 
-LIBS =		${LWRESLIBS} ${DNSLIBS} ${BIND9LIBS} ${ISCCFGLIBS} ${ISCLIBS} -ldl 
+LIBS =		${LWRESLIBS} ${DNSLIBS} ${BIND9LIBS} ${ISCCFGLIBS} ${ISCLIBS} -ldl  -lxml2
 
-NOSYMLIBS =	${LWRESLIBS} ${DNSLIBS} ${BIND9LIBS} ${ISCCFGLIBS} ${ISCNOSYMLIBS} -ldl 
+NOSYMLIBS =	${LWRESLIBS} ${DNSLIBS} ${BIND9LIBS} ${ISCCFGLIBS} ${ISCNOSYMLIBS} -ldl  -lxml2
 
 SUBDIRS =
 
@@ -155,7 +156,7 @@ DESTDIR =
 
 
 
-top_builddir =	/home/isruser/Desktop/xia/release/xia-core/DNS/bind-9.8.1
+top_builddir =	/usr0/home/sukbokl/xia-core/DNS/bind-9.8.1
 
 ###
 ### All
@@ -223,17 +224,17 @@ install clean distclean maintainer-clean doc docclean man manclean::
 ###     EXT_CFLAGS
 
 CC = 		gcc
-CFLAGS =	-g -O2
+CFLAGS =	-g -O2 -I/usr/include/libxml2
 LDFLAGS =	
 STD_CINCLUDES =	
 STD_CDEFINES =	 -D_GNU_SOURCE
 STD_CWARNINGS =	 -W -Wall -Wmissing-prototypes -Wcast-qual -Wwrite-strings -Wformat -Wpointer-arith -fno-strict-aliasing
 
 BUILD_CC = gcc
-BUILD_CFLAGS = -g -O2
+BUILD_CFLAGS = -g -O2 -I/usr/include/libxml2
 BUILD_CPPFLAGS =  -D_GNU_SOURCE 
 BUILD_LDFLAGS = 
-BUILD_LIBS = -ldl 
+BUILD_LIBS = -ldl  -lxml2
 
 .SUFFIXES:
 .SUFFIXES: .c .o
@@ -412,7 +413,7 @@ XSLTPROC =		/usr/bin/xsltproc --novalid --xinclude --nonet
 PERL =			/usr/bin/perl
 LATEX =			latex
 PDFLATEX =		pdflatex
-W3M =			w3m
+W3M =			/usr/bin/w3m
 
 ###
 ### Script language program used to create internal symbol tables

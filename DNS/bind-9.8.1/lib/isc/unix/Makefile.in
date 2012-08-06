@@ -24,7 +24,7 @@ CINCLUDES =	-I${srcdir}/include \
 		-I../include \
 		-I${srcdir}/../include \
 		-I${srcdir}/.. \
-        -I/home/isruser/Desktop/xia/release/xia-core/XIASocket/API
+        -I ${top_srcdir}/../../XIASocket/API
 
 CDEFINES =
 CWARNINGS =

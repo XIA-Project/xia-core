@@ -27,7 +27,7 @@ CWARNINGS =
 
 ISCLIBS =	../../../lib/isc/libisc.@A@ @DNS_CRYPTO_LIBS@
 
-ISCDEPLIBS =	../../../lib/isc/libisc.@A@
+ISCDEPLIBS =	../../../lib/isc/libisc.@A@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
 
 DEPLIBS =	${ISCDEPLIBS}
 

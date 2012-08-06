@@ -21,14 +21,14 @@ top_srcdir =	@top_srcdir@
 
 @BIND9_MAKE_INCLUDES@
 
-CINCLUDES =	${TEST_INCLUDES} ${ISC_INCLUDES}
+CINCLUDES =	${TEST_INCLUDES} ${ISC_INCLUDES}  -I ${top_srcdir}/../../XIASocket/API
 
 CDEFINES =
 CWARNINGS =
 
-ISCLIBS =	../../../lib/isc/libisc.@A@ @DNS_CRYPTO_LIBS@
+ISCLIBS =	../../../lib/isc/libisc.@A@ @DNS_CRYPTO_LIBS@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
 
-ISCDEPLIBS =	../../../lib/isc/libisc.@A@
+ISCDEPLIBS =	../../../lib/isc/libisc.@A@ ${top_srcdir}/../../XIASocket/API/libXsocket.a -lprotobuf -lpthread
 
 DEPLIBS =	${ISCDEPLIBS}
 

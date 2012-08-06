@@ -12,7 +12,7 @@
 
 #define HID0 "HID:0000000000000000000000000000000000000000"
 #define AD0 "AD:1000000000000000000000000000000000000000"
-#define SID_BIND "SID:1110000000000000000000000000000000001113"
+#define SID_BIND "SID:1110000000000000000000000000000000001114"
 
 
 static char DAG[256];
@@ -133,6 +133,7 @@ const char *XgetDAGbyname(char *name) {
             0, serv_addr, serv_addr_len)) < 0) {
         return NULL;
     }
+//printf("After Xsento to (%s): query=%s\n", serv_addr, query_buf);     
     // receive response from dns server
     if (Xrecvfrom(dns_sock, response_buf, 1024, 0, serv_addr,
             &serv_addr_len) < 0) {
