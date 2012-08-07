@@ -98,12 +98,10 @@ def getStats(kind):
 	s = ''
 	if kind == 'final':
 		for k, v in final.items():
-			print k
 			s += v + '\n'
 #			del final[k]
 	else:
 		for k, v in next.items():
-			print k
 			s += v + '\n'
 #			del next[k]
 
@@ -115,7 +113,7 @@ def getStats(kind):
 class XIAStatsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
 	def do_GET(self):
-		print 'get: ', self.path
+#		print 'get: ', self.path
 		if self.path == CONNECTIONS:
 			self.wfile.write(getConnections())
 		elif self.path == FINAL:
@@ -127,7 +125,7 @@ class XIAStatsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
 
 	def do_POST(self):
-		print "post"
+#		print "post"
 		self.wfile.write("post")
 
 
