@@ -36,7 +36,7 @@ NEXT_PATH = '/next'
 
 # retrieval intervals
 STATS_INTERVAL = 1
-ROUTE_INTERVAL = 5
+ROUTE_INTERVAL = 1
 
 # Minimum Click version required
 MAJOR = 1
