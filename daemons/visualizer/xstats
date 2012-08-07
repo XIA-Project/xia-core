@@ -35,7 +35,7 @@ FINAL_PATH = '/final'
 NEXT_PATH = '/next'
 
 # retrieval intervals
-STATS_INTERVAL = 3
+STATS_INTERVAL = 1
 ROUTE_INTERVAL = 3
 
 # Minimum Click version required
