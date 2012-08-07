@@ -136,14 +136,17 @@ XIAXIDTypeCounter::configure(Vector<String> &conf, ErrorHandler *errh)
 void 
 XIAXIDTypeCounter::count_stats(int cl)
 {
+printf("count_stats\n");
     assert(cl < _size);
     _stats[cl]++;
+printf("port %d = %d\n", cl, _stats[cl]);
 }
 
 Packet *
 XIAXIDTypeCounter::simple_action(Packet *p)
 {
     int classification = match(p);
+printf("match returned %d\n", classification);
     if (classification >= 0)
 		count_stats(classification);
     return p;
@@ -167,10 +170,10 @@ XIAXIDTypeCounter::match(Packet *p)
     uint32_t dst_xid_type = __dstID.type;
     struct click_xia_xid __srcID = hdr->node[hdr->dnode + hdr->snode - 1].xid;
     uint32_t src_xid_type = __srcID.type;
-
+#if 0
     // hack to the hack. Filter out weird xid types so the following code doesn't smash the stack
     // for some reason we get garbage data periodically that causes the XID constructor to fail
-    if (__srcID.type > CLICK_XIA_XID_TYPE_IP || __dstID.type > CLICK_XIA_XID_TYPE_IP)
+    if (ntohl(__srcID.type > CLICK_XIA_XID_TYPE_IP) || ntohl(__dstID.type > CLICK_XIA_XID_TYPE_IP))
 	return -1;
 
 //    printf ("%08x %08x\n", ntohl(__dstID.type), ntohl(__srcID.type));
@@ -189,9 +192,10 @@ XIAXIDTypeCounter::match(Packet *p)
     	strcmp(ds, "SID:1110000000000000000000000000000000001112") == 0 ||
     	strcmp(ds, "SID:1110000000000000000000000000000000001113") == 0 ||
     	strcmp(ds, "HID:1111111111111111111111111111111111111111") == 0) {
+printf("skipping management traffic\n");
     	return -1;
     }
-
+#endif
     uint32_t next_xid_type = -1;
     {
         int last = hdr->last;
@@ -210,30 +214,38 @@ XIAXIDTypeCounter::match(Packet *p)
         const struct pattern& pat = _patterns[i];
         switch (pat.type) {
             case pattern::SRC:
+printf("src count\n");
                 if (src_xid_type == pat.src_xid_type)
                     return i;
                 break;
             case pattern::DST:
+printf("dst count\n");
                 if (dst_xid_type == pat.dst_xid_type)
                     return i;
                 break;
             case pattern::SRC_AND_DST:
+printf("sad count\n");
                 if (src_xid_type == pat.src_xid_type && dst_xid_type == pat.dst_xid_type)
                     return i;
                 break;
             case pattern::SRC_OR_DST:
+printf("sod count\n");
                 if (src_xid_type == pat.src_xid_type || dst_xid_type == pat.dst_xid_type)
                     return i;
                 break;
             case pattern::NEXT:
+printf("nxt count\n");
                 if (next_xid_type == pat.next_xid_type)
                     return i;
                 break;
             case pattern::ANY:
+printf("any count\n");
                 return i;
                 break;
         }
     }
+
+printf("no match in counter\n");
     return -1;
 }
 
