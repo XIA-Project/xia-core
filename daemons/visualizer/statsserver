@@ -16,7 +16,9 @@
 #
 
 import time
+import threading
 import BaseHTTPServer
+from SocketServer import ThreadingMixIn
 from optparse import OptionParser
 
 TITLE = "XIAStatsServer/0.1"
@@ -30,6 +32,9 @@ connections = {}
 final = {}
 next = {}
 
+c_lock = threading.Lock()
+f_lock = threading.Lock()
+n_lock = threading.Lock()
 
 def say(msg):
 	global options
@@ -39,6 +44,8 @@ def say(msg):
 
 
 def updateConnections(data):
+	global c_lock
+
 	lines = data.split()
 
 	key = ''
@@ -49,20 +56,27 @@ def updateConnections(data):
 
 		if k != key:
 			if len(c) != 0:
+				c_lock.acquire()
 				connections[key] = c
+				c_lock.release()
 				c = []
 			key = k
 
 		c.append({'time': time.time(), 'data': line})
 
 	if key != '':
+		c_lock.acquire()
 		connections[key] = c
+		c_lock.release()
 
 
 
 def getConnections():
+	global c_lock
 
 	s = ''
+
+	c_lock.acquire()
 	expired = time.time() - EXPIRED
 
 	for c in connections.itervalues():
@@ -75,6 +89,7 @@ def getConnections():
 		# add any non-expired entries to the result
 		for cc in c:
 			s += cc['data'] + '\n'
+	c_lock.release()
 
 	return s
 
@@ -82,28 +97,41 @@ def getConnections():
 def updateStats(kind, data):
 	global final
 	global next
+	global n_lock
+	global f_lock
 
 	for line in data.split():
 		(hid, port, io, counts) = line.split(',', 3)
 		key = ('%s:%s:%s') % (hid, port, io)
 		if kind == 'final':
+			f_lock.acquire()
 			final[key] = line
+			f_lock.release()
 		else:
+			n_lock.acquire()
 			next[key] = line
+			n_lock.release()
 
 
 def getStats(kind):
 	global final
 	global next
+	global n_lock
+	global f_lock
+
 	s = ''
 	if kind == 'final':
+		f_lock.acquire()
 		for k, v in final.items():
 			s += v + '\n'
 #			del final[k]
+		f_lock.release()
 	else:
+		n_lock.acquire()
 		for k, v in next.items():
 			s += v + '\n'
 #			del next[k]
+		n_lock.release()
 
 	return s
 
@@ -150,7 +178,11 @@ class XIAStatsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		self.send_response(200)
 
 
-def main(server_class=BaseHTTPServer.HTTPServer, handler_class=XIAStatsHandler):
+class MultiThreadedHTTPServer(ThreadingMixIn, BaseHTTPServer.HTTPServer):
+    pass
+
+
+def main(server_class=MultiThreadedHTTPServer, handler_class=XIAStatsHandler):
 
 	global options
 
