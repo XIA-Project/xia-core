@@ -136,17 +136,14 @@ XIAXIDTypeCounter::configure(Vector<String> &conf, ErrorHandler *errh)
 void 
 XIAXIDTypeCounter::count_stats(int cl)
 {
-printf("count_stats\n");
     assert(cl < _size);
     _stats[cl]++;
-printf("port %d = %d\n", cl, _stats[cl]);
 }
 
 Packet *
 XIAXIDTypeCounter::simple_action(Packet *p)
 {
     int classification = match(p);
-printf("match returned %d\n", classification);
     if (classification >= 0)
 		count_stats(classification);
     return p;
@@ -192,7 +189,6 @@ XIAXIDTypeCounter::match(Packet *p)
     	strcmp(ds, "SID:1110000000000000000000000000000000001112") == 0 ||
     	strcmp(ds, "SID:1110000000000000000000000000000000001113") == 0 ||
     	strcmp(ds, "HID:1111111111111111111111111111111111111111") == 0) {
-printf("skipping management traffic\n");
     	return -1;
     }
 #endif
@@ -214,38 +210,31 @@ printf("skipping management traffic\n");
         const struct pattern& pat = _patterns[i];
         switch (pat.type) {
             case pattern::SRC:
-printf("src count\n");
                 if (src_xid_type == pat.src_xid_type)
                     return i;
                 break;
             case pattern::DST:
-printf("dst count\n");
                 if (dst_xid_type == pat.dst_xid_type)
                     return i;
                 break;
             case pattern::SRC_AND_DST:
-printf("sad count\n");
                 if (src_xid_type == pat.src_xid_type && dst_xid_type == pat.dst_xid_type)
                     return i;
                 break;
             case pattern::SRC_OR_DST:
-printf("sod count\n");
                 if (src_xid_type == pat.src_xid_type || dst_xid_type == pat.dst_xid_type)
                     return i;
                 break;
             case pattern::NEXT:
-printf("nxt count\n");
                 if (next_xid_type == pat.next_xid_type)
                     return i;
                 break;
             case pattern::ANY:
-printf("any count\n");
                 return i;
                 break;
         }
     }
 
-printf("no match in counter\n");
     return -1;
 }
 
