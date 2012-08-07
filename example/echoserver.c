@@ -202,6 +202,7 @@ void echo_stream()
 {
 	char myAD[MAX_XID_SIZE];
 	char myHID[MAX_XID_SIZE];
+	char my4ID[MAX_XID_SIZE];
 	int acceptor, sock;
 	char *dag;
 
@@ -211,7 +212,7 @@ void echo_stream()
 		die(-2, "unable to create the stream socket\n");
 
     // read the localhost AD and HID
-    if ( XreadLocalHostAddr(acceptor, myAD, sizeof(myAD), myHID, sizeof(myHID)) < 0 )
+    if ( XreadLocalHostAddr(acceptor, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
     	die(-1, "Reading localhost address\n");
 
 	if (!(dag = createDAG(myAD, myHID, SID_STREAM)))
@@ -264,6 +265,7 @@ void echo_dgram()
 	char cdag[1024]; // client's dag
 	char myAD[MAX_XID_SIZE];
 	char myHID[MAX_XID_SIZE];
+	char my4ID[MAX_XID_SIZE];
 	size_t dlen;
 	int n;
 
@@ -273,7 +275,7 @@ void echo_dgram()
 		die(-2, "unable to create the datagram socket\n");
 
     // read the localhost AD and HID
-    if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID)) < 0 )
+    if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
     	die(-1, "Reading localhost address\n");
 
 	if (!(dag = createDAG(myAD, myHID, SID_DGRAM)))
