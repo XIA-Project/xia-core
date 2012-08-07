@@ -137,26 +137,15 @@ class ClickControl:
 	#
 	def readData(self, cmd):
 		self.csock.write("READ %s\n" % (cmd))
-		self.checkStatus(False)
+		code = self.checkStatus(False)
 
+		if code != 200:
+			return None
 		length = self.readLength()
 		buf = ""
 		while len(buf) < length:
 			buf += self.csock.read_some()
 		return buf
-
-
-	#
-	# send a write command to click and verify it worked OK
-	#
-	def writeData(self, cmd):
-		self.csock.write("WRITE %s\n" % (cmd))
-		code = self.checkStatus(False)
-
-		# the click write handler returns 2 lines of status on an error, and the
-		#second line contains a more useful message, so call it again
-		if code != 200:
-			self.checkStatus(True)
 
 
 	#
@@ -196,7 +185,17 @@ class Router:
 		self.connections = []
 		self.nextStats = {}
 		self.finalStats = {}
+		self.nextStatsIp = {}
+		self.finalStatsIp = {}
 		self.ports = []
+
+		for port in range(0, 4):
+			k = '%d:IN' % (port)
+			self.finalStatsIp[k] = Stats('final')
+			self.nextStatsIp[k] = Stats('next')
+			k = '%d:OUT' % (port)
+			self.finalStatsIp[k] = Stats('final')
+			self.nextStatsIp[k] = Stats('next')
 
 
 	def addRoute(self, r):
@@ -298,14 +297,19 @@ class Connection:
 # XIA routers/hosts
 #
 class DeviceList:
-	devices = {}
 
+	def __init__(self):
+		self.devices = {}
+		self.dualStack = False
 
 	def add(self, name, r):
 		self.devices[name] = r
 
 
 	def parse(self, conf):
+		if conf.find('dualrouter') >= 0:
+			self.dualStack = True
+
 		entries = conf.split(";")
 		for entry in entries:
 			entry = entry.strip()
@@ -417,15 +421,59 @@ def updateRoutes(click):
 
 
 def getCounts(s):
-	ad, hid, sid, cid, ip, unknown = s.splitlines()
-	ad  = ad[7:]
-	hid = hid[7:]
-	sid = sid[7:]
-	cid = cid[7:]
-	ip  = ip[7:]
-	unknown = unknown[7:]
+	if s == None:
+		return None
 
-	return "%s %s %s %s %s %s" % (ad, hid, sid, cid, ip, unknown)
+	counts = s.splitlines()
+	if len(counts) == 1:
+		ad = hid = cid = sid = unknown = 0
+		ip = counts[0][7:]
+
+	else:
+		ad, hid, sid, cid, ip, unknown = s.splitlines()
+		ad  = ad[7:]
+		hid = hid[7:]
+		sid = sid[7:]
+		cid = cid[7:]
+		ip  = ip[7:]
+		unknown = unknown[7:]
+
+	s = "%s %s %s %s %s %s" % (ad, hid, sid, cid, ip, unknown)
+#	print 's = ', s
+	return s
+
+
+def updateDualStats(click, kind):
+	s = ''
+	for device in devices.devices.itervalues():
+		for port in range(0, 4):
+
+#			print 'raw( ', click.readData("%s/dualrouter_%s_%d.count" % (device.name, kind, port)), ' )'
+			counts = getCounts(click.readData("%s/dualrouter_%s_%d.count" % (device.name, kind, port)))
+			fromip = getCounts(click.readData("%s/dualrouter_fromip_%s_%d.count" % (device.name, kind, port)))
+
+			kin = '%d:IN' % (port)
+			kout = '%d:OUT' % (port)
+
+			if kind == 'final':
+				if counts != None:
+					device.finalStatsIp[kout].update(counts, device.name)
+					s += '%s,%d,OUT,%s\n' % (device.hid, port, device.finalStatsIp[kout].csv())
+				if fromip != None:
+					device.finalStatsIp[kin].update(counts, device.name)
+					s += '%s,%d,IN,%s\n' % (device.hid, port, device.finalStatsIp[kin].csv())
+
+			else:
+				if counts != None:
+					device.nextStatsIp[kout].update(counts, device.name)
+					s += '%s,%d,OUT,%s\n' % (device.hid, port, device.nextStatsIp[kout].csv())
+				if fromip != None:
+					device.nextStatsIp[kin].update(counts, device.name)
+					s += '%s,%d,IN,%s\n' % (device.hid, port, device.nextStatsIp[kin].csv())
+
+	# check to see if there is a - next hop IP route, and if so also get dualrouter_next_foo and dualrouter_final_foo
+	# dualrouter_fromip_final_foo, dualrouter_fromip_next_foo
+	return s
 
 
 def updateStats(click, kind):
@@ -435,6 +483,9 @@ def updateStats(click, kind):
 
 			counts = getCounts(click.readData("%s_%s_%d.count" % (device.name, kind, port)))
 
+			if counts == None:
+				continue
+				
 			if kind == 'final':
 				device.finalStats[port].update(counts, device.name)
 				txt= '%s,%d,OUT,%s\n' % (device.hid, port, device.finalStats[port].csv())
@@ -444,8 +495,6 @@ def updateStats(click, kind):
 				device.nextStats[port].update(counts, device.name)
 				s += '%s,%d,OUT,%s\n' % (device.hid, port, device.nextStats[port].csv())
 
-	# check to see if there is a - next hop IP route, and if so also get dualrouter_next_foo and dualrouter_final_foo
-	# dualrouter_fromip_final_foo, dualrouter_fromip_next_foo
 	return s
 
 
@@ -481,6 +530,9 @@ def main():
 	devices = DeviceList()
 	devices.parse(click.readData("flatconfig"))
 
+	rts = updateRoutes(click)
+	sendData(CONNECT_PATH, rts)
+
 	# query and send info to the stats server
 	base_url = 'http://%s:%s' %(options.host, options.port)
 	lastStat = lastRoute = 0
@@ -489,10 +541,19 @@ def main():
 			now = time.time()
 			if now - lastStat > STATS_INTERVAL:
 				lastStat = now
+
+				if devices.dualStack:
+					s = updateDualStats(click, 'final')
+					sendData(FINAL_PATH, s)
+					s = updateDualStats(click, 'next')
+					sendData(NEXT_PATH, s)
+
 				s = updateStats(click, 'final')
-				sendData(FINAL_PATH, s)
+				if s != None:
+					sendData(FINAL_PATH, s)
 				s = updateStats(click, 'next')
-				sendData(NEXT_PATH, s)
+				if s != None:
+					sendData(NEXT_PATH, s)
 
 			if now - lastRoute > ROUTE_INTERVAL:
 				lastRoute = now
