@@ -26,6 +26,7 @@ PORT = 8888
 CONNECTIONS = '/connections'
 FINAL = '/final'
 NEXT = '/next'
+STATS = '/stats'
 EXPIRED = 10
 
 connections = {}
@@ -52,7 +53,7 @@ def updateConnections(data):
 	c = []
 	for line in lines:
 		(name, ad, hid, kind, port, next) = line.split(',')
-		k = ('%s:%s') % (ad, hid)
+		k = hid
 
 		if k != key:
 			if len(c) != 0:
@@ -77,21 +78,41 @@ def getConnections():
 	s = ''
 
 	c_lock.acquire()
-	expired = time.time() - EXPIRED
+	expired = time.time() - options.expired
 
 	for c in connections.itervalues():
 
-		# remove all expired entries
-		# this still leaves the device key in the hash table, but the list of entries is empty
-		# probably would be good to clean this up at some point, but not worth worrying about right now
+		# find unexpired entries
+		# FIXME: change this to delete old entries and delete them instead of i
+		# leaving them in the table
 		c[:] = (cc for cc in c if cc['time'] > expired)
 
-		# add any non-expired entries to the result
 		for cc in c:
 			s += cc['data'] + '\n'
 	c_lock.release()
 
 	return s
+
+
+def updateStats1(data):
+	global final
+	global next
+	global n_lock
+	global f_lock
+
+	for line in data.split():
+		(kind, line) = line.split(',', 1)
+		(hid, port, io, counts) = line.split(',', 3)
+		key = ('%s:%s:%s') % (hid, port, io)
+
+		if kind == 'final':
+			f_lock.acquire()
+			final[key] = line
+			f_lock.release()
+		else:
+			n_lock.acquire()
+			next[key] = line
+			n_lock.release()
 
 
 def updateStats(kind, data):
@@ -124,13 +145,11 @@ def getStats(kind):
 		f_lock.acquire()
 		for k, v in final.items():
 			s += v + '\n'
-#			del final[k]
 		f_lock.release()
 	else:
 		n_lock.acquire()
 		for k, v in next.items():
 			s += v + '\n'
-#			del next[k]
 		n_lock.release()
 
 	return s
@@ -164,11 +183,14 @@ class XIAStatsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		if self.path == CONNECTIONS:
 			updateConnections(data)
 
-		elif self.path == FINAL:
-			updateStats('final', data)
+		elif self.path == STATS:
+			updateStats1(data)
 
-		elif self.path == NEXT:
-			updateStats('next', data)
+#		elif self.path == FINAL:
+#			updateStats('final', data)
+#
+#		elif self.path == NEXT:
+#			updateStats('next', data)
 
 		else:
 			print 'bad request: ', self.path
@@ -188,7 +210,8 @@ def main(server_class=MultiThreadedHTTPServer, handler_class=XIAStatsHandler):
 
 	parser = OptionParser()
 	parser.add_option("-v", "--verbose", dest="verbose", help="print status messages", default=False, action="store_true")
-	parser.add_option("-p", "--port", dest="port", help="Stats server port", default=PORT)
+	parser.add_option("-p", "--port", dest="port", help="stats server port", default=PORT)
+	parser.add_option("-e", "--expired", dest="expired", type='int', help="connection table expiration time", default=EXPIRED)
 
 	(options, args) = parser.parse_args()
 

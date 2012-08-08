@@ -458,18 +458,18 @@ def updateDualStats(click, kind):
 			if kind == 'final':
 				if counts != None:
 					device.finalStatsIp[kout].update(counts, device.name)
-					s += '%s,%d,OUT,%s\n' % (device.hid, port, device.finalStatsIp[kout].csv())
+					s += '%s,%s,%d,OUT,%s\n' % (kind, device.hid, port, device.finalStatsIp[kout].csv())
 				if fromip != None:
 					device.finalStatsIp[kin].update(counts, device.name)
-					s += '%s,%d,IN,%s\n' % (device.hid, port, device.finalStatsIp[kin].csv())
+					s += '%s,%s,%d,IN,%s\n' % (kind, device.hid, port, device.finalStatsIp[kin].csv())
 
 			else:
 				if counts != None:
 					device.nextStatsIp[kout].update(counts, device.name)
-					s += '%s,%d,OUT,%s\n' % (device.hid, port, device.nextStatsIp[kout].csv())
+					s += '%s,%s,%d,OUT,%s\n' % (kind, device.hid, port, device.nextStatsIp[kout].csv())
 				if fromip != None:
 					device.nextStatsIp[kin].update(counts, device.name)
-					s += '%s,%d,IN,%s\n' % (device.hid, port, device.nextStatsIp[kin].csv())
+					s += '%s,%s,%d,IN,%s\n' % (kind, device.hid, port, device.nextStatsIp[kin].csv())
 
 	# check to see if there is a - next hop IP route, and if so also get dualrouter_next_foo and dualrouter_final_foo
 	# dualrouter_fromip_final_foo, dualrouter_fromip_next_foo
@@ -488,12 +488,12 @@ def updateStats(click, kind):
 				
 			if kind == 'final':
 				device.finalStats[port].update(counts, device.name)
-				txt= '%s,%d,OUT,%s\n' % (device.hid, port, device.finalStats[port].csv())
+				txt= '%s,%s,%d,OUT,%s\n' % (kind, device.hid, port, device.finalStats[port].csv())
 				s += txt
 
 			else:
 				device.nextStats[port].update(counts, device.name)
-				s += '%s,%d,OUT,%s\n' % (device.hid, port, device.nextStats[port].csv())
+				s += '%s,%s,%d,OUT,%s\n' % (kind, device.hid, port, device.nextStats[port].csv())
 
 	return s
 
@@ -520,6 +520,8 @@ def main():
 	parser.add_option("-c", "--click", dest="click", help="Click instance address", default=CLICK)
 	parser.add_option("-s", "--server", dest="host", help="Stats server host", default=STATS_HOST)
 	parser.add_option("-p", "--port", dest="port", help="Stats server port", default=PORT)
+	parser.add_option("-i", "--interval", dest="stats_interval", type='int', help="stats update interval", default=STATS_INTERVAL)
+	parser.add_option("-r", "--rinterval", dest="route_interval", type='int', help="connections update interval", default=ROUTE_INTERVAL)
 	parser.add_option("-v", "--verbose", dest="verbose", help="print status messages", default=False, action="store_true")
 	(options, args) = parser.parse_args()
 
@@ -539,23 +541,20 @@ def main():
 	try:
 		while 1:
 			now = time.time()
-			if now - lastStat > STATS_INTERVAL:
+			if now - lastStat > options.stats_interval:
 				lastStat = now
 
 				if devices.dualStack:
 					s = updateDualStats(click, 'final')
-					sendData(FINAL_PATH, s)
-					s = updateDualStats(click, 'next')
-					sendData(NEXT_PATH, s)
+					s += updateDualStats(click, 'next')
+					sendData(STATS_PATH, s)
 
 				s = updateStats(click, 'final')
-				if s != None:
-					sendData(FINAL_PATH, s)
-				s = updateStats(click, 'next')
-				if s != None:
-					sendData(NEXT_PATH, s)
+				s += updateStats(click, 'next')
+				if s != '':
+					sendData(STATS_PATH, s)
 
-			if now - lastRoute > ROUTE_INTERVAL:
+			if now - lastRoute > options.route_interval:
 				lastRoute = now
 				rts = updateRoutes(click)
 				sendData(CONNECT_PATH, rts)
