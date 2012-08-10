@@ -365,7 +365,7 @@ if [ "$HOSTNAME" == "" ]; then
 fi
 
 # By default, use CHAIN_TOPOLOGY_DAEMONS if others were not specified
-if [ "$DAEMONS" == "" ]; then
+if [ $SCRIPT_SET -eq 0 -a $HOST -eq 0 -a $ROUTER -eq 0 ]; then
 	DAEMONS=$CHAIN_TOPOLOGY_DAEMONS
 	LOCAL_CHAIN_TOPOLOGY=1
 fi

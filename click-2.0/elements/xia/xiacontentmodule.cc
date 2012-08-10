@@ -61,7 +61,7 @@ void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID 
 	
 	// simple.html vs. simple_malicious_explanation.html
 	if (malicious && 
-		strcmp(dstCID.unparse().c_str(), "CID:5351d9e61cb2a4971bf72624b5639104795b5c2a") == 0)
+		strcmp(dstCID.unparse().c_str(), "CID:f85579621d88b11490773d2b6196230bd2beb7b5") == 0)
 	{
 		// If this router is malicous, then this content 
 		// module reponds to requests for the simple.html page
@@ -71,7 +71,7 @@ void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID 
 		if (malicious_this_time)
 		{
 			XID fakeCID = XID();
-			fakeCID.parse("CID:1e3587a90084561268e6ee372cf6bbe96c886aaf");
+			fakeCID.parse("CID:4e3f8b2d710eb4b1937d22bc2966462b068144d8");
 
     		it=_contentTable.find(fakeCID);
 		}
