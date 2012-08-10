@@ -33,7 +33,7 @@ def updateConnections(data):
 	c = []
 	for line in lines:
 		(name, ad, hid, kind, port, next) = line.split(',')
-		k = ('%s:%s') % (ad, hid)
+		k = hid
 
 		if k != key:
 			if len(c) != 0:
@@ -48,9 +48,10 @@ def updateConnections(data):
 
 
 def getConnections():
+	global options
 	s = ''
 
-	expired = time.time() - EXPIRED
+	expired = time.time() - options.expired
 
 	for c in connections.itervalues():
 
@@ -140,6 +141,7 @@ def main():
 	parser = OptionParser()
 	parser.add_option("-v", "--verbose", dest="verbose", help="print status messages", default=False, action="store_true")
 	parser.add_option("-p", "--port", dest="port", help="Stats server port", default=PORT)
+	parser.add_option("-e", "--expires", dest="expired", help="connection table expiration time", default=EXPIRED)
 
 	(options, args) = parser.parse_args()
 
