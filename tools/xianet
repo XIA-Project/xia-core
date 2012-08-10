@@ -59,7 +59,7 @@ SCRIPT_SET=0
 
 is_running()
 {
-	RUNNING=`ps a | grep "/$1" | grep -v grep`
+	RUNNING=`ps -e | grep "$1" `    #| grep -v grep`
 	[ "$RUNNING" != "" ]
 }
 
