@@ -19,7 +19,6 @@ import sys
 import time
 import telnetlib
 import requests
-import simplejson as json
 from optparse import OptionParser
 
 # default Click host and port
@@ -36,7 +35,7 @@ NEXT_PATH = '/next'
 
 # retrieval intervals
 STATS_INTERVAL = 1
-ROUTE_INTERVAL = 3
+ROUTE_INTERVAL = 1
 
 # Minimum Click version required
 MAJOR = 1
@@ -49,16 +48,6 @@ MINOR = 3
 def say(msg):
 	if options.verbose:
 		print msg
-
-#
-# allows objects to be output as json strings instead of throwing an error
-#
-class ObjEncoder(json.JSONEncoder):
-	def default(self, obj):
-		if hasattr(obj, 'jsonStr'):
-			return obj.jsonStr()
-		else:
-			return json.JSONEncoder.default(self, obj)
 
 #
 # click controler interface
@@ -169,10 +158,6 @@ class Route:
 		return "Route(kind=%s, xid=%s, port=%s, flags=%s, nexthop=%s)" % (self.kind, self.xid, self.port, self.flags, self.nexthop)
 
 
-	def jsonStr(self):
-		return dict(kind=self.kind, xid=self.xid, port=self.port, nexthop=self.nexthop)
-
-
 #
 # XIA Host/Router definition
 #
@@ -262,10 +247,6 @@ class Router:
 		return s
 
 
-	def jsonStr(self):
-		return dict(name=self.name, hid=self.hid, ad=self.ad, routes=self.connections)
-
-
 	def csv(self):
 		s = ''
 		for c in self.connections:
@@ -284,10 +265,6 @@ class Connection:
 
 	def __repr__(self):
 		return "Connection(kind=%s, port=%d, next=%s)" % (self.kind, self.port, self.next)
-
-
-	def jsonStr(self):
-		return dict(kind=self.kind, port=self.port, next=self.next)
 
 
 	def csv(self):
@@ -344,10 +321,6 @@ class DeviceList:
 		return s
 
 
-	def jsonStr(self):
-		return dict(devices=self.devices)
-
-
 	def csv(self):
 		s = ''
 		for d in self.devices.itervalues():
@@ -397,9 +370,6 @@ class Stats:
 		self.last['UNKNOWN'] = unknown
 
 
-	def jsonStr(self):
-		return dict(name=self.name, ad=self.ad, hid=self.hid, data=self.data)
-
 	def csv(self):
 		return "%d,%d,%d,%d,%d,%d,0,0,0,0,0,0" % (self.data['AD'], self.data['HID'], self.data['SID'], self.data['CID'], self.data['IP'], self.data['UNKNOWN'])
 
@@ -426,8 +396,8 @@ def getCounts(s):
 
 	counts = s.splitlines()
 	if len(counts) == 1:
-		ad = hid = cid = sid = unknown = 0
 		ip = counts[0][7:]
+		s = "0 0 0 0 %s 0" % (ip)
 
 	else:
 		ad, hid, sid, cid, ip, unknown = s.splitlines()
@@ -437,9 +407,8 @@ def getCounts(s):
 		cid = cid[7:]
 		ip  = ip[7:]
 		unknown = unknown[7:]
+		s = "%s %s %s %s %s %s" % (ad, hid, sid, cid, ip, unknown)
 
-	s = "%s %s %s %s %s %s" % (ad, hid, sid, cid, ip, unknown)
-#	print 's = ', s
 	return s
 
 
@@ -448,7 +417,6 @@ def updateDualStats(click, kind):
 	for device in devices.devices.itervalues():
 		for port in range(0, 4):
 
-#			print 'raw( ', click.readData("%s/dualrouter_%s_%d.count" % (device.name, kind, port)), ' )'
 			counts = getCounts(click.readData("%s/dualrouter_%s_%d.count" % (device.name, kind, port)))
 			fromip = getCounts(click.readData("%s/dualrouter_fromip_%s_%d.count" % (device.name, kind, port)))
 
@@ -460,7 +428,7 @@ def updateDualStats(click, kind):
 					device.finalStatsIp[kout].update(counts, device.name)
 					s += '%s,%s,%d,OUT,%s\n' % (kind, device.hid, port, device.finalStatsIp[kout].csv())
 				if fromip != None:
-					device.finalStatsIp[kin].update(counts, device.name)
+					device.finalStatsIp[kin].update(fromip, device.name)
 					s += '%s,%s,%d,IN,%s\n' % (kind, device.hid, port, device.finalStatsIp[kin].csv())
 
 			else:
@@ -468,11 +436,10 @@ def updateDualStats(click, kind):
 					device.nextStatsIp[kout].update(counts, device.name)
 					s += '%s,%s,%d,OUT,%s\n' % (kind, device.hid, port, device.nextStatsIp[kout].csv())
 				if fromip != None:
-					device.nextStatsIp[kin].update(counts, device.name)
+					device.nextStatsIp[kin].update(fromip, device.name)
 					s += '%s,%s,%d,IN,%s\n' % (kind, device.hid, port, device.nextStatsIp[kin].csv())
 
-	# check to see if there is a - next hop IP route, and if so also get dualrouter_next_foo and dualrouter_final_foo
-	# dualrouter_fromip_final_foo, dualrouter_fromip_next_foo
+
 	return s
 
 
@@ -547,7 +514,8 @@ def main():
 				if devices.dualStack:
 					s = updateDualStats(click, 'final')
 					s += updateDualStats(click, 'next')
-					sendData(STATS_PATH, s)
+					if s != '':
+						sendData(STATS_PATH, s)
 
 				s = updateStats(click, 'final')
 				s += updateStats(click, 'next')
