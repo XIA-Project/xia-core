@@ -114,7 +114,8 @@ elementclass XIAPacketRoute {
 	rt_IP[4] -> consider_first_path; // possible xcmp redirect message
 
     GPRP[0] -> [0]output;
-    GPRP[1] -> Print("TTL TIME EXCEEDED") -> x[0] -> consider_first_path;
+//    GPRP[1] -> Print("TTL TIME EXCEEDED") -> x[0] -> consider_first_path;
+    GPRP[1] -> x[0] -> consider_first_path;
     x[1] -> Discard;
 
     c[5] -> [2]output;
