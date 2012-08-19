@@ -160,10 +160,12 @@ XTRANSPORT::run_timer(Timer *timer)
 				//printf("\n\nDATA RETRANSMIT at from (%s) from_port=%d base=%d next_seq=%d \n\n", (_local_addr.unparse()).c_str(), _sport, daginfo->base, daginfo->next_seqnum );
 				// retransmit data
 				for (unsigned int i = daginfo->base; i < daginfo->next_seqnum; i++) {
-					copy = copy_packet(daginfo->sent_pkt[i % MAX_WIN_SIZE], daginfo);
-					XIAHeader xiah(copy);
-					//printf("\n\n (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
-					output(2).push(copy);
+					if (daginfo->sent_pkt[i % MAX_WIN_SIZE] != NULL) {
+						copy = copy_packet(daginfo->sent_pkt[i % MAX_WIN_SIZE], daginfo);
+						XIAHeader xiah(copy);
+						//printf("\n\n (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
+						output(2).push(copy);
+					}
 				}
 				daginfo->timer_on = true;
 				daginfo->dataack_waiting = true;
@@ -184,6 +186,12 @@ XTRANSPORT::run_timer(Timer *timer)
 				hlim.erase(_sport);
 				nxt_xport.erase(_sport);
 				xcmp_listeners.remove(_sport);
+				for (int i = 0; i < MAX_WIN_SIZE; i++) {
+					if (daginfo->sent_pkt[i] != NULL) {
+						daginfo->sent_pkt[i]->kill();
+						daginfo->sent_pkt[i] = NULL;
+					}
+				}
 			}
 		}
 
@@ -402,6 +410,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			daginfo.dataack_waiting = false;
 			daginfo.teardown_waiting = false;
 			daginfo.num_connect_tries = 0; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
+			memset(daginfo.sent_pkt, 0, MAX_WIN_SIZE * sizeof(WritablePacket*));
 
 			//Set the socket_type (reliable or not) in DAGinfo
 			daginfo.sock_type = sock_type;
@@ -718,6 +727,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				daginfo.hlim = hlim.get(_sport);
 				daginfo.next_seqnum = 0;
 				daginfo.expected_seqnum = 0;
+				memset(daginfo.sent_pkt, 0, MAX_WIN_SIZE * sizeof(WritablePacket*));
 
 				portToDAGinfo.set(_sport, daginfo);
 
@@ -977,7 +987,10 @@ void XTRANSPORT::push(int port, Packet *p_input)
 				delete thdr;
 
 				// Store the packet into buffer
+				WritablePacket *tmp = daginfo->sent_pkt[daginfo->seq_num % MAX_WIN_SIZE];
 				daginfo->sent_pkt[daginfo->seq_num % MAX_WIN_SIZE] = copy_packet(p, daginfo);
+				if (tmp)
+					tmp->kill();
 
 				//printf("\n\nSENT DATA at (%s) seq=%d \n\n", dagstr.c_str(), daginfo->seq_num%MAX_WIN_SIZE);
 
@@ -1794,7 +1807,9 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 					// Clear all Acked packets
 					for (int i = daginfo->base; i < expected_seqnum; i++) {
-						//daginfo->sent_pkt[i%MAX_WIN_SIZE]->kill();
+						daginfo->sent_pkt[i % MAX_WIN_SIZE]->kill();
+						daginfo->sent_pkt[i % MAX_WIN_SIZE] = NULL;
+						
 						resetTimer = true;
 					}
 
