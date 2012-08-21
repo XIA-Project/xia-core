@@ -18,6 +18,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <sys/wait.h>
 #include "Xsocket.h"
 
 #define VERSION "v1.0"
@@ -31,7 +32,7 @@
 #define SID_DGRAM   "SID:0f00000000000000000000000000000000008888"
 
 // if no data is received from the client for this number of seconds, close the socket
-#define WAIT_FOR_DATA	20
+#define WAIT_FOR_DATA	10
 
 // global configuration options
 int verbose = 1;
@@ -198,6 +199,14 @@ void process(int sock)
 	Xclose(sock);
 }
 
+static void reaper(int sig)
+{
+	if (sig == SIGCHLD) {
+		while (waitpid(0, NULL, WNOHANG) > 0)
+			;
+	}
+}
+
 void echo_stream()
 {
 	char myAD[MAX_XID_SIZE];
@@ -205,6 +214,10 @@ void echo_stream()
 	char my4ID[MAX_XID_SIZE];
 	int acceptor, sock;
 	char *dag;
+
+	if (signal(SIGCHLD, reaper) == SIG_ERR) {
+		die(-1, "unable to catch SIGCHLD");
+	}
 
 	say("Stream service started\n");
 
@@ -240,7 +253,10 @@ void echo_stream()
 
 		pid_t pid = fork();
 
-		if (pid == 0) {  
+		if (pid == -1) {
+			die(-1, "FORK FAILED\n");
+
+		} else if (pid == 0) { 
 			process(sock);
 			exit(0);
 
