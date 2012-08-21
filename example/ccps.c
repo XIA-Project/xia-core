@@ -36,6 +36,7 @@
 int verbose = 1;
 char myAD[MAX_XID_SIZE];
 char myHID[MAX_XID_SIZE];
+char my4ID[MAX_XID_SIZE];
 
 /*
 ** simple code to create a formatted DAG
@@ -204,7 +205,7 @@ int main()
 		 die(-1, "Unable to create the listening socket\n");
 
     // read the localhost AD and HID
-    if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID)) < 0 )
+    if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
     	die(-1, "Reading localhost address\n");
 
 	if (!(dag = createDAG(myAD, myHID, SID)))

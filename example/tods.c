@@ -34,7 +34,7 @@ int main()
 	time_t now;
 	struct tm *t;
 
-	char ad[128], hid[128];
+	char ad[128], hid[128], fid[128];
 
     // create a datagram socket
     if ((sock = Xsocket(XSOCK_DGRAM)) < 0) {
@@ -43,7 +43,7 @@ int main()
 	}
 
     // read the localhost AD and HID
-    if ( XreadLocalHostAddr(sock, ad, sizeof(ad), hid, sizeof(hid)) < 0 ) {
+    if ( XreadLocalHostAddr(sock, ad, sizeof(ad), hid, sizeof(hid), fid, sizeof(fid)) < 0 ) {
     	printf("error: Reading localhost address");
 		exit(1);
 	}
