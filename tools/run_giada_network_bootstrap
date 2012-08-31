@@ -1,0 +1,120 @@
+#!/bin/bash
+#
+# Copyright 2012 Carnegie Mellon University
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
+NAME=`basename $0`
+VERBOSE=0
+STATSERVER="10.0.0.16"
+CLOUD_4ID="10.0.1.17"
+#STATSERVER="128.237.197.130"
+
+# Set the command each node should run here
+XIADEMO1_COMMAND="sudo ~/Documents/xia-core/tools/xianet -rn -f wlan -m $CLOUD_4ID -z $STATSERVER -i Domain1"
+XIADEMO2_COMMAND="sudo ~/Documents/xia-core/tools/xianet -r -f wlan -m $CLOUD_4ID -z $STATSERVER -i Domain2"
+XIADEMO3_COMMAND="sudo ~/Documents/xia-core/tools/xianet -r -f wlan -m $CLOUD_4ID -z $STATSERVER -i Domain3"
+XIADEMO4_COMMAND="sudo ~/Documents/xia-core/tools/xianet -r4 -I wlan0 -m $CLOUD_4ID -z $STATSERVER -i Domain4"
+LOCALVM_COMMAND="sudo ~/Documents/xia-core/tools/xianet -t4 -I eth0 -m 10.0.0.16 -z $STATSERVER -i David"
+
+
+stop_click_bootstrap()
+{
+	printf "Stopping Click and all XIA bootstraping processes\n"
+	ssh xiademo1 -f "$XIADEMO1_COMMAND stop"
+	ssh xiademo2 -f "$XIADEMO2_COMMAND stop"
+	ssh xiademo3 -f "$XIADEMO3_COMMAND stop"
+	ssh xiademo4 -f "$XIADEMO4_COMMAND stop"
+	ssh -p 1322 xia@localhost -f "$LOCALVM_COMMAND stop"
+	printf "Stopped Click and all XIA bootstraping processes\n"
+}
+
+start_click_bootstrap()
+{
+	printf "Starting XIA processes\n"
+	ssh xiademo1 -f "$XIADEMO1_COMMAND start"
+	ssh xiademo2 -f "$XIADEMO2_COMMAND start"
+	ssh xiademo3 -f "$XIADEMO3_COMMAND start"
+	ssh xiademo4 -f "$XIADEMO4_COMMAND start"
+	ssh -p 1322 xia@localhost -f "$LOCALVM_COMMAND start"
+	printf "Started XIA bootstraping processes\n"
+}
+
+shutdown()
+{
+	ssh xiademo1 -f "sudo shutdown -P now"
+	ssh xiademo2 -f "sudo shutdown -P now"
+	ssh xiademo3 -f "sudo shutdown -P now"
+	ssh xiademo4 -f "sudo shutdown -P now"
+}
+
+help ()
+{
+	cat << EOH
+
+usage: $NAME [-qv] [start|stop|restart]
+where:
+  -q runs click silently
+  -v prints click debug messages to stdout (default)
+
+  start   - run Click and start the bootstraping processes if not already running
+  stop    - stops Click and the bootstraping processes
+  restart - stops then starts Click and the bootstraping processes
+
+EOH
+	exit 0
+}
+
+while getopts ":qvh" opt; do
+	case $opt in
+		q)
+			VERBOSE="0"
+			;;
+		v)
+			VERBOSE="1"
+			;;
+		h)
+			help
+			;;
+		\?)
+			printf "\nInvalid option: -$OPTARG\n" >&2
+			help
+			;;
+	esac
+done
+
+shift $((OPTIND-1))
+
+case $1 in
+	start)
+		start_click_bootstrap
+		;;
+	stop)
+		stop_click_bootstrap
+		;;
+	restart|reload)
+		stop_click_bootstrap
+		sleep 1
+		start_click_bootstrap
+		;;
+	shutdown)
+		shutdown
+		;;
+	*)
+		printf "\nInvalid command: -$1\n" >&2
+		help
+		;;
+esac
+
