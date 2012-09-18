@@ -28,6 +28,8 @@ enum XSocketCallType {
   XREADNAMESERVERDAG = 22;
   
   XISDUALSTACKROUTER = 23;
+  XGETPEERNAME = 24;
+  XGETSOCKNAME = 25;
 }
 
 message XSocketMsg {
@@ -54,12 +56,14 @@ message XSocketMsg {
   optional X_Requestfailed_Msg x_requestfailed= 18; 
   optional X_Result_Msg x_result = 19;
 
-  optional X_Changead_Msg x_changead = 20;	
+  optional X_Changead_Msg x_changead = 20;
   optional X_ReadLocalHostAddr_Msg x_readlocalhostaddr = 21;  
   optional X_Updatenameserverdag_Msg x_updatenameserverdag = 22;  
   optional X_ReadNameServerDag_Msg x_readnameserverdag = 23; 
   
   optional X_IsDualStackRouter_Msg x_isdualstackrouter = 24;   
+  optional X_GetPeername_Msg x_getpeername = 25;
+  optional X_GetSockname_Msg x_getsockname = 26; 
 }
  
 message X_Socket_Msg {
@@ -183,6 +187,14 @@ message X_IsDualStackRouter_Msg {
   optional int32 flag = 1; // Indicating if this node is an XIA-IPv4 dual-stack router
 }
   
+
+message X_GetPeername_Msg {
+  optional string dag = 1; // Full DAG of the remote socket
+}
+
+message X_GetSockname_Msg {
+  optional string dag = 1; // Full DAG of the this socket
+}
 
 /**************************************************/
 
