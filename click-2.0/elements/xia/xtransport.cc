@@ -889,7 +889,42 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			output(1).push(UDPIPEncap(reply, _sport, _sport));
 		}		
 		break;
+
+		case xia::XGETPEERNAME:
+		{
+			xia::XSocketMsg _xsm;
+			_xsm.set_type(xia::XGETPEERNAME);
+			xia::X_GetPeername_Msg *_msg = _xsm.mutable_x_getpeername();
+
+			DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
+
+			_msg->set_dag(daginfo->dst_path.unparse_re().c_str());
+
+			std::string p_buf1;
+			_xsm.SerializeToString(&p_buf1);
+			WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
+			output(1).push(UDPIPEncap(reply, _sport, _sport));	
+		}
+		break;
 						
+
+		case xia::XGETSOCKNAME:
+		{
+			xia::XSocketMsg _xsm;
+			_xsm.set_type(xia::XGETSOCKNAME);
+			xia::X_GetSockname_Msg *_msg = _xsm.mutable_x_getsockname();
+
+			DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
+
+			_msg->set_dag(daginfo->src_path.unparse_re().c_str());
+
+			std::string p_buf1;
+			_xsm.SerializeToString(&p_buf1);
+			WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
+			output(1).push(UDPIPEncap(reply, _sport, _sport));	
+		}
+		break;
+
 		default:
 			click_chatter("\n\nERROR: CONTROL TRAFFIC !!!\n\n");
 			break;

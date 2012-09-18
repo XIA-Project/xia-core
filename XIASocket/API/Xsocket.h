@@ -144,6 +144,9 @@ extern int XupdateNameServerDAG(int sockfd, char *nsDAG);
 extern int XreadNameServerDAG(int sockfd, char *nsDAG);
 extern int XisDualStackRouter(int sockfd);
 
+extern int Xgetpeername(int sockfd, char *dag, size_t *len);
+extern int Xgetsockname(int sockfd, char *dag, size_t *len);
+
 #ifdef __cplusplus
 }
 #endif
