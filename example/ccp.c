@@ -132,16 +132,25 @@ int getFileData(int csock, FILE *fd, char *chunks)
 	while (1) {
 		status = XgetChunkStatuses(csock, cs, n);
 
-		if (status == 1)
+		if (status == READY_TO_READ)
 			break;
 
 		else if (status < 0) {
 			say("error getting chunk status\n");
 			return -1;
 
-		} else if (status == 0) {
+		} else if (status & WAITING_FOR_CHUNK) {
 			// one or more chunks aren't ready.
 			say("waiting... one or more chunks aren't ready yet\n");
+		
+		} else if (status & INVALID_HASH) {
+			die(-1, "one or more chunks has an invalid hash");
+		
+		} else if (status & REQUEST_FAILED) {
+			die(-1, "no chunks found\n");
+
+		} else {
+			say("unexpected result\n");
 		}
 		sleep(1);
 	}
