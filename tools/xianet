@@ -135,6 +135,13 @@ start_daemons()
 	if [ $HOST_INTERFACE != "None" ]; then
 		FLAGS=$FLAGS" -I "$HOST_INTERFACE
 	fi
+
+	exec 3>&1  # save stdout handle
+	if [ $LOGGING -eq 1 ]; then
+		echo "logging to: $LOGFILE"
+		exec &> $LOGFILE
+	fi
+
 	cd $XIADIR/tools/click_templates
 	python xconfig.py $FLAGS  # TODO: we maybe be calling this unnecessarily, but that's OK
 
@@ -146,11 +153,7 @@ start_daemons()
 		exit 1
 	fi
 
-	exec 3>&1  # save stdout handle
 
-	if [ $LOGGING ]; then
-		exec &> /tmp/xia.log
-	fi
 
 	if [ $VERBOSE -eq 0 ]; then
 		exec &> /dev/null
@@ -251,10 +254,10 @@ help ()
 
 Start or stop the XIA network services.
 
-usage: $NAME [-cqvV4rtnZ] [-i <hostname>] [-m <ip-addr>] [-f <filter_str>] [-I <interface>] [-s <script>] [-z <statserver>] [start|stop|restart|check]
+usage: $NAME [-cqvV4rtnZ] [-l <logfile>] [-i <hostname>] [-m <ip-addr>] [-f <filter_str>] [-I <interface>] [-s <script>] [-z <statserver>] [start|stop|restart|check]
 where:
   -c only start click
-  -l send output to /tmp/xia.log
+  -l send stderr/stdout to logfile
   -s run click using the specified script
      (should be located in the $CONFPATH directory)
   -q run silently (default)
@@ -280,13 +283,14 @@ EOH
 	exit 0
 }
 
-while getopts "cls:qvV4nrthi:m:f:I:z:Z" opt; do
+while getopts "cl:s:qvV4nrthi:m:f:I:z:Z" opt; do
 	case $opt in
 		c)
 			CLICK_ONLY=1
 			;;
 		l)
 			LOGGING=1
+			LOGFILE=$OPTARG
 			;;
 		s)
 			SCRIPT=$OPTARG
