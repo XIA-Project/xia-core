@@ -20,6 +20,7 @@ LD_LIBRARY_PATH=.
 
 NAME=`basename $0`
 VERBOSE=0
+LOGGING=0
 CLICK_ONLY=0
 ROUTER=0
 HOST=0
@@ -146,6 +147,11 @@ start_daemons()
 	fi
 
 	exec 3>&1  # save stdout handle
+
+	if [ $LOGGING ]; then
+		exec &> /tmp/xia.log
+	fi
+
 	if [ $VERBOSE -eq 0 ]; then
 		exec &> /dev/null
 	fi
@@ -248,6 +254,7 @@ Start or stop the XIA network services.
 usage: $NAME [-cqvV4rtnZ] [-i <hostname>] [-m <ip-addr>] [-f <filter_str>] [-I <interface>] [-s <script>] [-z <statserver>] [start|stop|restart|check]
 where:
   -c only start click
+  -l send output to /tmp/xia.log
   -s run click using the specified script
      (should be located in the $CONFPATH directory)
   -q run silently (default)
@@ -273,10 +280,13 @@ EOH
 	exit 0
 }
 
-while getopts "cs:qvV4nrthi:m:f:I:z:Z" opt; do
+while getopts "cls:qvV4nrthi:m:f:I:z:Z" opt; do
 	case $opt in
 		c)
 			CLICK_ONLY=1
+			;;
+		l)
+			LOGGING=1
 			;;
 		s)
 			SCRIPT=$OPTARG
