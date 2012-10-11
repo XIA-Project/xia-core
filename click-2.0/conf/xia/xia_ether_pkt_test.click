@@ -21,14 +21,14 @@ gen :: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZ
     DST RE  HID1,
     SRC RE  HID0)
 -> XIAPrint("out")
--> EtherEncap(0x9999, 00:1a:92:9b:4a:77 , $DST_ETHER)
+-> EtherEncap(0xC0DE, 00:1a:92:9b:4a:77 , $DST_ETHER)
 //-> Clone($COUNT)
 -> RatedUnqueue(2)
 -> Queue()
 -> ToDevice($OUTDEVICE);
 
 FromDevice($INDEVICE, PROMISC true) 
--> c0 :: Classifier(12/9999, -)
+-> c0 :: Classifier(12/C0DE, -)
 -> Strip(14) -> MarkXIAHeader()
 -> XIAPrint("in") -> Discard;
 

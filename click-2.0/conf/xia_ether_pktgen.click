@@ -21,7 +21,7 @@ gen :: InfiniteSource(LENGTH $PAYLOAD_SIZE, ACTIVE false, HEADROOM $HEADROOM_SIZ
 -> XIAEncap(
     DST RE  HID1,
     SRC RE  HID0)
--> EtherEncap(0x9999, 00:1a:92:9b:4a:77 ,00:15:17:51:d3:d4)
+-> EtherEncap(0xc0de, 00:1a:92:9b:4a:77 ,00:15:17:51:d3:d4)
 -> Clone($COUNT)
 -> ToDevice($OUTDEVICE);
 

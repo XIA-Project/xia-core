@@ -24,7 +24,7 @@ puts str
 
 # classifier 
 PORTS.each do |dev|
-  puts "c_#{dev} :: Classifier(12/9999, -);"
+  puts "c_#{dev} :: Classifier(12/C0DE, -);"
 end
 
 # Poll device
@@ -52,7 +52,7 @@ PORTS.each do |dev|
   if (PRINT_PACKET!=0)
      str += "-> XIAPrint()"
   end
-  str+= " -> encap#{index}::EtherEncap(0x9999, 00:15:17:51:d3:d4, 00:1A:92:9B:4A:77); "
+  str+= " -> encap#{index}::EtherEncap(0xC0DE, 00:15:17:51:d3:d4, 00:1A:92:9B:4A:77); "
   puts str
 end
 

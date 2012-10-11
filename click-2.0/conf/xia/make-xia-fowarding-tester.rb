@@ -22,7 +22,7 @@ devices.each do |dev|
   str = "Q_#{dev}:: Queue() -> ToDevice_#{dev}::ToDevice(#{dev})"
   puts str
   str = "FromDevice(#{dev}, PROMISC true) 
-          -> c_#{dev} :: Classifier(12/9999, -)
+          -> c_#{dev} :: Classifier(12/C0DE, -)
           -> Strip(14) -> MarkXIAHeader()
           -> XIAPrint(\"#{dev} in\") -> Discard; "
   puts ""
@@ -47,7 +47,7 @@ traffic_matrix.each do |srcdev, dstdev|
     		DST RE  HID#{dst},
     		SRC RE  HID#{src})
 	 -> XIAPrint(\"#{srcdev} out\")
-	 -> EtherEncap(0x9999, 00:1a:92:9b:4a:77 , 00:1a:92:9b:4a:78)  // Just use any ether address
+	 -> EtherEncap(0xC0DE, 00:1a:92:9b:4a:77 , 00:1a:92:9b:4a:78)  // Just use any ether address
 	 //-> Clone($COUNT)
 	 -> RatedUnqueue(1)
 	 -> Q_#{srcdev}; "

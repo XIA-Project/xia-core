@@ -281,7 +281,7 @@ elementclass DualRouter {
     arpt :: Tee(2);
 
    					//ARP query        arp response    IP      UDP   4ID PORT   XIP 
-	c0 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/9999, -);
+	c0 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/C0DE, -);
 
     input[0] -> c0;
     out0 :: Queue(200) -> [0]output;
@@ -302,7 +302,7 @@ elementclass DualRouter {
 
 
 
-    c1 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/9999, -);
+    c1 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/C0DE, -);
 
     input[1] -> c1;
     out1 :: Queue(200) -> [1]output;
@@ -559,7 +559,7 @@ elementclass XRouter2Port {
     
     
     // setup XARP module0
-    c0 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
+    c0 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/C0DE);  // XARP (query) or XARP (response) or XIP
     xarpq0 :: XARPQuerier($local_hid, $mac0);
     xarpr0 :: XARPResponder($local_hid $mac0);        
     
@@ -584,7 +584,7 @@ elementclass XRouter2Port {
         
 
     // setup XARP module1
-    c1 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
+    c1 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/C0DE);  // XARP (query) or XARP (response) or XIP
     xarpq1 :: XARPQuerier($local_hid, $mac1);
     xarpr1 :: XARPResponder($local_hid $mac1);        
     
@@ -708,7 +708,7 @@ elementclass XRouter4Port {
     
     
     // setup XARP module0
-    c0 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
+    c0 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/C0DE);  // XARP (query) or XARP (response) or XIP
     xarpq0 :: XARPQuerier($local_hid, $mac0);
     xarpr0 :: XARPResponder($local_hid $mac0);        
     
@@ -733,7 +733,7 @@ elementclass XRouter4Port {
     
     
     // setup XARP module1
-    c1 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
+    c1 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/C0DE);  // XARP (query) or XARP (response) or XIP
     xarpq1 :: XARPQuerier($local_hid, $mac1);
     xarpr1 :: XARPResponder($local_hid $mac1);        
     
@@ -758,7 +758,7 @@ elementclass XRouter4Port {
 
         
     // setup XARP module2
-    c2 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
+    c2 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/C0DE);  // XARP (query) or XARP (response) or XIP
     xarpq2 :: XARPQuerier($local_hid, $mac2);
     xarpr2 :: XARPResponder($local_hid $mac2);        
     
@@ -783,7 +783,7 @@ elementclass XRouter4Port {
         
     
     // setup XARP module3
-    c3 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
+    c3 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/C0DE);  // XARP (query) or XARP (response) or XIP
     xarpq3 :: XARPQuerier($local_hid, $mac3);
     xarpr3 :: XARPResponder($local_hid $mac3);        
 
@@ -942,7 +942,7 @@ elementclass DualRouter4Port {
     
     // setup XARP module0
 	//			     ARP query        ARP response     IP      UDP   4ID port XARP query       XARP response    XIP	
-    c0 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/9990 20/0001, 12/9990 20/0002, 12/9999);
+    c0 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/9990 20/0001, 12/9990 20/0002, 12/C0DE);
 
 	// Set up XARP querier and responder
     xarpq0 :: XARPQuerier($local_hid, $mac0);
@@ -981,7 +981,7 @@ elementclass DualRouter4Port {
     
     // setup XARP module1
 	//			     ARP query        ARP response     IP      UDP   4ID port XARP query       XARP response    XIP	
-    c1 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/9990 20/0001, 12/9990 20/0002, 12/9999);
+    c1 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/9990 20/0001, 12/9990 20/0002, 12/C0DE);
 
 	// Set up XARP querier and responder
     xarpq1 :: XARPQuerier($local_hid, $mac1);
@@ -1020,7 +1020,7 @@ elementclass DualRouter4Port {
         
     // setup XARP module2
 	//			     ARP query        ARP response     IP      UDP   4ID port XARP query       XARP response    XIP	
-    c2 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/9990 20/0001, 12/9990 20/0002, 12/9999);
+    c2 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/9990 20/0001, 12/9990 20/0002, 12/C0DE);
 
 	// Set up XARP querier and responder
     xarpq2 :: XARPQuerier($local_hid, $mac2);
@@ -1059,7 +1059,7 @@ elementclass DualRouter4Port {
     
     // setup XARP module3
 	//			     ARP query        ARP response     IP      UDP   4ID port XARP query       XARP response    XIP	
-    c3 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/9990 20/0001, 12/9990 20/0002, 12/9999);
+    c3 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/9990 20/0001, 12/9990 20/0002, 12/C0DE);
 
 	// Set up XARP querier and responder
     xarpq3 :: XARPQuerier($local_hid, $mac3);
@@ -1262,7 +1262,7 @@ elementclass EndHost {
 
     
     // setup XARP module
-    c0 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
+    c0 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/C0DE);  // XARP (query) or XARP (response) or XIP
     xarpq0 :: XARPQuerier($local_hid, $mac);
     xarpr0 :: XARPResponder($local_hid $mac);        
     

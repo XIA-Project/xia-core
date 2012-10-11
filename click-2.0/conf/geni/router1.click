@@ -7,9 +7,9 @@ router1 :: Router(RE AD1 RHID1, AD1, RHID1);
 //router1 :: Router4PortDummyCache(RE AD1 RHID1, AD1, RHID1); // if router does not understand CID pricipal
 
 
-c0 :: Classifier(12/9999);
-c1 :: Classifier(12/9999);
-//c2 :: Classifier(12/9999);
+c0 :: Classifier(12/C0DE);
+c1 :: Classifier(12/C0DE);
+//c2 :: Classifier(12/C0DE);
 
 todevice0 :: ToDevice(eth2);
 todevice1 :: ToDevice(eth3);
@@ -38,12 +38,12 @@ c1[0] -> Strip(14) -> MarkXIAHeader()
 router1[0]
 //-> XIAPrint() 
 ->  XIAPrint("router1->host1")
--> EtherEncap(0x9999, 00:04:23:b7:40:76, 00:04:23:b7:19:02) -> todevice0;
+-> EtherEncap(0xC0DE, 00:04:23:b7:40:76, 00:04:23:b7:19:02) -> todevice0;
 
 router1[1]
 //-> XIAPrint() 
 ->  XIAPrint("router1->router0")
--> EtherEncap(0x9999, 00:04:23:b7:40:77, 00:04:23:b7:1a:be) 
+-> EtherEncap(0xC0DE, 00:04:23:b7:40:77, 00:04:23:b7:1a:be) 
 -> c::XIAXIDTypeCounter(src AD, src HID, src SID, src CID, src IP, -)
 -> todevice1; 
 
@@ -53,7 +53,7 @@ ControlSocket(tcp, 7777);
 
 //router1[2]
 //-> XIAPrint() 
-//-> EtherEncap(0x9999, 00:03:47:73:b8:dc, 00:02:b3:35:e6:29) -> todevice2;
+//-> EtherEncap(0xC0DE, 00:03:47:73:b8:dc, 00:02:b3:35:e6:29) -> todevice2;
 
 
 //Script(write gen.active true);  // the packet source should be activated after all other scripts are executed

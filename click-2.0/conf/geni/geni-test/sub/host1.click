@@ -8,7 +8,7 @@ host1 :: EndHost (RE AD1 HID1, HID1, fake1,192.0.0.2,192.0.0.1,21:11:11:11:11:11
 
 
 // Interface0 (eth2)
-c0 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
+c0 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/C0DE);  // XARP (query) or XARP (response) or XIP
 xarpq0 :: XARPQuerier(HID:0000000000000000000000000000000000000001, 00:04:23:b7:1d:f4);
 xarpr0 :: XARPResponder(HID:0000000000000000000000000000000000000001 00:04:23:b7:1d:f4);
 todevice0 :: ToDevice(eth2);

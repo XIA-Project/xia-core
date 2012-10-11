@@ -160,22 +160,22 @@ index f1ab088..c1ce298 100644
 -to_eth1 :: Queue() -> ToDevice(eth1);
 -
  from_eth1
---> c0 :: Classifier(12/9999) -> Strip(14) -> MarkXIAHeader() -> [0]router
+--> c0 :: Classifier(12/C0DE) -> Strip(14) -> MarkXIAHeader() -> [0]router
 -
 -router[0]
 --> sw :: PaintSwitch;
-+-> c0 :: Classifier(12/9999) -> Strip(14) -> MarkXIAHeader() -> [0]host
++-> c0 :: Classifier(12/C0DE) -> Strip(14) -> MarkXIAHeader() -> [0]host
  
 -sw[0]
 +host[0]
  //-> XIAPrint("xia_vm_ping_server:to_other")
---> EtherEncap(0x9999, GUEST, CLIENT) -> to_eth1;
+--> EtherEncap(0xC0DE, GUEST, CLIENT) -> to_eth1;
 -
 -router[1]
 --> XIAPingResponder(RE AD0 RHID0 HID0)
 -//-> XIAPrint("xia_vm_ping_server:resp")
 --> [1]router;
-+-> EtherEncap(0x9999, GUEST, CLIENT) -> ToDevice(eth1);
++-> EtherEncap(0xC0DE, GUEST, CLIENT) -> ToDevice(eth1);
  
 -router[2]
 --> XIAPrint("xia_vm_ping_server:no_cache")
@@ -205,7 +205,7 @@ index 07a8be3..96d5fca 100644
  to_tap0 :: Queue() -> ToDevice(tap0);
  
  from_eth0
---> c0 :: Classifier(12/9999) -> Strip(14) -> MarkXIAHeader() -> [0]router;
+--> c0 :: Classifier(12/C0DE) -> Strip(14) -> MarkXIAHeader() -> [0]router;
 +-> c0 :: Classifier(12/0800) -> Strip(14) 
 +-> MarkIPHeader()
 +-> c_ip::IPClassifier(udp port 9999, udp port 9998)
@@ -215,24 +215,24 @@ index 07a8be3..96d5fca 100644
 +c_ip[1]-> MarkXIAHeader() -> XIAPrint("From r1") -> [0]router;
  
  from_tap0
- -> c1 :: Classifier(12/9999) -> Strip(14) -> MarkXIAHeader() -> [0]router;
+ -> c1 :: Classifier(12/C0DE) -> Strip(14) -> MarkXIAHeader() -> [0]router;
 @@ -22,16 +28,16 @@ router[0]
  -> sw :: PaintSwitch;
  
  sw[0]
 -//-> XIAPrint("xia_vm_hostA_relay:to_client")
---> EtherEncap(0x9999, RHID0, CLIENT) -> to_eth0;
+--> EtherEncap(0xC0DE, RHID0, CLIENT) -> to_eth0;
 +-> XIAPrint("xia_vm_hostA_relay:to_Xbone")
 +-> Socket(UDP, 64.57.23.165 , 9999, 0.0.0.0, 9999, SNAPLEN 9000)
  
  sw[1]
 -//-> XIAPrint("xia_vm_hostA_relay:to_guest")
 +-> XIAPrint("xia_vm_hostA_relay:to_guest")
- -> EtherEncap(0x9999, RHID0, GUEST) -> to_tap0;
+ -> EtherEncap(0xC0DE, RHID0, GUEST) -> to_tap0;
  
  sw[2]
 -//-> XIAPrint("xia_vm_hostA_relay:to_rhid1")
---> EtherEncap(0x9999, RHID0, RHID1) -> to_eth0;
+--> EtherEncap(0xC0DE, RHID0, RHID1) -> to_eth0;
 +-> XIAPrint("xia_vm_hostA_relay:to_rhid1")
 +-> Socket(UDP, 128.2.208.169 , 9998, 0.0.0.0, 9998, SNAPLEN 9000)
  

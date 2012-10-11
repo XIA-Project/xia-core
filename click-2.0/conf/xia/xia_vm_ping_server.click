@@ -9,14 +9,14 @@ from_eth1 :: FromDevice(eth1, PROMISC true);
 to_eth1 :: Queue() -> ToDevice(eth1);
 
 from_eth1
--> c0 :: Classifier(12/9999) -> Strip(14) -> MarkXIAHeader() -> [0]router
+-> c0 :: Classifier(12/C0DE) -> Strip(14) -> MarkXIAHeader() -> [0]router
 
 router[0]
 -> sw :: PaintSwitch;
 
 sw[0]
 //-> XIAPrint("xia_vm_ping_server:to_other")
--> EtherEncap(0x9999, GUEST, CLIENT) -> to_eth1;
+-> EtherEncap(0xC0DE, GUEST, CLIENT) -> to_eth1;
 
 router[1]
 -> XIAPingResponder(RE AD0 RHID0 HID0)

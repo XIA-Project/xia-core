@@ -9,7 +9,7 @@ router0 :: Router(RE AD0 RHID0, AD0, RHID0);
 
 
 // Interface0 (eth2)
-c0 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
+c0 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/C0DE);  // XARP (query) or XARP (response) or XIP
 xarpq0 :: XARPQuerier(HID:0000000000000000000000000000000000000002, 00:04:23:b7:1e:20);
 xarpr0 :: XARPResponder(HID:0000000000000000000000000000000000000002 00:04:23:b7:1e:20);
 todevice0 :: ToDevice(eth2);
@@ -49,7 +49,7 @@ router0[0]
 
 
 // Interface1 (eth4)
-c1 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/9999);  // XARP (query) or XARP (response) or XIP
+c1 :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/C0DE);  // XARP (query) or XARP (response) or XIP
 xarpq1 :: XARPQuerier(HID:0000000000000000000000000000000000000002, 00:04:23:b7:21:04);
 xarpr1 :: XARPResponder(HID:0000000000000000000000000000000000000002 00:04:23:b7:21:04);
 todevice1 :: ToDevice(eth4);

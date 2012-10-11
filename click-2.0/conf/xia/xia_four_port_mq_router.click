@@ -7,10 +7,10 @@ require(library xia_address.click);
 //router0 :: Router4PortDummyCache(RE AD0 RHID0, AD0, RHID0);
 router0 :: Router4PortDummyCache(RE AD0 RHID0);
 toh :: ToHost; 
-c_eth2 :: Classifier(12/9999, -);
-c_eth3 :: Classifier(12/9999, -);
-c_eth4 :: Classifier(12/9999, -);
-c_eth5 :: Classifier(12/9999, -);
+c_eth2 :: Classifier(12/C0DE, -);
+c_eth3 :: Classifier(12/C0DE, -);
+c_eth4 :: Classifier(12/C0DE, -);
+c_eth5 :: Classifier(12/C0DE, -);
 
 pd_eth2_0:: MQPollDevice(eth2, QUEUE 0, BURST 32, PROMISC true) -> c_eth2; 
 pd_eth2_1:: MQPollDevice(eth2, QUEUE 1, BURST 32, PROMISC true) -> c_eth2; 
@@ -77,16 +77,16 @@ c_eth4[1] -> toh;
 c_eth5[1] -> toh;
 router0[0] 
 //-> XIAPrint() 
--> encap0::EtherEncap(0x9999, 00:15:17:51:d3:d4, 00:1A:92:9B:4A:77); 
+-> encap0::EtherEncap(0xC0DE, 00:15:17:51:d3:d4, 00:1A:92:9B:4A:77); 
 router0[1] 
 //-> XIAPrint() 
--> encap1::EtherEncap(0x9999, 00:15:17:51:d3:d4, 00:1A:92:9B:4A:77); 
+-> encap1::EtherEncap(0xC0DE, 00:15:17:51:d3:d4, 00:1A:92:9B:4A:77); 
 router0[2] 
 //-> XIAPrint() 
--> encap2::EtherEncap(0x9999, 00:15:17:51:d3:d4, 00:1A:92:9B:4A:77); 
+-> encap2::EtherEncap(0xC0DE, 00:15:17:51:d3:d4, 00:1A:92:9B:4A:77); 
 router0[3] 
 //-> XIAPrint() 
--> encap3::EtherEncap(0x9999, 00:15:17:51:d3:d4, 00:1A:92:9B:4A:77); 
+-> encap3::EtherEncap(0xC0DE, 00:15:17:51:d3:d4, 00:1A:92:9B:4A:77); 
 
  encap0 -> tod_eth2_0 :: MQToDevice(eth2, QUEUE 0, BURST 32) 
  encap0 -> tod_eth2_1 :: MQToDevice(eth2, QUEUE 1, BURST 32) 

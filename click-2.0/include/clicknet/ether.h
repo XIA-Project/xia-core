@@ -30,7 +30,7 @@ struct click_ether {
 #define ETHERTYPE_PPPOE_SESSION	0x8864
 #define ETHERTYPE_GRID		0x7fff	/* wvlan_cs driver won't transmit frames with high bit of protocol number set */
 #define ETHERTYPE_XARP		0x9990   
-#define ETHERTYPE_XIP		0x9999   
+#define ETHERTYPE_XIP		0xc0de   
 
 struct click_arp {		/* Offsets relative to ARP (Ethernet) header */
     uint16_t	ar_hrd;		/* 0-1 (14-15)  hardware address format      */

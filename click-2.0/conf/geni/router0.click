@@ -7,8 +7,8 @@ router0 :: Router(RE AD0 RHID0, AD0, RHID0);
 //router0 :: Router4PortDummyCache(RE AD0 RHID0, AD0, RHID0); // if router does not understand CID pricipal
 
 
-c0 :: Classifier(12/9999);
-c1 :: Classifier(12/9999);
+c0 :: Classifier(12/C0DE);
+c1 :: Classifier(12/C0DE);
 
 todevice0 :: ToDevice(eth5);
 todevice1 :: ToDevice(eth2);
@@ -29,7 +29,7 @@ c1[0] -> Strip(14) -> MarkXIAHeader()
 
 router0[0]
 //-> XIAPrint() 
--> EtherEncap(0x9999, 00:04:23:b7:1a:bd, 00:04:23:b7:1b:e2) 
+-> EtherEncap(0xC0DE, 00:04:23:b7:1a:bd, 00:04:23:b7:1b:e2) 
 ->  XIAPrint("router0->host0")
 -> c::XIAXIDTypeCounter(src AD, src HID, src SID, src CID, src IP, -) 
 -> todevice0;
@@ -38,7 +38,7 @@ router0[0]
 router0[1]
 //-> XIAPrint() 
 ->  XIAPrint("router0->router1")
--> EtherEncap(0x9999, 00:04:23:b7:1a:be, 00:04:23:b7:40:77) -> todevice1; 
+-> EtherEncap(0xC0DE, 00:04:23:b7:1a:be, 00:04:23:b7:40:77) -> todevice1; 
 
 
 

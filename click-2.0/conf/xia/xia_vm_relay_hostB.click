@@ -11,10 +11,10 @@ from_tap0 :: FromDevice(tap0, PROMISC true);
 to_tap0 :: Queue() -> ToDevice(tap0);
 
 from_eth0
--> c0 :: Classifier(12/9999) -> Strip(14) -> MarkXIAHeader() -> [0]router;
+-> c0 :: Classifier(12/C0DE) -> Strip(14) -> MarkXIAHeader() -> [0]router;
 
 from_tap0
--> c1 :: Classifier(12/9999) -> Strip(14) -> MarkXIAHeader() -> [0]router;
+-> c1 :: Classifier(12/C0DE) -> Strip(14) -> MarkXIAHeader() -> [0]router;
 
 Idle -> [1]router;
 
@@ -23,15 +23,15 @@ router[0]
 
 sw[0]
 //-> XIAPrint("xia_vm_hostB_relay:to_client")
--> EtherEncap(0x9999, RHID1, CLIENT) -> to_eth0;
+-> EtherEncap(0xC0DE, RHID1, CLIENT) -> to_eth0;
 
 sw[1]
 //-> XIAPrint("xia_vm_hostB_relay:to_guest")
--> EtherEncap(0x9999, RHID1, GUEST) -> to_tap0;
+-> EtherEncap(0xC0DE, RHID1, GUEST) -> to_tap0;
 
 sw[2]
 //-> XIAPrint("xia_vm_hostB_relay:to_rhid0")
--> EtherEncap(0x9999, RHID1, RHID0) -> to_eth0;
+-> EtherEncap(0xC0DE, RHID1, RHID0) -> to_eth0;
 
 router[1]
 -> XIAPrint("xia_vm_hostB_relay:no_cache")

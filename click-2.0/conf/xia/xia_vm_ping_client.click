@@ -14,7 +14,7 @@ Queue() -> DelayUnqueue($ONEWAYDELAY)
 
 from_eth0
 -> Queue() -> DelayUnqueue($ONEWAYDELAY)
--> c0 :: Classifier(12/9999) -> Strip(14) -> MarkXIAHeader() -> [0]router;
+-> c0 :: Classifier(12/C0DE) -> Strip(14) -> MarkXIAHeader() -> [0]router;
 
 Idle -> [1]router;
 
@@ -23,11 +23,11 @@ router[0]
 
 sw[0]
 //-> XIAPrint("xia_vm_ping_client:to_rhid0")
--> EtherEncap(0x9999, CLIENT, RHID0) -> to_eth0;
+-> EtherEncap(0xC0DE, CLIENT, RHID0) -> to_eth0;
 
 sw[1]
 //-> XIAPrint("xia_vm_ping_client:to_rhid1")
--> EtherEncap(0x9999, CLIENT, RHID1) -> to_eth0;
+-> EtherEncap(0xC0DE, CLIENT, RHID1) -> to_eth0;
 
 router[1]
 -> XIAPingSource(RE AD1 HID1, RE AD0 RHID0 HID0, PRINT_EVERY 1)

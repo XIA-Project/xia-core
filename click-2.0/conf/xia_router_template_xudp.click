@@ -214,7 +214,7 @@ elementclass DualRouter {
 
     arpt :: Tee(2);
 
-    c0 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/9999, -);
+    c0 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/C0DE, -);
 
     input[0] -> c0;
     out0 :: Queue(200) -> [0]output;
@@ -227,7 +227,7 @@ elementclass DualRouter {
     //c0[4] -> Print("eth0 non-IP/XIA") -> Discard;
     c0[4] -> [0]n; // Print("eth0 non-IP") -> Discard;
 
-    c1 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/9999, -);
+    c1 :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/03E9, 12/C0DE, -);
 
     input[1] -> c1;
     out1 :: Queue(200) -> [1]output;
