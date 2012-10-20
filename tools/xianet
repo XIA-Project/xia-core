@@ -335,7 +335,6 @@ while getopts "cl:s:S:qvV4nrthi:m:f:I:z:Z" opt; do
 			;;
 		n)
 			NAMESERVER=1
-			DAEMONS=$DAEMONS" "$NAMESERVER_DAEMONS
 			;;
 		z)
 			RUN_VISUALIZER_CLIENT=1
@@ -358,19 +357,20 @@ while getopts "cl:s:S:qvV4nrthi:m:f:I:z:Z" opt; do
 	esac
 done
 
+if [ $NAMESERVER -eq 1 -a $HOST -eq 1 ]; then
+	DAEMONS=$DAEMONS" "$NAMESERVER_DAEMONS
+fi
+
 if [ $SCRIPT_SET -eq 0 ]; then
 	if [ $HOST -eq 1 ]; then
 		CONFPATH=$XIADIR/tools/click_templates
-		DAEMONS=$DAEMONS" "$HOST_DAEMONS
 		if [ $DUAL_STACK -eq 0 ]; then
 			SCRIPT=host.click
 		else
 			SCRIPT=dual_stack_host.click
-			DAEMONS=$DAEMONS" "$DUAL_STACK_HOST_EXTRA_DAEMONS
 		fi
 	elif [ $ROUTER -eq 1 ]; then
 		CONFPATH=$XIADIR/tools/click_templates
-		DAEMONS=$DAEMONS" "$ROUTER_DAEMONS
 		if [ $DUAL_STACK -eq 0 ]; then
 			SCRIPT=router.click
 		else
@@ -379,6 +379,15 @@ if [ $SCRIPT_SET -eq 0 ]; then
 	else
 		SCRIPT=xia_chain_topology_socket_reliable_test.click
 	fi
+fi
+	
+if [ $HOST -eq 1 ]; then
+	DAEMONS=$DAEMONS" "$HOST_DAEMONS
+	if [ $DUAL_STACK -eq 1 ]; then
+		DAEMONS=$DAEMONS" "$DUAL_STACK_HOST_EXTRA_DAEMONS
+	fi
+elif [ $ROUTER -eq 1 ]; then
+	DAEMONS=$DAEMONS" "$ROUTER_DAEMONS
 fi
 
 if [ "$HOSTNAME" == "" ]; then
