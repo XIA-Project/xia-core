@@ -39,7 +39,7 @@ typedef struct xhcp_pkt_entry {
 
 typedef struct xhcp_pkt {
 	uint32_t seq_num;
-	uint8_t num_entries;
+	uint16_t num_entries;
 	char data[];
 } xhcp_pkt;
 
