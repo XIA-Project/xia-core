@@ -38,8 +38,8 @@ typedef struct xhcp_pkt_entry {
 } xhcp_pkt_entry;
 
 typedef struct xhcp_pkt {
-	unsigned long seq_num;
-	unsigned short num_entries;
+	uint32_t seq_num;
+	uint8_t num_entries;
 	char data[];
 } xhcp_pkt;
 

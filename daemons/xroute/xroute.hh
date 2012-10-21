@@ -39,33 +39,33 @@ using namespace std;
 typedef struct {
 	std::string dest;	// destination AD or HID
 	std::string nextHop;	// nexthop HID
-	int port;		// interface (outgoing port)
-	unsigned long  flags;	// flag 
+	int32_t port;		// interface (outgoing port)
+	uint32_t flags;	// flag 
 } RouteEntry;
 
 typedef struct {
 	std::string AD;		// neigbor AD
 	std::string HID;	// neighbor HID
-	int cost; 		// link cost
-	int port;		// interface (outgoing port)
+	int32_t cost; 		// link cost
+	int32_t port;		// interface (outgoing port)
 } NeighborEntry;
 
 
 typedef struct {
 	std::string dest;	// destination AD or HID
-	int seq; 		// LSA seq of dest (for filtering purpose)	
-	int num_neighbors;	// number of neighbors of dest AD
+	int32_t seq; 		// LSA seq of dest (for filtering purpose)	
+	int32_t num_neighbors;	// number of neighbors of dest AD
 	vector<std::string> neighbor_list; // neighbor AD list
 	
 	bool checked;	// used for calculating the shortest path
-	int cost;	// cost from myAD to destAD
+	int32_t cost;	// cost from myAD to destAD
 	std::string prevNode; // previous node along the shortest path from myAD to destAD
 	
 } NodeStateEntry; // extracted from incoming LSA
 
 
 typedef struct RouteState {
-	int sock; // socket for routing process
+	int32_t sock; // socket for routing process
 	
 	char * sdag; // src DAG: this router
 	char * ddag; // dest DAG: broadcast HELLO/LSA to other routers
@@ -73,13 +73,13 @@ typedef struct RouteState {
 	char myHID[MAX_XID_SIZE]; // this router HID
 	char my4ID[MAX_XID_SIZE]; // not used
 	
-	int dual_router;   // 0: this router is not a dual XIA-IP router, 1: this router is a dual router
+	int32_t dual_router;   // 0: this router is not a dual XIA-IP router, 1: this router is a dual router
 	std::string dual_router_AD; // AD (with dual router) -- default AD for 4ID traffic	
-	int num_neighbors; // number of neighbor routers
-	int lsa_seq;	// LSA sequence number of this router
-	int hello_seq;  // hello seq number of this router 
-	int hello_lsa_ratio; // frequency ratio of hello:lsa (for timer purpose) 
-	int calc_dijstra_ticks;   
+	int32_t num_neighbors; // number of neighbor routers
+	int32_t lsa_seq;	// LSA sequence number of this router
+	int32_t hello_seq;  // hello seq number of this router 
+	int32_t hello_lsa_ratio; // frequency ratio of hello:lsa (for timer purpose) 
+	int32_t calc_dijstra_ticks;   
 
 	map<std::string, RouteEntry> ADrouteTable; // map DestAD to route entry
 	map<std::string, RouteEntry> HIDrouteTable; // map DestHID to route entry

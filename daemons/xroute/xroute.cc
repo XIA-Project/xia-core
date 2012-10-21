@@ -491,7 +491,7 @@ void printRoutingTable() {
 	printf("\n\nAD Routing table at %s\n", route_state.myAD);
   	map<std::string, RouteEntry>::iterator it1;
   	for ( it1=route_state.ADrouteTable.begin() ; it1 != route_state.ADrouteTable.end(); it1++ ) {
-  		printf("Dest=%s, NextHop=%s, Port=%d, Flags=%lu \n", (it1->second.dest).c_str(), (it1->second.nextHop).c_str(), (it1->second.port), (it1->second.flags) );
+  		printf("Dest=%s, NextHop=%s, Port=%d, Flags=%u \n", (it1->second.dest).c_str(), (it1->second.nextHop).c_str(), (it1->second.port), (it1->second.flags) );
 
   	}
   	printf("\n\n");
