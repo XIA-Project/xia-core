@@ -1744,10 +1744,15 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 				DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
 
-				// Clear timer
-				daginfo->timer_on = false;
-				daginfo->synack_waiting = false;
-				//daginfo->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
+				if(daginfo->synack_waiting) {
+				  // Clear timer
+				  daginfo->timer_on = false;
+				  daginfo->synack_waiting = false;
+				  //daginfo->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
+				}
+				else {
+				  sendToApplication = false;
+				}
 
 			} else if (thdr.pkt_info() == TransportHeader::DATA) {
 
