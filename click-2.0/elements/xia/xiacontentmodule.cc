@@ -55,7 +55,6 @@ Packet * XIAContentModule::makeChunkResponse(CChunk * chunk, Packet *p_in)
 
 void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID & dstCID)
 {
-
     HashTable<XID,CChunk*>::iterator it;
     it=_contentTable.find(dstCID);
 	
@@ -90,6 +89,26 @@ void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID 
 		{
 			XID fakeCID = XID();
 			fakeCID.parse("CID:5830f441b0895cd2a82d5a13fc64f6e9a5f710ad");
+
+    		it=_contentTable.find(fakeCID);
+		}
+		
+		malicious_this_time = 1 - malicious_this_time;
+	}
+	
+	// 1st chunk of dongsu demo image vs. 1st chunk of anon.jpg
+	if (malicious && 
+		strcmp(dstCID.unparse().c_str(), "CID:fc65c7a4afaae5e59fd79af6c3f49fddbc2698de") == 0)
+	{
+		// If this router is malicous, then this content 
+		// module reponds to requests for the umbrella image
+		// with the anonymous image instead. (But only every
+		// other time.)
+		// TODO: something more flexible
+		if (malicious_this_time)
+		{
+			XID fakeCID = XID();
+			fakeCID.parse("CID:dd44c65bc81365ea7dfd2958732a6df937604613");
 
     		it=_contentTable.find(fakeCID);
 		}

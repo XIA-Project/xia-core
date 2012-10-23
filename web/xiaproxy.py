@@ -74,6 +74,7 @@ def readcid_with_timeout(sock, cid, timeout=5):
                     received_data = True
                     if status & INVALID_HASH == INVALID_HASH:
                         warn_bad_content()
+                        return False
             except IOError:
                 received_data = False
             except Exception, msg:
@@ -363,6 +364,12 @@ def get_content_from_cid_list(dstAD, dst4ID, dstHID, cid_list):
     content = ""
     for i in range(0, num_cids):
         data = readcid_with_timeout(sock, cids[i].cid)
+        if data == False:  ## HACK FOR GEC!! REMOVE ME!!
+            with open('anon.jpg', 'r') as f:
+                anon_data = f.read()
+            f.closed
+            Xclose(sock)
+            return anon_data
         content += data
 
     Xclose(sock)
