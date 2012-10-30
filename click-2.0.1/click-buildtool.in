@@ -1,0 +1,1564 @@
+#! /bin/sh
+
+# click-buildtool -- build tools for Click
+# Eddie Kohler
+#
+# Copyright (c) 2000-2001 Massachusetts Institute of Technology
+# Copyright (c) 2000-2008 Mazu Networks, Inc.
+# Copyright (c) 2001-2003 International Computer Science Institute
+# Copyright (c) 2008 Meraki, Inc.
+# Copyright (c) 2004-2011 Regents of the University of California
+# Copyright (c) 2000-2011 Eddie Kohler
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, subject to the conditions
+# listed in the Click LICENSE file. These conditions include: you must
+# preserve this copyright notice, and you cannot mention the copyright
+# holders in advertising related to the Software without their permission.
+# The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
+# notice is a summary of the Click LICENSE file; the license in that file is
+# legally binding.
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+bindir=@bindir@
+datarootdir=@datarootdir@
+datadir=@datadir@
+clickdatadir=@clickdatadir@
+LINUXMODULE_2_6=@LINUXMODULE_2_6@
+gmake=@GMAKE@
+
+verbose=""
+elem2=""
+default_provisions="@provisions@"
+driver_provisions="@DRIVERS@"
+
+export LC_COLLATE=C
+trap "exit 1" HUP
+
+# find good versions of awk and grep
+awk="@AWK@"
+grep="@GREP@"
+egrep="@EGREP@"
+
+echo_n () {
+	# suns can't echo -n, and Mac OS X can't echo "x\c"
+	echo "$@" | tr -d '
+'
+}
+
+
+###############
+# SHORTENSYMS #
+###############
+
+shortensyms_usage () {
+    echo "Usage: click-buildtool shortensyms OBJ..." 1>&2
+    echo "Try 'click-buildtool shortensyms --help' for more information." 1>&2
+    exit 1
+}
+
+shortensyms () {
+    driver=""
+    date=`date`
+    objs=
+    len=56
+    while [ x"$1" != x ]; do
+    case $1 in
+    -n|--l|--le|--len|--leng|--lengt|--length)
+	if test $# -lt 2; then shortensyms_usage; fi
+	len="$2"; shift 2;;
+    -n*)
+	len="`echo "$1" | sed 's/^-n//'`"; shift 1;;
+    --l=*|--le=*|--len=*|--leng=*|--lengt=*|--length=*)
+	len="`echo "$1" | sed 's/^[^=]*=//'`"; shift 1;;
+    -h|--h|--he|--hel|--help)
+	cat <<'EOF' 1>&2
+'Click-buildtool shortensyms' shortens the symbols in the object files listed
+on the command line to be at most 56 characters long.
+
+Usage: click-buildtool shortensyms OBJ...
+
+Options:
+  -n, --length=N           Set maximum symbol length to N.
+  -h, --help               Print this message and exit.
+
+Report bugs to <click@pdos.lcs.mit.edu>.
+EOF
+	exit 0;;
+    *)
+	objs="$objs
+$1"; shift 1;;
+    esac
+    done
+
+    test -z "$objs" && shortensyms_usage
+    objs=`echo "$objs" | sort | uniq`
+    if test -z "$NM"; then NM="@NM@"; fi
+    if test -z "$OBJCOPY"; then OBJCOPY="@OBJCOPY@"; fi
+    if test -z "$MD5SUM"; then MD5SUM="@MD5SUM@"; fi
+
+    for obj in $objs; do
+	longsyms=`$NM -g $obj | sed 's/^[^ 	]*[ 	]*.[ 	]*//
+/^.\{0,'$len'\}$/d'`
+	if test -z "$longsyms"; then
+	    continue
+	elif test -z "$OBJCOPY"; then
+	    echo "$obj: 'objcopy' missing, 'click-buildtool shortensyms' must leave long symbols unchanged" 1>&2
+	    continue
+	elif test -z "$MD5SUM"; then
+	    # We don't need security, so default to a weaker checksum.
+	    if echo | sum >/dev/null; then MD5SUM=sum; else MD5SUM=cat; fi
+	fi
+
+	/bin/rm -f $obj.shortenmap $obj~
+	echo "$longsyms" | $awk 'BEGIN {
+  split("28HashContainer_const_iterator 3HCj \
+22HashContainer_iterator 3HCi \
+21HashContainer_adapter 3HCa \
+13HashContainer 2HC \
+26TokenBucketJiffyParameters 3TBJ \
+12TokenBucketX 3TBX \
+20can_live_reconfigure 10can_reconf \
+16live_reconfigure 6reconf \
+24HashTable_const_iterator 3HTj \
+18HashTable_iterator 3HTi \
+9HashTable 2HT \
+16OrderedHashTable 3OHT \
+12ErrorHandler 2EH \
+10ArgContext 4Argx \
+14NotifierSignal 4NSig \
+9IPAddress 2IP \
+12EtherAddress 3Eth \
+10IP6Address 3IP6 \
+6Vector 1V \
+11StringAccum 2SA \
+6String 1S \
+7Element 2El \
+6Packet 1P", pats, "[^A-Za-z0-9_]*");
+}
+{
+  orig = $0;
+  for (i = 1; length() > '$len' && pats[i]; i += 2)
+    gsub(pats[i], pats[i+1]);
+  if (length() > '$len') {
+    ("echo " orig " | '"$MD5SUM"'") | getline hash
+    sub("[^A-Za-z_0-9.].*", "", hash)
+    $0 = substr($0, 1, '$len' - 12) ".H" substr(hash, 1, 10)
+  }
+  print orig, $0;
+}' > $obj.shortenmap || exit 1
+	$OBJCOPY --redefine-syms=$obj.shortenmap $obj || { /bin/rm -f $obj.shortenmap; exit 1; }
+	/bin/rm -f $obj.shortenmap
+    done
+}
+
+if test "$1" = shortensyms; then
+    shift 1; shortensyms "$@"; exit 0
+fi
+
+
+############
+# FINDELEM #
+############
+
+findelem_usage () {
+    echo "Usage: click-buildtool findelem [-a] [-V] [-p PREFIX] < [FILES AND DIRECTORIES]
+Try 'click-buildtool findelem --help' for more information." 1>&2
+    exit 1
+}
+
+elementmap_provisions () {
+    elementmap="$1"
+    $grep "^<elementmap \|^<entry " <"$elementmap" | $awk '/ name="([^"]*)"/ {
+  sub(/.* name="/, "", $0);
+  sub(/".*/, "", $0);
+  prov[$0] = 1;
+}
+/ provides="([^"]*)"/ {
+  sub(/.* provides="/, "", $0);
+  sub(/".*/, "", $0);
+  split($0, d, / +/);
+  for (j in d) prov[d[j]] = 1;
+}
+END {
+  # delete references to drivers
+  delete prov["userlevel"]; delete prov["linuxmodule"];
+  delete prov["bsdmodule"]; delete prov["ns"];
+  for (j in prov) print j;
+}'
+}
+
+expand_provisions () {
+    tr -s ', \n\r\f\t\v' '\n'
+}
+
+findelem () {
+    pfx=
+    all=
+    provisions=
+    filenames=
+    standards=
+    unprovisions='false 0'
+    while [ x"$1" != x ]; do
+    case $1 in
+    -S|--s|--st|--sta|--stan|--stand|--standa|--standar|--standard|--standards)
+	standards=1; shift 1;;
+    -p|--pre|--pref|--prefi|--prefix)
+	if test $# -lt 2; then findelem_usage; fi
+	shift 1; pfx="$1/"; shift 1;;
+    -p*)
+	pfx="`echo "$1" | sed 's/^-p//'`"/; shift 1;;
+    --pre=*|--pref=*|--prefi=*|--prefix=*)
+	pfx="`echo "$1" | sed 's/^[^=]*=//'`"/; shift 1;;
+    -f|--filenames)
+	filenames=f; shift 1;;
+    -F|--filename-|--filename-p|--filename-pa|--filename-pai|--filename-pair|--filename-pairs)
+	filenames=F; shift 1;;
+    -V|--verb|--verbo|--verbos|--verbose)
+	verbose=1; shift 1;;
+    -a|--a|--al|--all)
+	all=1; shift 1;;
+    -r|--pro|--prov|--provi|--provid|--provide)
+	if test $# -lt 2; then findelem_usage; fi
+	provisions="`echo "$2" | expand_provisions`
+$provisions"; shift 2;;
+    -r*)
+	provisions="`echo "$1" | sed 's/^-r//' | expand_provisions`
+$provisions"; shift 1;;
+    --pro=*|--prov=*|--provi=*|--provid=*|--provide=*)
+	provisions="`echo "$1" | sed 's/^[^=]*=//' | expand_provisions`
+$provisions"; shift 1;;
+    -x|--u|--un|--unp|--unpr|--unpro|--unprov|--unprovi|--unprovid|--unprovide)
+	if test $# -lt 2; then findelem_usage; fi
+	unprovisions="`echo "$2" | expand_provisions`
+$unprovisions"; shift 2;;
+    -x*)
+	unprovisions="`echo "$1" | sed 's/^-x//' | expand_provisions`
+$unprovisions"; shift 1;;
+    --u=*|--un=*|--unp=*|--unpr=*|--unpro=*|--unprov=*|--unprovi=*|--unprovid=*|--unprovide=*)
+	unprovisions="`echo "$1" | sed 's/^[^=]*=//' | expand_provisions`
+$unprovisions"; shift 1;;
+    -X|--unprovide-|--unprovide-f|--unprovide-fi|--unprovide-fil|--unprovide-file)
+	if test $# -lt 2; then findelem_usage; fi
+	shift 1; if test -f "$1"; then unprovisions="`cat "$1"`
+$unprovisions"; fi; shift 1;;
+    -X*)
+	f="`echo "$1" | sed 's/^-X//'`"; if test -f "$f"; then unprovisions="`cat "$f"`
+$unprovisions"; fi; shift 1;;
+    --unprovide-=*|--unprovide-f=*|--unprovide-fi=*|--unprovide-fil=*|--unprovide-file=*)
+	f="`echo "$1" | sed 's/^[^=]*=//'`"; if test -f "$f"; then unprovisions="`cat "$f"`
+$unprovisions"; fi; shift 1;;
+    -e|--e|--el|--ele|--elem|--eleme|--elemen|--element|--elementm|--elementma|--elementmap)
+	if test $# -lt 2; then findelem_usage; fi
+	shift 1; provisions="`elementmap_provisions "$1"`
+$provisions"; shift 1;;
+    -e*)
+	emap="`echo "$1" | sed 's/^-e//'`"
+	provisions="`elementmap_provisions "$emap"`
+$provisions"; shift 1;;
+    --e=*|--el=*|--ele=*|--elem=*|--eleme=*|--elemen=*|--element=*|--elementm=*|--elementma=*|--elementmap=*)
+	emap="`echo '$1' | sed 's/^[^=]*=//'`"
+	provisions="`elementmap_provisions "$emap"`
+$provisions"; shift 1;;
+    -P|--pa|--pac|--pack|--packa|--packag|--package)
+	provisions="`elementmap_provisions "${clickdatadir}/elementmap.xml"`
+$provisions"; shift 1;;
+    -h|--h|--he|--hel|--help)
+	cat <<'EOF' 1>&2
+'Click-buildtool findelem' locates valid Click element source code. It starts
+with a collection of source code, then eliminates files whose requirements
+are not available until reaching a stable set of sources. It expects a list of
+files and directories on standard input. Directories are searched for .cc/.c
+source files. Only files containing EXPORT_ELEMENT() or ELEMENT_PROVIDES() are
+considered. The initial list of available requirements is the list of
+requirements specified with '-r', plus the list of EXPORT_ELEMENT() and
+ELEMENT_PROVIDES() keywords.
+
+Usage: click-buildtool findelem [OPTIONS] < [FILES AND DIRECTORIES]
+
+Options:
+  -a, --all                  Include all subdirectories of 'elements' rather
+                             than reading standard input, and pretend all
+                             requirements are available (except for '-x').
+  -V, --verbose              Print more information about dependency checking.
+  -p, --prefix PREFIX        Prepend PREFIX to every file and/or directory.
+  -r, --provide REQ          Provide requirement(s) in REQ.
+  -e, --elementmap EMAP      Provide requirement(s) from EMAP.
+  -P, --package              Provide requirement(s) from default elementmap.
+  -S, --standards            Mark standard elements as available.
+  -x, --unprovide REQ        Reject requirement(s) in REQ.
+  -X, --unprovide-file FILE  Reject requirement(s) from FILE.
+  -f, --filenames            Output filenames only.
+  -F, --filename-pairs       Output "sourcefile:headerfile" pairs for elements.
+  -h, --help                 Print this message and exit.
+
+Report bugs to <click@pdos.lcs.mit.edu>.
+EOF
+	exit 0;;
+    *)
+	findelem_usage;;
+    esac
+    done
+
+    if test -n "$verbose" -a -n "$pfx"; then
+	echo "Prefix: $pfx" 1>&2
+    fi
+
+    # add defaults to provisions
+    provisions="$provisions $default_provisions"
+
+    # add standards to provisions if necessary
+    if test "x$standards" != x; then
+	provisions="$provisions AddressInfo AlignmentInfo ErrorElement PortInfo ScheduleInfo Storage XIAXIDInfo"
+    fi
+
+    # add 'multithread' provision based on driver
+    if echo "$provisions" | $grep userlevel >/dev/null 2>&1; then
+	if echo "$provisions" | $grep umultithread >/dev/null 2>&1; then
+	    provisions="$provisions multithread"
+	fi
+    fi
+    if echo "$provisions" | $grep linuxmodule >/dev/null 2>&1; then
+	if echo "$provisions" | $grep smpclick >/dev/null 2>&1; then
+	    provisions="$provisions multithread"
+	fi
+    fi
+
+    # expand provisions and unprovisions: require one per line
+    provisions=`echo "$provisions" | tr -s ' \011\015\014\013' '\012'`
+    unprovisions=`echo "$unprovisions" | tr -s ' \011\015\014\013' '\012'`
+    if test -n "$verbose" -a -n "$provisions"; then
+	echo 1>&2
+	echo "Provisions: $provisions" 1>&2
+    fi
+    if test -n "$verbose" -a -n "$unprovisions"; then
+	echo 1>&2
+	echo "Unprovisions: $unprovisions" 1>&2
+    fi
+
+    # expand list of files
+    if test -n "$all"; then
+	fdir=${pfx}
+	test -d ${pfx}elements && fdir=${pfx}elements
+	first_files=`cd $fdir >/dev/null && ls`
+	bad_first_files=`echo "$first_files
+$unprovisions" | sort | uniq -d`
+	first_files=`echo "$first_files
+$bad_first_files" | sort | uniq -u`
+    else
+	first_files=`cat`
+    fi
+
+    files=""
+    for i in $first_files; do
+	ppfx="$pfx"
+	if test -d "${pfx}elements/$i" && echo "$i" | $grep -v '^\.' >/dev/null; then
+	    ppfx="${pfx}elements/"
+	fi
+	if test -d "${ppfx}$i"; then
+	    files="$files
+"`find ${ppfx}$i -follow \( -name \*.cc -o -name \*.c \) -print | $grep -v '/[.,][^/]*$'`
+	elif test -r "${ppfx}$i"; then
+	    files="$files
+${ppfx}$i"
+	fi
+    done
+    files=`echo "$files" | sort | uniq | $grep .`
+
+    # die if no files
+    if test -z "$files"; then
+	echo "no files found" 1>&2
+	exit 1
+    fi
+
+    # if '$all', then accept all dependencies except the unprovisions
+    dep_test='<='
+    if test -n "$all"; then
+	dep_test='<'
+    fi
+
+    # check dependencies: generate a list of bad files, then remove those files
+    # from the list of good files
+
+    # first remove files that provide an unprovision
+    awk_exports=`echo "$unprovisions" | sed 's/\(..*\)/dep["\1"]=-1;/'`
+    bad_files=`$egrep '^EXPORT_ELEMENT|^ELEMENT_PROVIDES' $files | sed 's/EXPORT_ELEMENT[ 	]*(\(.*\)).*/\1/
+s/ELEMENT_PROVIDES[ 	]*(\(.*\)).*/\1/' | $awk -F: 'BEGIN {OFS="";'"$awk_exports"'}
+{
+  split($2, deps, / +/);
+  for (j in deps) {
+    if (dep[deps[j]] < 0) {
+      print $1;
+      break;
+    }
+  }
+}' | sort | uniq`
+    if test -n "$verbose" -a -n "$bad_files"; then
+	echo 1>&2
+	echo "Files: $files" 1>&2
+	echo 1>&2
+	echo "Bad files: $bad_files" 1>&2
+    fi
+    if test -n "$bad_files"; then
+	files=`echo "$files
+$bad_files" | sort | uniq -u`
+    fi
+
+    # then cycle, removing files that require something not provided
+    while true; do
+	provides=`$egrep '^EXPORT_ELEMENT|^ELEMENT_PROVIDES' $files | sed 's/.*(\(.*\)).*/\1/' | tr ' \011' '\012'`
+	awk_exports=`echo "$provides"'
+'"$provisions" | sed 's/\(..*\)/dep["\1"]=1;/'`"
+"`echo "$unprovisions" | sed 's/\(..*\)/dep["\1"]=-1;/'`
+	new_bad_files=`$grep '^ELEMENT_REQUIRES' $files | sed 's/ELEMENT_REQUIRES[ 	]*(\(.*\)).*/\1/' | $awk -F: 'BEGIN {OFS="";'"$awk_exports"'dep["true"]=1; dep["1"]=1;}
+{
+  split($2, deps, / +/);
+  for (j in deps) {
+    i = deps[j]
+    if (dep[i] <= 0) {
+      bad = 1;
+      split(i, or_deps, /\|+/);
+      for (k in or_deps) {
+	if (!(dep[or_deps[k]] '"$dep_test"' 0))
+	  bad = 0;
+      }
+      if (bad) {
+	print $1;
+	break;
+      }
+    }
+  }
+}' | sort | uniq`
+	if test -n "$verbose"; then
+	    echo 1>&2
+	    echo "Files: $files" 1>&2
+	    echo 1>&2
+	    echo "Bad files: $new_bad_files" 1>&2
+	fi
+	if test -z "$new_bad_files"; then
+	    break
+	else
+	    files=`echo "$files
+$new_bad_files" | sort | uniq -u`
+	    bad_files="$new_bad_files
+$bad_files"
+	fi
+    done
+
+    header_files=`echo "$files" | sed 's/\.cc/\.hh/'`
+
+    # generate output
+    if test "$filenames" = f; then
+	outscriptlet=i
+    elif test "$filenames" = F; then
+	outscriptlet='i, ":", header[i]'
+    else
+	echo "# Generated by 'click-buildtool findelem' on" `date`
+	outscriptlet='i, "\t", header[i], "\t", ex'
+    fi
+
+    $egrep '^(ELEMENT_|EXPORT_|class|[ 	]*(virtual[ 	]*)?const[ 	]*char[ 	]*\*[ 	]*class_name|[ 	]*static[ 	]*void[ 	]*static_[ic]|[ 	]*(virtual[ 	]*)?[bv]o..[ 	]*run_t|[ 	]*(virtual[ 	]*)?int[ 	]*initial_home|[}])' $files $header_files /dev/null 2>/dev/null | $awk -F: 'BEGIN {
+  OFS = ""; cur_class = ""; errors = 0; class_name_warned = 0; nexports = 0
+}
+/:class[ 	]/ {
+  sub(/^class[ 	]*/, "", $2);
+  sub(/[ 	].*$/, "", $2);
+  cur_class = $2;
+  next
+}
+/:}/ {
+  cur_class = "";
+  next
+}
+/:EXPORT_ELEMENT/ {
+  sub(/.*EXPORT_ELEMENT[ 	]*\([ 	]*/, "", $2);
+  sub(/[ 	]*\).*/, "", $2);
+  if (exports[$1] != "") {
+    exports[$1] = exports[$1] " " $2
+  } else {
+    exports[$1] = $2; nexports++
+  }
+  next
+}
+/:ELEMENT_PROVIDES/ {
+  sub(/.*ELEMENT_PROVIDES[ 	]*\([ 	]*/, "", $2);
+  sub(/[ 	]*\).*/, "", $2);
+  split($2, provs, / /)
+  for (i in provs) {
+    if (provs[i] != "") {
+      if (exports[$1] == "")
+        nexports++;
+      else
+        exports[$1] = exports[$1] " ";
+      exports[$1] = exports[$1] "*" provs[i]
+    }
+  }
+  next
+}
+/:ELEMENT_HEADER/ {
+  sub(/.*ELEMENT_HEADER[ 	]*\(/, "", $2)
+  sub(/\).*/, "", $2)
+  header[$1] = $2
+  next
+}
+/:ELEMENT_LIBS/ {
+  sub(/.*ELEMENT_LIBS[ 	]*\(\(?/, "", $2)
+  sub(/\)?\).*/, "", $2)
+  gsub(/[ 	][ 	]*/, ";", $2)
+  gsub(/-L;/, "-L", $2)
+  libs[$1] = $2
+  next
+}
+/class_name.*return[ 	]*"/ {
+  sub(/.*return[ 	]*"/, "", $0);
+  sub(/".*/, "", $0);
+  class_name[cur_class] = $0
+  next
+}
+/class_name/ {
+  print $1, ": ", cur_class, "::class_name method malformed" | "cat 1>&2"
+  if (++class_name_warned == 1)
+    print "  (class_name methods must be written on a single line.)" | "cat 1>&2"
+  ++errors
+}
+/static_initialize/ {
+  static_initialize[cur_class] = 1
+  next
+}
+/static_cleanup/ {
+  static_cleanup[cur_class] = 1
+  next
+}
+/void[ 	]*run_task/ {
+  print $1, ": ", cur_class, "::run_task must return bool" | "cat 1>&2"
+  ++errors
+}
+/[^_a-z]run_task *\( *\)/ {
+  print $1, ": ", cur_class, "::run_task should take a Task * argument" | "cat 1>&2"
+  ++errors
+}
+/[^_a-z]run_timer *\( *\)/ {
+  print $1, ": ", cur_class, "::run_timer should take a Timer * argument" | "cat 1>&2"
+  ++errors
+}
+/[^_a-z]initial_home_thread_id *\([ 	]*E/ {
+  print $1, ": ", cur_class, "::initial_home_thread_id should take ONLY a const Element * argument" | "cat 1>&2"
+  ++errors
+}
+END {
+  if (nexports == 0)
+    print "click-buildtool: No elements found" | "cat 1>&2"
+  if (errors || nexports == 0)
+    system("kill -HUP '$$'")
+  for (i in exports) {
+    if (header[i] == "") {
+      header[i] = "\"" i "\""; sub(/\.cc/, ".hh", header[i])
+    }
+    ex = exports[i]
+    split(ex, exes, / /); ex = ""
+    for (j in exes) {
+      star = index(exes[j], "*")
+      dash = index(exes[j], "-")
+      if (star == 0 && dash == 0) {
+	dash = length(exes[j]);
+        if (class_name[exes[j]] == "")
+          exes[j] = exes[j] "-" exes[j];
+        else
+          exes[j] = exes[j] "-" class_name[exes[j]];
+      }
+      if (star == 0) {
+	ex = ex exes[j] " "
+	klass = substr(exes[j], 1, dash)
+      } else
+	klass = substr(exes[j], star + 1)
+      if (static_initialize[klass]) {
+	ex = ex klass "-!si ";
+	static_initialize[klass] = 0
+      }
+      if (static_cleanup[klass]) {
+	ex = ex klass "-!sc ";
+	static_cleanup[klass] = 0
+      }
+      if (libs[i])
+	ex = ex "-!lib" libs[i] " "
+    }
+    print '"$outscriptlet"'
+  }
+}' | sort
+
+  # attempt to detect reuse of a header protection #define
+  for x in $header_files; do
+    xp=`echo "$x" | tr -c -d 'a-zA-Z0-9 /_.@~=:+;,?-'`
+    head -n 10 $x 2>/dev/null | sed 's,^,'"$xp"':,'
+  done | $awk -F: 'BEGIN {
+  OFS = ""; errors = 0
+}
+/: *# *ifndef/ {
+  sub(/ *# *ifndef[ 	]*/, "", $2);
+  sub(/[ 	\/].*/, "", $2);
+  if (!protector[$1]) {
+    protector[$1] = $2;
+    if (protecting[$2]) {
+      print $1, ": header protector #ifndef ", $2, " reused" | "cat 1>&2";
+      print protecting[$2], ": first use was here" | "cat 1>&2";
+      if (errors == 0)
+	print "  (Every element header must use a different #ifndef symbol.)" | "cat 1>&2";
+      ++errors;
+    } else
+      protecting[$2] = $1;
+  }
+}
+END {
+  if (errors)
+    system("kill -HUP '$$'");
+}'
+
+  exit $?
+}
+
+
+
+##########################
+# ELEM2MAKE/ELEM2PACKAGE #
+##########################
+
+elem2xxx_usage () {
+    echo_n "Usage: click-buildtool elem2$elem2 [-p PREFIX] [-V]" 1>&2
+    if test "$elem2" = package; then echo_n " PKGNAME" 1>&2; fi
+    echo " < elements.conf
+Try 'click-buildtool elem2$elem2 --help' for more information." 1>&2
+    exit 1
+}
+
+elem2make () {
+    driver=""
+    makevar=""
+    date=`date`
+    linux26=x
+    bsdmake=0
+    while [ x"$1" != x ]; do
+    case $1 in
+    -t|--d|--dr|--dri|--driv|--drive|--driver)
+	if test $# -lt 2; then elem2xxx_usage; fi
+	shift 1; driver="$1"; shift 1;;
+    -t*)
+	driver=`echo "$1" | sed 's/^-D//'`; shift 1;;
+    --d=*|--dr=*|--dri=*|--driv=*|--drive=*|--driver=*)
+	driver=`echo "$1" | sed 's/^[^=]*=//'`; shift 1;;
+    --t|--ta|--tar|--targ|--targe|--target)
+	if test $# -lt 2; then elem2xxx_usage; fi
+	shift 1; driver="$1"; shift 1;;
+    --t=*|--ta=*|--tar=*|--targ=*|--targe=*|--target=*)
+	driver=`echo "$1" | sed 's/^[^=]*=//'`; shift 1;;
+    -v|--m|--ma|--mak|--make|--make-|--make-v|--make-va|--make-var|--make-vari|--make-varia|--make-variab|--make-variabl|--make-variable)
+	if test $# -lt 2; then elem2xxx_usage; fi
+	shift 1; makevar="$1"; shift 1;;
+    -v*)
+	makevar=`echo "$1" | sed 's/^-v//'`; shift 1;;
+    --m=*|--ma=*|--mak=*|--make=*|--make-=*|--make-v=*|--make-va=*|--make-var=*|--make-vari=*|--make-varia=*|--make-variab=*|--make-variabl=*|--make-variable=*)
+	makevar=`echo "$1" | sed 's/^[^=]*=//'`; shift 1;;
+    -x|--e|--ex|--exc|--excl|--exclu|--exclud|--exclude)
+        if test $# -lt 2; then elem2xxx_usage; fi
+	shift 1
+	for i in $1; do excludes=";/^$i"' \\$'"/d$excludes"; done
+	shift 1;;
+    -x*)
+	this_exclude=`echo "$1" | sed 's/^-p//'`
+	for i in $this_exclude; do excludes=";/^$i"' \\$'"/d$excludes"; done
+	shift 1;;
+    --e=*|--ex=*|--exc=*|--excl=*|--exclu=*|--exclud=*|--exclude=*)
+	this_exclude=`echo "$1" | sed 's/^[^=]*=//'`
+	for i in $this_exclude; do excludes=";/^$i"' \\$'"/d$excludes"; done
+	shift 1;;
+    --l|--li|--lin|--linu|--linux|--linux2|--linux26)
+	linux26=1; shift 1;;
+    --b|--bs|--bsd)
+	bsdmake=1; shift 1;;
+    --no-l|--no-li|--no-lin|--no-linu|--no-linux|--no-linux2|--no-linux26)
+	linux26=0; shift 1;;
+    -V|--verb|--verbo|--verbos|--verbose)
+	verbose=1; shift 1;;
+    -h|--h|--he|--hel|--help)
+	cat <<'EOF' 1>&2
+'Click-buildtool elem2make' reads an 'elements.conf' file generated by
+'click-buildtool findelem' on the standard input, and writes a Makefile
+fragment defining the ELEMENT_OBJS variable to the standard output.
+
+Usage: click-buildtool elem2make [-t DRIVER] [-V] < elements.conf
+
+Options:
+  -t, --driver DRIVER      Set target driver to DRIVER ('userlevel',
+                           'linuxmodule', 'bsdmodule', 'ns', or 'tool').
+  -v, --make-variable N    Use make variable N.
+      --linux26            Generate Linux 2.6-style makefile fragment.
+      --bsd                Generate BSD make compatible Makefile.
+  -x, --exclude FILE       Do not include FILE.
+  -V, --verbose            Print more information.
+  -h, --help               Print this message and exit.
+
+Report bugs to <click@pdos.lcs.mit.edu>.
+EOF
+	exit 0;;
+    *)
+	elem2xxx_usage;;
+    esac
+    done
+
+    L=
+    defmakevar="ELEMENT_OBJS"
+    if test -n "$driver"; then
+	if test "$driver" = 'user' -o "$driver" = 'userlevel'; then
+	    L=u
+	elif test "$driver" = 'kernel' -o "$driver" = 'linuxmodule'; then
+	    L=k
+	    test "$linux26" = x && linux26="$LINUXMODULE_2_6"
+	elif test "$driver" = 'bsdmodule'; then
+	    L=b
+	elif test "$driver" = 'ns' -o "$driver" = 'nsmodule'; then
+	    L=n
+	elif test "$driver" = 'tool'; then
+	    L=t
+	else
+	    echo "Unknown driver $driver" 1>&2
+	    exit 1
+	fi
+    fi
+    if test "$linux26" = 1 -a "$bsdmake" = 1; then
+	echo "--linux26 and --bsd are mutually exclusive" 1>&2
+	exit 1
+    fi
+    osuffix=".${L}o"
+    if test -z "$makevar"; then
+	makevar=$defmakevar
+    fi
+
+    # expand list of files
+    elemconf=`cat`
+    files=`echo "$elemconf" | $grep -v '^#' | sed 's/[ 	].*//'`
+
+    # find libraries
+    libs=`echo "$elemconf" | sed '/-!lib/!d;s/^.*-!lib//g;s/;/ /g' | $grep .`
+    if test -n "$libs"; then
+	libs=`echo "$libs" | sed 's/^\([^ ][^ ]*\) *$/\1 \1/'`
+	while echo "$libs" | $grep ' [^ ].* [^ ]' >/dev/null; do
+	    libs=`echo "$libs" | sed '/ [^ ].* [^ ]/s/^\([^ ][^ ]*\)  *\([^ ][^ ]*\) /\1 \2\\
+\2 /'`
+	done
+    fi
+    test -n "$libs" && libs=`echo "$libs" | tsort`
+
+    # massage awk script based on Linux 2.6 or not
+    if test "$linux26" = 1; then
+	set_subdir_scriptlet='
+	    if (dir != "" && substr(dir, 1, 1) == "/")
+		subdirs[dirid] = dir;
+	    else
+		subdirs[dirid] = "$(obj)/" dir;
+        '
+	pattern_scriptlet='$(addprefix $(obj)/,$('"$makevar"'__", i, "))'
+	obj_scriptlet='    obj = "$(obj)/%'"$osuffix"'";'
+	action_scriptlet='    action["c" obj] = "	$(call if_changed_dep,ccompile)";
+    action["C" obj] = "	$(call if_changed_dep,cxxcompile)";'
+    else
+	set_subdir_scriptlet='subdirs[dirid] = dir;'
+	pattern_scriptlet='$('"$makevar"'__", i, ")'
+	obj_scriptlet='    obj = "%'"$osuffix"'";'
+	action_scriptlet='    action["c" obj] = "	$(call ccompile,-c $< -o $@,CC)";
+    action["C" obj] = "	$(call cxxcompile,-c $< -o $@,CXX)";
+    action["c%.i"] = "	$(call ccompile_nodep,-E $< -o $@,CPP)";
+    action["C%.ii"] = "	$(call cxxcompile_nodep,-E $< -o $@,CXXCPP)";
+    action["c%.s"] = "	$(call ccompile_nodep,-S $< -o $@,CC -S)";
+    action["C%.s"] = "	$(call cxxcompile_nodep,-S $< -o $@,CXX -S)";'
+	if test -n "$L"; then
+	    action_scriptlet="$action_scriptlet"'
+    action["c" obj] = action["c" obj] "\n	$(FIXDEP)";
+    action["C" obj] = action["C" obj] "\n	$(FIXDEP)";'
+	fi
+    fi
+
+    # output
+    echo "# Generated by 'click-buildtool elem2make' on" `date`
+    echo "$files" | $awk '
+BEGIN { OFS = "";
+'"$obj_scriptlet"'
+'"$action_scriptlet"'
+}
+{   filetype = ($0 ~ /\.c$/ ? "c" : "C");
+    sub(/\.cc*$/, "'"$osuffix"'");
+    i = match($0, /\/[^\/]*$/);
+    if (i == 0) {
+	dir = "";
+	file = $0;
+    } else {
+	dir = substr($0, 1, RSTART);
+	file = substr($0, RSTART + 1);
+    }
+    decdir = filetype dir;
+    if (decdir in subdirid)
+	dirid = subdirid[decdir];
+    else {
+	dirid = nsubdirs++;
+	subdirid[decdir] = dirid;
+	subdirtype[dirid] = filetype;
+	'"$set_subdir_scriptlet"'
+    }
+    elements[dirid] = elements[dirid] file " \\\n";
+}
+END {
+    for (i = 0; i < nsubdirs; i++) {
+	print "'"$makevar"'__", i, " = \\\n", elements[i];
+	allsubdirs = allsubdirs "$('"$makevar"'__" i ") \\\n";
+    }
+    print "'"$makevar"' = \\\n", allsubdirs;
+    for (i = 0; i < nsubdirs; i++) {
+	for (j in action) {
+	    if (substr(j, 1, 1) != subdirtype[i])
+		continue;
+	    suffix = (subdirtype[i] == "C" ? "%.cc" : "%.c");
+	    x = substr(j, 2) ": " subdirs[i] suffix;
+	    if (substr(j, 2) == obj)
+		print "'"$pattern_scriptlet"': ", x;
+	    else
+		print "$(patsubst %'"$osuffix"',", substr(j, 2), ",'"$pattern_scriptlet"'): ", x;
+	    print action[j];
+	}
+	print "";
+    }
+}' | sed "$excludes"
+
+    if test -n "$libs"; then
+	libvar=`echo $makevar | sed 's/OBJS$/LIBS/'`
+	echo $libvar = $libs
+    fi
+}
+
+elem2xxx () {
+    package=""
+    date=`date`
+    standards=''
+    includes=''
+    while [ x"$1" != x ]; do
+    case $1 in
+    -S|--s|--st|--sta|--stan|--stand|--standa|--standar|--standard|--standards)
+	standards=1; shift 1;;
+    -V|--verb|--verbo|--verbos|--verbose)
+	verbose=1; shift 1;;
+    -i|--i|--in|--inc|--incl|--inclu|--includ|--include)
+	if test $# -lt 2; then elem2xxx_usage; fi
+	includes="$includes print '#include $2';"; shift 2;;
+    -i*)
+	this_include=`echo "$1" | sed 's/^-i//'`
+	includes="$includes print '#include $this_include';"; shift 1;;
+    --i=*|--in=*|--inc=*|--incl=*|--inclu=*|--includ=*|--include=*)
+	this_include=`echo "$1" | sed 's/^[^=]*=//'`
+	includes="$includes print '#include $this_include';"; shift 1;;
+    -h|--h|--he|--hel|--help)
+	if test "$elem2" = export; then
+	    cat <<'EOF' 1>&2
+'Click-buildtool elem2export' reads an 'elements.conf' file generated by
+'click-buildtool findelem' on the standard input, examines those files for
+exported elements, and writes a C++ source file defining the
+click_export_elements() function to the standard output.
+
+Usage: click-buildtool elem2export [-V] < elements.conf
+EOF
+	elif test "$elem2" = package; then
+	    cat <<'EOF' 1>&2
+'Click-buildtool elem2package' reads an 'elements.conf' file generated by
+'click-buildtool findelem' on the standard input, examines those files for
+exported elements, and writes a C++ source file suitable for creating a
+dynamically linked package with those elements to the standard output. PKGNAME
+is the name of the package.
+
+Usage: click-buildtool elem2package [-p PREFIX] [-V] PKGNAME < elements.conf
+EOF
+	fi
+	cat <<'EOF' 1>&2
+
+Options:
+  -S, --standards          Export standard required elements as well.
+  -i, --include HDR        Emit "#include HDR" at top of file.
+  -V, --verbose            Print more information.
+  -h, --help               Print this message and exit.
+
+Report bugs to <click@pdos.lcs.mit.edu>.
+EOF
+	exit 0;;
+    -*)
+	elem2xxx_usage;;
+    *)
+	if test -z "$package" -a "$elem2" = package; then package="$1"; shift 1; else elem2xxx_usage; fi;;
+    esac
+    done
+
+    # set up awk program
+    if test -n "$package"; then
+	includes="  $includes "'print "#define WANT_MOD_USE_COUNT 1\n#include <click/config.h>\n#include <click/package.hh>\n#include <click/glue.hh>";
+  for (file in INCLUDES) {
+    if (file != "-") print "#include ", file;
+  }'
+	awk_program='BEGIN {
+  OFS = ""; nrebecca = 0; packname="'"$package"'";
+}
+/^#/ { next; }
+{
+  if (NF == 1)
+    next;
+  anyprovides = 0;
+  for (i = 3; i <= NF; i++) {
+    split($i, ans, /-/);
+    if (ans[2] == "!si") {
+      B = B "  " ans[1] "::static_initialize();\n";
+      anyprovides++;
+    } else if (ans[2] == "!sc") {
+      C = C "  " ans[1] "::static_cleanup();\n";
+      anyprovides++;
+    } else if (ans[2] !~ /^!/) {
+      B = B "  hatred_of_rebecca[" nrebecca "] = click_add_element_type(\"" ans[2] "\", beetlemonkey, " nrebecca ");\n"
+      C = C "  click_remove_element_type(hatred_of_rebecca[" nrebecca "]);\n";
+      D = D "   case " nrebecca ": return new " ans[1] ";\n";
+      anyprovides++; nrebecca++;
+    }
+  }
+  if (anyprovides)
+    INCLUDES[$2] = 1;
+}
+END {
+  print "/* Generated by \"click-buildtool elem2package\" on '"$date"' */";
+  print "/* Package name: ", packname, " */\n";
+'"$includes"'
+  print "\nCLICK_USING_DECLS";
+  print "static int hatred_of_rebecca[", nrebecca, "];";
+  print "static Element *\nbeetlemonkey(uintptr_t heywood)\n{\n  switch (heywood) {\n", D, "   default: return 0;\n  }\n}\n";
+  print "#ifdef CLICK_LINUXMODULE\n#define click_add_element_type(n, f, t) click_add_element_type((n), (f), (t), THIS_MODULE)\n#endif";
+  print "#ifdef CLICK_BSDMODULE\nstatic int\nmodevent(module_t, int t, void *)\n{\n  if (t == MOD_LOAD) {\n#else\nextern \"C\" int\ninit_module()\n{\n#endif";
+  print "  click_provide(\"", packname, "\");\n", B, "  CLICK_DMALLOC_REG(\"nXXX\");\n  return 0;";
+  print "#ifdef CLICK_BSDMODULE\n  } else if (t == MOD_UNLOAD) {\n#else\n}\nextern \"C\" void\ncleanup_module()\n{\n#endif";
+  print C, "  click_unprovide(\"", packname, "\");";
+  print "#ifdef CLICK_BSDMODULE\n  return 0;\n  } else\n    return 0;\n}\nstatic moduledata_t modinfo = {\n  \"", packname, "\", modevent, 0\n};\nDECLARE_MODULE(", packname, ", modinfo, SI_SUB_PSEUDO, SI_ORDER_ANY);\nMODULE_VERSION(", packname, ", 1);\nMODULE_DEPEND(", packname, ", click, 1, 1, 1);\n#else\n}\n#endif";
+}
+'
+
+    else
+	includes="$includes"'  print "#include <click/config.h>\n#include <click/package.hh>";
+  for (file in INCLUDES) {
+    if (file != "-") print "#include ", file;
+  }'
+	awk_program='BEGIN {
+  OFS = ""; nrebecca = 0;
+}
+/^#/ { next; }
+{
+  if (NF == 1)
+    next;
+  anyprovides = 0;
+  for (i = 3; i <= NF; i++) {
+    split($i, ans, /-/);
+    if (ans[2] == "!si") {
+      B = B "  " ans[1] "::static_initialize();\n";
+      anyprovides++;
+    } else if (ans[2] == "!sc") {
+      C = C "  " ans[1] "::static_cleanup();\n";
+      anyprovides++;
+    } else if (ans[2] !~ /^!/) {
+      B = B "  (void) click_add_element_type_stable(\"" ans[2] "\", beetlemonkey, " nrebecca ");\n";
+      D = D "   case " nrebecca ": return new " ans[1] ";\n";
+      anyprovides++; nrebecca++;
+    }
+  }
+  if (anyprovides)
+    INCLUDES[$2] = 1;
+}
+END {
+  print "/* Generated by \"click-buildtool elem2export\" on '"$date"' */\n";
+'"$includes"'
+  print "CLICK_USING_DECLS";
+  print "static Element *\nbeetlemonkey(uintptr_t heywood)\n{\n  switch (heywood) {\n", D, "   default: return 0;\n  }\n}\n";
+  print "#ifdef CLICK_LINUXMODULE\n#define click_add_element_type_stable(n, f, t) click_add_element_type_stable((n), (f), (t), 0)\n#endif";
+  print "void\nclick_export_elements()\n{\n", B, "  CLICK_DMALLOC_REG(\"nXXX\");\n}\n";
+  print "void\nclick_unexport_elements()\n{\n", C, "}";
+}
+'
+    fi
+
+    # Actually generate the command!
+    if test -z "$standards"; then
+	$awk "$awk_program"
+    else
+	cat <<EOF >/tmp/click-buildtool-standards.$$
+-	<click/standard/addressinfo.hh>	AddressInfo-AddressInfo
+-	<click/standard/alignmentinfo.hh>	AlignmentInfo-AlignmentInfo
+-	<click/standard/errorelement.hh>	ErrorElement-ErrorElement
+-	<click/standard/portinfo.hh>	PortInfo-PortInfo
+-	<click/standard/scheduleinfo.hh>	ScheduleInfo-ScheduleInfo
+-   <click/standard/xiaxidinfo.hh>   XIAXIDInfo-XIAXIDInfo
+EOF
+	cat - /tmp/click-buildtool-standards.$$ | $awk "$awk_program"
+	/bin/rm -f /tmp/click-buildtool-standards.$$
+    fi
+}
+
+
+
+############
+# PROVIDES #
+############
+
+provides_usage () {
+    echo "Usage: click-buildtool provides [REQS]" 1>&2
+    echo "Try 'click-buildtool provides --help' for more information." 1>&2
+    exit 1
+}
+
+provides () {
+    provisions="$default_provisions
+$driver_provisions
+"`elementmap_provisions ${clickdatadir}/elementmap.xml`
+    requirements=""
+    stdin=n; query=n; print=n
+    while [ x"$1" != x ]; do
+    case $1 in
+    -q|--q|--qu|--que|--quer|--query)
+	query=y; shift 1;;
+    -l|--pri|--prin|--print)
+	print=y; shift 1;;
+    -r|--pro|--prov|--provi|--provid|--provide)
+	if test $# -lt 2; then provides_usage; fi
+	shift 1; provisions="$1
+$provisions"; shift 1;;
+    -r*)
+	provisions=`echo "$1" | sed 's/^-r//'`"
+$provisions"; shift 1;;
+    --p=*|--pr=*|--pro=*|--prov=*|--provi=*|--provid=*|--provide=*)
+	provisions=`echo "$1" | sed 's/^[^=]*=//'`"
+$provisions"; shift 1;;
+    -e|--e|--el|--ele|--elem|--eleme|--elemen|--element|--elementm|--elementma|--elementmap)
+	if test $# -lt 2; then provides_usage; fi
+	shift 1; provisions=`elementmap_provisions $1`"
+$provisions"; shift 1;;
+    -e*)
+	emap=`echo "$1" | sed 's/^-e//'`
+	provisions=`elementmap_provisions $emap`"
+$provisions"; shift 1;;
+    --e=*|--el=*|--ele=*|--elem=*|--eleme=*|--elemen=*|--element=*|--elementm=*|--elementma=*|--elementmap=*)
+	emap=`echo "$1" | sed 's/^[^=]*=//'`
+	provisions=`elementmap_provisions $emap`"
+$provisions"; shift 1;;
+    -h|--h|--he|--hel|--help)
+	cat <<'EOF' 1>&2
+'Click-buildtool provides' exits with status 0 if the Click installation
+provides all requirement(s) in REQ arguments, and status 1 otherwise.
+
+Usage: click-buildtool provides [OPTIONS] [REQ...]
+
+Options:
+  -q, --query              Print provisions to standard output.
+  -r, --provide REQ        Provide requirement(s) in REQ.
+  -e, --elementmap EMAP    Provide requirement(s) from EMAP.
+  -l, --print              Print 0 (REQs not provided) or 1 (REQs provided).
+  -h, --help               Print this message and exit.
+
+Report bugs to <click@pdos.lcs.mit.edu>.
+EOF
+	exit 0;;
+    -)
+	stdin=y; shift 1;;
+    -*)
+	provides_usage;;
+    *)
+	requirements="$1
+$requirements"; shift 1;;
+    esac
+    done
+
+    [ $stdin = y ] && requirements="`cat` $requirements"
+    provisions="`echo "$provisions" | tr -s ' \011\015\014\013' '\012' | $grep . | sort | uniq`"
+    [ $query = y ] && echo "$provisions"
+    requirements="`echo "$requirements" | tr -s ' \011\015\014\013' '\012' | $grep . | sort | uniq`"
+    awk_provisions="`echo "$provisions" | sed 's/\(..*\)/dep["\1"]=1;/'`"
+    echo "$requirements" | $awk -F: 'BEGIN {
+'"$awk_provisions"'
+}
+/./ { if (!dep[$1]) exit 1; }' >/dev/null 2>&1
+    status=$?
+    [ $print = y ] && expr 1 - $status
+    exit $status
+}
+
+
+#############
+# QUIETLINK #
+#############
+
+quietlink_usage () {
+    echo "Usage: click-buildtool quietlink" 1>&2
+    echo "Try 'click-buildtool quietlink --help' for more information." 1>&2
+    exit 1
+}
+
+quietlink () {
+    while [ x"$1" != x ]; do
+    case $1 in
+    -h|--h|--he|--hel|--help)
+	cat <<'EOF' 1>&2
+'Click-buildtool quietlink' quiets the GNU linker when linking an element
+package. Specifically, it removes undefined reference complaints.
+
+Usage: ld ... 2>&1 | click-buildtool quietlink
+
+Options:
+  -h, --help                 Print this message and exit.
+
+Report bugs to <click@pdos.lcs.mit.edu>.
+EOF
+	exit 0;;
+    *)
+	quietlink_usage;;
+    esac
+    done
+
+    $awk -F: 'BEGIN {
+  context = ""
+}
+/: In function/ {
+  context = $0
+  next
+}
+/: undefined reference to/ {
+  next
+}
+/: more undefined references to/ {
+  next
+}
+{
+  if (context != "") {
+    print context
+    context = ""
+  }
+  print $0
+}' 1>&2
+}
+
+
+
+##########
+# PREFIX #
+##########
+
+prefix_usage () {
+    echo "Usage: click-buildtool prefix" 1>&2
+    echo "Try 'click-buildtool prefix --help' for more information." 1>&2
+    exit 1
+}
+
+prefix () {
+    while [ x"$1" != x ]; do
+    case $1 in
+    -h|--h|--he|--hel|--help)
+	cat <<'EOF' 1>&2
+'Click-buildtool prefix' prints the Click prefix directory.
+
+Usage: click-buildtool prefix
+
+Options:
+  -h, --help                 Print this message and exit.
+
+Report bugs to <click@pdos.lcs.mit.edu>.
+EOF
+	exit 0;;
+    *)
+	prefix_usage;;
+    esac
+    done
+    echo $prefix
+}
+
+
+
+############
+# KVERSION #
+############
+
+kversion_usage () {
+    echo_n "Usage: click-buildtool kversion [--gpl] > kversion.c" 1>&2
+    echo "Try 'click-buildtool kversion --help' for more information." 1>&2
+    exit 1
+}
+
+kversion () {
+    gpl=0
+    linux26=$LINUXMODULE_2_6
+    while [ x"$1" != x ]; do
+    case $1 in
+    --g|--gp|--gpl)
+	gpl=1; shift 1;;
+    -h|--h|--he|--hel|--help)
+	cat <<'EOF' 1>&2
+'Click-buildtool kversion' writes a kversion.c file, to be used for building
+a Click kernel package, on the standard output.
+
+Usage: click-buildtool kversion [--gpl] > kversion.c
+
+Options:
+      --gpl                The package is dual-licensed BSD/GPL (otherwise
+                           no license).
+  -h, --help               Print this message and exit.
+
+Report bugs to <click@pdos.lcs.mit.edu>.
+EOF
+	exit 0;;
+    *)
+	kversion_usage;;
+    esac
+    done
+
+    cat <<EOF
+#include <click/config.h>
+#include <linux/module.h>
+
+/* a new version of EXPORT_NO_SYMBOLS that works */
+const int __ksymtab_nothing[0] __attribute__((section("__ksymtab"))) = { };
+EOF
+    test $gpl = 1 && cat <<EOF
+
+#ifdef MODULE_LICENSE
+MODULE_LICENSE("Dual BSD/GPL");
+#endif
+EOF
+}
+
+
+
+##########
+# KBUILD #
+##########
+
+kbuild_usage () {
+    echo_n "Usage: click-buildtool kbuild > Kbuild" 1>&2
+    echo "Try 'click-buildtool kbuild --help' for more information." 1>&2
+    exit 1
+}
+
+kbuild () {
+    while [ x"$1" != x ]; do
+    case $1 in
+    -h|--h|--he|--hel|--help)
+	cat <<'EOF' 1>&2
+'Click-buildtool kbuild' writes a Kbuild file, to be used for building
+a Click kernel package for Linux 2.6 kernels, on the standard output.
+
+Usage: click-buildtool kbuild > Kbuild
+
+Options:
+  -h, --help               Print this message and exit.
+
+Report bugs to <click@pdos.lcs.mit.edu>.
+EOF
+	exit 0;;
+    *)
+	kversion_usage;;
+    esac
+    done
+
+    echo "include ${clickdatadir}/pkg-linuxmodule-26.mk"
+}
+
+
+
+###############
+# MAKEPACKAGE #
+###############
+
+makepackage_usage () {
+    echo "Usage: click-buildtool makepackage [-t DRIVER] PACKAGENAME SRCFILES..." 1>&2
+    echo "Try 'click-buildtool makepackage for more information." 1>&2
+    exit 1
+}
+
+makepackage () {
+    driver=""
+    date=`date`
+    dir=
+    pkg=
+    srcs=
+    if test -n "$verbose"; then quiet=V=1; else quiet=; fi
+    cflags=
+    while [ x"$1" != x ]; do
+    case $1 in
+    -t|--d|--dr|--dri|--driv|--drive|--driver)
+	test $# -lt 2 && makepackage_usage
+	shift 1; driver="$1"; shift 1;;
+    -t*)
+	driver=`echo "$1" | sed 's/^-D//'`; shift 1;;
+    --dr=*|--dri=*|--driv=*|--drive=*|--driver=*)
+	driver=`echo "$1" | sed 's/^[^=]*=//'`; shift 1;;
+    --t|--ta|--tar|--targ|--targe|--target)
+        test $# -lt 2 && makepackage_usage
+	shift 1; driver="$1"; shift 1;;
+    --t=*|--ta=*|--tar=*|--targ=*|--targe=*|--target=*)
+	driver=`echo "$1" | sed 's/^[^=]*=//'`; shift 1;;
+    -C|--di|--dir|--dire|--direc|--direct|--directo|--director|--directory)
+        test $# -lt 2 && makepackage_usage
+	shift 1; dir="$1"; shift 1;;
+    -C*)
+	dir="`echo "$1" | sed 's/^-C//'`"/; shift 1;;
+    --di=*|--dir=*|--dire=*|--direc=*|--direct=*|--directo=*|--director=*|--directory=*)
+	dir="`echo "$1" | sed 's/^[^=]*=//'`"/; shift 1;;
+    -q|--q|--qu|--qui|--quie|--quiet)
+	quiet="-s V=1"; shift 1;;
+    -V|--v|--ve|--ver|--verb|--verbo|--verbos|--verbose)
+	quiet="V=1"; shift 1;;
+    -h|--h|--he|--hel|--help)
+	cat <<'EOF' 1>&2
+'Click-buildtool makepackage' builds a Click package for the specified
+driver from sources listed on the command line.
+
+Usage: click-buildtool makepackage [-t DRIVER] PACKAGENAME SRCFILES...
+
+Options:
+  -t, --driver DRIVER      Set target driver to DRIVER ('userlevel',
+                           'linuxmodule', 'bsdmodule', 'ns', or 'tool').
+  -q, --quiet              Build quietly (may be ignored).
+  -V, --verbose            Build verbosely (may be ignored).
+  -C, --directory DIR      Switch to DIR directory before building.
+  -h, --help               Print this message and exit.
+  -[other options]         Passed to the C/C++ compiler.
+
+Report bugs to <click@pdos.lcs.mit.edu>.
+EOF
+	exit 0;;
+    -*)
+	cflags="$cflags $1"; shift 1;;
+    *)
+	if test -z "$pkg"; then
+	    pkg="$1"; shift 1
+	else
+	    srcs="$srcs
+$1"; shift 1
+	fi;;
+    esac
+    done
+
+    test -z "$srcs" && makepackage_usage
+
+    objs=
+    objsvar=OBJS
+    if test -z "$driver" -o "$driver" = 'user' -o "$driver" = 'userlevel'; then
+	L=u
+    elif test "$driver" = 'kernel' -o "$driver" = 'linuxmodule'; then
+	L=k
+    elif test "$driver" = 'bsdmodule'; then
+	L=b
+    elif test "$driver" = 'ns' -o "$driver" = 'nsmodule'; then
+	L=n
+    elif test "$driver" = 'tool'; then
+	L=t
+    else
+	echo "Unknown driver $driver" 1>&2
+	exit 1
+    fi
+    osuffix=".${L}o"
+
+    if test -n "$dir"; then cd "$dir"; fi
+    echo > ${L}elements.conf
+    echo "$srcs" | $grep . | elem2make -t $driver > ${L}elements.mk
+    echo "PACKAGE_OBJS :=" >> ${L}elements.mk
+
+    echo "package = $pkg
+
+srcdir = .
+top_srcdir = .
+builddir = .
+top_builddir = .
+PACKAGE_CFLAGS = $cflags
+PACKAGE_CXXFLAGS = $cflags
+
+include ${clickdatadir}/config.mk
+include ${clickdatadir}/pkg-Makefile" > Makefile
+
+    test -z "$quiet" && echo "+" $gmake $pkg$osuffix
+    $gmake $quiet $pkg$osuffix
+}
+
+
+
+#########
+# KSYMS #
+#########
+
+ksyms_usage () {
+    echo "Usage: click-buildtool ksyms OBJ... > KSYMS" 1>&2
+    echo "Try 'click-buildtool ksyms --help' for more information." 1>&2
+    exit 1
+}
+
+ksyms () {
+    driver=""
+    date=`date`
+    dir=
+    objs=
+    exclude=
+    while [ x"$1" != x ]; do
+    case $1 in
+    -C|--di|--dir|--dire|--direc|--direct|--directo|--director|--directory)
+        test $# -lt 2 && ksyms_usage
+	shift 1; dir="$1"; shift 1;;
+    -C*)
+	dir="`echo "$1" | sed 's/^-C//'`"/; shift 1;;
+    --di=*|--dir=*|--dire=*|--direc=*|--direct=*|--directo=*|--director=*|--directory=*)
+	dir="`echo "$1" | sed 's/^[^=]*=//'`"/; shift 1;;
+    -x|--e|--ex|--exc|--excl|--exclu|--exclud|--exclude)
+    	test $# -lt 2 && ksyms_usage
+	shift 1; exclude="$exclude
+$1"; shift 1;;
+    -x*)
+	exclude="$exclude
+`echo "$1" | sed 's/^-x//'`"; shift 1;;
+    --e=*|--ex=*|--exc=*|--excl=*|--exclu=*|--exclud=*|--exclude=*)
+	exclude="$exclude
+`echo "$1" | sed 's/^[^=]*=//'`"; shift 1;;
+    -h|--h|--he|--hel|--help)
+	cat <<'EOF' 1>&2
+'Click-buildtool ksyms' creates a C file that exports all symbols for the
+Click objects listed on the command line.
+
+Usage: click-buildtool ksyms OBJ... > KSYMS
+
+Options:
+  -x, --exclude=FILE       Ignore OBJ even if it is supplied as an argument.
+  -C, --directory DIR      Switch to DIR directory before running.
+  -h, --help               Print this message and exit.
+
+Report bugs to <click@pdos.lcs.mit.edu>.
+EOF
+	exit 0;;
+    *)
+	objs="$objs
+$1"; shift 1;;
+    esac
+    done
+
+    test -z "$objs" && ksyms_usage
+    objs=`echo "$objs" | sort | uniq`
+    test -n "$exclude" && objs=`echo "$objs
+$exclude" | sort | uniq -u`
+
+    if test -n "$dir"; then cd "$dir"; fi
+    if test -z "$NM"; then NM="@NM@"; fi
+    echo "// Created by 'click-buildtool ksyms' on $date"
+    echo "#include <click/config.h>"
+    echo "#include <linux/version.h>"
+    echo "#include <linux/module.h>"
+    $NM -g $objs | $awk '
+BEGIN {
+    printed["init_module"] = printed["cleanup_module"] = 1;
+}
+/^[ 	]/ {
+    next
+}
+/^.*[ 	][ABCDGRSTVW]/ {
+    x = $3;
+    if (x ~ /^[_A-Za-z][_A-Za-z0-9]*$/ && !printed[x]) {
+	printed[x] = 1;
+	if (x != "click_assert_failed")
+	    print "extern char " x "[];";
+	print "EXPORT_SYMBOL(" x ");";
+    }
+}'
+}
+
+
+
+################
+# MAIN PROGRAM #
+################
+
+if test $# = 0; then
+    # force usage message
+    set crapfunc
+fi
+
+while [ x"$1" != x ]; do
+case $1 in
+  --vers|--versi|--versio|--version)
+     cat <<'EOF'
+click-buildtool (Click) @CLICK_VERSION@
+Copyright (c) 2000-2001 Massachusetts Institute of Technology
+Copyright (c) 2000-2004 Mazu Networks, Inc.
+Copyright (c) 2001-2003 International Computer Science Institute
+Copyright (c) 2004-2007 Regents of the University of California
+This is free software; see the source for copying conditions.
+There is NO warranty, not even for merchantability or fitness for a
+particular purpose.
+EOF
+     exit 0;;
+  -V|--verb|--verbo|--verbos|--verbose)
+     verbose=1; shift 1;;
+  -h|--h|--he|--hel|--help)
+     cat <<'EOF' 1>&2
+'Click-buildtool' is a set of tools used when building Click. For information
+on a particular tool, run 'click-buildtool TOOLNAME --help'.
+
+Usage: click-buildtool elem2make [-V] [-p PREFIX] < [ELEMENTS]
+   or: click-buildtool elem2export [-V] [-p PREFIX] < [ELEMENTS]
+   or: click-buildtool elem2package [-V] [-p PREFIX] PACKAGENAME < [ELEMENTS]
+   or: click-buildtool findelem [-a] [-V] [-p PREFIX] < [FILES AND DIRECTORIES]
+   or: click-buildtool makepackage [-t DRIVER] PACKAGENAME SRCFILES...
+   or: click-buildtool prefix
+   or: click-buildtool provides [REQS]
+   or: click-buildtool quietlink
+   or: click-buildtool kbuild
+   or: click-buildtool kversion [--gpl]
+   or: click-buildtool ksyms OBJS > KSYMSFILE
+   or: click-buildtool shortensyms OBJS
+   or: click-buildtool [--cflags | --otherlibs | --toolcflags | --toollibs]
+
+Options:
+  -V, --verbose            Print more information.
+  -h, --help               Print this message and exit.
+      --version            Print version number and exit.
+
+Report bugs to <click@pdos.lcs.mit.edu>.
+EOF
+     exit 0;;
+  findelem)
+     shift 1; findelem "$@"; exit 0;;
+  elem2make)
+     elem2="make"; shift 1; elem2make "$@"; exit 0;;
+  elem2export)
+     elem2="export"; shift 1; elem2xxx "$@"; exit 0;;
+  elem2package)
+     elem2="package"; shift 1; elem2xxx "$@"; exit 0;;
+  makepackage)
+     shift 1; makepackage "$@"; exit 0;;
+  prefix)
+     shift 1; prefix "$@"; exit 0;;
+  provides)
+     shift 1; provides "$@"; exit 0;;
+  quietlink)
+     shift 1; quietlink "$@"; exit 0;;
+  kversion)
+     shift 1; kversion "$@"; exit 0;;
+  kbuild)
+     shift 1; kbuild "$@"; exit 0;;
+  ksyms)
+     shift 1; ksyms "$@"; exit 0;;
+  shortensyms)
+     shift 1; shortensyms "$@"; exit 0;;
+  --c|--cf|--cfl|--cfla|--cflag|--cflags|--d|--de|--def|--defs)
+     echo @PROPER_INCLUDES@ @PCAP_INCLUDES@ -I@includedir@; exit 0;;
+  --o|--ot|--oth|--othe|--other|--otherl|--otherli|--otherlib|--otherlibs)
+     echo @PROPER_LIBS@ @PCAP_LIBS@ @DL_LIBS@ @SOCKET_LIBS@ @PTHREAD_LIBS@ @POSIX_CLOCK_LIBS@;
+     exit 0;;
+  --toolc|--toolcf|--toolcfl|--toolcfla|--toolcflag|--toolcflags)
+     echo -DCLICK_TOOL -I@includedir@; exit 0;;
+  --tooll|--toolli|--toollib|--toollibs)
+     echo -L@libdir@ -lclicktool @DL_LIBS@ @SOCKET_LIBS@ @POSIX_CLOCK_LIBS@; exit 0;;
+  *)
+     echo "Usage: click-buildtool TOOLNAME [ARGUMENTS]
+Try 'click-buildtool --help' for more information." 1>&2
+     exit 1;;
+esac
+done

@@ -1,0 +1,1628 @@
+\input texinfo.tex
+@setfilename click.info
+@settitle Click
+@footnotestyle end
+
+@dircategory Click modular router
+@direntry
+* Click: (click).           The Click modular router programming manual.
+@end direntry
+
+@ifnottex
+@macro leq
+<=
+@end macro
+@end ifnottex
+@ifnotinfo
+@macro click {arg}
+@emph{\arg\}
+@end macro
+@end ifnotinfo
+@ifinfo
+@macro click {arg}
+@code{\arg\}
+@end macro
+@end ifinfo
+
+@macro handler {arg}
+`\arg\'
+@end macro
+
+@rmacro strcode {arg}
+@t{\arg\}
+@end rmacro
+
+@macro qsamp {arg}
+@r{``}@t{\arg\}@r{''}
+@end macro
+@tex
+% The macro definition above doesn't get space expansion right.
+\gdef\qsamp#1{@r{``}@t{#1}@r{''}}
+@end tex
+
+@syncodeindex vr cp
+@syncodeindex fn cp
+@syncodeindex tp cp
+
+@titlepage
+@title Programming the Click Modular Router
+@author Eddie Kohler
+@end titlepage
+
+@contents
+
+@node Top, Overview, (dir), (dir)
+@top
+
+@ifinfo
+This document describes the Click modular router's programming
+interface. Read this if you're interested in writing new elements for
+Click. You shouldn't need to read it if you are just building routers
+that use existing elements.
+
+Most of Click's programming interface documentation is now stored in
+the source code as structured comments.  The formatted documentation
+is on the Web: @indicateurl{http://www.read.cs.ucla.edu/click/doxygen}
+@end ifinfo
+
+@menu
+* Overview::                    
+* Helper Classes::              
+* Tasks::                       
+* Timers::                      
+* Notification::                
+* Coding Standards::            
+* Index::                       Index.
+
+@detailmenu
+ --- The Detailed Node Listing ---
+
+Overview
+
+* Packet Transfer::             
+
+Helper Classes
+
+* ErrorHandler::                
+* Handlers::                    
+
+ErrorHandler
+
+* ErrorHandler Initialization::  
+* Reporting Errors::            
+* Error Format Strings::        
+* Counting Errors::             
+* Basic ErrorHandlers::         
+* Error Veneers::               
+* Writing ErrorHandlers::       
+
+Handlers
+
+* Read and Write Handler Overview::  
+* Adding Handlers::             
+* Default Handlers::            
+* Accessing Handlers Internally::  
+* LLRPC Overview::              
+
+Accessing Handlers Internally
+
+* Handler Objects::             
+* Handlers By Name or Index::   
+
+Tasks
+
+* Task Initialization::         
+* Scheduling Tasks::            
+* Tickets::                     
+* Task Thread Choice::          
+* Task Status::                 
+* Task Handlers::               
+* Task Cleanup::                
+
+Timers
+
+* Timer Initialization::        
+* Scheduling Timers::           
+* Timer Status Methods::        
+* Timer Cleanup::               
+
+Coding Standards
+
+* Upper and lower case names::  
+* Common name patterns::        
+
+@end detailmenu
+@end menu
+
+@node Overview, Helper Classes, Top, Top
+@chapter Overview
+
+@menu
+* Packet Transfer::             
+@end menu
+
+@node Packet Transfer,  , Overview, Overview
+@section Packet Transfer
+
+
+
+@node Helper Classes, Tasks, Overview, Top
+@chapter Helper Classes
+
+@menu
+* ErrorHandler::                
+* Handlers::                    
+@end menu
+
+
+@node ErrorHandler, Handlers, Helper Classes, Helper Classes
+@section ErrorHandler
+
+All Click error messages are passed to an instance of the
+@code{ErrorHandler} class. @code{ErrorHandler} separates the generation
+of error messages from the particular way those messages should be
+printed. It also makes it easy to automatically decorate errors with
+context information.
+
+Most Click users must know how to report errors to an
+@code{ErrorHandler}, and how @code{ErrorHandler}s count the messages
+they receive. This section also describes how to decorate error messages
+with error veneers, and how to write new @code{ErrorHandler}s.
+
+@code{ErrorHandler} and its important subclasses are defined in
+@code{<click/error.hh>}.
+
+@menu
+* ErrorHandler Initialization::  
+* Reporting Errors::            
+* Error Format Strings::        
+* Counting Errors::             
+* Basic ErrorHandlers::         
+* Error Veneers::               
+* Writing ErrorHandlers::       
+@end menu
+
+
+@node ErrorHandler Initialization, Reporting Errors, ErrorHandler, ErrorHandler
+@subsection Class Initialization
+
+The @code{ErrorHandler} class maintains some global state that must be
+initialized by calling @code{static_initialize} at the beginning of the
+program, and may be freed by calling @code{static_cleanup} when
+execution is complete.
+
+@deftypeop {Static Method} ErrorHandler void static_initialize (ErrorHandler *@var{default_errh})
+Call this function exactly once, at the beginning of the program, before
+any error messages are reported to any @code{ErrorHandler}. It is OK to
+create arbitrary @code{ErrorHandler} objects before calling this method,
+however. The @var{default_errh} argument becomes the default
+@code{ErrorHandler}; see @ref{Basic ErrorHandlers}.
+@end deftypeop
+
+@deftypeop {Static Method} ErrorHandler void static_cleanup ()
+Call this function exactly once, just before the program exits. Destroys
+the default and silent @code{ErrorHandler}s and cleans up other
+@code{ErrorHandler}-related memory. It is an error to call any
+@code{ErrorHandler} method after calling @code{static_cleanup}.
+@end deftypeop
+
+
+@node Reporting Errors, Error Format Strings, ErrorHandler Initialization, ErrorHandler
+@subsection Reporting Errors
+
+@code{ErrorHandler}'s basic error reporting methods take a format
+string, which may use @code{printf}-like @samp{%} escape sequences, and
+additional arguments as required by the format string. @xref{Error
+Format Strings}, for more details on the format string. The five methods
+differ in the seriousness of the error they report.
+
+@deftypemethod ErrorHandler void debug (const char *@var{format}, @dots{})
+@deftypemethodx ErrorHandler void message (const char *@var{format}, @dots{})
+@deftypemethodx ErrorHandler int warning (const char *@var{format}, @dots{})
+@deftypemethodx ErrorHandler int error (const char *@var{format}, @dots{})
+@deftypemethodx ErrorHandler int fatal (const char *@var{format}, @dots{})
+Report the error described by @var{format} and any additional arguments.
+The methods are listed by increasing seriousness. Use @code{debug} for
+debugging messages that should not be printed in a production
+environment; @code{message} for explanatory messages that do not
+indicate errors; @code{warning} for warnings (this function prepends the
+string @samp{warning:@ } to every line of the error message);
+@code{error} for errors; and @code{fatal} for errors so serious that
+they should halt the execution of the program. The three functions that
+indicate errors, @code{warning}, @code{error}, and @code{fatal}, always
+return @code{-EINVAL}. In some environments, @code{fatal} will actually
+exit the program with exit code 1.
+@end deftypemethod
+
+Each of these methods has an analogue that additionally takes a
+@dfn{landmark}: a string representing where the error took place. A
+typical landmark contains a file name and line number, separated by a
+colon---@samp{foo.click:31}, for example.
+
+@deftypemethod ErrorHandler void ldebug (const String &@var{landmark}, const char *@var{format}, @dots{})
+@deftypemethodx ErrorHandler void lmessage (const String &@var{landmark}, const char *@var{format}, @dots{})
+@deftypemethodx ErrorHandler int lwarning (const String &@var{landmark}, const char *@var{format}, @dots{})
+@deftypemethodx ErrorHandler int lerror (const String &@var{landmark}, const char *@var{format}, @dots{})
+@deftypemethodx ErrorHandler int lfatal (const String &@var{landmark}, const char *@var{format}, @dots{})
+Report the error described by @var{format} and any additional arguments.
+The error took place at @var{landmark}. Most @code{ErrorHandler}s will
+simply prepend @samp{@var{landmark}:@ } to each line of the error
+message.
+@end deftypemethod
+
+These methods are all implemented as wrappers around the @code{verror}
+function. This function takes a landmark, a format string, a
+@code{va_list} packaging up any additional arguments, and a
+@dfn{seriousness value}, which encodes how serious the error was. The
+@code{Seriousness} enumerated type, which is defined in the
+@code{ErrorHandler} class, represents seriousness values. There are five
+constants, corresponding to the five error-reporting methods:
+
+@table @code
+@item ERR_DEBUG
+Corresponds to @code{debug} and @code{ldebug}.
+
+@item ERR_MESSAGE
+Corresponds to @code{message} and @code{lmessage}.
+
+@item ERR_WARNING
+Corresponds to @code{warning} and @code{lwarning}.
+
+@item ERR_ERROR
+Corresponds to @code{error} and @code{lerror}.
+
+@item ERR_FATAL
+Corresponds to @code{fatal} and @code{lfatal}.
+@end table
+
+@deftypemethod ErrorHandler int verror (Seriousness @var{seriousness}, const String &@var{landmark}, const char *@var{format}, va_list @var{val})
+Report the error described by @var{format} and @var{val}. The error took
+place at @var{landmark}, if @var{landmark} is nonempty. The
+@var{seriousness} value is one of the five constants described above.
+Always returns @code{-EINVAL}.
+@end deftypemethod
+
+
+@node Error Format Strings, Counting Errors, Reporting Errors, ErrorHandler
+@subsection Format Strings
+
+@code{ErrorHandler}'s format strings closely follow C's standard
+@code{printf} format strings. Most characters in the format string are
+printed verbatim. The @samp{%} character introduces a @dfn{conversion},
+which prints data read from the remaining arguments. The format string
+may contain newlines @samp{\n}, but it need not end with a newline;
+@code{ErrorHandler} will add a final newline if one does not exist.
+
+Each conversion, or formatting escape, follows this pattern:
+
+@itemize @bullet
+@item
+First, the @samp{%} character introduces each conversion.
+
+@item
+Next comes zero or more @dfn{flag characters};
+
+@item
+then an optional @dfn{field width};
+
+@item
+then an optional @dfn{precision};
+
+@item
+then an optional @dfn{length modifier};
+
+@item
+and finally, the mandatory @dfn{conversion specifier}, which is
+usually a single character, but may be a name enclosed in braces.
+@end itemize
+
+@noindent
+We discuss each of these is turn.
+
+Any conversion may be modified by zero or more of these flag characters.
+
+@table @asis
+@item @samp{#}
+The value should be converted to an ``alternate form''. For @samp{o}
+conversions, the first character of the output string is made @samp{0},
+by prepending a @samp{0} if there was not one already. For @samp{x} and
+@samp{X} conversions, nonzero values have @samp{0x} or @samp{0X}
+prepended, respectively.
+
+@item @samp{0}
+The value should be zero padded. For @samp{d}, @samp{i}, @samp{u},
+@samp{o}, @samp{x}, and @samp{X} conversions, the converted value is
+padded on the left with @samp{0} characters rather than spaces.
+
+@item @samp{-}
+The value should be left-justified within the field width.
+
+@item @samp{@ } (a space)
+Leave a blank before a nonnegative number produced by a signed
+conversion.
+
+@item @samp{+}
+Print a @samp{+} character before a nonnegative number produced by a
+signed conversion.
+
+@end table
+
+The optional @dfn{field width}, a decimal digit string, forces the
+conversion to use a minimum number of characters. The result of a
+conversion is padded on the left with space characters to reach the
+minimum field width, unless one of the @samp{0} or @samp{-} flags was
+supplied.
+
+The optional @dfn{precision} is a decimal digit string preceded by a
+period @samp{.}. For @samp{d}, @samp{i}, @samp{u}, @samp{o}, @samp{x},
+and @samp{X} conversions, the precision specifies the minimum number
+of digits that must appear; results with fewer digits are padded on
+the left with @samp{0} characters. For the @samp{s} conversion, the
+precision specifies the maximum number of characters that can be
+printed. For @samp{e}, @samp{f}, @samp{E}, and @samp{F} conversions,
+it specifies the number of digits to appear after the radix character;
+for @samp{g} and @samp{G} conversions, the number of significant
+digits.
+
+If either the field width or precision is specified as a star @samp{*},
+@code{ErrorHandler} reads the next argument as an integer and uses that
+instead.
+
+Length modifiers affect the argument type read by the conversion. There
+are three modifiers:
+
+@table @asis
+@item @samp{h}
+The next argument is a @code{short} or @code{unsigned short}. Affects
+the @samp{d}, @samp{i}, @samp{u}, @samp{o}, @samp{x}, and @samp{X}
+conversions.
+
+@item @samp{l}
+The next argument is a @code{long} or @code{unsigned long}. Affects the
+@samp{d}, @samp{i}, @samp{u}, @samp{o}, @samp{x}, and @samp{X}
+conversions.
+
+@item @samp{ll}
+The next argument is a @code{long long} or @code{unsigned long long}.
+Affects the @samp{d}, @samp{i}, @samp{u}, @samp{o}, @samp{x}, and
+@samp{X} conversions.
+@end table
+
+Finally, these are the conversions themselves.
+
+@table @asis
+@item @samp{s}
+Print the @code{const char *} argument, treated as a C string.
+
+@item @samp{c}
+The @code{int} argument is treated as a character constant. Printable
+ASCII characters (values between 32 and 126) are printed verbatim.
+Characters @samp{\n}, @samp{\t}, @samp{\r}, and @samp{\0} use those C
+escape representations. Other characters use the representation
+@samp{\%03o}.
+
+@item @samp{d}, @samp{i}
+The argument is an @code{int}; print its decimal representation.
+
+@item @samp{u}
+The argument is an @code{unsigned int}; print its decimal
+representation.
+
+@item @samp{o}
+The argument is an @code{unsigned int}; print its octal representation.
+
+@item @samp{x}, @samp{X}
+The argument is an @code{unsigned int}; print its hexadecimal
+representation. The @samp{%x} conversion uses lowercase letters;
+@samp{%X} uses uppercase letters.
+
+@item @samp{e}, @samp{f}, @samp{g}, @samp{E}, @samp{F}, @samp{G}
+The argument is a @code{double}; print its representation as if by
+@code{printf} (user-level drivers only).
+
+@item @samp{p}
+The @code{void *} argument is cast to @code{unsigned long} and printed
+as by @samp{%#lx}.
+
+@item @samp{%}
+Print a literal @samp{%} character.
+
+@item @samp{@{element@}}
+The argument is an @code{Element *}. Print that element's declaration.
+
+@end table
+
+Note that @code{ErrorHandler} does not support the @samp{n} conversion.
+
+
+@node Counting Errors, Basic ErrorHandlers, Error Format Strings, ErrorHandler
+@subsection Counting Errors
+
+@code{ErrorHandler} objects count the number of errors and warnings they
+have received and make those values available to the user.
+
+@deftypemethodx ErrorHandler {virtual int} nerrors () const
+Returns the number of errors received by this
+@code{ErrorHandler} so far.
+@end deftypemethod
+
+These counters are typically used to determine whether an error has
+taken place in some complex piece of code. For example:
+
+@example
+int before_nerrors = errh->nerrors();
+// @r{@dots{} complex code that may report errors to @code{errh} @dots{}}
+if (errh->nerrors() != before_nerrors) @{
+    // @r{an error has taken place}
+@}
+@end example
+
+
+@node Basic ErrorHandlers, Error Veneers, Counting Errors, ErrorHandler
+@subsection Basic @code{ErrorHandler}s
+
+Every Click error message eventually reaches some @dfn{basic}
+@code{ErrorHandler}, which generally prints the messages it receives.
+The user-level driver's basic @code{ErrorHandler} prints error messages
+to standard error, while in the Linux kernel module, the basic
+@code{ErrorHandler} logs messages to the syslog and stores them for
+access via @file{/click/errors}.
+
+@cindex default @code{ErrorHandler}
+@cindex @code{ErrorHandler}, default
+Two basic @code{ErrorHandlers} are always accessible via static methods:
+the @dfn{default @code{ErrorHandler}}, returned by
+@code{default_handler} and set by @code{set_default_handler}; and the
+@dfn{silent @code{ErrorHandler}}, returned by @code{silent_handler},
+which ignores any error messages it receives.
+
+@deftypeop {Static Method} ErrorHandler {ErrorHandler *} default_handler ()
+Returns the default @code{ErrorHandler}.
+@end deftypeop
+
+@deftypeop {Static Method} ErrorHandler void set_default_handler (@w{ErrorHandler *errh})
+Sets the default @code{ErrorHandler} to @var{errh}. The
+@code{static_initialize} method also sets the default
+@code{ErrorHandler}; see @ref{ErrorHandler Initialization}.
+@end deftypeop
+
+@deftypeop {Static Method} ErrorHandler {ErrorHandler *} silent_handler ()
+Returns the silent @code{ErrorHandler}. This handler ignores any error
+messages it receives. It maintains correct @code{nerrors} counts, however.
+@end deftypeop
+
+@code{FileErrorHandler}, a kind of basic @code{ErrorHandler}, is
+available in any user-level program. It prints every message it receives
+to some file, usually standard error. It can also prepend an optional
+context string to every line of every error message.
+
+@deftypeop Constructor FileErrorHandler {} FileErrorHandler (FILE *@var{f}, @w{const String &@var{prefix} = ""})
+Constructs a @code{FileErrorHandler} that prints error messages to file
+@var{f}. If @var{prefix} is nonempty, then every line of every error
+message is prepended by @var{prefix}.
+@end deftypeop
+
+
+@node Error Veneers, Writing ErrorHandlers, Basic ErrorHandlers, ErrorHandler
+@subsection Error Veneers
+
+@dfn{Error veneers} wrap around basic @code{ErrorHandler} objects and
+change how error text is generated. An error veneer generally changes
+each error message's text in some way, perhaps by adding a context
+message or some indentation. It then passes the altered text to the
+basic @code{ErrorHandler} for printing. Error veneers can be easily
+nested.
+
+The first argument to each error veneer constructor is a pointer to
+another @code{ErrorHandler} object. The veneer will pass altered error
+text to this handler, the @dfn{base handler}, for further processing and
+printing. It also delegates @code{nerrors()} calls to the base handler.
+
+Click comes with three error veneers: one for adding context, one for
+prepending text to every line, and one for supplying missing landmarks.
+It is easy to write others; see @ref{Writing ErrorHandlers}, for
+details.
+
+@deftypeop Constructor ContextErrorHandler {} ContextErrorHandler (@w{ErrorHandler *@var{base_errh}}, @w{const String &@var{context}}, @w{const String &@var{indent} = "@w{@ @ }"})
+Constructs a @code{ContextErrorHandler} with @var{base_errh} as base.
+
+The first time this handler receives an error message, it will precede
+the message with the @var{context} string---generally more detailed
+information about where the error has occurred. Every line in every
+received error message is prepended with @var{indent}, two spaces by
+default, to set off the message from its context.
+@end deftypeop
+
+@deftypeop Constructor PrefixErrorHandler {} PrefixErrorHandler (@w{ErrorHandler *@var{base_errh}}, @w{const String &@var{prefix}})
+Constructs a @code{PrefixErrorHandler} with @var{base_errh} as base.
+
+This handler precedes every line of every error message with
+@var{prefix}.
+@end deftypeop
+
+@deftypeop Constructor LandmarkErrorHandler {} LandmarkErrorHandler (@w{ErrorHandler *@var{base_errh}}, @w{const String &@var{landmark}})
+Constructs a @code{LandmarkErrorHandler} with @var{base_errh} as base.
+
+This handler supplies @var{landmark} in place of any blank landmark
+passed to it. This will cause the base handler to include @var{landmark}
+in its error message.
+@end deftypeop
+
+To demonstrate these veneers in practice, we'll use the following
+function, which prints two error messages:
+
+@example
+void f(ErrorHandler *errh) @{
+    errh->error("First line\nSecond line");
+    errh->lwarning("here", "Third line");
+@}
+@end example
+
+A simple @code{FileErrorHandler} shows the base case.
+
+@example
+FileErrorHandler errh1(stderr);
+f(&errh1);
+    @print{} First line
+    @print{} Second line
+    @print{} here: warning: Third line
+@end example
+
+The simplest error veneer, @code{PrefixErrorHandler}, just prepends text
+to every line.
+
+@example
+PrefixErrorHandler errh2(&errh1, "prefix - ");
+f(&errh2);
+    @print{} prefix - First line
+    @print{} prefix - Second line
+    @print{} prefix - here: warning: Third line
+@end example
+
+@code{ContextErrorHandler} supplies a line of context before the first
+error message, and indents all messages except the context.
+
+@example
+ContextErrorHandler errh3(&errh1, "This was called from ...", "** ");
+f(&errh3);
+    @print{} This was called from ...
+    @print{} ** First line
+    @print{} ** Second line
+    @print{} here: ** warning: Third line
+@end example
+
+@noindent
+Note that the indentation @samp{**@ } is printed after the landmark.
+This often looks better than the alternative.
+
+Of course, an error veneer can take another error veneer as its ``base
+handler'', leading to cumulative effects.
+
+@example
+ContextErrorHandler errh4(&errh2, "This was called from ...", "** ");
+f(&errh4);
+    @print{} prefix - This was called from ...
+    @print{} prefix - ** First line
+    @print{} prefix - ** Second line
+    @print{} prefix - here: ** warning: Third line
+@end example
+
+
+@node Writing ErrorHandlers,  , Error Veneers, ErrorHandler
+@subsection Writing @code{ErrorHandler}s
+
+@code{ErrorHandler} constructs an error message using three virtual
+functions. The first, @code{make_text}, parses a format string and
+argument list into a single @code{String}. This is passed to the second
+function, @code{decorate_text}, which may transform the string. The
+final function, @code{handle_text}, prints the resulting error message.
+This structure makes @code{ErrorHandler} easy to extend. To write a new
+basic @code{ErrorHandler}, you will need to override just
+@code{handle_text} and the counting functions (@code{nerrors}). The @code{ErrorVeneer} helper
+class, described below, lets you override just @code{decorate_text} when
+writing an error veneer.
+
+@deftypemethod ErrorHandler {virtual String} make_text @w{(Seriousness @var{s},} @w{const char *@var{format}}, va_list @var{val})
+Parses the format string @var{format} with arguments from @var{val},
+returning the results as a @var{String} object.
+
+The default implementation processes the formatting escapes described
+above (@pxref{Error Format Strings}). It also prepends every line of
+the error message with @samp{warning: } if @var{s} equals
+@code{ERR_WARNING}.
+@end deftypemethod
+
+@deftypemethod ErrorHandler {virtual String} decorate_text (Seriousness @var{s}, const String &@var{prefix}, const String &@var{landmark}, const String &@var{text})
+Decorates the error message @var{text} as appropriate and returns the
+result. At minimum, every line of the result should be prepended by
+@var{prefix} and, if it is nonempty, the landmark string @var{landmark}.
+
+The default implementation creates lines like this:
+
+@example
+@var{prefix}@var{landmark}: @var{text}     @r{(if @var{landmark} is nonempty)}
+@var{prefix}@var{text}               @r{(if @var{landmark} is empty)}
+@end example
+
+@noindent
+Any spaces and/or a final colon are stripped from the end of
+@var{landmark}. Special landmarks, which begin and end with a backslash
+@samp{\}, are ignored.
+@end deftypemethod
+
+@deftypemethod ErrorHandler {virtual void} handle_text (@w{Seriousness @var{s}, const String &@var{text}})
+This method is responsible for printing or otherwise informing the user
+about the error message @var{text}. If @var{s} equals @code{ERR_FATAL},
+the method should exit the program or perform some other drastic action.
+It should also maintain the @code{nerrors()}
+counter. In most cases, it should ensure that the last character in
+@var{text} is a newline.
+
+This method has no default implementation.
+@end deftypemethod
+
+@tpindex @code{ErrorVeneer}
+The @code{ErrorVeneer} class, a subclass of @code{ErrorHandler},
+supplies default implementations for these functions that ease the
+construction of new error veneers. @code{ErrorVeneer}'s single instance
+variable, @code{ErrorHandler *_errh}, is the base handler.
+@code{ErrorVeneer} overrides all the relevant virtual
+functions---@code{nerrors}, @code{clear},
+@code{make_text}, @code{decorate_text}, and @code{handle_text}. Its
+versions simply delegate to the corresponding methods on @code{_errh}.
+An error veneer designer will generally subclass @code{ErrorVeneer}
+rather than @code{ErrorHandler}; then she will override only the methods
+she cares about (usually @code{decorate_text}), relying on
+@code{ErrorVeneer}'s default implementations for the rest.
+
+@deftypeop Constructor ErrorVeneer {} ErrorVeneer (ErrorHandler *@var{base_errh})
+Constructs an @code{ErrorVeneer} helper class with @var{base_errh} as
+its base error handler. This constructor simply sets @code{_errh =
+base_errh}.
+@end deftypeop
+
+
+@node Handlers,  , ErrorHandler, Helper Classes
+@section Handlers
+
+@dfn{Handlers} are access points through which users can interact with
+elements in a running Click router, or with the router as a whole.
+@dfn{Read} and @dfn{write handlers} behave like files in a file system,
+while @dfn{LLRPCs} provide a remote procedure call interface.
+
+@menu
+* Read and Write Handler Overview::  
+* Adding Handlers::             
+* Default Handlers::            
+* Accessing Handlers Internally::  
+* LLRPC Overview::              
+@end menu
+
+
+@node Read and Write Handler Overview, Adding Handlers, Handlers, Handlers
+@subsection Read and Write Handler Overview
+
+Read and write handlers appear to the user like files in a file system,
+or alternatively, like a limited RPC mechanism that uses ASCII strings
+for data transfer. To the element programmer, a read handler is simply a
+function that takes an element and returns a String; a write handler is
+a function that takes an element and a String and returns an error code.
+
+@deftypefn {Function Type} String {(*ReadHandler)} (@w{Element *@var{element}}, @w{void *@var{thunk}})
+Read handler functions have this type. When the user accesses a read
+handler on an element, Click calls some @code{ReadHandler} function
+and passes the element as an argument. The @var{thunk} argument
+contains callback data specified when the handler was added. The
+function's String return value is passed back to the user.
+@end deftypefn
+
+@deftypefn {Function Type} int {(*WriteHandler)} (@w{const String &@var{data}}, @w{Element *@var{element}}, @w{void *@var{thunk}}, @w{ErrorHandler *@var{errh}})
+Write handler functions have this type. When the user accesses some
+element write handler by passing in a string, Click calls some
+@code{WriteHandler} function and passes the data and the relevant
+element as arguments. The @var{thunk} argument contains callback data
+specified when the handler was added. The return value is an error
+code: zero when there are no errors, and the negative of some
+@code{errno} value when there is an error. More detailed information
+about any errors should be reported to the @var{errh} argument.
+@end deftypefn
+
+Each handler has an ASCII @dfn{name}. Handler names must be unique
+within each element; for example, there can be at most one @samp{x} read
+handler in a given element. A given name can be shared by a read handler
+and a write handler, however. Such a handler pair is colloquially called
+a ``read/write handler'', although its two components need not have
+anything to do with one another.
+
+There is currently no way to pass data to a read handler or return data
+from a write handler. Use LLRPCs if you need a more RPC-like read-write
+interface.
+
+Note that read and write handler functions are regular functions, not
+virtual functions. Often, therefore, handler functions are defined as
+private static member functions in the relevant element class.
+
+Read and write handlers need not use ASCII-formatted data. Most existing
+handlers do format their data in ASCII, however, and use
+@code{cp_uncomment} to ignore leading and trailing whitespace and
+comments. You may want to do the same
+for consistency's sake.
+
+Be careful when writing handlers that modify element state, or read
+state that packet processing can modify. On an SMP machine, a handler
+may be called on one processor while packets are passing through the
+router on another processor. Furthermore, multiple read handlers and
+safe LLRPCs (@pxref{LLRPC Overview}) may be active simultaneously on
+different processors. Write handlers are serialized with respect to
+other handlers and LLRPCs (but not packet processing). That is, no other
+handler or LLRPC will proceed while a write handler is active.
+
+
+@node Adding Handlers, Default Handlers, Read and Write Handler Overview, Handlers
+@subsection Adding Handlers
+
+Use @code{Element}'s @code{add_read_handler} and
+@code{add_write_handler} methods to add handlers for an element. You
+will generally call these methods only from within your element's
+@code{add_handlers} method, although nothing prevents you from adding
+handlers at any time.
+
+@deftypemethod Element void add_read_handler (@w{const String &@var{name}}, @w{ReadHandler @var{func}}, @w{void *@var{thunk}})
+Adds a read handler named @var{name} for this element. When the handler
+is accessed, @var{func} will be called with @code{this} and @var{thunk}
+as parameters.
+@end deftypemethod
+
+@deftypemethod Element void add_write_handler (@w{const String &@var{name}}, @w{WriteHandler @var{func}}, @w{void *@var{thunk}})
+Adds a write handler named @var{name} for this element. When the handler
+is accessed, @var{func} will be called with the relevant data,
+@code{this}, @var{thunk}, and an @code{ErrorHandler} as parameters.
+@end deftypemethod
+
+To create a read/write handler, call @code{add_read_handler} and
+@code{add_write_handler} and supply the same handler name.
+
+These methods simply forward their requests to static
+@code{add_read_handler} and @code{add_write_handler} methods on the
+@code{Router} class. Call those methods directly to add handlers to
+other elements, or to add global handlers.
+
+@deftypeop {Static Method} Router void add_read_handler (@w{const Element *@var{element}}, @w{const String &@var{name}}, @w{ReadHandler @var{func}}, @w{void *@var{thunk}})
+@deftypeopx {Static Method} Router void add_write_handler (@w{const Element *@var{element}}, @w{const String &@var{name}}, @w{WriteHandler @var{func}}, @w{void *@var{thunk}})
+Adds a read or write handler for @var{element}, or a global read or
+write handler if @var{element} is null. The handler is named
+@var{name}.
+@end deftypeop
+
+The @code{change_handler_flags} method lets you change a handler's flags
+word (@pxref{Handler Objects}).
+
+@anchor{Changing Handler Flags}
+@deftypeop {Static Method} Router void change_handler_flags (@w{Element *@var{element}}, @w{const String &@var{name}}, @w{uint32_t @var{clear_flags}}, @w{uint32_t @var{set_flags}})
+Changes the flags for @var{element}'s @var{name} handler, or the global
+@var{name} handler if @var{element} is null. The flags are changed by
+first clearing the bits set in @var{clear_flags}, then setting the bits
+set in @var{set_flags}. This method fails and returns @math{-1} when the
+specified handler does not exist; otherwise, it returns 0.
+@end deftypeop
+
+
+@node Default Handlers, Accessing Handlers Internally, Adding Handlers, Handlers
+@subsection Default Read and Write Handlers
+
+Every element automatically provides five handlers, @handler{class},
+@handler{name}, @handler{config}, @handler{ports}, and
+@handler{handlers}. There is no need to add these handlers yourself. The
+default handlers behave as follows:
+
+@table @asis
+@item @handler{class}
+Returns the element's class name, as returned by @code{class_name()},
+followed by a newline. Example result: @strcode{"ARPQuerier\n"}.
+
+@item @handler{name}
+Returns the element's name, as returned by @code{id()}, followed by a
+newline. Example result: @strcode{"arpq_0\n"}.
+
+@item @handler{config}
+Returns the element's configuration string. If the configuration string
+does not end in newline, the hander appends a newline itself. Example
+result: @strcode{"18.26.7.1, 00:00:C0:4F:71:EF\n"}.
+
+If @code{can_live_reconfigure} returns true, @handler{config} is also a
+write handler, and writing to it reconfigures the element.
+
+@item @handler{ports}
+Returns a multi-line string describing the element's ports and what they
+are connected to. The string has the form
+
+@example
+@var{M} input[s]
+@r{@dots{} @var{M} input port descriptions, one per line @dots{}}
+@var{N} output[s]
+@r{@dots{} @var{N} output port descriptions, one per line @dots{}}
+@end example
+
+@noindent
+Each port description lists the port's processing type, a dash, and then
+a comma-separated list of all the ports to which this port is connected.
+The processing type is either @samp{push} or @samp{pull}; formerly
+agnostic ports are indicated by a trailing tilde (@samp{push~} or
+@samp{pull~}). Example result:
+
+@example
+1 input
+push~   -       Strip@@2 [0]
+2 outputs
+push~   -       [0] GetIPAddress@@4
+push    -       [0] Print@@7
+@end example
+
+@noindent
+If Click was compiled with statistics collection enabled, the dash on
+each line is replaced by a packet count.
+
+@item @handler{handlers}
+Returns a string listing the element's visible handlers, one per line.
+Each line contains the handler name, a tab, and then either @samp{r},
+@samp{w}, or @samp{rw}, depending on whether the handler is read-only,
+write-only, or read/write. Example result for an @click{InfiniteSource}
+element, which has many handlers:
+
+@example
+scheduled       r
+tickets r
+reset   w
+count   r
+active  rw
+burstsize       rw
+limit   rw
+data    rw
+handlers        r
+ports   r
+config  rw
+name    r
+class   r
+@end example
+@end table
+
+
+@node Accessing Handlers Internally, LLRPC Overview, Default Handlers, Handlers
+@subsection Accessing Handlers Internally
+
+Element handlers are stored in the relevant @code{Router} as objects
+of type @code{Router::Handler}. (This design allows handler objects to
+be shared between elements when possible.) Handlers are often referred
+to by index; indexes between 0 and @code{Router::FIRST_GLOBAL_HANDLER
+@minus{} 1} refer to element handlers, while indexes above
+@code{Router::FIRST_GLOBAL_HANDLER} refer to global handlers. Indexes
+less than 0 are used for error returns, such as nonexistent handlers.
+@code{Router} methods translate between handler indexes and
+@code{Router::Handler} objects, and find handlers or handler indexes
+given handler names.
+
+@menu
+* Handler Objects::             
+* Handlers By Name or Index::   
+@end menu
+
+@node Handler Objects, Handlers By Name or Index, Accessing Handlers Internally, Accessing Handlers Internally
+@subsubsection The Router::Handler Type
+
+The @code{Router::Handler} type allows you to check a handler's
+properties and call the handler. All of its methods are @code{const};
+you must go through @code{Router} to change a handler's properties.
+@code{Router::Handler} objects do not contain element references, since
+they are shared among elements. That means you can't easily find the
+element (if any) to which a particular @code{Router::Handler} is
+attached.
+
+@deftypemethod Router::Handler {const String &} name () const
+Returns the handler's name.
+@end deftypemethod
+
+@deftypemethod Router::Handler uint32_t flags () const
+Returns the handler's flags as an integer. The lower bits of the flags
+word are reserved for the system, and four bits are reserved for
+drivers, but the upper bits (at least 16) are left uninterpreted, and
+may be used by elements. The first user flag bit is called
+@code{Router::Handler::USER_FLAG_0}; its position in the word equals
+@code{Router::Handler::USER_FLAG_SHIFT}. To change a handler's flags,
+use the @code{Router::change_handler_flags} method (@pxref{Changing
+Handler Flags}).
+@end deftypemethod
+
+@deftypemethod Router::Handler bool readable () const
+Returns true iff this handler is readable.
+@end deftypemethod
+
+@deftypemethod Router::Handler bool read_visible () const
+Returns true iff this handler is readable, and that read handler should
+be externally visible. Drivers and the ControlSocket element use
+@code{read_visible} rather than @code{readable} when deciding whether to
+tell the user that a read handler exists. Inter-element communication
+within the router, however, may use @code{readable} rather than
+@code{read_visible}.
+@end deftypemethod
+
+@deftypemethod Router::Handler bool writable () const
+@deftypemethodx Router::Handler bool write_visible () const
+The analogous methods for write handlers.
+@end deftypemethod
+
+@deftypemethod Router::Handler bool visible () const
+Equivalent to @code{read_visible() || write_visible()}.
+@end deftypemethod
+
+@deftypemethod Router::Handler String unparse_name (@w{Element *@var{element}}) const
+Returns the handler's name, including its attached element's name if
+@var{element} is non-null. For example, calling @code{unparse_name} on
+element @samp{e}'s @samp{foo} handler would return @samp{e.foo}, while
+calling it on a global @samp{bar} handler would return @samp{bar}.
+@end deftypemethod
+
+@deftypeop {Static Method} Router::Handler String unparse_name (@w{Element *@var{element}}, @w{const String &@var{name}})
+Returns a string representing @var{element}'s hypothetical @var{name}
+handler, or the global @var{name} handler if @var{element} is null.
+@end deftypeop
+
+@deftypemethod Router::Handler String call_read (@w{Element *@var{element}}) const
+Calls this read handler on @var{element} and returns the result. Do not
+use this method unless you know the handler is @code{readable()}.
+@end deftypemethod
+
+@deftypemethod Router::Handler int call_write (@w{const String &@var{data}}, @w{Element *@var{element}}, @w{ErrorHandler *@var{errh}}) const
+Calls this write handler on @var{element}, passing it @var{data} and
+@var{errh}, and returns the result. Do not use this method unless you
+know the handler is @code{writable()}.
+@end deftypemethod
+
+
+@node Handlers By Name or Index,  , Handler Objects, Accessing Handlers Internally
+@subsubsection Handlers By Name or Index
+
+These @code{Router} methods locate handlers by name, returning either
+a pointer to a handler object or a handler index. The methods are
+static to allow access to global handlers outside the context of a
+running router.
+
+@deftypeop {Static Method} Router {const Router::Handler *} handler (@w{const Element *@var{element}}, @w{const String &@var{name}})
+Returns a pointer to the handler object for @var{element}'s handler
+named @var{name}, or null if no such handler exists. @var{Element} may
+be null, in which case the method looks for a global handler named
+@var{name}.
+@end deftypeop
+
+@quotation
+@strong{Caution}: Handler pointers returned by @code{Router::handler}
+and similar methods should be treated as transient, since they may
+become invalid when new handlers are added.
+@end quotation
+
+@deftypeop {Static Method} Router int hindex (@w{const Element *@var{element}}, @w{const String &@var{name}})
+Like @code{Router::handler}, above, but returns an integer handler
+index for the named handler, or a negative number if no such handler
+exists. All valid handler indexes are nonnegative.
+@end deftypeop
+
+@deftypeop {Static Method} Router {const Router::Handler *} handler (@w{const Router *@var{router}}, @w{int @var{hindex}})
+Returns @var{router}'s handler object corresponding to @var{hindex},
+or a null pointer if @var{hindex} is invalid with respect to
+@var{router}. There are three possibilities: (1) @var{hindex}
+coresponds to a valid global handler, which is returned. In this case,
+@var{router} need not be valid. (2) @var{hindex} corresponds to a
+valid local handler in class @var{router}, which is returned. (3)
+Otherwise, a null pointer is returned.
+@end deftypeop
+
+@deftypeop {Static Method} Router {const Router::Handler *} handler (@w{const Element *@var{element}}, @w{int @var{hindex}})
+Convenience function equivalent to
+@code{handler(@var{element}->router(), @var{hindex})}. Note that
+@var{hindex} need not refer to one of @var{element}'s handlers.
+@end deftypeop
+
+@deftypemethod Router {const Router::Handler *} handler (@w{int @var{hindex}}) const
+Convenience function equivalent to @code{handler(this, @var{hindex})}.
+@end deftypemethod
+
+Finally, the @code{element_hindexes} static method returns all the
+handler indices that apply to a given element.
+
+@deftypeop {Static Method} Router void element_hindexes (@w{const Element *@var{element}}, @w{Vector<int> &@var{results}})
+Appends to @var{results} all the handler indexes for @var{element}'s
+handlers, or all global handlers if @var{element} is null.
+@end deftypeop
+
+
+@node LLRPC Overview,  , Accessing Handlers Internally, Handlers
+@subsection LLRPC Overview
+
+
+@node Tasks, Timers, Helper Classes, Top
+@chapter Tasks
+
+Click schedules a router's CPU or CPUs with one or more @dfn{task
+queues}. These queues are simply lists of @dfn{tasks}, which represent
+functions that would like access to the CPU. Tasks are generally
+associated with elements. When scheduled, most tasks call some element's
+@code{run_task} method.
+
+Click tasks are represented by @code{Task} objects. An element that
+would like special access to a router's CPU should include and
+initialize a @code{Task} instance variable.
+
+Tasks are generally called very frequently, up to tens of thousands of
+times per second. For infrequent events, it is far more efficient to use
+timers than to use tasks; see @ref{Timers}.
+
+Executing a task should not take a long time. The Click driver loop is
+not currently adaptive, so very long tasks can inappropriately delay
+timers and other periodic events. We may address this problem in a
+future release, but for now, keep tasks short.
+
+See the Doxygen documentation on class @code{Task} for more
+information.
+
+The @code{Task} class is defined in the @code{<click/task.hh>} header
+file.
+
+@menu
+* Task Initialization::         
+* Scheduling Tasks::            
+* Tickets::                     
+* Task Thread Choice::          
+* Task Status::                 
+* Task Handlers::               
+* Task Cleanup::                
+@end menu
+
+
+@node Task Initialization, Scheduling Tasks, Tasks, Tasks
+@section Task Initialization
+
+Task initialization is a two-step process. First, when a @code{Task}
+object is constructed, you must supply information about the function
+that it should call when it is scheduled. Second, when the router is
+initialized, you must initialize the task by supplying it with the
+relevant router. (You must initialize the task even if it will not be
+scheduled right away.)
+
+@code{Task} has two constructors. One of them asks the task to call an
+element's @code{run_task} method when scheduled; the other asks it
+to call an arbitrary function pointer.
+
+@deftypeop Constructor Task {} Task (Element *@var{e})
+When this task is scheduled, call @code{@var{e}->run_task()}.
+@end deftypeop
+
+@deftypeop Constructor Task {} Task (TaskHook @var{hook}, void *@var{thunk})
+When this task is scheduled, call @code{@var{hook}(this, @var{thunk})}.
+The @var{hook} argument is a function pointer with type @code{void
+(*)(Task *, void *)}.
+@end deftypeop
+
+The @code{Task::initialize} method places the task on a router-wide list
+of @code{Task}s, associates the task with a particular task queue, and,
+optionally, schedules it. Typically, an element's @code{initialize}
+method calls @code{Task::initialize}.
+
+@deftypemethod Task void initialize (Router *@var{r}, bool @var{scheduled})
+@deftypemethodx Task void initialize (Element *@var{e}, bool @var{scheduled})
+Attaches the task to the router object @var{r} (or
+@code{@var{e}->router()}). Additionally sets the task's tickets to a
+default value, and schedules the task if @var{scheduled} is true.
+@end deftypemethod
+
+Many elements call @code{ScheduleInfo::initialize_task} instead of
+calling @code{Task::initialize} directly. This method queries any
+@click{ScheduleInfo} elements in the configuration to determine the
+task's scheduling parameters, sets those parameters, and calls
+@code{Task::initialize} to schedule the task. The
+@code{ScheduleInfo::initialize_task} method is defined in the
+@code{<click/standard/scheduleinfo.hh>} header file.
+
+@deftypeop {Static Method} ScheduleInfo void initialize_task (Element *@var{e}, @w{Task *@var{task}}, @w{bool @var{schedule}}, @w{ErrorHandler *@var{errh}})
+Sets @var{task}'s scheduling parameters as specified by any
+@click{ScheduleInfo} elements in the router configuration. The element
+@var{e} is used to find the correct router, and provides the relevant
+name for parameter lookup---the user supplies parameters to
+@click{ScheduleInfo} by element name. If @var{schedule} is true, also
+schedules @var{task} on @code{@var{e}->router()}'s task queue. Reports
+any errors to @var{errh}.
+@end deftypeop
+
+@deftypeop {Static Method} ScheduleInfo void initialize_task (Element *@var{e}, @w{Task *@var{task}}, @w{ErrorHandler *@var{errh}})
+A synonym for @code{initialize_task(@var{e}, @var{task}, true,
+@var{errh})}.
+@end deftypeop
+
+@deftypeop {Static Method} ScheduleInfo void join_scheduler (Element *@var{e}, @w{Task *@var{task}}, @w{ErrorHandler *@var{errh}})
+A synonym for @code{initialize_task(@var{e}, @var{task}, true,
+@var{errh})}.
+@end deftypeop
+
+The @code{initialize_task} method is generally called like this:
+
+@example
+int
+SomeElement::initialize(ErrorHandler *errh)
+@{
+    ScheduleInfo::initialize_task(this, &_task, errh);
+@}
+@end example
+
+@noindent
+Here, @code{_task}, a @code{Task} object, is one of @code{SomeElement}'s
+instance variables.
+
+
+@node Scheduling Tasks, Tickets, Task Initialization, Tasks
+@section Scheduling Tasks
+
+The user may take a task off its task queue with the @code{unschedule}
+method, and place it back onto its task queue with the @code{reschedule}
+method. As tasks move to the head of the task queue, they are
+unscheduled and their callbacks are called. Within these callback
+functions, the user will typically call @code{fast_reschedule}, which is
+like @code{reschedule} without the locking overhead.
+
+@deftypemethod Task void unschedule ()
+Unschedules the task by removing it from its task queue. Does nothing if
+if the task is currently unscheduled, or if it was never initialized.
+When this function returns, the task will not be scheduled.
+@end deftypemethod
+
+@deftypemethod Task void reschedule ()
+Reschedules the task by placing it on its task queue. If the task is
+already scheduled, then this method does nothing.
+@end deftypemethod
+
+All three functions lock the task queue before manipulating it. This
+avoids corruption when there are multiple processors executing
+simultaneously. If @code{reschedule} cannot immediately lock a task
+queue---perhaps because it is being used on another processor---then
+they register a task request, which will be executed in the near
+future. In contrast, the @code{unschedule} function will wait until it
+can lock the task queue.
+
+Sometimes unscheduling a task is not enough: you don't want the task
+to run, even if someone else (an upstream queue, for example) were to
+reschedule it. The @code{strong_unschedule} method both unschedules
+the task and shifts the task to the quiescent thread, which never
+runs. Thus, a @code{strong_unschedule}d task will not run until
+someone calls @code{strong_reschedule}, which reschedules the task on
+its original preferred thread.
+
+@deftypemethod Task void strong_unschedule ()
+Unschedules the task by removing it from its task queue and shifting
+it to the quiescent thread. Does nothing if if the task is currently
+unscheduled, or if it was never initialized. When this function
+returns, the task will not be scheduled.
+@end deftypemethod
+
+@deftypemethod Task void strong_reschedule ()
+Reschedules the task by placing it on the task queue corresponding to
+its thread preference. The task will not be scheduled immediately upon
+return, but it will become scheduled soon---@code{strong_reschedule}
+uses a task request to avoid locking.
+@end deftypemethod
+
+The @code{fast_reschedule} method avoids locking overhead in the common
+case that a task must be rescheduled from within its callback.
+
+@deftypemethod Task void fast_reschedule ()
+Reschedules the task by placing it on its preferred task queue. This
+method avoids locking overhead, so it is faster than @code{reschedule}.
+
+@quotation
+@strong{Caution}: You may call a @code{Task}'s @code{fast_reschedule}
+method only from within its callback function. For instance, if an
+element has a task, @w{@code{_task}}, that calls the element's
+@code{run_task} method when scheduled, and if @code{run_task}
+is called only by that task's callback, then that element's
+@code{run_task} method should call @code{_task.fast_reschedule()}
+instead of @code{_task.reschedule()}.
+@end quotation
+@end deftypemethod
+
+@node Tickets, Task Thread Choice, Scheduling Tasks, Tasks
+@section Tickets
+
+Click tasks are scheduled using the flexible, lightweight stride
+scheduling algorithm.@footnote{For more information, see MIT Laboratory
+for Computer Science Technical Memo MIT/LCS/TM-528, @cite{Stride
+scheduling: deterministic proportional-share resource management}, by
+Carl A. Waldspurger and William E. Weihl, June 1995.} This algorithm
+assigns each task a parameter called its @dfn{tickets}. A task with
+twice as many tickets as usual is scheduled twice as frequently.
+
+@code{Task}s have methods for querying, setting, and adjusting their
+tickets.
+
+@deftypemethod Task int tickets () const
+Returns this task's tickets. This number will be at least 1 and no more
+than @code{Task::MAX_TICKETS}, which equals 32768.
+@end deftypemethod
+
+@deftypemethod Task void set_tickets (int @var{t})
+Sets this task's tickets to @var{t}. The @var{t} parameter should lie
+between 1 and @code{Task::MAX_TICKETS}, inclusive; numbers outside this
+range are constrained to the nearest valid value.
+@end deftypemethod
+
+@deftypemethod Task void adj_tickets (int @var{delta})
+Equivalent to @code{set_tickets(tickets() + @var{delta})}.
+@end deftypemethod
+
+
+@node Task Thread Choice, Task Status, Tickets, Tasks
+@section Choosing a Thread
+
+Each task belongs to some task queue, which generally corresponds to a
+thread of control. Single-threaded Click has one active thread, and
+therefore one task queue, but multithreaded Click can have an
+arbitrary number of threads. Either Click has a special thread, the
+@dfn{quiescent thread}, numbered @math{-1}; tasks belonging to the
+quiescent thread never run, whether or not they are scheduled. Every
+task starts out belonging to the first thread, @w{thread 0}. The
+@code{change_thread} method moves a task to another thread.
+
+@deftypemethod Task void change_thread (int @var{thread_id})
+Move this task to thread @var{thread_id}, which should be a number
+between @math{-1} and the relevant @code{Router}'s @code{nthreads()}.
+
+The task is scheduled on the new task queue if and only if it was
+scheduled on the old task queue.
+@end deftypemethod
+
+Like @code{reschedule}, @code{change_thread} must lock the task queue
+before manipulating it. (Unlike those methods, @code{change_thread}
+must lock two task queues, the old and the new.) If
+@code{change_thread} cannot lock a task queue, then it registers a
+task request that will be executed in the near future. This implies
+that a task may remain on the same thread, or become unscheduled, for
+some time after @code{change_thread} is called.
+
+
+@node Task Status, Task Handlers, Task Thread Choice, Tasks
+@section Task Status Methods
+
+These methods let a user check various properties of a task---for
+instance, whether it is initialized or scheduled.
+
+@deftypemethod Task bool initialized () const
+Returns true iff the task has been initialized---that is, if it is
+associated with some router.
+@end deftypemethod
+
+@deftypemethod Task bool scheduled () const
+Returns true iff the task is currently scheduled on some task queue.
+@end deftypemethod
+
+@deftypemethod Task {RouterThread *} scheduled_list () const
+Returns the task queue with which this task is associated. Even
+unscheduled tasks are associated with some task queue; this is the task
+queue on which the task will be placed if @code{reschedule} is called.
+@end deftypemethod
+
+@deftypemethod Task TaskHook hook () const
+Returns the callback function that is called when the task is scheduled.
+If the task is associated with some element, this method returns a null
+pointer.
+@end deftypemethod
+
+@deftypemethod Task {void *} thunk () const
+Returns the extra data passed to the callback function when the task is
+scheduled.
+@end deftypemethod
+
+@deftypemethod Task {Element *} element () const
+If the task is associated with some element, this method returns that
+element. Otherwise, returns a null pointer.
+@end deftypemethod
+
+
+@node Task Handlers, Task Cleanup, Task Status, Tasks
+@section Task Handlers
+
+By convention, elements with tasks should provide handlers that access
+task properties. The @code{Element::add_task_handlers} method
+automatically adds these handlers for a given @code{Task} object.
+
+@deftypemethod Element void add_task_handlers (@w{Task *@var{task}}, @w{const String &@var{prefix} = String()})
+Adds task handlers for @var{task} to this element. The string
+@var{prefix} is prepended to every handler name.
+@end deftypemethod
+
+This method adds at least the following handlers:
+
+@table @asis
+@item @handler{scheduled}
+Returns a Boolean value saying whether the task is currently scheduled
+on some task queue. Example result: @strcode{"true\n"}.
+
+@item @handler{tickets}
+Returns or sets the task's currently allocated tickets. This handler
+is only available if Click was compiled to support stride scheduling.
+Example result: @strcode{"1024\n"}.
+
+@item @handler{thread_preference}
+Returns the task's thread preference. This handler is only available on
+multithreaded Click. Example result: @strcode{"2\n"}.
+@end table
+
+
+@node Task Cleanup,  , Task Handlers, Tasks
+@section Task Cleanup
+
+You generally don't need to worry about destroying @code{Task} objects:
+they are automatically unscheduled and removed when the @code{Router} is
+destroyed. This only works if the @code{Task} objects have the same
+lifetime as the @code{Router}, however. This includes the normal case,
+when @code{Task}s are element instance variables. If you create and
+destroy @code{Task} objects as the router runs, however, you will need
+to call the following method before deleting the @code{Task}.
+
+@deftypemethod Task void cleanup ()
+Cleans up the @code{Task} object.
+@end deftypemethod
+
+
+@node Timers, Notification, Tasks, Top
+@chapter Timers
+
+Click @dfn{timers}, like Click tasks, represent callback functions that
+the driver calls when appropriate. Unlike tasks, however, you schedule
+timers to go off at a specified time. Timers are intended for more
+infrequent and/or slower tasks.
+
+As with @code{Task}, most @code{Timer} objects are declared as instance
+variables of elements and scheduled when needed.
+
+Timers may be scheduled with microsecond precision, but on current
+hardware, only millisecond precision is likely to be achievable.
+
+The @code{Timer} class is defined in the @code{<click/timer.hh>} header
+file.
+
+@menu
+* Timer Initialization::        
+* Scheduling Timers::           
+* Timer Status Methods::        
+* Timer Cleanup::               
+@end menu
+
+
+@node Timer Initialization, Scheduling Timers, Timers, Timers
+@section Timer Initialization
+
+Timer initialization resembles task initialization. When the timer is
+constructed, you must supply it with information about its callback
+function. Later, after the router is initialized, you must initialize
+and, optionally, schedule it.
+
+@deftypeop Constructor Timer {} Timer (@w{Element *@var{e}})
+When this timer goes off, call @code{@var{e}->run_timer()}.
+@end deftypeop
+
+@deftypeop Constructor Timer {} Timer (@w{Task *@var{t}})
+When this timer goes off, call @code{@var{t}->reschedule()}.
+@end deftypeop
+
+@deftypeop Constructor Timer {} Timer (@w{TimerHook @var{hook}}, @w{void *@var{thunk}})
+When this timer goes off, call @code{@var{hook}(this, @var{thunk})}. The
+@var{hook} argument is a function pointer with type @code{void (*)(Timer
+*, void *)}.
+@end deftypeop
+
+@deftypemethod Timer void initialize (@w{Router *@var{r}})
+@deftypemethodx Timer void initialize (@w{Element *@var{e}})
+Attaches the timer to the router object @var{r} (or
+@code{@var{e}->router()}).
+@end deftypemethod
+
+Typically, an element's @code{initialize} method
+calls @code{Timer::initialize}, and possibly one of the @code{schedule}
+functions described below.
+
+
+@node Scheduling Timers, Timer Status Methods, Timer Initialization, Timers
+@section Scheduling Timers
+
+A variety of methods schedule timers to go off at specified times. The
+basic method is @code{schedule_at}, which schedules the timer for a
+specified time. Subsidiary methods schedule the timer relative to the
+current time (the @code{schedule_after} methods), or relative to the
+last time the timer was scheduled to run (the @code{reschedule_after}
+methods). Finally, @code{unschedule} unschedules the timer.
+
+All @code{schedule} and @code{reschedule} functions first unschedule the
+timer if it was already scheduled.
+
+The @code{reschedule} methods are particularly useful for timers that
+should occur periodically. For example, this callback function will
+cause its timer to go off at 20-second intervals:
+
+@example
+void timer_callback(Timer *t, void *) @{
+    t->reschedule_after_s(20);
+@}
+@end example
+
+
+@deftypemethod Timer void schedule_at (@w{const struct timeval &@var{when}})
+Schedule the timer to go off at @var{when}. You must have initialized
+the timer earlier.
+@end deftypemethod
+
+@deftypemethod Timer void schedule_now ()
+Schedule the timer to go off as soon as possible.
+@end deftypemethod
+
+@deftypemethod Timer void schedule_after (@w{const struct timeval &@var{delay}})
+Schedule the timer to go off @var{delay} after the current time.
+@end deftypemethod
+
+@deftypemethod Timer void schedule_after_s (@w{uint32_t @var{delay}})
+Schedule the timer to go off @var{delay} seconds after the current time.
+@end deftypemethod
+
+@deftypemethod Timer void schedule_after_ms (@w{uint32_t @var{delay}})
+Schedule the timer to go off @var{delay} milliseconds after the current
+time.
+@end deftypemethod
+
+@deftypemethod Timer void reschedule_after (@w{const struct timeval &@var{delay}})
+Schedule the timer to go off @var{delay} after it was last scheduled
+to go off. If the timer was never previously scheduled, this method
+will schedule the timer for some arbitrary time.
+@end deftypemethod
+
+@deftypemethod Timer void reschedule_after_s (@w{uint32_t @var{delay}})
+Schedule the timer to go off @var{delay} seconds after it was last
+scheduled to go off.
+@end deftypemethod
+
+@deftypemethod Timer void reschedule_after_ms (@w{uint32_t @var{delay}})
+Schedule the timer to go off @var{delay} milliseconds after it was last
+scheduled to go off.
+@end deftypemethod
+
+@deftypemethod Timer void unschedule ()
+Unschedules the timer, if it was scheduled.
+@end deftypemethod
+
+
+@node Timer Status Methods, Timer Cleanup, Scheduling Timers, Timers
+@section Timer Status Methods
+
+These methods return information about a timer, including when it is
+scheduled to expire.
+
+@deftypemethod Timer bool initialized () const
+Returns true iff the timer has been initialized with a call to
+@code{initialize()}. Uninitialized timers must not be scheduled.
+@end deftypemethod
+
+@deftypemethod Timer bool scheduled () const
+Returns true iff the timer is scheduled to expire some time in the
+future.
+@end deftypemethod
+
+@deftypemethod Timer {const struct timeval &} expiry () const
+Returns the time that the timer is set to expire. If the timer has never
+been scheduled, the value is garbage. If the timer was scheduled but is
+not scheduled currently, the value is most recently set expiry time.
+@end deftypemethod
+
+
+@node Timer Cleanup,  , Timer Status Methods, Timers
+@section Timer Cleanup
+
+You don't need to worry about cleaning up @code{Timer} objects. They are
+automatically unscheduled and removed when the @code{Router} is
+destroyed, and deleting a @code{Timer} automatically removes it from any
+relevant lists. The following function is nevertheless provided for
+consistency with @code{Task}s, which do need to be cleaned up in certain
+circumstances (@pxref{Task Cleanup}).
+
+@deftypemethod Timer void cleanup ()
+Cleans up the @code{Timer} object.
+@end deftypemethod
+
+
+@node Notification, Coding Standards, Timers, Top
+@chapter Notification
+
+
+@node Coding Standards, Index, Notification, Top
+@chapter Coding Standards
+
+
+@menu
+* Upper and lower case names::  
+* Common name patterns::        
+@end menu
+
+
+@node Upper and lower case names, Common name patterns, Coding Standards, Coding Standards
+@section Upper and Lower Case in Names
+
+Keep to the following consistent scheme for choosing between upper and
+lower case when naming variables, types, and functions.
+
+@table @strong
+@item Classes
+Use mixed case with an initial capital letter and no underscores:
+@code{LookupIPRoute}.
+
+@item Methods
+Use all lower case with underscores separating words:
+@code{negation_is_simple}.
+
+@item Constants
+Use all upper case with underscores separating words:
+@code{TYPE_ICMP_TYPE}.
+
+@item Instance variables
+Begin with an underscore, then use all lower case with underscores
+separating words: @code{_length}.
+
+@item Regular variables
+Use all lower case with underscores separating words: @code{i},
+@code{the_handler}.
+
+@item Class variables
+These variables are declared as @code{static} in the class header. Name
+them like regular variables: @code{nelements_allocated}.
+
+@item Functions
+Name them like methods: @code{quicksort_hook}.
+
+@item Other types
+This includes typedefs and enumerated types. Name them like classes:
+@code{CpVaParseCmd}, @code{ConfigurePhase}.
+@end table
+
+There are exceptions to these guidelines. In particular:
+
+@itemize @bullet
+@item
+Instance variables in C structs---that is, classes with few methods
+whose instance variables are mostly public---may be named like regular
+variables, without a preceding underscore. The same goes for the
+components of unions.
+
+@item
+Classes that act like simple types, such as @code{uatomic32_t}, take
+names similar to the types they replace (in this case @code{uint32_t}).
+@end itemize
+
+
+@node Common name patterns,  , Upper and lower case names, Coding Standards
+@section Common Name Patterns
+
+@itemize @bullet
+@item
+Many instance variables have associated @dfn{getter methods} that return
+their values, and/or @dfn{setter methods} that change their values. For
+an instance variable named @code{_x}, the getter method should be named
+@code{x()} and the setter method should be named @code{set_x()}.
+
+@item
+A variable or method which counts something is often named
+@code{n@var{object}s}---for instance, @code{ninputs()}, @code{_npackets}.
+
+@item
+Use a bare @samp{0} for a null pointer, except where some ambiguity
+might arise (for example, where an incorrect overloading might be
+selected).
+@end itemize
+
+
+@node Index,  , Coding Standards, Top
+@unnumbered Index
+
+@printindex cp
+
+@bye

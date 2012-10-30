@@ -1,0 +1,127 @@
+#!/bin/bash
+#
+# Copyright 2012 Carnegie Mellon University
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+# FIXME:
+# the locaitons of the various service executables makes this script fragile
+# as they all currently have to run from the directory they are located in
+# in order to use the correct xsockconf.ini file. It would be good to 
+# a) relocate the services into a common directory instead of being scattered
+# throughout the source tree
+# b) not rely on the xsockconf.ini file if possible
+
+NAME=`basename $0`
+VERBOSE=0
+
+CLIENTS="pc268"
+SERVERS="pc349"
+
+# hacky way of finding the root of the XIA source tree
+# assumes this script is in a directory off the parent of the XIA tree
+# and that the services it starts are rooted off of the same location
+#  so XIADIR would be /xia-core assuming the script were /xia-core/tools/run_demo
+XIADIR=$(dirname $(dirname $(cd ${0%/*} && echo $PWD/${0##*/})))
+
+
+stop_services()
+{
+	printf "Stopping XIA Demo Services\n"
+	for node in $CLIENTS
+	do
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/web_demo_proxy_stop.sh"
+	done
+
+	for node in $SERVERS
+	do
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/web_demo_service_stop.sh"
+	done	
+	printf "Stopped XIA Demo Services\n"
+}
+
+start_services()
+{
+	printf "Starting XIA Demo Services\n"
+
+	for node in $SERVERS
+	do
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/web_demo_service_start.sh"
+	done	
+	
+	sleep 1
+	for node in $CLIENTS
+	do
+		ssh -o "StrictHostKeyChecking no" -A $node -f "~/xia-core/click-2.0/conf/geni/init-scripts/sub/web_demo_proxy_start.sh"
+	done
+	
+	printf "Started XIA Demo Services\n"
+
+}
+
+help ()
+{
+	cat << EOH
+
+usage: $NAME [-qv] [start|stop|restart]
+where:
+  -q runs click silently
+  -v prints click debug messages to stdout (default)
+
+  start   - starts the demo services if not already running
+  stop    - stops the demo services
+  restart - stops then starts the demo services
+
+EOH
+	exit 0
+}
+
+while getopts ":qvh" opt; do
+	case $opt in
+		q)
+			VERBOSE="0"
+			;;
+		v)
+			VERBOSE="1"
+			;;
+		h)
+			help
+			;;
+		\?)
+			printf "\nInvalid option: -$OPTARG\n" >&2
+			help
+			;;
+	esac
+done
+
+shift $((OPTIND-1))
+
+case $1 in
+	start)
+		start_services
+		;;
+	stop)
+		stop_services
+		;;
+	restart|reload)
+		stop_services
+		sleep 1
+		start_services
+		;;
+	*)
+		printf "\nInvalid command: -$1\n" >&2
+		help
+		;;
+esac
+

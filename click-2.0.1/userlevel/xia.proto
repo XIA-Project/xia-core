@@ -1,0 +1,223 @@
+package xia;
+
+enum XSocketCallType {
+  XSOCKET = 1;
+  XBIND = 2;
+  XCLOSE = 3;
+  XCONNECT = 4;
+  XACCEPT = 5;
+  XSENDTO = 6;
+  XSEND = 7;
+  XRECV = 8;
+  XRECVFROM = 9;
+  XSETSOCKOPT = 10;
+  XGETSOCKOPT = 11;
+
+  XPUTCHUNK = 12;
+  XREQUESTCHUNK = 13;
+  XGETCHUNKSTATUS = 14;
+  XREADCHUNK = 15;
+  XREMOVECHUNK =16;
+
+  XREQUESTFAILED = 17;
+  XRESULT = 18;
+
+  XCHANGEAD = 19;
+  XREADLOCALHOSTADDR = 20;  
+  XUPDATENAMESERVERDAG = 21;
+  XREADNAMESERVERDAG = 22;
+  
+  XISDUALSTACKROUTER = 23;
+  XGETPEERNAME = 24;
+  XGETSOCKNAME = 25;
+}
+
+message XSocketMsg {
+  required XSocketCallType type = 1; // XIA Socket call type
+  
+  optional X_Socket_Msg x_socket= 2;
+  optional X_Bind_Msg x_bind= 3;
+  optional X_Close_Msg x_close= 4;
+  optional X_Connect_Msg x_connect= 5;
+  optional X_Accept_Msg x_accept= 6;
+  optional X_Sendto_Msg x_sendto= 7;
+  optional X_Send_Msg x_send= 8;
+  optional X_Recv_Msg x_recv= 9;
+  optional X_Recvfrom_Msg x_recvfrom= 10;  
+  optional X_Setsockopt_Msg x_setsockopt = 11;
+  optional X_Getsockopt_Msg x_getsockopt = 12;
+
+  optional X_Putchunk_Msg x_putchunk= 13;
+  optional X_Requestchunk_Msg x_requestchunk= 14;
+  optional X_Getchunkstatus_Msg x_getchunkstatus= 15;
+  optional X_Readchunk_Msg x_readchunk= 16;
+  optional X_Removechunk_Msg x_removechunk = 17;
+  
+  optional X_Requestfailed_Msg x_requestfailed= 18; 
+  optional X_Result_Msg x_result = 19;
+
+  optional X_Changead_Msg x_changead = 20;
+  optional X_ReadLocalHostAddr_Msg x_readlocalhostaddr = 21;  
+  optional X_Updatenameserverdag_Msg x_updatenameserverdag = 22;  
+  optional X_ReadNameServerDag_Msg x_readnameserverdag = 23; 
+  
+  optional X_IsDualStackRouter_Msg x_isdualstackrouter = 24;   
+  optional X_GetPeername_Msg x_getpeername = 25;
+  optional X_GetSockname_Msg x_getsockname = 26; 
+}
+ 
+message X_Socket_Msg {
+  required int32 type = 1; // Indicating the type of tranport (0: Reliable transport, 1: Unreliable transport)
+  optional string temp = 2; // currently not used
+}
+
+message X_Bind_Msg {
+  required string sdag = 1; // bind to src dag 
+}
+
+message X_Close_Msg {
+  optional bytes payload = 1; // data  
+}
+
+message X_Connect_Msg {
+  required string ddag = 1; // connect to destination dag 
+  optional int32 status = 2; // Indicating the status (-1: connected, -1: failed) 
+}
+
+message X_Accept_Msg {
+  optional string temp = 1; // currently not used
+}
+
+message X_Sendto_Msg {
+  required string ddag = 1; // dest dag
+  required bytes payload = 2; // data 
+}
+
+message X_Send_Msg {
+  required bytes payload = 1; // data 
+}
+
+message X_Recv_Msg {
+  optional string temp = 1; // currently not used
+  optional string dag = 2;
+  optional bytes payload = 3;
+}
+
+message X_Recvfrom_Msg {
+  optional string temp = 1; // currently not used
+  optional bytes payload = 2;
+}
+
+message X_Setsockopt_Msg {
+	required int32 opt_type = 1;
+	optional int32 int_opt = 2;
+	// we will likely have to add other optional fields as we add options in the future
+}
+
+message X_Getsockopt_Msg {
+	required int32 opt_type = 1;
+	optional int32 int_opt = 2;
+	// we will likely have to add other optional fields as we add options in the future
+}
+
+message X_Putchunk_Msg {
+  required int32 cachepolicy = 1;
+  required int32 cachesize = 2;
+  required int32 contextid = 3;
+  required int32 TTL = 4;
+  required bytes payload = 5; // data
+  optional string cid = 6;
+  optional int32 length = 7;
+  optional int64 timestamp = 8; 
+}
+
+message X_Requestchunk_Msg {
+  repeated string dag = 1;
+  optional bytes payload = 2; // data
+}
+
+message X_Getchunkstatus_Msg {
+  repeated string dag = 1;
+  repeated string status = 2;
+  optional bytes payload = 3; // data
+}
+
+message X_Readchunk_Msg {
+  required string dag = 1;
+  optional bytes payload = 2;
+}
+
+message X_Removechunk_Msg {
+    required int32 contextid =1 ;
+	required string cid = 2;
+	optional int32 status = 3;
+}
+
+message X_Result_Msg {
+	required XSocketCallType type = 1; // XIA Socket call type
+	required int32 return_code = 2;	// same as a normal socket return code
+	optional int32 err_code = 3;	// if ret_code is -1, contains related errno value
+}
+
+message X_Requestfailed_Msg {
+  optional int32 type = 1; // Indicating the type of error (to be defined)
+  optional string temp = 2; // currently not used
+}
+
+message X_Changead_Msg {
+  required string ad = 1;
+  optional string ip4id = 2;
+}
+
+message X_ReadLocalHostAddr_Msg {
+  optional string ad = 1;
+  optional string hid = 2;
+  optional string ip4id = 3;
+}
+
+message X_Updatenameserverdag_Msg {
+  required string dag = 1;
+}
+
+message X_ReadNameServerDag_Msg {
+  optional string dag = 1;
+}
+
+message X_IsDualStackRouter_Msg {
+  optional int32 flag = 1; // Indicating if this node is an XIA-IPv4 dual-stack router
+}
+  
+
+message X_GetPeername_Msg {
+  optional string dag = 1; // Full DAG of the remote socket
+}
+
+message X_GetSockname_Msg {
+  optional string dag = 1; // Full DAG of the this socket
+}
+
+/**************************************************/
+
+message msg {
+  optional int32 appid = 1;  // port number?
+  optional bytes xid = 2;
+  optional string xiapath_src = 5;
+  optional string xiapath_dst = 6;
+  optional bytes payload = 3;  
+  enum MsgType {
+    GETLOCALHID = 0;
+    GETCID = 1;
+    CONNECTSID = 2;
+    PUTCID = 3;
+    SERVESID = 4;
+  }
+  optional MsgType type = 4;
+
+}
+
+message msg_response {
+  required int32 appid = 1;
+  repeated bytes xid = 2;   // can be a list of CID's
+  optional string payload = 3;  // bytes or string?
+}
+  

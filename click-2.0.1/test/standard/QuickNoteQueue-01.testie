@@ -1,0 +1,35 @@
+%info
+Tests QuickNoteQueue notifications.
+
+%require
+click-buildtool provides NotifierDebug
+
+%script
+click --simtime -e '
+i :: InfiniteSource(LIMIT 1, ACTIVE false)
+	-> d1 :: NotifierDebug
+	-> q :: QuickNoteQueue
+	-> d2 :: NotifierDebug
+	-> s :: PullSwitch
+	-> c :: Counter(COUNT_CALL 1 s.switch 1)
+	-> d :: Discard;
+Idle	-> [1] s;
+
+DriverManager(wait 0.01s,
+	print d1.signal, print d2.signal,
+	write i.active true,
+	wait 0.01s,
+	print d1.signal, print d2.signal,
+	write s.switch 1,
+	wait 0.01s,
+	print d1.signal, print d2.signal,
+	stop)
+' >OUT
+
+%expect OUT
+full.0/1:1*
+empty.0/{{\d+}}:0
+full.0/1:1*
+empty.0/{{\d+}}:0
+full.0/1:1*
+empty.0/{{\d+}}:0

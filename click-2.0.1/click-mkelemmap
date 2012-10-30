@@ -1,0 +1,561 @@
+#! /usr/bin/perl -w
+
+# click-mkelemmap -- make map of element name to C++ class and file
+# Eddie Kohler
+#
+# Copyright (c) 1999-2001 Massachusetts Institute of Technology
+# Copyright (c) 2004-2006 Regents of the University of California
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, subject to the conditions
+# listed in the Click LICENSE file. These conditions include: you must
+# preserve this copyright notice, and you cannot mention the copyright
+# holders in advertising related to the Software without their permission.
+# The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
+# notice is a summary of the Click LICENSE file; the license in that file is
+# legally binding.
+
+my(%port_count_constants) =
+    ('PORTS_0_0' => '0/0', 'PORTS_0_1' => '0/1', 'PORTS_1_0' => '1/0',
+     'PORTS_1_1' => '1/1', 'PORTS_1_1X2' => '1/1-2');
+my(%processing_constants) =
+    ('AGNOSTIC' => 'a/a', 'PUSH' => 'h/h', 'PULL' => 'l/l',
+     'PUSH_TO_PULL' => 'h/l', 'PULL_TO_PUSH' => 'l/h',
+     'PROCESSING_A_AH' => 'a/ah', 'PROCESSING_H_LH' => 'h/lh');
+my(%flow_code_constants) =
+    ('COMPLETE_FLOW' => 'x/x');
+my(@source_file, @header_file, @click_name, @cxx_name, @doc_name,
+   @parents, @port_count, @processing, @flow_code, @flags, @requirements,
+   @element_methods, @element_libs, @provisions, @noexports,
+   %click_name_to_id, %cxx_name_to_id, $verbose);
+my(@includes) = ( );
+
+sub driver_mask ($) {
+    my($m) = 0;
+    # XXX "|" syntax?
+    $m |= 1 if $_[0] =~ /\buserlevel\b/;
+    $m |= 2 if $_[0] =~ /\blinuxmodule\b/;
+    $m |= 4 if $_[0] =~ /\bbsdmodule\b/;
+    $m |= 8 if $_[0] =~ /\bns\b/;
+    ($m ? $m : 15);
+}
+
+sub filecontents ($) {
+    my $text = "";
+    if (open(IN, $_[0])) {
+	$text = <IN>;
+	close IN;
+    }
+    $text;
+}
+
+sub process_file ($) {
+    my($filename) = @_;
+    my($headername, $headerfile, $i, $comment);
+
+    if ($filename =~ /^(.*):"(.*)"$/) {
+	($filename, $headername) = ($1, $2);
+	$headerfile = $headername;
+    } elsif ($filename =~ /^(.*):<(.*)>$/) {
+	($filename, $headername) = ($1, "<$2>");
+	$headerfile = $2;
+    } else {
+	$headername = $filename;
+	$headername =~ s/\.cc$/.hh/;
+	$headerfile = $headername;
+    }
+
+    print STDERR "Reading $headerfile\n" if $verbose;
+    my($text) = "";
+    if ($headerfile =~ m|^/|) {
+	$text = filecontents($headerfile);
+    } else {
+	for ($i = 0; $i < @includes && $text eq ""; $i++) {
+	    $text = filecontents($includes[$i] . "/" . $headerfile);
+	}
+    }
+    $headername = "" if $text eq "";
+
+    my $first;
+    $first = @cxx_name;
+    foreach $_ (split(m{^class(?=.*[\n\s]*\{)}m, $text)) {
+	my($cxx_class) = (/^\s*(\w+)(\s|:\s).*[\n\s]*\{/);
+	$cxx_class = "" if !defined($cxx_class);
+	my($click_name) = (/class_name.*return\s*\"([^\"]+)\"/);
+	next if !$click_name;
+	push @cxx_name, $cxx_class;
+	push @source_file, $filename;
+	push @header_file, $headername;
+	$cxx_name_to_id{$cxx_class} = @cxx_name - 1 if $cxx_class;
+	if (/\A\s*\w*\s*:\s*([\w\s,]+)/) {
+	    my $p = $1;
+	    $p =~ s/\bpublic\b//g;
+	    push @parents, [ split(/[\s,]+/, $p) ];
+	} else {
+	    push @parents, [];
+	}
+	if (/class_name.*return\s*\"([^\"]+)\"/) {
+	    push @click_name, $1;
+	} else {
+	    push @click_name, "";
+	}
+	if (/port_count.*return\s*(.*?);/) {
+	    my $p = $1;
+	    $p = $port_count_constants{$p} if exists($port_count_constants{$p});
+	    $p =~ tr/\" \t\r\n//d;
+	    push @port_count, $p;
+	} else {
+	    push @port_count, "";
+	}
+	if (/processing.*return\s*(.*?);/) {
+	    my $p = $1;
+	    $p = $processing_constants{$p} if exists($processing_constants{$p});
+	    $p =~ tr/\" \t\r\n//d;
+	    push @processing, $p;
+	} else {
+	    push @processing, "";
+	}
+	if (/flow_code.*return\s*(.*?);/) {
+	    my $p = $1;
+	    $p = $flow_code_constants{$p} if exists($flow_code_constants{$p});
+	    $p =~ tr/\" \t\r\n//d;
+	    push @flow_code, $p;
+	} else {
+	    push @flow_code, "";
+	}
+	if (/\bflags\(\).*return\s*"(.*?)";/) {
+	    push @flags, $1;
+	} else {
+	    push @flags, undef;
+	}
+	my($methods) = '';
+	$methods .= "static_initialize " if /\n\s*static\s+void\s+static_initialize/;
+	$methods .= "static_cleanup " if /\n\s*static\s+void\s+static_cleanup/;
+	$methods =~ s/\s+\Z//;
+	push @element_methods, $methods;
+    }
+
+    # process element documentation
+    my(%doc_titles);
+    foreach $comment (split(m{(/\*.*?\*/)}s, $text)) {
+	if ($comment =~ /^\/\*/ && $comment =~ /^[\/*\s]+=/) {
+	    $comment =~ s/^\/\*\s*//g;
+	    $comment =~ s/\s*\*\/$//g;
+	    $comment =~ s/^ ?\* ?//gm;
+	    my($title, $count);
+	    while ($comment =~ m{^=(\w+)( *)(.*)([\0-\377]*?)(?=^=\w|\Z)}mg) {
+		if ($1 eq 'title') {
+		    $title = $3;
+		} elsif ($1 eq 'c') {
+		    $_ = $4;
+		    while (/^\s*(\w+)\(/mg) {
+			$doc_titles{$1} = ($title ? $title : $1);
+		    }
+		    if (!%doc_titles && /^\s*([\w@]+)\s*$/) {
+			$doc_titles{$1} = ($title ? $title : $1);
+		    }
+		    last;
+		}
+	    }
+	}
+    }
+
+    # apply element documentation to element names
+    for ($i = $first; $i < @processing; $i++) {
+	push @doc_name, $doc_titles{$click_name[$i]};
+    }
+
+    # check titles
+    if (@processing == 0 && keys(%doc_titles) > 1) {
+	print STDERR "$filename: more than 1 documentation class for requirement\n";
+    }
+
+    # process ELEMENT_REQUIRES, ELEMENT_PROVIDES, and EXPORT_ELEMENT
+    if (!open(IN, $filename)) {
+	print STDERR "$filename: $!\n";
+	return;
+    }
+    $text = <IN>;
+    close IN;
+
+    my($req, $prov, $exp, $libs) = ('', '', '', '');
+    $req .= " " . $1 while $text =~ /^ELEMENT_REQUIRES\s*\((.*)\)/mg;
+    $prov .= " " . $1 while $text =~ /^ELEMENT_PROVIDES\s*\((.*)\)/mg;
+    $exp .= " " . $1 while $text =~ /^EXPORT_ELEMENT\s*\((.*)\)/mg;
+    $libs .= " " . $1 while $text =~ /^ELEMENT_LIBS\s*\((.*)\)/mg;
+    $req =~ s/^\s+//;
+    $prov =~ s/^\s+//;
+    $libs =~ s/^\s+//;
+
+    # don't change a provision into an export just because a class of that
+    # name exists
+    my(%cxx_export);
+    foreach my $exp1 (split(/\s+/, $exp)) {
+	my($cxx) = ($exp1 =~ /(\S+)-/ ? $1 : $exp1);
+	$cxx_export{$cxx} = 1 if $cxx ne "";
+    }
+    for ($i = $first; $i < @processing; $i++) {
+	push @noexports, ($cxx_name[$i] eq "" || !exists($cxx_export{$cxx_name[$i]}));
+    }
+
+    # make copies of classes as required
+    while ($exp =~ /(\S+)-(\S+)/g) {
+	my($cxx, $click) = ($1, $2);
+	for ($i = $first; $i < @processing; $i++) {
+	    if ($cxx_name[$i] eq $cxx) {
+		push @click_name, $click;
+		push @cxx_name, $cxx;
+		push @doc_name, $doc_name[$i];
+		push @source_file, $source_file[$i];
+		push @header_file, $header_file[$i];
+		push @parents, $parents[$i];
+		push @port_count, $port_count[$i];
+		push @processing, $processing[$i];
+		push @flow_code, $flow_code[$i];
+		push @flags, $flags[$i];
+		push @element_methods, $element_methods[$i];
+		push @noexports, 0;
+		last;
+	    }
+	}
+    }
+
+    # add a fake class if there were no classes
+    if (@cxx_name == $first && $prov) {
+	push @click_name, "";
+	push @cxx_name, "";
+	push @doc_name, (%doc_titles ? keys(%doc_titles) : (""));
+	push @source_file, $filename;
+	push @header_file, $headername;
+	push @parents, [];
+	push @port_count, "";
+	push @processing, "";
+	push @flow_code, "";
+	push @flags, undef;
+	push @element_methods, "";
+	push @noexports, 1;
+    }
+
+    # apply requirements and provisions
+    for ($i = $first; $i < @processing; $i++) {
+	push @requirements, $req;
+	push @provisions, $prov;
+	push @element_libs, $libs;
+
+	# check to see if overloading is valid
+	if ($click_name[$i] && exists($click_name_to_id{$click_name[$i]})) {
+	    my($j) = $click_name_to_id{$click_name[$i]};
+	    my($dm_a) = driver_mask($requirements[$i]);
+	    my($dm_b) = driver_mask($requirements[$j]);
+	    if (($dm_a & $dm_b) == 0) {
+		# ok
+	    } else {
+		print STDERR "invalid multiple definition of element class '$click_name[$i]'\n";
+		print STDERR $header_file[$j], ": first definition here\n";
+		print STDERR $header_file[$i], ": second definition here\n";
+		print STDERR "(Two classes may share a name only if they work in disjoint drivers.\nAdd explicit ELEMENT_REQUIRES() statements.)\n";
+	    }
+	}
+	$click_name_to_id{$click_name[$i]} = $i;
+    }
+}
+
+sub parents_port_count ($) {
+    my($classid) = @_;
+    return undef if !defined $classid;
+    if (!$port_count[$classid]) {
+	my($parent);
+	foreach $parent (@{$parents[$classid]}) {
+	    if ($parent eq 'Element') {
+		$port_count[$classid] = '0/0';
+		last;
+	    } elsif ($parent ne '') {
+		$port_count[$classid] = &parents_port_count($cxx_name_to_id{$parent});
+		last if $port_count[$classid];
+	    }
+	}
+    }
+    return $port_count[$classid];
+}
+
+sub parents_processing ($) {
+    my($classid) = @_;
+    return undef if !defined $classid;
+    if (!$processing[$classid]) {
+	my($parent);
+	foreach $parent (@{$parents[$classid]}) {
+	    if ($parent eq 'Element') {
+		$processing[$classid] = 'a/a';
+		last;
+	    } elsif ($parent ne '') {
+		$processing[$classid] = &parents_processing($cxx_name_to_id{$parent});
+		last if $processing[$classid];
+	    }
+	}
+    }
+    return $processing[$classid];
+}
+
+sub parents_flow_code ($) {
+    my($classid) = @_;
+    return undef if !defined $classid;
+    if (!$flow_code[$classid]) {
+	my($parent);
+	foreach $parent (@{$parents[$classid]}) {
+	    if ($parent eq 'Element') {
+		$flow_code[$classid] = 'x/x';
+		last;
+	    } elsif ($parent ne '') {
+		$flow_code[$classid] = &parents_flow_code($cxx_name_to_id{$parent});
+		last if $flow_code[$classid];
+	    }
+	}
+    }
+    return $flow_code[$classid];
+}
+
+sub parents_flags ($) {
+    my($classid) = @_;
+    return undef if !defined $classid;
+    if (!defined $flags[$classid]) {
+	my($parent);
+	foreach $parent (@{$parents[$classid]}) {
+	    if ($parent eq 'Element') {
+		last;
+	    } elsif ($parent ne '') {
+		$flags[$classid] = &parents_flags($cxx_name_to_id{$parent});
+		last if defined $flags[$classid];
+	    }
+	}
+    }
+    return $flags[$classid];
+}
+
+sub xml_quote ($) {
+    my($x) = @_;
+    $x =~ s/&/&amp;/g;
+    $x =~ s/</&lt;/g;
+    $x;
+}
+
+# main program: parse options
+sub read_files_from ($) {
+    my($fn) = @_;
+    if (open(IN, ($fn eq '-' ? "<&STDIN" : $fn))) {
+	my(@a, @b, $t);
+	$t = <IN>;
+	close IN;
+
+	# Parse file; click-buildtool gets special treatment
+	if ($t =~ /\A#.*click-(buildtool findelem|mkmindriver)/) {
+	    $t =~ s/^#.*//mg;
+	    @a = map {
+		if (/^(\S+)\s+(\S+)/) {
+		    "$1:$2";
+		} else {
+		    $_;
+		}
+	    } split(/\n+/, $t);
+	} else {
+	    $t =~ s/^#.*//mg;
+	    @a = split(/\s+/, $t);
+	}
+
+	foreach $t (@a) {
+	    next if $t eq '';
+	    if ($t =~ /[*?\[]/) {
+		push @b, glob($t);
+	    } else {
+		push @b, $t;
+	    }
+	}
+
+	@b;
+    } else {
+	print STDERR "$fn: $!\n";
+	();
+    }
+}
+
+sub long_option_match ($$$) {
+    my($have, $want, $len) = @_;
+    $have = $1 if $have =~ /^(--[^=]*)=/;
+    my($hl) = length($have);
+    ($hl <= length($want) && $hl >= $len && $have eq substr($want, 0, $hl));
+}
+
+sub help () {
+    print STDERR <<"EOD;";
+'Click-mkelemmap' creates an elementmap file from a collection of Click
+elements.
+
+Usage: click-mkelemmap [OPTIONS] [-f FILE | SRCFILE]...
+
+Each SRCFILE is a Click header file. '-' means standard input. Default is
+'-f -' if no '-f' or 'SRCFILE' options are supplied.
+
+Options:
+  -f, --files FILE        Read header filenames, or an 'elements.conf' file,
+                          from FILE.
+  -r, --provide PROV      Record provisions PROV in output.
+  -t, --drivers DRIVERS   Record drivers DRIVERS in output.
+      --dochref DOCSTR    Record documentation URL pattern DOCSTR in output.
+  -p, --prefix PFX        Sources start at PFX.  Add PFX to includes and remove
+                          PFX from filenames in output.
+  -I, --include DIR       Look for header files in PFX/DIR.
+  -s, --sourcedir DIR     Record DIR as source directory in output.
+  -V, --verbose           Be more verbose.
+  -h, --help              Print this message and exit.
+
+Report bugs to <click\@pdos.lcs.mit.edu>.
+EOD;
+    exit 0;
+}
+
+undef $/;
+my(@files, @provides, @drivers, $fn, $prefix, $any_files, $dochref, $sourcedir);
+$prefix = "";
+
+while (@ARGV) {
+    $_ = shift @ARGV;
+    if (long_option_match($_, '--files', 3) && /^[^=]*=(.*)$/) {
+	push @files, read_files_from($1);
+	$any_files = 1;
+    } elsif (/^-f$/ || long_option_match($_, '--files', 3)) {
+	die "not enough arguments" if !@ARGV;
+	push @files, read_files_from(shift @ARGV);
+	$any_files = 1;
+    } elsif (long_option_match($_, '--prefix', 5) && /^[^=]*=(.*)$/) {
+	$prefix = $1;
+	$prefix .= "/" if $prefix !~ m|/\Z|;
+    } elsif (/^-p$/ || long_option_match($_, '--prefix', 5)) {
+	die "not enough arguments" if !@ARGV;
+	$prefix = shift @ARGV;
+	$prefix .= "/" if $prefix !~ m|/\Z|;
+    } elsif (long_option_match($_, '--provide', 5) && /^[^=]*=(.*)$/) {
+	push @provides, split(/\s+/, $1);
+    } elsif (/^-r$/ || long_option_match($_, '--provide', 5)) {
+	die "not enough arguments" if !@ARGV;
+	push @provides, split(/\s+/, shift @ARGV);
+    } elsif (long_option_match($_, '--drivers', 4) && /^[^=]*=(.*)$/) {
+	push @drivers, split(/\s+/, $1);
+    } elsif (/^-t$/ || long_option_match($_, '--drivers', 4)) {
+	die "not enough arguments" if !@ARGV;
+	push @drivers, split(/\s+/, shift @ARGV);
+    } elsif (long_option_match($_, '--include', 3) && /^[^=]*=(.*)$/) {
+	push @includes, $1;
+    } elsif (/^-I$/ || long_option_match($_, '--include', 3)) {
+	die "not enough arguments" if !@ARGV;
+	push @includes, shift @ARGV;
+    } elsif (/^-I(.+)$/) {
+	push @includes, $1;
+    } elsif (long_option_match($_, '--sourcedir', 3) && /^[^=]*=(.*)$/) {
+	$sourcedir = xml_quote($1);
+    } elsif (/^-s$/ || long_option_match($_, '--sourcedir', 3)) {
+	die "not enough arguments" if !@ARGV;
+	$sourcedir = xml_quote(shift @ARGV);
+    } elsif (/^-s(.+)$/) {
+	$sourcedir = xml_quote($1);
+    } elsif ((long_option_match($_, '--dochref', 4) || long_option_match($_, '--webdoc', 3))
+	     && /^[^=]*=(.*)$/) {
+	die "repeated --dochref" if defined($dochref);
+	$dochref = $1;
+    } elsif (long_option_match($_, '--dochref', 4) || long_option_match($_, '--webdoc', 3)) {
+	die "not enough arguments" if !@ARGV;
+	die "repeated --dochref" if defined($dochref);
+	$dochref = shift @ARGV;
+    } elsif (/^-h$/ || long_option_match($_, '--help', 3)) {
+	help();
+    } elsif (/^-V$/ || long_option_match($_, '--verbose', 3)) {
+	$verbose = 1;
+    } elsif (/^-./) {
+	die "unknown option '$_'\n";
+    } elsif (/^-$/) {
+	push @files, "-";
+	$any_files = 1;
+    } else {
+	push @files, glob($_);
+	$any_files = 1;
+    }
+}
+push @files, read_files_from("-") if !$any_files;
+if ($prefix eq "" || $prefix eq "." || $prefix eq "./") {
+    unshift @includes, ".";
+} else {
+    @includes = (".", $prefix, map { m|^/| ? $_ : "$prefix$_" } @includes);
+}
+print STDERR "Includes: ", join(", ", @includes), "\n" if $verbose;
+
+foreach $fn (@files) {
+    process_file($fn);
+}
+
+umask(022);
+open(OUT, ">&STDOUT");
+
+print OUT "<?xml version=\"1.0\" standalone=\"yes\"?>
+<?xml-stylesheet type=\"application/xml\" href=\"http://www.lcdf.org/click/xml/elementmap.xsl\"?>\n";
+print OUT "<?xml-stylesheet type=\"application/xml\" href=\"file://$sourcedir/etc/elementmap.xsl\"?>\n" if defined($sourcedir) && $sourcedir =~ m|^/|;
+print OUT "<elementmap xmlns=\"http://www.lcdf.org/click/xml/\"";
+print OUT " sourcedir=\"$sourcedir\"" if defined($sourcedir);
+print OUT " src=\"file://$sourcedir\"" if defined($sourcedir) && $sourcedir =~ m|^/|;
+print OUT " provides=\"", join(' ', @provides), "\"";
+print OUT " drivers=\"", join(' ', @drivers), "\"" if @drivers;
+print OUT " dochref=\"$dochref\"" if defined($dochref);
+print OUT ">\n";
+
+sub sorter {
+    my($xa, $xb) = ($click_name[$a], $click_name[$b]);
+    if ($xa && $xb) {
+	$xa cmp $xb;
+    } elsif ($xa || $xb) {
+	($xa ? -1 : 1);
+    } else {
+	$provisions[$a] cmp $provisions[$b];
+    }
+}
+
+foreach $id (sort sorter 0..$#click_name) {
+    print OUT "<entry";
+
+    print OUT " name=\"", $click_name[$id], "\"" if $click_name[$id];
+    print OUT " cxxclass=\"", $cxx_name[$id], "\"" if $cxx_name[$id];
+    print OUT " docname=\"", $doc_name[$id], "\"" if $doc_name[$id];
+
+    my($hf) = $header_file[$id];
+    $hf =~ s/^$prefix\/*// if $prefix;
+    print OUT " headerfile=\"", xml_quote($hf), "\"" if $hf;
+
+    my($sf) = $source_file[$id];
+    $sf =~ s/^$prefix\/*// if $prefix;
+    print OUT " sourcefile=\"", xml_quote($sf), "\"" if $sf;
+
+    my($pc) = $port_count[$id];
+    $pc = parents_port_count($id) if !$pc;
+    print OUT " portcount=\"", $pc, "\"" if $pc;
+
+    my($p) = $processing[$id];
+    $p = parents_processing($id) if !$p;
+    print OUT " processing=\"", $p, "\"" if $p;
+
+    my($flow) = $flow_code[$id];
+    $flow = parents_flow_code($id) if !$flow;
+    print OUT " flowcode=\"", $flow, "\"" if $flow;
+
+    my($flags) = $flags[$id];
+    $flags = parents_flags($id) if !defined($flags);
+    print OUT " flags=\"", $flags, "\"" if defined($flags);
+
+    print OUT " methods=\"", $element_methods[$id], "\"" if $element_methods[$id];
+
+    print OUT " requires=\"", $requirements[$id], "\"" if $requirements[$id];
+    print OUT " provides=\"", $provisions[$id], "\"" if $provisions[$id];
+    print OUT " libs=\"", xml_quote($element_libs[$id]), "\"" if $element_libs[$id];
+    print OUT " noexport=\"noexport\"" if $cxx_name[$id] && $noexports[$id];
+
+    print OUT " />\n";
+}
+
+print OUT "</elementmap>\n";
+close OUT;

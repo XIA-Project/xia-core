@@ -1,0 +1,15 @@
+--- linux-source-2.6.35-org/tools/perf/util/hist.c	2010-08-01 18:11:14.000000000 -0400
++++ linux-source-2.6.35/tools/perf/util/hist.c	2011-01-18 23:34:41.000000000 -0500
+@@ -493,8 +493,12 @@
+ 		percent = chain->hit * 100.0 / total_samples;
+ 		switch (callchain_param.mode) {
+ 		case CHAIN_FLAT:
++			/*
+ 			ret += percent_color_fprintf(fp, "           %6.2f%%\n",
+ 						     percent);
++			*/
++			ret += fprintf(fp, "           %Lu\n", chain->hit);
++
+ 			ret += callchain__fprintf_flat(fp, chain, total_samples);
+ 			break;
+ 		case CHAIN_GRAPH_ABS: /* Falldown */

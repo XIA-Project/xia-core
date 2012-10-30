@@ -1,0 +1,51 @@
+include xia_router_template.inc
+
+// aliases for XIDs
+XIAXIDInfo(
+    HID0 HID:0000000000000000000000000000000000000000,
+    HID1 HID:0000000000000000000000000000000000000001,
+    AD0 AD:1000000000000000000000000000000000000000,
+    AD1 AD:1000000000000000000000000000000000000001,
+    RHID0 HID:0000000000000000000000000000000000000002,
+    RHID1 HID:0000000000000000000000000000000000000003,
+    CID0 CID:2000000000000000000000000000000000000001,
+);
+
+// host & router instantiation
+host0 :: Host(RE AD0 HID0, HID0, 2000);
+host1 :: Host(RE AD1 HID1, HID1, 2001);
+router0 :: Router(RE AD0 RHID0, AD0, RHID0);
+router1 :: Router(RE AD1 RHID1, AD1, RHID1);
+
+// interconnection -- host - ad
+host0[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) -> [0]router0;
+router0[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) -> [0]host0;
+
+host1[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) -> [0]router1;
+router1[0] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) ->[0]host1;
+
+// interconnection -- ad - ad
+router0[1] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) ->[1]router1;
+router1[1] ->  Script(TYPE PACKET, print "host0 output0", print_realtime) -> LinkUnqueue(0.005, 1 GB/s) ->[1]router0;
+
+// send test packets from host0 to host1
+/*
+gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
+-> RatedUnqueue(5)
+-> XIAEncap(
+    DST RE AD1 HID1,
+    SRC RE AD0 HID0)
+-> AggregateCounter(COUNT_STOP 1)
+-> host0;
+*/
+// send test packets from host1 to host0
+//gen :: InfiniteSource(LENGTH 100, ACTIVE false, HEADROOM 256)
+//-> RatedUnqueue(5)
+//-> XIAEncap(
+//    DST RE AD0 HID0,
+//    SRC RE AD1 HID1)
+//-> AggregateCounter(COUNT_STOP 1)
+//-> host1;
+
+Script(write gen.active true);  // the packet source should be activated after all other scripts are executed
+

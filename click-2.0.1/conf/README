@@ -1,0 +1,20 @@
+Configuration files
+
+------------
+Emulation of a simple topology 
+    xia_chain_topology_socket.click
+
+IPv4 principal tester
+    xia_ipv4.click
+
+Stand-alone Ethernet XIA Router
+	xia_two_port_router.click
+
+Performance Testing was done using scripts in conf/xia. Some of the configuration uses RouterBricks' MQ*Device and some of them use Packet Shader's PS*Device.  Note that to use these elements you need to compile and install specific drivers and NIC hardware.
+
+XIA Router with IP tunnels
+	xia_chain_topology_server.click
+	xia_chain_topology_client.click
+
+These show UDPIPEncap of XIA packet for wide-area deployment. But the host uses old RCP module. This need to be changed to use XUDP.  Each script run a network with a single router and a host.  The two routers are connected via a IP-encapsulated tunnel (conceptually). 
+

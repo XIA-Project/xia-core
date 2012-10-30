@@ -1,0 +1,24 @@
+require(library ../../../xia_router_template_xtransport.click);
+require(library ../../../xia_address.click);
+
+// router instantiation
+router0 :: XRouter4Port(RE $ADNAME $HID, $ADNAME, $HID, fake0, 172.0.0.2, 172.0.0.1, 21:11:11:11:11:11, $MAC0, $MAC1, $MAC2, $MAC3);
+
+######
+// Interface$NUM ($IFACE)
+todevice$NUM :: ToDevice($IFACE);
+fromdevice$NUM :: FromDevice($IFACE, PROMISC true);
+
+
+// On receiving a packet from Interface$NUM
+fromdevice$NUM -> [$NUM]router0; // XIA packet
+
+// Sending an XIP packet to Interface$NUM
+router0[$NUM] -> todevice$NUM 
+
+
+######
+	Idle -> [$NUM]router0[$NUM] -> Discard;
+######
+
+	ControlSocket(tcp, 7777);

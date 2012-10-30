@@ -1,0 +1,11 @@
+#ifndef MODULEPARM_H
+#define MODULEPARM_H
+
+#define CLICKPARM_ACCESSIBLE	1
+#define CLICKPARM_THREADS	2
+#define CLICKPARM_GREEDY	3
+#define CLICKPARM_UID		4
+#define CLICKPARM_GID		5
+#define CLICKPARM_CPU		6
+
+#endif

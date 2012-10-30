@@ -1,0 +1,39 @@
+// kernel.clickpat
+
+// Patterns for the Click pattern optimizer (click-xform) that get rid
+// of redundant kernel elements.
+
+// To transform a router configuration according to these patterns, run
+//     % click-xform -p kernel.clickpat ROUTER > TRANSFORMED-ROUTER
+
+elementclass ToHostRemover {
+  input[0] -> t :: ToHost;
+  input[1] -> ToHost;
+}
+
+elementclass ToHostRemover_Replacement {
+  input[0] -> t :: ToHost;
+  input[1] -> t;
+}
+
+
+elementclass ToHostSniffersRemover1 {
+  input[0] -> t :: ToHostSniffers;
+  input[1] -> ToHostSniffers;
+}
+
+elementclass ToHostSniffersRemover1_Replacement {
+  input[0] -> t :: ToHostSniffers;
+  input[1] -> t;
+}
+
+
+elementclass ToHostSniffersRemover2 {
+  input[0] -> t :: ToHostSniffers($device);
+  input[1] -> ToHostSniffers($device);
+}
+
+elementclass ToHostSniffersRemover2_Replacement {
+  input[0] -> t :: ToHostSniffers($device);
+  input[1] -> t;
+}

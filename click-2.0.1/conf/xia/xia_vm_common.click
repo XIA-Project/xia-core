@@ -1,0 +1,9 @@
+AddressInfo(
+    RHID0 00:0f:b5:3f:54:6d,
+    RHID1 00:0f:b5:9a:8b:2f,
+    GUEST 00:11:22:33:44:55,
+    #GUEST_AT_RHID0 52:54:75:00:00:00,
+    #GUEST_AT_RHID1 52:54:76:00:00:00,
+    CLIENT 00:24:e8:31:d0:4f,
+);
+
