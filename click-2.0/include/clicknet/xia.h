@@ -8,11 +8,11 @@
  */
 
 #define CLICK_XIA_XID_TYPE_UNDEF    (0)
-#define CLICK_XIA_XID_TYPE_AD       (10)
-#define CLICK_XIA_XID_TYPE_HID      (11)
-#define CLICK_XIA_XID_TYPE_CID      (12)
-#define CLICK_XIA_XID_TYPE_SID      (13)
-#define CLICK_XIA_XID_TYPE_IP       (14)
+#define CLICK_XIA_XID_TYPE_AD       (0x10)
+#define CLICK_XIA_XID_TYPE_HID      (0x11)
+#define CLICK_XIA_XID_TYPE_CID      (0x12)
+#define CLICK_XIA_XID_TYPE_SID      (0x13)
+#define CLICK_XIA_XID_TYPE_IP       (0x14)
 
 #define CLICK_XIA_XID_ID_LEN        20
 
