@@ -51,7 +51,7 @@
 **
 */
 int Xsendto(int sockfd,const void *buf, size_t len, int /*flags*/,
-		char* dDAG, size_t /*dlen*/)
+		const char* dDAG, size_t /*dlen*/)
 {
 	int rc;
 

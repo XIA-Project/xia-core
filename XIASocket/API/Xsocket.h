@@ -36,6 +36,9 @@
 extern "C" {
 #endif
 
+// FIXME:change this to match what the Linux implementation is using
+#define AF_XIA	9999
+
 #define MAXBUFLEN 65000 // Note that this limits the size of chunk we can receive TODO: What should this be?
 #define XIA_MAXBUF MAXBUFLEN
 #define XIA_MAXCHUNK	MAXBUFLEN
@@ -103,7 +106,7 @@ typedef struct {
 #endif
 
 //Function list
-extern int Xsendto(int sockfd,const void *buf, size_t len, int flags,char * dDAG, size_t dlen);
+extern int Xsendto(int sockfd,const void *buf, size_t len, int flags, const char * dDAG, size_t dlen);
 extern int Xrecvfrom(int sockfd,void *rbuf, size_t len, int flags, char * sDAG, size_t *dlen);
 extern int Xsocket(int transport_type);
 extern int Xconnect(int sockfd, const char* dDAG);
