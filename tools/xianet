@@ -271,7 +271,8 @@ where:
   -i use the supplied name as the click element name and HID shortcut
   -m manually set the node's 4ID IP address
   -n if generating a click script, this node will be the name server
-  -f if generating a click script don't use interfaces matching these filter strings (comma-separated)
+  -f if generating a click script, don't use interfaces matching the supplied string
+     (to ignore multiple interfaces, use a comma-separated list)
   -I if generating a click script, use this interface (i.e., pick which interface a host uses)
   -z start the visualizer client daemon, using the supplied address for the statserver
   -Z make this the visualizer server (runs statserver and xstats)

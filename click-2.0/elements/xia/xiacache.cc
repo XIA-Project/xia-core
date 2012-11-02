@@ -129,7 +129,19 @@ void XIACache::push(int port, Packet *p)
     }
 }
 
-enum {H_MOVE};
+int
+XIACache::set_malicious(int m)
+{
+	_content_module->malicious = m;
+	return 0;
+}
+
+int XIACache::get_malicious()
+{
+	return _content_module->malicious;
+}
+
+enum {H_MOVE, MALICIOUS};
 
 int XIACache::write_param(const String &conf, Element *e, void *vparam,
                 ErrorHandler *errh)
@@ -149,13 +161,32 @@ int XIACache::write_param(const String &conf, Element *e, void *vparam,
             
         } break;
 
+		case MALICIOUS: {
+			f->set_malicious(atoi(conf.c_str()));
+		} break;
+
         default: break;
     }
     return 0;
 }
 
+String
+XIACache::read_handler(Element *e, void *thunk)
+{
+	XIACache *c = (XIACache *) e;
+    switch ((intptr_t)thunk) {
+		case MALICIOUS:
+			return String(c->get_malicious());
+
+		default:
+			return "<error>";
+    }
+}
+
 void XIACache::add_handlers() {
     add_write_handler("local_addr", write_param, (void *)H_MOVE);
+	add_write_handler("malicious", write_param, (void*)MALICIOUS);
+	add_read_handler("malicious", read_handler, (void*)MALICIOUS);
 }
 
 

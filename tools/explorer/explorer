@@ -1,0 +1,347 @@
+#! /usr/bin/python
+#
+# Copyright 2012 Carnegie Mellon University
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+import sys
+import time
+import telnetlib
+import requests
+import readline
+from optparse import OptionParser
+from click_control import *
+from xroute import *
+
+click=None
+devices=None
+functions=None
+device_centric_functions=None
+first_time_in_device_centric_mode = True
+
+
+
+#
+# some helper functions to make the CLI more usable
+#
+
+class SimpleCompleter(object):
+    
+    def __init__(self, options):
+        self.options = sorted(options)
+        return
+
+    def complete(self,text,state):
+            results =  [x+" " for x in self.options if x.startswith(text)] + [None]
+            return results[state]
+
+#
+# A class that encapsulates information about a command that can be issued
+# at the click explorer CLI
+#
+class Command(object):
+    
+    def __init__(self, name, function, args, help_string):
+        self.name = name
+        self.function = function
+        self.args = args
+        self.help_string = help_string
+
+    def get_name(self):
+        return self.name
+
+    def get_function(self):
+        return self.function
+
+    def get_args(self):
+        return self.args
+
+    def get_help_string(self):
+        return self.help_string
+
+
+#
+# print the message if configured to be noisy
+#
+def say(msg):
+    if options.verbose:
+        print msg
+
+#
+# list the click elements in the currently running click instance
+#
+def list_devices(*args):
+    global devices
+    for key in devices.getList():
+        print key
+
+#
+# list the elements belonging to the specified device
+#
+def list_elements(device):
+    pass
+
+#
+# Display info about a particular device
+#
+def device_info(device):
+    global devices
+    try:
+        device_element = devices.getList()[device]
+        print device_element
+        #for key in device_element:
+        #    print '%s: %s' % (key, device_element[key])
+    except KeyError:
+        print '%s: no device found' % device
+
+#
+# wrapper for xroute
+#
+def run_xroute(*args):
+    xroute = XrouteApp()
+    xroute.run(args)
+
+#
+# device-centric wrapper for xroute
+#
+def d_run_xroute(device, *args):
+    device_arg = '--device=%s' % device
+    run_xroute(device_arg)
+
+#
+# gets or sets the verbosity for a given port on a given device
+#
+def get_set_verbosity(device, port, verbosity=-1):
+    global click, devices
+    v = int(verbosity)
+    try:
+        device_element = devices.getList()[device]
+        if v == -1:
+            device_element.get_verbosity_for_port(click, port)
+        else:
+            device_element.set_verbosity_for_port(click, port, v)
+    except KeyError:
+        print '%s: no device found' % device
+
+#
+# gets or sets whether or not the cache in the specified device is malicious 
+#
+def get_set_malicious_cache(device, malicious=-1):
+    global click, devices
+    m = int(malicious)
+    try:
+        device_element = devices.getList()[device]
+        if m != -1: # set malicious
+            device_element.set_malicious_cache(click, m)
+        read = device_element.get_malicious_cache(click)  # read malicious
+        print '%s\tMalicious: %s' % (device, read) 
+    except KeyError:
+        print '%s: no device found' % device
+
+#
+# Prints the current top-level click configuration
+#
+def print_click_config():
+    global click
+    print click.readData('config')
+
+#
+# Prints the current complete click configuration
+#
+def print_click_flatconfig():
+    global click
+    print click.readData('flatconfig')
+
+#
+# Prints a list of all instantiated click elements
+#
+def print_click_list():
+    global click
+    print click.readData('list')
+    
+
+
+#
+# print help
+#
+def help(*args):
+    for command in functions:
+        print '%s\t\t%s\n\n' % (command, functions[command].get_help_string().replace('\n', '\n\t\t'))
+
+#
+# print help for device-centric functions
+#
+def d_help(*args):
+    for command in device_centric_functions:
+        print '%s\t\t%s\n\n' % (command, functions[command].get_help_string().replace('\n', '\n\t\t'))
+    
+
+# TODO:::: Do something about functions crashing if given the wrong # of args
+
+#
+# This dictionary defines the commands the Click Explorer CLI understands. The
+# key is the string to be entered at the CLI and the value is an element of the
+# Command class that encapsulates the function to be invoked, default arguments
+# that should be supplied when it is called, and a help string describing the
+# command. The commands listed here will automatically be available for tab
+# completion.
+#
+functions = {'devices': Command('devices', list_devices, None, 'Lists the top-level click elements (routers and hosts) found in the current instance of Click.'),
+             'info': Command('info', device_info, None, 'Prints information about the specified devices:\n\tinfo router0'),
+             'xroute': Command('xroute', run_xroute, None, 'A wrapper for the xroute tool. For more details, run xroute --help'),
+             'verbosity': Command('verbosity', get_set_verbosity, None, 'Gets or sets the verbosity for a given port on a given device.\nIf a new verbosity level is supplied, it sets the verbosity; otherwise it just prints it:\n\tverbosity router0 0 2  // sets the verbosity of port 0 on router0 to 2\n\tverbosity router0 0  // prints the current verbosity setting for port 0 on router0\nVerbosity levels are:\n\t0\tPrint Nothing\n\t1\tUnused\n\t2\tPrint Everything except Daemon Traffic\n\t3\tPrint Everything'),
+             'malicious': Command('malicious', get_set_malicious_cache, None, 'Gets or sets whether or not the cache in the specified device is malicious:\n\tmalicious router0 1'),
+             'config': Command('config', print_click_config, None, 'Prints the current top-level click configuration'),
+             'flatconfig': Command('flatconfig', print_click_flatconfig, None, 'Prints the current entire click configuration'),
+             'list': Command('list', print_click_list, None, 'Prints a list of all currently insantiated click elements'),
+             'help': Command('help', help, None, 'Prints information about the available commands')}
+
+#
+# This dictionary works like the one above, except it defines the commands
+# available in device-centric mode. For a command to be available in both
+# modes, it must appear in both dictionaries.
+#
+device_centric_functions = {'info': Command('info', device_info, None, 'Prints information about the current device'),
+                            'verbosity': Command('verbosity', get_set_verbosity, None, 'Gets or sets the verbosity for the current device.\nIf a new verbosity level is supplied, it sets the verbosity; otherwise it just prints it:\n\tverbosity 0 2  // sets the verbosity of port 0 on router0 to 2\n\tverbosity 0  // prints the current verbosity setting for port 0 on router0\nVerbosity levels are:\n\t0\tPrint Nothing\n\t1\tUnused\n\t2\tPrint Everything except Daemon Traffic\n\t3\tPrint Everything'),
+                            'malicious': Command('malicious', get_set_malicious_cache, None, 'Gets or sets whether or not the cache in the current device is malicious:\n\tmalicious router0 1'),
+                            'xroute': Command('xroute', d_run_xroute, None, 'Runs the xroute tool on the current device.'),
+             'help': Command('help', d_help, None, 'Prints information about the available commands')}
+
+
+#
+# sets the "current device" and enters a mode where commands
+# apply to the current device (e.g., when adding a route, the
+# route is added to the 
+#
+def device_centric_mode(device):
+    global first_time_in_device_centric_mode, devices
+    # If this is the first time the user has entered device-centric mode,
+    # print some information
+    if first_time_in_device_centric_mode:
+        first_time_in_device_centric_mode = False
+        print """
+Entering device-centric mode. In this mode, commands apply
+directly to the current device. To exit device-centric mode,
+type 'done'.
+"""
+
+    if device == 'all':
+        device_list = devices.getList().keys()
+        device = '[all devices]'
+    else:
+        device_list = [device,]
+        device_info(device)
+
+    # register our completer function for device-centric functions
+    readline.set_completer(SimpleCompleter(device_centric_functions.keys()).complete)
+    
+    # start CLI for device-centric mode
+    while True:
+        try:
+            command = raw_input('%s> ' % device)
+            command_array = command.strip().split(' ')
+            command = command_array[0]
+            args = command_array[1:]
+        except EOFError:
+            break
+        except KeyboardInterrupt:
+            break
+        
+        if not command:
+            continue
+
+        try:
+            if device_centric_functions[command].get_args() != None:
+                args = device_centric_functions[command].get_args() + args
+            for d in device_list:
+                device_centric_functions[command].get_function()(d, *args)
+        except KeyError:
+            if command == 'exit' or command == 'quit' or command == 'done':
+                print ''
+                break
+            print '%s: command not found' % command_array[0]
+        except EOFError:
+            print ''
+            break
+        except SystemExit:
+            pass  # don't exit if the function calls sys.exit
+
+
+    
+
+#
+# go speed racer go!
+#
+def main():
+    global click, devices, functions
+
+    parser = OptionParser()
+    parser.add_option("-v", "--verbose", dest="verbose", help="print status messages", default=False, action="store_true")
+    (options, args) = parser.parse_args()
+
+    click = ClickControl()
+    click.connect()
+
+    # get the list of hosts/routers from click
+    devices = DeviceList()
+    #devices.parse(click.readData("flatconfig"))
+    devices.parse(click.readData("config"))
+
+    updateRoutes(devices, click)
+
+    # Register our completer function
+    readline.set_completer(SimpleCompleter(functions.keys() + devices.getList().keys() + ['all',]).complete)
+    # Use the tab key for completion
+    readline.parse_and_bind('tab: complete')
+
+    # run as an interactive prompt
+    print '\n\nWelcome to Click Explorer'
+    while True:
+        try:
+            command = raw_input('> ')
+            command_array = command.strip().split(' ')
+            command = command_array[0]
+            args = command_array[1:]
+        except EOFError:
+            print ''
+            break
+        except KeyboardInterrupt:
+            print ''
+            break
+        
+        if not command:
+            continue
+
+        try:
+            if functions[command].get_args() != None:
+                args = functions[command].get_args() + args
+            functions[command].get_function()(*args)
+        except KeyError:
+            if command == 'exit' or command == 'quit' or command == 'done':
+                print ''
+                break
+            if command in devices.getList().keys() + ['all',]:
+                device_centric_mode(command)
+                # Re-register our completer function
+                readline.set_completer(SimpleCompleter(functions.keys() + devices.getList().keys()).complete)
+                continue
+            print '%s: command not found' % command_array[0]
+        except SystemExit:
+            pass  # don't exit if the function calls sys.exit
+
+    click.shutdown()
+
+
+if __name__ == "__main__":
+    main()

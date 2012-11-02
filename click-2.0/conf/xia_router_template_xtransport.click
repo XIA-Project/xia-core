@@ -696,6 +696,17 @@ elementclass XRouter4Port {
     Script(write n/proc/rt_CID/rt.add - 5);     // no default route for CID; consider other path
     //Script(write n/proc/rt_IP/rt.add - 0); 	// default route for IPv4    
 
+	// Set up print elements. Don't change the names or Click Explorer
+	// won't be able to turn them on or off
+	in0_print :: XIAPrint(VERBOSITY 0);
+	in1_print :: XIAPrint(VERBOSITY 0);
+	in2_print :: XIAPrint(VERBOSITY 0);
+	in3_print :: XIAPrint(VERBOSITY 0);
+	out0_print :: XIAPrint(VERBOSITY 0);
+	out1_print :: XIAPrint(VERBOSITY 0);
+	out2_print :: XIAPrint(VERBOSITY 0);
+	out3_print :: XIAPrint(VERBOSITY 0);
+
     // quick fix
     n[3] -> Discard();
     Idle() -> [4]xtransport;
@@ -716,9 +727,9 @@ elementclass XRouter4Port {
     input[0] -> c0; 
     
     // Receiving an XIA packet
-    c0[2] -> Strip(14) -> MarkXIAHeader() -> Paint(0) -> [0]n; 
+    c0[2] -> Strip(14) -> MarkXIAHeader() -> in0_print -> Paint(0) -> [0]n; 
 
-    out0 :: Queue(200) -> [0]output;
+    out0 :: Queue(200) -> out0_print -> [0]output;
      
     // On receiving XARP response
     c0[1] -> [1]xarpq0 -> out0;
@@ -741,9 +752,9 @@ elementclass XRouter4Port {
     input[1] -> c1; 
     
     // Receiving an XIA packet
-    c1[2] -> Strip(14) -> MarkXIAHeader() -> Paint(1) -> [0]n; 
+    c1[2] -> Strip(14) -> MarkXIAHeader() -> in1_print -> Paint(1) -> [0]n; 
     
-    out1 :: Queue(200) -> [1]output;
+    out1 :: Queue(200) -> out1_print -> [1]output;
      
     // On receiving XARP response
     c1[1] -> [1]xarpq1 -> out1;
@@ -766,9 +777,9 @@ elementclass XRouter4Port {
     input[2] -> c2; 
     
     // Receiving an XIA packet
-    c2[2] -> Strip(14) -> MarkXIAHeader() -> Paint(2) -> [0]n; 
+    c2[2] -> Strip(14) -> MarkXIAHeader() -> in2_print -> Paint(2) -> [0]n; 
 
-    out2 :: Queue(200) -> [2]output;
+    out2 :: Queue(200) -> out2_print -> [2]output;
      
     // On receiving XARP response
     c2[1] -> [1]xarpq2 -> out2;
@@ -791,9 +802,9 @@ elementclass XRouter4Port {
     input[3] -> c3; 
     
     // Receiving an XIA packet
-    c3[2] -> Strip(14) -> MarkXIAHeader() -> Paint(3) -> [0]n; 
+    c3[2] -> Strip(14) -> MarkXIAHeader() -> in3_print -> Paint(3) -> [0]n; 
 
-    out3 :: Queue(200) -> [3]output;
+    out3 :: Queue(200) -> out3_print -> [3]output;
      
     // On receiving XARP response
     c3[1] -> [1]xarpq3 -> out3;
