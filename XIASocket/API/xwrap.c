@@ -5,9 +5,13 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include "Xsocket.h"
+#include "Xinit.h"
+#include "Xutil.h"
 
 #define DEBUG
 #define XIA_PRELOAD
+
+#define isXsocket(s)	(getSocketType(s) != -1)
 
 #ifdef DEBUG
 #define MSG(...)	printf(__VA_ARGS__)
@@ -43,13 +47,16 @@
 /*
 ** Declare a typedef and a function pointer definition that uses it.
 ** The typedef is created so we can use it to cast the void * result from
-** dlsym to the appropriate function pointer type in teh GET_FCN macro.
+** dlsym to the appropriate function pointer type in the GET_FCN macro.
 **
 ** example:
 **   DECLARE(int, socket, int domain, int type, int protocol); ==>
 **
 **   typedef int (*fcn_socket)(int domain, int type, int protocol);
 **   fcn_socket __real_socket;
+**
+** FIXME: see if there's a way to make this look a little more like a normal 
+**	function declaration.
 */
 #define DECLARE(r, f, ...)	\
 	typedef r (*fcn_##f)(__VA_ARGS__);	\
@@ -91,19 +98,9 @@ DECLARE(int, sockatmark, int fd);
 DECLARE(int, close, int fd);
 
 
-
-
-// defined in xutil.h, but we can't include that here as it uses C++ conventions
-// and we need to compile this file with gcc, not g++
-
-extern int getSocketType(int sock);
-int isXsocket(int sock)
-{
-//	return 1;
-	return getSocketType(sock) != -1;
-}
-
-
+/*
+** Called at library load time to initialize the function pointers
+*/
 void __attribute__ ((constructor)) xwrap_init(void)
 {
 	MSG("loading XIA wrappers (created: %s)\n", __DATE__);
@@ -197,7 +194,6 @@ ssize_t send(int fd, const void *buf, size_t n, int flags)
 		return __real_send(fd, buf, n, flags);
 	}
 }
-
 
 ssize_t recv(int fd, void *buf, size_t n, int flags)
 {
