@@ -64,16 +64,11 @@ void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID 
 	{
 		// If this router is malicous, then this content 
 		// module reponds to requests for the simple.html page
-		// with a version explaining CID security (But only every
-		// other time.)
-		// TODO: something more flexible
-		if (malicious_this_time)
-		{
-			XID fakeCID = XID();
-			fakeCID.parse("CID:4e3f8b2d710eb4b1937d22bc2966462b068144d8");
+		// with a version explaining CID security 
+		XID fakeCID = XID();
+		fakeCID.parse("CID:4e3f8b2d710eb4b1937d22bc2966462b068144d8");
 
-    		it=_contentTable.find(fakeCID);
-		}
+    	it=_contentTable.find(fakeCID);
 	}
 
 	// image.jpg vs. anon.jpg
@@ -82,18 +77,11 @@ void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID 
 	{
 		// If this router is malicous, then this content 
 		// module reponds to requests for the umbrella image
-		// with the anonymous image instead. (But only every
-		// other time.)
-		// TODO: something more flexible
-		if (malicious_this_time)
-		{
-			XID fakeCID = XID();
-			fakeCID.parse("CID:5830f441b0895cd2a82d5a13fc64f6e9a5f710ad");
+		// with the anonymous image instead. 
+		XID fakeCID = XID();
+		fakeCID.parse("CID:5830f441b0895cd2a82d5a13fc64f6e9a5f710ad");
 
-    		it=_contentTable.find(fakeCID);
-		}
-		
-		malicious_this_time = 1 - malicious_this_time;
+    	it=_contentTable.find(fakeCID);
 	}
 	
 	// 1st chunk of dongsu demo image vs. 1st chunk of anon.jpg
@@ -102,18 +90,11 @@ void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID 
 	{
 		// If this router is malicous, then this content 
 		// module reponds to requests for the umbrella image
-		// with the anonymous image instead. (But only every
-		// other time.)
-		// TODO: something more flexible
-		if (malicious_this_time)
-		{
-			XID fakeCID = XID();
-			fakeCID.parse("CID:dd44c65bc81365ea7dfd2958732a6df937604613");
+		// with the anonymous image instead. 
+		XID fakeCID = XID();
+		fakeCID.parse("CID:dd44c65bc81365ea7dfd2958732a6df937604613");
 
-    		it=_contentTable.find(fakeCID);
-		}
-		
-		malicious_this_time = 1 - malicious_this_time;
+    	it=_contentTable.find(fakeCID);
 	}
 
 #ifdef CLIENTCACHE
