@@ -1,0 +1,27 @@
+#!/bin/sh
+# clean all of the XIA components
+
+XIADIR=$(dirname $(dirname $(cd ${0%/*} && echo $PWD/${0##*/})))
+
+cd $XIADIR/click
+make clean
+
+cd $XIADIR/XIASocket/API
+make clean
+
+cd $XIADIR/XIASocket/sample
+make clean
+
+cd $XIADIR/example
+make clean
+
+cd $XIADIR/daemons/xroute
+make clean
+
+cd $XIADIR/daemons/xhcp
+make clean
+
+cd $XIADIR/daemons/nameserver
+make clean
+
+cd $XIADIR
