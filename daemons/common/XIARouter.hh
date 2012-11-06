@@ -39,6 +39,14 @@ using namespace std;
 #define XR_BAD_HOSTNAME			-8
 #define XR_INVALID_XID			-9
 
+#define TOTAL_SPECIAL_CASES 8
+#define DESTINED_FOR_DISCARD -1
+#define DESTINED_FOR_LOCALHOST -2
+#define DESTINED_FOR_DHCP -3
+#define DESTINED_FOR_BROADCAST -4
+#define REDIRECT -5
+#define UNREACHABLE -6
+#define FALLBACK -7
 
 typedef struct {
 	std::string xid;
@@ -76,8 +84,8 @@ public:
 	int getRoutes(std::string xidtype, std::vector<XIARouteEntry> &xrt);
 
 	// returns 0 success, < 0 on error
-	int addRoute(std::string &xid, unsigned short port, std::string &next, unsigned long flags);
-	int setRoute(std::string &xid, unsigned short port, std::string &next, unsigned long flags);
+	int addRoute(std::string &xid, int port, std::string &next, unsigned long flags);
+	int setRoute(std::string &xid, int port, std::string &next, unsigned long flags);
 	int delRoute(std::string &xid);
 
 	const char *cserror();
@@ -87,7 +95,7 @@ private:
 	ControlSocketClient _cs;
 	ControlSocketClient::err_t _cserr;
 
-	int updateRoute(std::string cmd, std::string &xid, unsigned short port, std::string &next, unsigned long flags);
-	string itoa(unsigned);
+	int updateRoute(std::string cmd, std::string &xid, int port, std::string &next, unsigned long flags);
+	string itoa(signed);
 };
 

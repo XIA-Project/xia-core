@@ -398,8 +398,8 @@ void
 XARPQuerier::xarp_query_timeout(Packet *p)
 {
     // Paint the packet with the XARP_timeout color	
-    int anno = PAINT_ANNO_OFFSET;
-    int color = XARP_TIMEOUT;
+    int anno = XIA_PAINT_ANNO_OFFSET;
+    int color = UNREACHABLE;
     p->set_anno_u8(anno, color);
     output(noutputs() - 1).push(p);
 }

@@ -61,8 +61,8 @@ int XIARouter::listRouters(std::vector<std::string> &rlist)
 	vector<string>::iterator it;
 	for (it = elements.begin(); it < elements.end(); it++) {
 
-		// cheap way of finding host and router devices, they both have a /cache element
-		if ((n = (*it).find("/cache")) != string::npos) {
+		// cheap way of finding host and router devices, they both have a /xrc element
+		if ((n = (*it).find("/xrc")) != string::npos) {
 			rlist.push_back((*it).substr(0, n));
 		}
 	}
@@ -85,7 +85,7 @@ int XIARouter::getRoutes(std::string xidtype, std::vector<XIARouteEntry> &xrt)
 	if (getRouter().length() == 0)
 		return  XR_ROUTER_NOT_SET;
 
-	std::string table = _router + "/n/proc/rt_" + xidtype + "/rt";
+	std::string table = _router + "/xrc/n/proc/rt_" + xidtype;
 
 	if ((_cserr = _cs.read(table, "list", result)) != 0)
 		return XR_CLICK_ERROR;
@@ -137,7 +137,7 @@ int XIARouter::getRoutes(std::string xidtype, std::vector<XIARouteEntry> &xrt)
 	return n;
 }
 
-std::string XIARouter::itoa(unsigned i)
+std::string XIARouter::itoa(signed i)
 {
 	std::string s;
 	std::stringstream ss;
@@ -147,7 +147,7 @@ std::string XIARouter::itoa(unsigned i)
 	return s;
 }
 
-int XIARouter::updateRoute(string cmd, std::string &xid, unsigned short port, std::string &next, unsigned long flags)
+int XIARouter::updateRoute(string cmd, std::string &xid, int port, std::string &next, unsigned long flags)
 {
 	string xidtype;
 	unsigned n;
@@ -170,12 +170,12 @@ int XIARouter::updateRoute(string cmd, std::string &xid, unsigned short port, st
 
 	xidtype = xid.substr(0, n);
 
-	std::string table = _router + "/n/proc/rt_" + xidtype + "/rt";
-
+	std::string table = _router + "/xrc/n/proc/rt_" + xidtype;
+	
 	string default_xid("-"); 
 	if (xid.compare(n+1, 1, default_xid) == 0)
 		xid = default_xid;
-
+		
 	std::string entry;
 
 	// remove command only takes an xid
@@ -190,12 +190,12 @@ int XIARouter::updateRoute(string cmd, std::string &xid, unsigned short port, st
 	return XR_OK;
 }
 
-int XIARouter::addRoute(std::string &xid, unsigned short port, std::string &next, unsigned long flags)
+int XIARouter::addRoute(std::string &xid, int port, std::string &next, unsigned long flags)
 {
 	return updateRoute("add4", xid, port, next, flags);
 }
 
-int XIARouter::setRoute(std::string &xid, unsigned short port, std::string &next, unsigned long flags)
+int XIARouter::setRoute(std::string &xid, int port, std::string &next, unsigned long flags)
 {
 	return updateRoute("set4", xid, port, next, flags);
 }

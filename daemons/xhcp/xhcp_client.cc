@@ -8,7 +8,7 @@
 
 #include "Xsocket.h"
 #include "xhcp.hh"
-#include "XIARouter.hh"
+#include "../common/XIARouter.hh"
 
 #define DEFAULT_HOSTNAME "www_h.hostxxx.com.xia" // used if not provided by user (via command-line)
 
@@ -191,7 +191,7 @@ int main(int argc, char *argv[]) {
 			xr.delRoute(myAD);
 		
 			// update AD table (my AD entry)
-			if ((rc = xr.setRoute(AD, 4, empty_str, 0xffff)) != 0)
+			if ((rc = xr.setRoute(AD, DESTINED_FOR_LOCALHOST, empty_str, 0xffff)) != 0)
 				printf("error setting route %d\n", rc);			
 				
 			myAD = AD;

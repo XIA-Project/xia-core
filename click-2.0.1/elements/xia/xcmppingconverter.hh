@@ -15,58 +15,67 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef CLICK_XCMP_HH
-#define CLICK_XCMP_HH
+#ifndef CLICK_XCMPPINGCONVERTER_HH
+#define CLICK_XCMPPINGCONVERTER_HH
 #include <click/element.hh>
 #include <click/glue.hh>
 #include <click/atomic.hh>
 #include <clicknet/xia.h>
 #include <click/xiapath.hh>
-#include "xiaxidroutetable.hh"
+#include <click/timer.hh>
 CLICK_DECLS
 
 /*
 =c
 
-XCMP(SRC)
+XCMPPingConverter(SRC [, PRINT_EVERY])
 
 =s xia
 
-Responds to various XCMP requests
+replaces incoming packets with XCMP ping requests from SRC to DST IP converted to HID (HIP encoding)
 
 =d
 
-Responds to various XCMP requests. Output 0 sends packets out to the network.
-Output 1 sends packets up to the local host
+Sends XCMP ping packets with SRC as source when 
+receiving a packet on input. Uses DST IP from packet
+as DST HID (HIP encoding). Printing out a message for 
+every PRINT_EVERY pings sent.
 
 =e
 
-An XCMP responder for host AD0 HID0
-XCMP(RE AD0 HID0)
+Send pings from AD1 HID1, printing every other packet sent.
+XCMPPingConverter(RE AD1 HID1, 2)
 
 */
 
-class XCMP : public Element { public:
+class XCMPPingConverter : public Element { public:
 
-    XCMP();
-    ~XCMP();
-
-    const char *class_name() const		{ return "XCMP"; }
-    const char *port_count() const		{ return "1/2"; }
+    XCMPPingConverter();
+    ~XCMPPingConverter();
+  
+    const char *class_name() const		{ return "XCMPPingConverter"; }
+    const char *port_count() const		{ return "0-1/1"; }
     const char *processing() const		{ return PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *);
     int initialize(ErrorHandler *);
 
+  void makePacket(XIAPath *);
+  void run_timer(Timer *);
+
     void push(int, Packet *);
 
   private:
-    // ICMP-style checksum
-    u_short in_cksum(u_short *, int);
-    
-    // source XIAPath of the local host
+
+  Timer _timer;
+  int _interval;
+    // for the ping packet
     XIAPath _src_path;
+  XIAPath _dst_path;
+    uint16_t _seqnum;
+
+    // how often to print message to console
+    uint32_t _print_every;
 };
 
 CLICK_ENDDECLS

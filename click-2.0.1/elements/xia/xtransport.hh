@@ -178,7 +178,7 @@ class XTRANSPORT : public Element {
     
     //modify routing table
     void addRoute(const XID &sid) {
-        String cmd=sid.unparse()+" 4";
+	    String cmd=sid.unparse()+ " " + String(DESTINED_FOR_LOCALHOST);
         HandlerCall::call_write(_routeTable, "add", cmd);
     }   
         

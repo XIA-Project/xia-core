@@ -6,6 +6,7 @@
 #include "xiadechlim.hh"
 #include <click/glue.hh>
 #include <click/confparse.hh>
+#include <click/packet_anno.hh>
 #include <clicknet/xia.h>
 CLICK_DECLS
 
@@ -39,6 +40,7 @@ XIADecHLIM::simple_action(Packet *p)
 
 	if (hdr->hlim <= 1) {
     	++_drops;
+		SET_XIA_PAINT_ANNO(p, UNREACHABLE);
     	checked_output_push(1, p);
     	return 0;
     } else {

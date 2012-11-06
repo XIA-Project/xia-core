@@ -29,6 +29,8 @@ XIAXIDRouteTable::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     click_chatter("XIAXIDRouteTable: configuring %s\n", this->name().c_str());
 
+	_num_ports = 0;
+
     _rtdata.port = -1;
     _rtdata.flags = 0;
     _rtdata.nexthop = NULL;
@@ -37,6 +39,7 @@ XIAXIDRouteTable::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (cp_va_kparse(conf, this, errh,
 		"LOCAL_ADDR", cpkP+cpkM, cpXIAPath, &local_addr,
+		"NUM_PORT", cpkP+cpkM, cpInteger, &_num_ports,
 		cpEnd) < 0)
 	return -1;
 
@@ -46,10 +49,6 @@ XIAXIDRouteTable::configure(Vector<String> &conf, ErrorHandler *errh)
     String broadcast_xid("HID:1111111111111111111111111111111111111111");  // broadcast HID
     _bcast_xid.parse(broadcast_xid);    
     
-	_redirect_port = 8; // this port will be used to inform xcmp that the sender should be told about a redirect
-    _bcast_port = 7;  // this port will duplicate the packet and send each to every interface
-    _my_port = 4; // this port will update the last-pointer in DAG or send the packet to the upper layer    
-
 	return 0;
 }
 
@@ -146,7 +145,10 @@ XIAXIDRouteTable::set_handler4(const String &conf, Element *e, void *thunk, Erro
 	}
 
 	if (args.size() >= 3 && args[2].length() > 0) {
-		nexthop = new XID(args[2]);
+	    String nxthop = args[2];
+		nexthop = new XID;
+		cp_xid(nxthop, nexthop, e);
+		//nexthop = new XID(args[2]);
 		if (!nexthop->valid()) {
 			delete nexthop;
 			return errh->error("invalid next hop xid: ", conf.c_str());
@@ -385,24 +387,39 @@ void
 XIAXIDRouteTable::push(int in_ether_port, Packet *p)
 {
     int port;
-    if(in_ether_port == 6) {
-	// if this is an XCMP redirect packet
-	port = process_xcmp_redirect(p);
+
+	in_ether_port = XIA_PAINT_ANNO(p);
+
+    if(in_ether_port == REDIRECT) {
+	  // if this is an XCMP redirect packet
+	  port = process_xcmp_redirect(p);
     } else {    
     	port = lookup_route(in_ether_port, p);
     }
 
-    if(port == in_ether_port && in_ether_port !=4 && in_ether_port !=5) { // need to inform XCMP that this is a redirect
+    if(port == in_ether_port && in_ether_port !=DESTINED_FOR_LOCALHOST && in_ether_port !=DESTINED_FOR_DISCARD) { // need to inform XCMP that this is a redirect
 	  // ports 4 and 5 are "local" and "discard" so we shouldn't send a redirect in that case
 	  Packet *q = p->clone();
-	  q->set_anno_u8(PAINT_ANNO_OFFSET,q->anno_u8(PAINT_ANNO_OFFSET)+REDIRECT_BASE);
-	  output(_redirect_port).push(q);
+	  SET_XIA_PAINT_ANNO(q, (XIA_PAINT_ANNO(q)+TOTAL_SPECIAL_CASES)*-1);
+	  output(DESTINED_FOR_LOCALHOST).push(q); // This is not right....
     }
-    if (port >= 0) {
-        output(port).push(p);
-    }
-    else
-    {
+	SET_XIA_PAINT_ANNO(p,port);
+    if (port >= 0) output(0).push(p);
+	else if (port == DESTINED_FOR_LOCALHOST) output(1).push(p);
+	else if (port == DESTINED_FOR_DHCP) output(3).push(p);
+	else if (port == DESTINED_FOR_BROADCAST) {
+	  for(int i = 0; i <= _num_ports; i++) {
+		Packet *q = p->clone();
+		SET_XIA_PAINT_ANNO(q,i);
+		//q->set_anno_u8(PAINT_ANNO_OFFSET,i);
+		output(0).push(q);
+	  }
+	  p->kill();
+	}
+	else {
+	  SET_XIA_PAINT_ANNO(p,UNREACHABLE);
+	  //p->set_anno_u8(PAINT_ANNO_OFFSET,UNREACHABLE);
+
         // no match -- discard packet
 	  // Output 9 is for dropping packets.
 	  // let the routing engine handle the dropping.
@@ -410,7 +427,7 @@ XIAXIDRouteTable::push(int in_ether_port, Packet *p)
 	  //if (_drops == 1)
       //      click_chatter("Dropping a packet with no match (last message)\n");
       //  p->kill();
-	  output(9).push(p);
+	  output(2).push(p);
     }
 }
 
@@ -479,27 +496,27 @@ XIAXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
     	if(_local_hid == source_hid) {
     	    	// Case 1. Outgoing broadcast packet: send it to port 7 (which will duplicate the packet and send each to every interface)
     	    	p->set_nexthop_neighbor_xid_anno(_bcast_xid);
-    	    	return _bcast_port;
+    	    	return DESTINED_FOR_BROADCAST;
     	} else {
     		// Case 2. Incoming broadcast packet: send it to port 4 (which eventually send the packet to upper layer)
     		// Also, mark the incoming (ethernet) interface number that connects to this neighbor
     		HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(source_hid);
     		if (it != _rts.end())
-   		{
-   			if ((*it).second->port != in_ether_port) {
-   				// update the entry
-   				(*it).second->port = in_ether_port;
-			}	
-    		}
+			  {
+				if ((*it).second->port != in_ether_port) {
+				  // update the entry
+				  (*it).second->port = in_ether_port;
+				}	
+			  }
     		else
-    		{
+			  {
     			// Make a new entry for this newly discovered neighbor
        			XIARouteData *xrd1 = new XIARouteData();
-			xrd1->port = in_ether_port;
-			xrd1->nexthop = new XID(source_hid);
-			_rts[source_hid] = xrd1;
-    		}
-    		return _my_port;
+				xrd1->port = in_ether_port;
+				xrd1->nexthop = new XID(source_hid);
+				_rts[source_hid] = xrd1;
+			  }
+    		return DESTINED_FOR_LOCALHOST;
     	}    	
        return 0;
     

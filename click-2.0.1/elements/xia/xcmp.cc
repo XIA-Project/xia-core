@@ -69,10 +69,10 @@ XCMP::push(int, Packet *p_in)
     const uint8_t *payload = hdr.payload();
 
 	//if(DEBUG)
-	//  click_chatter("XCMP: paint = %d\n",p_in->anno_u8(PAINT_ANNO_OFFSET));
+	//  click_chatter("XCMP: paint = %d\n", XIA_PAINT_ANNO(p_in);
 
 	// check if this packet is painted for redirection
-    if(p_in->anno_u8(PAINT_ANNO_OFFSET) >= REDIRECT_BASE) { // need to send XCMP REDIRECT
+    if(XIA_PAINT_ANNO(p_in) <= -1*TOTAL_SPECIAL_CASES) { // need to send XCMP REDIRECT
         if(DEBUG)
 		    click_chatter("%s: %u: %s sent me a packet that should route on its local network (Dst: %s)\n", _src_path.unparse().c_str(),p_in->timestamp_anno().usecval(),hdr.src_path().unparse().c_str(),hdr.dst_path().unparse().c_str());
       
@@ -113,7 +113,7 @@ XCMP::push(int, Packet *p_in)
 		    click_chatter("%s: %u: Redirect sent\n", _src_path.unparse().c_str(),Timestamp::now().usecval());
 		
 		// paint the packet so the route engine knows where to send it
-		p->set_anno_u8(PAINT_ANNO_OFFSET,p_in->anno_u8(PAINT_ANNO_OFFSET)-REDIRECT_BASE);
+		SET_XIA_PAINT_ANNO(p, XIA_PAINT_ANNO(p_in)*-1-TOTAL_SPECIAL_CASES);
 
 		// if(DEBUG)
 		//    click_chatter("%s: %u: Redirect paint color: %d\n", _src_path.unparse().c_str(),Timestamp::now().usecval(),p->anno_u8(PAINT_ANNO_OFFSET));
@@ -126,7 +126,7 @@ XCMP::push(int, Packet *p_in)
 
 	// check to see if this packet can't make it to its destination
 	// we need to send a DESTINATION XID Unreachable message to the src
-    if(p_in->anno_u8(PAINT_ANNO_OFFSET) == XARP_TIMEOUT) { // need to send a DESTINATION XID UNREACHABLE MESSAGE
+    if(XIA_PAINT_ANNO(p_in) == UNREACHABLE) { // need to send a DESTINATION XID UNREACHABLE MESSAGE
 	    if(hdr.nxt() == CLICK_XIA_NXT_XCMP && ((unsigned char *)hdr.payload())[0] == 3) { // can't deliever an unreachable?
 		    // drop this packet to avoid infinite packet generation
 		    p_in->kill();
@@ -164,7 +164,7 @@ XCMP::push(int, Packet *p_in)
 		  click_chatter("%s: %u: Dest Unreachable sent to %s\n", _src_path.unparse().c_str(),Timestamp::now().usecval(), hdr.src_path().unparse().c_str());
       
 		// clear the paint
-		p->set_anno_u8(PAINT_ANNO_OFFSET,0);
+		SET_XIA_PAINT_ANNO(p, DESTINED_FOR_LOCALHOST);
 
 		// send this out to the network, kill the packet, and exit
 		output(0).push(encap.encap(p));
@@ -204,6 +204,8 @@ XCMP::push(int, Packet *p_in)
 		if(DEBUG)
             click_chatter("%s: %u: TIME EXCEEDED sent\n", _src_path.unparse().c_str(),Timestamp::now().usecval());
 		
+		SET_XIA_PAINT_ANNO(p, DESTINED_FOR_LOCALHOST);
+
 		// send the packet out, kill the original packet, and exit
 		output(0).push(encap.encap(p));
 		p_in->kill();
@@ -229,6 +231,11 @@ XCMP::push(int, Packet *p_in)
 	XID *newroute;
 	XIAHeader *badhdr;
 	
+
+	String re;
+	uint32_t uintip;
+	IPAddress *ip;
+	int i;
 
 	// what type is it?
     switch (*payload) {
@@ -266,8 +273,30 @@ XCMP::push(int, Packet *p_in)
 		encap.set_dst_path(hdr.src_path());
 		encap.set_src_path(_src_path);
 
+		// set the dst ip anno for arp
+		re = hdr.src_path().unparse();
+		
+
+		for(i = 0; i < strlen(re.c_str()); i++)
+		  if(re.c_str()[i] == 'H') break;
+
+		i=i+36; // get to IP part
+
+		sscanf(&re.c_str()[i], "%2x%2x%2x%2x", (((unsigned char*)&uintip)+0), (((unsigned char*)&uintip)+1), (((unsigned char*)&uintip)+2), (((unsigned char*)&uintip)+3));
+		ip = new IPAddress(uintip);
+
+		p->set_anno_u32(Packet::dst_ip_anno_offset, uintip);
+
+		//printf("XID = %s\n", hdr.src_path().unparse().c_str());
+		//printf("XID = %s\n", re.c_str());
+		//printf("XID = %s, IP=%s\n",&re.c_str()[i],ip->unparse().c_str());
+
+		//click_chatter("src = %s\n", hdr.src_path().unparse().c_str());
+
 		if(DEBUG)
 		    click_chatter("%s: %u: PONG sent; client seq = %u\n", _src_path.unparse().c_str(),Timestamp::now().usecval(), *(uint16_t*)(p->data() + 6));
+
+		SET_XIA_PAINT_ANNO(p, DESTINED_FOR_LOCALHOST);
 		
 		// send out the pong to the network
 		output(0).push(encap.encap(p));

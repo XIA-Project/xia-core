@@ -89,6 +89,10 @@
 /* Define if IPv6 support is enabled. */
 #define HAVE_IP6 1
 
+/* Define if XIA support is enabled. */
+#define HAVE_XIA 1
+//#undef HAVE_XIA
+
 /* Define if IPsec support is enabled. */
 #define HAVE_IPSEC 1
 

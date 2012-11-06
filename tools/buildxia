@@ -3,7 +3,7 @@
 
 XIADIR=$(dirname $(dirname $(cd ${0%/*} && echo $PWD/${0##*/})))
 
-cd $XIADIR/click-2.0
+cd $XIADIR/click
 ./conf_user_click.sh
 make -j8
 

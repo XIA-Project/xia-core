@@ -51,10 +51,10 @@ VISUALIZER_SERVER_DAEMONS="statsserver"
 XIADIR=$(dirname $(dirname $(cd ${0%/*} && echo $PWD/${0##*/})))
 
 # click parameters
-CLICKPATH=$XIADIR/click-2.0
+CLICKPATH=$XIADIR/click
 CONFPATH=$CLICKPATH/conf
 CLICK=$CLICKPATH/userlevel/click
-SCRIPT=xia_chain_topology_socket_reliable_test.click
+SCRIPT=xia_local_topology.click
 SCRIPT_SET=0
 
 
@@ -376,8 +376,6 @@ if [ $SCRIPT_SET -eq 0 ]; then
 		else
 			SCRIPT=dual_stack_router.click
 		fi
-	else
-		SCRIPT=xia_chain_topology_socket_reliable_test.click
 	fi
 fi
 	
