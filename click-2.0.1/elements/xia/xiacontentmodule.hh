@@ -129,7 +129,7 @@ class XIAContentModule {
 
     //modify routing table
     void addRoute(const XID &cid) {
-	String cmd=cid.unparse()+" 4";
+	String cmd=cid.unparse() + " " + String(DESTINED_FOR_LOCALHOST);
 	click_chatter("Add route %s", cid.unparse().c_str());
 	HandlerCall::call_write(_routeTable, "add", cmd);
     } 
