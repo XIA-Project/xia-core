@@ -164,13 +164,13 @@ XIAXIDTypeCounter::match(Packet *p)
     */
 
     struct click_xia_xid __dstID =  hdr->node[hdr->dnode - 1].xid;
-    uint32_t dst_xid_type = __dstID.type;
+    uint32_t dst_xid_type = ntohl(__dstID.type);
     struct click_xia_xid __srcID = hdr->node[hdr->dnode + hdr->snode - 1].xid;
-    uint32_t src_xid_type = __srcID.type;
+    uint32_t src_xid_type = ntohl(__srcID.type);
 #if 0
     // hack to the hack. Filter out weird xid types so the following code doesn't smash the stack
     // for some reason we get garbage data periodically that causes the XID constructor to fail
-    if (ntohl(__srcID.type > CLICK_XIA_XID_TYPE_IP) || ntohl(__dstID.type > CLICK_XIA_XID_TYPE_IP))
+    if (src_xid_type > CLICK_XIA_XID_TYPE_IP || dst_xid_type > CLICK_XIA_XID_TYPE_IP)
 	return -1;
 
 //    printf ("%08x %08x\n", ntohl(__dstID.type), ntohl(__srcID.type));

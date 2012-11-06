@@ -46,6 +46,7 @@ XIAPrint::configure(Vector<String> &conf, ErrorHandler *errh)
     bool print_aggregate = false;
     bool bcontents;
     String channel;
+	verbosity = 0;
   
     if (cp_va_kparse(conf, this, errh,
 		   "LABEL", cpkP, cpString, &_label,
@@ -63,6 +64,7 @@ XIAPrint::configure(Vector<String> &conf, ErrorHandler *errh)
 		   "OUTFILE", 0, cpFilename, &_outfilename,
 #endif
 		   "CHANNEL", 0, cpWord, &channel,
+		   "VERBOSITY", 0, cpInteger, &verbosity,
 		   cpEnd) < 0)
 		return -1;
 
@@ -141,10 +143,66 @@ void XIAPrint::print_xids(StringAccum &sa, const struct click_xia *xiah)
     sa << ", DST " << dst.unparse(this);
 }
 
+bool
+XIAPrint::should_print(Packet *p)
+{
+    if (!_active || !p->has_network_header())
+		return 0;
+	
+	if (verbosity == 0) // print nothing
+		return 0;
+	else if (verbosity == 1) // print all but daemon traffic
+	{
+    	const struct click_xia* hdr = p->xia_header();
+
+    	/*
+    	if (p==NULL) return -1;
+    	if (!hdr) 
+    	    return -1;
+    	if (hdr->dnode == 0 || hdr->snode == 0)
+    	    return -1;
+    	*/
+
+    	struct click_xia_xid __dstID =  hdr->node[hdr->dnode - 1].xid;
+    	uint32_t dst_xid_type = ntohl(__dstID.type);
+    	struct click_xia_xid __srcID = hdr->node[hdr->dnode + hdr->snode - 1].xid;
+    	uint32_t src_xid_type = ntohl(__srcID.type);
+    	
+		// hack to the hack. Filter out weird xid types so the following code doesn't smash the stack
+    	// for some reason we get garbage data periodically that causes the XID constructor to fail
+    	if (dst_xid_type > CLICK_XIA_XID_TYPE_IP || src_xid_type > CLICK_XIA_XID_TYPE_IP)
+		return 1; // TODO: should we be printing these garbage packets?
+
+		//printf ("%08x %08x\n", ntohl(__dstID.type), ntohl(__srcID.type));
+
+    	XID dstXID(__dstID);
+    	XID srcXID(__srcID);
+
+    	const char *ss = srcXID.unparse().c_str();
+    	const char *ds = dstXID.unparse().c_str();
+
+    	// Hack: filtering out daemon traffic (e.g., xroute, xhcp, name-server)
+    	if (strcmp(ss, "SID:1110000000000000000000000000000000001111") == 0 ||
+    	    strcmp(ss, "SID:1110000000000000000000000000000000001112") == 0 ||
+    		strcmp(ss, "SID:1110000000000000000000000000000000001113") == 0 ||
+    		strcmp(ds, "SID:1110000000000000000000000000000000001111") == 0 ||
+    		strcmp(ds, "SID:1110000000000000000000000000000000001112") == 0 ||
+    		strcmp(ds, "SID:1110000000000000000000000000000000001113") == 0 ||
+    		strcmp(ds, "HID:1111111111111111111111111111111111111111") == 0) {
+    		return 0;
+    	}
+		else
+			return 1;
+
+	}
+	else if (verbosity >= 3) // print everything
+		return 1;
+}
+
 Packet *
 XIAPrint::simple_action(Packet *p)
 {
-    if (!_active || !p->has_network_header())
+	if (!should_print(p))
 		return p;
 
     StringAccum sa;
@@ -203,10 +261,50 @@ XIAPrint::simple_action(Packet *p)
     return p;
 }
 
+int
+XIAPrint::set_verbosity(int v)
+{
+	verbosity = v;
+	return 0;
+}
+
+int XIAPrint::get_verbosity()
+{
+	return verbosity;
+}
+
+String
+XIAPrint::read_handler(Element *e, void *thunk)
+{
+	XIAPrint *p = (XIAPrint *) e;
+    switch ((intptr_t)thunk) {
+		case VERBOSITY:
+			return String(p->get_verbosity());
+
+		default:
+			return "<error>";
+    }
+}
+
+int 
+XIAPrint::write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh)
+{
+	XIAPrint *p = (XIAPrint *) e;
+    switch ((intptr_t)thunk) {
+		case VERBOSITY:
+			return p->set_verbosity(atoi(str.c_str()));
+
+		default:
+			return -1;
+    }
+}
+
 void
 XIAPrint::add_handlers()
 {
     add_data_handlers("active", Handler::OP_READ | Handler::OP_WRITE | Handler::CHECKBOX | Handler::CALM, &_active);
+	add_write_handler("verbosity", write_handler, (void *)VERBOSITY);
+	add_read_handler("verbosity", read_handler, (void *)VERBOSITY);
 }
 
 CLICK_ENDDECLS

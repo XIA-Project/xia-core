@@ -11,7 +11,7 @@ SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XrequestChunk.c  \
 SHARED_OBJECTS=$(SOURCES:.c=.shared.o) xia.pb.shared.o
 STATIC_OBJECTS=$(SOURCES:.c=.o) xia.pb.o
 
-all: xia.pb.cc  libXsocket.a libXsocket.so
+all: xia.pb.cc  libXsocket.a libXsocket.so xwrap.so
 	make -C python all
 
 xia.pb.cc: xia.proto
@@ -31,6 +31,10 @@ libXsocket.a: $(STATIC_OBJECTS)
 
 libXsocket.so: $(SHARED_OBJECTS) 
 	$(LD) -shared -o $@ $(SHARED_OBJECTS) $(LDFLAGS) -lc  -l dl
+
+xwrap.so: xwrap.c
+	$(CC) -Wall -fPIC -DPIC -c $<
+	$(LD) -shared -o $@ xwrap.o -ldl
 
 doc: Xdoc.h $(SOURCES)
 	doxygen XsocketsAPI.cfg
