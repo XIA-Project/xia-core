@@ -43,6 +43,9 @@ class XIACache : public Element {
     XIAPath local_addr() { return _local_addr; };
     void add_handlers();
     static int write_param(const String &, Element *, void *vparam, ErrorHandler *);
+	static String read_handler(Element *e, void *thunk);
+	int set_malicious(int m);
+	int get_malicious();
 
   private:
     uint32_t _cid_type;
