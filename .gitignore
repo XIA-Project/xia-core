@@ -1,4 +1,6 @@
 # our things go here
+*.hd
+*.d
 *.o
 *.pyc
 core
