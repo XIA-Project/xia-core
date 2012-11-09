@@ -25,7 +25,7 @@
 #define TITLE "XIA Echo Server"
 
 #define MAX_XID_SIZE 100
-#define DAG  "RE %s %s %s"
+#define DAG  "RE ( %s ) %s %s %s"
 #define STREAM_NAME "www_s.stream_echo.aaa.xia"
 #define DGRAM_NAME "www_s.dgram_echo.aaa.xia"
 #define SID_STREAM  "SID:0f00000000000000000000000000000000000888"
@@ -44,11 +44,11 @@ int dgram = 1;
 **
 ** The dag should be free'd by the calling code when no longer needed
 */
-char *createDAG(const char *ad, const char *host, const char *service)
+char *createDAG(const char *fid, const char *ad, const char *host, const char *service)
 {
-	int len = snprintf(NULL, 0, DAG, ad, host, service) + 1;
+	int len = snprintf(NULL, 0, DAG, fid, ad, host, service) + 1;
 	char * dag = (char*)malloc(len);
-	sprintf(dag, DAG, ad, host, service);
+	sprintf(dag, DAG, fid, ad, host, service);
 	return dag;
 }
 
@@ -228,7 +228,7 @@ void echo_stream()
     if ( XreadLocalHostAddr(acceptor, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
     	die(-1, "Reading localhost address\n");
 
-	if (!(dag = createDAG(myAD, myHID, SID_STREAM)))
+	if (!(dag = createDAG(my4ID, myAD, myHID, SID_STREAM)))
 		die(-1, "unable to create DAG: %s\n", dag);
 	say("Created DAG: \n%s\n", dag);
 
@@ -294,7 +294,7 @@ void echo_dgram()
     if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
     	die(-1, "Reading localhost address\n");
 
-	if (!(dag = createDAG(myAD, myHID, SID_DGRAM)))
+	if (!(dag = createDAG(my4ID, myAD, myHID, SID_DGRAM)))
 		die(-1, "unable to create DAG: %s\n", dag);
 	say("Created DAG: \n%s\n", dag);
 

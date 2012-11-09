@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import math
 import socket
 import sys
 import struct
@@ -45,8 +46,12 @@ def serveHTTPRequest(request, sock):
         http_msg_type = "HTTP/1.1 404 Not Found\n"
 
     # Send response
-    response = http_msg_type + http_header + response_data
-    Xsend(sock, response, 0)
+    response = http_msg_type + http_header + response_data + 'DONEDONEDONE'
+    last_sent = 0
+    while last_sent < len(response):
+        base = last_sent
+        last_sent = min(len(response), last_sent + 800)
+        Xsend(sock, response[base:last_sent], 0)
 
 
 # Chunk and publish all files in the local www directory.
@@ -76,7 +81,7 @@ def put_content_in_dir(dir):
     for root, dirs, files in os.walk(dir):
         for file in files:
             if link_files_type_order.count(os.path.splitext(file)[1]) == 0 and link_files_type_order.count(os.path.splitext(file)[1][:-4]) == 0:
-                cids_by_filename[os.path.join(root,file)] = XputFile(chunk_context, os.path.join(root, file), XIA_MAXBUF)
+                cids_by_filename[os.path.join(root,file)] = XputFile(chunk_context, os.path.join(root, file), 1000)
             else:
                 files_with_links.append(os.path.join(root, file))
 
@@ -126,7 +131,7 @@ def put_content_in_dir(dir):
                         fnew.closed
                         
                         # publish the modified HTML file
-                        cids_by_filename_to_add[os.path.join(root,file)] = XputFile(chunk_context, os.path.join(root, file+'TEMP'), 0)
+                        cids_by_filename_to_add[os.path.join(root,file)] = XputFile(chunk_context, os.path.join(root, file+'TEMP'), 1000)
                         os.remove(os.path.join(root, file+'TEMP'))
                     orig_html_file.closed
         cids_by_filename = dict(cids_by_filename.items() + cids_by_filename_to_add.items());
