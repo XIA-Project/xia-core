@@ -381,3 +381,45 @@ elementclass XIAEndHost {
 	input -> xlc :: XIALineCard($local_addr, $local_hid, $mac, 0) -> output;
 	xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> xrc;
 };
+
+// Endhost node with XRoute process running and IP support
+elementclass XIADualEndhost {
+    $local_addr, $local_ad, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, 
+	$ip_active0, $ip0, $mac0, $gw0,
+	$malicious_cache |
+
+	// NOTE: This router assumes that each port is connected to *either* an XIA network *or* an IP network.
+	// If port 0 is connected to an IP network and is asked to send an XIA packet (e.g., a broadcast), the
+	// packet will be dropped, and vice-versa. HOWEVER, incoming packets are currently not filtered. So,
+	// if an XIA packet somehow arrives on an IP port, it will be processed as normal.
+
+    // $local_addr: the full address of the node
+	// $local_ad: the node's AD
+	// $local_hid: the node's HID
+    // $external_ip: the node's IP address (given to XHCP to give to connected hosts)  TODO: should eventually use all 4 individual external IPs
+	// $fake: the fake interface apps use to communicate with this click element
+	// $CLICK_IP: 
+	// $API_IP: 
+	// $ether_addr:
+	// $ip_activeNUM:  1 = port NUM is connected to an IP network;  0 = port NUM is connected to an XIA network
+	// $ipNUM:  port NUM's IP address (if port NUM isn't connected to IP, this doesn't matter)
+	// $macNUM:  port NUM's MAC address (if port NUM isn't connected to IP, this doesn't matter)
+	// $gwNUM:  port NUM's gateway router's IP address (if port NUM isn't connected to IP, this doesn't matter)
+	// $malicious_cache: if set to 1, the content cache responds with bad content
+
+    // input[0]: a packet arrived at the node
+    // output[0]: forward to interface 0
+    
+	xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, 4, $malicious_cache, 1);    
+
+
+    Script(write xrc/n/proc/rt_AD.add $local_ad $DESTINED_FOR_LOCALHOST);    // self AD as destination
+    Script(write xrc/n/proc/rt_IP.add IP:$ip0 $DESTINED_FOR_LOCALHOST);  // self as destination for interface 0's IP addr
+    Script(write xrc/n/proc/rt_IP.add - 3); 	// default route for IPv4     TODO: Need real routes somehow
+
+    
+	dlc0 :: XIADualLineCard($local_addr, $local_hid, $mac0, 0, $ip0, $gw0, $ip_active0);
+    
+    input -> dlc0 -> output;
+	xrc -> XIAPaintSwitch[0] => [1]dlc0[1] -> xrc;
+};
