@@ -23,7 +23,7 @@ xia.pb.shared.o:
 %.o: %.c X*.h xia.pb.cc xia.pb.h
 	$(CC) $(CFLAGS) $(LDFLAGS)  $<  -o $@
 
-%.shared.o: %.c X*.h  xia.pb.cc xia.pb.h
+%.shared.o: %.c X*.h  xia.pb.cc
 	$(CC) $(CFLAGS) -fpic $<  -o $@
 
 libXsocket.a: $(STATIC_OBJECTS) 
