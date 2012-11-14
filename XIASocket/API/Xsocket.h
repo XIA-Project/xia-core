@@ -110,7 +110,7 @@ extern int Xsendto(int sockfd,const void *buf, size_t len, int flags, const char
 extern int Xrecvfrom(int sockfd,void *rbuf, size_t len, int flags, char * sDAG, size_t *dlen);
 extern int Xsocket(int transport_type);
 extern int Xconnect(int sockfd, const char* dDAG);
-extern int Xbind(int sockfd, char* SID);
+extern int Xbind(int sockfd, const char* SID);
 extern int Xclose(int sock);
 extern int Xrecv(int sockfd, void *rbuf, size_t len, int flags);
 extern int Xsend(int sockfd, const void *buf, size_t len, int flags);

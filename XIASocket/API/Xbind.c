@@ -43,7 +43,7 @@
 ** @returns -1 on error with errno set to an error compatible with those
 ** retuned by the standard bind call.
 */
-int Xbind(int sockfd, char* sDAG)
+int Xbind(int sockfd, const char* sDAG)
 {
 	xia::XSocketCallType type;
 	int rc;
