@@ -4,8 +4,10 @@
 #include <click/ipaddress.hh>
 #include <click/glue.hh>
 #include <click/timestamp.hh>
+#if HAVE_XIA
 #include <clicknet/xia.h>
 #include <click/xid.hh>
+#endif
 #if CLICK_LINUXMODULE
 # include <click/skbmgr.hh>
 #else
@@ -20,7 +22,9 @@
 #if (CLICK_USERLEVEL || CLICK_NS) && (!HAVE_MULTITHREAD || HAVE___THREAD_STORAGE_CLASS)
 # define HAVE_CLICK_PACKET_POOL 1
 #endif
+#if HAVE_XIA
 struct click_xia;
+#endif
 struct click_ether;
 struct click_ip;
 struct click_icmp;
@@ -290,8 +294,10 @@ class Packet { public:
     inline void set_ip6_header(const click_ip6 *ip6h);
     inline void set_ip6_header(const click_ip6 *ip6h, uint32_t len);
 
+	#if HAVE_XIA
     inline void set_xia_header(const click_xia *xiah, uint32_t len);
     inline const click_xia *xia_header() const;
+	#endif
 
     inline const click_icmp *icmp_header() const;
     inline const click_tcp *tcp_header() const;
@@ -315,7 +321,11 @@ class Packet { public:
     //@{
 
     enum {
-	anno_size = 80			///< Size of annotation area.
+	#if HAVE_XIA
+	anno_size = 82			///< Size of annotation area.
+	#else
+	anno_size = 48			///< Size of annotation area.
+	#endif
     };
 
     /** @brief Return the timestamp annotation. */
@@ -390,10 +400,16 @@ class Packet { public:
 
     enum {
 	dst_ip_anno_offset = 0, dst_ip_anno_size = 4,
+#if HAVE_XIA
 	dst_ip6_anno_offset = 0, dst_ip6_anno_size = 16,
 	nexthop_neighbor_xid_anno_offset = 56, nexthop_neighbor_xid_anno_size = 24
+#else
+	dst_ip6_anno_offset = 0, dst_ip6_anno_size = 16
+#endif
     };
+    
 
+#if HAVE_XIA
     /** @brief Return the nexthop_neighbor_xid annotation.
      *
      * The value is taken from the address annotation area. */
@@ -403,6 +419,7 @@ class Packet { public:
      *
      * The value is stored in the address annotation area. */
     inline void set_nexthop_neighbor_xid_anno(XID x);
+#endif
 
     /** @brief Return the destination IPv4 address annotation.
      *
@@ -768,7 +785,9 @@ class WritablePacket : public Packet { public:
     inline click_ip *ip_header() const;
     inline click_ip6 *ip6_header() const;
     inline unsigned char *transport_header() const;
+#if HAVE_XIA
     inline click_xia *xia_header() const;
+#endif
     inline click_icmp *icmp_header() const;
     inline click_tcp *tcp_header() const;
     inline click_udp *udp_header() const;
@@ -1150,6 +1169,7 @@ Packet::ether_header() const
     return reinterpret_cast<const click_ether *>(mac_header());
 }
 
+#if HAVE_XIA
 /** @brief Return the packet's network header pointer as XIA header.
  * @invariant (void *) xia_header() == (void *) network_header()
  * @warning Not useful if !has_network_header().
@@ -1159,6 +1179,7 @@ Packet::xia_header() const
 {
     return reinterpret_cast<const click_xia *>(network_header());
 }
+#endif
 
 /** @brief Return the packet's network header pointer as IPv4.
  * @invariant (void *) ip_header() == (void *) network_header()
@@ -1724,6 +1745,7 @@ Packet::change_headroom_and_length(uint32_t headroom, uint32_t length)
 }
 #endif
 
+#if HAVE_XIA  
 inline XID
 Packet::nexthop_neighbor_xid_anno() const
 {
@@ -1748,6 +1770,7 @@ Packet::set_nexthop_neighbor_xid_anno(XID x)
     	xanno()->u8[nexthop_neighbor_xid_anno_offset + 4 + d] = xid_temp.id[d];
     }
 }
+#endif
 
 inline IPAddress
 Packet::dst_ip_anno() const
@@ -1897,6 +1920,7 @@ Packet::set_network_header_length(uint32_t len)
 #endif
 }
 
+#if HAVE_XIA
 /** @brief Set the network header pointer to an XIA header.
  * @param xiah new XIA header pointer
  * @param len new XIA header length in bytes
@@ -1908,6 +1932,7 @@ Packet::set_xia_header(const click_xia *xiah, uint32_t len)
 {
     set_network_header(reinterpret_cast<const unsigned char *>(xiah), len);
 }
+#endif
 
 /** @brief Set the network header pointer to an IPv4 header.
  * @param iph new IP header pointer
@@ -2418,11 +2443,13 @@ WritablePacket::ip6_header() const
     return const_cast<click_ip6 *>(Packet::ip6_header());
 }
 
+#if HAVE_XIA
 inline click_xia *
 WritablePacket::xia_header() const
 {
     return const_cast<click_xia *>(Packet::xia_header());
 }
+#endif
 
 inline click_icmp *
 WritablePacket::icmp_header() const

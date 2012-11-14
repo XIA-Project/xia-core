@@ -28,6 +28,15 @@ so use the XIACheckDest element before using this element.
 =a StaticIPLookup, IPRouteTable
 */
 
+#define TOTAL_SPECIAL_CASES 8
+#define DESTINED_FOR_DISCARD -1
+#define DESTINED_FOR_LOCALHOST -2
+#define DESTINED_FOR_DHCP -3
+#define DESTINED_FOR_BROADCAST -4
+#define REDIRECT -5
+#define UNREACHABLE -6
+#define FALLBACK -7
+
 typedef struct {
 	int	port;
 	unsigned flags;
@@ -65,10 +74,10 @@ private:
 	XIARouteData _rtdata;
     uint32_t _drops;
 
+    int _num_ports;
     XIAPath _local_addr;
     XID _local_hid;
     XID _bcast_xid;
-    int _redirect_port, _bcast_port, _my_port;
 };
 
 CLICK_ENDDECLS

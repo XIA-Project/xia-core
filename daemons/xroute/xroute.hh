@@ -5,7 +5,7 @@
 #include <arpa/inet.h>
 #include <string>
 #include <vector>
-#include "XIARouter.hh"
+#include "../common/XIARouter.hh"
 
 #include <sys/types.h>
 #include <netdb.h>

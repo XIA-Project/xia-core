@@ -92,7 +92,6 @@ class XIAContentModule {
     void process_request(Packet *p, const XID &, const XID &);
 
 	int malicious; // Respond to CID requests with bad data if set to 1
-	int malicious_this_time; // So we can alternate between sending bad content and not
 
     protected:
     void cache_incoming_local(Packet *p, const XID& srcCID, bool local_putcid);
@@ -130,7 +129,7 @@ class XIAContentModule {
 
     //modify routing table
     void addRoute(const XID &cid) {
-	String cmd=cid.unparse()+" 4";
+	String cmd=cid.unparse() + " " + String(DESTINED_FOR_LOCALHOST);
 	click_chatter("Add route %s", cid.unparse().c_str());
 	HandlerCall::call_write(_routeTable, "add", cmd);
     } 

@@ -60,7 +60,7 @@ def recv_with_timeout(sock, timeout=5, transport_proto=XSP):
     	return reply, reply_dag
     
     
-def readcid_with_timeout(sock, cid, timeout=5):
+def readcid_with_timeout(sock, cid, timeout=0.1):
     # Receive data
     start_time = time.time()   # current time in seconds since the epoch
     received_data = False
@@ -83,8 +83,10 @@ def readcid_with_timeout(sock, cid, timeout=5):
         Xclose(sock)
         sys.exit()
 
-    if (not received_data):
-        print "Recieved nothing"
+    if (not received_data):  # TIMEOUT
+        print "%s: Recieved nothing; requesting retransmit" % time.time()
+        XrequestChunk(sock, cid)
+        return readcid_with_timeout(sock, cid)
         raise IOError
 
     return reply
@@ -301,7 +303,10 @@ def send_sid_request(ddag, payload, browser_socket, transport_proto=XSP):
     # Receive reply and close socket
     try:
         if transport_proto == XSP:
-            reply = recv_with_timeout(sock) # Use default timeout
+            reply = ''
+            while reply.find('DONEDONEDONE') < 0:
+                reply += recv_with_timeout(sock) # Use default timeout
+            reply = reply.split('DONEDONEDONE')[0]
         elif transport_proto == XDP:
             (reply, reply_dag) = recv_with_timeout(sock, 5, XDP)
     except IOError:

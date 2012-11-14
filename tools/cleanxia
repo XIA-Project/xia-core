@@ -1,29 +1,27 @@
 #!/bin/sh
-# build all of the XIA components
+# clean all of the XIA components
 
 XIADIR=$(dirname $(dirname $(cd ${0%/*} && echo $PWD/${0##*/})))
 
 cd $XIADIR/click
-./conf_user_click.sh
-make -j8
+make clean
 
 cd $XIADIR/XIASocket/API
-make
+make clean
 
 cd $XIADIR/XIASocket/sample
-make
+make clean
 
 cd $XIADIR/example
-make
+make clean
 
 cd $XIADIR/daemons/xroute
-make
+make clean
 
 cd $XIADIR/daemons/xhcp
-make
+make clean
 
 cd $XIADIR/daemons/nameserver
-make
+make clean
 
 cd $XIADIR
-

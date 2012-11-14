@@ -105,15 +105,23 @@ class XIAPrint : public Element { public:
     bool _print_aggregate : 1;
     bool _payload : 1;		// '_contents' refers to payload
     unsigned _contents : 2;	// Whether to dump packet contents
+	int verbosity;
   
 #if CLICK_USERLEVEL
     String _outfilename;
     FILE *_outfile;
 #endif
 
+	int set_verbosity(int v);
+	int get_verbosity();
+	bool should_print(Packet *p);
+
     ErrorHandler *_errh;
 
+	enum{VERBOSITY};
     void print_xids(StringAccum &sa, const struct click_xia *xiah);
+	static int write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh);
+    static String read_handler(Element *e, void *thunk);
 };
 
 CLICK_ENDDECLS

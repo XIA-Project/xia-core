@@ -1,6 +1,0 @@
-1. How to compile and run userlevel click
-
-./conf_user_click.sh
-make -j8
-./userlevel/click <configration_file_of_your_choice>
-
