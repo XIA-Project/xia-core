@@ -49,5 +49,8 @@ int isConnected(int sock);
 int setConnected(int sock, int conn);
 int getSocketData(int sock, char *buf, unsigned bufLen);
 void setSocketData(int sock, const char *buf, unsigned bufLen);
-
+void setWrapped(int sock, int wrapped);
+int isWrapped(int sock);
+void setAsync(int sock, int async);
+int isAsync(int sock);
 #endif

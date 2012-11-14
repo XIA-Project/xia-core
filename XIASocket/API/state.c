@@ -43,9 +43,17 @@ public:
 	int isConnected() { return m_connected; };
 	void setConnected(int conn) { m_connected = conn; };
 
+	int isWrapped() { return m_wrapped; };
+	void setWrapped(int wrapped) { m_wrapped = wrapped; };
+
+	int isAsync() { return m_async; };
+	void setAsync(int async) { m_async = async; };
+
 private:
 	int m_transportType;
 	int m_connected;
+	int m_async;
+	int m_wrapped;	// hack for dealing with xwrap stuff
 	char *m_buf;
 	unsigned m_bufLen;
 };
@@ -55,6 +63,8 @@ SocketState::SocketState(int tt)
 	::SocketState();
 	m_transportType = tt;
 	m_connected = 0;
+	m_async = 0;
+	m_wrapped = 0;
 	m_buf = (char *)0;
 	m_bufLen = 0;
 }
@@ -63,6 +73,8 @@ SocketState::SocketState()
 {
 	m_transportType = -1;
 	m_connected = 0;
+	m_async = 0;
+	m_wrapped = 0;
 	m_buf = (char *)0;
 	m_bufLen = 0;
 }
@@ -225,6 +237,39 @@ void setConnected(int sock, int conn)
 	if (sstate)
 		sstate->setConnected(conn);
 }
+
+int isWrapped(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		return sstate->isWrapped();
+	else
+		return 0;
+}
+
+void setWrapped(int sock, int wrapped)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		sstate->setWrapped(wrapped);
+}
+
+int isAsync(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		return sstate->isAsync();
+	else
+		return 0;
+}
+
+void setAsync(int sock, int async)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		sstate->setAsync(async);
+}
+
 
 void setSocketType(int sock, int tt)
 {
