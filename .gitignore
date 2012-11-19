@@ -59,6 +59,7 @@ click-2.0.1/tools/click2xml/xml2click
 click-2.0.1/userlevel/elements.cc
 click-2.0.1/userlevel/elements.conf
 click-2.0.1/userlevel/elements.mk
+click-2.0.1/userlevel/click
 daemons/nameserver/xnameservice
 daemons/xhcp/xhcp_clientd
 daemons/xhcp/xhcp_serverd
@@ -74,3 +75,7 @@ example/tods
 example/xcmpping
 example/xcmptraceroute
 example/xecho
+
+# output from scripts
+tools/click_templates/xia_address.click
+tools/click_templates/host.click
