@@ -50,7 +50,8 @@ elementclass XIAPacketRoute {
     input -> consider_first_path :: XIASelectPath(first);
 
     // arrived at the final destination or reiterate paths with new last pointer
-    check_dest :: XIACheckDest() => [1]output, consider_first_path;
+    check_dest :: XIACheckDest() -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [1]output
+	check_dest[1] -> consider_first_path;
 
 	consider_next_path :: XIASelectPath(next);
     consider_first_path => c, [2]output;
@@ -65,7 +66,8 @@ elementclass XIAPacketRoute {
     c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, [2]output;
 		
     rt_AD[0], rt_HID[0], rt_SID[0], rt_CID[0], rt_IP[0] -> GPRP;		
-    rt_AD[1], rt_HID[1], rt_SID[1], rt_CID[1], rt_IP[1] -> XIANextHop -> check_dest;
+    rt_AD[1], rt_HID[1], 			rt_CID[1], rt_IP[1] -> XIANextHop -> check_dest;
+			  			 rt_SID[1]			   			-> XIANextHop -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [1]output;
     rt_AD[2], rt_HID[2], rt_SID[2], rt_CID[2], rt_IP[2] -> consider_next_path;
 	rt_AD[3], rt_HID[3],            rt_CID[3], rt_IP[3] -> Discard;
 			  			 rt_SID[3]                      -> [3]output;
@@ -224,6 +226,7 @@ elementclass XIARoutingCore {
 
     Script(write n/proc/rt_HID.add $local_hid $DESTINED_FOR_LOCALHOST);  // self RHID as destination
     Script(write n/proc/rt_HID.add BHID $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
+	Script(write n/proc/rt_HID.add - $FALLBACK);
     Script(write n/proc/rt_AD.add - $FALLBACK);     // no default route for AD; consider other path
     Script(write n/proc/rt_SID.add - $FALLBACK);     // no default route for SID; consider other path
     Script(write n/proc/rt_CID.add - $FALLBACK);     // no default route for CID; consider other path
@@ -375,7 +378,6 @@ elementclass XIAEndHost {
 	xrc :: XIARoutingCore($local_addr, $local_hid, 0.0.0.0, $fake, $CLICK_IP, $API_IP, $ether_addr, 1, 0, 0);
 
     Script(write xrc/n/proc/rt_AD.add - 0);      // default route for AD
-    Script(write xrc/n/proc/rt_HID.add - 0);     // default route for HID
     Script(write xrc/n/proc/rt_IP.add - 0); 	// default route for IPv4    
     
 	input -> xlc :: XIALineCard($local_addr, $local_hid, $mac, 0) -> output;
