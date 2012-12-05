@@ -523,7 +523,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 	//Extract the SID/CID
 	XIAHeader xiah(p_in->xia_header());
 	XIAPath dst_path = xiah.dst_path();
-	XID	_destination_xid = dst_path.xid(dst_path.destination_node());
+	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
 	//TODO:In case of stream use source AND destination XID to find port, if not found use source. No TCP like protocol exists though
 	//TODO:pass dag back to recvfrom. But what format?
 

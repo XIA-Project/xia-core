@@ -401,12 +401,20 @@ XIAXIDRouteTable::push(int in_ether_port, Packet *p)
 	  // ports 4 and 5 are "local" and "discard" so we shouldn't send a redirect in that case
 	  Packet *q = p->clone();
 	  SET_XIA_PAINT_ANNO(q, (XIA_PAINT_ANNO(q)+TOTAL_SPECIAL_CASES)*-1);
-	  output(DESTINED_FOR_LOCALHOST).push(q); // This is not right....
+	  assert(0);
+	  output(1).push(q); // This is not right....
     }
-	SET_XIA_PAINT_ANNO(p,port);
-    if (port >= 0) output(0).push(p);
-	else if (port == DESTINED_FOR_LOCALHOST) output(1).push(p);
-	else if (port == DESTINED_FOR_DHCP) output(3).push(p);
+    if (port >= 0) {
+	  SET_XIA_PAINT_ANNO(p,port);
+	  output(0).push(p);
+	}
+	else if (port == DESTINED_FOR_LOCALHOST) {
+	  output(1).push(p);
+	}
+	else if (port == DESTINED_FOR_DHCP) {
+	  SET_XIA_PAINT_ANNO(p,port);
+	  output(3).push(p);
+	}
 	else if (port == DESTINED_FOR_BROADCAST) {
 	  for(int i = 0; i <= _num_ports; i++) {
 		Packet *q = p->clone();
@@ -417,7 +425,8 @@ XIAXIDRouteTable::push(int in_ether_port, Packet *p)
 	  p->kill();
 	}
 	else {
-	  SET_XIA_PAINT_ANNO(p,UNREACHABLE);
+	  //SET_XIA_PAINT_ANNO(p,UNREACHABLE);
+
 	  //p->set_anno_u8(PAINT_ANNO_OFFSET,UNREACHABLE);
 
         // no match -- discard packet
@@ -518,7 +527,9 @@ XIAXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
 			  }
     		return DESTINED_FOR_LOCALHOST;
     	}    	
-       return 0;
+		// TODO: not sure what this should be??
+		assert(0);
+		return DESTINED_FOR_LOCALHOST; 
     
     } else {
     	// Unicast packet
@@ -527,7 +538,7 @@ XIAXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
 		{
 			XIARouteData *xrd = (*it).second;
 			// check if outgoing packet
-			if(xrd->port != 4 && xrd->port != 5 && xrd->nexthop != NULL) {
+			if(xrd->port != DESTINED_FOR_LOCALHOST && xrd->port != FALLBACK && xrd->nexthop != NULL) {
 				p->set_nexthop_neighbor_xid_anno(*(xrd->nexthop));
 			}
 			return xrd->port;
@@ -536,7 +547,7 @@ XIAXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
 		{
 			// no match -- use default route
 			// check if outgoing packet
-			if(_rtdata.port != 4 && _rtdata.port != 5 && _rtdata.nexthop != NULL) {
+			if(_rtdata.port != DESTINED_FOR_LOCALHOST && _rtdata.port != FALLBACK && _rtdata.nexthop != NULL) {
 				p->set_nexthop_neighbor_xid_anno(*(_rtdata.nexthop));
 			}			
 			return _rtdata.port;

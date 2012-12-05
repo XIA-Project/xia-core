@@ -205,10 +205,6 @@ int main(int argc, char *argv[]) {
 			// update AD (default entry)
 			if ((rc = xr.setRoute(default_AD, 0, gwRHID, 0xffff)) != 0)
 				printf("error setting route %d\n", rc);			
-			
-			// update HID table (default entry)
-			if ((rc = xr.setRoute(default_HID, 0, gwRHID, 0xffff)) != 0)
-				printf("error setting route %d\n", rc);	
 				
 			// update 4ID table (default entry)
 			if ((rc = xr.setRoute(default_4ID, 0, gwRHID, 0xffff)) != 0)
