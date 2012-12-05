@@ -15,7 +15,6 @@
 /*
 ** FIXME:
 ** - why is xia_socket_msg in the class definition and not a local variable?
-** - should control channel return data go on the control port instead of data?
 ** - implement a backoff delay on retransmits so we don't flood the connection
 ** - fix cid header size issue so we work correctly with the linux version
 ** - migrate from uisng printf and click_chatter to using the click ErrorHandler class
@@ -233,13 +232,20 @@ XTRANSPORT::run_timer(Timer *timer)
 				portToActive.set(_sport, false);
 
 				//XID source_xid = portToDAGinfo.get(_sport).xid;
-				// FIXME - the followin line can have a null pointer error!
-				XID source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
-				if (!daginfo->isAcceptSocket) {
 
-					//click_chatter("deleting route %s from port %d\n", source_xid.unparse().c_str(), _sport);
-					delRoute(source_xid);
-					XIDtoPort.erase(source_xid);
+				// this check for -1 prevents a segfault cause by bad XIDs
+				// it may happen in other cases, but opening a XSOCK_STREAM socket, calling
+				// XreadLocalHostAddr and then closing the socket without doing anything else will
+				// cause the problem
+				// TODO: make sure that -1 is the only condition that will cause us to get a bad XID
+				if (daginfo->src_path.destination_node() != -1) {
+					XID source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+					if (!daginfo->isAcceptSocket) {
+
+						//click_chatter("deleting route %s from port %d\n", source_xid.unparse().c_str(), _sport);
+						delRoute(source_xid);
+						XIDtoPort.erase(source_xid);
+					}
 				}
 
 				portToDAGinfo.erase(_sport);
