@@ -54,7 +54,7 @@ extern "C" {
 #define READY_TO_READ 0x00000004
 #define INVALID_HASH 0x00000008
 
-/* Cache policy */
+// Cache policy
 #define POLICY_LRU				0x00000001
 #define POLICY_FIFO				0x00000002
 #define POLICY_REMOVE_ON_EXIT	0x00001000
@@ -86,6 +86,24 @@ typedef struct {
 	size_t cidLen; 
 	int status; // 1: ready to be read, 0: waiting for chunk response, -1: failed
 } ChunkStatus;
+
+
+// XIA specific addrinfo flags
+#define XAI_DAGHOST	AI_NUMERICHOST	// if set, name is a dag instead of a generic name string
+#define XAI_XIDSERV	AI_NUMERICSERV	// if set, service is an XID instead of a name string
+#define XAI_FALLBACK 0x1000 		// if set, wrap the dag in parens
+
+
+// XIA specific getaddrinfo error codes (move to xia.h)
+#define XEAI_UNIMPLEMENTED	-8000
+
+#define SX_DAG_SIZE	1016	// lets the entire sockaddr_x struct fit in 1K
+typedef struct {
+	u_int16_t sx_family;
+	size_t    sx_size;
+	char      sx_dag[SX_DAG_SIZE];
+} sockaddr_x;
+
 
 // Xsetsockopt options
 #define XOPT_HLIM		1	// Hop Limit TTL
@@ -149,6 +167,12 @@ extern int XisDualStackRouter(int sockfd);
 
 extern int Xgetpeername(int sockfd, char *dag, size_t *len);
 extern int Xgetsockname(int sockfd, char *dag, size_t *len);
+
+extern int Xgetaddrinfo(const char *, const char *, const struct addrinfo *, struct addrinfo **);
+extern void Xfreeaddrinfo(struct addrinfo *);
+extern const char *Xgai_strerror(int);
+extern int checkXid(const char *xid, const char *type);
+extern int checkDag(const char *dag);
 
 #ifdef __cplusplus
 }

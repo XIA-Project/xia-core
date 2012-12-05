@@ -25,6 +25,8 @@
 #define CONTROL 1
 #define DATA 2
 
+#define XID_SIZE 40
+
 
 int validateSocket(int sock, int stype, int err)
 {
@@ -149,4 +151,109 @@ int click_reply2(int sockfd, xia::XSocketCallType *type)
 		errno = msg->err_code();
 
 	return rc;
+}
+
+int checkXid(const char *xid, const char *type)
+{
+	const char *p;
+	const char *colon = NULL;
+	int rc = 0;
+
+	if (type && strlen(type) > 0) {
+		if (strncmp(xid, type, strlen(type)) != 0)
+			return 0;
+	}
+
+	for (p = xid; *p; p++) {
+		if (*p == ':') {
+
+			if (colon) {
+				// FAIL, we already found one
+				break;
+			}
+			if (p == xid) {
+				// FAIL, colon is first character
+				break;
+			}
+			colon = p;
+
+		} else if (colon) {
+			if (!isxdigit(*p)) {
+				// FAIL, the hash string is invalid
+				break;
+			}
+
+		} else if (!isalnum(*p)) {
+			// FAIL, the XID type is invalid
+			break;
+		}
+	}
+
+	if (colon && (p - colon - 1 == XID_SIZE))
+		rc = 1;
+
+	return rc;
+}
+
+// currently this expects the DAG to be in RE ... format
+// may need to make it smarter later
+int checkDag(const char *dag)
+{
+	int valid = 1;
+	int fallback = 0;
+	int inXid = 0;
+	char *xid = NULL;
+
+	if (strncmp(dag, "RE ", 3) != 0)
+		return 0;
+
+	// make a copy so we can step on it
+	char *buf = strdup(dag);
+	char *p = buf + 3;
+
+	while (*p != '\0') {
+
+		if (*p == ' ') {
+			if (inXid) {
+				*p = 0;
+				if (!checkXid(xid, NULL)) {
+					valid = 0;
+					break;
+				}
+				inXid = 0;
+			}
+
+		} else if (*p == '(') {
+			// parens need a space or nul on either side
+			if ((*(p-1) != ' ' && *(p-1) != '\0') || (*(p+1) != ' ' && *(p+1) != '\0')) {
+				valid = 0;
+				break;
+			}
+			fallback++;
+
+		} else if (*p == ')') {
+			// parens need a space on either side
+			if ((*(p-1) != ' ' && *(p-1) != '\0') || (*(p+1) != ' ' && *(p+1) != '\0')) {
+				valid = 0;
+				break;
+			}
+			fallback--;
+
+		} else if (!inXid) {
+			inXid = 1;
+			xid = p;
+		}
+
+		p++;
+	}
+
+	if (fallback != 0) {
+		valid = 0;
+
+	} else  if (inXid) {
+		valid = checkXid(xid, NULL);
+	}
+
+	free(buf);
+	return valid;
 }

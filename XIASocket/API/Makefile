@@ -1,11 +1,11 @@
-.PHONY: clean doc
+.PHONY: clean doc test
 CC=g++
 LD=g++
 CFLAGS=-c -Wall -Wextra -I../minini
 LDFLAGS =-lprotobuf
 SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XrequestChunk.c  \
 		XgetChunkStatus.c  XreadChunk.c  XputChunk.c Xrecv.c \
-        Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c   \
+        Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c  Xgetaddrinfo.c \
 		Xsetsockopt.c Xutil.c state.c Xinit.c XupdateAD.c XupdateNameServerDAG.c XgetDAGbyName.c  \
 		../minini/minIni.c 
 SHARED_OBJECTS=$(SOURCES:.c=.shared.o) xia.pb.shared.o
@@ -40,8 +40,12 @@ doc: Xdoc.h $(SOURCES)
 	doxygen XsocketsAPI.cfg
 	make -C python doc
 
+test: libXsocket.so
+	make -C test test
+
 clean:
 	rm -f *.o *.a *.so *.shared.o xia.pb.*
 	rm -rf doc
 	make -C python clean
+	make -C test clean
 
