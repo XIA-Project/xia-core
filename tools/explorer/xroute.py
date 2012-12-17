@@ -436,7 +436,7 @@ class XrouteApp:
 	#
 	def portType(self, port):
 		pt = ""
-		if port == "4":
+		if port == "-2":
 			pt = " (self)"
 		elif port == "5":
 			pt = " (fallback)"
@@ -446,7 +446,7 @@ class XrouteApp:
 	# print the specified route table to stdout
 	#
 	def printTable(self, device, table):
-		tfmt = "%s/n/proc/rt_%s/rt.list"
+		tfmt = "%s/wrapped/xrc/n/proc/rt_%s.list"
 		data = self.readData(tfmt % (device, table))
 
 		text = ""
@@ -519,7 +519,7 @@ class XrouteApp:
 			# in case we were passed an alias, try to map to an xid
 			xid = self.config.getXID(xid)
 
-		cmd = "%s/n/proc/rt_%s/rt.remove %s" % (device, table, xid)
+		cmd = "%s/wrapped/xrc/n/proc/rt_%s.remove %s" % (device, table, xid)
 		self.writeData(cmd)
 		print "%s: deleted route for %s:%s" % (device, table, self.config.getAlias(xid))
 
@@ -564,7 +564,7 @@ class XrouteApp:
 		if (port == None or port == ""):
 			self.errorExit("port not specified")
 
-		cmd = "%s/n/proc/rt_%s/rt.set4 %s,%s,%s,%s" % (device, table, xid, port, nexthop, flags)
+		cmd = "%s/wrapped/xrc/n/proc/rt_%s.set4 %s,%s,%s,%s" % (device, table, xid, port, nexthop, flags)
 		print cmd
 
 		self.writeData(cmd)
@@ -614,7 +614,7 @@ class XrouteApp:
 	# specified particular devides or xid types on the command line
 	#
 	def dumpCommands(self):
-		tfmt = "%s/n/proc/rt_%s/rt.list"
+		tfmt = "%s/wrapped/xrc/n/proc/rt_%s.list"
 		ts = datetime.datetime.now()
 		devices = self.config.devices()
 

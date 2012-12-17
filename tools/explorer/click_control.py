@@ -29,6 +29,12 @@ CLICK_PORT = 7777
 MAJOR = 1
 MINOR = 3
 
+# principal types
+DOMAIN = 1
+HOST = 2
+SERVICE = 3
+CONTENT = 4
+
 
 #
 # print the message if configured to be noisy
@@ -162,8 +168,9 @@ class Route:
 # XIA Host/Router definition
 #
 class Router:
-    def __init__(self, name):
+    def __init__(self, name, num_ports):
         self.name = name
+        self.num_ports = num_ports
         self.hid = None
         self.ad = None
         self.routes = []
@@ -253,6 +260,26 @@ class Router:
             s += "%s,%s,%s,%s\n" % (self.name, self.ad, self.hid, c.csv())
         return s
 
+    def get_routes(self, click, kind):
+        pass
+    
+    def set_verbosity_for_port(self, click, port, verbosity):
+        pass
+
+    def get_verbosity_for_port(self, click, port):
+        pass
+
+    def set_malicious_cache(self, click, malicious):
+        pass
+
+    def get_malicious_cache(self, click):
+        pass
+
+
+class LegacyRouter(Router):
+    def get_routes(self, click, kind):
+        return click.readData("%s/n/proc/rt_%s/rt.list" % (self.name, kind))
+
     def set_verbosity_for_port(self, click, port, verbosity):
         port = int(port)
         verbosity = int(verbosity)
@@ -272,16 +299,44 @@ class Router:
 
     def get_malicious_cache(self, click):
         return click.readData("%s/cache.malicious" % (self.name))
-        
 
-class EndHost(Router):
+class MattInstrumentedRouter(Router):
+    def get_routes(self, click, kind):
+        return click.readData("%s/wrapped/xrc/n/proc/rt_%s.list" % (self.name, kind))
+
+    def set_verbosity_for_port(self, click, port, verbosity):
+        port = int(port)
+        verbosity = int(verbosity)
+        click.writeData("%s/print_in%d.verbosity %d" % (self.name, port, verbosity))
+        click.writeData("%s/print_out%d.verbosity %d" % (self.name, port, verbosity))
+        self.get_verbosity_for_port(click, port)
+
+    def get_verbosity_for_port(self, click, port):
+        port = int(port)
+        v_in = click.readData("%s/print_in%d.verbosity" % (self.name, port))
+        v_out = click.readData("%s/print_out%d.verbosity" % (self.name, port))
+        print '%s\tPort %d Verbosity:  In: %s  Out: %s' % (self.name, port, v_in, v_out)
+
+    def set_malicious_cache(self, click, malicious):
+        click.writeData("%s/wrapped/xrc/cache.malicious %d" % (self.name, malicious))
+
+    def get_malicious_cache(self, click):
+        return click.readData("%s/wrapped/xrc/cache.malicious" % (self.name))
+    
+
+class EndHost(LegacyRouter):
     pass
 
-class XRouter4Port(Router):
+class XRouter(LegacyRouter):
     pass
 
+class DualRouter(LegacyRouter):
+    pass
 
-class DualRouter4Port(Router):
+class XIAInstrumentedRouter(MattInstrumentedRouter):
+    pass
+
+class XIAInstrumentedEndHost(MattInstrumentedRouter):
     pass
 
 #
@@ -331,12 +386,17 @@ class DeviceList:
                 obj = None
 
                 if type == 'EndHost':
-                    obj = EndHost(device)
+                    obj = EndHost(device, 1)
                 elif type == 'XRouter4Port':
-                    obj = XRouter4Port(device)
+                    obj = XRouter(device, 1)
                 elif type == 'DualRouter4Port':
-                    obj = DualRouter4Port(device)
+                    obj = DualRouter(device, 4)
+                elif type == 'XIAInstrumentedRouter2Port':
+                    obj = XIAInstrumentedRouter(device, 2)
+                elif type == 'XIAInstrumentedEndHost':
+                    obj = XIAInstrumentedEndHost(device, 1)
                 else:
+                    print 'WARNING Unsupported Device: %s' % type
                     continue
 
                 self.add(device, obj)
@@ -434,7 +494,7 @@ def updateRoutes(devices, click):
     devices.resetRoutes()
     for device in devices.devices.itervalues():
         for kind in ('AD', 'HID', 'IP'):
-            lines = click.readData("%s/n/proc/rt_%s/rt.list" % (device.name, kind))
+            lines = device.get_routes(click, kind)
 
             for line in lines.splitlines():
                 rt = Route(kind, line)

@@ -222,7 +222,7 @@ elementclass XIARoutingCore {
 
     xtransport[0] -> Discard; // Port 0 is unused for now.
     
-    cache :: XIACache($local_addr, n/proc/rt_CID, PACKET_SIZE 1400, MALICIOUS $malicious_cache);
+    cache :: XIACache($local_addr, n/proc/rt_CID, PACKET_SIZE 1400, MALICIOUS 0);
 
     Script(write n/proc/rt_HID.add $local_hid $DESTINED_FOR_LOCALHOST);  // self RHID as destination
     Script(write n/proc/rt_HID.add BHID $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
@@ -256,10 +256,10 @@ elementclass XIARoutingCore {
     xtransport[3] -> [1]cache[1] -> [3]xtransport;
 }
 
-// 2-port router node with XRoute process running
+// 2-port router 
 elementclass XIARouter2Port {
     $local_addr, $local_ad, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, 
-	$mac0, $mac1, $malicious_cache |
+	$mac0, $mac1, |
 
     // $local_addr: the full address of the node
     // $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
@@ -281,10 +281,33 @@ elementclass XIARouter2Port {
 	xrc -> XIAPaintSwitch[0,1] => [1]xlc0[1], [1]xlc1[1]  -> [0]xrc;
 };
 
-// 4-port router node with XRoute process running
+// 2-port router instrumented with counters and prints
+elementclass XIAInstrumentedRouter2Port {
+    $local_addr, $local_ad, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, $mac0, $mac1 |
+
+    wrapped :: XIARouter2Port($local_addr, $local_ad, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, $mac0, $mac1);
+
+    print_in0 :: XIAPrint(">>> $local_hid (In Port 0)");
+    print_in1 :: XIAPrint(">>> $local_hid (In Port 1)");
+    print_out0 :: XIAPrint("<<< $local_hid (Out Port 0)");
+    print_out1 :: XIAPrint("<<< $local_hid (Out Port 1)");
+
+    count_final_out0 :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
+    count_next_out0 :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -);
+    count_final_out1 :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
+    count_next_out1 :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -);
+
+    input => print_in0, print_in1 
+        => wrapped 
+        => print_out0, print_out1 
+        => count_final_out0, count_final_out1 
+        => count_next_out0, count_next_out1 => output;
+}
+
+// 4-port router node 
 elementclass XIARouter4Port {
     $local_addr, $local_ad, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, 
-	$mac0, $mac1, $mac2, $mac3, $malicious_cache |
+	$mac0, $mac1, $mac2, $mac3 |
 
     // $local_addr: the full address of the node
     // $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
@@ -297,7 +320,7 @@ elementclass XIARouter4Port {
     // output[3]: forward to interface 3
     
 	xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $fake, $CLICK_IP, 
-		   				  $API_IP, $ether_addr, 4, $malicious_cache, 0);
+		   				  $API_IP, $ether_addr, 4, 0);
 
     Script(write xrc/n/proc/rt_AD.add $local_ad $DESTINED_FOR_LOCALHOST);    // self AD as destination
 
@@ -309,6 +332,37 @@ elementclass XIARouter4Port {
 	input => xlc0, xlc1, xlc2, xlc3 => output;
 	xrc -> XIAPaintSwitch[0,1,2,3] => [1]xlc0[1], [1]xlc1[1], [1]xlc2[1], [1]xlc3[1] -> [0]xrc;
 };
+
+// 4-port router instrumented with counters and prints
+elementclass XIAInstrumentedRouter4Port {
+    $local_addr, $local_ad, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, $mac0, $mac1 |
+
+    wrapped :: XIARouter2Port($local_addr, $local_ad, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, $mac0, $mac1);
+
+    print_in0 :: XIAPrint(">>> $local_hid (In Port 0)");
+    print_in1 :: XIAPrint(">>> $local_hid (In Port 1)");
+    print_in2 :: XIAPrint(">>> $local_hid (In Port 2)");
+    print_in3 :: XIAPrint(">>> $local_hid (In Port 3)");
+    print_out0 :: XIAPrint("<<< $local_hid (Out Port 0)");
+    print_out1 :: XIAPrint("<<< $local_hid (Out Port 1)");
+    print_out2 :: XIAPrint("<<< $local_hid (Out Port 2)");
+    print_out3 :: XIAPrint("<<< $local_hid (Out Port 3)");
+
+    count_final_out0 :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
+    count_next_out0 :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -);
+    count_final_out1 :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
+    count_next_out1 :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -);
+    count_final_out2 :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
+    count_next_out2 :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -);
+    count_final_out3 :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
+    count_next_out3 :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -);
+
+    input => print_in0, print_in1, print_in2, print_in3
+        => wrapped 
+        => print_out0, print_out1, print_out2, print_out3 
+        => count_final_out0, count_final_out1, count_final_out2, count_final_out3
+        => count_next_out0, count_next_out1, count_final_out2, count_final_out3 => output;
+}
 
 // 4-port router node with XRoute process running and IP support
 elementclass XIADualRouter4Port {
@@ -382,6 +436,21 @@ elementclass XIAEndHost {
     
 	input -> xlc :: XIALineCard($local_addr, $local_hid, $mac, 0) -> output;
 	xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> xrc;
+};
+
+// 1-port endhost node with sockets instrumented with printers and counters
+elementclass XIAInstrumentedEndHost {
+    $local_addr, $local_hid, $fake, $CLICK_IP, $API_IP, $ether_addr, $enable_local_cache, $mac |
+
+    wrapped :: XIAEndHost($local_addr, $local_hid, $fake, $CLICK_IP, $API_IP, $ether_addr, $enable_local_cache, $mac);
+
+    print_in0 :: XIAPrint(">>> $local_hid (In Port 0)");
+    print_out0 :: XIAPrint("<<< $local_hid (Out Port 0)");
+
+    count_final_out0 :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
+    count_next_out0 :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -);
+
+    input -> print_in0 -> wrapped -> print_out0 -> count_final_out0 -> count_next_out0 -> output;
 };
 
 // Endhost node with XRoute process running and IP support

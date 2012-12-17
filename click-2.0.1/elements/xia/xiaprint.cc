@@ -151,7 +151,9 @@ XIAPrint::should_print(Packet *p)
 	
 	if (verbosity == 0) // print nothing
 		return 0;
-	else if (verbosity == 1) // print all but daemon traffic
+	else if (verbosity == 1) // TODO: implement custom filtering here
+		return 0;
+	else if (verbosity == 2) // print all but daemon traffic
 	{
     	const struct click_xia* hdr = p->xia_header();
 

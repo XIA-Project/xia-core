@@ -62,7 +62,7 @@ int XIARouter::listRouters(std::vector<std::string> &rlist)
 	for (it = elements.begin(); it < elements.end(); it++) {
 
 		// cheap way of finding host and router devices, they both have a /xrc element
-		if ((n = (*it).find("/xrc")) != string::npos) {
+		if ((n = (*it).find("/wrapped/xrc")) != string::npos) {
 			rlist.push_back((*it).substr(0, n));
 		}
 	}
@@ -85,7 +85,7 @@ int XIARouter::getRoutes(std::string xidtype, std::vector<XIARouteEntry> &xrt)
 	if (getRouter().length() == 0)
 		return  XR_ROUTER_NOT_SET;
 
-	std::string table = _router + "/xrc/n/proc/rt_" + xidtype;
+	std::string table = _router + "/wrapped/xrc/n/proc/rt_" + xidtype;
 
 	if ((_cserr = _cs.read(table, "list", result)) != 0)
 		return XR_CLICK_ERROR;
@@ -170,7 +170,7 @@ int XIARouter::updateRoute(string cmd, std::string &xid, int port, std::string &
 
 	xidtype = xid.substr(0, n);
 
-	std::string table = _router + "/xrc/n/proc/rt_" + xidtype;
+	std::string table = _router + "/wrapped/xrc/n/proc/rt_" + xidtype;
 	
 	string default_xid("-"); 
 	if (xid.compare(n+1, 1, default_xid) == 0)
