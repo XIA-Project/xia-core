@@ -43,6 +43,8 @@ XIASocket/sample/xcmptraceroute
 XIASocket/sample/xecho
 XIASocket/sample/xs_dgram
 XIASocket/sample/xs_stream
+XIASocket/chunkc
+XIASocket/chunks
 click-2.0.1/Makefile             
 click-2.0.1/bsdmodule/Makefile   
 click-2.0.1/click-compile        
@@ -101,3 +103,5 @@ example/xecho
 # output from scripts
 tools/click_templates/xia_address.click
 tools/click_templates/host.click
+tools/click_templates/router.click
+tools/click_templates/dual_stack_host.click
