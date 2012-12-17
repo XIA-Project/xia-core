@@ -43,8 +43,8 @@ XIASocket/sample/xcmptraceroute
 XIASocket/sample/xecho
 XIASocket/sample/xs_dgram
 XIASocket/sample/xs_stream
-XIASocket/chunkc
-XIASocket/chunks
+XIASocket/sample/chunkc
+XIASocket/sample/chunks
 click-2.0.1/Makefile             
 click-2.0.1/bsdmodule/Makefile   
 click-2.0.1/click-compile        
