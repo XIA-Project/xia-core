@@ -37,6 +37,8 @@ so use the XIACheckDest element before using this element.
 #define UNREACHABLE -6
 #define FALLBACK -7
 
+enum { PRINCIPAL_TYPE_ENABLED };
+
 typedef struct {
 	int	port;
 	unsigned flags;
@@ -57,6 +59,9 @@ class XIAXIDRouteTable : public Element { public:
 
     void push(int in_ether_port, Packet *);
 
+	int set_enabled(int e);
+	int get_enabled();
+
 protected:
     int lookup_route(int in_ether_port, Packet *);
     int process_xcmp_redirect(Packet *);
@@ -66,6 +71,8 @@ protected:
     static int remove_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
     static int load_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
     static int generate_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
+	static String read_handler(Element *e, void *thunk);
+	static int write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh);
 
     static String list_routes_handler(Element *e, void *thunk);
 
@@ -74,6 +81,7 @@ private:
 	XIARouteData _rtdata;
     uint32_t _drops;
 
+	int _principal_type_enabled;
     int _num_ports;
     XIAPath _local_addr;
     XID _local_hid;

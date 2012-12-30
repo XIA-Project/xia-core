@@ -29,6 +29,7 @@ XIAXIDRouteTable::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     click_chatter("XIAXIDRouteTable: configuring %s\n", this->name().c_str());
 
+	_principal_type_enabled = 1;
 	_num_ports = 0;
 
     _rtdata.port = -1;
@@ -52,6 +53,18 @@ XIAXIDRouteTable::configure(Vector<String> &conf, ErrorHandler *errh)
 	return 0;
 }
 
+int
+XIAXIDRouteTable::set_enabled(int e)
+{
+	_principal_type_enabled = e;
+	return 0;
+}
+
+int XIAXIDRouteTable::get_enabled()
+{
+	return _principal_type_enabled;
+}
+
 void
 XIAXIDRouteTable::add_handlers()
 {
@@ -64,6 +77,34 @@ XIAXIDRouteTable::add_handlers()
 	add_write_handler("generate", generate_routes_handler, 0);
 	add_data_handlers("drops", Handler::OP_READ, &_drops);
 	add_read_handler("list", list_routes_handler, 0);
+	add_write_handler("enabled", write_handler, (void *)PRINCIPAL_TYPE_ENABLED);
+	add_read_handler("enabled", read_handler, (void *)PRINCIPAL_TYPE_ENABLED);
+}
+
+String
+XIAXIDRouteTable::read_handler(Element *e, void *thunk)
+{
+	XIAXIDRouteTable *t = (XIAXIDRouteTable *) e;
+    switch ((intptr_t)thunk) {
+		case PRINCIPAL_TYPE_ENABLED:
+			return String(t->get_enabled());
+
+		default:
+			return "<error>";
+    }
+}
+
+int 
+XIAXIDRouteTable::write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh)
+{
+	XIAXIDRouteTable *t = (XIAXIDRouteTable *) e;
+    switch ((intptr_t)thunk) {
+		case PRINCIPAL_TYPE_ENABLED:
+			return t->set_enabled(atoi(str.c_str()));
+
+		default:
+			return -1;
+    }
 }
 
 String
@@ -389,6 +430,11 @@ XIAXIDRouteTable::push(int in_ether_port, Packet *p)
     int port;
 
 	in_ether_port = XIA_PAINT_ANNO(p);
+
+	if (!_principal_type_enabled) {
+		output(2).push(p);
+		return;
+	}
 
     if(in_ether_port == REDIRECT) {
 	  // if this is an XCMP redirect packet

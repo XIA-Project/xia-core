@@ -34,7 +34,44 @@ DOMAIN = 1
 HOST = 2
 SERVICE = 3
 CONTENT = 4
+IPV4 = 5
 
+
+#
+# converts a string to a principal type number
+#
+def get_principal_from_string(principal_string):
+    principal_string = principal_string.lower()
+    if 'content' in principal_string or 'cid' in principal_string:
+        return CONTENT
+    elif 'service' in principal_string or 'sid' in principal_string:
+        return SERVICE
+    elif 'host' in principal_string or 'hid' in principal_string:
+        return HOST
+    elif 'domain' in principal_string or 'ad' in principal_string:
+        return DOMAIN
+    elif 'ip' in principal_string or '4id' in principal_string:
+        return IPV4
+    else:
+        print 'Unrecognized principal type: %s' % principal_string
+        return -1
+
+#
+# converts a principal type number into a string
+#
+def string_for_principal_type(principal_type):
+    if principal_type == DOMAIN:
+        return 'Domain'
+    elif principal_type == HOST:
+        return 'Host'
+    elif principal_type == SERVICE:
+        return 'Service'
+    elif principal_type == CONTENT:
+        return 'Content'
+    elif principal_type == IPV4:
+        return 'IPv4'
+    else:
+        raise Exception('Unknown principal type: %d', principal_type)
 
 #
 # print the message if configured to be noisy
@@ -260,69 +297,92 @@ class Router:
             s += "%s,%s,%s,%s\n" % (self.name, self.ad, self.hid, c.csv())
         return s
 
+    def proc_path(self):
+        pass
+
+    def cache_path(self):
+        pass
+
+    def print_path(self, port, direction):
+        pass
+
+    def route_table_path(self, principal_type):
+        table_string = ''
+        if principal_type == DOMAIN:
+            table_string = 'rt_AD'
+        elif principal_type == HOST:
+            table_string = 'rt_HID'
+        elif principal_type == SERVICE:
+            table_string = 'rt_SID'
+        elif principal_type == CONTENT:
+            table_string = 'rt_CID'
+        elif principal_type == IPV4:
+            table_string = 'rt_IP'
+        else:
+            raise Exception('Unknown principal type: %d', principal_type)
+
+        return '%s/%s' % (self.proc_path(), table_string)
+
     def get_routes(self, click, kind):
         pass
-    
-    def set_verbosity_for_port(self, click, port, verbosity):
-        pass
-
-    def get_verbosity_for_port(self, click, port):
-        pass
-
-    def set_malicious_cache(self, click, malicious):
-        pass
-
-    def get_malicious_cache(self, click):
-        pass
-
-
-class LegacyRouter(Router):
-    def get_routes(self, click, kind):
-        return click.readData("%s/n/proc/rt_%s/rt.list" % (self.name, kind))
 
     def set_verbosity_for_port(self, click, port, verbosity):
         port = int(port)
         verbosity = int(verbosity)
-        click.writeData("%s/in%d_print.verbosity %d" % (self.name, port, verbosity))
-        click.writeData("%s/out%d_print.verbosity %d" % (self.name, port, verbosity))
+        click.writeData("%s.verbosity %d" % (self.print_path(port, 'in'), verbosity))
+        click.writeData("%s.verbosity %d" % (self.print_path(port, 'out'), verbosity))
         self.get_verbosity_for_port(click, port)
-
 
     def get_verbosity_for_port(self, click, port):
         port = int(port)
-        v_in = click.readData("%s/in%d_print.verbosity" % (self.name, port))
-        v_out = click.readData("%s/out%d_print.verbosity" % (self.name, port))
+        v_in = click.readData("%s.verbosity" % (self.print_path(port, 'in')))
+        v_out = click.readData("%s.verbosity" % (self.print_path(port, 'out')))
         print '%s\tPort %d Verbosity:  In: %s  Out: %s' % (self.name, port, v_in, v_out)
 
     def set_malicious_cache(self, click, malicious):
-        click.writeData("%s/cache.malicious %d" % (self.name, malicious))
+        click.writeData("%s.malicious %d" % (self.cache_path(), malicious))
 
     def get_malicious_cache(self, click):
-        return click.readData("%s/cache.malicious" % (self.name))
+        return click.readData("%s.malicious" % (self.cache_path()))
+
+
+    def get_principal_type_enabled(self, click, principal_type):
+        enabled = click.readData('%s.enabled' % self.route_table_path(principal_type))
+        print '%s\t%s enabled: %s' % (self.name, string_for_principal_type(principal_type), enabled)
+
+    def set_principal_type_enabled(self, click, principal_type, enabled):
+        enabled = int(enabled)
+        click.writeData('%s.enabled %d' % (self.route_table_path(principal_type), enabled))
+        self.get_principal_type_enabled(click, principal_type)
+
+
+# TODO: Eventually remove this class
+class LegacyRouter(Router):
+    def get_routes(self, click, kind):
+        return click.readData("%s/n/proc/rt_%s/rt.list" % (self.name, kind))
+
+    def proc_path(self):
+        return '%s/n/proc' % self.name
+
+    def cache_path(self):
+        return '%s/cache' % self.name
+
+    def print_path(self, port, direction):
+        return '%s/%s%d_print' % (self.name, direction, port)
 
 class MattInstrumentedRouter(Router):
     def get_routes(self, click, kind):
         return click.readData("%s/wrapped/xrc/n/proc/rt_%s.list" % (self.name, kind))
 
-    def set_verbosity_for_port(self, click, port, verbosity):
-        port = int(port)
-        verbosity = int(verbosity)
-        click.writeData("%s/print_in%d.verbosity %d" % (self.name, port, verbosity))
-        click.writeData("%s/print_out%d.verbosity %d" % (self.name, port, verbosity))
-        self.get_verbosity_for_port(click, port)
+    def proc_path(self):
+        return '%s/wrapped/xrc/n/proc' % self.name
 
-    def get_verbosity_for_port(self, click, port):
-        port = int(port)
-        v_in = click.readData("%s/print_in%d.verbosity" % (self.name, port))
-        v_out = click.readData("%s/print_out%d.verbosity" % (self.name, port))
-        print '%s\tPort %d Verbosity:  In: %s  Out: %s' % (self.name, port, v_in, v_out)
+    def cache_path(self):
+        return '%s/wrapped/xrc/cache' % self.name
 
-    def set_malicious_cache(self, click, malicious):
-        click.writeData("%s/wrapped/xrc/cache.malicious %d" % (self.name, malicious))
+    def print_path(self, port, direction):
+        return '%s/print_%s%d' % (self.name, direction, port)
 
-    def get_malicious_cache(self, click):
-        return click.readData("%s/wrapped/xrc/cache.malicious" % (self.name))
-    
 
 class EndHost(LegacyRouter):
     pass
