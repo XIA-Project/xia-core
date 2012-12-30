@@ -243,6 +243,7 @@ def makeRouterConfig(ad, hid):
 	if ip_override_addr == None:
 		xchg['EXTERNAL_IP'] = '0.0.0.0'
 	else:
+		print 'WARNING: new dual stack routers do not support external IP addresses'
 		xchg['EXTERNAL_IP'] = ip_override_addr
 
 	# create $MAC0 thru $MAC3 replacements

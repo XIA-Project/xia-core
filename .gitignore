@@ -45,15 +45,18 @@ XIASocket/sample/xs_dgram
 XIASocket/sample/xs_stream
 XIASocket/sample/chunkc
 XIASocket/sample/chunks
-click-2.0.1/Makefile             
+click-2.0.1/Makefile
 click-2.0.1/config.log
-click-2.0.1/bsdmodule/Makefile   
-click-2.0.1/click-compile        
-click-2.0.1/config.status        
+click-2.0.1/bsdmodule/Makefile
+click-2.0.1/click-compile
+click-2.0.1/click-buildtool
+click-2.0.1/config.status
+click-2.0.1/doc/Makefile
 click-2.0.1/etc/libclick/Makefile
 click-2.0.1/etc/pkg-config.mk    
 click-2.0.1/linuxmodule/Makefile 
 click-2.0.1/ns/Makefile          
+click-2.0.1/tools/Makefile
 click-2.0.1/tools/click-align/click-align
 click-2.0.1/tools/click-align/Makefile
 click-2.0.1/tools/click-check/click-check
@@ -63,6 +66,7 @@ click-2.0.1/tools/click-combine/click-uncombine
 click-2.0.1/tools/click-combine/Makefile
 click-2.0.1/tools/click-devirtualize/click-devirtualize
 click-2.0.1/tools/click-devirtualize/Makefile
+click-2.0.1/tools/click-install/Makefile
 click-2.0.1/tools/click-fastclassifier/click-fastclassifier
 click-2.0.1/tools/click-fastclassifier/Makefile
 click-2.0.1/tools/click-flatten/click-flatten
@@ -106,3 +110,4 @@ tools/click_templates/xia_address.click
 tools/click_templates/host.click
 tools/click_templates/router.click
 tools/click_templates/dual_stack_host.click
+tools/click_templates/dual_stack_router.click

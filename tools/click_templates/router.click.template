@@ -1,19 +1,13 @@
-require(library ../../click-2.0/conf/xia_router_template_xtransport.click);
+require(library ../../click/conf/xia_router_lib.click);
 require(library xia_address.click);
 
 // router instantiation
-${HNAME} :: XRouter4Port(RE $ADNAME $HID, $ADNAME, $HID, $EXTERNAL_IP, fake0, 172.0.0.2, 172.0.0.1, 21:11:11:11:11:11, $MAC0, $MAC1, $MAC2, $MAC3, 0);
+${HNAME} :: XIAInstrumentedRouter4Port(RE $ADNAME $HID, $ADNAME, $HID, $EXTERNAL_IP, fake0, 172.0.0.2, 172.0.0.1, 21:11:11:11:11:11, $MAC0, $MAC1, $MAC2, $MAC3);
 
 ######
-
-${HNAME}_final_$NUM::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
-${HNAME}_next_$NUM::XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -)
-FromDevice($IFACE, PROMISC true) -> XIAPrint("$IFACE -> [$NUM]${HNAME}") -> [$NUM]${HNAME}[$NUM] -> XIAPrint("${HNAME}[$NUM] -> $IFACE") -> ${HNAME}_final_$NUM -> ${HNAME}_next_$NUM -> ToDevice($IFACE)
-
+FromDevice($IFACE, PROMISC true) -> [$NUM]${HNAME}[$NUM] -> ToDevice($IFACE)
 ######
-${HNAME}_final_$NUM::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
-${HNAME}_next_$NUM::XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -)
-Idle -> [$NUM]${HNAME}[$NUM] -> ${HNAME}_final_$NUM -> ${HNAME}_next_$NUM -> Discard;
+Idle -> [$NUM]${HNAME}[$NUM] -> Discard;
 ######
 
 	ControlSocket(tcp, 7777);

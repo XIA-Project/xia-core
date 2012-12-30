@@ -1,16 +1,16 @@
-require(library ../../click-2.0/conf/xia_router_template_xtransport.click);
+require(library ../../click/conf/xia_router_lib.click);
 require(library xia_address.click);
 
 // router instantiation
 // TODO: If we ever connect more than one port to IP, we somehow need to tell the router about all of its IP addresses in local_addr
-${HNAME} :: DualRouter4Port(RE ( IP:$EXT_IPADDR0 ) $ADNAME $RHID, $ADNAME, $RHID, $EXTERNAL_IP, fake2, 172.0.0.2, 172.0.0.1, 31:11:11:11:11:11, $IP_ACTIVE0, $IPADDR0, $EXT_IPADDR0, $MAC0, $GWADDR0, 
-                                                                                                                                               $IP_ACTIVE1, $IPADDR1, $EXT_IPADDR1, $MAC1, $GWADDR1, 
-                                                                                                                                               $IP_ACTIVE2, $IPADDR2, $EXT_IPADDR2, $MAC2, $GWADDR2, 
-                                                                                                                                               $IP_ACTIVE3, $IPADDR3, $EXT_IPADDR3, $MAC3, $GWADDR3, 0);
+${HNAME} :: XIAInstrumentedDualRouter4Port(RE ( IP:$EXT_IPADDR0 ) $ADNAME $RHID, $ADNAME, $RHID, $EXTERNAL_IP, fake2, 172.0.0.2, 172.0.0.1, 31:11:11:11:11:11, $IP_ACTIVE0, $IPADDR0, $MAC0, $GWADDR0, 
+                                                                                                                                               $IP_ACTIVE1, $IPADDR1, $MAC1, $GWADDR1, 
+                                                                                                                                               $IP_ACTIVE2, $IPADDR2, $MAC2, $GWADDR2, 
+                                                                                                                                               $IP_ACTIVE3, $IPADDR3, $MAC3, $GWADDR3);
 
 // connect router's ports
 ######
-FromDevice($IFACE) -> IPPrint("$IFACE to [$NUM]${HNAME}") -> [$NUM]${HNAME}[$NUM] -> IPPrint("${HNAME}[$NUM] to $IFACE") -> ToDevice($IFACE);
+FromDevice($IFACE) -> [$NUM]${HNAME}[$NUM] -> ToDevice($IFACE);
 ######
 Idle -> [$NUM]${HNAME}[$NUM] -> Discard;
 ######

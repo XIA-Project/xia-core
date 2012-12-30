@@ -1,13 +1,10 @@
-require(library ../../click-2.0/conf/xia_router_template_xtransport.click);
+require(library ../../click/conf/xia_router_lib.click);
 require(library xia_address.click);
 
 // host instantiation
-$HNAME :: EndHost (RE $ADNAME $HID, $HID, fake0, 172.0.0.2, 172.0.0.1, 01:11:11:11:11:11, 0, $MAC0);
+$HNAME :: XIAInstrumentedEndHost (RE $ADNAME $HID, $HID, fake0, 172.0.0.2, 172.0.0.1, 01:11:11:11:11:11, 0, $MAC0);
 
-${HNAME}_final_0::XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -)
-${HNAME}_next_0::XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -)
-
-FromDevice($IFACE, PROMISC true) -> XIAPrint("$IFACE -> [0]${HNAME}") -> [0]${HNAME}[0] -> XIAPrint("${HNAME}[0] -> $IFACE") -> ${HNAME}_final_0 -> ${HNAME}_next_0 -> ToDevice($IFACE);
+FromDevice($IFACE, PROMISC true) -> [0]${HNAME}[0] -> ToDevice($IFACE);
 
 	ControlSocket(tcp, 7777);
 

@@ -202,13 +202,22 @@ elementclass XIADualLineCard {
 	// check if it's heading to an XIA network or an IP network
 	input[1] -> dstTypeC :: XIAXIDTypeClassifier(next IP, -);
 
-	dstTypeC[1] -> Discard(ACTIVE !$ip_active) -> xlc[1] -> [1]output;
-	dstTypeC[0] -> Discard(ACTIVE $ip_active) -> iplc[1] -> [1]output;
+        // TODO: something here doesn't work. (push/pull weirdness?)
+	dstTypeC[0], dstTypeC[1] 
+                => suppress::Suppressor() 
+                => [1]iplc[1], [1]xlc[1] 
+                => [1]output, [1]output;
+
+        // Tell surpressor which packets to drop based on whether or not IP is enabled
+        // TODO: test this and then take out the reads
+        Script(write suppress.active0 $ip_active,
+               write suppress.active1 !$ip_active,
+               print read suppess.active0,
+               print read suppress.active1);
 }
 
 elementclass XIARoutingCore {
-    $local_addr, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, $num_ports,
-	$malicious_cache, $is_dual_stack |
+    $local_addr, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, $num_ports, $is_dual_stack |
 
     // input[0]: packet to route
 	// output[0]: packet to be forwarded out a given port based on paint value
@@ -263,14 +272,13 @@ elementclass XIARouter2Port {
 
     // $local_addr: the full address of the node
     // $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
-	// $malicious_cache: if set to 1, the content cache responds with bad content
 
     // input[0], input[1]: a packet arrived at the node
     // output[0]: forward to interface 0
     // output[1]: forward to interface 1
     
 	xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $fake, $CLICK_IP, 
-		   				  $API_IP, $ether_addr, 2, $malicious_cache, 0);
+		   				  $API_IP, $ether_addr, 2, 0);
 
     Script(write xrc/n/proc/rt_AD.add $local_ad $DESTINED_FOR_LOCALHOST);    // self AD as destination
 
@@ -335,9 +343,10 @@ elementclass XIARouter4Port {
 
 // 4-port router instrumented with counters and prints
 elementclass XIAInstrumentedRouter4Port {
-    $local_addr, $local_ad, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, $mac0, $mac1 |
+    $local_addr, $local_ad, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, 
+        $mac0, $mac1, $mac2, $mac3|
 
-    wrapped :: XIARouter2Port($local_addr, $local_ad, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, $mac0, $mac1);
+    wrapped :: XIARouter4Port($local_addr, $local_ad, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, $mac0, $mac1, $mac2, $mac3);
 
     print_in0 :: XIAPrint(">>> $local_hid (In Port 0)");
     print_in1 :: XIAPrint(">>> $local_hid (In Port 1)");
@@ -361,7 +370,7 @@ elementclass XIAInstrumentedRouter4Port {
         => wrapped 
         => print_out0, print_out1, print_out2, print_out3 
         => count_final_out0, count_final_out1, count_final_out2, count_final_out3
-        => count_next_out0, count_next_out1, count_final_out2, count_final_out3 => output;
+        => count_next_out0, count_next_out1, count_next_out2, count_next_out3 => output;
 }
 
 // 4-port router node with XRoute process running and IP support
@@ -370,8 +379,7 @@ elementclass XIADualRouter4Port {
 	$ip_active0, $ip0, $mac0, $gw0,
 	$ip_active1, $ip1, $mac1, $gw1,
 	$ip_active2, $ip2, $mac2, $gw2, 
-	$ip_active3, $ip3, $mac3, $gw3, 
-	$malicious_cache |
+	$ip_active3, $ip3, $mac3, $gw3 |
 
 	// NOTE: This router assumes that each port is connected to *either* an XIA network *or* an IP network.
 	// If port 0 is connected to an IP network and is asked to send an XIA packet (e.g., a broadcast), the
@@ -399,7 +407,7 @@ elementclass XIADualRouter4Port {
     // output[2]: forward to interface 2
     // output[3]: forward to interface 3
     
-	xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, 4, $malicious_cache, 1);    
+	xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, 4, 1);    
 
 
     Script(write xrc/n/proc/rt_AD.add $local_ad $DESTINED_FOR_LOCALHOST);    // self AD as destination
@@ -419,6 +427,49 @@ elementclass XIADualRouter4Port {
 	xrc -> XIAPaintSwitch[0,1,2,3] => [1]dlc0[1], [1]dlc1[1], [1]dlc2[1], [1]dlc3[1] -> [0]xrc;
 };
 
+// 4-port dual stack router instrumented with counters and prints
+elementclass XIAInstrumentedDualRouter4Port {
+    $local_addr, $local_ad, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, 
+	$ip_active0, $ip0, $mac0, $gw0,
+	$ip_active1, $ip1, $mac1, $gw1,
+	$ip_active2, $ip2, $mac2, $gw2, 
+	$ip_active3, $ip3, $mac3, $gw3 |
+
+    wrapped :: XIADualRouter4Port($local_addr, $local_ad, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, 
+	$ip_active0, $ip0, $mac0, $gw0,
+	$ip_active1, $ip1, $mac1, $gw1,
+	$ip_active2, $ip2, $mac2, $gw2, 
+	$ip_active3, $ip3, $mac3, $gw3);
+
+    // TODO: Make XIAIPPrint element?
+
+    print_in0 :: XIAPrint(">>> $local_hid (In Port 0)");
+    print_in1 :: XIAPrint(">>> $local_hid (In Port 1)");
+    print_in2 :: XIAPrint(">>> $local_hid (In Port 2)");
+    print_in3 :: XIAPrint(">>> $local_hid (In Port 3)");
+    print_out0 :: XIAPrint("<<< $local_hid (Out Port 0)");
+    print_out1 :: XIAPrint("<<< $local_hid (Out Port 1)");
+    print_out2 :: XIAPrint("<<< $local_hid (Out Port 2)");
+    print_out3 :: XIAPrint("<<< $local_hid (Out Port 3)");
+
+    // TODO: counter for inbound IP traffic
+
+    count_final_out0 :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
+    count_next_out0 :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -);
+    count_final_out1 :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
+    count_next_out1 :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -);
+    count_final_out2 :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
+    count_next_out2 :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -);
+    count_final_out3 :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
+    count_next_out3 :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -);
+
+    input => print_in0, print_in1, print_in2, print_in3
+        => wrapped 
+        => print_out0, print_out1, print_out2, print_out3 
+        => count_final_out0, count_final_out1, count_final_out2, count_final_out3
+        => count_next_out0, count_next_out1, count_next_out2, count_next_out3 => output;
+}
+
 // 1-port endhost node with sockets
 elementclass XIAEndHost {
     $local_addr, $local_hid, $fake, $CLICK_IP, $API_IP, $ether_addr, $enable_local_cache, $mac |
@@ -429,7 +480,7 @@ elementclass XIAEndHost {
     // input: a packet arrived at the node
     // output: forward to interface 0
     
-	xrc :: XIARoutingCore($local_addr, $local_hid, 0.0.0.0, $fake, $CLICK_IP, $API_IP, $ether_addr, 1, 0, 0);
+	xrc :: XIARoutingCore($local_addr, $local_hid, 0.0.0.0, $fake, $CLICK_IP, $API_IP, $ether_addr, 1, 0);
 
     Script(write xrc/n/proc/rt_AD.add - 0);      // default route for AD
     Script(write xrc/n/proc/rt_IP.add - 0); 	// default route for IPv4    
