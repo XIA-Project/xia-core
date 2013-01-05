@@ -1,0 +1,2 @@
+We are transitioning to keeping libraries here. Make sure this directory is in
+both your LD_LIBRARY_PATH and PYTHONPATH environment variables.

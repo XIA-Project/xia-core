@@ -1,0 +1,19 @@
+To compile, run the following in the "cpp" directory. This will automatically
+generate the Python wrapper in the "python" directory as well.
+
+1) Run "cmake ."
+2) Run "make"
+3) Run "make install"
+
+To generate documentation, run the following in the "cpp" directory.
+Documentation will be built in the "doc" dir in this directory. Currently only
+C++ documentation is generated.
+
+1) Run "cmake ." if you haven't already
+2) Run "make doc"
+
+
+
+To run any code that uses these libraries, be sure you have
+<path-to-xia-core>/lib in both your LD_LIBRARY_PATH and PYTHONPATH environment
+variables.
