@@ -25,5 +25,11 @@ make
 cd $XIADIR/daemons/nameserver
 make
 
+cd $XIADIR/dagaddr/cpp
+cmake .
+cmake .
+make
+make install
+
 cd $XIADIR
 

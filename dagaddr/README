@@ -2,8 +2,9 @@ To compile, run the following in the "cpp" directory. This will automatically
 generate the Python wrapper in the "python" directory as well.
 
 1) Run "cmake ."
-2) Run "make"
-3) Run "make install"
+2) Run "cmake ." again. For some reason the CMAKE_INSTALL_PREFIX isn't set correctly the first time.
+3) Run "make"
+4) Run "make install"
 
 To generate documentation, run the following in the "cpp" directory.
 Documentation will be built in the "doc" dir in this directory. Currently only
