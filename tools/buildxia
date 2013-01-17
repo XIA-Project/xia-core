@@ -1,7 +1,7 @@
 #!/bin/sh
 # build all of the XIA components
 
-XIADIR=$(dirname $(dirname $(cd ${0%/*} && echo $PWD/${0##*/})))
+XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")" 
 
 cd $XIADIR/click
 ./conf_user_click.sh

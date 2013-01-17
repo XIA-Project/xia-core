@@ -44,11 +44,11 @@ CHAIN_TOPOLOGY_DAEMONS="xrouted xhcp_serverd xhcp_clientd xnameservice"
 VISUALIZER_CLIENT_DAEMONS="xstats"
 VISUALIZER_SERVER_DAEMONS="statsserver"
 
-# hacky way of finding the root of the XIA source tree
+# find the root of the XIA source tree
 # assumes this script is in a directory off the parent of the XIA tree
 # and that the daemons it starts are rooted off of the same location
 #  so XIADIR would be /xia-core assuming the script were /xia-core/tools/xianet
-XIADIR=$(dirname $(dirname $(cd ${0%/*} && echo $PWD/${0##*/})))
+XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")" 
 
 # click parameters
 CLICKPATH=$XIADIR/click

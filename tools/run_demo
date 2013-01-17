@@ -32,11 +32,11 @@ VERBOSE=0
 
 SERVICES="proxy.py webserver.py vs hello_service.py stock_service.py"
 
-# hacky way of finding the root of the XIA source tree
+# find the root of the XIA source tree
 # assumes this script is in a directory off the parent of the XIA tree
 # and that the services it starts are rooted off of the same location
 #  so XIADIR would be /xia-core assuming the script were /xia-core/tools/run_demo
-XIADIR=$(dirname $(dirname $(cd ${0%/*} && echo $PWD/${0##*/})))
+XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")" 
 
 is_running()
 {

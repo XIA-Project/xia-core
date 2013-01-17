@@ -14,11 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# hacky way of finding the root of the XIA source tree
+# find the root of the XIA source tree
 # assumes this script is in a directory off the parent of the XIA tree
 # and that click is rooted off of the same location so XIADIR 
 # would be /xia-core assuming the script were /xia-core/tools/run_click
-XIADIR=$(dirname $(dirname $(cd ${0%/*} && echo $PWD/${0##*/})))
+XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")" 
 
 NAME=`basename $0`
 CLICKPATH=$XIADIR/click-2.0
