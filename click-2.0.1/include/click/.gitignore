@@ -1,2 +1,6 @@
 config.h
+config-bsdmodule.h  
+config-linuxmodule.h
+config-ns.h
 config-userlevel.h
+
