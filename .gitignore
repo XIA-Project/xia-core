@@ -54,9 +54,11 @@ click-2.0.1/click-buildtool
 click-2.0.1/config.status
 click-2.0.1/doc/Makefile
 click-2.0.1/etc/libclick/Makefile
-click-2.0.1/etc/pkg-config.mk    
-click-2.0.1/linuxmodule/Makefile 
-click-2.0.1/ns/Makefile          
+click-2.0.1/etc/pkg-config.mk
+click-2.0.1/include/click/config.h
+click-2.0.1/include/click/config-userlevel.h
+click-2.0.1/linuxmodule/Makefile
+click-2.0.1/ns/Makefile
 click-2.0.1/tools/Makefile
 click-2.0.1/tools/click-align/click-align
 click-2.0.1/tools/click-align/Makefile
