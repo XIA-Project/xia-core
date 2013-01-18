@@ -11,7 +11,7 @@ SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XrequestChunk.c  \
 SHARED_OBJECTS=$(SOURCES:.c=.shared.o) xia.pb.shared.o
 STATIC_OBJECTS=$(SOURCES:.c=.o) xia.pb.o
 
-all: xia.pb.cc  libXsocket.a libXsocket.so xwrap.so
+all: xia.pb.cc  libXsocket.a libXsocket.so
 	make -C python all
 
 xia.pb.cc: xia.proto
