@@ -1,21 +1,33 @@
-.PHONY: clean doc
+.PHONY: clean doc install
 
-XSOCK_LIB=../libXsocket.so
+XLIB=../../lib
+XSOCK_LIB=$(XLIB)/libXsocket.so
+TARGET=$(XLIB)/_c_xsocket.so
 
-all: _c_xsocket.so
+all: $(TARGET) $(XLIB)/xsocket.py 
 
-_c_xsocket.so: $(XSOCK_LIB) c_xsocket_wrap.c 
+$(TARGET): $(XSOCK_LIB) c_xsocket_wrap.c 
 	gcc -I/usr/include/python2.7 -fpic -c c_xsocket_wrap.c 
-	gcc -shared c_xsocket_wrap.o -lXsocket -o _c_xsocket.so  -I/usr/include/python2.7 -L../
+	gcc -shared c_xsocket_wrap.o -lXsocket -o $@  -I/usr/include/python2.7 -L$(XLIB)
 
 c_xsocket_wrap.c: c_xsocket.i $(XSOCK_LIB)
-	swig -python c_xsocket.i 
+	swig -outdir $(XLIB) -python c_xsocket.i 
+
+$(XLIB)/xsocket.py: oo_wrapper/xsocket.py
+	cp $< $@
+
+install: all
+	cp _c_xsocket.so $(XLIB)
+	cp c_xsocket.py $(XLIB)
+	cp oo_wrapper/xsocket.py $(XLIB)
 
 doc:
 	make -C doc html
 
 clean: 
+	rm $(TARGET)
+	rm $(XLIB)/xsocket.py
+	rm $(XLIB)/c_xsocket.py
 	make -C doc clean
 	rm -f *.so *.o *.pyc
 	rm c_xsocket_wrap.c
-	rm c_xsocket.py
