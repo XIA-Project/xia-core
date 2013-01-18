@@ -105,7 +105,7 @@ elementclass RouteEngine {
 
     dstTypeClassifier[0] -> [2]output;  // To cache (for serving content request)
 
-    proc[2] -> x::XCMP($local_addr) -> proc; 
+    proc[2] -> XIAPAINT($UNREACHABLE) -> x::XCMP($local_addr) -> proc; 
 	x[1] -> Discard;
   
     // hack to use DHCP functionality

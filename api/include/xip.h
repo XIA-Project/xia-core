@@ -30,10 +30,10 @@ struct xip {
   uint8_t ver;                        /* header version */
   uint8_t nxt;                        /* next header */
   uint16_t plen;                      /* payload length */
+  uint8_t hlim;                       /* hop limit */
   uint8_t dnode;                      /* total number of dest nodes */
   uint8_t snode;                      /* total number of src nodes */
   int8_t last;                        /* index of last visited node (note: integral) */
-  uint8_t hlim;                       /* hop limit */
   xia_xid_node node[0];         /* XID node list */
 };
 
