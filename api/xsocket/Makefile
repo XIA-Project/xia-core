@@ -1,4 +1,4 @@
-.PHONY: clean doc test
+.PHONY: clean doc test install
 CC=g++
 LD=g++
 CFLAGS=-c -Wall -Wextra -Iminini
@@ -28,9 +28,11 @@ xia.pb.shared.o:
 
 libXsocket.a: $(STATIC_OBJECTS) 
 	ar rcs $@ $(STATIC_OBJECTS) 
+	cp $@ ../lib
 
 libXsocket.so: $(SHARED_OBJECTS) 
 	$(LD) -shared -o $@ $(SHARED_OBJECTS) $(LDFLAGS) -lc  -l dl
+	cp $@ ../lib
 
 xwrap.so: xwrap.c
 	$(CC) -Wall -fPIC -DPIC -c $<
@@ -42,6 +44,10 @@ doc: Xdoc.h $(SOURCES)
 
 test: libXsocket.so
 	make -C test test
+
+install:
+	cp libXsocket.a ../lib
+	cp libXsocket.so ../lib
 
 clean:
 	rm -f *.o *.a *.so *.shared.o xia.pb.*
