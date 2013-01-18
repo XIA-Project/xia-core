@@ -1,11 +1,17 @@
 CC=g++
 LD=g++
-CFLAGS=-I../../XIASocket/minini -I../../XIASocket/API -ggdb
+
+APIDIR=../../api
+XINC=$(APIDIR)/include
+XLIB=$(APIDIR)/lib
+BINDIR=../../bin
+
+CFLAGS=-I$(APIDIR)/xsocket -I$(APIDIR)/xsocket/minini -ggdb
 LDFLAGS=-lprotobuf -lpthread
-SOURCES_CLIENT=xhcp_client.cc ../common/csclient.cc ../common/XIARouter.cc ../../XIASocket/API/libXsocket.a
-SOURCES_SERVER=xhcp_server.cc ../common/csclient.cc ../common/XIARouter.cc ../../XIASocket/API/libXsocket.a
-CLIENT=xhcp_clientd
-SERVER=xhcp_serverd
+SOURCES_CLIENT=xhcp_client.cc ../common/csclient.cc ../common/XIARouter.cc $(XLIB)/libXsocket.a
+SOURCES_SERVER=xhcp_server.cc ../common/csclient.cc ../common/XIARouter.cc $(XLIB)/libXsocket.a
+CLIENT=$(BINDIR)/xhcp_clientd
+SERVER=$(BINDIR)/xhcp_serverd
 
 all: $(CLIENT) $(SERVER)
 

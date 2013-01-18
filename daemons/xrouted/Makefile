@@ -1,10 +1,16 @@
 .PHONY: clean
+
+APIDIR=../../api
+XINC=$(APIDIR)/include
+XLIB=$(APIDIR)/lib
+BINDIR=../../bin
+
 CC=g++
 CFLAGS1=-Wall -Wextra
-CFLAGS2=-I../../XIASocket/API
+CFLAGS2=-I$(APIDIR)/xsocket
 LDFLAGS =  -lprotobuf -lpthread
-SOURCES=xrouted.cc ../common/csclient.cc ../common/XIARouter.cc ../../XIASocket/API/libXsocket.a
-XROUTED=xrouted
+SOURCES=xrouted.cc ../common/csclient.cc ../common/XIARouter.cc $(XLIB)/libXsocket.a
+XROUTED=$(BINDIR)/xrouted
 
 all: $(XROUTED)
 

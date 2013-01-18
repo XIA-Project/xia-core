@@ -1,6 +1,6 @@
-all: nameserver xhcp xroute
+all: nameserver xhcp xrouted
 
-clean: nameserver_clean xhcp_clean xroute_clean
+clean: nameserver_clean xhcp_clean xrouted_clean
 
 .PHONY: nameserver
 nameserver:
@@ -10,8 +10,8 @@ nameserver:
 xhcp:
 	make -C $@;
 
-.PHONY: xroute
-xroute:
+.PHONY: xrouted
+xrouted:
 	make -C $@;
 
 .PHONY: nameserver_clean
@@ -23,6 +23,6 @@ xhcp_clean:
 	make -C xhcp clean;
 
 .PHONY: xroute_clean
-xroute_clean:
-	make -C xroute clean;
+xrouted_clean:
+	make -C xrouted clean;
 
