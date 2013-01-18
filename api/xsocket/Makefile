@@ -1,13 +1,13 @@
 .PHONY: clean doc test
 CC=g++
 LD=g++
-CFLAGS=-c -Wall -Wextra -I../minini
+CFLAGS=-c -Wall -Wextra -Iminini
 LDFLAGS =-lprotobuf
 SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XrequestChunk.c  \
 		XgetChunkStatus.c  XreadChunk.c  XputChunk.c Xrecv.c \
         Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c  Xgetaddrinfo.c \
 		Xsetsockopt.c Xutil.c state.c Xinit.c XupdateAD.c XupdateNameServerDAG.c XgetDAGbyName.c  \
-		../minini/minIni.c 
+		minini/minIni.c 
 SHARED_OBJECTS=$(SOURCES:.c=.shared.o) xia.pb.shared.o
 STATIC_OBJECTS=$(SOURCES:.c=.o) xia.pb.o
 
