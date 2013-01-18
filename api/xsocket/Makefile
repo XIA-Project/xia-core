@@ -49,9 +49,9 @@ test: $(DLIB)
 	make -C test test
 
 clean:
-	rm -f $(SLIB) $(DLIB)
-	rm -f *.o xia.pb.*
-	rm -rf doc
+	-rm -f $(SLIB) $(DLIB)
+	-rm -f *.o xia.pb.*
+	-rm -rf doc
 	make -C python clean
 	make -C test clean
 

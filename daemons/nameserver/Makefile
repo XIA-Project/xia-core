@@ -17,6 +17,6 @@ $(NS): $(SOURCES)
 	$(CC) -o $@ $(CFLAGS) $(SOURCES) $(LDFLAGS)	
 
 clean:
-	rm $(NS)
+	-rm $(NS)
 	
 	

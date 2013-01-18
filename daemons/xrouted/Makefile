@@ -18,5 +18,5 @@ $(XROUTED): $(SOURCES)
 	$(CC) -o $@ $(CFLAGS2) $(SOURCES) $(LDFLAGS)
 
 clean:
-	rm $(XROUTED)
+	-rm $(XROUTED)
 

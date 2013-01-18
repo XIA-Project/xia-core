@@ -19,4 +19,4 @@ test: $(TARGETS)
 	./addrinfo_test
 
 clean:
-	rm $(TARGETS)
+	-rm $(TARGETS)

@@ -22,4 +22,4 @@ $(SERVER): $(SOURCES_SERVER)
 	$(CC) -o $@ $(CFLAGS) $(SOURCES_SERVER) $(LDFLAGS)
 
 clean:
-	rm $(CLIENT) $(SERVER)
+	-rm $(CLIENT) $(SERVER)

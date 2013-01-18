@@ -25,9 +25,9 @@ doc:
 	make -C doc html
 
 clean: 
-	rm $(TARGET)
-	rm $(XLIB)/xsocket.py
-	rm $(XLIB)/c_xsocket.py
+	-rm $(TARGET)
+	-rm $(XLIB)/xsocket.py
+	-rm $(XLIB)/c_xsocket.py
 	make -C doc clean
-	rm -f *.so *.o *.pyc
-	rm c_xsocket_wrap.c
+	-rm -f *.so *.o *.pyc
+	-rm c_xsocket_wrap.c
