@@ -1,7 +1,10 @@
 .PHONY: clean doc test install
+APIDIR=..
+XLIB=$(APIDIR)/lib
+XINC=$(APIDIR)/include
 CC=g++
 LD=g++
-CFLAGS=-c -Wall -Wextra -Iminini
+CFLAGS=-c -Wall -Wextra -Iminini -I$(XINC)
 LDFLAGS =-lprotobuf
 SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XrequestChunk.c  \
 		XgetChunkStatus.c  XreadChunk.c  XputChunk.c Xrecv.c \
@@ -10,8 +13,10 @@ SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XrequestChunk.c  \
 		minini/minIni.c 
 SHARED_OBJECTS=$(SOURCES:.c=.shared.o) xia.pb.shared.o
 STATIC_OBJECTS=$(SOURCES:.c=.o) xia.pb.o
+SLIB=$(XLIB)/libXsocket.a
+DLIB=$(XLIB)/libXsocket.so
 
-all: xia.pb.cc  libXsocket.a libXsocket.so
+all: xia.pb.cc  $(SLIB) $(DLIB)
 	make -C python all
 
 xia.pb.cc: xia.proto
@@ -26,13 +31,11 @@ xia.pb.shared.o:
 %.shared.o: %.c X*.h  xia.pb.cc
 	$(CC) $(CFLAGS) -fpic $<  -o $@
 
-libXsocket.a: $(STATIC_OBJECTS) 
+$(SLIB): $(STATIC_OBJECTS) 
 	ar rcs $@ $(STATIC_OBJECTS) 
-	cp $@ ../lib
 
-libXsocket.so: $(SHARED_OBJECTS) 
+$(DLIB): $(SHARED_OBJECTS) 
 	$(LD) -shared -o $@ $(SHARED_OBJECTS) $(LDFLAGS) -lc  -l dl
-	cp $@ ../lib
 
 xwrap.so: xwrap.c
 	$(CC) -Wall -fPIC -DPIC -c $<
@@ -42,15 +45,12 @@ doc: Xdoc.h $(SOURCES)
 	doxygen XsocketsAPI.cfg
 	make -C python doc
 
-test: libXsocket.so
+test: $(DLIB)
 	make -C test test
 
-install:
-	cp libXsocket.a ../lib
-	cp libXsocket.so ../lib
-
 clean:
-	rm -f *.o *.a *.so *.shared.o xia.pb.*
+	rm -f $(SLIB) $(DLIB)
+	rm -f *.o xia.pb.*
 	rm -rf doc
 	make -C python clean
 	make -C test clean

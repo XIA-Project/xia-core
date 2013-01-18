@@ -1,8 +1,11 @@
 .PHONY: all runtests
 
+APIDIR=../..
+XLIB=$(APIDIR)/lib
+XINC=$(APIDIR)/include
 CC=gcc
-CFLAGS=-I.. -Wall -Wextra
-LIBS =../libXsocket.so
+CFLAGS=-I.. -I$(XINC) -Wall -Wextra
+LIBS =$(XLIB)/libXsocket.so
 
 TARGETS=dag_test addrinfo_test
 
