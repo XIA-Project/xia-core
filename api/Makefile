@@ -1,7 +1,7 @@
 all: 
 	make -C xsocket
 	make -C XIAResolver
-	cd dagaddr/cpp && cmake . && cmake . && make && make install
+	make -C dagaddr
 
 clean:
 	make -C xsocket clean

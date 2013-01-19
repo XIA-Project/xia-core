@@ -9,4 +9,4 @@ all: xtraceroute
 	mv xtraceroute $(BINDIR)/
 
 clean: 
-	rm $(BINDIR)/xtraceroute
+	-rm $(BINDIR)/xtraceroute

@@ -16,8 +16,8 @@ APPS = chunk_copy_client chunk_copy_server echoclient echoclient-datagram echocl
 
 all: $(APPS)
 	mv $(APPS) $(BINDIR)
+	make -C dag_manipulation
 
 clean:
 	rm -f $(addprefix $(BINDIR)/, $(APPS))
-
-
+	make -C dag_manipulation clean

@@ -12,7 +12,6 @@ OBJECTS=$(SOURCES:.cpp=.o)
 TARGET=$(XLIB)/libdagaddr.so
 
 all: $(TARGET) dagaddr_test
-	make -C ../python all
 
 %.o: %.cpp utils.hpp $(XINC)/dagaddr.hpp
 	$(CC) $(CFLAGS) -c -fpic $<  -o $@ $(LDFLAGS)
@@ -29,4 +28,3 @@ doc: mainpage.h $(SOURCES)
 clean:
 	-rm -f *.o *.so dagaddr_test $(TARGET)
 	-rm -rf ../doc
-	make -C ../python clean

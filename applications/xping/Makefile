@@ -9,4 +9,4 @@ all: xping
 	mv xping $(BINDIR)/
 
 clean: 
-	rm $(BINDIR)/xping
+	-rm $(BINDIR)/xping
