@@ -1,7 +1,9 @@
 CC=g++
 LD=g++
 
-APIDIR=../../api
+XIADIR=$(shell cd ../../ && pwd)
+
+APIDIR=$(XIADIR)/api
 XINC=$(APIDIR)/include
 XLIB=$(APIDIR)/lib
 BINDIR=../../bin

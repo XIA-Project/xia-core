@@ -38,6 +38,8 @@ const char *XgetDAGbyname(char *name) {
     if (answer_found) {
       return DAG;
     }
+  } else {
+      printf("XIAResolver file error\n");
   }
   
   printf("Name not found in ./hosts_xia\n");

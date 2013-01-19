@@ -52,7 +52,7 @@ XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
 
 # click parameters
 CLICKPATH=$XIADIR/click
-CONFPATH=$CLICKPATH/conf
+CONFPATH=$XIADIR/etc/click/
 CLICK=$CLICKPATH/userlevel/click
 SCRIPT=xia_local_topology.click
 SCRIPT_SET=0
@@ -142,7 +142,7 @@ start_daemons()
 		exec &> $LOGFILE
 	fi
 
-	cd $XIADIR/tools/click_templates
+	cd $XIADIR/etc/click/templates/
 	python xconfig.py $FLAGS  # TODO: we maybe be calling this unnecessarily, but that's OK
 
 
@@ -183,46 +183,37 @@ start_daemons()
 	cd $XIADIR/bin
 
 	if [ $ROUTER -eq 1 ]; then
-#		cd $XIADIR/daemons/xroute
 		./xrouted $HOSTNAME & 
 		sleep 2
 		
-#		cd $XIADIR/daemons/xhcp
 		./xhcp_serverd &
 		sleep 1 
 	fi
 	if [ $HOST -eq 1 ]; then    
 
 		if [ $DUAL_STACK -eq 1 ]; then
-#			cd $XIADIR/daemons/xroute
 			./xrouted "$HOSTNAME"_router 180 &   # 180 is the name of a section in daemons/xroute/xsockconf.ini
 			sleep 2
 			
-#			cd $XIADIR/daemons/xhcp
 			./xhcp_serverd 180 &
 			sleep 1 
 		
-#			cd $XIADIR/daemons/xhcp
 			./xhcp_clientd www_h.$HOSTNAME.com.xia "$HOSTNAME"_host &
 			sleep 2 
 		else
-#			cd $XIADIR/daemons/xhcp
 			./xhcp_clientd www_h.$HOSTNAME.com.xia $HOSTNAME & 
 			sleep 2 
 		fi
 		
 	fi
 	if [ $NAMESERVER -eq 1 -a $HOST -eq 1 ]; then
-#		cd $XIADIR/daemons/nameserver
 		./xnameservice &
 	fi
 	if [ $LOCAL_CHAIN_TOPOLOGY -eq 1 ]; then
-#		cd $XIADIR/daemons/xroute
 		./xrouted router0 180 &
 		./xrouted router1 181 & 
 		sleep 2
 		
-#		cd $XIADIR/daemons/xhcp
 		./xhcp_serverd 180 &
 		./xhcp_serverd 181 &
 		sleep 1 
@@ -231,7 +222,6 @@ start_daemons()
 		./xhcp_clientd www_h.host1.com.xia host1 192 &
 		sleep 2 
 			
-#		cd $XIADIR/daemons/nameserver
 		./xnameservice &
 	fi
 	if [ $RUN_VISUALIZER_SERVER -eq 1 ]; then
