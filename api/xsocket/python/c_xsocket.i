@@ -1,6 +1,6 @@
 %module c_xsocket
 %{
-#include  "../Xsocket.h"
+#include  "../../include/Xsocket.h"
 %}
 
 
@@ -243,8 +243,7 @@
    in Xsocket.h in our python wrapper 
    NOTE: It matters to swig where everything else in this file is
    with relation to this include, so don't move it. */
-%include "../Xsocket.h"
-
+%include "../../include/Xsocket.h"
 
 /* ===== Xsend ===== */
 /* eliminate the need for python users to pass the length of the data, since we can calculate it */

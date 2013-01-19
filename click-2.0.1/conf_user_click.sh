@@ -1,6 +1,6 @@
 #!/bin/sh
 
-IO_ENGINE=`dirname $0`/../io_engine
+IO_ENGINE=`dirname $0`/../experiments/io_engine
 IO_ENGINE=`readlink -f $IO_ENGINE`
 
 cd `dirname $0`/

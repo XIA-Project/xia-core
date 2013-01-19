@@ -1,11 +1,15 @@
 .PHONY: all clean test
 
 all:
-	make -C api/xsocket
+	cd click && ./conf_user_click.sh && make -j8
+	make -C api
+	make -C applications
 	make -C daemons
 
 clean:
-	make -C api/xsocket clean
+	make -C click clean
+	make -C api clean
+	make -C applications clean
 	make -C daemons clean
 
 test:

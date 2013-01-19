@@ -7,9 +7,9 @@ BINDIR=../../bin
 
 CC=g++
 CFLAGS1=-Wall -Wextra
-CFLAGS2=-I$(APIDIR)/xsocket
+CFLAGS2=-I$(XINC)
 LDFLAGS =  -lprotobuf -lpthread
-SOURCES=xrouted.cc ../common/csclient.cc ../common/XIARouter.cc $(XLIB)/libXsocket.a
+SOURCES=xrouted.cc ../common/csclient.cc ../common/XIARouter.cc $(XLIB)/libXsocket.so
 XROUTED=$(BINDIR)/xrouted
 
 all: $(XROUTED)

@@ -16,11 +16,6 @@ c_xsocket_wrap.c: c_xsocket.i $(XSOCK_LIB)
 $(XLIB)/xsocket.py: oo_wrapper/xsocket.py
 	cp $< $@
 
-install: all
-	cp _c_xsocket.so $(XLIB)
-	cp c_xsocket.py $(XLIB)
-	cp oo_wrapper/xsocket.py $(XLIB)
-
 doc:
 	make -C doc html
 

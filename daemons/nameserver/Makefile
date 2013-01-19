@@ -6,7 +6,7 @@ XINC=$(APIDIR)/include
 XLIB=$(APIDIR)/lib
 BINDIR=../../bin
 
-CFLAGS=-I$(APIDIR)/xsocket -ggdb
+CFLAGS=-I$(XINC) -ggdb
 LDFLAGS=-lprotobuf -lpthread
 SOURCES=ns.cc $(XLIB)/libXsocket.so
 NS=$(BINDIR)/xnameservice
@@ -18,5 +18,3 @@ $(NS): $(SOURCES)
 
 clean:
 	-rm $(NS)
-	
-	
