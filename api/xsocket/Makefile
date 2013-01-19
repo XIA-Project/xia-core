@@ -1,4 +1,4 @@
-.PHONY: clean doc test install
+.PHONY: clean doc test
 APIDIR=..
 XLIB=$(APIDIR)/lib
 XINC=$(APIDIR)/include

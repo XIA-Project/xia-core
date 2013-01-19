@@ -1,6 +1,7 @@
-#TODO set this for real
-XIADIR=../..
-#XIADIR=$(dirname $(dirname $(cd ${0%/*} && echo $PWD/${0##*/})))
+#TODO set this automatically?
+APIDIR=../../../api
+XLIB=$(APIDIR)/lib
+XINC=$(APIDIR)/include
 
 # TODO: Why isn't it working with just these?
 #CXXFLAGS=-I$(XIADIR)/include -std=c++0x 
@@ -9,7 +10,7 @@ XIADIR=../..
 all: dagaddr_example
 
 dagaddr_example:
-	g++ -I$(XIADIR)/include -std=c++0x -L$(XIADIR)/lib dagaddr_example.cpp -ldagaddr  -o dagaddr_example
+	g++ -I$(XINC) -std=c++0x -L$(XLIB) dagaddr_example.cpp -ldagaddr -o dagaddr_example
 
 clean:
-	rm -f dagaddr_example
+	-rm -f dagaddr_example

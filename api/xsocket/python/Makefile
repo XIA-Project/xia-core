@@ -1,4 +1,4 @@
-.PHONY: clean doc install
+.PHONY: clean doc
 
 XLIB=../../lib
 XSOCK_LIB=$(XLIB)/libXsocket.so
