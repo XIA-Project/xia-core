@@ -71,7 +71,7 @@ elementclass XIAPacketRoute {
     rt_AD[2], rt_HID[2], rt_SID[2], rt_CID[2], rt_IP[2] -> consider_next_path;
 	rt_AD[3], rt_HID[3],            rt_CID[3], rt_IP[3] -> Discard;
 			  			 rt_SID[3]                      -> [3]output;
-	rt_AD[4], rt_HID[4], rt_SID[4], rt_CID[4], rt_IP[4] -> x; // possible xcmp redirect message
+	rt_AD[4], rt_HID[4], rt_SID[4], rt_CID[4], rt_IP[4] -> x; // xcmp redirect message
 };
 
 

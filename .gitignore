@@ -46,6 +46,7 @@ XIASocket/sample/xs_dgram
 XIASocket/sample/xs_stream
 XIASocket/sample/chunkc
 XIASocket/sample/chunks
+click-2.0.1/autom4te.cache
 click-2.0.1/Makefile
 click-2.0.1/config.log
 click-2.0.1/bsdmodule/Makefile
@@ -110,8 +111,8 @@ example/xcmptraceroute
 example/xecho
 
 # output from scripts
-tools/click_templates/xia_address.click
-tools/click_templates/host.click
-tools/click_templates/router.click
-tools/click_templates/dual_stack_host.click
-tools/click_templates/dual_stack_router.click
+etc/click/templates/xia_address.click
+etc/click/templates/host.click
+etc/click/templates/router.click
+etc/click/templates/dual_stack_host.click
+etc/click/templates/dual_stack_router.click

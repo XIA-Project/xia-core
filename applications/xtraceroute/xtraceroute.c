@@ -85,7 +85,7 @@ char whereto[1024];/* Who to ping */
 int datalen;		/* How much data */
 
 char usage[] =
-"Usage: xcmptraceroute [-dfqrv] host [packetsize [count [preload]]]\n";
+"Usage: xtraceroute [-dfqrv] host [packetsize [count [preload]]]\n";
 
 char *hostname;
 char hnamebuf[MAXHOSTNAMELEN];

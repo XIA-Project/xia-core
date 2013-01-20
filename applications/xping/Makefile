@@ -1,12 +1,21 @@
 XIADIR=$(shell cd ../../ && pwd)
 
 APIDIR=$(XIADIR)/api
-BINDIR=../../bin
-CFLAGS=-Wall -I$(APIDIR)/include
-LDFLAGS=$(APIDIR)/lib/libXsocket.so $(APIDIR)/lib/libXIAResolver.so -lpthread
+XLIB=$(APIDIR)/lib
+XINC=$(APIDIR)/include
+BINDIR=$(XIADIR)/bin
+CFLAGS=-Wall -Wextra -I$(XINC)
+LDFLAGS=-lpthread
+LIBS=$(XLIB)/libXsocket.so $(XLIB)/libXIAResolver.so
 
-all: xping
-	mv xping $(BINDIR)/
+OUT=xping
+TARGETS=$(addprefix $(BINDIR)/, $(OUT))
+SOURCES=$(addsuffix .c, $(OUT))
+
+all: $(TARGETS)
+
+$(TARGETS): $(SOURCES)
+	$(CC) $(CFLAGS) $(LDFLAGS) $< -o $@ $(LIBS)
 
 clean: 
-	-rm $(BINDIR)/xping
+	-rm $(TARGETS)
