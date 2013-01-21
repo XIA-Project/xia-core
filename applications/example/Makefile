@@ -10,19 +10,20 @@ XLIB=$(APIDIR)/lib
 BINDIR=$(XIADIR)/bin
 CFLAGS=-Wall -Wextra -I$(XINC)
 LDFLAGS=-lprotobuf -lpthread
-LIBS=$(XLIB)/libXsocket.so $(XLIB)/libXIAResolver.so
+LIBS=$(XLIB)/libXsocket.so
 
-OUT= chunk_copy_client chunk_copy_server echoclient echoclient-datagram \
+TARGETS= chunk_copy_client chunk_copy_server echoclient echoclient-datagram \
 	echoclient-simple echoserver time_of_day_client time_of_day_server
-TARGETS=$(addprefix $(BINDIR)/, $(OUT))
-SOURCES=$(addsuffix .c, $(OUT))
 
-all: $(TARGETS)
+all: $(addprefix $(BINDIR)/, $(TARGETS))
 	make -C dag_manipulation
 
-$(TARGETS): $(SOURCES)
-	$(CC) $(CFLAGS) $(LDFLAGS) $< -o $@ $(LIBS)
+$(BINDIR)/%: %.c
+	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS) $(LIBS)
+
+$(BINDIR)/%: %.cpp
+	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS) $(LIBS)
 
 clean: 
-	-rm $(TARGETS)
+	-rm $(addprefix $(BINDIR)/, $(TARGETS))
 	make -C dag_manipulation clean
