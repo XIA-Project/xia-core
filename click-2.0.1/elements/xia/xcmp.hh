@@ -66,7 +66,7 @@ class XCMP : public Element { public:
     u_short in_cksum(u_short *, int);
     
     void sendUp(Packet *p_in);
-    void sendXCMPPacket(Packet *p_in, int type, int code, click_xia_xid*);
+    void sendXCMPPacket(Packet *p_in, int type, int code, click_xia_xid*, click_xia_xid*);
 
     void processBadForwarding(Packet *p_in);
     void processUnreachable(Packet *p_in);

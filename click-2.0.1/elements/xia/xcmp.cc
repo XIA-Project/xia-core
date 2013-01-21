@@ -27,7 +27,7 @@
 #include <click/packet_anno.hh>
 CLICK_DECLS
 
-#define DEBUG 1
+#define DEBUG 0
 
 // no initialization needed
 XCMP::XCMP()
@@ -75,7 +75,7 @@ XCMP::sendUp(Packet *p_in) {
 
 // create and send XCMP packet with the following params. _addr_ is used for redirects.
 void
-XCMP::sendXCMPPacket(Packet *p_in, int type, int code, click_xia_xid *addr) {
+XCMP::sendXCMPPacket(Packet *p_in, int type, int code, click_xia_xid *lastaddr, click_xia_xid *nxthop) {
     char msg[256];
 
     XIAHeader hdr(p_in);
@@ -90,14 +90,16 @@ XCMP::sendXCMPPacket(Packet *p_in, int type, int code, click_xia_xid *addr) {
     msg[1] = code;
 		
     // copy the correct route redirect address into the packet if needed
-    if(addr)
-        memcpy(&msg[4], addr, sizeof(struct click_xia_xid));
+    if(lastaddr && nxthop) {
+        memcpy(&msg[4], lastaddr, sizeof(struct click_xia_xid));
+        memcpy(&msg[4+sizeof(struct click_xia_xid)], nxthop, sizeof(struct click_xia_xid));
+    }
 		
     // copy in the XIA header and the first 8 bytes of the datagram.
     // strictly speaking, this first 8 bytes don't get us anything,
     // but for the sake of similarity to ICMP we include them.
-    memcpy(&msg[4+sizeof(struct click_xia_xid)], hdr.hdr(), hdr.hdr_size()); // copy XIP header
-    memcpy(&msg[4+sizeof(struct click_xia_xid)+hdr.hdr_size()], 
+    memcpy(&msg[4+sizeof(struct click_xia_xid)*2], hdr.hdr(), hdr.hdr_size()); // copy XIP header
+    memcpy(&msg[4+sizeof(struct click_xia_xid)*2+hdr.hdr_size()], 
            hdr.payload(), 8); // copy first 8 bytes of datagram
 		
     // update the checksum
@@ -114,10 +116,7 @@ XCMP::sendXCMPPacket(Packet *p_in, int type, int code, click_xia_xid *addr) {
     encap.set_src_path(_src_path);
 		
     // clear the paint
-    if(type == 5) // redirect
-        SET_XIA_PAINT_ANNO(p, XIA_PAINT_ANNO(p_in)*-1-TOTAL_SPECIAL_CASES);
-    else 
-        SET_XIA_PAINT_ANNO(p, DESTINED_FOR_LOCALHOST);
+    SET_XIA_PAINT_ANNO(p, DESTINED_FOR_LOCALHOST);
 
     // send the packet out to the network
     output(0).push(encap.encap(p));
@@ -130,20 +129,27 @@ XCMP::sendXCMPPacket(Packet *p_in, int type, int code, click_xia_xid *addr) {
 void
 XCMP::processBadForwarding(Packet *p_in) {
     XIAHeader hdr(p_in);
+
+
+    const struct click_xia* shdr = p_in->xia_header();
+    int last = shdr->last;
+    if(last < 0)
+        last += shdr->dnode;
+    const struct click_xia_xid_node& lastnode = shdr->node[last];
+    XID lnode(lastnode.xid);
+
     if(DEBUG)
         click_chatter("%s: %u: %s sent me a packet that should route on its local network (Dst: %s)\n", 
                       _src_path.unparse().c_str(), p_in->timestamp_anno().usecval(), hdr.src_path().unparse().c_str(), 
-                      hdr.dst_path().unparse().c_str());
+                      XID(lastnode.xid).unparse().c_str());
 
     // get the next hop information stored in the packet annotation
-    XID x = p_in->nexthop_neighbor_xid_anno();
-    struct click_xia_xid xid_temp;
-    xid_temp = x.xid();
+    XID nxt_hop = p_in->nexthop_neighbor_xid_anno();
 
-    sendXCMPPacket(p_in, 5, 1, &xid_temp); // send a redirect
+    sendXCMPPacket(p_in, 5, 1, &lnode.xid(), &nxt_hop.xid()); // send a redirect
 	   
     if(DEBUG)
-        click_chatter("%s: %u: Redirect sent (paint color: %d)\n", _src_path.unparse().c_str(), Timestamp::now().usecval(), XIA_PAINT_ANNO(p_in)*-1-TOTAL_SPECIAL_CASES);
+        click_chatter("%s: %u: Redirect sent\n", _src_path.unparse().c_str(), Timestamp::now().usecval());
 
     return;
 }
@@ -157,12 +163,25 @@ XCMP::processUnreachable(Packet *p_in) {
         return;
     }
 
+
+    String broadcast_xid("HID:1111111111111111111111111111111111111111");  // broadcast HID
+    XID bcast_xid;
+    bcast_xid.parse(broadcast_xid);    
+
+    XIAPath dst_path = hdr.dst_path();
+    dst_path.remove_node(dst_path.destination_node());
+    XID dst_hid = dst_path.xid(dst_path.destination_node());
+    if(dst_hid == bcast_xid) {
+        // don't send undeliverables back to broadcast packets
+        return;
+    }
+
     if(DEBUG)
         click_chatter("%s: %u: Dest (S: %s , D: %s) Unreachable\n", _src_path.unparse().c_str(), 
                       p_in->timestamp_anno().usecval(), hdr.src_path().unparse().c_str(), 
                       hdr.dst_path().unparse().c_str());
       
-    sendXCMPPacket(p_in, 3, 1, NULL); // send an undeliverable message
+    sendXCMPPacket(p_in, 3, 1, NULL, NULL); // send an undeliverable message
       
     if(DEBUG)
         click_chatter("%s: %u: Dest Unreachable sent to %s\n", _src_path.unparse().c_str(), 
@@ -177,7 +196,7 @@ XCMP::processExpired(Packet *p_in) {
     if(DEBUG)
         click_chatter("%s: %u: HLIM Exceeded\n", _src_path.unparse().c_str(), p_in->timestamp_anno().usecval());
     
-    sendXCMPPacket(p_in, 11, 0, NULL); // send a TTL expire message
+    sendXCMPPacket(p_in, 11, 0, NULL, NULL); // send a TTL expire message
   		
     if(DEBUG)
         click_chatter("%s: %u: TIME EXCEEDED sent\n", _src_path.unparse().c_str(), Timestamp::now().usecval());
@@ -193,7 +212,7 @@ XCMP::gotPing(Packet *p_in) {
         click_chatter("%s: %u: PING received; client seq = %u\n", _src_path.unparse().c_str(), 
                       p_in->timestamp_anno().usecval(), *(uint16_t*)(hdr.payload() + 6));
 
-    sendXCMPPacket(p_in, 0, 0, NULL);
+    sendXCMPPacket(p_in, 0, 0, NULL, NULL);
 
     /*
     // TODO: What is this?
@@ -255,28 +274,45 @@ XCMP::gotRedirect(Packet *p_in) {
         click_chatter("%s: %u: Received REDIRECT\n", _src_path.unparse().c_str(), Timestamp::now().usecval());
     
     XIAHeader hdr(p_in);
-    const uint8_t *payload = hdr.payload();
-    const uint8_t *pay;
-    XID *newroute;
+    const uint8_t *pay = hdr.payload();
+    XID baddest, newroute;
     XIAHeader *badhdr;
 
-    pay = payload;
-    newroute = new XID((const struct click_xia_xid &)(pay[4]));
-    badhdr = new XIAHeader((const struct click_xia *)(&pay[4+sizeof(struct click_xia_xid)]));
+    baddest = XID((const struct click_xia_xid &)(pay[4]));
+    newroute = XID((const struct click_xia_xid &)(pay[4+sizeof(struct click_xia_xid)]));
+    badhdr = new XIAHeader((const struct click_xia *)(&pay[4+sizeof(struct click_xia_xid)*2]));
     if(DEBUG)
         click_chatter("%s: %u: REDIRECT INFO: %s told me (%s) that in order to send to %s, I should first send to %s\n",
                       _src_path.unparse().c_str(), Timestamp::now().usecval(), hdr.src_path().unparse().c_str(), 
-                      hdr.dst_path().unparse().c_str(), badhdr->dst_path().unparse().c_str(), newroute->unparse().c_str());
+                      hdr.dst_path().unparse().c_str(), baddest.unparse().c_str(), newroute.unparse().c_str());
 		
-    delete newroute;
     delete badhdr;
+
+    char msg[256];
+    memcpy(msg, hdr.payload(), hdr.plen());
+				
+    // create a packet to store the message in
+    WritablePacket *p = Packet::make(256, msg, 4+sizeof(struct click_xia_xid)+hdr.hdr_size()+8, 0);
+
+    XIAPath dest;
+    XIAPath::handle_t d_dummy = dest.add_node(XID());
+    XIAPath::handle_t d_node = dest.add_node(XID((const struct click_xia_xid &)(pay[4])));
+    dest.add_edge(d_dummy, d_node);
+
+    // encapsulate the packet within XCMP
+    XIAHeaderEncap encap;
+    encap.set_nxt(CLICK_XIA_NXT_XCMP);   // XCMP
+    encap.set_dst_path(dest);
+    encap.set_src_path(_src_path);
 
     // paint the packet so the upper level routing process
     // knows to update its table
-    SET_XIA_PAINT_ANNO(p_in, 1);
+    SET_XIA_PAINT_ANNO(p, 1);
 		
     // send the Route Update to Host
-    output(1).push(p_in);
+    output(1).push(encap.encap(p));
+
+    p_in->kill();
 }
 
 // process packet and send out proper xcmp message.
