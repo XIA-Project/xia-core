@@ -1,5 +1,14 @@
+import sys
+import os
+                                                                                                                                                                                                                    
+# find the path to xia-core
+XIADIR=os.getcwd()
+while os.path.split(XIADIR)[1] != 'xia-core':
+    XIADIR=os.path.split(XIADIR)[0]
+sys.path.append(XIADIR + '/api/lib')
+
 import socket, select, random
-import struct, time, signal, os, sys, re
+import struct, time, signal, re
 import threading
 import Tkinter
 from tkMessageBox import showwarning
