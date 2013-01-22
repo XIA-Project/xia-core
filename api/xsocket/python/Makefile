@@ -23,6 +23,7 @@ clean:
 	-rm $(TARGET)
 	-rm $(XLIB)/xsocket.py
 	-rm $(XLIB)/c_xsocket.py
+	-rm $(XLIB)/*.pyc
 	make -C doc clean
 	-rm -f *.so *.o *.pyc
 	-rm c_xsocket_wrap.c

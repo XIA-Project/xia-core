@@ -1,2 +1,2 @@
 python/dagaddr.py
-python/dagaddrPYTHON_wrap.cxx
+python/dagaddr_wrap.cxx
