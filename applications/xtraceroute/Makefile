@@ -1,7 +1,7 @@
 include ../../xia.mk
 
 CC=gcc
-LDFLAGS += $(XLIB)/libXsocket.so $(XLIB)/libXIAResolver.so
+LDFLAGS += $(XLIB)/libXsocket.so
 
 OUT=xtraceroute
 TARGETS=$(addprefix $(BINDIR)/, $(OUT))

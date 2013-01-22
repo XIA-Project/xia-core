@@ -44,7 +44,6 @@
 #include "Xsocket.h"
 
 #include "xip.h"
-#include "XgetDAGbyname.h"
 
 #define	MAXWAIT		10	/* max time to wait for response, sec. */
 #define	MAXPACKET	4096	/* max packet size */
@@ -142,7 +141,7 @@ char *argv[];
 	bzero((char *)whereto, 1024);
 	
 	const char *tmp;
-	if(!(tmp = XgetDAGbyname(av[0]))) {
+	if(!(tmp = XgetDAGbyName(av[0]))) {
 	  printf("Error Resolving XID\n");
 	  exit(-1);
 	}

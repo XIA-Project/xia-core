@@ -2,7 +2,8 @@
 #define DNS_DEF_PORT 53
 #define DNS_NOENTRY -1
 #define DNS_FAILURE -2
-#define ETC_HOSTS "/etc/hosts_xia"
+#define SOURCE_DIR "xia-core"
+#define ETC_HOSTS "/etc/hosts.xia"
 #define RESOLV_CONF "/etc/resolv.xiaconf"
 
 // DNS query header
@@ -41,6 +42,8 @@ typedef struct dns_rr {
     char *rdata;		// record data
 } dns_rr_t;
 
-const char *XgetDAGbyname(char *name);
+char *findroot();
+char *hostsLookup(const char *name);
+char *XgetDAGbyName(const char *name);
 void nameconv_dnstonorm(char *dst, char *src);
 int aaa();
