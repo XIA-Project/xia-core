@@ -479,6 +479,9 @@ class XrouteApp:
 				elif self.options.verbose() == False:
 					xid = self.config.getAlias(xid)
 
+				if self.options.verbose() == False:
+					nexthop = self.config.getAlias(nexthop)
+
 				text += "%-5s %-45s %2s%-11s %08x %s\n" % (table, xid, 
 						port, self.portType(port), flags, nexthop) 
 
