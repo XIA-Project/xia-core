@@ -1,6 +1,7 @@
+include ../../../xia.mk
+
 .PHONY: clean doc
 
-XLIB=../../lib
 XSOCK_LIB=$(XLIB)/libXsocket.so
 TARGET=$(XLIB)/_c_xsocket.so
 
@@ -8,7 +9,8 @@ all: $(TARGET) $(XLIB)/xsocket.py
 
 $(TARGET): $(XSOCK_LIB) c_xsocket_wrap.c 
 	gcc -I/usr/include/python2.7 -fpic -c c_xsocket_wrap.c 
-	gcc -shared c_xsocket_wrap.o -lXsocket -o $@  -I/usr/include/python2.7 -L$(XLIB)
+	#gcc -shared c_xsocket_wrap.o -lXsocket -o $@  -I/usr/include/python2.7 -L$(XLIB)
+	gcc -shared c_xsocket_wrap.o $(XSOCK_LIB) -o $@  -I/usr/include/python2.7
 
 c_xsocket_wrap.c: c_xsocket.i $(XSOCK_LIB)
 	swig -outdir $(XLIB) -python c_xsocket.i 
