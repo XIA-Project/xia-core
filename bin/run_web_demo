@@ -23,10 +23,6 @@
 # throughout the source tree
 # b) not rely on the xsockconf.ini file if possible
 
-# set this just in case user doesn't have it in their environment
-# can be removed once libraries are installed in correct paths
-export LD_LIBRARY_PATH=.
-
 NAME=`basename $0`
 VERBOSE=0
 
@@ -37,6 +33,10 @@ SERVICES="proxy.py webserver.py vs hello_service.py stock_service.py"
 # and that the services it starts are rooted off of the same location
 #  so XIADIR would be /xia-core assuming the script were /xia-core/tools/run_demo
 XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")" 
+
+# set this just in case user doesn't have it in their environment
+# can be removed once libraries are installed in correct paths
+export LD_LIBRARY_PATH=$(XIADIR)/api/lib
 
 is_running()
 {
@@ -80,15 +80,15 @@ start_services()
 		exec &> /dev/null
 	fi
 
-	cd $XIADIR/web_demo
+	cd $XIADIR/applications/demo/web_demo
 	./stock_service.py &
 	./hello_service.py & 
 
-	cd $XIADIR/XIASocket/sample
-	./vs video.ogv &
+	cd $XIADIR/applications/demo/web_demo
+	./vs resources/video.ogv &
 	sleep 1  # need this otherwise it doesn't work
-
-	cd $XIADIR/web
+	
+	cd $XIADIR/applications/web
 	./webserver.py &
 	sleep 1
 	./proxy.py 8080 127.0.0.1 &
