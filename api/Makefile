@@ -8,3 +8,4 @@ clean:
 
 test:
 	make -C xsocket test
+	make -C dagaddr test

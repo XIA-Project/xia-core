@@ -1,4 +1,4 @@
-.PHONY: clean doc
+.PHONY: all test clean doc
 
 all: 
 	make -C cpp all
@@ -6,6 +6,9 @@ all:
 
 doc: 
 	make -C cpp doc
+
+test:
+	make -C cpp test
 
 clean:
 	make -C cpp clean

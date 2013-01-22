@@ -1,12 +1,8 @@
-.PHONY: clean doc
-APIDIR=../..
-XLIB=$(APIDIR)/lib
-XINC=$(APIDIR)/include
+include ../../../xia.mk
 
-CC=g++
-LD=g++
-CFLAGS=-I$(XINC)
-LDFLAGS=-std=c++0x -L$(XLIB)
+.PHONY: all clean doc
+
+CFLAGS += -std=c++0x
 SOURCES=dagaddr.cpp utils.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 TARGET=$(XLIB)/libdagaddr.so
@@ -14,16 +10,19 @@ TARGET=$(XLIB)/libdagaddr.so
 all: $(TARGET) dagaddr_test
 
 %.o: %.cpp utils.hpp $(XINC)/dagaddr.hpp
-	$(CC) $(CFLAGS) -c -fpic $<  -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) -c -fpic -std=c++0x $<  -o $@
 
 $(TARGET): $(OBJECTS) 
-	$(LD) -shared -o $@ $(OBJECTS) $(LDFLAGS) -lc -l dl
+	$(LD) -shared -o $@ $(OBJECTS) -lc -ldl $(LDFLAGS)
 
 dagaddr_test: test.cpp
-	$(CC) $(CFLAGS) $< -ldagaddr $(LDFLAGS) -o $@
+	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@ $(TARGET)
 
 doc: mainpage.h $(SOURCES)
 	doxygen Doxyfile
+
+test: dagaddr_test
+	./dagaddr_test
 
 clean:
 	-rm -f *.o *.so dagaddr_test $(TARGET)
