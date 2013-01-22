@@ -1,12 +1,18 @@
 #!/usr/bin/python
+import sys
+import os
+                                                                                                                                                                                                                    
+# find the path to xia-core
+XIADIR=os.getcwd()
+while os.path.split(XIADIR)[1] != 'xia-core':
+    XIADIR=os.path.split(XIADIR)[0]
+sys.path.append(XIADIR + '/api/lib')
 
 import math
 import socket
-import sys
 import struct
 import time
 import datetime
-import os
 import string
 from c_xsocket import *
 from ctypes import *

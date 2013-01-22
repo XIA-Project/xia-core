@@ -1,16 +1,14 @@
-#TODO set this automatically?
-APIDIR=../../../api
-XLIB=$(APIDIR)/lib
-XINC=$(APIDIR)/include
+include ../../../xia.mk
 
-# TODO: Why isn't it working with just these?
-#CXXFLAGS=-I$(XIADIR)/include -std=c++0x 
-#LDFLAGS=-L$(XIADIR)/lib -ldagaddr
+.PHONY: all clean
 
-all: dagaddr_example
+TARGET=dagaddr_example
+LDFLAGS += $(XLIB)/libXsocket.so $(XLIB)/libdagaddr.so
 
-dagaddr_example:
-	g++ -I$(XINC) -std=c++0x -L$(XLIB) dagaddr_example.cpp -ldagaddr -o dagaddr_example
+all: $(TARGET)
+
+%: %.cpp
+	$(CC) $(CFLAGS) -std=c++0x -o $@ $< $(LDFLAGS)
 
 clean:
-	-rm -f dagaddr_example
+	-rm -f $(TARGET)
