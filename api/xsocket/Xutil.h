@@ -21,12 +21,10 @@
 #define _Xutil_h
 
 
-#define DEBUG
 #ifdef DEBUG
 #define LOG(s) fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, s)
 #define LOGF(fmt, ...) fprintf(stderr, "%s:%d: " fmt"\n", __FILE__, __LINE__, __VA_ARGS__) 
 #else
-int x
 #define LOG(s)
 #define LOGF(fmt, ...)
 #endif
