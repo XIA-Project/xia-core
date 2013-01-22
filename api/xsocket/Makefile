@@ -1,12 +1,11 @@
+include ../../xia.mk
+
 .PHONY: clean doc test
-APIDIR=..
-XLIB=$(APIDIR)/lib
-XINC=$(APIDIR)/include
-CC=g++
-LD=g++
-CFLAGS=-c -Wall -Wextra -Iminini -I$(XINC)
-CPPFLAGS=-c -Wall -Wextra -Iminini -I$(XINC)
-LDFLAGS =-lprotobuf
+
+CFLAGS +=-c -Iminini -fpic
+CPPFLAGS=$(CFLAGS)
+LDFLAGS +=-lprotobuf -lc -ldl
+
 SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XrequestChunk.c  \
 		XgetChunkStatus.c  XreadChunk.c  XputChunk.c Xrecv.c \
         Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c  Xgetaddrinfo.c \
@@ -16,22 +15,23 @@ OBJS=$(SOURCES:.c=.o) xia.pb.o
 LIB=$(XLIB)/libXsocket.so
 
 all: xia.pb.cc $(LIB)
+	echo $(MAKEFLAGS)
 	make -C python all
 
 xia.pb.cc: xia.proto
 	protoc --cpp_out=. xia.proto
 
 xia.pb.o:
-	$(CC) $(CFLAGS) -fpic xia.pb.cc  -o $@
+	$(CC) $(CFLAGS) xia.pb.cc  -o $@
 
 %.o: %.c xia.pb.cc
-	$(CC) $(CFLAGS) $(LDFLAGS) -fpic $<  -o $@
+	$(CC) $(CFLAGS) $<  -o $@
 
 $(LIB): $(OBJS) 
-	$(LD) -shared -o $@ $(OBJS) $(LDFLAGS) -lc  -l dl
+	$(LD) -shared -o $@ $(OBJS) $(LDFLAGS)
 
 xwrap.so: xwrap.c
-	$(CC) -Wall -fPIC -DPIC -c $<
+	$(CC) -fPIC -DPIC $<
 	$(LD) -shared -o $@ xwrap.o -ldl
 
 doc: Xdoc.h $(SOURCES)
