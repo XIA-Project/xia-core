@@ -46,16 +46,16 @@ typedef struct ns_pkt {
 **
 */
 char *findRoot() {
-    int len;
     char *pos;
-    char *cwd = (char*)malloc(sizeof(char)*4096);
+    char *path = (char*)malloc(sizeof(char)*4096);
+    readlink("/proc/self/exe", path, 4096);
 
-    getcwd(cwd, 4096);
-    len = strlen(cwd);
-    pos = strstr(cwd, SOURCE_DIR);
-    pos += sizeof(SOURCE_DIR)-1;
-    *pos = '\0';
-    return cwd;
+    pos = strstr(path, SOURCE_DIR);
+    if(pos) {
+        pos += sizeof(SOURCE_DIR)-1;
+        *pos = '\0';
+    }
+    return path;
 }
 
 /*!
