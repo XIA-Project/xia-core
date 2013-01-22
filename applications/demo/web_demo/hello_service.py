@@ -1,10 +1,17 @@
 #!/usr/bin/python
+import sys
+import os
+                                                                                                                                                                                                                    
+# find the path to xia-core
+XIADIR=os.getcwd()
+while os.path.split(XIADIR)[1] != 'xia-core':
+    XIADIR=os.path.split(XIADIR)[0]
+sys.path.append(XIADIR + '/api/lib')
+
 import socket 
 import c_xsocket
 from xia_address import * 
 import random
-import sys
-import os
 from c_xsocket import *
 
 set_conf("xsockconf_python.ini","hello_service.py")

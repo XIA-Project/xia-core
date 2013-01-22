@@ -17,6 +17,15 @@
 #    with this program; if not, write to the Free Software Foundation, Inc.,
 #    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
+import sys
+import os
+                                                                                                                                                                                                                    
+# find the path to xia-core
+XIADIR=os.getcwd()
+while os.path.split(XIADIR)[1] != 'xia-core':
+    XIADIR=os.path.split(XIADIR)[0]
+sys.path.append(XIADIR + '/api/lib')
+
 import thread
 from neitris_cfg import *
 import neitris_class
@@ -29,7 +38,7 @@ import struct
 import zlib
 from socket import socket, AF_INET, SOCK_STREAM
 import time
-import pygame, sys,os, pickle
+import pygame, pickle
 from pygame.locals import *
 from c_xsocket import *
 
