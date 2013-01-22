@@ -22,6 +22,7 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
+#include "XgetDAGbyName.h"
 
 #define NS_MAX_PACKET_SIZE 1024
 #define NS_MAX_DAG_LENGTH 1024
@@ -36,6 +37,74 @@ typedef struct ns_pkt {
 	char* name;
 	char* dag;
 } ns_pkt;
+
+
+/*!
+** @brief Finds the root of the source tree
+**
+** @returns a character point to the root of the source tree
+**
+*/
+char *findRoot() {
+    int len;
+    char *pos;
+    char *cwd = (char*)malloc(sizeof(char)*4096);
+
+    getcwd(cwd, 4096);
+    len = strlen(cwd);
+    pos = strstr(cwd, SOURCE_DIR);
+    pos += sizeof(SOURCE_DIR)-1;
+    *pos = '\0';
+    return cwd;
+}
+
+/*!
+** @brief Lookup a DAG in the hosts.xia file
+**
+** @param name The name of an XIA service or host. 
+**
+** @returns a character point to the dag on success
+** @returns NULL on failure
+**
+*/
+char *hostsLookup(const char *name) {
+  char line[512];
+  char *linend;
+  char *dag;
+  char _dag[NS_MAX_DAG_LENGTH];
+
+  // look for an hosts_xia file locally
+  FILE *hostsfp = fopen(strcat(findRoot(), ETC_HOSTS), "r");
+  int answer_found = 0;
+  if (hostsfp != NULL) {
+    while (fgets(line, 511, hostsfp) != NULL) {
+      linend = line+strlen(line)-1;
+      while (*linend == '\r' || *linend == '\n' || *linend == '\0') {
+	linend--; 
+      }
+      *(linend+1) = '\0';
+      if (line[0] == '#') {
+	continue;
+      } else if (!strncmp(line, name, strlen(name))
+					   && line[strlen(name)] == ' ') {
+	strncpy(_dag, line+strlen(name)+1, strlen(line)-strlen(name)-1);
+	_dag[strlen(line)-strlen(name)-1] = '\0';
+        answer_found = 1;
+      }
+		}
+    fclose(hostsfp);
+    if (answer_found) {
+        dag = (char*)malloc(sizeof(_dag) + 1);
+        strcpy(dag, _dag);
+        return dag;
+    }
+  } else {
+      //printf("XIAResolver file error\n");
+  }
+  
+  //printf("Name not found in ./hosts_xia\n");
+  return NULL;
+}
 
 
 /*!
@@ -62,6 +131,9 @@ char *XgetDAGbyName(const char *name) {
     char _name[NS_MAX_DAG_LENGTH], _dag[NS_MAX_DAG_LENGTH];      
     int result;
     
+    if((dag = hostsLookup(name)))
+        return dag;
+
     //Open socket
     sock=Xsocket(XSOCK_DGRAM);
     

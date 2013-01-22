@@ -6,7 +6,7 @@ XINC=$(APIDIR)/include
 BINDIR=$(XIADIR)/bin
 CFLAGS=-Wall -Wextra -I$(XINC)
 LDFLAGS=-lpthread
-LIBS=$(XLIB)/libXsocket.so $(XLIB)/libXIAResolver.so
+LIBS=$(XLIB)/libXsocket.so
 
 OUT=xtraceroute
 TARGETS=$(addprefix $(BINDIR)/, $(OUT))
