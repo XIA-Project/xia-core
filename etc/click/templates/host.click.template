@@ -1,4 +1,4 @@
-require(library ../../click/conf/xia_router_lib.click);
+require(library ../../../click/conf/xia_router_lib.click);
 require(library xia_address.click);
 
 // host instantiation

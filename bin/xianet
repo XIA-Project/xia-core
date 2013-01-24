@@ -246,14 +246,12 @@ help ()
 
 Start or stop the XIA network services.
 
-usage: $NAME [-cqvV4rtnZ] [-l <logfile>] [-i <hostname>] [-m <ip-addr>] [-f <filter_str>] [-I <interface>] [-sS <script>] [-z <statserver>] [start|stop|restart|check]
+usage: $NAME [-cqvV4rtnZ] [-l <logfile>] [-i <hostname>] [-m <ip-addr>] [-f <filter_str>] [-I <interface>] [-s <script>] [-z <statserver>] [start|stop|restart|check]
 where:
   -c only start click
   -l send stderr/stdout to logfile
   -s run click using the specified script
      (should be located in the $CONFPATH directory)
-  -S run click using the specified script
-     (should be located in the tools/click_templates directory)
   -q run silently (default)
   -v prints click debug messages to stdout
   -V prints all daemon debug messages to stdout
@@ -278,7 +276,7 @@ EOH
 	exit 0
 }
 
-while getopts "cl:s:S:qvV4nrthi:m:f:I:z:Z" opt; do
+while getopts "cl:s:qvV4nrthi:m:f:I:z:Z" opt; do
 	case $opt in
 		c)
 			CLICK_ONLY=1
@@ -289,11 +287,6 @@ while getopts "cl:s:S:qvV4nrthi:m:f:I:z:Z" opt; do
 			;;
 		s)
 			SCRIPT=$OPTARG
-			SCRIPT_SET=1
-			;;
-		S)
-			SCRIPT=$OPTARG
-			CONFPATH=$XIADIR/tools/click_templates
 			SCRIPT_SET=1
 			;;
 		q)
@@ -356,14 +349,14 @@ fi
 
 if [ $SCRIPT_SET -eq 0 ]; then
 	if [ $HOST -eq 1 ]; then
-		CONFPATH=$XIADIR/tools/click_templates
+		CONFPATH=$XIADIR/etc/click/templates
 		if [ $DUAL_STACK -eq 0 ]; then
 			SCRIPT=host.click
 		else
 			SCRIPT=dual_stack_host.click
 		fi
 	elif [ $ROUTER -eq 1 ]; then
-		CONFPATH=$XIADIR/tools/click_templates
+		CONFPATH=$XIADIR/etc/click/templates
 		if [ $DUAL_STACK -eq 0 ]; then
 			SCRIPT=router.click
 		else
