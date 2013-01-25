@@ -10,7 +10,7 @@ TARGET=$(XLIB)/libdagaddr.so
 all: $(TARGET) dagaddr_test
 
 %.o: %.cpp utils.hpp $(XINC)/dagaddr.hpp
-	$(CC) $(CFLAGS) -c -fpic -std=c++0x $<  -o $@
+	$(CC) $(CFLAGS) -c -fpic $<  -o $@
 
 $(TARGET): $(OBJECTS) 
 	$(LD) -shared -o $@ $(OBJECTS) -lc -ldl $(LDFLAGS)

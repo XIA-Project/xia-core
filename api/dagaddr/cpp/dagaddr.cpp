@@ -22,6 +22,8 @@
 #include "utils.hpp"
 #include <cstring>
 #include <cstdio>
+#include <map>
+#include <algorithm>
 
 Node::container Node::undefined_ = {0, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", 0};
 
@@ -57,13 +59,13 @@ Node::Node(const Node& r)
 	acquire();
 }
 
-/*Node::Node(uint32_t type, const void* id)
+Node::Node(uint32_t type, const void* id, int dummy)
 {
 	ptr_ = new container;
 	ptr_->type = type;
 	memcpy(ptr_->id, id, ID_LEN);
 	ptr_->ref_count = 1;
-}*/
+}
 
 /**
 * @brief Create a new node from a type and an XID string
@@ -208,6 +210,27 @@ Node::type_string() const
 }
 
 /**
+* @brief Get the node's XID as a string
+*
+* Get the node's XID as a std::string. This string will be 40 characters long
+* (representing 20 bytes in hex). The string does not include the principal 
+* type prefix (e.g., "HID:").
+*
+* @return The node's XID as a string
+*/
+std::string
+Node::id_string() const
+{
+	std::string xid_string;
+	char *xid = (char*)malloc(sizeof(char) * 2 * Node::ID_LEN);
+	for (std::size_t j = 0; j < Node::ID_LEN; j++)
+		sprintf(&xid[2*j], "%02x", id()[j]);
+	xid_string += xid;
+	free(xid);
+	return xid_string;
+}
+
+/**
 * @brief Create an empty graph
 *
 * Create an empty graph.
@@ -252,54 +275,28 @@ Graph::Graph(const Graph& r)
 * XrecvFrom() call, for example).
 *
 * @param dag_string The DAG in the string format used by the XSocket API.
-*			Example:
+*			Example 1:
 *<div><pre>DAG 2 0 - 
 *AD:4349445f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f 2 1 - 
 *HID:4849445f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f 2 - 
 *SID:534944305f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f</pre></div>
+*			Example 2:
+*<div><pre>RE ( AD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 ) SID:1110000000000000000000000000000000001113</pre></div>
 *
 */
 Graph::Graph(std::string dag_string)
 {
-	// TODO: split on -, not \n
-	std::vector<std::string> lines = split(dag_string, '\n');
-
-	// Maps indices in the graph to indices in the DAG string
-	// IMPORTANT: DAG string indices are off by one since the first
-	// line in a DAG string is index -1. So, when indexing into this
-	// vector, ALWAYS ADD 1
-	std::vector<std::size_t> dag_idx_to_graph_idx;
-
-	// Pass 1: add nodes
-	for (int i = 0; i < lines.size(); i++)
+	if (dag_string.find("DAG") != std::string::npos)
 	{
-		std::vector<std::string> elems = split(lines[i], ' ');
-
-		int graph_index;
-		if (i == 0)
-		{
-			Node n_src;
-			graph_index = add_node(n_src);
-		} 
-		else
-		{
-			std::vector<std::string> xid_elems = split(elems[0], ':');
-			Node n(xid_elems[0], xid_elems[1]);
-			graph_index = add_node(n);
-		}
-		dag_idx_to_graph_idx.push_back(graph_index);
+		construct_from_dag_string(dag_string);
 	}
-	
-	// Pass 2: add edges
-	for (int i = 0; i < lines.size(); i++)
+	else if (dag_string.find("RE") != std::string::npos)
 	{
-		std::vector<std::string> elems = split(lines[i], ' ');
-
-		for (int j = 1; j < elems.size() - 1; j++)
-		{
-			int dag_idx = std::stoi(elems[j]);
-			add_edge(dag_idx_to_graph_idx[i], dag_idx_to_graph_idx[dag_idx+1]);
-		}
+		construct_from_re_string(dag_string);
+	}
+	else
+	{
+		printf("WARNING: dag_string must be in either DAG or RE forma\n");
 	}
 }
 
@@ -504,18 +501,6 @@ Graph::out_edges_for_index(std::size_t i, std::size_t source_index, std::size_t 
 	return out_edge_string;
 }
 
-std::string
-Graph::xid_string_for_index(std::size_t i) const
-{
-	std::string xid_string;
-	char *xid = (char*)malloc(sizeof(char) * 2 * Node::ID_LEN);
-	for (std::size_t j = 0; j < Node::ID_LEN; j++)
-		sprintf(&xid[2*j], "%02x", nodes_[i].id()[j]);
-	xid_string += xid;
-	free(xid);
-	return xid_string;
-}
-
 std::size_t 
 Graph::index_in_dag_string(std::size_t index, std::size_t source_index, std::size_t sink_index) const
 {
@@ -532,6 +517,37 @@ Graph::index_in_dag_string(std::size_t index, std::size_t source_index, std::siz
 		new_index--;
 
 	return new_index;
+}
+	
+std::size_t 
+Graph::index_from_dag_string_index(std::size_t dag_string_index, std::size_t source_index, std::size_t sink_index) const
+{
+	if (dag_string_index == -1) return source_index;
+	if (dag_string_index == num_nodes()-1) return sink_index;
+
+	std::size_t real_index = dag_string_index;
+	if (source_index < sink_index)
+	{
+		// add 1 if after real sink index (sink moves back from -1)
+		if (real_index >= source_index)
+			real_index++;
+
+		// add 1 if after sink index (sink moves back from end)
+		if (real_index >= sink_index)
+			real_index++;
+	}
+	else
+	{
+		// add 1 if after sink index (sink moves back from end)
+		if (real_index >= sink_index)
+			real_index++;
+
+		// add 1 if after real sink index (sink moves back from -1)
+		if (real_index >= source_index)
+			real_index++;
+	}
+
+	return real_index;
 }
 
 /**
@@ -574,7 +590,7 @@ Graph::dag_string() const
 		dag_string += nodes_[i].type_string() + ":";
 
 		// add XID
-		dag_string += xid_string_for_index(i);
+		dag_string += nodes_[i].id_string();
 
 		// add out edges
 		dag_string += out_edges_for_index(i, source_index, sink_index);
@@ -583,8 +599,406 @@ Graph::dag_string() const
 
 	// Add sink last
 	dag_string += nodes_[sink_index].type_string() + ":";
-	dag_string += xid_string_for_index(sink_index);
+	dag_string += nodes_[sink_index].id_string();
 
 
 	return dag_string;
+}
+	
+
+/**
+* @brief Get the index of the souce node
+*
+* Get the index of the source node. This method returns the index of the first
+* source node it finds.
+*
+* @return The index of the DAG's source node
+*/
+std::size_t 
+Graph::source_index() const
+{
+	for (std::size_t i = 0; i < nodes_.size(); i++)
+	{
+		if (is_source(i)) return i;
+	}
+
+	printf("Warning: source_index: no source node found\n");
+	return -1;
+}
+
+/**
+* @brief Test if a node is the final intent
+*
+* Check whether or not the supplied Node is the final intent of the DAG
+*
+* @param n The node to check
+*
+* @return true if n is the final intent, false otherwise
+*/
+bool
+Graph::is_final_intent(const Node& n)
+{
+	for (std::size_t i = 0; i < nodes_.size(); i++)
+	{
+		if (nodes_[i] == n) return is_sink(i);
+	}
+	
+	printf("Warning: is_final_intent: supplied node not found in DAG\n");
+	return false;
+}
+
+/**
+* @brief Test if a node is the final intent
+*
+* Check whether or not the supplied XID is the final intent of the DAG
+*
+* @param xid_string The XID to check
+*
+* @return true if the XID is the final intent, false otherwise
+*/
+bool
+Graph::is_final_intent(const std::string xid_string)
+{
+	for (std::size_t i = 0; i < nodes_.size(); i++)
+	{
+		if (nodes_[i].id_string() == xid_string) return is_final_intent(nodes_[i]);
+	}
+	
+	printf("Warning: is_final_intent: supplied node not found in DAG\n");
+	return false;
+}
+	
+/**
+* @brief Get the next "intent unit" in the DAG starting at the supplied node
+*
+* Get the next "intent unit" in the DAG starting at the supplied node. An 
+* intent node is a node that can be reached by following the highest priority
+* out edge of each node beginning with the source. An intent unit is an intent
+* node along with its fallbacks. In the new DAG, the previous intent unit
+* becomes the source node.
+*
+* @param n The node from which to find the next intent unit. n must be an
+* 		   intent node.
+*
+* @return The next intent unit (as a Graph)
+*/
+Graph
+Graph::next_hop(const Node& n)
+{
+	// first find n and make sure it's an intent unit
+	std::size_t nIndex = -1;
+	std::size_t curIndex = source_index();
+	while (nIndex == -1) {
+		if (nodes_[curIndex] == n) {
+			nIndex = curIndex;
+		} else {
+			if (is_sink(curIndex)) {
+				printf("Warning: next_hop: n not found or is not an intent node\n");
+				return Graph();
+			} else {
+				curIndex = out_edges_[curIndex][0];
+			}
+		}
+	}
+	
+	// if n is the DAG's sink, there is no next hop
+	if (is_sink(nIndex))
+	{
+		printf("Warning: next_hop: n is the final intent; no next hop\n");
+		return Graph();
+	}
+
+
+	// find the next intent node (the final intent of the new DAG)
+	// for now, we we'll only consider CIDs and SIDs to be intent nodes
+	std::size_t intentIndex = nIndex;
+	while (intentIndex == nIndex || (nodes_[intentIndex].type() != Node::XID_TYPE_CID && nodes_[intentIndex].type() != Node::XID_TYPE_SID))
+	{
+		if (is_sink(intentIndex)) {
+			break;
+		}
+		intentIndex = out_edges_[intentIndex][0];
+
+	}
+
+	Graph g = Graph();
+
+	// make copies of all the nodes we need in the new Graph with BFS
+	std::vector<std::size_t> to_process;
+	std::map<std::size_t, std::size_t> old_to_new_map;
+
+	vector_push_back_unique(to_process, nIndex);
+	while (to_process.size() > 0)
+	{
+		curIndex = to_process.back();
+		to_process.pop_back();
+
+		// copy this node to the new graph and the mapping
+		Node new_node;
+		if (curIndex != nIndex) // the start node, n, should be replaced with a dummy source
+		{
+			new_node = Node(nodes_[curIndex]);
+		}
+		std::size_t newIndex = g.add_node(new_node);
+		old_to_new_map[curIndex] = newIndex;
+
+
+		// prepare to process its children
+		if (curIndex == intentIndex) continue; // but if we've gotten to the new intent node, stop
+		for (int i = 0; i < out_edges_[curIndex].size(); i++)
+		{
+			vector_push_back_unique(to_process, out_edges_[curIndex][i]);
+		}
+	}
+	
+	// add edges to the new graph
+	for (std::map<std::size_t, std::size_t>::const_iterator it = old_to_new_map.begin(); it != old_to_new_map.end(); ++it)
+	{
+		std::size_t old_index = (*it).first;
+		std::size_t new_index = (*it).second;
+
+		if (old_index == intentIndex) continue; // the new final intent has no out edges
+
+		for (int i = 0; i < out_edges_[old_index].size(); i++)
+		{
+			g.add_edge(new_index, old_to_new_map[out_edges_[old_index][i]]);
+		}
+	}
+
+	return g;
+}
+
+/**
+* @brief Get the next "intent unit" in the DAG starting at the supplied XID
+*
+* This method is the same as Graph::next_hop(const Node& n) except it takes an
+* XID string instead of a Node object.
+*
+* @param xid_string The XID of the intent node from which to find the next
+*				    intent unit.
+*
+* @return The next intent unit (as a Graph)
+*/
+Graph 
+Graph::next_hop(const std::string xid_string)
+{
+	for (std::size_t i = 0; i < nodes_.size(); i++)
+	{
+		if (nodes_[i].id_string() == xid_string) return next_hop(nodes_[i]);
+	}
+	
+	printf("Warning: is_final_intent: supplied node not found in DAG\n");
+	return Graph();
+
+}
+
+/**
+* @brief Get the first "intent unit" in the DAG
+*
+* Get the first "intent unit" in the DAG. Calling this method is equivalent to
+* calling g.next_hope(Node()).
+*
+* @return The DAG's first intent unit (as a Graph)
+*/
+Graph
+Graph::first_hop()
+{
+	return next_hop(Node());
+}
+	
+/**
+* @brief Get the number of nodes in the DAG
+*
+* Get the number of nodes in the DAG.
+*
+* @note This does not include the starting node
+*
+* @return The number of nodes in the DAG
+*/
+uint8_t
+Graph::num_nodes() const
+{
+	return nodes_.size()-1;
+}
+
+
+/**
+* @brief Get a node from the DAG
+*
+* Get a Node from the graph at the specified index. The sink node will always
+* be returned last (that is, it has index num_nodes()-1).
+*
+* @note This function skips the starting node
+*
+* @param i The index of the node to return
+*
+* @return The node at index i
+*/
+Node 
+Graph::get_node(int i) const
+{
+	std::size_t src_index, sink_index;
+	for (std::size_t j = 0; j < nodes_.size(); j++)
+	{
+		if (is_source(j)) src_index = j;
+		if (is_sink(j)) sink_index = j;
+	}
+
+	return nodes_[index_from_dag_string_index(i, src_index, sink_index)];
+}
+
+
+/**
+* @brief Get the out edges for a node
+*
+* Get the out edges for a node at index i
+*
+* @note This function skips the starting node. Use index -1 to get the
+* starting node's outgoing edges.
+*
+* @param i The index of the node
+*
+* @return The out edges of node i
+*/
+std::vector<std::size_t>
+Graph::get_out_edges(int i) const
+{
+	std::size_t src_index, sink_index;
+	for (std::size_t j = 0; j < nodes_.size(); j++)
+	{
+		if (is_source(j)) src_index = j;
+		if (is_sink(j)) sink_index = j;
+	}
+
+	std::size_t real_index;
+	if (i == -1) 
+		real_index = src_index;
+	else
+		real_index = index_from_dag_string_index(i, src_index, sink_index);
+
+	std::vector<std::size_t> out_edges;
+	for (std::size_t j = 0; j < out_edges_[real_index].size(); j++)
+	{
+		out_edges.push_back(index_in_dag_string(out_edges_[real_index][j], src_index, sink_index));
+	}
+
+	return out_edges;
+}
+
+
+void 
+Graph::construct_from_dag_string(std::string dag_string)
+{
+	// remove newline chars
+	dag_string.erase(std::remove(dag_string.begin(), dag_string.end(), '\n'), dag_string.end());
+
+	// split on '-'
+	std::vector<std::string> lines = split(dag_string, '-');
+
+
+	// Maps indices in the graph to indices in the DAG string
+	// IMPORTANT: DAG string indices are off by one since the first
+	// line in a DAG string is index -1. So, when indexing into this
+	// vector, ALWAYS ADD 1
+	std::vector<std::size_t> dag_idx_to_graph_idx;
+
+	// Pass 1: add nodes
+	for (int i = 0; i < lines.size(); i++)
+	{
+		std::vector<std::string> elems = split(trim(lines[i]), ' ');
+
+		int graph_index;
+		if (i == 0)
+		{
+			Node n_src;
+			graph_index = add_node(n_src);
+		} 
+		else
+		{
+			std::vector<std::string> xid_elems = split(elems[0], ':');
+			Node n(xid_elems[0], xid_elems[1]);
+			graph_index = add_node(n);
+		}
+		dag_idx_to_graph_idx.push_back(graph_index);
+	}
+	
+	// Pass 2: add edges
+	for (int i = 0; i < lines.size(); i++)
+	{
+		std::vector<std::string> elems = split(trim(lines[i]), ' ');
+
+		for (int j = 1; j < elems.size(); j++)
+		{
+			int dag_idx = std::stoi(elems[j]);
+			add_edge(dag_idx_to_graph_idx[i], dag_idx_to_graph_idx[dag_idx+1]);
+		}
+	}
+}
+void
+Graph::construct_from_re_string(std::string re_string)
+{
+	// split on ' '
+	std::vector<std::string> components = split(re_string, ' ');
+
+	// keep track of the last "intent" node and last fallback node 
+	// we added to the dag
+	Node n_src;
+	std::size_t last_intent_idx = add_node(n_src);
+	std::size_t last_fallback_idx;
+	std::size_t first_fallback_idx;
+
+	// keep track of whether or not we're currently processing a fallback path
+	bool processing_fallback = false;
+	bool just_processed_fallback = false;
+	bool just_started_fallback = false;
+
+	// Process each component one at a time. If it's a '(' or a ')', start or
+	// stop fallback processing respectively
+	for (int i = 1; i < components.size(); i++)
+	{
+		if ( components[i] == "(")
+		{
+			processing_fallback = true;
+			just_started_fallback = true;
+		}
+		else if (components[i] == ")")
+		{
+			processing_fallback = false;
+			just_processed_fallback = true;
+		}
+		else
+		{
+			// TODO: verify that this component is a valid XID
+			std::vector<std::string> xid_elems = split(components[i], ':');
+			Node n(xid_elems[0], xid_elems[1]);
+			std::size_t cur_idx = add_node(n);
+
+			if (processing_fallback)
+			{
+				if (just_started_fallback)
+				{
+					first_fallback_idx = cur_idx;
+					just_started_fallback = false;
+				}
+				else
+				{
+					add_edge(last_fallback_idx, cur_idx);
+				}
+
+				last_fallback_idx = cur_idx;
+			}
+			else
+			{
+				add_edge(last_intent_idx, cur_idx);
+
+				if (just_processed_fallback)
+				{
+					add_edge(last_intent_idx, first_fallback_idx);
+					add_edge(last_fallback_idx, cur_idx);
+				}
+
+				last_intent_idx = cur_idx;
+			}
+		}
+	}
 }
