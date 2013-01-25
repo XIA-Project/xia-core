@@ -8,6 +8,26 @@
 #include "Xsocket.h"
 #include "xhcp.hh"
 
+
+/*!
+** @brief Finds the root of the source tree
+**
+** @returns a character point to the root of the source tree
+**
+*/
+char *findRoot() {
+    char *pos;
+    char *path = (char*)malloc(sizeof(char)*4096);
+    readlink("/proc/self/exe", path, 4096);
+
+    pos = strstr(path, SOURCE_DIR);
+    if(pos) {
+        pos += sizeof(SOURCE_DIR)-1;
+        *pos = '\0';
+    }
+    return path;
+}
+
 int main(int argc, char *argv[]) {
 	char pkt[XHCP_MAX_PACKET_SIZE];
 	char ddag[XHCP_MAX_DAG_LENGTH];
@@ -40,7 +60,7 @@ int main(int argc, char *argv[]) {
         sprintf(ns_dag, "RE ( %s ) %s %s %s", IP_NS, AD0, HID0, SID_NS);  	
 
 	// read the name server DAG from xia-core/etc/resolv.conf, if present
-	ini_gets(NULL, "nameserver", ns_dag, ns_dag, XHCP_MAX_DAG_LENGTH, "../../etc/resolv.conf");
+	ini_gets(NULL, "nameserver", ns_dag, ns_dag, XHCP_MAX_DAG_LENGTH, strcat(findRoot(), RESOLV_CONF));
  
  
 	xhcp_pkt beacon_pkt;
