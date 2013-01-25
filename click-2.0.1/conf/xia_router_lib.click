@@ -167,6 +167,7 @@ elementclass IPLineCard {
 	arpq :: ARPQuerier($ip, $mac);
 	arpr :: ARPResponder($ip/32 $mac);
 
+    // TODO: Make these IPPrint elements? Will require adding handlers to IPPrint element....
     print_in :: XIAPrint(">>> $local_hid (In Port $num)");
     print_out :: XIAPrint("<<< $local_hid (Out Port $num)");
 
