@@ -112,7 +112,7 @@ int processHello(const char* hello_msg);
 int processLSA(const char* lsa_msg);
 
 // process a Host Register message 
-int processHostRegister(const char* host_register_msg);
+void processHostRegister(const char* host_register_msg);
 
 // compute the shortest path (Dijkstra)
 void calcShortestPath();

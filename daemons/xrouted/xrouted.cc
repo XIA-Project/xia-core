@@ -54,6 +54,8 @@ int interfaceNumber(std::string xidType, std::string xid)
 
 void timeout_handler(int signum)
 {
+	UNUSED(signum);
+
 	if (route_state.hello_seq < route_state.hello_lsa_ratio) {
 		// send Hello
 		sendHello();
@@ -146,7 +148,7 @@ int sendLSA() {
 }
 
 // process a Host Register message 
-int processHostRegister(const char* host_register_msg) {
+void processHostRegister(const char* host_register_msg) {
 	/* Procedure:
 		1. update this host entry in (click-side) HID table:
 			(hostHID, interface#, hostHID, -)
@@ -501,7 +503,7 @@ void printRoutingTable() {
 
 void updateClickRoutingTable() {
 
-	int rc, port, flags;
+	int rc, port;
 	string destXID, nexthopXID;
 	string default_AD("AD:-"), default_HID("HID:-"), default_4ID("IP:-"), empty_str("HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
 	
@@ -562,10 +564,10 @@ void initRouteState()
 
 int main(int argc, char *argv[])
 {
-	int rc, x, selectRetVal, n;
+	int rc, selectRetVal, n;
     	size_t dlen, found, start;
     	char recv_message[1024];
-    	char buffer[2048], theirDAG[1024];   
+    	char theirDAG[1024];   
     	fd_set socks;
     	struct timeval timeoutval;	
 	vector<string> routers;
