@@ -36,9 +36,6 @@
 extern "C" {
 #endif
 
-// FIXME:change this to match what the Linux implementation is using
-#define AF_XIA	9999
-
 #define MAXBUFLEN 65000 // Note that this limits the size of chunk we can receive TODO: What should this be?
 #define XIA_MAXBUF MAXBUFLEN
 #define XIA_MAXCHUNK	MAXBUFLEN
