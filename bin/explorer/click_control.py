@@ -372,13 +372,13 @@ class LegacyRouter(Router):
 
 class MattInstrumentedRouter(Router):
     def get_routes(self, click, kind):
-        return click.readData("%s/wrapped/xrc/n/proc/rt_%s.list" % (self.name, kind))
+        return click.readData("%s/xrc/n/proc/rt_%s.list" % (self.name, kind))
 
     def proc_path(self):
-        return '%s/wrapped/xrc/n/proc' % self.name
+        return '%s/xrc/n/proc' % self.name
 
     def cache_path(self):
-        return '%s/wrapped/xrc/cache' % self.name
+        return '%s/xrc/cache' % self.name
 
     def print_path(self, port, direction):
         return '%s/print_%s%d' % (self.name, direction, port)
