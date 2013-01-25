@@ -15,7 +15,6 @@ OBJS=$(SOURCES:.c=.o) xia.pb.o
 LIB=$(XLIB)/libXsocket.so
 
 all: xia.pb.cc $(LIB)
-	echo $(MAKEFLAGS)
 	make -C python all
 
 xia.pb.cc: xia.proto

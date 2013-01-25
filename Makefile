@@ -17,7 +17,6 @@ NPROCS=$(shell echo `grep -c ^processor /proc/cpuinfo`\*2 | bc)
 #### BUILD RULES
 #always make sure we have configured before building the sub projects
 all: config $(MAKEDIRS)
-	echo $(MAKEFLAGS)
 
 # treat click special since we want multi-proc compiles
 click:
