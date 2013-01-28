@@ -21,25 +21,25 @@
 #ifndef XIA_H
 #define XIA_H
 
-#define AF_INET		40
+#define AF_XIA		40
 
 #define EDGES_MAX	4
 #define XID_SIZE	20
 #define NODES_MAX	20
 
 typedef struct {
-	uint32 s_type;
-	uint8  s_id[XID_SIZE];
+	uint          s_type;
+	unsigned char s_id[XID_SIZE];
 } xid_t;
 
 typedef struct {
-	xid_t s_xid;
-	uint8 s_edge[EDGES_MAX];
+	xid_t         s_xid;
+	unsigned char s_edge[EDGES_MAX];
 } node_t;
 
 typedef struct {
-	uint8  s_count;
-	node_t s_addr[NODES_MAX];
+	unsigned char s_count;
+	node_t        s_addr[NODES_MAX];
 } x_addr_t;
 
 typedef struct {
