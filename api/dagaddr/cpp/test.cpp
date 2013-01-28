@@ -130,6 +130,20 @@ int main()
 	printf("Graph(\"RE ( AD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 ) SID:1110000000000000000000000000000000001113\")\n%s\n", g8.dag_string().c_str());
 
 	printf("Testing construct_from_re_string ^^^\n\n\n");
+	
+
+	printf("Testing sockaddr_x vvv\n");
+
+	sockaddr_x *s = (sockaddr_x*)malloc(sizeof(sockaddr_x));
+	g6.fill_sockaddr(s);
+	Graph g6_prime = Graph(s);
+	printf("g6_prime.dag_string().c_str():\n%s\n", g6_prime.dag_string().c_str());
+
+	g7.fill_sockaddr(s);
+	Graph g7_prime = Graph(s);
+	printf("g7_prime.dag_string().c_str():\n%s\n", g7_prime.dag_string().c_str());
+
+	printf("Testing sockaddr_x ^^^\n");
 
 	return 0;
 }

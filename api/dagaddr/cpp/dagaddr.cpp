@@ -299,6 +299,52 @@ Graph::Graph(std::string dag_string)
 		printf("WARNING: dag_string must be in either DAG or RE forma\n");
 	}
 }
+	
+/**
+* @brief Create a graph from a sockaddr_x
+*
+* Create a new graph from a sockaddr_x. This constructor is useful for creating
+* a DAG from from a sockaddr_x obtained from the XSocket API (from the
+* XrecvFrom() call, for example).
+*
+* @param s The sockaddr_x
+*/
+Graph::Graph(sockaddr_x *s)
+{
+	int num_nodes = s->sx_addr.s_count;
+	// First add nodes to the graph and remember their new indices
+	std::vector<uint8_t> graph_indices;
+	for (int i = 0; i < num_nodes; i++)
+	{
+		node_t *node = &(s->sx_addr.s_addr[i]);
+		Node n = Node(node->s_xid.s_type, &(node->s_xid.s_id), 0); // 0 means nothing
+		graph_indices.push_back(add_node(n));
+	}
+
+	// Add the source node
+	uint8_t src_index = add_node(Node());
+
+	// Add edges
+	for (int i = 0; i < num_nodes; i++)
+	{
+		node_t *node = &(s->sx_addr.s_addr[i]);
+
+		int from_node;
+		if (i == num_nodes-1)
+			from_node = src_index;
+		else
+			from_node = graph_indices[i];
+
+		for (int j = 0; j < EDGES_MAX; j++)
+		{
+			int to_node = node->s_edge[j];
+			
+			if (to_node != EDGE_UNUSED)
+				add_edge(from_node, to_node);
+		}
+	}
+
+}
 
 Graph&
 Graph::operator=(const Graph& r)
@@ -1000,5 +1046,45 @@ Graph::construct_from_re_string(std::string re_string)
 				last_intent_idx = cur_idx;
 			}
 		}
+	}
+}
+
+/**
+* @brief Fill a sockaddr_x with this DAG
+*
+* Fill the provided sockaddr_x with this DAG
+*
+* @param s The sockaddr_x struct to be filled in (allocated by caller)
+*/
+void 
+Graph::fill_sockaddr(sockaddr_x *s) const
+{
+	s->sx_family = AF_XIA;
+	s->sx_addr.s_count = num_nodes();
+
+	for (int i = 0; i < num_nodes(); i++)                   
+	{                                                            
+		node_t* node = (node_t*)&(s->sx_addr.s_addr[i]); // check this
+
+	    // Set the node's XID and type                           
+		node->s_xid.s_type = get_node(i).type();
+	    memcpy(&(node->s_xid.s_id), get_node(i).id(), Node::ID_LEN);   
+	                                                             
+	    // Get the node's out edge list                          
+	    std::vector<std::size_t> out_edges;                      
+	    if (i == num_nodes()-1) {                           
+	        out_edges = get_out_edges(-1); // put the source node's edges here
+	    } else {                                                 
+	        out_edges = get_out_edges(i);                   
+	    }                                                        
+	                                                             
+	    // Set the out edges in the header                       
+	    for (uint8_t j = 0; j < EDGES_MAX; j++)              
+	    {                                                        
+	        if (j < out_edges.size())                            
+	            node->s_edge[j] = out_edges[j];                   
+	        else                                                 
+	            node->s_edge[j] = EDGE_UNUSED;
+	    }                                                        
 	}
 }

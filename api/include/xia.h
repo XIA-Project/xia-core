@@ -24,6 +24,7 @@
 #define AF_XIA		40
 
 #define EDGES_MAX	4
+#define EDGE_UNUSED 127u
 #define XID_SIZE	20
 #define NODES_MAX	20
 

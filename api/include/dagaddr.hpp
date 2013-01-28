@@ -75,6 +75,7 @@ public:
 	Graph(const Node& n);
 	Graph(const Graph& r);
 	Graph(std::string dag_string);
+	Graph(sockaddr_x *s);
 
 	Graph& operator=(const Graph& r);
 	Graph& operator*=(const Graph& r);
@@ -98,6 +99,7 @@ public:
 	uint8_t num_nodes() const;
 	Node get_node(int i) const;
 	std::vector<std::size_t> get_out_edges(int i) const;
+	void fill_sockaddr(sockaddr_x *s) const;
 
 protected:
 
