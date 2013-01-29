@@ -2,9 +2,9 @@
 
 #include <stdint.h>	// for non-c++0x
 #include <cstdint>	// for c++0x
-
 #include <vector>
 #include <string>
+#include <xia.h>
 
 class Graph;
 
@@ -31,7 +31,7 @@ public:
 public:
 	Node();
 	Node(const Node& r);
-	//Node(uint32_t type, const void* id);
+	Node(uint32_t type, const void* id, int dummy); // NOTE: dummy is so compiler doesn't complain about ambigous constructors  TODO: fix.
 	Node(int type, const std::string id_string); // NOTE: type is an int here because the consts above are ints, otherwise swig will complain again
 	Node(const std::string type_string, const std::string id_string);
 
@@ -40,6 +40,7 @@ public:
 	const uint32_t& type() const { return ptr_->type; }
 	const char* id() const { return ptr_->id; }
 	std::string type_string() const;
+	std::string id_string() const;
 
 	Node& operator=(const Node& r);
 	bool operator==(const Node& r) const { return ptr_ == r.ptr_; }
@@ -74,6 +75,7 @@ public:
 	Graph(const Node& n);
 	Graph(const Graph& r);
 	Graph(std::string dag_string);
+	Graph(sockaddr_x *s);
 
 	Graph& operator=(const Graph& r);
 	Graph& operator*=(const Graph& r);
@@ -82,24 +84,40 @@ public:
 	Graph operator+(const Graph& r) const;
 	Graph operator*(const Node& r) const;
 	Graph operator+(const Node& r) const;
+	
+	// TODO: should these be part of public interface?
+	std::size_t add_node(const Node& p);
+	void add_edge(std::size_t from_id, std::size_t to_id);
 
 	void print_graph() const;
 	std::string dag_string() const;
+	bool is_final_intent(const Node& n);
+	bool is_final_intent(const std::string xid_string);
+	Graph next_hop(const Node& n);
+	Graph next_hop(const std::string xid_string);
+	Graph first_hop();
+	uint8_t num_nodes() const;
+	Node get_node(int i) const;
+	std::vector<std::size_t> get_out_edges(int i) const;
+	void fill_sockaddr(sockaddr_x *s) const;
 
 protected:
-	std::size_t add_node(const Node& p);
-	void add_edge(std::size_t from_id, std::size_t to_id);
 
 	bool is_source(std::size_t id) const;
 	bool is_sink(std::size_t id) const;
 
+	std::size_t source_index() const;
+
 	void merge_graph(const Graph& r, std::vector<std::size_t>& node_mapping);
 	
 	std::string out_edges_for_index(std::size_t i, std::size_t source_index, std::size_t sink_index) const;
-	std::string xid_string_for_index(std::size_t i) const;
 	std::size_t index_in_dag_string(std::size_t index, std::size_t source_index, std::size_t sink_index) const;
+	std::size_t index_from_dag_string_index(std::size_t dag_string_index, std::size_t source_index, std::size_t sink_index) const;
 
 private:
+	void construct_from_dag_string(std::string dag_string);
+	void construct_from_re_string(std::string re_string);
+
 	std::vector<Node> nodes_;
 	std::vector<std::vector<std::size_t> > out_edges_;
 	std::vector<std::vector<std::size_t> > in_edges_;
