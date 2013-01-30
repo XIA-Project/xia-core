@@ -1,30 +1,23 @@
 require(library xia_constants.click);
 
 elementclass XIAFromHost {
-    $fake, $API_IP, $CLICK_IP, $ether_addr |
+    $click_port |
 
 	// output[0]: control traffic from host (should go to [0]xtransport)
-	// output[1]: data traffic from host (should go to [1]xtransport)
-
-    // Create kernel TAP interface which responds to ARP
-    fake0::FromHost($fake, $API_IP/24, CLICK_XTRANSPORT_ADDR $CLICK_IP, HEADROOM 256, MTU 65521) 
-    -> fromhost_cl :: Classifier(12/0806, 12/0800) -> ARPResponder(0.0.0.0/0 $ether_addr) -> ToHost($fake);
+	// output[1]: data traffic from host (should go to [1]xtransport)    
 
     // Classifier to sort between control/normal
-    fromhost_cl[1] -> StripToNetworkHeader()
-    -> sorter::IPClassifier(dst udp port 5001 or 5002 or 5003 or 5004 or 5005 or 5006,
-                            dst udp port 10000 or 10001 or 10002);
-
     // Control in (0); Socket side data in (1)
-    sorter[0,1] => output;
+    RawSocket("UDP", $click_port) -> [0]output;
+    RawSocket("UDP", $click_port+1) -> [1]output;
 }
 
 elementclass XIAToHost {
-    $fake, $ether_addr |
+    |
 	// input: packets to send up (usually xtransport[1])	
 
     // socket side out
-    input -> cIP::CheckIPHeader() -> EtherEncap(0x0800, $ether_addr, 11:11:11:11:11:11) -> ToHost($fake);	
+    input -> cIP::CheckIPHeader() -> RawSocket("UDP"); 
     cIP[1] -> Print(bad, MAXLENGTH 100, CONTENTS ASCII) -> Discard();
 }
 
@@ -226,17 +219,17 @@ elementclass XIADualLineCard {
 }
 
 elementclass XIARoutingCore {
-    $local_addr, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, $num_ports, $is_dual_stack |
+    $local_addr, $local_hid, $external_ip, $click_port, $num_ports, $is_dual_stack |
 
     // input[0]: packet to route
 	// output[0]: packet to be forwarded out a given port based on paint value
 
 	n :: RouteEngine($local_addr, $num_ports);       
     
-    xtransport::XTRANSPORT($local_addr, IP:$external_ip, $CLICK_IP, $API_IP, n/proc/rt_SID, IS_DUAL_STACK_ROUTER $is_dual_stack); 
+    xtransport::XTRANSPORT($local_addr, IP:$external_ip, n/proc/rt_SID, IS_DUAL_STACK_ROUTER $is_dual_stack); 
 
-	XIAFromHost($fake, $API_IP, $CLICK_IP, $ether_addr)[0,1] => xtransport;
-	xtransport[1] -> XIAToHost($fake, $ether_addr);
+	XIAFromHost($click_port) -> xtransport;
+	xtransport[1] -> XIAToHost();
 
     xtransport[0] -> Discard; // Port 0 is unused for now.
     
@@ -276,7 +269,7 @@ elementclass XIARoutingCore {
 
 // 2-port router 
 elementclass XIARouter2Port {
-    $local_addr, $local_ad, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, 
+    $local_addr, $local_ad, $local_hid, $external_ip, $click_port, 
 	$mac0, $mac1, |
 
     // $local_addr: the full address of the node
@@ -286,8 +279,7 @@ elementclass XIARouter2Port {
     // output[0]: forward to interface 0
     // output[1]: forward to interface 1
     
-	xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $fake, $CLICK_IP, 
-		   				  $API_IP, $ether_addr, 2, 0);
+	xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $click_port, 2, 0);
 
     Script(write xrc/n/proc/rt_AD.add $local_ad $DESTINED_FOR_LOCALHOST);    // self AD as destination
 
@@ -300,7 +292,7 @@ elementclass XIARouter2Port {
 
 // 4-port router node 
 elementclass XIARouter4Port {
-    $local_addr, $local_ad, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, 
+    $local_addr, $local_ad, $local_hid, $external_ip, $click_port,
 	$mac0, $mac1, $mac2, $mac3 |
 
     // $local_addr: the full address of the node
@@ -313,8 +305,7 @@ elementclass XIARouter4Port {
     // output[2]: forward to interface 2
     // output[3]: forward to interface 3
     
-	xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $fake, $CLICK_IP, 
-		   				  $API_IP, $ether_addr, 4, 0);
+	xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $click_port, 4, 0);
 
     Script(write xrc/n/proc/rt_AD.add $local_ad $DESTINED_FOR_LOCALHOST);    // self AD as destination
 
@@ -329,7 +320,7 @@ elementclass XIARouter4Port {
 
 // 4-port router node with XRoute process running and IP support
 elementclass XIADualRouter4Port {
-    $local_addr, $local_ad, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, 
+    $local_addr, $local_ad, $local_hid, $external_ip, $click_port,
 	$ip_active0, $ip0, $mac0, $gw0,
 	$ip_active1, $ip1, $mac1, $gw1,
 	$ip_active2, $ip2, $mac2, $gw2, 
@@ -361,7 +352,7 @@ elementclass XIADualRouter4Port {
     // output[2]: forward to interface 2
     // output[3]: forward to interface 3
     
-	xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, 4, 1);    
+	xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $click_port, 4, 1);    
 
 
     Script(write xrc/n/proc/rt_AD.add $local_ad $DESTINED_FOR_LOCALHOST);    // self AD as destination
@@ -383,7 +374,7 @@ elementclass XIADualRouter4Port {
 
 // 1-port endhost node with sockets
 elementclass XIAEndHost {
-    $local_addr, $local_hid, $fake, $CLICK_IP, $API_IP, $ether_addr, $enable_local_cache, $mac |
+    $local_addr, $local_hid, $click_port, $enable_local_cache, $mac |
 
     // $local_addr: the full address of the node
     // $local_hid:  the HID of the node
@@ -391,7 +382,7 @@ elementclass XIAEndHost {
     // input: a packet arrived at the node
     // output: forward to interface 0
     
-	xrc :: XIARoutingCore($local_addr, $local_hid, 0.0.0.0, $fake, $CLICK_IP, $API_IP, $ether_addr, 1, 0);
+	xrc :: XIARoutingCore($local_addr, $local_hid, 0.0.0.0, $click_port, 1, 0);
 
     Script(write xrc/n/proc/rt_AD.add - 0);      // default route for AD
     Script(write xrc/n/proc/rt_IP.add - 0); 	// default route for IPv4    
@@ -402,7 +393,7 @@ elementclass XIAEndHost {
 
 // Endhost node with XRoute process running and IP support
 elementclass XIADualEndhost {
-    $local_addr, $local_ad, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, 
+    $local_addr, $local_ad, $local_hid, $external_ip, $click_port, 
 	$ip_active0, $ip0, $mac0, $gw0,
 	$malicious_cache |
 
@@ -428,7 +419,7 @@ elementclass XIADualEndhost {
     // input[0]: a packet arrived at the node
     // output[0]: forward to interface 0
     
-	xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $fake, $CLICK_IP, $API_IP, $ether_addr, 4, $malicious_cache, 1);    
+	xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $click_port, 4, $malicious_cache, 1);    
 
 
     Script(write xrc/n/proc/rt_AD.add $local_ad $DESTINED_FOR_LOCALHOST);    // self AD as destination

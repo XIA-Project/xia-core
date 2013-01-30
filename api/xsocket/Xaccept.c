@@ -87,7 +87,7 @@ int Xaccept(int sockfd)
 
 	// bind to an unused random port number
 	addr.sin_family = PF_INET;
-	addr.sin_addr.s_addr = inet_addr(MYADDRESS);
+	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 	addr.sin_port = 0;
 
 	if (bind(new_sockfd, (const struct sockaddr *)&addr, sizeof(addr)) < 0) {

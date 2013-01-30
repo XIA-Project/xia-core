@@ -58,8 +58,6 @@ XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	if (cp_va_kparse(conf, this, errh,
 					 "LOCAL_ADDR", cpkP + cpkM, cpXIAPath, &local_addr,
 					 "LOCAL_4ID", cpkP + cpkM, cpXID, &local_4id,
-					 "CLICK_IP", cpkP + cpkM, cpIPAddress, &_CLICKaddr,
-					 "API_IP", cpkP + cpkM, cpIPAddress, &_APIaddr,
 					 "ROUTETABLENAME", cpkP + cpkM, cpElement, &routing_table_elem,
 					 "IS_DUAL_STACK_ROUTER", 0, cpInteger, &is_dual_stack_router,
 					 cpEnd) < 0)
@@ -1105,9 +1103,9 @@ XTRANSPORT::UDPIPEncap(Packet *p_in, int sport, int dport)
 	ip->ip_len = htons(p->length());
 	ip->ip_id = htons(_id.fetch_and_add(1));
 	ip->ip_p = IP_PROTO_UDP;
-	ip->ip_src = _CLICKaddr;
-	ip->ip_dst = _APIaddr;
-	p->set_dst_ip_anno(IPAddress(_APIaddr));
+	ip->ip_src = IPAddress("127.0.0.1");
+	ip->ip_dst = IPAddress("127.0.0.1");
+	p->set_dst_ip_anno(IPAddress("127.0.0.1"));
 
 	ip->ip_tos = 0;
 	ip->ip_off = 0;

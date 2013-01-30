@@ -55,11 +55,11 @@ int click_x(int sockfd, int kind, xia::XSocketMsg *xsm)
 	slen = sizeof sa;
 	sa.sin_family = PF_INET;
 	if (kind == DATA) {
-		sa.sin_addr.s_addr = inet_addr(CLICKDATAADDRESS);
-		sa.sin_port = htons(atoi(CLICKDATAPORT));
+		sa.sin_addr.s_addr = inet_addr(127.0.0.1);
+		sa.sin_port = htons(atoi(CLICKPORT+1));
 	} else if (kind == CONTROL) {
-		sa.sin_addr.s_addr = inet_addr(CLICKCONTROLADDRESS);
-		sa.sin_port = htons(atoi(CLICKCONTROLPORT));
+		sa.sin_addr.s_addr = inet_addr(127.0.0.1);
+		sa.sin_port = htons(atoi(CLICKPORT));
 	} else {
 		LOG("invalid click port specified");
 		return -1;

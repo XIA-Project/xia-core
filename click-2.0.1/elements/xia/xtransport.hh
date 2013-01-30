@@ -192,8 +192,6 @@ class XTRANSPORT : public Element {
 
     queue<DAGinfo> pending_connection_buf;
     
-    struct in_addr _CLICKaddr;
-    struct in_addr _APIaddr;
     atomic_uint32_t _id;
     bool _cksum;
     XIAXIDRouteTable *_routeTable;
