@@ -4,7 +4,7 @@
 #include <cstdint>	// for c++0x
 #include <vector>
 #include <string>
-#include <xia.h>
+#include "xia.h"
 
 class Graph;
 
