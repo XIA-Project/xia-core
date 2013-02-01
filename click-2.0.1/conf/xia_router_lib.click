@@ -8,8 +8,8 @@ elementclass XIAFromHost {
 
     // Classifier to sort between control/normal
     // Control in (0); Socket side data in (1)
-    RawSocket("UDP", $click_port) -> [0]output;
-    RawSocket("UDP", $click_port+1) -> [1]output;
+    RawSocket("UDP") -> sorter::XIAFilterPackets($click_port);    
+    sorter[0,1] => output;
 }
 
 elementclass XIAToHost {
@@ -17,7 +17,7 @@ elementclass XIAToHost {
 	// input: packets to send up (usually xtransport[1])	
 
     // socket side out
-    input -> cIP::CheckIPHeader() -> RawSocket("UDP"); 
+    input -> cIP::CheckIPHeader() -> Queue(200) -> RawSocket("UDP"); 
     cIP[1] -> Print(bad, MAXLENGTH 100, CONTENTS ASCII) -> Discard();
 }
 
@@ -228,7 +228,7 @@ elementclass XIARoutingCore {
     
     xtransport::XTRANSPORT($local_addr, IP:$external_ip, n/proc/rt_SID, IS_DUAL_STACK_ROUTER $is_dual_stack); 
 
-	XIAFromHost($click_port) -> xtransport;
+	XIAFromHost($click_port)[0,1] => xtransport;
 	xtransport[1] -> XIAToHost();
 
     xtransport[0] -> Discard; // Port 0 is unused for now.
