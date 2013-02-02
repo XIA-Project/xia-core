@@ -67,7 +67,7 @@ def getInterfaces(ignore_interfaces, specific_interface):
 	
 	# Get the default gateway  TODO: should there be one per interface?
 	cmdline = subprocess.Popen(
-			"route -n | grep ^0.0.0.0 | tr -s ' ' | cut -d ' ' -f2",
+			"/sbin/route -n | grep ^0.0.0.0 | tr -s ' ' | cut -d ' ' -f2",
 			shell=True, stdout=subprocess.PIPE)
 	default_gw = cmdline.stdout.read().strip()
 
@@ -83,7 +83,7 @@ def getInterfaces(ignore_interfaces, specific_interface):
 		use_interface = 'grep -A 1 %s | ' % specific_interface
 	
 	cmdline = subprocess.Popen(
-			"ifconfig | %s grep -v fake | grep -A 1 HWaddr | %s sed 's/ \+/ /g' | sed s/addr://" % (filters, use_interface),  
+			"/sbin/ifconfig | %s grep -v fake | grep -A 1 HWaddr | %s sed 's/ \+/ /g' | sed s/addr://" % (filters, use_interface),  
 			shell=True, stdout=subprocess.PIPE)
 	result = cmdline.stdout.read().strip()
 
