@@ -101,7 +101,7 @@ int Xaccept(int sockfd)
 	xia::XSocketMsg xia_socket_msg;
 	xia_socket_msg.set_type(xia::XACCEPT);
 
-	if (click_control(new_sockfd, &xia_socket_msg) < 0) {
+	if (click_send(new_sockfd, &xia_socket_msg) < 0) {
 		close(new_sockfd);
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;

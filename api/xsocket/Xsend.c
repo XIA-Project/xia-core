@@ -76,7 +76,7 @@ int Xsend(int sockfd, const void *buf, size_t len, int /*flags*/)
 	x_send_msg->set_payload(buf, len);
 
 	// send the protobuf containing the user data to click
-	if ((rc = click_data(sockfd, &xsm)) < 0) {
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}

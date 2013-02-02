@@ -51,7 +51,7 @@ int Xclose(int sockfd)
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XCLOSE);
 
-	if ((rc = click_control(sockfd, &xsm)) < 0) {
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 
 	} else if ((rc = click_reply2(sockfd, &type)) < 0) {

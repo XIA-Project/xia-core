@@ -24,7 +24,7 @@ int XupdateNameServerDAG(int sockfd, char *nsDAG) {
   xia::X_Updatenameserverdag_Msg *x_updatenameserverdag_msg = xsm.mutable_x_updatenameserverdag();
   x_updatenameserverdag_msg->set_dag(nsDAG);
   
-  if ((rc = click_control(sockfd, &xsm)) < 0) {
+  if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
   }
@@ -46,7 +46,7 @@ int XreadNameServerDAG(int sockfd, char *nsDAG) {
  	xia::XSocketMsg xsm;
   	xsm.set_type(xia::XREADNAMESERVERDAG);
   
-  	if ((rc = click_control(sockfd, &xsm)) < 0) {
+  	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
   	}

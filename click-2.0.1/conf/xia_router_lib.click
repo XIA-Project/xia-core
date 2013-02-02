@@ -2,23 +2,16 @@ require(library xia_constants.click);
 
 elementclass XIAFromHost {
     $click_port |
-
-	// output[0]: control traffic from host (should go to [0]xtransport)
-	// output[1]: data traffic from host (should go to [1]xtransport)    
-
-    // Classifier to sort between control/normal
-    // Control in (0); Socket side data in (1)
-    RawSocket("UDP") -> sorter::XIAFilterPackets($click_port);    
-    sorter[0,1] => output;
+    // Packets coming down from API
+    // output: traffic from host (should go to [0]xtransport)
+    Socket("UDP", 127.0.0.1, $click_port) -> output;
 }
 
 elementclass XIAToHost {
-    |
-	// input: packets to send up (usually xtransport[1])	
-
-    // socket side out
-    input -> cIP::CheckIPHeader() -> Queue(200) -> RawSocket("UDP"); 
-    cIP[1] -> Print(bad, MAXLENGTH 100, CONTENTS ASCII) -> Discard();
+    $click_port |
+    // Packets to send up to API	
+    // input: packets to send up (usually xtransport[1])	
+    input -> Socket("UDP", 0.0.0.0, 0); 
 }
 
 elementclass GenericPostRouteProc {
@@ -228,10 +221,11 @@ elementclass XIARoutingCore {
     
     xtransport::XTRANSPORT($local_addr, IP:$external_ip, n/proc/rt_SID, IS_DUAL_STACK_ROUTER $is_dual_stack); 
 
-	XIAFromHost($click_port)[0,1] => xtransport;
-	xtransport[1] -> XIAToHost();
+	XIAFromHost($click_port) -> xtransport;
+    Idle -> [1]xtransport;
+	xtransport[0] -> XIAToHost($click_port);
 
-    xtransport[0] -> Discard; // Port 0 is unused for now.
+    xtransport[1] -> Discard; // Port 1 is unused for now.
     
     cache :: XIACache($local_addr, n/proc/rt_CID, PACKET_SIZE 1400, MALICIOUS 0);
 

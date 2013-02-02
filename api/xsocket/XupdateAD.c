@@ -45,7 +45,7 @@ int XupdateAD(int sockfd, char *newad, char *new4id) {
   x_changead_msg->set_ad(newad);
   x_changead_msg->set_ip4id(new4id);
   
-  if ((rc = click_control(sockfd, &xsm)) < 0) {
+  if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
   }
@@ -84,7 +84,7 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *loca
  	xia::XSocketMsg xsm;
   	xsm.set_type(xia::XREADLOCALHOSTADDR);
   
-  	if ((rc = click_control(sockfd, &xsm)) < 0) {
+  	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
   	}
@@ -134,7 +134,7 @@ int XisDualStackRouter(int sockfd) {
  	xia::XSocketMsg xsm;
   	xsm.set_type(xia::XISDUALSTACKROUTER);
   
-  	if ((rc = click_control(sockfd, &xsm)) < 0) {
+  	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
   	}

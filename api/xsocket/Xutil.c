@@ -41,29 +41,18 @@ int validateSocket(int sock, int stype, int err)
 	return -1;
 }
 
-int click_x(int sockfd, int kind, xia::XSocketMsg *xsm)
+int click_send(int sockfd, xia::XSocketMsg *xsm)
 {
 	int rc;
 	struct sockaddr_in sa;
-	socklen_t slen;
 
 	assert(xsm);
 
 	// TODO: cache these so we don't have to set everything up each time we
 	// are called
-
-	slen = sizeof sa;
 	sa.sin_family = PF_INET;
-	if (kind == DATA) {
-		sa.sin_addr.s_addr = inet_addr("127.0.0.1");
-		sa.sin_port = htons(atoi(CLICKPORT)+1);
-	} else if (kind == CONTROL) {
-		sa.sin_addr.s_addr = inet_addr("127.0.0.1");
-		sa.sin_port = htons(atoi(CLICKPORT));
-	} else {
-		LOG("invalid click port specified");
-		return -1;
-	}
+	sa.sin_addr.s_addr = inet_addr("127.0.0.1");
+    sa.sin_port = htons(atoi(CLICKPORT));
 
 	std::string p_buf;
 	xsm->SerializeToString(&p_buf);
@@ -71,7 +60,7 @@ int click_x(int sockfd, int kind, xia::XSocketMsg *xsm)
 	int remaining = p_buf.size();
 	const char *p = p_buf.c_str();
 	while (remaining > 0) {
-		rc = sendto(sockfd, p, remaining, 0, (struct sockaddr *)&sa, slen);
+		rc = sendto(sockfd, p, remaining, 0, (struct sockaddr *)&sa, sizeof(sa));
 
 		if (rc == -1) {
 			LOGF("click socket failure: errno = %d", errno);
@@ -95,16 +84,6 @@ int click_x(int sockfd, int kind, xia::XSocketMsg *xsm)
 	}
 
 	return  (rc >= 0 ? 0 : -1);
-}
-
-int click_data(int sockfd, xia::XSocketMsg *xsm)
-{
-	return click_x(sockfd, DATA, xsm);
-}
-
-int click_control(int sockfd, xia::XSocketMsg *xsm)
-{
-	return click_x(sockfd, CONTROL, xsm);
 }
 
 int click_reply(int sockfd, char *buf, int buflen)

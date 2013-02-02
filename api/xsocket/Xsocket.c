@@ -98,7 +98,7 @@ int Xsocket(int transport_type)
 	xia::X_Socket_Msg *x_socket_msg = xsm.mutable_x_socket();
 	x_socket_msg->set_type(transport_type);		
 	
-	if ((rc = click_control(sockfd, &xsm)) < 0) {
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		close(sockfd);
 		return -1;

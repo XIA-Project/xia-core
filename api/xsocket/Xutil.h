@@ -29,8 +29,7 @@
 #define LOGF(fmt, ...)
 #endif
 
-int click_data(int sockfd, xia::XSocketMsg *xsm);
-int click_control(int sockfd, xia::XSocketMsg *xsm);
+int click_send(int sockfd, xia::XSocketMsg *xsm);
 int click_reply(int sockfd, char *buf, int buflen);
 int click_reply2(int sockfd, xia::XSocketCallType *type);
 int bind_to_random_port(int sockfd);

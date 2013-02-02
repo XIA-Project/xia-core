@@ -107,7 +107,7 @@ int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen)
 			return -1;
 	}
 
-	if ((rc = click_control(sockfd, &xsm)) < 0)
+	if ((rc = click_send(sockfd, &xsm)) < 0)
 		LOGF("Error talking to Click: %s", strerror(errno));
 	else if ((rc = click_reply2(sockfd, &type) ) < 0)
 		LOGF("Error getting status from Click: %s", strerror(errno));
@@ -175,7 +175,7 @@ int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen)
 				return -1;
 			}
 
-			if (click_control(sockfd, &xsm) < 0) {
+			if (click_send(sockfd, &xsm) < 0) {
 				LOGF("Error talking to Click: %s", strerror(errno));
 				return -1;
 			}
@@ -204,7 +204,7 @@ int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen)
 				return -1;
 			}
 
-			if (click_control(sockfd, &xsm) < 0) {
+			if (click_send(sockfd, &xsm) < 0) {
 				LOGF("Error talking to Click: %s", strerror(errno));
 				return -1;
 			}
