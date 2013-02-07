@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include "Xsocket.h"
+#include "dagaddr.hpp"
 
 #define VERSION "v1.0"
 #define TITLE "XIA Datagram Echo Client"
@@ -40,7 +41,8 @@ int  pktSize = 512;	// default pkt size
 int reconnect = 0;	// don't reconnect between loops
 int threads = 1;	// just a single thread
 
-char *sdag;
+struct addrinfo *ai;
+sockaddr_x *sa;
 
 /*
 ** display cmd line options and exit
@@ -190,8 +192,6 @@ int process(int sock)
 {
 	int size;
 	int sent, received;
-	char tdag[1024];
-	size_t dlen;
 	char buf1[XIA_MAXBUF], buf2[XIA_MAXBUF];
 
 	if (pktSize == 0)
@@ -200,15 +200,14 @@ int process(int sock)
 		size = pktSize;
 	randomString(buf1, size);
 
-	if ((sent = Xsendto(sock, buf1, size, 0, sdag, strlen(sdag)+1)) < 0) {
+	if ((sent = Xsendto(sock, buf1, size, 0, (sockaddr*)sa, sizeof(sockaddr_x))) < 0) {
 		die(-4, "Send error %d on socket %d\n", errno, sock);
 	}
 
 	say("Xsock %4d sent %d bytes\n", sock, sent);
 
-	memset(buf2, sizeof(buf2), 0);
-	dlen = sizeof(tdag);
-	if ((received = Xrecvfrom(sock, buf2, sizeof(buf2), 0, tdag, &dlen)) < 0)
+	memset(buf2, 0, sizeof(buf2));
+	if ((received = Xrecvfrom(sock, buf2, sizeof(buf2), 0, NULL, NULL)) < 0)
 		die(-5, "Receive error %d on socket %d\n", errno, sock);
 
 	say("Xsock %4d received %d bytes\n", sock, received);
@@ -245,7 +244,7 @@ void pausex()
 int connectToServer()
 {
 	int ssock;
-	if ((ssock = Xsocket(XSOCK_DGRAM)) < 0) {
+	if ((ssock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0) {
 		die(-2, "unable to create the socket\n");
 	}
 	say("Xsock %4d created\n", ssock);
@@ -309,8 +308,12 @@ int main(int argc, char **argv)
 
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 
-    if(!(sdag = XgetDAGbyName(DGRAM_NAME)))
-		die(-1, "Unable to lookup name: %s\n", DGRAM_NAME);
+	if (Xgetaddrinfo(DGRAM_NAME, NULL, NULL, &ai) != 0)
+		die(-1, "unable to lookup name %s\n", DGRAM_NAME);
+	sa = (sockaddr_x*)ai->ai_addr;
+
+	Graph g(sa);
+	printf("\n%s\n", g.dag_string().c_str());
 
 	if (threads == 1)
 		// just do it
@@ -331,6 +334,5 @@ int main(int argc, char **argv)
 		free(clients);
 	}
 
-	free(sdag);
 	return 0;
 }

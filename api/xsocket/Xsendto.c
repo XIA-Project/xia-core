@@ -22,6 +22,7 @@
 #include "Xinit.h"
 #include "Xutil.h"
 #include <errno.h>
+#include "dagaddr.hpp"
 
 /*!
 ** @brief Sends a datagram message on an Xsocket
@@ -42,23 +43,34 @@
 ** Xsendto api is limited to sending at most XIA_MAXBUF bytes.
 ** @param flags (This is not currently used but is kept to be compatible
 ** with the standard sendto socket call.
-** @param dDAG address (SID) to send the datagram to
-** @param dlen length of the DAG, currently unused
+** @param addr address (SID) to send the datagram to
+** @param addrlen length of the DAG
 **
 ** @returns number of bytes sent on success
 ** @returns -1 on failure with errno set to an error compatible with those
 ** returned by the standard sendto call.
 **
 */
-int Xsendto(int sockfd,const void *buf, size_t len, int /*flags*/,
-		const char* dDAG, size_t /*dlen*/)
+int Xsendto(int sockfd,const void *buf, size_t len, int flags,
+		const struct sockaddr *addr, socklen_t addrlen)
 {
 	int rc;
 
 	if (len == 0)
 		return 0;
 
-	if (!buf || !dDAG) {
+	if (addrlen < sizeof(sockaddr_x)) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (flags != 0) {
+		LOG("the flags parameter is not currently supported");
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (!buf || !addr) {
 		LOG("null pointer!\n");
 		errno = EFAULT;
 		return -1;
@@ -80,7 +92,12 @@ int Xsendto(int sockfd,const void *buf, size_t len, int /*flags*/,
 	xsm.set_type(xia::XSENDTO);
 
 	xia::X_Sendto_Msg *x_sendto_msg = xsm.mutable_x_sendto();
-	x_sendto_msg->set_ddag(dDAG);
+
+	// FIXME: validate addr
+	Graph g((sockaddr_x*)addr);
+	std::string s = g.dag_string();
+
+	x_sendto_msg->set_ddag(s.c_str());
 	x_sendto_msg->set_payload((const char*)buf, len);
 
 	if ((rc = click_data(sockfd, &xsm)) < 0) {

@@ -109,8 +109,9 @@ int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen)
 
 	if ((rc = click_control(sockfd, &xsm)) < 0)
 		LOGF("Error talking to Click: %s", strerror(errno));
-	else if ((rc = click_reply2(sockfd, &type) ) < 0)
+	else if ((rc = click_reply2(sockfd, &type) ) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
+	}
 	
 	return rc;
 }

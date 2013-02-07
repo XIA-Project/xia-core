@@ -38,37 +38,36 @@ void help()
 void echo_dgram()
 {
 	int sock;
-	char *dag;
-	char sdag[512];
+	sockaddr_x sa;
+	socklen_t slen;
 	char buf[2048];
 	char reply[2048];
 	int ns, nr;
-	size_t len;
 	
-	if ((sock = Xsocket(XSOCK_DGRAM)) < 0) {
+	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0) {
 		printf("error creating socket\n");
 		exit(1);
 	}
 
     // lookup the xia service 
-    if (!(dag = XgetDAGbyName(DGRAM_NAME))) {
+	slen = sizeof(sa);
+    if (XgetDAGbyName(DGRAM_NAME, &sa, &slen) != 0) {
 		printf("unable to locate: %s\n", DGRAM_NAME);
 		exit(1);
 	}
 
 	while(1) {
 		printf("\nPlease enter the message (blank line to exit):\n");
-		fgets(buf, sizeof(buf), stdin);
-		if ((ns = strlen(buf)) <= 1)
+		char *s = fgets(buf, sizeof(buf), stdin);
+		if ((ns = strlen(s)) <= 1)
 			break;
 
-		if (Xsendto(sock, buf, ns, 0, dag, strlen(dag)) < 0) {
+		if (Xsendto(sock, s, ns, 0, (struct sockaddr*) &sa, sizeof(sa)) < 0) {
 			printf("error sending message\n");
 			break;
 		}
 
-		len =  sizeof(sdag);
-		if ((nr = Xrecvfrom(sock, reply, sizeof(reply), 0, sdag, &len)) < 0) {
+		if ((nr = Xrecvfrom(sock, reply, sizeof(reply), 0, NULL, NULL)) < 0) {
 			printf("error receiving message\n");
 			break;
 		}
@@ -85,35 +84,37 @@ void echo_dgram()
 void echo_stream()
 {
 	int sock;
-	char *dag;
+	sockaddr_x sa;
+	socklen_t slen;
 	char buf[2048];
 	char reply[2048];
 	int ns, nr;
 
-	if ((sock = Xsocket(XSOCK_STREAM)) < 0) {
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
 		printf("error creating socket\n");
 		exit(1);
 	}
 
     // lookup the xia service 
-    if (!(dag = XgetDAGbyName(STREAM_NAME))) {
+	slen = sizeof(sa);
+    if (XgetDAGbyName(STREAM_NAME, &sa, &slen) != 0) {
 		printf("unable to locate: %s\n", STREAM_NAME);
 		exit(1);
 	}
 
-	if (Xconnect(sock, dag) < 0) {
-		printf("can't connect to %s\n", dag);
+	if (Xconnect(sock, (struct sockaddr*)&sa, sizeof(sa)) < 0) {
+		printf("can't connect to %s\n", STREAM_NAME);
 		Xclose(sock);
 		exit(1);
 	}
 
 	while(1) {
 		printf("\nPlease enter the message (blank line to exit):\n");
-		fgets(buf, sizeof(buf), stdin);
-		if ((ns = strlen(buf)) <= 1)
+		char *s = fgets(buf, sizeof(buf), stdin);
+		if ((ns = strlen(s)) <= 1)
 			break;
 		
-		if (Xsend(sock, buf, ns, 0) < 0) {
+		if (Xsend(sock, s, ns, 0) < 0) {
 			printf("error sending message\n");
 			break;
 		}

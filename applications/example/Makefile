@@ -2,7 +2,8 @@ include ../../xia.mk
 
 .PHONY: clean
 
-LDFLAGS += $(XLIB)/libXsocket.so
+LDFLAGS += $(XLIB)/libXsocket.so $(XLIB)/libdagaddr.so
+CFLAGS += -std=c++0x
 
 TARGETS= chunk_copy_client chunk_copy_server echoclient echoclient-datagram \
 	echoclient-simple echoserver time_of_day_client time_of_day_server

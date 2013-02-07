@@ -53,11 +53,16 @@
 ** @returns -1 on failure with errno set to an error compatible with the standard
 ** recv call.
 */
-int Xrecv(int sockfd, void *rbuf, size_t len, int  /*flags */)
+int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 {
 	int numbytes;
 	char UDPbuf[MAXBUFLEN];
 	
+	if (flags) {
+		errno = EOPNOTSUPP;
+		return -1;
+	}
+
 	if (len == 0)
 		return 0;
 

@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include "Xsocket.h"
+#include "dagaddr.hpp"
 
 #define VERSION "v1.0"
 #define TITLE "XIA Echo Client"
@@ -40,7 +41,8 @@ int  pktSize = 512;	// default pkt size
 int reconnect = 0;	// don't reconnect between loops
 int threads = 1;	// just a single thread
 
-char *sdag;
+struct addrinfo *ai;
+sockaddr_x *sa;
 
 /*
 ** display cmd line options and exit
@@ -203,7 +205,7 @@ int process(int sock)
 
 	say("Xsock %4d sent %d bytes\n", sock, sent);
 
-	memset(buf2, sizeof(buf2), 0);
+	memset(buf2, 0, sizeof(buf2));
 	if ((received = Xrecv(sock, buf2, sizeof(buf2), 0)) < 0)
 		die(-5, "Receive error %d on socket %d\n", errno, sock);
 
@@ -240,12 +242,12 @@ void pausex()
 int connectToServer()
 {
 	int ssock;
-	if ((ssock = Xsocket(XSOCK_STREAM)) < 0) {
+	if ((ssock = Xsocket(AF_XIA, XSOCK_STREAM, 0)) < 0) {
 		die(-2, "unable to create the server socket\n");
 	}
 	say("Xsock %4d created\n", ssock);
 
-	if (Xconnect(ssock, sdag) < 0) 
+	if (Xconnect(ssock, (struct sockaddr *)sa, sizeof(sockaddr_x)) < 0) 
 		die(-3, "unable to connect to the destination dag\n");
 	
 	say("Xsock %4d connected\n", ssock);
@@ -308,8 +310,12 @@ int main(int argc, char **argv)
 
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 
-    if(!(sdag = XgetDAGbyName(STREAM_NAME)))
-		die(-1, "Unable to lookup name: %s\n", STREAM_NAME);
+	if (Xgetaddrinfo(STREAM_NAME, NULL, NULL, &ai) != 0)
+		die(-1, "unable to lookup name %s\n", STREAM_NAME);
+	sa = (sockaddr_x*)ai->ai_addr;
+
+	Graph g(sa);
+	printf("\n%s\n", g.dag_string().c_str());
 
 	if (threads == 1)
 		// just do it
@@ -330,6 +336,5 @@ int main(int argc, char **argv)
 		free(clients);
 	}
 
-	free(sdag);
 	return 0;
 }

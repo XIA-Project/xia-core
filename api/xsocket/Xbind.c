@@ -23,6 +23,7 @@
 #include "Xinit.h"
 #include "Xutil.h"
 #include <errno.h>
+#include "dagaddr.hpp"
 
 /*!
 ** @brief Bind an Xsocket to a DAG.
@@ -37,19 +38,25 @@
 ** available to the application.
 **
 ** @param sockfd	The control socket
-** @param sDAG		The source service (local) DAG
+** @param addr		The source service (local) DAG
+** @param addrlen	The size of addr
 **
 ** @returns 0 on success
 ** @returns -1 on error with errno set to an error compatible with those
 ** retuned by the standard bind call.
 */
-int Xbind(int sockfd, const char* sDAG)
+int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
 	xia::XSocketCallType type;
 	int rc;
 
-	if (!sDAG) {
-		LOG("sDAG is NULL!");
+	if (addrlen == 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (!addr) {
+		LOG("addr is NULL!");
 		errno = EFAULT;
 		return -1;
 	}
@@ -60,11 +67,17 @@ int Xbind(int sockfd, const char* sDAG)
 		return -1;
 	}
 
+	Graph g((sockaddr_x*)addr);
+	if (g.num_nodes() <= 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XBIND);
 
 	xia::X_Bind_Msg *x_bind_msg = xsm.mutable_x_bind();
-	x_bind_msg->set_sdag(sDAG);
+	x_bind_msg->set_sdag(g.dag_string().c_str());
 
 	if ((rc = click_control(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
