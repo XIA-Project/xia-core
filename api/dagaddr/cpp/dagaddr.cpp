@@ -91,7 +91,7 @@ Node::Node(int type, const std::string id_str)
 
 	for (int i = 0; i < ID_LEN; i++)
 	{
-		int num = std::stoi(id_str.substr(2*i, 2), 0, 16);
+		int num = stoi(id_str.substr(2*i, 2), 0, 16);
 		memcpy(&(ptr_->id[i]), &num, 1);
 	}
 }
@@ -198,7 +198,7 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 
 	for (int i = 0; i < ID_LEN; i++)
 	{
-		int num = std::stoi(id_str.substr(2*i, 2), 0, 16);
+		int num = stoi(id_str.substr(2*i, 2), 0, 16);
 		memcpy(&(ptr_->id[i]), &num, 1);
 	}
 }
@@ -365,8 +365,8 @@ Graph::operator*=(const Graph& r)
 	std::vector<std::size_t> node_mapping_r;
 	merge_graph(r, node_mapping_r);
 
-	for (auto it_sink = sinks.begin(); it_sink != sinks.end(); ++it_sink)
-		for (auto it_source = sources.begin(); it_source != sources.end(); ++it_source)
+	for (std::vector<std::size_t>::const_iterator it_sink = sinks.begin(); it_sink != sinks.end(); ++it_sink)
+		for (std::vector<std::size_t>::const_iterator it_source = sources.begin(); it_source != sources.end(); ++it_source)
 			add_edge(*it_sink, node_mapping_r[*it_source]);
 
 	return *this;
@@ -514,11 +514,11 @@ Graph::merge_graph(const Graph& r, std::vector<std::size_t>& node_mapping)
 {
 	node_mapping.clear();
 
-	for (auto it = r.nodes_.begin(); it != r.nodes_.end(); ++it)
+	for (std::vector<Node>::const_iterator it = r.nodes_.begin(); it != r.nodes_.end(); ++it)
 		node_mapping.push_back(add_node(*it));
 
 	for (std::size_t from_id = 0; from_id < r.out_edges_.size(); from_id++)
-		for (auto it = r.out_edges_[from_id].begin(); it != r.out_edges_[from_id].end(); ++it)
+		for (std::vector<std::size_t>::const_iterator it = r.out_edges_[from_id].begin(); it != r.out_edges_[from_id].end(); ++it)
 			add_edge(node_mapping[from_id], node_mapping[*it]);
 }
 
@@ -989,7 +989,7 @@ Graph::construct_from_dag_string(std::string dag_string)
 
 		for (int j = 1; j < elems.size(); j++)
 		{
-			int dag_idx = std::stoi(elems[j]);
+			int dag_idx = stoi(elems[j], 0, 10);
 			add_edge(dag_idx_to_graph_idx[i], dag_idx_to_graph_idx[dag_idx+1]);
 		}
 	}

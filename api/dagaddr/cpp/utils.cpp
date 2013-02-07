@@ -13,12 +13,28 @@ std::vector<std::string> split(const std::string &s, char delim) {
 std::string trim(const std::string& str)
 {
 	const std::string& whitespace = " \t";
-    const auto strBegin = str.find_first_not_of(whitespace);
+    const size_t strBegin = str.find_first_not_of(whitespace);
     if (strBegin == std::string::npos)
         return ""; // no content
 
-    const auto strEnd = str.find_last_not_of(whitespace);
-    const auto strRange = strEnd - strBegin + 1;
+    const size_t strEnd = str.find_last_not_of(whitespace);
+    const size_t strRange = strEnd - strBegin + 1;
 
     return str.substr(strBegin, strRange);
+}
+
+int stoi(const std::string& str, int pos, int base) {
+    int output = -1;
+    switch (base) {
+    case 10:
+        scanf(str.c_str(), "%d",&output);
+        break;
+    case 16:
+        scanf(str.c_str(), "%x",&output);
+        break;
+    default:
+        scanf(str.c_str(), "%d",&output);
+        break;
+    }
+    return output;
 }

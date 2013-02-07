@@ -4,13 +4,14 @@ include ../../../xia.mk
 
 XSOCK_LIB=$(XLIB)/libXsocket.so
 TARGET=$(XLIB)/_c_xsocket.so
+PYTHON=`find /usr/include/python*/Python.h | sed "s/\/Python.h//"`
 
 all: $(TARGET) $(XLIB)/xsocket.py 
 
 $(TARGET): $(XSOCK_LIB) c_xsocket_wrap.c 
-	gcc -I/usr/include/python2.7 -fpic -c c_xsocket_wrap.c 
-	#gcc -shared c_xsocket_wrap.o -lXsocket -o $@  -I/usr/include/python2.7 -L$(XLIB)
-	gcc -shared c_xsocket_wrap.o $(XSOCK_LIB) -o $@  -I/usr/include/python2.7
+	gcc -I $(PYTHON) -fpic -c c_xsocket_wrap.c 
+	#gcc -shared c_xsocket_wrap.o -lXsocket -o $@ -I $(PYTHON) -L$(XLIB)
+	gcc -shared c_xsocket_wrap.o $(XSOCK_LIB) -o $@  -I $(PYTHON)
 
 c_xsocket_wrap.c: c_xsocket.i $(XSOCK_LIB)
 	swig -outdir $(XLIB) -python c_xsocket.i 

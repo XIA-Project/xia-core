@@ -2,7 +2,6 @@ include ../../../xia.mk
 
 .PHONY: all clean doc
 
-CFLAGS += -std=c++0x
 SOURCES=dagaddr.cpp utils.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 TARGET=$(XLIB)/libdagaddr.so

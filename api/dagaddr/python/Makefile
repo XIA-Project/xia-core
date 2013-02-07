@@ -4,12 +4,13 @@ include ../../../xia.mk
 
 DAGADDR_LIB=$(XLIB)/libdagaddr.so
 TARGET=$(XLIB)/_dagaddr.so
+PYTHON=`find /usr/include/python*/Python.h | sed "s/\/Python.h//"`
 
 all: $(TARGET) $(XLIB)/dagaddr.py 
 
 $(TARGET): $(DAGADDR_LIB) dagaddr_wrap.cxx
-	gcc -I/usr/include/python2.7 -fpic -c dagaddr_wrap.cxx -std=c++0x
-	gcc -shared dagaddr_wrap.o $(DAGADDR_LIB) -o $@  -I/usr/include/python2.7
+	gcc -I$(PYTHON) -fpic -c dagaddr_wrap.cxx
+	gcc -shared dagaddr_wrap.o $(DAGADDR_LIB) -o $@  -I$(PYTHON)
 
 dagaddr_wrap.cxx: dagaddr.i $(DAGADDR_LIB)
 	swig -c++ -outdir $(XLIB) -python dagaddr.i 

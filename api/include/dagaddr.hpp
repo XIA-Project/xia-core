@@ -1,7 +1,6 @@
 #pragma once
 
 #include <stdint.h>	// for non-c++0x
-#include <cstdint>	// for c++0x
 #include <vector>
 #include <string>
 #include "xia.h"
