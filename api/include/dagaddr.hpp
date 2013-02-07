@@ -103,6 +103,7 @@ public:
 	Node get_node(int i) const;
 	std::vector<std::size_t> get_out_edges(int i) const;
 	void fill_sockaddr(sockaddr_x *s) const;
+	void from_sockaddr(sockaddr_x *s);
 
 protected:
 
