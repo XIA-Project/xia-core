@@ -213,7 +213,7 @@ void echo_stream()
 
 	Graph g((sockaddr_x*)ai->ai_addr);
 
-	sockaddr_x *sa = (sockaddr_x*)pai->ai_addr;
+	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
 
 	printf("\nStream DAG\n%s\n", g.dag_string().c_str());
 
