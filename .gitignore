@@ -60,6 +60,7 @@ click-2.0.1/etc/pkg-config.mk
 click-2.0.1/include/click/config.h
 click-2.0.1/include/click/config-userlevel.h
 click-2.0.1/include/click/config-bsdmodule.h
+click-2.0.1/include/click/pathvars.h
 click-2.0.1/linuxmodule/Makefile
 click-2.0.1/ns/Makefile
 click-2.0.1/tools/Makefile
