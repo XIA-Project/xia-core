@@ -124,8 +124,8 @@ Node::Node(const std::string type_str, const std::string id_str)
 *
 * Create a new node from a single string with the format <type>:<id>.
 * Examples:
-*	\nAD:1234567890123456789012345678901234567890
-*	\nCID:0000011111222223333344444555556666677777
+*	\n AD:1234567890123456789012345678901234567890
+*	\n CID:0000011111222223333344444555556666677777
 *
 * @param node_string
 */
@@ -665,6 +665,27 @@ Graph::source_index() const
 	return -1;
 }
 
+
+/**
+* @brief Get the index of the final intent node
+*
+* Get the index of the final intent node. This method returns the index of the
+* first sink node it finds.
+*
+* @return The index of the DAG's final intent node.
+*/
+std::size_t
+Graph::final_intent_index() const
+{
+	for (std::size_t i = 0; i < nodes_.size(); i++)
+	{
+		if (is_sink(i)) return i;
+	}
+
+	printf("Warning: source_index: no sink node found\n");
+	return -1;
+}
+
 /**
 * @brief Test if a node is the final intent
 *
@@ -1127,4 +1148,19 @@ Graph::from_sockaddr(sockaddr_x *s)
 				add_edge(from_node, to_node);
 		}
 	}
+}
+
+
+/**
+* @brief Replace the DAG's final intent with the supplied Node.
+*
+* Replace the DAG's final intent with the supplied node.
+*
+* @param new_intent The Node to become the DAG's new final intent.
+*/
+void 
+Graph::replace_final_intent(const Node& new_intent)
+{
+	std::size_t intent_index = final_intent_index();
+	nodes_[intent_index] = new_intent;
 }
