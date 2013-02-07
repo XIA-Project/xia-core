@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include "Xsocket.h"
 #include "xrouted.hh"
+#include "dagaddr.hpp"
 
 RouteState route_state;
 
@@ -91,7 +92,7 @@ int sendHello(){
 	hello.append(route_state.myHID);
 	hello.append("^");
 	strcpy (buffer, hello.c_str());
-	Xsendto(route_state.sock, buffer, strlen(buffer), 0, route_state.ddag, strlen(route_state.ddag)+1);
+	Xsendto(route_state.sock, buffer, strlen(buffer), 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
 	return 1;
 }
 
@@ -143,7 +144,7 @@ int sendLSA() {
 	// increase the LSA seq
 	route_state.lsa_seq++;
 	route_state.lsa_seq = route_state.lsa_seq % MAX_SEQNUM;
-	Xsendto(route_state.sock, buffer, strlen(buffer), 0, route_state.ddag, strlen(route_state.ddag)+1);
+	Xsendto(route_state.sock, buffer, strlen(buffer), 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
 	return 1;
 }
 
@@ -390,7 +391,7 @@ int processLSA(const char* lsa_msg) {
 
 	// 5. rebroadcast this LSA	
 	strcpy (buffer, lsa_msg);
-	Xsendto(route_state.sock, buffer, strlen(buffer), 0, route_state.ddag, strlen(route_state.ddag)+1);
+	Xsendto(route_state.sock, buffer, strlen(buffer), 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
 
 	return 1;
 }
@@ -530,18 +531,23 @@ void updateClickRoutingTable() {
 
 void initRouteState()
 {
-	
-    	// make the dest DAG (broadcast to other routers)
-    	route_state.ddag = (char*)malloc(snprintf(NULL, 0, "RE %s %s", BHID, SID_XROUTE) + 1);
-    	sprintf(route_state.ddag, "RE %s %s", BHID, SID_XROUTE);	
+	// make the dest DAG (broadcast to other routers)
+	Graph g = Node() * Node(BHID) * Node(SID_XROUTE);
+	g.fill_sockaddr(&route_state.ddag);
 
-    	// read the localhost AD and HID
-    	if ( XreadLocalHostAddr(route_state.sock, route_state.myAD, MAX_XID_SIZE, route_state.myHID, MAX_XID_SIZE, route_state.my4ID, MAX_XID_SIZE) < 0 )
-    		perror("Reading localhost address");
+	g.print_graph();
+
+	// read the localhost AD and HID
+	if ( XreadLocalHostAddr(route_state.sock, route_state.myAD, MAX_XID_SIZE, route_state.myHID, MAX_XID_SIZE, route_state.my4ID, MAX_XID_SIZE) < 0 )
+		perror("Reading localhost address");
 
 	// make the src DAG (the one the routing process listens on)
-    	route_state.sdag = (char*) malloc(snprintf(NULL, 0, "RE %s %s %s", route_state.myAD, route_state.myHID, SID_XROUTE) + 1);
-    	sprintf(route_state.sdag, "RE %s %s %s", route_state.myAD, route_state.myHID, SID_XROUTE); 
+	struct addrinfo *ai;
+	if (Xgetaddrinfo(NULL, SID_XROUTE, NULL, &ai) != 0) {
+		perror("getaddrinfo failure!\n");
+		exit(-1);
+	}
+	memcpy(&route_state.sdag, ai->ai_addr, sizeof(sockaddr_x));
 	
 	route_state.num_neighbors = 0; // number of neighbor routers
 	route_state.lsa_seq = 0;	// LSA sequence number of this router
@@ -567,7 +573,7 @@ int main(int argc, char *argv[])
 	int rc, selectRetVal, n;
     	size_t dlen, found, start;
     	char recv_message[1024];
-    	char theirDAG[1024];   
+    	sockaddr_x theirDAG;   
     	fd_set socks;
     	struct timeval timeoutval;	
 	vector<string> routers;
@@ -596,7 +602,7 @@ int main(int argc, char *argv[])
 	listRoutes("AD");
 
     	// open socket for route process
-    	route_state.sock=Xsocket(XSOCK_DGRAM);
+    	route_state.sock=Xsocket(AF_XIA, SOCK_DGRAM, 0);
     	if (route_state.sock < 0) 
     		perror("Opening socket");
 
@@ -604,7 +610,7 @@ int main(int argc, char *argv[])
     	initRouteState();
    
     	// bind to the src DAG
-    	Xbind(route_state.sock, route_state.sdag);
+    	Xbind(route_state.sock, (struct sockaddr*)&route_state.sdag, sizeof(sockaddr_x));
     	
 	while (1) {
 		FD_ZERO(&socks);
@@ -616,8 +622,8 @@ int main(int argc, char *argv[])
 		if (selectRetVal > 0) {
 			// receiving a Hello or LSA packet
 			memset(&recv_message[0], 0, sizeof(recv_message));
-			dlen = 1024;
-			n = Xrecvfrom(route_state.sock, recv_message, 1024, 0, theirDAG, &dlen);
+			dlen = sizeof(sockaddr_x);
+			n = Xrecvfrom(route_state.sock, recv_message, 1024, 0, (struct sockaddr*)&theirDAG, &dlen);
 			if (n < 0) {
 	    			perror("recvfrom");
 			}

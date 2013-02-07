@@ -9,6 +9,7 @@
 #include "Xsocket.h"
 #include "xhcp.hh"
 #include "../common/XIARouter.hh"
+#include "dagaddr.hpp"
 
 #define DEFAULT_HOSTNAME "www_h.hostxxx.com.xia" // used if not provided by user (via command-line)
 
@@ -40,11 +41,11 @@ void listRoutes(std::string xidType)
 
 int main(int argc, char *argv[]) {
 	int rc;
-	pthread_t advertiser_pid;
+//	pthread_t advertiser_pid;
+	sockaddr_x sdag;
+	sockaddr_x hdag;
+	sockaddr_x ddag;
 	char pkt[XHCP_MAX_PACKET_SIZE];
-	char sdag[XHCP_MAX_DAG_LENGTH];
-	char ddag[XHCP_MAX_DAG_LENGTH];
-	char hdag[XHCP_MAX_DAG_LENGTH];
 	char buffer[XHCP_MAX_PACKET_SIZE]; 	
 	string myAD(""), myGWRHID(""), myGWR4ID(""), myNS_DAG("");
 	string default_AD("AD:-"), default_HID("HID:-"), default_4ID("IP:-"), empty_str("HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
@@ -56,7 +57,7 @@ int main(int argc, char *argv[]) {
 	char *gw_dag = (char *)malloc(XHCP_MAX_DAG_LENGTH);
 	char *gw_4id = (char *)malloc(XHCP_MAX_DAG_LENGTH);
 	char *ns_dag = (char *)malloc(XHCP_MAX_DAG_LENGTH);
-	char *pseudo_gw_router_dag; // dag for host_register_message (broadcast message), but only the gw router will accept it
+	sockaddr_x pseudo_gw_router_dag; // dag for host_register_message (broadcast message), but only the gw router will accept it
 	string host_register_message;
 	char mydummyAD[MAX_XID_SIZE];
 	char myrealAD[MAX_XID_SIZE];
@@ -96,8 +97,10 @@ int main(int argc, char *argv[]) {
 	}
 
     // make the response message dest DAG (intended destination: gw router who is running the routing process)
-    pseudo_gw_router_dag = (char*)malloc(snprintf(NULL, 0, "RE %s %s", BHID, SID_XROUTE) + 1);
-    sprintf(pseudo_gw_router_dag, "RE %s %s", BHID, SID_XROUTE);	
+	Graph gw = Node() * Node(BHID) * Node(SID_XROUTE);
+	gw.fill_sockaddr(&pseudo_gw_router_dag);
+//    pseudo_gw_router_dag = (char*)malloc(snprintf(NULL, 0, "RE %s %s", BHID, SID_XROUTE) + 1);
+//    sprintf(pseudo_gw_router_dag, "RE %s %s", BHID, SID_XROUTE);	
 
     // connect to the click route engine
 	if ((rc = xr.connect()) != 0) {
@@ -106,16 +109,17 @@ int main(int argc, char *argv[]) {
 	}
 	
 	// Xsocket init
-	int sockfd = Xsocket(XSOCK_DGRAM);
+	int sockfd = Xsocket(AF_XIA, SOCK_DGRAM, 0);
 	if (sockfd < 0) { perror("Opening Xsocket"); }
 	
-    	// read the localhost HID 
-    	if ( XreadLocalHostAddr(sockfd, mydummyAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE, my4ID, MAX_XID_SIZE) < 0 )
-    		perror("Reading localhost address");   	
+   	// read the localhost HID 
+   	if ( XreadLocalHostAddr(sockfd, mydummyAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE, my4ID, MAX_XID_SIZE) < 0 )
+   		perror("Reading localhost address");   	
 
 	// make the src DAG (Actual AD will be updated when receiving XHCP beacons from an XHCP server)
-	sprintf(sdag, "RE %s", SID_XHCP);
-	Xbind(sockfd, sdag);
+	Graph g = Node() * Node(SID_XHCP);
+//	sprintf(sdag, "RE %s", SID_XHCP);
+	Xbind(sockfd, (struct sockaddr*)&sdag, sizeof(sdag));
 	
 	/* Main operation:
 		1. receive myAD, gateway router HID, and Name-Server-DAG information from XHCP server
@@ -135,9 +139,8 @@ int main(int argc, char *argv[]) {
 	while(!(quit_flag & 2)) {
 		// clear out packet
 		memset(pkt, 0, sizeof(pkt));
-		memset(ddag, 0, sizeof(ddag));
-		size_t ddaglen = sizeof(ddag);
-		int rc = Xrecvfrom(sockfd, pkt, XHCP_MAX_PACKET_SIZE, 0, ddag, &ddaglen);
+		socklen_t ddaglen = sizeof(ddag);
+		int rc = Xrecvfrom(sockfd, pkt, XHCP_MAX_PACKET_SIZE, 0, (struct sockaddr*)&ddag, &ddaglen);
 		if (rc < 0) { perror("recvfrom"); }
 
 		memset(self_dag, '\0', XHCP_MAX_DAG_LENGTH);
@@ -243,7 +246,7 @@ int main(int argc, char *argv[]) {
 			host_register_message.append("^");
 			strcpy (buffer, host_register_message.c_str());
 			// send the registraton message to gw router
-			Xsendto(sockfd, buffer, strlen(buffer), 0, pseudo_gw_router_dag, strlen(pseudo_gw_router_dag)+1);
+			Xsendto(sockfd, buffer, strlen(buffer), 0, (sockaddr*)&pseudo_gw_router_dag, sizeof(pseudo_gw_router_dag));
 			first_beacon_reception = false;
 			beacon_reception_count= 0;
 		}
@@ -254,8 +257,16 @@ int main(int argc, char *argv[]) {
     			if ( XreadLocalHostAddr(sockfd, myrealAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE, my4ID, MAX_XID_SIZE) < 0 )
     				perror("Reading localhost address"); 
     			// make the host DAG 
-        		sprintf(hdag, "RE ( %s ) %s %s", my4ID, myrealAD, myHID);  
-    			if (XregisterName(hostname, hdag) < 0 )
+				Node n_src = Node();
+				Node n_ip  = Node(my4ID);
+				Node n_ad  = Node(myrealAD);
+				Node n_hid = Node(myHID);
+
+				Graph hg = (n_src * n_ad * n_hid);
+				hg = hg + (n_src * n_ip * n_ad * n_hid);
+				hg.fill_sockaddr(&hdag);
+//        		sprintf(hdag, "RE ( %s ) %s %s", my4ID, myrealAD, myHID);  
+    			if (XregisterName(hostname, &hdag) < 0 )
     				perror("name register");
 		}   
 		

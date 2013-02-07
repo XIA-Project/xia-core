@@ -4,7 +4,7 @@ VPATH=../common
 .PHONY: all clean
 
 CFLAGS += -I$(APIDIR)/xsocket/minini
-LDFLAGS += $(XLIB)/libXsocket.so
+LDFLAGS += $(XLIB)/libXsocket.so $(XLIB)/libdagaddr.so
 
 COMMON=csclient.cc XIARouter.cc
 SOURCES_CLIENT=xhcp_client.cc

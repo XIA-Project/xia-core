@@ -2,7 +2,7 @@ include ../../xia.mk
 
 .PHONY: all clean
 
-LDFLAGS += $(XLIB)/libXsocket.so
+LDFLAGS += $(XLIB)/libXsocket.so $(XLIB)/libdagaddr.so
 SOURCES=ns.cc
 NS=$(BINDIR)/xnameservice
 

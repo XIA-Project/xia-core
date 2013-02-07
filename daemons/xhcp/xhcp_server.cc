@@ -7,6 +7,7 @@
 #include "minIni.h"
 #include "Xsocket.h"
 #include "xhcp.hh"
+#include "dagaddr.hpp"
 
 
 /*!
@@ -18,23 +19,30 @@
 char *findRoot() {
     char *pos;
     char *path = (char*)malloc(sizeof(char)*4096);
-    readlink("/proc/self/exe", path, 4096);
+    int rc = readlink("/proc/self/exe", path, 4096);
+
+	if (rc < 0) {
+		path[0] = 0;
+		return path;
+	}
 
     pos = strstr(path, SOURCE_DIR);
     if(pos) {
         pos += sizeof(SOURCE_DIR)-1;
         *pos = '\0';
     }
+
+	// FIXME: this is getting leaked on app exit
     return path;
 }
 
 int main(int argc, char *argv[]) {
+	sockaddr_x ddag;
+	sockaddr_x ns_dag;
 	char pkt[XHCP_MAX_PACKET_SIZE];
-	char ddag[XHCP_MAX_DAG_LENGTH];
 	char myAD[MAX_XID_SIZE]; 
 	char gw_router_hid[MAX_XID_SIZE];
 	char gw_router_4id[MAX_XID_SIZE];
-	char ns_dag[XHCP_MAX_DAG_LENGTH];
 
 
 	if ( argc == 1 ) {
@@ -45,23 +53,28 @@ int main(int argc, char *argv[]) {
 		printf("Expceted usage: xhcp_server [<API conf name>]\n");
 	}
 
-
 	// Xsocket init
-	int sockfd = Xsocket(XSOCK_DGRAM);
+	int sockfd = Xsocket(AF_XIA, SOCK_DGRAM, 0);
 	if (sockfd < 0) { perror("Opening Xsocket"); }
-	// dag init
-	sprintf(ddag, "RE %s %s", BHID, SID_XHCP);
-	
-    	// read the localhost AD and HID (currently, XHCP server running on gw router)
-    	if ( XreadLocalHostAddr(sockfd, myAD, MAX_XID_SIZE, gw_router_hid, MAX_XID_SIZE, gw_router_4id, MAX_XID_SIZE) < 0 )
-    		perror("Reading localhost address");
 
-        // set the default name server DAG   	
-        sprintf(ns_dag, "RE ( %s ) %s %s %s", IP_NS, AD0, HID0, SID_NS);  	
+	// dag init
+	Graph g = Node() * Node(BHID) * Node(SID_XHCP);
+	g.fill_sockaddr(&ddag);
+//	sprintf(ddag, "RE %s %s", BHID, SID_XHCP);
+	
+	// read the localhost AD and HID (currently, XHCP server running on gw router)
+	if ( XreadLocalHostAddr(sockfd, myAD, MAX_XID_SIZE, gw_router_hid, MAX_XID_SIZE, gw_router_4id, MAX_XID_SIZE) < 0 )
+		perror("Reading localhost address");
+
+	// set the default name server DAG   	
+	char ns[512];
+	sprintf(ns, "RE ( %s ) %s %s %s", IP_NS, AD0, HID0, SID_NS);  	
 
 	// read the name server DAG from xia-core/etc/resolv.conf, if present
-	ini_gets(NULL, "nameserver", ns_dag, ns_dag, XHCP_MAX_DAG_LENGTH, strcat(findRoot(), RESOLV_CONF));
- 
+	ini_gets(NULL, "nameserver", ns, ns, XHCP_MAX_DAG_LENGTH, strcat(findRoot(), RESOLV_CONF));
+
+	Graph gns(ns);
+	gns.fill_sockaddr(&ns_dag);
  
 	xhcp_pkt beacon_pkt;
 	beacon_pkt.seq_num = 0;
@@ -69,7 +82,7 @@ int main(int argc, char *argv[]) {
 	xhcp_pkt_entry *ad_entry = (xhcp_pkt_entry*)malloc(sizeof(short)+strlen(myAD)+1);
 	xhcp_pkt_entry *gw_entry = (xhcp_pkt_entry*)malloc(sizeof(short)+strlen(gw_router_hid)+1);
 	xhcp_pkt_entry *gw_entry_4id = (xhcp_pkt_entry*)malloc(sizeof(short)+strlen(gw_router_4id)+1);
-	xhcp_pkt_entry *ns_entry = (xhcp_pkt_entry*)malloc(sizeof(short)+strlen(ns_dag)+1);
+	xhcp_pkt_entry *ns_entry = (xhcp_pkt_entry*)malloc(sizeof(short)+strlen(ns)+1);
 		
 	ad_entry->type = XHCP_TYPE_AD;
 	gw_entry->type = XHCP_TYPE_GATEWAY_ROUTER_HID;
@@ -78,7 +91,7 @@ int main(int argc, char *argv[]) {
 	sprintf(ad_entry->data, "%s", myAD);
 	sprintf(gw_entry->data, "%s", gw_router_hid);
 	sprintf(gw_entry_4id->data, "%s", gw_router_4id);
-	sprintf(ns_entry->data, "%s", ns_dag);
+	sprintf(ns_entry->data, "%s", ns);
 
 	while (1) {
 		// construct packet
@@ -103,7 +116,7 @@ int main(int argc, char *argv[]) {
 		memcpy(pkt+offset, ns_entry->data, strlen(ns_entry->data)+1);
 		offset += strlen(ns_entry->data)+1;		
 		// send out packet
-		Xsendto(sockfd, pkt, offset, 0, ddag, strlen(ddag)+1);
+		Xsendto(sockfd, pkt, offset, 0, (struct sockaddr*)&ddag, sizeof(ddag));
 		//fprintf(stderr, "XHCP beacon %ld\n", beacon_pkt.seq_num);
 		beacon_pkt.seq_num += 1;
 		sleep(XHCP_SERVER_BEACON_INTERVAL);
