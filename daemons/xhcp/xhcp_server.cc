@@ -58,10 +58,10 @@ int main(int argc, char *argv[]) {
 	if (sockfd < 0) { perror("Opening Xsocket"); }
 
 	// dag init
+//	sprintf(ddag, "RE %s %s", BHID, SID_XHCP);
 	Graph g = Node() * Node(BHID) * Node(SID_XHCP);
 	g.fill_sockaddr(&ddag);
-//	sprintf(ddag, "RE %s %s", BHID, SID_XHCP);
-	
+
 	// read the localhost AD and HID (currently, XHCP server running on gw router)
 	if ( XreadLocalHostAddr(sockfd, myAD, MAX_XID_SIZE, gw_router_hid, MAX_XID_SIZE, gw_router_4id, MAX_XID_SIZE) < 0 )
 		perror("Reading localhost address");
@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
 
 	Graph gns(ns);
 	gns.fill_sockaddr(&ns_dag);
- 
+
 	xhcp_pkt beacon_pkt;
 	beacon_pkt.seq_num = 0;
 	beacon_pkt.num_entries = 4;

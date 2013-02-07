@@ -41,7 +41,6 @@ void listRoutes(std::string xidType)
 
 int main(int argc, char *argv[]) {
 	int rc;
-//	pthread_t advertiser_pid;
 	sockaddr_x sdag;
 	sockaddr_x hdag;
 	sockaddr_x ddag;
@@ -94,13 +93,12 @@ int main(int argc, char *argv[]) {
 		}
     } else {
 		printf("Expected usage: xhcp_client [<hostname> [<element name> [<API conf name>]]]\n");
+		exit(-1);
 	}
 
     // make the response message dest DAG (intended destination: gw router who is running the routing process)
 	Graph gw = Node() * Node(BHID) * Node(SID_XROUTE);
 	gw.fill_sockaddr(&pseudo_gw_router_dag);
-//    pseudo_gw_router_dag = (char*)malloc(snprintf(NULL, 0, "RE %s %s", BHID, SID_XROUTE) + 1);
-//    sprintf(pseudo_gw_router_dag, "RE %s %s", BHID, SID_XROUTE);	
 
     // connect to the click route engine
 	if ((rc = xr.connect()) != 0) {
@@ -118,7 +116,8 @@ int main(int argc, char *argv[]) {
 
 	// make the src DAG (Actual AD will be updated when receiving XHCP beacons from an XHCP server)
 	Graph g = Node() * Node(SID_XHCP);
-//	sprintf(sdag, "RE %s", SID_XHCP);
+	g.fill_sockaddr(&sdag);
+
 	Xbind(sockfd, (struct sockaddr*)&sdag, sizeof(sdag));
 	
 	/* Main operation:
@@ -141,6 +140,7 @@ int main(int argc, char *argv[]) {
 		memset(pkt, 0, sizeof(pkt));
 		socklen_t ddaglen = sizeof(ddag);
 		int rc = Xrecvfrom(sockfd, pkt, XHCP_MAX_PACKET_SIZE, 0, (struct sockaddr*)&ddag, &ddaglen);
+
 		if (rc < 0) { perror("recvfrom"); }
 
 		memset(self_dag, '\0', XHCP_MAX_DAG_LENGTH);
@@ -222,6 +222,7 @@ int main(int argc, char *argv[]) {
 		
 		// Check if myNS_DAG has been changed
 		if(myNS_DAG.compare(nsDAG) != 0) {
+
 			// update new name-server-DAG information
 			XupdateNameServerDAG(sockfd, ns_dag);		
 			myNS_DAG = nsDAG;
@@ -265,7 +266,6 @@ int main(int argc, char *argv[]) {
 				Graph hg = (n_src * n_ad * n_hid);
 				hg = hg + (n_src * n_ip * n_ad * n_hid);
 				hg.fill_sockaddr(&hdag);
-//        		sprintf(hdag, "RE ( %s ) %s %s", my4ID, myrealAD, myHID);  
     			if (XregisterName(hostname, &hdag) < 0 )
     				perror("name register");
 		}   
