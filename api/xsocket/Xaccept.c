@@ -98,7 +98,7 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 
 	// bind to an unused random port number
 	my_addr.sin_family = PF_INET;
-	my_addr.sin_addr.s_addr = inet_addr(MYADDRESS);
+	my_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 	my_addr.sin_port = 0;
 
 	if (bind(new_sockfd, (const struct sockaddr *)&my_addr, sizeof(my_addr)) < 0) {
@@ -112,7 +112,7 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	xia::XSocketMsg xia_socket_msg;
 	xia_socket_msg.set_type(xia::XACCEPT);
 
-	if (click_control(new_sockfd, &xia_socket_msg) < 0) {
+	if (click_send(new_sockfd, &xia_socket_msg) < 0) {
 		close(new_sockfd);
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;

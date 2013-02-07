@@ -78,7 +78,7 @@ int main()
 
 	Node n_ad2(Node::XID_TYPE_AD, "0707070707070707070707070707070707070707");
 	Node n_hid2(Node::XID_TYPE_HID, "0808080808080808080808080808080808080808");
-	Node n_sid(Node::XID_TYPE_SID, "0909090909090909090909090909090909090909");
+	Node n_sid("SID:0909090909090909090909090909090909090909");
 
 	printf("g6 = g3 * ((n_cid * n_sid) + (n_cid * n_ad2 * n_sid) + (n_cid * n_ad2 * n_hid2 * n_sid))\n");
 	Graph g6 = g3 * ((n_cid * n_sid) + (n_cid * n_ad2 * n_sid) + (n_cid * n_ad2 * n_hid2 * n_sid));
@@ -128,6 +128,8 @@ int main()
 	printf("Graph(\"RE AD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 SID:1110000000000000000000000000000000001113\")\n%s\n", g7.dag_string().c_str());
 	Graph g8 = Graph("RE ( AD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 ) SID:1110000000000000000000000000000000001113");
 	printf("Graph(\"RE ( AD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 ) SID:1110000000000000000000000000000000001113\")\n%s\n", g8.dag_string().c_str());
+	//Graph g9 = Graph("RE ( IP:4500000000010000fafa00000000000000000000 ) AD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 SID:0f00000000000000000000000000000000008888");
+	//printf("Graph(\"RE ( IP:4500000000010000fafa00000000000000000000 ) AD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 SID:0f00000000000000000000000000000000008888\")\n%s\n", g9.dag_string().c_str());
 
 	printf("Testing construct_from_re_string ^^^\n\n\n");
 	
@@ -143,7 +145,13 @@ int main()
 	Graph g7_prime = Graph(s);
 	printf("g7_prime.dag_string().c_str():\n%s\n", g7_prime.dag_string().c_str());
 
-	printf("Testing sockaddr_x ^^^\n");
+	printf("Testing sockaddr_x ^^^\n\n\n");
+
+	printf("Testing replace_final_intent vvv\n");
+	Graph g6_new_intent = Graph(g6);
+	g6_new_intent.replace_final_intent(n_cid);
+	printf("g6_new_intent.dag_string().c_str():\n%s\n", g6_new_intent.dag_string().c_str());
+	printf("Testing replace_final_intent ^^^\n\n\n");
 
 	return 0;
 }

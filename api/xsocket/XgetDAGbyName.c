@@ -377,7 +377,7 @@ int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	xsm.set_type(xia::XGETPEERNAME);
 
 	// send the protobuf containing the user data to click
-	if ((rc = click_control(sockfd, &xsm)) < 0) {
+    if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
@@ -452,7 +452,7 @@ int Xgetsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	xsm.set_type(xia::XGETSOCKNAME);
 
 	// send the protobuf containing the user data to click
-	if ((rc = click_control(sockfd, &xsm)) < 0) {
+    if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}

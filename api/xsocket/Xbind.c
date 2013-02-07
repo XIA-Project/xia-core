@@ -79,7 +79,7 @@ int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 	xia::X_Bind_Msg *x_bind_msg = xsm.mutable_x_bind();
 	x_bind_msg->set_sdag(g.dag_string().c_str());
 
-	if ((rc = click_control(sockfd, &xsm)) < 0) {
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}

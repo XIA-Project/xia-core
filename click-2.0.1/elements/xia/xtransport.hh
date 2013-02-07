@@ -40,17 +40,6 @@ using namespace std;
 #define RANDOM_XID_FMT		"%s:30000ff0000000000000000000000000%08x"
 #define UDP_HEADER_SIZE		8
 
-//#define CLICKCONTROLPORT 5001
-//#define CLICKOPENPORT 5001
-//#define CLICKBINDPORT 5002
-//#define CLICKCLOSEPORT 50
-#define CLICKCONNECTPORT 5004
-#define CLICKACCEPTPORT 5005
-
-//#define CLICKPUTCIDPORT 10002
-//#define CLICKSENDTOPORT 10001
-#define CLICKDATAPORT 10000
-
 #define XSOCKET_INVALID -1	// invalid socket type	
 #define XSOCKET_STREAM	1	// Reliable transport (SID)
 #define XSOCKET_DGRAM	2	// Unreliable transport (SID)
@@ -69,8 +58,8 @@ using namespace std;
 
 #define HASH_KEYSIZE    20
 
-#define CONTROL_PORT    0
-#define DATA_PORT       1
+#define API_PORT    0
+#define BAD_PORT       1
 #define NETWORK_PORT    2
 #define CACHE_PORT      3
 #define XHCP_PORT       4
@@ -79,14 +68,14 @@ CLICK_DECLS
 
 /**
 XTRANSPORT:   
-input port[0]:  control port
-input port[1]:  Socket Rx data port
+input port[0]:  api port
+input port[1]:  Unused
 input port[2]:  Network Rx data port
 input port[3]:  in from cache
 
 output[3]: To cache for putCID
 output[2]: Network Tx data port 
-output[1]: Socket Tx data port
+output[0]: Socket (API) Tx data port
 
 Might need other things to handle chunking
 */
@@ -135,7 +124,7 @@ class XTRANSPORT : public Element {
     xia::XSocketMsg xia_socket_msg; // FIXME: WHY IS THIS NOT LOCAL TO THE PUSH METHOD????
     //enum xia_socket_msg::XSocketMsgType type;
     
-    Packet* UDPIPEncap(Packet *, int,int);
+    Packet* UDPIPPrep(Packet *, int);
     
     struct DAGinfo{
     DAGinfo(): port(0), isConnected(false), initialized(false), full_src_dag(false), timer_on(false), synack_waiting(false), dataack_waiting(false), teardown_waiting(false) {};
@@ -192,8 +181,6 @@ class XTRANSPORT : public Element {
 
     queue<DAGinfo> pending_connection_buf;
     
-    struct in_addr _CLICKaddr;
-    struct in_addr _APIaddr;
     atomic_uint32_t _id;
     bool _cksum;
     XIAXIDRouteTable *_routeTable;
@@ -219,8 +206,7 @@ class XTRANSPORT : public Element {
 
     char *random_xid(const char *type, char *buf);
 
-    void ProcessControlPacket(WritablePacket *p_in);
-    void ProcessDataPacket(WritablePacket *p_in);
+    void ProcessAPIPacket(WritablePacket *p_in);
     void ProcessNetworkPacket(WritablePacket *p_in);
     void ProcessCachePacket(WritablePacket *p_in);
     void ProcessXhcpPacket(WritablePacket *p_in);

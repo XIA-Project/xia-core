@@ -154,7 +154,7 @@ int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkI
     _msg->set_cachesize(ctx->cacheSize);
     _msg->set_cachepolicy(ctx->cachePolicy);
 
-	if ((rc = click_data(ctx->sockfd, &xsm)) < 0) {
+	if ((rc = click_send(ctx->sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
@@ -399,7 +399,7 @@ int XremoveChunk(ChunkContext *ctx, const char *cid)
     _msg->set_contextid(ctx->contextID);
     _msg->set_cid(cid);
 
-	if ((rc = click_data(ctx->sockfd, &xsm)) < 0) {
+	if ((rc = click_send(ctx->sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}

@@ -101,9 +101,9 @@ int Xsocket(int family, int transport_type, int protocol)
 		return -1;
 	}
 
-	// bind to an unused random port number
+	// bind to any random port number
 	addr.sin_family = PF_INET;
-	addr.sin_addr.s_addr = inet_addr(MYADDRESS);
+	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 	addr.sin_port = 0;
 
 	if (bind(sockfd, (const struct sockaddr *)&addr, sizeof(addr)) < 0) {
@@ -119,7 +119,7 @@ int Xsocket(int family, int transport_type, int protocol)
 	xia::X_Socket_Msg *x_socket_msg = xsm.mutable_x_socket();
 	x_socket_msg->set_type(transport_type);		
 	
-	if ((rc = click_control(sockfd, &xsm)) < 0) {
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		close(sockfd);
 		return -1;

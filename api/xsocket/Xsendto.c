@@ -100,7 +100,7 @@ int Xsendto(int sockfd,const void *buf, size_t len, int flags,
 	x_sendto_msg->set_ddag(s.c_str());
 	x_sendto_msg->set_payload((const char*)buf, len);
 
-	if ((rc = click_data(sockfd, &xsm)) < 0) {
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}

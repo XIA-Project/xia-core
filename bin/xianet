@@ -76,18 +76,8 @@ check_daemons()
 	done
 }
 
-check_root()
-{
-	if [[ `whoami` != "root" ]]; then
-		printf "\n ERROR: $NAME must be run as root\n\n"
-		exit 1
-	fi
-}
-
 stop_daemons()
 {
-	check_root
-
 	printf "Stopping xia network processes\n"
 	for svc in $DAEMONS "click"
 	do
@@ -105,9 +95,6 @@ start_daemons()
 		printf "Click is already running, aborting...\n"
 		exit 1
 	fi
-
-	check_root
-
 
 	# 1) GENERATE A CLICK SCRIPT, IF NECESSARY
 	FLAGS=""

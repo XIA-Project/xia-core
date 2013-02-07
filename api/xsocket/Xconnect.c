@@ -76,7 +76,7 @@ int Xconnect(int sockfd, const sockaddr *addr, socklen_t addrlen)
 	x_connect_msg->set_ddag(g.dag_string().c_str());
 
 	// In Xtransport: send SYN to destination server
-	if ((rc = click_control(sockfd, &xsm)) < 0) {
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}

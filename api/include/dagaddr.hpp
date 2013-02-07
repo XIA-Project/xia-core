@@ -4,7 +4,7 @@
 //#include <cstdint>	// for c++0x
 #include <vector>
 #include <string>
-#include <xia.h>
+#include "xia.h"
 
 class Graph;
 
@@ -34,6 +34,7 @@ public:
 	Node(uint32_t type, const void* id, int dummy); // NOTE: dummy is so compiler doesn't complain about ambigous constructors  TODO: fix.
 	Node(int type, const std::string id_string); // NOTE: type is an int here because the consts above are ints, otherwise swig will complain again
 	Node(const std::string type_string, const std::string id_string);
+	Node(const std::string node_string);
 
 	~Node();
 
@@ -66,6 +67,8 @@ private:
 
 	mutable container* ptr_;
 	static container undefined_;
+
+	void construct_from_strings(const std::string type_string, const std::string id_string);
 };
 
 class Graph 
@@ -100,6 +103,8 @@ public:
 	Node get_node(int i) const;
 	std::vector<std::size_t> get_out_edges(int i) const;
 	void fill_sockaddr(sockaddr_x *s) const;
+	void from_sockaddr(sockaddr_x *s);
+	void replace_final_intent(const Node& new_intent);
 
 protected:
 
@@ -107,6 +112,7 @@ protected:
 	bool is_sink(std::size_t id) const;
 
 	std::size_t source_index() const;
+	std::size_t final_intent_index() const;
 
 	void merge_graph(const Graph& r, std::vector<std::size_t>& node_mapping);
 	
