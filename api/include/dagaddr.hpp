@@ -34,6 +34,7 @@ public:
 	Node(uint32_t type, const void* id, int dummy); // NOTE: dummy is so compiler doesn't complain about ambigous constructors  TODO: fix.
 	Node(int type, const std::string id_string); // NOTE: type is an int here because the consts above are ints, otherwise swig will complain again
 	Node(const std::string type_string, const std::string id_string);
+	Node(const std::string node_string);
 
 	~Node();
 
@@ -66,6 +67,8 @@ private:
 
 	mutable container* ptr_;
 	static container undefined_;
+
+	void construct_from_strings(const std::string type_string, const std::string id_string);
 };
 
 class Graph 

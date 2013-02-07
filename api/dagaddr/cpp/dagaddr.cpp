@@ -115,27 +115,25 @@ Node::Node(int type, const std::string id_str)
 */
 Node::Node(const std::string type_str, const std::string id_str)
 {
-	ptr_ = new container;
-	ptr_->ref_count = 1;
+	construct_from_strings(type_str, id_str);
+}
 
-	if (type_str == XID_TYPE_AD_STRING)
-		ptr_->type = XID_TYPE_AD;
-	else if (type_str == XID_TYPE_HID_STRING)
-		ptr_->type = XID_TYPE_HID;
-	else if (type_str == XID_TYPE_CID_STRING)
-		ptr_->type = XID_TYPE_CID;
-	else if (type_str == XID_TYPE_SID_STRING)
-		ptr_->type = XID_TYPE_SID;
-	else if (type_str == XID_TYPE_IP_STRING)
-		ptr_->type = XID_TYPE_IP;
-	else
-		ptr_->type = 0;
 
-	for (int i = 0; i < ID_LEN; i++)
-	{
-		int num = std::stoi(id_str.substr(2*i, 2), 0, 16);
-		memcpy(&(ptr_->id[i]), &num, 1);
-	}
+/**
+* @brief Create a new node from a single string.
+*
+* Create a new node from a single string with the format <type>:<id>.
+* Examples:
+*	\nAD:1234567890123456789012345678901234567890
+*	\nCID:0000011111222223333344444555556666677777
+*
+* @param node_string
+*/
+Node::Node(const std::string node_string)
+{
+	// TODO: check string is valid format
+	std::vector<std::string> xid_elems = split(node_string, ':');
+	construct_from_strings(xid_elems[0], xid_elems[1]);
 }
 
 Node::~Node()
@@ -175,6 +173,33 @@ Node::release() const
 	{
 		delete ptr_;
 		ptr_ = &undefined_;
+	}
+}
+
+
+void
+Node::construct_from_strings(const std::string type_str, const std::string id_str)
+{
+	ptr_ = new container;
+	ptr_->ref_count = 1;
+
+	if (type_str == XID_TYPE_AD_STRING)
+		ptr_->type = XID_TYPE_AD;
+	else if (type_str == XID_TYPE_HID_STRING)
+		ptr_->type = XID_TYPE_HID;
+	else if (type_str == XID_TYPE_CID_STRING)
+		ptr_->type = XID_TYPE_CID;
+	else if (type_str == XID_TYPE_SID_STRING)
+		ptr_->type = XID_TYPE_SID;
+	else if (type_str == XID_TYPE_IP_STRING)
+		ptr_->type = XID_TYPE_IP;
+	else
+		ptr_->type = 0;
+
+	for (int i = 0; i < ID_LEN; i++)
+	{
+		int num = std::stoi(id_str.substr(2*i, 2), 0, 16);
+		memcpy(&(ptr_->id[i]), &num, 1);
 	}
 }
 
@@ -1041,6 +1066,7 @@ Graph::construct_from_re_string(std::string re_string)
 				{
 					add_edge(last_intent_idx, first_fallback_idx);
 					add_edge(last_fallback_idx, cur_idx);
+					just_processed_fallback = false;
 				}
 
 				last_intent_idx = cur_idx;
