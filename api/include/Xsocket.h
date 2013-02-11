@@ -76,7 +76,7 @@ typedef struct {
 
 typedef struct {
 	int size;
-	char cid[CID_HASH_SIZE];
+	char cid[CID_HASH_SIZE + 1];
 	int32_t ttl;
 	struct timeval timestamp;
 } ChunkInfo;
