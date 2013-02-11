@@ -1,6 +1,4 @@
 /*
- *
- printf("in loop\n");
  *			X C M P T R A C E R O U T E . C
  *
  * Using the InterNet Control Message Protocol (ICMP) "ECHO" facility,
@@ -119,7 +117,7 @@ int main(int argc, char **argv)
     sockaddr_x from;
 	char **av = argv;
 	socklen_t len;
-	char s_to[1024], s_from[1024];
+	const char *s_to, *s_from;
 
 	argc--, av++;
 	while (argc > 0 && *av[0] == '-') {
@@ -184,7 +182,7 @@ int main(int argc, char **argv)
 	}
 
 	Graph g(&whereto);
-	strncpy(s_to, g.dag_string().c_str(), sizeof(s_to));
+	s_to = g.dag_string().c_str();
 	printf("TRACEROUTE %s:\n", s_to);
 
 	setlinebuf( stdout );
@@ -222,7 +220,7 @@ int main(int argc, char **argv)
 		}
 
 		Graph gf(&from);
-		strncpy(s_from, gf.dag_string().c_str(), sizeof(s_from));
+		s_from = gf.dag_string().c_str();
 		pr_pack( packet, cc, s_from);
 		if(!strcmp(s_to,s_from)) finish();
 		if (npackets && nreceived >= npackets)
