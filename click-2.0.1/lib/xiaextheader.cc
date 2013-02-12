@@ -147,7 +147,7 @@ XIAGenericExtHeaderEncap::update()
             click_chatter("too long value for key %d", (*it).first);
             continue;
         }
-        size_t new_size = size + 2 + (*it).second.length();
+        size_t new_size = size + offsetof(struct click_xia_ext, data) + (*it).second.length();
         if (new_size >= 255) {
             click_chatter("too large key-value map");
             break;
