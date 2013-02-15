@@ -14,6 +14,7 @@
 ** limitations under the License.
 */
 #include "dagaddr.hpp"
+#include <stdlib.h>
 #include <cstdio>
 
 int main()
