@@ -29,7 +29,7 @@
 #define NODES_MAX	20
 
 typedef struct {
-	uint          s_type;
+	unsigned int  s_type;
 	unsigned char s_id[XID_SIZE];
 } xid_t;
 
@@ -44,7 +44,7 @@ typedef struct {
 } x_addr_t;
 
 typedef struct {
-	ushort   sx_family;
+	unsigned short sx_family;
 	x_addr_t sx_addr;
 } sockaddr_x;
 
