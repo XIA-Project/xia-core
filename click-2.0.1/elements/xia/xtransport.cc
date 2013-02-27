@@ -58,7 +58,7 @@ XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 					 "LOCAL_ADDR", cpkP + cpkM, cpXIAPath, &local_addr,
 					 "LOCAL_4ID", cpkP + cpkM, cpXID, &local_4id,
 					 "ROUTETABLENAME", cpkP + cpkM, cpElement, &routing_table_elem,
-					 "IS_DUAL_STACK_ROUTER", 0, cpInteger, &is_dual_stack_router,
+					 "IS_DUAL_STACK_ROUTER", 0, cpBool, &is_dual_stack_router,
 					 cpEnd) < 0)
 		return -1;
 
