@@ -4,6 +4,10 @@ all:
 	make -C cpp all
 	make -C python all
 
+static:
+	make -C cpp static
+	make -C python static
+
 doc: 
 	make -C cpp doc
 

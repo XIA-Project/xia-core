@@ -18,12 +18,15 @@ NPROCS=$(shell echo `grep -c ^processor /proc/cpuinfo`\*2 | bc)
 #always make sure we have configured before building the sub projects
 all: config $(MAKEDIRS)
 
+static:
+	make all STATIC='static'
+
 # treat click special since we want multi-proc compiles
 click:
 	make -j$(NPROCS) -C $@
 
 $(filter-out click, $(MAKEDIRS)):
-	make -C $@
+	make -C $@ $(STATIC)
 
 
 

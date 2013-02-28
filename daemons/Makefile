@@ -5,6 +5,8 @@ CLEAN=$(addsuffix .build, $(TARGETS))
 
 all: $(TARGETS)
 
+static: all
+
 $(TARGETS):
 	make -C $@
 

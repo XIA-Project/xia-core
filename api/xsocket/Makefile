@@ -13,9 +13,12 @@ SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XrequestChunk.c  \
 		minini/minIni.c 
 OBJS=$(SOURCES:.c=.o) xia.pb.o
 LIB=$(XLIB)/libXsocket.so
+STATICLIB=$(XLIB)/libXsocket.a
 
 all: xia.pb.cc $(LIB)
 	make -C python all
+
+static: xia.pb.cc $(STATICLIB)
 
 xia.pb.cc: xia.proto
 	protoc --cpp_out=. xia.proto
@@ -24,10 +27,13 @@ xia.pb.o:
 	$(CC) $(CFLAGS) xia.pb.cc  -o $@
 
 %.o: %.c xia.pb.cc
-	$(CC) $(CFLAGS) $<  -o $@
+	$(CC) $(CFLAGS) $<  -o $@ -lpthread
 
 $(LIB): $(OBJS) 
 	$(LD) -shared -o $@ $(OBJS) $(LDFLAGS)
+
+$(STATICLIB): $(OBJS) 
+	ar rcs $@ $(OBJS)
 
 xwrap.so: xwrap.c
 	$(CC) -fPIC -DPIC $<
@@ -42,6 +48,7 @@ test: $(LIB)
 
 clean:
 	-rm -f $(LIB)
+	-rm -f $(STATICLIB)
 	-rm -f *.o xia.pb.*
 	-rm -rf doc
 	make -C python clean

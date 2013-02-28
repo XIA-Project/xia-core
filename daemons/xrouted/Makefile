@@ -5,7 +5,7 @@ VPATH=../common
 
 SOURCES=xrouted.cc csclient.cc XIARouter.cc
 XROUTED=$(BINDIR)/xrouted
-LDFLAGS += $(XLIB)/libXsocket.so
+LDFLAGS += $(LIBS)
 
 all: $(XROUTED)
 

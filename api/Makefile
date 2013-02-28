@@ -2,6 +2,10 @@ all:
 	make -C xsocket
 	make -C dagaddr
 
+static:
+	make -C xsocket static
+	make -C dagaddr static
+
 clean:
 	make -C xsocket clean
 	make -C dagaddr clean

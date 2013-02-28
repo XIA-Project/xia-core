@@ -3,7 +3,12 @@ include ../../../xia.mk
 .PHONY: all clean
 
 TARGET=dagaddr_example
-LDFLAGS += $(XLIB)/libXsocket.so $(XLIB)/libdagaddr.so
+LDFLAGS += $(LIBS)
+ifeq ($(wildcard $(XLIB)/libdagaddr.a),)
+	LDFLAGS += $(XLIB)/libdagaddr.so
+else
+	LDFLAGS += $(XLIB)/libdagaddr.a -Bstatic
+endif
 
 all: $(TARGET)
 

@@ -18,7 +18,11 @@ CC=g++
 LD=g++
 CFLAGS=-Wall -Wextra -I\$(XINC)
 LDFLAGS=-lpthread
-LIBS=\$(XLIB)/libXsocket.so
+ifeq (\$(wildcard \$(XLIB)/libXsocket.a),)
+	LIBS=\$(XLIB)/libXsocket.so
+else
+	LIBS=\$(XLIB)/libXsocket.a -Bstatic -lprotobuf
+endif
 
 ifdef DEBUG
 CFLAGS +=-ggdb -DDEBUG

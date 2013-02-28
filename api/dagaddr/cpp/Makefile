@@ -4,18 +4,25 @@ include ../../../xia.mk
 
 SOURCES=dagaddr.cpp utils.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
-TARGET=$(XLIB)/libdagaddr.so
+LIBS=$(XLIB)/libdagaddr.so
+STATICLIB=$(XLIB)/libdagaddr.a
 
-all: $(TARGET) dagaddr_test
+all: $(LIB) dagaddr_test
+
+static: $(STATICLIB) dagaddr_test
 
 %.o: %.cpp utils.hpp $(XINC)/dagaddr.hpp
 	$(CC) $(CFLAGS) -c -fpic $<  -o $@
 
-$(TARGET): $(OBJECTS) 
+$(LIBS): $(OBJECTS) 
 	$(LD) -shared -o $@ $(OBJECTS) -lc -ldl $(LDFLAGS)
 
-dagaddr_test: test.cpp
-	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@ $(TARGET)
+$(STATICLIB): $(OBJECTS)
+	ar rcs $@ $(OBJECTS)
+	make dagaddr_test LIBS='$(STATICLIB)' LIBFLAGS='-Bstatic -lprotobuf'
+
+dagaddr_test: test.cpp $(LIBS)
+	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@ $(LIBS) $(LIBFLAGS)
 
 doc: mainpage.h $(SOURCES)
 	doxygen Doxyfile
@@ -24,5 +31,5 @@ test: dagaddr_test
 	./dagaddr_test
 
 clean:
-	-rm -f *.o *.so dagaddr_test $(TARGET)
+	-rm -f *.o *.so dagaddr_test $(LIB) $(STATICLIB)
 	-rm -rf ../doc

@@ -2,21 +2,36 @@ include ../../../xia.mk
 
 .PHONY: clean
 
-DAGADDR_LIB=$(XLIB)/libdagaddr.so
-TARGET=$(XLIB)/_dagaddr.so
 PYTHON=`find /usr/include/python*/Python.h | sed "s/\/Python.h//"`
 
-all: $(TARGET) $(XLIB)/dagaddr.py 
+CFLAGS +=-c -I$(PYTHON) -fpic
+LDFLAGS +=-lc -ldl
 
-$(TARGET): $(DAGADDR_LIB) dagaddr_wrap.cxx
-	gcc -I$(PYTHON) -fpic -c dagaddr_wrap.cxx
-	gcc -shared dagaddr_wrap.o $(DAGADDR_LIB) -o $@  -I$(PYTHON)
+DAGADDR_LIB=$(XLIB)/libdagaddr.so
+LIB=$(XLIB)/_dagaddr.so
+STATIC_DAGADDR_LIB=$(XLIB)/libdagaddr.a
+STATICLIB=$(XLIB)/_dagaddr.a
 
-dagaddr_wrap.cxx: dagaddr.i $(DAGADDR_LIB)
+OBJS=dagaddr_wrap.o
+
+all: $(LIB) $(XLIB)/dagaddr.py 
+
+static: $(STATICLIB) $(XLIB)/dagaddr.py
+
+%.o: %.cxx
+	$(CC) $(CFLAGS) $< -o $@
+
+$(LIB): $(DAGADDR_LIB) $(OBJS)
+	$(LD) -shared -o $@ $(OBJS) $(DAGADDR_LIB) -I$(PYTHON) $(LDFLAGS)
+
+$(STATICLIB): $(STATIC_DAGADDR_LIB) $(OBJS)
+	ar rcs $@ $(OBJS)
+
+dagaddr_wrap.cxx: dagaddr.i
 	swig -c++ -outdir $(XLIB) -python dagaddr.i 
 
 clean: 
-	-rm -f $(TARGET)
+	-rm -f $(LIB) $(STATICLIB)
 	-rm -f $(XLIB)/dagaddr.py $(XLIB)/dagaddr.pyc
 	-rm -f *.so *.o *.pyc
 	-rm -f dagaddr_wrap.cxx

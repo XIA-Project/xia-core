@@ -1,7 +1,7 @@
 include ../../xia.mk
 
 CC=gcc
-LDFLAGS += $(XLIB)/libXsocket.so
+LDFLAGS += $(LIBS)
 
 OUT=xping
 TARGETS=$(addprefix $(BINDIR)/, $(OUT))
