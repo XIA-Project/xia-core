@@ -35,7 +35,7 @@ NAME = "www_s.dgram_echo.aaa.xia"
 try:
 	sock = Xsocket(XSOCK_DGRAM)
 
-	(ad, hid) = XreadLocalHostAddr(sock)
+	(ad, hid, fid) = XreadLocalHostAddr(sock)
 
 	dag = "RE %s %s %s" % (ad, hid, SID) 
 

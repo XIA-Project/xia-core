@@ -43,6 +43,14 @@ extern "C" {
 #define XIA_MAXBUF   MAXBUFLEN
 #define XIA_MAXCHUNK MAXBUFLEN
 
+// for python swig compiles
+#ifndef SOCK_STREAM
+#define SOCK_STREAM 1
+#endif
+#ifndef SOCK_DGRAM
+#define SOCK_DGRAM 2
+#endif
+
 #define XSOCK_INVALID -1			// invalid socket type	
 #define XSOCK_STREAM SOCK_STREAM	// Reliable transport (SID)
 #define XSOCK_DGRAM  SOCK_DGRAM		// Unreliable transport (SID)
@@ -154,8 +162,8 @@ extern void print_conf();
 extern int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen);
 extern int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen);
 
-extern int XgetDAGbyName(const char *name, sockaddr_x *dag, socklen_t *len);
-extern int XregisterName(const char *name, sockaddr_x *DAG);
+extern int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen);
+extern int XregisterName(const char *name, sockaddr_x *addr);
 
 extern int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *localhostHID, unsigned lenHID, char *local4ID, unsigned len4ID);
 
