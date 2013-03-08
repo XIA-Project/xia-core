@@ -4,14 +4,14 @@ elementclass XIAFromHost {
     $click_port |
     // Packets coming down from API
     // output: traffic from host (should go to [0]xtransport)
-    Socket("UDP", 127.0.0.1, $click_port) -> output;
+    Socket("UDP", 127.0.0.1, $click_port, SNAPLEN 65536) -> output;
 }
 
 elementclass XIAToHost {
     $click_port |
     // Packets to send up to API	
     // input: packets to send up (usually xtransport[1])	
-    input -> Socket("UDP", 0.0.0.0, 0); 
+    input -> Socket("UDP", 0.0.0.0, 0, SNAPLEN 65536); 
 }
 
 elementclass GenericPostRouteProc {
