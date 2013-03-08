@@ -27,7 +27,7 @@ nameserver_hid = "HID_NAMESERVER"
 ip_override_addr = None
 interface_filter = None
 interface = None
-socket_ports = None
+socket_ips_ports = None
 
 #
 # create a globally unique HID based off of our mac address
@@ -183,8 +183,11 @@ def makeHostConfig(hid):
     else:
         xchg['HID'] = nameserver_hid    
 
-    if socket_ports:
-        xchg['PORT'] = int(socket_ports.split(',')[0].strip())
+    if socket_ips_ports:
+        ip, port = socket_ips_ports.split(',')[0].strip().split(':')
+        xchg['PORT'] = int(port)
+        xchg['SOCK_IP'] = ip
+        xchg['CLIENT'] = 'false' if ip == '0.0.0.0' else 'true'
         text = header + socks + footer
     else:
         text = header + body + footer
@@ -276,13 +279,17 @@ def makeRouterConfig(ad, hid):
     ## SOCKS
     ## (The router ports connected using click socket elements)
     ##
-    if socket_ports:
+    if socket_ips_ports:
         tpl = Template(socks)
-        for port in [int(p.strip()) for p in socket_ports.split(',')]:
+        for pair in [p.strip() for p in socket_ips_ports.split(',')]:
             if i > 4: # Make sure we go up to at most 4 ports
                 break
 
-            xchg['PORT'] = port
+            ip, port = pair.split(':')
+
+            xchg['SOCK_IP'] = ip
+            xchg['PORT'] = int(port)
+            xchg['CLIENT'] = 'false' if ip == '0.0.0.0' else 'true'
             xchg['NUM'] = i
             i += 1
 
@@ -630,6 +637,17 @@ def makeDualRouterConfig(ad, rhid):
     newtext = tpl.substitute(xchg)
 
     i = 0
+    ##
+    ## SOCKS
+    ## (The router ports connected using click socket elements)
+    ##
+
+
+
+
+    ##
+    ## BODY
+    ##
     tpl = Template(body)
     for (interface, mac, ip, gw, ext_ip) in xia_interfaces:
         xchg['IFACE'] = xia_interfaces[i][0]
@@ -647,6 +665,9 @@ def makeDualRouterConfig(ad, rhid):
     xchg['NUM'] = 3
     newtext += tpl.substitute(xchg)
 
+    ##
+    ## BODY
+    ##
     tpl = Template(extra)
     while i < 3:
         xchg['NUM'] = i
@@ -671,7 +692,7 @@ def getOptions():
     global ip_override_addr
     global interface_filter
     global interface
-    global socket_ports
+    global socket_ips_ports
     try:
         shortopt = "hr4ni:a:m:f:I:tP:"
         opts, args = getopt.getopt(sys.argv[1:], shortopt, 
@@ -702,7 +723,7 @@ def getOptions():
         elif o in ("-I", "--host-interface"):
             interface = a
         elif o in ("-P", "--socket-ports"):
-            socket_ports = a
+            socket_ips_ports = a
         elif o in ("-n", "--nameserver"):
             nameserver = "yes"            
         else:
@@ -742,7 +763,7 @@ where:
   -f            : a CSV string; any interfaces whose names match one of the strings will be ignored
   --interface-filter=<filter string>
 
-  -P            : a CSV string; the TCP port numbers to be used to tunnel packets between click sockets
+  -P            : a CSV string; the IP addr/TCP port pairs to be used to tunnel packets between click sockets. Each pair should be colon-separated: <ip>:<port>
   --socket-ports=<ports>
   
   -I            : the network interface a host should use, if it has multiple
