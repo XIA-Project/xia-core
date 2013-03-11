@@ -12,6 +12,13 @@
 #include "xtransport.hh"
 #include <click/xiatransportheader.hh>
 
+#include <fstream>
+#include <openssl/rsa.h>
+#include <openssl/pem.h>
+#include <elements/ipsec/sha1_impl.hh>
+
+
+
 /*
 ** FIXME:
 ** - why is xia_socket_msg in the class definition and not a local variable?
@@ -55,7 +62,10 @@ XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	bool is_dual_stack_router;
 	_is_dual_stack_router = false;
 
+	String key_path, pub_path, priv_path;
+
 	if (cp_va_kparse(conf, this, errh,
+					 "KEY_PATH", cpkP + cpkM, cpString, &key_path,		
 					 "LOCAL_ADDR", cpkP + cpkM, cpXIAPath, &local_addr,
 					 "LOCAL_4ID", cpkP + cpkM, cpXID, &local_4id,
 					 "CLICK_IP", cpkP + cpkM, cpIPAddress, &_CLICKaddr,
@@ -65,8 +75,93 @@ XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 					 cpEnd) < 0)
 		return -1;
 
+	pub_path.append(key_path.c_str(), strlen(key_path.c_str()));
+	pub_path.append("pub", 3);
+	priv_path.append(key_path.c_str(), strlen(key_path.c_str()));
+	priv_path.append("priv", 4);
+	click_chatter("Public key path: %s", pub_path.c_str());
+
+	ifstream myfile(pub_path.c_str());
+	char * pem_pub;
+	int i; 
+	int keylen_pub;
+	if(myfile.is_open()) {
+		std::string str((std::istreambuf_iterator<char>(myfile)),
+        std::istreambuf_iterator<char>());
+		str.replace(str.find("-----BEGIN RSA PUBLIC KEY-----"), sizeof("-----BEGIN RSA PUBLIC KEY-----"), "");
+		str.replace(str.find("-----END RSA PUBLIC KEY-----"), sizeof("-----END RSA PUBLIC KEY-----"), "");
+		pem_pub = (char*)calloc(strlen(str.c_str())+1, 1); 
+		strcpy(pem_pub, str.c_str());
+		keylen_pub = strlen(pem_pub);
+
+		click_chatter("Public Key found:\n==========\n%s==========\n", pem_pub);
+	}
+	else {
+		click_chatter("Public Key not found. Generating new key");
+		const int kBits = 1024;
+		const int kExp = 3;
+		int keylen_priv;
+		char *pem_priv;
+		ofstream outfile;
+
+		// Generate Private Key
+		RSA *rsa = RSA_generate_key(kBits, kExp, 0, 0);
+		// To get the C-string PEM form
+		BIO *bio_priv = BIO_new(BIO_s_mem());
+		PEM_write_bio_RSAPrivateKey(bio_priv, rsa, NULL, NULL, 0, NULL, NULL);
+		keylen_priv = BIO_pending(bio_priv);
+		pem_priv = (char*)calloc(keylen_priv+1, 1); // Null-terminate 
+		BIO_read(bio_priv, pem_priv, keylen_priv);
+		outfile.open(priv_path.c_str());
+		outfile << pem_priv;
+		outfile.close();
+		BIO_free_all(bio_priv);
+
+		// Generate Public Key
+		BIO *bio_pub = BIO_new(BIO_s_mem());
+		PEM_write_bio_RSAPublicKey(bio_pub, rsa);
+		keylen_pub = BIO_pending(bio_pub);
+		pem_pub = (char*)calloc(keylen_pub+1, 1); 
+		BIO_read(bio_pub, pem_pub, keylen_pub);
+		outfile.open(pub_path.c_str());
+		outfile << pem_pub;
+		outfile.close();
+		BIO_free_all(bio_pub);
+
+		// Remove header and footer
+		std::string str(pem_pub);
+        str.replace(str.find("-----BEGIN RSA PUBLIC KEY-----"), sizeof("-----BEGIN RSA PUBLIC KEY-----"), "");
+		str.replace(str.find("-----END RSA PUBLIC KEY-----"), sizeof("-----END RSA PUBLIC KEY-----"), "");
+		free(pem_pub);
+		pem_pub = (char*)calloc(strlen(str.c_str())+1, 1); 
+		strcpy(pem_pub, str.c_str());
+		keylen_pub = strlen(pem_pub);
+
+		free(pem_priv);
+		RSA_free(rsa);
+	}
+	SHA1_ctx sha_ctx;
+    unsigned char digest[20];
+    SHA1_init(&sha_ctx);
+    SHA1_update(&sha_ctx, (unsigned char *)pem_pub, keylen_pub);
+    SHA1_final(digest, &sha_ctx);
+//	click_chatter("Hash of Public Key (IPSEC): \n");
+//	for(i=0; i<20; i++)
+//		click_chatter("%02X ", digest[i]);
+
+	char buf[48];
+	char *c = buf;
+	c += sprintf(c, "HID:");
+	for(i=0; i<20; i++)
+		c += sprintf(c, "%02x", digest[i]);
+	_local_hid = XID(String(buf));
+
+	click_chatter(_local_hid.unparse_pretty().c_str());
+	free(pem_pub);
+	myfile.close();
+
+
 	_local_addr = local_addr;
-	_local_hid = local_addr.xid(local_addr.destination_node());
 	_local_4id = local_4id;
 	// IP:0.0.0.0 indicates NULL 4ID
 	_null_4id.parse("IP:0.0.0.0");
@@ -2290,3 +2385,4 @@ EXPORT_ELEMENT(XTRANSPORT)
 ELEMENT_REQUIRES(userlevel)
 ELEMENT_REQUIRES(XIAContentModule)
 ELEMENT_MT_SAFE(XTRANSPORT)
+ELEMENT_LIBS((-lssl))
