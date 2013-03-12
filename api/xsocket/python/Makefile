@@ -10,7 +10,7 @@ PYTHON=`find /usr/include/python*/Python.h | sed "s/\/Python.h//"`
 all: $(TARGET) $(XLIB)/xsocket.py 
 
 $(TARGET): $(XSOCK_LIB) c_xsocket_wrap.c 
-	$(CC) -I $(PYTHON) -fpic -c c_xsocket_wrap.c 
+	$(CC) -I $(XINC) -I $(PYTHON) -fpic -c c_xsocket_wrap.c 
 	$(CC) -shared c_xsocket_wrap.o $(LIBS) -o $@  -I $(PYTHON)
 
 c_xsocket_wrap.c: c_xsocket.i $(XSOCK_LIB)

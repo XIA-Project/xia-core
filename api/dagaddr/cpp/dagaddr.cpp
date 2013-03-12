@@ -719,14 +719,9 @@ Graph::is_final_intent(const Node& n)
 bool
 Graph::is_final_intent(const std::string xid_string)
 {
-	// We only check ID, so strip node type off it was included.
-	std::string test_string = std::string(xid_string);
-	if (xid_string.find(":") != std::string::npos)
-		test_string = split(xid_string, ':')[1];
-
 	for (std::size_t i = 0; i < nodes_.size(); i++)
 	{
-		if (nodes_[i].id_string() == test_string) return is_final_intent(nodes_[i]);
+		if (nodes_[i].id_string() == xid_string) return is_final_intent(nodes_[i]);
 	}
 	
 	printf("Warning: is_final_intent: supplied node not found in DAG\n");
@@ -847,14 +842,9 @@ Graph::next_hop(const Node& n)
 Graph 
 Graph::next_hop(const std::string xid_string)
 {
-	// We only check ID, so strip node type off it was included.
-	std::string test_string = std::string(xid_string);
-	if (xid_string.find(":") != std::string::npos)
-		test_string = split(xid_string, ':')[1];
-
 	for (std::size_t i = 0; i < nodes_.size(); i++)
 	{
-		if (nodes_[i].id_string() == test_string) return next_hop(nodes_[i]);
+		if (nodes_[i].id_string() == xid_string) return next_hop(nodes_[i]);
 	}
 	
 	printf("Warning: is_final_intent: supplied node not found in DAG\n");

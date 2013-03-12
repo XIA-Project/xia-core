@@ -31,5 +31,5 @@ test: dagaddr_test
 	./dagaddr_test
 
 clean:
-	-rm -f *.o *.so dagaddr_test $(LIB) $(STATICLIB)
+	-rm -f *.o *.so dagaddr_test $(LIBS) $(STATICLIB)
 	-rm -rf ../doc

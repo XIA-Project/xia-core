@@ -36,7 +36,9 @@ XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
 
 # set this just in case user doesn't have it in their environment
 # can be removed once libraries are installed in correct paths
-export LD_LIBRARY_PATH=$(XIADIR)/api/lib
+export LD_LIBRARY_PATH=$XIADIR/api/lib
+export PYTHON_PATH=$XIADIR/api/lib
+
 
 is_running()
 {

@@ -39,7 +39,7 @@ try:
         
         while(True):
         	
-        	accept_sock = Xaccept(sock);
+        	(accept_sock, peer) = Xaccept(sock);
         		
         	child_pid = os.fork()
   
@@ -54,7 +54,7 @@ try:
         		hello_message = "<html><body><h1>Hello World!</h1></body></html>"
 			http_header = "HTTP/1.1 200 OK\nDate: Sat, 08 Jan 2011 22:25:07 GMT\nServer: Apache/2.2.17 (Unix)\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type:  text/html\n\n"
         		#c_xsocket.Xsendto(sock, stock_feed, len(stock_feed), 0, replyto, dlen)
-			response = http_header+ hello_message
+			response = http_header+ hello_message +  'DONEDONEDONE'
 			#print "response len %d" % len(response)
 			
         		Xsend(accept_sock, response, 0)

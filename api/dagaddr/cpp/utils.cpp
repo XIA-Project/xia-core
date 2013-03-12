@@ -26,16 +26,18 @@ std::string trim(const std::string& str)
 
 int stoi(const std::string& str, int pos, int base) {
     int output = -1;
+
     switch (base) {
     case 10:
-        scanf(str.c_str(), "%d",&output);
+        sscanf(str.c_str(), "%d",&output);
         break;
     case 16:
-        scanf(str.c_str(), "%x",&output);
+        sscanf(str.c_str(), "%x",&output);
         break;
     default:
-        scanf(str.c_str(), "%d",&output);
+        sscanf(str.c_str(), "%d",&output);
         break;
     }
+
     return output;
 }

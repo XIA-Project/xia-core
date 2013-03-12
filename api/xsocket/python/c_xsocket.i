@@ -129,6 +129,37 @@
 }
 
 /*
+** used by Xaccept
+*/
+%typemap (argout) (int sockfd, struct sockaddr *addr, socklen_t *addrlen)
+{
+    Py_XDECREF($result);
+    if (result < 0) {
+        free($2);
+        free($3);
+        PyErr_SetFromErrno(PyExc_IOError);
+        return NULL;
+    }
+
+    PyObject *accept_sock, *peer, *return_tuple;
+    return_tuple = PyTuple_New(2);
+
+    sockaddr_x *a = (sockaddr_x*)$2;
+    Graph g(a);
+
+    accept_sock = PyLong_FromLong(result);
+    if (g.num_nodes() != 0)
+        peer = PyString_FromString(g.dag_string().c_str());
+    else
+        peer = PyString_FromString("");
+
+    PyTuple_SetItem(return_tuple, 0, accept_sock);
+    PyTuple_SetItem(return_tuple, 1, peer);
+    $result = return_tuple;
+    free($2);
+    free($3);
+}
+/*
 ** used by:
 **  XgetDAGbyName
 */

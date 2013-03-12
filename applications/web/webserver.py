@@ -166,8 +166,9 @@ def main():
         print '4ID: %s' % my4ID
         listen_dag_re = "RE %s %s %s" % (myAD, myHID, mySID) # dag to listen on; TODO: fix Xbind so this can be DAG format, not just RE
         listen_dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 0 - \n %s 3 - \n %s" % (myAD, my4ID, myHID, mySID)
+
         Xbind(listen_sock, listen_dag_re)
-        print 'Listening on %s' % listen_dag
+        print 'Webserver listening on %s' % listen_dag
 
         # Publish DAG to naming service
         XregisterName("www_s.xiaweb.com.xia", listen_dag)
@@ -180,7 +181,7 @@ def main():
        
         # TODO: use threads instead of processes?
         while(True):
-            accept_sock = Xaccept(listen_sock);
+            (accept_sock, peer) = Xaccept(listen_sock);
             print 'connection accepted'
             child_pid = os.fork()
   

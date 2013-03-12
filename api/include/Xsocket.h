@@ -173,8 +173,8 @@ extern int XupdateNameServerDAG(int sockfd, char *nsDAG);
 extern int XreadNameServerDAG(int sockfd, sockaddr_x *nsDAG);
 extern int XisDualStackRouter(int sockfd);
 
-extern int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
-extern int Xgetsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+extern int Xgetpeername(int sockd, struct sockaddr *addr, socklen_t *addrlen);
+extern int Xgetsockname(int sockd, struct sockaddr *addr, socklen_t *addrlen);
 
 extern int Xgetaddrinfo(const char *, const char *, const struct addrinfo *, struct addrinfo **);
 extern void Xfreeaddrinfo(struct addrinfo *);
