@@ -3,9 +3,9 @@
 APIDIR=../..
 XLIB=$(APIDIR)/lib
 XINC=$(APIDIR)/include
-CC=gcc
+CC=g++
 CFLAGS=-I.. -I$(XINC) -Wall -Wextra
-LIBS =$(XLIB)/libXsocket.so
+LIBS =$(XLIB)/libXsocket.so $(XLIB)/libdagaddr.so
 
 TARGETS=dag_test addrinfo_test
 

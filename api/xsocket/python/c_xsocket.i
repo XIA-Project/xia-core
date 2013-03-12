@@ -1,20 +1,25 @@
 %module c_xsocket
 %{
-#include  "../../include/Xsocket.h"
+#include "Xsocket.h"
+#include "xia.h"
+#include "dagaddr.hpp"
 %}
 
 
+/*
+** generic void* to python string converter
+*/
 %typemap (in) const void *
 {
-    $1 = (const void*)PyString_AsString($input);
+    $1 = PyString_AsString($input);
 }
 
-/* The "out" map for recvfrom. It packages the data C put into rbuf and dDAG and
-   returns them as a python tuple: (rbuf, dDAG). Currently dlen is discarded. Since
+/* The "out" map for recvfrom. It packages the data C put into rbuf and addr and
+   returns them as a python tuple: (rbuf, addr string). Currently dlen is discarded. Since
    this means the caller of the Python function no longer has access to
    the C function's return value, the status code, we do an error check
    here instead. */
-%typemap(argout) (void *rbuf, size_t len, int flags, char * sDAG, size_t *dlen) 
+%typemap(argout) (void *rbuf, size_t len, int flags, struct sockaddr *addr, socklen_t *addrlen) 
 {
     Py_XDECREF($result);
     if (result < 0) {
@@ -24,10 +29,15 @@
         PyErr_SetFromErrno(PyExc_IOError);
         return NULL;
     }
+
     PyObject *data, *sender, *return_tuple;
-    data = PyString_FromStringAndSize($1, result);
-    sender = PyString_FromStringAndSize($4, *$5);
     return_tuple = PyTuple_New(2);
+    data = PyString_FromStringAndSize((const char *)$1, result);
+    sockaddr_x *a = (sockaddr_x*)$4;
+
+    Graph g(a);
+    sender = PyString_FromString(g.dag_string().c_str());
+
     PyTuple_SetItem(return_tuple, 0, data);
     PyTuple_SetItem(return_tuple, 1, sender);
     $result = return_tuple;
@@ -35,6 +45,8 @@
     free($4);
     free($5);
 }
+
+
 
 
 /* The "in" map for the receive buffer of receive functions. It converts a single
@@ -53,7 +65,6 @@
         return NULL;
     }
     $1= (void*)malloc($2);
-
 }
 
 /* The "out" map for receive functions. It takes the data C put in rbuf
@@ -69,7 +80,7 @@
         PyErr_SetFromErrno(PyExc_IOError);
         return NULL;
     }
-    $result = PyString_FromStringAndSize($1, result);
+    $result = PyString_FromStringAndSize((const char *)$1, result);
     free($1);
 }
 
@@ -79,11 +90,86 @@
    C function will be generated:
         $1 (dDAG): a buffer to be filled in with the sender's DAG
         $2 (dlen): a size_t to be filled in with the length of the sender's DAG */
-%typemap (in) (int flags, char * sDAG, size_t *dlen)
+%typemap (in) (int flags, struct sockaddr* addr, socklen_t *addrlen)
 {
     $1 = (int) PyLong_AsLong($input);  /*TODO: There's no reason to mess with "flags", but we need at least one python input. Better way? */
-    $2 = (void*)malloc(4096);  /* TODO: 4096 is arbitrary; is this big enough? */
-    $3 = (size_t*)malloc(sizeof(size_t));
+    $2 = (struct sockaddr *)malloc(sizeof(sockaddr_x));
+    $3 = (size_t*)malloc(sizeof(socklen_t));
+}
+
+%typemap (in) (int sockfd, struct sockaddr* addr, socklen_t *addrlen)
+{
+    $1 = (int) PyLong_AsLong($input);
+    $2 = (struct sockaddr *)malloc(sizeof(sockaddr_x));
+    $3 = (size_t*)malloc(sizeof(socklen_t));
+}
+
+%typemap (in) (const char *name, sockaddr_x *addr, socklen_t *addrlen)
+{
+    $1 = PyString_AsString($input);
+    $2 = (sockaddr_x*)calloc(1, sizeof(sockaddr_x));
+    $3 = (size_t*)malloc(sizeof(socklen_t));
+
+    *$3 = sizeof(sockaddr_x);
+}
+
+
+%typemap (in) (const struct sockaddr *addr, socklen_t addrlen)
+{
+    PyObject *dag = $input;
+    if (!PyString_Check(dag)) {
+        PyErr_SetString(PyExc_ValueError, "expected a dag string");
+        return NULL;
+    }
+
+    $2 = sizeof(sockaddr_x);
+    Graph g(PyString_AsString(dag));
+    $1 = (struct sockaddr*)malloc($2);
+    g.fill_sockaddr((sockaddr_x*)$1);
+}
+
+/*
+** used by:
+**  XgetDAGbyName
+*/
+%typemap (argout) (struct sockaddr *addr, socklen_t *addrlen)
+{
+    sockaddr_x *a = (sockaddr_x*)$1;
+    Graph g(a);
+
+    if (g.num_nodes() != 0)
+        $result = PyString_FromString(g.dag_string().c_str());
+    else
+        $result = PyString_FromString("");
+}
+
+%typemap (argout) (sockaddr_x *addr, socklen_t *addrlen)
+{
+    Graph g($1);
+ 
+    if (g.num_nodes() != 0)
+    	$result = PyString_FromString(g.dag_string().c_str());
+    else
+    	$result = PyString_FromString("");
+}
+
+
+
+/*
+** used by:
+**  XgetDAGbyName
+*/
+%typemap (in) (sockaddr_x *addr)
+{
+    if (!PyString_Check($input)) {
+        PyErr_SetString(PyExc_ValueError, "expected a dag string");
+        return NULL;
+    }
+
+    Graph g(PyString_AsString($input));
+
+    $1 = (sockaddr_x*)malloc(sizeof(sockaddr_x));
+    g.fill_sockaddr((sockaddr_x*)$1);
 }
 
 
@@ -195,7 +281,7 @@
     PyTuple_SetItem(return_tuple, 2, fid);
     $result = return_tuple;
     free($2);
-    free($4);
+    free($4); 
     free($6);
 }
 
@@ -220,7 +306,7 @@
         PyErr_SetFromErrno(PyExc_Exception);
         return NULL;
     }
-    $result = PyLong_FromVoidPtr(*(int*)$2);
+    $result = PyLong_FromLong(*(int*)$2);
     free($2);
     free($3);
 }
@@ -244,6 +330,12 @@
    NOTE: It matters to swig where everything else in this file is
    with relation to this include, so don't move it. */
 %include "../../include/Xsocket.h"
+%include "../../include/xia.h"
+
+%pythoncode %{
+def Xsocket(type):
+    return _c_xsocket.Xsocket(AF_XIA, type, 0)
+%}
 
 /* ===== Xsend ===== */
 /* eliminate the need for python users to pass the length of the data, since we can calculate it */
@@ -257,7 +349,7 @@ def Xsend(sock, data, flags):
    since we can calculate it */
 %pythoncode %{
 def Xsendto(sock, data, flags, dest_dag):
-    return _c_xsocket.Xsendto(sock, data, len(data), flags, dest_dag, len(dest_dag))
+    return _c_xsocket.Xsendto(sock, data, len(data), flags, dest_dag)
 %}
 
 /* ===== XgetChunkStatus ===== */

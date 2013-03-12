@@ -1,4 +1,6 @@
 /*
+ *
+ printf("in loop\n");
  *			X C M P T R A C E R O U T E . C
  *
  * Using the InterNet Control Message Protocol (ICMP) "ECHO" facility,
@@ -43,6 +45,7 @@
 #include <signal.h>
 
 #include "Xsocket.h"
+#include "dagaddr.hpp"
 
 #include "xip.h"
 
@@ -67,6 +70,13 @@
 
 typedef void (*sighandler_t)(int);
 
+void pinger();
+void catcher();
+void finish();
+void pr_pack(u_char *buf, int cc, const char *from);
+void tvsub(struct timeval *out, struct timeval *in);
+int in_cksum(struct icmp *addr, int len);
+
 
 int ttl = 2;
 
@@ -80,8 +90,8 @@ int s;			/* Socket file descriptor */
 struct hostent *hp;	/* Pointer to host info */
 struct timezone tz;	/* leftover */
 
-char whereto[1024];/* Who to ping */
-int datalen;		/* How much data */
+sockaddr_x whereto;
+size_t datalen;		/* How much data */
 
 char usage[] =
 "Usage: xtraceroute [-dfqrv] host [packetsize [count [preload]]]\n";
@@ -99,20 +109,17 @@ int timing = 0;
 int tmin = 999999999;
 int tmax = 0;
 int tsum = 0;			/* sum of all times, for doing average */
-int finish(), catcher();
 char *inet_ntoa();
 
 /*
  * 			M A I N
  */
-main(argc, argv)
-char *argv[];
+int main(int argc, char **argv)
 {
-    char from[1024];
+    sockaddr_x from;
 	char **av = argv;
-	char *to = (char *)whereto;
-	int on = 1;
-	struct protoent *proto;
+	socklen_t len;
+	char s_to[1024], s_from[1024];
 
 	argc--, av++;
 	while (argc > 0 && *av[0] == '-') {
@@ -140,14 +147,11 @@ char *argv[];
 		exit(1);
 	}
 
-	bzero((char *)whereto, 1024);
-	
-	const char *tmp;
-	if(!(tmp = XgetDAGbyName(av[0]))) {
+	len = sizeof(whereto);
+	if (XgetDAGbyName(av[0], &whereto, &len) < 0) {
 	  printf("Error Resolving XID\n");
 	  exit(-1);
 	}
-	strncpy((char *)whereto,tmp,1024);
 
 	if( argc >= 2 )
 		datalen = atoi( av[1] );
@@ -168,7 +172,7 @@ char *argv[];
 
 	ident = getpid() & 0xFFFF;
 
-	if((s = Xsocket(XSOCK_RAW)) < 0) {
+	if((s = Xsocket(AF_XIA, SOCK_RAW, 0)) < 0) {
 	  perror("ping: socket");
 	  exit(5);
 	}
@@ -178,7 +182,10 @@ char *argv[];
 	  printf("Xsetsockopt failed on XOPT_NEXT_PROTO\n");
 	  exit(-1);
 	}
-	printf("TRACEROUTE %s:\n", to);
+
+	Graph g(&whereto);
+	strncpy(s_to, g.dag_string().c_str(), sizeof(s_to));
+	printf("TRACEROUTE %s:\n", s_to);
 
 	setlinebuf( stdout );
 
@@ -207,14 +214,17 @@ char *argv[];
 			if( select(32, (fd_set *)&fdmask, 0, 0, &timeout) == 0)
 				continue;
 		}
-		if ( (cc=Xrecvfrom(s, packet, len, 0, from, &fromlen)) < 0) {
+		if ( (cc=Xrecvfrom(s, packet, len, 0, (struct sockaddr *)&from, &fromlen)) < 0) {
 			if( errno == EINTR )
 				continue;
 			perror("ping: recvfrom");
 			continue;
 		}
-		pr_pack( packet, cc, from );
-		if(!strcmp(to,from)) finish();
+
+		Graph gf(&from);
+		strncpy(s_from, gf.dag_string().c_str(), sizeof(s_from));
+		pr_pack( packet, cc, s_from);
+		if(!strcmp(s_to,s_from)) finish();
 		if (npackets && nreceived >= npackets)
 			finish();
 	}
@@ -232,7 +242,7 @@ char *argv[];
  * 	exactly at 1-second intervals).  This does not affect the quality
  *	of the delay and loss statistics.
  */
-catcher()
+void catcher()
 {
 	int waittime;
 
@@ -262,11 +272,12 @@ catcher()
  *
  * we also keep incrmenting the packet TTL in order to emulate traceroute
  */
-pinger()
+void pinger()
 {
 	static u_char outpack[MAXPACKET];
 	register struct icmp *icp = (struct icmp *) outpack;
-	int i, cc;
+	unsigned i;
+	int rc, cc;
 	register struct timeval *tp = (struct timeval *) &outpack[8];
 	register u_char *datap = &outpack[8+sizeof(struct timeval)];
 
@@ -297,12 +308,12 @@ pinger()
 	ttl++;
 
 
-	i = Xsendto(s, outpack, cc, 0, whereto, strlen(whereto));
+	rc = Xsendto(s, outpack, cc, 0, (struct sockaddr *)&whereto, sizeof(whereto));
 
-	if( i < 0 || i != cc )  {
-		if( i<0 )  perror("sendto");
+	if( rc < 0 || rc != cc )  {
+		if( rc<0 )  perror("sendto");
 		printf("ping: wrote %s %d chars, ret=%d\n",
-			hostname, cc, i );
+			hostname, cc, rc );
 		fflush(stdout);
 	}
 	if(pingflags == FLOOD) {
@@ -316,11 +327,10 @@ pinger()
  *
  * Convert an ICMP "type" field to a printable string.
  */
-char *
-pr_type( t )
-register int t;
+const char *
+pr_type( register int t )
 {
-	static char *ttab[] = {
+	static const char *ttab[] = {
 		"Echo Reply",
 		"ICMP 1",
 		"ICMP 2",
@@ -354,10 +364,7 @@ register int t;
  * which arrive ('tis only fair).  This permits multiple copies of this
  * program to be run without having intermingled output (or statistics!).
  */
-pr_pack( buf, cc, from )
-char *buf;
-int cc;
-char *from;
+void pr_pack(u_char *buf, int cc, const char *from)
 {
     struct xip *xp;
 	register struct icmp *icp;
@@ -431,12 +438,10 @@ char *from;
  * Checksum routine for Internet Protocol family headers (C Version)
  *
  */
-in_cksum(addr, len)
-u_short *addr;
-int len;
+int in_cksum(struct icmp *addr, int len)
 {
 	register int nleft = len;
-	register u_short *w = addr;
+	register u_short *w = (ushort *)addr;
 	register u_short answer;
 	register int sum = 0;
 
@@ -475,8 +480,7 @@ int len;
  * 
  * Out is assumed to be >= in.
  */
-tvsub( out, in )
-register struct timeval *out, *in;
+void tvsub(struct timeval *out, struct timeval *in)
 {
 	if( (out->tv_usec -= in->tv_usec) < 0 )   {
 		out->tv_sec--;
@@ -490,7 +494,7 @@ register struct timeval *out, *in;
  *
  * Just clean up
  */
-finish()
+void finish()
 {
     Xclose(s);
 	fflush(stdout);

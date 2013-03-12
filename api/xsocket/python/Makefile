@@ -2,16 +2,16 @@ include ../../../xia.mk
 
 .PHONY: clean doc
 
-XSOCK_LIB=$(XLIB)/libXsocket.so
+XSOCK_LIB=$(XLIB)/libXsocket.so $(XLIB)/libdagaddr.so
 TARGET=$(XLIB)/_c_xsocket.so
+CC=g++
 PYTHON=`find /usr/include/python*/Python.h | sed "s/\/Python.h//"`
 
 all: $(TARGET) $(XLIB)/xsocket.py 
 
 $(TARGET): $(XSOCK_LIB) c_xsocket_wrap.c 
-	gcc -I $(PYTHON) -fpic -c c_xsocket_wrap.c 
-	#gcc -shared c_xsocket_wrap.o -lXsocket -o $@ -I $(PYTHON) -L$(XLIB)
-	gcc -shared c_xsocket_wrap.o $(XSOCK_LIB) -o $@  -I $(PYTHON)
+	$(CC) -I $(PYTHON) -fpic -c c_xsocket_wrap.c 
+	$(CC) -shared c_xsocket_wrap.o $(LIBS) -o $@  -I $(PYTHON)
 
 c_xsocket_wrap.c: c_xsocket.i $(XSOCK_LIB)
 	swig -outdir $(XLIB) -python c_xsocket.i 

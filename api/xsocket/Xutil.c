@@ -25,7 +25,7 @@
 #define CONTROL 1
 #define DATA 2
 
-#define XID_SIZE 40
+#define XID_CHARS (XID_SIZE * 2)
 
 
 int validateSocket(int sock, int stype, int err)
@@ -43,7 +43,7 @@ int validateSocket(int sock, int stype, int err)
 
 int click_send(int sockfd, xia::XSocketMsg *xsm)
 {
-	int rc;
+	int rc = 0;
 	struct sockaddr_in sa;
 
 	assert(xsm);
@@ -168,7 +168,7 @@ int checkXid(const char *xid, const char *type)
 		}
 	}
 
-	if (colon && (p - colon - 1 == XID_SIZE))
+	if (colon && (p - colon - 1 == XID_CHARS))
 		rc = 1;
 
 	return rc;

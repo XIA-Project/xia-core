@@ -3,10 +3,11 @@ include ../../xia.mk
 .PHONY: clean doc test
 
 CFLAGS +=-c -Iminini -fpic
+CFLAGS += -std=c++0x
 CPPFLAGS=$(CFLAGS)
 LDFLAGS +=-lprotobuf -lc -ldl
 
-SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XrequestChunk.c  \
+SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XrequestChunk.c  Xgetaddrinfo.c \
 		XgetChunkStatus.c  XreadChunk.c  XputChunk.c Xrecv.c \
         Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c \
 		Xsetsockopt.c Xutil.c state.c Xinit.c XupdateAD.c XupdateNameServerDAG.c XgetDAGbyName.c  \
@@ -16,7 +17,7 @@ LIB=$(XLIB)/libXsocket.so
 STATICLIB=$(XLIB)/libXsocket.a
 
 all: xia.pb.cc $(LIB)
-	make -C python all
+#	make -C python all
 
 static: xia.pb.cc $(STATICLIB)
 
@@ -26,7 +27,7 @@ xia.pb.cc: xia.proto
 xia.pb.o:
 	$(CC) $(CFLAGS) xia.pb.cc  -o $@
 
-%.o: %.c xia.pb.cc
+%.o: %.c xia.pb.cc $(XINC)/Xsocket.h $(XINC)/xia.h
 	$(CC) $(CFLAGS) $<  -o $@ -lpthread
 
 $(LIB): $(OBJS) 

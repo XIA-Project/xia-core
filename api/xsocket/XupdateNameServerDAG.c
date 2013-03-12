@@ -2,6 +2,7 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
+#include "dagaddr.hpp"
 
 int XupdateNameServerDAG(int sockfd, char *nsDAG) {
   int rc;
@@ -33,8 +34,8 @@ int XupdateNameServerDAG(int sockfd, char *nsDAG) {
 }
 
 
-int XreadNameServerDAG(int sockfd, char *nsDAG) {
-  	int rc;
+int XreadNameServerDAG(int sockfd, sockaddr_x *nsDAG) {
+  	int rc = -1;
   	char UDPbuf[MAXBUFLEN];
   	
  	if (getSocketType(sockfd) == XSOCK_INVALID) {
@@ -42,6 +43,11 @@ int XreadNameServerDAG(int sockfd, char *nsDAG) {
    	 	errno = EBADF;
   		return -1;
  	}
+
+	if (!nsDAG) {
+		errno = EINVAL;
+		return -1;
+	}
 
  	xia::XSocketMsg xsm;
   	xsm.set_type(xia::XREADNAMESERVERDAG);
@@ -60,12 +66,13 @@ int XreadNameServerDAG(int sockfd, char *nsDAG) {
 	xsm1.ParseFromString(UDPbuf);
 	if (xsm1.type() == xia::XREADNAMESERVERDAG) {
 		xia::X_ReadNameServerDag_Msg *_msg = xsm1.mutable_x_readnameserverdag();
-		strcpy(nsDAG, (_msg->dag()).c_str() );
-	} else {
-		rc = -1;
+
+		Graph g(_msg->dag().c_str());
+		if (g.num_nodes() > 0) {
+			g.fill_sockaddr(nsDAG);
+			rc = 0;
+		}
 	}	
 	return rc;
-	 
 }
-
 

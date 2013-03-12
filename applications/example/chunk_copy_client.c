@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include "Xsocket.h"
+#include "dagaddr.hpp"
 
 #define VERSION "v1.0"
 #define TITLE "XIA Chunk File Client"
@@ -182,7 +183,9 @@ int main(int argc, char **argv)
 {
 	int sock, chunkSock;
 	int offset;
-	char *dag;
+	sockaddr_x dag;
+	socklen_t daglen;
+	char sdag[1024];
 	char *p;
 	const char *fin;
 	const char *fout;
@@ -199,28 +202,31 @@ int main(int argc, char **argv)
 	fout = argv[2];
 
     // lookup the xia service 
-    if (!(dag = XgetDAGbyName(NAME)))
+	daglen = sizeof(dag);
+    if (XgetDAGbyName(NAME, &dag, &daglen) < 0)
 		die(-1, "unable to locate: %s\n", NAME);
 
 
 	// create a socket, and listen for incoming connections
-	if ((sock = Xsocket(XSOCK_STREAM)) < 0)
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		 die(-1, "Unable to create the listening socket\n");
     
-	if (Xconnect(sock, dag) < 0) {
+	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(sock);
 		 die(-1, "Unable to bind to the dag: %s\n", dag);
 	}
 
 	// save the AD and HID for later. This seems hacky
 	// we need to find a better way to deal with this
-	ad = strchr(dag, ' ') + 1;
+	Graph g(&dag);
+	strncpy(sdag, g.dag_string().c_str(), sizeof(sdag));
+	ad = strstr(sdag, "AD:");
 	p = strchr(ad, ' ');
 	*p = 0;
 	hid = p + 1;
+	hid = strstr(hid, "HID:");
 	p = strchr(hid, ' ');
 	*p = 0;
-
 
 	// send the file request
 	sprintf(cmd, "get %s",  fin);
@@ -231,7 +237,7 @@ int main(int argc, char **argv)
 
 	int count = atoi(&reply[4]);
 
-	if ((chunkSock = Xsocket(XSOCK_CHUNK)) < 0)
+	if ((chunkSock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0)
 		die(-1, "unable to create chunk socket\n");
 
 	FILE *f = fopen(fout, "w");

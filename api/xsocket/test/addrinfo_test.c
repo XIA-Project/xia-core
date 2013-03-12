@@ -1,5 +1,7 @@
-#include "Xsocket.h"
 #include <stdio.h>
+#include <netdb.h>
+#include "Xsocket.h"
+#include "dagaddr.hpp"
 
 #define SIZE	100
 #define FULL_DAG	"RE %s %s %s"
@@ -10,7 +12,7 @@
 
 
 int sock = -1;
-int verbose = 0;
+int verbose = 1;
 char hdag[1024];
 char fdag[1024];
 
@@ -25,8 +27,9 @@ void die(const char *msg)
 void setup()
 {
 	char ad[SIZE], hid[SIZE], fid[SIZE];
+	sockaddr_x sa;
 
-	sock = Xsocket(SOCK_STREAM);
+	sock = Xsocket(AF_XIA, SOCK_STREAM, 0);
 	if (sock < 0)
 		die("Can't create a socket\n");
 
@@ -34,11 +37,15 @@ void setup()
 		die("Can't get local address\n");
 
 	sprintf(fdag, FULL_DAG, ad, hid, SID);
-	if (XregisterName(FULL_NAME, fdag) != 0)
+	Graph gf(fdag);
+	gf.fill_sockaddr(&sa);
+	if (XregisterName(FULL_NAME, &sa) != 0)
 		die("Unable to register full test dag\n");
 
 	sprintf(hdag, HOST_DAG, ad, hid);
-	if (XregisterName(HOST_NAME, hdag) != 0)
+	Graph gh(hdag);
+	gh.fill_sockaddr(&sa);
+	if (XregisterName(HOST_NAME, &sa) != 0)
 		die("Unable to register host test dag\n");
 }
 
@@ -60,10 +67,8 @@ void ai_print(const struct addrinfo *ai)
 	if (ai->ai_addr) {
 		sockaddr_x *sx = (sockaddr_x *)ai->ai_addr;
 
-		printf("sockaddr_x\n");
-		printf("family: %d\n", sx->sx_family);
-		printf("size:    %d\n", sx->sx_size);
-		printf("dag:    %s\n", sx->sx_dag);
+		Graph g(sx);
+		g.print_graph();
 	}
 }
 

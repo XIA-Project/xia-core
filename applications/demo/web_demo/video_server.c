@@ -240,11 +240,8 @@ void *processRequest (void *socketid)
 
 int main(int argc, char *argv[])
 {
-	char *dag;
+	sockaddr_x *dag;
 	int sock, acceptSock;
-	char myAD[1024]; 
-        char myHID[1024];   
-	char my4ID[1024];  
 
 	getConfig(argc, argv);
 
@@ -253,34 +250,29 @@ int main(int argc, char *argv[])
 		die(-1, "Unable to upload the video %s\n", videoname.c_str());
 
 	// create a socket, and listen for incoming connections
-	if ((sock = Xsocket(XSOCK_STREAM)) < 0)
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		 die(-1, "Unable to create the listening socket\n");
 
-        // read the localhost AD and HID
-    	if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
-    		perror("Reading localhost address");	
-
-    	// make the src DAG (the one the server listens on)
-    	dag = (char*) malloc(snprintf(NULL, 0, "RE ( %s ) %s %s %s", my4ID, myAD, myHID, SID_VIDEO) + 1);
-    	sprintf(dag, "RE ( %s ) %s %s %s", my4ID, myAD, myHID, SID_VIDEO);  			
+	struct addrinfo *ai;
+	if (Xgetaddrinfo(NULL, SID_VIDEO, NULL, &ai) < 0)
+		 die(-1, "Unable to create the local dag\n");
+	dag = (sockaddr_x*)ai->ai_addr;
 
 	// register this service name to the name server 
-    	char * sname = (char*) malloc(snprintf(NULL, 0, "%s", SNAME) + 1);
-    	sprintf(sname, "%s", SNAME);  	
-    	if (XregisterName(sname, dag) < 0 )
-    		perror("name register");		   
+    if (XregisterName(SNAME, dag) < 0 )
+		perror("name register");
     
-	if(Xbind(sock,dag) < 0)
+	if(Xbind(sock, (struct sockaddr*)dag, sizeof(sockaddr_x)) < 0)
 		 die(-1, "Unable to bind to the dag: %s\n", dag);
 
 	// we're done with this
-	free(dag);
+	Xfreeaddrinfo(ai);
 	
 
    	while (1) {
 		say("\nListening...\n");
    		
-		if ((acceptSock = Xaccept(sock)) < 0)
+		if ((acceptSock = Xaccept(sock, NULL, NULL)) < 0)
 			die(-1, "accept failed\n");
 
 		say("We have a new connection\n");

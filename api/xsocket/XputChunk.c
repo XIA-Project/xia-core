@@ -53,7 +53,7 @@
 **
 */
 ChunkContext *XallocCacheSlice(unsigned policy, unsigned ttl, unsigned size) {
-    int sockfd = Xsocket(XSOCK_CHUNK);
+    int sockfd = Xsocket(AF_XIA, XSOCK_CHUNK, 0);
     if(sockfd < 0) {
         LOG("Unable to allocate the cache slice.\n");
         return NULL;

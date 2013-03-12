@@ -19,9 +19,9 @@ LD=g++
 CFLAGS=-Wall -Wextra -I\$(XINC)
 LDFLAGS=-lpthread
 ifeq (\$(wildcard \$(XLIB)/libXsocket.a),)
-	LIBS=\$(XLIB)/libXsocket.so
+LIBS=\$(XLIB)/libXsocket.so \$(XLIB)/libdagaddr.so
 else
-	LIBS=\$(XLIB)/libXsocket.a -Bstatic -lprotobuf
+	LIBS=\$(XLIB)/libXsocket.a \$(XLIB)/libdagaddr.a -Bstatic -lprotobuf
 endif
 
 ifdef DEBUG

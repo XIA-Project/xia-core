@@ -1,6 +1,6 @@
 include ../../xia.mk
 
-CC=gcc
+CC=g++
 LDFLAGS += $(LIBS)
 
 OUT=xping

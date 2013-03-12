@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include "Xsocket.h"
+#include "dagaddr.hpp"
 
 #define VERSION "v1.0"
 #define TITLE "XIA Chunk File Server"
@@ -31,25 +32,12 @@
 #define SID "SID:00000000dd41b924c1001cfa1e1117a812492434"
 #define NAME "www_s.chunkcopy.aaa.xia"
 
-#define CHUNKSIZE 8192
+#define CHUNKSIZE 1024
 
 int verbose = 1;
 char myAD[MAX_XID_SIZE];
 char myHID[MAX_XID_SIZE];
 char my4ID[MAX_XID_SIZE];
-
-/*
-** simple code to create a formatted DAG
-**
-** The dag should be free'd by the calling code when no longer needed
-*/
-char *createDAG(const char *ad, const char *host, const char *service)
-{
-	int len = snprintf(NULL, 0, DAG, ad, host, service) + 1;
-    char * dag = (char*)malloc(len);
-    sprintf(dag, DAG, ad, host, service);
-	return dag;
-}
 
 /*
 ** write the message to stdout unless in quiet mode
@@ -94,7 +82,7 @@ void die(int ecode, const char *fmt, ...)
 
 void *processRequest (void *socketid)
 {
-	int i, n, count;
+	int i, n, count = 0;
 	ChunkInfo *info = NULL;
 	char command[XIA_MAXBUF];
 	char reply[XIA_MAXBUF];
@@ -195,36 +183,39 @@ void *processRequest (void *socketid)
 */
 int main()
 {
-	char *dag;
 	int sock, acceptSock;
 
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 
 	// create a socket, and listen for incoming connections
-	if ((sock = Xsocket(XSOCK_STREAM)) < 0)
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		 die(-1, "Unable to create the listening socket\n");
 
     // read the localhost AD and HID
     if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
     	die(-1, "Reading localhost address\n");
 
-	if (!(dag = createDAG(myAD, myHID, SID)))
-		die(-1, "unable to create DAG: %s\n", dag);
+	struct addrinfo *ai;
+	if (Xgetaddrinfo(NULL, SID, NULL, &ai) != 0)
+		die(-1, "getaddrinfo failure!\n");
+
+	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
 
     if (XregisterName(NAME, dag) < 0 )
     	die(-1, "error registering name: %s\n", NAME);
 
-	if (Xbind(sock, dag) < 0) {
+	if (Xbind(sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
 		Xclose(sock);
 		 die(-1, "Unable to bind to the dag: %s\n", dag);
 	}
-	say("listening on dag: %s\n", dag);
-	free(dag);
+
+	Graph g(dag);
+	say("listening on dag: %s\n", g.dag_string().c_str());
 
    	while (1) {
 		say("Waiting for a client connection\n");
    		
-		if ((acceptSock = Xaccept(sock)) < 0)
+		if ((acceptSock = Xaccept(sock, NULL, NULL)) < 0)
 			die(-1, "accept failed\n");
 
 		say("connected\n");

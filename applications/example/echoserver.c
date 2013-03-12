@@ -20,12 +20,12 @@
 #include <errno.h>
 #include <sys/wait.h>
 #include "Xsocket.h"
+#include "dagaddr.hpp"
 
 #define VERSION "v1.0"
 #define TITLE "XIA Echo Server"
 
 #define MAX_XID_SIZE 100
-#define DAG  "RE ( %s ) %s %s %s"
 #define STREAM_NAME "www_s.stream_echo.aaa.xia"
 #define DGRAM_NAME "www_s.dgram_echo.aaa.xia"
 #define SID_STREAM  "SID:0f00000000000000000000000000000000000888"
@@ -38,19 +38,6 @@
 int verbose = 1;
 int stream = 1;
 int dgram = 1;
-
-/*
-** simple code to create a formatted DAG
-**
-** The dag should be free'd by the calling code when no longer needed
-*/
-char *createDAG(const char *fid, const char *ad, const char *host, const char *service)
-{
-	int len = snprintf(NULL, 0, DAG, fid, ad, host, service) + 1;
-	char * dag = (char*)malloc(len);
-	sprintf(dag, DAG, fid, ad, host, service);
-	return dag;
-}
 
 /*
 ** display cmd line options and exit
@@ -209,11 +196,7 @@ static void reaper(int sig)
 
 void echo_stream()
 {
-	char myAD[MAX_XID_SIZE];
-	char myHID[MAX_XID_SIZE];
-	char my4ID[MAX_XID_SIZE];
 	int acceptor, sock;
-	char *dag;
 
 	if (signal(SIGCHLD, reaper) == SIG_ERR) {
 		die(-1, "unable to catch SIGCHLD");
@@ -221,29 +204,31 @@ void echo_stream()
 
 	say("Stream service started\n");
 
-	if ((acceptor = Xsocket(XSOCK_STREAM)) < 0)
+	if ((acceptor = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		die(-2, "unable to create the stream socket\n");
 
-    // read the localhost AD and HID
-    if ( XreadLocalHostAddr(acceptor, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
-    	die(-1, "Reading localhost address\n");
+	struct addrinfo *ai;
+	if (Xgetaddrinfo(NULL, SID_STREAM, NULL, &ai) != 0)
+		die(-1, "getaddrinfo failure!\n");
 
-	if (!(dag = createDAG(my4ID, myAD, myHID, SID_STREAM)))
-		die(-1, "unable to create DAG: %s\n", dag);
-	say("Created DAG: \n%s\n", dag);
+	Graph g((sockaddr_x*)ai->ai_addr);
 
-    if (XregisterName(STREAM_NAME, dag) < 0 )
+	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
+
+	printf("\nStream DAG\n%s\n", g.dag_string().c_str());
+
+    if (XregisterName(STREAM_NAME, sa) < 0 )
     	die(-1, "error registering name: %s\n", STREAM_NAME);
 	say("registered name: \n%s\n", STREAM_NAME);
 
-	if (Xbind(acceptor, dag) < 0) {
+	if (Xbind(acceptor, (struct sockaddr *)sa, sizeof(sockaddr_x)) < 0) {
 		die(-3, "unable to bind to the dag\n");
 	}
 
 	while (1) {
 
 		say("Xsock %4d waiting for a new connection.\n", acceptor);
-		if ((sock = Xaccept(acceptor)) < 0) {
+		if ((sock = Xaccept(acceptor, NULL, 0)) < 0) {
 			warn("Xsock %d accept failure! error = %d\n", acceptor, errno);
 			// FIXME: should we die here instead or try and recover?
 			continue;
@@ -269,40 +254,36 @@ void echo_stream()
 		}
 	}
 
-	free(dag);
 	Xclose(acceptor);
 }
 
 void echo_dgram()
 {
 	int sock;
-	char *dag;
 	char buf[XIA_MAXBUF];
-	char cdag[1024]; // client's dag
-	char myAD[MAX_XID_SIZE];
-	char myHID[MAX_XID_SIZE];
-	char my4ID[MAX_XID_SIZE];
+	sockaddr_x cdag;
 	size_t dlen;
 	int n;
 
 	say("Datagram service started\n");
 
-	if ((sock = Xsocket(XSOCK_DGRAM)) < 0)
+	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
 		die(-2, "unable to create the datagram socket\n");
 
-    // read the localhost AD and HID
-    if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
-    	die(-1, "Reading localhost address\n");
+	struct addrinfo *ai;
+	if (Xgetaddrinfo(NULL, SID_DGRAM, NULL, &ai) != 0)
+		die(-1, "getaddrinfo failure!\n");
 
-	if (!(dag = createDAG(my4ID, myAD, myHID, SID_DGRAM)))
-		die(-1, "unable to create DAG: %s\n", dag);
-	say("Created DAG: \n%s\n", dag);
+	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
 
-    if (XregisterName(DGRAM_NAME, dag) < 0 )
+	Graph g((sockaddr_x*)ai->ai_addr);
+	printf("\nDatagram DAG\n%s\n", g.dag_string().c_str());
+
+    if (XregisterName(DGRAM_NAME, sa) < 0 )
     	die(-1, "error registering name: %s\n", DGRAM_NAME);
 	say("registered name: \n%s\n", DGRAM_NAME);
 
-	if (Xbind(sock, dag) < 0) {
+	if (Xbind(sock, (sockaddr *)sa, sizeof(sa)) < 0) {
 		die(-3, "unable to bind to the dag\n");
 	}
 
@@ -311,16 +292,18 @@ void echo_dgram()
 		while (1) {
 			say("Dgram Server waiting\n");
 
+
+
 			dlen = sizeof(cdag);
 			memset(buf, 0, sizeof(buf));
-			if ((n = Xrecvfrom(sock, buf, sizeof(buf), 0, cdag, &dlen)) < 0) {
+			if ((n = Xrecvfrom(sock, buf, sizeof(buf), 0, (struct sockaddr *)&cdag, &dlen)) < 0) {
 				warn("Recv error on socket %d, closing connection\n", pid);
 				break;
 			}
 			
 			say("dgram received %d bytes\n", n);
 
-			if ((n = Xsendto(sock, buf, n, 0, cdag, dlen)) < 0) {
+			if ((n = Xsendto(sock, buf, n, 0, (struct sockaddr *)&cdag, dlen)) < 0) {
 				warn("%5d send error\n", pid);
 				break;
 			}
@@ -328,7 +311,6 @@ void echo_dgram()
 			say("dgram sent %d bytes\n", n);
 		}
 
-		free(dag);
 		Xclose(sock);
 	}
 }

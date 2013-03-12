@@ -38,7 +38,7 @@ public:
 	~Node();
 
 	const uint32_t& type() const { return ptr_->type; }
-	const char* id() const { return ptr_->id; }
+	const unsigned char* id() const { return ptr_->id; }
 	std::string type_string() const;
 	std::string id_string() const;
 
@@ -60,7 +60,7 @@ private:
 	struct container
 	{
 		uint32_t type;
-		char id[ID_LEN];
+		unsigned char id[ID_LEN];
 		std::size_t ref_count;
 	};
 

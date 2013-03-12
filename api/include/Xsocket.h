@@ -21,6 +21,7 @@
 #ifndef XSOCKET_H
 #define XSOCKET_H
 
+
 #include <netinet/in.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -32,24 +33,34 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
+#include "xia.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define MAXBUFLEN 65000 // Note that this limits the size of chunk we can receive TODO: What should this be?
-#define XIA_MAXBUF MAXBUFLEN
-#define XIA_MAXCHUNK	MAXBUFLEN
+#define MAXBUFLEN    65000 // Note that this limits the size of chunk we can receive TODO: What should this be?
+#define XIA_MAXBUF   MAXBUFLEN
+#define XIA_MAXCHUNK MAXBUFLEN
 
-#define XSOCK_INVALID -1 // invalid socket type	
-#define XSOCK_STREAM 1	// Reliable transport (SID)
-#define XSOCK_DGRAM 2	// Unreliable transport (SID)
-#define XSOCK_RAW	3	// Raw XIA socket
-#define XSOCK_CHUNK 4	// Content Chunk transport (CID)
+// for python swig compiles
+#ifndef SOCK_STREAM
+#define SOCK_STREAM 1
+#endif
+#ifndef SOCK_DGRAM
+#define SOCK_DGRAM 2
+#endif
 
-#define REQUEST_FAILED 0x00000001 
+#define XSOCK_INVALID -1			// invalid socket type	
+#define XSOCK_STREAM SOCK_STREAM	// Reliable transport (SID)
+#define XSOCK_DGRAM  SOCK_DGRAM		// Unreliable transport (SID)
+#define XSOCK_RAW	 SOCK_RAW		// Raw XIA socket
+#define XSOCK_CHUNK  4				// Content Chunk transport (CID)
+
+#define REQUEST_FAILED    0x00000001 
 #define WAITING_FOR_CHUNK 0x00000002
-#define READY_TO_READ 0x00000004
-#define INVALID_HASH 0x00000008
+#define READY_TO_READ     0x00000004
+#define INVALID_HASH      0x00000008
 
 // Cache policy
 #define POLICY_LRU				0x00000001
@@ -73,7 +84,7 @@ typedef struct {
 
 typedef struct {
 	int size;
-	char cid[CID_HASH_SIZE];
+	char cid[CID_HASH_SIZE + 1];
 	int32_t ttl;
 	struct timeval timestamp;
 } ChunkInfo;
@@ -94,14 +105,6 @@ typedef struct {
 // XIA specific getaddrinfo error codes (move to xia.h)
 #define XEAI_UNIMPLEMENTED	-8000
 
-#define SX_DAG_SIZE	1016	// lets the entire sockaddr_x struct fit in 1K
-typedef struct {
-	u_int16_t sx_family;
-	size_t    sx_size;
-	char      sx_dag[SX_DAG_SIZE];
-} sockaddr_x;
-
-
 // Xsetsockopt options
 #define XOPT_HLIM		1	// Hop Limit TTL
 #define XOPT_NEXT_PROTO	2	// change the next proto field of the XIA header
@@ -119,13 +122,22 @@ typedef struct {
 #ifndef MIN
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 #endif
+#ifndef UNUSED
+#define UNUSED(x) (void)(x)
+#endif
 
 //Function list
-extern int Xsendto(int sockfd,const void *buf, size_t len, int flags, const char * dDAG, size_t dlen);
-extern int Xrecvfrom(int sockfd,void *rbuf, size_t len, int flags, char * sDAG, size_t *dlen);
-extern int Xsocket(int transport_type);
-extern int Xconnect(int sockfd, const char* dDAG);
-extern int Xbind(int sockfd, const char* SID);
+extern int Xsocket(int family, int transport_type, int protocol);
+extern int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+extern int Xaccept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags);
+extern int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+extern int Xconnect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+#define Xselect select
+#define Xpoll poll
+#define Xlisten(x, y) 0
+extern int Xrecvfrom(int sockfd,void *rbuf, size_t len, int flags, struct sockaddr *addr, socklen_t *addrlen);
+extern int Xsendto(int sockfd,const void *buf, size_t len, int flags, const struct sockaddr *addr, socklen_t addrlen);
+
 extern int Xclose(int sock);
 extern int Xrecv(int sockfd, void *rbuf, size_t len, int flags);
 extern int Xsend(int sockfd, const void *buf, size_t len, int flags);
@@ -144,26 +156,25 @@ extern int XputBuffer(ChunkContext *ctx, const char *, unsigned size, unsigned c
 extern int XremoveChunk(ChunkContext *ctx, const char *cid);
 extern void XfreeChunkInfo(ChunkInfo *infoList);
 
-extern int Xaccept(int sockfd);
 extern void set_conf(const char *filename, const char *sectioname);
 extern void print_conf();
 
 extern int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen);
 extern int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen);
 
-extern char *XgetDAGbyName(const char *name);
-extern int XregisterName(const char *name, const char *DAG);
+extern int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen);
+extern int XregisterName(const char *name, sockaddr_x *addr);
 
 extern int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *localhostHID, unsigned lenHID, char *local4ID, unsigned len4ID);
 
 /* internal only functions */
 extern int XupdateAD(int sockfd, char *newad, char *new4id);
 extern int XupdateNameServerDAG(int sockfd, char *nsDAG);
-extern int XreadNameServerDAG(int sockfd, char *nsDAG);
+extern int XreadNameServerDAG(int sockfd, sockaddr_x *nsDAG);
 extern int XisDualStackRouter(int sockfd);
 
-extern int Xgetpeername(int sockfd, char *dag, size_t *len);
-extern int Xgetsockname(int sockfd, char *dag, size_t *len);
+extern int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+extern int Xgetsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
 
 extern int Xgetaddrinfo(const char *, const char *, const struct addrinfo *, struct addrinfo **);
 extern void Xfreeaddrinfo(struct addrinfo *);

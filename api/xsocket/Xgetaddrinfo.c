@@ -23,9 +23,11 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
+#include "dagaddr.hpp"
 
 /* FIXME: 
 ** - should we have XIA specific protocols for use in the addrinfo structure, or should it always be 0?
+** - do something with the fallback flag
 **
 ** philisophical questions:
 ** - is there an equivilent loopback address in XIA?
@@ -34,10 +36,10 @@
 ** - are multiple AD/HIDs allowed on either the same interface, or different interfaces?
 */
 
-#define DAG_PLUS4ID   "RE ( %s ) %s %s"
-#define DAG_F_PLUS4ID "RE ( ( %s ) %s %s )"
-#define DAG 		  "RE %s %s"
-#define DAG_F 		  "RE ( %s %s )"
+//#define DAG_PLUS4ID   "RE ( %s ) %s %s"
+//#define DAG_F_PLUS4ID "RE ( ( %s ) %s %s )"
+//#define DAG 		  "RE %s %s"
+//#define DAG_F 		  "RE ( %s %s )"
 #define XID_LEN		  64
 
 
@@ -72,8 +74,10 @@ const char *xerr_unimplemented = "This feature is not currently supported";
 int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *hints, struct addrinfo **pai)
 {
 	struct addrinfo *ai = NULL;
-	sockaddr_x *sa      = NULL;
-	char *hname   = NULL;
+	sockaddr_x sa;
+	socklen_t slen;
+	char sname[41];
+	char stype[21];
 
 	int local    = 0;	// local and loopback are the same right now, they tell us
 	int loopback = 0;	//  to look up the local AD:HID instead of going to the name server
@@ -191,8 +195,20 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 
 	if (!haveserv && service) {
 		// FIXME: implement service lookup
-		return XEAI_UNIMPLEMENTED;
+		//return XEAI_UNIMPLEMENTED;
 	}
+
+
+	if (service) {
+		const char *p = strchr(service, ':');
+		if (p) {
+			bzero(stype, sizeof(stype));
+			bzero(sname, sizeof(sname));
+			strncpy(sname, p+1, 40);
+			strncpy(stype, service, MIN(20, p - service));
+		}
+	}
+
 
 	if (local || loopback) {
 		// user wants the name of the local system for binding to a suocket to be used in accept calls
@@ -203,13 +219,14 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 
 		char ad[XID_LEN], hid[XID_LEN], fid[XID_LEN];
 		int rc;
-		int sock = Xsocket(XSOCK_DGRAM);
+		int sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
 
 		if (sock < 0) {
 			return EAI_SYSTEM;
 		}
 
 		rc = XreadLocalHostAddr(sock, ad, XID_LEN, hid, XID_LEN, fid, XID_LEN);
+
 		Xclose(sock);
 		if (rc < 0) {
 			return EAI_SYSTEM;
@@ -232,64 +249,82 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 			}
 		}
 
-		hname = (char *)calloc(SX_DAG_SIZE, 1);
-		if (!hname) {
-			return EAI_MEMORY;
+		Node n_src = Node();
+		Node n_ip  = Node(fid);
+		Node n_ad  = Node(ad);
+		Node n_hid = Node(hid);
+
+		Graph g = (n_src * n_ad * n_hid);
+
+		if (have4id)
+			g = g + (n_src * n_ip * n_ad * n_hid);
+
+		if (fallback) {
+			Graph gf = n_src;
+			g = gf + g;
 		}
 
-		if (have4id) {
-			// 4id is valid, include as a fallback
-			snprintf(hname, SX_DAG_SIZE, (fallback ? DAG_F_PLUS4ID : DAG_PLUS4ID), fid, ad, hid);
-		} else {
-			snprintf(hname, SX_DAG_SIZE, (fallback ? DAG_F : DAG), ad, hid);
-		}
+		if (service)
+			g = g * Node(stype, sname);
+
+		g.fill_sockaddr(&sa);
 
 	} else if (!havename) {
-		hname = XgetDAGbyName(name);
-		if (!hname) {
+		slen = sizeof(sa);
+		if (XgetDAGbyName(name, &sa, &slen) < 0) {
 			return EAI_NONAME;
+		}
+
+		if (service) {
+			Graph g(&sa);
+
+			if (fallback) {
+				Graph gf = Node();
+				g = gf + g;
+			}
+			g = g * Node(stype, sname);
+			g.fill_sockaddr(&sa);
 		}
 
 	} else {
-		// caller wants us to use nam as the returned dag
-		if (!checkDag(name))
-			return EAI_NONAME;
-		hname = (char *)calloc(SX_DAG_SIZE, 1);
-		if (!hname) {
-			return EAI_MEMORY;
+		// caller wants us to use name as the returned dag
+		Graph g(name);
+
+		if (fallback) {
+			Graph gf = Node();
+			g = gf + g;
 		}
-		strncpy(hname, name, SX_DAG_SIZE);
+
+		if (service)
+			g = g * Node(stype, sname);
+
+		g.fill_sockaddr(&sa);
 	}
 
 	// allocate memory needed
  	ai = (struct addrinfo *)calloc(sizeof(struct addrinfo), 1);
- 	sa = (sockaddr_x *)calloc(sizeof(sockaddr_x), 1);
-	if (!ai || !sa) {
+ 	sockaddr_x *psa = (sockaddr_x *)calloc(sizeof(sockaddr_x), 1);
+	if (!ai || !psa) {
 		if (ai)
 			free(ai);
 		return EAI_MEMORY;
 	}
+	memcpy(psa, &sa, sizeof(sa));
 
 	// fill in the blanks
-	sa->sx_family = AF_XIA;
-	strncpy(sa->sx_dag, hname, SX_DAG_SIZE);
-	if (service) {
-		strncat(sa->sx_dag, " ", SX_DAG_SIZE);
-		strncat(sa->sx_dag, service, SX_DAG_SIZE);
-	}
-	sa->sx_size = strlen(sa->sx_dag);
-	free(hname);
 
 	ai->ai_family    = AF_XIA;
 	ai->ai_socktype  = socktype;
 	ai->ai_protocol  = protocol;
 	ai->ai_flags     = 0;
-	ai->ai_addr      = (struct sockaddr *)sa;
+	ai->ai_addr      = (struct sockaddr *)psa;
 	ai->ai_addrlen   = sizeof(sockaddr_x);
 	ai->ai_next      = NULL;	// this could change in the future at least for local lookups if multiple interfaces are present
 
-	if (cname)	// FIXME: check to see if this needs to be an allocated string by checking against real getaddrinfo function
-		ai->ai_canonname = sa->sx_dag;
+	if (cname) {
+		// FIXME: should we allocate a copy of the dag string in this case?
+		ai->ai_canonname = NULL;
+	}
 
 	*pai = ai;
 
