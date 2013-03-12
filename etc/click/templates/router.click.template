@@ -5,6 +5,8 @@ require(library xia_address.click);
 ${HNAME} :: XIARouter4Port(RE $ADNAME $HID, $ADNAME, $HID, $EXTERNAL_IP, fake0, 172.0.0.2, 172.0.0.1, 21:11:11:11:11:11, $MAC0, $MAC1, $MAC2, $MAC3);
 
 ######
+sock${NUM}::Socket("TCP", $SOCK_IP, $PORT, CLIENT $CLIENT) -> [$NUM]${HNAME}[$NUM] -> sock${NUM};
+######
 FromDevice($IFACE, PROMISC true) -> [$NUM]${HNAME}[$NUM] -> ToDevice($IFACE)
 ######
 Idle -> [$NUM]${HNAME}[$NUM] -> Discard;

@@ -31,6 +31,7 @@ IP_OVERRIDE_ADDR="None"
 HOSTNAME=""
 INTERFACE_FILTER="None"
 HOST_INTERFACE="None"
+SOCKET_PORTS="None"
 RUN_VISUALIZER_CLIENT=0
 RUN_VISUALIZER_SERVER=0
 VISUALIZER_SERVER="localhost"
@@ -121,6 +122,9 @@ start_daemons()
 	fi
 	if [ $HOST_INTERFACE != "None" ]; then
 		FLAGS=$FLAGS" -I "$HOST_INTERFACE
+	fi
+	if [ $SOCKET_PORTS != "None" ]; then
+		FLAGS=$FLAGS" -P "$SOCKET_PORTS
 	fi
 
 	exec 3>&1  # save stdout handle
@@ -233,7 +237,7 @@ help ()
 
 Start or stop the XIA network services.
 
-usage: $NAME [-cqvV4rtnZ] [-l <logfile>] [-i <hostname>] [-m <ip-addr>] [-f <filter_str>] [-I <interface>] [-s <script>] [-z <statserver>] [start|stop|restart|check]
+usage: $NAME [-cqvV4rtnZ] [-l <logfile>] [-i <hostname>] [-m <ip-addr>] [-f <filter_str>] [-I <interface>] [-P <socket-ports>] [-s <script>] [-z <statserver>] [start|stop|restart|check]
 where:
   -c only start click
   -l send stderr/stdout to logfile
@@ -247,6 +251,7 @@ where:
   -t generate and use a generic host click script (like on GENI)
   -i use the supplied name as the click element name and HID shortcut
   -m manually set the node's 4ID IP address
+  -P set the TCP socket ports to use (instead of ToDevice/FromDevice)
   -n if generating a click script, this node will be the name server
   -f if generating a click script, don't use interfaces matching the supplied string
      (to ignore multiple interfaces, use a comma-separated list)
@@ -263,7 +268,7 @@ EOH
 	exit 0
 }
 
-while getopts "cl:s:qvV4nrthi:m:f:I:z:Z" opt; do
+while getopts "cl:s:qvV4nrthi:m:f:I:z:ZP:" opt; do
 	case $opt in
 		c)
 			CLICK_ONLY=1
@@ -302,6 +307,9 @@ while getopts "cl:s:qvV4nrthi:m:f:I:z:Z" opt; do
 			;;
 		m)
 			IP_OVERRIDE_ADDR=$OPTARG
+			;;
+		P)
+			SOCKET_PORTS=$OPTARG
 			;;
 		i)
 			HOSTNAME=$OPTARG
