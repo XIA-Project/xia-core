@@ -1,15 +1,15 @@
 all: 
-	make -C xsocket
 	make -C dagaddr
+	make -C xsocket
 
 static:
-	make -C xsocket static
 	make -C dagaddr static
+	make -C xsocket static
 
 clean:
-	make -C xsocket clean
 	make -C dagaddr clean
+	make -C xsocket clean
 
 test:
-	make -C xsocket test
 	make -C dagaddr test
+	make -C xsocket test
