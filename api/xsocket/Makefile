@@ -17,7 +17,7 @@ LIB=$(XLIB)/libXsocket.so
 STATICLIB=$(XLIB)/libXsocket.a
 
 all: xia.pb.cc $(LIB)
-#	make -C python all
+	make -C python all
 
 static: xia.pb.cc $(STATICLIB)
 
