@@ -20,12 +20,12 @@
 #include "xia.pb.h"
 
 //Click side: Control/data address/info
-#define DEFAULT_CLICKPORT "15000"
+#define DEFAULT_CLICKPORT "1500"
 
 //set xia.click sorter to sort based on these ports. 
 
 
-#define __PORT_LEN 5
+#define __PORT_LEN 6
 
 class  __InitXSocket {
     public:
