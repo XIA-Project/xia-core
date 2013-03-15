@@ -203,7 +203,7 @@ int process(int sock)
 	if ((sent = Xsend(sock, buf1, size, 0)) < 0)
 		die(-4, "Send error %d on socket %d\n", errno, sock);
 
-	say("Xsock %4d sent %d bytes\n", sock, sent);
+	say("Xsock %4d sent %d of %d bytes\n", sock, sent, size);
 
 	memset(buf2, 0, sizeof(buf2));
 	if ((received = Xrecv(sock, buf2, sizeof(buf2), 0)) < 0)
