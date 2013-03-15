@@ -45,7 +45,10 @@ def recv_with_timeout(sock, timeout=5, transport_proto=XSP):
     try:
         while (time.time() - start_time < timeout and not received_data):
             try:
-                select.select([sock], [], [], 0.02)
+                (rl, wl, xl) = select.select([sock], [], [], 0.02)
+		if not rl:
+		    continue
+
                 if transport_proto == XSP:
                     reply = Xrecv(sock, XIA_MAXBUF, 0)
                 elif transport_proto == XDP:
