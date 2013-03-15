@@ -4,5 +4,5 @@ all:
 static: all
 
 clean:
-	make -C webdemo clean
+	make -C web_demo clean
 
