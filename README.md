@@ -6,7 +6,7 @@ We are proud to announce version 1.0 of XIA (eXpressive Internet Architecture). 
 Information and papers on XIA are available on the [XIA project page](http://cs.cmu.edu/~xia)
 XIA design information can be found on the [XIA Wiki](https://github.com/XIA-Project/xia-core/wiki). Information on building and using XIA is also available on the wiki.
 
-Help on evaluating XIA is available at <xia-users-help@cs.cmu.edu>
+Help on using XIA is available at <xia-users-help@cs.cmu.edu>
 
 The main git branch will always contain the most recently released version of XIA. Other branches will contain ongoing development or research projects and are not guaranteed to function correctly. If you are interested in using one of the other branches, contact us at the address above for status of the branch.
 
@@ -25,7 +25,7 @@ Release 1.0
 * Modified [Xsocket API](http://cs.cmu.edu/~xia/api/c) to more closely match the standard socket API.
 * Added click explorer utility to make it easy to monitor and control the click XIA elements.
 * The XIA directory tree has been reorganized to group related components together (applications, experiments, apis, etc) rather than scatter them throughout the tree.
-* Makefiles are improved so that XIA can be built statically or dynamically or with debug flags with a single make command instead of requireing hand edits to different files.
+* Makefiles are improved so that XIA can be built statically or dynamically or with debug flags with a single make command instead of requiring hand edits to different files.
 * Upgraded to click version 2.0.1.
 * Added capability to build statically linked version of XIA for use on networks such as PlanetLab.
 * Setting up an XIA network is more automated, for example, most nodes can be brought up with a single command.
