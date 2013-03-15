@@ -82,18 +82,18 @@ start_services()
 		exec &> /dev/null
 	fi
 
+	cd $XIADIR/applications/web
+	./proxy.py 8080 127.0.0.1 &
+	./webserver.py &
+	sleep 4
+
 	cd $XIADIR/applications/demo/web_demo
 	./stock_service.py &
 	./hello_service.py & 
 
 	cd $XIADIR/applications/demo/web_demo
 	./vs resources/video.ogv &
-	sleep 1  # need this otherwise it doesn't work
-	
-	cd $XIADIR/applications/web
-	./webserver.py &
-	sleep 1
-	./proxy.py 8080 127.0.0.1 &
+	sleep 3  # need this otherwise it doesn't work
 }
 
 help ()
@@ -138,6 +138,7 @@ case $1 in
 	start)
 		start_services
 		[ $VERBOSE == 0 ] && exec 1>&3
+		sleep 3
 		check_services
 		;;
 	stop)
