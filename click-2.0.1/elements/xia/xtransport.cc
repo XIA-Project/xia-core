@@ -710,7 +710,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				output(NETWORK_PORT).push(p);
 
 			} else {
-				//printf("disabling send to app, port not found dport=%d\n", _dport);
+				printf("destination port not found: %d\n", _dport);
 				sendToApplication = false;
 			}
 
@@ -839,7 +839,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 	} else {
 		if (!_dport) {
-			click_chatter("Case 1. Packet to unknown %s, dest_port=%d, sendToApp=%d", _destination_xid.unparse().c_str(), _dport, sendToApplication );
+			click_chatter("Packet to unknown port %d XID=%s, sendToApp=%d", _dport, _destination_xid.unparse().c_str(), sendToApplication );
 		}
 	}
 }
