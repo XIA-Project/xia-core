@@ -95,13 +95,17 @@
     $1 = (int) PyLong_AsLong($input);  /*TODO: There's no reason to mess with "flags", but we need at least one python input. Better way? */
     $2 = (struct sockaddr *)malloc(sizeof(sockaddr_x));
     $3 = (size_t*)malloc(sizeof(socklen_t));
+
+    *$3 = sizeof(sockaddr_x);
 }
 
 %typemap (in) (int sockfd, struct sockaddr* addr, socklen_t *addrlen)
 {
     $1 = (int) PyLong_AsLong($input);
-    $2 = (struct sockaddr *)malloc(sizeof(sockaddr_x));
+    $2 = (struct sockaddr *)calloc(1, sizeof(sockaddr_x));
     $3 = (size_t*)malloc(sizeof(socklen_t));
+
+    *$3 = sizeof(sockaddr_x);
 }
 
 %typemap (in) (const char *name, sockaddr_x *addr, socklen_t *addrlen)
@@ -144,12 +148,16 @@
     PyObject *accept_sock, *peer, *return_tuple;
     return_tuple = PyTuple_New(2);
 
-    sockaddr_x *a = (sockaddr_x*)$2;
-    Graph g(a);
-
     accept_sock = PyLong_FromLong(result);
-    if (g.num_nodes() != 0)
-        peer = PyString_FromString(g.dag_string().c_str());
+
+    sockaddr_x *a = (sockaddr_x*)$2;
+    if (a) {
+        Graph g(a);
+        if (g.num_nodes() != 0)
+            peer = PyString_FromString(g.dag_string().c_str());
+        else
+            peer = PyString_FromString("");
+    }
     else
         peer = PyString_FromString("");
 
@@ -172,6 +180,9 @@
         $result = PyString_FromString(g.dag_string().c_str());
     else
         $result = PyString_FromString("");
+
+    free($1);
+    free($2);
 }
 
 %typemap (argout) (sockaddr_x *addr, socklen_t *addrlen)
@@ -182,6 +193,9 @@
     	$result = PyString_FromString(g.dag_string().c_str());
     else
     	$result = PyString_FromString("");
+
+    free($1);
+    free($2);
 }
 
 
