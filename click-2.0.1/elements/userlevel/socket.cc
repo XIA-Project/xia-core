@@ -380,6 +380,8 @@ Socket::selected(int fd, int)
 	} else if (len > 0) {
 	  memcpy(&_remote, &from, from_len);
 	  _remote_len = from_len;
+      _rq->set_src_ip_anno(_remote.in.sin_addr);
+	  SET_SRC_PORT_ANNO(_rq, _remote.in.sin_port);
 	}
       }
 
@@ -429,6 +431,7 @@ Socket::write_packet(Packet *p)
       // If the IP address specified when the element was created is 0.0.0.0,
       // send the packet to its IP destination annotation address
       _remote.in.sin_addr = p->dst_ip_anno();
+      _remote.in.sin_port = DST_PORT_ANNO(p);
     }
 
     // write segment

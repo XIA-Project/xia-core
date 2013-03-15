@@ -1,0 +1,412 @@
+#!/bin/bash
+#
+# Copyright 2012 Carnegie Mellon University
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# set this just in case user doesn't have it in their environment
+# can be removed once libraries are installed in correct paths
+LD_LIBRARY_PATH=.
+
+NAME=`basename $0`
+VERBOSE=0
+LOGGING=0
+CLICK_ONLY=0
+ROUTER=0
+HOST=0
+DUAL_STACK=0
+LOCAL_CHAIN_TOPOLOGY=0
+NAMESERVER=0
+IP_OVERRIDE_ADDR="None"
+HOSTNAME=""
+INTERFACE_FILTER="None"
+HOST_INTERFACE="None"
+SOCKET_PORTS="None"
+RUN_VISUALIZER_CLIENT=0
+RUN_VISUALIZER_SERVER=0
+VISUALIZER_SERVER="localhost"
+
+DAEMONS=""
+ROUTER_DAEMONS="xrouted xhcp_serverd"
+HOST_DAEMONS="xhcp_clientd"
+NAMESERVER_DAEMONS="xnameservice"
+DUAL_STACK_HOST_EXTRA_DAEMONS="xrouted xhcp_serverd"
+CHAIN_TOPOLOGY_DAEMONS="xrouted xhcp_serverd xhcp_clientd xnameservice"
+VISUALIZER_CLIENT_DAEMONS="xstats"
+VISUALIZER_SERVER_DAEMONS="statsserver"
+
+# find the root of the XIA source tree
+# assumes this script is in a directory off the parent of the XIA tree
+# and that the daemons it starts are rooted off of the same location
+#  so XIADIR would be /xia-core assuming the script were /xia-core/tools/xianet
+XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")" 
+
+# click parameters
+CLICKPATH=$XIADIR/click
+CONFPATH=$XIADIR/etc/click/
+CLICK=$CLICKPATH/userlevel/click
+SCRIPT=xia_local_topology.click
+SCRIPT_SET=0
+
+
+is_running()
+{
+	RUNNING=`ps -e | grep "$1" `    #| grep -v grep`
+	[ "$RUNNING" != "" ]
+}
+
+check_daemons()
+{
+	printf "XIA Demo Service Status\n"
+	for svc in "click" $DAEMONS
+	do
+		status="stopped"
+		is_running $svc
+		[ $? -eq 0 ] && status="running"
+		printf "%-16s: %s\n" $svc $status
+	done
+}
+
+stop_daemons()
+{
+	printf "Stopping xia network processes\n"
+	for svc in $DAEMONS "click"
+	do
+		printf "stopping: %s\n" $svc
+		killall -9 $svc &> /dev/null
+	done
+}
+
+start_daemons()
+{
+	printf "Starting XIA network processes\n"
+
+	is_running "click"
+	if [ $? -eq 0 ]; then
+		printf "Click is already running, aborting...\n"
+		exit 1
+	fi
+
+	# 1) GENERATE A CLICK SCRIPT, IF NECESSARY
+	FLAGS=""
+	if [ $ROUTER -eq 1 ]; then
+		FLAGS=$FLAGS" -r"
+	fi
+	if [ $HOST -eq 1 ]; then    
+		FLAGS=$FLAGS" -t"
+	fi
+	if [ $DUAL_STACK -eq 1 ]; then
+		FLAGS=$FLAGS" -4"
+	fi
+	if [ $IP_OVERRIDE_ADDR != "None" ]; then
+		FLAGS=$FLAGS" -m "$IP_OVERRIDE_ADDR
+	fi
+	if [ "$HOSTNAME" != "" ]; then
+		FLAGS=$FLAGS" -i "\"$HOSTNAME\"
+	fi
+	if [ $NAMESERVER -eq 1 ]; then
+		FLAGS=$FLAGS" -n"
+	fi
+	if [ $INTERFACE_FILTER != "None" ]; then
+		FLAGS=$FLAGS" -f "$INTERFACE_FILTER
+	fi
+	if [ $HOST_INTERFACE != "None" ]; then
+		FLAGS=$FLAGS" -I "$HOST_INTERFACE
+	fi
+	if [ $SOCKET_PORTS != "None" ]; then
+		FLAGS=$FLAGS" -P "$SOCKET_PORTS
+	fi
+
+	exec 3>&1  # save stdout handle
+	if [ $LOGGING -eq 1 ]; then
+		echo "logging to: $LOGFILE"
+		exec &> $LOGFILE
+	fi
+
+	cd $XIADIR/etc/click/templates/
+	python xconfig.py $FLAGS  # TODO: we maybe be calling this unnecessarily, but that's OK
+
+
+	# 2) START CLICK
+	if [ ! -f $CONFPATH/$SCRIPT ]; then
+		SNAME=`basename $SCRIPT .click`
+		printf "\nERROR: unable to locate click conf file: $SNAME\n\n"
+		exit 1
+	fi
+
+
+
+	if [ $VERBOSE -eq 0 ]; then
+		exec &> /dev/null
+	fi
+
+	$CLICK -R $CONFPATH/$SCRIPT &
+	if [ $CLICK_ONLY -eq 1 ]; then
+		exit
+	fi
+	sleep 2
+
+
+	is_running "click"
+	if [ $? -ne 0 ]; then
+		# put stdout handle back in case we were in silent mode
+		exec 1>&3
+		printf "Click is not running, aborting...\n"
+		exit 1
+	fi
+
+	if [ $VERBOSE -eq 1 ]; then
+		exec &> /dev/null
+	fi
+
+
+	# 3) START DAEMONS
+	cd $XIADIR/bin
+
+	if [ $ROUTER -eq 1 ]; then
+		./xrouted $HOSTNAME & 
+		sleep 2
+		
+		./xhcp_serverd &
+		sleep 1 
+	fi
+	if [ $HOST -eq 1 ]; then    
+
+		if [ $DUAL_STACK -eq 1 ]; then
+			./xrouted "$HOSTNAME"_router 180 &   # 180 is the name of a section in daemons/xroute/xsockconf.ini
+			sleep 2
+			
+			./xhcp_serverd 180 &
+			sleep 1 
+		
+			./xhcp_clientd www_h.$HOSTNAME.com.xia "$HOSTNAME"_host &
+			sleep 2 
+		else
+			./xhcp_clientd www_h.$HOSTNAME.com.xia $HOSTNAME & 
+			sleep 2 
+		fi
+		
+	fi
+	if [ $NAMESERVER -eq 1 -a $HOST -eq 1 ]; then
+		./xnameservice &
+	fi
+	if [ $LOCAL_CHAIN_TOPOLOGY -eq 1 ]; then
+		./xrouted router0 180 &
+		./xrouted router1 181 & 
+		sleep 2
+		
+		./xhcp_serverd 180 &
+		./xhcp_serverd 181 &
+		sleep 1 
+			
+		./xhcp_clientd www_h.host0.com.xia host0 172 &  # 172 is the name of a section in daemons/xhcp/xsockconf.ini
+		./xhcp_clientd www_h.host1.com.xia host1 192 &
+		sleep 2 
+			
+		./xnameservice &
+	fi
+	if [ $RUN_VISUALIZER_SERVER -eq 1 ]; then
+		cd $XIADIR/daemons/visualizer
+		./statsserver &
+		sleep 1
+	fi
+	if [ $RUN_VISUALIZER_CLIENT -eq 1 ]; then
+		FLAGS="-s $VISUALIZER_SERVER"
+		if [ $VERBOSE -eq 2 ]; then
+			FLAGS=$FLAGS" -v"
+		fi
+		cd $XIADIR/daemons/visualizer
+		./xstats $FLAGS &
+		sleep 1
+	fi
+}
+
+help ()
+{
+	cat << EOH
+
+Start or stop the XIA network services.
+
+usage: $NAME [-cqvV4rtnZ] [-l <logfile>] [-i <hostname>] [-m <ip-addr>] [-f <filter_str>] [-I <interface>] [-P <socket-ports>] [-s <script>] [-z <statserver>] [start|stop|restart|check]
+where:
+  -c only start click
+  -l send stderr/stdout to logfile
+  -s run click using the specified script
+     (should be located in the $CONFPATH directory)
+  -q run silently (default)
+  -v prints click debug messages to stdout
+  -V prints all daemon debug messages to stdout
+  -4 generate and use a dual stack click script
+  -r generate and use a generic router click script (like on GENI)
+  -t generate and use a generic host click script (like on GENI)
+  -i use the supplied name as the click element name and HID shortcut
+  -m manually set the node's 4ID IP address
+  -P set the TCP socket ports to use (instead of ToDevice/FromDevice)
+  -n if generating a click script, this node will be the name server
+  -f if generating a click script, don't use interfaces matching the supplied string
+     (to ignore multiple interfaces, use a comma-separated list)
+  -I if generating a click script, use this interface (i.e., pick which interface a host uses)
+  -z start the visualizer client daemon, using the supplied address for the statserver
+  -Z make this the visualizer server (runs statserver and xstats)
+
+  start   - starts the xia network processes if not already running
+  stop    - stops the xia processes
+  restart - stops then starts the xia processes
+  check   - print service status
+
+EOH
+	exit 0
+}
+
+while getopts "cl:s:qvV4nrthi:m:f:I:z:ZP:" opt; do
+	case $opt in
+		c)
+			CLICK_ONLY=1
+			;;
+		l)
+			LOGGING=1
+			LOGFILE=$OPTARG
+			;;
+		s)
+			SCRIPT=$OPTARG
+			SCRIPT_SET=1
+			;;
+		q)
+			VERBOSE=0
+			;;
+		V)
+			VERBOSE=2
+			;;
+		v)
+			VERBOSE=1
+			;;
+		4)
+			DUAL_STACK=1
+			;;
+		r)
+			ROUTER=1
+			;;
+		t)
+			HOST=1
+			;;
+		f)
+			INTERFACE_FILTER=$OPTARG
+			;;
+		I)
+			HOST_INTERFACE=$OPTARG
+			;;
+		m)
+			IP_OVERRIDE_ADDR=$OPTARG
+			;;
+		P)
+			SOCKET_PORTS=$OPTARG
+			;;
+		i)
+			HOSTNAME=$OPTARG
+			;;
+		n)
+			NAMESERVER=1
+			;;
+		z)
+			RUN_VISUALIZER_CLIENT=1
+			DAEMONS=$DAEMONS" "$VISUALIZER_CLIENT_DAEMONS
+			VISUALIZER_SERVER=$OPTARG
+			;;
+		Z)
+			RUN_VISUALIZER_CLIENT=1
+			RUN_VISUALIZER_SERVER=1
+			DAEMONS=$DAEMONS" "$VISUALIZER_CLIENT_DAEMONS
+			DAEMONS=$DAEMONS" "$VISUALIZER_SERVER_DAEMONS
+			;;
+		h)
+			help
+			;;
+		\?)
+			printf "\nInvalid option: -$OPTARG\n" >&2
+			help
+			;;
+	esac
+done
+
+if [ $NAMESERVER -eq 1 -a $HOST -eq 1 ]; then
+	DAEMONS=$DAEMONS" "$NAMESERVER_DAEMONS
+fi
+
+if [ $SCRIPT_SET -eq 0 ]; then
+	if [ $HOST -eq 1 ]; then
+		CONFPATH=$XIADIR/etc/click/templates
+		if [ $DUAL_STACK -eq 0 ]; then
+			SCRIPT=host.click
+		else
+			SCRIPT=dual_stack_host.click
+		fi
+	elif [ $ROUTER -eq 1 ]; then
+		CONFPATH=$XIADIR/etc/click/templates
+		if [ $DUAL_STACK -eq 0 ]; then
+			SCRIPT=router.click
+		else
+			SCRIPT=dual_stack_router.click
+		fi
+	fi
+fi
+	
+if [ $HOST -eq 1 ]; then
+	DAEMONS=$DAEMONS" "$HOST_DAEMONS
+	if [ $DUAL_STACK -eq 1 ]; then
+		DAEMONS=$DAEMONS" "$DUAL_STACK_HOST_EXTRA_DAEMONS
+	fi
+elif [ $ROUTER -eq 1 ]; then
+	DAEMONS=$DAEMONS" "$ROUTER_DAEMONS
+fi
+
+if [ "$HOSTNAME" == "" ]; then
+	HOSTNAME=$(hostname -s)
+fi
+
+# By default, use CHAIN_TOPOLOGY_DAEMONS if others were not specified
+if [ $SCRIPT_SET -eq 0 -a $HOST -eq 0 -a $ROUTER -eq 0 ]; then
+	DAEMONS=$CHAIN_TOPOLOGY_DAEMONS
+	LOCAL_CHAIN_TOPOLOGY=1
+fi
+
+echo "SCRIPT: $SCRIPT"
+echo "DAEMONS: $DAEMONS"
+echo "HOSTNAME: $HOSTNAME"
+
+shift $((OPTIND-1))
+
+case $1 in
+	start)
+		start_daemons
+		[ $VERBOSE == 0 ] && exec 1>&3
+		check_daemons
+		;;
+	stop)
+		stop_daemons
+		;;
+	restart|reload)
+		stop_daemons
+		sleep 1
+		start_daemons
+		[ $VERBOSE == 0 ] && exec 1>&3
+		check_daemons
+		;;
+	check)
+		check_daemons
+		;;
+	*)
+		printf "\nInvalid command\n" >&2
+		help
+		;;
+esac
+

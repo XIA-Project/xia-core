@@ -1,15 +1,15 @@
-CC=g++
-LD=g++
-CFLAGS=-I../../XIASocket/API -ggdb
-LDFLAGS=-lprotobuf -lpthread
-SOURCES=ns.cc ../../XIASocket/API/libXsocket.a
+include ../../xia.mk
 
-all: xnameservice
+.PHONY: all clean
 
-xnameservice: $(SOURCES)
+LDFLAGS += $(LIBS)
+SOURCES=ns.cc
+NS=$(BINDIR)/xnameservice
+
+all: $(NS)
+
+$(NS): $(SOURCES)
 	$(CC) -o $@ $(CFLAGS) $(SOURCES) $(LDFLAGS)	
 
 clean:
-	rm xnameservice
-	
-	
+	-rm $(NS)

@@ -32,6 +32,9 @@
 #define XHCP_TYPE_GATEWAY_ROUTER_4ID 3
 #define XHCP_TYPE_NAME_SERVER_DAG 4
 
+#define SOURCE_DIR "xia-core"
+#define RESOLV_CONF "/etc/resolv.conf"
+
 typedef struct xhcp_pkt_entry {
 	short type;
 	char data[];

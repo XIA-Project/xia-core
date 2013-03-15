@@ -1,0 +1,27 @@
+There are two variants of the python API. The first is a C-like wrapper around
+the C functions and the second is an object-based version that mimics python's
+socket object.
+
+To use either version, you must ensure two things:
+	
+	1) Your python program imports "./c_xsocket.py"
+
+	2) "./c_xsocket.py" and "./_c_xsocket.so" are in your python module search
+	   path. This can be accomplished by placing links to these files in the
+	   same directory as your python file, or by adding them to the environment
+	   variable PYTHONPATH (with the same syntax as the standard PATH variable)
+
+	3) "api/lib/libXsocket.so" is in your LD_LIBRARY_PATH
+
+	4) "api/lib/libdagaddr.so" is in your LD_LIBRARY_PATH
+
+To use the object-oriented version of the API, you must additionally ensure:
+
+	5) Your python program imports "./oo_wrapper/xsocket.py"
+
+	6) "./oo_wrapper/xsocket.py" is in your python module search path (as
+		described above)
+
+Running "make" in this directory will prepare both variants of the python API
+for use. Running "make" in "api/xsocket" or the xia project tree will do this
+for you automatically.

@@ -1,4 +1,3 @@
-
 #include <click/config.h>
 #include <click/glue.hh>
 #include <click/error.hh>
@@ -58,10 +57,8 @@ XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	if (cp_va_kparse(conf, this, errh,
 					 "LOCAL_ADDR", cpkP + cpkM, cpXIAPath, &local_addr,
 					 "LOCAL_4ID", cpkP + cpkM, cpXID, &local_4id,
-					 "CLICK_IP", cpkP + cpkM, cpIPAddress, &_CLICKaddr,
-					 "API_IP", cpkP + cpkM, cpIPAddress, &_APIaddr,
 					 "ROUTETABLENAME", cpkP + cpkM, cpElement, &routing_table_elem,
-					 "IS_DUAL_STACK_ROUTER", 0, cpInteger, &is_dual_stack_router,
+					 "IS_DUAL_STACK_ROUTER", 0, cpBool, &is_dual_stack_router,
 					 cpEnd) < 0)
 		return -1;
 
@@ -183,7 +180,7 @@ XTRANSPORT::run_timer(Timer *timer)
 
 					if (DEBUG)
 						//click_chatter("Timer: Sent packet to socket with port %d", _sport);
-					output(DATA_PORT).push(UDPIPEncap(ppp, _sport, _sport));
+                        output(API_PORT).push(UDPIPPrep(ppp, _sport));
 				}
 
 			} else if (daginfo->dataack_waiting == true && daginfo->expiry <= now ) {
@@ -399,18 +396,13 @@ XTRANSPORT::copy_cid_response_packet(Packet *p, DAGinfo *daginfo) {
 	return copy;
 }
 
-void XTRANSPORT::ProcessControlPacket(WritablePacket *p_in)
+void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 {
 	//Extract the destination port
-	click_udp * uh = p_in->udp_header();
-	unsigned short _dport = uh->uh_dport;
-	unsigned short _sport = uh->uh_sport;
-	UNUSED(_dport);
+	unsigned short _sport = SRC_PORT_ANNO(p_in);
 
-	//click_chatter("control sport:%d, dport:%d",ntohs(_sport), ntohs(_dport));
-
-	p_in->pull(p_in->transport_header_offset());	//Remove IP header
-	p_in->pull(8);	//Remove UDP header
+	if (DEBUG)
+        click_chatter("\nPush: Got packet from API sport:%d",ntohs(_sport));
 
 	std::string p_buf;
 	p_buf.assign((const char*)p_in->data(), (const char*)p_in->end_data());
@@ -454,39 +446,8 @@ void XTRANSPORT::ProcessControlPacket(WritablePacket *p_in)
 		break;
 	case xia::XISDUALSTACKROUTER:
 		Xisdualstackrouter(_sport);	
-		break;	
-	default:
-		click_chatter("\n\nERROR: CONTROL TRAFFIC !!!\n\n");
 		break;
-	}
-
-	p_in->kill();
-}
-
-void XTRANSPORT::ProcessDataPacket(WritablePacket *p_in)
-{
-	//Extract the destination port
-	const click_udp *uh = p_in->udp_header();
-	unsigned short _dport=uh->uh_dport;
-	unsigned short _sport = uh->uh_sport;
-
-	UNUSED(_dport);
-
-	if (DEBUG)
-		click_chatter("\nPush: Got packet from socket on port %d", _sport);
-
-	p_in->pull(p_in->transport_header_offset());//Remove IP header
-	p_in->pull(UDP_HEADER_SIZE); //Remove UDP header
-
-	std::string p_buf;
-	p_buf.assign((const char*)p_in->data(), (const char*)p_in->end_data());
-	//click_chatter("\n payload:%s, length=%d\n",p_buf.c_str(), p_buf.size());
-
-	//protobuf message parsing
-	xia_socket_msg.ParseFromString(p_buf);
-
-	switch(xia_socket_msg.type()) {
-	case xia::XSEND:
+    case xia::XSEND:
 		Xsend(_sport, p_in);
 		break;
 	case xia::XSENDTO:
@@ -508,7 +469,7 @@ void XTRANSPORT::ProcessDataPacket(WritablePacket *p_in)
 		XputChunk(_sport);
 		break;
 	default:
-		click_chatter("\n\nERROR DATA TRAFFIC !!!\n\n");
+		click_chatter("\n\nERROR: API TRAFFIC !!!\n\n");
 		break;
 	}
 
@@ -531,7 +492,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 
 	unsigned short _dport = XIDtoPort.get(_destination_xid);  // This is to be updated for the XSOCK_STREAM type connections below
-	unsigned short _sport = CLICKDATAPORT;
 
 	bool sendToApplication = true;
 	//String pld((char *)xiah.payload(), xiah.plen());
@@ -565,7 +525,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 		for (i = xcmp_listeners.begin(); i != xcmp_listeners.end(); i++) {
 			int port = *i;
-			output(DATA_PORT).push(UDPIPEncap(xcmp_pkt, port, port));
+			output(API_PORT).push(UDPIPPrep(xcmp_pkt, port));
 		}
 
 		return;
@@ -576,7 +536,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 		if (thdr.pkt_info() == TransportHeader::SYN) {
 			//printf("syn dport = %d\n", _dport);
 			// Connection request from client...
-			_sport = CLICKACCEPTPORT;
 
 			// First, check if this request is already in the pending queue
 			XIDpair xid_pair;
@@ -668,8 +627,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			//   Done below (via port#5005)
 
 		} else if (thdr.pkt_info() == TransportHeader::SYNACK) {
-			_sport = CLICKCONNECTPORT;
-
 			XIDpair xid_pair;
 			xid_pair.set_src(_destination_xid);
 			xid_pair.set_dst(_source_xid);
@@ -692,9 +649,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			//daginfo->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
 
 		} else if (thdr.pkt_info() == TransportHeader::DATA) {
-
-			_sport = CLICKDATAPORT;
-
 			XIDpair xid_pair;
 			xid_pair.set_src(_destination_xid);
 			xid_pair.set_dst(_source_xid);
@@ -756,7 +710,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				output(NETWORK_PORT).push(p);
 
 			} else {
-				//printf("disabling send to app, port not found dport=%d\n", _dport);
+				printf("destination port not found: %d\n", _dport);
 				sendToApplication = false;
 			}
 
@@ -880,12 +834,12 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 			if (DEBUG)
 				click_chatter("Sent packet to socket with port %d", _dport);
-			output(DATA_PORT).push(UDPIPEncap(p2, _sport, _dport));
+			output(API_PORT).push(UDPIPPrep(p2, _dport));
 		}
 
 	} else {
 		if (!_dport) {
-			click_chatter("Case 1. Packet to unknown %s, dest_port=%d, sendToApp=%d", _destination_xid.unparse().c_str(), _dport, sendToApplication );
+			click_chatter("Packet to unknown port %d XID=%s, sendToApp=%d", _dport, _destination_xid.unparse().c_str(), sendToApplication );
 		}
 	}
 }
@@ -905,7 +859,6 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 	xid_pair.set_src(destination_sid);
 	xid_pair.set_dst(source_cid);
 
-	unsigned short _sport = CLICKDATAPORT;
 	unsigned short _dport = XIDpairToPort.get(xid_pair);
 
 	if(_dport)
@@ -998,7 +951,7 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 				if (DEBUG)
 					click_chatter("Sent packet to socket: sport %d dport %d", _dport, _dport);
 
-				output(DATA_PORT).push(UDPIPEncap(p2, _sport, _dport));
+				output(API_PORT).push(UDPIPPrep(p2, _dport));
 
 			} else {
 				// Store the packet into temp buffer (until ReadCID() is called for this CID)
@@ -1042,12 +995,13 @@ void XTRANSPORT::push(int port, Packet *p_input)
 	//Depending on which CLICK-module-port it arrives at it could be control/API traffic/Data traffic
 
 	switch(port) { // This is a "CLICK" port of UDP module.
-	case CONTROL_PORT:	// control packet from socket API
-		ProcessControlPacket(p_in);
+	case API_PORT:	// control packet from socket API
+		ProcessAPIPacket(p_in);
 		break;
 
-	case DATA_PORT: //packet from Socket API
-		ProcessDataPacket(p_in);
+	case BAD_PORT: //packet from ???
+        if (DEBUG)
+            click_chatter("\n\nERROR: BAD INPUT PORT TO XTRANSPORT!!!\n\n");
 		break;
 
 	case NETWORK_PORT: //Packet from network layer
@@ -1086,61 +1040,16 @@ void XTRANSPORT::ReturnResult(int sport, xia::XSocketCallType type, int rc, int 
 	std::string p_buf;
 	xia_socket_msg_response.SerializeToString(&p_buf);
 	WritablePacket *reply = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
-	output(DATA_PORT).push(UDPIPEncap(reply, sport, sport));
+	output(API_PORT).push(UDPIPPrep(reply, sport));
 }
 
 Packet *
-XTRANSPORT::UDPIPEncap(Packet *p_in, int sport, int dport)
+XTRANSPORT::UDPIPPrep(Packet *p_in, int dport)
 {
-	WritablePacket *p = p_in->push(sizeof(click_udp) + sizeof(click_ip));
-	click_ip *ip = reinterpret_cast<click_ip *>(p->data());
-	click_udp *udp = reinterpret_cast<click_udp *>(ip + 1);
+    p_in->set_dst_ip_anno(IPAddress("127.0.0.1"));
+    SET_DST_PORT_ANNO(p_in, dport);
 
-#if !HAVE_INDIFFERENT_ALIGNMENT
-	assert((uintptr_t)ip % 4 == 0);
-#endif
-	// set up IP header
-	ip->ip_v = 4;
-	ip->ip_hl = sizeof(click_ip) >> 2;
-	ip->ip_len = htons(p->length());
-	ip->ip_id = htons(_id.fetch_and_add(1));
-	ip->ip_p = IP_PROTO_UDP;
-	ip->ip_src = _CLICKaddr;
-	ip->ip_dst = _APIaddr;
-	p->set_dst_ip_anno(IPAddress(_APIaddr));
-
-	ip->ip_tos = 0;
-	ip->ip_off = 0;
-	ip->ip_ttl = HLIM_DEFAULT;
-	_cksum = false;
-
-	ip->ip_sum = 0;
-#if HAVE_FAST_CHECKSUM && FAST_CHECKSUM_ALIGNED
-	if (_aligned)
-		ip->ip_sum = ip_fast_csum((unsigned char *)ip, sizeof(click_ip) >> 2);
-	else
-		ip->ip_sum = click_in_cksum((unsigned char *)ip, sizeof(click_ip));
-#elif HAVE_FAST_CHECKSUM
-	ip->ip_sum = ip_fast_csum((unsigned char *)ip, sizeof(click_ip) >> 2);
-#else
-	ip->ip_sum = click_in_cksum((unsigned char *)ip, sizeof(click_ip));
-#endif
-
-	p->set_ip_header(ip, sizeof(click_ip));
-
-	// set up UDP header
-	udp->uh_sport = sport;
-	udp->uh_dport = dport;
-
-	uint16_t len = p->length() - sizeof(click_ip);
-	udp->uh_ulen = htons(len);
-	udp->uh_sum = 0;
-	if (_cksum) {
-		unsigned csum = click_in_cksum((unsigned char *)udp, len);
-		udp->uh_sum = click_in_cksum_pseudohdr(csum, ip, len);
-	}
-
-	return p;
+	return p_in;
 }
 
 
@@ -1213,7 +1122,7 @@ void XTRANSPORT::Xsocket(unsigned short _sport) {
 
 	// (for Ack purpose) Reply with a packet with the destination port=source port
 	ReturnResult(_sport, xia::XSOCKET, 0);
-	// output(DATA_PORT).push(UDPIPEncap(p_in,_sport,_sport));
+	// output(API_PORT).push(UDPIPPrep(p_in,_sport));
 }
 
 /*
@@ -1286,7 +1195,7 @@ void XTRANSPORT::Xgetsockopt(unsigned short _sport) {
 	xia_socket_msg.SerializeToString(&p_buf);
 
 	WritablePacket *reply = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
-	output(DATA_PORT).push(UDPIPEncap(reply, _sport, _sport));
+	output(API_PORT).push(UDPIPPrep(reply, _sport));
 }
 
 void XTRANSPORT::Xbind(unsigned short _sport) {
@@ -1498,7 +1407,7 @@ void XTRANSPORT::Xconnect(unsigned short _sport)
 	//click_chatter("\nbound to %s\n",portToDAGinfo.get_pointer(_sport)->src_path.unparse().c_str());
 
 	// (for Ack purpose) Reply with a packet with the destination port=source port
-	//output(DATA_PORT).push(UDPIPEncap(p_in,_sport,_sport));
+	//output(API_PORT).push(UDPIPPrep(p_in,_sport));
 }
 
 void XTRANSPORT::Xaccept(unsigned short _sport)
@@ -1590,7 +1499,7 @@ void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport)
 	std::string p_buf1;
 	_Response.SerializeToString(&p_buf1);
 	WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
-	output(DATA_PORT).push(UDPIPEncap(reply, _sport, _sport));
+	output(API_PORT).push(UDPIPPrep(reply, _sport));
 }
 
 void XTRANSPORT::Xupdatenameserverdag(unsigned short _sport)
@@ -1615,7 +1524,7 @@ void XTRANSPORT::Xreadnameserverdag(unsigned short _sport)
 	std::string p_buf1;
 	_Response.SerializeToString(&p_buf1);
 	WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
-	output(DATA_PORT).push(UDPIPEncap(reply, _sport, _sport));
+	output(API_PORT).push(UDPIPPrep(reply, _sport));
 }
 
 void XTRANSPORT::Xisdualstackrouter(unsigned short _sport)
@@ -1628,7 +1537,7 @@ void XTRANSPORT::Xisdualstackrouter(unsigned short _sport)
 	std::string p_buf1;
 	_Response.SerializeToString(&p_buf1);
 	WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
-	output(DATA_PORT).push(UDPIPEncap(reply, _sport, _sport));
+	output(API_PORT).push(UDPIPPrep(reply, _sport));
 }
 
 void XTRANSPORT::Xgetpeername(unsigned short _sport)
@@ -1644,7 +1553,7 @@ void XTRANSPORT::Xgetpeername(unsigned short _sport)
 	std::string p_buf1;
 	_xsm.SerializeToString(&p_buf1);
 	WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
-	output(DATA_PORT).push(UDPIPEncap(reply, _sport, _sport));
+	output(API_PORT).push(UDPIPPrep(reply, _sport));
 }
 					
 
@@ -1661,7 +1570,7 @@ void XTRANSPORT::Xgetsockname(unsigned short _sport)
 	std::string p_buf1;
 	_xsm.SerializeToString(&p_buf1);
 	WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
-	output(DATA_PORT).push(UDPIPEncap(reply, _sport, _sport));
+	output(API_PORT).push(UDPIPPrep(reply, _sport));
 }
 
 
@@ -2065,7 +1974,7 @@ void XTRANSPORT::XgetChunkStatus(unsigned short _sport)
 	xia_socket_msg.SerializeToString(&p_buf);
 
 	WritablePacket *reply = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
-	output(DATA_PORT).push(UDPIPEncap(reply, _sport, _sport));
+	output(API_PORT).push(UDPIPPrep(reply, _sport));
 }
 
 void XTRANSPORT::XreadChunk(unsigned short _sport)
@@ -2130,7 +2039,7 @@ void XTRANSPORT::XreadChunk(unsigned short _sport)
 			if (DEBUG)
 				click_chatter("Sent packet to socket: sport %d dport %d", _sport, _sport);
 
-			output(DATA_PORT).push(UDPIPEncap(p2, _sport, _sport));
+			output(API_PORT).push(UDPIPPrep(p2, _sport));
 
 			it2->second->kill();
 			daginfo->XIDtoCIDresponsePkt.erase(it2);
@@ -2184,7 +2093,7 @@ void XTRANSPORT::XremoveChunk(unsigned short _sport)
 	std::string p_buf1;
 	_socketResponse.SerializeToString(&p_buf1);
 	WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
-	output(DATA_PORT).push(UDPIPEncap(reply, _sport, _sport));
+	output(API_PORT).push(UDPIPPrep(reply, _sport));
 }
 
 void XTRANSPORT::XputChunk(unsigned short _sport)
@@ -2281,7 +2190,7 @@ void XTRANSPORT::XputChunk(unsigned short _sport)
 	std::string p_buf1;
 	_socketResponse.SerializeToString(&p_buf1);
 	WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
-	output(DATA_PORT).push(UDPIPEncap(reply, _sport, _sport));
+	output(API_PORT).push(UDPIPPrep(reply, _sport));
 }
 
 CLICK_ENDDECLS

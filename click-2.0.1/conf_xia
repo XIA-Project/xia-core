@@ -1,0 +1,7 @@
+#!/bin/sh
+
+if [ ! -f .configured ] ; then
+	echo Configuring Click.....
+	./configure --disable-linuxmodule --enable-warp9 --enable-user-multithread --enable-userlevel --enable-multithread=24  --enable-ip6 --enable-ipsec "$*"
+	touch .configured
+fi

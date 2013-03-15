@@ -1,0 +1,14 @@
+require(library ../../../click/conf/xia_router_lib.click);
+require(library xia_address.click);
+
+// host instantiation
+$HNAME :: XIAEndHost (RE $ADNAME $HID, $HID, fake0, 172.0.0.2, 172.0.0.1, 01:11:11:11:11:11, 0, $MAC0);
+
+######
+sock::Socket("TCP",$SOCK_IP, $PORT, CLIENT $CLIENT) -> [0]${HNAME}[0] -> sock;
+######
+FromDevice($IFACE, PROMISC true) -> [0]${HNAME}[0] -> ToDevice($IFACE);
+######
+
+	ControlSocket(tcp, 7777);
+

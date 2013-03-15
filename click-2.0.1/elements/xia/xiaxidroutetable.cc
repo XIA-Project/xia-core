@@ -437,18 +437,19 @@ XIAXIDRouteTable::push(int in_ether_port, Packet *p)
 	}
 
     if(in_ether_port == REDIRECT) {
-	  // if this is an XCMP redirect packet
-	  port = process_xcmp_redirect(p);
+        // if this is an XCMP redirect packet
+        process_xcmp_redirect(p);
+        p->kill();
+        return;
     } else {    
     	port = lookup_route(in_ether_port, p);
     }
 
     if(port == in_ether_port && in_ether_port !=DESTINED_FOR_LOCALHOST && in_ether_port !=DESTINED_FOR_DISCARD) { // need to inform XCMP that this is a redirect
-	  // ports 4 and 5 are "local" and "discard" so we shouldn't send a redirect in that case
+	  // "local" and "discard" shouldn't send a redirect
 	  Packet *q = p->clone();
 	  SET_XIA_PAINT_ANNO(q, (XIA_PAINT_ANNO(q)+TOTAL_SPECIAL_CASES)*-1);
-	  assert(0);
-	  output(1).push(q); // This is not right....
+	  output(4).push(q); 
     }
     if (port >= 0) {
 	  SET_XIA_PAINT_ANNO(p,port);
@@ -491,32 +492,27 @@ XIAXIDRouteTable::process_xcmp_redirect(Packet *p)
 {
    XIAHeader hdr(p->xia_header());
    const uint8_t *pay = hdr.payload();
-   XID *newroute;
-   XIAHeader *badhdr;
-   newroute = new XID((const struct click_xia_xid &)(pay[4]));
-   badhdr = new XIAHeader((const struct click_xia*)(&pay[4+sizeof(struct click_xia_xid)]));
-   //XIAHeader xiah(badhdr);
-
-   XIAPath dst_path = badhdr->dst_path();
-   XID dst_xid = dst_path.xid(dst_path.destination_node());
+   XID *dest, *newroute;
+   dest = new XID((const struct click_xia_xid &)(pay[4]));
+   newroute = new XID((const struct click_xia_xid &)(pay[4+sizeof(struct click_xia_xid)]));
 
    // route update (dst, out, newroute, )
-   HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(dst_xid);
-   if (it != _rts.end())
-   {
+   HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(*dest);
+   if (it != _rts.end()) {
    	(*it).second->nexthop = newroute;
-   }
-   else
-   {
-    	// Make a new entry for this XID
-       	XIARouteData *xrd1 = new XIARouteData();
-	xrd1->port = _rtdata.port;
-	xrd1->nexthop = newroute;
-	_rts[dst_xid] = xrd1;
-   }   
+   } else {
+       // Make a new entry for this XID
+       XIARouteData *xrd1 = new XIARouteData();
 
-   //delete newroute;
-   delete badhdr;
+       int port = _rtdata.port;
+       if(strstr(_local_addr.unparse().c_str(), dest->unparse().c_str())) {
+           port = DESTINED_FOR_LOCALHOST;
+       }
+
+       xrd1->port = port;
+       xrd1->nexthop = newroute;
+       _rts[*dest] = xrd1;
+   }
    
    return -1;
 }

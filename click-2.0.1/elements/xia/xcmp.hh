@@ -65,6 +65,22 @@ class XCMP : public Element { public:
     // ICMP-style checksum
     u_short in_cksum(u_short *, int);
     
+    void sendUp(Packet *p_in);
+    void sendXCMPPacket(Packet *p_in, int type, int code, click_xia_xid*, click_xia_xid*);
+
+    void processBadForwarding(Packet *p_in);
+    void processUnreachable(Packet *p_in);
+    void processExpired(Packet *p_in);
+
+    void gotPing(Packet *p_in);
+    void gotPong(Packet *p_in);
+    void gotExpired(Packet *p_in);
+    void gotUnreachable(Packet *p_in);
+    void gotRedirect(Packet *p_in);
+
+    bool processPacket(Packet *p_in);
+    void gotXCMPPacket(Packet *p_in);
+
     // source XIAPath of the local host
     XIAPath _src_path;
 };
