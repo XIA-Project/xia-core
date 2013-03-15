@@ -27,7 +27,7 @@ Release 1.0
 * The XIA directory tree has been reorganized to group related components together (applications, experiments, apis, etc) rather than scatter them throughout the tree.
 * Makefiles are improved so that XIA can be built statically or dynamically or with debug flags with a single make command instead of requireing hand edits to different files.
 * Upgraded to click version 2.0.1.
-* Added capability to build statically linked version of XIA for use on networks such as PlanetLab where building XIA is not possible.
+* Added capability to build statically linked version of XIA for use on networks such as PlanetLab.
 * Setting up an XIA network is more automated, for example, most nodes can be brought up with a single command.
 * Communication between the application level and Click has been changed so that root access is no longer requried to run XIA. This allows XIA to be used on PlanetLab nodes where root access is not available.
 * XIA now works on the latest releases of Fedora and Ubuntu.
