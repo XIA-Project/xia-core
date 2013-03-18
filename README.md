@@ -33,7 +33,3 @@ Release 1.0
 * XIA now works on the latest releases of Fedora and Ubuntu.
 * Various bug fixes.
 
-Related Projects
-----------------
-- [XIA Wireshark plugin](https://github.com/cjdoucette/wireshark-xia)
-- [Native Linux implementation of XIA](https://github.com/AltraMayor/XIA-for-Linux)
