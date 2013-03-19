@@ -135,7 +135,7 @@ def makeXIAAddrConfig(hid):
 
         f = open(xia_addr, "w")
 
-    except Exception as e:
+    except Exception, e:
         print "error opening file for reading and/or writing:\n%s" % e
         sys.exit(-1)
 
@@ -168,7 +168,7 @@ def makeHostConfig(hid):
 
         f = open(hostconfig, "w")
 
-    except Exception as e:
+    except Exception, e:
         print "error opening file for reading and/or writing\n%s" % e
         sys.exit(-1)
 
@@ -236,7 +236,7 @@ def makeRouterConfig(ad, hid):
 
         f = open(routerconfig, "w")
 
-    except Exception as e:
+    except Exception, e:
         print 'error opening file for reading and/or writing:\n%s' % e
         sys.exit(-1)
 

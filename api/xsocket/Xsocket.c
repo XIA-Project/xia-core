@@ -77,11 +77,11 @@ int Xsocket(int family, int transport_type, int protocol)
 		return -1;
 	}
 
-	if (transport_type & SOCK_NONBLOCK || transport_type & SOCK_CLOEXEC) {
+	/*if (transport_type & SOCK_NONBLOCK || transport_type & SOCK_CLOEXEC) {
 		LOG("error: invalid flags passed as part of the treansport_type");
 		errno = EINVAL;
 		return -1;
-	}
+		}*/
 
 	switch (transport_type) {
 		case SOCK_STREAM:

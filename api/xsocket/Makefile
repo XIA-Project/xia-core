@@ -3,7 +3,6 @@ include ../../xia.mk
 .PHONY: clean doc test
 
 CFLAGS +=-c -Iminini -fpic
-CFLAGS += -std=c++0x
 CPPFLAGS=$(CFLAGS)
 LDFLAGS +=-lprotobuf -lc -ldl
 
