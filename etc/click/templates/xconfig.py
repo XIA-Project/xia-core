@@ -469,7 +469,7 @@ def makeDualHostConfig(ad, hid, rhid):
         print "error opening file for reading and/or writing"
         sys.exit(-1)
 
-    (header, body, extra, footer) = text.split("######")
+    (header, socks, body, extra, footer) = text.split("######")
 
     tpl = Template(header)
 
@@ -522,8 +522,36 @@ def makeDualHostConfig(ad, hid, rhid):
     newtext = tpl.substitute(xchg)
 
     i = 0
+    ##
+    ## SOCKS
+    ## (The router ports connected using click socket elements)
+    ##
+    if socket_ips_ports:
+        tpl = Template(socks)
+        for pair in [p.strip() for p in socket_ips_ports.split(',')]:
+            if i > 4: # Make sure we go up to at most 4 ports
+                break
+
+            ip, port = pair.split(':')
+
+            xchg['SOCK_IP'] = ip
+            xchg['PORT'] = int(port)
+            xchg['CLIENT'] = 'false' if ip == '0.0.0.0' else 'true'
+            xchg['NUM'] = i
+            i += 1
+
+            newtext += tpl.substitute(xchg)
+
+
+    ##
+    ## BODY
+    ## (The router ports connected to FromDevice/ToDevice)
+    ##
     tpl = Template(body)
+    start = i
     for (interface, mac, ip, gw, ext_ip) in xia_interfaces:
+        if i > 3: # Make sure we go up to at most 4 ports
+            break
         xchg['IFACE'] = xia_interfaces[i][0]
         xchg['MAC'] = xia_interfaces[i][1]
         xchg['NUM'] = i
@@ -531,20 +559,23 @@ def makeDualHostConfig(ad, hid, rhid):
 
         newtext += tpl.substitute(xchg)
 
-        if i >= 2:
-            break
-
     xchg['IFACE'] = ip_interface[0][0]
     xchg['MAC'] = ip_interface[0][1]
     xchg['NUM'] = 3
     newtext += tpl.substitute(xchg)
 
+    ##
+    ## EXTRA
+    ##
     tpl = Template(extra)
     while i < 2:
         xchg['NUM'] = i
         newtext += tpl.substitute(xchg)
         i += 1
 
+    ##
+    ## FOOTER
+    ## 
     tpl = Template(footer)
     newtext += tpl.substitute(xchg)
 
@@ -641,7 +672,21 @@ def makeDualRouterConfig(ad, rhid):
     ## SOCKS
     ## (The router ports connected using click socket elements)
     ##
+    if socket_ips_ports:
+        tpl = Template(socks)
+        for pair in [p.strip() for p in socket_ips_ports.split(',')]:
+            if i > 4: # Make sure we go up to at most 4 ports
+                break
 
+            ip, port = pair.split(':')
+
+            xchg['SOCK_IP'] = ip
+            xchg['PORT'] = int(port)
+            xchg['CLIENT'] = 'false' if ip == '0.0.0.0' else 'true'
+            xchg['NUM'] = i
+            i += 1
+
+            newtext += tpl.substitute(xchg)
 
 
 
@@ -649,16 +694,16 @@ def makeDualRouterConfig(ad, rhid):
     ## BODY
     ##
     tpl = Template(body)
+    start = i
     for (interface, mac, ip, gw, ext_ip) in xia_interfaces:
+        if i > 4: # Make sure we go up to at most 4 ports
+            break
         xchg['IFACE'] = xia_interfaces[i][0]
         xchg['MAC'] = xia_interfaces[i][1]
         xchg['NUM'] = i
         i += 1
 
         newtext += tpl.substitute(xchg)
-
-        if i >= 3:
-            break
 
     xchg['IFACE'] = ip_interface[0][0]
     xchg['MAC'] = ip_interface[0][1]
