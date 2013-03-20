@@ -199,8 +199,6 @@ int main(int argc, char **argv)
 		struct timeval timeout;
 		int fdmask = 1 << s;
 
-printf("in loop\n");
-
 		timeout.tv_sec = 0;
 		timeout.tv_usec = 10000;
 
