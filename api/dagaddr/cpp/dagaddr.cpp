@@ -247,9 +247,9 @@ std::string
 Node::id_string() const
 {
 	std::string xid_string;
-	char *xid = (char*)malloc(sizeof(char) * 2 * Node::ID_LEN);
+	char *xid = (char*)malloc(sizeof(char) * 2 * Node::ID_LEN + 1);
 	for (std::size_t j = 0; j < Node::ID_LEN; j++)
-		sprintf(&xid[2*j], "%02x", id()[j]);
+		snprintf(&xid[2*j], 3, "%02x", id()[j]);
 	xid_string += xid;
 	free(xid);
 	return xid_string;
