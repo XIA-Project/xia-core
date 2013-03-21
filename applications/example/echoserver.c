@@ -262,7 +262,7 @@ void echo_dgram()
 	int sock;
 	char buf[XIA_MAXBUF];
 	sockaddr_x cdag;
-	size_t dlen;
+	socklen_t dlen;
 	int n;
 
 	say("Datagram service started\n");

@@ -94,7 +94,7 @@
 {
     $1 = (int) PyLong_AsLong($input);  /*TODO: There's no reason to mess with "flags", but we need at least one python input. Better way? */
     $2 = (struct sockaddr *)malloc(sizeof(sockaddr_x));
-    $3 = (size_t*)malloc(sizeof(socklen_t));
+    $3 = (socklen_t*)malloc(sizeof(socklen_t));
 
     *$3 = sizeof(sockaddr_x);
 }
@@ -103,7 +103,7 @@
 {
     $1 = (int) PyLong_AsLong($input);
     $2 = (struct sockaddr *)calloc(1, sizeof(sockaddr_x));
-    $3 = (size_t*)malloc(sizeof(socklen_t));
+    $3 = (socklen_t*)malloc(sizeof(socklen_t));
 
     *$3 = sizeof(sockaddr_x);
 }
@@ -112,7 +112,7 @@
 {
     $1 = PyString_AsString($input);
     $2 = (sockaddr_x*)calloc(1, sizeof(sockaddr_x));
-    $3 = (size_t*)malloc(sizeof(socklen_t));
+    $3 = (socklen_t*)malloc(sizeof(socklen_t));
 
     *$3 = sizeof(sockaddr_x);
 }

@@ -28,7 +28,7 @@
 int main()
 {
     int sock;
-    size_t len;
+    socklen_t len;
     char buf[XIA_MAXBUF];
 	sockaddr_x client;
 	time_t now;

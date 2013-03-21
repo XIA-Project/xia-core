@@ -178,7 +178,7 @@ int main(int argc, char **argv)
 	}
 	
 	Graph g(&whereto);
-	printf("PING %s: %d data bytes\n", g.dag_string().c_str(), datalen);
+	printf("PING %s: %ld data bytes\n", g.dag_string().c_str(), datalen);
 
 	setlinebuf( stdout );
 
@@ -194,7 +194,7 @@ int main(int argc, char **argv)
 
 	for (;;) {
 		int len = sizeof (packet);
-		size_t fromlen = sizeof (from);
+		socklen_t fromlen = sizeof (from);
 		int cc;
 		struct timeval timeout;
 		int fdmask = 1 << s;
