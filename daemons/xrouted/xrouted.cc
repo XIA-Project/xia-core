@@ -571,7 +571,8 @@ void initRouteState()
 int main(int argc, char *argv[])
 {
 	int rc, selectRetVal, n;
-    	size_t dlen, found, start;
+    	size_t found, start;
+    	socklen_t dlen;
     	char recv_message[1024];
     	sockaddr_x theirDAG;   
     	fd_set socks;
