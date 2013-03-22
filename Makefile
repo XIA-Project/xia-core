@@ -7,8 +7,8 @@ CLEANDIRS=$(addsuffix .build, $(MAKEDIRS))
 # list of directories with automated tests that should be run
 TESTDIRS=$(addsuffix .test, api)
 
-#set number of procs == (2 * actual processors)
-NPROCS=$(shell echo `grep -c ^processor /proc/cpuinfo`\*2 | bc)
+#set num of procs for parallel builds
+NPROCS=$(shell grep -c ^processor /proc/cpuinfo)
 
 .PHONY: all config clean test $(MAKEDIRS) $(CLEANDIRS) $(TESTDIRS)
 
