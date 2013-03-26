@@ -123,10 +123,10 @@ elementclass XIALineCard {
 	input[1] -> xarpq;
     
 	// On receiving a packet from interface
-	input[0] -> print_in -> c;
+	input[0] -> c;
     
     // Receiving an XIA packet
-    c[2] -> Strip(14) -> MarkXIAHeader() -> XIAPaint($num) -> [1]output; // this should send out to [0]n; 
+    c[2] -> Strip(14) -> MarkXIAHeader() -> XIAPaint($num) -> print_in -> [1]output; // this should send out to [0]n; 
 
     // On receiving ARP response
     c[1] -> [1]xarpq -> toNet;
