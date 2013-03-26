@@ -703,7 +703,7 @@ Graph::is_final_intent(const Node& n)
 		if (nodes_[i] == n) return is_sink(i);
 	}
 	
-	printf("Warning: is_final_intent: supplied node not found in DAG\n");
+	printf("Warning: is_final_intent: supplied node not found in DAG: %s\n", n.id_string().c_str());
 	return false;
 }
 
@@ -719,12 +719,19 @@ Graph::is_final_intent(const Node& n)
 bool
 Graph::is_final_intent(const std::string xid_string)
 {
+	std::string xid_str = xid_string;
+	// if the string includes the "<type>:", cut it off
+	if (xid_string.find(":") != std::string::npos)
+	{
+	    xid_str = split(xid_string, ':')[1];
+	}
+
 	for (std::size_t i = 0; i < nodes_.size(); i++)
 	{
-		if (nodes_[i].id_string() == xid_string) return is_final_intent(nodes_[i]);
+		if (nodes_[i].id_string() == xid_str) return is_final_intent(nodes_[i]);
 	}
 	
-	printf("Warning: is_final_intent: supplied node not found in DAG\n");
+	printf("Warning: is_final_intent: supplied node not found in DAG: %s\n", xid_str.c_str());
 	return false;
 }
 	
@@ -842,12 +849,19 @@ Graph::next_hop(const Node& n)
 Graph 
 Graph::next_hop(const std::string xid_string)
 {
+	std::string xid_str = xid_string;
+	// if the string includes the "<type>:", cut it off
+	if (xid_string.find(":") != std::string::npos)
+	{
+	    xid_str = split(xid_string, ':')[1];
+	}
+
 	for (std::size_t i = 0; i < nodes_.size(); i++)
 	{
-		if (nodes_[i].id_string() == xid_string) return next_hop(nodes_[i]);
+		if (nodes_[i].id_string() == xid_str) return next_hop(nodes_[i]);
 	}
 	
-	printf("Warning: is_final_intent: supplied node not found in DAG\n");
+	printf("Warning: next_hop: supplied node not found in DAG: %s\n", xid_str.c_str());
 	return Graph();
 
 }
