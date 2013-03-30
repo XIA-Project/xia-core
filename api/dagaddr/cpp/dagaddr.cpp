@@ -321,7 +321,8 @@ Graph::Graph(std::string dag_string)
 	}
 	else
 	{
-		printf("WARNING: dag_string must be in either DAG or RE forma\n");
+		printf("WARNING: dag_string must be in either DAG or RE format. Returning empty Graph.\n");
+		add_node(Node());
 	}
 }
 	
