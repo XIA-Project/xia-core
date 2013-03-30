@@ -27,7 +27,7 @@
 #include <click/packet_anno.hh>
 CLICK_DECLS
 
-#define DEBUG 1
+#define DEBUG 0
 
 // no initialization needed
 XCMP::XCMP()
