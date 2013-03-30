@@ -27,7 +27,7 @@
 #include <click/packet_anno.hh>
 CLICK_DECLS
 
-#define DEBUG 0
+#define DEBUG 1
 
 // no initialization needed
 XCMP::XCMP()
@@ -75,52 +75,48 @@ XCMP::sendUp(Packet *p_in) {
 
 // create and send XCMP packet with the following params. _addr_ is used for redirects.
 void
-XCMP::sendXCMPPacket(Packet *p_in, int type, int code, click_xia_xid *lastaddr, click_xia_xid *nxthop) {
+XCMP::sendXCMPPacket(const Packet *p_in, int type, int code, click_xia_xid *lastaddr, click_xia_xid *nxthop) {
 
     const XIAHeader hdr(p_in);
     const size_t xs = sizeof(struct click_xia_xcmp);
-    size_t xlen;
-    if (type==0) 
+    size_t xlen = xs+sizeof(struct click_xia_xid)*2+hdr.hdr_size()+8;
+
+    // make enough room for payload
+    if (type==0 && xlen< xs+hdr.plen()) 
         xlen = xs+hdr.plen();
-    else 
-        xlen = xs+sizeof(struct click_xia_xid)+hdr.hdr_size()+8;
 
     assert(xlen<1500);
-
     char* msg = new char[xlen];
-    struct click_xia_xcmp *xcmph = reinterpret_cast<struct click_xia_xcmp *>(msg);
-    xcmph->type = type; 
-    xcmph->code = code;
-
 
     if(type == 0) { // pong
         // copy the data from the ping (ie. we need the seq num and ID,
         // so the sender can figure out what ping our pong refers to)
-        memcpy(sizeof(struct click_xia_xcmp) + msg, hdr.payload(), xlen);
-    } else {
-        // copy the correct route redirect address into the packet if needed
-        if(lastaddr && nxthop) {
-            memcpy(&msg[xs], lastaddr, sizeof(struct click_xia_xid));
-            memcpy(&msg[xs+sizeof(struct click_xia_xid)], nxthop, sizeof(struct click_xia_xid));
-        }
-
-        // copy in the XIA header and the first 8 bytes of the datagram.
-        // strictly speaking, this first 8 bytes don't get us anything,
-        // but for the sake of similarity to ICMP we include them.
-        memcpy(&msg[xs+sizeof(struct click_xia_xid)*2], hdr.hdr(), hdr.hdr_size()); // copy XIP header
-        memcpy(&msg[xs+sizeof(struct click_xia_xid)*2+hdr.hdr_size()], 
-                hdr.payload(), 8); // copy first 8 bytes of datagram
-
+        memcpy(msg, hdr.payload(), hdr.plen());
+    }
+ 
+    // copy the correct route redirect address into the packet if needed
+    if(lastaddr && nxthop) {
+	memcpy(&msg[xs], lastaddr, sizeof(struct click_xia_xid));
+	memcpy(&msg[xs+sizeof(struct click_xia_xid)], nxthop, sizeof(struct click_xia_xid));
     }
 
+    // copy in the XIA header and the first 8 bytes of the datagram.
+    // strictly speaking, this first 8 bytes don't get us anything,
+    // but for the sake of similarity to ICMP we include them.
+    memcpy(&msg[xs+sizeof(struct click_xia_xid)*2], hdr.hdr(), hdr.hdr_size()); // copy XIP header
+    memcpy(&msg[xs+sizeof(struct click_xia_xid)*2+hdr.hdr_size()], 
+	       hdr.payload(), 8); // copy first 8 bytes of datagram
+
+    struct click_xia_xcmp *xcmph = reinterpret_cast<struct click_xia_xcmp *>(msg);
+    xcmph->type = type; 
+    xcmph->code = code;
+    xcmph->cksum = 0;
     // update the checksum
     uint16_t checksum = in_cksum((u_short *)msg, xlen);
     xcmph->cksum = checksum;
 		
     // create a packet to store the message in
     WritablePacket *p = Packet::make(256, msg, xlen, 0);
-    delete[] msg;
-    msg = NULL;
 		
     // encapsulate the packet within XCMP
     XIAHeaderEncap encap;
@@ -133,6 +129,9 @@ XCMP::sendXCMPPacket(Packet *p_in, int type, int code, click_xia_xid *lastaddr, 
 
     // send the packet out to the network
     output(0).push(encap.encap(p));
+
+    delete[] msg;
+    msg = NULL;
 
     return;
 }
@@ -219,8 +218,8 @@ XCMP::processExpired(Packet *p_in) {
 
 // receive a ping and send a pong back to the sender
 void
-XCMP::gotPing(Packet *p_in) {
-    XIAHeader hdr(p_in);
+XCMP::gotPing(const Packet *p_in) {
+    const XIAHeader hdr(p_in);
     if(DEBUG)
         click_chatter("%s: %u: PING received; client seq = %u\n", _src_path.unparse().c_str(), 
                       p_in->timestamp_anno().usecval(), *(uint16_t*)(hdr.payload() + 6));
