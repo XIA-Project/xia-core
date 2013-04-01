@@ -669,6 +669,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 					//printf("(%s) Accept Received data (now expected seq=%d)\n", (_local_addr.unparse()).c_str(), daginfo->expected_seqnum);
 				} else {
 					sendToApplication = false;
+					printf("expected sequence # %d, received %d\n", daginfo->expected_seqnum, thdr.seq_num());
 					printf("(%s) Discarded Received data\n", (_local_addr.unparse()).c_str());
 				}
 
