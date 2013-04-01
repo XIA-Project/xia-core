@@ -176,7 +176,7 @@ XCMP::processUnreachable(Packet *p_in) {
     }
 
 
-    String broadcast_xid("HID:1111111111111111111111111111111111111111");  // broadcast HID
+    String broadcast_xid(BHID);  // broadcast HID
     XID bcast_xid;
     bcast_xid.parse(broadcast_xid);    
 

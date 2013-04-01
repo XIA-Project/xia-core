@@ -56,8 +56,6 @@ Just a simple port to a click element
 #define LSA 1
 #define HOST_REGISTER 2
 
-
-#define BHID "HID:1111111111111111111111111111111111111111"
 #define SID_XROUTE "SID:1110000000000000000000000000000000001112"
 
 typedef struct {
