@@ -1,0 +1,46 @@
+<?xml version="1.0" ?>
+<Topology>
+  <Servers>
+    <BeaconServer>
+      <AddrType>SCION</AddrType>
+      <Addr>11111</Addr>
+    </BeaconServer>
+    <PathServer>
+      <AddrType>SCION</AddrType>
+      <Addr>22222</Addr>
+    </PathServer>
+    <CertificateServer>
+      <AddrType>SCION</AddrType>
+      <Addr>33333</Addr>
+    </CertificateServer>
+  </Servers>
+  <BorderRouters>
+    <Router>
+      <AddrType>SCION</AddrType>
+      <Addr>1111</Addr>
+      <Interface>
+        <IFID>10</IFID>
+        <NeighborAD>2</NeighborAD>
+        <NeighborType>CHILD</NeighborType>
+      </Interface>
+    </Router>	
+    <Router>
+      <AddrType>SCION</AddrType>
+      <Addr>2222</Addr>
+      <Interface>
+        <IFID>11</IFID>
+        <NeighborAD>3</NeighborAD>
+        <NeighborType>CHILD</NeighborType>
+      </Interface>
+    </Router>	
+  </BorderRouters>
+  <Clients>
+    <Client>
+      <AddrType>SCION</AddrType>
+      <Addr>44444</Addr>
+    </Client>
+  </Clients>
+</Topology>
+
+
+

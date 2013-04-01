@@ -63,7 +63,7 @@ String
 XID::unparse() const
 {
     const unsigned char *p = _xid.id;
-    char buf[48];
+    char buf[100];
     char *c = buf;
     switch (ntohl(_xid.type)) {
         case CLICK_XIA_XID_TYPE_UNDEF:
@@ -83,7 +83,16 @@ XID::unparse() const
            break;
         case CLICK_XIA_XID_TYPE_IP:
            c += sprintf(c, "IP");
-	   break;
+           break;
+        case CLICK_XIA_XID_TYPE_XION:
+           c += sprintf(c, "XION");
+           break;
+        case CLICK_XIA_XID_TYPE_XION_:
+           c += sprintf(c, "XION_");
+           break;
+        case CLICK_XIA_XID_TYPE_XION_UNRESOLV:
+           c += sprintf(c, "XION_UNRESOLV");
+           break;
         default:
            c += sprintf(c, "%x", _xid.type);
     }

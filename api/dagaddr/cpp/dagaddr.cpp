@@ -33,6 +33,9 @@ const std::string Node::XID_TYPE_HID_STRING = "HID";
 const std::string Node::XID_TYPE_CID_STRING = "CID";
 const std::string Node::XID_TYPE_SID_STRING = "SID";
 const std::string Node::XID_TYPE_IP_STRING = "IP";
+const std::string Node::XID_TYPE_XION_STRING = "XION";
+const std::string Node::XID_TYPE_XION__STRING = "XION_";
+const std::string Node::XID_TYPE_XION_UNRESOLV_STRING = "XION_UNRESOLV";
 
 
 /**
@@ -141,6 +144,30 @@ Node::~Node()
 	release();
 }
 
+Graph Node::XIONNode(const std::string xion_string) {
+  std::size_t ID_LEN_CHAR = ID_LEN * 2;
+  std::vector<std::string> xid_elems = split(xion_string, ':');
+  int xid_length = xid_elems[1].length();
+  int block_count = xid_length / ID_LEN_CHAR;
+  if (xid_length % ID_LEN_CHAR) {
+    block_count++;
+  }
+  std::vector<Node> nodes;
+  for (int i=0; i<block_count; i++) {
+    std::string tmp_id = xid_elems[1].substr(i * ID_LEN_CHAR, ID_LEN_CHAR);
+    if (tmp_id.length() < ID_LEN_CHAR)
+      tmp_id.resize(ID_LEN_CHAR, '0');
+    if (i)
+      nodes.push_back(Node("XION_", tmp_id));
+    else
+      nodes.push_back(Node("XION", tmp_id));
+  }
+  Graph rtn = Node();
+  for (std::vector<Node>::iterator it=nodes.begin(); it != nodes.end(); ++it)
+    rtn *= (*it);
+  return rtn;
+}
+
 Node&
 Node::operator=(const Node& r)
 {
@@ -193,6 +220,12 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 		ptr_->type = XID_TYPE_SID;
 	else if (type_str == XID_TYPE_IP_STRING)
 		ptr_->type = XID_TYPE_IP;
+	else if (type_str == XID_TYPE_XION_STRING)
+		ptr_->type = XID_TYPE_XION;
+	else if (type_str == XID_TYPE_XION__STRING)
+		ptr_->type = XID_TYPE_XION_;
+	else if (type_str == XID_TYPE_XION_UNRESOLV_STRING)
+		ptr_->type = XID_TYPE_XION_UNRESOLV;
 	else
 		ptr_->type = 0;
 
@@ -229,6 +262,12 @@ Node::type_string() const
 			return XID_TYPE_SID_STRING;
 		case XID_TYPE_IP:
 			return XID_TYPE_IP_STRING;
+		case XID_TYPE_XION:
+			return XID_TYPE_XION_STRING;
+		case XID_TYPE_XION_:
+			return XID_TYPE_XION__STRING;
+		case XID_TYPE_XION_UNRESOLV:
+			return XID_TYPE_XION_UNRESOLV_STRING;
 		default:
 			return XID_TYPE_UNKNOWN_STRING;
 	}

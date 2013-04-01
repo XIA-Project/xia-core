@@ -18,6 +18,9 @@ public:
 	static const int XID_TYPE_CID = 0x12;
 	static const int XID_TYPE_SID = 0x13;
 	static const int XID_TYPE_IP = 0x14;
+	static const int XID_TYPE_XION = 0x20;
+	static const int XID_TYPE_XION_ = 0x21;
+	static const int XID_TYPE_XION_UNRESOLV = 0x22;
 
 	static const std::string XID_TYPE_UNKNOWN_STRING;
 	static const std::string XID_TYPE_AD_STRING;
@@ -25,6 +28,9 @@ public:
 	static const std::string XID_TYPE_CID_STRING;
 	static const std::string XID_TYPE_SID_STRING;
 	static const std::string XID_TYPE_IP_STRING;
+	static const std::string XID_TYPE_XION_STRING;
+	static const std::string XID_TYPE_XION__STRING;
+	static const std::string XID_TYPE_XION_UNRESOLV_STRING;
 
 
 public:
@@ -36,6 +42,8 @@ public:
 	Node(const std::string node_string);
 
 	~Node();
+
+  static Graph XIONNode(const std::string xion_string);
 
 	const uint32_t& type() const { return ptr_->type; }
 	const unsigned char* id() const { return ptr_->id; }

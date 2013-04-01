@@ -1,0 +1,9 @@
+#!/bin/bash
+
+rm -rf ./TD1/TDC/AD1/*.log*
+
+for i in 2 3 4 5 6 7
+do
+    rm -rf ./TD1/Non-TDC/AD$i/*.log*
+done
+

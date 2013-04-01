@@ -1,0 +1,22 @@
+#!/bin/bash
+
+
+for i in 3 4 5 6 7
+do
+   rm TD1/Non-TDC/AD$i/beaconserver/certificates/*.crt
+done
+
+rm TD1/Non-TDC/AD3/certserver/certificates/td1-ad2-0.crt
+
+rm TD1/Non-TDC/AD4/certserver/certificates/td1-ad2-0.crt
+
+rm TD1/Non-TDC/AD5/certserver/certificates/td1-ad2-0.crt
+rm TD1/Non-TDC/AD5/certserver/certificates/td1-ad3-0.crt
+rm TD1/Non-TDC/AD5/certserver/certificates/td1-ad4-0.crt
+
+rm TD1/Non-TDC/AD6/certserver/certificates/td1-ad2-0.crt
+rm TD1/Non-TDC/AD6/certserver/certificates/td1-ad3-0.crt
+
+rm TD1/Non-TDC/AD7/certserver/certificates/td1-ad2-0.crt
+rm TD1/Non-TDC/AD7/certserver/certificates/td1-ad4-0.crt
+#cp ./rsa/*cert.pem ./AD1/certserver/certificates/

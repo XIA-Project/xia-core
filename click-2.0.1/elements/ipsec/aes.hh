@@ -51,6 +51,8 @@ class Aes : public Element {
 
    Packet *simple_action(Packet *);
 
+#undef AES_DECRYPT
+#undef AES_ENCRYPT
    enum { AES_DECRYPT = 0, AES_ENCRYPT = 1 };
 
  private:

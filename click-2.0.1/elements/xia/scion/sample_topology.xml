@@ -1,0 +1,42 @@
+<?xml version="1.0" ?>
+<Topology>
+	<Servers>
+		<BeaconServer>12345</BeaconServer>
+		<PathServer>67890</PathServer>
+		<CertificateServer>99999</CertificateServer>
+	</Servers>
+	<BorderRouters>
+		<Router>
+			<AID>1111</AID>
+			<Interface>
+				<IFID>11</IFID>
+				<NeighborAD>111111</NeighborAD>
+				<NeighborType>PEER</NeighborType>
+			</Interface>
+			<Interface>
+				<IFID>12</IFID>
+				<NeighborAD>111112</NeighborAD>
+				<NeighborType>PARENT</NeighborType>
+			</Interface>
+		</Router>	
+		<Router>
+			<AID>2222</AID>
+			<Interface>
+				<IFID>21</IFID>
+				<NeighborAD>222221</NeighborAD>
+				<NeighborType>CHILD</NeighborType>
+			</Interface>
+			<Interface>
+				<IFID>22</IFID>
+				<NeighborAD>222222</NeighborAD>
+				<NeighborType>CHILD</NeighborType>
+			</Interface>
+		</Router>	
+    </BorderRouters>
+	<Gateways>
+		<Gateway>
+			<AID>9999</AID>
+			<Protocol>UNKNOWN</Protocol>
+		</Gateway>
+	</Gateways>
+</Topology>

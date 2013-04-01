@@ -31,7 +31,7 @@ elementclass XIAPacketRoute {
     // output[2]: could not route at all (tried all paths)
 	// output[3]: SID hack for DHCP functionality
 
-    c :: XIAXIDTypeClassifier(next AD, next HID, next SID, next CID, next IP, -);
+    c :: XIAXIDTypeClassifier(next AD, next HID, next SID, next CID, next IP, next XION, next XION_UNRESOLV, -);
 
     input -> consider_first_path :: XIASelectPath(first);
 
@@ -49,11 +49,13 @@ elementclass XIAPacketRoute {
 	GPRP[1] -> x[0] -> consider_first_path;
 
 	rt_AD, rt_HID, rt_SID, rt_CID, rt_IP :: XIAXIDRouteTable($local_addr, $num_ports);
-    c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, [2]output;
+  rt_XION, rt_XION_UNRESOLV :: XIAXIONRouteTable();
+    c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, rt_XION, rt_XION_UNRESOLV, [2]output;
 		
-    rt_AD[0], rt_HID[0], rt_SID[0], rt_CID[0], rt_IP[0] -> GPRP;		
+    rt_AD[0], rt_HID[0], rt_SID[0], rt_CID[0], rt_IP[0], rt_XION[0], rt_XION_UNRESOLV -> GPRP;		
     rt_AD[1], rt_HID[1], 			rt_CID[1], rt_IP[1] -> XIANextHop -> check_dest;
 			  			 rt_SID[1]			   			-> XIANextHop -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [1]output;
+    rt_XION[1], rt_XION_UNRESOLV[1] -> consider_first_path;
     rt_AD[2], rt_HID[2], rt_SID[2], rt_CID[2], rt_IP[2] -> consider_next_path;
 	rt_AD[3], rt_HID[3],            rt_CID[3], rt_IP[3] -> Discard;
 			  			 rt_SID[3]                      -> [3]output;

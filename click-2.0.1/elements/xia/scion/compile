@@ -1,0 +1,12 @@
+#!/bin/bash
+
+cd ../../
+
+#sudo make clean
+sudo make elemlist
+sudo make
+sudo make install
+cd ./elements/local
+#sudo click ./mytest2.click
+
+
