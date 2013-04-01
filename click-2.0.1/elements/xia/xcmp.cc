@@ -181,6 +181,10 @@ XCMP::processUnreachable(Packet *p_in) {
     bcast_xid.parse(broadcast_xid);    
 
     XIAPath dst_path = hdr.dst_path();
+    if (!dst_path.is_valid()) {
+        click_chatter("xcmp: discarding invalid path\n");
+        return;
+    }
     dst_path.remove_node(dst_path.destination_node());
     XID dst_hid = dst_path.xid(dst_path.destination_node());
     if(dst_hid == bcast_xid) {
