@@ -13,6 +13,7 @@ public:
 	static const std::size_t ID_LEN = 20;
 	
 	static const int XID_TYPE_UNKNOWN = 0;
+	static const int XID_TYPE_DUMMY_SOURCE = 0xff;
 	static const int XID_TYPE_AD = 0x10;  // TODO: why does swig complain when these are uint32_t?
 	static const int XID_TYPE_HID = 0x11;
 	static const int XID_TYPE_CID = 0x12;
@@ -20,6 +21,7 @@ public:
 	static const int XID_TYPE_IP = 0x14;
 
 	static const std::string XID_TYPE_UNKNOWN_STRING;
+	static const std::string XID_TYPE_DUMMY_SOURCE_STRING;
 	static const std::string XID_TYPE_AD_STRING;
 	static const std::string XID_TYPE_HID_STRING;
 	static const std::string XID_TYPE_CID_STRING;
@@ -65,7 +67,7 @@ private:
 	};
 
 	mutable container* ptr_;
-	static container undefined_;
+	static container dummy_source_;
 
 	void construct_from_strings(const std::string type_string, const std::string id_string);
 };
@@ -88,7 +90,7 @@ public:
 	Graph operator+(const Node& r) const;
 	
 	// TODO: should these be part of public interface?
-	std::size_t add_node(const Node& p);
+	std::size_t add_node(const Node& p, bool allow_duplicate_nodes = false);
 	void add_edge(std::size_t from_id, std::size_t to_id);
 
 	void print_graph() const;
@@ -113,7 +115,7 @@ protected:
 	std::size_t source_index() const;
 	std::size_t final_intent_index() const;
 
-	void merge_graph(const Graph& r, std::vector<std::size_t>& node_mapping);
+	void merge_graph(const Graph& r, std::vector<std::size_t>& node_mapping, bool allow_duplicate_nodes = false);
 	
 	std::string out_edges_for_index(std::size_t i, std::size_t source_index, std::size_t sink_index) const;
 	std::size_t index_in_dag_string(std::size_t index, std::size_t source_index, std::size_t sink_index) const;

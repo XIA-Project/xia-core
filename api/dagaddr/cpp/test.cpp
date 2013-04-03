@@ -67,7 +67,7 @@ int main()
 
 	printf("\n\n");
 	printf("g5 = g3 * (SID0 + SID1) * SID2\n");
-	Graph g5 = g3 * (Node(Node::XID_TYPE_SID, "0303030303030303030303030303030303030303") + Node(Node::XID_TYPE_SID, "0404040404040404040404040404040404040404"));// * Node(Node::XID_TYPE_SID, "0505050505050505050505050505050505050505");
+	Graph g5 = g3 * (Node(Node::XID_TYPE_SID, "0303030303030303030303030303030303030303") + Node(Node::XID_TYPE_SID, "0404040404040404040404040404040404040404")) * Node(Node::XID_TYPE_SID, "0505050505050505050505050505050505050505");
 	g5.print_graph();
 	printf("\n");
 	printf("%s\n\n", g5.dag_string().c_str());
@@ -76,6 +76,20 @@ int main()
 	Graph g5_prime = Graph(g5.dag_string());
 	g5_prime.print_graph();
 	printf("\n\n");
+
+	printf("g5_prime2 = Graph(g3)\n");
+	Graph g5_prime2 = Graph(g3);
+	printf("%s\n\n", g5_prime2.dag_string().c_str());
+	printf("g5_prime2 *= SID0\n");
+	g5_prime2 *= Node(Node::XID_TYPE_SID, "0303030303030303030303030303030303030303");
+	printf("%s\n\n", g5_prime2.dag_string().c_str());
+	printf("g5_double = g5 * g3\n");
+	Graph g5_double = g5 * g3;
+	printf("%s\n\n", g5_double.dag_string().c_str());
+
+
+
+
 
 	Node n_ad2(Node::XID_TYPE_AD, "0707070707070707070707070707070707070707");
 	Node n_hid2(Node::XID_TYPE_HID, "0808080808080808080808080808080808080808");
