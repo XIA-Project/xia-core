@@ -25,9 +25,39 @@
 #include <map>
 #include <algorithm>
 
-Node::container Node::undefined_ = {0, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", 0};
+
+static const std::size_t vector_find_npos = std::size_t(-1);
+
+template <typename T>
+static std::size_t
+vector_find(std::vector<T>& v, const T& e)
+{
+	for (std::size_t i = 0; i < v.size(); i++)
+		if (v[i] == e)
+			return i;
+	return vector_find_npos;
+}
+
+template <typename T>
+static std::size_t
+vector_push_back_unique(std::vector<T>& v, const T& e)
+{
+	std::size_t idx = vector_find(v, e);
+	if (idx == vector_find_npos)
+	{
+		idx = v.size();
+		v.push_back(e);
+	}
+	return idx;
+}
+
+
+
+
+Node::container Node::dummy_source_ = {0xff, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", 0};
 
 const std::string Node::XID_TYPE_UNKNOWN_STRING = "UNKNOWN";
+const std::string Node::XID_TYPE_DUMMY_SOURCE_STRING = "SOURCE";
 const std::string Node::XID_TYPE_AD_STRING = "AD";
 const std::string Node::XID_TYPE_HID_STRING = "HID";
 const std::string Node::XID_TYPE_CID_STRING = "CID";
@@ -38,11 +68,11 @@ const std::string Node::XID_TYPE_IP_STRING = "IP";
 /**
 * @brief Create a new empty node.
 *
-* Create a new empty node with type XID_TYPE_UNKNOWN and id 0. This is
+* Create a new empty node with type XID_TYPE_DUMMY_SOURCE and id 0. This is
 * 			commonly used to create the "dummy" source node.
 */
 Node::Node()
-	: ptr_(&undefined_)
+	: ptr_(&dummy_source_)
 {
 }
 
@@ -89,7 +119,7 @@ Node::Node(int type, const std::string id_str)
 	ptr_->ref_count = 1;
 	ptr_->type = type;
 
-	for (int i = 0; i < ID_LEN; i++)
+	for (std::size_t i = 0; i < ID_LEN; i++)
 	{
 		int num = stoi(id_str.substr(2*i, 2), 0, 16);
 		memcpy(&(ptr_->id[i]), &num, 1);
@@ -159,7 +189,7 @@ Node::equal_to(const Node& r) const
 void
 Node::acquire() const
 {
-	if (ptr_ == &undefined_)
+	if (ptr_ == &dummy_source_)
 		return;
 	++ptr_->ref_count;
 }
@@ -167,12 +197,12 @@ Node::acquire() const
 void
 Node::release() const
 {
-	if (ptr_ == &undefined_)
+	if (ptr_ == &dummy_source_)
 		return;
 	if (--ptr_->ref_count == 0)
 	{
 		delete ptr_;
-		ptr_ = &undefined_;
+		ptr_ = &dummy_source_;
 	}
 }
 
@@ -193,10 +223,12 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 		ptr_->type = XID_TYPE_SID;
 	else if (type_str == XID_TYPE_IP_STRING)
 		ptr_->type = XID_TYPE_IP;
+	else if (type_str == XID_TYPE_DUMMY_SOURCE_STRING)
+		ptr_->type = XID_TYPE_DUMMY_SOURCE;
 	else
 		ptr_->type = 0;
 
-	for (int i = 0; i < ID_LEN; i++)
+	for (std::size_t i = 0; i < ID_LEN; i++)
 	{
 		int num = stoi(id_str.substr(2*i, 2), 0, 16);
 		memcpy(&(ptr_->id[i]), &num, 1);
@@ -212,7 +244,8 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 *			\n Node::XID_TYPE_CID_STRING
 *			\n Node::XID_TYPE_SID_STRING
 *			\n Node::XID_TYPE_IP_STRING
-*			\n Node::XID_TYPE_UNKNOWN_STRING
+*			\n Node::XID_TYPE_DUMMY_SOURCE
+*			\n Node:: ID_TYPE_UNKNOWN_STRING
 */
 std::string
 Node::type_string() const
@@ -229,6 +262,8 @@ Node::type_string() const
 			return XID_TYPE_SID_STRING;
 		case XID_TYPE_IP:
 			return XID_TYPE_IP_STRING;
+		case XID_TYPE_DUMMY_SOURCE:
+			return XID_TYPE_DUMMY_SOURCE_STRING;
 		default:
 			return XID_TYPE_UNKNOWN_STRING;
 	}
@@ -361,10 +396,20 @@ Graph::operator*=(const Graph& r)
 
 	for (std::size_t i = 0; i < r.nodes_.size(); i++)
 		if (r.is_source(i))
-			sources.push_back(i);
+		{
+			if (r.nodes_[i].type() == Node::XID_TYPE_DUMMY_SOURCE)
+			{
+				for (std::vector<std::size_t>::const_iterator it = r.out_edges_[i].begin(); it != r.out_edges_[i].end(); ++it)
+					vector_push_back_unique(sources, *it);
+			}
+			else
+			{
+				sources.push_back(i);
+			}
+		}
 
 	std::vector<std::size_t> node_mapping_r;
-	merge_graph(r, node_mapping_r);
+	merge_graph(r, node_mapping_r, true);
 
 	for (std::vector<std::size_t>::const_iterator it_sink = sinks.begin(); it_sink != sinks.end(); ++it_sink)
 		for (std::vector<std::size_t>::const_iterator it_source = sources.begin(); it_source != sources.end(); ++it_source)
@@ -452,35 +497,17 @@ Graph::print_graph() const
 	}
 }
 
-static const std::size_t vector_find_npos = std::size_t(-1);
-
-template <typename T>
-static std::size_t
-vector_find(std::vector<T>& v, const T& e)
-{
-	for (std::size_t i = 0; i < v.size(); i++)
-		if (v[i] == e)
-			return i;
-	return vector_find_npos;
-}
-
-template <typename T>
-static std::size_t
-vector_push_back_unique(std::vector<T>& v, const T& e)
-{
-	std::size_t idx = vector_find(v, e);
-	if (idx == vector_find_npos)
-	{
-		idx = v.size();
-		v.push_back(e);
-	}
-	return idx;
-}
-
 std::size_t
-Graph::add_node(const Node& p)
+Graph::add_node(const Node& p, bool allow_duplicate_nodes)
 {
-	std::size_t idx = vector_push_back_unique(nodes_, p);
+	std::size_t idx;
+	if (allow_duplicate_nodes) {
+		nodes_.push_back(p);
+		idx = nodes_.size()-1;
+	} else {
+		idx = vector_push_back_unique(nodes_, p);
+	}
+
 	if (idx >= out_edges_.size())
 	{
 		out_edges_.push_back(std::vector<std::size_t>());
@@ -510,17 +537,42 @@ Graph::is_sink(std::size_t id) const
 	return out_edges_[id].size() == 0;
 }
 
+/**
+* @brief Merge the supplied graph into this one.
+*
+* Merge the supplied graph into this one. If allow_duplicate_nodes is false,
+* any XID appearing in both r and this graph will appear only once in the
+* merged graph; any "extra" edges it has in r will be merged into this one.
+* If allow_duplicate_nodes is true, then r is merely appended to the end of
+* this graph; an XID already in this graph that appears again in r is treated
+* as a "new instance" and given its own node.
+*
+* @param r  The graph to merge into this one.
+* @param node_mapping  Initially empty; node_mapping[i] will contain node i's (in r)
+*  index in the newly merged graph.
+* @param allow_duplicate_nodes A bool indicating whether or not the same XID
+*	appearing in both graphs should be treated as two separate nodes or merged
+*	into one.
+*/
 void
-Graph::merge_graph(const Graph& r, std::vector<std::size_t>& node_mapping)
+Graph::merge_graph(const Graph& r, std::vector<std::size_t>& node_mapping, bool allow_duplicate_nodes)
 {
 	node_mapping.clear();
 
 	for (std::vector<Node>::const_iterator it = r.nodes_.begin(); it != r.nodes_.end(); ++it)
-		node_mapping.push_back(add_node(*it));
+		if (allow_duplicate_nodes && (*it).type() == Node::XID_TYPE_DUMMY_SOURCE) // don't add r's source node to the middle of this graph
+			node_mapping.push_back(-1);
+		else
+		{
+			node_mapping.push_back(add_node(*it, allow_duplicate_nodes));
+		}
 
 	for (std::size_t from_id = 0; from_id < r.out_edges_.size(); from_id++)
+	{
+		if (allow_duplicate_nodes && r.nodes_[from_id].type() == Node::XID_TYPE_DUMMY_SOURCE) continue;
 		for (std::vector<std::size_t>::const_iterator it = r.out_edges_[from_id].begin(); it != r.out_edges_[from_id].end(); ++it)
 			add_edge(node_mapping[from_id], node_mapping[*it]);
+	}
 }
 
 std::string
@@ -603,7 +655,7 @@ Graph::dag_string() const
 {
 	// TODO: check DAG first (one source, one sink, actually a DAG)
 	std::string dag_string;
-	int sink_index, source_index;
+	int sink_index = -1, source_index = -1;
 
 	// Find source and sink
 	for (std::size_t i = 0; i < nodes_.size(); i++)
@@ -615,31 +667,38 @@ Graph::dag_string() const
 			sink_index = i;
 	}
 
-	// Add source first
-	dag_string += "DAG";
-	dag_string += out_edges_for_index(source_index, source_index, sink_index);
-	dag_string += " - \n";
-
-	// Add intermediate nodes
-	for (std::size_t i = 0; i < nodes_.size(); i++)
+	if (sink_index >= 0 && source_index >= 0)
 	{
-		if (i == source_index || i == sink_index)
-			continue;
-
-		// add XID type
-		dag_string += nodes_[i].type_string() + ":";
-
-		// add XID
-		dag_string += nodes_[i].id_string();
-
-		// add out edges
-		dag_string += out_edges_for_index(i, source_index, sink_index);
+		// Add source first
+		dag_string += "DAG";
+		dag_string += out_edges_for_index(source_index, source_index, sink_index);
 		dag_string += " - \n";
-	}
 
-	// Add sink last
-	dag_string += nodes_[sink_index].type_string() + ":";
-	dag_string += nodes_[sink_index].id_string();
+		// Add intermediate nodes
+		for (std::size_t i = 0; i < nodes_.size(); i++)
+		{
+			if (i == source_index || i == sink_index)
+				continue;
+
+			// add XID type
+			dag_string += nodes_[i].type_string() + ":";
+
+			// add XID
+			dag_string += nodes_[i].id_string();
+
+			// add out edges
+			dag_string += out_edges_for_index(i, source_index, sink_index);
+			dag_string += " - \n";
+		}
+
+		// Add sink last
+		dag_string += nodes_[sink_index].type_string() + ":";
+		dag_string += nodes_[sink_index].id_string();
+	}
+	else
+	{
+		printf("WARNING: dag_string(): could not find source and/or sink. Returning empty string.\n");
+	}
 
 
 	return dag_string;
