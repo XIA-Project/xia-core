@@ -1,0 +1,165 @@
+<rspec type="request" generated_by="Flack" generated="2012-04-18T15:03:47Z" xsi:schemaLocation="http://www.geni.net/resources/rspec/3 http://www.geni.net/resources/rspec/3/request.xsd " xmlns:flack="http://www.protogeni.net/resources/rspec/ext/flack/1" xmlns:client="http://www.protogeni.net/resources/rspec/ext/client/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.geni.net/resources/rspec/3">
+  <node client_id="router0" component_manager_id="urn:publicid:IDN+emulab.net+authority+cm" component_id="urn:publicid:IDN+emulab.net+node+pc204" component_name="pc204" exclusive="true" xmlns:rs="http://www.protogeni.net/resources/rspec/ext/emulab/1">
+    <rs:vnode name="pc204"/>
+    <location latitude="40.768652" longitude="-111.84581" country="US"/>
+    <sliver_type name="raw-pc">
+      <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU11-64-STD"/>
+    </sliver_type>
+    <services>
+      <execute command="sudo su barrettd -c 'sh /users/barrettd/build-xia-click-ubuntu11.sh'" shell="sh"/>
+      <install install_path="/users/barrettd" url="http://xia.cs.cmu.edu/geni/build-xia-click-ubuntu11.sh.tar.gz"/>
+    </services>
+    <interface client_id="PC:if0">
+      <ip address="10.10.1.1" netmask="" type="ipv4"/>
+      <flack:interface_info addressUnset="false"/>
+    </interface>
+    <interface client_id="PC:if1">
+      <ip address="10.10.2.1" netmask="" type="ipv4"/>
+      <flack:interface_info addressUnset="false"/>
+    </interface>
+    <interface client_id="PC:if2">
+      <ip address="10.10.5.2" netmask="" type="ipv4"/>
+      <flack:interface_info addressUnset="false"/>
+    </interface>
+    <flack:node_info x="183" y="260" unbound="true"/>
+  </node>
+  <node client_id="host3" component_manager_id="urn:publicid:IDN+emulab.net+authority+cm" component_id="urn:publicid:IDN+emulab.net+node+pc260" component_name="pc260" exclusive="true" xmlns:rs="http://www.protogeni.net/resources/rspec/ext/emulab/1">
+    <rs:vnode name="pc260"/>
+    <location latitude="40.768652" longitude="-111.84581" country="US"/>
+    <sliver_type name="raw-pc">
+      <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU11-64-STD"/>
+    </sliver_type>
+    <services>
+      <execute command="sudo su barrettd -c 'sh /users/barrettd/build-xia-click-ubuntu11.sh'" shell="sh"/>
+      <install install_path="/users/barrettd/" url="http://xia.cs.cmu.edu/geni/build-xia-click-ubuntu11.sh.tar.gz"/>
+    </services>
+    <interface client_id="PC-0:if0">
+      <ip address="10.10.4.1" netmask="" type="ipv4"/>
+      <flack:interface_info addressUnset="false"/>
+    </interface>
+    <flack:node_info x="739" y="436" unbound="true"/>
+  </node>
+  <node client_id="host2" component_manager_id="urn:publicid:IDN+emulab.net+authority+cm" component_id="urn:publicid:IDN+emulab.net+node+pc231" component_name="pc231" exclusive="true" xmlns:rs="http://www.protogeni.net/resources/rspec/ext/emulab/1">
+    <rs:vnode name="pc231"/>
+    <location latitude="40.768652" longitude="-111.84581" country="US"/>
+    <sliver_type name="raw-pc">
+      <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU11-64-STD"/>
+    </sliver_type>
+    <services>
+      <execute command="sudo su barrettd -c 'sh /users/barrettd/build-xia-click-ubuntu11.sh'" shell="sh"/>
+      <install install_path="/users/barrettd/" url="http://xia.cs.cmu.edu/geni/build-xia-click-ubuntu11.sh.tar.gz"/>
+    </services>
+    <interface client_id="PC-1:if0">
+      <ip address="10.10.3.2" netmask="" type="ipv4"/>
+      <flack:interface_info addressUnset="false"/>
+    </interface>
+    <flack:node_info x="737" y="68" unbound="true"/>
+  </node>
+  <node client_id="router1" component_manager_id="urn:publicid:IDN+emulab.net+authority+cm" component_id="urn:publicid:IDN+emulab.net+node+pc238" component_name="pc238" exclusive="true" xmlns:rs="http://www.protogeni.net/resources/rspec/ext/emulab/1">
+    <rs:vnode name="pc238"/>
+    <location latitude="40.768652" longitude="-111.84581" country="US"/>
+    <sliver_type name="raw-pc">
+      <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU11-64-STD"/>
+    </sliver_type>
+    <services>
+      <execute command="sudo su barrettd -c 'sh /users/barrettd/build-xia-click-ubuntu11.sh'" shell="sh"/>
+      <install install_path="/users/barrettd/" url="http://xia.cs.cmu.edu/geni/build-xia-click-ubuntu11.sh.tar.gz"/>
+    </services>
+    <interface client_id="PC-2:if0">
+      <ip address="10.10.2.2" netmask="" type="ipv4"/>
+      <flack:interface_info addressUnset="false"/>
+    </interface>
+    <interface client_id="PC-2:if1">
+      <ip address="10.10.3.1" netmask="" type="ipv4"/>
+      <flack:interface_info addressUnset="false"/>
+    </interface>
+    <interface client_id="PC-2:if2">
+      <ip address="10.10.4.2" netmask="" type="ipv4"/>
+      <flack:interface_info addressUnset="false"/>
+    </interface>
+    <flack:node_info x="634" y="256" unbound="true"/>
+  </node>
+  <node client_id="host1" component_manager_id="urn:publicid:IDN+emulab.net+authority+cm" component_id="urn:publicid:IDN+emulab.net+node+pc214" component_name="pc214" exclusive="true" xmlns:rs="http://www.protogeni.net/resources/rspec/ext/emulab/1">
+    <rs:vnode name="pc214"/>
+    <location latitude="40.768652" longitude="-111.84581" country="US"/>
+    <sliver_type name="raw-pc">
+      <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU11-64-STD"/>
+    </sliver_type>
+    <services>
+      <execute command="sudo su barrettd -c 'sh /users/barrettd/build-xia-click-ubuntu11.sh'" shell="sh"/>
+      <install install_path="/users/barrettd/" url="http://xia.cs.cmu.edu/geni/build-xia-click-ubuntu11.sh.tar.gz"/>
+    </services>
+    <interface client_id="PC-3:if0">
+      <ip address="10.10.5.1" netmask="" type="ipv4"/>
+      <flack:interface_info addressUnset="false"/>
+    </interface>
+    <flack:node_info x="48" y="106" unbound="true"/>
+  </node>
+  <node client_id="host0" component_manager_id="urn:publicid:IDN+emulab.net+authority+cm" component_id="urn:publicid:IDN+emulab.net+node+pc211" component_name="pc211" exclusive="true" xmlns:rs="http://www.protogeni.net/resources/rspec/ext/emulab/1">
+    <rs:vnode name="pc211"/>
+    <location latitude="40.768652" longitude="-111.84581" country="US"/>
+    <sliver_type name="raw-pc">
+      <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU11-64-STD"/>
+    </sliver_type>
+    <services>
+      <execute command="sudo su barrettd -c 'sh /users/barrettd/build-xia-click-ubuntu11.sh'" shell="sh"/>
+      <install install_path="/users/barrettd/" url="http://xia.cs.cmu.edu/geni/build-xia-click-ubuntu11.sh.tar.gz"/>
+    </services>
+    <interface client_id="PC-4:if0">
+      <ip address="10.10.1.2" netmask="" type="ipv4"/>
+      <flack:interface_info addressUnset="false"/>
+    </interface>
+    <flack:node_info x="54" y="431" unbound="true"/>
+  </node>
+  <link client_id="lan0" vlantag="402">
+    <flack:link_info x="-1" y="-1" unboundVlantag="true" xmlns="http://www.protogeni.net/resources/rspec/ext/flack/1"/>
+    <component_manager name="urn:publicid:IDN+emulab.net+authority+cm"/>
+    <interface_ref client_id="PC:if0"/>
+    <interface_ref client_id="PC-4:if0"/>
+    <property source_id="PC:if0" dest_id="PC-4:if0" capacity="0" latency="0" packet_loss="0"/>
+    <property source_id="PC-4:if0" dest_id="PC:if0" capacity="0" latency="0" packet_loss="0"/>
+    <link_type name="lan"/>
+    <flack:link_info x="-1" y="-1" unboundVlantag="true"/>
+  </link>
+  <link client_id="lan1" vlantag="405">
+    <flack:link_info x="-1" y="-1" unboundVlantag="true" xmlns="http://www.protogeni.net/resources/rspec/ext/flack/1"/>
+    <component_manager name="urn:publicid:IDN+emulab.net+authority+cm"/>
+    <interface_ref client_id="PC:if1"/>
+    <interface_ref client_id="PC-2:if0"/>
+    <property source_id="PC:if1" dest_id="PC-2:if0" capacity="0" latency="0" packet_loss="0"/>
+    <property source_id="PC-2:if0" dest_id="PC:if1" capacity="0" latency="0" packet_loss="0"/>
+    <link_type name="lan"/>
+    <flack:link_info x="-1" y="-1" unboundVlantag="true"/>
+  </link>
+  <link client_id="lan2" vlantag="404">
+    <flack:link_info x="-1" y="-1" unboundVlantag="true" xmlns="http://www.protogeni.net/resources/rspec/ext/flack/1"/>
+    <component_manager name="urn:publicid:IDN+emulab.net+authority+cm"/>
+    <interface_ref client_id="PC-2:if1"/>
+    <interface_ref client_id="PC-1:if0"/>
+    <property source_id="PC-2:if1" dest_id="PC-1:if0" capacity="0" latency="0" packet_loss="0"/>
+    <property source_id="PC-1:if0" dest_id="PC-2:if1" capacity="0" latency="0" packet_loss="0"/>
+    <link_type name="lan"/>
+    <flack:link_info x="-1" y="-1" unboundVlantag="true"/>
+  </link>
+  <link client_id="lan3" vlantag="403">
+    <flack:link_info x="-1" y="-1" unboundVlantag="true" xmlns="http://www.protogeni.net/resources/rspec/ext/flack/1"/>
+    <component_manager name="urn:publicid:IDN+emulab.net+authority+cm"/>
+    <interface_ref client_id="PC-0:if0"/>
+    <interface_ref client_id="PC-2:if2"/>
+    <property source_id="PC-0:if0" dest_id="PC-2:if2" capacity="0" latency="0" packet_loss="0"/>
+    <property source_id="PC-2:if2" dest_id="PC-0:if0" capacity="0" latency="0" packet_loss="0"/>
+    <link_type name="lan"/>
+    <flack:link_info x="-1" y="-1" unboundVlantag="true"/>
+  </link>
+  <link client_id="lan4" vlantag="406">
+    <flack:link_info x="-1" y="-1" unboundVlantag="true" xmlns="http://www.protogeni.net/resources/rspec/ext/flack/1"/>
+    <component_manager name="urn:publicid:IDN+emulab.net+authority+cm"/>
+    <interface_ref client_id="PC-3:if0"/>
+    <interface_ref client_id="PC:if2"/>
+    <property source_id="PC-3:if0" dest_id="PC:if2" capacity="0" latency="0" packet_loss="0"/>
+    <property source_id="PC:if2" dest_id="PC-3:if0" capacity="0" latency="0" packet_loss="0"/>
+    <link_type name="lan"/>
+    <flack:link_info x="-1" y="-1" unboundVlantag="true"/>
+  </link>
+  <client:client_info name="Flack" environment="Flash Version: MAC 11,1,102,55, OS: Mac OS 10.7.2, Arch: x86, Screen: 1440x900 @ 72 DPI with touchscreen type none" version="v14.14" url="https://www.emulab.net/protogeni/flack2/flack.swf?mode=public&amp;debug=0&amp;usejs=1"/>
+</rspec>

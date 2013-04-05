@@ -1,0 +1,177 @@
+#!/bin/bash
+#
+# Copyright 2013 Carnegie Mellon University
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+NAME=`basename $0`
+
+# xianet startup flags
+# host flags may need to change if flack changes which interfaces it allocates
+H_FLAGS="-tI eth2"
+R_FLAGS="-rf eth0"
+H_NS_FLAGS="-n $H_FLAGS"
+R_NS_FLAGS="-n $R_FLAGS"
+
+#xiahosts should contain a list of the geni hostnames used in the xia network
+source xiahosts
+
+stop_node()
+{
+	printf "\nshutting down node: $1\n"
+	echo "========================="
+	ssh -o "StrictHostKeyChecking no" -A $1 -f "sudo ~/xia-core/bin/xianet stop"
+	sleep 1
+}
+
+stop_nodes()
+{
+	echo "Stopping Click and all XIA bootstraping processes"
+	for node in $HOSTS $NS_HOST $NS_ROUTER $ROUTERS
+	do
+		stop_node $node
+	done
+}
+
+start_node() {
+	flags="bad flags"
+	[ "$2" == "HOST" ] && flags=$H_FLAGS
+	[ "$2" == "ROUTER" ] && flags=$R_FLAGS
+	[ "$2" == "NAMESERVER HOST" ] && flags=$H_NS_FLAGS
+	[ "$2" == "NAMESERVER ROUTER" ] && flags=$R_NS_FLAGS
+
+	printf "\nstarting $1 as a XIA $2 with flags $flags\n"
+	echo "=============================================================="
+
+	# command to find interfaces
+	# ifconfig | awk '/^eth[^0]/ {print $1}'
+	ssh -o "StrictHostKeyChecking no" -A $1 -f "sudo ~/xia-core/bin/xianet $flags start"
+	sleep 5
+}
+
+start_host()
+{
+	# hosts are usually, but not always configured with eth2 on geni
+	# get the interface to be sure
+	iface=`ssh -o "StrictHostKeyChecking no" -A $1 -f ifconfig | awk '/^eth[^0]/ {print $1}'`
+
+	f="-tI"
+	[ "$2" == "NAMESERVER" ] && f="-ntI"
+	flags="$f $iface"
+
+	printf "\nstarting $1 as an XIA $2 HOST with flags $flags\n"
+	echo "=============================================================="
+
+	ssh -o "StrictHostKeyChecking no" -A $1 -f "sudo ~/xia-core/bin/xianet $flags start"
+	sleep 7
+}
+
+start_router()
+{
+	flags=$R_FLAGS
+	[ "$2" == "NAMESERVER" ] && flags=$R_NS_FLAGS
+
+	printf "\nstarting $1 as an XIA $2 ROUTER with flags $flags\n"
+	echo "=============================================================="
+
+	ssh -o "StrictHostKeyChecking no" -A $1 -f "sudo ~/xia-core/bin/xianet $flags start"
+	sleep 5
+}
+
+start_nodes()
+{
+	start_router $NS_ROUTER "NAMESERVER"
+	start_host $NS_HOST "NAMESERVER"
+	for node in $ROUTERS
+	do
+		[ $node != $NS_ROUTER ] && start_router $node
+	done
+	for node in $HOSTS
+	do
+		[ $node != $NS_HOST ] && start_host $node
+	done
+}
+
+restart_nodes()
+{
+	# this may call stop for some nodes twice
+	# pause long enough to make sure the stop cmds don't
+	#overlap with the start
+	stop_nodes
+	sleep 5
+	start_nodes
+}
+
+check_node() {
+	flags="bad flags"
+	[ "$2" == "HOST" ] && flags=$H_FLAGS
+	[ "$2" == "ROUTER" ] && flags=$R_FLAGS
+	[ "$2" == "NAMESERVER HOST" ] && flags=$H_NS_FLAGS
+	[ "$2" == "NAMESERVER ROUTER" ] && flags=$R_NS_FLAGS
+
+	printf "\nchecking node: $1\n"
+	echo "===================="
+	ssh -o "StrictHostKeyChecking no" -A $1 -f "~/xia-core/bin/xianet $flags check"
+	sleep 2
+}
+
+check_nodes()
+{
+	check_node $NS_ROUTER "NAMESERVER ROUTER"
+	check_node $NS_HOST "NAMESERVER HOST"
+	for node in $ROUTERS
+	do
+		[ $node != $NS_ROUTER ] && check_node $node "ROUTER"
+	done
+	for node in $HOSTS
+	do
+		[ $node != $NS_HOST ] && check_node $node "HOST"
+	done
+}
+
+help ()
+{
+	cat << EOH
+
+usage: $NAME [start|stop|restart]
+where:
+
+  start   - start xia on all nodes specified in xia.conf
+  stop    - stops xia on all nodes specified in xia.conf
+  restart - stops then starts all of the xia nodes
+  check   - query nodes for status
+
+EOH
+	exit 0
+}
+
+case $1 in
+	start)
+		start_nodes
+		;;
+	stop)
+		stop_nodes
+		;;
+	restart|reload)
+		restart_nodes
+		;;
+	check)
+		check_nodes
+		exit
+		;;
+	*)
+		printf "\nInvalid command: -$1\n" >&2
+		help
+		;;
+esac
+
