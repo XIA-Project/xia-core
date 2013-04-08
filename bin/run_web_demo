@@ -25,8 +25,11 @@
 
 NAME=`basename $0`
 VERBOSE=0
+RUN_PROXY=1
+RUN_SERVICES=1
 
-SERVICES="proxy.py webserver.py vs hello_service.py stock_service.py"
+SERVICES="webserver.py vs hello_service.py stock_service.py"
+PROXY="proxy.py"
 
 # find the root of the XIA source tree
 # assumes this script is in a directory off the parent of the XIA tree
@@ -46,10 +49,9 @@ is_running()
 	[ "$RUNNING" != "" ]
 }
 
-check_services()
+check_svcs()
 {
-	printf "XIA Demo Service Status\n"
-	for svc in "click" $SERVICES
+	for svc in $@
 	do
 		status="stopped"
 		is_running $svc
@@ -58,10 +60,17 @@ check_services()
 	done
 }
 
+check_services()
+{
+	printf "XIA Demo Service Status\n"
+	[ $RUN_PROXY == 1 ] && check_svcs $PROXY
+	[ $RUN_SERVICES == 1 ] && check_svcs $SERVICES
+}
+
 stop_services()
 {
 	printf "Stopping XIA Demo Services\n"
-	for svc in $SERVICES
+	for svc in $SERVICES $PROXY
 	do
 		killall -9 $svc &> /dev/null
 	done
@@ -83,17 +92,21 @@ start_services()
 	fi
 
 	cd $XIADIR/applications/web
-	./proxy.py 8080 127.0.0.1 &
-	./webserver.py &
-	sleep 4
+	if [ $RUN_PROXY == 1 ]; then
+		./proxy.py 8080 127.0.0.1 &
+	fi
+	if [ $RUN_SERVICES == 1 ]; then
+		./webserver.py &
+		sleep 4
 
-	cd $XIADIR/applications/demo/web_demo
-	./stock_service.py &
-	./hello_service.py & 
+		cd $XIADIR/applications/demo/web_demo
+		./stock_service.py &
+		./hello_service.py & 
 
-	cd $XIADIR/applications/demo/web_demo
-	./vs resources/video.ogv &
-	sleep 3  # need this otherwise it doesn't work
+		cd $XIADIR/applications/demo/web_demo
+		./vs resources/video.ogv &
+		sleep 3  # need this otherwise it doesn't work
+	fi
 }
 
 help ()
@@ -114,8 +127,16 @@ EOH
 	exit 0
 }
 
-while getopts ":qvh" opt; do
+while getopts ":psqvh" opt; do
 	case $opt in
+		p)
+			RUN_PROXY="1"
+			RUN_SERVICES="0"
+			;;
+		s)
+			RUN_SERVICES="1"
+			RUN_PROXY="0"
+			;;	
 		q)
 			VERBOSE="0"
 			;;
