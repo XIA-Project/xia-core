@@ -1,8 +1,0 @@
-# This file should contain the names of the hosts on your xia network
-# hostnames can be found be examining the configuration in flack
-
-HOSTS="pc295 pc210 pc314 pc206"
-ROUTERS="pc310 pc318"
-
-NS_ROUTER="pc310"
-NS_HOST="pc210"
