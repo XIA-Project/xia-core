@@ -45,7 +45,7 @@ export PYTHON_PATH=$XIADIR/api/lib
 
 is_running()
 {
-	RUNNING=`ps  -e | grep $1`
+	RUNNING=`ps -ef | grep $1` | grep -v grep
 	[ "$RUNNING" != "" ]
 }
 
@@ -93,7 +93,7 @@ start_services()
 
 	cd $XIADIR/applications/web
 	if [ $RUN_PROXY == 1 ]; then
-		./proxy.py 8080 127.0.0.1 &
+		./proxy.py 8080 &
 	fi
 	if [ $RUN_SERVICES == 1 ]; then
 		./webserver.py &
