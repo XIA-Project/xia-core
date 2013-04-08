@@ -113,7 +113,7 @@ help ()
 {
 	cat << EOH
 
-usage: $NAME [-qv] [start|stop|restart]
+usage: $NAME [-psqv] [start|stop|restart]
 where:
   -p only starts only the XIA proxy service (default is start everything)
   -s starts all services except for the proxy
