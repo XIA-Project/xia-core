@@ -115,6 +115,8 @@ help ()
 
 usage: $NAME [-qv] [start|stop|restart]
 where:
+  -p only starts only the XIA proxy service (default is start everything)
+  -s starts all services except for the proxy
   -q runs click silently
   -v prints click debug messages to stdout (default)
 
