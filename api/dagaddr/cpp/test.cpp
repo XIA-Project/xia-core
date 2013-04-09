@@ -167,6 +167,11 @@ int main()
 	g6_new_intent.replace_final_intent(n_cid);
 	printf("g6_new_intent.dag_string().c_str():\n%s\n", g6_new_intent.dag_string().c_str());
 	printf("Testing replace_final_intent ^^^\n\n\n");
+	
+	
+	printf("Testing get_final_intent vvv\n");
+	printf("Final intent of g6_new_intent: %s\n", g6_new_intent.get_final_intent().id_string().c_str());
+	printf("Testing rget_final_intent ^^^\n\n\n");
 
 	return 0;
 }
