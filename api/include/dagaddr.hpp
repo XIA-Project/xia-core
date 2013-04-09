@@ -106,6 +106,7 @@ public:
 	void fill_sockaddr(sockaddr_x *s) const;
 	void from_sockaddr(sockaddr_x *s);
 	void replace_final_intent(const Node& new_intent);
+	Node get_final_intent() const;
 
 protected:
 

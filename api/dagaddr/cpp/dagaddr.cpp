@@ -1238,3 +1238,17 @@ Graph::replace_final_intent(const Node& new_intent)
 	std::size_t intent_index = final_intent_index();
 	nodes_[intent_index] = new_intent;
 }
+
+/**
+* @brief Return the final intent of the DAG.
+*
+* Returns the DAG's final intent (as a Node).
+*
+* @return the DAG's final intent
+*/
+Node
+Graph::get_final_intent() const
+{
+	std::size_t intent_index = final_intent_index();
+	return nodes_[intent_index];
+}
