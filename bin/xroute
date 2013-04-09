@@ -577,7 +577,7 @@ class XrouteApp:
 		if (port == None or port == ""):
 			self.errorExit("port not specified")
 
-		cmd = "%s/xrc/proc/rt_%s.set4 %s,%s,%s,%s" % (device, table, xid, port, nexthop, flags)
+		cmd = "%s/xrc/n/proc/rt_%s.set4 %s,%s,%s,%s" % (device, table, xid, port, nexthop, flags)
 		print cmd
 
 		self.writeData(cmd)

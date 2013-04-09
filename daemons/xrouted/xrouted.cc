@@ -506,7 +506,7 @@ void updateClickRoutingTable() {
 
 	int rc, port;
 	string destXID, nexthopXID;
-	string default_AD("AD:-"), default_HID("HID:-"), default_4ID("IP:-"), empty_str("HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+	string default_AD("AD:-"), default_HID("HID:-"), default_4ID("IP:-");
 	
   	map<std::string, RouteEntry>::iterator it1;
   	for ( it1=route_state.ADrouteTable.begin() ; it1 != route_state.ADrouteTable.end(); it1++ ) {
