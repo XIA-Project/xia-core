@@ -16,10 +16,9 @@
 ** @returns a character point to the root of the source tree
 **
 */
-char *findRoot() {
+char *findRoot(char *path, size_t size) {
     char *pos;
-    char *path = (char*)malloc(sizeof(char)*4096);
-    int rc = readlink("/proc/self/exe", path, 4096);
+    int rc = readlink("/proc/self/exe", path, size);
 
 	if (rc < 0) {
 		path[0] = 0;
@@ -32,15 +31,13 @@ char *findRoot() {
         *pos = '\0';
     }
 
-	// FIXME: this is getting leaked on app exit
     return path;
 }
 
 int main(int argc, char *argv[]) {
 	sockaddr_x ddag;
-	sockaddr_x ns_dag;
 	char pkt[XHCP_MAX_PACKET_SIZE];
-	char myAD[MAX_XID_SIZE]; 
+	char myAD[MAX_XID_SIZE];
 	char gw_router_hid[MAX_XID_SIZE];
 	char gw_router_4id[MAX_XID_SIZE];
 
@@ -58,7 +55,6 @@ int main(int argc, char *argv[]) {
 	if (sockfd < 0) { perror("Opening Xsocket"); }
 
 	// dag init
-//	sprintf(ddag, "RE %s %s", BHID, SID_XHCP);
 	Graph g = Node() * Node(BHID) * Node(SID_XHCP);
 	g.fill_sockaddr(&ddag);
 
@@ -66,15 +62,18 @@ int main(int argc, char *argv[]) {
 	if ( XreadLocalHostAddr(sockfd, myAD, MAX_XID_SIZE, gw_router_hid, MAX_XID_SIZE, gw_router_4id, MAX_XID_SIZE) < 0 )
 		perror("Reading localhost address");
 
-	// set the default name server DAG   	
-	char ns[512];
-	sprintf(ns, "RE ( %s ) %s %s %s", IP_NS, AD0, HID0, SID_NS);  	
+	// set the default name server DAG
+	char ns[XHCP_MAX_DAG_LENGTH];
+	sprintf(ns, "RE  %s %s %s", AD0, HID0, SID_NS);
 
 	// read the name server DAG from xia-core/etc/resolv.conf, if present
-	ini_gets(NULL, "nameserver", ns, ns, XHCP_MAX_DAG_LENGTH, strcat(findRoot(), RESOLV_CONF));
-
-	Graph gns(ns);
-	gns.fill_sockaddr(&ns_dag);
+	char *rconf = (char*)malloc(XHCP_MAX_PATH);
+	if (rconf) {
+		findRoot(rconf, XHCP_MAX_PATH);
+		strncat(rconf, RESOLV_CONF, XHCP_MAX_PATH);
+		ini_gets(NULL, "nameserver", ns, ns, XHCP_MAX_DAG_LENGTH, rconf);
+		free(rconf);
+	}
 
 	xhcp_pkt beacon_pkt;
 	beacon_pkt.seq_num = 0;
@@ -83,7 +82,7 @@ int main(int argc, char *argv[]) {
 	xhcp_pkt_entry *gw_entry = (xhcp_pkt_entry*)malloc(sizeof(short)+strlen(gw_router_hid)+1);
 	xhcp_pkt_entry *gw_entry_4id = (xhcp_pkt_entry*)malloc(sizeof(short)+strlen(gw_router_4id)+1);
 	xhcp_pkt_entry *ns_entry = (xhcp_pkt_entry*)malloc(sizeof(short)+strlen(ns)+1);
-		
+
 	ad_entry->type = XHCP_TYPE_AD;
 	gw_entry->type = XHCP_TYPE_GATEWAY_ROUTER_HID;
 	gw_entry_4id->type = XHCP_TYPE_GATEWAY_ROUTER_4ID;
@@ -106,15 +105,15 @@ int main(int argc, char *argv[]) {
 		memcpy(pkt+offset, &gw_entry->type, sizeof(gw_entry->type));
 		offset += sizeof(gw_entry->type);
 		memcpy(pkt+offset, gw_entry->data, strlen(gw_entry->data)+1);
-		offset += strlen(gw_entry->data)+1;	
+		offset += strlen(gw_entry->data)+1;
 		memcpy(pkt+offset, &gw_entry_4id->type, sizeof(gw_entry_4id->type));
 		offset += sizeof(gw_entry_4id->type);
 		memcpy(pkt+offset, gw_entry_4id->data, strlen(gw_entry_4id->data)+1);
-		offset += strlen(gw_entry_4id->data)+1;		
+		offset += strlen(gw_entry_4id->data)+1;
 		memcpy(pkt+offset, &ns_entry->type, sizeof(ns_entry->type));
 		offset += sizeof(ns_entry->type);
 		memcpy(pkt+offset, ns_entry->data, strlen(ns_entry->data)+1);
-		offset += strlen(ns_entry->data)+1;		
+		offset += strlen(ns_entry->data)+1;
 		// send out packet
 		Xsendto(sockfd, pkt, offset, 0, (struct sockaddr*)&ddag, sizeof(ddag));
 		//fprintf(stderr, "XHCP beacon %ld\n", beacon_pkt.seq_num);
