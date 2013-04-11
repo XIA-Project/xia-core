@@ -345,9 +345,9 @@ def makeGenericRouterConfig(num_ports, ad, hid, socket_ip_port_list, xia_interfa
     dummy_mac = '00:00:00:00:00:00'
 
     try:
-        with open(template, 'r') as f:
-            text = f.read()
-        f.closed
+        f = open(template, 'r')
+        text = f.read()
+        f.close()
     except Exception, e:
         print 'error opening template file for reading:\n%s' % e
         sys.exit(-1)
@@ -477,9 +477,9 @@ def makeGenericRouterConfig(num_ports, ad, hid, socket_ip_port_list, xia_interfa
 
 
     # Write the generated conf to disk
-    with open(outfile, 'w') as f:
-        f.write(newtext)
-    f.closed
+    f = open(outfile, 'w')
+    f.write(newtext)
+    f.close()
 
 
 # TODO: Modify makeRouterConfig and makeDualRouterConfig to call this appropriately and TEST!
