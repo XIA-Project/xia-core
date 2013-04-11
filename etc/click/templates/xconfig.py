@@ -225,22 +225,180 @@ def makeRouterConfig(ad, hid):
     global interface_filter, interface
 
     interfaces = getInterfaces(interface_filter, interface)
-    if (len(interfaces) < 2):
-        print "error, not enough interfaces found for a router"
-        exit(1)
+
+    template = '%s.%s' % (routerconfig, ext)
+    outfile = routerconfig
+
+    socket_ip_port_list = [p.strip() for p in socket_ips_ports.split(',')] if socket_ips_ports else []
+
+    makeGenericRouterConfig(4, ad, hid, socket_ip_port_list, interfaces, [], template, outfile)
+
+    #try:
+    #    f = open(routerconfig + "." + ext, "r")
+    #    text = f.read()
+    #    f.close()
+
+    #    f = open(routerconfig, "w")
+
+    #except Exception, e:
+    #    print 'error opening file for reading and/or writing:\n%s' % e
+    #    sys.exit(-1)
+
+    #(header, socks, body, extra, footer) = text.split("######")
+
+    ###
+    ### HEADER
+    ###
+    #tpl = Template(header)
+
+    #xchg = {}
+    #if (nameserver == "no"):
+    #    xchg['ADNAME'] = ad
+    #else:
+    #    xchg['ADNAME'] = nameserver_ad        
+    #xchg['HNAME'] = getHostname()
+    #xchg['HID'] = hid
+
+    #if ip_override_addr == None:
+    #    xchg['EXTERNAL_IP'] = '0.0.0.0'
+    #else:
+    #    print 'WARNING: new dual stack routers do not support external IP addresses'
+    #    xchg['EXTERNAL_IP'] = ip_override_addr
+
+    ## create $MAC0 thru $MAC3 replacements
+    #i = 0
+    #while i < 4 and i < len(interfaces):
+    #    repl = 'MAC' + str(i)
+    #    xchg[repl] = interfaces[i][1]
+    #    i += 1
+    #while i < 4:
+    #    repl = 'MAC' + str(i)
+    #    xchg[repl] = "00:00:00:00:00:00"
+    #    i += 1
+    #     
+    #newtext = tpl.substitute(xchg)
+
+    #i = 0
+    ###
+    ### SOCKS
+    ### (The router ports connected using click socket elements)
+    ###
+    #if socket_ips_ports:
+    #    tpl = Template(socks)
+    #    for pair in [p.strip() for p in socket_ips_ports.split(',')]:
+    #        if i > 4: # Make sure we go up to at most 4 ports
+    #            break
+
+    #        ip, port = pair.split(':')
+
+    #        xchg['SOCK_IP'] = ip
+    #        xchg['PORT'] = int(port)
+    #        xchg['CLIENT'] = 'false' if ip == '0.0.0.0' else 'true'
+    #        xchg['NUM'] = i
+    #        i += 1
+
+    #        newtext += tpl.substitute(xchg)
+
+
+    ###
+    ### BODY
+    ### (The router ports connected to FromDevice/ToDevice)
+    ###
+    #tpl = Template(body)
+    #start = i
+    #for interface in interfaces:
+    #    if i > 4: # Make sure we go up to at most 4 ports
+    #        break
+
+    #    xchg['IFACE'] = interfaces[i-start][0]
+    #    xchg['MAC'] = interfaces[i-start][1]
+    #    xchg['NUM'] = i
+    #    i += 1
+
+    #    newtext += tpl.substitute(xchg)
+
+
+    ###
+    ### EXTRA
+    ### (The router ports connected to Idle/Discard)
+    ###
+    #tpl = Template(extra)
+    #while i < 4:
+    #    xchg['NUM'] = i
+    #    newtext += tpl.substitute(xchg)
+    #    i += 1
+
+    ###
+    ### FOOTER
+    ###
+    #tpl = Template(footer)
+    #newtext += tpl.substitute(xchg)
+
+    #f.write(newtext)
+    #f.close()
+
+
+
+# makeRouterConfig and makeDualRouterConfig call this
+def makeGenericRouterConfig(num_ports, ad, hid, socket_ip_port_list, xia_interfaces, ip_interfaces, template, outfile):
+    dummy_ip = '0.0.0.0'
+    dummy_mac = '00:00:00:00:00:00'
 
     try:
-        f = open(routerconfig + "." + ext, "r")
-        text = f.read()
-        f.close()
-
-        f = open(routerconfig, "w")
-
+        with open(template, 'r') as f:
+            text = f.read()
+        f.closed
     except Exception, e:
-        print 'error opening file for reading and/or writing:\n%s' % e
+        print 'error opening template file for reading:\n%s' % e
         sys.exit(-1)
 
-    (header, socks, body, extra, footer) = text.split("######")
+    (header, socks_interfaces, raw_interfaces, unused_interfaces, footer) = text.split("######")
+
+
+    # Assign ports to one of:
+    # socket port -- uses click socket element to connect to other end of "wire"
+    # raw port -- uses FromDevice/ToDevice to connect to other end
+    # ip port -- ip speaking "raw" port on dual stack router
+    # unused -- connected to click's Idle and Discard
+    start_unassigned = 0
+    end_unassigned = num_ports - 1
+
+    # store the port numbers (0, 1, 2, etc) assigned to each type
+    socket_ports = []
+    raw_ports = []
+    ip_ports = []
+    unused_ports = []
+
+    # map port numbers to interfaces (e.g., 0 -> eth0)
+    interfaces = {}
+
+    for ip_face in ip_interfaces:
+        if start_unassigned > end_unassigned:
+            break
+        ip_ports.append(end_unassigned)
+        interfaces[end_unassigned] = ip_face
+        end_unassigned -= 1
+
+    for ip_port_pair in socket_ip_port_list:
+        if start_unassigned > end_unassigned:
+            break
+        socket_ports.append(start_unassigned)
+        interfaces[start_unassigned] = (ip_port_pair, dummy_mac, dummy_ip, dummy_ip)  # ip_port_pair is a string: e.g. '1.2.3.4:4000'
+        start_unassigned += 1
+
+    for xia_face in xia_interfaces:
+        if start_unassigned > end_unassigned:
+            break
+        raw_ports.append(start_unassigned)
+        interfaces[start_unassigned] = xia_face
+        start_unassigned += 1
+
+    while start_unassigned <= end_unassigned:
+        unused_ports.append(start_unassigned)
+        interfaces[start_unassigned] = ('dummy', dummy_mac, dummy_ip, dummy_ip)
+        start_unassigned += 1
+        
+
 
     ##
     ## HEADER
@@ -255,83 +413,90 @@ def makeRouterConfig(ad, hid):
     xchg['HNAME'] = getHostname()
     xchg['HID'] = hid
 
-    if ip_override_addr == None:
-        xchg['EXTERNAL_IP'] = '0.0.0.0'
+    if len(ip_interfaces) > 0:
+        xchg['EXTERNAL_IP'] = ip_interfaces[0][4]
+    elif ip_override_addr == None:
+        xchg['EXTERNAL_IP'] = dummy_ip
     else:
-        print 'WARNING: new dual stack routers do not support external IP addresses'
         xchg['EXTERNAL_IP'] = ip_override_addr
 
     # create $MAC0 thru $MAC3 replacements
-    i = 0
-    while i < 4 and i < len(interfaces):
-        repl = 'MAC' + str(i)
-        xchg[repl] = interfaces[i][1]
-        i += 1
-    while i < 4:
-        repl = 'MAC' + str(i)
-        xchg[repl] = "00:00:00:00:00:00"
-        i += 1
-         
+    # create $IP_ACTIVE, $IPADDR, and $GWADDR replacements also,
+    # though if this isn't a dual stack router, the strings we're
+    # trying to replace won't exist in the template, but that's OK
+    for i in range(0, num_ports):
+        xchg['MAC' + str(i)] = interfaces[i][1]
+        xchg['IP_ACTIVE' + str(i)] = str(1) if i in ip_ports else str(0)
+        xchg['IPADDR' + str(i)] = interfaces[i][2]
+        xchg['GWADDR' + str(i)] = interfaces[i][3]
+        
     newtext = tpl.substitute(xchg)
-
-    i = 0
+    
+    
     ##
     ## SOCKS
     ## (The router ports connected using click socket elements)
     ##
-    if socket_ips_ports:
-        tpl = Template(socks)
-        for pair in [p.strip() for p in socket_ips_ports.split(',')]:
-            if i > 4: # Make sure we go up to at most 4 ports
-                break
+    tpl = Template(socks_interfaces)
+    for i in socket_ports:
+        ip, port = interfaces[i][0].split(':')
 
-            ip, port = pair.split(':')
+        xchg['SOCK_IP'] = ip
+        xchg['PORT'] = port
+        xchg['CLIENT'] = 'false' if ip == '0.0.0.0' else 'true'
+        xchg['NUM'] = i
 
-            xchg['SOCK_IP'] = ip
-            xchg['PORT'] = int(port)
-            xchg['CLIENT'] = 'false' if ip == '0.0.0.0' else 'true'
-            xchg['NUM'] = i
-            i += 1
-
-            newtext += tpl.substitute(xchg)
-
-
+        newtext += tpl.substitute(xchg)
+    
     ##
-    ## BODY
+    ## RAW
     ## (The router ports connected to FromDevice/ToDevice)
     ##
-    tpl = Template(body)
-    start = i
-    for interface in interfaces:
-        if i > 4: # Make sure we go up to at most 4 ports
-            break
-
-        xchg['IFACE'] = interfaces[i-start][0]
-        xchg['MAC'] = interfaces[i-start][1]
+    tpl = Template(raw_interfaces)
+    for i in raw_ports + ip_ports:
+        xchg['IFACE'] = interfaces[i][0]
+        xchg['MAC'] = interfaces[i][1]
         xchg['NUM'] = i
-        i += 1
 
         newtext += tpl.substitute(xchg)
 
-
     ##
-    ## EXTRA
+    ## UNUSED
     ## (The router ports connected to Idle/Discard)
     ##
-    tpl = Template(extra)
-    while i < 4:
+    tpl = Template(unused_interfaces)
+    for i in unused_ports:
         xchg['NUM'] = i
         newtext += tpl.substitute(xchg)
-        i += 1
-
+    
     ##
     ## FOOTER
     ##
     tpl = Template(footer)
     newtext += tpl.substitute(xchg)
 
-    f.write(newtext)
-    f.close()
+
+    # Write the generated conf to disk
+    with open(outfile, 'w') as f:
+        f.write(newtext)
+    f.closed
+
+
+# TODO: Modify makeRouterConfig and makeDualRouterConfig to call this appropriately and TEST!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ##
 ## fill in the dual-stack host config
@@ -598,132 +763,144 @@ def makeDualHostConfig(ad, hid, rhid):
 def makeDualRouterConfig(ad, rhid):
     global interface_filter, interface
 
+    if interface == None:
+        print "Must specify which interface should be this router's IP-speaking port"
+        sys.exit(1)
+
+
     if interface_filter == None:
         filter = interface
     else:
         filter = '%s,%s' % (interface, interface_filter)
 
-    ip_interface = getInterfaces(None, interface)
+    ip_interfaces = getInterfaces(None, interface)
     xia_interfaces = getInterfaces(filter, None) 
 
-    try:
-        f = open(dualrouterconfig + "." + ext, "r")
-        text = f.read()
-        f.close()
-
-        f = open(dualrouterconfig, "w")
-
-    except:
-        print "error opening file for reading and/or writing"
-        sys.exit(-1)
-
-    (header, socks, body, extra, footer) = text.split("######")
-
-    tpl = Template(header)
-
-    xchg = {}
-    if (nameserver == "no"):
-        xchg['ADNAME'] = ad
-    else:
-        xchg['ADNAME'] = nameserver_ad        
-    xchg['RHID'] = rhid
-    xchg['HNAME'] = getHostname()
+    template = '%s.%s' % (dualrouterconfig, ext)
+    outfile = dualrouterconfig
     
-    xchg['EXTERNAL_IP'] = ip_interface[0][4]
+    socket_ip_port_list = [p.strip() for p in socket_ips_ports.split(',')] if socket_ips_ports else []
+    
+    makeGenericRouterConfig(4, ad, rhid, socket_ip_port_list, xia_interfaces, ip_interfaces, template, outfile)
 
-    # Handle the pure XIA ports (0-2)
-    i = 0  
-    while i < 3 and i < len(xia_interfaces):  # Only go to 2 because port 3 is connected to IP
-        repl = 'IP_ACTIVE' + str(i)
-        xchg[repl] = str(0)
-        repl = 'MAC' + str(i)
-        xchg[repl] = xia_interfaces[i][1]
-        repl = 'IPADDR' + str(i)
-        xchg[repl] = xia_interfaces[i][2]
-        repl = 'GWADDR' + str(i)
-        xchg[repl] = xia_interfaces[i][3]
-        repl = 'EXT_IPADDR' + str(i)
-        xchg[repl] = xia_interfaces[i][4]
-        i += 1
-    while i < 3:
-        repl = 'IP_ACTIVE' + str(i)
-        xchg[repl] = str(0)
-        repl = 'MAC' + str(i)
-        xchg[repl] = "00:00:00:00:00:00"
-        repl = 'IPADDR' + str(i)
-        xchg[repl] = "1.1.1.1"
-        repl = 'GWADDR' + str(i)
-        xchg[repl] = "1.1.1.1"
-        repl = 'EXT_IPADDR' + str(i)
-        xchg[repl] = "1.1.1.1"
-        i += 1
+    #try:
+    #    f = open(dualrouterconfig + "." + ext, "r")
+    #    text = f.read()
+    #    f.close()
 
-    # Handle the IP port (3)
-    xchg['IP_ACTIVE3'] = str(1)
-    xchg['MAC3'] = ip_interface[0][1];
-    xchg['IPADDR3'] = ip_interface[0][2]
-    xchg['GWADDR3'] = ip_interface[0][3]
-    xchg['EXT_IPADDR3'] = ip_interface[0][4]
-         
-    newtext = tpl.substitute(xchg)
+    #    f = open(dualrouterconfig, "w")
 
-    i = 0
-    ##
-    ## SOCKS
-    ## (The router ports connected using click socket elements)
-    ##
-    if socket_ips_ports:
-        tpl = Template(socks)
-        for pair in [p.strip() for p in socket_ips_ports.split(',')]:
-            if i > 4: # Make sure we go up to at most 4 ports
-                break
+    #except:
+    #    print "error opening file for reading and/or writing"
+    #    sys.exit(-1)
 
-            ip, port = pair.split(':')
+    #(header, socks, body, extra, footer) = text.split("######")
 
-            xchg['SOCK_IP'] = ip
-            xchg['PORT'] = int(port)
-            xchg['CLIENT'] = 'false' if ip == '0.0.0.0' else 'true'
-            xchg['NUM'] = i
-            i += 1
+    #tpl = Template(header)
 
-            newtext += tpl.substitute(xchg)
+    #xchg = {}
+    #if (nameserver == "no"):
+    #    xchg['ADNAME'] = ad
+    #else:
+    #    xchg['ADNAME'] = nameserver_ad        
+    #xchg['RHID'] = rhid
+    #xchg['HNAME'] = getHostname()
+    #
+    #xchg['EXTERNAL_IP'] = ip_interface[0][4]
+
+    ## Handle the pure XIA ports (0-2)
+    #i = 0  
+    #while i < 3 and i < len(xia_interfaces):  # Only go to 2 because port 3 is connected to IP
+    #    repl = 'IP_ACTIVE' + str(i)
+    #    xchg[repl] = str(0)
+    #    repl = 'MAC' + str(i)
+    #    xchg[repl] = xia_interfaces[i][1]
+    #    repl = 'IPADDR' + str(i)
+    #    xchg[repl] = xia_interfaces[i][2]
+    #    repl = 'GWADDR' + str(i)
+    #    xchg[repl] = xia_interfaces[i][3]
+    #    repl = 'EXT_IPADDR' + str(i)
+    #    xchg[repl] = xia_interfaces[i][4]
+    #    i += 1
+    #while i < 3:
+    #    repl = 'IP_ACTIVE' + str(i)
+    #    xchg[repl] = str(0)
+    #    repl = 'MAC' + str(i)
+    #    xchg[repl] = "00:00:00:00:00:00"
+    #    repl = 'IPADDR' + str(i)
+    #    xchg[repl] = "1.1.1.1"
+    #    repl = 'GWADDR' + str(i)
+    #    xchg[repl] = "1.1.1.1"
+    #    repl = 'EXT_IPADDR' + str(i)
+    #    xchg[repl] = "1.1.1.1"
+    #    i += 1
+
+    ## Handle the IP port (3)
+    #xchg['IP_ACTIVE3'] = str(1)
+    #xchg['MAC3'] = ip_interface[0][1];
+    #xchg['IPADDR3'] = ip_interface[0][2]
+    #xchg['GWADDR3'] = ip_interface[0][3]
+    #xchg['EXT_IPADDR3'] = ip_interface[0][4]
+    #     
+    #newtext = tpl.substitute(xchg)
+
+    #i = 0
+    ###
+    ### SOCKS
+    ### (The router ports connected using click socket elements)
+    ###
+    #if socket_ips_ports:
+    #    tpl = Template(socks)
+    #    for pair in [p.strip() for p in socket_ips_ports.split(',')]:
+    #        if i > 4: # Make sure we go up to at most 4 ports
+    #            break
+
+    #        ip, port = pair.split(':')
+
+    #        xchg['SOCK_IP'] = ip
+    #        xchg['PORT'] = int(port)
+    #        xchg['CLIENT'] = 'false' if ip == '0.0.0.0' else 'true'
+    #        xchg['NUM'] = i
+    #        i += 1
+
+    #        newtext += tpl.substitute(xchg)
 
 
 
-    ##
-    ## BODY
-    ##
-    tpl = Template(body)
-    start = i
-    for (interface, mac, ip, gw, ext_ip) in xia_interfaces:
-        if i > 4: # Make sure we go up to at most 4 ports
-            break
-        xchg['IFACE'] = xia_interfaces[i][0]
-        xchg['MAC'] = xia_interfaces[i][1]
-        xchg['NUM'] = i
-        i += 1
+    ###
+    ### BODY
+    ###
+    #tpl = Template(body)
+    #start = i
+    #for (interface, mac, ip, gw, ext_ip) in xia_interfaces:
+    #    if i > 4: # Make sure we go up to at most 4 ports
+    #        break
+    #    xchg['IFACE'] = xia_interfaces[i][0]
+    #    xchg['MAC'] = xia_interfaces[i][1]
+    #    xchg['NUM'] = i
+    #    i += 1
 
-        newtext += tpl.substitute(xchg)
+    #    newtext += tpl.substitute(xchg)
 
-    xchg['IFACE'] = ip_interface[0][0]
-    xchg['MAC'] = ip_interface[0][1]
-    xchg['NUM'] = 3
-    newtext += tpl.substitute(xchg)
+    #xchg['IFACE'] = ip_interface[0][0]
+    #xchg['MAC'] = ip_interface[0][1]
+    #xchg['NUM'] = 3
+    #newtext += tpl.substitute(xchg)
 
-    ##
-    ## BODY
-    ##
-    tpl = Template(extra)
-    while i < 3:
-        xchg['NUM'] = i
-        newtext += tpl.substitute(xchg)
-        i += 1
+    ###
+    ### BODY
+    ###
+    #tpl = Template(extra)
+    #while i < 3:
+    #    xchg['NUM'] = i
+    #    newtext += tpl.substitute(xchg)
+    #    i += 1
 
-    tpl = Template(footer)
-    newtext += tpl.substitute(xchg)
+    #tpl = Template(footer)
+    #newtext += tpl.substitute(xchg)
 
-    f.write(newtext)
-    f.close()
+    #f.write(newtext)
+    #f.close()
 
 #
 # parse the command line so we can do stuff
