@@ -32,7 +32,9 @@ import tempfile
 import time
 from datetime import datetime
 from optparse import OptionParser
+from c_xsocket import *
 
+SID = 'SID:1111111111222222222233333333334444444444'
 
 def create_directory(path):
     if not os.path.isdir(path):
@@ -534,7 +536,7 @@ class Client(object):
 
     def socket_readable_notification(self):
         try:
-            data = self.socket.recv(2 ** 10)
+            data = Xrecv(self.socket, 2**10)
             self.server.print_debug(
                 "[%s:%d] -> %r" % (self.host, self.port, data))
             quitmsg = "EOT"
@@ -551,7 +553,7 @@ class Client(object):
 
     def socket_writable_notification(self):
         try:
-            sent = self.socket.send(self.__writebuffer)
+            sent = Xsend(self.socket, self.__writebuffer)
             self.server.print_debug(
                 "[%s:%d] <- %r" % (
                     self.host, self.port, self.__writebuffer[:sent]))
@@ -564,7 +566,7 @@ class Client(object):
         self.server.print_info(
             "Disconnected connection from %s:%s (%s)." % (
                 self.host, self.port, quitmsg))
-        self.socket.close()
+        Xclose(self.socket)
         self.server.remove_client(self, quitmsg)
 
     def message(self, msg):
@@ -725,14 +727,17 @@ class Server(object):
     def start(self):
         serversockets = []
         for port in self.ports:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s = Xsocket(XSOCK_STREAM)
+            #s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            (ad, hid, ip) = XreadLocalHostAddr(s)
+            dag = "RE %s %s %s" % (ad, hid, SID)
+            self.print_debug("LocalHostAddr: (%s, %s, %s)" % (ad, hid, ip))
             try:
-                s.bind(("", port))
+                Xbind(s, dag)
             except socket.error, x:
                 self.print_error("Could not bind port %s: %s." % (port, x))
                 sys.exit(1)
-            s.listen(5)
+            #s.listen(5)
             serversockets.append(s)
             del s
             self.print_info("Listening on port %d." % port)
@@ -748,7 +753,7 @@ class Server(object):
                 if x in self.clients:
                     self.clients[x].socket_readable_notification()
                 else:
-                    (conn, addr) = x.accept()
+                    (conn, addr) = Xaccept(x)
                     self.clients[conn] = Client(self, conn)
                     self.print_info("Accepted connection from %s:%s." % (
                         addr[0], addr[1]))
@@ -823,10 +828,11 @@ def main(argv):
     server = Server(options)
     if options.daemon:
         server.daemonize()
-    try:
-        server.start()
-    except KeyboardInterrupt:
-        server.print_error("Interrupted.")
+    server.start()
+    #try:
+    #    server.start()
+    #except KeyboardInterrupt:
+    #    server.print_error("Interrupted.")
 
 
 main(sys.argv)
