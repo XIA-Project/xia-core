@@ -35,6 +35,7 @@ from optparse import OptionParser
 from c_xsocket import *
 
 SID = 'SID:1111111111222222222233333333334444444444'
+NAME = 'www_s.irc.aaa.xia'
 
 def create_directory(path):
     if not os.path.isdir(path):
@@ -116,7 +117,7 @@ class Client(object):
         self.nickname = None
         self.user = None
         self.realname = None
-        (self.host, self.port) = socket.getpeername()
+        (self.host, self.port) = ('-', 0) #socket.getpeername()
         self.__timestamp = time.time()
         self.__readbuffer = ""
         self.__writebuffer = ""
@@ -536,7 +537,7 @@ class Client(object):
 
     def socket_readable_notification(self):
         try:
-            data = Xrecv(self.socket, 2**10)
+            data = Xrecv(self.socket, 2**10, 0)
             self.server.print_debug(
                 "[%s:%d] -> %r" % (self.host, self.port, data))
             quitmsg = "EOT"
@@ -553,7 +554,7 @@ class Client(object):
 
     def socket_writable_notification(self):
         try:
-            sent = Xsend(self.socket, self.__writebuffer)
+            sent = Xsend(self.socket, self.__writebuffer, 0)
             self.server.print_debug(
                 "[%s:%d] <- %r" % (
                     self.host, self.port, self.__writebuffer[:sent]))
@@ -730,8 +731,9 @@ class Server(object):
             s = Xsocket(XSOCK_STREAM)
             #s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             (ad, hid, ip) = XreadLocalHostAddr(s)
-            dag = "RE %s %s %s" % (ad, hid, SID)
             self.print_debug("LocalHostAddr: (%s, %s, %s)" % (ad, hid, ip))
+            dag = "RE %s %s %s" % (ad, hid, SID)
+            XregisterName(NAME, dag)
             try:
                 Xbind(s, dag)
             except socket.error, x:
@@ -755,8 +757,7 @@ class Server(object):
                 else:
                     (conn, addr) = Xaccept(x)
                     self.clients[conn] = Client(self, conn)
-                    self.print_info("Accepted connection from %s:%s." % (
-                        addr[0], addr[1]))
+                    self.print_info("Accepted connection from %s." % (addr))
             for x in owtd:
                 if x in self.clients: # client may have been disconnected
                     self.clients[x].socket_writable_notification()
