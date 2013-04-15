@@ -21,10 +21,13 @@
 
 ### Usage:
 Join channel:
+
     :j #<channel>
 
 Leave channel:
+
     :l #<channel>
 
 Man page:
+
     man sic/sic.1
