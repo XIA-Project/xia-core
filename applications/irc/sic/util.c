@@ -19,7 +19,7 @@ eprint(const char *fmt, ...) {
 }
 
 static int
-dial(char *host, char *port) {
+dial(char *service) {
 	int sock;
 	sockaddr_x sa;
 	socklen_t slen;
@@ -30,7 +30,7 @@ dial(char *host, char *port) {
 	}
 
 	slen = sizeof(sa);
-	if (XgetDAGbyName(host, &sa, &slen) < 0) {
+	if (XgetDAGbyName(service, &sa, &slen) < 0) {
 		Xclose(sock);
 		eprint("error: unable to resovle service '%s'.\n", host);
 		return -1;

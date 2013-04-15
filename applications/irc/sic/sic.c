@@ -195,7 +195,7 @@ main(int argc, char *argv[]) {
 		}
 	}
 	/* init */
-	srv = dial(host, port);
+	srv = dial(host);
 	/* login */
 	if(password)
 		sout("PASS %s", password);
