@@ -3,6 +3,8 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
+#include "Xsocket.h"
+
 static void
 eprint(const char *fmt, ...) {
 	va_list ap;
@@ -18,26 +20,29 @@ eprint(const char *fmt, ...) {
 
 static int
 dial(char *host, char *port) {
-	static struct addrinfo hints;
-	int srv;
-	struct addrinfo *res, *r;
+	int sock;
+	sockaddr_x sa;
+	socklen_t slen;
 
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	if(getaddrinfo(host, port, &hints, &res) != 0)
-		eprint("error: cannot resolve hostname '%s':", host);
-	for(r = res; r; r = r->ai_next) {
-		if((srv = socket(r->ai_family, r->ai_socktype, r->ai_protocol)) == -1)
-			continue;
-		if(connect(srv, r->ai_addr, r->ai_addrlen) == 0)
-			break;
-		close(srv);
+	if ((sock = Xsocket(AF_XIA, XSOCK_STREAM, 0)) < 0) {
+		eprint("error: unable to open Xsocket\n");
+		return sock;
 	}
-	freeaddrinfo(res);
-	if(!r)
-		eprint("error: cannot connect to host '%s'\n", host);
-	return srv;
+
+	slen = sizeof(sa);
+	if (XgetDAGbyName(host, &sa, &slen) < 0) {
+		Xclose(sock);
+		eprint("error: unable to resovle service '%s'.\n", host);
+		return -1;
+	}
+
+	if (Xconnect(sock, (struct sockaddr*)&sa, slen) < 0) {
+		Xclose(sock);
+		eprint("error: unable to connect to service '%s'.\n", host);
+		return -1;
+	}
+
+	return sock;
 }
 
 #define strlcpy _strlcpy

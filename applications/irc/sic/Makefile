@@ -4,6 +4,8 @@ include config.mk
 
 SRC = sic.c
 OBJ = ${SRC:.c=.o}
+CFLAGS += -Iapi-include
+LDFLAGS += -Lapi-lib -lXsocket -ldagaddr
 
 all: options sic
 

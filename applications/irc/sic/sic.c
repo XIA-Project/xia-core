@@ -8,7 +8,7 @@
 #include <time.h>
 #include <unistd.h>
 
-static char *host = "irc.oftc.net";
+static char *host = "www_s.irc.aaa.xia";
 static char *port = "6667";
 static char *password;
 static char nick[32];
@@ -16,7 +16,7 @@ static char bufin[4096];
 static char bufout[4096];
 static char channel[256];
 static time_t trespond;
-static FILE *srv;
+static int srv;
 
 #include "util.c"
 
@@ -37,11 +37,24 @@ pout(char *channel, char *fmt, ...) {
 static void
 sout(char *fmt, ...) {
 	va_list ap;
+	int w, l;
 
+	char buf[4096];
 	va_start(ap, fmt);
 	vsnprintf(bufout, sizeof bufout, fmt, ap);
 	va_end(ap);
-	fprintf(srv, "%s\r\n", bufout);
+
+	w = snprintf(buf, sizeof buf, "%s\r\n", bufout);
+
+	fprintf(stdout, "Sending: %s (%d)\n", bufout, w);
+	fflush(stdout);
+
+	if ((l = Xsend(srv, buf, w, 0)) < 0) {
+		eprint("unable to write:");
+	}
+
+	fprintf(stdout, "Sent: (%d)\n", l);
+	fflush(stdout);
 }
 
 static void
@@ -159,27 +172,23 @@ main(int argc, char *argv[]) {
 		case 'v':
 			eprint("sic-"VERSION", © 2005-2012 Kris Maglione, Anselm R. Garbe, Nico Golde\n");
 		default:
-			eprint("usage: sic [-h host] [-p port] [-n nick] [-k keyword] [-v]\n");
+			eprint("usage: sic [-h service_name] [-p port] [-n nick] [-k keyword] [-v]\n");
 		}
 	}
 	/* init */
-	i = dial(host, port);
-	srv = fdopen(i, "r+");
+	srv = dial(host, port);
 	/* login */
 	if(password)
 		sout("PASS %s", password);
 	sout("NICK %s", nick);
 	sout("USER %s localhost %s :%s", nick, host, nick);
-	fflush(srv);
-	setbuf(stdout, NULL);
-	setbuf(srv, NULL);
 	for(;;) { /* main loop */
 		FD_ZERO(&rd);
 		FD_SET(0, &rd);
-		FD_SET(fileno(srv), &rd);
+		FD_SET(srv, &rd);
 		tv.tv_sec = 120;
 		tv.tv_usec = 0;
-		i = select(fileno(srv) + 1, &rd, 0, 0, &tv);
+		i = select(srv + 1, &rd, 0, 0, &tv);
 		if(i < 0) {
 			if(errno == EINTR)
 				continue;
@@ -191,8 +200,8 @@ main(int argc, char *argv[]) {
 			sout("PING %s", host);
 			continue;
 		}
-		if(FD_ISSET(fileno(srv), &rd)) {
-			if(fgets(bufin, sizeof bufin, srv) == NULL)
+		if(FD_ISSET(srv, &rd)) {
+			if(read(srv, bufin, sizeof bufin) < 0)
 				eprint("sic: remote host closed connection\n");
 			parsesrv(bufin);
 			trespond = time(NULL);
