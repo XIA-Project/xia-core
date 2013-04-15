@@ -46,15 +46,19 @@ sout(char *fmt, ...) {
 
 	w = snprintf(buf, sizeof buf, "%s\r\n", bufout);
 
+#if 0
 	fprintf(stdout, "Sending: %s (%d)\n", bufout, w);
 	fflush(stdout);
+#endif
 
 	if ((l = Xsend(srv, buf, w, 0)) < 0) {
 		eprint("unable to write:");
 	}
 
+#if 0
 	fprintf(stdout, "Sent: (%d)\n", l);
 	fflush(stdout);
+#endif
 }
 
 static void
@@ -114,7 +118,7 @@ parsein(char *s) {
 }
 
 static void
-parsesrv(char *cmd) {
+parsesrv_line(char *cmd) {
 	char *usr, *par, *txt;
 
 	usr = host;
@@ -143,6 +147,21 @@ parsesrv(char *cmd) {
 			strlcpy(nick, txt, sizeof nick);
 	}
 }
+
+static void
+parsesrv(char *buf) {
+	int len = strlen(buf);
+	char line[4096];
+	char *end;
+	while ((end = strstr(buf, "\r\n")) && len > 0) {
+		end+=2;
+		memcpy(line, buf, end-buf);
+		line[end-buf] = '\0';
+		parsesrv_line(line);
+		len -= end-buf; buf = end;
+	}
+}
+
 
 int
 main(int argc, char *argv[]) {
@@ -201,8 +220,9 @@ main(int argc, char *argv[]) {
 			continue;
 		}
 		if(FD_ISSET(srv, &rd)) {
-			if(read(srv, bufin, sizeof bufin) < 0)
+			if((c = Xrecv(srv, bufin, sizeof bufin, 0)) < 0)
 				eprint("sic: remote host closed connection\n");
+			bufin[c] = '\0';
 			parsesrv(bufin);
 			trespond = time(NULL);
 		}
@@ -214,3 +234,4 @@ main(int argc, char *argv[]) {
 	}
 	return 0;
 }
+/* vim: set noet nolist: */

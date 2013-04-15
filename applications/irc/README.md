@@ -18,3 +18,13 @@
     export LD_LIBRARY_PATH="<xia-core>/api/lib"
     cd <xia-core>/applications/irc
     ./sic/sic -n <nickname> -h www_s.irc.aaa.xia
+
+### Usage:
+Join channel:
+    :j #<channel>
+
+Leave channel:
+    :l #<channel>
+
+Man page:
+    man sic/sic.1
