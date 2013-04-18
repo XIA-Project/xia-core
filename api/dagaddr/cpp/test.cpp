@@ -194,6 +194,10 @@ int main()
 	printf("\nTesting short (<40 char) XID string\n");
 	Graph g13 = Graph("RE AD:10000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 SID:1110000000000000000000000000000000001113");
 	printf("g13.dag_string().c_str():\n%s\n", g13.dag_string().c_str());
+	
+	printf("\nTesting non-hex XID string\n");
+	Graph g14 = Graph("RE AD:10000hello0world0qrsxyz00000000000000000 HID:0000000000000000000000000000000000000000 SID:1110000000000000000000000000000000001113");
+	printf("g14.dag_string().c_str():\n%s\n", g14.dag_string().c_str());
 
 	printf("Testing string parse error checking ^^^\n\n\n");
 

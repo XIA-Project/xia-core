@@ -261,7 +261,10 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 		for (std::size_t i = 0; i < ID_LEN; i++)
 		{
 			int num = stoi(id_str.substr(2*i, 2), 0, 16);
-			memcpy(&(ptr_->id[i]), &num, 1);
+			if (num == -1)
+				printf("WARNING: Error parsing XID string (should be 20 hex digits): %s\n", id_str.c_str());
+			else
+				memcpy(&(ptr_->id[i]), &num, 1);
 		}
 	}
 }
@@ -1054,6 +1057,14 @@ Graph::get_out_edges(int i) const
 void 
 Graph::construct_from_dag_string(std::string dag_string)
 {
+	// Check for malformed DAG string
+	if (check_dag_string(dag_string) == -1)
+	{
+		printf("WARNING: DAG string is malformed: %s\n", dag_string.c_str());
+		add_node(Node()); // Add one dummy node to keep other code from blowing up
+		return;
+	}
+
 	// remove newline chars
 	dag_string.erase(std::remove(dag_string.begin(), dag_string.end(), '\n'), dag_string.end());
 
@@ -1099,9 +1110,35 @@ Graph::construct_from_dag_string(std::string dag_string)
 		}
 	}
 }
+
+/**
+* @brief Checks that a DAG string is formatted properly.
+*
+* Runs some simple checks on the supplied DAG string to make sure it's not
+* malformed.
+*
+* @param dag_string The DAG string to check
+*
+* @return 1 if string is OK, -1 otherwise
+*/
+int
+Graph::check_dag_string(std::string dag_string)
+{
+	// TODO: Implement
+	return 1;
+}
+
 void
 Graph::construct_from_re_string(std::string re_string)
 {
+	// Check for malformed RE string
+	if (check_re_string(re_string) == -1)
+	{
+		printf("WARNING: RE string is malformed: %s\n", re_string.c_str());
+		add_node(Node()); // Add one dummy node to keep other code from blowing up
+		return;
+	}
+
 	// split on ' '
 	std::vector<std::string> components = split(re_string, ' ');
 
@@ -1166,6 +1203,22 @@ Graph::construct_from_re_string(std::string re_string)
 			}
 		}
 	}
+}
+/**
+* @brief Checks that an RE string is formatted properly.
+*
+* Runs some simple checks on the supplied RE string to make sure it's not
+* malformed.
+*
+* @param re_string The RE string to check
+*
+* @return 1 if string is OK, -1 otherwise
+*/
+int
+Graph::check_re_string(std::string re_string)
+{
+	// TODO: Implement
+	return 1;
 }
 
 /**

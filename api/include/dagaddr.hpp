@@ -124,7 +124,9 @@ protected:
 
 private:
 	void construct_from_dag_string(std::string dag_string);
+	int check_dag_string(std::string dag_string);
 	void construct_from_re_string(std::string re_string);
+	int check_re_string(std::string re_string);
 
 	std::vector<Node> nodes_;
 	std::vector<std::vector<std::size_t> > out_edges_;
