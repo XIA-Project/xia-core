@@ -24,6 +24,9 @@
 #include <cstdio>
 #include <map>
 #include <algorithm>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 
 static const std::size_t vector_find_npos = std::size_t(-1);
@@ -212,6 +215,7 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 {
 	ptr_ = new container;
 	ptr_->ref_count = 1;
+    memset(ptr_->id,0,Node::ID_LEN); // zero the ID
 
 	if (type_str == XID_TYPE_AD_STRING)
 		ptr_->type = XID_TYPE_AD;
@@ -226,12 +230,39 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 	else if (type_str == XID_TYPE_DUMMY_SOURCE_STRING)
 		ptr_->type = XID_TYPE_DUMMY_SOURCE;
 	else
-		ptr_->type = 0;
-
-	for (std::size_t i = 0; i < ID_LEN; i++)
 	{
-		int num = stoi(id_str.substr(2*i, 2), 0, 16);
-		memcpy(&(ptr_->id[i]), &num, 1);
+		ptr_->type = 0;
+		printf("WARNING: Unrecognized XID type: %s\n", type_str.c_str());
+	}
+
+	// If this is a 4ID formatted as an IP address (x.x.x.x), we
+	// need to handle it separately. Otherwise, treat string as
+	// hex digits.
+	uint32_t ip = inet_addr(id_str.c_str());
+	if (ptr_->type == XID_TYPE_IP && ip != INADDR_NONE)
+	{
+        ptr_->id[0] = 0x45;  // set some special "4ID" values
+        ptr_->id[5] = 0x01;
+        ptr_->id[8] = 0xFA;
+        ptr_->id[9] = 0xFA;
+
+		ptr_->id[16] = *(((unsigned char*)&ip)+0);   
+		ptr_->id[17] = *(((unsigned char*)&ip)+1);
+		ptr_->id[18] = *(((unsigned char*)&ip)+2);
+		ptr_->id[19] = *(((unsigned char*)&ip)+3); 
+	}
+	else
+	{
+		if (id_str.length() != 40)
+		{
+			printf("WARNING: XID string must be 40 characters (20 hex digits): %s\n", id_str.c_str());
+			return;
+		}
+		for (std::size_t i = 0; i < ID_LEN; i++)
+		{
+			int num = stoi(id_str.substr(2*i, 2), 0, 16);
+			memcpy(&(ptr_->id[i]), &num, 1);
+		}
 	}
 }
 
@@ -1049,8 +1080,8 @@ Graph::construct_from_dag_string(std::string dag_string)
 		} 
 		else
 		{
-			std::vector<std::string> xid_elems = split(elems[0], ':');
-			Node n(xid_elems[0], xid_elems[1]);
+			//std::vector<std::string> xid_elems = split(elems[0], ':');
+			Node n(elems[0]);
 			graph_index = add_node(n);
 		}
 		dag_idx_to_graph_idx.push_back(graph_index);
@@ -1102,9 +1133,8 @@ Graph::construct_from_re_string(std::string re_string)
 		}
 		else
 		{
-			// TODO: verify that this component is a valid XID
-			std::vector<std::string> xid_elems = split(components[i], ':');
-			Node n(xid_elems[0], xid_elems[1]);
+			//std::vector<std::string> xid_elems = split(components[i], ':');
+			Node n(components[i]);
 			std::size_t cur_idx = add_node(n);
 
 			if (processing_fallback)

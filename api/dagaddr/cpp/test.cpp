@@ -171,7 +171,31 @@ int main()
 	
 	printf("Testing get_final_intent vvv\n");
 	printf("Final intent of g6_new_intent: %s\n", g6_new_intent.get_final_intent().id_string().c_str());
-	printf("Testing rget_final_intent ^^^\n\n\n");
+	printf("Testing get_final_intent ^^^\n\n\n");
+
+
+
+	printf("Testing string parse error checking vvv\n");
+
+	printf("Testing IP parsing\n");
+	Graph g10 = Graph("RE ( IP:192.168.0.1 ) AD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 SID:1110000000000000000000000000000000001113");
+	printf("g10.dag_string().c_str():\n%s\n", g10.dag_string().c_str());
+
+	printf("\nTesting 4ID parsing\n");
+	Graph g11 = Graph("RE ( IP:4500000000010000fafa000000000000c0a80001 ) AD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 SID:1110000000000000000000000000000000001113");
+	printf("g11.dag_string().c_str():\n%s\n", g11.dag_string().c_str());
+	
+	
+	printf("\nTesting bogus XID type\n");
+	Graph g12 = Graph("RE QD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 SID:1110000000000000000000000000000000001113");
+	printf("g12.dag_string().c_str():\n%s\n", g12.dag_string().c_str());
+	
+	
+	printf("\nTesting short (<40 char) XID string\n");
+	Graph g13 = Graph("RE AD:10000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 SID:1110000000000000000000000000000000001113");
+	printf("g13.dag_string().c_str():\n%s\n", g13.dag_string().c_str());
+
+	printf("Testing string parse error checking ^^^\n\n\n");
 
 	return 0;
 }
