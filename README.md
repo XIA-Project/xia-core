@@ -6,9 +6,13 @@ We are proud to announce version 1.0 of XIA (eXpressive Internet Architecture). 
 Information and papers on XIA are available on the [XIA project page](http://cs.cmu.edu/~xia)
 XIA design information can be found on the [XIA Wiki](https://github.com/XIA-Project/xia-core/wiki). Information on building and using XIA is also available on the wiki.
 
-Help on using XIA is available at <xia-users-help@cs.cmu.edu>
-
 The main git branch will always contain the most recently released version of XIA. Other branches will contain ongoing development or research projects and are not guaranteed to function correctly. If you are interested in using one of the other branches, contact us at the address above for status of the branch.
+
+Contact
+-------
+- [XIA announcement mailing list](https://mailman.srv.cs.cmu.edu/mailman/listinfo/xia-announce)
+- [XIA discussion list](https://mailman.srv.cs.cmu.edu/mailman/listinfo/xia-users)
+- Help on using XIA is available at <xia-users-help@cs.cmu.edu>
 
 Related Projects
 ----------------
