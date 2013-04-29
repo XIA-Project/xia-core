@@ -213,7 +213,7 @@ void echo_stream()
 
 	struct addrinfo *ai;
 	if (Xgetaddrinfo(NULL, SID_STREAM, NULL, &ai) != 0)
-		die(-1, "stream getaddrinfo failure!\n");
+		die(-1, "getaddrinfo failure!\n");
 
 	Graph g((sockaddr_x*)ai->ai_addr);
 
@@ -276,7 +276,7 @@ void echo_dgram()
 
 	struct addrinfo *ai;
 	if (Xgetaddrinfo(NULL, SID_DGRAM, NULL, &ai) != 0)
-		die(-1, "dgram getaddrinfo failure!\n");
+		die(-1, "getaddrinfo failure!\n");
 
 	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
 
