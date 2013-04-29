@@ -5,7 +5,7 @@ include ../../../xia.mk
 PYTHON=`python-config --include`
 
 CFLAGS +=-c -I$(PYTHON) -fpic
-LDFLAGS +=-lc -ldl
+LDFLAGS +=-lc -ldl `python-config --ldflags`
 
 DAGADDR_LIB=$(XLIB)/libdagaddr.so
 LIB=$(XLIB)/_dagaddr.so

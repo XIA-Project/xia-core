@@ -5,13 +5,14 @@ include ../../../xia.mk
 XSOCK_LIB=$(XLIB)/libXsocket.so $(XLIB)/libdagaddr.so
 TARGET=$(XLIB)/_c_xsocket.so
 CC=g++
+LDFLAGS +=-lc -ldl `python-config --ldflags`
 PYTHON=`python-config --include`
 
 all: $(TARGET) $(XLIB)/xsocket.py
 
 $(TARGET): $(XSOCK_LIB) c_xsocket_wrap.c
 	$(CC) -I $(XINC) $(PYTHON) -fpic -c c_xsocket_wrap.c
-	$(CC) -shared c_xsocket_wrap.o $(LIBS) -o $@  $(PYTHON)
+	$(CC) -shared c_xsocket_wrap.o $(LIBS) -o $@  $(PYTHON) $(LDFLAGS)
 
 c_xsocket_wrap.c: c_xsocket.i $(XSOCK_LIB)
 	swig -outdir $(XLIB) -python c_xsocket.i
