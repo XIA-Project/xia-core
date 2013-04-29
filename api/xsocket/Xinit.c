@@ -22,7 +22,6 @@
 
 #include <sys/types.h>
 #include <unistd.h>
-#include <linux/unistd.h>
 
 #include "Xsocket.h"
 #include "Xinit.h"
@@ -39,7 +38,7 @@ using namespace std;
 extern "C" {
 
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-	
+
 	/*!
 	** @brief Specify the location of the XSockets configuration file.
 	**
@@ -63,12 +62,12 @@ static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 **
 ** Returns a pointer to the conf object containing the addresses of the API
 ** client's IP address and the IP addresses used for communicating with click.
-** When first called, a mutex is locked and the config setting are loaded from 
+** When first called, a mutex is locked and the config setting are loaded from
 ** file. Subsequent calls do not incur the overhead of a mutex operation.
 **
 ** @returns pointer to the gobal XSocketConf structure
 */
-struct __XSocketConf* get_conf() 
+struct __XSocketConf* get_conf()
 {
 
 	if (__XSocketConf::initialized == 0) {
@@ -81,7 +80,7 @@ struct __XSocketConf* get_conf()
 
 		__XSocketConf::initialized=1;
 		pthread_mutex_unlock(&lock);
-	}	
+	}
 	return &_conf;
 }
 
@@ -89,11 +88,11 @@ struct __XSocketConf* get_conf()
 ** @brief constructor for the Xsockets library config settings.
 **
 ** Creates the config object and loads the settings from the config file.
-** 
+**
 ** NOTE: document the conf file format
 **
 */
-__InitXSocket::__InitXSocket() 
+__InitXSocket::__InitXSocket()
 {
 	const char * inifile = getenv("XSOCKCONF");
 
@@ -112,7 +111,7 @@ __InitXSocket::__InitXSocket()
 	}
 
 	const char * section_name_env  = getenv("XSOCKCONF_SECTION");
-	if (section_name_env) 
+	if (section_name_env)
 		section_name = section_name_env;
 
 	// NOTE: unlikely, but what happens if section_name is NULL?
@@ -126,7 +125,7 @@ __InitXSocket::__InitXSocket()
 **
 ** @returns void
 */
-void __InitXSocket::read_conf(const char *inifile, const char *section_name) 
+void __InitXSocket::read_conf(const char *inifile, const char *section_name)
 {
   ini_gets(section_name, "click_port", DEFAULT_CLICKPORT, _conf.click_port, __PORT_LEN , inifile);
 }
@@ -153,7 +152,7 @@ void print_conf()
 **
 ** @returns void
 */
-void __InitXSocket::print_conf() 
+void __InitXSocket::print_conf()
 {
   printf("click_port %s\n", _conf.click_port);
 }

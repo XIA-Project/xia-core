@@ -25,7 +25,7 @@
 #include "Xutil.h"
 #include "dagaddr.hpp"
 
-/* FIXME: 
+/* FIXME:
 ** - should we have XIA specific protocols for use in the addrinfo structure, or should it always be 0?
 ** - do something with the fallback flag
 **
@@ -107,11 +107,11 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 			return EAI_SOCKTYPE;
 		}
 
-		if (socktype != 0 && 
-			socktype != XSOCK_STREAM && 
+		if (socktype != 0 &&
+			socktype != XSOCK_STREAM &&
 			socktype != XSOCK_DGRAM &&
 			socktype != XSOCK_CHUNK) {
-			// make sure it's one of our socket types. 
+			// make sure it's one of our socket types.
 			// FIXME: should raw be allowed?
 			return EAI_SOCKTYPE;
 		}
@@ -166,7 +166,7 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 		}
 
 		if (flags & AI_ADDRCONFIG) {
-			// FIXME: will we ever want to use this flag?			
+			// FIXME: will we ever want to use this flag?
 			return EAI_BADFLAGS;
 		}
 
@@ -174,7 +174,7 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 			// FIXME: will we ever want to use this flag?
 			return EAI_BADFLAGS;
 		}
-
+#ifdef AI_IDN
 		// FIXME: at some point, add support for  international names
 		if (flags & AI_IDN ||
 			flags & AI_CANONIDN ||
@@ -183,7 +183,7 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 
 			return EAI_BADFLAGS;
 		}
-
+#endif
 		if (flags & XAI_FALLBACK) {
 			fallback = 1;
 		}
@@ -244,7 +244,7 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 			// FIXME: is the 127.0.0.1 check in the right byte order?
 			if (strncmp(ip, "00000000", 8) != 0 &&
 				strncasecmp(ip, "0100007f", 8) != 0) {
-			
+
 				have4id = 1;
 			}
 		}
