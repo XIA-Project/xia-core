@@ -7,12 +7,12 @@ echo "# DO NOT HAND EDIT!" >> $OUTPUT
 echo >> $OUTPUT
 
 # set num of procs for parallel builds
-if [ $(uname) == Darwin ]; then
+if [ $(uname) = "Darwin" ]; then
 	# os x
 	CORES=$(sysctl -n hw.ncpu)
 else
 	# linux
-	CORES=`grep -c "^processor /proc/cpuinfo"`
+	CORES=`grep -c ^processor /proc/cpuinfo`
 fi
 echo NPROCS=$(($CORES * 2)) >> $OUTPUT
 
