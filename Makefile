@@ -1,7 +1,7 @@
 ifeq ($(wildcard xia.mk),)
-	$(error You must run configure first)
+$(error You must run configure first)
 else
-	include xia.mk
+include xia.mk
 endif
 
 # list of top level directories that need to be built
