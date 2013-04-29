@@ -1,3 +1,4 @@
+#include "../../userlevel/xia.pb.h"
 #include <click/config.h>
 #include "xiarpc.hh"
 #include <click/glue.hh>
