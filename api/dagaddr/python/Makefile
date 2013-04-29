@@ -2,7 +2,7 @@ include ../../../xia.mk
 
 .PHONY: clean
 
-PYTHON=`find /usr/include/python*/Python.h | sed "s/\/Python.h//"`
+PYTHON=`python-config --include`
 
 CFLAGS +=-c -I$(PYTHON) -fpic
 LDFLAGS +=-lc -ldl
@@ -14,7 +14,7 @@ STATICLIB=$(XLIB)/_dagaddr.a
 
 OBJS=dagaddr_wrap.o
 
-all: $(LIB) $(XLIB)/dagaddr.py 
+all: $(LIB) $(XLIB)/dagaddr.py
 
 static: $(STATICLIB) $(XLIB)/dagaddr.py
 
@@ -28,9 +28,9 @@ $(STATICLIB): $(STATIC_DAGADDR_LIB) $(OBJS)
 	ar rcs $@ $(OBJS)
 
 dagaddr_wrap.cxx: dagaddr.i
-	swig -c++ -outdir $(XLIB) -python dagaddr.i 
+	swig -c++ -outdir $(XLIB) -python dagaddr.i
 
-clean: 
+clean:
 	-rm -f $(LIB) $(STATICLIB)
 	-rm -f $(XLIB)/dagaddr.py $(XLIB)/dagaddr.pyc
 	-rm -f *.so *.o *.pyc
