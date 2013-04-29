@@ -49,7 +49,7 @@ VISUALIZER_SERVER_DAEMONS="statsserver"
 # assumes this script is in a directory off the parent of the XIA tree
 # and that the daemons it starts are rooted off of the same location
 #  so XIADIR would be /xia-core assuming the script were /xia-core/tools/xianet
-XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")" 
+XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
 
 # click parameters
 CLICKPATH=$XIADIR/click
@@ -61,7 +61,7 @@ SCRIPT_SET=0
 
 is_running()
 {
-	RUNNING=`ps -e | grep "$1" `    #| grep -v grep`
+	RUNNING=`ps -Ao comm | grep "$1"`
 	[ "$RUNNING" != "" ]
 }
 
@@ -102,7 +102,7 @@ start_daemons()
 	if [ $ROUTER -eq 1 ]; then
 		FLAGS=$FLAGS" -r"
 	fi
-	if [ $HOST -eq 1 ]; then    
+	if [ $HOST -eq 1 ]; then
 		FLAGS=$FLAGS" -t"
 	fi
 	if [ $DUAL_STACK -eq 1 ]; then
@@ -174,45 +174,45 @@ start_daemons()
 	cd $XIADIR/bin
 
 	if [ $ROUTER -eq 1 ]; then
-		./xrouted $HOSTNAME & 
+		./xrouted $HOSTNAME &
 		sleep 2
-		
+
 		./xhcp_serverd &
-		sleep 1 
+		sleep 1
 	fi
-	if [ $HOST -eq 1 ]; then    
+	if [ $HOST -eq 1 ]; then
 
 		if [ $DUAL_STACK -eq 1 ]; then
 			./xrouted "$HOSTNAME"_router 180 &   # 180 is the name of a section in daemons/xroute/xsockconf.ini
 			sleep 2
-			
+
 			./xhcp_serverd 180 &
-			sleep 1 
-		
+			sleep 1
+
 			./xhcp_clientd www_h.$HOSTNAME.com.xia "$HOSTNAME"_host &
-			sleep 2 
+			sleep 2
 		else
-			./xhcp_clientd www_h.$HOSTNAME.com.xia $HOSTNAME & 
-			sleep 2 
+			./xhcp_clientd www_h.$HOSTNAME.com.xia $HOSTNAME &
+			sleep 2
 		fi
-		
+
 	fi
 	if [ $NAMESERVER -eq 1 -a $HOST -eq 1 ]; then
 		./xnameservice &
 	fi
 	if [ $LOCAL_CHAIN_TOPOLOGY -eq 1 ]; then
 		./xrouted router0 180 &
-		./xrouted router1 181 & 
+		./xrouted router1 181 &
 		sleep 2
-		
+
 		./xhcp_serverd 180 &
 		./xhcp_serverd 181 &
-		sleep 1 
-			
+		sleep 1
+
 		./xhcp_clientd www_h.host0.com.xia host0 172 &  # 172 is the name of a section in daemons/xhcp/xsockconf.ini
 		./xhcp_clientd www_h.host1.com.xia host1 192 &
-		sleep 2 
-			
+		sleep 2
+
 		./xnameservice &
 	fi
 	if [ $RUN_VISUALIZER_SERVER -eq 1 ]; then
@@ -359,7 +359,7 @@ if [ $SCRIPT_SET -eq 0 ]; then
 		fi
 	fi
 fi
-	
+
 if [ $HOST -eq 1 ]; then
 	DAEMONS=$DAEMONS" "$HOST_DAEMONS
 	if [ $DUAL_STACK -eq 1 ]; then
