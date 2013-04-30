@@ -83,7 +83,7 @@ click_chatter("CCCCCCCCCCCCCCCCC - in: %d, out: %d", of->ingressIf, of->egressIf
 
     click_chatter("%s - outport: %d, outifid: %d", name().c_str(), out_ether_port, out_ifid);
 
-    if (out_ether_port == 0) {
+    if (out_ifid == 0) {
       ((click_xia *)p->xia_header())->last += num_xid_block;
       
       output(1).push(p);

@@ -42,13 +42,12 @@ void XIONBridge::push(int port, Packet *p) {
   
   int pkt_type = SCIONPacketHeader::getType(pkt);
 
-  if (port == 0) {
+  if (port == 0) { // SCION SIDE
     if (pkt_type == UP_PATH) {
       path_table->parse(pkt, 0);
     } else if (pkt_type == PATH_REP_LOCAL) {
       path_table->parse(pkt, 1);
     } else if (pkt_type == AID_REQ) {
-      
       HostAddr srcAddr = HostAddr(HOST_ADDR_SCION, scion_aid);
       SCIONPacketHeader::setType(pkt, AID_REP);
       SCIONPacketHeader::setSrcAddr(pkt, srcAddr);
@@ -62,22 +61,19 @@ void XIONBridge::push(int port, Packet *p) {
       WritablePacket *out = Packet::make(DEFAULT_HD_ROOM, pkt, pkt_len, DEFAULT_TL_ROOM);
       output(0).push(out);
     } else {
-      click_chatter("[%s] unexpected packet from SCION side", name().c_str());
+      // out of SCION network, strip off SCION header, and give it to XIA routing core
       int hdrlen = SCIONPacketHeader::getHdrLen(pkt);
-      for (int i=0; i<200+hdrlen; i++) { fprintf(stderr, "%02x", p->data()[i]);} fprintf(stderr, "\n");
       p->pull(hdrlen);
-      for (int i=0; i<200; i++) { fprintf(stderr, "%02x", p->data()[i]);} fprintf(stderr, "\n");
 
       output(1).push(p);
     }
-  } else {
-    // unparse xid to get the target AD number
+  } else { // XIA SIDE
+    // unparse XID to find target AD number in XION_UNRESOLV XID type
     XIAHeader xiah = XIAHeader(p);
     String xid_str = xiah.dst_path().xid(xiah.last() + 1).unparse();
     int delim_pos = xid_str.find_left(':');
     String ad_num_str = xid_str.substring(delim_pos + 1, CLICK_XIA_XID_ID_LEN * 2);
     unsigned long int ad_number = strtol(ad_num_str.c_str(), NULL, 16);
-    click_chatter("%d", ad_number);
     pkt_cache.push_back(std::make_pair(ad_number, p));
   }
 }
@@ -110,11 +106,34 @@ int XIONBridge::request_scion_path_handler(int flags, String &str, Element *e, c
   path.opaque_field = NULL;
   if (xb->path_table->get_path(xb->scion_adid, target, path)) {
     rtn_flag = HANDLER_RTN_FLAG_FULLPATH;
-    str = "found\n";
+    char rtn_buf[4096];
+    // scion header making routine
+    uint8_t scion_header_buf[4096];
+    scionHeader hdr;
+    hdr.src = HostAddr(HOST_ADDR_SCION, (uint64_t)44444);
+    hdr.dst = HostAddr(HOST_ADDR_SCION, (uint64_t)44444);
+    uint8_t srcLen = hdr.src.getLength();
+    uint8_t dstLen = hdr.dst.getLength();
+    uint8_t offset = srcLen + dstLen;
+    uint8_t hdrLen = path.length + COMMON_HEADER_SIZE + offset;
+    hdr.cmn.type = DATA;
+    hdr.cmn.hdrLen = hdrLen;
+    hdr.cmn.totalLen = hdrLen;
+    hdr.cmn.timestamp = offset;
+    hdr.cmn.flag |= 0x80;
+    hdr.cmn.currOF = offset;
+    hdr.n_of = path.length / OPAQUE_FIELD_SIZE;
+    hdr.p_of = path.opaque_field;
+    SCIONPacketHeader::setHeader(scion_header_buf, hdr);
+    // scion header making routine end
+    for (int i=0; i<hdrLen; i++) {
+      sprintf(rtn_buf, "%s%02x", rtn_buf, scion_header_buf[i]);
+    }
+    fprintf(stderr, "%s\n", rtn_buf);
+    str = rtn_buf;
   } else {
-    rtn_flag = HANDLER_RTN_FLAG_NOTREADY;
     xb->send_path_request(target);
-    str = "fail\n";
+    return errh->error("target ad not found");
   }
   return 0;
 }
