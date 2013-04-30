@@ -139,6 +139,7 @@ $(ELEMENTSCONF).mk: $(ELEMENTSCONF).conf $(top_builddir)/click-buildtool
 $(ELEMENTSCONF).cc: $(ELEMENTSCONF).conf $(top_builddir)/click-buildtool
 	$(call verbose_cmd,$(top_builddir)/click-buildtool elem2export < $(ELEMENTSCONF).conf >,CREATE,$(ELEMENTSCONF).cc)
 	@rm -f $(ELEMENTSCONF).d
+#	echo '#include "xia.pb.h"' | cat - $(ELEMENTSCONF).cc  > temp && mv temp $(ELEMENTSCONF).cc
 
 DEPFILES := $(wildcard *.d)
 ifneq ($(DEPFILES),)
