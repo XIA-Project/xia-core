@@ -1,0 +1,50 @@
+package session;
+
+enum SessionCallType {
+  // Messages between API and session process
+  RETURN_CODE = 1;
+
+  NEW_CONTEXT = 3;
+  INIT = 4;
+
+
+  // Messages between session processes
+  SESSION_INFO = 2;
+}
+
+enum ReturnCode {
+	SUCCESS = 1;
+	FAILURE = 2;
+}
+
+message SessionMsg {
+  required SessionCallType type = 1;
+  
+  // This message could be one of the following specific types of message
+  optional S_Return_Code_Msg s_rc = 2;
+  optional S_New_Context_Msg s_new_context = 3;
+  optional SInitMsg s_init = 4;
+}
+
+message S_Return_Code_Msg {
+	required ReturnCode rc = 1;
+}
+ 
+message S_New_Context_Msg {
+  optional string temp = 1; // currently not used
+}
+
+message SInitMsg {
+  required string forward_path = 1;
+  required string return_path = 2;
+}
+
+message SessionInfo {
+
+	message ServiceInfo {
+		required string name = 1;
+	}
+
+	repeated ServiceInfo forward_path = 1;
+	repeated ServiceInfo return_path = 2;
+}
