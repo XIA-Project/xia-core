@@ -6,16 +6,29 @@ enum SessionCallType {
 
   NEW_CONTEXT = 3;
   INIT = 4;
-
-
-  // Messages between session processes
-  SESSION_INFO = 2;
+  BIND = 5;
+  ACCEPT = 6;
 }
 
 enum ReturnCode {
 	SUCCESS = 1;
 	FAILURE = 2;
 }
+
+enum ConnType {
+	TCP = 1;
+	UDP = 2;
+	XSP = 3;
+	XDP = 4;
+}
+
+enum PacketType {
+	SESSION_INFO = 1;
+	DATA = 2;
+}
+
+
+// Messages between API and session process
 
 message SessionMsg {
   required SessionCallType type = 1;
@@ -24,10 +37,13 @@ message SessionMsg {
   optional S_Return_Code_Msg s_rc = 2;
   optional S_New_Context_Msg s_new_context = 3;
   optional SInitMsg s_init = 4;
+  optional SBindMsg s_bind = 5;
+  optional SAcceptMsg s_accept = 6;
 }
 
 message S_Return_Code_Msg {
 	required ReturnCode rc = 1;
+	optional string message = 2;
 }
  
 message S_New_Context_Msg {
@@ -37,6 +53,28 @@ message S_New_Context_Msg {
 message SInitMsg {
   required string forward_path = 1;
   required string return_path = 2;
+  required string my_name = 3;
+}
+
+message SBindMsg {
+	required string name = 1;
+}
+
+message SAcceptMsg {
+	required uint32 new_ctx = 1;
+}
+
+
+// Messages between session processes
+
+message SessionPacket {
+	// Header fields
+	required PacketType type = 1;
+	required uint32 sender_ctx = 2;
+
+	// Data field
+	optional SessionInfo info = 10;
+	optional SessionData data = 11;
 }
 
 message SessionInfo {
@@ -47,4 +85,22 @@ message SessionInfo {
 
 	repeated ServiceInfo forward_path = 1;
 	repeated ServiceInfo return_path = 2;
+	optional string my_name = 3;
+	optional bytes my_addr = 4; // If XIA, a sockaddr_x
+	optional bytes initiator_addr = 5; // If XIA, a sockaddr_x
+}
+
+message SessionData {
+	required uint32 length = 1;
+	optional bytes data = 2;
+}
+
+// Stores information about an open transport connection.
+// The connection might be shared between multiple sessions.
+message ConnectionInfo {
+	optional string name = 1;
+	required int32 sockfd = 2;
+	repeated int32 sessions = 3;
+	required string interface = 4 [default = "default"];
+	required ConnType type = 5 [default = XSP];
 }

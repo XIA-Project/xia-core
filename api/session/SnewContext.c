@@ -23,8 +23,11 @@
 #include "Sutil.h"
 #include <errno.h>
 
+using namespace std;
+
 int SnewContext()
 {
+LOG("SnewContext()");
 	int rc;
 	int sockfd;
 
@@ -34,6 +37,7 @@ int SnewContext()
 		LOGF("error creating socket to session process: %s", strerror(errno));
 		return -1;
 	}
+LOG("make socket");
 
 	struct sockaddr_in addr;
 	addr.sin_family = PF_INET;
@@ -45,13 +49,14 @@ int SnewContext()
 		LOGF("bind error: %s", strerror(errno));
 		return -1;
 	}
+LOG("bound socket");
 		
 	// protobuf message
 	session::SessionMsg sm;
 	sm.set_type(session::NEW_CONTEXT);
 	//session::S_New_Context_Msg *ncm = sm.mutable_s_new_context(); // TODO: don't need this?
-	
-	if ((rc = click_send(sockfd, &sm)) < 0) {
+LOG("make session message, sending...");	
+	if ((rc = proc_send(sockfd, &sm)) < 0) {
 		LOGF("Error talking to session proc: %s", strerror(errno));
 		close(sockfd);
 		return -1;
@@ -59,19 +64,22 @@ int SnewContext()
 
 	// process the reply from the session process
 	session::SessionMsg rsm;
-	if ((rc = click_reply(sockfd, rsm)) < 0) {
+	if ((rc = proc_reply(sockfd, rsm)) < 0) {
 		LOGF("Error getting status from session proc: %s", strerror(errno));
 	} 
 	if (rsm.type() != session::RETURN_CODE || rsm.s_rc().rc() != session::SUCCESS) {
-		LOG("Session proc returned an error");
+		string errormsg = "Unspecified";
+		if (rsm.s_rc().has_message())
+			errormsg = rsm.s_rc().message();
+		LOGF("Session proc returned an error: %s", errormsg.c_str());
 		rc = -1;
 	}
 	
-	if (rc == 0) {
-		return sockfd; // for now, treat the sockfd as the context handle
+	if (rc < 0) {
+		// close the control socket since the underlying Xsocket is no good
+		close(sockfd);
+		return -1; 
 	}
 
-	// close the control socket since the underlying Xsocket is no good
-	close(sockfd);
-	return -1; 
+	return sockfd; // for now, treat the sockfd as the context handle
 }

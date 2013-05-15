@@ -2,11 +2,12 @@ include ../../xia.mk
 
 .PHONY: clean 
 
-CFLAGS +=-c -fpic
+CFLAGS +=-c -Iminini -fpic
 CPPFLAGS=$(CFLAGS)
 LDFLAGS +=-lprotobuf -lc -ldl
 
-SOURCES=SnewContext.c Sutil.c
+SOURCES=SnewContext.c Sinit.c Sutil.c Sbind.c SacceptConnReq.c api_init.c \
+		minini/minIni.c
 OBJS=$(SOURCES:.c=.o) session.pb.o
 LIB=$(XLIB)/libSession.so
 STATICLIB=$(XLIB)/libSession.a

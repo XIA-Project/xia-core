@@ -1,6 +1,6 @@
 /* ts=4 */
 /*
-** Copyright 2011 Carnegie Mellon University
+** Copyright 2013 Carnegie Mellon University
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
 ** limitations under the License.
 */
 /*!
- @file Sinit.c
- @brief Implements Sinit()
+ @file SacceptConnReq.c
+ @brief Implements SacceptConnReq()
 */
 
 #include "session.h"
@@ -25,22 +25,38 @@
 
 using namespace std;
 
-int Sinit(int ctx, const char* forwardPath, const char* returnPath, const char* myName)
+int SacceptConnReq(int ctx)
 {
-	int rc;
 	int sockfd = ctx; // for now on the client side we treat the socket fd as the context handle
+	int new_sockfd;
+
+	// make new socket for the new incoming session
+	if ((new_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+		LOGF("error creating socket to session process: %s", strerror(errno));
+		return -1;
+	}
+
+	struct sockaddr_in addr;
+	addr.sin_family = PF_INET;
+	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	addr.sin_port = 0;
+
+	if (bind(new_sockfd, (const struct sockaddr *)&addr, sizeof(addr)) < 0) {
+		close(new_sockfd);
+		LOGF("bind error: %s", strerror(errno));
+		return -1;
+	}
+LOGF("New context (port): %d", addr.sin_port);
+	
+
 		
 	// protobuf message
 	session::SessionMsg sm;
-	sm.set_type(session::INIT);
-	session::SInitMsg *im = sm.mutable_s_init();
+	sm.set_type(session::ACCEPT);
+	session::SAcceptMsg *am = sm.mutable_s_accept();
+	am->set_new_ctx(addr.sin_port);
 
-	// parse paths into protobuf msg
-	im->set_forward_path(forwardPath);
-	im->set_return_path(returnPath);
-	im->set_my_name(myName);
-	
-	if ((rc = proc_send(sockfd, &sm)) < 0) {
+	if (proc_send(sockfd, &sm) < 0) {
 		LOGF("Error talking to session proc: %s", strerror(errno));
 		close(sockfd);
 		return -1;
@@ -48,7 +64,7 @@ int Sinit(int ctx, const char* forwardPath, const char* returnPath, const char* 
 
 	// process the reply from the session process
 	session::SessionMsg rsm;
-	if ((rc = proc_reply(sockfd, rsm)) < 0) {
+	if (proc_reply(sockfd, rsm) < 0) {
 		LOGF("Error getting status from session proc: %s", strerror(errno));
 	} 
 	if (rsm.type() != session::RETURN_CODE || rsm.s_rc().rc() != session::SUCCESS) {
@@ -56,14 +72,7 @@ int Sinit(int ctx, const char* forwardPath, const char* returnPath, const char* 
 		if (rsm.s_rc().has_message())
 			errormsg = rsm.s_rc().message();
 		LOGF("Session proc returned an error: %s", errormsg.c_str());
-		rc = -1;
+		return -1;
 	}
-	
-	if (rc == 0) {
-		return sockfd; // for now, treat the sockfd as the context handle
-	}
-
-	// close the control socket since the underlying Xsocket is no good
-	close(sockfd);
-	return -1; 
+	return new_sockfd;
 }

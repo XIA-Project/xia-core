@@ -1,6 +1,6 @@
 /* ts=4 */
 /*
-** Copyright 2011 Carnegie Mellon University
+** Copyright 2013 Carnegie Mellon University
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
 ** limitations under the License.
 */
 /*!
- @file Sinit.c
- @brief Implements Sinit()
+ @file Sbind.c
+ @brief Implements Sbind()
 */
 
 #include "session.h"
@@ -25,20 +25,18 @@
 
 using namespace std;
 
-int Sinit(int ctx, const char* forwardPath, const char* returnPath, const char* myName)
+int Sbind(int ctx, const char* name)
 {
 	int rc;
 	int sockfd = ctx; // for now on the client side we treat the socket fd as the context handle
 		
 	// protobuf message
 	session::SessionMsg sm;
-	sm.set_type(session::INIT);
-	session::SInitMsg *im = sm.mutable_s_init();
+	sm.set_type(session::BIND);
+	session::SBindMsg *bm = sm.mutable_s_bind();
 
 	// parse paths into protobuf msg
-	im->set_forward_path(forwardPath);
-	im->set_return_path(returnPath);
-	im->set_my_name(myName);
+	bm->set_name(name);
 	
 	if ((rc = proc_send(sockfd, &sm)) < 0) {
 		LOGF("Error talking to session proc: %s", strerror(errno));
@@ -58,12 +56,5 @@ int Sinit(int ctx, const char* forwardPath, const char* returnPath, const char* 
 		LOGF("Session proc returned an error: %s", errormsg.c_str());
 		rc = -1;
 	}
-	
-	if (rc == 0) {
-		return sockfd; // for now, treat the sockfd as the context handle
-	}
-
-	// close the control socket since the underlying Xsocket is no good
-	close(sockfd);
-	return -1; 
+	return rc;
 }

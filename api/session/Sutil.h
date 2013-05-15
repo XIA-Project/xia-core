@@ -30,11 +30,12 @@
 #define LOGF(fmt, ...)
 #endif
 
-#define PROCPORT 1989
-
-int click_send(int sockfd, session::SessionMsg *sm);
-int click_reply(int sockfd, session::SessionMsg &sm);
-//int click_reply2(int sockfd, xia::XSocketCallType *type);
+int proc_send(int sockfd, session::SessionMsg *sm);
+int proc_reply(int sockfd, session::SessionMsg &sm);
+//int proc_reply2(int sockfd, xia::XSocketCallType *type);
 int bind_to_random_port(int sockfd);
+
+std::vector<std::string> split(const std::string &s, char delim);
+std::string trim(const std::string& str);
 
 #endif /* _SUTIL_H */

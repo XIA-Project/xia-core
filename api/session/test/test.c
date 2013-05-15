@@ -5,5 +5,6 @@
 int main()
 {
 	int ctx = SnewContext();
+	Sinit(ctx, "one, two, three", "return1,return2,return3", "one");
 	return 0;
 }

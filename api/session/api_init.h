@@ -13,40 +13,33 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
-/*!
-  @file session.h
-  @brief Session API header file
-*/
 
-#ifndef SESSION_H
-#define SESSION_H
-
-#define DEBUG
+#ifndef APIINIT_H
+#define APIINIT_H
 
 
-#include <stdlib.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <string.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#define DEFAULT_PROCPORT "1989"
 
-#ifdef __cplusplus
-extern "C" {
+
+#define __PORT_LEN 6
+
+class  __InitSession {
+    public:
+		~__InitSession() {};
+		__InitSession();
+        static void read_session_conf(const char *inifile, const char *section_name);
+	    static void print_session_conf();
+	private:
+	static __InitSession _instance;
+};
+
+struct __SessionConf {
+  static int initialized;
+  char proc_port[__PORT_LEN];
+};
+
+extern struct __SessionConf _session_conf;
+extern struct __SessionConf* get_session_conf(void);
+
+#define PROCPORT  (atoi(get_session_conf()->proc_port))
 #endif
-
-
-//Function list
-extern int SnewContext();
-extern int Sinit(int ctx, const char* forwardPath, const char* returnPath, const char* myName);
-extern int Sbind(int ctx, const char* name);
-extern int SacceptConnReq(int ctx);
-
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* SESSION_H */
-

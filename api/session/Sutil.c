@@ -17,13 +17,16 @@
   @file Sutil.c
   @brief Impliments internal socket helper functions
 */
-#include "Sutil.h"
 #include "session.h"
+#include "Sutil.h"
+#include "api_init.h"
 #include <errno.h>
+#include <sstream>
+#include <vector>
 
 
 
-int click_send(int sockfd, session::SessionMsg *sm)
+int proc_send(int sockfd, session::SessionMsg *sm)
 {
 	int rc = 0;
 	struct sockaddr_in sa;
@@ -68,7 +71,7 @@ int click_send(int sockfd, session::SessionMsg *sm)
 	return  (rc >= 0 ? 0 : -1);
 }
 
-int click_reply(int sockfd, session::SessionMsg &sm)
+int proc_reply(int sockfd, session::SessionMsg &sm)
 {
 	struct sockaddr_in sa;
 	socklen_t len;
@@ -118,3 +121,29 @@ int click_reply2(int sockfd, xia::XSocketCallType *type)
 
 	return rc;
 }*/
+
+
+
+
+std::vector<std::string> split(const std::string &s, char delim) {
+    std::vector<std::string> elems;
+    std::stringstream ss(s);
+    std::string item;
+    while(std::getline(ss, item, delim)) {
+        elems.push_back(item);
+    }
+    return elems;
+}
+
+std::string trim(const std::string& str)
+{
+	const std::string& whitespace = " \t\n";
+    const size_t strBegin = str.find_first_not_of(whitespace);
+    if (strBegin == std::string::npos)
+        return ""; // no content
+
+    const size_t strEnd = str.find_last_not_of(whitespace);
+    const size_t strRange = strEnd - strBegin + 1;
+
+    return str.substr(strBegin, strRange);
+}

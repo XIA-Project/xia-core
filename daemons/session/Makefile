@@ -4,7 +4,7 @@ include ../../xia.mk
 
 LDFLAGS += $(LIBS)
 LDFLAGS +=-lprotobuf -lc -ldl
-SOURCES=sessiond.cpp session.pb.cc
+SOURCES=sessiond.cpp session.pb.cc utils.cpp
 #SESSIOND=$(BINDIR)/sessiond
 SESSIOND=sessiond
 
