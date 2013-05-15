@@ -4,7 +4,6 @@
 """Threaded heartbeat server"""
 
 UDP_PORT = 43278; CHECK_PERIOD = 3; CHECK_TIMEOUT = 5
-HOSTNAME = 'gs11698.sp.cs.cmu.edu'
 
 import socket, threading, time
 
@@ -45,7 +44,7 @@ class Receiver(threading.Thread):
         self.heartbeats = heartbeats
         self.recSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.recSocket.settimeout(CHECK_TIMEOUT)
-        self.recSocket.bind((socket.gethostbyname(HOSTNAME), UDP_PORT))
+        self.recSocket.bind(('', UDP_PORT))
         self.latlonfile = open('IPLATLON', 'r').read().split('\n')
         self.latlond = {}
         for ll in self.latlonfile:
