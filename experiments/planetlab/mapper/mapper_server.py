@@ -1,5 +1,4 @@
 #!/usr/bin/python
-# Filename: ThreadedBeatServer.py
 
 """Threaded heartbeat server"""
 
@@ -54,19 +53,32 @@ class Receiver(threading.Thread):
     def run(self):
         while self.goOnEvent.isSet():
             try:
-                data, addr = self.recSocket.recvfrom(30)
+                data, addr = self.recSocket.recvfrom(65535)
                 data = data.split(':');
                 if data[0] == 'PyHB':
-                    ip = data[1].split(' ')[0]
-                    color = data[1].split(' ')[1]
+                    ip = data[1].split(';')[0]
+                    color = data[1].split(';')[1]
                     lat = self.latlond[ip][0]
                     lon = self.latlond[ip][1]
                     name = self.latlond[ip][2]
-                    self.heartbeats[ip] = [time.time(), color, lat, lon, name]
+                    try:
+                        neighbors = eval(data[1].split(';')[2])
+                        nlatlon = [self.latlond[neighbor] for neighbor in neighbors]
+                    except:
+                        nlatlon = []
+                    self.heartbeats[ip] = [time.time(), color, lat, lon, name, nlatlon]
             except socket.timeout:
                 pass
             except KeyError:
                 pass
+
+def buildMap(clients):
+    url = 'http://maps.googleapis.com/maps/api/staticmap?center=Kansas&zoom=4&size=640x400&maptype=roadmap&sensor=false'
+    for client in clients:
+        url += '&markers=color:%s|%s,%s' % (client[0],client[2],client[1])
+        url += ''.join(['&path=color:%s|%s,%s|%s,%s' % (client[0],client[2],client[1],x[1],x[0]) for x in client[4]])
+    html = '<html>\n<head>\n<title>Current Nodes In Topology</title>\n<meta http-equiv="refresh" content="5">\n</head>\n<body>\n<img src="%s">\n</body>\n</html>' % url
+    return html
 
 def main():
     receiverEvent = threading.Event()
@@ -79,6 +91,11 @@ def main():
     try:
         while True:
             clients = heartbeats.getClients()
+            html = buildMap(clients)
+            f = open('/var/www/html/map.html', 'w')
+            f.write(html)
+            f.close()
+            clients = [client[3] for client in clients]
             print 'Active clients: %s' % clients
             time.sleep(CHECK_PERIOD)
     except KeyboardInterrupt:
