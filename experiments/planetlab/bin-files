@@ -43,3 +43,4 @@
 ./xia-core/experiments/planetlab/libprotobuf.so.8
 ./xia-core/experiments/planetlab/libc.conf
 ./xia-core/experiments/planetlab/refresh.sh
+./xia-core/experiments/planetlab/mapper/HeartbeatClient.py
