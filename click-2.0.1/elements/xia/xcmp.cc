@@ -151,8 +151,8 @@ XCMP::processBadForwarding(Packet *p_in) {
     XID lnode(lastnode.xid);
 
     if(DEBUG)
-        click_chatter("%s: %u: %s sent me a packet that should route on its local network (Dst: %s)\n", 
-                      _src_path.unparse().c_str(), p_in->timestamp_anno().usecval(), hdr.src_path().unparse().c_str(), 
+        click_chatter("%s: %s sent me a packet that should route on its local network (Dst: %s)\n", 
+                      _src_path.unparse().c_str(), hdr.src_path().unparse().c_str(), 
                       XID(lastnode.xid).unparse().c_str());
 
     // get the next hop information stored in the packet annotation
@@ -161,7 +161,7 @@ XCMP::processBadForwarding(Packet *p_in) {
     sendXCMPPacket(p_in, XCMP_REDIRECT, XCMP_REDIRECT_HOST, &lnode.xid(), &nxt_hop.xid()); // send a redirect
 	   
     if(DEBUG)
-        click_chatter("%s: %u: Redirect sent\n", _src_path.unparse().c_str(), Timestamp::now().usecval());
+        click_chatter("%s: Redirect sent\n", _src_path.unparse().c_str());
 
     return;
 }
@@ -170,7 +170,7 @@ XCMP::processBadForwarding(Packet *p_in) {
 void
 XCMP::processUnreachable(Packet *p_in) {
     XIAHeader hdr(p_in);
-    if(hdr.nxt() == CLICK_XIA_NXT_XCMP && ((unsigned char *)hdr.payload())[0] == 3) { // can't deliever an unreachable?
+    if(hdr.nxt() == CLICK_XIA_NXT_XCMP && ((unsigned char *)hdr.payload())[0] == XCMP_UNREACH) { // can't deliever an unreachable?
         // return immediately to avoid infinite packet generation
         return;
     }
@@ -193,15 +193,15 @@ XCMP::processUnreachable(Packet *p_in) {
     }
 
     if(DEBUG)
-        click_chatter("%s: %u: Dest (S: %s , D: %s) Unreachable\n", _src_path.unparse().c_str(), 
-                      p_in->timestamp_anno().usecval(), hdr.src_path().unparse().c_str(), 
+        click_chatter("%s: Dest (S: %s , D: %s) Unreachable\n", _src_path.unparse().c_str(), 
+                      hdr.src_path().unparse().c_str(), 
                       hdr.dst_path().unparse().c_str());
-      
+
     sendXCMPPacket(p_in, XCMP_UNREACH, XCMP_UNREACH_HOST, NULL, NULL); // send an undeliverable message
-      
+
     if(DEBUG)
-        click_chatter("%s: %u: Dest Unreachable sent to %s\n", _src_path.unparse().c_str(), 
-                      Timestamp::now().usecval(), hdr.src_path().unparse().c_str());
+        click_chatter("%s: Dest Unreachable sent to %s\n", _src_path.unparse().c_str(), 
+                      hdr.src_path().unparse().c_str());
 
     return;
 }
@@ -210,12 +210,12 @@ XCMP::processUnreachable(Packet *p_in) {
 void
 XCMP::processExpired(Packet *p_in) {
     if(DEBUG)
-        click_chatter("%s: %u: HLIM Exceeded\n", _src_path.unparse().c_str(), p_in->timestamp_anno().usecval());
+        click_chatter("%s: HLIM Exceeded\n", _src_path.unparse().c_str());
     
     sendXCMPPacket(p_in, XCMP_TIMXCEED, XCMP_TIMXCEED_REASSEMBLY , NULL, NULL); // send a TTL expire message
   		
     if(DEBUG)
-        click_chatter("%s: %u: TIME EXCEEDED sent\n", _src_path.unparse().c_str(), Timestamp::now().usecval());
+        click_chatter("%s: TIME EXCEEDED sent\n", _src_path.unparse().c_str());
 		
     return;
 }
@@ -225,8 +225,8 @@ void
 XCMP::gotPing(const Packet *p_in) {
     const XIAHeader hdr(p_in);
     if(DEBUG)
-        click_chatter("%s: %u: PING received; client seq = %u\n", _src_path.unparse().c_str(), 
-                      p_in->timestamp_anno().usecval(), *(uint16_t*)(hdr.payload() + 6));
+        click_chatter("%s: PING received; client seq = %u\n", _src_path.unparse().c_str(), 
+                      *(uint16_t*)(hdr.payload() + 6));
 
     sendXCMPPacket(p_in, XCMP_ECHOREPLY, 0, NULL, NULL);
 
@@ -254,8 +254,8 @@ XCMP::gotPing(const Packet *p_in) {
     */
 
     if(DEBUG)
-        click_chatter("%s: %u: PONG sent; client seq = %u\n", _src_path.unparse().c_str(), 
-                      Timestamp::now().usecval(), *(uint16_t*)(p_in->data() + 6));
+        click_chatter("%s: PONG sent; client seq = %u\n", _src_path.unparse().c_str(), 
+                      *(uint16_t*)(p_in->data() + 6));
 }
 
 // got pong, send up
@@ -263,7 +263,7 @@ void
 XCMP::gotPong(Packet *p_in) {
     XIAHeader hdr(p_in);
     if(DEBUG)
-        click_chatter("%s: %u: PONG recieved; client seq = %u\n", _src_path.unparse().c_str(), Timestamp::now().usecval(), *(uint16_t*)(hdr.payload() + 6));
+        click_chatter("%s: PONG recieved; client seq = %u\n", _src_path.unparse().c_str(), *(uint16_t*)(hdr.payload() + 6));
     sendUp(p_in);
 }
 
@@ -271,7 +271,7 @@ XCMP::gotPong(Packet *p_in) {
 void
 XCMP::gotExpired(Packet *p_in) {
     if(DEBUG)
-        click_chatter("%s: %u: Received TIME EXCEEDED\n", _src_path.unparse().c_str(), Timestamp::now().usecval());
+        click_chatter("%s: Received TIME EXCEEDED\n", _src_path.unparse().c_str());
     sendUp(p_in);
 }
 
@@ -279,7 +279,7 @@ XCMP::gotExpired(Packet *p_in) {
 void
 XCMP::gotUnreachable(Packet *p_in) {
     if(DEBUG)
-        click_chatter("%s: %u: Received UNREACHABLE\n", _src_path.unparse().c_str(), Timestamp::now().usecval());
+        click_chatter("%s: Received UNREACHABLE\n", _src_path.unparse().c_str());
     sendUp(p_in);		
 }
 
@@ -287,7 +287,7 @@ XCMP::gotUnreachable(Packet *p_in) {
 void
 XCMP::gotRedirect(Packet *p_in) {
     if(DEBUG)
-        click_chatter("%s: %u: Received REDIRECT\n", _src_path.unparse().c_str(), Timestamp::now().usecval());
+        click_chatter("%s: Received REDIRECT\n", _src_path.unparse().c_str());
     
     XIAHeader hdr(p_in);
     const uint8_t *pay = hdr.payload();
@@ -299,8 +299,8 @@ XCMP::gotRedirect(Packet *p_in) {
     newroute = XID((const struct click_xia_xid &)(pay[xs+sizeof(struct click_xia_xid)]));
     badhdr = new XIAHeader((const struct click_xia *)(&pay[xs+sizeof(struct click_xia_xid)*2]));
     if(DEBUG)
-        click_chatter("%s: %u: REDIRECT INFO: %s told me (%s) that in order to send to %s, I should first send to %s\n",
-                      _src_path.unparse().c_str(), Timestamp::now().usecval(), hdr.src_path().unparse().c_str(), 
+        click_chatter("%s: REDIRECT INFO: %s told me (%s) that in order to send to %s, I should first send to %s\n",
+                      _src_path.unparse().c_str(), hdr.src_path().unparse().c_str(), 
                       hdr.dst_path().unparse().c_str(), baddest.unparse().c_str(), newroute.unparse().c_str());
 		
     delete badhdr;
