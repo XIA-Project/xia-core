@@ -27,6 +27,7 @@ using namespace std;
 
 int Sbind(int ctx, const char* name)
 {
+LOG("BEGIN Sbind");
 	int rc;
 	int sockfd = ctx; // for now on the client side we treat the socket fd as the context handle
 		

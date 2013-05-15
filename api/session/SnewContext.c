@@ -27,7 +27,7 @@ using namespace std;
 
 int SnewContext()
 {
-LOG("SnewContext()");
+LOG("BEGIN SnewContext()");
 	int rc;
 	int sockfd;
 
@@ -37,7 +37,6 @@ LOG("SnewContext()");
 		LOGF("error creating socket to session process: %s", strerror(errno));
 		return -1;
 	}
-LOG("make socket");
 
 	struct sockaddr_in addr;
 	addr.sin_family = PF_INET;
@@ -49,13 +48,11 @@ LOG("make socket");
 		LOGF("bind error: %s", strerror(errno));
 		return -1;
 	}
-LOG("bound socket");
 		
 	// protobuf message
 	session::SessionMsg sm;
 	sm.set_type(session::NEW_CONTEXT);
 	//session::S_New_Context_Msg *ncm = sm.mutable_s_new_context(); // TODO: don't need this?
-LOG("make session message, sending...");	
 	if ((rc = proc_send(sockfd, &sm)) < 0) {
 		LOGF("Error talking to session proc: %s", strerror(errno));
 		close(sockfd);

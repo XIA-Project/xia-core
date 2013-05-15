@@ -27,6 +27,8 @@ using namespace std;
 
 int SacceptConnReq(int ctx)
 {
+LOG("BEGIN SacceptConnReq");
+
 	int sockfd = ctx; // for now on the client side we treat the socket fd as the context handle
 	int new_sockfd;
 
@@ -46,8 +48,6 @@ int SacceptConnReq(int ctx)
 		LOGF("bind error: %s", strerror(errno));
 		return -1;
 	}
-LOGF("New context (port): %d", addr.sin_port);
-	
 
 		
 	// protobuf message

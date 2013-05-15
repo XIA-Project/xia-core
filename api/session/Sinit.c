@@ -59,7 +59,7 @@ int Sinit(int ctx, const char* forwardPath, const char* returnPath, const char* 
 		rc = -1;
 	}
 	
-	if (rc == 0) {
+	if (rc >= 0) {
 		return sockfd; // for now, treat the sockfd as the context handle
 	}
 
