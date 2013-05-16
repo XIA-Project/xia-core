@@ -366,6 +366,7 @@ elementclass XIAEndHost {
 
     Script(write xrc/n/proc/rt_AD.add - 0);      // default route for AD
     Script(write xrc/n/proc/rt_IP.add - 0); 	// default route for IPv4    
+    Script(write xrc/n/proc/rt_HID.add - 0); 	// default route for HID (so hosts can reach other hosts on the same AD)
     
 	input -> xlc :: XIALineCard($local_addr, $local_hid, $mac, 0) -> output;
 	xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> xrc;
