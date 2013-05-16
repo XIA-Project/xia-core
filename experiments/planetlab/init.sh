@@ -1,7 +1,7 @@
 #!/bin/bash
 
 cd ~
-wget http://www.cs.cmu.edu/~mmukerje/planetlab/id_rsa
+wget https://raw.github.com/XIA-Project/xia-core/develop/experiments/planetlab/id_rsa
 chmod 600 id_rsa
 mkdir .ssh
 mv id_rsa .ssh/
