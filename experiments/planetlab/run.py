@@ -24,6 +24,7 @@ elif sys.argv[1] == 'init':
 machines = open('machines','r').read().split('\n')
 for machine in machines:
     try:
+        machine = machine.split('#')[0]
         f = open('/tmp/%s-log' % (machine),'w')
         c = 'ssh cmu_xia@%s %s' % (machine, cmd)
         print c

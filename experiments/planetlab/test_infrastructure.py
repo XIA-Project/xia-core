@@ -17,8 +17,10 @@ try:
     sections = f.read().split('[')
     for section in sections:
         ip = section.split(']')[0]
+        if ip == 'default':
+            my_commands += section.split('\n')[1:-1]
         if ip == my_ip:
-            my_commands = section.split('\n')[1:-1]
+            my_commands += section.split('\n')[1:-1]
     f.close()
 except Exception, e: 
     print e
