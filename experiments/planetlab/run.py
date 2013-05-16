@@ -10,7 +10,7 @@ if len(sys.argv) < 2:
 START = '"./fedora-bin/xia-core/experiments/planetlab/test_infrastructure.py ./fedora-bin/xia-core/experiments/planetlab/tunneling.ini"'
 STOP = '"sudo killall sh; sudo ~/fedora-bin/xia-core/bin/xianet stop; sudo killall mapper_client.py"'
 PS = '"ps -ae"'
-INIT = '"wget http://www.cs.cmu.edu/~mmukerje/planetlab/init.sh && chmod 755 ./init.sh && ./init.sh && %s"' % (START.replace('"', ''))
+INIT = '"wget https://raw.github.com/XIA-Project/xia-core/develop/experiments/planetlab/init.sh && chmod 755 ./init.sh && ./init.sh && %s"' % (START.replace('"', ''))
 
 if sys.argv[1] == 'start':
     cmd = START
@@ -26,7 +26,7 @@ for machine in machines:
     try:
         machine = machine.split('#')[0]
         f = open('/tmp/%s-log' % (machine),'w')
-        c = 'ssh cmu_xia@%s %s' % (machine, cmd)
+        c = 'ssh -o StrictHostKeyChecking=no cmu_xia@%s %s' % (machine, cmd)
         print c
         process = Popen(shlex.split(c),stdout=f,stderr=f)
     except:
