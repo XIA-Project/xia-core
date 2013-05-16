@@ -83,6 +83,7 @@ def buildMap(clients):
     url = 'http://maps.googleapis.com/maps/api/staticmap?center=Kansas&zoom=4&size=640x400&maptype=roadmap&sensor=false'
     for client in clients:
         #url += '&markers=color:%s|%s,%s' % (client[0],client[2],client[1])
+        url += '&markers=%s,%s' % (client[2],client[1])
         #url += ''.join(['&path=color:%s|%s,%s|%s,%s' % (client[0],client[2],client[1],x[1],x[0]) for x in client[4]])
         url += ''.join(['&path=%s,%s|%s,%s' % (client[2],client[1],x[1],x[0]) for x in client[4]])
     html = '<html>\n<head>\n<title>Current Nodes In Topology</title>\n<meta http-equiv="refresh" content="5">\n</head>\n<body>\n<img src="%s">\n</body>\n</html>' % url
