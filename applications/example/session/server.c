@@ -20,8 +20,7 @@
 int main(int argc, char *argv[])
 {
     int n, listen_ctx, accept_ctx;
-    size_t dlen;
-    char buf[1024],theirDAG[1024];
+    char buf[1024];
     char reply[1024];
     pid_t pid;
 
@@ -53,25 +52,24 @@ int main(int argc, char *argv[])
     	if (pid == 0) {  
     		// child
     		
-    		/*while (1) {
+    		while (1) {
     			// Receive packet
 				memset(&buf[0], 0, sizeof(buf));
-				n = Xsrecv(acceptSock,buf,1024,0);
+				n = Srecv(accept_ctx, buf, 1024);
 				
 				if (n < 0) 
-				    printf("error recvfrom");
-				//printf("\nReceived a datagram from:%s len %d strlen %d\n",theirDAG, (int)dlen, (int)strlen(theirDAG));
+				    printf("Error receiving data\n");
 				write(1,buf,n);
 
 				//Reply to client
-				//Xsendto(sock,reply,strlen(reply)+1,0,theirDAG,strlen(theirDAG));
-				
 				memset(&reply[0], 0, sizeof(reply));
 				strcat (reply, "Got your message: ");
 				strcat (reply, buf);
 				
-				Xssend(acceptSock,reply,strlen(reply),0);
-    		}*/
+				if (Ssend(accept_ctx, reply, strlen(reply)) < 0) {
+					LOG("Error sending reply");
+				}
+    		}
     	}
     }
     return 0;

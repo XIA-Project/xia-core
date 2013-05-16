@@ -15,8 +15,8 @@
 ** limitations under the License.
 */
 /*!
- @file SacceptConnReq.c
- @brief Implements SacceptConnReq()
+ @file Ssend.c
+ @brief Implements Ssend()
 */
 
 #include "session.h"
@@ -25,45 +25,22 @@
 
 using namespace std;
 
-int SacceptConnReq(int ctx)
+int Ssend(int ctx, const void* buf, size_t len)
 {
-LOG("BEGIN SacceptConnReq");
-
+LOG("BEGIN Ssend");
+	int rc;
 	int sockfd = ctx; // for now on the client side we treat the socket fd as the context handle
-	int new_sockfd;
-
-	// make new socket for the new incoming session
-	if ((new_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		LOGF("error creating socket to session process: %s", strerror(errno));
-		return -1;
-	}
-
-	struct sockaddr_in addr;
-	socklen_t len = sizeof(addr);
-	addr.sin_family = PF_INET;
-	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-	addr.sin_port = 0;
-
-	if (bind(new_sockfd, (const struct sockaddr *)&addr, len) < 0) {
-		close(new_sockfd);
-		LOGF("bind error: %s", strerror(errno));
-		return -1;
-	}
-
-	// figure out which port we bound to
-	if(getsockname(new_sockfd, (struct sockaddr *)&addr, &len) < 0) {
-		close(new_sockfd);
-		LOGF("Error retrieving new socket's UDP port: %s", strerror(errno));
-		return -1;
-	}
-
+		
 	// protobuf message
 	session::SessionMsg sm;
-	sm.set_type(session::ACCEPT);
-	session::SAcceptMsg *am = sm.mutable_s_accept();
-	am->set_new_ctx(ntohs(addr.sin_port));
+	sm.set_type(session::SEND);
+	session::SSendMsg *sendm = sm.mutable_s_send();
 
-	if (proc_send(sockfd, &sm) < 0) {
+	// prepare data
+	string *strbuf = new string((const char*)buf, len);
+	sendm->set_data(*strbuf);
+	
+	if ((rc = proc_send(sockfd, &sm)) < 0) {
 		LOGF("Error talking to session proc: %s", strerror(errno));
 		close(sockfd);
 		return -1;
@@ -71,7 +48,7 @@ LOG("BEGIN SacceptConnReq");
 
 	// process the reply from the session process
 	session::SessionMsg rsm;
-	if (proc_reply(sockfd, rsm) < 0) {
+	if ((rc = proc_reply(sockfd, rsm)) < 0) {
 		LOGF("Error getting status from session proc: %s", strerror(errno));
 	} 
 	if (rsm.type() != session::RETURN_CODE || rsm.s_rc().rc() != session::SUCCESS) {
@@ -79,7 +56,13 @@ LOG("BEGIN SacceptConnReq");
 		if (rsm.s_rc().has_message())
 			errormsg = rsm.s_rc().message();
 		LOGF("Session proc returned an error: %s", errormsg.c_str());
-		return -1;
+		rc = -1;
 	}
-	return new_sockfd;
+	// return the number of bytes sent
+	if (rsm.has_s_send_ret()) { 
+		rc = rsm.s_send_ret().bytes_sent();
+	} else {
+		LOG("WARNING: Session process did not return how many bytes were sent");
+	}
+	return rc;
 }

@@ -15,8 +15,8 @@
 ** limitations under the License.
 */
 /*!
- @file SacceptConnReq.c
- @brief Implements SacceptConnReq()
+ @file Srecv.c
+ @brief Implements Srecv()
 */
 
 #include "session.h"
@@ -25,45 +25,19 @@
 
 using namespace std;
 
-int SacceptConnReq(int ctx)
+int Srecv(int ctx, void* buf, size_t len)
 {
-LOG("BEGIN SacceptConnReq");
-
+LOG("BEGIN Srecv");
 	int sockfd = ctx; // for now on the client side we treat the socket fd as the context handle
-	int new_sockfd;
-
-	// make new socket for the new incoming session
-	if ((new_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		LOGF("error creating socket to session process: %s", strerror(errno));
-		return -1;
-	}
-
-	struct sockaddr_in addr;
-	socklen_t len = sizeof(addr);
-	addr.sin_family = PF_INET;
-	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-	addr.sin_port = 0;
-
-	if (bind(new_sockfd, (const struct sockaddr *)&addr, len) < 0) {
-		close(new_sockfd);
-		LOGF("bind error: %s", strerror(errno));
-		return -1;
-	}
-
-	// figure out which port we bound to
-	if(getsockname(new_sockfd, (struct sockaddr *)&addr, &len) < 0) {
-		close(new_sockfd);
-		LOGF("Error retrieving new socket's UDP port: %s", strerror(errno));
-		return -1;
-	}
-
+		
 	// protobuf message
 	session::SessionMsg sm;
-	sm.set_type(session::ACCEPT);
-	session::SAcceptMsg *am = sm.mutable_s_accept();
-	am->set_new_ctx(ntohs(addr.sin_port));
+	sm.set_type(session::RECEIVE);
+	session::SRecvMsg *rm = sm.mutable_s_recv();
+	rm->set_bytes_to_recv(len);
 
-	if (proc_send(sockfd, &sm) < 0) {
+	
+	if ( proc_send(sockfd, &sm) < 0) {
 		LOGF("Error talking to session proc: %s", strerror(errno));
 		close(sockfd);
 		return -1;
@@ -81,5 +55,15 @@ LOG("BEGIN SacceptConnReq");
 		LOGF("Session proc returned an error: %s", errormsg.c_str());
 		return -1;
 	}
-	return new_sockfd;
+	
+	// copy the returned data into the buffer
+	if (!rsm.has_s_recv_ret()) {
+		LOG("ERROR: Session proc returned no data");
+		return -1;
+	}
+	int bytes  = rsm.s_recv_ret().data().size();
+	const char* tempbuf = rsm.s_recv_ret().data().data();
+	memcpy(buf, tempbuf, bytes); // TODO: off by one?
+
+	return bytes;
 }

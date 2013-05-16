@@ -8,6 +8,8 @@ enum SessionCallType {
   INIT = 4;
   BIND = 5;
   ACCEPT = 6;
+  SEND = 7;
+  RECEIVE = 8;
 }
 
 enum ReturnCode {
@@ -39,6 +41,10 @@ message SessionMsg {
   optional SInitMsg s_init = 4;
   optional SBindMsg s_bind = 5;
   optional SAcceptMsg s_accept = 6;
+  optional SSendMsg s_send = 7;
+  optional SSendRet s_send_ret = 8;
+  optional SRecvMsg s_recv = 9;
+  optional SRecvRet s_recv_ret = 10;
 }
 
 message S_Return_Code_Msg {
@@ -62,6 +68,22 @@ message SBindMsg {
 
 message SAcceptMsg {
 	required uint32 new_ctx = 1;
+}
+
+message SSendMsg {
+	required string data = 1;
+}
+
+message SSendRet {
+	required int32 bytes_sent = 1;
+}
+
+message SRecvMsg {
+	required int32 bytes_to_recv = 1;
+}
+
+message SRecvRet {
+	required string data = 1;
 }
 
 
@@ -91,8 +113,7 @@ message SessionInfo {
 }
 
 message SessionData {
-	required uint32 length = 1;
-	optional bytes data = 2;
+	optional bytes data = 1;
 }
 
 // Stores information about an open transport connection.

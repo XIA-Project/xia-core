@@ -9,6 +9,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <errno.h>
+#include <pthread.h>
 
 #define DEFAULT_PROCPORT 1989
 #define BUFSIZE 65000
@@ -36,6 +37,16 @@ map<uint32_t, unsigned short> incomingctx_to_myctx; // key: upper 16 = sender's 
 
 string sockconf_name = "sessiond";
 int procport = DEFAULT_PROCPORT;
+
+struct proc_func_data {
+	int (*process_function)(int, session::SessionMsg&, session::SessionMsg&);
+	int sockfd;
+	struct sockaddr_in *sa;
+	socklen_t len;
+	int ctx;
+	session::SessionMsg *msg;
+	session::SessionMsg *reply;
+};
 
 /* HELPER FUNCTIONS */
 
@@ -112,7 +123,7 @@ int bind_random_addr_xia(sockaddr_x **sa) {
 }
 #endif /* XIA */
 
-void infocpy(session::SessionInfo *from, session::SessionInfo *to) {
+void infocpy(const session::SessionInfo *from, session::SessionInfo *to) {
 	for (int i = 0; i < from->forward_path_size(); i++) {
 		session::SessionInfo_ServiceInfo *serviceInfo = to->add_forward_path();
 		serviceInfo->set_name(from->forward_path(i).name());
@@ -189,7 +200,6 @@ string get_neighborhop_name(int ctx, bool next) {
 			}
 		}
 	}
-
 	// If we didn't find it, look for my_name in the return path
 	for (int i = 0; i < info->return_path_size(); i++) {
 		if (info->return_path(i).name() == my_name) {
@@ -262,7 +272,12 @@ int open_connection(string name, session::ConnectionInfo *cinfo) {
 	}
 	sa = (sockaddr_x*)ai->ai_addr;
 
-	return open_connection_xia(sa, cinfo);
+	int ret = open_connection_xia(sa, cinfo);
+	if (ret >= 0) {
+		name_to_conn[name] = cinfo;
+	}
+
+	return ret;
 #endif /* XIA */
 }
 
@@ -272,31 +287,31 @@ int get_txconn_for_context(int ctx, session::ConnectionInfo **cinfo) {
 		*cinfo = ctx_to_txconn[ctx];
 		return (*cinfo)->sockfd();
 	} else {
+		// There isn't a tx transport conn for this session yet 
+		
 		// Get the next-hop hostname
 		string nexthop = get_nexthop_name(ctx);
 
-		// There isn't a tx transport conn for this session yet. First check to see
-		// if some other session already has a connection open with the same next hop
-		if ( name_to_conn.find(nexthop) != name_to_conn.end() ) {
-			*cinfo = name_to_conn[nexthop];
-
-			// add this context to the connection so it doesn't get "garbage collected"
-			// if all the other sessions using it close
-			(*cinfo)->add_sessions(ctx);  // TODO: remove when session closes
-
-			// TODO: check that the connection is of the correct type (TCP vs UDP etc)
-
-			return (*cinfo)->sockfd();
-		}
-
-		// If not, open a new one
-		*cinfo = new session::ConnectionInfo();
-		if ( open_connection(nexthop, *cinfo) > 0 ) {
-			(*cinfo)->add_sessions(ctx);
-			return (*cinfo)->sockfd();
+		// If no one else has opened a connection to this name, open one
+		if ( name_to_conn.find(nexthop) == name_to_conn.end() ) {
+			*cinfo = new session::ConnectionInfo();
+			if ( open_connection(nexthop, *cinfo) < 0 ) {
+				return -1;
+			}
 		} else {
-			return -1;
+			*cinfo = name_to_conn[nexthop];
 		}
+
+			
+		// now add this context to the connection so it doesn't get "garbage collected"
+		// if all the other sessions using it close
+		(*cinfo)->add_sessions(ctx);  // TODO: remove when session closes
+
+		ctx_to_txconn[ctx] = *cinfo;
+
+		// TODO: check that the connection is of the correct type (TCP vs UDP etc)
+
+		return (*cinfo)->sockfd();
 	}
 }
 
@@ -306,35 +321,35 @@ int get_rxconn_for_context(int ctx, session::ConnectionInfo **cinfo) {
 		*cinfo = ctx_to_rxconn[ctx];
 		return (*cinfo)->sockfd();
 	} else {
+		// There isn't a rx transport conn for this session yet 
+		
 		// Get the prev-hop hostname
 		string prevhop = get_prevhop_name(ctx);
 
-		// There isn't a rx transport conn for this session yet. First check to see
-		// if some other session already has a connection open with the same prev hop
-		if ( name_to_conn.find(prevhop) != name_to_conn.end() ) {
-			*cinfo = name_to_conn[prevhop];
-
-			// add this context to the connection so it doesn't get "garbage collected"
-			// if all the other sessions using it close
-			(*cinfo)->add_sessions(ctx);  // TODO: remove when session closes
-
-			// TODO: check that the connection is of the correct type (TCP vs UDP etc)
-
-			return (*cinfo)->sockfd();
-		}
-		
-		// If not, open a new one. It's a bit strange that we're opening this connection
-		// "backwards," but it should be easier that binding and listening
-		*cinfo = new session::ConnectionInfo();
-		if ( open_connection(prevhop, *cinfo) > 0 ) {
-			(*cinfo)->add_sessions(ctx);
-			return (*cinfo)->sockfd();
+		// If no one else has opened a connection to this name, open one
+		if ( name_to_conn.find(prevhop) == name_to_conn.end() ) {
+			*cinfo = new session::ConnectionInfo();
+			if ( open_connection(prevhop, *cinfo) < 0 ) {
+				return -1;
+			}
 		} else {
-			return -1;
+			*cinfo = name_to_conn[prevhop];
 		}
+
+			
+		// now add this context to the connection so it doesn't get "garbage collected"
+		// if all the other sessions using it close
+		(*cinfo)->add_sessions(ctx);  // TODO: remove when session closes
+
+		ctx_to_rxconn[ctx] = *cinfo;
+
+		// TODO: check that the connection is of the correct type (TCP vs UDP etc)
+
+		return (*cinfo)->sockfd();
 	}
 }
 
+// TODO: deal with fragmentation
 // sends to arbitrary transport connection
 int send(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 	int sock = cinfo->sockfd();
@@ -365,6 +380,7 @@ int send(int ctx, session::SessionPacket *pkt) {
 }
 
 // TODO: be smart about which session the received data is for...
+// TODO: take in how much data should be read and buffer unwanted data somewhere
 int recv(int ctx, session::SessionPacket *pkt) {
 	session::ConnectionInfo *cinfo = NULL;
 	get_rxconn_for_context(ctx, &cinfo);
@@ -392,10 +408,8 @@ int recv(int ctx, session::SessionPacket *pkt) {
 
 /* MESSAGE PROCESSING  FUNCTIONS */
 
-int process_new_context_msg(const session::S_New_Context_Msg &ncm, struct sockaddr_in *sa, session::SessionMsg &reply) {
-
-	// get sender's port number; use this as context handle
-	unsigned short ctx = ntohs(sa->sin_port);
+int process_new_context_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &reply) {
+LOG("BEGIN process_new_context_msg");
 
 	// allocate an empty session state protobuf object for this session
 	session::SessionInfo* info = new session::SessionInfo();
@@ -409,8 +423,9 @@ int process_new_context_msg(const session::S_New_Context_Msg &ncm, struct sockad
 	return 0;
 }
 
-int process_init_msg(int ctx, const session::SInitMsg &im, session::SessionMsg &reply) {
+int process_init_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &reply) {
 LOG("BEGIN process_init_msg");
+	session::SInitMsg im = msg.s_init();
 LOGF("    Initiating a session from %s", im.my_name().c_str());
 	reply.set_type(session::RETURN_CODE);
 	session::S_Return_Code_Msg *rcm = reply.mutable_s_rc();
@@ -520,8 +535,9 @@ LOGF("    Got final synack from: %s", sender_name.c_str());
 	return 1;
 }
 
-int process_bind_msg(int ctx, const session::SBindMsg &bm, session::SessionMsg &reply) {
+int process_bind_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &reply) {
 LOG("BEGIN process_bind_msg");
+	const session::SBindMsg bm = msg.s_bind();
 	reply.set_type(session::RETURN_CODE);
 	session::S_Return_Code_Msg *rcm = reply.mutable_s_rc();
 	
@@ -541,6 +557,8 @@ LOGF("    Binding to name: %s", bm.name().c_str());
 		return -1;
 	}
 LOG("    Bound to random XIA SID:");
+Graph g(sa);
+g.print_graph();
 	
 	// store addr in session info
 	string *strbuf = new string((const char*)sa, sizeof(sockaddr_x));
@@ -551,6 +569,7 @@ LOG("    Bound to random XIA SID:");
 	// tx or rx sockets
 	ctx_to_listensock[ctx] = sock;
 
+LOGF("    Registering name: %s", bm.name().c_str());
 	// register name
     if (XregisterName(bm.name().c_str(), sa) < 0 ) {
     	LOGF("error registering name: %s\n", bm.name().c_str());
@@ -569,10 +588,11 @@ LOG("    Registered name");
 	return 1;
 }
 
-int process_accept_msg(int ctx, const session::SAcceptMsg &am, session::SessionMsg &reply) {
+int process_accept_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &reply) {
 LOG("BEGIN process_accept_msg");
 
 	int new_rxsock = -1;
+	const session::SAcceptMsg am = msg.s_accept();
 	uint32_t new_ctx = am.new_ctx();
 	session::SessionInfo *listen_info = ctx_to_session_info[ctx];
 
@@ -623,7 +643,7 @@ LOG("    Received SESSION_INFO packet on new connection");
 	
 	// save  rx connection by name for others to use
 	string prevhop = get_prevhop_name(new_ctx);
-LOGF("    Got conn req from %s!", prevhop.c_str());
+LOGF("    Got conn req from %s on context %d", prevhop.c_str(), new_ctx);
 	name_to_conn[prevhop] = rx_cinfo;
 
 	
@@ -688,6 +708,75 @@ LOG("    Sent SessionInfo packet to next hop");
 	return 1;
 }
 
+int process_send_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &reply) {
+LOG("BEGIN process_send_msg");
+
+	int sent;
+	const session::SSendMsg sendm = msg.s_send();
+	reply.set_type(session::RETURN_CODE);
+	session::S_Return_Code_Msg *rcm = reply.mutable_s_rc();
+
+
+	// Build a SessionPacket
+	session::SessionPacket pkt;
+	pkt.set_type(session::DATA);
+	pkt.set_sender_ctx(ctx);
+	session::SessionData *dm = pkt.mutable_data();
+	dm->set_data(sendm.data());
+
+	// Send it
+	sent = send(ctx, &pkt);
+
+	// Report back how many bytes we sent
+	session::SSendRet *retm = reply.mutable_s_send_ret();
+	retm->set_bytes_sent(sent);
+
+
+	if ( sent < 0 ) {
+		LOG("Error sending data");
+		rcm->set_message("Error sending data");
+		rcm->set_rc(session::FAILURE);
+		return -1;
+	}
+
+	// return success
+	rcm->set_rc(session::SUCCESS);
+	return 1;
+}
+
+int process_recv_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &reply) {
+LOG("BEGIN process_recv_msg");
+
+	int received;
+	const session::SRecvMsg rm = msg.s_recv();
+	reply.set_type(session::RETURN_CODE);
+	session::S_Return_Code_Msg *rcm = reply.mutable_s_rc();
+
+
+	// Receive a SessionPacket
+	session::SessionPacket pkt;
+	if ( (received = recv(ctx, &pkt)) < 0 ) {
+		LOG("Error receiving data");
+		rcm->set_message("Error receiving data");
+		rcm->set_rc(session::FAILURE);
+		return -1;
+	}
+	if ( pkt.type() != session::DATA || !pkt.has_data() || !pkt.data().has_data()) {
+		LOG("Received packet did not contain data");
+		rcm->set_message("Received packet did not contain data");
+		rcm->set_rc(session::FAILURE);
+		return -1;
+	}
+	
+	// Send back the data
+	session::SRecvRet *retm = reply.mutable_s_recv_ret();
+	retm->set_data(pkt.data().data());
+
+	// return success
+	rcm->set_rc(session::SUCCESS);
+	return 1;
+}
+
 
 int send_reply(int sockfd, struct sockaddr_in *sa, socklen_t sa_size, session::SessionMsg *sm)
 {
@@ -727,6 +816,27 @@ int send_reply(int sockfd, struct sockaddr_in *sa, socklen_t sa_size, session::S
 	return  (rc >= 0 ? 0 : -1);
 }
 
+void* process_function_wrapper(void* args) {
+LOG("BEGIN wrapper");
+	struct proc_func_data *data = (struct proc_func_data*)args;
+
+	int rc = data->process_function(data->ctx, *(data->msg), *(data->reply));
+
+	// send the reply that was filled in by the processing function
+	if (rc < 0) {
+		LOG("Error processing message");
+	}
+	if (send_reply(data->sockfd, data->sa, data->len, data->reply) < 0) {
+		LOG("Error sending reply");
+	}
+
+	free(data->sa);
+	delete data->msg;
+	delete data->reply;
+	free(args);
+LOG("END wrapper");
+}
+
 int listen() {
 	// Open socket to listen on
 	int sockfd;
@@ -747,6 +857,11 @@ int listen() {
 	}
 
 
+	// set up pthreads
+	pthread_t threads[1000];
+	int next_tid = 0;
+
+
 	// listen for messages (and process them)
 	LOGF("Listening on %d", procport);
 	while (true)
@@ -758,6 +873,7 @@ int listen() {
 		unsigned buflen = sizeof(buf);
 		memset(buf, 0, buflen);
 
+LOG("Waiting for a new message");
 		if ((rc = recvfrom(sockfd, buf, buflen - 1 , 0, (struct sockaddr *)&sa, &len)) < 0) {
 			LOGF("error(%d) getting reply data from session process", errno);
 		} else {
@@ -765,37 +881,57 @@ int listen() {
 			session::SessionMsg sm;
 			sm.ParseFromString(buf);
 
-			// make a blank reply message to be filled in by processing function
-			session::SessionMsg reply;
-
 			// for now we use the sender's port as the context handle
 			int ctx = ntohs(sa.sin_port);
+
+			// make a function pointer to store which processing function we want to use
+			int (*process_function)(int, session::SessionMsg&, session::SessionMsg&);
 
 			switch(sm.type())
 			{
 				case session::NEW_CONTEXT:
-					rc = process_new_context_msg(sm.s_new_context(), &sa, reply);
-					LOGF("Num sessions: %d", ctx_to_session_info.size());
+					process_function = &process_new_context_msg;
+					//rc = process_new_context_msg(sm.s_new_context(), &sa, reply);
 					break;
 				case session::INIT:
-					rc = process_init_msg(ctx, sm.s_init(), reply);
+					process_function = &process_init_msg;
+					//rc = process_init_msg(ctx, sm.s_init(), reply);
 					break;
 				case session::BIND:
-					rc = process_bind_msg(ctx, sm.s_bind(), reply);
+					process_function = &process_bind_msg;
+					//rc = process_bind_msg(ctx, sm.s_bind(), reply);
 					break;
 				case session::ACCEPT:
-					rc = process_accept_msg(ctx, sm.s_accept(), reply);
+					process_function = &process_accept_msg;
+					//rc = process_accept_msg(ctx, sm.s_accept(), reply);
+					break;
+				case session::SEND:
+					process_function  = &process_send_msg;
+					//rc = process_send_msg(ctx, sm.s_send(), reply);
+					break;
+				case session::RECEIVE:
+					process_function = &process_recv_msg;
+					//rc = process_recv_msg(ctx, sm.s_recv(), reply);
 					break;
 				default:
 					LOG("Unrecognized protobuf message");
 			}
 
-			// send the reply that was filled in by the processing function
-			if (rc < 0) {
-				LOG("Error processing message");
-			}
-			if (send_reply(sockfd, &sa, len, &reply) < 0) {
-				LOG("Error sending reply");
+			// make a new thread
+			pthread_t dummy_handle;
+			struct proc_func_data* args = (struct proc_func_data*)malloc(sizeof(struct proc_func_data));
+			args->process_function = process_function;
+			args->sockfd = sockfd;
+			args->sa = (struct sockaddr_in*)malloc(sizeof(struct sockaddr_in));
+			memcpy(args->sa, &sa, len);
+			args->len = len;
+			args->ctx = ctx;
+			args->msg = new session::SessionMsg(sm);
+			args->reply = new session::SessionMsg();
+
+			int pthread_rc;
+			if ( (pthread_rc = pthread_create(&dummy_handle, NULL, process_function_wrapper, (void*)args)) < 0) {
+				LOGF("Error creating thread: %s", strerror(pthread_rc));
 			}
 		}
 	}

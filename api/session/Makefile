@@ -6,7 +6,7 @@ CFLAGS +=-c -Iminini -fpic
 CPPFLAGS=$(CFLAGS)
 LDFLAGS +=-lprotobuf -lc -ldl
 
-SOURCES=SnewContext.c Sinit.c Sutil.c Sbind.c SacceptConnReq.c api_init.c \
+SOURCES=SnewContext.c Sinit.c Sutil.c Sbind.c SacceptConnReq.c Ssend.c Srecv.c api_init.c \
 		minini/minIni.c
 OBJS=$(SOURCES:.c=.o) session.pb.o
 LIB=$(XLIB)/libSession.so
