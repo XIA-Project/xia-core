@@ -123,3 +123,6 @@ etc/click/templates/host.click
 etc/click/templates/router.click
 etc/click/templates/dual_stack_host.click
 etc/click/templates/dual_stack_router.click
+
+# planetlab
+experiments/planetlab/*.ini
