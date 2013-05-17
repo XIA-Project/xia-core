@@ -18,7 +18,6 @@ for machine in machines:
     neighbors = machine.split(':')[1].replace(' ','').split(',')
     links += [tuple(sorted((name,neighbor))) for neighbor in neighbors]    
 links = list(set(links))
-print links
 
 for machine in machines:
     name = machine.split(':')[0]
@@ -26,7 +25,7 @@ for machine in machines:
     host = hostd[name][0]
     line = '[%s] #%s\nuntil sudo ~/fedora-bin/xia-core/bin/xianet -v -r -P ' % (ip, host)    
 
-    neighbors = ['%s:400%s' % (hostd[''.join([n for n in link if n != name])][1],links.index(link)) for link in links if name in link]    
+    neighbors = ['%s:500%s' % (hostd[''.join([n for n in link if n != name])][1],links.index(link)) for link in links if name in link]    
     line += ','.join(neighbors)
     line += ' -f eth0 start; do echo "restarting click"; done\n'
     cmd += line

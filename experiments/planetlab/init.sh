@@ -11,6 +11,7 @@ mkdir fedora-bin
 cd fedora-bin
 rsync --rsh='ssh -o StrictHostKeyChecking=no -p5556' update@gs11698.sp.cs.cmu.edu:~/fedora/xia-core/experiments/planetlab/bin-files ./
 rsync --rsh='ssh -o StrictHostKeyChecking=no -p5556' -a --files-from=./bin-files update@gs11698.sp.cs.cmu.edu:~/fedora/ ./
+echo "export PATH=\"~/fedora-bin/xia-core/bin:\$PATH\"" >> .bashrc 
 ./xia-core/experiments/planetlab/refresh.sh
 " > sync.sh
 chmod 755 sync.sh

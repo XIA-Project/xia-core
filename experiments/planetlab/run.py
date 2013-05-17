@@ -2,24 +2,23 @@
 
 import shlex, sys
 from subprocess import Popen, PIPE
+from os.path import splitext
 
-if len(sys.argv) < 2:
-    print 'usage %s [start|stop|ps|init]' % (sys.argv[0])
+if len(sys.argv) < 3:
+    print 'usage %s [topo_file] [start|stop|ps|init]' % (sys.argv[0])
     sys.exit(-1)
 
-START = '"./fedora-bin/xia-core/experiments/planetlab/test_infrastructure.py ./fedora-bin/xia-core/experiments/planetlab/tunneling.ini"'
-STOP = '"sudo killall sh; sudo ~/fedora-bin/xia-core/bin/xianet stop; sudo killall mapper_client.py"'
-PS = '"ps -ae"'
-INIT = '"curl https://raw.github.com/XIA-Project/xia-core/develop/experiments/planetlab/init.sh > ./init.sh && chmod 755 ./init.sh && ./init.sh && %s"' % (START.replace('"', ''))
+cmd_output = open(splitext(sys.argv[1])[0]+'.ini', 'w')
+process = Popen(shlex.split('./generate_commands.py %s' % (sys.argv[1])), stdout=cmd_output)
+rc = process.wait()
 
-if sys.argv[1] == 'start':
+STOP = '"sudo killall sh; sudo ~/fedora-bin/xia-core/bin/xianet stop; sudo killall mapper_client.py"'
+START = '"curl https://raw.github.com/XIA-Project/xia-core/develop/experiments/planetlab/init.sh > ./init.sh && chmod 755 ./init.sh && ./init.sh && ./fedora-bin/xia-core/experiments/planetlab/test_infrastructure.py ./fedora-bin/xia-core/experiments/planetlab/tunneling.ini"'
+
+if sys.argv[2] == 'start':
     cmd = START
-elif sys.argv[1] == 'stop':
+elif sys.argv[2] == 'stop':
     cmd = STOP
-elif sys.argv[1] == 'ps':
-    cmd = PS
-elif sys.argv[1] == 'init':
-    cmd = INIT
 
 machines = open('machines','r').read().split('\n')
 for machine in machines:
