@@ -3,6 +3,7 @@
 #include "Xsocket.h"
 #include "dagaddr.hpp"
 #include <map>
+#include <queue>
 #include <stdio.h>
 #include <iostream>
 #include <string>
@@ -35,6 +36,12 @@ map<unsigned short, int> ctx_to_listensock;
 map<string, session::ConnectionInfo*> name_to_conn;
 map<uint32_t, unsigned short> incomingctx_to_myctx; // key: upper 16 = sender's ctx, lower 16 = incoming sockfd
 
+map<string, unsigned short> name_to_listen_ctx;
+map<unsigned short, queue<session::SessionPacket*>* > listen_ctx_to_acceptQ;
+map<int, pthread_t*> sockfd_to_pthread;
+map<int, pthread_mutex_t*> sock_to_Q_mutex; // used for accessing packet Q
+map<int, pthread_cond_t*> sock_to_cond;
+
 string sockconf_name = "sessiond";
 int procport = DEFAULT_PROCPORT;
 
@@ -47,6 +54,60 @@ struct proc_func_data {
 	session::SessionMsg *msg;
 	session::SessionMsg *reply;
 };
+
+
+
+
+/* PRINT FUNCTIONS */
+void print_sessions() {
+	printf("*******************************************************************************\n");
+	printf("*                                 SESSIONS                                    *\n");
+	printf("*******************************************************************************\n\n");
+	
+	map<unsigned short, session::SessionInfo*>::iterator iter;
+	for (iter = ctx_to_session_info.begin(); iter!= ctx_to_session_info.end(); ++iter) {
+		session::SessionInfo* sinfo = iter->second;
+
+		printf("Context:\t%d\n", iter->first);	
+		printf("Forward path:\t");
+		for (int i = 0; i < sinfo->forward_path_size(); i++) {
+			printf("%s  ", sinfo->forward_path(i).name().c_str());
+		}
+		printf("\nReturn path:\t");
+		for (int i = 0; i < sinfo->return_path_size(); i++) {
+			printf("%s  ", sinfo->return_path(i).name().c_str());
+		}
+
+		if (sinfo->has_my_name()) {
+			printf("\nMy name:\t%s", sinfo->my_name().c_str());
+		}
+		printf("\n\n-------------------------------------------------------------------------------\n\n");
+	}
+}
+
+void print_connections() {
+	printf("*******************************************************************************\n");
+	printf("*                               CONNECTIONS                                   *\n");
+	printf("*******************************************************************************\n\n");
+	
+	map<string, session::ConnectionInfo*>::iterator iter;
+	for (iter = name_to_conn.begin(); iter!= name_to_conn.end(); ++iter) {
+		session::ConnectionInfo *cinfo = iter->second;
+
+		printf("Name:\t\t%s\n", iter->first.c_str());
+		printf("Sockfd:\t\t%d\n", cinfo->sockfd());
+		printf("Sessions:\t");
+		for (int i = 0; i < cinfo->sessions_size(); i++) {
+			printf("%d  ", cinfo->sessions(i));
+		}
+		printf("\nInterface:\t%s", cinfo->interface().c_str());
+		//printf("Type:\t%s", cinfo->type());
+
+		printf("\n\n-------------------------------------------------------------------------------\n\n");
+	}
+}
+
+
 
 /* HELPER FUNCTIONS */
 
@@ -170,10 +231,7 @@ bool is_last_hop(int ctx, string name) {
 	return false;
 }
 
-string get_neighborhop_name(int ctx, bool next) {
-	session::SessionInfo *info = ctx_to_session_info[ctx];
-	string my_name = info->my_name();
-	
+string get_neighborhop_name(string my_name, const session::SessionInfo *info, bool next) {
 	// Look for my_name in the forward path
 	int found_index = -1;
 	for (int i = 0; i < info->forward_path_size(); i++) {
@@ -227,6 +285,12 @@ string get_neighborhop_name(int ctx, bool next) {
 	}
 
 	return "NOT FOUND";
+}
+
+string get_neighborhop_name(int ctx, bool next) {
+	session::SessionInfo *info = ctx_to_session_info[ctx];
+	string my_name = info->my_name();
+	return get_neighborhop_name(my_name, info, next);
 }
 
 string get_nexthop_name(int ctx) {
@@ -381,9 +445,7 @@ int send(int ctx, session::SessionPacket *pkt) {
 
 // TODO: be smart about which session the received data is for...
 // TODO: take in how much data should be read and buffer unwanted data somewhere
-int recv(int ctx, session::SessionPacket *pkt) {
-	session::ConnectionInfo *cinfo = NULL;
-	get_rxconn_for_context(ctx, &cinfo);
+int recv(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 	int sock = cinfo->sockfd();
 	int received = -1;
 	char buf[BUFSIZE];
@@ -393,7 +455,7 @@ int recv(int ctx, session::SessionPacket *pkt) {
 #ifdef XIA
 		memset(buf, 0, BUFSIZE);
 		if ((received = Xrecv(sock, buf, BUFSIZE, 0)) < 0) {
-			LOGF("Receive error %d on socket %d, context %d: %s", errno, sock, ctx, strerror(errno));
+			LOGF("Receive error %d on socket %d: %s", errno, sock, strerror(errno));
 		} else {
 			string *bufstr = new string(buf, received);
 			pkt->ParseFromString(*bufstr);
@@ -404,6 +466,100 @@ int recv(int ctx, session::SessionPacket *pkt) {
 
 	return received;
 }
+
+int recv(int ctx, session::SessionPacket *pkt) {
+	session::ConnectionInfo *cinfo = NULL;
+	get_rxconn_for_context(ctx, &cinfo);
+	return recv(cinfo, pkt);
+}
+
+
+
+
+/* POLLING FUNCTIONS */
+
+// TODO: Good way to report failures from these functions?
+void * poll_listen_sock(void * args) {
+LOG("BEGIN poll_listen_sock");
+
+	int ctx = (int)args;   // TOOD: check this
+	int listen_sock = ctx_to_listensock[ctx];
+
+	while(true)
+	{
+		int new_rxsock = -1;
+		
+		// accept connection on listen sock
+	#ifdef XIA
+		if ( (new_rxsock = Xaccept(listen_sock, NULL, 0)) < 0 ) {
+			LOGF("Error accepting new connection on listen context %d", ctx);
+			//rcm->set_message("Error accpeting new connection on listen context");
+			//rcm->set_rc(session::FAILURE);
+			//return -1;
+		}
+	#endif /* XIA */
+	LOGF("    Accepted new connection on sockfd %d", ctx_to_listensock[ctx]);
+	
+	
+		session::ConnectionInfo *rx_cinfo = new session::ConnectionInfo();
+		rx_cinfo->set_sockfd(new_rxsock);
+	
+		
+		// receive first message (using new_ctx, not ctx) and
+		// make sure it's a session info or lasthop handshake msg
+		session::SessionPacket *rpkt = new session::SessionPacket();
+		if ( recv(rx_cinfo, rpkt) < 0 ) {
+			LOGF("Error receiving on listen sock for context %d", ctx);
+			//rcm->set_message("Error receiving on new connection");
+			//rcm->set_rc(session::FAILURE);
+			//return -1;
+		}
+		if (rpkt->type() != session::SESSION_INFO || !rpkt->has_info()) {
+			LOGF("Received a packet on the listen sock for contex %d that was not a SESSION_INFO msg.", ctx);
+			//rcm->set_message("First packet was not a SESSION_INFO msg.");
+			//rcm->set_rc(session::FAILURE);
+			//return -1;
+		}
+	LOGF("    Received SESSION_INFO packet on listen sock for context %d", ctx);
+	
+	
+		// Get the prevhop's name so we can store this transport connection
+		string prevhop = rpkt->info().my_name();
+		name_to_conn[prevhop] = rx_cinfo;
+	
+	
+		// Add session info pkt to acceptQ
+		pthread_mutex_lock(sock_to_Q_mutex[listen_sock]);
+		listen_ctx_to_acceptQ[ctx]->push(rpkt);
+		pthread_mutex_unlock(sock_to_Q_mutex[listen_sock]);
+		pthread_cond_signal(sock_to_cond[listen_sock]);
+
+LOGF("    Added session info packet to accept Q %p", listen_ctx_to_acceptQ[ctx]);
+LOGF("    There are %d packets in the Q", listen_ctx_to_acceptQ[ctx]->size());
+
+	}
+
+	return NULL;
+}
+
+void *poll_recv_sock(void *) {
+
+	// TODO: wait for packets
+
+	// TODO: if they're data packets, put them in appropriate queue based on
+	// on sender's ctx + sockfd (we have a mapping)
+
+	// TODO: if it's a session info packet, put it in the appropriate acceptQ
+	// using the name in the packet -> listen_ctx -> acceptQ
+}
+
+
+
+
+
+
+
+
 
 
 /* MESSAGE PROCESSING  FUNCTIONS */
@@ -504,6 +660,7 @@ LOGF("    Accepted a new connection on rxsock %d", rxsock);
 	cinfo->set_sockfd(rxsock);
 	cinfo->add_sessions(ctx);
 	ctx_to_rxconn[ctx] = cinfo;
+	name_to_conn[prevhop] = cinfo;
 
 	// listen for "synack" -- receive and check incoming session info msg
 	session::SessionPacket rpkt;
@@ -583,6 +740,33 @@ LOG("    Registered name");
 	// actually store the mapping if everything worked
 	ctx_to_session_info[ctx] = sinfo;
 	
+	// store a mapping of name -> listen_ctx
+	name_to_listen_ctx[bm.name()] = ctx;
+
+	// initialize a queue to store incoming Connection Requests
+	// (these might arrive on the accept socket or on another socket,
+	// since the session layer shares transport connections among sessions)
+	queue<session::SessionPacket*> *acceptQ = new queue<session::SessionPacket*>();
+	listen_ctx_to_acceptQ[ctx] = acceptQ;
+
+	// kick off a thread draining the listen socket into the acceptQ
+	pthread_mutex_t *mutex = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
+	pthread_mutex_init(mutex, NULL);
+	sock_to_Q_mutex[sock] = mutex;
+	pthread_cond_t *cond = (pthread_cond_t*)malloc(sizeof(pthread_cond_t));
+	pthread_cond_init(cond, NULL);
+	sock_to_cond[sock] = cond;
+
+	pthread_t *t = (pthread_t*)malloc(sizeof(pthread_t));
+	int pthread_rc;
+	if ( (pthread_rc = pthread_create(t, NULL, poll_listen_sock, (void*)ctx)) < 0) {
+		LOGF("Error creating listen sock thread: %s", strerror(pthread_rc));
+		rcm->set_message("Error creating listen sock thread");
+		rcm->set_rc(session::FAILURE);
+		return -1;
+	}
+	sockfd_to_pthread[sock] = t;
+	
 	// return success
 	rcm->set_rc(session::SUCCESS);
 	return 1;
@@ -590,53 +774,29 @@ LOG("    Registered name");
 
 int process_accept_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &reply) {
 LOG("BEGIN process_accept_msg");
-
-	int new_rxsock = -1;
-	const session::SAcceptMsg am = msg.s_accept();
-	uint32_t new_ctx = am.new_ctx();
-	session::SessionInfo *listen_info = ctx_to_session_info[ctx];
-
+	
 	reply.set_type(session::RETURN_CODE);
 	session::S_Return_Code_Msg *rcm = reply.mutable_s_rc();
 	
-	// accept connection on listen sock
-#ifdef XIA
-	if ( (new_rxsock = Xaccept(ctx_to_listensock[ctx], NULL, 0)) < 0 ) {
-		LOGF("Error accepting new connection on listen context %d", ctx);
-		rcm->set_message("Error accpeting new connection on listen context");
-		rcm->set_rc(session::FAILURE);
-		return -1;
-	}
-#endif /* XIA */
-LOGF("    Accepted new connection on sockfd %d", ctx_to_listensock[ctx]);
-
-	// store ctx -> conn mapping so get_rxconn works so we can call recv
-	session::ConnectionInfo *rx_cinfo = new session::ConnectionInfo();
-	rx_cinfo->set_sockfd(new_rxsock);
-	rx_cinfo->add_sessions(new_ctx);
-	ctx_to_rxconn[new_ctx] = rx_cinfo; // TODO: set this in api call
-
+	const session::SAcceptMsg am = msg.s_accept();
+	uint32_t new_ctx = am.new_ctx();
 	
-	// receive first message (using new_ctx, not ctx) and
-	// make sure it's a session info or lasthop handshake msg
-	session::SessionPacket rpkt;
-	if ( recv(new_ctx, &rpkt) < 0 ) {
-		LOG("Error receiving on new connection");
-		rcm->set_message("Error receiving on new connection");
-		rcm->set_rc(session::FAILURE);
-		return -1;
-	}
-	if (rpkt.type() != session::SESSION_INFO) {
-		LOG("First packet was not a SESSION_INFO msg.");
-		rcm->set_message("First packet was not a SESSION_INFO msg.");
-		rcm->set_rc(session::FAILURE);
-		return -1;
-	}
-LOG("    Received SESSION_INFO packet on new connection");
+	session::SessionInfo *listen_info = ctx_to_session_info[ctx];
+
+	// pull message from acceptQ
+	queue<session::SessionPacket*> *acceptQ = listen_ctx_to_acceptQ[ctx];
+LOGF("    checking for msgs in accept Q %p", acceptQ);
+	pthread_mutex_t *mutex = sock_to_Q_mutex[ctx_to_listensock[ctx]];
+	pthread_cond_t *cond = sock_to_cond[ctx_to_listensock[ctx]];
+	pthread_mutex_lock(mutex);
+	if (acceptQ->size() ==0) pthread_cond_wait(cond, mutex);  // wait until there's a message
+	session::SessionPacket *rpkt = acceptQ->front();
+	acceptQ->pop();
+	pthread_mutex_unlock(mutex);
 
 
 	// store a copy of the session info, updating my_name and my_addr
-	session::SessionInfo *sinfo = new session::SessionInfo(rpkt.info());
+	session::SessionInfo *sinfo = new session::SessionInfo(rpkt->info());
 	sinfo->set_my_name(listen_info->my_name());
 	sinfo->clear_my_addr();
 	ctx_to_session_info[new_ctx] = sinfo;
@@ -644,11 +804,13 @@ LOG("    Received SESSION_INFO packet on new connection");
 	// save  rx connection by name for others to use
 	string prevhop = get_prevhop_name(new_ctx);
 LOGF("    Got conn req from %s on context %d", prevhop.c_str(), new_ctx);
-	name_to_conn[prevhop] = rx_cinfo;
+	session::ConnectionInfo *rx_cinfo = name_to_conn[prevhop];
+	rx_cinfo->add_sessions(new_ctx);
+	ctx_to_rxconn[new_ctx] = rx_cinfo; // TODO: set this in api call
 
 	
 	// store incoming ctx mapping
-	uint32_t key = rpkt.sender_ctx() << 8;
+	uint32_t key = rpkt->sender_ctx() << 8;
 	key += ctx_to_rxconn[new_ctx]->sockfd();
 	incomingctx_to_myctx[key] = new_ctx;
 
@@ -667,6 +829,7 @@ LOGF("    Got conn req from %s on context %d", prevhop.c_str(), new_ctx);
 LOG("    I'm the last hop; connecting to initiator with supplied addr");
 		session::ConnectionInfo *tx_cinfo = new session::ConnectionInfo();
 		tx_cinfo->set_name(sinfo->return_path(sinfo->return_path_size()-1).name());
+		tx_cinfo->add_sessions(new_ctx);
 		
 #ifdef XIA
 		if (!sinfo->has_initiator_addr()) {
@@ -702,6 +865,8 @@ LOGF("    Opened connection with initiator on sock %d", tx_cinfo->sockfd());
 	}
 
 LOG("    Sent SessionInfo packet to next hop");
+
+	free(rpkt); // TODO: not freed if we hit an error and returned early
 
 	// return success
 	rcm->set_rc(session::SUCCESS);
@@ -834,6 +999,8 @@ LOG("BEGIN wrapper");
 	delete data->msg;
 	delete data->reply;
 	free(args);
+
+	return NULL;
 LOG("END wrapper");
 }
 
@@ -857,11 +1024,6 @@ int listen() {
 	}
 
 
-	// set up pthreads
-	pthread_t threads[1000];
-	int next_tid = 0;
-
-
 	// listen for messages (and process them)
 	LOGF("Listening on %d", procport);
 	while (true)
@@ -874,6 +1036,8 @@ int listen() {
 		memset(buf, 0, buflen);
 
 LOG("Waiting for a new message");
+//print_sessions();
+//print_connections();
 		if ((rc = recvfrom(sockfd, buf, buflen - 1 , 0, (struct sockaddr *)&sa, &len)) < 0) {
 			LOGF("error(%d) getting reply data from session process", errno);
 		} else {
@@ -885,7 +1049,7 @@ LOG("Waiting for a new message");
 			int ctx = ntohs(sa.sin_port);
 
 			// make a function pointer to store which processing function we want to use
-			int (*process_function)(int, session::SessionMsg&, session::SessionMsg&);
+			int (*process_function)(int, session::SessionMsg&, session::SessionMsg&) = NULL;
 
 			switch(sm.type())
 			{
