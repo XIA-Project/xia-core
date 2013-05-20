@@ -77,7 +77,7 @@ int click_send(int sockfd, xia::XSocketMsg *xsm)
 	// are called
 	sa.sin_family = PF_INET;
 	sa.sin_addr.s_addr = inet_addr("127.0.0.1");
-    sa.sin_port = htons(atoi(CLICKPORT));
+	sa.sin_port = htons(atoi(CLICKPORT));
 
 	std::string p_buf;
 	xsm->SerializeToString(&p_buf);
@@ -85,7 +85,9 @@ int click_send(int sockfd, xia::XSocketMsg *xsm)
 	int remaining = p_buf.size();
 	const char *p = p_buf.c_str();
 	while (remaining > 0) {
+		setWrapped(sockfd, 1);
 		rc = sendto(sockfd, p, remaining, 0, (struct sockaddr *)&sa, sizeof(sa));
+		setWrapped(sockfd, 0);
 
 		if (rc == -1) {
 			LOGF("click socket failure: errno = %d", errno);
@@ -120,7 +122,10 @@ int click_reply(int sockfd, char *buf, int buflen)
 	len = sizeof sa;
 
 	memset(buf, 0, buflen);
-	if ((rc = recvfrom(sockfd, buf, buflen - 1 , 0, (struct sockaddr *)&sa, &len)) < 0) {
+	setWrapped(sockfd, 1);
+	rc = recvfrom(sockfd, buf, buflen - 1 , 0, (struct sockaddr *)&sa, &len);
+	setWrapped(sockfd, 0);
+	if (rc < 0) {
 		LOGF("error(%d) getting reply data from click", errno);
 		return -1;
 	}
@@ -139,7 +144,10 @@ int click_reply2(int sockfd, xia::XSocketCallType *type)
 	len = sizeof sa;
 
 	memset(buf, 0, buflen);
-	if ((rc = recvfrom(sockfd, buf, buflen - 1 , 0, (struct sockaddr *)&sa, &len)) < 0) {
+	setWrapped(sockfd, 1);
+	rc = recvfrom(sockfd, buf, buflen - 1 , 0, (struct sockaddr *)&sa, &len);
+	setWrapped(sockfd, 0);
+	if (rc < 0) {
 		LOGF("error(%d) getting reply data from click", errno);
 		return -1;
 	}
