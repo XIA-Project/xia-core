@@ -5,7 +5,7 @@ from subprocess import Popen, PIPE
 from os.path import splitext
 
 if len(sys.argv) < 3:
-    print 'usage %s [topo_file] [start|stop|ps|init]' % (sys.argv[0])
+    print 'usage %s [topo_file] [start|stop]' % (sys.argv[0])
     sys.exit(-1)
 
 cmd_output = open(splitext(sys.argv[1])[0]+'.ini', 'w')
