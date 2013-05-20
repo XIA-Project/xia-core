@@ -29,6 +29,7 @@
 using namespace std;
 
 /* DATA STRUCTURES */
+map<unsigned short, session::ContextInfo*> ctx_to_ctx_info;
 map<unsigned short, session::SessionInfo*> ctx_to_session_info; 
 map<unsigned short, session::ConnectionInfo*> ctx_to_txconn;
 map<unsigned short, session::ConnectionInfo*> ctx_to_rxconn;
@@ -63,11 +64,40 @@ struct proc_func_data {
 
 /* FORWARD DECLARATIONS */
 void *poll_recv_sock(void *args);
+bool is_last_hop(int ctx, string name);
+int send(int ctx, session::SessionPacket *pkt);
 
 
 
 
 /* PRINT FUNCTIONS */
+void print_contexts() {
+	printf("*******************************************************************************\n");
+	printf("*                                 CONTEXTS                                    *\n");
+	printf("*******************************************************************************\n\n");
+	
+	map<unsigned short, session::ContextInfo*>::iterator iter;
+	for (iter = ctx_to_ctx_info.begin(); iter!= ctx_to_ctx_info.end(); ++iter) {
+		session::ContextInfo* ctxInfo = iter->second;
+
+		printf("Context:\t%d\n", iter->first);	
+
+		string type = "UNASSIGNED";
+		if (ctxInfo->type() == session::ContextInfo::LISTEN)
+			type = "LISTEN";
+		else if (ctxInfo->type() == session::ContextInfo::SESSION)
+			type = "SESSION";
+		printf("Type:\t\t%s\n", type.c_str());
+
+		printf("Initialized:\t%s", ctxInfo->initialized() ? "YES" : "NO");
+
+		if (ctxInfo->has_my_name()) {
+			printf("\nMy name:\t%s", ctxInfo->my_name().c_str());
+		}
+		printf("\n\n-------------------------------------------------------------------------------\n\n");
+	}
+}
+
 void print_sessions() {
 	printf("*******************************************************************************\n");
 	printf("*                                 SESSIONS                                    *\n");
@@ -157,19 +187,219 @@ void getConfig(int argc, char** argv)
 	}
 }
 
-void allocate_dataQ(int ctx) {
-	// allocate a data Q
-	queue<session::SessionPacket*> *dataQ = new queue<session::SessionPacket*>();
-	ctx_to_dataQ[ctx] = dataQ;
+session::SessionPacket* popQ(queue<session::SessionPacket*> *Q, pthread_mutex_t *mutex, pthread_cond_t *cond) {
+	pthread_mutex_lock(mutex);
+	if (Q->size() == 0) pthread_cond_wait(cond, mutex);  // wait until there's a message
+	session::SessionPacket *pkt = Q->front();
+	Q->pop();
+	pthread_mutex_unlock(mutex);
+	return pkt;
+}
 
-	// allocate new pthread vars for this session's data Q
+session::SessionPacket* popDataQ(int ctx) {
+	return popQ(ctx_to_dataQ[ctx], ctx_to_dataQ_mutex[ctx], ctx_to_dataQ_cond[ctx]);
+}
+
+session::SessionPacket* popAcceptQ(int ctx) {
+	return popQ(listen_ctx_to_acceptQ[ctx], ctx_to_acceptQ_mutex[ctx], ctx_to_acceptQ_cond[ctx]);
+}
+
+void pushQ(session::SessionPacket* pkt, queue<session::SessionPacket*> *Q, pthread_mutex_t *mutex, pthread_cond_t *cond) {
+		pthread_mutex_lock(mutex);
+		Q->push(pkt);
+		pthread_mutex_unlock(mutex);
+		pthread_cond_signal(cond);
+}
+
+void pushDataQ(int ctx, session::SessionPacket *pkt) {
+	pushQ(pkt, ctx_to_dataQ[ctx], ctx_to_dataQ_mutex[ctx], ctx_to_dataQ_cond[ctx]);
+}
+
+void pushAcceptQ(int ctx, session::SessionPacket *pkt) {
+	pushQ(pkt, listen_ctx_to_acceptQ[ctx], ctx_to_acceptQ_mutex[ctx], ctx_to_acceptQ_cond[ctx]);
+}
+
+void allocateQ(int ctx, map<unsigned short, queue<session::SessionPacket*>* > *QMap,
+						map<unsigned short, pthread_mutex_t*> *mutexMap,
+						map<unsigned short, pthread_cond_t*> *condMap) {
+
+	// allocate a queue
+	queue<session::SessionPacket*> *Q = new queue<session::SessionPacket*>();
+	(*QMap)[ctx] = Q;
+
+	// allocate new pthread vars for this data Q
 	pthread_mutex_t *mutex = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
 	pthread_mutex_init(mutex, NULL);
-	ctx_to_dataQ_mutex[ctx] = mutex;
+	(*mutexMap)[ctx] = mutex;
 	pthread_cond_t *cond = (pthread_cond_t*)malloc(sizeof(pthread_cond_t));
 	pthread_cond_init(cond, NULL);
-	ctx_to_dataQ_cond[ctx] = cond;
+	(*condMap)[ctx] = cond;
 }
+
+void allocateDataQ(int ctx) {
+	allocateQ(ctx, &ctx_to_dataQ, &ctx_to_dataQ_mutex, &ctx_to_dataQ_cond);
+}
+
+void allocateAcceptQ(int ctx) {
+	allocateQ(ctx, &listen_ctx_to_acceptQ, &ctx_to_acceptQ_mutex, &ctx_to_acceptQ_cond);
+}
+
+void deallocateQ(int ctx, map<unsigned short, queue<session::SessionPacket*>* > *QMap,
+						  map<unsigned short, pthread_mutex_t*> *mutexMap,
+						  map<unsigned short, pthread_cond_t*> *condMap) {
+	
+	delete (*QMap)[ctx];
+	QMap->erase(ctx);
+
+	free((*mutexMap)[ctx]);
+	mutexMap->erase(ctx);
+	free((*condMap)[ctx]);
+	condMap->erase(ctx);
+}
+
+void deallocateDataQ(int ctx) {
+	deallocateQ(ctx, &ctx_to_dataQ, &ctx_to_dataQ_mutex, &ctx_to_dataQ_cond);
+}
+
+void deallocateAcceptQ(int ctx) {
+	deallocateQ(ctx, &listen_ctx_to_acceptQ, &ctx_to_acceptQ_mutex, &ctx_to_acceptQ_cond);
+}
+
+int startPollingSocket(int sock, void*(polling_function)(void*), void* args) {
+	pthread_t *t = (pthread_t*)malloc(sizeof(pthread_t));
+	int pthread_rc;
+	if ( (pthread_rc = pthread_create(t, NULL, polling_function, args)) >= 0)
+		sockfd_to_pthread[sock] = t;
+	return pthread_rc;
+}
+
+int stopPollingSocket(int sock) {
+LOG("here");
+	int rc = 1;
+	pthread_t *t = sockfd_to_pthread[sock];
+	
+	// no need to kill ourselves; this could happen if poll_recv_sock got a
+	// TEARDOWN msg. poll_recv_sock will exit after closeSession call completes,
+	// so all we need to do here is remove state
+	if (*t != pthread_self()) {
+		rc = pthread_cancel(*t);
+LOG("here");
+		if (rc < 0) {
+			LOGF("Error cancelling listen thread for sock %d", sock);
+		}
+		rc = pthread_join(*t, NULL);
+LOG("here");
+		if (rc < 0) {
+			LOGF("Error waiting for listen thread to terminate (sock %d)", sock);
+		}
+	}
+
+	free(sockfd_to_pthread[sock]);
+	sockfd_to_pthread.erase(sock);
+LOG("here");
+	return rc;
+}
+
+// Removes the specified context from the connection and, if no one else is
+// using the connection, closes it
+bool closeConnection(int ctx, session::ConnectionInfo *cinfo) {
+	bool closed_conn = false;
+	// remove ctx from the connections list of sessions
+	int found = -1;
+	for (int i = 0; i < cinfo->sessions_size(); i++) {
+		if (ctx == cinfo->sessions(i)) {
+			found = i;
+			break;
+		}
+	}
+
+	if (found == -1) {
+		LOGF("Error: did not find context %d in connection", ctx);
+		return closed_conn;
+	}
+
+	// swap found ctx with the last ctx, then remove last
+	// (that's how the protobuf API makes us do it)
+	cinfo->mutable_sessions()->SwapElements(found, cinfo->sessions_size()-1);
+	cinfo->mutable_sessions()->RemoveLast();
+
+	// If no one else is using this connection, close it
+	if (cinfo->sessions_size() == 0) {
+		LOGF("Closing connection to: %s", cinfo->name().c_str());
+		closed_conn = true;
+
+LOG("here");
+		// stop polling the socket
+		if (stopPollingSocket(cinfo->sockfd()) < 0) {
+			LOGF("Error closing the polling thread for socket %d", cinfo->sockfd());
+		}
+
+LOG("here");
+		// close the socket
+#ifdef XIA
+		if (Xclose(cinfo->sockfd()) < 0) {
+			LOGF("Error closing xsocket %d", cinfo->sockfd());
+		}
+#endif /* XIA */
+
+LOG("here");
+		// free state and remove mapping
+		name_to_conn.erase(cinfo->name());
+		delete cinfo;
+	}
+
+	return closed_conn;
+}
+
+bool closeSession(int ctx) {
+LOGF("Closing session %d", ctx);
+	bool kill_self = false;
+	session::ContextInfo *ctxInfo = ctx_to_ctx_info[ctx];
+	if (ctxInfo->initialized()) {
+		if (ctxInfo->type() == session::ContextInfo::LISTEN) {
+
+			stopPollingSocket(ctx_to_listensock[ctx]);
+			deallocateAcceptQ(ctx);
+
+		} else if (ctxInfo->type() == session::ContextInfo::SESSION) {
+
+			// first forward close message to next hop (if i'm not last)
+			if (!is_last_hop(ctx, ctx_to_session_info[ctx]->my_name())) {
+LOG("Not last hop, sending teardown msg");
+				session::SessionPacket *pkt = new session::SessionPacket();
+				pkt->set_type(session::TEARDOWN);
+				pkt->set_sender_ctx(ctx);
+				if (send(ctx, pkt) < 0) {
+					LOG("Error sending teardown message to next hop");
+				}
+				delete pkt;
+			}
+
+
+			// then tear down state on this node
+			deallocateDataQ(ctx);
+
+			closeConnection(ctx, ctx_to_txconn[ctx]);
+			kill_self = closeConnection(ctx, ctx_to_rxconn[ctx]); // this thread is the rxconn thread
+			ctx_to_rxconn.erase(ctx);
+			ctx_to_txconn.erase(ctx);
+
+			free(ctx_to_session_info[ctx]);
+			ctx_to_session_info.erase(ctx);
+		} else {
+			LOGF("Unknown context type for context %d", ctx);
+		}
+	}
+
+	free(ctxInfo);
+	ctx_to_ctx_info.erase(ctx);
+
+print_contexts();
+print_sessions();
+print_connections();
+	return kill_self;
+}
+
 
 #ifdef XIA
 int bind_random_addr_xia(sockaddr_x **sa) {
@@ -363,17 +593,14 @@ int open_connection(string name, session::ConnectionInfo *cinfo) {
 #endif /* XIA */
 	
 	if (ret >= 0) {
+		cinfo->set_name(name);
 		name_to_conn[name] = cinfo;
 
 		// start a thread reading this socket
-		pthread_t *t = (pthread_t*)malloc(sizeof(pthread_t));
-		int pthread_rc;
-		if ( (pthread_rc = pthread_create(t, NULL, poll_recv_sock, (void*)cinfo)) < 0) {
-			LOGF("Error creating recv sock thread: %s", strerror(pthread_rc));
+		if ( (ret = startPollingSocket(cinfo->sockfd(), poll_recv_sock, (void*)cinfo) < 0) ) {
+			LOGF("Error creating recv sock thread: %s", strerror(ret));
 			return -1;
 		}
-		sockfd_to_pthread[cinfo->sockfd()] = t;
-	
 	}
 
 	return ret;
@@ -488,14 +715,18 @@ int recv(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 		memset(buf, 0, BUFSIZE);
 		if ((received = Xrecv(sock, buf, BUFSIZE, 0)) < 0) {
 			LOGF("Receive error %d on socket %d: %s", errno, sock, strerror(errno));
-		} else {
-			string *bufstr = new string(buf, received);
-			pkt->ParseFromString(*bufstr);
+			return received;
 		}
 #endif /* XIA */
 	} else {
 	}
 
+	string *bufstr = new string(buf, received);
+	if (!pkt->ParseFromString(*bufstr)) {
+		LOG("Error parsing protobuf packet");
+		LOGF("bufstr: %s\n", bufstr->c_str());
+		return -1;
+	}
 	return received;
 }
 
@@ -557,46 +788,53 @@ LOG("BEGIN poll_listen_sock");
 	
 		// Get the prevhop's name so we can store this transport connection
 		string prevhop = rpkt->info().my_name();
+		rx_cinfo->set_name(prevhop);
 		name_to_conn[prevhop] = rx_cinfo;
 	
 	
 		// Add session info pkt to acceptQ
-		pthread_mutex_lock(ctx_to_acceptQ_mutex[ctx]);
-		listen_ctx_to_acceptQ[ctx]->push(rpkt);
-		pthread_mutex_unlock(ctx_to_acceptQ_mutex[ctx]);
-		pthread_cond_signal(ctx_to_acceptQ_cond[ctx]);
+		pushAcceptQ(ctx, rpkt);
 
 LOGF("    Added session info packet to accept Q %p", listen_ctx_to_acceptQ[ctx]);
 LOGF("    There are %d packets in the Q", listen_ctx_to_acceptQ[ctx]->size());
 
 		// start a thread reading this socket
-		pthread_t *t = (pthread_t*)malloc(sizeof(pthread_t));
-		int pthread_rc;
-		if ( (pthread_rc = pthread_create(t, NULL, poll_recv_sock, (void*)rx_cinfo)) < 0) {
-			LOGF("Error creating recv sock thread: %s", strerror(pthread_rc));
+		int rc;
+		if ( (rc = startPollingSocket(rx_cinfo->sockfd(), poll_recv_sock, (void*)rx_cinfo) < 0) ) {
+			LOGF("Error creating recv sock thread: %s", strerror(rc));
 		}
-		sockfd_to_pthread[rx_cinfo->sockfd()] = t;
-
 	}
 
 	return NULL;
 }
 
 // TODO: take in how much data should be read and buffer unwanted data somewhere
+// TODO: don't crash if we get a packet for a session not in our maps
 void *poll_recv_sock(void *args) {
+	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL); // exit right away if cancelled
 
 	session::ConnectionInfo *cinfo = (session::ConnectionInfo*)args;
 	int sock = cinfo->sockfd();
+	int rc;
 
 	while(true)
 	{
 		session::SessionPacket *rpkt = new session::SessionPacket();
-		if ( recv(cinfo, rpkt) < 0 ) {
+
+		pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL); // cancel is possible while waiting
+		rc = recv(cinfo, rpkt);
+		pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL); // don't cancel while we process a packet
+
+		if (rc < 0) {
 			LOGF("Error receiving on data sock %d", sock);
-			//rcm->set_message("Error receiving on new connection");
-			//rcm->set_rc(session::FAILURE);
-			//return -1;
+			continue;
 		}
+LOGF("received a packet on socket %d", cinfo->sockfd());
+				
+		// get the context this packet belongs to
+		uint32_t key = rpkt->sender_ctx() << 8;
+		key += sock;
+		int ctx = incomingctx_to_myctx[key];
 
 		// process packet according to its type
 		switch(rpkt->type())
@@ -606,24 +844,19 @@ void *poll_recv_sock(void *args) {
 				// Add session info pkt to acceptQ
 				string my_name = get_neighborhop_name(rpkt->info().my_name(), &(rpkt->info()), true);
 				int listen_ctx = name_to_listen_ctx[my_name];
-				pthread_mutex_lock(ctx_to_acceptQ_mutex[listen_ctx]);
-				listen_ctx_to_acceptQ[listen_ctx]->push(rpkt);
-				pthread_mutex_unlock(ctx_to_acceptQ_mutex[listen_ctx]);
-				pthread_cond_signal(ctx_to_acceptQ_cond[listen_ctx]);
+				pushAcceptQ(listen_ctx, rpkt);
 				break;
 			}
 			case session::DATA:
 			{
-				// get the context this packet belongs to
-				uint32_t key = rpkt->sender_ctx() << 8;
-				key += sock;
-				int ctx = incomingctx_to_myctx[key];
-
 				// Add data pkt to dataQ
-				pthread_mutex_lock(ctx_to_dataQ_mutex[ctx]);
-				ctx_to_dataQ[ctx]->push(rpkt);
-				pthread_mutex_unlock(ctx_to_dataQ_mutex[ctx]);
-				pthread_cond_signal(ctx_to_dataQ_cond[ctx]);
+				pushDataQ(ctx, rpkt);
+				break;
+			}
+			case session::TEARDOWN:
+			{
+				bool kill_self = closeSession(ctx);
+				if (kill_self) return NULL;
 				break;
 			}
 			default:
@@ -647,12 +880,11 @@ void *poll_recv_sock(void *args) {
 
 int process_new_context_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &reply) {
 LOG("BEGIN process_new_context_msg");
+	(void)msg; // msg currently unused
 
-	// allocate an empty session state protobuf object for this session
-	session::SessionInfo* info = new session::SessionInfo();
-	ctx_to_session_info[ctx] = info;
-
-	allocate_dataQ(ctx);
+	// allocate context info
+	session::ContextInfo *ctxInfo = new session::ContextInfo();
+	ctx_to_ctx_info[ctx] = ctxInfo;
 
 	// return success
 	reply.set_type(session::RETURN_CODE);
@@ -669,8 +901,9 @@ LOGF("    Initiating a session from %s", im.my_name().c_str());
 	reply.set_type(session::RETURN_CODE);
 	session::S_Return_Code_Msg *rcm = reply.mutable_s_rc();
 
-	// retrieve this session's state
-	session::SessionInfo *info = ctx_to_session_info[ctx];
+	// allocate session state and data queue for this session
+	session::SessionInfo* info = new session::SessionInfo();
+	ctx_to_session_info[ctx] = info;
 
 	// parse paths into session state msg
 	vector<string> forwardNames = split(im.forward_path(), ',');
@@ -690,6 +923,13 @@ LOGF("    Initiating a session from %s", im.my_name().c_str());
 		session::SessionInfo_ServiceInfo *serviceInfo = info->add_return_path();
 		serviceInfo->set_name(info->my_name());
 	}
+	
+	// set context info status to initialized session
+	session::ContextInfo *ctxInfo = ctx_to_ctx_info[ctx];
+	ctxInfo->set_type(session::ContextInfo::SESSION);
+	ctxInfo->set_my_name(info->my_name());
+	ctxInfo->set_initialized(true);
+	allocateDataQ(ctx);
 
 
 	// If necessary, make a socket for the last hop to connect to
@@ -723,14 +963,7 @@ LOG("    Made socket to accept synack from last hop");
 			fake_listen_ctx = ctx;
 			name_to_listen_ctx[info->my_name()] = ctx;
 
-			queue<session::SessionPacket*> *acceptQ = new queue<session::SessionPacket*>();
-			listen_ctx_to_acceptQ[fake_listen_ctx] = acceptQ;
-			pthread_mutex_t *mutex = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
-			pthread_mutex_init(mutex, NULL);
-			ctx_to_acceptQ_mutex[ctx] = mutex;
-			pthread_cond_t *cond = (pthread_cond_t*)malloc(sizeof(pthread_cond_t));
-			pthread_cond_init(cond, NULL);
-			ctx_to_acceptQ_cond[ctx] = cond;
+			allocateAcceptQ(fake_listen_ctx);
 		} else {
 			fake_listen_ctx = name_to_listen_ctx[info->my_name()];
 		}
@@ -781,18 +1014,18 @@ LOGF("    Accepted a new connection on rxsock %d", rxsock);
 			rcm->set_rc(session::FAILURE);
 			return -1;
 		} 
+
+		// start a thread reading this socket
+		int rc;
+		if ( (rc = startPollingSocket(cinfo->sockfd(), poll_recv_sock, (void*)cinfo) < 0) ) {
+			LOGF("Error creating recv sock thread: %s", strerror(rc));
+			return -1;
+		}
 	} else {
 		cinfo = name_to_conn[prevhop];
 		rxsock = cinfo->sockfd();
 		// get synack session info from accept Q
-		queue<session::SessionPacket*> *acceptQ = listen_ctx_to_acceptQ[fake_listen_ctx];
-		pthread_mutex_t *mutex = ctx_to_acceptQ_mutex[fake_listen_ctx];
-		pthread_cond_t *cond = ctx_to_acceptQ_cond[fake_listen_ctx];
-		pthread_mutex_lock(mutex);
-		if (acceptQ->size() ==0) pthread_cond_wait(cond, mutex);  // wait until there's a message
-		rpkt = acceptQ->front();
-		acceptQ->pop();
-		pthread_mutex_unlock(mutex);
+		rpkt = popAcceptQ(fake_listen_ctx);
 		// TODO: free acceptQ? maybe only if fake_listen_ctx == ctx?
 	}
 
@@ -817,14 +1050,6 @@ LOGF("    Got final synack from: %s", sender_name.c_str());
 	key += rxsock;
 	incomingctx_to_myctx[key] = ctx;
 
-	// start a thread reading this socket
-	pthread_t *t = (pthread_t*)malloc(sizeof(pthread_t));
-	int pthread_rc;
-	if ( (pthread_rc = pthread_create(t, NULL, poll_recv_sock, (void*)cinfo)) < 0) {
-		LOGF("Error creating recv sock thread: %s", strerror(pthread_rc));
-		return -1;
-	}
-	sockfd_to_pthread[cinfo->sockfd()] = t;
 	
 	// return success
 	rcm->set_rc(session::SUCCESS);
@@ -837,9 +1062,6 @@ LOG("BEGIN process_bind_msg");
 	reply.set_type(session::RETURN_CODE);
 	session::S_Return_Code_Msg *rcm = reply.mutable_s_rc();
 	
-	// store this "listen context's" session info
-	session::SessionInfo *sinfo = new session::SessionInfo();
-	sinfo->set_my_name(bm.name());
 LOGF("    Binding to name: %s", bm.name().c_str());
 
 #ifdef XIA
@@ -856,10 +1078,6 @@ LOG("    Bound to random XIA SID:");
 Graph g(sa);
 g.print_graph();
 	
-	// store addr in session info
-	string *strbuf = new string((const char*)sa, sizeof(sockaddr_x));
-	sinfo->set_my_addr(*strbuf);
-
 
 	// store port as this context's listen sock. This context does not have
 	// tx or rx sockets
@@ -876,8 +1094,14 @@ LOGF("    Registering name: %s", bm.name().c_str());
 LOG("    Registered name");
 #endif /* XIA */
 
-	// actually store the mapping if everything worked
-	ctx_to_session_info[ctx] = sinfo;
+	// if everything worked, store name and addr in context info
+	session::ContextInfo *ctxInfo = new session::ContextInfo();
+	ctxInfo->set_type(session::ContextInfo::LISTEN);
+	ctxInfo->set_my_name(bm.name());
+	string *strbuf = new string((const char*)sa, sizeof(sockaddr_x));
+	ctxInfo->set_my_addr(*strbuf);
+	ctxInfo->set_initialized(true);
+	ctx_to_ctx_info[ctx] = ctxInfo;
 	
 	// store a mapping of name -> listen_ctx
 	name_to_listen_ctx[bm.name()] = ctx;
@@ -885,26 +1109,16 @@ LOG("    Registered name");
 	// initialize a queue to store incoming Connection Requests
 	// (these might arrive on the accept socket or on another socket,
 	// since the session layer shares transport connections among sessions)
-	queue<session::SessionPacket*> *acceptQ = new queue<session::SessionPacket*>();
-	listen_ctx_to_acceptQ[ctx] = acceptQ;
+	allocateAcceptQ(ctx);
 
 	// kick off a thread draining the listen socket into the acceptQ
-	pthread_mutex_t *mutex = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
-	pthread_mutex_init(mutex, NULL);
-	ctx_to_acceptQ_mutex[ctx] = mutex;
-	pthread_cond_t *cond = (pthread_cond_t*)malloc(sizeof(pthread_cond_t));
-	pthread_cond_init(cond, NULL);
-	ctx_to_acceptQ_cond[ctx] = cond;
-
-	pthread_t *t = (pthread_t*)malloc(sizeof(pthread_t));
-	int pthread_rc;
-	if ( (pthread_rc = pthread_create(t, NULL, poll_listen_sock, (void*)ctx)) < 0) {
-		LOGF("Error creating listen sock thread: %s", strerror(pthread_rc));
+	int rc;
+	if ( (rc = startPollingSocket(sock, poll_listen_sock, (void*)ctx) < 0) ) {
+		LOGF("Error creating listen sock thread: %s", strerror(rc));
 		rcm->set_message("Error creating listen sock thread");
 		rcm->set_rc(session::FAILURE);
 		return -1;
 	}
-	sockfd_to_pthread[sock] = t;
 	
 	// return success
 	rcm->set_rc(session::SUCCESS);
@@ -919,26 +1133,32 @@ LOG("BEGIN process_accept_msg");
 	
 	const session::SAcceptMsg am = msg.s_accept();
 	uint32_t new_ctx = am.new_ctx();
-	allocate_dataQ(new_ctx);
-	
-	session::SessionInfo *listen_info = ctx_to_session_info[ctx];
+
+	// check that this context is an initialized listen context
+	session::ContextInfo *listenCtxInfo = ctx_to_ctx_info[ctx];
+	if (!listenCtxInfo->initialized() || listenCtxInfo->type() != session::ContextInfo::LISTEN) {
+		LOG("Context was not an initialized listen context");
+		rcm->set_message("Context was not an initialized listen context");
+		rcm->set_rc(session::FAILURE);
+		return -1;
+	}
 
 	// pull message from acceptQ
-	queue<session::SessionPacket*> *acceptQ = listen_ctx_to_acceptQ[ctx];
-	pthread_mutex_t *mutex = ctx_to_acceptQ_mutex[ctx];
-	pthread_cond_t *cond = ctx_to_acceptQ_cond[ctx];
-	pthread_mutex_lock(mutex);
-	if (acceptQ->size() ==0) pthread_cond_wait(cond, mutex);  // wait until there's a message
-	session::SessionPacket *rpkt = acceptQ->front();
-	acceptQ->pop();
-	pthread_mutex_unlock(mutex);
-
+	session::SessionPacket *rpkt = popAcceptQ(ctx);
 
 	// store a copy of the session info, updating my_name and my_addr
 	session::SessionInfo *sinfo = new session::SessionInfo(rpkt->info());
-	sinfo->set_my_name(listen_info->my_name());
+	sinfo->set_my_name(listenCtxInfo->my_name());
 	sinfo->clear_my_addr();
 	ctx_to_session_info[new_ctx] = sinfo;
+
+	// allocate context info and a data queue for the new session context
+	session::ContextInfo *ctxInfo = new session::ContextInfo();
+	ctxInfo->set_type(session::ContextInfo::SESSION);
+	ctxInfo->set_initialized(true);
+	ctxInfo->set_my_name(listenCtxInfo->my_name());
+	ctx_to_ctx_info[new_ctx] = ctxInfo;
+	allocateDataQ(new_ctx);
 	
 	// save  rx connection by name for others to use
 	string prevhop = get_prevhop_name(new_ctx);
@@ -991,6 +1211,14 @@ LOG("    I'm the last hop; connecting to initiator with supplied addr");
 				return -1;
 			}
 
+			// start a thread reading this socket
+			// TODO: somehow make this part of open_connection_xia
+			int ret;
+			if ( (ret = startPollingSocket(tx_cinfo->sockfd(), poll_recv_sock, (void*)tx_cinfo) < 0) ) {
+				LOGF("Error creating recv sock thread: %s", strerror(ret));
+				return -1;
+			}
+
 			name_to_conn[nexthop] = tx_cinfo;
 #endif /* XIA */
 		} else {
@@ -1028,6 +1256,15 @@ LOG("BEGIN process_send_msg");
 	reply.set_type(session::RETURN_CODE);
 	session::S_Return_Code_Msg *rcm = reply.mutable_s_rc();
 
+	// Check that ctx is an initialized session context
+	session::ContextInfo *listenCtxInfo = ctx_to_ctx_info[ctx];
+	if (!listenCtxInfo->initialized() || listenCtxInfo->type() != session::ContextInfo::SESSION) {
+		LOG("Context was not an initialized session context");
+		rcm->set_message("Context was not an initialized session context");
+		rcm->set_rc(session::FAILURE);
+		return -1;
+	}
+
 
 	// Build a SessionPacket
 	session::SessionPacket pkt;
@@ -1062,16 +1299,18 @@ LOG("BEGIN process_recv_msg");
 	const session::SRecvMsg rm = msg.s_recv();
 	reply.set_type(session::RETURN_CODE);
 	session::S_Return_Code_Msg *rcm = reply.mutable_s_rc();
+	
+	// Check that ctx is an initialized session context
+	session::ContextInfo *listenCtxInfo = ctx_to_ctx_info[ctx];
+	if (!listenCtxInfo->initialized() || listenCtxInfo->type() != session::ContextInfo::SESSION) {
+		LOG("Context was not an initialized session context");
+		rcm->set_message("Context was not an initialized session context");
+		rcm->set_rc(session::FAILURE);
+		return -1;
+	}
 
 	// pull packet off data Q
-	queue<session::SessionPacket*> *dataQ = ctx_to_dataQ[ctx];
-	pthread_mutex_t *mutex = ctx_to_dataQ_mutex[ctx];
-	pthread_cond_t *cond = ctx_to_dataQ_cond[ctx];
-	pthread_mutex_lock(mutex);
-	if (dataQ->size() ==0) pthread_cond_wait(cond, mutex);  // wait until there's a message
-	session::SessionPacket *pkt = dataQ->front();
-	dataQ->pop();
-	pthread_mutex_unlock(mutex);
+	session::SessionPacket *pkt = popDataQ(ctx);
 
 
 	if ( pkt->type() != session::DATA || !pkt->has_data() || !pkt->data().has_data()) {
@@ -1085,6 +1324,20 @@ LOG("BEGIN process_recv_msg");
 	session::SRecvRet *retm = reply.mutable_s_recv_ret();
 	retm->set_data(pkt->data().data());
 
+	// return success
+	rcm->set_rc(session::SUCCESS);
+	return 1;
+}
+
+int process_close_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &reply) {
+LOG("BEGIN process_close_msg");
+	
+	const session::SCloseMsg cm = msg.s_close();
+	reply.set_type(session::RETURN_CODE);
+	session::S_Return_Code_Msg *rcm = reply.mutable_s_rc();
+
+	closeSession(ctx);
+	
 	// return success
 	rcm->set_rc(session::SUCCESS);
 	return 1;
@@ -1183,7 +1436,7 @@ int listen() {
 		unsigned buflen = sizeof(buf);
 		memset(buf, 0, buflen);
 
-LOG("Waiting for a new message");
+print_contexts();
 print_sessions();
 print_connections();
 		if ((rc = recvfrom(sockfd, buf, buflen - 1 , 0, (struct sockaddr *)&sa, &len)) < 0) {
@@ -1203,27 +1456,24 @@ print_connections();
 			{
 				case session::NEW_CONTEXT:
 					process_function = &process_new_context_msg;
-					//rc = process_new_context_msg(sm.s_new_context(), &sa, reply);
 					break;
 				case session::INIT:
 					process_function = &process_init_msg;
-					//rc = process_init_msg(ctx, sm.s_init(), reply);
 					break;
 				case session::BIND:
 					process_function = &process_bind_msg;
-					//rc = process_bind_msg(ctx, sm.s_bind(), reply);
 					break;
 				case session::ACCEPT:
 					process_function = &process_accept_msg;
-					//rc = process_accept_msg(ctx, sm.s_accept(), reply);
 					break;
 				case session::SEND:
 					process_function  = &process_send_msg;
-					//rc = process_send_msg(ctx, sm.s_send(), reply);
 					break;
 				case session::RECEIVE:
 					process_function = &process_recv_msg;
-					//rc = process_recv_msg(ctx, sm.s_recv(), reply);
+					break;
+				case session::CLOSE:
+					process_function = &process_close_msg;
 					break;
 				default:
 					LOG("Unrecognized protobuf message");

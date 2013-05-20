@@ -10,6 +10,7 @@ enum SessionCallType {
   ACCEPT = 6;
   SEND = 7;
   RECEIVE = 8;
+  CLOSE = 9;
 }
 
 enum ReturnCode {
@@ -27,6 +28,7 @@ enum ConnType {
 enum PacketType {
 	SESSION_INFO = 1;
 	DATA = 2;
+	TEARDOWN = 3;
 }
 
 
@@ -45,6 +47,7 @@ message SessionMsg {
   optional SSendRet s_send_ret = 8;
   optional SRecvMsg s_recv = 9;
   optional SRecvRet s_recv_ret = 10;
+  optional SCloseMsg s_close = 11;
 }
 
 message S_Return_Code_Msg {
@@ -86,6 +89,10 @@ message SRecvRet {
 	required string data = 1;
 }
 
+message SCloseMsg {
+	optional string dummy = 1; // not used
+}
+
 
 // Messages between session processes
 
@@ -119,9 +126,22 @@ message SessionData {
 // Stores information about an open transport connection.
 // The connection might be shared between multiple sessions.
 message ConnectionInfo {
-	optional string name = 1;
+	required string name = 1;
 	required int32 sockfd = 2;
 	repeated int32 sessions = 3;
 	required string interface = 4 [default = "default"];
 	required ConnType type = 5 [default = XSP];
+}
+
+message ContextInfo {
+	enum ContextType {
+		SESSION = 1;
+		LISTEN = 2;
+		UNASSIGNED = 3;
+	}
+
+	optional ContextType type = 1 [default = UNASSIGNED];
+	optional bool initialized = 2 [default = false];
+	optional string my_name = 3;
+	optional bytes my_addr = 4;
 }

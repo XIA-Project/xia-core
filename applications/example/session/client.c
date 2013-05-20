@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
 		printf("\n");
     }
 
-    //Xsclose(sock);
+	Sclose(ctx);
     return 0;
 }
 

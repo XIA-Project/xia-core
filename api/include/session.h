@@ -44,6 +44,7 @@ extern int Sbind(int ctx, const char* name);
 extern int SacceptConnReq(int ctx);
 extern int Ssend(int ctx, const void* buf, size_t len);
 extern int Srecv(int ctx, void* buf, size_t len);
+extern int Sclose(int ctx);
 
 
 #ifdef __cplusplus
