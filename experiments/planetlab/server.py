@@ -37,15 +37,16 @@ class Heartbeats(dict):
 class Receiver(threading.Thread):
     """Receive UDP packets and log them in the heartbeats dictionary"""
 
-    def __init__(self, goOnEvent, heartbeats, neighbord):
+    def __init__(self, goOnEvent, heartbeats, neighbord, statsd):
         super(Receiver, self).__init__()
         self.goOnEvent = goOnEvent
         self.heartbeats = heartbeats
         self.neighbord = neighbord
+        self.statsd = statsd
         self.recSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.recSocket.settimeout(CHECK_TIMEOUT)
         self.recSocket.bind(('', UDP_PORT))
-        self.latlonfile = open('IPLATLON', 'r').read().split('\n')
+        self.latlonfile = open('./mapper/IPLATLON', 'r').read().split('\n')
         self.latlond = {}
         for ll in self.latlonfile:
             ll = ll.split(' ')
@@ -74,6 +75,14 @@ class Receiver(threading.Thread):
                     except:
                         pass
                     self.heartbeats[ip] = [time.time(), color, lat, lon, name, nlatlon]
+                elif data[0] == 'PyStat':
+                    stats = data[1].split(';')
+                    if len(stats) == 4:
+                        ip = stats[0]
+                        name = stats[1]
+                        ping = stats[2]
+                        hops = stats[3]
+                        self.statsd[ip] = (name,ping,hops)
             except socket.timeout:
                 pass
             except KeyError:
@@ -82,8 +91,10 @@ class Receiver(threading.Thread):
 def buildMap(clients):
     url = 'http://maps.googleapis.com/maps/api/staticmap?center=Kansas&zoom=4&size=640x400&maptype=roadmap&sensor=false'
     for client in clients:
-        #url += '&markers=color:%s|%s,%s' % (client[0],client[2],client[1])
-        url += '&markers=%s,%s' % (client[2],client[1])
+        if client[0] != 'red':
+            url += '&markers=color:%s|%s,%s' % (client[0],client[2],client[1])
+        else:
+            url += '&markers=%s,%s' % (client[2],client[1])
         #url += ''.join(['&path=color:%s|%s,%s|%s,%s' % (client[0],client[2],client[1],x[1],x[0]) for x in client[4]])
         url += ''.join(['&path=%s,%s|%s,%s' % (client[2],client[1],x[1],x[0]) for x in client[4]])
     html = '<html>\n<head>\n<title>Current Nodes In Topology</title>\n<meta http-equiv="refresh" content="5">\n</head>\n<body>\n<img src="%s">\n</body>\n</html>' % url
@@ -94,7 +105,8 @@ def main():
     receiverEvent.set()
     heartbeats = Heartbeats()
     neighbord = Heartbeats()
-    receiver = Receiver(goOnEvent = receiverEvent, heartbeats = heartbeats, neighbord = neighbord)
+    statsd = {}
+    receiver = Receiver(goOnEvent = receiverEvent, heartbeats = heartbeats, neighbord = neighbord, statsd = statsd)
     receiver.start()
     print ('Threaded heartbeat server listening on port %d\n'
         'press Ctrl-C to stop\n') % UDP_PORT

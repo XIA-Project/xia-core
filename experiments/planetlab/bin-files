@@ -45,4 +45,9 @@
 ./xia-core/experiments/planetlab/refresh.sh
 ./xia-core/experiments/planetlab/test_infrastructure.py
 ./xia-core/experiments/planetlab/tunneling.ini
+./xia-core/experiments/planetlab/tunneling.topo
+./xia-core/experiments/planetlab/machines
 ./xia-core/experiments/planetlab/mapper/mapper_client.py
+./xia-core/experiments/planetlab/stats/ping.py
+./xia-core/experiments/planetlab/stats/traceroute.py
+./xia-core/experiments/planetlab/stats/stats_client.py
