@@ -205,12 +205,20 @@ int main(int argc, char *argv[]) {
 			// delete obsolete gw-router HID entry
 			xr.delRoute(myGWRHID);
 			
+			// TODO: These default next-hops shouldn't be hard coded; when we get a message
+			// telling us what the router's HID is, we should look through the tables and
+			// update the next hop for anything point to port 0.
+
 			// update AD (default entry)
 			if ((rc = xr.setRoute(default_AD, 0, gwRHID, 0xffff)) != 0)
 				printf("error setting route %d\n", rc);			
 				
 			// update 4ID table (default entry)
 			if ((rc = xr.setRoute(default_4ID, 0, gwRHID, 0xffff)) != 0)
+				printf("error setting route %d\n", rc);								
+			
+			// update HID table (default entry)
+			if ((rc = xr.setRoute(default_HID, 0, gwRHID, 0xffff)) != 0)
 				printf("error setting route %d\n", rc);								
 			
 			// update HID table (gateway router HID entry)
