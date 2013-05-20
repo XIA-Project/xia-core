@@ -83,6 +83,7 @@ class Receiver(threading.Thread):
                         ping = stats[2]
                         hops = stats[3]
                         self.statsd[ip] = (name,ping,hops)
+                        print stats
             except socket.timeout:
                 pass
             except KeyError:
@@ -105,7 +106,7 @@ def main():
     receiverEvent.set()
     heartbeats = Heartbeats()
     neighbord = Heartbeats()
-    statsd = {}
+    statsd = Heartbeats()
     receiver = Receiver(goOnEvent = receiverEvent, heartbeats = heartbeats, neighbord = neighbord, statsd = statsd)
     receiver.start()
     print ('Threaded heartbeat server listening on port %d\n'
