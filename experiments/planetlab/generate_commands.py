@@ -9,7 +9,7 @@ if len(sys.argv) < 2:
 hosts = open('./machines','r').read().split('\n')
 hostd = dict((x.split('#')[1],(x.split('#')[0],socket.gethostbyname(x.split('#')[0].strip()))) for x in hosts)
 
-cmd = '[default]\n~/fedora-bin/xia-core/experiments/planetlab/local_server.py&'
+cmd = '[default]\n~/fedora-bin/xia-core/experiments/planetlab/local_server.py&\n'
 
 topo = open(sys.argv[1],'r').read()
 backbones = topo.split('[backbone]')[1].split('[')[0].split('\n')[1:-1]
