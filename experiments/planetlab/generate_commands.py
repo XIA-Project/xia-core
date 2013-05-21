@@ -29,7 +29,7 @@ for machine in backbones:
     name = machine.split(':')[0]
     ip = hostd[name][1]
     host = hostd[name][0]
-    line = '[%s] #%s\n~/fedora-bin/xia-core/experiments/planetlab/mapper/mapper_client.py red&\n~/fedora-bin/xia-core/experiments/planetlab/reconfigure_server.py ~/fedora-bin/xia-core/experiments/planetlab/tunelling.ini&\nuntil sudo ~/fedora-bin/xia-core/bin/xianet -v -r -P ' % (ip, host)    
+    line = '[%s] #%s\n~/fedora-bin/xia-core/experiments/planetlab/mapper/mapper_client.py red&\n~/fedora-bin/xia-core/experiments/planetlab/reconfigure_server.py ~/fedora-bin/xia-core/experiments/planetlab/tunneling.ini&\nuntil sudo ~/fedora-bin/xia-core/bin/xianet -v -r -P ' % (ip, host)    
 
     neighbors = ['%s:500%s' % (hostd[''.join([n for n in link if n != name])][1],links.index(link)) for link in links if name in link]    
     line += ','.join(neighbors)
@@ -40,7 +40,7 @@ for machine in clients:
     name = machine
     ip = hostd[name][1]
     host = hostd[name][0]
-    line = '[%s] #%s\n~/fedora-bin/xia-core/experiments/planetlab/mapper/mapper_client.py blue&\n~/fedora-bin/xia-core/experiments/planetlab/stats/stats_client.py ~/fedora-bin/xia-core/experiments/planetlab/tunneling.topo ~/fedora-bin/xia-core/experiments/planetlab/machines' % (ip,host)
+    line = '[%s] #%s\nsleep 15\n~/fedora-bin/xia-core/experiments/planetlab/mapper/mapper_client.py blue&\n~/fedora-bin/xia-core/experiments/planetlab/stats/stats_client.py ~/fedora-bin/xia-core/experiments/planetlab/tunneling.topo ~/fedora-bin/xia-core/experiments/planetlab/machines\n' % (ip,host)
     cmd += line
 
 print cmd

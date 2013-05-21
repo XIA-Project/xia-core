@@ -2,30 +2,35 @@
 
 """Threaded heartbeat server"""
 
-UDP_PORT = 43278; CHECK_PERIOD = 3; CHECK_TIMEOUT = 5
+UDP_PORT = 43278; CHECK_PERIOD = 3; CHECK_TIMEOUT = 6
 
 import socket, threading, time
 
-class Heartbeats(dict):
+class TimedThreadedDict(dict):
     """Manage shared heartbeats dictionary with thread locking"""
 
     def __init__(self):
-        super(Heartbeats, self).__init__()
+        super(TimedThreadedDict, self).__init__()
         self._lock = threading.Lock()
 
     def __setitem__(self, key, value):
         """Create or update the dictionary entry for a client"""
+        if isinstance(value, list):
+            timeval = [time.time()] + value
+        else:
+            timeval = [time.time(), value]
         self._lock.acquire()
-        super(Heartbeats, self).__setitem__(key, value)
+        dict.__setitem__(self, key, timeval)
         self._lock.release()
-
-    def getSilent(self):
-        """Return a list of clients with heartbeat older than CHECK_TIMEOUT"""
+        
+    def __getitem__(self, key):
         limit = time.time() - CHECK_TIMEOUT
-        self._lock.acquire()
-        silent = [ip for (ip, ipTime) in self.items() if ipTime < limit]
-        self._lock.release()
-        return silent
+        val =  dict.__getitem__(self, key)
+        if val[0] >= limit:
+            if len(val) == 2:
+                return val[1]
+            return val[1:]
+        raise Exception("KeyError: " + key)            
 
     def getClients(self):
         limit = time.time() - CHECK_TIMEOUT
@@ -67,14 +72,14 @@ class Receiver(threading.Thread):
                     nlatlon = []
                     try:
                         neighbors = eval(data[1].split(';')[3])
-                        try:
-                            for neighbor in neighbors:
+                        for neighbor in neighbors:
+                            try:
                                 nlatlon.append(self.latlond[self.neighbord[neighbor]])
-                        except:
-                            pass
+                            except:
+                                pass
                     except:
                         pass
-                    self.heartbeats[ip] = [time.time(), color, lat, lon, name, nlatlon]
+                    self.heartbeats[ip] = [color, lat, lon, name, nlatlon]
                 elif data[0] == 'PyStat':
                     stats = data[1].split(';')
                     if len(stats) == 4:
@@ -88,6 +93,8 @@ class Receiver(threading.Thread):
                 pass
             except KeyError:
                 pass
+            except Exception,e:
+                pass
 
 def buildMap(clients):
     url = 'http://maps.googleapis.com/maps/api/staticmap?center=Kansas&zoom=4&size=640x400&maptype=roadmap&sensor=false'
@@ -96,17 +103,16 @@ def buildMap(clients):
             url += '&markers=color:%s|%s,%s' % (client[0],client[2],client[1])
         else:
             url += '&markers=%s,%s' % (client[2],client[1])
-        #url += ''.join(['&path=color:%s|%s,%s|%s,%s' % (client[0],client[2],client[1],x[1],x[0]) for x in client[4]])
         url += ''.join(['&path=%s,%s|%s,%s' % (client[2],client[1],x[1],x[0]) for x in client[4]])
-    html = '<html>\n<head>\n<title>Current Nodes In Topology</title>\n<meta http-equiv="refresh" content="5">\n</head>\n<body>\n<img src="%s">\n</body>\n</html>' % url
+    html = '<html>\n<head>\n<title>Current Nodes In Topology</title>\n<meta http-equiv="refresh" content="3">\n</head>\n<body>\n<img src="%s">\n</body>\n</html>' % url
     return html
 
 def main():
     receiverEvent = threading.Event()
     receiverEvent.set()
-    heartbeats = Heartbeats()
-    neighbord = Heartbeats()
-    statsd = Heartbeats()
+    heartbeats = TimedThreadedDict()
+    neighbord = TimedThreadedDict()
+    statsd = {}
     receiver = Receiver(goOnEvent = receiverEvent, heartbeats = heartbeats, neighbord = neighbord, statsd = statsd)
     receiver.start()
     print ('Threaded heartbeat server listening on port %d\n'

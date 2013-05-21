@@ -2,12 +2,13 @@
 
 """Threaded heartbeat server"""
 
-UDP_PORT = 5690; CHECK_TIMEOUT = 5; CHECK_PERIOD = 5
+UDP_PORT = 5691; CHECK_TIMEOUT = 5; CHECK_PERIOD = 5
 CLIENT_PORT = '3000';
-KILL_CMD = '"sudo ~/fedora-bin/xia-core/bin/xianet stop"'
+KILL_CMD = 'sudo ~/fedora-bin/xia-core/bin/xianet stop'
 
 
 import socket, threading, commands, sys, time
+from subprocess import call
 
 class Receiver(threading.Thread):
 
@@ -28,9 +29,9 @@ class Receiver(threading.Thread):
                     if len(self.cmd[1].split(',')) < 4:
                         ip = data[1]
                         run = self.cmd[0] + ' ' + self.cmd[1].strip() + ',' + ip + ':' + CLIENT_PORT + ' ' + self.cmd[2]
+                        call(KILL_CMD,shell=True)                        
                         print run
-                        commands.getoutput(KILL_CMD)
-                        commands.getoutput(run)
+                        call(run,shell=True)
             except socket.timeout:
                 pass
             except KeyError:
