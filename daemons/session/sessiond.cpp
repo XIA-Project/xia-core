@@ -14,17 +14,20 @@
 
 #define DEFAULT_PROCPORT 1989
 #define BUFSIZE 65000
+#define MTU 150  // TODO: set this higher
 
 #define DEBUG
 #define XIA
 
 #ifdef DEBUG
-#define LOG(s) fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, s)
-#define LOGF(fmt, ...) fprintf(stderr, "%s:%d: " fmt"\n", __FILE__, __LINE__, __VA_ARGS__) 
+#define LOG(s) fprintf(stderr, "%s:%d: INFO  %s\n", __FILE__, __LINE__, s)
+#define LOGF(fmt, ...) fprintf(stderr, "%s:%d: INFO  " fmt"\n", __FILE__, __LINE__, __VA_ARGS__) 
 #else
 #define LOG(s)
 #define LOGF(fmt, ...)
 #endif
+#define ERROR(s) fprintf(stderr, "\033[0;31m%s:%d: ERROR  %s\n\033[0m\n", __FILE__, __LINE__, s)
+#define ERRORF(fmt, ...) fprintf(stderr, "\033[0;31m%s:%d: ERROR  " fmt"\n\033[0m\n", __FILE__, __LINE__, __VA_ARGS__) 
 
 using namespace std;
 
@@ -196,8 +199,30 @@ session::SessionPacket* popQ(queue<session::SessionPacket*> *Q, pthread_mutex_t 
 	return pkt;
 }
 
-session::SessionPacket* popDataQ(int ctx) {
-	return popQ(ctx_to_dataQ[ctx], ctx_to_dataQ_mutex[ctx], ctx_to_dataQ_cond[ctx]);
+session::SessionPacket* popDataQ(int ctx, uint32_t max_bytes) {
+	queue<session::SessionPacket*> *Q = ctx_to_dataQ[ctx];
+	pthread_mutex_t *mutex = ctx_to_dataQ_mutex[ctx];
+	pthread_cond_t *cond = ctx_to_dataQ_cond[ctx];
+
+	pthread_mutex_lock(mutex);
+	if (Q->size() == 0) pthread_cond_wait(cond, mutex);  // wait until there's a message
+	session::SessionPacket *pkt = Q->front();
+
+	if (pkt->data().data().size() > max_bytes) {
+		// make a new packet containing the first max_bytes bytes of the data;
+		// then remove the bytes from the packet on the Q, but leave it there
+		pkt = new session::SessionPacket(*pkt);
+
+		// only take the first max_bytes bytes
+		pkt->mutable_data()->mutable_data()->erase(max_bytes, pkt->data().data().size()-max_bytes);
+
+		// only leave behind what we didn't read
+		Q->front()->mutable_data()->mutable_data()->erase(0, max_bytes);
+	} else {
+		Q->pop();
+	}
+	pthread_mutex_unlock(mutex);
+	return pkt;
 }
 
 session::SessionPacket* popAcceptQ(int ctx) {
@@ -274,7 +299,6 @@ int startPollingSocket(int sock, void*(polling_function)(void*), void* args) {
 }
 
 int stopPollingSocket(int sock) {
-LOG("here");
 	int rc = 1;
 	pthread_t *t = sockfd_to_pthread[sock];
 	
@@ -283,20 +307,17 @@ LOG("here");
 	// so all we need to do here is remove state
 	if (*t != pthread_self()) {
 		rc = pthread_cancel(*t);
-LOG("here");
 		if (rc < 0) {
-			LOGF("Error cancelling listen thread for sock %d", sock);
+			ERRORF("Error cancelling listen thread for sock %d", sock);
 		}
 		rc = pthread_join(*t, NULL);
-LOG("here");
 		if (rc < 0) {
-			LOGF("Error waiting for listen thread to terminate (sock %d)", sock);
+			ERRORF("Error waiting for listen thread to terminate (sock %d)", sock);
 		}
 	}
 
 	free(sockfd_to_pthread[sock]);
 	sockfd_to_pthread.erase(sock);
-LOG("here");
 	return rc;
 }
 
@@ -314,7 +335,7 @@ bool closeConnection(int ctx, session::ConnectionInfo *cinfo) {
 	}
 
 	if (found == -1) {
-		LOGF("Error: did not find context %d in connection", ctx);
+		ERRORF("Error: did not find context %d in connection", ctx);
 		return closed_conn;
 	}
 
@@ -328,21 +349,18 @@ bool closeConnection(int ctx, session::ConnectionInfo *cinfo) {
 		LOGF("Closing connection to: %s", cinfo->name().c_str());
 		closed_conn = true;
 
-LOG("here");
 		// stop polling the socket
 		if (stopPollingSocket(cinfo->sockfd()) < 0) {
-			LOGF("Error closing the polling thread for socket %d", cinfo->sockfd());
+			ERRORF("Error closing the polling thread for socket %d", cinfo->sockfd());
 		}
 
-LOG("here");
 		// close the socket
 #ifdef XIA
 		if (Xclose(cinfo->sockfd()) < 0) {
-			LOGF("Error closing xsocket %d", cinfo->sockfd());
+			ERRORF("Error closing xsocket %d", cinfo->sockfd());
 		}
 #endif /* XIA */
 
-LOG("here");
 		// free state and remove mapping
 		name_to_conn.erase(cinfo->name());
 		delete cinfo;
@@ -365,12 +383,11 @@ LOGF("Closing session %d", ctx);
 
 			// first forward close message to next hop (if i'm not last)
 			if (!is_last_hop(ctx, ctx_to_session_info[ctx]->my_name())) {
-LOG("Not last hop, sending teardown msg");
 				session::SessionPacket *pkt = new session::SessionPacket();
 				pkt->set_type(session::TEARDOWN);
 				pkt->set_sender_ctx(ctx);
 				if (send(ctx, pkt) < 0) {
-					LOG("Error sending teardown message to next hop");
+					ERROR("Error sending teardown message to next hop");
 				}
 				delete pkt;
 			}
@@ -387,7 +404,7 @@ LOG("Not last hop, sending teardown msg");
 			free(ctx_to_session_info[ctx]);
 			ctx_to_session_info.erase(ctx);
 		} else {
-			LOGF("Unknown context type for context %d", ctx);
+			ERRORF("Unknown context type for context %d", ctx);
 		}
 	}
 
@@ -418,7 +435,7 @@ int bind_random_addr_xia(sockaddr_x **sa) {
 	sid[44] = '\0';
 	struct addrinfo *ai;
 	if (Xgetaddrinfo(NULL, sid, NULL, &ai) != 0) {
-		LOG("getaddrinfo failure!\n");
+		ERROR("getaddrinfo failure!\n");
 		return -1;
 	}
 	*sa = (sockaddr_x*)ai->ai_addr;
@@ -426,11 +443,11 @@ int bind_random_addr_xia(sockaddr_x **sa) {
 	// make socket and bind
 	int sock;
 	if ((sock = Xsocket(AF_XIA, XSOCK_STREAM, 0)) < 0) {
-		LOG("unable to create the listen socket");
+		ERROR("unable to create the listen socket");
 		return -1;
 	}
 	if (Xbind(sock, (struct sockaddr *)*sa, sizeof(sockaddr_x)) < 0) {
-		LOG("unable to bind");
+		ERROR("unable to bind");
 		return -1;
 	}
 	return sock;
@@ -560,13 +577,13 @@ int open_connection_xia(sockaddr_x *sa, session::ConnectionInfo *cinfo) {
 	// make socket
 	int sock;
 	if ((sock = Xsocket(AF_XIA, XSOCK_STREAM, 0)) < 0) {
-		LOG("unable to create the server socket");
+		ERROR("unable to create the server socket");
 		return -1;
 	}
 
 	// connect
 	if (Xconnect(sock, (struct sockaddr *)sa, sizeof(sockaddr_x)) < 0) {
-		LOG("unable to connect to the destination dag");
+		ERROR("unable to connect to the destination dag");
 		return -1;
 	}
 LOGF("    opened connection, sock is %d", sock);
@@ -584,7 +601,7 @@ int open_connection(string name, session::ConnectionInfo *cinfo) {
 	struct addrinfo *ai;
 	sockaddr_x *sa;
 	if (Xgetaddrinfo(name.c_str(), NULL, NULL, &ai) != 0) {
-		LOGF("unable to lookup name %s", name.c_str());
+		ERRORF("unable to lookup name %s", name.c_str());
 		return -1;
 	}
 	sa = (sockaddr_x*)ai->ai_addr;
@@ -598,7 +615,7 @@ int open_connection(string name, session::ConnectionInfo *cinfo) {
 
 		// start a thread reading this socket
 		if ( (ret = startPollingSocket(cinfo->sockfd(), poll_recv_sock, (void*)cinfo) < 0) ) {
-			LOGF("Error creating recv sock thread: %s", strerror(ret));
+			ERRORF("Error creating recv sock thread: %s", strerror(ret));
 			return -1;
 		}
 	}
@@ -688,7 +705,7 @@ int send(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 	if (cinfo->type() == session::XSP) {
 #ifdef XIA
 		if ((sent = Xsend(sock, buf, len, 0)) < 0) {
-			LOGF("Send error %d on socket %d, dest name %s: %s", errno, sock, cinfo->name().c_str(), strerror(errno));
+			ERRORF("Send error %d on socket %d, dest name %s: %s", errno, sock, cinfo->name().c_str(), strerror(errno));
 		}
 #endif /* XIA */
 	} else {
@@ -714,7 +731,7 @@ int recv(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 #ifdef XIA
 		memset(buf, 0, BUFSIZE);
 		if ((received = Xrecv(sock, buf, BUFSIZE, 0)) < 0) {
-			LOGF("Receive error %d on socket %d: %s", errno, sock, strerror(errno));
+			ERRORF("Receive error %d on socket %d: %s", errno, sock, strerror(errno));
 			return received;
 		}
 #endif /* XIA */
@@ -723,8 +740,7 @@ int recv(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 
 	string *bufstr = new string(buf, received);
 	if (!pkt->ParseFromString(*bufstr)) {
-		LOG("Error parsing protobuf packet");
-		LOGF("bufstr: %s\n", bufstr->c_str());
+		ERROR("Error parsing protobuf packet");
 		return -1;
 	}
 	return received;
@@ -755,7 +771,7 @@ LOG("BEGIN poll_listen_sock");
 		// accept connection on listen sock
 	#ifdef XIA
 		if ( (new_rxsock = Xaccept(listen_sock, NULL, 0)) < 0 ) {
-			LOGF("Error accepting new connection on listen context %d", ctx);
+			ERRORF("Error accepting new connection on listen context %d", ctx);
 			//rcm->set_message("Error accpeting new connection on listen context");
 			//rcm->set_rc(session::FAILURE);
 			//return -1;
@@ -772,7 +788,7 @@ LOG("BEGIN poll_listen_sock");
 		// make sure it's a session info or lasthop handshake msg
 		session::SessionPacket *rpkt = new session::SessionPacket();
 		if ( recv(rx_cinfo, rpkt) < 0 ) {
-			LOGF("Error receiving on listen sock for context %d", ctx);
+			ERRORF("Error receiving on listen sock for context %d", ctx);
 			//rcm->set_message("Error receiving on new connection");
 			//rcm->set_rc(session::FAILURE);
 			//return -1;
@@ -795,13 +811,11 @@ LOG("BEGIN poll_listen_sock");
 		// Add session info pkt to acceptQ
 		pushAcceptQ(ctx, rpkt);
 
-LOGF("    Added session info packet to accept Q %p", listen_ctx_to_acceptQ[ctx]);
-LOGF("    There are %d packets in the Q", listen_ctx_to_acceptQ[ctx]->size());
 
 		// start a thread reading this socket
 		int rc;
 		if ( (rc = startPollingSocket(rx_cinfo->sockfd(), poll_recv_sock, (void*)rx_cinfo) < 0) ) {
-			LOGF("Error creating recv sock thread: %s", strerror(rc));
+			ERRORF("Error creating recv sock thread: %s", strerror(rc));
 		}
 	}
 
@@ -826,10 +840,9 @@ void *poll_recv_sock(void *args) {
 		pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL); // don't cancel while we process a packet
 
 		if (rc < 0) {
-			LOGF("Error receiving on data sock %d", sock);
+			ERRORF("Error receiving on data sock %d", sock);
 			continue;
 		}
-LOGF("received a packet on socket %d", cinfo->sockfd());
 				
 		// get the context this packet belongs to
 		uint32_t key = rpkt->sender_ctx() << 8;
@@ -850,6 +863,7 @@ LOGF("received a packet on socket %d", cinfo->sockfd());
 			case session::DATA:
 			{
 				// Add data pkt to dataQ
+LOGF("    Received %d bytes", rpkt->data().data().size());
 				pushDataQ(ctx, rpkt);
 				break;
 			}
@@ -860,7 +874,7 @@ LOGF("received a packet on socket %d", cinfo->sockfd());
 				break;
 			}
 			default:
-				LOGF("Received a packet of unknown type on socket %d", sock);
+				ERRORF("Received a packet of unknown type on socket %d", sock);
 		}
 	}
 
@@ -942,7 +956,7 @@ LOGF("    Initiating a session from %s", im.my_name().c_str());
 		sockaddr_x *sa = NULL;
 		lsock = bind_random_addr_xia(&sa);
 		if (lsock < 0) {
-			LOG("Error binding to random SID");
+			ERROR("Error binding to random SID");
 			rcm->set_message("Error binding to random SID");
 			rcm->set_rc(session::FAILURE);
 			return -1;
@@ -976,7 +990,7 @@ LOG("    Made socket to accept synack from last hop");
 	session::SessionInfo *newinfo = pkt.mutable_info();// TODO: better way?
 	infocpy(info, newinfo);
 	if (send(ctx, &pkt) < 0) {
-		LOG("Error sending session info to next hop");
+		ERROR("Error sending session info to next hop");
 		rcm->set_message("Error sending session info to next hop");
 		rcm->set_rc(session::FAILURE);
 		return -1;
@@ -993,7 +1007,7 @@ LOG("    Sent connection request to next hop");
 		// accept connection on listen sock
 #ifdef XIA
 		if ( (rxsock = Xaccept(lsock, NULL, 0)) < 0 ) {
-			LOGF("Error accepting connection from last hop on context %d", ctx);
+			ERRORF("Error accepting connection from last hop on context %d", ctx);
 			rcm->set_message("Error accepting connection from last hop");
 			rcm->set_rc(session::FAILURE);
 			return -1;
@@ -1009,7 +1023,7 @@ LOGF("    Accepted a new connection on rxsock %d", rxsock);
 		name_to_conn[prevhop] = cinfo;
 		// listen for "synack" -- receive and check incoming session info msg
 		if ( recv(cinfo, rpkt) < 0) {
-			LOG("Error receiving synack session info msg");
+			ERROR("Error receiving synack session info msg");
 			rcm->set_message("Error receiving synack session info msg");
 			rcm->set_rc(session::FAILURE);
 			return -1;
@@ -1018,7 +1032,7 @@ LOGF("    Accepted a new connection on rxsock %d", rxsock);
 		// start a thread reading this socket
 		int rc;
 		if ( (rc = startPollingSocket(cinfo->sockfd(), poll_recv_sock, (void*)cinfo) < 0) ) {
-			LOGF("Error creating recv sock thread: %s", strerror(rc));
+			ERRORF("Error creating recv sock thread: %s", strerror(rc));
 			return -1;
 		}
 	} else {
@@ -1036,7 +1050,7 @@ LOGF("    Accepted a new connection on rxsock %d", rxsock);
 	
 	// TODO: check that this is the correct session info pkt
 	if (rpkt->type() != session::SESSION_INFO) {
-		LOG("Expecting final synack, but packet was not a SESSION_INFO msg.");
+		ERROR("Expecting final synack, but packet was not a SESSION_INFO msg.");
 		rcm->set_message("Expecting final synack, but packet was not a SESSION_INFO msg.");
 		rcm->set_rc(session::FAILURE);
 		return -1;
@@ -1069,7 +1083,7 @@ LOGF("    Binding to name: %s", bm.name().c_str());
 	sockaddr_x *sa = NULL;
 	int sock = bind_random_addr_xia(&sa);
 	if (sock < 0) {
-		LOG("Error binding to random SID");
+		ERROR("Error binding to random SID");
 		rcm->set_message("Error binding to random SID");
 		rcm->set_rc(session::FAILURE);
 		return -1;
@@ -1086,7 +1100,7 @@ g.print_graph();
 LOGF("    Registering name: %s", bm.name().c_str());
 	// register name
     if (XregisterName(bm.name().c_str(), sa) < 0 ) {
-    	LOGF("error registering name: %s\n", bm.name().c_str());
+    	ERRORF("error registering name: %s\n", bm.name().c_str());
 		rcm->set_message("Error registering name");
 		rcm->set_rc(session::FAILURE);
 		return -1;
@@ -1114,7 +1128,7 @@ LOG("    Registered name");
 	// kick off a thread draining the listen socket into the acceptQ
 	int rc;
 	if ( (rc = startPollingSocket(sock, poll_listen_sock, (void*)ctx) < 0) ) {
-		LOGF("Error creating listen sock thread: %s", strerror(rc));
+		ERRORF("Error creating listen sock thread: %s", strerror(rc));
 		rcm->set_message("Error creating listen sock thread");
 		rcm->set_rc(session::FAILURE);
 		return -1;
@@ -1137,7 +1151,7 @@ LOG("BEGIN process_accept_msg");
 	// check that this context is an initialized listen context
 	session::ContextInfo *listenCtxInfo = ctx_to_ctx_info[ctx];
 	if (!listenCtxInfo->initialized() || listenCtxInfo->type() != session::ContextInfo::LISTEN) {
-		LOG("Context was not an initialized listen context");
+		ERROR("Context was not an initialized listen context");
 		rcm->set_message("Context was not an initialized listen context");
 		rcm->set_rc(session::FAILURE);
 		return -1;
@@ -1195,7 +1209,7 @@ LOG("    I'm the last hop; connecting to initiator with supplied addr");
 		
 #ifdef XIA
 			if (!sinfo->has_initiator_addr()) {
-				LOG("Initiator did not send address");
+				ERROR("Initiator did not send address");
 				rcm->set_message("Initiator did not send address");
 				rcm->set_rc(session::FAILURE);
 				return -1;
@@ -1205,7 +1219,7 @@ LOG("    I'm the last hop; connecting to initiator with supplied addr");
 			sockaddr_x *sa = (sockaddr_x*)addr_buf;
 
 			if (open_connection_xia(sa, tx_cinfo) < 0) {
-				LOG("Error connecting to initiator");
+				ERROR("Error connecting to initiator");
 				rcm->set_message("Error connecting to initiator");
 				rcm->set_rc(session::FAILURE);
 				return -1;
@@ -1215,7 +1229,7 @@ LOG("    I'm the last hop; connecting to initiator with supplied addr");
 			// TODO: somehow make this part of open_connection_xia
 			int ret;
 			if ( (ret = startPollingSocket(tx_cinfo->sockfd(), poll_recv_sock, (void*)tx_cinfo) < 0) ) {
-				LOGF("Error creating recv sock thread: %s", strerror(ret));
+				ERRORF("Error creating recv sock thread: %s", strerror(ret));
 				return -1;
 			}
 
@@ -1233,7 +1247,7 @@ LOGF("    Opened connection with initiator on sock %d", tx_cinfo->sockfd());
 		
 	// send session info to next hop
 	if (send(new_ctx, &pkt) < 0) {
-		LOG("Error connecting to or sending session info to next hop");
+		ERROR("Error connecting to or sending session info to next hop");
 		rcm->set_message("Error connecting to or sending session info to next hop");
 		rcm->set_rc(session::FAILURE);
 		return -1;
@@ -1251,7 +1265,7 @@ LOG("    Sent SessionInfo packet to next hop");
 int process_send_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &reply) {
 LOG("BEGIN process_send_msg");
 
-	int sent;
+	uint32_t sent = 0;
 	const session::SSendMsg sendm = msg.s_send();
 	reply.set_type(session::RETURN_CODE);
 	session::S_Return_Code_Msg *rcm = reply.mutable_s_rc();
@@ -1259,7 +1273,7 @@ LOG("BEGIN process_send_msg");
 	// Check that ctx is an initialized session context
 	session::ContextInfo *listenCtxInfo = ctx_to_ctx_info[ctx];
 	if (!listenCtxInfo->initialized() || listenCtxInfo->type() != session::ContextInfo::SESSION) {
-		LOG("Context was not an initialized session context");
+		ERROR("Context was not an initialized session context");
 		rcm->set_message("Context was not an initialized session context");
 		rcm->set_rc(session::FAILURE);
 		return -1;
@@ -1271,22 +1285,29 @@ LOG("BEGIN process_send_msg");
 	pkt.set_type(session::DATA);
 	pkt.set_sender_ctx(ctx);
 	session::SessionData *dm = pkt.mutable_data();
-	dm->set_data(sendm.data());
 
-	// Send it
-	sent = send(ctx, &pkt);
+
+	// send MTU bytes at a time until we've sent the whole message
+	// for now, assume that protobur overhead is 10 bytes TODO: get actual size
+	uint32_t overhead = 10;
+	while (sent < sendm.data().size()) {
+		dm->set_data(sendm.data().substr(sent, MTU-overhead)); // grab next chunk of bytes
+LOGF("    Sending bytes %d through %d of %d", sent, sent+MTU-overhead, sendm.data().size());
+		if ( send(ctx, &pkt) < 0 ) {
+			ERROR("Error sending data");
+			rcm->set_message("Error sending data");
+			rcm->set_rc(session::FAILURE);
+			return -1;
+		}
+
+		sent += dm->data().size();
+	}
+
 
 	// Report back how many bytes we sent
 	session::SSendRet *retm = reply.mutable_s_send_ret();
 	retm->set_bytes_sent(sent);
 
-
-	if ( sent < 0 ) {
-		LOG("Error sending data");
-		rcm->set_message("Error sending data");
-		rcm->set_rc(session::FAILURE);
-		return -1;
-	}
 
 	// return success
 	rcm->set_rc(session::SUCCESS);
@@ -1297,24 +1318,35 @@ int process_recv_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &rep
 LOG("BEGIN process_recv_msg");
 
 	const session::SRecvMsg rm = msg.s_recv();
+	uint32_t max_bytes = rm.bytes_to_recv();
+
 	reply.set_type(session::RETURN_CODE);
 	session::S_Return_Code_Msg *rcm = reply.mutable_s_rc();
 	
 	// Check that ctx is an initialized session context
 	session::ContextInfo *listenCtxInfo = ctx_to_ctx_info[ctx];
 	if (!listenCtxInfo->initialized() || listenCtxInfo->type() != session::ContextInfo::SESSION) {
-		LOG("Context was not an initialized session context");
+		ERROR("Context was not an initialized session context");
 		rcm->set_message("Context was not an initialized session context");
 		rcm->set_rc(session::FAILURE);
 		return -1;
 	}
 
 	// pull packet off data Q
-	session::SessionPacket *pkt = popDataQ(ctx);
+	session::SessionPacket *pkt = popDataQ(ctx, max_bytes);
+	string data(pkt->data().data());
+
+	// keep pulling data while there's data in the Q and we have less than max_bytes
+	while (data.size() < max_bytes && ctx_to_dataQ[ctx]->size() > 0) {
+LOGF("    Grabbing more data. Have %d so far. %d msgs in queue.", data.size(), ctx_to_dataQ[ctx]->size());
+		delete pkt; // free current packet before blowing away the pointer
+		pkt = popDataQ(ctx, max_bytes - data.size());
+		data += pkt->data().data();
+	}
 
 
 	if ( pkt->type() != session::DATA || !pkt->has_data() || !pkt->data().has_data()) {
-		LOG("Received packet did not contain data");
+		ERROR("Received packet did not contain data");
 		rcm->set_message("Received packet did not contain data");
 		rcm->set_rc(session::FAILURE);
 		return -1;
@@ -1322,7 +1354,9 @@ LOG("BEGIN process_recv_msg");
 	
 	// Send back the data
 	session::SRecvRet *retm = reply.mutable_s_recv_ret();
-	retm->set_data(pkt->data().data());
+	retm->set_data(data);
+	
+	delete pkt;
 
 	// return success
 	rcm->set_rc(session::SUCCESS);
@@ -1359,7 +1393,7 @@ int send_reply(int sockfd, struct sockaddr_in *sa, socklen_t sa_size, session::S
 		rc = sendto(sockfd, p, remaining, 0, (struct sockaddr *)sa, sa_size);
 
 		if (rc == -1) {
-			LOGF("socket failure: error %d (%s)", errno, strerror(errno));
+			ERRORF("socket failure: error %d (%s)", errno, strerror(errno));
 			break;
 		} else {
 			remaining -= rc;
@@ -1371,7 +1405,7 @@ int send_reply(int sockfd, struct sockaddr_in *sa, socklen_t sa_size, session::S
 				// single buffer to get the entire block of data sent. Is 
 				// this fixable, or do we have to assume it will always go
 				// in one send?
-				LOG("click can't handle partial packets");
+				ERROR("click can't handle partial packets");
 				rc = -1;
 				break;
 #endif
@@ -1390,10 +1424,10 @@ LOG("BEGIN wrapper");
 
 	// send the reply that was filled in by the processing function
 	if (rc < 0) {
-		LOG("Error processing message");
+		ERROR("Error processing message");
 	}
 	if (send_reply(data->sockfd, data->sa, data->len, data->reply) < 0) {
-		LOG("Error sending reply");
+		ERROR("Error sending reply");
 	}
 
 	free(data->sa);
@@ -1409,7 +1443,7 @@ int listen() {
 	// Open socket to listen on
 	int sockfd;
 	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		LOGF("error creating socket to listen on: %s", strerror(errno));
+		ERRORF("error creating socket to listen on: %s", strerror(errno));
 		return -1;
 	}
 
@@ -1420,7 +1454,7 @@ int listen() {
 
 	if (bind(sockfd, (const struct sockaddr *)&addr, sizeof(addr)) < 0) {
 		close(sockfd);
-		LOGF("bind error: %s", strerror(errno));
+		ERRORF("bind error: %s", strerror(errno));
 		return -1;
 	}
 
@@ -1436,11 +1470,11 @@ int listen() {
 		unsigned buflen = sizeof(buf);
 		memset(buf, 0, buflen);
 
-print_contexts();
-print_sessions();
-print_connections();
+//print_contexts();
+//print_sessions();
+//print_connections();
 		if ((rc = recvfrom(sockfd, buf, buflen - 1 , 0, (struct sockaddr *)&sa, &len)) < 0) {
-			LOGF("error(%d) getting reply data from session process", errno);
+			ERRORF("error(%d) getting reply data from session process", errno);
 		} else {
 			// TODO: make this robust to null chars (make into std::string?)
 			session::SessionMsg sm;
@@ -1493,7 +1527,7 @@ print_connections();
 
 			int pthread_rc;
 			if ( (pthread_rc = pthread_create(&dummy_handle, NULL, process_function_wrapper, (void*)args)) < 0) {
-				LOGF("Error creating thread: %s", strerror(pthread_rc));
+				ERRORF("Error creating thread: %s", strerror(pthread_rc));
 			}
 		}
 	}

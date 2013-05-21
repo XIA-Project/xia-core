@@ -21,7 +21,7 @@
 int main(int argc, char *argv[])
 {
     int ctx, n;
-    char reply[128];
+    char reply[2048];
     char buffer[2048];
     
 	// Initiate session
@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
 		Ssend(ctx, buffer, strlen(buffer));
 		
 		//Process reply from server
-		n = Srecv(ctx, reply, 128);
+		n = Srecv(ctx, reply, sizeof(reply));
 		if (n < 0) 
 		    printf("Error receiving data");
 		write(1,reply,n);

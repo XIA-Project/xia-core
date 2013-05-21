@@ -74,7 +74,7 @@ message SAcceptMsg {
 }
 
 message SSendMsg {
-	required string data = 1;
+	required bytes data = 1;
 }
 
 message SSendRet {
@@ -82,11 +82,11 @@ message SSendRet {
 }
 
 message SRecvMsg {
-	required int32 bytes_to_recv = 1;
+	required uint32 bytes_to_recv = 1;
 }
 
 message SRecvRet {
-	required string data = 1;
+	required bytes data = 1;
 }
 
 message SCloseMsg {
