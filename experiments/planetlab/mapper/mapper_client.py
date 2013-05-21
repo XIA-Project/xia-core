@@ -2,7 +2,7 @@
 
 """Heartbeat client, sends out an UDP packet periodically"""
 
-import socket, time, commands, sys, shlex, re
+import rpyc, time, commands, sys, shlex, re
 from subprocess import Popen, PIPE
 
 XROUTE = '/home/cmu_xia/fedora-bin/xia-core/bin/xroute -v'
@@ -39,10 +39,9 @@ while True:
             if myHID in neighbors: neighbors.remove(myHID)
             if BROADCAST_HID in neighbors: neighbors.remove(BROADCAST_HID)
 
-            message = 'PyHB:%s;%s;%s;%s' %(my_ip, my_color, myHID, neighbors)
-            print message
-            hbSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            hbSocket.sendto(message, (SERVER_IP, SERVER_PORT))
+            master = rpyc.connect(SERVER_IP, SERVER_PORT)
+            master.root.heartbeat(my_ip, my_color, myHID, neighbors)
+            print my_ip, my_color, myHID, neighbors
             if __debug__: print 'Sent packet'
         else:
             myHID = '';

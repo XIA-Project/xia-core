@@ -1,7 +1,8 @@
 #!/usr/bin/python
 
-import commands, socket, sys, re
+import commands, sys, re, rpyc
 from subprocess import Popen, PIPE, call
+from os.path import splitext
 
 if len(sys.argv) < 3:
     print 'usage: %s [topofile.topo] [machines]' % (sys.argv[0])
@@ -21,15 +22,13 @@ host = out.split("'")[3]
 out = commands.getoutput(dir + 'traceroute.py %s' % (host))
 hops = re.search(r"\((\d*), '%s'\)" % host,out).group(1)
 
-message = 'PyStat:%s;%s;%s;%s' % (my_ip, host, ping, hops)
-print message
-statSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-statSocket.sendto(message, (SERVER_IP, SERVER_PORT))
-if __debug__: print 'Sent packet'
+master = rpyc.connect(SERVER_IP,SERVER_PORT)
+master.root.stats(my_ip, host, ping, hops)   
+if __debug__: print 'Sent stats'
 
-message = 'PyRestart:' + my_ip
-reconfigSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-reconfigSocket.sendto(message, (socket.gethostbyname(host), RECONFIGURE_PORT))
+cmd_file = splitext(sys.argv[1])[0].'ini'
+client = rpyc.connect(host, RECONFIGURE_PORT)
+client.restart(cmd_file, my_ip)
 if __debug__: print 'Sent reconfigure packet'
 
 cmd = 'until sudo ~/fedora-bin/xia-core/bin/xianet -v -r -P %s:%s -f eth0 start; do echo "restarting click"; done' % (socket.gethostbyname(host), CLIENT_PORT)

@@ -1,10 +1,8 @@
 #!/usr/bin/python
 
-"""Threaded heartbeat server"""
-
 UDP_PORT = 43278; CHECK_PERIOD = 3; CHECK_TIMEOUT = 6
 
-import socket, threading, time
+import rpyc, time
 
 class TimedThreadedDict(dict):
     """Manage shared heartbeats dictionary with thread locking"""
@@ -39,63 +37,46 @@ class TimedThreadedDict(dict):
         self._lock.release()
         return clients
 
-class Receiver(threading.Thread):
-    """Receive UDP packets and log them in the heartbeats dictionary"""
-
-    def __init__(self, goOnEvent, heartbeats, neighbord, statsd):
-        super(Receiver, self).__init__()
-        self.goOnEvent = goOnEvent
+class HeartBeatService(rpyc.Service):
+    def __init__(self, heartbeats, neighbord, statsd):
+        super(HeartBeatService, self).__init__()
         self.heartbeats = heartbeats
         self.neighbord = neighbord
         self.statsd = statsd
-        self.recSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.recSocket.settimeout(CHECK_TIMEOUT)
-        self.recSocket.bind(('', UDP_PORT))
         self.latlonfile = open('./mapper/IPLATLON', 'r').read().split('\n')
         self.latlond = {}
         for ll in self.latlonfile:
             ll = ll.split(' ')
             self.latlond[ll[0]] = ll[1:]
 
-    def run(self):
-        while self.goOnEvent.isSet():
-            try:
-                data, addr = self.recSocket.recvfrom(65535)
-                data = data.split(':');
-                if data[0] == 'PyHB':
-                    ip = data[1].split(';')[0]
-                    color = data[1].split(';')[1]
-                    lat = self.latlond[ip][0]
-                    lon = self.latlond[ip][1]
-                    name = self.latlond[ip][2]
-                    self.neighbord[data[1].split(';')[2]] = ip;
-                    nlatlon = []
-                    try:
-                        neighbors = eval(data[1].split(';')[3])
-                        for neighbor in neighbors:
-                            try:
-                                nlatlon.append(self.latlond[self.neighbord[neighbor]])
-                            except:
-                                pass
-                    except:
-                        pass
-                    self.heartbeats[ip] = [color, lat, lon, name, nlatlon]
-                elif data[0] == 'PyStat':
-                    stats = data[1].split(';')
-                    if len(stats) == 4:
-                        ip = stats[0]
-                        name = stats[1]
-                        ping = stats[2]
-                        hops = stats[3]
-                        self.statsd[ip] = (name,ping,hops)
-                        print stats
-            except socket.timeout:
-                pass
-            except KeyError:
-                pass
-            except Exception,e:
-                pass
+    def on_connect(self):
+        # code that runs when a connection is created
+        # (to init the serivce, if needed)
+        pass
 
+    def on_disconnect(self):
+        # code that runs when the connection has already closed
+        # (to finalize the service, if needed)
+        pass
+
+    def exposed_heartbeat(self, ip, color, hid, neighbors):
+        lat = self.latlond[ip][0]
+        lon = self.latlond[ip][1]
+        name = self.latlond[ip][2]
+        self.neighbord[hid] = ip;
+        nlatlon = []
+        for neighbor in neighbors:
+            try:
+                nlatlon.append(self.latlond[self.neighbord[neighbor]])
+            except:
+                pass
+        self.heartbeats[ip] = [color, lat, lon, name, nlatlon]
+
+    def exposed_stats(self, ip, name, ping, hops):
+        self.statsd[ip] = (name,ping,hops)
+        print stats
+
+        
 def buildMap(clients):
     url = 'http://maps.googleapis.com/maps/api/staticmap?center=Kansas&zoom=4&size=640x400&maptype=roadmap&sensor=false'
     for client in clients:
@@ -108,13 +89,11 @@ def buildMap(clients):
     return html
 
 def main():
-    receiverEvent = threading.Event()
-    receiverEvent.set()
     heartbeats = TimedThreadedDict()
     neighbord = TimedThreadedDict()
     statsd = {}
-    receiver = Receiver(goOnEvent = receiverEvent, heartbeats = heartbeats, neighbord = neighbord, statsd = statsd)
-    receiver.start()
+    receiver = HeartBeatService(heartbeats = heartbeats, neighbord = neighbord, statsd = statsd)
+    t = ThreadedServer(MyService, port = UDP_PORT)
     print ('Threaded heartbeat server listening on port %d\n'
         'press Ctrl-C to stop\n') % UDP_PORT
     try:
