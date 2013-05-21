@@ -12,13 +12,19 @@ cmd_output = open(splitext(sys.argv[1])[0]+'.ini', 'w')
 process = Popen(shlex.split('./generate_commands.py %s' % (sys.argv[1])), stdout=cmd_output)
 rc = process.wait()
 
-STOP = '"sudo killall sh; sudo ~/fedora-bin/xia-core/bin/xianet stop; sudo killall mapper_client.py; sudo killall reconfigure_server.py"'
+STOP = '"sudo killall sh; sudo ~/fedora-bin/xia-core/bin/xianet stop; sudo killall mapper_client.py; sudo killall local_server.py"'
 START = '"curl https://raw.github.com/XIA-Project/xia-core/develop/experiments/planetlab/init.sh > ./init.sh && chmod 755 ./init.sh && ./init.sh && ./fedora-bin/xia-core/experiments/planetlab/test_infrastructure.py ./fedora-bin/xia-core/experiments/planetlab/tunneling.ini"'
+LS = '"ls"'
+RM = '"rm -rf ~/*; rm -rf ~/.*"'
 
 if sys.argv[2] == 'start':
     cmd = START
 elif sys.argv[2] == 'stop':
     cmd = STOP
+elif sys.argv[2] == 'ls':
+    cmd = LS
+elif sys.argv[2] == 'rm':
+    cmd = RM
 
 machines = open('machines','r').read().split('\n')
 for machine in machines:
