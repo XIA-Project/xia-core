@@ -7,10 +7,10 @@ CPPFLAGS=$(CFLAGS)
 LDFLAGS +=-lprotobuf -lc -ldl
 
 SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XrequestChunk.c  Xgetaddrinfo.c \
-		XgetChunkStatus.c  XreadChunk.c  XputChunk.c Xrecv.c \
-        Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c \
-		Xsetsockopt.c Xutil.c state.c Xinit.c XupdateAD.c XupdateNameServerDAG.c XgetDAGbyName.c  \
-		minini/minIni.c 
+	Xfcntl.c XgetChunkStatus.c  XreadChunk.c  XputChunk.c Xrecv.c \
+	Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c \
+	Xsetsockopt.c Xutil.c state.c Xinit.c XupdateAD.c XupdateNameServerDAG.c XgetDAGbyName.c  \
+	minini/minIni.c 
 OBJS=$(SOURCES:.c=.o) xia.pb.o
 LIB=$(XLIB)/libXsocket.so
 STATICLIB=$(XLIB)/libXsocket.a
@@ -36,8 +36,8 @@ $(STATICLIB): $(OBJS)
 	ar rcs $@ $(OBJS)
 
 xwrap.so: xwrap.c
-	$(CC) -fPIC -DPIC $<
-	$(LD) -shared -o $@ xwrap.o -ldl
+	$(CC) -c -fPIC -DPIC  -I$(XINC) -g -O0 $<
+	$(LD) -shared -o $@ xwrap.o $(LDFLAGS) $(XLIB)/libdagaddr.so $(XLIB)/libXsocket.so
 
 doc: Xdoc.h $(SOURCES)
 	doxygen XsocketsAPI.cfg

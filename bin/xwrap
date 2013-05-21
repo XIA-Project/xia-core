@@ -1,0 +1,73 @@
+#!/bin/sh
+#
+# Copyright 2013 Carnegie Mellon University
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
+XLIB=$XIADIR/api/lib
+
+export LD_PRELOAD="$XLIB/xwrap.so $XLIB/libXsocket.so $XLIB/libdagaddr.so"
+
+help ()
+{
+	cat << EOH
+
+Start or stop the XIA network services.
+
+usage: xwrap [-tixwv] [-o <logfile>] cmd
+where:
+  -t log at entry of every wrapped API call
+  -i log informative messages
+  -x log XIA related messages
+  -w log warnings and errors
+  -v log everything in the wrapper
+  -o <logfile> log to the specified file instead of stderr
+
+  cmd is the application and any command line arguments it requires
+
+EOH
+	exit 0
+}
+
+
+while getopts "o:tvwx" opt; do
+	case $opt in
+		o)
+			export XWRAP_LOGFILE=$OPTARG
+			;;
+		v)
+			export XWRAP_VERBOSE=1
+			;;
+		t)
+			export XWRAP_TRACE=1
+			;;
+		x)
+			export XWRAP_XIA=1
+			;;
+		i)
+			export XWRAP_INFO=1
+			;;	 
+		w)
+			export XWRAP_WARNING=1
+			;;	 
+		\?)
+			help
+			;;
+	esac
+done
+
+shift $((OPTIND-1))
+
+# ececute command
+$@

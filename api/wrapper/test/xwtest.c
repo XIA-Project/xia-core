@@ -1,12 +1,17 @@
 #include <stdio.h>
 #include <sys/socket.h>
-#include "Xsocket.h"
+#include <netdb.h>
+#include "dagaddr.hpp"
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+//#include "Xsocket.h"
 
 #define STREAM_NAME "www_s.stream_echo.aaa.xia"
 
-int setup(int type, char *name)
+int setup(int type, const char *name)
 {
-	char *dag;
+	struct addrinfo *addr;
 
 	printf("\nConnecting to %s server\n", type == SOCK_STREAM ? "stream" : "datagram");
 
@@ -20,19 +25,19 @@ int setup(int type, char *name)
 
 		// FIXME: need to implement name lookup correctly
 		printf("\nLooking up dag for %s\n", name);
-	    if (!(dag = XgetDAGbyName(name))) {
-			printf("unable to locate: %s\n", dag);
+	    if (getaddrinfo(name, NULL, NULL, &addr) < 0) {
+			printf("unable to locate: %s\n", name);
 			close(fd);
 			exit(1);
 		}
-		printf("\nDAG = %s\n", dag);
+		Graph g((sockaddr_x*)addr->ai_addr);
+		printf("\nDAG = %s\n", g.dag_string().c_str());
 
 		// FIXME: need to use default API for this
 		printf("\nConnecting to server\n");
 
-		if (connect(fd, (struct sockaddr *)dag, strlen(dag)) < 0) {
-//		if (Xconnect(fd, dag) < 0) {
-			printf("can't connect to %s\n", dag);
+		if (connect(fd, addr->ai_addr, sizeof(struct sockaddr)) < 0) {
+			printf("can't connect to %s\n", name);
 			close(fd);
 			exit(1);
 		}
@@ -56,7 +61,7 @@ void socket_tests(int fd)
 {
 	const char *XS_TEST = "XSEND TEST STRING\n";
 
-	char buf[256];
+	char buf[1024];
 	int s, r, match;
 
 	printf("\nRunning socket tests\n");
@@ -64,10 +69,12 @@ void socket_tests(int fd)
 	printf("\ngetpeername/getsockname tests\n");
 	r = sizeof(buf);
 	getsockname(fd, (struct sockaddr *)buf, (socklen_t *)&r);
-	printf("getsockname: %s\n", buf);
+	Graph g((sockaddr_x *)buf);
+	printf("getsockname: %s\n", g.dag_string().c_str());
 	r = sizeof(buf);
-	getpeername(fd, (struct sockaddr *)buf, (socklen_t *)&r);
-	printf("getpeername: %s\n", buf);
+	getpeername(fd, (struct sockaddr*)buf, (socklen_t *)&r);
+	Graph g1((sockaddr_x *)buf);
+	printf("getpeername: %s\n", g1.dag_string().c_str());
 	
 
 	printf("\nTesting send/recv\n");
@@ -226,36 +233,13 @@ void stdio_tests(int fd)
 	int rc;
 	char buf[256];
 
-	int sin = dup(STDIN_FILENO);
-	int sout = dup(STDOUT_FILENO);	
-
-	printf("\nstdin = %d, stdout = %d\n", fileno(stdin), fileno(stdout));
-	dup2(fd, STDIN_FILENO);
-	close(STDOUT_FILENO);
-	dup2(fd, STDOUT_FILENO);
-
 	fprintf(stderr, "\nstdin = %d, stdout = %d\n", fileno(stdin), fileno(stdout));
 
 	fprintf(stderr, "TRYING stdio remapping!!!\n");
-	printf("testing stdio remapping - scary!\n");
 	fprintf(stderr, "string sent\n");
 	rc = recv(fd, buf, sizeof(buf), 0);
 	buf[rc] = 0;
 	fprintf(stderr, "%s\n", buf);
-
-	fprintf(stderr, "putting things back!!!\n");
-	// FIXME: this is going to cause the underlying click layer to be shutdown, as the fds
-	// mapped onto stdin and stdout get closed in the call
-	dup2(sin, STDIN_FILENO);
-	dup2(sout, STDOUT_FILENO);
-
-	// dup3
-	// getchar
-	// putchar
-	// putchar_unlocked
-	// getchar_unlocked
-	// gets
-	// puts
 }
 
 
