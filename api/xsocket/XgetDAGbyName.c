@@ -121,6 +121,20 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 		return -1;
 	}
 
+    printf("name = %s\n", name);
+
+    // check to see if name is actually a dag to begin with
+    Graph gcheck(name);
+
+    // check to see if the returned dag was valid
+    // we may want a better check for this in the future
+    if (gcheck.num_nodes() > 0) {
+        std::string s = gcheck.dag_string();
+        gcheck.fill_sockaddr((sockaddr_x*)addr);
+        *addrlen = sizeof(sockaddr_x);
+        return 0;
+    }
+
 	// see if name is registered in the local hosts.xia file
 	if((dag = hostsLookup(name))) {
 
