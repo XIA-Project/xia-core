@@ -5,6 +5,7 @@ curl https://raw.github.com/XIA-Project/xia-core/develop/experiments/planetlab/i
 chmod 600 id_rsa
 mkdir .ssh
 mv id_rsa .ssh/
+ln -s ~/fedora-bin/xia-core/experiments/planetlab/rpyc/ ~/rpyc
 echo "export PATH=\"~/fedora-bin/xia-core/bin:\$PATH\"" >> .bashrc 
 echo "
 cd ~

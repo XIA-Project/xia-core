@@ -2,7 +2,8 @@
 
 UDP_PORT = 43278; CHECK_PERIOD = 3; CHECK_TIMEOUT = 6
 
-import rpyc, time
+import rpyc, time, threading
+from rpyc.utils.server import ThreadedServer
 
 class TimedThreadedDict(dict):
     """Manage shared heartbeats dictionary with thread locking"""
@@ -37,18 +38,13 @@ class TimedThreadedDict(dict):
         self._lock.release()
         return clients
 
-class HeartBeatService(rpyc.Service):
-    def __init__(self, heartbeats, neighbord, statsd):
-        super(HeartBeatService, self).__init__()
-        self.heartbeats = heartbeats
-        self.neighbord = neighbord
-        self.statsd = statsd
-        self.latlonfile = open('./mapper/IPLATLON', 'r').read().split('\n')
-        self.latlond = {}
-        for ll in self.latlonfile:
-            ll = ll.split(' ')
-            self.latlond[ll[0]] = ll[1:]
+HEARTBEATS = TimedThreadedDict()
+NEIGHBORD = TimedThreadedDict()
+STATSD = {}
+LATLOND = {}
 
+
+class HeartBeatService(rpyc.Service):
     def on_connect(self):
         # code that runs when a connection is created
         # (to init the serivce, if needed)
@@ -60,21 +56,21 @@ class HeartBeatService(rpyc.Service):
         pass
 
     def exposed_heartbeat(self, ip, color, hid, neighbors):
-        lat = self.latlond[ip][0]
-        lon = self.latlond[ip][1]
-        name = self.latlond[ip][2]
-        self.neighbord[hid] = ip;
+        lat = LATLOND[ip][0]
+        lon = LATLOND[ip][1]
+        name = LATLOND[ip][2]
+        NEIGHBORD[hid] = ip;
         nlatlon = []
         for neighbor in neighbors:
             try:
-                nlatlon.append(self.latlond[self.neighbord[neighbor]])
+                nlatlon.append(LATLOND[NEIGHBORD[neighbor]])
             except:
                 pass
-        self.heartbeats[ip] = [color, lat, lon, name, nlatlon]
+        HEARTBEATS[ip] = [color, lat, lon, name, nlatlon]
 
     def exposed_stats(self, ip, name, ping, hops):
-        self.statsd[ip] = (name,ping,hops)
-        print stats
+        STATSD[ip] = (name,ping,hops)
+        print ip, name, ping, hops
 
         
 def buildMap(clients):
@@ -88,17 +84,14 @@ def buildMap(clients):
     html = '<html>\n<head>\n<title>Current Nodes In Topology</title>\n<meta http-equiv="refresh" content="3">\n</head>\n<body>\n<img src="%s">\n</body>\n</html>' % url
     return html
 
-def main():
-    heartbeats = TimedThreadedDict()
-    neighbord = TimedThreadedDict()
-    statsd = {}
-    receiver = HeartBeatService(heartbeats = heartbeats, neighbord = neighbord, statsd = statsd)
-    t = ThreadedServer(MyService, port = UDP_PORT)
-    print ('Threaded heartbeat server listening on port %d\n'
-        'press Ctrl-C to stop\n') % UDP_PORT
-    try:
-        while True:
-            clients = heartbeats.getClients()
+class Printer(threading.Thread):
+    def __init__(self, goOnEvent):
+        super(Printer, self).__init__()
+        self.goOnEvent = goOnEvent
+
+    def run(self):
+        while self.goOnEvent.isSet():
+            clients = HEARTBEATS.getClients()
             html = buildMap(clients)
             f = open('/var/www/html/map.html', 'w')
             f.write(html)
@@ -106,11 +99,25 @@ def main():
             clients = [client[3] for client in clients]
             print 'Active clients: %s' % clients
             time.sleep(CHECK_PERIOD)
-    except KeyboardInterrupt:
-        print 'Exiting, please wait...'
-        receiverEvent.clear()
-        receiver.join()
-        print 'Finished.'
 
 if __name__ == '__main__':
-    main()
+    latlonfile = open('./mapper/IPLATLON', 'r').read().split('\n')
+    for ll in latlonfile:
+        ll = ll.split(' ')
+        LATLOND[ll[0]] = ll[1:]
+
+
+    print ('Threaded heartbeat server listening on port %d\n'
+        'press Ctrl-C to stop\n') % UDP_PORT
+
+    printerEvent = threading.Event()
+    printerEvent.set()
+    printer = Printer(goOnEvent = printerEvent)
+    printer.start()
+
+    t = ThreadedServer(HeartBeatService, port = UDP_PORT)
+    t.start()
+    print 'Exiting, please wait...'
+    printerEvent.clear()
+    printer.join()
+    print 'Finished.'
