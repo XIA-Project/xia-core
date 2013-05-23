@@ -37,10 +37,11 @@ for machine in backbones:
     cmd += line
     
 for machine in clients:
-    name = machine
+    name = machine.split(':')[0]
     ip = hostd[name][1]
     host = hostd[name][0]
-    line = '[%s] #%s\nsleep 15\n~/fedora-bin/xia-core/experiments/planetlab/mapper/mapper_client.py blue&\n~/fedora-bin/xia-core/experiments/planetlab/stats/stats_client.py /home/cmu_xia/fedora-bin/xia-core/experiments/planetlab/tunneling.topo /home/cmu_xia/fedora-bin/xia-core/experiments/planetlab/machines\n' % (ip,host)
+    neighbor = hostd[machine.split(':')[1].strip()][0]
+    line = ''#'[%s] #%s\n~/fedora-bin/xia-core/experiments/planetlab/mapper/mapper_client.py blue&\n~/fedora-bin/xia-core/experiments/planetlab/stats/stats_client.py /home/cmu_xia/fedora-bin/xia-core/experiments/planetlab/tunneling.topo /home/cmu_xia/fedora-bin/xia-core/experiments/planetlab/machines %s\n' % (ip,host, neighbor)
     cmd += line
 
 print cmd

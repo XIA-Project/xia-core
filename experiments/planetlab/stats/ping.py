@@ -6,7 +6,7 @@ from subprocess import Popen, PIPE
 my_ip = commands.getoutput("/sbin/ifconfig").split("\n")[1].split()[1][5:]
 interval = .25
 count = 4
-ping = 'ping -i %s -c %s ' % (interval, count)
+ping = 'ping -i %s -c ' % (interval)
 
 if len(sys.argv) < 3:
     print 'usage: %s [topofile.topo] [machines]' % (sys.argv[0])
@@ -21,7 +21,11 @@ backbones = [backbone.strip() for backbone in backbones]
 
 nodes = [hostd[backbone.split(':')[0]] for backbone in backbones]
 
-processes = [Popen(shlex.split(ping + node), stdout=PIPE) for node in nodes]
+processes = [Popen(shlex.split(ping + '1 ' + node), stdout=PIPE) for node in nodes]
+outs = [process.communicate() for process in processes]
+rcs = [process.wait() for process in processes]
+
+processes = [Popen(shlex.split(ping + '%s ' % count + node), stdout=PIPE) for node in nodes]
 outs = [process.communicate() for process in processes]
 rcs = [process.wait() for process in processes]
 

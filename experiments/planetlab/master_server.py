@@ -72,6 +72,11 @@ class HeartBeatService(rpyc.Service):
         STATSD[ip] = (name,ping,hops)
         print ip, name, ping, hops
 
+    def exposed_xstats(self, ip, name, xping, xhops):
+        (name,ping,hops) = STATSD[ip]
+        STATSD[ip] = (name,ping,hops,xping,xhops);
+        print ip, name, ping, hops, xping, xhops
+
         
 def buildMap(clients):
     url = 'http://maps.googleapis.com/maps/api/staticmap?center=Kansas&zoom=4&size=640x400&maptype=roadmap&sensor=false'

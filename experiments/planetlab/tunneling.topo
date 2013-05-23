@@ -12,5 +12,5 @@
         NYC: Cleveland, DC
         DC: Atlanta, NYC
 [clients]
-        UCSB
-        Iowa
+        UCSB: Iowa
+        Iowa: UCSB

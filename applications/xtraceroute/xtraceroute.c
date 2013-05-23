@@ -99,7 +99,7 @@ char usage[] =
 char *hostname;
 char hnamebuf[MAXHOSTNAMELEN];
 
-int npackets = 30;
+int npackets = 30; /* max number of hops allowed */
 int preload = 0;		/* number of packets to "preload" */
 int ntransmitted = 0;		/* sequence # for outbound packets = #sent */
 int ident;
@@ -249,7 +249,10 @@ void catcher()
 
 	pinger();
 	if (npackets == 0 || ntransmitted < npackets)
-		ualarm(interval*1000000,0);
+        if(interval < 1)
+            ualarm(interval*1000000,0);
+        else
+            alarm((int)interval);
 	else {
 		if (nreceived) {
 			waittime = 2 * tmax / 1000;

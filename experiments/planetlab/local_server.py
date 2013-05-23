@@ -26,6 +26,10 @@ class MyService(rpyc.Service):
         xr_out = commands.getoutput(XROUTE)
         return re.search(r'HID:(.*) *-2 \(self\)', xr_out).group(1).strip().lower()
 
+    def exposed_get_ad(self):
+        xr_out = commands.getoutput(XROUTE)
+        return re.search(r'AD:(.*) *-2 \(self\)', xr_out).group(1).strip().lower()
+
     def exposed_restart(self, cmd_file, remote_ip):
         my_commands = []
         try: 

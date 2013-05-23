@@ -140,7 +140,7 @@ int main(int argc, char **argv)
                 argc--, av++;
                 interval = atof(av[0]);
                 break;
-            case 'n':
+            case 'c':
                 argc--, av++;
                 npackets = atoi(av[0]);
                 break;
@@ -249,7 +249,10 @@ void catcher()
 
 	pinger();
 	if (npackets == 0 || ntransmitted < npackets)
-		ualarm(interval*1000000, 0);
+        if (interval < 1)
+            ualarm(interval*1000000, 0);
+        else
+            alarm((int)interval);
 	else {
 		if (nreceived) {
 			waittime = 2 * tmax / 1000;

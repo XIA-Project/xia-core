@@ -9,11 +9,13 @@ if len(sys.argv) < 2:
     print 'usage: %s [machine_name]' % (sys.argv[0])
     sys.exit(-1)
 
-process = Popen(shlex.split('traceroute ' + sys.argv[1]), stdout=PIPE)
+process = Popen(shlex.split('traceroute -w 1 ' + sys.argv[1]), stdout=PIPE)
 out = process.communicate()
 rc = process.wait()
 
-stats = (int(out[0].split("\n")[-2].split(' ')[0]), out[0].split('\n')[0].split(' ')[2])
+stats = [int(out[0].split("\n")[-2].split(' ')[0]), out[0].split('\n')[0].split(' ')[2]]
+if stats[0] == 30:
+    stats[0] = -1
 
-message = 'PyStat:%s;traceroute;%s' % (my_ip, stats)
+message = 'PyStat:%s;traceroute;%s' % (my_ip, tuple(stats))
 print message
