@@ -36,7 +36,10 @@ while True:
         if myHID in neighbors: neighbors.remove(myHID)
         if BROADCAST_HID in neighbors: neighbors.remove(BROADCAST_HID)
 
-        master.root.heartbeat(my_ip, my_color, myHID, neighbors)
+        try:
+            master.root.heartbeat(my_ip, my_color, myHID, neighbors)
+        except:
+            master = rpyc.connect(SERVER_NAME, SERVER_PORT)
         print my_ip, my_color, myHID, neighbors
         if __debug__: print 'Sent packet'
         if __debug__: print 'Time: %s' % time.ctime()

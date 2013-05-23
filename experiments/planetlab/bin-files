@@ -42,6 +42,8 @@
 ./xia-core/experiments/planetlab/mapper/rpyc
 ./xia-core/experiments/planetlab/stats/ping.py
 ./xia-core/experiments/planetlab/stats/traceroute.py
+./xia-core/experiments/planetlab/stats/xping.py
+./xia-core/experiments/planetlab/stats/xtraceroute.py
 ./xia-core/experiments/planetlab/stats/stats_client.py
 ./xia-core/experiments/planetlab/stats/rpyc
 ./xia-core/experiments/planetlab/rpyc

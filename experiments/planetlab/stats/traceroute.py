@@ -9,7 +9,7 @@ if len(sys.argv) < 2:
     print 'usage: %s [machine_name]' % (sys.argv[0])
     sys.exit(-1)
 
-process = Popen(shlex.split('traceroute -w 1 ' + sys.argv[1]), stdout=PIPE)
+process = Popen(shlex.split('sudo traceroute -I -w 1 ' + sys.argv[1]), stdout=PIPE)
 out = process.communicate()
 rc = process.wait()
 

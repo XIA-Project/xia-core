@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-UDP_PORT = 43278; CHECK_PERIOD = 3; CHECK_TIMEOUT = 6
+UDP_PORT = 43278; CHECK_PERIOD = 3; CHECK_TIMEOUT = 6; STATS_TIMEOUT = 10
 
 import rpyc, time, threading
 from rpyc.utils.server import ThreadedServer
@@ -68,14 +68,13 @@ class HeartBeatService(rpyc.Service):
                 pass
         HEARTBEATS[ip] = [color, lat, lon, name, nlatlon]
 
-    def exposed_stats(self, ip, name, ping, hops):
-        STATSD[ip] = (name,ping,hops)
-        print ip, name, ping, hops
+    def exposed_stats(self, ip, backbone_name, ping, hops):
+        STATSD[ip] = [(backbone_name,ping,hops)]
+        print ip, backbone_name, ping, hops
 
-    def exposed_xstats(self, ip, name, xping, xhops):
-        (name,ping,hops) = STATSD[ip]
-        STATSD[ip] = (name,ping,hops,xping,xhops);
-        print ip, name, ping, hops, xping, xhops
+    def exposed_xstats(self, ip, neighbor_name, xping, xhops):
+        STATSD[ip].append((neighbor_name,xping,xhops));
+        print ip, neighbor_name, xping, xhops
 
         
 def buildMap(clients):
@@ -105,6 +104,23 @@ class Printer(threading.Thread):
             print 'Active clients: %s' % clients
             time.sleep(CHECK_PERIOD)
 
+class DumpStats(threading.Thread):
+    def __init__(self, goOnEvent):
+        super(DumpStats, self).__init__()
+        self.goOnEvent = goOnEvent
+
+    def run(self):
+        while self.goOnEvent.isSet():
+            f = open('./stats.txt', 'w')
+            for key, value in STATSD.iteritems():
+                try:
+                    f.write('%s:\t %s\n' % (HEARTBEATS[key][3],value))
+                except:
+                    pass
+            f.close()
+            print 'Writing out Stats'
+            time.sleep(STATS_TIMEOUT)
+
 if __name__ == '__main__':
     latlonfile = open('./mapper/IPLATLON', 'r').read().split('\n')
     for ll in latlonfile:
@@ -115,14 +131,19 @@ if __name__ == '__main__':
     print ('Threaded heartbeat server listening on port %d\n'
         'press Ctrl-C to stop\n') % UDP_PORT
 
-    printerEvent = threading.Event()
-    printerEvent.set()
-    printer = Printer(goOnEvent = printerEvent)
+    finishEvent = threading.Event()
+    finishEvent.set()
+    printer = Printer(goOnEvent = finishEvent)
     printer.start()
+
+    dumper = DumpStats(goOnEvent = finishEvent)
+    dumper.start()
+
 
     t = ThreadedServer(HeartBeatService, port = UDP_PORT)
     t.start()
     print 'Exiting, please wait...'
-    printerEvent.clear()
+    finishEvent.clear()
     printer.join()
+    dumper.join()
     print 'Finished.'
