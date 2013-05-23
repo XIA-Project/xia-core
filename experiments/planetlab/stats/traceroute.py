@@ -13,7 +13,7 @@ process = Popen(shlex.split('sudo traceroute -I -w 1 ' + sys.argv[1]), stdout=PI
 out = process.communicate()
 rc = process.wait()
 
-stats = [int(out[0].split("\n")[-2].split(' ')[0]), out[0].split('\n')[0].split(' ')[2]]
+stats = [int(out[0].split("\n")[-2].strip().split(' ')[0]), out[0].split('\n')[0].split(' ')[2]]
 if stats[0] == 30:
     stats[0] = -1
 

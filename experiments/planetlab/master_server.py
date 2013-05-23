@@ -1,8 +1,8 @@
 #!/usr/bin/python
 
-UDP_PORT = 43278; CHECK_PERIOD = 3; CHECK_TIMEOUT = 6; STATS_TIMEOUT = 10
+UDP_PORT = 43278; CHECK_PERIOD = 3; CHECK_TIMEOUT = 15; STATS_TIMEOUT = 3
 
-import rpyc, time, threading
+import rpyc, time, threading, sys, curses
 from rpyc.utils.server import ThreadedServer
 
 class TimedThreadedDict(dict):
@@ -70,11 +70,11 @@ class HeartBeatService(rpyc.Service):
 
     def exposed_stats(self, ip, backbone_name, ping, hops):
         STATSD[ip] = [(backbone_name,ping,hops)]
-        print ip, backbone_name, ping, hops
+        stdscr.addstr(10, 0, '%s, %s, %s, %s' % (ip, backbone_name, ping, hops))
 
     def exposed_xstats(self, ip, neighbor_name, xping, xhops):
         STATSD[ip].append((neighbor_name,xping,xhops));
-        print ip, neighbor_name, xping, xhops
+        stdscr.addstr(11, 0, '%s, %s, %s, %s' % (ip, neighbor_name, xping, xhops))
 
         
 def buildMap(clients):
@@ -101,7 +101,12 @@ class Printer(threading.Thread):
             f.write(html)
             f.close()
             clients = [client[3] for client in clients]
-            print 'Active clients: %s' % clients
+            stdscr.addstr(0, 0, '%s : Active clients: %s\r' % (time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()), clients))
+            
+            stdout.write(curses.tigetstr("clear"))
+            stdout.flush()
+            stdscr.refresh()
+            
             time.sleep(CHECK_PERIOD)
 
 class DumpStats(threading.Thread):
@@ -116,9 +121,10 @@ class DumpStats(threading.Thread):
                 try:
                     f.write('%s:\t %s\n' % (HEARTBEATS[key][3],value))
                 except:
+                    f.write('%s:\t %s\n' % (key,value))
                     pass
             f.close()
-            print 'Writing out Stats'
+            stdscr.addstr(20, 0, '%s : Writing out Stats' % (time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())))
             time.sleep(STATS_TIMEOUT)
 
 if __name__ == '__main__':
@@ -131,6 +137,10 @@ if __name__ == '__main__':
     print ('Threaded heartbeat server listening on port %d\n'
         'press Ctrl-C to stop\n') % UDP_PORT
 
+    stdscr = curses.initscr()
+    curses.noecho()
+    curses.cbreak()
+
     finishEvent = threading.Event()
     finishEvent.set()
     printer = Printer(goOnEvent = finishEvent)
@@ -142,8 +152,12 @@ if __name__ == '__main__':
 
     t = ThreadedServer(HeartBeatService, port = UDP_PORT)
     t.start()
+    curses.echo()
+    curses.nocbreak()
+    curses.endwin()
     print 'Exiting, please wait...'
     finishEvent.clear()
     printer.join()
     dumper.join()
+    
     print 'Finished.'

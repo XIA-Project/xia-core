@@ -30,6 +30,8 @@ machines = open('machines','r').read().split('\n')
 for machine in machines:
     try:
         name = machine.split('#')[1].strip()
+        if(len(sys.argv) == 4 and sys.argv[3] != name):
+            continue
         machine = machine.split('#')[0].strip()
         f = open('/tmp/%s-log' % (name),'w')
         c = 'ssh -o StrictHostKeyChecking=no cmu_xia@%s %s' % (machine, cmd)
