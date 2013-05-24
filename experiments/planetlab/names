@@ -30,7 +30,6 @@ pli1-pa-6.hpl.hp.com #pli1-pa-6.hpl.hp.com
 planetlab1.poly.edu #planetlab1.poly.edu
 ricepl-2.cs.rice.edu #ricepl-2.cs.rice.edu
 planetlab2.cs.columbia.edu #planetlab2.cs.columbia.edu
-planetlab10.millennium.berkeley.edu #planetlab10.millennium.berkeley.edu
 node1.planetlab.albany.edu #node1.planetlab.albany.edu
 planetlab6.flux.utah.edu #planetlab6.flux.utah.edu
 75-130-96-12.static.oxfr.ma.charter.com #75-130-96-12.static.oxfr.ma.charter.com
@@ -56,7 +55,6 @@ plab2.tidprojects.com #plab2.tidprojects.com
 planet6.cs.ucsb.edu #planet6.cs.ucsb.edu
 planetlab1.rutgers.edu #planetlab1.rutgers.edu
 planetlab1.esprit-tn.com #planetlab1.esprit-tn.com
-planetlab1.cs.ucla.edu #planetlab1.cs.ucla.edu
 planetlabpc1.upf.edu #planetlabpc1.upf.edu
 planetlab2.esprit-tn.com #planetlab2.esprit-tn.com
 planetlab3.williams.edu #planetlab3.williams.edu
@@ -75,7 +73,6 @@ pli1-pa-4.hpl.hp.com #pli1-pa-4.hpl.hp.com
 plnode-04.gpolab.bbn.com #plnode-04.gpolab.bbn.com
 planet5.cs.ucsb.edu #planet5.cs.ucsb.edu
 planetlab3.cs.uoregon.edu #planetlab3.cs.uoregon.edu
-planet2.cc.gt.atl.ga.us #planet2.cc.gt.atl.ga.us
 planetlab1.byu.edu #planetlab1.byu.edu
 pluto.cs.brown.edu #pluto.cs.brown.edu
 planetlab-1.cs.uh.edu #planetlab-1.cs.uh.edu
@@ -84,7 +81,6 @@ planetlab1.tamu.edu #planetlab1.tamu.edu
 plgmu2.ite.gmu.edu #plgmu2.ite.gmu.edu
 planet1.pnl.nitech.ac.jp #planet1.pnl.nitech.ac.jp
 planet4.cc.gt.atl.ga.us #planet4.cc.gt.atl.ga.us
-planetlab1.millennium.berkeley.edu #planetlab1.millennium.berkeley.edu
 planetlab2.acis.ufl.edu #planetlab2.acis.ufl.edu
 planetlab4.cs.uoregon.edu #planetlab4.cs.uoregon.edu
 planetlab3.tamu.edu #planetlab3.tamu.edu
@@ -92,7 +88,6 @@ pl2.cs.unm.edu #pl2.cs.unm.edu
 planetlab1.cs.umass.edu #planetlab1.cs.umass.edu
 planetlab4.rutgers.edu #planetlab4.rutgers.edu
 planetlab1.temple.edu #planetlab1.temple.edu
-planetlab3.eecs.northwestern.edu #planetlab3.eecs.northwestern.edu
 planetlab5.csail.mit.edu #planetlab5.csail.mit.edu
 vn5.cse.wustl.edu #vn5.cse.wustl.edu
 planetlab1.cs.cornell.edu #planetlab1.cs.cornell.edu
@@ -127,7 +122,6 @@ planetlab2.eecs.umich.edu #planetlab2.eecs.umich.edu
 planetlab1.tsuniv.edu #planetlab1.tsuniv.edu
 plnode-03.gpolab.bbn.com #plnode-03.gpolab.bbn.com
 pllx1.parc.xerox.com #pllx1.parc.xerox.com
-planetlab1.cs.pitt.edu #planetlab1.cs.pitt.edu
 planetlab-1.pdl.nudt.edu.cn #planetlab-1.pdl.nudt.edu.cn
 planetlab2.eecs.ucf.edu #planetlab2.eecs.ucf.edu
 pl2.cs.yale.edu #pl2.cs.yale.edu
@@ -136,7 +130,6 @@ pli2-pa-2.hpl.hp.com #pli2-pa-2.hpl.hp.com
 planetlab-1.cmcl.cs.cmu.edu #planetlab-1.cmcl.cs.cmu.edu
 plab3.eece.ksu.edu #plab3.eece.ksu.edu
 planetlab1.jhu.edu #planetlab1.jhu.edu
-planetlab3.cs.columbia.edu #planetlab3.cs.columbia.edu
 planetlab4.csail.mit.edu #planetlab4.csail.mit.edu
 planetlab01.uncc.edu #planetlab01.uncc.edu
 planetlab3.rutgers.edu #planetlab3.rutgers.edu
@@ -148,7 +141,6 @@ planetlab2.netlab.uky.edu #planetlab2.netlab.uky.edu
 planetlab2.cs.umass.edu #planetlab2.cs.umass.edu
 planetlab-3.cmcl.cs.cmu.edu #planetlab-3.cmcl.cs.cmu.edu
 planetlab2.mnlab.cti.depaul.edu #planetlab2.mnlab.cti.depaul.edu
-planetlab01.cs.washington.edu #planetlab01.cs.washington.edu
 planetlab1.acis.ufl.edu #planetlab1.acis.ufl.edu
 planetlab1.georgetown.edu #planetlab1.georgetown.edu
 planetlab1.eecs.umich.edu #planetlab1.eecs.umich.edu
@@ -178,7 +170,6 @@ planetlab-2.cs.uic.edu #planetlab-2.cs.uic.edu
 planetlab2.clemson.edu #planetlab2.clemson.edu
 planetlab1.clemson.edu #planetlab1.clemson.edu
 planetlab2.cs.okstate.edu #planetlab2.cs.okstate.edu
-kupl1.ittc.ku.edu #kupl1.ittc.ku.edu
 planetlab1.cs.columbia.edu #planetlab1.cs.columbia.edu
 planet1.dsp.ac.cn #planet1.dsp.ac.cn
 planetlab1.cis.upenn.edu #planetlab1.cis.upenn.edu
@@ -187,7 +178,6 @@ planetlab4.cs.uiuc.edu #planetlab4.cs.uiuc.edu
 osiris.planetlab.cs.umd.edu #osiris.planetlab.cs.umd.edu
 planetlab1.cqupt.edu.cn #planetlab1.cqupt.edu.cn
 planetlab1.umassd.edu #planetlab1.umassd.edu
-whitefall.planetlab.cs.umd.edu #whitefall.planetlab.cs.umd.edu
 planetlab2.cs.uoregon.edu #planetlab2.cs.uoregon.edu
 planetlab1.uta.edu #planetlab1.uta.edu
 planetlab2.georgetown.edu #planetlab2.georgetown.edu
@@ -198,7 +188,6 @@ planetlab2.cs.stevens-tech.edu #planetlab2.cs.stevens-tech.edu
 pl2.ucs.indiana.edu #pl2.ucs.indiana.edu
 planetlab2.dtc.umn.edu #planetlab2.dtc.umn.edu
 planetlabone.ccs.neu.edu #planetlabone.ccs.neu.edu
-planetlab1.eecs.wsu.edu #planetlab1.eecs.wsu.edu
 planetlab-6.ece.iastate.edu #planetlab-6.ece.iastate.edu
 planetlab02.alucloud.com #planetlab02.alucloud.com
 planetlab2.cs.du.edu #planetlab2.cs.du.edu
@@ -223,7 +212,6 @@ plab2.nec-labs.com #plab2.nec-labs.com
 metis.mcs.suffolk.edu #metis.mcs.suffolk.edu
 orbpl1.rutgers.edu #orbpl1.rutgers.edu
 planetlab3.csee.usf.edu #planetlab3.csee.usf.edu
-planetlab2.cs.purdue.edu #planetlab2.cs.purdue.edu
 planetlab-02.ece.uprm.edu #planetlab-02.ece.uprm.edu
 orbpl2.rutgers.edu #orbpl2.rutgers.edu
 pl-node-0.csl.sri.com #pl-node-0.csl.sri.com
@@ -233,8 +221,6 @@ planet3.cs.ucsb.edu #planet3.cs.ucsb.edu
 mtuplanetlab1.cs.mtu.edu #mtuplanetlab1.cs.mtu.edu
 pl1.6test.edu.cn #pl1.6test.edu.cn
 planetlab1.cs.du.edu #planetlab1.cs.du.edu
-ricepl-1.cs.rice.edu #ricepl-1.cs.rice.edu
 planetlab2.eecs.wsu.edu #planetlab2.eecs.wsu.edu
 pl2.cis.uab.edu #pl2.cis.uab.edu
 planetlab2.tsuniv.edu #planetlab2.tsuniv.edu
-planetlab1.cs.colorado.edu #planetlab1.cs.colorado.edu

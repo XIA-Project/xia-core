@@ -11,11 +11,24 @@ echo "
 cd ~
 mkdir fedora-bin
 cd fedora-bin
-until rsync --rsh='ssh -o StrictHostKeyChecking=no -p5556' update@gs11698.sp.cs.cmu.edu:~/fedora/xia-core/experiments/planetlab/bin-files ./; do echo \"retrying rsync\"; done
-until rsync --rsh='ssh -o StrictHostKeyChecking=no -p5556' -ar --files-from=./bin-files update@gs11698.sp.cs.cmu.edu:~/fedora/ ./; do echo \"retrying rsync\"; done
+for i in {1..5}
+do
+  rsync --rsh='ssh -o StrictHostKeyChecking=no -p5556' update@gs11698.sp.cs.cmu.edu:~/fedora/xia-core/experiments/planetlab/bin-files ./
+  if [ $? -eq 0 ]
+  then
+    break
+  fi
+done
+for i in {1..5}
+do
+  rsync --rsh='ssh -o StrictHostKeyChecking=no -p5556' -ar --files-from=./bin-files update@gs11698.sp.cs.cmu.edu:~/fedora/ ./
+  if [ $? -eq 0 ]
+  then
+    break
+  fi
+done
 ./xia-core/experiments/planetlab/refresh.sh
 " > sync.sh
 chmod 755 sync.sh
 ./sync.sh
-#echo '1 * * * * /home/cmu_xia/sync.sh' | crontab -
 

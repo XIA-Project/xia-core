@@ -4,6 +4,7 @@ UDP_PORT = 43278; CHECK_PERIOD = 3; CHECK_TIMEOUT = 15; STATS_TIMEOUT = 3
 
 import rpyc, time, threading, sys, curses
 from rpyc.utils.server import ThreadedServer
+from os.path import splitext
 
 class TimedThreadedDict(dict):
     """Manage shared heartbeats dictionary with thread locking"""
@@ -42,6 +43,17 @@ HEARTBEATS = TimedThreadedDict()
 NEIGHBORD = TimedThreadedDict()
 STATSD = {}
 LATLOND = {}
+finishEvent = threading.Event()
+
+def get_stats():
+    s = ''
+    for key, value in STATSD.iteritems():
+        try:
+            s += '%s:\t %s\n' % (HEARTBEATS[key][3],value)
+        except:
+            s += '%s:\t %s\n' % (key,value)
+    return s
+
 
 
 class HeartBeatService(rpyc.Service):
@@ -69,13 +81,25 @@ class HeartBeatService(rpyc.Service):
         HEARTBEATS[ip] = [color, lat, lon, name, nlatlon]
 
     def exposed_stats(self, ip, backbone_name, ping, hops):
-        STATSD[ip] = [(backbone_name,ping,hops)]
-        stdscr.addstr(10, 0, '%s, %s, %s, %s' % (ip, backbone_name, ping, hops))
+        try:
+            STATSD[ip].append((backbone_name,'backbone',ping,hops))
+        except:
+            STATSD[ip] = [(backbone_name,'backbone',ping,hops)]
 
     def exposed_xstats(self, ip, neighbor_name, xping, xhops):
-        STATSD[ip].append((neighbor_name,xping,xhops));
-        stdscr.addstr(11, 0, '%s, %s, %s, %s' % (ip, neighbor_name, xping, xhops))
+        try:
+            STATSD[ip].append((neighbor_name,'test',xping,xhops))
+        except:
+            STATSD[ip] = [(neighbor_name,'test',xping,xhops)]
 
+    def exposed_newtopo(self):
+        call('./run %s stop' % sys.argv[1],shell=True)
+        call('./generate_topo',shell=True)
+        call('./run %s start' % sys.argv[1],shell=True)
+
+    def exposed_stop(self):
+        call('./run %s stop' % sys.argv[1],shell=True)
+        finishEvent.clear()
         
 def buildMap(clients):
     url = 'http://maps.googleapis.com/maps/api/staticmap?center=Kansas&zoom=4&size=640x400&maptype=roadmap&sensor=false'
@@ -85,7 +109,7 @@ def buildMap(clients):
         else:
             url += '&markers=%s,%s' % (client[2],client[1])
         url += ''.join(['&path=%s,%s|%s,%s' % (client[2],client[1],x[1],x[0]) for x in client[4]])
-    html = '<html>\n<head>\n<title>Current Nodes In Topology</title>\n<meta http-equiv="refresh" content="3">\n</head>\n<body>\n<img src="%s">\n</body>\n</html>' % url
+    html = '<html>\n<head>\n<title>Current Nodes In Topology</title>\n<meta http-equiv="refresh" content="5">\n</head>\n<body>\n<img src="%s">\n</body>\n</html>' % url
     return html
 
 class Printer(threading.Thread):
@@ -101,10 +125,9 @@ class Printer(threading.Thread):
             f.write(html)
             f.close()
             clients = [client[3] for client in clients]
+            stdscr.clrtoeol()
             stdscr.addstr(0, 0, '%s : Active clients: %s\r' % (time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()), clients))
             
-            stdout.write(curses.tigetstr("clear"))
-            stdout.flush()
             stdscr.refresh()
             
             time.sleep(CHECK_PERIOD)
@@ -116,18 +139,22 @@ class DumpStats(threading.Thread):
 
     def run(self):
         while self.goOnEvent.isSet():
-            f = open('./stats.txt', 'w')
-            for key, value in STATSD.iteritems():
-                try:
-                    f.write('%s:\t %s\n' % (HEARTBEATS[key][3],value))
-                except:
-                    f.write('%s:\t %s\n' % (key,value))
-                    pass
+            f = open('./stats-%s.txt' % splitext(sys.argv[1])[0].split('/')[-1], 'w')
+            f.write(get_stats())
             f.close()
+            stdscr.clrtoeol()
             stdscr.addstr(20, 0, '%s : Writing out Stats' % (time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())))
+            stdscr.clrtoeol()
+            stdscr.addstr(12, 0, get_stats())
+
             time.sleep(STATS_TIMEOUT)
 
 if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        print 'usage %s [topo_file]' % (sys.argv[0])
+        sys.exit(-1)
+
+
     latlonfile = open('./mapper/IPLATLON', 'r').read().split('\n')
     for ll in latlonfile:
         ll = ll.split(' ')
@@ -141,7 +168,7 @@ if __name__ == '__main__':
     curses.noecho()
     curses.cbreak()
 
-    finishEvent = threading.Event()
+
     finishEvent.set()
     printer = Printer(goOnEvent = finishEvent)
     printer.start()
