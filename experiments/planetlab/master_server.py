@@ -3,6 +3,7 @@
 UDP_PORT = 43278; CHECK_PERIOD = 3; CHECK_TIMEOUT = 15; STATS_TIMEOUT = 3
 
 import rpyc, time, threading, sys, curses
+from subprocess import call, PIPE
 from rpyc.utils.server import ThreadedServer
 from os.path import splitext
 
@@ -44,14 +45,12 @@ NEIGHBORD = TimedThreadedDict()
 STATSD = {}
 LATLOND = {}
 finishEvent = threading.Event()
+NUMEXP = 0
 
 def get_stats():
     s = ''
     for key, value in STATSD.iteritems():
-        try:
-            s += '%s:\t %s\n' % (HEARTBEATS[key][3],value)
-        except:
-            s += '%s:\t %s\n' % (key,value)
+        s += '%s:\t %s\n' % (key,value)
     return s
 
 
@@ -80,26 +79,43 @@ class HeartBeatService(rpyc.Service):
                 pass
         HEARTBEATS[ip] = [color, lat, lon, name, nlatlon]
 
-    def exposed_stats(self, ip, backbone_name, ping, hops):
+    def exposed_stats(self, my_name, neighbor_name, backbone_name, ping, hops):
+        key = tuple(sorted([my_name,neighbor_name]))
         try:
-            STATSD[ip].append((backbone_name,'backbone',ping,hops))
+            STATSD[key].append(((my_name,backbone_name),'backbone',ping,hops))
         except:
-            STATSD[ip] = [(backbone_name,'backbone',ping,hops)]
+            STATSD[key] = [((my_name,backbone_name),'backbone',ping,hops)]
+        s = '%s:\t %s\n' % (key,STATSD[key])
+        stdscr.addstr(16, 0, s)
 
-    def exposed_xstats(self, ip, neighbor_name, xping, xhops):
-        try:
-            STATSD[ip].append((neighbor_name,'test',xping,xhops))
-        except:
-            STATSD[ip] = [(neighbor_name,'test',xping,xhops)]
+    def exposed_xstats(self, my_name, neighbor_name, xping, xhops):
+        key = tuple(sorted([my_name,neighbor_name]))
+        STATSD[key].append(((my_name,neighbor_name),'test',xping,xhops))
+        s = '%s:\t %s\n' % (key,STATSD[key])
+        stdscr.addstr(16, 0, s)
+        if len(STATSD[key]) is 4:
+            self.exposed_newtopo()
 
     def exposed_newtopo(self):
-        call('./run %s stop' % sys.argv[1],shell=True)
-        call('./generate_topo',shell=True)
-        call('./run %s start' % sys.argv[1],shell=True)
+        global NUMEXP
+        clients = open(sys.argv[1]).read().split('[clients]')[1].split('\n')
+        clients = [client.split(':')[0].strip() for client in clients]
+        clients = clients[1:]
+        outs = [call('./run.py %s stop %s' % (sys.argv[1], client),shell=True, stdout=PIPE, stderr=PIPE) for client in clients]
+        out = call('./generate_topo.py',shell=True, stdout=PIPE, stderr=PIPE)
+
+        clients = open(sys.argv[1]).read().split('[clients]')[1].split('\n')
+        clients = [client.split(':')[0].strip() for client in clients]
+        clients = clients[1:]
+        stdscr.addstr(26, 0, '%s: new experiment (%s): %s' % (time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()), NUMEXP, clients))
+        out = [call('./run.py %s start %s' % (sys.argv[1], client),shell=True, stdout=PIPE, stderr=PIPE) for client in clients]
+        NUMEXP += 1
+        return 'done'
 
     def exposed_stop(self):
-        call('./run %s stop' % sys.argv[1],shell=True)
-        finishEvent.clear()
+        out = call('./run.py %s stop' % sys.argv[1],shell=True, stdout=PIPE, stderr=PIPE)
+        return 'done'
+        #finishEvent.clear()
         
 def buildMap(clients):
     url = 'http://maps.googleapis.com/maps/api/staticmap?center=Kansas&zoom=4&size=640x400&maptype=roadmap&sensor=false'
@@ -125,10 +141,10 @@ class Printer(threading.Thread):
             f.write(html)
             f.close()
             clients = [client[3] for client in clients]
-            stdscr.clrtoeol()
             stdscr.addstr(0, 0, '%s : Active clients: %s\r' % (time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()), clients))
-            
+
             stdscr.refresh()
+            stdscr.clearok(1)
             
             time.sleep(CHECK_PERIOD)
 
@@ -139,14 +155,13 @@ class DumpStats(threading.Thread):
 
     def run(self):
         while self.goOnEvent.isSet():
-            f = open('./stats-%s.txt' % splitext(sys.argv[1])[0].split('/')[-1], 'w')
-            f.write(get_stats())
-            f.close()
-            stdscr.clrtoeol()
-            stdscr.addstr(20, 0, '%s : Writing out Stats' % (time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())))
-            stdscr.clrtoeol()
-            stdscr.addstr(12, 0, get_stats())
-
+            try:
+                f = open('./stats-%s.txt' % splitext(sys.argv[1])[0].split('/')[-1], 'w')
+                f.write(get_stats())
+                f.close()
+                stdscr.addstr(20, 0, '%s : Writing out Stats' % (time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())))
+            except:
+                pass
             time.sleep(STATS_TIMEOUT)
 
 if __name__ == '__main__':

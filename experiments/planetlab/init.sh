@@ -6,7 +6,7 @@ chmod 600 id_rsa
 mkdir .ssh
 mv id_rsa .ssh/
 echo "export PATH=\"~/fedora-bin/xia-core/bin:\$PATH\"" > .bash_profile
-echo "alias pl='cd ~/fedora/xia-core/experiments/planetlab/'" >> .bash_profile
+echo "alias pl='cd ~/fedora-bin/xia-core/experiments/planetlab/'" >> .bash_profile
 echo "
 cd ~
 mkdir fedora-bin

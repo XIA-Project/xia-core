@@ -6,7 +6,7 @@ from subprocess import Popen, PIPE
 my_ip = commands.getoutput("/sbin/ifconfig").split("\n")[1].split()[1][5:]
 interval = .25
 count = 4
-ping = 'ping -W 1 -i %s -c ' % (interval)
+ping = 'sudo ping -W 1 -i %s -c ' % (interval)
 
 if len(sys.argv) < 3:
     print 'usage: %s [topofile.topo] [machines]' % (sys.argv[0])

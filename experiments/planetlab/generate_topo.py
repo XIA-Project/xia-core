@@ -2,14 +2,14 @@
 
 from random import choice
 
-machines = open('names','r').read().split('\n')[12:]
+machines = open('names','r').read().split('\n')[11:]
 
 client_a = choice(machines)
 client_b = client_a
 while client_b == client_a:
     client_b = choice(machines)
 
-machines = open('names','r').read().split('\n')[:12]
+machines = open('names','r').read().split('\n')[:11]
 open('machines','w').write("\n".join(machines+[client_a]+[client_b]))
 
 client_a = client_a.split('#')[1]
@@ -21,10 +21,9 @@ bb= """[backbone]
         SF: Seattle, Denver, LA
         LA: SF, Houston
         Houston: LA, KC, Atlanta
-        Chicago: Indianapolis
         KC: Denver, Houston, Indianapolis
         Atlanta: Houston, Indianapolis, DC
-        Indianapolis: KC, Chicago, Atlanta, Cleveland
+        Indianapolis: KC, Atlanta, Cleveland
         Cleveland: Indianapolis, NYC
         NYC: Cleveland, DC
         DC: Atlanta, NYC"""

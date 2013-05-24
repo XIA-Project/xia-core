@@ -4,13 +4,12 @@
         SF: Seattle, Denver, LA
         LA: SF, Houston
         Houston: LA, KC, Atlanta
-        Chicago: Indianapolis
         KC: Denver, Houston, Indianapolis
         Atlanta: Houston, Indianapolis, DC
-        Indianapolis: KC, Chicago, Atlanta, Cleveland
+        Indianapolis: KC, Atlanta, Cleveland
         Cleveland: Indianapolis, NYC
         NYC: Cleveland, DC
         DC: Atlanta, NYC
 [clients]
-        Iowa: planet4.cc.gt.atl.ga.us
-        planet4.cc.gt.atl.ga.us: Iowa
+        planetlab2.byu.edu: planetlab2.cnds.jhu.edu
+        planetlab2.cnds.jhu.edu: planetlab2.byu.edu

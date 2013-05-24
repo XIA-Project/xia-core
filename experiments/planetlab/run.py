@@ -12,7 +12,7 @@ cmd_output = open(splitext(sys.argv[1])[0]+'.ini', 'w')
 process = Popen(shlex.split('./generate_commands.py %s' % (sys.argv[1])), stdout=cmd_output)
 rc = process.wait()
 
-STOP = '"sudo killall sh; sudo ~/fedora-bin/xia-core/bin/xianet stop; sudo killall mapper_client.py; sudo killall local_server.py"'
+STOP = '"sudo killall sh; sudo killall init.sh; sudo killall rsync; sudo ~/fedora-bin/xia-core/bin/xianet stop; sudo killall mapper_client.py; sudo killall local_server.py"'
 START = '"curl https://raw.github.com/XIA-Project/xia-core/develop/experiments/planetlab/init.sh > ./init.sh && chmod 755 ./init.sh && ./init.sh && ./fedora-bin/xia-core/experiments/planetlab/test_infrastructure.py ./fedora-bin/xia-core/experiments/planetlab/tunneling.ini"'
 LS = '"ls"'
 RM = '"rm -rf ~/*; rm -rf ~/.*"'
@@ -27,6 +27,7 @@ elif sys.argv[2] == 'rm':
     cmd = RM
 
 machines = open('machines','r').read().split('\n')
+processes = []
 for machine in machines:
     try:
         name = machine.split('#')[1].strip()
@@ -34,8 +35,21 @@ for machine in machines:
             continue
         machine = machine.split('#')[0].strip()
         f = open('/tmp/%s-log' % (name),'w')
-        c = 'ssh -o StrictHostKeyChecking=no cmu_xia@%s %s' % (machine, cmd)
+        c = 'ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 cmu_xia@%s %s' % (machine, cmd)
         print c
-        process = Popen(shlex.split(c),stdout=f,stderr=f)
+        processes.append((name,Popen(shlex.split(c),stdout=f,stderr=f)))
     except:
         pass
+
+# while True:
+#     for process in processes:
+#         process[1].communiate()
+#         if process[1].poll() is not None:
+#             if process[1].returncode is not 0:
+#                 # process[0] is the name of the machine
+#                 # need to re generate topo and such
+#                 print process[1].returncode
+#             processes.remove(process)
+#     time.sleep(1)
+#     if len(processes) is 0:
+#         break
