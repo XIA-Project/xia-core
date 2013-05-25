@@ -3,7 +3,7 @@
 UDP_PORT = 43278; CHECK_PERIOD = 3; CHECK_TIMEOUT = 15; STATS_TIMEOUT = 3
 
 import rpyc, time, threading, sys, curses
-from subprocess import call, PIPE
+from subprocess import check_call
 from rpyc.utils.server import ThreadedServer
 from os.path import splitext
 
@@ -101,19 +101,23 @@ class HeartBeatService(rpyc.Service):
         clients = open(sys.argv[1]).read().split('[clients]')[1].split('\n')
         clients = [client.split(':')[0].strip() for client in clients]
         clients = clients[1:]
-        outs = [call('./run.py %s stop %s' % (sys.argv[1], client),shell=True, stdout=PIPE, stderr=PIPE) for client in clients]
-        out = call('./generate_topo.py',shell=True, stdout=PIPE, stderr=PIPE)
+        [check_call('./run.py %s stop %s' % (sys.argv[1], client),shell=True) for client in clients]
+        check_call('./generate_topo.py',shell=True)
 
         clients = open(sys.argv[1]).read().split('[clients]')[1].split('\n')
         clients = [client.split(':')[0].strip() for client in clients]
         clients = clients[1:]
         stdscr.addstr(26, 0, '%s: new experiment (%s): %s' % (time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()), NUMEXP, clients))
-        out = [call('./run.py %s start %s' % (sys.argv[1], client),shell=True, stdout=PIPE, stderr=PIPE) for client in clients]
+        [check_call('./run.py %s start %s' % (sys.argv[1], client),shell=True) for client in clients]
         NUMEXP += 1
         return 'done'
 
+    def exposed_error(self, my_name):
+        stdscr.addstr(30, 0, '%s: %s error!' % (time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()), my_name))
+        self.exposed_newtopo()
+
     def exposed_stop(self):
-        out = call('./run.py %s stop' % sys.argv[1],shell=True, stdout=PIPE, stderr=PIPE)
+        check_call('./run.py %s stop' % sys.argv[1],shell=True)
         return 'done'
         #finishEvent.clear()
         

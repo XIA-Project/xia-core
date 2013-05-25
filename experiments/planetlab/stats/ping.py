@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
-import sys, shlex, commands
-from subprocess import Popen, PIPE
+import sys
+from check_output import check_output
 
-my_ip = commands.getoutput("/sbin/ifconfig").split("\n")[1].split()[1][5:]
+my_ip = check_output("/sbin/ifconfig").split("\n")[1].split()[1][5:]
 interval = .25
 count = 4
 ping = 'sudo ping -W 1 -i %s -c ' % (interval)
@@ -21,13 +21,8 @@ backbones = [backbone.strip() for backbone in backbones]
 
 nodes = [hostd[backbone.split(':')[0]] for backbone in backbones]
 
-processes = [Popen(shlex.split(ping + '1 ' + node), stdout=PIPE) for node in nodes]
-outs = [process.communicate() for process in processes]
-rcs = [process.wait() for process in processes]
-
-processes = [Popen(shlex.split(ping + '%s ' % count + node), stdout=PIPE) for node in nodes]
-outs = [process.communicate() for process in processes]
-rcs = [process.wait() for process in processes]
+outs = [check_output(ping + '1 ' + node) for node in nodes]
+outs = [check_output(ping + '%s ' % count + node) for node in nodes]
 outs = zip(outs, rcs)
 
 stats = []

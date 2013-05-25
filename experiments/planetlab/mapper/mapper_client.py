@@ -2,13 +2,14 @@
 
 """Heartbeat client, sends out an UDP packet periodically"""
 
-import rpyc, time, commands, sys, re
+import rpyc, time, sys, re
+from check_output import check_output
 
 XROUTE = '/home/cmu_xia/fedora-bin/xia-core/bin/xroute -v'
 SERVER_NAME = 'GS11698.SP.CS.CMU.EDU'
 SERVER_PORT = 43278
 BEAT_PERIOD = 3
-my_ip = commands.getoutput("/sbin/ifconfig").split("\n")[1].split()[1][5:]
+my_ip = check_output("/sbin/ifconfig").split("\n")[1].split()[1][5:]
 myHID = ''
 BROADCAST_HID = 'ffffffffffffffffffffffffffffffffffffffff'
 
@@ -23,7 +24,7 @@ print ('Sending heartbeat to IP %s , port %d\n'
     'press Ctrl-C to stop\n') % (SERVER_NAME, SERVER_PORT)
 while True:
     try:
-        xr_out = commands.getoutput(XROUTE)
+        xr_out = check_output(XROUTE)
         myHID = re.search(r'HID:(.*) *-2 \(self\)', xr_out).group(1).strip().lower()
         neighbors = []
         for xline in xr_out.split('\n'):

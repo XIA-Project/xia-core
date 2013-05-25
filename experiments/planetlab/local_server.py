@@ -1,14 +1,14 @@
 #!/usr/bin/python
 
-import rpyc, commands, re
-from subprocess import call
+import rpyc, re
+from check_output import check_output
 from rpyc.utils.server import ThreadedServer
 
 RPC_PORT = 5691;
 CLIENT_PORT = '3000';
 KILL_CMD = 'sudo ~/fedora-bin/xia-core/bin/xianet stop'
 XROUTE = '/home/cmu_xia/fedora-bin/xia-core/bin/xroute -v'
-my_ip = commands.getoutput("/sbin/ifconfig").split("\n")[1].split()[1][5:]
+my_ip = check_output("/sbin/ifconfig").split("\n")[1].split()[1][5:]
 myHID = ''
 
 class MyService(rpyc.Service):
@@ -23,11 +23,11 @@ class MyService(rpyc.Service):
         pass
 
     def exposed_get_hid(self):
-        xr_out = commands.getoutput(XROUTE)
+        xr_out = check_output(XROUTE)
         return re.search(r'HID:(.*) *-2 \(self\)', xr_out).group(1).strip().lower()
 
     def exposed_get_ad(self):
-        xr_out = commands.getoutput(XROUTE)
+        xr_out = check_output(XROUTE)
         return re.search(r'AD:(.*) *-2 \(self\)', xr_out).group(1).strip().lower()
 
     def exposed_restart(self, cmd_file, remote_ip):
@@ -52,9 +52,9 @@ class MyService(rpyc.Service):
 
         if len(cmd[1].split(',')) < 4:
             run = cmd[0] + ' ' + cmd[1].strip() + ',' + remote_ip + ':' + CLIENT_PORT + ' ' + cmd[2]
-            call(KILL_CMD,shell=True)                        
+            print check_output(KILL_CMD)                        
             print run
-            call(run,shell=True)
+            print check_output(run)
 
 if __name__ == '__main__':
     print ('RPC server listening on port %d\n'

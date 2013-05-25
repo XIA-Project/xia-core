@@ -1,9 +1,9 @@
 #!/usr/bin/python 
 
-import commands, sys
-from subprocess import call
+import sys
+from check_output import check_output
 
-my_ip = commands.getoutput("/sbin/ifconfig").split("\n")[1].split()[1][5:]
+my_ip = check_output("/sbin/ifconfig").split("\n")[1].split()[1][5:]
 my_commands = []
 
 if len(sys.argv) < 2:
@@ -28,6 +28,4 @@ except Exception, e:
 # some quick testing
 for command in my_commands:
     print command
-    call(command,shell=True)
-
-
+    print check_output(command)

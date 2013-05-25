@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
-import commands, sys, rpyc, socket, time
-from subprocess import Popen, PIPE, call
+import sys, rpyc, socket, time
+from check_output import check_output
 from os.path import splitext
 
 def try_until(f, args, msg):
@@ -23,15 +23,15 @@ SERVER_PORT = 43278
 RPC_PORT = 5691
 CLIENT_PORT = 3000
 dir = '/home/cmu_xia/fedora-bin/xia-core/experiments/planetlab/stats/'
-my_hostname = commands.getoutput('hostname')
+my_hostname = check_output('hostname')
 neighbor = sys.argv[3]
 
-out = commands.getoutput(dir + 'ping.py %s %s' % (sys.argv[1], sys.argv[2])).split(";")[2].split(")")[0]
+out = check_output(dir + 'ping.py %s %s' % (sys.argv[1], sys.argv[2])).split(";")[2].split(")")[0]
 ping = out.split("'")[1]
 host = out.split("'")[3]
 print ping, host
 
-out = commands.getoutput(dir + 'traceroute.py %s' % (host))
+out = check_output(dir + 'traceroute.py %s' % (host))
 hops = out.split(';')[-1].split('(')[1].split(',')[0]
 print hops
 
@@ -48,7 +48,7 @@ if __debug__: print 'Sent reconfigure packet'
 
 cmd = 'until sudo ~/fedora-bin/xia-core/bin/xianet -v -r -P %s:%s -f eth0 start; do echo "restarting click"; done' % (socket.gethostbyname(host), CLIENT_PORT)
 print cmd
-call(cmd, shell=True)
+check_output(cmd)
 
 nc = try_until(rpyc.connect, (neighbor, RPC_PORT), 'waiting for neighbor: %s' % neighbor)
 nhid = try_until(nc.root.get_hid, (), 'waiting for neighbor xianet: %s' % neighbor)
@@ -56,22 +56,11 @@ nad = nc.root.get_ad()
 
 print nad, nhid
 
-i = 0
-while True:
-    out = commands.getoutput(dir + 'xping.py %s %s' % (nad, nhid))
-    print out
-    xping = out.split(';')[-1].split("'")[1]
-    i+=1
-    if i is 5 or xping is not '=':
-        break
+out = check_output(dir + 'xping.py %s %s' % (nad, nhid))
+xping = out.split(';')[-1].split("'")[1]
 
-i = 0
-while True:
-    out = commands.getoutput(dir + 'xtraceroute.py %s %s' % (nad, nhid))
-    xhops = out.split(';')[-1].split('(')[1].split(',')[0]
-    i+=1
-    if i is 5 or xhops is not '-1':
-        break
+out = check_output(dir + 'xtraceroute.py %s %s' % (nad, nhid))
+xhops = out.split(';')[-1].split('(')[1].split(',')[0]
 
 print xping, xhops
 
