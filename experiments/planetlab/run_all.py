@@ -13,11 +13,17 @@ nodes = [node.split('#')[0].strip() for node in nodes]
 
 INIT = '"curl https://raw.github.com/XIA-Project/xia-core/develop/experiments/planetlab/init.sh > ./init.sh && chmod 755 ./init.sh && ./init.sh"'
 UNAME = '"uname -r"'
+LS = '"ls"'
+RM = '"rm -rf ~/*; rm -rf ~/.*"'
 
 if sys.argv[2] == 'init':
     cmd = INIT
 elif sys.argv[2] == 'uname':
     cmd = UNAME
+elif sys.argv[2] == 'ls':
+    cmd = LS
+elif sys.argv[2] == 'rm':
+    cmd = RM
 
 total = len(nodes)
 current = 1
