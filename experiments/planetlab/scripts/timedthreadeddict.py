@@ -2,6 +2,8 @@
 
 import time, threading
 
+CHECK_TIMEOUT = 15
+
 class TimedThreadedDict(dict):
     """Manage shared heartbeats dictionary with thread locking"""
 

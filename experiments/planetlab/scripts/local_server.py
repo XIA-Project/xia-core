@@ -67,19 +67,19 @@ class MyService(rpyc.Service):
         pass
 
     def exposed_gather_stats(self):
-        neighbors = rpc(MASTER_SERVER,get_backbone, ())
+        neighbors = rpc(MASTER_SERVER, 'get_backbone', ())
         out = multi_ping(neighbors)
         latency = out[0][0]
         my_backbone = out[0][1]
         hops = traceroute(my_backbone)
-        rpc(MASTER_SERVER, stats, (my_backbone, latency, hops))
+        rpc(MASTER_SERVER, 'stats', (my_backbone, latency, hops))
         return ['Sent stats: (%s, %s, %s)' (my_backbone, latency, hops), my_backbone]
 
     def exposed_gather_xstats(self):
-        neighbor = rpc(MASTER_SERVER, get_neighbor, ())
+        neighbor = rpc(MASTER_SERVER, 'get_neighbor', ())
         xlatency = xping(neighbor)
         xhops = xtraceroute(neighbor)
-        rpc(MASTER_SERVER, xstats, (xlatency, xhops))
+        rpc(MASTER_SERVER, 'xstats', (xlatency, xhops))
         return 'Sent xstats: (%s, %s, %s)' (neighbor, xlatency, xhops)
 
     def exposed_get_hid(self):
@@ -106,7 +106,7 @@ class MyService(rpyc.Service):
         return neighbors
 
     def exposed_soft_restart(self, neighbor):
-        xianetcmd = rpc(MASTER_SERVER, get_xianet, (neighbor))
+        xianetcmd = rpc(MASTER_SERVER, 'get_xianet', (neighbor, ))
         check_output(KILL_XIANET)
         out = check_output(run)
         return '%s: %s' % (xianetcmd, out)
@@ -115,14 +115,14 @@ class MyService(rpyc.Service):
         out = None
         while out is None:
             try:
-                out = rpc(neighbor, get_hid, ())
+                out = rpc(neighbor, 'get_hid', ())
             except:
                 print msg
                 time.sleep(1)
         return out
 
     def exposed_hard_stop(self):
-        kill_cmd = rpc(MASTER_SERVER, get_kill, ())
+        kill_cmd = rpc(MASTER_SERVER, 'get_kill', ())
         call(kill_cmd)
         sys.exit(0)
 
@@ -135,9 +135,9 @@ class Mapper(threading.Thread):
     def run(self):
         while self.goOnEvent.isSet():
             try:
-                myHID = rpc('localhost', get_hid, ())
-                neighbors = rpc('localhost', get_neighbors, ())
-                rpc(MASTER_SERVER, heartbeat, (myHID, neighbors))
+                myHID = rpc('localhost', 'get_hid', ())
+                neighbors = rpc('localhost', 'get_neighbors', ())
+                rpc(MASTER_SERVER, 'heartbeat', (myHID, neighbors))
             except:
                 pass
             time.sleep(BEAT_PERIOD)
@@ -146,11 +146,11 @@ class Mapper(threading.Thread):
 class Runner(threading.Thread):
     def run(self):
         try:
-            commands = rpc(MASTER_SERVER, get_commands, ())
+            commands = rpc(MASTER_SERVER, 'get_commands', ())
             for command in commands:
                 eval(command)
         except:
-            rpc(MASTER_SERVER, error, ('Runner'))
+            rpc(MASTER_SERVER, 'error', ('Runner', ))
 
 if __name__ == '__main__':
     print ('RPC server listening on port %d\n'
@@ -167,7 +167,7 @@ if __name__ == '__main__':
         t = ThreadedServer(MyService, port = RPC_PORT)
         t.start()
     except:
-        rpc(MASTER_SERVER, error, ('RPC Server'))
+        rpc(MASTER_SERVER, 'error', ('RPC Server', ))
 
     print 'Exiting, please wait...'
     finishEvent.clear()
