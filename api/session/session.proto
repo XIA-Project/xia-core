@@ -26,9 +26,10 @@ enum ConnType {
 }
 
 enum PacketType {
-	SESSION_INFO = 1;
+	SETUP = 1;
 	DATA = 2;
 	TEARDOWN = 3;
+	MIGRATE = 4;
 }
 
 
@@ -99,11 +100,12 @@ message SCloseMsg {
 message SessionPacket {
 	// Header fields
 	required PacketType type = 1;
-	required uint32 sender_ctx = 2;
+	optional uint32 sender_ctx = 2;
 
 	// Data field
 	optional SessionInfo info = 10;
 	optional SessionData data = 11;
+	optional SessionMigrate migrate = 12;
 }
 
 message SessionInfo {
@@ -123,14 +125,19 @@ message SessionData {
 	optional bytes data = 1;
 }
 
+message SessionMigrate {
+	required string sender_name = 1;
+}
+
 // Stores information about an open transport connection.
 // The connection might be shared between multiple sessions.
 message ConnectionInfo {
-	required string name = 1;
+	required string name = 1;  // remote name
 	required int32 sockfd = 2;
 	repeated int32 sessions = 3;
 	required string interface = 4 [default = "default"];
 	required ConnType type = 5 [default = XSP];
+	required string my_name = 6;
 }
 
 message ContextInfo {
@@ -144,4 +151,27 @@ message ContextInfo {
 	optional bool initialized = 2 [default = false];
 	optional string my_name = 3;
 	optional bytes my_addr = 4;
+}
+
+
+// Messages for IP nameserver
+message NSMsg {
+	optional NSRegister reg = 1;
+	optional NSLookup lookup = 2;
+	optional NSLookupReply reply = 3;
+}
+
+message NSRegister { 
+	required uint32 ip = 1;
+	required uint32 port = 2;
+	required string name = 3;
+}
+
+message NSLookup {
+	required string name = 1;
+}
+
+message NSLookupReply {
+	required uint32 ip = 1;
+	required uint32 port = 2;
 }

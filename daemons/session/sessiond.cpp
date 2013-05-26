@@ -1,7 +1,5 @@
 #include "session.pb.h"
 #include "utils.hpp"
-#include "Xsocket.h"
-#include "dagaddr.hpp"
 #include <map>
 #include <queue>
 #include <stdio.h>
@@ -12,12 +10,15 @@
 #include <errno.h>
 #include <pthread.h>
 
+using namespace std;
+
 #define DEFAULT_PROCPORT 1989
 #define BUFSIZE 65000
 #define MTU 150  // TODO: set this higher
 
+
+
 #define DEBUG
-#define XIA
 
 #ifdef DEBUG
 #define LOG(s) fprintf(stderr, "%s:%d: INFO  %s\n", __FILE__, __LINE__, s)
@@ -26,10 +27,30 @@
 #define LOG(s)
 #define LOGF(fmt, ...)
 #endif
-#define ERROR(s) fprintf(stderr, "\033[0;31m%s:%d: ERROR  %s\n\033[0m\n", __FILE__, __LINE__, s)
-#define ERRORF(fmt, ...) fprintf(stderr, "\033[0;31m%s:%d: ERROR  " fmt"\n\033[0m\n", __FILE__, __LINE__, __VA_ARGS__) 
+#define ERROR(s) fprintf(stderr, "\033[0;31m%s:%d: ERROR  %s\n\033[0m", __FILE__, __LINE__, s)
+#define ERRORF(fmt, ...) fprintf(stderr, "\033[0;31m%s:%d: ERROR  " fmt"\n\033[0m", __FILE__, __LINE__, __VA_ARGS__) 
 
-using namespace std;
+
+
+/* FORWARD DECLARATIONS */
+void *poll_recv_sock(void *args);
+bool is_last_hop(int ctx, string name);
+int send(int ctx, session::SessionPacket *pkt);
+int migrate_connections();
+
+
+
+#define XIA
+
+#ifdef XIA
+#include "xia.cpp"
+#endif
+#ifdef IP
+#include "ip.cpp"
+#endif
+
+
+
 
 /* DATA STRUCTURES */
 map<unsigned short, session::ContextInfo*> ctx_to_ctx_info;
@@ -51,6 +72,8 @@ map<unsigned short, queue<session::SessionPacket*>* > ctx_to_dataQ;
 map<unsigned short, pthread_mutex_t*> ctx_to_dataQ_mutex;
 map<unsigned short, pthread_cond_t*> ctx_to_dataQ_cond;
 
+pthread_t mobility_thread;
+
 string sockconf_name = "sessiond";
 int procport = DEFAULT_PROCPORT;
 
@@ -65,10 +88,6 @@ struct proc_func_data {
 };
 
 
-/* FORWARD DECLARATIONS */
-void *poll_recv_sock(void *args);
-bool is_last_hop(int ctx, string name);
-int send(int ctx, session::SessionPacket *pkt);
 
 
 
@@ -355,11 +374,9 @@ bool closeConnection(int ctx, session::ConnectionInfo *cinfo) {
 		}
 
 		// close the socket
-#ifdef XIA
-		if (Xclose(cinfo->sockfd()) < 0) {
-			ERRORF("Error closing xsocket %d", cinfo->sockfd());
+		if (closeSock(cinfo->sockfd()) < 0) {
+			ERRORF("Error closing socket %d", cinfo->sockfd());
 		}
-#endif /* XIA */
 
 		// free state and remove mapping
 		name_to_conn.erase(cinfo->name());
@@ -418,41 +435,6 @@ print_connections();
 }
 
 
-#ifdef XIA
-int bind_random_addr_xia(sockaddr_x **sa) {
-	// make DAG to bind to (w/ random SID)
-	unsigned char buf[20];
-	uint32_t i;
-	srand(time(NULL));
-	for (i = 0; i < sizeof(buf); i++) {
-	    buf[i] = rand() % 255 + 1;
-	}
-	char sid[45];
-	sprintf(&(sid[0]), "SID:");
-	for (i = 0; i < 20; i++) {
-		sprintf(&(sid[i*2 + 4]), "%02x", buf[i]);
-	}
-	sid[44] = '\0';
-	struct addrinfo *ai;
-	if (Xgetaddrinfo(NULL, sid, NULL, &ai) != 0) {
-		ERROR("getaddrinfo failure!\n");
-		return -1;
-	}
-	*sa = (sockaddr_x*)ai->ai_addr;
-
-	// make socket and bind
-	int sock;
-	if ((sock = Xsocket(AF_XIA, XSOCK_STREAM, 0)) < 0) {
-		ERROR("unable to create the listen socket");
-		return -1;
-	}
-	if (Xbind(sock, (struct sockaddr *)*sa, sizeof(sockaddr_x)) < 0) {
-		ERROR("unable to bind");
-		return -1;
-	}
-	return sock;
-}
-#endif /* XIA */
 
 void infocpy(const session::SessionInfo *from, session::SessionInfo *to) {
 	for (int i = 0; i < from->forward_path_size(); i++) {
@@ -557,6 +539,14 @@ string get_neighborhop_name(string my_name, const session::SessionInfo *info, bo
 	return "NOT FOUND";
 }
 
+string get_nexthop_name(string name, const session::SessionInfo *info) {
+	return get_neighborhop_name(name, info, true);
+}
+
+string get_prevhop_name(string name, const session::SessionInfo *info) {
+	return get_neighborhop_name(name, info, false);
+}
+
 string get_neighborhop_name(int ctx, bool next) {
 	session::SessionInfo *info = ctx_to_session_info[ctx];
 	string my_name = info->my_name();
@@ -571,45 +561,13 @@ string get_prevhop_name(int ctx) {
 	return get_neighborhop_name(ctx, false);
 }
 
-#ifdef XIA
-int open_connection_xia(sockaddr_x *sa, session::ConnectionInfo *cinfo) {
-	
-	// make socket
-	int sock;
-	if ((sock = Xsocket(AF_XIA, XSOCK_STREAM, 0)) < 0) {
-		ERROR("unable to create the server socket");
-		return -1;
-	}
 
-	// connect
-	if (Xconnect(sock, (struct sockaddr *)sa, sizeof(sockaddr_x)) < 0) {
-		ERROR("unable to connect to the destination dag");
-		return -1;
-	}
-LOGF("    opened connection, sock is %d", sock);
-
-	cinfo->set_sockfd(sock);
-	return 1;
-
-}
-#endif /* XIA */
 
 
 int open_connection(string name, session::ConnectionInfo *cinfo) {
-#ifdef XIA
-	// resolve name
-	struct addrinfo *ai;
-	sockaddr_x *sa;
-	if (Xgetaddrinfo(name.c_str(), NULL, NULL, &ai) != 0) {
-		ERRORF("unable to lookup name %s", name.c_str());
-		return -1;
-	}
-	sa = (sockaddr_x*)ai->ai_addr;
-
-	int ret = open_connection_xia(sa, cinfo);
-#endif /* XIA */
 	
-	if (ret >= 0) {
+	int ret;
+	if ( (ret = openConnectionToName(name, cinfo)) >= 0) {
 		cinfo->set_name(name);
 		name_to_conn[name] = cinfo;
 
@@ -648,6 +606,7 @@ int get_txconn_for_context(int ctx, session::ConnectionInfo **cinfo) {
 		// now add this context to the connection so it doesn't get "garbage collected"
 		// if all the other sessions using it close
 		(*cinfo)->add_sessions(ctx);  // TODO: remove when session closes
+		(*cinfo)->set_my_name(ctx_to_ctx_info[ctx]->my_name());
 
 		ctx_to_txconn[ctx] = *cinfo;
 
@@ -682,6 +641,7 @@ int get_rxconn_for_context(int ctx, session::ConnectionInfo **cinfo) {
 		// now add this context to the connection so it doesn't get "garbage collected"
 		// if all the other sessions using it close
 		(*cinfo)->add_sessions(ctx);  // TODO: remove when session closes
+		(*cinfo)->set_my_name(ctx_to_ctx_info[ctx]->my_name());
 
 		ctx_to_rxconn[ctx] = *cinfo;
 
@@ -691,10 +651,8 @@ int get_rxconn_for_context(int ctx, session::ConnectionInfo **cinfo) {
 	}
 }
 
-// TODO: deal with fragmentation
 // sends to arbitrary transport connection
 int send(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
-	int sock = cinfo->sockfd();
 	int sent = -1;
 
 	string p_buf;
@@ -702,13 +660,8 @@ int send(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 	int len = p_buf.size();
 	const char *buf = p_buf.c_str();
 
-	if (cinfo->type() == session::XSP) {
-#ifdef XIA
-		if ((sent = Xsend(sock, buf, len, 0)) < 0) {
-			ERRORF("Send error %d on socket %d, dest name %s: %s", errno, sock, cinfo->name().c_str(), strerror(errno));
-		}
-#endif /* XIA */
-	} else {
+	if ( (sent = sendBuffer(cinfo, buf, len)) < 0) {
+		ERRORF("Send error %d on socket %d, dest name %s: %s", errno, cinfo->sockfd(), cinfo->name().c_str(), strerror(errno));
 	}
 
 	return sent;
@@ -722,20 +675,12 @@ int send(int ctx, session::SessionPacket *pkt) {
 }
 
 int recv(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
-	int sock = cinfo->sockfd();
 	int received = -1;
 	char buf[BUFSIZE];
 
-
-	if (cinfo->type() == session::XSP) {
-#ifdef XIA
-		memset(buf, 0, BUFSIZE);
-		if ((received = Xrecv(sock, buf, BUFSIZE, 0)) < 0) {
-			ERRORF("Receive error %d on socket %d: %s", errno, sock, strerror(errno));
-			return received;
-		}
-#endif /* XIA */
-	} else {
+	if ((received = recvBuffer(cinfo, buf, BUFSIZE)) < 0) {
+		ERRORF("Receive error %d on socket %d: %s", errno, cinfo->sockfd(), strerror(errno));
+		return received;
 	}
 
 	string *bufstr = new string(buf, received);
@@ -746,11 +691,47 @@ int recv(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 	return received;
 }
 
-/*int recv(int ctx, session::SessionPacket *pkt) {
-	session::ConnectionInfo *cinfo = NULL;
-	get_rxconn_for_context(ctx, &cinfo);
-	return recv(cinfo, pkt);
-}*/
+// called when we switch networks. close any existing transport connections
+// and restart them.
+int migrate_connections() {
+	int rc = 1;
+	
+	map<string, session::ConnectionInfo*>::iterator iter;
+	for (iter = name_to_conn.begin(); iter!= name_to_conn.end(); ++iter) {
+		session::ConnectionInfo *cinfo = iter->second;
+
+		// close old socket
+		if (closeSock(cinfo->sockfd()) < 0) {
+			ERRORF("Error closing old transport connection to %s", iter->first.c_str());
+			rc = -1;
+			continue;
+		}
+
+		// open a new one
+		if (openConnectionToName(cinfo->name(), cinfo) < 0) {
+			ERRORF("Error opening new transport connection to %s", iter->first.c_str());
+			rc = -1;
+			continue;
+		}
+
+		// tell the other side who we are
+		session::SessionPacket pkt;
+		pkt.set_type(session::MIGRATE);
+		session::SessionMigrate *m = pkt.mutable_migrate();
+		m->set_sender_name(cinfo->my_name());
+		if (send(cinfo, &pkt) < 0) {
+			ERRORF("Error sending MIGRATE packet to %s", iter->first.c_str());
+			rc = -1;
+			continue;
+		}
+	}
+
+	return rc;
+}
+
+
+
+
 
 
 
@@ -763,20 +744,22 @@ LOG("BEGIN poll_listen_sock");
 
 	int ctx = (int)args;   // TOOD: check this
 	int listen_sock = ctx_to_listensock[ctx];
+	if (listen_sock < 0) {
+		ERRORF("poll_listen_sock: bad socket: %d", listen_sock);
+		return NULL;
+	}
 
 	while(true)
 	{
 		int new_rxsock = -1;
 		
 		// accept connection on listen sock
-	#ifdef XIA
-		if ( (new_rxsock = Xaccept(listen_sock, NULL, 0)) < 0 ) {
-			ERRORF("Error accepting new connection on listen context %d", ctx);
+		if ( (new_rxsock = acceptSock(listen_sock)) < 0 ) {
+			ERRORF("Error accepting new connection on listen context %d: %s", ctx, strerror(errno));
 			//rcm->set_message("Error accpeting new connection on listen context");
 			//rcm->set_rc(session::FAILURE);
 			//return -1;
 		}
-	#endif /* XIA */
 	LOGF("    Accepted new connection on sockfd %d", ctx_to_listensock[ctx]);
 	
 	
@@ -793,24 +776,48 @@ LOG("BEGIN poll_listen_sock");
 			//rcm->set_rc(session::FAILURE);
 			//return -1;
 		}
-		if (rpkt->type() != session::SESSION_INFO || !rpkt->has_info()) {
-			LOGF("Received a packet on the listen sock for contex %d that was not a SESSION_INFO msg.", ctx);
-			//rcm->set_message("First packet was not a SESSION_INFO msg.");
-			//rcm->set_rc(session::FAILURE);
-			//return -1;
-		}
-	LOGF("    Received SESSION_INFO packet on listen sock for context %d", ctx);
-	
-	
-		// Get the prevhop's name so we can store this transport connection
-		string prevhop = rpkt->info().my_name();
-		rx_cinfo->set_name(prevhop);
-		name_to_conn[prevhop] = rx_cinfo;
-	
-	
-		// Add session info pkt to acceptQ
-		pushAcceptQ(ctx, rpkt);
 
+		switch (rpkt->type())
+		{
+			case session::SETUP:  // someone new wants to talk to us
+			{
+				if (!rpkt->has_info()) {
+					ERROR("SETUP packet didn't contain session info");
+					continue;
+				}
+
+				// Get the prevhop's name so we can store this transport connection
+				string prevhop = rpkt->info().my_name();
+				rx_cinfo->set_name(prevhop);
+				name_to_conn[prevhop] = rx_cinfo;
+	
+				// Add session info pkt to acceptQ
+				pushAcceptQ(ctx, rpkt);
+
+				break;
+			}
+			case session::MIGRATE:  // someone we were already talking to moved
+			{
+				if (!rpkt->has_migrate()) {
+					ERROR("MIGRATE packet didn't contain migrate info");
+					continue;
+				}
+
+				// find the old connection
+				delete rx_cinfo; // there's not really a new connection after all
+				rx_cinfo = name_to_conn[rpkt->migrate().sender_name()]; //TODO: handle not found
+
+				// stop the thread that was polling the old socket
+				stopPollingSocket(rx_cinfo->sockfd());
+
+				// replace the socket we were using with this name with new_rxsock
+				rx_cinfo->set_sockfd(new_rxsock);
+
+				break;
+			}
+			default:
+				ERROR("poll_listen_sock received a packet of unknown or unexpected type");
+		}
 
 		// start a thread reading this socket
 		int rc;
@@ -830,6 +837,11 @@ void *poll_recv_sock(void *args) {
 	session::ConnectionInfo *cinfo = (session::ConnectionInfo*)args;
 	int sock = cinfo->sockfd();
 	int rc;
+	
+	if (sock < 0) {
+		ERRORF("poll_recv_sock: bad socket: %d", sock);
+		return NULL;
+	}
 
 	while(true)
 	{
@@ -852,10 +864,10 @@ void *poll_recv_sock(void *args) {
 		// process packet according to its type
 		switch(rpkt->type())
 		{
-			case session::SESSION_INFO:
+			case session::SETUP:
 			{
 				// Add session info pkt to acceptQ
-				string my_name = get_neighborhop_name(rpkt->info().my_name(), &(rpkt->info()), true);
+				string my_name = get_nexthop_name(rpkt->info().my_name(), &(rpkt->info()));
 				int listen_ctx = name_to_listen_ctx[my_name];
 				pushAcceptQ(listen_ctx, rpkt);
 				break;
@@ -890,7 +902,7 @@ LOGF("    Received %d bytes", rpkt->data().data().size());
 
 
 
-/* MESSAGE PROCESSING  FUNCTIONS */
+/* API MESSAGE PROCESSING  FUNCTIONS */
 
 int process_new_context_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &reply) {
 LOG("BEGIN process_new_context_msg");
@@ -952,22 +964,19 @@ LOGF("    Initiating a session from %s", im.my_name().c_str());
 	int lsock = -1; // might not get used
 	if ( name_to_conn.find(prevhop) == name_to_conn.end() ) {  // NOT ALREADY A CONNECTION
 		// make a socket to accept connection from last hop
-#ifdef XIA
-		sockaddr_x *sa = NULL;
-		lsock = bind_random_addr_xia(&sa);
+		string *addr_buf = NULL;
+		lsock = bindRandomAddr(&addr_buf);
 		if (lsock < 0) {
-			ERROR("Error binding to random SID");
-			rcm->set_message("Error binding to random SID");
+			ERROR("Error binding to random address");
+			rcm->set_message("Error binding to random address");
 			rcm->set_rc(session::FAILURE);
 			return -1;
 		}
-
 	
 		// store addr in session info
-		string *strbuf = new string((const char*)sa, sizeof(sockaddr_x));
-		info->set_my_addr(*strbuf);
-		info->set_initiator_addr(*strbuf);
-#endif /* XIA */
+		info->set_my_addr(*addr_buf);
+		info->set_initiator_addr(*addr_buf);
+		delete addr_buf;
 LOG("    Made socket to accept synack from last hop");
 	
 	} else {
@@ -985,7 +994,7 @@ LOG("    Made socket to accept synack from last hop");
 
 	// send session info to next hop
 	session::SessionPacket pkt;
-	pkt.set_type(session::SESSION_INFO); 
+	pkt.set_type(session::SETUP); 
 	pkt.set_sender_ctx(ctx);
 	session::SessionInfo *newinfo = pkt.mutable_info();// TODO: better way?
 	infocpy(info, newinfo);
@@ -1005,15 +1014,13 @@ LOG("    Sent connection request to next hop");
 	int rxsock = -1;
 	if ( name_to_conn.find(prevhop) == name_to_conn.end() ) {  // NOT ALREADY A CONNECTION
 		// accept connection on listen sock
-#ifdef XIA
-		if ( (rxsock = Xaccept(lsock, NULL, 0)) < 0 ) {
+		if ( (rxsock = acceptSock(lsock)) < 0 ) {
 			ERRORF("Error accepting connection from last hop on context %d", ctx);
 			rcm->set_message("Error accepting connection from last hop");
 			rcm->set_rc(session::FAILURE);
 			return -1;
 		}
-		Xclose(lsock);
-#endif /* XIA */
+		closeSock(lsock);
 LOGF("    Accepted a new connection on rxsock %d", rxsock);
 
 		// store this rx transport conn
@@ -1049,7 +1056,7 @@ LOGF("    Accepted a new connection on rxsock %d", rxsock);
 	
 	
 	// TODO: check that this is the correct session info pkt
-	if (rpkt->type() != session::SESSION_INFO) {
+	if (rpkt->type() != session::SETUP) {
 		ERROR("Expecting final synack, but packet was not a SESSION_INFO msg.");
 		rcm->set_message("Expecting final synack, but packet was not a SESSION_INFO msg.");
 		rcm->set_rc(session::FAILURE);
@@ -1078,19 +1085,15 @@ LOG("BEGIN process_bind_msg");
 	
 LOGF("    Binding to name: %s", bm.name().c_str());
 
-#ifdef XIA
-	// bind to random SID
-	sockaddr_x *sa = NULL;
-	int sock = bind_random_addr_xia(&sa);
+	// bind to random app ID
+	string *addr_buf = NULL;
+	int sock = bindRandomAddr(&addr_buf);
 	if (sock < 0) {
-		ERROR("Error binding to random SID");
-		rcm->set_message("Error binding to random SID");
+		ERROR("Error binding to random address");
+		rcm->set_message("Error binding to random address");
 		rcm->set_rc(session::FAILURE);
 		return -1;
 	}
-LOG("    Bound to random XIA SID:");
-Graph g(sa);
-g.print_graph();
 	
 
 	// store port as this context's listen sock. This context does not have
@@ -1099,21 +1102,19 @@ g.print_graph();
 
 LOGF("    Registering name: %s", bm.name().c_str());
 	// register name
-    if (XregisterName(bm.name().c_str(), sa) < 0 ) {
+    if (registerName(bm.name(), addr_buf) < 0) {
     	ERRORF("error registering name: %s\n", bm.name().c_str());
 		rcm->set_message("Error registering name");
 		rcm->set_rc(session::FAILURE);
 		return -1;
 	}
 LOG("    Registered name");
-#endif /* XIA */
 
 	// if everything worked, store name and addr in context info
 	session::ContextInfo *ctxInfo = new session::ContextInfo();
 	ctxInfo->set_type(session::ContextInfo::LISTEN);
 	ctxInfo->set_my_name(bm.name());
-	string *strbuf = new string((const char*)sa, sizeof(sockaddr_x));
-	ctxInfo->set_my_addr(*strbuf);
+	ctxInfo->set_my_addr(*addr_buf);
 	ctxInfo->set_initialized(true);
 	ctx_to_ctx_info[ctx] = ctxInfo;
 	
@@ -1190,7 +1191,7 @@ LOGF("    Got conn req from %s on context %d", prevhop.c_str(), new_ctx);
 
 	// connect to next hop
 	session::SessionPacket pkt;
-	pkt.set_type(session::SESSION_INFO); 
+	pkt.set_type(session::SETUP); 
 	pkt.set_sender_ctx(new_ctx);
 	session::SessionInfo *newinfo = pkt.mutable_info();// TODO: better way?
 	infocpy(sinfo, newinfo);
@@ -1207,7 +1208,6 @@ LOG("    I'm the last hop; connecting to initiator with supplied addr");
 			tx_cinfo = new session::ConnectionInfo();
 			tx_cinfo->set_name(nexthop);
 		
-#ifdef XIA
 			if (!sinfo->has_initiator_addr()) {
 				ERROR("Initiator did not send address");
 				rcm->set_message("Initiator did not send address");
@@ -1215,10 +1215,7 @@ LOG("    I'm the last hop; connecting to initiator with supplied addr");
 				return -1;
 			}
 
-			const char* addr_buf = sinfo->initiator_addr().data();
-			sockaddr_x *sa = (sockaddr_x*)addr_buf;
-
-			if (open_connection_xia(sa, tx_cinfo) < 0) {
+			if (openConnectionToAddr(&(sinfo->initiator_addr()), tx_cinfo) < 0) {
 				ERROR("Error connecting to initiator");
 				rcm->set_message("Error connecting to initiator");
 				rcm->set_rc(session::FAILURE);
@@ -1234,7 +1231,6 @@ LOG("    I'm the last hop; connecting to initiator with supplied addr");
 			}
 
 			name_to_conn[nexthop] = tx_cinfo;
-#endif /* XIA */
 		} else {
 			tx_cinfo = name_to_conn[nexthop];
 		}
@@ -1539,9 +1535,17 @@ int listen() {
 int main(int argc, char *argv[]) {
 	getConfig(argc, argv);
 
+#ifdef XIA
 	// set sockconf.ini name
 	set_conf("xsockconf.ini", sockconf_name.c_str());
 	LOGF("Click sockconf name: %s", sockconf_name.c_str());
+#endif /* XIA */
+			
+	// Start a thread watching for mobility
+	int pthread_rc;
+	if ( (pthread_rc = pthread_create(&mobility_thread, NULL, mobility_daemon, NULL)) < 0) {
+		ERRORF("Error creating thread: %s", strerror(pthread_rc));
+	}
 
 	listen();
 	return 0;
