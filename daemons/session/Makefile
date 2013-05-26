@@ -23,4 +23,5 @@ session.pb.cc: session.proto
 
 clean:
 	-rm $(SESSIOND)
+	-rm $(NS)
 	-rm -f *.o session.pb.*
