@@ -786,7 +786,8 @@ int migrate_connections() {
 void * poll_listen_sock(void * args) {
 LOG("BEGIN poll_listen_sock");
 
-	int ctx = *(int*)args;   // TOOD: check this
+	int ctx = *((int*)args);   // TOOD: check this
+	free(args);
 	int listen_sock = ctx_to_listensock[ctx];
 	if (listen_sock < 0) {
 		ERRORF("poll_listen_sock: bad socket: %d", listen_sock);
@@ -799,7 +800,8 @@ LOG("BEGIN poll_listen_sock");
 		
 		// accept connection on listen sock
 		if ( (new_rxsock = acceptSock(listen_sock)) < 0 ) {
-			ERRORF("Error accepting new connection on listen context %d: %s", ctx, strerror(errno));
+			ERRORF("Error accepting new connection on socket %d for listen context %d: %s", listen_sock, ctx, strerror(errno));
+exit(-1);
 			//rcm->set_message("Error accpeting new connection on listen context");
 			//rcm->set_rc(session::FAILURE);
 			//return -1;
@@ -921,7 +923,6 @@ void *poll_recv_sock(void *args) {
 				// Add data pkt to dataQ
 LOGF("    Received %lu bytes", rpkt->data().data().size());
 				pushDataQ(ctx, rpkt);
-LOG("    pushed to data queue");
 				break;
 			}
 			case session::TEARDOWN:
@@ -1060,6 +1061,7 @@ LOG("    Sent connection request to next hop");
 	if ( name_to_conn.find(prevhop) == name_to_conn.end() ) {  // NOT ALREADY A CONNECTION
 		// accept connection on listen sock
 		if ( (rxsock = acceptSock(lsock)) < 0 ) {
+exit(-1);
 			ERRORF("Error accepting connection from last hop on context %d", ctx);
 			rcm->set_message("Error accepting connection from last hop");
 			rcm->set_rc(session::FAILURE);
@@ -1174,7 +1176,9 @@ LOG("    Registered name");
 
 	// kick off a thread draining the listen socket into the acceptQ
 	int rc;
-	if ( (rc = startPollingSocket(sock, poll_listen_sock, (void*)&ctx) < 0) ) {
+	int *ctxptr = (int*)malloc(sizeof(int)); // TODO: better way?
+	*ctxptr = ctx;
+	if ( (rc = startPollingSocket(sock, poll_listen_sock, (void*)ctxptr) < 0) ) {
 		ERRORF("Error creating listen sock thread: %s", strerror(rc));
 		rcm->set_message("Error creating listen sock thread");
 		rcm->set_rc(session::FAILURE);
