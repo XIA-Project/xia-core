@@ -3,7 +3,9 @@
 #include <stdio.h>
 #include <dlfcn.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include <stdint.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include "Xsocket.h"
@@ -12,67 +14,43 @@
 
 /*
 ** FIXME:
+** - are the setwrapped macros needed here anymore, or can they safely just be used in the xsocket api now?
+** - gcc 4.7 as inlined some of the *printf functions, need to find new way to catch them
 ** - fclose doesn't capture correctly
-** - socket and socketpair take flags for async and close on exec. need to handle them
-** - need to implement async sockets
-** - what should we do with unsupport socket options in get/setsockopt? 
 ** - implement getline
 ** - add support for getdelim (like getline)
-** - properly implement gets
-** - figure out test for stdin/stdout cases
+** - fix fcntl to use va_list
+** - don't know how to implement fcloseall
 ** - close will have problems when closing dup'd fds
 ** - dup functions need to mark the new fd somehow so rhe xsocket api knows it's special
 ** - reads/writes are atomic, can't merge multiple writes into a single read at the other end
 ** - fputs_unlocked/fgets_unlocked not defined for applications?
 */
 
-/* 
+/*
 ** See end of file for list of functions remapped and those that are ignored
 */
 
-#define DEBUG
-#define TRACE_ALL
-#define TRACE_XIA
 #define XIA_PRELOAD
 
-#ifdef TRACE_ALL
-#define FLAG()		__real_printf("%s: called\r\n", __FUNCTION__)
-#else
-#define FLAG()
-#endif
+#define TRACE()		{if (_log_trace)   __real_fprintf(_log, "xwrap: %s\r\n", __FUNCTION__);}
+#define STOCK()		{if (_log_trace)   __real_fprintf(_log, "xwrap: %s informational tracing only\r\n", __FUNCTION__);}
 
-#ifdef TRACE_XIA
-#define XIAIFY()	__real_printf("%s: CATCHING XIA SOCKET\r\n", __FUNCTION__)
-#else
-#define XIAIFY()
-#endif
+#define MSG(...)	{if (_log_info)    __real_fprintf(_log, "xwrap: %s ", __FUNCTION__); __real_fprintf(_log, __VA_ARGS__);}
 
-#ifdef DEBUG
-#define MSG(...)	__real_printf(__VA_ARGS__)
-#define TRACE(...)	__real_printf("%s: ", __FUNCTION__); __real_printf(__VA_ARGS__)
-#define NOXIA()		__real_printf("%s: used normally\r\n", __FUNCTION__)
-#define SKIP()		__real_printf("%s: not required/supported in XIA (no-op)\r\n", __FUNCTION__)
-#define STOCK()		__real_printf("%s: tracing only\r\n", __FUNCTION__)
-#define ALERT()		__real_printf("ALERT!!!, %s needs wrapping!\r\n", __FUNCTION__)
-#else
-#define MSG(...)
-#define TRACE(...)
-#define NOXIA()
-#define SKIP()
-#define STOCK()
-#endif // DEBUG
+#define XIAIFY()	{if (_log_xia)     __real_fprintf(_log, "xwrap: %s redirected to XIA\r\n", __FUNCTION__);}
+#define NOXIA()		{if (_log_xia)     __real_fprintf(_log, "xwrap: %s used normally\r\n", __FUNCTION__);}
+#define SKIP()		{if (_log_xia)     __real_fprintf(_log, "xwrap: %s not required/supported in XIA (no-op)\r\n", __FUNCTION__);}
 
-/*
-** This code can be added to any socket based application either at compile time 
-** or runtime depending on how it is built.
-*/
+#define ALERT()		{if (_log_warning) __real_fprintf(_log, "xwrap: ALERT!!!, %s is not implemented in XIA!\r\n", __FUNCTION__);}
+#define WARNING(...)	{if (_log_warning) __real_fprintf(_log, "xwrap: %s ", __FUNCTION__); __real_fprintf(_log, __VA_ARGS__);}
+
 /*
 ** If XIA_PRELOAD is defined, the code below will be compiled as a library that
 ** can be loaded at runtime into an application giving it XIA support without
 ** requiring a recompile. Seed above for functions that require code changes.
 **
-** To use in the preload situation:
-** LD_PRELOAD="xwrap.so libXsocket.so" application
+# see the xia-core/bin/xwrap script for usage
 */
 #ifdef XIA_PRELOAD
 
@@ -102,14 +80,22 @@
 */
 #define GET_FCN(f)	__real_##f = (fcn_##f)dlsym(RTLD_NEXT, #f)
 
-/* 
+/*
 **  using LD_PRELOAD method, variables for each overridden function
 */
+// Informationa remallings
+//DECLARE(int, fileno, FILE *stream);
+//DECLARE(int, fileno_unlocked, FILE *stream);
+
+// need changes to click in order to work correctly
 DECLARE(int, dup, int fd);
 DECLARE(int, dup2, int fd, int fd2);
 DECLARE(int, dup3, int fd, int fd2, int flags);
-DECLARE(int, fileno, FILE *stream);
-DECLARE(int, fileno_unlocked, FILE *stream);
+
+// not remapping correctly
+//DECLARE(int, fclose, FILE *stream);
+
+// socket I/O or potential socket I/O calls
 DECLARE(int, socket, int domain, int type, int protocol);
 DECLARE(int, socketpair, int domain, int type, int protocol, int fds[2]);
 DECLARE(int, bind, int fd, const struct sockaddr *addr, socklen_t len);
@@ -131,28 +117,19 @@ DECLARE(int, shutdown, int fd, int how);
 DECLARE(int, sockatmark, int fd);
 DECLARE(int, close, int fd);
 DECLARE(int, ioctl, int d, int request, ...);
-//DECLARE(int, fclose, FILE *stream);
-DECLARE(int, fcloseall, void);
 DECLARE(int, fprintf, FILE *stream, const char *format, ...);
-DECLARE(int, printf, const char *format, ...);
 DECLARE(int, vfprintf, FILE *s, const char *format, va_list arg);
-DECLARE(int, vprintf, const char *format, va_list arg);
 DECLARE(int, vdprintf, int fd, const char *fmt, va_list arg);
 DECLARE(int, dprintf, int fd, const char *fmt, ...);
 DECLARE(int, fgetc, FILE *stream);
 DECLARE(int, getc, FILE *stream);
-DECLARE(int, getchar, void);
 DECLARE(int, getc_unlocked, FILE *stream);
-DECLARE(int, getchar_unlocked, void);
 DECLARE(int, fgetc_unlocked, FILE *stream);
 DECLARE(int, fputc, int c, FILE *stream);
 DECLARE(int, putc, int c, FILE *stream);
-DECLARE(int, putchar, int c);
 DECLARE(int, fputc_unlocked, int c, FILE *stream);
 DECLARE(int, putc_unlocked, int c, FILE *stream);
-DECLARE(int, putchar_unlocked, int c);
 DECLARE(char *, fgets, char *s, int n, FILE *stream);
-DECLARE(char *, gets, char *s);
 DECLARE(char *, fgets_unlocked, char *s, int n, FILE *stream);
 DECLARE(_IO_ssize_t, getline, char **lineptr, size_t *n, FILE *stream);
 DECLARE(int, fputs, const char *s, FILE *stream);
@@ -164,13 +141,33 @@ DECLARE(size_t, fread_unlocked, void *ptr, size_t size, size_t n, FILE *stream);
 DECLARE(size_t, fwrite_unlocked, const void *ptr, size_t size, size_t n, FILE *stream);
 DECLARE(ssize_t, read, int fd, void *buf, size_t nbytes);
 DECLARE(ssize_t, write, int fd, const void *buf, size_t n);
+DECLARE(int, fcntl, int fd, int cmd, ...);
+DECLARE(int, getaddrinfo, const char *name, const char *service, const struct addrinfo *req, struct addrinfo **pai);
+DECLARE(void, freeaddrinfo, struct addrinfo *ai);
+DECLARE(const char *, gai_strerror, int ecode);
+
+DECLARE(ssize_t, readv, int fd, const struct iovec *iov, int iovcnt);
+DECLARE(ssize_t, writev, int fd, const struct iovec *iov, int iovcnt);
+
+// unsure what to do with
+DECLARE(int, fcloseall, void);
+
+// not remapping std* related calls for now
+//DECLARE(int, printf, const char *format, ...);
+//DECLARE(int, vprintf, const char *format, va_list arg);
+//DECLARE(int, getchar, void);
+//DECLARE(int, getchar_unlocked, void);
+//DECLARE(int, putchar, int c);
+//DECLARE(int, putchar_unlocked, int c);
+//DECLARE(char *, gets, char *s);
+
+// not ported to XIA, remapped for warning purposes
 DECLARE(int, gethostname, char *name, size_t len);
 DECLARE(int, sethostname, const char *name, size_t len);
 DECLARE(int, sethostid, long int id);
 DECLARE(int, getdomainname, char *name, size_t len);
 DECLARE(int, setdomainname, const char *name, size_t len);
 DECLARE(long int, gethostid, void);
-DECLARE(int, fcntl, int fd, int cmd, ...);
 DECLARE(void, sethostent, int stay_open);
 DECLARE(void, endhostent, void);
 DECLARE(struct hostent *,gethostent, void);
@@ -210,13 +207,42 @@ DECLARE(void, endnetgrent, void);
 DECLARE(int, getnetgrent, char **hostp, char **userp, char **domainp);
 DECLARE(int, innetgr, const char *netgroup, const char *host, const char *user, const char *domain);
 DECLARE(int, getnetgrent_r, char **hostp, char **userp, char **domainp, char *buffer, size_t buflen);
-DECLARE(int, getaddrinfo, const char *name, const char *service, const struct addrinfo *req, struct addrinfo **pai);
-DECLARE(void, freeaddrinfo, struct addrinfo *ai);
-DECLARE(const char *, gai_strerror, int ecode);
 DECLARE(int, getnameinfo, const struct sockaddr *sa, socklen_t salen, char *host, socklen_t hostlen, char *serv, socklen_t servlen, unsigned int flags);
+
 // macros for putc and getc seem to already create these
 //DECLARE(int, _IO_getc, _IO_FILE *__fp);
 //DECLARE(int, _IO_putc, int __c, _IO_FILE *__fp);
+
+
+//****************************************************************************
+// set up logging parameters
+//
+int _log_trace = 0;
+int _log_warning = 0;
+int _log_info = 0;
+int _log_xia = 0;
+FILE *_log = NULL;
+
+void __xwrap_setup()
+{
+	if (getenv("XWRAP_TRACE") != NULL)
+		_log_trace = 1;
+	if (getenv("XWRAP_VERBOSE") != NULL)
+		_log_trace = _log_info = _log_xia = _log_warning = 1;
+	if (getenv("XWRAP_INFO") != NULL)
+		_log_info = 1;
+	if (getenv("XWRAP_WARNING") != NULL)
+		_log_warning = 1;
+	if (getenv("XWRAP_XIA") != NULL)
+		_log_xia = 1;
+
+	const char *lf = getenv("XWRAP_LOGFILE");
+	if (lf)
+		_log = fopen(lf, "w");
+	if (!_log)
+		_log = stderr;
+}
+
 
 /******************************************************************************
 **
@@ -225,13 +251,19 @@ DECLARE(int, getnameinfo, const struct sockaddr *sa, socklen_t salen, char *host
 ******************************************************************************/
 void __attribute__ ((constructor)) xwrap_init(void)
 {
-	// NEED to do this first so tht it is loaded before the trace macros are called
-	GET_FCN(fileno);
-	GET_FCN(fileno_unlocked);
-	GET_FCN(printf);
-	GET_FCN(vprintf);
 
-	MSG("loading XIA wrappers (created: %s)\n", __DATE__);
+	// must do this first so that they load before the trace macros are called
+//	GET_FCN(fileno);
+//	GET_FCN(fileno_unlocked);
+//	GET_FCN(printf);
+//	GET_FCN(vprintf);
+	GET_FCN(fprintf);
+	GET_FCN(vfprintf);
+
+	__xwrap_setup();
+
+	if (_log_info || _log_warning || _log_xia || _log_trace)
+		fprintf(_log, "loading XIA wrappers (created: %s)\n", __DATE__);
 
 	GET_FCN(socket);
 	GET_FCN(socketpair);
@@ -255,25 +287,23 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	GET_FCN(close);
 	GET_FCN(ioctl);
 	GET_FCN(fcloseall);
-	GET_FCN(fprintf);
-	GET_FCN(vfprintf);
 	GET_FCN(vdprintf);
 	GET_FCN(dprintf);
 	GET_FCN(fgetc);
 	GET_FCN(getc);
-	GET_FCN(getchar);
 //	GET_FCN(fclose);
+//	GET_FCN(getchar);
 	GET_FCN(getc_unlocked);
-	GET_FCN(getchar_unlocked);
+//	GET_FCN(getchar_unlocked);
 	GET_FCN(fgetc_unlocked);
 	GET_FCN(fputc);
 	GET_FCN(putc);
-	GET_FCN(putchar);
+//	GET_FCN(putchar);
 	GET_FCN(fputc_unlocked);
 	GET_FCN(putc_unlocked);
-	GET_FCN(putchar_unlocked);
+//	GET_FCN(putchar_unlocked);
 	GET_FCN(fgets);
-	GET_FCN(gets);
+//	GET_FCN(gets);
 	GET_FCN(fgets_unlocked);
 	GET_FCN(getline);
 	GET_FCN(fputs);
@@ -342,6 +372,9 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	GET_FCN(dup);
 	GET_FCN(dup2);
 	GET_FCN(dup3);
+
+	GET_FCN(readv);
+	GET_FCN(writev);
 }
 #endif // XIA_PRELOAD
 
@@ -353,17 +386,15 @@ void __attribute__ ((constructor)) xwrap_init(void)
 ******************************************************************************/
 
 // call into the Xsockets API to see if the fd is associated with an Xsocket
-#define isXsocket(s)	(getSocketType(s) != -1)
-
-#define markWrapped(s)	(setWrapped(s, 1))
-#define markUnwrapped(s)	(setWrapped(s, 0))
-
-#define shouldWrap(s)	(isXsocket(s) && !isWrapped(s))
+#define isXsocket(s)	 (getSocketType(s) != -1)
+#define markWrapped(s)	 (setWrapped(s, 1))
+#define markUnwrapped(s) (setWrapped(s, 0))
+#define shouldWrap(s)	 (isXsocket(s) && !isWrapped(s))
 
 // FIXME: need a different name for this so it doesn't collide with above.
 int _GetSocketType(int type)
 {
-	/* 
+	/*
 	** XSOCK_STREAM, XSOCK_DGRAM, XSOCK_RAW have the same values
 	** as the matching XSOCK constants.
 	**
@@ -377,14 +408,11 @@ int _GetSocketType(int type)
 			return type;
 		default:
 			MSG("%d is not a valid XSOCKET type\n", type);
+			break;
 	}
 	return XSOCK_INVALID;
 }
 
-/* 
-** FIXME: all of the following functions should be modifed at some point
-** to handle async socket calls
-*/
 
 // called by the various <>printf wrappers
 int _vasend(int fd, const char *format, va_list args)
@@ -398,7 +426,7 @@ int _vasend(int fd, const char *format, va_list args)
 	markWrapped(fd);
 	int rc = Xsend(fd, s, n, 0);
 	markUnwrapped(fd);
-	
+
 	free(s);
 //	va_end(args);
 
@@ -427,7 +455,7 @@ int _xputc(int i, int fd)
 	markWrapped(fd);
 	int rc = Xsend(fd, &c, 1, 0);
 	markUnwrapped(fd);
-	
+
 	return rc;
 }
 
@@ -436,7 +464,7 @@ int _xputs(const char *s, int fd)
 	markWrapped(fd);
 	int rc = Xsend(fd, s, strlen(s), 0);
 	markUnwrapped(fd);
-	
+
 	return rc;
 }
 
@@ -444,7 +472,7 @@ int _xputs(const char *s, int fd)
 char *_xgets(int fd, char *s, int n)
 {
 	int i;
-	int rc;
+	int rc = -1;
 	char *p = s;
 
 	markWrapped(fd);
@@ -452,7 +480,7 @@ char *_xgets(int fd, char *s, int n)
 		rc = Xrecv(fd, p, 1, 0);
 		p++;
 		if (rc < 0 || *(p - 1) == '\n')
-			break;			
+			break;
 	}
 	markUnwrapped(fd);
 
@@ -469,7 +497,7 @@ int _xfread(void *buf, int size, int n, int fd)
 	markWrapped(fd);
 	int rc = Xrecv(fd, buf, size * n, 0);
 	markUnwrapped(fd);
-	
+
 	if (rc >= 0)
 		rc = rc / size;
 	return rc;
@@ -480,7 +508,7 @@ int _xfwrite(const void *buf, int size, int n, int fd)
 	markWrapped(fd);
 	int rc = Xsend(fd, buf, size * n, 0);
 	markUnwrapped(fd);
-	
+
 	if (rc >= 0)
 		rc = rc / size;
 	return rc;
@@ -491,7 +519,7 @@ int _xread(int fd, void *buf, size_t count)
 	markWrapped(fd);
 	int rc = Xrecv(fd, buf, count, 0);
 	markUnwrapped(fd);
-	
+
 	return rc;
 }
 
@@ -500,9 +528,9 @@ int _xwrite(int fd, const void *buf, size_t count)
 	markWrapped(fd);
 	int rc = Xsend(fd, buf, count, 0);
 	markUnwrapped(fd);
-	
+
 	return rc;
-} 
+}
 
 /******************************************************************************
 **
@@ -510,39 +538,60 @@ int _xwrite(int fd, const void *buf, size_t count)
 **
 ******************************************************************************/
 
+#if 0
 /*
-** The following are informational remappings, all they do is print the 
-** parameter and return details
+** The following are informational remappings, all they do is print the
+** parameter and return details. We can probab ly eliminate them when everything
+** is working correctly.
 */
 int fileno(FILE *stream)
 {
-	int fd = __real_fileno(stream);	
-//	TRACE("FILE:%p fd:%d\r\n", stream, fd);
-	return fd;
+//	TRACE();
+	return __real_fileno(stream);
 }
 int fileno_unlocked(FILE *stream)
 {
-	int fd = __real_fileno_unlocked(stream);
-//	TRACE("FILE:%p fd:%d\r\n", stream, fd);
-	return fd;
+//	TRACE();
+	return __real_fileno_unlocked(stream);
 }
-
+#endif
+/*
+** FIXME: dup,dup2,dup3 functionality won't be implemented until we have
+** dup logic in click.
+*/
 int dup(int fd)
 {
-	int fd2 = __real_dup(fd);
-	TRACE("fd:%d fd2:%d\r\n");
-	return fd2;
+	TRACE();
+	if (isXsocket(fd)) {
+		ALERT();
+		errno = EINVAL;
+		return -1;
+	}
+
+	return __real_dup(fd);
 }
 
 int dup2(int fd, int fd2)
-{	
-	TRACE("fd:%d fd2:%d\r\n", fd, fd2);
+{
+	TRACE();
+	if (isXsocket(fd)) {
+		ALERT();
+		errno = EINVAL;
+		return -1;
+	}
+
 	return __real_dup2(fd, fd2);
 }
 
 int dup3(int fd, int fd2, int flags)
 {
-	TRACE("fd:%d fd2:%d flags:%d\r\n", fd, fd2, flags);
+	TRACE();
+	if (isXsocket(fd)) {
+		ALERT();
+		errno = EINVAL;
+		return -1;
+	}
+
 	return __real_dup3(fd, fd2, flags);
 }
 
@@ -552,45 +601,38 @@ int dup3(int fd, int fd2, int flags)
 int socket(int domain, int type, int protocol)
 {
 	int fd;
-	FLAG();
+	TRACE();
 
 	if (domain == AF_XIA) {
 		XIAIFY();
-		int async = type & SOCK_NONBLOCK;
-		int coe = type & SOCK_CLOEXEC;
-		TRACE("async:%d close on exec:%d\r\n", async, coe);
-		// FIXME: handle flags somehow
-		
-		type = _GetSocketType(type & 0xf);
-		fd = Xsocket(type);
+		fd = Xsocket(domain, type, protocol);
 	} else {
 		fd = __real_socket(domain, type, protocol);
 	}
-	return fd;	
+	return fd;
 }
 
 int socketpair(int domain, int type, int protocol, int fds[2])
 {
-	FLAG();
+	TRACE();
 	if (domain == AF_XIA) {
 		XIAIFY();
-		int async = type & SOCK_NONBLOCK;
-		int coe = type & SOCK_CLOEXEC;
-		TRACE("async:%d close on exec:%d\r\n", async, coe);
-		// FIXME: handle flags somehow
+		fds[0] = Xsocket(domain, type, protocol);
+		fds[1] = Xsocket(domain, type, protocol);
 
-		type = _GetSocketType(type & 0xf);
-		fds[0] = Xsocket(type);
-		fds[1] = Xsocket(type);
-		
 		if (fds[0] >= 0 && fds[1] >= 0) {
 			return 0;
 		} else {
+			int e = errno;
+			markWrapped(fds[0]);
+			markWrapped(fds[1]);
 			Xclose(fds[0]);
 			Xclose(fds[1]);
+			markUnwrapped(fds[0]);
+			markUnwrapped(fds[1]);
+			errno = e;
 			return -1;
 		}
-		// FIXME
 	} else {
 		return __real_socketpair(domain, type, protocol, fds);
 	}
@@ -599,16 +641,14 @@ int socketpair(int domain, int type, int protocol, int fds[2])
 int connect(int fd, const struct sockaddr *addr, socklen_t len)
 {
 	int rc;
-	
-	FLAG();
+
+	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
-		// HACK!!!
-		const char *dag = (const char *)addr;
 		markWrapped(fd);
-		rc= Xconnect(fd, dag);
+		rc= Xconnect(fd, addr, len);
 		markUnwrapped(fd);
-
+MSG("rc = %d\n", rc);
 	} else {
 		rc = __real_connect(fd, addr, len);
 	}
@@ -618,14 +658,12 @@ int connect(int fd, const struct sockaddr *addr, socklen_t len)
 int bind(int fd, const struct sockaddr *addr, socklen_t len)
 {
 	int rc;
-	
-	FLAG();
+
+	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
-		// HACK!!!
-		const char *dag = (const char *)addr;
 		markWrapped(fd);
-		rc= Xbind(fd, dag);
+		rc= Xbind(fd, addr, len);
 		markUnwrapped(fd);
 
 	} else {
@@ -636,39 +674,42 @@ int bind(int fd, const struct sockaddr *addr, socklen_t len)
 
 int accept(int fd, struct sockaddr *addr, socklen_t *addr_len)
 {
-	int rc, rc1;
-	
-	FLAG();
+	int rc;
+
+	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
-		// HACK!!!
 		markWrapped(fd);
-		rc = Xaccept(fd);
-		if (rc >= 0) {
-			char *dag = (char *)addr;
-			rc1 = Xgetpeername(fd, dag, addr_len);
-			if (rc1 < 0) {
-				MSG("getpeername failed in accept");
-			}
-		}
+		rc = Xaccept(fd, addr, addr_len);
 		markUnwrapped(fd);
 
 	} else {
 		rc = __real_accept(fd, addr, addr_len);
 	}
-	return rc; 
+	return rc;
 }
 
 int accept4(int fd, struct sockaddr *addr, socklen_t *addr_len, int flags)
 {
-	FLAG();
-	return __real_accept4(fd, addr, addr_len, flags);
+	int rc;
+
+	TRACE();
+	if (isXsocket(fd)) {
+		XIAIFY();
+		markWrapped(fd);
+		rc = Xaccept4(fd, addr, addr_len, flags);
+		markUnwrapped(fd);
+
+	} else {
+		rc = __real_accept4(fd, addr, addr_len, flags);
+	}
+	return rc;
 }
 
 ssize_t send(int fd, const void *buf, size_t n, int flags)
 {
 	int rc;
-	FLAG();
+	TRACE();
 
 	if (shouldWrap(fd)) {
 //	if (isXsocket(fd) {
@@ -685,7 +726,7 @@ ssize_t send(int fd, const void *buf, size_t n, int flags)
 ssize_t recv(int fd, void *buf, size_t n, int flags)
 {
 	int rc;
-	FLAG();
+	TRACE();
 	if (shouldWrap(fd)) {
 //	if (isXsocket(fd) {
 		XIAIFY();
@@ -702,15 +743,14 @@ ssize_t recv(int fd, void *buf, size_t n, int flags)
 ssize_t sendto(int fd, const void *buf, size_t n, int flags, const struct sockaddr *addr, socklen_t addr_len)
 {
 	int rc;
-	FLAG();
+	TRACE();
 
-	if (0) {
-//	if (shouldWrap(fd)) {
+//	if (0) {
+	if (shouldWrap(fd)) {
 //	if (isXsocket(fd) {
 		XIAIFY();
-		// FIXME: need to add async support
 		markWrapped(fd);
-		rc = Xsendto(fd, buf, n, flags, (const char *)addr, addr_len);
+		rc = Xsendto(fd, buf, n, flags, addr, addr_len);
 		markUnwrapped(fd);
 
 	} else {
@@ -722,15 +762,14 @@ ssize_t sendto(int fd, const void *buf, size_t n, int flags, const struct sockad
 ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, socklen_t *addr_len)
 {
 	int rc;
-	FLAG();
+	TRACE();
 
-	if (0) {
-//	if (shouldWrap(fd)) {
+//	if (0) {
+	if (shouldWrap(fd)) {
 //	if (isXsocket(fd) {
 		XIAIFY();
-		// FIXME: need to add async support		
 		markWrapped(fd);
-		rc = Xrecvfrom(fd, buf, n, flags, (char *)addr, addr_len);
+		rc = Xrecvfrom(fd, buf, n, flags, addr, addr_len);
 		markUnwrapped(fd);
 	} else {
 		rc = __real_recvfrom(fd, buf, n, flags, addr, addr_len);
@@ -740,11 +779,11 @@ ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, 
 
 ssize_t sendmsg(int fd, const struct msghdr *message, int flags)
 {
-	FLAG();
+	TRACE();
 	if (isXsocket(fd)) {
 		ALERT();
 		return 0;
-		
+
 	} else {
 		return __real_sendmsg(fd, message, flags);
 	}
@@ -752,29 +791,26 @@ ssize_t sendmsg(int fd, const struct msghdr *message, int flags)
 
 ssize_t recvmsg(int fd, struct msghdr *message, int flags)
 {
-	FLAG();
+	TRACE();
 	if (isXsocket(fd)) {
 		ALERT();
 		return 0;
-		
+
 	} else {
 		return __real_recvmsg(fd, message, flags);
-	}	
+	}
 }
 
 int getsockopt(int fd, int level, int optname, void *optval, socklen_t *optlen)
 {
 	int rc;
-	FLAG();
+	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
-		/* NOTE: for now passing all options through and letting the
-		** API decide if they are valid or not
-		*/
 		markWrapped(fd);
 		rc =  Xgetsockopt(fd, optname, optval, optlen);
 		markUnwrapped(fd);
-	
+
 	} else {
 		rc = __real_getsockopt(fd, level, optname, optval, optlen);
 	}
@@ -784,16 +820,13 @@ int getsockopt(int fd, int level, int optname, void *optval, socklen_t *optlen)
 int setsockopt(int fd, int level, int optname, const void *optval, socklen_t optlen)
 {
 	int rc;
-	FLAG();	
+	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
-		/* NOTE: for now passing all options through and letting the
-		** API decide if they are valid or not
-		*/
 		markWrapped(fd);
 		rc =  Xsetsockopt(fd, optname, optval, optlen);
 		markUnwrapped(fd);
-	
+
 	} else {
 		rc = __real_setsockopt(fd, level, optname, optval, optlen);
 	}
@@ -802,12 +835,13 @@ int setsockopt(int fd, int level, int optname, const void *optval, socklen_t opt
 
 int listen(int fd, int n)
 {
-	FLAG();
+	TRACE();
 	if (isXsocket(fd)) {
+		// XIA doesn't have a listen function yet, so just return success
 		SKIP();
 		return 0;
 
-	} else {	
+	} else {
 		return __real_listen(fd, n);
 	}
 }
@@ -815,14 +849,13 @@ int listen(int fd, int n)
 int close(int fd)
 {
 	int rc;
-	FLAG();
+	TRACE();
 	if (shouldWrap(fd)) {
-//	if (isXsocket(fd) {
 		XIAIFY();
 		markWrapped(fd);
 		rc = Xclose(fd);
 		markUnwrapped(fd);
-	
+
 	} else {
 		rc = __real_close(fd);
 	}
@@ -831,9 +864,9 @@ int close(int fd)
 
 int shutdown(int fd, int how)
 {
-	FLAG();
+	TRACE();
 	if (isXsocket(fd)) {
-		SKIP();
+		ALERT();
 		return 0;
 
 	} else {
@@ -846,9 +879,9 @@ int sockatmark(int fd)
 	/* NOTE: XIA has no concept of out of band data in the current version
 	** this function will always return 0 for now
 	*/
-	FLAG();
+	TRACE();
 	if (isXsocket(fd)) {
-		SKIP();
+		ALERT();
 		return 0;
 
 	} else {
@@ -856,12 +889,19 @@ int sockatmark(int fd)
 	}
 }
 
+//#if 0
+
+/* These are inlined as of GCC 4.7, so we can't intercept them anymore
+** need to document them instead as not working. However, they seem less
+** likely to be called directly on a socket than some of the other *printf
+** functions
+*/
 int vfprintf(FILE *s, const char *format, va_list arg)
 {
 	int fd = fileno(s);
 	int rc;
-	
-	FLAG();
+
+	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -873,50 +913,11 @@ int vfprintf(FILE *s, const char *format, va_list arg)
 	return rc;
 }
 
-int fprintf(FILE *stream, const char *format, ...)
-{
-	int rc;
-	va_list args;	
-	va_start(args, format);
-
-	FLAG();
-	rc = vfprintf(stream, format, args);
-	va_end(args);
-	return rc;
-}
-
-int vprintf(const char *format, va_list arg)
-{
-	int fd = fileno(stdout);
-	int rc;
-	
-	if (isXsocket(fd)) {
-		XIAIFY();
-		rc = _vasend(fd, format, arg);
-
-	} else {
-		rc = __real_vprintf(format, arg);
-	}
-	return rc;
-}
-
-// NOTE: stdout may be remapped to our socket
-int printf(const char *format, ...)
-{
-	int rc;
-	va_list args;
-	va_start(args, format);
-
-	rc = vprintf(format, args);
-	va_end(args);
-	return rc;
-}
-
 int vdprintf(int fd, const char *fmt, va_list arg)
 {
 	int rc;
-	
-	FLAG();
+
+	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
 		rc = _vasend(fd, fmt, arg);
@@ -928,24 +929,67 @@ int vdprintf(int fd, const char *fmt, va_list arg)
 	return rc;
 }
 
+#if 0
+// FIXME: this is probably not necessary. Anyone who remaps std* deserves what they get
+int vprintf(const char *format, va_list arg)
+{
+	int fd = fileno(stdout);
+	int rc;
+
+	if (isXsocket(fd)) {
+		XIAIFY();
+		rc = _vasend(fd, format, arg);
+
+	} else {
+		rc = __real_vprintf(format, arg);
+	}
+	return rc;
+}
+
+// FIXME: this is probably not necessary. Anyone who remaps std* deserves what they get
+int printf(const char *format, ...)
+{
+	int rc;
+	va_list args;
+	va_start(args, format);
+
+	rc = vprintf(format, args);
+	va_end(args);
+	return rc;
+}
+#endif
+
+int fprintf(FILE *stream, const char *format, ...)
+{
+	int rc;
+	va_list args;
+	va_start(args, format);
+
+	TRACE();
+	rc = vfprintf(stream, format, args);
+	va_end(args);
+	return rc;
+}
+
 int dprintf(int fd, const char *fmt, ...)
 {
 	int rc;
 	va_list args;
 	va_start(args, fmt);
 
-	FLAG();
+	TRACE();
 	rc = vdprintf(fd, fmt, args);
 	va_end(args);
 	return rc;
 }
+//#endif
 
 int fgetc(FILE *stream)
 {
 	int fd = fileno(stream);
 	int rc;
-	
-	FLAG();
+
+	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -962,8 +1006,8 @@ int getc(FILE *stream)
 {
 	int fd = fileno(stream);
 	int rc;
-	
-	FLAG();
+
+	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
 		rc = _xgetc(fd);
@@ -974,28 +1018,47 @@ int getc(FILE *stream)
 	return rc;
 }
 
+#if 0
+// FIXME: these are probably not necessary. Anyone who remaps std* to a socket deserves what they get
 int getchar(void)
 {
 	int fd = fileno(stdin);
 	int rc;
-	
-	FLAG();
+
+	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
 		rc = _xgetc(fd);
-	
+
 	} else {
 		rc = __real_getc(stdin);
 	}
 	return rc;
 }
 
+int getchar_unlocked(void)
+{
+	int fd = fileno(stdin);
+	int rc;
+
+	TRACE();
+	if (isXsocket(fd)) {
+		XIAIFY();
+		rc = _xgetc(fd);
+
+	} else {
+		rc = __real_getchar_unlocked();
+	}
+	return rc;
+}
+#endif
+
 int getc_unlocked(FILE *stream)
 {
 	int fd = fileno(stream);
 	int rc;
-	
-	FLAG();
+
+	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
 		rc = _xgetc(fd);
@@ -1006,28 +1069,12 @@ int getc_unlocked(FILE *stream)
 	return rc;
 }
 
-int getchar_unlocked(void)
-{
-	int fd = fileno(stdin);
-	int rc;
-	
-	FLAG();
-	if (isXsocket(fd)) {
-		XIAIFY();
-		rc = _xgetc(fd);
-
-	} else {
-		rc = __real_getchar_unlocked();
-	}
-	return rc;
-}
-
 int fgetc_unlocked(FILE *stream)
 {
 	int fd = fileno(stream);
 	int rc;
-	
-	FLAG();
+
+	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
 		rc = _xgetc(fd);
@@ -1042,8 +1089,8 @@ int fputc(int c, FILE *stream)
 {
 	int fd = fileno(stream);
 	int rc;
-	
-	FLAG();
+
+	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1059,8 +1106,8 @@ int putc(int c, FILE *stream)
 {
 	int fd = fileno(stream);
 	int rc;
-	
-	FLAG();
+
+	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1072,12 +1119,14 @@ int putc(int c, FILE *stream)
 	return rc;
 }
 
+#if 0
+// FIXME: these are probably not necessary. Anyone who remaps std* to a socket deserves what they get
 int putchar(int c)
 {
 	int fd = fileno(stdout);
 	int rc;
-	
-	FLAG();
+
+	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1089,12 +1138,29 @@ int putchar(int c)
 	return rc;
 }
 
+int putchar_unlocked(int c)
+{
+	int fd = fileno(stdout);
+	int rc;
+
+	TRACE();
+	if (isXsocket(fd)) {
+		XIAIFY();
+		rc = _xputc(c, fd);
+
+	} else {
+		rc = __real_putchar_unlocked(c);
+	}
+	return rc;
+}
+#endif
+
 int fputc_unlocked(int c, FILE *stream)
 {
 	int fd = fileno(stream);
 	int rc;
-	
-	FLAG();
+
+	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
 		rc = _xputc(c, fd);
@@ -1109,8 +1175,8 @@ int putc_unlocked(int c, FILE *stream)
 {
 	int fd = fileno(stream);
 	int rc;
-	
-	FLAG();
+
+	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
 		rc = _xputc(c, fd);
@@ -1121,28 +1187,12 @@ int putc_unlocked(int c, FILE *stream)
 	return rc;
 }
 
-int putchar_unlocked(int c)
-{
-	int fd = fileno(stdout);
-	int rc;
-	
-	FLAG();
-	if (isXsocket(fd)) {
-		XIAIFY();
-		rc = _xputc(c, fd);
-
-	} else {
-		rc = __real_putchar_unlocked(c);
-	}
-	return rc;
-}
-
 char *fgets(char *s, int n, FILE *stream)
 {
 	int fd = fileno(stream);
 	char *rc;
-	
-	FLAG();
+
+	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1154,12 +1204,14 @@ char *fgets(char *s, int n, FILE *stream)
 	return rc;
 }
 
+#if 0
+// FIXME: these are probably not necessary. Anyone who remaps std* to a socket deserves what they get
 char *gets(char *s)
 {
 	int fd = fileno(stdin);
 	char *rc;
-	
-	FLAG();
+
+	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1170,13 +1222,14 @@ char *gets(char *s)
 	}
 	return rc;
 }
+#endif
 
 char *fgets_unlocked(char *s, int n, FILE *stream)
 {
 	int fd = fileno(stream);
 	char *rc;
-	
-	FLAG();
+
+	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1192,8 +1245,8 @@ _IO_ssize_t getline(char **lineptr, size_t *n, FILE *stream)
 {
 	int fd = fileno(stream);
 	_IO_ssize_t rc;
-	
-	FLAG();
+
+	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1210,8 +1263,8 @@ int fputs(const char *s, FILE *stream)
 {
 	int fd = fileno(stream);
 	int rc;
-	
-	FLAG();
+
+	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1227,8 +1280,8 @@ int fputs_unlocked(const char *s, FILE *stream)
 {
 	int fd = fileno(stream);
 	int rc;
-	
-	FLAG();
+
+	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1244,13 +1297,13 @@ int puts(const char *s)
 {
 	int fd = fileno(stdout);
 	int rc;
-	
-	//FLAG();
+
+	//TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
 		rc = _xputs(s, fd);
-		
+
 	} else {
 		rc = __real_puts(s);
 	}
@@ -1261,8 +1314,8 @@ size_t fread(void *ptr, size_t size, size_t n, FILE *stream)
 {
 	int fd = fileno(stream);
 	size_t rc;
-	
-	FLAG();
+
+	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1278,8 +1331,8 @@ size_t fwrite(const void *ptr, size_t size, size_t n, FILE *s)
 {
 	int fd = fileno(s);
 	size_t rc;
-	
-	FLAG();
+
+	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1296,8 +1349,8 @@ size_t fread_unlocked(void *ptr, size_t size, size_t n, FILE *stream)
 {
 	int fd = fileno(stream);
 	size_t rc;
-	
-	FLAG();
+
+	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1313,8 +1366,8 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t n, FILE *stream)
 {
 	int fd = fileno(stream);
 	size_t rc;
-	
-	FLAG();
+
+	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1330,8 +1383,8 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t n, FILE *stream)
 ssize_t read(int fd, void *buf, size_t nbytes)
 {
 	size_t rc;
-	
-	FLAG();
+
+	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1346,8 +1399,8 @@ ssize_t read(int fd, void *buf, size_t nbytes)
 ssize_t write(int fd, const void *buf, size_t n)
 {
 	size_t rc;
-	
-	FLAG();
+
+	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1362,14 +1415,15 @@ ssize_t write(int fd, const void *buf, size_t n)
 int getsockname(int fd, struct sockaddr *addr, socklen_t *len)
 {
 	int rc;
-	
-	FLAG();
+
+	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
-		// HACK!!!
-		char *dag = (char *)addr;
+		if (*len < sizeof(sockaddr_x)) {
+			WARNING("not enough room for the XIA sockaddr! have %d, need %d\n", *len, sizeof(sockaddr_x));
+		}
 		markWrapped(fd);
-		rc = Xgetsockname(fd, dag, len);
+		rc = Xgetsockname(fd, addr, len);
 		markUnwrapped(fd);
 
 	} else {
@@ -1381,14 +1435,14 @@ int getsockname(int fd, struct sockaddr *addr, socklen_t *len)
 int getpeername(int fd, struct sockaddr *addr, socklen_t *len)
 {
 	int rc;
-	
-	FLAG();
+
+	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
-		// HACK!!!
-		char *dag = (char *)addr;
+		if (*len < sizeof(sockaddr_x))
+			WARNING("not enough room for the XIA sockaddr! have %d, need %d\n", *len, sizeof(sockaddr_x));
 		markWrapped(fd);
-		rc = Xgetpeername(fd, dag, len);
+		rc = Xgetpeername(fd, addr, len);
 		markUnwrapped(fd);
 
 	} else {
@@ -1397,20 +1451,89 @@ int getpeername(int fd, struct sockaddr *addr, socklen_t *len)
 	return rc;
 }
 
-/******************************************************************************
-** functions below still need to be implemented
-******************************************************************************/
+ssize_t readv(int fd, const struct iovec *iov, int iovcnt)
+{
+	int rc;
+
+	TRACE();
+	if (isXsocket(fd)) {
+		int i, size = 0;
+		char *p, *buf;
+		
+		XIAIFY();
+
+		// readv is atomic, so make one buffer big enough to handle
+		// the requsted size, and then use it to fill the iovecs
+		for (i = 0; i < iovcnt; i++)
+			size += iov[i].iov_len;
+
+		p = buf = (char *)malloc(size);
+		rc = _xread(fd, buf, size);
+
+		if (rc >= 0) {
+			for (i = 0; i < iovcnt; i++) {
+				if (size <= 0)
+					break;
+				int cnt = MIN(size, iov[i].iov_len);
+
+				memcpy(iov[i].iov_base, p, cnt);
+				p += cnt;
+				size -= cnt;
+			}
+		}
+
+		free(buf);
+
+	} else {
+		rc = __real_readv(fd, iov, iovcnt);
+	}
+	return rc;
+}
+
+ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
+{
+	int rc;
+
+	TRACE();
+	if (isXsocket(fd)) {
+		int i, size = 0;
+		char *p, *buf;
+		
+		XIAIFY();
+
+		// writev is atomic, so put everything into a buffer instead of
+		// writing out each individual iovec
+		for (i = 0; i < iovcnt; i++)
+			size += iov[i].iov_len;
+
+		p = buf = (char *)malloc(size);
+	
+		for (i = 0; i < iovcnt; i++) {
+			memcpy(p, iov[i].iov_base, iov[i].iov_len);
+			p += iov[i].iov_len;
+		}
+	
+		rc = _xwrite(fd, buf, size);
+		free(buf);
+	} else {
+		rc = __real_writev(fd, iov, iovcnt);
+	}
+	return rc;
+}
+
 
 int ioctl(int d, int request, ...)
 {
 	int rc;
-	va_list args;	
-	
-	FLAG();
+	va_list args;
+
+	TRACE();
 	va_start(args, request);
 
 	if (isXsocket(d)) {
-		XIAIFY();
+		// Not sure what ioctl requests should work on an xsocket
+		// just flag it for now
+		ALERT();
 		rc = -1;
 	} else {
 		NOXIA();
@@ -1423,14 +1546,14 @@ int ioctl(int d, int request, ...)
 int fcntl (int fd, int cmd, ...)
 {
 	int rc;
-	va_list args;	
-	
-	FLAG();
+	va_list args;
+
+	TRACE();
 	va_start(args, cmd);
 
 	if (isXsocket(fd)) {
 		XIAIFY();
-		rc = -1;
+		rc = Xfcntl(fd, cmd, args);
 	} else {
 		NOXIA();
 		rc = __real_fcntl(fd, cmd, args);
@@ -1439,13 +1562,77 @@ int fcntl (int fd, int cmd, ...)
 	return rc;
 }
 
+int getaddrinfo (const char *name, const char *service, const struct addrinfo *req, struct addrinfo **pai)
+{
+	int rc = -1;
+	int tryxia = 1;
+	int trynormal = 1;
+
+	TRACE();
+	// try to determine if this is an XIA address lookup
+	if (req) {
+		// they specified hints, see if the family is XIA, or unspecified
+		if (req->ai_family == AF_UNSPEC) {
+			MSG("family is unspec\n");
+			tryxia = 1;
+		} else if (req->ai_family == AF_XIA) {
+			MSG("family is XIA\n");
+			tryxia = 1;
+			trynormal = 0;
+		} else {
+			MSG("family does not include XIA\n");
+			tryxia = 0;
+		}
+	
+	} else if (service) {
+		MSG("service is: %s\n", service);
+		// see if service looks like a DAG
+		// FIXME: this should be made smarter
+		if (strchr(service, ':') != NULL) {
+			MSG("XIA service found\n");
+			tryxia = 1;
+		} else {
+			tryxia = 0;
+		}
+	}
+
+	if (tryxia) {
+		XIAIFY();
+		MSG("looking up name in XIA\n");
+		rc = Xgetaddrinfo(name, service, req, pai);
+		MSG("Xgetaddrinfo returns %d\n", rc);
+	}
+
+	// XIA lookup failed, fall back to 
+	if (trynormal && rc < 0) {	
+		NOXIA();
+		MSG("looking up name normally\n");
+		rc = __real_getaddrinfo(name, service, req, pai);
+	}
+
+	return rc;
+}
+
+void freeaddrinfo (struct addrinfo *ai)
+{
+	TRACE();
+	// there currently isn't any new XIA functionality for this call
+	return __real_freeaddrinfo(ai);
+}
+
+const char *gai_strerror (int ecode)
+{
+	TRACE();
+	// there currently isn't any new XIA functionality for this call
+	return __real_gai_strerror(ecode);
+}
 #if 0
 int fclose (FILE *stream)
 {
 	int fd = fileno(stream);
 	int rc;
 
-	FLAG();
+	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1466,7 +1653,7 @@ int fclose (FILE *stream)
 
 int fcloseall (void)
 {
-	FLAG();
+	TRACE();
 
 	MSG("not sure what to do with this function");
 	// FIXME: what do we do with this??
@@ -1474,20 +1661,12 @@ int fcloseall (void)
 	return __real_fcloseall();
 }
 
-
-
-
-
-
-
-
-
-
 int gethostname (char *name, size_t len)
 {
 	int rc;
-	
-	FLAG();
+
+	TRACE();
+	ALERT();
 
 	rc = __real_gethostname(name, len);
 	return rc;
@@ -1496,8 +1675,9 @@ int gethostname (char *name, size_t len)
 int sethostname (const char *name, size_t len)
 {
 	int rc;
-	
-	FLAG();
+
+	TRACE();
+	ALERT();
 
 	rc = __real_sethostname(name, len);
 	return rc;
@@ -1506,8 +1686,9 @@ int sethostname (const char *name, size_t len)
 int sethostid (long int id)
 {
 	int rc;
-	
-	FLAG();
+
+	TRACE();
+	ALERT();
 
 	rc = __real_sethostid(id);
 	return rc;
@@ -1516,8 +1697,9 @@ int sethostid (long int id)
 int getdomainname (char *name, size_t len)
 {
 	int rc;
-	
-	FLAG();
+
+	TRACE();
+	ALERT();
 
 	rc = __real_getdomainname(name, len);
 	return rc;
@@ -1526,8 +1708,9 @@ int getdomainname (char *name, size_t len)
 int setdomainname (const char *name, size_t len)
 {
 	int rc;
-	
-	FLAG();
+
+	TRACE();
+	ALERT();
 
 	rc = __real_setdomainname(name, len);
 	return rc;
@@ -1535,287 +1718,304 @@ int setdomainname (const char *name, size_t len)
 
 long int gethostid (void)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 
 	return __real_gethostid();
 }
 
-
-
 void sethostent (int stay_open)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 
 	__real_sethostent(stay_open);
 }
 
 void endhostent (void)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 
 	__real_endhostent();
 }
 
 struct hostent *gethostent (void)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_gethostent();
 }
 
 struct hostent *gethostbyaddr (const void *addr, socklen_t len, int type)
 {
-	FLAG();
-	return __real_gethostbyaddr(addr, len, type);	
+	TRACE();
+	ALERT();
+	return __real_gethostbyaddr(addr, len, type);
 }
 
 struct hostent *gethostbyname (const char *name)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_gethostbyname(name);
 }
 
 struct hostent *gethostbyname2 (const char *name, int af)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_gethostbyname2(name, af);
 }
 
 int gethostent_r (struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errnop)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_gethostent_r(result_buf, buf, buflen, result, h_errnop);
 }
 
 int gethostbyaddr_r (const void *addr, socklen_t len, int type, struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errnop)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_gethostbyaddr_r(addr, len, type, result_buf, buf, buflen, result, h_errnop);
 }
 
 int gethostbyname_r (const char *name, struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errnop)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_gethostbyname_r(name, result_buf, buf, buflen, result, h_errnop);
 }
 
 int gethostbyname2_r (const char *name, int af, struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errnop)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_gethostbyname2_r(name, af, result_buf, buf, buflen, result, h_errnop);
 }
 
 void setnetent (int stay_open)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_setnetent(stay_open);
 }
 
 void endnetent (void)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_endnetent();
 }
 
 struct netent *getnetent (void)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_getnetent();
 }
 
 struct netent *getnetbyaddr (uint32_t net, int type)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_getnetbyaddr(net, type);
 }
 
 struct netent *getnetbyname (const char *name)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_getnetbyname(name);
 }
 
 int getnetent_r (struct netent *result_buf, char *buf, size_t buflen, struct netent **result, int *h_errnop)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_getnetent_r(result_buf, buf, buflen, result, h_errnop);
 }
 
 int getnetbyaddr_r (uint32_t net, int type, struct netent *result_buf, char *buf, size_t buflen, struct netent **result, int *h_errnop)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_getnetbyaddr_r(net, type, result_buf, buf, buflen, result, h_errnop);
 }
 
 int getnetbyname_r (const char *name, struct netent *result_buf, char *buf, size_t buflen, struct netent **result, int *h_errnop)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_getnetbyname_r(name, result_buf, buf, buflen, result, h_errnop);
 }
 
 void setservent (int stay_open)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	__real_setservent(stay_open);
 }
 
 void endservent (void)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	__real_endservent();
 }
 
 
 struct servent *getservent (void)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_getservent();
 }
 
 struct servent *getservbyname (const char *name, const char *proto)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_getservbyname(name, proto);
 }
 
 struct servent *getservbyport (int port, const char *proto)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_getservbyport(port, proto);
 }
 
 int getservent_r (struct servent *result_buf, char *buf, size_t buflen, struct servent **result)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_getservent_r(result_buf, buf, buflen, result);
 }
 
 int getservbyname_r (const char *name, const char *proto, struct servent *result_buf, char *buf, size_t buflen, struct servent **result)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_getservbyname_r(name, proto, result_buf, buf, buflen, result);
 }
 
 int getservbyport_r (int port, const char *proto, struct servent *result_buf, char *buf, size_t buflen, struct servent **result)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_getservbyport_r(port, proto, result_buf, buf, buflen, result);
 }
 
 void setprotoent (int stay_open)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	__real_setprotoent(stay_open);
 }
 
 void endprotoent (void)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	__real_endprotoent();
 }
 
 struct protoent *getprotoent (void)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_getprotoent();
 }
 
 struct protoent *getprotobyname (const char *name)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_getprotobyname(name);
 }
 
 struct protoent *getprotobynumber (int proto)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_getprotobynumber(proto);
 }
 
 int getprotoent_r (struct protoent *result_buf, char *buf, size_t buflen, struct protoent **result)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_getprotoent_r(result_buf, buf, buflen, result);
 }
 
 int getprotobyname_r (const char *name, struct protoent *result_buf, char *buf, size_t buflen, struct protoent **result)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_getprotobyname_r(name, result_buf, buf, buflen, result);
 }
 
 int getprotobynumber_r (int proto, struct protoent *result_buf, char *buf, size_t buflen, struct protoent **result)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_getprotobynumber_r(proto, result_buf, buf, buflen, result);
 }
 
 int setnetgrent (const char *netgroup)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_setnetgrent(netgroup);
 }
 
 void endnetgrent (void)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	__real_endnetgrent();
 }
 
 int getnetgrent (char **hostp, char **userp, char **domainp)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_getnetgrent(hostp, userp, domainp);
 }
 
 int innetgr (const char *netgroup, const char *host, const char *user, const char *domain)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_innetgr(netgroup, host, user, domain);
 }
 
 int getnetgrent_r (char **hostp, char **userp, char **domainp, char *buffer, size_t buflen)
 {
-	FLAG();
+	TRACE();
+	ALERT();
 	return __real_getnetgrent_r(hostp, userp, domainp, buffer, buflen);
-}
-
-int getaddrinfo (const char *name, const char *service, const struct addrinfo *req, struct addrinfo **pai)
-{
-	FLAG();
-	return __real_getaddrinfo(name, service, req, pai);
-}
-
-void freeaddrinfo (struct addrinfo *ai)
-{
-	FLAG();
-	return __real_freeaddrinfo(ai);
-}
-
-const char *gai_strerror (int ecode)
-{
-	FLAG();
-	return __real_gai_strerror(ecode);
 }
 
 int getnameinfo (const struct sockaddr *sa, socklen_t salen, char *host, socklen_t hostlen, char *serv, socklen_t servlen, unsigned int flags)
 {
-	int rc;
-	FLAG();
-	printf("__real_getnameinfo = %p\n", __real_getnameinfo);
-	rc =__real_getnameinfo(sa, salen, host, hostlen, serv, servlen, flags);
-	STOCK();
-	return rc;
+	TRACE();
+	ALERT();
+	return __real_getnameinfo(sa, salen, host, hostlen, serv, servlen, flags);
 }
 
 #if 0
-/* 
+/*
 ** these seem to be handled by macros for putc and getc
 */
 int _IO_getc (_IO_FILE *__fp)
 {
 	size_t rc;
-	
-	FLAG();
+
+	TRACE();
 
 	if (isXsocket(fp->fileno)) {
 		XIAIFY();
@@ -1831,8 +2031,8 @@ int _IO_getc (_IO_FILE *__fp)
 int _IO_putc (int __c, _IO_FILE *__fp)
 {
 	size_t rc;
-	
-	FLAG();
+
+	TRACE();
 
 	if (isXsocket(fp->fileno)) {
 		XIAIFY();
@@ -1847,103 +2047,6 @@ int _IO_putc (int __c, _IO_FILE *__fp)
 #endif
 
 /*
-** Informational remappings
-** int dup (int fd);
-** int dup2 (int fd, int fd2);
-** int dup3 (int fd, int fd2, int flags);
-** int fileno (FILE *stream);
-** int fileno_unlocked (FILE *stream);
-**
-** Remapped file i/o functions
-** int ioctl(int d, int request, ...);
-** int fclose (FILE *stream);
-** int fcloseall (void);
-** int fprintf (FILE *stream, const char *format, ...);
-** int printf (const char *format, ...);
-** int vfprintf (FILE *s, const char *format, _G_va_list arg);
-** int vprintf (const char *format, _G_va_list arg);
-** int vdprintf (int fd, const char *fmt, _G_va_list arg);
-** int dprintf (int fd, const char *fmt, ...);
-** int fgetc (FILE *stream);
-** int getc (FILE *stream);
-** int getchar (void);
-** int getc_unlocked (FILE *stream);
-** int getchar_unlocked (void);
-** int fgetc_unlocked (FILE *stream);
-** int fputc (int c, FILE *stream);
-** int putc (int c, FILE *stream);
-** int putchar (int c);
-** int fputc_unlocked (int c, FILE *stream);
-** int putc_unlocked (int c, FILE *stream);
-** int putchar_unlocked (int c);
-** char *fgets (char *s, int n, FILE *stream)
-** char *gets (char *s);
-** char *fgets_unlocked (char *s, int n, FILE *stream);
-** _IO_ssize_t getline (char **lineptr, size_t *n, FILE *stream);
-** int fputs (const char *s, FILE *stream);
-** int puts (const char *s);
-** size_t fread (void *ptr, size_t size, size_t n, FILE *stream);
-** size_t fwrite (const void *ptr, size_t size, size_t n, FILE *s);
-** int fputs_unlocked (const char *s, FILE *stream);
-** size_t fread_unlocked (void *ptr, size_t size, size_t n, FILE *stream);
-** size_t fwrite_unlocked (const void *ptr, size_t size, size_t n, FILE *stream);
-** ssize_t read (int fd, void *buf, size_t nbytes);
-** ssize_t write (int fd, const void *buf, size_t n);
-** int gethostname (char *name, size_t len);
-** int sethostname (const char *name, size_t len)
-** int sethostid (long int id);
-** int getdomainname (char *name, size_t len);
-** int setdomainname (const char *name, size_t len);
-** long int gethostid (void);
-** int fcntl (int fd, int cmd, ...);
-** int _IO_getc (_IO_FILE *__fp);
-** int _IO_putc (int __c, _IO_FILE *__fp);
-**
-** Remapped name functions
-** void sethostent (int stay_open);
-** void endhostent (void);
-** struct hostent *gethostent (void);
-** struct hostent *gethostbyaddr (const void *addr, socklen_t len, int type);
-** struct hostent *gethostbyname (const char *name);
-** struct hostent *gethostbyname2 (const char *name, int af);
-** int gethostent_r (struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errnop);
-** int gethostbyaddr_r (const void *addr, socklen_t len, int type, struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errnop);
-** int gethostbyname_r (const char *name, struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errnop);
-** int gethostbyname2_r (const char *name, int af, struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errnop);
-** void setnetent (int stay_open);
-** void endnetent (void);
-** struct netent *getnetent (void);
-** struct netent *getnetbyaddr (uint32_t net, int type);
-** struct netent *getnetbyname (const char *name);
-** int getnetent_r (struct netent *result_buf, char *buf, size_t buflen, struct netent **result, int *h_errnop);
-** int getnetbyaddr_r (uint32_t net, int type, struct netent *result_buf, char *buf, size_t buflen, struct netent **result, int *h_errnop);
-** int getnetbyname_r (const char *name, struct netent *result_buf, char *buf, size_t buflen, struct netent **result, int *h_errnop);
-** void setservent (int stay_open);
-** void endservent (void);
-** struct servent *getservent (void);
-** struct servent *getservbyname (const char *name, const char *proto);
-** struct servent *getservbyport (int port, const char *proto);
-** int getservent_r (struct servent *result_buf, char *buf, size_t buflen, struct servent **result);
-** int getservbyname_r (const char *name, const char *proto, struct servent *result_buf, char *buf, size_t buflen, struct servent **result);
-** int getservbyport_r (int port, const char *proto, struct servent *result_buf, char *buf, size_t buflen, struct servent **result);
-** void setprotoent (int stay_open);
-** void endprotoent (void);
-** struct protoent *getprotoent (void);
-** struct protoent *getprotobyname (const char *name);
-** struct protoent *getprotobynumber (int proto);
-** int getprotoent_r (struct protoent *result_buf, char *buf, size_t buflen, struct protoent **result);
-** int getprotobyname_r (const char *name, struct protoent *result_buf, char *buf, size_t buflen, struct protoent **result);
-** int getprotobynumber_r (int proto, struct protoent *result_buf, char *buf, size_t buflen, struct protoent **result);
-** int setnetgrent (const char *netgroup);
-** void endnetgrent (void);
-** int getnetgrent (char **hostp, char **userp, char **domainp);
-** int innetgr (const char *netgroup, const char *host, const char *user, const char *domain);
-** int getnetgrent_r (char **hostp, char **userp, char **domainp, char *buffer, size_t buflen);
-** int getaddrinfo (const char *name, const char *service, const struct addrinfo *req, struct addrinfo **pai);
-** void freeaddrinfo (struct addrinfo *ai);
-** const char *gai_strerror (int ecode);
-** int getnameinfo (const struct sockaddr *sa, socklen_t salen, char *host, socklen_t hostlen, char *serv, socklen_t servlen, unsigned int flags);
-**
 ** Not remapped functions because they shoudn't be used with sockets
 ** int fflush (FILE *stream);
 ** int fflush_unlocked (FILE *stream);
@@ -1956,11 +2059,6 @@ int _IO_putc (int __c, _IO_FILE *__fp)
 ** int setvbuf (FILE *stream, char *buf, int modes, size_t n);
 ** void setbuffer (FILE *stream, char *buf, size_t size);
 ** void setlinebuf (FILE *stream);
-** int snprintf (char *s, size_t maxlen, const char *format, ...);
-** int vsnprintf (char *s, size_t maxlen, const char *format, _G_va_list arg);
-** int vasprintf (char **ptr, const char *f, _G_va_list arg);
-** int asprintf (char **ptr, const char *fmt, ...);
-** int asprintf (char **ptr, const char *fmt, ...);
 ** int fseek (FILE *stream, long int off, int whence);
 ** long int ftell (FILE *stream);
 ** void rewind (FILE *stream);
@@ -1983,19 +2081,15 @@ int _IO_putc (int __c, _IO_FILE *__fp)
 ** int openat (int fd, const char *file, int oflag, ...)
 ** int creat (const char *file, mode_t mode);
 ** int creat64 (const char *file, mode_t mode);
-** 
+** int preadv();
+** int pwritev();
+**
 ** These functions probably won't be used in socket calls
 ** int fscanf (FILE *stream, const char *format, ...);
-** int scanf (const char *format, ...);
-** int sscanf (const char *s, const char *format, ...);
 ** int isoc99_fscanf (FILE *stream, const char *format, ...);
-** int isoc99_scanf (const char *format, ...);
-** int isoc99_sscanf (const char *s, const char *format, ...);
 ** int vfscanf (FILE *s, const char *format, _G_va_list arg)
 ** int vscanf (const char *format, _G_va_list arg);
 ** int isoc99_vfscanf (FILE *s, const char *format, _G_va_list arg);
-** int isoc99_vscanf (const char *format, _G_va_list arg);
-** int isoc99_vsscanf (const char *s, const char *format, _G_va_list arg);
 ** int getw (FILE *stream);
 ** int putw (int w, FILE *stream);
 ** int ungetc (int c, FILE *stream);
@@ -2004,7 +2098,7 @@ int _IO_putc (int __c, _IO_FILE *__fp)
 ** void clearerr_unlocked (FILE *stream);
 ** int feof_unlocked (FILE *stream);
 ** int ferror_unlocked (FILE *stream);
-** int getaddrinfo_a (int mode, struct gaicb *list[restrict_arr], int ent, struct sigevent *sig); 
+** int getaddrinfo_a (int mode, struct gaicb *list[restrict_arr], int ent, struct sigevent *sig);
 ** int gai_suspend (const struct gaicb *const list[], int ent, const struct timespec *timeout);
 ** int gai_error (struct gaicb *req);
 ** int gai_cancel (struct gaicb *gaicbp);

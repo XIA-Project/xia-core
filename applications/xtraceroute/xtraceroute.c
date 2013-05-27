@@ -99,10 +99,11 @@ char usage[] =
 char *hostname;
 char hnamebuf[MAXHOSTNAMELEN];
 
-int npackets;
+int npackets = 30; /* max number of hops allowed */
 int preload = 0;		/* number of packets to "preload" */
 int ntransmitted = 0;		/* sequence # for outbound packets = #sent */
 int ident;
+float interval = 0.5;
 
 int nreceived = 0;		/* # of packets we got back */
 int timing = 0;
@@ -248,7 +249,10 @@ void catcher()
 
 	pinger();
 	if (npackets == 0 || ntransmitted < npackets)
-		alarm(1);
+        if(interval < 1)
+            ualarm(interval*1000000,0);
+        else
+            alarm((int)interval);
 	else {
 		if (nreceived) {
 			waittime = 2 * tmax / 1000;
@@ -393,6 +397,7 @@ void pr_pack(u_char *buf, int cc, const char *from)
 		printf("%s\n",
 		       from
 		       );
+        nreceived++;
 		if (pingflags & VERBOSE) {
 			for( i=0; i<12; i++)
 			    printf("x%2.2x: x%8.8x\n", (unsigned int)(i*sizeof(long)),
@@ -497,6 +502,7 @@ void tvsub(struct timeval *out, struct timeval *in)
 void finish()
 {
     Xclose(s);
+    printf("hops = %d\n", nreceived);
 	fflush(stdout);
 	exit(0);
 }

@@ -58,7 +58,9 @@ int Xclose(int sockfd)
 		LOGF("Error getting status from Click: %s", strerror(errno));
 	}
 
+	setWrapped(sockfd, 1);
 	close(sockfd);
+	setWrapped(sockfd, 0);
 	freeSocketState(sockfd);
 	return rc;
 }

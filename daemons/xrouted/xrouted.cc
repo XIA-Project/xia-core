@@ -71,7 +71,7 @@ void timeout_handler(int signum)
 	}
 	// reset the timer
 	signal(SIGALRM, timeout_handler);
-	alarm(HELLO_INTERVAL);
+	ualarm(HELLO_INTERVAL*1000000,0);
 }
 
 // send Hello message (1-hop broadcast)
@@ -565,7 +565,7 @@ void initRouteState()
 
 	// set timer for HELLO/LSA
 	signal(SIGALRM, timeout_handler);  
-	alarm(HELLO_INTERVAL); 	
+	ualarm(HELLO_INTERVAL*1000000,0); 	
 }
 
 int main(int argc, char *argv[])

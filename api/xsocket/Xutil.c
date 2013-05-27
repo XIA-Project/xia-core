@@ -27,6 +27,31 @@
 
 #define XID_CHARS (XID_SIZE * 2)
 
+/*!
+** @brief Finds the root of the source tree
+**
+** @returns a character pointer to the root of the source tree
+**
+*/
+char *findRoot() {
+	char *pos;
+	char *path = (char*)malloc(sizeof(char) * PATH_SIZE);
+	int len = readlink("/proc/self/exe", path, PATH_SIZE);
+
+	if (len < 0)
+		return NULL;
+	else if (len == BUF_SIZE)
+		path[BUF_SIZE - 1] = 0;
+	else
+		path[len] = 0;
+
+	pos = strstr(path, SOURCE_DIR);
+	if(pos) {
+		pos += sizeof(SOURCE_DIR)-1;
+		*pos = '\0';
+	}
+	return path;
+}
 
 int validateSocket(int sock, int stype, int err)
 {
@@ -52,7 +77,7 @@ int click_send(int sockfd, xia::XSocketMsg *xsm)
 	// are called
 	sa.sin_family = PF_INET;
 	sa.sin_addr.s_addr = inet_addr("127.0.0.1");
-    sa.sin_port = htons(atoi(CLICKPORT));
+	sa.sin_port = htons(atoi(CLICKPORT));
 
 	std::string p_buf;
 	xsm->SerializeToString(&p_buf);
@@ -60,7 +85,9 @@ int click_send(int sockfd, xia::XSocketMsg *xsm)
 	int remaining = p_buf.size();
 	const char *p = p_buf.c_str();
 	while (remaining > 0) {
+		setWrapped(sockfd, 1);
 		rc = sendto(sockfd, p, remaining, 0, (struct sockaddr *)&sa, sizeof(sa));
+		setWrapped(sockfd, 0);
 
 		if (rc == -1) {
 			LOGF("click socket failure: errno = %d", errno);
@@ -71,8 +98,8 @@ int click_send(int sockfd, xia::XSocketMsg *xsm)
 			if (remaining > 0) {
 				LOGF("%d bytes left to send", remaining);
 #if 1
-				// FIXME: click will crash if we need to send more than a 
-				// single buffer to get the entire block of data sent. Is 
+				// FIXME: click will crash if we need to send more than a
+				// single buffer to get the entire block of data sent. Is
 				// this fixable, or do we have to assume it will always go
 				// in one send?
 				LOG("click can't handle partial packets");
@@ -80,7 +107,7 @@ int click_send(int sockfd, xia::XSocketMsg *xsm)
 				break;
 #endif
 			}
-		}	
+		}
 	}
 
 	return  (rc >= 0 ? 0 : -1);
@@ -95,7 +122,10 @@ int click_reply(int sockfd, char *buf, int buflen)
 	len = sizeof sa;
 
 	memset(buf, 0, buflen);
-	if ((rc = recvfrom(sockfd, buf, buflen - 1 , 0, (struct sockaddr *)&sa, &len)) < 0) {
+	setWrapped(sockfd, 1);
+	rc = recvfrom(sockfd, buf, buflen - 1 , 0, (struct sockaddr *)&sa, &len);
+	setWrapped(sockfd, 0);
+	if (rc < 0) {
 		LOGF("error(%d) getting reply data from click", errno);
 		return -1;
 	}
@@ -114,7 +144,10 @@ int click_reply2(int sockfd, xia::XSocketCallType *type)
 	len = sizeof sa;
 
 	memset(buf, 0, buflen);
-	if ((rc = recvfrom(sockfd, buf, buflen - 1 , 0, (struct sockaddr *)&sa, &len)) < 0) {
+	setWrapped(sockfd, 1);
+	rc = recvfrom(sockfd, buf, buflen - 1 , 0, (struct sockaddr *)&sa, &len);
+	setWrapped(sockfd, 0);
+	if (rc < 0) {
 		LOGF("error(%d) getting reply data from click", errno);
 		return -1;
 	}

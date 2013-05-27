@@ -104,6 +104,9 @@ int timing = 0;
 int tmin = 999999999;
 int tmax = 0;
 int tsum = 0;			/* sum of all times, for doing average */
+
+float interval = 1;
+
 char *inet_ntoa();
 
 /*
@@ -133,6 +136,14 @@ int main(int argc, char **argv)
 			case 'f':
 				pingflags |= FLOOD;
 				break;
+            case 'i':
+                argc--, av++;
+                interval = atof(av[0]);
+                break;
+            case 'c':
+                argc--, av++;
+                npackets = atoi(av[0]);
+                break;
 		}
 		argc--, av++;
 	}
@@ -225,7 +236,7 @@ int main(int argc, char **argv)
  * 			C A T C H E R
  * 
  * This routine causes another PING to be transmitted, and then
- * schedules another SIGALRM for 1 second from now.
+ * schedules another SIGALRM for interval seconds from now.
  * 
  * Bug -
  * 	Our sense of time will slowly skew (ie, packets will not be launched
@@ -238,12 +249,15 @@ void catcher()
 
 	pinger();
 	if (npackets == 0 || ntransmitted < npackets)
-		alarm(1);
+        if (interval < 1)
+            ualarm(interval*1000000, 0);
+        else
+            alarm((int)interval);
 	else {
 		if (nreceived) {
 			waittime = 2 * tmax / 1000;
 			if (waittime == 0)
-				waittime = 1;
+				waittime = interval;
 		} else
 			waittime = MAXWAIT;
 		signal(SIGALRM, (sighandler_t)finish);
