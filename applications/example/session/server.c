@@ -68,7 +68,6 @@ int main(int argc, char *argv[])
 
 				//Reply to client
 				memset(&reply[0], 0, sizeof(reply));
-				strcat (reply, "Got your message: ");
 				strcat (reply, buf);
 				
 				if (Ssend(accept_ctx, reply, strlen(reply)) < 0) {

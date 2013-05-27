@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <time.h>
 #include "session.h"
 
 #ifdef DEBUG
@@ -17,15 +18,92 @@
 #define LOGF(fmt, ...)
 #endif
 
+#define MAXBUF 2048
+
+// global configuration options
+int loops = -1;		// only do 1 pass
+int pktSize = 512;	// default pkt size
+
+/*
+** display cmd line options and exit
+*/
+void help(const char *name)
+{
+	printf("usage: %s [-l loops] [-s size]\n", name);
+	printf("where:\n");
+	printf(" -l loops   : loop <loops> times and exit (0 loops infinitely; -1 prompts for user input)\n");
+	printf(" -s size    : set packet size to <size>. if 0, uses random sizes\n");
+	printf("\n");
+	exit(0);
+}
+
+
+/*
+** configure the app
+*/
+void getConfig(int argc, char** argv)
+{
+	int c;
+
+	opterr = 0;
+
+	while ((c = getopt(argc, argv, "hl:s:")) != -1) {
+		switch (c) {
+			case '?':
+			case 'h':
+				// Help Me!
+				help(basename(argv[0]));
+				break;
+			case 'l':
+				// loop <loops> times and exit
+				// if 0, loop forever
+				loops = atoi(optarg);
+				if (loops < 0) loops = 0;
+				break;
+			case 's':
+				// send pacets of size <size> maximum is 1024
+				// if 0, send random sized packets
+				pktSize = atoi(optarg);
+				if (pktSize < 0) pktSize = 0;
+				if (pktSize > MAXBUF) pktSize = MAXBUF;
+				break;
+			default:
+				help(basename(argv[0]));
+		}
+	}
+}
+
+void randomString(char *buf, int size)
+{
+	int i;
+	static const char *filler = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	static int refresh = 1;
+	int samples = strlen(filler);
+
+	if (!(--refresh)) {
+		// refresh rand every now and then so it doesn't degenerate too much
+		//  use a prime number to keep it interesting
+		srand(time(NULL));
+		refresh = 997;
+	}
+	for (i = 0; i < size - 1; i ++) {
+		buf[i] = filler[rand() % samples];
+	}
+	buf[size - 1] = '\0';
+}
+
 
 int main(int argc, char *argv[])
 {
 	(void)argc;
 	(void)argv;
+	
+	srand(time(NULL));
+	getConfig(argc, argv);
 
     int ctx, n;
-    char reply[2048];
-    char buffer[2048];
+    char reply[MAXBUF];
+    char buffer[MAXBUF];
     
 	// Initiate session
 	ctx = SnewContext();
@@ -38,16 +116,25 @@ int main(int argc, char *argv[])
 		exit(-1);
 	}
 
-     
+    int count = 0; 
     while(1)
     {
-		printf("\nPlease enter the message (0 to exit): ");
-		bzero(buffer,2048);
-		if (fgets(buffer,2048,stdin) != NULL) {
-			LOG("Error reading user input");
+		int size;
+		bzero(buffer, MAXBUF);
+		if (loops == -1) {
+			printf("\nPlease enter the message (0 to exit): ");
+			if (fgets(buffer,MAXBUF,stdin) != NULL) {
+				LOG("Error reading user input");
+			}
+			if (buffer[0]=='0'&&strlen(buffer)==2)
+			    break;
+		} else {
+			if (pktSize == 0)
+				size = (rand() % MAXBUF) + 1;
+			else
+				size = pktSize;
+			randomString(buffer, size);
 		}
-		if (buffer[0]=='0'&&strlen(buffer)==2)
-		    break;
 		    
 		Ssend(ctx, buffer, strlen(buffer));
 		
@@ -59,6 +146,10 @@ int main(int argc, char *argv[])
 			printf("Error writing reply");
 		}
 		printf("\n");
+
+		count++;
+		if (loops > 0 && count == loops)
+			break;
     }
 
 	Sclose(ctx);

@@ -14,7 +14,7 @@ using namespace std;
 
 #define DEFAULT_PROCPORT 1989
 #define BUFSIZE 65000
-#define MTU 150  // TODO: set this higher
+#define MTU 1250  // TODO: actually figure out how big protobuf header is
 
 
 
@@ -740,6 +740,7 @@ int swap_sockets_for_connection(session::ConnectionInfo *cinfo, int oldsock, int
 // and restart them.
 int migrate_connections() {
 	LOG("Migrating existing transport connections.");
+	//sleep(5);
 	int rc = 1;
 	
 	map<string, session::ConnectionInfo*>::iterator iter;
@@ -801,7 +802,6 @@ LOG("BEGIN poll_listen_sock");
 		// accept connection on listen sock
 		if ( (new_rxsock = acceptSock(listen_sock)) < 0 ) {
 			ERRORF("Error accepting new connection on socket %d for listen context %d: %s", listen_sock, ctx, strerror(errno));
-exit(-1);
 			//rcm->set_message("Error accpeting new connection on listen context");
 			//rcm->set_rc(session::FAILURE);
 			//return -1;
