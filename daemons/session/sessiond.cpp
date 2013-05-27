@@ -786,7 +786,7 @@ int migrate_connections() {
 void * poll_listen_sock(void * args) {
 LOG("BEGIN poll_listen_sock");
 
-	int ctx = (int)args;   // TOOD: check this
+	int ctx = *(int*)args;   // TOOD: check this
 	int listen_sock = ctx_to_listensock[ctx];
 	if (listen_sock < 0) {
 		ERRORF("poll_listen_sock: bad socket: %d", listen_sock);
@@ -919,7 +919,7 @@ void *poll_recv_sock(void *args) {
 			case session::DATA:
 			{
 				// Add data pkt to dataQ
-LOGF("    Received %d bytes", rpkt->data().data().size());
+LOGF("    Received %lu bytes", rpkt->data().data().size());
 				pushDataQ(ctx, rpkt);
 LOG("    pushed to data queue");
 				break;
@@ -1174,7 +1174,7 @@ LOG("    Registered name");
 
 	// kick off a thread draining the listen socket into the acceptQ
 	int rc;
-	if ( (rc = startPollingSocket(sock, poll_listen_sock, (void*)ctx) < 0) ) {
+	if ( (rc = startPollingSocket(sock, poll_listen_sock, (void*)&ctx) < 0) ) {
 		ERRORF("Error creating listen sock thread: %s", strerror(rc));
 		rcm->set_message("Error creating listen sock thread");
 		rcm->set_rc(session::FAILURE);
@@ -1334,7 +1334,7 @@ LOG("BEGIN process_send_msg");
 	uint32_t overhead = 10;
 	while (sent < sendm.data().size()) {
 		dm->set_data(sendm.data().substr(sent, MTU-overhead)); // grab next chunk of bytes
-LOGF("    Sending bytes %d through %d of %d", sent, sent+MTU-overhead, sendm.data().size());
+LOGF("    Sending bytes %d through %d of %lu", sent, sent+MTU-overhead, sendm.data().size());
 		if ( send(ctx, &pkt) < 0 ) {
 			ERROR("Error sending data");
 			rcm->set_message("Error sending data");
@@ -1380,7 +1380,7 @@ LOG("BEGIN process_recv_msg");
 
 	// keep pulling data while there's data in the Q and we have less than max_bytes
 	while (data.size() < max_bytes && ctx_to_dataQ[ctx]->size() > 0) {
-LOGF("    Grabbing more data. Have %d so far. %d msgs in queue.", data.size(), ctx_to_dataQ[ctx]->size());
+LOGF("    Grabbing more data. Have %lu so far. %lu msgs in queue.", data.size(), ctx_to_dataQ[ctx]->size());
 		delete pkt; // free current packet before blowing away the pointer
 		pkt = popDataQ(ctx, max_bytes - data.size());
 		data += pkt->data().data();

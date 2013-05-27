@@ -20,6 +20,9 @@
 
 int main(int argc, char *argv[])
 {
+	(void)argc;
+	(void)argv;
+
     int ctx, n;
     char reply[2048];
     char buffer[2048];
@@ -40,7 +43,9 @@ int main(int argc, char *argv[])
     {
 		printf("\nPlease enter the message (0 to exit): ");
 		bzero(buffer,2048);
-		fgets(buffer,2048,stdin);
+		if (fgets(buffer,2048,stdin) != NULL) {
+			LOG("Error reading user input");
+		}
 		if (buffer[0]=='0'&&strlen(buffer)==2)
 		    break;
 		    
@@ -50,7 +55,9 @@ int main(int argc, char *argv[])
 		n = Srecv(ctx, reply, sizeof(reply));
 		if (n < 0) 
 		    printf("Error receiving data");
-		write(1,reply,n);
+		if (write(1,reply,n) < 0) {
+			printf("Error writing reply");
+		}
 		printf("\n");
     }
 

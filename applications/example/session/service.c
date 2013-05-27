@@ -18,6 +18,9 @@
 
 int main(int argc, char *argv[])
 {
+	(void)argc;
+	(void)argv;
+
     int listen_ctx, n, accept_ctx;
     char buf[1024];
     pid_t pid;
@@ -59,7 +62,9 @@ int main(int argc, char *argv[])
 				
 				if (n < 0) 
 				    printf("Error receiving data\n");
-				write(1,buf,n);
+				if (write(1,buf,n) < 0) {
+					printf("Error writing to buf\n");
+				}
 
 
 				// Do processing on received data here...

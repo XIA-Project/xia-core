@@ -19,6 +19,9 @@
 
 int main(int argc, char *argv[])
 {
+	(void)argc;
+	(void)argv;
+
     int n, listen_ctx, accept_ctx;
     char buf[1024];
     char reply[1024];
@@ -59,7 +62,9 @@ int main(int argc, char *argv[])
 				
 				if (n < 0) 
 				    printf("Error receiving data\n");
-				write(1,buf,n);
+				if (write(1,buf,n) < 0) {
+					printf("Error writing to buf\n");
+				}
 
 				//Reply to client
 				memset(&reply[0], 0, sizeof(reply));
