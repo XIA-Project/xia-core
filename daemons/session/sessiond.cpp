@@ -691,21 +691,62 @@ int recv(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 	return received;
 }
 
+int swap_sockets_for_connection(session::ConnectionInfo *cinfo, int oldsock, int newsock) {
+	// stop the thread that was polling the old socket
+	stopPollingSocket(oldsock);
+
+	// close old socket
+	if (closeSock(oldsock) < 0) {
+		ERRORF("Error closing old transport connection to %s", cinfo->name().c_str());
+		return -1;
+	}
+
+	// replace the socket we were using with this name with newsock
+	cinfo->set_sockfd(newsock);
+
+	// correct incomingctx_to_myctx mapping (since incoming sockfd changed)
+	for (int i = 0; i < cinfo->sessions_size(); i++) {
+		int myctx = cinfo->sessions(i);
+
+		vector<uint32_t> keysToChange;
+		map<uint32_t, unsigned short>::iterator iter;
+		for (iter = incomingctx_to_myctx.begin(); iter!= incomingctx_to_myctx.end(); ++iter) {
+			int32_t incoming_sock = iter->first & 0xFFFF;
+
+			if (myctx == iter->second && incoming_sock == oldsock) {
+				keysToChange.push_back(iter->first);
+			}
+		}
+
+		vector<uint32_t>::iterator keyIter;
+		for (keyIter = keysToChange.begin(); keyIter != keysToChange.end(); ++keyIter) {
+			uint32_t oldKey = *keyIter;
+			uint32_t newKey = oldKey - oldsock + newsock;
+			incomingctx_to_myctx.erase(oldKey);
+			incomingctx_to_myctx[newKey] = myctx;
+		}
+	}
+		
+	// start a thread reading new socket
+	int rc;
+	if ( (rc = startPollingSocket(newsock, poll_recv_sock, (void*)cinfo) < 0) ) {
+		ERRORF("Error creating recv sock thread: %s", strerror(rc));
+	}
+
+	return 1;
+}
+
 // called when we switch networks. close any existing transport connections
 // and restart them.
 int migrate_connections() {
+	LOG("Migrating existing transport connections.");
 	int rc = 1;
 	
 	map<string, session::ConnectionInfo*>::iterator iter;
 	for (iter = name_to_conn.begin(); iter!= name_to_conn.end(); ++iter) {
 		session::ConnectionInfo *cinfo = iter->second;
 
-		// close old socket
-		if (closeSock(cinfo->sockfd()) < 0) {
-			ERRORF("Error closing old transport connection to %s", iter->first.c_str());
-			rc = -1;
-			continue;
-		}
+		int oldsock = cinfo->sockfd();
 
 		// open a new one
 		if (openConnectionToName(cinfo->name(), cinfo) < 0) {
@@ -713,6 +754,9 @@ int migrate_connections() {
 			rc = -1;
 			continue;
 		}
+		
+		// swap old socket for new one
+		swap_sockets_for_connection(cinfo, oldsock, cinfo->sockfd()); 
 
 		// tell the other side who we are
 		session::SessionPacket pkt;
@@ -794,10 +838,17 @@ LOG("BEGIN poll_listen_sock");
 				// Add session info pkt to acceptQ
 				pushAcceptQ(ctx, rpkt);
 
+				// start a thread reading this socket
+				int rc;
+				if ( (rc = startPollingSocket(rx_cinfo->sockfd(), poll_recv_sock, (void*)rx_cinfo) < 0) ) {
+					ERRORF("Error creating recv sock thread: %s", strerror(rc));
+				}
+
 				break;
 			}
 			case session::MIGRATE:  // someone we were already talking to moved
 			{
+LOGF("Received a MIGRATE message from: %s", rpkt->migrate().sender_name().c_str());
 				if (!rpkt->has_migrate()) {
 					ERROR("MIGRATE packet didn't contain migrate info");
 					continue;
@@ -807,23 +858,16 @@ LOG("BEGIN poll_listen_sock");
 				delete rx_cinfo; // there's not really a new connection after all
 				rx_cinfo = name_to_conn[rpkt->migrate().sender_name()]; //TODO: handle not found
 
-				// stop the thread that was polling the old socket
-				stopPollingSocket(rx_cinfo->sockfd());
+				swap_sockets_for_connection(rx_cinfo, rx_cinfo->sockfd(), new_rxsock);
 
-				// replace the socket we were using with this name with new_rxsock
-				rx_cinfo->set_sockfd(new_rxsock);
 
 				break;
 			}
 			default:
 				ERROR("poll_listen_sock received a packet of unknown or unexpected type");
 		}
+		
 
-		// start a thread reading this socket
-		int rc;
-		if ( (rc = startPollingSocket(rx_cinfo->sockfd(), poll_recv_sock, (void*)rx_cinfo) < 0) ) {
-			ERRORF("Error creating recv sock thread: %s", strerror(rc));
-		}
 	}
 
 	return NULL;
@@ -857,7 +901,7 @@ void *poll_recv_sock(void *args) {
 		}
 				
 		// get the context this packet belongs to
-		uint32_t key = rpkt->sender_ctx() << 8;
+		uint32_t key = rpkt->sender_ctx() << 16;
 		key += sock;
 		int ctx = incomingctx_to_myctx[key];
 
@@ -877,6 +921,7 @@ void *poll_recv_sock(void *args) {
 				// Add data pkt to dataQ
 LOGF("    Received %d bytes", rpkt->data().data().size());
 				pushDataQ(ctx, rpkt);
+LOG("    pushed to data queue");
 				break;
 			}
 			case session::TEARDOWN:
@@ -1050,6 +1095,7 @@ LOGF("    Accepted a new connection on rxsock %d", rxsock);
 		// TODO: free acceptQ? maybe only if fake_listen_ctx == ctx?
 	}
 
+	cinfo->set_my_name(info->my_name());
 	cinfo->add_sessions(ctx);
 	ctx_to_rxconn[ctx] = cinfo;
 	
@@ -1067,7 +1113,7 @@ LOGF("    Accepted a new connection on rxsock %d", rxsock);
 LOGF("    Got final synack from: %s", sender_name.c_str());
 	
 	// store incoming ctx mapping
-	uint32_t key = rpkt->sender_ctx() << 8;
+	uint32_t key = rpkt->sender_ctx() << 16;
 	key += rxsock;
 	incomingctx_to_myctx[key] = ctx;
 
@@ -1184,7 +1230,7 @@ LOGF("    Got conn req from %s on context %d", prevhop.c_str(), new_ctx);
 
 	
 	// store incoming ctx mapping
-	uint32_t key = rpkt->sender_ctx() << 8;
+	uint32_t key = rpkt->sender_ctx() << 16;
 	key += ctx_to_rxconn[new_ctx]->sockfd();
 	incomingctx_to_myctx[key] = new_ctx;
 

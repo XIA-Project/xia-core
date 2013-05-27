@@ -131,6 +131,8 @@ void* mobility_daemon(void *args) {
 	sa = (sockaddr_x*)ai->ai_addr;
 	Graph my_addr(sa);
 
+
+
 	// Now watch for changes
 	while (true) {
 		if (Xgetaddrinfo(NULL, NULL, NULL, &ai) != 0) {
@@ -148,7 +150,6 @@ void* mobility_daemon(void *args) {
 			my_addr = g;
 		}
 
-		LOG("Same AD");
 		sleep(2);
 	}
 
