@@ -2,13 +2,15 @@
 
 import rpyc, time, threading, sys, curses, socket, thread
 from threading import Thread
-from rpyc.utils.server import ThreadedServer
+from rpyc.utils.server import ThreadPoolServer
 from os.path import splitext
 from timedthreadeddict import TimedThreadedDict
 from check_output import check_output
 from rpc import rpc
 from random import choice
 from subprocess import Popen, PIPE
+import logging
+logging.basicConfig()
 
 RPC_PORT = 43278;
 CLIENT_PORT = 3000
@@ -21,10 +23,11 @@ STATSD = {} # (hostname,hostname) --> [((hostname, hostname), backbone | test, p
 LATLOND = {} # IP --> [lat, lon]
 NAMES = [] # names
 NAME_LOOKUP = {} # names --> hostname
+IP_LOOKUP = {} # IP --> hostname
 BACKBONES = [] # hostname
 BACKBONE_TOPO = {} # hostname --> [hostname]
 FINISHED_EVENT = threading.Event()
-NUMEXP = 1
+MAX_EXPERIMENT_TIMEOUT = 300 # seconds
 PLANETLAB_DIR = '/home/cmu_xia/fedora-bin/xia-core/experiments/planetlab/'
 LOG_DIR = PLANETLAB_DIR + 'logs/'
 STATS_FILE = LOG_DIR + 'stats-tunneling.txt'
@@ -41,7 +44,10 @@ SSH_CMD = 'ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 cmu_xia@'
 XIANET_FRONT_CMD = 'until sudo ~/fedora-bin/xia-core/bin/xianet -v -r -P'
 XIANET_BACK_CMD = '-f eth0 start; do echo "restarting click"; done'
 
+NUMEXP = 1
+NEW_EXP_TIMER = None
 CLIENTS = [] # hostname
+PRINT_VERB = [] # print verbosity
 
 def stime():
     return time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
@@ -53,15 +59,23 @@ def std_listen(handle, out):
             return
         if out: out.write(line)
 
+def hard_stop(nodes, out=None):
+    ts = [Thread(target=ssh_run, args=(host, STOP_CMD, out, False)) for host in nodes]
+    ts += [Thread(target=ssh_run, args=(host, KILL_LS, out, False)) for host in nodes]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+
 def ssh_run(host, cmd, out, check=True):
     c = SSH_CMD+'%s %s' % (host, cmd)
-    print '%s: launching subprocess: %s' % (host, cmd)
+    if host in PRINT_VERB: print '%s: launching subprocess: %s' % (host, cmd)
     if out: out.write('launching subprocess: %s' % cmd)
     p = Popen(SSH_CMD+'%s %s' % (host, cmd), shell=True, stdout=PIPE, stderr=PIPE)
-    thread.start_new_thread(std_listen, (p.stdout, out))
-    thread.start_new_thread(std_listen, (p.stderr, out))
+    ts = [Thread(target=std_listen, args=(p.stdout, out))]
+    ts += [Thread(target=std_listen, args=(p.stderr, out))]
+    [t.start() for t in ts]
     p.wait()
-    print '%s: finished running subprocess: %s' % (host, cmd)
+    [t.join(5) for t in ts]
+    if host in PRINT_VERB: print '%s: finished running subprocess: %s' % (host, cmd)
     if out: out.write('finished running subprocess: %s' % cmd)
     if check is True:
         rc = p.returncode
@@ -71,16 +85,11 @@ def ssh_run(host, cmd, out, check=True):
 
 
 class MasterService(rpyc.Service):
-    def on_connect(self):
-        self._host = socket.gethostbyaddr(self._conn._config['endpoints'][1][0])[0].lower()
+    def on_connect(self):        
+        self._host = IP_LOOKUP[self._conn._config['endpoints'][1][0]]
         self._conn._config['allow_pickle'] = True
-        # code that runs when a connection is created
-        # (to init the serivce, if needed)
-        pass
 
     def on_disconnect(self):
-        # code that runs when the connection has already closed
-        # (to finalize the service, if needed)
         pass
 
     def exposed_heartbeat(self, hid, neighbors):
@@ -115,79 +124,76 @@ class MasterService(rpyc.Service):
         except:
             STATSD[cur_exp] = [((self._host,backbone_name),'backbone',ping,hops)]
 
-        s = '%s:\t %s\n' % (cur_exp,STATSD[cur_exp])
-        print s
+        s = '%s: %s:\t %s\n' % (stime(), cur_exp,STATSD[cur_exp])
+        if 'stats' in PRINT_VERB: print s
         #stdscr.addstr(16, 0, s)
 
     def exposed_xstats(self, xping, xhops):
         cur_exp = tuple(CLIENTS)
         STATSD[cur_exp].append((cur_exp,'test',xping,xhops))
 
-        s = '%s:\t %s\n' % (cur_exp,STATSD[cur_exp])
-        print s
+        s = '%s: %s:\t %s\n' % (stime(), cur_exp,STATSD[cur_exp])
+        if 'xstats' in PRINT_VERB: print s
         #stdscr.addstr(16, 0, s)
 
-        #if len(STATSD[cur_exp]) is 4:
-            #self.exposed_new_exp()
+        if len(STATSD[cur_exp]) is 4:
+            NEW_EXP_TIMER.cancel()
+            self.exposed_new_exp()
+            pass
 
     def exposed_new_exp(self):
-        global CLIENTS, NUMEXP
-        [rpc(client, 'hard_stop', ()) for client in CLIENTS]
+        global CLIENTS, NUMEXP, NEW_EXP_TIMER, PRINT_VERB
 
-        client_a = choice(NAMES[11:])
-        client_b = client_a
-        while client_b == client_a:
+        while True:
+            client_a = choice(NAMES[11:])
+            if client_a not in CLIENTS: break
+
+        while True:
             client_b = choice(NAMES[11:])
+            if client_b != client_a and client_b not in CLIENTS: break
 
 ###########
-        client_a = 'planetlab1.tsuniv.edu'
-        client_b = 'planetlab5.cs.cornell.edu'
+        #client_a = 'planetlab1.tsuniv.edu'
+        #client_b = 'planetlab5.cs.cornell.edu'
 ##########
 
+        hard_stop(CLIENTS)
         CLIENTS = sorted([NAME_LOOKUP[client_a], NAME_LOOKUP[client_b]])
+        for client in CLIENTS:
+            IP_LOOKUP[socket.gethostbyname(client)] = client
         
+        [PRINT_VERB.append(c) for c in CLIENTS]
+
         print '%s: new experiment (%s): %s' % (stime(), NUMEXP, CLIENTS)
         #stdscr.addstr(26, 0, '%s: new experiment (%s): %s' % (stime(), NUMEXP, CLIENTS))
         [self.exposed_hard_restart(client) for client in CLIENTS]
         NUMEXP += 1
+        NEW_EXP_TIMER = threading.Timer(MAX_EXPERIMENT_TIMEOUT, self.exposed_new_exp)
+        NEW_EXP_TIMER.start()
 
     def exposed_error(self, msg, host=None):
-        return
-
-    ########
         host = self._host if host == None else host
-        try:
-            rpc(host, 'hard_stop', ())
-        except:
-            pass
+        hard_stop([host])
         if host in BACKBONES:
             self.exposed_hard_restart(host)
         print '%s: %s  (error!): %s' % (stime(), host, msg)
         #stdscr.addstr(30, 0, '%s: %s  (error!): %s' % (stime(), host, msg))
-        #self.exposed_new_exp()
-
-    def exposed_hard_stop(self):
-        [rpc(client, 'hard_stop', ()) for client in CLIENTS]
-        [rpc(backbone, 'hard_stop', ()) for backbone in BACKBONES]
-        sys.exit(-1)
+        NEW_EXP_TIMER.cancel()
+        self.exposed_new_exp()
             
     def launch_process(self, host):
-        print '%s: launching...' % host
+        if host in PRINT_VERB: print '%s: launching...' % host
         f = open('/tmp/%s-log' % (host),'w',0)
         f.write('launching...\n')
-        try:
-            rpc(host, 'hard_stop', ())
-        except:
-            pass
-        ssh_run(host, STOP_CMD, f, check=False)
-        ssh_run(host, KILL_LS, f, check=False)
-
+        hard_stop([host], f)
         try:
             ssh_run(host, START_CMD, f)
         except Exception, e:
-            print e
-            #self.exposed_error('Startup', host=host)
-        print '%s: finished running process' % host
+            time.sleep(5)
+            if FINISHED_EVENT.isSet() and (host in BACKBONES or host in CLIENTS):
+                if host in PRINT_VERB: print e
+                self.exposed_error('Startup', host=host)
+        if host in PRINT_VERB: print '%s: finished running process' % host
         f.write('finished running process')
         f.close()
 
@@ -197,18 +203,18 @@ class MasterService(rpyc.Service):
     def exposed_get_xianet(self, neighbor_host = None, host = None):
         host = self._host if host == None else host
         if host in CLIENTS:
-            return "check_output('%s %s:%s %s')" % (XIANET_FRONT_CMD, socket.gethostbyname(neighbor_host), CLIENT_PORT, XIANET_BACK_CMD)
+            return "Popen('%s %s:%s %s', shell=True)" % (XIANET_FRONT_CMD, socket.gethostbyname(neighbor_host), CLIENT_PORT, XIANET_BACK_CMD)
         elif host in BACKBONES:
             links = list(set([tuple(sorted((backbone,neighbor))) for backbone in BACKBONES for neighbor in BACKBONE_TOPO[backbone]]))
             neighbors = ['%s:500%s' % ([socket.gethostbyname(n) for n in link if n != host][0],links.index(link)) for link in links if host in link]
             if neighbor_host:
                 neighbors.append('%s:%s' % (socket.gethostbyname(neighbor_host), CLIENT_PORT))
-            return "check_output('%s %s %s')" % (XIANET_FRONT_CMD, ','.join(neighbors[0:4]), XIANET_BACK_CMD)
+            return "Popen('%s %s %s', shell=True)" % (XIANET_FRONT_CMD, ','.join(neighbors[0:4]), XIANET_BACK_CMD)
         return ''
 
     def exposed_get_commands(self, host = None):
         host = self._host if host == None else host
-        print 'MASTER: %s checked in for commands' % host
+        if 'master' in PRINT_VERB: print 'MASTER: %s checked in for commands' % host
         if host in BACKBONES:
             return [self.exposed_get_xianet(host = host)]
         elif host in CLIENTS:
@@ -217,7 +223,7 @@ class MasterService(rpyc.Service):
             cmd += ["rpc(my_backbone, 'soft_restart', (my_name, ))"]
             cmd += ["xianetcmd = rpc(MASTER_SERVER, 'get_xianet', (my_backbone, ))"]
             cmd += ["print xianetcmd"]
-            cmd += ["thread.start_new_thread(exec_fun, (xianetcmd, ))"]
+            cmd += ["exec(xianetcmd)"]
             cmd += ["rpc('localhost', 'wait_for_neighbor', ('localhost', 'waiting for xianet to start'))"]
             cmd += ["my_neighbor = rpc(MASTER_SERVER, 'get_neighbor_host', ())"]
             cmd += ["print my_neighbor"]
@@ -227,8 +233,6 @@ class MasterService(rpyc.Service):
             return cmd
         return ''
 
-    def exposed_get_kill(self):
-        return STOP_CMD
         
 class Printer(threading.Thread):
     def __init__(self, goOnEvent):
@@ -243,7 +247,8 @@ class Printer(threading.Thread):
             else:
                 url += '&markers=%s,%s' % (beat[2],beat[1])
             url += ''.join(['&path=%s,%s|%s,%s' % (beat[2],beat[1],x[1],x[0]) for x in beat[3]])
-        html = '<html>\n<head>\n<title>Current Nodes In Topology</title>\n<meta http-equiv="refresh" content="5">\n</head>\n<body>\n<img src="%s">\n</body>\n</html>' % url
+        #html = '<html>\n<head>\n<title>Current Nodes In Topology</title>\n<meta http-equiv="refresh" content="5">\n</head>\n<body>\n<img src="%s">\n</body>\n</html>' % url
+        html = '<html>\n<head>\n<title>Current Nodes In Topology</title>\n<meta http-equiv="refresh" content="60">\n</head>\n<body>\n<img src="%s">\n</body>\n</html>' % url
         return html
 
     def run(self):
@@ -254,6 +259,7 @@ class Printer(threading.Thread):
             f.close()
             beats = [beat[4] for beat in beats]
             #print '%s : Active clients: %s\r' % (stime(), beats)
+            #print '%s : Active clients: %s\r' % (stime(), len(beats))
             #stdscr.addstr(0, 0, '%s : Active clients: %s\r' % (stime(), beats))
 
             s = ''
@@ -273,7 +279,7 @@ class Printer(threading.Thread):
 
 class Runner(threading.Thread):
     def run(self):
-        while True:
+        while FINISHED_EVENT.isSet():
             try:
                 [rpc('localhost', 'hard_restart', (backbone, )) for backbone in BACKBONES]
                 rpc('localhost', 'new_exp', ())
@@ -301,6 +307,14 @@ if __name__ == '__main__':
     lines = open(BACKBONE_TOPO_FILE,'r').read().split('\n')
     for line in lines:
         BACKBONE_TOPO[NAME_LOOKUP[line.split(':')[0].strip()]] = tuple([NAME_LOOKUP[l.strip()] for l in line.split(':')[1].split(',')])
+    for backbone in BACKBONES:
+        IP_LOOKUP[socket.gethostbyname(backbone)] = backbone
+    IP_LOOKUP['127.0.0.1'] = socket.gethostbyaddr('127.0.0.1')
+
+    PRINT_VERB.append('stats')
+    PRINT_VERB.append('xstats')
+    PRINT_VERB.append('master')
+    [PRINT_VERB.append(b) for b in BACKBONES]
 
     print ('Threaded heartbeat server listening on port %d\n'
         'press Ctrl-C to stop\n') % RPC_PORT
@@ -318,27 +332,21 @@ if __name__ == '__main__':
     runner.start()
 
     try:
-        t = ThreadedServer(MasterService, port = RPC_PORT)
+        t = ThreadPoolServer(MasterService, port = RPC_PORT)
         t.start()
     except Exception, e:
         print e
+
+    FINISHED_EVENT.clear()
 
     #curses.echo()
     #curses.nocbreak()
     #curses.endwin()
 
     print 'Master_Server killing all clients'
-    ts = []
-    ts += [Thread(target=ssh_run, args=(host, STOP_CMD, None, False)) for host in CLIENTS]
-    ts += [Thread(target=ssh_run, args=(host, KILL_LS, None, False)) for host in CLIENTS]
-    ts += [Thread(target=ssh_run, args=(host, STOP_CMD, None, False)) for host in BACKBONES]
-    ts += [Thread(target=ssh_run, args=(host, KILL_LS, None, False)) for host in BACKBONES]
-
-    [t1.start() for t1 in ts]
-    [t1.join() for t1 in ts]
+    hard_stop(CLIENTS+BACKBONES)
 
     print 'Exiting, please wait...'
-    FINISHED_EVENT.clear()
     printer.join()
 
     print 'Finished.'

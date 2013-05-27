@@ -6,8 +6,10 @@ import rpyc
 RPC_PORT = 43278
 
 def rpc(dest, cmd, args):
+    global CONND
+    print '<<<<rpc:%s.%s(%s)>>>>' % (dest, cmd, args)
     c = rpyc.connect(dest, RPC_PORT)
     s = 'c.root.%s(*args)' % cmd
     out = copy.deepcopy(eval(s))
-    del c
+    c.close()
     return out

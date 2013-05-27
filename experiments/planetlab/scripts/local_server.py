@@ -4,7 +4,7 @@ import rpyc, re, time, threading, thread
 from check_output import check_output
 from rpc import rpc
 from subprocess import call, Popen, PIPE
-from rpyc.utils.server import ThreadedServer
+from rpyc.utils.server import ThreadPoolServer
 
 RPC_PORT = 43278
 KILL_XIANET = 'sudo ~/fedora-bin/xia-core/bin/xianet stop'
@@ -18,10 +18,7 @@ PING_COUNT = 4
 myHID = ''
 my_name = check_output("hostname")[0].strip()
 
-finishEvent = threading.Event()
-
-def exec_fun(fun):
-    exec(fun)
+FINISH_EVENT = threading.Event()    
 
 def multi_ping(neighbors):
     pingcmd = 'sudo ping -W 1 -i %s -c' % PING_INTERVAL
@@ -67,7 +64,7 @@ def xping(neighbor,tryUntilSuccess=True):
             break
         except:
             stat = -1
-        stat = -1 if stat == '=' else stat
+    stat = -1 if stat == '=' else stat
     return stat
 
 def xtraceroute(neighbor):
@@ -79,13 +76,8 @@ def xtraceroute(neighbor):
 class MyService(rpyc.Service):
     def on_connect(self):
         self._conn._config['allow_pickle'] = True
-        # code that runs when a connection is created
-        # (to init the serivce, if needed)
-        pass
 
     def on_disconnect(self):
-        # code that runs when the connection has already closed
-        # (to finalize the service, if needed)
         pass
 
     def exposed_gather_stats(self):
@@ -137,25 +129,18 @@ class MyService(rpyc.Service):
         xianetcmd = rpc(MASTER_SERVER, 'get_xianet', (neighbor, ))
         check_output(KILL_XIANET)
         print 'running %s' % xianetcmd
-        thread.start_new_thread(exec_fun, (xianetcmd, ))
+        exec(xianetcmd)
         return xianetcmd
 
     def exposed_wait_for_neighbor(self, neighbor, msg):
-        out = None
-        while out == None:
+        while True:
             try:
+                print 'waiting on: %s' % neighbor
                 out = rpc(neighbor, 'get_hid', ())
+                return out
             except:
                 print msg
                 time.sleep(1)
-        return out
-
-    def exposed_hard_stop(self):
-        kill_cmd = rpc(MASTER_SERVER, 'get_kill', ())
-        print kill_cmd
-        call(kill_cmd,shell=True)
-        sys.exit(0)
-
 
 class Mapper(threading.Thread):
     def __init__(self, goOnEvent):
@@ -163,18 +148,13 @@ class Mapper(threading.Thread):
         self.goOnEvent = goOnEvent
 
     def run(self):
-        hb_serv = rpyc.connect(MASTER_SERVER, RPC_PORT)
         while self.goOnEvent.isSet():
             try:
                 myHID = rpc('localhost', 'get_hid', ())
                 neighbors = rpc('localhost', 'get_neighbors', ())
-                hb_serv.root.heartbeat(myHID, neighbors)
+                rpc(MASTER_SERVER, 'heartbeat', (myHID, neighbors))
                 print 'HB: %s %s' % (myHID, neighbors)
             except Exception, e:
-                try:
-                    hb_serv = rpyc.connect(MASTER_SERVER, RPC_PORT)
-                except:
-                    pass
                 pass
             time.sleep(BEAT_PERIOD)
 
@@ -191,7 +171,7 @@ class Runner(threading.Thread):
                 exec(command)
         except Exception, e:
             print e
-            while True:
+            while FINISH_EVENT.isSet():
                 try:
                     rpc(MASTER_SERVER, 'error', ('Runner', ))
                 except:
@@ -204,22 +184,22 @@ if __name__ == '__main__':
     print ('RPC server listening on port %d\n'
         'press Ctrl-C to stop\n') % RPC_PORT
 
-    finishEvent.set()
-    mapper = Mapper(goOnEvent = finishEvent)
+    FINISH_EVENT.set()
+    mapper = Mapper(goOnEvent = FINISH_EVENT)
     mapper.start()
 
     runner = Runner()
     runner.start()
 
     try:
-        t = ThreadedServer(MyService, port = RPC_PORT)
+        t = ThreadPoolServer(MyService, port = RPC_PORT)
         t.start()
     except Exception, e:
         print e
         rpc(MASTER_SERVER, 'error', ('RPC Server', ))
 
     print 'Local_Server Exiting, please wait...'
-    finishEvent.clear()
+    FINISH_EVENT.clear()
     mapper.join()
     runner.join()
 
