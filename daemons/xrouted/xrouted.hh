@@ -21,7 +21,7 @@ using namespace std;
 
 #define HELLO_INTERVAL 0.1
 #define LSA_INTERVAL 0.3
-#define CALC_DIJKSTRA_INTERVAL 2
+#define CALC_DIJKSTRA_INTERVAL 4
 #define MAX_HOP_COUNT 50
 #define MAX_SEQNUM 100000
 #define MAX_XID_SIZE 100

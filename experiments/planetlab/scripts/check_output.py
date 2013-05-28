@@ -3,6 +3,7 @@
 from subprocess import Popen, PIPE
 
 def check_output(args):
+    #print '<<<<check_output(%s)>>>>' % args
     p = Popen(args,shell=True,stdout=PIPE,stderr=PIPE)
     out = p.communicate()
     rc = p.wait()

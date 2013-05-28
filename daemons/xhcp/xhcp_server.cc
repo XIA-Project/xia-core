@@ -16,7 +16,7 @@
 ** @returns a character point to the root of the source tree
 **
 */
-char *findRoot() {
+char *findRootPath() {
     char *pos;
     char *path = (char*)malloc(sizeof(char)*4096);
     int rc = readlink("/proc/self/exe", path, 4096);
@@ -71,7 +71,7 @@ int main(int argc, char *argv[]) {
 	sprintf(ns, "RE ( %s ) %s %s %s", IP_NS, AD0, HID0, SID_NS);  	
 
 	// read the name server DAG from xia-core/etc/resolv.conf, if present
-	ini_gets(NULL, "nameserver", ns, ns, XHCP_MAX_DAG_LENGTH, strcat(findRoot(), RESOLV_CONF));
+	ini_gets(NULL, "nameserver", ns, ns, XHCP_MAX_DAG_LENGTH, strcat(findRootPath(), RESOLV_CONF));
 
 	Graph gns(ns);
 	gns.fill_sockaddr(&ns_dag);
