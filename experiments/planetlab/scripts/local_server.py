@@ -13,6 +13,7 @@ MASTER_SERVER = 'GS11698.SP.CS.CMU.EDU'
 BEAT_PERIOD = 3
 BROADCAST_HID = 'ffffffffffffffffffffffffffffffffffffffff'
 PING_INTERVAL = .25
+XPING_INTERVAL = 1
 PING_COUNT = 4
 
 myHID = ''
@@ -51,10 +52,18 @@ def traceroute(neighbor):
 
 def xping(neighbor,tryUntilSuccess=True):
     while tryUntilSuccess:
-        xpingcmd = '/home/cmu_xia/fedora-bin/xia-core/bin/xping -i %s -c' % PING_INTERVAL
-        s = '%s %s "%s"' % (xpingcmd, 1, neighbor)
-        print s
-        check_output(s)
+        xpingcmd = '/home/cmu_xia/fedora-bin/xia-core/bin/xping -t'
+        s = '%s "%s"' % (xpingcmd, neighbor)
+        while True:
+            print s
+            out = check_output(s)
+            try:
+                print out
+                stat = "%.3f" % float(out[0].split("\n")[-2].split('=')[1].split('/')[1])
+                break
+            except:
+                pass
+        xpingcmd = '/home/cmu_xia/fedora-bin/xia-core/bin/xping -i %s -c' % XPING_INTERVAL
         s = '%s %s "%s"' % (xpingcmd, PING_COUNT, neighbor)
         print s
         out = check_output(s)
@@ -67,7 +76,13 @@ def xping(neighbor,tryUntilSuccess=True):
     stat = -1 if stat == '=' else stat
     return stat
 
-def xtraceroute(neighbor):
+def xtraceroute(neighbor,tryUntilSuccess=True):
+    while tryUntilSuccess:
+        out = check_output('/home/cmu_xia/fedora-bin/xia-core/bin/xtraceroute "%s"' % neighbor)
+        print out
+        stat = int(out[0].split('\n')[-2].split('=')[1].strip())
+        print stat
+        if stat is not 30: break
     out = check_output('/home/cmu_xia/fedora-bin/xia-core/bin/xtraceroute "%s"' % neighbor)
     stat = int(out[0].split('\n')[-2].split('=')[1].strip())
     stat = -1 if stat is 30 else stat
@@ -96,6 +111,7 @@ class MyService(rpyc.Service):
         print 'neighbor: %s' % neighbor
         xlatency = xping(neighbor)
         print 'xlatency: %s' % xlatency
+        time.sleep(2)
         xhops = xtraceroute(neighbor)
         print 'xhops: %s' % xhops
         rpc(MASTER_SERVER, 'xstats', (xlatency, xhops))
@@ -124,6 +140,11 @@ class MyService(rpyc.Service):
         if BROADCAST_HID in neighbors: neighbors.remove(BROADCAST_HID)
         return neighbors
 
+    def exposed_add_default_ad_route(self, my_backbone):
+        hname = ''.join(ch for ch in my_name.split('.')[0] if ch.isalnum())
+        cmd="%s --add %s,AD,-,0,HID:%s,0" % (XROUTE, hname, rpc(my_backbone, 'get_hid', ()))
+        print cmd
+        print check_output(cmd)
 
     def exposed_soft_restart(self, neighbor):
         xianetcmd = rpc(MASTER_SERVER, 'get_xianet', (neighbor, ))
@@ -153,7 +174,7 @@ class Mapper(threading.Thread):
                 myHID = rpc('localhost', 'get_hid', ())
                 neighbors = rpc('localhost', 'get_neighbors', ())
                 rpc(MASTER_SERVER, 'heartbeat', (myHID, neighbors))
-                print 'HB: %s %s' % (myHID, neighbors)
+                #print 'HB: %s %s' % (myHID, neighbors)
             except Exception, e:
                 pass
             time.sleep(BEAT_PERIOD)

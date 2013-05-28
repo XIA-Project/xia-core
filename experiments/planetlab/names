@@ -7,10 +7,11 @@ planetlab-6.ece.iastate.edu #KC
 planet2.cc.gt.atl.ga.us #Atlanta
 planetlab2.cs.purdue.edu #Indianapolis
 planetlab1.cs.pitt.edu #Cleveland
-node1.planetlab.albany.edu #NYC
+pl1.cs.yale.edu #NYC
 whitefall.planetlab.cs.umd.edu #DC
 planetlab3.eecs.northwestern.edu #Chicago
 planet3.cs.ucsb.edu #UCSB
+node1.planetlab.albany.edu #node1.planetlab.albany.edu
 kupl2.ittc.ku.edu #kupl2.ittc.ku.edu
 ple2.ipv6.lip6.fr #ple2.ipv6.lip6.fr
 planetlab4.wail.wisc.edu #planetlab4.wail.wisc.edu
@@ -127,7 +128,6 @@ planetlab1.eecs.umich.edu #planetlab1.eecs.umich.edu
 planetlab2.tamu.edu #planetlab2.tamu.edu
 node2.planetlab.albany.edu #node2.planetlab.albany.edu
 planetlab2.cs.unc.edu #planetlab2.cs.unc.edu
-pl1.cs.yale.edu #pl1.cs.yale.edu
 planetlab5.cs.cornell.edu #planetlab5.cs.cornell.edu
 adrastea.mcs.suffolk.edu #adrastea.mcs.suffolk.edu
 planetlab1.cs.purdue.edu #planetlab1.cs.purdue.edu
