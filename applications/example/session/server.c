@@ -16,6 +16,8 @@
 #define LOGF(fmt, ...)
 #endif
 
+#define MAXBUF 2048
+
 
 int main(int argc, char *argv[])
 {
@@ -23,8 +25,8 @@ int main(int argc, char *argv[])
 	(void)argv;
 
     int n, listen_ctx, accept_ctx;
-    char buf[1024];
-    char reply[1024];
+    char buf[MAXBUF];
+    char reply[MAXBUF];
     pid_t pid;
 
     // Make "listen" context
@@ -58,7 +60,7 @@ int main(int argc, char *argv[])
     		while (1) {
     			// Receive packet
 				memset(&buf[0], 0, sizeof(buf));
-				n = Srecv(accept_ctx, buf, 1024);
+				n = Srecv(accept_ctx, buf, MAXBUF);
 				
 				if (n < 0) 
 				    printf("Error receiving data\n");
