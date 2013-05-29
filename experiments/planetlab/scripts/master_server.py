@@ -27,7 +27,7 @@ IP_LOOKUP = {} # IP --> hostname
 BACKBONES = [] # hostname
 BACKBONE_TOPO = {} # hostname --> [hostname]
 FINISHED_EVENT = threading.Event()
-MAX_EXPERIMENT_TIMEOUT = 120 # seconds
+MAX_EXPERIMENT_TIMEOUT = 180 # seconds
 PLANETLAB_DIR = '/home/cmu_xia/fedora-bin/xia-core/experiments/planetlab/'
 LOG_DIR = PLANETLAB_DIR + 'logs/'
 STATS_FILE = LOG_DIR + 'stats-tunneling.txt'
@@ -37,8 +37,8 @@ NAMES_FILE = PLANETLAB_DIR + 'names'
 BACKBONE_TOPO_FILE = PLANETLAB_DIR + 'backbone_topo'
 
 # note that killing local server is not in this one
-STOP_CMD = '"sudo killall sh; sudo killall init.sh; sudo killall rsync; sudo ~/fedora-bin/xia-core/bin/xianet stop; sudo killall mapper_client.py; sudo killall xping; sudo killall xtraceroute"'
-KILL_LS = '"sudo killall local_server.py; sudo killall python"'
+STOP_CMD = '"sudo killall sh; sudo killall init.sh; sudo killall rsync; sudo ~/fedora-bin/xia-core/bin/xianet stop; sudo killall mapper_client.py; sudo killall xping; sudo killall xtraceroute; sudo killall ping; sudo killall traceroute"'
+KILL_LS = '"sudo killall -s INT local_server.py; sudo killall -s INT python; sleep 5; sudo killall local_server.py; sudo killall python"'
 START_CMD = '"curl https://raw.github.com/XIA-Project/xia-core/develop/experiments/planetlab/init.sh > ./init.sh && chmod 755 ./init.sh && ./init.sh"'
 SSH_CMD = 'ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 cmu_xia@'
 XIANET_FRONT_CMD = 'until sudo ~/fedora-bin/xia-core/bin/xianet -v -r -P'
@@ -49,7 +49,7 @@ NUMEXP = 1
 NEW_EXP_TIMER = None
 CLIENTS = [] # hostname
 PRINT_VERB = [] # print verbosity
-ERRORED = False
+NEW_EXP_LOCK = thread.allocate_lock()
 
 def stime():
     return time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
@@ -115,12 +115,8 @@ class MasterService(rpyc.Service):
             neighbor = [client for client in CLIENTS if client != self._host][0]
             while True:
                 try:
-                    cur_exp = tuple(CLIENTS)
-                    bbs = [b[0] for b in STATSD[cur_exp][0:2]]
-                    my_bb = bbs[0][1] if self._host in bbs[0] else bbs[1][1]
-                    n_bb = bbs[0][1] if neighbor in bbs[0] else bbs[1][1]
                     return 'RE AD:%s HID:%s' % \
-                        (rpc(neighbor, 'get_ad', ()), rpc(neighbor, 'get_hid', ()))                    
+                        (rpc(neighbor, 'get_ad', ()), rpc(neighbor, 'get_hid', ()))
                 except:
                     pass
         return None            
@@ -136,6 +132,16 @@ class MasterService(rpyc.Service):
         except:
             STATSD[cur_exp] = [((self._host,backbone_name),'backbone',ping,hops)]
 
+        # went to the same BB node -- we don't handle this
+        if len(STATSD[cur_exp]) >= 2:
+            neighbor = [client for client in CLIENTS if client != self._host][0]
+            bbs = [b[0] for b in STATSD[cur_exp][0:2]]
+            my_bb = bbs[0][1] if self._host in bbs[0] else bbs[1][1]
+            n_bb = bbs[0][1] if neighbor in bbs[0] else bbs[1][1]
+            if my_bb == n_bb:
+                self.exposed_new_exp()
+                pass
+
         s = '%s: %s:\t %s\n' % (stime(), cur_exp,STATSD[cur_exp])
         if 'stats' in PRINT_VERB: print s
         #stdscr.addstr(16, 0, s)
@@ -149,12 +155,15 @@ class MasterService(rpyc.Service):
         #stdscr.addstr(16, 0, s)
 
         if len(STATSD[cur_exp]) is 4:
-            NEW_EXP_TIMER.cancel()
             self.exposed_new_exp()
             pass
 
     def exposed_new_exp(self):
-        global CLIENTS, NUMEXP, NEW_EXP_TIMER, PRINT_VERB
+        global CLIENTS, NUMEXP, NEW_EXP_TIMER, PRINT_VERB, NEW_EXP_LOCK
+
+        if NEW_EXP_LOCK.locked():
+            return
+        NEW_EXP_LOCK.acquire()
 
         while True:
             client_a = choice(NAMES[11:])
@@ -177,26 +186,28 @@ class MasterService(rpyc.Service):
         [PRINT_VERB.append(c) for c in CLIENTS]
 
         print '%s: new experiment (%s): %s' % (stime(), NUMEXP, CLIENTS)
+
+        try:
+            self.exposed_soft_restart_backbones()
+        except:
+            pass
+
         #stdscr.addstr(26, 0, '%s: new experiment (%s): %s' % (stime(), NUMEXP, CLIENTS))
         [self.exposed_hard_restart(client) for client in CLIENTS]
         NUMEXP += 1
+        if NEW_EXP_TIMER: NEW_EXP_TIMER.cancel()
         NEW_EXP_TIMER = threading.Timer(MAX_EXPERIMENT_TIMEOUT, self.exposed_new_exp)
         NEW_EXP_TIMER.start()
+        NEW_EXP_LOCK.release()
 
     def exposed_error(self, msg, host=None):
         print '%s: %s  (error!): %s' % (stime(), host, msg)
-        global ERRORED
         host = self._host if host == None else host
         hard_stop([host])
         if host in BACKBONES:
             self.exposed_hard_restart(host)
         #stdscr.addstr(30, 0, '%s: %s  (error!): %s' % (stime(), host, msg))
-        NEW_EXP_TIMER.cancel()
-        if not ERRORED:
-            self.exposed_new_exp()
-            pass
-        ERRORED = True
-
+        self.exposed_new_exp()
             
     def launch_process(self, host):
         if host in PRINT_VERB: print '%s: launching...' % host
@@ -206,16 +217,22 @@ class MasterService(rpyc.Service):
         try:
             ssh_run(host, START_CMD, f)
         except Exception, e:
-            time.sleep(5)
-            if FINISHED_EVENT.isSet() and (host in BACKBONES or host in CLIENTS):
-                if host in PRINT_VERB: print e
-                self.exposed_error('Startup', host=host)
-        if host in PRINT_VERB: print '%s: finished running process' % host
+            if not NEW_EXP_LOCK.locked():
+                if host in PRINT_VERB: print '%s: %s' % (host, e)
+                time.sleep(5)
+                if FINISHED_EVENT.isSet() and (host in BACKBONES or host in CLIENTS):
+                    if host in PRINT_VERB: print host, BACKBONES, CLIENTS
+                    if host in PRINT_VERB: print e
+                    self.exposed_error('Startup', host=host)
+            if host in PRINT_VERB: print '%s: finished running process' % host
         f.write('finished running process')
         f.close()
 
     def exposed_hard_restart(self, host):
         thread.start_new_thread(self.launch_process, (host, ))
+
+    def exposed_soft_restart_backbones(self):
+        [rpc(backbone, 'soft_restart', ()) for backbone in BACKBONES]
 
     def exposed_get_xianet(self, neighbor_host = None, host = None):
         host = self._host if host == None else host
@@ -230,26 +247,23 @@ class MasterService(rpyc.Service):
         return ''
 
     def exposed_get_commands(self, host = None):
-        global ERRORED
         host = self._host if host == None else host
         if 'master' in PRINT_VERB: print 'MASTER: %s checked in for commands' % host
         if host in BACKBONES:
             return [self.exposed_get_xianet(host = host)]
         elif host in CLIENTS:
-            cmd = ["my_backbone = rpc('localhost', 'gather_stats', ())[1]"]
-            cmd += ["rpc('localhost', 'wait_for_neighbor', (my_backbone, 'waiting for backbone: %s' % my_backbone))"]
+            cmd = ["my_backbone = self.exposed_gather_stats()[1]"]
+            cmd += ["self.exposed_wait_for_neighbor(my_backbone, 'waiting for backbone: %s' % my_backbone)"]
             cmd += ["rpc(my_backbone, 'soft_restart', (my_name, ))"]
             cmd += ["xianetcmd = rpc(MASTER_SERVER, 'get_xianet', (my_backbone, ))"]
             cmd += ["print xianetcmd"]
             cmd += ["exec(xianetcmd)"]
-            cmd += ["rpc('localhost', 'wait_for_neighbor', ('localhost', 'waiting for xianet to start'))"]
+            cmd += ["self.exposed_wait_for_neighbor('localhost', 'waiting for xianet to start')"]
             cmd += ["my_neighbor = rpc(MASTER_SERVER, 'get_neighbor_host', ())"]
             cmd += ["print my_neighbor"]
-            cmd += ["rpc('localhost', 'wait_for_neighbor', (my_backbone, 'waiting for backbone: %s' % my_backbone))"]
-            cmd += ["rpc('localhost', 'wait_for_neighbor', (my_neighbor, 'waiting for neighbor: %s' % my_neighbor))"]
-            #cmd += ["time.sleep(5)"]
-            cmd += ["rpc('localhost', 'gather_xstats', ())"]
-            ERRORED = False
+            cmd += ["self.exposed_wait_for_neighbor(my_backbone, 'waiting for backbone: %s' % my_backbone)"]
+            cmd += ["self.exposed_wait_for_neighbor(my_neighbor, 'waiting for neighbor: %s' % my_neighbor)"]
+            cmd += ["self.exposed_gather_xstats()"]
             return cmd
         return ''
 

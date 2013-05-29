@@ -48,7 +48,6 @@
 
 #define	MAXWAIT		10	/* max time to wait for response, sec. */
 #define	MAXPACKET	4096	/* max packet size */
-#define CATCHER_TIMEOUT 5 /* seconds */
 #define VERBOSE		1	/* verbose flag */
 #define QUIET		2	/* quiet flag */
 #define FLOOD		4	/* floodping flag */
@@ -106,8 +105,10 @@ int tmin = 999999999;
 int tmax = 0;
 int tsum = 0;			/* sum of all times, for doing average */
 
-float nCatcher = CATCHER_TIMEOUT;
+float nCatcher = 0;
+float catcher_timeout = 0; /* seconds */
 float interval = 1;
+int rc = 0;
 
 char *inet_ntoa();
 
@@ -147,7 +148,8 @@ int main(int argc, char **argv)
                 npackets = atoi(av[0]);
                 break;
             case 't':
-                nCatcher = 0;
+                argc--, av++;
+                catcher_timeout = atoi(av[0]);
                 break;
 		}
 		argc--, av++;
@@ -254,8 +256,10 @@ void catcher()
 
 	pinger();
     nCatcher+=interval;
-    if (nCatcher == CATCHER_TIMEOUT)
+    if (catcher_timeout && nCatcher >= catcher_timeout) {
+        rc = nreceived ? 0 : -1;
         finish();
+    }
 	if (npackets == 0 || ntransmitted < npackets)
         if (interval < 1)
             ualarm(interval*1000000, 0);
@@ -541,5 +545,5 @@ void finish()
 	fflush(stdout);
 
 	Xclose(s);
-	exit(0);
+	exit(rc);
 }
