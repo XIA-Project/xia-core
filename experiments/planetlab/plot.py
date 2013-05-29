@@ -7,7 +7,7 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt
 
 PING_BIN_SIZE = 20
-PING_MAX = 300
+PING_MAX = 5000
 TR_BIN_SIZE = 1
 TR_MAX = 60
 
@@ -27,11 +27,12 @@ for pair in pairs:
 hops = []
 for pair in pairs:
     try:
-        hops.append(eval(pair[1][0][3]) + eval(pair[1][1][3]) + eval(pair[1][2][3]))
+        hops.append(pair[1][0][3] + pair[1][1][3] + pair[1][2][3])
     except:
         pass
 
 print pings, hops
+print len(pings)
 
 X = [PING_BIN_SIZE*x for x in range(0,PING_MAX/PING_BIN_SIZE)]
 Y = {}
