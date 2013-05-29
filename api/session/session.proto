@@ -11,6 +11,7 @@ enum SessionCallType {
   SEND = 7;
   RECEIVE = 8;
   CLOSE = 9;
+  CHECK_FOR_DATA = 16;
 }
 
 enum ReturnCode {
@@ -49,6 +50,8 @@ message SessionMsg {
   optional SRecvMsg s_recv = 9;
   optional SRecvRet s_recv_ret = 10;
   optional SCloseMsg s_close = 11;
+  optional SCheckDataMsg s_check_data = 16;
+  optional SCheckDataRet s_check_data_ret = 17;
 }
 
 message S_Return_Code_Msg {
@@ -92,6 +95,14 @@ message SRecvRet {
 
 message SCloseMsg {
 	optional string dummy = 1; // not used
+}
+
+message SCheckDataMsg {
+	optional string dummy = 1; // not used
+}
+
+message SCheckDataRet {
+	required bool data_available = 1;
 }
 
 

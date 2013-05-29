@@ -16,7 +16,7 @@
 */
 /*!
  @file Srecv.c
- @brief Implements Srecv()
+ @brief Implements Srecv() and ScheckForData()
 */
 
 #include "session.h"
@@ -66,4 +66,41 @@ LOG("BEGIN Srecv");
 	memcpy(buf, tempbuf, bytes); // TODO: off by one?
 
 	return bytes;
+}
+
+bool ScheckForData(int ctx) {
+LOG("BEGIN ScheckForData");
+
+	int sockfd = ctx; // for now on the client side we treat the socket fd as the context handle
+		
+	// protobuf message
+	session::SessionMsg sm;
+	sm.set_type(session::CHECK_FOR_DATA);
+	
+	if ( proc_send(sockfd, &sm) < 0) {
+		LOGF("Error talking to session proc: %s", strerror(errno));
+		close(sockfd);
+		return -1;
+	}
+
+	// process the reply from the session process
+	session::SessionMsg rsm;
+	if (proc_reply(sockfd, rsm) < 0) {
+		LOGF("Error getting status from session proc: %s", strerror(errno));
+	} 
+	if (rsm.type() != session::RETURN_CODE || rsm.s_rc().rc() != session::SUCCESS) {
+		string errormsg = "Unspecified";
+		if (rsm.s_rc().has_message())
+			errormsg = rsm.s_rc().message();
+		LOGF("Session proc returned an error: %s", errormsg.c_str());
+		return -1;
+	}
+	
+	// check whether or not data is available to read
+	if (!rsm.has_s_check_data_ret()) {
+		LOG("ERROR: Session proc didn't return data availability status");
+		return -1;
+	}
+
+	return rsm.s_check_data_ret().data_available();
 }

@@ -45,6 +45,7 @@ extern int SacceptConnReq(int ctx);
 extern int Ssend(int ctx, const void* buf, size_t len);
 extern int Srecv(int ctx, void* buf, size_t len);
 extern int Sclose(int ctx);
+extern bool ScheckForData(int ctx);
 
 
 #ifdef __cplusplus
