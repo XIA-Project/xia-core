@@ -1,8 +1,7 @@
 #!/usr/bin/python
 
 import rpyc, re, time, threading, thread
-from check_output import check_output
-from rpc import rpc
+from plcommon import check_output, rpc, printtime
 from subprocess import call, Popen, PIPE
 from rpyc.utils.server import ThreadPoolServer
 
@@ -32,8 +31,6 @@ def multi_ping(neighbors):
     rcs = [process.wait() for process in processes]
     outs = zip(outs, rcs)
 
-    #print '<<<< PING RESULTS: %s >>>>' % outs
-
     stats = []
     for out in outs:
         host = out[0][0].split('\n')[0].split(' ')[1]
@@ -56,9 +53,9 @@ def xping(neighbor,tryUntilSuccess=True):
         s = '%s "%s"' % (xpingcmd, neighbor)
         while True:
             try:
-                print s
+                printtime(s)
                 out = check_output(s)
-                print out
+                printtime(out)
                 stat = "%.3f" % float(out[0].split("\n")[-2].split('=')[1].split('/')[1])
                 break
             except:
@@ -67,12 +64,12 @@ def xping(neighbor,tryUntilSuccess=True):
         s = '%s %s "%s"' % (xpingcmd, PING_COUNT, neighbor)
         while tryUntilSuccess:
             try:
-                print s
+                printtime(s)
                 out = check_output(s)
                 break
             except:
                 pass
-        print out
+        printtime(out)
         try:
             stat = "%.3f" % float(out[0].split("\n")[-2].split('=')[1].split('/')[1])
             break
@@ -85,16 +82,16 @@ def xtraceroute(neighbor,tryUntilSuccess=True):
     cmd = '/home/cmu_xia/fedora-bin/xia-core/bin/xtraceroute -t 30 "%s"' % neighbor
     while tryUntilSuccess:
         try:
-            print cmd
+            printtime(cmd)
             out = check_output(cmd)
-            print out
+            printtime(out)
             break
         except Exception, e:
-            print e
+            printtime('%s' % e)
             pass
     stat = int(out[0].split('\n')[-2].split('=')[1].strip())
     stat = -1 if stat is 30 else stat
-    print stat
+    printtime('%s' % stat)
     return stat
     
 class MyService(rpyc.Service):
@@ -105,7 +102,7 @@ class MyService(rpyc.Service):
         pass
 
     def exposed_gather_stats(self):
-        print '<<<<GATHER STATS>>>>'
+        printtime('<<<<GATHER STATS>>>>')
         neighbors = rpc(MASTER_SERVER, 'get_backbone', ())
         out = multi_ping(neighbors)
         latency = out[0][0]
@@ -115,14 +112,14 @@ class MyService(rpyc.Service):
         return ['Sent stats: (%s, %s, %s)' % (my_backbone, latency, hops), my_backbone]
 
     def exposed_gather_xstats(self):
-        print '<<<<GATHER XSTATS>>>>'
+        printtime('<<<<GATHER XSTATS>>>>')
         neighbor = rpc(MASTER_SERVER, 'get_neighbor_xhost', ())
-        print 'neighbor: %s' % neighbor
+        printtime('neighbor: %s' % neighbor)
         xlatency = xping(neighbor)
-        print 'xlatency: %s' % xlatency
-        time.sleep(2)
+        printtime('xlatency: %s' % xlatency)
+#########time.sleep(2)
         xhops = xtraceroute(neighbor)
-        print 'xhops: %s' % xhops
+        printtime('xhops: %s' % xhops)
         rpc(MASTER_SERVER, 'xstats', (xlatency, xhops))
         return 'Sent xstats: (%s, %s, %s)' % (neighbor, xlatency, xhops)
 
@@ -149,36 +146,30 @@ class MyService(rpyc.Service):
         if BROADCAST_HID in neighbors: neighbors.remove(BROADCAST_HID)
         return neighbors
 
-    def exposed_add_default_ad_route(self, my_backbone):
-        hname = ''.join(ch for ch in my_name.split('.')[0] if ch.isalnum())
-        cmd="%s --add %s,AD,-,0,HID:%s,0" % (XROUTE, hname, rpc(my_backbone, 'get_hid', ()))
-        print cmd
-        print check_output(cmd)
-
     def exposed_soft_restart(self, neighbor):
         xianetcmd = rpc(MASTER_SERVER, 'get_xianet', (neighbor, ))
         check_output(KILL_XIANET)
-        print 'running %s' % xianetcmd
+        printtime('running %s' % xianetcmd)
         exec(xianetcmd)
         return xianetcmd
 
     def exposed_run_commands(self):
-        print 'requesting commands!'
+        printtime('requesting commands!')
         commands = rpc(MASTER_SERVER, 'get_commands', ())
-        print 'commands received!'
-        print 'commands: %s' % commands
+        printtime('commands received!')
+        printtime('commands: %s' % commands)
         for command in commands:
-            print command
+            printtime(command)
             exec(command)
 
     def exposed_wait_for_neighbor(self, neighbor, msg):
         while True:
             try:
-                print 'waiting on: %s' % neighbor
+                printtime('waiting on: %s' % neighbor)
                 out = rpc(neighbor, 'get_hid', ())
                 return out
             except:
-                print msg
+                printtime(msg)
                 time.sleep(1)
 
 class Mapper(threading.Thread):
@@ -192,7 +183,6 @@ class Mapper(threading.Thread):
                 myHID = rpc('localhost', 'get_hid', ())
                 neighbors = rpc('localhost', 'get_neighbors', ())
                 rpc(MASTER_SERVER, 'heartbeat', (myHID, neighbors))
-                #print 'HB: %s %s' % (myHID, neighbors)
             except Exception, e:
                 pass
             time.sleep(BEAT_PERIOD)
@@ -200,24 +190,17 @@ class Mapper(threading.Thread):
 
 class Runner(threading.Thread):
     def run(self):
-        while True:
+        while FINISH_EVENT.isSet():
             try:
                 rpc('localhost', 'run_commands', ())
                 break
             except Exception, e:
-                print e
-#             while FINISH_EVENT.isSet():
-#                 try:
-#                     rpc(MASTER_SERVER, 'error', ('Runner', ))
-#                 except:
-#                     print 'Failed to report error!! retrying'
-#                     time.sleep(1)
-#                 else:
-#                     break
+                printtime('%s' % e)
+                time.sleep(1)
 
 if __name__ == '__main__':
-    print ('RPC server listening on port %d\n'
-        'press Ctrl-C to stop\n') % RPC_PORT
+    printtime(('RPC server listening on port %d\n'
+        'press Ctrl-C to stop\n') % RPC_PORT)
 
     FINISH_EVENT.set()
     mapper = Mapper(goOnEvent = FINISH_EVENT)
@@ -230,12 +213,11 @@ if __name__ == '__main__':
         t = ThreadPoolServer(MyService, port = RPC_PORT)
         t.start()
     except Exception, e:
-        print e
-#         rpc(MASTER_SERVER, 'error', ('RPC Server', ))
+        printtime('%s' % e)
 
-    print 'Local_Server Exiting, please wait...'
+    printtime('Local_Server Exiting, please wait...')
     FINISH_EVENT.clear()
     mapper.join()
     runner.join()
 
-    print 'Local_Server Finished.'
+    printtime('Local_Server Finished.')

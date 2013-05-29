@@ -34,6 +34,4 @@
 ./xia-core/experiments/planetlab/libc.conf
 ./xia-core/experiments/planetlab/refresh.sh
 ./xia-core/experiments/planetlab/scripts/local_server.py
-./xia-core/experiments/planetlab/scripts/check_output.py
-./xia-core/experiments/planetlab/scripts/rpc.py
-./xia-core/experiments/planetlab/scripts/rpyc
+./xia-core/experiments/planetlab/scripts/plcommon.py

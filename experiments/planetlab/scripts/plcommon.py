@@ -1,8 +1,16 @@
 #!/usr/bin/python
 
-import time, threading
+import copy, time, threading, rpyc
+from subprocess import Popen, PIPE
 
+RPC_PORT = 43278
 CHECK_TIMEOUT = 15
+
+def stime():
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+
+def printtime(s):
+    print '%s: %s' % (stime(), s)
 
 class TimedThreadedDict(dict):
     """Manage shared heartbeats dictionary with thread locking"""
@@ -36,3 +44,19 @@ class TimedThreadedDict(dict):
         clients = [val[1:]+[host] for (host, val) in self.items() if val[0] >= limit]
         self._lock.release()
         return clients
+
+def rpc(dest, cmd, args):
+    c = rpyc.connect(dest, RPC_PORT)
+    s = 'c.root.%s(*args)' % cmd
+    out = copy.deepcopy(eval(s))
+    c.close()
+    return out
+
+def check_output(args):
+    p = Popen(args,shell=True,stdout=PIPE,stderr=PIPE)
+    out = p.communicate()
+    rc = p.wait()
+    if rc is not 0:
+        raise Exception("subprocess.CalledProcessError: Command '%s'" \
+                            "returned non-zero exit status %s" % (args, rc))
+    return out

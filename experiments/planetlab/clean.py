@@ -23,7 +23,7 @@ sys.path.insert(0, 'scripts')
 
 from commands import getoutput
 from subprocess import Popen, PIPE
-from check_output import check_output
+from plcommon import check_output
 
 nodes = getoutput('ls /tmp/ | grep log').split('\n')
 nodes = [node.split('-log')[0].strip() for node in nodes]

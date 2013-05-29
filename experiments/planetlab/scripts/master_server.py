@@ -1,12 +1,10 @@
 #!/usr/bin/python
 
-import rpyc, time, threading, sys, curses, socket, thread
+import rpyc, time, threading, sys, socket, thread, os, signal
 from threading import Thread
 from rpyc.utils.server import ThreadPoolServer
 from os.path import splitext
-from timedthreadeddict import TimedThreadedDict
-from check_output import check_output
-from rpc import rpc
+from plcommon import TimedThreadedDict, check_output, rpc, printtime, stime
 from random import choice
 from subprocess import Popen, PIPE
 import logging
@@ -23,15 +21,15 @@ STATSD = {} # (hostname,hostname) --> [((hostname, hostname), backbone | test, p
 LATLOND = {} # IP --> [lat, lon]
 NAMES = [] # names
 NAME_LOOKUP = {} # names --> hostname
+HOSTNAME_LOOKUP = {} # hostname --> names
 IP_LOOKUP = {} # IP --> hostname
 BACKBONES = [] # hostname
 BACKBONE_TOPO = {} # hostname --> [hostname]
 FINISHED_EVENT = threading.Event()
-MAX_EXPERIMENT_TIMEOUT = 180 # seconds
+MAX_EXPERIMENT_TIMEOUT = 300 # seconds
 PLANETLAB_DIR = '/home/cmu_xia/fedora-bin/xia-core/experiments/planetlab/'
 LOG_DIR = PLANETLAB_DIR + 'logs/'
 STATS_FILE = LOG_DIR + 'stats-tunneling.txt'
-            #f = open(LOGDIR+'stats-%s.txt' % splitext(sys.argv[1])[0].split('/')[-1], 'w')
 LATLON_FILE = PLANETLAB_DIR + 'IPLATLON'
 NAMES_FILE = PLANETLAB_DIR + 'names'
 BACKBONE_TOPO_FILE = PLANETLAB_DIR + 'backbone_topo'
@@ -41,49 +39,100 @@ STOP_CMD = '"sudo killall sh; sudo killall init.sh; sudo killall rsync; sudo ~/f
 KILL_LS = '"sudo killall -s INT local_server.py; sudo killall -s INT python; sleep 5; sudo killall local_server.py; sudo killall python"'
 START_CMD = '"curl https://raw.github.com/XIA-Project/xia-core/develop/experiments/planetlab/init.sh > ./init.sh && chmod 755 ./init.sh && ./init.sh"'
 SSH_CMD = 'ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 cmu_xia@'
-XIANET_FRONT_CMD = 'until sudo ~/fedora-bin/xia-core/bin/xianet -v -r -P'
-XIANET_FRONT_HOST_CMD = 'until sudo ~/fedora-bin/xia-core/bin/xianet -v -t -P'
-XIANET_BACK_CMD = '-f eth0 start; do echo "restarting click"; done'
+XIANET_FRONT_CMD = 'sudo ~/fedora-bin/xia-core/bin/xianet -v -r -P'
+XIANET_FRONT_HOST_CMD = 'sudo ~/fedora-bin/xia-core/bin/xianet -v -t -P'
+XIANET_BACK_CMD = '-f eth0 start'
 
 NUMEXP = 1
 NEW_EXP_TIMER = None
 CLIENTS = [] # hostname
 PRINT_VERB = [] # print verbosity
+NODE_WATCHERS = {} # hostname -> [(NodeWatcher Thread, goOnEvent)]
+CHECKED_IN_NODES = []
 NEW_EXP_LOCK = thread.allocate_lock()
+NODE_WATCHERS_LOCK = thread.allocate_lock()
+SINGLE_EXPERIMENT = False
+SAME_TEST_NODES = False
 
-def stime():
-    return time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+class NodeWatcher(threading.Thread):
+    def __init__(self, host, goOnEvent, finishEvent):
+        super(NodeWatcher, self).__init__()
+        self.goOnEvent = goOnEvent
+        self.finishEvent = finishEvent
+        self.host = host
+        self.out = open('/tmp/%s-log' % (self.host),'w',0)
 
-def std_listen(handle, out):
-    while True:
-        line = handle.readline()
-        if not line:
-            return
-        if out: out.write(line)
+    def __del__(self):
+        self.out.close()
 
-def hard_stop(nodes, out=None):
-    ts = [Thread(target=ssh_run, args=(host, STOP_CMD, out, False)) for host in nodes]
-    ts += [Thread(target=ssh_run, args=(host, KILL_LS, out, False)) for host in nodes]
-    [t.start() for t in ts]
-    [t.join() for t in ts]
+    def print_write(self, s):
+        if self.host in PRINT_VERB: printtime('%s: %s' % (self.host, s))
+        self.out.write('%s: %s' % (stime(), s))
+        
+    def std_listen(self, handle, out):
+        while True:
+            line = handle.readline()
+            if not line:
+                return
+            if out: out.write('%s: %s' %(stime(), line))
 
-def ssh_run(host, cmd, out, check=True):
-    c = SSH_CMD+'%s %s' % (host, cmd)
-    if host in PRINT_VERB: print '%s: launching subprocess: %s' % (host, cmd)
-    if out: out.write('launching subprocess: %s' % cmd)
-    p = Popen(SSH_CMD+'%s %s' % (host, cmd), shell=True, stdout=PIPE, stderr=PIPE)
-    ts = [Thread(target=std_listen, args=(p.stdout, out))]
-    ts += [Thread(target=std_listen, args=(p.stderr, out))]
-    [t.start() for t in ts]
-    p.wait()
-    [t.join(5) for t in ts]
-    if host in PRINT_VERB: print '%s: finished running subprocess: %s' % (host, cmd)
-    if out: out.write('finished running subprocess: %s' % cmd)
-    if check is True:
-        rc = p.returncode
-        if rc is not 0:
-            raise Exception("subprocess.CalledProcessError: Command '%s'" \
-                                "returned non-zero exit status %s" % (c, rc))
+    def hard_stop(self):
+        self.ssh_run(STOP_CMD, checkRC=False)
+        self.ssh_run(KILL_LS, checkRC=False)
+
+    def ssh_run(self, cmd, checkRC=True, waitForCompletion=True):
+        def target(p):
+            p.wait()
+            [t.join() for t in ts]
+
+        self.print_write('launching subprocess: %s' % cmd)
+        p = Popen(SSH_CMD+'%s %s' % (self.host, cmd), shell=True, stdout=PIPE, stderr=PIPE)
+        ts = [Thread(target=self.std_listen, args=(p.stdout, self.out))]
+        ts += [Thread(target=self.std_listen, args=(p.stderr, self.out))]
+        [t.start() for t in ts]
+            
+        t = Thread(target=target, args=(p, ))
+        t.start()
+        while waitForCompletion or self.goOnEvent.isSet():
+            t.join(1)
+            if not t.isAlive(): break
+        if t.isAlive():
+            os.kill(p.pid, signal.SIGTERM)
+        self.print_write('finished running subprocess: %s' % cmd)
+        if checkRC is True and self.goOnEvent.isSet():
+            rc = p.returncode
+            if rc is not 0:
+                c = SSH_CMD+'%s %s' % (self.host, cmd)
+                raise Exception("subprocess.CalledProcessError: Command '%s'" \
+                                    "returned non-zero exit status %s" % (c, rc))
+
+    def clearFinish(self):
+        self.finishEvent.clear()
+
+    def clearGoOn(self):
+        self.goOnEvent.clear()
+
+    def run(self):
+        should_run = True
+        while should_run:
+            should_run = False
+            self.print_write('launching...')
+            self.hard_stop()
+            try:
+                self.ssh_run(START_CMD, waitForCompletion=False)
+            except Exception, e:
+                if self.finishEvent.isSet():
+                    self.print_write('NW.run Exception: %s' % e)
+                    try:
+                        rpc('localhost', 'error', ('Startup', self.host))
+                    except:
+                        time.sleep(1)
+            if self.finishEvent.isSet() and self.host in BACKBONES:
+                should_run = True
+                self.goOnEvent.set()
+        self.hard_stop()
+        self.print_write('finished running process')
+        NODE_WATCHERS.pop(self.host)
 
 
 class MasterService(rpyc.Service):
@@ -110,7 +159,7 @@ class MasterService(rpyc.Service):
         return BACKBONES
 
     def exposed_get_neighbor_xhost(self):
-        print "<<<< GET NEIGHBORS >>>>"
+        printtime("<<<< GET NEIGHBORS >>>>")
         if self._host in CLIENTS:
             neighbor = [client for client in CLIENTS if client != self._host][0]
             while True:
@@ -139,100 +188,108 @@ class MasterService(rpyc.Service):
             my_bb = bbs[0][1] if self._host in bbs[0] else bbs[1][1]
             n_bb = bbs[0][1] if neighbor in bbs[0] else bbs[1][1]
             if my_bb == n_bb:
+                printtime("<<<< Experiment went to the same backbone node >>>>")
                 self.exposed_new_exp()
                 pass
 
-        s = '%s: %s:\t %s\n' % (stime(), cur_exp,STATSD[cur_exp])
-        if 'stats' in PRINT_VERB: print s
-        #stdscr.addstr(16, 0, s)
+        if ping == '-1.000' or hops == -1:
+            printtime("<<<< NODE can't see backbone >>>>")
+            self.exposed_new_exp()
+            pass
+
+        if 'stats' in PRINT_VERB: printtime('%s:\t %s\n' % (cur_exp,STATSD[cur_exp]))
 
     def exposed_xstats(self, xping, xhops):
         cur_exp = tuple(CLIENTS)
         STATSD[cur_exp].append((cur_exp,'test',xping,xhops))
 
-        s = '%s: %s:\t %s\n' % (stime(), cur_exp,STATSD[cur_exp])
-        if 'xstats' in PRINT_VERB: print s
-        #stdscr.addstr(16, 0, s)
+        if 'xstats' in PRINT_VERB: printtime('%s:\t %s\n' % (cur_exp,STATSD[cur_exp]))
 
         if len(STATSD[cur_exp]) is 4:
             self.exposed_new_exp()
             pass
 
-    def exposed_new_exp(self):
+    def exposed_new_exp(self, host=None):
         global CLIENTS, NUMEXP, NEW_EXP_TIMER, PRINT_VERB, NEW_EXP_LOCK
+
+        if SINGLE_EXPERIMENT and NUMEXP == 2:
+            return
 
         if NEW_EXP_LOCK.locked():
             return
         NEW_EXP_LOCK.acquire()
 
-        while True:
-            client_a = choice(NAMES[11:])
-            if client_a not in CLIENTS: break
+        # some host errored that's not currently in the experiment
+        if host and host not in CLIENTS and host not in BACKBONES:
+            return
+
+        try:
+            cur_exp = tuple(CLIENTS)
+            if len(STATSD[cur_exp]) != 4:
+                printtime("<<<< TIMEOUT!! (%s) >>>>" % cur_exp)
+        except:
+            pass
 
         while True:
-            client_b = choice(NAMES[11:])
-            if client_b != client_a and client_b not in CLIENTS: break
+            while True:
+                client_a = choice(NAMES)
+                if client_a not in CLIENTS: break
 
-###########
-        #client_a = 'planetlab1.tsuniv.edu'
-        #client_b = 'planetlab5.cs.cornell.edu'
-##########
+            while True:
+                client_b = choice(NAMES)
+                if client_b != client_a and client_b not in CLIENTS: break
 
-        hard_stop(CLIENTS)
-        CLIENTS = sorted([NAME_LOOKUP[client_a], NAME_LOOKUP[client_b]])
+            if SAME_TEST_NODES:
+                client_a = 'planetlab1.tsuniv.edu'
+                client_b = 'planetlab5.cs.cornell.edu'
+
+            c = sorted([NAME_LOOKUP[client_a], NAME_LOOKUP[client_b]])
+            if tuple(c) not in STATSD:
+                break
+
+        CLIENTS = c
         for client in CLIENTS:
             IP_LOOKUP[socket.gethostbyname(client)] = client
         
         [PRINT_VERB.append(c) for c in CLIENTS]
 
-        print '%s: new experiment (%s): %s' % (stime(), NUMEXP, CLIENTS)
+        printtime('<<<< new experiment (%s): %s >>>>' % (NUMEXP, CLIENTS))
 
-        try:
-            self.exposed_soft_restart_backbones()
-        except:
-            pass
+        for host in NODE_WATCHERS:
+            self.exposed_hard_restart(host)
 
-        #stdscr.addstr(26, 0, '%s: new experiment (%s): %s' % (stime(), NUMEXP, CLIENTS))
-        [self.exposed_hard_restart(client) for client in CLIENTS]
+        for client in CLIENTS:
+            self.exposed_hard_restart(client)
+
         NUMEXP += 1
         if NEW_EXP_TIMER: NEW_EXP_TIMER.cancel()
         NEW_EXP_TIMER = threading.Timer(MAX_EXPERIMENT_TIMEOUT, self.exposed_new_exp)
         NEW_EXP_TIMER.start()
         NEW_EXP_LOCK.release()
 
-    def exposed_error(self, msg, host=None):
-        print '%s: %s  (error!): %s' % (stime(), host, msg)
+    def exposed_error(self, msg, host):
+        printtime('<<<< %s  (error!): %s >>>>' % (host, msg))
+        if SINGLE_EXPERIMENT:
+            return
         host = self._host if host == None else host
-        hard_stop([host])
-        if host in BACKBONES:
-            self.exposed_hard_restart(host)
-        #stdscr.addstr(30, 0, '%s: %s  (error!): %s' % (stime(), host, msg))
-        self.exposed_new_exp()
+        if host not in BACKBONES:
+            printtime('<<<< Remvoing bad host: %s from NAMES >>>>' % host)
+            NAMES.remove(HOSTNAME_LOOKUP[host]) # remove this misbehaving host from further experiments
+        self.exposed_new_exp(host=host)
             
-    def launch_process(self, host):
-        if host in PRINT_VERB: print '%s: launching...' % host
-        f = open('/tmp/%s-log' % (host),'w',0)
-        f.write('launching...\n')
-        hard_stop([host], f)
-        try:
-            ssh_run(host, START_CMD, f)
-        except Exception, e:
-            if not NEW_EXP_LOCK.locked():
-                if host in PRINT_VERB: print '%s: %s' % (host, e)
-                time.sleep(5)
-                if FINISHED_EVENT.isSet() and (host in BACKBONES or host in CLIENTS):
-                    if host in PRINT_VERB: print host, BACKBONES, CLIENTS
-                    if host in PRINT_VERB: print e
-                    self.exposed_error('Startup', host=host)
-            if host in PRINT_VERB: print '%s: finished running process' % host
-        f.write('finished running process')
-        f.close()
-
     def exposed_hard_restart(self, host):
-        thread.start_new_thread(self.launch_process, (host, ))
-
-    def exposed_soft_restart_backbones(self):
-        [rpc(backbone, 'soft_restart', ()) for backbone in BACKBONES]
+        NODE_WATCHERS_LOCK.acquire()
+        if host in NODE_WATCHERS:
+            NODE_WATCHERS[host].clearGoOn()
+        else:
+            goEv = threading.Event()
+            goEv.set()
+            finishEv = threading.Event()
+            finishEv.set()
+            nw = NodeWatcher(host=host, goOnEvent=goEv, finishEvent=finishEv)
+            nw.start()
+            NODE_WATCHERS[host] = nw
+        NODE_WATCHERS_LOCK.release()
 
     def exposed_get_xianet(self, neighbor_host = None, host = None):
         host = self._host if host == None else host
@@ -248,24 +305,26 @@ class MasterService(rpyc.Service):
 
     def exposed_get_commands(self, host = None):
         host = self._host if host == None else host
-        if 'master' in PRINT_VERB: print 'MASTER: %s checked in for commands' % host
+        if 'master' in PRINT_VERB: printtime('MASTER: %s checked in for commands' % host)
+        CHECKED_IN_NODES.append(host)
         if host in BACKBONES:
             return [self.exposed_get_xianet(host = host)]
         elif host in CLIENTS:
-            cmd = ["my_backbone = self.exposed_gather_stats()[1]"]
-            cmd += ["self.exposed_wait_for_neighbor(my_backbone, 'waiting for backbone: %s' % my_backbone)"]
-            cmd += ["rpc(my_backbone, 'soft_restart', (my_name, ))"]
-            cmd += ["xianetcmd = rpc(MASTER_SERVER, 'get_xianet', (my_backbone, ))"]
-            cmd += ["print xianetcmd"]
-            cmd += ["exec(xianetcmd)"]
-            cmd += ["self.exposed_wait_for_neighbor('localhost', 'waiting for xianet to start')"]
-            cmd += ["my_neighbor = rpc(MASTER_SERVER, 'get_neighbor_host', ())"]
-            cmd += ["print my_neighbor"]
-            cmd += ["self.exposed_wait_for_neighbor(my_backbone, 'waiting for backbone: %s' % my_backbone)"]
-            cmd += ["self.exposed_wait_for_neighbor(my_neighbor, 'waiting for neighbor: %s' % my_neighbor)"]
-            cmd += ["self.exposed_gather_xstats()"]
-            return cmd
-        return ''
+            if not NEW_EXP_LOCK.locked():
+                cmd = ["my_backbone = self.exposed_gather_stats()[1]"]
+                cmd += ["self.exposed_wait_for_neighbor(my_backbone, 'waiting for backbone: %s' % my_backbone)"]
+                cmd += ["rpc(my_backbone, 'soft_restart', (my_name, ))"]
+                cmd += ["xianetcmd = rpc(MASTER_SERVER, 'get_xianet', (my_backbone, ))"]
+                cmd += ["printtime(xianetcmd)"]
+                cmd += ["exec(xianetcmd)"]
+                cmd += ["self.exposed_wait_for_neighbor('localhost', 'waiting for xianet to start')"]
+                cmd += ["my_neighbor = rpc(MASTER_SERVER, 'get_neighbor_host', ())"]
+                cmd += ["printtime(my_neighbor)"]
+                cmd += ["self.exposed_wait_for_neighbor(my_backbone, 'waiting for backbone: %s' % my_backbone)"]
+                cmd += ["self.exposed_wait_for_neighbor(my_neighbor, 'waiting for neighbor: %s' % my_neighbor)"]
+                cmd += ["time.sleep(10)"]
+                cmd += ["self.exposed_gather_xstats()"]
+                return cmd
 
         
 class Printer(threading.Thread):
@@ -281,7 +340,6 @@ class Printer(threading.Thread):
             else:
                 url += '&markers=%s,%s' % (beat[2],beat[1])
             url += ''.join(['&path=%s,%s|%s,%s' % (beat[2],beat[1],x[1],x[0]) for x in beat[3]])
-        #html = '<html>\n<head>\n<title>Current Nodes In Topology</title>\n<meta http-equiv="refresh" content="5">\n</head>\n<body>\n<img src="%s">\n</body>\n</html>' % url
         html = '<html>\n<head>\n<title>Current Nodes In Topology</title>\n<meta http-equiv="refresh" content="60">\n</head>\n<body>\n<img src="%s">\n</body>\n</html>' % url
         return html
 
@@ -292,9 +350,6 @@ class Printer(threading.Thread):
             f.write(self.buildMap(beats))
             f.close()
             beats = [beat[4] for beat in beats]
-            #print '%s : Active clients: %s\r' % (stime(), beats)
-            #print '%s : Active clients: %s\r' % (stime(), len(beats))
-            #stdscr.addstr(0, 0, '%s : Active clients: %s\r' % (stime(), beats))
 
             s = ''
             for key, value in STATSD.iteritems():
@@ -302,28 +357,27 @@ class Printer(threading.Thread):
             f = open(STATS_FILE, 'w')
             f.write(s)
             f.close()
-            #print '%s : Writing out Stats' % stime()
-            #stdscr.addstr(20, 0, '%s : Writing out Stats' % stime())
-
-            #stdscr.refresh()
-            #stdscr.clearok(1)
             
             time.sleep(CHECK_PERIOD)
 
 
 class Runner(threading.Thread):
     def run(self):
-        while FINISHED_EVENT.isSet():
+        for backbone in BACKBONES:
+            while True:
+                try:
+                    rpc('localhost', 'hard_restart', (backbone, ))
+                    break;
+                except Exception, e:
+                    printtime('%s' % e)
+                    time.sleep(1)                
+        while True:
             try:
-                [rpc('localhost', 'hard_restart', (backbone, )) for backbone in BACKBONES]
                 rpc('localhost', 'new_exp', ())
-            except Exception, e:
-                print e
-                time.sleep(1)
-                pass
-            else:
                 break
-                
+            except Exception, e:
+                printtime('%s' % e)
+                time.sleep(1)
 
 
 if __name__ == '__main__':
@@ -336,8 +390,11 @@ if __name__ == '__main__':
     NAMES = [n.split('#')[1].strip() for n in ns]
     nl = [line.split('#') for line in ns]
     NAME_LOOKUP = dict((n.strip(), host.strip()) for (host, n) in nl)
+    HOSTNAME_LOOKUP = dict((host.strip(), n.strip()) for (host, n) in nl)
 
     BACKBONES = [NAME_LOOKUP[n.strip()] for n in NAMES[:11]]
+    for backbone in BACKBONES:
+        NAMES.remove(HOSTNAME_LOOKUP[backbone])
     lines = open(BACKBONE_TOPO_FILE,'r').read().split('\n')
     for line in lines:
         BACKBONE_TOPO[NAME_LOOKUP[line.split(':')[0].strip()]] = tuple([NAME_LOOKUP[l.strip()] for l in line.split(':')[1].split(',')])
@@ -350,13 +407,8 @@ if __name__ == '__main__':
     PRINT_VERB.append('master')
     [PRINT_VERB.append(b) for b in BACKBONES]
 
-    print ('Threaded heartbeat server listening on port %d\n'
-        'press Ctrl-C to stop\n') % RPC_PORT
-
-    #stdscr = curses.initscr()
-    #curses.noecho()
-    #curses.cbreak()
-
+    printtime(('Threaded heartbeat server listening on port %d\n' 
+              'press Ctrl-C to stop\n') % RPC_PORT)
 
     FINISHED_EVENT.set()
     printer = Printer(goOnEvent = FINISHED_EVENT)
@@ -369,20 +421,19 @@ if __name__ == '__main__':
         t = ThreadPoolServer(MasterService, port = RPC_PORT)
         t.start()
     except Exception, e:
-        print e
+        printtime('%s' % e)
 
     FINISHED_EVENT.clear()
 
-    #curses.echo()
-    #curses.nocbreak()
-    #curses.endwin()
+    printtime('Master_Server killing all clients')
+    for host in NODE_WATCHERS:
+        NODE_WATCHERS[host].clearFinish()
+        NODE_WATCHERS[host].clearGoOn()
+    while len(NODE_WATCHERS): time.sleep(1)
 
-    print 'Master_Server killing all clients'
-    hard_stop(CLIENTS+BACKBONES)
-
-    print 'Exiting, please wait...'
+    printtime('Exiting, please wait...')
     printer.join()
 
-    print 'Finished.'
+    printtime('Finished.')
     
     sys.exit(0)
