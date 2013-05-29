@@ -143,14 +143,13 @@ void* mobility_daemon(void *args) {
 		Graph g(sa);
 
 		if ( g.dag_string() != my_addr.dag_string() ) { // TODO: better comparison?
-			LOG("We moved!");
 			if (migrate_connections() < 0) {
 				ERROR("Error migrating connections");
 			}
 			my_addr = g;
 		}
 
-		sleep(2);
+		sleep(MOBILITY_CHECK_INTERVAL);
 	}
 
 
