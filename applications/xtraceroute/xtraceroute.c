@@ -103,13 +103,18 @@ int npackets = 30; /* max number of hops allowed */
 int preload = 0;		/* number of packets to "preload" */
 int ntransmitted = 0;		/* sequence # for outbound packets = #sent */
 int ident;
-float interval = 0.5;
 
 int nreceived = 0;		/* # of packets we got back */
 int timing = 0;
 int tmin = 999999999;
 int tmax = 0;
 int tsum = 0;			/* sum of all times, for doing average */
+
+float nCatcher = 0;
+float catcher_timeout = 0; /* seconds */
+float interval = 0.5;
+int rc = 0;
+
 char *inet_ntoa();
 
 /*
@@ -140,6 +145,10 @@ int main(int argc, char **argv)
 			case 'f':
 				pingflags |= FLOOD;
 				break;
+            case 't':
+                argc--, av++;
+                catcher_timeout = atoi(av[0]);
+                break;
 		}
 		argc--, av++;
 	}
@@ -248,6 +257,11 @@ void catcher()
 	int waittime;
 
 	pinger();
+    nCatcher+=interval;
+    if (catcher_timeout && nCatcher >= catcher_timeout) {
+        rc = -1;
+        finish();
+    }
 	if (npackets == 0 || ntransmitted < npackets)
         if(interval < 1)
             ualarm(interval*1000000,0);
@@ -502,7 +516,8 @@ void tvsub(struct timeval *out, struct timeval *in)
 void finish()
 {
     Xclose(s);
-    printf("hops = %d\n", nreceived);
+    int hops = rc ? -1 : nreceived;
+    printf("hops = %d\n", hops); 
 	fflush(stdout);
-	exit(0);
+	exit(rc);
 }

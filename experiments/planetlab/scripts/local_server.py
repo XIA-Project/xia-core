@@ -52,21 +52,26 @@ def traceroute(neighbor):
 
 def xping(neighbor,tryUntilSuccess=True):
     while tryUntilSuccess:
-        xpingcmd = '/home/cmu_xia/fedora-bin/xia-core/bin/xping -t'
+        xpingcmd = '/home/cmu_xia/fedora-bin/xia-core/bin/xping -t 5'
         s = '%s "%s"' % (xpingcmd, neighbor)
         while True:
-            print s
-            out = check_output(s)
             try:
+                print s
+                out = check_output(s)
                 print out
                 stat = "%.3f" % float(out[0].split("\n")[-2].split('=')[1].split('/')[1])
                 break
             except:
                 pass
-        xpingcmd = '/home/cmu_xia/fedora-bin/xia-core/bin/xping -i %s -c' % XPING_INTERVAL
+        xpingcmd = '/home/cmu_xia/fedora-bin/xia-core/bin/xping -t 5 -i %s -c' % XPING_INTERVAL
         s = '%s %s "%s"' % (xpingcmd, PING_COUNT, neighbor)
-        print s
-        out = check_output(s)
+        while tryUntilSuccess:
+            try:
+                print s
+                out = check_output(s)
+                break
+            except:
+                pass
         print out
         try:
             stat = "%.3f" % float(out[0].split("\n")[-2].split('=')[1].split('/')[1])
@@ -77,15 +82,19 @@ def xping(neighbor,tryUntilSuccess=True):
     return stat
 
 def xtraceroute(neighbor,tryUntilSuccess=True):
+    cmd = '/home/cmu_xia/fedora-bin/xia-core/bin/xtraceroute -t 30 "%s"' % neighbor
     while tryUntilSuccess:
-        out = check_output('/home/cmu_xia/fedora-bin/xia-core/bin/xtraceroute "%s"' % neighbor)
-        print out
-        stat = int(out[0].split('\n')[-2].split('=')[1].strip())
-        print stat
-        if stat is not 30: break
-    out = check_output('/home/cmu_xia/fedora-bin/xia-core/bin/xtraceroute "%s"' % neighbor)
+        try:
+            print cmd
+            out = check_output(cmd)
+            print out
+            break
+        except Exception, e:
+            print e
+            pass
     stat = int(out[0].split('\n')[-2].split('=')[1].strip())
     stat = -1 if stat is 30 else stat
+    print stat
     return stat
     
 class MyService(rpyc.Service):
@@ -153,6 +162,15 @@ class MyService(rpyc.Service):
         exec(xianetcmd)
         return xianetcmd
 
+    def exposed_run_commands(self):
+        print 'requesting commands!'
+        commands = rpc(MASTER_SERVER, 'get_commands', ())
+        print 'commands received!'
+        print 'commands: %s' % commands
+        for command in commands:
+            print command
+            exec(command)
+
     def exposed_wait_for_neighbor(self, neighbor, msg):
         while True:
             try:
@@ -182,24 +200,20 @@ class Mapper(threading.Thread):
 
 class Runner(threading.Thread):
     def run(self):
-        try:
-            print 'requesting commands!'
-            commands = rpc(MASTER_SERVER, 'get_commands', ())
-            print 'commands received!'
-            print 'commands: %s' % commands
-            for command in commands:
-                print command
-                exec(command)
-        except Exception, e:
-            print e
-            while FINISH_EVENT.isSet():
-                try:
-                    rpc(MASTER_SERVER, 'error', ('Runner', ))
-                except:
-                    print 'Failed to report error!! retrying'
-                    time.sleep(1)
-                else:
-                    break
+        while True:
+            try:
+                rpc('localhost', 'run_commands', ())
+                break
+            except Exception, e:
+                print e
+#             while FINISH_EVENT.isSet():
+#                 try:
+#                     rpc(MASTER_SERVER, 'error', ('Runner', ))
+#                 except:
+#                     print 'Failed to report error!! retrying'
+#                     time.sleep(1)
+#                 else:
+#                     break
 
 if __name__ == '__main__':
     print ('RPC server listening on port %d\n'
@@ -217,7 +231,7 @@ if __name__ == '__main__':
         t.start()
     except Exception, e:
         print e
-        rpc(MASTER_SERVER, 'error', ('RPC Server', ))
+#         rpc(MASTER_SERVER, 'error', ('RPC Server', ))
 
     print 'Local_Server Exiting, please wait...'
     FINISH_EVENT.clear()
