@@ -19,6 +19,8 @@
 #endif
 
 #define MAXBUF 2048
+#define RECV_TIMEOUT_MICRO 500000
+#define CHECK_INTERVAL_MICRO 100000
 
 // global configuration options
 int loops = -1;		// only do 1 pass
@@ -123,7 +125,7 @@ int main(int argc, char *argv[])
 		bzero(buffer, MAXBUF);
 		if (loops == -1) {
 			printf("\nPlease enter the message (0 to exit): ");
-			if (fgets(buffer,MAXBUF,stdin) != NULL) {
+			if (fgets(buffer,MAXBUF,stdin) == NULL) {
 				LOG("Error reading user input");
 			}
 			if (buffer[0]=='0'&&strlen(buffer)==2)
@@ -137,15 +139,24 @@ int main(int argc, char *argv[])
 		}
 		    
 		Ssend(ctx, buffer, strlen(buffer));
+
 		
-		//Process reply from server
-		n = Srecv(ctx, reply, sizeof(reply));
-		if (n < 0) 
-		    printf("Error receiving data");
-		if (write(1,reply,n) < 0) {
-			printf("Error writing reply");
+		// Wait a little bit for data to become available
+		long int waited = 0;
+		while (!ScheckForData(ctx) && waited < RECV_TIMEOUT_MICRO) {
+			usleep(CHECK_INTERVAL_MICRO);
+			waited += CHECK_INTERVAL_MICRO;
 		}
-		printf("\n");
+
+		if (ScheckForData(ctx)) { // don't hang
+			n = Srecv(ctx, reply, sizeof(reply));
+			if (n < 0) 
+			    printf("Error receiving data");
+			if (write(1,reply,n) < 0) {
+				printf("Error writing reply");
+			}
+			printf("\n");
+		}
 
 		count++;
 		if (loops > 0 && count == loops)

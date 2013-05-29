@@ -25,7 +25,7 @@ class TimedThreadedDict(dict):
         limit = time.time() - CHECK_TIMEOUT
         val =  dict.__getitem__(self, key)
         if val[0] >= limit:
-            if len(val) == 2:
+            if len(val) is 2:
                 return val[1]
             return val[1:]
         raise Exception("KeyError: " + key)            
@@ -33,6 +33,6 @@ class TimedThreadedDict(dict):
     def getClients(self):
         limit = time.time() - CHECK_TIMEOUT
         self._lock.acquire()
-        clients = [val[1:] for (ip, val) in self.items() if val[0] >= limit]
+        clients = [val[1:]+[host] for (host, val) in self.items() if val[0] >= limit]
         self._lock.release()
         return clients

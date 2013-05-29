@@ -15,6 +15,7 @@ using namespace std;
 #define DEFAULT_PROCPORT 1989
 #define BUFSIZE 65000
 #define MTU 1250  // TODO: actually figure out how big protobuf header is
+#define MOBILITY_CHECK_INTERVAL .5
 
 
 
@@ -740,7 +741,6 @@ int swap_sockets_for_connection(session::ConnectionInfo *cinfo, int oldsock, int
 // and restart them.
 int migrate_connections() {
 	LOG("Migrating existing transport connections.");
-	//sleep(5);
 	int rc = 1;
 	
 	map<string, session::ConnectionInfo*>::iterator iter;
@@ -1423,6 +1423,22 @@ LOG("BEGIN process_close_msg");
 	return 1;
 }
 
+int process_check_for_data_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &reply) {
+LOG("BEGIN process_check_for_data_msg");
+	
+	const session::SCloseMsg cm = msg.s_close();
+	reply.set_type(session::RETURN_CODE);
+	session::S_Return_Code_Msg *rcm = reply.mutable_s_rc();
+
+	session::SCheckDataRet *cdret = reply.mutable_s_check_data_ret();
+	cdret->set_data_available( (ctx_to_dataQ[ctx]->size() > 0) ); // TODO: should really grab the mutex; someone might be removing last msg
+
+
+	// return success
+	rcm->set_rc(session::SUCCESS);
+	return 1;
+}
+
 
 int send_reply(int sockfd, struct sockaddr_in *sa, socklen_t sa_size, session::SessionMsg *sm)
 {
@@ -1554,6 +1570,9 @@ int listen() {
 					break;
 				case session::CLOSE:
 					process_function = &process_close_msg;
+					break;
+				case session::CHECK_FOR_DATA:
+					process_function = &process_check_for_data_msg;
 					break;
 				default:
 					LOG("Unrecognized protobuf message");

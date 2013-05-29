@@ -155,7 +155,7 @@ def makeHostConfig(hid):
 
     interfaces = getInterfaces(interface_filter, interface)
 
-    if (len(interfaces) == 0):
+    if (len(interfaces) == 0) and not socket_ips_ports:
         print "no available interface"
         exit(1)
     elif (len(interfaces) > 1):
@@ -191,9 +191,10 @@ def makeHostConfig(hid):
         text = header + socks + footer
     else:
         text = header + body + footer
-    
-    xchg['IFACE'] = interfaces[0][0]
-    xchg['MAC'] = interfaces[0][1]
+
+    if interfaces:
+        xchg['IFACE'] = interfaces[0][0]
+        xchg['MAC'] = interfaces[0][1]
 
     # create $MAC0 thru $MAC3 replacements (not sure if needed for hosts??)
     i = 0

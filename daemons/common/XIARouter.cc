@@ -147,42 +147,43 @@ std::string XIARouter::itoa(signed i)
 	return s;
 }
 
-int XIARouter::updateRoute(string cmd, std::string &xid, int port, std::string &next, unsigned long flags)
+int XIARouter::updateRoute(string cmd, const std::string &xid, int port, const std::string &next, unsigned long flags)
 {
 	string xidtype;
+	string mutableXID(xid);
 	unsigned n;
 
 	if (!connected())
 		return XR_NOT_CONNECTED;
 
-	if (xid.length() == 0)
+	if (mutableXID.length() == 0)
 		return XR_INVALID_XID;
 
 	if (next.length() > 0 && next.find(":") == string::npos)
 		return XR_INVALID_XID;
 
-	n = xid.find(":");
+	n = mutableXID.find(":");
 	if (n == string::npos || n >= sizeof(xidtype))
 		return XR_INVALID_XID;
 
 	if (getRouter().length() == 0)
 		return  XR_ROUTER_NOT_SET;
 
-	xidtype = xid.substr(0, n);
+	xidtype = mutableXID.substr(0, n);
 
 	std::string table = _router + "/xrc/n/proc/rt_" + xidtype;
 	
 	string default_xid("-"); 
-	if (xid.compare(n+1, 1, default_xid) == 0)
-		xid = default_xid;
+	if (mutableXID.compare(n+1, 1, default_xid) == 0)
+		mutableXID = default_xid;
 		
 	std::string entry;
 
 	// remove command only takes an xid
 	if (cmd == "remove") 
-		entry = xid;
+		entry = mutableXID;
 	else
-		entry = xid + "," + itoa(port) + "," + next + "," + itoa(flags);
+		entry = mutableXID + "," + itoa(port) + "," + next + "," + itoa(flags);
 
 	if ((_cserr = _cs.write(table, cmd, entry)) != 0)
 		return XR_CLICK_ERROR;
@@ -190,17 +191,17 @@ int XIARouter::updateRoute(string cmd, std::string &xid, int port, std::string &
 	return XR_OK;
 }
 
-int XIARouter::addRoute(std::string &xid, int port, std::string &next, unsigned long flags)
+int XIARouter::addRoute(const std::string &xid, int port, const std::string &next, unsigned long flags)
 {
 	return updateRoute("add4", xid, port, next, flags);
 }
 
-int XIARouter::setRoute(std::string &xid, int port, std::string &next, unsigned long flags)
+int XIARouter::setRoute(const std::string &xid, int port, const std::string &next, unsigned long flags)
 {
 	return updateRoute("set4", xid, port, next, flags);
 }
 
-int XIARouter::delRoute(std::string &xid)
+int XIARouter::delRoute(const std::string &xid)
 {
 	string next = "";
 	return updateRoute("remove", xid, 0, next, 0);
