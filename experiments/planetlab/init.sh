@@ -19,4 +19,3 @@ rsync --rsh='ssh -o StrictHostKeyChecking=no -p5556' -ar --files-from=./bin-file
 " > sync.sh
 chmod 755 sync.sh
 ./sync.sh
-python -u ~/fedora-bin/xia-core/experiments/planetlab/scripts/local_server.py
