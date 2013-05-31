@@ -87,6 +87,7 @@ message SSendRet {
 
 message SRecvMsg {
 	required uint32 bytes_to_recv = 1;
+	required bool wait_for_adu = 2 [default = false];
 }
 
 message SRecvRet {

@@ -19,7 +19,7 @@
 #endif
 
 #define MAXBUF 2048
-#define RECV_TIMEOUT_MICRO 500000
+#define RECV_TIMEOUT_MICRO 750000
 #define CHECK_INTERVAL_MICRO 100000
 
 // global configuration options
@@ -149,7 +149,7 @@ int main(int argc, char *argv[])
 		}
 
 		if (ScheckForData(ctx)) { // don't hang
-			n = Srecv(ctx, reply, sizeof(reply));
+			n = SrecvADU(ctx, reply, sizeof(reply));
 			if (n < 0) 
 			    printf("Error receiving data");
 			if (write(1,reply,n) < 0) {

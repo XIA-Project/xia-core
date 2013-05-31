@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
     			//Receive packet
 				memset(&buf[0], 0, sizeof(buf));
 				
-				n = Srecv(accept_ctx, buf, MAXBUF);
+				n = SrecvADU(accept_ctx, buf, MAXBUF);
 				
 				if (n < 0) 
 				    printf("Error receiving data\n");

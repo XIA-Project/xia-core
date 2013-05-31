@@ -16,7 +16,7 @@
 */
 /*!
  @file Srecv.c
- @brief Implements Srecv() and ScheckForData()
+ @brief Implements Srecv(), SrecvADU(), and ScheckForData()
 */
 
 #include "session.h"
@@ -25,7 +25,7 @@
 
 using namespace std;
 
-int Srecv(int ctx, void* buf, size_t len)
+int Srecv(int ctx, void* buf, size_t len, bool waitForADU)
 {
 LOG("BEGIN Srecv");
 	int sockfd = ctx; // for now on the client side we treat the socket fd as the context handle
@@ -35,6 +35,7 @@ LOG("BEGIN Srecv");
 	sm.set_type(session::RECEIVE);
 	session::SRecvMsg *rm = sm.mutable_s_recv();
 	rm->set_bytes_to_recv(len);
+	rm->set_wait_for_adu(waitForADU);
 
 	
 	if ( proc_send(sockfd, &sm) < 0) {
@@ -66,6 +67,14 @@ LOG("BEGIN Srecv");
 	memcpy(buf, tempbuf, bytes); // TODO: off by one?
 
 	return bytes;
+}
+
+int Srecv(int ctx, void* buf, size_t len) {
+	return Srecv(ctx, buf, len, false);
+}
+
+int SrecvADU(int ctx, void* buf, size_t len) {
+	return Srecv(ctx, buf, len, true);
 }
 
 bool ScheckForData(int ctx) {

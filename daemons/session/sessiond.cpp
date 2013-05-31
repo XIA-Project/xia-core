@@ -14,8 +14,9 @@ using namespace std;
 
 #define DEFAULT_PROCPORT 1989
 #define BUFSIZE 65000
-#define MTU 1250  // TODO: actually figure out how big protobuf header is
-#define MOBILITY_CHECK_INTERVAL .5
+#define MTU 1250
+#define MOBILITY_CHECK_INTERVAL 10
+#define ADU_DELIMITER "\x1f"  // 0x1f is the unit separator
 
 
 
@@ -657,6 +658,7 @@ int send(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 	int sent = -1;
 
 	string p_buf;
+	assert(pkt);
 	pkt->SerializeToString(&p_buf);
 	int len = p_buf.size();
 	const char *buf = p_buf.c_str();
@@ -921,7 +923,6 @@ void *poll_recv_sock(void *args) {
 			case session::DATA:
 			{
 				// Add data pkt to dataQ
-LOGF("    Received %lu bytes", rpkt->data().data().size());
 				pushDataQ(ctx, rpkt);
 				break;
 			}
@@ -1326,6 +1327,9 @@ LOG("BEGIN process_send_msg");
 	}
 
 
+	// Add the ADU_DELIMITER to the data to send
+	string data_str(sendm.data() + ADU_DELIMITER);
+
 	// Build a SessionPacket
 	session::SessionPacket pkt;
 	pkt.set_type(session::DATA);
@@ -1336,9 +1340,8 @@ LOG("BEGIN process_send_msg");
 	// send MTU bytes at a time until we've sent the whole message
 	// for now, assume that protobur overhead is 10 bytes TODO: get actual size
 	uint32_t overhead = 10;
-	while (sent < sendm.data().size()) {
-		dm->set_data(sendm.data().substr(sent, MTU-overhead)); // grab next chunk of bytes
-LOGF("    Sending bytes %d through %d of %lu", sent, sent+MTU-overhead, sendm.data().size());
+	while (sent < data_str.size()) {
+		dm->set_data(data_str.substr(sent, MTU-overhead)); // grab next chunk of bytes
 		if ( send(ctx, &pkt) < 0 ) {
 			ERROR("Error sending data");
 			rcm->set_message("Error sending data");
@@ -1378,31 +1381,51 @@ LOG("BEGIN process_recv_msg");
 		return -1;
 	}
 
-	// pull packet off data Q
-	session::SessionPacket *pkt = popDataQ(ctx, max_bytes);
-	string data(pkt->data().data());
+	bool waitForADU = rm.wait_for_adu();
+	bool foundADU = false;
 
-	// keep pulling data while there's data in the Q and we have less than max_bytes
-	while (data.size() < max_bytes && ctx_to_dataQ[ctx]->size() > 0) {
-LOGF("    Grabbing more data. Have %lu so far. %lu msgs in queue.", data.size(), ctx_to_dataQ[ctx]->size());
+	// pull packet off data Q
+	session::SessionPacket *pkt;// = popDataQ(ctx, max_bytes);
+	string data; //data(pkt->data().data());
+
+	// keep pulling data while:  there's data in the Q and we have less than max_bytes and (but only if we're not waiting for a full ADU)
+	//                           OR: we're waiting for a full ADU and we have less than max_bytes
+	do {
 		delete pkt; // free current packet before blowing away the pointer
 		pkt = popDataQ(ctx, max_bytes - data.size());
+
+		if ( pkt->type() != session::DATA || !pkt->has_data() || !pkt->data().has_data()) {
+			ERROR("Received packet did not contain data");
+			rcm->set_message("Received packet did not contain data");
+			rcm->set_rc(session::FAILURE);
+			return -1;
+		}
+		
 		data += pkt->data().data();
-	}
 
-
-	if ( pkt->type() != session::DATA || !pkt->has_data() || !pkt->data().has_data()) {
-		ERROR("Received packet did not contain data");
-		rcm->set_message("Received packet did not contain data");
-		rcm->set_rc(session::FAILURE);
-		return -1;
+		// check for ADU delimiter
+		size_t pos = data.find(ADU_DELIMITER);
+		if (pos != data.npos) {
+			data.erase(pos, 1); // remove delim char
+			foundADU = true; // we've got it!
+		}
 	}
+	while ( (data.size() < max_bytes && !waitForADU && ctx_to_dataQ[ctx]->size() > 0) 
+			|| (waitForADU && !foundADU && data.size() < max_bytes) ) ;
+
 	
 	// Send back the data
 	session::SRecvRet *retm = reply.mutable_s_recv_ret();
 	retm->set_data(data);
 	
 	delete pkt;
+	
+	if (waitForADU && data.size() >= max_bytes) {
+		ERROR("Not enough room in buffer for full ADU. Returning max_bytes.");
+		rcm->set_message("Not enough room in buffer for full ADU. Returning max_bytes.");
+		rcm->set_rc(session::FAILURE);
+		return -1;
+	}
 
 	// return success
 	rcm->set_rc(session::SUCCESS);
@@ -1479,7 +1502,6 @@ int send_reply(int sockfd, struct sockaddr_in *sa, socklen_t sa_size, session::S
 }
 
 void* process_function_wrapper(void* args) {
-LOG("BEGIN wrapper");
 	struct proc_func_data *data = (struct proc_func_data*)args;
 
 	int rc = data->process_function(data->ctx, *(data->msg), *(data->reply));
@@ -1498,7 +1520,6 @@ LOG("BEGIN wrapper");
 	free(args);
 
 	return NULL;
-LOG("END wrapper");
 }
 
 int listen() {
