@@ -105,7 +105,9 @@ void* sendRequests(void* args) {
 	//Send a name query to the name server
 	while (true) {
 printf("sending another NS req\n");
+		pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
 		Xsendto(sra->sock, sra->pkt, sra->offset, 0, (const struct sockaddr*)sra->ns_dag, sizeof(sockaddr_x));
+		pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
 		sleep(.1);
 	}
 
