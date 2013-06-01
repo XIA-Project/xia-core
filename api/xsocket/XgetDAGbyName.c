@@ -101,13 +101,23 @@ struct sendRequestsArgs {
 void* sendRequests(void* args) {
 
 	struct sendRequestsArgs *sra = (struct sendRequestsArgs*)args;
+
+	int sock = sra->sock;
+	int offset = sra->offset;
+	char pkt[NS_MAX_PACKET_SIZE];
+	memcpy(pkt, sra->pkt, NS_MAX_PACKET_SIZE);
+	sockaddr_x ns_dag;
+	memcpy(&ns_dag, sra->ns_dag, sizeof(sockaddr_x));
+
 	
 	//Send a name query to the name server
-	while (true) {
+	int count = 0;
+	while (count < 100) {
 printf("sending another NS req\n");
 		pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
-		Xsendto(sra->sock, sra->pkt, sra->offset, 0, (const struct sockaddr*)sra->ns_dag, sizeof(sockaddr_x));
+		Xsendto(sock, pkt, offset, 0, (const struct sockaddr*)&ns_dag, sizeof(sockaddr_x));
 		pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+		count++;
 		sleep(.1);
 	}
 
@@ -199,6 +209,7 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 	offset += sizeof(query_pkt.type);
 	memcpy(pkt+offset, query_pkt.name, strlen(query_pkt.name)+1);
 	offset += strlen(query_pkt.name)+1;
+
 
 	//TODO: start thread
 	struct sendRequestsArgs sra;
