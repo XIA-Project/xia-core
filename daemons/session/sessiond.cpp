@@ -18,6 +18,9 @@ using namespace std;
 #define MOBILITY_CHECK_INTERVAL 10
 #define ADU_DELIMITER "\x1f"  // 0x1f is the unit separator
 
+#define Q_ALLOCATED 1
+#define Q_WATCHED 2
+
 
 
 #define DEBUG
@@ -39,6 +42,7 @@ void *poll_recv_sock(void *args);
 bool is_last_hop(int ctx, string name);
 int send(int ctx, session::SessionPacket *pkt);
 int migrate_connections();
+bool checkQ(queue<session::SessionPacket*> *Q);
 
 
 
@@ -73,6 +77,8 @@ map<unsigned short, pthread_cond_t*> ctx_to_acceptQ_cond;
 map<unsigned short, queue<session::SessionPacket*>* > ctx_to_dataQ;
 map<unsigned short, pthread_mutex_t*> ctx_to_dataQ_mutex;
 map<unsigned short, pthread_cond_t*> ctx_to_dataQ_cond;
+
+map<queue<session::SessionPacket*>*, short> QState; // keeps track of which Q's are allocated
 
 pthread_t mobility_thread;
 
@@ -211,25 +217,36 @@ void getConfig(int argc, char** argv)
 	}
 }
 
-session::SessionPacket* popQ(queue<session::SessionPacket*> *Q, pthread_mutex_t *mutex, pthread_cond_t *cond) {
-	pthread_mutex_lock(mutex);
-	if (Q->size() == 0) pthread_cond_wait(cond, mutex);  // wait until there's a message
-	session::SessionPacket *pkt = Q->front();
-	Q->pop();
-	pthread_mutex_unlock(mutex);
-	return pkt;
+// returns true if context exists, is initialized, and is of the specified type
+// returns false otherwise
+bool checkContext(int ctx, session::ContextInfo_ContextType type) {
+	if (ctx_to_ctx_info.find(ctx) == ctx_to_ctx_info.end())
+		return false;
+
+	session::ContextInfo *ctxInfo = ctx_to_ctx_info[ctx];
+	if (!ctxInfo->initialized() || ctxInfo->type() != type)
+		return false;
+	
+	return true;
 }
 
-session::SessionPacket* popDataQ(int ctx, uint32_t max_bytes) {
-	queue<session::SessionPacket*> *Q = ctx_to_dataQ[ctx];
-	pthread_mutex_t *mutex = ctx_to_dataQ_mutex[ctx];
-	pthread_cond_t *cond = ctx_to_dataQ_cond[ctx];
-
+session::SessionPacket* popQ(queue<session::SessionPacket*> *Q, pthread_mutex_t *mutex, pthread_cond_t *cond, uint32_t max_bytes) {
 	pthread_mutex_lock(mutex);
+	QState[Q] = Q_WATCHED;
 	if (Q->size() == 0) pthread_cond_wait(cond, mutex);  // wait until there's a message
-	session::SessionPacket *pkt = Q->front();
 
-	if (pkt->data().data().size() > max_bytes) {
+	// We either got signalled because there's data to pop or because the Q
+	// was dealloc'd. Figure out which.
+	if (!checkQ(Q)) {
+		LOG("Q torn down");
+		pthread_cond_signal(cond); // signal that we got the message
+		pthread_mutex_unlock(mutex);
+		LOG("popDataQ: signalled that we got the msg; exiting");
+		return NULL; 
+	}
+
+	session::SessionPacket *pkt = Q->front();
+	if ( max_bytes > 0 && pkt->data().data().size() > max_bytes) {
 		// make a new packet containing the first max_bytes bytes of the data;
 		// then remove the bytes from the packet on the Q, but leave it there
 		pkt = new session::SessionPacket(*pkt);
@@ -242,12 +259,18 @@ session::SessionPacket* popDataQ(int ctx, uint32_t max_bytes) {
 	} else {
 		Q->pop();
 	}
+
+	QState[Q] = Q_ALLOCATED;
 	pthread_mutex_unlock(mutex);
 	return pkt;
 }
 
+session::SessionPacket* popDataQ(int ctx, uint32_t max_bytes) {
+	return popQ(ctx_to_dataQ[ctx], ctx_to_dataQ_mutex[ctx], ctx_to_dataQ_cond[ctx], max_bytes);
+}
+
 session::SessionPacket* popAcceptQ(int ctx) {
-	return popQ(listen_ctx_to_acceptQ[ctx], ctx_to_acceptQ_mutex[ctx], ctx_to_acceptQ_cond[ctx]);
+	return popQ(listen_ctx_to_acceptQ[ctx], ctx_to_acceptQ_mutex[ctx], ctx_to_acceptQ_cond[ctx], -1);
 }
 
 void pushQ(session::SessionPacket* pkt, queue<session::SessionPacket*> *Q, pthread_mutex_t *mutex, pthread_cond_t *cond) {
@@ -272,6 +295,7 @@ void allocateQ(int ctx, map<unsigned short, queue<session::SessionPacket*>* > *Q
 	// allocate a queue
 	queue<session::SessionPacket*> *Q = new queue<session::SessionPacket*>();
 	(*QMap)[ctx] = Q;
+	QState[Q] = Q_ALLOCATED;
 
 	// allocate new pthread vars for this data Q
 	pthread_mutex_t *mutex = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
@@ -293,13 +317,33 @@ void allocateAcceptQ(int ctx) {
 void deallocateQ(int ctx, map<unsigned short, queue<session::SessionPacket*>* > *QMap,
 						  map<unsigned short, pthread_mutex_t*> *mutexMap,
 						  map<unsigned short, pthread_cond_t*> *condMap) {
+
+	queue<session::SessionPacket*> *Q = (*QMap)[ctx];
+	pthread_mutex_t *mutex = (*mutexMap)[ctx];
+	pthread_cond_t *cond = (*condMap)[ctx];
+
+	pthread_mutex_lock(mutex);
 	
-	delete (*QMap)[ctx];
+	// mark the Q as dealloc'd and signal anyone waiting on this Q
+	bool watched = QState[Q] == Q_WATCHED;
+	QState.erase(Q);
+	if (watched) {
+		pthread_cond_signal(cond); // signal watched Q is going away
+		LOGF("Signalled on context; waiting for confirmation %d", ctx);
+		pthread_cond_wait(cond, mutex); // wait until they get the message
+		LOG("Watcher stopped watching; finish deallocing");
+	}
+
+	// dealloc the Q
+	delete Q;
 	QMap->erase(ctx);
 
-	free((*mutexMap)[ctx]);
+	pthread_mutex_unlock(mutex);
+
+	// free the mutex and condition var
+	free(mutex);
 	mutexMap->erase(ctx);
-	free((*condMap)[ctx]);
+	free(cond);
 	condMap->erase(ctx);
 }
 
@@ -309,6 +353,10 @@ void deallocateDataQ(int ctx) {
 
 void deallocateAcceptQ(int ctx) {
 	deallocateQ(ctx, &listen_ctx_to_acceptQ, &ctx_to_acceptQ_mutex, &ctx_to_acceptQ_cond);
+}
+
+bool checkQ(queue<session::SessionPacket*> *Q) {
+	return QState.find(Q) != QState.end();
 }
 
 int startPollingSocket(int sock, void*(polling_function)(void*), void* args) {
@@ -392,7 +440,10 @@ bool closeSession(int ctx) {
 LOGF("Closing session %d", ctx);
 	bool kill_self = false;
 	session::ContextInfo *ctxInfo = ctx_to_ctx_info[ctx];
+	
 	if (ctxInfo->initialized()) {
+		ctxInfo->set_initialized(false); // just in case someone tries to use this ctx while we're closing it
+
 		if (ctxInfo->type() == session::ContextInfo::LISTEN) {
 
 			stopPollingSocket(ctx_to_listensock[ctx]);
@@ -420,14 +471,14 @@ LOGF("Closing session %d", ctx);
 			ctx_to_rxconn.erase(ctx);
 			ctx_to_txconn.erase(ctx);
 
-			free(ctx_to_session_info[ctx]);
+			delete ctx_to_session_info[ctx];
 			ctx_to_session_info.erase(ctx);
 		} else {
 			ERRORF("Unknown context type for context %d", ctx);
 		}
 	}
 
-	free(ctxInfo);
+	delete ctxInfo;
 	ctx_to_ctx_info.erase(ctx);
 
 print_contexts();
@@ -930,6 +981,7 @@ void *poll_recv_sock(void *args) {
 			{
 				bool kill_self = closeSession(ctx);
 				if (kill_self) return NULL;
+				delete rpkt;
 				break;
 			}
 			default:
@@ -1096,6 +1148,13 @@ LOGF("    Accepted a new connection on rxsock %d", rxsock);
 		// get synack session info from accept Q
 		rpkt = popAcceptQ(fake_listen_ctx);
 		// TODO: free acceptQ? maybe only if fake_listen_ctx == ctx?
+
+		if (rpkt == NULL) {
+			ERROR("Trying to listen on a closed context");
+			rcm->set_message("Trying to listen on a closed context");
+			rcm->set_rc(session::FAILURE);
+			return -1;
+		}
 	}
 
 	cinfo->set_my_name(info->my_name());
@@ -1211,9 +1270,20 @@ LOG("BEGIN process_accept_msg");
 
 	// pull message from acceptQ
 	session::SessionPacket *rpkt = popAcceptQ(ctx);
+		
+	if (rpkt == NULL) {
+		ERROR("Trying to listen on a closed context");
+		rcm->set_message("Trying to listen on a closed context");
+		rcm->set_rc(session::FAILURE);
+		return -1;
+	}
+
+	assert(rpkt);
 
 	// store a copy of the session info, updating my_name and my_addr
-	session::SessionInfo *sinfo = new session::SessionInfo(rpkt->info());
+	//session::SessionInfo *sinfo = new session::SessionInfo(rpkt->info());
+	session::SessionInfo *sinfo = new session::SessionInfo();
+	infocpy(&(rpkt->info()), sinfo);
 	sinfo->set_my_name(listenCtxInfo->my_name());
 	sinfo->clear_my_addr();
 	ctx_to_session_info[new_ctx] = sinfo;
@@ -1302,7 +1372,7 @@ LOGF("    Opened connection with initiator on sock %d", tx_cinfo->sockfd());
 
 LOG("    Sent SessionInfo packet to next hop");
 
-	free(rpkt); // TODO: not freed if we hit an error and returned early
+	delete rpkt; // TODO: not freed if we hit an error and returned early
 
 	// return success
 	rcm->set_rc(session::SUCCESS);
@@ -1318,8 +1388,7 @@ LOG("BEGIN process_send_msg");
 	session::S_Return_Code_Msg *rcm = reply.mutable_s_rc();
 
 	// Check that ctx is an initialized session context
-	session::ContextInfo *listenCtxInfo = ctx_to_ctx_info[ctx];
-	if (!listenCtxInfo->initialized() || listenCtxInfo->type() != session::ContextInfo::SESSION) {
+	if (!checkContext(ctx, session::ContextInfo::SESSION)) {
 		ERROR("Context was not an initialized session context");
 		rcm->set_message("Context was not an initialized session context");
 		rcm->set_rc(session::FAILURE);
@@ -1373,8 +1442,7 @@ LOG("BEGIN process_recv_msg");
 	session::S_Return_Code_Msg *rcm = reply.mutable_s_rc();
 	
 	// Check that ctx is an initialized session context
-	session::ContextInfo *listenCtxInfo = ctx_to_ctx_info[ctx];
-	if (!listenCtxInfo->initialized() || listenCtxInfo->type() != session::ContextInfo::SESSION) {
+	if (!checkContext(ctx, session::ContextInfo::SESSION)) {
 		ERROR("Context was not an initialized session context");
 		rcm->set_message("Context was not an initialized session context");
 		rcm->set_rc(session::FAILURE);
@@ -1385,8 +1453,8 @@ LOG("BEGIN process_recv_msg");
 	bool foundADU = false;
 
 	// pull packet off data Q
-	session::SessionPacket *pkt;// = popDataQ(ctx, max_bytes);
-	string data; //data(pkt->data().data());
+	session::SessionPacket *pkt = NULL;
+	string data;
 
 	// keep pulling data while:  there's data in the Q and we have less than max_bytes and (but only if we're not waiting for a full ADU)
 	//                           OR: we're waiting for a full ADU and we have less than max_bytes
@@ -1394,6 +1462,12 @@ LOG("BEGIN process_recv_msg");
 		delete pkt; // free current packet before blowing away the pointer
 		pkt = popDataQ(ctx, max_bytes - data.size());
 
+		if ( pkt == NULL ) {
+			ERROR("Trying to receive on a closed session");
+			rcm->set_message("Trying to receive on a closed session");
+			rcm->set_rc(session::FAILURE);
+			return -1;
+		}
 		if ( pkt->type() != session::DATA || !pkt->has_data() || !pkt->data().has_data()) {
 			ERROR("Received packet did not contain data");
 			rcm->set_message("Received packet did not contain data");
@@ -1452,17 +1526,29 @@ LOG("BEGIN process_check_for_data_msg");
 	const session::SCloseMsg cm = msg.s_close();
 	reply.set_type(session::RETURN_CODE);
 	session::S_Return_Code_Msg *rcm = reply.mutable_s_rc();
+	
+	// Check that ctx is an initialized session context
+	if (!checkContext(ctx, session::ContextInfo::SESSION)) {
+		ERROR("Context was not an initialized session context");
+		rcm->set_message("Context was not an initialized session context");
+		rcm->set_rc(session::FAILURE);
+		return -1;
+	}
 
 	session::SCheckDataRet *cdret = reply.mutable_s_check_data_ret();
-	cdret->set_data_available( (ctx_to_dataQ[ctx]->size() > 0) ); // TODO: should really grab the mutex; someone might be removing last msg
+
+	pthread_mutex_lock(ctx_to_dataQ_mutex[ctx]);
+	cdret->set_data_available( (ctx_to_dataQ[ctx]->size() > 0) ); 
+	pthread_mutex_unlock(ctx_to_dataQ_mutex[ctx]);
 
 
 	// return success
 	rcm->set_rc(session::SUCCESS);
+LOGF("END process_check_for_data_msg (%d packets in Q)", cdret->data_available());
 	return 1;
 }
 
-
+int reply_count = 0;
 int send_reply(int sockfd, struct sockaddr_in *sa, socklen_t sa_size, session::SessionMsg *sm)
 {
 	int rc = 0;
@@ -1473,9 +1559,11 @@ int send_reply(int sockfd, struct sockaddr_in *sa, socklen_t sa_size, session::S
 	sm->SerializeToString(&p_buf);
 
 	int remaining = p_buf.size();
+LOGF("send_reply: sending %d bytes", remaining);
 	const char *p = p_buf.c_str();
 	while (remaining > 0) {
 		rc = sendto(sockfd, p, remaining, 0, (struct sockaddr *)sa, sa_size);
+LOGF("sendto port: %d rc: %d, count: %d", ntohs(sa->sin_port), rc, ++reply_count);
 
 		if (rc == -1) {
 			ERRORF("socket failure: error %d (%s)", errno, strerror(errno));
@@ -1513,6 +1601,7 @@ void* process_function_wrapper(void* args) {
 	if (send_reply(data->sockfd, data->sa, data->len, data->reply) < 0) {
 		ERROR("Error sending reply");
 	}
+	LOG("Wrapper: sent reply");
 
 	free(data->sa);
 	delete data->msg;
@@ -1529,6 +1618,9 @@ int listen() {
 		ERRORF("error creating socket to listen on: %s", strerror(errno));
 		return -1;
 	}
+
+	int buffer_size = 500 * 1024;// * 1024 ;
+	setsockopt(sockfd, SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(buffer_size));
 
 	struct sockaddr_in addr;
 	addr.sin_family = PF_INET;
@@ -1632,10 +1724,10 @@ int main(int argc, char *argv[]) {
 #endif /* XIA */
 			
 	// Start a thread watching for mobility
-	int pthread_rc;
-	if ( (pthread_rc = pthread_create(&mobility_thread, NULL, mobility_daemon, NULL)) < 0) {
-		ERRORF("Error creating thread: %s", strerror(pthread_rc));
-	}
+	//int pthread_rc;
+	//if ( (pthread_rc = pthread_create(&mobility_thread, NULL, mobility_daemon, NULL)) < 0) {
+	//	ERRORF("Error creating thread: %s", strerror(pthread_rc));
+	//}
 
 	listen();
 	return 0;

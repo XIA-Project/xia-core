@@ -62,8 +62,10 @@ int main(int argc, char *argv[])
 				memset(&buf[0], 0, sizeof(buf));
 				n = SrecvADU(accept_ctx, buf, MAXBUF);
 				
-				if (n < 0) 
+				if (n < 0) {
 				    printf("Error receiving data\n");
+					return -1;
+				}
 				if (write(1,buf,n) < 0) {
 					printf("Error writing to buf\n");
 				}

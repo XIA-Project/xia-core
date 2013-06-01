@@ -62,12 +62,13 @@ int main(int argc, char *argv[])
 				
 				n = SrecvADU(accept_ctx, buf, MAXBUF);
 				
-				if (n < 0) 
+				if (n < 0) {
 				    printf("Error receiving data\n");
+					return -1;
+				}
 				if (write(1,buf,n) < 0) {
 					printf("Error writing to buf\n");
 				}
-
 
 				// Do processing on received data here...
 				// Change message to upper case
@@ -78,7 +79,6 @@ int main(int argc, char *argv[])
 					else if (buf[i] >= 65 && buf[i] <= 90)
 						buf[i] += 32;
 				}
-
 
 				if (Ssend(accept_ctx, buf, strlen(buf)) < 0) {
 					LOG("Error sending buf to next hop");
