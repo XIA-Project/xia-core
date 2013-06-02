@@ -26,9 +26,6 @@ for pair in pairs:
         try:
             pings[t+1].append((eval(pair[t]['%s-AB' % types[t]][2]) + eval(pair[t]['%s-BA' % types[t]][2]))/2)
             hops[t+1].append(1 + pair[t]['%s-GG' % types[t]][3] + 1)
-            if pings[t+1][-1] < 50:
-                print pair[t]
-
         except:
             pass
 
@@ -39,8 +36,6 @@ for pair in pairs:
     try:
         pings[0].append((eval(pair[1][3][2]) + eval(pair[1][2][2])) /2)
         hops[0].append(pair[1][0][3] + pair[1][1][3] + pair[1][2][3])
-#         if pings[0][-1] < 50:
-#             print pair
     except:
         pass
 
@@ -53,17 +48,6 @@ print len(pings[0]), len(pings[1]), len(pings[2]), len(pings[3])
 # remove outlies
 for i in range(4):
     pings[i] = [p for p in pings[i] if p < 1000]
-
-#print pings[0][len(pings[0])/2]
-#print pings[3][len(pings[3])/2]
-
-print hops[1]
-print hops[2]
-print hops[3]
-print pings[1]
-print pings[2]
-print pings[3]
-
 
 fig = plt.figure()
 plt.title('Latency using Different Deployment Mechanisms')
