@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import rpyc, re, time, threading, thread
+import rpyc, re, time, threading, thread, sys
 from plcommon import check_output, rpc, printtime
 from subprocess import call, Popen, PIPE
 from rpyc.utils.server import ThreadPoolServer
@@ -20,22 +20,24 @@ my_name = check_output("hostname")[0].strip()
 
 FINISH_EVENT = threading.Event()    
 
+FOURID_SETUP = False
+
 def multi_ping(neighbors):
+    print "<<<< Multi Ping >>>>"
     pingcmd = 'sudo ping -W 1 -i %s -c' % PING_INTERVAL
     
-    processes = [Popen('%s %s %s' % (pingcmd, 1, neighbor), shell=True, stdout=PIPE, stderr=PIPE) for neighbor in neighbors]
-    outs = [process.communicate() for process in processes]
+    processes = [(Popen('%s %s %s' % (pingcmd, 1, neighbor), shell=True, stdout=PIPE, stderr=PIPE), neighbor) for neighbor in neighbors]
+    outs = [process[0].communicate() for process in processes]
 
-    processes = [Popen('%s %s %s' % (pingcmd, PING_COUNT, neighbor), shell=True, stdout=PIPE, stderr=PIPE) for neighbor in neighbors]
-    outs = [process.communicate() for process in processes]
-    rcs = [process.wait() for process in processes]
-    outs = zip(outs, rcs)
+    processes = [(Popen('%s %s %s' % (pingcmd, PING_COUNT, neighbor), shell=True, stdout=PIPE, stderr=PIPE), neighbor) for neighbor in neighbors]
+    outs = [process[0].communicate() for process in processes]
+    rcs = [process[0].wait() for process in processes]
+    outs = zip(outs, rcs, [p[1] for p in processes])
 
     stats = []
     for out in outs:
-        host = out[0][0].split('\n')[0].split(' ')[1]
-        p = float(out[0][0].split("\n")[-2].split('=')[1].split('/')[1]) if out[1] == 0 else 5000.00
-        stats.append((p,host))
+            p = float(out[0][0].split("\n")[-2].split('=')[1].split('/')[1]) if out[1] == 0 else 5000.00
+            stats.append((p,out[2]))
     stats = sorted(stats)
     stats = [(-1,stat[1]) if stat[0] == 5000 else stat for stat in stats]
     stats = [("%.3f" % stat[0], stat[1]) for stat in stats]
@@ -47,9 +49,11 @@ def traceroute(neighbor):
     stat = -1 if stat is 30 else stat
     return stat
 
-def xping(neighbor,tryUntilSuccess=True):
+def xping(neighbor,tryUntilSuccess=True,src=None):
+    xpingcmd = '/home/cmu_xia/fedora-bin/xia-core/bin/xping -t 5'
+    if src:
+        xpingcmd = '%s -s "%s"' % (xpingcmd, src)
     while tryUntilSuccess:
-        xpingcmd = '/home/cmu_xia/fedora-bin/xia-core/bin/xping -t 5'
         s = '%s "%s"' % (xpingcmd, neighbor)
         while True:
             try:
@@ -60,8 +64,7 @@ def xping(neighbor,tryUntilSuccess=True):
                 break
             except:
                 pass
-        xpingcmd = '/home/cmu_xia/fedora-bin/xia-core/bin/xping -t 5 -i %s -c' % XPING_INTERVAL
-        s = '%s %s "%s"' % (xpingcmd, PING_COUNT, neighbor)
+        s = '%s -c %s "%s"' % (xpingcmd, PING_COUNT, neighbor)
         while tryUntilSuccess:
             try:
                 printtime(s)
@@ -78,8 +81,11 @@ def xping(neighbor,tryUntilSuccess=True):
     stat = -1 if stat == '=' else stat
     return stat
 
-def xtraceroute(neighbor,tryUntilSuccess=True):
-    cmd = '/home/cmu_xia/fedora-bin/xia-core/bin/xtraceroute -t 30 "%s"' % neighbor
+def xtraceroute(neighbor,tryUntilSuccess=True, src=None):
+    cmd = '/home/cmu_xia/fedora-bin/xia-core/bin/xtraceroute -t 30'
+    if src:
+        cmd = '%s -s "%s"' % (cmd, src)
+    cmd = '%s "%s"' % (cmd, neighbor)
     while tryUntilSuccess:
         try:
             printtime(cmd)
@@ -101,6 +107,9 @@ class MyService(rpyc.Service):
     def on_disconnect(self):
         pass
 
+    def exposed_get_hello(self):
+        return 'hello'
+
     def exposed_gather_stats(self):
         printtime('<<<<GATHER STATS>>>>')
         neighbors = rpc(MASTER_SERVER, 'get_backbone', ())
@@ -117,18 +126,128 @@ class MyService(rpyc.Service):
         printtime('neighbor: %s' % neighbor)
         xlatency = xping(neighbor)
         printtime('xlatency: %s' % xlatency)
-#########time.sleep(2)
+        time.sleep(2)
         xhops = xtraceroute(neighbor)
         printtime('xhops: %s' % xhops)
         rpc(MASTER_SERVER, 'xstats', (xlatency, xhops))
         return 'Sent xstats: (%s, %s, %s)' % (neighbor, xlatency, xhops)
 
+#     class fourid_stat_runner(threading.Thread):
+#         def __init__(self, bucket, type, gpair, npair, neighbor):
+#             threading.Thread.__init__(self)
+#             self.bucket = bucket
+#             self.type = type
+#             self.gpair = gpair
+#             self.npair = npair
+#             self.neighbor = neighbor
+#         def run(self):
+#             try:
+#                 printtime('<<<<NODE STARTING %s STATS>>>>' % self.type)
+#                 gateway = rpc(MASTER_SERVER,'get_gateway_host',(self.type,))
+#                 DST = rpc(MASTER_SERVER,'get_gateway_xhost',(self.type,))
+#                 xlatency = xping(DST)
+#                 xhops = xtraceroute(DST)
+#                 rpc(MASTER_SERVER, 'fidstats', ('%s-%s' % (self.type, self.gpair), gateway, xlatency, xhops))
+
+#                 SRC = rpc(MASTER_SERVER,'get_fourid_neighbor_xhost',(self.type,True))
+#                 DST = rpc(MASTER_SERVER,'get_fourid_neighbor_xhost',(self.type,False))
+#                 xlatency = xping(DST, src=SRC)
+# #####
+#                 #xhops = xtraceroute(DST, src=SRC)
+#                 xhops = -1
+# ####
+#                 rpc(MASTER_SERVER, 'fidstats', ('%s-%s' % (self.type, self.npair), self.neighbor, xlatency, xhops))
+#             except:
+#                 self.bucket.put(sys.exc_info())
+
+    def exposed_gather_fourid_stats(self): 
+        printtime('<<<<GATHER FOURIDSTATS>>>>')
+        # [CA, 6RDA, GA, SDNA, CB, 6RDB, GB, SDNB]
+        fidn = rpc(MASTER_SERVER, 'get_fourid_nodes', ())
+        print my_name, fidn
+        if my_name not in fidn:
+            return
+        elif my_name in [fidn[0], fidn[4]]: #CA, CB
+            printtime('<<<<<NODE STARTING 4IDSTAT>>>>')
+            i = fidn.index(my_name)
+            gpair = 'AG' if i == 0 else 'BG'
+            npair = 'AB' if i == 0 else 'BA'
+            neighbor = fidn[4] if i == 0 else fidn[0]
+
+#            buckets = [Queue.Queue(), Queue.Queue(), Queue.Queue()]
+#            threads = []
+#            types = ['6RD', '4ID', 'SDN']
+            for type in ['SDN', '4ID', '6RD']:
+                printtime('<<<<NODE STARTING %s STATS>>>>' % type)
+                gateway = rpc(MASTER_SERVER,'get_gateway_host',(type,))
+                DST = rpc(MASTER_SERVER,'get_gateway_xhost',(type,))
+                xlatency = xping(DST)
+                xhops = xtraceroute(DST)
+                rpc(MASTER_SERVER, 'fidstats', ('%s-%s' % (type, gpair), gateway, xlatency, xhops))
+
+                SRC = rpc(MASTER_SERVER,'get_fourid_neighbor_xhost',(type,True))
+                DST = rpc(MASTER_SERVER,'get_fourid_neighbor_xhost',(type,False))
+                xlatency = xping(DST, src=SRC)
+#####
+                #xhops = xtraceroute(DST, src=SRC)
+                xhops = -1
+####
+                rpc(MASTER_SERVER, 'fidstats', ('%s-%s' % (type, npair), neighbor, xlatency, xhops))
+
+#             for i in range(3):
+#                 threads.append(fourid_stat_runner(bucket[i], type[i], gpair, npair, neighbor))
+#                 threads[i].start()
+#             while True:
+#                 for i in range(3):
+#                     try:
+#                         exc = buckets[i].get(block=False)
+#                         break
+#                     except Queue.Empty:
+#                         pass
+#                 if exc:
+#                     rpc(MASTER_SERVER, error, ('4ID Stats', my_name))
+#                 for i in range(3):
+#                     threads[i].join(0.1)
+#                 if not threads[0].isAlive() and not thread[1].isAlive() and not thread[2].isAlive():
+#                     break
+
+        elif my_name in [fidn[1], fidn[2], fidn[3]]: # 6RDA, GA, SDNA
+            indices = [i for i,x in enumerate(fidn) if x == my_name]
+            for i in indices:
+                type = ['6RD', '4ID', 'SDN'][i-1]
+                partner_node = fidn[i+4]
+                latency = multi_ping([partner_node])[0][0]
+                hops = traceroute(partner_node)
+                rpc(MASTER_SERVER, 'fidstats', ('%s-GG' % type, partner_node, latency, hops))
+
+    def exposed_get_ping(self, nodes):
+        return multi_ping(nodes)
+
+    def try_xroute(self):
+#         i = 0
+#         while i < 5:
+#             try:
+#                 xr_out = check_output(XROUTE)
+#                 break
+#             except:
+#                 self.exposed_soft_restart(None)
+#                 i += 1
+#         if i < 5:
+#             return xr_out
+#         else:
+#             raise Exception("Failed to restart XIANET")
+        return check_output(XROUTE)
+
+    def exposed_get_fourid(self):
+        xr_out = self.try_xroute()
+        return re.search(r'IP:(.*) *-2 \(self\)', xr_out[0]).group(1).strip().lower()
+
     def exposed_get_hid(self):
-        xr_out = check_output(XROUTE)
+        xr_out = self.try_xroute()
         return re.search(r'HID:(.*) *-2 \(self\)', xr_out[0]).group(1).strip().lower()
 
     def exposed_get_ad(self):
-        xr_out = check_output(XROUTE)
+        xr_out = self.try_xroute()
         return re.search(r'AD:(.*) *-2 \(self\)', xr_out[0]).group(1).strip().lower()
 
     def exposed_get_neighbors(self):
@@ -162,15 +281,16 @@ class MyService(rpyc.Service):
             printtime(command)
             exec(command)
 
-    def exposed_wait_for_neighbor(self, neighbor, msg):
+    def exposed_wait_for_neighbors(self, neighbors, msg):
         while True:
-            try:
-                printtime('waiting on: %s' % neighbor)
-                out = rpc(neighbor, 'get_hid', ())
-                return out
-            except:
-                printtime(msg)
-                time.sleep(1)
+            for neighbor in neighbors:
+                try:
+                    printtime('waiting on: %s' % neighbor)
+                    out = rpc(neighbor, 'get_hid', ())
+                    return out
+                except:
+                    printtime(msg)
+                    time.sleep(1)
 
 class Mapper(threading.Thread):
     def __init__(self, goOnEvent):
@@ -202,12 +322,17 @@ if __name__ == '__main__':
     printtime(('RPC server listening on port %d\n'
         'press Ctrl-C to stop\n') % RPC_PORT)
 
+    if len(sys.argv) > 1:
+        if sys.argv[1] == 'setup':
+            FOURID_SETUP = True
+
     FINISH_EVENT.set()
     mapper = Mapper(goOnEvent = FINISH_EVENT)
     mapper.start()
 
-    runner = Runner()
-    runner.start()
+    if not FOURID_SETUP:
+        runner = Runner()
+        runner.start()
 
     try:
         t = ThreadPoolServer(MyService, port = RPC_PORT)
@@ -218,6 +343,8 @@ if __name__ == '__main__':
     printtime('Local_Server Exiting, please wait...')
     FINISH_EVENT.clear()
     mapper.join()
-    runner.join()
+
+    if not FOURID_SETUP:
+        runner.join()
 
     printtime('Local_Server Finished.')

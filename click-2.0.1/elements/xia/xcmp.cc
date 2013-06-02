@@ -27,7 +27,7 @@
 #include <click/packet_anno.hh>
 CLICK_DECLS
 
-#define DEBUG 0
+#define DEBUG 1
 
 // no initialization needed
 XCMP::XCMP()
@@ -75,7 +75,7 @@ XCMP::sendUp(Packet *p_in) {
 
 // create and send XCMP packet with the following params. _addr_ is used for redirects.
 void
-XCMP::sendXCMPPacket(const Packet *p_in, int type, int code, click_xia_xid *lastaddr, click_xia_xid *nxthop) {
+XCMP::sendXCMPPacket(const Packet *p_in, int type, int code, click_xia_xid *lastaddr, click_xia_xid *nxthop, XIAPath *src) {
 
     const XIAHeader hdr(p_in);
     const size_t xs = sizeof(struct click_xia_xcmp);
@@ -122,7 +122,11 @@ XCMP::sendXCMPPacket(const Packet *p_in, int type, int code, click_xia_xid *last
     XIAHeaderEncap encap;
     encap.set_nxt(CLICK_XIA_NXT_XCMP);   // XCMP
     encap.set_dst_path(hdr.src_path());
-    encap.set_src_path(_src_path);
+    if (src) {
+        encap.set_src_path(*src);
+    } else {
+        encap.set_src_path(hdr.dst_path());
+    }
 		
     // clear the paint
     SET_XIA_PAINT_ANNO(p, DESTINED_FOR_LOCALHOST);
@@ -158,7 +162,7 @@ XCMP::processBadForwarding(Packet *p_in) {
     // get the next hop information stored in the packet annotation
     XID nxt_hop = p_in->nexthop_neighbor_xid_anno();
 
-    sendXCMPPacket(p_in, XCMP_REDIRECT, XCMP_REDIRECT_HOST, &lnode.xid(), &nxt_hop.xid()); // send a redirect
+    sendXCMPPacket(p_in, XCMP_REDIRECT, XCMP_REDIRECT_HOST, &lnode.xid(), &nxt_hop.xid(), &_src_path); // send a redirect
 	   
     if(DEBUG)
         click_chatter("%s: Redirect sent\n", _src_path.unparse().c_str());
@@ -186,6 +190,9 @@ XCMP::processUnreachable(Packet *p_in) {
         return;
     }
     dst_path.remove_node(dst_path.destination_node());
+    if(dst_path.unparse_node_size() < 1) {
+        return;
+    }
     XID dst_hid = dst_path.xid(dst_path.destination_node());
     if(dst_hid == bcast_xid) {
         // don't send undeliverables back to broadcast packets
@@ -197,7 +204,7 @@ XCMP::processUnreachable(Packet *p_in) {
                       hdr.src_path().unparse().c_str(), 
                       hdr.dst_path().unparse().c_str());
 
-    sendXCMPPacket(p_in, XCMP_UNREACH, XCMP_UNREACH_HOST, NULL, NULL); // send an undeliverable message
+    sendXCMPPacket(p_in, XCMP_UNREACH, XCMP_UNREACH_HOST, NULL, NULL, &_src_path); // send an undeliverable message
 
     if(DEBUG)
         click_chatter("%s: Dest Unreachable sent to %s\n", _src_path.unparse().c_str(), 
@@ -212,7 +219,7 @@ XCMP::processExpired(Packet *p_in) {
     if(DEBUG)
         click_chatter("%s: HLIM Exceeded\n", _src_path.unparse().c_str());
     
-    sendXCMPPacket(p_in, XCMP_TIMXCEED, XCMP_TIMXCEED_REASSEMBLY , NULL, NULL); // send a TTL expire message
+    sendXCMPPacket(p_in, XCMP_TIMXCEED, XCMP_TIMXCEED_REASSEMBLY , NULL, NULL, &_src_path); // send a TTL expire message
   		
     if(DEBUG)
         click_chatter("%s: TIME EXCEEDED sent\n", _src_path.unparse().c_str());
@@ -228,7 +235,7 @@ XCMP::gotPing(const Packet *p_in) {
         click_chatter("%s: PING received; client seq = %u\n", _src_path.unparse().c_str(), 
                       *(uint16_t*)(hdr.payload() + 6));
 
-    sendXCMPPacket(p_in, XCMP_ECHOREPLY, 0, NULL, NULL);
+    sendXCMPPacket(p_in, XCMP_ECHOREPLY, 0, NULL, NULL, NULL);
 
     /*
     // TODO: What is this?
