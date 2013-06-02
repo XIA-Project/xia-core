@@ -21,28 +21,6 @@ if len(sys.argv) < 3:
 
 pairs = open(sys.argv[2],'r').read().split('\n')[:-1]
 pairs = [eval(pair.split('):')[1]) for pair in pairs]
-
-if len(sys.argv) > 3:
-    d1 = {}
-    p = open(sys.argv[2],'r').read().split('\n')[:-1]
-    pkey = [pair.split('):')[0]+')' for pair in p]
-    pval = [eval(pair.split('):')[1]) for pair in p]
-    for i in range(len(p)):
-        d1[pkey[i]] = pval[i]
-
-    d2 = {}
-    p2 = open(sys.argv[3],'r').read().split('\n')[:-1]
-    p2key = [pair.split('):')[0]+')' for pair in p2]
-    p2val = [eval(pair.split('):')[1]) for pair in p2]
-    for i in range(len(p2)):
-        d2[p2key[i]] = p2val[i]
-
-    d1.update(d2)
-    pairs = []
-    for key, value in d1.iteritems():
-        pairs.append(value)
-
-
 for pair in pairs:
     for t in range(3):
         try:
