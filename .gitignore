@@ -127,3 +127,4 @@ etc/click/templates/dual_stack_router.click
 # planetlab
 experiments/planetlab/logs/*.txt
 experiments/planetlab/logs/tunneling
+experiments/planetlab/logs/fourid
