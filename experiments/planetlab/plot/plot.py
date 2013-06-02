@@ -64,7 +64,7 @@ for pt in pings:
 
     p = sorted(zip(Y.keys(), Y.values()))
     plt.plot(zip(*p)[0], 100*np.cumsum(zip(*p)[1]))
-plt.legend(('Tunneling', '6RD/6to4', '4ID', '4ID+SDN'),
+plt.legend(('Tunneling', '6RD/6to4', '4ID', 'Smart 4ID'),
            'lower right')
 ax.axis([0, PING_MAX, 0, 100])
 plt.savefig('/home/cmu_xia/ping.png')
