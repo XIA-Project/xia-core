@@ -1,8 +1,8 @@
 #!/usr/bin/python
 
-import socket, time, re
+import socket, time, re, sys
 PROXY_IP = '127.0.0.1'
-PROXY_PORT = 8000
+PROXY_PORT = 14659 #8000
 BUFFER_SIZE = 65535
 
 FILE = 'http://www_s.xiaweb.com.xia/xia/index.html'
@@ -30,14 +30,24 @@ def get_file(file):
     return data
 
 
+if len(sys.argv) > 1:
+    PROXY_PORT = int(sys.argv[1])
+
+print 'starting browser test!!'
 start = time.time()
 data = get_file(FILE)
+print 'browser data: %s' % data
 
-for r in re.finditer(r'href="(.*)"', data):
+rc = 42
+for r in re.finditer(r'href="(\S*)"', data):
+    print r.group(1).strip()
     get_file(r.group(1).strip())
 
-for r in re.finditer(r'src="(.*)"', data):
+for r in re.finditer(r'src="(\S*)"', data):
+    print r.group(1).strip()
     get_file(r.group(1).strip())
+    rc = 0
 
 elapsed = (time.time() - start)
-print elapsed
+print 'Elapsed Time for Browser Test: %s' % elapsed
+sys.exit(rc)

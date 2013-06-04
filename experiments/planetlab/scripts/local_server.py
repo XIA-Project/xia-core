@@ -1,12 +1,16 @@
 #!/usr/bin/python
 
 import rpyc, re, time, threading, thread, sys
-from plcommon import check_output, rpc, printtime
+from plcommon import check_output, rpc, printtime, check_both
 from subprocess import call, Popen, PIPE
 from rpyc.utils.server import ThreadPoolServer
 
 RPC_PORT = 43278
-KILL_XIANET = 'sudo ~/fedora-bin/xia-core/bin/xianet stop'
+KILL_XIANET = 'sudo killall xianet; sudo ~/fedora-bin/xia-core/bin/xianet stop'
+PROXY_CMD = '/home/cmu_xia//fedora-bin/xia-core/experiments/planetlab/proxy_mockup.sh'
+BROWSER_CMD = '/home/cmu_xia/fedora-bin/xia-core/experiments/planetlab/browser_mockup.py'
+BROWSER_ADDR = 'www_s.xiaweb.com.xia'
+ETC_HOSTS = '~/fedora-bin/xia-core/etc/hosts.xia'
 XROUTE = '/home/cmu_xia/fedora-bin/xia-core/bin/xroute -v'
 MASTER_SERVER = 'GS11698.SP.CS.CMU.EDU'
 BEAT_PERIOD = 3
@@ -45,6 +49,7 @@ def multi_ping(neighbors):
 
 def traceroute(neighbor):
     out = check_output('sudo traceroute -I -w 1 %s' % neighbor)
+    print out
     stat = int(out[0].split("\n")[-2].strip().split(' ')[0])
     stat = -1 if stat is 30 else stat
     return stat
@@ -109,6 +114,32 @@ class MyService(rpyc.Service):
 
     def exposed_get_hello(self):
         return 'hello'
+
+    def exposed_gather_browser_stats(self):
+        # write to etc/hosts.xia
+        check_output('echo "%s %s" > %s' % (BROWSER_ADDR, rpc(MASTER_SERVER, 'get_neighbor_webserver', ()), ETC_HOSTS))
+
+        print check_output('cat %s' % ETC_HOSTS)
+
+        while True:
+            try:
+                check_output('ps -e | grep proxy.py')
+                break
+            except:
+                Popen(PROXY_CMD, shell=True)
+                time.sleep(1)
+        time.sleep(3)
+        p = Popen(BROWSER_CMD,shell=True)
+        p.wait()
+        time.sleep(3)
+        while True:
+            (out, rc) = check_both(BROWSER_CMD, check=False)
+            if rc == 1:
+                raise Execption("BROWSER_CMD failed")
+            if rc == 0:
+                break
+        out = out[0].split('\n')[-2].split(' ')[-1]
+        rpc(MASTER_SERVER, 'browser_stats', (out,))
 
     def exposed_gather_stats(self):
         printtime('<<<<GATHER STATS>>>>')
@@ -180,10 +211,16 @@ class MyService(rpyc.Service):
             for type in ['SDN', '4ID', '6RD']:
                 printtime('<<<<NODE STARTING %s STATS>>>>' % type)
                 gateway = rpc(MASTER_SERVER,'get_gateway_host',(type,))
-                DST = rpc(MASTER_SERVER,'get_gateway_xhost',(type,))
-                xlatency = xping(DST)
-                xhops = xtraceroute(DST)
-                rpc(MASTER_SERVER, 'fidstats', ('%s-%s' % (type, gpair), gateway, xlatency, xhops))
+#                 DST = rpc(MASTER_SERVER,'get_gateway_xhost',(type,))
+
+#                 xlatency = xping(DST)
+#                 xhops = xtraceroute(DST)
+                
+                DST_h = rpc(MASTER_SERVER,'get_gateway_host',(type,))
+                latency = multiping([DST_h])[0][0]
+                hops = traceroute(DST_h)
+#                rpc(MASTER_SERVER, 'fidstats', ('%s-%s' % (type, gpair), gateway, xlatency, xhops))
+                rpc(MASTER_SERVER, 'fidstats', ('%s-%s' % (type, gpair), gateway, latency, hops))
 
                 SRC = rpc(MASTER_SERVER,'get_fourid_neighbor_xhost',(type,True))
                 DST = rpc(MASTER_SERVER,'get_fourid_neighbor_xhost',(type,False))
@@ -193,7 +230,6 @@ class MyService(rpyc.Service):
                 xhops = -1
 ####
                 rpc(MASTER_SERVER, 'fidstats', ('%s-%s' % (type, npair), neighbor, xlatency, xhops))
-
 #             for i in range(3):
 #                 threads.append(fourid_stat_runner(bucket[i], type[i], gpair, npair, neighbor))
 #                 threads[i].start()
@@ -273,6 +309,7 @@ class MyService(rpyc.Service):
         return xianetcmd
 
     def exposed_run_commands(self):
+        printtime('stopping local processes')
         printtime('requesting commands!')
         commands = rpc(MASTER_SERVER, 'get_commands', ())
         printtime('commands received!')

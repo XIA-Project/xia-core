@@ -40,7 +40,7 @@ FOURID_TOPO_FILE = PLANETLAB_DIR + '4ID_topo'
 FOURID_G_INDEX = None
 
 # note that killing local server is not in this one
-STOP_CMD = '"sudo killall sh; sudo killall init.sh; sudo killall rsync; sudo ~/fedora-bin/xia-core/bin/xianet stop; sudo killall mapper_client.py; sudo killall xping; sudo killall xtraceroute; sudo killall ping; sudo killall traceroute"'
+STOP_CMD = '"sudo killall sh; sudo killall init.sh; sudo killall rsync; sudo ~/fedora-bin/xia-core/bin/xianet stop; sudo killall mapper_client.py; sudo killall xping; sudo killall xtraceroute; sudo killall ping; sudo killall traceroute; sudo killall webserver.py; sudo killall proxy.py; sudo killall browser_mockup.py"'
 KILL_LS = '"sudo killall -s INT local_server.py; sudo killall -s INT python; sleep 5; sudo killall local_server.py; sudo killall python"'
 START_CMD = '"curl https://raw.github.com/XIA-Project/xia-core/develop/experiments/planetlab/init.sh > ./init.sh && chmod 755 ./init.sh && ./init.sh && python -u ~/fedora-bin/xia-core/experiments/planetlab/scripts/local_server.py"'
 FOURID_SETUP_CMD = '"curl https://raw.github.com/XIA-Project/xia-core/develop/experiments/planetlab/init.sh > ./init.sh && chmod 755 ./init.sh && ./init.sh && python -u ~/fedora-bin/xia-core/experiments/planetlab/scripts/local_server.py setup"'
@@ -50,6 +50,10 @@ XIANET_FRONT_HOST_CMD = 'sudo ~/fedora-bin/xia-core/bin/xianet -v -t -P'
 XIANET_FRONT_4ID_CMD = 'sudo ~/fedora-bin/xia-core/bin/xianet -v -4r -P'
 XIANET_BACK_CMD = '-f eth0 start'
 XIANET_BACK_4ID_CMD = '-I eth0 start'
+
+WEBSERVER_CMD = '/home/cmu_xia/fedora-bin/xia-core/experiments/planetlab/webserver_mockup.sh'
+WEBSERVER_SID = 'f0afa824a36f2a2d95c67ff60f61200e48006625'
+BLANK_FOURID = '4500000000010000fafa00000000000000000000'
 
 NUMEXP = 1
 NEW_EXP_TIMER = None
@@ -61,7 +65,8 @@ NODE_WATCHERS_LOCK = thread.allocate_lock()
 PAIRWISE_PING_LOCK = thread.allocate_lock()
 SINGLE_EXPERIMENT = False
 SAME_TEST_NODES = False
-FOURID_EXPERIMENT = True
+FOURID_EXPERIMENT = False
+APP_EXPERIMENT = True
 
 class NodeWatcher(threading.Thread):
     def preexec(self): # Don't forward signals.
@@ -307,25 +312,49 @@ class MasterService(rpyc.Service):
                         (rpc(neighbor, 'get_ad', ()), rpc(neighbor, 'get_hid', ()))
                 except:
                     pass
-        return None            
+        return None    
+
+    def exposed_get_neighbor_webserver(self):
+        printtime("<<<< GET WEBSERVER >>>>")
+        if self._host in CLIENTS:
+            neighbor = [client for client in CLIENTS if client != self._host][0]
+            while True:
+                try:
+                    ad = 'AD:%s' % rpc(neighbor, 'get_ad', ())
+                    hid = 'HID:%s' % rpc(neighbor, 'get_hid', ())
+                    try:
+                        fourid = 'IP:%s' % rpc(neighbor, 'get_fourid', ())
+                    except:
+                        fourid = 'IP:%s' % BLANK_FOURID
+                    s = 'RE ( %s ) %s %s SID:%s' % \
+                        (fourid, ad, hid, WEBSERVER_SID)
+                    return s
+                except:
+                    pass
+        return None    
+
 
     def exposed_get_neighbor_host(self):
         if self._host in CLIENTS:
             return [client for client in CLIENTS if client != self._host][0]
 
+    def exposed_browser_stats(self, latency):
+        cur_exp = tuple(CLIENTS)
+        STATSD[cur_exp]['browser'] = (self._host, CLIENTS[0], latency)
+
+        if 'stats' in PRINT_VERB: printtime('%s:\t %s\n' % (cur_exp,STATSD[cur_exp]))
+        self.exposed_new_exp()
+
     def exposed_stats(self, backbone_name, ping, hops):        
         cur_exp = tuple(CLIENTS)
-        try:
-            STATSD[cur_exp].append(((self._host,backbone_name),'backbone',ping,hops))
-        except:
-            STATSD[cur_exp] = [((self._host,backbone_name),'backbone',ping,hops)]
+        m = 'A' if self._host == CLIENTS[0] else 'B'
+        n = 'B' if self._host == CLIENTS[0] else 'A'
+        STATSD[cur_exp]['backbone-%s' % m] = (self._host, backbone_name, ping, hops)
 
         # went to the same BB node -- we don't handle this
         if len(STATSD[cur_exp]) >= 2:
-            neighbor = [client for client in CLIENTS if client != self._host][0]
-            bbs = [b[0] for b in STATSD[cur_exp][0:2]]
-            my_bb = bbs[0][1] if self._host in bbs[0] else bbs[1][1]
-            n_bb = bbs[0][1] if neighbor in bbs[0] else bbs[1][1]
+            my_bb = STATSD[cur_exp]['backbone-%s' % m][1]
+            n_bb = STATSD[cur_exp]['backbone-%s' % n][1]
             if my_bb == n_bb:
                 printtime("<<<< Experiment went to the same backbone node >>>>")
                 self.exposed_new_exp()
@@ -340,13 +369,16 @@ class MasterService(rpyc.Service):
 
     def exposed_xstats(self, xping, xhops):
         cur_exp = tuple(CLIENTS)
-        STATSD[cur_exp].append((cur_exp,'test',xping,xhops))
+        m = 'A' if self._host == CLIENTS[0] else 'B'
+        n = 'B' if self._host == CLIENTS[0] else 'A'
+        neighbor = CLIENTS[1] if self._host == CLIENTS[0] else CLIENTS[0]
+        STATSD[cur_exp]['%s%s' % (m,n)] = (self._host, neighbor, xping, xhops)
 
         if 'xstats' in PRINT_VERB: printtime('%s:\t %s\n' % (cur_exp,STATSD[cur_exp]))
 
-        if len(STATSD[cur_exp]) is 4:
-            self.exposed_new_exp()
-            pass
+#         if len(STATSD[cur_exp]) is 4:
+#             self.exposed_new_exp()
+#             pass
 
     def exposed_fidstats(self, type, neighbor, ping, hops):
         cur_exp = tuple(CLIENTS)
@@ -371,9 +403,11 @@ class MasterService(rpyc.Service):
             pass
 
     def init_statsd(self, new_clients):
+        cur_exp = tuple(new_clients)
         if FOURID_EXPERIMENT:
-            cur_exp = tuple(new_clients)
-            STATSD[cur_exp]= [{},{},{}] # 6RD, 4ID, SDN
+            STATSD[cur_exp] = [{},{},{}] # 6RD, 4ID, SDN
+        else:
+            STATSD[cur_exp] = {}
 
     def build_topo(self, new_clients):
         # no node can have more than three edges
@@ -461,8 +495,7 @@ class MasterService(rpyc.Service):
                         break
                 if SAME_TEST_NODES:
                     new_clients = [NAME_LOOKUP['planetlab1.tsuniv.edu'],NAME_LOOKUP['planetlab5.cs.cornell.edu']]
-                    new_clients = sorted(new_clients)
-
+                new_clients = sorted(new_clients)
             else:
                 while True:
                     while True:
@@ -619,6 +652,11 @@ class MasterService(rpyc.Service):
                 cmd += ["self.exposed_wait_for_neighbors([my_backbone], 'waiting for backbone: %s' % my_backbone)"]
                 cmd += ["self.exposed_wait_for_neighbors([my_neighbor], 'waiting for neighbor: %s' % my_neighbor)"]
                 cmd += ["self.exposed_gather_xstats()"]
+                if APP_EXPERIMENT:
+                    if host == CLIENTS[0]:
+                        cmd += ["check_output('%s')" % WEBSERVER_CMD]
+                    else:
+                        cmd += ["self.exposed_gather_browser_stats()"]
                 return cmd
 
         
@@ -676,6 +714,7 @@ class Runner(threading.Thread):
 
 
 if __name__ == '__main__':
+    global MAX_EXPERIMENT_TIMEOUT
     seed()
 
     latlonfile = open(LATLON_FILE, 'r').read().split('\n')
@@ -693,6 +732,7 @@ if __name__ == '__main__':
         topo_file = FOURID_TOPO_FILE
     else:
         topo_file = BACKBONE_TOPO_FILE
+        MAX_EXPERIMENT_TIMEOUT = 180
 
     lines = open(topo_file,'r').read().split('\n')
     for line in lines:

@@ -1,7 +1,8 @@
 #!/usr/bin/python
 
-import copy, time, threading, rpyc
-from subprocess import Popen, PIPE
+import copy, time, threading, rpyc, sys
+from threading import Thread
+from subprocess import Popen, PIPE, STDOUT
 
 RPC_PORT = 43278
 CHECK_TIMEOUT = 15
@@ -52,11 +53,23 @@ def rpc(dest, cmd, args):
     c.close()
     return out
 
-def check_output(args):
-    p = Popen(args,shell=True,stdout=PIPE,stderr=PIPE)
-    out = p.communicate()
+def check_output(args, shouldPrint=True):
+    return check_both(args, shouldPrint)[0]
+
+def check_both(args, shouldPrint=True, check=True):
+    out = ""
+    p = Popen(args,shell=True,stdout=PIPE,stderr=STDOUT)
+    while True:
+        line = p.stdout.readline()
+        if not line:
+            break
+        if shouldPrint: sys.stdout.write(line)
+        out += line
     rc = p.wait()
-    if rc is not 0:
+    out = (out,"")
+    out = (out, rc)
+    if check and rc is not 0:
+        print "Error processes output: %s" % (out,)
         raise Exception("subprocess.CalledProcessError: Command '%s'" \
                             "returned non-zero exit status %s" % (args, rc))
     return out
