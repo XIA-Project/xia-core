@@ -1,4 +1,4 @@
-TARGETS=nameserver xhcp xrouted
+TARGETS=nameserver xhcp xrouted session
 CLEAN=$(addsuffix .build, $(TARGETS))
 
 .PHONY: all clean $(TARGETS)

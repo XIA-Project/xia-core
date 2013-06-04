@@ -10,6 +10,7 @@ TARGETS= chunk_copy_client chunk_copy_server echoclient echoclient-datagram \
 
 all: $(TARGETS)
 	make -C dag_manipulation
+	make -C session
 
 %: %.c
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS) -lpthread
@@ -20,3 +21,4 @@ all: $(TARGETS)
 clean: 
 	-rm $(TARGETS)
 	make -C dag_manipulation clean
+	make -C session clean
