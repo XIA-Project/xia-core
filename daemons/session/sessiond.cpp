@@ -15,7 +15,7 @@ using namespace std;
 #define DEFAULT_PROCPORT 1989
 #define BUFSIZE 65000
 #define MTU 1250
-#define MOBILITY_CHECK_INTERVAL 10
+#define MOBILITY_CHECK_INTERVAL 1
 #define ADU_DELIMITER "\x1f"  // 0x1f is the unit separator
 
 #define Q_ALLOCATED 1
@@ -238,10 +238,8 @@ session::SessionPacket* popQ(queue<session::SessionPacket*> *Q, pthread_mutex_t 
 	// We either got signalled because there's data to pop or because the Q
 	// was dealloc'd. Figure out which.
 	if (!checkQ(Q)) {
-		LOG("Q torn down");
 		pthread_cond_signal(cond); // signal that we got the message
 		pthread_mutex_unlock(mutex);
-		LOG("popDataQ: signalled that we got the msg; exiting");
 		return NULL; 
 	}
 
@@ -329,9 +327,7 @@ void deallocateQ(int ctx, map<unsigned short, queue<session::SessionPacket*>* > 
 	QState.erase(Q);
 	if (watched) {
 		pthread_cond_signal(cond); // signal watched Q is going away
-		LOGF("Signalled on context; waiting for confirmation %d", ctx);
 		pthread_cond_wait(cond, mutex); // wait until they get the message
-		LOG("Watcher stopped watching; finish deallocing");
 	}
 
 	// dealloc the Q
@@ -376,12 +372,12 @@ int stopPollingSocket(int sock) {
 	// so all we need to do here is remove state
 	if (*t != pthread_self()) {
 		rc = pthread_cancel(*t);
-		if (rc < 0) {
-			ERRORF("Error cancelling listen thread for sock %d", sock);
+		if (rc != 0) {
+			ERRORF("Error cancelling listen thread for sock %d: %s", sock, strerror(rc));
 		}
 		rc = pthread_join(*t, NULL);
-		if (rc < 0) {
-			ERRORF("Error waiting for listen thread to terminate (sock %d)", sock);
+		if (rc != 0) {
+			ERRORF("Error waiting for listen thread to terminate (sock %d): %s", sock, strerror(rc));
 		}
 	}
 
@@ -1544,11 +1540,9 @@ LOG("BEGIN process_check_for_data_msg");
 
 	// return success
 	rcm->set_rc(session::SUCCESS);
-LOGF("END process_check_for_data_msg (%d packets in Q)", cdret->data_available());
 	return 1;
 }
 
-int reply_count = 0;
 int send_reply(int sockfd, struct sockaddr_in *sa, socklen_t sa_size, session::SessionMsg *sm)
 {
 	int rc = 0;
@@ -1557,13 +1551,15 @@ int send_reply(int sockfd, struct sockaddr_in *sa, socklen_t sa_size, session::S
 
 	std::string p_buf;
 	sm->SerializeToString(&p_buf);
+	
 
 	int remaining = p_buf.size();
-LOGF("send_reply: sending %d bytes", remaining);
 	const char *p = p_buf.c_str();
+
+
+
 	while (remaining > 0) {
 		rc = sendto(sockfd, p, remaining, 0, (struct sockaddr *)sa, sa_size);
-LOGF("sendto port: %d rc: %d, count: %d", ntohs(sa->sin_port), rc, ++reply_count);
 
 		if (rc == -1) {
 			ERRORF("socket failure: error %d (%s)", errno, strerror(errno));
@@ -1571,18 +1567,6 @@ LOGF("sendto port: %d rc: %d, count: %d", ntohs(sa->sin_port), rc, ++reply_count
 		} else {
 			remaining -= rc;
 			p += rc;
-			if (remaining > 0) {
-				LOGF("%d bytes left to send", remaining);
-#if 1
-				// FIXME: click will crash if we need to send more than a 
-				// single buffer to get the entire block of data sent. Is 
-				// this fixable, or do we have to assume it will always go
-				// in one send?
-				ERROR("click can't handle partial packets");
-				rc = -1;
-				break;
-#endif
-			}
 		}	
 	}
 
@@ -1601,7 +1585,6 @@ void* process_function_wrapper(void* args) {
 	if (send_reply(data->sockfd, data->sa, data->len, data->reply) < 0) {
 		ERROR("Error sending reply");
 	}
-	LOG("Wrapper: sent reply");
 
 	free(data->sa);
 	delete data->msg;
@@ -1611,6 +1594,7 @@ void* process_function_wrapper(void* args) {
 	return NULL;
 }
 
+
 int listen() {
 	// Open socket to listen on
 	int sockfd;
@@ -1618,9 +1602,6 @@ int listen() {
 		ERRORF("error creating socket to listen on: %s", strerror(errno));
 		return -1;
 	}
-
-	int buffer_size = 500 * 1024;// * 1024 ;
-	setsockopt(sockfd, SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(buffer_size));
 
 	struct sockaddr_in addr;
 	addr.sin_family = PF_INET;
@@ -1704,8 +1685,11 @@ int listen() {
 			args->reply = new session::SessionMsg();
 
 			int pthread_rc;
-			if ( (pthread_rc = pthread_create(&dummy_handle, NULL, process_function_wrapper, (void*)args)) < 0) {
+			if ( (pthread_rc = pthread_create(&dummy_handle, NULL, process_function_wrapper, (void*)args)) != 0) {
 				ERRORF("Error creating thread: %s", strerror(pthread_rc));
+			}
+			if ( (pthread_rc = pthread_detach(dummy_handle)) != 0 ) {
+				ERRORF("Error detaching thread: %s", strerror(pthread_rc));
 			}
 		}
 	}
@@ -1724,10 +1708,10 @@ int main(int argc, char *argv[]) {
 #endif /* XIA */
 			
 	// Start a thread watching for mobility
-	//int pthread_rc;
-	//if ( (pthread_rc = pthread_create(&mobility_thread, NULL, mobility_daemon, NULL)) < 0) {
-	//	ERRORF("Error creating thread: %s", strerror(pthread_rc));
-	//}
+	int pthread_rc;
+	if ( (pthread_rc = pthread_create(&mobility_thread, NULL, mobility_daemon, NULL)) != 0) {
+		ERRORF("Error creating thread: %s", strerror(pthread_rc));
+	}
 
 	listen();
 	return 0;

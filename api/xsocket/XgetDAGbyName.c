@@ -118,7 +118,7 @@ printf("sending another NS req\n");
 		Xsendto(sock, pkt, offset, 0, (const struct sockaddr*)&ns_dag, sizeof(sockaddr_x));
 		pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
 		count++;
-		sleep(.1);
+		usleep(100000);
 	}
 
 }
