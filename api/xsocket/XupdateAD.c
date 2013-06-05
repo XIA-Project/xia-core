@@ -81,6 +81,12 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *loca
   		return -1;
  	}
 
+	if (localhostAD == NULL || localhostHID == NULL || local4ID == NULL) {
+		LOG("NULL pointer!");
+		errno = EINVAL;
+		return -1;
+	}
+
  	xia::XSocketMsg xsm;
   	xsm.set_type(xia::XREADLOCALHOSTADDR);
   
@@ -101,6 +107,10 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *loca
 		strncpy(localhostAD, (_msg->ad()).c_str(), lenAD);
 		strncpy(localhostHID, (_msg->hid()).c_str(), lenHID);
 		strncpy(local4ID, (_msg->ip4id()).c_str(), len4ID);
+		// put in null terminators in case buffers were too short
+		localhostAD[lenAD - 1] = 0;
+		localhostHID[lenHID - 1] = 0;
+		local4ID[len4ID - 1] = 0;
 		rc = 0;
 	} else {
 		rc = -1;
