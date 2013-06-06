@@ -1320,7 +1320,7 @@ LOGF("    Got conn req from %s on context %d", prevhop.c_str(), new_ctx);
 	// So, we need to use the DAG that was supplied by the initiator and build the
 	// tx_conn ourselves. (Unless we already have a connection open with them.)
 	// BUT: if it's just me and the initiator, we already have a connection.
-	if ( is_last_hop(new_ctx, sinfo->my_name()) && session_hop_count(ctx) > 2 ) {
+	if ( is_last_hop(new_ctx, sinfo->my_name()) && session_hop_count(new_ctx) > 2 ) {
 LOG("    I'm the last hop; connecting to initiator with supplied addr");
 		
 		string nexthop = get_nexthop_name(new_ctx);
