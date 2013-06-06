@@ -29,7 +29,7 @@ BACKBONE_TOPO = {} # hostname --> [hostname]
 CLIENT_TOPO = {} # hostname --> [hostname]
 PAIRWISE_PING = {} # (hostname,hostname,...) --> (backbone_hostname,client_hostname)
 FINISHED_EVENT = threading.Event()
-MAX_EXPERIMENT_TIMEOUT = 150 # seconds
+MAX_EXPERIMENT_TIMEOUT = 300 #150 # seconds
 PLANETLAB_DIR = '/home/cmu_xia/fedora-bin/xia-core/experiments/planetlab/'
 LOG_DIR = PLANETLAB_DIR + 'logs/'
 STATS_FILE = LOG_DIR + 'stats.txt'
@@ -53,6 +53,7 @@ XIANET_BACK_4ID_CMD = '-I eth0 start'
 
 WEBSERVER_CMD = '/home/cmu_xia/fedora-bin/xia-core/experiments/planetlab/webserver_mockup.sh'
 WEBSERVER_SID = 'f0afa824a36f2a2d95c67ff60f61200e48006625'
+PROXY_SID = '91afa824a36f2a2d95c67ff60f61200e48006678'
 BLANK_FOURID = '4500000000010000fafa00000000000000000000'
 
 NUMEXP = 1
@@ -65,7 +66,7 @@ NODE_WATCHERS_LOCK = thread.allocate_lock()
 PAIRWISE_PING_LOCK = thread.allocate_lock()
 SINGLE_EXPERIMENT = False
 SAME_TEST_NODES = False
-FOURID_EXPERIMENT = False
+FOURID_EXPERIMENT = True
 APP_EXPERIMENT = True
 
 class NodeWatcher(threading.Thread):
@@ -186,7 +187,7 @@ class MasterService(rpyc.Service):
         return self.exposed_get_backbone() + self.exposed_get_clients()
 
     def exposed_get_gateway_xhost(self, type):
-        host = self.exposed_get_gateway_host(type)
+        host = self.exposed_get_gateway_host(type,self._host)
 
         try: 
             xhost =  'RE AD:%s HID:%s' % \
@@ -196,8 +197,8 @@ class MasterService(rpyc.Service):
             self.exposed_error('get_xhost: %s' % type, host)
             
 
-    def exposed_get_gateway_host(self, type):
-        A = True if self._host in BACKBONES else False
+    def exposed_get_gateway_host(self, type, host):
+        A = True if host in BACKBONES else False
         if type == '6RD':
             if A:
                 return self.exposed_get_sixrd_A()
@@ -314,36 +315,74 @@ class MasterService(rpyc.Service):
                     pass
         return None    
 
-    def exposed_get_neighbor_webserver(self):
+    def exposed_get_neighbor_webserver(self, type):
         printtime("<<<< GET WEBSERVER >>>>")
-        if self._host in CLIENTS:
+        if type == "tunneling" and self._host in CLIENTS:
             neighbor = [client for client in CLIENTS if client != self._host][0]
-            while True:
-                try:
-                    ad = 'AD:%s' % rpc(neighbor, 'get_ad', ())
-                    hid = 'HID:%s' % rpc(neighbor, 'get_hid', ())
-                    try:
-                        fourid = 'IP:%s' % rpc(neighbor, 'get_fourid', ())
-                    except:
-                        fourid = 'IP:%s' % BLANK_FOURID
+        elif type in ['6RD','4ID','SDN']:
+            neighbor = BACKBONES[0]
+        while True:
+            try:
+                ad = 'AD:%s' % rpc(neighbor, 'get_ad', ())
+                hid = 'HID:%s' % rpc(neighbor, 'get_hid', ())
+                if type == "tunneling":
+                    fourid = 'IP:%s' % BLANK_FOURID
                     s = 'RE ( %s ) %s %s SID:%s' % \
                         (fourid, ad, hid, WEBSERVER_SID)
-                    return s
-                except:
-                    pass
-        return None    
+                else:
+                    gad = 'AD:%s' % rpc( \
+                        self.exposed_get_gateway_host(type,self._host), 'get_ad', ())
+                    fourid = 'IP:%s' % rpc( \
+                        self.exposed_get_gateway_host(type,neighbor), 'get_fourid', ())
+                    s = 'RE %s %s %s %s SID:%s' % \
+                        (gad, fourid, ad, hid, WEBSERVER_SID)
+                return s
+            except:
+                pass
+
+    def exposed_get_proxy_address(self, type):
+        printtime("<<<< GET PROXY ADDR >>>>")
+        me = CLIENTS[0]
+        neighbor = BACKBONES[0]
+        while True:
+            try:
+                gad = 'AD:%s' % rpc( \
+                    self.exposed_get_gateway_host(type,neighbor), 'get_ad', ())
+                ad = 'AD:%s' % rpc(self._host, 'get_ad', ())
+                hid = 'HID:%s' % rpc(self._host, 'get_hid', ())
+                fourid = 'IP:%s' % rpc( \
+                    self.exposed_get_gateway_host(type,self._host), 'get_fourid', ())
+                s = 'RE %s %s %s %s SID:%s' % \
+                    (gad, fourid, ad, hid, PROXY_SID)
+                return s
+            except:
+                time.sleep(1)
+                print "Trying to get proxy addres..."
+                pass
 
 
     def exposed_get_neighbor_host(self):
         if self._host in CLIENTS:
             return [client for client in CLIENTS if client != self._host][0]
 
-    def exposed_browser_stats(self, latency):
+    def exposed_browser_stats(self, latency, type):
+        print "<<<< Browser Stats >>>>"
         cur_exp = tuple(CLIENTS)
-        STATSD[cur_exp]['browser'] = (self._host, CLIENTS[0], latency)
 
-        if 'stats' in PRINT_VERB: printtime('%s:\t %s\n' % (cur_exp,STATSD[cur_exp]))
-        self.exposed_new_exp()
+        if type == 'tunneling':
+            STATSD[cur_exp]['browser'] = (self._host, CLIENTS[0], latency)
+
+            if 'stats' in PRINT_VERB: printtime('%s:\t %s\n' % (cur_exp,STATSD[cur_exp]))
+            self.exposed_new_exp()
+        else:
+            print type
+            i = ['6RD','4ID','SDN'].index(type)
+            STATSD[cur_exp][i]['browser'] = (self._host, CLIENTS[0], latency)
+            if 'stats' in PRINT_VERB: printtime('%s:\t %s\n' % (cur_exp,STATSD[cur_exp]))            
+            l = STATSD[cur_exp]
+            if len(l[0]) == 6 and len(l[1]) == 6 and len(l[2]) == 6:
+                print "<<< GOT ALL STATS!! >>>"
+                self.exposed_new_exp()
 
     def exposed_stats(self, backbone_name, ping, hops):        
         cur_exp = tuple(CLIENTS)
@@ -376,10 +415,6 @@ class MasterService(rpyc.Service):
 
         if 'xstats' in PRINT_VERB: printtime('%s:\t %s\n' % (cur_exp,STATSD[cur_exp]))
 
-#         if len(STATSD[cur_exp]) is 4:
-#             self.exposed_new_exp()
-#             pass
-
     def exposed_fidstats(self, type, neighbor, ping, hops):
         cur_exp = tuple(CLIENTS)
 
@@ -396,12 +431,6 @@ class MasterService(rpyc.Service):
 
         if 'stats' in PRINT_VERB: printtime('%s:\t %s\n' % (cur_exp,STATSD[cur_exp]))
 
-        l = STATSD[cur_exp]
-        if len(l[0]) == 5 and len(l[1]) == 5 and len(l[2]) == 5:
-            print "<<< GOT ALL STATS!! >>>"
-            self.exposed_new_exp()
-            pass
-
     def init_statsd(self, new_clients):
         cur_exp = tuple(new_clients)
         if FOURID_EXPERIMENT:
@@ -414,52 +443,19 @@ class MasterService(rpyc.Service):
         # must be connected
         # 7 edges
 
-#########        
-        # A --> [B, C, D]
-        # B --> [A, C, E]
-        # C --> [A, B, D]
-        # D --> [A, C, E]
-        # E --> [B, D]
-        # (A,B) (A,C) (A,D) (B,C) (B,E) (C,D) (D,E)
-        # (0,1) (0,2) (0,3) (1,2) (1,4) (2,3) (3,4)
-#########
-
         # A --> [B, C, D, E]
         # (0,1) (0,2) (0,3) (0,4)
 
 
         nc = copy.deepcopy(new_clients)
-        #shuffle(nc)
 
         for c in nc:
             CLIENT_TOPO[c] = []
         
-        #links = [(0,1),(0,2),(0,3),(1,2),(1,4),(2,3),(3,4)]
         links = [(0,1),(0,2),(0,3),(0,4)]
         for (a,b) in links:
             CLIENT_TOPO[nc[a]].append(nc[b])
             CLIENT_TOPO[nc[b]].append(nc[a])
-
-#         while True:
-#             print 'trying to build topo'
-#             print new_clients
-#             for client in new_clients:
-#                 CLIENT_TOPO[client] = []
-#             i = 0
-#             while i < 7:
-#                 [a, b] = sample(new_clients, 2)
-#                 if len(CLIENT_TOPO[a]) < 3 and len(CLIENT_TOPO[b]) < 3 and (b not in CLIENT_TOPO[a]):
-#                     CLIENT_TOPO[a].append(b)
-#                     CLIENT_TOPO[b].append(a)
-#                     i += 1
-#             print 'got seven links'
-#             exit = True
-#             for client in new_clients:
-#                 if CLIENT_TOPO[client] == []:
-#                     print 'client without links'
-#                     exit = False
-#             if exit: break
-
 
     def exposed_new_exp(self, host=None):
         global CLIENTS, NUMEXP, NEW_EXP_TIMER, PRINT_VERB, NEW_EXP_LOCK, FOURID_G_INDEX
@@ -542,6 +538,10 @@ class MasterService(rpyc.Service):
                 print "Done Ping"
                 ping_hosts = [p[1] for p in pings]
                 new_clients += ping_hosts[:4]
+                if SAME_TEST_NODES:
+                    new_clients = [new_clients[0]]+['NYC','Atlanta','Cleveland', 'Houston']
+                    print new_clients
+                    new_clients = [new_clients[0]]+[NAME_LOOKUP[c] for c in new_clients[1:]]
                 print "building topo"
                 self.build_topo(new_clients)
                 print "done topo"
@@ -602,7 +602,6 @@ class MasterService(rpyc.Service):
         host = self._host if host == None else host
         if host in CLIENTS:
             if FOURID_EXPERIMENT:
-                print CLIENT_TOPO
                 links = list(set([tuple(sorted((client,neighbor))) for client in CLIENTS for neighbor in CLIENT_TOPO[client]]))
                 neighbors = ['%s:5120%s' % ([socket.gethostbyname(n) for n in link if n != host][0],links.index(link)) for link in links if host in link]
                 if host == self.exposed_get_fourid_CB():
@@ -656,7 +655,7 @@ class MasterService(rpyc.Service):
                     if host == CLIENTS[0]:
                         cmd += ["check_output('%s')" % WEBSERVER_CMD]
                     else:
-                        cmd += ["self.exposed_gather_browser_stats()"]
+                        cmd += ["self.exposed_gather_browser_stats('tunneling')"]
                 return cmd
 
         
@@ -714,7 +713,6 @@ class Runner(threading.Thread):
 
 
 if __name__ == '__main__':
-    global MAX_EXPERIMENT_TIMEOUT
     seed()
 
     latlonfile = open(LATLON_FILE, 'r').read().split('\n')

@@ -18,6 +18,7 @@ BROADCAST_HID = 'ffffffffffffffffffffffffffffffffffffffff'
 PING_INTERVAL = .25
 XPING_INTERVAL = 1
 PING_COUNT = 4
+WEBSERVER_CMD = '/home/cmu_xia/fedora-bin/xia-core/experiments/planetlab/webserver_mockup.sh'
 
 myHID = ''
 my_name = check_output("hostname")[0].strip()
@@ -115,9 +116,9 @@ class MyService(rpyc.Service):
     def exposed_get_hello(self):
         return 'hello'
 
-    def exposed_gather_browser_stats(self):
+    def exposed_gather_browser_stats(self, type):
         # write to etc/hosts.xia
-        check_output('echo "%s %s" > %s' % (BROWSER_ADDR, rpc(MASTER_SERVER, 'get_neighbor_webserver', ()), ETC_HOSTS))
+        check_output('echo "%s %s" > %s' % (BROWSER_ADDR, rpc(MASTER_SERVER, 'get_neighbor_webserver', (type,)), ETC_HOSTS))
 
         print check_output('cat %s' % ETC_HOSTS)
 
@@ -126,9 +127,16 @@ class MyService(rpyc.Service):
                 check_output('ps -e | grep proxy.py')
                 break
             except:
-                Popen(PROXY_CMD, shell=True)
+                if type == 'tunneling':
+                    Popen(PROXY_CMD, shell=True)
+                else:
+                    proxy_dag = rpc(MASTER_SERVER, 'exposed_get_proxy_address', (type,))
+                    print 'proxy going to start'
+                    print proxy_dag
+                    Popen('%s "%s"' % (PROXY_CMD, proxy_dag), shell=True)
                 time.sleep(1)
         time.sleep(3)
+        print 'running browser cmd'
         p = Popen(BROWSER_CMD,shell=True)
         p.wait()
         time.sleep(3)
@@ -138,8 +146,22 @@ class MyService(rpyc.Service):
                 raise Execption("BROWSER_CMD failed")
             if rc == 0:
                 break
+            time.sleep(1)
         out = out[0].split('\n')[-2].split(' ')[-1]
-        rpc(MASTER_SERVER, 'browser_stats', (out,))
+        rpc(MASTER_SERVER, 'browser_stats', (out,type))
+        check_output('killall proxy.py')
+
+    def exposed_run_webserver(self, type):
+        myAD = self.exposed_get_ad()
+        myHID = self.exposed_get_hid()
+        neighbor = rpc(MASTER_SERVER, 'get_neighbor_host', ())
+        my_gateway = rpc(MASTER_SERVER, 'get_gateway_host', (type, my_name))
+        their_gateway = rpc(MASTER_SERVER, 'get_gateway_host', (type, neighbor))
+        g4ID = rpc(my_gateway, 'get_fourid', ())
+        gAD = rpc(their_gateway, 'get_ad', ())
+        print myAD, myHID, neighbor, my_gateway, their_gateway, g4ID, gAD
+        Popen('%s AD:%s HID:%s IP:%s AD:%s' % (WEBSERVER_CMD, myAD, myHID, g4ID, gAD),shell=True)
+        time.sleep(3)
 
     def exposed_gather_stats(self):
         printtime('<<<<GATHER STATS>>>>')
@@ -163,34 +185,6 @@ class MyService(rpyc.Service):
         rpc(MASTER_SERVER, 'xstats', (xlatency, xhops))
         return 'Sent xstats: (%s, %s, %s)' % (neighbor, xlatency, xhops)
 
-#     class fourid_stat_runner(threading.Thread):
-#         def __init__(self, bucket, type, gpair, npair, neighbor):
-#             threading.Thread.__init__(self)
-#             self.bucket = bucket
-#             self.type = type
-#             self.gpair = gpair
-#             self.npair = npair
-#             self.neighbor = neighbor
-#         def run(self):
-#             try:
-#                 printtime('<<<<NODE STARTING %s STATS>>>>' % self.type)
-#                 gateway = rpc(MASTER_SERVER,'get_gateway_host',(self.type,))
-#                 DST = rpc(MASTER_SERVER,'get_gateway_xhost',(self.type,))
-#                 xlatency = xping(DST)
-#                 xhops = xtraceroute(DST)
-#                 rpc(MASTER_SERVER, 'fidstats', ('%s-%s' % (self.type, self.gpair), gateway, xlatency, xhops))
-
-#                 SRC = rpc(MASTER_SERVER,'get_fourid_neighbor_xhost',(self.type,True))
-#                 DST = rpc(MASTER_SERVER,'get_fourid_neighbor_xhost',(self.type,False))
-#                 xlatency = xping(DST, src=SRC)
-# #####
-#                 #xhops = xtraceroute(DST, src=SRC)
-#                 xhops = -1
-# ####
-#                 rpc(MASTER_SERVER, 'fidstats', ('%s-%s' % (self.type, self.npair), self.neighbor, xlatency, xhops))
-#             except:
-#                 self.bucket.put(sys.exc_info())
-
     def exposed_gather_fourid_stats(self): 
         printtime('<<<<GATHER FOURIDSTATS>>>>')
         # [CA, 6RDA, GA, SDNA, CB, 6RDB, GB, SDNB]
@@ -205,19 +199,16 @@ class MyService(rpyc.Service):
             npair = 'AB' if i == 0 else 'BA'
             neighbor = fidn[4] if i == 0 else fidn[0]
 
-#            buckets = [Queue.Queue(), Queue.Queue(), Queue.Queue()]
-#            threads = []
-#            types = ['6RD', '4ID', 'SDN']
             for type in ['SDN', '4ID', '6RD']:
                 printtime('<<<<NODE STARTING %s STATS>>>>' % type)
-                gateway = rpc(MASTER_SERVER,'get_gateway_host',(type,))
+                gateway = rpc(MASTER_SERVER,'get_gateway_host',(type,my_name))
 #                 DST = rpc(MASTER_SERVER,'get_gateway_xhost',(type,))
 
 #                 xlatency = xping(DST)
 #                 xhops = xtraceroute(DST)
                 
-                DST_h = rpc(MASTER_SERVER,'get_gateway_host',(type,))
-                latency = multiping([DST_h])[0][0]
+                DST_h = rpc(MASTER_SERVER,'get_gateway_host',(type,my_name))
+                latency = multi_ping([DST_h])[0][0]
                 hops = traceroute(DST_h)
 #                rpc(MASTER_SERVER, 'fidstats', ('%s-%s' % (type, gpair), gateway, xlatency, xhops))
                 rpc(MASTER_SERVER, 'fidstats', ('%s-%s' % (type, gpair), gateway, latency, hops))
@@ -225,27 +216,13 @@ class MyService(rpyc.Service):
                 SRC = rpc(MASTER_SERVER,'get_fourid_neighbor_xhost',(type,True))
                 DST = rpc(MASTER_SERVER,'get_fourid_neighbor_xhost',(type,False))
                 xlatency = xping(DST, src=SRC)
-#####
-                #xhops = xtraceroute(DST, src=SRC)
                 xhops = -1
-####
                 rpc(MASTER_SERVER, 'fidstats', ('%s-%s' % (type, npair), neighbor, xlatency, xhops))
-#             for i in range(3):
-#                 threads.append(fourid_stat_runner(bucket[i], type[i], gpair, npair, neighbor))
-#                 threads[i].start()
-#             while True:
-#                 for i in range(3):
-#                     try:
-#                         exc = buckets[i].get(block=False)
-#                         break
-#                     except Queue.Empty:
-#                         pass
-#                 if exc:
-#                     rpc(MASTER_SERVER, error, ('4ID Stats', my_name))
-#                 for i in range(3):
-#                     threads[i].join(0.1)
-#                 if not threads[0].isAlive() and not thread[1].isAlive() and not thread[2].isAlive():
-#                     break
+
+                if my_name == fidn[4]: #CB
+                    self.exposed_gather_browser_stats(type)
+                elif my_name == fidn[0]: #CA
+                    self.exposed_run_webserver(type)
 
         elif my_name in [fidn[1], fidn[2], fidn[3]]: # 6RDA, GA, SDNA
             indices = [i for i,x in enumerate(fidn) if x == my_name]
@@ -260,18 +237,6 @@ class MyService(rpyc.Service):
         return multi_ping(nodes)
 
     def try_xroute(self):
-#         i = 0
-#         while i < 5:
-#             try:
-#                 xr_out = check_output(XROUTE)
-#                 break
-#             except:
-#                 self.exposed_soft_restart(None)
-#                 i += 1
-#         if i < 5:
-#             return xr_out
-#         else:
-#             raise Exception("Failed to restart XIANET")
         return check_output(XROUTE)
 
     def exposed_get_fourid(self):
