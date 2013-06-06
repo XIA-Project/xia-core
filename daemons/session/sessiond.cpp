@@ -508,6 +508,12 @@ void infocpy(const session::SessionInfo *from, session::SessionInfo *to) {
 	}
 }
 
+// counts the number of application endpoints in a session
+int session_hop_count(int ctx) {
+	session::SessionInfo *info = ctx_to_session_info[ctx];
+	return info->forward_path_size() + info->return_path_size();
+}
+
 // name is last hop if it is second to last in the return path or if it is the
 // last name in the forward path and the return path contains only the initiator
 bool is_last_hop(int ctx, string name) {
@@ -1057,7 +1063,7 @@ LOGF("    Initiating a session from %s", im.my_name().c_str());
 	string prevhop = get_prevhop_name(ctx);
 	int fake_listen_ctx = -1;
 	int lsock = -1; // might not get used
-	if ( name_to_conn.find(prevhop) == name_to_conn.end() ) {  // NOT ALREADY A CONNECTION
+	if ( name_to_conn.find(prevhop) == name_to_conn.end() && session_hop_count(ctx) > 2 ) {  // NOT ALREADY A CONNECTION
 		// make a socket to accept connection from last hop
 		string *addr_buf = NULL;
 		lsock = bindRandomAddr(&addr_buf);
@@ -1110,7 +1116,6 @@ LOG("    Sent connection request to next hop");
 	if ( name_to_conn.find(prevhop) == name_to_conn.end() ) {  // NOT ALREADY A CONNECTION
 		// accept connection on listen sock
 		if ( (rxsock = acceptSock(lsock)) < 0 ) {
-exit(-1);
 			ERRORF("Error accepting connection from last hop on context %d", ctx);
 			rcm->set_message("Error accepting connection from last hop");
 			rcm->set_rc(session::FAILURE);
@@ -1266,14 +1271,12 @@ LOG("BEGIN process_accept_msg");
 
 	// pull message from acceptQ
 	session::SessionPacket *rpkt = popAcceptQ(ctx);
-		
 	if (rpkt == NULL) {
 		ERROR("Trying to listen on a closed context");
 		rcm->set_message("Trying to listen on a closed context");
 		rcm->set_rc(session::FAILURE);
 		return -1;
 	}
-
 	assert(rpkt);
 
 	// store a copy of the session info, updating my_name and my_addr
@@ -1316,7 +1319,8 @@ LOGF("    Got conn req from %s on context %d", prevhop.c_str(), new_ctx);
 	// If i'm the last hop, the initiator doesn't have a name in the name service.
 	// So, we need to use the DAG that was supplied by the initiator and build the
 	// tx_conn ourselves. (Unless we already have a connection open with them.)
-	if ( is_last_hop(new_ctx, sinfo->my_name()) ) {
+	// BUT: if it's just me and the initiator, we already have a connection.
+	if ( is_last_hop(new_ctx, sinfo->my_name()) && session_hop_count(ctx) > 2 ) {
 LOG("    I'm the last hop; connecting to initiator with supplied addr");
 		
 		string nexthop = get_nexthop_name(new_ctx);
@@ -1354,7 +1358,6 @@ LOG("    I'm the last hop; connecting to initiator with supplied addr");
 
 		tx_cinfo->add_sessions(new_ctx);
 		ctx_to_txconn[new_ctx] = tx_cinfo;
-LOGF("    Opened connection with initiator on sock %d", tx_cinfo->sockfd());
 	} 
 
 		
