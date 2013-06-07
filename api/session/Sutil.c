@@ -24,6 +24,7 @@
 #include <sstream>
 #include <vector>
 
+#define BUFSIZE 65000
 
 
 int proc_send(int sockfd, session::SessionMsg *sm)
@@ -55,15 +56,6 @@ int proc_send(int sockfd, session::SessionMsg *sm)
 			p += rc;
 			if (remaining > 0) {
 				LOGF("%d bytes left to send", remaining);
-#if 1
-				// FIXME: click will crash if we need to send more than a 
-				// single buffer to get the entire block of data sent. Is 
-				// this fixable, or do we have to assume it will always go
-				// in one send?
-				LOG("click can't handle partial packets");
-				rc = -1;
-				break;
-#endif
 			}
 		}	
 	}
@@ -76,7 +68,7 @@ int proc_reply(int sockfd, session::SessionMsg &sm)
 	struct sockaddr_in sa;
 	socklen_t len;
 	int rc;
-	char buf[1500];
+	char buf[BUFSIZE];
 	unsigned buflen = sizeof(buf);
 
 	len = sizeof sa;
@@ -87,7 +79,8 @@ int proc_reply(int sockfd, session::SessionMsg &sm)
 		return -1;
 	}
 	
-	sm.ParseFromString(buf);
+	std::string p_buf(buf, rc);  // make a std string to deal with null chars
+	sm.ParseFromString(p_buf);
 
 	return rc;
 }

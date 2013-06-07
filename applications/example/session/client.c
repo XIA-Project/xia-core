@@ -97,9 +97,6 @@ void randomString(char *buf, int size)
 
 int main(int argc, char *argv[])
 {
-	(void)argc;
-	(void)argv;
-	
 	srand(time(NULL));
 	getConfig(argc, argv);
 

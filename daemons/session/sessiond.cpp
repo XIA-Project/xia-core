@@ -16,7 +16,7 @@ using namespace std;
 #define BUFSIZE 65000
 #define MTU 1250
 #define MOBILITY_CHECK_INTERVAL 1
-#define ADU_DELIMITER "\x1f"  // 0x1f is the unit separator
+#define ADU_DELIMITER "\x1f\x1f\x1f\x1f\x1f\x1f\x1f\x1f\x1f\x1f\x1f\x1f\x1f\x1f\x1f\x1f\x1f\x1f"  // 0x1f is the unit separator
 
 #define Q_ALLOCATED 1
 #define Q_WATCHED 2
@@ -547,6 +547,14 @@ string get_neighborhop_name(string my_name, const session::SessionInfo *info, bo
 			break;
 		}
 	}
+		
+	// special treatment if there are only two parties
+	if ( info->forward_path_size() + info->return_path_size() == 2) {
+		if (found_index != -1)
+			return info->return_path(0).name();
+		else
+			return info->forward_path(0).name();
+	}
 
 	// If we found it, the next hop is either the next entry in the forward path
 	// or the first entry in the return path
@@ -739,8 +747,9 @@ int recv(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 		return received;
 	}
 
-	string *bufstr = new string(buf, received);
-	if (!pkt->ParseFromString(*bufstr)) {
+
+	string bufstr(buf, received);
+	if (!pkt->ParseFromString(bufstr)) {
 		ERROR("Error parsing protobuf packet");
 		return -1;
 	}
@@ -1395,7 +1404,11 @@ LOG("BEGIN process_send_msg");
 	}
 
 
-	// Add the ADU_DELIMITER to the data to send
+	// Add the ADU_DELIMITER to the data to send (and make sure it didn't
+	// accidentally appear in the data)
+	if (sendm.data().find(ADU_DELIMITER) != sendm.data().npos) {
+		ERROR("WARNING: ADU_DELIMITER found in data to send!");
+	}
 	string data_str(sendm.data() + ADU_DELIMITER);
 
 	// Build a SessionPacket
@@ -1410,7 +1423,7 @@ LOG("BEGIN process_send_msg");
 	uint32_t overhead = 10;
 	while (sent < data_str.size()) {
 		dm->set_data(data_str.substr(sent, MTU-overhead)); // grab next chunk of bytes
-		if ( send(ctx, &pkt) < 0 ) {
+		if ( (send(ctx, &pkt)) < 0 ) {
 			ERROR("Error sending data");
 			rcm->set_message("Error sending data");
 			rcm->set_rc(session::FAILURE);
@@ -1421,7 +1434,8 @@ LOG("BEGIN process_send_msg");
 	}
 
 
-	// Report back how many bytes we sent
+	// Report back how many bytes we sent (don't include delimiter)
+	sent -= strlen(ADU_DELIMITER);
 	session::SSendRet *retm = reply.mutable_s_send_ret();
 	retm->set_bytes_sent(sent);
 
@@ -1479,14 +1493,14 @@ LOG("BEGIN process_recv_msg");
 		// check for ADU delimiter
 		size_t pos = data.find(ADU_DELIMITER);
 		if (pos != data.npos) {
-			data.erase(pos, 1); // remove delim char
+			data.erase(pos, strlen(ADU_DELIMITER)); // remove delim char
 			foundADU = true; // we've got it!
 		}
 	}
 	while ( (data.size() < max_bytes && !waitForADU && ctx_to_dataQ[ctx]->size() > 0) 
-			|| (waitForADU && !foundADU && data.size() < max_bytes) ) ;
+			|| (waitForADU && !foundADU && data.size() < max_bytes) 
+			|| data.size() == 0 ) ;
 
-	
 	// Send back the data
 	session::SRecvRet *retm = reply.mutable_s_recv_ret();
 	retm->set_data(data);
@@ -1629,15 +1643,12 @@ int listen() {
 		unsigned buflen = sizeof(buf);
 		memset(buf, 0, buflen);
 
-//print_contexts();
-//print_sessions();
-//print_connections();
 		if ((rc = recvfrom(sockfd, buf, buflen - 1 , 0, (struct sockaddr *)&sa, &len)) < 0) {
 			ERRORF("error(%d) getting reply data from session process", errno);
 		} else {
-			// TODO: make this robust to null chars (make into std::string?)
+			string p_buf(buf, rc); // need to make into a std::string first in case of null chars
 			session::SessionMsg sm;
-			sm.ParseFromString(buf);
+			sm.ParseFromString(p_buf);
 
 			// for now we use the sender's port as the context handle
 			int ctx = ntohs(sa.sin_port);

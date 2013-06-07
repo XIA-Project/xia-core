@@ -37,8 +37,7 @@ LOG("BEGIN Ssend");
 	session::SSendMsg *sendm = sm.mutable_s_send();
 
 	// prepare data
-	string *strbuf = new string((const char*)buf, len);
-	sendm->set_data(*strbuf);
+	sendm->set_data(buf, len);
 	
 	if ((rc = proc_send(sockfd, &sm)) < 0) {
 		LOGF("Error talking to session proc: %s", strerror(errno));
