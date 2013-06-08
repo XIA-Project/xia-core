@@ -12,6 +12,7 @@
 #include <signal.h>
 #include "session.h"
 #include "utils.hpp"
+#include "http.hpp"
 
 using namespace std;
 
@@ -35,15 +36,17 @@ int listensock, sock;
 
 // global configuration options
 int proxy_port = 8888;
+bool scale_images = false;
 
 /*
 ** display cmd line options and exit
 */
 void help(const char *name)
 {
-	printf("usage: %s [-p port] \n", name);
+	printf("usage: %s [-p port] [-s]\n", name);
 	printf("where:\n");
 	printf(" -p port   : port for incoming browser connections (default is 8888)\n");
+	printf(" -s        : use in-path service to scale down images (default is false)\n");
 	printf("\n");
 	exit(0);
 }
@@ -58,7 +61,7 @@ void getConfig(int argc, char** argv)
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "hl:s:")) != -1) {
+	while ((c = getopt(argc, argv, "hl:p:s")) != -1) {
 		switch (c) {
 			case '?':
 			case 'h':
@@ -69,6 +72,10 @@ void getConfig(int argc, char** argv)
 				// browser proxy port
 				proxy_port = atoi(optarg);
 				break;
+			case 's':
+				// scale images
+				scale_images = true;
+				break;
 			default:
 				help(basename(argv[0]));
 		}
@@ -78,6 +85,7 @@ void getConfig(int argc, char** argv)
 
 
 void process(int sock) {
+	LOGF("Serving browser on new socket: %d", sock);
 	char recvbuf[BUFSIZE];
     int bytesReceived, ctx;
 
@@ -90,71 +98,80 @@ void process(int sock) {
 		}
 		if (bytesReceived >= BUFSIZE) {
 			ERROR("We may not have received all of the message from the browser");
+		} else if (bytesReceived == 0) {
+			ERROR("Received empty message from browser");
+			close(sock);
+			return;  // TODO: figure out when browser closed socket
 		}
-		string request(recvbuf);
-		LOGF("%s", request.c_str());
+		string request(recvbuf, bytesReceived);
+		LOGF("New Request from browser:\n%s", request.c_str());
+		/* make sure this is an HTTP GET */
+		if (request.find("GET") == request.npos || request.find("HTTP") == request.npos) {
+			ERROR("Message from browser was not an HTTP GET");
+			continue;
+		}
 
-		/* hacky way of getting hostname */
-		vector<string> elements = split(request, '\n');
-		string host;
-		vector<string>::iterator it;
-		for (it = elements.begin(); it != elements.end(); ++it) {
-			if ((*it).find("Host:") != (*it).npos) {
-				host = trim(split((*it), ' ')[1]);
-				break;
-			}
-		}
-		
+		/* get hostname */
+		string host = hostNameFromHTTP(request);
 		LOGF("Hostname: %s", host.c_str());
 	
 		/* Initiate session */
 		ctx = SnewContext();
 		if (ctx < 0) {
-			ERROR("Error creating new context"); exit(-1);
+			ERROR("Error creating new context"); 
+			break;
 		}
-		if (Sinit(ctx, host.c_str(), "client", "client") < 0 ) {
-		//if (Sinit(ctx, "www.test.cmu.edu", "client", "client") < 0 ) {
+		string returnPath = scale_images ? "pagespeed.cmu.edu, client" : "client";
+		if (Sinit(ctx, host.c_str(), returnPath.c_str(), "client") < 0 ) {
 			ERROR("Error initiating session");
-			exit(-1);
+			break;
 		}
 
 		/* send file request */
 		if (Ssend(ctx, recvbuf, bytesReceived) < 0) {
 			ERROR("Error sending request");
-			exit(-1);
+			break;
 		}
 
-		/* as we receive data, pipe it to browser. a bit confusing perhaps,
-		   but we're re-using recvbuf */
-//int total = 0;
-//int pktcount = 0;
-		bytesReceived = Srecv(ctx, recvbuf, BUFSIZE);
-		while (bytesReceived > 0) {
-//total += bytesReceived;
-//pktcount++;
-//LOGF("Received %d bytes, cumm total: %d; packet # %d", bytesReceived, total, pktcount);
+		/* receive & forward the response HTTP header */
+		if ( (bytesReceived = SrecvADU(ctx, recvbuf, BUFSIZE)) < 0 ) {
+			ERROR("Error sending request");
+			break;
+		}
+		string responseHeader(recvbuf, bytesReceived);
+		send(sock, recvbuf, bytesReceived, 0);
+		LOGF("Received response header:\n%s", responseHeader.c_str());
+
+		/* receive & forward the # bytes specified by content length */
+		int contentLength = contentLengthFromHTTP(responseHeader);
+		int total = 0;
+		while (total < contentLength) {
+			if ( (bytesReceived = SrecvADU(ctx, recvbuf, BUFSIZE)) < 0) {
+				ERROR("Error receiving");
+			}
 			send(sock, recvbuf, bytesReceived, 0);
-			bytesReceived = Srecv(ctx, recvbuf, BUFSIZE);
-		}  // TODO: We'll never get out!
+
+			total += bytesReceived;
+		} 
 
 
-
-
-
-
-		if (request.find("Connection: keep-alive") == request.npos) {
+		/* if we're not supposed to keep the connection alive, exit */
+		if (responseHeader.find("Connection: keep-alive") == request.npos) {
+			LOGF("Ctx %d    No keep-alive found, closing connections", ctx);
 			break;
 		}
 	}
 
-	LOGF("Closing socket %d", sock);
+	LOGF("Closing socket %d and context %d", sock, ctx);
     close(sock);
+	Sclose(ctx);
 }
 
 void signal_callback_handler(int signum)
 {
 	LOG("Signal handler");
 	close(listensock);
+	close(sock);
 	exit(signum);
 }
 

@@ -131,6 +131,7 @@ message SessionInfo {
 	optional string my_name = 3;
 	optional bytes my_addr = 4; // If XIA, a sockaddr_x
 	optional bytes initiator_addr = 5; // If XIA, a sockaddr_x
+	optional uint32 initiator_ctx = 6;
 }
 
 message SessionData {
