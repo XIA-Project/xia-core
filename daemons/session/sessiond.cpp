@@ -105,6 +105,7 @@ struct proc_func_data {
 
 /* PRINT FUNCTIONS */
 void print_contexts() {
+return;
 	printf("*******************************************************************************\n");
 	printf("*                                 CONTEXTS                                    *\n");
 	printf("*******************************************************************************\n\n");
@@ -132,6 +133,7 @@ void print_contexts() {
 }
 
 void print_sessions() {
+return;
 	printf("*******************************************************************************\n");
 	printf("*                                 SESSIONS                                    *\n");
 	printf("*******************************************************************************\n\n");
@@ -158,6 +160,7 @@ void print_sessions() {
 }
 
 void print_connections() {
+return;
 	printf("*******************************************************************************\n");
 	printf("*                               CONNECTIONS                                   *\n");
 	printf("*******************************************************************************\n\n");
@@ -500,6 +503,7 @@ LOGF("Closing session %d", ctx);
 
 			// first forward close message to next hop (if i'm not last)
 			if (!is_last_hop(ctx, ctx_to_session_info[ctx]->my_name())) {
+LOGF("Ctx %d    Sending TEARDOWN to next hop", ctx);
 				session::SessionPacket *pkt = new session::SessionPacket();
 				pkt->set_type(session::TEARDOWN);
 				pkt->set_sender_ctx(ctx);
@@ -1228,9 +1232,9 @@ LOGF("Ctx %d    Found an exising connection, making acceptQ", ctx);
 LOGF("Ctx %d    Sent connection request to next hop", ctx);
 
 
-	if (two_party) {
-		rx_cinfo = name_to_conn[prevhop];
-		rx_cinfo->add_sessions(ctx);
+	if (two_party) {  // rxconn and txconn are the same
+		get_txconn_for_context(ctx, &rx_cinfo);
+		rx_cinfo->add_sessions(ctx);  // redundant...
 	}
 
 
@@ -1285,7 +1289,6 @@ LOGF("Ctx %d    Accepted a new connection on rxsock %d", ctx, rxsock);
 	}
 
 	ctx_to_rxconn[ctx] = rx_cinfo;
-	
 	
 	
 	// TODO: check that this is the correct session info pkt
@@ -1509,10 +1512,12 @@ LOGF("    Got conn req from %s on context %d (sender ctx %d)", prevhop.c_str(), 
 		session::ConnectionInfo *rx_cinfo;
 		memcpy(&rx_cinfo, rpkt->info().rx_cinfo().data(), sizeof(session::ConnectionInfo*));
 		ctx_to_rxconn[new_ctx] = rx_cinfo;
+		rx_cinfo->add_sessions(new_ctx);
 
 		if (two_party) {  // this is the only case where we didn't set tx_cinfo above
 			tx_cinfo = rx_cinfo;
 			ctx_to_txconn[new_ctx] = tx_cinfo;
+			tx_cinfo->add_sessions(new_ctx);
 		}
 
 	} else {
