@@ -46,6 +46,7 @@ bool checkQ(queue<session::SessionPacket*> *Q);
 
 
 
+#define MULTIPLEX
 #define XIA
 
 #ifdef XIA
@@ -160,12 +161,27 @@ void print_connections() {
 	printf("*******************************************************************************\n");
 	printf("*                               CONNECTIONS                                   *\n");
 	printf("*******************************************************************************\n\n");
-	
-	map<string, session::ConnectionInfo*>::iterator iter;
-	for (iter = name_to_conn.begin(); iter!= name_to_conn.end(); ++iter) {
+
+	// first collect a list of all open connections
+	map<int, session::ConnectionInfo*> connections;
+	map<unsigned short, session::ConnectionInfo*>::iterator connIt;
+	for (connIt = ctx_to_txconn.begin(); connIt != ctx_to_txconn.end(); ++connIt) {
+		if (connections.find(connIt->second->sockfd()) == connections.end()) {
+			connections[connIt->second->sockfd()] = connIt->second;
+		}
+	}
+	for (connIt = ctx_to_rxconn.begin(); connIt != ctx_to_rxconn.end(); ++connIt) {
+		if (connections.find(connIt->second->sockfd()) == connections.end()) {
+			connections[connIt->second->sockfd()] = connIt->second;
+		}
+	}
+
+	// now print them
+	map<int, session::ConnectionInfo*>::iterator iter;
+	for (iter = connections.begin(); iter!= connections.end(); ++iter) {
 		session::ConnectionInfo *cinfo = iter->second;
 
-		printf("Name:\t\t%s\n", iter->first.c_str());
+		printf("Name:\t\t%s\n", cinfo->name().c_str());
 		printf("Sockfd:\t\t%d\n", cinfo->sockfd());
 		printf("Sessions:\t");
 		for (int i = 0; i < cinfo->sessions_size(); i++) {
@@ -690,78 +706,56 @@ int open_connection(string name, session::ConnectionInfo *cinfo) {
 	return ret;
 }
 
-int get_txconn_for_context(int ctx, session::ConnectionInfo **cinfo) {
-	if ( ctx_to_txconn.find(ctx) != ctx_to_txconn.end() ) {
+int get_conn_for_context(int ctx, map<unsigned short, session::ConnectionInfo*> *ctx_to_conn, string &hopname, session::ConnectionInfo **cinfo) {
+	int rc;
+
+	if ( ctx_to_conn->find(ctx) != ctx_to_conn->end() ) {
 		// This session already has a transport conn
-		*cinfo = ctx_to_txconn[ctx];
+		*cinfo = (*ctx_to_conn)[ctx];
 		return (*cinfo)->sockfd();
 	} else {
-		// There isn't a tx transport conn for this session yet 
-		
-		// Get the next-hop hostname
-		string nexthop = get_nexthop_name(ctx);
-
+		// There isn't a transport conn for this session+hop yet
+#ifdef MULTIPLEX
 		// If no one else has opened a connection to this name, open one
 		pthread_mutex_lock(&name_to_conn_mutex); // lock so 2 threads don't try to create same conn
-		if ( name_to_conn.find(nexthop) == name_to_conn.end() ) {
+		if ( name_to_conn.find(hopname) == name_to_conn.end() ) {
+#endif /* MULTIPLEX */
 			*cinfo = new session::ConnectionInfo();
-			if ( open_connection(nexthop, *cinfo) < 0 ) {
-				pthread_mutex_unlock(&name_to_conn_mutex);
-				return -1;
-			}
+			rc = open_connection(hopname, *cinfo);
+#ifdef MULTIPLEX
 		} else {
-			*cinfo = name_to_conn[nexthop];
+			*cinfo = name_to_conn[hopname];
 		}
 		pthread_mutex_unlock(&name_to_conn_mutex);
+#endif /* MULTIPLEX */
 
-			
+		if (rc < 0) {
+			return rc;
+		}
+
 		// now add this context to the connection so it doesn't get "garbage collected"
 		// if all the other sessions using it close
 		(*cinfo)->add_sessions(ctx);  // TODO: remove when session closes
 		(*cinfo)->set_my_name(ctx_to_ctx_info[ctx]->my_name());
 
-		ctx_to_txconn[ctx] = *cinfo;
+		(*ctx_to_conn)[ctx] = *cinfo;
 
 		// TODO: check that the connection is of the correct type (TCP vs UDP etc)
 
 		return (*cinfo)->sockfd();
 	}
+}
+
+int get_txconn_for_context(int ctx, session::ConnectionInfo **cinfo) {
+	string nexthop = get_nexthop_name(ctx);
+	return get_conn_for_context(ctx, &ctx_to_txconn, nexthop, cinfo);
 }
 
 int get_rxconn_for_context(int ctx, session::ConnectionInfo **cinfo) {
-	if ( ctx_to_rxconn.find(ctx) != ctx_to_rxconn.end() ) {
-		// This session already has a transport conn
-		*cinfo = ctx_to_rxconn[ctx];
-		return (*cinfo)->sockfd();
-	} else {
-		// There isn't a rx transport conn for this session yet 
-		
-		// Get the prev-hop hostname
-		string prevhop = get_prevhop_name(ctx);
-
-		// If no one else has opened a connection to this name, open one
-		if ( name_to_conn.find(prevhop) == name_to_conn.end() ) {
-			*cinfo = new session::ConnectionInfo();
-			if ( open_connection(prevhop, *cinfo) < 0 ) {
-				return -1;
-			}
-		} else {
-			*cinfo = name_to_conn[prevhop];
-		}
-
-			
-		// now add this context to the connection so it doesn't get "garbage collected"
-		// if all the other sessions using it close
-		(*cinfo)->add_sessions(ctx);  // TODO: remove when session closes
-		(*cinfo)->set_my_name(ctx_to_ctx_info[ctx]->my_name());
-
-		ctx_to_rxconn[ctx] = *cinfo;
-
-		// TODO: check that the connection is of the correct type (TCP vs UDP etc)
-
-		return (*cinfo)->sockfd();
-	}
+	string prevhop = get_prevhop_name(ctx);
+	return get_conn_for_context(ctx, &ctx_to_rxconn, prevhop, cinfo);
 }
+
 
 // sends to arbitrary transport connection
 int send(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
@@ -1159,11 +1153,14 @@ LOGF("    Forward path: %s\nReturn Path: %s", im.forward_path().c_str(), im.retu
 	int lsock = -1; // might not get used
 
 	bool two_party = (session_hop_count(ctx) == 2);
-	pthread_mutex_lock(&name_to_conn_mutex);
-	//bool connection_exists = !( name_to_conn.find(prevhop) == name_to_conn.end() && session_hop_count(ctx) > 2 );
-	bool connection_exists = !( name_to_conn.find(prevhop) == name_to_conn.end() );
 
+	pthread_mutex_lock(&name_to_conn_mutex);
+#ifdef MULTIPLEX
+	bool connection_exists = !( name_to_conn.find(prevhop) == name_to_conn.end() );
 	if (!connection_exists && !two_party) {  // NOT ALREADY A CONNECTION
+#else
+	if (!two_party) { 
+#endif /* MULTIPLEX */
 LOGF("Ctx %d    No connection exists, making rx_sock", ctx);
 		// make a socket to accept connection from last hop
 		string *addr_buf = NULL;
@@ -1234,7 +1231,11 @@ LOGF("Ctx %d    Sent connection request to next hop", ctx);
 
 	session::SessionPacket *rpkt = new session::SessionPacket();
 	int rxsock = -1;
-	if ( !connection_exists && !two_party ) {  // NOT ALREADY A CONNECTION
+#ifdef MULTIPLEX
+	if (!connection_exists && !two_party) {  // NOT ALREADY A CONNECTION
+#else
+	if (!two_party) { 
+#endif /* MULTIPLEX */
 		// accept connection on listen sock
 		if ( (rxsock = acceptSock(lsock)) < 0 ) {
 			ERRORF("Error accepting connection from last hop on context %d", ctx);
@@ -1297,6 +1298,10 @@ LOGF("Ctx %d    Got final synack from: %s (sender ctx: %d)", ctx, sender_name.c_
 	setLocalContextForIncomingContext(ctx, rpkt->sender_ctx(), rxsock);
 
 	// TODO: set session state to ESTABLISHED
+
+print_contexts();
+print_sessions();
+print_connections();
 	
 	// return success
 	rcm->set_rc(session::SUCCESS);
@@ -1513,6 +1518,10 @@ LOGF("    Got conn req from %s on context %d (sender ctx %d)", prevhop.c_str(), 
 LOGF("    Ctx %d    Sent SessionInfo packet to next hop", new_ctx);
 
 	delete rpkt; // TODO: not freed if we hit an error and returned early
+
+print_contexts();
+print_sessions();
+print_connections();
 
 	// return success
 	rcm->set_rc(session::SUCCESS);
