@@ -941,10 +941,15 @@ LOG("BEGIN poll_listen_sock");
 					continue;
 				}
 
+#ifdef MULTIPLEX
 				// Get the prevhop's name so we can store this transport connection
 				string prevhop = rpkt->info().my_name();
 				rx_cinfo->set_name(prevhop);
 				name_to_conn[prevhop] = rx_cinfo;
+#else
+				// Save rx_info in the session info so accepter can get to it
+				rpkt->mutable_info()->set_rx_cinfo(&rx_cinfo, sizeof(session::ConnectionInfo*));
+#endif /* MULTIPLEX */
 	
 				// Add session info pkt to acceptQ
 				pushAcceptQ(ctx, rpkt);
@@ -1402,14 +1407,16 @@ LOG("BEGIN process_accept_msg");
 	assert(rpkt);
 
 
-	// First make sure have a connection to the next hop.
+	// First make sure we have a connection to the next hop.
+	session::ConnectionInfo *tx_cinfo = NULL;
+
 	// If i'm the last hop, the initiator doesn't have a name in the name service.
 	// So, we need to use the DAG that was supplied by the initiator and build the
 	// tx_conn ourselves. (Unless we already have a connection open with them.)
 	// BUT: if it's just me and the initiator, we already have a connection.
-	if ( is_last_hop(&(rpkt->info()), listenCtxInfo->my_name()) && session_hop_count(&(rpkt->info())) > 2 ) {
+	bool two_party = (session_hop_count(&(rpkt->info())) == 2 );
+	if ( is_last_hop(&(rpkt->info()), listenCtxInfo->my_name()) && !two_party) {
 		string nexthop = get_nexthop_name(listenCtxInfo->my_name(), &(rpkt->info()));
-		session::ConnectionInfo *tx_cinfo = NULL;
 
 		// If has init addr, connect
 		if (rpkt->info().has_initiator_addr()) {
@@ -1428,6 +1435,8 @@ LOGF("    Ctx %d    I'm the last hop; connecting to initiator with supplied addr
 			int ret;
 			if ( (ret = startPollingSocket(tx_cinfo->sockfd(), poll_recv_sock, (void*)tx_cinfo) < 0) ) {
 				ERRORF("Error creating recv sock thread: %s", strerror(ret));
+				rcm->set_message("Error creating recv sock thread");
+				rcm->set_rc(session::FAILURE);
 				return -1;
 			}
 
@@ -1438,6 +1447,7 @@ LOGF("    Ctx %d    I'm the last hop; connecting to initiator with supplied addr
 
 		} else {
 
+#ifdef MULTIPLEX
 			// check for an existing connection
 			pthread_mutex_lock(&name_to_conn_mutex);
 			if ( name_to_conn.find(nexthop) == name_to_conn.end() ) {
@@ -1458,15 +1468,16 @@ LOGF("    Ctx %d    I'm the last hop; waiting for a connection to initiator. Put
 			tx_cinfo = name_to_conn[nexthop];
 			tx_cinfo->add_sessions(new_ctx);
 			pthread_mutex_unlock(&name_to_conn_mutex);
+#else
+			ERROR("Last hop. Initiator did not supply an address and we're not multiplexing");
+			rcm->set_message("Last hop. Initiator did not supply an address and we're not multiplexing");
+			rcm->set_rc(session::FAILURE);
+			return -1;
+#endif /* MULTIPLEX */
 		}
 
 		ctx_to_txconn[new_ctx] = tx_cinfo;
 	} 
-
-
-
-
-
 
 
 
@@ -1486,12 +1497,31 @@ LOGF("    Ctx %d    I'm the last hop; waiting for a connection to initiator. Put
 	ctx_to_ctx_info[new_ctx] = ctxInfo;
 	allocateDataQ(new_ctx);
 	
+#ifdef MULTIPLEX
 	// save  rx connection by name for others to use
 	string prevhop = get_prevhop_name(new_ctx);
 LOGF("    Got conn req from %s on context %d (sender ctx %d)", prevhop.c_str(), new_ctx, rpkt->sender_ctx());
 	session::ConnectionInfo *rx_cinfo = name_to_conn[prevhop];
 	rx_cinfo->add_sessions(new_ctx);
 	ctx_to_rxconn[new_ctx] = rx_cinfo; // TODO: set this in api call
+#else
+	if (rpkt->info().has_rx_cinfo()) {
+		session::ConnectionInfo *rx_cinfo;
+		memcpy(&rx_cinfo, rpkt->info().rx_cinfo().data(), sizeof(session::ConnectionInfo*));
+		ctx_to_rxconn[new_ctx] = rx_cinfo;
+
+		if (two_party) {  // this is the only case where we didn't set tx_cinfo above
+			tx_cinfo = rx_cinfo;
+			ctx_to_txconn[new_ctx] = tx_cinfo;
+		}
+
+	} else {
+		ERROR("No multiplexing, but ConnReq wasn't tagged with incoming connection.");
+		rcm->set_message("No multiplexing, but ConnReq wasn't tagged with incoming connection.");
+		rcm->set_rc(session::FAILURE);
+		return -1;
+	}
+#endif /* MULTIPLEX */
 
 	
 	// store incoming ctx mapping
