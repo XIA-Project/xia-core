@@ -446,9 +446,8 @@ bool closeConnection(int ctx, session::ConnectionInfo *cinfo) {
 		LOGF("Closing connection to: %s", cinfo->name().c_str());
 		closed_conn = true;
 		
-		// free state and remove mapping
+		// remove mapping
 		name_to_conn.erase(cinfo->name()); // TODO: when we have indidivual mutexes, still lock whole thing here
-		delete cinfo;
 
 		// stop polling the socket
 		if (stopPollingSocket(cinfo->sockfd()) < 0) {
@@ -459,6 +458,9 @@ bool closeConnection(int ctx, session::ConnectionInfo *cinfo) {
 		if (closeSock(cinfo->sockfd()) < 0) {
 			ERRORF("Error closing socket %d", cinfo->sockfd());
 		}
+		
+		// remove mapping
+		delete cinfo;
 	}
 	
 	pthread_mutex_unlock(&name_to_conn_mutex);
@@ -546,16 +548,18 @@ void infocpy(const session::SessionInfo *from, session::SessionInfo *to) {
 }
 
 // counts the number of application endpoints in a session
+int session_hop_count(const session::SessionInfo *info) {
+	return info->forward_path_size() + info->return_path_size();
+}
+
 int session_hop_count(int ctx) {
 	session::SessionInfo *info = ctx_to_session_info[ctx];
-	return info->forward_path_size() + info->return_path_size();
+	return session_hop_count(info);
 }
 
 // name is last hop if it is second to last in the return path or if it is the
 // last name in the forward path and the return path contains only the initiator
-bool is_last_hop(int ctx, string name) {
-	session::SessionInfo *info = ctx_to_session_info[ctx];
-	
+bool is_last_hop(const session::SessionInfo *info, string name) {
 	// Look for name in the return path
 	int found_index = -1;
 	for (int i = 0; i < info->return_path_size(); i++) {
@@ -573,6 +577,11 @@ bool is_last_hop(int ctx, string name) {
 	}
 	
 	return false;
+}
+
+bool is_last_hop(int ctx, string name) {
+	session::SessionInfo *info = ctx_to_session_info[ctx];
+	return is_last_hop(info, name);
 }
 
 string get_neighborhop_name(string my_name, const session::SessionInfo *info, bool next) {
@@ -1387,6 +1396,75 @@ LOG("BEGIN process_accept_msg");
 	}
 	assert(rpkt);
 
+
+	// First make sure have a connection to the next hop.
+	// If i'm the last hop, the initiator doesn't have a name in the name service.
+	// So, we need to use the DAG that was supplied by the initiator and build the
+	// tx_conn ourselves. (Unless we already have a connection open with them.)
+	// BUT: if it's just me and the initiator, we already have a connection.
+	if ( is_last_hop(&(rpkt->info()), listenCtxInfo->my_name()) && session_hop_count(&(rpkt->info())) > 2 ) {
+		string nexthop = get_nexthop_name(listenCtxInfo->my_name(), &(rpkt->info()));
+		session::ConnectionInfo *tx_cinfo = NULL;
+
+		// If has init addr, connect
+		if (rpkt->info().has_initiator_addr()) {
+LOGF("    Ctx %d    I'm the last hop; connecting to initiator with supplied addr", new_ctx);
+			tx_cinfo = new session::ConnectionInfo();
+			tx_cinfo->set_name(nexthop);
+
+			if (openConnectionToAddr(&(rpkt->info().initiator_addr()), tx_cinfo) < 0) {
+				ERROR("Error connecting to initiator");
+				rcm->set_message("Error connecting to initiator");
+				rcm->set_rc(session::FAILURE);
+				return -1;
+			}
+
+			// start a thread reading this socket
+			int ret;
+			if ( (ret = startPollingSocket(tx_cinfo->sockfd(), poll_recv_sock, (void*)tx_cinfo) < 0) ) {
+				ERRORF("Error creating recv sock thread: %s", strerror(ret));
+				return -1;
+			}
+
+			pthread_mutex_lock(&name_to_conn_mutex);
+			name_to_conn[nexthop] = tx_cinfo;
+			tx_cinfo->add_sessions(new_ctx);
+			pthread_mutex_unlock(&name_to_conn_mutex);
+
+		} else {
+
+			// check for an existing connection
+			pthread_mutex_lock(&name_to_conn_mutex);
+			if ( name_to_conn.find(nexthop) == name_to_conn.end() ) {
+LOGF("    Ctx %d    I'm the last hop; waiting for a connection to initiator. Putting ConnReq back on Q", new_ctx);
+				// there isn't one, so we'll put the ConnReq back on the accecptQ
+				// so we can process it again later once we've gotten a ConnReq
+				// with the initiator's address
+				pushAcceptQ(ctx, rpkt);
+				pthread_mutex_unlock(&name_to_conn_mutex);
+				
+				// Try again (hopefully someone else has either added the ConnReq
+				// we want to the acceptQ or they've processed it themselves and
+				// already created the connection we need)
+				return process_accept_msg(ctx, msg, reply);
+			}
+
+			// we're good to go!
+			tx_cinfo = name_to_conn[nexthop];
+			tx_cinfo->add_sessions(new_ctx);
+			pthread_mutex_unlock(&name_to_conn_mutex);
+		}
+
+		ctx_to_txconn[new_ctx] = tx_cinfo;
+	} 
+
+
+
+
+
+
+
+
 	// store a copy of the session info, updating my_name and my_addr
 	//session::SessionInfo *sinfo = new session::SessionInfo(rpkt->info());
 	session::SessionInfo *sinfo = new session::SessionInfo();
@@ -1422,49 +1500,6 @@ LOGF("    Got conn req from %s on context %d (sender ctx %d)", prevhop.c_str(), 
 	session::SessionInfo *newinfo = pkt.mutable_info();// TODO: better way?
 	infocpy(sinfo, newinfo);
 	
-	// If i'm the last hop, the initiator doesn't have a name in the name service.
-	// So, we need to use the DAG that was supplied by the initiator and build the
-	// tx_conn ourselves. (Unless we already have a connection open with them.)
-	// BUT: if it's just me and the initiator, we already have a connection.
-	if ( is_last_hop(new_ctx, sinfo->my_name()) && session_hop_count(new_ctx) > 2 ) {
-LOG("    I'm the last hop; connecting to initiator with supplied addr");
-		
-		string nexthop = get_nexthop_name(new_ctx);
-		session::ConnectionInfo *tx_cinfo = NULL;
-		if ( name_to_conn.find(nexthop) == name_to_conn.end() ) { // NO CONNECTION ALREADY
-			tx_cinfo = new session::ConnectionInfo();
-			tx_cinfo->set_name(nexthop);
-		
-			if (!sinfo->has_initiator_addr()) {
-				ERROR("Initiator did not send address");
-				rcm->set_message("Initiator did not send address");
-				rcm->set_rc(session::FAILURE);
-				return -1;
-			}
-
-			if (openConnectionToAddr(&(sinfo->initiator_addr()), tx_cinfo) < 0) {
-				ERROR("Error connecting to initiator");
-				rcm->set_message("Error connecting to initiator");
-				rcm->set_rc(session::FAILURE);
-				return -1;
-			}
-
-			// start a thread reading this socket
-			// TODO: somehow make this part of open_connection_xia
-			int ret;
-			if ( (ret = startPollingSocket(tx_cinfo->sockfd(), poll_recv_sock, (void*)tx_cinfo) < 0) ) {
-				ERRORF("Error creating recv sock thread: %s", strerror(ret));
-				return -1;
-			}
-
-			name_to_conn[nexthop] = tx_cinfo;
-		} else {
-			tx_cinfo = name_to_conn[nexthop];
-		}
-
-		tx_cinfo->add_sessions(new_ctx);
-		ctx_to_txconn[new_ctx] = tx_cinfo;
-	} 
 
 		
 	// send session info to next hop
@@ -1475,7 +1510,7 @@ LOG("    I'm the last hop; connecting to initiator with supplied addr");
 		return -1;
 	}
 
-LOG("    Sent SessionInfo packet to next hop");
+LOGF("    Ctx %d    Sent SessionInfo packet to next hop", new_ctx);
 
 	delete rpkt; // TODO: not freed if we hit an error and returned early
 

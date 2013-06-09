@@ -135,7 +135,7 @@ LOGF("Ctx %d    BEGIN send_file", ctx);
 			if (Ssend(ctx, data, n) < 0) {
 				ERROR("Error sending");
 			}
-			usleep(6000);
+			usleep(20 * 1000);
 		}
 		fclose(file);
 
