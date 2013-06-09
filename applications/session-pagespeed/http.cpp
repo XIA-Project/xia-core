@@ -25,6 +25,7 @@ string get_mime_type(const char *name)
 	if (!ext) return NULL;
 	if (strcmp(ext, ".html") == 0 || strcmp(ext, ".htm") == 0) return "text/html";
 	if (strcmp(ext, ".jpg") == 0 || strcmp(ext, ".jpeg") == 0) return "image/jpeg";
+	if (strcmp(ext, ".tif") == 0 || strcmp(ext, ".tiff") == 0) return "image/tiff";
 	if (strcmp(ext, ".gif") == 0) return "image/gif";
 	if (strcmp(ext, ".png") == 0) return "image/png";
 	if (strcmp(ext, ".css") == 0) return "text/css";
