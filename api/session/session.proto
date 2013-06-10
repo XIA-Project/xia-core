@@ -132,6 +132,7 @@ message SessionInfo {
 	optional bytes my_addr = 4; // If XIA, a sockaddr_x
 	optional bytes initiator_addr = 5; // If XIA, a sockaddr_x
 	optional uint32 initiator_ctx = 6;
+	optional bytes rx_cinfo = 7;  // receiver of a ConnReq can tag it with the receiving transport conn
 }
 
 message SessionData {
