@@ -67,7 +67,7 @@ NODE_WATCHERS_LOCK = thread.allocate_lock()
 PAIRWISE_PING_LOCK = thread.allocate_lock()
 SINGLE_EXPERIMENT = False
 SAME_TEST_NODES = False
-FOURID_EXPERIMENT = True
+FOURID_EXPERIMENT = False
 APP_EXPERIMENT = True
 
 class NodeWatcher(threading.Thread):
