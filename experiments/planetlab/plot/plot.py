@@ -10,10 +10,11 @@ PING_BIN_SIZE = 10
 PING_MAX = 400
 TR_BIN_SIZE = 1
 TR_MAX = 40
+TR_MIN = 14
 BROWSER_BIN_SIZE = 100
 BROWSER_MAX = 5000
 DETECTION_BIN_SIZE = 20
-DETECTION_MAX = 5000
+DETECTION_MAX = 400
 
 # Tunnels: 2*RTT to local gateway; new tunnel setup
 # 6RD: 2*RTT to local gateway; BGP/OSPF prop (remember, Egress is sep from Ingress in 6RD)
@@ -41,10 +42,12 @@ types = ['6RD', '4ID', 'SDN']
 titles = ['Latency using Different Deployment Mechanisms', 'Path Stretch using Different Deployment Mechanisms', 'Simple Webpage Latency', 'Detection Time for Remote Failures']
 binsize = [PING_BIN_SIZE, TR_BIN_SIZE, BROWSER_BIN_SIZE, DETECTION_BIN_SIZE]
 xmax = [PING_MAX, TR_MAX, BROWSER_MAX, DETECTION_MAX]
+xmin = [0, TR_MIN, 0, 0]
 xlabels = ['Ping Time (ms)', 'Hop Count', 'Time to Completion (ms)', 'Time (ms)']
 ylabels = ['Percentage of Ping Times', 'Percentage of Hop Counts', 'Percentage of Browser Experiments', 'Percentage of Tests']
 legends = ('Tunneling', '6RD/6to4', '4ID', 'Smart 4ID')
-outputs = ['/home/cmu_xia/ping.png', '/home/cmu_xia/hops.png', '/home/cmu_xia/browsers.png', '/home/cmu_xia/detection.png']
+outputs = ['/home/cmu_xia/ping.pdf', '/home/cmu_xia/hops.pdf', '/home/cmu_xia/browsers.pdf', '/home/cmu_xia/detection.pdf']
+colors = ['b','g','r','c']
 
 if len(sys.argv) < 3:
     print 'usage: %s [stats-tunneling.txt] [stats-4id.txt]' % (sys.argv[0])
@@ -82,8 +85,10 @@ for pair in pairs:
             pass
 
         try:
-            if pair[t][ag][3] != 1 and pair[t][gg][3] != -1 and pair[t][bg][3] != -1:
-                hops[t+1].append(pair[t][ag][3]/2 + pair[t][gg][3] + pair[t][bg][3]/2)
+            if pair[t][ag][3] != 1 and pair[t][gg][3] != -1 and pair[t][bg][3] != -1 and pair[t][gg][3] > 1:
+                hops[t+1].append(pair[t][ag][3] + pair[t][gg][3] + pair[t][bg][3])
+                if hops[t+1][-1] < 10:
+                    print pair
         except:
             pass
         
@@ -156,6 +161,7 @@ for t in range(4):
 ####################
 
 data = [pings, hops, browsers, detection]
+lines = []
 for i in range(4):
     # remove outlies
     for j in range(4):
@@ -166,7 +172,7 @@ for i in range(4):
     MAX = int(MAX - (MAX % binsize[i]))
     plt.clf()
     fig = plt.figure()
-    plt.title(titles[i])
+    #plt.title(titles[i])
     ax = fig.add_subplot(111)
     ax.set_xlabel(xlabels[i])
     ax.set_ylabel(ylabels[i])
@@ -179,8 +185,23 @@ for i in range(4):
             Y[p - (p % binsize[i])] += (1.0/len(pt))
 
         p = sorted(zip(Y.keys(), Y.values()))
-        plt.plot(zip(*p)[0], 100*np.cumsum(zip(*p)[1]))
-        plt.legend(legends,
-                   'lower right')
-        ax.axis([0, xmax[i], 0, 100])
-        plt.savefig(outputs[i])
+        lines.append(plt.plot(zip(*p)[0], 100*np.cumsum(zip(*p)[1]), color=colors[data[i].index(pt)]))
+        
+
+        p2 = zip(np.cumsum(zip(*p)[1]),zip(*p)[0])
+        lside = (0,)
+        rside = (1,)
+        for j in p2:
+            if j[0] > lside[0] and j[0] <= .5: lside = j
+            if j[0] < rside[0] and j[0] >= .5: rside = j
+
+        m = (rside[0]-lside[0])/(rside[1]-lside[1])
+        b = ((rside[0] - m*rside[1]) + (lside[0] - m*lside[1])) / 2
+        med = (.5-b)/m
+
+        plt.plot([med], [50], color=colors[data[i].index(pt)], marker='o')
+        plt.annotate(int(med), (med+(1.0/16)*med,50+data[i].index(pt)%2*4+1), color=colors[data[i].index(pt)])
+    plt.legend(lines, legends,
+               'lower right')
+    ax.axis([xmin[i], xmax[i], 0, 100])
+    plt.savefig(outputs[i])
