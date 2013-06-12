@@ -122,7 +122,7 @@ for pair in pairs:
 
     try:
         if pair[ag][3] > 2 and pair[bg][3] > 2:
-            hops[0].append(pair[ag][3] + pair[bg][3] + pair[ab][3])
+            hops[0].append(pair[ag][3] + pair[bg][3] + pair[ab][3]-2)
     except:
         pass
 

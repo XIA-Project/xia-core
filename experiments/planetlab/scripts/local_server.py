@@ -15,9 +15,10 @@ XROUTE = '/home/cmu_xia/fedora-bin/xia-core/bin/xroute -v'
 MASTER_SERVER = 'GS11698.SP.CS.CMU.EDU'
 BEAT_PERIOD = 3
 BROADCAST_HID = 'ffffffffffffffffffffffffffffffffffffffff'
-PING_INTERVAL = .25
-XPING_INTERVAL = 1
-PING_COUNT = 4
+PING_INTERVAL = .10
+XPING_INTERVAL = .10
+PING_COUNT = 50
+XPING_COUNT = 50
 WEBSERVER_CMD = '/home/cmu_xia/fedora-bin/xia-core/experiments/planetlab/webserver_mockup.sh'
 
 myHID = ''
@@ -27,40 +28,53 @@ FINISH_EVENT = threading.Event()
 
 FOURID_SETUP = False
 
-def multi_ping(neighbors):
+def multi_ping(neighbors, np=PING_COUNT):
     print "<<<< Multi Ping >>>>"
     pingcmd = 'sudo ping -W 1 -i %s -c' % PING_INTERVAL
     
     processes = [(Popen('%s %s %s' % (pingcmd, 1, neighbor), shell=True, stdout=PIPE, stderr=PIPE), neighbor) for neighbor in neighbors]
     outs = [process[0].communicate() for process in processes]
 
-    processes = [(Popen('%s %s %s' % (pingcmd, PING_COUNT, neighbor), shell=True, stdout=PIPE, stderr=PIPE), neighbor) for neighbor in neighbors]
+    processes = [(Popen('%s %s %s' % (pingcmd, np, neighbor), shell=True, stdout=PIPE, stderr=PIPE), neighbor) for neighbor in neighbors]
     outs = [process[0].communicate() for process in processes]
     rcs = [process[0].wait() for process in processes]
     outs = zip(outs, rcs, [p[1] for p in processes])
 
     stats = []
     for out in outs:
-            p = float(out[0][0].split("\n")[-2].split('=')[1].split('/')[1]) if out[1] == 0 else 5000.00
-            stats.append((p,out[2]))
+        p = 5000
+        try:
+            l = sorted([float(x.split('time=')[1].split(' ')[0]) for x in out[0][0].split('\n')[1:-5]])[:5]
+            print l
+            p = float(sum(l))/len(l)
+        except:
+            pass
+        stats.append((p,out[2]))
     stats = sorted(stats)
     stats = [(-1,stat[1]) if stat[0] == 5000 else stat for stat in stats]
     stats = [("%.3f" % stat[0], stat[1]) for stat in stats]
     return stats
 
-def traceroute(neighbor):
+def traceroute(neighbor, gateway=False):
     out = check_output('sudo traceroute -I -w 1 %s' % neighbor)
     print out
-    stat = int(out[0].split("\n")[-2].strip().split(' ')[0])
-    stat = -1 if stat is 30 else stat
+    if gateway:
+        out = out[0].split('\n')
+        z = my_name.split('.')[-2]
+        stat = -1
+        for o in out:
+            stat = int(o.strip().split(' ')[0]) if z in o else stat
+    else:
+        stat = int(out[0].split("\n")[-2].strip().split(' ')[0])
+        stat = -1 if stat is 30 else stat
     return stat
 
-def xping(neighbor,tryUntilSuccess=True,src=None):
-    xpingcmd = '/home/cmu_xia/fedora-bin/xia-core/bin/xping -t 5'
+def xping(neighbor,tryUntilSuccess=False,src=None):
+    xpingcmd = '/home/cmu_xia/fedora-bin/xia-core/bin/xping'
     if src:
         xpingcmd = '%s -s "%s"' % (xpingcmd, src)
-    while tryUntilSuccess:
-        s = '%s "%s"' % (xpingcmd, neighbor)
+    while True:
+        s = '%s -t 5 "%s"' % (xpingcmd, neighbor)
         while True:
             try:
                 printtime(s)
@@ -70,22 +84,26 @@ def xping(neighbor,tryUntilSuccess=True,src=None):
                 break
             except:
                 pass
-        s = '%s -c %s "%s"' % (xpingcmd, PING_COUNT, neighbor)
-        while tryUntilSuccess:
+        s = '%s -t 30 -i %s -c %s "%s"' % (xpingcmd, XPING_INTERVAL, XPING_COUNT, neighbor)
+        while True:
             try:
                 printtime(s)
                 out = check_output(s)
                 break
             except:
-                pass
+                if not tryUntilSuccess:
+                    break
         printtime(out)
         try:
-            stat = "%.3f" % float(out[0].split("\n")[-2].split('=')[1].split('/')[1])
-            break
+            l = sorted([float(x.split('time=')[1].split(' ')[0]) for x in out[0].split('\n') if 'time=' in x])[:5]
+            print l
+            stat = sum(l) / len(l)
+            #stat = "%.3f" % float(out[0].split("\n")[-2].split('=')[1].split('/')[1])
         except:
             stat = -1
-    stat = -1 if stat == '=' else stat
-    return stat
+        stat = "%.3f" % stat
+        stat = -1 if stat == '=' else stat
+        return stat
 
 def xtraceroute(neighbor,tryUntilSuccess=True, src=None):
     cmd = '/home/cmu_xia/fedora-bin/xia-core/bin/xtraceroute -t 30'
@@ -185,7 +203,7 @@ class MyService(rpyc.Service):
         rpc(MASTER_SERVER, 'xstats', (xlatency, xhops))
         return 'Sent xstats: (%s, %s, %s)' % (neighbor, xlatency, xhops)
 
-    def exposed_gather_fourid_stats(self): 
+    def exposed_gather_fourid_stats(self, type): 
         printtime('<<<<GATHER FOURIDSTATS>>>>')
         # [CA, 6RDA, GA, SDNA, CB, 6RDB, GB, SDNB]
         fidn = rpc(MASTER_SERVER, 'get_fourid_nodes', ())
@@ -199,42 +217,46 @@ class MyService(rpyc.Service):
             npair = 'AB' if i == 0 else 'BA'
             neighbor = fidn[4] if i == 0 else fidn[0]
 
-            for type in ['SDN', '4ID', '6RD']:
-                printtime('<<<<NODE STARTING %s STATS>>>>' % type)
-                gateway = rpc(MASTER_SERVER,'get_gateway_host',(type,my_name))
+            #for type in ['SDN', '4ID', '6RD']:
+            printtime('<<<<NODE STARTING %s STATS>>>>' % type)
+            gateway = rpc(MASTER_SERVER,'get_gateway_host',(type,my_name))
 #                 DST = rpc(MASTER_SERVER,'get_gateway_xhost',(type,))
 
 #                 xlatency = xping(DST)
 #                 xhops = xtraceroute(DST)
                 
-                DST_h = rpc(MASTER_SERVER,'get_gateway_host',(type,my_name))
-                latency = multi_ping([DST_h])[0][0]
-                hops = traceroute(DST_h)
+#            DST_h = rpc(MASTER_SERVER,'get_gateway_host',(type,my_name))
+            latency = multi_ping([gateway])[0][0]
+            hops = traceroute(gateway, gateway=True)
 #                rpc(MASTER_SERVER, 'fidstats', ('%s-%s' % (type, gpair), gateway, xlatency, xhops))
-                rpc(MASTER_SERVER, 'fidstats', ('%s-%s' % (type, gpair), gateway, latency, hops))
+            rpc(MASTER_SERVER, 'fidstats', ('%s-%s' % (type, gpair), gateway, latency, hops))
 
-                SRC = rpc(MASTER_SERVER,'get_fourid_neighbor_xhost',(type,True))
-                DST = rpc(MASTER_SERVER,'get_fourid_neighbor_xhost',(type,False))
-                xlatency = xping(DST, src=SRC)
-                xhops = -1
-                rpc(MASTER_SERVER, 'fidstats', ('%s-%s' % (type, npair), neighbor, xlatency, xhops))
+            SRC = rpc(MASTER_SERVER,'get_fourid_neighbor_xhost',(type,True))
+            DST = rpc(MASTER_SERVER,'get_fourid_neighbor_xhost',(type,False))
+            xlatency = xping(DST, src=SRC)
+            xhops = -1
+            rpc(MASTER_SERVER, 'fidstats', ('%s-%s' % (type, npair), neighbor, xlatency, xhops))
 
-                if my_name == fidn[4]: #CB
-                    self.exposed_gather_browser_stats(type)
-                elif my_name == fidn[0]: #CA
-                    self.exposed_run_webserver(type)
+            if my_name == fidn[4]: #CB
+                self.exposed_gather_browser_stats(type)
+            elif my_name == fidn[0]: #CA
+                self.exposed_run_webserver(type)
+                while not rpc(MASTER_SERVER, 'check_done_type', (type,)):
+                    print "Waiting for browser test to complete..."
+                    time.sleep(1)
 
         elif my_name in [fidn[1], fidn[2], fidn[3]]: # 6RDA, GA, SDNA
             indices = [i for i,x in enumerate(fidn) if x == my_name]
             for i in indices:
-                type = ['6RD', '4ID', 'SDN'][i-1]
-                partner_node = fidn[i+4]
-                latency = multi_ping([partner_node])[0][0]
-                hops = traceroute(partner_node)
-                rpc(MASTER_SERVER, 'fidstats', ('%s-GG' % type, partner_node, latency, hops))
+                t = ['6RD', '4ID', 'SDN'][i-1]
+                if t == type:
+                    partner_node = fidn[i+4]
+                    latency = multi_ping([partner_node])[0][0]
+                    hops = traceroute(partner_node)
+                    rpc(MASTER_SERVER, 'fidstats', ('%s-GG' % type, partner_node, latency, hops))
 
     def exposed_get_ping(self, nodes):
-        return multi_ping(nodes)
+        return multi_ping(nodes, 5)
 
     def try_xroute(self):
         return check_output(XROUTE)
@@ -318,6 +340,7 @@ class Runner(threading.Thread):
                 break
             except Exception, e:
                 printtime('%s' % e)
+                #rpc(MASTER_SERVER, 'error', ('command broke?', my_name))
                 time.sleep(1)
 
 if __name__ == '__main__':

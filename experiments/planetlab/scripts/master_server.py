@@ -29,7 +29,7 @@ BACKBONE_TOPO = {} # hostname --> [hostname]
 CLIENT_TOPO = {} # hostname --> [hostname]
 PAIRWISE_PING = {} # (hostname,hostname,...) --> (backbone_hostname,client_hostname)
 FINISHED_EVENT = threading.Event()
-MAX_EXPERIMENT_TIMEOUT = 300 #150 # seconds
+MAX_EXPERIMENT_TIMEOUT = 150 # seconds
 PLANETLAB_DIR = '/home/cmu_xia/fedora-bin/xia-core/experiments/planetlab/'
 LOG_DIR = PLANETLAB_DIR + 'logs/'
 STATS_FILE = LOG_DIR + 'stats.txt'
@@ -38,6 +38,7 @@ NAMES_FILE = PLANETLAB_DIR + 'names'
 BACKBONE_TOPO_FILE = PLANETLAB_DIR + 'backbone_topo'
 FOURID_TOPO_FILE = PLANETLAB_DIR + '4ID_topo'
 FOURID_G_INDEX = None
+TYPE = None
 
 # note that killing local server is not in this one
 STOP_CMD = '"sudo killall sh; sudo killall init.sh; sudo killall rsync; sudo ~/fedora-bin/xia-core/bin/xianet stop; sudo killall mapper_client.py; sudo killall xping; sudo killall xtraceroute; sudo killall ping; sudo killall traceroute; sudo killall webserver.py; sudo killall proxy.py; sudo killall browser_mockup.py"'
@@ -243,7 +244,7 @@ class MasterService(rpyc.Service):
             return PAIRWISE_PING[cur_exp]
         min_ping = 5000
         min_pair = None
-        for node in BACKBONES:
+        for node in BACKBONES[1:]:
             while True:
                 try:
                     out = rpc(node, 'get_ping', (CLIENTS[1:],))[0]
@@ -327,8 +328,8 @@ class MasterService(rpyc.Service):
                 hid = 'HID:%s' % rpc(neighbor, 'get_hid', ())
                 if type == "tunneling":
                     fourid = 'IP:%s' % BLANK_FOURID
-                    s = 'RE ( %s ) %s %s SID:%s' % \
-                        (fourid, ad, hid, WEBSERVER_SID)
+                    s = 'RE %s %s %s %s SID:%s' % \
+                        (ad, fourid, ad, hid, WEBSERVER_SID)
                 else:
                     gad = 'AD:%s' % rpc( \
                         self.exposed_get_gateway_host(type,self._host), 'get_ad', ())
@@ -364,6 +365,15 @@ class MasterService(rpyc.Service):
     def exposed_get_neighbor_host(self):
         if self._host in CLIENTS:
             return [client for client in CLIENTS if client != self._host][0]
+        elif self._host in BACKBONES:
+            return CLIENTS[0]
+
+    def exposed_check_done_type(self, type):
+        cur_exp = tuple(CLIENTS)
+        i = ['6RD', '4ID', 'SDN'].index(type)
+        if len(STATSD[cur_exp][i]) == 6:
+            return True
+        return False
 
     def exposed_browser_stats(self, latency, type):
         print "<<<< Browser Stats >>>>"
@@ -379,8 +389,9 @@ class MasterService(rpyc.Service):
             i = ['6RD','4ID','SDN'].index(type)
             STATSD[cur_exp][i]['browser'] = (self._host, CLIENTS[0], latency)
             if 'stats' in PRINT_VERB: printtime('%s:\t %s\n' % (cur_exp,STATSD[cur_exp]))            
-            l = STATSD[cur_exp]
-            if len(l[0]) == 6 and len(l[1]) == 6 and len(l[2]) == 6:
+            #l = STATSD[cur_exp]
+            #if len(l[0]) == 6 and len(l[1]) == 6 and len(l[2]) == 6:
+            if len(STATSD[cur_exp][i]) == 6:
                 print "<<< GOT ALL STATS!! >>>"
                 self.exposed_new_exp()
 
@@ -458,7 +469,7 @@ class MasterService(rpyc.Service):
             CLIENT_TOPO[nc[b]].append(nc[a])
 
     def exposed_new_exp(self, host=None):
-        global CLIENTS, NUMEXP, NEW_EXP_TIMER, PRINT_VERB, NEW_EXP_LOCK, FOURID_G_INDEX
+        global CLIENTS, NUMEXP, NEW_EXP_TIMER, PRINT_VERB, NEW_EXP_LOCK, FOURID_G_INDEX, TYPE
 
         if SINGLE_EXPERIMENT and NUMEXP == 2:
             return
@@ -466,10 +477,12 @@ class MasterService(rpyc.Service):
         if NEW_EXP_LOCK.locked():
             return
         NEW_EXP_LOCK.acquire()
+        print "<<< lock aquired >>>"
 
         # some host errored that's not currently in the experiment
         if host and host not in CLIENTS and host not in BACKBONES:
             NEW_EXP_LOCK.release()
+            print "<<< nope: lock released >>>"
             return
 
         try:
@@ -502,15 +515,16 @@ class MasterService(rpyc.Service):
                         new_clients = [NAME_LOOKUP['DC']]
                     print new_clients[0]
                     IP_LOOKUP[socket.gethostbyname(new_clients[0])] = new_clients[0]
-                    FOURID_G_INDEX = randint(1,4)
                     self.exposed_hard_restart(new_clients[0], setup=True)
-                    while new_clients[0] in NODE_WATCHERS:
+                    i = 0
+                    while new_clients[0] in NODE_WATCHERS and i < 30:
                         try:
                             rpc(new_clients[0],'get_hello',())
                             break
                         except:
                             time.sleep(1)
-                    if new_clients[0] not in NODE_WATCHERS: # client crashed
+                            i += 1
+                    if new_clients[0] not in NODE_WATCHERS or i >= 30: # client crashed
                         continue
                         
                     i = 0
@@ -555,12 +569,21 @@ class MasterService(rpyc.Service):
 
         CLIENTS = new_clients
         for client in CLIENTS:
-            IP_LOOKUP[socket.gethostbyname(client)] = client
+            while True:
+                try:
+                    IP_LOOKUP[socket.gethostbyname(client)] = client
+                    break
+                except:
+                    print "Error doing Client lookup in new exp: %s" % client
+                    time.sleep(1)
         
         [PRINT_VERB.append(c) for c in CLIENTS]
 
         printtime('<<<< new experiment (%s): %s >>>>' % (NUMEXP, CLIENTS))
+        FOURID_G_INDEX = randint(1,4)
         printtime("<<<<<<<<RANDINT: %s>>>>>>>>" % FOURID_G_INDEX)
+        TYPE = choice(['6RD','4ID','SDN'])
+
 
         for host in NODE_WATCHERS:
             self.exposed_hard_restart(host)
@@ -568,11 +591,16 @@ class MasterService(rpyc.Service):
         for host in CLIENTS:
             self.exposed_hard_restart(host)
 
+        printtime('<<< FINISHED RELAUNCHING HOSTS >>>')
+
+
         NUMEXP += 1
         if NEW_EXP_TIMER: NEW_EXP_TIMER.cancel()
         NEW_EXP_TIMER = threading.Timer(MAX_EXPERIMENT_TIMEOUT, self.exposed_new_exp)
         NEW_EXP_TIMER.start()
         NEW_EXP_LOCK.release()
+
+        printtime('<<< LOCK RELEASED >>>')
 
     def exposed_error(self, msg, host):
         printtime('<<<< %s  (error!): %s >>>>' % (host, msg))
@@ -629,10 +657,11 @@ class MasterService(rpyc.Service):
         if 'master' in PRINT_VERB: printtime('MASTER: %s checked in for commands' % host)
 
         if FOURID_EXPERIMENT:
+            print TYPE
             cmd = [self.exposed_get_xianet(host=host)]
             if CLIENTS:
                 cmd += ["self.exposed_wait_for_neighbors(rpc(MASTER_SERVER, 'get_experiment_nodes', ()), 'waiting for xianet to start on all nodes')"]
-                cmd += ["self.exposed_gather_fourid_stats()"]
+                cmd += ["self.exposed_gather_fourid_stats('%s')" % TYPE]
             return cmd
 
         if host in BACKBONES:
