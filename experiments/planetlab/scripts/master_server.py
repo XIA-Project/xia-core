@@ -65,9 +65,9 @@ NODE_WATCHERS = {} # hostname -> [(NodeWatcher Thread, goOnEvent)]
 NEW_EXP_LOCK = thread.allocate_lock()
 NODE_WATCHERS_LOCK = thread.allocate_lock()
 PAIRWISE_PING_LOCK = thread.allocate_lock()
-SINGLE_EXPERIMENT = False
+SINGLE_EXPERIMENT = True
 SAME_TEST_NODES = False
-FOURID_EXPERIMENT = False
+FOURID_EXPERIMENT = True
 APP_EXPERIMENT = True
 
 class NodeWatcher(threading.Thread):

@@ -45,7 +45,7 @@ xmax = [PING_MAX, TR_MAX, BROWSER_MAX, DETECTION_MAX]
 xmin = [0, TR_MIN, 0, 0]
 xlabels = ['Ping Time (ms)', 'Hop Count', 'Time to Completion (ms)', 'Time (ms)']
 ylabels = ['Percentage of Ping Times', 'Percentage of Hop Counts', 'Percentage of Browser Experiments', 'Percentage of Tests']
-legends = ('Tunneling', '6RD/6to4', '4ID', 'Smart 4ID')
+legends = ('6in4', '6RD', '4ID', 'Smart 4ID')
 outputs = ['/home/cmu_xia/ping.pdf', '/home/cmu_xia/hops.pdf', '/home/cmu_xia/browsers.pdf', '/home/cmu_xia/detection.pdf']
 colors = ['b','g','r','c']
 
