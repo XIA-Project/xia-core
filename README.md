@@ -10,9 +10,15 @@ The main git branch will always contain the most recently released version of XI
 
 Contact
 -------
-- [XIA announcement mailing list](https://mailman.srv.cs.cmu.edu/mailman/listinfo/xia-announce)
-- [XIA discussion list](https://mailman.srv.cs.cmu.edu/mailman/listinfo/xia-users)
-- Help on using XIA is available at <xia-users-help@cs.cmu.edu>
+- Support and general XIA usage questions should be sent to the support email address <xia-users-help@cs.cmu.edu>. 
+This address is monitored by several of the XIA developers and we strive to respond in a timely fashion.
+- [XIA-Users](https://mailman.srv.cs.cmu.edu/mailman/listinfo/xia-users) is an unmoderated general discussion mailing 
+list for XIA. Everyone is welcome to join and participate in the discussion, whether you are an XIA user or developer, 
+or are just curious about to know more about XIA.  This is the place to post ideas, share problems and solutions, 
+and discuss the design and goals of XIA. 
+- [XIA-Announce](https://mailman.srv.cs.cmu.edu/mailman/listinfo/xia-announce) is a read-only list for announcements 
+of new XIA releases and events. This list is open to everyone.
+
 
 Related Projects
 ----------------
