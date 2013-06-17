@@ -16,7 +16,7 @@
 #define LOGF(fmt, ...)
 #endif
 
-#define MAXBUF 2048
+#define MAXBUF 4096
 
 
 int main(int argc, char *argv[])

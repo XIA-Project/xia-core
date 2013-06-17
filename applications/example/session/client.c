@@ -18,13 +18,13 @@
 #define LOGF(fmt, ...)
 #endif
 
-#define MAXBUF 2048
+#define MAXBUF 4096
 #define RECV_TIMEOUT_MICRO 750000
 #define CHECK_INTERVAL_MICRO 100000
 
 // global configuration options
 int loops = -1;		// only do 1 pass
-int pktSize = 512;	// default pkt size
+int pktSize = 1024;	// default pkt size
 
 /*
 ** display cmd line options and exit
@@ -34,7 +34,7 @@ void help(const char *name)
 	printf("usage: %s [-l loops] [-s size]\n", name);
 	printf("where:\n");
 	printf(" -l loops   : loop <loops> times and exit (0 loops infinitely; -1 prompts for user input)\n");
-	printf(" -s size    : set packet size to <size>. if 0, uses random sizes\n");
+	printf(" -s size    : set packet size to <size>. if 0, uses random sizes (default is %d bytes)\n", pktSize);
 	printf("\n");
 	exit(0);
 }
