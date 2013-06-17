@@ -120,5 +120,6 @@ etc/click/templates/dual_stack_host.click
 etc/click/templates/dual_stack_router.click
 
 # planetlab
-experiments/planetlab/*.ini
-experiments/planetlab/*.txt
+experiments/planetlab/logs/*.txt
+experiments/planetlab/logs/tunneling
+experiments/planetlab/logs/fourid

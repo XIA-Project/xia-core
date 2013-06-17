@@ -617,9 +617,9 @@ Graph::out_edges_for_index(std::size_t i, std::size_t source_index, std::size_t 
 	{
 		int idx = index_in_dag_string(out_edges_[i][j], source_index, sink_index);
 		char *idx_str;
-		int size = snprintf(NULL, 0, " %zu\0", idx);
-		idx_str = (char*)malloc(sizeof(char) * size);
-		sprintf(idx_str, " %zu\0", idx);
+		int size = snprintf(NULL, 0, " %zu", idx);
+		idx_str = (char*)malloc(sizeof(char) * size +1); // +1 for null char (sprintf automatically appends it)
+		sprintf(idx_str, " %zu", idx);
 		out_edge_string += idx_str; 
 		free(idx_str);
 	}

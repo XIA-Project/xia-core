@@ -150,8 +150,8 @@ elementclass IPLineCard {
 	// output[1]: send up to the higher stack (i.e. router or end host)
 
     // TODO: Make these IPPrint elements? Will require adding handlers to IPPrint element....
-    print_in :: XIAPrint(">>> $local_hid (In Port $num)");
-    print_out :: XIAPrint("<<< $local_hid (Out Port $num)");
+    print_in :: IPPrint(">>> $local_hid (In Port $num)");
+    print_out :: IPPrint("<<< $local_hid (Out Port $num)");
 
     // TODO: Make a counter for IP
     //count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
@@ -165,7 +165,7 @@ elementclass IPLineCard {
     // On receiving a packet from interface
 	// Receiving an XIA-encapped-in-IP packet; strip the ethernet, IP, and UDP headers, 
 	// leaving bare XIP packet, then paint so we know which port it came in on
-	input[0] -> print_in -> MarkIPHeader -> IPClassifier(dst udp port 1001) -> 
+	input[0] -> CheckIPHeader() -> IPClassifier(dst udp port 13781) -> print_in -> MarkIPHeader ->
     StripIPHeader -> Strip(8) -> MarkXIAHeader
 	-> XIAPaint($num) -> [1]output; // this should be send out to [0]n;   	
 }
