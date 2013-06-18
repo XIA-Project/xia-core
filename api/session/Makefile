@@ -1,6 +1,6 @@
 include ../../xia.mk
 
-.PHONY: clean 
+.PHONY: clean doc
 
 CFLAGS +=-c -Iminini -fpic
 CPPFLAGS=$(CFLAGS)
@@ -31,7 +31,11 @@ $(LIB): $(OBJS)
 $(STATICLIB): $(OBJS) 
 	ar rcs $@ $(OBJS)
 
+doc: $(SOURCES)
+	doxygen Doxyfile
+
 clean:
 	-rm -f $(LIB)
 	-rm -f $(STATICLIB)
 	-rm -f *.o session.pb.*
+	-rm -rf doc

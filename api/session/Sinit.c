@@ -25,6 +25,22 @@
 
 using namespace std;
 
+/**
+* @brief Initializes a session.
+*
+* Initiates a session (akin to "connect" in the standard sockets API). Begins by
+* opening a transport connection with the next application in the session path
+* and passing on the required session information for the next hop to continue
+* session setup by connecting to the following hop.
+*
+* @param ctx The context (like a session-layer socket).
+* @param forwardPath A comma separated list (as a stirng) of application names
+* specifying through which applications session data should pass.
+* @param returnPath
+* @param myName
+*
+* @return A negative value on failure.
+*/
 int Sinit(int ctx, const char* forwardPath, const char* returnPath, const char* myName)
 {
 	int rc;

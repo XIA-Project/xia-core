@@ -25,6 +25,17 @@
 
 using namespace std;
 
+/**
+* @brief Close a session.
+*
+* Closes an open session. Will notify other session participants that the
+* session is closing. Sclose() also closes any open transport connections
+* currently being used only by this session.
+*
+* @param ctx The context handle for the session to close.
+*
+* @return A negative error code on failure.
+*/
 int Sclose(int ctx)
 {
 LOG("BEGIN Sclose");

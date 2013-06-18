@@ -25,6 +25,17 @@
 
 using namespace std;
 
+/**
+* @brief Accept an incoming session request.
+* 
+* Accepts an incoming session. SacceptConnReq() will block until a connection
+* request is received.
+*
+* @param ctx A ``listen'' context that has been bound to a name with Sbind.
+*
+* @return The context of the new session on success.
+* @return A negative error code on failure.
+*/
 int SacceptConnReq(int ctx)
 {
 LOG("BEGIN SacceptConnReq");

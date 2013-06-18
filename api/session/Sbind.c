@@ -25,6 +25,19 @@
 
 using namespace std;
 
+/**
+* @brief Binds a context to a name.
+*
+* Binds the supplied context to the provided name where others can connect to
+* it. Sbind() creates a transport socket and binds it to a random address
+* (e.g., a random port in IP or a random SID in XIA). It then publishes this
+* address/name pair to the name server.
+*
+* @param ctx The context to bind.
+* @param name The name to bind it to.
+*
+* @return A negative error code on failure.
+*/
 int Sbind(int ctx, const char* name)
 {
 LOG("BEGIN Sbind");

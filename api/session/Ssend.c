@@ -25,6 +25,20 @@
 
 using namespace std;
 
+/**
+* @brief Send data on a session.
+*
+* Send data to the next hop in a session. Each call to Ssend() implicitly
+* results in sending one ADU; if the receiver uses SrecvADU(), it will receive
+* each buffer of data sent as a unit.
+*
+* @param ctx The handle of the session.
+* @param buf The buffer of data to send.
+* @param len Number of bytes to send.
+*
+* @return The number of bytes sent on success.
+* @return A negative error code on failure.
+*/
 int Ssend(int ctx, const void* buf, size_t len)
 {
 LOG("BEGIN Ssend");

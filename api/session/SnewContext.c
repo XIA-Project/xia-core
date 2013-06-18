@@ -25,6 +25,16 @@
 
 using namespace std;
 
+/**
+* @brief Initialize a new session context.
+*
+* Initializes a new session context (like a session layer socket). The resulting
+* context can be used to connect to listening applications or to listen for
+* connection requests from others.
+*
+* @return The session context on success.
+* @return A negative error code on failure.
+*/
 int SnewContext()
 {
 LOG("BEGIN SnewContext()");

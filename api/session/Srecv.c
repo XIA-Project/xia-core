@@ -69,14 +69,52 @@ LOG("BEGIN Srecv");
 	return bytes;
 }
 
+/**
+* @brief Receive data on a session.
+*
+* Receive a buffer of data from the previous hop in a session. If no data is
+* available, Srecv() blocks.
+*
+* @param ctx The context handle of the session to receive on.
+* @param buf A buffer where received data should be placed.
+* @param len The maximum number of bytes to receive.
+*
+* @return The number of bytes received on success.
+* @return A negative error code on failure.
+*/
 int Srecv(int ctx, void* buf, size_t len) {
 	return Srecv(ctx, buf, len, false);
 }
 
+/**
+* @brief Receive an ADU on a session.
+*
+* Same as Srecv(), but receives one ADU at a time. (ADU boundaries are
+* determined by the sender --- each call to Ssend() generates one ADU.) If
+* len is smaller than the ADU, the full ADU is not returned.
+*
+* @param ctx The context handle of the session to receive on.
+* @param buf A buffer where received data should be placed.
+* @param len The maximum number of bytes to receive.
+*
+* @return The number of bytes received on success.
+* @return A negative error code on failure.
+*/
 int SrecvADU(int ctx, void* buf, size_t len) {
 	return Srecv(ctx, buf, len, true);
 }
 
+/**
+* @brief Check if data is available to read.
+*
+* Check if data is available to read on a particular session. Can be used to
+* avoid a blocking call to Srecv() or SrecvADU(). (Similar to poll.)
+*
+* @param ctx The context handle of the session.
+*
+* @return true if data is available to read
+* @return false otherwise
+*/
 bool ScheckForData(int ctx) {
 LOG("BEGIN ScheckForData");
 
