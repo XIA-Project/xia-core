@@ -39,7 +39,7 @@ extern "C" {
 
 //Function list
 extern int SnewContext();
-extern int Sinit(int ctx, const char* forwardPath, const char* returnPath, const char* myName);
+extern int Sinit(int ctx, const char* sessionPath);
 extern int Sbind(int ctx, const char* name);
 extern int SacceptConnReq(int ctx);
 extern int Ssend(int ctx, const void* buf, size_t len);

@@ -105,7 +105,6 @@ struct proc_func_data {
 
 /* PRINT FUNCTIONS */
 void print_contexts() {
-return;
 	printf("*******************************************************************************\n");
 	printf("*                                 CONTEXTS                                    *\n");
 	printf("*******************************************************************************\n\n");
@@ -133,7 +132,6 @@ return;
 }
 
 void print_sessions() {
-return;
 	printf("*******************************************************************************\n");
 	printf("*                                 SESSIONS                                    *\n");
 	printf("*******************************************************************************\n\n");
@@ -143,13 +141,9 @@ return;
 		session::SessionInfo* sinfo = iter->second;
 
 		printf("Context:\t%d\n", iter->first);	
-		printf("Forward path:\t");
-		for (int i = 0; i < sinfo->forward_path_size(); i++) {
-			printf("%s  ", sinfo->forward_path(i).name().c_str());
-		}
-		printf("\nReturn path:\t");
-		for (int i = 0; i < sinfo->return_path_size(); i++) {
-			printf("%s  ", sinfo->return_path(i).name().c_str());
+		printf("Session path:\t");
+		for (int i = 0; i < sinfo->session_path_size(); i++) {
+			printf("%s  ", sinfo->session_path(i).name().c_str());
 		}
 
 		if (sinfo->has_my_name()) {
@@ -160,7 +154,6 @@ return;
 }
 
 void print_connections() {
-return;
 	printf("*******************************************************************************\n");
 	printf("*                               CONNECTIONS                                   *\n");
 	printf("*******************************************************************************\n\n");
@@ -541,13 +534,9 @@ print_connections();
 
 
 void infocpy(const session::SessionInfo *from, session::SessionInfo *to) {
-	for (int i = 0; i < from->forward_path_size(); i++) {
-		session::SessionInfo_ServiceInfo *serviceInfo = to->add_forward_path();
-		serviceInfo->set_name(from->forward_path(i).name());
-	}
-	for (int i = 0; i < from->return_path_size(); i++) {
-		session::SessionInfo_ServiceInfo *serviceInfo = to->add_return_path();
-		serviceInfo->set_name(from->return_path(i).name());
+	for (int i = 0; i < from->session_path_size(); i++) {
+		session::SessionInfo_ServiceInfo *serviceInfo = to->add_session_path();
+		serviceInfo->set_name(from->session_path(i).name());
 	}
 
 	if (from->has_my_name()) {
@@ -569,7 +558,7 @@ void infocpy(const session::SessionInfo *from, session::SessionInfo *to) {
 
 // counts the number of application endpoints in a session
 int session_hop_count(const session::SessionInfo *info) {
-	return info->forward_path_size() + info->return_path_size();
+	return info->session_path_size();
 }
 
 int session_hop_count(int ctx) {
@@ -577,26 +566,9 @@ int session_hop_count(int ctx) {
 	return session_hop_count(info);
 }
 
-// name is last hop if it is second to last in the return path or if it is the
-// last name in the forward path and the return path contains only the initiator
+// name is last hop if it is second to last in the session path
 bool is_last_hop(const session::SessionInfo *info, string name) {
-	// Look for name in the return path
-	int found_index = -1;
-	for (int i = 0; i < info->return_path_size(); i++) {
-		if (info->return_path(i).name() == name) {
-			found_index = i;
-			break;
-		}
-	}
-
-	if (found_index != -1 && found_index == info->return_path_size() - 2) {
-		return true;
-	} else if (info->return_path_size() == 1 && 
-				info->forward_path(info->forward_path_size()-1).name() == name) {
-		return true;
-	}
-	
-	return false;
+	return info->session_path(info->session_path_size()-2).name() == name;
 }
 
 bool is_last_hop(int ctx, string name) {
@@ -605,67 +577,30 @@ bool is_last_hop(int ctx, string name) {
 }
 
 string get_neighborhop_name(string my_name, const session::SessionInfo *info, bool next) {
-	// Look for my_name in the forward path
+
+	// Look for my_name in the session path
 	int found_index = -1;
-	for (int i = 0; i < info->forward_path_size(); i++) {
-		if (info->forward_path(i).name() == my_name) {
-			found_index = i;
-			break;
-		}
-	}
-		
-	// special treatment if there are only two parties
-	if ( info->forward_path_size() + info->return_path_size() == 2) {
-		if (found_index != -1)
-			return info->return_path(0).name();
-		else
-			return info->forward_path(0).name();
-	}
-
-	// If we found it, the next hop is either the next entry in the forward path
-	// or the first entry in the return path
-	if ( found_index != -1 ) {
-		if (next) {  // finding next hop
-			if ( found_index == info->forward_path_size()-1 ) {
-				return info->return_path(0).name();
-			} else {
-				return info->forward_path(found_index+1).name();
-			}
-		} else {  // finding previous hop
-			if ( found_index == 0) {
-				return info->return_path(info->return_path_size()-1).name();
-			} else {
-				return info->forward_path(found_index-1).name();
-			}
-		}
-	}
-	// If we didn't find it, look for my_name in the return path
-	for (int i = 0; i < info->return_path_size(); i++) {
-		if (info->return_path(i).name() == my_name) {
+	for (int i = 0; i < info->session_path_size(); i++) {
+		if (info->session_path(i).name() == my_name) {
 			found_index = i;
 			break;
 		}
 	}
 
-	// The next hop is either the next entry in the return path or the first entry
-	// in the forward path
-	if ( found_index != -1 ) {
-		if (next) {  // finding next hop
-			if ( found_index == info->return_path_size()-1 ) {
-				return info->forward_path(0).name();
-			} else {
-				return info->return_path(found_index+1).name();
-			}
-		} else {  // finding previous hop
-			if ( found_index == 0 ) {
-				return info->forward_path(info->forward_path_size()-1).name();
-			} else {
-				return info->return_path(found_index-1).name();
-			}
-		}
-	}
+	int hop = next ? 1 : -1;
 
-	return "NOT FOUND";
+	if (found_index == -1) {
+		return "NOT FOUND";
+	} else {
+		// move one hop in the appropriate direction
+		int neighbor_index = found_index + hop;
+
+		// wrap around if necessary
+		if (neighbor_index == -1) neighbor_index = info->session_path_size()-1;
+		else if (neighbor_index == info->session_path_size()) neighbor_index = 0;
+
+		return info->session_path(neighbor_index).name();
+	}
 }
 
 string get_nexthop_name(string name, const session::SessionInfo *info) {
@@ -711,7 +646,7 @@ int open_connection(string name, session::ConnectionInfo *cinfo) {
 }
 
 int get_conn_for_context(int ctx, map<unsigned short, session::ConnectionInfo*> *ctx_to_conn, string &hopname, session::ConnectionInfo **cinfo) {
-	int rc;
+	int rc = 0;
 
 	if ( ctx_to_conn->find(ctx) != ctx_to_conn->end() ) {
 		// This session already has a transport conn
@@ -1114,8 +1049,6 @@ LOG("BEGIN process_new_context_msg");
 int process_init_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &reply) {
 LOG("BEGIN process_init_msg");
 	session::SInitMsg im = msg.s_init();
-LOGF("    Initiating a session from %s", im.my_name().c_str());
-LOGF("    Forward path: %s\nReturn Path: %s", im.forward_path().c_str(), im.return_path().c_str());
 	reply.set_type(session::RETURN_CODE);
 	session::S_Return_Code_Msg *rcm = reply.mutable_s_rc();
 
@@ -1123,30 +1056,25 @@ LOGF("    Forward path: %s\nReturn Path: %s", im.forward_path().c_str(), im.retu
 	session::SessionInfo* info = new session::SessionInfo();
 	ctx_to_session_info[ctx] = info;
 
-	// parse paths into session state msg
-	vector<string> forwardNames = split(im.forward_path(), ',');
-	vector<string> returnNames = split(im.return_path(), ',');
-	if (forwardNames.size() <= 0) {
-		ERROR("Forward path is empty");
-		rcm->set_message("Forward path is empty");
+	// parse path into session state msg
+	vector<string> pathNames = split(im.session_path(), ',');
+	if (pathNames.size() <= 0) {
+		ERROR("Session path is empty");
+		rcm->set_message("Session path is empty");
 		rcm->set_rc(session::FAILURE);
 		return -1;
 	}
-	for (vector<string>::iterator it = forwardNames.begin(); it != forwardNames.end(); ++it) {
-		session::SessionInfo_ServiceInfo *serviceInfo = info->add_forward_path();
-		serviceInfo->set_name(trim(*it));
-	}
-	for (vector<string>::iterator it = returnNames.begin(); it != returnNames.end(); ++it) {
-		session::SessionInfo_ServiceInfo *serviceInfo = info->add_return_path();
+	for (vector<string>::iterator it = pathNames.begin(); it != pathNames.end(); ++it) {
+		session::SessionInfo_ServiceInfo *serviceInfo = info->add_session_path();
 		serviceInfo->set_name(trim(*it));
 	}
 
-	// set my name, and if I'm not the last hop in the return path, add me
-	info->set_my_name(trim(im.my_name()));
-	if (info->return_path(info->return_path_size()-1).name() != info->my_name()) {
-		session::SessionInfo_ServiceInfo *serviceInfo = info->add_return_path();
-		serviceInfo->set_name(info->my_name());
-	}
+	// set my name and add me to the session path
+	char my_name[30];
+	gethostname(my_name, 30);  // TODO: use something unique?
+	info->set_my_name(my_name);
+	session::SessionInfo_ServiceInfo *serviceInfo = info->add_session_path();
+	serviceInfo->set_name(info->my_name());
 	
 	// set context info status to initialized session
 	session::ContextInfo *ctxInfo = ctx_to_ctx_info[ctx];

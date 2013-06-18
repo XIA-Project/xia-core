@@ -64,9 +64,7 @@ message S_New_Context_Msg {
 }
 
 message SInitMsg {
-  required string forward_path = 1;
-  required string return_path = 2;
-  required string my_name = 3;
+  required string session_path = 1;
 }
 
 message SBindMsg {
@@ -126,8 +124,7 @@ message SessionInfo {
 		required string name = 1;
 	}
 
-	repeated ServiceInfo forward_path = 1;
-	repeated ServiceInfo return_path = 2;
+	repeated ServiceInfo session_path = 1;
 	optional string my_name = 3;
 	optional bytes my_addr = 4; // If XIA, a sockaddr_x
 	optional bytes initiator_addr = 5; // If XIA, a sockaddr_x

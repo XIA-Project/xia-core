@@ -34,14 +34,12 @@ using namespace std;
 * session setup by connecting to the following hop.
 *
 * @param ctx The context (like a session-layer socket).
-* @param forwardPath A comma separated list (as a stirng) of application names
+* @param sessionPath A comma separated list (as a stirng) of application names
 * specifying through which applications session data should pass.
-* @param returnPath
-* @param myName
 *
 * @return A negative value on failure.
 */
-int Sinit(int ctx, const char* forwardPath, const char* returnPath, const char* myName)
+int Sinit(int ctx, const char* sessionPath)
 {
 	int rc;
 	int sockfd = ctx; // for now on the client side we treat the socket fd as the context handle
@@ -52,9 +50,7 @@ int Sinit(int ctx, const char* forwardPath, const char* returnPath, const char* 
 	session::SInitMsg *im = sm.mutable_s_init();
 
 	// parse paths into protobuf msg
-	im->set_forward_path(forwardPath);
-	im->set_return_path(returnPath);
-	im->set_my_name(myName);
+	im->set_session_path(sessionPath);
 	
 	if ((rc = proc_send(sockfd, &sm)) < 0) {
 		LOGF("Error talking to session proc: %s", strerror(errno));
