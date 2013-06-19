@@ -121,8 +121,8 @@ void process(int sock) {
 			ERROR("Error creating new context"); 
 			break;
 		}
-		string returnPath = scale_images ? "pagespeed.cmu.edu, client" : "client";
-		if (Sinit(ctx, host.c_str(), returnPath.c_str(), "client") < 0 ) {
+		string sessionPath = scale_images ? host + ", pagespeed.cmu.edu" : host;
+		if (Sinit(ctx, sessionPath.c_str()) < 0 ) {
 			ERROR("Error initiating session");
 			break;
 		}
