@@ -91,7 +91,7 @@ struct timezone tz;	/* leftover */
 
 sockaddr_x whereto;
 sockaddr_x wherefrom;
-size_t fromlen;
+socklen_t fromlen;
 size_t datalen;		/* How much data */
 
 char usage[] =
