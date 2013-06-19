@@ -112,13 +112,17 @@ elementclass XIALineCard {
     xarpq :: XARPQuerier($local_hid, $mac);
     xarpr :: XARPResponder($local_hid $mac);        
 
-    print_in :: XIAPrint(">>> $local_hid (In Port $num)");
+    print_in :: XIAPrint(">>> $local_hid (In Port $num) ");
     print_out :: XIAPrint("<<< $local_hid (Out Port $num)");
 
     count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
     count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -);
 
-    toNet :: Null -> print_out -> count_final_out -> count_next_out -> Queue(200) -> [0]output;
+	// packets to network could be XIA packets or XARP queries (or XCMP messages?)
+	// we only want to print/count the XIA packets
+    toNet :: Tee(2) -> Queue(200) -> [0]output;   // send all packets
+	toNet[1] -> statsFilter :: Classifier(12/C0DE, -) -> print_out -> count_final_out -> count_next_out -> Discard;  // only print/count XIP packets
+	statsFilter[1] -> Discard;   // don't print/count XARP or XCMP packets
 
 	// On receiving a packet from the host
 	input[1] -> xarpq;
