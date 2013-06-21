@@ -1552,7 +1552,7 @@ void XTRANSPORT::Xgetpeername(unsigned short _sport)
 
 	DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
 
-	_msg->set_dag(daginfo->dst_path.unparse_re().c_str());
+	_msg->set_dag(daginfo->dst_path.unparse().c_str());
 
 	std::string p_buf1;
 	_xsm.SerializeToString(&p_buf1);

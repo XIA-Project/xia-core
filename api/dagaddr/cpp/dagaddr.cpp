@@ -326,6 +326,17 @@ Node::id_string() const
 }
 
 /**
+* @brief Return a string representing the node.
+*
+* @return A string of the form <type>:<id>
+*/
+std::string
+Node::to_string() const
+{
+	return type_string() + ":" + id_string();
+}
+
+/**
 * @brief Create an empty graph
 *
 * Create an empty graph.
