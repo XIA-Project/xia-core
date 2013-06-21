@@ -43,6 +43,7 @@ public:
 	const unsigned char* id() const { return ptr_->id; }
 	std::string type_string() const;
 	std::string id_string() const;
+	std::string to_string() const;
 
 	Node& operator=(const Node& r);
 	bool operator==(const Node& r) const { return ptr_ == r.ptr_; }
