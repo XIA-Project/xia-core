@@ -468,6 +468,9 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XPUTCHUNK:
 		XputChunk(_sport);
 		break;
+	case xia::XGETPEERNAME:
+		Xgetpeername(_sport);
+		break;
 	default:
 		click_chatter("\n\nERROR: API TRAFFIC !!!\n\n");
 		break;
