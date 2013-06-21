@@ -471,6 +471,9 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XGETPEERNAME:
 		Xgetpeername(_sport);
 		break;
+	case xia::XGETSOCKNAME:
+		Xgetsockname(_sport);
+		break;
 	default:
 		click_chatter("\n\nERROR: API TRAFFIC !!!\n\n");
 		break;
@@ -1569,7 +1572,7 @@ void XTRANSPORT::Xgetsockname(unsigned short _sport)
 
 	DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
 
-	_msg->set_dag(daginfo->src_path.unparse_re().c_str());
+	_msg->set_dag(daginfo->src_path.unparse().c_str());
 
 	std::string p_buf1;
 	_xsm.SerializeToString(&p_buf1);
