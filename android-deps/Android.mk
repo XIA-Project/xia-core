@@ -32,7 +32,6 @@ protobuf/src/google/protobuf/stubs/common.cc \
 protobuf/src/google/protobuf/stubs/once.cc \
 protobuf/src/google/protobuf/stubs/structurally_valid.cc \
 protobuf/src/google/protobuf/stubs/strutil.cc \
-protobuf/src/google/protobuf/stubs/stringprintf.cc \
 protobuf/src/google/protobuf/stubs/substitute.cc
 
 LOCAL_CPP_EXTENSION := .cc
