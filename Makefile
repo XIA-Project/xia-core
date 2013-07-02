@@ -21,7 +21,7 @@ all: config $(MAKEDIRS)
 
 android:
 	android-deps/prepare.sh
-	ndk-build $(NDKFLAGS)
+	ndk-build $(NDKFLAGS) 
 
 static:
 	make all STATIC='static'
@@ -46,7 +46,7 @@ xia.mk: configure
 
 #### CLEAN RULES
 clean: $(CLEANDIRS)
-	ndk-build $(NDKFLAGS) clean
+	ndk-build $(NDKFLAGS) clean 2> /dev/null
 	-@rm -fr libs obj
 	-@rm click/.configured
 	-@rm xia.mk
