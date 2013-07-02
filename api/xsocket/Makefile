@@ -35,22 +35,21 @@ $(LIB): $(OBJS)
 $(STATICLIB): $(OBJS) 
 	ar rcs $@ $(OBJS)
 
-xwrap.so: xwrap.c
-	$(CC) -fPIC -DPIC $<
-	$(LD) -shared -o $@ xwrap.o -ldl
-
 doc: Xdoc.h $(SOURCES)
 	doxygen XsocketsAPI.cfg
 	make -C python doc
 
-test: $(LIB)
-	make -C test test
+unittest: unittest.cpp  $(LIB) $(XINC)/Xsocket.h $(XINC)/xia.h
+	$(CC) -I$(XINC) -Wall -Wextra $< -o $@ -lgtest $(LIB) $(XLIB)/libdagaddr.so
+
+test: unittest $(LIB)
+	./unittest
 
 clean:
 	-rm -f $(LIB)
 	-rm -f $(STATICLIB)
 	-rm -f *.o xia.pb.*
 	-rm -rf doc
+	-rm -f unittest
 	make -C python clean
-	make -C test clean
 
