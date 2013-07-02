@@ -20,6 +20,7 @@ NDKFLAGS=NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk APP_STL=gnustl_static AP
 all: config $(MAKEDIRS)
 
 android:
+	android-deps/prepare.sh
 	ndk-build $(NDKFLAGS)
 
 static:
