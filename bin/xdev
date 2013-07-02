@@ -18,8 +18,9 @@ if [ $# -ne 0 ]; then
 	if [ $1 = "-v" ]; then
 		verbose=",3"
 	else
-		echo "usage:xdev"
-		echo "  if no device specified, prints DAGs for all devices"
+		echo "usage:xdev [-v]"
+		echo "  prints a list of the XIA devices running on this node"
+		echo "  -v causes the type of device to be printed as well"
 		exit 1
 	fi
 fi
@@ -28,5 +29,10 @@ hash nc 2>/dev/null || { echo "xdag requires netcat to be installed"; exit 1; }
 
 [ "`ps aux | grep userlevel/click | grep -v grep`" = "" ] && { echo "click is not running!"; exit 1; }
 
-printf "read config\nquit\n" | nc localhost 7777 | grep "::" | cut -d "(" -f1 | cut -s -d\  -f1$verbose
+# use netcat to send commands thru the click command socket to get the config file
+# the sed/cut pipeline could probably be condensed and is left as an exercise for the reader
+# this code is dependent on the format of the conf file, and could break if the file changes
+# assumptions:
+#  click host and router elements are the only lines in the file containing the :: character sequence
+printf "read config\nquit\n" | nc localhost 7777 | grep "::" | sed -r 's/^\s+//g' | cut -d "(" -f1 | cut -s -d\  -f1$verbose
 
