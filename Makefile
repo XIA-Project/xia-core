@@ -12,11 +12,15 @@ NPROCS=$(shell grep -c ^processor /proc/cpuinfo)
 
 .PHONY: all config clean test $(MAKEDIRS) $(CLEANDIRS) $(TESTDIRS)
 
+NDKFLAGS=NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk APP_STL=gnustl_static APP_PLATFORM=android-9
 
 
 #### BUILD RULES
 #always make sure we have configured before building the sub projects
 all: config $(MAKEDIRS)
+
+android:
+	ndk-build $(NDKFLAGS)
 
 static:
 	make all STATIC='static'
@@ -41,6 +45,8 @@ xia.mk: configure
 
 #### CLEAN RULES
 clean: $(CLEANDIRS)
+	ndk-build $(NDKFLAGS) clean
+	-@rm -fr libs obj
 	-@rm click/.configured
 	-@rm xia.mk
 
