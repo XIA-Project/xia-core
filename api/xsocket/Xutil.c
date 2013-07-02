@@ -33,24 +33,35 @@
 ** @returns a character pointer to the root of the source tree
 **
 */
-char *findRoot() {
+char *findRoot(char *buf, unsigned len) {
+	char *dir;
 	char *pos;
-	char *path = (char*)malloc(sizeof(char) * PATH_SIZE);
-	int len = readlink("/proc/self/exe", path, PATH_SIZE);
 
-	if (len < 0)
+	if (buf == NULL || len == 0)
 		return NULL;
-	else if (len == BUF_SIZE)
-		path[BUF_SIZE - 1] = 0;
-	else
-		path[len] = 0;
 
-	pos = strstr(path, SOURCE_DIR);
-	if(pos) {
-		pos += sizeof(SOURCE_DIR)-1;
+	if ((dir = getenv("XIADIR")) != NULL) {
+		strncpy(buf, dir, len);
+		return buf;
+	}
+
+	int cnt = readlink("/proc/self/exe", buf, MIN(len, PATH_SIZE));
+
+	if (cnt < 0) {
+		buf[0] = 0;
+		return buf;
+	}
+	else if ((unsigned)cnt == len)
+		buf[len - 1] = 0;
+	else
+		buf[cnt] = 0;
+
+	pos = strstr(buf, SOURCE_DIR);
+	if (pos) {
+		pos += sizeof(SOURCE_DIR) - 1;
 		*pos = '\0';
 	}
-	return path;
+	return buf;
 }
 
 int validateSocket(int sock, int stype, int err)
