@@ -27,7 +27,7 @@ XgetDAGbyName.c \
 xia.pb.cc \
 ../../../xia-core/api/xsocket/minini/minIni.c 
 
-LOCAL_CPP_EXTENSION := .c
+LOCAL_CPP_EXTENSION := .c .cc
 
 LOCAL_C_INCLUDES += api/include api/xsocket/ api/xsocket/minini android-deps/protobuf/src
 

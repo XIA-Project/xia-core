@@ -54,7 +54,8 @@ clean: $(CLEANDIRS)
 $(CLEANDIRS):
 	-make -C $(basename $@) clean
 
-
+aclean: 
+	ndk-build $(NDKFLAGS) clean 2> /dev/null
 
 #### TEST RULES
 test: $(TESTDIRS)
