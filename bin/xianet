@@ -61,7 +61,10 @@ SCRIPT_SET=0
 
 is_running()
 {
-	RUNNING=`ps -e | grep "$1" `    #| grep -v grep`
+	# FIXME: this test can give false positives in cases such as editing a file containing the
+	#  desired process name (i.e. vi host.click would cause a positive result even if click was
+	#  not running
+	RUNNING=`ps aux | grep "$1" | grep -v grep`
 	[ "$RUNNING" != "" ]
 }
 
