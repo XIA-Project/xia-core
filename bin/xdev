@@ -25,9 +25,9 @@ if [ $# -ne 0 ]; then
 	fi
 fi
 
-hash nc 2>/dev/null || { echo "xdag requires netcat to be installed"; exit 1; }
+hash nc 2>/dev/null || { echo "xdev requires netcat to be installed"; exit 1; }
 
-[ "`ps aux | grep userlevel/click | grep -v grep`" = "" ] && { echo "click is not running!"; exit 1; }
+[ "`ps aux | grep userlevel/click | grep -v grep`" != "" ] || { echo "click is not running!"; exit 1; }
 
 # use netcat to send commands thru the click command socket to get the config file
 # the sed/cut pipeline could probably be condensed and is left as an exercise for the reader
