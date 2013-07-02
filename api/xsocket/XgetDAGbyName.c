@@ -57,7 +57,8 @@ char *hostsLookup(const char *name) {
 	char _dag[NS_MAX_DAG_LENGTH];
 
 	// look for an hosts_xia file locally
-	FILE *hostsfp = fopen(strcat(findRoot(), ETC_HOSTS), "r");
+	char buf[BUF_SIZE];
+	FILE *hostsfp = fopen(strcat(findRoot(buf, BUF_SIZE), ETC_HOSTS), "r");
 	int answer_found = 0;
 	if (hostsfp != NULL) {
 		while (fgets(line, 511, hostsfp) != NULL) {
@@ -115,6 +116,11 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 	char *dag;
 	char _name[NS_MAX_DAG_LENGTH], _dag[NS_MAX_DAG_LENGTH];
 	int result;
+
+	if (!name || *name == 0) {
+		errno = EINVAL;
+		return -1;
+	}
 
 	if (!addr || !addrlen || *addrlen < sizeof(sockaddr_x)) {
 		errno = EINVAL;
@@ -198,6 +204,7 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 
 	Graph g(_dag);
 	g.fill_sockaddr(addr);
+	*addrlen = sizeof(sockaddr_x);
 
 	return 0;
 }
@@ -239,7 +246,17 @@ int XregisterName(const char *name, sockaddr_x *DAG) {
 		return -1;
 	}
 
+	if (!name || *name == 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	if (!DAG) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (DAG->sx_family != AF_XIA) {
 		errno = EINVAL;
 		return -1;
 	}
