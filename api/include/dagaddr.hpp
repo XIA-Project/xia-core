@@ -12,13 +12,13 @@ class Node
 public:
 	static const std::size_t ID_LEN = 20;
 	
-	static const int XID_TYPE_UNKNOWN = 0;
-	static const int XID_TYPE_DUMMY_SOURCE = 0xff;
-	static const int XID_TYPE_AD = 0x10;  // TODO: why does swig complain when these are uint32_t?
-	static const int XID_TYPE_HID = 0x11;
-	static const int XID_TYPE_CID = 0x12;
-	static const int XID_TYPE_SID = 0x13;
-	static const int XID_TYPE_IP = 0x14;
+	static const unsigned int XID_TYPE_UNKNOWN = 0;
+	static const unsigned int XID_TYPE_DUMMY_SOURCE = 0xff;
+	static const unsigned int XID_TYPE_AD = 0x10;  // TODO: why does swig complain when these are uint32_t?
+	static const unsigned int XID_TYPE_HID = 0x11;
+	static const unsigned int XID_TYPE_CID = 0x12;
+	static const unsigned int XID_TYPE_SID = 0x13;
+	static const unsigned int XID_TYPE_IP = 0x14;
 
 	static const std::string XID_TYPE_UNKNOWN_STRING;
 	static const std::string XID_TYPE_DUMMY_SOURCE_STRING;
@@ -43,6 +43,7 @@ public:
 	const unsigned char* id() const { return ptr_->id; }
 	std::string type_string() const;
 	std::string id_string() const;
+	std::string to_string() const;
 
 	Node& operator=(const Node& r);
 	bool operator==(const Node& r) const { return ptr_ == r.ptr_; }
@@ -107,6 +108,7 @@ public:
 	void from_sockaddr(sockaddr_x *s);
 	void replace_final_intent(const Node& new_intent);
 	Node get_final_intent() const;
+	std::vector<const Node*> get_nodes_of_type(unsigned int type) const;
 
 protected:
 
@@ -120,7 +122,7 @@ protected:
 	
 	std::string out_edges_for_index(std::size_t i, std::size_t source_index, std::size_t sink_index) const;
 	std::size_t index_in_dag_string(std::size_t index, std::size_t source_index, std::size_t sink_index) const;
-	std::size_t index_from_dag_string_index(std::size_t dag_string_index, std::size_t source_index, std::size_t sink_index) const;
+	std::size_t index_from_dag_string_index(int32_t dag_string_index, std::size_t source_index, std::size_t sink_index) const;
 
 private:
 	void construct_from_dag_string(std::string dag_string);

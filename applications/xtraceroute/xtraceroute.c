@@ -1,6 +1,5 @@
 /*
  *
- printf("in loop\n");
  *			X C M P T R A C E R O U T E . C
  *
  * Using the InterNet Control Message Protocol (ICMP) "ECHO" facility,
@@ -91,6 +90,8 @@ struct hostent *hp;	/* Pointer to host info */
 struct timezone tz;	/* leftover */
 
 sockaddr_x whereto;
+sockaddr_x wherefrom;
+socklen_t fromlen;
 size_t datalen;		/* How much data */
 
 char usage[] =
@@ -99,7 +100,7 @@ char usage[] =
 char *hostname;
 char hnamebuf[MAXHOSTNAMELEN];
 
-int npackets;
+int npackets = 30; /* max number of hops allowed */
 int preload = 0;		/* number of packets to "preload" */
 int ntransmitted = 0;		/* sequence # for outbound packets = #sent */
 int ident;
@@ -109,6 +110,13 @@ int timing = 0;
 int tmin = 999999999;
 int tmax = 0;
 int tsum = 0;			/* sum of all times, for doing average */
+
+float nCatcher = 0;
+float catcher_timeout = 0; /* seconds */
+float interval = 0.5;
+int rc = 0;
+int srcSet = 0;
+
 char *inet_ntoa();
 
 /*
@@ -123,7 +131,11 @@ int main(int argc, char **argv)
 
 	argc--, av++;
 	while (argc > 0 && *av[0] == '-') {
-		while (*++av[0]) switch (*av[0]) {
+        int c = argc;
+		while (*++av[0]) {
+            if (c != argc)
+                break;
+            switch (*av[0]) {
 			case 'd':
 				options |= SO_DEBUG;
 				break;
@@ -139,7 +151,21 @@ int main(int argc, char **argv)
 			case 'f':
 				pingflags |= FLOOD;
 				break;
-		}
+            case 't':
+                argc--, av++;
+                catcher_timeout = atoi(av[0]);
+                break;
+            case 's':
+                argc--, av++;
+                fromlen = sizeof(wherefrom);
+                srcSet = 1;
+                if(XgetDAGbyName(av[0], &wherefrom, &fromlen) < 0) {
+                    printf("Error Resolving XID\n");
+                    exit(-1);
+                }
+                break;
+            }
+        }
 		argc--, av++;
 	}
 	if(argc < 1 || argc > 4)  {
@@ -182,6 +208,13 @@ int main(int argc, char **argv)
 	  printf("Xsetsockopt failed on XOPT_NEXT_PROTO\n");
 	  exit(-1);
 	}
+
+    if (srcSet) {
+        if (Xbind(s, (struct sockaddr *)&wherefrom, sizeof(sockaddr_x)) < 0) {
+            printf("Xbind failed");
+            exit(-1);
+        }
+    }
 
 	Graph g(&whereto);
 	strncpy(s_to, g.dag_string().c_str(), sizeof(s_to));
@@ -247,8 +280,19 @@ void catcher()
 	int waittime;
 
 	pinger();
-	if (npackets == 0 || ntransmitted < npackets)
-		alarm(1);
+    nCatcher+=interval;
+    if (catcher_timeout && nCatcher >= catcher_timeout) {
+        rc = -1;
+        finish();
+    }
+	if (npackets == 0 || ntransmitted < npackets) {
+        if(interval < 1) {
+            ualarm((int)(interval*1000000),0);
+        }
+        else {
+            alarm((int)interval);
+        }
+    }
 	else {
 		if (nreceived) {
 			waittime = 2 * tmax / 1000;
@@ -372,7 +416,7 @@ void pr_pack(u_char *buf, int cc, const char *from)
 	register int i;
 	struct timeval tv;
 	struct timeval *tp;
-	int hlen, triptime;
+	int hlen, triptime = 0;
 
 	gettimeofday( &tv, &tz );
 
@@ -393,6 +437,7 @@ void pr_pack(u_char *buf, int cc, const char *from)
 		printf("%s\n",
 		       from
 		       );
+        nreceived++;
 		if (pingflags & VERBOSE) {
 			for( i=0; i<12; i++)
 			    printf("x%2.2x: x%8.8x\n", (unsigned int)(i*sizeof(long)),
@@ -497,6 +542,8 @@ void tvsub(struct timeval *out, struct timeval *in)
 void finish()
 {
     Xclose(s);
+    int hops = rc ? -1 : nreceived;
+    printf("hops = %d\n", hops); 
 	fflush(stdout);
-	exit(0);
+	exit(rc);
 }

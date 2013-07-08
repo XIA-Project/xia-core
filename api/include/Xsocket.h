@@ -141,6 +141,7 @@ extern int Xsendto(int sockfd,const void *buf, size_t len, int flags, const stru
 extern int Xclose(int sock);
 extern int Xrecv(int sockfd, void *rbuf, size_t len, int flags);
 extern int Xsend(int sockfd, const void *buf, size_t len, int flags);
+extern int Xfcntl(int sockfd, int cmd, ...);
 
 extern int XrequestChunk(int sockfd, char* dag, size_t dagLen);
 extern int XrequestChunks(int sockfd, const ChunkStatus *chunks, int numChunks);

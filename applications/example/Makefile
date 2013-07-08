@@ -5,8 +5,9 @@ include ../../xia.mk
 LDFLAGS += $(LIBS)
 #CFLAGS += -std=c++0x
 
-TARGETS= chunk_copy_client chunk_copy_server echoclient echoclient-datagram \
-	echoclient-simple echoserver time_of_day_client time_of_day_server
+TARGETS= xftp_basic_client xftp_basic_server chunk_copy_client chunk_copy_server echoclient echoclient-datagram \
+	echoclient-simple echoserver time_of_day_client time_of_day_server \
+	firehose drink
 
 all: $(TARGETS)
 	make -C dag_manipulation

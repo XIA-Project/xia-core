@@ -81,7 +81,7 @@ void timeout_handler(int signum)
 	}
 	// reset the timer
 	signal(SIGALRM, timeout_handler);
-	alarm(HELLO_INTERVAL);
+	ualarm((int)ceil(HELLO_INTERVAL*1000000),0);
 }
 
 // send Hello message (1-hop broadcast)
@@ -563,7 +563,7 @@ void initRouteState()
 	route_state.num_neighbors = 0; // number of neighbor routers
 	route_state.lsa_seq = 0;	// LSA sequence number of this router
 	route_state.hello_seq = 0;  // hello seq number of this router
-	route_state.hello_lsa_ratio = ceil(LSA_INTERVAL/HELLO_INTERVAL);
+	route_state.hello_lsa_ratio = (int32_t) ceil(LSA_INTERVAL/HELLO_INTERVAL);
 	route_state.calc_dijstra_ticks = 0;
 
 	route_state.dual_router_AD = "NULL";
@@ -577,7 +577,7 @@ void initRouteState()
 
 	// set timer for HELLO/LSA
 	signal(SIGALRM, timeout_handler);
-	alarm(HELLO_INTERVAL);
+	ualarm((int)ceil(HELLO_INTERVAL*1000000),0); 	
 }
 
 void help(const char *name)
@@ -677,7 +677,7 @@ int main(int argc, char *argv[])
 		FD_ZERO(&socks);
 		FD_SET(route_state.sock, &socks);
 		timeoutval.tv_sec = 0;
-		timeoutval.tv_usec = 20000; // every 0.02 sec, check if any received packets
+		timeoutval.tv_usec = 2000; // every 0.002 sec, check if any received packets
 
 		selectRetVal = select(route_state.sock+1, &socks, NULL, NULL, &timeoutval);
 		if (selectRetVal > 0) {

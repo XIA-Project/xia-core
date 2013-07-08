@@ -84,9 +84,9 @@ public:
 	int getRoutes(std::string xidtype, std::vector<XIARouteEntry> &xrt);
 
 	// returns 0 success, < 0 on error
-	int addRoute(std::string &xid, int port, std::string &next, unsigned long flags);
-	int setRoute(std::string &xid, int port, std::string &next, unsigned long flags);
-	int delRoute(std::string &xid);
+	int addRoute(const std::string &xid, int port, const std::string &next, unsigned long flags);
+	int setRoute(const std::string &xid, int port, const std::string &next, unsigned long flags);
+	int delRoute(const std::string &xid);
 
 	const char *cserror();
 private:
@@ -95,7 +95,7 @@ private:
 	ControlSocketClient _cs;
 	ControlSocketClient::err_t _cserr;
 
-	int updateRoute(std::string cmd, std::string &xid, int port, std::string &next, unsigned long flags);
+	int updateRoute(std::string cmd, const std::string &xid, int port, const std::string &next, unsigned long flags);
 	string itoa(signed);
 };
 

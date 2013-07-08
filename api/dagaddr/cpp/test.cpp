@@ -24,6 +24,10 @@ int main()
 	Node n_hid(Node::XID_TYPE_HID, "0101010101010101010101010101010101010101");
 	Node n_cid(Node::XID_TYPE_CID, "0202020202020202020202020202020202020202");
 
+	printf("n_ad: %s\n", n_ad.to_string().c_str());
+	printf("n_hid: %s\n", n_hid.to_string().c_str());
+	printf("n_cid: %s\n\n", n_cid.to_string().c_str());
+
 	// Path directly to n_cid
 	// n_src -> n_cid
 	printf("g0 = n_src * n_cid\n");
