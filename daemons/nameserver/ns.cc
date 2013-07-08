@@ -29,7 +29,6 @@ using namespace std;
 
 #define DEFAULT_NAME "host0"
 #define APPNAME "xnameservice"
-#define FACILITY "local0"
 
 char *hostname = NULL;
 char *ident = NULL;
@@ -85,9 +84,9 @@ void config(int argc, char** argv)
 	set_conf("xsockconf.ini", hostname);
 
 	// note: ident must exist for the life of the app
-	ident = (char *)calloc(strlen(hostname) + strlen (APPNAME) + 4, 1);
+	ident = (char *)calloc(strlen (APPNAME) + 4, 1);
 	sprintf(ident, "%s", APPNAME);
-	openlog(ident, LOG_CONS|LOG_NDELAY|verbose, level);
+	openlog(ident, LOG_CONS|LOG_NDELAY|verbose, LOG_LOCAL4);
 	setlogmask(LOG_UPTO(level));
 }
 

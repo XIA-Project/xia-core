@@ -12,7 +12,6 @@
 
 #define DEFAULT_NAME "host0"
 #define APPNAME "xhcp_server"
-#define FACILITY "local0"
 
 char *hostname = NULL;
 char *ident = NULL;
@@ -65,7 +64,7 @@ void config(int argc, char** argv)
 	// note: ident must exist for the life of the app
 	ident = (char *)calloc(strlen(hostname) + strlen (APPNAME) + 4, 1);
 	sprintf(ident, "%s:%s", APPNAME, hostname);
-	openlog(ident, LOG_CONS|LOG_NDELAY|verbose, level);
+	openlog(ident, LOG_CONS|LOG_NDELAY|verbose, LOG_LOCAL4);
 	setlogmask(LOG_UPTO(level));
 }
 
