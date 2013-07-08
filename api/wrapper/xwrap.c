@@ -123,22 +123,24 @@ DECLARE(int, vdprintf, int fd, const char *fmt, va_list arg);
 DECLARE(int, dprintf, int fd, const char *fmt, ...);
 DECLARE(int, fgetc, FILE *stream);
 DECLARE(int, getc, FILE *stream);
+#ifdef __linux__
 DECLARE(int, getc_unlocked, FILE *stream);
 DECLARE(int, fgetc_unlocked, FILE *stream);
-DECLARE(int, fputc, int c, FILE *stream);
-DECLARE(int, putc, int c, FILE *stream);
 DECLARE(int, fputc_unlocked, int c, FILE *stream);
 DECLARE(int, putc_unlocked, int c, FILE *stream);
-DECLARE(char *, fgets, char *s, int n, FILE *stream);
 DECLARE(char *, fgets_unlocked, char *s, int n, FILE *stream);
-DECLARE(_IO_ssize_t, getline, char **lineptr, size_t *n, FILE *stream);
+DECLARE(int, fputs_unlocked, const char *s, FILE *stream);
+DECLARE(size_t, fread_unlocked, void *ptr, size_t size, size_t n, FILE *stream);
+DECLARE(size_t, fwrite_unlocked, const void *ptr, size_t size, size_t n, FILE *stream);
+#endif
+DECLARE(int, fputc, int c, FILE *stream);
+DECLARE(int, putc, int c, FILE *stream);
+DECLARE(char *, fgets, char *s, int n, FILE *stream);
+DECLARE(ssize_t, getline, char **lineptr, size_t *n, FILE *stream);
 DECLARE(int, fputs, const char *s, FILE *stream);
 DECLARE(int, puts, const char *s);
 DECLARE(size_t, fread, void *ptr, size_t size, size_t n, FILE *stream);
 DECLARE(size_t, fwrite, const void *ptr, size_t size, size_t n, FILE *s);
-DECLARE(int, fputs_unlocked, const char *s, FILE *stream);
-DECLARE(size_t, fread_unlocked, void *ptr, size_t size, size_t n, FILE *stream);
-DECLARE(size_t, fwrite_unlocked, const void *ptr, size_t size, size_t n, FILE *stream);
 DECLARE(ssize_t, read, int fd, void *buf, size_t nbytes);
 DECLARE(ssize_t, write, int fd, const void *buf, size_t n);
 DECLARE(int, fcntl, int fd, int cmd, ...);
@@ -164,7 +166,11 @@ DECLARE(int, fcloseall, void);
 // not ported to XIA, remapped for warning purposes
 DECLARE(int, gethostname, char *name, size_t len);
 DECLARE(int, sethostname, const char *name, size_t len);
+#ifdef __APPLE__
+DECLARE(void, sethostid, long int id);
+#else
 DECLARE(int, sethostid, long int id);
+#endif
 DECLARE(int, getdomainname, char *name, size_t len);
 DECLARE(int, setdomainname, const char *name, size_t len);
 DECLARE(long int, gethostid, void);
@@ -202,7 +208,11 @@ DECLARE(struct protoent *, getprotobynumber, int proto);
 DECLARE(int, getprotoent_r, struct protoent *result_buf, char *buf, size_t buflen, struct protoent **result);
 DECLARE(int, getprotobyname_r, const char *name, struct protoent *result_buf, char *buf, size_t buflen, struct protoent **result);
 DECLARE(int, getprotobynumber_r, int proto, struct protoent *result_buf, char *buf, size_t buflen, struct protoent **result);
+#ifdef __APPLE__
+DECLARE(void, setnetgrent, const char *netgroup);
+#else
 DECLARE(int, setnetgrent, const char *netgroup);
+#endif
 DECLARE(void, endnetgrent, void);
 DECLARE(int, getnetgrent, char **hostp, char **userp, char **domainp);
 DECLARE(int, innetgr, const char *netgroup, const char *host, const char *user, const char *domain);
@@ -293,26 +303,28 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	GET_FCN(getc);
 //	GET_FCN(fclose);
 //	GET_FCN(getchar);
+#ifdef __linux__
 	GET_FCN(getc_unlocked);
 //	GET_FCN(getchar_unlocked);
 	GET_FCN(fgetc_unlocked);
+	GET_FCN(fputc_unlocked);
+	GET_FCN(putc_unlocked);
+	GET_FCN(fgets_unlocked);
+	GET_FCN(fputs_unlocked);
+	GET_FCN(fread_unlocked);
+	GET_FCN(fwrite_unlocked);
+//	GET_FCN(putchar_unlocked);
+#endif 
 	GET_FCN(fputc);
 	GET_FCN(putc);
 //	GET_FCN(putchar);
-	GET_FCN(fputc_unlocked);
-	GET_FCN(putc_unlocked);
-//	GET_FCN(putchar_unlocked);
 	GET_FCN(fgets);
 //	GET_FCN(gets);
-	GET_FCN(fgets_unlocked);
 	GET_FCN(getline);
 	GET_FCN(fputs);
 	GET_FCN(puts);
 	GET_FCN(fread);
 	GET_FCN(fwrite);
-	GET_FCN(fputs_unlocked);
-	GET_FCN(fread_unlocked);
-	GET_FCN(fwrite_unlocked);
 	GET_FCN(read);
 	GET_FCN(write);
 	GET_FCN(gethostname);
@@ -1053,6 +1065,7 @@ int getchar_unlocked(void)
 }
 #endif
 
+#ifdef __linux__
 int getc_unlocked(FILE *stream)
 {
 	int fd = fileno(stream);
@@ -1084,6 +1097,107 @@ int fgetc_unlocked(FILE *stream)
 	}
 	return rc;
 }
+
+int fputc_unlocked(int c, FILE *stream)
+{
+	int fd = fileno(stream);
+	int rc;
+
+	TRACE();
+	if (isXsocket(fd)) {
+		XIAIFY();
+		rc = _xputc(c, fd);
+
+	} else {
+		rc = __real_fputc_unlocked(c, stream);
+	}
+	return rc;
+}
+
+int putc_unlocked(int c, FILE *stream)
+{
+	int fd = fileno(stream);
+	int rc;
+
+	TRACE();
+	if (isXsocket(fd)) {
+		XIAIFY();
+		rc = _xputc(c, fd);
+
+	} else {
+		rc = __real_putc_unlocked(c, stream);
+	}
+	return rc;
+}
+
+char *fgets_unlocked(char *s, int n, FILE *stream)
+{
+	int fd = fileno(stream);
+	char *rc;
+
+	TRACE();
+
+	if (isXsocket(fd)) {
+		XIAIFY();
+		rc = _xgets(fd, s, n);
+
+	} else {
+		rc = __real_fgets_unlocked(s, n, stream);
+	}
+	return rc;
+}
+
+int fputs_unlocked(const char *s, FILE *stream)
+{
+	int fd = fileno(stream);
+	int rc;
+
+	TRACE();
+
+	if (isXsocket(fd)) {
+		XIAIFY();
+		rc = _xputs(s, fd);
+
+	} else {
+		rc = __real_fputs_unlocked(s, stream);
+	}
+	return rc;
+}
+
+size_t fread_unlocked(void *ptr, size_t size, size_t n, FILE *stream)
+{
+	int fd = fileno(stream);
+	size_t rc;
+
+	TRACE();
+
+	if (isXsocket(fd)) {
+		XIAIFY();
+		rc = _xfread(ptr, size, n, fd);
+
+	} else {
+		rc = __real_fread_unlocked(ptr, size, n, stream);
+	}
+	return rc;
+}
+
+size_t fwrite_unlocked(const void *ptr, size_t size, size_t n, FILE *stream)
+{
+	int fd = fileno(stream);
+	size_t rc;
+
+	TRACE();
+
+	if (isXsocket(fd)) {
+		XIAIFY();
+		rc = _xfwrite(ptr, size, n, fd);
+
+	} else {
+		rc = __real_fwrite_unlocked(ptr, size, n, stream);
+	}
+	return rc;
+}
+#endif
 
 int fputc(int c, FILE *stream)
 {
@@ -1155,38 +1269,6 @@ int putchar_unlocked(int c)
 }
 #endif
 
-int fputc_unlocked(int c, FILE *stream)
-{
-	int fd = fileno(stream);
-	int rc;
-
-	TRACE();
-	if (isXsocket(fd)) {
-		XIAIFY();
-		rc = _xputc(c, fd);
-
-	} else {
-		rc = __real_fputc_unlocked(c, stream);
-	}
-	return rc;
-}
-
-int putc_unlocked(int c, FILE *stream)
-{
-	int fd = fileno(stream);
-	int rc;
-
-	TRACE();
-	if (isXsocket(fd)) {
-		XIAIFY();
-		rc = _xputc(c, fd);
-
-	} else {
-		rc = __real_putc_unlocked(c, stream);
-	}
-	return rc;
-}
-
 char *fgets(char *s, int n, FILE *stream)
 {
 	int fd = fileno(stream);
@@ -1224,27 +1306,10 @@ char *gets(char *s)
 }
 #endif
 
-char *fgets_unlocked(char *s, int n, FILE *stream)
+ssize_t getline(char **lineptr, size_t *n, FILE *stream)
 {
 	int fd = fileno(stream);
-	char *rc;
-
-	TRACE();
-
-	if (isXsocket(fd)) {
-		XIAIFY();
-		rc = _xgets(fd, s, n);
-
-	} else {
-		rc = __real_fgets_unlocked(s, n, stream);
-	}
-	return rc;
-}
-
-_IO_ssize_t getline(char **lineptr, size_t *n, FILE *stream)
-{
-	int fd = fileno(stream);
-	_IO_ssize_t rc;
+	ssize_t rc;
 
 	TRACE();
 
@@ -1272,23 +1337,6 @@ int fputs(const char *s, FILE *stream)
 
 	} else {
 		rc = __real_fputs(s, stream);
-	}
-	return rc;
-}
-
-int fputs_unlocked(const char *s, FILE *stream)
-{
-	int fd = fileno(stream);
-	int rc;
-
-	TRACE();
-
-	if (isXsocket(fd)) {
-		XIAIFY();
-		rc = _xputs(s, fd);
-
-	} else {
-		rc = __real_fputs_unlocked(s, stream);
 	}
 	return rc;
 }
@@ -1344,40 +1392,6 @@ size_t fwrite(const void *ptr, size_t size, size_t n, FILE *s)
 	return rc;
 }
 
-
-size_t fread_unlocked(void *ptr, size_t size, size_t n, FILE *stream)
-{
-	int fd = fileno(stream);
-	size_t rc;
-
-	TRACE();
-
-	if (isXsocket(fd)) {
-		XIAIFY();
-		rc = _xfread(ptr, size, n, fd);
-
-	} else {
-		rc = __real_fread_unlocked(ptr, size, n, stream);
-	}
-	return rc;
-}
-
-size_t fwrite_unlocked(const void *ptr, size_t size, size_t n, FILE *stream)
-{
-	int fd = fileno(stream);
-	size_t rc;
-
-	TRACE();
-
-	if (isXsocket(fd)) {
-		XIAIFY();
-		rc = _xfwrite(ptr, size, n, fd);
-
-	} else {
-		rc = __real_fwrite_unlocked(ptr, size, n, stream);
-	}
-	return rc;
-}
 
 
 ssize_t read(int fd, void *buf, size_t nbytes)
@@ -1683,6 +1697,15 @@ int sethostname (const char *name, size_t len)
 	return rc;
 }
 
+#ifdef __APPLE__
+void sethostid (long int id)
+{
+	TRACE();
+	ALERT();
+
+	__real_sethostid(id);
+}
+#else
 int sethostid (long int id)
 {
 	int rc;
@@ -1693,6 +1716,7 @@ int sethostid (long int id)
 	rc = __real_sethostid(id);
 	return rc;
 }
+#endif
 
 int getdomainname (char *name, size_t len)
 {
@@ -1965,12 +1989,21 @@ int getprotobynumber_r (int proto, struct protoent *result_buf, char *buf, size_
 	return __real_getprotobynumber_r(proto, result_buf, buf, buflen, result);
 }
 
+#ifdef __APPLE__
+void setnetgrent (const char *netgroup)
+{
+	TRACE();
+	ALERT();
+	__real_setnetgrent(netgroup);
+}
+#else
 int setnetgrent (const char *netgroup)
 {
 	TRACE();
 	ALERT();
 	return __real_setnetgrent(netgroup);
 }
+#endif
 
 void endnetgrent (void)
 {

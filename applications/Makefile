@@ -4,6 +4,7 @@ all:
 	make -C tinyhttpd
 	make -C example
 	make -C demo
+	make -C irc
 	make -C session-pagespeed
 
 static: all
@@ -14,4 +15,5 @@ clean:
 	make -C tinyhttpd clean
 	make -C example clean
 	make -C demo clean
+	make -C irc clean
 	make -C session-pagespeed clean

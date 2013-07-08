@@ -23,6 +23,9 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <pthread.h>
+#ifdef __APPLE__
+#include <libgen.h>
+#endif
 #include "Xsocket.h"
 #include "dagaddr.hpp"
 
@@ -108,7 +111,7 @@ void getConfig(int argc, char** argv)
 				if (reconnect < 0) reconnect = 0;
 				break;
 			case 't':
-				// start up <threads> threads each using the other settings 
+				// start up <threads> threads each using the other settings
 				// for it's configuration
 				threads = atoi(optarg);
 				if (threads < 1) threads = 1;
@@ -116,6 +119,7 @@ void getConfig(int argc, char** argv)
 				break;
 			default:
 				help(basename(argv[0]));
+				break;
 		}
 	}
 }
@@ -212,7 +216,7 @@ int process(int sock)
 	say("Xsock %4d received %d bytes\n", sock, received);
 
 	if (sent != received || strcmp(buf1, buf2) != 0)
-		warn("Xsock %4d received data different from sent data! (bytes sent/recv'd: %d/%d)\n", 
+		warn("Xsock %4d received data different from sent data! (bytes sent/recv'd: %d/%d)\n",
 				sock, sent, received);
 
 	return 0;
@@ -247,9 +251,9 @@ int connectToServer()
 	}
 	say("Xsock %4d created\n", ssock);
 
-	if (Xconnect(ssock, (struct sockaddr *)sa, sizeof(sockaddr_x)) < 0) 
+	if (Xconnect(ssock, (struct sockaddr *)sa, sizeof(sockaddr_x)) < 0)
 		die(-3, "unable to connect to the destination dag\n");
-	
+
 	say("Xsock %4d connected\n", ssock);
 
 	return ssock;
@@ -277,11 +281,11 @@ void *mainLoop(void * /* dummy */)
 		if (printcount)
 			say("Xsock %4d loop #%d\n", ssock, count);
 
-		if (process(ssock) != 0) 
+		if (process(ssock) != 0)
 			break;
-		
+
 		pausex();
-		
+
 		count++;
 		if (reconnect != 0) {
 			if (count % reconnect == 0) {

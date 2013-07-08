@@ -1,6 +1,7 @@
 #! /usr/bin/python #
 # script to generate click host and router config files
 
+import os
 import sys
 import uuid
 import getopt
@@ -36,14 +37,14 @@ def createHID(prefix="00000000"):
     hid = "HID:" + prefix
     id = uuid.uuid1(uuid.getnode())
     return hid + id.hex
-    
+
 #
 # create a globally unique AD based off of router's mac address
 #
 def createAD():
     ad = "AD:10000000"
     id = uuid.uuid1(uuid.getnode())
-    return ad + id.hex    
+    return ad + id.hex
 
 #
 # make a short hostname
@@ -56,23 +57,43 @@ def getHostname():
     if (dot >= 0):
         hostname = hostname[:dot]
     return ''.join(char for char in hostname if char.isalnum())  # make sure we don't return characters illegal in click element names
-    
-#
-# get a list of the interfaces and associated mac addresses on this machine
-# 
-# ignore any interfaces matching 'filter' (e.g., eth0 on GENI or wlan0 on the
-# demo Giadas as it is the control socket for the node) and also ignore any
-# fake<n> interfaces as those are internal only
-#
-def getInterfaces(ignore_interfaces, specific_interface):
-    
-    # Get the default gateway  TODO: should there be one per interface?
-    cmdline = subprocess.Popen(
-            "/sbin/route -n | grep ^0.0.0.0 | tr -s ' ' | cut -d ' ' -f2",
-            shell=True, stdout=subprocess.PIPE)
-    default_gw = cmdline.stdout.read().strip()
 
+#
+# get list of network interfaces on OS X
+#
+def getOsxInterfaces(skip, use_interface):
 
+    addrs = []
+    ignore = ''
+    if skip != None:
+        for filter in skip.split(','):
+            ignore += 'grep -v %s | ' % filter.strip()
+    use = ''
+    if use_interface != None:
+        use = 'grep %s | ' % use_interface
+
+    cmd = "ifconfig | %s %s grep UP | cut -d: -f1" % (ignore, use)
+    result = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+    interfaces = result.stdout.read().strip()
+    interfaces = interfaces.split('\n')
+
+    for interface in interfaces:
+        cmd = 'ifconfig %s | grep ether | tr -s " " | cut -d\  -f2' % interface
+        result = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+        mac = result.stdout.read().strip()
+        cmd = 'ifconfig %s | grep "inet " | cut -d\  -f2' % interface
+        result = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+        ip = result.stdout.read().strip()
+
+        if mac != '' and ip != '':
+            addrs.append([interface, mac, ip])
+
+    return addrs
+
+#
+# get list of interfaces on Linux
+#
+def getLinuxInterfaces(ignore_interfaces, specific_interfaces):
     # Get the MAC and IP addresses
     filters = ''
     if ignore_interfaces != None:
@@ -82,9 +103,9 @@ def getInterfaces(ignore_interfaces, specific_interface):
     use_interface = ''
     if specific_interface != None:
         use_interface = 'grep -A 1 %s | ' % specific_interface
-    
+
     cmdline = subprocess.Popen(
-            "/sbin/ifconfig | %s grep -v fake | grep -A 1 HWaddr | %s sed 's/ \+/ /g' | sed s/addr://" % (filters, use_interface),  
+            "/sbin/ifconfig | %s grep -v fake | grep -A 1 HWaddr | %s sed 's/ \+/ /g' | sed s/addr://" % (filters, use_interface),
             shell=True, stdout=subprocess.PIPE)
     result = cmdline.stdout.read().strip()
 
@@ -102,15 +123,31 @@ def getInterfaces(ignore_interfaces, specific_interface):
             ip = temp_array[i].split(' ')[2]
             addrs.append([iface, mac, ip])
 
-    #interfaces = []
-    #addrs = result.split("\n")
-    #print addrs
+    return addrs
+
+#
+# get a list of the interfaces and associated mac addresses on this machine
+#
+# ignore any interfaces matching 'filter' (e.g., eth0 on GENI or wlan0 on the
+# demo Giadas as it is the control socket for the node) and also ignore any
+# fake<n> interfaces as those are internal only
+#
+def getInterfaces(ignore_interfaces, specific_interface):
+
+    # Get the default gateway  TODO: should there be one per interface?
+
+    if os.uname()[0] == "Darwin":
+        addrs = getOsxInterfaces(ignore_interfaces, specific_interface)
+        cmd = "netstat -nr | grep -v : | grep default | tr -s ' ' | cut -d\  -f2"
+    else:
+        addrs = getLinuxInterfaces(ignore_interfaces, specific_interface)
+        cmd = "/sbin/route -n | grep ^0.0.0.0 | tr -s ' '  | cut -d ' ' -f2"
+
+    cmdline = subprocess.Popen(cmd,
+            shell=True, stdout=subprocess.PIPE)
+    default_gw = cmdline.stdout.read().strip()
 
     interfaces = []
-    #for addr in addrs:
-    #    if (len(addr) != 0):
-    #        (iface, mac) = addr.split()
-    #        interfaces.append([iface, mac])
     for addr in addrs:
         if (len(addr) != 0):
             (iface, mac, ip) = addr#.split()
@@ -177,11 +214,11 @@ def makeHostConfig(hid):
     xchg = {}
     xchg['HNAME'] = getHostname()
     xchg['ADNAME'] = adname
-        
+
     if (nameserver == "no"):
         xchg['HID'] = hid
     else:
-        xchg['HID'] = nameserver_hid    
+        xchg['HID'] = nameserver_hid
 
     if socket_ips_ports:
         ip, port = socket_ips_ports.split(',')[0].strip().split(':')
@@ -218,7 +255,7 @@ def makeHostConfig(hid):
 # the router config file is broken into 4 sections
 # header - router definition and include lines
 # repeated block - with one section per interface
-# extra section - discard mappping for unused ports on the 
+# extra section - discard mappping for unused ports on the
 #  router (depends on the number of interfaces)
 # footer - boilerplate
 
@@ -293,7 +330,7 @@ def makeGenericRouterConfig(num_ports, ad, hid, socket_ip_port_list, xia_interfa
         unused_ports.append(start_unassigned)
         interfaces[start_unassigned] = ('dummy', dummy_mac, dummy_ip, dummy_ip)
         start_unassigned += 1
-        
+
 
 
     ##
@@ -305,7 +342,7 @@ def makeGenericRouterConfig(num_ports, ad, hid, socket_ip_port_list, xia_interfa
     if (nameserver == "no"):
         xchg['ADNAME'] = ad
     else:
-        xchg['ADNAME'] = nameserver_ad        
+        xchg['ADNAME'] = nameserver_ad
     xchg['HNAME'] = getHostname()
     xchg['HID'] = hid
 
@@ -325,10 +362,10 @@ def makeGenericRouterConfig(num_ports, ad, hid, socket_ip_port_list, xia_interfa
         xchg['IP_ACTIVE' + str(i)] = str(1) if i in ip_ports else str(0)
         xchg['IPADDR' + str(i)] = interfaces[i][2]
         xchg['GWADDR' + str(i)] = interfaces[i][3]
-        
+
     newtext = tpl.substitute(xchg)
-    
-    
+
+
     ##
     ## SOCKS
     ## (The router ports connected using click socket elements)
@@ -343,7 +380,7 @@ def makeGenericRouterConfig(num_ports, ad, hid, socket_ip_port_list, xia_interfa
         xchg['NUM'] = i
 
         newtext += tpl.substitute(xchg)
-    
+
     ##
     ## RAW
     ## (The router ports connected to FromDevice/ToDevice)
@@ -364,7 +401,7 @@ def makeGenericRouterConfig(num_ports, ad, hid, socket_ip_port_list, xia_interfa
     for i in unused_ports:
         xchg['NUM'] = i
         newtext += tpl.substitute(xchg)
-    
+
     ##
     ## FOOTER
     ##
@@ -390,8 +427,8 @@ def makeGenericRouterConfig(num_ports, ad, hid, socket_ip_port_list, xia_interfa
 #
 # the router config file is broken into 4 sections
 # header - router definition and include lines
-# used ports - connects used ports to interfaces 
-# extra section - discard mappping for unused ports on the router 
+# used ports - connects used ports to interfaces
+# extra section - discard mappping for unused ports on the router
 # footer - boilerplate
 
 def makeDualHostConfig(ad, hid, rhid):
@@ -403,7 +440,7 @@ def makeDualHostConfig(ad, hid, rhid):
         filter = '%s,%s' % (interface, interface_filter)
 
     ip_interface = getInterfaces(None, interface)
-    xia_interfaces = getInterfaces(filter, None) 
+    xia_interfaces = getInterfaces(filter, None)
 
     try:
         f = open(dualhostconfig + "." + ext, "r")
@@ -425,15 +462,15 @@ def makeDualHostConfig(ad, hid, rhid):
         xchg['ADNAME'] = ad
         xchg['HID'] = hid
     else:
-        xchg['ADNAME'] = nameserver_ad        
+        xchg['ADNAME'] = nameserver_ad
         xchg['HID'] = nameserver_hid
     xchg['RHID'] = rhid
     xchg['HNAME'] = getHostname()
-    
+
     xchg['EXTERNAL_IP'] = ip_interface[0][4]
 
     # Handle the pure XIA ports (0-1)
-    i = 0  
+    i = 0
     while i < 2 and i < len(xia_interfaces):  # Only go to 1 because port 2 is connected to the host and 3 is connected to IP
         repl = 'IP_ACTIVE' + str(i)
         xchg[repl] = str(0)
@@ -465,7 +502,7 @@ def makeDualHostConfig(ad, hid, rhid):
     xchg['IPADDR3'] = ip_interface[0][2]
     xchg['GWADDR3'] = ip_interface[0][3]
     xchg['EXT_IPADDR3'] = ip_interface[0][4]
-         
+
     newtext = tpl.substitute(xchg)
 
     i = 0
@@ -522,7 +559,7 @@ def makeDualHostConfig(ad, hid, rhid):
 
     ##
     ## FOOTER
-    ## 
+    ##
     tpl = Template(footer)
     newtext += tpl.substitute(xchg)
 
@@ -538,8 +575,8 @@ def makeDualHostConfig(ad, hid, rhid):
 #
 # the router config file is broken into 4 sections
 # header - router definition and include lines
-# used ports - connects used ports to interfaces 
-# extra section - discard mappping for unused ports on the router 
+# used ports - connects used ports to interfaces
+# extra section - discard mappping for unused ports on the router
 # footer - boilerplate
 
 def makeDualRouterConfig(ad, rhid):
@@ -556,13 +593,13 @@ def makeDualRouterConfig(ad, rhid):
         filter = '%s,%s' % (interface, interface_filter)
 
     ip_interfaces = getInterfaces(None, interface)
-    xia_interfaces = getInterfaces(filter, None) 
+    xia_interfaces = getInterfaces(filter, None)
 
     template = '%s.%s' % (dualrouterconfig, ext)
     outfile = dualrouterconfig
-    
+
     socket_ip_port_list = [p.strip() for p in socket_ips_ports.split(',')] if socket_ips_ports else []
-    
+
     makeGenericRouterConfig(4, ad, rhid, socket_ip_port_list, xia_interfaces, ip_interfaces, template, outfile)
 
 
@@ -574,14 +611,14 @@ def getOptions():
     global nodetype
     global dual_stack
     global adname
-    global nameserver 
+    global nameserver
     global ip_override_addr
     global interface_filter
     global interface
     global socket_ips_ports
     try:
         shortopt = "hr4ni:a:m:f:I:tP:"
-        opts, args = getopt.getopt(sys.argv[1:], shortopt, 
+        opts, args = getopt.getopt(sys.argv[1:], shortopt,
             ["help", "router", "host", "dual-stack", "nameserver", "id=", "ad=", "manual-address=", "interface-filter=", "host-interface=", "socket-ports="])
     except getopt.GetoptError, err:
         # print     help information and exit:
@@ -611,7 +648,7 @@ def getOptions():
         elif o in ("-P", "--socket-ports"):
             socket_ips_ports = a
         elif o in ("-n", "--nameserver"):
-            nameserver = "yes"            
+            nameserver = "yes"
         else:
              assert False, "unhandled option"
 
@@ -633,25 +670,25 @@ where:
 
   -r            : do router config instead of host
   --router
-  
+
   -t            : do a host config (this is the default)
   --host
-  
+
   -4            : do a dual-stack config
   --dual-stack
-  
+
   -n            : indicate that this needs to use nameserver AD and HID
-  --nameserver  
-  
+  --nameserver
+
   -m            : manually provide IP address
   --manual-address
-  
+
   -f            : a CSV string; any interfaces whose names match one of the strings will be ignored
   --interface-filter=<filter string>
 
   -P            : a CSV string; the IP addr/TCP port pairs to be used to tunnel packets between click sockets. Each pair should be colon-separated: <ip>:<port>
   --socket-ports=<ports>
-  
+
   -I            : the network interface a host should use, if it has multiple
   --host-interface=<interface>
 """

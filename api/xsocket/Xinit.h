@@ -39,7 +39,7 @@ class  __InitXSocket {
 
 struct __XSocketConf {
   static int initialized;
-  static char *master_conf;
+  static char master_conf[BUF_SIZE];
   char click_port[__PORT_LEN];
 };
 

@@ -5,13 +5,14 @@
 #include <unistd.h>
 #include <math.h>
 #include <pthread.h>
+#include <libgen.h>
+#include <syslog.h>
 
 #include "Xsocket.h"
 #include "xhcp.hh"
 #include "../common/XIARouter.hh"
 #include "dagaddr.hpp"
 
-#define DEFAULT_HOSTNAME "www_h.hostxxx.com.xia" // used if not provided by user (via command-line)
 
 unsigned int quit_flag = 0;
 char *adv_selfdag = NULL;
@@ -19,8 +20,71 @@ char *adv_gwdag = NULL;
 char *adv_gw4id = NULL;
 char *adv_nsdag = NULL;
 
+#define DEFAULT_NAME "host0"
+#define EXTENSION "xia"
+#define APPNAME "xhcp_client"
+
+char *hostname = NULL;
+char *fullname = NULL;
+char *ident = NULL;
 
 XIARouter xr;
+
+void help(const char *name)
+{
+	printf("\nusage: %s [-l level] [-v] [-c config] [-h nostname]\n", name);
+	printf("where:\n");
+	printf(" -l level    : syslog logging level 0 = LOG_EMERG ... 7 = LOG_DEBUG (default=3:LOG_ERR)");
+	printf(" -v          : log to the console as well as syslog");
+	printf(" -h hostname : click device name (default=host0)\n");
+	printf("\n");
+	exit(0);
+}
+
+void config(int argc, char** argv)
+{
+	int c;
+	unsigned level = 3;
+	int verbose = 0;
+
+	opterr = 0;
+
+	while ((c = getopt(argc, argv, "h:l:v")) != -1) {
+		switch (c) {
+			case 'h':
+				hostname = strdup(optarg);
+				fullname = (char*)calloc(1, strlen(hostname) + strlen(EXTENSION) + 1);
+				sprintf(fullname, "%s.%s", hostname, EXTENSION);
+				break;
+			case 'l':
+				level = MIN(atoi(optarg), LOG_DEBUG);
+				break;
+			case 'v':
+				verbose = LOG_PERROR;
+				break;
+			case '?':
+			default:
+				// Help Me!
+				help(basename(argv[0]));
+				break;
+		}
+	}
+
+	if (!hostname) {
+		hostname = strdup(DEFAULT_NAME);
+		fullname = (char*)calloc(1, strlen(hostname) + strlen(EXTENSION) + 1);
+		sprintf(fullname, "%s.%s", hostname, EXTENSION);
+	}
+
+	// load the config setting for this hostname
+	set_conf("xsockconf.ini", hostname);
+
+	// note: ident must exist for the life of the app
+	ident = (char *)calloc(strlen(hostname) + strlen (APPNAME) + 4, 1);
+	sprintf(ident, "%s:%s", APPNAME, hostname);
+	openlog(ident, LOG_CONS|LOG_NDELAY|verbose, LOG_LOCAL4);
+	setlogmask(LOG_UPTO(level));
+}
 
 void listRoutes(std::string xidType)
 {
@@ -30,12 +94,12 @@ void listRoutes(std::string xidType)
 		vector<XIARouteEntry>::iterator ir;
 		for (ir = routes.begin(); ir < routes.end(); ir++) {
 			XIARouteEntry r = *ir;
-			printf("%s: %d : %s : %ld\n", r.xid.c_str(), r.port, r.nextHop.c_str(), r.flags);
+			syslog(LOG_INFO, "%s: %d : %s : %ld\n", r.xid.c_str(), r.port, r.nextHop.c_str(), r.flags);
 		}
 	} else if (rc == 0) {
-		printf("No routes exist for %s\n", xidType.c_str());
+		syslog(LOG_INFO, "No routes exist for %s\n", xidType.c_str());
 	} else {
-		printf("Error getting route list %d\n", rc);
+		syslog(LOG_INFO, "Error getting route list %d\n", rc);
 	}
 }
 
@@ -47,11 +111,11 @@ int main(int argc, char *argv[]) {
 	char pkt[XHCP_MAX_PACKET_SIZE];
 	char buffer[XHCP_MAX_PACKET_SIZE]; 	
 	string myAD(""), myGWRHID(""), myGWR4ID(""), myNS_DAG("");
-	string default_AD("AD:-"), default_HID("HID:-"), default_4ID("IP:-"), empty_str("HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+	string default_AD("AD:-"), default_HID("HID:-"), default_4ID("IP:-");
+	string empty_str("");
 	string AD, gwRHID, gwR4ID, nsDAG;
 	int beacon_reception_count=0;
-	int beacon_response_freq = ceil(XHCP_CLIENT_ADVERTISE_INTERVAL/XHCP_SERVER_BEACON_INTERVAL);
-	int first_beacon_reception = true;	
+	int beacon_response_freq = ceil(XHCP_CLIENT_ADVERTISE_INTERVAL/XHCP_SERVER_BEACON_INTERVAL);	int first_beacon_reception = true;	
 	char *self_dag = (char *)malloc(XHCP_MAX_DAG_LENGTH);
 	char *gw_dag = (char *)malloc(XHCP_MAX_DAG_LENGTH);
 	char *gw_4id = (char *)malloc(XHCP_MAX_DAG_LENGTH);
@@ -62,39 +126,11 @@ int main(int argc, char *argv[]) {
 	char myrealAD[MAX_XID_SIZE];
 	char myHID[MAX_XID_SIZE]; 
 	char my4ID[MAX_XID_SIZE];	
-    char *hostname;
+	int changed;
 
- 	// set hostname, click element name, and API conf
-	if ( argc < 2 ) {
-		hostname = (char*) malloc(snprintf(NULL, 0, "%s", DEFAULT_HOSTNAME) + 1);
-		sprintf(hostname, "%s", DEFAULT_HOSTNAME);
-
-		xr.setRouter("host0");
-
-    } else if ( argc == 2 || argc == 3 || argc == 4 ) {
-		std::string commandline_input = argv[1];
-		if (commandline_input.find("www_h.") != string::npos) {	
-			hostname = (char*) malloc(snprintf(NULL, 0, "%s", argv[1]) + 1);
-		    sprintf(hostname, "%s", argv[1]);
-		} else {
-			hostname = (char*) malloc(snprintf(NULL, 0, "%s", DEFAULT_HOSTNAME) + 1);
-		    sprintf(hostname, "%s", DEFAULT_HOSTNAME);
-		}
-
-		if ( argc == 3 || argc == 4 ) {
-			char* element_name = (char*)malloc(snprintf(NULL, 0, "%s", argv[2]) + 1);
-			sprintf(element_name, "%s", argv[2]);
-			xr.setRouter(element_name);
-		} else {
-			xr.setRouter("host0");
-		}
-		if ( argc == 4 ) {
-			set_conf("xsockconf.ini", argv[3]);
-		}
-    } else {
-		printf("Expected usage: xhcp_client [<hostname> [<element name> [<API conf name>]]]\n");
-		exit(-1);
-	}
+	config(argc, argv);
+	xr.setRouter(hostname);
+	syslog(LOG_NOTICE, "%s started on %s", APPNAME, hostname);
 
     // make the response message dest DAG (intended destination: gw router who is running the routing process)
 	Graph gw = Node() * Node(BHID) * Node(SID_XROUTE);
@@ -102,23 +138,32 @@ int main(int argc, char *argv[]) {
 
     // connect to the click route engine
 	if ((rc = xr.connect()) != 0) {
-		printf("unable to connect to click! (%d)\n", rc);
+		syslog(LOG_ERR, "unable to connect to click! (%d)\n", rc);
 		return -1;
 	}
 	
 	// Xsocket init
 	int sockfd = Xsocket(AF_XIA, SOCK_DGRAM, 0);
-	if (sockfd < 0) { perror("Opening Xsocket"); }
+	if (sockfd < 0) {
+		syslog(LOG_ERR, "unable to create a socket");
+		exit(-1);
+	}
 	
    	// read the localhost HID 
-   	if ( XreadLocalHostAddr(sockfd, mydummyAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE, my4ID, MAX_XID_SIZE) < 0 )
-   		perror("Reading localhost address");   	
+   	if ( XreadLocalHostAddr(sockfd, mydummyAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE, my4ID, MAX_XID_SIZE) < 0 ) {
+		syslog(LOG_ERR, "unable to retrieve local host address");
+		Xclose(sockfd);
+	}
 
 	// make the src DAG (Actual AD will be updated when receiving XHCP beacons from an XHCP server)
 	Graph g = Node() * Node(SID_XHCP);
 	g.fill_sockaddr(&sdag);
 
-	Xbind(sockfd, (struct sockaddr*)&sdag, sizeof(sdag));
+	if (Xbind(sockfd, (struct sockaddr*)&sdag, sizeof(sdag)) < 0) {
+		syslog(LOG_ERR, "unable to bind to %s", g.dag_string().c_str());
+		Xclose(sockfd);
+		exit(-1);
+	}
 	
 	/* Main operation:
 		1. receive myAD, gateway router HID, and Name-Server-DAG information from XHCP server
@@ -141,8 +186,8 @@ int main(int argc, char *argv[]) {
 		socklen_t ddaglen = sizeof(ddag);
 		int rc = Xrecvfrom(sockfd, pkt, XHCP_MAX_PACKET_SIZE, 0, (struct sockaddr*)&ddag, &ddaglen);
 
-		if (rc < 0) { perror("recvfrom"); }
-
+		if (rc < 0)
+			syslog(LOG_WARNING, "error receiving data");
 		memset(self_dag, '\0', XHCP_MAX_DAG_LENGTH);
 		memset(gw_dag, '\0', XHCP_MAX_DAG_LENGTH);
 		memset(gw_4id, '\0', XHCP_MAX_DAG_LENGTH);
@@ -165,7 +210,7 @@ int main(int argc, char *argv[]) {
 					sprintf(ns_dag, "%s", entry->data);
 					break;					
 				default:
-					fprintf(stderr, "dafault\n");
+					syslog(LOG_WARNING, "invalid xhcp data, discarding...");
 					break;
 			}
 			entry = (xhcp_pkt_entry *)((char *)entry + sizeof(entry->type) + strlen(entry->data) + 1);
@@ -185,23 +230,31 @@ int main(int argc, char *argv[]) {
 		gwR4ID = gw_4id;
 		nsDAG = ns_dag;
 		
+		changed = 0;
+
 		// Check if myAD has been changed
 		if(myAD.compare(AD) != 0) {
+			changed = 1;
+			syslog(LOG_INFO, "AD updated");
 			// update new AD information
-			XupdateAD(sockfd, self_dag, gw_4id);
+			if(XupdateAD(sockfd, self_dag, gw_4id) < 0)
+				syslog(LOG_WARNING, "Error updating my AD");
 		
 			// delete obsolete myAD entry
 			xr.delRoute(myAD);
 		
 			// update AD table (my AD entry)
 			if ((rc = xr.setRoute(AD, DESTINED_FOR_LOCALHOST, empty_str, 0xffff)) != 0)
-				printf("error setting route %d\n", rc);			
+				syslog(LOG_WARNING, "error setting route %d\n", rc);
 				
 			myAD = AD;
 		}
 
 		// Check if myGWRouterHID has been changed
 		if(myGWRHID.compare(gwRHID) != 0) {
+			changed = 1;
+			syslog(LOG_INFO, "default route updated");
+
 			// delete obsolete gw-router HID entry
 			xr.delRoute(myGWRHID);
 			
@@ -211,19 +264,22 @@ int main(int argc, char *argv[]) {
 
 			// update AD (default entry)
 			if ((rc = xr.setRoute(default_AD, 0, gwRHID, 0xffff)) != 0)
-				printf("error setting route %d\n", rc);			
+				syslog(LOG_WARNING, "error setting route %d\n", rc);
 				
 			// update 4ID table (default entry)
 			if ((rc = xr.setRoute(default_4ID, 0, gwRHID, 0xffff)) != 0)
-				printf("error setting route %d\n", rc);								
+				syslog(LOG_WARNING, "error setting route %d\n", rc);
 			
 			// update HID table (default entry)
 			if ((rc = xr.setRoute(default_HID, 0, gwRHID, 0xffff)) != 0)
-				printf("error setting route %d\n", rc);								
+				syslog(LOG_WARNING, "error setting route %d\n", rc);
 			
 			// update HID table (gateway router HID entry)
 			if ((rc = xr.setRoute(gwRHID, 0, gwRHID, 0xffff)) != 0)
-				printf("error setting route %d\n", rc);
+				syslog(LOG_WARNING, "error setting route %d\n", rc);
+				
+			if ((rc = xr.setRoute(default_HID, 0, gwRHID, 0xffff)) != 0)
+				syslog(LOG_WARNING, "error setting route %d\n", rc);
 				
 			myGWRHID = gwRHID;
 		}
@@ -236,11 +292,11 @@ int main(int argc, char *argv[]) {
 			myNS_DAG = nsDAG;
 		}				
 		
-		listRoutes("AD");
-		printf("\n");
-		listRoutes("HID");
-		printf("\n");
-		
+		if (changed) {
+			listRoutes("AD");
+			listRoutes("HID");
+		}
+
 		beacon_reception_count++;
 		if(beacon_reception_count >= beacon_response_freq || first_beacon_reception) {
 			// construct a registration message to gw router
@@ -264,7 +320,7 @@ int main(int argc, char *argv[]) {
                 if (beacon_reception_count == XHCP_CLIENT_NAME_REGISTER_WAIT) {    
     			// read the localhost HID 
     			if ( XreadLocalHostAddr(sockfd, myrealAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE, my4ID, MAX_XID_SIZE) < 0 )
-    				perror("Reading localhost address"); 
+    				syslog(LOG_WARNING, "error reading localhost address"); 
     			// make the host DAG 
 				Node n_src = Node();
 				Node n_ip  = Node(my4ID);
@@ -275,9 +331,8 @@ int main(int argc, char *argv[]) {
 				hg = hg + (n_src * n_ip * n_ad * n_hid);
 				hg.fill_sockaddr(&hdag);
     			if (XregisterName(hostname, &hdag) < 0 )
-    				perror("name register");
+    				syslog(LOG_ERR, "error registering new name");
 		}   
-		
 	}	
 	return 0;
 }

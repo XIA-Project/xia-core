@@ -5,16 +5,17 @@ include ../../../xia.mk
 XSOCK_LIB=$(XLIB)/libXsocket.so $(XLIB)/libdagaddr.so
 TARGET=$(XLIB)/_c_xsocket.so
 CC=g++
-PYTHON=`find /usr/include/python*/Python.h | sed "s/\/Python.h//"`
+LDFLAGS +=-lc -ldl `python-config --ldflags`
+PYTHON=`python-config --includes`
 
-all: $(TARGET) $(XLIB)/xsocket.py 
+all: $(TARGET) $(XLIB)/xsocket.py
 
-$(TARGET): $(XSOCK_LIB) c_xsocket_wrap.c 
-	$(CC) -I $(XINC) -I $(PYTHON) -fpic -c c_xsocket_wrap.c 
-	$(CC) -shared c_xsocket_wrap.o $(LIBS) -o $@  -I $(PYTHON)
+$(TARGET): $(XSOCK_LIB) c_xsocket_wrap.c
+	$(CC) -I $(XINC) $(PYTHON) -fpic -c c_xsocket_wrap.c
+	$(CC) -shared c_xsocket_wrap.o $(LIBS) -o $@  $(PYTHON) $(LDFLAGS)
 
 c_xsocket_wrap.c: c_xsocket.i $(XSOCK_LIB)
-	swig -outdir $(XLIB) -python c_xsocket.i 
+	swig -outdir $(XLIB) -python c_xsocket.i
 
 $(XLIB)/xsocket.py: oo_wrapper/xsocket.py
 	cp $< $@
@@ -22,7 +23,7 @@ $(XLIB)/xsocket.py: oo_wrapper/xsocket.py
 doc:
 	make -C doc html
 
-clean: 
+clean:
 	-rm $(TARGET)
 	-rm $(XLIB)/xsocket.py
 	-rm $(XLIB)/c_xsocket.py

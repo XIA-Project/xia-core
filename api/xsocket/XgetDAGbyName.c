@@ -19,6 +19,7 @@
  @brief Implements XgetDAGbyName(), XregisterName(), Xgetpeername() and Xgetsockname()
 */
 #include <errno.h>
+ #include <unistd.h>
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
@@ -57,7 +58,8 @@ char *hostsLookup(const char *name) {
 	char _dag[NS_MAX_DAG_LENGTH];
 
 	// look for an hosts_xia file locally
-	FILE *hostsfp = fopen(strcat(findRoot(), ETC_HOSTS), "r");
+	char buf[BUF_SIZE];
+	FILE *hostsfp = fopen(strcat(XrootDir(buf, BUF_SIZE), ETC_HOSTS), "r");
 	int answer_found = 0;
 	if (hostsfp != NULL) {
 		while (fgets(line, 511, hostsfp) != NULL) {
@@ -151,12 +153,32 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 	char _name[NS_MAX_DAG_LENGTH], _dag[NS_MAX_DAG_LENGTH];
 	int result;
 
+	if (!name || *name == 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	if (!addr || !addrlen || *addrlen < sizeof(sockaddr_x)) {
 		errno = EINVAL;
 		return -1;
 	}
 
-    if (!strncmp(name, "RE ", 3) || !strncmp(name, "DAG ", 4)) {
+	// see if name is registered in the local hosts.xia file
+	if((dag = hostsLookup(name))) {
+		Graph g(dag);
+		free(dag);
+
+		// check to see if the returned dag was valid
+		// we may want a better check for this in the future
+		if (g.num_nodes() > 0) {
+			std::string s = g.dag_string();
+			g.fill_sockaddr((sockaddr_x*)addr);
+			*addrlen = sizeof(sockaddr_x);
+			return 0;
+		}
+	}
+
+if (!strncmp(name, "RE ", 3) || !strncmp(name, "DAG ", 4)) {
 
         // check to see if name is actually a dag to begin with
         Graph gcheck(name);
@@ -170,22 +192,6 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
             return 0;
         }
     }
-
-	// see if name is registered in the local hosts.xia file
-	if((dag = hostsLookup(name))) {
-
-		Graph g(dag);
-		free(dag);
-
-		// check to see if the returned dag was valid
-		// we may want a better check for this in the future
-		if (g.num_nodes() > 0) {
-			std::string s = g.dag_string();
-			g.fill_sockaddr((sockaddr_x*)addr);
-			*addrlen = sizeof(sockaddr_x);
-			return 0;
-		}
-	}
 
 	// not found locally, check the name server
 	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
@@ -259,6 +265,7 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 
 	Graph g(_dag);
 	g.fill_sockaddr(addr);
+	*addrlen = sizeof(sockaddr_x);
 
 	return 0;
 }
@@ -300,7 +307,17 @@ int XregisterName(const char *name, sockaddr_x *DAG) {
 		return -1;
 	}
 
+	if (!name || *name == 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	if (!DAG) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (DAG->sx_family != AF_XIA) {
 		errno = EINVAL;
 		return -1;
 	}

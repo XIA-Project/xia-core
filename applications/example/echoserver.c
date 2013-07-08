@@ -19,6 +19,9 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <sys/wait.h>
+#ifdef __APPLE__
+#include <libgen.h>
+#endif
 #include "Xsocket.h"
 #include "dagaddr.hpp"
 
@@ -82,6 +85,7 @@ void getConfig(int argc, char** argv)
 			default:
 				// Help Me!
 				help(basename(argv[0]));
+				break;
 		}
 	}
 
@@ -158,7 +162,7 @@ void process(int sock)
 		 if ((n = select(sock + 1, &fds, NULL, NULL, &tv)) < 0) {
 			 warn("%5d Select failed, closing...\n", pid);
 			 break;
-		 
+
 		 } else if (n == 0) {
 			 // we timed out, close the socket
 			 say("%5d timed out on recv\n", pid);
@@ -167,12 +171,12 @@ void process(int sock)
 			 // this shouldn't happen!
 			 die(-4, "something is really wrong, exiting\n");
 		 }
-	
+
 		if ((n = Xrecv(sock, buf, sizeof(buf), 0)) < 0) {
 			warn("Recv error on socket %d, closing connection\n", pid);
 			break;
 		}
-			
+
 		say("%5d received %d bytes\n", pid, n);
 
 		if ((n = Xsend(sock, buf, n, 0)) < 0) {
@@ -241,7 +245,7 @@ void echo_stream()
 		if (pid == -1) {
 			die(-1, "FORK FAILED\n");
 
-		} else if (pid == 0) { 
+		} else if (pid == 0) {
 			process(sock);
 			exit(0);
 
@@ -300,7 +304,7 @@ void echo_dgram()
 				warn("Recv error on socket %d, closing connection\n", pid);
 				break;
 			}
-			
+
 			say("dgram received %d bytes\n", n);
 
 			if ((n = Xsendto(sock, buf, n, 0, (struct sockaddr *)&cdag, dlen)) < 0) {

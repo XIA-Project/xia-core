@@ -233,6 +233,7 @@ class RouterConfig:
 				(alias, xid) = entry.split()
 			
 				# create hash maps to go in both directions
+				xid = xid.lower()
 				self._xids[xid] = alias
 				self._xaliases[alias] = xid
 	#
@@ -267,6 +268,7 @@ class RouterConfig:
 		return xid
 
 	def getAlias(self, xid):
+		xid = xid.lower()
 		alias = xid
 		if xid in self._xids:
 			alias = self._xids[xid]

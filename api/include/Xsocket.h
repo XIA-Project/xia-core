@@ -183,6 +183,8 @@ extern const char *Xgai_strerror(int);
 extern int checkXid(const char *xid, const char *type);
 extern int checkDag(const char *dag);
 
+extern char *XrootDir(char *buf, unsigned len);
+
 #ifdef __cplusplus
 }
 #endif
