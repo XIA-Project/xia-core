@@ -21,6 +21,7 @@ LD_LIBRARY_PATH=.
 NAME=`basename $0`
 VERBOSE=0
 LOGGING=0
+LOGLEVEL=3
 CLICK_ONLY=0
 ROUTER=0
 HOST=0
@@ -49,7 +50,7 @@ VISUALIZER_SERVER_DAEMONS="statsserver"
 # assumes this script is in a directory off the parent of the XIA tree
 # and that the daemons it starts are rooted off of the same location
 #  so XIADIR would be /xia-core assuming the script were /xia-core/tools/xianet
-XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")" 
+XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
 
 # click parameters
 CLICKPATH=$XIADIR/click
@@ -61,7 +62,7 @@ SCRIPT_SET=0
 
 is_running()
 {
-	RUNNING=`ps -e | grep "$1" `    #| grep -v grep`
+	RUNNING=`ps aux | grep "$1" | grep -v grep`
 	[ "$RUNNING" != "" ]
 }
 
@@ -102,7 +103,7 @@ start_daemons()
 	if [ $ROUTER -eq 1 ]; then
 		FLAGS=$FLAGS" -r"
 	fi
-	if [ $HOST -eq 1 ]; then    
+	if [ $HOST -eq 1 ]; then
 		FLAGS=$FLAGS" -t"
 	fi
 	if [ $DUAL_STACK -eq 1 ]; then
@@ -144,6 +145,8 @@ start_daemons()
 		exit 1
 	fi
 
+	$XIADIR/bin/make_sockconf $CONFPATH/$SCRIPT $XIADIR/etc/xsockconf.ini
+
 
 
 	if [ $VERBOSE -eq 0 ]; then
@@ -174,46 +177,47 @@ start_daemons()
 	cd $XIADIR/bin
 
 	if [ $ROUTER -eq 1 ]; then
-		./xrouted $HOSTNAME & 
+		./xrouted -h $HOSTNAME $LOG_FLAGS &
 		sleep 2
-		
-		./xhcp_serverd &
-		sleep 1 
+
+		./xhcp_serverd -h $HOSTNAME $LOG_FLAGS &
+		sleep 1
 	fi
-	if [ $HOST -eq 1 ]; then    
+	if [ $HOST -eq 1 ]; then
 
 		if [ $DUAL_STACK -eq 1 ]; then
-			./xrouted "$HOSTNAME"_router 180 &   # 180 is the name of a section in daemons/xroute/xsockconf.ini
+			./xrouted -h "$HOSTNAME"_router $LOG_FLAGS &
 			sleep 2
-			
-			./xhcp_serverd 180 &
-			sleep 1 
-		
-			./xhcp_clientd www_h.$HOSTNAME.com.xia "$HOSTNAME"_host &
-			sleep 2 
+
+			./xhcp_serverd "$HOSTNAME"_router &
+			sleep 1
+
+			# FIXME: make this register something useful in the nameserver instead of these names
+			./xhcp_clientd -h "$HOSTNAME"_host $LOG_FLAGS &
+			sleep 2
 		else
-			./xhcp_clientd www_h.$HOSTNAME.com.xia $HOSTNAME & 
-			sleep 2 
+			./xhcp_clientd -h $HOSTNAME $LOG_FLAGS &
+			sleep 2
 		fi
-		
+
 	fi
 	if [ $NAMESERVER -eq 1 -a $HOST -eq 1 ]; then
-		./xnameservice &
+		./xnameservice -h $HOSTNAME $LOG_FLAGS &
 	fi
 	if [ $LOCAL_CHAIN_TOPOLOGY -eq 1 ]; then
-		./xrouted router0 180 &
-		./xrouted router1 181 & 
+		./xrouted -h router0 $LOG_FLAGS &
+		./xrouted -h router1 $LOG_FLAGS &
 		sleep 2
-		
-		./xhcp_serverd 180 &
-		./xhcp_serverd 181 &
-		sleep 1 
-			
-		./xhcp_clientd www_h.host0.com.xia host0 172 &  # 172 is the name of a section in daemons/xhcp/xsockconf.ini
-		./xhcp_clientd www_h.host1.com.xia host1 192 &
-		sleep 2 
-			
-		./xnameservice &
+
+		./xhcp_serverd -h router0 $LOG_FLAGS &
+		./xhcp_serverd -h router1 $LOG_FLAGS &
+		sleep 1
+
+		./xhcp_clientd -h host0 $LOG_FLAGS &
+		./xhcp_clientd -h host1 $LOG_FLAGS &
+		sleep 2
+
+		./xnameservice $LOG_FLAGS &
 	fi
 	if [ $RUN_VISUALIZER_SERVER -eq 1 ]; then
 		cd $XIADIR/daemons/visualizer
@@ -237,10 +241,10 @@ help ()
 
 Start or stop the XIA network services.
 
-usage: $NAME [-cqvV4rtnZ] [-l <logfile>] [-i <hostname>] [-m <ip-addr>] [-f <filter_str>] [-I <interface>] [-P <socket-ports>] [-s <script>] [-z <statserver>] [start|stop|restart|check]
+usage: $NAME [-cqvV4rtnZ] [-l <loglevel>] [-i <hostname>] [-m <ip-addr>] [-f <filter_str>] [-I <interface>] [-P <socket-ports>] [-s <script>] [-z <statserver>] [start|stop|restart|check]
 where:
   -c only start click
-  -l send stderr/stdout to logfile
+  -l syslog level (0=LOG_EMERG through 7=LOG_DEBUG) default=3 (LOG_WARNING)
   -s run click using the specified script
      (should be located in the $CONFPATH directory)
   -q run silently (default)
@@ -274,8 +278,7 @@ while getopts "cl:s:qvV4nrthi:m:f:I:z:ZP:" opt; do
 			CLICK_ONLY=1
 			;;
 		l)
-			LOGGING=1
-			LOGFILE=$OPTARG
+			LOGLEVEL=$OPTARG
 			;;
 		s)
 			SCRIPT=$OPTARG
@@ -338,6 +341,9 @@ while getopts "cl:s:qvV4nrthi:m:f:I:z:ZP:" opt; do
 	esac
 done
 
+LOG_FLAGS="-l $LOGLEVEL"
+[ "$VERBOSE" == "2" ] && LOG_FLAGS="$LOG_FLAGS -v"
+
 if [ $NAMESERVER -eq 1 -a $HOST -eq 1 ]; then
 	DAEMONS=$DAEMONS" "$NAMESERVER_DAEMONS
 fi
@@ -359,7 +365,7 @@ if [ $SCRIPT_SET -eq 0 ]; then
 		fi
 	fi
 fi
-	
+
 if [ $HOST -eq 1 ]; then
 	DAEMONS=$DAEMONS" "$HOST_DAEMONS
 	if [ $DUAL_STACK -eq 1 ]; then
