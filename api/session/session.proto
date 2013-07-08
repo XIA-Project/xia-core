@@ -129,7 +129,8 @@ message SessionInfo {
 	optional bytes my_addr = 4; // If XIA, a sockaddr_x
 	optional bytes initiator_addr = 5; // If XIA, a sockaddr_x
 	optional uint32 initiator_ctx = 6;
-	optional bytes rx_cinfo = 7;  // receiver of a ConnReq can tag it with the receiving transport conn
+	optional bool new_lasthop_conn = 7 [default = false];  // should the last hop open a new conn to me?
+	optional bytes rx_cinfo = 8;  // receiver of a ConnReq can tag it with the receiving transport conn
 }
 
 message SessionData {
@@ -143,12 +144,13 @@ message SessionMigrate {
 // Stores information about an open transport connection.
 // The connection might be shared between multiple sessions.
 message ConnectionInfo {
-	required string name = 1;  // remote name
+	required string hid = 1;  // remote HID
 	required int32 sockfd = 2;
-	repeated int32 sessions = 3;
-	required string interface = 4 [default = "default"];
-	required ConnType type = 5 [default = XSP];
-	required string my_name = 6;
+	required bytes addr = 3;  // remote address
+	repeated int32 sessions = 4;
+	required string interface = 5 [default = "default"];
+	required ConnType type = 6 [default = XSP];
+	required string my_name = 7;
 }
 
 message ContextInfo {

@@ -8,6 +8,73 @@ sockaddr_x* addrFromData(const string *addr_buf) {
 	return (sockaddr_x*)addr_buf->data();
 }
 
+string* getAddrForName(string name) {
+	struct addrinfo *ai;
+	sockaddr_x *sa;
+	if (Xgetaddrinfo(name.c_str(), NULL, NULL, &ai) != 0) {
+		ERRORF("unable to lookup name %s", name.c_str());
+		return NULL;
+	}
+	sa = (sockaddr_x*)ai->ai_addr;
+
+	string *addr_buf = new string((const char*)sa, sizeof(sockaddr_x));
+	return addr_buf;
+}
+
+string* getRemoteAddrForSocket(int sock) {
+	sockaddr_x *sa = (sockaddr_x*)malloc(sizeof(sockaddr_x));
+	socklen_t len = sizeof(sockaddr_x);
+	if (Xgetpeername(sock, (struct sockaddr*)sa, &len) < 0) {
+		ERRORF("Error in Xgetpeername on socket %d: %s", sock, strerror(errno));
+	}
+	string *addr_buf = new string((const char*)sa, sizeof(sockaddr_x));
+	return addr_buf;
+}
+
+string* getLocalAddrForSocket(int sock) {
+	sockaddr_x *sa = (sockaddr_x*)malloc(sizeof(sockaddr_x));
+	socklen_t len = sizeof(sockaddr_x);
+	if (Xgetsockname(sock, (struct sockaddr*)sa, &len) < 0) {
+		ERRORF("Error in Xgetsockname on socket %d: %s", sock, strerror(errno));
+	}
+	string *addr_buf = new string((const char*)sa, sizeof(sockaddr_x));
+	return addr_buf;
+}
+
+// returns an address's HID as a string (which we use to keep track of transport
+// connections going to a particular host)
+string getHIDForAddr(const string *addr_buf) {
+	sockaddr_x *sa = addrFromData(addr_buf);
+	Graph g(sa);
+	g.print_graph();
+	vector<const Node*> hids = g.get_nodes_of_type(Node::XID_TYPE_HID);
+
+	if (hids.size() > 0) {
+		return hids[0]->to_string();
+	} else {
+		ERROR("DAG contained no HIDs");
+		return "ERROR";
+	}
+}
+
+string getHIDForName(string name) {
+	// resolve name
+	struct addrinfo *ai;
+	sockaddr_x *sa;
+	if (Xgetaddrinfo(name.c_str(), NULL, NULL, &ai) != 0) {
+		ERRORF("unable to lookup name %s", name.c_str());
+		return "ERROR";
+	}
+	sa = (sockaddr_x*)ai->ai_addr;
+
+	string *addr_buf = new string((const char*)sa, sizeof(sockaddr_x));
+	return getHIDForAddr(addr_buf);
+}
+
+string getHIDForSocket(int sock) {
+	return getHIDForAddr(getRemoteAddrForSocket(sock));
+}
+
 int sendBuffer(session::ConnectionInfo *cinfo, const char* buf, size_t len) {
 	int sock = cinfo->sockfd();
 	
@@ -93,23 +160,14 @@ int openConnectionToAddr(const string *addr_buf, session::ConnectionInfo *cinfo)
 LOGF("    opened connection, sock is %d", sock);
 
 	cinfo->set_sockfd(sock);
+	cinfo->set_hid(getHIDForAddr(addr_buf));
+	cinfo->set_addr(*addr_buf);
 	return 1;
 
 }
 
 int openConnectionToName(const string &name, session::ConnectionInfo *cinfo) {
-
-	// resolve name
-	struct addrinfo *ai;
-	sockaddr_x *sa;
-	if (Xgetaddrinfo(name.c_str(), NULL, NULL, &ai) != 0) {
-		ERRORF("unable to lookup name %s", name.c_str());
-		return -1;
-	}
-	sa = (sockaddr_x*)ai->ai_addr;
-
-	string *addr_buf = new string((const char*)sa, sizeof(sockaddr_x));
-	return openConnectionToAddr(addr_buf, cinfo);
+	return openConnectionToAddr(getAddrForName(name), cinfo);
 }
 
 int registerName(const string &name, string *addr_buf) {
@@ -155,3 +213,4 @@ void* mobility_daemon(void *args) {
 
 	return NULL;
 }
+

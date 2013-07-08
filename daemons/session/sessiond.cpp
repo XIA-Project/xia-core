@@ -67,8 +67,8 @@ map<unsigned short, session::ConnectionInfo*> ctx_to_rxconn;
 map<unsigned short, int> ctx_to_listensock;
 map<uint32_t, unsigned short> incomingctx_to_myctx; // key: upper 16 = sender's ctx, lower 16 = incoming sockfd
 pthread_mutex_t incomingctx_to_myctx_mutex;
-map<string, session::ConnectionInfo*> name_to_conn;
-pthread_mutex_t name_to_conn_mutex;
+map<string, session::ConnectionInfo*> hid_to_conn;
+pthread_mutex_t hid_to_conn_mutex;
 
 map<int, pthread_t*> sockfd_to_pthread;  // could be a listen sock or data sock (not both)
 
@@ -177,7 +177,7 @@ void print_connections() {
 	for (iter = connections.begin(); iter!= connections.end(); ++iter) {
 		session::ConnectionInfo *cinfo = iter->second;
 
-		printf("Name:\t\t%s\n", cinfo->name().c_str());
+		printf("HID:\t\t%s\n", cinfo->hid().c_str());
 		printf("Sockfd:\t\t%d\n", cinfo->sockfd());
 		printf("Sessions:\t");
 		for (int i = 0; i < cinfo->sessions_size(); i++) {
@@ -432,7 +432,7 @@ int stopPollingSocket(int sock) {
 bool closeConnection(int ctx, session::ConnectionInfo *cinfo) {
 	bool closed_conn = false;
 		
-	pthread_mutex_lock(&name_to_conn_mutex);  // TODO: make a mutex for each connection
+	pthread_mutex_lock(&hid_to_conn_mutex);  // TODO: make a mutex for each connection
 	// remove ctx from the connections list of sessions
 	int found = -1;
 	for (int i = 0; i < cinfo->sessions_size(); i++) {
@@ -444,7 +444,7 @@ bool closeConnection(int ctx, session::ConnectionInfo *cinfo) {
 
 	if (found == -1) {
 		ERRORF("Error: did not find context %d in connection", ctx);
-		pthread_mutex_unlock(&name_to_conn_mutex);
+		pthread_mutex_unlock(&hid_to_conn_mutex);
 		return closed_conn;
 	}
 
@@ -455,11 +455,11 @@ bool closeConnection(int ctx, session::ConnectionInfo *cinfo) {
 
 	// If no one else is using this connection, close it
 	if (cinfo->sessions_size() == 0) {
-		LOGF("Closing connection to: %s", cinfo->name().c_str());
+		LOGF("Closing connection to: %s", cinfo->hid().c_str());
 		closed_conn = true;
 		
 		// remove mapping
-		name_to_conn.erase(cinfo->name()); // TODO: when we have indidivual mutexes, still lock whole thing here
+		hid_to_conn.erase(cinfo->hid()); // TODO: when we have indidivual mutexes, still lock whole thing here
 
 		// stop polling the socket
 		if (stopPollingSocket(cinfo->sockfd()) < 0) {
@@ -475,7 +475,7 @@ bool closeConnection(int ctx, session::ConnectionInfo *cinfo) {
 		delete cinfo;
 	}
 	
-	pthread_mutex_unlock(&name_to_conn_mutex);
+	pthread_mutex_unlock(&hid_to_conn_mutex);
 	return closed_conn;
 }
 
@@ -553,6 +553,10 @@ void infocpy(const session::SessionInfo *from, session::SessionInfo *to) {
 
 	if (from->has_initiator_ctx()) {
 		to->set_initiator_ctx(from->initiator_ctx());
+	}
+
+	if (from->has_new_lasthop_conn()) {
+		to->set_new_lasthop_conn(from->new_lasthop_conn());
 	}
 }
 
@@ -632,8 +636,7 @@ int open_connection(string name, session::ConnectionInfo *cinfo) {
 	
 	int ret;
 	if ( (ret = openConnectionToName(name, cinfo)) >= 0) {
-		cinfo->set_name(name);
-		name_to_conn[name] = cinfo;
+		hid_to_conn[cinfo->hid()] = cinfo;
 
 		// start a thread reading this socket
 		if ( (ret = startPollingSocket(cinfo->sockfd(), poll_recv_sock, (void*)cinfo) < 0) ) {
@@ -656,16 +659,17 @@ int get_conn_for_context(int ctx, map<unsigned short, session::ConnectionInfo*> 
 		// There isn't a transport conn for this session+hop yet
 #ifdef MULTIPLEX
 		// If no one else has opened a connection to this name, open one
-		pthread_mutex_lock(&name_to_conn_mutex); // lock so 2 threads don't try to create same conn
-		if ( name_to_conn.find(hopname) == name_to_conn.end() ) {
+		string hid = getHIDForName(hopname);
+		pthread_mutex_lock(&hid_to_conn_mutex); // lock so 2 threads don't try to create same conn
+		if ( hid_to_conn.find(hid) == hid_to_conn.end() ) {
 #endif /* MULTIPLEX */
 			*cinfo = new session::ConnectionInfo();
 			rc = open_connection(hopname, *cinfo);
 #ifdef MULTIPLEX
 		} else {
-			*cinfo = name_to_conn[hopname];
+			*cinfo = hid_to_conn[hid];
 		}
-		pthread_mutex_unlock(&name_to_conn_mutex);
+		pthread_mutex_unlock(&hid_to_conn_mutex);
 #endif /* MULTIPLEX */
 
 		if (rc < 0) {
@@ -707,7 +711,7 @@ int send(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 	const char *buf = p_buf.c_str();
 
 	if ( (sent = sendBuffer(cinfo, buf, len)) < 0) {
-		ERRORF("Send error %d on socket %d, dest name %s: %s", errno, cinfo->sockfd(), cinfo->name().c_str(), strerror(errno));
+		ERRORF("Send error %d on socket %d, dest hid %s: %s", errno, cinfo->sockfd(), cinfo->hid().c_str(), strerror(errno));
 	}
 
 	return sent;
@@ -744,7 +748,7 @@ int swap_sockets_for_connection(session::ConnectionInfo *cinfo, int oldsock, int
 
 	// close old socket
 	if (closeSock(oldsock) < 0) {
-		ERRORF("Error closing old transport connection to %s", cinfo->name().c_str());
+		ERRORF("Error closing old transport connection to %s", cinfo->hid().c_str());
 		return -1;
 	}
 
@@ -791,14 +795,15 @@ int migrate_connections() {
 	LOG("Migrating existing transport connections.");
 	int rc = 1;
 	
+	// TODO: what if we're not multiplexing????? won't get all the conns!
 	map<string, session::ConnectionInfo*>::iterator iter;
-	for (iter = name_to_conn.begin(); iter!= name_to_conn.end(); ++iter) {
+	for (iter = hid_to_conn.begin(); iter!= hid_to_conn.end(); ++iter) {
 		session::ConnectionInfo *cinfo = iter->second;
 
 		int oldsock = cinfo->sockfd();
 
 		// open a new one
-		if (openConnectionToName(cinfo->name(), cinfo) < 0) {
+		if (openConnectionToAddr(&cinfo->addr(), cinfo) < 0) {
 			ERRORF("Error opening new transport connection to %s", iter->first.c_str());
 			rc = -1;
 			continue;
@@ -858,7 +863,13 @@ LOG("BEGIN poll_listen_sock");
 	
 	
 		session::ConnectionInfo *rx_cinfo = new session::ConnectionInfo();
+LOG("here");
 		rx_cinfo->set_sockfd(new_rxsock);
+LOG("here");
+		rx_cinfo->set_hid(getHIDForSocket(new_rxsock));
+LOG("here");
+		rx_cinfo->set_addr(*getRemoteAddrForSocket(new_rxsock));
+LOG("here");
 	
 		
 		// receive first message (using new_ctx, not ctx) and
@@ -881,14 +892,12 @@ LOG("BEGIN poll_listen_sock");
 				}
 
 #ifdef MULTIPLEX
-				// Get the prevhop's name so we can store this transport connection
-				string prevhop = rpkt->info().my_name();
-				rx_cinfo->set_name(prevhop);
-				name_to_conn[prevhop] = rx_cinfo;
-#else
+				// save transport connection for others to use
+				hid_to_conn[rx_cinfo->hid()] = rx_cinfo;
+#endif /* MULTIPLEX */
+
 				// Save rx_info in the session info so accepter can get to it
 				rpkt->mutable_info()->set_rx_cinfo(&rx_cinfo, sizeof(session::ConnectionInfo*));
-#endif /* MULTIPLEX */
 	
 				// Add session info pkt to acceptQ
 				pushAcceptQ(ctx, rpkt);
@@ -911,7 +920,8 @@ LOGF("Received a MIGRATE message from: %s", rpkt->migrate().sender_name().c_str(
 
 				// find the old connection
 				delete rx_cinfo; // there's not really a new connection after all
-				rx_cinfo = name_to_conn[rpkt->migrate().sender_name()]; //TODO: handle not found
+				rx_cinfo = hid_to_conn[rx_cinfo->hid()]; //TODO: handle not found
+				// TODO: does the migrate message still need to send the sender's name?
 
 				swap_sockets_for_connection(rx_cinfo, rx_cinfo->sockfd(), new_rxsock);
 
@@ -987,6 +997,8 @@ void *poll_recv_sock(void *args) {
 					break;
 				}
 				
+				// Save rx_info in the session info so accepter can get to it
+				rpkt->mutable_info()->set_rx_cinfo(&cinfo, sizeof(session::ConnectionInfo*));
 				
 				// Add session info pkt to acceptQ
 				pushAcceptQ(listen_ctx, rpkt);
@@ -1084,46 +1096,46 @@ LOG("BEGIN process_init_msg");
 	allocateDataQ(ctx);
 
 
-	// If necessary, make a socket for the last hop to connect to
 	session::ConnectionInfo *rx_cinfo = NULL;
+	string *my_addr_buf = NULL;
 	string prevhop = get_prevhop_name(ctx);
+	string prevHID = getHIDForName(prevhop);
+	string* prevaddr = getAddrForName(prevhop);
 	int lsock = -1; // might not get used
-
 	bool two_party = (session_hop_count(ctx) == 2);
 
-	pthread_mutex_lock(&name_to_conn_mutex);
+
+	// If necessary, make a socket for the last hop to connect to
+	pthread_mutex_lock(&hid_to_conn_mutex);
 #ifdef MULTIPLEX
-	bool connection_exists = !( name_to_conn.find(prevhop) == name_to_conn.end() );
+	bool connection_exists = !( hid_to_conn.find(prevHID) == hid_to_conn.end() );
 	if (!connection_exists && !two_party) {  // NOT ALREADY A CONNECTION
 #else
 	if (!two_party) { 
 #endif /* MULTIPLEX */
 LOGF("Ctx %d    No connection exists, making rx_sock", ctx);
 		// make a socket to accept connection from last hop
-		string *addr_buf = NULL;
-		lsock = bindRandomAddr(&addr_buf);
+		lsock = bindRandomAddr(&my_addr_buf);
 		if (lsock < 0) {
 			ERROR("Error binding to random address");
 			rcm->set_message("Error binding to random address");
 			rcm->set_rc(session::FAILURE);
-			pthread_mutex_unlock(&name_to_conn_mutex);
+			pthread_mutex_unlock(&hid_to_conn_mutex);
 			return -1;
 		}
 		
 		// store this rx-transport-conn-to-be so others connecting to the same
 		// lasthop don't make their own rx conns (actual sock filled in below)
 		rx_cinfo = new session::ConnectionInfo();
-		rx_cinfo->set_name(prevhop);
+		rx_cinfo->set_hid(prevHID);
+		rx_cinfo->set_addr(*prevaddr);
 		rx_cinfo->set_my_name(info->my_name());
 		rx_cinfo->add_sessions(ctx);
 
-		name_to_conn[prevhop] = rx_cinfo;
-		pthread_mutex_unlock(&name_to_conn_mutex);
+		hid_to_conn[prevHID] = rx_cinfo;
+		pthread_mutex_unlock(&hid_to_conn_mutex);
 	
-		// store addr in session info
-		info->set_my_addr(*addr_buf);
-		info->set_initiator_addr(*addr_buf);
-		delete addr_buf;
+		info->set_new_lasthop_conn(true);  // last hop should open new conn to me
 LOG("    Made socket to accept synack from last hop");
 	
 	} else {
@@ -1139,11 +1151,19 @@ LOGF("Ctx %d    Found an exising connection, making acceptQ", ctx);
 		// add this session to the connection (do this now to protect against
 		// the connection being closed while we send around the session info)
 		if (!two_party) {
-			rx_cinfo = name_to_conn[prevhop];
+			rx_cinfo = hid_to_conn[prevHID];
 			rx_cinfo->add_sessions(ctx);
+			my_addr_buf = getLocalAddrForSocket(rx_cinfo->sockfd());
 		}
-		pthread_mutex_unlock(&name_to_conn_mutex);
+		pthread_mutex_unlock(&hid_to_conn_mutex);
 	}
+		
+	if (!two_party) {
+		// store addr in session info
+		info->set_my_addr(*my_addr_buf);
+		info->set_initiator_addr(*my_addr_buf);
+	}
+	delete my_addr_buf;
 
 	// send session info to next hop
 	session::SessionPacket pkt;
@@ -1336,6 +1356,7 @@ LOG("BEGIN process_accept_msg");
 		return -1;
 	}
 	assert(rpkt);
+LOG("here");
 
 
 	// First make sure we have a connection to the next hop.
@@ -1349,18 +1370,18 @@ LOG("BEGIN process_accept_msg");
 	if ( is_last_hop(&(rpkt->info()), listenCtxInfo->my_name()) && !two_party) {
 		string nexthop = get_nexthop_name(listenCtxInfo->my_name(), &(rpkt->info()));
 
-		// If has init addr, connect
-		if (rpkt->info().has_initiator_addr()) {
+		if (rpkt->info().new_lasthop_conn()) {
 LOGF("    Ctx %d    I'm the last hop; connecting to initiator with supplied addr", new_ctx);
 			tx_cinfo = new session::ConnectionInfo();
-			tx_cinfo->set_name(nexthop);
 
+LOG("here");
 			if (openConnectionToAddr(&(rpkt->info().initiator_addr()), tx_cinfo) < 0) {
 				ERROR("Error connecting to initiator");
 				rcm->set_message("Error connecting to initiator");
 				rcm->set_rc(session::FAILURE);
 				return -1;
 			}
+LOG("here");
 
 			// start a thread reading this socket
 			int ret;
@@ -1370,24 +1391,30 @@ LOGF("    Ctx %d    I'm the last hop; connecting to initiator with supplied addr
 				rcm->set_rc(session::FAILURE);
 				return -1;
 			}
+LOG("here");
 
-			pthread_mutex_lock(&name_to_conn_mutex);
-			name_to_conn[nexthop] = tx_cinfo;
+			pthread_mutex_lock(&hid_to_conn_mutex);
+			hid_to_conn[tx_cinfo->hid()] = tx_cinfo;
 			tx_cinfo->add_sessions(new_ctx);
-			pthread_mutex_unlock(&name_to_conn_mutex);
+			pthread_mutex_unlock(&hid_to_conn_mutex);
+LOG("here");
 
 		} else {
 
+LOG("here");
 #ifdef MULTIPLEX
+LOG("here");
 			// check for an existing connection
-			pthread_mutex_lock(&name_to_conn_mutex);
-			if ( name_to_conn.find(nexthop) == name_to_conn.end() ) {
+			string nextHID = getHIDForAddr(&(rpkt->info().initiator_addr()));
+			pthread_mutex_lock(&hid_to_conn_mutex);
+			if ( hid_to_conn.find(nextHID) == hid_to_conn.end() ) {
+LOG("here");
 LOGF("    Ctx %d    I'm the last hop; waiting for a connection to initiator. Putting ConnReq back on Q", new_ctx);
 				// there isn't one, so we'll put the ConnReq back on the accecptQ
 				// so we can process it again later once we've gotten a ConnReq
 				// with the initiator's address
 				pushAcceptQ(ctx, rpkt);
-				pthread_mutex_unlock(&name_to_conn_mutex);
+				pthread_mutex_unlock(&hid_to_conn_mutex);
 				
 				// Try again (hopefully someone else has either added the ConnReq
 				// we want to the acceptQ or they've processed it themselves and
@@ -1396,9 +1423,10 @@ LOGF("    Ctx %d    I'm the last hop; waiting for a connection to initiator. Put
 			}
 
 			// we're good to go!
-			tx_cinfo = name_to_conn[nexthop];
+			tx_cinfo = hid_to_conn[nextHID];
 			tx_cinfo->add_sessions(new_ctx);
-			pthread_mutex_unlock(&name_to_conn_mutex);
+			pthread_mutex_unlock(&hid_to_conn_mutex);
+LOG("here");
 #else
 			ERROR("Last hop. Initiator did not supply an address and we're not multiplexing");
 			rcm->set_message("Last hop. Initiator did not supply an address and we're not multiplexing");
@@ -1412,6 +1440,7 @@ LOGF("    Ctx %d    I'm the last hop; waiting for a connection to initiator. Put
 
 
 
+LOG("here");
 	// store a copy of the session info, updating my_name and my_addr
 	//session::SessionInfo *sinfo = new session::SessionInfo(rpkt->info());
 	session::SessionInfo *sinfo = new session::SessionInfo();
@@ -1419,6 +1448,7 @@ LOGF("    Ctx %d    I'm the last hop; waiting for a connection to initiator. Put
 	sinfo->set_my_name(listenCtxInfo->my_name());
 	sinfo->clear_my_addr();
 	ctx_to_session_info[new_ctx] = sinfo;
+LOG("here");
 
 	// allocate context info and a data queue for the new session context
 	session::ContextInfo *ctxInfo = new session::ContextInfo();
@@ -1427,39 +1457,37 @@ LOGF("    Ctx %d    I'm the last hop; waiting for a connection to initiator. Put
 	ctxInfo->set_my_name(listenCtxInfo->my_name());
 	ctx_to_ctx_info[new_ctx] = ctxInfo;
 	allocateDataQ(new_ctx);
+LOG("here");
 	
-#ifdef MULTIPLEX
-	// save  rx connection by name for others to use
-	string prevhop = get_prevhop_name(new_ctx);
-LOGF("    Got conn req from %s on context %d (sender ctx %d)", prevhop.c_str(), new_ctx, rpkt->sender_ctx());
-	session::ConnectionInfo *rx_cinfo = name_to_conn[prevhop];
-	rx_cinfo->add_sessions(new_ctx);
-	ctx_to_rxconn[new_ctx] = rx_cinfo; // TODO: set this in api call
-#else
+	// get the rx transport connection
 	if (rpkt->info().has_rx_cinfo()) {
 		session::ConnectionInfo *rx_cinfo;
 		memcpy(&rx_cinfo, rpkt->info().rx_cinfo().data(), sizeof(session::ConnectionInfo*));
 		ctx_to_rxconn[new_ctx] = rx_cinfo;
 		rx_cinfo->add_sessions(new_ctx);
+LOG("here");
 
+		// TODO: should this be only if multiplexing is off? I think it's OK as it is.
 		if (two_party) {  // this is the only case where we didn't set tx_cinfo above
 			tx_cinfo = rx_cinfo;
 			ctx_to_txconn[new_ctx] = tx_cinfo;
 			tx_cinfo->add_sessions(new_ctx);
 		}
+LOG("here");
 
 	} else {
-		ERROR("No multiplexing, but ConnReq wasn't tagged with incoming connection.");
+		ERROR("ConnReq wasn't tagged with incoming connection.");
 		rcm->set_message("No multiplexing, but ConnReq wasn't tagged with incoming connection.");
 		rcm->set_rc(session::FAILURE);
 		return -1;
 	}
-#endif /* MULTIPLEX */
 
+LOG("here");
 	
 	// store incoming ctx mapping
 	setLocalContextForIncomingContext(new_ctx, rpkt->sender_ctx(), ctx_to_rxconn[new_ctx]->sockfd());
 
+LOG("here");
 
 	// connect to next hop
 	session::SessionPacket pkt;
@@ -1468,6 +1496,7 @@ LOGF("    Got conn req from %s on context %d (sender ctx %d)", prevhop.c_str(), 
 	session::SessionInfo *newinfo = pkt.mutable_info();// TODO: better way?
 	infocpy(sinfo, newinfo);
 	
+LOG("here");
 
 		
 	// send session info to next hop
@@ -1477,6 +1506,7 @@ LOGF("    Got conn req from %s on context %d (sender ctx %d)", prevhop.c_str(), 
 		rcm->set_rc(session::FAILURE);
 		return -1;
 	}
+LOG("here");
 
 LOGF("    Ctx %d    Sent SessionInfo packet to next hop", new_ctx);
 
@@ -1832,7 +1862,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Initializes some mutexes
-	pthread_mutex_init(&name_to_conn_mutex, NULL);
+	pthread_mutex_init(&hid_to_conn_mutex, NULL);
 	pthread_mutex_init(&incomingctx_to_myctx_mutex, NULL);
 
 	listen();
