@@ -58,7 +58,7 @@ char *hostsLookup(const char *name) {
 
 	// look for an hosts_xia file locally
 	char buf[BUF_SIZE];
-	FILE *hostsfp = fopen(strcat(findRoot(buf, BUF_SIZE), ETC_HOSTS), "r");
+	FILE *hostsfp = fopen(strcat(XrootDir(buf, BUF_SIZE), ETC_HOSTS), "r");
 	int answer_found = 0;
 	if (hostsfp != NULL) {
 		while (fgets(line, 511, hostsfp) != NULL) {

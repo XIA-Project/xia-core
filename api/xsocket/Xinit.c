@@ -56,7 +56,7 @@ static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 		if (__XSocketConf::master_conf)
 			free(__XSocketConf::master_conf);
-		__XSocketConf::master_conf = strncat(findRoot(root, BUF_SIZE), "/etc/xsockconf.ini", BUF_SIZE);
+		__XSocketConf::master_conf = strncat(XrootDir(root, BUF_SIZE), "/etc/xsockconf.ini", BUF_SIZE);
         __InitXSocket::read_conf(filename, sectionname);
 		__XSocketConf::initialized=1;
 		pthread_mutex_unlock(&lock);
@@ -116,7 +116,7 @@ __InitXSocket::__InitXSocket()
 		free(__XSocketConf::master_conf);
 
 	char root[BUF_SIZE];
-	__XSocketConf::master_conf = strncat(findRoot(root, BUF_SIZE), "/etc/xsockconf.ini", BUF_SIZE);
+	__XSocketConf::master_conf = strncat(XrootDir(root, BUF_SIZE), "/etc/xsockconf.ini", BUF_SIZE);
 
 	if ((rc = readlink("/proc/self/exe", buf, sizeof(buf) - 1)) != -1) {
 		section_name = basename(buf);

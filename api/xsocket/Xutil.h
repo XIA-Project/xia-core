@@ -30,7 +30,6 @@
 #define LOGF(fmt, ...)
 #endif
 
-char *findRoot(char *buf, unsigned len);
 int click_send(int sockfd, xia::XSocketMsg *xsm);
 int click_reply(int sockfd, char *buf, int buflen);
 int click_reply2(int sockfd, xia::XSocketCallType *type);

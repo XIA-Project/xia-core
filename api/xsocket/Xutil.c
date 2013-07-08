@@ -33,7 +33,7 @@
 ** @returns a character pointer to the root of the source tree
 **
 */
-char *findRoot(char *buf, unsigned len) {
+char *XrootDir(char *buf, unsigned len) {
 	char *dir;
 	char *pos;
 
