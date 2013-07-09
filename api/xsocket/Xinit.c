@@ -54,9 +54,7 @@ static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 		char root[BUF_SIZE];
 
-		if (__XSocketConf::master_conf)
-			free(__XSocketConf::master_conf);
-		__XSocketConf::master_conf = strncat(XrootDir(root, BUF_SIZE), "/etc/xsockconf.ini", BUF_SIZE);
+		snprintf(__XSocketConf::master_conf, BUF_SIZE, "%s%s", XrootDir(root, BUF_SIZE), "/etc/xsockconf.ini");
         __InitXSocket::read_conf(filename, sectionname);
 		__XSocketConf::initialized=1;
 		pthread_mutex_unlock(&lock);
@@ -112,11 +110,8 @@ __InitXSocket::__InitXSocket()
 	char buf[PATH_MAX+1];
 	int rc;
 
-	if (__XSocketConf::master_conf)
-		free(__XSocketConf::master_conf);
-
 	char root[BUF_SIZE];
-	__XSocketConf::master_conf = strncat(XrootDir(root, BUF_SIZE), "/etc/xsockconf.ini", BUF_SIZE);
+	snprintf(__XSocketConf::master_conf, BUF_SIZE, "%s%s", XrootDir(root, BUF_SIZE), "/etc/xsockconf.ini");
 
 	if ((rc = readlink("/proc/self/exe", buf, sizeof(buf) - 1)) != -1) {
 		section_name = basename(buf);
@@ -181,5 +176,5 @@ void __InitXSocket::print_conf()
   printf("click_port %s\n", _conf.click_port);
 }
 int  __XSocketConf::initialized=0;
-char *__XSocketConf::master_conf=NULL;
+char __XSocketConf::master_conf[BUF_SIZE];
 
