@@ -45,7 +45,7 @@ export PYTHON_PATH=$XIADIR/api/lib
 
 is_running()
 {
-	RUNNING=`ps aux | grep $1` | grep -v grep
+	RUNNING=`ps aux | grep $1 | grep -v grep `
 	[ "$RUNNING" != "" ]
 }
 
