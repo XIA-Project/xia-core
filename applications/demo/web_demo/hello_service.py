@@ -14,7 +14,7 @@ from xia_address import *
 import random
 from c_xsocket import *
 
-set_conf("xsockconf_python.ini","hello_service.py")
+set_conf("xsockconf.ini","hello_service.py")
 print_conf()
 
 #while(True):
