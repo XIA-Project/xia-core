@@ -24,7 +24,8 @@ asm
 *.asm
 *.htmlTEMP
 xia.mk
-*/.DS_Store
+.DS_Store
+*.dSYM
 
 # ignore session layer files on this branch only
 api/session

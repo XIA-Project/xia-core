@@ -110,7 +110,8 @@ int main(int argc, char *argv[]) {
 	char pkt[XHCP_MAX_PACKET_SIZE];
 	char buffer[XHCP_MAX_PACKET_SIZE]; 	
 	string myAD(""), myGWRHID(""), myGWR4ID(""), myNS_DAG("");
-	string default_AD("AD:-"), default_HID("HID:-"), default_4ID("IP:-"), empty_str("HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+	string default_AD("AD:-"), default_HID("HID:-"), default_4ID("IP:-");
+	string empty_str("");
 	string AD, gwRHID, gwR4ID, nsDAG;
 	int beacon_reception_count=0;
 	int beacon_response_freq = ceil(XHCP_CLIENT_ADVERTISE_INTERVAL/XHCP_SERVER_BEACON_INTERVAL);	int first_beacon_reception = true;	
@@ -310,6 +311,9 @@ int main(int argc, char *argv[]) {
 			// update HID table (gateway router HID entry)
 			if ((rc = xr.setRoute(gwRHID, 0, gwRHID, 0xffff)) != 0)
 				syslog(LOG_WARNING, "error setting route %d\n", rc);
+				
+			if ((rc = xr.setRoute(default_HID, 0, gwRHID, 0xffff)) != 0)
+				printf("error setting route %d\n", rc);
 				
 			myGWRHID = gwRHID;
 		}

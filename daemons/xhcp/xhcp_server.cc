@@ -87,7 +87,6 @@ int main(int argc, char *argv[]) {
 	}
 
 	// dag init
-//	sprintf(ddag, "RE %s %s", BHID, SID_XHCP);
 	Graph g = Node() * Node(BHID) * Node(SID_XHCP);
 	g.fill_sockaddr(&ddag);
 
@@ -98,8 +97,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	// set the default name server DAG
-	char ns[512];
-	sprintf(ns, "RE ( %s ) %s %s %s", IP_NS, AD0, HID0, SID_NS);
+	char ns[XHCP_MAX_DAG_LENGTH];
+	sprintf(ns, "RE  %s %s %s", AD0, HID0, SID_NS);
 
 	// read the name server DAG from xia-core/etc/resolv.conf, if present
 	char root[BUF_SIZE];

@@ -19,6 +19,7 @@
  @brief Implements XgetDAGbyName(), XregisterName(), Xgetpeername() and Xgetsockname()
 */
 #include <errno.h>
+ #include <unistd.h>
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"

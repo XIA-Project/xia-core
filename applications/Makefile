@@ -4,6 +4,7 @@ all:
 	make -C tinyhttpd
 	make -C example
 	make -C demo
+	make -C irc
 
 static: all
 
@@ -13,4 +14,5 @@ clean:
 	make -C tinyhttpd clean
 	make -C example clean
 	make -C demo clean
+	make -C irc clean
 
