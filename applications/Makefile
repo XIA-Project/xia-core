@@ -1,4 +1,5 @@
 all:
+	make -C xnetcat
 	make -C xping
 	make -C xtraceroute
 	make -C tinyhttpd
@@ -9,10 +10,10 @@ all:
 static: all
 
 clean:
+	make -C xnetcat clean
 	make -C xping clean
 	make -C xtraceroute clean
 	make -C tinyhttpd clean
 	make -C example clean
 	make -C demo clean
 	make -C irc clean
-

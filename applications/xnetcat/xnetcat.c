@@ -53,7 +53,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <limits.h>
-#include "atomicio.h"
+
+#include "Xsocket.h"
+#include "dagaddr.hpp"
 
 #ifndef SUN_LEN
 #define SUN_LEN(su) \
@@ -63,6 +65,8 @@
 #define PORT_MAX	65535
 #define PORT_MAX_LEN	6
 #define UNIX_DG_TMP_SOCKET_SIZE	19
+
+#define vwrite (ssize_t (*)(int, void *, size_t))write
 
 /* Command Line Options */
 int	dflag;					/* detached, no stdin */
@@ -93,7 +97,7 @@ char *portlist[PORT_MAX+1];
 char *unix_dg_tmp_socket;
 
 void	atelnet(int, unsigned char *, unsigned int);
-void	build_ports(char *);
+//void	build_ports(char *);
 void	help(void);
 int	local_listen(char *, char *, struct addrinfo);
 void	readwrite(int);
@@ -102,31 +106,37 @@ int	timeout_connect(int, const struct sockaddr *, socklen_t);
 int	socks_connect(const char *, const char *, struct addrinfo,
 	    const char *, const char *, struct addrinfo, int, const char *);
 int	udptest(int);
-int	unix_bind(char *);
-int	unix_connect(char *);
-int	unix_listen(char *);
+//int	unix_bind(char *);
+//int	unix_connect(char *);
+//int	unix_listen(char *);
 void	set_common_sockopts(int);
 int	map_tos(char *, int *);
 void	report_connect(const struct sockaddr *, socklen_t);
 void	usage(int);
 
+/*
+ * Ensure all of data on socket comes through. f==read || f==vwrite
+ */
+size_t	atomicio(ssize_t (*)(int, void *, size_t), int, void *, size_t);
+
 int
 main(int argc, char *argv[])
 {
-	int ch, s, ret, socksv;
+	//int ch, s, ret, socksv;
+	int ch, s, ret;
 	char *host, *uport;
 	struct addrinfo hints;
 	struct servent *sv;
 	socklen_t len;
 	struct sockaddr_storage cliaddr;
 	char *proxy;
-	const char *errstr, *proxyhost = "", *proxyport = NULL;
-	struct addrinfo proxyhints;
-	char unix_dg_tmp_socket_buf[UNIX_DG_TMP_SOCKET_SIZE];
+	//const char *errstr, *proxyhost = "", *proxyport = NULL;
+	//struct addrinfo proxyhints;
+	//char unix_dg_tmp_socket_buf[UNIX_DG_TMP_SOCKET_SIZE];
 
 	ret = 1;
 	s = 0;
-	socksv = 5;
+	//socksv = 5;
 	host = NULL;
 	uport = NULL;
 	sv = NULL;
@@ -143,27 +153,27 @@ main(int argc, char *argv[])
 		case 'U':
 			family = AF_UNIX;
 			break;
-		case 'X':
+		/*case 'X':
 			if (strcasecmp(optarg, "connect") == 0)
-				socksv = -1; /* HTTP proxy CONNECT */
+				socksv = -1; // HTTP proxy CONNECT
 			else if (strcmp(optarg, "4") == 0)
-				socksv = 4; /* SOCKS v.4 */
+				socksv = 4; // SOCKS v.4
 			else if (strcmp(optarg, "5") == 0)
-				socksv = 5; /* SOCKS v.5 */
+				socksv = 5; // SOCKS v.5
 			else
 				errx(1, "unsupported proxy protocol");
-			break;
+			break;*/
 		case 'd':
 			dflag = 1;
 			break;
 		case 'h':
 			help();
 			break;
-		case 'i':
+		/*case 'i':
 			iflag = strtonum(optarg, 0, UINT_MAX, &errstr);
 			if (errstr)
 				errx(1, "interval %s: %s", errstr, optarg);
-			break;
+			break;*/
 		case 'k':
 			kflag = 1;
 			break;
@@ -194,21 +204,21 @@ main(int argc, char *argv[])
 		case 'u':
 			uflag = 1;
 			break;
-		case 'V':
+		/*case 'V':
 			rtableid = (unsigned int)strtonum(optarg, 0,
 			    RT_TABLEID_MAX, &errstr);
 			if (errstr)
 				errx(1, "rtable %s: %s", errstr, optarg);
-			break;
+			break;*/
 		case 'v':
 			vflag = 1;
 			break;
-		case 'w':
+		/*case 'w':
 			timeout = strtonum(optarg, 0, INT_MAX / 1000, &errstr);
 			if (errstr)
 				errx(1, "timeout %s: %s", errstr, optarg);
 			timeout *= 1000;
-			break;
+			break;*/
 		case 'x':
 			xflag = 1;
 			if ((proxy = strdup(optarg)) == NULL)
@@ -220,22 +230,22 @@ main(int argc, char *argv[])
 		case 'D':
 			Dflag = 1;
 			break;
-		case 'I':
+		/*case 'I':
 			Iflag = strtonum(optarg, 1, 65536 << 14, &errstr);
 			if (errstr != NULL)
 				errx(1, "TCP receive window %s: %s",
 				    errstr, optarg);
-			break;
-		case 'O':
+			break;*/
+		/*case 'O':
 			Oflag = strtonum(optarg, 1, 65536 << 14, &errstr);
 			if (errstr != NULL)
 				errx(1, "TCP send window %s: %s",
 				    errstr, optarg);
-			break;
+			break;*/
 		case 'S':
 			Sflag = 1;
 			break;
-		case 'T':
+		/*case 'T':
 			errstr = NULL;
 			errno = 0;
 			if (map_tos(optarg, &Tflag))
@@ -248,7 +258,7 @@ main(int argc, char *argv[])
 				    &errstr);
 			if (Tflag < 0 || Tflag > 255 || errstr || errno)
 				errx(1, "illegal tos value %s", optarg);
-			break;
+			break;*/
 		default:
 			usage(1);
 		}
@@ -281,7 +291,7 @@ main(int argc, char *argv[])
 		errx(1, "must use -l with -k");
 
 	/* Get name of temporary socket for unix datagram client */
-	if ((family == AF_UNIX) && uflag && !lflag) {
+	/*if ((family == AF_UNIX) && uflag && !lflag) {
 		if (sflag) {
 			unix_dg_tmp_socket = sflag;
 		} else {
@@ -291,7 +301,7 @@ main(int argc, char *argv[])
 				err(1, "mktemp");
 			unix_dg_tmp_socket = unix_dg_tmp_socket_buf;
 		}
-	}
+	}*/
 
 	/* Initialize addrinfo structure. */
 	if (family != AF_UNIX) {
@@ -320,7 +330,7 @@ main(int argc, char *argv[])
 		if (sflag)
 			errx(1, "no proxy support for local source address");
 
-		proxyhost = strsep(&proxy, ":");
+		/*proxyhost = strsep(&proxy, ":");
 		proxyport = proxy;
 
 		memset(&proxyhints, 0, sizeof(struct addrinfo));
@@ -328,19 +338,19 @@ main(int argc, char *argv[])
 		proxyhints.ai_socktype = SOCK_STREAM;
 		proxyhints.ai_protocol = IPPROTO_TCP;
 		if (nflag)
-			proxyhints.ai_flags |= AI_NUMERICHOST;
+			proxyhints.ai_flags |= AI_NUMERICHOST;*/
 	}
 
 	if (lflag) {
 		int connfd;
 		ret = 0;
 
-		if (family == AF_UNIX) {
+		/*if (family == AF_UNIX) {
 			if (uflag)
 				s = unix_bind(host);
 			else
 				s = unix_listen(host);
-		}
+		}*/
 
 		/* Allow only one connection at a time, but stay alive. */
 		for (;;) {
@@ -404,7 +414,7 @@ main(int argc, char *argv[])
 			if (!kflag)
 				break;
 		}
-	} else if (family == AF_UNIX) {
+	/*} *else if (family == AF_UNIX) {
 		ret = 0;
 
 		if ((s = unix_connect(host)) > 0 && !zflag) {
@@ -415,24 +425,24 @@ main(int argc, char *argv[])
 
 		if (uflag)
 			unlink(unix_dg_tmp_socket);
-		exit(ret);
+		exit(ret);*/
 
 	} else {
 		int i = 0;
 
 		/* Construct the portlist[] array. */
-		build_ports(uport);
+		//build_ports(uport);
 
 		/* Cycle through portlist, connecting to each port. */
 		for (i = 0; portlist[i] != NULL; i++) {
 			if (s)
 				close(s);
 
-			if (xflag)
+			/*if (xflag)
 				s = socks_connect(host, portlist[i], hints,
 				    proxyhost, proxyport, proxyhints, socksv,
 				    Pflag);
-			else
+			else*/
 				s = remote_connect(host, portlist[i], hints);
 
 			if (s < 0)
@@ -478,13 +488,13 @@ main(int argc, char *argv[])
  * unix_bind()
  * Returns a unix socket bound to the given path
  */
-int
+/*int
 unix_bind(char *path)
 {
 	struct sockaddr_un sun;
 	int s;
 
-	/* Create unix domain socket. */
+	// Create unix domain socket. 
 	if ((s = socket(AF_UNIX, uflag ? SOCK_DGRAM : SOCK_STREAM,
 	     0)) < 0)
 		return (-1);
@@ -504,13 +514,13 @@ unix_bind(char *path)
 		return (-1);
 	}
 	return (s);
-}
+}*/
 
 /*
  * unix_connect()
  * Returns a socket connected to a local unix socket. Returns -1 on failure.
  */
-int
+/*int
 unix_connect(char *path)
 {
 	struct sockaddr_un sun;
@@ -540,13 +550,13 @@ unix_connect(char *path)
 	}
 	return (s);
 
-}
+}*/
 
 /*
  * unix_listen()
  * Create a unix domain socket, and listen on it.
  */
-int
+/*int
 unix_listen(char *path)
 {
 	int s;
@@ -558,7 +568,7 @@ unix_listen(char *path)
 		return (-1);
 	}
 	return (s);
-}
+}*/
 
 /*
  * remote_connect()
@@ -569,7 +579,8 @@ int
 remote_connect(const char *host, const char *port, struct addrinfo hints)
 {
 	struct addrinfo *res, *res0;
-	int s, error, on = 1;
+	//int s, error, on = 1;
+	int s, error;
 
 	if ((error = getaddrinfo(host, port, &hints, &res)))
 		errx(1, "getaddrinfo: %s", gai_strerror(error));
@@ -580,18 +591,18 @@ remote_connect(const char *host, const char *port, struct addrinfo hints)
 		    res0->ai_protocol)) < 0)
 			continue;
 
-		if (rtableid) {
+		/*if (rtableid) {
 			if (setsockopt(s, SOL_SOCKET, SO_RTABLE, &rtableid,
 			    sizeof(rtableid)) == -1)
 				err(1, "setsockopt SO_RTABLE");
-		}
+		}*/
 
 		/* Bind to a local port or source address if specified. */
 		if (sflag || pflag) {
 			struct addrinfo ahints, *ares;
 
 			/* try SO_BINDANY, but don't insist */
-			setsockopt(s, SOL_SOCKET, SO_BINDANY, &on, sizeof(on));
+			//setsockopt(s, SOL_SOCKET, SO_BINDANY, &on, sizeof(on));
 			memset(&ahints, 0, sizeof(struct addrinfo));
 			ahints.ai_family = res0->ai_family;
 			ahints.ai_socktype = uflag ? SOCK_DGRAM : SOCK_STREAM;
@@ -628,7 +639,7 @@ timeout_connect(int s, const struct sockaddr *name, socklen_t namelen)
 {
 	struct pollfd pfd;
 	socklen_t optlen;
-	int flags, optval;
+	int flags = 0, optval;
 	int ret;
 
 	if (timeout != -1) {
@@ -669,7 +680,8 @@ int
 local_listen(char *host, char *port, struct addrinfo hints)
 {
 	struct addrinfo *res, *res0;
-	int s, ret, x = 1;
+	//int s, ret, x = 1;
+	int s;
 	int error;
 
 	/* Allow nodename to be null. */
@@ -691,15 +703,15 @@ local_listen(char *host, char *port, struct addrinfo hints)
 		    res0->ai_protocol)) < 0)
 			continue;
 
-		if (rtableid) {
+		/*if (rtableid) {
 			if (setsockopt(s, IPPROTO_IP, SO_RTABLE, &rtableid,
 			    sizeof(rtableid)) == -1)
 				err(1, "setsockopt SO_RTABLE");
-		}
+		}*/
 
-		ret = setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &x, sizeof(x));
+		/*ret = setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &x, sizeof(x));
 		if (ret == -1)
-			err(1, NULL);
+			err(1, NULL);*/
 
 		set_common_sockopts(s);
 
@@ -766,7 +778,7 @@ readwrite(int nfd)
 			} else {
 				if (tflag)
 					atelnet(nfd, buf, n);
-				if (atomicio(vwrite, lfd, buf, n) != n)
+				if (atomicio(vwrite, lfd, buf, n) != (size_t)n)
 					return;
 			}
 		}
@@ -780,7 +792,7 @@ readwrite(int nfd)
 				pfd[1].fd = -1;
 				pfd[1].events = 0;
 			} else {
-				if (atomicio(vwrite, nfd, buf, n) != n)
+				if (atomicio(vwrite, nfd, buf, n) != (size_t)n)
 					return;
 			}
 		}
@@ -823,7 +835,7 @@ atelnet(int nfd, unsigned char *buf, unsigned int size)
  * Build an array of ports in portlist[], listing each port
  * that we should try to connect to.
  */
-void
+/*void
 build_ports(char *p)
 {
 	const char *errstr;
@@ -835,8 +847,8 @@ build_ports(char *p)
 		*n = '\0';
 		n++;
 
-		/* Make sure the ports are in order: lowest->highest. */
-		hi = strtonum(n, 1, PORT_MAX, &errstr);
+		// Make sure the ports are in order: lowest->highest.
+        hi = strtonum(n, 1, PORT_MAX, &errstr);
 		if (errstr)
 			errx(1, "port number %s: %s", errstr, n);
 		lo = strtonum(p, 1, PORT_MAX, &errstr);
@@ -849,7 +861,7 @@ build_ports(char *p)
 			lo = cp;
 		}
 
-		/* Load ports sequentially. */
+		// Load ports sequentially.
 		for (cp = lo; cp <= hi; cp++) {
 			portlist[x] = calloc(1, PORT_MAX_LEN);
 			if (portlist[x] == NULL)
@@ -858,7 +870,7 @@ build_ports(char *p)
 			x++;
 		}
 
-		/* Randomly swap ports. */
+		// Randomly swap ports.
 		if (rflag) {
 			int y;
 			char *c;
@@ -871,14 +883,14 @@ build_ports(char *p)
 			}
 		}
 	} else {
-		hi = strtonum(p, 1, PORT_MAX, &errstr);
+		//hi = strtonum(p, 1, PORT_MAX, &errstr);
 		if (errstr)
 			errx(1, "port number %s: %s", errstr, p);
 		portlist[0] = strdup(p);
 		if (portlist[0] == NULL)
 			err(1, NULL);
 	}
-}
+}*/
 
 /*
  * udptest()
@@ -931,10 +943,10 @@ set_common_sockopts(int s)
 	}
 }
 
-int
+/*int
 map_tos(char *s, int *val)
 {
-	/* DiffServ Codepoints and other TOS mappings */
+	// DiffServ Codepoints and other TOS mappings
 	const struct toskeywords {
 		const char	*keyword;
 		int		 val;
@@ -977,7 +989,7 @@ map_tos(char *s, int *val)
 	}
 
 	return (0);
-}
+}*/
 
 void
 report_connect(const struct sockaddr *sa, socklen_t salen)
@@ -1051,4 +1063,38 @@ usage(int ret)
 	    "\t  [-x proxy_address[:port]] [destination] [port]\n");
 	if (ret)
 		exit(1);
+}
+
+/*
+ * ensure all of data on socket comes through. f==read || f==vwrite
+ */
+size_t
+atomicio(ssize_t (*f) (int, void *, size_t), int fd, void *_s, size_t n)
+{
+	char *s = (char *)_s;
+	size_t pos = 0;
+	ssize_t res;
+	struct pollfd pfd;
+
+	pfd.fd = fd;
+	pfd.events = f == read ? POLLIN : POLLOUT;
+	while (n > pos) {
+		res = (f) (fd, s + pos, n - pos);
+		switch (res) {
+		case -1:
+			if (errno == EINTR)
+				continue;
+			if ((errno == EAGAIN) || (errno == ENOBUFS)) {
+				(void)poll(&pfd, 1, -1);
+				continue;
+			}
+			return 0;
+		case 0:
+			errno = EPIPE;
+			return pos;
+		default:
+			pos += (size_t)res;
+		}
+	}
+	return (pos);
 }
