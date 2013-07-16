@@ -2,6 +2,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <libgen.h>
 #include <syslog.h>
 #include <arpa/inet.h>
 #include <string>
