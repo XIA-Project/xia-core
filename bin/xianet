@@ -192,7 +192,7 @@ start_daemons()
 			./xrouted -h "$HOSTNAME"_router $LOG_FLAGS &
 			sleep 2
 
-			./xhcp_serverd "$HOSTNAME"_router &
+			./xhcp_serverd -h "$HOSTNAME"_router &
 			sleep 1
 
 			./xhcp_clientd -h "$HOSTNAME"_host $LOG_FLAGS &
