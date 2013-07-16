@@ -6,7 +6,7 @@ XSOCK_LIB=$(XLIB)/libXsocket.so $(XLIB)/libdagaddr.so
 TARGET=$(XLIB)/_c_xsocket.so
 CC=g++
 LDFLAGS +=-lc -ldl `python-config --ldflags`
-PYTHON=`python-config --include`
+PYTHON=`python-config --includes`
 
 all: $(TARGET) $(XLIB)/xsocket.py
 
