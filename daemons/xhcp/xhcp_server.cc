@@ -3,6 +3,7 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <libgen.h>
 #include <syslog.h>
 
 #include "minIni.h"
@@ -98,10 +99,11 @@ int main(int argc, char *argv[]) {
 
 	// set the default name server DAG
 	char ns[XHCP_MAX_DAG_LENGTH];
-	sprintf(ns, "RE  %s %s %s", AD0, HID0, SID_NS);
+	sprintf(ns, "RE %s %s %s", AD0, HID0, SID_NS);
 
 	// read the name server DAG from xia-core/etc/resolv.conf, if present
 	char root[BUF_SIZE];
+	memset(root, 0, BUF_SIZE);
 	ini_gets(NULL, "nameserver", ns, ns, XHCP_MAX_DAG_LENGTH, strcat(XrootDir(root, BUF_SIZE), RESOLV_CONF));
 
 	Graph gns(ns);
