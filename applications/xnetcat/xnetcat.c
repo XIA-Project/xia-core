@@ -31,6 +31,8 @@
  * *Hobbit* <hobbit@avian.org>.
  */
 
+/* Rewritten for XIA */
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -40,7 +42,6 @@
 #include <netinet/in_systm.h>
 #include <netinet/tcp.h>
 #include <netinet/ip.h>
-#include <arpa/telnet.h>
 
 #include <err.h>
 #include <errno.h>
@@ -57,172 +58,120 @@
 #include "Xsocket.h"
 #include "dagaddr.hpp"
 
-#define SID0 "SID:0f00000000000000000000000000000123456789"
-#define SNAME "tod_s.testbed.xia"
-
-#define PORT_MAX	65535
-#define PORT_MAX_LEN	6
+#define DEFAULT_SID  "SID:ffff000000000000000000000000000123456789"
+#define DEFAULT_NAME "xnc_s.testbed.xia"
 
 #define vwrite (ssize_t (*)(int, void *, size_t))write
 
 /* Command Line Options */
-int	dflag;					/* detached, no stdin */
-unsigned int iflag;				/* Interval Flag */
-int	kflag;					/* More than one connect */
-int	lflag;					/* Bind to local port */
-int	Nflag;					/* shutdown() network socket */
-int	nflag;					/* Don't do name look up */
-char   *pflag;					/* Localport flag */
-int	rflag;					/* Random ports flag */
-char   *sflag;					/* Source Address */
-int	uflag;					/* UDP - Default to TCP */
-int	vflag;					/* Verbosity */
-int	zflag;					/* Port Scan Flag */
-int	Dflag;					/* sodebug */
-int	Iflag;					/* TCP receive buffer size */
-int	Oflag;					/* TCP send buffer size */
-int	Sflag;					/* TCP MD5 signature option */
-u_int	rtableid;
-
-int timeout = -1;
-int family = AF_UNSPEC;
-char *portlist[PORT_MAX+1];
+int	dflag = 0;					/* detached, no stdin */
+int	hflag = 0;					/* detached, no stdin */
+int	Iflag = 0;					/* TCP receive buffer size */
+int iflag = 0;				/* Interval Flag */
+int	kflag = 0;					/* More than one connect */
+int	lflag = 0;					/* Bind to local port */
+int	nflag = 0;					/* Don't do name look up */
+int	Oflag = 0;					/* TCP send buffer size */
+int	qflag = 0;					/* Don't do name look up */
+int	uflag = 0;					/* UDP - Default to TCP */
+int	vflag = 0;					/* Verbosity */
+int	wflag = 0;					/* Verbosity */
 
 void	help(void);
 int	local_listen(const char *, const char *, int transport_type);
-void	readwrite(int, sockaddr_x *);
-int	remote_connect(const char *, sockaddr_x *);
+void	readwrite(int, sockaddr_x *, int transport_type);
+int	remote_connect(const char *, sockaddr_x *, int transport_type);
 int	udptest(int);
 void	report_connect(const struct sockaddr *, socklen_t);
 void	usage(int);
-
-/*
- * Ensure all of data on socket comes through. f==read || f==vwrite
- */
 size_t	atomicio(ssize_t (*)(int, void *, size_t), int, void *, size_t);
+
+    int timeout = -1;
 
 int
 main(int argc, char *argv[])
 {
-	int ch, s, ret;
-	const char *host, *name;
+	int ch, ret = 1;
+	const char *host = NULL, *name = NULL;
     int transport_type = SOCK_DGRAM;
+    int sock = 0;
 
-	ret = 1;
-	s = 0;
-	host = NULL;
+    int buf_size = 0;
 
-	while ((ch = getopt(argc, argv,
-	    "46DdhI:i:klNnO:P:p:rSs:tT:UuV:vw:X:x:z")) != -1) {
-		switch (ch) {
-		case 'd':
-			dflag = 1;
-			break;
-		case 'h':
-			help();
-			break;
-		/*case 'i':
-			iflag = strtonum(optarg, 0, UINT_MAX, &errstr);
-			if (errstr)
-				errx(1, "interval %s: %s", errstr, optarg);
-			break;*/
-		case 'k':
-			kflag = 1;
-			break;
-		case 'l':
-			lflag = 1;
-			break;
-		case 'N':
-			Nflag = 1;
-			break;
-		case 'n':
-			nflag = 1;
-			break;
-		case 'p':
-			pflag = optarg;
-			break;
-		case 'r':
-			rflag = 1;
-			break;
-		case 's':
-			sflag = optarg;
-			break;
-		case 'u':
-			uflag = 1;
-			break;
-		/*case 'V':
-			rtableid = (unsigned int)strtonum(optarg, 0,
-			    RT_TABLEID_MAX, &errstr);
-			if (errstr)
-				errx(1, "rtable %s: %s", errstr, optarg);
-			break;*/
-		case 'v':
-			vflag = 1;
-			break;
-		/*case 'w':
-			timeout = strtonum(optarg, 0, INT_MAX / 1000, &errstr);
-			if (errstr)
-				errx(1, "timeout %s: %s", errstr, optarg);
-			timeout *= 1000;
-			break;*/
-		case 'z':
-			zflag = 1;
-			break;
-		case 'D':
-			Dflag = 1;
-			break;
-		/*case 'I':
-			Iflag = strtonum(optarg, 1, 65536 << 14, &errstr);
-			if (errstr != NULL)
-				errx(1, "TCP receive window %s: %s",
-				    errstr, optarg);
-			break;*/
-		/*case 'O':
-			Oflag = strtonum(optarg, 1, 65536 << 14, &errstr);
-			if (errstr != NULL)
-				errx(1, "TCP send window %s: %s",
-				    errstr, optarg);
-			break;*/
-		case 'S':
-			Sflag = 1;
-			break;
-		default:
-			usage(1);
-            break;
+	while ((ch = getopt(argc, argv, "dhI:i:klnO:q:uvw:")) >= 0)
+    {
+		switch (ch)
+        {
+            case 'd':
+                dflag = 1;
+                break;
+            case 'h':
+                hflag = 1;
+                help();
+                break;
+            case 'I':
+                Iflag = 1;
+                //Iflag = strtonum(optarg, 1, 65536 << 14, &errstr);
+                //if (errstr != NULL)
+                    //errx(1, "TCP receive window %s: %s",
+                        //errstr, optarg);
+                break;
+            case 'i':
+                iflag = 1;
+                //iflag = strtonum(optarg, 0, UINT_MAX, &errstr);
+                //if (errstr)
+                    //errx(1, "interval %s: %s", errstr, optarg);
+                break;
+            case 'k':
+                kflag = 1;
+                break;
+            case 'l':
+                lflag = 1;
+                break;
+            case 'n':
+                nflag = 1;
+                break;
+            case 'O':
+                Oflag = 1;
+                //Oflag = strtonum(optarg, 1, 65536 << 14, &errstr);
+                //if (errstr != NULL)
+                    //errx(1, "TCP send window %s: %s",
+                        //errstr, optarg);
+                break;
+            case 'q':
+                qflag = 1;
+                break;
+            case 'u':
+                uflag = 1;
+                break;
+            case 'v':
+                vflag = 1;
+                break;
+            case 'w':
+                wflag = 1;
+                //timeout = strtonum(optarg, 0, INT_MAX / 1000, &errstr);
+                //if (errstr)
+                    //errx(1, "timeout %s: %s", errstr, optarg);
+                //timeout *= 1000;
+                break;
+            default:
+                usage(1);
+                break;
 		}
 	}
 	argc -= optind;
 	argv += optind;
 
 	/* Cruft to make sure options are clean, and used properly. */
-	if (argv[0] && !argv[1]) {
-		if  (!lflag)
-			usage(1);
-		host = NULL;
-	} else if (argv[0] && argv[1]) {
+	if (argv[0])
 		host = argv[0];
-	} else
+	else
 		usage(1);
 
-	if (lflag && sflag)
-		errx(1, "cannot use -s and -l");
-	if (lflag && pflag)
-		errx(1, "cannot use -p and -l");
-	if (lflag && zflag)
-		errx(1, "cannot use -z and -l");
 	if (!lflag && kflag)
 		errx(1, "must use -l with -k");
 
-	/* Initialize addrinfo structure. */
-    /*
-	if (family != AF_UNIX) {
-		memset(&hints, 0, sizeof(struct addrinfo));
-		hints.ai_family = family;
-		hints.ai_socktype = uflag ? SOCK_DGRAM : SOCK_STREAM;
-		hints.ai_protocol = uflag ? IPPROTO_UDP : IPPROTO_TCP;
-		if (nflag)
-			hints.ai_flags |= AI_NUMERICHOST;
-	}*/
+    transport_type = uflag ? SOCK_DGRAM : SOCK_STREAM;
 
 	if (lflag) {
 		ret = 0;
@@ -231,10 +180,9 @@ main(int argc, char *argv[])
 
 		/* Allow only one connection at a time, but stay alive. */
 		for (;;) {
-            name = SID0;
-            host = SNAME;
-            s = local_listen(name, host, transport_type);
-			if (s < 0)
+            name = DEFAULT_SID;
+            sock = local_listen(name, host, transport_type);
+			if (sock < 0)
 				err(1, NULL);
 			/*
 			 * For UDP and -k, don't connect the socket, let it
@@ -242,8 +190,8 @@ main(int argc, char *argv[])
 			 */
 			if (uflag && kflag)
             {
-                printf("UDP\n");
-				readwrite(s, NULL);
+                printf("XDP\n");
+				readwrite(sock, NULL, transport_type);
             }
 			/*
 			 * For UDP and not -k, we will use recvfrom() initially
@@ -251,35 +199,30 @@ main(int argc, char *argv[])
 			 * to talk to the caller.
 			 */
 			else if (uflag && !kflag) {
-                printf("UDP\n");
+                printf("XDP\n");
 
-				readwrite(s, NULL);
+				readwrite(sock, NULL, transport_type);
 
 			} else {
 
-                printf("TCP\n");
+                printf("XSP\n");
 
-                /*
+                int s2;
 
-				len = sizeof(cliaddr);
-				connfd = accept(s, (struct sockaddr *)&cliaddr,
-				    &len);
-				if (connfd == -1) {
-					// For now, all errnos are fatal
-   					err(1, "accept");
-				}
-				if (vflag)
-					report_connect((struct sockaddr *)&cliaddr, len);
+                if ((s2 = Xaccept(sock, NULL, 0)) < 0) {
+                    printf("could not accept XSP connection");
+                    exit(1);
+                }
 
-				readwrite(connfd);
-				close(connfd);
-                */
+                Xclose(sock);
+
+				readwrite(s2, NULL, transport_type);
 			}
 
-			if (family != AF_UNIX)
-				Xclose(s);
-			else if (uflag) {
-				if (connect(s, NULL, 0) < 0)
+            Xclose(sock);
+
+			if (uflag) {
+				if (connect(sock, NULL, 0) < 0)
 					err(1, "connect");
 			}
 
@@ -288,17 +231,22 @@ main(int argc, char *argv[])
 		}
 	} else {
         printf("Connecting as client\n");
-        printf("UDP\n");
+        transport_type == SOCK_DGRAM ? printf("XDP\n") :  printf("XSP\n");
 
         sockaddr_x client;
 
-        s = remote_connect(SNAME, &client);
+        sock = remote_connect(host, &client, transport_type);
+        if (sock <0)
+        {
+            printf("remote connection failed\n");
+            exit(1);
+        }
 
-        readwrite(s, &client);
+        readwrite(sock, &client, transport_type);
 	}
 
-	if (s)
-		Xclose(s);
+	if (sock)
+		Xclose(sock);
 
 	exit(ret);
 }
@@ -309,21 +257,30 @@ main(int argc, char *argv[])
  * port or source address if needed. Returns -1 on failure.
  */
 int
-remote_connect(const char *host, sockaddr_x *client)
+remote_connect(const char *host, sockaddr_x *client, int transport_type)
 {
     int sock;
     socklen_t len;
 
     // create a datagram socket
-    if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0) {
+    if ((sock = Xsocket(AF_XIA, transport_type, 0)) < 0) {
         printf("error: unable to create the listening socket.\n");
         return -1;
     }
 
     len = sizeof(*client);
     if (XgetDAGbyName(host, client, &len) < 0) {
-        printf("unable to locate: %s\n", SNAME);
+        printf("unable to locate: %s\n", host);
         return -1;
+    }
+
+    if (transport_type == SOCK_STREAM)
+    {
+        if (Xconnect(sock, (struct sockaddr*)client, len) < 0)
+        {
+            printf("connection failed\n");
+            exit(1);
+        }
     }
 
 	return (sock);
@@ -363,7 +320,7 @@ local_listen(const char *sid, const char *host, int transport_type)
     // bind to the DAG
     if (Xbind(sock, (struct sockaddr*)sa, sizeof(sockaddr_x)) < 0) {
 		Xclose(sock);
-		printf("error: unable to bind to %s\n", SNAME);
+		printf("error: unable to bind to %s\n", host);
 		exit(1);
 	}
 
@@ -375,7 +332,7 @@ local_listen(const char *sid, const char *host, int transport_type)
  * Loop that polls on the network file descriptor and stdin.
  */
 void
-readwrite(int nfd, sockaddr_x *c2)
+readwrite(int nfd, sockaddr_x *c2, int transport_type)
 {
 	struct pollfd pfd[2];
 	int n, wfd = fileno(stdin);
@@ -417,7 +374,16 @@ readwrite(int nfd, sockaddr_x *c2)
 		if (pfd[0].revents & POLLIN) {
             len = sizeof(client);
 
-            if ((n = Xrecvfrom(sock, buf, sizeof(buf), 0, (struct sockaddr*)&client, &len)) < 0) {
+            if (transport_type == SOCK_DGRAM)
+            {
+                n = Xrecvfrom(sock, buf, sizeof(buf), 0, (struct sockaddr*)&client, &len);
+            }
+            else
+            {
+                n = Xrecv(sock, buf, sizeof(buf), 0);
+            }
+
+            if (n < 0) {
                 printf("error receiving client request\n");
                 // assume it's ok, and just keep listening
                 //return;
@@ -437,16 +403,26 @@ readwrite(int nfd, sockaddr_x *c2)
 			if ((n = read(wfd, buf, plen)) < 0)
 				return;
 			else if (n == 0) {
-				if (Nflag)
-					shutdown(nfd, SHUT_WR);
 				pfd[1].fd = -1;
 				pfd[1].events = 0;
 			} else {
-                if (Xsendto(sock, buf, n, 0, (struct sockaddr*)&client, sizeof(client)) < 0)
+                if (transport_type == SOCK_DGRAM)
                 {
-                    printf("error sending time to the client\n");
-                    return;
+                    if (Xsendto(sock, buf, n, 0, (struct sockaddr*)&client, sizeof(client)) < 0)
+                    {
+                        printf("error sending time to the client\n");
+                        return;
+                    }
                 }
+                else
+                {
+                    if (Xsend(sock, buf, n, 0) < 0)
+                    {
+                        printf("error sending time to the client\n");
+                        return;
+                    }
+                }
+
 			}
 		}
 	}
