@@ -37,8 +37,24 @@ LOCAL_SRC_FILES :=  \
 ../../lib/notifier.cc \
 ../../lib/element.cc \
 ../../lib/lexer.cc \
+../../lib/packet.cc \
+../../lib/routerthread.cc \
+../../lib/bighashmap_arena.cc \
 ../../elements/standard/addressinfo.cc \
 ../../elements/standard/xiaxidinfo.cc \
+../../tools/lib/elementt.cc \
+../../tools/lib/eclasst.cc \
+../../tools/lib/routert.cc \
+../../tools/lib/runparse.cc \
+../../tools/lib/landmarkt.cc \
+../../tools/lib/lexert.cc \
+../../tools/lib/lexertinfo.cc \
+../../tools/lib/processingt.cc \
+../../tools/lib/etraits.cc \
+../../tools/lib/elementmap.cc \
+../../tools/lib/toolutils.cc \
+alignclass.cc \
+alignment.cc \
 click-align.cc
 
 LOCAL_CPP_EXTENSION := .c .cc
@@ -49,7 +65,8 @@ LOCAL_SHARED_LIBRARIES := \
 libdagaddr libprotobuf libz libcutils libutils libpthread
 LOCAL_LDLIBS := -lz -lm
 
-LOCAL_CPPFLAGS := -D__MTCLICK__ -DCLICK_USERLEVEL -DHAVE_USER_MULTITHREAD -Wno-psabi -L$(LOCAL_PATH)/src/google/protobuf/io_engine/lib -frtti 
-LOCAL_CFLAGS := -Wno-psabi -L$(LOCAL_PATH)/src/google/protobuf/io_engine/lib -frtti 
+LOCAL_CPPFLAGS := -D__MTCLICK__ -DHAVE_IFADDRS_H=0 -DCLICK_ANDROID -DCLICK_USERLEVEL -DHAVE_USER_MULTITHREAD -Wno-psabi -L$(LOCAL_PATH)/src/google/protobuf/io_engine/lib -frtti 
+LOCAL_CFLAGS := -Wno-psabi -DHAVE_IFADDRS_H=0 -DCLICK_ANDROID -DCLICK_USERLEVEL -DHAVE_USER_MULTITHREAD -Wno-psabi -L$(LOCAL_PATH)/src/google/protobuf/io_engine/lib -frtti
+LOCAL_CXX_FLAGS := -Wno-psabi -DHAVE_IFADDRS_H=0 -DCLICK_ANDROID -DCLICK_USERLEVEL -DHAVE_USER_MULTITHREAD -Wno-psabi -L$(LOCAL_PATH)/src/google/protobuf/io_engine/lib -frtti
 
 include $(BUILD_SHARED_LIBRARY)
