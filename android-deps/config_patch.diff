@@ -1,0 +1,15 @@
+--- click/include/click/config.h	2013-07-22 15:47:27.862628002 -0400
++++ click/include/click/config.h	2013-07-22 15:06:50.086627849 -0400
+@@ -253,7 +253,11 @@
+ 
+ /* Define stuff under tools or a user-level driver. */
+ #if defined(CLICK_USERLEVEL) || defined(CLICK_TOOL)
+-# include <click/config-userlevel.h>
++  #if defined(CLICK_ANDROID)
++    #include <click/android-userlevel.h>
++  #else
++    # include <click/config-userlevel.h>
++  #endif
+ #endif
+ 
+ /* Ensure declaration of DefaultArg template. */
