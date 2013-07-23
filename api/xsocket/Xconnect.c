@@ -48,11 +48,13 @@ int Xconnect(int sockfd, const sockaddr *addr, socklen_t addrlen)
 {
 	int rc;
 
+printf("xconnect\n");
+
 	int numbytes;
 	char buf[MAXBUFLEN];
 	struct sockaddr_in their_addr;
 	socklen_t addr_len;
-	
+
 	if (!addr || addrlen < sizeof(sockaddr_x)) {
 		errno = EINVAL;
 		return -1;
@@ -77,29 +79,37 @@ int Xconnect(int sockfd, const sockaddr *addr, socklen_t addrlen)
 
 	// In Xtransport: send SYN to destination server
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
+		// FIXME: deal with non-blocking state here
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
 
-	// Waiting for SYNACK from destination server
+printf("connect sent %d\n", isBlocking(sockfd));
+	setConnState(sockfd, CONNECTING);
+	if (!isBlocking(sockfd)) {
+		errno = EINPROGRESS;
+		return -1;
+	}
 
+printf("connect waiting\n");
+	// Waiting for SYNACK from destination server
 	// FIXME: make this use protobufs
-#if 1	
 	addr_len = sizeof their_addr;
 	if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
 			(struct sockaddr *)&their_addr, &addr_len)) == -1) {
-		LOGF("Error getting status from Click: %s", strerror(errno));
+		if (errno != EAGAIN && errno != EWOULDBLOCK) {
+			LOGF("Error getting status from Click: %s", strerror(errno));
+		}
 		return -1;
 	}
 
 	if (strcmp(buf, "^Connection-failed^") == 0) {
 		errno = ECONNREFUSED;
 		LOG("Connection Failed");
-		return -1;	    
+		setConnState(sockfd, UNCONNECTED);
+		return -1;
 	} else {
-		setConnected(sockfd, 1);
-		return 0; 
+		setConnState(sockfd, CONNECTED);
+		return 0;
 	}
-#endif
 }
-

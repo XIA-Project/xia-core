@@ -23,6 +23,7 @@
 #include "Xinit.h"
 #include "Xutil.h"
 #include <errno.h>
+#include <fcntl.h>
 #include "dagaddr.hpp"
 
 /*!
@@ -30,7 +31,7 @@
 **
 ** Assign the specified DAG to to the Xsocket referred to by sockfd. The DAG's
 ** final intent should be a valid SID.
-** 
+**
 ** It is necessary to assign a local DAG using Xbind() before an XSOCK_STREAM
 ** socket may receive connections (see accept()).
 **
@@ -48,6 +49,7 @@
 int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
 	xia::XSocketCallType type;
+	int flags;
 	int rc;
 
 	if (addrlen == 0) {
@@ -79,7 +81,11 @@ int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 	xia::X_Bind_Msg *x_bind_msg = xsm.mutable_x_bind();
 	x_bind_msg->set_sdag(g.dag_string().c_str());
 
+	flags = fcntl(sockfd, F_GETFL);
+	fcntl(sockfd, F_SETFL, flags & ~O_NONBLOCK);
+
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
+		fcntl(sockfd, F_SETFL, flags);
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
@@ -87,8 +93,11 @@ int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 	// process the reply from click
 	if ((rc = click_reply2(sockfd, &type)) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
+		fcntl(sockfd, F_SETFL, flags);
 		return -1;
 	}
+
+	fcntl(sockfd, F_SETFL, flags);
 
 	if (type != xia::XBIND) {
 		// something bad happened

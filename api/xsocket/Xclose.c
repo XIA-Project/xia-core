@@ -22,6 +22,7 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
+#include <fcntl.h>
 #include <errno.h>
 
 /*!
@@ -50,6 +51,9 @@ int Xclose(int sockfd)
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XCLOSE);
+
+	// set back to blocking just in case
+	Xfcntl(sockfd, F_SETFL, 0);
 
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));

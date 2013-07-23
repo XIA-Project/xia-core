@@ -29,8 +29,8 @@
 **
 ** the CID specified in cid must be a full DAG, not a fragment such as is
 ** returned by XputChunk. For instance: "RE ( AD:AD0 HID:HID0 ) CID:<hash>"
-** where <hash> is the 40 character hash of the content chunk generated 
-** by the sender. The XputChunk() API call only returns <hash>. Either the 
+** where <hash> is the 40 character hash of the content chunk generated
+** by the sender. The XputChunk() API call only returns <hash>. Either the
 ** client or server application must generate the full DAG that is passed
 ** to this API call.
 **
@@ -45,7 +45,7 @@
 ** @returns -1 on error with errno set
 **
 */
-int XreadChunk(int sockfd, void *rbuf, size_t len, int /* flags */, 
+int XreadChunk(int sockfd, void *rbuf, size_t len, int /* flags */,
 		char * cid, size_t /* cidLen */)
 {
 	int rc;
@@ -69,19 +69,24 @@ int XreadChunk(int sockfd, void *rbuf, size_t len, int /* flags */,
 	xsm.set_type(xia::XREADCHUNK);
 
 	xia::X_Readchunk_Msg *x_readchunk_msg = xsm.mutable_x_readchunk();
-  
+
 	x_readchunk_msg->set_dag(cid);
 
 	std::string p_buf;
 	xsm.SerializeToString(&p_buf);
 
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
-		LOGF("Error talking to Click: %s", strerror(errno));
+		if (!WOULDBLOCK()) {
+			// FIXME: correct behavior here, if we get past here, but
+			LOGF("Error talking to Click: %s", strerror(errno));
+		}
 		return -1;
 	}
 
-	if ((rc = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) < 0) {
-		LOGF("Error retrieving status from Click: %s", strerror(errno));
+	if ((rc = click_reply(sockfd, xia::XREADCHUNK, UDPbuf, sizeof(UDPbuf))) < 0) {
+		if (!WOULDBLOCK()) {
+			LOGF("Error retrieving status from Click: %s", strerror(errno));
+		}
 		return -1;
 	}
 

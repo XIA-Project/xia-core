@@ -20,6 +20,7 @@
 */
 
 #include <errno.h>
+#include <fcntl.h>
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
@@ -29,25 +30,25 @@
 **
 ** The Xaccept system call is is only valid with Xsockets created with
 ** the XSOCK_STREAM transport type. It accepts the first available connection
-** request for the listening socket, sockfd, creates a new connected socket, 
-** and returns a new Xsocket descriptor referring to that socket. The newly 
-** created socket is not in the listening state. The original socket 
+** request for the listening socket, sockfd, creates a new connected socket,
+** and returns a new Xsocket descriptor referring to that socket. The newly
+** created socket is not in the listening state. The original socket
 ** sockfd is unaffected by this call.
 **
 ** Xaccept does not currently have a non-blocking mode, and will block
 ** until a connection is made. However, the standard socket API calls select
 ** and poll may be used with the Xsocket. Either function will deliver a
 ** readable event when a new connection is attempted and you may then call
-** Xaccept() to get a socket for that connection. 
+** Xaccept() to get a socket for that connection.
 **
-** @note Unlike standard sockets, there is currently no Xlisten function. 
-** Callers must create the listening socket by calling Xsocket with the 
+** @note Unlike standard sockets, there is currently no Xlisten function.
+** Callers must create the listening socket by calling Xsocket with the
 ** XSOCK_STREAM transport_type and bind it to a source DAG with Xbind(). XAccept
 ** may then be called to wait for connections.
 **
 ** @param sockfd	an Xsocket() previously created with the XSOCK_STREAM type,
 ** and bound to a local DAG with Xbind()
-** @param addr if non-NULL, points to a block of memory that will contain the 
+** @param addr if non-NULL, points to a block of memory that will contain the
 ** address of the peer on return
 ** @param addrlen on entry, contains the size of addr, on exit contains the actual
 ** size of the address. addr will be truncated, if the size passed in is smaller than
@@ -79,16 +80,17 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		LOG("Xaccept is only valid with stream sockets.");
 		return -1;
 	}
-	
+
 	// Wait for connection from client
 	len = sizeof their_addr;
 	if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
                     (struct sockaddr *)&their_addr, &len)) == -1) {
-		LOGF("Error reading from socket (%d): %s", sockfd, 
-				strerror(errno));
+		if (!WOULDBLOCK()) {
+			LOGF("Error reading from socket (%d): %s", sockfd, strerror(errno));
+		}
 		return -1;
 	}
-        
+
 	// Create new socket (this is a socket between API and Xtransport)
 
 	if ((new_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
@@ -105,8 +107,8 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		close(new_sockfd);
 		LOGF("Error binding new socket to local port: %s", strerror(errno));
 		return -1;
-	}	
-	
+	}
+
 	// Do actual binding in Xtransport
 
 	xia::XSocketMsg xia_socket_msg;
@@ -134,7 +136,7 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		*addrlen = 0;
 
 	allocSocketState(new_sockfd, XSOCK_STREAM);
-	setConnected(new_sockfd, 1);
+	setConnState(new_sockfd, CONNECTED);
 
 	return new_sockfd;
 }
@@ -144,25 +146,25 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 **
 ** The Xaccept4 system call is is only valid with Xsockets created with
 ** the XSOCK_STREAM transport type. It accepts the first available connection
-** request for the listening socket, sockfd, creates a new connected socket, 
-** and returns a new Xsocket descriptor referring to that socket. The newly 
-** created socket is not in the listening state. The original socket 
+** request for the listening socket, sockfd, creates a new connected socket,
+** and returns a new Xsocket descriptor referring to that socket. The newly
+** created socket is not in the listening state. The original socket
 ** sockfd is unaffected by this call.
 **
 ** Xaccept4 does not currently have a non-blocking mode, and will block
 ** until a connection is made. However, the standard socket API calls select
 ** and poll may be used with the Xsocket. Either function will deliver a
 ** readable event when a new connection is attempted and you may then call
-** Xaccept() to get a socket for that connection. 
+** Xaccept() to get a socket for that connection.
 **
-** @note Unlike standard sockets, there is currently no Xlisten function. 
-** Callers must create the listening socket by calling Xsocket with the 
+** @note Unlike standard sockets, there is currently no Xlisten function.
+** Callers must create the listening socket by calling Xsocket with the
 ** XSOCK_STREAM transport_type and bind it to a source DAG with Xbind(). XAccept
 ** may then be called to wait for connections.
 **
 ** @param sockfd	an Xsocket() previously created with the XSOCK_STREAM type,
 ** and bound to a local DAG with Xbind()
-** @param addr if non-NULL, points to a block of memory that will contain the 
+** @param addr if non-NULL, points to a block of memory that will contain the
 ** address of the peer on return
 ** @param addrlen on entry, contains the size of addr, on exit contains the actual
 ** size of the address. addr will be truncated, if the size passed in is smaller than
@@ -175,11 +177,22 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 */
 int Xaccept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
 {
-	if (flags != 0) {
-		LOG("error: flags are not currently allowed in the XIA version of accept4");
+	int newsock;
+
+	if (flags & ~O_NONBLOCK) {
+		LOGF("error: unsupported flags: %08x\n", flags);
 		errno = EINVAL;
 		return - 1;
 	}
 
-	return Xaccept(sockfd, addr, addrlen);
+	if ((newsock = Xaccept(sockfd, addr, addrlen)) >= 0) {
+		if (flags & O_NONBLOCK) {
+			if (Xfcntl(newsock, F_SETFL, flags) < 0) {
+				Xclose(newsock);
+				newsock = -1;
+			}
+		}
+	}
+
+	return newsock;
 }

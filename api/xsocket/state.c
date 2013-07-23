@@ -23,58 +23,66 @@
 #include <string.h>
 #include <assert.h>
 #include "Xsocket.h"
+#include "xia.pb.h"
+#include <list>
 
 using namespace std;
 
 class SocketState
 {
 public:
-	SocketState();
-	SocketState(int tt);
+	SocketState() { init(); };
+	SocketState(int tt) { init(); m_transportType = tt; };
 	~SocketState();
 
 	int transportType() { return m_transportType; };
 	void setTransportType(int tt) {m_transportType = tt; };
-	
+
 	int data(char *buf, unsigned bufLen);
 	void setData(const char *buf, unsigned bufLen);
 	int dataLen() { return m_bufLen; };
 
-	int isConnected() { return m_connected; };
-	void setConnected(int conn) { m_connected = conn; };
+	int connState() { return m_connected; };
+	void setConnState(int conn) { m_connected = conn; };
 
 	int isWrapped() { return m_wrapped; };
 	void setWrapped(int wrapped) { m_wrapped = wrapped; };
 
-	int isAsync() { return m_async; };
-	void setAsync(int async) { m_async = async; };
+	int isBlocking() { return m_blocking; };
+	void setBlocking(int blocking) { m_blocking = blocking; };
+
+	void setError(int error) { m_error = error; };
+	int error() { return m_error; };
+
+	void addPacket(xia::XSocketMsg &msg);
+	int getPacket(xia::XSocketMsg &msg, xia::XSocketCallType mtype);
+
+	void sock(int sock) { m_sock = sock; };
+	int sock() { return m_sock; };
+
+protected:
+	void init();
 
 private:
+	int m_sock;
 	int m_transportType;
 	int m_connected;
-	int m_async;
+	int m_blocking;
+	int m_error;
 	int m_wrapped;	// hack for dealing with xwrap stuff
 	char *m_buf;
 	unsigned m_bufLen;
+	std::list<xia::XSocketMsg> m_packets;
 };
 
-SocketState::SocketState(int tt)
-{
-	::SocketState();
-	m_transportType = tt;
-	m_connected = 0;
-	m_async = 0;
-	m_wrapped = 0;
-	m_buf = (char *)0;
-	m_bufLen = 0;
-}
-
-SocketState::SocketState()
+void SocketState::init()
 {
 	m_transportType = -1;
+	m_sock = 0;
 	m_connected = 0;
-	m_async = 0;
+	m_blocking = 1;
 	m_wrapped = 0;
+	m_error = 0;
 	m_buf = (char *)0;
 	m_bufLen = 0;
 }
@@ -83,6 +91,25 @@ SocketState::~SocketState()
 {
 	if (m_buf)
 		delete(m_buf);
+	m_packets.clear();
+}
+
+
+void SocketState::addPacket(xia::XSocketMsg &msg)
+{
+	m_packets.push_back(msg);
+}
+
+int SocketState::getPacket(xia::XSocketMsg &msg, xia::XSocketCallType mtype)
+{
+	for (std::list<xia::XSocketMsg>::iterator it = m_packets.begin(); it != m_packets.end(); it++) {
+		if (it->type() == mtype) {
+			msg = *it;
+			m_packets.erase(it);
+			return 1;
+		}
+	}
+	return 0;
 }
 
 int SocketState::data(char *buf, unsigned bufLen)
@@ -163,7 +190,7 @@ SocketMap *SocketMap::getMap()
 	if (!instance) {
 
 		pthread_mutex_lock(&lock);
-		
+
 		if (!instance)
 			instance = new SocketMap();
 
@@ -222,20 +249,20 @@ int getSocketType(int sock)
 		return -1;
 }
 
-int isConnected(int sock)
+int connState(int sock)
 {
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
-		return sstate->isConnected();
+		return sstate->connState();
 	else
 		return 0;
 }
 
-void setConnected(int sock, int conn)
+void setConnState(int sock, int conn)
 {
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
-		sstate->setConnected(conn);
+		sstate->setConnState(conn);
 }
 
 int isWrapped(int sock)
@@ -254,20 +281,20 @@ void setWrapped(int sock, int wrapped)
 		sstate->setWrapped(wrapped);
 }
 
-int isAsync(int sock)
+int isBlocking(int sock)
 {
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
-		return sstate->isAsync();
+		return sstate->isBlocking();
 	else
 		return 0;
 }
 
-void setAsync(int sock, int async)
+void setBlocking(int sock, int blocking)
 {
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
-		sstate->setAsync(async);
+		sstate->setBlocking(blocking);
 }
 
 
@@ -294,6 +321,46 @@ void setSocketData(int sock, const char *buf, unsigned bufLen)
 		sstate->setData(buf, bufLen);
 }
 
+void setError(int sock, int error)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		sstate->setError(error);
+}
+
+int getError(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		return sstate->error();
+	else
+		return 0;
+}
+
+void addPacket(int sock, xia::XSocketMsg& msg)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		sstate->addPacket(msg);
+}
+
+int getPacket(int sock, xia::XSocketMsg &msg, xia::XSocketCallType mtype)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		return sstate->getPacket(msg, mtype);
+	else
+		return 0;
+}
+
+void sock(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		sstate->sock(sock);
+}
+
+
 #if 0
 int main()
 {
@@ -302,7 +369,7 @@ int main()
 
 	// should be invalid
 	printf("socket %d tt %d\n", 0, getSocketType(0));
-	
+
 	// should be valid, then invalid
 	allocSocketState(5, 1);
 	printf("socket %d tt %d\n", 5, getSocketType(5));

@@ -8,9 +8,9 @@ LDFLAGS +=-lprotobuf -lc -ldl
 
 SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XrequestChunk.c  Xgetaddrinfo.c \
 		XgetChunkStatus.c  XreadChunk.c  XputChunk.c Xrecv.c \
-        Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c \
+        Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c Xfcntl.c Xselect.c\
 		Xsetsockopt.c Xutil.c state.c Xinit.c XupdateAD.c XupdateNameServerDAG.c XgetDAGbyName.c  \
-		minini/minIni.c 
+		minini/minIni.c
 OBJS=$(SOURCES:.c=.o) xia.pb.o
 LIB=$(XLIB)/libXsocket.so
 STATICLIB=$(XLIB)/libXsocket.a
@@ -29,10 +29,10 @@ xia.pb.o:
 %.o: %.c xia.pb.cc $(XINC)/Xsocket.h $(XINC)/xia.h
 	$(CC) $(CFLAGS) $<  -o $@ -lpthread
 
-$(LIB): $(OBJS) 
+$(LIB): $(OBJS)
 	$(LD) -shared -o $@ $(OBJS) $(LDFLAGS)
 
-$(STATICLIB): $(OBJS) 
+$(STATICLIB): $(OBJS)
 	ar rcs $@ $(OBJS)
 
 xwrap.so: xwrap.c

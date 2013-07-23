@@ -44,9 +44,6 @@
 */
 int Xsend(int sockfd, const void *buf, size_t len, int flags)
 {
-	UNUSED(len);
-
-//`	xia::XSocketCallType type;
 	int rc;
 
 	if (flags) {
@@ -70,7 +67,7 @@ int Xsend(int sockfd, const void *buf, size_t len, int flags)
 		return -1;
 	}
 
-	if (!isConnected(sockfd)) {
+	if (connState(sockfd) != CONNECTED) {
 		LOGF("Socket %d is not connected", sockfd);
 		errno = ENOTCONN;
 		return -1;
@@ -84,7 +81,9 @@ int Xsend(int sockfd, const void *buf, size_t len, int flags)
 
 	// send the protobuf containing the user data to click
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
-		LOGF("Error talking to Click: %s", strerror(errno));
+		if (!WOULDBLOCK()) {
+			LOGF("Error talking to Click: %s", strerror(errno));
+		}
 		return -1;
 	}
 #if 0
