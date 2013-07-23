@@ -14,6 +14,7 @@ XreadChunk.c \
 XputChunk.c \
 Xrecv.c \
 Xrecvfrom.c \
+Xfcntl.c \
 Xsend.c \
 Xsendto.c \
 Xsocket.c \

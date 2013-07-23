@@ -5,7 +5,9 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := xhcp_client
 
 LOCAL_SRC_FILES := \
-xhcp_client.cc
+xhcp_client.cc \
+../common/XIARouter.cc \
+../common/csclient.cc
 
 LOCAL_CPP_EXTENSION := .c .cc
 
