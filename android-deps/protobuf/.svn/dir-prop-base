@@ -1,6 +1,0 @@
-K 13
-svn:externals
-V 63
-gtest http://googletest.googlecode.com/svn/tags/release-1.4.0/
-
-END
