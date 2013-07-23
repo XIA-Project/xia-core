@@ -22,6 +22,7 @@
 #include "Xutil.h"
 #include <errno.h>
 
+
 #define CONTROL 1
 #define DATA 2
 
@@ -63,30 +64,29 @@ int click_send(int sockfd, xia::XSocketMsg *xsm)
 		rc = sendto(sockfd, p, remaining, 0, (struct sockaddr *)&sa, sizeof(sa));
 
 		if (rc == -1) {
-			LOGF("click socket failure: errno = %d", errno);
+			if (!WOULDBLOCK()) {
+				LOGF("click socket failure: errno = %d", errno);
+			}
 			break;
 		} else {
 			remaining -= rc;
 			p += rc;
 			if (remaining > 0) {
 				LOGF("%d bytes left to send", remaining);
-#if 1
-				// FIXME: click will crash if we need to send more than a 
-				// single buffer to get the entire block of data sent. Is 
-				// this fixable, or do we have to assume it will always go
-				// in one send?
+
+				// FIXME: click will crash if we need to send more than a
+				// single buffer to get the entire block of data sent.
 				LOG("click can't handle partial packets");
 				rc = -1;
 				break;
-#endif
 			}
-		}	
+		}
 	}
 
 	return  (rc >= 0 ? 0 : -1);
 }
 
-int click_reply(int sockfd, char *buf, int buflen)
+int click_reply(int sockfd, xia::XSocketCallType type, char *buf, int buflen)
 {
 	struct sockaddr_in sa;
 	socklen_t len;
@@ -94,9 +94,13 @@ int click_reply(int sockfd, char *buf, int buflen)
 
 	len = sizeof sa;
 
+	// check to see if we have a stored packet
+
 	memset(buf, 0, buflen);
 	if ((rc = recvfrom(sockfd, buf, buflen - 1 , 0, (struct sockaddr *)&sa, &len)) < 0) {
-		LOGF("error(%d) getting reply data from click", errno);
+		if (!WOULDBLOCK()) {
+			LOGF("error(%d) getting reply data from click", errno);
+		}
 		return -1;
 	}
 
@@ -115,7 +119,9 @@ int click_reply2(int sockfd, xia::XSocketCallType *type)
 
 	memset(buf, 0, buflen);
 	if ((rc = recvfrom(sockfd, buf, buflen - 1 , 0, (struct sockaddr *)&sa, &len)) < 0) {
-		LOGF("error(%d) getting reply data from click", errno);
+		if (!WOULDBLOCK()) {
+			LOGF("error(%d) getting reply data from click", errno);
+		}
 		return -1;
 	}
 
@@ -128,6 +134,59 @@ int click_reply2(int sockfd, xia::XSocketCallType *type)
 	rc = msg->return_code();
 	if (rc == -1)
 		errno = msg->err_code();
+
+	return rc;
+}
+
+int click_reply3(int sockfd, xia::XSocketCallType type, xia::XSocketMsg &msg)
+{
+	char buf[MAXBUFLEN];
+	int buflen = sizeof(buf);
+	int rc;
+
+	// FIXME: check to see if we have a stored packet
+
+	for (;;) {
+
+		if ((rc = recvfrom(sockfd, buf, buflen - 1 , 0, NULL, NULL)) < 0) {
+			if (errno != EAGAIN || errno != EWOULDBLOCK) {
+				LOGF("error(%d) getting reply data from click", errno);
+			}
+			break;
+		}
+
+		// FIXME: connect should really use protobufs!
+		if (!isBlocking(sockfd)) {
+			if (strcmp(buf, "Connection_granted") == 0) {
+				// we got a connect reply, mark socket as connected
+				setConnState(sockfd, CONNECTED);
+				setError(sockfd, 0);
+				// now go back and loop looking for data
+			} else if (strcmp(buf, "^Connection-failed^") == 0) {
+				setConnState(sockfd, UNCONNECTED);
+				setError(sockfd, ECONNREFUSED);
+				errno = ECONNREFUSED;
+				break;
+			}
+		}
+
+		std::string str(buf, buflen);
+		xia::XSocketMsg xsm;
+		xsm.ParseFromString(str);
+
+		// is it what we were expecting?
+		if (xsm.type() == type) {
+			msg = xsm;
+			rc = 0;
+			break;
+
+		} else if (xsm.type() == xia::XCONNECT) {
+			setConnState(sockfd, CONNECTED);
+
+		} else {
+			LOG("unexpected packet, queueing and looping...");
+		}
+	}
 
 	return rc;
 }

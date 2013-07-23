@@ -16,22 +16,29 @@
 /*!
   @file Xutil.h
   @brief header for internal helper functions
-*/  
+*/
 #ifndef _Xutil_h
 #define _Xutil_h
 
 
 #ifdef DEBUG
 #define LOG(s) fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, s)
-#define LOGF(fmt, ...) fprintf(stderr, "%s:%d: " fmt"\n", __FILE__, __LINE__, __VA_ARGS__) 
+#define LOGF(fmt, ...) fprintf(stderr, "%s:%d: " fmt"\n", __FILE__, __LINE__, __VA_ARGS__)
 #else
 #define LOG(s)
 #define LOGF(fmt, ...)
 #endif
 
+#define WOULDBLOCK()	(errno == EAGAIN || errno == EWOULDBLOCK)
+
+#define UNCONNECTED	0
+#define CONNECTING	1
+#define CONNECTED 	2
+
 int click_send(int sockfd, xia::XSocketMsg *xsm);
-int click_reply(int sockfd, char *buf, int buflen);
+int click_reply(int sockfd, xia::XSocketCallType type, char *buf, int buflen);
 int click_reply2(int sockfd, xia::XSocketCallType *type);
+int click_reply3(int sockfd, xia::XSocketCallType type, xia::XSocketMsg &msg);
 int bind_to_random_port(int sockfd);
 
 int validateSocket(int sock, int stype, int err);
@@ -42,12 +49,16 @@ void allocSocketState(int sock, int tt);
 void freeSocketState(int sock);
 int getSocketType(int sock);
 void setSocketType(int sock, int tt);
-int isConnected(int sock);
-int setConnected(int sock, int conn);
+int connState(int sock);
+int setConnState(int sock, int conn);
 int getSocketData(int sock, char *buf, unsigned bufLen);
 void setSocketData(int sock, const char *buf, unsigned bufLen);
 void setWrapped(int sock, int wrapped);
 int isWrapped(int sock);
-void setAsync(int sock, int async);
-int isAsync(int sock);
+void setBlocking(int sock, int blocking);
+int isBlocking(int sock);
+void setError(int sock, int error);
+int getError(int sock);
+void addPacket(int sock, xia::XSocketMsg &msg);
+int getPacket(int sock, xia::XSocketMsg &msg, xia::XSocketCallType mtype);
 #endif

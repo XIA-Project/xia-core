@@ -57,7 +57,7 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 {
 	int numbytes;
 	char UDPbuf[MAXBUFLEN];
-	
+
 	if (flags) {
 		errno = EOPNOTSUPP;
 		return -1;
@@ -77,7 +77,7 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 		return -1;
 	}
 
-	if (!isConnected(sockfd)) {
+	if (connState(sockfd) != CONNECTED) {
 		LOGF("Socket %d is not connected", sockfd);
 		errno = ENOTCONN;
 		return -1;
@@ -87,15 +87,14 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len)) > 0)
 		return numbytes;
 
-	if ((numbytes = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) < 0) {
-		LOGF("Error retrieving recv data from Click: %s", strerror(errno));
-		return -1;
-	}
-
-	std::string str(UDPbuf, numbytes);
 	xia::XSocketMsg xsm;
 
-	xsm.ParseFromString(str);
+	if ((numbytes = click_reply3(sockfd, xia::XRECV, xsm)) < 0) {
+		if (!WOULDBLOCK()) {
+			LOGF("Error retrieving recv data from Click: %s", strerror(errno));
+		}
+		return -1;
+	}
 
 	xia::X_Recv_Msg *msg = xsm.mutable_x_recv();
 	unsigned paylen = msg->payload().size();

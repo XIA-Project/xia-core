@@ -21,6 +21,7 @@
 
 #include <sys/types.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <linux/unistd.h>
 
 #include "Xsocket.h"
@@ -35,25 +36,28 @@
 /*!
 ** @brief Create an XIA socket
 **
-** Creates an XIA socket of the specified type. 
+** Creates an XIA socket of the specified type.
 **
 ** @param family socket family, currently must be AF_XIA
-** @param transport_type Valid values are: 
+** @param transport_type Valid values are:
 **	\n SOCK_STREAM for reliable communications (SID)
-**	\n SOCK_DGRAM for a ligher weight connection, but with 
+**	\n SOCK_DGRAM for a ligher weight connection, but with
 **	unguranteed delivery (SID)
 **	\n XSOCK_CHUNK for getting/putting content chunks (CID)
 **	\n SOCK_RAW for a raw socket that can have direct edits made to the header
+**  \n transport_type may also include the bitwise OR of SOCK_NONBLOCK to indicate
+**  that the O_NONBLOCK flag should be applied to new socket
+**
 ** @param for posix compatibility, currently must be 0
 **
-** @returns socket id on success. 
+** @returns socket id on success.
 ** @returns -1 on failure with errno set to an error compatible with those
 ** from the standard socket call.
 **
-** @warning In the current implementation, the returned socket is 
+** @warning In the current implementation, the returned socket is
 ** a normal UDP socket that is used to communicate with the click
 ** transport layer. Using this socket with normal unix socket
-** calls (aside from select and poll) will cause unexpected behaviors. 
+** calls (aside from select and poll) will cause unexpected behaviors.
 ** Attempting to pass a socket created with the the standard socket function
 ** to the Xsocket API will have similar results.
 **
@@ -64,6 +68,7 @@ int Xsocket(int family, int transport_type, int protocol)
 	xia::XSocketCallType type;
 	int rc;
 	int sockfd;
+	int flags = 0;
 
 	if (family != AF_XIA) {
 		LOG("error: the Xsockets API only supports the AF_XIA family");
@@ -77,11 +82,22 @@ int Xsocket(int family, int transport_type, int protocol)
 		return -1;
 	}
 
-	/*if (transport_type & SOCK_NONBLOCK || transport_type & SOCK_CLOEXEC) {
-		LOG("error: invalid flags passed as part of the treansport_type");
+#ifdef SOCK_NONBLOCK
+	if (transport_type & SOCK_NONBLOCK) {
+		flags |= O_NONBLOCK;
+		transport_type &= ~SOCK_NONBLOCK;
+
+		LOG("NONBLOCK enabled\n");
+	}
+#endif
+
+#ifdef SOCK_CLOEXEC
+	if (transport_type & SOCK_CLOEXEC) {
+		LOG("error: invalid flags passed as part of the transport_type");
 		errno = EINVAL;
 		return -1;
-		}*/
+		}
+#endif
 
 	switch (transport_type) {
 		case SOCK_STREAM:
@@ -111,14 +127,14 @@ int Xsocket(int family, int transport_type, int protocol)
 		LOGF("bind error: %s", strerror(errno));
 		return -1;
 	}
-		
+
 	// protobuf message
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XSOCKET);
-		
+
 	xia::X_Socket_Msg *x_socket_msg = xsm.mutable_x_socket();
-	x_socket_msg->set_type(transport_type);		
-	
+	x_socket_msg->set_type(transport_type);
+
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		close(sockfd);
@@ -137,11 +153,14 @@ int Xsocket(int family, int transport_type, int protocol)
 	}
 
 	if (rc == 0) {
+		if (flags) {
+			Xfcntl(sockfd, F_SETFL, flags);
+		}
 		allocSocketState(sockfd, transport_type);
 		return sockfd;
 	}
 
 	// close the control socket since the underlying Xsocket is no good
 	close(sockfd);
-	return -1; 
+	return -1;
 }

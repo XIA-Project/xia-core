@@ -19,6 +19,7 @@
  @brief Implements XgetDAGbyName(), XregisterName(), Xgetpeername() and Xgetsockname()
 */
 #include <errno.h>
+#include <fcntl.h>
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
@@ -72,7 +73,7 @@ char *findRoot() {
 /*!
 ** @brief Lookup a DAG in the hosts.xia file
 **
-** @param name The name of an XIA service or host. 
+** @param name The name of an XIA service or host.
 **
 ** @returns a character point to the dag on success
 ** @returns NULL on failure
@@ -91,7 +92,7 @@ char *hostsLookup(const char *name) {
 		while (fgets(line, 511, hostsfp) != NULL) {
 			linend = line+strlen(line)-1;
 			while (*linend == '\r' || *linend == '\n' || *linend == '\0') {
-				linend--; 
+				linend--;
 			}
 			*(linend+1) = '\0';
 			if (line[0] == '#') {
@@ -112,7 +113,7 @@ char *hostsLookup(const char *name) {
 	} else {
 		//printf("XIAResolver file error\n");
 	}
-  
+
 	//printf("Name not found in ./hosts_xia\n");
 	return NULL;
 }
@@ -121,7 +122,7 @@ char *hostsLookup(const char *name) {
 /*!
 ** @brief Lookup a DAG based using a host or service name.
 **
-** The name should be a string such as www_s.example.xia or host.example.xia. 
+** The name should be a string such as www_s.example.xia or host.example.xia.
 ** By convention services are indicated by '_s' appended to the service name.
 ** The memory returned is dynamically allocated and should be released with a
 ** call to free() when the caller is done with it.
@@ -129,7 +130,7 @@ char *hostsLookup(const char *name) {
 ** This is a very simple implementation of the name query function.
 ** It will be replaces in a future release.
 **
-** @param name The name of an XIA service or host. 
+** @param name The name of an XIA service or host.
 **
 ** @returns a character point to the dag on success
 ** @returns NULL on failure
@@ -138,23 +139,23 @@ char *hostsLookup(const char *name) {
 int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 {
 	int sock;
-	sockaddr_x ns_dag; 
+	sockaddr_x ns_dag;
 	char pkt[NS_MAX_PACKET_SIZE];
-	char *dag; 
-	char _name[NS_MAX_DAG_LENGTH], _dag[NS_MAX_DAG_LENGTH];	  
+	char *dag;
+	char _name[NS_MAX_DAG_LENGTH], _dag[NS_MAX_DAG_LENGTH];
 	int result;
 
 	if (!addr || !addrlen || *addrlen < sizeof(sockaddr_x)) {
 		errno = EINVAL;
 		return -1;
 	}
-	
+
 	// see if name is registered in the local hosts.xia file
 	if((dag = hostsLookup(name))) {
 
 		Graph g(dag);
 		free(dag);
-		
+
 		// check to see if the returned dag was valid
 		// we may want a better check for this in the future
 		if (g.num_nodes() > 0) {
@@ -168,7 +169,7 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 	// not found locally, check the name server
 	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
 		return -1;
-	
+
 	//Read the nameserver DAG (the one that the name-query will be sent to)
 	if ( XreadNameServerDAG(sock, &ns_dag) < 0 ) {
 		LOG("Unable to find nameserver address");
@@ -176,7 +177,7 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 		return -1;
 	}
 
-	//Construct a name-query packet	
+	//Construct a name-query packet
 	ns_pkt query_pkt;
 	query_pkt.type = NS_TYPE_QUERY;
 	query_pkt.name = strdup(name);
@@ -187,10 +188,10 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 	offset += sizeof(query_pkt.type);
 	memcpy(pkt+offset, query_pkt.name, strlen(query_pkt.name)+1);
 	offset += strlen(query_pkt.name)+1;
- 
-	//Send a name query to the name server	
+
+	//Send a name query to the name server
 	Xsendto(sock, pkt, offset, 0, (const struct sockaddr*)&ns_dag, sizeof(sockaddr_x));
-	
+
 	//Check the response from the name server
 	memset(pkt, 0, sizeof(pkt));
 	int rc = Xrecvfrom(sock, pkt, NS_MAX_PACKET_SIZE, 0, NULL, NULL);
@@ -198,7 +199,7 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 
 	memset(_name, '\0', NS_MAX_DAG_LENGTH);
 	memset(_dag, '\0', NS_MAX_DAG_LENGTH);
-   
+
 	ns_pkt *tmp = (ns_pkt *)pkt;
 	char* tmp_name = (char*)(pkt+sizeof(tmp->type));
 	char* tmp_dag = (char*)(pkt+sizeof(tmp->type)+ strlen(tmp_name)+1);
@@ -210,19 +211,19 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 		break;
 	case NS_TYPE_RESPONSE_ERROR:
 		result = -1;
-		break;					
+		break;
 	default:
 		LOG("Unknown nameserver response");
 		result = -1;
 		break;
-	}			
+	}
 
 	Xclose(sock);
-	free(query_pkt.name);  
-		
+	free(query_pkt.name);
+
 	if (result < 0) {
 		return result;
-	}  
+	}
 
 	Graph g(_dag);
 	g.fill_sockaddr(addr);
@@ -239,7 +240,7 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 ** The memory returned is dynamically allocated and should be released with a
 ** call to free() when the caller is done with it.
 **
-** This is a very simple implementation and will be replaced in a 
+** This is a very simple implementation and will be replaced in a
 ** future release. This version does not check correctness of the name or dag,
 ** nor does it check to ensure that the client is allowed to bind to name.
 **
@@ -254,12 +255,12 @@ int XregisterName(const char *name, sockaddr_x *DAG) {
 	int sock;
 	sockaddr_x ns_dag;
 	char pkt[NS_MAX_PACKET_SIZE];
-	char _name[NS_MAX_DAG_LENGTH], _dag[NS_MAX_DAG_LENGTH];	
+	char _name[NS_MAX_DAG_LENGTH], _dag[NS_MAX_DAG_LENGTH];
 	int result;
 
 	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
 		return -1;
-	
+
 	//Read the nameserver DAG (the one that the name-registration will be sent to)
 	if (XreadNameServerDAG(sock, &ns_dag) < 0) {
 		LOG("Unable to find nameserver address");
@@ -278,7 +279,7 @@ int XregisterName(const char *name, sockaddr_x *DAG) {
 		return -1;
 	}
 
-	//Construct a registration packet	
+	//Construct a registration packet
 	ns_pkt register_pkt;
 	register_pkt.type = NS_TYPE_REGISTER;
 	register_pkt.name = strdup(name);
@@ -291,9 +292,9 @@ int XregisterName(const char *name, sockaddr_x *DAG) {
 	memcpy(pkt+offset, register_pkt.name, strlen(register_pkt.name)+1);
 	offset += strlen(register_pkt.name)+1;
 	memcpy(pkt+offset, register_pkt.dag, strlen(register_pkt.dag)+1);
-	offset += strlen(register_pkt.dag)+1;	   
+	offset += strlen(register_pkt.dag)+1;
 
-	//Send the name registration packet to the name server	
+	//Send the name registration packet to the name server
 	//FIXME: use sockaddr here
 	Xsendto(sock, pkt, offset, 0, (const struct sockaddr *)&ns_dag, sizeof(sockaddr_x));
 
@@ -304,7 +305,7 @@ int XregisterName(const char *name, sockaddr_x *DAG) {
 
 	memset(_name, '\0', NS_MAX_DAG_LENGTH);
 	memset(_dag, '\0', NS_MAX_DAG_LENGTH);
-   
+
 	ns_pkt *tmp = (ns_pkt *)pkt;
 	char* tmp_name = (char*)(pkt+sizeof(tmp->type));
 	char* tmp_dag = (char*)(pkt+sizeof(tmp->type)+ strlen(tmp_name)+1);
@@ -316,21 +317,19 @@ int XregisterName(const char *name, sockaddr_x *DAG) {
 		break;
 	case NS_TYPE_RESPONSE_ERROR:
 		result = -1;
-		break;					
+		break;
 	default:
 		fprintf(stderr, "dafault\n");
 		result = -1;
 		break;
-	 }			
+	 }
 	free(register_pkt.name);
 	free(register_pkt.dag);
-	
-	//Close socket	
+
 	Xclose(sock);
-	
 	return result;
 }
-	
+
 /*!
 ** @brief Get the full DAG of the remote socket.
 **
@@ -348,6 +347,7 @@ int XregisterName(const char *name, sockaddr_x *DAG) {
 */
 int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
+	int flags;
 	int rc;
 	char buf[MAXBUFLEN];
 
@@ -367,7 +367,7 @@ int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		return -1;
 	}
 
-	if (!isConnected(sockfd)) {
+	if (connState(sockfd) != CONNECTED) {
 		LOGF("Socket %d is not connected", sockfd);
 		errno = ENOTCONN;
 		return -1;
@@ -376,17 +376,24 @@ int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XGETPEERNAME);
 
+	flags = fcntl(sockfd, F_GETFL);
+	fcntl(sockfd, F_SETFL, flags & ~O_NONBLOCK);
+
 	// send the protobuf containing the user data to click
     if ((rc = click_send(sockfd, &xsm)) < 0) {
+		fcntl(sockfd, F_SETFL, flags);
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
 
 	// get the dag
-	if ((rc = click_reply(sockfd, buf, sizeof(buf))) < 0) {
+	if ((rc = click_reply(sockfd, xia::XGETPEERNAME, buf, sizeof(buf))) < 0) {
+		fcntl(sockfd, F_SETFL, flags);
 		LOGF("Error retrieving status from Click: %s", strerror(errno));
 		return -1;
 	}
+
+	fcntl(sockfd, F_SETFL, flags);
 
 	xsm.Clear();
 	xsm.ParseFromString(buf);
@@ -399,7 +406,7 @@ int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	xia::X_GetPeername_Msg *msg = xsm.mutable_x_getpeername();
 
 	Graph g(msg->dag().c_str());
-	
+
 	g.fill_sockaddr((sockaddr_x*)addr);
 	*addrlen = sizeof(sockaddr_x);
 
@@ -424,6 +431,7 @@ int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 int Xgetsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
 	int rc;
+	int flags;
 	char buf[MAXBUFLEN];
 
 	if (!addr || !addrlen) {
@@ -442,7 +450,7 @@ int Xgetsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		return -1;
 	}
 
-	if (!isConnected(sockfd)) {
+	if (connState(sockfd) != CONNECTED) {
 		LOGF("Socket %d is not connected", sockfd);
 		errno = ENOTCONN;
 		return -1;
@@ -451,17 +459,25 @@ int Xgetsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XGETSOCKNAME);
 
+	flags = Xfcntl(sockfd, F_GETFL);
+	fcntl(sockfd, F_SETFL, flags & ~O_NONBLOCK);
+
 	// send the protobuf containing the user data to click
     if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
+		fcntl(sockfd, F_SETFL, flags);
 		return -1;
 	}
 
 	// get the dag
-	if ((rc = click_reply(sockfd, buf, sizeof(buf))) < 0) {
+	// FIXME: loop here till done or error
+	if ((rc = click_reply(sockfd, xia::XGETSOCKNAME, buf, sizeof(buf))) < 0) {
 		LOGF("Error retrieving status from Click: %s", strerror(errno));
+		fcntl(sockfd, F_SETFL, flags);
 		return -1;
 	}
+
+	fcntl(sockfd, F_SETFL, flags);
 
 	xsm.Clear();
 	xsm.ParseFromString(buf);
@@ -474,7 +490,7 @@ int Xgetsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	xia::X_GetSockname_Msg *msg = xsm.mutable_x_getsockname();
 
 	Graph g(msg->dag().c_str());
-	
+
 	g.fill_sockaddr((sockaddr_x*)addr);
 	*addrlen = sizeof(sockaddr_x);
 

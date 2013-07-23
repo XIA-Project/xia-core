@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <fcntl.h>
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
@@ -24,10 +25,12 @@ int XupdateNameServerDAG(int sockfd, char *nsDAG) {
 
   xia::X_Updatenameserverdag_Msg *x_updatenameserverdag_msg = xsm.mutable_x_updatenameserverdag();
   x_updatenameserverdag_msg->set_dag(nsDAG);
-  
+
   if ((rc = click_send(sockfd, &xsm)) < 0) {
+	if (!WOULDBLOCK()) {
 		LOGF("Error talking to Click: %s", strerror(errno));
-		return -1;
+	}
+	return -1;
   }
 
   return 0;
@@ -35,32 +38,39 @@ int XupdateNameServerDAG(int sockfd, char *nsDAG) {
 
 
 int XreadNameServerDAG(int sockfd, sockaddr_x *nsDAG) {
-  	int rc = -1;
-  	char UDPbuf[MAXBUFLEN];
-  	
- 	if (getSocketType(sockfd) == XSOCK_INVALID) {
-   	 	LOG("The socket is not a valid Xsocket");
-   	 	errno = EBADF;
-  		return -1;
- 	}
+	int rc = -1;
+	char UDPbuf[MAXBUFLEN];
+
+	if (getSocketType(sockfd) == XSOCK_INVALID) {
+		LOG("The socket is not a valid Xsocket");
+		errno = EBADF;
+		return -1;
+	}
 
 	if (!nsDAG) {
 		errno = EINVAL;
 		return -1;
 	}
 
- 	xia::XSocketMsg xsm;
-  	xsm.set_type(xia::XREADNAMESERVERDAG);
-  
-  	if ((rc = click_send(sockfd, &xsm)) < 0) {
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XREADNAMESERVERDAG);
+
+	int flags = fcntl(sockfd, F_GETFL);
+	fcntl(sockfd, F_SETFL, flags & ~O_NONBLOCK);
+
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
+		fcntl(sockfd, F_SETFL, flags);
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
-  	}
+	}
 
-	if ((rc = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) < 0) {
+	if ((rc = click_reply(sockfd, xia::XREADNAMESERVERDAG, UDPbuf, sizeof(UDPbuf))) < 0) {
+		fcntl(sockfd, F_SETFL, flags);
 		LOGF("Error retrieving status from Click: %s", strerror(errno));
 		return -1;
 	}
+
+	fcntl(sockfd, F_SETFL, flags);
 
 	xia::XSocketMsg xsm1;
 	xsm1.ParseFromString(UDPbuf);
@@ -72,7 +82,7 @@ int XreadNameServerDAG(int sockfd, sockaddr_x *nsDAG) {
 			g.fill_sockaddr(nsDAG);
 			rc = 0;
 		}
-	}	
+	}
 	return rc;
 }
 

@@ -32,7 +32,7 @@
 /*!
 ** @brief receives datagram data on an Xsocket.
 **
-** Xrecvfrom() retrieves data from an Xsocket of type XSOCK_DGRAM. Unlike the 
+** Xrecvfrom() retrieves data from an Xsocket of type XSOCK_DGRAM. Unlike the
 ** standard recvfrom API, it will not work with sockets of type XSOCK_STREAM.
 **
 ** XrecvFrom() does not currently have a non-blocking mode, and will block
@@ -42,7 +42,7 @@
 ** you may then call XrecvFrom() to get the data.
 **
 ** NOTE: in cases where more data is received than specified by the caller,
-** the excess data will be stored in the socket state structure and will 
+** the excess data will be stored in the socket state structure and will
 ** be returned from there rather than from Click. Once the socket state
 ** is drained, requests will be sent through to Click again.
 **
@@ -78,7 +78,7 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		LOG("null pointer!\n");
 		errno = EFAULT;
 		return -1;
-	}	
+	}
 
 	if (addr && *addrlen < sizeof(sockaddr_x)) {
 		LOG("addr is not large enough");
@@ -90,7 +90,7 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		LOGF("Socket %d must be a datagram socket", sockfd);
 		return -1;
 	}
-	
+
 	// see if we have bytes leftover from a previous Xrecv call
 	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len)) > 0) {
 		// FIXME: we need to also have stashed away the sDAG and
@@ -98,9 +98,11 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		*addrlen = 0;
 		return numbytes;
 	}
-	
-	if ((numbytes = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) < 0) {
-		LOGF("Error retrieving recv data from Click: %s", strerror(errno));
+
+	if ((numbytes = click_reply(sockfd, xia::XRECV, UDPbuf, sizeof(UDPbuf))) < 0) {
+		if (errno != EAGAIN && errno != EWOULDBLOCK) {
+			LOGF("Error retrieving recv data from Click: %s", strerror(errno));
+		}
 		return -1;
 	}
 
