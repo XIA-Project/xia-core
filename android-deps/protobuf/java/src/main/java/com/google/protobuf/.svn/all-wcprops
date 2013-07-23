@@ -1,0 +1,227 @@
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/!svn/ver/354/trunk/java/src/main/java/com/google/protobuf
+END
+MessageLite.java
+K 25
+svn:wc:ra_dav:version-url
+V 79
+/svn/!svn/ver/349/trunk/java/src/main/java/com/google/protobuf/MessageLite.java
+END
+AbstractMessage.java
+K 25
+svn:wc:ra_dav:version-url
+V 83
+/svn/!svn/ver/349/trunk/java/src/main/java/com/google/protobuf/AbstractMessage.java
+END
+BlockingService.java
+K 25
+svn:wc:ra_dav:version-url
+V 83
+/svn/!svn/ver/120/trunk/java/src/main/java/com/google/protobuf/BlockingService.java
+END
+CodedInputStream.java
+K 25
+svn:wc:ra_dav:version-url
+V 84
+/svn/!svn/ver/349/trunk/java/src/main/java/com/google/protobuf/CodedInputStream.java
+END
+MessageLiteOrBuilder.java
+K 25
+svn:wc:ra_dav:version-url
+V 88
+/svn/!svn/ver/353/trunk/java/src/main/java/com/google/protobuf/MessageLiteOrBuilder.java
+END
+CodedOutputStream.java
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/svn/!svn/ver/354/trunk/java/src/main/java/com/google/protobuf/CodedOutputStream.java
+END
+UnknownFieldSet.java
+K 25
+svn:wc:ra_dav:version-url
+V 83
+/svn/!svn/ver/251/trunk/java/src/main/java/com/google/protobuf/UnknownFieldSet.java
+END
+WireFormat.java
+K 25
+svn:wc:ra_dav:version-url
+V 78
+/svn/!svn/ver/349/trunk/java/src/main/java/com/google/protobuf/WireFormat.java
+END
+InvalidProtocolBufferException.java
+K 25
+svn:wc:ra_dav:version-url
+V 98
+/svn/!svn/ver/163/trunk/java/src/main/java/com/google/protobuf/InvalidProtocolBufferException.java
+END
+RpcUtil.java
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/!svn/ver/163/trunk/java/src/main/java/com/google/protobuf/RpcUtil.java
+END
+AbstractMessageLite.java
+K 25
+svn:wc:ra_dav:version-url
+V 87
+/svn/!svn/ver/310/trunk/java/src/main/java/com/google/protobuf/AbstractMessageLite.java
+END
+SmallSortedMap.java
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/svn/!svn/ver/349/trunk/java/src/main/java/com/google/protobuf/SmallSortedMap.java
+END
+RpcController.java
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/!svn/ver/294/trunk/java/src/main/java/com/google/protobuf/RpcController.java
+END
+ByteString.java
+K 25
+svn:wc:ra_dav:version-url
+V 78
+/svn/!svn/ver/349/trunk/java/src/main/java/com/google/protobuf/ByteString.java
+END
+ProtocolMessageEnum.java
+K 25
+svn:wc:ra_dav:version-url
+V 87
+/svn/!svn/ver/163/trunk/java/src/main/java/com/google/protobuf/ProtocolMessageEnum.java
+END
+FieldSet.java
+K 25
+svn:wc:ra_dav:version-url
+V 76
+/svn/!svn/ver/349/trunk/java/src/main/java/com/google/protobuf/FieldSet.java
+END
+Service.java
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/!svn/ver/294/trunk/java/src/main/java/com/google/protobuf/Service.java
+END
+RpcCallback.java
+K 25
+svn:wc:ra_dav:version-url
+V 79
+/svn/!svn/ver/294/trunk/java/src/main/java/com/google/protobuf/RpcCallback.java
+END
+Descriptors.java
+K 25
+svn:wc:ra_dav:version-url
+V 79
+/svn/!svn/ver/349/trunk/java/src/main/java/com/google/protobuf/Descriptors.java
+END
+LazyStringArrayList.java
+K 25
+svn:wc:ra_dav:version-url
+V 87
+/svn/!svn/ver/349/trunk/java/src/main/java/com/google/protobuf/LazyStringArrayList.java
+END
+LazyStringList.java
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/svn/!svn/ver/349/trunk/java/src/main/java/com/google/protobuf/LazyStringList.java
+END
+GeneratedMessage.java
+K 25
+svn:wc:ra_dav:version-url
+V 84
+/svn/!svn/ver/354/trunk/java/src/main/java/com/google/protobuf/GeneratedMessage.java
+END
+RepeatedFieldBuilder.java
+K 25
+svn:wc:ra_dav:version-url
+V 88
+/svn/!svn/ver/349/trunk/java/src/main/java/com/google/protobuf/RepeatedFieldBuilder.java
+END
+ExtensionRegistry.java
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/svn/!svn/ver/251/trunk/java/src/main/java/com/google/protobuf/ExtensionRegistry.java
+END
+Internal.java
+K 25
+svn:wc:ra_dav:version-url
+V 76
+/svn/!svn/ver/349/trunk/java/src/main/java/com/google/protobuf/Internal.java
+END
+RpcChannel.java
+K 25
+svn:wc:ra_dav:version-url
+V 78
+/svn/!svn/ver/294/trunk/java/src/main/java/com/google/protobuf/RpcChannel.java
+END
+ServiceException.java
+K 25
+svn:wc:ra_dav:version-url
+V 84
+/svn/!svn/ver/349/trunk/java/src/main/java/com/google/protobuf/ServiceException.java
+END
+UnmodifiableLazyStringList.java
+K 25
+svn:wc:ra_dav:version-url
+V 94
+/svn/!svn/ver/349/trunk/java/src/main/java/com/google/protobuf/UnmodifiableLazyStringList.java
+END
+GeneratedMessageLite.java
+K 25
+svn:wc:ra_dav:version-url
+V 88
+/svn/!svn/ver/354/trunk/java/src/main/java/com/google/protobuf/GeneratedMessageLite.java
+END
+ExtensionRegistryLite.java
+K 25
+svn:wc:ra_dav:version-url
+V 89
+/svn/!svn/ver/163/trunk/java/src/main/java/com/google/protobuf/ExtensionRegistryLite.java
+END
+Message.java
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/!svn/ver/349/trunk/java/src/main/java/com/google/protobuf/Message.java
+END
+BlockingRpcChannel.java
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/!svn/ver/120/trunk/java/src/main/java/com/google/protobuf/BlockingRpcChannel.java
+END
+DynamicMessage.java
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/svn/!svn/ver/163/trunk/java/src/main/java/com/google/protobuf/DynamicMessage.java
+END
+UninitializedMessageException.java
+K 25
+svn:wc:ra_dav:version-url
+V 97
+/svn/!svn/ver/163/trunk/java/src/main/java/com/google/protobuf/UninitializedMessageException.java
+END
+MessageOrBuilder.java
+K 25
+svn:wc:ra_dav:version-url
+V 84
+/svn/!svn/ver/349/trunk/java/src/main/java/com/google/protobuf/MessageOrBuilder.java
+END
+SingleFieldBuilder.java
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/!svn/ver/349/trunk/java/src/main/java/com/google/protobuf/SingleFieldBuilder.java
+END
+TextFormat.java
+K 25
+svn:wc:ra_dav:version-url
+V 78
+/svn/!svn/ver/349/trunk/java/src/main/java/com/google/protobuf/TextFormat.java
+END

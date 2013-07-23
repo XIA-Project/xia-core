@@ -1,0 +1,41 @@
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/!svn/ver/329/tags/release-1.4.0/xcode/Config
+END
+ReleaseProject.xcconfig
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/svn/!svn/ver/329/tags/release-1.4.0/xcode/Config/ReleaseProject.xcconfig
+END
+General.xcconfig
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/svn/!svn/ver/329/tags/release-1.4.0/xcode/Config/General.xcconfig
+END
+DebugProject.xcconfig
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/!svn/ver/329/tags/release-1.4.0/xcode/Config/DebugProject.xcconfig
+END
+StaticLibraryTarget.xcconfig
+K 25
+svn:wc:ra_dav:version-url
+V 78
+/svn/!svn/ver/329/tags/release-1.4.0/xcode/Config/StaticLibraryTarget.xcconfig
+END
+FrameworkTarget.xcconfig
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/!svn/ver/329/tags/release-1.4.0/xcode/Config/FrameworkTarget.xcconfig
+END
+TestTarget.xcconfig
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/!svn/ver/329/tags/release-1.4.0/xcode/Config/TestTarget.xcconfig
+END

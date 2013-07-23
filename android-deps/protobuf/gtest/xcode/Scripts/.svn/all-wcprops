@@ -1,0 +1,17 @@
+K 25
+svn:wc:ra_dav:version-url
+V 50
+/svn/!svn/ver/329/tags/release-1.4.0/xcode/Scripts
+END
+versiongenerate.py
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/!svn/ver/329/tags/release-1.4.0/xcode/Scripts/versiongenerate.py
+END
+runtests.sh
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/!svn/ver/329/tags/release-1.4.0/xcode/Scripts/runtests.sh
+END

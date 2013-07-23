@@ -1,0 +1,161 @@
+K 25
+svn:wc:ra_dav:version-url
+V 52
+/svn/!svn/ver/363/trunk/src/google/protobuf/compiler
+END
+mock_code_generator.cc
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/mock_code_generator.cc
+END
+subprocess.h
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/subprocess.h
+END
+mock_code_generator.h
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/mock_code_generator.h
+END
+parser_unittest.cc
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/parser_unittest.cc
+END
+parser.cc
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/parser.cc
+END
+test_plugin.cc
+K 25
+svn:wc:ra_dav:version-url
+V 67
+/svn/!svn/ver/262/trunk/src/google/protobuf/compiler/test_plugin.cc
+END
+plugin.cc
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/plugin.cc
+END
+zip_writer.cc
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/zip_writer.cc
+END
+plugin.pb.cc
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/plugin.pb.cc
+END
+parser.h
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/parser.h
+END
+plugin.pb.h
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/!svn/ver/359/trunk/src/google/protobuf/compiler/plugin.pb.h
+END
+importer_unittest.cc
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/svn/!svn/ver/120/trunk/src/google/protobuf/compiler/importer_unittest.cc
+END
+plugin.h
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/plugin.h
+END
+zip_writer.h
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/zip_writer.h
+END
+importer.cc
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/!svn/ver/356/trunk/src/google/protobuf/compiler/importer.cc
+END
+importer.h
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svn/!svn/ver/120/trunk/src/google/protobuf/compiler/importer.h
+END
+command_line_interface_unittest.cc
+K 25
+svn:wc:ra_dav:version-url
+V 87
+/svn/!svn/ver/363/trunk/src/google/protobuf/compiler/command_line_interface_unittest.cc
+END
+command_line_interface.cc
+K 25
+svn:wc:ra_dav:version-url
+V 78
+/svn/!svn/ver/353/trunk/src/google/protobuf/compiler/command_line_interface.cc
+END
+zip_output_unittest.sh
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/zip_output_unittest.sh
+END
+command_line_interface.h
+K 25
+svn:wc:ra_dav:version-url
+V 77
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/command_line_interface.h
+END
+package_info.h
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/svn/!svn/ver/50/trunk/src/google/protobuf/compiler/package_info.h
+END
+plugin.proto
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/plugin.proto
+END
+code_generator.cc
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/code_generator.cc
+END
+code_generator.h
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/code_generator.h
+END
+main.cc
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/!svn/ver/251/trunk/src/google/protobuf/compiler/main.cc
+END
+subprocess.cc
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/subprocess.cc
+END

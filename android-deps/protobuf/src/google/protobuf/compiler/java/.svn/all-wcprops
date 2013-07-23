@@ -1,0 +1,155 @@
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java
+END
+java_plugin_unittest.cc
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_plugin_unittest.cc
+END
+java_service.cc
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_service.cc
+END
+java_service.h
+K 25
+svn:wc:ra_dav:version-url
+V 72
+/svn/!svn/ver/120/trunk/src/google/protobuf/compiler/java/java_service.h
+END
+java_helpers.cc
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_helpers.cc
+END
+java_helpers.h
+K 25
+svn:wc:ra_dav:version-url
+V 72
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_helpers.h
+END
+java_enum.cc
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_enum.cc
+END
+java_enum.h
+K 25
+svn:wc:ra_dav:version-url
+V 68
+/svn/!svn/ver/50/trunk/src/google/protobuf/compiler/java/java_enum.h
+END
+java_enum_field.cc
+K 25
+svn:wc:ra_dav:version-url
+V 76
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_enum_field.cc
+END
+java_enum_field.h
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_enum_field.h
+END
+java_string_field.cc
+K 25
+svn:wc:ra_dav:version-url
+V 78
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_string_field.cc
+END
+java_string_field.h
+K 25
+svn:wc:ra_dav:version-url
+V 77
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_string_field.h
+END
+java_primitive_field.cc
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_primitive_field.cc
+END
+java_extension.cc
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_extension.cc
+END
+java_primitive_field.h
+K 25
+svn:wc:ra_dav:version-url
+V 80
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_primitive_field.h
+END
+java_extension.h
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_extension.h
+END
+java_file.cc
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_file.cc
+END
+java_file.h
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_file.h
+END
+java_field.cc
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_field.cc
+END
+java_message.cc
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_message.cc
+END
+java_field.h
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_field.h
+END
+java_message.h
+K 25
+svn:wc:ra_dav:version-url
+V 72
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_message.h
+END
+java_generator.cc
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_generator.cc
+END
+java_message_field.cc
+K 25
+svn:wc:ra_dav:version-url
+V 79
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_message_field.cc
+END
+java_generator.h
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_generator.h
+END
+java_message_field.h
+K 25
+svn:wc:ra_dav:version-url
+V 78
+/svn/!svn/ver/349/trunk/src/google/protobuf/compiler/java/java_message_field.h
+END

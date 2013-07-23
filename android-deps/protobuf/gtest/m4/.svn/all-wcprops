@@ -1,0 +1,17 @@
+K 25
+svn:wc:ra_dav:version-url
+V 39
+/svn/!svn/ver/329/tags/release-1.4.0/m4
+END
+gtest.m4
+K 25
+svn:wc:ra_dav:version-url
+V 48
+/svn/!svn/ver/329/tags/release-1.4.0/m4/gtest.m4
+END
+acx_pthread.m4
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/svn/!svn/ver/329/tags/release-1.4.0/m4/acx_pthread.m4
+END

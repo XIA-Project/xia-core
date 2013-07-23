@@ -1,0 +1,35 @@
+K 25
+svn:wc:ra_dav:version-url
+V 44
+/svn/!svn/ver/329/tags/release-1.4.0/scripts
+END
+gtest-config.in
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/!svn/ver/329/tags/release-1.4.0/scripts/gtest-config.in
+END
+upload_gtest.py
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/!svn/ver/329/tags/release-1.4.0/scripts/upload_gtest.py
+END
+gen_gtest_pred_impl.py
+K 25
+svn:wc:ra_dav:version-url
+V 67
+/svn/!svn/ver/329/tags/release-1.4.0/scripts/gen_gtest_pred_impl.py
+END
+fuse_gtest_files.py
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/!svn/ver/329/tags/release-1.4.0/scripts/fuse_gtest_files.py
+END
+upload.py
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/svn/!svn/ver/329/tags/release-1.4.0/scripts/upload.py
+END

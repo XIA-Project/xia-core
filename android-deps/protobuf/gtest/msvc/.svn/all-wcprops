@@ -1,0 +1,65 @@
+K 25
+svn:wc:ra_dav:version-url
+V 41
+/svn/!svn/ver/329/tags/release-1.4.0/msvc
+END
+gtest-md.sln
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/svn/!svn/ver/329/tags/release-1.4.0/msvc/gtest-md.sln
+END
+gtest.sln
+K 25
+svn:wc:ra_dav:version-url
+V 51
+/svn/!svn/ver/329/tags/release-1.4.0/msvc/gtest.sln
+END
+gtest_unittest-md.vcproj
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/svn/!svn/ver/329/tags/release-1.4.0/msvc/gtest_unittest-md.vcproj
+END
+gtest-md.vcproj
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/svn/!svn/ver/329/tags/release-1.4.0/msvc/gtest-md.vcproj
+END
+gtest_unittest.vcproj
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svn/!svn/ver/329/tags/release-1.4.0/msvc/gtest_unittest.vcproj
+END
+gtest.vcproj
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/svn/!svn/ver/329/tags/release-1.4.0/msvc/gtest.vcproj
+END
+gtest_prod_test-md.vcproj
+K 25
+svn:wc:ra_dav:version-url
+V 67
+/svn/!svn/ver/329/tags/release-1.4.0/msvc/gtest_prod_test-md.vcproj
+END
+gtest_main-md.vcproj
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/!svn/ver/329/tags/release-1.4.0/msvc/gtest_main-md.vcproj
+END
+gtest_prod_test.vcproj
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/!svn/ver/329/tags/release-1.4.0/msvc/gtest_prod_test.vcproj
+END
+gtest_main.vcproj
+K 25
+svn:wc:ra_dav:version-url
+V 59
+/svn/!svn/ver/329/tags/release-1.4.0/msvc/gtest_main.vcproj
+END
