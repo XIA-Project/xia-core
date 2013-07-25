@@ -3,7 +3,7 @@
 #include <click/element.hh>
 #include <clicknet/udp.h>
 #include <clicknet/icmp.h>
-#include "elements/ip/iprewriterbase.hh"
+#include "../elements/ip/iprewriterbase.hh"
 CLICK_DECLS
 
 /*

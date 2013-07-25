@@ -21,6 +21,7 @@
 #include <click/confparse.hh>
 #include <click/router.hh>
 #include <click/error.hh>
+#include <pthread.h>
 CLICK_DECLS
 
 QueueThreadTest1::QueueThreadTest1()

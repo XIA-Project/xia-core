@@ -21,9 +21,9 @@
 
 #include <click/config.h>
 #include "iprewriterbase.hh"
-#include "elements/ip/iprwpatterns.hh"
-#include "elements/ip/iprwmapping.hh"
-#include "elements/ip/iprwpattern.hh"
+#include "../elements/ip/iprwpatterns.hh"
+#include "../elements/ip/iprwmapping.hh"
+#include "../elements/ip/iprwpattern.hh"
 #include <clicknet/ip.h>
 #include <clicknet/tcp.h>
 #include <clicknet/udp.h>

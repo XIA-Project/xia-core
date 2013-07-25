@@ -60,7 +60,7 @@
 #define HEADER_HMAC_H
 
 #define HMAC_MAX_MD_CBLOCK	128	/* largest known is SHA512 */
-#include "elements/ipsec/sha1_impl.hh"
+#include "../elements/ipsec/sha1_impl.hh"
 
 #define EVP_MAX_MD_SIZE			64
 void OpenSSLDie(void);

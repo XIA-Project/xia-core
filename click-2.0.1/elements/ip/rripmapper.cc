@@ -18,7 +18,7 @@
 
 #include <click/config.h>
 #include "rripmapper.hh"
-#include "elements/ip/iprwpattern.hh"
+#include "../elements/ip/iprwpattern.hh"
 #include <click/confparse.hh>
 #include <click/error.hh>
 CLICK_DECLS

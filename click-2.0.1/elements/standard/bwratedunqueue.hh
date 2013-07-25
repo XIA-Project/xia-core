@@ -1,7 +1,7 @@
 // -*- c-basic-offset: 4 -*-
 #ifndef CLICK_BWRATEDUNQUEUE_HH
 #define CLICK_BWRATEDUNQUEUE_HH
-#include "elements/standard/ratedunqueue.hh"
+#include "../elements/standard/ratedunqueue.hh"
 CLICK_DECLS
 
 /*

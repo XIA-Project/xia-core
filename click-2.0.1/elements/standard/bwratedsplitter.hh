@@ -1,7 +1,7 @@
 // -*- c-basic-offset: 4 -*-
 #ifndef CLICK_BWRATEDSPLITTER_HH
 #define CLICK_BWRATEDSPLITTER_HH
-#include "elements/standard/ratedsplitter.hh"
+#include "../elements/standard/ratedsplitter.hh"
 CLICK_DECLS
 
 /*

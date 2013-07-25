@@ -1,6 +1,6 @@
 #ifndef CLICK_FTPPORTMAPPER_HH
 #define CLICK_FTPPORTMAPPER_HH
-#include "elements/tcpudp/tcprewriter.hh"
+#include "../elements/tcpudp/tcprewriter.hh"
 CLICK_DECLS
 
 /*

@@ -23,7 +23,7 @@
 #if CLICK_BSDMODULE
 # include <sys/limits.h>
 #endif
-#include "elements/ip/iprwpattern.hh"
+#include "../elements/ip/iprwpattern.hh"
 #include "siphmapper.hh"
 CLICK_DECLS
 

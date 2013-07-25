@@ -28,7 +28,7 @@
 #include <click/glue.hh>
 #include <click/packet_anno.hh>
 
-#include "elements/ipsec/hmac.hh"
+#include "../elements/ipsec/hmac.hh"
 #include "satable.hh"
 #include "sadatatuple.hh"
 CLICK_DECLS

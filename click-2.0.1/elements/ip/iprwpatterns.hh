@@ -1,6 +1,6 @@
 #ifndef CLICK_IPRWPATTERNS_HH
 #define CLICK_IPRWPATTERNS_HH
-#include "elements/ip/iprewriterbase.hh"
+#include "../elements/ip/iprewriterbase.hh"
 #include <click/hashtable.hh>
 CLICK_DECLS
 

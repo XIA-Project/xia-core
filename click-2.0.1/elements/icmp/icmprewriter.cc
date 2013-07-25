@@ -18,7 +18,7 @@
 
 #include <click/config.h>
 #include "icmprewriter.hh"
-#include "elements/ip/iprwmapping.hh"
+#include "../elements/ip/iprwmapping.hh"
 #include <clicknet/icmp.h>
 #include <clicknet/tcp.h>
 #include <click/args.hh>

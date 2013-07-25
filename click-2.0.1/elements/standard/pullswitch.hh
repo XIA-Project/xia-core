@@ -1,6 +1,6 @@
 #ifndef CLICK_PULLSWITCH_HH
 #define CLICK_PULLSWITCH_HH
-#include "elements/simple/simplepullswitch.hh"
+#include "../elements/simple/simplepullswitch.hh"
 #include <click/notifier.hh>
 CLICK_DECLS
 

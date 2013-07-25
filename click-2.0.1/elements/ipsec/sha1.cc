@@ -26,7 +26,7 @@
 #include <clicknet/ip.h>
 #include <click/error.hh>
 #include <click/glue.hh>
-#include "elements/ipsec/sha1_impl.hh"
+#include "../elements/ipsec/sha1_impl.hh"
 CLICK_DECLS
 
 #define SHA_DIGEST_LEN 20

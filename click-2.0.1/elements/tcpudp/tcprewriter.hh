@@ -1,7 +1,7 @@
 #ifndef CLICK_TCPREWRITER_HH
 #define CLICK_TCPREWRITER_HH
-#include "elements/ip/iprewriterbase.hh"
-#include "elements/ip/iprwmapping.hh"
+#include "../elements/ip/iprewriterbase.hh"
+#include "../elements/ip/iprwmapping.hh"
 #include <clicknet/tcp.h>
 CLICK_DECLS
 
