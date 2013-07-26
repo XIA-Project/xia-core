@@ -154,13 +154,15 @@ message ConnectionInfo {
 }
 
 message ContextInfo {
-	enum ContextType {
-		SESSION = 1;
+	enum ContextState {
+		CLOSED = 1;
 		LISTEN = 2;
-		UNASSIGNED = 3;
+		CONNECTING = 3;
+		ESTABLISHED = 4;
+		CLOSING = 5;
 	}
 
-	optional ContextType type = 1 [default = UNASSIGNED];
+	optional ContextState state = 1 [default = CLOSED];
 	optional bool initialized = 2 [default = false];
 	optional string my_name = 3;
 	optional bytes my_addr = 4;
