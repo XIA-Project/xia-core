@@ -5,7 +5,7 @@
 #include <click/task.hh>
 #include <click/timer.hh>
 #include <click/notifier.hh>
-#include "elements/userlevel/fromdevice.hh"
+#include "../elements/userlevel/fromdevice.hh"
 CLICK_DECLS
 
 /*

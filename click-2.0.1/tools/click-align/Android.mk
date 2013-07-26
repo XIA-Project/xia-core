@@ -63,7 +63,6 @@ LOCAL_SRC_FILES := \
 ../../elements/standard/scheduleinfo.cc \
 ../../elements/standard/xiaxidinfo.cc \
 ../../lib/clp.c \
-../../lib/exportstub.cc \
 ../../elements/analysis/adjusttimestamp.cc \
 ../../elements/analysis/aggcounter.cc \
 ../../elements/analysis/aggpktcounter.cc \
@@ -323,7 +322,6 @@ LOCAL_SRC_FILES := \
 ../../elements/test/notifierdebug.cc \
 ../../elements/test/nulltask.cc \
 ../../elements/test/packettest.cc \
-../../elements/test/queuethreadtest.cc \
 ../../elements/test/queueyanktest.cc \
 ../../elements/test/randomseed.cc \
 ../../elements/test/schedordertest.cc \
@@ -334,6 +332,7 @@ LOCAL_SRC_FILES := \
 ../../elements/test/vectortest.cc \
 ../../elements/threads/balancedthreadsched.cc \
 ../../elements/threads/spinlockacquire.cc \
+../../elements/test/queuethreadtest.cc \
 ../../elements/threads/spinlockinfo.cc \
 ../../elements/threads/spinlockrelease.cc \
 ../../elements/threads/staticthreadsched.cc \
@@ -396,9 +395,9 @@ LOCAL_SRC_FILES := \
 ../../elements/xia/xiaxidtypecounter.cc \
 ../../elements/xia/xroute.cc \
 ../../elements/xia/xtransport.cc \
-../../elements.cc \
-../../xia.pb.cc \
-../../click.cc
+../../userlevel/elements.cc \
+../../../api/xsocket/xia.pb.cc \
+../../userlevel/click.cc
 
 LOCAL_CPP_EXTENSION := .c .cc
 

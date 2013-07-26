@@ -52,8 +52,8 @@
 #include <click/userutils.hh>
 #include <click/args.hh>
 #include <click/handlercall.hh>
-#include "elements/standard/quitwatcher.hh"
-#include "elements/userlevel/controlsocket.hh"
+#include "../elements/standard/quitwatcher.hh"
+#include "../elements/userlevel/controlsocket.hh"
 CLICK_USING_DECLS
 
 #define HELP_OPT		300

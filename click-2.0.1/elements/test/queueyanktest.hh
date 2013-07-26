@@ -3,7 +3,7 @@
 #define CLICK_QUEUEYANKTEST_HH
 #include <click/element.hh>
 #include <click/timer.hh>
-#include "elements/standard/simplequeue.hh"
+#include "../elements/standard/simplequeue.hh"
 CLICK_DECLS
 
 /*

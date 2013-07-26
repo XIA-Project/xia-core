@@ -71,11 +71,17 @@ QueueThreadTest1::initialize(ErrorHandler *errh)
 	return 0;
 }
 
+
+/**
+ * Must ifdef this part. Fudged it with the whole int n thing.
+ */
 void
 QueueThreadTest1::cleanup(CleanupStage stage)
 {
-    if (stage >= CLEANUP_INITIALIZED)
-	pthread_cancel(_push_thread);
+    if (stage >= CLEANUP_INITIALIZED){
+        //pthread_cancel(_push_thread);
+	int n = 1;
+    }
 }
 
 
