@@ -93,7 +93,7 @@ def getOsxInterfaces(skip, use_interface):
 #
 # get list of interfaces on Linux
 #
-def getLinuxInterfaces(ignore_interfaces, specific_interfaces):
+def getLinuxInterfaces(ignore_interfaces, specific_interface):
     # Get the MAC and IP addresses
     filters = ''
     if ignore_interfaces != None:
