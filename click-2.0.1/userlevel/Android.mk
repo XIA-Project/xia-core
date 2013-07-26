@@ -396,12 +396,12 @@ LOCAL_SRC_FILES := \
 ../elements/xia/xroute.cc \
 ../elements/xia/xtransport.cc \
 elements.cc \
-../api/xsocket/xia.pb.cc \
+xia.pb.cc \
 click.cc
 
 LOCAL_CPP_EXTENSION := .c .cc
 
-LOCAL_C_INCLUDES += api/include api/xsocket/ api/xsocket/minini android-deps/protobuf/src click/include click/tools/lib
+LOCAL_C_INCLUDES += api/include api/xsocket/ api/xsocket/minini android-deps/protobuf/src click/include click/tools/lib $(LOCAL_PATH)/..
 
 LOCAL_SHARED_LIBRARIES := \
 libdagaddr libprotobuf libz libcutils libutils libpthread
