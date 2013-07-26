@@ -73,8 +73,10 @@ QueueThreadTest1::initialize(ErrorHandler *errh)
 void
 QueueThreadTest1::cleanup(CleanupStage stage)
 {
+#ifndef CLICK_ANDROID
     if (stage >= CLEANUP_INITIALIZED)
 	pthread_cancel(_push_thread);
+#endif
 }
 
 
