@@ -30,7 +30,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <fcntl.h>
-#include "../elements/analysis/ipsumdumpinfo.hh"
+#include "elements/analysis/ipsumdumpinfo.hh"
 CLICK_DECLS
 
 #ifdef i386

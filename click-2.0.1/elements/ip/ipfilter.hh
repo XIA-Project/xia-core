@@ -1,6 +1,6 @@
 #ifndef CLICK_IPFILTER_HH
 #define CLICK_IPFILTER_HH
-#include "../elements/standard/classification.hh"
+#include "elements/standard/classification.hh"
 #include <click/element.hh>
 CLICK_DECLS
 

@@ -2,7 +2,7 @@
 #ifndef CLICK_AGGREGATEIP_HH
 #define CLICK_AGGREGATEIP_HH
 #include <click/element.hh>
-#include "../elements/ip/ipfieldinfo.hh"
+#include "elements/ip/ipfieldinfo.hh"
 CLICK_DECLS
 
 /*

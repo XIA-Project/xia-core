@@ -23,7 +23,7 @@
 #include <click/error.hh>
 #include <click/packet_anno.hh>
 #include <click/standard/alignmentinfo.hh>
-#include "../elements/ip/checkipheader.hh"
+#include "elements/ip/checkipheader.hh"
 CLICK_DECLS
 
 IPInputCombo::IPInputCombo()

@@ -1,7 +1,7 @@
 #ifndef CLICK_ICMPPINGREWRITER_HH
 #define CLICK_ICMPPINGREWRITER_HH
-#include "../elements/ip/iprewriterbase.hh"
-#include "../elements/ip/iprwmapping.hh"
+#include "elements/ip/iprewriterbase.hh"
+#include "elements/ip/iprwmapping.hh"
 #include <clicknet/icmp.h>
 CLICK_DECLS
 

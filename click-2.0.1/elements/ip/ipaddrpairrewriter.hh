@@ -1,8 +1,8 @@
 // -*- mode: c++; c-basic-offset: 4 -*-
 #ifndef CLICK_IPADDRPAIRREWRITER_HH
 #define CLICK_IPADDRPAIRREWRITER_HH
-#include "../elements/ip/iprewriterbase.hh"
-#include "../elements/ip/iprwmapping.hh"
+#include "elements/ip/iprewriterbase.hh"
+#include "elements/ip/iprwmapping.hh"
 CLICK_DECLS
 
 /*

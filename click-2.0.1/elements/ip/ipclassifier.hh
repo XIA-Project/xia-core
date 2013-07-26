@@ -1,6 +1,6 @@
 #ifndef CLICK_IPCLASSIFIER_HH
 #define CLICK_IPCLASSIFIER_HH
-#include "../elements/ip/ipfilter.hh"
+#include "elements/ip/ipfilter.hh"
 CLICK_DECLS
 
 /*

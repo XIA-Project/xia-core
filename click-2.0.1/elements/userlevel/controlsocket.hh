@@ -1,6 +1,6 @@
 #ifndef CLICK_CONTROLSOCKET_HH
 #define CLICK_CONTROLSOCKET_HH
-#include "../elements/userlevel/handlerproxy.hh"
+#include "elements/userlevel/handlerproxy.hh"
 #include <click/straccum.hh>
 CLICK_DECLS
 class ControlSocketErrorHandler;

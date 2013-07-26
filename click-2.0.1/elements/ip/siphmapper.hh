@@ -3,7 +3,7 @@
 #include <click/element.hh>
 #include <click/ipflowid.hh>
 #include <clicknet/ip.h>
-#include "../elements/ip/iprewriterbase.hh"
+#include "elements/ip/iprewriterbase.hh"
 #include <click/glue.hh>
 CLICK_DECLS
 

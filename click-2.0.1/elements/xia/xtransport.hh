@@ -14,7 +14,7 @@
 #include "xiaxidroutetable.hh"
 #include <clicknet/udp.h>
 #include <click/string.hh>
-#include <../elements/ipsec/sha1_impl.hh>
+#include <elements/ipsec/sha1_impl.hh>
 
 
 #if CLICK_USERLEVEL

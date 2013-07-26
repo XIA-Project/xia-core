@@ -1,7 +1,7 @@
 #ifndef CLICK_UDPREWRITER_HH
 #define CLICK_UDPREWRITER_HH
-#include "../elements/ip/iprewriterbase.hh"
-#include "../elements/ip/iprwmapping.hh"
+#include "elements/ip/iprewriterbase.hh"
+#include "elements/ip/iprwmapping.hh"
 #include <click/sync.hh>
 CLICK_DECLS
 

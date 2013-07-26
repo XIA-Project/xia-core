@@ -2,7 +2,7 @@
 #ifndef CLICK_QUEUETHREADTEST_HH
 #define CLICK_QUEUETHREADTEST_HH
 #include <click/element.hh>
-#include "../elements/standard/simplequeue.hh"
+#include "elements/standard/simplequeue.hh"
 #include <pthread.h>
 #include <click/task.hh>
 #include <click/notifier.hh>

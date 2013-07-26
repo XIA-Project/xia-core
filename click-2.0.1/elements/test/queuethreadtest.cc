@@ -21,7 +21,6 @@
 #include <click/confparse.hh>
 #include <click/router.hh>
 #include <click/error.hh>
-#include <pthread.h>
 CLICK_DECLS
 
 QueueThreadTest1::QueueThreadTest1()
@@ -71,17 +70,11 @@ QueueThreadTest1::initialize(ErrorHandler *errh)
 	return 0;
 }
 
-
-/**
- * Must ifdef this part. Fudged it with the whole int n thing.
- */
 void
 QueueThreadTest1::cleanup(CleanupStage stage)
 {
-    if (stage >= CLEANUP_INITIALIZED){
-        //pthread_cancel(_push_thread);
-	int n = 1;
-    }
+    if (stage >= CLEANUP_INITIALIZED)
+	pthread_cancel(_push_thread);
 }
 
 

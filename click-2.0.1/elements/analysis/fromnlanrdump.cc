@@ -27,7 +27,7 @@
 #include <click/handlercall.hh>
 #include <clicknet/rfc1483.h>
 #include <click/userutils.hh>
-#include "../elements/userlevel/fakepcap.hh"
+#include "elements/userlevel/fakepcap.hh"
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>

@@ -1,6 +1,6 @@
 #ifndef CLICK_CHECKIPHEADER2_HH
 #define CLICK_CHECKIPHEADER2_HH
-#include "../elements/ip/checkipheader.hh"
+#include "elements/ip/checkipheader.hh"
 CLICK_DECLS
 
 /*

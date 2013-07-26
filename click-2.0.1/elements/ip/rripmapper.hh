@@ -1,6 +1,6 @@
 #ifndef CLICK_RRIPMAPPER_HH
 #define CLICK_RRIPMAPPER_HH
-#include "../elements/ip/iprewriterbase.hh"
+#include "elements/ip/iprewriterbase.hh"
 CLICK_DECLS
 
 /*

@@ -11,7 +11,7 @@
 #include <click/string.hh>
 #include <click/packet.hh>
 #include <click/xiaheader.hh>
-#include "../elements/ipsec/sha1_impl.hh"
+#include "elements/ipsec/sha1_impl.hh"
 CLICK_DECLS
 
 XIAInsertHash::XIAInsertHash() 

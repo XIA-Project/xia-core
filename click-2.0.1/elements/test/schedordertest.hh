@@ -3,7 +3,7 @@
 #define CLICK_SCHEDORDERTEST_HH
 #include <click/element.hh>
 #include <click/task.hh>
-#include "../elements/standard/simplequeue.hh"
+#include "elements/standard/simplequeue.hh"
 CLICK_DECLS
 
 /*

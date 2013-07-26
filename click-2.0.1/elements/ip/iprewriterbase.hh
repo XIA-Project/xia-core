@@ -2,7 +2,7 @@
 #ifndef CLICK_IPREWRITERBASE_HH
 #define CLICK_IPREWRITERBASE_HH
 #include <click/timer.hh>
-#include "../elements/ip/iprwmapping.hh"
+#include "elements/ip/iprwmapping.hh"
 #include <click/bitvector.hh>
 CLICK_DECLS
 class IPMapper;
