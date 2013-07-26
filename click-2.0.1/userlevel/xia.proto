@@ -30,6 +30,8 @@ enum XSocketCallType {
   XISDUALSTACKROUTER = 23;
   XGETPEERNAME = 24;
   XGETSOCKNAME = 25;
+
+  XPUSHCHUNK = 27;
 }
 
 message XSocketMsg {
@@ -64,6 +66,8 @@ message XSocketMsg {
   optional X_IsDualStackRouter_Msg x_isdualstackrouter = 24;   
   optional X_GetPeername_Msg x_getpeername = 25;
   optional X_GetSockname_Msg x_getsockname = 26; 
+
+  optional X_Pushchunk_Msg x_pushchunk= 27;
 }
  
 message X_Socket_Msg {
@@ -210,6 +214,8 @@ message msg {
     CONNECTSID = 2;
     PUTCID = 3;
     SERVESID = 4;
+/*** IS THIS NECESSARY? ***/
+    PUSHCID = 5;
   }
   optional MsgType type = 4;
 
@@ -220,4 +226,16 @@ message msg_response {
   repeated bytes xid = 2;   // can be a list of CID's
   optional string payload = 3;  // bytes or string?
 }
-  
+ 
+
+message X_Pushchunk_Msg {
+  required int32 cachepolicy = 1;
+  required int32 cachesize = 2;
+  required int32 contextid = 3;
+  required int32 TTL = 4;
+  required bytes payload = 5; // data
+  optional string cid = 6;
+  optional int32 length = 7;
+  optional int64 timestamp = 8; 
+}
+ 

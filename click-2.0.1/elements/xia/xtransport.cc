@@ -2201,6 +2201,108 @@ void XTRANSPORT::XputChunk(unsigned short _sport)
 	output(API_PORT).push(UDPIPPrep(reply, _sport));
 }
 
+
+
+
+void XTRANSPORT::XpushChunk(unsigned short _sport)
+{
+	xia::X_Pushchunk_Msg *x_pushchunk_msg = xia_socket_msg.mutable_x_pushchunk();
+//			int hasCID = x_putchunk_msg->hascid();
+	int32_t contextID = x_pushchunk_msg->contextid();
+	int32_t ttl = x_pushchunk_msg->ttl();
+	int32_t cacheSize = x_pushchunk_msg->cachesize();
+	int32_t cachePolicy = x_pushchunk_msg->cachepolicy();
+
+	String pktPayload(x_pushchunk_msg->payload().c_str(), x_pushchunk_msg->payload().size());
+	String src;
+
+	/* Computes SHA1 Hash if user does not supply it */
+	char hexBuf[3];
+	int i = 0;
+	SHA1_ctx sha_ctx;
+	unsigned char digest[HASH_KEYSIZE];
+	SHA1_init(&sha_ctx);
+	SHA1_update(&sha_ctx, (unsigned char *)pktPayload.c_str() , pktPayload.length() );
+	SHA1_final(digest, &sha_ctx);
+	for(i = 0; i < HASH_KEYSIZE; i++) {
+		sprintf(hexBuf, "%02x", digest[i]);
+		src.append(const_cast<char *>(hexBuf), 2);
+	}
+
+	if(DEBUG) {
+		click_chatter("ctxID=%d, length=%d, ttl=%d cid=%s\n",
+					  contextID, x_pushchunk_msg->payload().size(), ttl, src.c_str());
+	}
+
+	//append local address before CID
+	String str_local_addr = _local_addr.unparse_re();
+	str_local_addr = "RE " + str_local_addr + " CID:" + src;
+	XIAPath src_path;
+	src_path.parse(str_local_addr);
+
+	if(DEBUG) {
+		click_chatter("DAG: %s\n", str_local_addr.c_str());
+	}
+
+	/*TODO: The destination dag of the incoming packet is local_addr:XID
+	 * Thus the cache thinks it is destined for local_addr and delivers to socket
+	 * This must be ignored. Options
+	 * 1. Use an invalid SID
+	 * 2. The cache should only store the CID responses and not forward them to
+	 *	local_addr when the source and the destination HIDs are the same.
+	 * 3. Use the socket SID on which putCID was issued. This will
+	 *	result in a reply going to the same socket on which the putCID was issued.
+	 *	Use the response to return 1 to the putCID call to indicate success.
+	 *	Need to add daginfo/ephemeral SID generation for this to work.
+	 * 4. Special OPCODE in content extension header and treat it specially in content module (done below)
+	 */
+
+	//Add XIA headers
+	XIAHeaderEncap xiah;
+	xiah.set_last(LAST_NODE_DEFAULT);
+	xiah.set_hlim(hlim.get(_sport));
+	xiah.set_dst_path(_local_addr);
+	xiah.set_src_path(src_path);
+	xiah.set_nxt(CLICK_XIA_NXT_CID);
+
+	//Might need to remove more if another header is required (eg some control/DAG info)
+
+	WritablePacket *just_payload_part = WritablePacket::make(256, (const void*)pktPayload.c_str(), pktPayload.length(), 0);
+
+	WritablePacket *p = NULL;
+	int chunkSize = pktPayload.length();
+	ContentHeaderEncap  contenth(0, 0, pktPayload.length(), chunkSize, ContentHeader::OP_LOCAL_PUTCID,
+								 contextID, ttl, cacheSize, cachePolicy);
+	p = contenth.encap(just_payload_part);
+	p = xiah.encap(p, true);
+
+	if (DEBUG)
+		click_chatter("sent packet to cache");
+	output(CACHE_PORT).push(p);
+
+	// (for Ack purpose) Reply with a packet with the destination port=source port
+	struct timeval timestamp;
+	gettimeofday(&timestamp, NULL);
+	xia::XSocketMsg _socketResponse;
+	_socketResponse.set_type(xia::XPUTCHUNK);
+	xia::X_Putchunk_Msg *_msg = _socketResponse.mutable_x_putchunk();
+	_msg->set_contextid(contextID);
+	_msg->set_cid(src.c_str());
+	_msg->set_ttl(ttl);
+	_msg->set_timestamp(timestamp.tv_sec);
+//	_msg->set_hascid(1);
+	_msg->set_cachepolicy(0);
+	_msg->set_cachesize(0);
+	_msg->set_payload(x_pushchunk_msg->payload().c_str(), x_pushchunk_msg->payload().size());
+
+	std::string p_buf1;
+	_socketResponse.SerializeToString(&p_buf1);
+	WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
+	output(API_PORT).push(UDPIPPrep(reply, _sport));
+}
+
+
+
 CLICK_ENDDECLS
 
 EXPORT_ELEMENT(XTRANSPORT)
