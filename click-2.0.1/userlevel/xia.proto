@@ -30,11 +30,13 @@ enum XSocketCallType {
   XISDUALSTACKROUTER = 23;
   XGETPEERNAME = 24;
   XGETSOCKNAME = 25;
+
+  XGETMSG = 26;
 }
 
 message XSocketMsg {
   required XSocketCallType type = 1; // XIA Socket call type
-  required int32 sequence = 2;
+  optional int32 sequence = 2;
 
   optional X_Socket_Msg x_socket= 3;
   optional X_Bind_Msg x_bind= 4;
