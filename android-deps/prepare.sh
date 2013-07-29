@@ -9,7 +9,5 @@ if [ $already_patched -eq 0 ]; then
   patch -p0 < android-deps/config_patch.diff
 fi
 
-already_patched=$(grep CLICK_ANDROID "click/userlevel/elements.cc" | wc -l)
-if [ $already_patched -eq 0 ]; then 
-  patch -p0 < android-deps/elements_patch1.diff
-fi
+./android-deps/elements_modifier.py
+mv click/userlevel/elementsMod.cc click/userlevel/elements.cc
