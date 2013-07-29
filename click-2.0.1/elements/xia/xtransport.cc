@@ -397,6 +397,82 @@ XTRANSPORT::copy_cid_response_packet(Packet *p, DAGinfo *daginfo) {
 	return copy;
 }
 
+/**
+* @brief Checks whether or not a received packet can be buffered.
+*
+* Checks if we have room to buffer the received packet; that is, is the packet's
+* sequence number within our recieve window?
+*
+* @param p
+* @param daginfo
+*
+* @return true if packet can be buffered, false otherwise
+*/
+bool XTRANSPORT::should_buffer_received_packet(WritablePacket *p, DAGinfo *daginfo) {
+	
+	TransportHeader thdr(p);
+	int received_seqnum = thdr.seq_num();
+
+	// check if received_seqnum is within our current recv window
+	// TODO: if we switch to a byte-based, buf size, this needs to change
+	if (received_seqnum >= daginfo->next_recv_seqnum &&
+		received_seqnum < daginfo->next_recv_seqnum + daginfo->recv_buffer_size) {
+		return true;
+	}
+	return false;
+}
+
+// TODO: make these two functions check sock_type and act accordingly!!
+
+/**
+* @brief Adds a packet to the connection's receive buffer.
+*
+* Stores the supplied packet pointer, p, in slot seqnum % bufsize.
+*
+* @param p
+* @param daginfo
+*/
+void XTRANSPORT::add_packet_to_recv_buf(WriteablePacket *p, DAGinfo *daginfo) {
+
+	TransportHeader thdr(p);
+	int received_seqnum = thdr.seq_num();
+	int index = received_seqnum % daginfo->recv_buffer_size;
+
+	daginfo->recv_buffer[index] = p;
+}
+
+/**
+* @brief Returns the next expected sequence number.
+*
+* Beginning with daginfo->recv_base, this function checks consecutive slots
+* in the receive buffer and returns the first missing sequence number.
+*
+* @param daginfo
+*/
+void XTRANSPORT::next_missing_seqnum(DAGinfo *daginfo) {
+
+	uint32_t next_missing = daginfo->recv_base;
+	for (uint32_t i = 0; i < daginfo->recv_buffer_size; i++) {
+
+		// checking if we have the next consecutive packet
+		uint32_t seqnum_to_check = daginfo->recv_base + i;
+		uint32_t index_to_check = seqnum_to_check % daginfo->recv_buffer_size;
+
+		next_missing = seqnum_to_check;
+
+		if (daginfo->recv_buffer[index_to_check]) {
+			TransportHeader thdr(daginfo->recv_buffer[index_to_check]);
+			if (thdr.seq_num() != seqnum_to_check) {
+				break; // found packet, but its seqnum isn't right, so break and return next_missing
+			}
+		} else {
+			break; // no packet here, so break and return next_missing
+		}
+	}
+
+	return next_missing;
+}
+
 void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 {
 	//Extract the destination port
@@ -500,7 +576,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 	unsigned short _dport = XIDtoPort.get(_destination_xid);  // This is to be updated for the XSOCK_STREAM type connections below
 
-	bool sendToApplication = true;
+	// bool sendToApplication = true;
 	//String pld((char *)xiah.payload(), xiah.plen());
 	//printf("\n\n 1. (%s) Received=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), pld.c_str(), xiah.plen());
 
@@ -671,16 +747,13 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 				DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
 
-				if (thdr.seq_num() == daginfo->next_recv_seqnum) {
-					daginfo->next_recv_seqnum++;
-					//printf("(%s) Accept Received data (now expected seq=%d)\n", (_local_addr.unparse()).c_str(), daginfo->next_recv_seqnum);
-				} else {
-					sendToApplication = false;
-					printf("expected sequence # %d, received %d\n", daginfo->next_recv_seqnum, thdr.seq_num());
-					printf("(%s) Discarded Received data\n", (_local_addr.unparse()).c_str());
-				}
+				// buffer data, if we have room
+				if (should_buffer_received_packet(p_in, daginfo)) {
+					add_packet_to_recv_buf(p_in, daginfo);
+					daginfo->next_recv_seqnum = next_missing_seqnum(daginfo);
+				} 
 
-				portToDAGinfo.set(_dport, *daginfo);
+				portToDAGinfo.set(_dport, *daginfo); // TODO: why do we need this?
 			
 				//In case of Client Mobility...	 Update 'daginfo->dst_path'
 				daginfo->dst_path = src_path;		
@@ -700,7 +773,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				WritablePacket *p = NULL;
 
 				xiah_new.set_plen(strlen(dummy));
-				//click_chatter("Sent packet to network");
 
 				TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeACKHeader( 0, daginfo->next_recv_seqnum, 0); // #seq, #ack, length
 				p = thdr_new->encap(just_payload_part);
@@ -747,7 +819,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 				// Clear all Acked packets
 				for (int i = daginfo->send_base; i < remote_next_seqnum_expected; i++) {
-					int idx = i % MAX_WIN_SIZE;
+					int idx = i % daginfo->send_buffer_size;
 					if (daginfo->send_buffer[idx]) {
 						daginfo->send_buffer[idx]->kill();
 						daginfo->send_buffer[idx] = NULL;
@@ -796,9 +868,11 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 		_dport = XIDtoPort.get(_destination_xid);
 		DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
-		// check if _destination_sid is of XSOCK_DGRAM
-		if (daginfo->sock_type != XSOCKET_DGRAM) {
-			sendToApplication = false;
+
+		// buffer packet if this is a DGRAM socket and we have room
+		if (daginfo->sock_type == XSOCKET_DGRAM &&
+			should_buffer_received_packet(p_in, daginfo)) {
+			add_packet_to_recv_buf(p_in, daginfo);
 		}
 	
 	} else {
@@ -806,7 +880,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 	}
 
 
-	if(_dport && sendToApplication) {
+	/*if(_dport && sendToApplication) {
 		//TODO: Refine the way we change DAG in case of migration. Use some control bits. Add verification
 		DAGinfo daginfo = portToDAGinfo.get(_dport);
 
@@ -849,7 +923,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 		if (!_dport) {
 			click_chatter("Packet to unknown port %d XID=%s, sendToApp=%d", _dport, _destination_xid.unparse().c_str(), sendToApplication );
 		}
-	}
+	}*/
 }
 
 void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
