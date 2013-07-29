@@ -46,7 +46,7 @@ using namespace std;
 #define XSOCKET_RAW		3	// Raw XIA socket
 #define XSOCKET_CHUNK	4	// Content Chunk transport (CID)
 
-#define MAX_SEND_WIN_SIZE 100
+#define MAX_SEND_WIN_SIZE 100  // in packets, not bytes
 #define MAX_RECV_WIN_SIZE 100
 
 #define MAX_CONNECT_TRIES	 30
