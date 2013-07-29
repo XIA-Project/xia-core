@@ -401,7 +401,8 @@ XTRANSPORT::copy_cid_response_packet(Packet *p, sock *sk) {
 * @brief Checks whether or not a received packet can be buffered.
 *
 * Checks if we have room to buffer the received packet; that is, is the packet's
-* sequence number within our recieve window?
+* sequence number within our recieve window? (Or, in the case of a DGRAM socket,
+* simply checks if there is an unused slot at the end of the recv buffer.)
 *
 * @param p
 * @param sk
@@ -409,35 +410,47 @@ XTRANSPORT::copy_cid_response_packet(Packet *p, sock *sk) {
 * @return true if packet can be buffered, false otherwise
 */
 bool XTRANSPORT::should_buffer_received_packet(WritablePacket *p, sock *sk) {
-	
-	TransportHeader thdr(p);
-	int received_seqnum = thdr.seq_num();
 
-	// check if received_seqnum is within our current recv window
-	// TODO: if we switch to a byte-based, buf size, this needs to change
-	if (received_seqnum >= sk->next_recv_seqnum &&
-		received_seqnum < sk->next_recv_seqnum + sk->recv_buffer_size) {
-		return true;
+	if (sk->sock_type == XSOCKET_STREAM) {
+		// check if received_seqnum is within our current recv window
+		// TODO: if we switch to a byte-based, buf size, this needs to change
+		TransportHeader thdr(p);
+		int received_seqnum = thdr.seq_num();
+		if (received_seqnum >= sk->next_recv_seqnum &&
+			received_seqnum < sk->next_recv_seqnum + sk->recv_buffer_size) {
+			return true;
+		}
+	} else if (sk->sock_type == XSOCKET_DGRAM) {
+		if ( (sk->dgram_buffer_end + 1) % sk->recv_buffer_size != sk->dgram_buffer_start) {
+			return true;
+		}
 	}
 	return false;
 }
 
-// TODO: make these two functions check sock_type and act accordingly!!
-
 /**
 * @brief Adds a packet to the connection's receive buffer.
 *
-* Stores the supplied packet pointer, p, in slot seqnum % bufsize.
+* Stores the supplied packet pointer, p, in a slot depending on sock type:
+*
+*   STREAM: index = seqnum % bufsize.
+*   DGRAM:  index = (end + 1) % bufsize
 *
 * @param p
 * @param sk
 */
 void XTRANSPORT::add_packet_to_recv_buf(WritablePacket *p, sock *sk) {
 
-	TransportHeader thdr(p);
-	int received_seqnum = thdr.seq_num();
-	int index = received_seqnum % sk->recv_buffer_size;
-
+	int index = -1;
+	if (sk->sock_type == XSOCKET_STREAM) {
+		TransportHeader thdr(p);
+		int received_seqnum = thdr.seq_num();
+		index = received_seqnum % sk->recv_buffer_size;
+	} else if (sk->sock_type == XSOCKET_DGRAM) {
+		index = (sk->dgram_buffer_end + 1) % sk->recv_buffer_size;
+		sk->dgram_buffer_end = index;
+	}
+		
 	sk->recv_buffer[index] = p;
 }
 
@@ -446,6 +459,7 @@ void XTRANSPORT::add_packet_to_recv_buf(WritablePacket *p, sock *sk) {
 *
 * Beginning with sk->recv_base, this function checks consecutive slots
 * in the receive buffer and returns the first missing sequence number.
+* (This function only applies to STREAM sockets.)
 *
 * @param sk
 */
