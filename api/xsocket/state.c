@@ -35,7 +35,7 @@ public:
 
 	int transportType() { return m_transportType; };
 	void setTransportType(int tt) {m_transportType = tt; };
-	
+
 	int data(char *buf, unsigned bufLen);
 	void setData(const char *buf, unsigned bufLen);
 	int dataLen() { return m_bufLen; };
@@ -49,6 +49,8 @@ public:
 	int isAsync() { return m_async; };
 	void setAsync(int async) { m_async = async; };
 
+	unsigned seqNo() { return m_sequence++; };
+
 private:
 	int m_transportType;
 	int m_connected;
@@ -56,6 +58,7 @@ private:
 	int m_wrapped;	// hack for dealing with xwrap stuff
 	char *m_buf;
 	unsigned m_bufLen;
+	unsigned m_sequence;
 };
 
 SocketState::SocketState(int tt)
@@ -67,6 +70,7 @@ SocketState::SocketState(int tt)
 	m_wrapped = 0;
 	m_buf = (char *)0;
 	m_bufLen = 0;
+	m_sequence = 1;
 }
 
 SocketState::SocketState()
@@ -163,7 +167,7 @@ SocketMap *SocketMap::getMap()
 	if (!instance) {
 
 		pthread_mutex_lock(&lock);
-		
+
 		if (!instance)
 			instance = new SocketMap();
 
@@ -294,6 +298,15 @@ void setSocketData(int sock, const char *buf, unsigned bufLen)
 		sstate->setData(buf, bufLen);
 }
 
+unsigned seqNo(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		return sstate->seqNo();
+	else
+		return 0;
+}
+
 #if 0
 int main()
 {
@@ -302,7 +315,7 @@ int main()
 
 	// should be invalid
 	printf("socket %d tt %d\n", 0, getSocketType(0));
-	
+
 	// should be valid, then invalid
 	allocSocketState(5, 1);
 	printf("socket %d tt %d\n", 5, getSocketType(5));

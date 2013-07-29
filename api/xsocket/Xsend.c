@@ -78,6 +78,9 @@ int Xsend(int sockfd, const void *buf, size_t len, int flags)
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XSEND);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
+	printf("seq # = %d\n", xsm.sequence());
 
 	xia::X_Send_Msg *x_send_msg = xsm.mutable_x_send();
 	x_send_msg->set_payload(buf, len);

@@ -379,6 +379,8 @@ int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XGETPEERNAME);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
 
 	// send the protobuf containing the user data to click
     if ((rc = click_send(sockfd, &xsm)) < 0) {
@@ -454,6 +456,8 @@ int Xgetsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XGETSOCKNAME);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
 
 	// send the protobuf containing the user data to click
     if ((rc = click_send(sockfd, &xsm)) < 0) {

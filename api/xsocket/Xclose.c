@@ -50,6 +50,8 @@ int Xclose(int sockfd)
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XCLOSE);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
 
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));

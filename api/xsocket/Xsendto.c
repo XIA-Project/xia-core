@@ -29,7 +29,7 @@
 **
 ** Xsendto sends a datagram to the specified address. The final intent of
 ** the address should be a valid SID.
-** 
+**
 ** Unlike a standard socket, Xsendto() is only valid on Xsockets of
 ** type XSOCK_DGRAM.
 **
@@ -83,13 +83,15 @@ int Xsendto(int sockfd,const void *buf, size_t len, int flags,
 
 	// if buf is too big, send only what we can
 	if (len > XIA_MAXBUF) {
-		LOGF("truncating... requested size (%d) is larger than XIA_MAXBUF (%d)\n", 
+		LOGF("truncating... requested size (%d) is larger than XIA_MAXBUF (%d)\n",
 				len, XIA_MAXBUF);
 		len = XIA_MAXBUF;
 	}
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XSENDTO);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
 
 	xia::X_Sendto_Msg *x_sendto_msg = xsm.mutable_x_sendto();
 
@@ -105,7 +107,7 @@ int Xsendto(int sockfd,const void *buf, size_t len, int flags,
 		return -1;
 	}
 
-	// because we don't have queueing or seperate control and data sockets, we 
+	// because we don't have queueing or seperate control and data sockets, we
 	// can't get status back reliably on a datagram socket as multiple peers
 	// could be talking to it at the same time and the control messages can get
 	// mixed up with the data packets. So just assume that all went well and tell

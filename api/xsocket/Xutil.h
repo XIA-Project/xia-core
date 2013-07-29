@@ -51,4 +51,6 @@ void setWrapped(int sock, int wrapped);
 int isWrapped(int sock);
 void setAsync(int sock, int async);
 int isAsync(int sock);
+unsigned seqNo(int sock);
+
 #endif

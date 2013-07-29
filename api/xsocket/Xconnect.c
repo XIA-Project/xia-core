@@ -55,7 +55,7 @@ int Xconnect(int sockfd, const sockaddr *addr, socklen_t addrlen)
 
 	// we can't count on addrlen being set correctly if we are being called via
 	// the wrapper functions as the original source program doesn't know that
-	// a sockaddr_x is larger than a sockaddr	
+	// a sockaddr_x is larger than a sockaddr
 //	if (!addr || addrlen < sizeof(sockaddr_x)) {
 	if (!addr) {
 		errno = EINVAL;
@@ -74,6 +74,8 @@ int Xconnect(int sockfd, const sockaddr *addr, socklen_t addrlen)
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XCONNECT);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
 
 	xia::X_Connect_Msg *x_connect_msg = xsm.mutable_x_connect();
 	x_connect_msg->set_ddag(g.dag_string().c_str());
@@ -85,7 +87,7 @@ int Xconnect(int sockfd, const sockaddr *addr, socklen_t addrlen)
 	// Waiting for SYNACK from destination server
 
 	// FIXME: make this use protobufs
-#if 1	
+#if 1
 	addr_len = sizeof their_addr;
 	setWrapped(sockfd, 1);
 	if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
@@ -99,10 +101,10 @@ int Xconnect(int sockfd, const sockaddr *addr, socklen_t addrlen)
 	if (strcmp(buf, "^Connection-failed^") == 0) {
 		errno = ECONNREFUSED;
 		LOG("Connection Failed");
-		return -1;	    
+		return -1;
 	} else {
 		setConnected(sockfd, 1);
-		return 0; 
+		return 0;
 	}
 #endif
 }

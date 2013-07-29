@@ -40,11 +40,13 @@ int XupdateAD(int sockfd, char *newad, char *new4id) {
 
   xia::XSocketMsg xsm;
   xsm.set_type(xia::XCHANGEAD);
+  unsigned seq = seqNo(sockfd);
+  xsm.set_sequence(seq);
 
   xia::X_Changead_Msg *x_changead_msg = xsm.mutable_x_changead();
   x_changead_msg->set_ad(newad);
   x_changead_msg->set_ip4id(new4id);
-  
+
   if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
@@ -74,7 +76,7 @@ int XupdateAD(int sockfd, char *newad, char *new4id) {
 int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *localhostHID, unsigned lenHID, char *local4ID, unsigned len4ID) {
   	int rc;
   	char UDPbuf[MAXBUFLEN];
-  	
+
  	if (getSocketType(sockfd) == XSOCK_INVALID) {
    	 	LOG("The socket is not a valid Xsocket");
    	 	errno = EBADF;
@@ -89,7 +91,9 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *loca
 
  	xia::XSocketMsg xsm;
   	xsm.set_type(xia::XREADLOCALHOSTADDR);
-  
+  	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
+
   	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
@@ -114,9 +118,9 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *loca
 		rc = 0;
 	} else {
 		rc = -1;
-	}	
+	}
 	return rc;
-	 
+
 }
 
 
@@ -126,7 +130,7 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *loca
 **
 ** @param sockfd an Xsocket (may be of any type XSOCK_STREAM, etc...)
 **
-** @returns 1 if this is an XIA-IPv4 dual-stack router 
+** @returns 1 if this is an XIA-IPv4 dual-stack router
 ** @returns 0 if this is an XIA router
 ** @returns -1 on failure with errno set
 **
@@ -134,7 +138,7 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *loca
 int XisDualStackRouter(int sockfd) {
   	int rc;
   	char UDPbuf[MAXBUFLEN];
-  	
+
  	if (getSocketType(sockfd) == XSOCK_INVALID) {
    	 	LOG("The socket is not a valid Xsocket");
    	 	errno = EBADF;
@@ -143,7 +147,9 @@ int XisDualStackRouter(int sockfd) {
 
  	xia::XSocketMsg xsm;
   	xsm.set_type(xia::XISDUALSTACKROUTER);
-  
+  	unsigned seq = seqNo(sockfd);
+  	xsm.set_sequence(seq);
+
   	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
@@ -161,7 +167,7 @@ int XisDualStackRouter(int sockfd) {
 		rc = _msg->flag();
 	} else {
 		rc = -1;
-	}	
+	}
 	return rc;
-	 
+
 }
