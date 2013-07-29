@@ -4,29 +4,32 @@
  #include "../elements/analysis/aggregateip.hh"
  #include "../elements/xia/xiarandomize.hh"
  #include "../elements/xia/iprandomize.hh"
-+#ifndef CLICK_ANDROID
++#ifdef CLICK_ANDROID
++#else
  #include "../elements/userlevel/ipflowrawsockets.hh"
 +#endif
  #include "../elements/standard/unqueue.hh"
  #include "../elements/standard/truncate.hh"
- #include "../elements/ipsec/hmacsha1.hh"
 @@ -623,7 +625,9 @@
-    case 285: return new FromHost;
-    case 286: return new FromRawSocket;
-    case 287: return new FromSocket;
-+#ifndef CLICK_ANDROID
-    case 288: return new IPFlowRawSockets;
+ case 330: return new XIATransport;
+ case 331: return new XIAXIDRouteTable;
+ case 332: return new XIAXIDTypeClassifier;
+ case 333: return new XIAXIDTypeCounter;
+ case 334: return new XRoute;
+ case 335: return new XTRANSPORT;
++ifdef CLICK_ANDROID
++#else
+ case 336: return new IPFlowRawSockets;
 +#endif
-    case 289: return new KernelFilter;
-    case 290: return new KernelTap;
-    case 291: return new KernelTun;
+ default: return 0;
 @@ -981,7 +985,9 @@
-   (void) click_add_element_type_stable("FromHost", beetlemonkey, 285);
-   (void) click_add_element_type_stable("FromRawSocket", beetlemonkey, 286);
-   (void) click_add_element_type_stable("FromSocket", beetlemonkey, 287);
-+#ifndef CLICK_ANDROID
-   (void) click_add_element_type_stable("IPFlowRawSockets", beetlemonkey, 288);
+ (void) click_add_element_type_stable("FromHost", beetlemonkey, 285);
+ (void) click_add_element_type_stable("FromRawSocket", beetlemonkey, 286);
+ (void) click_add_element_type_stable("FromSocket", beetlemonkey, 287);
++#ifdef CLICK_ANDROID
++#else
+ (void) click_add_element_type_stable("IPFlowRawSockets", beetlemonkey, 288);
 +#endif
-   (void) click_add_element_type_stable("KernelFilter", beetlemonkey, 289);
-   (void) click_add_element_type_stable("KernelTap", beetlemonkey, 290);
-   (void) click_add_element_type_stable("KernelTun", beetlemonkey, 291);
+ (void) click_add_element_type_stable("KernelFilter", beetlemonkey, 289);
+ (void) click_add_element_type_stable("KernelTap", beetlemonkey, 290);
+ (void) click_add_element_type_stable("KernelTun", beetlemonkey, 291);

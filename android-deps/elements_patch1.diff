@@ -1,0 +1,44 @@
+--- ../click-2.0.1/userlevel/elements_new.cc	2013-07-27 16:49:32.265234210 -0400
++++ ../click-2.0.1/userlevel/elements.cc	2013-07-29 11:34:13.517309367 -0400
+@@ -62,10 +62,10 @@
+ #include "../elements/analysis/fromnetflowsumdump.hh"
+ #include "../elements/xia/xiapaintswitch.hh"
+ #include "../elements/xia/iprandomize.hh"
+-+#ifdef CLICK_ANDROID
+-+#else
++#ifdef CLICK_ANDROID
++#else
+ #include "../elements/userlevel/ipflowrawsockets.hh"
+-+#endif
++#endif
+ #include "../elements/standard/hub.hh"
+ #include "../elements/standard/devirtualizeinfo.hh"
+ #include <click/standard/alignmentinfo.hh>
+@@ -674,10 +674,10 @@ beetlemonkey(uintptr_t heywood)
+    case 333: return new XIAXIDTypeCounter;
+    case 334: return new XRoute;
+    case 335: return new XTRANSPORT;
+-+#ifdef CLICK_ANDROID
+-+#else
++#ifdef CLICK_ANDROID
++#else
+    case 336: return new IPFlowRawSockets;
+-+#endif
++#endif
+    default: return 0;
+   }
+ }
+@@ -1035,10 +1035,10 @@ click_export_elements()
+   (void) click_add_element_type_stable("XIAXIDTypeCounter", beetlemonkey, 333);
+   (void) click_add_element_type_stable("XRoute", beetlemonkey, 334);
+   (void) click_add_element_type_stable("XTRANSPORT", beetlemonkey, 335);
+-+#ifdef CLICK_ANDROID
+-+#else
++#ifdef CLICK_ANDROID
++#else
+   (void) click_add_element_type_stable("IPFlowRawSockets", beetlemonkey, 336);
+-+#endif
++#endif
+   CLICK_DMALLOC_REG("nXXX");
+ }
+ 
