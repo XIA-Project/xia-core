@@ -46,8 +46,11 @@ using namespace std;
 #define XSOCKET_RAW		3	// Raw XIA socket
 #define XSOCKET_CHUNK	4	// Content Chunk transport (CID)
 
-#define MAX_SEND_WIN_SIZE 100  // in packets, not bytes
-#define MAX_RECV_WIN_SIZE 100
+// TODO: switch these to bytes, not packets?
+#define MAX_SEND_WIN_SIZE 256  // in packets, not bytes
+#define MAX_RECV_WIN_SIZE 256
+#define DEFAULT_SEND_WIN_SIZE 64
+#define DEFAULT_RECV_WIN_SIZE 64
 
 #define MAX_CONNECT_TRIES	 30
 #define MAX_RETRANSMIT_TRIES 100
@@ -128,7 +131,7 @@ class XTRANSPORT : public Element {
     Packet* UDPIPPrep(Packet *, int);
     
     struct DAGinfo{
-    DAGinfo(): port(0), isConnected(false), initialized(false), full_src_dag(false), timer_on(false), synack_waiting(false), dataack_waiting(false), teardown_waiting(false) {};
+    DAGinfo(): port(0), isConnected(false), initialized(false), full_src_dag(false), timer_on(false), synack_waiting(false), dataack_waiting(false), teardown_waiting(false), send_buffer_size(DEFAULT_SEND_WIN_SIZE), recv_buffer_size(DEFAULT_RECV_WIN_SIZE) {};
     unsigned short port;
     XIAPath src_path;
     XIAPath dst_path;
@@ -145,9 +148,20 @@ class XTRANSPORT : public Element {
     int num_connect_tries; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
     int num_retransmit_tries; // number of times to try resending data packets
 
+	// send buffer
+    WritablePacket *send_buffer[MAX_SEND_WIN_SIZE]; // packets we've sent but have not gotten an ACK for // TODO: start smaller, dynamically resize if app asks for more space (up to MAX)?
+	uint32_t send_buffer_size;
+    uint32_t send_base; // the sequence # of the oldest unacked packet
+    uint32_t next_send_seqnum; // the smallest unused sequence # (i.e., the sequence # of the next packet to be sent)
+
+	// receive buffer
+    WritablePacket *recv_buffer[MAX_RECV_WIN_SIZE]; // packets we've received but haven't delivered to the app // TODO: start smaller, dynamically resize if app asks for more space (up to MAX)?
+	uint32_t recv_buffer_size; // the number of PACKETS we can buffer (received but not delivered to app)
+	uint32_t recv_base; // sequence # of the oldest received packet not delivered to app
+    uint32_t next_recv_seqnum; // the sequence # of the next in-order packet we expect to receive
+
     //Vector<WritablePacket*> pkt_buf;
     WritablePacket *syn_pkt;
-    WritablePacket *sent_pkt[MAX_WIN_SIZE];
     HashTable<XID, WritablePacket*> XIDtoCIDreqPkt;
     HashTable<XID, Timestamp> XIDtoExpiryTime;
     HashTable<XID, bool> XIDtoTimerOn;
@@ -156,9 +170,6 @@ class XTRANSPORT : public Element {
     HashTable<XID, WritablePacket*> XIDtoCIDresponsePkt;
     uint32_t seq_num;
     uint32_t ack_num;
-    uint32_t base; // the sequence # of the oldest unacked packet
-    uint32_t next_seqnum; // the smallest unused sequence # (i.e., the sequence # of the next packet to be sent)
-    uint32_t expected_seqnum; // the sequence # of the next in-order packet (this is used at receiver-side)
     bool timer_on;
     Timestamp expiry;
     bool synack_waiting;

@@ -187,17 +187,17 @@ XTRANSPORT::run_timer(Timer *timer)
 			} else if (daginfo->dataack_waiting == true && daginfo->expiry <= now ) {
 
 				// adding check to see if anything was retransmitted. We can get in here with
-				// no packets in the daginfo->sent_pkt array waiting to go and will stay here forever
+				// no packets in the daginfo->send_buffer array waiting to go and will stay here forever
 				bool retransmit_sent = false;
 
 				if (daginfo->num_retransmit_tries < MAX_RETRANSMIT_TRIES) {
 
-				//click_chatter("Timer: DATA RETRANSMIT at from (%s) from_port=%d base=%d next_seq=%d \n\n", (_local_addr.unparse()).c_str(), _sport, daginfo->base, daginfo->next_seqnum );
+				//click_chatter("Timer: DATA RETRANSMIT at from (%s) from_port=%d send_base=%d next_seq=%d \n\n", (_local_addr.unparse()).c_str(), _sport, daginfo->send_base, daginfo->next_send_seqnum );
 		
 					// retransmit data
-					for (unsigned int i = daginfo->base; i < daginfo->next_seqnum; i++) {
-						if (daginfo->sent_pkt[i % MAX_WIN_SIZE] != NULL) {
-							copy = copy_packet(daginfo->sent_pkt[i % MAX_WIN_SIZE], daginfo);
+					for (unsigned int i = daginfo->send_base; i < daginfo->next_send_seqnum; i++) {
+						if (daginfo->send_buffer[i % MAX_WIN_SIZE] != NULL) {
+							copy = copy_packet(daginfo->send_buffer[i % MAX_WIN_SIZE], daginfo);
 							XIAHeader xiah(copy);
 							//printf("Timer: (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
 							//printf("pusing the retransmit pkt\n");
@@ -253,9 +253,9 @@ XTRANSPORT::run_timer(Timer *timer)
 				nxt_xport.erase(_sport);
 				xcmp_listeners.remove(_sport);
 				for (int i = 0; i < MAX_WIN_SIZE; i++) {
-					if (daginfo->sent_pkt[i] != NULL) {
-						daginfo->sent_pkt[i]->kill();
-						daginfo->sent_pkt[i] = NULL;
+					if (daginfo->send_buffer[i] != NULL) {
+						daginfo->send_buffer[i]->kill();
+						daginfo->send_buffer[i] = NULL;
 					}
 				}
 			}
@@ -671,12 +671,12 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 				DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
 
-				if (thdr.seq_num() == daginfo->expected_seqnum) {
-					daginfo->expected_seqnum++;
-					//printf("(%s) Accept Received data (now expected seq=%d)\n", (_local_addr.unparse()).c_str(), daginfo->expected_seqnum);
+				if (thdr.seq_num() == daginfo->next_recv_seqnum) {
+					daginfo->next_recv_seqnum++;
+					//printf("(%s) Accept Received data (now expected seq=%d)\n", (_local_addr.unparse()).c_str(), daginfo->next_recv_seqnum);
 				} else {
 					sendToApplication = false;
-					printf("expected sequence # %d, received %d\n", daginfo->expected_seqnum, thdr.seq_num());
+					printf("expected sequence # %d, received %d\n", daginfo->next_recv_seqnum, thdr.seq_num());
 					printf("(%s) Discarded Received data\n", (_local_addr.unparse()).c_str());
 				}
 
@@ -702,7 +702,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				xiah_new.set_plen(strlen(dummy));
 				//click_chatter("Sent packet to network");
 
-				TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeACKHeader( 0, daginfo->expected_seqnum, 0); // #seq, #ack, length
+				TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeACKHeader( 0, daginfo->next_recv_seqnum, 0); // #seq, #ack, length
 				p = thdr_new->encap(just_payload_part);
 
 				thdr_new->update();
@@ -741,23 +741,23 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				//In case of Client Mobility...	 Update 'daginfo->dst_path'
 				daginfo->dst_path = src_path;					
 
-				int expected_seqnum = thdr.ack_num();
+				int remote_next_seqnum_expected = thdr.ack_num();
 
 				bool resetTimer = false;
 
 				// Clear all Acked packets
-				for (int i = daginfo->base; i < expected_seqnum; i++) {
+				for (int i = daginfo->send_base; i < remote_next_seqnum_expected; i++) {
 					int idx = i % MAX_WIN_SIZE;
-					if (daginfo->sent_pkt[idx]) {
-						daginfo->sent_pkt[idx]->kill();
-						daginfo->sent_pkt[idx] = NULL;
+					if (daginfo->send_buffer[idx]) {
+						daginfo->send_buffer[idx]->kill();
+						daginfo->send_buffer[idx] = NULL;
 					}
 				
 					resetTimer = true;
 				}
 
 				// Update the variables
-				daginfo->base = expected_seqnum;
+				daginfo->send_base = remote_next_seqnum_expected;
 
 				// Reset timer
 				if (resetTimer) {
@@ -769,7 +769,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 					if (! _timer.scheduled() || _timer.expiry() >= daginfo->expiry )
 						_timer.reschedule_at(daginfo->expiry);
 
-					if (daginfo->base == daginfo->next_seqnum) {
+					if (daginfo->send_base == daginfo->next_send_seqnum) {
 
 						// Clear timer
 						daginfo->timer_on = false;
@@ -1113,7 +1113,7 @@ void XTRANSPORT::Xsocket(unsigned short _sport) {
 	daginfo.teardown_waiting = false;
 	daginfo.isAcceptSocket = false;
 	daginfo.num_connect_tries = 0; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
-	memset(daginfo.sent_pkt, 0, MAX_WIN_SIZE * sizeof(WritablePacket*));
+	memset(daginfo.send_buffer, 0, MAX_WIN_SIZE * sizeof(WritablePacket*));
 
 	//Set the socket_type (reliable or not) in DAGinfo
 	daginfo.sock_type = sock_type;
@@ -1325,9 +1325,9 @@ void XTRANSPORT::Xconnect(unsigned short _sport)
 	daginfo->ddag = dest;
 	daginfo->seq_num = 0;
 	daginfo->ack_num = 0;
-	daginfo->base = 0;
-	daginfo->next_seqnum = 0;
-	daginfo->expected_seqnum = 0;
+	daginfo->send_base = 0;
+	daginfo->next_send_seqnum = 0;
+	daginfo->next_recv_seqnum = 0;
 	daginfo->num_connect_tries++; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
 
 	String str_local_addr = _local_addr.unparse_re();
@@ -1431,12 +1431,12 @@ void XTRANSPORT::Xaccept(unsigned short _sport)
 
 		daginfo.seq_num = 0;
 		daginfo.ack_num = 0;
-		daginfo.base = 0;
+		daginfo.send_base = 0;
 		daginfo.hlim = hlim.get(_sport);
-		daginfo.next_seqnum = 0;
-		daginfo.expected_seqnum = 0;
+		daginfo.next_send_seqnum = 0;
+		daginfo.next_recv_seqnum = 0;
 		daginfo.isAcceptSocket = true;
-		memset(daginfo.sent_pkt, 0, MAX_WIN_SIZE * sizeof(WritablePacket*));
+		memset(daginfo.send_buffer, 0, MAX_WIN_SIZE * sizeof(WritablePacket*));
 
 		portToDAGinfo.set(_sport, daginfo);
 
@@ -1638,7 +1638,7 @@ void XTRANSPORT::Xsend(unsigned short _sport, WritablePacket *p_in)
 		WritablePacket *p = NULL;
 
 		//Add XIA Transport headers
-		TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDATAHeader(daginfo->next_seqnum, daginfo->ack_num, 0 ); // #seq, #ack, length
+		TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDATAHeader(daginfo->next_send_seqnum, daginfo->ack_num, 0 ); // #seq, #ack, length
 		p = thdr->encap(just_payload_part);
 
 		thdr->update();
@@ -1649,15 +1649,15 @@ void XTRANSPORT::Xsend(unsigned short _sport, WritablePacket *p_in)
 		delete thdr;
 
 		// Store the packet into buffer
-		WritablePacket *tmp = daginfo->sent_pkt[daginfo->seq_num % MAX_WIN_SIZE];
-		daginfo->sent_pkt[daginfo->seq_num % MAX_WIN_SIZE] = copy_packet(p, daginfo);
+		WritablePacket *tmp = daginfo->send_buffer[daginfo->seq_num % MAX_WIN_SIZE];
+		daginfo->send_buffer[daginfo->seq_num % MAX_WIN_SIZE] = copy_packet(p, daginfo);
 		if (tmp)
 			tmp->kill();
 
 		// printf("XSEND: SENT DATA at (%s) seq=%d \n\n", dagstr.c_str(), daginfo->seq_num%MAX_WIN_SIZE);
 
 		daginfo->seq_num++;
-		daginfo->next_seqnum++;
+		daginfo->next_send_seqnum++;
 
 		// Set timer
 		daginfo->timer_on = true;
