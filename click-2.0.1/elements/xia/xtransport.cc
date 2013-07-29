@@ -99,7 +99,7 @@ XTRANSPORT::~XTRANSPORT()
 {
 	//Clear all hashtable entries
 	XIDtoPort.clear();
-	portToDAGinfo.clear();
+	portToSock.clear();
 	XIDpairToPort.clear();
 	XIDpairToConnectPending.clear();
 
@@ -146,35 +146,35 @@ XTRANSPORT::run_timer(Timer *timer)
 
 	bool tear_down;
 
-	for (HashTable<unsigned short, DAGinfo>::iterator iter = portToDAGinfo.begin(); iter != portToDAGinfo.end(); ++iter ) {
+	for (HashTable<unsigned short, sock>::iterator iter = portToSock.begin(); iter != portToSock.end(); ++iter ) {
 		unsigned short _sport = iter->first;
-		DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
+		sock *sk = portToSock.get_pointer(_sport);
 		tear_down = false;
 
 		// check if pending
-		if (daginfo->timer_on == true) {
+		if (sk->timer_on == true) {
 			// check if synack waiting
-			if (daginfo->synack_waiting == true && daginfo->expiry <= now ) {
+			if (sk->synack_waiting == true && sk->expiry <= now ) {
 				//click_chatter("Timer: synack waiting\n");
 		
-				if (daginfo->num_connect_tries <= MAX_CONNECT_TRIES) {
+				if (sk->num_connect_tries <= MAX_CONNECT_TRIES) {
 
 					//click_chatter("Timer: SYN RETRANSMIT! \n");
-					copy = copy_packet(daginfo->syn_pkt, daginfo);
+					copy = copy_packet(sk->syn_pkt, sk);
 					// retransmit syn
 					XIAHeader xiah(copy);
 					// printf("Timer: (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
 					output(NETWORK_PORT).push(copy);
 
-					daginfo->timer_on = true;
-					daginfo->synack_waiting = true;
-					daginfo->expiry = now + Timestamp::make_msec(_ackdelay_ms);
-					daginfo->num_connect_tries++;
+					sk->timer_on = true;
+					sk->synack_waiting = true;
+					sk->expiry = now + Timestamp::make_msec(_ackdelay_ms);
+					sk->num_connect_tries++;
 
 				} else {
 					// Stop sending the connection request & Report the failure to the application
-					daginfo->timer_on = false;
-					daginfo->synack_waiting = false;
+					sk->timer_on = false;
+					sk->synack_waiting = false;
 
 					String str = String("^Connection-failed^");
 					WritablePacket *ppp = WritablePacket::make (256, str.c_str(), str.length(), 0);
@@ -184,20 +184,20 @@ XTRANSPORT::run_timer(Timer *timer)
                         output(API_PORT).push(UDPIPPrep(ppp, _sport));
 				}
 
-			} else if (daginfo->dataack_waiting == true && daginfo->expiry <= now ) {
+			} else if (sk->dataack_waiting == true && sk->expiry <= now ) {
 
 				// adding check to see if anything was retransmitted. We can get in here with
-				// no packets in the daginfo->send_buffer array waiting to go and will stay here forever
+				// no packets in the sk->send_buffer array waiting to go and will stay here forever
 				bool retransmit_sent = false;
 
-				if (daginfo->num_retransmit_tries < MAX_RETRANSMIT_TRIES) {
+				if (sk->num_retransmit_tries < MAX_RETRANSMIT_TRIES) {
 
-				//click_chatter("Timer: DATA RETRANSMIT at from (%s) from_port=%d send_base=%d next_seq=%d \n\n", (_local_addr.unparse()).c_str(), _sport, daginfo->send_base, daginfo->next_send_seqnum );
+				//click_chatter("Timer: DATA RETRANSMIT at from (%s) from_port=%d send_base=%d next_seq=%d \n\n", (_local_addr.unparse()).c_str(), _sport, sk->send_base, sk->next_send_seqnum );
 		
 					// retransmit data
-					for (unsigned int i = daginfo->send_base; i < daginfo->next_send_seqnum; i++) {
-						if (daginfo->send_buffer[i % MAX_WIN_SIZE] != NULL) {
-							copy = copy_packet(daginfo->send_buffer[i % MAX_WIN_SIZE], daginfo);
+					for (unsigned int i = sk->send_base; i < sk->next_send_seqnum; i++) {
+						if (sk->send_buffer[i % sk->send_buffer_size] != NULL) {
+							copy = copy_packet(sk->send_buffer[i % sk->send_buffer_size], sk);
 							XIAHeader xiah(copy);
 							//printf("Timer: (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
 							//printf("pusing the retransmit pkt\n");
@@ -213,32 +213,32 @@ XTRANSPORT::run_timer(Timer *timer)
 
 				if (retransmit_sent) {
 					//click_chatter("resetting retransmit timer for %d\n", _sport);
-					daginfo->timer_on = true;
-					daginfo->dataack_waiting = true;
-					daginfo-> num_retransmit_tries++;
-					daginfo->expiry = now + Timestamp::make_msec(_ackdelay_ms);
+					sk->timer_on = true;
+					sk->dataack_waiting = true;
+					sk-> num_retransmit_tries++;
+					sk->expiry = now + Timestamp::make_msec(_ackdelay_ms);
 				} else {
 					//click_chatter("terminating retransmit timer for %d\n", _sport);
-					daginfo->timer_on = false;
-					daginfo->dataack_waiting = false;
-					daginfo->num_retransmit_tries = 0;
+					sk->timer_on = false;
+					sk->dataack_waiting = false;
+					sk->num_retransmit_tries = 0;
 				}
 
-			} else if (daginfo->teardown_waiting == true && daginfo->teardown_expiry <= now) {
+			} else if (sk->teardown_waiting == true && sk->teardown_expiry <= now) {
 				tear_down = true;
-				daginfo->timer_on = false;
+				sk->timer_on = false;
 				portToActive.set(_sport, false);
 
-				//XID source_xid = portToDAGinfo.get(_sport).xid;
+				//XID source_xid = portToSock.get(_sport).xid;
 
 				// this check for -1 prevents a segfault cause by bad XIDs
 				// it may happen in other cases, but opening a XSOCK_STREAM socket, calling
 				// XreadLocalHostAddr and then closing the socket without doing anything else will
 				// cause the problem
 				// TODO: make sure that -1 is the only condition that will cause us to get a bad XID
-				if (daginfo->src_path.destination_node() != -1) {
-					XID source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
-					if (!daginfo->isAcceptSocket) {
+				if (sk->src_path.destination_node() != -1) {
+					XID source_xid = sk->src_path.xid(sk->src_path.destination_node());
+					if (!sk->isAcceptSocket) {
 
 						//click_chatter("deleting route %s from port %d\n", source_xid.unparse().c_str(), _sport);
 						delRoute(source_xid);
@@ -246,16 +246,16 @@ XTRANSPORT::run_timer(Timer *timer)
 					}
 				}
 
-				portToDAGinfo.erase(_sport);
+				portToSock.erase(_sport);
 				portToActive.erase(_sport);
 				hlim.erase(_sport);
 
 				nxt_xport.erase(_sport);
 				xcmp_listeners.remove(_sport);
-				for (int i = 0; i < MAX_WIN_SIZE; i++) {
-					if (daginfo->send_buffer[i] != NULL) {
-						daginfo->send_buffer[i]->kill();
-						daginfo->send_buffer[i] = NULL;
+				for (int i = 0; i < sk->send_buffer_size; i++) {
+					if (sk->send_buffer[i] != NULL) {
+						sk->send_buffer[i]->kill();
+						sk->send_buffer[i] = NULL;
 					}
 				}
 			}
@@ -264,36 +264,36 @@ XTRANSPORT::run_timer(Timer *timer)
 		if (tear_down == false) {
 
 			// find the (next) earlist expiry
-			if (daginfo->timer_on == true && daginfo->expiry > now && ( daginfo->expiry < earlist_pending_expiry || earlist_pending_expiry == now ) ) {
-				earlist_pending_expiry = daginfo->expiry;
+			if (sk->timer_on == true && sk->expiry > now && ( sk->expiry < earlist_pending_expiry || earlist_pending_expiry == now ) ) {
+				earlist_pending_expiry = sk->expiry;
 			}
-			if (daginfo->timer_on == true && daginfo->teardown_expiry > now && ( daginfo->teardown_expiry < earlist_pending_expiry || earlist_pending_expiry == now ) ) {
-				earlist_pending_expiry = daginfo->teardown_expiry;
+			if (sk->timer_on == true && sk->teardown_expiry > now && ( sk->teardown_expiry < earlist_pending_expiry || earlist_pending_expiry == now ) ) {
+				earlist_pending_expiry = sk->teardown_expiry;
 			}
 
 
 			// check for CID request cases
-			for (HashTable<XID, bool>::iterator it = daginfo->XIDtoTimerOn.begin(); it != daginfo->XIDtoTimerOn.end(); ++it ) {
+			for (HashTable<XID, bool>::iterator it = sk->XIDtoTimerOn.begin(); it != sk->XIDtoTimerOn.end(); ++it ) {
 				XID requested_cid = it->first;
 				bool timer_on = it->second;
 
 				HashTable<XID, Timestamp>::iterator it2;
-				it2 = daginfo->XIDtoExpiryTime.find(requested_cid);
+				it2 = sk->XIDtoExpiryTime.find(requested_cid);
 				Timestamp cid_req_expiry = it2->second;
 
 				if (timer_on == true && cid_req_expiry <= now) {
 					//printf("CID-REQ RETRANSMIT! \n");
 					//retransmit cid-request
 					HashTable<XID, WritablePacket*>::iterator it3;
-					it3 = daginfo->XIDtoCIDreqPkt.find(requested_cid);
-					copy = copy_cid_req_packet(it3->second, daginfo);
+					it3 = sk->XIDtoCIDreqPkt.find(requested_cid);
+					copy = copy_cid_req_packet(it3->second, sk);
 					XIAHeader xiah(copy);
 					//printf("\n\n (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
 					output(NETWORK_PORT).push(copy);
 
 					cid_req_expiry  = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
-					daginfo->XIDtoExpiryTime.set(requested_cid, cid_req_expiry);
-					daginfo->XIDtoTimerOn.set(requested_cid, true);
+					sk->XIDtoExpiryTime.set(requested_cid, cid_req_expiry);
+					sk->XIDtoTimerOn.set(requested_cid, true);
 				}
 
 				if (timer_on == true && cid_req_expiry > now && ( cid_req_expiry < earlist_pending_expiry || earlist_pending_expiry == now ) ) {
@@ -301,7 +301,7 @@ XTRANSPORT::run_timer(Timer *timer)
 				}
 			}
 
-			portToDAGinfo.set(_sport, *daginfo);
+			portToSock.set(_sport, *sk);
 		}
 	}
 
@@ -314,35 +314,35 @@ XTRANSPORT::run_timer(Timer *timer)
 }
 
 void
-XTRANSPORT::copy_common(DAGinfo *daginfo, XIAHeader &xiahdr, XIAHeaderEncap &xiah) {  
+XTRANSPORT::copy_common(sock *sk, XIAHeader &xiahdr, XIAHeaderEncap &xiah) {  
 
 	//Recalculate source path
-	XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+	XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
 	String str_local_addr = _local_addr.unparse_re() + " " + source_xid.unparse();
 	//Make source DAG _local_addr:SID
-	String dagstr = daginfo->src_path.unparse_re();
+	String dagstr = sk->src_path.unparse_re();
 
 	//Client Mobility...
 	if (dagstr.length() != 0 && dagstr != str_local_addr) {
 		//Moved!
-		// 1. Update 'daginfo->src_path'
-		daginfo->src_path.parse_re(str_local_addr);
+		// 1. Update 'sk->src_path'
+		sk->src_path.parse_re(str_local_addr);
 	}
 
 	xiah.set_nxt(xiahdr.nxt());
 	xiah.set_last(xiahdr.last());
 	xiah.set_hlim(xiahdr.hlim());
-	xiah.set_dst_path(daginfo->dst_path);
-	xiah.set_src_path(daginfo->src_path);
+	xiah.set_dst_path(sk->dst_path);
+	xiah.set_src_path(sk->src_path);
 	xiah.set_plen(xiahdr.plen());
 }
 
 WritablePacket *
-XTRANSPORT::copy_packet(Packet *p, DAGinfo *daginfo) {  
+XTRANSPORT::copy_packet(Packet *p, sock *sk) {  
 
 	XIAHeader xiahdr(p);
 	XIAHeaderEncap xiah;
-	copy_common(daginfo, xiahdr, xiah);
+	copy_common(sk, xiahdr, xiah);
 
 	TransportHeader thdr(p);
 	TransportHeaderEncap *new_thdr = new TransportHeaderEncap(thdr.type(), thdr.pkt_info(), thdr.seq_num(), thdr.ack_num(), thdr.length());
@@ -358,11 +358,11 @@ XTRANSPORT::copy_packet(Packet *p, DAGinfo *daginfo) {
 
 
 WritablePacket *
-XTRANSPORT::copy_cid_req_packet(Packet *p, DAGinfo *daginfo) {
+XTRANSPORT::copy_cid_req_packet(Packet *p, sock *sk) {
 
 	XIAHeader xiahdr(p);
 	XIAHeaderEncap xiah;
-	copy_common(daginfo, xiahdr, xiah);
+	copy_common(sk, xiahdr, xiah);
 
 	WritablePacket *copy = WritablePacket::make(256, xiahdr.payload(), xiahdr.plen(), 20);
 
@@ -378,11 +378,11 @@ XTRANSPORT::copy_cid_req_packet(Packet *p, DAGinfo *daginfo) {
 
 
 WritablePacket *
-XTRANSPORT::copy_cid_response_packet(Packet *p, DAGinfo *daginfo) {
+XTRANSPORT::copy_cid_response_packet(Packet *p, sock *sk) {
 
 	XIAHeader xiahdr(p);
 	XIAHeaderEncap xiah;
-	copy_common(daginfo, xiahdr, xiah);
+	copy_common(sk, xiahdr, xiah);
 
 	WritablePacket *copy = WritablePacket::make(256, xiahdr.payload(), xiahdr.plen(), 20);
 
@@ -404,19 +404,19 @@ XTRANSPORT::copy_cid_response_packet(Packet *p, DAGinfo *daginfo) {
 * sequence number within our recieve window?
 *
 * @param p
-* @param daginfo
+* @param sk
 *
 * @return true if packet can be buffered, false otherwise
 */
-bool XTRANSPORT::should_buffer_received_packet(WritablePacket *p, DAGinfo *daginfo) {
+bool XTRANSPORT::should_buffer_received_packet(WritablePacket *p, sock *sk) {
 	
 	TransportHeader thdr(p);
 	int received_seqnum = thdr.seq_num();
 
 	// check if received_seqnum is within our current recv window
 	// TODO: if we switch to a byte-based, buf size, this needs to change
-	if (received_seqnum >= daginfo->next_recv_seqnum &&
-		received_seqnum < daginfo->next_recv_seqnum + daginfo->recv_buffer_size) {
+	if (received_seqnum >= sk->next_recv_seqnum &&
+		received_seqnum < sk->next_recv_seqnum + sk->recv_buffer_size) {
 		return true;
 	}
 	return false;
@@ -430,38 +430,38 @@ bool XTRANSPORT::should_buffer_received_packet(WritablePacket *p, DAGinfo *dagin
 * Stores the supplied packet pointer, p, in slot seqnum % bufsize.
 *
 * @param p
-* @param daginfo
+* @param sk
 */
-void XTRANSPORT::add_packet_to_recv_buf(WriteablePacket *p, DAGinfo *daginfo) {
+void XTRANSPORT::add_packet_to_recv_buf(WritablePacket *p, sock *sk) {
 
 	TransportHeader thdr(p);
 	int received_seqnum = thdr.seq_num();
-	int index = received_seqnum % daginfo->recv_buffer_size;
+	int index = received_seqnum % sk->recv_buffer_size;
 
-	daginfo->recv_buffer[index] = p;
+	sk->recv_buffer[index] = p;
 }
 
 /**
 * @brief Returns the next expected sequence number.
 *
-* Beginning with daginfo->recv_base, this function checks consecutive slots
+* Beginning with sk->recv_base, this function checks consecutive slots
 * in the receive buffer and returns the first missing sequence number.
 *
-* @param daginfo
+* @param sk
 */
-void XTRANSPORT::next_missing_seqnum(DAGinfo *daginfo) {
+uint32_t XTRANSPORT::next_missing_seqnum(sock *sk) {
 
-	uint32_t next_missing = daginfo->recv_base;
-	for (uint32_t i = 0; i < daginfo->recv_buffer_size; i++) {
+	uint32_t next_missing = sk->recv_base;
+	for (uint32_t i = 0; i < sk->recv_buffer_size; i++) {
 
 		// checking if we have the next consecutive packet
-		uint32_t seqnum_to_check = daginfo->recv_base + i;
-		uint32_t index_to_check = seqnum_to_check % daginfo->recv_buffer_size;
+		uint32_t seqnum_to_check = sk->recv_base + i;
+		uint32_t index_to_check = seqnum_to_check % sk->recv_buffer_size;
 
 		next_missing = seqnum_to_check;
 
-		if (daginfo->recv_buffer[index_to_check]) {
-			TransportHeader thdr(daginfo->recv_buffer[index_to_check]);
+		if (sk->recv_buffer[index_to_check]) {
+			TransportHeader thdr(sk->recv_buffer[index_to_check]);
 			if (thdr.seq_num() != seqnum_to_check) {
 				break; // found packet, but its seqnum isn't right, so break and return next_missing
 			}
@@ -576,7 +576,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 	unsigned short _dport = XIDtoPort.get(_destination_xid);  // This is to be updated for the XSOCK_STREAM type connections below
 
-	// bool sendToApplication = true;
 	//String pld((char *)xiah.payload(), xiah.plen());
 	//printf("\n\n 1. (%s) Received=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), pld.c_str(), xiah.plen());
 
@@ -641,28 +640,28 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				//	 2. send SYNACK to client
 				//	   3. Notify the api of SYN reception
 
-				//1. Prepare new DAGinfo for this connection
-				DAGinfo daginfo;
-				daginfo.port = -1; // just for now. This will be updated via Xaccept call
+				//1. Prepare new sock for this connection
+				sock sk;
+				sk.port = -1; // just for now. This will be updated via Xaccept call
 
-				daginfo.sock_type = 0; // 0: Reliable transport, 1: Unreliable transport
+				sk.sock_type = 0; // 0: Reliable transport, 1: Unreliable transport
 
-				daginfo.dst_path = src_path;
-				daginfo.src_path = dst_path;
-				daginfo.isConnected = true;
-				daginfo.initialized = true;
-				daginfo.nxt = LAST_NODE_DEFAULT;
-				daginfo.last = LAST_NODE_DEFAULT;
-				daginfo.hlim = HLIM_DEFAULT;
-				daginfo.seq_num = 0;
-				daginfo.ack_num = 0;
+				sk.dst_path = src_path;
+				sk.src_path = dst_path;
+				sk.isConnected = true;
+				sk.initialized = true;
+				sk.nxt = LAST_NODE_DEFAULT;
+				sk.last = LAST_NODE_DEFAULT;
+				sk.hlim = HLIM_DEFAULT;
+				sk.seq_num = 0;
+				sk.ack_num = 0;
 
-				pending_connection_buf.push(daginfo);
+				pending_connection_buf.push(sk);
 
 				// Mark these src & dst XID pair
 				XIDpairToConnectPending.set(xid_pair, true);
 
-				//portToDAGinfo.set(-1, daginfo);	// just for now. This will be updated via Xaccept call
+				//portToSock.set(-1, sk);	// just for now. This will be updated via Xaccept call
 
 			} else {
 				// If already in the pending queue, just send back SYNACK to the requester
@@ -670,7 +669,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				// if this case is hit, we won't trigger the accept, and the connection will get be left
 				// in limbo. see above for whether or not we should even be checking.
 				// printf("%06d conn request already pending\n", _dport);
-				sendToApplication = false;
 			}
 
 
@@ -717,19 +715,12 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			// Get the dst port from XIDpair table
 			_dport = XIDpairToPort.get(xid_pair);
 
-			DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
-
-			if(!daginfo->synack_waiting) {
-				// Fix for synack storm sending messages up to the API
-				// still need to fix the root cause, but this prevents the API from 
-				// getting multiple connection granted messages
-				sendToApplication = false;
-			}
+			sock *sk = portToSock.get_pointer(_dport);
 
 			// Clear timer
-			daginfo->timer_on = false;
-			daginfo->synack_waiting = false;
-			//daginfo->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
+			sk->timer_on = false;
+			sk->synack_waiting = false;
+			//sk->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
 
 		} else if (thdr.pkt_info() == TransportHeader::DATA) {
 			XIDpair xid_pair;
@@ -745,18 +736,18 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 			if(it1 != portToActive.end() ) {
 
-				DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
+				sock *sk = portToSock.get_pointer(_dport);
 
 				// buffer data, if we have room
-				if (should_buffer_received_packet(p_in, daginfo)) {
-					add_packet_to_recv_buf(p_in, daginfo);
-					daginfo->next_recv_seqnum = next_missing_seqnum(daginfo);
+				if (should_buffer_received_packet(p_in, sk)) {
+					add_packet_to_recv_buf(p_in, sk);
+					sk->next_recv_seqnum = next_missing_seqnum(sk);
 				} 
 
-				portToDAGinfo.set(_dport, *daginfo); // TODO: why do we need this?
+				portToSock.set(_dport, *sk); // TODO: why do we need this?
 			
-				//In case of Client Mobility...	 Update 'daginfo->dst_path'
-				daginfo->dst_path = src_path;		
+				//In case of Client Mobility...	 Update 'sk->dst_path'
+				sk->dst_path = src_path;		
 
 				// send the cumulative ACK to the sender
 				//Add XIA headers
@@ -774,7 +765,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 				xiah_new.set_plen(strlen(dummy));
 
-				TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeACKHeader( 0, daginfo->next_recv_seqnum, 0); // #seq, #ack, length
+				TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeACKHeader( 0, sk->next_recv_seqnum, 0); // #seq, #ack, length
 				p = thdr_new->encap(just_payload_part);
 
 				thdr_new->update();
@@ -791,11 +782,9 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 			} else {
 				printf("destination port not found: %d\n", _dport);
-				sendToApplication = false;
 			}
 
 		} else if (thdr.pkt_info() == TransportHeader::ACK) {
-			sendToApplication = false;
 
 			XIDpair xid_pair;
 			xid_pair.set_src(_destination_xid);
@@ -808,50 +797,50 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			it1 = portToActive.find(_dport);
 
 			if(it1 != portToActive.end() ) {
-				DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
+				sock *sk = portToSock.get_pointer(_dport);
 			
-				//In case of Client Mobility...	 Update 'daginfo->dst_path'
-				daginfo->dst_path = src_path;					
+				//In case of Client Mobility...	 Update 'sk->dst_path'
+				sk->dst_path = src_path;					
 
 				int remote_next_seqnum_expected = thdr.ack_num();
 
 				bool resetTimer = false;
 
 				// Clear all Acked packets
-				for (int i = daginfo->send_base; i < remote_next_seqnum_expected; i++) {
-					int idx = i % daginfo->send_buffer_size;
-					if (daginfo->send_buffer[idx]) {
-						daginfo->send_buffer[idx]->kill();
-						daginfo->send_buffer[idx] = NULL;
+				for (int i = sk->send_base; i < remote_next_seqnum_expected; i++) {
+					int idx = i % sk->send_buffer_size;
+					if (sk->send_buffer[idx]) {
+						sk->send_buffer[idx]->kill();
+						sk->send_buffer[idx] = NULL;
 					}
 				
 					resetTimer = true;
 				}
 
 				// Update the variables
-				daginfo->send_base = remote_next_seqnum_expected;
+				sk->send_base = remote_next_seqnum_expected;
 
 				// Reset timer
 				if (resetTimer) {
-					daginfo->timer_on = true;
-					daginfo->dataack_waiting = true;
+					sk->timer_on = true;
+					sk->dataack_waiting = true;
 					// FIXME: should we reset retransmit_tries here?
-					daginfo->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
+					sk->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
 
-					if (! _timer.scheduled() || _timer.expiry() >= daginfo->expiry )
-						_timer.reschedule_at(daginfo->expiry);
+					if (! _timer.scheduled() || _timer.expiry() >= sk->expiry )
+						_timer.reschedule_at(sk->expiry);
 
-					if (daginfo->send_base == daginfo->next_send_seqnum) {
+					if (sk->send_base == sk->next_send_seqnum) {
 
 						// Clear timer
-						daginfo->timer_on = false;
-						daginfo->dataack_waiting = false;
-						daginfo->num_retransmit_tries = 0;
-						//daginfo->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
+						sk->timer_on = false;
+						sk->dataack_waiting = false;
+						sk->num_retransmit_tries = 0;
+						//sk->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
 					}
 				}
 
-				portToDAGinfo.set(_dport, *daginfo);
+				portToSock.set(_dport, *sk);
 
 			} else {
 				//printf("port not found\n");
@@ -861,18 +850,18 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			//printf("FIN received, doing nothing\n");
 		}
 		else {
-			printf("UNKNOWN dport = %d send = %d hdr=%d\n", _dport, sendToApplication, thdr.pkt_info());		
+			printf("UNKNOWN dport = %d hdr=%d\n", _dport, thdr.pkt_info());		
 		}
 
 	} else if (thdr.type() == TransportHeader::XSOCK_DGRAM) {
 
 		_dport = XIDtoPort.get(_destination_xid);
-		DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
+		sock *sk = portToSock.get_pointer(_dport);
 
 		// buffer packet if this is a DGRAM socket and we have room
-		if (daginfo->sock_type == XSOCKET_DGRAM &&
-			should_buffer_received_packet(p_in, daginfo)) {
-			add_packet_to_recv_buf(p_in, daginfo);
+		if (sk->sock_type == XSOCKET_DGRAM &&
+			should_buffer_received_packet(p_in, sk)) {
+			add_packet_to_recv_buf(p_in, sk);
 		}
 	
 	} else {
@@ -882,20 +871,20 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 	/*if(_dport && sendToApplication) {
 		//TODO: Refine the way we change DAG in case of migration. Use some control bits. Add verification
-		DAGinfo daginfo = portToDAGinfo.get(_dport);
+		sock sk = portToSock.get(_dport);
 
-		if(daginfo.initialized == false) {
-			daginfo.dst_path = xiah.src_path();
-			daginfo.initialized = true;
-			portToDAGinfo.set(_dport, daginfo);
+		if(sk.initialized == false) {
+			sk.dst_path = xiah.src_path();
+			sk.initialized = true;
+			portToSock.set(_dport, sk);
 		}
 
 		// FIXME: what is this? need constant here
-		if(xiah.nxt() == 22 && daginfo.isConnected == true)
+		if(xiah.nxt() == 22 && sk.isConnected == true)
 		{
 			//Verify mobility info
-			daginfo.dst_path = xiah.src_path();
-			portToDAGinfo.set(_dport, daginfo);
+			sk.dst_path = xiah.src_path();
+			portToSock.set(_dport, sk);
 			click_chatter("Sender moved, update to the new DAG");
 
 		} else {
@@ -946,36 +935,36 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 	if(_dport)
 	{
 		//TODO: Refine the way we change DAG in case of migration. Use some control bits. Add verification
-		//DAGinfo daginfo=portToDAGinfo.get(_dport);
-		//daginfo.dst_path=xiah.src_path();
-		//portToDAGinfo.set(_dport,daginfo);
+		//sock sk=portToSock.get(_dport);
+		//sk.dst_path=xiah.src_path();
+		//portToSock.set(_dport,sk);
 		//ENDTODO
 
-		DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
+		sock *sk = portToSock.get_pointer(_dport);
 
 		// Reset timer or just Remove the corresponding entry in the hash tables (Done below)
 		HashTable<XID, WritablePacket*>::iterator it1;
-		it1 = daginfo->XIDtoCIDreqPkt.find(source_cid);
+		it1 = sk->XIDtoCIDreqPkt.find(source_cid);
 
-		if(it1 != daginfo->XIDtoCIDreqPkt.end() ) {
+		if(it1 != sk->XIDtoCIDreqPkt.end() ) {
 			// Remove the entry
-			daginfo->XIDtoCIDreqPkt.erase(it1);
+			sk->XIDtoCIDreqPkt.erase(it1);
 		}
 
 		HashTable<XID, Timestamp>::iterator it2;
-		it2 = daginfo->XIDtoExpiryTime.find(source_cid);
+		it2 = sk->XIDtoExpiryTime.find(source_cid);
 
-		if(it2 != daginfo->XIDtoExpiryTime.end()) {
+		if(it2 != sk->XIDtoExpiryTime.end()) {
 			// Remove the entry
-			daginfo->XIDtoExpiryTime.erase(it2);
+			sk->XIDtoExpiryTime.erase(it2);
 		}
 
 		HashTable<XID, bool>::iterator it3;
-		it3 = daginfo->XIDtoTimerOn.find(source_cid);
+		it3 = sk->XIDtoTimerOn.find(source_cid);
 
-		if(it3 != daginfo->XIDtoTimerOn.end()) {
+		if(it3 != sk->XIDtoTimerOn.end()) {
 			// Remove the entry
-			daginfo->XIDtoTimerOn.erase(it3);
+			sk->XIDtoTimerOn.erase(it3);
 		}
 
 		// compute the hash and verify it matches the CID
@@ -999,21 +988,21 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 		}
 
 		// Update the status of CID request
-		daginfo->XIDtoStatus.set(source_cid, status);
+		sk->XIDtoStatus.set(source_cid, status);
 
 		// Check if the ReadCID() was called for this CID
 		HashTable<XID, bool>::iterator it4;
-		it4 = daginfo->XIDtoReadReq.find(source_cid);
+		it4 = sk->XIDtoReadReq.find(source_cid);
 
-		if(it4 != daginfo->XIDtoReadReq.end()) {
+		if(it4 != sk->XIDtoReadReq.end()) {
 			// There is an entry
 			bool read_cid_req = it4->second;
 
 			if (read_cid_req == true) {
 				// Send pkt up
-				daginfo->XIDtoReadReq.erase(it4);
+				sk->XIDtoReadReq.erase(it4);
 
-				portToDAGinfo.set(_dport, *daginfo);
+				portToSock.set(_dport, *sk);
 
 				//Unparse dag info
 				String src_path = xiah.src_path().unparse();
@@ -1037,16 +1026,16 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 
 			} else {
 				// Store the packet into temp buffer (until ReadCID() is called for this CID)
-				WritablePacket *copy_response_pkt = copy_cid_response_packet(p_in, daginfo);
-				daginfo->XIDtoCIDresponsePkt.set(source_cid, copy_response_pkt);
+				WritablePacket *copy_response_pkt = copy_cid_response_packet(p_in, sk);
+				sk->XIDtoCIDresponsePkt.set(source_cid, copy_response_pkt);
 
-				portToDAGinfo.set(_dport, *daginfo);
+				portToSock.set(_dport, *sk);
 			}
 
 		} else {
-			WritablePacket *copy_response_pkt = copy_cid_response_packet(p_in, daginfo);
-			daginfo->XIDtoCIDresponsePkt.set(source_cid, copy_response_pkt);
-			portToDAGinfo.set(_dport, *daginfo);
+			WritablePacket *copy_response_pkt = copy_cid_response_packet(p_in, sk);
+			sk->XIDtoCIDresponsePkt.set(source_cid, copy_response_pkt);
+			portToSock.set(_dport, *sk);
 		}
 	}
 	else
@@ -1177,23 +1166,23 @@ void XTRANSPORT::Xsocket(unsigned short _sport) {
 	xia::X_Socket_Msg *x_socket_msg = xia_socket_msg.mutable_x_socket();
 	int sock_type = x_socket_msg->type();
 
-	//Set the source port in DAGinfo
-	DAGinfo daginfo;
-	daginfo.port = _sport;
-	daginfo.timer_on = false;
-	daginfo.synack_waiting = false;
-	daginfo.dataack_waiting = false;
-	daginfo.num_retransmit_tries = 0;
-	daginfo.teardown_waiting = false;
-	daginfo.isAcceptSocket = false;
-	daginfo.num_connect_tries = 0; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
-	memset(daginfo.send_buffer, 0, MAX_WIN_SIZE * sizeof(WritablePacket*));
+	//Set the source port in sock
+	sock sk;
+	sk.port = _sport;
+	sk.timer_on = false;
+	sk.synack_waiting = false;
+	sk.dataack_waiting = false;
+	sk.num_retransmit_tries = 0;
+	sk.teardown_waiting = false;
+	sk.isAcceptSocket = false;
+	sk.num_connect_tries = 0; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
+	memset(sk.send_buffer, 0, sk.send_buffer_size * sizeof(WritablePacket*));
 
-	//Set the socket_type (reliable or not) in DAGinfo
-	daginfo.sock_type = sock_type;
+	//Set the socket_type (reliable or not) in sock
+	sk.sock_type = sock_type;
 
 	// Map the source port to DagInfo
-	portToDAGinfo.set(_sport, daginfo);
+	portToSock.set(_sport, sk);
 
 	portToActive.set(_sport, true);
 
@@ -1299,28 +1288,28 @@ void XTRANSPORT::Xbind(unsigned short _sport) {
 	//String str_local_addr=_local_addr.unparse();
 	//str_local_addr=str_local_addr+" "+xid_string;//Make source DAG _local_addr:SID
 
-	//Set the source DAG in DAGinfo
-	DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
-	if (daginfo->src_path.parse(sdag_string)) {
-		daginfo->nxt = LAST_NODE_DEFAULT;
-		daginfo->last = LAST_NODE_DEFAULT;
-		daginfo->hlim = hlim.get(_sport);
-		daginfo->isConnected = false;
-		daginfo->initialized = true;
-		daginfo->sdag = sdag_string;
+	//Set the source DAG in sock
+	sock *sk = portToSock.get_pointer(_sport);
+	if (sk->src_path.parse(sdag_string)) {
+		sk->nxt = LAST_NODE_DEFAULT;
+		sk->last = LAST_NODE_DEFAULT;
+		sk->hlim = hlim.get(_sport);
+		sk->isConnected = false;
+		sk->initialized = true;
+		sk->sdag = sdag_string;
 
 		//Check if binding to full DAG or just to SID only
-		Vector<XIAPath::handle_t> xids = daginfo->src_path.next_nodes( daginfo->src_path.source_node() );		
-		XID front_xid = daginfo->src_path.xid( xids[0] );
+		Vector<XIAPath::handle_t> xids = sk->src_path.next_nodes( sk->src_path.source_node() );		
+		XID front_xid = sk->src_path.xid( xids[0] );
 		struct click_xia_xid head_xid = front_xid.xid();
 		uint32_t head_xid_type = head_xid.type;
 		if(head_xid_type == _sid_type) {
-			daginfo->full_src_dag = false; 
+			sk->full_src_dag = false; 
 		} else {
-			daginfo->full_src_dag = true;
+			sk->full_src_dag = true;
 		}
 
-		XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+		XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
 		//XID xid(xid_string);
 		//TODO: Add a check to see if XID is already being used
 
@@ -1328,7 +1317,7 @@ void XTRANSPORT::Xbind(unsigned short _sport) {
 		XIDtoPort.set(source_xid, _sport);
 		addRoute(source_xid);
 
-		portToDAGinfo.set(_sport, *daginfo);
+		portToSock.set(_sport, *sk);
 
 		//click_chatter("Bound");
 		//click_chatter("set %d %d",_sport, __LINE__);
@@ -1347,17 +1336,17 @@ void XTRANSPORT::Xclose(unsigned short _sport)
 	// Close port
 	//click_chatter("Xclose: closing %d\n", _sport);
 
-	DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
+	sock *sk = portToSock.get_pointer(_sport);
 
 	// Set timer
-	daginfo->timer_on = true;
-	daginfo->teardown_waiting = true;
-	daginfo->teardown_expiry = Timestamp::now() + Timestamp::make_msec(_teardown_wait_ms);
+	sk->timer_on = true;
+	sk->teardown_waiting = true;
+	sk->teardown_expiry = Timestamp::now() + Timestamp::make_msec(_teardown_wait_ms);
 
-	if (! _timer.scheduled() || _timer.expiry() >= daginfo->teardown_expiry )
-		_timer.reschedule_at(daginfo->teardown_expiry);
+	if (! _timer.scheduled() || _timer.expiry() >= sk->teardown_expiry )
+		_timer.reschedule_at(sk->teardown_expiry);
 
-	portToDAGinfo.set(_sport, *daginfo);
+	portToSock.set(_sport, *sk);
 
 	xcmp_listeners.remove(_sport);
 
@@ -1383,32 +1372,32 @@ void XTRANSPORT::Xconnect(unsigned short _sport)
 	XIAPath dst_path;
 	dst_path.parse(dest);
 
-	DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
-	//click_chatter("connect %d %x",_sport, daginfo);
+	sock *sk = portToSock.get_pointer(_sport);
+	//click_chatter("connect %d %x",_sport, sk);
 
-	if(!daginfo) {
-		//click_chatter("Create DAGINFO connect %d %x",_sport, daginfo);
+	if(!sk) {
+		//click_chatter("Create DAGINFO connect %d %x",_sport, sk);
 		//No local SID bound yet, so bind ephemeral one
-		daginfo = new DAGinfo();
+		sk = new sock();
 	}
 
-	daginfo->dst_path = dst_path;
-	daginfo->port = _sport;
-	daginfo->isConnected = true;
-	daginfo->initialized = true;
-	daginfo->ddag = dest;
-	daginfo->seq_num = 0;
-	daginfo->ack_num = 0;
-	daginfo->send_base = 0;
-	daginfo->next_send_seqnum = 0;
-	daginfo->next_recv_seqnum = 0;
-	daginfo->num_connect_tries++; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
+	sk->dst_path = dst_path;
+	sk->port = _sport;
+	sk->isConnected = true;
+	sk->initialized = true;
+	sk->ddag = dest;
+	sk->seq_num = 0;
+	sk->ack_num = 0;
+	sk->send_base = 0;
+	sk->next_send_seqnum = 0;
+	sk->next_recv_seqnum = 0;
+	sk->num_connect_tries++; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
 
 	String str_local_addr = _local_addr.unparse_re();
-	//String dagstr = daginfo->src_path.unparse_re();
+	//String dagstr = sk->src_path.unparse_re();
 
 	/* Use src_path set by Xbind() if exists */
-	if(daginfo->sdag.length() == 0) {
+	if(sk->sdag.length() == 0) {
 		char xid_string[50];
 		random_xid("SID", xid_string);
 
@@ -1416,15 +1405,15 @@ void XTRANSPORT::Xconnect(unsigned short _sport)
 //		String xid_string = "SID:20000ff00000000000000000000000000" + rand;
 //		str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
 		str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
-		daginfo->src_path.parse_re(str_local_addr);
+		sk->src_path.parse_re(str_local_addr);
 	}
 
-	daginfo->nxt = LAST_NODE_DEFAULT;
-	daginfo->last = LAST_NODE_DEFAULT;
-	daginfo->hlim = hlim.get(_sport);
+	sk->nxt = LAST_NODE_DEFAULT;
+	sk->last = LAST_NODE_DEFAULT;
+	sk->hlim = hlim.get(_sport);
 
-	XID source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
-	XID destination_xid = daginfo->dst_path.xid(daginfo->dst_path.destination_node());
+	XID source_xid = sk->src_path.xid(sk->src_path.destination_node());
+	XID destination_xid = sk->dst_path.xid(sk->dst_path.destination_node());
 
 	XIDpair xid_pair;
 	xid_pair.set_src(source_xid);
@@ -1439,7 +1428,7 @@ void XTRANSPORT::Xconnect(unsigned short _sport)
 	XIDtoPort.set(source_xid, _sport);
 	addRoute(source_xid);
 
-	// click_chatter("XCONNECT: set %d %x",_sport, daginfo);
+	// click_chatter("XCONNECT: set %d %x",_sport, sk);
 
 	// Prepare SYN packet
 
@@ -1449,7 +1438,7 @@ void XTRANSPORT::Xconnect(unsigned short _sport)
 	xiah.set_last(LAST_NODE_DEFAULT);
 	xiah.set_hlim(hlim.get(_sport));
 	xiah.set_dst_path(dst_path);
-	xiah.set_src_path(daginfo->src_path);
+	xiah.set_src_path(sk->src_path);
 
 	//click_chatter("Sent packet to network");
 	const char* dummy = "Connection_request";
@@ -1469,24 +1458,24 @@ void XTRANSPORT::Xconnect(unsigned short _sport)
 	delete thdr;
 
 	// Set timer
-	daginfo->timer_on = true;
-	daginfo->synack_waiting = true;
-	daginfo->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
+	sk->timer_on = true;
+	sk->synack_waiting = true;
+	sk->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
 
-	if (! _timer.scheduled() || _timer.expiry() >= daginfo->expiry )
-		_timer.reschedule_at(daginfo->expiry);
+	if (! _timer.scheduled() || _timer.expiry() >= sk->expiry )
+		_timer.reschedule_at(sk->expiry);
 
 	// Store the syn packet for potential retransmission
-	daginfo->syn_pkt = copy_packet(p, daginfo);
+	sk->syn_pkt = copy_packet(p, sk);
 
-	portToDAGinfo.set(_sport, *daginfo);
+	portToSock.set(_sport, *sk);
 	XIAHeader xiah1(p);
 	//String pld((char *)xiah1.payload(), xiah1.plen());
 	// printf("XCONNECT: %d: %s\n", _sport, (_local_addr.unparse()).c_str());
 	output(NETWORK_PORT).push(p);
 
-	//daginfo=portToDAGinfo.get_pointer(_sport);
-	//click_chatter("\nbound to %s\n",portToDAGinfo.get_pointer(_sport)->src_path.unparse().c_str());
+	//sk=portToSock.get_pointer(_sport);
+	//click_chatter("\nbound to %s\n",portToSock.get_pointer(_sport)->src_path.unparse().c_str());
 
 	// (for Ack purpose) Reply with a packet with the destination port=source port
 	//output(API_PORT).push(UDPIPPrep(p_in,_sport));
@@ -1500,22 +1489,22 @@ void XTRANSPORT::Xaccept(unsigned short _sport)
 
 	if (!pending_connection_buf.empty()) {
 
-		DAGinfo daginfo = pending_connection_buf.front();
-		daginfo.port = _sport;
+		sock sk = pending_connection_buf.front();
+		sk.port = _sport;
 
-		daginfo.seq_num = 0;
-		daginfo.ack_num = 0;
-		daginfo.send_base = 0;
-		daginfo.hlim = hlim.get(_sport);
-		daginfo.next_send_seqnum = 0;
-		daginfo.next_recv_seqnum = 0;
-		daginfo.isAcceptSocket = true;
-		memset(daginfo.send_buffer, 0, MAX_WIN_SIZE * sizeof(WritablePacket*));
+		sk.seq_num = 0;
+		sk.ack_num = 0;
+		sk.send_base = 0;
+		sk.hlim = hlim.get(_sport);
+		sk.next_send_seqnum = 0;
+		sk.next_recv_seqnum = 0;
+		sk.isAcceptSocket = true;
+		memset(sk.send_buffer, 0, sk.send_buffer_size * sizeof(WritablePacket*));
 
-		portToDAGinfo.set(_sport, daginfo);
+		portToSock.set(_sport, sk);
 
-		XID source_xid = daginfo.src_path.xid(daginfo.src_path.destination_node());
-		XID destination_xid = daginfo.dst_path.xid(daginfo.dst_path.destination_node());
+		XID source_xid = sk.src_path.xid(sk.src_path.destination_node());
+		XID destination_xid = sk.dst_path.xid(sk.dst_path.destination_node());
 
 		XIDpair xid_pair;
 		xid_pair.set_src(source_xid);
@@ -1628,9 +1617,9 @@ void XTRANSPORT::Xgetpeername(unsigned short _sport)
 	_xsm.set_type(xia::XGETPEERNAME);
 	xia::X_GetPeername_Msg *_msg = _xsm.mutable_x_getpeername();
 
-	DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
+	sock *sk = portToSock.get_pointer(_sport);
 
-	_msg->set_dag(daginfo->dst_path.unparse().c_str());
+	_msg->set_dag(sk->dst_path.unparse().c_str());
 
 	std::string p_buf1;
 	_xsm.SerializeToString(&p_buf1);
@@ -1645,9 +1634,9 @@ void XTRANSPORT::Xgetsockname(unsigned short _sport)
 	_xsm.set_type(xia::XGETSOCKNAME);
 	xia::X_GetSockname_Msg *_msg = _xsm.mutable_x_getsockname();
 
-	DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
+	sock *sk = portToSock.get_pointer(_sport);
 
-	_msg->set_dag(daginfo->src_path.unparse().c_str());
+	_msg->set_dag(sk->src_path.unparse().c_str());
 
 	std::string p_buf1;
 	_xsm.SerializeToString(&p_buf1);
@@ -1669,30 +1658,30 @@ void XTRANSPORT::Xsend(unsigned short _sport, WritablePacket *p_in)
 	//printf("XSEND: %d bytes from (%d)\n", pktPayloadSize, _sport);
 
 	//Find DAG info for that stream
-	DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
-	if (daginfo && daginfo->isConnected) {
+	sock *sk = portToSock.get_pointer(_sport);
+	if (sk && sk->isConnected) {
 
 		//Recalculate source path
-		XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+		XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
 		String str_local_addr = _local_addr.unparse_re() + " " + source_xid.unparse();
 		//Make source DAG _local_addr:SID
-		String dagstr = daginfo->src_path.unparse_re();
+		String dagstr = sk->src_path.unparse_re();
 
 		//Client Mobility...
 		if (dagstr.length() != 0 && dagstr != str_local_addr) {
 			//Moved!
-			// 1. Update 'daginfo->src_path'
-			daginfo->src_path.parse_re(str_local_addr);
+			// 1. Update 'sk->src_path'
+			sk->src_path.parse_re(str_local_addr);
 		}
 	
 		// Case of initial binding to only SID
-		if(daginfo->full_src_dag == false) {
-			daginfo->full_src_dag = true;
+		if(sk->full_src_dag == false) {
+			sk->full_src_dag = true;
 			String str_local_addr = _local_addr.unparse_re();
-			XID front_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+			XID front_xid = sk->src_path.xid(sk->src_path.destination_node());
 			String xid_string = front_xid.unparse();
 			str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
-			daginfo->src_path.parse_re(str_local_addr);
+			sk->src_path.parse_re(str_local_addr);
 		}
 
 		//Add XIA headers
@@ -1700,19 +1689,19 @@ void XTRANSPORT::Xsend(unsigned short _sport, WritablePacket *p_in)
 		xiah.set_nxt(CLICK_XIA_NXT_TRN);
 		xiah.set_last(LAST_NODE_DEFAULT);
 		xiah.set_hlim(hlim.get(_sport));
-		xiah.set_dst_path(daginfo->dst_path);
-		xiah.set_src_path(daginfo->src_path);
+		xiah.set_dst_path(sk->dst_path);
+		xiah.set_src_path(sk->src_path);
 		xiah.set_plen(pktPayloadSize);
 
 		if (DEBUG)
-			click_chatter("XSEND: (%d) sent packet to %s, from %s\n", _sport, daginfo->dst_path.unparse_re().c_str(), daginfo->src_path.unparse_re().c_str());
+			click_chatter("XSEND: (%d) sent packet to %s, from %s\n", _sport, sk->dst_path.unparse_re().c_str(), sk->src_path.unparse_re().c_str());
 
 		WritablePacket *just_payload_part = WritablePacket::make(p_in->headroom() + 1, (const void*)x_send_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
 
 		WritablePacket *p = NULL;
 
 		//Add XIA Transport headers
-		TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDATAHeader(daginfo->next_send_seqnum, daginfo->ack_num, 0 ); // #seq, #ack, length
+		TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDATAHeader(sk->next_send_seqnum, sk->ack_num, 0 ); // #seq, #ack, length
 		p = thdr->encap(just_payload_part);
 
 		thdr->update();
@@ -1723,31 +1712,31 @@ void XTRANSPORT::Xsend(unsigned short _sport, WritablePacket *p_in)
 		delete thdr;
 
 		// Store the packet into buffer
-		WritablePacket *tmp = daginfo->send_buffer[daginfo->seq_num % MAX_WIN_SIZE];
-		daginfo->send_buffer[daginfo->seq_num % MAX_WIN_SIZE] = copy_packet(p, daginfo);
+		WritablePacket *tmp = sk->send_buffer[sk->seq_num % sk->send_buffer_size];
+		sk->send_buffer[sk->seq_num % sk->send_buffer_size] = copy_packet(p, sk);
 		if (tmp)
 			tmp->kill();
 
-		// printf("XSEND: SENT DATA at (%s) seq=%d \n\n", dagstr.c_str(), daginfo->seq_num%MAX_WIN_SIZE);
+		// printf("XSEND: SENT DATA at (%s) seq=%d \n\n", dagstr.c_str(), sk->seq_num%sk->send_buffer_size);
 
-		daginfo->seq_num++;
-		daginfo->next_send_seqnum++;
+		sk->seq_num++;
+		sk->next_send_seqnum++;
 
 		// Set timer
-		daginfo->timer_on = true;
-		daginfo->dataack_waiting = true;
-		daginfo->num_retransmit_tries = 0;
-		daginfo->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
+		sk->timer_on = true;
+		sk->dataack_waiting = true;
+		sk->num_retransmit_tries = 0;
+		sk->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
 
-		if (! _timer.scheduled() || _timer.expiry() >= daginfo->expiry )
-			_timer.reschedule_at(daginfo->expiry);
+		if (! _timer.scheduled() || _timer.expiry() >= sk->expiry )
+			_timer.reschedule_at(sk->expiry);
 
-		portToDAGinfo.set(_sport, *daginfo);
+		portToSock.set(_sport, *sk);
 
 		//click_chatter("Sent packet to network");
 		XIAHeader xiah1(p);
 		String pld((char *)xiah1.payload(), xiah1.plen());
-		//printf("\n\n (%s) send (timer set at %f) =%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (daginfo->expiry).doubleval(), pld.c_str(), xiah1.plen());
+		//printf("\n\n (%s) send (timer set at %f) =%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (sk->expiry).doubleval(), pld.c_str(), xiah1.plen());
 		output(NETWORK_PORT).push(p);
 
 		// REMOVED STATUS RETURNS AS WE RAN INTO SEQUENCING ERRORS
@@ -1775,17 +1764,17 @@ void XTRANSPORT::Xsendto(unsigned short _sport, WritablePacket *p_in)
 	dst_path.parse(dest);
 
 	//Find DAG info for this DGRAM
-	DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
+	sock *sk = portToSock.get_pointer(_sport);
 
-	if(!daginfo) {
+	if(!sk) {
 		//No local SID bound yet, so bind one
-		daginfo = new DAGinfo();
+		sk = new sock();
 	}
 
-	if (daginfo->initialized == false) {
-		daginfo->initialized = true;
-		daginfo->full_src_dag = true;
-		daginfo->port = _sport;
+	if (sk->initialized == false) {
+		sk->initialized = true;
+		sk->full_src_dag = true;
+		sk->port = _sport;
 		String str_local_addr = _local_addr.unparse_re();
 
 		char xid_string[50];
@@ -1794,41 +1783,41 @@ void XTRANSPORT::Xsendto(unsigned short _sport, WritablePacket *p_in)
 //		String xid_string = "SID:20000ff00000000000000000000000000" + rand;
 		str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
 
-		daginfo->src_path.parse_re(str_local_addr);
+		sk->src_path.parse_re(str_local_addr);
 
-		daginfo->last = LAST_NODE_DEFAULT;
-		daginfo->hlim = hlim.get(_sport);
+		sk->last = LAST_NODE_DEFAULT;
+		sk->hlim = hlim.get(_sport);
 
-		XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+		XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
 
-		XIDtoPort.set(source_xid, _sport); //Maybe change the mapping to XID->DAGinfo?
+		XIDtoPort.set(source_xid, _sport); //Maybe change the mapping to XID->sock?
 		addRoute(source_xid);
 	}
 
 	// Case of initial binding to only SID
-	if(daginfo->full_src_dag == false) {
-		daginfo->full_src_dag = true;
+	if(sk->full_src_dag == false) {
+		sk->full_src_dag = true;
 		String str_local_addr = _local_addr.unparse_re();
-		XID front_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+		XID front_xid = sk->src_path.xid(sk->src_path.destination_node());
 		String xid_string = front_xid.unparse();
 		str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
-		daginfo->src_path.parse_re(str_local_addr);
+		sk->src_path.parse_re(str_local_addr);
 	}
 
 
-	if(daginfo->src_path.unparse_re().length() != 0) {
+	if(sk->src_path.unparse_re().length() != 0) {
 		//Recalculate source path
-		XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+		XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
 		String str_local_addr = _local_addr.unparse_re() + " " + source_xid.unparse(); //Make source DAG _local_addr:SID
-		daginfo->src_path.parse(str_local_addr);
+		sk->src_path.parse(str_local_addr);
 	}
 
-	portToDAGinfo.set(_sport, *daginfo);
+	portToSock.set(_sport, *sk);
 
-	daginfo = portToDAGinfo.get_pointer(_sport);
+	sk = portToSock.get_pointer(_sport);
 
 //			if (DEBUG)
-//				click_chatter("sent packet from %s, to %s\n", daginfo->src_path.unparse_re().c_str(), dest.c_str());
+//				click_chatter("sent packet from %s, to %s\n", sk->src_path.unparse_re().c_str(), dest.c_str());
 
 	//Add XIA headers
 	XIAHeaderEncap xiah;
@@ -1836,14 +1825,14 @@ void XTRANSPORT::Xsendto(unsigned short _sport, WritablePacket *p_in)
 	xiah.set_last(LAST_NODE_DEFAULT);
 	xiah.set_hlim(hlim.get(_sport));
 	xiah.set_dst_path(dst_path);
-	xiah.set_src_path(daginfo->src_path);
+	xiah.set_src_path(sk->src_path);
 
 	WritablePacket *just_payload_part = WritablePacket::make(p_in->headroom() + 1, (const void*)x_sendto_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
 
 	WritablePacket *p = NULL;
 
 	// FIXME: shouldn't be a raw number
-	if (daginfo->sock_type == 3) {
+	if (sk->sock_type == 3) {
 		xiah.set_nxt(nxt_xport.get(_sport));
 
 		xiah.set_plen(pktPayloadSize);
@@ -1854,7 +1843,7 @@ void XTRANSPORT::Xsendto(unsigned short _sport, WritablePacket *p_in)
 		xiah.set_plen(pktPayloadSize);
 
 		//p = xiah.encap(just_payload_part, true);
-		//printf("\n\nSEND: %s ---> %s\n\n", daginfo->src_path.unparse_re().c_str(), dest.c_str());
+		//printf("\n\nSEND: %s ---> %s\n\n", sk->src_path.unparse_re().c_str(), dest.c_str());
 		//printf("payload=%s len=%d \n\n", x_sendto_msg->payload().c_str(), pktPayloadSize);
 
 		//Add XIA Transport headers
@@ -1892,17 +1881,17 @@ void XTRANSPORT::XrequestChunk(unsigned short _sport, WritablePacket *p_in)
 		dst_path.parse(dest);
 
 		//Find DAG info for this DGRAM
-		DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
+		sock *sk = portToSock.get_pointer(_sport);
 
-		if(!daginfo) {
+		if(!sk) {
 			//No local SID bound yet, so bind one
-			daginfo = new DAGinfo();
+			sk = new sock();
 		}
 
-		if (daginfo->initialized == false) {
-			daginfo->initialized = true;
-			daginfo->full_src_dag = true;
-			daginfo->port = _sport;
+		if (sk->initialized == false) {
+			sk->initialized = true;
+			sk->full_src_dag = true;
+			sk->port = _sport;
 			String str_local_addr = _local_addr.unparse_re();
 
 			char xid_string[50];
@@ -1911,41 +1900,41 @@ void XTRANSPORT::XrequestChunk(unsigned short _sport, WritablePacket *p_in)
 //			String xid_string = "SID:20000ff00000000000000000000000000" + rand;
 			str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
 
-			daginfo->src_path.parse_re(str_local_addr);
+			sk->src_path.parse_re(str_local_addr);
 
-			daginfo->last = LAST_NODE_DEFAULT;
-			daginfo->hlim = hlim.get(_sport);
+			sk->last = LAST_NODE_DEFAULT;
+			sk->hlim = hlim.get(_sport);
 
-			XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+			XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
 
-			XIDtoPort.set(source_xid, _sport); //Maybe change the mapping to XID->DAGinfo?
+			XIDtoPort.set(source_xid, _sport); //Maybe change the mapping to XID->sock?
 			addRoute(source_xid);
 
 		}
 	
 		// Case of initial binding to only SID
-		if(daginfo->full_src_dag == false) {
-			daginfo->full_src_dag = true;
+		if(sk->full_src_dag == false) {
+			sk->full_src_dag = true;
 			String str_local_addr = _local_addr.unparse_re();
-			XID front_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+			XID front_xid = sk->src_path.xid(sk->src_path.destination_node());
 			String xid_string = front_xid.unparse();
 			str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
-			daginfo->src_path.parse_re(str_local_addr);
+			sk->src_path.parse_re(str_local_addr);
 		}
 	
-		if(daginfo->src_path.unparse_re().length() != 0) {
+		if(sk->src_path.unparse_re().length() != 0) {
 			//Recalculate source path
-			XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+			XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
 			String str_local_addr = _local_addr.unparse_re() + " " + source_xid.unparse(); //Make source DAG _local_addr:SID
-			daginfo->src_path.parse(str_local_addr);
+			sk->src_path.parse(str_local_addr);
 		}
 
-		portToDAGinfo.set(_sport, *daginfo);
+		portToSock.set(_sport, *sk);
 
-		daginfo = portToDAGinfo.get_pointer(_sport);
+		sk = portToSock.get_pointer(_sport);
 
 		if (DEBUG)
-			click_chatter("sent packet to %s, from %s\n", dest.c_str(), daginfo->src_path.unparse_re().c_str());
+			click_chatter("sent packet to %s, from %s\n", dest.c_str(), sk->src_path.unparse_re().c_str());
 
 		//Add XIA headers
 		XIAHeaderEncap xiah;
@@ -1953,7 +1942,7 @@ void XTRANSPORT::XrequestChunk(unsigned short _sport, WritablePacket *p_in)
 		xiah.set_last(LAST_NODE_DEFAULT);
 		xiah.set_hlim(hlim.get(_sport));
 		xiah.set_dst_path(dst_path);
-		xiah.set_src_path(daginfo->src_path);
+		xiah.set_src_path(sk->src_path);
 		xiah.set_plen(pktPayloadSize);
 
 		WritablePacket *just_payload_part = WritablePacket::make(p_in->headroom() + 1, (const void*)x_requestchunk_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
@@ -1966,7 +1955,7 @@ void XTRANSPORT::XrequestChunk(unsigned short _sport, WritablePacket *p_in)
 		p = xiah.encap(p, true);
 		delete chdr;
 
-		XID	source_sid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+		XID	source_sid = sk->src_path.xid(sk->src_path.destination_node());
 		XID	destination_cid = dst_path.xid(dst_path.destination_node());
 
 		XIDpair xid_pair;
@@ -1977,24 +1966,24 @@ void XTRANSPORT::XrequestChunk(unsigned short _sport, WritablePacket *p_in)
 		XIDpairToPort.set(xid_pair, _sport);
 
 		// Store the packet into buffer
-		WritablePacket *copy_req_pkt = copy_cid_req_packet(p, daginfo);
-		daginfo->XIDtoCIDreqPkt.set(destination_cid, copy_req_pkt);
+		WritablePacket *copy_req_pkt = copy_cid_req_packet(p, sk);
+		sk->XIDtoCIDreqPkt.set(destination_cid, copy_req_pkt);
 
 		// Set the status of CID request
-		daginfo->XIDtoStatus.set(destination_cid, WAITING_FOR_CHUNK);
+		sk->XIDtoStatus.set(destination_cid, WAITING_FOR_CHUNK);
 
 		// Set the status of ReadCID reqeust
-		daginfo->XIDtoReadReq.set(destination_cid, false);
+		sk->XIDtoReadReq.set(destination_cid, false);
 
 		// Set timer
 		Timestamp cid_req_expiry  = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
-		daginfo->XIDtoExpiryTime.set(destination_cid, cid_req_expiry);
-		daginfo->XIDtoTimerOn.set(destination_cid, true);
+		sk->XIDtoExpiryTime.set(destination_cid, cid_req_expiry);
+		sk->XIDtoTimerOn.set(destination_cid, true);
 
 		if (! _timer.scheduled() || _timer.expiry() >= cid_req_expiry )
 			_timer.reschedule_at(cid_req_expiry);
 
-		portToDAGinfo.set(_sport, *daginfo);
+		portToSock.set(_sport, *sk);
 
 		output(NETWORK_PORT).push(p);
 	}
@@ -2016,15 +2005,15 @@ void XTRANSPORT::XgetChunkStatus(unsigned short _sport)
 		dst_path.parse(dest);
 
 		//Find DAG info for this DGRAM
-		DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
+		sock *sk = portToSock.get_pointer(_sport);
 
 		XID	destination_cid = dst_path.xid(dst_path.destination_node());
 
 		// Check the status of CID request
 		HashTable<XID, int>::iterator it;
-		it = daginfo->XIDtoStatus.find(destination_cid);
+		it = sk->XIDtoStatus.find(destination_cid);
 
-		if(it != daginfo->XIDtoStatus.end()) {
+		if(it != sk->XIDtoStatus.end()) {
 			// There is an entry
 			int status = it->second;
 
@@ -2071,19 +2060,19 @@ void XTRANSPORT::XreadChunk(unsigned short _sport)
 	dst_path.parse(dest);
 
 	//Find DAG info for this DGRAM
-	DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
+	sock *sk = portToSock.get_pointer(_sport);
 
 	XID	destination_cid = dst_path.xid(dst_path.destination_node());
 
 	// Update the status of ReadCID reqeust
-	daginfo->XIDtoReadReq.set(destination_cid, true);
-	portToDAGinfo.set(_sport, *daginfo);
+	sk->XIDtoReadReq.set(destination_cid, true);
+	portToSock.set(_sport, *sk);
 
 	// Check the status of CID request
 	HashTable<XID, int>::iterator it;
-	it = daginfo->XIDtoStatus.find(destination_cid);
+	it = sk->XIDtoStatus.find(destination_cid);
 
-	if(it != daginfo->XIDtoStatus.end()) {
+	if(it != sk->XIDtoStatus.end()) {
 		// There is an entry
 		int status = it->second;
 
@@ -2094,12 +2083,12 @@ void XTRANSPORT::XreadChunk(unsigned short _sport)
 		} else {
 			// Send the buffered pkt to upper layer
 
-			daginfo->XIDtoReadReq.set(destination_cid, false);
-			portToDAGinfo.set(_sport, *daginfo);
+			sk->XIDtoReadReq.set(destination_cid, false);
+			portToSock.set(_sport, *sk);
 
 			HashTable<XID, WritablePacket*>::iterator it2;
-			it2 = daginfo->XIDtoCIDresponsePkt.find(destination_cid);
-			copy = copy_cid_response_packet(it2->second, daginfo);
+			it2 = sk->XIDtoCIDresponsePkt.find(destination_cid);
+			copy = copy_cid_response_packet(it2->second, sk);
 
 			XIAHeader xiah(copy->xia_header());
 
@@ -2124,9 +2113,9 @@ void XTRANSPORT::XreadChunk(unsigned short _sport)
 			output(API_PORT).push(UDPIPPrep(p2, _sport));
 
 			it2->second->kill();
-			daginfo->XIDtoCIDresponsePkt.erase(it2);
+			sk->XIDtoCIDresponsePkt.erase(it2);
 
-			portToDAGinfo.set(_sport, *daginfo);
+			portToSock.set(_sport, *sk);
 		}
 	}
 
@@ -2227,7 +2216,7 @@ void XTRANSPORT::XputChunk(unsigned short _sport)
 	 * 3. Use the socket SID on which putCID was issued. This will
 	 *	result in a reply going to the same socket on which the putCID was issued.
 	 *	Use the response to return 1 to the putCID call to indicate success.
-	 *	Need to add daginfo/ephemeral SID generation for this to work.
+	 *	Need to add sk/ephemeral SID generation for this to work.
 	 * 4. Special OPCODE in content extension header and treat it specially in content module (done below)
 	 */
 
