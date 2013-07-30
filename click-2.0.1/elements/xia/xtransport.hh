@@ -542,6 +542,9 @@ class XTRANSPORT : public Element {
 	bool should_buffer_received_packet(WritablePacket *p, sock *sk);
 	void add_packet_to_recv_buf(WritablePacket *p, sock *sk);
 	uint32_t next_missing_seqnum(sock *sk);
+	void resize_buffer(WritablePacket* buf[], int max, int type, uint32_t old_size, uint32_t new_size, int *dgram_start, int *dgram_end);
+	void resize_send_buffer(sock *sk, uint32_t new_size);
+	void resize_recv_buffer(sock *sk, uint32_t new_size);
 
     void ProcessAPIPacket(WritablePacket *p_in);
     void ProcessNetworkPacket(WritablePacket *p_in);

@@ -487,6 +487,55 @@ uint32_t XTRANSPORT::next_missing_seqnum(sock *sk) {
 	return next_missing;
 }
 
+
+void XTRANSPORT::resize_buffer(WritablePacket* buf[], int max, int type, uint32_t old_size, uint32_t new_size, int *dgram_start, int *dgram_end) {
+
+	if (new_size < old_size) {
+		click_chatter("WARNING: new buffer size is smaller than old size. Some data may be discarded.\n");
+		old_size = new_size; // so we stop after moving as many packets as will fit in the new buffer
+	}
+
+	// General procedure: make a temporary buffer and copy pointers to their
+	// new indices in the temp buffer. Then, rewrite the original buffer.
+	WritablePacket *temp[max];
+	memset(temp, 0, max);
+
+	// Figure out the new index for each packet in buffer
+	int new_index = -1;
+	for (int i = 0; i < old_size; i++) {
+		if (type == XSOCKET_STREAM) {
+			TransportHeader thdr(buf[i]);
+			new_index = thdr.seq_num() % new_size;
+		} else if (type == XSOCKET_DGRAM) {
+			new_index = (i + *dgram_start) % old_size;
+		}
+		temp[new_index] = buf[i];
+	}
+
+	// For DGRAM socket, reset start and end vars
+	if (type == XSOCKET_DGRAM) {
+		*dgram_start = 0;
+		*dgram_end = (*dgram_start + *dgram_end) % old_size;
+	}
+
+	// Copy new locations from temp back to original buf
+	memset(buf, 0, max);
+	for (int i = 0; i < max; i++) {
+		buf[i] = temp[i];
+	}
+}
+
+void XTRANSPORT::resize_send_buffer(sock *sk, uint32_t new_size) {
+	resize_buffer(sk->send_buffer, MAX_SEND_WIN_SIZE, sk->sock_type, sk->send_buffer_size, new_size, &(sk->dgram_buffer_start), &(sk->dgram_buffer_end));
+	sk->send_buffer_size = new_size;
+}
+
+void XTRANSPORT::resize_recv_buffer(sock *sk, uint32_t new_size) {
+	resize_buffer(sk->recv_buffer, MAX_RECV_WIN_SIZE, sk->sock_type, sk->recv_buffer_size, new_size, &(sk->dgram_buffer_start), &(sk->dgram_buffer_end));
+	sk->recv_buffer_size = new_size;
+}
+
+
 void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 {
 	//Extract the destination port
