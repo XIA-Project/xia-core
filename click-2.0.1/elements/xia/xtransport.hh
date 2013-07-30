@@ -301,10 +301,6 @@ class XTRANSPORT : public Element {
     bool isConnected;
     XIAPath _nameserver_addr;
 
-    // protobuf message
-    xia::XSocketMsg xia_socket_msg; // FIXME: WHY IS THIS NOT LOCAL TO THE PUSH METHOD????
-    //enum xia_socket_msg::XSocketMsgType type;
-    
     Packet* UDPIPPrep(Packet *, int);
 
 
@@ -553,27 +549,29 @@ class XTRANSPORT : public Element {
     /*
     ** Xsockets API handlers
     */
-    void Xsocket(unsigned short _sport);
-    void Xsetsockopt(unsigned short _sport);
-    void Xgetsockopt(unsigned short _sport);
-    void Xbind(unsigned short _sport);
-    void Xclose(unsigned short _sport);
-    void Xconnect(unsigned short _sport);
-    void Xaccept(unsigned short _sport);
-    void Xchangead(unsigned short _sport);
-    void Xreadlocalhostaddr(unsigned short _sport);
-    void Xupdatenameserverdag(unsigned short _sport);
-    void Xreadnameserverdag(unsigned short _sport);
-    void Xgetpeername(unsigned short _sport);
-    void Xgetsockname(unsigned short _sport);    
-    void Xisdualstackrouter(unsigned short _sport);
-    void Xsend(unsigned short _sport, WritablePacket *p_in);
-    void Xsendto(unsigned short _sport, WritablePacket *p_in);
-    void XrequestChunk(unsigned short _sport, WritablePacket *p_in);
-    void XgetChunkStatus(unsigned short _sport);
-    void XreadChunk(unsigned short _sport);
-    void XremoveChunk(unsigned short _sport);
-    void XputChunk(unsigned short _sport);
+    void Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+    void Xsetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+    void Xgetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+    void Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+    void Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+    void Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+    void Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+    void Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+    void Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+    void Xupdatenameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+    void Xreadnameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+    void Xgetpeername(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+    void Xgetsockname(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);    
+    void Xisdualstackrouter(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+    void Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
+    void Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
+	void Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+    void XrequestChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
+    void XgetChunkStatus(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+    void XreadChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+    void XremoveChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+    void XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 };
 
 
