@@ -120,7 +120,7 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		return -1;
 	}
 
-	if (click_reply2(new_sockfd, &type) < 0) {
+	if (click_reply2(new_sockfd, seq, &type) < 0) {
 		close(new_sockfd);
 		LOGF("Error getting status from Click: %s", strerror(errno));
 		return -1;

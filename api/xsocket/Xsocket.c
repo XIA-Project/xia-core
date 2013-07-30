@@ -121,7 +121,7 @@ int Xsocket(int family, int transport_type, int protocol)
 	}
 
 	// process the reply from click
-	if ((rc = click_reply2(sockfd, &type)) < 0) {
+	if ((rc = click_reply2(sockfd, seq, &type)) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
 
 	} else if (type != xia::XSOCKET) {

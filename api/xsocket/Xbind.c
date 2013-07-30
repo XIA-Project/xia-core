@@ -87,7 +87,7 @@ int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 	}
 
 	// process the reply from click
-	if ((rc = click_reply2(sockfd, &type)) < 0) {
+	if ((rc = click_reply2(sockfd, seq, &type)) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
 		return -1;
 	}

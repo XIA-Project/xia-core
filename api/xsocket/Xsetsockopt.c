@@ -111,7 +111,7 @@ int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen)
 
 	if ((rc = click_send(sockfd, &xsm)) < 0)
 		LOGF("Error talking to Click: %s", strerror(errno));
-	else if ((rc = click_reply2(sockfd, &type) ) < 0) {
+	else if ((rc = click_reply2(sockfd, seq, &type) ) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
 	}
 
@@ -147,8 +147,6 @@ int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen)
 */
 int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen)
 {
-	char buf[MAXBUFLEN];
-
 	/* TODO: we may need to check the type of the socket at some point, but for now
 	** treat them all the same as far as options go.
 	**
@@ -185,14 +183,12 @@ int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen)
 				return -1;
 			}
 
-			xia::XSocketMsg reply;
-			if (click_reply(sockfd, buf, sizeof(buf)) < 0) {
+			xsm.Clear();
+			if (click_reply(sockfd, seq, &xsm) < 0) {
 				LOGF("Error getting status from Click: %s", strerror(errno));
 				return -1;
 			}
 
-			xsm.Clear();
-			xsm.ParseFromString(buf);
 			xia::X_Getsockopt_Msg *msg = xsm.mutable_x_getsockopt();
 
 			int hlim = msg->int_opt();
@@ -214,14 +210,12 @@ int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen)
 				return -1;
 			}
 
-			xia::XSocketMsg reply;
-			if (click_reply(sockfd, buf, sizeof(buf)) < 0) {
+			xsm.Clear();
+			if (click_reply(sockfd, seq, &xsm) < 0) {
 				LOGF("Error getting status from Click: %s", strerror(errno));
 				return -1;
 			}
 
-			xsm.Clear();
-			xsm.ParseFromString(buf);
 			xia::X_Getsockopt_Msg *msg = xsm.mutable_x_getsockopt();
 
 			int nxt = msg->int_opt();

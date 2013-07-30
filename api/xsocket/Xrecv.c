@@ -56,8 +56,7 @@
 int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 {
 	int numbytes;
-	char UDPbuf[MAXBUFLEN];
-	
+
 	if (flags) {
 		errno = EOPNOTSUPP;
 		return -1;
@@ -87,15 +86,12 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len)) > 0)
 		return numbytes;
 
-	if ((numbytes = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) < 0) {
+	// FIXME: what should sequence # be here?
+	xia::XSocketMsg xsm;
+	if ((numbytes = click_reply(sockfd, 0, &xsm)) < 0) {
 		LOGF("Error retrieving recv data from Click: %s", strerror(errno));
 		return -1;
 	}
-
-	std::string str(UDPbuf, numbytes);
-	xia::XSocketMsg xsm;
-
-	xsm.ParseFromString(str);
 
 	xia::X_Recv_Msg *msg = xsm.mutable_x_recv();
 	unsigned paylen = msg->payload().size();

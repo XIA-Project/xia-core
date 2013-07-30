@@ -19,6 +19,7 @@
   @brief implements internal socket state functionality.
 */
 #include <map>
+#include <string>
 #include <pthread.h>
 #include <string.h>
 #include <assert.h>
@@ -43,13 +44,16 @@ public:
 	int isConnected() { return m_connected; };
 	void setConnected(int conn) { m_connected = conn; };
 
-	int isWrapped() { return m_wrapped; };
-	void setWrapped(int wrapped) { m_wrapped = wrapped; };
+	int isWrapped() { return (m_wrapped != 0); };
+	void setWrapped(int wrap) { wrap ? m_wrapped++ : m_wrapped--; };
 
 	int isAsync() { return m_async; };
 	void setAsync(int async) { m_async = async; };
 
 	unsigned seqNo() { return m_sequence++; };
+
+	int getPacket(unsigned seq, char *buf, unsigned buflen);
+	void insertPacket(unsigned seq, char *buf, unsigned buflen);
 
 private:
 	int m_transportType;
@@ -59,6 +63,7 @@ private:
 	char *m_buf;
 	unsigned m_bufLen;
 	unsigned m_sequence;
+	map<unsigned, string> m_packets;
 };
 
 SocketState::SocketState(int tt)
@@ -126,6 +131,27 @@ void SocketState::setData(const char *buf, unsigned bufLen)
 
 	memcpy(m_buf, buf, bufLen);
 	m_bufLen = bufLen;
+}
+
+int SocketState::getPacket(unsigned seq, char *buf, unsigned buflen)
+{
+	int rc = 0;
+
+	std::string s = m_packets[seq];
+	if (s.size()) {
+		rc = MIN(buflen, s.size());
+		memcpy(buf, s.c_str(), rc);
+
+		m_packets.erase(seq);
+	}
+
+	return rc;
+}
+
+void SocketState::insertPacket(unsigned seq, char *buf, unsigned buflen)
+{
+	std::string s(buf, buflen);
+	m_packets[seq] = s;
 }
 
 class SocketMap
@@ -306,6 +332,27 @@ unsigned seqNo(int sock)
 	else
 		return 0;
 }
+
+void cachePacket(int sock, unsigned seq, char *buf, unsigned buflen)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate) {
+		sstate->insertPacket(seq, buf, buflen);
+	}
+}
+
+int getCachedPacket(int sock, unsigned seq, char *buf, unsigned buflen)
+{
+	int rc = 0;
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+
+	if (sstate) {
+		rc = sstate->getPacket(seq, buf, buflen);
+	}
+
+	return rc;
+}
+
 
 #if 0
 int main()

@@ -56,13 +56,13 @@ int Xclose(int sockfd)
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 
-	} else if ((rc = click_reply2(sockfd, &type)) < 0) {
+	} else if ((rc = click_reply2(sockfd, seq, &type)) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
 	}
 
-	setWrapped(sockfd, 1);
+	setWrapped(sockfd, TRUE);
 	close(sockfd);
-	setWrapped(sockfd, 0);
+	setWrapped(sockfd, FALSE);
 	freeSocketState(sockfd);
 	return rc;
 }

@@ -30,9 +30,16 @@
 #define LOGF(fmt, ...)
 #endif
 
+#ifndef FALSE
+#define FALSE 0
+#endif
+#ifndef TRUE
+#define TRUE (!FALSE)
+#endif
+
 int click_send(int sockfd, xia::XSocketMsg *xsm);
-int click_reply(int sockfd, char *buf, int buflen);
-int click_reply2(int sockfd, xia::XSocketCallType *type);
+int click_reply(int sockfd, unsigned seq, xia::XSocketMsg *msg);
+int click_reply2(int sockfd, unsigned seq, xia::XSocketCallType *type);
 int bind_to_random_port(int sockfd);
 
 int validateSocket(int sock, int stype, int err);
@@ -52,5 +59,7 @@ int isWrapped(int sock);
 void setAsync(int sock, int async);
 int isAsync(int sock);
 unsigned seqNo(int sock);
+void cachePacket(int sock, unsigned seq, char *buf, unsigned buflen);
+int getCachedPacket(int sock, unsigned seq, char *buf, unsigned buflen);
 
 #endif

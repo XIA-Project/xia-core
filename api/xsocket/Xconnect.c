@@ -89,14 +89,14 @@ int Xconnect(int sockfd, const sockaddr *addr, socklen_t addrlen)
 	// FIXME: make this use protobufs
 #if 1
 	addr_len = sizeof their_addr;
-	setWrapped(sockfd, 1);
+	setWrapped(sockfd, TRUE);
 	if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
 			(struct sockaddr *)&their_addr, &addr_len)) == -1) {
-	setWrapped(sockfd, 0);
+	setWrapped(sockfd, FALSE);
 		LOGF("Error getting status from Click: %s", strerror(errno));
 		return -1;
 	}
-	setWrapped(sockfd, 0);
+	setWrapped(sockfd, FALSE);
 
 	if (strcmp(buf, "^Connection-failed^") == 0) {
 		errno = ECONNREFUSED;

@@ -75,7 +75,6 @@ int XupdateAD(int sockfd, char *newad, char *new4id) {
 */
 int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *localhostHID, unsigned lenHID, char *local4ID, unsigned len4ID) {
   	int rc;
-  	char UDPbuf[MAXBUFLEN];
 
  	if (getSocketType(sockfd) == XSOCK_INVALID) {
    	 	LOG("The socket is not a valid Xsocket");
@@ -99,13 +98,12 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *loca
 		return -1;
   	}
 
-	if ((rc = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) < 0) {
+	xia::XSocketMsg xsm1;
+	if ((rc = click_reply(sockfd, seq, &xsm1)) < 0) {
 		LOGF("Error retrieving status from Click: %s", strerror(errno));
 		return -1;
 	}
 
-	xia::XSocketMsg xsm1;
-	xsm1.ParseFromString(UDPbuf);
 	if (xsm1.type() == xia::XREADLOCALHOSTADDR) {
 		xia::X_ReadLocalHostAddr_Msg *_msg = xsm1.mutable_x_readlocalhostaddr();
 		strncpy(localhostAD, (_msg->ad()).c_str(), lenAD);
@@ -137,7 +135,6 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *loca
 */
 int XisDualStackRouter(int sockfd) {
   	int rc;
-  	char UDPbuf[MAXBUFLEN];
 
  	if (getSocketType(sockfd) == XSOCK_INVALID) {
    	 	LOG("The socket is not a valid Xsocket");
@@ -155,13 +152,12 @@ int XisDualStackRouter(int sockfd) {
 		return -1;
   	}
 
-	if ((rc = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) < 0) {
+	xia::XSocketMsg xsm1;
+	if ((rc = click_reply(sockfd, seq, &xsm1)) < 0) {
 		LOGF("Error retrieving status from Click: %s", strerror(errno));
 		return -1;
 	}
 
-	xia::XSocketMsg xsm1;
-	xsm1.ParseFromString(UDPbuf);
 	if (xsm1.type() == xia::XISDUALSTACKROUTER) {
 		xia::X_IsDualStackRouter_Msg *_msg = xsm1.mutable_x_isdualstackrouter();
 		rc = _msg->flag();

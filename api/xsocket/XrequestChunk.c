@@ -151,7 +151,7 @@ int XrequestChunks(int sockfd, const ChunkStatus *chunks, int numChunks)
 
 #if 0
 	// process the reply from click
-	if ((rc = click_reply2(sockfd, &type)) < 0) {
+	if ((rc = click_reply2(sockfd, seq, &type)) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
 		return -1;
 	}

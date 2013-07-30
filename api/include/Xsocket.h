@@ -181,7 +181,6 @@ extern int Xgetaddrinfo(const char *, const char *, const struct addrinfo *, str
 extern void Xfreeaddrinfo(struct addrinfo *);
 extern const char *Xgai_strerror(int);
 extern int checkXid(const char *xid, const char *type);
-extern int checkDag(const char *dag);
 
 extern char *XrootDir(char *buf, unsigned len);
 
