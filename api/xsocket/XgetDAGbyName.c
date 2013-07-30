@@ -353,7 +353,6 @@ int XregisterName(const char *name, sockaddr_x *DAG) {
 int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
 	int rc;
-	char buf[MAXBUFLEN];
 
 	if (!addr || !addrlen) {
 		LOG("pointer is null!\n");
@@ -389,13 +388,11 @@ int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	}
 
 	// get the dag
-	if ((rc = click_reply(sockfd, buf, sizeof(buf))) < 0) {
+	xsm.Clear();
+	if ((rc = click_reply(sockfd, seq, &xsm)) < 0) {
 		LOGF("Error retrieving status from Click: %s", strerror(errno));
 		return -1;
 	}
-
-	xsm.Clear();
-	xsm.ParseFromString(buf);
 
 	if (xsm.type() != xia::XGETPEERNAME) {
 		LOGF("error: expected %d, got %d\n", xia::XGETPEERNAME, xsm.type());
@@ -430,7 +427,6 @@ int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 int Xgetsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
 	int rc;
-	char buf[MAXBUFLEN];
 
 	if (!addr || !addrlen) {
 		LOG("pointer is null!\n");
@@ -466,13 +462,12 @@ int Xgetsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	}
 
 	// get the dag
-	if ((rc = click_reply(sockfd, buf, sizeof(buf))) < 0) {
+	xsm.Clear();
+
+	if ((rc = click_reply(sockfd, seq, &xsm)) < 0) {
 		LOGF("Error retrieving status from Click: %s", strerror(errno));
 		return -1;
 	}
-
-	xsm.Clear();
-	xsm.ParseFromString(buf);
 
 	if (xsm.type() != xia::XGETSOCKNAME) {
 		LOGF("error: expected %d, got %d\n", xia::XGETPEERNAME, xsm.type());

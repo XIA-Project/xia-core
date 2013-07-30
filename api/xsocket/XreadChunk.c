@@ -49,7 +49,6 @@ int XreadChunk(int sockfd, void *rbuf, size_t len, int /* flags */,
 		char * cid, size_t /* cidLen */)
 {
 	int rc;
-	char UDPbuf[MAXBUFLEN];
 
 	if (validateSocket(sockfd, XSOCK_CHUNK, EAFNOSUPPORT) < 0) {
 		LOGF("Socket %d must be a chunk socket\n", sockfd);
@@ -82,15 +81,11 @@ int XreadChunk(int sockfd, void *rbuf, size_t len, int /* flags */,
 		return -1;
 	}
 
-	if ((rc = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) < 0) {
+	xsm.Clear();
+	if ((rc = click_reply(sockfd, seq, &xsm)) < 0) {
 		LOGF("Error retrieving status from Click: %s", strerror(errno));
 		return -1;
 	}
-
-	std::string str(UDPbuf, rc);
-
-	xsm.Clear();
-	xsm.ParseFromString(str);
 
 	xia::X_Readchunk_Msg *msg = xsm.mutable_x_readchunk();
 	unsigned paylen = msg->payload().size();

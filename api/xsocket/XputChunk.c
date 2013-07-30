@@ -124,8 +124,6 @@ int XfreeCacheSlice(ChunkContext *ctx)
 int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkInfo *info)
 {
     int rc;
-    char buffer[MAXBUFLEN];
-
 
 	if (length > XIA_MAXCHUNK) {
 		errno = EMSGSIZE;
@@ -162,14 +160,12 @@ int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkI
 	}
 
 	// process the reply from click
-	if ((rc = click_reply(ctx->sockfd, buffer, sizeof(buffer))) < 0) {
+    xia::XSocketMsg _socketMsgReply;
+	if ((rc = click_reply(ctx->sockfd, seq, &_socketMsgReply)) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
 		return -1;
 	}
 
-    xia::XSocketMsg _socketMsgReply;
-    std::string bufStr(buffer, rc);
-    _socketMsgReply.ParseFromString(bufStr);
     if(_socketMsgReply.type() == xia::XPUTCHUNK) {
 		xia::X_Putchunk_Msg *_msgReply = _socketMsgReply.mutable_x_putchunk();
 		info->size = _msgReply->payload().size();
@@ -386,7 +382,6 @@ int XputBuffer(ChunkContext *ctx, const char *data, unsigned len, unsigned chunk
 */
 int XremoveChunk(ChunkContext *ctx, const char *cid)
 {
-    char buffer[2048];
     int rc;
 
     if(cid == NULL || ctx == NULL) {
@@ -409,14 +404,11 @@ int XremoveChunk(ChunkContext *ctx, const char *cid)
 	}
 
 	// process the reply from click
-	if ((rc = click_reply(ctx->sockfd, buffer, sizeof(buffer))) < 0) {
+    xia::XSocketMsg _socketMsgReply;
+	if ((rc = click_reply(ctx->sockfd, seq, &_socketMsgReply)) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
 		return -1;
 	}
-
-    xia::XSocketMsg _socketMsgReply;
-    std::string bufStr(buffer, rc);
-    _socketMsgReply.ParseFromString(bufStr);
 
     if(_socketMsgReply.type() == xia::XREMOVECHUNK) {
         xia::X_Removechunk_Msg *_msgReply = _socketMsgReply.mutable_x_removechunk();

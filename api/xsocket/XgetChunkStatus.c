@@ -84,7 +84,6 @@ int XgetChunkStatus(int sockfd, char* dag, size_t /* dagLen */)
 int XgetChunkStatuses(int sockfd, ChunkStatus *statusList, int numCIDs)
 {
 	int rc;
-	char buffer[MAXBUFLEN];
 
 	const char *buf="CID list request status query";//Maybe send more useful information here.
 
@@ -134,13 +133,12 @@ int XgetChunkStatuses(int sockfd, ChunkStatus *statusList, int numCIDs)
 		return -1;
 	}
 
-	if ((rc = click_reply(sockfd, buffer, sizeof(buffer))) < 0) {
+	xia::XSocketMsg xia_socket_msg1;
+
+	if ((rc = click_reply(sockfd, seq, &xia_socket_msg1)) < 0) {
 		LOGF("Error retrieving status from Click: %s", strerror(errno));
 		return -1;
 	}
-
-	xia::XSocketMsg xia_socket_msg1;
-	xia_socket_msg1.ParseFromString(buffer);
 
 	if (xia_socket_msg1.type() == xia::XGETCHUNKSTATUS) {
 
