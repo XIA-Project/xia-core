@@ -281,8 +281,7 @@ class XTRANSPORT : public Element {
     int initialize(ErrorHandler *);
     void run_timer(Timer *timer);
 
-    void ReturnResult(int sport, xia::XSocketCallType type, int rc = 0, int err = 0);
-	void ReturnResult(int sport, xia::XSocketMsg *xia_socket_msg);
+    void ReturnResult(int sport, xia::XSocketMsg *xia_socket_msg, int rc = 0, int err = 0);
     
   private:
 //  pthread_mutex_t _lock;

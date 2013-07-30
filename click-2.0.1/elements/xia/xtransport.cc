@@ -594,6 +594,12 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XSENDTO:
 		Xsendto(_sport, &xia_socket_msg, p_in);
 		break;
+	case xia::XRECV:
+		Xrecv(_sport, &xia_socket_msg);
+		break;
+	case xia::XRECVFROM:
+		Xrecvfrom(_sport, &xia_socket_msg);
+		break;
 	case xia::XREQUESTCHUNK:
 		XrequestChunk(_sport, &xia_socket_msg, p_in);
 		break;
@@ -1158,21 +1164,13 @@ void XTRANSPORT::push(int port, Packet *p_input)
 //	pthread_mutex_unlock(&_lock);
 }
 
-void XTRANSPORT::ReturnResult(int sport, xia::XSocketCallType type, int rc, int err)
+void XTRANSPORT::ReturnResult(int sport, xia::XSocketMsg *xia_socket_msg, int rc, int err)
 {
 //	click_chatter("sport=%d type=%d rc=%d err=%d\n", sport, type, rc, err);
-	xia::XSocketMsg xia_socket_msg_response;
-	xia_socket_msg_response.set_type(xia::XRESULT);
-	xia::X_Result_Msg *x_result = xia_socket_msg_response.mutable_x_result();
-	x_result->set_type(type);
+	xia::X_Result_Msg *x_result = xia_socket_msg->mutable_x_result();
 	x_result->set_return_code(rc);
 	x_result->set_err_code(err);
 
-	ReturnResult(sport, &xia_socket_msg_response);
-}
-
-void XTRANSPORT::ReturnResult(int sport, xia::XSocketMsg *xia_socket_msg)
-{
 	std::string p_buf;
 	xia_socket_msg->SerializeToString(&p_buf);
 	WritablePacket *reply = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
@@ -1256,9 +1254,8 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 	// printf("XSOCKET: sport=%hu\n", _sport);
 
-	// (for Ack purpose) Reply with a packet with the destination port=source port
-	ReturnResult(_sport, xia::XSOCKET, 0);
-	// output(API_PORT).push(UDPIPPrep(p_in,_sport));
+	// Return result to API
+	ReturnResult(_sport, xia_socket_msg, 0);
 }
 
 /*
@@ -1296,7 +1293,8 @@ void XTRANSPORT::Xsetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_
 		// unsupported option
 		break;
 	}
-	ReturnResult(_sport, xia::XSETSOCKOPT);
+
+	ReturnResult(_sport, xia_socket_msg); // TODO: return code
 }
 
 /*
@@ -1327,11 +1325,8 @@ void XTRANSPORT::Xgetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_
 		// unsupported option
 		break;
 	}
-	std::string p_buf;
-	xia_socket_msg->SerializeToString(&p_buf);
 
-	WritablePacket *reply = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
-	output(API_PORT).push(UDPIPPrep(reply, _sport));
+	ReturnResult(_sport, xia_socket_msg); // TODO: return code
 }
 
 void XTRANSPORT::Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg) {
@@ -1392,8 +1387,7 @@ void XTRANSPORT::Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg) {
 		ec = EADDRNOTAVAIL;
 	}
 
-	// (for Ack purpose) Reply with a packet with the destination port=source port
-	ReturnResult(_sport, xia::XBIND, rc, ec);
+	ReturnResult(_sport, xia_socket_msg, rc, ec);
 }
 
 void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
@@ -1415,10 +1409,10 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 	xcmp_listeners.remove(_sport);
 
-	// (for Ack purpose) Reply with a packet with the destination port=source port
-	ReturnResult(_sport, xia::XCLOSE);
+	ReturnResult(_sport, xia_socket_msg);
 }
 
+// TODO: return status code to API
 void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
 	//click_chatter("Xconect: connecting %d\n", _sport);
@@ -1549,6 +1543,7 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
 	// Returns same xia_socket_msg to the API, filled in with the remote DAG
+	int rc = 0, ec = 0;
 
 	//click_chatter("Xaccept: on %d\n", _sport);
 	hlim.set(_sport, HLIM_DEFAULT);
@@ -1591,13 +1586,12 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		xia::X_Accept_Msg *x_accept_msg = xia_socket_msg->mutable_x_accept();
 		x_accept_msg->set_remote_dag(sk.dst_path.unparse().c_str()); // remote endpoint is dest from our perspective
 
-		ReturnResult(_sport, xia_socket_msg);
-
 	} else {
-		// FIXME: what error code should be returned?
-		ReturnResult(_sport, xia::XACCEPT, -1, ECONNABORTED);
-		click_chatter("\n Xaccept: error\n");
+		rc = -1;
+		ec = ECONNABORTED; // FIXME: what error code should be returned?
 	}
+	
+	ReturnResult(_sport, xia_socket_msg, rc, ec);
 }
 
 void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
@@ -1621,6 +1615,8 @@ void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	}
 	click_chatter("new address is - %s", new_local_addr.c_str());
 	_local_addr.parse(new_local_addr);		
+
+	ReturnResult(_sport, xia_socket_msg);
 }
 
 void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
@@ -1643,6 +1639,8 @@ void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_
 	_Response.SerializeToString(&p_buf1);
 	WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
 	output(API_PORT).push(UDPIPPrep(reply, _sport));
+
+	ReturnResult(_sport, xia_socket_msg);
 }
 
 void XTRANSPORT::Xupdatenameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
@@ -1653,85 +1651,89 @@ void XTRANSPORT::Xupdatenameserverdag(unsigned short _sport, xia::XSocketMsg *xi
 	String ns_dag(x_updatenameserverdag_msg->dag().c_str());
 	//click_chatter("new nameserver address is - %s", ns_dag.c_str());
 	_nameserver_addr.parse(ns_dag);
+	
+	ReturnResult(_sport, xia_socket_msg);
 }
 
 void XTRANSPORT::Xreadnameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
 	// read the nameserver DAG
 	String ns_addr = _nameserver_addr.unparse();
+
 	// return a packet containing the nameserver DAG
-	xia::XSocketMsg _Response;
-	_Response.set_type(xia::XREADNAMESERVERDAG);
-	xia::X_ReadNameServerDag_Msg *_msg = _Response.mutable_x_readnameserverdag();
+	xia::X_ReadNameServerDag_Msg *_msg = xia_socket_msg->mutable_x_readnameserverdag();
 	_msg->set_dag(ns_addr.c_str());
-	std::string p_buf1;
-	_Response.SerializeToString(&p_buf1);
-	WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
-	output(API_PORT).push(UDPIPPrep(reply, _sport));
+
+	ReturnResult(_sport, xia_socket_msg);
 }
 
 void XTRANSPORT::Xisdualstackrouter(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
 	// return a packet indicating whether this node is an XIA-IPv4 dual-stack router
-	xia::XSocketMsg _Response;
-	_Response.set_type(xia::XISDUALSTACKROUTER);
-	xia::X_IsDualStackRouter_Msg *_msg = _Response.mutable_x_isdualstackrouter();
+	xia::X_IsDualStackRouter_Msg *_msg = xia_socket_msg->mutable_x_isdualstackrouter();
 	_msg->set_flag(_is_dual_stack_router);
-	std::string p_buf1;
-	_Response.SerializeToString(&p_buf1);
-	WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
-	output(API_PORT).push(UDPIPPrep(reply, _sport));
+
+	ReturnResult(_sport, xia_socket_msg);
 }
 
 void XTRANSPORT::Xgetpeername(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
-	xia::XSocketMsg _xsm;
-	_xsm.set_type(xia::XGETPEERNAME);
-	xia::X_GetPeername_Msg *_msg = _xsm.mutable_x_getpeername();
-
 	sock *sk = portToSock.get_pointer(_sport);
 
+	xia::X_GetPeername_Msg *_msg = xia_socket_msg->mutable_x_getpeername();
 	_msg->set_dag(sk->dst_path.unparse().c_str());
-
-	std::string p_buf1;
-	_xsm.SerializeToString(&p_buf1);
-	WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
-	output(API_PORT).push(UDPIPPrep(reply, _sport));
+	
+	ReturnResult(_sport, xia_socket_msg);
 }
 					
 
 void XTRANSPORT::Xgetsockname(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
-	xia::XSocketMsg _xsm;
-	_xsm.set_type(xia::XGETSOCKNAME);
-	xia::X_GetSockname_Msg *_msg = _xsm.mutable_x_getsockname();
-
 	sock *sk = portToSock.get_pointer(_sport);
 
+	xia::X_GetSockname_Msg *_msg = xia_socket_msg->mutable_x_getsockname();
 	_msg->set_dag(sk->src_path.unparse().c_str());
 
-	std::string p_buf1;
-	_xsm.SerializeToString(&p_buf1);
-	WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
-	output(API_PORT).push(UDPIPPrep(reply, _sport));
+	ReturnResult(_sport, xia_socket_msg);
 }
 
 
+// TODO: figure out error codes, bytes sent, and return response to API
 void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in)
 {
+	int rc = 0, ec = 0;
 	//click_chatter("Xsend on %d\n", _sport);
 
 	xia::X_Send_Msg *x_send_msg = xia_socket_msg->mutable_x_send();
+	int pktPayloadSize = x_send_msg->payload().size(); 
 
-	String pktPayload(x_send_msg->payload().c_str(), x_send_msg->payload().size());  // TODO: why do we do this?
-
-	int pktPayloadSize = pktPayload.length();
 	//click_chatter("pkt %s port %d", pktPayload.c_str(), _sport);
 	//printf("XSEND: %d bytes from (%d)\n", pktPayloadSize, _sport);
-
-	//Find DAG info for that stream
+	
+	//Find socket state
 	sock *sk = portToSock.get_pointer(_sport);
-	if (sk && sk->isConnected) {
+
+	// Make sure the socket state isn't null
+	if (rc == 0 && !sk) {
+		rc = -1;
+		ec = EBADF; // FIXME: is this the right error?
+	}
+
+	// Make sure socket is connected
+	if (rc == 0 && !sk->isConnected) {
+		rc = -1;
+		ec = ENOTCONN;
+	}
+
+	// Make sure we have space in the send buffer
+	if (rc == 0 && (sk->next_send_seqnum - sk->send_base) >= sk->send_buffer_size) {
+		rc = -1;
+		ec = ENOBUFS;
+	}
+
+	// If everything is OK so far, try sending
+	if (rc == 0) {
+		rc = pktPayloadSize;
 
 		//Recalculate source path
 		XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
@@ -1810,26 +1812,20 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 		String pld((char *)xiah1.payload(), xiah1.plen());
 		//printf("\n\n (%s) send (timer set at %f) =%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (sk->expiry).doubleval(), pld.c_str(), xiah1.plen());
 		output(NETWORK_PORT).push(p);
-
-		// REMOVED STATUS RETURNS AS WE RAN INTO SEQUENCING ERRORS
-		// WHERE IT INTERLEAVED WITH RECEIVE PACKETS
-		// (for Ack purpose) Reply with a packet with the destination port=source port
-//				ReturnResult(_sport, xia::XSEND);
-
-	} else {
-	
-//				ReturnResult(_sport, xia::XSEND, -1, ENOTCONN);
-		click_chatter("Not 'connect'ed: you may need to use 'sendto()'");
 	}
+
+	x_send_msg->clear_payload(); // clear payload before returning result
+	ReturnResult(_sport, xia_socket_msg, rc, ec);
 }
 
 void XTRANSPORT::Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in)
 {
+	int rc = 0, ec = 0;
+
 	xia::X_Sendto_Msg *x_sendto_msg = xia_socket_msg->mutable_x_sendto();
 
 	String dest(x_sendto_msg->ddag().c_str());
-	String pktPayload(x_sendto_msg->payload().c_str(), x_sendto_msg->payload().size());
-	int pktPayloadSize = pktPayload.length();
+	int pktPayloadSize = x_sendto_msg->payload().size();
 	//click_chatter("\n SENDTO ddag:%s, payload:%s, length=%d\n",xia_socket_msg.ddag().c_str(), xia_socket_msg.payload().c_str(), pktPayloadSize);
 
 	XIAPath dst_path;
@@ -1903,8 +1899,7 @@ void XTRANSPORT::Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg,
 
 	WritablePacket *p = NULL;
 
-	// FIXME: shouldn't be a raw number
-	if (sk->sock_type == 3) {
+	if (sk->sock_type == XSOCKET_RAW) {
 		xiah.set_nxt(nxt_xport.get(_sport));
 
 		xiah.set_plen(pktPayloadSize);
@@ -1931,9 +1926,9 @@ void XTRANSPORT::Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg,
 
 	output(NETWORK_PORT).push(p);
 
-	// removed due to multi peer collision problem
-	// (for Ack purpose) Reply with a packet with the destination port=source port
-//				ReturnResult(_sport, xia::XSENDTO);
+	rc = pktPayloadSize;
+	x_sendto_msg->clear_payload();
+	ReturnResult(_sport, xia_socket_msg, rc, ec);
 }
 
 void XTRANSPORT::Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
@@ -1972,7 +1967,7 @@ void XTRANSPORT::Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	x_recv_msg->set_bytes_returned(bytes_returned);
 	
 	// Return response to API
-	ReturnResult(_sport, xia_socket_msg);
+	ReturnResult(_sport, xia_socket_msg, bytes_returned);
 }
 
 void XTRANSPORT::Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
@@ -2011,7 +2006,7 @@ void XTRANSPORT::Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	}
 	
 	// Return response to API
-	ReturnResult(_sport, xia_socket_msg);
+	ReturnResult(_sport, xia_socket_msg, x_recvfrom_msg->bytes_returned());
 }
 
 void XTRANSPORT::XrequestChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in)
@@ -2137,6 +2132,8 @@ void XTRANSPORT::XrequestChunk(unsigned short _sport, xia::XSocketMsg *xia_socke
 
 		output(NETWORK_PORT).push(p);
 	}
+
+	ReturnResult(_sport, xia_socket_msg); // TODO: Error codes?
 }
 
 void XTRANSPORT::XgetChunkStatus(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
@@ -2191,11 +2188,7 @@ void XTRANSPORT::XgetChunkStatus(unsigned short _sport, xia::XSocketMsg *xia_soc
 	const char *buf = "CID request status response";
 	x_getchunkstatus_msg->set_payload((const char*)buf, strlen(buf) + 1);
 
-	std::string p_buf;
-	xia_socket_msg->SerializeToString(&p_buf);
-
-	WritablePacket *reply = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
-	output(API_PORT).push(UDPIPPrep(reply, _sport));
+	ReturnResult(_sport, xia_socket_msg); // TODO: Error codes?
 }
 
 void XTRANSPORT::XreadChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
@@ -2249,16 +2242,9 @@ void XTRANSPORT::XreadChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_m
 			x_readchunk_msg->set_dag(src_path.c_str());
 			x_readchunk_msg->set_payload((const char *)xiah.payload(), xiah.plen());
 
-			std::string p_buf;
-			xia_socket_msg->SerializeToString(&p_buf);
-
-			WritablePacket *p2 = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
-
 			//printf("FROM CACHE. data length = %d  \n", str.length());
 			if (DEBUG)
 				click_chatter("Sent packet to socket: sport %d dport %d", _sport, _sport);
-
-			output(API_PORT).push(UDPIPPrep(p2, _sport));
 
 			it2->second->kill();
 			sk->XIDtoCIDresponsePkt.erase(it2);
@@ -2267,6 +2253,7 @@ void XTRANSPORT::XreadChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_m
 		}
 	}
 
+	ReturnResult(_sport, xia_socket_msg); // TODO: Error codes?
 }
 
 void XTRANSPORT::XremoveChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
@@ -2301,18 +2288,12 @@ void XTRANSPORT::XremoveChunk(unsigned short _sport, xia::XSocketMsg *xia_socket
 	}
 	output(CACHE_PORT).push(p);
 
-	// (for Ack purpose) Reply with a packet with the destination port=source port
-	xia::XSocketMsg _socketResponse;
-	_socketResponse.set_type(xia::XREMOVECHUNK);
-	xia::X_Removechunk_Msg *_msg = _socketResponse.mutable_x_removechunk();
+	xia::X_Removechunk_Msg *_msg = xia_socket_msg->mutable_x_removechunk();
 	_msg->set_contextid(contextID);
 	_msg->set_cid(src.c_str());
 	_msg->set_status(0);
 
-	std::string p_buf1;
-	_socketResponse.SerializeToString(&p_buf1);
-	WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
-	output(API_PORT).push(UDPIPPrep(reply, _sport));
+	ReturnResult(_sport, xia_socket_msg); // TODO: Error codes?
 }
 
 void XTRANSPORT::XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
@@ -2391,25 +2372,8 @@ void XTRANSPORT::XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 		click_chatter("sent packet to cache");
 	output(CACHE_PORT).push(p);
 
-	// (for Ack purpose) Reply with a packet with the destination port=source port
-	struct timeval timestamp;
-	gettimeofday(&timestamp, NULL);
-	xia::XSocketMsg _socketResponse;
-	_socketResponse.set_type(xia::XPUTCHUNK);
-	xia::X_Putchunk_Msg *_msg = _socketResponse.mutable_x_putchunk();
-	_msg->set_contextid(contextID);
-	_msg->set_cid(src.c_str());
-	_msg->set_ttl(ttl);
-	_msg->set_timestamp(timestamp.tv_sec);
-//	_msg->set_hascid(1);
-	_msg->set_cachepolicy(0);
-	_msg->set_cachesize(0);
-	_msg->set_payload(x_putchunk_msg->payload().c_str(), x_putchunk_msg->payload().size());
-
-	std::string p_buf1;
-	_socketResponse.SerializeToString(&p_buf1);
-	WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
-	output(API_PORT).push(UDPIPPrep(reply, _sport));
+	// TODO: It looks like we were returning the chunk data with the result before. Any reason?
+	ReturnResult(_sport, xia_socket_msg); // TODO: Error codes?
 }
 
 CLICK_ENDDECLS
