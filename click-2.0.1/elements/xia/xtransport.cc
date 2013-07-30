@@ -1168,8 +1168,13 @@ void XTRANSPORT::ReturnResult(int sport, xia::XSocketCallType type, int rc, int 
 	x_result->set_return_code(rc);
 	x_result->set_err_code(err);
 
+	ReturnResult(sport, &xia_socket_msg_response);
+}
+
+void XTRANSPORT::ReturnResult(int sport, xia::XSocketMsg *xia_socket_msg)
+{
 	std::string p_buf;
-	xia_socket_msg_response.SerializeToString(&p_buf);
+	xia_socket_msg->SerializeToString(&p_buf);
 	WritablePacket *reply = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
 	output(API_PORT).push(UDPIPPrep(reply, sport));
 }
@@ -1543,6 +1548,8 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 
 void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
+	// Returns same xia_socket_msg to the API, filled in with the remote DAG
+
 	//click_chatter("Xaccept: on %d\n", _sport);
 	hlim.set(_sport, HLIM_DEFAULT);
 	nxt_xport.set(_sport, CLICK_XIA_NXT_TRN);
@@ -1579,7 +1586,12 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 		pending_connection_buf.pop();
 
-		ReturnResult(_sport, xia::XACCEPT);
+
+		// Get remote DAG to return to app
+		xia::X_Accept_Msg *x_accept_msg = xia_socket_msg->mutable_x_accept();
+		x_accept_msg->set_remote_dag(sk.dst_path.unparse().c_str()); // remote endpoint is dest from our perspective
+
+		ReturnResult(_sport, xia_socket_msg);
 
 	} else {
 		// FIXME: what error code should be returned?
@@ -1960,10 +1972,7 @@ void XTRANSPORT::Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	x_recv_msg->set_bytes_returned(bytes_returned);
 	
 	// Return response to API
-	std::string p_buf;
-	xia_socket_msg->SerializeToString(&p_buf);
-	WritablePacket *reply = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
-	output(API_PORT).push(UDPIPPrep(reply, _sport));
+	ReturnResult(_sport, xia_socket_msg);
 }
 
 void XTRANSPORT::Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
@@ -2002,10 +2011,7 @@ void XTRANSPORT::Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	}
 	
 	// Return response to API
-	std::string p_buf;
-	xia_socket_msg->SerializeToString(&p_buf);
-	WritablePacket *reply = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
-	output(API_PORT).push(UDPIPPrep(reply, _sport));
+	ReturnResult(_sport, xia_socket_msg);
 }
 
 void XTRANSPORT::XrequestChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in)

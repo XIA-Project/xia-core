@@ -89,6 +89,7 @@ message X_Connect_Msg {
 
 message X_Accept_Msg {
   optional string temp = 1; // currently not used
+  optional string remote_dag = 2;
 }
 
 message X_Sendto_Msg {
