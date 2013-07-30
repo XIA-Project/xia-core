@@ -1412,7 +1412,6 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	ReturnResult(_sport, xia_socket_msg);
 }
 
-// TODO: return status code to API
 void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
 	//click_chatter("Xconect: connecting %d\n", _sport);
@@ -1536,8 +1535,12 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 	//sk=portToSock.get_pointer(_sport);
 	//click_chatter("\nbound to %s\n",portToSock.get_pointer(_sport)->src_path.unparse().c_str());
 
-	// (for Ack purpose) Reply with a packet with the destination port=source port
-	//output(API_PORT).push(UDPIPPrep(p_in,_sport));
+	// We return EINPROGRESS no matter what. If we're in non-blocking mode, the
+	// API will pass EINPROGRESS on to the app. If we're in blocking mode, the API
+	// will wait until it gets another message from xtransport notifying it that
+	// the other end responded and the connection has been established.
+	// TODO: should the rc be -1 or 0?
+	ReturnResult(_sport, xia_socket_msg, -1, EINPROGRESS);
 }
 
 void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
@@ -1698,7 +1701,6 @@ void XTRANSPORT::Xgetsockname(unsigned short _sport, xia::XSocketMsg *xia_socket
 }
 
 
-// TODO: figure out error codes, bytes sent, and return response to API
 void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in)
 {
 	int rc = 0, ec = 0;
