@@ -717,7 +717,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 				// Todo: 1. prepare new Daginfo and store it
 				//	 2. send SYNACK to client
-				//	   3. Notify the api of SYN reception
 
 				//1. Prepare new sock for this connection
 				sock sk;
@@ -777,14 +776,10 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			p = xiah_new.encap(p, false);
 
 			delete thdr_new;
-			XIAHeader xiah1(p);
+			//XIAHeader xiah1(p);
 			//String pld((char *)xiah1.payload(), xiah1.plen());
 			//printf("\n\n (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), pld.c_str(), xiah1.plen());
 			output(NETWORK_PORT).push(p);
-
-
-			// 3. Notify the api of SYN reception
-			//   Done below (via port#5005)
 
 		} else if (thdr.pkt_info() == TransportHeader::SYNACK) {
 			XIDpair xid_pair;
@@ -800,6 +795,14 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			sk->timer_on = false;
 			sk->synack_waiting = false;
 			//sk->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
+
+			// Notify API that the connection is established
+			xia::XSocketMsg xsm;
+			xsm.set_type(xia::XCONNECT);
+			xsm.set_sequence(0); // TODO: what should this be?
+			xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
+			connect_msg->set_status(xia::X_Connect_Msg::CONNECTED);
+			ReturnResult(_dport, &xsm);
 
 		} else if (thdr.pkt_info() == TransportHeader::DATA) {
 			XIDpair xid_pair;
@@ -1552,7 +1555,7 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 	// API will pass EINPROGRESS on to the app. If we're in blocking mode, the API
 	// will wait until it gets another message from xtransport notifying it that
 	// the other end responded and the connection has been established.
-	// TODO: should the rc be -1 or 0?
+	x_connect_msg->set_status(xia::X_Connect_Msg::CONNECTING);
 	ReturnResult(_sport, xia_socket_msg, -1, EINPROGRESS);
 }
 
@@ -1604,7 +1607,7 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 	} else {
 		rc = -1;
-		ec = ECONNABORTED; // FIXME: what error code should be returned?
+		ec = EWOULDBLOCK;
 	}
 	
 	ReturnResult(_sport, xia_socket_msg, rc, ec);
