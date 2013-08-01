@@ -67,7 +67,6 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	struct sockaddr_in their_addr;
 	socklen_t len;
 	int new_sockfd;
-	xia::XSocketCallType type;
 
 	// if an addr buf is passed, we must also have a valid length pointer
 	if (addr != NULL && addrlen == NULL) {
@@ -120,7 +119,8 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		return -1;
 	}
 
-	if (click_reply2(new_sockfd, seq, &type) < 0) {
+// FIXME: change to use click rely so we get the peer dag!
+	if (click_status(new_sockfd, seq) < 0) {
 		close(new_sockfd);
 		LOGF("Error getting status from Click: %s", strerror(errno));
 		return -1;

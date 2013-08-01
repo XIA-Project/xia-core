@@ -182,7 +182,7 @@ int click_reply(int sock, unsigned seq, xia::XSocketMsg *msg)
 	return click_get(sock, seq, buf, buflen, msg);
 }
 
-int click_reply2(int sock, unsigned seq, xia::XSocketCallType *type)
+int click_status(int sock, unsigned seq)
 {
 	char buf[XIA_MAXBUF];
 	unsigned buflen = sizeof(buf);
@@ -192,7 +192,6 @@ int click_reply2(int sock, unsigned seq, xia::XSocketCallType *type)
 	if ((rc = click_get(sock, seq, buf, buflen, &msg)) >= 0) {
 
 		xia::X_Result_Msg *res = msg.mutable_x_result();
-		*type = res->type();
 
 		rc = res->return_code();
 		if (rc == -1)

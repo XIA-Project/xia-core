@@ -59,8 +59,6 @@
 */
 int Xsocket(int family, int transport_type, int protocol)
 {
-	struct sockaddr_in addr;
-	xia::XSocketCallType type;
 	int rc;
 	int sockfd;
 
@@ -100,11 +98,6 @@ int Xsocket(int family, int transport_type, int protocol)
 		return -1;
 	}
 
-	// bind to any random port number
-	addr.sin_family = PF_INET;
-	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-	addr.sin_port = 0;
-
 	// protobuf message
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XSOCKET);
@@ -121,14 +114,8 @@ int Xsocket(int family, int transport_type, int protocol)
 	}
 
 	// process the reply from click
-	if ((rc = click_reply2(sockfd, seq, &type)) < 0) {
+	if ((rc = click_status(sockfd, seq)) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
-
-	} else if (type != xia::XSOCKET) {
-		// something bad happened
-		LOGF("Expected type %d, got %d", xia::XSOCKET, type);
-		errno = ECLICKCONTROL;
-		rc = -1;
 	}
 
 	if (rc == 0) {
@@ -138,5 +125,5 @@ int Xsocket(int family, int transport_type, int protocol)
 
 	// close the control socket since the underlying Xsocket is no good
 	close(sockfd);
-	return -1;
+	return rc;
 }

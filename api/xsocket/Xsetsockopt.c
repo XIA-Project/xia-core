@@ -51,7 +51,6 @@
 int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen)
 {
 	int rc;
-	xia::XSocketCallType type;
 
 	/* TODO: we may need to check the type of the socket at some point, but for now
 	** treat them all the same as far as options go.
@@ -111,7 +110,7 @@ int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen)
 
 	if ((rc = click_send(sockfd, &xsm)) < 0)
 		LOGF("Error talking to Click: %s", strerror(errno));
-	else if ((rc = click_reply2(sockfd, seq, &type) ) < 0) {
+	else if ((rc = click_status(sockfd, seq)) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
 	}
 

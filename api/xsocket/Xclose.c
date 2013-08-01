@@ -38,7 +38,6 @@
 */
 int Xclose(int sockfd)
 {
-	xia::XSocketCallType type;
 	int rc;
 
 	if (getSocketType(sockfd) == XSOCK_INVALID)
@@ -56,7 +55,7 @@ int Xclose(int sockfd)
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 
-	} else if ((rc = click_reply2(sockfd, seq, &type)) < 0) {
+	} else if ((rc = click_status(sockfd, seq)) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
 	}
 

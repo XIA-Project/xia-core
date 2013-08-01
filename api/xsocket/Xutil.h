@@ -39,8 +39,7 @@
 
 int click_send(int sockfd, xia::XSocketMsg *xsm);
 int click_reply(int sockfd, unsigned seq, xia::XSocketMsg *msg);
-int click_reply2(int sockfd, unsigned seq, xia::XSocketCallType *type);
-int bind_to_random_port(int sockfd);
+int click_status(int sockfd, unsigned seq);
 
 int validateSocket(int sock, int stype, int err);
 

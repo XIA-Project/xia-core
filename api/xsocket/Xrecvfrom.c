@@ -105,7 +105,7 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		return -1;
 	}
 
-	xia::X_Recv_Msg *msg = xsm.mutable_x_recv();
+	xia::X_Recvfrom_Msg *msg = xsm.mutable_x_recvfrom();
 	unsigned paylen = msg->payload().size();
 	const char *payload = msg->payload().c_str();
 
@@ -121,7 +121,7 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 	}
 
 	if (addr) {
-		Graph g(msg->dag().c_str());
+		Graph g(msg->sender_dag().c_str());
 
 		// FIXME: validate addr
 		g.fill_sockaddr((sockaddr_x*)addr);
