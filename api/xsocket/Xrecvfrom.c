@@ -98,20 +98,38 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		return numbytes;
 	}
 
-	// FIXME: what should seq # be here?
 	xia::XSocketMsg xsm;
-	if ((numbytes = click_reply(sockfd, 0, &xsm)) < 0) {
+	xsm.set_type(xia::XRECVFROM);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
+
+	xia::X_Recvfrom_Msg *xrm = xsm.mutable_x_recvfrom();
+	xrm->set_bytes_requested(len);
+
+	if (click_send(sockfd, &xsm) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
+		return -1;
+	}
+
+	xsm.Clear();
+	if ((numbytes = click_reply(sockfd, seq, &xsm)) < 0) {
 		LOGF("Error retrieving recv data from Click: %s", strerror(errno));
 		return -1;
 	}
 
-	xia::X_Recvfrom_Msg *msg = xsm.mutable_x_recvfrom();
-	unsigned paylen = msg->payload().size();
-	const char *payload = msg->payload().c_str();
+	xrm = xsm.mutable_x_recvfrom();
+	const char *payload = xrm->payload().c_str();
 
-	if (paylen <= len)
+	xia::X_Result_Msg *r = xsm.mutable_x_result();
+	int paylen = r->return_code();
+
+	if (paylen < 0) {
+		errno = r->err_code();
+	
+	} else if ((unsigned)paylen <= len) {
 		memcpy(rbuf, payload, paylen);
-	else {
+	
+	} else {
 		// we got back more data than the caller requested
 		// stash the extra away for subsequent Xrecv calls
 		memcpy(rbuf, payload, len);
@@ -121,7 +139,7 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 	}
 
 	if (addr) {
-		Graph g(msg->sender_dag().c_str());
+		Graph g(xrm->sender_dag().c_str());
 
 		// FIXME: validate addr
 		g.fill_sockaddr((sockaddr_x*)addr);

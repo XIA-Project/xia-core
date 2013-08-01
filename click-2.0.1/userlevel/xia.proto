@@ -100,11 +100,11 @@ message X_Accept_Msg {
 
 message X_Sendto_Msg {
   required string ddag = 1; // dest dag
-  required bytes payload = 2; // data
+  optional bytes payload = 2; // data
 }
 
 message X_Send_Msg {
-  required bytes payload = 1; // data
+  optional bytes payload = 1; // data
 }
 
 message X_Recv_Msg {
