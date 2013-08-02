@@ -312,7 +312,7 @@ class XTRANSPORT : public Element {
 	 * Socket states
 	 * ========================= */
     struct sock {
-    	sock(): port(0), isConnected(false), initialized(false), full_src_dag(false), timer_on(false), synack_waiting(false), dataack_waiting(false), teardown_waiting(false), send_buffer_size(DEFAULT_SEND_WIN_SIZE), recv_buffer_size(DEFAULT_RECV_WIN_SIZE), send_base(0), next_send_seqnum(0), recv_base(0), next_recv_seqnum(0), dgram_buffer_start(0), dgram_buffer_end(0) {};
+    	sock(): port(0), isConnected(false), initialized(false), full_src_dag(false), timer_on(false), synack_waiting(false), dataack_waiting(false), teardown_waiting(false), send_buffer_size(DEFAULT_SEND_WIN_SIZE), recv_buffer_size(DEFAULT_RECV_WIN_SIZE), send_base(0), next_send_seqnum(0), recv_base(0), next_recv_seqnum(0), dgram_buffer_start(0), dgram_buffer_end(-1), recv_buffer_count(0) {};
 
 	/* =========================
 	 * Common Socket states
@@ -358,6 +358,7 @@ class XTRANSPORT : public Element {
     	uint32_t next_recv_seqnum; // the sequence # of the next in-order packet we expect to receive
 		int dgram_buffer_start; // the first undelivered index in the recv buffer (DGRAM only)
 		int dgram_buffer_end; // the last undelivered index in the recv buffer (DGRAM only)
+		uint32_t recv_buffer_count; // the number of packets in the buffer (DGRAM only)
 
 		//Vector<WritablePacket*> pkt_buf;
 		WritablePacket *syn_pkt;

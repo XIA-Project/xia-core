@@ -168,7 +168,7 @@ message X_Removechunk_Msg {
 }
 
 message X_Result_Msg {
-	required int32 return_code = 1;	// same as a normal socket return code
+	optional int32 return_code = 1;	// same as a normal socket return code
 	optional int32 err_code = 2;	// if ret_code is -1, contains related errno value
 }
 

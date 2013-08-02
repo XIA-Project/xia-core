@@ -110,6 +110,7 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 	// even if we use select
 	// should we use a delay in the loop?
 	while (1) {
+	sleep(1);
 		xsm.set_type(xia::XRECVFROM);
 		seq = seqNo(sockfd);
 		xsm.set_sequence(seq);
@@ -132,8 +133,9 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		payload = xrm->payload().c_str();
 		paylen = xrm->bytes_returned();
 
-		if (paylen != 0)
+		if (paylen != 0) {
 			break;		
+		}
 	}
 
 //	xrm = xsm.mutable_x_recvfrom();

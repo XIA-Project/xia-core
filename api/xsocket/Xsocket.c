@@ -97,6 +97,8 @@ int Xsocket(int family, int transport_type, int protocol)
 		LOGF("error creating Xsocket: %s", strerror(errno));
 		return -1;
 	}
+		
+	allocSocketState(sockfd, transport_type);
 
 	// protobuf message
 	xia::XSocketMsg xsm;
@@ -119,11 +121,11 @@ int Xsocket(int family, int transport_type, int protocol)
 	}
 
 	if (rc == 0) {
-		allocSocketState(sockfd, transport_type);
 		return sockfd;
 	}
 
 	// close the control socket since the underlying Xsocket is no good
+	freeSocketState(sockfd);
 	close(sockfd);
 	return rc;
 }

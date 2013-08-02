@@ -411,7 +411,7 @@ XTRANSPORT::copy_cid_response_packet(Packet *p, sock *sk) {
 */
 bool XTRANSPORT::should_buffer_received_packet(WritablePacket *p, sock *sk) {
 
-printf("<<<< should_buffer_received_packet\n");
+//printf("<<<< should_buffer_received_packet\n");
 
 	if (sk->sock_type == XSOCKET_STREAM) {
 		// check if received_seqnum is within our current recv window
@@ -424,14 +424,15 @@ printf("<<<< should_buffer_received_packet\n");
 		}
 	} else if (sk->sock_type == XSOCKET_DGRAM) {
 
-printf("    sk->recv_buffer_size: %u\n    sk->dgram_buffer_start: %u\n    sk->dgram_buffer_end: %u\n\n", sk->recv_buffer_size, sk->dgram_buffer_start, sk->dgram_buffer_end);
+//printf("    sk->recv_buffer_size: %u\n    sk->dgram_buffer_start: %u\n    sk->dgram_buffer_end: %u\n\n", sk->recv_buffer_size, sk->dgram_buffer_start, sk->dgram_buffer_end);
 
-		if ( (sk->dgram_buffer_end + 1) % sk->recv_buffer_size != sk->dgram_buffer_start) {
-printf("    return: TRUE\n");
+		//if ( (sk->dgram_buffer_end + 1) % sk->recv_buffer_size != sk->dgram_buffer_start) {
+		if (sk->recv_buffer_count < sk->recv_buffer_size) {
+//printf("    return: TRUE\n");
 			return true;
 		}
 	}
-printf("    return: FALSE\n");
+//printf("    return: FALSE\n");
 	return false;
 }
 
@@ -448,7 +449,7 @@ printf("    return: FALSE\n");
 */
 void XTRANSPORT::add_packet_to_recv_buf(WritablePacket *p, sock *sk) {
 
-printf("<<<< add_packet_to_recv_buf\n");
+//printf("<<<< add_packet_to_recv_buf\n");
 
 	int index = -1;
 	if (sk->sock_type == XSOCKET_STREAM) {
@@ -456,15 +457,17 @@ printf("<<<< add_packet_to_recv_buf\n");
 		int received_seqnum = thdr.seq_num();
 		index = received_seqnum % sk->recv_buffer_size;
 	} else if (sk->sock_type == XSOCKET_DGRAM) {
-printf("    sk->recv_buffer_size: %u\n    sk->dgram_buffer_start: %u\n    sk->dgram_buffer_end: %u\n\n", sk->recv_buffer_size, sk->dgram_buffer_start, sk->dgram_buffer_end);
+//printf("    sk->recv_buffer_size: %u\n    sk->dgram_buffer_start: %u\n    sk->dgram_buffer_end: %u\n\n", sk->recv_buffer_size, sk->dgram_buffer_start, sk->dgram_buffer_end);
 		index = (sk->dgram_buffer_end + 1) % sk->recv_buffer_size;
-printf("    Adding packet to index: %d\n", index);
 		sk->dgram_buffer_end = index;
+		sk->recv_buffer_count++;
+//printf("    Adding packet %p to index: %d,   packet count: %d\n", p, index, sk->recv_buffer_count);
 	}
 		
-	sk->recv_buffer[index] = p;
+	WritablePacket *p_cpy = copy_packet(p, sk);
+	sk->recv_buffer[index] = p_cpy;
 
-printf("\nUpdated values:\n    sk->recv_buffer_size: %u\n    sk->dgram_buffer_start: %u\n    sk->dgram_buffer_end: %u\n\n", sk->recv_buffer_size, sk->dgram_buffer_start, sk->dgram_buffer_end);
+//printf("\nUpdated values:\n    sk->recv_buffer_size: %u\n    sk->dgram_buffer_start: %u\n    sk->dgram_buffer_end: %u\n\n", sk->recv_buffer_size, sk->dgram_buffer_start, sk->dgram_buffer_end);
 }
 
 /**
@@ -718,7 +721,8 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				// Todo: 1. prepare new Daginfo and store it
 				//	 2. send SYNACK to client
 
-				//1. Prepare new sock for this connection
+				//1. Prepare new sock for this connection 
+				// TODO: do we need to malloc this?
 				sock sk;
 				sk.port = -1; // just for now. This will be updated via Xaccept call
 
@@ -733,6 +737,8 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				sk.hlim = HLIM_DEFAULT;
 				sk.seq_num = 0;
 				sk.ack_num = 0;
+				memset(sk.send_buffer, 0, sk.send_buffer_size * sizeof(WritablePacket*));
+				memset(sk.recv_buffer, 0, sk.recv_buffer_size * sizeof(WritablePacket*));
 
 				pending_connection_buf.push(sk);
 
@@ -1256,6 +1262,7 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	sk.isAcceptSocket = false;
 	sk.num_connect_tries = 0; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
 	memset(sk.send_buffer, 0, sk.send_buffer_size * sizeof(WritablePacket*));
+	memset(sk.recv_buffer, 0, sk.recv_buffer_size * sizeof(WritablePacket*));
 
 	//Set the socket_type (reliable or not) in sock
 	sk.sock_type = sock_type;
@@ -1581,6 +1588,7 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		sk.next_recv_seqnum = 0;
 		sk.isAcceptSocket = true;
 		memset(sk.send_buffer, 0, sk.send_buffer_size * sizeof(WritablePacket*));
+		memset(sk.recv_buffer, 0, sk.recv_buffer_size * sizeof(WritablePacket*));
 
 		portToSock.set(_sport, sk);
 
@@ -1648,16 +1656,10 @@ void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_
 	String HID_str = _local_hid.unparse();
 	String IP4ID_str = _local_4id.unparse();
 	// return a packet containing localhost AD and HID
-	xia::XSocketMsg _Response;
-	_Response.set_type(xia::XREADLOCALHOSTADDR);
-	xia::X_ReadLocalHostAddr_Msg *_msg = _Response.mutable_x_readlocalhostaddr();
+	xia::X_ReadLocalHostAddr_Msg *_msg = xia_socket_msg->mutable_x_readlocalhostaddr();
 	_msg->set_ad(AD_str.c_str());
 	_msg->set_hid(HID_str.c_str());
 	_msg->set_ip4id(IP4ID_str.c_str());
-	std::string p_buf1;
-	_Response.SerializeToString(&p_buf1);
-	WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
-	output(API_PORT).push(UDPIPPrep(reply, _sport));
 
 	ReturnResult(_sport, xia_socket_msg);
 }
@@ -1670,6 +1672,10 @@ void XTRANSPORT::Xupdatenameserverdag(unsigned short _sport, xia::XSocketMsg *xi
 	String ns_dag(x_updatenameserverdag_msg->dag().c_str());
 	//click_chatter("new nameserver address is - %s", ns_dag.c_str());
 	_nameserver_addr.parse(ns_dag);
+printf("Updating NS DAG: %s\n", ns_dag.c_str());
+String test = _nameserver_addr.unparse();
+printf("Unparsing NS DAG: %s\n", test.c_str());
+
 	
 	ReturnResult(_sport, xia_socket_msg);
 }
@@ -1682,6 +1688,7 @@ void XTRANSPORT::Xreadnameserverdag(unsigned short _sport, xia::XSocketMsg *xia_
 	// return a packet containing the nameserver DAG
 	xia::X_ReadNameServerDag_Msg *_msg = xia_socket_msg->mutable_x_readnameserverdag();
 	_msg->set_dag(ns_addr.c_str());
+printf("Reading NS DAG: %s\n", ns_addr.c_str());
 
 	ReturnResult(_sport, xia_socket_msg);
 }
@@ -1865,8 +1872,6 @@ void XTRANSPORT::Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg,
 
 		char xid_string[50];
 		random_xid("SID", xid_string);
-//		String rand(click_random(1000000, 9999999));
-//		String xid_string = "SID:20000ff00000000000000000000000000" + rand;
 		str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
 
 		sk->src_path.parse_re(str_local_addr);
@@ -2000,14 +2005,14 @@ void XTRANSPORT::Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 
 	sock *sk = portToSock.get_pointer(_sport);
 
-printf("<<< Xrecvfrom\n    sk->recv_buffer_size: %u\n    sk->dgram_buffer_start: %u\n    sk->dgram_buffer_end: %u\n\n", sk->recv_buffer_size, sk->dgram_buffer_start, sk->dgram_buffer_end);
+//printf("<<< Xrecvfrom (port %d)\n    sk->recv_buffer_size: %u\n    sk->dgram_buffer_start: %u\n    sk->dgram_buffer_end: %u\n\n", _sport, sk->recv_buffer_size, sk->dgram_buffer_start, sk->dgram_buffer_end);
 
 	// Get just the next packet in the recv buffer (we don't return data from more
 	// than one packet in case the packets came from different senders). If no
 	// packet is available, we indicate to the app that we returned 0 bytes.
 	WritablePacket *p = sk->recv_buffer[sk->dgram_buffer_start];
-printf("    sk->recv_buffer[sk->dgram_buffer_start] = %p\n\n", p);
-	if (p) {
+//printf("    sk->recv_buffer[sk->dgram_buffer_start] = %p\n\n", p);
+	if (sk->recv_buffer_count > 0 && p) {
 		XIAHeader xiah(p->xia_header());
 		TransportHeader thdr(p);
 		int data_size = xiah.plen() - thdr.hlen();
@@ -2020,8 +2025,9 @@ printf("    sk->recv_buffer[sk->dgram_buffer_start] = %p\n\n", p);
 
 		p->kill();
 		sk->recv_buffer[sk->dgram_buffer_start] = NULL;
-		if (sk->dgram_buffer_start != sk->dgram_buffer_end) 
-			sk->dgram_buffer_start++;
+		sk->recv_buffer_count--;
+		sk->dgram_buffer_start = (sk->dgram_buffer_start + 1) % sk->recv_buffer_size;
+//printf("incrementing start: %u\n", sk->dgram_buffer_start);
 	} else {
 		x_recvfrom_msg->set_bytes_returned(0);
 	}
@@ -2029,7 +2035,7 @@ printf("    sk->recv_buffer[sk->dgram_buffer_start] = %p\n\n", p);
 	// Return response to API
 	ReturnResult(_sport, xia_socket_msg, x_recvfrom_msg->bytes_returned());
 
-printf("\nUpdated values:\n    sk->recv_buffer_size: %u\n    sk->dgram_buffer_start: %u\n    sk->dgram_buffer_end: %u\n\n", sk->recv_buffer_size, sk->dgram_buffer_start, sk->dgram_buffer_end);
+//printf("\nUpdated values:\n    sk->recv_buffer_size: %u\n    sk->dgram_buffer_start: %u\n    sk->dgram_buffer_end: %u\n\n", sk->recv_buffer_size, sk->dgram_buffer_start, sk->dgram_buffer_end);
 }
 
 void XTRANSPORT::XrequestChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in)
