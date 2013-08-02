@@ -103,15 +103,18 @@ int Xsendto(int sockfd,const void *buf, size_t len, int flags,
 	x_sendto_msg->set_payload((const char*)buf, len);
 
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
+		printf("send error\n");
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
 
-	// because we don't have queueing or seperate control and data sockets, we
-	// can't get status back reliably on a datagram socket as multiple peers
-	// could be talking to it at the same time and the control messages can get
-	// mixed up with the data packets. So just assume that all went well and tell
-	// the caller we sent the data
+	// process the reply from click
+	if ((rc = click_status(sockfd, seq)) < 0) {
+		printf("receive error\n");
+		LOGF("Error getting status from Click: %s", strerror(errno));
+		return -1;
+
+	}
 
 	return len;
 }

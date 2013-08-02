@@ -90,18 +90,12 @@ int Xsend(int sockfd, const void *buf, size_t len, int flags)
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
-#if 0
+
 	// process the reply from click
-	if ((rc = click_reply2(sockfd, seq, &type)) < 0) {
-		LOGF("Error retreiving data from Click: %s", strerror(errno));
+	if ((rc = click_status(sockfd, seq)) < 0) {
+		LOGF("Error getting status from Click: %s", strerror(errno));
 		return -1;
 	}
 
-	if (type != xia::XSEND) {
-		LOGF("Expected type %d, got %d", xia::XSEND, type);
-		// what do we do in this case?
-		// we might have sent the data, but can't be sure
-	}
-#endif
 	return len;
 }
