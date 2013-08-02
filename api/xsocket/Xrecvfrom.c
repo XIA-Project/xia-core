@@ -98,30 +98,48 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		return numbytes;
 	}
 
+
 	xia::XSocketMsg xsm;
-	xsm.set_type(xia::XRECVFROM);
-	unsigned seq = seqNo(sockfd);
-	xsm.set_sequence(seq);
+	unsigned seq;
+	const char *payload;
+	int paylen;
+	xia::X_Recvfrom_Msg *xrm;
 
-	xia::X_Recvfrom_Msg *xrm = xsm.mutable_x_recvfrom();
-	xrm->set_bytes_requested(len);
+	// FIXME: do this the right way!
+	// click replies immediately right now, so we are going to poll like crazy 
+	// even if we use select
+	// should we use a delay in the loop?
+	while (1) {
+		xsm.set_type(xia::XRECVFROM);
+		seq = seqNo(sockfd);
+		xsm.set_sequence(seq);
 
-	if (click_send(sockfd, &xsm) < 0) {
-		LOGF("Error talking to Click: %s", strerror(errno));
-		return -1;
+		xrm = xsm.mutable_x_recvfrom();
+		xrm->set_bytes_requested(len);
+
+		if (click_send(sockfd, &xsm) < 0) {
+			LOGF("Error talking to Click: %s", strerror(errno));
+			return -1;
+		}
+
+		xsm.Clear();
+
+		if ((numbytes = click_reply(sockfd, seq, &xsm)) < 0) {
+			LOGF("Error retrieving recv data from Click: %s", strerror(errno));
+			return -1;
+		}
+		xrm = xsm.mutable_x_recvfrom();
+		payload = xrm->payload().c_str();
+		paylen = xrm->bytes_returned();
+
+		if (paylen != 0)
+			break;		
 	}
 
-	xsm.Clear();
-	if ((numbytes = click_reply(sockfd, seq, &xsm)) < 0) {
-		LOGF("Error retrieving recv data from Click: %s", strerror(errno));
-		return -1;
-	}
-
-	xrm = xsm.mutable_x_recvfrom();
-	const char *payload = xrm->payload().c_str();
+//	xrm = xsm.mutable_x_recvfrom();
+//	const char *payload = xrm->payload().c_str();
 
 	xia::X_Result_Msg *r = xsm.mutable_x_result();
-	int paylen = r->return_code();
 
 	if (paylen < 0) {
 		errno = r->err_code();
@@ -139,6 +157,7 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 	}
 
 	if (addr) {
+printf("dag = %s\n", xrm->sender_dag().c_str());
 		Graph g(xrm->sender_dag().c_str());
 
 		// FIXME: validate addr
