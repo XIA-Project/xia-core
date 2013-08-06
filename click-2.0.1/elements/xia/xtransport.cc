@@ -464,7 +464,7 @@ void XTRANSPORT::add_packet_to_recv_buf(WritablePacket *p, sock *sk) {
 //printf("    Adding packet %p to index: %d,   packet count: %d\n", p, index, sk->recv_buffer_count);
 	}
 		
-	WritablePacket *p_cpy = copy_packet(p, sk);
+	WritablePacket *p_cpy = p->clone()->uniqueify();
 	sk->recv_buffer[index] = p_cpy;
 
 //printf("\nUpdated values:\n    sk->recv_buffer_size: %u\n    sk->dgram_buffer_start: %u\n    sk->dgram_buffer_end: %u\n\n", sk->recv_buffer_size, sk->dgram_buffer_start, sk->dgram_buffer_end);
@@ -1672,10 +1672,6 @@ void XTRANSPORT::Xupdatenameserverdag(unsigned short _sport, xia::XSocketMsg *xi
 	String ns_dag(x_updatenameserverdag_msg->dag().c_str());
 	//click_chatter("new nameserver address is - %s", ns_dag.c_str());
 	_nameserver_addr.parse(ns_dag);
-printf("Updating NS DAG: %s\n", ns_dag.c_str());
-String test = _nameserver_addr.unparse();
-printf("Unparsing NS DAG: %s\n", test.c_str());
-
 	
 	ReturnResult(_sport, xia_socket_msg);
 }
@@ -1688,7 +1684,6 @@ void XTRANSPORT::Xreadnameserverdag(unsigned short _sport, xia::XSocketMsg *xia_
 	// return a packet containing the nameserver DAG
 	xia::X_ReadNameServerDag_Msg *_msg = xia_socket_msg->mutable_x_readnameserverdag();
 	_msg->set_dag(ns_addr.c_str());
-printf("Reading NS DAG: %s\n", ns_addr.c_str());
 
 	ReturnResult(_sport, xia_socket_msg);
 }
@@ -2011,12 +2006,13 @@ void XTRANSPORT::Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	// than one packet in case the packets came from different senders). If no
 	// packet is available, we indicate to the app that we returned 0 bytes.
 	WritablePacket *p = sk->recv_buffer[sk->dgram_buffer_start];
+
 //printf("    sk->recv_buffer[sk->dgram_buffer_start] = %p\n\n", p);
 	if (sk->recv_buffer_count > 0 && p) {
 		XIAHeader xiah(p->xia_header());
 		TransportHeader thdr(p);
 		int data_size = xiah.plen() - thdr.hlen();
-			
+
 		String src_path = xiah.src_path().unparse();
 		String payload((const char*)thdr.payload(), data_size);
 		x_recvfrom_msg->set_sender_dag(src_path.c_str());
