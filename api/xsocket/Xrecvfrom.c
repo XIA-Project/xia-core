@@ -106,11 +106,15 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 	xia::X_Recvfrom_Msg *xrm;
 
 	// FIXME: do this the right way!
-	// click replies immediately right now, so we are going to poll like crazy 
-	// even if we use select
-	// should we use a delay in the loop?
+	// click replies immediately right now, so the recvfrom on the API socket
+	// will always return immediately even if there is no data. Select won't
+	// make a difference because of this. Changes need to be made in click so
+	// that it doesn't fire back so rapidly.
+	// inserting a short delay for now, but this still means polling far too
+	// often.
 	while (1) {
-	sleep(1);
+		usleep(100);
+
 		xsm.set_type(xia::XRECVFROM);
 		seq = seqNo(sockfd);
 		xsm.set_sequence(seq);
@@ -159,13 +163,13 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 	}
 
 	if (addr) {
-printf("dag = %s\n", xrm->sender_dag().c_str());
 		Graph g(xrm->sender_dag().c_str());
 
 		// FIXME: validate addr
 		g.fill_sockaddr((sockaddr_x*)addr);
 		*addrlen = sizeof(sockaddr_x);
 	}
+
 
     return paylen;
 }
