@@ -291,12 +291,15 @@ void echo_dgram()
 		die(-3, "unable to bind to the dag\n");
 	}
 
-	pid_t pid = fork();
+	pid_t pid = 0;
+
+	// only need to fork if doing stream echo at the same time
+	if (stream == 1)
+		pid = fork();
+
 	if (pid == 0) {
 		while (1) {
 			say("Dgram Server waiting\n");
-
-
 
 			dlen = sizeof(cdag);
 			memset(buf, 0, sizeof(buf));
