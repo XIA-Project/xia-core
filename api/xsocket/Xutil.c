@@ -136,14 +136,13 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 	while (1) {
 		// see if another thread received and cached our packet
 		if ((rc = getCachedPacket(sock, seq, buf, buflen)) > 0) {
-printf("Got cached response\n");
+			LOGF("Got cached response with sequence # %d\n", seq);
 			std::string s(buf, rc);
 			msg->ParseFromString(s);
 			break;
 
 		} else {
 
-			// nothing in cache, get data from click
 			setWrapped(sock, TRUE);
 			rc = recvfrom(sock, buf, buflen - 1 , 0, NULL, NULL);
 			setWrapped(sock, FALSE);
@@ -159,19 +158,13 @@ printf("Got cached response\n");
 				assert(msg);
 				unsigned sn = msg->sequence();
 
-				// FIXME: DEBUG DEBUG DEBUG
-printf("sn = %u, seq = %u\n", sn, seq);
-				//sn = seq;
-
 				if (sn == seq)
 					break;
 
 				// these are not the data you were looking for
-printf("Still looking for a packet with sequence # %d\n", seq);
+				LOGF("Expected packet %u, received %u, caching packet\n", seq, sn);
 				cachePacket(sock, sn, buf, buflen);
-printf("cached packet\n");
 				msg->Clear();
-printf("cleared msg\n");
 			}
 		}
 	}
