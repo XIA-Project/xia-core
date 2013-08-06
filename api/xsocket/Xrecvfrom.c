@@ -113,7 +113,8 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 	// inserting a short delay for now, but this still means polling far too
 	// often.
 	while (1) {
-		usleep(100);
+		//usleep(1000);
+		sleep(1);
 
 		xsm.set_type(xia::XRECVFROM);
 		seq = seqNo(sockfd);
