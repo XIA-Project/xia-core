@@ -49,6 +49,12 @@ int XupdateNameServerDAG(int sockfd, char *nsDAG) {
 		return -1;
   }
 
+  // process the reply from click
+  if ((rc = click_status(sockfd, seq)) < 0) {
+    LOGF("Error getting status from Click: %s", strerror(errno));
+    return -1;
+  }
+
   return 0;
 }
 
