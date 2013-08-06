@@ -316,11 +316,16 @@ def send_sid_request(ddag, payload, browser_socket, transport_proto=XSP):
     try:
         if transport_proto == XSP:
             reply = ''
-            while reply.find('DONEDONEDONE') < 0:
-                reply += recv_with_timeout(sock) # Use default timeout
-            reply = reply.split('DONEDONEDONE')[0]
+            reply += recv_with_timeout(sock)
+            content_length_start_index = reply.find('Length: ')
+            content_length_end_index = reply.find('\n\n')
+            content_length = reply[content_length_start_index+8:content_length_end_index]
+            content_length = int(content_length)
+            while content_length > (len(reply) - content_length_end_index - 2):
+                reply += recv_with_timeout(sock)
         elif transport_proto == XDP:
             (reply, reply_dag) = recv_with_timeout(sock, 5, XDP)
+            Xclose(sock);
     except IOError:
         print "ERROR: xiaproxy.py: send_sid_request(): Closing browser socket "
         print "Unexpected error:", sys.exc_info()[0]
@@ -358,6 +363,8 @@ def get_content_from_cid_list(dstAD, dst4ID, dstHID, cid_list):
         cid = 'CID:%s' % cid_list[i*40:40+i*40]
         content_dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 0 - \n %s 3 - \n %s" % (dstAD, dst4ID, dstHID, cid)
         
+        print "!!!!!!CID = %s" % cid   
+     
         chunk_info = ChunkStatus()
         chunk_info.cid = content_dag
         chunk_info.cidLen = len(content_dag)

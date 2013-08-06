@@ -55,6 +55,8 @@ using namespace std;
 int verbose = 1;
 string videoname;
 
+int *acceptSock;
+
 vector<string> CIDlist;
 
 /*
@@ -244,7 +246,8 @@ void *processRequest (void *socketid)
 int main(int argc, char *argv[])
 {
 	sockaddr_x *dag;
-	int sock, acceptSock;
+	int sock;
+	pthread_t client;
 
 	getConfig(argc, argv);
 
@@ -275,14 +278,18 @@ int main(int argc, char *argv[])
    	while (1) {
 		say("\nListening...\n");
 
-		if ((acceptSock = Xaccept(sock, NULL, NULL)) < 0)
-			die(-1, "accept failed\n");
+		acceptSock = (int *)calloc(1, sizeof(int));
 
+		if ((*acceptSock = Xaccept(sock, NULL, NULL)) < 0) {
+			free(acceptSock);
+			die(-1, "accept failed\n");
+        }
 		say("We have a new connection\n");
 
 		// handle the connection in a new thread
-		pthread_t client;
-       	pthread_create(&client, NULL, processRequest, (void *)&acceptSock);
+		if (pthread_create(&client, NULL, processRequest, acceptSock) != 0) {
+			free(acceptSock);
+        }
 	}
 
 	Xclose(sock); // we should never reach here!

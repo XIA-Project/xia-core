@@ -53,8 +53,6 @@ void config(int argc, char** argv)
 		switch (c) {
 			case 'h':
 				hostname = strdup(optarg);
-				fullname = (char*)calloc(1, strlen(hostname) + strlen(EXTENSION) + 1);
-				sprintf(fullname, "%s.%s", hostname, EXTENSION);
 				break;
 			case 'l':
 				level = MIN(atoi(optarg), LOG_DEBUG);
@@ -72,9 +70,9 @@ void config(int argc, char** argv)
 
 	if (!hostname) {
 		hostname = strdup(DEFAULT_NAME);
-		fullname = (char*)calloc(1, strlen(hostname) + strlen(EXTENSION) + 1);
-		sprintf(fullname, "%s.%s", hostname, EXTENSION);
 	}
+	fullname = (char*)calloc(1, strlen(hostname) + strlen(EXTENSION) + 1);
+	sprintf(fullname, "%s.%s", hostname, EXTENSION);
 
 	// load the config setting for this hostname
 	set_conf("xsockconf.ini", hostname);
@@ -330,8 +328,8 @@ int main(int argc, char *argv[]) {
 				Graph hg = (n_src * n_ad * n_hid);
 				hg = hg + (n_src * n_ip * n_ad * n_hid);
 				hg.fill_sockaddr(&hdag);
-    			if (XregisterName(hostname, &hdag) < 0 )
-    				syslog(LOG_ERR, "error registering new name");
+				if (XregisterName(fullname, &hdag) < 0 )
+					syslog(LOG_ERR, "error registering new name");
 		}   
 	}	
 	return 0;
