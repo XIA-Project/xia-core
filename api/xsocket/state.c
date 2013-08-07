@@ -55,11 +55,19 @@ public:
 	int getPacket(unsigned seq, char *buf, unsigned buflen);
 	void insertPacket(unsigned seq, char *buf, unsigned buflen);
 
+	void setDebug(int debug) { m_debug = debug; };
+	int getDebug() { return m_debug; };
+
+	void setError(int error) { m_error = error; };
+	int getError() { return m_error; };
+
 private:
 	int m_transportType;
 	int m_connected;
 	int m_async;
 	int m_wrapped;	// hack for dealing with xwrap stuff
+	int m_debug;
+	int m_error;
 	char *m_buf;
 	unsigned m_bufLen;
 	unsigned m_sequence;
@@ -76,6 +84,8 @@ SocketState::SocketState(int tt)
 	m_buf = (char *)0;
 	m_bufLen = 0;
 	m_sequence = 1;
+	m_debug = 0;
+	m_error = 0;
 }
 
 SocketState::SocketState()
@@ -86,6 +96,9 @@ SocketState::SocketState()
 	m_wrapped = 0;
 	m_buf = (char *)0;
 	m_bufLen = 0;
+	m_sequence = 1;
+	m_debug = 0;
+	m_error = 0;
 }
 
 SocketState::~SocketState()
@@ -303,6 +316,37 @@ void setAsync(int sock, int async)
 		sstate->setAsync(async);
 }
 
+int getDebug(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		return sstate->getDebug();
+	else
+		return 0;
+}
+
+void setDebug(int sock, int debug)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		sstate->setDebug(debug);
+}
+
+int getError(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		return sstate->getError();
+	else
+		return 0;
+}
+
+void setError(int sock, int error)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		sstate->setError(error);
+}
 
 void setSocketType(int sock, int tt)
 {

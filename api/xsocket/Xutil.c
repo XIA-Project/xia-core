@@ -242,3 +242,7 @@ int checkXid(const char *xid, const char *type)
 
 	return rc;
 }
+
+// FIXME: implement log handlers that use SO_DEBUG value to decide whether or not to log
+// FIXME: implement handler to set output for log messages, file* or syslog
+

@@ -24,6 +24,47 @@
 #include "Xutil.h"
 #include <errno.h>
 
+int ssoCheckSize(unsigned *size, unsigned needed)
+{
+	if (*size < needed) {
+		*size = needed;
+		errno = EINVAL;
+		return -1;
+	}
+	return 0;
+}
+
+int ssoGetInt(int sockfd, int optname, void *optval, socklen_t *optlen)
+{
+	if (ssoCheckSize(optlen, sizeof(int)) < 0)
+		return -1;
+
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XGETSOCKOPT);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
+	xia::X_Getsockopt_Msg *msg = xsm.mutable_x_getsockopt();
+	msg->set_opt_type(optname);
+
+	if (click_send(sockfd, &xsm) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
+		return -1;
+	}
+
+	xsm.Clear();
+	if (click_reply(sockfd, seq, &xsm) < 0) {
+		LOGF("Error getting status from Click: %s", strerror(errno));
+		return -1;
+	}
+
+	msg = xsm.mutable_x_getsockopt();
+	*(int *)optval = msg->int_opt();
+	*optlen = sizeof(int);
+
+	// FIXME: get return code from protobuf
+	return 0;
+}
+
 /*!
 ** @brief Xsocket implemention of the standard setsockopt function.
 **
@@ -103,6 +144,8 @@ int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen)
 			break;
 		}
 
+		// case SO_DEBUG: // FIXME: implement! also make log macros use this value
+
 		default:
 			errno = ENOPROTOOPT;
 			return -1;
@@ -127,6 +170,7 @@ int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen)
 ** Supported Options:
 **	\n XOPT_HLIM	Retrieves the 'hop limit' element of the XIA header as an integer value
 **	\n XOPT_NEXT_PROTO Gets the next proto field in the XIA header
+**	\n SO_TYPE 		Returns the type of socket (SOCK_STREAM, etc...)
 **
 ** @param sockfd	The control socket
 ** @param optname	The socket option to set (currently must be IP_TTL)
@@ -146,11 +190,6 @@ int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen)
 */
 int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen)
 {
-	/* TODO: we may need to check the type of the socket at some point, but for now
-	** treat them all the same as far as options go.
-	**
-	** Should we add a validate socket function that takes the expected type?
-	*/
 	if (getSocketType(sockfd) == XSOCK_INVALID) {
 		errno = EBADF;
 		return -1;
@@ -161,67 +200,38 @@ int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen)
 		return -1;
 	}
 
-	xia::XSocketMsg xsm;
-	xsm.set_type(xia::XGETSOCKOPT);
-	unsigned seq = seqNo(sockfd);
-	xsm.set_sequence(seq);
-	xia::X_Getsockopt_Msg *msg = xsm.mutable_x_getsockopt();
-	msg->set_opt_type(optname);
-
 	switch (optname) {
 		case XOPT_HLIM:
-		{
-			if (*optlen < sizeof(int)) {
-				*optlen = sizeof(int);
-				errno = EINVAL;
-				return -1;
-			}
-
-			if (click_send(sockfd, &xsm) < 0) {
-				LOGF("Error talking to Click: %s", strerror(errno));
-				return -1;
-			}
-
-			xsm.Clear();
-			if (click_reply(sockfd, seq, &xsm) < 0) {
-				LOGF("Error getting status from Click: %s", strerror(errno));
-				return -1;
-			}
-
-			xia::X_Getsockopt_Msg *msg = xsm.mutable_x_getsockopt();
-
-			int hlim = msg->int_opt();
-			*optlen = sizeof(int);
-			*(int *)optval = hlim;
-			break;
-		}
-
 		case XOPT_NEXT_PROTO:
-		{
-			if (*optlen < sizeof(int)) {
-				*optlen = sizeof(int);
-				errno = EINVAL;
-				return -1;
-			}
-
-			if (click_send(sockfd, &xsm) < 0) {
-				LOGF("Error talking to Click: %s", strerror(errno));
-				return -1;
-			}
-
-			xsm.Clear();
-			if (click_reply(sockfd, seq, &xsm) < 0) {
-				LOGF("Error getting status from Click: %s", strerror(errno));
-				return -1;
-			}
-
-			xia::X_Getsockopt_Msg *msg = xsm.mutable_x_getsockopt();
-
-			int nxt = msg->int_opt();
-			*optlen = sizeof(int);
-			*(int *)optval = nxt;
+			return ssoGetInt(sockfd, optname, optval, optlen);
 			break;
-		}
+
+		case SO_TYPE:
+			if (ssoCheckSize(optlen, sizeof(int)) < 0)
+				return -1;
+			*(int *)optval = getSocketType(sockfd);
+			break;
+
+		case SO_DEBUG:
+			if (ssoCheckSize(optlen, sizeof(int)) < 0)
+				return -1;
+			*(int *)optval = getDebug(sockfd);
+			break;
+
+		case SO_ERROR:
+			if (ssoCheckSize(optlen, sizeof(int)) < 0)
+				return -1;
+			*(int *)optval = getError(sockfd);
+			break;
+
+		// FIXME: implement these!
+		case SO_SNDBUF:
+		case SO_RCVBUF:
+		case SO_SNDTIMEO:
+		case SO_RCVTIMEO:
+		case SO_LINGER:
+			return -1;
+			break;
 
 		default:
 			errno = ENOPROTOOPT;
