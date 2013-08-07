@@ -24,6 +24,7 @@
 ** - what is the constant 22 for near line 850? I can't find a 22 anywhere else in the source tree
 */
 
+// FIXME: make this a variable controled by either the global build DEBUG flag, or the value set by SO_DEBUG
 #define DEBUG 0
 
 CLICK_DECLS
@@ -1292,7 +1293,7 @@ void XTRANSPORT::Xsetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_
 	switch (x_sso_msg->opt_type())
 	{
 		// FIXME: need real opt type for protobufs
-	case 1:
+	case 0x07001:
 	{
 		int hl = x_sso_msg->int_opt();
 	
@@ -1301,7 +1302,7 @@ void XTRANSPORT::Xsetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_
 	}
 	break;
 
-	case 2:
+	case 0x07002:
 	{
 		int nxt = x_sso_msg->int_opt();
 		nxt_xport.set(_sport, nxt);
