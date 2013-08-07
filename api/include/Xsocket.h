@@ -148,6 +148,7 @@ extern int XrequestChunks(int sockfd, const ChunkStatus *chunks, int numChunks);
 extern int XgetChunkStatus(int sockfd, char* dag, size_t dagLen);
 extern int XgetChunkStatuses(int sockfd, ChunkStatus *statusList, int numCids);
 extern int XreadChunk(int sockfd, void *rbuf, size_t len, int flags, char *cid, size_t cidLen);
+extern int XpushChunkto(int sockfd,const void *buf, size_t len, int flags, const struct sockaddr *addr, socklen_t addrlen, ChunkInfo *info);
 
 extern ChunkContext *XallocCacheSlice(unsigned policy, unsigned ttl, unsigned size);
 extern int XfreeCacheSlice(ChunkContext *ctx);

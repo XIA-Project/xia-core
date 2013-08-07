@@ -8,7 +8,7 @@ LDFLAGS +=-lprotobuf -lc -ldl $(XLIB)/libdagaddr.so
 
 SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XrequestChunk.c  Xgetaddrinfo.c \
 	Xfcntl.c XgetChunkStatus.c  XreadChunk.c  XputChunk.c Xrecv.c \
-	Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c \
+	Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c  XpushChunkto.c\
 	Xsetsockopt.c Xutil.c state.c Xinit.c XupdateAD.c XupdateNameServerDAG.c XgetDAGbyName.c  \
 	minini/minIni.c 
 OBJS=$(SOURCES:.c=.o) xia.pb.o

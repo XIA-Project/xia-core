@@ -229,13 +229,14 @@ message msg_response {
  
 
 message X_Pushchunk_Msg {
-  required int32 cachepolicy = 1;
-  required int32 cachesize = 2;
-  required int32 contextid = 3;
-  required int32 TTL = 4;
-  required bytes payload = 5; // data
-  optional string cid = 6;
-  optional int32 length = 7;
-  optional int64 timestamp = 8; 
+  required string ddag = 1; // dest dag
+  required int32 cachepolicy = 2;
+  required int32 cachesize = 3;
+  required int32 contextid = 4;
+  required int32 TTL = 5;
+  required bytes payload = 6; // data
+  optional string cid = 7;
+  optional int32 length = 8;
+  optional int64 timestamp = 9; 
 }
  
