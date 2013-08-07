@@ -136,9 +136,12 @@ void SocketState::setData(const char *buf, unsigned bufLen)
 int SocketState::getPacket(unsigned seq, char *buf, unsigned buflen)
 {
 	int rc = 0;
+	map<unsigned, string>::iterator it;
 
-	std::string s = m_packets[seq];
-	if (s.size()) {
+	it = m_packets.find(seq);
+	if (it != m_packets.end()) {
+		string s = it->second;
+
 		rc = MIN(buflen, s.size());
 		memcpy(buf, s.c_str(), rc);
 
