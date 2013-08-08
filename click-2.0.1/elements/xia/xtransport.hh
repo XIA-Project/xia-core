@@ -234,7 +234,7 @@ class XTRANSPORT : public Element {
     void XreadChunk(unsigned short _sport);
     void XremoveChunk(unsigned short _sport);
     void XputChunk(unsigned short _sport);
-    void XpushChunk(unsigned short _sport);
+    void XpushChunkto(unsigned short _sport, WritablePacket *p_in);
 };
 
 CLICK_ENDDECLS

@@ -27,17 +27,16 @@
 /*!
 ** @brief Sends a datagram chunk message on an Xsocket
 **
+** Internally calls XputChunk 
 ** XpushChunkto sends a datagram style chunk to the specified address. The final intent of
 ** the address should be a valid SID or HID.
 ** 
 ** Unlike a standard socket, XpushChunkto() is only valid on Xsockets of
 ** type XSOCK_CHUNK. FIXME: Maybe there should be chunk_datagram
 **
-** If the buffer is too large, Xsendto() will truncate the message and
-** send what it can. This is different from the standard sendto which returns
-** an error.
+** If the buffer is too large (bigger than XIA_MAXCHUNK), XpushChunkto() will return an error.
 **
-** @param sockfd The socket to send the data on
+** @param ChunkContext Chunk context including socket, ttl, etc
 ** @param buf the data to send
 ** @param len lenngth of the data to send. The
 ** Xsendto api is limited to sending at most XIA_MAXBUF bytes.
@@ -45,19 +44,34 @@
 ** with the standard sendto socket call.
 ** @param addr address (SID) to send the datagram to
 ** @param addrlen length of the DAG
+** @param ChunkInfo cid, ttl, len, etc
 **
 ** @returns number of bytes sent on success
 ** @returns -1 on failure with errno set to an error compatible with those
 ** returned by the standard sendto call.
 **
 */
-int XpushChunkto(int sockfd,const void *buf, size_t len, int flags,
+int XpushChunkto(const ChunkContext *ctx, const char *buf, size_t len, int flags,
 		const struct sockaddr *addr, socklen_t addrlen, ChunkInfo *info)
 {
+	
 	int rc;
+// 	char buffer[MAXBUFLEN];
+	
+	if ((rc = XputChunk(ctx, buf, len, info)) < 0)
+		return rc;
+	
 
-	if (len == 0)
-		return 0;
+/*	if(ctx == NULL || buf == NULL || info == NULL || !addr)*/
+	if(!addr){
+			errno = EFAULT;
+			LOG("NULL pointer");
+		return -1;
+	}
+
+// 	if (len == 0)
+// 		return 0;
+
 
 	if (addrlen < sizeof(sockaddr_x)) {
 		errno = EINVAL;
@@ -70,14 +84,8 @@ int XpushChunkto(int sockfd,const void *buf, size_t len, int flags,
 		return -1;
 	}
 
-	if (!buf || !addr) {
-		LOG("null pointer!\n");
-		errno = EFAULT;
-		return -1;
-	}
-
-	if (validateSocket(sockfd, XSOCK_DGRAM, EOPNOTSUPP) < 0) {
-		LOGF("Socket %d must be a datagram socket", sockfd);
+	if (validateSocket(ctx->sockfd, XSOCK_CHUNK, EOPNOTSUPP) < 0) {
+		LOGF("Socket %d must be a chunk socket", ctx->sockfd);
 		return -1;
 	}
 
@@ -89,18 +97,23 @@ int XpushChunkto(int sockfd,const void *buf, size_t len, int flags,
 	}
 
 	xia::XSocketMsg xsm;
-	xsm.set_type(xia::XSENDTO);
+	xsm.set_type(xia::XPUSHCHUNKTO);
 
-	xia::X_Sendto_Msg *x_sendto_msg = xsm.mutable_x_sendto();
+	xia::X_Pushchunkto_Msg *x_pushchunkto = xsm.mutable_x_pushchunkto();
 
 	// FIXME: validate addr
 	Graph g((sockaddr_x*)addr);
 	std::string s = g.dag_string();
 
-	x_sendto_msg->set_ddag(s.c_str());
-	x_sendto_msg->set_payload((const char*)buf, len);
+	x_pushchunkto->set_ddag(s.c_str());
+	x_pushchunkto->set_payload((const char*)buf, len);
+	
+	x_pushchunkto->set_contextid(ctx->contextID);
+	x_pushchunkto->set_ttl(ctx->ttl);
+	x_pushchunkto->set_cachesize(ctx->cacheSize);
+	x_pushchunkto->set_cachepolicy(ctx->cachePolicy);
 
-	if ((rc = click_send(sockfd, &xsm)) < 0) {
+	if ((rc = click_send(ctx->sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
