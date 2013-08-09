@@ -99,7 +99,7 @@ typedef struct {
 // XIA specific addrinfo flags
 #define XAI_DAGHOST	AI_NUMERICHOST	// if set, name is a dag instead of a generic name string
 #define XAI_XIDSERV	AI_NUMERICSERV	// if set, service is an XID instead of a name string
-#define XAI_FALLBACK 0x1000 		// if set, wrap the dag in parens
+#define XAI_FALLBACK 0x10000 		// if set, wrap the dag in parens
 
 
 // XIA specific getaddrinfo error codes (move to xia.h)
