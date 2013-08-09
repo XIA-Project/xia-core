@@ -40,7 +40,7 @@ doc: Xdoc.h $(SOURCES)
 	make -C python doc
 
 unittest: unittest.cpp  $(LIB) $(XINC)/Xsocket.h $(XINC)/xia.h
-	$(CC) -I$(XINC) -Wall -Wextra $< -o $@ -lgtest $(LIB) $(XLIB)/libdagaddr.so
+	$(CC) -I$(XINC) -I../gtest/include -Wall -Wextra $< -o $@ ../gtest/libgtest.a $(LIB) $(XLIB)/libdagaddr.so
 
 test: unittest $(LIB)
 	./unittest
