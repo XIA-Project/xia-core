@@ -116,7 +116,7 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 			return EAI_SOCKTYPE;
 		}
 
-		if (name == NULL) {
+		if (name == NULL || strlen(name) == 0) {
 			// user wants up to look up the local AD:HID
 			// currently we have the same behavior whether or not passive is set
 			// this could change in the future
@@ -139,7 +139,6 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 			// same flag bit as AI_NUMERICSERV
 			// we don't have ports, but if this is set, treat the service string
 			//  as an XID and append it to the end of the DAG returned in the sockaddr
-
 			if (!service)
 				return EAI_BADFLAGS;
 
@@ -188,7 +187,7 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 			fallback = 1;
 		}
 
-	} else if (name == NULL) {
+	} else if (name == NULL || strlen(name) == 0) {
 		// hints doesn't exist and NAME is null, so make loopback
 		loopback = 1;
 	}
