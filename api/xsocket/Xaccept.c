@@ -136,7 +136,7 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		*addrlen = 0;
 
 	allocSocketState(new_sockfd, XSOCK_STREAM);
-	setConnected(new_sockfd, 1);
+	setConnState(new_sockfd, CONNECTED);
 
 	return new_sockfd;
 }

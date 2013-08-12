@@ -90,6 +90,8 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		return -1;
 	}
 
+	// FIXME: what should we do if the datagram socket is connected???
+
 	// see if we have bytes leftover from a previous Xrecv call
 	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len)) > 0) {
 		// FIXME: we need to also have stashed away the sDAG and
@@ -139,7 +141,7 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		paylen = xrm->bytes_returned();
 
 		if (paylen != 0) {
-			break;		
+			break;
 		}
 	}
 
@@ -150,10 +152,10 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 
 	if (paylen < 0) {
 		errno = r->err_code();
-	
+
 	} else if ((unsigned)paylen <= len) {
 		memcpy(rbuf, payload, paylen);
-	
+
 	} else {
 		// we got back more data than the caller requested
 		// stash the extra away for subsequent Xrecv calls

@@ -19,7 +19,7 @@
  @brief Implements XgetDAGbyName(), XregisterName(), Xgetpeername() and Xgetsockname()
 */
 #include <errno.h>
- #include <unistd.h>
+#include <unistd.h>
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
@@ -365,12 +365,14 @@ int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		return -1;
 	}
 
-	if (validateSocket(sockfd, XSOCK_STREAM, EOPNOTSUPP) < 0) {
+	int stype = getSocketType(sockfd);
+	if (stype != SOCK_STREAM && stype != SOCK_DGRAM) {
 		LOG("Xgetpeername is only valid with stream sockets.");
+		errno = EOPNOTSUPP;
 		return -1;
 	}
 
-	if (!isConnected(sockfd)) {
+	if (getConnState(sockfd) != CONNECTED) {
 		LOGF("Socket %d is not connected", sockfd);
 		errno = ENOTCONN;
 		return -1;
@@ -439,14 +441,10 @@ int Xgetsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		return -1;
 	}
 
-	if (validateSocket(sockfd, XSOCK_STREAM, EOPNOTSUPP) < 0) {
-		LOG("Xgetsockname is only valid with stream sockets.");
-		return -1;
-	}
-
-	if (!isConnected(sockfd)) {
-		LOGF("Socket %d is not connected", sockfd);
-		errno = ENOTCONN;
+	if (getSocketType(sockfd) == XSOCK_INVALID)
+	{
+		LOG("The socket is not a valid Xsocket");
+		errno = EBADF;
 		return -1;
 	}
 

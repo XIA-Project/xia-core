@@ -65,12 +65,14 @@ int Xsend(int sockfd, const void *buf, size_t len, int flags)
 		return -1;
 	}
 
+	// FIXME: add support for connected DGRAM sockets
+
 	if (validateSocket(sockfd, XSOCK_STREAM, EOPNOTSUPP) < 0) {
 		LOG("Xsend is only valid with stream sockets.");
 		return -1;
 	}
 
-	if (!isConnected(sockfd)) {
+	if (getConnState(sockfd) != CONNECTED) {
 		LOGF("Socket %d is not connected", sockfd);
 		errno = ENOTCONN;
 		return -1;
