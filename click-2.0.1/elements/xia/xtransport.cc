@@ -614,15 +614,14 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk) {
 
 			String src_path = xiah.src_path().unparse();
 			String payload((const char*)thdr.payload(), data_size);
-			x_recvfrom_msg->set_sender_dag(src_path.c_str());
 			x_recvfrom_msg->set_payload(payload.c_str(), payload.length());
+			x_recvfrom_msg->set_sender_dag(src_path.c_str());
 			x_recvfrom_msg->set_bytes_returned(data_size);
 
 			p->kill();
 			sk->recv_buffer[sk->dgram_buffer_start] = NULL;
 			sk->recv_buffer_count--;
 			sk->dgram_buffer_start = (sk->dgram_buffer_start + 1) % sk->recv_buffer_size;
-
 			return data_size;
 		} else {
 			x_recvfrom_msg->set_bytes_returned(0);
@@ -888,6 +887,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			xsm.set_type(xia::XCONNECT);
 			xsm.set_sequence(0); // TODO: what should this be?
 			xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
+			connect_msg->set_ddag(src_path.unparse().c_str());
 			connect_msg->set_status(xia::X_Connect_Msg::CONNECTED);
 			ReturnResult(_dport, &xsm);
 
@@ -2054,7 +2054,11 @@ void XTRANSPORT::Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	} else {
 		// rather than returning a response, wait until we get data
 		sk->recv_pending = true; // when we get data next, send straight to app
-		sk->pending_recv_msg = xia_socket_msg; // TODO: is this saved on the stack in ProcessAPIPacket? Allocate on heap?
+
+		// xia_socket_msg is saved on the stack; allocate a copy on the heap
+		xia::XSocketMsg *xsm_cpy = new xia::XSocketMsg();
+		xsm_cpy->CopyFrom(*xia_socket_msg);
+		sk->pending_recv_msg = xsm_cpy;
 	}
 }
 
