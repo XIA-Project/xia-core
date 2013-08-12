@@ -48,8 +48,10 @@ typedef struct {
 } x_addr_t;
 
 typedef struct {
-	unsigned short sx_family;
-	x_addr_t sx_addr;
+	unsigned char sx_fake_len;	// needed so initial fields line up with struct sockaddr
+	unsigned char sx_family;
+	unsigned short sx_len;
+	x_addr_t      sx_addr;
 } sockaddr_x;
 
 #endif // XIA_H
