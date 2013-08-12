@@ -24,6 +24,8 @@
 #include <string.h>
 #include <assert.h>
 #include "Xsocket.h"
+#include "Xinit.h"
+#include "Xutil.h"
 
 using namespace std;
 
@@ -41,8 +43,8 @@ public:
 	void setData(const char *buf, unsigned bufLen);
 	int dataLen() { return m_bufLen; };
 
-	int isConnected() { return m_connected; };
-	void setConnected(int conn) { m_connected = conn; };
+	int getConnState() { return m_connected; };
+	void setConnState(int conn) { m_connected = conn; };
 
 	int isWrapped() { return (m_wrapped != 0); };
 	void setWrapped(int wrap) { wrap ? m_wrapped++ : m_wrapped--; };
@@ -61,6 +63,9 @@ public:
 	void setError(int error) { m_error = error; };
 	int getError() { return m_error; };
 
+	const sockaddr_x *peer() { return m_peer; };
+	int setPeer(const sockaddr_x *peer);
+
 private:
 	int m_transportType;
 	int m_connected;
@@ -69,6 +74,7 @@ private:
 	int m_debug;
 	int m_error;
 	char *m_buf;
+	sockaddr_x *m_peer;
 	unsigned m_bufLen;
 	unsigned m_sequence;
 	map<unsigned, string> m_packets;
@@ -81,7 +87,8 @@ SocketState::SocketState(int tt)
 	m_connected = 0;
 	m_async = 0;
 	m_wrapped = 0;
-	m_buf = (char *)0;
+	m_buf = NULL;
+	m_peer = NULL;
 	m_bufLen = 0;
 	m_sequence = 1;
 	m_debug = 0;
@@ -94,7 +101,8 @@ SocketState::SocketState()
 	m_connected = 0;
 	m_async = 0;
 	m_wrapped = 0;
-	m_buf = (char *)0;
+	m_buf = NULL;
+	m_peer = NULL;
 	m_bufLen = 0;
 	m_sequence = 1;
 	m_debug = 0;
@@ -247,6 +255,16 @@ SocketState *SocketMap::get(int sock)
 	return p;
 }
 
+int SocketState::setPeer(const sockaddr_x *peer)
+{
+	if (m_peer != NULL)
+		free(m_peer);
+
+	m_peer = (sockaddr_x *)malloc(sizeof(sockaddr_x));
+	memcpy(m_peer, peer, sizeof(sockaddr_x));
+	return 0;
+}
+
 // extern "C" {
 
 void allocSocketState(int sock, int tt)
@@ -268,20 +286,20 @@ int getSocketType(int sock)
 		return -1;
 }
 
-int isConnected(int sock)
+int getConnState(int sock)
 {
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
-		return sstate->isConnected();
+		return sstate->getConnState();
 	else
-		return 0;
+		return UNKNOWN_STATE;
 }
 
-void setConnected(int sock, int conn)
+void setConnState(int sock, int conn)
 {
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
-		sstate->setConnected(conn);
+		sstate->setConnState(conn);
 }
 
 int isWrapped(int sock)
@@ -400,6 +418,18 @@ int getCachedPacket(int sock, unsigned seq, char *buf, unsigned buflen)
 	return rc;
 }
 
+int connectDgram(int sock, sockaddr_x *addr)
+{
+	int rc = 0;
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+
+	if (sstate) {
+		sstate->setConnState((addr == NULL) ? UNCONNECTED : CONNECTED);
+		sstate->setPeer(addr);
+	}
+
+	return rc;
+}
 
 #if 0
 int main()

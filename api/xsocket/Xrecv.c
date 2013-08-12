@@ -76,7 +76,7 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 		return -1;
 	}
 
-	if (!isConnected(sockfd)) {
+	if (getConnState(sockfd) != CONNECTED) {
 		LOGF("Socket %d is not connected", sockfd);
 		errno = ENOTCONN;
 		return -1;

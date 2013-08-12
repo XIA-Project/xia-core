@@ -25,6 +25,99 @@
 #include "Xutil.h"
 #include "dagaddr.hpp"
 
+int _connDgram(int sockfd, const sockaddr *addr, socklen_t addrlen)
+{
+	int rc = 0;
+
+	if (addr->sa_family == AF_UNSPEC) {
+
+		// go back to allowing connections to/from any peer
+		connectDgram(sockfd, NULL);
+
+	} else if (addr->sa_family == AF_XIA) {
+		// validate addr
+		Graph g((sockaddr_x *)addr);
+
+		if (g.num_nodes() == 0) {
+			rc = -1;
+			errno = EHOSTUNREACH;
+
+		// FIXME: can we verify addrlen here?
+
+		} else {
+			connectDgram(sockfd, (sockaddr_x *)addr);
+		}
+	} else {
+		rc = -1;
+		errno = EAFNOSUPPORT;
+	}
+
+	return rc;
+}
+
+int _connStream(int sockfd, const sockaddr *addr, socklen_t addrlen)
+{
+	int rc;
+
+	if (addr->sa_family != AF_XIA) {
+		errno = EAFNOSUPPORT;
+		return -1;
+	}
+
+	// FIXME: check addrlen here. check against wrapper, there were problems with it not setting length correctly
+
+	Graph g((sockaddr_x*)addr);
+	if (g.num_nodes() <= 0) {
+		errno = EADDRNOTAVAIL;
+		return -1;
+	}
+
+	int state = getConnState(sockfd);
+	if (state == CONNECTED) {
+		errno = EALREADY;
+		return -1;
+	} else if (state == CONNECTING) {
+		errno = EINPROGRESS;
+		return -1;
+	}
+
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XCONNECT);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
+
+	xia::X_Connect_Msg *x_connect_msg = xsm.mutable_x_connect();
+	x_connect_msg->set_ddag(g.dag_string().c_str());
+	// In Xtransport: send SYN to destination server
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
+		return -1;
+	}
+
+	setConnState(sockfd, CONNECTING);
+
+	rc = click_status(sockfd, seq);
+	if (rc == -1) {
+		if (errno != EINPROGRESS) {
+			setConnState(sockfd, UNCONNECTED);
+			LOGF("Error retrieving recv data from Click: %s", strerror(errno));
+			return -1;
+		}
+	} else {
+		// something bad happened! we shouldn't get a success code here
+	}
+
+	// Waiting for SYNACK from destination server
+	if (click_status(sockfd, seq) < 0) {
+		setConnState(sockfd, UNCONNECTED);
+		LOGF("Xconnect failed: %s", strerror(errno));
+		return -1;
+	}
+
+	setConnState(sockfd, CONNECTED);
+	return 0;
+}
+
 /*!
 ** @brief Initiate a connection on an Xsocket of type XSOCK_STREAM
 **
@@ -46,66 +139,25 @@
 */
 int Xconnect(int sockfd, const sockaddr *addr, socklen_t addrlen)
 {
-	int rc;
+	int stype = getSocketType(sockfd);
+	int rc = -1;
 
-	int numbytes;
-	char buf[MAXBUFLEN];
-	struct sockaddr_in their_addr;
-	socklen_t addr_len;
-
-	// we can't count on addrlen being set correctly if we are being called via
-	// the wrapper functions as the original source program doesn't know that
-	// a sockaddr_x is larger than a sockaddr
-//	if (!addr || addrlen < sizeof(sockaddr_x)) {
 	if (!addr) {
 		errno = EINVAL;
-		return -1;
-	}
-	if (validateSocket(sockfd, XSOCK_STREAM, EOPNOTSUPP) < 0) {
-		LOG("Xconnect is only valid with stream sockets.");
-		return -1;
-	}
+		rc = -1;
 
-	Graph g((sockaddr_x*)addr);
-	if (g.num_nodes() <= 0) {
-		errno = EINVAL;
-		return -1;
-	}
+	} else if (stype == SOCK_DGRAM) {
+		rc = _connDgram(sockfd, addr, addrlen);
 
-	xia::XSocketMsg xsm;
-	xsm.set_type(xia::XCONNECT);
-	unsigned seq = seqNo(sockfd);
-	xsm.set_sequence(seq);
+	} else if (stype == SOCK_STREAM) {
+		rc = _connStream(sockfd, addr, addrlen);
 
-	xia::X_Connect_Msg *x_connect_msg = xsm.mutable_x_connect();
-	x_connect_msg->set_ddag(g.dag_string().c_str());
-	// In Xtransport: send SYN to destination server
-	if ((rc = click_send(sockfd, &xsm)) < 0) {
-		LOGF("Error talking to Click: %s", strerror(errno));
-		return -1;
-	}
-	// Waiting for SYNACK from destination server
-
-	// FIXME: make this use protobufs
-#if 1
-	addr_len = sizeof their_addr;
-	setWrapped(sockfd, TRUE);
-	if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
-			(struct sockaddr *)&their_addr, &addr_len)) == -1) {
-	setWrapped(sockfd, FALSE);
-		LOGF("Error getting status from Click: %s", strerror(errno));
-		return -1;
-	}
-	setWrapped(sockfd, FALSE);
-
-	if (strcmp(buf, "^Connection-failed^") == 0) {
-		errno = ECONNREFUSED;
-		LOG("Connection Failed");
-		return -1;
 	} else {
-		setConnected(sockfd, 1);
-		return 0;
+		errno = EBADF;
+		LOG("Invalid socket type, only SOCK_STREAM and SOCK_DGRAM allowed");
+		rc = -1;
 	}
-#endif
+
+	return rc;
 }
 

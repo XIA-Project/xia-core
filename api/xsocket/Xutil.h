@@ -37,6 +37,11 @@
 #define TRUE (!FALSE)
 #endif
 
+#define UNKNOWN_STATE 0
+#define UNCONNECTED	  1
+#define CONNECTING	  2
+#define CONNECTED 	  3
+
 int click_send(int sockfd, xia::XSocketMsg *xsm);
 int click_reply(int sockfd, unsigned seq, xia::XSocketMsg *msg);
 int click_status(int sockfd, unsigned seq);
@@ -49,8 +54,8 @@ void allocSocketState(int sock, int tt);
 void freeSocketState(int sock);
 int getSocketType(int sock);
 void setSocketType(int sock, int tt);
-int isConnected(int sock);
-int setConnected(int sock, int conn);
+int getConnState(int sock);
+void setConnState(int sock, int conn);
 int getSocketData(int sock, char *buf, unsigned bufLen);
 void setSocketData(int sock, const char *buf, unsigned bufLen);
 void setWrapped(int sock, int wrapped);
@@ -64,5 +69,6 @@ int getError(int sock);
 unsigned seqNo(int sock);
 void cachePacket(int sock, unsigned seq, char *buf, unsigned buflen);
 int getCachedPacket(int sock, unsigned seq, char *buf, unsigned buflen);
+int connectDgram(int sock, sockaddr_x *addr);
 
 #endif
