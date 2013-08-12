@@ -450,25 +450,29 @@ bool XTRANSPORT::should_buffer_received_packet(WritablePacket *p, sock *sk) {
 */
 void XTRANSPORT::add_packet_to_recv_buf(WritablePacket *p, sock *sk) {
 
-//printf("<<<< add_packet_to_recv_buf\n");
-
 	int index = -1;
 	if (sk->sock_type == XSOCKET_STREAM) {
 		TransportHeader thdr(p);
 		int received_seqnum = thdr.seq_num();
 		index = received_seqnum % sk->recv_buffer_size;
 	} else if (sk->sock_type == XSOCKET_DGRAM) {
-//printf("    sk->recv_buffer_size: %u\n    sk->dgram_buffer_start: %u\n    sk->dgram_buffer_end: %u\n\n", sk->recv_buffer_size, sk->dgram_buffer_start, sk->dgram_buffer_end);
 		index = (sk->dgram_buffer_end + 1) % sk->recv_buffer_size;
 		sk->dgram_buffer_end = index;
 		sk->recv_buffer_count++;
-//printf("    Adding packet %p to index: %d,   packet count: %d\n", p, index, sk->recv_buffer_count);
 	}
 
 	WritablePacket *p_cpy = p->clone()->uniqueify();
 	sk->recv_buffer[index] = p_cpy;
+	
+	// check to see if the app is waiting for this data; if so, return it now
+	if (sk->recv_pending) {
+		int bytes_returned = read_from_recv_buf(sk->pending_recv_msg, sk);
+		ReturnResult(sk->port, sk->pending_recv_msg, bytes_returned);
 
-//printf("\nUpdated values:\n    sk->recv_buffer_size: %u\n    sk->dgram_buffer_start: %u\n    sk->dgram_buffer_end: %u\n\n", sk->recv_buffer_size, sk->dgram_buffer_start, sk->dgram_buffer_end);
+		sk->recv_pending = false;
+		delete sk->pending_recv_msg;
+		sk->pending_recv_msg = NULL;
+	}
 }
 
 /**
@@ -552,6 +556,82 @@ void XTRANSPORT::resize_recv_buffer(sock *sk, uint32_t new_size) {
 	sk->recv_buffer_size = new_size;
 }
 
+/**
+* @brief Read received data from buffer.
+*
+* We'll use this same xia_socket_msg as the response to the API:
+* 1) We fill in the data (from *only one* packet for DGRAM)
+* 2) We fill in how many bytes we're returning
+* 3) We fill in the sender's DAG (DGRAM only)
+* 4) We clear out any buffered packets whose data we return to the app
+*
+* @param xia_socket_msg The Xrecv or Xrecvfrom message from the API
+* @param sk The sock struct for this connection
+*
+* @return  The number of bytes read from the buffer.
+*/
+int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk) {
+
+	if (sk->sock_type == XSOCKET_STREAM) {
+		xia::X_Recv_Msg *x_recv_msg = xia_socket_msg->mutable_x_recv();
+		int bytes_requested = x_recv_msg->bytes_requested();
+		int bytes_returned = 0;
+		char buf[1024*1024]; // TODO: pick a buf size
+		memset(buf, 0, 1024*1024);
+		for (int i = sk->recv_base; i < sk->next_recv_seqnum; i++) {
+
+			if (bytes_returned >= bytes_requested) break;
+
+			WritablePacket *p = sk->recv_buffer[i % sk->recv_buffer_size];
+			XIAHeader xiah(p->xia_header());
+			TransportHeader thdr(p);
+			size_t data_size = xiah.plen() - thdr.hlen();
+
+			memcpy((void*)(&buf[bytes_returned]), (const void*)thdr.payload(), data_size);
+			bytes_returned += data_size;
+
+			p->kill();
+			sk->recv_buffer[i % sk->recv_buffer_size] = NULL;
+			sk->recv_base++;
+		}
+		x_recv_msg->set_payload(buf, bytes_returned); // TODO: check this: need to turn buf into String first?
+		x_recv_msg->set_bytes_returned(bytes_returned);
+
+		return bytes_returned;
+
+	} else if (sk->sock_type == XSOCKET_DGRAM) {
+		xia::X_Recvfrom_Msg *x_recvfrom_msg = xia_socket_msg->mutable_x_recvfrom();
+	
+		// Get just the next packet in the recv buffer (we don't return data from more
+		// than one packet in case the packets came from different senders). If no
+		// packet is available, we indicate to the app that we returned 0 bytes.
+		WritablePacket *p = sk->recv_buffer[sk->dgram_buffer_start];
+
+		if (sk->recv_buffer_count > 0 && p) {
+			XIAHeader xiah(p->xia_header());
+			TransportHeader thdr(p);
+			int data_size = xiah.plen() - thdr.hlen();
+
+			String src_path = xiah.src_path().unparse();
+			String payload((const char*)thdr.payload(), data_size);
+			x_recvfrom_msg->set_sender_dag(src_path.c_str());
+			x_recvfrom_msg->set_payload(payload.c_str(), payload.length());
+			x_recvfrom_msg->set_bytes_returned(data_size);
+
+			p->kill();
+			sk->recv_buffer[sk->dgram_buffer_start] = NULL;
+			sk->recv_buffer_count--;
+			sk->dgram_buffer_start = (sk->dgram_buffer_start + 1) % sk->recv_buffer_size;
+
+			return data_size;
+		} else {
+			x_recvfrom_msg->set_bytes_returned(0);
+			return 0;
+		}
+	}
+
+	return -1;
+}
 
 void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 {
@@ -1950,87 +2030,32 @@ void XTRANSPORT::Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg,
 
 void XTRANSPORT::Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
-	// We'll use this same xia_socket_msg as the response to the API:
-	// 1) We fill in the data
-	// 2) We fill in how many bytes we're returning
-	// 3) We clear out any buffered packets whose data we return to the app
-
-	xia::X_Recv_Msg *x_recv_msg = xia_socket_msg->mutable_x_recv();
-	int bytes_requested = x_recv_msg->bytes_requested();
-
 	sock *sk = portToSock.get_pointer(_sport);
+	read_from_recv_buf(xia_socket_msg, sk);
 
-	int bytes_returned = 0;
-	char buf[1024*1024]; // TODO: pick a buf size
-	memset(buf, 0, 1024*1024);
-	for (int i = sk->recv_base; i < sk->next_recv_seqnum; i++) {
-
-		if (bytes_returned >= bytes_requested) break;
-
-		WritablePacket *p = sk->recv_buffer[i % sk->recv_buffer_size];
-		XIAHeader xiah(p->xia_header());
-		TransportHeader thdr(p);
-		size_t data_size = xiah.plen() - thdr.hlen();
-
-		memcpy((void*)(&buf[bytes_returned]), (const void*)thdr.payload(), data_size);
-		bytes_returned += data_size;
-
-		p->kill();
-		sk->recv_buffer[i % sk->recv_buffer_size] = NULL;
-		sk->recv_base++;
+	if (xia_socket_msg->x_recv().bytes_returned() > 0) {
+		// Return response to API
+		ReturnResult(_sport, xia_socket_msg, xia_socket_msg->x_recv().bytes_returned());
+	} else {
+		// rather than returning a response, wait until we get data
+		sk->recv_pending = true; // when we get data next, send straight to app
+		sk->pending_recv_msg = xia_socket_msg; // TODO: is this saved on the stack in ProcessAPIPacket? Allocate on heap?
 	}
-
-	x_recv_msg->set_payload(buf, bytes_returned); // TODO: check this: need to turn buf into String first?
-	x_recv_msg->set_bytes_returned(bytes_returned);
-
-	// Return response to API
-	ReturnResult(_sport, xia_socket_msg, bytes_returned);
 }
 
 void XTRANSPORT::Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
-	// We'll use this same xia_socket_msg as the response to the API:
-	// 1) We fill in the data from *only one* packet
-	// 2) We fill in how many bytes we're returning
-	// 3) We fill in the sender's DAG
-	// 4) We clear out the buffered packet whose data we return to the app
-
-	xia::X_Recvfrom_Msg *x_recvfrom_msg = xia_socket_msg->mutable_x_recvfrom();
-
 	sock *sk = portToSock.get_pointer(_sport);
+	read_from_recv_buf(xia_socket_msg, sk);
 
-//printf("<<< Xrecvfrom (port %d)\n    sk->recv_buffer_size: %u\n    sk->dgram_buffer_start: %u\n    sk->dgram_buffer_end: %u\n\n", _sport, sk->recv_buffer_size, sk->dgram_buffer_start, sk->dgram_buffer_end);
-
-	// Get just the next packet in the recv buffer (we don't return data from more
-	// than one packet in case the packets came from different senders). If no
-	// packet is available, we indicate to the app that we returned 0 bytes.
-	WritablePacket *p = sk->recv_buffer[sk->dgram_buffer_start];
-
-//printf("    sk->recv_buffer[sk->dgram_buffer_start] = %p\n\n", p);
-	if (sk->recv_buffer_count > 0 && p) {
-		XIAHeader xiah(p->xia_header());
-		TransportHeader thdr(p);
-		int data_size = xiah.plen() - thdr.hlen();
-
-		String src_path = xiah.src_path().unparse();
-		String payload((const char*)thdr.payload(), data_size);
-		x_recvfrom_msg->set_sender_dag(src_path.c_str());
-		x_recvfrom_msg->set_payload(payload.c_str(), payload.length());
-		x_recvfrom_msg->set_bytes_returned(data_size);
-
-		p->kill();
-		sk->recv_buffer[sk->dgram_buffer_start] = NULL;
-		sk->recv_buffer_count--;
-		sk->dgram_buffer_start = (sk->dgram_buffer_start + 1) % sk->recv_buffer_size;
-//printf("incrementing start: %u\n", sk->dgram_buffer_start);
+	if (xia_socket_msg->x_recvfrom().bytes_returned() > 0) {
+		// Return response to API
+		ReturnResult(_sport, xia_socket_msg, xia_socket_msg->x_recvfrom().bytes_returned());
 	} else {
-		x_recvfrom_msg->set_bytes_returned(0);
+		// rather than returning a response, wait until we get data
+		sk->recv_pending = true; // when we get data next, send straight to app
+		sk->pending_recv_msg = xia_socket_msg; // TODO: is this saved on the stack in ProcessAPIPacket? Allocate on heap?
 	}
-
-	// Return response to API
-	ReturnResult(_sport, xia_socket_msg, x_recvfrom_msg->bytes_returned());
-
-//printf("\nUpdated values:\n    sk->recv_buffer_size: %u\n    sk->dgram_buffer_start: %u\n    sk->dgram_buffer_end: %u\n\n", sk->recv_buffer_size, sk->dgram_buffer_start, sk->dgram_buffer_end);
 }
 
 void XTRANSPORT::XrequestChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in)

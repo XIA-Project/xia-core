@@ -316,7 +316,7 @@ class XTRANSPORT : public Element {
 	 * Socket states
 	 * ========================= */
     struct sock {
-    	sock(): port(0), isConnected(false), initialized(false), full_src_dag(false), timer_on(false), synack_waiting(false), dataack_waiting(false), teardown_waiting(false), send_buffer_size(DEFAULT_SEND_WIN_SIZE), recv_buffer_size(DEFAULT_RECV_WIN_SIZE), send_base(0), next_send_seqnum(0), recv_base(0), next_recv_seqnum(0), dgram_buffer_start(0), dgram_buffer_end(-1), recv_buffer_count(0) {};
+    	sock(): port(0), isConnected(false), initialized(false), full_src_dag(false), timer_on(false), synack_waiting(false), dataack_waiting(false), teardown_waiting(false), send_buffer_size(DEFAULT_SEND_WIN_SIZE), recv_buffer_size(DEFAULT_RECV_WIN_SIZE), send_base(0), next_send_seqnum(0), recv_base(0), next_recv_seqnum(0), dgram_buffer_start(0), dgram_buffer_end(-1), recv_buffer_count(0), recv_pending(false) {};
 
 	/* =========================
 	 * Common Socket states
@@ -363,6 +363,8 @@ class XTRANSPORT : public Element {
 		int dgram_buffer_start; // the first undelivered index in the recv buffer (DGRAM only)
 		int dgram_buffer_end; // the last undelivered index in the recv buffer (DGRAM only)
 		uint32_t recv_buffer_count; // the number of packets in the buffer (DGRAM only)
+		bool recv_pending; // true if we should send received network data to app upon receiving it
+		xia::XSocketMsg *pending_recv_msg;
 
 		//Vector<WritablePacket*> pkt_buf;
 		WritablePacket *syn_pkt;
@@ -542,6 +544,7 @@ class XTRANSPORT : public Element {
 
 	bool should_buffer_received_packet(WritablePacket *p, sock *sk);
 	void add_packet_to_recv_buf(WritablePacket *p, sock *sk);
+	int read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk);
 	uint32_t next_missing_seqnum(sock *sk);
 	void resize_buffer(WritablePacket* buf[], int max, int type, uint32_t old_size, uint32_t new_size, int *dgram_start, int *dgram_end);
 	void resize_send_buffer(sock *sk, uint32_t new_size);
