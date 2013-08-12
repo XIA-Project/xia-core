@@ -59,7 +59,7 @@ int _connStream(int sockfd, const sockaddr *addr, socklen_t addrlen)
 {
 	int rc;
 
-	if (addr->sa_family != AF_INET) {
+	if (addr->sa_family != AF_XIA) {
 		errno = EAFNOSUPPORT;
 		return -1;
 	}
@@ -154,7 +154,7 @@ int Xconnect(int sockfd, const sockaddr *addr, socklen_t addrlen)
 
 	} else {
 		errno = EBADF;
-		LOGF("Invalid socket type, only SOCK_STREAM and SOCK_DGRAM allowed");
+		LOG("Invalid socket type, only SOCK_STREAM and SOCK_DGRAM allowed");
 		rc = -1;
 	}
 
