@@ -1252,8 +1252,11 @@ void
 Graph::fill_sockaddr(sockaddr_x *s) const
 {
 	s->sx_family = AF_XIA;
-	s->sx_len = sizeof(sockaddr_x);
-	s->sx_fake_len = 0;
+#ifdef __APPLE__
+	// the length field is not big enough for the size of a sockaddr_x
+	// we don't use it anywhere in our code, so just set it to a known state.
+	s->sx_len = 0;
+#endif;
 	s->sx_addr.s_count = num_nodes();
 
 	for (int i = 0; i < num_nodes(); i++)
