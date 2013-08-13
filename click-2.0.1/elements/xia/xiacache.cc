@@ -90,6 +90,8 @@ XIACache::configure(Vector<String> &conf, ErrorHandler *errh)
 
 void XIACache::push(int port, Packet *p)
 {
+	
+    click_chatter(">> XIACAche push %d", port);
     const struct click_xia* hdr = p->xia_header();
 
     if (!hdr) return;
