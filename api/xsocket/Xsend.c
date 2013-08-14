@@ -44,9 +44,6 @@
 */
 int Xsend(int sockfd, const void *buf, size_t len, int flags)
 {
-	UNUSED(len);
-
-//`	xia::XSocketCallType type;
 	int rc;
 
 	if (flags) {
@@ -65,16 +62,21 @@ int Xsend(int sockfd, const void *buf, size_t len, int flags)
 		return -1;
 	}
 
-	// FIXME: add support for connected DGRAM sockets
-
-	if (validateSocket(sockfd, XSOCK_STREAM, EOPNOTSUPP) < 0) {
-		LOG("Xsend is only valid with stream sockets.");
-		return -1;
-	}
-
 	if (getConnState(sockfd) != CONNECTED) {
 		LOGF("Socket %d is not connected", sockfd);
 		errno = ENOTCONN;
+		return -1;
+	}
+
+	int stype = getSocketType(sockfd);
+	if (stype == SOCK_DGRAM) {
+
+		// if the DGRAM socket is connected, send to the associated address
+		return _xsendto(sockfd, buf, len, flags, dgramPeer(sockfd), sizeof(sockaddr_x));
+
+	} else if (stype != SOCK_STREAM) {
+		LOGF("Socket %d must be a stream or datagram socket", sockfd);
+		errno = EOPNOTSUPP;
 		return -1;
 	}
 

@@ -85,15 +85,20 @@ int validateSocket(int sock, int stype, int err)
 int click_send(int sockfd, xia::XSocketMsg *xsm)
 {
 	int rc = 0;
-	struct sockaddr_in sa;
+	static int initialized = 0;
+	static struct sockaddr_in sa;
 
 	assert(xsm);
 
-	// TODO: cache these so we don't have to set everything up each time we
-	// are called
-	sa.sin_family = PF_INET;
-	sa.sin_addr.s_addr = inet_addr("127.0.0.1");
-	sa.sin_port = htons(atoi(CLICKPORT));
+	// FIXME: have I created a race condition here?
+	if (!initialized) {
+
+		sa.sin_family = PF_INET;
+		sa.sin_addr.s_addr = inet_addr("127.0.0.1");
+		sa.sin_port = htons(atoi(CLICKPORT));
+
+		initialized = 1;
+	}
 
 	std::string p_buf;
 	xsm->SerializeToString(&p_buf);
@@ -133,6 +138,10 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 {
 	int rc;
 
+	// FIXME: if someone caches our packet as we start to do the recv, we'll block forever
+	// may need to implement select so that we re-loop frequently so we can pick up our
+	// cached packet
+
 	while (1) {
 		// see if another thread received and cached our packet
 		if ((rc = getCachedPacket(sock, seq, buf, buflen)) > 0) {
@@ -142,7 +151,6 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 			break;
 
 		} else {
-
 			setWrapped(sock, TRUE);
 			rc = recvfrom(sock, buf, buflen - 1 , 0, NULL, NULL);
 			setWrapped(sock, FALSE);

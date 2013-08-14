@@ -15,7 +15,7 @@
 */
 /*!
   @file xia.h
-  @brief COmmon XIA structures and constants
+  @brief Common XIA structures and constants
 */
 
 #ifndef XIA_H
@@ -47,10 +47,17 @@ typedef struct {
 	node_t        s_addr[NODES_MAX];
 } x_addr_t;
 
+
 typedef struct {
-	unsigned char sx_fake_len;	// needed so initial fields line up with struct sockaddr
+	// common sockaddr fields
+#ifdef __APPLE__
+	unsigned char sx_len; // not actually large enough for sizeof(sockaddr_x)
 	unsigned char sx_family;
-	unsigned short sx_len;
+#else
+	unsigned short sx_family;
+#endif
+
+	// XIA specific fields
 	x_addr_t      sx_addr;
 } sockaddr_x;
 

@@ -70,5 +70,9 @@ unsigned seqNo(int sock);
 void cachePacket(int sock, unsigned seq, char *buf, unsigned buflen);
 int getCachedPacket(int sock, unsigned seq, char *buf, unsigned buflen);
 int connectDgram(int sock, sockaddr_x *addr);
+const sockaddr_x *dgramPeer(int sock);
+
+int _xsendto(int sockfd, const void *buf, size_t len, int flags, const sockaddr_x *addr, socklen_t addrlen);
+int _xrecvfromconn(int sockfd, void *buf, size_t len, int flags);
 
 #endif
