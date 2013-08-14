@@ -455,6 +455,7 @@ void XTRANSPORT::add_packet_to_recv_buf(WritablePacket *p, sock *sk) {
 		TransportHeader thdr(p);
 		int received_seqnum = thdr.seq_num();
 		index = received_seqnum % sk->recv_buffer_size;
+//printf("    port=%u adding packet to index %d\n", sk->port, index);
 	} else if (sk->sock_type == XSOCKET_DGRAM) {
 		index = (sk->dgram_buffer_end + 1) % sk->recv_buffer_size;
 		sk->dgram_buffer_end = index;
@@ -579,6 +580,7 @@ void XTRANSPORT::resize_recv_buffer(sock *sk, uint32_t new_size) {
 int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk) {
 
 	if (sk->sock_type == XSOCKET_STREAM) {
+//printf("<<< read_from_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", sk->port, sk->recv_base, sk->next_recv_seqnum, sk->recv_buffer_size);
 		xia::X_Recv_Msg *x_recv_msg = xia_socket_msg->mutable_x_recv();
 		int bytes_requested = x_recv_msg->bytes_requested();
 		int bytes_returned = 0;
@@ -599,10 +601,12 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk) {
 			p->kill();
 			sk->recv_buffer[i % sk->recv_buffer_size] = NULL;
 			sk->recv_base++;
+printf("    port %u grabbing index %d, seqnum %d\n", sk->port, i%sk->recv_buffer_size, i);
 		}
 		x_recv_msg->set_payload(buf, bytes_returned); // TODO: check this: need to turn buf into String first?
 		x_recv_msg->set_bytes_returned(bytes_returned);
 
+//printf(">>> read_from_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", sk->port, sk->recv_base, sk->next_recv_seqnum, sk->recv_buffer_size);
 		return bytes_returned;
 
 	} else if (sk->sock_type == XSOCKET_DGRAM) {
@@ -928,8 +932,10 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 				// buffer data, if we have room
 				if (should_buffer_received_packet(p_in, sk)) {
+//printf("<<< add_packet_to_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", sk->port, sk->recv_base, sk->next_recv_seqnum, sk->recv_buffer_size);
 					add_packet_to_recv_buf(p_in, sk);
 					sk->next_recv_seqnum = next_missing_seqnum(sk);
+//printf(">>> add_packet_to_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", sk->port, sk->recv_base, sk->next_recv_seqnum, sk->recv_buffer_size);
 					check_for_and_handle_pending_recv(sk);
 				}
 
