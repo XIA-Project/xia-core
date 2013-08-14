@@ -32,6 +32,7 @@ enum XSocketCallType {
   XGETSOCKNAME = 25;
 
   XGETMSG = 26;
+  XREADYTOACCEPT = 27;
 }
 
 message XSocketMsg {
@@ -95,7 +96,8 @@ message X_Connect_Msg {
 
 message X_Accept_Msg {
   optional string temp = 1; // currently not used
-  optional string remote_dag = 2;
+  required uint32 new_port = 2; // the UDP port for the new API socket
+  optional string remote_dag = 3;
 }
 
 message X_Sendto_Msg {

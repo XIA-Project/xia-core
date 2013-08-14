@@ -79,17 +79,24 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		return -1;
 	}
 
-	// Wait for connection from client
-	len = sizeof their_addr;
-	if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
-                    (struct sockaddr *)&their_addr, &len)) == -1) {
-		LOGF("Error reading from socket (%d): %s", sockfd,
-				strerror(errno));
+	// Tell click we're ready to accept a pending connection
+	xia::XSocketMsg ready_xsm;
+	ready_xsm.set_type(xia::XREADYTOACCEPT);
+	unsigned seq = seqNo(sockfd);
+	ready_xsm.set_sequence(seq);
+
+	if (click_send(sockfd, &ready_xsm) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
+		return -1;
+	}
+
+	// we'll block waiting for click to tell us there's a pending connection
+	if (click_status(sockfd, seq) < 0) {
+		LOGF("Error getting status from Click: %s", strerror(errno));
 		return -1;
 	}
 
 	// Create new socket (this is a socket between API and Xtransport)
-
 	if ((new_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		LOGF("Error creating new socket: %s", strerror(errno));
 		return -1;
@@ -106,21 +113,30 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		return -1;
 	}
 
-	// Do actual binding in Xtransport
+	// Tell click what the new socket's port is (but we'll tell click
+	// over the old socket)
+	if(getsockname(new_sockfd, (struct sockaddr *)&my_addr, &len) < 0) {
+		close(new_sockfd);
+		LOGF("Error retrieving new socket's UDP port: %s", strerror(errno));
+		return -1;
+	}
 
 	xia::XSocketMsg xia_socket_msg;
 	xia_socket_msg.set_type(xia::XACCEPT);
-	unsigned seq = seqNo(new_sockfd);
+	seq = seqNo(new_sockfd);
 	xia_socket_msg.set_sequence(seq);
+	
+	xia::X_Accept_Msg *x_accept_msg = xia_socket_msg.mutable_x_accept();
+	x_accept_msg->set_new_port(((struct sockaddr_in)my_addr).sin_port);
 
-	if (click_send(new_sockfd, &xia_socket_msg) < 0) {
+	if (click_send(sockfd, &xia_socket_msg) < 0) {
 		close(new_sockfd);
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
 
 // FIXME: change to use click rely so we get the peer dag!
-	if (click_status(new_sockfd, seq) < 0) {
+	if (click_status(sockfd, seq) < 0) {
 		close(new_sockfd);
 		LOGF("Error getting status from Click: %s", strerror(errno));
 		return -1;

@@ -463,8 +463,14 @@ void XTRANSPORT::add_packet_to_recv_buf(WritablePacket *p, sock *sk) {
 
 	WritablePacket *p_cpy = p->clone()->uniqueify();
 	sk->recv_buffer[index] = p_cpy;
-	
-	// check to see if the app is waiting for this data; if so, return it now
+}
+
+/**
+* @brief check to see if the app is waiting for this data; if so, return it now
+*
+* @param sk
+*/
+void XTRANSPORT::check_for_and_handle_pending_recv(sock *sk) {
 	if (sk->recv_pending) {
 		int bytes_returned = read_from_recv_buf(sk->pending_recv_msg, sk);
 		ReturnResult(sk->port, sk->pending_recv_msg, bytes_returned);
@@ -666,6 +672,9 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XCONNECT:
 		Xconnect(_sport, &xia_socket_msg);
 		break;
+	case xia::XREADYTOACCEPT:
+		XreadyToAccept(_sport, &xia_socket_msg);
+		break;
 	case xia::XACCEPT:
 		Xaccept(_sport, &xia_socket_msg);
 		break;
@@ -780,6 +789,8 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 		if (thdr.pkt_info() == TransportHeader::SYN) {
 			//printf("syn dport = %d\n", _dport);
 			// Connection request from client...
+		
+			sock *sk = portToSock.get_pointer(_dport); // TODO: check that mapping exists
 
 			// First, check if this request is already in the pending queue
 			XIDpair xid_pair;
@@ -803,29 +814,37 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 				//1. Prepare new sock for this connection
 				// TODO: do we need to malloc this?
-				sock sk;
-				sk.port = -1; // just for now. This will be updated via Xaccept call
+				sock new_sk;
+				new_sk.port = -1; // just for now. This will be updated via Xaccept call
 
-				sk.sock_type = 0; // 0: Reliable transport, 1: Unreliable transport
+				new_sk.sock_type = XSOCKET_STREAM; //0; // 0: Reliable transport, 1: Unreliable transport
 
-				sk.dst_path = src_path;
-				sk.src_path = dst_path;
-				sk.isConnected = true;
-				sk.initialized = true;
-				sk.nxt = LAST_NODE_DEFAULT;
-				sk.last = LAST_NODE_DEFAULT;
-				sk.hlim = HLIM_DEFAULT;
-				sk.seq_num = 0;
-				sk.ack_num = 0;
-				memset(sk.send_buffer, 0, sk.send_buffer_size * sizeof(WritablePacket*));
-				memset(sk.recv_buffer, 0, sk.recv_buffer_size * sizeof(WritablePacket*));
+				new_sk.dst_path = src_path;
+				new_sk.src_path = dst_path;
+				new_sk.isConnected = true;
+				new_sk.initialized = true;
+				new_sk.nxt = LAST_NODE_DEFAULT;
+				new_sk.last = LAST_NODE_DEFAULT;
+				new_sk.hlim = HLIM_DEFAULT;
+				new_sk.seq_num = 0;
+				new_sk.ack_num = 0;
+				memset(new_sk.send_buffer, 0, new_sk.send_buffer_size * sizeof(WritablePacket*));
+				memset(new_sk.recv_buffer, 0, new_sk.recv_buffer_size * sizeof(WritablePacket*));
+				//new_sk.pending_connection_buf = new queue<sock>();
+				//new_sk.pendingAccepts = new queue<xia::XSocketMsg*>();
 
-				pending_connection_buf.push(sk);
+				sk->pending_connection_buf.push(new_sk);
 
 				// Mark these src & dst XID pair
 				XIDpairToConnectPending.set(xid_pair, true);
 
-				//portToSock.set(-1, sk);	// just for now. This will be updated via Xaccept call
+				// If the app is ready for a new connection, alert it
+				if (!sk->pendingAccepts.empty()) {
+					xia::XSocketMsg *acceptXSM = sk->pendingAccepts.front();
+					ReturnResult(_dport, acceptXSM);
+					sk->pendingAccepts.pop();
+					delete acceptXSM;
+				}
 
 			} else {
 				// If already in the pending queue, just send back SYNACK to the requester
@@ -899,7 +918,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			// Get the dst port from XIDpair table
 			_dport = XIDpairToPort.get(xid_pair);
 
-			//printf("(%s) my_sport=%d  my_sid=%s  his_sid=%s\n", (_local_addr.unparse()).c_str(),  _dport,  _destination_xid.unparse().c_str(), _source_xid.unparse().c_str());
+			//printf("(%s) my_sport=%u  my_sid=%s  his_sid=%s\n", (_local_addr.unparse()).c_str(),  _dport,  _destination_xid.unparse().c_str(), _source_xid.unparse().c_str());
 			HashTable<unsigned short, bool>::iterator it1;
 			it1 = portToActive.find(_dport);
 
@@ -911,6 +930,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				if (should_buffer_received_packet(p_in, sk)) {
 					add_packet_to_recv_buf(p_in, sk);
 					sk->next_recv_seqnum = next_missing_seqnum(sk);
+					check_for_and_handle_pending_recv(sk);
 				}
 
 				portToSock.set(_dport, *sk); // TODO: why do we need this?
@@ -1031,6 +1051,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 		if (sk->sock_type == XSOCKET_DGRAM &&
 			should_buffer_received_packet(p_in, sk)) {
 			add_packet_to_recv_buf(p_in, sk);
+			check_for_and_handle_pending_recv(sk);
 		}
 
 	} else {
@@ -1344,11 +1365,13 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	sk.num_connect_tries = 0; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
 	memset(sk.send_buffer, 0, sk.send_buffer_size * sizeof(WritablePacket*));
 	memset(sk.recv_buffer, 0, sk.recv_buffer_size * sizeof(WritablePacket*));
+	//sk.pending_connection_buf = new queue<sock>();
+	//sk.pendingAccepts = new queue<xia::XSocketMsg*>();
 
 	//Set the socket_type (reliable or not) in sock
 	sk.sock_type = sock_type;
 
-	// Map the source port to DagInfo
+	// Map the source port to sock
 	portToSock.set(_sport, sk);
 
 	portToActive.set(_sport, true);
@@ -1645,52 +1668,71 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 	ReturnResult(_sport, xia_socket_msg, -1, EINPROGRESS);
 }
 
+void XTRANSPORT::XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
+{
+	// If there is already a pending connection, return true now
+	// If not, add this request to the pendingAccept queue
+	sock *sk = portToSock.get_pointer(_sport);
+
+	if (!sk->pending_connection_buf.empty()) {
+		ReturnResult(_sport, xia_socket_msg);
+	} else {
+		// xia_socket_msg is saved on the stack; allocate a copy on the heap
+		xia::XSocketMsg *xsm_cpy = new xia::XSocketMsg();
+		xsm_cpy->CopyFrom(*xia_socket_msg);
+		sk->pendingAccepts.push(xsm_cpy);
+	}
+}
+
 void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
-	// Returns same xia_socket_msg to the API, filled in with the remote DAG
 	int rc = 0, ec = 0;
+	
+	// _sport is the *existing accept socket*
+	unsigned short new_port = xia_socket_msg->x_accept().new_port();
+	sock *sk = portToSock.get_pointer(_sport);
 
-	//click_chatter("Xaccept: on %d\n", _sport);
-	hlim.set(_sport, HLIM_DEFAULT);
-	nxt_xport.set(_sport, CLICK_XIA_NXT_TRN);
+	hlim.set(new_port, HLIM_DEFAULT);
+	nxt_xport.set(new_port, CLICK_XIA_NXT_TRN);
 
-	if (!pending_connection_buf.empty()) {
+	if (!sk->pending_connection_buf.empty()) {
+		sock new_sk = sk->pending_connection_buf.front();
+		new_sk.port = new_port;
 
-		sock sk = pending_connection_buf.front();
-		sk.port = _sport;
+		new_sk.seq_num = 0;
+		new_sk.ack_num = 0;
+		new_sk.send_base = 0;
+		new_sk.hlim = hlim.get(new_port);
+		new_sk.next_send_seqnum = 0;
+		new_sk.next_recv_seqnum = 0;
+		new_sk.isAcceptSocket = true; // FIXME backwards? shouldn't sk be the accpet socket?
+		memset(new_sk.send_buffer, 0, new_sk.send_buffer_size * sizeof(WritablePacket*));
+		memset(new_sk.recv_buffer, 0, new_sk.recv_buffer_size * sizeof(WritablePacket*));
+		//new_sk.pending_connection_buf = new queue<sock>();
+		//new_sk.pendingAccepts = new queue<xia::XSocketMsg*>();
 
-		sk.seq_num = 0;
-		sk.ack_num = 0;
-		sk.send_base = 0;
-		sk.hlim = hlim.get(_sport);
-		sk.next_send_seqnum = 0;
-		sk.next_recv_seqnum = 0;
-		sk.isAcceptSocket = true;
-		memset(sk.send_buffer, 0, sk.send_buffer_size * sizeof(WritablePacket*));
-		memset(sk.recv_buffer, 0, sk.recv_buffer_size * sizeof(WritablePacket*));
+		portToSock.set(new_port, new_sk);
 
-		portToSock.set(_sport, sk);
-
-		XID source_xid = sk.src_path.xid(sk.src_path.destination_node());
-		XID destination_xid = sk.dst_path.xid(sk.dst_path.destination_node());
+		XID source_xid = new_sk.src_path.xid(new_sk.src_path.destination_node());
+		XID destination_xid = new_sk.dst_path.xid(new_sk.dst_path.destination_node());
 
 		XIDpair xid_pair;
 		xid_pair.set_src(source_xid);
 		xid_pair.set_dst(destination_xid);
 
 		// Map the src & dst XID pair to source port
-		XIDpairToPort.set(xid_pair, _sport);
+		XIDpairToPort.set(xid_pair, new_port);
 
-		portToActive.set(_sport, true);
+		portToActive.set(new_port, true);
 
-		// printf("XACCEPT: (%s) my_sport=%d  my_sid=%s  his_sid=%s \n\n", (_local_addr.unparse()).c_str(), _sport, source_xid.unparse().c_str(), destination_xid.unparse().c_str());
+		// printf("XACCEPT: (%s) my_new_port=%d  my_sid=%s  his_sid=%s \n\n", (_local_addr.unparse()).c_str(), new_port, source_xid.unparse().c_str(), destination_xid.unparse().c_str());
 
-		pending_connection_buf.pop();
+		sk->pending_connection_buf.pop();
 
 
 		// Get remote DAG to return to app
 		xia::X_Accept_Msg *x_accept_msg = xia_socket_msg->mutable_x_accept();
-		x_accept_msg->set_remote_dag(sk.dst_path.unparse().c_str()); // remote endpoint is dest from our perspective
+		x_accept_msg->set_remote_dag(new_sk.dst_path.unparse().c_str()); // remote endpoint is dest from our perspective
 
 	} else {
 		rc = -1;
@@ -2039,7 +2081,11 @@ void XTRANSPORT::Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	} else {
 		// rather than returning a response, wait until we get data
 		sk->recv_pending = true; // when we get data next, send straight to app
-		sk->pending_recv_msg = xia_socket_msg; // TODO: is this saved on the stack in ProcessAPIPacket? Allocate on heap?
+
+		// xia_socket_msg is saved on the stack; allocate a copy on the heap
+		xia::XSocketMsg *xsm_cpy = new xia::XSocketMsg();
+		xsm_cpy->CopyFrom(*xia_socket_msg);
+		sk->pending_recv_msg = xsm_cpy;
 	}
 }
 

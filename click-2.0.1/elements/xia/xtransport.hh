@@ -340,14 +340,17 @@ class XTRANSPORT : public Element {
 	 * ========================= */
 
 		bool isConnected;
-		bool isAcceptSocket;
 		bool initialized;
+		bool isAcceptSocket;
 		bool synack_waiting;
 		bool dataack_waiting;
 		bool teardown_waiting;
 
 		int num_connect_tries; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
 		int num_retransmit_tries; // number of times to try resending data packets
+
+    	queue<sock> pending_connection_buf;
+		queue<xia::XSocketMsg*> pendingAccepts; // stores accept messages from API when there are no pending connections
 	
 		// send buffer
     	WritablePacket *send_buffer[MAX_SEND_WIN_SIZE]; // packets we've sent but have not gotten an ACK for // TODO: start smaller, dynamically resize if app asks for more space (up to MAX)?
@@ -515,7 +518,6 @@ class XTRANSPORT : public Element {
 	HashTable<unsigned short, int> nxt_xport;
     HashTable<unsigned short, int> hlim;
 
-    queue<sock> pending_connection_buf;
     
     atomic_uint32_t _id;
     bool _cksum;
@@ -544,6 +546,7 @@ class XTRANSPORT : public Element {
 
 	bool should_buffer_received_packet(WritablePacket *p, sock *sk);
 	void add_packet_to_recv_buf(WritablePacket *p, sock *sk);
+	void check_for_and_handle_pending_recv(sock *sk);
 	int read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk);
 	uint32_t next_missing_seqnum(sock *sk);
 	void resize_buffer(WritablePacket* buf[], int max, int type, uint32_t old_size, uint32_t new_size, int *dgram_start, int *dgram_end);
@@ -563,6 +566,7 @@ class XTRANSPORT : public Element {
     void Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
