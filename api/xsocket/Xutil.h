@@ -50,7 +50,7 @@ void freeSocketState(int sock);
 int getSocketType(int sock);
 void setSocketType(int sock, int tt);
 int connState(int sock);
-int setConnState(int sock, int conn);
+void setConnState(int sock, int conn);
 int getSocketData(int sock, char *buf, unsigned bufLen);
 void setSocketData(int sock, const char *buf, unsigned bufLen);
 void setWrapped(int sock, int wrapped);
@@ -61,4 +61,10 @@ void setError(int sock, int error);
 int getError(int sock);
 void addPacket(int sock, xia::XSocketMsg &msg);
 int getPacket(int sock, xia::XSocketMsg &msg, xia::XSocketCallType mtype);
+int connectDgram(int sock, sockaddr_x *addr);
+const sockaddr_x *dgramPeer(int sock);
+
+int _xsendto(int sockfd, const void *buf, size_t len, int flags, const sockaddr_x *addr, socklen_t addrlen);
+int _xrecvfromconn(int sockfd, void *buf, size_t len, int flags);
+
 #endif

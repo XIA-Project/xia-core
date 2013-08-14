@@ -72,14 +72,19 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 		return -1;
 	}
 
-	if (validateSocket(sockfd, XSOCK_STREAM, EOPNOTSUPP) < 0) {
-		LOGF("Socket %d must be a stream socket", sockfd);
-		return -1;
-	}
-
 	if (connState(sockfd) != CONNECTED) {
 		LOGF("Socket %d is not connected", sockfd);
 		errno = ENOTCONN;
+		return -1;
+	}
+
+	int stype = getSocketType(sockfd);
+	if (stype == SOCK_DGRAM) {
+		return _xrecvfromconn(sockfd, rbuf, len, flags);
+
+	} else if (stype != SOCK_STREAM) {
+		LOGF("Socket %d must be a stream or datagram socket", sockfd);
+		errno = EOPNOTSUPP;
 		return -1;
 	}
 

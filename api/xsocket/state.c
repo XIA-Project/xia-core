@@ -24,6 +24,7 @@
 #include <assert.h>
 #include "Xsocket.h"
 #include "xia.pb.h"
+#include "Xutil.h"
 #include <list>
 
 using namespace std;
@@ -60,6 +61,9 @@ public:
 	void sock(int sock) { m_sock = sock; };
 	int sock() { return m_sock; };
 
+	const sockaddr_x *peer() { return m_peer; };
+	int setPeer(const sockaddr_x *peer);
+
 protected:
 	void init();
 
@@ -72,6 +76,7 @@ private:
 	int m_wrapped;	// hack for dealing with xwrap stuff
 	char *m_buf;
 	unsigned m_bufLen;
+	sockaddr_x *m_peer;
 	std::list<xia::XSocketMsg> m_packets;
 };
 
@@ -85,12 +90,16 @@ void SocketState::init()
 	m_error = 0;
 	m_buf = (char *)0;
 	m_bufLen = 0;
+	m_peer = NULL;
 }
 
 SocketState::~SocketState()
 {
 	if (m_buf)
 		delete(m_buf);
+	if (m_peer)
+		free(m_peer);
+
 	m_packets.clear();
 }
 
@@ -228,6 +237,20 @@ SocketState *SocketMap::get(int sock)
 	return p;
 }
 
+int SocketState::setPeer(const sockaddr_x *peer)
+{
+	if (m_peer != NULL) {
+		free(m_peer);
+		m_peer = NULL;
+	}
+
+	if (peer) {
+		m_peer = (sockaddr_x *)malloc(sizeof(sockaddr_x));
+		memcpy(m_peer, peer, sizeof(sockaddr_x));
+	}
+	return 0;
+}
+
 // extern "C" {
 
 void allocSocketState(int sock, int tt)
@@ -358,6 +381,29 @@ void sock(int sock)
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
 		sstate->sock(sock);
+}
+
+int connectDgram(int sock, sockaddr_x *addr)
+{
+	int rc = 0;
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+
+	if (sstate) {
+		sstate->setConnState((addr == NULL) ? UNCONNECTED : CONNECTED);
+		sstate->setPeer(addr);
+	}
+
+	return rc;
+}
+
+const sockaddr_x *dgramPeer(int sock)
+{
+	const sockaddr_x *peer = NULL;
+
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		peer = sstate->peer();
+	return peer;
 }
 
 

@@ -25,30 +25,39 @@
 #include "Xutil.h"
 #include "dagaddr.hpp"
 
-/*!
-** @brief Initiate a connection on an Xsocket of type XSOCK_STREAM
-**
-** The Xconnect() call connects the socket referred to by sockfd to the
-** SID specified by dDAG. It is only valid for use with sockets created
-** with the XSOCK_STREAM Xsocket type.
-**
-** @note Xconnect() differs from the standard connect API in that it does
-** not currently support use with Xsockets created with the XSOCK_DGRAM
-** socket type.
-**
-** @param sockfd	The control socket
-** @param addr	The address (SID) of the remote service to connect to.
-** @param addrlen The length of addr
-**
-** @returns 0 on success
-** @returns -1 on error with errno set to an error compatible with those
-** returned by the standard connect call.
-*/
-int Xconnect(int sockfd, const sockaddr *addr, socklen_t addrlen)
+int _connDgram(int sockfd, const sockaddr *addr, socklen_t addrlen)
+{
+	int rc = 0;
+
+	if (addr->sa_family == AF_UNSPEC) {
+
+		// go back to allowing connections to/from any peer
+		connectDgram(sockfd, NULL);
+
+	} else if (addr->sa_family == AF_XIA) {
+		// validate addr
+		Graph g((sockaddr_x *)addr);
+
+		if (g.num_nodes() == 0) {
+			rc = -1;
+			errno = EHOSTUNREACH;
+
+		// FIXME: can we verify addrlen here?
+
+		} else {
+			connectDgram(sockfd, (sockaddr_x *)addr);
+		}
+	} else {
+		rc = -1;
+		errno = EAFNOSUPPORT;
+	}
+
+	return rc;
+}
+
+int _connStream(int sockfd, const sockaddr *addr, socklen_t addrlen)
 {
 	int rc;
-
-printf("xconnect\n");
 
 	int numbytes;
 	char buf[MAXBUFLEN];
@@ -84,14 +93,12 @@ printf("xconnect\n");
 		return -1;
 	}
 
-printf("connect sent %d\n", isBlocking(sockfd));
 	setConnState(sockfd, CONNECTING);
 	if (!isBlocking(sockfd)) {
 		errno = EINPROGRESS;
 		return -1;
 	}
 
-printf("connect waiting\n");
 	// Waiting for SYNACK from destination server
 	// FIXME: make this use protobufs
 	addr_len = sizeof their_addr;
@@ -112,4 +119,47 @@ printf("connect waiting\n");
 		setConnState(sockfd, CONNECTED);
 		return 0;
 	}
+}
+
+/*!
+** @brief Initiate a connection on an Xsocket of type XSOCK_STREAM
+**
+** The Xconnect() call connects the socket referred to by sockfd to the
+** SID specified by dDAG. It is only valid for use with sockets created
+** with the XSOCK_STREAM Xsocket type.
+**
+** @note Xconnect() differs from the standard connect API in that it does
+** not currently support use with Xsockets created with the XSOCK_DGRAM
+** socket type.
+**
+** @param sockfd	The control socket
+** @param addr	The address (SID) of the remote service to connect to.
+** @param addrlen The length of addr
+**
+** @returns 0 on success
+** @returns -1 on error with errno set to an error compatible with those
+** returned by the standard connect call.
+*/
+int Xconnect(int sockfd, const sockaddr *addr, socklen_t addrlen)
+{
+	int stype = getSocketType(sockfd);
+	int rc = -1;
+
+	if (!addr) {
+		errno = EINVAL;
+		rc = -1;
+
+	} else if (stype == SOCK_DGRAM) {
+		rc = _connDgram(sockfd, addr, addrlen);
+
+	} else if (stype == SOCK_STREAM) {
+		rc = _connStream(sockfd, addr, addrlen);
+
+	} else {
+		errno = EBADF;
+		LOG("Invalid socket type, only SOCK_STREAM and SOCK_DGRAM allowed");
+		rc = -1;
+	}
+
+	return rc;
 }

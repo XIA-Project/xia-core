@@ -24,35 +24,9 @@
 #include <errno.h>
 #include "dagaddr.hpp"
 
-/*!
-** @brief Sends a datagram message on an Xsocket
-**
-** Xsendto sends a datagram to the specified address. The final intent of
-** the address should be a valid SID.
-**
-** Unlike a standard socket, Xsendto() is only valid on Xsockets of
-** type XSOCK_DGRAM.
-**
-** If the buffer is too large, Xsendto() will truncate the message and
-** send what it can. This is different from the standard sendto which returns
-** an error.
-**
-** @param sockfd The socket to send the data on
-** @param buf the data to send
-** @param len lenngth of the data to send. The
-** Xsendto api is limited to sending at most XIA_MAXBUF bytes.
-** @param flags (This is not currently used but is kept to be compatible
-** with the standard sendto socket call.
-** @param addr address (SID) to send the datagram to
-** @param addrlen length of the DAG
-**
-** @returns number of bytes sent on success
-** @returns -1 on failure with errno set to an error compatible with those
-** returned by the standard sendto call.
-**
-*/
-int Xsendto(int sockfd,const void *buf, size_t len, int flags,
-		const struct sockaddr *addr, socklen_t addrlen)
+
+int _xsendto(int sockfd, const void *buf, size_t len, int flags,
+	const sockaddr_x *addr, socklen_t addrlen)
 {
 	int rc;
 
@@ -73,11 +47,6 @@ int Xsendto(int sockfd,const void *buf, size_t len, int flags,
 	if (!buf || !addr) {
 		LOG("null pointer!\n");
 		errno = EFAULT;
-		return -1;
-	}
-
-	if (validateSocket(sockfd, XSOCK_DGRAM, EOPNOTSUPP) < 0) {
-		LOGF("Socket %d must be a datagram socket", sockfd);
 		return -1;
 	}
 
@@ -114,4 +83,50 @@ int Xsendto(int sockfd,const void *buf, size_t len, int flags,
 	// the caller we sent the data
 
 	return len;
+}
+
+/*!
+** @brief Sends a datagram message on an Xsocket
+**
+** Xsendto sends a datagram to the specified address. The final intent of
+** the address should be a valid SID.
+**
+** Unlike a standard socket, Xsendto() is only valid on Xsockets of
+** type XSOCK_DGRAM.
+**
+** If the buffer is too large, Xsendto() will truncate the message and
+** send what it can. This is different from the standard sendto which returns
+** an error.
+**
+** @param sockfd The socket to send the data on
+** @param buf the data to send
+** @param len lenngth of the data to send. The
+** Xsendto api is limited to sending at most XIA_MAXBUF bytes.
+** @param flags (This is not currently used but is kept to be compatible
+** with the standard sendto socket call.
+** @param addr address (SID) to send the datagram to
+** @param addrlen length of the DAG
+**
+** @returns number of bytes sent on success
+** @returns -1 on failure with errno set to an error compatible with those
+** returned by the standard sendto call.
+**
+*/
+int Xsendto(int sockfd,const void *buf, size_t len, int flags,
+		const struct sockaddr *addr, socklen_t addrlen)
+{
+
+	if (validateSocket(sockfd, XSOCK_DGRAM, EOPNOTSUPP) < 0) {
+		LOGF("Socket %d must be a datagram socket", sockfd);
+		return -1;
+	}
+
+	if (connState(sockfd) == CONNECTED) {
+		LOGF("socket %d is connected, use Xsend instead!", sockfd);
+		errno = EISCONN;
+		return -1;
+	}
+
+	return _xsendto(sockfd, buf, len, flags, (sockaddr_x *)addr, addrlen);
+	
 }
