@@ -61,7 +61,7 @@ public:
 	int getDebug() { return m_debug; };
 
 	void setError(int error) { m_error = error; };
-	int getError() { return m_error; };
+	int getError() { return m_error; m_error = 0; };
 
 	const sockaddr_x *peer() { return m_peer; };
 	int setPeer(const sockaddr_x *peer);
@@ -429,6 +429,16 @@ int connectDgram(int sock, sockaddr_x *addr)
 	}
 
 	return rc;
+}
+
+const sockaddr_x *dgramPeer(int sock)
+{
+	const sockaddr_x *peer = NULL;
+
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		peer = sstate->peer();
+	return peer;
 }
 
 #if 0

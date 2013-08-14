@@ -29,6 +29,136 @@
 #include "Xutil.h"
 #include "dagaddr.hpp"
 
+int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
+	sockaddr_x *addr, socklen_t *addrlen)
+{
+    int numbytes;
+
+	if (flags != 0) {
+		LOG("flags is not suppored at this time");
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (!rbuf || (addr && !addrlen)) {
+		LOG("null pointer!\n");
+		errno = EFAULT;
+		return -1;
+	}
+
+	if (addr && *addrlen < sizeof(sockaddr_x)) {
+		LOG("addr is not large enough");
+		errno = EINVAL;
+		return -1;
+	}
+
+	// see if we have bytes leftover from a previous Xrecv call
+	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len)) > 0) {
+		// FIXME: we need to also have stashed away the sDAG and
+		// return it as well
+		*addrlen = 0;
+		return numbytes;
+	}
+
+	xia::XSocketMsg xsm;
+	unsigned seq;
+	const char *payload;
+	int paylen;
+	xia::X_Recvfrom_Msg *xrm;
+
+	while (1) {
+		xsm.set_type(xia::XRECVFROM);
+		seq = seqNo(sockfd);
+		xsm.set_sequence(seq);
+
+		xrm = xsm.mutable_x_recvfrom();
+		xrm->set_bytes_requested(len);
+
+		if (click_send(sockfd, &xsm) < 0) {
+			LOGF("Error talking to Click: %s", strerror(errno));
+			return -1;
+		}
+
+		xsm.Clear();
+
+		if ((numbytes = click_reply(sockfd, seq, &xsm)) < 0) {
+			LOGF("Error retrieving recv data from Click: %s", strerror(errno));
+			return -1;
+		}
+		xrm = xsm.mutable_x_recvfrom();
+		payload = xrm->payload().c_str();
+		paylen = xrm->bytes_returned();
+
+		if (paylen != 0) {
+			break;
+		}
+	}
+
+	xia::X_Result_Msg *r = xsm.mutable_x_result();
+
+	if (paylen < 0) {
+		errno = r->err_code();
+
+	} else if ((unsigned)paylen <= len) {
+		memcpy(rbuf, payload, paylen);
+
+	} else {
+		// we got back more data than the caller requested
+		// stash the extra away for subsequent Xrecv calls
+		memcpy(rbuf, payload, len);
+		paylen -= len;
+		setSocketData(sockfd, payload + len, paylen);
+		paylen = len;
+	}
+
+	if (addr) {
+		Graph g(xrm->sender_dag().c_str());
+
+		// FIXME: validate addr
+		g.fill_sockaddr((sockaddr_x*)addr);
+		*addrlen = sizeof(sockaddr_x);
+	}
+
+    return paylen;
+}
+
+int _xrecvfromconn(int sockfd, void *rbuf, size_t len, int flags)
+{
+
+	int rc;
+	sockaddr_x sa;
+	socklen_t addrlen;
+	Graph g(dgramPeer(sockfd));
+
+	if (g.num_nodes() == 0) {
+		errno = EHOSTUNREACH;
+		return -1;
+	}
+
+	Node nPeer = g.get_final_intent();
+
+	while (1) {
+
+		addrlen = sizeof(sa);
+		rc = _xrecvfrom(sockfd, rbuf, len, flags, &sa, &addrlen);
+
+		if (rc < 0)
+			return rc;
+
+		// check to see if addr and the stored addr for the connection are the same
+		g.from_sockaddr(&sa);
+
+		if (g.get_final_intent() == nPeer)
+			break;
+
+		// packet came from a different peer, just discard it and try again
+		LOGF("discarding packet from unconnected peer: %s", g.dag_string.c_str())
+	}
+
+	return rc;
+}
+
+
 /*!
 ** @brief receives datagram data on an Xsocket.
 **
@@ -65,114 +195,16 @@
 int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 	struct sockaddr *addr, socklen_t *addrlen)
 {
-    int numbytes;
-
-	if (flags != 0) {
-		LOG("flags is not suppored at this time");
-		errno = EINVAL;
-		return -1;
-	}
-
-	if (!rbuf || (addr && !addrlen)) {
-		LOG("null pointer!\n");
-		errno = EFAULT;
-		return -1;
-	}
-
-	if (addr && *addrlen < sizeof(sockaddr_x)) {
-		LOG("addr is not large enough");
-		errno = EINVAL;
-		return -1;
-	}
-
 	if (validateSocket(sockfd, XSOCK_DGRAM, EOPNOTSUPP) < 0) {
 		LOGF("Socket %d must be a datagram socket", sockfd);
 		return -1;
 	}
 
-	// FIXME: what should we do if the datagram socket is connected???
-
-	// see if we have bytes leftover from a previous Xrecv call
-	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len)) > 0) {
-		// FIXME: we need to also have stashed away the sDAG and
-		// return it as well
-		*addrlen = 0;
-		return numbytes;
+	if (getConnState(sockfd) == CONNECTED) {
+		LOGF("socket %d is connected, use Xrecv instead!", sockfd);
+		errno = EISCONN;
+		return -1;
 	}
 
-
-	xia::XSocketMsg xsm;
-	unsigned seq;
-	const char *payload;
-	int paylen;
-	xia::X_Recvfrom_Msg *xrm;
-
-	// FIXME: do this the right way!
-	// click replies immediately right now, so the recvfrom on the API socket
-	// will always return immediately even if there is no data. Select won't
-	// make a difference because of this. Changes need to be made in click so
-	// that it doesn't fire back so rapidly.
-	// inserting a short delay for now, but this still means polling far too
-	// often.
-	while (1) {
-		//usleep(1000);
-		sleep(1);
-
-		xsm.set_type(xia::XRECVFROM);
-		seq = seqNo(sockfd);
-		xsm.set_sequence(seq);
-
-		xrm = xsm.mutable_x_recvfrom();
-		xrm->set_bytes_requested(len);
-
-		if (click_send(sockfd, &xsm) < 0) {
-			LOGF("Error talking to Click: %s", strerror(errno));
-			return -1;
-		}
-
-		xsm.Clear();
-
-		if ((numbytes = click_reply(sockfd, seq, &xsm)) < 0) {
-			LOGF("Error retrieving recv data from Click: %s", strerror(errno));
-			return -1;
-		}
-		xrm = xsm.mutable_x_recvfrom();
-		payload = xrm->payload().c_str();
-		paylen = xrm->bytes_returned();
-
-		if (paylen != 0) {
-			break;
-		}
-	}
-
-//	xrm = xsm.mutable_x_recvfrom();
-//	const char *payload = xrm->payload().c_str();
-
-	xia::X_Result_Msg *r = xsm.mutable_x_result();
-
-	if (paylen < 0) {
-		errno = r->err_code();
-
-	} else if ((unsigned)paylen <= len) {
-		memcpy(rbuf, payload, paylen);
-
-	} else {
-		// we got back more data than the caller requested
-		// stash the extra away for subsequent Xrecv calls
-		memcpy(rbuf, payload, len);
-		paylen -= len;
-		setSocketData(sockfd, payload + len, paylen);
-		paylen = len;
-	}
-
-	if (addr) {
-		Graph g(xrm->sender_dag().c_str());
-
-		// FIXME: validate addr
-		g.fill_sockaddr((sockaddr_x*)addr);
-		*addrlen = sizeof(sockaddr_x);
-	}
-
-
-    return paylen;
+	return _xrecvfrom(sockfd, rbuf, len, flags, (sockaddr_x *)addr, addrlen);
 }
