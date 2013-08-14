@@ -85,9 +85,9 @@ message X_Close_Msg {
 
 message X_Connect_Msg {
   enum ConnectStatus {
-    CONNECTING = 0;
-	CONNECTED = 1;
-	FAILED = 2;
+    XCONNECTING = 0;
+	XCONNECTED = 1;
+	XFAILED = 2;
   }
 
   required string ddag = 1; // connect to destination dag

@@ -108,11 +108,12 @@ int _connStream(int sockfd, const sockaddr *addr, socklen_t addrlen)
 	}
 
 	// Waiting for SYNACK from destination server
-	if (click_status(sockfd, seq) < 0) {
-		setConnState(sockfd, UNCONNECTED);
-		LOGF("Xconnect failed: %s", strerror(errno));
-		return -1;
-	}
+    int clickrc = click_reply(sockfd, 0, &xsm);
+    if (clickrc < 0 || xsm.x_connect().status() != xia::X_Connect_Msg::XCONNECTED) {
+        setConnState(sockfd, UNCONNECTED);
+        LOGF("Xconnect failed: %s", strerror(errno));
+        return -1;
+    }
 
 	setConnState(sockfd, CONNECTED);
 	return 0;

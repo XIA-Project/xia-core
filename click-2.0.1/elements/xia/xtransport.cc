@@ -907,7 +907,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			xsm.set_sequence(0); // TODO: what should this be?
 			xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
 			connect_msg->set_ddag(src_path.unparse().c_str());
-			connect_msg->set_status(xia::X_Connect_Msg::CONNECTED);
+			connect_msg->set_status(xia::X_Connect_Msg::XCONNECTED);
 			ReturnResult(_dport, &xsm);
 
 		} else if (thdr.pkt_info() == TransportHeader::DATA) {
@@ -1664,7 +1664,7 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 	// API will pass EINPROGRESS on to the app. If we're in blocking mode, the API
 	// will wait until it gets another message from xtransport notifying it that
 	// the other end responded and the connection has been established.
-	x_connect_msg->set_status(xia::X_Connect_Msg::CONNECTING);
+	x_connect_msg->set_status(xia::X_Connect_Msg::XCONNECTING);
 	ReturnResult(_sport, xia_socket_msg, -1, EINPROGRESS);
 }
 
