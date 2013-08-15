@@ -132,7 +132,6 @@ extern int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
 extern int Xaccept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags);
 extern int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 extern int Xconnect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
-#define Xselect select
 #define Xpoll poll
 #define Xlisten(x, y) 0
 extern int Xrecvfrom(int sockfd,void *rbuf, size_t len, int flags, struct sockaddr *addr, socklen_t *addrlen);
@@ -142,6 +141,7 @@ extern int Xclose(int sock);
 extern int Xrecv(int sockfd, void *rbuf, size_t len, int flags);
 extern int Xsend(int sockfd, const void *buf, size_t len, int flags);
 extern int Xfcntl(int sockfd, int cmd, ...);
+extern int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struct timeval *timeout);
 
 extern int XrequestChunk(int sockfd, char* dag, size_t dagLen);
 extern int XrequestChunks(int sockfd, const ChunkStatus *chunks, int numChunks);
