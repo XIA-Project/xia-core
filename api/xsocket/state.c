@@ -113,6 +113,9 @@ SocketState::~SocketState()
 {
 	if (m_buf)
 		delete(m_buf);
+	if (m_peer)
+		free(m_peer);
+	m_packets.clear();
 }
 
 int SocketState::data(char *buf, unsigned bufLen)
