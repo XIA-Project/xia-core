@@ -346,7 +346,7 @@ XTRANSPORT::copy_packet(Packet *p, sock *sk) {
 	copy_common(sk, xiahdr, xiah);
 
 	TransportHeader thdr(p);
-	TransportHeaderEncap *new_thdr = new TransportHeaderEncap(thdr.type(), thdr.pkt_info(), thdr.seq_num(), thdr.ack_num(), thdr.length());
+	TransportHeaderEncap *new_thdr = new TransportHeaderEncap(thdr.type(), thdr.pkt_info(), thdr.seq_num(), thdr.ack_num(), thdr.length(), thdr.recv_window());
 
 	WritablePacket *copy = WritablePacket::make(256, thdr.payload(), xiahdr.plen() - thdr.hlen(), 20);
 
@@ -396,6 +396,19 @@ XTRANSPORT::copy_cid_response_packet(Packet *p, sock *sk) {
 	xiah.set_plen(xiahdr.plen());
 
 	return copy;
+}
+
+/**
+* @brief Calculates a connection's loacal receive window.
+*
+* recv_window = recv_buffer_size - (next_seqnum - base)
+*
+* @param sk
+*
+* @return The receive window.
+*/
+uint32_t XTRANSPORT::calc_recv_window(sock *sk) {
+	return sk->recv_buffer_size - (sk->next_recv_seqnum - sk->recv_base);
 }
 
 /**
@@ -601,7 +614,7 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk) {
 			p->kill();
 			sk->recv_buffer[i % sk->recv_buffer_size] = NULL;
 			sk->recv_base++;
-printf("    port %u grabbing index %d, seqnum %d\n", sk->port, i%sk->recv_buffer_size, i);
+//printf("    port %u grabbing index %d, seqnum %d\n", sk->port, i%sk->recv_buffer_size, i);
 		}
 		x_recv_msg->set_payload(buf, bytes_returned); // TODO: check this: need to turn buf into String first?
 		x_recv_msg->set_bytes_returned(bytes_returned);
@@ -789,18 +802,31 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 	} else if (thdr.type() == TransportHeader::XSOCK_STREAM) {
 
+		// some common actions for all STREAM packets
+		XIDpair xid_pair;
+		xid_pair.set_src(_destination_xid);
+		xid_pair.set_dst(_source_xid);
+
+		// update _dport if there's already a connection, then get sock
+		if (thdr.pkt_info() != TransportHeader::SYN) {
+			_dport = XIDpairToPort.get(xid_pair);
+		}
+		sock *sk = portToSock.get_pointer(_dport); // TODO: check that mapping exists
+
+		// update remote recv window
+//if (thdr.recv_window() == 0)
+//printf("received STREAM packet on port %u;   recv window = %u\n", _dport, thdr.recv_window());
+		sk->remote_recv_window = thdr.recv_window();
+		
+
 		//printf("stream socket dport = %d\n", _dport);
 		if (thdr.pkt_info() == TransportHeader::SYN) {
 			//printf("syn dport = %d\n", _dport);
 			// Connection request from client...
 		
-			sock *sk = portToSock.get_pointer(_dport); // TODO: check that mapping exists
+			//sock *sk = portToSock.get_pointer(_dport); // TODO: check that mapping exists
 
 			// First, check if this request is already in the pending queue
-			XIDpair xid_pair;
-			xid_pair.set_src(_destination_xid);
-			xid_pair.set_dst(_source_xid);
-
 			HashTable<XIDpair , bool>::iterator it;
 			it = XIDpairToConnectPending.find(xid_pair);
 
@@ -809,7 +835,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			// were used previously. Commenting out the check for now. Need to look into whether
 			// or not we can just get rid of this logic? probably neede for retransmit cases
 			// if needed, where should it be cleared???
-			if (1) {
 //			if (it == XIDpairToConnectPending.end()) {
 				// if this is new request, put it in the queue
 
@@ -850,13 +875,13 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 					delete acceptXSM;
 				}
 
-			} else {
+//			} else {
 				// If already in the pending queue, just send back SYNACK to the requester
 
 				// if this case is hit, we won't trigger the accept, and the connection will get be left
 				// in limbo. see above for whether or not we should even be checking.
 				// printf("%06d conn request already pending\n", _dport);
-			}
+//			}
 
 
 			//2. send SYNACK to client
@@ -876,7 +901,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			xiah_new.set_plen(strlen(dummy));
 			//click_chatter("Sent packet to network");
 
-			TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeSYNACKHeader( 0, 0, 0); // #seq, #ack, length
+			TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeSYNACKHeader( 0, 0, 0, calc_recv_window(&new_sk)); // #seq, #ack, length, recv_wind
 			p = thdr_new->encap(just_payload_part);
 
 			thdr_new->update();
@@ -891,14 +916,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			output(NETWORK_PORT).push(p);
 
 		} else if (thdr.pkt_info() == TransportHeader::SYNACK) {
-			XIDpair xid_pair;
-			xid_pair.set_src(_destination_xid);
-			xid_pair.set_dst(_source_xid);
-
-			// Get the dst port from XIDpair table
-			_dport = XIDpairToPort.get(xid_pair);
-
-			sock *sk = portToSock.get_pointer(_dport);
 
 			// Clear timer
 			sk->timer_on = false;
@@ -915,26 +932,18 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			ReturnResult(_dport, &xsm);
 
 		} else if (thdr.pkt_info() == TransportHeader::DATA) {
-			XIDpair xid_pair;
-			xid_pair.set_src(_destination_xid);
-			xid_pair.set_dst(_source_xid);
-
-			// Get the dst port from XIDpair table
-			_dport = XIDpairToPort.get(xid_pair);
-
 			//printf("(%s) my_sport=%u  my_sid=%s  his_sid=%s\n", (_local_addr.unparse()).c_str(),  _dport,  _destination_xid.unparse().c_str(), _source_xid.unparse().c_str());
 			HashTable<unsigned short, bool>::iterator it1;
 			it1 = portToActive.find(_dport);
 
 			if(it1 != portToActive.end() ) {
 
-				sock *sk = portToSock.get_pointer(_dport);
-
 				// buffer data, if we have room
 				if (should_buffer_received_packet(p_in, sk)) {
 //printf("<<< add_packet_to_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", sk->port, sk->recv_base, sk->next_recv_seqnum, sk->recv_buffer_size);
 					add_packet_to_recv_buf(p_in, sk);
 					sk->next_recv_seqnum = next_missing_seqnum(sk);
+					// TODO: update recv window
 //printf(">>> add_packet_to_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", sk->port, sk->recv_base, sk->next_recv_seqnum, sk->recv_buffer_size);
 					check_for_and_handle_pending_recv(sk);
 				}
@@ -960,7 +969,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 				xiah_new.set_plen(strlen(dummy));
 
-				TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeACKHeader( 0, sk->next_recv_seqnum, 0); // #seq, #ack, length
+				TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeACKHeader( 0, sk->next_recv_seqnum, 0, calc_recv_window(sk)); // #seq, #ack, length, recv_wind
 				p = thdr_new->encap(just_payload_part);
 
 				thdr_new->update();
@@ -981,19 +990,10 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 		} else if (thdr.pkt_info() == TransportHeader::ACK) {
 
-			XIDpair xid_pair;
-			xid_pair.set_src(_destination_xid);
-			xid_pair.set_dst(_source_xid);
-
-			// Get the dst port from XIDpair table
-			_dport = XIDpairToPort.get(xid_pair);
-
 			HashTable<unsigned short, bool>::iterator it1;
 			it1 = portToActive.find(_dport);
 
 			if(it1 != portToActive.end() ) {
-				sock *sk = portToSock.get_pointer(_dport);
-
 				//In case of Client Mobility...	 Update 'sk->dst_path'
 				sk->dst_path = src_path;
 
@@ -1050,7 +1050,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 	} else if (thdr.type() == TransportHeader::XSOCK_DGRAM) {
 
-		_dport = XIDtoPort.get(_destination_xid);
 		sock *sk = portToSock.get_pointer(_dport);
 
 		// buffer packet if this is a DGRAM socket and we have room
@@ -1063,52 +1062,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 	} else {
 		printf("UNKNOWN!!!!! dport = %d\n", _dport);
 	}
-
-
-	/*if(_dport && sendToApplication) {
-		//TODO: Refine the way we change DAG in case of migration. Use some control bits. Add verification
-		sock sk = portToSock.get(_dport);
-
-		if(sk.initialized == false) {
-			sk.dst_path = xiah.src_path();
-			sk.initialized = true;
-			portToSock.set(_dport, sk);
-		}
-
-		// FIXME: what is this? need constant here
-		if(xiah.nxt() == 22 && sk.isConnected == true)
-		{
-			//Verify mobility info
-			sk.dst_path = xiah.src_path();
-			portToSock.set(_dport, sk);
-			click_chatter("Sender moved, update to the new DAG");
-
-		} else {
-			//Unparse dag info
-			String src_path = xiah.src_path().unparse();
-			String payload((const char*)thdr.payload(), xiah.plen() - thdr.hlen());
-
-			xia::XSocketMsg xsm;
-			xsm.set_type(xia::XRECV);
-			xia::X_Recv_Msg *x_recv_msg = xsm.mutable_x_recv();
-			x_recv_msg->set_dag(src_path.c_str());
-			x_recv_msg->set_payload(payload.c_str(), payload.length());
-
-			std::string p_buf;
-			xsm.SerializeToString(&p_buf);
-
-			WritablePacket *p2 = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
-
-			if (DEBUG)
-				click_chatter("Sent packet to socket with port %d", _dport);
-			output(API_PORT).push(UDPIPPrep(p2, _dport));
-		}
-
-	} else {
-		if (!_dport) {
-			click_chatter("Packet to unknown port %d XID=%s, sendToApp=%d", _dport, _destination_xid.unparse().c_str(), sendToApplication );
-		}
-	}*/
 }
 
 void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
@@ -1635,7 +1588,7 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 
 	WritablePacket *p = NULL;
 
-	TransportHeaderEncap *thdr = TransportHeaderEncap::MakeSYNHeader( 0, -1, 0); // #seq, #ack, length
+	TransportHeaderEncap *thdr = TransportHeaderEncap::MakeSYNHeader( 0, -1, 0, calc_recv_window(sk)); // #seq, #ack, length, recv_wind
 
 	p = thdr->encap(just_payload_part);
 
@@ -1872,10 +1825,19 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 		ec = ENOTCONN;
 	}
 
-	// Make sure we have space in the send buffer
-	if (rc == 0 && (sk->next_send_seqnum - sk->send_base) >= sk->send_buffer_size) {
-		rc = -1;
-		ec = ENOBUFS;
+	// FIXME: in blocking mode, send should block until buffer space is available.
+	int numUnACKedSentPackets = sk->next_send_seqnum - sk->send_base;
+	if (rc == 0 && 
+		numUnACKedSentPackets >= sk->send_buffer_size &&  // make sure we have space in send buf
+		numUnACKedSentPackets >= sk->remote_recv_window) { // and receiver has space in recv buf
+
+//if (numUnACKedSentPackets >= sk->send_buffer_size)
+//printf("Not sending -- out of send buf space\n");
+//else if (numUnACKedSentPackets >= sk->remote_recv_window)
+//printf("Not sending -- out of recv buf space\n");
+
+		rc = 0; // -1;  // set to 0 for now until blocking behavior is fixed
+		ec = EAGAIN;
 	}
 
 	// If everything is OK so far, try sending
@@ -1922,7 +1884,7 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 		WritablePacket *p = NULL;
 
 		//Add XIA Transport headers
-		TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDATAHeader(sk->next_send_seqnum, sk->ack_num, 0 ); // #seq, #ack, length
+		TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDATAHeader(sk->next_send_seqnum, sk->ack_num, 0, calc_recv_window(sk) ); // #seq, #ack, length, recv_wind
 		p = thdr->encap(just_payload_part);
 
 		thdr->update();

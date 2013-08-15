@@ -54,8 +54,8 @@ using namespace std;
 // TODO: switch these to bytes, not packets?
 #define MAX_SEND_WIN_SIZE 256  // in packets, not bytes
 #define MAX_RECV_WIN_SIZE 256
-#define DEFAULT_SEND_WIN_SIZE 64
-#define DEFAULT_RECV_WIN_SIZE 64
+#define DEFAULT_SEND_WIN_SIZE 128
+#define DEFAULT_RECV_WIN_SIZE 128
 
 #define MAX_CONNECT_TRIES	 30
 #define MAX_RETRANSMIT_TRIES 100
@@ -357,6 +357,7 @@ class XTRANSPORT : public Element {
 		uint32_t send_buffer_size;
     	uint32_t send_base; // the sequence # of the oldest unacked packet
     	uint32_t next_send_seqnum; // the smallest unused sequence # (i.e., the sequence # of the next packet to be sent)
+		uint32_t remote_recv_window; // num additional *packets* the receiver has room to buffer
 
 		// receive buffer
     	WritablePacket *recv_buffer[MAX_RECV_WIN_SIZE]; // packets we've received but haven't delivered to the app // TODO: start smaller, dynamically resize if app asks for more space (up to MAX)?
@@ -544,6 +545,7 @@ class XTRANSPORT : public Element {
 
     char *random_xid(const char *type, char *buf);
 
+	uint32_t calc_recv_window(sock *sk);
 	bool should_buffer_received_packet(WritablePacket *p, sock *sk);
 	void add_packet_to_recv_buf(WritablePacket *p, sock *sk);
 	void check_for_and_handle_pending_recv(sock *sk);
