@@ -49,7 +49,7 @@ done
 
 pass=0
 while [ $pass -ne $loops ]; do
-	(( pass++))
+	pass=$(( pass + 1 ))
 	printf "pass $pass: testing... "
 	$XIADIR/bin/xianet restart > /dev/null
 	sleep $delay1
