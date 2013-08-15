@@ -6,11 +6,12 @@ CFLAGS +=-c -Iminini -fpic
 CPPFLAGS=$(CFLAGS)
 LDFLAGS +=-lprotobuf -lc -ldl $(XLIB)/libdagaddr.so
 
-SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XrequestChunk.c  Xgetaddrinfo.c \
-	Xfcntl.c XgetChunkStatus.c  XreadChunk.c  XputChunk.c Xrecv.c \
-	Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c \
-	Xsetsockopt.c Xutil.c state.c Xinit.c XupdateAD.c XupdateNameServerDAG.c XgetDAGbyName.c  \
-	minini/minIni.c 
+SOURCES= Xaccept.c Xbind.c Xclose.c Xconnect.c Xfcntl.c Xgetaddrinfo.c \
+	XgetChunkStatus.c XgetDAGbyName.c Xinit.c XputChunk.c XreadChunk.c \
+	Xrecv.c XrequestChunk.c Xselect.c Xsend.c Xsetsockopt.c Xsocket.c \
+	XupdateAD.c XupdateNameServerDAG.c Xutil.c state.c \
+	minini/minIni.c
+
 OBJS=$(SOURCES:.c=.o) xia.pb.o
 LIB=$(XLIB)/libXsocket.so
 STATICLIB=$(XLIB)/libXsocket.a
@@ -29,10 +30,10 @@ xia.pb.o:
 %.o: %.c xia.pb.cc $(XINC)/Xsocket.h $(XINC)/xia.h
 	$(CC) $(CFLAGS) $<  -o $@ -lpthread
 
-$(LIB): $(OBJS) 
+$(LIB): $(OBJS)
 	$(LD) -shared -o $@ $(OBJS) $(LDFLAGS)
 
-$(STATICLIB): $(OBJS) 
+$(STATICLIB): $(OBJS)
 	ar rcs $@ $(OBJS)
 
 doc: Xdoc.h $(SOURCES)
