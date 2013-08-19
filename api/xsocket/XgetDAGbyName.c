@@ -19,7 +19,7 @@
  @brief Implements XgetDAGbyName(), XregisterName(), Xgetpeername() and Xgetsockname()
 */
 #include <errno.h>
- #include <unistd.h>
+#include <unistd.h>
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
@@ -399,7 +399,6 @@ int XregisterName(const char *name, sockaddr_x *DAG) {
 int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
 	int rc;
-	char buf[MAXBUFLEN];
 
 	if (!addr || !addrlen) {
 		LOG("pointer is null!\n");
@@ -412,12 +411,14 @@ int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		return -1;
 	}
 
-	if (validateSocket(sockfd, XSOCK_STREAM, EOPNOTSUPP) < 0) {
+	int stype = getSocketType(sockfd);
+	if (stype != SOCK_STREAM && stype != SOCK_DGRAM) {
 		LOG("Xgetpeername is only valid with stream sockets.");
+		errno = EOPNOTSUPP;
 		return -1;
 	}
 
-	if (!isConnected(sockfd)) {
+	if (getConnState(sockfd) != CONNECTED) {
 		LOGF("Socket %d is not connected", sockfd);
 		errno = ENOTCONN;
 		return -1;
@@ -425,6 +426,8 @@ int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XGETPEERNAME);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
 
 	// send the protobuf containing the user data to click
     if ((rc = click_send(sockfd, &xsm)) < 0) {
@@ -433,13 +436,11 @@ int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	}
 
 	// get the dag
-	if ((rc = click_reply(sockfd, buf, sizeof(buf))) < 0) {
+	xsm.Clear();
+	if ((rc = click_reply(sockfd, seq, &xsm)) < 0) {
 		LOGF("Error retrieving status from Click: %s", strerror(errno));
 		return -1;
 	}
-
-	xsm.Clear();
-	xsm.ParseFromString(buf);
 
 	if (xsm.type() != xia::XGETPEERNAME) {
 		LOGF("error: expected %d, got %d\n", xia::XGETPEERNAME, xsm.type());
@@ -474,7 +475,6 @@ int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 int Xgetsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
 	int rc;
-	char buf[MAXBUFLEN];
 
 	if (!addr || !addrlen) {
 		LOG("pointer is null!\n");
@@ -487,19 +487,17 @@ int Xgetsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		return -1;
 	}
 
-	if (validateSocket(sockfd, XSOCK_STREAM, EOPNOTSUPP) < 0) {
-		LOG("Xgetsockname is only valid with stream sockets.");
-		return -1;
-	}
-
-	if (!isConnected(sockfd)) {
-		LOGF("Socket %d is not connected", sockfd);
-		errno = ENOTCONN;
+	if (getSocketType(sockfd) == XSOCK_INVALID)
+	{
+		LOG("The socket is not a valid Xsocket");
+		errno = EBADF;
 		return -1;
 	}
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XGETSOCKNAME);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
 
 	// send the protobuf containing the user data to click
     if ((rc = click_send(sockfd, &xsm)) < 0) {
@@ -508,13 +506,12 @@ int Xgetsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	}
 
 	// get the dag
-	if ((rc = click_reply(sockfd, buf, sizeof(buf))) < 0) {
+	xsm.Clear();
+
+	if ((rc = click_reply(sockfd, seq, &xsm)) < 0) {
 		LOGF("Error retrieving status from Click: %s", strerror(errno));
 		return -1;
 	}
-
-	xsm.Clear();
-	xsm.ParseFromString(buf);
 
 	if (xsm.type() != xia::XGETSOCKNAME) {
 		LOGF("error: expected %d, got %d\n", xia::XGETPEERNAME, xsm.type());

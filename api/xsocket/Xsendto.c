@@ -24,12 +24,77 @@
 #include <errno.h>
 #include "dagaddr.hpp"
 
+
+int _xsendto(int sockfd, const void *buf, size_t len, int flags,
+	const sockaddr_x *addr, socklen_t addrlen)
+{
+	int rc;
+
+	if (len == 0)
+		return 0;
+
+	if (addrlen < sizeof(sockaddr_x)) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (flags != 0) {
+		LOG("the flags parameter is not currently supported");
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (!buf || !addr) {
+		LOG("null pointer!\n");
+		errno = EFAULT;
+		return -1;
+	}
+
+	// FIXME: should this return an error, like sendto does?
+	// if buf is too big, send only what we can
+	if (len > XIA_MAXBUF) {
+		LOGF("truncating... requested size (%d) is larger than XIA_MAXBUF (%d)\n",
+				len, XIA_MAXBUF);
+		len = XIA_MAXBUF;
+	}
+
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XSENDTO);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
+
+	xia::X_Sendto_Msg *x_sendto_msg = xsm.mutable_x_sendto();
+
+	// FIXME: validate addr
+	Graph g(addr);
+	std::string s = g.dag_string();
+
+	x_sendto_msg->set_ddag(s.c_str());
+	x_sendto_msg->set_payload((const char*)buf, len);
+
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
+		printf("send error\n");
+		LOGF("Error talking to Click: %s", strerror(errno));
+		return -1;
+	}
+
+	// process the reply from click
+	if ((rc = click_status(sockfd, seq)) < 0) {
+		printf("receive error\n");
+		LOGF("Error getting status from Click: %s", strerror(errno));
+		return -1;
+
+	}
+
+	return len;
+}
+
 /*!
 ** @brief Sends a datagram message on an Xsocket
 **
 ** Xsendto sends a datagram to the specified address. The final intent of
 ** the address should be a valid SID.
-** 
+**
 ** Unlike a standard socket, Xsendto() is only valid on Xsockets of
 ** type XSOCK_DGRAM.
 **
@@ -54,62 +119,16 @@
 int Xsendto(int sockfd,const void *buf, size_t len, int flags,
 		const struct sockaddr *addr, socklen_t addrlen)
 {
-	int rc;
-
-	if (len == 0)
-		return 0;
-
-	if (addrlen < sizeof(sockaddr_x)) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	if (flags != 0) {
-		LOG("the flags parameter is not currently supported");
-		errno = EINVAL;
-		return -1;
-	}
-
-	if (!buf || !addr) {
-		LOG("null pointer!\n");
-		errno = EFAULT;
-		return -1;
-	}
-
 	if (validateSocket(sockfd, XSOCK_DGRAM, EOPNOTSUPP) < 0) {
 		LOGF("Socket %d must be a datagram socket", sockfd);
 		return -1;
 	}
 
-	// if buf is too big, send only what we can
-	if (len > XIA_MAXBUF) {
-		LOGF("truncating... requested size (%d) is larger than XIA_MAXBUF (%d)\n", 
-				len, XIA_MAXBUF);
-		len = XIA_MAXBUF;
-	}
-
-	xia::XSocketMsg xsm;
-	xsm.set_type(xia::XSENDTO);
-
-	xia::X_Sendto_Msg *x_sendto_msg = xsm.mutable_x_sendto();
-
-	// FIXME: validate addr
-	Graph g((sockaddr_x*)addr);
-	std::string s = g.dag_string();
-
-	x_sendto_msg->set_ddag(s.c_str());
-	x_sendto_msg->set_payload((const char*)buf, len);
-
-	if ((rc = click_send(sockfd, &xsm)) < 0) {
-		LOGF("Error talking to Click: %s", strerror(errno));
+	if (getConnState(sockfd) == CONNECTED) {
+		LOGF("socket %d is connected, use Xsend instead!", sockfd);
+		errno = EISCONN;
 		return -1;
 	}
 
-	// because we don't have queueing or seperate control and data sockets, we 
-	// can't get status back reliably on a datagram socket as multiple peers
-	// could be talking to it at the same time and the control messages can get
-	// mixed up with the data packets. So just assume that all went well and tell
-	// the caller we sent the data
-
-	return len;
+	return _xsendto(sockfd, buf, len, flags, (sockaddr_x *)addr, addrlen);
 }

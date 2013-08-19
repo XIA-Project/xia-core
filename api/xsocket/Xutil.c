@@ -85,15 +85,20 @@ int validateSocket(int sock, int stype, int err)
 int click_send(int sockfd, xia::XSocketMsg *xsm)
 {
 	int rc = 0;
-	struct sockaddr_in sa;
+	static int initialized = 0;
+	static struct sockaddr_in sa;
 
 	assert(xsm);
 
-	// TODO: cache these so we don't have to set everything up each time we
-	// are called
-	sa.sin_family = PF_INET;
-	sa.sin_addr.s_addr = inet_addr("127.0.0.1");
-	sa.sin_port = htons(atoi(CLICKPORT));
+	// FIXME: have I created a race condition here?
+	if (!initialized) {
+
+		sa.sin_family = PF_INET;
+		sa.sin_addr.s_addr = inet_addr("127.0.0.1");
+		sa.sin_port = htons(atoi(CLICKPORT));
+
+		initialized = 1;
+	}
 
 	std::string p_buf;
 	xsm->SerializeToString(&p_buf);
@@ -101,9 +106,9 @@ int click_send(int sockfd, xia::XSocketMsg *xsm)
 	int remaining = p_buf.size();
 	const char *p = p_buf.c_str();
 	while (remaining > 0) {
-		setWrapped(sockfd, 1);
+		setWrapped(sockfd, TRUE);
 		rc = sendto(sockfd, p, remaining, 0, (struct sockaddr *)&sa, sizeof(sa));
-		setWrapped(sockfd, 0);
+		setWrapped(sockfd, FALSE);
 
 		if (rc == -1) {
 			LOGF("click socket failure: errno = %d", errno);
@@ -129,57 +134,80 @@ int click_send(int sockfd, xia::XSocketMsg *xsm)
 	return  (rc >= 0 ? 0 : -1);
 }
 
-int click_reply(int sockfd, char *buf, int buflen)
+int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMsg *msg)
 {
-	struct sockaddr_in sa;
-	socklen_t len;
 	int rc;
 
-	len = sizeof sa;
+	// FIXME: if someone caches our packet as we start to do the recv, we'll block forever
+	// may need to implement select so that we re-loop frequently so we can pick up our
+	// cached packet
 
-	memset(buf, 0, buflen);
-	setWrapped(sockfd, 1);
-	rc = recvfrom(sockfd, buf, buflen - 1 , 0, (struct sockaddr *)&sa, &len);
-	setWrapped(sockfd, 0);
-	if (rc < 0) {
-		LOGF("error(%d) getting reply data from click", errno);
-		return -1;
+	while (1) {
+		// see if another thread received and cached our packet
+		if ((rc = getCachedPacket(sock, seq, buf, buflen)) > 0) {
+			LOGF("Got cached response with sequence # %d\n", seq);
+			std::string s(buf, rc);
+			msg->ParseFromString(s);
+			break;
+
+		} else {
+			setWrapped(sock, TRUE);
+			rc = recvfrom(sock, buf, buflen - 1 , 0, NULL, NULL);
+			setWrapped(sock, FALSE);
+
+			if (rc < 0) {
+				LOGF("error(%d) getting reply data from click", errno);
+				rc = -1;
+				break;
+
+			} else {
+				std::string s(buf, rc);
+				msg->ParseFromString(s);
+				assert(msg);
+				unsigned sn = msg->sequence();
+
+				if (sn == seq)
+					break;
+
+				// these are not the data you were looking for
+				LOGF("Expected packet %u, received %u, caching packet\n", seq, sn);
+				cachePacket(sock, sn, buf, buflen);
+				msg->Clear();
+			}
+		}
 	}
 
 	return rc;
 }
 
-int click_reply2(int sockfd, xia::XSocketCallType *type)
+int click_reply(int sock, unsigned seq, xia::XSocketMsg *msg)
 {
-	char buf[1024];
+	char buf[XIA_MAXBUF];
 	unsigned buflen = sizeof(buf);
-	struct sockaddr_in sa;
-	socklen_t len;
+
+	return click_get(sock, seq, buf, buflen, msg);
+}
+
+int click_status(int sock, unsigned seq)
+{
+	char buf[XIA_MAXBUF];
+	unsigned buflen = sizeof(buf);
 	int rc;
+	xia::XSocketMsg msg;
 
-	len = sizeof sa;
+	if ((rc = click_get(sock, seq, buf, buflen, &msg)) >= 0) {
 
-	memset(buf, 0, buflen);
-	setWrapped(sockfd, 1);
-	rc = recvfrom(sockfd, buf, buflen - 1 , 0, (struct sockaddr *)&sa, &len);
-	setWrapped(sockfd, 0);
-	if (rc < 0) {
-		LOGF("error(%d) getting reply data from click", errno);
-		return -1;
+		xia::X_Result_Msg *res = msg.mutable_x_result();
+
+		rc = res->return_code();
+		if (rc == -1)
+			errno = res->err_code();
 	}
-
-	xia::XSocketMsg reply;
-	reply.ParseFromString(buf);
-	xia::X_Result_Msg *msg = reply.mutable_x_result();
-
-	*type = msg->type();
-
-	rc = msg->return_code();
-	if (rc == -1)
-		errno = msg->err_code();
 
 	return rc;
 }
+
+
 
 int checkXid(const char *xid, const char *type)
 {
@@ -223,65 +251,6 @@ int checkXid(const char *xid, const char *type)
 	return rc;
 }
 
-// currently this expects the DAG to be in RE ... format
-// may need to make it smarter later
-int checkDag(const char *dag)
-{
-	int valid = 1;
-	int fallback = 0;
-	int inXid = 0;
-	char *xid = NULL;
+// FIXME: implement log handlers that use SO_DEBUG value to decide whether or not to log
+// FIXME: implement handler to set output for log messages, file* or syslog
 
-	if (strncmp(dag, "RE ", 3) != 0)
-		return 0;
-
-	// make a copy so we can step on it
-	char *buf = strdup(dag);
-	char *p = buf + 3;
-
-	while (*p != '\0') {
-
-		if (*p == ' ') {
-			if (inXid) {
-				*p = 0;
-				if (!checkXid(xid, NULL)) {
-					valid = 0;
-					break;
-				}
-				inXid = 0;
-			}
-
-		} else if (*p == '(') {
-			// parens need a space or nul on either side
-			if ((*(p-1) != ' ' && *(p-1) != '\0') || (*(p+1) != ' ' && *(p+1) != '\0')) {
-				valid = 0;
-				break;
-			}
-			fallback++;
-
-		} else if (*p == ')') {
-			// parens need a space on either side
-			if ((*(p-1) != ' ' && *(p-1) != '\0') || (*(p+1) != ' ' && *(p+1) != '\0')) {
-				valid = 0;
-				break;
-			}
-			fallback--;
-
-		} else if (!inXid) {
-			inXid = 1;
-			xid = p;
-		}
-
-		p++;
-	}
-
-	if (fallback != 0) {
-		valid = 0;
-
-	} else  if (inXid) {
-		valid = checkXid(xid, NULL);
-	}
-
-	free(buf);
-	return valid;
-}

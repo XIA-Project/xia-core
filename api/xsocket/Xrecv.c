@@ -56,8 +56,7 @@
 int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 {
 	int numbytes;
-	char UDPbuf[MAXBUFLEN];
-	
+
 	if (flags) {
 		errno = EOPNOTSUPP;
 		return -1;
@@ -72,14 +71,19 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 		return -1;
 	}
 
-	if (validateSocket(sockfd, XSOCK_STREAM, EOPNOTSUPP) < 0) {
-		LOGF("Socket %d must be a stream socket", sockfd);
+	if (getConnState(sockfd) != CONNECTED) {
+		LOGF("Socket %d is not connected", sockfd);
+		errno = ENOTCONN;
 		return -1;
 	}
 
-	if (!isConnected(sockfd)) {
-		LOGF("Socket %d is not connected", sockfd);
-		errno = ENOTCONN;
+	int stype = getSocketType(sockfd);
+	if (stype == SOCK_DGRAM) {
+		return _xrecvfromconn(sockfd, rbuf, len, flags);
+
+	} else if (stype != SOCK_STREAM) {
+		LOGF("Socket %d must be a stream or datagram socket", sockfd);
+		errno = EOPNOTSUPP;
 		return -1;
 	}
 
@@ -87,21 +91,35 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len)) > 0)
 		return numbytes;
 
-	if ((numbytes = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) < 0) {
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XRECV);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
+
+	xia::X_Recv_Msg *xrm = xsm.mutable_x_recv();
+	xrm->set_bytes_requested(len);
+
+	if (click_send(sockfd, &xsm) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
+		return -1;
+	}
+
+	xsm.Clear();
+	if ((numbytes = click_reply(sockfd, seq, &xsm)) < 0) {
 		LOGF("Error retrieving recv data from Click: %s", strerror(errno));
 		return -1;
 	}
 
-	std::string str(UDPbuf, numbytes);
-	xia::XSocketMsg xsm;
+	xrm = xsm.mutable_x_recv();
+	const char *payload = xrm->payload().c_str();
 
-	xsm.ParseFromString(str);
+	xia::X_Result_Msg *r = xsm.mutable_x_result();
+	int paylen = r->return_code();
 
-	xia::X_Recv_Msg *msg = xsm.mutable_x_recv();
-	unsigned paylen = msg->payload().size();
-	const char *payload = msg->payload().c_str();
-
-	if (paylen <= len)
+	if (paylen < 0) {
+		errno = r->err_code();
+	}
+	else if (paylen <= len)
 		memcpy(rbuf, payload, paylen);
 	else {
 		// we got back more data than the caller requested

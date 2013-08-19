@@ -157,7 +157,7 @@ void process(int sock)
    	while (1) {
 		memset(buf, 0, sizeof(buf));
 
-	tv.tv_sec = WAIT_FOR_DATA;
+	/*tv.tv_sec = WAIT_FOR_DATA;
 	tv.tv_usec = 0;
 		 if ((n = select(sock + 1, &fds, NULL, NULL, &tv)) < 0) {
 			 warn("%5d Select failed, closing...\n", pid);
@@ -170,7 +170,7 @@ void process(int sock)
 		 } else if (!FD_ISSET(sock, &fds)) {
 			 // this shouldn't happen!
 			 die(-4, "something is really wrong, exiting\n");
-		 }
+		 }*/
 
 		if ((n = Xrecv(sock, buf, sizeof(buf), 0)) < 0) {
 			warn("Recv error on socket %d, closing connection\n", pid);
@@ -291,12 +291,15 @@ void echo_dgram()
 		die(-3, "unable to bind to the dag\n");
 	}
 
-	pid_t pid = fork();
+	pid_t pid = 0;
+
+	// only need to fork if doing stream echo at the same time
+	if (stream == 1)
+		pid = fork();
+
 	if (pid == 0) {
 		while (1) {
 			say("Dgram Server waiting\n");
-
-
 
 			dlen = sizeof(cdag);
 			memset(buf, 0, sizeof(buf));

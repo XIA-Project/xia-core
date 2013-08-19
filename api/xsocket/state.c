@@ -19,10 +19,13 @@
   @brief implements internal socket state functionality.
 */
 #include <map>
+#include <string>
 #include <pthread.h>
 #include <string.h>
 #include <assert.h>
 #include "Xsocket.h"
+#include "Xinit.h"
+#include "Xutil.h"
 
 using namespace std;
 
@@ -35,27 +38,46 @@ public:
 
 	int transportType() { return m_transportType; };
 	void setTransportType(int tt) {m_transportType = tt; };
-	
+
 	int data(char *buf, unsigned bufLen);
 	void setData(const char *buf, unsigned bufLen);
 	int dataLen() { return m_bufLen; };
 
-	int isConnected() { return m_connected; };
-	void setConnected(int conn) { m_connected = conn; };
+	int getConnState() { return m_connected; };
+	void setConnState(int conn) { m_connected = conn; };
 
-	int isWrapped() { return m_wrapped; };
-	void setWrapped(int wrapped) { m_wrapped = wrapped; };
+	int isWrapped() { return (m_wrapped != 0); };
+	void setWrapped(int wrap) { wrap ? m_wrapped++ : m_wrapped--; };
 
 	int isAsync() { return m_async; };
 	void setAsync(int async) { m_async = async; };
+
+	unsigned seqNo() { return m_sequence++; };
+
+	int getPacket(unsigned seq, char *buf, unsigned buflen);
+	void insertPacket(unsigned seq, char *buf, unsigned buflen);
+
+	void setDebug(int debug) { m_debug = debug; };
+	int getDebug() { return m_debug; };
+
+	void setError(int error) { m_error = error; };
+	int getError() { return m_error; m_error = 0; };
+
+	const sockaddr_x *peer() { return m_peer; };
+	int setPeer(const sockaddr_x *peer);
 
 private:
 	int m_transportType;
 	int m_connected;
 	int m_async;
 	int m_wrapped;	// hack for dealing with xwrap stuff
+	int m_debug;
+	int m_error;
 	char *m_buf;
+	sockaddr_x *m_peer;
 	unsigned m_bufLen;
+	unsigned m_sequence;
+	map<unsigned, string> m_packets;
 };
 
 SocketState::SocketState(int tt)
@@ -65,8 +87,12 @@ SocketState::SocketState(int tt)
 	m_connected = 0;
 	m_async = 0;
 	m_wrapped = 0;
-	m_buf = (char *)0;
+	m_buf = NULL;
+	m_peer = NULL;
 	m_bufLen = 0;
+	m_sequence = 1;
+	m_debug = 0;
+	m_error = 0;
 }
 
 SocketState::SocketState()
@@ -75,8 +101,12 @@ SocketState::SocketState()
 	m_connected = 0;
 	m_async = 0;
 	m_wrapped = 0;
-	m_buf = (char *)0;
+	m_buf = NULL;
+	m_peer = NULL;
 	m_bufLen = 0;
+	m_sequence = 1;
+	m_debug = 0;
+	m_error = 0;
 }
 
 SocketState::~SocketState()
@@ -124,6 +154,30 @@ void SocketState::setData(const char *buf, unsigned bufLen)
 	m_bufLen = bufLen;
 }
 
+int SocketState::getPacket(unsigned seq, char *buf, unsigned buflen)
+{
+	int rc = 0;
+	map<unsigned, string>::iterator it;
+
+	it = m_packets.find(seq);
+	if (it != m_packets.end()) {
+		string s = it->second;
+
+		rc = MIN(buflen, s.size());
+		memcpy(buf, s.c_str(), rc);
+
+		m_packets.erase(seq);
+	}
+
+	return rc;
+}
+
+void SocketState::insertPacket(unsigned seq, char *buf, unsigned buflen)
+{
+	std::string s(buf, buflen);
+	m_packets[seq] = s;
+}
+
 class SocketMap
 {
 public:
@@ -163,7 +217,7 @@ SocketMap *SocketMap::getMap()
 	if (!instance) {
 
 		pthread_mutex_lock(&lock);
-		
+
 		if (!instance)
 			instance = new SocketMap();
 
@@ -201,6 +255,16 @@ SocketState *SocketMap::get(int sock)
 	return p;
 }
 
+int SocketState::setPeer(const sockaddr_x *peer)
+{
+	if (m_peer != NULL)
+		free(m_peer);
+
+	m_peer = (sockaddr_x *)malloc(sizeof(sockaddr_x));
+	memcpy(m_peer, peer, sizeof(sockaddr_x));
+	return 0;
+}
+
 // extern "C" {
 
 void allocSocketState(int sock, int tt)
@@ -222,20 +286,20 @@ int getSocketType(int sock)
 		return -1;
 }
 
-int isConnected(int sock)
+int getConnState(int sock)
 {
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
-		return sstate->isConnected();
+		return sstate->getConnState();
 	else
-		return 0;
+		return UNKNOWN_STATE;
 }
 
-void setConnected(int sock, int conn)
+void setConnState(int sock, int conn)
 {
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
-		sstate->setConnected(conn);
+		sstate->setConnState(conn);
 }
 
 int isWrapped(int sock)
@@ -270,6 +334,37 @@ void setAsync(int sock, int async)
 		sstate->setAsync(async);
 }
 
+int getDebug(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		return sstate->getDebug();
+	else
+		return 0;
+}
+
+void setDebug(int sock, int debug)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		sstate->setDebug(debug);
+}
+
+int getError(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		return sstate->getError();
+	else
+		return 0;
+}
+
+void setError(int sock, int error)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		sstate->setError(error);
+}
 
 void setSocketType(int sock, int tt)
 {
@@ -294,6 +389,58 @@ void setSocketData(int sock, const char *buf, unsigned bufLen)
 		sstate->setData(buf, bufLen);
 }
 
+unsigned seqNo(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		return sstate->seqNo();
+	else
+		return 0;
+}
+
+void cachePacket(int sock, unsigned seq, char *buf, unsigned buflen)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate) {
+		sstate->insertPacket(seq, buf, buflen);
+	}
+}
+
+int getCachedPacket(int sock, unsigned seq, char *buf, unsigned buflen)
+{
+	int rc = 0;
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+
+	if (sstate) {
+		rc = sstate->getPacket(seq, buf, buflen);
+	}
+
+	return rc;
+}
+
+int connectDgram(int sock, sockaddr_x *addr)
+{
+	int rc = 0;
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+
+	if (sstate) {
+		sstate->setConnState((addr == NULL) ? UNCONNECTED : CONNECTED);
+		sstate->setPeer(addr);
+	}
+
+	return rc;
+}
+
+const sockaddr_x *dgramPeer(int sock)
+{
+	const sockaddr_x *peer = NULL;
+
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		peer = sstate->peer();
+	return peer;
+}
+
 #if 0
 int main()
 {
@@ -302,7 +449,7 @@ int main()
 
 	// should be invalid
 	printf("socket %d tt %d\n", 0, getSocketType(0));
-	
+
 	// should be valid, then invalid
 	allocSocketState(5, 1);
 	printf("socket %d tt %d\n", 5, getSocketType(5));
