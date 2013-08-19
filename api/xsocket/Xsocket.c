@@ -97,8 +97,14 @@ int Xsocket(int family, int transport_type, int protocol)
 		LOGF("error creating Xsocket: %s", strerror(errno));
 		return -1;
 	}
-		
+
 	allocSocketState(sockfd, transport_type);
+
+
+struct timeval tv;
+tv.tv_sec = 0;
+tv.tv_usec = 10000;
+setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
 	// protobuf message
 	xia::XSocketMsg xsm;
