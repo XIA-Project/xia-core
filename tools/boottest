@@ -1,0 +1,76 @@
+#!/bin/sh
+
+# repeatedly start xianet using the local topology file to try and
+# force the error where not all of the route lines are created correctly.
+
+expected=28		# we should see this many total AD & HID route entries
+loops=-1		# by default loop forever
+delay1=0.5		# how long to delay before the first route check
+delay2=1		# how lont to wait before rechecking
+XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
+
+help()
+{
+	cat << EOH
+Test XIA network boot sequence to make sure network is set up correctly
+usage: boottest [-d n]-[-r n][-l n]
+where:
+  -d wait for n seconds (or partial seconds) between network boot 
+  and initial test. default is $delay1 second(s)
+  -r if first test fails, wait an additional n seconds and test 
+  again. default is $delay2 second(s)
+  -l loop through the test n times. default is run forever
+EOH
+	exit
+}
+
+getroutes()
+{ 
+	$XIADIR/bin/xroute --type=AD --type=HID | egrep 'AD|HID' | wc -l
+}
+
+while getopts "d:r:l:" opt; do
+	case $opt in
+		d)
+			delay1=$OPTARG
+			;;
+		r)
+			delay2=$OPTARG
+			;;
+		l)
+			loops=$OPTARG
+			;;
+		*)
+			help
+			;;
+	esac
+
+done
+
+pass=0
+while [ $pass -ne $loops ]; do
+	pass=$(( pass + 1 ))
+	printf "pass $pass: testing... "
+	$XIADIR/bin/xianet restart > /dev/null
+	sleep $delay1
+
+	found=$( getroutes )
+	if [ $found != $expected ]; then
+		missing=$(( expected - found ))
+
+		printf ": missing $missing routes: rechecking... "
+		sleep $delay2
+		found=$( getroutes )
+
+		if [ $found != $expected ]; then
+			printf ": failed\n"
+			bin/xroute --type=AD --type=HID
+			break
+		fi
+	fi
+
+	printf ": OK\n"
+done
+
+$XIADIR/bin/xianet stop
+

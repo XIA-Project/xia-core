@@ -106,6 +106,8 @@ int click_send(int sockfd, xia::XSocketMsg *xsm)
 	int remaining = p_buf.size();
 	const char *p = p_buf.c_str();
 	while (remaining > 0) {
+
+//LOGF("sending to click: seq: %d type: %d", xsm->sequence(), xsm->type());
 		setWrapped(sockfd, TRUE);
 		rc = sendto(sockfd, p, remaining, 0, (struct sockaddr *)&sa, sizeof(sa));
 		setWrapped(sockfd, FALSE);
@@ -151,6 +153,23 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 			break;
 
 		} else {
+
+			struct timeval tv;
+			fd_set fds;
+			FD_ZERO(&fds);
+			FD_SET(sock, &fds);
+			tv.tv_sec = 0;
+			tv.tv_usec = 10000;
+			rc = select(sock+1, &fds, NULL, NULL, &tv);
+			if (rc == 0)
+				continue;
+			else if (rc < 0) {
+				if (errno == EINTR)
+					continue;
+				LOG("select failed");
+				return -1;
+			}
+
 			setWrapped(sock, TRUE);
 			rc = recvfrom(sock, buf, buflen - 1 , 0, NULL, NULL);
 			setWrapped(sock, FALSE);
