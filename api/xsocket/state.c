@@ -52,7 +52,7 @@ public:
 	int isAsync() { return m_async; };
 	void setAsync(int async) { m_async = async; };
 
-	unsigned seqNo() { return m_sequence++; };
+	unsigned seqNo();
 
 	int getPacket(unsigned seq, char *buf, unsigned buflen);
 	void insertPacket(unsigned seq, char *buf, unsigned buflen);
@@ -77,25 +77,34 @@ private:
 	sockaddr_x *m_peer;
 	unsigned m_bufLen;
 	unsigned m_sequence;
+	pthread_mutex_t m_sequence_lock;
 	map<unsigned, string> m_packets;
+
+	void init();
 };
 
 SocketState::SocketState(int tt)
 {
-	::SocketState();
+	init();
 	m_transportType = tt;
-	m_connected = 0;
-	m_async = 0;
-	m_wrapped = 0;
-	m_buf = NULL;
-	m_peer = NULL;
-	m_bufLen = 0;
-	m_sequence = 1;
-	m_debug = 0;
-	m_error = 0;
 }
 
 SocketState::SocketState()
+{
+	init();
+}
+
+SocketState::~SocketState()
+{
+	if (m_buf)
+		delete(m_buf);
+	if (m_peer)
+		free(m_peer);
+	m_packets.clear();
+	pthread_mutex_destroy(&m_sequence_lock);
+}
+
+void SocketState::init()
 {
 	m_transportType = -1;
 	m_connected = 0;
@@ -107,15 +116,7 @@ SocketState::SocketState()
 	m_sequence = 1;
 	m_debug = 0;
 	m_error = 0;
-}
-
-SocketState::~SocketState()
-{
-	if (m_buf)
-		delete(m_buf);
-	if (m_peer)
-		free(m_peer);
-	m_packets.clear();
+	pthread_mutex_init(&m_sequence_lock, NULL);
 }
 
 int SocketState::data(char *buf, unsigned bufLen)
@@ -179,6 +180,15 @@ void SocketState::insertPacket(unsigned seq, char *buf, unsigned buflen)
 {
 	std::string s(buf, buflen);
 	m_packets[seq] = s;
+}
+
+unsigned SocketState::seqNo()
+{ 
+	pthread_mutex_lock(&m_sequence_lock);
+	unsigned seq = m_sequence++;
+	pthread_mutex_unlock(&m_sequence_lock);
+
+	return seq; 
 }
 
 class SocketMap
