@@ -349,7 +349,7 @@ class XTRANSPORT : public Element {
 		int num_connect_tries; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
 		int num_retransmit_tries; // number of times to try resending data packets
 
-    	queue<sock> pending_connection_buf;
+    	queue<sock*> pending_connection_buf;
 		queue<xia::XSocketMsg*> pendingAccepts; // stores accept messages from API when there are no pending connections
 	
 		// send buffer
@@ -510,7 +510,7 @@ class XTRANSPORT : public Element {
 
     HashTable<XID, unsigned short> XIDtoPort;
     HashTable<XIDpair , unsigned short> XIDpairToPort;
-    HashTable<unsigned short, sock> portToSock;
+    HashTable<unsigned short, sock*> portToSock;
 
     HashTable<unsigned short, bool> portToActive;
     HashTable<XIDpair , bool> XIDpairToConnectPending;
