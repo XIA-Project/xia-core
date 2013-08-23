@@ -115,7 +115,6 @@ void* sendRequests(void* args) {
 	//Send a name query to the name server
 	int count = 0;
 	while (count < 100) {
-printf("sending another NS req\n");
 		pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
 		Xsendto(sock, pkt, offset, 0, (const struct sockaddr*)&ns_dag, sizeof(sockaddr_x));
 		pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
@@ -123,6 +122,7 @@ printf("sending another NS req\n");
 		usleep(100000);
 	}
 
+	return NULL;
 }
 
 
@@ -217,7 +217,7 @@ if (!strncmp(name, "RE ", 3) || !strncmp(name, "DAG ", 4)) {
 	offset += strlen(query_pkt.name)+1;
 
 
-	//TODO: start thread
+	// start request thread
 	struct sendRequestsArgs sra;
 	sra.sock = sock;
 	sra.pkt = pkt;
@@ -234,6 +234,7 @@ if (!strncmp(name, "RE ", 3) || !strncmp(name, "DAG ", 4)) {
 
 	// stop sending requests
 	pthread_cancel(srt);
+	pthread_join(srt, NULL);
 
 	memset(_name, '\0', NS_MAX_DAG_LENGTH);
 	memset(_dag, '\0', NS_MAX_DAG_LENGTH);
