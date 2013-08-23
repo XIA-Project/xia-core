@@ -80,6 +80,7 @@ bool is_last_hop(int ctx, string name);
 int send(int ctx, session::SessionPacket *pkt);
 int migrate_connections();
 bool checkQ(queue<session::SessionPacket*> *Q);
+map<int, session::ConnectionInfo*> getAllConnections();
 
 
 
@@ -217,21 +218,7 @@ void print_connections() {
 	printf("*                               CONNECTIONS                                   *\n");
 	printf("*******************************************************************************\n\n");
 
-	// first collect a list of all open connections
-	map<int, session::ConnectionInfo*> connections;
-	map<unsigned short, session::ConnectionInfo*>::iterator connIt;
-	for (connIt = ctx_to_txconn.begin(); connIt != ctx_to_txconn.end(); ++connIt) {
-		if (connections.find(connIt->second->sockfd()) == connections.end()) {
-			connections[connIt->second->sockfd()] = connIt->second;
-		}
-	}
-	for (connIt = ctx_to_rxconn.begin(); connIt != ctx_to_rxconn.end(); ++connIt) {
-		if (connections.find(connIt->second->sockfd()) == connections.end()) {
-			connections[connIt->second->sockfd()] = connIt->second;
-		}
-	}
-
-	// now print them
+	map<int, session::ConnectionInfo*> connections = getAllConnections();
 	map<int, session::ConnectionInfo*>::iterator iter;
 	for (iter = connections.begin(); iter!= connections.end(); ++iter) {
 		session::ConnectionInfo *cinfo = iter->second;
@@ -330,6 +317,27 @@ int removeLocalContextForIncomingContext(int localCtx, int incomingCtx, int inco
 	incomingctx_to_myctx[key] = localCtx;
 	pthread_mutex_unlock(&incomingctx_to_myctx);
 }*/
+
+/**
+* @brief Returns a list of all open connections.
+*
+* @return Map of sockfd -> ConnectionInfo*
+*/
+map<int, session::ConnectionInfo*> getAllConnections() {
+	map<int, session::ConnectionInfo*> connections;
+	map<unsigned short, session::ConnectionInfo*>::iterator connIt;
+	for (connIt = ctx_to_txconn.begin(); connIt != ctx_to_txconn.end(); ++connIt) {
+		if (connections.find(connIt->second->sockfd()) == connections.end()) {
+			connections[connIt->second->sockfd()] = connIt->second;
+		}
+	}
+	for (connIt = ctx_to_rxconn.begin(); connIt != ctx_to_rxconn.end(); ++connIt) {
+		if (connections.find(connIt->second->sockfd()) == connections.end()) {
+			connections[connIt->second->sockfd()] = connIt->second;
+		}
+	}
+	return connections;
+}
 
 session::SessionPacket* popQ(struct queue_data *qdata, uint32_t max_bytes) {
 	// check that the Q is allocated
@@ -581,7 +589,7 @@ bool closeConnection(int ctx, session::ConnectionInfo *cinfo) {
 	}
 
 	if (found == -1) {
-		ERRORF("Error: did not find context %d in connection", ctx);
+		WARNF("Did not find context %d in connection", ctx);
 		pthread_mutex_unlock(&hid_to_conn_mutex);
 		return closed_conn;
 	}
@@ -733,6 +741,7 @@ string get_neighborhop_name(string my_name, const session::SessionInfo *info, bo
 	int hop = next ? 1 : -1;
 
 	if (found_index == -1) {
+		WARNF("My name not found in session path: %s", my_name.c_str());
 		return "NOT FOUND";
 	} else {
 		// move one hop in the appropriate direction
@@ -817,7 +826,7 @@ int get_conn_for_context(int ctx, map<unsigned short, session::ConnectionInfo*> 
 
 		// now add this context to the connection so it doesn't get "garbage collected"
 		// if all the other sessions using it close
-		(*cinfo)->add_sessions(ctx);  // TODO: remove when session closes
+		(*cinfo)->add_sessions(ctx);
 		(*cinfo)->set_my_name(ctx_to_ctx_info[ctx]->my_name());
 
 		(*ctx_to_conn)[ctx] = *cinfo;
@@ -934,16 +943,16 @@ int migrate_connections() {
 	INFO("Migrating existing transport connections.");
 	int rc = 1;
 	
-	// TODO: what if we're not multiplexing????? won't get all the conns!
-	map<string, session::ConnectionInfo*>::iterator iter;
-	for (iter = hid_to_conn.begin(); iter!= hid_to_conn.end(); ++iter) {
+	map<int, session::ConnectionInfo*> connections = getAllConnections();
+	map<int, session::ConnectionInfo*>::iterator iter;
+	for (iter = connections.begin(); iter!= connections.end(); ++iter) {
+	
 		session::ConnectionInfo *cinfo = iter->second;
-
 		int oldsock = cinfo->sockfd();
 
 		// open a new one
 		if (openConnectionToAddr(&cinfo->addr(), cinfo) < 0) {
-			ERRORF("Error opening new transport connection to %s", iter->first.c_str());
+			ERRORF("Error opening new transport connection to %s", cinfo->hid().c_str());
 			rc = -1;
 			continue;
 		}
@@ -957,7 +966,7 @@ int migrate_connections() {
 		session::SessionMigrate *m = pkt.mutable_migrate();
 		m->set_sender_name(cinfo->my_name());
 		if (send(cinfo, &pkt) < 0) {
-			ERRORF("Error sending MIGRATE packet to %s", iter->first.c_str());
+			ERRORF("Error sending MIGRATE packet to %s", cinfo->hid().c_str());
 			rc = -1;
 			continue;
 		}
@@ -993,9 +1002,6 @@ void * poll_listen_sock(void * args) {
 		// accept connection on listen sock
 		if ( (new_rxsock = acceptSock(listen_sock)) < 0 ) {
 			ERRORF("Error accepting new connection on socket %d for listen context %d: %s", listen_sock, ctx, strerror(errno));
-			//rcm->set_message("Error accpeting new connection on listen context");
-			//rcm->set_rc(session::FAILURE);
-			//return -1;
 		}
 		DBGF("    Accepted new connection on sockfd %d", ctx_to_listensock[ctx]);
 	
@@ -1011,9 +1017,6 @@ void * poll_listen_sock(void * args) {
 		session::SessionPacket *rpkt = new session::SessionPacket();
 		if ( recv(rx_cinfo, rpkt) < 0 ) {
 			ERRORF("Error receiving on listen sock for context %d", ctx);
-			//rcm->set_message("Error receiving on new connection");
-			//rcm->set_rc(session::FAILURE);
-			//return -1;
 		}
 
 		switch (rpkt->type())
@@ -1063,10 +1066,8 @@ void * poll_listen_sock(void * args) {
 				break;
 			}
 			default:
-				ERROR("poll_listen_sock received a packet of unknown or unexpected type");
+				WARNF("poll_listen_sock received a packet of unknown or unexpected type (ctx %d)", ctx);
 		}
-		
-
 	}
 
 	return NULL;
@@ -1159,7 +1160,7 @@ void *poll_recv_sock(void *args) {
 				break;
 			}
 			default:
-				ERRORF("Received a packet of unknown type on socket %d", sock);
+				WARNF("Received a packet of unknown type on socket %d", sock);
 		}
 	}
 

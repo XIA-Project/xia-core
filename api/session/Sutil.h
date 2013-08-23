@@ -32,7 +32,7 @@
 #ifdef DEBUG
 #define VERBOSITY V_DEBUG
 #else
-#define VERBOSITY V_DEBUG
+#define VERBOSITY V_WARNING
 #endif
 
 #define LOG(levelstr, color, s) fprintf(stderr, "\033[0;3%dm[ %s ]\033[0m\t[%s:%d (thread %p)]\t%s\n", color, levelstr, __FILE__, __LINE__, (void*)pthread_self(), s)
