@@ -24,18 +24,53 @@ using namespace std;
 #define Q_WATCHED 2
 
 
+/* LOGGING */
 
-#define DEBUG
+#define V_ERROR 0
+#define V_WARNING 1
+#define V_INFO 2
+#define V_DEBUG 3
 
 #ifdef DEBUG
-#define LOG(s) fprintf(stderr, "[ INFO ]\t%s:%d (thread %p):\t%s\n", __FILE__, __LINE__, (void*)pthread_self(), s)
-#define LOGF(fmt, ...) fprintf(stderr, "[ INFO ]\t%s:%d (thread %p):\t" fmt"\n", __FILE__, __LINE__, (void*)pthread_self(), __VA_ARGS__) 
+#define VERBOSITY V_DEBUG
 #else
-#define LOG(s)
-#define LOGF(fmt, ...)
+#define VERBOSITY V_DEBUG
 #endif
-#define ERROR(s) fprintf(stderr, "\033[0;31m[ ERROR ]\t%s:%d (thread %p):\t%s\n\033[0m", __FILE__, __LINE__, (void*)pthread_self(), s)
-#define ERRORF(fmt, ...) fprintf(stderr, "\033[0;31m[ ERROR ]\t%s:%d (thread %p):\t" fmt"\n\033[0m", __FILE__, __LINE__, (void*)pthread_self(), __VA_ARGS__) 
+
+#define LOG(levelstr, color, s) fprintf(stderr, "\033[0;3%dm[ %s ]\033[0m\t[%s:%d (thread %p)]\t%s\n", color, levelstr, __FILE__, __LINE__, (void*)pthread_self(), s)
+#define LOGF(levelstr, color, fmt, ...) fprintf(stderr, "\033[0;3%dm[ %s ]\033[0m\t[%s:%d (thread %p)]\t" fmt"\n", color, levelstr, __FILE__, __LINE__, (void*)pthread_self(), __VA_ARGS__) 
+
+#if VERBOSITY >= V_INFO
+#define INFO(s) LOG("INFO", 2, s)
+#define INFOF(fmt, ...) LOGF("INFO", 2, fmt, __VA_ARGS__)
+#else
+#define INFO(s)
+#define INFOF(fmt, ...)
+#endif
+
+#if VERBOSITY >= V_DEBUG
+#define DBG(s) LOG("DEBUG", 4, s)
+#define DBGF(fmt, ...) LOGF("DEBUG", 4, fmt, __VA_ARGS__)
+#else
+#define DBG(s)
+#define DBGF(fmt, ...)
+#endif
+
+#if VERBOSITY >= V_ERROR
+#define ERROR(s) LOG("ERROR", 1, s)
+#define ERRORF(fmt, ...) LOGF("ERROR", 1, fmt, __VA_ARGS__)
+#else
+#define ERROR(s)
+#define ERRORF(fmt, ...)
+#endif
+
+#if VERBOSITY >= V_WARNING
+#define WARN(s) LOG("WARNING", 3, s)
+#define WARNF(fmt, ...) LOGF("WARNING", 3, fmt, __VA_ARGS__)
+#else
+#define WARN(s)
+#define WARNF(fmt, ...)
+#endif
 
 
 
@@ -558,7 +593,7 @@ bool closeConnection(int ctx, session::ConnectionInfo *cinfo) {
 
 	// If no one else is using this connection, close it
 	if (cinfo->sessions_size() == 0) {
-		LOGF("Closing connection to: %s", cinfo->hid().c_str());
+		INFOF("Closing connection to: %s", cinfo->hid().c_str());
 		closed_conn = true;
 		
 		// remove mapping
@@ -583,7 +618,7 @@ bool closeConnection(int ctx, session::ConnectionInfo *cinfo) {
 }
 
 bool closeSession(int ctx) {
-LOGF("Closing session %d", ctx);
+DBGF("Closing session %d", ctx);
 	bool kill_self = false;
 	session::ContextInfo *ctxInfo = ctx_to_ctx_info[ctx]; // check that ctx exists
 	session::ContextInfo::ContextState state = ctxInfo->state();
@@ -600,7 +635,7 @@ LOGF("Closing session %d", ctx);
 
 			// first forward close message to next hop (if i'm not last)
 			if (!is_last_hop(ctx, ctx_to_session_info[ctx]->my_name())) {
-LOGF("Ctx %d    Sending TEARDOWN to next hop", ctx);
+DBGF("Ctx %d    Sending TEARDOWN to next hop", ctx);
 				session::SessionPacket *pkt = new session::SessionPacket();
 				pkt->set_type(session::TEARDOWN);
 				pkt->set_sender_ctx(ctx);
@@ -896,7 +931,7 @@ int swap_sockets_for_connection(session::ConnectionInfo *cinfo, int oldsock, int
 // called when we switch networks. close any existing transport connections
 // and restart them.
 int migrate_connections() {
-	LOG("Migrating existing transport connections.");
+	INFO("Migrating existing transport connections.");
 	int rc = 1;
 	
 	// TODO: what if we're not multiplexing????? won't get all the conns!
@@ -942,7 +977,6 @@ int migrate_connections() {
 
 // TODO: Good way to report failures from these functions?
 void * poll_listen_sock(void * args) {
-LOG("BEGIN poll_listen_sock");
 
 	int ctx = *((int*)args);   // TOOD: check this
 	free(args);
@@ -963,7 +997,7 @@ LOG("BEGIN poll_listen_sock");
 			//rcm->set_rc(session::FAILURE);
 			//return -1;
 		}
-	LOGF("    Accepted new connection on sockfd %d", ctx_to_listensock[ctx]);
+		DBGF("    Accepted new connection on sockfd %d", ctx_to_listensock[ctx]);
 	
 	
 		session::ConnectionInfo *rx_cinfo = new session::ConnectionInfo();
@@ -1012,7 +1046,7 @@ LOG("BEGIN poll_listen_sock");
 			}
 			case session::MIGRATE:  // someone we were already talking to moved
 			{
-LOGF("Received a MIGRATE message from: %s", rpkt->migrate().sender_name().c_str());
+				DBGF("Received a MIGRATE message from: %s", rpkt->migrate().sender_name().c_str());
 				if (!rpkt->has_migrate()) {
 					ERROR("MIGRATE packet didn't contain migrate info");
 					continue;
@@ -1144,7 +1178,7 @@ void *poll_recv_sock(void *args) {
 /* API MESSAGE PROCESSING  FUNCTIONS */
 
 int process_new_context_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &reply) {
-LOG("BEGIN process_new_context_msg");
+DBG("BEGIN process_new_context_msg");
 	(void)msg; // msg currently unused
 
 	// allocate context info
@@ -1160,7 +1194,7 @@ LOG("BEGIN process_new_context_msg");
 }
 
 int process_init_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &reply) {
-LOG("BEGIN process_init_msg");
+DBG("BEGIN process_init_msg");
 	session::SInitMsg im = msg.s_init();
 	reply.set_type(session::RETURN_CODE);
 	session::S_Return_Code_Msg *rcm = reply.mutable_s_rc();
@@ -1223,7 +1257,7 @@ LOG("BEGIN process_init_msg");
 #else
 	if (!two_party) { 
 #endif /* MULTIPLEX */
-LOGF("Ctx %d    No connection exists, making rx_sock", ctx);
+DBGF("Ctx %d    No connection exists, making rx_sock", ctx);
 		// make a socket to accept connection from last hop
 		lsock = bindRandomAddr(&my_addr_buf);
 		if (lsock < 0) {
@@ -1246,10 +1280,10 @@ LOGF("Ctx %d    No connection exists, making rx_sock", ctx);
 		pthread_mutex_unlock(&hid_to_conn_mutex);
 	
 		info->set_new_lasthop_conn(true);  // last hop should open new conn to me
-LOG("    Made socket to accept synack from last hop");
+DBG("    Made socket to accept synack from last hop");
 	
 	} else {
-LOGF("Ctx %d    Found an exising connection, waiting for synack in acceptQ", ctx);
+DBGF("Ctx %d    Found an exising connection, waiting for synack in acceptQ", ctx);
 		// we already alloc'd an acceptQ
 
 		// tell the last hop our context # so things get linked up correctly
@@ -1285,7 +1319,7 @@ LOGF("Ctx %d    Found an exising connection, waiting for synack in acceptQ", ctx
 		rcm->set_rc(session::FAILURE);
 		return -1;
 	}
-LOGF("Ctx %d    Sent connection request to next hop", ctx);
+DBGF("Ctx %d    Sent connection request to next hop", ctx);
 
 
 	if (two_party) {  // rxconn and txconn are the same
@@ -1309,7 +1343,7 @@ LOGF("Ctx %d    Sent connection request to next hop", ctx);
 			return -1;
 		}
 		closeSock(lsock);
-LOGF("Ctx %d    Accepted a new connection on rxsock %d", ctx, rxsock);
+DBGF("Ctx %d    Accepted a new connection on rxsock %d", ctx, rxsock);
 
 		// fill in the connection info we didn't have above
 		rx_cinfo->set_sockfd(rxsock);
@@ -1355,7 +1389,7 @@ LOGF("Ctx %d    Accepted a new connection on rxsock %d", ctx, rxsock);
 	}
 
 	string sender_name = rpkt->info().my_name();
-LOGF("Ctx %d    Got final synack from: %s (sender ctx: %d)", ctx, sender_name.c_str(), rpkt->sender_ctx());
+DBGF("Ctx %d    Got final synack from: %s (sender ctx: %d)", ctx, sender_name.c_str(), rpkt->sender_ctx());
 	
 	// store incoming ctx mapping
 	setLocalContextForIncomingContext(ctx, rpkt->sender_ctx(), rxsock);
@@ -1374,7 +1408,7 @@ print_connections();
 }
 
 int process_bind_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &reply) {
-LOG("BEGIN process_bind_msg");
+DBG("BEGIN process_bind_msg");
 	const session::SBindMsg bm = msg.s_bind();
 	reply.set_type(session::RETURN_CODE);
 	session::S_Return_Code_Msg *rcm = reply.mutable_s_rc();
@@ -1387,7 +1421,7 @@ LOG("BEGIN process_bind_msg");
 		return -1;
 	}
 	
-LOGF("    Binding to name: %s", bm.name().c_str());
+	INFOF("    Binding to name: %s", bm.name().c_str());
 
 	// bind to random app ID
 	string *addr_buf = NULL;
@@ -1404,7 +1438,7 @@ LOGF("    Binding to name: %s", bm.name().c_str());
 	// tx or rx sockets
 	ctx_to_listensock[ctx] = sock;
 
-LOGF("    Registering name: %s", bm.name().c_str());
+	DBGF("    Registering name: %s", bm.name().c_str());
 	// register name
     if (registerName(bm.name(), addr_buf) < 0) {
     	ERRORF("error registering name: %s\n", bm.name().c_str());
@@ -1412,7 +1446,7 @@ LOGF("    Registering name: %s", bm.name().c_str());
 		rcm->set_rc(session::FAILURE);
 		return -1;
 	}
-LOG("    Registered name");
+	DBG("    Registered name");
 
 	// if everything worked, store name and addr in context info
 	session::ContextInfo *ctxInfo = ctx_to_ctx_info[ctx];
@@ -1447,7 +1481,7 @@ LOG("    Registered name");
 }
 
 int process_accept_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &reply) {
-LOG("BEGIN process_accept_msg");
+DBG("BEGIN process_accept_msg");
 	
 	reply.set_type(session::RETURN_CODE);
 	session::S_Return_Code_Msg *rcm = reply.mutable_s_rc();
@@ -1487,7 +1521,7 @@ LOG("BEGIN process_accept_msg");
 		string nexthop = get_nexthop_name(listenCtxInfo->my_name(), &(rpkt->info()));
 
 		if (rpkt->info().new_lasthop_conn()) {
-LOGF("    Ctx %d    I'm the last hop; connecting to initiator with supplied addr", new_ctx);
+DBGF("    Ctx %d    I'm the last hop; connecting to initiator with supplied addr", new_ctx);
 			tx_cinfo = new session::ConnectionInfo();
 
 			if (openConnectionToAddr(&(rpkt->info().initiator_addr()), tx_cinfo) < 0) {
@@ -1518,7 +1552,7 @@ LOGF("    Ctx %d    I'm the last hop; connecting to initiator with supplied addr
 			string nextHID = getHIDForAddr(&(rpkt->info().initiator_addr()));
 			pthread_mutex_lock(&hid_to_conn_mutex);
 			if ( hid_to_conn.find(nextHID) == hid_to_conn.end() ) {
-LOGF("    Ctx %d    I'm the last hop; waiting for a connection to initiator. Putting ConnReq back on Q", new_ctx);
+DBGF("    Ctx %d    I'm the last hop; waiting for a connection to initiator. Putting ConnReq back on Q", new_ctx);
 				// there isn't one, so we'll put the ConnReq back on the accecptQ
 				// so we can process it again later once we've gotten a ConnReq
 				// with the initiator's address
@@ -1608,7 +1642,7 @@ LOGF("    Ctx %d    I'm the last hop; waiting for a connection to initiator. Put
 		return -1;
 	}
 
-LOGF("    Ctx %d    Sent SessionInfo packet to next hop", new_ctx);
+DBGF("    Ctx %d    Sent SessionInfo packet to next hop", new_ctx);
 
 	delete rpkt; // TODO: not freed if we hit an error and returned early
 
@@ -1624,7 +1658,7 @@ print_connections();
 }
 
 int process_send_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &reply) {
-//LOG("BEGIN process_send_msg");
+//DBG("BEGIN process_send_msg");
 
 	uint32_t sent = 0;
 	const session::SSendMsg sendm = msg.s_send();
@@ -1682,7 +1716,7 @@ int process_send_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &rep
 }
 
 int process_recv_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &reply) {
-//LOG("BEGIN process_recv_msg");
+//DBG("BEGIN process_recv_msg");
 
 	const session::SRecvMsg rm = msg.s_recv();
 	uint32_t max_bytes = rm.bytes_to_recv();
@@ -1756,7 +1790,7 @@ int process_recv_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &rep
 }
 
 int process_close_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &reply) {
-LOG("BEGIN process_close_msg");
+DBG("BEGIN process_close_msg");
 	
 	const session::SCloseMsg cm = msg.s_close();
 	reply.set_type(session::RETURN_CODE);
@@ -1770,7 +1804,7 @@ LOG("BEGIN process_close_msg");
 }
 
 int process_check_for_data_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &reply) {
-LOG("BEGIN process_check_for_data_msg");
+DBG("BEGIN process_check_for_data_msg");
 	
 	const session::SCloseMsg cm = msg.s_close();
 	reply.set_type(session::RETURN_CODE);
@@ -1865,7 +1899,7 @@ int listen() {
 
 
 	// listen for messages (and process them)
-	LOGF("Listening on %d", procport);
+	INFOF("Listening on %d", procport);
 	while (true)
 	{
 		struct sockaddr_in sa;
@@ -1915,7 +1949,7 @@ int listen() {
 					process_function = &process_check_for_data_msg;
 					break;
 				default:
-					LOG("Unrecognized protobuf message");
+					WARN("Unrecognized protobuf message");
 			}
 
 			// make a new thread
@@ -1950,7 +1984,7 @@ int main(int argc, char *argv[]) {
 #ifdef XIA
 	// set sockconf.ini name
 	set_conf("xsockconf.ini", sockconf_name.c_str());
-	LOGF("Click sockconf name: %s", sockconf_name.c_str());
+	INFOF("Click sockconf name: %s", sockconf_name.c_str());
 #endif /* XIA */
 			
 	// Start a thread watching for mobility

@@ -156,7 +156,7 @@ int openConnectionToAddr(const string *addr_buf, session::ConnectionInfo *cinfo)
 		ERROR("unable to connect to the destination dag");
 		return -1;
 	}
-LOGF("    opened connection, sock is %d", sock);
+DBGF("    opened connection, sock is %d", sock);
 
 	cinfo->set_sockfd(sock);
 	cinfo->set_hid(getHIDForAddr(addr_buf));

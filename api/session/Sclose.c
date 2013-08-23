@@ -38,7 +38,7 @@ using namespace std;
 */
 int Sclose(int ctx)
 {
-LOG("BEGIN Sclose");
+DBG("BEGIN Sclose");
 	int rc;
 	int sockfd = ctx; // for now on the client side we treat the socket fd as the context handle
 		
@@ -47,7 +47,7 @@ LOG("BEGIN Sclose");
 	sm.set_type(session::CLOSE);
 	
 	if ((rc = proc_send(sockfd, &sm)) < 0) {
-		LOGF("Error talking to session proc: %s", strerror(errno));
+		ERRORF("Error talking to session proc: %s", strerror(errno));
 		close(sockfd);
 		return -1;
 	}
@@ -55,13 +55,13 @@ LOG("BEGIN Sclose");
 	// process the reply from the session process
 	session::SessionMsg rsm;
 	if ((rc = proc_reply(sockfd, rsm)) < 0) {
-		LOGF("Error getting status from session proc: %s", strerror(errno));
+		ERRORF("Error getting status from session proc: %s", strerror(errno));
 	} 
 	if (rsm.type() != session::RETURN_CODE || rsm.s_rc().rc() != session::SUCCESS) {
 		string errormsg = "Unspecified";
 		if (rsm.s_rc().has_message())
 			errormsg = rsm.s_rc().message();
-		LOGF("Session proc returned an error: %s", errormsg.c_str());
+		ERRORF("Session proc returned an error: %s", errormsg.c_str());
 		rc = -1;
 	}
 	return rc;

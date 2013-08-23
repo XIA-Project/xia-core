@@ -37,14 +37,14 @@ using namespace std;
 */
 int SnewContext()
 {
-LOG("BEGIN SnewContext()");
+DBG("BEGIN SnewContext()");
 	int rc;
 	int sockfd;
 
 
 	// Open socket to session process
 	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		LOGF("error creating socket to session process: %s", strerror(errno));
+		ERRORF("error creating socket to session process: %s", strerror(errno));
 		return -1;
 	}
 
@@ -55,7 +55,7 @@ LOG("BEGIN SnewContext()");
 
 	if (bind(sockfd, (const struct sockaddr *)&addr, sizeof(addr)) < 0) {
 		close(sockfd);
-		LOGF("bind error: %s", strerror(errno));
+		ERRORF("bind error: %s", strerror(errno));
 		return -1;
 	}
 		
@@ -64,7 +64,7 @@ LOG("BEGIN SnewContext()");
 	sm.set_type(session::NEW_CONTEXT);
 	//session::S_New_Context_Msg *ncm = sm.mutable_s_new_context(); // TODO: don't need this?
 	if ((rc = proc_send(sockfd, &sm)) < 0) {
-		LOGF("Error talking to session proc: %s", strerror(errno));
+		ERRORF("Error talking to session proc: %s", strerror(errno));
 		close(sockfd);
 		return -1;
 	}
@@ -72,13 +72,13 @@ LOG("BEGIN SnewContext()");
 	// process the reply from the session process
 	session::SessionMsg rsm;
 	if ((rc = proc_reply(sockfd, rsm)) < 0) {
-		LOGF("Error getting status from session proc: %s", strerror(errno));
+		ERRORF("Error getting status from session proc: %s", strerror(errno));
 	} 
 	if (rsm.type() != session::RETURN_CODE || rsm.s_rc().rc() != session::SUCCESS) {
 		string errormsg = "Unspecified";
 		if (rsm.s_rc().has_message())
 			errormsg = rsm.s_rc().message();
-		LOGF("Session proc returned an error: %s", errormsg.c_str());
+		ERRORF("Session proc returned an error: %s", errormsg.c_str());
 		rc = -1;
 	}
 	

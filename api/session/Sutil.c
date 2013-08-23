@@ -49,13 +49,13 @@ int proc_send(int sockfd, session::SessionMsg *sm)
 		rc = sendto(sockfd, p, remaining, 0, (struct sockaddr *)&sa, sizeof(sa));
 
 		if (rc == -1) {
-			LOGF("click socket failure: errno = %d", errno);
+			ERRORF("click socket failure: errno = %d", errno);
 			break;
 		} else {
 			remaining -= rc;
 			p += rc;
 			if (remaining > 0) {
-				LOGF("%d bytes left to send", remaining);
+				DBGF("%d bytes left to send", remaining);
 			}
 		}	
 	}
@@ -75,7 +75,7 @@ int proc_reply(int sockfd, session::SessionMsg &sm)
 
 	memset(buf, 0, buflen);
 	if ((rc = recvfrom(sockfd, buf, buflen - 1 , 0, (struct sockaddr *)&sa, &len)) < 0) {
-		LOGF("error(%d) getting reply data from session process", errno);
+		ERRORF("error(%d) getting reply data from session process", errno);
 		return -1;
 	}
 	
@@ -84,36 +84,6 @@ int proc_reply(int sockfd, session::SessionMsg &sm)
 
 	return rc;
 }
-
-/*
-int click_reply2(int sockfd, xia::XSocketCallType *type)
-{
-	char buf[1024];
-	unsigned buflen = sizeof(buf);
-	struct sockaddr_in sa;
-	socklen_t len;
-	int rc;
-
-	len = sizeof sa;
-
-	memset(buf, 0, buflen);
-	if ((rc = recvfrom(sockfd, buf, buflen - 1 , 0, (struct sockaddr *)&sa, &len)) < 0) {
-		LOGF("error(%d) getting reply data from click", errno);
-		return -1;
-	}
-
-	session::SessionMsg reply;
-	reply.ParseFromString(buf);
-	xia::X_Result_Msg *msg = reply.mutable_x_result();
-
-	*type = msg->type();
-
-	rc = msg->return_code();
-	if (rc == -1)
-		errno = msg->err_code();
-
-	return rc;
-}*/
 
 
 

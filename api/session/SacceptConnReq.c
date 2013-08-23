@@ -38,14 +38,14 @@ using namespace std;
 */
 int SacceptConnReq(int ctx)
 {
-LOG("BEGIN SacceptConnReq");
+DBG("BEGIN SacceptConnReq");
 
 	int sockfd = ctx; // for now on the client side we treat the socket fd as the context handle
 	int new_sockfd;
 
 	// make new socket for the new incoming session
 	if ((new_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		LOGF("error creating socket to session process: %s", strerror(errno));
+		ERRORF("error creating socket to session process: %s", strerror(errno));
 		return -1;
 	}
 
@@ -57,14 +57,14 @@ LOG("BEGIN SacceptConnReq");
 
 	if (bind(new_sockfd, (const struct sockaddr *)&addr, len) < 0) {
 		close(new_sockfd);
-		LOGF("bind error: %s", strerror(errno));
+		ERRORF("bind error: %s", strerror(errno));
 		return -1;
 	}
 
 	// figure out which port we bound to
 	if(getsockname(new_sockfd, (struct sockaddr *)&addr, &len) < 0) {
 		close(new_sockfd);
-		LOGF("Error retrieving new socket's UDP port: %s", strerror(errno));
+		ERRORF("Error retrieving new socket's UDP port: %s", strerror(errno));
 		return -1;
 	}
 
@@ -75,7 +75,7 @@ LOG("BEGIN SacceptConnReq");
 	am->set_new_ctx(ntohs(addr.sin_port));
 
 	if (proc_send(sockfd, &sm) < 0) {
-		LOGF("Error talking to session proc: %s", strerror(errno));
+		ERRORF("Error talking to session proc: %s", strerror(errno));
 		close(sockfd);
 		return -1;
 	}
@@ -83,13 +83,13 @@ LOG("BEGIN SacceptConnReq");
 	// process the reply from the session process
 	session::SessionMsg rsm;
 	if (proc_reply(sockfd, rsm) < 0) {
-		LOGF("Error getting status from session proc: %s", strerror(errno));
+		ERRORF("Error getting status from session proc: %s", strerror(errno));
 	} 
 	if (rsm.type() != session::RETURN_CODE || rsm.s_rc().rc() != session::SUCCESS) {
 		string errormsg = "Unspecified";
 		if (rsm.s_rc().has_message())
 			errormsg = rsm.s_rc().message();
-		LOGF("Session proc returned an error: %s", errormsg.c_str());
+		ERRORF("Session proc returned an error: %s", errormsg.c_str());
 		return -1;
 	}
 	return new_sockfd;

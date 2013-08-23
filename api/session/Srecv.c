@@ -27,7 +27,7 @@ using namespace std;
 
 int Srecv(int ctx, void* buf, size_t len, bool waitForADU)
 {
-LOG("BEGIN Srecv");
+DBG("BEGIN Srecv");
 	int sockfd = ctx; // for now on the client side we treat the socket fd as the context handle
 		
 	// protobuf message
@@ -39,7 +39,7 @@ LOG("BEGIN Srecv");
 
 	
 	if ( proc_send(sockfd, &sm) < 0) {
-		LOGF("Error talking to session proc: %s", strerror(errno));
+		ERRORF("Error talking to session proc: %s", strerror(errno));
 		close(sockfd);
 		return -1;
 	}
@@ -47,19 +47,19 @@ LOG("BEGIN Srecv");
 	// process the reply from the session process
 	session::SessionMsg rsm;
 	if (proc_reply(sockfd, rsm) < 0) {
-		LOGF("Error getting status from session proc: %s", strerror(errno));
+		ERRORF("Error getting status from session proc: %s", strerror(errno));
 	} 
 	if (rsm.type() != session::RETURN_CODE || rsm.s_rc().rc() != session::SUCCESS) {
 		string errormsg = "Unspecified";
 		if (rsm.s_rc().has_message())
 			errormsg = rsm.s_rc().message();
-		LOGF("Session proc returned an error: %s", errormsg.c_str());
+		ERRORF("Session proc returned an error: %s", errormsg.c_str());
 		return -1;
 	}
 	
 	// copy the returned data into the buffer
 	if (!rsm.has_s_recv_ret()) {
-		LOG("ERROR: Session proc returned no data");
+		ERROR("ERROR: Session proc returned no data");
 		return -1;
 	}
 	int bytes  = rsm.s_recv_ret().data().size();
@@ -116,7 +116,7 @@ int SrecvADU(int ctx, void* buf, size_t len) {
 * @return false otherwise
 */
 bool ScheckForData(int ctx) {
-LOG("BEGIN ScheckForData");
+DBG("BEGIN ScheckForData");
 
 	int sockfd = ctx; // for now on the client side we treat the socket fd as the context handle
 		
@@ -125,7 +125,7 @@ LOG("BEGIN ScheckForData");
 	sm.set_type(session::CHECK_FOR_DATA);
 	
 	if ( proc_send(sockfd, &sm) < 0) {
-		LOGF("Error talking to session proc: %s", strerror(errno));
+		ERRORF("Error talking to session proc: %s", strerror(errno));
 		close(sockfd);
 		return -1;
 	}
@@ -133,19 +133,19 @@ LOG("BEGIN ScheckForData");
 	// process the reply from the session process
 	session::SessionMsg rsm;
 	if (proc_reply(sockfd, rsm) < 0) {
-		LOGF("Error getting status from session proc: %s", strerror(errno));
+		ERRORF("Error getting status from session proc: %s", strerror(errno));
 	} 
 	if (rsm.type() != session::RETURN_CODE || rsm.s_rc().rc() != session::SUCCESS) {
 		string errormsg = "Unspecified";
 		if (rsm.s_rc().has_message())
 			errormsg = rsm.s_rc().message();
-		LOGF("Session proc returned an error: %s", errormsg.c_str());
+		ERRORF("Session proc returned an error: %s", errormsg.c_str());
 		return -1;
 	}
 	
 	// check whether or not data is available to read
 	if (!rsm.has_s_check_data_ret()) {
-		LOG("ERROR: Session proc didn't return data availability status");
+		ERROR("Session proc didn't return data availability status");
 		return -1;
 	}
 
