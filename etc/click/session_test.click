@@ -9,6 +9,9 @@ host2 :: XIAEndHost (RE AD1 HID2, HID2, 1900, 1, aa:aa:aa:aa:aa:aa);
 router0 :: XIARouter2Port(RE AD0 RHID0, AD0, RHID0, 0.0.0.0, 1700, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
 router1 :: XIARouter4Port(RE AD1 RHID1, AD1, RHID1, 0.0.0.0, 1800, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
 
+// The following line is required by the xianet script so it can determine the appropriate
+// host/router pair to run the nameserver on
+// host0 :: nameserver
 
 // interconnection -- host - ad
 host0[0] -> LinkUnqueue(0.1, 25 Mbps) -> [0]router0;
