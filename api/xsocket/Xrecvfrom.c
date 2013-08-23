@@ -35,8 +35,8 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
     int numbytes;
     char UDPbuf[MAXBUFLEN];
 
-	if (flags != 0) {
-		LOG("flags is not suppored at this time");
+	if (flags != 0 && flags != MSG_PEEK) {
+		LOGF("unsupported flag %d(s)", flags);
 		errno = EINVAL;
 		return -1;
 	}
@@ -55,9 +55,12 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 
 	// see if we have bytes leftover from a previous Xrecv call
 	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len)) > 0) {
-		// FIXME: we need to also have stashed away the sDAG and
-		// return it as well
-		*addrlen = 0;
+		if (addr) {
+			*addrlen = sizeof(sockaddr_x);
+			memcpy(addr, dgramPeer(sockfd), sizeof(sockaddr_x));
+		}
+		else
+			*addrlen = 0;
 		return numbytes;
 	}
 
@@ -88,12 +91,28 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		paylen = len;
 	}
 
-	if (addr) {
+	if (addr || (flags & MSG_PEEK)) {
 		Graph g(msg->dag().c_str());
 
-		// FIXME: validate addr
-		g.fill_sockaddr((sockaddr_x*)addr);
-		*addrlen = sizeof(sockaddr_x);
+		if (addr) {
+			// FIXME: validate addr
+			g.fill_sockaddr((sockaddr_x*)addr);
+			*addrlen = sizeof(sockaddr_x);
+		}
+
+		// user peeked, so save all of the data
+		if (flags & MSG_PEEK) {
+			sockaddr_x sa;
+
+			if (!addr) {
+				addr = &sa;
+				g.fill_sockaddr((sockaddr_x*)addr);
+
+			}
+			printf("len: %d p: %p\n", msg->payload().size(), payload);
+			setSocketData(sockfd, payload, msg->payload().size());
+			setPeer(sockfd, addr);
+		}
 	}
 
     return paylen;

@@ -32,7 +32,8 @@ int _connDgram(int sockfd, const sockaddr *addr, socklen_t addrlen)
 	if (addr->sa_family == AF_UNSPEC) {
 
 		// go back to allowing connections to/from any peer
-		connectDgram(sockfd, NULL);
+		setPeer(sockfd, NULL);
+		setConnState(sockfd, UNCONNECTED);
 
 	} else if (addr->sa_family == AF_XIA) {
 		// validate addr
@@ -45,7 +46,8 @@ int _connDgram(int sockfd, const sockaddr *addr, socklen_t addrlen)
 		// FIXME: can we verify addrlen here?
 
 		} else {
-			connectDgram(sockfd, (sockaddr_x *)addr);
+			setConnState(sockfd, CONNECTED);
+			setPeer(sockfd, (sockaddr_x *)addr);
 		}
 	} else {
 		rc = -1;

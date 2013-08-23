@@ -88,7 +88,7 @@ void SocketState::init()
 	m_blocking = 1;
 	m_wrapped = 0;
 	m_error = 0;
-	m_buf = (char *)0;
+	m_buf = NULL;
 	m_bufLen = 0;
 	m_peer = NULL;
 }
@@ -150,7 +150,9 @@ void SocketState::setData(const char *buf, unsigned bufLen)
 	if (!buf || bufLen == 0)
 		return;
 
-	assert(!m_buf && m_bufLen == 0);
+	if (m_buf)
+		delete(m_buf);
+	m_bufLen = 0;
 
 	m_buf = new char [bufLen];
 	if (!m_buf)
@@ -383,13 +385,12 @@ void sock(int sock)
 		sstate->sock(sock);
 }
 
-int connectDgram(int sock, sockaddr_x *addr)
+int setPeer(int sock, sockaddr_x *addr)
 {
 	int rc = 0;
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 
 	if (sstate) {
-		sstate->setConnState((addr == NULL) ? UNCONNECTED : CONNECTED);
 		sstate->setPeer(addr);
 	}
 
