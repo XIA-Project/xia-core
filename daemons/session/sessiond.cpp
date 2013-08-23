@@ -28,14 +28,14 @@ using namespace std;
 #define DEBUG
 
 #ifdef DEBUG
-#define LOG(s) fprintf(stderr, "%s:%d: INFO  %s\n", __FILE__, __LINE__, s)
-#define LOGF(fmt, ...) fprintf(stderr, "%s:%d: INFO  " fmt"\n", __FILE__, __LINE__, __VA_ARGS__) 
+#define LOG(s) fprintf(stderr, "[ INFO ]\t%s:%d (thread %p):\t%s\n", __FILE__, __LINE__, (void*)pthread_self(), s)
+#define LOGF(fmt, ...) fprintf(stderr, "[ INFO ]\t%s:%d (thread %p):\t" fmt"\n", __FILE__, __LINE__, (void*)pthread_self(), __VA_ARGS__) 
 #else
 #define LOG(s)
 #define LOGF(fmt, ...)
 #endif
-#define ERROR(s) fprintf(stderr, "\033[0;31m%s:%d: ERROR  %s\n\033[0m", __FILE__, __LINE__, s)
-#define ERRORF(fmt, ...) fprintf(stderr, "\033[0;31m%s:%d: ERROR  " fmt"\n\033[0m", __FILE__, __LINE__, __VA_ARGS__) 
+#define ERROR(s) fprintf(stderr, "\033[0;31m[ ERROR ]\t%s:%d (thread %p):\t%s\n\033[0m", __FILE__, __LINE__, (void*)pthread_self(), s)
+#define ERRORF(fmt, ...) fprintf(stderr, "\033[0;31m[ ERROR ]\t%s:%d (thread %p):\t" fmt"\n\033[0m", __FILE__, __LINE__, (void*)pthread_self(), __VA_ARGS__) 
 
 
 
@@ -149,7 +149,7 @@ void print_contexts() {
 		printf("State:\t\t%s\n", state.c_str());
 
 		if (ctxInfo->has_my_name()) {
-			printf("\nMy name:\t%s", ctxInfo->my_name().c_str());
+			printf("My name:\t%s", ctxInfo->my_name().c_str());
 		}
 		printf("\n\n-------------------------------------------------------------------------------\n\n");
 	}
@@ -967,13 +967,9 @@ LOG("BEGIN poll_listen_sock");
 	
 	
 		session::ConnectionInfo *rx_cinfo = new session::ConnectionInfo();
-LOG("here");
 		rx_cinfo->set_sockfd(new_rxsock);
-LOG("here");
 		rx_cinfo->set_hid(getHIDForSocket(new_rxsock));
-LOG("here");
 		rx_cinfo->set_addr(*getRemoteAddrForSocket(new_rxsock));
-LOG("here");
 	
 		
 		// receive first message (using new_ctx, not ctx) and
@@ -1477,7 +1473,6 @@ LOG("BEGIN process_accept_msg");
 		return -1;
 	}
 	assert(rpkt);
-LOG("here");
 
 
 	// First make sure we have a connection to the next hop.
@@ -1495,14 +1490,12 @@ LOG("here");
 LOGF("    Ctx %d    I'm the last hop; connecting to initiator with supplied addr", new_ctx);
 			tx_cinfo = new session::ConnectionInfo();
 
-LOG("here");
 			if (openConnectionToAddr(&(rpkt->info().initiator_addr()), tx_cinfo) < 0) {
 				ERROR("Error connecting to initiator");
 				rcm->set_message("Error connecting to initiator");
 				rcm->set_rc(session::FAILURE);
 				return -1;
 			}
-LOG("here");
 
 			// start a thread reading this socket
 			int ret;
@@ -1512,24 +1505,19 @@ LOG("here");
 				rcm->set_rc(session::FAILURE);
 				return -1;
 			}
-LOG("here");
 
 			pthread_mutex_lock(&hid_to_conn_mutex);
 			hid_to_conn[tx_cinfo->hid()] = tx_cinfo;
 			tx_cinfo->add_sessions(new_ctx);
 			pthread_mutex_unlock(&hid_to_conn_mutex);
-LOG("here");
 
 		} else {
 
-LOG("here");
 #ifdef MULTIPLEX
-LOG("here");
 			// check for an existing connection
 			string nextHID = getHIDForAddr(&(rpkt->info().initiator_addr()));
 			pthread_mutex_lock(&hid_to_conn_mutex);
 			if ( hid_to_conn.find(nextHID) == hid_to_conn.end() ) {
-LOG("here");
 LOGF("    Ctx %d    I'm the last hop; waiting for a connection to initiator. Putting ConnReq back on Q", new_ctx);
 				// there isn't one, so we'll put the ConnReq back on the accecptQ
 				// so we can process it again later once we've gotten a ConnReq
@@ -1547,7 +1535,6 @@ LOGF("    Ctx %d    I'm the last hop; waiting for a connection to initiator. Put
 			tx_cinfo = hid_to_conn[nextHID];
 			tx_cinfo->add_sessions(new_ctx);
 			pthread_mutex_unlock(&hid_to_conn_mutex);
-LOG("here");
 #else
 			ERROR("Last hop. Initiator did not supply an address and we're not multiplexing");
 			rcm->set_message("Last hop. Initiator did not supply an address and we're not multiplexing");
@@ -1561,7 +1548,6 @@ LOG("here");
 
 
 
-LOG("here");
 	// store a copy of the session info, updating my_name and my_addr
 	//session::SessionInfo *sinfo = new session::SessionInfo(rpkt->info());
 	session::SessionInfo *sinfo = new session::SessionInfo();
@@ -1569,24 +1555,22 @@ LOG("here");
 	sinfo->set_my_name(listenCtxInfo->my_name());
 	sinfo->clear_my_addr();
 	ctx_to_session_info[new_ctx] = sinfo;
-LOG("here");
 
 	// allocate context info for the new session context
 	session::ContextInfo *ctxInfo = new session::ContextInfo();
 	ctxInfo->set_my_name(listenCtxInfo->my_name());
+	ctxInfo->set_state(session::ContextInfo::ESTABLISHED); // TODO: should be CONNECTING?
 	ctx_to_ctx_info[new_ctx] = ctxInfo;
 
 	// allocate dataQ, acceptQ (might not be used), send buffer, & recv buffer
 	alloc_context_queues(new_ctx);
-LOG("here");
 	
 	// get the rx transport connection
 	if (rpkt->info().has_rx_cinfo()) {
-		session::ConnectionInfo *rx_cinfo;
+		session::ConnectionInfo *rx_cinfo;  // TODO: malloc this?
 		memcpy(&rx_cinfo, rpkt->info().rx_cinfo().data(), sizeof(session::ConnectionInfo*));
 		ctx_to_rxconn[new_ctx] = rx_cinfo;
 		rx_cinfo->add_sessions(new_ctx);
-LOG("here");
 
 		// TODO: should this be only if multiplexing is off? I think it's OK as it is.
 		if (two_party) {  // this is the only case where we didn't set tx_cinfo above
@@ -1594,7 +1578,6 @@ LOG("here");
 			ctx_to_txconn[new_ctx] = tx_cinfo;
 			tx_cinfo->add_sessions(new_ctx);
 		}
-LOG("here");
 
 	} else {
 		ERROR("ConnReq wasn't tagged with incoming connection.");
@@ -1603,12 +1586,10 @@ LOG("here");
 		return -1;
 	}
 
-LOG("here");
 	
 	// store incoming ctx mapping
 	setLocalContextForIncomingContext(new_ctx, rpkt->sender_ctx(), ctx_to_rxconn[new_ctx]->sockfd());
 
-LOG("here");
 
 	// connect to next hop
 	session::SessionPacket pkt;
@@ -1617,7 +1598,6 @@ LOG("here");
 	session::SessionInfo *newinfo = pkt.mutable_info();// TODO: better way?
 	infocpy(sinfo, newinfo);
 	
-LOG("here");
 
 		
 	// send session info to next hop
@@ -1627,7 +1607,6 @@ LOG("here");
 		rcm->set_rc(session::FAILURE);
 		return -1;
 	}
-LOG("here");
 
 LOGF("    Ctx %d    Sent SessionInfo packet to next hop", new_ctx);
 
@@ -1733,8 +1712,8 @@ int process_recv_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &rep
 		pkt = popDataQ(ctx, max_bytes - data.size());
 
 		if ( pkt == NULL ) {
-			ERROR("Trying to receive on a closed session");
-			rcm->set_message("Trying to receive on a closed session");
+			ERROR("Popped packet was NULL");
+			rcm->set_message("Popped packet was NULL");
 			rcm->set_rc(session::FAILURE);
 			return -1;
 		}

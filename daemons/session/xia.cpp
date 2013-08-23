@@ -12,7 +12,7 @@ string* getAddrForName(string name) {
 	struct addrinfo *ai;
 	sockaddr_x *sa;
 	if (Xgetaddrinfo(name.c_str(), NULL, NULL, &ai) != 0) {
-		ERRORF("unable to lookup name %s", name.c_str());
+		ERRORF("unable to lookup name: %s", name.c_str());
 		return NULL;
 	}
 	sa = (sockaddr_x*)ai->ai_addr;
@@ -46,7 +46,6 @@ string* getLocalAddrForSocket(int sock) {
 string getHIDForAddr(const string *addr_buf) {
 	sockaddr_x *sa = addrFromData(addr_buf);
 	Graph g(sa);
-	g.print_graph();
 	vector<const Node*> hids = g.get_nodes_of_type(Node::XID_TYPE_HID);
 
 	if (hids.size() > 0) {
