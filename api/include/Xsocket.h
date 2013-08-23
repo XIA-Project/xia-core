@@ -183,6 +183,7 @@ extern const char *Xgai_strerror(int);
 extern int checkXid(const char *xid, const char *type);
 
 extern char *XrootDir(char *buf, unsigned len);
+extern void debug(int sock);
 
 #ifdef __cplusplus
 }
