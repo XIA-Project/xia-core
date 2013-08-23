@@ -161,6 +161,9 @@ setup()
 	done
 
 	case $MAKECONF in
+		"")
+			# local topology, just use the default script
+			;;
 		router)
 			SCRIPT=router.click
 			;;
