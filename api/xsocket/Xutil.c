@@ -28,6 +28,21 @@
 #define XID_CHARS (XID_SIZE * 2)
 
 /*!
+* @brief Prints some debug information
+*
+* @param sock
+*/
+void debug(int sock) {
+	struct sockaddr_in my_addr;
+	socklen_t len = sizeof(my_addr);
+	if(getsockname(sock, (struct sockaddr *)&my_addr, &len) < 0) {
+		printf("Error retrieving socket's UDP port: %s", strerror(errno));
+	}
+	
+	printf("[ sock %d/%d, thread %p ]\t", sock, ((struct sockaddr_in)my_addr).sin_port, (void*)pthread_self());
+}
+
+/*!
 ** @brief Finds the root of the source tree
 **
 ** @returns a character pointer to the root of the source tree
