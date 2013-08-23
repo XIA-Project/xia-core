@@ -159,6 +159,25 @@ setup()
 				;;
 		esac
 	done
+
+	case $MAKECONF in
+		router)
+			SCRIPT=router.click
+			;;
+		dualrouter)
+			SCRIPT=dual_stack_router.click
+			;;
+		host)
+			SCRIPT=host.click
+			;;
+		dualhost)
+			SCRIPT=dual_stack_host.click
+			;;
+		*)
+			echo ERROR: invalid node type: $MAKECONF
+			exit 1
+			;;
+	esac
 }
 
 # sets global variable $XPID for the given process
