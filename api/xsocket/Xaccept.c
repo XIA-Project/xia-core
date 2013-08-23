@@ -115,6 +115,7 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 
 	// Tell click what the new socket's port is (but we'll tell click
 	// over the old socket)
+	len = sizeof(my_addr);
 	if(getsockname(new_sockfd, (struct sockaddr *)&my_addr, &len) < 0) {
 		close(new_sockfd);
 		LOGF("Error retrieving new socket's UDP port: %s", strerror(errno));
