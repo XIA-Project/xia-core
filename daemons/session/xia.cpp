@@ -161,7 +161,8 @@ DBGF("    opened connection, sock is %d", sock);
 	cinfo->set_sockfd(sock);
 	cinfo->set_hid(getHIDForAddr(addr_buf));
 	cinfo->set_addr(*addr_buf);
-	return 1;
+	cinfo->set_type(session::XSP);
+	return 0;
 
 }
 
