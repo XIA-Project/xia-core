@@ -27,6 +27,11 @@
 
 #define XID_CHARS (XID_SIZE * 2)
 
+// FIXME: do this smarter
+// this should be larger than the size of the maximum amount XIA can transfer, but smaller than localhost MTU
+// optimally, XIA_MAXBUF would be calculated based off of this and the maximum size of a protobuf message
+#define XIA_INTERNAL_BUFSIZE	(16 * 1024)
+
 /*!
 * @brief Prints some debug information
 *
@@ -216,7 +221,7 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 
 int click_reply(int sock, unsigned seq, xia::XSocketMsg *msg)
 {
-	char buf[XIA_MAXBUF];
+	char buf[XIA_INTERNAL_BUFSIZE];
 	unsigned buflen = sizeof(buf);
 
 	return click_get(sock, seq, buf, buflen, msg);
@@ -224,7 +229,7 @@ int click_reply(int sock, unsigned seq, xia::XSocketMsg *msg)
 
 int click_status(int sock, unsigned seq)
 {
-	char buf[XIA_MAXBUF];
+	char buf[XIA_INTERNAL_BUFSIZE];
 	unsigned buflen = sizeof(buf);
 	int rc;
 	xia::XSocketMsg msg;
