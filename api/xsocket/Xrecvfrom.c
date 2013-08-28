@@ -32,7 +32,7 @@
 /*!
 ** @brief receives datagram data on an Xsocket.
 **
-** Xrecvfrom() retrieves data from an Xsocket of type XSOCK_DGRAM. Unlike the 
+** Xrecvfrom() retrieves data from an Xsocket of type XSOCK_DGRAM. Unlike the
 ** standard recvfrom API, it will not work with sockets of type XSOCK_STREAM.
 **
 ** XrecvFrom() does not currently have a non-blocking mode, and will block
@@ -42,7 +42,7 @@
 ** you may then call XrecvFrom() to get the data.
 **
 ** NOTE: in cases where more data is received than specified by the caller,
-** the excess data will be stored in the socket state structure and will 
+** the excess data will be stored in the socket state structure and will
 ** be returned from there rather than from Click. Once the socket state
 ** is drained, requests will be sent through to Click again.
 **
@@ -68,8 +68,8 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
     int numbytes;
     char UDPbuf[MAXBUFLEN];
 
-	if (flags != 0) {
-		LOG("flags is not suppored at this time");
+	if (flags != 0 && flags != MSG_PEEK) {
+		LOGF("unsupported flag %d(s)", flags);
 		errno = EINVAL;
 		return -1;
 	}
@@ -78,7 +78,7 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		LOG("null pointer!\n");
 		errno = EFAULT;
 		return -1;
-	}	
+	}
 
 	if (addr && *addrlen < sizeof(sockaddr_x)) {
 		LOG("addr is not large enough");
@@ -90,15 +90,19 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		LOGF("Socket %d must be a datagram socket", sockfd);
 		return -1;
 	}
-	
+
 	// see if we have bytes leftover from a previous Xrecv call
+	// FIXME: this will do the wrong thing for MSG_PEEK
 	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len)) > 0) {
-		// FIXME: we need to also have stashed away the sDAG and
-		// return it as well
-		*addrlen = 0;
+		if (addr) {
+			*addrlen = sizeof(sockaddr_x);
+			memcpy(addr, dgramPeer(sockfd), sizeof(sockaddr_x));
+		}
+		else if (addrlen)
+			*addrlen = 0;
 		return numbytes;
 	}
-	
+
 	if ((numbytes = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) < 0) {
 		LOGF("Error retrieving recv data from Click: %s", strerror(errno));
 		return -1;
@@ -124,12 +128,28 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		paylen = len;
 	}
 
-	if (addr) {
+	if (addr || (flags & MSG_PEEK)) {
 		Graph g(msg->dag().c_str());
 
-		// FIXME: validate addr
-		g.fill_sockaddr((sockaddr_x*)addr);
-		*addrlen = sizeof(sockaddr_x);
+		if (addr) {
+			// FIXME: validate addr
+			g.fill_sockaddr((sockaddr_x*)addr);
+			*addrlen = sizeof(sockaddr_x);
+		}
+
+		// user peeked, so save all of the data
+		if (flags & MSG_PEEK) {
+			sockaddr_x sa;
+
+			if (!addr) {
+				addr = (sockaddr *)&sa;
+				g.fill_sockaddr((sockaddr_x*)addr);
+
+			}
+			printf("len: %d p: %p\n", msg->payload().size(), payload);
+			setSocketData(sockfd, payload, msg->payload().size());
+			setPeer(sockfd, (sockaddr_x *)addr);
+		}
 	}
 
     return paylen;
