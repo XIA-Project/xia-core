@@ -222,8 +222,6 @@ string getHIDForAddr(const string *addr_buf) {
 	//free(ipstr);
 	free(portstr);
 
-DBGF("returning HID: %s", hid.c_str());
-
 	return hid;
 }
 
@@ -244,23 +242,6 @@ string getHIDForName(string name) {
 string getHIDForSocket(int sock) {
 	return getHIDForAddr(getRemoteAddrForSocket(sock));
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 int sendBuffer(session::ConnectionInfo *cinfo, const char* buf, size_t len) {
 	int sock = cinfo->sockfd();
@@ -352,7 +333,6 @@ int openConnectionToAddr(const string *addr_buf, session::ConnectionInfo *cinfo)
 		ERRORF("unable to connect to the destination addr: %s", strerror(errno));
 		return -1;
 	}
-DBGF("New sock is %d", sock);
 	
 	cinfo->set_sockfd(sock);
 	cinfo->set_hid(getHIDForAddr(addr_buf));
@@ -362,7 +342,6 @@ DBGF("New sock is %d", sock);
 }
 
 int openConnectionToName(string &name, session::ConnectionInfo *cinfo) {
-DBGF("Opening connection to name: %s", name.c_str());
 	
 	struct addrinfo *ai;
 	if (_getaddrinfo(name.c_str(), NULL, NULL, &ai) < 0) {
