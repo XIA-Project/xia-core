@@ -11,6 +11,7 @@ TARGETS= xftp_basic_client xftp_basic_server chunk_copy_client chunk_copy_server
 all: $(TARGETS)
 	make -C dag_manipulation
 	make -C session
+	make -C xssl
 
 %: %.c
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS) -lpthread
@@ -22,3 +23,4 @@ clean:
 	-rm $(TARGETS)
 	make -C dag_manipulation clean
 	make -C session clean
+	make -C xssl clean
