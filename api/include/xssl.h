@@ -27,13 +27,15 @@
 #include <openssl/rsa.h>
 #include <openssl/pem.h>
 #include <openssl/sha.h>
-#include <openssl/err.h>
 #include <openssl/aes.h>
+#include <openssl/err.h>
 #include <openssl/rand.h>
+#include <openssl/evp.h>
 
 #define RSA_KEY_LENGTH 1024  /* in bits */
 #define RSA_PUB_EXPONENT 3
-#define AES_KEY_LENGTH 16  /* in bytes */
+#define PRE_MASTER_SECRET_LENGTH 32  /* in bytes */
+#define SALT {7509, 9022}
 
 
 typedef struct {
@@ -46,7 +48,8 @@ typedef struct {
 	XSSL_CTX *ctx;
 	RSA *session_keypair;
 	int sockfd;
-	unsigned char *aes_key;
+	EVP_CIPHER_CTX *en;  // encryption context
+	EVP_CIPHER_CTX *de;  // decryption context
 } XSSL;
 
 
@@ -67,13 +70,16 @@ int XSSL_read(XSSL *xssl, void *buf, int num);
 /* Utility Functions (in XSSL_util.c) */
 char* SID_from_keypair(RSA *keypair);
 void print_keypair(RSA *keypair);
-void print_aes_key(unsigned char *key);
+void print_bytes(unsigned char *bytes, size_t len);
 uint32_t serialize_rsa_pub_key(RSA *keypair, char *buf, size_t len);
 RSA *deserialize_rsa_pub_key(char *buf, size_t len);
 unsigned char *hash(char *msg, size_t msg_len);
 uint32_t sign(RSA *keypair, char *msg, size_t msg_len, char *sigbuf, int sigbuflen);
 int verify(RSA *keypair, char *msg, size_t msg_len, char *sig, size_t sig_len);
-int encrypt(RSA *keypair, unsigned char *msg, size_t msg_len, char *ciphertext_buf, int ciphertext_buf_len);
-int decrypt(RSA *keypair, unsigned char *msg_buf, size_t msg_buf_len, unsigned char *ciphertext, size_t ciphertext_len);
+int pub_encrypt(RSA *keypair, unsigned char *msg, size_t msg_len, char *ciphertext_buf, int ciphertext_buf_len);
+int priv_decrypt(RSA *keypair, unsigned char *msg_buf, int msg_buf_len, unsigned char *ciphertext, size_t ciphertext_len);
+int aes_init(unsigned char *en_key_data, int en_key_data_len, unsigned char *de_key_data, int de_key_data_len, unsigned char *salt, EVP_CIPHER_CTX *e_ctx, EVP_CIPHER_CTX *d_ctx);
+int aes_encrypt(EVP_CIPHER_CTX *e, unsigned char *plaintext, int plaintext_len, unsigned char *ciphertext_buf, int ciphertext_buf_len);
+int aes_decrypt(EVP_CIPHER_CTX *e, unsigned char *plaintext_buf, int plaintext_buf_len, unsigned char *ciphertext, int ciphertext_len);
 
 #endif /* XSSL_H */

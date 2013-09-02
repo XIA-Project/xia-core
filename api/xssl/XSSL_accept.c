@@ -95,7 +95,7 @@ printf("    sent keys (%d bytes)\n\tkeylen: %d\n\ttempkeylen: %d\n\tsiglen:%d\n"
 	}
 
 
-	/* Receive and decrypt session key */
+	/* Receive and decrypt pre-master secret */
 	size_t expecting = RSA_size(xssl->session_keypair); // TODO: have client send key size?
 	n = 0;
 	offset = 0;
@@ -107,22 +107,32 @@ printf("    sent keys (%d bytes)\n\tkeylen: %d\n\ttempkeylen: %d\n\tsiglen:%d\n"
 		offset += n;
 	}
 
-	unsigned char* plaintext_buf = (unsigned char*)malloc(RSA_size(xssl->session_keypair));
+	unsigned char* pms = (unsigned char*)malloc(RSA_size(xssl->session_keypair));
 	int plaintext_len;
-	if ( (plaintext_len = decrypt(xssl->session_keypair, 
-							plaintext_buf, RSA_size(xssl->session_keypair), 
+	if ( (plaintext_len = priv_decrypt(xssl->session_keypair, 
+							pms, RSA_size(xssl->session_keypair), 
 							(unsigned char*)buf, offset)) == -1) {
 		fprintf(stderr, "ERROR decrypting session key\n");
 		return 0;
 	}
-	if (plaintext_len != AES_KEY_LENGTH) {
-		fprintf(stderr, "ERRLR: decrypted key is not of size AES_KEY_LENGTH\n");
+	if (plaintext_len != PRE_MASTER_SECRET_LENGTH) {
+		fprintf(stderr, "ERRLR: decrypted key material is not of size PRE_MASTER_SECRET_LENGTH\n");
 		return 0;
 	}
-	xssl->aes_key = (unsigned char*)malloc(AES_KEY_LENGTH);
-	memcpy(xssl->aes_key, plaintext_buf, AES_KEY_LENGTH);
-	free(plaintext_buf);
-print_aes_key(xssl->aes_key);
+print_bytes(pms, PRE_MASTER_SECRET_LENGTH);
+
+
+	/* Init symmetric session ciphers with pre-master secret.
+	   Client encrypt context initialized with same key data as
+	   server decrypt context and vice versa. */
+	uint32_t salt[] = SALT;
+	if (aes_init(&pms[PRE_MASTER_SECRET_LENGTH/2], PRE_MASTER_SECRET_LENGTH/2, 
+				 pms, PRE_MASTER_SECRET_LENGTH/2, 
+				 (unsigned char *)&salt, xssl->en, xssl->de)) {
+		fprintf(stderr, "ERROR initializing AES ciphers\n");
+		return 0;
+	}
+	free(pms);
 
 
 	/* For now, omitting SERVER DONE */

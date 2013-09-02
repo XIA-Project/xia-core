@@ -111,17 +111,17 @@ printf("%s\n", sid_from_key_hash);
 	}
 
 
-	/* Generate AES key and send to server, encrypted with sessionPubKey */
-	xssl->aes_key = (unsigned char*)malloc(AES_KEY_LENGTH);
-    if (RAND_bytes(xssl->aes_key, AES_KEY_LENGTH) != 1) {
-        fprintf(stderr, "ERROR: Couldn't generate AES key\n");
+	/* Generate pre-master secret and send to server, encrypted with sessionPubKey */
+	unsigned char* pms = (unsigned char*)malloc(PRE_MASTER_SECRET_LENGTH);
+    if (RAND_bytes(pms, PRE_MASTER_SECRET_LENGTH) != 1) {
+        fprintf(stderr, "ERROR: Couldn't generate pre-master secret\n");
 		return 0;
     }
-print_aes_key(xssl->aes_key);
+print_bytes(pms, PRE_MASTER_SECRET_LENGTH);
 
 	int ciphertext_len;
-	if ( (ciphertext_len = encrypt(sessionPubkey, 
-							xssl->aes_key, AES_KEY_LENGTH, 
+	if ( (ciphertext_len = pub_encrypt(sessionPubkey, 
+							pms, PRE_MASTER_SECRET_LENGTH, 
 							buf, XIA_MAXBUF)) == -1 ) {
 		fprintf(stderr, "ERROR: Unable to encrypt session key\n");
 		return 0;
@@ -131,11 +131,24 @@ print_aes_key(xssl->aes_key);
 	offset = 0;
 	while (offset < ciphertext_len) {
 		if ((n = Xsend(xssl->sockfd, &buf[offset], ciphertext_len-offset, 0)) < 0) {
-			fprintf(stderr, "ERROR sending session key\n");
+			fprintf(stderr, "ERROR sending pre-master secret\n");
 			return 0;
 		}
 		offset += n;
 	}
+	
+
+	/* Init symmetric session ciphers with pre-master secret.
+	   Client encrypt context initialized with same key data as
+	   server decrypt context and vice versa. */
+	uint32_t salt[] = SALT;
+	if (aes_init(pms, PRE_MASTER_SECRET_LENGTH/2, 
+				 &pms[PRE_MASTER_SECRET_LENGTH/2], PRE_MASTER_SECRET_LENGTH/2, 
+				 (unsigned char *)&salt, xssl->en, xssl->de)) {
+		fprintf(stderr, "ERROR initializing AES ciphers\n");
+		return 0;
+	}
+	free(pms);
 
 	
 	/* For now, omitting CLIENT DONE */

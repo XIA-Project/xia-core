@@ -36,6 +36,10 @@ XSSL *XSSL_new(XSSL_CTX *ctx) {
 
 	xssl->ctx = ctx;
 	xssl->session_keypair = RSA_generate_key(RSA_KEY_LENGTH, RSA_PUB_EXPONENT, NULL, NULL);
+	xssl->en = (EVP_CIPHER_CTX*)malloc(sizeof(EVP_CIPHER_CTX));
+	EVP_CIPHER_CTX_init(xssl->en);
+	xssl->de = (EVP_CIPHER_CTX*)malloc(sizeof(EVP_CIPHER_CTX));
+	EVP_CIPHER_CTX_init(xssl->de);
 
 	return xssl;
 }
@@ -48,6 +52,7 @@ XSSL *XSSL_new(XSSL_CTX *ctx) {
 */
 void XSSL_free(XSSL *xssl) {
 	RSA_free(xssl->session_keypair);
-	free(xssl->aes_key);
+	if (xssl->en) EVP_CIPHER_CTX_cleanup(xssl->en);
+	if (xssl->de) EVP_CIPHER_CTX_cleanup(xssl->de);
 	free(xssl);
 }
