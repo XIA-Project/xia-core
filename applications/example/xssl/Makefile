@@ -4,7 +4,7 @@ include ../../../xia.mk
 
 LDFLAGS += $(LIBS)
 
-TARGETS=test echoserver echoclient
+TARGETS=echoserver echoclient
 
 all: $(TARGETS)
 
