@@ -1,0 +1,192 @@
+package session;
+
+enum SessionCallType {
+  // Messages between API and session process
+  RETURN_CODE = 1;
+
+  NEW_CONTEXT = 3;
+  INIT = 4;
+  BIND = 5;
+  ACCEPT = 6;
+  SEND = 7;
+  RECEIVE = 8;
+  CLOSE = 9;
+  CHECK_FOR_DATA = 16;
+}
+
+enum ReturnCode {
+	SUCCESS = 1;
+	FAILURE = 2;
+}
+
+enum ConnType {
+	TCP = 1;
+	UDP = 2;
+	XSP = 3;
+	XDP = 4;
+}
+
+enum PacketType {
+	SETUP = 1;
+	DATA = 2;
+	TEARDOWN = 3;
+	MIGRATE = 4;
+}
+
+
+// Messages between API and session process
+
+message SessionMsg {
+  required SessionCallType type = 1;
+  
+  // This message could be one of the following specific types of message
+  optional S_Return_Code_Msg s_rc = 2;
+  optional S_New_Context_Msg s_new_context = 3;
+  optional SInitMsg s_init = 4;
+  optional SBindMsg s_bind = 5;
+  optional SAcceptMsg s_accept = 6;
+  optional SSendMsg s_send = 7;
+  optional SSendRet s_send_ret = 8;
+  optional SRecvMsg s_recv = 9;
+  optional SRecvRet s_recv_ret = 10;
+  optional SCloseMsg s_close = 11;
+  optional SCheckDataMsg s_check_data = 16;
+  optional SCheckDataRet s_check_data_ret = 17;
+}
+
+message S_Return_Code_Msg {
+	required ReturnCode rc = 1;
+	optional string message = 2;
+}
+ 
+message S_New_Context_Msg {
+  optional string temp = 1; // currently not used
+}
+
+message SInitMsg {
+  required string session_path = 1;
+}
+
+message SBindMsg {
+	required string name = 1;
+}
+
+message SAcceptMsg {
+	required uint32 new_ctx = 1;
+}
+
+message SSendMsg {
+	required bytes data = 1;
+}
+
+message SSendRet {
+	required int32 bytes_sent = 1;
+}
+
+message SRecvMsg {
+	required uint32 bytes_to_recv = 1;
+	required bool wait_for_adu = 2 [default = false];
+}
+
+message SRecvRet {
+	required bytes data = 1;
+}
+
+message SCloseMsg {
+	optional string dummy = 1; // not used
+}
+
+message SCheckDataMsg {
+	optional string dummy = 1; // not used
+}
+
+message SCheckDataRet {
+	required bool data_available = 1;
+}
+
+
+// Messages between session processes
+
+message SessionPacket {
+	// Header fields
+	required PacketType type = 1;
+	optional uint32 sender_ctx = 2;
+
+	// Data field
+	optional SessionInfo info = 10;
+	optional SessionData data = 11;
+	optional SessionMigrate migrate = 12;
+}
+
+message SessionInfo {
+
+	message ServiceInfo {
+		required string name = 1;
+	}
+
+	repeated ServiceInfo session_path = 1;
+	optional string my_name = 3;
+	optional bytes my_addr = 4; // If XIA, a sockaddr_x
+	optional bytes initiator_addr = 5; // If XIA, a sockaddr_x
+	optional uint32 initiator_ctx = 6;
+	optional bool new_lasthop_conn = 7 [default = false];  // should the last hop open a new conn to me?
+	optional bytes rx_cinfo = 8;  // receiver of a ConnReq can tag it with the receiving transport conn
+}
+
+message SessionData {
+	optional bytes data = 1;
+}
+
+message SessionMigrate {
+	required string sender_name = 1;
+}
+
+// Stores information about an open transport connection.
+// The connection might be shared between multiple sessions.
+message ConnectionInfo {
+	required string hid = 1;  // remote HID
+	required int32 sockfd = 2;
+	required bytes addr = 3;  // remote address
+	repeated int32 sessions = 4;
+	required string interface = 5 [default = "default"];
+	required ConnType type = 6 [default = XSP];
+	required string my_name = 7;
+}
+
+message ContextInfo {
+	enum ContextState {
+		CLOSED = 1;
+		LISTEN = 2;
+		CONNECTING = 3;
+		ESTABLISHED = 4;
+		CLOSING = 5;
+	}
+
+	optional ContextState state = 1 [default = CLOSED];
+	optional bool initialized = 2 [default = false];
+	optional string my_name = 3;
+	optional bytes my_addr = 4;
+}
+
+
+// Messages for IP nameserver
+message NSMsg {
+	optional NSRegister reg = 1;
+	optional NSLookup lookup = 2;
+	optional NSLookupReply reply = 3;
+}
+
+message NSRegister { 
+	required uint32 ip = 1;
+	required uint32 port = 2;
+	required string name = 3;
+}
+
+message NSLookup {
+	required string name = 1;
+}
+
+message NSLookupReply {
+	required uint32 ip = 1;
+	required uint32 port = 2;
+}

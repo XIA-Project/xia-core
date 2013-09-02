@@ -92,6 +92,40 @@ char *hostsLookup(const char *name) {
 }
 
 
+// A hack for the session layer mobility demo: repeatedly send requests on a
+// separate thread until we get at least one response
+struct sendRequestsArgs {
+	int sock;
+	char* pkt;
+	int offset;
+	sockaddr_x *ns_dag;
+};
+void* sendRequests(void* args) {
+
+	struct sendRequestsArgs *sra = (struct sendRequestsArgs*)args;
+
+	int sock = sra->sock;
+	int offset = sra->offset;
+	char pkt[NS_MAX_PACKET_SIZE];
+	memcpy(pkt, sra->pkt, NS_MAX_PACKET_SIZE);
+	sockaddr_x ns_dag;
+	memcpy(&ns_dag, sra->ns_dag, sizeof(sockaddr_x));
+
+	
+	//Send a name query to the name server
+	int count = 0;
+	while (count < 100) {
+		pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+		Xsendto(sock, pkt, offset, 0, (const struct sockaddr*)&ns_dag, sizeof(sockaddr_x));
+		pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+		count++;
+		usleep(100000);
+	}
+
+	return NULL;
+}
+
+
 /*!
 ** @brief Lookup a DAG based using a host or service name.
 **
@@ -114,6 +148,7 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 	int sock;
 	sockaddr_x ns_dag;
 	char pkt[NS_MAX_PACKET_SIZE];
+	char reply_pkt[NS_MAX_PACKET_SIZE];
 	char *dag;
 	char _name[NS_MAX_DAG_LENGTH], _dag[NS_MAX_DAG_LENGTH];
 	int result;
@@ -181,20 +216,32 @@ if (!strncmp(name, "RE ", 3) || !strncmp(name, "DAG ", 4)) {
 	memcpy(pkt+offset, query_pkt.name, strlen(query_pkt.name)+1);
 	offset += strlen(query_pkt.name)+1;
 
-	//Send a name query to the name server
-	Xsendto(sock, pkt, offset, 0, (const struct sockaddr*)&ns_dag, sizeof(sockaddr_x));
+
+	// start request thread
+	struct sendRequestsArgs sra;
+	sra.sock = sock;
+	sra.pkt = pkt;
+	sra.offset = offset;
+	sra.ns_dag = &ns_dag;
+
+	pthread_t srt;
+	pthread_create(&srt, NULL, sendRequests, (void*)&sra);
 
 	//Check the response from the name server
-	memset(pkt, 0, sizeof(pkt));
-	int rc = Xrecvfrom(sock, pkt, NS_MAX_PACKET_SIZE, 0, NULL, NULL);
+	memset(reply_pkt, 0, sizeof(reply_pkt));
+	int rc = Xrecvfrom(sock, reply_pkt, NS_MAX_PACKET_SIZE, 0, NULL, NULL);
 	if (rc < 0) { perror("recvfrom"); }
+
+	// stop sending requests
+	pthread_cancel(srt);
+	pthread_join(srt, NULL);
 
 	memset(_name, '\0', NS_MAX_DAG_LENGTH);
 	memset(_dag, '\0', NS_MAX_DAG_LENGTH);
 
-	ns_pkt *tmp = (ns_pkt *)pkt;
-	char* tmp_name = (char*)(pkt+sizeof(tmp->type));
-	char* tmp_dag = (char*)(pkt+sizeof(tmp->type)+ strlen(tmp_name)+1);
+	ns_pkt *tmp = (ns_pkt *)reply_pkt;
+	char* tmp_name = (char*)(reply_pkt+sizeof(tmp->type));
+	char* tmp_dag = (char*)(reply_pkt+sizeof(tmp->type)+ strlen(tmp_name)+1);
 	switch (tmp->type) {
 	case NS_TYPE_RESPONSE:
 		sprintf(_name, "%s", tmp_name);
