@@ -1,6 +1,6 @@
 include ../../xia.mk
 
-.PHONY: clean
+.PHONY: clean doc all
 
 CFLAGS +=-c
 LDFLAGS += -lssl -lcrypto
@@ -23,7 +23,11 @@ $(LIB): $(OBJS)
 $(STATICLIB): $(OBJS) 
 	ar rcs $@ $(OBJS)
 
+doc: $(SOURCES) $(XINC)/xssl.h
+	doxygen Doxyfile
+
 clean:
 	-rm -f $(LIB)
 	-rm -f $(STATICLIB)
 	-rm -f *.o
+	-rm -rf doc

@@ -16,7 +16,18 @@
 /*!
   @file XSSL_util.c
   @brief Implements SID_from_keypair(),
-  					print_keypair()
+  					print_keypair(),
+					print_bytes(),
+					serialize_rsa_pub_key(),
+					deserialize_rsa_pub_key(),
+					hash(),
+					sign(),
+					verify(),
+					pub_encrypt(),
+					priv_decrypt(),
+					aes_init(),
+					aes_encrypt(),
+					aes_decrypt()
 */
 
 #include "xssl.h"
