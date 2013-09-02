@@ -305,19 +305,20 @@ void *mainLoop(void * /* dummy */)
 		if (reconnect != 0) {
 			if (count % reconnect == 0) {
 				// time to close and reopen the socket
+				XSSL_shutdown(xssl);
 				Xclose(xssl->sockfd);
+				XSSL_free(xssl);
 				say("Xsock %4d closed\n", xssl->sockfd);
-				// TODO: close xssl
 				xssl = connectToServer();
 			}
 		}
 		if (loops > 0 && count == loops)
 				break;
 	}
+	XSSL_shutdown(xssl);
 	Xclose(xssl->sockfd);
-	// TODO: close XSSL
-	say("Xsock %4d closed\n", xssl->sockfd);
 	XSSL_free(xssl);
+	say("Xsock %4d closed\n", xssl->sockfd);
 
 	return NULL;
 }
