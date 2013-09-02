@@ -106,20 +106,21 @@ void print_keypair(RSA *keypair) {
 }
 
 /**
-* @brief Print an AES key.
+* @brief Print bytes in hex.
 *
-* @param key
+* @param bytes
+* @param len
 */
-void print_aes_key(unsigned char *key) {
+void print_bytes(unsigned char *bytes, size_t len) {
 	
 	// format key as hex string
-	char keystr[AES_KEY_LENGTH*2 + 1];
-	for (int i = 0; i < AES_KEY_LENGTH; i++) {
-		sprintf(&keystr[i*2], "%02x", key[i]);
+	char str[len*2 + 1];
+	for (size_t i = 0; i < len; i++) {
+		sprintf(&str[i*2], "%02x", bytes[i]);
 	}
-    keystr[AES_KEY_LENGTH*2] = '\0';
+    str[len*2] = '\0';
 	
-	printf("========== AES KEY ==========\n%s\n\n", keystr);
+	printf("%s\n\n", str);
 }
 
 
@@ -329,7 +330,7 @@ int verify(RSA *keypair, char *msg, size_t msg_len, char *sig, size_t sig_len) {
 *
 * @return Size of encrypted message on success, -1 on failure.
 */
-int encrypt(RSA *keypair, unsigned char *msg, size_t msg_len, char *ciphertext_buf, int ciphertext_buf_len) {
+int pub_encrypt(RSA *keypair, unsigned char *msg, size_t msg_len, char *ciphertext_buf, int ciphertext_buf_len) {
 	if (ciphertext_buf_len < RSA_size(keypair)) {
 		fprintf(stderr, "ERROR: Not enough room for ciphertext\n");
 		return -1;
@@ -360,7 +361,7 @@ int encrypt(RSA *keypair, unsigned char *msg, size_t msg_len, char *ciphertext_b
 *
 * @return Size of decrypted message on success, -1 on failure.
 */
-int decrypt(RSA *keypair, unsigned char *msg_buf, size_t msg_buf_len, unsigned char *ciphertext, size_t ciphertext_len) {
+int priv_decrypt(RSA *keypair, unsigned char *msg_buf, int msg_buf_len, unsigned char *ciphertext, size_t ciphertext_len) {
 	if (msg_buf_len < RSA_size(keypair)) {
 		fprintf(stderr, "ERROR: Not enough room for plaintext\n");
 		return -1;
@@ -378,4 +379,146 @@ int decrypt(RSA *keypair, unsigned char *msg_buf, size_t msg_buf_len, unsigned c
     }
 
 	return plaintext_len;
+}
+
+
+/**
+ **/
+/**
+* @brief Prepares AES encryption and decryption contexts.
+*
+* Create an 256 bit key and IV using the supplied key_data. salt can be added for taste.
+* Fills in the encryption and decryption ctx objects and returns 0 on success
+*
+* Code adapted from: http://saju.net.in/code/misc/openssl_aes.c.txt
+*
+* @param key_data
+* @param key_data_len
+* @param salt
+* @param e_ctx
+* @param d_ctx
+*
+* @return 0 on success
+*/
+int aes_init(unsigned char *en_key_data, int en_key_data_len, 
+			 unsigned char *de_key_data, int de_key_data_len, 
+			 unsigned char *salt, EVP_CIPHER_CTX *e_ctx, 
+             EVP_CIPHER_CTX *d_ctx) {
+	int i, nrounds = 5;
+	unsigned char en_key[32], en_iv[32], de_key[32], de_iv[32];
+	
+	/*
+	 * Gen key & IV for AES 256 CBC mode. A SHA1 digest is used to hash the supplied key material.
+	 * nrounds is the number of times the we hash the material. More rounds are more secure but
+	 * slower.
+	 */
+	i = EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha1(), salt, en_key_data, en_key_data_len, nrounds, en_key, en_iv);
+	if (i != 32) {
+	  printf("Key size is %d bits - should be 256 bits\n", i);
+	  return -1;
+	}
+	if (EVP_EncryptInit_ex(e_ctx, EVP_aes_256_cbc(), NULL, en_key, en_iv) != 1) {
+		fprintf(stderr, "ERROR initializing encryption context\n");
+		return -1;
+	}
+
+	i = EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha1(), salt, de_key_data, de_key_data_len, nrounds, de_key, de_iv);
+	if (i != 32) {
+	  printf("Key size is %d bits - should be 256 bits\n", i);
+	  return -1;
+	}
+	if (EVP_DecryptInit_ex(d_ctx, EVP_aes_256_cbc(), NULL, de_key, de_iv) != 1) {
+		fprintf(stderr, "ERROR initializing decryption context\n");
+		return -1;
+	}
+	
+	return 0;
+}
+
+
+/**
+* @brief Encrypt *len bytes of data
+*
+* All data going in & out is considered binary (unsigned char[])
+*
+* Code adapted from: http://saju.net.in/code/misc/openssl_aes.c.txt
+*
+* @param e
+* @param plaintext
+* @param plaintext_len
+* @param ciphertext_buf
+* @param ciphertext_buf_len
+*
+* @return Size of ciphertext on success, -1 on failure
+*/
+int aes_encrypt(EVP_CIPHER_CTX *e, 
+				unsigned char *plaintext, int plaintext_len,
+				unsigned char *ciphertext_buf, int ciphertext_buf_len) {
+	/* max ciphertext len for a n bytes of plaintext is n + AES_BLOCK_SIZE -1 bytes */
+	int c_len = plaintext_len + AES_BLOCK_SIZE, f_len = 0;
+	if (ciphertext_buf_len < c_len) {
+		fprintf(stderr, "ERROR: ciphertext buffer too small\n");
+		return -1;
+	}
+	
+	/* allows reusing of 'e' for multiple encryption cycles */
+	if (EVP_EncryptInit_ex(e, NULL, NULL, NULL, NULL) != 1) {
+		fprintf(stderr, "ERROR initializing encryption\n");
+		return -1;
+	}
+	
+	/* update ciphertext, c_len is filled with the length of ciphertext generated,
+	  *len is the size of plaintext in bytes */
+	if (EVP_EncryptUpdate(e, ciphertext_buf, &c_len, plaintext, plaintext_len) != 1) {
+		fprintf(stderr, "ERROR encrypting\n");
+		return -1;
+	}
+	
+	/* update ciphertext with the final remaining bytes */
+	if (EVP_EncryptFinal_ex(e, ciphertext_buf+c_len, &f_len) != 1) {
+		fprintf(stderr, "ERROR encrypting\n");
+		return -1;
+	}
+	
+	return c_len + f_len;
+}
+
+
+/**
+* @brief Decrypt *len bytes of ciphertext.
+*
+* Code adapted from: http://saju.net.in/code/misc/openssl_aes.c.txt
+*
+* @param e
+* @param plaintext_buf
+* @param plaintext_buf_len
+* @param ciphertext
+* @param ciphertext_len
+*
+* @return Size of decrypted data on success; -1 on failure
+*/
+int aes_decrypt(EVP_CIPHER_CTX *e, 
+				unsigned char *plaintext_buf, int plaintext_buf_len,
+				unsigned char *ciphertext, int ciphertext_len) {
+	/* because we have padding ON, we must have an extra cipher block size of memory */
+	int p_len = ciphertext_len, f_len = 0;
+	if (plaintext_buf_len < p_len + AES_BLOCK_SIZE) {
+		fprintf(stderr, "ERROR: plaintext buffer too small\n");
+		return -1;
+	}
+	
+	if (EVP_DecryptInit_ex(e, NULL, NULL, NULL, NULL) != 1) {
+		fprintf(stderr, "ERROR initializing decryption\n");
+		return -1;
+	}
+	if (EVP_DecryptUpdate(e, plaintext_buf, &p_len, ciphertext, ciphertext_len) != 1) {
+		fprintf(stderr, "ERROR decrypting\n");
+		return-1;
+	}
+	if (EVP_DecryptFinal_ex(e, plaintext_buf+p_len, &f_len) != 1) {
+		fprintf(stderr, "ERROR decrypting\n");
+		return -1;
+	}
+	
+	return p_len + f_len;;
 }
