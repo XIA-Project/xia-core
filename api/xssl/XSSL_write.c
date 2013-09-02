@@ -19,6 +19,7 @@
 */
 
 #include "xssl.h"
+#include "Xsocket.h"
 
 
 /**
@@ -28,9 +29,35 @@
 * @param buf Data to send.
 * @param num Number of bytes to send.
 *
-* @return Number of bytes written to the connection on success.
+* @return Number of bytes (before encryption) written to the connection on success.
 * @return 0 or <0 on failure
 */
 int XSSL_write(XSSL *xssl, const void *buf, int num) {
 
+	/* encrypt data to send */
+	unsigned char *ciphertext = (unsigned char*)malloc(XIA_MAXBUF);
+	int ciphertext_len = aes_encrypt(xssl->en, 
+							(unsigned char*)buf, num,
+							ciphertext, XIA_MAXBUF);
+
+	if (ciphertext_len <= 0) {
+		fprintf(stderr, "ERROR encrypting message\n");
+		return ciphertext_len;
+	}
+
+
+	/* send the ciphertext.
+	   can't send partial block, or other side can't decrypt! */
+	int offset = 0;
+	int n = 0;
+	while (offset < ciphertext_len) {
+		if ( (n = Xsend(xssl->sockfd, &ciphertext[offset], ciphertext_len-offset, 0)) < 0) {
+			fprintf(stderr, "ERROR sending ciphertext\n");
+			return -1;
+		}
+		offset += n;
+	}
+	
+	free(ciphertext);
+	return num; // return num bytes of *plain text* we sent
 }

@@ -194,7 +194,7 @@ char *randomString(char *buf, int size)
 /*
 ** do one send/receive operation on the specified socket
 */
-int process(int sock)
+int process(XSSL* xssl)
 {
 	int size;
 	int sent, received;
@@ -206,20 +206,20 @@ int process(int sock)
 		size = pktSize;
 	randomString(buf1, size);
 
-	if ((sent = Xsend(sock, buf1, size, 0)) < 0)
-		die(-4, "Send error %d on socket %d\n", errno, sock);
+	if ((sent = XSSL_write(xssl, buf1, size)) < 0)
+		die(-4, "Send error %d on socket %d\n", errno, xssl->sockfd);
 
-	say("Xsock %4d sent %d of %d bytes\n", sock, sent, size);
+	say("Xsock %4d sent %d of %d bytes\n", xssl->sockfd, sent, size);
 
 	memset(buf2, 0, sizeof(buf2));
-	if ((received = Xrecv(sock, buf2, sizeof(buf2), 0)) < 0)
-		die(-5, "Receive error %d on socket %d\n", errno, sock);
+	if ((received = XSSL_read(xssl, buf2, sizeof(buf2))) < 0)
+		die(-5, "Receive error %d on socket %d\n", errno, xssl->sockfd);
 
-	say("Xsock %4d received %d bytes\n", sock, received);
+	say("Xsock %4d received %d bytes\n", xssl->sockfd, received);
 
 	if (sent != received || strcmp(buf1, buf2) != 0)
 		warn("Xsock %4d received data different from sent data! (bytes sent/recv'd: %d/%d)\n",
-				sock, sent, received);
+				xssl->sockfd, sent, received);
 
 	return 0;
 }
@@ -296,8 +296,8 @@ void *mainLoop(void * /* dummy */)
 		if (printcount)
 			say("Xsock %4d loop #%d\n", xssl->sockfd, count);
 
-		//if (process(xssl) != 0)
-		//	break;
+		if (process(xssl) != 0)
+			break;
 
 		pausex();
 

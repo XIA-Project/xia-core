@@ -148,13 +148,12 @@ void process(int sock, XSSL_CTX *ctx)
 		die(-8, "Error accepting XSSL connection\n");
 	}
 
-// TODO: switch to XSSL send and XSSL recv
    	while (1) {
 		memset(buf, 0, sizeof(buf));
 
 	tv.tv_sec = WAIT_FOR_DATA;
 	tv.tv_usec = 0;
-		 if ((n = select(sock + 1, &fds, NULL, NULL, &tv)) < 0) {
+		 if ((n = select(xssl->sockfd + 1, &fds, NULL, NULL, &tv)) < 0) {
 			 warn("%5d Select failed, closing...\n", pid);
 			 break;
 
@@ -162,19 +161,19 @@ void process(int sock, XSSL_CTX *ctx)
 			 // we timed out, close the socket
 			 say("%5d timed out on recv\n", pid);
 			 break;
-		 } else if (!FD_ISSET(sock, &fds)) {
+		 } else if (!FD_ISSET(xssl->sockfd, &fds)) {
 			 // this shouldn't happen!
 			 die(-4, "something is really wrong, exiting\n");
 		 }
 
-		if ((n = Xrecv(sock, buf, sizeof(buf), 0)) < 0) {
+		if ((n = XSSL_read(xssl, buf, sizeof(buf))) < 0) {
 			warn("Recv error on socket %d, closing connection\n", pid);
 			break;
 		}
 
 		say("%5d received %d bytes\n", pid, n);
 
-		if ((n = Xsend(sock, buf, n, 0)) < 0) {
+		if ((n = XSSL_write(xssl, buf, n)) < 0) {
 			warn("%5d send error\n", pid);
 			break;
 		}
