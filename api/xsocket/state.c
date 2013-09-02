@@ -35,7 +35,7 @@ public:
 
 	int transportType() { return m_transportType; };
 	void setTransportType(int tt) {m_transportType = tt; };
-	
+
 	int data(char *buf, unsigned bufLen);
 	void setData(const char *buf, unsigned bufLen);
 	int dataLen() { return m_bufLen; };
@@ -49,6 +49,9 @@ public:
 	int isAsync() { return m_async; };
 	void setAsync(int async) { m_async = async; };
 
+	const sockaddr_x *peer() { return m_peer; };
+	int setPeer(const sockaddr_x *peer);
+
 private:
 	int m_transportType;
 	int m_connected;
@@ -56,6 +59,7 @@ private:
 	int m_wrapped;	// hack for dealing with xwrap stuff
 	char *m_buf;
 	unsigned m_bufLen;
+	sockaddr_x *m_peer;
 };
 
 SocketState::SocketState(int tt)
@@ -65,8 +69,9 @@ SocketState::SocketState(int tt)
 	m_connected = 0;
 	m_async = 0;
 	m_wrapped = 0;
-	m_buf = (char *)0;
+	m_buf = NULL;
 	m_bufLen = 0;
+	m_peer = NULL;
 }
 
 SocketState::SocketState()
@@ -75,8 +80,9 @@ SocketState::SocketState()
 	m_connected = 0;
 	m_async = 0;
 	m_wrapped = 0;
-	m_buf = (char *)0;
+	m_buf = NULL;
 	m_bufLen = 0;
+	m_peer = NULL;
 }
 
 SocketState::~SocketState()
@@ -114,7 +120,9 @@ void SocketState::setData(const char *buf, unsigned bufLen)
 	if (!buf || bufLen == 0)
 		return;
 
-	assert(!m_buf && m_bufLen == 0);
+	if (m_buf)
+		delete(m_buf);
+	m_bufLen = 0;
 
 	m_buf = new char [bufLen];
 	if (!m_buf)
@@ -163,7 +171,7 @@ SocketMap *SocketMap::getMap()
 	if (!instance) {
 
 		pthread_mutex_lock(&lock);
-		
+
 		if (!instance)
 			instance = new SocketMap();
 
@@ -199,6 +207,20 @@ SocketState *SocketMap::get(int sock)
 	SocketState *p =  SocketMap::getMap()->sockets[sock];
 	pthread_rwlock_unlock(&rwlock);
 	return p;
+}
+
+int SocketState::setPeer(const sockaddr_x *peer)
+{
+	if (m_peer != NULL) {
+		free(m_peer);
+		m_peer = NULL;
+	}
+
+	if (peer) {
+		m_peer = (sockaddr_x *)malloc(sizeof(sockaddr_x));
+		memcpy(m_peer, peer, sizeof(sockaddr_x));
+	}
+	return 0;
 }
 
 // extern "C" {
@@ -294,6 +316,28 @@ void setSocketData(int sock, const char *buf, unsigned bufLen)
 		sstate->setData(buf, bufLen);
 }
 
+int setPeer(int sock, sockaddr_x *addr)
+{
+	int rc = 0;
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+
+	if (sstate) {
+		sstate->setPeer(addr);
+	}
+
+	return rc;
+}
+
+const sockaddr_x *dgramPeer(int sock)
+{
+	const sockaddr_x *peer = NULL;
+
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		peer = sstate->peer();
+	return peer;
+}
+
 #if 0
 int main()
 {
@@ -302,7 +346,7 @@ int main()
 
 	// should be invalid
 	printf("socket %d tt %d\n", 0, getSocketType(0));
-	
+
 	// should be valid, then invalid
 	allocSocketState(5, 1);
 	printf("socket %d tt %d\n", 5, getSocketType(5));

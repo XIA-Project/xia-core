@@ -51,4 +51,7 @@ void setWrapped(int sock, int wrapped);
 int isWrapped(int sock);
 void setAsync(int sock, int async);
 int isAsync(int sock);
+int setPeer(int sock, sockaddr_x *addr);
+const sockaddr_x *dgramPeer(int sock);
+
 #endif
