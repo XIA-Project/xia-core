@@ -41,7 +41,7 @@ int XSSL_write(XSSL *xssl, const void *buf, int num) {
 							ciphertext, XIA_MAXBUF);
 
 	if (ciphertext_len <= 0) {
-		fprintf(stderr, "ERROR encrypting message\n");
+		ERROR("ERROR encrypting message");
 		return ciphertext_len;
 	}
 
@@ -52,7 +52,7 @@ int XSSL_write(XSSL *xssl, const void *buf, int num) {
 	int n = 0;
 	while (offset < ciphertext_len) {
 		if ( (n = Xsend(xssl->sockfd, &ciphertext[offset], ciphertext_len-offset, 0)) < 0) {
-			fprintf(stderr, "ERROR sending ciphertext\n");
+			ERROR("ERROR sending ciphertext");
 			return -1;
 		}
 		offset += n;

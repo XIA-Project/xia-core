@@ -39,19 +39,19 @@ char* SID_from_keypair(RSA *keypair) {
 	SHA_CTX ctx;
 	unsigned char *md = (unsigned char*)malloc(SHA_DIGEST_LENGTH);
 	if (SHA1_Init(&ctx) == 0) {
-		printf("ERROR initing SHA1 context");
+		ERROR("ERROR initing SHA1 context");
 		return NULL;
 	}
 	if (SHA1_Update(&ctx, hexforkey, strlen(hexforkey)) == 0) {
-		printf("ERROR updating SHA1 context with hexforkey");
+		ERROR("ERROR updating SHA1 context with hexforkey");
 		return NULL;
 	}
 	if (SHA1_Update(&ctx, hexforexp, strlen(hexforexp)) == 0) {
-		printf("ERROR updating SHA1 context with hexforexp");
+		ERROR("ERROR updating SHA1 context with hexforexp");
 		return NULL;
 	}
 	if (SHA1_Final(md, &ctx) == 0) {
-		printf("ERROR computing digest");
+		ERROR("ERROR computing digest");
 		return NULL;
 	}
 	
@@ -146,8 +146,8 @@ uint32_t serialize_rsa_pub_key(RSA *keypair, char *buf, size_t len) {
 	uint32_t hexformodsize = strlen(hexformod);
     char *hexforexp = BN_bn2hex(keypair->e);
 	uint32_t hexforexpsize = strlen(hexforexp);
-printf("hexformod: %s (%d)\n", hexformod, hexformodsize);
-printf("hexforexp: %s (%d)\n", hexforexp, hexforexpsize);
+	DBGF("hexformod: %s (%d)", hexformod, hexformodsize);
+	DBGF("hexforexp: %s (%d)", hexforexp, hexforexpsize);
 
 	if (bufSpaceLeft > sizeof(uint32_t)) {
 		uint32_t *modsizeptr = (uint32_t*)buf;
@@ -194,14 +194,14 @@ RSA *deserialize_rsa_pub_key(char *buf, size_t len) {
 	char *hexformod = (char*)malloc(hexformodsize + 1);
 	memcpy(hexformod, &buf[sizeof(uint32_t)], hexformodsize);
 	hexformod[hexformodsize] = '\0';
-printf("hexformod: %s\n", hexformod);
+	DBGF("hexformod: %s", hexformod);
 
 	/* get exponent */
 	uint32_t hexforexpsize = *(uint32_t*)&buf[sizeof(uint32_t) + hexformodsize];
 	char *hexforexp = (char*)malloc(hexforexpsize + 1);
 	memcpy(hexforexp, &buf[2*sizeof(uint32_t) + hexformodsize], hexforexpsize);
 	hexforexp[hexforexpsize] = '\0';
-printf("hexforexp: %s\n", hexforexp);
+	DBGF("hexforexp: %s", hexforexp);
 
 	/* make the keypair */
     RSA *keypair = RSA_new();
@@ -233,15 +233,15 @@ unsigned char *hash(char *msg, size_t msg_len) {
 	SHA_CTX ctx;
 	unsigned char *digest = (unsigned char*)malloc(SHA_DIGEST_LENGTH);
 	if (SHA1_Init(&ctx) == 0) {
-		printf("ERROR initing SHA1 context");
+		ERROR("ERROR initing SHA1 context");
 		return NULL;
 	}
 	if (SHA1_Update(&ctx, msg, msg_len) == 0) {
-		printf("ERROR updating SHA1 context");
+		ERROR("ERROR updating SHA1 context");
 		return NULL;
 	}
 	if (SHA1_Final(digest, &ctx) == 0) {
-		printf("ERROR computing digest");
+		ERROR("ERROR computing digest");
 		return NULL;
 	}
 
@@ -264,14 +264,14 @@ unsigned char *hash(char *msg, size_t msg_len) {
 uint32_t sign(RSA *keypair, char *msg, size_t msg_len, char *sigbuf, int sigbuflen) {
 	
 	if (sigbuflen < RSA_size(keypair)) {
-		printf("ERROR: Could not sign message because sigbuf is too small\n");
+		ERROR("ERROR: Could not sign message because sigbuf is too small");
 		return 0;
 	}
 
 	/* first hash msg */
 	unsigned char *digest = hash(msg, msg_len);
 	if (digest == NULL) {
-		printf("ERROR: Unable to hash message\n");
+		ERROR("ERROR: Unable to hash message");
 		return 0;
 	}
 
@@ -282,7 +282,7 @@ uint32_t sign(RSA *keypair, char *msg, size_t msg_len, char *sigbuf, int sigbufl
     	char *err = (char *)malloc(130); //FIXME?
         ERR_load_crypto_strings();
         ERR_error_string(ERR_get_error(), err);
-        fprintf(stderr, "Error signing message: %s\n", err);
+        ERRORF("Error signing message: %s", err);
         
         free(err);
         return 0;
@@ -308,7 +308,7 @@ int verify(RSA *keypair, char *msg, size_t msg_len, char *sig, size_t sig_len) {
 	/* first hash msg */
 	unsigned char *digest = hash(msg, msg_len);
 	if (digest == NULL) {
-		fprintf(stderr, "ERROR: Unable to hash message\n");
+		ERROR("ERROR: Unable to hash message");
 		return 0;
 	}
 
@@ -332,7 +332,7 @@ int verify(RSA *keypair, char *msg, size_t msg_len, char *sig, size_t sig_len) {
 */
 int pub_encrypt(RSA *keypair, unsigned char *msg, size_t msg_len, char *ciphertext_buf, int ciphertext_buf_len) {
 	if (ciphertext_buf_len < RSA_size(keypair)) {
-		fprintf(stderr, "ERROR: Not enough room for ciphertext\n");
+		ERROR("ERROR: Not enough room for ciphertext");
 		return -1;
 	}
 
@@ -341,7 +341,7 @@ int pub_encrypt(RSA *keypair, unsigned char *msg, size_t msg_len, char *cipherte
     	char *err = (char *)malloc(130); //FIXME?
         ERR_load_crypto_strings();
         ERR_error_string(ERR_get_error(), err);
-        fprintf(stderr, "Error encrypting message: %s\n", err);
+        ERRORF("Error encrypting message: %s", err);
         
         free(err);
         return -1;
@@ -363,7 +363,7 @@ int pub_encrypt(RSA *keypair, unsigned char *msg, size_t msg_len, char *cipherte
 */
 int priv_decrypt(RSA *keypair, unsigned char *msg_buf, int msg_buf_len, unsigned char *ciphertext, size_t ciphertext_len) {
 	if (msg_buf_len < RSA_size(keypair)) {
-		fprintf(stderr, "ERROR: Not enough room for plaintext\n");
+		ERROR("ERROR: Not enough room for plaintext");
 		return -1;
 	}
 
@@ -372,7 +372,7 @@ int priv_decrypt(RSA *keypair, unsigned char *msg_buf, int msg_buf_len, unsigned
     	char *err = (char *)malloc(130); //FIXME?
         ERR_load_crypto_strings();
         ERR_error_string(ERR_get_error(), err);
-        fprintf(stderr, "error decrypting message: %s\n", err);
+        ERRORF("error decrypting message: %s", err);
         
         free(err);
 		return -1;
@@ -414,21 +414,21 @@ int aes_init(unsigned char *en_key_data, int en_key_data_len,
 	 */
 	i = EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha1(), salt, en_key_data, en_key_data_len, nrounds, en_key, en_iv);
 	if (i != 32) {
-	  printf("Key size is %d bits - should be 256 bits\n", i);
+	  ERRORF("Key size is %d bits - should be 256 bits", i);
 	  return -1;
 	}
 	if (EVP_EncryptInit_ex(e_ctx, EVP_aes_256_cbc(), NULL, en_key, en_iv) != 1) {
-		fprintf(stderr, "ERROR initializing encryption context\n");
+		ERROR("ERROR initializing encryption context");
 		return -1;
 	}
 
 	i = EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha1(), salt, de_key_data, de_key_data_len, nrounds, de_key, de_iv);
 	if (i != 32) {
-	  printf("Key size is %d bits - should be 256 bits\n", i);
+	  ERRORF("Key size is %d bits - should be 256 bits", i);
 	  return -1;
 	}
 	if (EVP_DecryptInit_ex(d_ctx, EVP_aes_256_cbc(), NULL, de_key, de_iv) != 1) {
-		fprintf(stderr, "ERROR initializing decryption context\n");
+		ERROR("ERROR initializing decryption context");
 		return -1;
 	}
 	
@@ -457,26 +457,26 @@ int aes_encrypt(EVP_CIPHER_CTX *e,
 	/* max ciphertext len for a n bytes of plaintext is n + AES_BLOCK_SIZE -1 bytes */
 	int c_len = plaintext_len + AES_BLOCK_SIZE, f_len = 0;
 	if (ciphertext_buf_len < c_len) {
-		fprintf(stderr, "ERROR: ciphertext buffer too small\n");
+		ERROR("Ciphertext buffer too small");
 		return -1;
 	}
 	
 	/* allows reusing of 'e' for multiple encryption cycles */
 	if (EVP_EncryptInit_ex(e, NULL, NULL, NULL, NULL) != 1) {
-		fprintf(stderr, "ERROR initializing encryption\n");
+		ERROR("ERROR initializing encryption");
 		return -1;
 	}
 	
 	/* update ciphertext, c_len is filled with the length of ciphertext generated,
 	  *len is the size of plaintext in bytes */
 	if (EVP_EncryptUpdate(e, ciphertext_buf, &c_len, plaintext, plaintext_len) != 1) {
-		fprintf(stderr, "ERROR encrypting\n");
+		ERROR("ERROR encrypting");
 		return -1;
 	}
 	
 	/* update ciphertext with the final remaining bytes */
 	if (EVP_EncryptFinal_ex(e, ciphertext_buf+c_len, &f_len) != 1) {
-		fprintf(stderr, "ERROR encrypting\n");
+		ERROR("ERROR encrypting");
 		return -1;
 	}
 	
@@ -503,20 +503,20 @@ int aes_decrypt(EVP_CIPHER_CTX *e,
 	/* because we have padding ON, we must have an extra cipher block size of memory */
 	int p_len = ciphertext_len, f_len = 0;
 	if (plaintext_buf_len < p_len + AES_BLOCK_SIZE) {
-		fprintf(stderr, "ERROR: plaintext buffer too small\n");
+		ERROR("ERROR: plaintext buffer too small");
 		return -1;
 	}
 	
 	if (EVP_DecryptInit_ex(e, NULL, NULL, NULL, NULL) != 1) {
-		fprintf(stderr, "ERROR initializing decryption\n");
+		ERROR("ERROR initializing decryption");
 		return -1;
 	}
 	if (EVP_DecryptUpdate(e, plaintext_buf, &p_len, ciphertext, ciphertext_len) != 1) {
-		fprintf(stderr, "ERROR decrypting\n");
+		ERROR("ERROR decrypting");
 		return-1;
 	}
 	if (EVP_DecryptFinal_ex(e, plaintext_buf+p_len, &f_len) != 1) {
-		fprintf(stderr, "ERROR decrypting\n");
+		ERROR("ERROR decrypting");
 		return -1;
 	}
 	
