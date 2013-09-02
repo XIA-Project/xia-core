@@ -34,6 +34,6 @@
 */
 int XSSL_shutdown(XSSL *xssl) {
 	(void)xssl;
-	fprintf(stderr, "WARNING: XSSL_shutdown not implemented\n");
+	WARN("XSSL_shutdown not implemented\n");
 	return 1;
 }

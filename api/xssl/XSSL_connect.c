@@ -30,7 +30,6 @@
 * @return 1 on success, <1 on failure
 */
 int XSSL_connect(XSSL *xssl) {
-printf("<<< XSSL_connect\n");
 
 	char buf[XIA_MAXBUF];
 	int n;
@@ -38,10 +37,9 @@ printf("<<< XSSL_connect\n");
 	/* Send CLIENT HELLO */
 	sprintf(buf, "CLIENT HELLO");
 	if ((n = Xsend(xssl->sockfd, buf, strlen(buf), 0)) != strlen(buf)) {
-		printf("ERROR sending CLIENT HELLO\n");
+		ERROR("ERROR sending CLIENT HELLO");
 		return 0;
 	}
-printf("    sent CLEINT HELLO\n");
 
 	/* Wait for SERVER HELLO */
 	// Receive public key + temporary public key signed by server's long-term private key
@@ -49,19 +47,17 @@ printf("    sent CLEINT HELLO\n");
 	int offset = 0;
 	while ( offset < 11 || strcmp("SERVER DONE", &buf[offset-11]) != 0 ) {
 		n = Xrecv(xssl->sockfd, &buf[offset], sizeof(buf)-offset, 0);
-printf("    received %d bytes\n", n);
 		if (n < 0) {
-			printf("ERROR receiving SERVER HELLO\n");
+			ERROR("ERROR receiving SERVER HELLO");
 			return n;
 		}
 		if (n == 0) {
-			printf("ERROR: server closed connection during SERVER HELLO\n");
+			ERROR("ERROR: server closed connection during SERVER HELLO");
 			return n;
 		}
 
 		offset += n;
 	}
-printf("    Got SERVER HELLO!\n");
 
 	/* Parse public keys from SERVER HELLO */
 	offset = strlen("SERVER HELLO");
@@ -84,7 +80,7 @@ printf("    Got SERVER HELLO!\n");
 	offset += sizeof(uint32_t);
 	char* sig = &buf[offset];
 	offset += siglen;
-printf("    Received keys:\n\tkeylen: %d\n\ttempkeylen: %d\n\tsiglen: %d\n", keybufsize, tempkeybufsize, siglen);
+	DBGF("Received keys:\n\tkeylen: %d\n\ttempkeylen: %d\n\tsiglen: %d", keybufsize, tempkeybufsize, siglen);
 
 	/* Verify two things:
 	 *	1) hash(key) == SID so we trust the signature
@@ -93,20 +89,20 @@ printf("    Received keys:\n\tkeylen: %d\n\ttempkeylen: %d\n\tsiglen: %d\n", key
 	sockaddr_x *sa = (sockaddr_x*)malloc(sizeof(sockaddr_x));
 	socklen_t len = sizeof(sockaddr_x);
 	if (Xgetpeername(xssl->sockfd, (struct sockaddr*)sa, &len) < 0) {
-		printf("Error in Xgetpeername on socket %d: %s\n", xssl->sockfd, strerror(errno));
+		ERRORF("Error in Xgetpeername on socket %d: %s", xssl->sockfd, strerror(errno));
 		return 0;
 	}	
 	Graph g(sa);
 	Node sid_node = g.get_final_intent();
-printf("%s\n", sid_node.to_string().c_str());
+	DBGF("SID:          %s", sid_node.to_string().c_str());
 	char *sid_from_key_hash = SID_from_keypair(pubkey);
-printf("%s\n", sid_from_key_hash);
+	DBGF("Pub key hash: %s", sid_from_key_hash);
 	if (strcmp(sid_node.to_string().c_str(), sid_from_key_hash) != 0) {
-		printf("WARNING! Hash of received public key does not match SID! Closing connection.\n");
+		WARN("Hash of received public key does not match SID! Closing connection.");
 		return 0;
 	}
 	if (verify(pubkey, keys, keybufsize+tempkeybufsize+2*sizeof(uint32_t), sig, siglen) != 1) {
-		printf("WARNING! Unable to verify signature on temporary RSA keypair! Closing connection.\n");
+		WARN("Unable to verify signature on temporary RSA keypair! Closing connection.");
 		return 0;
 	}
 
@@ -114,16 +110,19 @@ printf("%s\n", sid_from_key_hash);
 	/* Generate pre-master secret and send to server, encrypted with sessionPubKey */
 	unsigned char* pms = (unsigned char*)malloc(PRE_MASTER_SECRET_LENGTH);
     if (RAND_bytes(pms, PRE_MASTER_SECRET_LENGTH) != 1) {
-        fprintf(stderr, "ERROR: Couldn't generate pre-master secret\n");
+        ERROR("ERROR: Couldn't generate pre-master secret");
 		return 0;
     }
-print_bytes(pms, PRE_MASTER_SECRET_LENGTH);
+	if (VERBOSITY >= V_DEBUG) {
+		DBG("Pre-Master Secret:");
+		print_bytes(pms, PRE_MASTER_SECRET_LENGTH);
+	}
 
 	int ciphertext_len;
 	if ( (ciphertext_len = pub_encrypt(sessionPubkey, 
 							pms, PRE_MASTER_SECRET_LENGTH, 
 							buf, XIA_MAXBUF)) == -1 ) {
-		fprintf(stderr, "ERROR: Unable to encrypt session key\n");
+		ERROR("ERROR: Unable to encrypt session key");
 		return 0;
 	}
     
@@ -131,7 +130,7 @@ print_bytes(pms, PRE_MASTER_SECRET_LENGTH);
 	offset = 0;
 	while (offset < ciphertext_len) {
 		if ((n = Xsend(xssl->sockfd, &buf[offset], ciphertext_len-offset, 0)) < 0) {
-			fprintf(stderr, "ERROR sending pre-master secret\n");
+			ERROR("ERROR sending pre-master secret");
 			return 0;
 		}
 		offset += n;
@@ -145,7 +144,7 @@ print_bytes(pms, PRE_MASTER_SECRET_LENGTH);
 	if (aes_init(pms, PRE_MASTER_SECRET_LENGTH/2, 
 				 &pms[PRE_MASTER_SECRET_LENGTH/2], PRE_MASTER_SECRET_LENGTH/2, 
 				 (unsigned char *)&salt, xssl->en, xssl->de)) {
-		fprintf(stderr, "ERROR initializing AES ciphers\n");
+		ERROR("ERROR initializing AES ciphers");
 		return 0;
 	}
 	free(pms);

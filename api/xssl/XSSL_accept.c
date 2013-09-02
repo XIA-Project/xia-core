@@ -29,28 +29,24 @@
 * @return 1 on success, <1 on failure
 */
 int XSSL_accept(XSSL *xssl) {
-printf("<<< XSSL_accept\n");
 
 	char buf[XIA_MAXBUF];
 	int n;
 
 	/* Wait for CLIENT HELLO */
     if ((n = Xrecv(xssl->sockfd, buf, sizeof(buf), 0)) < 0) {
-		printf("ERROR receiving CLIENT HELLO\n");
+		ERROR("ERROR receiving CLIENT HELLO");
 		return 0;
     }
-printf("    received %d bytes\n", n);
 	if (strcmp("CLIENT HELLO", buf) != 0) {  // TODO: test
-		printf("ERROR: received message was not CLIENT HELLO\n");
+		ERROR("ERROR: received message was not CLIENT HELLO");
 		return 0;
 	}
-printf("    it was a CLIENT HELLO!\n");
-
 
 	/* Send SERVER HELLO */
 	sprintf(buf, "SERVER HELLO");
 	if ((n = Xsend(xssl->sockfd, buf, strlen(buf), 0)) != strlen(buf)) {
-		printf("ERROR sending SERVER HELLO\n");
+		ERROR("ERROR sending SERVER HELLO");
 		return 0;
 	}
 
@@ -81,16 +77,17 @@ printf("    it was a CLIENT HELLO!\n");
 
 	// Send it!
 	if ((n = Xsend(xssl->sockfd, buf, offset, 0)) != offset) {
-		printf("ERROR sending public keys\n");
+		ERROR("ERROR sending public keys");
 		return 0;
 	}
-printf("    sent keys (%d bytes)\n\tkeylen: %d\n\ttempkeylen: %d\n\tsiglen:%d\n", offset, keybufsize, tempkeybufsize, siglen);
+
+	DBGF("Sent keys (%d bytes)\n\tkeylen: %d\n\ttempkeylen: %d\n\tsiglen:%d", offset, keybufsize, tempkeybufsize, siglen);
 
 
 	/* Send SERVER DONE */
 	sprintf(buf, "SERVER DONE");
 	if ((n = Xsend(xssl->sockfd, buf, strlen(buf), 0)) != strlen(buf)) {
-		printf("ERROR sending SERVER DONE\n");
+		ERROR("ERROR sending SERVER DONE");
 		return 0;
 	}
 
@@ -101,7 +98,7 @@ printf("    sent keys (%d bytes)\n\tkeylen: %d\n\ttempkeylen: %d\n\tsiglen:%d\n"
 	offset = 0;
 	while (offset < expecting) {
     	if ((n = Xrecv(xssl->sockfd, &buf[offset], expecting-offset, 0)) < 0) {
-			fprintf(stderr, "ERROR receiving session key\n");
+			ERROR("ERROR receiving session key");
 			return 0;
     	}
 		offset += n;
@@ -112,14 +109,17 @@ printf("    sent keys (%d bytes)\n\tkeylen: %d\n\ttempkeylen: %d\n\tsiglen:%d\n"
 	if ( (plaintext_len = priv_decrypt(xssl->session_keypair, 
 							pms, RSA_size(xssl->session_keypair), 
 							(unsigned char*)buf, offset)) == -1) {
-		fprintf(stderr, "ERROR decrypting session key\n");
+		ERROR("ERROR decrypting session key");
 		return 0;
 	}
 	if (plaintext_len != PRE_MASTER_SECRET_LENGTH) {
-		fprintf(stderr, "ERRLR: decrypted key material is not of size PRE_MASTER_SECRET_LENGTH\n");
+		ERROR("Decrypted key material is not of size PRE_MASTER_SECRET_LENGTH");
 		return 0;
 	}
-print_bytes(pms, PRE_MASTER_SECRET_LENGTH);
+	if (VERBOSITY >= V_DEBUG) {
+		DBG("Pre_Master Secret:");
+		print_bytes(pms, PRE_MASTER_SECRET_LENGTH);
+	}
 
 
 	/* Init symmetric session ciphers with pre-master secret.
@@ -129,7 +129,7 @@ print_bytes(pms, PRE_MASTER_SECRET_LENGTH);
 	if (aes_init(&pms[PRE_MASTER_SECRET_LENGTH/2], PRE_MASTER_SECRET_LENGTH/2, 
 				 pms, PRE_MASTER_SECRET_LENGTH/2, 
 				 (unsigned char *)&salt, xssl->en, xssl->de)) {
-		fprintf(stderr, "ERROR initializing AES ciphers\n");
+		ERROR("ERROR initializing AES ciphers");
 		return 0;
 	}
 	free(pms);
