@@ -19,6 +19,7 @@
 */
 
 #include "xssl.h"
+#include "Xsocket.h"
 
 
 /**
@@ -33,4 +34,27 @@
 */
 int XSSL_read(XSSL *xssl, void *buf, int num) {
 
+	/* receive up to num bytes of ciphertext.
+	   to decrease the chance we don't receive the full message,
+	   don't stop unless we're on an AES_BLOCK boundary.
+	   FIXME: still possible we don't get all blocks; to fix this we
+	   really need an SSL header w/ message size up front */
+	unsigned char* ciphertext = (unsigned char *)malloc(num);
+	int n = 0;
+	int offset = 0;
+	while ( offset == 0 || offset % AES_BLOCK_SIZE != 0 ) {
+		if ( (n = Xrecv(xssl->sockfd, &ciphertext[offset], num-offset, 0)) <= 0) {
+			return n;
+		}
+		offset += n;
+	}
+
+
+	/* decrpyt the ciphertext */
+	int plaintext_len = aes_decrypt(xssl->de,
+							(unsigned char*)buf, num,
+							ciphertext, n);	
+
+	free(ciphertext);
+	return plaintext_len;
 }
