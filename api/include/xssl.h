@@ -65,6 +65,7 @@ int XSSL_accept(XSSL *xssl);
 int XSSL_connect(XSSL *xssl);
 int XSSL_write(XSSL *xssl, const void *buf, int num);
 int XSSL_read(XSSL *xssl, void *buf, int num);
+int XSSL_shutdown(XSSL *xssl);
 
 
 /* Utility Functions (in XSSL_util.c) */

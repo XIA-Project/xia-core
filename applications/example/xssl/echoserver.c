@@ -181,8 +181,8 @@ void process(int sock, XSSL_CTX *ctx)
 		say("%5d sent %d bytes\n", pid, n);
    	}
 	say("%5d closing\n", pid);
-	// TODO: XSSL close?
-	Xclose(sock); // does XSSL close this?
+	XSSL_shutdown(xssl);
+	Xclose(sock);
 	XSSL_free(xssl);
 }
 

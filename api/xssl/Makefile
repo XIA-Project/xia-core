@@ -5,7 +5,7 @@ include ../../xia.mk
 CFLAGS +=-c
 LDFLAGS += -lssl -lcrypto
 SOURCES=XSSL_CTX_new.c XSSL_util.c XSSL_new.c XSSL_set_fd.c XSSL_accept.c \
-		XSSL_connect.c XSSL_read.c XSSL_write.c
+		XSSL_connect.c XSSL_read.c XSSL_write.c XSSL_shutdown.c
 OBJS=$(SOURCES:.c=.o)
 LIB=$(XLIB)/libXssl.so
 STATICLIB=$(XLIB)/libXssl.a
