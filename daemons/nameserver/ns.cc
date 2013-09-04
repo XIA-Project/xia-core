@@ -42,7 +42,7 @@ typedef struct ns_pkt {
 
 void help(const char *name)
 {
-	printf("\nusage: %s [-l level] [-v] [-c config] [-h nostname]\n", name);
+	printf("\nusage: %s [-l level] [-v] [-c config] [-h hostname]\n", name);
 	printf("where:\n");
 	printf(" -l level    : syslog logging level 0 = LOG_EMERG ... 7 = LOG_DEBUG (default=3:LOG_ERR)");
 	printf(" -v          : log to the console as well as syslog");

@@ -289,7 +289,7 @@ router()
 			check_service $host "xhcp_serverd"
 			;;
 		*)
-			echo "unrecornized action: $action"
+			echo "unrecognized action: $action"
 			;;
 	esac
 }
@@ -305,7 +305,7 @@ host()
 	cd $XIADIR/bin
 	case $action in
 		"start")
-			./xhcp_clientd -h $host $_LOG_FLAGS &
+			./xhcp_clientd -h $host $LOG_FLAGS &
 			sleep 0.5
 			;;
 		"stop")
@@ -315,7 +315,7 @@ host()
 			check_service $host "xhcp_clientd"
 			;;
 		*)
-			echo "unreconized action: $action"
+			echo "unrecognized action: $action"
 			;;
 	esac
 }
@@ -340,7 +340,7 @@ nameserver()
 			check_service $host "xnameservice"
 			;;
 		*)
-			echo "unreconized action: $action"
+			echo "unrecognized action: $action"
 			;;
 	esac
 }
@@ -457,7 +457,7 @@ visualizer()
 			check_service "xstats"
 			;;
 		*)
-			echo "unreconized action: $action"
+			echo "unrecognized action: $action"
 			;;
 	esac
 }
@@ -485,7 +485,7 @@ create_click_config()
 			SCRIPT=dual_stack_router.click
 			;;
 		*)
-			echo "error unknow device type: $MAKECONF"
+			echo "error unknown device type: $MAKECONF"
 			exit 1
 	esac
 
