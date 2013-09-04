@@ -54,11 +54,11 @@ typedef struct {
 	unsigned long  flags;
 } XIARouteEntry;
 
-class XIARouter {
+class XIAController {
 public:
-	XIARouter(const char *_rtr = "router0") { _connected = false; 
+	XIAController(const char *_rtr = "router0") { _connected = false; 
 		_cserr = ControlSocketClient::no_err; _router = _rtr; };
-	~XIARouter() { if (connected()) close(); };
+	~XIAController() { if (connected()) close(); };
 
 	// connect to click
 	int connect(std::string clickHost = "localhost", unsigned short controlPort = 7777);

@@ -417,3 +417,25 @@ elementclass XIADualEndhost {
     input -> dlc0 -> output;
 	xrc -> XIAPaintSwitch[0] => [1]dlc0[1] -> xrc;
 };
+
+// 1-port controller node
+elementclass XIAController {
+    $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac |
+
+    // $local_addr: the full address of the node
+    // $local_ad: the node's AD
+    // $local_hid: the node's HID
+    // $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
+
+    // input[0]: a packet arrived at the node
+    // output[0]: forward to interface 0
+
+    xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $click_port, 1, 0);
+
+    Script(write xrc/n/proc/rt_AD.add $local_ad $DESTINED_FOR_LOCALHOST);    // self AD as destination
+
+    xlc :: XIALineCard($local_addr, $local_hid, $mac, 0);
+
+    input => xlc => output;
+    xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> xrc;
+};

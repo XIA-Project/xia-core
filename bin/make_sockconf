@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Copyright 2013 Carnegie Mellon University
 #
@@ -54,7 +54,7 @@ sockconf.write('# Generated from %s\n\n' % os.path.basename(sys.argv[1]))
 sockconf.write('[default]\nclick_port=%s\n\n' % DEFAULT_PORT)
 
 # look for elements of type XIAEndHost, XiaRouter[n]Port, and XIADualRouter[n]Port
-test = re.compile('XIAEndHost|XIARouter\d+Port|XIADualRouter\d+Port')
+test = re.compile('XIAEndHost|XIARouter\d+Port|XIADualRouter\d+Port|XIAController')
 
 lines = lines.split(';')
 for line in lines:

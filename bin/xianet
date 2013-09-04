@@ -1,4 +1,4 @@
-#! /bin/bash
+#! /usr/bin/env bash
 #
 # Copyright 2013 Carnegie Mellon University
 #
@@ -17,7 +17,7 @@
 # find the root of the XIA source tree
 # assumes this script is in a directory off the parent of the XIA tree
 # and that the daemons it starts are rooted off of the same location
-#  so XIADIR would be /xia-core assuming the script were /xia-core/tools/xianet
+# so XIADIR would be /xia-core assuming the script were /xia-core/tools/xianet
 XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
 
 # click parameters
@@ -29,7 +29,7 @@ SCRIPT=xia_local_topology.click
 NODECONF=$XIADIR/etc/nodes.conf
 XSOCKCONF=$XIADIR/etc/xsockconf.ini
 
-ALL_PROCESSES="click xrouted xhcp_serverd xhcp_clientd xnameservice xstats xstatserver"
+ALL_PROCESSES="click xrouted xhcp_serverd xhcp_clientd xnameservice xstats xstatserver xcontrold"
 
 NAME=`basename $0`
 VERBOSE=0
@@ -324,6 +324,32 @@ nameserver()
 }
 
 #
+# start/stop/check a controller node
+#
+controller()
+{
+	local host=$1
+	local action=$2
+
+	cd $XIADIR/bin
+	case $action in
+		"start")
+			./xcontrold -h $host $LOG_FLAGS &
+			sleep 0.5
+			;;
+		"stop")
+			kill_service $host "xcontrold"
+			;;
+		"check")
+			check_service $host "xcontrold"
+			;;
+		*)
+			echo "unrecognized action: $action"
+			;;
+	esac
+}
+
+#
 # read etc/nodes.conf and perform the given action on each node
 # assumes the first host found is the nameserver
 # FIXME: work out a better solution for setting the name server in a local topology
@@ -350,6 +376,9 @@ process_nodes()
 				;;
 			nameserver)
 				nameserver $name $action
+				;;
+			XIAController)
+				controller $name $action
 				;;
 			*)
 				echo Unknown device type $name:$type
@@ -462,6 +491,9 @@ create_click_config()
 		"dualrouter")
 			SCRIPT=dual_stack_router.click
 			;;
+		"controller")
+			SCRIPT=controller.click
+			;;
 		*)
 			echo "error unknown device type: $MAKECONF"
 			exit 1
@@ -509,7 +541,7 @@ case $1 in
 		process_nodes "check"
 		visualizer "check"
 		;;
-	check)
+	check|status)
 		check_service "click"
 		process_nodes "check"
 		visualizer "check"
