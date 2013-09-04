@@ -54,12 +54,12 @@ typedef struct {
 typedef struct {
 	std::string dest;	// destination AD or HID
 	int32_t seq; 		// LSA seq of dest (for filtering purpose)	
-	int32_t num_neighbors;	// number of neighbors of dest AD
-	vector<std::string> neighbor_list; // neighbor AD list
+	int32_t num_neighbors;	// number of neighbors of dest HID
+	vector<std::string> neighbor_list; // neighbor HID list
 	
 	bool checked;	// used for calculating the shortest path
-	int32_t cost;	// cost from myAD to destAD
-	std::string prevNode; // previous node along the shortest path from myAD to destAD
+	int32_t cost;	// cost from myHID to destHID
+	std::string prevNode; // previous node along the shortest path from myHID to destHID
 	
 } NodeStateEntry; // extracted from incoming LSA
 
@@ -87,9 +87,9 @@ typedef struct RouteState {
 	map<std::string, RouteEntry> ADrouteTable; // map DestAD to route entry
 	map<std::string, RouteEntry> HIDrouteTable; // map DestHID to route entry
 	
-	map<std::string, NeighborEntry> neighborTable; // map neighborAD to neighbor entry
+	map<std::string, NeighborEntry> neighborTable; // map neighborHID to neighbor entry
 	
-	map<std::string, NodeStateEntry> networkTable; // map DestAD to NodeState entry
+	map<std::string, NodeStateEntry> networkTable; // map DestHID to NodeState entry
 	
 } RouteState;
 
