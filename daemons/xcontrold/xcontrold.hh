@@ -118,13 +118,13 @@ int processLSA(const char* lsa_msg);
 void processHostRegister(const char* host_register_msg);
 
 // compute the shortest path (Dijkstra)
-void calcShortestPath();
+void populateRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> &routingTable);
+
+// print routing table
+void printRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> &routingTable);
 
 // update the click routing table
 void updateClickRoutingTable();
-
-// print routing table
-void printRoutingTable();
 
 // timer to send Hello and LinkStateAdvertisement messages periodically
 void timeout_handler(int signum);

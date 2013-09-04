@@ -69,11 +69,11 @@ void timeout_handler(int signum)
 
 	if (route_state.hello_seq < route_state.hello_lsa_ratio) {
 		// send Hello
-		sendHello();
+		//sendHello();
 		route_state.hello_seq++;
 	} else if (route_state.hello_seq == route_state.hello_lsa_ratio) {
 		// it's time to send LSA
-		sendLSA();
+		//sendLSA();
 		// reset hello req
 		route_state.hello_seq = 0;
 	} else {
@@ -338,29 +338,29 @@ int processLSA(const char* lsa_msg) {
   	}
 
   	// First, filter out the LSA originating from myself
-  	string myAD = route_state.myAD;
-  	if (myAD.compare(destAD) == 0) {
+  	string myHID = route_state.myHID;
+  	if (myHID.compare(destHID) == 0) {
   		return 1;
   	}
 
   	// 1. Filter out the already seen LSA
 	map<std::string, NodeStateEntry>::iterator it;
-	it=route_state.networkTable.find(destAD);
+	it=route_state.networkTable.find(destHID);
 
 	if(it != route_state.networkTable.end()) {
-  		// If this originating AD has been known (i.e., already in the networkTable)
+  		// If this originating HID has been known (i.e., already in the networkTable)
 
   	  	if (lsaSeq <= it->second.seq  &&  it->second.seq - lsaSeq < 10000) {
   	  		// If this LSA already seen, ignore this LSA; do nothing
   			return 1;
   		}
-  		// For now, delete this dest AD entry in networkTable (... we will re-insert the updated entry shortly)
+  		// For now, delete this dest HID entry in networkTable (... we will re-insert the updated entry shortly)
   		route_state.networkTable.erase (it);
   	}
 
 	// 2. Update the network table
 	NodeStateEntry entry;
-	entry.dest = destAD;
+	entry.dest = destHID;
 	entry.seq = lsaSeq;
 	entry.num_neighbors = numNeighbors;
 
@@ -382,18 +382,21 @@ int processLSA(const char* lsa_msg) {
   		}
 
  		// fill the neighbors into the corresponding networkTable entry
- 		entry.neighbor_list.push_back(neighborAD);
+ 		entry.neighbor_list.push_back(neighborHID);
 
  	}
 
-	route_state.networkTable[destAD] = entry;
-	//printf("LSA received: src=%s, seq=%d, num_neighbors=%d \n", (route_state.networkTable[destAD].dest).c_str(), route_state.networkTable[destAD].seq, route_state.networkTable[destAD].num_neighbors );
+	route_state.networkTable[destHID] = entry;
+	//printf("LSA received: src=%s, seq=%d, num_neighbors=%d \n", (route_state.networkTable[destHID].dest).c_str(), route_state.networkTable[destHID].seq, route_state.networkTable[destHID].num_neighbors );
 	route_state.calc_dijstra_ticks++;
+
+	map<std::string, RouteEntry> testRoutingTable; // map DestHID to route entry
+    populateRoutingTable(destHID, testRoutingTable);
 
 	if (route_state.calc_dijstra_ticks == CALC_DIJKSTRA_INTERVAL) {
 		// Calculate Shortest Path algorithm
 		syslog(LOG_INFO, "Calcuating shortest paths\n");
-		calcShortestPath();
+		//calcShortestPath();
 		route_state.calc_dijstra_ticks = 0;
 
 		// update Routing table (click routing table as well)
@@ -408,10 +411,10 @@ int processLSA(const char* lsa_msg) {
 }
 
 
-void calcShortestPath() {
-
+void populateRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> &routingTable)
+{
 	// first, clear the current routing table
-	route_state.ADrouteTable.clear();
+	routingTable.clear();
 
  	map<std::string, NodeStateEntry>::iterator it1;
   	for ( it1=route_state.networkTable.begin() ; it1 != route_state.networkTable.end(); it1++ ) {
@@ -433,79 +436,79 @@ void calcShortestPath() {
 
 	// compute shortest path
 	// initialization
-	string myAD, tempAD;
-	myAD = route_state.myAD;
-	route_state.networkTable[myAD].checked = true;
-	route_state.networkTable[myAD].cost = 0;
-	table.erase(myAD);
+	string myHID, tempHID;
+	myHID = srcHID;
+	route_state.networkTable[myHID].checked = true;
+	route_state.networkTable[myHID].cost = 0;
+	table.erase(myHID);
 
 	vector<std::string>::iterator it2;
-	for ( it2=route_state.networkTable[myAD].neighbor_list.begin() ; it2 < route_state.networkTable[myAD].neighbor_list.end(); it2++ ) {
+	for ( it2=route_state.networkTable[myHID].neighbor_list.begin() ; it2 < route_state.networkTable[myHID].neighbor_list.end(); it2++ ) {
 
-		tempAD = (*it2).c_str();
-		route_state.networkTable[tempAD].cost = 1;
-		route_state.networkTable[tempAD].prevNode = myAD;
+		tempHID = (*it2).c_str();
+		route_state.networkTable[tempHID].cost = 1;
+		route_state.networkTable[tempHID].prevNode = myHID;
 	}
 
 	// loop
 	while (!table.empty()) {
 		int minCost = 10000000;
-		string selectedAD, tmpAD;
+		string selectedHID, tmpHID;
 		for ( it1=table.begin() ; it1 != table.end(); it1++ ) {
-			tmpAD = it1->second.dest;
-			if (route_state.networkTable[tmpAD].cost < minCost) {
-				minCost = route_state.networkTable[tmpAD].cost;
-				selectedAD = tmpAD;
+			tmpHID = it1->second.dest;
+			if (route_state.networkTable[tmpHID].cost < minCost) {
+				minCost = route_state.networkTable[tmpHID].cost;
+				selectedHID = tmpHID;
 			}
   		}
-		if(selectedAD.empty()) {
+		if(selectedHID.empty()) {
 			return;
 		}
 
-  		table.erase(selectedAD);
-  		route_state.networkTable[selectedAD].checked = true;
+  		table.erase(selectedHID);
+  		route_state.networkTable[selectedHID].checked = true;
 
- 		for ( it2=route_state.networkTable[selectedAD].neighbor_list.begin() ; it2 < route_state.networkTable[selectedAD].neighbor_list.end(); it2++ ) {
-			tempAD = (*it2).c_str();
-			if (route_state.networkTable[tempAD].checked != true) {
-				if (route_state.networkTable[tempAD].cost > route_state.networkTable[selectedAD].cost + 1) {
-					route_state.networkTable[tempAD].cost = route_state.networkTable[selectedAD].cost + 1;
-					route_state.networkTable[tempAD].prevNode = selectedAD;
+ 		for ( it2=route_state.networkTable[selectedHID].neighbor_list.begin() ; it2 < route_state.networkTable[selectedHID].neighbor_list.end(); it2++ ) {
+			tempHID = (*it2).c_str();
+			if (route_state.networkTable[tempHID].checked != true) {
+				if (route_state.networkTable[tempHID].cost > route_state.networkTable[selectedHID].cost + 1) {
+					route_state.networkTable[tempHID].cost = route_state.networkTable[selectedHID].cost + 1;
+					route_state.networkTable[tempHID].prevNode = selectedHID;
 				}
 			}
 		}
 	}
 
-	string tempAD1, tempAD2;
+	string tempHID1, tempHID2;
 	int hop_count;
 	// set up the nexthop
   	for ( it1=route_state.networkTable.begin() ; it1 != route_state.networkTable.end(); it1++ ) {
 
-  		tempAD1 = it1->second.dest;
-  		if ( myAD.compare(tempAD1) != 0 ) {
-  			tempAD2 = tempAD1;
+  		tempHID1 = it1->second.dest;
+  		if ( myHID.compare(tempHID1) != 0 ) {
+  			tempHID2 = tempHID1;
   			hop_count = 0;
-  			while (route_state.networkTable[tempAD2].prevNode.compare(myAD)!=0 && hop_count < MAX_HOP_COUNT) {
-  				tempAD2 = route_state.networkTable[tempAD2].prevNode;
+  			while (route_state.networkTable[tempHID2].prevNode.compare(myHID)!=0 && hop_count < MAX_HOP_COUNT) {
+  				tempHID2 = route_state.networkTable[tempHID2].prevNode;
   				hop_count++;
   			}
   			if(hop_count < MAX_HOP_COUNT) {
-  				route_state.ADrouteTable[tempAD1].dest = tempAD1;
-  				route_state.ADrouteTable[tempAD1].nextHop = route_state.neighborTable[tempAD2].HID;
-  				route_state.ADrouteTable[tempAD1].port = route_state.neighborTable[tempAD2].port;
+  				routingTable[tempHID1].dest = tempHID1;
+  				routingTable[tempHID1].nextHop = route_state.neighborTable[tempHID2].HID;
+  				routingTable[tempHID1].port = route_state.neighborTable[tempHID2].port;
   			}
   		}
   	}
-	printRoutingTable();
+
+	printRoutingTable(srcHID, routingTable);
 }
 
-
-void printRoutingTable() {
-
-	syslog(LOG_INFO, "AD Routing table at %s", route_state.myAD);
+void printRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> &routingTable)
+{
+	syslog(LOG_ALERT, "HID Routing table at %s", srcHID.c_str());
   	map<std::string, RouteEntry>::iterator it1;
-  	for ( it1=route_state.ADrouteTable.begin() ; it1 != route_state.ADrouteTable.end(); it1++ ) {
-  		syslog(LOG_INFO, "Dest=%s, NextHop=%s, Port=%d, Flags=%u", (it1->second.dest).c_str(), (it1->second.nextHop).c_str(), (it1->second.port), (it1->second.flags) );
+  	for ( it1=routingTable.begin() ; it1 != routingTable.end(); it1++ ) {
+  		syslog(LOG_ALERT, "Dest=%s, NextHop=%s, Port=%d, Flags=%u", (it1->second.dest).c_str(), (it1->second.nextHop).c_str(), (it1->second.port), (it1->second.flags) );
 
   	}
 }
@@ -698,7 +701,7 @@ int main(int argc, char *argv[])
 				switch (type) {
 					case HELLO:
 						// process the incoming Hello message
-    						processHello(msg.c_str());
+                        //processHello(msg.c_str());
 						break;
 					case LSA:
 						// process the incoming LSA message
@@ -706,7 +709,7 @@ int main(int argc, char *argv[])
 						break;
 					case HOST_REGISTER:
 						// process the incoming host-register message
-  						processHostRegister(msg.c_str());
+  						//processHostRegister(msg.c_str());
 						break;
 					default:
 						perror("unknown routing message");
