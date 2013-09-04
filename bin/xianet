@@ -176,6 +176,9 @@ setup()
 		dualhost)
 			SCRIPT=dual_stack_host.click
 			;;
+		controller)
+			SCRIPT=controller.click
+			;;
 		*)
 			echo ERROR: invalid node type: $MAKECONF
 			exit 1
