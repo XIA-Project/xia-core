@@ -29,6 +29,7 @@ using namespace std;
 #define HELLO 0
 #define LSA 1
 #define HOST_REGISTER 2
+#define CONTROL 3
 
 
 #define BHID "HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
@@ -116,6 +117,9 @@ int processLSA(const char* lsa_msg);
 
 // process a Host Register message 
 void processHostRegister(const char* host_register_msg);
+
+// process a control message 
+int processControl(const char* control_msg);
 
 // compute the shortest path (Dijkstra)
 void calcShortestPath();

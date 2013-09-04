@@ -499,6 +499,88 @@ void calcShortestPath() {
 	printRoutingTable();
 }
 
+// process a control message 
+int processControl(const char* control_msg) {
+	/* Procedure:
+		1. fill in the neighbor table
+		2. update my entry in the networkTable
+	*/
+    /*
+	// 1. fill in the neighbor table
+	size_t found, start;
+	string msg, neighborAD, neighborHID, myAD;
+
+	start = 0;
+	msg = hello_msg;
+
+ 	// read message-type
+	found=msg.find("^", start);
+  	if (found!=string::npos) {
+  		start = found+1;   // message-type was previously read
+  	}
+
+	// read neighborAD
+	found=msg.find("^", start);
+  	if (found!=string::npos) {
+  		neighborAD = msg.substr(start, found-start);
+  		start = found+1;  // forward the search point
+  	}
+
+ 	// read neighborHID
+	found=msg.find("^", start);
+  	if (found!=string::npos) {
+  		neighborHID = msg.substr(start, found-start);
+  		start = found+1;  // forward the search point
+  	}
+
+	// fill in the table
+	map<std::string, NeighborEntry>::iterator it;
+	it=route_state.neighborTable.find(neighborAD);
+	if(it == route_state.neighborTable.end()) {
+		// if no entry yet
+		NeighborEntry entry;
+		entry.AD = neighborAD;
+		entry.HID = neighborHID;
+		entry.cost = 1; // for now, same cost
+
+		int interface = interfaceNumber("HID", neighborHID);
+		entry.port = interface;
+
+		route_state.neighborTable[neighborAD] = entry;
+
+		// increase the neighbor count
+		route_state.num_neighbors++;
+	}
+
+	// 2. update my entry in the networkTable
+	myAD = route_state.myAD;
+
+	map<std::string, NodeStateEntry>::iterator it2;
+	it2=route_state.networkTable.find(myAD);
+
+	if(it2 != route_state.networkTable.end()) {
+
+  		// For now, delete my entry in networkTable (... we will re-insert the updated entry shortly)
+  		route_state.networkTable.erase (it2);
+  	}
+
+	NodeStateEntry entry;
+	entry.dest = myAD;
+	entry.seq = route_state.lsa_seq;
+	entry.num_neighbors = route_state.num_neighbors;
+
+  	map<std::string, NeighborEntry>::iterator it3;
+  	for ( it3=route_state.neighborTable.begin() ; it3 != route_state.neighborTable.end(); it3++ ) {
+
+ 		// fill my neighbors into my entry in the networkTable
+ 		entry.neighbor_list.push_back(it3->second.AD);
+  	}
+
+	route_state.networkTable[myAD] = entry;
+
+    */
+	return 1;
+}
 
 void printRoutingTable() {
 
@@ -707,6 +789,10 @@ int main(int argc, char *argv[])
 					case HOST_REGISTER:
 						// process the incoming host-register message
   						processHostRegister(msg.c_str());
+						break;
+                    case CONTROL:
+						// process the incoming LSA message
+  						processControl(msg.c_str());
 						break;
 					default:
 						perror("unknown routing message");

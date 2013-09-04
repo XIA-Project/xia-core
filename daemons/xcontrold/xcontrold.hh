@@ -29,6 +29,7 @@ using namespace std;
 #define HELLO 0
 #define LSA 1
 #define HOST_REGISTER 2
+#define CONTROL 3
 
 
 #define BHID "HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
@@ -107,6 +108,9 @@ int sendHello();
 
 // send LinkStateAdvertisement message (flooding)
 int sendLSA();
+
+// send control message
+int sendControl();
 
 // process an incoming Hello message
 int processHello(const char* hello_msg);

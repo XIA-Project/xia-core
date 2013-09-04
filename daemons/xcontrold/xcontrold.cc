@@ -74,6 +74,7 @@ void timeout_handler(int signum)
 	} else if (route_state.hello_seq == route_state.hello_lsa_ratio) {
 		// it's time to send LSA
 		//sendLSA();
+		sendControl();
 		// reset hello req
 		route_state.hello_seq = 0;
 	} else {
@@ -154,6 +155,27 @@ int sendLSA() {
 	// increase the LSA seq
 	route_state.lsa_seq++;
 	route_state.lsa_seq = route_state.lsa_seq % MAX_SEQNUM;
+	Xsendto(route_state.sock, buffer, strlen(buffer), 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
+	return 1;
+}
+
+int sendControl() {
+	// Send my AD and my HID to the directly connected neighbors
+	char buffer[1024];
+	bzero(buffer, 1024);
+
+	/* Message format (delimiter=^)
+		message-type{Hello=0 or LSA=1}
+		source-AD
+		source-HID
+	*/
+	string hello;
+	hello.append("3^");
+	hello.append(route_state.myAD);
+	hello.append("^");
+	hello.append(route_state.myHID);
+	hello.append("^");
+	strcpy (buffer, hello.c_str());
 	Xsendto(route_state.sock, buffer, strlen(buffer), 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
 	return 1;
 }
