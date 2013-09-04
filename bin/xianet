@@ -1,6 +1,6 @@
-#!/bin/bash
+#! /bin/bash
 #
-# Copyright 2012 Carnegie Mellon University
+# Copyright 2013 Carnegie Mellon University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,38 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# set this just in case user doesn't have it in their environment
-# can be removed once libraries are installed in correct paths
-LD_LIBRARY_PATH=.
-
-NAME=`basename $0`
-VERBOSE=0
-LOGGING=0
-LOGLEVEL=3
-CLICK_ONLY=0
-ROUTER=0
-HOST=0
-DUAL_STACK=0
-LOCAL_CHAIN_TOPOLOGY=0
-NAMESERVER=0
-IP_OVERRIDE_ADDR="None"
-HOSTNAME=""
-INTERFACE_FILTER="None"
-HOST_INTERFACE="None"
-SOCKET_PORTS="None"
-RUN_VISUALIZER_CLIENT=0
-RUN_VISUALIZER_SERVER=0
-VISUALIZER_SERVER="localhost"
-
-DAEMONS=""
-ROUTER_DAEMONS="xrouted xhcp_serverd"
-HOST_DAEMONS="xhcp_clientd"
-NAMESERVER_DAEMONS="xnameservice"
-DUAL_STACK_HOST_EXTRA_DAEMONS="xrouted xhcp_serverd"
-CHAIN_TOPOLOGY_DAEMONS="xrouted xhcp_serverd xhcp_clientd xnameservice"
-VISUALIZER_CLIENT_DAEMONS="xstats"
-VISUALIZER_SERVER_DAEMONS="statsserver"
-
 # find the root of the XIA source tree
 # assumes this script is in a directory off the parent of the XIA tree
 # and that the daemons it starts are rooted off of the same location
@@ -57,204 +25,42 @@ CLICKPATH=$XIADIR/click
 CONFPATH=$XIADIR/etc/click/
 CLICK=$CLICKPATH/userlevel/click
 SCRIPT=xia_local_topology.click
-SCRIPT_SET=0
 
+NODECONF=$XIADIR/etc/nodes.conf
+XSOCKCONF=$XIADIR/etc/xsockconf.ini
 
-is_running()
-{
-	# FIXME: this test can give false positives in cases such as editing a file containing the
-	#  desired process name (i.e. vi host.click would cause a positive result even if click was
-	#  not running)
-	RUNNING=`ps aux | grep "$1" | grep -v grep`
-	[ "$RUNNING" != "" ]
-}
+ALL_PROCESSES="click xrouted xhcp_serverd xhcp_clientd xnameservice xstats xstatserver"
 
-check_daemons()
-{
-	printf "XIA Demo Service Status\n"
-	for svc in "click" $DAEMONS
-	do
-		status="stopped"
-		is_running $svc
-		[ $? -eq 0 ] && status="running"
-		printf "%-16s: %s\n" $svc $status
-	done
-}
+NAME=`basename $0`
+VERBOSE=0
+LOG_FLAGS=""
+CLICK_ONLY=0
+NAMESERVER=0
+RUN_VISUALIZER_CLIENT=0
+RUN_VISUALIZER_SERVER=0
+VISUALIZER_SERVER="localhost"
+MAKECONF=""
+CONFFLAGS=""
+HOSTNAME=$(hostname -s | tr -C -d 'a-zA-Z0-9')
 
-stop_daemons()
-{
-	printf "Stopping xia network processes\n"
-	for svc in $DAEMONS "click"
-	do
-		printf "stopping: %s\n" $svc
-		killall -9 $svc &> /dev/null
-	done
-}
-
-start_daemons()
-{
-	printf "Starting XIA network processes\n"
-
-	is_running "click"
-	if [ $? -eq 0 ]; then
-		printf "Click is already running, aborting...\n"
-		exit 1
-	fi
-
-	# 1) GENERATE A CLICK SCRIPT, IF NECESSARY
-	FLAGS=""
-	if [ $ROUTER -eq 1 ]; then
-		FLAGS=$FLAGS" -r"
-	fi
-	if [ $HOST -eq 1 ]; then
-		FLAGS=$FLAGS" -t"
-	fi
-	if [ $DUAL_STACK -eq 1 ]; then
-		FLAGS=$FLAGS" -4"
-	fi
-	if [ $IP_OVERRIDE_ADDR != "None" ]; then
-		FLAGS=$FLAGS" -m "$IP_OVERRIDE_ADDR
-	fi
-	if [ "$HOSTNAME" != "" ]; then
-		FLAGS=$FLAGS" -i "\"$HOSTNAME\"
-	fi
-	if [ $NAMESERVER -eq 1 ]; then
-		FLAGS=$FLAGS" -n"
-	fi
-	if [ $INTERFACE_FILTER != "None" ]; then
-		FLAGS=$FLAGS" -f "$INTERFACE_FILTER
-	fi
-	if [ $HOST_INTERFACE != "None" ]; then
-		FLAGS=$FLAGS" -I "$HOST_INTERFACE
-	fi
-	if [ $SOCKET_PORTS != "None" ]; then
-		FLAGS=$FLAGS" -P "$SOCKET_PORTS
-	fi
-
-	exec 3>&1  # save stdout handle
-	if [ $LOGGING -eq 1 ]; then
-		echo "logging to: $LOGFILE"
-		exec &> $LOGFILE
-	fi
-
-	cd $XIADIR/etc/click/templates/
-	python xconfig.py $FLAGS  # TODO: we maybe be calling this unnecessarily, but that's OK
-
-
-	# 2) START CLICK
-	if [ ! -f $CONFPATH/$SCRIPT ]; then
-		SNAME=`basename $SCRIPT .click`
-		printf "\nERROR: unable to locate click conf file: $SNAME\n\n"
-		exit 1
-	fi
-
-	$XIADIR/bin/make_sockconf $CONFPATH/$SCRIPT $XIADIR/etc/xsockconf.ini
-
-
-
-	if [ $VERBOSE -eq 0 ]; then
-		exec &> /dev/null
-	fi
-
-	$CLICK -R $CONFPATH/$SCRIPT &
-	if [ $CLICK_ONLY -eq 1 ]; then
-		exit
-	fi
-	sleep 2
-
-
-	is_running "click"
-	if [ $? -ne 0 ]; then
-		# put stdout handle back in case we were in silent mode
-		exec 1>&3
-		printf "Click is not running, aborting...\n"
-		exit 1
-	fi
-
-	if [ $VERBOSE -eq 1 ]; then
-		exec &> /dev/null
-	fi
-
-
-	# 3) START DAEMONS
-	cd $XIADIR/bin
-
-	if [ $ROUTER -eq 1 ]; then
-		./xrouted -h $HOSTNAME $LOG_FLAGS &
-		sleep 2
-
-		./xhcp_serverd -h $HOSTNAME $LOG_FLAGS &
-		sleep 1
-	fi
-	if [ $HOST -eq 1 ]; then
-
-		if [ $DUAL_STACK -eq 1 ]; then
-			./xrouted -h "$HOSTNAME"_router $LOG_FLAGS &
-			sleep 2
-
-			./xhcp_serverd -h "$HOSTNAME"_router &
-			sleep 1
-
-			./xhcp_clientd -h "$HOSTNAME"_host $LOG_FLAGS &
-			sleep 2
-		else
-			./xhcp_clientd -h $HOSTNAME $LOG_FLAGS &
-			sleep 2
-		fi
-
-	fi
-	if [ $NAMESERVER -eq 1 -a $HOST -eq 1 ]; then
-		./xnameservice -h $HOSTNAME $LOG_FLAGS &
-	fi
-	if [ $LOCAL_CHAIN_TOPOLOGY -eq 1 ]; then
-		./xrouted -h router0 $LOG_FLAGS &
-		./xrouted -h router1 $LOG_FLAGS &
-		sleep 2
-
-		./xhcp_serverd -h router0 $LOG_FLAGS &
-		./xhcp_serverd -h router1 $LOG_FLAGS &
-		sleep 1
-
-		./xhcp_clientd -h host0 $LOG_FLAGS &
-		./xhcp_clientd -h host1 $LOG_FLAGS &
-		sleep 2
-
-		./xnameservice $LOG_FLAGS &
-	fi
-	if [ $RUN_VISUALIZER_SERVER -eq 1 ]; then
-		cd $XIADIR/daemons/visualizer
-		./statsserver &
-		sleep 1
-	fi
-	if [ $RUN_VISUALIZER_CLIENT -eq 1 ]; then
-		FLAGS="-s $VISUALIZER_SERVER"
-		if [ $VERBOSE -eq 2 ]; then
-			FLAGS=$FLAGS" -v"
-		fi
-		cd $XIADIR/daemons/visualizer
-		./xstats $FLAGS &
-		sleep 1
-	fi
-}
-
-help ()
+help()
 {
 	cat << EOH
 
 Start or stop the XIA network services.
 
-usage: $NAME [-cqvV4rtnZ] [-l <loglevel>] [-i <hostname>] [-m <ip-addr>] [-f <filter_str>] [-I <interface>] [-P <socket-ports>] [-s <script>] [-z <statserver>] [start|stop|restart|check]
+usage: $NAME [-cvV4rtnZ] [-l <loglevel>] [-i <hostname>] [-m <ip-addr>]
+             [-f <filter_str>] [-I <interface>] [-P <socket-ports>]
+             [-s <script>] [-N <host>] [-z <statserver>] [start|stop|restart|check]
 where:
   -c only start click
-  -l syslog level (0=LOG_EMERG through 7=LOG_DEBUG) default=3 (LOG_WARNING)
-  -s run click using the specified script
-     (should be located in the $CONFPATH directory)
-  -q run silently (default)
+  -l syslog level (0=LOG_EMERG through 7=LOG_DEBUG) default=3 (LOG_ERR)
+  -s run click using the specified script in the $CONFPATH directory.
   -v prints click debug messages to stdout
   -V prints all daemon debug messages to stdout
   -4 generate and use a dual stack click script
-  -r generate and use a generic router click script (like on GENI)
-  -t generate and use a generic host click script (like on GENI)
+  -r generate and use a generic router click script
+  -t generate and use a generic host click script
   -i use the supplied name as the click element name and HID shortcut
   -m manually set the node's 4ID IP address
   -P set the TCP socket ports to use (instead of ToDevice/FromDevice)
@@ -262,6 +68,7 @@ where:
   -f if generating a click script, don't use interfaces matching the supplied string
      (to ignore multiple interfaces, use a comma-separated list)
   -I if generating a click script, use this interface (i.e., pick which interface a host uses)
+  -N start the nameserver on the specified host
   -z start the visualizer client daemon, using the supplied address for the statserver
   -Z make this the visualizer server (runs statserver and xstats)
 
@@ -269,152 +76,471 @@ where:
   stop    - stops the xia processes
   restart - stops then starts the xia processes
   check   - print service status
+  kill    - kill all XIA services including orphaned services
 
 EOH
 	exit 0
 }
 
-while getopts "cl:s:qvV4nrthi:m:f:I:z:ZP:" opt; do
-	case $opt in
-		c)
-			CLICK_ONLY=1
+setup()
+{
+	local OPTARG=$2
+
+	while getopts "cl:s:qvV4nN:rthi:m:f:I:z:ZP:" opt; do
+		case $opt in
+			c)
+				CLICK_ONLY=1
+				;;
+			l)
+				LOG_FLAGS="$LOG_FLAGS -l $OPTARG"
+				;;
+			s)
+				SCRIPT=$OPTARG
+				;;
+			V)
+				VERBOSE=2
+				LOG_FLAGS="$LOG_FLAGS -v"
+				;;
+			v)
+				VERBOSE=1
+				;;
+			4)
+				MAKECONF="dual$MAKECONF"
+				CONFFLAGS="$CONFFLAGS -4"
+				;;
+			r)
+				MAKECONF=$MAKECONF"router"
+				CONFFLAGS="$CONFFLAGS -r"
+				NODETYPE="router"
+				;;
+			t)
+				MAKECONF=$MAKECONF"host"
+				CONFFLAGS="$CONFFLAGS -t"
+				NODETYPE="host"
+				;;
+			f)
+				CONFFLAGS="CONFFLAGS -f $OPTARG"
+				;;
+			I)
+				CONFFLAGS="$CONFFLAGS -I $OPTARG"
+				;;
+			m)
+				CONFFLAGS="$CONFFLAGS -m $OPTARG"
+				;;
+			P)
+				CONFFLAGS="$CONFFLAGS -P $OPTARG"
+				;;
+			i)
+				HOSTNAME=$OPTARG
+				;;
+			n)
+				NAMESERVER=1
+				CONFFLAGS="$CONFFLAGS -n"
+				;;
+			N)
+				NSHOST=$OPTARG
+				NAMESERVER=1
+				CONFFLAGS="$CONFFLAGS -n"
+				;;
+			z)
+				RUN_VISUALIZER_CLIENT=1
+				VISUALIZER_SERVER=$OPTARG
+				;;
+			Z)
+				RUN_VISUALIZER_CLIENT=1
+				RUN_VISUALIZER_SERVER=1
+				;;
+			h)
+				help
+				;;
+			\?)
+				printf "\nInvalid option: -$OPTARG\n" >&2
+				help
+				;;
+		esac
+	done
+
+	case $MAKECONF in
+		"")
+			# local topology, just use the default script
 			;;
-		l)
-			LOGLEVEL=$OPTARG
+		router)
+			SCRIPT=router.click
 			;;
-		s)
-			SCRIPT=$OPTARG
-			SCRIPT_SET=1
+		dualrouter)
+			SCRIPT=dual_stack_router.click
 			;;
-		q)
-			VERBOSE=0
+		host)
+			SCRIPT=host.click
 			;;
-		V)
-			VERBOSE=2
+		dualhost)
+			SCRIPT=dual_stack_host.click
 			;;
-		v)
-			VERBOSE=1
-			;;
-		4)
-			DUAL_STACK=1
-			;;
-		r)
-			ROUTER=1
-			;;
-		t)
-			HOST=1
-			;;
-		f)
-			INTERFACE_FILTER=$OPTARG
-			;;
-		I)
-			HOST_INTERFACE=$OPTARG
-			;;
-		m)
-			IP_OVERRIDE_ADDR=$OPTARG
-			;;
-		P)
-			SOCKET_PORTS=$OPTARG
-			;;
-		i)
-			HOSTNAME=$OPTARG
-			;;
-		n)
-			NAMESERVER=1
-			;;
-		z)
-			RUN_VISUALIZER_CLIENT=1
-			DAEMONS=$DAEMONS" "$VISUALIZER_CLIENT_DAEMONS
-			VISUALIZER_SERVER=$OPTARG
-			;;
-		Z)
-			RUN_VISUALIZER_CLIENT=1
-			RUN_VISUALIZER_SERVER=1
-			DAEMONS=$DAEMONS" "$VISUALIZER_CLIENT_DAEMONS
-			DAEMONS=$DAEMONS" "$VISUALIZER_SERVER_DAEMONS
-			;;
-		h)
-			help
-			;;
-		\?)
-			printf "\nInvalid option: -$OPTARG\n" >&2
-			help
+		*)
+			echo ERROR: invalid node type: $MAKECONF
+			exit 1
 			;;
 	esac
-done
+}
 
-LOG_FLAGS="-l $LOGLEVEL"
-[ "$VERBOSE" == "2" ] && LOG_FLAGS="$LOG_FLAGS -v"
+# sets global variable $XPID for the given process
+# looks for process and hostname when matching if both given, otherwise
+# just looks for the processname
+# FIXME: seems like this could be smarter
+get_pid()
+{
+	if [ $# = 1 ]; then
+		local service=$1
+		# avoid false positives when editing a file with click in the name
+		[ $service == "click" ] && service="userlevel/click"
 
-if [ $NAMESERVER -eq 1 -a $HOST -eq 1 ]; then
-	DAEMONS=$DAEMONS" "$NAMESERVER_DAEMONS
-fi
+		XPID=`ps aux | grep -v grep | grep $service | tr -s " " | cut -d\  -f2`
+	else
+		XPID=`ps aux | grep -v grep | grep $1 | grep $2 | tr -s " " | cut -d\  -f2`
+	fi
+}
 
-if [ $SCRIPT_SET -eq 0 ]; then
-	if [ $HOST -eq 1 ]; then
-		CONFPATH=$XIADIR/etc/click/templates
-		if [ $DUAL_STACK -eq 0 ]; then
+#
+# find out if the specified host:service pair is running
+#
+check_service()
+{
+	local state="stopped"
+	local name="$1:$2:"
+	[ $# == 1 ] && name="$1:"
+
+	get_pid $1 $2
+	[ "$XPID" != "" ] && state="running"
+	printf "%-24s %s\n" $name $state
+}
+
+#
+# kill the specified host:service pair
+#
+kill_service()
+{
+	local state="notrunning"
+	local name="$1:$2:"
+	[ $# == 1 ] && name="$1:"
+
+	get_pid $1 $2
+	if [ "$XPID" != "" ]; then
+		kill $XPID
+		state="stopped"
+	fi
+		printf "%-24s $state\n" $name
+}
+
+#
+# nuke without mercy anything that looks like an XIA process
+#
+kill_all_services()
+{
+	check_all_services 1
+	[ $ORPHANS -ne 1 ] && echo "nothing to kill" && exit 1
+
+	echo "Killing all possible XIA related services..."
+	for p in $ALL_PROCESSES
+	do
+		killall -9 $p &> /dev/null
+	done
+	check_all_services 1
+}
+
+#
+# see if any services are running, don't use nodes.conf
+#
+check_all_services()
+{
+	local skip=$1
+	ORPHANS=0
+	for p in $ALL_PROCESSES
+	do
+		get_pid $p
+		if [ "$XPID" != "" ]; then
+			ORPHANS=1
+			echo "Orphan $p process found"
+		fi
+	done
+	[ $ORPHANS -eq 1  ] && [ "$skip" != "1" ] && echo "Use xianet kill to stop orphaned processes"
+}
+
+#
+# start/stop/check a router node
+#
+router()
+{
+	local host=$1
+	local action=$2
+
+	case $action in
+		"start")
+			cd $XIADIR/bin
+			./xrouted -h $host $LOG_FLAGS &
+			./xhcp_serverd -h $host $LOG_FLAGS &
+			sleep 0.5
+			;;
+		"stop")
+			kill_service $host "xrouted"
+			kill_service $host "xhcp_serverd"
+			;;
+		"check")
+			check_service $host "xrouted"
+			check_service $host "xhcp_serverd"
+			;;
+		*)
+			echo "unrecornized action: $action"
+			;;
+	esac
+}
+
+#
+# start/stop/check a host node
+#
+host()
+{
+	local host=$1
+	local action=$2
+
+	cd $XIADIR/bin
+	case $action in
+		"start")
+			./xhcp_clientd -h $host $_LOG_FLAGS &
+			sleep 0.5
+			;;
+		"stop")
+			kill_service $host "xhcp_clientd"
+			;;
+		"check")
+			check_service $host "xhcp_clientd"
+			;;
+		*)
+			echo "unreconized action: $action"
+			;;
+	esac
+}
+
+#
+# start/stop/check the nameserver
+#
+nameserver()
+{
+	local host=$1
+	local action=$2
+
+	cd $XIADIR/bin
+	case $action in
+		"start")
+			./xnameservice i-h $host $LOG_FLAGS &
+			;;
+		"stop")
+			kill_service $host "xnameservice"
+			;;
+		"check")
+			check_service $host "xnameservice"
+			;;
+		*)
+			echo "unreconized action: $action"
+			;;
+	esac
+}
+
+#
+# read etc/nodes.conf and perform the given action on each node
+# assumes the first host found is the nameserver
+# FIXME: work out a better solution for setting the name server in a local topology
+#
+process_nodes()
+{
+	local action=$1
+
+	if [ ! -f $NODECONF ]; then
+		echo "nodes.conf not found."
+		check_all_services
+		exit 1
+	fi
+
+	shopt -s nocasematch
+	while read name type
+	do
+		case $type in
+			XIAEndHost)
+				host $name $action
+				;;
+			XIA*Router*Port)
+				router $name $action
+				;;
+			nameserver)
+				nameserver $name $action
+				;;
+			*)
+				echo Unknown device type $name:$type
+				;;
+		esac
+	done < $XIADIR/etc/nodes.conf
+	shopt -u nocasematch
+}
+
+#
+# load click environment
+#
+start_click()
+{
+	get_pid "click"
+	[ "$XPID" != "" ] && printf "Click is already running, aborting...\n" && exit 1
+
+	# create a click conf file from a template if necessary
+	create_click_config
+
+	if [ ! -f $CONFPATH/$SCRIPT ]; then
+		SNAME=`basename $SCRIPT .click`
+		printf "\nERROR: unable to locate click conf file: $SNAME\n\n"
+		exit 1
+	fi
+
+	# create xsockconf.ini and nodes.conf from the click config file
+	$XIADIR/bin/read_topology $CONFPATH/$SCRIPT $XSOCKCONF $NODECONF
+
+	# nameserver was configured on cmd line, add it to the nodes file so we control
+	#  it properly
+	if [ "$NSHOST" != "" ]; then
+		printf "$NSHOST\tnameserver\n" >> $NODECONF
+	elif [ $NAMESERVER -eq 1 -a "$NODETYPE" == "host" ]; then
+		printf "$HOSTNAME\tnameserver\n" >> $NODECONF
+	fi
+
+	if [ $VERBOSE -eq 0 ]; then
+		exec 3>&1  # save stdout handle
+		exec &> /dev/null
+	fi
+
+	$CLICK -R $CONFPATH/$SCRIPT &
+	[ $VERBOSE -eq 0 ] && exec 1>&3
+
+	get_pid "click"
+	[ "$XPID" == "" ] && printf "Click is not running, aborting...\n" && exit 1
+
+	[ $CLICK_ONLY -eq 1 ] && check_service click && exit
+	sleep 1
+}
+
+#
+# start/stop/check the visualizer daemons
+#
+visualizer()
+{
+	local action=$1
+
+	case $action in
+		"start")
+			if [ $RUN_VISUALIZER_SERVER -eq 1 ]; then
+				cd $XIADIR/daemons/visualizer
+				./statsserver &
+				sleep 1
+			fi
+			if [ $RUN_VISUALIZER_CLIENT -eq 1 ]; then
+				FLAGS="-s $VISUALIZER_SERVER"
+				if [ $VERBOSE -eq 2 ]; then
+					FLAGS=$FLAGS" -v"
+				fi
+				cd $XIADIR/daemons/visualizer
+				./xstats $FLAGS &
+				sleep 1
+			fi
+			;;
+		"stop")
+			kill_service "statsserver"
+			kill_service "xstats"
+			;;
+		"check")
+			check_service "statsserver"
+			check_service "xstats"
+			;;
+		*)
+			echo "unreconized action: $action"
+			;;
+	esac
+}
+
+#
+# create a click config from the appropriate template using cmd line opts
+#
+create_click_config()
+{
+	case $MAKECONF in
+		"")
+			# using a predefined config file instead of a template
+			return
+			;;
+		"host")
 			SCRIPT=host.click
-		else
-			SCRIPT=dual_stack_host.click
-		fi
-	elif [ $ROUTER -eq 1 ]; then
-		CONFPATH=$XIADIR/etc/click/templates
-		if [ $DUAL_STACK -eq 0 ]; then
+			;;
+		"router")
 			SCRIPT=router.click
-		else
+			;;
+		"dualhost")
+			SCRIPT=dual_stack_host.click
+			;;
+		"dualrouter")
 			SCRIPT=dual_stack_router.click
-		fi
-	fi
-fi
+			;;
+		*)
+			echo "error unknow device type: $MAKECONF"
+			exit 1
+	esac
 
-if [ $HOST -eq 1 ]; then
-	DAEMONS=$DAEMONS" "$HOST_DAEMONS
-	if [ $DUAL_STACK -eq 1 ]; then
-		DAEMONS=$DAEMONS" "$DUAL_STACK_HOST_EXTRA_DAEMONS
-	fi
-elif [ $ROUTER -eq 1 ]; then
-	DAEMONS=$DAEMONS" "$ROUTER_DAEMONS
-fi
+	CONFFLAGS="$CONFFLAGS -i $HOSTNAME"
+	CONFPATH=$XIADIR/etc/click/templates
 
-if [ "$HOSTNAME" == "" ]; then
-	HOSTNAME=$(hostname -s | tr -C -d 'a-zA-Z0-9')
-fi
+	cd $CONFPATH
+	python xconfig.py $CONFFLAGS
+}
 
-# By default, use CHAIN_TOPOLOGY_DAEMONS if others were not specified
-if [ $SCRIPT_SET -eq 0 -a $HOST -eq 0 -a $ROUTER -eq 0 ]; then
-	DAEMONS=$CHAIN_TOPOLOGY_DAEMONS
-	LOCAL_CHAIN_TOPOLOGY=1
-fi
-
-echo "SCRIPT: $SCRIPT"
-echo "DAEMONS: $DAEMONS"
-echo "HOSTNAME: $HOSTNAME"
-
+#
+# SCRIPT STARTS HERE
+#
+setup $@
 shift $((OPTIND-1))
+printf "\nXIA using script: $SCRIPT\n"
 
 case $1 in
 	start)
-		start_daemons
-		[ $VERBOSE == 0 ] && exec 1>&3
-		check_daemons
+		start_click
+		process_nodes "start"
+		visualizer "start"
+		check_service "click"
+		process_nodes "check"
+		visualizer "check"
 		;;
 	stop)
-		stop_daemons
+		process_nodes "stop"
+		kill_service "click"
+		visualizer "stop"
+		check_all_services
 		;;
 	restart|reload)
-		stop_daemons
-		sleep 1
-		start_daemons
-		[ $VERBOSE == 0 ] && exec 1>&3
-		check_daemons
+		echo "Stopping XIA"
+		process_nodes "stop"
+		kill_service "click"
+		visualizer "stop"
+		echo "Starting XIA"
+		start_click
+		process_nodes "start"
+		visualizer "start"
+		check_service "click"
+		process_nodes "check"
+		visualizer "check"
 		;;
 	check)
-		check_daemons
+		check_service "click"
+		process_nodes "check"
+		visualizer "check"
+		;;
+	kill)
+		kill_all_services
 		;;
 	*)
 		printf "\nInvalid command\n" >&2
 		help
 		;;
 esac
-

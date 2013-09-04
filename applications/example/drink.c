@@ -18,6 +18,7 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <signal.h>
+#include <libgen.h>
 
 #define VERSION "v1.0"
 #define TITLE "XIA Firehose Drinker"

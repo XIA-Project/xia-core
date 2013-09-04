@@ -128,7 +128,22 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 		return -1;
 	}
 
-    if (!strncmp(name, "RE ", 3) || !strncmp(name, "DAG ", 4)) {
+	// see if name is registered in the local hosts.xia file
+	if((dag = hostsLookup(name))) {
+		Graph g(dag);
+		free(dag);
+
+		// check to see if the returned dag was valid
+		// we may want a better check for this in the future
+		if (g.num_nodes() > 0) {
+			std::string s = g.dag_string();
+			g.fill_sockaddr((sockaddr_x*)addr);
+			*addrlen = sizeof(sockaddr_x);
+			return 0;
+		}
+	}
+
+if (!strncmp(name, "RE ", 3) || !strncmp(name, "DAG ", 4)) {
 
         // check to see if name is actually a dag to begin with
         Graph gcheck(name);
@@ -142,22 +157,6 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
             return 0;
         }
     }
-
-	// see if name is registered in the local hosts.xia file
-	if((dag = hostsLookup(name))) {
-
-		Graph g(dag);
-		free(dag);
-
-		// check to see if the returned dag was valid
-		// we may want a better check for this in the future
-		if (g.num_nodes() > 0) {
-			std::string s = g.dag_string();
-			g.fill_sockaddr((sockaddr_x*)addr);
-			*addrlen = sizeof(sockaddr_x);
-			return 0;
-		}
-	}
 
 	// not found locally, check the name server
 	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)

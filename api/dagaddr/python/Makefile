@@ -2,9 +2,9 @@ include ../../../xia.mk
 
 .PHONY: clean
 
-PYTHON=`python-config --include`
+PYTHON=`python-config --includes`
 
-CFLAGS +=-c -I$(PYTHON) -fpic
+CFLAGS +=-c $(PYTHON) -fpic
 LDFLAGS +=-lc -ldl `python-config --ldflags`
 
 DAGADDR_LIB=$(XLIB)/libdagaddr.so

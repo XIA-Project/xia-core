@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <math.h>
 #include <pthread.h>
+#include <libgen.h>
 #include <syslog.h>
 
 #include "Xsocket.h"
@@ -52,8 +53,6 @@ void config(int argc, char** argv)
 		switch (c) {
 			case 'h':
 				hostname = strdup(optarg);
-				fullname = (char*)calloc(1, strlen(hostname) + strlen(EXTENSION) + 1);
-				sprintf(fullname, "%s.%s", hostname, EXTENSION);
 				break;
 			case 'l':
 				level = MIN(atoi(optarg), LOG_DEBUG);
@@ -71,9 +70,9 @@ void config(int argc, char** argv)
 
 	if (!hostname) {
 		hostname = strdup(DEFAULT_NAME);
-		fullname = (char*)calloc(1, strlen(hostname) + strlen(EXTENSION) + 1);
-		sprintf(fullname, "%s.%s", hostname, EXTENSION);
 	}
+	fullname = (char*)calloc(1, strlen(hostname) + strlen(EXTENSION) + 1);
+	sprintf(fullname, "%s.%s", hostname, EXTENSION);
 
 	// load the config setting for this hostname
 	set_conf("xsockconf.ini", hostname);
@@ -126,40 +125,6 @@ int main(int argc, char *argv[]) {
 	char myHID[MAX_XID_SIZE]; 
 	char my4ID[MAX_XID_SIZE];	
 	int changed;
-
-#if 0
- 	// set hostname, click element name, and API conf
-	if ( argc < 2 ) {
-		hostname = (char*) malloc(snprintf(NULL, 0, "%s", DEFAULT_HOSTNAME) + 1);
-		sprintf(hostname, "%s", DEFAULT_HOSTNAME);
-
-		xr.setRouter("host0");
-
-    } else if ( argc == 2 || argc == 3 || argc == 4 ) {
-		std::string commandline_input = argv[1];
-		if (commandline_input.find("www_h.") != string::npos) {	
-			hostname = (char*) malloc(snprintf(NULL, 0, "%s", argv[1]) + 1);
-		    sprintf(hostname, "%s", argv[1]);
-		} else {
-			hostname = (char*) malloc(snprintf(NULL, 0, "%s", DEFAULT_HOSTNAME) + 1);
-		    sprintf(hostname, "%s", DEFAULT_HOSTNAME);
-		}
-
-		if ( argc == 3 || argc == 4 ) {
-			char* element_name = (char*)malloc(snprintf(NULL, 0, "%s", argv[2]) + 1);
-			sprintf(element_name, "%s", argv[2]);
-			xr.setRouter(element_name);
-		} else {
-			xr.setRouter("host0");
-		}
-		if ( argc == 4 ) {
-			set_conf("xsockconf.ini", argv[3]);
-		}
-    } else {
-		printf("Expected usage: xhcp_client [<hostname> [<element name> [<API conf name>]]]\n");
-		exit(-1);
-	}
-#endif
 
 	config(argc, argv);
 	xr.setRouter(hostname);
@@ -221,7 +186,6 @@ int main(int argc, char *argv[]) {
 
 		if (rc < 0)
 			syslog(LOG_WARNING, "error receiving data");
-
 		memset(self_dag, '\0', XHCP_MAX_DAG_LENGTH);
 		memset(gw_dag, '\0', XHCP_MAX_DAG_LENGTH);
 		memset(gw_4id, '\0', XHCP_MAX_DAG_LENGTH);
@@ -279,7 +243,7 @@ int main(int argc, char *argv[]) {
 		
 			// update AD table (my AD entry)
 			if ((rc = xr.setRoute(AD, DESTINED_FOR_LOCALHOST, empty_str, 0xffff)) != 0)
-				syslog(LOG_WARNING, "error setting route %d\n", rc);			
+				syslog(LOG_WARNING, "error setting route %d\n", rc);
 				
 			myAD = AD;
 		}
@@ -298,22 +262,22 @@ int main(int argc, char *argv[]) {
 
 			// update AD (default entry)
 			if ((rc = xr.setRoute(default_AD, 0, gwRHID, 0xffff)) != 0)
-				syslog(LOG_WARNING, "error setting route %d\n", rc);			
+				syslog(LOG_WARNING, "error setting route %d\n", rc);
 				
 			// update 4ID table (default entry)
 			if ((rc = xr.setRoute(default_4ID, 0, gwRHID, 0xffff)) != 0)
-				syslog(LOG_WARNING, "error setting route %d\n", rc);								
+				syslog(LOG_WARNING, "error setting route %d\n", rc);
 			
 			// update HID table (default entry)
 			if ((rc = xr.setRoute(default_HID, 0, gwRHID, 0xffff)) != 0)
-				printf("error setting route %d\n", rc);								
+				syslog(LOG_WARNING, "error setting route %d\n", rc);
 			
 			// update HID table (gateway router HID entry)
 			if ((rc = xr.setRoute(gwRHID, 0, gwRHID, 0xffff)) != 0)
 				syslog(LOG_WARNING, "error setting route %d\n", rc);
 				
 			if ((rc = xr.setRoute(default_HID, 0, gwRHID, 0xffff)) != 0)
-				printf("error setting route %d\n", rc);
+				syslog(LOG_WARNING, "error setting route %d\n", rc);
 				
 			myGWRHID = gwRHID;
 		}
@@ -364,10 +328,9 @@ int main(int argc, char *argv[]) {
 				Graph hg = (n_src * n_ad * n_hid);
 				hg = hg + (n_src * n_ip * n_ad * n_hid);
 				hg.fill_sockaddr(&hdag);
-    			if (XregisterName(hostname, &hdag) < 0 )
-    				syslog(LOG_ERR, "error registering new name");
+				if (XregisterName(fullname, &hdag) < 0 )
+					syslog(LOG_ERR, "error registering new name");
 		}   
-		
 	}	
 	return 0;
 }

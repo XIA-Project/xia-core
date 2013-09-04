@@ -30,9 +30,9 @@ hash nc 2>/dev/null || { echo "xdev requires netcat to be installed"; exit 1; }
 [ "`ps aux | grep userlevel/click | grep -v grep`" != "" ] || { echo "click is not running!"; exit 1; }
 
 # use netcat to send commands thru the click command socket to get the config file
-# the sed/cut pipeline could probably be condensed and is left as an exercise for the reader
+# the tr/cut pipeline could probably be condensed and is left as an exercise for the reader
 # this code is dependent on the format of the conf file, and could break if the file changes
 # assumptions:
 #  click host and router elements are the only lines in the file containing the :: character sequence
-printf "read config\nquit\n" | nc localhost 7777 | grep "::" | sed -r 's/^\s+//g' | cut -d "(" -f1 | cut -s -d\  -f1$verbose
+printf "read config\nquit\n" | nc localhost 7777 | grep "::" | tr -s " " "\t"  | cut -d "(" -f1 | cut -s  -f1$verbose
 

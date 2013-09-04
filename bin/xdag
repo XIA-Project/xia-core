@@ -15,10 +15,9 @@
 # limitations under the License.
 
 getxid() {
-	# extract the self route lines, and grab the one we're interested in
 	# global variable $device is used for which table to used 
 	# $1 contains the XID type to search for
-	XID=`$xdir/xroute -v --device=$device | grep self | grep "  $1" | sed -r "s/\s+/\t/g" | cut -f2`
+	XID=`$xdir/xroute -v --device=$device --type=$1 | grep self | tr -s " " "\t"  | cut -f2`
 }
 	
 xdir=`dirname $0`

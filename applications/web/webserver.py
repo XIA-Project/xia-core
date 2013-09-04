@@ -33,7 +33,8 @@ def serveHTTPRequest(request, sock):
     date = datetime.datetime.now().strftime("%a, %d %b %Y %H:%M:%S %Z")  #TODO: fix time zone
     response_data = ''
     http_msg_type = ''
-    http_header = 'Date: %s\nServer: XIA Baby Webserver\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/html\n\n' % date
+    content_length = 250
+    http_header = 'Date: %s\nServer: XIA Baby Webserver\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/html\nX-Length: %d\n\n' % (date, content_length)
 
     # If file exists in cids_by_filename, return its CID (list); otherwise return 404 Not Found
     requested_file = './www/' + request.split(' ')[1][1:]
@@ -52,13 +53,15 @@ def serveHTTPRequest(request, sock):
         http_msg_type = "HTTP/1.1 404 Not Found\n"
 
     # Send response
-    response = http_msg_type + http_header + response_data + 'DONEDONEDONE'
-    last_sent = 0
-    while last_sent < len(response):
-        base = last_sent
-        last_sent = min(len(response), last_sent + 800)
-        Xsend(sock, response[base:last_sent], 0)
+    content_length = len(response_data)
+    http_header = 'Date: %s\nServer: XIA Baby Webserver\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/html\nX-Length: %d\n\n' % (date,content_length)
 
+    response = http_msg_type + http_header + response_data
+    last_sent_length = 0;
+    while (content_length + len(http_msg_type) + len(http_header)) > last_sent_length:
+        base = last_sent_length
+        last_sent_length = min(len(response), last_sent_length + 800)
+        Xsend(sock, response[base:last_sent_length], 0)
 
 # Chunk and publish all files in the local www directory.
 # If the file is an html file and contains images also stored in

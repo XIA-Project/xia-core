@@ -3,7 +3,7 @@ include ../../xia.mk
 .PHONY: clean test
 
 CFLAGS=-c -Wall -Wextra -fPIC -DPIC -g -O0 -I$(XINC) -I../xsocket
-LDFLAGS+=-lc -ldl
+LDFLAGS+=-lc -ldl $(XLIB)/libXsocket.so
 LIB=$(XLIB)/xwrap.so
 
 ifdef DEBUG

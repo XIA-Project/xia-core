@@ -512,7 +512,8 @@ int initializeClient(const char *name)
 	return sock;
 }
 
-
+//FIXME Apparently XPutFile exists so use that instead.
+//FIXME hardcoded ad-hid format for dag.
 void putFile(int sock, char *ad, char*hid, const char *fin, const char *fout)
 {
 	char cmd[512];
