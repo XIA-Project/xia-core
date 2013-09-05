@@ -125,6 +125,7 @@ int sendLSA() {
 	*/
 	string lsa;
 	char lsa_seq[10], num_neighbors[10], is_dual_router[10];
+	char neighbor_port[10];
 
 	sprintf(lsa_seq, "%d", route_state.lsa_seq);
 	sprintf(num_neighbors, "%d", route_state.num_neighbors);
@@ -148,6 +149,9 @@ int sendLSA() {
 		lsa.append( it->second.AD );
 		lsa.append("^");
 		lsa.append( it->second.HID );
+		lsa.append("^");
+        sprintf(neighbor_port, "%d", it->second.port);
+		lsa.append( neighbor_port );
 		lsa.append("^");
   	}
 	strcpy (buffer, lsa.c_str());
@@ -187,6 +191,58 @@ void processHostRegister(const char* host_register_msg) {
 	if ((rc = xr.setRoute(hostHID, interface, hostHID, 0xffff)) != 0)
 		syslog(LOG_ERR, "unable to set route %d", rc);
 
+
+    /* Add host to neighbor table so info can be sent to controller */
+	string neighborAD, neighborHID, myHID;
+	neighborAD = route_state.myAD;
+	neighborHID = hostHID;
+
+	// fill in the table
+	map<std::string, NeighborEntry>::iterator it;
+	it=route_state.neighborTable.find(neighborHID);
+	if(it == route_state.neighborTable.end()) {
+		// if no entry yet
+		NeighborEntry entry;
+		entry.AD = neighborAD;
+		entry.HID = neighborHID;
+		entry.cost = 1; // for now, same cost
+
+		//int interface = interfaceNumber("HID", neighborHID);
+		entry.port = interface;
+
+		route_state.neighborTable[neighborHID] = entry;
+
+		// increase the neighbor count
+		route_state.num_neighbors++;
+	}
+
+	// 2. update my entry in the networkTable
+	myHID = route_state.myHID;
+
+	map<std::string, NodeStateEntry>::iterator it2;
+	it2=route_state.networkTable.find(myHID);
+
+	if(it2 != route_state.networkTable.end()) {
+
+  		// For now, delete my entry in networkTable (... we will re-insert the updated entry shortly)
+  		route_state.networkTable.erase (it2);
+  	}
+
+	NodeStateEntry entry;
+	entry.dest = myHID;
+	entry.seq = route_state.lsa_seq;
+	entry.num_neighbors = route_state.num_neighbors;
+
+  	map<std::string, NeighborEntry>::iterator it3;
+  	for ( it3=route_state.neighborTable.begin() ; it3 != route_state.neighborTable.end(); it3++ ) {
+
+ 		// fill my neighbors into my entry in the networkTable
+ 		entry.neighbor_list.push_back(it3->second.HID);
+  	}
+
+	route_state.networkTable[myHID] = entry;
+
+    //return 1;
 }
 
 // process an incoming Hello message

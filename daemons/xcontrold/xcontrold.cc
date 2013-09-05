@@ -284,7 +284,7 @@ int processHello(const char* hello_msg) {
   	for ( it3=route_state.neighborTable.begin() ; it3 != route_state.neighborTable.end(); it3++ ) {
 
  		// fill my neighbors into my entry in the networkTable
- 		entry.neighbor_list.push_back(it3->second.AD);
+ 		//entry.neighbor_list.push_back(it3->second.AD);
   	}
 
 	route_state.networkTable[myAD] = entry;
@@ -306,6 +306,8 @@ int processLSA(const char* lsa_msg) {
 	// 0. Read this LSA
 	size_t found, start;
 	string msg, routerType, destAD, destHID, lsa_seq, num_neighbors, neighborAD, neighborHID;
+    string port;
+    int neighborPort;
 
 	start = 0;
 	msg = lsa_msg;
@@ -403,9 +405,20 @@ int processLSA(const char* lsa_msg) {
   			start = found+1;  // forward the search point
   		}
 
- 		// fill the neighbors into the corresponding networkTable entry
- 		entry.neighbor_list.push_back(neighborHID);
+ 		// read neighborPort
+		found=msg.find("^", start);
+  		if (found!=string::npos) {
+            port = msg.substr(start, found-start);
+  			start = found+1;  // forward the search point
+  		}
+        neighborPort = atoi(port.c_str());
 
+ 		// fill the neighbors into the corresponding networkTable entry
+        NeighborEntry neighbor_entry;
+        neighbor_entry.AD = neighborAD;
+        neighbor_entry.HID = neighborHID;
+        neighbor_entry.port = neighborPort;
+ 		entry.neighbor_list.push_back(neighbor_entry);
  	}
 
 	route_state.networkTable[destHID] = entry;
@@ -422,7 +435,7 @@ int processLSA(const char* lsa_msg) {
 		route_state.calc_dijstra_ticks = 0;
 
 		// update Routing table (click routing table as well)
-		updateClickRoutingTable();
+		//updateClickRoutingTable();
 	}
 
 	// 5. rebroadcast this LSA
@@ -464,12 +477,33 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> 
 	route_state.networkTable[myHID].cost = 0;
 	table.erase(myHID);
 
-	vector<std::string>::iterator it2;
+	vector<NeighborEntry>::iterator it2;
 	for ( it2=route_state.networkTable[myHID].neighbor_list.begin() ; it2 < route_state.networkTable[myHID].neighbor_list.end(); it2++ ) {
 
-		tempHID = (*it2).c_str();
-		route_state.networkTable[tempHID].cost = 1;
-		route_state.networkTable[tempHID].prevNode = myHID;
+		tempHID = (*it2).HID.c_str();
+
+        if (route_state.networkTable.find(tempHID) != route_state.networkTable.end())
+        {
+            route_state.networkTable[tempHID].cost = 1;
+            route_state.networkTable[tempHID].prevNode = myHID;
+        }
+        else
+        {
+            NodeStateEntry entry;
+            entry.dest = tempHID;
+            entry.seq = route_state.networkTable[myHID].seq;
+            entry.num_neighbors = 1;
+
+            NeighborEntry neighbor_entry;
+            //neighbor_entry.AD = neighborAD;
+            neighbor_entry.HID = myHID;
+            neighbor_entry.port = 0;
+            entry.neighbor_list.push_back(neighbor_entry);
+            entry.cost = 1;
+            entry.prevNode = myHID;
+
+            route_state.networkTable[tempHID] = entry;
+        }
 	}
 
 	// loop
@@ -491,7 +525,7 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> 
   		route_state.networkTable[selectedHID].checked = true;
 
  		for ( it2=route_state.networkTable[selectedHID].neighbor_list.begin() ; it2 < route_state.networkTable[selectedHID].neighbor_list.end(); it2++ ) {
-			tempHID = (*it2).c_str();
+			tempHID = (*it2).HID.c_str();
 			if (route_state.networkTable[tempHID].checked != true) {
 				if (route_state.networkTable[tempHID].cost > route_state.networkTable[selectedHID].cost + 1) {
 					route_state.networkTable[tempHID].cost = route_state.networkTable[selectedHID].cost + 1;
@@ -516,8 +550,13 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> 
   			}
   			if(hop_count < MAX_HOP_COUNT) {
   				routingTable[tempHID1].dest = tempHID1;
-  				routingTable[tempHID1].nextHop = route_state.neighborTable[tempHID2].HID;
-  				routingTable[tempHID1].port = route_state.neighborTable[tempHID2].port;
+                routingTable[tempHID1].nextHop = tempHID2;
+
+                for ( it2=route_state.networkTable[myHID].neighbor_list.begin() ; it2 < route_state.networkTable[myHID].neighbor_list.end(); it2++ )
+                {
+                    if ((*it2).HID == tempHID2)
+                        routingTable[tempHID1].port = (*it2).port;
+                }
   			}
   		}
   	}

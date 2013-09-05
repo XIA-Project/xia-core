@@ -56,7 +56,7 @@ typedef struct {
 	std::string dest;	// destination AD or HID
 	int32_t seq; 		// LSA seq of dest (for filtering purpose)	
 	int32_t num_neighbors;	// number of neighbors of dest AD
-	vector<std::string> neighbor_list; // neighbor AD list
+    std::vector<NeighborEntry> neighbor_list; // neighbor list
 	
 	bool checked;	// used for calculating the shortest path
 	int32_t cost;	// cost from myAD to destAD
