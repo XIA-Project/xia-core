@@ -77,7 +77,7 @@ string getHIDForSocket(int sock) {
 int sendBuffer(session::ConnectionInfo *cinfo, const char* buf, size_t len) {
 	int sock = cinfo->sockfd();
 	
-	if (cinfo->type() == session::XSP) {
+	if (cinfo->transport_protocol() == session::XSP) {
 		return Xsend(sock, buf, len, 0);
 	}
 
@@ -87,7 +87,7 @@ int sendBuffer(session::ConnectionInfo *cinfo, const char* buf, size_t len) {
 int recvBuffer(session::ConnectionInfo *cinfo, char* buf, size_t len) {
 	int sock = cinfo->sockfd();
 
-	if (cinfo->type() == session::XSP) {
+	if (cinfo->transport_protocol() == session::XSP) {
 		memset(buf, 0, len);
 		return Xrecv(sock, buf, len, 0);
 	}
@@ -161,13 +161,8 @@ DBGF("    opened connection, sock is %d", sock);
 	cinfo->set_sockfd(sock);
 	cinfo->set_hid(getHIDForAddr(addr_buf));
 	cinfo->set_addr(*addr_buf);
-	cinfo->set_type(session::XSP);
 	return 0;
 
-}
-
-int openConnectionToName(const string &name, session::ConnectionInfo *cinfo) {
-	return openConnectionToAddr(getAddrForName(name), cinfo);
 }
 
 int registerName(const string &name, string *addr_buf) {

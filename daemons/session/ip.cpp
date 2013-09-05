@@ -246,7 +246,7 @@ string getHIDForSocket(int sock) {
 int sendBuffer(session::ConnectionInfo *cinfo, const char* buf, size_t len) {
 	int sock = cinfo->sockfd();
 	
-	//if (cinfo->type() == session::TCP) {
+	//if (cinfo->transport_protocol() == session::TCP) {
 		return send(sock, buf, len, 0);
 	//} else {
 	//	ERROR("Expected a TCP socket");
@@ -258,7 +258,7 @@ int sendBuffer(session::ConnectionInfo *cinfo, const char* buf, size_t len) {
 int recvBuffer(session::ConnectionInfo *cinfo, char* buf, size_t len) {
 	int sock = cinfo->sockfd();
 
-	//if (cinfo->type() == session::TCP) {
+	//if (cinfo->transport_protocol() == session::TCP) {
 		memset(buf, 0, len);
 		return recv(sock, buf, len, 0);
 	//} else {
@@ -337,21 +337,7 @@ int openConnectionToAddr(const string *addr_buf, session::ConnectionInfo *cinfo)
 	cinfo->set_sockfd(sock);
 	cinfo->set_hid(getHIDForAddr(addr_buf));
 	cinfo->set_addr(*addr_buf);
-	cinfo->set_type(session::TCP);
 	return 0;
-}
-
-int openConnectionToName(string &name, session::ConnectionInfo *cinfo) {
-	
-	struct addrinfo *ai;
-	if (_getaddrinfo(name.c_str(), NULL, NULL, &ai) < 0) {
-		ERRORF("Error looking up hostname: %s", name.c_str());
-		return -1;
-	}
-
-	string *addr_buf = bufFromAddr((sockaddr_in*)ai->ai_addr);
-
-	return openConnectionToAddr(addr_buf, cinfo);
 }
 
 // watches to see if we switch networks; makes new transport connections if so

@@ -9,11 +9,15 @@ NS_SOURCES=ns.cpp session.pb.cc
 #SESSIOND=$(BINDIR)/sessiond
 SESSIOND=sessiond
 NS=ns
+CONTEXT_MODULE_LIB=modules/libContextModules.so
 
-all: session.pb.cc $(SESSIOND) $(NS)
+all: session.pb.cc $(CONTEXT_MODULE_LIB) $(SESSIOND) $(NS)
 
-$(SESSIOND): $(SOURCES) xia.cpp ip.cpp
-	$(CC) -o $@ $(CFLAGS) $(SOURCES) $(LDFLAGS)	
+$(CONTEXT_MODULE_LIB):
+	make -C modules
+
+$(SESSIOND): $(SOURCES) xia.cpp ip.cpp $(CONTEXT_MODULE_LIB)
+	$(CC) -o $@ $(CFLAGS) $(SOURCES) $(LDFLAGS)	$(CONTEXT_MODULE_LIB)
 
 $(NS): $(NS_SOURCES)
 	$(CC) -o $@ $(CFLAGS) $(NS_SOURCES) $(LDFLAGS)	
@@ -25,3 +29,4 @@ clean:
 	-rm $(SESSIOND)
 	-rm $(NS)
 	-rm -f *.o session.pb.*
+	make -C modules clean

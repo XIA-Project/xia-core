@@ -19,7 +19,7 @@ enum ReturnCode {
 	FAILURE = 2;
 }
 
-enum ConnType {
+enum TransportProtocol {
 	TCP = 1;
 	UDP = 2;
 	XSP = 3;
@@ -131,6 +131,9 @@ message SessionInfo {
 	optional uint32 initiator_ctx = 6;
 	optional bool new_lasthop_conn = 7 [default = false];  // should the last hop open a new conn to me?
 	optional bytes rx_cinfo = 8;  // receiver of a ConnReq can tag it with the receiving transport conn
+
+	optional bool use_ssl = 15 [default = false];
+	optional TransportProtocol transport_protocol = 16 [default = XSP];
 }
 
 message SessionData {
@@ -149,8 +152,10 @@ message ConnectionInfo {
 	required bytes addr = 3;  // remote address
 	repeated int32 sessions = 4;
 	required string interface = 5 [default = "default"];
-	required ConnType type = 6 [default = XSP];
-	required string my_name = 7;
+	required string my_name = 6;
+
+	required bool use_ssl = 7;
+	required TransportProtocol transport_protocol = 8;
 }
 
 message ContextInfo {

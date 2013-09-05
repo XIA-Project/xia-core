@@ -1,5 +1,8 @@
 #include "session.pb.h"
 #include "utils.hpp"
+#include "modules/ContextModule.h"
+#include "modules/SecurityPrivacyModule.h"
+#include "modules/ServicePerformanceModule.h"
 #include <map>
 #include <queue>
 #include <stdio.h>
@@ -143,10 +146,9 @@ map<string, session::ConnectionInfo*> hid_to_conn;
 pthread_mutex_t hid_to_conn_mutex;
 
 map<int, pthread_t*> sockfd_to_pthread;  // could be a listen sock or data sock (not both)
-
 map<string, unsigned short> name_to_listen_ctx;
-
 map<unsigned short, struct context_queues*> ctx_to_queues; // TODO: make mutex for this
+vector<ContextModule *> context_modules;
 
 pthread_t mobility_thread;
 
@@ -705,6 +707,13 @@ void infocpy(const session::SessionInfo *from, session::SessionInfo *to) {
 	if (from->has_new_lasthop_conn()) {
 		to->set_new_lasthop_conn(from->new_lasthop_conn());
 	}
+
+	if (from->has_use_ssl()) {
+		to->set_use_ssl(from->use_ssl());
+	}
+	if (from->has_transport_protocol()) {
+		to->set_transport_protocol(from->transport_protocol());
+	}
 }
 
 // counts the number of application endpoints in a session
@@ -778,12 +787,80 @@ string get_prevhop_name(int ctx) {
 }
 
 
+// TODO: send in app attrs too
+DecisionValue get_decision(DecisionType decision) {
 
+	// Right now run dead-simple algo: the first module that cares
+	// about this decision (i.e., doesn't return kNoPreference) wins
 
-int open_connection(string name, session::ConnectionInfo *cinfo) {
+	vector<ContextModule*>::iterator iter;
+	for (iter = context_modules.begin(); iter != context_modules.end(); iter++) {
+		DecisionValue result = (*iter)->makeDecision(decision);
+		if (result != kNoPreference)
+			return result;
+	}
+
+	return kNoPreference;
+}
+
+void configure_session(session::SessionInfo *sinfo) {
 	
+	// Step through decisions, one by one. For each, ask each module that
+	// registered interest in this decision to "vote"
+	// TODO: for now, we're asking all to vote.
+
+	// USE SSL?
+	switch (get_decision(kUseSSL)) {
+		case kUseSSLNo:
+			DBG("Not using SSL");
+			sinfo->set_use_ssl(false);
+			break;
+		case kUseSSLYes:
+			DBG("Using SSL");
+			sinfo->set_use_ssl(true);
+			break;
+		default:
+			DBG("No preference about SSL");
+			break;
+	}
+
+	// WHICH TRANSPORT?
+	switch(get_decision(kTransportProtocol)) {
+		case kTransportXSP:
+			DBG("Using XSP");
+			sinfo->set_transport_protocol(session::XSP);
+			break;
+		case kTransportXDP:
+			DBG("Using XDP");
+			sinfo->set_transport_protocol(session::XDP);
+			break;
+		case kTransportTCP:
+			DBG("Using TCP");
+			sinfo->set_transport_protocol(session::TCP);
+			break;
+		case kTransportUDP:
+			DBG("Using UDP");
+			sinfo->set_transport_protocol(session::UDP);
+			break;
+		default:
+			DBG("No preference about transport protocol");
+			break;
+	}
+}
+
+
+
+int open_connection(const session::SessionInfo *sinfo, const string *addr_buf, session::ConnectionInfo *cinfo) {
+
+	// Transfer relevant session information to the connection (e.g., so future 
+	// connect/send/recv calls know wheter to use TCP or UDP, SSL or not, etc.)
+	cinfo->set_use_ssl(sinfo->use_ssl());
+	cinfo->set_transport_protocol(sinfo->transport_protocol());
+
+
+	// Open the conneciton
 	int ret;
-	if ( (ret = openConnectionToName(name, cinfo)) >= 0) {
+	if ( (ret = openConnectionToAddr(addr_buf, cinfo)) >= 0) {
 		hid_to_conn[cinfo->hid()] = cinfo;
 
 		// start a thread reading this socket
@@ -794,6 +871,12 @@ int open_connection(string name, session::ConnectionInfo *cinfo) {
 	}
 
 	return ret;
+
+}
+
+int open_connection(const session::SessionInfo *sinfo, string name, session::ConnectionInfo *cinfo) {
+	
+	return open_connection(sinfo, getAddrForName(name), cinfo);
 }
 
 int get_conn_for_context(int ctx, map<unsigned short, session::ConnectionInfo*> *ctx_to_conn, string &hopname, session::ConnectionInfo **cinfo) {
@@ -812,7 +895,7 @@ int get_conn_for_context(int ctx, map<unsigned short, session::ConnectionInfo*> 
 		if ( hid_to_conn.find(hid) == hid_to_conn.end() ) {
 #endif /* MULTIPLEX */
 			*cinfo = new session::ConnectionInfo();
-			rc = open_connection(hopname, *cinfo);
+			rc = open_connection(ctx_to_session_info[ctx], hopname, *cinfo);
 #ifdef MULTIPLEX
 		} else {
 			*cinfo = hid_to_conn[hid];
@@ -1010,6 +1093,11 @@ void * poll_listen_sock(void * args) {
 		rx_cinfo->set_sockfd(new_rxsock);
 		rx_cinfo->set_hid(getHIDForSocket(new_rxsock));
 		rx_cinfo->set_addr(*getRemoteAddrForSocket(new_rxsock));
+#ifdef XIA
+		rx_cinfo->set_transport_protocol(session::XSP);  // FIXME: we don't know yet, but recv will complain if this isn't set.
+#else
+		rx_cinfo->set_transport_protocol(session::TCP);  
+#endif
 	
 		
 		// receive first message (using new_ctx, not ctx) and
@@ -1027,6 +1115,9 @@ void * poll_listen_sock(void * args) {
 					ERROR("SETUP packet didn't contain session info");
 					continue;
 				}
+
+				rx_cinfo->set_use_ssl(rpkt->info().use_ssl());
+				rx_cinfo->set_transport_protocol(rpkt->info().transport_protocol()); // TODO: a bit late for this... we already did an accept and a streaming receive...
 
 #ifdef MULTIPLEX
 				// save transport connection for others to use
@@ -1241,6 +1332,10 @@ DBG("BEGIN process_init_msg");
 	alloc_context_queues(ctx);
 
 
+	// MAKE DECISIONS
+	configure_session(info);
+
+
 	session::ConnectionInfo *rx_cinfo = NULL;
 	string *my_addr_buf = NULL;
 	string prevhop = get_prevhop_name(ctx);
@@ -1276,6 +1371,8 @@ DBGF("Ctx %d    No connection exists, making rx_sock", ctx);
 		rx_cinfo->set_addr(*prevaddr);
 		rx_cinfo->set_my_name(info->my_name());
 		rx_cinfo->add_sessions(ctx);
+		rx_cinfo->set_use_ssl(info->use_ssl());
+		rx_cinfo->set_transport_protocol(info->transport_protocol());
 
 		hid_to_conn[prevHID] = rx_cinfo;
 		pthread_mutex_unlock(&hid_to_conn_mutex);
@@ -1525,18 +1622,9 @@ DBG("BEGIN process_accept_msg");
 DBGF("    Ctx %d    I'm the last hop; connecting to initiator with supplied addr", new_ctx);
 			tx_cinfo = new session::ConnectionInfo();
 
-			if (openConnectionToAddr(&(rpkt->info().initiator_addr()), tx_cinfo) < 0) {
+			if (open_connection(&(rpkt->info()), &(rpkt->info().initiator_addr()), tx_cinfo) < 0) {
 				ERROR("Error connecting to initiator");
 				rcm->set_message("Error connecting to initiator");
-				rcm->set_rc(session::FAILURE);
-				return -1;
-			}
-
-			// start a thread reading this socket
-			int ret;
-			if ( (ret = startPollingSocket(tx_cinfo->sockfd(), poll_recv_sock, (void*)tx_cinfo) < 0) ) {
-				ERRORF("Error creating recv sock thread: %s", strerror(ret));
-				rcm->set_message("Error creating recv sock thread");
 				rcm->set_rc(session::FAILURE);
 				return -1;
 			}
@@ -1997,6 +2085,10 @@ int main(int argc, char *argv[]) {
 	// Initializes some mutexes
 	pthread_mutex_init(&hid_to_conn_mutex, NULL);
 	pthread_mutex_init(&incomingctx_to_myctx_mutex, NULL);
+
+	// Initialize Context Modules
+	context_modules.push_back(new SecurityPrivacyModule());
+	context_modules.push_back(new ServicePerformanceModule());
 
 	listen();
 	return 0;
