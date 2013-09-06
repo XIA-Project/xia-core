@@ -85,6 +85,8 @@ typedef struct RouteState {
 	int32_t hello_lsa_ratio; // frequency ratio of hello:lsa (for timer purpose) 
 	int32_t calc_dijstra_ticks;   
 
+	int32_t ctl_seq;	// LSA sequence number of this router
+
 	map<std::string, RouteEntry> ADrouteTable; // map DestAD to route entry
 	map<std::string, RouteEntry> HIDrouteTable; // map DestHID to route entry
 	
@@ -132,5 +134,3 @@ void printRoutingTable();
 
 // timer to send Hello and LinkStateAdvertisement messages periodically
 void timeout_handler(int signum);
-
-

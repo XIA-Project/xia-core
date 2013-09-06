@@ -44,6 +44,8 @@ typedef struct {
 	uint32_t flags;	// flag 
 } RouteEntry;
 
+typedef std::map<std::string, RouteEntry> routing_table_t;
+
 typedef struct {
 	std::string AD;		// neigbor AD
 	std::string HID;	// neighbor HID
@@ -64,7 +66,6 @@ typedef struct {
 	
 } NodeStateEntry; // extracted from incoming LSA
 
-
 typedef struct RouteState {
 	int32_t sock; // socket for routing process
 	
@@ -84,6 +85,8 @@ typedef struct RouteState {
 	int32_t hello_seq;  // hello seq number of this router 
 	int32_t hello_lsa_ratio; // frequency ratio of hello:lsa (for timer purpose) 
 	int32_t calc_dijstra_ticks;   
+
+	int32_t ctl_seq;	// LSA sequence number of this router
 
 	map<std::string, RouteEntry> ADrouteTable; // map DestAD to route entry
 	map<std::string, RouteEntry> HIDrouteTable; // map DestHID to route entry
@@ -110,7 +113,7 @@ int sendHello();
 int sendLSA();
 
 // send control message
-int sendControl();
+int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> routingTable);
 
 // process an incoming Hello message
 int processHello(const char* hello_msg);
@@ -127,10 +130,5 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> 
 // print routing table
 void printRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> &routingTable);
 
-// update the click routing table
-void updateClickRoutingTable();
-
 // timer to send Hello and LinkStateAdvertisement messages periodically
 void timeout_handler(int signum);
-
-

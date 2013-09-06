@@ -453,7 +453,7 @@ int processLSA(const char* lsa_msg) {
 		route_state.calc_dijstra_ticks = 0;
 
 		// update Routing table (click routing table as well)
-		updateClickRoutingTable();
+		//updateClickRoutingTable();
 	}
 
 	// 5. rebroadcast this LSA
@@ -557,17 +557,22 @@ void calcShortestPath() {
 
 // process a control message 
 int processControl(const char* control_msg) {
+	char buffer[10240];
+	bzero(buffer, 10240);
 	/* Procedure:
-		1. fill in the neighbor table
-		2. update my entry in the networkTable
+		0. scan this LSA (mark AD with a DualRouter if there)
+		1. filter out the already seen LSA (via LSA-seq for this dest)
+		2. update the network table
+		3. rebroadcast this LSA
 	*/
-    /*
-	// 1. fill in the neighbor table
+	// 0. Read this LSA
 	size_t found, start;
-	string msg, neighborAD, neighborHID, myAD;
+	string msg, srcAD, srcHID, ctl_seq, destAD, destHID, num_entries, hid, nextHop, sPort, sFlags;
+    int ctlSeq, numEntries, port, flags;
+	int rc;
 
 	start = 0;
-	msg = hello_msg;
+	msg = control_msg;
 
  	// read message-type
 	found=msg.find("^", start);
@@ -575,66 +580,100 @@ int processControl(const char* control_msg) {
   		start = found+1;   // message-type was previously read
   	}
 
-	// read neighborAD
+	// read destAD
 	found=msg.find("^", start);
   	if (found!=string::npos) {
-  		neighborAD = msg.substr(start, found-start);
+  		srcAD = msg.substr(start, found-start);
   		start = found+1;  // forward the search point
   	}
 
- 	// read neighborHID
+ 	// read destHID
 	found=msg.find("^", start);
   	if (found!=string::npos) {
-  		neighborHID = msg.substr(start, found-start);
+  		srcHID = msg.substr(start, found-start);
   		start = found+1;  // forward the search point
   	}
 
-	// fill in the table
-	map<std::string, NeighborEntry>::iterator it;
-	it=route_state.neighborTable.find(neighborAD);
-	if(it == route_state.neighborTable.end()) {
-		// if no entry yet
-		NeighborEntry entry;
-		entry.AD = neighborAD;
-		entry.HID = neighborHID;
-		entry.cost = 1; // for now, same cost
+	// read LSA-seq-num
+	found=msg.find("^", start);
+  	if (found!=string::npos) {
+  		ctl_seq = msg.substr(start, found-start);
+  		start = found+1;  // forward the search point
+  	}
+  	ctlSeq = atoi(ctl_seq.c_str());
 
-		int interface = interfaceNumber("HID", neighborHID);
-		entry.port = interface;
-
-		route_state.neighborTable[neighborAD] = entry;
-
-		// increase the neighbor count
-		route_state.num_neighbors++;
-	}
-
-	// 2. update my entry in the networkTable
-	myAD = route_state.myAD;
-
-	map<std::string, NodeStateEntry>::iterator it2;
-	it2=route_state.networkTable.find(myAD);
-
-	if(it2 != route_state.networkTable.end()) {
-
-  		// For now, delete my entry in networkTable (... we will re-insert the updated entry shortly)
-  		route_state.networkTable.erase (it2);
+	// read destAD
+	found=msg.find("^", start);
+  	if (found!=string::npos) {
+  		destAD = msg.substr(start, found-start);
+  		start = found+1;  // forward the search point
   	}
 
-	NodeStateEntry entry;
-	entry.dest = myAD;
-	entry.seq = route_state.lsa_seq;
-	entry.num_neighbors = route_state.num_neighbors;
-
-  	map<std::string, NeighborEntry>::iterator it3;
-  	for ( it3=route_state.neighborTable.begin() ; it3 != route_state.neighborTable.end(); it3++ ) {
-
- 		// fill my neighbors into my entry in the networkTable
- 		entry.neighbor_list.push_back(it3->second.AD);
+ 	// read destHID
+	found=msg.find("^", start);
+  	if (found!=string::npos) {
+  		destHID = msg.substr(start, found-start);
+  		start = found+1;  // forward the search point
   	}
 
-	route_state.networkTable[myAD] = entry;
+    /* CHECK IF INTENDED FOR ME */
+    // dont need source addr
+    // first item should be source addr
+    if ((destAD != route_state.myAD) || (destHID != route_state.myHID))
+        return 1;
 
-    */
+ 	// read num_neighbors
+	found=msg.find("^", start);
+  	if (found!=string::npos) {
+  		num_entries = msg.substr(start, found-start);
+  		start = found+1;  // forward the search point
+  	}
+  	numEntries = atoi(num_entries.c_str());
+
+  	// 1. Filter out the already seen LSA
+    if (ctlSeq <= route_state.ctl_seq && route_state.ctl_seq - ctlSeq < 10000) {
+        // If this LSA already seen, ignore this LSA; do nothing
+        return 1;
+    }
+    route_state.ctl_seq = ctlSeq;
+
+  	int i;
+ 	for (i = 0; i < numEntries; i++) {
+
+ 		// read neighborAD
+		found=msg.find("^", start);
+  		if (found!=string::npos) {
+  			hid = msg.substr(start, found-start);
+  			start = found+1;  // forward the search point
+  		}
+
+ 		// read neighborHID
+		found=msg.find("^", start);
+  		if (found!=string::npos) {
+  			nextHop = msg.substr(start, found-start);
+  			start = found+1;  // forward the search point
+  		}
+
+ 		// read neighborHID
+		found=msg.find("^", start);
+  		if (found!=string::npos) {
+  			sPort = msg.substr(start, found-start);
+  			start = found+1;  // forward the search point
+  		}
+        port = atoi(sPort.c_str());
+
+ 		// read neighborHID
+		found=msg.find("^", start);
+  		if (found!=string::npos) {
+  			sFlags = msg.substr(start, found-start);
+  			start = found+1;  // forward the search point
+  		}
+        flags = atoi(sFlags.c_str());
+
+		if ((rc = xr.setRoute(hid, port, nextHop, flags)) != 0)
+			syslog(LOG_ERR, "error setting route %d", rc);
+ 	}
+
 	return 1;
 }
 
@@ -703,6 +742,8 @@ void initRouteState()
 	route_state.hello_seq = 0;  // hello seq number of this router
 	route_state.hello_lsa_ratio = (int32_t) ceil(LSA_INTERVAL/HELLO_INTERVAL);
 	route_state.calc_dijstra_ticks = 0;
+
+	route_state.ctl_seq = 0;	// LSA sequence number of this router
 
 	route_state.dual_router_AD = "NULL";
 	// mark if this is a dual XIA-IPv4 router

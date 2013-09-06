@@ -74,7 +74,6 @@ void timeout_handler(int signum)
 	} else if (route_state.hello_seq == route_state.hello_lsa_ratio) {
 		// it's time to send LSA
 		//sendLSA();
-		sendControl();
 		// reset hello req
 		route_state.hello_seq = 0;
 	} else {
@@ -159,24 +158,66 @@ int sendLSA() {
 	return 1;
 }
 
-int sendControl() {
+int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> routingTable)
+{
 	// Send my AD and my HID to the directly connected neighbors
-	char buffer[1024];
-	bzero(buffer, 1024);
+	char buffer[10240];
+	bzero(buffer, 10240);
 
 	/* Message format (delimiter=^)
 		message-type{Hello=0 or LSA=1}
 		source-AD
 		source-HID
 	*/
-	string hello;
-	hello.append("3^");
-	hello.append(route_state.myAD);
-	hello.append("^");
-	hello.append(route_state.myHID);
-	hello.append("^");
-	strcpy (buffer, hello.c_str());
+	string msg;
+	char ctl_seq[10], num_entries[10];
+	char port[10], flags[10];
+
+	sprintf(ctl_seq, "%d", route_state.ctl_seq);
+	sprintf(num_entries, "%d", routingTable.size());
+
+	msg.append("3^");
+	msg.append(route_state.myAD);
+	msg.append("^");
+	msg.append(route_state.myHID);
+	msg.append("^");
+
+	msg.append(ctl_seq);
+	msg.append("^");
+
+	msg.append(route_state.myAD);
+	msg.append("^");
+	msg.append(destHID);
+	msg.append("^");
+
+	msg.append(num_entries);
+	msg.append("^");
+
+	map<std::string, RouteEntry>::iterator it;
+  	for ( it=routingTable.begin() ; it != routingTable.end(); it++ ) {
+        // dest
+		msg.append( it->second.dest );
+		msg.append("^");
+        //next hop
+		msg.append( it->second.nextHop );
+		msg.append("^");
+        //port
+        sprintf(port, "%d", it->second.port);
+		msg.append(port);
+		msg.append("^");
+        //flags
+        sprintf(flags, "%d", it->second.flags);
+		msg.append(flags);
+		msg.append("^");
+  	}
+
+	strcpy (buffer, msg.c_str());
 	Xsendto(route_state.sock, buffer, strlen(buffer), 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
+
+	// increase the LSA seq
+	route_state.ctl_seq++;
+	route_state.ctl_seq = route_state.ctl_seq % MAX_SEQNUM;
+
 	return 1;
 }
 
@@ -422,25 +463,23 @@ int processLSA(const char* lsa_msg) {
  	}
 
 	route_state.networkTable[destHID] = entry;
-	//printf("LSA received: src=%s, seq=%d, num_neighbors=%d \n", (route_state.networkTable[destHID].dest).c_str(), route_state.networkTable[destHID].seq, route_state.networkTable[destHID].num_neighbors );
 	route_state.calc_dijstra_ticks++;
 
-	map<std::string, RouteEntry> testRoutingTable; // map DestHID to route entry
-    populateRoutingTable(destHID, testRoutingTable);
-
-	if (route_state.calc_dijstra_ticks == CALC_DIJKSTRA_INTERVAL) {
+	if (route_state.calc_dijstra_ticks >= CALC_DIJKSTRA_INTERVAL) {
 		// Calculate Shortest Path algorithm
 		syslog(LOG_INFO, "Calcuating shortest paths\n");
-		//calcShortestPath();
+
+        map<std::string, NodeStateEntry>::iterator it1;
+        for ( it1=route_state.networkTable.begin() ; it1 != route_state.networkTable.end(); it1++ )
+        {
+            map<std::string, RouteEntry> routingTable;
+            populateRoutingTable(it1->second.dest, routingTable);
+
+            sendRoutingTable(it1->second.dest, routingTable);
+        }
+
 		route_state.calc_dijstra_ticks = 0;
-
-		// update Routing table (click routing table as well)
-		//updateClickRoutingTable();
 	}
-
-	// 5. rebroadcast this LSA
-	strcpy (buffer, lsa_msg);
-	Xsendto(route_state.sock, buffer, strlen(buffer), 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
 
 	return 1;
 }
@@ -566,41 +605,12 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> 
 
 void printRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> &routingTable)
 {
-	syslog(LOG_ALERT, "HID Routing table at %s", srcHID.c_str());
+	syslog(LOG_INFO, "Routing table for %s", srcHID.c_str());
   	map<std::string, RouteEntry>::iterator it1;
   	for ( it1=routingTable.begin() ; it1 != routingTable.end(); it1++ ) {
-  		syslog(LOG_ALERT, "Dest=%s, NextHop=%s, Port=%d, Flags=%u", (it1->second.dest).c_str(), (it1->second.nextHop).c_str(), (it1->second.port), (it1->second.flags) );
-
+  		syslog(LOG_INFO, "Dest=%s, NextHop=%s, Port=%d, Flags=%u", (it1->second.dest).c_str(), (it1->second.nextHop).c_str(), (it1->second.port), (it1->second.flags) );
   	}
 }
-
-
-void updateClickRoutingTable() {
-
-	int rc, port;
-	string destXID, nexthopXID;
-	string default_AD("AD:-"), default_HID("HID:-"), default_4ID("IP:-");
-
-  	map<std::string, RouteEntry>::iterator it1;
-  	for ( it1=route_state.ADrouteTable.begin() ; it1 != route_state.ADrouteTable.end(); it1++ ) {
- 		destXID = it1->second.dest;
- 		nexthopXID = it1->second.nextHop;
-		port =  it1->second.port;
-
-		if ((rc = xr.setRoute(destXID, port, nexthopXID, 0xffff)) != 0)
-			syslog(LOG_ERR, "error setting route %d", rc);
-
-		// set default AD for 4ID traffic
-		if (route_state.dual_router==0 && destXID.compare(route_state.dual_router_AD)==0) {
-			if ((rc = xr.setRoute(default_4ID, port, nexthopXID, 0xffff)) != 0)
-				syslog(LOG_ERR, "error setting route %d", rc);
-		}
-  	}
-  	listRoutes("AD");
-	listRoutes("HID");
-}
-
-
 
 void initRouteState()
 {
@@ -629,6 +639,8 @@ void initRouteState()
 	route_state.hello_seq = 0;  // hello seq number of this router
 	route_state.hello_lsa_ratio = (int32_t) ceil(LSA_INTERVAL/HELLO_INTERVAL);
 	route_state.calc_dijstra_ticks = 0;
+
+	route_state.ctl_seq = 0;	// LSA sequence number of this router
 
 	route_state.dual_router_AD = "NULL";
 	// mark if this is a dual XIA-IPv4 router
