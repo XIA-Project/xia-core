@@ -121,7 +121,7 @@ int processLSA(const char* lsa_msg);
 void processHostRegister(const char* host_register_msg);
 
 // process a control message 
-int processControl(const char* control_msg);
+int processRoutingTableUpdate(const char* control_msg);
 
 // compute the shortest path (Dijkstra)
 void calcShortestPath();

@@ -556,15 +556,15 @@ void calcShortestPath() {
 }
 
 // process a control message 
-int processControl(const char* control_msg) {
-	char buffer[10240];
-	bzero(buffer, 10240);
+int processRoutingTableUpdate(const char* control_msg)
+{
 	/* Procedure:
 		0. scan this LSA (mark AD with a DualRouter if there)
 		1. filter out the already seen LSA (via LSA-seq for this dest)
 		2. update the network table
 		3. rebroadcast this LSA
 	*/
+
 	// 0. Read this LSA
 	size_t found, start;
 	string msg, srcAD, srcHID, ctl_seq, destAD, destHID, num_entries, hid, nextHop, sPort, sFlags;
@@ -583,28 +583,6 @@ int processControl(const char* control_msg) {
 	// read destAD
 	found=msg.find("^", start);
   	if (found!=string::npos) {
-  		srcAD = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  	}
-
- 	// read destHID
-	found=msg.find("^", start);
-  	if (found!=string::npos) {
-  		srcHID = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  	}
-
-	// read LSA-seq-num
-	found=msg.find("^", start);
-  	if (found!=string::npos) {
-  		ctl_seq = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  	}
-  	ctlSeq = atoi(ctl_seq.c_str());
-
-	// read destAD
-	found=msg.find("^", start);
-  	if (found!=string::npos) {
   		destAD = msg.substr(start, found-start);
   		start = found+1;  // forward the search point
   	}
@@ -617,10 +595,27 @@ int processControl(const char* control_msg) {
   	}
 
     /* CHECK IF INTENDED FOR ME */
-    // dont need source addr
-    // first item should be source addr
     if ((destAD != route_state.myAD) || (destHID != route_state.myHID))
+    {
+        Xsendto(route_state.sock, msg.c_str(), msg.size(), 0, (struct sockaddr *)&route_state.ddag, sizeof(sockaddr_x));
         return 1;
+    }
+
+	// read LSA-seq-num
+	found=msg.find("^", start);
+  	if (found!=string::npos) {
+  		ctl_seq = msg.substr(start, found-start);
+  		start = found+1;  // forward the search point
+  	}
+  	ctlSeq = atoi(ctl_seq.c_str());
+
+  	// 1. Filter out the already seen LSA
+    if (ctlSeq <= route_state.ctl_seq && route_state.ctl_seq - ctlSeq < 10000) {
+        // If this LSA already seen, ignore this LSA; do nothing
+        return 1;
+    }
+
+    route_state.ctl_seq = ctlSeq;
 
  	// read num_neighbors
 	found=msg.find("^", start);
@@ -629,13 +624,6 @@ int processControl(const char* control_msg) {
   		start = found+1;  // forward the search point
   	}
   	numEntries = atoi(num_entries.c_str());
-
-  	// 1. Filter out the already seen LSA
-    if (ctlSeq <= route_state.ctl_seq && route_state.ctl_seq - ctlSeq < 10000) {
-        // If this LSA already seen, ignore this LSA; do nothing
-        return 1;
-    }
-    route_state.ctl_seq = ctlSeq;
 
   	int i;
  	for (i = 0; i < numEntries; i++) {
@@ -851,7 +839,6 @@ int main(int argc, char *argv[])
    		exit(-1);
    	}
 
-
 	while (1) {
 		FD_ZERO(&socks);
 		FD_SET(route_state.sock, &socks);
@@ -889,7 +876,7 @@ int main(int argc, char *argv[])
 						break;
                     case CONTROL:
 						// process the incoming LSA message
-  						processControl(msg.c_str());
+  						processRoutingTableUpdate(msg.c_str());
 						break;
 					default:
 						perror("unknown routing message");
@@ -897,8 +884,7 @@ int main(int argc, char *argv[])
 				}
   			}
 		}
-    	}
-
+    }
 
 	return 0;
 }

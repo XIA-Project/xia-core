@@ -18,6 +18,7 @@
 #include <math.h>
 #include <fcntl.h>
 using namespace std;
+#include <sstream>
 
 #define HELLO_INTERVAL 0.1
 #define LSA_INTERVAL 0.3
@@ -26,10 +27,12 @@ using namespace std;
 #define MAX_SEQNUM 100000
 #define MAX_XID_SIZE 100
 
+#define CTL_MSG_BUF_SIZE 10240
+
 #define HELLO 0
 #define LSA 1
 #define HOST_REGISTER 2
-#define CONTROL 3
+#define CTL_ROUTING_TABLE_UPDATE 3
 
 
 #define BHID "HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
@@ -109,9 +112,6 @@ void initRouteState();
 // send Hello message (1-hop broadcast)
 int sendHello();
 
-// send LinkStateAdvertisement message (flooding)
-int sendLSA();
-
 // send control message
 int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> routingTable);
 
@@ -119,10 +119,7 @@ int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> rout
 int processHello(const char* hello_msg);
 
 // process a LinkStateAdvertisement message 
-int processLSA(const char* lsa_msg);
-
-// process a Host Register message 
-void processHostRegister(const char* host_register_msg);
+int processLSA(string msg);
 
 // compute the shortest path (Dijkstra)
 void populateRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> &routingTable);

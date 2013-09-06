@@ -106,150 +106,82 @@ int sendHello(){
 	return 1;
 }
 
-// send LinkStateAdvertisement message (flooding)
-int sendLSA() {
-	char buffer[1024];
-	bzero(buffer, 1024);
-	/* Message format (delimiter=^)
-		message-type{Hello=0 or LSA=1}
-		router-type{XIA=0 or XIA-IPv4-Dual=1}
-		source-AD
-		source-HID
-		LSA-seq-num
-		num_neighbors
-		neighbor1-AD
-		neighbor1-HID
-		neighbor2-AD
-		neighbor2-HID
-		...
-	*/
-	string lsa;
-	char lsa_seq[10], num_neighbors[10], is_dual_router[10];
+string controlMessageAppend(string &msg, string s)
+{
+	msg.append(s);
+	msg.append("^");
+    return msg;
+}
 
-	sprintf(lsa_seq, "%d", route_state.lsa_seq);
-	sprintf(num_neighbors, "%d", route_state.num_neighbors);
-	sprintf(is_dual_router, "%d", route_state.dual_router);
+string controlMessageAppend(string &msg, int n)
+{
+    stringstream out;
+    out << n;
+    return controlMessageAppend(msg, out.str());
+}
 
-	lsa.append("1^");
-	lsa.append(is_dual_router);
-	lsa.append("^");
-	lsa.append(route_state.myAD);
-	lsa.append("^");
-	lsa.append(route_state.myHID);
-	lsa.append("^");
-	lsa.append(lsa_seq);
-	lsa.append("^");
-	lsa.append(num_neighbors);
-	lsa.append("^");
+string controlMessageNew(int type)
+{
+    string s;
+    return controlMessageAppend(s, type);
+}
 
-	map<std::string, NeighborEntry>::iterator it;
+int controlMessageRead(string msg, size_t &pos, string &s)
+{
+    size_t r = msg.find("^", pos);
 
-  	for ( it=route_state.neighborTable.begin() ; it != route_state.neighborTable.end(); it++ ) {
-		lsa.append( it->second.AD );
-		lsa.append("^");
-		lsa.append( it->second.HID );
-		lsa.append("^");
-  	}
-	strcpy (buffer, lsa.c_str());
-	// increase the LSA seq
-	route_state.lsa_seq++;
-	route_state.lsa_seq = route_state.lsa_seq % MAX_SEQNUM;
-	Xsendto(route_state.sock, buffer, strlen(buffer), 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
-	return 1;
+    if (r == string::npos)
+        return -1;
+
+    s = msg.substr(pos, r - pos);
+    pos = r + 1;
+
+    return 0;
+}
+
+int controlMessageRead(string msg, size_t &pos, int &n)
+{
+    string s;
+
+    if (controlMessageRead(msg, pos, s) < 0)
+        return -1;
+
+    n = atoi(s.c_str());
+
+    return 0;
 }
 
 int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> routingTable)
 {
-	// Send my AD and my HID to the directly connected neighbors
-	char buffer[10240];
-	bzero(buffer, 10240);
-
 	/* Message format (delimiter=^)
 		message-type{Hello=0 or LSA=1}
 		source-AD
 		source-HID
 	*/
-	string msg;
-	char ctl_seq[10], num_entries[10];
-	char port[10], flags[10];
 
-	sprintf(ctl_seq, "%d", route_state.ctl_seq);
-	sprintf(num_entries, "%d", routingTable.size());
+	string msg = controlMessageNew(CTL_ROUTING_TABLE_UPDATE);
 
-	msg.append("3^");
-	msg.append(route_state.myAD);
-	msg.append("^");
-	msg.append(route_state.myHID);
-	msg.append("^");
+    controlMessageAppend(msg, route_state.myAD);
+    controlMessageAppend(msg, destHID);
 
-	msg.append(ctl_seq);
-	msg.append("^");
+    controlMessageAppend(msg, route_state.ctl_seq);
 
-	msg.append(route_state.myAD);
-	msg.append("^");
-	msg.append(destHID);
-	msg.append("^");
+    controlMessageAppend(msg, (int)routingTable.size());
 
-	msg.append(num_entries);
-	msg.append("^");
-
-	map<std::string, RouteEntry>::iterator it;
-  	for ( it=routingTable.begin() ; it != routingTable.end(); it++ ) {
-        // dest
-		msg.append( it->second.dest );
-		msg.append("^");
-        //next hop
-		msg.append( it->second.nextHop );
-		msg.append("^");
-        //port
-        sprintf(port, "%d", it->second.port);
-		msg.append(port);
-		msg.append("^");
-        //flags
-        sprintf(flags, "%d", it->second.flags);
-		msg.append(flags);
-		msg.append("^");
+	map<string, RouteEntry>::iterator it;
+  	for (it = routingTable.begin(); it != routingTable.end(); it++)
+    {
+        controlMessageAppend(msg, it->second.dest);
+        controlMessageAppend(msg, it->second.nextHop);
+        controlMessageAppend(msg, it->second.port);
+        controlMessageAppend(msg, it->second.flags);
   	}
 
-	strcpy (buffer, msg.c_str());
-	Xsendto(route_state.sock, buffer, strlen(buffer), 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
+	Xsendto(route_state.sock, msg.c_str(), msg.size(), 0, (struct sockaddr *)&route_state.ddag, sizeof(sockaddr_x));
 
-	// increase the LSA seq
-	route_state.ctl_seq++;
-	route_state.ctl_seq = route_state.ctl_seq % MAX_SEQNUM;
+	route_state.ctl_seq = (route_state.ctl_seq + 1) % MAX_SEQNUM;
 
 	return 1;
-}
-
-// process a Host Register message
-void processHostRegister(const char* host_register_msg) {
-	/* Procedure:
-		1. update this host entry in (click-side) HID table:
-			(hostHID, interface#, hostHID, -)
-	*/
-	int rc;
-	size_t found, start;
-	string msg, hostHID;
-	start = 0;
-	msg = host_register_msg;
- 	// read message-type
-	found=msg.find("^", start);
-  	if (found!=string::npos) {
-  		start = found+1;   // message-type was previously read
-  	}
-
-	// read hostHID
-	found=msg.find("^", start);
-  	if (found!=string::npos) {
-  		hostHID = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  	}
-
- 	int interface = interfaceNumber("HID", hostHID);
-	// update the host entry in (click-side) HID table
-	if ((rc = xr.setRoute(hostHID, interface, hostHID, 0xffff)) != 0)
-		syslog(LOG_ERR, "unable to set route %d", rc);
-
 }
 
 // process an incoming Hello message
@@ -334,94 +266,52 @@ int processHello(const char* hello_msg) {
 }
 
 // process a LinkStateAdvertisement message
-int processLSA(const char* lsa_msg) {
-
-	char buffer[1024];
-	bzero(buffer, 1024);
+int processLSA(string msg)
+{
 	/* Procedure:
 		0. scan this LSA (mark AD with a DualRouter if there)
 		1. filter out the already seen LSA (via LSA-seq for this dest)
 		2. update the network table
 		3. rebroadcast this LSA
 	*/
+
 	// 0. Read this LSA
-	size_t found, start;
-	string msg, routerType, destAD, destHID, lsa_seq, num_neighbors, neighborAD, neighborHID;
-    string port;
-    int neighborPort;
+	size_t pos = 0;
+    int msgType, isDualRouter, lsaSeq, numNeighbors, neighborPort;
+    string destAD, destHID, neighborAD, neighborHID;
 
-	start = 0;
-	msg = lsa_msg;
+    controlMessageRead(msg, pos, msgType);
 
- 	// read message-type
-	found=msg.find("^", start);
-  	if (found!=string::npos) {
-  		start = found+1;   // message-type was previously read
-  	}
-
-	// read routerType
-	found=msg.find("^", start);
-  	if (found!=string::npos) {
-  		routerType = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  	}
-  	int is_dual_router = atoi(routerType.c_str());
-
-	// read destAD
-	found=msg.find("^", start);
-  	if (found!=string::npos) {
-  		destAD = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  	}
-
- 	// read destHID
-	found=msg.find("^", start);
-  	if (found!=string::npos) {
-  		destHID = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  	}
-
-	// read LSA-seq-num
-	found=msg.find("^", start);
-  	if (found!=string::npos) {
-  		lsa_seq = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  	}
-  	int lsaSeq = atoi(lsa_seq.c_str());
-
- 	// read num_neighbors
-	found=msg.find("^", start);
-  	if (found!=string::npos) {
-  		num_neighbors = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  	}
-  	int numNeighbors = atoi(num_neighbors.c_str());
+    controlMessageRead(msg, pos, isDualRouter);
+    controlMessageRead(msg, pos, destAD);
+    controlMessageRead(msg, pos, destHID);
 
   	// See if this LSA comes from AD with dualRouter
-  	if (is_dual_router == 1) {
+  	if (isDualRouter == 1)
   		route_state.dual_router_AD = destAD;
-  	}
 
   	// First, filter out the LSA originating from myself
-  	string myHID = route_state.myHID;
-  	if (myHID.compare(destHID) == 0) {
+  	if (destHID == route_state.myHID)
   		return 1;
-  	}
+
+    controlMessageRead(msg, pos, lsaSeq);
 
   	// 1. Filter out the already seen LSA
 	map<std::string, NodeStateEntry>::iterator it;
-	it=route_state.networkTable.find(destHID);
+	it = route_state.networkTable.find(destHID);
 
-	if(it != route_state.networkTable.end()) {
-  		// If this originating HID has been known (i.e., already in the networkTable)
-
-  	  	if (lsaSeq <= it->second.seq  &&  it->second.seq - lsaSeq < 10000) {
-  	  		// If this LSA already seen, ignore this LSA; do nothing
+    // If this originating HID has been known (i.e., already in the networkTable)
+	if (it != route_state.networkTable.end())
+    {
+        // If this LSA already seen, ignore this LSA; do nothing
+  	  	if ((lsaSeq <= it->second.seq) && ((it->second.seq - lsaSeq) < 10000))
   			return 1;
-  		}
+
   		// For now, delete this dest HID entry in networkTable (... we will re-insert the updated entry shortly)
   		route_state.networkTable.erase (it);
   	}
+
+    controlMessageRead(msg, pos, numNeighbors);
 
 	// 2. Update the network table
 	NodeStateEntry entry;
@@ -430,29 +320,11 @@ int processLSA(const char* lsa_msg) {
 	entry.num_neighbors = numNeighbors;
 
   	int i;
- 	for (i = 0; i < numNeighbors; i++) {
-
- 		// read neighborAD
-		found=msg.find("^", start);
-  		if (found!=string::npos) {
-  			neighborAD = msg.substr(start, found-start);
-  			start = found+1;  // forward the search point
-  		}
-
- 		// read neighborHID
-		found=msg.find("^", start);
-  		if (found!=string::npos) {
-  			neighborHID = msg.substr(start, found-start);
-  			start = found+1;  // forward the search point
-  		}
-
- 		// read neighborPort
-		found=msg.find("^", start);
-  		if (found!=string::npos) {
-            port = msg.substr(start, found-start);
-  			start = found+1;  // forward the search point
-  		}
-        neighborPort = atoi(port.c_str());
+ 	for (i = 0; i < numNeighbors; i++)
+    {
+        controlMessageRead(msg, pos, neighborAD);
+        controlMessageRead(msg, pos, neighborHID);
+        controlMessageRead(msg, pos, neighborPort);
 
  		// fill the neighbors into the corresponding networkTable entry
         NeighborEntry neighbor_entry;
@@ -465,16 +337,15 @@ int processLSA(const char* lsa_msg) {
 	route_state.networkTable[destHID] = entry;
 	route_state.calc_dijstra_ticks++;
 
-	if (route_state.calc_dijstra_ticks >= CALC_DIJKSTRA_INTERVAL) {
-		// Calculate Shortest Path algorithm
+	if (route_state.calc_dijstra_ticks >= CALC_DIJKSTRA_INTERVAL)
+    {
 		syslog(LOG_INFO, "Calcuating shortest paths\n");
 
         map<std::string, NodeStateEntry>::iterator it1;
-        for ( it1=route_state.networkTable.begin() ; it1 != route_state.networkTable.end(); it1++ )
+        for (it1=route_state.networkTable.begin(); it1 != route_state.networkTable.end(); it1++)
         {
             map<std::string, RouteEntry> routingTable;
             populateRoutingTable(it1->second.dest, routingTable);
-
             sendRoutingTable(it1->second.dest, routingTable);
         }
 
@@ -483,7 +354,6 @@ int processLSA(const char* lsa_msg) {
 
 	return 1;
 }
-
 
 void populateRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> &routingTable)
 {
@@ -748,7 +618,6 @@ int main(int argc, char *argv[])
    		exit(-1);
    	}
 
-
 	while (1) {
 		FD_ZERO(&socks);
 		FD_SET(route_state.sock, &socks);
@@ -773,25 +642,18 @@ int main(int argc, char *argv[])
   				int type = atoi(msg_type.c_str());
 				switch (type) {
 					case HELLO:
-						// process the incoming Hello message
                         //processHello(msg.c_str());
 						break;
 					case LSA:
-						// process the incoming LSA message
-  						processLSA(msg.c_str());
-						break;
-					case HOST_REGISTER:
-						// process the incoming host-register message
-  						//processHostRegister(msg.c_str());
+  						processLSA(msg);
 						break;
 					default:
-						perror("unknown routing message");
+						//perror("unknown routing message");
 						break;
 				}
   			}
 		}
-    	}
-
+    }
 
 	return 0;
 }
