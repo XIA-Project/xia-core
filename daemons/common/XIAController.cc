@@ -50,7 +50,7 @@ int XIAController::version(std::string &ver)
 int XIAController::listRouters(std::vector<std::string> &rlist)
 {
 	vector<string> elements;
-	int n;
+	size_t n;
 
 	if (!connected())
 		return XR_NOT_CONNECTED;
@@ -151,7 +151,7 @@ int XIAController::updateRoute(string cmd, const std::string &xid, int port, con
 {
 	string xidtype;
 	string mutableXID(xid);
-	unsigned n;
+	size_t n;
 
 	if (!connected())
 		return XR_NOT_CONNECTED;
