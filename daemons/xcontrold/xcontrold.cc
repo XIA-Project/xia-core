@@ -160,11 +160,12 @@ int processLSA(string msg)
         ctlMsg.read(neighborPort);
 
  		// fill the neighbors into the corresponding networkTable entry
-        NeighborEntry neighbor_entry;
-        neighbor_entry.AD = neighborAD;
-        neighbor_entry.HID = neighborHID;
-        neighbor_entry.port = neighborPort;
- 		entry.neighbor_list.push_back(neighbor_entry);
+        Node src;
+        Node ad(neighborAD);
+        Node hid(neighborHID);
+        Graph g = src * ad * hid;
+        Neighbor neighbor(g, neighborPort, 1);
+        entry.neighbor_list.push_back(neighbor);
  	}
 
 	route_state.networkTable[destHID] = entry;
@@ -219,29 +220,31 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> 
 	route_state.networkTable[myHID].cost = 0;
 	table.erase(myHID);
 
-	vector<NeighborEntry>::iterator it2;
-	for ( it2=route_state.networkTable[myHID].neighbor_list.begin() ; it2 < route_state.networkTable[myHID].neighbor_list.end(); it2++ ) {
-
-		tempHID = (*it2).HID.c_str();
+    vector<Neighbor>::iterator it2;
+    for (it2 = route_state.networkTable[myHID].neighbor_list.begin(); it2 < route_state.networkTable[myHID].neighbor_list.end(); it2++)
+    {
+		tempHID = it2->final_intent_str();
 
         if (route_state.networkTable.find(tempHID) != route_state.networkTable.end())
         {
-            route_state.networkTable[tempHID].cost = 1;
+            route_state.networkTable[tempHID].cost = it2->cost();
             route_state.networkTable[tempHID].prevNode = myHID;
         }
-        else
+        else /* We have an endhost */
         {
             NodeStateEntry entry;
             entry.dest = tempHID;
             entry.seq = route_state.networkTable[myHID].seq;
             entry.num_neighbors = 1;
 
-            NeighborEntry neighbor_entry;
-            //neighbor_entry.AD = neighborAD;
-            neighbor_entry.HID = myHID;
-            neighbor_entry.port = 0;
-            entry.neighbor_list.push_back(neighbor_entry);
-            entry.cost = 1;
+            Node src;
+            Node ad(route_state.myAD);
+            Node hid(myHID);
+            Graph g = src * ad * hid;
+            Neighbor neighbor(g, 0, 1);
+
+            entry.neighbor_list.push_back(neighbor);
+            entry.cost = neighbor.cost();
             entry.prevNode = myHID;
 
             route_state.networkTable[tempHID] = entry;
@@ -267,7 +270,7 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> 
   		route_state.networkTable[selectedHID].checked = true;
 
  		for ( it2=route_state.networkTable[selectedHID].neighbor_list.begin() ; it2 < route_state.networkTable[selectedHID].neighbor_list.end(); it2++ ) {
-			tempHID = (*it2).HID.c_str();
+			tempHID = it2->final_intent_str();
 			if (route_state.networkTable[tempHID].checked != true) {
 				if (route_state.networkTable[tempHID].cost > route_state.networkTable[selectedHID].cost + 1) {
 					route_state.networkTable[tempHID].cost = route_state.networkTable[selectedHID].cost + 1;
@@ -296,8 +299,8 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> 
 
                 for ( it2=route_state.networkTable[myHID].neighbor_list.begin() ; it2 < route_state.networkTable[myHID].neighbor_list.end(); it2++ )
                 {
-                    if ((*it2).HID == tempHID2)
-                        routingTable[tempHID1].port = (*it2).port;
+                    if (it2->final_intent_str() == tempHID2)
+                        routingTable[tempHID1].port = it2->port();
                 }
   			}
   		}

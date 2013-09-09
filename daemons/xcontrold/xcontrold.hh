@@ -18,6 +18,7 @@
 #include <fcntl.h>
 
 #include "../common/ControlMessage.hh"
+#include "../common/Neighbor.hh"
 
 using namespace std;
 
@@ -40,17 +41,10 @@ typedef struct {
 } RouteEntry;
 
 typedef struct {
-	std::string AD;		// neigbor AD
-	std::string HID;	// neighbor HID
-	int32_t cost; 		// link cost
-	int32_t port;		// interface (outgoing port)
-} NeighborEntry;
-
-typedef struct {
 	std::string dest;	// destination AD or HID
 	int32_t seq; 		// LSA seq of dest (for filtering purpose)	
 	int32_t num_neighbors;	// number of neighbors of dest AD
-    std::vector<NeighborEntry> neighbor_list; // neighbor list
+    std::vector<Neighbor> neighbor_list; // neighbor list
 	
 	bool checked;	// used for calculating the shortest path
 	int32_t cost;	// cost from myAD to destAD
@@ -82,8 +76,6 @@ typedef struct RouteState {
 
 	map<std::string, RouteEntry> ADrouteTable; // map DestAD to route entry
 	map<std::string, RouteEntry> HIDrouteTable; // map DestHID to route entry
-	
-	map<std::string, NeighborEntry> neighborTable; // map neighborAD to neighbor entry
 	
 	map<std::string, NodeStateEntry> networkTable; // map DestAD to NodeState entry
 	
