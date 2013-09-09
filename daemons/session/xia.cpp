@@ -3,6 +3,7 @@
  */
 #include "Xsocket.h"
 #include "dagaddr.hpp"
+#include "xssl.h"
 
 sockaddr_x* addrFromData(const string *addr_buf) {
 	return (sockaddr_x*)addr_buf->data();
@@ -75,21 +76,23 @@ string getHIDForSocket(int sock) {
 }
 
 int sendBuffer(session::ConnectionInfo *cinfo, const char* buf, size_t len) {
-	int sock = cinfo->sockfd();
-	
-	if (cinfo->transport_protocol() == session::XSP) {
-		return Xsend(sock, buf, len, 0);
+
+	if (cinfo->use_ssl() && cinfo->has_ssl_ptr()) {
+		return XSSL_write(*(XSSL**)cinfo->ssl_ptr().data(), buf, len);
+	} else if (cinfo->transport_protocol() == session::XSP) {
+		return Xsend(cinfo->sockfd(), buf, len, 0);
 	}
 
 	return -1; // we shouldn't get here
 }
 
 int recvBuffer(session::ConnectionInfo *cinfo, char* buf, size_t len) {
-	int sock = cinfo->sockfd();
 
-	if (cinfo->transport_protocol() == session::XSP) {
+	if (cinfo->use_ssl() && cinfo->has_ssl_ptr()) {
+		return XSSL_read(*(XSSL**)cinfo->ssl_ptr().data(), buf, len);
+	} else if (cinfo->transport_protocol() == session::XSP) {
 		memset(buf, 0, len);
-		return Xrecv(sock, buf, len, 0);
+		return Xrecv(cinfo->sockfd(), buf, len, 0);
 	}
 
 	return -1; // we shouldn't get here
@@ -103,22 +106,12 @@ int closeSock(int sock) {
 	return Xclose(sock);
 }
 
-int bindRandomAddr(string **addr_buf) {
-	// make DAG to bind to (w/ random SID)
-	unsigned char buf[20];
-	uint32_t i;
-	srand(time(NULL));
-	for (i = 0; i < sizeof(buf); i++) {
-	    buf[i] = rand() % 255 + 1;
-	}
-	char sid[45];
-	sprintf(&(sid[0]), "SID:");
-	for (i = 0; i < 20; i++) {
-		sprintf(&(sid[i*2 + 4]), "%02x", buf[i]);
-	}
-	sid[44] = '\0';
+
+int bindWithKeypair(RSA *keypair, string **addr_buf) {
+
+	char *SID = SID_from_keypair(keypair);
 	struct addrinfo *ai;
-	if (Xgetaddrinfo(NULL, sid, NULL, &ai) != 0) {
+	if (Xgetaddrinfo(NULL, SID, NULL, &ai) != 0) {
 		ERROR("getaddrinfo failure!\n");
 		return -1;
 	}
@@ -137,6 +130,30 @@ int bindRandomAddr(string **addr_buf) {
 
 	 *addr_buf = new string((const char*)sa, sizeof(sockaddr_x));
 	return sock;
+}
+
+int bindNewSocket(session::ConnectionInfo *cinfo, string **addr_buf) {
+	if (!cinfo->has_ssl_ctx_ptr()) {
+		XSSL_CTX *xssl_ctx = XSSL_CTX_new();
+		if (xssl_ctx == NULL) {
+			ERROR("Unable to init new XSSL context");
+			return -1;
+		}
+		cinfo->set_ssl_ctx_ptr(&xssl_ctx, sizeof(XSSL_CTX*));
+	}
+	return bindWithKeypair((*(XSSL_CTX**)cinfo->ssl_ctx_ptr().data())->keypair, addr_buf);
+}
+
+int bindNewSocket(session::ContextInfo *ctxInfo, string **addr_buf) {
+	if (!ctxInfo->has_ssl_ctx_ptr()) {
+		XSSL_CTX *xssl_ctx = XSSL_CTX_new();
+		if (xssl_ctx == NULL) {
+			ERROR("Unable to init new XSSL context");
+			return -1;
+		}
+		ctxInfo->set_ssl_ctx_ptr(&xssl_ctx, sizeof(XSSL_CTX*));
+	}
+	return bindWithKeypair((*(XSSL_CTX**)ctxInfo->ssl_ctx_ptr().data())->keypair, addr_buf);
 }
 
 
@@ -161,8 +178,69 @@ DBGF("    opened connection, sock is %d", sock);
 	cinfo->set_sockfd(sock);
 	cinfo->set_hid(getHIDForAddr(addr_buf));
 	cinfo->set_addr(*addr_buf);
+
 	return 0;
 
+}
+
+int connectSSL(session::ConnectionInfo *cinfo) {
+
+	if (!cinfo->has_ssl_ctx_ptr()) {
+		XSSL_CTX *xssl_ctx = XSSL_CTX_new();
+		if (xssl_ctx == NULL) {
+			ERROR("Unable to init new XSSL context");
+			return -1;
+		}
+		cinfo->set_ssl_ctx_ptr(&xssl_ctx, sizeof(XSSL_CTX*));
+	}
+
+	// Make sure we haven't already connected
+	if (cinfo->has_ssl_ptr()) return 0;
+
+	XSSL *xssl = XSSL_new(*(XSSL_CTX**)cinfo->ssl_ctx_ptr().data());
+	if (xssl == NULL) {
+		ERROR("Unable to init new XSSL object");
+		return -1;
+	}
+	if (XSSL_set_fd(xssl, cinfo->sockfd()) != 1) {
+		ERROR("Unable to set XSSL sockfd");
+		return -1;
+	}
+	if (XSSL_connect(xssl) != 1) {
+		ERROR("Unable to initiatie XSSL connection");
+		return -1;
+	}
+	cinfo->set_ssl_ptr(&xssl, sizeof(XSSL*));
+
+	return 0;
+}
+
+int acceptSSL(session::ConnectionInfo *cinfo) {
+
+	// If we're accpeting, we should have already bound, which set the ssl ctx
+	if (!cinfo->has_ssl_ctx_ptr()) {
+		ERROR("Connection does not have an associated XSSL_ctx");
+		return -1;
+	}
+	
+	// Make sure we haven't already accepted
+	if (cinfo->has_ssl_ptr()) return 0;
+
+	XSSL *xssl = XSSL_new(*(XSSL_CTX**)cinfo->ssl_ctx_ptr().data());
+	if (xssl == NULL) {
+		ERROR("Unable to init new XSSL object");
+		return -1;
+	}
+	if (XSSL_set_fd(xssl, cinfo->sockfd()) != 1) {
+		ERROR("Unable to set XSSL sockfd");
+		return -1;
+	}
+	if (XSSL_accept(xssl) != 1) {
+		ERROR("Error accepting XSSL connection");
+	}
+	cinfo->set_ssl_ptr(&xssl, sizeof(XSSL*));
+
+	return 0;
 }
 
 int registerName(const string &name, string *addr_buf) {

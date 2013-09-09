@@ -276,7 +276,7 @@ int closeSock(int sock) {
 	return close(sock);
 }
 
-int bindRandomAddr(string **addr_buf) {
+int bindRandomPort(string **addr_buf) {
 
 	int sfd;
 	if ((sfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {                
@@ -315,6 +315,14 @@ int bindRandomAddr(string **addr_buf) {
 
 	*addr_buf = bufFromAddr(&sa);
 	return sfd;
+}
+
+int bindNewSocket(session::ConnectionInfo *cinfo, string **addr_buf) {
+	return bindRandomPort(addr_buf);
+}
+
+int bindNewSocket(session::ContextInfo *ctxInfo, string **addr_buf) {
+	return bindRandomPort(addr_buf);
 }
 
 int openConnectionToAddr(const string *addr_buf, session::ConnectionInfo *cinfo) {

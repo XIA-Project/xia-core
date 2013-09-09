@@ -1072,6 +1072,7 @@ void * poll_listen_sock(void * args) {
 
 	int ctx = *((int*)args);   // TOOD: check this
 	free(args);
+	session::ContextInfo *ctxInfo = ctx_to_ctx_info[ctx];
 	int listen_sock = ctx_to_listensock[ctx];
 	if (listen_sock < 0) {
 		ERRORF("poll_listen_sock: bad socket: %d", listen_sock);
@@ -1090,6 +1091,7 @@ void * poll_listen_sock(void * args) {
 	
 	
 		session::ConnectionInfo *rx_cinfo = new session::ConnectionInfo();
+		rx_cinfo->set_ssl_ctx_ptr(ctxInfo->ssl_ctx_ptr());
 		rx_cinfo->set_sockfd(new_rxsock);
 		rx_cinfo->set_hid(getHIDForSocket(new_rxsock));
 		rx_cinfo->set_addr(*getRemoteAddrForSocket(new_rxsock));
@@ -1118,6 +1120,10 @@ void * poll_listen_sock(void * args) {
 
 				rx_cinfo->set_use_ssl(rpkt->info().use_ssl());
 				rx_cinfo->set_transport_protocol(rpkt->info().transport_protocol()); // TODO: a bit late for this... we already did an accept and a streaming receive...
+
+				if (rx_cinfo->use_ssl()) {
+					acceptSSL(rx_cinfo);
+				}
 
 #ifdef MULTIPLEX
 				// save transport connection for others to use
@@ -1354,15 +1360,6 @@ DBG("BEGIN process_init_msg");
 	if (!two_party) { 
 #endif /* MULTIPLEX */
 DBGF("Ctx %d    No connection exists, making rx_sock", ctx);
-		// make a socket to accept connection from last hop
-		lsock = bindRandomAddr(&my_addr_buf);
-		if (lsock < 0) {
-			ERROR("Error binding to random address");
-			rcm->set_message("Error binding to random address");
-			rcm->set_rc(session::FAILURE);
-			pthread_mutex_unlock(&hid_to_conn_mutex);
-			return -1;
-		}
 		
 		// store this rx-transport-conn-to-be so others connecting to the same
 		// lasthop don't make their own rx conns (actual sock filled in below)
@@ -1376,6 +1373,16 @@ DBGF("Ctx %d    No connection exists, making rx_sock", ctx);
 
 		hid_to_conn[prevHID] = rx_cinfo;
 		pthread_mutex_unlock(&hid_to_conn_mutex);
+		
+		// make a socket to accept connection from last hop
+		lsock = bindNewSocket(rx_cinfo, &my_addr_buf);
+		if (lsock < 0) {
+			ERROR("Error binding to random address");
+			rcm->set_message("Error binding to random address");
+			rcm->set_rc(session::FAILURE);
+			pthread_mutex_unlock(&hid_to_conn_mutex);
+			return -1;
+		}
 	
 		info->set_new_lasthop_conn(true);  // last hop should open new conn to me
 DBG("    Made socket to accept synack from last hop");
@@ -1420,6 +1427,13 @@ DBGF("Ctx %d    Found an exising connection, waiting for synack in acceptQ", ctx
 DBGF("Ctx %d    Sent connection request to next hop", ctx);
 
 
+	session::ConnectionInfo *tx_cinfo;
+	get_txconn_for_context(ctx, &tx_cinfo);
+	if (tx_cinfo->use_ssl()) {
+		connectSSL(tx_cinfo);
+	}
+
+
 	if (two_party) {  // rxconn and txconn are the same
 		get_txconn_for_context(ctx, &rx_cinfo);
 		rx_cinfo->add_sessions(ctx);  // redundant...
@@ -1454,6 +1468,10 @@ DBGF("Ctx %d    Accepted a new connection on rxsock %d", ctx, rxsock);
 			rcm->set_rc(session::FAILURE);
 			return -1;
 		} 
+	
+		if (rx_cinfo->use_ssl()) {
+			acceptSSL(rx_cinfo);
+		}
 
 		// start a thread reading this socket
 		int rc;
@@ -1473,6 +1491,10 @@ DBGF("Ctx %d    Accepted a new connection on rxsock %d", ctx, rxsock);
 		}
 		
 		rxsock = rx_cinfo->sockfd();
+
+		// Note: since this connection already existed, it should already have SSL
+		// set up (if we're using SSL). BUT, if an SSL and a non-SSL connection both
+		// try to share the same underlying connection, we don't support that now!
 	}
 
 	ctx_to_rxconn[ctx] = rx_cinfo;
@@ -1488,6 +1510,8 @@ DBGF("Ctx %d    Accepted a new connection on rxsock %d", ctx, rxsock);
 
 	string sender_name = rpkt->info().my_name();
 DBGF("Ctx %d    Got final synack from: %s (sender ctx: %d)", ctx, sender_name.c_str(), rpkt->sender_ctx());
+
+
 	
 	// store incoming ctx mapping
 	setLocalContextForIncomingContext(ctx, rpkt->sender_ctx(), rxsock);
@@ -1520,10 +1544,11 @@ DBG("BEGIN process_bind_msg");
 	}
 	
 	INFOF("    Binding to name: %s", bm.name().c_str());
+	session::ContextInfo *ctxInfo = ctx_to_ctx_info[ctx];
 
 	// bind to random app ID
 	string *addr_buf = NULL;
-	int sock = bindRandomAddr(&addr_buf);
+	int sock = bindNewSocket(ctxInfo, &addr_buf);
 	if (sock < 0) {
 		ERROR("Error binding to random address");
 		rcm->set_message("Error binding to random address");
@@ -1547,7 +1572,6 @@ DBG("BEGIN process_bind_msg");
 	DBG("    Registered name");
 
 	// if everything worked, store name and addr in context info
-	session::ContextInfo *ctxInfo = ctx_to_ctx_info[ctx];
 	ctxInfo->set_state(session::ContextInfo::LISTEN);
 	ctxInfo->set_my_name(bm.name());
 	ctxInfo->set_my_addr(*addr_buf);
@@ -1734,6 +1758,17 @@ DBGF("    Ctx %d    I'm the last hop; waiting for a connection to initiator. Put
 DBGF("    Ctx %d    Sent SessionInfo packet to next hop", new_ctx);
 
 	delete rpkt; // TODO: not freed if we hit an error and returned early
+
+
+	// Get a fresh pointer to tx_cinfo (if we didn't have to create one above,
+	// it's still NULL)
+	get_txconn_for_context(new_ctx, &tx_cinfo);
+	
+	// if this is 2-party and we already did acceptSSL on this connection (in 
+	// poll_listen_sock), then connectSSL will just return and not hurt anything
+	if (tx_cinfo->use_ssl()) {
+		connectSSL(tx_cinfo);
+	}
 
 	ctxInfo->set_state(session::ContextInfo::ESTABLISHED);
 

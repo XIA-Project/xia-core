@@ -155,6 +155,8 @@ message ConnectionInfo {
 	required string my_name = 6;
 
 	required bool use_ssl = 7;
+	optional bytes ssl_ctx_ptr = 15; // pointer to SSL or XSSL context object
+	optional bytes ssl_ptr = 16; // pointer to SSL or XSSL object
 	required TransportProtocol transport_protocol = 8;
 }
 
@@ -171,6 +173,7 @@ message ContextInfo {
 	optional bool initialized = 2 [default = false];
 	optional string my_name = 3;
 	optional bytes my_addr = 4;
+	optional bytes ssl_ctx_ptr = 5; // pointer to SSL or XSSL context object
 }
 
 
