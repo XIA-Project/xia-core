@@ -5,7 +5,6 @@
 #include <arpa/inet.h>
 #include <string>
 #include <vector>
-#include "../common/XIARouter.hh"
 
 #include <sys/types.h>
 #include <netdb.h>
@@ -17,6 +16,10 @@
 #include <map>
 #include <math.h>
 #include <fcntl.h>
+
+#include "../common/ControlMessage.hh"
+#include "../common/XIARouter.hh"
+
 using namespace std;
 
 #define HELLO_INTERVAL 0.1
@@ -26,16 +29,9 @@ using namespace std;
 #define MAX_SEQNUM 100000
 #define MAX_XID_SIZE 100
 
-#define HELLO 0
-#define LSA 1
-#define HOST_REGISTER 2
-#define CONTROL 3
-
-
 #define BHID "HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 #define SID_XROUTE "SID:1110000000000000000000000000000000001112"
 #define NULL_4ID "IP:4500000000010000fafa00000000000000000000"
-
 
 typedef struct {
 	std::string dest;	// destination AD or HID
@@ -51,7 +47,6 @@ typedef struct {
 	int32_t port;		// interface (outgoing port)
 } NeighborEntry;
 
-
 typedef struct {
 	std::string dest;	// destination AD or HID
 	int32_t seq; 		// LSA seq of dest (for filtering purpose)	
@@ -63,7 +58,6 @@ typedef struct {
 	std::string prevNode; // previous node along the shortest path from myHID to destHID
 	
 } NodeStateEntry; // extracted from incoming LSA
-
 
 typedef struct RouteState {
 	int32_t sock; // socket for routing process
@@ -96,7 +90,6 @@ typedef struct RouteState {
 	
 } RouteState;
 
-
 void listRoutes(std::string xidType);
 
 // returns an interface number to a neighbor HID
@@ -121,7 +114,7 @@ int processLSA(const char* lsa_msg);
 void processHostRegister(const char* host_register_msg);
 
 // process a control message 
-int processRoutingTableUpdate(const char* control_msg);
+int processRoutingTable(const char* control_msg);
 
 // compute the shortest path (Dijkstra)
 void calcShortestPath();

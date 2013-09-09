@@ -3,7 +3,7 @@ VPATH=../common
 
 .PHONY: all clean
 
-SOURCES=xcontrold.cc csclient.cc XIAController.cc
+SOURCES=xcontrold.cc csclient.cc ControlMessage.cc
 XCONTROLD=$(BINDIR)/xcontrold
 LDFLAGS += $(LIBS)
 

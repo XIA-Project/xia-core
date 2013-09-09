@@ -5,7 +5,6 @@
 #include <arpa/inet.h>
 #include <string>
 #include <vector>
-#include "../common/XIAController.hh"
 
 #include <sys/types.h>
 #include <netdb.h>
@@ -17,8 +16,10 @@
 #include <map>
 #include <math.h>
 #include <fcntl.h>
+
+#include "../common/ControlMessage.hh"
+
 using namespace std;
-#include <sstream>
 
 #define HELLO_INTERVAL 0.1
 #define LSA_INTERVAL 0.3
@@ -27,18 +28,9 @@ using namespace std;
 #define MAX_SEQNUM 100000
 #define MAX_XID_SIZE 100
 
-#define CTL_MSG_BUF_SIZE 10240
-
-#define HELLO 0
-#define LSA 1
-#define HOST_REGISTER 2
-#define CTL_ROUTING_TABLE_UPDATE 3
-
-
 #define BHID "HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 #define SID_XROUTE "SID:1110000000000000000000000000000000001112"
 #define NULL_4ID "IP:4500000000010000fafa00000000000000000000"
-
 
 typedef struct {
 	std::string dest;	// destination AD or HID
@@ -47,15 +39,12 @@ typedef struct {
 	uint32_t flags;	// flag 
 } RouteEntry;
 
-typedef std::map<std::string, RouteEntry> routing_table_t;
-
 typedef struct {
 	std::string AD;		// neigbor AD
 	std::string HID;	// neighbor HID
 	int32_t cost; 		// link cost
 	int32_t port;		// interface (outgoing port)
 } NeighborEntry;
-
 
 typedef struct {
 	std::string dest;	// destination AD or HID
@@ -100,12 +89,6 @@ typedef struct RouteState {
 	
 } RouteState;
 
-
-void listRoutes(std::string xidType);
-
-// returns an interface number to a neighbor HID
-int interfaceNumber(std::string xidType, std::string xid);
-
 // initialize the route state
 void initRouteState();
 
@@ -114,9 +97,6 @@ int sendHello();
 
 // send control message
 int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> routingTable);
-
-// process an incoming Hello message
-int processHello(const char* hello_msg);
 
 // process a LinkStateAdvertisement message 
 int processLSA(string msg);
