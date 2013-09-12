@@ -4,6 +4,8 @@
 #include <cstdlib>
 #include <sstream>
 #include <string>
+#include <sys/socket.h>
+#include "Xsocket.h"
 
 using namespace std;
 
@@ -20,7 +22,7 @@ class ControlMessage
         size_t _pos;
 
     public:
-        ControlMessage(int type);
+        ControlMessage(int type, std::string ad, std::string hid);
         ControlMessage(std::string s);
 
         void clear();
@@ -37,6 +39,8 @@ class ControlMessage
         void seek(int pos);
         int read(std::string &s);
         int read(int &n);
+
+        int send(int socket, const sockaddr_x *dest) const;
 };
 
 #endif /* CONTROLMESSAGE_HH */

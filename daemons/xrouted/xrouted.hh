@@ -18,6 +18,7 @@
 #include <fcntl.h>
 
 #include "../common/ControlMessage.hh"
+#include "../common/Neighbor.hh"
 #include "../common/XIARouter.hh"
 
 using namespace std;
@@ -65,8 +66,6 @@ typedef struct RouteState {
 	sockaddr_x sdag;
 	sockaddr_x ddag;
 
-//	char * sdag; // src DAG: this router
-//	char * ddag; // dest DAG: broadcast HELLO/LSA to other routers
 	char myAD[MAX_XID_SIZE]; // this router AD
 	char myHID[MAX_XID_SIZE]; // this router HID
 	char my4ID[MAX_XID_SIZE]; // not used
@@ -104,17 +103,19 @@ int sendHello();
 // send LinkStateAdvertisement message (flooding)
 int sendLSA();
 
-// process an incoming Hello message
-int processHello(const char* hello_msg);
-
-// process a LinkStateAdvertisement message 
-int processLSA(const char* lsa_msg);
+int processMsg(std::string msg);
 
 // process a Host Register message 
-void processHostRegister(const char* host_register_msg);
+int processHostRegister(ControlMessage msg);
+
+// process an incoming Hello message
+int processHello(ControlMessage msg);
+
+// process a LinkStateAdvertisement message 
+int processLSA(ControlMessage msg);
 
 // process a control message 
-int processRoutingTable(const char* control_msg);
+int processRoutingTable(ControlMessage msg);
 
 // compute the shortest path (Dijkstra)
 void calcShortestPath();

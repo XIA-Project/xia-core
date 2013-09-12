@@ -58,8 +58,6 @@ typedef struct RouteState {
 	sockaddr_x sdag;
 	sockaddr_x ddag;
 
-//	char * sdag; // src DAG: this router
-//	char * ddag; // dest DAG: broadcast HELLO/LSA to other routers
 	char myAD[MAX_XID_SIZE]; // this router AD
 	char myHID[MAX_XID_SIZE]; // this router HID
 	char my4ID[MAX_XID_SIZE]; // not used
@@ -91,7 +89,7 @@ int sendHello();
 int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> routingTable);
 
 // process a LinkStateAdvertisement message 
-int processLSA(string msg);
+int processLSA(string lsa_msg);
 
 // compute the shortest path (Dijkstra)
 void populateRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> &routingTable);

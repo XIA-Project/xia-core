@@ -30,7 +30,7 @@ void timeout_handler(int signum)
 
 	if (route_state.hello_seq < route_state.hello_lsa_ratio) {
 		// send Hello
-		//sendHello();
+		sendHello();
 		route_state.hello_seq++;
 	} else if (route_state.hello_seq == route_state.hello_lsa_ratio) {
 		// it's time to send LSA
@@ -45,35 +45,27 @@ void timeout_handler(int signum)
 	ualarm((int)ceil(HELLO_INTERVAL*1000000),0);
 }
 
-// send Hello message (1-hop broadcast)
-// Send my AD and my HID to the directly connected neighbors
+// send Hello message (1-hop broadcast) with my AD and my HID to the directly connected neighbors
+/* Message format (delimiter=^)
+    message-type{Hello=0}
+    source-AD
+    source-HID
+*/
 int sendHello()
 {
-	/* Message format (delimiter=^)
-		message-type{Hello=0 or LSA=1}
-		source-AD
-		source-HID
-	*/
+    ControlMessage msg(CTL_HELLO, route_state.myAD, route_state.myHID);
 
-    ControlMessage msg(CTL_HELLO);
-
-    msg.append(route_state.myAD);
-    msg.append(route_state.myHID);
-
-	Xsendto(route_state.sock, msg.c_str(), msg.size(), 0, (struct sockaddr *)&route_state.ddag, sizeof(sockaddr_x));
-
-	return 1;
+    return msg.send(route_state.sock, &route_state.ddag);
 }
 
+/* Message format (delimiter=^)
+    message-type{Hello=0 or LSA=1}
+    source-AD
+    source-HID
+*/
 int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> routingTable)
 {
-	/* Message format (delimiter=^)
-		message-type{Hello=0 or LSA=1}
-		source-AD
-		source-HID
-	*/
-
-    ControlMessage msg(CTL_ROUTING_TABLE);
+    ControlMessage msg(CTL_ROUTING_TABLE, route_state.myAD, route_state.myHID);
 
     msg.append(route_state.myAD);
     msg.append(destHID);
@@ -91,15 +83,13 @@ int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> rout
         msg.append(it->second.flags);
   	}
 
-	Xsendto(route_state.sock, msg.c_str(), msg.size(), 0, (struct sockaddr *)&route_state.ddag, sizeof(sockaddr_x));
-
 	route_state.ctl_seq = (route_state.ctl_seq + 1) % MAX_SEQNUM;
 
-	return 1;
+    return msg.send(route_state.sock, &route_state.ddag);
 }
 
 // process a LinkStateAdvertisement message
-int processLSA(string msg)
+int processLSA(string lsa_msg)
 {
 	/* Procedure:
 		0. scan this LSA (mark AD with a DualRouter if there)
@@ -109,15 +99,15 @@ int processLSA(string msg)
 	*/
 
 	// 0. Read this LSA
-    int msgType, isDualRouter, lsaSeq, numNeighbors, neighborPort;
+    int msgType, isDualRouter, lsaSeq, numNeighbors, neighborPort, neighborCost;
     string destAD, destHID, neighborAD, neighborHID;
 
-    ControlMessage ctlMsg(msg);
-    ctlMsg.read(msgType);
+    ControlMessage msg(lsa_msg);
+    msg.read(msgType);
 
-    ctlMsg.read(isDualRouter);
-    ctlMsg.read(destAD);
-    ctlMsg.read(destHID);
+    msg.read(destAD);
+    msg.read(destHID);
+    msg.read(isDualRouter);
 
   	// See if this LSA comes from AD with dualRouter
   	if (isDualRouter == 1)
@@ -127,7 +117,7 @@ int processLSA(string msg)
   	if (destHID == route_state.myHID)
   		return 1;
 
-    ctlMsg.read(lsaSeq);
+    msg.read(lsaSeq);
 
   	// 1. Filter out the already seen LSA
 	map<std::string, NodeStateEntry>::iterator it;
@@ -144,7 +134,7 @@ int processLSA(string msg)
   		route_state.networkTable.erase (it);
   	}
 
-    ctlMsg.read(numNeighbors);
+    msg.read(numNeighbors);
 
 	// 2. Update the network table
 	NodeStateEntry entry;
@@ -155,16 +145,17 @@ int processLSA(string msg)
   	int i;
  	for (i = 0; i < numNeighbors; i++)
     {
-        ctlMsg.read(neighborAD);
-        ctlMsg.read(neighborHID);
-        ctlMsg.read(neighborPort);
+        msg.read(neighborAD);
+        msg.read(neighborHID);
+        msg.read(neighborPort);
+        msg.read(neighborCost);
 
  		// fill the neighbors into the corresponding networkTable entry
         Node src;
         Node ad(neighborAD);
         Node hid(neighborHID);
         Graph g = src * ad * hid;
-        Neighbor neighbor(g, neighborPort, 1);
+        Neighbor neighbor(g, neighborPort, neighborCost);
         entry.neighbor_list.push_back(neighbor);
  	}
 

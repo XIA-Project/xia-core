@@ -84,49 +84,38 @@ void timeout_handler(int signum)
 	ualarm((int)ceil(HELLO_INTERVAL*1000000),0);
 }
 
-// send Hello message (1-hop broadcast)
-// Send my AD and my HID to the directly connected neighbors
+// send Hello message (1-hop broadcast) with my AD and my HID to the directly connected neighbors
+/* Message format (delimiter=^)
+    message-type{Hello=0}
+    source-AD
+    source-HID
+*/
 int sendHello()
 {
-	/* Message format (delimiter=^)
-		message-type{Hello=0 or LSA=1}
-		source-AD
-		source-HID
-	*/
+    ControlMessage msg(CTL_HELLO, route_state.myAD, route_state.myHID);
 
-    ControlMessage msg(CTL_HELLO);
-
-    msg.append(route_state.myAD);
-    msg.append(route_state.myHID);
-
-	Xsendto(route_state.sock, msg.c_str(), msg.size(), 0, (struct sockaddr *)&route_state.ddag, sizeof(sockaddr_x));
-
-	return 1;
+    return msg.send(route_state.sock, &route_state.ddag);
 }
 
 // send LinkStateAdvertisement message (flooding)
+/* Message format (delimiter=^)
+    message-type{LSA=1}
+    source-AD
+    source-HID
+    router-type{XIA=0 or XIA-IPv4-Dual=1}
+    LSA-seq-num
+    num_neighbors
+    neighbor1-AD
+    neighbor1-HID
+    neighbor2-AD
+    neighbor2-HID
+    ...
+*/
 int sendLSA()
 {
-	/* Message format (delimiter=^)
-		message-type{Hello=0 or LSA=1}
-		router-type{XIA=0 or XIA-IPv4-Dual=1}
-		source-AD
-		source-HID
-		LSA-seq-num
-		num_neighbors
-		neighbor1-AD
-		neighbor1-HID
-		neighbor2-AD
-		neighbor2-HID
-		...
-	*/
-
-    ControlMessage msg(CTL_LSA);
+    ControlMessage msg(CTL_LSA, route_state.myAD, route_state.myHID);
 
     msg.append(route_state.dual_router);
-    msg.append(route_state.myAD);
-    msg.append(route_state.myHID);
-
     msg.append(route_state.lsa_seq);
     msg.append(route_state.num_neighbors);
 
@@ -136,29 +125,54 @@ int sendLSA()
         msg.append(it->second.AD);
         msg.append(it->second.HID);
         msg.append(it->second.port);
+        msg.append(it->second.cost);
   	}
-
-	Xsendto(route_state.sock, msg.c_str(), msg.size(), 0, (struct sockaddr *)&route_state.ddag, sizeof(sockaddr_x));
 
 	// increase the LSA seq
 	route_state.lsa_seq = (route_state.lsa_seq + 1) % MAX_SEQNUM;
 
-	return 1;
+    return msg.send(route_state.sock, &route_state.ddag);
+}
+
+int processMsg(std::string msg)
+{
+    int type, rc = 0;
+    ControlMessage m(msg);
+
+    m.read(type);
+
+    switch (type)
+    {
+        case CTL_HOST_REGISTER:
+            rc = processHostRegister(m);
+            break;
+        case CTL_HELLO:
+            rc = processHello(m);
+            break;
+        case CTL_LSA:
+            rc = processLSA(m);
+            break;
+        case CTL_ROUTING_TABLE:
+            rc = processRoutingTable(m);
+            break;
+        default:
+            perror("unknown routing message");
+            break;
+    }
+
+    return rc;
 }
 
 // process a Host Register message
-void processHostRegister(const char *host_register_msg)
+int processHostRegister(ControlMessage msg)
 {
 	/* Procedure:
 		1. update this host entry in (click-side) HID table:
 			(hostHID, interface#, hostHID, -)
 	*/
-	int msgType, rc, interface;
+	int rc, interface;
 	string hostHID;
 	string neighborAD, neighborHID, myHID;
-
-    ControlMessage msg(host_register_msg);
-    msg.read(msgType);
 
     msg.read(hostHID);
 
@@ -210,10 +224,12 @@ void processHostRegister(const char *host_register_msg)
  		entry.neighbor_list.push_back(it3->second.HID);
 
 	route_state.networkTable[myHID] = entry;
+
+    return 1;
 }
 
 // process an incoming Hello message
-int processHello(const char *hello_msg)
+int processHello(ControlMessage msg)
 {
 	/* Procedure:
 		1. fill in the neighbor table
@@ -221,11 +237,7 @@ int processHello(const char *hello_msg)
 	*/
 
 	// 1. fill in the neighbor table
-    int msgType;
 	string neighborAD, neighborHID, myHID;
-
-    ControlMessage msg(hello_msg);
-    msg.read(msgType);
 
     msg.read(neighborAD);
     msg.read(neighborHID);
@@ -275,7 +287,7 @@ int processHello(const char *hello_msg)
 }
 
 // process a LinkStateAdvertisement message
-int processLSA(const char *lsa_msg)
+int processLSA(ControlMessage msg)
 {
 	/* Procedure:
 		0. scan this LSA (mark AD with a DualRouter if there)
@@ -285,15 +297,12 @@ int processLSA(const char *lsa_msg)
 	*/
 
 	// 0. Read this LSA
-    int msgType, isDualRouter, lsaSeq, numNeighbors, neighborPort;
+    int isDualRouter, lsaSeq, numNeighbors, neighborPort, neighborCost;
     string destAD, destHID, neighborAD, neighborHID;
 
-    ControlMessage msg(lsa_msg);
-    msg.read(msgType);
-
-    msg.read(isDualRouter);
     msg.read(destAD);
     msg.read(destHID);
+    msg.read(isDualRouter);
 
   	// See if this LSA comes from AD with dualRouter
   	if (isDualRouter == 1)
@@ -334,6 +343,7 @@ int processLSA(const char *lsa_msg)
         msg.read(neighborAD);
         msg.read(neighborHID);
         msg.read(neighborPort);
+        msg.read(neighborCost);
 
  		// fill the neighbors into the corresponding networkTable entry
  		entry.neighbor_list.push_back(neighborHID);
@@ -354,9 +364,7 @@ int processLSA(const char *lsa_msg)
 	}
 
 	// 5. rebroadcast this LSA
-	Xsendto(route_state.sock, msg.c_str(), msg.size(), 0, (struct sockaddr *)&route_state.ddag, sizeof(sockaddr_x));
-
-	return 1;
+    return msg.send(route_state.sock, &route_state.ddag);
 }
 
 void calcShortestPath() {
@@ -451,7 +459,7 @@ void calcShortestPath() {
 }
 
 // process a control message 
-int processRoutingTable(const char *control_msg)
+int processRoutingTable(ControlMessage msg)
 {
 	/* Procedure:
 		0. scan this LSA (mark AD with a DualRouter if there)
@@ -461,21 +469,22 @@ int processRoutingTable(const char *control_msg)
 	*/
 
 	// 0. Read this LSA
-	string destAD, destHID, hid, nextHop;
-    int msgType, ctlSeq, numEntries, port, flags, rc;
+	string srcAD, srcHID, destAD, destHID, hid, nextHop;
+    int ctlSeq, numEntries, port, flags, rc;
 
-    ControlMessage msg(control_msg);
-    msg.read(msgType);
+    msg.read(srcAD);
+    msg.read(srcHID);
+
+    /* Check if this came from our controller */
+    if (srcAD != route_state.myAD)
+        return 1;
 
     msg.read(destAD);
     msg.read(destHID);
 
     /* Check if intended for me */
     if ((destAD != route_state.myAD) || (destHID != route_state.myHID))
-    {
-        Xsendto(route_state.sock, msg.c_str(), msg.size(), 0, (struct sockaddr *)&route_state.ddag, sizeof(sockaddr_x));
-        return 1;
-    }
+        return msg.send(route_state.sock, &route_state.ddag);
 
     msg.read(ctlSeq);
 
@@ -636,7 +645,6 @@ void config(int argc, char** argv)
 int main(int argc, char *argv[])
 {
 	int rc, selectRetVal, n;
-    size_t found, start;
     socklen_t dlen;
     char recv_message[1024];
     sockaddr_x theirDAG;
@@ -690,30 +698,8 @@ int main(int argc, char *argv[])
 	    			perror("recvfrom");
 			}
 
-			string msg = recv_message;
-			start = 0;
-			found=msg.find("^");
-  			if (found!=string::npos) {
-  				string msg_type = msg.substr(start, found-start);
-  				int type = atoi(msg_type.c_str());
-				switch (type) {
-					case CTL_HELLO:
-                        processHello(msg.c_str());
-						break;
-					case CTL_LSA:
-  						processLSA(msg.c_str());
-						break;
-					case CTL_HOST_REGISTER:
-  						processHostRegister(msg.c_str());
-						break;
-                    case CTL_ROUTING_TABLE:
-  						processRoutingTable(msg.c_str());
-						break;
-					default:
-						perror("unknown routing message");
-						break;
-				}
-  			}
+            std::string msg = recv_message;
+            processMsg(msg);
 		}
     }
 

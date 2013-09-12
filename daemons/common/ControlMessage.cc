@@ -1,9 +1,11 @@
 #include "ControlMessage.hh"
 
-ControlMessage::ControlMessage(int type)
+ControlMessage::ControlMessage(int type, std::string ad, std::string hid)
 {
     clear();
     append(type);
+    append(ad);
+    append(hid);
 }
 
 ControlMessage::ControlMessage(std::string s)
@@ -78,4 +80,9 @@ int ControlMessage::read(int &n)
     n = atoi(s.c_str());
 
     return r;
+}
+
+int ControlMessage::send(int socket, const sockaddr_x *dest) const
+{
+	return Xsendto(socket, _msg.c_str(), _msg.size(), 0, (struct sockaddr *)dest, sizeof(sockaddr_x));
 }

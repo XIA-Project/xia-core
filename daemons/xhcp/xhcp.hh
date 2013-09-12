@@ -12,8 +12,8 @@
 
 #define XHCP_MAX_PATH 4096
 
-#define HELLO 0
-#define LSA 1
+#define HELLO         0
+#define LSA           1
 #define HOST_REGISTER 2
 
 #define MAX_XID_SIZE 100
