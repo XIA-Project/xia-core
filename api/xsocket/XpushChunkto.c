@@ -23,6 +23,7 @@
 #include "Xutil.h"
 #include <errno.h>
 #include "dagaddr.hpp"
+#include <sys/stat.h>
 
 /*!
 ** @brief Sends a datagram chunk message on an Xsocket
@@ -104,6 +105,8 @@ int XpushChunkto(const ChunkContext *ctx, const char *buf, size_t len, int flags
 	// FIXME: validate addr
 	Graph g((sockaddr_x*)addr);
 	std::string s = g.dag_string();
+	
+// 	printf("destination dag: %s \n", s.c_str());
 
 	x_pushchunkto->set_ddag(s.c_str());
 	x_pushchunkto->set_payload((const char*)buf, len);
@@ -112,6 +115,10 @@ int XpushChunkto(const ChunkContext *ctx, const char *buf, size_t len, int flags
 	x_pushchunkto->set_ttl(ctx->ttl);
 	x_pushchunkto->set_cachesize(ctx->cacheSize);
 	x_pushchunkto->set_cachepolicy(ctx->cachePolicy);
+	x_pushchunkto->set_cid(info->cid);
+	x_pushchunkto->set_length(sizeof(info->cid));
+	printf("info->cid: %s\n", info->cid);
+	printf("CID for Push right after setting it: %s\n", x_pushchunkto->cid().c_str());
 
 	if ((rc = click_send(ctx->sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
@@ -126,3 +133,356 @@ int XpushChunkto(const ChunkContext *ctx, const char *buf, size_t len, int flags
 
 	return len;
 }
+
+
+
+int XpushBufferto(const ChunkContext *ctx, const char *data, size_t len, int flags,
+		const struct sockaddr *addr, socklen_t addrlen, ChunkInfo **info, unsigned chunkSize)
+{
+		
+	ChunkInfo *infoList;
+	unsigned numChunks;
+	unsigned i;
+	int rc;
+	int count;
+	char *buf;
+	const char *p;
+
+	if (ctx == NULL || data == NULL) {
+		errno = EFAULT;
+		return -1;
+	}
+
+	if (chunkSize == 0)
+		chunkSize =  DEFAULT_CHUNK_SIZE;
+	else if (chunkSize > XIA_MAXBUF)
+		chunkSize = XIA_MAXBUF;
+
+	numChunks = len / chunkSize;
+	if (len % chunkSize)
+		numChunks ++;
+
+	if (!(infoList = (ChunkInfo*)calloc(numChunks, chunkSize))) {
+		return -1;
+	}
+
+	if (!(buf = (char*)malloc(chunkSize))) {
+		free(infoList);
+		return -1;
+	}
+
+	p = data;
+	for (i = 0; i < numChunks; i++) {
+		count = MIN(len, chunkSize);
+		// XputChunk(ctx, p, count, &infoList[i]))
+		if ((rc =XpushChunkto(ctx, p, count, flags, addr, addrlen, &infoList[i]) < 0))
+			break;
+		len -= count;
+		p += chunkSize;
+	}
+
+	if (i != numChunks) {
+		// FIXME: something happened, what do we want to do in this case?
+		rc = -1;
+	}
+	else
+		rc = i;
+
+	*info = infoList;
+	free(buf);
+
+	return rc;
+}
+
+
+
+/*!
+** @brief Publish a file by breaking it into one or more content chunks.
+**
+** XputFile() calls XputChunk() internally and has the same requiremts as that 
+** function.
+**
+** On success, the CID of the chunk is set to the 40 character hash of the
+** content data. The CID is not a full DAG, and must be converted to a DAG
+** before the client applicatation can request it, otherwise an error will
+** occur.
+**
+** If the file causes the cache slice to grow too large, the oldest content 
+** chunk(s) will be reoved to make enough space for the new chunk(s).
+**
+** @param ctx Pointer to the cache slice where this chunk will be stored
+** @param fname The file to publish.
+** @param chunkSize The maximum requested size of each chunk. This value
+** must not be larger than XIA_MAXCHUNK or an error will be returned.
+** @param info a pointer to an array of ChunkInfo structures. The memory for
+** this array is allocated by the XputFile() function on success and should
+** be free'd with the XfreeChunkInfo() function when it is no longer needed.
+**
+** @returns The number of chunks created on success with info pointing to an 
+** allocated array of ChunkInfo structures.
+** @returns -1 on error
+**
+**/
+int XpushFileto(const ChunkContext *ctx, const char *fname, int flags,
+		const struct sockaddr *addr, socklen_t addrlen, ChunkInfo **info, unsigned chunkSize)
+{
+	FILE *fp;
+	struct stat fs;
+	ChunkInfo *infoList;
+	unsigned numChunks;
+	unsigned i;
+	int rc;
+	int count;
+	char *buf;
+
+	if (ctx == NULL) {
+		errno = EFAULT;
+		return -1;
+	}
+
+	if (fname == NULL) {
+		errno = EFAULT;
+		return -1;
+	}
+
+	if (chunkSize == 0)
+		chunkSize =  DEFAULT_CHUNK_SIZE;
+	else if (chunkSize > XIA_MAXBUF)
+		chunkSize = XIA_MAXBUF;
+
+	if (stat(fname, &fs) != 0)
+		return -1;
+
+	if (!(fp= fopen(fname, "rb")))
+		return -1;
+
+	numChunks = fs.st_size / chunkSize;
+	if (fs.st_size % chunkSize)
+		numChunks ++;
+	//FIXME: this should be numChunks, sizeof(ChunkInfo)
+	if (!(infoList = (ChunkInfo*)calloc(numChunks, chunkSize))) {
+		fclose(fp);
+		return -1;
+	}
+
+	if (!(buf = (char*)malloc(chunkSize))) {
+		free(infoList);
+		fclose(fp);
+		return -1;
+	}
+
+	i = 0;
+	while (!feof(fp)) {
+	
+		if ((count = fread(buf, sizeof(char), chunkSize, fp)) > 0) {
+			if ((rc = XpushChunkto(ctx, buf, count, flags, addr, addrlen, &infoList[i])) < 0)
+				break;
+			i++;
+		}
+	}
+
+	if (i != numChunks) {
+		// FIXME: something happened, what do we want to do in this case?
+		rc = -1;
+	}
+	else
+		rc = i;
+
+	*info = infoList;
+	fclose(fp);
+	free(buf);
+
+	return rc;
+}
+
+
+
+
+
+/*!
+** @brief Publish a file by breaking it into one or more content chunks.
+**
+** XputBuffer() calls XputChunk() internally and has the same requiremts as that 
+** function.
+**
+** On success, the CID of the chunk is set to the 40 character hash of the
+** content data. The CID is not a full DAG, and must be converted to a DAG
+** before the client applicatation can request it, otherwise an error will
+** occur.
+**
+** If the file causes the cache slice to grow too large, the oldest content 
+** chunk(s) will be reoved to make enough space for the new chunk(s).
+**
+** @param ctx Pointer to the cache slice where this chunk will be stored
+** @param data The data buffer to be published
+** @param len length of the data buffer
+** @param chunkSize The maximum requested size of each chunk. This value
+** must not be larger than XIA_MAXCHUNK or an error will be returned.
+** @param info a pointer to an array of ChunkInfo structures. The memory for
+** this array is allocated by the XputBuffer() function on success and should
+** be free'd with the XfreeChunkInfo() function when it is no longer needed.
+**
+** @returns The number of chunks created on success with info pointing to an 
+** allocated array of ChunkInfo structures.
+** @returns -1 on error
+**
+**/
+// int XputBuffer(ChunkContext *ctx, const char *data, unsigned len, unsigned chunkSize, ChunkInfo **info)
+// {
+// 	ChunkInfo *infoList;
+// 	unsigned numChunks;
+// 	unsigned i;
+// 	int rc;
+// 	int count;
+// 	char *buf;
+// 	const char *p;
+// 
+// 	if (ctx == NULL || data == NULL) {
+// 		errno = EFAULT;
+// 		return -1;
+// 	}
+// 
+// 	if (chunkSize == 0)
+// 		chunkSize =  DEFAULT_CHUNK_SIZE;
+// 	else if (chunkSize > XIA_MAXBUF)
+// 		chunkSize = XIA_MAXBUF;
+// 
+// 	numChunks = len / chunkSize;
+// 	if (len % chunkSize)
+// 		numChunks ++;
+// 
+// 	if (!(infoList = (ChunkInfo*)calloc(numChunks, chunkSize))) {
+// 		return -1;
+// 	}
+// 
+// 	if (!(buf = (char*)malloc(chunkSize))) {
+// 		free(infoList);
+// 		return -1;
+// 	}
+// 
+// 	p = data;
+// 	for (i = 0; i < numChunks; i++) {
+// 		count = MIN(len, chunkSize);
+// 
+// 		if ((rc = XputChunk(ctx, p, count, &infoList[i])) < 0)
+// 			break;
+// 		len -= count;
+// 		p += chunkSize;
+// 	}
+// 
+// 	if (i != numChunks) {
+// 		// FIXME: something happened, what do we want to do in this case?
+// 		rc = -1;
+// 	}
+// 	else
+// 		rc = i;
+// 
+// 	*info = infoList;
+// 	free(buf);
+// 
+// 	return rc;
+// }
+
+
+
+
+/*!
+** @brief Publish a file by breaking it into one or more content chunks.
+**
+** XputFile() calls XputChunk() internally and has the same requiremts as that 
+** function.
+**
+** On success, the CID of the chunk is set to the 40 character hash of the
+** content data. The CID is not a full DAG, and must be converted to a DAG
+** before the client applicatation can request it, otherwise an error will
+** occur.
+**
+** If the file causes the cache slice to grow too large, the oldest content 
+** chunk(s) will be reoved to make enough space for the new chunk(s).
+**
+** @param ctx Pointer to the cache slice where this chunk will be stored
+** @param fname The file to publish.
+** @param chunkSize The maximum requested size of each chunk. This value
+** must not be larger than XIA_MAXCHUNK or an error will be returned.
+** @param info a pointer to an array of ChunkInfo structures. The memory for
+** this array is allocated by the XputFile() function on success and should
+** be free'd with the XfreeChunkInfo() function when it is no longer needed.
+**
+** @returns The number of chunks created on success with info pointing to an 
+** allocated array of ChunkInfo structures.
+** @returns -1 on error
+**
+**/
+// int XputFile(ChunkContext *ctx, const char *fname, unsigned chunkSize, ChunkInfo **info)
+// {
+// 	FILE *fp;
+// 	struct stat fs;
+// 	ChunkInfo *infoList;
+// 	unsigned numChunks;
+// 	unsigned i;
+// 	int rc;
+// 	int count;
+// 	char *buf;
+// 
+// 	if (ctx == NULL) {
+// 		errno = EFAULT;
+// 		return -1;
+// 	}
+// 
+// 	if (fname == NULL) {
+// 		errno = EFAULT;
+// 		return -1;
+// 	}
+// 
+// 	if (chunkSize == 0)
+// 		chunkSize =  DEFAULT_CHUNK_SIZE;
+// 	else if (chunkSize > XIA_MAXBUF)
+// 		chunkSize = XIA_MAXBUF;
+// 
+// 	if (stat(fname, &fs) != 0)
+// 		return -1;
+// 
+// 	if (!(fp= fopen(fname, "rb")))
+// 		return -1;
+// 
+// 	numChunks = fs.st_size / chunkSize;
+// 	if (fs.st_size % chunkSize)
+// 		numChunks ++;
+// 	//FIXME: this should be numChunks, sizeof(ChunkInfo)
+// 	if (!(infoList = (ChunkInfo*)calloc(numChunks, chunkSize))) {
+// 		fclose(fp);
+// 		return -1;
+// 	}
+// 
+// 	if (!(buf = (char*)malloc(chunkSize))) {
+// 		free(infoList);
+// 		fclose(fp);
+// 		return -1;
+// 	}
+// 
+// 	i = 0;
+// 	while (!feof(fp)) {
+// 	
+// 		if ((count = fread(buf, sizeof(char), chunkSize, fp)) > 0) {
+// 
+// 			if ((rc = XputChunk(ctx, buf, count, &infoList[i])) < 0)
+// 				break;
+// 			i++;
+// 		}
+// 	}
+// 
+// 	if (i != numChunks) {
+// 		// FIXME: something happened, what do we want to do in this case?
+// 		rc = -1;
+// 	}
+// 	else
+// 		rc = i;
+// 
+// 	*info = infoList;
+// 	fclose(fp);
+// 	free(buf);
+// 
+// 	return rc;
+// }
+
+

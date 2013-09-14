@@ -34,6 +34,8 @@
 
 #define DGRAM_NAME "www_s.dgram_echo.aaa.xia"
 
+#define CHUNK_NAME "www_s.chunk_echo.aaa.xia"
+
 
 // FIXME: clean up globals and move into a structure or similar
 // global configuration options
@@ -43,6 +45,7 @@ int loops = 1;		// only do 1 pass
 int  pktSize = 512;	// default pkt size
 int reconnect = 0;	// don't reconnect between loops
 int threads = 1;	// just a single thread
+int use_chunk = 0; 		//uses unrealiable chunking API pushchunkto
 
 struct addrinfo *ai;
 sockaddr_x *sa;
@@ -61,6 +64,7 @@ void help(const char *name)
 	printf(" -d delay   : delay for <delay> hundredths of a second between sends\n");
 	printf(" -r recon   : reconnect to the echo server every recon sends\n");
 	printf(" -t threads : start up the specified # of threads\n");
+	printf(" -c chunks  : Use unreliable chunking API to push content\n");
 	printf("\n");
 	exit(0);
 }
@@ -74,7 +78,7 @@ void getConfig(int argc, char** argv)
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "hqd:l:s:r:t:")) != -1) {
+	while ((c = getopt(argc, argv, "hqd:l:s:r:t:c")) != -1) {
 		switch (c) {
 			case '?':
 			case 'h':
@@ -116,6 +120,10 @@ void getConfig(int argc, char** argv)
 				threads = atoi(optarg);
 				if (threads < 1) threads = 1;
 				if (threads > 100) threads = 100;
+				break;
+			case 'c':
+				//create and send chunks using the unreliable chunking API
+				use_chunk = 1;
 				break;
 			default:
 				help(basename(argv[0]));
@@ -194,24 +202,47 @@ char *randomString(char *buf, int size)
 */
 int process(int sock)
 {
+	
+	sleep(30);
 	int size;
 	int sent, received;
 	char buf1[XIA_MAXBUF], buf2[XIA_MAXBUF];
+	
+	
+	ChunkInfo *info = (ChunkInfo*) malloc(sizeof(ChunkInfo));
+	//ChunkContext contains size, ttl, policy, and contextID which for now is PID
+	ChunkContext *ctx = XallocCacheSlice(POLICY_FIFO|POLICY_REMOVE_ON_EXIT, 0, 20000000);
+	
+// 	count = XputFile(ctx, fname, CHUNKSIZE, &info);
+
 
 	if (pktSize == 0)
 		size = (rand() % XIA_MAXBUF) + 1;
 	else
 		size = pktSize;
 	randomString(buf1, size);
-
-	if ((sent = Xsendto(sock, buf1, size, 0, (sockaddr*)sa, sizeof(sockaddr_x))) < 0) {
+	
+	if(use_chunk==1){
+		say("Pushing chunk");
+		if(sent = XpushChunkto(ctx, buf1, size, 0, (sockaddr*)sa, sizeof(sockaddr_x), info) < 0){
+			die(-4, "Send error %d on socket %d\n", errno, sock);
+		}
+	}
+	else if ((sent = Xsendto(sock, buf1, size, 0, (sockaddr*)sa, sizeof(sockaddr_x))) < 0) {
 		die(-4, "Send error %d on socket %d\n", errno, sock);
 	}
 
 	say("Xsock %4d sent %d bytes\n", sock, sent);
 
 	memset(buf2, 0, sizeof(buf2));
-	if ((received = Xrecvfrom(sock, buf2, sizeof(buf2), 0, NULL, NULL)) < 0)
+	if(use_chunk==1){
+		//FIXME: should the recive dag be null?
+		//FIXME: for now it should just read the push from the other side?
+		if(received = XrecvChunkfrom(sock, buf2, sizeof(buf2), 0, NULL, NULL) < 0){
+			die(-4, "Send error %d on socket %d\n", errno, sock);
+		}
+	}
+	else if ((received = Xrecvfrom(sock, buf2, sizeof(buf2), 0, NULL, NULL)) < 0)
 		die(-5, "Receive error %d on socket %d\n", errno, sock);
 
 	say("Xsock %4d received %d bytes\n", sock, received);
@@ -243,11 +274,21 @@ void pausex()
 }
 
 /*
-** create a socket and connect to the remote server
+** initiate the socket DGram or Chunk
 */
-int connectToServer()
+int initiate_socket()
 {
 	int ssock;
+	
+	if(use_chunk==1){
+		if ((ssock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0) {
+			die(-2, "unable to create the socket\n");
+		}
+		say("Xsock %4d created\n", ssock);
+		return ssock;
+	}
+		
+	
 	if ((ssock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0) {
 		die(-2, "unable to create the socket\n");
 	}
@@ -272,7 +313,7 @@ void *mainLoop(void * /* dummy */)
 	if (loops == 1)
 		printcount = 0;
 
-	ssock = connectToServer();
+	ssock = initiate_socket();
 
 	for (;;) {
 
@@ -290,7 +331,7 @@ void *mainLoop(void * /* dummy */)
 				// time to close and reopen the socket
 				Xclose(ssock);
 				say("Xsock %4d closed\n", ssock);
-				ssock = connectToServer();
+				ssock = initiate_socket();
 			}
 		}
 		if (loops > 0 && count == loops)
@@ -312,8 +353,14 @@ int main(int argc, char **argv)
 
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 
-	if (Xgetaddrinfo(DGRAM_NAME, NULL, NULL, &ai) != 0)
-		die(-1, "unable to lookup name %s\n", DGRAM_NAME);
+	if(use_chunk==1){
+		if (Xgetaddrinfo(CHUNK_NAME, NULL, NULL, &ai) != 0)
+			die(-1, "unable to lookup name %s\n", CHUNK_NAME);
+	}
+	else{ 
+		if (Xgetaddrinfo(DGRAM_NAME, NULL, NULL, &ai) != 0)
+			die(-1, "unable to lookup name %s\n", DGRAM_NAME);
+	}
 	sa = (sockaddr_x*)ai->ai_addr;
 
 	Graph g(sa);

@@ -31,8 +31,10 @@
 #define MAX_XID_SIZE 100
 #define STREAM_NAME "www_s.stream_echo.aaa.xia"
 #define DGRAM_NAME "www_s.dgram_echo.aaa.xia"
+#define CHUNK_NAME "www_s.chunk_echo.aaa.xia"
 #define SID_STREAM  "SID:0f00000000000000000000000000000000000888"
 #define SID_DGRAM   "SID:0f00000000000000000000000000000000008888"
+#define SID_CHUNK   "SID:0f00000000000000000000000000000000088888"
 
 // if no data is received from the client for this number of seconds, close the socket
 #define WAIT_FOR_DATA	10
@@ -41,6 +43,7 @@
 int verbose = 1;
 int stream = 1;
 int dgram = 1;
+int cchunk = 1;
 
 /*
 ** display cmd line options and exit
@@ -53,6 +56,7 @@ void help(const char *name)
 	printf(" -q : quiet mode\n");
 	printf(" -s : stream echo\n");
 	printf(" -d : datagram echo\n");
+	printf(" -c : chunk echo\n");
 	printf("\n");
 	exit(0);
 }
@@ -65,10 +69,11 @@ void getConfig(int argc, char** argv)
 	int c;
 	int s = 0;
 	int d = 0;
+	int h = 0;
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "hqsd")) != -1) {
+	while ((c = getopt(argc, argv, "cqsd")) != -1) {
 		switch (c) {
 			case 'q':
 				// turn off info messages
@@ -80,8 +85,10 @@ void getConfig(int argc, char** argv)
 			case 'd':
 				d = 1;
 				break;
+			case 'c':
+				h = 1;
+				break;
 			case '?':
-			case 'h':
 			default:
 				// Help Me!
 				help(basename(argv[0]));
@@ -89,9 +96,10 @@ void getConfig(int argc, char** argv)
 		}
 	}
 
-	if (s || d) {
+	if (s || d || h) {
 		stream = s;
 		dgram = d;
+		cchunk = h;
 	}
 }
 
@@ -319,6 +327,69 @@ void echo_dgram()
 	}
 }
 
+
+void echo_chunk()
+{
+	int sock;
+	char buf[XIA_MAXBUF];
+	sockaddr_x cdag;
+	socklen_t dlen;
+	int n;
+
+	say("Chunk service started\n");
+
+	if ((sock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0)
+		die(-2, "unable to create the chunk socket\n");
+
+	struct addrinfo *ai;
+	if (Xgetaddrinfo(NULL, SID_CHUNK, NULL, &ai) != 0)
+		die(-1, "getaddrinfo failure!\n");
+
+	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
+
+	Graph g((sockaddr_x*)ai->ai_addr);
+	printf("\nChunk DAG\n%s\n", g.dag_string().c_str());
+
+    if (XregisterName(CHUNK_NAME, sa) < 0 )
+    	die(-1, "error registering name: %s\n", CHUNK_NAME);
+	say("registered name: \n%s\n", CHUNK_NAME);
+
+	if (Xbind(sock, (sockaddr *)sa, sizeof(sa)) < 0) {
+		die(-3, "unable to bind to the dag\n");
+	}
+
+	pid_t pid = fork();
+	if (pid == 0) {
+		say("Chunk Server waiting\n");
+		char s[50];
+		while (1) {
+			sleep(10);
+			scanf("[wait:] %s", &s);
+// 			say("Chunk Server waiting\n");
+// 
+// 
+// 
+// 			dlen = sizeof(cdag);
+// 			memset(buf, 0, sizeof(buf));
+// 			if ((n = Xrecvfrom(sock, buf, sizeof(buf), 0, (struct sockaddr *)&cdag, &dlen)) < 0) {
+// 				warn("Recv error on socket %d, closing connection\n", pid);
+// 				break;
+// 			}
+// 
+// 			say("dgram received %d bytes\n", n);
+// 
+// 			if ((n = Xsendto(sock, buf, n, 0, (struct sockaddr *)&cdag, dlen)) < 0) {
+// 				warn("%5d send error\n", pid);
+// 				break;
+// 			}
+// 
+// 			say("dgram sent %d bytes\n", n);
+		}
+
+		Xclose(sock);
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	getConfig(argc, argv);
@@ -332,6 +403,10 @@ int main(int argc, char *argv[])
 	// if configured, fork off processes as needed to handle stream connections
 	if (stream)
 		echo_stream();
+	
+	// if configured, fork off processes as needed to handle chunk connections
+	if (cchunk)
+		echo_chunk();
 
 	return 0;
 }

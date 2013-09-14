@@ -502,6 +502,8 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 	XIAPath src_path = xiah.src_path();
 	XID	_source_xid = src_path.xid(src_path.destination_node());
+	
+// 	click_chatter("NetworkPacket, Src: %s, Dest: %s", xiah.dst_path().unparse().c_str(), xiah.src_path().unparse().c_str());
 
 	unsigned short _dport = XIDtoPort.get(_destination_xid);  // This is to be updated for the XSOCK_STREAM type connections below
 
@@ -859,8 +861,10 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 {
-	if (DEBUG)
-		click_chatter("Got packet from cache");
+	if (DEBUG){
+		click_chatter("Got packet from cache");		
+	}
+	
 	//Extract the SID/CID
 	XIAHeader xiah(p_in->xia_header());
 	XIAPath dst_path = xiah.dst_path();
@@ -874,7 +878,9 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 
 	unsigned short _dport = XIDpairToPort.get(xid_pair);
 	
-	click_chatter(">>packet from processCACHEpackets %d\n", _dport);
+// 	click_chatter(">>packet from processCACHEpackets %d\n", _dport);
+	click_chatter("CachePacket, Src: %s, Dest: %s, Local: %s", xiah.dst_path().unparse().c_str(),
+			      xiah.src_path().unparse().c_str(), _local_addr.unparse_re().c_str());
 
 	if(_dport)
 	{
@@ -1031,7 +1037,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 	case CACHE_PORT:	//Packet from cache
 		//TODO: remove
- 		click_chatter(">>>>> control packet from socket Cache %d\n", port);
+ 		click_chatter(">>>>> Cache Port packet from socket Cache %d\n", port);
 		ProcessCachePacket(p_in);
 		p_in->kill();
 		break;
@@ -2209,7 +2215,7 @@ void XTRANSPORT::XputChunk(unsigned short _sport)
 		click_chatter("sent packet to cache");
 	
 	//TODO: remove
-	click_chatter(">>send putcid to cache %d\n", _sport);
+	click_chatter(">>send XputChunk to cache %d\n", _sport);
 	output(CACHE_PORT).push(p);
 
 	// (for Ack purpose) Reply with a packet with the destination port=source port
@@ -2323,8 +2329,15 @@ void XTRANSPORT::XpushChunkto(unsigned short _sport, WritablePacket *p_in)
 {
 	xia::X_Pushchunkto_Msg *x_pushchunkto_msg= xia_socket_msg.mutable_x_pushchunkto();
 
+	
+	int32_t contextID = x_pushchunkto_msg->contextid();
+	int32_t ttl = x_pushchunkto_msg->ttl();
+	int32_t cacheSize = x_pushchunkto_msg->cachesize();
+	int32_t cachePolicy = x_pushchunkto_msg->cachepolicy();
+	
 	String pktPayload(x_pushchunkto_msg->payload().c_str(), x_pushchunkto_msg->payload().size());
 	int pktPayloadSize = pktPayload.length();
+	
 
 	// send CID-Requests
 
@@ -2356,18 +2369,20 @@ void XTRANSPORT::XpushChunkto(unsigned short _sport, WritablePacket *p_in)
 // 		XIAPath src_path;
 // 		src_path.parse(str_local_addr);
 
-		char xid_string[50];
-		random_xid("SID", xid_string);
+		
+		//FIXME: AD->HID->SID->SID format needs an SID here to be added.
+// 		char xid_string[50];
+// 		random_xid("SID", xid_string);
 //			String rand(click_random(1000000, 9999999));
 //			String xid_string = "SID:20000ff00000000000000000000000000" + rand;
-		str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
+// 		str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
 
 		daginfo->src_path.parse_re(str_local_addr);
 
 		daginfo->last = LAST_NODE_DEFAULT;
 		daginfo->hlim = hlim.get(_sport);
 
-		XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+		XID source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
 
 		XIDtoPort.set(source_xid, _sport); //Maybe change the mapping to XID->DAGinfo?
 		addRoute(source_xid);
@@ -2381,6 +2396,7 @@ void XTRANSPORT::XpushChunkto(unsigned short _sport, WritablePacket *p_in)
 		XID front_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
 		String xid_string = front_xid.unparse();
 		str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
+		printf("str_local_addr: %s", str_local_addr.c_str() );
 		daginfo->src_path.parse_re(str_local_addr);
 	}
 
@@ -2388,6 +2404,7 @@ void XTRANSPORT::XpushChunkto(unsigned short _sport, WritablePacket *p_in)
 		//Recalculate source path
 		XID	source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
 		String str_local_addr = _local_addr.unparse_re() + " " + source_xid.unparse(); //Make source DAG _local_addr:SID
+		click_chatter("str_local_addr: %s", str_local_addr.c_str() );
 		daginfo->src_path.parse(str_local_addr);
 	}
 
@@ -2399,13 +2416,14 @@ void XTRANSPORT::XpushChunkto(unsigned short _sport, WritablePacket *p_in)
 		click_chatter("sent packet to %s, from %s\n", dest.c_str(), daginfo->src_path.unparse_re().c_str());
 
 
-
+	click_chatter("PUSHCID: %s",x_pushchunkto_msg->cid().c_str());
 	String src(x_pushchunkto_msg->cid().c_str(), x_pushchunkto_msg->cid().size());
 	//append local address before CID
 	String cid_str_local_addr = daginfo->src_path.unparse_re();
 	cid_str_local_addr = "RE " + cid_str_local_addr + " CID:" + src;
 	XIAPath cid_src_path;
 	cid_src_path.parse(cid_str_local_addr);
+	click_chatter("cid_local_addr: %s", cid_str_local_addr.c_str() );
 	
 	
 	//Add XIA headers	
@@ -2417,20 +2435,28 @@ void XTRANSPORT::XpushChunkto(unsigned short _sport, WritablePacket *p_in)
 	xiah.set_src_path(cid_src_path); //FIXME: is this the correct way to do it? Do we need SID? AD->HID->SID->CID 
 	xiah.set_plen(pktPayloadSize);
 
-	WritablePacket *just_payload_part = WritablePacket::make(p_in->headroom() + 1, (const void*)x_pushchunkto_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
+// 	WritablePacket *just_payload_part = WritablePacket::make(p_in->headroom() + 1, (const void*)x_pushchunkto_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
+	WritablePacket *just_payload_part = WritablePacket::make(256, (const void*)x_pushchunkto_msg->payload().c_str(), pktPayloadSize, 0);
 
 	WritablePacket *p = NULL;
 
 	//Add Content header
-	ContentHeaderEncap *chdr = ContentHeaderEncap::MakePushHeader();
-	p = chdr->encap(just_payload_part);
+// 	ContentHeaderEncap *chdr = ContentHeaderEncap::MakePushHeader();
+	int chunkSize = pktPayload.length();
+	ContentHeaderEncap  contenth(0, 0, pktPayload.length(), chunkSize, ContentHeader::OP_PUSH,
+								 contextID, ttl, cacheSize, cachePolicy);
+	
+	
+	
+	p = contenth.encap(just_payload_part);
 	p = xiah.encap(p, true);
-	delete chdr;
+	
 
 // 	XID	source_sid = daginfo->src_path.xid(daginfo->src_path.destination_node());
 // 	XID	destination_cid = dst_path.xid(dst_path.destination_node());
-	
-	XID	source_cid = daginfo->src_path.xid(cid_src_path.destination_node());
+	//FIXME this is wrong
+	XID	source_cid = cid_src_path.xid(cid_src_path.destination_node());
+// 	XID	source_cid = daginfo->src_path.xid(cid_src_path.destination_node());
 	XID	destination_sid = dst_path.xid(dst_path.destination_node());
 
 	XIDpair xid_pair;

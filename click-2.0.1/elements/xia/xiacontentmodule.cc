@@ -55,6 +55,8 @@ Packet * XIAContentModule::makeChunkResponse(CChunk * chunk, Packet *p_in)
 
 void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID & dstCID)
 {
+	
+    printf("process_request - local HID: %s, src HID: %s,  Dest CID: %s\n", _transport->local_hid().unparse().c_str(), srcHID.unparse().c_str(), dstCID.unparse().c_str());
     HashTable<XID,CChunk*>::iterator it;
     it=_contentTable.find(dstCID);
 	
@@ -130,6 +132,8 @@ void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID 
 
             newp=contenth.encap(newp);
             newp=encap.encap( newp, false );	      // add XIA header
+	    
+	    click_chatter("Found in my local cache! CID: %s, Local Address: %s\n", dstCID.unparse().c_str(),  _transport->local_hid().unparse().c_str());
             _transport->checked_output_push(1 , newp);
             //std::cout<<"In client"<<std::endl;
             //std::cout<<"payload: "<<pl<<std::endl;
@@ -172,6 +176,8 @@ void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID 
             newp=contenth.encap(newp);
             encap.set_plen(l);	// add XIA header
             newp=encap.encap( newp, false );
+	    click_chatter("Found in router cache! CID: %s, Local Address: %s\n", dstCID.unparse().c_str(),  _transport->local_hid().unparse().c_str());
+	    
             _transport->checked_output_push(0 , newp);
             //std::cout<<"have pushed out"<<std::endl;
             cp += l;
@@ -560,12 +566,15 @@ void XIAContentModule::cache_incoming(Packet *p, const XID& srcCID, const XID& d
 	}
     if(local_putcid || dstHID==_transport->local_hid()){
         // cache in client: if it is local putCID() then store content. Otherwise, should return the whole chunk if possible
-        cache_incoming_local(p, srcCID, local_putcid);
-	}else if(local_removecid){
+	printf("cache_incoming_local - local HID: %s, Dest HID: %s\n", _transport->local_hid().unparse().c_str(), dstHID.unparse().c_str());
+        cache_incoming_local(p, srcCID, local_putcid);	    
+    }else if(local_removecid){
+	printf("cache_incoming_remove - local HID: %s, Dest HID: %s\n", _transport->local_hid().unparse().c_str(), dstHID.unparse().c_str());
         cache_incoming_remove(p, srcCID);
     }
     else{
         // cache in server, router
+	printf("cache_incoming_forward - local HID: %s, Dest HID: %s\n", _transport->local_hid().unparse().c_str(), dstHID.unparse().c_str());
         cache_incoming_forward(p, srcCID);
 	}
 }

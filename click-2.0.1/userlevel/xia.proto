@@ -235,8 +235,8 @@ message X_Pushchunkto_Msg {
   required int32 contextid = 4;
   required int32 TTL = 5;
   required bytes payload = 6; // data
-  optional string cid = 7;
-  optional int32 length = 8;
+  required string cid = 7;
+  required int32 length = 8;
   optional int64 timestamp = 9; 
 }
  
