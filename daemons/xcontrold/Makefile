@@ -3,7 +3,7 @@ VPATH=../common
 
 .PHONY: all clean
 
-SOURCES=xcontrold.cc csclient.cc ControlMessage.cc Neighbor.cc
+SOURCES=xcontrold.cc csclient.cc ControlMessage.cc
 XCONTROLD=$(BINDIR)/xcontrold
 LDFLAGS += $(LIBS)
 
@@ -14,4 +14,3 @@ $(XCONTROLD): $(SOURCES)
 
 clean:
 	-rm $(XCONTROLD)
-

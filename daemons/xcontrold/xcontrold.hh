@@ -18,9 +18,7 @@
 #include <fcntl.h>
 
 #include "../common/ControlMessage.hh"
-#include "../common/Neighbor.hh"
-
-using namespace std;
+#include "../common/Topology.hh"
 
 #define HELLO_INTERVAL 0.1
 #define LSA_INTERVAL 0.3
@@ -32,25 +30,6 @@ using namespace std;
 #define BHID "HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 #define SID_XROUTE "SID:1110000000000000000000000000000000001112"
 #define NULL_4ID "IP:4500000000010000fafa00000000000000000000"
-
-typedef struct {
-	std::string dest;	// destination AD or HID
-	std::string nextHop;	// nexthop HID
-	int32_t port;		// interface (outgoing port)
-	uint32_t flags;	// flag 
-} RouteEntry;
-
-typedef struct {
-	std::string dest;	// destination AD or HID
-	int32_t seq; 		// LSA seq of dest (for filtering purpose)	
-	int32_t num_neighbors;	// number of neighbors of dest AD
-    std::vector<Neighbor> neighbor_list; // neighbor list
-	
-	bool checked;	// used for calculating the shortest path
-	int32_t cost;	// cost from myAD to destAD
-	std::string prevNode; // previous node along the shortest path from myAD to destAD
-	
-} NodeStateEntry; // extracted from incoming LSA
 
 typedef struct RouteState {
 	int32_t sock; // socket for routing process
@@ -72,10 +51,10 @@ typedef struct RouteState {
 
 	int32_t ctl_seq;	// LSA sequence number of this router
 
-	map<std::string, RouteEntry> ADrouteTable; // map DestAD to route entry
-	map<std::string, RouteEntry> HIDrouteTable; // map DestHID to route entry
+    std::map<std::string, RouteEntry> ADrouteTable; // map DestAD to route entry
+    std::map<std::string, RouteEntry> HIDrouteTable; // map DestHID to route entry
 	
-	map<std::string, NodeStateEntry> networkTable; // map DestAD to NodeState entry
+    std::map<std::string, NodeStateEntry> networkTable; // map DestAD to NodeState entry
 	
 } RouteState;
 
@@ -89,7 +68,7 @@ int sendHello();
 int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> routingTable);
 
 // process a LinkStateAdvertisement message 
-int processLSA(string lsa_msg);
+int processLSA(std::string lsa_msg);
 
 // compute the shortest path (Dijkstra)
 void populateRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> &routingTable);

@@ -23,7 +23,6 @@ char *hostname = NULL;
 char *ident = NULL;
 
 RouteState route_state;
-
 XIARouter xr;
 
 void listRoutes(std::string xidType)
@@ -45,7 +44,6 @@ void listRoutes(std::string xidType)
 	syslog(LOG_INFO, "%s: done listing route updates", xidType.c_str());
 }
 
-
 int interfaceNumber(std::string xidType, std::string xid)
 {
 	int rc;
@@ -62,7 +60,6 @@ int interfaceNumber(std::string xidType, std::string xid)
 	return -1;
 }
 
-
 void timeout_handler(int signum)
 {
 	UNUSED(signum);
@@ -71,7 +68,7 @@ void timeout_handler(int signum)
 		// send Hello
 		sendHello();
 		route_state.hello_seq++;
-	} else if (route_state.hello_seq == route_state.hello_lsa_ratio) {
+	} else if (route_state.hello_seq >= route_state.hello_lsa_ratio) {
 		// it's time to send LSA
 		sendLSA();
 		// reset hello req
@@ -119,7 +116,7 @@ int sendLSA()
     msg.append(route_state.lsa_seq);
     msg.append(route_state.num_neighbors);
 
-	map<std::string, NeighborEntry>::iterator it;
+    std::map<std::string, NeighborEntry>::iterator it;
     for (it = route_state.neighborTable.begin(); it != route_state.neighborTable.end(); it++)
     {
         msg.append(it->second.AD);
@@ -128,7 +125,6 @@ int sendLSA()
         msg.append(it->second.cost);
   	}
 
-	// increase the LSA seq
 	route_state.lsa_seq = (route_state.lsa_seq + 1) % MAX_SEQNUM;
 
     return msg.send(route_state.sock, &route_state.ddag);
@@ -163,299 +159,94 @@ int processMsg(std::string msg)
     return rc;
 }
 
-// process a Host Register message
+/* Procedure:
+    1. update this host entry in (click-side) HID table:
+        (hostHID, interface#, hostHID, -)
+*/
 int processHostRegister(ControlMessage msg)
 {
-	/* Procedure:
-		1. update this host entry in (click-side) HID table:
-			(hostHID, interface#, hostHID, -)
-	*/
-	int rc, interface;
-	string hostHID;
-	string neighborAD, neighborHID, myHID;
-
-    msg.read(hostHID);
-
-	// update the host entry in (click-side) HID table
-    interface = interfaceNumber("HID", hostHID);
-	if ((rc = xr.setRoute(hostHID, interface, hostHID, 0xffff)) != 0)
-		syslog(LOG_ERR, "unable to set route %d", rc);
+    NeighborEntry neighbor;
+    neighbor.AD = route_state.myAD;
+    msg.read(neighbor.HID);
+    neighbor.port = interfaceNumber("HID", neighbor.HID);
+    neighbor.cost = 1; // for now, same cost
 
     /* Add host to neighbor table so info can be sent to controller */
-	neighborAD = route_state.myAD;
-	neighborHID = hostHID;
-
-	// fill in the table
-	map<std::string, NeighborEntry>::iterator it;
-	it = route_state.neighborTable.find(neighborHID);
-	if (it == route_state.neighborTable.end())
-    {
-		// if no entry yet
-		NeighborEntry entry;
-		entry.AD = neighborAD;
-		entry.HID = neighborHID;
-		entry.cost = 1; // for now, same cost
-
-		entry.port = interface;
-
-		route_state.neighborTable[neighborHID] = entry;
-
-		// increase the neighbor count
-		route_state.num_neighbors++;
-	}
+    route_state.neighborTable[neighbor.HID] = neighbor;
+    route_state.num_neighbors = route_state.neighborTable.size();
 
 	// 2. update my entry in the networkTable
-	myHID = route_state.myHID;
-
-    // For now, delete my entry in networkTable (... we will re-insert the updated entry shortly)
-	map<std::string, NodeStateEntry>::iterator it2;
-	it2 = route_state.networkTable.find(myHID);
-	if (it2 != route_state.networkTable.end())
-  		route_state.networkTable.erase (it2);
+    std::string myHID = route_state.myHID;
 
 	NodeStateEntry entry;
-	entry.dest = myHID;
+	entry.hid = myHID;
 	entry.seq = route_state.lsa_seq;
 	entry.num_neighbors = route_state.num_neighbors;
 
     // fill my neighbors into my entry in the networkTable
-  	map<std::string, NeighborEntry>::iterator it3;
-    for (it3 = route_state.neighborTable.begin(); it3 != route_state.neighborTable.end(); it3++)
- 		entry.neighbor_list.push_back(it3->second.HID);
+    std::map<std::string, NeighborEntry>::iterator it;
+    for (it = route_state.neighborTable.begin(); it != route_state.neighborTable.end(); it++)
+ 		entry.neighbor_list.push_back(it->second);
 
 	route_state.networkTable[myHID] = entry;
+
+	// update the host entry in (click-side) HID table
+	int rc;
+	if ((rc = xr.setRoute(neighbor.HID, neighbor.port, neighbor.HID, 0xffff)) != 0)
+		syslog(LOG_ERR, "unable to set route %d", rc);
 
     return 1;
 }
 
-// process an incoming Hello message
 int processHello(ControlMessage msg)
 {
-	/* Procedure:
-		1. fill in the neighbor table
-		2. update my entry in the networkTable
-	*/
+	/* Update neighbor table */
+    NeighborEntry neighbor;
+    msg.read(neighbor.AD);
+    msg.read(neighbor.HID);
+    neighbor.port = interfaceNumber("HID", neighbor.HID);
+    neighbor.cost = 1; // for now, same cost
 
-	// 1. fill in the neighbor table
-	string neighborAD, neighborHID, myHID;
+    /* Index by HID if neighbor in same domain or by AD otherwise */
+    bool internal = (neighbor.AD == route_state.myAD);
+    route_state.neighborTable[internal ? neighbor.HID : neighbor.AD] = neighbor;
+    route_state.num_neighbors = route_state.neighborTable.size();
 
-    msg.read(neighborAD);
-    msg.read(neighborHID);
-
-	// fill in the table
-    // if no entry yet
-	map<std::string, NeighborEntry>::iterator it;
-	it = route_state.neighborTable.find(neighborHID);
-	if (it == route_state.neighborTable.end())
-    {
-		NeighborEntry entry;
-		entry.AD = neighborAD;
-		entry.HID = neighborHID;
-		entry.cost = 1; // for now, same cost
-
-		int interface = interfaceNumber("HID", neighborHID);
-		entry.port = interface;
-
-		route_state.neighborTable[neighborHID] = entry;
-
-		// increase the neighbor count
-		route_state.num_neighbors++;
-	}
-
-	// 2. update my entry in the networkTable
-	myHID = route_state.myHID;
-
-    // For now, delete my entry in networkTable (... we will re-insert the updated entry shortly)
-	map<std::string, NodeStateEntry>::iterator it2;
-	it2 = route_state.networkTable.find(myHID);
-	if (it2 != route_state.networkTable.end())
-  		route_state.networkTable.erase (it2);
+    /* Update network table */
+    std::string myHID = route_state.myHID;
 
 	NodeStateEntry entry;
-	entry.dest = myHID;
+	entry.hid = myHID;
 	entry.seq = route_state.lsa_seq;
 	entry.num_neighbors = route_state.num_neighbors;
 
- 		// fill my neighbors into my entry in the networkTable
-    map<std::string, NeighborEntry>::iterator it3;
-    for (it3 = route_state.neighborTable.begin(); it3 != route_state.neighborTable.end(); it3++)
- 		entry.neighbor_list.push_back(it3->second.HID);
+    /* Add neighbors to network table entry */
+    std::map<std::string, NeighborEntry>::iterator it;
+    for (it = route_state.neighborTable.begin(); it != route_state.neighborTable.end(); it++)
+ 		entry.neighbor_list.push_back(it->second);
 
 	route_state.networkTable[myHID] = entry;
 
 	return 1;
 }
 
-// process a LinkStateAdvertisement message
+/* Procedure:
+    0. scan this LSA (mark AD with a DualRouter if there)
+    1. filter out the already seen LSA (via LSA-seq for this dest)
+    2. update the network table
+    3. rebroadcast this LSA
+*/
 int processLSA(ControlMessage msg)
 {
-	/* Procedure:
-		0. scan this LSA (mark AD with a DualRouter if there)
-		1. filter out the already seen LSA (via LSA-seq for this dest)
-		2. update the network table
-		3. rebroadcast this LSA
-	*/
+    std::string srcAD;
 
-	// 0. Read this LSA
-    int isDualRouter, lsaSeq, numNeighbors, neighborPort, neighborCost;
-    string destAD, destHID, neighborAD, neighborHID;
+    msg.read(srcAD);
 
-    msg.read(destAD);
-    msg.read(destHID);
-    msg.read(isDualRouter);
-
-  	// See if this LSA comes from AD with dualRouter
-  	if (isDualRouter == 1)
-  		route_state.dual_router_AD = destAD;
-
-  	// First, filter out the LSA originating from myself
-  	if (destHID == route_state.myHID)
-  		return 1;
-
-    msg.read(lsaSeq);
-
-  	// 1. Filter out the already seen LSA
-	map<std::string, NodeStateEntry>::iterator it;
-	it = route_state.networkTable.find(destHID);
-
-    // If this originating HID has been known (i.e., already in the networkTable)
-	if (it != route_state.networkTable.end())
-    {
-        // If this LSA already seen, ignore this LSA; do nothing
-  	  	if ((lsaSeq <= it->second.seq) && ((it->second.seq - lsaSeq) < 10000))
-  			return 1;
-
-  		// For now, delete this dest HID entry in networkTable (... we will re-insert the updated entry shortly)
-  		route_state.networkTable.erase (it);
-  	}
-
-    msg.read(numNeighbors);
-
-	// 2. Update the network table
-	NodeStateEntry entry;
-	entry.dest = destHID;
-	entry.seq = lsaSeq;
-	entry.num_neighbors = numNeighbors;
-
-  	int i;
- 	for (i = 0; i < numNeighbors; i++)
-    {
-        msg.read(neighborAD);
-        msg.read(neighborHID);
-        msg.read(neighborPort);
-        msg.read(neighborCost);
-
- 		// fill the neighbors into the corresponding networkTable entry
- 		entry.neighbor_list.push_back(neighborHID);
- 	}
-
-	route_state.networkTable[destHID] = entry;
-	route_state.calc_dijstra_ticks++;
-
-	if (route_state.calc_dijstra_ticks == CALC_DIJKSTRA_INTERVAL)
-    {
-		// Calculate Shortest Path algorithm
-		syslog(LOG_INFO, "Calcuating shortest paths\n");
-		calcShortestPath();
-		route_state.calc_dijstra_ticks = 0;
-
-		// update Routing table (click routing table as well)
-		//updateClickRoutingTable();
-	}
+    if (srcAD != route_state.myAD)
+        return 1;
 
 	// 5. rebroadcast this LSA
     return msg.send(route_state.sock, &route_state.ddag);
-}
-
-void calcShortestPath() {
-
-	// first, clear the current routing table
-	route_state.HIDrouteTable.clear();
-
- 	map<std::string, NodeStateEntry>::iterator it1;
-  	for ( it1=route_state.networkTable.begin() ; it1 != route_state.networkTable.end(); it1++ ) {
-
- 		// filter out an abnormal case
- 		if(it1->second.num_neighbors == 0 || (it1->second.dest).empty() ) {
- 			route_state.networkTable.erase (it1);
- 		}
-  	}
-
- 	map<std::string, NodeStateEntry> table;
-	table = route_state.networkTable;
-
-  	for ( it1=route_state.networkTable.begin() ; it1 != route_state.networkTable.end(); it1++ ) {
- 		// initialize the checking variable
- 		it1->second.checked = false;
- 		it1->second.cost = 10000000;
-  	}
-
-	// compute shortest path
-	// initialization
-	string myHID, tempHID;
-	myHID = route_state.myHID;
-	route_state.networkTable[myHID].checked = true;
-	route_state.networkTable[myHID].cost = 0;
-	table.erase(myHID);
-
-	vector<std::string>::iterator it2;
-	for ( it2=route_state.networkTable[myHID].neighbor_list.begin() ; it2 < route_state.networkTable[myHID].neighbor_list.end(); it2++ ) {
-
-		tempHID = (*it2).c_str();
-		route_state.networkTable[tempHID].cost = 1;
-		route_state.networkTable[tempHID].prevNode = myHID;
-	}
-
-	// loop
-	while (!table.empty()) {
-		int minCost = 10000000;
-		string selectedHID, tmpHID;
-		for ( it1=table.begin() ; it1 != table.end(); it1++ ) {
-			tmpHID = it1->second.dest;
-			if (route_state.networkTable[tmpHID].cost < minCost) {
-				minCost = route_state.networkTable[tmpHID].cost;
-				selectedHID = tmpHID;
-			}
-  		}
-		if(selectedHID.empty()) {
-			return;
-		}
-
-  		table.erase(selectedHID);
-  		route_state.networkTable[selectedHID].checked = true;
-
- 		for ( it2=route_state.networkTable[selectedHID].neighbor_list.begin() ; it2 < route_state.networkTable[selectedHID].neighbor_list.end(); it2++ ) {
-			tempHID = (*it2).c_str();
-			if (route_state.networkTable[tempHID].checked != true) {
-				if (route_state.networkTable[tempHID].cost > route_state.networkTable[selectedHID].cost + 1) {
-					route_state.networkTable[tempHID].cost = route_state.networkTable[selectedHID].cost + 1;
-					route_state.networkTable[tempHID].prevNode = selectedHID;
-				}
-			}
-		}
-	}
-
-	string tempHID1, tempHID2;
-	int hop_count;
-	// set up the nexthop
-  	for ( it1=route_state.networkTable.begin() ; it1 != route_state.networkTable.end(); it1++ ) {
-
-  		tempHID1 = it1->second.dest;
-  		if ( myHID.compare(tempHID1) != 0 ) {
-  			tempHID2 = tempHID1;
-  			hop_count = 0;
-  			while (route_state.networkTable[tempHID2].prevNode.compare(myHID)!=0 && hop_count < MAX_HOP_COUNT) {
-  				tempHID2 = route_state.networkTable[tempHID2].prevNode;
-  				hop_count++;
-  			}
-  			if(hop_count < MAX_HOP_COUNT) {
-  				route_state.HIDrouteTable[tempHID1].dest = tempHID1;
-  				route_state.HIDrouteTable[tempHID1].nextHop = route_state.neighborTable[tempHID2].HID;
-  				route_state.HIDrouteTable[tempHID1].port = route_state.neighborTable[tempHID2].port;
-  			}
-  		}
-  	}
-	printRoutingTable();
 }
 
 // process a control message 
@@ -510,41 +301,6 @@ int processRoutingTable(ControlMessage msg)
  	}
 
 	return 1;
-}
-
-void printRoutingTable() {
-
-	syslog(LOG_INFO, "HID Routing table at %s", route_state.myHID);
-  	map<std::string, RouteEntry>::iterator it1;
-  	for ( it1=route_state.HIDrouteTable.begin() ; it1 != route_state.HIDrouteTable.end(); it1++ ) {
-  		syslog(LOG_INFO, "Dest=%s, NextHop=%s, Port=%d, Flags=%u", (it1->second.dest).c_str(), (it1->second.nextHop).c_str(), (it1->second.port), (it1->second.flags) );
-
-  	}
-}
-
-void updateClickRoutingTable() {
-
-	int rc, port;
-	string destXID, nexthopXID;
-	string default_AD("AD:-"), default_HID("HID:-"), default_4ID("IP:-");
-
-  	map<std::string, RouteEntry>::iterator it1;
-  	for ( it1=route_state.HIDrouteTable.begin() ; it1 != route_state.HIDrouteTable.end(); it1++ ) {
- 		destXID = it1->second.dest;
- 		nexthopXID = it1->second.nextHop;
-		port =  it1->second.port;
-
-		if ((rc = xr.setRoute(destXID, port, nexthopXID, 0xffff)) != 0)
-			syslog(LOG_ERR, "error setting route %d", rc);
-
-		// set default AD for 4ID traffic
-		if (route_state.dual_router==0 && destXID.compare(route_state.dual_router_AD)==0) {
-			if ((rc = xr.setRoute(default_4ID, port, nexthopXID, 0xffff)) != 0)
-				syslog(LOG_ERR, "error setting route %d", rc);
-		}
-  	}
-  	listRoutes("AD");
-	listRoutes("HID");
 }
 
 void initRouteState()
@@ -646,7 +402,7 @@ int main(int argc, char *argv[])
 {
 	int rc, selectRetVal, n;
     socklen_t dlen;
-    char recv_message[1024];
+    char recv_message[10240];
     sockaddr_x theirDAG;
     fd_set socks;
     struct timeval timeoutval;
@@ -693,7 +449,7 @@ int main(int argc, char *argv[])
 			// receiving a Hello or LSA packet
 			memset(&recv_message[0], 0, sizeof(recv_message));
 			dlen = sizeof(sockaddr_x);
-			n = Xrecvfrom(route_state.sock, recv_message, 1024, 0, (struct sockaddr*)&theirDAG, &dlen);
+			n = Xrecvfrom(route_state.sock, recv_message, 10240, 0, (struct sockaddr*)&theirDAG, &dlen);
 			if (n < 0) {
 	    			perror("recvfrom");
 			}

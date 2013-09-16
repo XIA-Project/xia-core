@@ -18,10 +18,8 @@
 #include <fcntl.h>
 
 #include "../common/ControlMessage.hh"
-#include "../common/Neighbor.hh"
+#include "../common/Topology.hh"
 #include "../common/XIARouter.hh"
-
-using namespace std;
 
 #define HELLO_INTERVAL 0.1
 #define LSA_INTERVAL 0.3
@@ -33,32 +31,6 @@ using namespace std;
 #define BHID "HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 #define SID_XROUTE "SID:1110000000000000000000000000000000001112"
 #define NULL_4ID "IP:4500000000010000fafa00000000000000000000"
-
-typedef struct {
-	std::string dest;	// destination AD or HID
-	std::string nextHop;	// nexthop HID
-	int32_t port;		// interface (outgoing port)
-	uint32_t flags;	// flag 
-} RouteEntry;
-
-typedef struct {
-	std::string AD;		// neigbor AD
-	std::string HID;	// neighbor HID
-	int32_t cost; 		// link cost
-	int32_t port;		// interface (outgoing port)
-} NeighborEntry;
-
-typedef struct {
-	std::string dest;	// destination AD or HID
-	int32_t seq; 		// LSA seq of dest (for filtering purpose)	
-	int32_t num_neighbors;	// number of neighbors of dest HID
-	vector<std::string> neighbor_list; // neighbor HID list
-	
-	bool checked;	// used for calculating the shortest path
-	int32_t cost;	// cost from myHID to destHID
-	std::string prevNode; // previous node along the shortest path from myHID to destHID
-	
-} NodeStateEntry; // extracted from incoming LSA
 
 typedef struct RouteState {
 	int32_t sock; // socket for routing process
@@ -80,12 +52,12 @@ typedef struct RouteState {
 
 	int32_t ctl_seq;	// LSA sequence number of this router
 
-	map<std::string, RouteEntry> ADrouteTable; // map DestAD to route entry
-	map<std::string, RouteEntry> HIDrouteTable; // map DestHID to route entry
+    std::map<std::string, RouteEntry> ADrouteTable; // map DestAD to route entry
+    std::map<std::string, RouteEntry> HIDrouteTable; // map DestHID to route entry
 	
-	map<std::string, NeighborEntry> neighborTable; // map neighborHID to neighbor entry
+    std::map<std::string, NeighborEntry> neighborTable; // map neighborHID to neighbor entry
 	
-	map<std::string, NodeStateEntry> networkTable; // map DestHID to NodeState entry
+    std::map<std::string, NodeStateEntry> networkTable; // map DestHID to NodeState entry
 	
 } RouteState;
 
@@ -116,15 +88,6 @@ int processLSA(ControlMessage msg);
 
 // process a control message 
 int processRoutingTable(ControlMessage msg);
-
-// compute the shortest path (Dijkstra)
-void calcShortestPath();
-
-// update the click routing table
-void updateClickRoutingTable();
-
-// print routing table
-void printRoutingTable();
 
 // timer to send Hello and LinkStateAdvertisement messages periodically
 void timeout_handler(int signum);

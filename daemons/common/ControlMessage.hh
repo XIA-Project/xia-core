@@ -9,11 +9,10 @@
 
 using namespace std;
 
-#define CTL_UNDEFINED     -1
 #define CTL_HELLO          0
 #define CTL_LSA            1
 #define CTL_HOST_REGISTER  2
-#define CTL_ROUTING_TABLE  3
+#define CTL_ROUTING_TABLE  3 // TODO: rename to RTU
 
 class ControlMessage
 {
