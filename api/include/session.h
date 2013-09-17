@@ -36,10 +36,14 @@
 extern "C" {
 #endif
 
+enum SessionAttribute {
+	kReliableDelivery 	= (1u << 0),
+	kEncryption 		= (1u << 1)
+};
 
 //Function list
 extern int SnewContext();
-extern int Sinit(int ctx, const char* sessionPath);
+extern int Sinit(int ctx, const char* sessionPath, uint32_t attributes);
 extern int Sbind(int ctx, const char* name);
 extern int SacceptConnReq(int ctx);
 extern int Ssend(int ctx, const void* buf, size_t len);

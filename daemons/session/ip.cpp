@@ -7,6 +7,9 @@
 #include <netdb.h>
 #include <sys/types.h>
 #include <ifaddrs.h>
+#include <openssl/ssl.h>
+#include <openssl/rsa.h>
+#include <openssl/err.h>
 
 
 
@@ -127,43 +130,6 @@ DBGF("getaddrinfo: %s", name);
 	return 0;
 }
 
-int registerName(const string &name, string *addr_buf) {
-	int sockfd;
-	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		ERRORF("error creating socket to name server: %s", strerror(errno));
-		return -1;
-	}
-
-	// nameserver addr
-	struct sockaddr_in sa;
-	sa.sin_family = PF_INET;
-	sa.sin_addr.s_addr = inet_addr("127.0.0.1");
-	sa.sin_port = htons(5353);
-
-	// addr to register
-	sockaddr_in *addr = addrFromData(addr_buf);
-
-	session::NSMsg nsm;
-	session::NSRegister *rm = nsm.mutable_reg();
-	rm->set_name(name);
-	rm->set_ip(addr->sin_addr.s_addr);
-	rm->set_port(addr->sin_port);
-
-	assert(rm);
-
-
-	std::string p_buf;
-	nsm.SerializeToString(&p_buf);
-
-	int remaining = p_buf.size();
-	const char *p = p_buf.data();
-	if (sendto(sockfd, p, remaining, 0, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
-		ERRORF("Error sending NS register: %s", strerror(errno));
-		return -1;
-	}
-
-    return 1;
-}
 
 
 
@@ -244,26 +210,26 @@ string getHIDForSocket(int sock) {
 }
 
 int sendBuffer(session::ConnectionInfo *cinfo, const char* buf, size_t len) {
-	int sock = cinfo->sockfd();
 	
-	//if (cinfo->transport_protocol() == session::TCP) {
-		return send(sock, buf, len, 0);
-	//} else {
-	//	ERROR("Expected a TCP socket");
-	//}
+	if (cinfo->use_ssl() && cinfo->has_ssl_ptr()) {
+DBG("SSL send");
+		return SSL_write(*(SSL**)cinfo->ssl_ptr().data(), buf, len);
+	} else if (cinfo->transport_protocol() == session::TCP) {
+		return send(cinfo->sockfd(), buf, len, 0);
+	}
 
 	return -1; // we shouldn't get here
 }
 
 int recvBuffer(session::ConnectionInfo *cinfo, char* buf, size_t len) {
-	int sock = cinfo->sockfd();
 
-	//if (cinfo->transport_protocol() == session::TCP) {
+	if (cinfo->use_ssl() && cinfo->has_ssl_ptr()) {
+DBG("SSL recv");
+		return SSL_read(*(SSL**)cinfo->ssl_ptr().data(), buf, len);
+	} else if (cinfo->transport_protocol() == session::TCP) {
 		memset(buf, 0, len);
-		return recv(sock, buf, len, 0);
-	//} else {
-	//	ERROR("Expected a TCP socket");
-	//}
+		return recv(cinfo->sockfd(), buf, len, 0);
+	}
 
 	return -1; // we shouldn't get here
 }
@@ -318,10 +284,34 @@ int bindRandomPort(string **addr_buf) {
 }
 
 int bindNewSocket(session::ConnectionInfo *cinfo, string **addr_buf) {
+	if (!cinfo->has_ssl_ctx_ptr()) {
+		SSL_CTX *ssl_ctx = SSL_CTX_new(SSLv23_server_method());
+		if (ssl_ctx == NULL) {
+			ERROR("Unable to init new SSL context");
+			return -1;
+		}
+		cinfo->set_ssl_ctx_ptr(&ssl_ctx, sizeof(SSL_CTX*));
+		
+		// set private key and cipher list
+		SSL_CTX_use_RSAPrivateKey(ssl_ctx, RSA_generate_key(1024, 3, NULL, NULL));
+		SSL_CTX_set_cipher_list(ssl_ctx, "aNULL");
+	}
 	return bindRandomPort(addr_buf);
 }
 
 int bindNewSocket(session::ContextInfo *ctxInfo, string **addr_buf) {
+	if (!ctxInfo->has_ssl_ctx_ptr()) {
+		SSL_CTX *ssl_ctx = SSL_CTX_new(SSLv23_server_method());
+		if (ssl_ctx == NULL) {
+			ERROR("Unable to init new SSL context");
+			return -1;
+		}
+		ctxInfo->set_ssl_ctx_ptr(&ssl_ctx, sizeof(SSL_CTX*));
+		
+		// set private key
+		SSL_CTX_use_RSAPrivateKey(ssl_ctx, RSA_generate_key(1024, 3, NULL, NULL));
+		SSL_CTX_set_cipher_list(ssl_ctx, "aNULL");
+	}
 	return bindRandomPort(addr_buf);
 }
 
@@ -346,6 +336,112 @@ int openConnectionToAddr(const string *addr_buf, session::ConnectionInfo *cinfo)
 	cinfo->set_hid(getHIDForAddr(addr_buf));
 	cinfo->set_addr(*addr_buf);
 	return 0;
+}
+
+int connectSSL(session::ConnectionInfo *cinfo) {
+
+	if (!cinfo->has_ssl_ctx_ptr()) {
+		SSL_CTX *ssl_ctx = SSL_CTX_new(SSLv23_client_method());
+		if (ssl_ctx == NULL) {
+			ERROR("Unable to init new SSL context");
+			return -1;
+		}
+		cinfo->set_ssl_ctx_ptr(&ssl_ctx, sizeof(SSL_CTX*));
+
+		// set private key
+		SSL_CTX_use_RSAPrivateKey(ssl_ctx, RSA_generate_key(1024, 3, NULL, NULL));
+		SSL_CTX_set_cipher_list(ssl_ctx, "aNULL");
+	}
+
+	// Make sure we haven't already connected
+	if (cinfo->has_ssl_ptr()) return 0;
+
+	SSL *ssl = SSL_new(*(SSL_CTX**)cinfo->ssl_ctx_ptr().data());
+	if (ssl == NULL) {
+		ERROR("Unable to init new SSL object");
+		return -1;
+	}
+	if (SSL_set_fd(ssl, cinfo->sockfd()) != 1) {
+		ERROR("Unable to set SSL sockfd");
+		return -1;
+	}
+	int rc;
+	if ((rc = SSL_connect(ssl)) != 1) {
+		ERRORF("Unable to initiate SSL connection: %s", ERR_error_string(ERR_get_error(), NULL));
+		exit(-1);
+		return -1;
+	}
+	cinfo->set_ssl_ptr(&ssl, sizeof(SSL*));
+
+	return 0;
+}
+
+int acceptSSL(session::ConnectionInfo *cinfo) {
+
+	// If we're accpeting, we should have already bound, which set the ssl ctx
+	if (!cinfo->has_ssl_ctx_ptr()) {
+		ERROR("Connection does not have an associated SSL_ctx");
+		return -1;
+	}
+	
+	// Make sure we haven't already accepted
+	if (cinfo->has_ssl_ptr()) return 0;
+
+	SSL *ssl = SSL_new(*(SSL_CTX**)cinfo->ssl_ctx_ptr().data());
+	if (ssl == NULL) {
+		ERROR("Unable to init new SSL object");
+		return -1;
+	}
+	if (SSL_set_fd(ssl, cinfo->sockfd()) != 1) {
+		ERROR("Unable to set SSL sockfd");
+		return -1;
+	}
+	if (SSL_accept(ssl) != 1) {
+		ERRORF("Error accepting SSL connection: %s", ERR_error_string(ERR_get_error(), NULL));
+		exit(-1);
+		return -1;
+	}
+	cinfo->set_ssl_ptr(&ssl, sizeof(SSL*));
+
+	return 0;
+}
+
+int registerName(const string &name, string *addr_buf) {
+	int sockfd;
+	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+		ERRORF("error creating socket to name server: %s", strerror(errno));
+		return -1;
+	}
+
+	// nameserver addr
+	struct sockaddr_in sa;
+	sa.sin_family = PF_INET;
+	sa.sin_addr.s_addr = inet_addr("127.0.0.1");
+	sa.sin_port = htons(5353);
+
+	// addr to register
+	sockaddr_in *addr = addrFromData(addr_buf);
+
+	session::NSMsg nsm;
+	session::NSRegister *rm = nsm.mutable_reg();
+	rm->set_name(name);
+	rm->set_ip(addr->sin_addr.s_addr);
+	rm->set_port(addr->sin_port);
+
+	assert(rm);
+
+
+	std::string p_buf;
+	nsm.SerializeToString(&p_buf);
+
+	int remaining = p_buf.size();
+	const char *p = p_buf.data();
+	if (sendto(sockfd, p, remaining, 0, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
+		ERRORF("Error sending NS register: %s", strerror(errno));
+		return -1;
+	}
+
+    return 1;
 }
 
 // watches to see if we switch networks; makes new transport connections if so

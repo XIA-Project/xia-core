@@ -9,6 +9,10 @@ sockaddr_x* addrFromData(const string *addr_buf) {
 	return (sockaddr_x*)addr_buf->data();
 }
 
+string *bufFromAddr(sockaddr_x *sa) {
+	return new string((const char*)sa, sizeof(sockaddr_x));
+}
+
 string* getAddrForName(string name) {
 	struct addrinfo *ai;
 	sockaddr_x *sa;
@@ -18,8 +22,7 @@ string* getAddrForName(string name) {
 	}
 	sa = (sockaddr_x*)ai->ai_addr;
 
-	string *addr_buf = new string((const char*)sa, sizeof(sockaddr_x));
-	return addr_buf;
+	return bufFromAddr(sa);
 }
 
 string* getRemoteAddrForSocket(int sock) {
@@ -28,8 +31,7 @@ string* getRemoteAddrForSocket(int sock) {
 	if (Xgetpeername(sock, (struct sockaddr*)sa, &len) < 0) {
 		ERRORF("Error in Xgetpeername on socket %d: %s", sock, strerror(errno));
 	}
-	string *addr_buf = new string((const char*)sa, sizeof(sockaddr_x));
-	return addr_buf;
+	return bufFromAddr(sa);
 }
 
 string* getLocalAddrForSocket(int sock) {
@@ -38,8 +40,7 @@ string* getLocalAddrForSocket(int sock) {
 	if (Xgetsockname(sock, (struct sockaddr*)sa, &len) < 0) {
 		ERRORF("Error in Xgetsockname on socket %d: %s", sock, strerror(errno));
 	}
-	string *addr_buf = new string((const char*)sa, sizeof(sockaddr_x));
-	return addr_buf;
+	return bufFromAddr(sa);
 }
 
 // returns an address's HID as a string (which we use to keep track of transport
@@ -67,7 +68,7 @@ string getHIDForName(string name) {
 	}
 	sa = (sockaddr_x*)ai->ai_addr;
 
-	string *addr_buf = new string((const char*)sa, sizeof(sockaddr_x));
+	string *addr_buf = bufFromAddr(sa);
 	return getHIDForAddr(addr_buf);
 }
 
@@ -77,9 +78,7 @@ string getHIDForSocket(int sock) {
 
 int sendBuffer(session::ConnectionInfo *cinfo, const char* buf, size_t len) {
 
-	if (cinfo->use_ssl() && cinfo->has_ssl_ptr()) {
-		return XSSL_write(*(XSSL**)cinfo->ssl_ptr().data(), buf, len);
-	} else if (cinfo->transport_protocol() == session::XSP) {
+	if (cinfo->transport_protocol() == session::XSP) {
 		return Xsend(cinfo->sockfd(), buf, len, 0);
 	}
 

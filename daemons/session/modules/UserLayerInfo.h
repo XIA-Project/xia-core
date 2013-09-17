@@ -14,15 +14,14 @@
 ** limitations under the License.
 */
 
-#ifndef SECURITY_PRIVACY_MODULE_H
-#define SECURITY_PRIVACY_MODULE_H
+#ifndef USER_LAYER_INFO_H
+#define USER_LAYER_INFO_H
 
-#include "ContextModule.h"
-
-class SecurityPrivacyModule : public ContextModule {
+class UserLayerInfo : public StackInfo {
 	public:
-		DecisionValue makeDecision(DecisionType decision);
+		bool getEncrypt();
 
 };
 
-#endif /* SECURITY_PRIVACY_MODULE_H */
+
+#endif /* USER_LAYER_INFO_H */

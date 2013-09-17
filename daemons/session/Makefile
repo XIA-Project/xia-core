@@ -3,21 +3,21 @@ include ../../xia.mk
 .PHONY: all clean
 
 LDFLAGS += $(LIBS)
-LDFLAGS +=-lprotobuf -lc -ldl
+LDFLAGS +=-lprotobuf -lc -ldl -lssl -lcrypto # -lssl and -lcrypto only needed for IP
 SOURCES=sessiond.cpp session.pb.cc utils.cpp
 NS_SOURCES=ns.cpp session.pb.cc
 #SESSIOND=$(BINDIR)/sessiond
 SESSIOND=sessiond
 NS=ns
-CONTEXT_MODULE_LIB=modules/libContextModules.so
+SESSION_MODULE_LIB=modules/libSessionModules.so
 
-all: session.pb.cc $(CONTEXT_MODULE_LIB) $(SESSIOND) $(NS)
+all: session.pb.cc $(SESSION_MODULE_LIB) $(SESSIOND) $(NS)
 
-$(CONTEXT_MODULE_LIB):
+$(SESSION_MODULE_LIB):
 	make -C modules
 
-$(SESSIOND): $(SOURCES) xia.cpp ip.cpp $(CONTEXT_MODULE_LIB)
-	$(CC) -o $@ $(CFLAGS) $(SOURCES) $(LDFLAGS)	$(CONTEXT_MODULE_LIB)
+$(SESSIOND): $(SOURCES) xia.cpp ip.cpp $(SESSION_MODULE_LIB)
+	$(CC) -o $@ $(CFLAGS) $(SOURCES) $(LDFLAGS)	$(SESSION_MODULE_LIB)
 
 $(NS): $(NS_SOURCES)
 	$(CC) -o $@ $(CFLAGS) $(NS_SOURCES) $(LDFLAGS)	

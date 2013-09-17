@@ -65,6 +65,7 @@ message S_New_Context_Msg {
 
 message SInitMsg {
   required string session_path = 1;
+  required uint32 attributes = 2;
 }
 
 message SBindMsg {

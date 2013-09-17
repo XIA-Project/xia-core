@@ -39,7 +39,7 @@ using namespace std;
 *
 * @return A negative value on failure.
 */
-int Sinit(int ctx, const char* sessionPath)
+int Sinit(int ctx, const char* sessionPath, uint32_t attributes)
 {
 DBG("BEGIN Sinit");
 	int rc;
@@ -50,9 +50,11 @@ DBG("BEGIN Sinit");
 	sm.set_type(session::INIT);
 	session::SInitMsg *im = sm.mutable_s_init();
 
-	// parse paths into protobuf msg
+	// copy path and attributes into protobuf msg
 	im->set_session_path(sessionPath);
+	im->set_attributes(attributes);
 	
+	// send protobuf msg down to session daemon
 	if ((rc = proc_send(sockfd, &sm)) < 0) {
 		ERRORF("Error talking to session proc: %s", strerror(errno));
 		close(sockfd);

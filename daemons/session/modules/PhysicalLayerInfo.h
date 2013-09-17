@@ -14,15 +14,12 @@
 ** limitations under the License.
 */
 
-#ifndef SERVICE_PERFORMANCE_MODULE_H
-#define SERVICE_PERFORMANCE_MODULE_H
+#ifndef PHYSICAL_LAYER_INFO_H
+#define PHYSICAL_LAYER_INFO_H
 
-#include "ContextModule.h"
-
-class ServicePerformanceModule : public ContextModule {
-	public:
-		DecisionValue makeDecision(DecisionType decision);
+class PhysicalLayerInfo : public StackInfo {
 
 };
 
-#endif /* SERVICE_PERFORMANCE_MODULE_H */
+
+#endif /* PHYSICAL_LAYER_INFO_H */
