@@ -21,7 +21,10 @@
 
 class SSLModule : public SessionModule {
 	protected:
-		bool preSend(void *context, void *rv);
+		bool preSend(struct breakpoint_context *context, void *rv);
+		bool preRecv(struct breakpoint_context *context, void *rv);
+		bool postRecv(struct breakpoint_context *context, void *rv);
+		bool postRecvSYN(struct breakpoint_context *context, void *rv);
 };
 
 class SSLModuleXIA : public SSLModule {
@@ -33,7 +36,7 @@ class SSLModuleXIA : public SSLModule {
 												 LinkLayerInfo &linkInfo, 
 												 PhysicalLayerInfo &physInfo);
 
-		bool breakpoint(Breakpoint breakpoint, void *context, void *rv);
+		bool breakpoint(Breakpoint breakpoint, struct breakpoint_context *context, void *rv);
 };
 
 class SSLModuleIP : public SSLModule {
@@ -45,7 +48,7 @@ class SSLModuleIP : public SSLModule {
 												 LinkLayerInfo &linkInfo, 
 												 PhysicalLayerInfo &physInfo);
 
-		bool breakpoint(Breakpoint breakpoint, void *context, void *rv);
+		bool breakpoint(Breakpoint breakpoint, struct breakpoint_context *context, void *rv);
 };
 
 #endif /* SSL_MODULE_H */

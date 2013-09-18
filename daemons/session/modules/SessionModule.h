@@ -111,15 +111,27 @@ enum Breakpoint {
 	kMigrateReceived
 };
 
+struct send_args {
+	const char *buf;
+	int *len;
+
+	send_args(const char *b, int *l) : buf(b), len(l) {}
+};
+
+struct recv_args {
+	char *buf;
+	int *len;
+	
+	recv_args(char *b, int *l) : buf(b), len(l) {}
+};
+
 struct breakpoint_context {
 	session::SessionInfo *sinfo;
 	session::ConnectionInfo *cinfo;
-	const char *send_buf;
-	char *recv_buf;
-	int len;
+	void *args;
 
-	breakpoint_context(session::SessionInfo *s, session::ConnectionInfo *c, const char *sb, char *rb, int l)
-		: sinfo(s), cinfo(c), send_buf(sb), recv_buf(rb), len(l) {}
+	breakpoint_context(session::SessionInfo *s, session::ConnectionInfo *c, void *a)
+		: sinfo(s), cinfo(c), args(a) {}
 };
 
 
@@ -132,7 +144,7 @@ class SessionModule {
 														 LinkLayerInfo &linkInfo, 
 														 PhysicalLayerInfo &physInfo) = 0;
 
-		virtual bool breakpoint(Breakpoint breakpoint, void *context, void *rv) = 0;
+		virtual bool breakpoint(Breakpoint breakpoint, struct breakpoint_context *context, void *rv) = 0;
 };
 
 

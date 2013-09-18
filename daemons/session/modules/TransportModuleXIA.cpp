@@ -41,6 +41,6 @@ void TransportModuleXIA::decide(session::SessionInfo *sinfo, UserLayerInfo &user
 
 }
 
-bool TransportModuleXIA::breakpoint(Breakpoint breakpoint, void *context, void *rv) {
+bool TransportModuleXIA::breakpoint(Breakpoint breakpoint, struct breakpoint_context *context, void *rv) {
 	return true;
 }

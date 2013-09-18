@@ -31,7 +31,7 @@ class TransportModuleIP : public TransportModule {
 												 LinkLayerInfo &linkInfo, 
 												 PhysicalLayerInfo &physInfo);
 
-		bool breakpoint(Breakpoint breakpoint, void *context, void *rv);
+		bool breakpoint(Breakpoint breakpoint, struct breakpoint_context *context, void *rv);
 
 };
 
@@ -44,7 +44,7 @@ class TransportModuleXIA : public TransportModule {
 												 LinkLayerInfo &linkInfo, 
 												 PhysicalLayerInfo &physInfo);
 
-		bool breakpoint(Breakpoint breakpoint, void *context, void *rv);
+		bool breakpoint(Breakpoint breakpoint, struct breakpoint_context *context, void *rv);
 
 };
 

@@ -87,9 +87,7 @@ int sendBuffer(session::ConnectionInfo *cinfo, const char* buf, size_t len) {
 
 int recvBuffer(session::ConnectionInfo *cinfo, char* buf, size_t len) {
 
-	if (cinfo->use_ssl() && cinfo->has_ssl_ptr()) {
-		return XSSL_read(*(XSSL**)cinfo->ssl_ptr().data(), buf, len);
-	} else if (cinfo->transport_protocol() == session::XSP) {
+	if (cinfo->transport_protocol() == session::XSP) {
 		memset(buf, 0, len);
 		return Xrecv(cinfo->sockfd(), buf, len, 0);
 	}
@@ -208,34 +206,6 @@ int connectSSL(session::ConnectionInfo *cinfo) {
 	if (XSSL_connect(xssl) != 1) {
 		ERROR("Unable to initiatie XSSL connection");
 		return -1;
-	}
-	cinfo->set_ssl_ptr(&xssl, sizeof(XSSL*));
-
-	return 0;
-}
-
-int acceptSSL(session::ConnectionInfo *cinfo) {
-
-	// If we're accpeting, we should have already bound, which set the ssl ctx
-	if (!cinfo->has_ssl_ctx_ptr()) {
-		ERROR("Connection does not have an associated XSSL_ctx");
-		return -1;
-	}
-	
-	// Make sure we haven't already accepted
-	if (cinfo->has_ssl_ptr()) return 0;
-
-	XSSL *xssl = XSSL_new(*(XSSL_CTX**)cinfo->ssl_ctx_ptr().data());
-	if (xssl == NULL) {
-		ERROR("Unable to init new XSSL object");
-		return -1;
-	}
-	if (XSSL_set_fd(xssl, cinfo->sockfd()) != 1) {
-		ERROR("Unable to set XSSL sockfd");
-		return -1;
-	}
-	if (XSSL_accept(xssl) != 1) {
-		ERROR("Error accepting XSSL connection");
 	}
 	cinfo->set_ssl_ptr(&xssl, sizeof(XSSL*));
 

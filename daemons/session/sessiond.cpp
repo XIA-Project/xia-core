@@ -831,7 +831,7 @@ void configure_session(session::SessionInfo *sinfo, AppLayerInfo &appInfo) {
 	}
 }
 
-bool trigger_breakpoint(Breakpoint breakpoint, void *context, void *rv) {
+bool trigger_breakpoint(Breakpoint breakpoint, struct breakpoint_context *context, void *rv) {
 
 	// Step through the session modules one by one triggering the breakpoint
 	bool performFollowingOp = true;   // e.g., the "send" in a PreSend breakpoint
@@ -841,6 +841,7 @@ bool trigger_breakpoint(Breakpoint breakpoint, void *context, void *rv) {
 			performFollowingOp = false;
 	}
 
+	free(context->args);
 	free(context);
 	return performFollowingOp;
 }
@@ -1003,22 +1004,18 @@ int send(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 	const char *buf = p_buf.c_str();
 
 	// (*) PreSendBreakpoint
-	int preSendRv;
-	bool doSend = trigger_breakpoint(kSendPreSend, new breakpoint_context(NULL, cinfo, buf, NULL, len), &preSendRv);
+	bool doSend = trigger_breakpoint(kSendPreSend, new breakpoint_context(NULL, cinfo, new send_args(buf, &len)), &sent);
 
 	if (doSend) {
 		if ( (sent = sendBuffer(cinfo, buf, len)) < 0) {
 			ERRORF("Send error %d on socket %d, dest hid %s: %s", errno, cinfo->sockfd(), cinfo->hid().c_str(), strerror(errno));
 		}
-	
-		// (*) PostSendBreakpoint
-		trigger_breakpoint(kSendPostSend, new breakpoint_context(NULL, cinfo, buf, NULL, len), NULL);
-			
-		return sent;
-
-	} else {
-		return preSendRv;
 	}
+		
+	// (*) PostSendBreakpoint
+	trigger_breakpoint(kSendPostSend, new breakpoint_context(NULL, cinfo, new send_args(buf, &len)), &sent);
+	
+	return sent;
 }
 
 // sends to next hop
@@ -1031,12 +1028,20 @@ int send(int ctx, session::SessionPacket *pkt) {
 int recv(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 	int received = -1;
 	char buf[BUFSIZE];
+	int len = BUFSIZE;
+	
+	// (*) PreRecvBreakpoint
+	bool doRecv = trigger_breakpoint(kRecvPreRecv, new breakpoint_context(NULL, cinfo, new recv_args(buf, &len)), &received);
 
-	if ((received = recvBuffer(cinfo, buf, BUFSIZE)) < 0) {
-		ERRORF("Receive error %d on socket %d: %s", errno, cinfo->sockfd(), strerror(errno));
-		return received;
+	if (doRecv) {
+		if ((received = recvBuffer(cinfo, buf, len)) < 0) {
+			ERRORF("Receive error %d on socket %d: %s", errno, cinfo->sockfd(), strerror(errno));
+			return received;
+		}
 	}
-
+		
+	// (*) PostRecvBreakpoint
+	trigger_breakpoint(kRecvPostRecv, new breakpoint_context(NULL, cinfo, new recv_args(buf, &len)), &received);
 
 	string bufstr(buf, received);
 	if (!pkt->ParseFromString(bufstr)) {
@@ -1194,9 +1199,8 @@ void * poll_listen_sock(void * args) {
 				rx_cinfo->set_use_ssl(rpkt->info().use_ssl());
 				rx_cinfo->set_transport_protocol(rpkt->info().transport_protocol()); // TODO: a bit late for this... we already did an accept and a streaming receive...
 
-				if (rx_cinfo->use_ssl()) {
-					acceptSSL(rx_cinfo);
-				}
+				// (*) PostReceiveSYNBreakpoint
+				trigger_breakpoint(kAcceptPostReceiveSYN, new breakpoint_context(NULL, rx_cinfo, NULL), NULL);
 
 #ifdef MULTIPLEX
 				// save transport connection for others to use
@@ -1543,9 +1547,8 @@ DBGF("Ctx %d    Accepted a new connection on rxsock %d", ctx, rxsock);
 			return -1;
 		} 
 	
-		if (rx_cinfo->use_ssl()) {
-			acceptSSL(rx_cinfo);
-		}
+		// (*) PostReceiveSYNBreakpoint
+		trigger_breakpoint(kAcceptPostReceiveSYN, new breakpoint_context(NULL, rx_cinfo, NULL), NULL);
 
 		// start a thread reading this socket
 		int rc;

@@ -39,6 +39,6 @@ void TransportModuleIP::decide(session::SessionInfo *sinfo, UserLayerInfo &userI
 
 }
 
-bool TransportModuleIP::breakpoint(Breakpoint breakpoint, void *context, void *rv) {
+bool TransportModuleIP::breakpoint(Breakpoint breakpoint, struct breakpoint_context *context, void *rv) {
 	return true;
 }

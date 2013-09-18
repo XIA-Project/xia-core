@@ -37,6 +37,6 @@ void SSLModuleIP::decide(session::SessionInfo *sinfo, UserLayerInfo &userInfo,
 	}
 }
 
-bool SSLModuleIP::breakpoint(Breakpoint breakpoint, void *context, void *rv) {
+bool SSLModuleIP::breakpoint(Breakpoint breakpoint, struct breakpoint_context *context, void *rv) {
 	return true;
 }
