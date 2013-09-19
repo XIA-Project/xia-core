@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
 		LOG("Error creating new context");
 		exit(-1);
 	}
-	if (Sinit(ctx, "service, server", kReliableDelivery) < 0 ) {
+	if (Sinit(ctx, "service, server", kEncryption | kReliableDelivery | kLatencyPriority ) < 0 ) {
 		LOG("Error initiating session");
 		exit(-1);
 	}

@@ -14,16 +14,21 @@
 ** limitations under the License.
 */
 
-#ifndef PHYSICAL_LAYER_INFO_H
-#define PHYSICAL_LAYER_INFO_H
+#ifndef INTERFACE_MODULE_H
+#define INTERFACE_MODULE_H
 
-#include "StackInfo.h"
+#include "SessionModule.h"
 
-class PhysicalLayerInfo : public StackInfo {
+class InterfaceModule : public SessionModule {
 	public:
-		float getDeviceBatteryLevel();
+		void decide(session::SessionInfo *sinfo, UserLayerInfo &userInfo, 
+												 AppLayerInfo &appInfo, 
+												 TransportLayerInfo &transportInfo, 
+												 NetworkLayerInfo &netInfo, 
+												 LinkLayerInfo &linkInfo, 
+												 PhysicalLayerInfo &physInfo);
 
+		bool breakpoint(Breakpoint breakpoint, struct breakpoint_context *context, void *rv);
 };
 
-
-#endif /* PHYSICAL_LAYER_INFO_H */
+#endif /* INTERFACE_MODULE_H */

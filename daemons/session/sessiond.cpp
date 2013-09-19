@@ -3,6 +3,7 @@
 #include "modules/SessionModule.h"
 #include "modules/TransportModule.h"
 #include "modules/SSLModule.h"
+#include "modules/InterfaceModule.h"
 #include "modules/StackInfo.h"
 #include "modules/UserLayerInfo.h"
 #include "modules/AppLayerInfo.h"
@@ -2252,6 +2253,7 @@ int main(int argc, char *argv[]) {
 	session_modules.push_back(new TransportModuleIP());
 	session_modules.push_back(new SSLModuleIP());
 #endif
+	session_modules.push_back(new InterfaceModule());
 
 	listen();
 	return 0;

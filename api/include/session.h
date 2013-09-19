@@ -38,7 +38,9 @@ extern "C" {
 
 enum SessionAttribute {
 	kReliableDelivery 	= (1u << 0),
-	kEncryption 		= (1u << 1)
+	kEncryption 		= (1u << 1),
+	kBandwidthPriority	= (1u << 2),
+	kLatencyPriority	= (1u << 3)
 };
 
 //Function list

@@ -3,7 +3,7 @@ include ../../xia.mk
 .PHONY: all clean
 
 LDFLAGS += $(LIBS)
-LDFLAGS +=-lprotobuf -lc -ldl -lssl -lcrypto # -lssl and -lcrypto only needed for IP
+LDFLAGS +=-lprotobuf -lc -ldl
 SOURCES=sessiond.cpp session.pb.cc utils.cpp
 NS_SOURCES=ns.cpp session.pb.cc
 #SESSIOND=$(BINDIR)/sessiond

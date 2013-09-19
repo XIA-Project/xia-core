@@ -14,7 +14,6 @@
 ** limitations under the License.
 */
 
-#include "StackInfo.h"
 #include "AppLayerInfo.h"
 
 AppLayerInfo::AppLayerInfo(uint32_t attributes) {

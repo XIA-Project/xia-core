@@ -17,8 +17,14 @@
 #ifndef LINK_LAYER_INFO_H
 #define LINK_LAYER_INFO_H
 
-class LinkLayerInfo : public StackInfo {
+#include "StackInfo.h"
 
+class LinkLayerInfo : public StackInfo {
+	public:
+		vector<string> getActiveInterfaces();
+		vector<string> getAllInterfaces();
+		float getBandwidthForInterface(string iface);
+		float getLatencyForInterface(string iface);
 };
 
 

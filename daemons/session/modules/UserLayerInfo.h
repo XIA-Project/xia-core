@@ -17,9 +17,12 @@
 #ifndef USER_LAYER_INFO_H
 #define USER_LAYER_INFO_H
 
+#include "StackInfo.h"
+
 class UserLayerInfo : public StackInfo {
 	public:
 		bool getEncrypt();
+		float getCellularBatteryCutoff();
 
 };
 

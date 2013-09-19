@@ -14,6 +14,61 @@
 ** limitations under the License.
 */
 
-#include "StackInfo.h"
+#include "LinkLayerInfo.h"
+#include <ifaddrs.h>
 
 
+vector<string> LinkLayerInfo::getActiveInterfaces() {
+
+	struct ifaddrs *ifaddr, *ifa;
+	vector<string> ifaces;
+	
+	if (getifaddrs(&ifaddr) == -1) {
+	    ERROR("getifaddrs");
+		return ifaces;
+	}
+	
+	/* Walk through linked list, maintaining head pointer so we
+	   can free list later */
+	
+	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+
+	    if (ifa->ifa_addr != NULL)  // skip inactive interfaces
+			if (ifa->ifa_addr->sa_family == AF_INET) // hack to avoid duplicate entries
+				ifaces.push_back(string(ifa->ifa_name));
+	}
+	
+	freeifaddrs(ifaddr);
+	return ifaces;
+}
+
+vector<string> LinkLayerInfo::getAllInterfaces() {
+
+	struct ifaddrs *ifaddr, *ifa;
+	vector<string> ifaces;
+	
+	if (getifaddrs(&ifaddr) == -1) {
+	    ERROR("getifaddrs");
+		return ifaces;
+	}
+	
+	/* Walk through linked list, maintaining head pointer so we
+	   can free list later */
+	
+	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+
+		if (ifa->ifa_addr->sa_family == AF_INET) // hack to avoid duplicate entries
+			ifaces.push_back(string(ifa->ifa_name));
+	}
+	
+	freeifaddrs(ifaddr);
+	return ifaces;
+}
+		
+float LinkLayerInfo::getBandwidthForInterface(string iface) {
+	return rand() % 150; // random BW up to 150 Mbps
+}
+
+float LinkLayerInfo::getLatencyForInterface(string iface) {
+	return rand() % 100; // random latency up to 100 ms
+}

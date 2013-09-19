@@ -135,6 +135,7 @@ message SessionInfo {
 
 	optional bool use_ssl = 15 [default = false];
 	optional TransportProtocol transport_protocol = 16 [default = XSP];
+	optional string interface = 17;
 }
 
 message SessionData {

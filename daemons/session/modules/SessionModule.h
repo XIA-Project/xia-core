@@ -19,6 +19,8 @@
 
 #include <stdio.h>
 #include <pthread.h>
+#include <vector>
+#include <string>
 #include "StackInfo.h"
 #include "UserLayerInfo.h"
 #include "AppLayerInfo.h"
@@ -27,6 +29,8 @@
 #include "LinkLayerInfo.h"
 #include "PhysicalLayerInfo.h"
 #include "../session.pb.h"
+
+using namespace std;
 
 
 /* LOGGING */

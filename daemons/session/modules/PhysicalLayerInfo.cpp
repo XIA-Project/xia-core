@@ -14,6 +14,8 @@
 ** limitations under the License.
 */
 
-#include "StackInfo.h"
+#include "PhysicalLayerInfo.h"
 
-
+float PhysicalLayerInfo::getDeviceBatteryLevel() {
+	return (rand() % 100) / 100.0;
+}

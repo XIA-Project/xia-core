@@ -14,7 +14,6 @@
 ** limitations under the License.
 */
 
-#include "StackInfo.h"
 #include "UserLayerInfo.h"
 
 
@@ -22,4 +21,9 @@ bool UserLayerInfo::getEncrypt() {
 	// Simulate the user having expressed a preference to encrypt all sessions
 	//return true;
 	return false;
+}
+		
+float UserLayerInfo::getCellularBatteryCutoff() {
+	// Simulate the user choosing no cellular connections when batter is below 10%
+	return 0.1;
 }

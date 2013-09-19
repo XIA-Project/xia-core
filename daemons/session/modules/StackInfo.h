@@ -19,7 +19,11 @@
 
 #include <stdio.h>
 #include <pthread.h>
+#include <vector>
+#include <string>
 #include "../session.pb.h"
+
+using namespace std;
 
 
 /* LOGGING */
