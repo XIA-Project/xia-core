@@ -180,38 +180,6 @@ DBGF("    opened connection, sock is %d", sock);
 
 }
 
-int connectSSL(session::ConnectionInfo *cinfo) {
-
-	if (!cinfo->has_ssl_ctx_ptr()) {
-		XSSL_CTX *xssl_ctx = XSSL_CTX_new();
-		if (xssl_ctx == NULL) {
-			ERROR("Unable to init new XSSL context");
-			return -1;
-		}
-		cinfo->set_ssl_ctx_ptr(&xssl_ctx, sizeof(XSSL_CTX*));
-	}
-
-	// Make sure we haven't already connected
-	if (cinfo->has_ssl_ptr()) return 0;
-
-	XSSL *xssl = XSSL_new(*(XSSL_CTX**)cinfo->ssl_ctx_ptr().data());
-	if (xssl == NULL) {
-		ERROR("Unable to init new XSSL object");
-		return -1;
-	}
-	if (XSSL_set_fd(xssl, cinfo->sockfd()) != 1) {
-		ERROR("Unable to set XSSL sockfd");
-		return -1;
-	}
-	if (XSSL_connect(xssl) != 1) {
-		ERROR("Unable to initiatie XSSL connection");
-		return -1;
-	}
-	cinfo->set_ssl_ptr(&xssl, sizeof(XSSL*));
-
-	return 0;
-}
-
 int registerName(const string &name, string *addr_buf) {
     return XregisterName(name.c_str(), addrFromData(addr_buf));
 }

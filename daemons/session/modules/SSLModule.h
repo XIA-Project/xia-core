@@ -20,35 +20,40 @@
 #include "SessionModule.h"
 
 class SSLModule : public SessionModule {
+	public:
+		void decide(session::SessionInfo *sinfo, UserLayerInfo &userInfo, 
+												 AppLayerInfo &appInfo, 
+												 TransportLayerInfo &transportInfo, 
+												 NetworkLayerInfo &netInfo, 
+												 LinkLayerInfo &linkInfo, 
+												 PhysicalLayerInfo &physInfo);
+
+		bool breakpoint(Breakpoint breakpoint, struct breakpoint_context *context, void *rv);
+
+	protected:
+		virtual bool preSend(struct breakpoint_context *context, void *rv) = 0;
+		virtual bool preRecv(struct breakpoint_context *context, void *rv) = 0;
+		virtual bool postRecv(struct breakpoint_context *context, void *rv) = 0;
+		virtual bool postRecvSYN(struct breakpoint_context *context, void *rv) = 0;
+		virtual bool postSendSYN(struct breakpoint_context *context, void *rv) = 0;
+};
+
+class SSLModuleXIA : public SSLModule {
 	protected:
 		bool preSend(struct breakpoint_context *context, void *rv);
 		bool preRecv(struct breakpoint_context *context, void *rv);
 		bool postRecv(struct breakpoint_context *context, void *rv);
 		bool postRecvSYN(struct breakpoint_context *context, void *rv);
-};
-
-class SSLModuleXIA : public SSLModule {
-	public:
-		void decide(session::SessionInfo *sinfo, UserLayerInfo &userInfo, 
-												 AppLayerInfo &appInfo, 
-												 TransportLayerInfo &transportInfo, 
-												 NetworkLayerInfo &netInfo, 
-												 LinkLayerInfo &linkInfo, 
-												 PhysicalLayerInfo &physInfo);
-
-		bool breakpoint(Breakpoint breakpoint, struct breakpoint_context *context, void *rv);
+		bool postSendSYN(struct breakpoint_context *context, void *rv);
 };
 
 class SSLModuleIP : public SSLModule {
-	public:
-		void decide(session::SessionInfo *sinfo, UserLayerInfo &userInfo, 
-												 AppLayerInfo &appInfo, 
-												 TransportLayerInfo &transportInfo, 
-												 NetworkLayerInfo &netInfo, 
-												 LinkLayerInfo &linkInfo, 
-												 PhysicalLayerInfo &physInfo);
-
-		bool breakpoint(Breakpoint breakpoint, struct breakpoint_context *context, void *rv);
+	protected:
+		bool preSend(struct breakpoint_context *context, void *rv);
+		bool preRecv(struct breakpoint_context *context, void *rv);
+		bool postRecv(struct breakpoint_context *context, void *rv);
+		bool postRecvSYN(struct breakpoint_context *context, void *rv);
+		bool postSendSYN(struct breakpoint_context *context, void *rv);
 };
 
 #endif /* SSL_MODULE_H */

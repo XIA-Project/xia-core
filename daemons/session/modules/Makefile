@@ -6,7 +6,7 @@ CFLAGS +=-c -fpic
 CPPFLAGS=$(CFLAGS)
 LDFLAGS += -lc -ldl
 
-MODULE_SOURCES=TransportModuleXIA.cpp TransportModuleIP.cpp SSLModuleXIA.cpp SSLModuleIP.cpp
+MODULE_SOURCES=TransportModuleXIA.cpp TransportModuleIP.cpp SSLModule.cpp SSLModuleXIA.cpp SSLModuleIP.cpp
 STACK_INFO_SOURCES=UserLayerInfo.cpp AppLayerInfo.cpp TransportLayerInfo.cpp NetworkLayerInfo.cpp LinkLayerInfo.cpp PhysicalLayerInfo.cpp
 SOURCES=$(MODULE_SOURCES) $(STACK_INFO_SOURCES)
 

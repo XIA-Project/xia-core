@@ -7,9 +7,6 @@
 #include <netdb.h>
 #include <sys/types.h>
 #include <ifaddrs.h>
-#include <openssl/ssl.h>
-#include <openssl/rsa.h>
-#include <openssl/err.h>
 
 
 
@@ -211,10 +208,7 @@ string getHIDForSocket(int sock) {
 
 int sendBuffer(session::ConnectionInfo *cinfo, const char* buf, size_t len) {
 	
-	if (cinfo->use_ssl() && cinfo->has_ssl_ptr()) {
-DBG("SSL send");
-		return SSL_write(*(SSL**)cinfo->ssl_ptr().data(), buf, len);
-	} else if (cinfo->transport_protocol() == session::TCP) {
+	if (cinfo->transport_protocol() == session::TCP) {
 		return send(cinfo->sockfd(), buf, len, 0);
 	}
 
@@ -223,10 +217,7 @@ DBG("SSL send");
 
 int recvBuffer(session::ConnectionInfo *cinfo, char* buf, size_t len) {
 
-	if (cinfo->use_ssl() && cinfo->has_ssl_ptr()) {
-DBG("SSL recv");
-		return SSL_read(*(SSL**)cinfo->ssl_ptr().data(), buf, len);
-	} else if (cinfo->transport_protocol() == session::TCP) {
+	if (cinfo->transport_protocol() == session::TCP) {
 		memset(buf, 0, len);
 		return recv(cinfo->sockfd(), buf, len, 0);
 	}
@@ -335,74 +326,6 @@ int openConnectionToAddr(const string *addr_buf, session::ConnectionInfo *cinfo)
 	cinfo->set_sockfd(sock);
 	cinfo->set_hid(getHIDForAddr(addr_buf));
 	cinfo->set_addr(*addr_buf);
-	return 0;
-}
-
-int connectSSL(session::ConnectionInfo *cinfo) {
-
-	if (!cinfo->has_ssl_ctx_ptr()) {
-		SSL_CTX *ssl_ctx = SSL_CTX_new(SSLv23_client_method());
-		if (ssl_ctx == NULL) {
-			ERROR("Unable to init new SSL context");
-			return -1;
-		}
-		cinfo->set_ssl_ctx_ptr(&ssl_ctx, sizeof(SSL_CTX*));
-
-		// set private key
-		SSL_CTX_use_RSAPrivateKey(ssl_ctx, RSA_generate_key(1024, 3, NULL, NULL));
-		SSL_CTX_set_cipher_list(ssl_ctx, "aNULL");
-	}
-
-	// Make sure we haven't already connected
-	if (cinfo->has_ssl_ptr()) return 0;
-
-	SSL *ssl = SSL_new(*(SSL_CTX**)cinfo->ssl_ctx_ptr().data());
-	if (ssl == NULL) {
-		ERROR("Unable to init new SSL object");
-		return -1;
-	}
-	if (SSL_set_fd(ssl, cinfo->sockfd()) != 1) {
-		ERROR("Unable to set SSL sockfd");
-		return -1;
-	}
-	int rc;
-	if ((rc = SSL_connect(ssl)) != 1) {
-		ERRORF("Unable to initiate SSL connection: %s", ERR_error_string(ERR_get_error(), NULL));
-		exit(-1);
-		return -1;
-	}
-	cinfo->set_ssl_ptr(&ssl, sizeof(SSL*));
-
-	return 0;
-}
-
-int acceptSSL(session::ConnectionInfo *cinfo) {
-
-	// If we're accpeting, we should have already bound, which set the ssl ctx
-	if (!cinfo->has_ssl_ctx_ptr()) {
-		ERROR("Connection does not have an associated SSL_ctx");
-		return -1;
-	}
-	
-	// Make sure we haven't already accepted
-	if (cinfo->has_ssl_ptr()) return 0;
-
-	SSL *ssl = SSL_new(*(SSL_CTX**)cinfo->ssl_ctx_ptr().data());
-	if (ssl == NULL) {
-		ERROR("Unable to init new SSL object");
-		return -1;
-	}
-	if (SSL_set_fd(ssl, cinfo->sockfd()) != 1) {
-		ERROR("Unable to set SSL sockfd");
-		return -1;
-	}
-	if (SSL_accept(ssl) != 1) {
-		ERRORF("Error accepting SSL connection: %s", ERR_error_string(ERR_get_error(), NULL));
-		exit(-1);
-		return -1;
-	}
-	cinfo->set_ssl_ptr(&ssl, sizeof(SSL*));
-
 	return 0;
 }
 

@@ -874,6 +874,7 @@ int open_connection(const session::SessionInfo *sinfo, const string *addr_buf, s
 
 		// send a setup packet (INFO or MIGRATE) if one was supplied
 		if (setup_packet != NULL) {
+DBG("Sending SETUP packet");
 			if (send(cinfo, setup_packet) < 0) {
 				ERROR("Error sending setup packet over new connection");
 				return -1;
@@ -881,9 +882,8 @@ int open_connection(const session::SessionInfo *sinfo, const string *addr_buf, s
 		}
 
 		// do SSL handshake before we start doing receives
-		if (sinfo->use_ssl()) {
-			connectSSL(cinfo);
-		}
+		// (*) PostSendSYNBreakpoint
+		trigger_breakpoint(kConnectPostSendSYN, new breakpoint_context(NULL, cinfo, NULL), NULL);
 
 		// start a thread reading this socket
 		if ( (ret = startPollingSocket(cinfo->sockfd(), poll_recv_sock, (void*)cinfo) < 0) ) {
@@ -907,8 +907,19 @@ int open_connection_to_nexthop(int ctx, session::SessionPacket *setup_packet) {
 
 
 	// If we already have a connection, don't open a new one
-	if ( ctx_to_txconn.find(ctx) != ctx_to_txconn.end() )
+	if ( ctx_to_txconn.find(ctx) != ctx_to_txconn.end() ) {
+		cinfo = ctx_to_txconn[ctx];
+		
+		// Just send the setup packet if there is one
+		if (setup_packet != NULL) {
+DBG("sending SETUP packet");
+			if (send(cinfo, setup_packet) < 0) {
+				ERROR("Error sending setup packet over new connection");
+				return -1;
+			}
+		}
 		return rc;
+	}
 
 
 	// There isn't a transport conn for this session+hop yet
@@ -923,6 +934,15 @@ int open_connection_to_nexthop(int ctx, session::SessionPacket *setup_packet) {
 #ifdef MULTIPLEX
 	} else {
 		cinfo = hid_to_conn[hid];
+
+		// Just send the setup packet if there is one
+		if (setup_packet != NULL) {
+DBG("Sending SETUP packet");
+			if (send(cinfo, setup_packet) < 0) {
+				ERROR("Error sending setup packet over new connection");
+				return -1;
+			}
+		}
 	}
 	pthread_mutex_unlock(&hid_to_conn_mutex);
 #endif /* MULTIPLEX */
@@ -1267,6 +1287,7 @@ void *poll_recv_sock(void *args) {
 		pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL); // cancel is possible while waiting
 		rc = recv(cinfo, rpkt);
 		pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL); // don't cancel while we process a packet
+DBG("Received packet");
 
 		if (rc < 0) {
 			ERRORF("Error receiving on data sock %d", sock);
@@ -1282,6 +1303,7 @@ void *poll_recv_sock(void *args) {
 		{
 			case session::SETUP:
 			{
+DBG("Received SETUP packet");
 				int listen_ctx;
 
 				string my_name = get_nexthop_name(rpkt->info().my_name(), &(rpkt->info()));
@@ -1507,9 +1529,9 @@ DBGF("Ctx %d    Sent connection request to next hop", ctx);
 
 	session::ConnectionInfo *tx_cinfo;
 	get_txconn_for_context(ctx, &tx_cinfo);
-	if (tx_cinfo->use_ssl()) {
-		connectSSL(tx_cinfo);
-	}
+
+	// (*) PostSendSYNBreakpoint
+	trigger_breakpoint(kConnectPostSendSYN, new breakpoint_context(NULL, tx_cinfo, NULL), NULL);
 
 
 	if (two_party) {  // rxconn and txconn are the same
@@ -1547,8 +1569,8 @@ DBGF("Ctx %d    Accepted a new connection on rxsock %d", ctx, rxsock);
 			return -1;
 		} 
 	
-		// (*) PostReceiveSYNBreakpoint
-		trigger_breakpoint(kAcceptPostReceiveSYN, new breakpoint_context(NULL, rx_cinfo, NULL), NULL);
+		// (*) PostReceiveSYNACKBreakpoint
+		trigger_breakpoint(kConnectPostReceiveSYNACK, new breakpoint_context(NULL, rx_cinfo, NULL), NULL);
 
 		// start a thread reading this socket
 		int rc;
@@ -1558,7 +1580,9 @@ DBGF("Ctx %d    Accepted a new connection on rxsock %d", ctx, rxsock);
 		}
 	} else {
 		// get synack session info from accept Q
+DBG("Waiting for packet from accept Q");
 		rpkt = popAcceptQ(ctx);
+DBG("Got packet from accept Q");
 
 		if (rpkt == NULL) {
 			ERROR("Trying to listen on a closed context");
@@ -1716,6 +1740,7 @@ DBG("BEGIN process_accept_msg");
 	// tx_conn ourselves. (Unless we already have a connection open with them.)
 	// BUT: if it's just me and the initiator, we already have a connection.
 	bool two_party = (session_hop_count(&(rpkt->info())) == 2 );
+	bool alreadySentSYN = false;
 	if ( is_last_hop(&(rpkt->info()), listenCtxInfo->my_name()) && !two_party) {
 		string nexthop = get_nexthop_name(listenCtxInfo->my_name(), &(rpkt->info()));
 
@@ -1737,11 +1762,13 @@ DBGF("    Ctx %d    I'm the last hop; connecting to initiator with supplied addr
 			infocpy(sinfo, newinfo);
 
 			if (open_connection(&(rpkt->info()), &(rpkt->info().initiator_addr()), tx_cinfo, &pkt) < 0) {
+			//if (open_connection(&(rpkt->info()), &(rpkt->info().initiator_addr()), tx_cinfo, NULL) < 0) {
 				ERROR("Error connecting to initiator");
 				rcm->set_message("Error connecting to initiator");
 				rcm->set_rc(session::FAILURE);
 				return -1;
 			}
+			alreadySentSYN = true;
 
 			pthread_mutex_lock(&hid_to_conn_mutex);
 			hid_to_conn[tx_cinfo->hid()] = tx_cinfo;
@@ -1838,10 +1865,12 @@ DBGF("    Ctx %d    I'm the last hop; waiting for a connection to initiator. Put
 
 		
 	// send session info to next hop
-	if ( open_connection_to_nexthop(new_ctx, &pkt) < 0) {
-		ERROR("Error connecting to or sending session info to next hop");
-		rcm->set_message("Error connecting to or sending session info to next hop");
-		rcm->set_rc(session::FAILURE);
+	if ( !alreadySentSYN ) {
+		if ( open_connection_to_nexthop(new_ctx, &pkt) < 0) {
+			ERROR("Error connecting to or sending session info to next hop");
+			rcm->set_message("Error connecting to or sending session info to next hop");
+			rcm->set_rc(session::FAILURE);
+		}
 	}
 
 DBGF("    Ctx %d    Sent SessionInfo packet to next hop", new_ctx);
@@ -1855,9 +1884,9 @@ DBGF("    Ctx %d    Sent SessionInfo packet to next hop", new_ctx);
 	
 	// if this is 2-party and we already did acceptSSL on this connection (in 
 	// poll_listen_sock), then connectSSL will just return and not hurt anything
-	if (tx_cinfo->use_ssl()) {
-		connectSSL(tx_cinfo);
-	}
+
+	// (*) PostSendSYNBreakpoint
+	trigger_breakpoint(kAcceptPostSendSYN, new breakpoint_context(NULL, tx_cinfo, NULL), NULL);
 
 	ctxInfo->set_state(session::ContextInfo::ESTABLISHED);
 

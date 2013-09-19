@@ -17,49 +17,7 @@
 #include "SSLModule.h"
 #include "xssl.h"
 
-void SSLModuleXIA::decide(session::SessionInfo *sinfo, UserLayerInfo &userInfo, 
-										 AppLayerInfo &appInfo, 
-										 TransportLayerInfo &transportInfo, 
-										 NetworkLayerInfo &netInfo, 
-										 LinkLayerInfo &linkInfo, 
-										 PhysicalLayerInfo &physInfo) {
-	
-	(void)transportInfo;
-	(void)netInfo;
-	(void)linkInfo;
-	(void)physInfo;
-
-	if (userInfo.getEncrypt() || appInfo.checkAttribute(kEncryption)) {
-		DBG("Using SSL");
-		sinfo->set_use_ssl(true);
-	} else {
-		DBG("Not using SSL");
-		sinfo->set_use_ssl(false);
-	}
-}
-
-bool SSLModuleXIA::breakpoint(Breakpoint breakpoint, struct breakpoint_context *context, void *rv) {
-
-	switch(breakpoint) {
-		case kSendPreSend:
-			DBG("kSendPreSend");
-			return preSend(context, rv);
-		case kRecvPreRecv:
-			DBG("kRecvPreRecv");
-			return preRecv(context, rv);
-		case kRecvPostRecv:
-			DBG("kRecvPostRecv");
-			return postRecv(context, rv);
-		case kAcceptPostReceiveSYN:
-			DBG("kAcceptPostReceiveSYN");
-			return postRecvSYN(context, rv);
-		default:
-			DBG("Other breakpoint");
-			return true;
-	}
-}
-
-bool SSLModule::preSend(struct breakpoint_context *context, void *rv) {
+bool SSLModuleXIA::preSend(struct breakpoint_context *context, void *rv) {
 	
 	struct send_args *args = (struct send_args*)context->args;
 	session::ConnectionInfo *cinfo = context->cinfo;
@@ -74,7 +32,7 @@ bool SSLModule::preSend(struct breakpoint_context *context, void *rv) {
 	}
 }
 
-bool SSLModule::preRecv(struct breakpoint_context *context, void *rv) {
+bool SSLModuleXIA::preRecv(struct breakpoint_context *context, void *rv) {
 	(void)rv;
 	
 	session::ConnectionInfo *cinfo = context->cinfo;
@@ -87,7 +45,7 @@ bool SSLModule::preRecv(struct breakpoint_context *context, void *rv) {
 	return true;
 }
 
-bool SSLModule::postRecv(struct breakpoint_context *context, void *rv) {
+bool SSLModuleXIA::postRecv(struct breakpoint_context *context, void *rv) {
 	
 	struct recv_args *args = (struct recv_args*)context->args;
 	session::ConnectionInfo *cinfo = context->cinfo;
@@ -101,7 +59,7 @@ bool SSLModule::postRecv(struct breakpoint_context *context, void *rv) {
 	return true;
 }
 
-bool SSLModule::postRecvSYN(struct breakpoint_context *context, void *rv) {
+bool SSLModuleXIA::postRecvSYN(struct breakpoint_context *context, void *rv) {
 	(void)rv;
 	
 	session::ConnectionInfo *cinfo = context->cinfo;
@@ -110,6 +68,7 @@ bool SSLModule::postRecvSYN(struct breakpoint_context *context, void *rv) {
 		// If we're accpeting, we should have already bound, which set the ssl ctx
 		if (!cinfo->has_ssl_ctx_ptr()) {
 			ERROR("Connection does not have an associated XSSL_ctx");
+			return true;
 		}
 		
 		// Make sure we haven't already accepted
@@ -118,12 +77,51 @@ bool SSLModule::postRecvSYN(struct breakpoint_context *context, void *rv) {
 		XSSL *xssl = XSSL_new(*(XSSL_CTX**)cinfo->ssl_ctx_ptr().data());
 		if (xssl == NULL) {
 			ERROR("Unable to init new XSSL object");
+			return true;
 		}
 		if (XSSL_set_fd(xssl, cinfo->sockfd()) != 1) {
 			ERROR("Unable to set XSSL sockfd");
+			return true;
 		}
 		if (XSSL_accept(xssl) != 1) {
 			ERROR("Error accepting XSSL connection");
+			return true;
+		}
+		cinfo->set_ssl_ptr(&xssl, sizeof(XSSL*));
+	}
+
+	return true;
+}
+
+bool SSLModuleXIA::postSendSYN(struct breakpoint_context *context, void *rv) {
+	(void)rv;
+	
+	session::ConnectionInfo *cinfo = context->cinfo;
+	if (cinfo->use_ssl()) {
+		if (!cinfo->has_ssl_ctx_ptr()) {
+			XSSL_CTX *xssl_ctx = XSSL_CTX_new();
+			if (xssl_ctx == NULL) {
+				ERROR("Unable to init new XSSL context");
+				return true;
+			}
+			cinfo->set_ssl_ctx_ptr(&xssl_ctx, sizeof(XSSL_CTX*));
+		}
+
+		// Make sure we haven't already connected
+		if (cinfo->has_ssl_ptr()) return true;
+
+		XSSL *xssl = XSSL_new(*(XSSL_CTX**)cinfo->ssl_ctx_ptr().data());
+		if (xssl == NULL) {
+			ERROR("Unable to init new XSSL object");
+			return true;
+		}
+		if (XSSL_set_fd(xssl, cinfo->sockfd()) != 1) {
+			ERROR("Unable to set XSSL sockfd");
+			return true;
+		}
+		if (XSSL_connect(xssl) != 1) {
+			ERROR("Unable to initiatie XSSL connection");
+			return true;
 		}
 		cinfo->set_ssl_ptr(&xssl, sizeof(XSSL*));
 	}
