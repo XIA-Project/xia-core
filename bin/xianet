@@ -119,7 +119,7 @@ setup()
 				NODETYPE="host"
 				;;
 			f)
-				CONFFLAGS="CONFFLAGS -f $OPTARG"
+				CONFFLAGS="$CONFFLAGS -f $OPTARG"
 				;;
 			I)
 				CONFFLAGS="$CONFFLAGS -I $OPTARG"
