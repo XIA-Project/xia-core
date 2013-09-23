@@ -1251,8 +1251,9 @@ void * poll_listen_sock(void * args) {
 				}
 
 				// find the old connection
+				string hid = rx_cinfo->hid();
 				delete rx_cinfo; // there's not really a new connection after all
-				rx_cinfo = hid_to_conn[rx_cinfo->hid()]; //TODO: handle not found
+				rx_cinfo = hid_to_conn[hid]; //TODO: handle not found
 				// TODO: does the migrate message still need to send the sender's name?
 
 				swap_sockets_for_connection(rx_cinfo, rx_cinfo->sockfd(), new_rxsock);
