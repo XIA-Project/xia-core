@@ -6,7 +6,7 @@ CFLAGS +=-c -fpic
 CPPFLAGS=$(CFLAGS)
 LDFLAGS += -lc -ldl -lssl -lcrypto # -lssl and -lcrypto only needed for IP
 
-MODULE_SOURCES=TransportModuleXIA.cpp TransportModuleIP.cpp SSLModule.cpp SSLModuleXIA.cpp SSLModuleIP.cpp InterfaceModule.cpp
+MODULE_SOURCES=TransportModuleXIA.cpp TransportModuleIP.cpp SSLModule.cpp SSLModuleIP.cpp InterfaceModule.cpp # SSLModuleXIA.cpp
 STACK_INFO_SOURCES=UserLayerInfo.cpp AppLayerInfo.cpp TransportLayerInfo.cpp NetworkLayerInfo.cpp LinkLayerInfo.cpp PhysicalLayerInfo.cpp
 SOURCES=$(MODULE_SOURCES) $(STACK_INFO_SOURCES)
 

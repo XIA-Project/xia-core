@@ -97,7 +97,7 @@ map<int, session::ConnectionInfo*> getAllConnections();
 
 
 #define MULTIPLEX
-#define XIA
+#define IP
 
 #ifdef XIA
 #include "xia.cpp"
@@ -1429,6 +1429,7 @@ DBG("BEGIN process_init_msg");
 	for (vector<string>::iterator it = pathNames.begin(); it != pathNames.end(); ++it) {
 		session::SessionInfo_ServiceInfo *serviceInfo = info->add_session_path();
 		serviceInfo->set_name(trim(*it));
+DBGF("Adding name to path: %s", (*it).c_str());
 	}
 
 	// set my name and add me to the session path
@@ -1527,6 +1528,12 @@ DBGF("Ctx %d    Found an exising connection, waiting for synack in acceptQ", ctx
 		rcm->set_rc(session::FAILURE);
 	}
 DBGF("Ctx %d    Sent connection request to next hop", ctx);
+
+DBG("Session path:\t");                                   
+const session::SessionInfo *ssinfo = &(pkt.info());        
+for (int i = 0; i < ssinfo->session_path_size(); i++) {      
+    DBGF("%s  ", ssinfo->session_path(i).name().c_str());  
+}                                                            
 
 
 	session::ConnectionInfo *tx_cinfo;
