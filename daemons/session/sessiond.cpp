@@ -654,6 +654,7 @@ bool closeConnection(int ctx, session::ConnectionInfo *cinfo) {
 		}
 		
 		// remove mapping
+		free(*(pthread_mutex_t**)cinfo->mutex_ptr().data());
 		delete cinfo;
 	}
 	
@@ -934,6 +935,10 @@ DBG("sending SETUP packet");
 	if ( hid_to_conn.find(hid) == hid_to_conn.end() ) {
 #endif /* MULTIPLEX */
 		cinfo = new session::ConnectionInfo();
+		pthread_mutex_t *conn_mutex = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
+		pthread_mutex_init(conn_mutex, NULL);
+		cinfo->set_mutex_ptr(&conn_mutex, sizeof(pthread_mutex_t*));
+
 		rc = open_connection(ctx_to_session_info[ctx], get_nexthop_name(ctx), cinfo, setup_packet);
 #ifdef MULTIPLEX
 	} else {
@@ -981,6 +986,9 @@ int get_conn_for_context(int ctx, map<unsigned short, session::ConnectionInfo*> 
 			if ( hid_to_conn.find(hid) == hid_to_conn.end() ) {
 	#endif /* MULTIPLEX */
 				*cinfo = new session::ConnectionInfo();
+				pthread_mutex_t *conn_mutex = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
+				pthread_mutex_init(conn_mutex, NULL);
+				(*cinfo)->set_mutex_ptr(&conn_mutex, sizeof(pthread_mutex_t*));
 				rc = open_connection(ctx_to_session_info[ctx], hopname, *cinfo, NULL);
 	#ifdef MULTIPLEX
 			} else {
@@ -1042,9 +1050,12 @@ int send(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 
 	//if (doSend) {
 	if (true) {
+		pthread_mutex_t *conn_mutex = *(pthread_mutex_t**)cinfo->mutex_ptr().data();
+		pthread_mutex_lock(conn_mutex);
 		if ( (sent = sendBuffer(cinfo, actualbuf, actuallen)) < 0) {
 			ERRORF("Send error %d on socket %d, dest hid %s: %s", errno, cinfo->sockfd(), cinfo->hid().c_str(), strerror(errno));
 		}
+		pthread_mutex_unlock(conn_mutex);
 	}
 		
 	// (*) PostSendBreakpoint
@@ -1222,6 +1233,9 @@ void * poll_listen_sock(void * args) {
 	
 	
 		session::ConnectionInfo *rx_cinfo = new session::ConnectionInfo();
+		pthread_mutex_t *conn_mutex = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
+		pthread_mutex_init(conn_mutex, NULL);
+		rx_cinfo->set_mutex_ptr(&conn_mutex, sizeof(pthread_mutex_t*));
 		rx_cinfo->set_ssl_ctx_ptr(ctxInfo->ssl_ctx_ptr());
 		rx_cinfo->set_sockfd(new_rxsock);
 		rx_cinfo->set_hid(getHIDForSocket(new_rxsock));
@@ -1501,6 +1515,9 @@ DBGF("Ctx %d    No connection exists, making rx_sock", ctx);
 		// store this rx-transport-conn-to-be so others connecting to the same
 		// lasthop don't make their own rx conns (actual sock filled in below)
 		rx_cinfo = new session::ConnectionInfo();
+		pthread_mutex_t *conn_mutex = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
+		pthread_mutex_init(conn_mutex, NULL);
+		rx_cinfo->set_mutex_ptr(&conn_mutex, sizeof(pthread_mutex_t*));
 		rx_cinfo->set_hid(prevHID);
 		rx_cinfo->set_addr(*prevaddr);
 		rx_cinfo->set_my_name(info->my_name());
@@ -1788,6 +1805,9 @@ DBG("BEGIN process_accept_msg");
 		if (rpkt->info().new_lasthop_conn()) {
 DBGF("    Ctx %d    I'm the last hop; connecting to initiator with supplied addr", new_ctx);
 			tx_cinfo = new session::ConnectionInfo();
+			pthread_mutex_t *conn_mutex = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
+			pthread_mutex_init(conn_mutex, NULL);
+			tx_cinfo->set_mutex_ptr(&conn_mutex, sizeof(pthread_mutex_t*));
 
 			// TODO: don't dup this code!
 			session::SessionInfo *sinfo = new session::SessionInfo();

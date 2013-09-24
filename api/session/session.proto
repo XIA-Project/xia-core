@@ -156,6 +156,7 @@ message ConnectionInfo {
 	repeated int32 sessions = 4;
 	required string interface = 5 [default = "default"];
 	required string my_name = 6;
+	required bytes mutex_ptr = 9;
 
 	required bool use_ssl = 7;
 	optional bytes ssl_ctx_ptr = 15; // pointer to SSL or XSSL context object
