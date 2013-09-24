@@ -748,6 +748,9 @@ void infocpy(const session::SessionInfo *from, session::SessionInfo *to) {
 	if (from->has_transport_protocol()) {
 		to->set_transport_protocol(from->transport_protocol());
 	}
+	if (from->has_use_compression()) {
+		to->set_use_compression(from->use_compression());
+	}
 }
 
 // counts the number of application endpoints in a session
@@ -1024,17 +1027,28 @@ int send(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 	int len = p_buf.size();
 	const char *buf = p_buf.c_str();
 
-	// (*) PreSendBreakpoint
-	bool doSend = trigger_breakpoint(kSendPreSend, new breakpoint_context(NULL, cinfo, new send_args(buf, &len)), &sent);
+	// Send length of the protobuf message first as a uint32_t
+	// TODO: move breakpoints to process_send (encryption/compression should happen there)
+	// TODO: Fix to avoid memcpy!!
+	// TODO: switch to network byte order!!
+	int actuallen = len + sizeof(uint32_t);
+	char *actualbuf = (char*)malloc(actuallen);
+	memcpy(actualbuf, &len, sizeof(uint32_t));
+	memcpy(actualbuf + sizeof(uint32_t), buf, len);
+	DBGF("Sending msg with size %d; total len %d", len, actuallen);
 
-	if (doSend) {
-		if ( (sent = sendBuffer(cinfo, buf, len)) < 0) {
+	// (*) PreSendBreakpoint
+	//bool doSend = trigger_breakpoint(kSendPreSend, new breakpoint_context(NULL, cinfo, new send_args(actualbuf, &actuallen)), &sent);
+
+	//if (doSend) {
+	if (true) {
+		if ( (sent = sendBuffer(cinfo, actualbuf, actuallen)) < 0) {
 			ERRORF("Send error %d on socket %d, dest hid %s: %s", errno, cinfo->sockfd(), cinfo->hid().c_str(), strerror(errno));
 		}
 	}
 		
 	// (*) PostSendBreakpoint
-	trigger_breakpoint(kSendPostSend, new breakpoint_context(NULL, cinfo, new send_args(buf, &len)), &sent);
+	//trigger_breakpoint(kSendPostSend, new breakpoint_context(NULL, cinfo, new send_args(actualbuf, &actuallen)), &sent);
 	
 	return sent;
 }
@@ -1052,17 +1066,35 @@ int recv(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 	int len = BUFSIZE;
 	
 	// (*) PreRecvBreakpoint
-	bool doRecv = trigger_breakpoint(kRecvPreRecv, new breakpoint_context(NULL, cinfo, new recv_args(buf, &len)), &received);
+	//bool doRecv = trigger_breakpoint(kRecvPreRecv, new breakpoint_context(NULL, cinfo, new recv_args(buf, &len)), &received);
 
-	if (doRecv) {
-		if ((received = recvBuffer(cinfo, buf, len)) < 0) {
-			ERRORF("Receive error %d on socket %d: %s", errno, cinfo->sockfd(), strerror(errno));
+	//if (doRecv) {
+	if (true) {
+		// First receive message size
+		if ((received = recvBuffer(cinfo, buf, sizeof(uint32_t))) != sizeof(uint32_t)) { // TODO: put this in a while loop too
+			ERRORF("Error receiving message size. Receive error %d on socket %d: %s", errno, cinfo->sockfd(), strerror(errno));
 			return received;
+		}
+
+		// Now send receive protobuf message
+		int msgsize, n;
+		received = 0;
+		memcpy(&msgsize, buf, sizeof(uint32_t));
+		if (msgsize > BUFSIZE) {
+			ERRORF("Message size (%d bytes) bigger than max BUFSIZE (%d bytes)", msgsize, BUFSIZE);
+			return -1;
+		}
+		while (received < msgsize) {
+			if ((n = recvBuffer(cinfo, buf+received, msgsize - received)) < 0) {
+				ERRORF("Receive error %d on socket %d: %s", errno, cinfo->sockfd(), strerror(errno));
+				return received;
+			}
+			received += n;
 		}
 	}
 		
 	// (*) PostRecvBreakpoint
-	trigger_breakpoint(kRecvPostRecv, new breakpoint_context(NULL, cinfo, new recv_args(buf, &len)), &received);
+	//trigger_breakpoint(kRecvPostRecv, new breakpoint_context(NULL, cinfo, new recv_args(buf, &len)), &received);
 
 	string bufstr(buf, received);
 	if (!pkt->ParseFromString(bufstr)) {
