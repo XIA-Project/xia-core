@@ -49,6 +49,7 @@ bool SSLModuleIP::preRecv(struct breakpoint_context *context, void *rv) {
 
 bool SSLModuleIP::postRecv(struct breakpoint_context *context, void *rv) {
 	
+	return true;
 	struct recv_args *args = (struct recv_args*)context->args;
 	session::ConnectionInfo *cinfo = context->cinfo;
 	char *buf = args->buf;
@@ -64,6 +65,7 @@ bool SSLModuleIP::postRecv(struct breakpoint_context *context, void *rv) {
 bool SSLModuleIP::postRecvSYN(struct breakpoint_context *context, void *rv) {
 	(void)rv;
 	
+	return true;
 	session::ConnectionInfo *cinfo = context->cinfo;
 	if (cinfo->use_ssl()) { 
 		// If we're accpeting, we should have already bound, which set the ssl ctx
@@ -97,6 +99,7 @@ bool SSLModuleIP::postRecvSYN(struct breakpoint_context *context, void *rv) {
 
 bool SSLModuleIP::postSendSYN(struct breakpoint_context *context, void *rv) {
 	(void)rv;
+	return true;
 	
 	session::ConnectionInfo *cinfo = context->cinfo;
 	if (cinfo->use_ssl()) {

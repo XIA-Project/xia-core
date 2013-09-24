@@ -122,7 +122,7 @@ void process(int sock) {
 			break;
 		}
 		string sessionPath = scale_images ? host + ", pagespeed.cmu.edu" : host;
-		if (Sinit(ctx, sessionPath.c_str()) < 0 ) {
+		if (Sinit(ctx, sessionPath.c_str(), kReliableDelivery) < 0 ) {
 			ERROR("Error initiating session");
 			break;
 		}

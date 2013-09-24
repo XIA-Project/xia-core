@@ -97,7 +97,7 @@ map<int, session::ConnectionInfo*> getAllConnections();
 
 
 #define MULTIPLEX
-#define XIA
+#define IP
 
 #ifdef XIA
 #include "xia.cpp"
@@ -1283,8 +1283,9 @@ void * poll_listen_sock(void * args) {
 				}
 
 				// find the old connection
+				string hid = rx_cinfo->hid();
 				delete rx_cinfo; // there's not really a new connection after all
-				rx_cinfo = hid_to_conn[rx_cinfo->hid()]; //TODO: handle not found
+				rx_cinfo = hid_to_conn[hid]; //TODO: handle not found
 				// TODO: does the migrate message still need to send the sender's name?
 
 				swap_sockets_for_connection(rx_cinfo, rx_cinfo->sockfd(), new_rxsock);
@@ -1460,6 +1461,7 @@ DBG("BEGIN process_init_msg");
 	for (vector<string>::iterator it = pathNames.begin(); it != pathNames.end(); ++it) {
 		session::SessionInfo_ServiceInfo *serviceInfo = info->add_session_path();
 		serviceInfo->set_name(trim(*it));
+DBGF("Adding name to path: %s", (*it).c_str());
 	}
 
 	// set my name and add me to the session path
@@ -1558,6 +1560,12 @@ DBGF("Ctx %d    Found an exising connection, waiting for synack in acceptQ", ctx
 		rcm->set_rc(session::FAILURE);
 	}
 DBGF("Ctx %d    Sent connection request to next hop", ctx);
+
+DBG("Session path:\t");                                   
+const session::SessionInfo *ssinfo = &(pkt.info());        
+for (int i = 0; i < ssinfo->session_path_size(); i++) {      
+    DBGF("%s  ", ssinfo->session_path(i).name().c_str());  
+}                                                            
 
 
 	session::ConnectionInfo *tx_cinfo;
