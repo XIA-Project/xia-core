@@ -27,3 +27,8 @@ float UserLayerInfo::getCellularBatteryCutoff() {
 	// Simulate the user choosing no cellular connections when batter is below 10%
 	return 0.1;
 }
+		
+bool UserLayerInfo::getCompress() {
+	// Simulate user preference for compression
+	return false;
+}

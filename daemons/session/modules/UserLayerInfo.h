@@ -23,6 +23,7 @@ class UserLayerInfo : public StackInfo {
 	public:
 		bool getEncrypt();
 		float getCellularBatteryCutoff();
+		bool getCompress();
 
 };
 
