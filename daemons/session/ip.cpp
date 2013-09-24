@@ -340,7 +340,7 @@ int registerName(const string &name, string *addr_buf) {
 	// nameserver addr
 	struct sockaddr_in sa;
 	sa.sin_family = PF_INET;
-	sa.sin_addr.s_addr = inet_addr("127.0.0.1");
+	sa.sin_addr.s_addr = inet_addr("192.168.170.128");
 	sa.sin_port = htons(5353);
 
 	// addr to register
