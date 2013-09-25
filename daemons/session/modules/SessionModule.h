@@ -116,17 +116,19 @@ enum Breakpoint {
 };
 
 struct send_args {
-	const char *buf;
-	int *len;
+	char *buf;
+	int buflen;
+	int *msglen;
 
-	send_args(const char *b, int *l) : buf(b), len(l) {}
+	send_args(char *b, int bl, int *ml) : buf(b), buflen(bl), msglen(ml) {}
 };
 
 struct recv_args {
 	char *buf;
-	int *len;
+	int buflen;
+	int *msglen;
 	
-	recv_args(char *b, int *l) : buf(b), len(l) {}
+	recv_args(char *b, int bl, int *ml) : buf(b), buflen(bl), msglen(ml) {}
 };
 
 struct breakpoint_context {

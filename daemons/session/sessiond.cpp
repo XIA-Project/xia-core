@@ -4,6 +4,7 @@
 #include "modules/TransportModule.h"
 #include "modules/SSLModule.h"
 #include "modules/InterfaceModule.h"
+#include "modules/CompressionModule.h"
 #include "modules/StackInfo.h"
 #include "modules/UserLayerInfo.h"
 #include "modules/AppLayerInfo.h"
@@ -20,6 +21,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <pthread.h>
+#include <algorithm>
 
 using namespace std;
 
@@ -1045,21 +1047,12 @@ int send(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 	memcpy(actualbuf + sizeof(uint32_t), buf, len);
 	DBGF("Sending msg with size %d; total len %d", len, actuallen);
 
-	// (*) PreSendBreakpoint
-	//bool doSend = trigger_breakpoint(kSendPreSend, new breakpoint_context(NULL, cinfo, new send_args(actualbuf, &actuallen)), &sent);
-
-	//if (doSend) {
-	if (true) {
-		pthread_mutex_t *conn_mutex = *(pthread_mutex_t**)cinfo->mutex_ptr().data();
-		pthread_mutex_lock(conn_mutex);
-		if ( (sent = sendBuffer(cinfo, actualbuf, actuallen)) < 0) {
-			ERRORF("Send error %d on socket %d, dest hid %s: %s", errno, cinfo->sockfd(), cinfo->hid().c_str(), strerror(errno));
-		}
-		pthread_mutex_unlock(conn_mutex);
+	pthread_mutex_t *conn_mutex = *(pthread_mutex_t**)cinfo->mutex_ptr().data();
+	pthread_mutex_lock(conn_mutex);
+	if ( (sent = sendBuffer(cinfo, actualbuf, actuallen)) < 0) {
+		ERRORF("Send error %d on socket %d, dest hid %s: %s", errno, cinfo->sockfd(), cinfo->hid().c_str(), strerror(errno));
 	}
-		
-	// (*) PostSendBreakpoint
-	//trigger_breakpoint(kSendPostSend, new breakpoint_context(NULL, cinfo, new send_args(actualbuf, &actuallen)), &sent);
+	pthread_mutex_unlock(conn_mutex);
 	
 	return sent;
 }
@@ -1391,6 +1384,14 @@ DBG("Received SETUP packet");
 					ERRORF("Received a data packet for context %d, which is not in the ESTABLISHED state (sender ctx %d)", ctx, rpkt->sender_ctx());
 					break;
 				}
+	
+				// (*) PostRecvBreakpoint
+				char recvData[BUFSIZE];
+				int msgLen = rpkt->data().data().size();
+				memcpy(recvData, rpkt->data().data().data(), msgLen);
+				trigger_breakpoint(kRecvPostRecv, new breakpoint_context(ctx_to_session_info[ctx], NULL, new recv_args(recvData, BUFSIZE, &msgLen)), NULL);
+
+				rpkt->mutable_data()->set_data(recvData, msgLen);
 
 				// Add data pkt to dataQ
 				pushDataQ(ctx, rpkt);
@@ -1983,6 +1984,15 @@ int process_send_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &rep
 		ERROR("WARNING: ADU_DELIMITER found in data to send!");
 	}
 	string data_str(sendm.data() + ADU_DELIMITER);
+	
+	// (*) PreSendBreakpoint
+	// TODO: more efficient
+	char sendBuf[BUFSIZE];
+	int dataSize = data_str.size();
+	memcpy(sendBuf, data_str.data(), dataSize);
+DBGF("Data size before breakpoint: %d bytes", dataSize);
+	trigger_breakpoint(kSendPreSend, new breakpoint_context(ctx_to_session_info[ctx], NULL, new send_args(sendBuf, BUFSIZE, &dataSize)), NULL);
+DBGF("Data size after breakpoint: %d bytes", dataSize);
 
 	// Build a SessionPacket
 	session::SessionPacket pkt;
@@ -1992,10 +2002,11 @@ int process_send_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &rep
 
 
 	// send MTU bytes at a time until we've sent the whole message
-	// for now, assume that protobur overhead is 10 bytes TODO: get actual size
-	uint32_t overhead = 10;
-	while (sent < data_str.size()) {
-		dm->set_data(data_str.substr(sent, MTU-overhead)); // grab next chunk of bytes
+	// for now, assume that protobur overhead is 15 bytes TODO: get actual size
+	uint32_t overhead = 15;
+	while (sent < dataSize) {
+		int chunkSize = min( MTU-overhead, dataSize-sent);
+		dm->set_data(sendBuf, chunkSize); // grab next chunk of bytes
 		if ( (send(ctx, &pkt)) < 0 ) {
 			ERROR("Error sending data");
 			rcm->set_message("Error sending data");
@@ -2003,8 +2014,11 @@ int process_send_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &rep
 			return -1;
 		}
 
-		sent += dm->data().size();
+		sent += dm->data().size(); // this better also be equal to chunkSize!
 	}
+
+	// (*) PostSendBreakpoint
+	trigger_breakpoint(kSendPostSend, new breakpoint_context(ctx_to_session_info[ctx], NULL, new send_args(sendBuf, BUFSIZE, &dataSize)), &sent);
 
 
 	// Report back how many bytes we sent (don't include delimiter)
@@ -2314,6 +2328,7 @@ int main(int argc, char *argv[]) {
 	session_modules.push_back(new SSLModuleIP());
 #endif
 	session_modules.push_back(new InterfaceModule());
+	session_modules.push_back(new CompressionModule());
 
 	listen();
 	return 0;

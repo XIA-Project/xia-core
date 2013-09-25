@@ -21,10 +21,11 @@
 
 bool SSLModuleIP::preSend(struct breakpoint_context *context, void *rv) {
 	
+	return true;
 	struct send_args *args = (struct send_args*)context->args;
 	session::ConnectionInfo *cinfo = context->cinfo;
 	const char *buf = args->buf;
-	int len = *(args->len);
+	int len = *(args->msglen);
 
 	if (cinfo->use_ssl() && cinfo->has_ssl_ptr()) {
 		*(int*)rv = SSL_write(*(SSL**)cinfo->ssl_ptr().data(), buf, len);
@@ -37,6 +38,7 @@ bool SSLModuleIP::preSend(struct breakpoint_context *context, void *rv) {
 bool SSLModuleIP::preRecv(struct breakpoint_context *context, void *rv) {
 	(void)rv;
 	
+	return true;
 	session::ConnectionInfo *cinfo = context->cinfo;
 
 	if (cinfo->use_ssl() && cinfo->has_ssl_ptr()) {
@@ -53,7 +55,7 @@ bool SSLModuleIP::postRecv(struct breakpoint_context *context, void *rv) {
 	struct recv_args *args = (struct recv_args*)context->args;
 	session::ConnectionInfo *cinfo = context->cinfo;
 	char *buf = args->buf;
-	int len = *(args->len);
+	int len = *(args->msglen);
 
 	if (cinfo->use_ssl() && cinfo->has_ssl_ptr()) {
 		*(int*)rv = SSL_read(*(SSL**)cinfo->ssl_ptr().data(), buf, len);

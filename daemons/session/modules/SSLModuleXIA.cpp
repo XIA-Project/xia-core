@@ -18,11 +18,13 @@
 #include "xssl.h"
 
 bool SSLModuleXIA::preSend(struct breakpoint_context *context, void *rv) {
+
+	return true;
 	
 	struct send_args *args = (struct send_args*)context->args;
 	session::ConnectionInfo *cinfo = context->cinfo;
 	const char *buf = args->buf;
-	int len = *(args->len);
+	int len = *(args->msglen);
 
 	if (cinfo->use_ssl() && cinfo->has_ssl_ptr()) {
 	    *(int*)rv = XSSL_write(*(XSSL**)cinfo->ssl_ptr().data(), buf, len);
@@ -34,6 +36,8 @@ bool SSLModuleXIA::preSend(struct breakpoint_context *context, void *rv) {
 
 bool SSLModuleXIA::preRecv(struct breakpoint_context *context, void *rv) {
 	(void)rv;
+
+	return true;
 	
 	session::ConnectionInfo *cinfo = context->cinfo;
 
@@ -46,11 +50,13 @@ bool SSLModuleXIA::preRecv(struct breakpoint_context *context, void *rv) {
 }
 
 bool SSLModuleXIA::postRecv(struct breakpoint_context *context, void *rv) {
+
+	return true;
 	
 	struct recv_args *args = (struct recv_args*)context->args;
 	session::ConnectionInfo *cinfo = context->cinfo;
 	char *buf = args->buf;
-	int len = *(args->len);
+	int len = *(args->msglen);
 
 	if (cinfo->use_ssl() && cinfo->has_ssl_ptr()) {
 		*(int*)rv = XSSL_read(*(XSSL**)cinfo->ssl_ptr().data(), buf, len);

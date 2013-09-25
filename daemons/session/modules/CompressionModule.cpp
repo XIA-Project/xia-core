@@ -67,11 +67,13 @@ bool CompressionModule::breakpoint(Breakpoint breakpoint, struct breakpoint_cont
 }
 
 bool CompressionModule::preSend(struct breakpoint_context *context, void *rv) {
+	(void)rv;
 	
 	struct send_args *args = (struct send_args*)context->args;
 	session::SessionInfo *sinfo = context->sinfo;
-	const char *buf = args->buf; // TODO: this can't be const, AND we need a bigger buffer than the num bytes of data
-	int len = *(args->len);
+	char *buf = args->buf;
+	int msglen = *(args->msglen);
+	int buflen = args->buflen;
 
 	if (sinfo == NULL) {
 		WARN("Session info was null; defaulting to no compression");
@@ -81,19 +83,29 @@ bool CompressionModule::preSend(struct breakpoint_context *context, void *rv) {
 	if (sinfo->use_compression()) {
 	    //*(int*)rv =???;
 		unsigned char temp[CHUNK];
-		memcpy(temp, buf, len);
-		// TODO: here
+		memcpy(temp, buf, msglen);
+		int compressed_len = compress(temp, msglen, (unsigned char*)buf, buflen);
+
+		if (compressed_len < 0) {
+			ERROR("Error compressing data");
+			return true;
+		}
+
+		*(args->msglen) = compressed_len; // tell future blocks the new message length
+		DBGF("Compressed %d bytes to %d bytes", msglen, compressed_len);
 	}
 		
 	return true;
 }
 
 bool CompressionModule::postRecv(struct breakpoint_context *context, void *rv) {
+	(void)rv;
 	
 	struct recv_args *args = (struct recv_args*)context->args;
 	session::SessionInfo *sinfo = context->sinfo;
 	char *buf = args->buf;
-	int len = *(args->len);
+	int msglen = *(args->msglen);
+	int buflen = args->buflen;
 
 	if (sinfo == NULL) {
 		WARN("Session info was null; defaulting to no compression");
@@ -102,6 +114,17 @@ bool CompressionModule::postRecv(struct breakpoint_context *context, void *rv) {
 
 	if (sinfo->use_compression()) {
 	    //*(int*)rv =???;
+		unsigned char temp[CHUNK];
+		memcpy(temp, buf, msglen);
+		int decompressed_len = decompress(temp, msglen, (unsigned char*)buf, buflen);
+
+		if (decompressed_len < 0) {
+			ERROR("Error decompressing data");
+			return true;
+		}
+
+		*(args->msglen) = decompressed_len; // tell future blocks the new message length
+		DBGF("Decompressed %d bytes to %d bytes", msglen, decompressed_len);
 	}
 		
 	return true;
@@ -109,7 +132,7 @@ bool CompressionModule::postRecv(struct breakpoint_context *context, void *rv) {
 
 
 // returns -1 on error, num bytes of compressed data otherwise
-int compress(unsigned char *in, size_t in_len, unsigned char *out, size_t out_len) {
+int CompressionModule::compress(unsigned char *in, size_t in_len, unsigned char *out, size_t out_len) {
 	int ret, flush, bytes_compressed = 0;
     unsigned have;
     z_stream strm;
@@ -152,7 +175,7 @@ int compress(unsigned char *in, size_t in_len, unsigned char *out, size_t out_le
 }
 
 // returns -1 on error; num bytes decompressed data otherwise
-int decompress(unsigned char *in, size_t in_len, unsigned char *out, size_t out_len) {
+int CompressionModule::decompress(unsigned char *in, size_t in_len, unsigned char *out, size_t out_len) {
 	int ret, bytes_decompressed = 0;
     unsigned have;
     z_stream strm;
