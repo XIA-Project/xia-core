@@ -50,7 +50,6 @@ struct addrinfo *ai;
 sockaddr_x *sa;
 
 int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout);
-// int PushChunks(int csock, ChunkContext *ctx,  char *chunks, char *p_ad, char *p_hid, ChunkInfo *info);
 
 
 /*
@@ -106,45 +105,6 @@ int sendCmd(int sock, const char *cmd)
 	return n;
 }
 
-// char** str_split(char* a_str, const char *a_delim)
-// {
-// 	char** result    = 0;
-// 	int count     = 0;
-// 	int str_len = strlen(a_str);
-// 	int del_len = strlen(a_delim);
-// 	int i = 0;
-// 	int j = 0;
-// 	char* last_delim = 0;
-// 	/* Count how many elements will be extracted. */
-// 	for(i = 0 ; i < str_len; i++) 
-// 		for(j = 0 ; j < del_len; j++) 
-// 			if( a_str[i] == a_delim[j]){
-// 				count++;
-// 				last_delim = &a_str[i];
-// 			}
-// 
-// 	 /* Add space for trailing token. */
-// 	count += last_delim < (a_str + strlen(a_str) - 1);
-// 	
-// // 	/* Add space for terminating null string so caller
-// // 	knows where the list of returned strings ends. */
-//  	count++;
-// 
-// 	result = (char **) malloc(sizeof(char*) * count);
-// 	
-// // 	printf ("Splitting string \"%s\" into %i tokens:\n", a_str, count);
-// 	
-// 	i = 0;
-// 	result[i] = strtok(a_str, a_delim);
-// // 	printf ("%s\n",result[i]);
-// 	
-// 	for( i = 1; i < count; i++){
-// 		result[i] = strtok (NULL, a_delim);
-// // 		printf ("%s\n",result[i]);
-// 	}
-// 
-// 	return result;
-// }
 
 void *recvCmd (void *socketid)
 {
@@ -185,7 +145,7 @@ void *recvCmd (void *socketid)
 			
 			//Chunking is done by the XputFile which itself uses XputChunk, and fills out the info
 // 			PushChunks( csock, ctx,  strchr(reply, ' ')+1, s_ad, s_hid, info);
-			XpushFileto(ctx,fname, 0, (sockaddr*)sa, sizeof(sockaddr_x), &info, CHUNKSIZE);
+// 			XpushFileto(ctx,fname, 0, (sockaddr*)sa, sizeof(sockaddr_x), &info, CHUNKSIZE);
 			if ((count = XpushFileto(ctx,fname, 0, (sockaddr*)sa, sizeof(sockaddr_x), &info, CHUNKSIZE)) < 0) {
 				warn("unable to serve the file: %s\n", fname);
 				sprintf(reply, "FAIL: File (%s) not found", fname);
@@ -365,83 +325,6 @@ int buildChunkDAGs(ChunkStatus cs[], char *chunks, char *p_ad, char *p_hid)
 	n++;
 	return n;
 }
-
-
-
-
-/*
-int PushChunks(int csock, ChunkContext *ctx,  char *chunks, char *p_ad, char *p_hid, ChunkInfo *info)
-{
-	ChunkStatus cs[NUM_CHUNKS];
-	char data[XIA_MAXCHUNK];
-	int len;
-	int status;
-	int n = -1;
-	
-	
-	n = buildChunkDAGs(cs, chunks, my_ad, my_hid);
-	
-	// bring the list of chunks local
-	say("requesting list of %d chunks, SHOULD BE locally answered \n", n);
-	if (XrequestChunks(csock, cs, n) < 0) {
-		say("unable to request chunks\n");
-		return -1;
-	}
-	
-	say("checking chunk status\n");
-	while (1) {
-		status = XgetChunkStatuses(csock, cs, n);
-
-		if (status == READY_TO_READ)
-			break;
-
-		else if (status < 0) {
-			say("error getting chunk status\n");
-			return -1;
-
-		} else if (status & WAITING_FOR_CHUNK) {
-			// one or more chunks aren't ready.
-			say("waiting... one or more chunks aren't ready yet\n");
-		
-		} else if (status & INVALID_HASH) {
-			die(-1, "one or more chunks has an invalid hash");
-		
-		} else if (status & REQUEST_FAILED) {
-			die(-1, "no chunks found\n");
-
-		} else {
-			say("unexpected result\n");
-		}
-		sleep(1);
-	}
-
-	say("all chunks ready\n");
-
-	for (int i = 0; i < n; i++) {
-		char *cid = strrchr(cs[i].cid, ':');
-		cid++;
-		say("reading chunk: %s\n", cid);
-		if ((len = XreadChunk(csock, data, sizeof(data), 0, cs[i].cid, cs[i].cidLen)) < 0) {
-			say("error getting chunk\n");
-			return -1;
-		}
-		
-		
-		
-		say("Pushing chunk: %s\n", cid);
-		int sent = -1;
-		if( (sent = XpushChunkto(ctx, data, sizeof(data), 0, (sockaddr*)sa, sizeof(sockaddr_x), &info[i])) < 0){
-			die(-4, "Send error %d on socket %d\n", errno, csock);
-		}
-
-	}
-
-	return n;
-}*/
-
-
-
-
 
 
 

@@ -493,6 +493,24 @@ int getFile(int sock, char *ad, char*hid, const char *fin, const char *fout)
 
 	if ((chunkSock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0)
 		die(-1, "unable to create chunk socket\n");
+	
+/*	
+	
+	
+	struct addrinfo *ai;
+	//FIXME: SID is hardcoded
+	if (Xgetaddrinfo(NULL, SID, NULL, &ai) != 0)
+		die(-1, "getaddrinfo failure!\n");
+	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
+	//FIXME NAME is hard coded
+
+	if (XbindPush(chunkSock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
+		Xclose(sock);
+		 die(-1, "Unable to bind to the dag: %s\n", dag);
+	}
+	
+	*/
+	
 
 	FILE *f = fopen(fout, "w");
 

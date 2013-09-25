@@ -53,6 +53,48 @@ Packet * XIAContentModule::makeChunkResponse(CChunk * chunk, Packet *p_in)
     return p;
 }
 
+
+Packet * XIAContentModule::makeChunkPush(CChunk * chunk, Packet *p_in)
+{
+    XIAHeader xhdr(p_in);  // parse xia header and locate nodes and payload
+    ContentHeader ch(p_in);
+
+    const unsigned char *payload=xhdr.payload();
+    int offset=ch.chunk_offset();
+    int length=ch.length();
+    int chunkSize=ch.chunk_length();
+	
+    uint32_t contextID=ch.contextID();
+    uint32_t cacheSize=ch.cacheSize();
+    uint32_t cachePolicy=ch.cachePolicy();
+    uint32_t ttl=ch.ttl();	
+		
+	
+    XIAHeaderEncap encap;
+    XIAHeader hdr(p_in);
+  
+    encap.set_dst_path(hdr.dst_path());
+    encap.set_src_path(hdr.src_path());
+    encap.set_nxt(CLICK_XIA_NXT_CID);
+    encap.set_plen(chunk->GetSize());
+
+//     ContentHeaderEncap  *contenth = ContentHeaderEncap::MakePushHeader(0,  chunk->GetSize() ); //contenth(0, 0, 0, chunk->GetSize());
+    ContentHeaderEncap  contenth( offset, offset, length, chunkSize, ContentHeader::OP_PUSH, contextID, ttl, cacheSize, cachePolicy);
+    
+    
+    uint16_t hdrsize = encap.hdr_size()+ contenth.hlen();
+    //build packet
+    WritablePacket *p = Packet::make(hdrsize, chunk->GetPayload() , chunk->GetSize(), 20 );
+
+    p=contenth.encap(p);		// add XIA header
+    p=encap.encap( p, false );
+	
+    
+    click_chatter("MAKING A PUSH MESSAGE FROM CONTENT MODULE");
+    return p;
+}
+
+
 void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID & dstCID)
 {
 	
@@ -254,7 +296,7 @@ void XIAContentModule::cache_incoming_forward(Packet *p, const XID& srcCID)
 
 }
 
-void XIAContentModule::cache_incoming_local(Packet *p, const XID& srcCID, bool local_putcid)
+void XIAContentModule::cache_incoming_local(Packet* p, const XID& srcCID, bool local_putcid, bool pushcid)
 {
     XIAHeader xhdr(p);  // parse xia header and locate nodes and payload
     ContentHeader ch(p);
@@ -335,6 +377,10 @@ void XIAContentModule::cache_incoming_local(Packet *p, const XID& srcCID, bool l
     if(chunkFull) { //have built the whole chunk pkt
         if (!local_putcid) { /* sendout response to upper layer (application) */
             Packet *newp = makeChunkResponse(chunk, p);
+            _transport->checked_output_push(1 , newp);
+        }
+	if (pushcid) { /* send push to upper layer (application) */
+            Packet *newp = makeChunkPush(chunk, p);
             _transport->checked_output_push(1 , newp);
         }
 #ifdef CLIENTCACHE
@@ -561,13 +607,14 @@ void XIAContentModule::cache_incoming(Packet *p, const XID& srcCID, const XID& d
     ContentHeader ch(p);
     bool local_putcid = (ch.opcode() == ContentHeader::OP_LOCAL_PUTCID);
     bool local_removecid= (ch.opcode() == ContentHeader::OP_LOCAL_REMOVECID);
+    bool local_pushcid= (ch.opcode() == ContentHeader::OP_PUSH);
     if (CACHE_DEBUG){
         //click_chatter("--Cache incoming--%s %s", srcCID.unparse().c_str(), _transport->local_hid().unparse().c_str());
 	}
     if(local_putcid || dstHID==_transport->local_hid()){
         // cache in client: if it is local putCID() then store content. Otherwise, should return the whole chunk if possible
 	printf("cache_incoming_local - local HID: %s, Dest HID: %s\n", _transport->local_hid().unparse().c_str(), dstHID.unparse().c_str());
-        cache_incoming_local(p, srcCID, local_putcid);	    
+        cache_incoming_local(p, srcCID, local_putcid, local_pushcid);	    
     }else if(local_removecid){
 	printf("cache_incoming_remove - local HID: %s, Dest HID: %s\n", _transport->local_hid().unparse().c_str(), dstHID.unparse().c_str());
         cache_incoming_remove(p, srcCID);

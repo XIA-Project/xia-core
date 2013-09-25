@@ -6,7 +6,7 @@ CFLAGS +=-c -Iminini -fpic
 CPPFLAGS=$(CFLAGS)
 LDFLAGS +=-lprotobuf -lc -ldl $(XLIB)/libdagaddr.so
 
-SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XrequestChunk.c  Xgetaddrinfo.c \
+SOURCES=Xaccept.c Xbind.c XbindPush.c Xclose.c Xconnect.c  XrequestChunk.c  Xgetaddrinfo.c \
 	Xfcntl.c XgetChunkStatus.c  XreadChunk.c  XputChunk.c Xrecv.c \
 	Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c  XpushChunkto.c XrecvChunkfrom.c\
 	Xsetsockopt.c Xutil.c state.c Xinit.c XupdateAD.c XupdateNameServerDAG.c XgetDAGbyName.c  \

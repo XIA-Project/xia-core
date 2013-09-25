@@ -62,11 +62,85 @@
 ** @returns number of bytes received
 ** @returns -1 on failure with errno set.
 */
-int XrecvChunkfrom(int sockfd, void *rbuf, size_t len, int flags,
-	struct sockaddr *addr, socklen_t *addrlen)
+// int XrecvChunkfrom(int sockfd, void *rbuf, size_t len, int flags,
+// 	struct sockaddr *addr, socklen_t *addrlen)
+// {
+//     int numbytes;
+//     char UDPbuf[MAXBUFLEN];
+// 
+// 	if (flags != 0) {
+// 		LOG("flags is not suppored at this time");
+// 		errno = EINVAL;
+// 		return -1;
+// 	}
+// 
+// 	if (!rbuf || (addr && !addrlen)) {
+// 		LOG("null pointer!\n");
+// 		errno = EFAULT;
+// 		return -1;
+// 	}	
+// 
+// 	if (addr && *addrlen < sizeof(sockaddr_x)) {
+// 		LOG("addr is not large enough");
+// 		errno = EINVAL;
+// 		return -1;
+// 	}
+// 
+// 	if (validateSocket(sockfd, XSOCK_CHUNK, EOPNOTSUPP) < 0) {
+// 		LOGF("Socket %d must be a datagram socket", sockfd);
+// 		return -1;
+// 	}
+// 	
+// 	// see if we have bytes leftover from a previous Xrecv call
+// 	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len)) > 0) {
+// 		// FIXME: we need to also have stashed away the sDAG and
+// 		// return it as well
+// 		*addrlen = 0;
+// 		return numbytes;
+// 	}
+// 	
+// 	if ((numbytes = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) < 0) {
+// 		LOGF("Error retrieving recv data from Click: %s", strerror(errno));
+// 		return -1;
+// 	}
+// 
+// 	std::string str(UDPbuf, numbytes);
+// 	xia::XSocketMsg xsm;
+// 
+// 	xsm.ParseFromString(str);
+// 
+// 	xia::X_Recv_Msg *msg = xsm.mutable_x_recv();
+// 	unsigned paylen = msg->payload().size();
+// 	const char *payload = msg->payload().c_str();
+// 
+// 	if (paylen <= len)
+// 		memcpy(rbuf, payload, paylen);
+// 	else {
+// 		// we got back more data than the caller requested
+// 		// stash the extra away for subsequent Xrecv calls
+// 		memcpy(rbuf, payload, len);
+// 		paylen -= len;
+// 		setSocketData(sockfd, payload + len, paylen);
+// 		paylen = len;
+// 	}
+// 
+// 	if (addr) {
+// 		Graph g(msg->dag().c_str());
+// 
+// 		// FIXME: validate addr
+// 		g.fill_sockaddr((sockaddr_x*)addr);
+// 		*addrlen = sizeof(sockaddr_x);
+// 	}
+// 
+//     return paylen;
+// }
+
+
+int XrecvChunkfrom(int sockfd, void *rbuf, size_t len, int flags, ChunkInfo *ci)
 {
-    int numbytes;
-    char UDPbuf[MAXBUFLEN];
+	int rc;
+	char UDPbuf[MAXBUFLEN];
+
 
 	if (flags != 0) {
 		LOG("flags is not suppored at this time");
@@ -74,63 +148,66 @@ int XrecvChunkfrom(int sockfd, void *rbuf, size_t len, int flags,
 		return -1;
 	}
 
-	if (!rbuf || (addr && !addrlen)) {
+	if (!rbuf || !ci ) {
 		LOG("null pointer!\n");
 		errno = EFAULT;
 		return -1;
 	}	
-
-	if (addr && *addrlen < sizeof(sockaddr_x)) {
-		LOG("addr is not large enough");
-		errno = EINVAL;
-		return -1;
-	}
-
-	if (validateSocket(sockfd, XSOCK_CHUNK, EOPNOTSUPP) < 0) {
-		LOGF("Socket %d must be a datagram socket", sockfd);
-		return -1;
-	}
 	
-	// see if we have bytes leftover from a previous Xrecv call
-	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len)) > 0) {
-		// FIXME: we need to also have stashed away the sDAG and
-		// return it as well
-		*addrlen = 0;
-		return numbytes;
-	}
-	
-	if ((numbytes = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) < 0) {
-		LOGF("Error retrieving recv data from Click: %s", strerror(errno));
+	if (validateSocket(sockfd, XSOCK_CHUNK, EAFNOSUPPORT) < 0) {
+		LOGF("Socket %d must be a chunk socket\n", sockfd);
 		return -1;
 	}
 
-	std::string str(UDPbuf, numbytes);
+	if (len == 0)
+		return 0;
+
+	if (!rbuf || !ci) {
+		LOG("null pointer error!");
+		errno = EFAULT;
+		return -1;
+	}
+
 	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XPUSHCHUNKTO);
 
+// 	xia::X_Pushchunkto_Msg *x_pushchunk_msg = xsm.mutable_x_pushchunkto();
+//   
+//  	x_pushchunk_msg->set_cid(ci->cid);
+
+// 	std::string p_buf;
+// 	xsm.SerializeToString(&p_buf);
+// 
+// 	if ((rc = click_send(sockfd, &xsm)) < 0) {
+// 		LOGF("Error talking to Click: %s", strerror(errno));
+// 		return -1;
+// 	}
+	LOG("recvchunk API waiting for chunk ");
+	if ((rc = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) < 0) {
+		LOGF("Error retrieving status from Click: %s", strerror(errno));
+		return -1;
+	}
+
+	std::string str(UDPbuf, rc);
+
+	xsm.Clear();
 	xsm.ParseFromString(str);
-
-	xia::X_Recv_Msg *msg = xsm.mutable_x_recv();
+	
+	xia::X_Pushchunkto_Msg *msg = xsm.mutable_x_pushchunkto();
 	unsigned paylen = msg->payload().size();
 	const char *payload = msg->payload().c_str();
+	strcpy(ci->cid, msg->cid().c_str());
+	ci->size = msg->length();
+	//TODO: FIX this
+// 	ci->timestamp = msg->timestamp();
+	ci->ttl = msg->ttl();
 
-	if (paylen <= len)
-		memcpy(rbuf, payload, paylen);
-	else {
-		// we got back more data than the caller requested
-		// stash the extra away for subsequent Xrecv calls
-		memcpy(rbuf, payload, len);
-		paylen -= len;
-		setSocketData(sockfd, payload + len, paylen);
-		paylen = len;
+	if (paylen > len) {
+		LOGF("CID is %d bytes, but rbuf is only %d bytes", paylen, len);
+		errno = EFAULT;
+		return -1;
 	}
 
-	if (addr) {
-		Graph g(msg->dag().c_str());
-
-		// FIXME: validate addr
-		g.fill_sockaddr((sockaddr_x*)addr);
-		*addrlen = sizeof(sockaddr_x);
-	}
-
-    return paylen;
+	memcpy(rbuf, payload, paylen);
+	return paylen;
 }

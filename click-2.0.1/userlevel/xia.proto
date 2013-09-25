@@ -32,6 +32,7 @@ enum XSocketCallType {
   XGETSOCKNAME = 25;
 
   XPUSHCHUNKTO = 27;
+  XBINDPUSH = 28;
 }
 
 message XSocketMsg {
@@ -68,6 +69,7 @@ message XSocketMsg {
   optional X_GetSockname_Msg x_getsockname = 26; 
 
   optional X_Pushchunkto_Msg x_pushchunkto= 27;
+  optional X_BindPush_Msg x_bindpush= 28;
 }
  
 message X_Socket_Msg {
@@ -239,4 +241,8 @@ message X_Pushchunkto_Msg {
   required int32 length = 8;
   optional int64 timestamp = 9; 
 }
- 
+
+
+message X_BindPush_Msg {
+  required string sdag = 1; // bind to src dag 
+} 

@@ -238,9 +238,9 @@ int process(int sock)
 	if(use_chunk==1){
 		//FIXME: should the recive dag be null?
 		//FIXME: for now it should just read the push from the other side?
-		if(received = XrecvChunkfrom(sock, buf2, sizeof(buf2), 0, NULL, NULL) < 0){
-			die(-4, "Send error %d on socket %d\n", errno, sock);
-		}
+// 		if(received = XrecvChunkfrom(sock, buf2, sizeof(buf2), 0, NULL, NULL) < 0){
+// 			die(-4, "Send error %d on socket %d\n", errno, sock);
+// 		}
 	}
 	else if ((received = Xrecvfrom(sock, buf2, sizeof(buf2), 0, NULL, NULL)) < 0)
 		die(-5, "Receive error %d on socket %d\n", errno, sock);

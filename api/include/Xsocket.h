@@ -151,7 +151,8 @@ extern int XreadChunk(int sockfd, void *rbuf, size_t len, int flags, char *cid, 
 extern int XpushChunkto(const ChunkContext* ctx, const char* buf, size_t len, int flags, const struct sockaddr *addr, socklen_t addrlen, ChunkInfo* info);
 extern int XpushBufferto(const ChunkContext *ctx, const char *data, size_t len, int flags, const struct sockaddr *addr, socklen_t addrlen, ChunkInfo **info, unsigned chunkSize);
 extern int XpushFileto(const ChunkContext *ctx, const char *fname, int flags, const struct sockaddr *addr, socklen_t addrlen, ChunkInfo **info, unsigned chunkSize);
-extern int XrecvChunkfrom(int sockfd, void *rbuf, size_t len, int flags, struct sockaddr *addr, socklen_t *addrlen);
+extern int XrecvChunkfrom(int sockfd, void* rbuf, size_t len, int flags, ChunkInfo* ci);
+extern int XbindPush(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 
 extern ChunkContext *XallocCacheSlice(unsigned policy, unsigned ttl, unsigned size);
 extern int XfreeCacheSlice(ChunkContext *ctx);
