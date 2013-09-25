@@ -1029,7 +1029,7 @@ int get_rxconn_for_context(int ctx, session::ConnectionInfo **cinfo) {
 
 // sends to arbitrary transport connection
 int send(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
-	int sent = -1;
+	int sent = 0;
 
 	string p_buf;
 	assert(pkt);
@@ -1038,7 +1038,6 @@ int send(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 	const char *buf = p_buf.c_str();
 
 	// Send length of the protobuf message first as a uint32_t
-	// TODO: move breakpoints to process_send (encryption/compression should happen there)
 	// TODO: Fix to avoid memcpy!!
 	// TODO: switch to network byte order!!
 	int actuallen = len + sizeof(uint32_t);
@@ -1049,8 +1048,13 @@ int send(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 
 	pthread_mutex_t *conn_mutex = *(pthread_mutex_t**)cinfo->mutex_ptr().data();
 	pthread_mutex_lock(conn_mutex);
-	if ( (sent = sendBuffer(cinfo, actualbuf, actuallen)) < 0) {
-		ERRORF("Send error %d on socket %d, dest hid %s: %s", errno, cinfo->sockfd(), cinfo->hid().c_str(), strerror(errno));
+	int n;
+	while (sent < actuallen) {
+		if ( (n = sendBuffer(cinfo, actualbuf + sent, actuallen - sent)) < 0) {
+			ERRORF("Send error %d on socket %d, dest hid %s: %s", errno, cinfo->sockfd(), cinfo->hid().c_str(), strerror(errno));
+			return -1;
+		}
+		sent += n;
 	}
 	pthread_mutex_unlock(conn_mutex);
 	
@@ -1999,23 +2003,35 @@ DBGF("Data size after breakpoint: %d bytes", dataSize);
 	pkt.set_type(session::DATA);
 	pkt.set_sender_ctx(ctx);
 	session::SessionData *dm = pkt.mutable_data();
+	dm->set_data(sendBuf, dataSize);
 
 
-	// send MTU bytes at a time until we've sent the whole message
-	// for now, assume that protobur overhead is 15 bytes TODO: get actual size
-	uint32_t overhead = 15;
-	while (sent < dataSize) {
-		int chunkSize = min( MTU-overhead, dataSize-sent);
-		dm->set_data(sendBuf, chunkSize); // grab next chunk of bytes
-		if ( (send(ctx, &pkt)) < 0 ) {
-			ERROR("Error sending data");
-			rcm->set_message("Error sending data");
-			rcm->set_rc(session::FAILURE);
-			return -1;
-		}
-
-		sent += dm->data().size(); // this better also be equal to chunkSize!
+	// Send it; send() promises to send the whole thing or fail
+	if (send(ctx, &pkt) < 0) {
+		ERROR("Error sending data");
+		rcm->set_message("Error sending data");
+		rcm->set_rc(session::FAILURE);
+		return -1;
 	}
+
+	sent = data_str.size();  // return num original bytes, not compressed/encrypted bytes
+
+
+	//// send MTU bytes at a time until we've sent the whole message
+	//// for now, assume that protobur overhead is 15 bytes TODO: get actual size
+	//uint32_t overhead = 15;
+	//while (sent < dataSize) {
+	//	int chunkSize = min( MTU-overhead, dataSize-sent);
+	//	dm->set_data(sendBuf, chunkSize); // grab next chunk of bytes
+	//	if ( (send(ctx, &pkt)) < 0 ) {
+	//		ERROR("Error sending data");
+	//		rcm->set_message("Error sending data");
+	//		rcm->set_rc(session::FAILURE);
+	//		return -1;
+	//	}
+
+	//	sent += dm->data().size(); // this better also be equal to chunkSize!
+	//}
 
 	// (*) PostSendBreakpoint
 	trigger_breakpoint(kSendPostSend, new breakpoint_context(ctx_to_session_info[ctx], NULL, new send_args(sendBuf, BUFSIZE, &dataSize)), &sent);
