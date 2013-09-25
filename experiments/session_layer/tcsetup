@@ -1,0 +1,172 @@
+#!/bin/bash
+#
+# Adapted from http://www.iplocation.net/tools/traffic-control.php
+#
+#  tc uses the following units when passed as a parameter.
+#  kbps: Kilobytes per second 
+#  mbps: Megabytes per second
+#  kbit: Kilobits per second
+#  mbit: Megabits per second
+#  bps: Bytes per second 
+#       Amounts of data can be specified in:
+#       kb or k: Kilobytes
+#       mb or m: Megabytes
+#       mbit: Megabits
+#       kbit: Kilobits
+#  To get the byte figure from bits, divide the number by 8 bit
+#
+TC=/sbin/tc
+IF=eth1			# Interface 
+DNLD=100mbit    # DOWNLOAD Limit
+UPLD=100mbit    # UPLOAD Limit 
+LAT=2ms			# LATENCY
+#IP=172.16.130.129   # Host IP
+U32="$TC filter add dev $IF protocol ip parent 1:0 prio 1 u32"
+
+help()
+{
+    pwd=$(pwd)
+	cat << EOH
+
+Start or stop traffic shaping using tc. 
+
+usage: $(/usr/bin/dirname $pwd)/tcsetup [-i <interface>] [-u <bandwidth>] [-d <bandwidth>] [-l <latency>] {start|stop|restart|show}
+
+where:
+  -i set network interface
+  -u set upload bandwidth (e.g., 10mbit or 1kbit)
+  -d set download bandwidth (e.g., 10mbit or 1kbit)
+  -l set outbound latency (e.g., 20ms)
+
+EOH
+	exit 0
+}
+
+setup()
+{
+	local OPTARG=$2
+
+	while getopts "i:u:d:l:h" opt; do
+		case $opt in
+			i)
+				IF=$OPTARG
+				;;
+			u)
+				UPLD=${OPTARG}
+				;;
+			d)
+				DNLD=${OPTARG}
+				;;
+			l)
+				LAT=${OPTARG}
+				;;
+			h)
+				help
+				;;
+			\?)
+				printf "\nInvalid option: -$OPTARG\n" >&2
+				help
+				;;
+		esac
+	done
+
+}
+
+print_args()
+{
+	echo "Interface:  $IF"
+	#echo "IP Address: $IP"
+	echo "Upload:     $UPLD"
+	echo "Download:   $DNLD"
+	echo "Latency:    $LAT"
+}
+ 
+start() {
+
+	#tc qdisc add dev $IF root netem delay $LAT
+
+	#tc qdisc add dev $IF root handle 1: cbq avpkt 1000 bandwidth 100Mbit
+	#tc class add dev $IF parent 1: classid 1:1 cbq rate $DNLD allot 1500 prio 3 bounded isolated
+	#tc class add dev $IF parent 1: classid 1:2 cbq rate $UPLD allot 1500 prio 3 bounded isolated
+    #$U32 match ip dst $IP/32 flowid 1:1
+    #$U32 match ip src $IP/32 flowid 1:2
+
+    #$TC qdisc add dev $IF root handle 1: htb default 30 netem delay $LAT
+    #$TC class add dev $IF parent 1: classid 1:1 htb rate $DNLD ceil $DNLD
+    #$TC class add dev $IF parent 1: classid 1:2 htb rate $UPLD ceil $UPLD
+    #$U32 match ip dst $IP/32 flowid 1:1
+    #$U32 match ip src $IP/32 flowid 1:2
+
+	tc qdisc add dev $IF root handle 1: htb default 12 
+	tc class add dev $IF parent 1:1 classid 1:12 htb rate $DNLD ceil $DNLD
+	tc qdisc add dev $IF parent 1:12 netem delay $LAT
+
+}
+
+stop() {
+
+    $TC qdisc del dev $IF root
+
+}
+
+restart() {
+
+    stop
+    sleep 1
+    start
+
+}
+
+show() {
+
+    $TC -s qdisc ls dev $IF
+
+}
+
+
+#
+# SCRIPT STARTS HERE
+#
+setup $@
+shift $((OPTIND-1))
+
+case "$1" in
+
+  start)
+
+	print_args
+    echo -n "Starting bandwidth shaping: "
+    start
+    echo "done"
+    ;;
+
+  stop)
+
+    echo -n "Stopping bandwidth shaping: "
+    stop
+    echo "done"
+    ;;
+
+  restart)
+
+	print_args
+    echo -n "Restarting bandwidth shaping: "
+    restart
+    echo "done"
+    ;;
+
+  show)
+    	    	    
+    echo "Bandwidth shaping status for $IF:"
+    show
+    echo ""
+    ;;
+
+  *)
+	help
+    ;;
+
+esac
+
+exit 0
+
