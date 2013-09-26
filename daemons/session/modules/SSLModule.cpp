@@ -44,10 +44,6 @@ bool SSLModule::breakpoint(Breakpoint breakpoint, struct breakpoint_context *con
 			DBG("kSendPreSend");
 			return preSend(context, rv);
 
-		case kRecvPreRecv:
-			DBG("kRecvPreRecv");
-			return preRecv(context, rv);
-			
 		case kRecvPostRecv:
 			DBG("kRecvPostRecv");
 			return postRecv(context, rv);

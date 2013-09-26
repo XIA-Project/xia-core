@@ -32,7 +32,6 @@ class SSLModule : public SessionModule {
 
 	protected:
 		virtual bool preSend(struct breakpoint_context *context, void *rv) = 0;
-		virtual bool preRecv(struct breakpoint_context *context, void *rv) = 0;
 		virtual bool postRecv(struct breakpoint_context *context, void *rv) = 0;
 		virtual bool postRecvSYN(struct breakpoint_context *context, void *rv) = 0;
 		virtual bool postSendSYN(struct breakpoint_context *context, void *rv) = 0;
@@ -41,7 +40,14 @@ class SSLModule : public SessionModule {
 class SSLModuleXIA : public SSLModule {
 	protected:
 		bool preSend(struct breakpoint_context *context, void *rv);
-		bool preRecv(struct breakpoint_context *context, void *rv);
+		bool postRecv(struct breakpoint_context *context, void *rv);
+		bool postRecvSYN(struct breakpoint_context *context, void *rv);
+		bool postSendSYN(struct breakpoint_context *context, void *rv);
+};
+
+class SSLModuleHybrid : public SSLModule {
+	protected:
+		bool preSend(struct breakpoint_context *context, void *rv);
 		bool postRecv(struct breakpoint_context *context, void *rv);
 		bool postRecvSYN(struct breakpoint_context *context, void *rv);
 		bool postSendSYN(struct breakpoint_context *context, void *rv);
@@ -50,7 +56,6 @@ class SSLModuleXIA : public SSLModule {
 class SSLModuleIP : public SSLModule {
 	protected:
 		bool preSend(struct breakpoint_context *context, void *rv);
-		bool preRecv(struct breakpoint_context *context, void *rv);
 		bool postRecv(struct breakpoint_context *context, void *rv);
 		bool postRecvSYN(struct breakpoint_context *context, void *rv);
 		bool postSendSYN(struct breakpoint_context *context, void *rv);

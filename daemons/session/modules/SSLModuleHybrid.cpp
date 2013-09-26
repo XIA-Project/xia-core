@@ -17,7 +17,7 @@
 #include "SSLModule.h"
 #include "xssl.h"
 
-bool SSLModuleXIA::preSend(struct breakpoint_context *context, void *rv) {
+bool SSLModuleHybrid::preSend(struct breakpoint_context *context, void *rv) {
 	(void)rv;
 
 	struct send_args *args = (struct send_args*)context->args;
@@ -49,7 +49,7 @@ bool SSLModuleXIA::preSend(struct breakpoint_context *context, void *rv) {
 	return true;
 }
 
-bool SSLModuleXIA::postRecv(struct breakpoint_context *context, void *rv) {
+bool SSLModuleHybrid::postRecv(struct breakpoint_context *context, void *rv) {
 	(void)rv;
 	
 	struct recv_args *args = (struct recv_args*)context->args;
@@ -81,7 +81,7 @@ bool SSLModuleXIA::postRecv(struct breakpoint_context *context, void *rv) {
 	return true;
 }
 
-bool SSLModuleXIA::postRecvSYN(struct breakpoint_context *context, void *rv) {
+bool SSLModuleHybrid::postRecvSYN(struct breakpoint_context *context, void *rv) {
 	(void)rv;
 	
 	session::ConnectionInfo *cinfo = context->cinfo;
@@ -105,7 +105,7 @@ bool SSLModuleXIA::postRecvSYN(struct breakpoint_context *context, void *rv) {
 			ERROR("Unable to set XSSL sockfd");
 			return true;
 		}
-		if (XSSL_accept(xssl) != 1) {
+		if (XSSL_accept_ip(xssl) != 1) {
 			ERROR("Error accepting XSSL connection");
 			return true;
 		}
@@ -115,7 +115,7 @@ bool SSLModuleXIA::postRecvSYN(struct breakpoint_context *context, void *rv) {
 	return true;
 }
 
-bool SSLModuleXIA::postSendSYN(struct breakpoint_context *context, void *rv) {
+bool SSLModuleHybrid::postSendSYN(struct breakpoint_context *context, void *rv) {
 	(void)rv;
 	
 	session::ConnectionInfo *cinfo = context->cinfo;
@@ -141,7 +141,7 @@ bool SSLModuleXIA::postSendSYN(struct breakpoint_context *context, void *rv) {
 			ERROR("Unable to set XSSL sockfd");
 			return true;
 		}
-		if (XSSL_connect(xssl) != 1) {
+		if (XSSL_connect_ip(xssl) != 1) {
 			ERROR("Unable to initiatie XSSL connection");
 			return true;
 		}

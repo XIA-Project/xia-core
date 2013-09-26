@@ -840,12 +840,26 @@ void configure_session(session::SessionInfo *sinfo, AppLayerInfo &appInfo) {
 
 bool trigger_breakpoint(Breakpoint breakpoint, struct breakpoint_context *context, void *rv) {
 
+	// Some breakpoints need to trigger modules in reverse
+	bool reverse = false;
+	if (breakpoint == kRecvPostRecv || breakpoint == kRecvPreRecv)
+		reverse = true;
+
 	// Step through the session modules one by one triggering the breakpoint
 	bool performFollowingOp = true;   // e.g., the "send" in a PreSend breakpoint
-	vector<SessionModule*>::iterator iter;
-	for (iter = session_modules.begin(); iter != session_modules.end(); iter++) {
-		if (!((*iter)->breakpoint(breakpoint, context, rv)))
-			performFollowingOp = false;
+
+	if (reverse) {
+		vector<SessionModule*>::reverse_iterator iter;
+		for (iter = session_modules.rbegin(); iter != session_modules.rend(); iter++) {
+			if (!((*iter)->breakpoint(breakpoint, context, rv)))
+				performFollowingOp = false;
+		}
+	} else {
+		vector<SessionModule*>::iterator iter;
+		for (iter = session_modules.begin(); iter != session_modules.end(); iter++) {
+			if (!((*iter)->breakpoint(breakpoint, context, rv)))
+				performFollowingOp = false;
+		}
 	}
 
 	free(context->args);
@@ -1044,7 +1058,6 @@ int send(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 	char *actualbuf = (char*)malloc(actuallen);
 	memcpy(actualbuf, &len, sizeof(uint32_t));
 	memcpy(actualbuf + sizeof(uint32_t), buf, len);
-	DBGF("Sending msg with size %d; total len %d", len, actuallen);
 
 	pthread_mutex_t *conn_mutex = *(pthread_mutex_t**)cinfo->mutex_ptr().data();
 	pthread_mutex_lock(conn_mutex);
@@ -1057,6 +1070,7 @@ int send(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 		sent += n;
 	}
 	pthread_mutex_unlock(conn_mutex);
+	DBGF("Sending message of size %d; total length %d", len, actuallen);
 	
 	return sent;
 }
@@ -1099,6 +1113,7 @@ int recv(session::ConnectionInfo *cinfo, session::SessionPacket *pkt) {
 			}
 			received += n;
 		}
+		DBGF("Msglen: %d;  received: %d", msgsize, received);
 	}
 		
 	// (*) PostRecvBreakpoint
@@ -1393,7 +1408,7 @@ DBG("Received SETUP packet");
 				char recvData[BUFSIZE];
 				int msgLen = rpkt->data().data().size();
 				memcpy(recvData, rpkt->data().data().data(), msgLen);
-				trigger_breakpoint(kRecvPostRecv, new breakpoint_context(ctx_to_session_info[ctx], NULL, new recv_args(recvData, BUFSIZE, &msgLen)), NULL);
+				trigger_breakpoint(kRecvPostRecv, new breakpoint_context(ctx_to_session_info[ctx], cinfo, new recv_args(recvData, BUFSIZE, &msgLen)), NULL);
 
 				rpkt->mutable_data()->set_data(recvData, msgLen);
 
@@ -1994,9 +2009,9 @@ int process_send_msg(int ctx, session::SessionMsg &msg, session::SessionMsg &rep
 	char sendBuf[BUFSIZE];
 	int dataSize = data_str.size();
 	memcpy(sendBuf, data_str.data(), dataSize);
-DBGF("Data size before breakpoint: %d bytes", dataSize);
-	trigger_breakpoint(kSendPreSend, new breakpoint_context(ctx_to_session_info[ctx], NULL, new send_args(sendBuf, BUFSIZE, &dataSize)), NULL);
-DBGF("Data size after breakpoint: %d bytes", dataSize);
+	session::ConnectionInfo *cinfo;
+	get_txconn_for_context(ctx, &cinfo);
+	trigger_breakpoint(kSendPreSend, new breakpoint_context(ctx_to_session_info[ctx], cinfo, new send_args(sendBuf, BUFSIZE, &dataSize)), NULL);
 
 	// Build a SessionPacket
 	session::SessionPacket pkt;
@@ -2336,15 +2351,15 @@ int main(int argc, char *argv[]) {
 	pthread_mutex_init(&incomingctx_to_myctx_mutex, NULL);
 
 	// Initialize Session Modules
+	session_modules.push_back(new InterfaceModule());
+	session_modules.push_back(new CompressionModule());
 #ifdef XIA
 	session_modules.push_back(new TransportModuleXIA());
 	session_modules.push_back(new SSLModuleXIA());
 #else
 	session_modules.push_back(new TransportModuleIP());
-	session_modules.push_back(new SSLModuleIP());
+	session_modules.push_back(new SSLModuleHybrid());
 #endif
-	session_modules.push_back(new InterfaceModule());
-	session_modules.push_back(new CompressionModule());
 
 	listen();
 	return 0;

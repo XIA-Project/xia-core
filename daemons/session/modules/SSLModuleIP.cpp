@@ -35,20 +35,6 @@ bool SSLModuleIP::preSend(struct breakpoint_context *context, void *rv) {
 	}
 }
 
-bool SSLModuleIP::preRecv(struct breakpoint_context *context, void *rv) {
-	(void)rv;
-	
-	return true;
-	session::ConnectionInfo *cinfo = context->cinfo;
-
-	if (cinfo->use_ssl() && cinfo->has_ssl_ptr()) {
-		// cancel the recv() call since we'll do a read ourselves
-		return false;
-	}
-
-	return true;
-}
-
 bool SSLModuleIP::postRecv(struct breakpoint_context *context, void *rv) {
 	
 	return true;
