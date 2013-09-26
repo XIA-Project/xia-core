@@ -9,6 +9,8 @@
 #include <ifaddrs.h>
 #include <openssl/ssl.h>
 
+#include "xssl.h"
+
 
 
 sockaddr_in* addrFromData(const string *addr_buf) {
@@ -277,23 +279,26 @@ int bindRandomPort(string **addr_buf) {
 
 int bindNewSocket(session::ConnectionInfo *cinfo, string **addr_buf) {
 	if (!cinfo->has_ssl_ctx_ptr()) {
-		SSL_CTX *ssl_ctx = SSL_CTX_new(SSLv23_server_method());
+		//SSL_CTX *ssl_ctx = SSL_CTX_new(SSLv23_server_method());
+		XSSL_CTX *ssl_ctx = XSSL_CTX_new();
 		if (ssl_ctx == NULL) {
 			ERROR("Unable to init new SSL context");
 			return -1;
 		}
-		cinfo->set_ssl_ctx_ptr(&ssl_ctx, sizeof(SSL_CTX*));
+		cinfo->set_ssl_ctx_ptr(&ssl_ctx, sizeof(XSSL_CTX*));
+		//cinfo->set_ssl_ctx_ptr(&ssl_ctx, sizeof(SSL_CTX*));
 		
 		// set private key and cipher list
-		SSL_CTX_use_RSAPrivateKey(ssl_ctx, RSA_generate_key(1024, 3, NULL, NULL));
-		SSL_CTX_set_cipher_list(ssl_ctx, "aNULL");
+		//SSL_CTX_use_RSAPrivateKey(ssl_ctx, RSA_generate_key(1024, 3, NULL, NULL));
+		//SSL_CTX_set_cipher_list(ssl_ctx, "aNULL");
 	}
 	return bindRandomPort(addr_buf);
 }
 
 int bindNewSocket(session::ContextInfo *ctxInfo, string **addr_buf) {
 	if (!ctxInfo->has_ssl_ctx_ptr()) {
-		SSL_CTX *ssl_ctx = SSL_CTX_new(SSLv23_server_method());
+		XSSL_CTX *ssl_ctx = XSSL_CTX_new();
+		//SSL_CTX *ssl_ctx = SSL_CTX_new(SSLv23_server_method());
 		if (ssl_ctx == NULL) {
 			ERROR("Unable to init new SSL context");
 			return -1;
@@ -301,8 +306,8 @@ int bindNewSocket(session::ContextInfo *ctxInfo, string **addr_buf) {
 		ctxInfo->set_ssl_ctx_ptr(&ssl_ctx, sizeof(SSL_CTX*));
 		
 		// set private key
-		SSL_CTX_use_RSAPrivateKey(ssl_ctx, RSA_generate_key(1024, 3, NULL, NULL));
-		SSL_CTX_set_cipher_list(ssl_ctx, "aNULL");
+		//SSL_CTX_use_RSAPrivateKey(ssl_ctx, RSA_generate_key(1024, 3, NULL, NULL));
+		//SSL_CTX_set_cipher_list(ssl_ctx, "aNULL");
 	}
 	return bindRandomPort(addr_buf);
 }
