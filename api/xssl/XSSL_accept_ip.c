@@ -19,7 +19,8 @@
 */
 
 #include "xssl.h"
-#include "Xsocket.h"
+#include <string.h>
+#include <sys/socket.h>
 
 /**
 * @brief Accept an incoming XSSL connection.
@@ -28,16 +29,16 @@
 *
 * @return 1 on success, <1 on failure
 */
-int XSSL_accept(XSSL *xssl) {
+int XSSL_accept_ip(XSSL *xssl) {
 
-	char buf[XIA_MAXBUF];
-	memset(buf, 0, XIA_MAXBUF);
+	char buf[65000];
+	memset(buf, 0, 65000);
 	int n;
 
 	/* Wait for CLIENT HELLO */
 	int received = 0;
 	while (received < strlen("CLIENT HELLO")) {
-    	if ((n = Xrecv(xssl->sockfd, buf+received, strlen("CLIENT HELLO")-received, 0)) < 0) {
+    	if ((n = recv(xssl->sockfd, buf+received, strlen("CLIENT HELLO")-received, 0)) < 0) {
 			ERRORF("ERROR receiving CLIENT HELLO on socket %d", xssl->sockfd);
 			return 0;
     	}
@@ -50,7 +51,7 @@ int XSSL_accept(XSSL *xssl) {
 
 	/* Send SERVER HELLO */
 	sprintf(buf, "SERVER HELLO");
-	if ((n = Xsend(xssl->sockfd, buf, strlen(buf), 0)) != strlen(buf)) {
+	if ((n = send(xssl->sockfd, buf, strlen(buf), 0)) != strlen(buf)) {
 		ERROR("ERROR sending SERVER HELLO");
 		return 0;
 	}
@@ -64,24 +65,24 @@ int XSSL_accept(XSSL *xssl) {
 	//
 	size_t offset = 0;
 
-	uint32_t keybufsize = serialize_rsa_pub_key(xssl->ctx->keypair, &buf[sizeof(uint32_t)], XIA_MAXBUF-offset-sizeof(uint32_t));
+	uint32_t keybufsize = serialize_rsa_pub_key(xssl->ctx->keypair, &buf[sizeof(uint32_t)], 65000-offset-sizeof(uint32_t));
 	uint32_t* keybufsizeptr = (uint32_t*)buf;
 	*keybufsizeptr = keybufsize;
 	offset += (sizeof(uint32_t) + keybufsize);
 	
-	uint32_t tempkeybufsize = serialize_rsa_pub_key(xssl->session_keypair, &buf[sizeof(uint32_t) + offset], XIA_MAXBUF-offset-sizeof(uint32_t));
+	uint32_t tempkeybufsize = serialize_rsa_pub_key(xssl->session_keypair, &buf[sizeof(uint32_t) + offset], 65000-offset-sizeof(uint32_t));
 	uint32_t* tempkeybufsizeptr = (uint32_t*)&buf[offset];
 	*tempkeybufsizeptr = tempkeybufsize;
 	offset += (sizeof(uint32_t) + tempkeybufsize);
 
-	uint32_t siglen = sign(xssl->ctx->keypair, buf, offset, &buf[offset+sizeof(uint32_t)], XIA_MAXBUF-offset-sizeof(uint32_t));
+	uint32_t siglen = sign(xssl->ctx->keypair, buf, offset, &buf[offset+sizeof(uint32_t)], 65000-offset-sizeof(uint32_t));
 	uint32_t* siglenptr = (uint32_t*)&buf[offset];
 	*siglenptr = siglen;
 	offset += sizeof(uint32_t);
 	offset += siglen;
 
 	// Send it!
-	if ((n = Xsend(xssl->sockfd, buf, offset, 0)) != offset) {
+	if ((n = send(xssl->sockfd, buf, offset, 0)) != offset) {
 		ERROR("ERROR sending public keys");
 		return 0;
 	}
@@ -91,7 +92,7 @@ int XSSL_accept(XSSL *xssl) {
 
 	/* Send SERVER DONE */
 	sprintf(buf, "SERVER DONE");
-	if ((n = Xsend(xssl->sockfd, buf, strlen(buf), 0)) != strlen(buf)) {
+	if ((n = send(xssl->sockfd, buf, strlen(buf), 0)) != strlen(buf)) {
 		ERROR("ERROR sending SERVER DONE");
 		return 0;
 	}
@@ -102,7 +103,7 @@ int XSSL_accept(XSSL *xssl) {
 	n = 0;
 	offset = 0;
 	while (offset < expecting) {
-    	if ((n = Xrecv(xssl->sockfd, &buf[offset], expecting-offset, 0)) < 0) {
+    	if ((n = recv(xssl->sockfd, &buf[offset], expecting-offset, 0)) < 0) {
 			ERROR("ERROR receiving session key");
 			return 0;
     	}

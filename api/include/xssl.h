@@ -120,6 +120,11 @@ int XSSL_write(XSSL *xssl, const void *buf, int num);
 int XSSL_read(XSSL *xssl, void *buf, int num);
 int XSSL_shutdown(XSSL *xssl);
 
+int XSSL_encrypt(XSSL *xssl, const void *plaintext, int len, void *ciphertext, int size);
+int XSSL_decrypt(XSSL *xssl, const void *ciphertext, int len, void *plaintext, int size);
+int XSSL_connect_ip(XSSL *xssl);
+int XSSL_accept_ip(XSSL *xssl);
+
 
 /* Utility Functions (in XSSL_util.c) */
 char* SID_from_keypair(RSA *keypair);
