@@ -1,6 +1,7 @@
 #!/bin/sh
 #Script to deploy XIA on Ubuntu 11 and above
 # 4/4/13 updated for XIA 1.0
+# e10/4/13 updated for revised XIA build commands
 
 # do this or flack will install into /
 cd ~
@@ -27,6 +28,7 @@ cd xia-core
 # Delete xsockconf.ini files that are not for GENI XIA-prototype
 find . -name "xsockconf*.ini" -exec rm -rf {} \;
 
+./configure
 make
 cd ..
 
