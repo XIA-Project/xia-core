@@ -23,6 +23,7 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
+#include "dagaddr.hpp"
 
 /*!
 ** @brief Accept a conection from a remote Xsocket
@@ -67,7 +68,6 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	struct sockaddr_in their_addr;
 	socklen_t len;
 	int new_sockfd;
-	xia::XSocketCallType type;
 
 	// if an addr buf is passed, we must also have a valid length pointer
 	if (addr != NULL && addrlen == NULL) {
@@ -118,20 +118,37 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		return -1;
 	}
 
-	if (click_reply2(new_sockfd, &type) < 0) {
+	char rbuf[XIA_MAXBUF];
+
+	if (click_reply(new_sockfd, rbuf, sizeof(rbuf)) < 0) {
 		close(new_sockfd);
 		LOGF("Error getting status from Click: %s", strerror(errno));
 		return -1;
 	}
 
-	// FIXME: add code to get the peername, and fill in the sockaddr
+	xia::XSocketMsg reply;
+	reply.ParseFromString(rbuf);
+
+	if (reply.type() == xia::XRESULT) {
+		// there was an error in the accept
+		errno = ECONNABORTED;
+		close(new_sockfd);
+		return -1;
+	}
+
+
 	if (addr != NULL) {
 		if (*addrlen < sizeof(sockaddr_x)) {
 			LOG("addr is not large enough to hold a sockaddr_x");
+			memset(addr, 0, *addrlen);
+		} else {
+			xia::X_Accept_Msg *msg = reply.mutable_x_accept();
+			Graph g(msg->dag().c_str());
+			g.fill_sockaddr((sockaddr_x*)addr);
 		}
+
+		*addrlen = sizeof(sockaddr_x);
 	}
-	if (addrlen)
-		*addrlen = 0;
 
 	allocSocketState(new_sockfd, XSOCK_STREAM);
 	setConnected(new_sockfd, 1);
