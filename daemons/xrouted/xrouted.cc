@@ -19,6 +19,14 @@
 #define DEFAULT_NAME "router0"
 #define APPNAME "xrouted"
 
+//#define XR_DEBUG
+
+#ifdef XR_DEBUG
+#define XR_LOG(...) syslog(LOG_INFO, __VA_ARGS__)
+#else
+#define XR_LOG(...) do {} while(0)
+#endif
+
 char *hostname = NULL;
 char *ident = NULL;
 
@@ -64,6 +72,7 @@ void timeout_handler(int signum)
 {
 	UNUSED(signum);
 
+	XR_LOG("timeout(%d)", route_state.hello_seq);
 	if (route_state.hello_seq < route_state.hello_lsa_ratio) {
 		// send Hello
 		sendHello();
@@ -90,6 +99,7 @@ void timeout_handler(int signum)
 int sendHello()
 {
     ControlMessage msg(CTL_HELLO, route_state.myAD, route_state.myHID);
+	XR_LOG("Send-Hello");
 
     return msg.send(route_state.sock, &route_state.ddag);
 }
@@ -124,6 +134,8 @@ int sendLSA()
         msg.append(it->second.port);
         msg.append(it->second.cost);
   	}
+
+	XR_LOG("Send-LSA[%d]", route_state.lsa_seq);
 
 	route_state.lsa_seq = (route_state.lsa_seq + 1) % MAX_SEQNUM;
 
@@ -227,6 +239,8 @@ int processHello(ControlMessage msg)
 
 	route_state.networkTable[myHID] = entry;
 
+	XR_LOG("Process-Hello[%s]", neighbor.HID.c_str());
+
 	return 1;
 }
 
@@ -239,11 +253,31 @@ int processHello(ControlMessage msg)
 int processLSA(ControlMessage msg)
 {
     std::string srcAD;
+	std::string srcHID;
+	int32_t	dualRouter;
+	int32_t lastSeq;
 
     msg.read(srcAD);
+	msg.read(srcHID);
+	msg.read(dualRouter);
+	msg.read(lastSeq);
+
+	XR_LOG("Process-LSA: [%d] %s %s", lastSeq, srcAD.c_str(), srcHID.c_str());
 
     if (srcAD != route_state.myAD)
         return 1;
+
+	if (route_state.lastSeqTable.find(srcHID) != route_state.lastSeqTable.end()) {
+		int32_t old = route_state.lastSeqTable[srcHID];
+		if (lastSeq <= old && (old - lastSeq) < SEQNUM_WINDOW) {
+			// drop the old LSA update.
+			XR_LOG("Drop-LSA: [%d] %s %s", lastSeq, srcAD.c_str(), srcHID.c_str());
+			return 1;
+		}
+	}
+
+	XR_LOG("Forward-LSA: [%d] %s %s", lastSeq, srcAD.c_str(), srcHID.c_str());
+	route_state.lastSeqTable[srcHID] = lastSeq;
 
 	// 5. rebroadcast this LSA
     return msg.send(route_state.sock, &route_state.ddag);
