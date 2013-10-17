@@ -19,6 +19,7 @@
 
 #include "../common/ControlMessage.hh"
 #include "../common/Topology.hh"
+#include "../common/XIARouter.hh"
 
 #define HELLO_INTERVAL 0.1
 #define LSA_INTERVAL 0.3
@@ -29,6 +30,7 @@
 
 #define BHID "HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 #define SID_XROUTE "SID:1110000000000000000000000000000000001112"
+#define SID_XCONTROL "SID:1110000000000000000000000000000000001114"
 #define NULL_4ID "IP:4500000000010000fafa00000000000000000000"
 
 typedef struct RouteState {
@@ -50,6 +52,7 @@ typedef struct RouteState {
 	int32_t calc_dijstra_ticks;   
 
 	int32_t ctl_seq;	// LSA sequence number of this router
+	int32_t ctl_seq_recv;	// LSA sequence number of this router
 
     std::map<std::string, RouteEntry> ADrouteTable; // map DestAD to route entry
     std::map<std::string, RouteEntry> HIDrouteTable; // map DestHID to route entry
@@ -67,8 +70,15 @@ int sendHello();
 // send control message
 int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> routingTable);
 
+int processMsg(std::string msg);
+
+// process a control message 
+int processRoutingTable(ControlMessage msg);
+
+int processXBGP(ControlMessage msg);
+
 // process a LinkStateAdvertisement message 
-int processLSA(std::string lsa_msg);
+int processLSA(ControlMessage msg);
 
 // compute the shortest path (Dijkstra)
 void populateRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> &routingTable);

@@ -324,6 +324,8 @@ void initRouteState()
 		exit(-1);
 	}
 	memcpy(&route_state.sdag, ai->ai_addr, sizeof(sockaddr_x));
+    Graph gg(&route_state.sdag);
+        syslog(LOG_INFO, "xroute Source DAG: %s", gg.dag_string().c_str());
 
 	route_state.num_neighbors = 0; // number of neighbor routers
 	route_state.lsa_seq = 0;	// LSA sequence number of this router
