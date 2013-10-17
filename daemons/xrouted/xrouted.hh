@@ -21,11 +21,12 @@
 #include "../common/Topology.hh"
 #include "../common/XIARouter.hh"
 
-#define HELLO_INTERVAL 0.1
-#define LSA_INTERVAL 0.3
+#define HELLO_INTERVAL 0.5
+#define LSA_INTERVAL 5.0
 #define CALC_DIJKSTRA_INTERVAL 4
 #define MAX_HOP_COUNT 50
 #define MAX_SEQNUM 100000
+#define SEQNUM_WINDOW 10000
 #define MAX_XID_SIZE 100
 
 #define BHID "HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
@@ -58,6 +59,7 @@ typedef struct RouteState {
     std::map<std::string, NeighborEntry> neighborTable; // map neighborHID to neighbor entry
 	
     std::map<std::string, NodeStateEntry> networkTable; // map DestHID to NodeState entry
+	std::map<std::string, int32_t> lastSeqTable; // router-HID to their last-seq number
 	
 } RouteState;
 
