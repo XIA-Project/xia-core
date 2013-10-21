@@ -40,7 +40,6 @@ typedef struct {
 typedef struct {
     std::string ad;
     std::string hid;
-	int32_t seq; 		// LSA seq of dest (for filtering purpose)	
 	int32_t num_neighbors;	// number of neighbors of dest AD //TODO: remove
     std::vector<NeighborEntry> neighbor_list; // neighbor list
 	

@@ -192,7 +192,6 @@ int processHostRegister(ControlMessage msg)
 
 	NodeStateEntry entry;
 	entry.hid = myHID;
-	entry.seq = route_state.lsa_seq;
 	entry.num_neighbors = route_state.num_neighbors;
 
     // fill my neighbors into my entry in the networkTable
@@ -212,11 +211,19 @@ int processHostRegister(ControlMessage msg)
 
 int processHello(ControlMessage msg)
 {
+	string HID;
+	string SID;
+
 	/* Update neighbor table */
     NeighborEntry neighbor;
     msg.read(neighbor.AD);
-    msg.read(neighbor.HID);
-    neighbor.port = interfaceNumber("HID", neighbor.HID);
+    msg.read(HID);
+	if (msg.read(SID) < 0) {
+		neighbor.HID = HID;
+	} else {
+		neighbor.HID = SID;
+	}
+    neighbor.port = interfaceNumber("HID", HID);
     neighbor.cost = 1; // for now, same cost
 
     /* Index by HID if neighbor in same domain or by AD otherwise */
@@ -229,7 +236,6 @@ int processHello(ControlMessage msg)
 
 	NodeStateEntry entry;
 	entry.hid = myHID;
-	entry.seq = route_state.lsa_seq;
 	entry.num_neighbors = route_state.num_neighbors;
 
     /* Add neighbors to network table entry */

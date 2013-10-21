@@ -27,6 +27,7 @@
 #define MAX_HOP_COUNT 50
 #define MAX_SEQNUM 100000
 #define MAX_XID_SIZE 100
+#define SEQNUM_WINDOW 10000
 
 #define BHID "HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 #define SID_XROUTE "SID:1110000000000000000000000000000000001112"
@@ -58,7 +59,7 @@ typedef struct RouteState {
     std::map<std::string, RouteEntry> HIDrouteTable; // map DestHID to route entry
 	
     std::map<std::string, NodeStateEntry> networkTable; // map DestAD to NodeState entry
-	
+	std::map<std::string, int32_t> lastSeqTable; // router-HID to their last-seq number	
 } RouteState;
 
 // initialize the route state
@@ -81,7 +82,10 @@ int processXBGP(ControlMessage msg);
 int processLSA(ControlMessage msg);
 
 // compute the shortest path (Dijkstra)
-void populateRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> &routingTable);
+void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEntry> &networkTable, std::map<std::string, RouteEntry> &routingTable);
+
+// populates routingTable with AD entries from routingTableAD
+void populateADEntries(std::map<std::string, RouteEntry> &routingTable, std::map<std::string, RouteEntry> routingTableAD);
 
 // print routing table
 void printRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> &routingTable);
