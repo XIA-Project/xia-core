@@ -58,6 +58,8 @@ typedef struct RouteState {
     std::map<std::string, RouteEntry> ADrouteTable; // map DestAD to route entry
     std::map<std::string, RouteEntry> HIDrouteTable; // map DestHID to route entry
 	
+    std::map<std::string, NeighborEntry> neighborTable; // map neighborHID to neighbor entry
+
     std::map<std::string, NodeStateEntry> networkTable; // map DestAD to NodeState entry
 	std::map<std::string, int32_t> lastSeqTable; // router-HID to their last-seq number	
 } RouteState;
@@ -73,8 +75,13 @@ int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> rout
 
 int processMsg(std::string msg);
 
-// process a control message 
-int processRoutingTable(ControlMessage msg);
+// returns an interface number to a neighbor HID
+int interfaceNumber(std::string xidType, std::string xid);
+
+// process an incoming Hello message
+int processHello(ControlMessage msg);
+
+int processRoutingTable(std::map<std::string, RouteEntry> routingTable);
 
 int processXBGP(ControlMessage msg);
 

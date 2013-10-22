@@ -62,27 +62,33 @@ int sendHello()
 
 int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> routingTable)
 {
-	ControlMessage msg(CTL_ROUTING_TABLE, route_state.myAD, route_state.myHID);
+	if (destHID == route_state.myHID) {
+		// If destHID is self, process immediately
+		return processRoutingTable(routingTable);
+	} else {
+		// If destHID is not SID, send to relevant router
+		ControlMessage msg(CTL_ROUTING_TABLE, route_state.myAD, route_state.myHID);
 
-	msg.append(route_state.myAD);
-	msg.append(destHID);
+		msg.append(route_state.myAD);
+		msg.append(destHID);
 
-	msg.append(route_state.ctl_seq);
+		msg.append(route_state.ctl_seq);
 
-	msg.append((int)routingTable.size());
+		msg.append((int)routingTable.size());
 
-	map<string, RouteEntry>::iterator it;
-	for (it = routingTable.begin(); it != routingTable.end(); it++)
-	{
-		msg.append(it->second.dest);
-		msg.append(it->second.nextHop);
-		msg.append(it->second.port);
-		msg.append(it->second.flags);
+		map<string, RouteEntry>::iterator it;
+		for (it = routingTable.begin(); it != routingTable.end(); it++)
+		{
+			msg.append(it->second.dest);
+			msg.append(it->second.nextHop);
+			msg.append(it->second.port);
+			msg.append(it->second.flags);
+		}
+
+		route_state.ctl_seq = (route_state.ctl_seq + 1) % MAX_SEQNUM;
+
+		return msg.send(route_state.sock, &route_state.ddag);
 	}
-
-	route_state.ctl_seq = (route_state.ctl_seq + 1) % MAX_SEQNUM;
-
-	return msg.send(route_state.sock, &route_state.ddag);
 }
 
 int processMsg(std::string msg)
@@ -98,7 +104,7 @@ int processMsg(std::string msg)
 //            rc = processHostRegister(m);
             break;
         case CTL_HELLO:
-//            rc = processHello(m);
+            rc = processHello(m);
             break;
         case CTL_LSA:
             rc = processLSA(m);
@@ -117,57 +123,68 @@ int processMsg(std::string msg)
     return rc;
 }
 
-// process a control message 
-int processRoutingTable(ControlMessage msg)
+int interfaceNumber(std::string xidType, std::string xid)
 {
-	/* Procedure:
-		0. scan this LSA (mark AD with a DualRouter if there)
-		1. filter out the already seen LSA (via LSA-seq for this dest)
-		2. update the network table
-		3. rebroadcast this LSA
-	*/
+	int rc;
+	vector<XIARouteEntry> routes;
+	if ((rc = xr.getRoutes(xidType, routes)) > 0) {
+		vector<XIARouteEntry>::iterator ir;
+		for (ir = routes.begin(); ir < routes.end(); ir++) {
+			XIARouteEntry r = *ir;
+			if ((r.xid).compare(xid) == 0) {
+				return (int)(r.port);
+			}
+		}
+	}
+	return -1;
+}
 
-	// 0. Read this LSA
-	string srcAD, srcHID, destAD, destHID, hid, nextHop;
-    int ctlSeq, numEntries, port, flags, rc;
+int processHello(ControlMessage msg)
+{
+	// Update neighbor table
+    NeighborEntry neighbor;
+    msg.read(neighbor.AD);
+    msg.read(neighbor.HID);
+    neighbor.port = interfaceNumber("HID", neighbor.HID);
+    neighbor.cost = 1; // for now, same cost
 
-    msg.read(srcAD);
-    msg.read(srcHID);
+    // Index by HID if neighbor in same domain or by AD otherwise
+    bool internal = (neighbor.AD == route_state.myAD);
+    route_state.neighborTable[internal ? neighbor.HID : neighbor.AD] = neighbor;
+    route_state.num_neighbors = route_state.neighborTable.size();
 
-    /* Check if this came from our controller */
-    if (srcAD != route_state.myAD)
-        return 1;
+    // Update network table
+    std::string myHID = route_state.myHID;
 
-    msg.read(destAD);
-    msg.read(destHID);
+	NodeStateEntry entry;
+	entry.hid = myHID;
+	entry.num_neighbors = route_state.num_neighbors;
 
-    /* Check if intended for me */
-    if ((destAD != route_state.myAD) || (destHID != route_state.myHID))
-        return msg.send(route_state.sock, &route_state.ddag);
+    // Add neighbors to network table entry
+    std::map<std::string, NeighborEntry>::iterator it;
+    for (it = route_state.neighborTable.begin(); it != route_state.neighborTable.end(); it++)
+ 		entry.neighbor_list.push_back(it->second);
 
-    msg.read(ctlSeq);
+	route_state.networkTable[myHID] = entry;
 
-  	// 1. Filter out the already seen LSA
-    // If this LSA already seen, ignore this LSA; do nothing
-    if (ctlSeq <= route_state.ctl_seq_recv && route_state.ctl_seq_recv - ctlSeq < 10000)
-        return 1;
+	return 1;
+}
 
-    route_state.ctl_seq_recv = ctlSeq;
-
-    msg.read(numEntries);
-
-  	int i;
- 	for (i = 0; i < numEntries; i++)
-    {
-        msg.read(hid);
-        msg.read(nextHop);
-        msg.read(port);
-        msg.read(flags);
-
-		if ((rc = xr.setRoute(hid, port, nextHop, flags)) != 0)
+int processRoutingTable(std::map<std::string, RouteEntry> routingTable)
+{
+	int rc;
+	map<string, RouteEntry>::iterator it;
+	for (it = routingTable.begin(); it != routingTable.end(); it++)
+	{
+		// TODO check for all published SIDs
+		// TODO do this for xrouted as well
+		// Ignore SIDs that we publish
+		if (it->second.dest == SID_XCONTROL) {
+			continue;
+		}
+		if ((rc = xr.setRoute(it->second.dest, it->second.port, it->second.nextHop, it->second.flags)) != 0)
 			syslog(LOG_ERR, "error setting route %d", rc);
- 	}
-
+	}
 	return 1;
 }
 
@@ -249,9 +266,13 @@ int processLSA(ControlMessage msg)
 		std::map<std::string, NodeStateEntry>::iterator it1;
 		for (it1 = route_state.networkTable.begin(); it1 != route_state.networkTable.end(); it1++)
 		{
-			if ((it1->second.ad != route_state.myAD) || (it1->second.hid == ""))
+			if ((it1->second.ad != route_state.myAD) || (it1->second.hid == "")) {
+				// Don't calculate routes for external ADs
 				continue;
-
+			} else if (it1->second.hid.find(string("SID")) != string::npos) {
+				// Don't calculate routes for SIDs
+				continue;
+			}
 			std::map<std::string, RouteEntry> routingTable;
 			populateRoutingTable(it1->second.hid, route_state.networkTable, routingTable);
 			//populateADEntries(routingTable, routingTableAD);
@@ -318,7 +339,7 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEnt
 			NeighborEntry neighbor;
 			neighbor.AD = route_state.myAD;
 			neighbor.HID = srcHID;
-			//neighbor.port = 0;
+			neighbor.port = 0; // Endhost only has one port
 			neighbor.cost = 1;
 
 			NodeStateEntry entry;
@@ -390,8 +411,9 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEnt
 
 				// Find port of next hop
 				for (it2 = networkTable[srcHID].neighbor_list.begin(); it2 < networkTable[srcHID].neighbor_list.end(); it2++) {
-					if (((it2->AD == route_state.myAD) ? it2->HID : it2->AD) == tempHID2)
+					if (((it2->AD == route_state.myAD) ? it2->HID : it2->AD) == tempHID2) {
 						routingTable[tempHID1].port = it2->port;
+					}
 				}
 			}
 		}
@@ -590,23 +612,6 @@ perror("bind");
 
 			string msg = recv_message;
             processMsg(msg);
-//
-//			start = 0;
-//			found=msg.find("^");
-//			if (found!=string::npos) {
-//				string msg_type = msg.substr(start, found-start);
-//				int type = atoi(msg_type.c_str());
-//				switch (type) {
-//					case CTL_LSA:
-//						processLSA(msg);
-//						break;
-//					case CTL_ROUTING_TABLE:
-//						processRoutingTable(msg);
-//						break;
-//					default:
-//						break;
-//				}
-//			}
 		}
 	}
 
