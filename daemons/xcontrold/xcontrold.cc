@@ -424,8 +424,14 @@ void populateADEntries(std::map<std::string, RouteEntry> &routingTable, std::map
 	std::map<std::string, RouteEntry>::iterator it1;  // Iter for route table
 	
 	for (it1 = ADRoutingTable.begin(); it1 != ADRoutingTable.end(); it1++) {
-		string dest = it1->second.dest;
-		string nextHop = it1->second.nextHop;
+		string destAD = it1->second.dest;
+		string nextHopAD = it1->second.nextHop;
+
+		RouteEntry &entry = routingTable[destAD];
+		entry.dest = routingTable[nextHopAD].dest;
+		entry.nextHop = routingTable[nextHopAD].nextHop;
+		entry.port = routingTable[nextHopAD].port;
+		entry.flags = routingTable[nextHopAD].flags;
 	}
 }
 
