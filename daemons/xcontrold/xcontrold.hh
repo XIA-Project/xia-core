@@ -23,6 +23,7 @@
 
 #define HELLO_INTERVAL 0.1
 #define LSA_INTERVAL 0.3
+#define AD_LSA_INTERVAL 1
 #define CALC_DIJKSTRA_INTERVAL 4
 #define MAX_HOP_COUNT 50
 #define MAX_SEQNUM 100000
@@ -59,9 +60,12 @@ typedef struct RouteState {
     std::map<std::string, RouteEntry> HIDrouteTable; // map DestHID to route entry
 	
     std::map<std::string, NeighborEntry> neighborTable; // map neighborHID to neighbor entry
+    std::map<std::string, NeighborEntry> ADNeighborTable; // map neighborHID to neighbor entry for ADs
 
     std::map<std::string, NodeStateEntry> networkTable; // map DestAD to NodeState entry
-	std::map<std::string, int32_t> lastSeqTable; // router-HID to their last-seq number	
+    std::map<std::string, NodeStateEntry> ADNetworkTable; // map DestAD to NodeState entry for ADs
+	std::map<std::string, int32_t> lastSeqTable; // router-HID to their last-seq number
+	std::map<std::string, int32_t> ADLastSeqTable; // router-HID to their last-seq number for ADs
 } RouteState;
 
 // initialize the route state
@@ -83,7 +87,9 @@ int processHello(ControlMessage msg);
 
 int processRoutingTable(std::map<std::string, RouteEntry> routingTable);
 
-int processXBGP(ControlMessage msg);
+int sendInterdomainLSA();
+
+int processInterdomainLSA(ControlMessage msg);
 
 // process a LinkStateAdvertisement message 
 int processLSA(ControlMessage msg);

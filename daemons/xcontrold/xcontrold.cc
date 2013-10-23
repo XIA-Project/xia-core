@@ -35,7 +35,7 @@ void timeout_handler(int signum)
 		route_state.hello_seq++;
 	} else if (route_state.hello_seq >= route_state.hello_lsa_ratio) {
 		// it's time to send LSA
-		//sendLSA();
+		//sendInterdomainLSA();
 		// reset hello req
 		route_state.hello_seq = 0;
 	} else {
@@ -58,6 +58,117 @@ int sendHello()
 	int rc2 = msg2.send(route_state.sock, &route_state.ddag);
 
 	return (rc1 < rc2)? rc1 : rc2;
+}
+
+// send LinkStateAdvertisement message to neighboring ADs (flooding)
+/* Message format (delimiter=^)
+    message-type{LSA=1}
+    source-AD
+    source-HID
+    router-type{XIA=0 or XIA-IPv4-Dual=1}
+    LSA-seq-num
+    num_neighbors
+    neighbor1-AD
+    neighbor1-HID
+    neighbor2-AD
+    neighbor2-HID
+    ...
+*/
+int sendInterdomainLSA()
+{
+	int rc = 1;
+    ControlMessage msg(CTL_XBGP, route_state.myAD, route_state.myAD);
+
+    msg.append(route_state.dual_router);
+    msg.append(route_state.lsa_seq);
+    msg.append(route_state.num_neighbors);
+
+    std::map<std::string, NeighborEntry>::iterator it;
+    for (it = route_state.ADNeighborTable.begin(); it != route_state.ADNeighborTable.end(); it++)
+    {
+        msg.append(it->second.AD);
+        msg.append(it->second.HID);
+        msg.append(it->second.port);
+        msg.append(it->second.cost);
+
+		sockaddr_x ddag;
+		Graph g = Node() * Node(it->second.AD) * Node(SID_XCONTROL);
+		g.fill_sockaddr(&ddag);
+
+		int temprc = msg.send(route_state.sock, &ddag);
+		rc = (temprc < rc)? temprc : rc;
+  	}
+
+	route_state.lsa_seq = (route_state.lsa_seq + 1) % MAX_SEQNUM;
+	return rc;
+}
+
+int processInterdomainLSA(ControlMessage msg)
+{
+	syslog(LOG_INFO, "controller %s received xBGP message", route_state.myHID);
+	
+	// 0. Read this LSA
+	int32_t isDualRouter, numNeighbors, lastSeq;
+	string srcAD, srcHID;
+
+	msg.read(srcAD);
+	msg.read(srcHID);
+	msg.read(isDualRouter);
+
+	// See if this LSA comes from AD with dualRouter
+	if (isDualRouter == 1)
+		route_state.dual_router_AD = srcAD;
+
+	// First, filter out the LSA originating from myself
+	if (srcHID == route_state.myHID)
+		return 1;
+
+	msg.read(lastSeq);
+
+	// 1. Filter out the already seen LSA
+	if (route_state.ADLastSeqTable.find(srcAD) != route_state.ADLastSeqTable.end()) {
+		int32_t old = route_state.ADLastSeqTable[srcAD];
+		if (lastSeq <= old && (old - lastSeq) < SEQNUM_WINDOW) {
+			// drop the old LSA update.
+			return 1;
+		}
+	}
+
+	route_state.ADLastSeqTable[srcAD] = lastSeq;
+	
+	msg.read(numNeighbors);
+
+	// 2. Update the network table
+	NodeStateEntry entry;
+	entry.ad = srcAD;
+	entry.hid = srcAD;
+	entry.num_neighbors = numNeighbors;
+
+	for (int i = 0; i < numNeighbors; i++)
+	{
+		NeighborEntry neighbor;
+		msg.read(neighbor.AD);
+		msg.read(neighbor.HID);
+		msg.read(neighbor.port);
+		msg.read(neighbor.cost);
+
+		entry.neighbor_list.push_back(neighbor);
+	}
+
+	route_state.ADNetworkTable[srcAD] = entry;
+
+	// Rebroadcast this LSA
+    int rc = 1;
+	std::map<std::string, NeighborEntry>::iterator it;
+    for (it = route_state.ADNeighborTable.begin(); it != route_state.ADNeighborTable.end(); it++) {
+		sockaddr_x ddag;
+		Graph g = Node() * Node(it->second.AD) * Node(SID_XCONTROL);
+		g.fill_sockaddr(&ddag);
+
+		int temprc = msg.send(route_state.sock, &ddag);
+		rc = (temprc < rc)? temprc : rc;
+	}
+	return rc;
 }
 
 int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> routingTable)
@@ -113,7 +224,7 @@ int processMsg(std::string msg)
             // rc = processRoutingTable(m);
             break;
 		case CTL_XBGP:
-			rc = processXBGP(m);
+			rc = processInterdomainLSA(m);
 			break;
         default:
             perror("unknown routing message");
@@ -184,14 +295,36 @@ int processRoutingTable(std::map<std::string, RouteEntry> routingTable)
 		}
 		if ((rc = xr.setRoute(it->second.dest, it->second.port, it->second.nextHop, it->second.flags)) != 0)
 			syslog(LOG_ERR, "error setting route %d", rc);
-	}
-	return 1;
-}
 
-int processXBGP(ControlMessage msg)
-{
-	//TODO
-	syslog(LOG_INFO, "controller %s received xBGP message", route_state.myHID);
+		if (it->second.dest.find(string("AD")) != string::npos) {
+			// If AD, add to AD neighbor table
+			// Update neighbor table
+			NeighborEntry neighbor;
+			neighbor.AD = it->second.dest;
+			neighbor.HID = it->second.dest;
+			neighbor.port = 0; 
+			neighbor.cost = 1; // for now, same cost
+
+			// Index by HID if neighbor in same domain or by AD otherwise
+			route_state.ADNeighborTable[neighbor.AD] = neighbor;
+			route_state.num_neighbors = route_state.ADNeighborTable.size();
+
+			// Update network table
+			std::string myAD = route_state.myAD;
+
+			NodeStateEntry entry;
+			entry.ad = myAD;
+			entry.hid = myAD;
+			entry.num_neighbors = route_state.num_neighbors;
+
+			// Add neighbors to network table entry
+			std::map<std::string, NeighborEntry>::iterator it;
+			for (it = route_state.ADNeighborTable.begin(); it != route_state.ADNeighborTable.end(); it++)
+				entry.neighbor_list.push_back(it->second);
+
+			route_state.ADNetworkTable[myAD] = entry;
+		}
+	}
 	return 1;
 }
 
@@ -259,8 +392,9 @@ int processLSA(ControlMessage msg)
 		syslog(LOG_DEBUG, "Calcuating shortest paths\n");
 
 		// Calculate next hop for ADs
-		//std::map<std::string, RouteEntry> routingTableAD;
-		//populateRoutingTable(route_state.myAD, route_state.ADTable, routingTableAD);
+		std::map<std::string, RouteEntry> ADRoutingTable;
+		populateRoutingTable(route_state.myAD, route_state.ADNetworkTable, ADRoutingTable);
+		//@printRoutingTable(route_state.myAD, ADRoutingTable);
 
 		// Calculate next hop for routers
 		std::map<std::string, NodeStateEntry>::iterator it1;
@@ -275,7 +409,7 @@ int processLSA(ControlMessage msg)
 			}
 			std::map<std::string, RouteEntry> routingTable;
 			populateRoutingTable(it1->second.hid, route_state.networkTable, routingTable);
-			//populateADEntries(routingTable, routingTableAD);
+			//populateADEntries(routingTable, ADRoutingTable);
 			sendRoutingTable(it1->second.hid, routingTable);
 		}
 
@@ -285,11 +419,11 @@ int processLSA(ControlMessage msg)
 	return 1;
 }
 
-void populateADEntries(std::map<std::string, RouteEntry> &routingTable, std::map<std::string, RouteEntry> routingTableAD)
+void populateADEntries(std::map<std::string, RouteEntry> &routingTable, std::map<std::string, RouteEntry> ADRoutingTable)
 {
 	std::map<std::string, RouteEntry>::iterator it1;  // Iter for route table
 	
-	for (it1 = routingTableAD.begin(); it1 != routingTableAD.end(); it1++) {
+	for (it1 = ADRoutingTable.begin(); it1 != ADRoutingTable.end(); it1++) {
 		string dest = it1->second.dest;
 		string nextHop = it1->second.nextHop;
 	}
@@ -419,15 +553,15 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEnt
 		}
 	}
 
-	printRoutingTable(srcHID, routingTable);
+	//printRoutingTable(srcHID, routingTable);
 }
 
 void printRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> &routingTable)
 {
-	syslog(LOG_DEBUG, "Routing table for %s", srcHID.c_str());
+	syslog(LOG_INFO, "Routing table for %s", srcHID.c_str());
 	map<std::string, RouteEntry>::iterator it1;
 	for ( it1=routingTable.begin() ; it1 != routingTable.end(); it1++ ) {
-		syslog(LOG_DEBUG, "Dest=%s, NextHop=%s, Port=%d, Flags=%u", (it1->second.dest).c_str(), (it1->second.nextHop).c_str(), (it1->second.port), (it1->second.flags) );
+		syslog(LOG_INFO, "Dest=%s, NextHop=%s, Port=%d, Flags=%u", (it1->second.dest).c_str(), (it1->second.nextHop).c_str(), (it1->second.port), (it1->second.flags) );
 	}
 }
 
@@ -456,7 +590,7 @@ void initRouteState()
 	route_state.num_neighbors = 0; // number of neighbor routers
 	route_state.lsa_seq = 0;	// LSA sequence number of this router
 	route_state.hello_seq = 0;  // hello seq number of this router
-	route_state.hello_lsa_ratio = (int32_t) ceil(LSA_INTERVAL/HELLO_INTERVAL);
+	route_state.hello_lsa_ratio = (int32_t) ceil(AD_LSA_INTERVAL/HELLO_INTERVAL);
 	route_state.calc_dijstra_ticks = 0;
 
 	route_state.ctl_seq = 0;	// LSA sequence number of this router
