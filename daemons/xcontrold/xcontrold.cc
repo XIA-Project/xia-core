@@ -22,6 +22,7 @@
 char *hostname = NULL;
 char *ident = NULL;
 
+int ctrl_sock;
 RouteState route_state;
 XIARouter xr;
 
@@ -35,7 +36,7 @@ void timeout_handler(int signum)
 		route_state.hello_seq++;
 	} else if (route_state.hello_seq >= route_state.hello_lsa_ratio) {
 		// it's time to send LSA
-		//sendInterdomainLSA();
+		sendInterdomainLSA();
 		// reset hello req
 		route_state.hello_seq = 0;
 	} else {
@@ -81,7 +82,7 @@ int sendInterdomainLSA()
 
     msg.append(route_state.dual_router);
     msg.append(route_state.lsa_seq);
-    msg.append(route_state.num_neighbors);
+    msg.append(route_state.ADNeighborTable.size());
 
     std::map<std::string, NeighborEntry>::iterator it;
     for (it = route_state.ADNeighborTable.begin(); it != route_state.ADNeighborTable.end(); it++)
@@ -95,7 +96,11 @@ int sendInterdomainLSA()
 		Graph g = Node() * Node(it->second.AD) * Node(SID_XCONTROL);
 		g.fill_sockaddr(&ddag);
 
+		syslog(LOG_INFO, "send inter-AD LSA[%d] to %s", route_state.lsa_seq, it->second.AD.c_str());
 		int temprc = msg.send(route_state.sock, &ddag);
+		if (temprc < 0) {
+			syslog(LOG_ERR, "error sending inter-AD LSA to %s", it->second.AD.c_str());
+		}
 		rc = (temprc < rc)? temprc : rc;
   	}
 
@@ -105,8 +110,6 @@ int sendInterdomainLSA()
 
 int processInterdomainLSA(ControlMessage msg)
 {
-	syslog(LOG_INFO, "controller %s received xBGP message", route_state.myHID);
-	
 	// 0. Read this LSA
 	int32_t isDualRouter, numNeighbors, lastSeq;
 	string srcAD, srcHID;
@@ -115,12 +118,13 @@ int processInterdomainLSA(ControlMessage msg)
 	msg.read(srcHID);
 	msg.read(isDualRouter);
 
+
 	// See if this LSA comes from AD with dualRouter
 	if (isDualRouter == 1)
 		route_state.dual_router_AD = srcAD;
 
 	// First, filter out the LSA originating from myself
-	if (srcHID == route_state.myHID)
+	if (srcAD == route_state.myAD)
 		return 1;
 
 	msg.read(lastSeq);
@@ -133,6 +137,8 @@ int processInterdomainLSA(ControlMessage msg)
 			return 1;
 		}
 	}
+
+	syslog(LOG_INFO, "inter-AD LSA[%d] from %s", lastSeq, srcAD.c_str());
 
 	route_state.ADLastSeqTable[srcAD] = lastSeq;
 	
@@ -151,6 +157,8 @@ int processInterdomainLSA(ControlMessage msg)
 		msg.read(neighbor.HID);
 		msg.read(neighbor.port);
 		msg.read(neighbor.cost);
+
+		syslog(LOG_INFO, "neighbor[%d] = %s", i, neighbor.AD.c_str());
 
 		entry.neighbor_list.push_back(neighbor);
 	}
@@ -366,7 +374,8 @@ int processLSA(ControlMessage msg)
 		// Calculate next hop for ADs
 		std::map<std::string, RouteEntry> ADRoutingTable;
 		populateRoutingTable(route_state.myAD, route_state.ADNetworkTable, ADRoutingTable);
-		//@printRoutingTable(route_state.myAD, ADRoutingTable);
+		printADNetworkTable();
+		printRoutingTable(route_state.myAD, ADRoutingTable);
 
 		// Calculate next hop for routers
 		std::map<std::string, NodeStateEntry>::iterator it1;
@@ -382,7 +391,8 @@ int processLSA(ControlMessage msg)
 			std::map<std::string, RouteEntry> routingTable;
 			populateRoutingTable(it1->second.hid, route_state.networkTable, routingTable);
 			extractNeighborADs(routingTable);
-			//populateADEntries(routingTable, ADRoutingTable);
+			populateADEntries(routingTable, ADRoutingTable);
+
 			sendRoutingTable(it1->second.hid, routingTable);
 		}
 
@@ -626,6 +636,21 @@ void printRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> &ro
 	}
 }
 
+void printADNetworkTable()
+{
+	syslog(LOG_INFO, "Network table for %s:", route_state.myAD);
+	std::map<std::string, NodeStateEntry>::iterator it;
+	for (it = route_state.ADNetworkTable.begin();
+		   	it != route_state.ADNetworkTable.end(); it++) {
+		syslog(LOG_INFO, "%s", it->first.c_str());
+		for (size_t i = 0; i < it->second.neighbor_list.size(); i++) {
+			syslog(LOG_INFO, "neighbor[%d]: %s", (int) i,
+					it->second.neighbor_list[i].AD.c_str());
+		}
+	}
+
+}
+
 void initRouteState()
 {
 	// make the dest DAG (broadcast to other routers)
@@ -772,12 +797,16 @@ int main(int argc, char *argv[])
 	// bind to the controller service 
 	struct addrinfo *ai;
 	sockaddr_x tempDAG;
-
+#if 0
+	Graph bindG = Node() * Node(route_state.myAD) * Node(SID_XCONTROL);
+	bindG.fill_sockaddr(&tempDAG);
+#else
 	if (Xgetaddrinfo(NULL, SID_XCONTROL, NULL, &ai) != 0) {
 		syslog(LOG_ALERT, "unable to bind controller service");
 		exit(-1);
 	}
 	memcpy(&tempDAG, ai->ai_addr, sizeof(sockaddr_x));
+#endif
 
 	if (Xbind(tempSock, (struct sockaddr*)&tempDAG, sizeof(sockaddr_x)) < 0) {
 		Graph g(&tempDAG);
@@ -787,6 +816,7 @@ perror("bind");
 		exit(-1);
 	}
 
+	int sock;
 	while (1) {
 		FD_ZERO(&socks);
 		FD_SET(route_state.sock, &socks);
@@ -795,12 +825,19 @@ perror("bind");
 		timeoutval.tv_usec = 2000; // every 0.002 sec, check if any received packets
 
 		int32_t highSock = max(route_state.sock, tempSock);
-		selectRetVal = select(highSock, &socks, NULL, NULL, &timeoutval);
+		selectRetVal = select(highSock+1, &socks, NULL, NULL, &timeoutval);
 		if (selectRetVal > 0) {
 			// receiving a Hello or LSA packet
 			memset(&recv_message[0], 0, sizeof(recv_message));
 			dlen = sizeof(sockaddr_x);
-			n = Xrecvfrom(route_state.sock, recv_message, 10240, 0, (struct sockaddr*)&theirDAG, &dlen);
+			if (FD_ISSET(route_state.sock, &socks)) {
+				sock = route_state.sock;
+			} else if (FD_ISSET(tempSock, &socks)) {
+				sock = tempSock;
+			} else {
+				continue;
+			}
+			n = Xrecvfrom(sock, recv_message, 10240, 0, (struct sockaddr*)&theirDAG, &dlen);
 			if (n < 0) {
 				perror("recvfrom");
 			}
