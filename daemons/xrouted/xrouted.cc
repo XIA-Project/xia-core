@@ -221,7 +221,6 @@ int processHello(ControlMessage msg)
 	if (msg.read(SID) < 0) {
 		neighbor.HID = HID;
 	} else {
-		return 1;
 		neighbor.HID = SID;
 	}
     neighbor.port = interfaceNumber("HID", HID);

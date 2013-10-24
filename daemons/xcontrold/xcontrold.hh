@@ -103,5 +103,7 @@ void populateADEntries(std::map<std::string, RouteEntry> &routingTable, std::map
 // print routing table
 void printRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> &routingTable);
 
+void printADNetworkTable();
+
 // timer to send Hello and LinkStateAdvertisement messages periodically
 void timeout_handler(int signum);

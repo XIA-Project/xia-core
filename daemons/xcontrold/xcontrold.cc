@@ -82,7 +82,7 @@ int sendInterdomainLSA()
 
     msg.append(route_state.dual_router);
     msg.append(route_state.lsa_seq);
-    msg.append(route_state.num_neighbors);
+    msg.append(route_state.ADNeighborTable.size());
 
     std::map<std::string, NeighborEntry>::iterator it;
     for (it = route_state.ADNeighborTable.begin(); it != route_state.ADNeighborTable.end(); it++)
@@ -129,8 +129,6 @@ int processInterdomainLSA(ControlMessage msg)
 
 	msg.read(lastSeq);
 
-	syslog(LOG_INFO, "inter-AD LSA[%d] from %s", lastSeq, srcAD.c_str());
-
 	// 1. Filter out the already seen LSA
 	if (route_state.ADLastSeqTable.find(srcAD) != route_state.ADLastSeqTable.end()) {
 		int32_t old = route_state.ADLastSeqTable[srcAD];
@@ -139,6 +137,8 @@ int processInterdomainLSA(ControlMessage msg)
 			return 1;
 		}
 	}
+
+	syslog(LOG_INFO, "inter-AD LSA[%d] from %s", lastSeq, srcAD.c_str());
 
 	route_state.ADLastSeqTable[srcAD] = lastSeq;
 	
@@ -157,6 +157,8 @@ int processInterdomainLSA(ControlMessage msg)
 		msg.read(neighbor.HID);
 		msg.read(neighbor.port);
 		msg.read(neighbor.cost);
+
+		syslog(LOG_INFO, "neighbor[%d] = %s", i, neighbor.AD.c_str());
 
 		entry.neighbor_list.push_back(neighbor);
 	}
@@ -400,7 +402,8 @@ int processLSA(ControlMessage msg)
 		// Calculate next hop for ADs
 		std::map<std::string, RouteEntry> ADRoutingTable;
 		populateRoutingTable(route_state.myAD, route_state.ADNetworkTable, ADRoutingTable);
-		//@printRoutingTable(route_state.myAD, ADRoutingTable);
+		printADNetworkTable();
+		printRoutingTable(route_state.myAD, ADRoutingTable);
 
 		// Calculate next hop for routers
 		std::map<std::string, NodeStateEntry>::iterator it1;
@@ -621,6 +624,21 @@ void printRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> &ro
 	for ( it1=routingTable.begin() ; it1 != routingTable.end(); it1++ ) {
 		syslog(LOG_INFO, "Dest=%s, NextHop=%s, Port=%d, Flags=%u", (it1->second.dest).c_str(), (it1->second.nextHop).c_str(), (it1->second.port), (it1->second.flags) );
 	}
+}
+
+void printADNetworkTable()
+{
+	syslog(LOG_INFO, "Network table for %s:", route_state.myAD);
+	std::map<std::string, NodeStateEntry>::iterator it;
+	for (it = route_state.ADNetworkTable.begin();
+		   	it != route_state.ADNetworkTable.end(); it++) {
+		syslog(LOG_INFO, "%s", it->first.c_str());
+		for (size_t i = 0; i < it->second.neighbor_list.size(); i++) {
+			syslog(LOG_INFO, "neighbor[%d]: %s", (int) i,
+					it->second.neighbor_list[i].AD.c_str());
+		}
+	}
+
 }
 
 void initRouteState()
