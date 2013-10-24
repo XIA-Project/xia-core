@@ -85,6 +85,9 @@ int interfaceNumber(std::string xidType, std::string xid);
 // process an incoming Hello message
 int processHello(ControlMessage msg);
 
+// extract neighboring AD info from routing table
+int extractNeighborADs(map<string, RouteEntry> routingTable);
+
 int processRoutingTable(std::map<std::string, RouteEntry> routingTable);
 
 int sendInterdomainLSA();

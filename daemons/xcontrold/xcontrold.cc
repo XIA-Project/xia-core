@@ -295,36 +295,8 @@ int processRoutingTable(std::map<std::string, RouteEntry> routingTable)
 		}
 		if ((rc = xr.setRoute(it->second.dest, it->second.port, it->second.nextHop, it->second.flags)) != 0)
 			syslog(LOG_ERR, "error setting route %d", rc);
-
-		if (it->second.dest.find(string("AD")) != string::npos) {
-			// If AD, add to AD neighbor table
-			// Update neighbor table
-			NeighborEntry neighbor;
-			neighbor.AD = it->second.dest;
-			neighbor.HID = it->second.dest;
-			neighbor.port = 0; 
-			neighbor.cost = 1; // for now, same cost
-
-			// Index by HID if neighbor in same domain or by AD otherwise
-			route_state.ADNeighborTable[neighbor.AD] = neighbor;
-			route_state.num_neighbors = route_state.ADNeighborTable.size();
-
-			// Update network table
-			std::string myAD = route_state.myAD;
-
-			NodeStateEntry entry;
-			entry.ad = myAD;
-			entry.hid = myAD;
-			entry.num_neighbors = route_state.num_neighbors;
-
-			// Add neighbors to network table entry
-			std::map<std::string, NeighborEntry>::iterator it;
-			for (it = route_state.ADNeighborTable.begin(); it != route_state.ADNeighborTable.end(); it++)
-				entry.neighbor_list.push_back(it->second);
-
-			route_state.ADNetworkTable[myAD] = entry;
-		}
 	}
+
 	return 1;
 }
 
@@ -409,6 +381,7 @@ int processLSA(ControlMessage msg)
 			}
 			std::map<std::string, RouteEntry> routingTable;
 			populateRoutingTable(it1->second.hid, route_state.networkTable, routingTable);
+			extractNeighborADs(routingTable);
 			//populateADEntries(routingTable, ADRoutingTable);
 			sendRoutingTable(it1->second.hid, routingTable);
 		}
@@ -416,6 +389,42 @@ int processLSA(ControlMessage msg)
 		route_state.calc_dijstra_ticks = 0;
 	}
 
+	return 1;
+}
+
+int extractNeighborADs(map<string, RouteEntry> routingTable)
+{
+	map<string, RouteEntry>::iterator it;
+	for (it = routingTable.begin(); it != routingTable.end(); it++)
+	{
+		if (it->second.dest.find(string("AD:")) == 0) {
+			// If AD, add to AD neighbor table
+			// Update neighbor table
+			NeighborEntry neighbor;
+			neighbor.AD = it->second.dest;
+			neighbor.HID = it->second.dest;
+			neighbor.port = 0; 
+			neighbor.cost = 1; // for now, same cost
+
+			// Index by HID if neighbor in same domain or by AD otherwise
+			route_state.ADNeighborTable[neighbor.AD] = neighbor;
+
+			// Update network table
+			std::string myAD = route_state.myAD;
+
+			NodeStateEntry entry;
+			entry.ad = myAD;
+			entry.hid = myAD;
+			entry.num_neighbors = route_state.ADNeighborTable.size();
+
+			// Add neighbors to network table entry
+			std::map<std::string, NeighborEntry>::iterator it;
+			for (it = route_state.ADNeighborTable.begin(); it != route_state.ADNeighborTable.end(); it++)
+				entry.neighbor_list.push_back(it->second);
+
+			route_state.ADNetworkTable[myAD] = entry;
+		}
+	}
 	return 1;
 }
 
