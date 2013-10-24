@@ -430,8 +430,14 @@ void populateADEntries(std::map<std::string, RouteEntry> &routingTable, std::map
 	std::map<std::string, RouteEntry>::iterator it1;  // Iter for route table
 	
 	for (it1 = ADRoutingTable.begin(); it1 != ADRoutingTable.end(); it1++) {
-		string dest = it1->second.dest;
-		string nextHop = it1->second.nextHop;
+		string destAD = it1->second.dest;
+		string nextHopAD = it1->second.nextHop;
+
+		RouteEntry &entry = routingTable[destAD];
+		entry.dest = routingTable[nextHopAD].dest;
+		entry.nextHop = routingTable[nextHopAD].nextHop;
+		entry.port = routingTable[nextHopAD].port;
+		entry.flags = routingTable[nextHopAD].flags;
 	}
 }
 
@@ -536,6 +542,10 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEnt
 
 	for (it1 = networkTable.begin(); it1 != networkTable.end(); it1++) {
 		tempHID1 = (it1->second.ad == route_state.myAD) ? it1->second.hid : it1->second.ad;
+		if (tempHID1.find(string("SID")) != string::npos) {
+			// Skip SIDs on first pass
+			continue;
+		}
 		if (srcHID.compare(tempHID1) != 0) {
 			tempHID2 = tempHID1;
 			tempNextHopHID2 = it1->second.hid;
@@ -548,7 +558,7 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEnt
 			if (hop_count < MAX_HOP_COUNT) {
 				routingTable[tempHID1].dest = tempHID1;
 				routingTable[tempHID1].nextHop = tempNextHopHID2;
-
+				
 				// Find port of next hop
 				for (it2 = networkTable[srcHID].neighbor_list.begin(); it2 < networkTable[srcHID].neighbor_list.end(); it2++) {
 					if (((it2->AD == route_state.myAD) ? it2->HID : it2->AD) == tempHID2) {
@@ -559,6 +569,48 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEnt
 		}
 	}
 
+	for (it1 = networkTable.begin(); it1 != networkTable.end(); it1++) {
+		tempHID1 = (it1->second.ad == route_state.myAD) ? it1->second.hid : it1->second.ad;
+		if (tempHID1.find(string("SID")) == string::npos) {
+			// Process SIDs on second pass 
+			continue;
+		}
+		if (srcHID.compare(tempHID1) != 0) {
+			tempHID2 = tempHID1;
+			tempNextHopHID2 = it1->second.hid;
+			hop_count = 0;
+			while (networkTable[tempHID2].prevNode.compare(srcHID)!=0 && hop_count < MAX_HOP_COUNT) {
+				tempHID2 = networkTable[tempHID2].prevNode;
+				tempNextHopHID2 = networkTable[tempHID2].hid;
+				hop_count++;
+			}
+			if (hop_count < MAX_HOP_COUNT) {
+				routingTable[tempHID1].dest = tempHID1;
+				
+				// Find port of next hop
+				for (it2 = networkTable[srcHID].neighbor_list.begin(); it2 < networkTable[srcHID].neighbor_list.end(); it2++) {
+					if (((it2->AD == route_state.myAD) ? it2->HID : it2->AD) == tempHID2) {
+						routingTable[tempHID1].port = it2->port;
+					}
+				}
+				
+				// Dest is SID, so we search existing ports for entry with same port and HID as next hop
+				bool entryFound = false;
+				map<string, RouteEntry>::iterator it3;
+				for (it3 = routingTable.begin(); it3 != routingTable.end(); it3++) {
+					if (it3->second.port == routingTable[tempHID1].port && it3->second.nextHop.find(string("HID")) != string::npos) {
+						routingTable[tempHID1].nextHop = it3->second.nextHop;
+						entryFound = true;
+						break;
+					}
+				}
+				if (!entryFound) {
+					// Delete SID entry from routingTable
+					routingTable.erase(tempHID1);
+				}
+			}
+		}
+	}
 	//printRoutingTable(srcHID, routingTable);
 }
 
