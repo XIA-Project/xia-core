@@ -91,12 +91,16 @@ int sendInterdomainLSA()
         msg.append(it->second.HID);
         msg.append(it->second.port);
         msg.append(it->second.cost);
+	}
 
+    for (it = route_state.ADNeighborTable.begin(); it != route_state.ADNeighborTable.end(); it++)
+    {
 		sockaddr_x ddag;
 		Graph g = Node() * Node(it->second.AD) * Node(SID_XCONTROL);
 		g.fill_sockaddr(&ddag);
 
-		syslog(LOG_INFO, "send inter-AD LSA[%d] to %s", route_state.lsa_seq, it->second.AD.c_str());
+		//syslog(LOG_INFO, "send inter-AD LSA[%d] to %s", route_state.lsa_seq, it->second.AD.c_str());
+		//syslog(LOG_INFO, "msg: %s", msg.c_str());
 		int temprc = msg.send(route_state.sock, &ddag);
 		if (temprc < 0) {
 			syslog(LOG_ERR, "error sending inter-AD LSA to %s", it->second.AD.c_str());
@@ -138,7 +142,7 @@ int processInterdomainLSA(ControlMessage msg)
 		}
 	}
 
-	syslog(LOG_INFO, "inter-AD LSA[%d] from %s", lastSeq, srcAD.c_str());
+	//syslog(LOG_INFO, "inter-AD LSA[%d] from %s", lastSeq, srcAD.c_str());
 
 	route_state.ADLastSeqTable[srcAD] = lastSeq;
 	
@@ -158,7 +162,7 @@ int processInterdomainLSA(ControlMessage msg)
 		msg.read(neighbor.port);
 		msg.read(neighbor.cost);
 
-		syslog(LOG_INFO, "neighbor[%d] = %s", i, neighbor.AD.c_str());
+		//syslog(LOG_INFO, "neighbor[%d] = %s", i, neighbor.AD.c_str());
 
 		entry.neighbor_list.push_back(neighbor);
 	}
@@ -374,8 +378,8 @@ int processLSA(ControlMessage msg)
 		// Calculate next hop for ADs
 		std::map<std::string, RouteEntry> ADRoutingTable;
 		populateRoutingTable(route_state.myAD, route_state.ADNetworkTable, ADRoutingTable);
-		printADNetworkTable();
-		printRoutingTable(route_state.myAD, ADRoutingTable);
+		//printADNetworkTable();
+		//printRoutingTable(route_state.myAD, ADRoutingTable);
 
 		// Calculate next hop for routers
 		std::map<std::string, NodeStateEntry>::iterator it1;
@@ -392,6 +396,7 @@ int processLSA(ControlMessage msg)
 			populateRoutingTable(it1->second.hid, route_state.networkTable, routingTable);
 			extractNeighborADs(routingTable);
 			populateADEntries(routingTable, ADRoutingTable);
+			//printRoutingTable(it1->second.hid, routingTable);
 
 			sendRoutingTable(it1->second.hid, routingTable);
 		}
@@ -447,7 +452,7 @@ void populateADEntries(std::map<std::string, RouteEntry> &routingTable, std::map
 		string nextHopAD = it1->second.nextHop;
 
 		RouteEntry &entry = routingTable[destAD];
-		entry.dest = routingTable[nextHopAD].dest;
+		entry.dest = destAD;
 		entry.nextHop = routingTable[nextHopAD].nextHop;
 		entry.port = routingTable[nextHopAD].port;
 		entry.flags = routingTable[nextHopAD].flags;
