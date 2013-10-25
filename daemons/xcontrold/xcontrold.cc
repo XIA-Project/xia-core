@@ -395,6 +395,7 @@ int processLSA(ControlMessage msg)
 			std::map<std::string, RouteEntry> routingTable;
 			populateRoutingTable(it1->second.hid, route_state.networkTable, routingTable);
 			extractNeighborADs(routingTable);
+			populateNeighboringADBorderRouterEntries(it1->second.hid, routingTable);
 			populateADEntries(routingTable, ADRoutingTable);
 			//printRoutingTable(it1->second.hid, routingTable);
 
@@ -441,6 +442,24 @@ int extractNeighborADs(map<string, RouteEntry> routingTable)
 		}
 	}
 	return 1;
+}
+
+void populateNeighboringADBorderRouterEntries(string currHID, std::map<std::string, RouteEntry> &routingTable)
+{
+	vector<NeighborEntry> currNeighborTable = route_state.networkTable[currHID].neighbor_list;
+
+	vector<NeighborEntry>::iterator it;
+	for (it = currNeighborTable.begin(); it != currNeighborTable.end(); it++) { 
+		if (it->AD != route_state.myAD) {
+			// Add HID of border routers of neighboring ADs into routing table
+			string neighborHID = it->HID;
+			RouteEntry &entry = routingTable[neighborHID];
+			entry.dest = neighborHID;
+			entry.nextHop = neighborHID;
+			entry.port = it->port;
+			//entry.flags = 0;
+		}
+	}
 }
 
 void populateADEntries(std::map<std::string, RouteEntry> &routingTable, std::map<std::string, RouteEntry> ADRoutingTable)

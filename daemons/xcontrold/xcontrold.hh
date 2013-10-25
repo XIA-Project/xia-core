@@ -100,6 +100,9 @@ int processLSA(ControlMessage msg);
 // compute the shortest path (Dijkstra)
 void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEntry> &networkTable, std::map<std::string, RouteEntry> &routingTable);
 
+// populates routingTable with HID entries of routers in neighboring ADs
+void populateNeighboringADBorderRouterEntries(string currHID, std::map<std::string, RouteEntry> &routingTable);
+
 // populates routingTable with AD entries from routingTableAD
 void populateADEntries(std::map<std::string, RouteEntry> &routingTable, std::map<std::string, RouteEntry> routingTableAD);
 
