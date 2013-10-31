@@ -21,6 +21,10 @@
 #ifndef XIA_H
 #define XIA_H
 
+#define SOURCE_DIR "xia-core"
+
+#define BUF_SIZE 4096
+
 #define AF_XIA		40
 
 #define EDGES_MAX	4

@@ -40,7 +40,6 @@ XIADecHLIM::simple_action(Packet *p)
 
 	if (hdr->hlim <= 1) {
     	++_drops;
-		SET_XIA_PAINT_ANNO(p, UNREACHABLE);
     	checked_output_push(1, p);
     	return 0;
     } else {

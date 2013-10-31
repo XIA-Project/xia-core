@@ -84,7 +84,8 @@ int XIAFastPath::configure(Vector<String> &conf, ErrorHandler *errh)
 
 void XIAFastPath::push(int port, Packet * p)
 {
-#if HAVE_MULTITHREAD
+// FIXME: this treats OSX as non-threaded
+#if HAVE_MULTITHREAD && HAVE___THREAD_STORAGE_CLASS
 #if CLICK_USERLEVEL
     int thread_id = click_current_thread_id;
 #else
@@ -93,6 +94,7 @@ void XIAFastPath::push(int port, Packet * p)
 #else
     int thread_id = 0;
 #endif
+
     const uint8_t *key = getkey(p);
  
     uint32_t index = *(uint32_t*)key % _bucket_size;

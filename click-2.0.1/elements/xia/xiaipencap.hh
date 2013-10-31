@@ -22,7 +22,7 @@ CLICK_DECLS
  *
  * =a IPEncap */
 
-#define IP_XID_UDP_PORT 1001
+#define IP_XID_UDP_PORT 13781
 
 class XIAIPEncap : public Element { public:
 

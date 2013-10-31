@@ -21,7 +21,6 @@
 
 #include <sys/types.h>
 #include <unistd.h>
-#include <linux/unistd.h>
 
 #include "Xsocket.h"
 #include "Xinit.h"
@@ -106,12 +105,6 @@ int Xsocket(int family, int transport_type, int protocol)
 	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 	addr.sin_port = 0;
 
-	if (bind(sockfd, (const struct sockaddr *)&addr, sizeof(addr)) < 0) {
-		close(sockfd);
-		LOGF("bind error: %s", strerror(errno));
-		return -1;
-	}
-		
 	// protobuf message
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XSOCKET);

@@ -110,7 +110,7 @@ XARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
     _my_xid_configured = true;	
 
     if (!have_broadcast) {
-    	String _bcast_xid("HID:1111111111111111111111111111111111111111");  // Broadcast HID
+    	String _bcast_xid(BHID);  // Broadcast HID
         _my_bcast_xid.parse(_bcast_xid);
     }
     
@@ -164,7 +164,7 @@ XARPQuerier::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
     */
 	
     if (!have_broadcast) {
-    	String _bcast_xid("HID:1111111111111111111111111111111111111111");  // Broadcast HID
+    	String _bcast_xid(BHID);  // Broadcast HID
         _my_bcast_xid.parse(_bcast_xid);
     }
 
@@ -173,7 +173,7 @@ XARPQuerier::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
 
     _my_xid = my_xid;
     _my_en = my_en;
-    String _bcast_xid("HID:1111111111111111111111111111111111111111");  // Broadcast HID
+    String _bcast_xid(BHID);  // Broadcast HID
     _my_bcast_xid.parse(_bcast_xid);
     if (_my_xarpt && have_capacity)
 	_xarpt->set_capacity(capacity);

@@ -1,0 +1,6 @@
+By default XIA logs to /var/log/syslog on Ubuntu systems. To put the messages
+into an XIA specific file perform the following steps.
+
+sudo cp rsyslog.d/* /etc/rsyslog.d
+sudo cp logrotate.d/* /etc/logrotate.d
+sudo service rsyslog restart

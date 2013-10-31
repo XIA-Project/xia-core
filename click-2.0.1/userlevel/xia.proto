@@ -85,7 +85,7 @@ message X_Connect_Msg {
 }
 
 message X_Accept_Msg {
-  optional string temp = 1; // currently not used
+  optional string dag = 1; // peer's dag
 }
 
 message X_Sendto_Msg {

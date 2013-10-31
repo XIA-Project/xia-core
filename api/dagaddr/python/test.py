@@ -85,6 +85,37 @@ def main():
     g5_prime = Graph(g5.dag_string())
     g5_prime.print_graph()
     print '\n'
+    
+   
+    # TODO: Copy the rest of the test code here
+    
+    
+    
+    print 'Testing string parse error checking vvv'
+
+    print 'Testing IP parsing'
+    g10 = Graph("RE ( IP:192.168.0.1 ) AD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 SID:1110000000000000000000000000000000001113");
+    print 'g10.dag_string():\n%s' % g10.dag_string()
+
+    print '\nTesting 4ID parsing'
+    g11 = Graph("RE ( IP:4500000000010000fafa000000000000c0a80001 ) AD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 SID:1110000000000000000000000000000000001113")
+    print 'g11.dag_string():\n%s' % g11.dag_string()
+    
+    
+    print '\nTesting bogus XID type'
+    g12 = Graph("RE QD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 SID:1110000000000000000000000000000000001113")
+    print 'g12.dag_string():\n%s' % g12.dag_string()
+    
+    
+    print '\nTesting short (<40 char) XID string'
+    g13 = Graph("RE AD:10000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 SID:1110000000000000000000000000000000001113")
+    print 'g13.dag_string().c_str():\n%s' % g13.dag_string()
+    
+    print '\nTesting non-hex XID string'
+    g14 = Graph("RE AD:10000hello0world0qrsxyz00000000000000000 HID:0000000000000000000000000000000000000000 SID:1110000000000000000000000000000000001113")
+    print 'g14.dag_string():\n%s\n' % g14.dag_string()
+
+    print 'Testing string parse error checking ^^^\n\n'
 
 
 if __name__ == "__main__":

@@ -1,3 +1,9 @@
+ifeq ($(wildcard xia.mk),)
+$(error You must run configure first)
+else
+include xia.mk
+endif
+
 # list of top level directories that need to be built
 MAKEDIRS=click api daemons applications
 
@@ -7,11 +13,7 @@ CLEANDIRS=$(addsuffix .build, $(MAKEDIRS))
 # list of directories with automated tests that should be run
 TESTDIRS=$(addsuffix .test, api)
 
-#set num of procs for parallel builds
-NPROCS=$(shell grep -c ^processor /proc/cpuinfo)
-
 .PHONY: all config clean test $(MAKEDIRS) $(CLEANDIRS) $(TESTDIRS)
-
 
 
 #### BUILD RULES
@@ -27,7 +29,6 @@ click:
 
 $(filter-out click, $(MAKEDIRS)):
 	make -C $@ $(STATIC)
-
 
 
 #### CONFIG RULES

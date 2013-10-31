@@ -22,7 +22,6 @@
 
 #include <sys/types.h>
 #include <unistd.h>
-#include <linux/unistd.h>
 
 #include "Xsocket.h"
 #include "Xinit.h"
@@ -39,7 +38,7 @@ using namespace std;
 extern "C" {
 
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-	
+
 	/*!
 	** @brief Specify the location of the XSockets configuration file.
 	**
@@ -51,6 +50,10 @@ static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
     void set_conf(const char *filename, const char* sectionname)
     {
 		pthread_mutex_lock(&lock);
+
+		char root[BUF_SIZE];
+
+		snprintf(__XSocketConf::master_conf, BUF_SIZE, "%s%s", XrootDir(root, BUF_SIZE), "/etc/xsockconf.ini");
         __InitXSocket::read_conf(filename, sectionname);
 		__XSocketConf::initialized=1;
 		pthread_mutex_unlock(&lock);
@@ -63,12 +66,12 @@ static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 **
 ** Returns a pointer to the conf object containing the addresses of the API
 ** client's IP address and the IP addresses used for communicating with click.
-** When first called, a mutex is locked and the config setting are loaded from 
+** When first called, a mutex is locked and the config setting are loaded from
 ** file. Subsequent calls do not incur the overhead of a mutex operation.
 **
 ** @returns pointer to the gobal XSocketConf structure
 */
-struct __XSocketConf* get_conf() 
+struct __XSocketConf* get_conf()
 {
 
 	if (__XSocketConf::initialized == 0) {
@@ -81,7 +84,7 @@ struct __XSocketConf* get_conf()
 
 		__XSocketConf::initialized=1;
 		pthread_mutex_unlock(&lock);
-	}	
+	}
 	return &_conf;
 }
 
@@ -89,13 +92,13 @@ struct __XSocketConf* get_conf()
 ** @brief constructor for the Xsockets library config settings.
 **
 ** Creates the config object and loads the settings from the config file.
-** 
+**
 ** NOTE: document the conf file format
 **
 */
-__InitXSocket::__InitXSocket() 
+__InitXSocket::__InitXSocket()
 {
-	const char * inifile = getenv("XSOCKCONF");
+	const char *inifile = getenv("XSOCKCONF");
 
 	memset(_conf.click_port, 0, __PORT_LEN);
 
@@ -106,13 +109,16 @@ __InitXSocket::__InitXSocket()
 	char buf[PATH_MAX+1];
 	int rc;
 
+	char root[BUF_SIZE];
+	snprintf(__XSocketConf::master_conf, BUF_SIZE, "%s%s", XrootDir(root, BUF_SIZE), "/etc/xsockconf.ini");
+
 	if ((rc = readlink("/proc/self/exe", buf, sizeof(buf) - 1)) != -1) {
 		section_name = basename(buf);
 		buf[rc] = 0;
 	}
 
 	const char * section_name_env  = getenv("XSOCKCONF_SECTION");
-	if (section_name_env) 
+	if (section_name_env)
 		section_name = section_name_env;
 
 	// NOTE: unlikely, but what happens if section_name is NULL?
@@ -126,9 +132,20 @@ __InitXSocket::__InitXSocket()
 **
 ** @returns void
 */
-void __InitXSocket::read_conf(const char *inifile, const char *section_name) 
+void __InitXSocket::read_conf(const char *inifile, const char *section_name)
 {
-  ini_gets(section_name, "click_port", DEFAULT_CLICKPORT, _conf.click_port, __PORT_LEN , inifile);
+	char host[256];
+
+	if (ini_gets(section_name, "host", "", host, sizeof(host), inifile) > 0) {
+		// local ini file specified a host entry in the master
+		// look for the specified host entry in the master conf file, and return the default port if not found
+		ini_gets(host, "click_port", DEFAULT_CLICKPORT, _conf.click_port, __PORT_LEN , __XSocketConf::master_conf);
+
+	} else if (ini_gets(section_name, "click_port", "", _conf.click_port, __PORT_LEN , inifile) == 0) {
+		// look for a port entry under the section specified in the local ini file
+		// if not found, look for that section in the master ini file
+		ini_gets(section_name, "click_port", DEFAULT_CLICKPORT, _conf.click_port, __PORT_LEN , __XSocketConf::master_conf);
+  	}
 }
 
 struct __XSocketConf _conf;
@@ -153,9 +170,10 @@ void print_conf()
 **
 ** @returns void
 */
-void __InitXSocket::print_conf() 
+void __InitXSocket::print_conf()
 {
   printf("click_port %s\n", _conf.click_port);
 }
 int  __XSocketConf::initialized=0;
+char __XSocketConf::master_conf[BUF_SIZE];
 

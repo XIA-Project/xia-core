@@ -31,6 +31,9 @@
 #include <vector>
 #include <sstream>
 #include <iostream>
+#ifdef __APPLE__
+#include <libgen.h>
+#endif
 #include "Xsocket.h"
 
 #define DEBUG
@@ -51,6 +54,8 @@ using namespace std;
 // global configuration options
 int verbose = 1;
 string videoname;
+
+int *acceptSock;
 
 vector<string> CIDlist;
 
@@ -183,7 +188,7 @@ int uploadContent(const char *fname)
 	XfreeCacheSlice(ctx);
 	return 0;
 }
-	
+
 /*
 ** handle the request from the client and return the requested data
 */
@@ -192,21 +197,21 @@ void *processRequest (void *socketid)
 	int n;
 	char SIDReq[1024];
 	int *sock = (int*)socketid;
-	int acceptSock = *sock; 
-	
-	
+	int acceptSock = *sock;
+
+
 	memset(SIDReq, 0, sizeof(SIDReq));
-		
+
 	//Receive packet
-		
+
 	if ((n = Xrecv(acceptSock, SIDReq, sizeof(SIDReq), 0)) > 0) {
-			
+
 		string SIDReqStr(SIDReq);
 		// cout << "Got request: " << SIDReqStr << "\n";
 		// if the request is about number of chunks return number of chunks
 		// since this is first time, you would return along with header
 		int found = SIDReqStr.find("numchunks");
-			
+
 		if(found != -1){
 			// cout << " Request asks for number of chunks \n";
 			stringstream yy;
@@ -219,7 +224,7 @@ void *processRequest (void *socketid)
 			int findpos = SIDReqStr.find(":");
 			// split around this position
 			string str = SIDReqStr.substr(0,findpos);
-			int start_offset = atoi(str.c_str()); 
+			int start_offset = atoi(str.c_str());
 			str = SIDReqStr.substr(findpos + 1);
 			int end_offset = atoi(str.c_str());
 
@@ -229,7 +234,7 @@ void *processRequest (void *socketid)
 			// not including end_offset
 			for(int i = start_offset; i < end_offset; i++){
 				requestedCIDlist += CIDlist[i] + " ";
-			}		
+			}
 			Xsend(acceptSock, (void *)requestedCIDlist.c_str(), requestedCIDlist.length(), 0);
 			cout << "sending " << requestedCIDlist << "\n";
 		}
@@ -241,7 +246,8 @@ void *processRequest (void *socketid)
 int main(int argc, char *argv[])
 {
 	sockaddr_x *dag;
-	int sock, acceptSock;
+	int sock;
+	pthread_t client;
 
 	getConfig(argc, argv);
 
@@ -258,32 +264,36 @@ int main(int argc, char *argv[])
 		 die(-1, "Unable to create the local dag\n");
 	dag = (sockaddr_x*)ai->ai_addr;
 
-	// register this service name to the name server 
+	// register this service name to the name server
     if (XregisterName(SNAME, dag) < 0 )
 		perror("name register");
-    
+
 	if(Xbind(sock, (struct sockaddr*)dag, sizeof(sockaddr_x)) < 0)
 		 die(-1, "Unable to bind to the dag: %s\n", dag);
 
 	// we're done with this
 	Xfreeaddrinfo(ai);
-	
+
 
    	while (1) {
 		say("\nListening...\n");
-   		
-		if ((acceptSock = Xaccept(sock, NULL, NULL)) < 0)
-			die(-1, "accept failed\n");
 
+		acceptSock = (int *)calloc(1, sizeof(int));
+
+		if ((*acceptSock = Xaccept(sock, NULL, NULL)) < 0) {
+			free(acceptSock);
+			die(-1, "accept failed\n");
+        }
 		say("We have a new connection\n");
-		
+
 		// handle the connection in a new thread
-		pthread_t client;
-       	pthread_create(&client, NULL, processRequest, (void *)&acceptSock);
+		if (pthread_create(&client, NULL, processRequest, acceptSock) != 0) {
+			free(acceptSock);
+        }
 	}
-	
+
 	Xclose(sock); // we should never reach here!
-	
+
 	return 0;
 }
 

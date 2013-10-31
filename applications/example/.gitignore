@@ -6,4 +6,7 @@ echoclient-simple
 echoserver
 time_of_day_client
 time_of_day_server
-
+firehose
+drink
+xftp_basic_server
+xftp_basic_client

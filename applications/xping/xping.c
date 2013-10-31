@@ -86,6 +86,7 @@ struct hostent *hp;	/* Pointer to host info */
 struct timezone tz;	/* leftover */
 
 sockaddr_x whereto;
+sockaddr_x wherefrom;
 size_t datalen;		/* How much data */
 
 char usage[] =
@@ -104,6 +105,13 @@ int timing = 0;
 int tmin = 999999999;
 int tmax = 0;
 int tsum = 0;			/* sum of all times, for doing average */
+
+float nCatcher = 0;
+float catcher_timeout = 0; /* seconds */
+float interval = 1;
+int rc = 0;
+int srcSet = 0;
+
 char *inet_ntoa();
 
 /*
@@ -117,7 +125,11 @@ int main(int argc, char **argv)
 
 	argc--, av++;
 	while (argc > 0 && *av[0] == '-') {
-		while (*++av[0]) switch (*av[0]) {
+        int c = argc;
+		while (*++av[0]) {
+            if (c != argc)
+                break;
+            switch (*av[0]) {
 			case 'd':
 				options |= SO_DEBUG;
 				break;
@@ -133,7 +145,29 @@ int main(int argc, char **argv)
 			case 'f':
 				pingflags |= FLOOD;
 				break;
-		}
+            case 'i':
+                argc--, av++;
+                interval = atof(av[0]);
+                break;
+            case 'c':
+                argc--, av++;
+                npackets = atoi(av[0]);
+                break;
+            case 't':
+                argc--, av++;
+                catcher_timeout = atoi(av[0]);
+                break;
+            case 's':
+                argc--, av++;
+                len = sizeof(wherefrom);
+                srcSet = 1;
+                if(XgetDAGbyName(av[0], &wherefrom, &len) < 0) {
+                    printf("Error Resolving XID\n");
+                    exit(-1);
+                }
+                break;
+            }
+        }
 		argc--, av++;
 	}
 	if(argc < 1 || argc > 4)  {
@@ -176,9 +210,16 @@ int main(int argc, char **argv)
 	  printf("Xsetsockopt failed on XOPT_NEXT_PROTO\n");
 	  exit(-1);
 	}
+
+    if (srcSet) {
+        if (Xbind(s, (struct sockaddr *)&wherefrom, sizeof(sockaddr_x)) < 0) {
+            printf("Xbind failed\n");
+            exit(-1);
+        }
+    }
 	
 	Graph g(&whereto);
-	printf("PING %s: %ld data bytes\n", g.dag_string().c_str(), datalen);
+	printf("PING %s: %ld data bytes\n", g.dag_string().c_str(), (long int)datalen);
 
 	setlinebuf( stdout );
 
@@ -225,7 +266,7 @@ int main(int argc, char **argv)
  * 			C A T C H E R
  * 
  * This routine causes another PING to be transmitted, and then
- * schedules another SIGALRM for 1 second from now.
+ * schedules another SIGALRM for interval seconds from now.
  * 
  * Bug -
  * 	Our sense of time will slowly skew (ie, packets will not be launched
@@ -237,13 +278,21 @@ void catcher()
 	int waittime;
 
 	pinger();
+    nCatcher+=interval;
+    if (catcher_timeout && nCatcher >= catcher_timeout) {
+        rc = nreceived ? 0 : -1;
+        finish();
+    }
 	if (npackets == 0 || ntransmitted < npackets)
-		alarm(1);
+        if (interval < 1)
+            ualarm((int)(interval*1000000), 0);
+        else
+            alarm((int)interval);
 	else {
 		if (nreceived) {
 			waittime = 2 * tmax / 1000;
 			if (waittime == 0)
-				waittime = 1;
+				waittime = 1; //interval;
 		} else
 			waittime = MAXWAIT;
 		signal(SIGALRM, (sighandler_t)finish);
@@ -350,7 +399,7 @@ void pr_pack(u_char *buf, int cc, char *from)
 	register int i;
 	struct timeval tv;
 	struct timeval *tp;
-	int hlen, triptime;
+	int hlen, triptime = 0;
 
 	gettimeofday( &tv, &tz );
 
@@ -519,5 +568,5 @@ void finish()
 	fflush(stdout);
 
 	Xclose(s);
-	exit(0);
+	exit(rc);
 }

@@ -100,7 +100,7 @@ IPRandomize::simple_action(Packet *p_in)
     assert(_zipf_cache);
     //uint32_t seed  = _zipf_cache[_current_cycle]; /* zipf */
 
-#if CLICK_USERLEVEL && HAVE_MULTITHREAD 
+#if CLICK_USERLEVEL && HAVE_MULTITHREAD && HAVE___THREAD_STORAGE_CLASS
     if (!_ip_cache_initialized && click_current_thread_id == 1) {
 #else
     if (!_ip_cache_initialized && click_get_processor()==0) {

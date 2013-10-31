@@ -16,14 +16,15 @@
 /*!
   @file Xutil.h
   @brief header for internal helper functions
-*/  
+*/
 #ifndef _Xutil_h
 #define _Xutil_h
 
+#define PATH_SIZE 4096
 
 #ifdef DEBUG
 #define LOG(s) fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, s)
-#define LOGF(fmt, ...) fprintf(stderr, "%s:%d: " fmt"\n", __FILE__, __LINE__, __VA_ARGS__) 
+#define LOGF(fmt, ...) fprintf(stderr, "%s:%d: " fmt"\n", __FILE__, __LINE__, __VA_ARGS__)
 #else
 #define LOG(s)
 #define LOGF(fmt, ...)
@@ -50,4 +51,7 @@ void setWrapped(int sock, int wrapped);
 int isWrapped(int sock);
 void setAsync(int sock, int async);
 int isAsync(int sock);
+int setPeer(int sock, sockaddr_x *addr);
+const sockaddr_x *dgramPeer(int sock);
+
 #endif
