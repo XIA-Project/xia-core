@@ -2383,89 +2383,6 @@ void XTRANSPORT::XputChunk(unsigned short _sport)
 
 
 
-// void XTRANSPORT::XpushChunkto(unsigned short _sport, WritablePacket *p_in)
-// {
-// 	xia::X_Pushchunkto_Msg *x_pushchunkto_msg = xia_socket_msg.mutable_x_pushchunkto();
-// //			int hasCID = x_putchunk_msg->hascid();
-// 	
-// 	String dest(x_pushchunkto_msg->ddag().c_str());
-// 	//click_chatter("\n SENDTO ddag:%s, payload:%s, length=%d\n",xia_socket_msg.ddag().c_str(), xia_socket_msg.payload().c_str(), pktPayloadSize);
-// 
-// 	XIAPath dst_path;
-// 	dst_path.parse(dest);
-// 	
-// 	
-// 	int32_t contextID = x_pushchunkto_msg->contextid();
-// 	int32_t ttl = x_pushchunkto_msg->ttl();
-// 	int32_t cacheSize = x_pushchunkto_msg->cachesize();
-// 	int32_t cachePolicy = x_pushchunkto_msg->cachepolicy();
-// 
-// 	String pktPayload(x_pushchunkto_msg->payload().c_str(), x_pushchunkto_msg->payload().size());
-// 	String src;
-// 
-// 	/* Computes SHA1 Hash if user does not supply it */
-// 	char hexBuf[3];
-// 	int i = 0;
-// 	SHA1_ctx sha_ctx;
-// 	unsigned char digest[HASH_KEYSIZE];
-// 	SHA1_init(&sha_ctx);
-// 	SHA1_update(&sha_ctx, (unsigned char *)pktPayload.c_str() , pktPayload.length() );
-// 	SHA1_final(digest, &sha_ctx);
-// 	for(i = 0; i < HASH_KEYSIZE; i++) {
-// 		sprintf(hexBuf, "%02x", digest[i]);
-// 		src.append(const_cast<char *>(hexBuf), 2);
-// 	}
-// 
-// 	if(DEBUG) {
-// 		click_chatter("ctxID=%d, length=%d, ttl=%d cid=%s\n",
-// 					  contextID, x_pushchunkto_msg->payload().size(), ttl, src.c_str());
-// 	}
-// 
-// 	//append local address before CID
-// 	String str_local_addr = _local_addr.unparse_re();
-// 	str_local_addr = "RE " + str_local_addr + " CID:" + src;
-// 	XIAPath src_path;
-// 	src_path.parse(str_local_addr);
-// 
-// 	if(DEBUG) {
-// 		click_chatter("DAG: %s\n", str_local_addr.c_str());
-// 	}
-// 
-// 	//Add XIA headers
-// 	XIAHeaderEncap xiah;
-// 	xiah.set_last(LAST_NODE_DEFAULT);
-// 	xiah.set_hlim(hlim.get(_sport));
-// // 	xiah.set_dst_path(_local_addr);
-// 	xiah.set_dst_path(dst_path);
-// 	xiah.set_src_path(src_path);
-// 	xiah.set_nxt(CLICK_XIA_NXT_CID);
-// 	
-// 	
-// // 	xiah.set_contextid(contextID);
-// // 	xiah.set_cid(src.c_str());
-// // 	xiah.set_ttl(ttl);
-// // 	xiah.set_timestamp(timestamp.tv_sec);
-// // //	xiah.set_hascid(1);
-// // 	xiah.set_cachepolicy(0);
-// // 	xiah.set_cachesize(0);
-// // 	xiah.set_payload(x_pushchunkto_msg->payload().c_str(), x_pushchunkto_msg->payload().size());
-// 
-// 	//Might need to remove more if another header is required (eg some control/DAG info)
-// 
-// 	WritablePacket *just_payload_part = WritablePacket::make(256, (const void*)pktPayload.c_str(), pktPayload.length(), 0);
-// 
-// 	WritablePacket *p = NULL;
-// 	int chunkSize = pktPayload.length();
-// 	ContentHeaderEncap  contenth(0, 0, pktPayload.length(), chunkSize, ContentHeader::OP_PUSH,
-// 								 contextID, ttl, cacheSize, cachePolicy);
-// 	p = contenth.encap(just_payload_part);
-// 	p = xiah.encap(p, true);
-// 
-// 	if (DEBUG)
-// 		click_chatter("sent packet to cache");
-// 	output(NETWORK_PORT).push(p);
-// }
-
 
 void XTRANSPORT::XpushChunkto(unsigned short _sport, WritablePacket *p_in)
 {
@@ -2503,20 +2420,13 @@ void XTRANSPORT::XpushChunkto(unsigned short _sport, WritablePacket *p_in)
 		daginfo->port = _sport;
 		String str_local_addr = _local_addr.unparse_re();
 		
-		//TODO: Should I add cid here?
-// 		String src(x_pushchunkto_msg->cid().c_str(), x_pushchunkto_msg->cid().size());
-// 		//append local address before CID
-// 		String str_local_addr = _local_addr.unparse_re();
-// 		str_local_addr = "RE " + str_local_addr + " CID:" + src;
-// 		XIAPath src_path;
-// 		src_path.parse(str_local_addr);
 
 		
-		//FIXME: AD->HID->SID->CID format needs an SID here to be added.
+		//FIXME: AD->HID->SID->CID We can add SID here (AD->HID->SID->CID) if SID is passed or generate randomly
 // 		char xid_string[50];
 // 		random_xid("SID", xid_string);
-//			String rand(click_random(1000000, 9999999));
-//			String xid_string = "SID:20000ff00000000000000000000000000" + rand;
+//		String rand(click_random(1000000, 9999999));
+//		String xid_string = "SID:20000ff00000000000000000000000000" + rand;
 // 		str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
 
 		daginfo->src_path.parse_re(str_local_addr);

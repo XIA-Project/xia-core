@@ -332,6 +332,23 @@ void XIAContentModule::cache_incoming_local(Packet* p, const XID& srcCID, bool l
         _timer++;
         cit=_contentTable.find(srcCID);
         if(cit!=_contentTable.end()) { // content exists alreaady
+	  click_chatter("FFound the Chunk! Push: %d Put:%d\n", pushcid, local_putcid);
+	  if (pushcid){
+	      click_chatter("Pushing something that we already have\n");
+	      
+	      chunk=cit->second;
+	      chunk->fill(payload, offset, length);
+	      if(chunk->full()) {
+		 chunkFull=true;
+	      }else
+		click_chatter("Why is a partial chunk in contentTable?\n");
+
+	      if(_timer>=REFRESH) {
+                _timer = 0;
+                cache_management();
+		}
+	      
+	    }else{
             if (!local_putcid)
                 content[srcCID]=1;
             p->kill();
@@ -341,6 +358,7 @@ void XIAContentModule::cache_incoming_local(Packet* p, const XID& srcCID, bool l
                 cache_management();
             }
             return;
+	    }
         }
     
 #endif
@@ -611,6 +629,7 @@ void XIAContentModule::cache_incoming(Packet *p, const XID& srcCID, const XID& d
     if (CACHE_DEBUG){
         //click_chatter("--Cache incoming--%s %s", srcCID.unparse().c_str(), _transport->local_hid().unparse().c_str());
 	}
+    //FIXME: This comparison is just wrong.
     if(local_putcid || dstHID==_transport->local_hid()){
         // cache in client: if it is local putCID() then store content. Otherwise, should return the whole chunk if possible
 	printf("cache_incoming_local - local HID: %s, Dest HID: %s\n", _transport->local_hid().unparse().c_str(), dstHID.unparse().c_str());

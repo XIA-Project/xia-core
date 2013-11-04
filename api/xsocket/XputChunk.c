@@ -175,7 +175,7 @@ int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkI
 		info->ttl= _msgReply->ttl();
 		info->timestamp.tv_sec=_msgReply->timestamp();
 		info->timestamp.tv_usec = 0;
-		printf(">>>>>> PUT: info->cid: %s \n", _msgReply->cid().c_str()); 
+		LOGF(">>>>>> PUT: info->cid: %s \n", _msgReply->cid().c_str()); 
         return 0;
     } else {
         return -1;
