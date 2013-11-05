@@ -62,8 +62,8 @@ void say(const char *fmt, ...);
 void warn(const char *fmt, ...);
 void die(int ecode, const char *fmt, ...);
 void usage();
-int PushFileto(const ChunkContext* ctx, const char* fname, int flags, std::vector< Graph *> *rcpList, 
-		       ChunkInfo** info, unsigned int chunkSize, std::string &res);
+// int PushFileto(const ChunkContext* ctx, const char* fname, int flags, std::vector< Graph *> *rcpList, 
+// 		       ChunkInfo** info, unsigned int chunkSize, std::string &res);
 
 bool file_exists(const char * filename);
 template<typename Container>
@@ -641,6 +641,7 @@ int MulticastSource::PushFileto(const ChunkContext* ctx, const char* fname, int 
 // 	      for(std::vector<Graph*>::iterator it = rcptList->begin(); it != rcptList->end(); ++it) {
 // 		sockaddr_x cdag;
 // 		(*it)->fill_sockaddr(&cdag);
+// 	      sleep(1);
 		    if ((rc = MulticastChunk(ctx, buf, count, flags, rcptList, &infoList[i])) < 0)
 			    break;
 		    res = res + infoList[i].cid +"|";
@@ -796,9 +797,9 @@ void MulticastSource::MulticastFile(std::string fin){
   PushFileto(ctx, fin.c_str(), 0, recchunk, &info, ChunkSize, res);
   
   
+//   die(-1, "die");
   
-  
-  sleep(1);
+//   sleep(1);
   say(("PUSHFILE: " + res + "\n" ).c_str());
   
   // TODO:  should use SHA1 instead.

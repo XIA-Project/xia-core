@@ -606,9 +606,9 @@ void MulticastRP::ControlLoop(){
 	
 	while(location != std::string::npos) {
 		c = chunkhashes.substr(prev_loc, location-prev_loc);
-		say(("chunk key: " + c+"\n").c_str());
+// 		say(("chunk key: " + c+"\n").c_str());
 		std::string cc = chunksLists->find(c)->second; 
-		say(("chunklist: "+cc + "\n").c_str() );
+// 		say(("chunklist: "+cc + "\n").c_str() );
 
 		prev_loc = location + 1;
 		location = chunkhashes.find_first_of("|", prev_loc);

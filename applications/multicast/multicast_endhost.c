@@ -177,7 +177,7 @@ int MulticastEndhost::BuildChunkDAGs(ChunkStatus *cs, std::string chunks, std::s
 
 		char *dag = (char *)malloc(512);
 		sprintf(dag, "RE ( %s %s ) CID:%s", ad.c_str(), hid.c_str(), c.c_str());
-//  		say("%s\n", dag);
+  		say("%s\n", dag);
 		cs[n].cidLen = strlen(dag);
 		cs[n].cid = dag;
 		
