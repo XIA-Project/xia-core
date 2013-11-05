@@ -111,8 +111,8 @@ int XrecvChunkfrom(int sockfd, void *rbuf, size_t len, int flags, ChunkInfo *ci)
 	unsigned paylen = msg->payload().size();
 	const char *payload = msg->payload().c_str();
 	//FIXME: This fixes CID:cid but not sure if this should be done here. 
-// 	strcpy(ci->cid, msg->cid().substr(4,msg->cid().npos).c_str());
-	strcpy(ci->cid, msg->cid().c_str());
+ 	strcpy(ci->cid, msg->cid().substr(4,msg->cid().npos).c_str());
+// 	strcpy(ci->cid, msg->cid().c_str());
 	ci->size = msg->length();
 	ci->timestamp.tv_sec=msg->timestamp();
 	ci->timestamp.tv_usec = 0;

@@ -1372,7 +1372,7 @@ void XTRANSPORT::XbindPush(unsigned short _sport) {
 	int rc = 0, ec = 0;
 
 	//Bind XID
-	click_chatter("\n\nOK: SOCKET BIND !!!\\n");
+// 	click_chatter("\n\nOK: SOCKET BIND !!!\\n");
 	//get source DAG from protobuf message
 
 	xia::X_BindPush_Msg *x_bindpush_msg = xia_socket_msg.mutable_x_bindpush();
@@ -1427,9 +1427,9 @@ void XTRANSPORT::XbindPush(unsigned short _sport) {
 	}
 	
 	// (for Ack purpose) Reply with a packet with the destination port=source port
-	click_chatter("\n\nPUSHBIND: DONE, SENDING ACK !!!\\n");
+// 	click_chatter("\n\nPUSHBIND: DONE, SENDING ACK !!!\\n");
 	ReturnResult(_sport, xia::XBINDPUSH, rc, ec);
-	click_chatter("\n\nAFTER PUSHBIND: DONE, SENDING ACK !!!\\n");
+// 	click_chatter("\n\nAFTER PUSHBIND: DONE, SENDING ACK !!!\\n");
 }
 
 void XTRANSPORT::Xclose(unsigned short _sport)

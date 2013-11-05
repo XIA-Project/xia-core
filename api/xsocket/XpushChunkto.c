@@ -57,11 +57,11 @@ int XpushChunkto(const ChunkContext *ctx, const char *buf, size_t len, int flags
 {
 	
 	int rc;
-// 	char buffer[MAXBUFLEN];
-	
-	if ((rc = XputChunk(ctx, buf, len, info)) < 0)
+	  
+	  if ((rc = XputChunk(ctx, buf, len, info)) < 0)
 		return rc;
-	printf("CID put: %s\n", info->cid);
+	  printf("CID put: %s\n", info->cid);
+
 
 /*	if(ctx == NULL || buf == NULL || info == NULL || !addr)*/
 	if(!addr){

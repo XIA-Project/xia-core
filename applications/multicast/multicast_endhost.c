@@ -177,16 +177,16 @@ int MulticastEndhost::BuildChunkDAGs(ChunkStatus *cs, std::string chunks, std::s
 
 		char *dag = (char *)malloc(512);
 		sprintf(dag, "RE ( %s %s ) CID:%s", ad.c_str(), hid.c_str(), c.c_str());
-		say("%s\n", dag);
+//  		say("%s\n", dag);
 		cs[n].cidLen = strlen(dag);
 		cs[n].cid = dag;
 		
 		
 		n++;
 		prev_location = location + 1;
-		say("prev_loc %d\n", prev_location);
+// 		say("prev_loc %d\n", prev_location);
 		location = chunks.find_first_of("|", prev_location);
-		say("location %d\n", location);
+// 		say("location %d\n", location);
 	}
 
 	return n;
@@ -223,9 +223,9 @@ int MulticastEndhost::PullChunks( std::string &s, std::string chunks, Graph *g)
   int csock = -1;// ChunkSock;
   
   
-  std::string ad = g->dag_string().substr(SourceServiceDAG->dag_string().find("AD:"),43);
+  std::string ad = g->dag_string().substr(g->dag_string().find("AD:"),43);
   say(("sad " + ad + "\n").c_str());
-  std::string hid = g->dag_string().substr(SourceServiceDAG->dag_string().find("HID:"),44);
+  std::string hid = g->dag_string().substr(g->dag_string().find("HID:"),44);
   say(("shid " + hid + "\n").c_str());
 
   n = BuildChunkDAGs(cs, chunks, ad, hid);
@@ -286,18 +286,18 @@ int MulticastEndhost::PullChunks( std::string &s, std::string chunks, Graph *g)
 	  //In chunk status cid is not really cid! it's the RE dag. 
 	  std::string mcid = std::string(cs[i].cid);
 	  mcid = mcid.substr(mcid.find("CID:")+4, mcid.npos);
-	  say("CID: %s\n", cs[i].cid);
+/*	  say("CID: %s\n", cs[i].cid);
 	  say("MCID: %s-\n", mcid.c_str());
-	  say("strlen(info.cid): %d, strlen(mcid): %d\n", (CID_HASH_SIZE + 1), strlen(mcid.c_str()));
+	  say("strlen(info.cid): %d, strlen(mcid): %d\n", (CID_HASH_SIZE + 1), strlen(mcid.c_str()))*/;
 	  ChunkInfo info;
 	  strcpy(info.cid, mcid.c_str());//, strlen(info.cid));
-	  say("INFOCID: %s\n", info.cid);
+// 	  say("INFOCID: %s\n", info.cid);
 	  info.size = len;
 // 	  info.ttl= 1000;
 // 	  info.timestamp.tv_sec  = 0;
 // 	  info.timestamp.tv_usec = 0;
 	  
-	  ChunkReceived(data, len, &info);
+// 	  ChunkReceived(data, len, &info);
 	  // write the chunk to disk
 //		say("writing %d bytes of chunk %s to disk\n", len, cid);
 // 		  fwrite(data, 1, len, fd);
@@ -431,9 +431,9 @@ void MulticastEndhost::ControlLoop(){
 	
 	while(location != std::string::npos) {
 		c = chunkhashes.substr(prev_loc, location-prev_loc);
-		say(("chunk key: " + c+"\n").c_str());
+// 		say(("chunk key: " + c+"\n").c_str());
 		std::string cc = chunksLists->find(c)->second; 
-		say(("chunklist: "+cc + "\n").c_str() );
+// 		say(("chunklist: "+cc + "\n").c_str() );
 
 		prev_loc = location + 1;
 		location = chunkhashes.find_first_of("|", prev_loc);
@@ -490,7 +490,7 @@ void MulticastEndhost::ControlLoop(){
 	if(RPServiceDAG->dag_string() != SourceServiceDAG->dag_string()){
 	  delete RPServiceDAG;
 	}
-	RPServiceDAG = SourceServiceDAG;
+	RPServiceDAG = new Graph(SourceServiceDAG->dag_string());
       }
 
 // 	say("Dgram Server waiting\n");

@@ -47,7 +47,8 @@
 #define NUM_PROMPTS	1
 
 #define CHUNKSIZE (XIA_MAXBUF - 500)
-#define NUM_CHUNKS	10
+#define NXIDS 80 //number of XIDS per masterchunk. Large numbers will cause problems
+// #define NUM_CHUNKS	10
 
 int verbose = 1;
 char myAD[MAX_XID_SIZE];
@@ -141,7 +142,7 @@ class MulticastSource{
     void RPPullChunks(std::string cmd);
     void PullChunksRP(std::string cmd);
   
-    MulticastSource(std::string sn, std::string sid, int pm=0, unsigned int cs = CHUNKSIZE, int NXIDs=200 ){
+    MulticastSource(std::string sn, std::string sid, int pm=0, unsigned int cs = CHUNKSIZE, int NXIDs=NXIDS ){
       hosts = new std::map<std::string, Receiver *>;
       RPs = new std::map<std::string, Graph *>;
       
@@ -152,8 +153,8 @@ class MulticastSource{
       DGramSID = sid;
       NumXIDs = NXIDs;
       
-      if(NXIDs > 200)
-	NumXIDs = 200;
+      if(NXIDs > NXIDS)
+	NumXIDs = NXIDS;
 
       ChunkSize= cs;
       if(cs > (XIA_MAXBUF-500))
@@ -295,8 +296,8 @@ std::vector<Graph *> *MulticastSource::BuildRPsControlRecvList(){
 
 std::vector<Graph *> *MulticastSource::BuildChunkRecvList(){
   
-std::vector<Graph *> *vec = new std::vector<Graph*>();
-std::map<std::string, Receiver*>::iterator iter;
+  std::vector<Graph *> *vec = new std::vector<Graph*>();
+  std::map<std::string, Receiver*>::iterator iter;
 
   for (iter = hosts->begin(); iter != hosts->end(); ++iter){
 // 	say("send to: %s", iter->second->ControlDAG->dag_string().c_str());
@@ -305,6 +306,28 @@ std::map<std::string, Receiver*>::iterator iter;
       g = new Graph(iter->second->ChunkDAG->dag_string());
     else
       g = new Graph(iter->second->RP->dag_string());
+    
+    //Make sure it's not duplicate, probably better to use a set
+    bool dup = false;
+    std::vector<Graph*>::iterator i;
+    for (i = vec->begin(); i != vec->end(); ++i){
+      if(g->dag_string() == (*i)->dag_string())
+	dup = true;
+    }
+    if(!dup)
+      vec->push_back(g);
+    else
+      delete g;
+    
+  }   
+  
+  std::map<std::string, Graph*>::iterator ip;
+  for (ip = RPs->begin(); ip != RPs->end(); ++ip){
+// 	say("send to: %s", iter->second->ControlDAG->dag_string().c_str());
+    Graph *g;
+    if(ip->second != NULL)
+      g = new Graph(ip->second->dag_string());
+
     
     //Make sure it's not duplicate, probably better to use a set
     bool dup = false;
@@ -888,7 +911,7 @@ void MulticastSource::Initialize(){
 
 
 void usage(){
-	say("usage: get|put <source file> <dest name>\n");
+	say("usage: put <source file> \n >>");
 }
 
 /*
@@ -995,7 +1018,7 @@ int main()
 // 		    sleep(10);
 //  		    m->PullChunksRP("f9979c33a2a74020d854fbc138696c5c249edc16|4715a6373ced400b37a63b07c609313e39d488d3|335c7b4ab714a29280ad47fc3d9060161dfefb73");
 		    
- 		    m->MulticastFile(std::string(fin) );
+  		    m->MulticastFile(std::string(fin) );
 		  
 		    
 	    }

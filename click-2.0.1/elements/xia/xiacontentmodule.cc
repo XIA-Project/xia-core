@@ -332,7 +332,7 @@ void XIAContentModule::cache_incoming_local(Packet* p, const XID& srcCID, bool l
         _timer++;
         cit=_contentTable.find(srcCID);
         if(cit!=_contentTable.end()) { // content exists alreaady
-	  click_chatter("FFound the Chunk! Push: %d Put:%d\n", pushcid, local_putcid);
+	  click_chatter("Found the Chunk! Push: %d Put:%d\n", pushcid, local_putcid);
 	  if (pushcid){
 	      click_chatter("Pushing something that we already have\n");
 	      
@@ -349,15 +349,15 @@ void XIAContentModule::cache_incoming_local(Packet* p, const XID& srcCID, bool l
 		}
 	      
 	    }else{
-            if (!local_putcid)
-                content[srcCID]=1;
-            p->kill();
+	      if (!local_putcid)
+		  content[srcCID]=1;
+	      p->kill();
 
-            if(_timer>=REFRESH) {
-                _timer = 0;
-                cache_management();
-            }
-            return;
+	      if(_timer>=REFRESH) {
+		  _timer = 0;
+		  cache_management();
+	      }
+	      return;
 	    }
         }
     

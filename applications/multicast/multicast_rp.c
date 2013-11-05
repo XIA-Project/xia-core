@@ -216,6 +216,7 @@ void MulticastRP::MulticastToEndHosts(std::string cmd){
 int MulticastRP::MulticastChunk(const ChunkContext*, const char *buf, size_t count, int flags, 
 				    std::vector< Graph* >* rcptList, ChunkInfo* info) {
   int rc = -1;
+  warn("RP Mutlicast Chunk %s\n", info->cid);
   for(std::vector<Graph*>::iterator it = rcptList->begin(); it != rcptList->end(); ++it) {
     sockaddr_x cdag;
     (*it)->fill_sockaddr(&cdag);
@@ -301,8 +302,12 @@ void MulticastRP::ChunkLoop(){
     else{
 	    std::vector<Graph *> *recchunk = BuildEndhostChunkRecvList();
 	    int rc = -1;
-	    if ((rc = MulticastChunk(ctx, buf1, sizeof(buf1), 0, recchunk, info)) < 0)
+	    
+	    if ((rc = MulticastChunk(ctx, buf1, strlen(buf1), 0, recchunk, info)) < 0)
 	      warn("Could not send chunk");
+// 	    if ((rc = XputChunk(ctx, buf1, strlen(buf1), info)) < 0)
+// 	      warn("Could not put chunk");
+	    
 	    RemoveVec(recchunk);
       
 	    ChunkReceived(buf1, received, info);
@@ -343,16 +348,16 @@ int MulticastRP::BuildChunkDAGs(ChunkStatus *cs, std::string chunks, std::string
 
 		char *dag = (char *)malloc(512);
 		sprintf(dag, "RE ( %s %s ) CID:%s", ad.c_str(), hid.c_str(), c.c_str());
-		say("%s\n", dag);
+// 		say("%s\n", dag);
 		cs[n].cidLen = strlen(dag);
 		cs[n].cid = dag;
 		
 		
 		n++;
 		prev_location = location + 1;
-		say("prev_loc %d\n", prev_location);
+// 		say("prev_loc %d\n", prev_location);
 		location = chunks.find_first_of("|", prev_location);
-		say("location %d\n", location);
+// 		say("location %d\n", location);
 	}
 
 	return n;
@@ -452,18 +457,18 @@ int MulticastRP::PullChunks( std::string &s, std::string chunks, Graph *g)
 	  //In chunk status cid is not really cid! it's the RE dag. 
 	  std::string mcid = std::string(cs[i].cid);
 	  mcid = mcid.substr(mcid.find("CID:")+4, mcid.npos);
-	  say("CID: %s\n", cs[i].cid);
-	  say("MCID: %s-\n", mcid.c_str());
-	  say("strlen(info.cid): %d, strlen(mcid): %d\n", (CID_HASH_SIZE + 1), strlen(mcid.c_str()));
+// 	  say("CID: %s\n", cs[i].cid);
+// 	  say("MCID: %s-\n", mcid.c_str());
+// 	  say("strlen(info.cid): %d, strlen(mcid): %d\n", (CID_HASH_SIZE + 1), strlen(mcid.c_str()));
 	  ChunkInfo info;
 	  strcpy(info.cid, mcid.c_str());//, strlen(info.cid));
-	  say("INFOCID: %s\n", info.cid);
+// 	  say("INFOCID: %s\n", info.cid);
 	  info.size = len;
 // 	  info.ttl= 1000;
 // 	  info.timestamp.tv_sec  = 0;
 // 	  info.timestamp.tv_usec = 0;
 	  
-	  ChunkReceived(data, len, &info);
+// 	  ChunkReceived(data, len, &info);
 	  // write the chunk to disk
 //		say("writing %d bytes of chunk %s to disk\n", len, cid);
 // 		  fwrite(data, 1, len, fd);
@@ -713,7 +718,7 @@ void MulticastRP::ControlLoop(){
       else{
 	std::string st(buf);
 	
-	say("RP received invalid command: %s\n", st.c_str());
+	die(-1,"RP received invalid command: %s\n", st.c_str());
       }
       
 // 	say("Dgram Server waiting\n");

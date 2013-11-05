@@ -10,6 +10,8 @@ TARGETS= multicast_source multicast_endhost multicast_rp
 all: $(TARGETS)
 	cp multicast_endhost multicast_endhost_1	
 	cp multicast_endhost multicast_endhost_2	
+	rm -f H*
+	rm -f T*
 %: %.c
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS) -lpthread
 
