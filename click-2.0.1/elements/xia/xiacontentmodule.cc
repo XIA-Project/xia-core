@@ -396,7 +396,6 @@ void XIAContentModule::cache_incoming_local(Packet* p, const XID& srcCID, bool l
     }
     if(chunkFull) { //have built the whole chunk pkt
         if (!local_putcid && !pushcid) { /* sendout response to upper layer (application) */
-	    click_chatter("inside !local_putcid && !pushcid");
             Packet *newp = makeChunkResponse(chunk, p);
             _transport->checked_output_push(1 , newp);
         }
@@ -635,15 +634,15 @@ void XIAContentModule::cache_incoming(Packet *p, const XID& srcCID, const XID& d
     //FIXME: This comparison is just wrong.
     if(local_putcid || dstHID==_transport->local_hid()){
         // cache in client: if it is local putCID() then store content. Otherwise, should return the whole chunk if possible
-	printf("cache_incoming_local - local HID: %s, Dest HID: %s\n", _transport->local_hid().unparse().c_str(), dstHID.unparse().c_str());
+// 	printf("cache_incoming_local - local HID: %s, Dest HID: %s\n", _transport->local_hid().unparse().c_str(), dstHID.unparse().c_str());
         cache_incoming_local(p, srcCID, local_putcid, local_pushcid);	    
     }else if(local_removecid){
-	printf("cache_incoming_remove - local HID: %s, Dest HID: %s\n", _transport->local_hid().unparse().c_str(), dstHID.unparse().c_str());
+// 	printf("cache_incoming_remove - local HID: %s, Dest HID: %s\n", _transport->local_hid().unparse().c_str(), dstHID.unparse().c_str());
         cache_incoming_remove(p, srcCID);
     }
     else{
         // cache in server, router
-	printf("cache_incoming_forward - local HID: %s, Dest HID: %s\n", _transport->local_hid().unparse().c_str(), dstHID.unparse().c_str());
+// 	printf("cache_incoming_forward - local HID: %s, Dest HID: %s\n", _transport->local_hid().unparse().c_str(), dstHID.unparse().c_str());
         cache_incoming_forward(p, srcCID);
 	}
 }

@@ -118,6 +118,8 @@ class MulticastRP{
     bool StartControlLoop();
     int  SendCommand(std::string cmd);
     int  PullChunks( std::string &s, std::string chunks, Graph *g);
+    int  PullChunksOneByOne( std::string &s, std::string chunks, Graph *g);
+    int  PullPushChunksOneByOne( std::string &s, std::string chunks, Graph *g, std::vector< Graph* >* rcptList);
 
     void EndhostJoin(std::string clean);
     void EndhostLeave(std::string dags);
@@ -183,7 +185,8 @@ public:
 		     int iflags, std::vector< Graph* >* ircptList, ChunkInfo* iinfo){
     xxct = ixxct;
     memset(buf, 0, sizeof(buf));
-    strncpy(buf, ibuf, count);
+//     strncpy(buf, ibuf, count);
+    strcpy(buf, ibuf);
     count = icount;
     flags = iflags;
     rcptList = ircptList;
@@ -392,9 +395,10 @@ void MulticastRP::ChunkLoop(){
     else{
 	    
 	    std::vector<Graph *> *recchunk = BuildEndhostChunkRecvList();
-	    ParallelMulticastChunk(ctx, buf1, strlen(buf1), 0, recchunk, info);
 	    
-	    // 	    int rc = -1;
+	    
+	    ParallelMulticastChunk(ctx, buf1, strlen(buf1), 0, recchunk, info);
+// 	    int rc = -1;
 // 	    if ((rc = MulticastChunk(ctx, buf1, strlen(buf1), 0, recchunk, info)) < 0)
 // 	      warn("Could not send chunk");
 	    
@@ -588,9 +592,227 @@ int MulticastRP::PullChunks( std::string &s, std::string chunks, Graph *g)
   return n;
 }
 
+// I think there may be a bug in XRequestChunks. Very fast large files cause problems with missing chunks for some reason
+int MulticastRP::PullChunksOneByOne( std::string &s, std::string chunks, Graph *g)
+{
+  
+  int num_chunks  = std::count(chunks.begin(), chunks.end(), '|');
+  say("numchunks: %d\n", num_chunks); 
+  ChunkStatus *cs = new ChunkStatus[num_chunks];
+  char data[XIA_MAXCHUNK];
+  int len;
+  int status;
+  int n = -1;
+  int csock = -1;// ChunkSock;
+  
+  
+  std::string ad = g->dag_string().substr(g->dag_string().find("AD:"),43);
+  say(("sad " + ad + "\n").c_str());
+  std::string hid = g->dag_string().substr(g->dag_string().find("HID:"),44);
+  say(("shid " + hid + "\n").c_str());
+
+  n = BuildChunkDAGs(cs, chunks, ad, hid);
+
+  if(n != num_chunks)
+    die(-1, "There was an error parsing the cids and number of chunks");
+  
+  if ((csock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0)
+    die(-1, "unable to create chunk socket\n");
+  
+  
+  // bring the list of chunks local
+  say("requesting list of %d chunks\n", n);
+
+  
+  
+  for(int j = 0; j < n ; j ++){
+    
+      if (XrequestChunk(csock, cs[j].cid, 1) < 0) {
+	  say("unable to request chunks\n");
+	  return -1;
+  }
+  
+  say("checking chunk status\n");
+  int maxtries = 10;
+  int tries = 0; 
+    
+  while(tries<maxtries) {
+	  status = XgetChunkStatus(csock, cs[j].cid, 1);
+
+	  if (status == READY_TO_READ)
+		  break;
+
+	  else if (status < 0) {
+		  say("error getting chunk status\n");
+		  return -1;
+
+	  } else if (status & WAITING_FOR_CHUNK) {
+		  // one or more chunks aren't ready.
+		  say("waiting... one or more chunks aren't ready yet\n");
+	  
+	  } else if (status & INVALID_HASH) {
+		  die(-1, "one or more chunks has an invalid hash");
+	  
+	  } else if (status & REQUEST_FAILED) {
+		  die(-1, "no chunks found\n");
+
+	  } else {
+		  say("unexpected result\n");
+	  }
+	  tries++;
+	  sleep(1);
+	  
+  }
+    
+  if (status != READY_TO_READ){
+    say("Status Check Failed. dest dag: %s\n", cs[j].cid);
+    return -1;
+    }    
+    
+    
+    
+    char *cid = strrchr(cs[j].cid, ':');
+    cid++;
+    say("reading chunk %s\n", cid);
+    if ((len = XreadChunk(csock, data, sizeof(data), 0, cs[j].cid, cs[j].cidLen)) < 0) {
+	    say("error getting chunk\n");
+	    return -1;
+    }
+    //FIXME: this whole chunkstatus and chunkinfo and chunkcontext thing is bad and should be fixed in the whole content module
+    //In chunk status cid is not really cid! it's the RE dag. 
+    std::string mcid = std::string(cs[j].cid);
+    mcid = mcid.substr(mcid.find("CID:")+4, mcid.npos);
+//     say("CID: %s\n", cs[j].cid);
+//     say("MCID: %s-\n", mcid.c_str());
+//     say("strlen(info.cid): %d, strlen(mcid): %d\n", (CID_HASH_SIZE + 1), strlen(mcid.c_str()))*/;
+    ChunkInfo info;
+    strcpy(info.cid, mcid.c_str());//, strlen(info.cid));
+
+    info.size = len;
+
+    s = s + std::string(data,len);
+
+    free(cs[j].cid);
+    
+  }
+  
+  delete[] cs;
+  return n;
+}
 
 
-  int MulticastRP::Join(std::string name){
+
+
+int MulticastRP::PullPushChunksOneByOne( std::string &s, std::string chunks, Graph *g, std::vector< Graph* >* rcptList)
+{
+  
+  int num_chunks  = std::count(chunks.begin(), chunks.end(), '|');
+  say("numchunks: %d\n", num_chunks); 
+  ChunkStatus *cs = new ChunkStatus[num_chunks];
+  char data[XIA_MAXCHUNK];
+  int len;
+  int status;
+  int n = -1;
+  int csock = -1;// ChunkSock;
+  
+  
+  std::string ad = g->dag_string().substr(g->dag_string().find("AD:"),43);
+  say(("sad " + ad + "\n").c_str());
+  std::string hid = g->dag_string().substr(g->dag_string().find("HID:"),44);
+  say(("shid " + hid + "\n").c_str());
+
+  n = BuildChunkDAGs(cs, chunks, ad, hid);
+
+  if(n != num_chunks)
+    die(-1, "There was an error parsing the cids and number of chunks");
+  
+  if ((csock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0)
+    die(-1, "unable to create chunk socket\n");
+  
+  
+  // bring the list of chunks local
+  say("requesting list of %d chunks\n", n);
+
+  
+  
+  for(int j = 0; j < n ; j ++){
+    
+      if (XrequestChunk(csock, cs[j].cid, 1) < 0) {
+	  say("unable to request chunks\n");
+	  return -1;
+  }
+  
+  say("checking chunk status\n");
+  int maxtries = 10;
+  int tries = 0; 
+    
+  while(tries<maxtries) {
+	  status = XgetChunkStatus(csock, cs[j].cid, 1);
+
+	  if (status == READY_TO_READ)
+		  break;
+
+	  else if (status < 0) {
+		  say("error getting chunk status\n");
+		  return -1;
+
+	  } else if (status & WAITING_FOR_CHUNK) {
+		  // one or more chunks aren't ready.
+		  say("waiting... one or more chunks aren't ready yet\n");
+	  
+	  } else if (status & INVALID_HASH) {
+		  die(-1, "one or more chunks has an invalid hash");
+	  
+	  } else if (status & REQUEST_FAILED) {
+		  die(-1, "no chunks found\n");
+
+	  } else {
+		  say("unexpected result\n");
+	  }
+	  tries++;
+	  sleep(1);
+	  
+  }
+    
+  if (status != READY_TO_READ){
+    say("Status Check Failed. dest dag: %s\n", cs[j].cid);
+    return -1;
+    }    
+    
+    
+    
+    char *cid = strrchr(cs[j].cid, ':');
+    cid++;
+    say("reading chunk %s\n", cid);
+    if ((len = XreadChunk(csock, data, sizeof(data), 0, cs[j].cid, cs[j].cidLen)) < 0) {
+	    say("error getting chunk\n");
+	    return -1;
+    }
+    //FIXME: this whole chunkstatus and chunkinfo and chunkcontext thing is bad and should be fixed in the whole content module
+    //In chunk status cid is not really cid! it's the RE dag. 
+    std::string mcid = std::string(cs[j].cid);
+    mcid = mcid.substr(mcid.find("CID:")+4, mcid.npos);
+//     say("CID: %s\n", cs[j].cid);
+//     say("MCID: %s-\n", mcid.c_str());
+//     say("strlen(info.cid): %d, strlen(mcid): %d\n", (CID_HASH_SIZE + 1), strlen(mcid.c_str()))*/;
+    ChunkInfo info;
+    strcpy(info.cid, mcid.c_str());//, strlen(info.cid));
+    info.size = len;
+    
+    ParallelMulticastChunk(ctx, data, len, 0, rcptList, &info);
+
+    s = s + std::string(data,len);
+
+    free(cs[j].cid);
+    
+  }
+  
+  delete[] cs;
+  return n;
+}
+
+
+int MulticastRP::Join(std::string name){
     
       // lookup the xia service 
   SourceName = name;
@@ -694,7 +916,7 @@ void MulticastRP::ControlLoop(){
 	say((st + "\n").c_str());
 	std::string fs = st.substr(9, st.npos);
 	int endoffname = fs.find_first_of("|");
-	fname = "H" +postname + "-" + fs.substr(0, endoffname);
+	fname = "F" +postname + "-" + fs.substr(0, endoffname);
 // 	say( (fname+ "\n").c_str());	  
 
 	
@@ -721,7 +943,8 @@ void MulticastRP::ControlLoop(){
 
 		
 		std::string result;		 
-		PullChunks( result, cc.c_str(), SourceServiceDAG);
+// 		PullChunks( result, cc.c_str(), SourceServiceDAG);
+		PullChunksOneByOne( result, cc.c_str(), SourceServiceDAG);
 		//Maybe do something more complicated
 // 		MulticastToEndHosts("pullchunks|"+cc);
 		
@@ -765,7 +988,7 @@ void MulticastRP::ControlLoop(){
 	std::string st(buf);
 	std::string clean = st.substr(13, clean.npos);
 	std::string result;
-	PullChunks( result, clean.c_str(), SourceServiceDAG);
+	PullChunksOneByOne( result, clean.c_str(), SourceServiceDAG);
       }
       else if(strncmp("pullchunksrp|", buf, 13) == 0){
 	//Endhosts pull chunks from the RP
@@ -826,6 +1049,8 @@ void MulticastRP::ControlLoop(){
 	std::string st(buf);
 	std::string clean = st.substr(13, clean.npos);
 	std::string result;
+	
+	PullPushChunksOneByOne(result, clean, SourceServiceDAG, BuildEndhostChunkRecvList());
 	say("not comppleted. \n");
 	//Buildchunkdags, readsthem, send them
 	//PullChunks( result, clean.c_str(), SourceServiceDAG);
@@ -891,7 +1116,7 @@ void MulticastRP::InitializeClient(std::string mySID)
 //      ------------Chunk Stuff
   if ((ChunkSock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0)
 	  die(-1, "unable to create chunk socket\n");
-  ctx = XallocCacheSlice(POLICY_FIFO|POLICY_REMOVE_ON_EXIT, 0, 20000000);
+  ctx = XallocCacheSlice(POLICY_FIFO|POLICY_REMOVE_ON_EXIT, 0, 200000000);
   if (ctx == NULL)
       die(-2, "Unable to initilize the chunking system\n");
     
@@ -937,10 +1162,10 @@ void MulticastRP::ChunkReceived(char* buf, size_t len, ChunkInfo* info)
   say("Received Chunk %s\n", info->cid);
   
   std::string localfname = "T" +postname + ".tmp";
-//   say( (fname+ "\n").c_str());	  
-//   FILE *f = fopen(localfname.c_str(), "a");
-//   fwrite(buf, sizeof(char), strlen(buf), f);
-//   fclose(f);
+  say( (fname+ "\n").c_str());	  
+  FILE *f = fopen(localfname.c_str(), "a");
+  fwrite(buf, sizeof(char), strlen(buf), f);
+  fclose(f);
   
   
 }

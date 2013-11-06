@@ -94,6 +94,7 @@ class MulticastEndhost{
 //     void ControlLoop();
     int  SendCommand(std::string cmd);
     int  PullChunks( std::string &s, std::string chunks, Graph *g);
+    int  PullChunksOneByOne( std::string &s, std::string chunks, Graph *g);
   
   
   
@@ -178,7 +179,9 @@ int MulticastEndhost::BuildChunkDAGs(ChunkStatus *cs, std::string chunks, std::s
 
 		char *dag = (char *)malloc(512);
 		sprintf(dag, "RE ( %s %s ) CID:%s", ad.c_str(), hid.c_str(), c.c_str());
-//   		say("%s\n", dag);
+//    		say("%s\n", dag);
+// 		Graph *g = new Graph(dag);
+// 		delete g;
 		cs[n].cidLen = strlen(dag);
 		cs[n].cid = dag;
 		
@@ -308,10 +311,6 @@ int MulticastEndhost::PullChunks( std::string &s, std::string chunks, Graph *g)
 // 	  info.timestamp.tv_sec  = 0;
 // 	  info.timestamp.tv_usec = 0;
 	  
-// 	  ChunkReceived(data, len, &info);
-	  // write the chunk to disk
-//		say("writing %d bytes of chunk %s to disk\n", len, cid);
-// 		  fwrite(data, 1, len, fd);
 	  s = s + std::string(data,len);
 
 	  free(cs[i].cid);
@@ -323,8 +322,117 @@ int MulticastEndhost::PullChunks( std::string &s, std::string chunks, Graph *g)
 }
 
 
+// I think there may be a bug in XRequestChunks. Very fast large files cause problems with missing chunks for some reason
+int MulticastEndhost::PullChunksOneByOne( std::string &s, std::string chunks, Graph *g)
+{
+  
+  int num_chunks  = std::count(chunks.begin(), chunks.end(), '|');
+  say("numchunks: %d\n", num_chunks); 
+  ChunkStatus *cs = new ChunkStatus[num_chunks];
+  char data[XIA_MAXCHUNK];
+  int len;
+  int status;
+  int n = -1;
+  int csock = -1;// ChunkSock;
+  
+  
+  std::string ad = g->dag_string().substr(g->dag_string().find("AD:"),43);
+  say(("sad " + ad + "\n").c_str());
+  std::string hid = g->dag_string().substr(g->dag_string().find("HID:"),44);
+  say(("shid " + hid + "\n").c_str());
 
-  int MulticastEndhost::Join(std::string name){
+  n = BuildChunkDAGs(cs, chunks, ad, hid);
+
+  if(n != num_chunks)
+    die(-1, "There was an error parsing the cids and number of chunks");
+  
+  if ((csock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0)
+    die(-1, "unable to create chunk socket\n");
+  
+  
+  // bring the list of chunks local
+  say("requesting list of %d chunks\n", n);
+
+  
+  
+  for(int j = 0; j < n ; j ++){
+    
+      if (XrequestChunk(csock, cs[j].cid, 1) < 0) {
+	  say("unable to request chunks\n");
+	  return -1;
+  }
+  
+  say("checking chunk status\n");
+  int maxtries = 10;
+  int tries = 0; 
+    
+  while(tries<maxtries) {
+	  status = XgetChunkStatus(csock, cs[j].cid, 1);
+
+	  if (status == READY_TO_READ)
+		  break;
+
+	  else if (status < 0) {
+		  say("error getting chunk status\n");
+		  return -1;
+
+	  } else if (status & WAITING_FOR_CHUNK) {
+		  // one or more chunks aren't ready.
+		  say("waiting... one or more chunks aren't ready yet\n");
+	  
+	  } else if (status & INVALID_HASH) {
+		  die(-1, "one or more chunks has an invalid hash");
+	  
+	  } else if (status & REQUEST_FAILED) {
+		  die(-1, "no chunks found\n");
+
+	  } else {
+		  say("unexpected result\n");
+	  }
+	  tries++;
+	  sleep(1);
+	  
+  }
+    
+  if (status != READY_TO_READ){
+    say("Status Check Failed. dest dag: %s\n", cs[j].cid);
+    return -1;
+    }    
+    
+    
+    
+    char *cid = strrchr(cs[j].cid, ':');
+    cid++;
+    say("reading chunk %s\n", cid);
+    if ((len = XreadChunk(csock, data, sizeof(data), 0, cs[j].cid, cs[j].cidLen)) < 0) {
+	    say("error getting chunk\n");
+	    return -1;
+    }
+    //FIXME: this whole chunkstatus and chunkinfo and chunkcontext thing is bad and should be fixed in the whole content module
+    //In chunk status cid is not really cid! it's the RE dag. 
+    std::string mcid = std::string(cs[j].cid);
+    mcid = mcid.substr(mcid.find("CID:")+4, mcid.npos);
+//     say("CID: %s\n", cs[j].cid);
+//     say("MCID: %s-\n", mcid.c_str());
+//     say("strlen(info.cid): %d, strlen(mcid): %d\n", (CID_HASH_SIZE + 1), strlen(mcid.c_str()))*/;
+    ChunkInfo info;
+    strcpy(info.cid, mcid.c_str());//, strlen(info.cid));
+
+    info.size = len;
+
+    s = s + std::string(data,len);
+
+    free(cs[j].cid);
+    
+  }
+  
+  delete[] cs;
+  return n;
+}
+
+
+
+int MulticastEndhost::Join(std::string name){
     
       // lookup the xia service 
   SourceName = name;
@@ -424,7 +532,7 @@ void MulticastEndhost::ControlLoop(){
 // 	say((st + "\n").c_str());
 	std::string fs = st.substr(9, st.npos);
 	int endoffname = fs.find_first_of("|");
-	fname = "H" +postname + "-" + fs.substr(0, endoffname);
+	fname = "F" +postname + "-" + fs.substr(0, endoffname);
 // 	say( (fname+ "\n").c_str());	  
 
 	
@@ -451,7 +559,8 @@ void MulticastEndhost::ControlLoop(){
 
 		
 		std::string result;		 
-		PullChunks( result, cc.c_str(), SourceServiceDAG);
+// 		PullChunks( result, cc.c_str(), SourceServiceDAG);
+		PullChunksOneByOne( result, cc.c_str(), SourceServiceDAG);
 		
 		fwrite(result.c_str(), sizeof(char), result.size(), f);
 //  		  say((result + "\n").c_str() );
@@ -481,13 +590,13 @@ void MulticastEndhost::ControlLoop(){
 	std::string st(buf);
 	std::string clean = st.substr(11, clean.npos);
 	std::string result;
-	PullChunks( result, clean.c_str(), SourceServiceDAG);
+	PullChunksOneByOne( result, clean.c_str(), SourceServiceDAG);
       }
       else if(strncmp("pullchunksrp|", buf, 13) == 0){
 	std::string st(buf);
 	std::string clean = st.substr(13, clean.npos);
 	std::string result;
-	PullChunks( result, clean.c_str(), RPServiceDAG);
+	PullChunksOneByOne( result, clean.c_str(), RPServiceDAG);
       }
       else if(strncmp("setrp|", buf, 6) == 0){
 	std::string st(buf);

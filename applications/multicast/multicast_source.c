@@ -48,7 +48,7 @@
 #define DGRAM_NAME "www_s.multicast.aaa.xia"
 #define NUM_PROMPTS	1
 
-#define CHUNKSIZE (XIA_MAXBUF - 500)
+#define CHUNKSIZE (XIA_MAXBUF - 1000)
 #define NXIDS 80 //number of XIDS per masterchunk. Large numbers will cause problems
 // #define NUM_CHUNKS	10
 
@@ -196,7 +196,8 @@ public:
 		     int iflags, std::vector< Graph* >* ircptList, ChunkInfo* iinfo){
     xxct = ixxct;
     memset(buf, 0, sizeof(buf));
-    strncpy(buf, ibuf, count);
+//     strncpy(buf, ibuf, count);
+    strcpy(buf, ibuf);
     count = icount;
     flags = iflags;
     rcptList = ircptList;
@@ -247,7 +248,7 @@ std::vector<Graph *> *MulticastSource::BuildControlRecvList(){
 	g = new Graph(iter->second->ControlDAG->dag_string());
     else{
 	g = new Graph(iter->second->RP->dag_string());
-	say("RP is : %s", g->dag_string().substr(g->dag_string().find("HID:"), 44).c_str());
+// 	say("RP is : %s", g->dag_string().substr(g->dag_string().find("HID:"), 44).c_str());
     }
     
     
@@ -757,7 +758,7 @@ void MulticastSource::ChunkSendLoop(){
 
 void MulticastSource::ControlLoop()
 {
-  say("Dgram Server waiting\n>>");
+  say("Dgram Server waiting");
   while (1) {
 
     char buf[XIA_MAXBUF];
@@ -797,7 +798,7 @@ void MulticastSource::ControlLoop()
     }
 // 	else if(strncmp("joinc|", buf,6) == 0){
 // 	}
-    say("\nDgram Server waiting\n>>");
+    say("Dgram Server waiting");
 
   }
 
@@ -898,7 +899,7 @@ void MulticastSource::MulticastFile(std::string fin){
 //   die(-1, "die");
   
 //   sleep(1);
-  say(("PUSHFILE: " + res + "\n" ).c_str());
+//   say(("PUSHFILE: " + res + "\n" ).c_str());
   
   // TODO:  should use SHA1 instead.
   std::size_t h1 = std::hash<std::string>()(res);
@@ -990,7 +991,7 @@ void MulticastSource::Initialize(){
     if ((ChunkSock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0)
 	    die(-1, "unable to create chunk socket\n");
     
-    ctx = XallocCacheSlice(POLICY_FIFO|POLICY_REMOVE_ON_EXIT, 0, 20000000);
+    ctx = XallocCacheSlice(POLICY_FIFO|POLICY_REMOVE_ON_EXIT, 0, 200000000);
     if (ctx == NULL)
 	    die(-2, "Unable to initilize the chunking system\n");
     
@@ -1010,12 +1011,8 @@ void MulticastSource::Initialize(){
 
 
 
-
-
-
-
 void usage(){
-	say("usage: put <source file> \n >>");
+	say("usage: put <source file> \n");
 }
 
 /*
@@ -1028,6 +1025,7 @@ void say(const char *fmt, ...)
 
 		va_start(args, fmt);
 		vprintf(fmt, args);
+		vprintf("\n>>", args);
 		va_end(args);
 	}
 }
