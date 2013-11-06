@@ -16,7 +16,7 @@
 */
 /*!
 ** @file Xbind.c
-** @brief implements Xbind()
+** @brief implements XbindPush()
 */
 
 #include "Xsocket.h"
@@ -26,13 +26,11 @@
 #include "dagaddr.hpp"
 
 /*!
-** @brief Bind an Xsocket to a DAG.
+** @brief Bind a Chunk Xsocket to a DAG.
 **
 ** Assign the specified DAG to to the Xsocket referred to by sockfd. The DAG's
-** final intent should be a valid SID.
+** final intent should be a valid SID. This only works with chunk sockets.
 ** 
-** It is necessary to assign a local DAG using Xbind() before an XSOCK_STREAM
-** socket may receive connections (see accept()).
 **
 ** An un-bound Xsocket will be given a random local SID that is currently not
 ** available to the application.

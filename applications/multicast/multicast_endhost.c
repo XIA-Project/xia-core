@@ -31,23 +31,13 @@
 #define VERSION "v1.0"
 #define TITLE "XIA Multicast Endhost"
 #define NAME "www_s.multicast.aaa.xia"
-// #define CHUNKSIZE 1024
 
-
-
-#define NUM_CHUNKS	10
 #define NUM_PROMPTS	2
 
 
 // global configuration options
 int verbose = 1;
-bool quick = false;
 
-char s_ad[MAX_XID_SIZE];
-char s_hid[MAX_XID_SIZE];
-
-char my_ad[MAX_XID_SIZE];
-char my_hid[MAX_XID_SIZE];
 
 
 struct addrinfo *ai;
@@ -72,9 +62,7 @@ class MulticastEndhost{
    
     Graph *DGramDAG;
     Graph *ChunkDAG;
-  //   Graph *SourceChunkDAG;
     Graph *SourceServiceDAG;
-  //   Graph *RPChunkDAG;
     Graph *RPServiceDAG;
     std::string DGramSID;
     std::string ChunkSID; //for now we use the same for both
@@ -84,14 +72,12 @@ class MulticastEndhost{
     std::map<std::string, std::string> *chunksLists;
     
     
-    int pushmode; //0 for push to RP, Push to host. 1 for push to RP, pull by the host
     int ChunkSock, DGramSock;
     ChunkContext *ctx;
     
     int  BuildChunkDAGs(ChunkStatus *cs, std::string chunks, std::string ad, std::string hid);
     bool StartChunkLoop();
     bool StartControlLoop();
-//     void ControlLoop();
     int  SendCommand(std::string cmd);
     int  PullChunks( std::string &s, std::string chunks, Graph *g);
     int  PullChunksOneByOne( std::string &s, std::string chunks, Graph *g);
@@ -114,8 +100,7 @@ class MulticastEndhost{
 
   
   
-  MulticastEndhost(int pm=0, std::string s = ""){
-  pushmode = pm;
+  MulticastEndhost( std::string s = ""){
   fname = "";
   postname = s;
   chunksLists = new std::map<std::string, std::string>;
@@ -538,10 +523,7 @@ void MulticastEndhost::ControlLoop(){
 	
 	std::string chunkhashes = fs.substr(endoffname+1, fs.npos);
 	say( (chunkhashes+ "\n").c_str());	
-	
-// 	  std::vector<const Node*>::iterator ads = SourceServiceDAG->get_nodes_of_type(Node::XID_TYPE_AD).begin();
-// 	  std::vector<const Node*>::iterator hds = SourceServiceDAG->get_nodes_of_type(Node::XID_TYPE_HID).begin();
-	  
+		  
 	std::string c;
 	// build the list of chunks to retrieve
 	std::size_t prev_loc = 0;
@@ -634,7 +616,10 @@ void MulticastEndhost::InitializeClient(std::string mySID)
   // create a socket, and listen for incoming connections
   if ((DGramSock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
 	    die(-1, "Unable to create the listening socket\n");
-      
+  
+  char my_ad[MAX_XID_SIZE];
+  char my_hid[MAX_XID_SIZE];
+  
   rc = XreadLocalHostAddr(DGramSock, my_ad, MAX_XID_SIZE, my_hid, MAX_XID_SIZE, IP, MAX_XID_SIZE);
 
   if (rc < 0) {
@@ -787,7 +772,7 @@ int main(int argc, char **argv)
     say("For now it doesn't accept source name");
   char *name = &argv[0][2];
   printf("name: %s", name);
-  MulticastEndhost *meh = new MulticastEndhost(0, std::string(name)); //:-)
+  MulticastEndhost *meh = new MulticastEndhost(std::string(name)); //:-)
   meh->InitializeClient(std::string("00000000dd41b924c1001cfa1e1117a812492444"));
   meh->Join(std::string(NAME));
 //   say("AFTER JOIN\n");

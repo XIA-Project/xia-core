@@ -33,10 +33,8 @@
 
 #define MAX_XID_SIZE 100
 #define VERSION "v1.0"
-#define TITLE "XIA Multicast Endhost"
-#define NAME "www_s.multicast.aaa.xia"
-// #define CHUNKSIZE 1024
-
+#define TITLE "XIA Multicast RP"
+#define NAME "www_s.multicast.aaa.xia" // connects to this name. We can just replace it with the source service DAG address.
 
 
 #define NUM_CHUNKS	10
@@ -45,13 +43,7 @@
 
 // global configuration options
 int verbose = 1;
-bool quick = false;
 
-char s_ad[MAX_XID_SIZE];
-char s_hid[MAX_XID_SIZE];
-
-char my_ad[MAX_XID_SIZE];
-char my_hid[MAX_XID_SIZE];
 
 
 struct addrinfo *ai;
@@ -75,7 +67,6 @@ class Receiver{
   Receiver(Graph *control, Graph *chunk){
     ControlDAG = control;
     ChunkDAG = chunk;
-//     say("created receiver: %s\n", ControlDAG->dag_string().c_str());
   }
 };
 
@@ -90,13 +81,12 @@ class MulticastRP{
    pthread_mutex_t  mtxlock = PTHREAD_MUTEX_INITIALIZER;
    pthread_mutex_t  chunksendmtxlock = PTHREAD_MUTEX_INITIALIZER;
    std::string fname;
-   
-    Graph *DGramDAG;
-    Graph *ChunkDAG;
+   //My info. Right now DGramDAG and ChunkDAG can be the same. Essentially you can bind the same SID for chunk and dgram and it will work.
+   Graph *DGramDAG;
+   Graph *ChunkDAG;
   //   Graph *SourceChunkDAG;
     Graph *SourceServiceDAG;
-  //   Graph *RPChunkDAG;
-//     Graph *RPServiceDAG;
+
     std::string DGramSID;
     std::string ChunkSID; //for now we use the same for both
     
@@ -107,7 +97,6 @@ class MulticastRP{
     std::queue<MulticastChunkData *> *MulticastChunks;
     
     
-    int pushmode; //0 for push to RP, Push to host. 1 for push to RP, pull by the host
     int ChunkSock, DGramSock;
     ChunkContext *ctx;
     sem_t qsem;
@@ -141,7 +130,6 @@ class MulticastRP{
     
     std::vector<Graph *> *BuildEndhostChunkRecvList();
     std::vector<Graph *> *BuildEndhostControlRecvList();
-//     std::vector<Graph *> *BuildChunkRecvList();
     void SendToList(std::string cmd, std::vector<Graph*> *rcptList);
     void MulticastToEndHosts(std::string cmd);
     int  Join(std::string name);
@@ -155,8 +143,7 @@ class MulticastRP{
 
   
   
-  MulticastRP(int pm=0, std::string s = ""){
-    pushmode = pm;
+  MulticastRP( std::string s = ""){
     fname = "";
     postname = s;
     chunksLists = new std::map<std::string, std::string>;
@@ -404,10 +391,7 @@ void MulticastRP::ChunkLoop(){
 	    
 	    ChunkReceived(buf1, received, info);
 
-	    // 	    RemoveVec(recchunk);
-      
-	    
-	    
+	    // 	    RemoveVec(recchunk);    
 // 	    warn("Received Chunk CID: %s\n", info->cid);
     }
 
@@ -578,6 +562,7 @@ int MulticastRP::PullChunks( std::string &s, std::string chunks, Graph *g)
 // 	  info.timestamp.tv_sec  = 0;
 // 	  info.timestamp.tv_usec = 0;
 	  
+	//TODO: so I get ChunkStatus and I want to pass Chunkinfo to the virtual ChunkReceived method. This is the problem. 
 // 	  ChunkReceived(data, len, &info);
 	  // write the chunk to disk
 //		say("writing %d bytes of chunk %s to disk\n", len, cid);
@@ -814,7 +799,7 @@ int MulticastRP::PullPushChunksOneByOne( std::string &s, std::string chunks, Gra
 
 int MulticastRP::Join(std::string name){
     
-      // lookup the xia service 
+      // lookup the xia service, can easily ignore this part and use a dag that is received through some other mechanism. 
   SourceName = name;
   sockaddr_x dag;
   socklen_t daglen;
@@ -829,8 +814,6 @@ int MulticastRP::Join(std::string name){
   SourceServiceDAG = new Graph(sa);
   printf("Service DAG: %s\n", SourceServiceDAG->dag_string().c_str());
     
-	  //Send messages
-  
 
   char joinmessage[512];
   sprintf(joinmessage, "joinrp|%s", DGramDAG->dag_string().c_str());
@@ -844,7 +827,7 @@ int MulticastRP::Join(std::string name){
 	die(0, DGramDAG->dag_string().c_str());
   }
 
-  //TODO: For now it's unreliable. This can be added to make it reliable.
+  //TODO: For now it's unreliable. This can be added to make it reliable. Either use a stream socket. or manually send acks for commands. 
 //     char buf[XIA_MAXBUF];
 //     sockaddr_x cdag;
 //     socklen_t dlen;
@@ -922,10 +905,7 @@ void MulticastRP::ControlLoop(){
 	
 	std::string chunkhashes = fs.substr(endoffname+1, fs.npos);
 // 	say( (chunkhashes+ "\n").c_str());	
-	
-// 	  std::vector<const Node*>::iterator ads = SourceServiceDAG->get_nodes_of_type(Node::XID_TYPE_AD).begin();
-// 	  std::vector<const Node*>::iterator hds = SourceServiceDAG->get_nodes_of_type(Node::XID_TYPE_HID).begin();
-	  
+ 
 	std::string c;
 	// build the list of chunks to retrieve
 	std::size_t prev_loc = 0;
@@ -945,7 +925,7 @@ void MulticastRP::ControlLoop(){
 		std::string result;		 
 // 		PullChunks( result, cc.c_str(), SourceServiceDAG);
 		PullChunksOneByOne( result, cc.c_str(), SourceServiceDAG);
-		//Maybe do something more complicated
+		//TODO: Maybe do something more complicated
 // 		MulticastToEndHosts("pullchunks|"+cc);
 		
 		fwrite(result.c_str(), sizeof(char), result.size(), f);
@@ -965,12 +945,6 @@ void MulticastRP::ControlLoop(){
 // 	say((clean + "\n").c_str());
 	int endofhash = clean.find_first_of("|");
 	std::string hash = clean.substr(0, endofhash);
-// 	say( ( hash+"\n" ).c_str());
-// 	  say(clean.c_str());
-// 	  say("\n");
-// 	  std::string ccid = clean.substr(endofhash+1, 39);
-// 	  say(ccid.c_str());	  
-// 	say(clean.substr(endofhash+1, clean.npos).c_str());
 	chunksLists->insert( std::pair<std::string, std::string>(hash, clean.substr(endofhash+1, clean.npos)) );
 
       }
@@ -978,7 +952,7 @@ void MulticastRP::ControlLoop(){
 	std::string st(buf);
 	//End host pulls chunks
 	MulticastToEndHosts(st);
-	//TODO: what should RP do?
+	//TODO: decide what should RP do?
 // 	std::string clean = st.substr(11, clean.npos);
 // 	std::string result;
 // 	PullChunks( result, clean.c_str(), SourceServiceDAG);
@@ -994,27 +968,18 @@ void MulticastRP::ControlLoop(){
 	//Endhosts pull chunks from the RP
 	std::string st(buf);
 	MulticastToEndHosts(st);
-// 	std::string clean = st.substr(13, clean.npos);
-// 	std::string result;
-// 	PullChunks( result, clean.c_str(), SourceServiceDAG);
       }
       else if(strncmp("setrp|", buf, 6) == 0){
 	std::string st(buf);
 	say("setrp, This should not happen unless RPs are used to set RPs in rpjoin\n");
 	MulticastToEndHosts(st);
-// 	std::string clean = st.substr(6, clean.npos);
-// 	Graph *g = new Graph(clean);
-// 	RPServiceDAG = g;
       }
       else if(strncmp("removerp|", buf, 9) == 0){
 	std::string st(buf);
 	say("removerp, This should not happen\n");
 	MulticastToEndHosts(st);
 	hosts->clear();
-// 	if(RPServiceDAG->dag_string() != SourceServiceDAG->dag_string()){
-// 	  delete RPServiceDAG;
-// 	}
-// 	RPServiceDAG = SourceServiceDAG;
+
       }
       else if(strncmp("ehlist|", buf, 7) == 0){
 	std::string st(buf);
@@ -1083,7 +1048,10 @@ void MulticastRP::InitializeClient(std::string mySID)
   // create a socket, and listen for incoming connections
   if ((DGramSock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
 	    die(-1, "Unable to create the listening socket\n");
-      
+  
+  char my_ad[MAX_XID_SIZE];
+  char my_hid[MAX_XID_SIZE];
+  
   rc = XreadLocalHostAddr(DGramSock, my_ad, MAX_XID_SIZE, my_hid, MAX_XID_SIZE, IP, MAX_XID_SIZE);
 
   if (rc < 0) {
@@ -1124,7 +1092,7 @@ void MulticastRP::InitializeClient(std::string mySID)
     
 //       char my_csid[] = "00000000dd41b924c1001cfa1e1117a812492411";
   char CDAG[500];
-  // Using same SID for chunk and DGram DAG. This should probably be different. But it fworks as the bind for chunk and DGram is different.
+  // Using same SID for chunk and DGram DAG. This should probably be different. But it works as the bind for chunk and DGram is different.
   // Can be easily changed to something else. Probably should. This was just easier.
   sprintf(CDAG,"DAG 0 - \n%s 1 - \n%s 2 - \nSID:%s", my_ad, my_hid,  mySID.c_str());
   std::string chunkDAG = CDAG;
@@ -1239,7 +1207,7 @@ int main(int argc, char **argv)
     say("For now it doesn't accept source name");
   char *name = &argv[0][2];
   printf("name: %s", name);
-  MulticastRP *mrp = new MulticastRP(0, std::string(name)); //:-)
+  MulticastRP *mrp = new MulticastRP(std::string(name)); //:-)
   //TODO make this random
   mrp->InitializeClient(std::string("00000000dd41b924c1001cfa1e1117a812492444"));
   mrp->Join(std::string(NAME));

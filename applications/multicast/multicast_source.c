@@ -43,19 +43,15 @@
 #define TITLE "XIA Multicast Source"
 
 #define MAX_XID_SIZE 100
-// #define DAG  "RE %s %s %s"
 #define DGRAM_SID "SID:00000000dd41b924c1001cfa1e1117a812492434"
 #define DGRAM_NAME "www_s.multicast.aaa.xia"
 #define NUM_PROMPTS	1
 
 #define CHUNKSIZE (XIA_MAXBUF - 1000)
 #define NXIDS 80 //number of XIDS per masterchunk. Large numbers will cause problems
-// #define NUM_CHUNKS	10
+
 
 int verbose = 1;
-char myAD[MAX_XID_SIZE];
-char myHID[MAX_XID_SIZE];
-char my4ID[MAX_XID_SIZE];
 bool quick = false;
 
 
@@ -64,8 +60,7 @@ void say(const char *fmt, ...);
 void warn(const char *fmt, ...);
 void die(int ecode, const char *fmt, ...);
 void usage();
-// int PushFileto(const ChunkContext* ctx, const char* fname, int flags, std::vector< Graph *> *rcpList, 
-// 		       ChunkInfo** info, unsigned int chunkSize, std::string &res);
+
 
 bool file_exists(const char * filename);
 template<typename Container>
@@ -85,8 +80,7 @@ class Receiver{
     ControlDAG = control;
     ChunkDAG = chunk;
     RP = rp;
-//     say("created receiver: %s\n", ControlDAG->dag_string().c_str());
-  
+
   }
 };
 class MulticastChunkData;
@@ -111,7 +105,6 @@ class MulticastSource{
     int ChunkSock, DGramSock;
     ChunkContext *ctx;
     
-    int pushmode; //0 for push to RP, Push to host. 1 for push to RP, pull by the host. NOT USED
     int NumXIDs;
     unsigned int ChunkSize;
     std::queue<MulticastChunkData *> *MulticastChunks;
@@ -159,14 +152,11 @@ class MulticastSource{
     void RPPushChunks(std::string cmd);
     void PullChunksRP(std::string cmd);
   
-    MulticastSource(std::string sn, std::string sid, int pm=0, unsigned int cs = CHUNKSIZE, int NXIDs=NXIDS ){
+    MulticastSource(std::string sn, std::string sid, unsigned int cs = CHUNKSIZE, int NXIDs=NXIDS ){
       hosts = new std::map<std::string, Receiver *>;
       RPs = new std::map<std::string, Graph *>;
       MulticastChunks = new std::queue<MulticastChunkData *>;
       
-//       ctx = XallocCacheSlice(POLICY_FIFO|POLICY_REMOVE_ON_EXIT, 0, 20000000); done in initialize
-
-      pushmode = pm;
       DGramName = sn;
       DGramSID = sid;
       NumXIDs = NXIDs;
@@ -1070,7 +1060,7 @@ void die(int ecode, const char *fmt, ...)
 int main()
 {	
     MulticastSource *m;
-    m = new MulticastSource(DGRAM_NAME, DGRAM_SID, 0);
+    m = new MulticastSource(DGRAM_NAME, DGRAM_SID);
     m->Initialize();
 
 

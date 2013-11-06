@@ -28,12 +28,12 @@
 /*!
 ** @brief Sends a datagram chunk message on an Xsocket
 **
-** Internally calls XputChunk 
+** 
 ** XpushChunkto sends a datagram style chunk to the specified address. The final intent of
-** the address should be a valid SID or HID.
+** the address should be a valid SID or HID. i.e., AD->HID (gets cached) AD->HID->SID (gets cached and send to application through xrecvchunkfrom)
 ** 
 ** Unlike a standard socket, XpushChunkto() is only valid on Xsockets of
-** type XSOCK_CHUNK. FIXME: Maybe there should be chunk_datagram
+** type XSOCK_CHUNK. 
 **
 ** If the buffer is too large (bigger than XIA_MAXCHUNK), XpushChunkto() will return an error.
 **
@@ -173,7 +173,7 @@ int XpushBufferto(const ChunkContext *ctx, const char *data, size_t len, int fla
 	p = data;
 	for (i = 0; i < numChunks; i++) {
 		count = MIN(len, chunkSize);
-		// XputChunk(ctx, p, count, &infoList[i]))
+	
 		if ((rc =XpushChunkto(ctx, p, count, flags, addr, addrlen, &infoList[i]) < 0))
 			break;
 		len -= count;
