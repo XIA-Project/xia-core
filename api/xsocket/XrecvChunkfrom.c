@@ -32,19 +32,11 @@
 /*!
 ** @brief receives datagram data on an Xsocket.
 **
-** XrecvChunkfrom() retrieves data from an Xsocket of type XSOCK_DGRAM. Unlike the 
-** standard recvfrom API, it will not work with sockets of type XSOCK_STREAM.
+** XrecvChunkfrom() retrieves data from an Xsocket of type XSOCK_CHUNK. 
 **
 ** XrecvChunkFrom() does not currently have a non-blocking mode, and will block
-** until a data is available on sockfd. However, the standard socket API
-** calls select and poll may be used with the Xsocket. Either function
-** will deliver a readable event when a new connection is attempted and
-** you may then call XrecvFrom() to get the data.
+** until a data is available on sockfd. 
 **
-** NOTE: in cases where more data is received than specified by the caller,
-** the excess data will be stored in the socket state structure and will 
-** be returned from there rather than from Click. Once the socket state
-** is drained, requests will be sent through to Click again.
 **
 ** @param sockfd The socket to receive with
 ** @param rbuf where to put the received data
@@ -59,7 +51,7 @@
 */
 
 
-// FIXME: Seems like recvchunk gets CID:cid instead of just cid in the ChunkInfo which shouldn't happen
+// FIXME: It's better if the whole source dag is returned. Have to modify push message and xiacontentmodule
 int XrecvChunkfrom(int sockfd, void *rbuf, size_t len, int flags, ChunkInfo *ci)
 {
 	int rc;
@@ -110,13 +102,14 @@ int XrecvChunkfrom(int sockfd, void *rbuf, size_t len, int flags, ChunkInfo *ci)
 	xia::X_Pushchunkto_Msg *msg = xsm.mutable_x_pushchunkto();
 	unsigned paylen = msg->payload().size();
 	const char *payload = msg->payload().c_str();
-	//FIXME: This fixes CID:cid but not sure if this should be done here. 
+	//FIXME: This fixes CID:cid to cid. The API should change to return the SDAG instead
  	strcpy(ci->cid, msg->cid().substr(4,msg->cid().npos).c_str());
 // 	strcpy(ci->cid, msg->cid().c_str());
 	ci->size = msg->length();
 	ci->timestamp.tv_sec=msg->timestamp();
 	ci->timestamp.tv_usec = 0;
 	ci->ttl = msg->ttl();
+	
 
 	if (paylen > len) {
 		LOGF("CID is %u bytes, but rbuf is only %lu bytes", paylen, len);

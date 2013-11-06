@@ -339,7 +339,9 @@ void XIAContentModule::cache_incoming_local(Packet* p, const XID& srcCID, bool l
 	      chunk=cit->second;
 	      chunk->fill(payload, offset, length);
 	      if(chunk->full()) {
-		 chunkFull=true;
+// 		  chunkFull=true;
+		  Packet *newp = makeChunkResponse(chunk, p);
+		  _transport->checked_output_push(1 , newp);
 	      }else
 		click_chatter("Why is a partial chunk in contentTable?\n");
 
@@ -393,7 +395,8 @@ void XIAContentModule::cache_incoming_local(Packet* p, const XID& srcCID, bool l
         }
     }
     if(chunkFull) { //have built the whole chunk pkt
-        if (!local_putcid) { /* sendout response to upper layer (application) */
+        if (!local_putcid && !pushcid) { /* sendout response to upper layer (application) */
+	    click_chatter("inside !local_putcid && !pushcid");
             Packet *newp = makeChunkResponse(chunk, p);
             _transport->checked_output_push(1 , newp);
         }

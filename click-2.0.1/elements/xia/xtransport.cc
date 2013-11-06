@@ -865,19 +865,24 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 {
-// 	if (DEBUG){
+ 	if (DEBUG){
 	click_chatter("Got packet from cache");		
-// 	}
+ 	}
 	
 	//Extract the SID/CID
 	XIAHeader xiah(p_in->xia_header());
 	XIAPath dst_path = xiah.dst_path();
 	XIAPath src_path = xiah.src_path();
 	XID	destination_sid = dst_path.xid(dst_path.destination_node());
-	XID	source_cid = src_path.xid(src_path.destination_node());
-	
+	XID	source_cid = src_path.xid(src_path.destination_node());	
 	
         ContentHeader ch(p_in);
+	
+// 	click_chatter("dest %s, src_cid %s, dst_path: %s, src_path: %s\n", 
+// 		      destination_sid.unparse().c_str(), source_cid.unparse().c_str(), dst_path.unparse().c_str(), src_path.unparse().c_str());
+// 	click_chatter("dst_path: %s, src_path: %s, OPCode: %d\n", dst_path.unparse().c_str(), src_path.unparse().c_str(), ch.opcode());
+	
+	
         if(ch.opcode()==ContentHeader::OP_PUSH){
 		// compute the hash and verify it matches the CID
 		String hash = "CID:";
@@ -950,8 +955,10 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 	unsigned short _dport = XIDpairToPort.get(xid_pair);
 	
 // 	click_chatter(">>packet from processCACHEpackets %d\n", _dport);
-	click_chatter("CachePacket, Src: %s, Dest: %s, Local: %s", xiah.dst_path().unparse().c_str(),
-			      xiah.src_path().unparse().c_str(), _local_addr.unparse_re().c_str());
+// 	click_chatter("CachePacket, Src: %s, Dest: %s, Local: %s", xiah.dst_path().unparse().c_str(),
+// 			      xiah.src_path().unparse().c_str(), _local_addr.unparse_re().c_str());
+	click_chatter("CachePacket, dest: %s, src_cid %s OPCode: %d \n", destination_sid.unparse().c_str(), source_cid.unparse().c_str(), ch.opcode());
+// 	click_chatter("dst_path: %s, src_path: %s, OPCode: %d\n", dst_path.unparse().c_str(), src_path.unparse().c_str(), ch.opcode());
 
 	if(_dport)
 	{
@@ -1041,7 +1048,7 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 
 				//printf("FROM CACHE. data length = %d  \n", str.length());
 				if (DEBUG)
-					click_chatter("Sent packet to socket: sport %d dport %d", _dport, _dport);
+					click_chatter("Sent packet to socket: sport %d dport %d \n", _dport, _dport);
 
 				output(API_PORT).push(UDPIPPrep(p2, _dport));
 
@@ -1061,8 +1068,14 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 	}
 	else
 	{
-		click_chatter("Case 2. Packet to unknown %s", destination_sid.unparse().c_str());
+		click_chatter("Case 2. Packet to unknown %s, src_cid %s\n", destination_sid.unparse().c_str(), source_cid.unparse().c_str());
+// 		click_chatter("Case 2. Packet to unknown dest %s, src_cid %s, dst_path: %s, src_path: %s\n", 
+// 		      destination_sid.unparse().c_str(), source_cid.unparse().c_str(), dst_path.unparse().c_str(), src_path.unparse().c_str());
+// 		click_chatter("Case 2. Packet to unknown  dst_path: %s, src_path: %s\n", dst_path.unparse().c_str(), src_path.unparse().c_str());
+
+	  
 	}
+	
 	
 	
 	

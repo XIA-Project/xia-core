@@ -66,6 +66,7 @@ class MulticastEndhost{
    static void * InternalChunkThread(void * This) {((MulticastEndhost *)This)->ChunkLoop(); return NULL;}
    static void * InternalControlThread(void * This) {((MulticastEndhost *)This)->ControlLoop(); return NULL;}
    pthread_t _thread;
+   pthread_t _thread2;
    pthread_mutex_t  mtxlock = PTHREAD_MUTEX_INITIALIZER;
    std::string fname;
    
@@ -159,7 +160,7 @@ bool MulticastEndhost::StartChunkLoop()
 
 bool MulticastEndhost::StartControlLoop()
 {
-  return (pthread_create(&_thread, NULL, InternalControlThread, this) == 0);
+  return (pthread_create(&_thread2, NULL, InternalControlThread, this) == 0);
 }
 
 int MulticastEndhost::BuildChunkDAGs(ChunkStatus *cs, std::string chunks, std::string ad, std::string hid)
@@ -177,7 +178,7 @@ int MulticastEndhost::BuildChunkDAGs(ChunkStatus *cs, std::string chunks, std::s
 
 		char *dag = (char *)malloc(512);
 		sprintf(dag, "RE ( %s %s ) CID:%s", ad.c_str(), hid.c_str(), c.c_str());
-  		say("%s\n", dag);
+//   		say("%s\n", dag);
 		cs[n].cidLen = strlen(dag);
 		cs[n].cid = dag;
 		
@@ -245,7 +246,10 @@ int MulticastEndhost::PullChunks( std::string &s, std::string chunks, Graph *g)
   }
   
   say("checking chunk status\n");
-  while (1) {
+  int maxtries = 10;
+  int tries = 0;
+  
+  while(tries<maxtries) {
 	  status = XgetChunkStatuses(csock, cs, n);
 
 	  if (status == READY_TO_READ)
@@ -268,10 +272,17 @@ int MulticastEndhost::PullChunks( std::string &s, std::string chunks, Graph *g)
 	  } else {
 		  say("unexpected result\n");
 	  }
+	  tries++;
 	  sleep(1);
 	  
   }
 
+  
+  if (status != READY_TO_READ){
+    say("Read Failed. \n");
+    return -1;
+    }
+  
   say("all chunks ready\n");
 
   for (int i = 0; i < n; i++) {
@@ -405,16 +416,16 @@ void MulticastEndhost::ControlLoop(){
 	      break;
       }
 
-      say("\n dgram received %d bytes, Text: %s\n", n, buf);
+      say("DGram received %d bytes, Text: %s\n", n, buf);
       
       
       if(strncmp("recvfile|", buf,9) == 0){
 	std::string st(buf);
-	say((st + "\n").c_str());
+// 	say((st + "\n").c_str());
 	std::string fs = st.substr(9, st.npos);
 	int endoffname = fs.find_first_of("|");
 	fname = "H" +postname + "-" + fs.substr(0, endoffname);
-	say( (fname+ "\n").c_str());	  
+// 	say( (fname+ "\n").c_str());	  
 
 	
 	std::string chunkhashes = fs.substr(endoffname+1, fs.npos);
@@ -454,15 +465,15 @@ void MulticastEndhost::ControlLoop(){
       else if(strncmp("chunks|", buf,7) == 0){
 	std::string st(buf);
 	std::string clean = st.substr(7, clean.npos);
-	say((clean + "\n").c_str());
+// 	say((clean + "\n").c_str());
 	int endofhash = clean.find_first_of("|");
 	std::string hash = clean.substr(0, endofhash);
-	say( ( hash+"\n" ).c_str());
+// 	say( ( hash+"\n" ).c_str());
 // 	  say(clean.c_str());
 // 	  say("\n");
 // 	  std::string ccid = clean.substr(endofhash+1, 39);
 // 	  say(ccid.c_str());	  
-	say(clean.substr(endofhash+1, clean.npos).c_str());
+// 	say(clean.substr(endofhash+1, clean.npos).c_str());
 	chunksLists->insert( std::pair<std::string, std::string>(hash, clean.substr(endofhash+1, clean.npos)) );
 
       }
@@ -509,6 +520,7 @@ void MulticastEndhost::InitializeClient(std::string mySID)
   int rc;
 // 	char sdag[1024];
   char IP[MAX_XID_SIZE];
+  pthread_mutex_init(&mtxlock, NULL);
 
   // create a socket, and listen for incoming connections
   if ((DGramSock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)

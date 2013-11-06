@@ -33,6 +33,8 @@
 #include <functional>
 #include <string>
 #include <algorithm>
+#include <queue>
+#include <semaphore.h>
 
 // #include <../../click/include/click/hashtable.hh>
 
@@ -87,13 +89,19 @@ class Receiver{
   
   }
 };
-
+class MulticastChunkData;
 
 class MulticastSource{
   private:
-    static void * InternalControlThread(void * This) {((MulticastSource *)This)->ControlLoop(); return NULL;}
+    static void * InternalControlThread(void * This) {((MulticastSource *)This)->ControlLoop(); return NULL;}  
+    static void * InternalChunkSendThread(void * This) {((MulticastSource *)This)->ChunkSendLoop(); return NULL;}
+    
     pthread_t _thread;
+    pthread_t _thread2;
+    sem_t qsem;
     pthread_mutex_t  mtxlock = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_t  chunksendmtxlock = PTHREAD_MUTEX_INITIALIZER;
+
     Graph *DGramDAG;
     std::map<std::string, Receiver *> *hosts; 
     std::map<std::string, Graph *> *RPs;
@@ -102,27 +110,28 @@ class MulticastSource{
     std::string DGramSID;
     int ChunkSock, DGramSock;
     ChunkContext *ctx;
+    
     int pushmode; //0 for push to RP, Push to host. 1 for push to RP, pull by the host. NOT USED
     int NumXIDs;
     unsigned int ChunkSize;
+    std::queue<MulticastChunkData *> *MulticastChunks;
+    
   
-    //private methods
-    template <typename Iter>  
-    void DeletePointers(Iter begin, Iter end);
-    template <typename T>
-    void RemoveVec(std::vector<T *>* vec);
+
     
     bool StartControlLoop();
+    bool StartChunkSendLoop();
     void EndhostJoin(std::string dags);
     void EndhostLeave(std::string dags);
     void RPJoin(std::string dags);
     void RPLeave(std::string dags);
     void SendToList(std::string cmd, std::vector<Graph*> *rcptList);
-    int  PushFileto(const ChunkContext* ctx, const char* fname, int flags, std::vector< Graph* >* rcptList, ChunkInfo** info, unsigned int chunkSize, std::string& res);
+    int  PushFileto(const ChunkContext* xxct, const char* fname, int flags, std::vector< Graph* >* rcptList, ChunkInfo** info, unsigned int chunkSize, std::string& res);
     int  SendCommand(std::string cmd, Graph *g);
   
   protected: 
     void ControlLoop();
+    void ChunkSendLoop();
   
   public:
     std::vector<Graph *> *BuildControlRecvList();
@@ -131,22 +140,31 @@ class MulticastSource{
     std::vector<Graph *> *BuildRPsControlRecvList();
     std::vector<Graph *> *BuildEndHostListForRP( std::string rp);
     
+        //private methods
+    template <typename Iter>  
+    static void DeletePointers(Iter begin, Iter end);
+    template <typename T>
+    static void RemoveVec(std::vector<T *>* vec);
+    
     void Multicast(std::string);
     void MulticastFile(std::string fin);
     void PutFile(std::string fin);
-    int  MulticastChunk(const ChunkContext*, const char *buf, size_t count, int flags, std::vector< Graph* >* rcptList, ChunkInfo* info);
+    int  MulticastChunk(const ChunkContext* xxct, const char* buf, size_t count, int flags, std::vector< Graph* >* rcptList, ChunkInfo* info);
+    void ParallelMulticastChunk(const ChunkContext* xxct, const char* buf, size_t count, int flags, std::vector< Graph* >* rcptList, ChunkInfo* info);
     void Initialize();
     void MulticastToEndHosts(std::string cmd);
     void MulticastToRPs(std::string cmd);
     void PullChunks(std::string cmd);
     void RPPullChunks(std::string cmd);
+    void RPPushChunks(std::string cmd);
     void PullChunksRP(std::string cmd);
   
     MulticastSource(std::string sn, std::string sid, int pm=0, unsigned int cs = CHUNKSIZE, int NXIDs=NXIDS ){
       hosts = new std::map<std::string, Receiver *>;
       RPs = new std::map<std::string, Graph *>;
+      MulticastChunks = new std::queue<MulticastChunkData *>;
       
-      ctx = XallocCacheSlice(POLICY_FIFO|POLICY_REMOVE_ON_EXIT, 0, 20000000);
+//       ctx = XallocCacheSlice(POLICY_FIFO|POLICY_REMOVE_ON_EXIT, 0, 20000000); done in initialize
 
       pushmode = pm;
       DGramName = sn;
@@ -163,7 +181,36 @@ class MulticastSource{
   
 
 };
+
+class MulticastChunkData{
+public:
+  const ChunkContext* xxct;
+  char buf[XIA_MAXBUF];
+  size_t count;
+  int flags;
+  std::vector< Graph* >* rcptList;
+  ChunkInfo* info;
+
+  
+  MulticastChunkData(const ChunkContext* ixxct, const char* ibuf, size_t icount, 
+		     int iflags, std::vector< Graph* >* ircptList, ChunkInfo* iinfo){
+    xxct = ixxct;
+    memset(buf, 0, sizeof(buf));
+    strncpy(buf, ibuf, count);
+    count = icount;
+    flags = iflags;
+    rcptList = ircptList;
+    info = iinfo;
+  }
+  
+  ~MulticastChunkData(){
+    MulticastSource::RemoveVec(rcptList);
+  }
+  
+};
 //======================================================
+
+
 template <typename Iter>  
 void MulticastSource::DeletePointers(Iter begin, Iter end)
 {
@@ -183,6 +230,10 @@ bool MulticastSource::StartControlLoop()
   return (pthread_create(&_thread, NULL, InternalControlThread, this) == 0);
 }
 
+bool MulticastSource::StartChunkSendLoop()
+{
+  return (pthread_create(&_thread2, NULL, InternalChunkSendThread, this) == 0);
+}
 
 std::vector<Graph *> *MulticastSource::BuildControlRecvList(){
   
@@ -570,14 +621,24 @@ void MulticastSource::EndhostLeave(std::string dags){
   
 }
 
+void MulticastSource::ParallelMulticastChunk(const ChunkContext* xxct, const char* buf, size_t count, int flags, std::vector< Graph* >* rcptList, ChunkInfo* info) {
+  
+  MulticastChunkData *mcd = new MulticastChunkData(xxct, buf, count, flags, rcptList, info);
+  
+  pthread_mutex_lock(&chunksendmtxlock);
+  MulticastChunks->push(mcd);
+  pthread_mutex_unlock(&chunksendmtxlock);
+  sem_post(&qsem);
+  
+}
 
-int MulticastSource::MulticastChunk(const ChunkContext*, const char *buf, size_t count, int flags, 
-				    std::vector< Graph* >* rcptList, ChunkInfo* info) {
+
+int MulticastSource::MulticastChunk(const ChunkContext* xxct, const char* buf, size_t count, int flags, std::vector< Graph* >* rcptList, ChunkInfo* info) {
   int rc = -1;
   for(std::vector<Graph*>::iterator it = rcptList->begin(); it != rcptList->end(); ++it) {
     sockaddr_x cdag;
     (*it)->fill_sockaddr(&cdag);
-    if ((rc = XpushChunkto(ctx, buf, count, flags, (struct sockaddr*)&cdag, sizeof(cdag), info)) < 0)
+    if ((rc = XpushChunkto(xxct, buf, count, flags, (struct sockaddr*)&cdag, sizeof(cdag), info)) < 0)
       die(-1, "Could not send chunk");
 	
   }
@@ -585,8 +646,7 @@ int MulticastSource::MulticastChunk(const ChunkContext*, const char *buf, size_t
 }
 
 //essentially the same as API XpushFileto but slightly modified to add latency, etc.
-int MulticastSource::PushFileto(const ChunkContext* ctx, const char* fname, int flags, std::vector< Graph* >* rcptList, 
-				ChunkInfo** info, unsigned int chunkSize, std::string& res)
+int MulticastSource::PushFileto(const ChunkContext* xxct, const char* fname, int flags, std::vector< Graph* >* rcptList, ChunkInfo** info, unsigned int chunkSize, std::string& res)
 {
     FILE *fp;
     struct stat fs;
@@ -597,7 +657,7 @@ int MulticastSource::PushFileto(const ChunkContext* ctx, const char* fname, int 
     int count;
     char *buf;
 
-    if (ctx == NULL) {
+    if (xxct == NULL) {
 	    errno = EFAULT;
 	    return -1;
     }
@@ -642,9 +702,10 @@ int MulticastSource::PushFileto(const ChunkContext* ctx, const char* fname, int 
 // 		sockaddr_x cdag;
 // 		(*it)->fill_sockaddr(&cdag);
 // 	      sleep(1);
-		    if ((rc = MulticastChunk(ctx, buf, count, flags, rcptList, &infoList[i])) < 0)
-			    break;
-		    res = res + infoList[i].cid +"|";
+	      if ((rc = MulticastChunk(xxct, buf, count, flags, rcptList, &infoList[i])) < 0)
+		      break;
+	      res = res + infoList[i].cid +"|";
+	      say("Chunk: %d\n", i);
 // 	      }
 	      i++;
 	    }
@@ -664,6 +725,35 @@ int MulticastSource::PushFileto(const ChunkContext* ctx, const char* fname, int 
     return rc;
 }
 
+void MulticastSource::ChunkSendLoop(){
+  while (1) {
+    
+    MulticastChunkData *mcd;
+    sem_wait(&qsem);
+    pthread_mutex_lock(&chunksendmtxlock);
+    mcd = MulticastChunks->front();
+    MulticastChunks->pop();
+    //MulticastChunks.pop_front(someObjectReference);
+    pthread_mutex_unlock(&chunksendmtxlock);
+    
+    int rc = -1;
+    warn("RP Mutlicast Chunk %s\n", mcd->info->cid);
+    for(std::vector<Graph*>::iterator it = mcd->rcptList->begin(); it != mcd->rcptList->end(); ++it) {
+      sockaddr_x cdag;
+      (*it)->fill_sockaddr(&cdag);
+      if ((rc = XpushChunkto(mcd->xxct, mcd->buf, mcd->count, mcd->flags, (struct sockaddr*)&cdag, sizeof(cdag), mcd->info)) < 0)
+	die(-1, "Could not send chunk");
+	  
+    }
+      
+    
+    delete mcd;
+    
+  }
+
+  Xclose(ChunkSock);
+  pthread_exit(NULL);
+}
 
 void MulticastSource::ControlLoop()
 {
@@ -683,7 +773,7 @@ void MulticastSource::ControlLoop()
 	    break;
     }
 
-    say("\n dgram received %d bytes, Text: %s\n", n, buf);
+    say("DGram received %d bytes, Text: %s\n", n, buf);
     
     if(strncmp("joinc|", buf,6) == 0){
       std::string st(buf);
@@ -747,6 +837,14 @@ void MulticastSource::RPPullChunks(std::string chunkslist){
   SendToList(cmd, veccontrol);
   RemoveVec(veccontrol); 
 }
+
+void MulticastSource::RPPushChunks(std::string chunkslist){
+  std::vector<Graph *> *veccontrol = BuildRPsControlRecvList();
+  std::string cmd = "rppushchunks|" + chunkslist;
+  SendToList(cmd, veccontrol);
+  RemoveVec(veccontrol); 
+}
+
 
 // chunkslist in format cid|cid|cid|...|cid|
 void MulticastSource::PullChunks(std::string chunkslist){
@@ -843,10 +941,9 @@ void MulticastSource::MulticastFile(std::string fin){
     
   }
   
-  
   //assuming it's not bigger than XIA_MAXBUF size
   std::string cmd = "recvfile|" + fin + "|" + masterchunk;
-  say(cmd.c_str());
+//   say(cmd.c_str());
 //     std::vector<Graph *> *veccontrol = BuildControlRecvList();
   SendToList(cmd, veccontrol);
   RemoveVec(veccontrol);
@@ -862,6 +959,12 @@ void MulticastSource::Initialize(){
     say ("\n%s (%s): started\n", TITLE, VERSION);
     say("Datagram service started\n");
 
+    
+    pthread_mutex_init(&mtxlock, NULL);
+  
+
+  
+  
     // create a socket, and listen for incoming connections
     if ((DGramSock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
 	    die(-1, "Unable to create the listening socket\n");

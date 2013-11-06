@@ -27,6 +27,9 @@
 #include <map>
 #include <algorithm>
 #include <vector>
+#include <queue>
+#include <semaphore.h>
+
 
 #define MAX_XID_SIZE 100
 #define VERSION "v1.0"
@@ -59,6 +62,8 @@ void warn(const char *fmt, ...);
 void die(int ecode, const char *fmt, ...);
 void usage();
 bool file_exists(const char * filename);
+class MulticastChunkData;
+
 
 class Receiver{
   public:
@@ -74,13 +79,16 @@ class Receiver{
   }
 };
 
-
 class MulticastRP{
   private:
    static void * InternalChunkThread(void * This) {((MulticastRP *)This)->ChunkLoop(); return NULL;}
+   static void * InternalChunkSendThread(void * This) {((MulticastRP *)This)->ChunkSendLoop(); return NULL;}
    static void * InternalControlThread(void * This) {((MulticastRP *)This)->ControlLoop(); return NULL;}
    pthread_t _thread;
+   pthread_t _thread2;
+   pthread_t _thread3;
    pthread_mutex_t  mtxlock = PTHREAD_MUTEX_INITIALIZER;
+   pthread_mutex_t  chunksendmtxlock = PTHREAD_MUTEX_INITIALIZER;
    std::string fname;
    
     Graph *DGramDAG;
@@ -96,22 +104,21 @@ class MulticastRP{
     std::string postname;
     std::map<std::string, std::string> *chunksLists;
     std::map<std::string, Receiver *> *hosts; 
+    std::queue<MulticastChunkData *> *MulticastChunks;
     
     
     int pushmode; //0 for push to RP, Push to host. 1 for push to RP, pull by the host
     int ChunkSock, DGramSock;
     ChunkContext *ctx;
+    sem_t qsem;
     
     int  BuildChunkDAGs(ChunkStatus *cs, std::string chunks, std::string ad, std::string hid);
     bool StartChunkLoop();
+    bool StartChunkSendLoop();
     bool StartControlLoop();
     int  SendCommand(std::string cmd);
     int  PullChunks( std::string &s, std::string chunks, Graph *g);
-        //private methods
-    template <typename Iter>  
-    void DeletePointers(Iter begin, Iter end);
-    template <typename T>
-    void RemoveVec(std::vector<T *>* vec);
+
     void EndhostJoin(std::string clean);
     void EndhostLeave(std::string dags);
   
@@ -119,20 +126,27 @@ class MulticastRP{
   
   protected:
     void ChunkLoop();
+    void ChunkSendLoop();
     void ControlLoop();
 
    
    
   public:  
+    template <typename Iter>  
+    static void DeletePointers(Iter begin, Iter end);
+    template <typename T>
+    static void RemoveVec(std::vector<T *>* vec);
+    
     std::vector<Graph *> *BuildEndhostChunkRecvList();
     std::vector<Graph *> *BuildEndhostControlRecvList();
-    std::vector<Graph *> *BuildChunkRecvList();
+//     std::vector<Graph *> *BuildChunkRecvList();
     void SendToList(std::string cmd, std::vector<Graph*> *rcptList);
     void MulticastToEndHosts(std::string cmd);
     int  Join(std::string name);
     int  Leave();
     void InitializeClient(std::string mySID);
-    int  MulticastChunk(const ChunkContext*, const char *buf, size_t count, int flags, std::vector< Graph* >* rcptList, ChunkInfo* info);
+    int  MulticastChunk(const ChunkContext* xxct, const char *buf, size_t count, int flags, std::vector< Graph* >* rcptList, ChunkInfo* info);
+    void ParallelMulticastChunk(const ChunkContext* xxct, const char* buf, size_t count, int flags, std::vector< Graph* >* rcptList, ChunkInfo* info);
     virtual void ChunkReceived(char *buf, size_t len, ChunkInfo *info);
 
     
@@ -145,12 +159,44 @@ class MulticastRP{
     postname = s;
     chunksLists = new std::map<std::string, std::string>;
     hosts = new std::map<std::string, Receiver *>;
+    MulticastChunks = new std::queue<MulticastChunkData *>;
+    sem_init(&qsem, 0, 0);
   
 
   }
 
  
 };
+
+
+class MulticastChunkData{
+public:
+  const ChunkContext* xxct;
+  char buf[XIA_MAXBUF];
+  size_t count;
+  int flags;
+  std::vector< Graph* >* rcptList;
+  ChunkInfo* info;
+
+  
+  MulticastChunkData(const ChunkContext* ixxct, const char* ibuf, size_t icount, 
+		     int iflags, std::vector< Graph* >* ircptList, ChunkInfo* iinfo){
+    xxct = ixxct;
+    memset(buf, 0, sizeof(buf));
+    strncpy(buf, ibuf, count);
+    count = icount;
+    flags = iflags;
+    rcptList = ircptList;
+    info = iinfo;
+  }
+  
+  ~MulticastChunkData(){
+    MulticastRP::RemoveVec(rcptList);
+  }
+  
+};
+
+
 //======================================================
 
 void MulticastRP::EndhostJoin(std::string clean){
@@ -213,17 +259,29 @@ void MulticastRP::MulticastToEndHosts(std::string cmd){
   
 }
 
-int MulticastRP::MulticastChunk(const ChunkContext*, const char *buf, size_t count, int flags, 
-				    std::vector< Graph* >* rcptList, ChunkInfo* info) {
+
+void MulticastRP::ParallelMulticastChunk(const ChunkContext* xxct, const char* buf, size_t count, int flags, std::vector< Graph* >* rcptList, ChunkInfo* info) {
+  
+  MulticastChunkData *mcd = new MulticastChunkData(xxct, buf, count, flags, rcptList, info);
+  
+  pthread_mutex_lock(&chunksendmtxlock);
+  MulticastChunks->push(mcd);
+  pthread_mutex_unlock(&chunksendmtxlock);
+  sem_post(&qsem);
+  
+}
+
+int MulticastRP::MulticastChunk(const ChunkContext* xxct, const char* buf, size_t count, int flags, std::vector< Graph* >* rcptList, ChunkInfo* info) {
   int rc = -1;
   warn("RP Mutlicast Chunk %s\n", info->cid);
   for(std::vector<Graph*>::iterator it = rcptList->begin(); it != rcptList->end(); ++it) {
     sockaddr_x cdag;
     (*it)->fill_sockaddr(&cdag);
-    if ((rc = XpushChunkto(ctx, buf, count, flags, (struct sockaddr*)&cdag, sizeof(cdag), info)) < 0)
+    if ((rc = XpushChunkto(xxct, buf, count, flags, (struct sockaddr*)&cdag, sizeof(cdag), info)) < 0)
       die(-1, "Could not send chunk");
 	
   }
+  RemoveVec(rcptList);
   return rc;
 }
 
@@ -288,6 +346,38 @@ std::vector<Graph *> *MulticastRP::BuildEndhostControlRecvList(){
   return vec;
 }
 
+
+
+void MulticastRP::ChunkSendLoop(){
+  while (1) {
+    
+    MulticastChunkData *mcd;
+    sem_wait(&qsem);
+    pthread_mutex_lock(&chunksendmtxlock);
+    mcd = MulticastChunks->front();
+    MulticastChunks->pop();
+    //MulticastChunks.pop_front(someObjectReference);
+    pthread_mutex_unlock(&chunksendmtxlock);
+    
+    int rc = -1;
+    warn("RP Mutlicast Chunk %s\n", mcd->info->cid);
+    for(std::vector<Graph*>::iterator it = mcd->rcptList->begin(); it != mcd->rcptList->end(); ++it) {
+      sockaddr_x cdag;
+      (*it)->fill_sockaddr(&cdag);
+      if ((rc = XpushChunkto(mcd->xxct, mcd->buf, mcd->count, mcd->flags, (struct sockaddr*)&cdag, sizeof(cdag), mcd->info)) < 0)
+	die(-1, "Could not send chunk");
+	  
+    }
+      
+    
+    delete mcd;
+    
+  }
+
+  Xclose(ChunkSock);
+  pthread_exit(NULL);
+}
+
 void MulticastRP::ChunkLoop(){
   while (1) {
 
@@ -300,17 +390,19 @@ void MulticastRP::ChunkLoop(){
     if((received = XrecvChunkfrom(ChunkSock, buf1, sizeof(buf1), 0, info)) < 0)
 	    die(-5, "Receive error %d on socket %d\n", errno, ChunkSock);
     else{
+	    
 	    std::vector<Graph *> *recchunk = BuildEndhostChunkRecvList();
-	    int rc = -1;
+	    ParallelMulticastChunk(ctx, buf1, strlen(buf1), 0, recchunk, info);
 	    
-	    if ((rc = MulticastChunk(ctx, buf1, strlen(buf1), 0, recchunk, info)) < 0)
-	      warn("Could not send chunk");
-// 	    if ((rc = XputChunk(ctx, buf1, strlen(buf1), info)) < 0)
-// 	      warn("Could not put chunk");
+	    // 	    int rc = -1;
+// 	    if ((rc = MulticastChunk(ctx, buf1, strlen(buf1), 0, recchunk, info)) < 0)
+// 	      warn("Could not send chunk");
 	    
-	    RemoveVec(recchunk);
-      
 	    ChunkReceived(buf1, received, info);
+
+	    // 	    RemoveVec(recchunk);
+      
+	    
 	    
 // 	    warn("Received Chunk CID: %s\n", info->cid);
     }
@@ -330,7 +422,12 @@ bool MulticastRP::StartChunkLoop()
 
 bool MulticastRP::StartControlLoop()
 {
-  return (pthread_create(&_thread, NULL, InternalControlThread, this) == 0);
+  return (pthread_create(&_thread2, NULL, InternalControlThread, this) == 0);
+}
+
+bool MulticastRP::StartChunkSendLoop()
+{
+  return (pthread_create(&_thread3, NULL, InternalChunkSendThread, this) == 0);
 }
 
 int MulticastRP::BuildChunkDAGs(ChunkStatus *cs, std::string chunks, std::string ad, std::string hid)
@@ -416,7 +513,11 @@ int MulticastRP::PullChunks( std::string &s, std::string chunks, Graph *g)
   }
   
   say("checking chunk status\n");
-  while (1) {
+  
+  int maxtries = 10;
+  int tries = 0;
+  
+  while(tries<maxtries) {
 	  status = XgetChunkStatuses(csock, cs, n);
 
 	  if (status == READY_TO_READ)
@@ -439,12 +540,17 @@ int MulticastRP::PullChunks( std::string &s, std::string chunks, Graph *g)
 	  } else {
 		  say("unexpected result\n");
 	  }
+	  tries++;
 	  sleep(1);
 	  
   }
 
+  
+  if (status != READY_TO_READ)
+    return -1;
+  
   say("all chunks ready\n");
-
+  
   for (int i = 0; i < n; i++) {
 	  char *cid = strrchr(cs[i].cid, ':');
 	  cid++;
@@ -576,7 +682,7 @@ void MulticastRP::ControlLoop(){
 	      break;
       }
 
-      say("\n dgram received %d bytes, Text: %s\n", n, buf);
+      say("DGram received %d bytes, Text: %s\n", n, buf);
       
       
       if(strncmp("recvfile|", buf,9) == 0){
@@ -589,11 +695,11 @@ void MulticastRP::ControlLoop(){
 	std::string fs = st.substr(9, st.npos);
 	int endoffname = fs.find_first_of("|");
 	fname = "H" +postname + "-" + fs.substr(0, endoffname);
-	say( (fname+ "\n").c_str());	  
+// 	say( (fname+ "\n").c_str());	  
 
 	
 	std::string chunkhashes = fs.substr(endoffname+1, fs.npos);
-	say( (chunkhashes+ "\n").c_str());	
+// 	say( (chunkhashes+ "\n").c_str());	
 	
 // 	  std::vector<const Node*>::iterator ads = SourceServiceDAG->get_nodes_of_type(Node::XID_TYPE_AD).begin();
 // 	  std::vector<const Node*>::iterator hds = SourceServiceDAG->get_nodes_of_type(Node::XID_TYPE_HID).begin();
@@ -633,15 +739,15 @@ void MulticastRP::ControlLoop(){
 	MulticastToEndHosts(st);
 	
 	std::string clean = st.substr(7, clean.npos);
-	say((clean + "\n").c_str());
+// 	say((clean + "\n").c_str());
 	int endofhash = clean.find_first_of("|");
 	std::string hash = clean.substr(0, endofhash);
-	say( ( hash+"\n" ).c_str());
+// 	say( ( hash+"\n" ).c_str());
 // 	  say(clean.c_str());
 // 	  say("\n");
 // 	  std::string ccid = clean.substr(endofhash+1, 39);
 // 	  say(ccid.c_str());	  
-	say(clean.substr(endofhash+1, clean.npos).c_str());
+// 	say(clean.substr(endofhash+1, clean.npos).c_str());
 	chunksLists->insert( std::pair<std::string, std::string>(hash, clean.substr(endofhash+1, clean.npos)) );
 
       }
@@ -715,6 +821,15 @@ void MulticastRP::ControlLoop(){
 	std::string clean = st.substr(12, clean.npos);
 	EndhostLeave(clean);
       }
+      else if(strncmp("rppushchunks|", buf, 13) == 0){
+	//RP pulls chunks
+	std::string st(buf);
+	std::string clean = st.substr(13, clean.npos);
+	std::string result;
+	say("not comppleted. \n");
+	//Buildchunkdags, readsthem, send them
+	//PullChunks( result, clean.c_str(), SourceServiceDAG);
+      }
       else{
 	std::string st(buf);
 	
@@ -737,6 +852,8 @@ void MulticastRP::InitializeClient(std::string mySID)
   int rc;
 // 	char sdag[1024];
   char IP[MAX_XID_SIZE];
+  pthread_mutex_init(&mtxlock, NULL);
+  pthread_mutex_init(&chunksendmtxlock, NULL);
 
   // create a socket, and listen for incoming connections
   if ((DGramSock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
@@ -800,6 +917,7 @@ void MulticastRP::InitializeClient(std::string mySID)
 //   RPServiceDAG = SourceServiceDAG;
   
   StartChunkLoop();
+  StartChunkSendLoop();
 
 }
 
@@ -820,9 +938,9 @@ void MulticastRP::ChunkReceived(char* buf, size_t len, ChunkInfo* info)
   
   std::string localfname = "T" +postname + ".tmp";
 //   say( (fname+ "\n").c_str());	  
-  FILE *f = fopen(localfname.c_str(), "a");
-  fwrite(buf, sizeof(char), strlen(buf), f);
-  fclose(f);
+//   FILE *f = fopen(localfname.c_str(), "a");
+//   fwrite(buf, sizeof(char), strlen(buf), f);
+//   fclose(f);
   
   
 }
