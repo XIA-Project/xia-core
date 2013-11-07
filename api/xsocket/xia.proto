@@ -238,6 +238,7 @@ message X_Pushchunkto_Msg {
   required int32 TTL = 5;
   required bytes payload = 6; // data
   required string cid = 7;
+  //add sdag here. modify xrecvfrom to return whole dag instead of just cid
   required int32 length = 8;
   optional int64 timestamp = 9; 
 }

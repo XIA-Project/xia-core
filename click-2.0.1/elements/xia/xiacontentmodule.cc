@@ -89,8 +89,9 @@ Packet * XIAContentModule::makeChunkPush(CChunk * chunk, Packet *p_in)
     p=contenth.encap(p);		// add XIA header
     p=encap.encap( p, false );
 	
+    if(CACHE_DEBUG)
+      click_chatter("Push message built in contentmodule \n");
     
-    click_chatter("MAKING A PUSH MESSAGE FROM CONTENT MODULE");
     return p;
 }
 
@@ -175,7 +176,7 @@ void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID 
             newp=contenth.encap(newp);
             newp=encap.encap( newp, false );	      // add XIA header
 	    
-	    click_chatter("Found in my local cache! CID: %s, Local Address: %s\n", dstCID.unparse().c_str(),  _transport->local_hid().unparse().c_str());
+// 	    click_chatter("Found in my local cache! CID: %s, Local Address: %s\n", dstCID.unparse().c_str(),  _transport->local_hid().unparse().c_str());
             _transport->checked_output_push(1 , newp);
             //std::cout<<"In client"<<std::endl;
             //std::cout<<"payload: "<<pl<<std::endl;
@@ -218,7 +219,7 @@ void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID 
             newp=contenth.encap(newp);
             encap.set_plen(l);	// add XIA header
             newp=encap.encap( newp, false );
-	    click_chatter("Found in router cache! CID: %s, Local Address: %s\n", dstCID.unparse().c_str(),  _transport->local_hid().unparse().c_str());
+// 	    click_chatter("Found in router cache! CID: %s, Local Address: %s\n", dstCID.unparse().c_str(),  _transport->local_hid().unparse().c_str());
 	    
             _transport->checked_output_push(0 , newp);
             //std::cout<<"have pushed out"<<std::endl;
@@ -332,9 +333,9 @@ void XIAContentModule::cache_incoming_local(Packet* p, const XID& srcCID, bool l
         _timer++;
         cit=_contentTable.find(srcCID);
         if(cit!=_contentTable.end()) { // content exists alreaady
-	  click_chatter("Found the Chunk! Push: %d Put:%d\n", pushcid, local_putcid);
+// 	  click_chatter("Found the Chunk! Push: %d Put:%d\n", pushcid, local_putcid);
 	  if (pushcid){
-	      click_chatter("Pushing something that we already have\n");
+// 	      click_chatter("Pushing something that we already have\n");
 	      
 	      chunk=cit->second;
 	      chunk->fill(payload, offset, length);
@@ -629,14 +630,16 @@ void XIAContentModule::cache_incoming(Packet *p, const XID& srcCID, const XID& d
     bool local_removecid= (ch.opcode() == ContentHeader::OP_LOCAL_REMOVECID);
     bool local_pushcid= (ch.opcode() == ContentHeader::OP_PUSH);
     if (CACHE_DEBUG){
-        //click_chatter("--Cache incoming--%s %s", srcCID.unparse().c_str(), _transport->local_hid().unparse().c_str());
+        click_chatter("--Cache incoming--%s %s", srcCID.unparse().c_str(), _transport->local_hid().unparse().c_str());
 	}
-    //FIXME: This comparison is just wrong.
+    //FIXME: This comparison is just wrong. dstHID that is passed is hardcoded and sometimes different types are being compared
     if(local_putcid || dstHID==_transport->local_hid()){
+      
         // cache in client: if it is local putCID() then store content. Otherwise, should return the whole chunk if possible
 // 	printf("cache_incoming_local - local HID: %s, Dest HID: %s\n", _transport->local_hid().unparse().c_str(), dstHID.unparse().c_str());
         cache_incoming_local(p, srcCID, local_putcid, local_pushcid);	    
     }else if(local_removecid){
+      
 // 	printf("cache_incoming_remove - local HID: %s, Dest HID: %s\n", _transport->local_hid().unparse().c_str(), dstHID.unparse().c_str());
         cache_incoming_remove(p, srcCID);
     }

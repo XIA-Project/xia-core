@@ -457,7 +457,9 @@ int MulticastRP::SendCommand(std::string cmd){
 
   int rc = -1;
   if( (rc = Xsendto(sock, cmd.c_str(), strlen(cmd.c_str()), 0, (struct sockaddr*)&dag, sizeof(dag))) >= 0) {
-    say("\nSent message: %s \n", cmd.c_str());
+     say("\nSent message: %s \n", cmd.c_str());
+  }else{
+    say("\nFailed to send: %s \n", cmd.c_str());
   }
   
     

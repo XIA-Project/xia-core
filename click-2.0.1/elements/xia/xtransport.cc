@@ -404,8 +404,8 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	//Extract the destination port
 	unsigned short _sport = SRC_PORT_ANNO(p_in);
 
-	if (DEBUG)
-        click_chatter("\nPush: Got packet from API sport:%d",ntohs(_sport));
+// 	if (DEBUG)
+//         click_chatter("\nPush: Got packet from API sport:%d",ntohs(_sport));
 
 	std::string p_buf;
 	p_buf.assign((const char*)p_in->data(), (const char*)p_in->end_data());
@@ -494,8 +494,8 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 
 void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 {
-	if (DEBUG)
-		click_chatter("Got packet from network");
+// 	if (DEBUG)
+// 		click_chatter("Got packet from network");
 
 	//Extract the SID/CID
 	XIAHeader xiah(p_in->xia_header());
@@ -865,9 +865,9 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 {
- 	if (DEBUG){
-	click_chatter("Got packet from cache");		
- 	}
+// 	if (DEBUG){
+// 	click_chatter("Got packet from cache");		
+//  	}
 	
 	//Extract the SID/CID
 	XIAHeader xiah(p_in->xia_header());
@@ -939,7 +939,7 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 		WritablePacket *p2 = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
 
 		//printf("FROM CACHE. data length = %d  \n", str.length());
-// 		if (DEBUG)
+ 		if (DEBUG)
 		click_chatter("Sent packet to socket: sport %d dport %d", _dport, _dport);
 
 		output(API_PORT).push(UDPIPPrep(p2, _dport));
@@ -1107,8 +1107,6 @@ void XTRANSPORT::push(int port, Packet *p_input)
 
 	switch(port) { // This is a "CLICK" port of UDP module.
 	case API_PORT:	// control packet from socket API
-		//TODO: remove
-// 		click_chatter(">>>>> control packet from socket API %d\n", port);
 		ProcessAPIPacket(p_in);
 		break;
 
@@ -1118,22 +1116,17 @@ void XTRANSPORT::push(int port, Packet *p_input)
 		break;
 
 	case NETWORK_PORT: //Packet from network layer
-		//TODO: remove
-// 		click_chatter(">>>>> control packet from socket NETWORK %d\n", port);
 		ProcessNetworkPacket(p_in);
 		p_in->kill();
 		break;
 
 	case CACHE_PORT:	//Packet from cache
-		//TODO: remove
- 		click_chatter(">>>>> Cache Port packet from socket Cache %d\n", port);
+//  		click_chatter(">>>>> Cache Port packet from socket Cache %d\n", port);
 		ProcessCachePacket(p_in);
 		p_in->kill();
 		break;
 
 	case XHCP_PORT:		//Packet with DHCP information
-		//TODO: remove
-// 		click_chatter(">>>>> control packet from XHCP %d\n", port);
 		ProcessXhcpPacket(p_in);
 		p_in->kill();
 		break;
@@ -2164,7 +2157,7 @@ void XTRANSPORT::XgetChunkStatus(unsigned short _sport)
 
 void XTRANSPORT::XreadChunk(unsigned short _sport)
 {
-	//TODO: remove
+	
 	click_chatter(">>READ chunk message from API %d\n", _sport);
 	
 	
@@ -2291,7 +2284,7 @@ void XTRANSPORT::XremoveChunk(unsigned short _sport)
 void XTRANSPORT::XputChunk(unsigned short _sport)
 {
 	
-	//TODO: remove
+	
 	click_chatter(">>putchunk message from API %d\n", _sport);
 	
 	
@@ -2369,8 +2362,6 @@ void XTRANSPORT::XputChunk(unsigned short _sport)
 	if (DEBUG)
 		click_chatter("sent packet to cache");
 	
-	//TODO: remove
-	click_chatter(">>send XputChunk to cache %d\n", _sport);
 	output(CACHE_PORT).push(p);
 
 	// (for Ack purpose) Reply with a packet with the destination port=source port
@@ -2435,7 +2426,9 @@ void XTRANSPORT::XpushChunkto(unsigned short _sport, WritablePacket *p_in)
 		
 
 		
-		//FIXME: AD->HID->SID->CID We can add SID here (AD->HID->SID->CID) if SID is passed or generate randomly
+		//TODO: AD->HID->SID->CID We can add SID here (AD->HID->SID->CID) if SID is passed or generate randomly
+		// Contentmodule forwarding needs to be fixed to get this to work. (wrong comparison there)
+		// Since there is no way to dictate policy to cache which content to accept right now this wasn't added.
 // 		char xid_string[50];
 // 		random_xid("SID", xid_string);
 //		String rand(click_random(1000000, 9999999));
@@ -2531,23 +2524,6 @@ void XTRANSPORT::XpushChunkto(unsigned short _sport, WritablePacket *p_in)
 	// Map the src & dst XID pair to source port
 	XIDpairToPort.set(xid_pair, _sport);
 
-// 	// Store the packet into buffer
-// 	WritablePacket *copy_req_pkt = copy_cid_req_packet(p, daginfo);
-// 	daginfo->XIDtoCIDreqPkt.set(destination_cid, copy_req_pkt);
-// 
-// 	// Set the status of CID request
-// 	daginfo->XIDtoStatus.set(destination_cid, WAITING_FOR_CHUNK);
-// 
-// 	// Set the status of ReadCID reqeust
-// 	daginfo->XIDtoReadReq.set(destination_cid, false);
-// 
-// 	// Set timer
-// 	Timestamp cid_req_expiry  = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
-// 	daginfo->XIDtoExpiryTime.set(destination_cid, cid_req_expiry);
-// 	daginfo->XIDtoTimerOn.set(destination_cid, true);
-/*
-	if (! _timer.scheduled() || _timer.expiry() >= cid_req_expiry )
-		_timer.reschedule_at(cid_req_expiry);*/
 
 	portToDAGinfo.set(_sport, *daginfo);
 
