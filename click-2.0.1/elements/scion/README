@@ -1,0 +1,66 @@
+
+Help file to describe the purpose of various code files
+
+# Basic SCION packet header description
+packetheader.cc
+packetheader.hh
+
+config.cc
+config.hh
+define.h
+define.hh
+
+# New Scion router
+scionrouter.cc
+scionrouter.hh
+
+# New Scion switch
+scionswitch.cc
+scionswitch.hh
+
+# Root of Trust file parser
+rot_parser.cc
+rot_parser.hh
+
+sample.cc
+sample.hh
+scionbeacon.cc
+scionbeacon.hh
+scionbeaconserver.cc
+scionbeaconserver.hh
+scionbeaconserver_core.cc
+scionbeaconserver_core.hh
+scioncertserver.cc
+scioncertserver.hh
+scioncertserver_core.cc
+scioncertserver_core.hh
+scionclient.cc
+scionclient.hh
+scioncommonlib.cc
+scioncommonlib.hh
+scioncryptolib.cc
+scioncryptolib.hh
+
+scionpathinfo.cc
+scionpathinfo.hh
+scionpathserver.cc
+scionpathserver.hh
+scionpathserver_core.cc
+scionpathserver_core.hh
+scionprint.cc
+scionprint.hh
+tinyxml2.cc
+tinyxml2.hh
+tinyxml2.sln
+topo_parser.cc
+topo_parser.hh
+trace.cc
+trace.hh
+
+# Files for SCION gateway
+sciondecap.cc
+sciondecap.hh
+scionencap.cc
+scionencap.hh
+sciongateway.cc
+sciongateway.hh

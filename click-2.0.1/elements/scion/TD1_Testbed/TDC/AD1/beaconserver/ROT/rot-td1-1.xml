@@ -1,0 +1,57 @@
+<?xml version=1.0 standalone=no ?>
+<!DOCTYPE document SYSTEM rot.dtd>
+<ROT>
+
+<header>
+	<version>1</version>
+	<issueDate>Jun 26 21:05:30 2013 GMT</issueDate>
+	<expireDate> Jun 23 18:23:39 2023 GMT</expireDate>
+	<TDID>1</TDID>
+	<policyThreshold>1</policyThreshold>
+	<certificateThreshold>1</certificateThreshold>
+</header>
+
+<coreADs>
+	<coreAD>
+		<AID>1</AID>
+		<len>1341</len>
+		<cert>-----BEGIN CERTIFICATE-----
+MIIDsjCCApoCAQEwDQYJKoZIhvcNAQEFBQAwgZ4xCzAJBgNVBAYTAlVTMRUwEwYD
+VQQIEwxQZW5uc3lsdmFuaWExEzARBgNVBAcTClBpdHRzYnVyZ2gxIzAhBgNVBAoT
+GkNhcm5lZ2llIE1lbGxvbiBVbml2ZXJzaXR5MQ4wDAYDVQQLEwVDeWxhYjEQMA4G
+A1UEAxMHdGQxLWFkMTEcMBoGCSqGSIb3DQEJARYNdGQxLWFkMUBzY2lvbjAeFw0x
+MzA2MjUxODIzMzlaFw0yMzA2MjMxODIzMzlaMIGeMQswCQYDVQQGEwJVUzEVMBMG
+A1UECBMMUGVubnN5bHZhbmlhMRMwEQYDVQQHEwpQaXR0c2J1cmdoMSMwIQYDVQQK
+ExpDYXJuZWdpZSBNZWxsb24gVW5pdmVyc2l0eTEOMAwGA1UECxMFQ3lsYWIxEDAO
+BgNVBAMTB3RkMS1hZDExHDAaBgkqhkiG9w0BCQEWDXRkMS1hZDFAc2Npb24wggEi
+MA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDofGX8R28P0qGfXblBF6oH2eSP
+VSHlprphycUSQUHe+2p235sKX564zcKr/1cwOQNU5BK6L7MixYRfcKRy5Qvamb95
+E8seEfVXke0R8mn/mMTD9lUH5sB6u9pMRuWxaHqPot1N3t+BBERV1tmWhyKeZRPa
+MMvqUKY6M69dx31FSeUId5gxb90vAmPYaYrNRjnnvdFUQjUsK4h2YhzWAbzZoKUH
+aE6Cl8XJ0BAU1DKAXllIqPMCn9GhMolQ8zm5dzMu5QUagR0iIMMxpoGI2r7Wcmb4
+jEdsV3XTMt7UtPOBqU0zqWFkig7feywjoazQf1/bgBd2OlcUo+xAFPoFwbOfAgMB
+AAEwDQYJKoZIhvcNAQEFBQADggEBADY7DVT2YQZ+OvcD0qz58EQav/J275p4AJky
+ggptHmIgtQv9It5BztfGwsNi5OQY8m+NczKQ0oBoO3Ol62c/Jtut8m/vRTb/8n6U
+zy2Nh6r7gMwRzPbdviYpjsSHBI/RCpbRxucrE05hiMEVWgr9V3U99NXPofmFep3I
+5HU9daqgFOpCuSQmxrp4bvKodP+LtuIaxyy6XDF0d8JosKInMYPkkGj02kLO7DJj
+XA/gAUgIcnM2UjB/cqUDvlzAtM9BXsaqM/AEQIshE6lySgF32N2iilTNXrnwprp1
+N2dgeCcPGXED9N2USqS6e9xBZAHgQDfwMWClchMjjSsVeUgmkdk=
+-----END CERTIFICATE-----</cert>
+	</coreAD>
+
+</coreADs>
+
+<signatures>
+	<coreAD>
+		<AID>1</AID>
+		<len>348</len>
+		<sign>mV4I777lg5y+HNbl3hPhYLj0qxvsggGrKB4G4YvRatMMJUNbosPHu6vxi1xwYH6BGsIwsiD0Adfs
+fMF9JGatczbQpXu+4haGrPGcbmonBP0zbfL6JAEJA5MecVJpgDcl8QLFIsYc7LoQrlgq7NgXmuMF
+Kq83q6HrX9G4n4LZ7r6qzz2XxKna7y31ktUMAQL/+Wd51ZWbn5BJGmdMxb+iEFrrexb7azAFxH+l
+Y8lYscI8+FJ2AQnUaEgcCD7jEIyfpEra2OHg6wNJOWWFksV3SfpHhJIBd0NtOjjacdc7TvwCaGsf
+g8W0jfB3UjVN9YcB1OgpyEaRXKltcPacbKu3Rw==</sign>
+	</coreAD>
+
+</signatures>
+
+</ROT>

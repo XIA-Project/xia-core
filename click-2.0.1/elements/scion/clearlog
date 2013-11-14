@@ -1,0 +1,19 @@
+#!/bin/bash
+
+rm -rf ./TD1/TDC/AD1/*.log*
+rm -rf ./TD1/TDC/AD1/beaconserver/logs/*.log*
+rm -rf ./TD1/TDC/AD1/certserver/logs/*.log*
+rm -rf ./TD1/TDC/AD1/pathserver/logs/*.log*
+rm -rf ./TD1/TDC/AD1/routers/logs/*.log*
+rm -rf ./TD1/TDC/AD1/gateway/logs/*.log*
+
+for i in 2 3 4 5 6 7
+do
+    rm -rf ./TD1/Non-TDC/AD$i/*.log*
+	rm -rf ./TD1/Non-TDC/AD$i/beaconserver/logs/*.log*
+	rm -rf ./TD1/Non-TDC/AD$i/certserver/logs/*.log*
+	rm -rf ./TD1/Non-TDC/AD$i/pathserver/logs/*.log*
+	rm -rf ./TD1/Non-TDC/AD$i/routers/logs/*.log*
+	rm -rf ./TD1/Non-TDC/AD$i/gateway/logs/*.log*
+done
+

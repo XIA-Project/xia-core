@@ -1,0 +1,34 @@
+//Gateway element
+//Syntax Encap <-> Gateway <-> Switch
+//       Decap <-
+
+elementclass SCIONGatewayModule {
+	//input[0]: a packet from SCION network
+	//output[0]: a packet to SCION network
+	//input[1]: a packet from IP network
+	//output[1]: a packet to IP network
+	$aid, $conf_file, $topo_file, $addr_table |
+
+	//pathinfo contians up/down paths and end-to-end paths
+	pathinfo::SCIONPathInfo(TIMEOUT 100);
+
+	//create encap, decap, and gateway
+	encap::SCIONEncap(AID $aid, CONFIG_FILE $conf_file, TOPOLOGY_FILE $topo_file, 
+	ADDR_TABLE $addr_table, PATHINFO pathinfo);
+	decap::SCIONDecap(PATHINFO pathinfo);
+	gateway::SCIONGateway(AID $aid, CONFIG_FILE $conf_file, TOPOLOGY_FILE $topo_file);
+	
+	//connection to SCION network (i.e., to switch)
+	input[0] -> [0]gateway;
+	gateway[0] -> [0]output;
+
+	//connection to IP network
+	input[1] -> [0]encap;
+	decap[0] -> [1] output;
+
+	//connection of internal elements
+	encap[0] -> [1]gateway;
+	gateway[1] -> [1]encap;
+	gateway[2] -> [0]decap;
+}
+

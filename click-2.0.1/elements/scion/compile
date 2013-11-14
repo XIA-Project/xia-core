@@ -1,0 +1,34 @@
+#!/bin/bash
+
+numcpu=`grep 'aes\|sse4' /proc/cpuinfo | sort -u | wc -l`
+archtype=`uname -m`
+
+if [ "$archtype" == "x86_64" ]; then
+	cd ../../
+	if [ "$numcpu" -gt "0" ]; then
+		echo "Host CPU supports AESNI instruction. Do you want to enable it? [Y/N]"
+		read aes_enable
+		if [ "$aes_enable" == "Y" ]; then
+			#install aesni library for scion
+			sudo mkdir -p /usr/local/include/intel_aesni
+			sudo mkdir -p /usr/local/lib
+			sudo cp elements/scion/aesni_module/include/aesni/*.h /usr/local/include/intel_aesni
+			sudo cp elements/scion/aesni_module/intel_aes64.a /usr/local/lib/libaesni.a
+			echo "Installed AESNI library Done."
+			./configure CXXFLAGS="$CXXFLAGS -DENABLE_AESNI" LIBS="$LIBS -laesni"
+		else
+			./configure
+		fi
+	fi
+	
+	# normal compile
+	sudo make clean
+	sudo make elemlist
+	sudo make
+	sudo make install
+	cd ./elements/scion
+else
+	echo "Please compile scion elements with a Linux 64-bit machine."
+fi
+
+

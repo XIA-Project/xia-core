@@ -1,0 +1,14 @@
+#!/bin/bash
+argc=("$#")
+argv=$@
+if [ $argc -eq 0 ]
+then
+    argv="5 6 7"
+fi
+str=""
+for i in $argv
+do
+    str=$str"./AD"$i"/AD"$i"C1.log "
+done
+vim -O $str
+
