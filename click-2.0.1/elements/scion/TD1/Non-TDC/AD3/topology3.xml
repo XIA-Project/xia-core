@@ -18,18 +18,8 @@
             <AddrType>SCION</AddrType>
 			<Addr>1111</Addr>
 			<Interface>
-				<IFID>11</IFID>
-				<NeighborAD>2</NeighborAD>
-				<NeighborType>PARENT</NeighborType>
-			</Interface>
-			<Interface>
-				<IFID>12</IFID>
-				<NeighborAD>2</NeighborAD>
-				<NeighborType>PARENT</NeighborType>
-			</Interface>
-			<Interface>
-				<IFID>13</IFID>
-				<NeighborAD>2</NeighborAD>
+				<IFID>31</IFID>
+				<NeighborAD>1</NeighborAD>
 				<NeighborType>PARENT</NeighborType>
 			</Interface>
 		</Router>	
@@ -38,19 +28,9 @@
             <AddrType>SCION</AddrType>
 			<Addr>2222</Addr>
 			<Interface>
-				<IFID>21</IFID>
-				<NeighborAD>5</NeighborAD>
-				<NeighborType>CHILD</NeighborType>
-			</Interface>
-			<Interface>
-				<IFID>22</IFID>
-				<NeighborAD>5</NeighborAD>
-				<NeighborType>CHILD</NeighborType>
-			</Interface>
-			<Interface>
-				<IFID>23</IFID>
-				<NeighborAD>5</NeighborAD>
-				<NeighborType>CHILD</NeighborType>
+				<IFID>32</IFID>
+				<NeighborAD>2</NeighborAD>
+				<NeighborType>PEER</NeighborType>
 			</Interface>
 		</Router>	
 		<Router>
@@ -58,22 +38,9 @@
             <AddrType>SCION</AddrType>
 			<Addr>3333</Addr>
 			<Interface>
-				<IFID>31</IFID>
-				<NeighborAD>6</NeighborAD>
-				<NeighborType>CHILD</NeighborType>
-				<AddrType>IPV4</AddrType>
-				<Addr>192.168.3.1</Addr>
-				<ToAddr>192.168.3.2</ToAddr>
-			</Interface>
-			<Interface>
-				<IFID>32</IFID>
-				<NeighborAD>6</NeighborAD>
-				<NeighborType>CHILD</NeighborType>
-			</Interface>
-			<Interface>
-				<IFID>33</IFID>
-				<NeighborAD>6</NeighborAD>
-				<NeighborType>CHILD</NeighborType>
+				<IFID>34</IFID>
+				<NeighborAD>4</NeighborAD>
+				<NeighborType>PEER</NeighborType>
 			</Interface>
 		</Router>	
 		<Router>
@@ -81,19 +48,9 @@
             <AddrType>SCION</AddrType>
 			<Addr>4444</Addr>
 			<Interface>
-				<IFID>41</IFID>
-				<NeighborAD>4</NeighborAD>
-				<NeighborType>PEER</NeighborType>
-			</Interface>
-			<Interface>
-				<IFID>42</IFID>
-				<NeighborAD>4</NeighborAD>
-				<NeighborType>PEER</NeighborType>
-			</Interface>
-			<Interface>
-				<IFID>43</IFID>
-				<NeighborAD>4</NeighborAD>
-				<NeighborType>PEER</NeighborType>
+				<IFID>36</IFID>
+				<NeighborAD>6</NeighborAD>
+				<NeighborType>CHILD</NeighborType>
 			</Interface>
 		</Router>	
     </BorderRouters>
