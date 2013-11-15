@@ -8,7 +8,7 @@ NS=$(BINDIR)/xnameservice
 
 all: $(NS)
 
-$(NS): $(SOURCES)
+$(NS): $(SOURCES) $(XINC)/Xsocket.h $(XINC)/xns.h
 	$(CC) -o $@ $(CFLAGS) $(SOURCES) $(LDFLAGS)	
 
 clean:
