@@ -50,6 +50,8 @@ typedef struct RouteState {
 	int32_t hello_seq;  // hello seq number of this router 
 	int32_t hello_lsa_ratio; // frequency ratio of hello:lsa (for timer purpose) 
 	int32_t calc_dijstra_ticks;   
+	bool send_hello;  // Should a hello message be sent?
+	bool send_lsa;  // Should a LSA message be sent?
 
 	int32_t ctl_seq;	// LSA sequence number of this router
 

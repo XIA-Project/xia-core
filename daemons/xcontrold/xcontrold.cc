@@ -32,11 +32,13 @@ void timeout_handler(int signum)
 
 	if (route_state.hello_seq < route_state.hello_lsa_ratio) {
 		// send Hello
-		sendHello();
+		route_state.send_hello = true;
+		//sendHello();
 		route_state.hello_seq++;
 	} else if (route_state.hello_seq >= route_state.hello_lsa_ratio) {
 		// it's time to send LSA
-		sendInterdomainLSA();
+		route_state.send_lsa = true;
+		//sendInterdomainLSA();
 		// reset hello req
 		route_state.hello_seq = 0;
 	} else {
@@ -842,6 +844,14 @@ perror("bind");
 
 	int sock;
 	while (1) {
+		if (route_state.send_hello == true) {
+			route_state.send_hello = false;
+			sendHello();
+		}
+		if (route_state.send_lsa == true) {
+			route_state.send_lsa = false;
+			sendInterdomainLSA();
+		}
 		FD_ZERO(&socks);
 		FD_SET(route_state.sock, &socks);
 		FD_SET(tempSock, &socks);
