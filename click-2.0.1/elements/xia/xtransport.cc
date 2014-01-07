@@ -1456,7 +1456,19 @@ void XTRANSPORT::Xaccept(unsigned short _sport)
 
 		pending_connection_buf.pop();
 
-		ReturnResult(_sport, xia::XACCEPT);
+
+ 		xia::XSocketMsg xsm;
+ 		xsm.set_type(xia::XACCEPT);
+
+		xia::X_Accept_Msg *msg = xsm.mutable_x_accept();
+		msg->set_dag(daginfo.dst_path.unparse().c_str());
+
+ 		std::string s;
+ 		xsm.SerializeToString(&s);
+		WritablePacket *reply = WritablePacket::make(256, s.c_str(), s.size(), 0);
+		output(API_PORT).push(UDPIPPrep(reply, _sport));
+		
+//		ReturnResult(_sport, xia::XACCEPT);
 
 	} else {
 		// FIXME: what error code should be returned?

@@ -11,7 +11,7 @@ class Node
 {
 public:
 	static const std::size_t ID_LEN = 20;
-	
+
 	static const unsigned int XID_TYPE_UNKNOWN = 0;
 	static const unsigned int XID_TYPE_DUMMY_SOURCE = 0xff;
 	static const unsigned int XID_TYPE_AD = 0x10;  // TODO: why does swig complain when these are uint32_t?
@@ -73,7 +73,7 @@ private:
 	void construct_from_strings(const std::string type_string, const std::string id_string);
 };
 
-class Graph 
+class Graph
 {
 public:
 	Graph();
@@ -89,7 +89,7 @@ public:
 	Graph operator+(const Graph& r) const;
 	Graph operator*(const Node& r) const;
 	Graph operator+(const Node& r) const;
-	
+
 	// TODO: should these be part of public interface?
 	std::size_t add_node(const Node& p, bool allow_duplicate_nodes = false);
 	void add_edge(std::size_t from_id, std::size_t to_id);
@@ -108,6 +108,7 @@ public:
 	void from_sockaddr(sockaddr_x *s);
 	void replace_final_intent(const Node& new_intent);
 	Node get_final_intent() const;
+	void replace_node_at(int i, const Node& new_node);
 	std::vector<const Node*> get_nodes_of_type(unsigned int type) const;
 
 protected:
@@ -119,7 +120,7 @@ protected:
 	std::size_t final_intent_index() const;
 
 	void merge_graph(const Graph& r, std::vector<std::size_t>& node_mapping, bool allow_duplicate_nodes = false);
-	
+
 	std::string out_edges_for_index(std::size_t i, std::size_t source_index, std::size_t sink_index) const;
 	std::size_t index_in_dag_string(std::size_t index, std::size_t source_index, std::size_t sink_index) const;
 	std::size_t index_from_dag_string_index(int32_t dag_string_index, std::size_t source_index, std::size_t sink_index) const;
@@ -136,7 +137,7 @@ private:
 };
 
 /**
-* @brief Make a graph by appending a node 
+* @brief Make a graph by appending a node
 *
 * Make a graph by appending a node to this node. The resulting graph will have
 * one edge from this node to the supplied node.
@@ -184,8 +185,8 @@ inline Graph Node::operator*(const Graph& r) const
 * @brief Make a graph by merging with a node
 *
 * Make a graph by merging this node with another node. If the nodes are equal,
-* the resulting graph will contain one node and no edges. Otherwise, the 
-* resulting graph will contain two nodes and no edges. Each node will be both 
+* the resulting graph will contain one node and no edges. Otherwise, the
+* resulting graph will contain two nodes and no edges. Each node will be both
 * a source and a sink.
 *
 * @param r The node with which to merge

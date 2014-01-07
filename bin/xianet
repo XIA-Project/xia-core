@@ -331,7 +331,7 @@ nameserver()
 	cd $XIADIR/bin
 	case $action in
 		"start")
-			./xnameservice i-h $host $LOG_FLAGS &
+			./xnameservice -h $host $LOG_FLAGS &
 			;;
 		"stop")
 			kill_service $host "xnameservice"
