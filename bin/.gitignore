@@ -1,6 +1,7 @@
 xnameservice
 xrouted
+xcontrold
 xhcp*
 xping
 xtraceroute
-xcontrold
+xnetcat
