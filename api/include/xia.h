@@ -15,7 +15,7 @@
 */
 /*!
   @file xia.h
-  @brief COmmon XIA structures and constants
+  @brief Common XIA structures and constants
 */
 
 #ifndef XIA_H

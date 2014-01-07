@@ -1,3 +1,18 @@
+/*
+** Copyright 2011 Carnegie Mellon University
+**
+** Licensed under the Apache License, Version 2.0 (the "License");
+** you may not use this file except in compliance with the License.
+** You may obtain a copy of the License at
+**
+**    http://www.apache.org/licenses/LICENSE-2.0
+**
+** Unless required by applicable law or agreed to in writing, software
+** distributed under the License is distributed on an "AS IS" BASIS,
+** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+** See the License for the specific language governing permissions and
+** limitations under the License.
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -9,6 +24,7 @@
 #include <syslog.h>
 
 #include "Xsocket.h"
+#include "xns.h"
 #include "xhcp.hh"
 #include "../common/XIARouter.hh"
 #include "dagaddr.hpp"
@@ -34,8 +50,8 @@ void help(const char *name)
 {
 	printf("\nusage: %s [-l level] [-v] [-c config] [-h hostname]\n", name);
 	printf("where:\n");
-	printf(" -l level    : syslog logging level 0 = LOG_EMERG ... 7 = LOG_DEBUG (default=3:LOG_ERR)");
-	printf(" -v          : log to the console as well as syslog");
+	printf(" -l level    : syslog logging level 0 = LOG_EMERG ... 7 = LOG_DEBUG (default=3:LOG_ERR)\n");
+	printf(" -v	         : log to the console as well as syslog\n");
 	printf(" -h hostname : click device name (default=host0)\n");
 	printf("\n");
 	exit(0);
@@ -97,7 +113,7 @@ void listRoutes(std::string xidType)
 	} else if (rc == 0) {
 		syslog(LOG_INFO, "No routes exist for %s\n", xidType.c_str());
 	} else {
-		syslog(LOG_INFO, "Error getting route list %d\n", rc);
+		syslog(LOG_INFO, "Error getting route list: %d\n", rc);
 	}
 }
 
@@ -112,8 +128,9 @@ int main(int argc, char *argv[]) {
 	string default_AD("AD:-"), default_HID("HID:-"), default_4ID("IP:-");
 	string empty_str("");
 	string AD, gwRHID, gwR4ID, nsDAG;
-	int beacon_reception_count=0;
-	int beacon_response_freq = ceil(XHCP_CLIENT_ADVERTISE_INTERVAL/XHCP_SERVER_BEACON_INTERVAL);	int first_beacon_reception = true;	
+	unsigned  beacon_reception_count=0;
+	unsigned beacon_response_freq = ceil(XHCP_CLIENT_ADVERTISE_INTERVAL/XHCP_SERVER_BEACON_INTERVAL);
+	int update_ns = 0;
 	char *self_dag = (char *)malloc(XHCP_MAX_DAG_LENGTH);
 	char *gw_dag = (char *)malloc(XHCP_MAX_DAG_LENGTH);
 	char *gw_4id = (char *)malloc(XHCP_MAX_DAG_LENGTH);
@@ -130,11 +147,11 @@ int main(int argc, char *argv[]) {
 	xr.setRouter(hostname);
 	syslog(LOG_NOTICE, "%s started on %s", APPNAME, hostname);
 
-    // make the response message dest DAG (intended destination: gw router who is running the routing process)
+	// make the response message dest DAG (intended destination: gw router who is running the routing process)
 	Graph gw = Node() * Node(BHID) * Node(SID_XROUTE);
 	gw.fill_sockaddr(&pseudo_gw_router_dag);
 
-    // connect to the click route engine
+	// connect to the click route engine
 	if ((rc = xr.connect()) != 0) {
 		syslog(LOG_ERR, "unable to connect to click! (%d)\n", rc);
 		return -1;
@@ -174,7 +191,7 @@ int main(int argc, char *argv[]) {
 		4. update 4ID table:
 			(default, 0, gwRHID, -)				
 		5. store Name-Server-DAG information
-                6. register hostname to the name server  	
+		6. register hostname to the name server  	
 	*/
 	
 	// main looping
@@ -184,8 +201,10 @@ int main(int argc, char *argv[]) {
 		socklen_t ddaglen = sizeof(ddag);
 		int rc = Xrecvfrom(sockfd, pkt, XHCP_MAX_PACKET_SIZE, 0, (struct sockaddr*)&ddag, &ddaglen);
 
-		if (rc < 0)
+		if (rc < 0) {
 			syslog(LOG_WARNING, "error receiving data");
+			continue;
+		}
 		memset(self_dag, '\0', XHCP_MAX_DAG_LENGTH);
 		memset(gw_dag, '\0', XHCP_MAX_DAG_LENGTH);
 		memset(gw_4id, '\0', XHCP_MAX_DAG_LENGTH);
@@ -246,6 +265,7 @@ int main(int argc, char *argv[]) {
 				syslog(LOG_WARNING, "error setting route %d\n", rc);
 				
 			myAD = AD;
+			update_ns = 1;
 		}
 
 		// Check if myGWRouterHID has been changed
@@ -296,7 +316,7 @@ int main(int argc, char *argv[]) {
 		}
 
 		beacon_reception_count++;
-		if(beacon_reception_count >= beacon_response_freq || first_beacon_reception) {
+		if ((beacon_reception_count % beacon_response_freq) == 0) {
 			// construct a registration message to gw router
 			/* Message format (delimiter=^)
 				message-type{HostRegister = 2}
@@ -310,26 +330,34 @@ int main(int argc, char *argv[]) {
 			strcpy (buffer, host_register_message.c_str());
 			// send the registraton message to gw router
 			Xsendto(sockfd, buffer, strlen(buffer), 0, (sockaddr*)&pseudo_gw_router_dag, sizeof(pseudo_gw_router_dag));
-			first_beacon_reception = false;
-			beacon_reception_count= 0;
 		}
 
 		//Register this hostname to the name server
-                if (beacon_reception_count == XHCP_CLIENT_NAME_REGISTER_WAIT) {    
-    			// read the localhost HID 
-    			if ( XreadLocalHostAddr(sockfd, myrealAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE, my4ID, MAX_XID_SIZE) < 0 )
-    				syslog(LOG_WARNING, "error reading localhost address"); 
-    			// make the host DAG 
-				Node n_src = Node();
-				Node n_ip  = Node(my4ID);
-				Node n_ad  = Node(myrealAD);
-				Node n_hid = Node(myHID);
+		if (update_ns && beacon_reception_count >= XHCP_CLIENT_NAME_REGISTER_WAIT) {	
+			// read the localhost HID 
+			if ( XreadLocalHostAddr(sockfd, myrealAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE, my4ID, MAX_XID_SIZE) < 0 ) {
+				syslog(LOG_WARNING, "error reading localhost address"); 
+				continue;
+			}
 
-				Graph hg = (n_src * n_ad * n_hid);
-				hg = hg + (n_src * n_ip * n_ad * n_hid);
-				hg.fill_sockaddr(&hdag);
-				if (XregisterName(fullname, &hdag) < 0 )
-					syslog(LOG_ERR, "error registering new name");
+			// make the host DAG 
+			Node n_src = Node();
+			Node n_ip  = Node(my4ID);
+			Node n_ad  = Node(myrealAD);
+			Node n_hid = Node(myHID);
+
+			Graph hg = (n_src * n_ad * n_hid);
+			hg = hg + (n_src * n_ip * n_ad * n_hid);
+			hg.fill_sockaddr(&hdag);
+			if (XregisterHost(fullname, &hdag) < 0 ) {
+				syslog(LOG_ERR, "error registering new DAG for %s", fullname);
+
+				// reset beacon counter so we try again in a few seconds
+				beacon_reception_count = 0;
+			} else {
+				syslog(LOG_INFO, "registered %s as %s", fullname, hg.dag_string().c_str());
+				update_ns = 0;
+			}
 		}   
 	}	
 	return 0;
