@@ -795,6 +795,7 @@ enable_ethernet
 enable_etherswitch
 enable_grid
 enable_xia
+enable_scion
 enable_icmp
 enable_ip
 enable_ip6
@@ -1477,6 +1478,7 @@ Optional Features:
   --enable-etherswitch    include Ethernet switch elements
   --enable-grid           include Grid elements (see FAQ)
   --disable-xia           do not include XIA elements
+  --disable-scion         do not include SCION elements
   --disable-icmp          do not include ICMP elements
   --disable-ip            do not include IP elements
   --enable-ip6            include IPv6 elements
@@ -6592,6 +6594,17 @@ if test "x$enable_xia" = xyes; then
     :
 
 fi
+# Check whether --enable-scion was given.
+if test "${enable_scion+set}" = set; then :
+  enableval=$enable_scion;
+else
+  enable_scion=yes
+fi
+test "x$enable_all_elements" = xyes -a \( "x$enable_scion" = xNO -o "x$enable_scion" = x \) && enable_scion=yes
+if test "x$enable_scion" = xyes; then
+    :
+
+fi
 # Check whether --enable-icmp was given.
 if test "${enable_icmp+set}" = set; then :
   enableval=$enable_icmp;
@@ -7398,7 +7411,7 @@ else
 
 	    	    ac_cv_endian=0
 	    cat > conftest.$ac_ext <<EOF
-#line 7401 "configure"
+#line 7414 "configure"
 #include "confdefs.h"
 #include <$endian_hdr>
 #ifdef __BYTE_ORDER
