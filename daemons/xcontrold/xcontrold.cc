@@ -241,7 +241,7 @@ int processMsg(std::string msg)
 			rc = processInterdomainLSA(m);
 			break;
         default:
-            perror("unknown routing message");
+			syslog(LOG_ALERT, "Unknown control message: %s\n", msg.c_str());
             break;
     }
 

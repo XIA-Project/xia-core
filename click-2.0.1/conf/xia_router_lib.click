@@ -439,3 +439,29 @@ elementclass XIAController {
     input => xlc => output;
     xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> xrc;
 };
+
+// 1-port SCION Beacon Server
+elementclass XIASCIONBeaconServer {
+    $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac |
+
+    // $local_addr: the full address of the node
+    // $local_ad: the node's AD
+    // $local_hid: the node's HID
+    // $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
+
+    // input[0]: a packet arrived at the node
+    // output[0]: forward to interface 0
+
+    xlc :: XIALineCard($local_addr, $local_hid, $mac, 0);
+
+    xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $click_port, 1, 0);
+
+    xbs::SCIONBeaconServerCore(AID 11111,
+    CONFIG_FILE "./TD1/TDC/AD1/beaconserver/conf/AD1BS.conf",
+    TOPOLOGY_FILE ."/TD1/TDC/AD1/topology1.xml",
+    ROT "./TD1/TDC/AD1/beaconserver/ROT/rot-td1-0.xml");
+
+    input => xlc => output;
+
+    xbs -> xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> xbs;
+};
