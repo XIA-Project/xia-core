@@ -52,9 +52,7 @@ linuxmodule: Makefile click-buildtool stamp-h
 ns: Makefile click-buildtool stamp-h
 	@cd ns && $(MAKE) all
 userlevel: Makefile click-buildtool click-compile stamp-h
-	-patch -N -p2 -r - --verbose < scioncryptolib.patch
 	@cd userlevel && $(MAKE) all
-	-patch -N -p2 -r - --verbose -R < scioncryptolib.patch
 tools: Makefile stamp-h
 	@cd tools && $(MAKE) all
 

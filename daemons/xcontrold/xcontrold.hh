@@ -21,8 +21,6 @@
 #include "../common/Topology.hh"
 #include "../common/XIARouter.hh"
 
-#include "rot_parser.hh"
-
 #define HELLO_INTERVAL 0.1
 #define LSA_INTERVAL 0.3
 #define AD_LSA_INTERVAL 1

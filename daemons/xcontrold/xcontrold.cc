@@ -716,10 +716,6 @@ void initRouteState()
 		route_state.dual_router = 0;
 	}
 
-    ROTParser parser;
-    if (parser.loadROTFile("rot-td1-0.xml") != ROTParseNoError)
-		syslog(LOG_ERR, "Failure loading rot-td1-0.xml");
-
 	// set timer for HELLO/LSA
 	signal(SIGALRM, timeout_handler);
 	ualarm((int)ceil(HELLO_INTERVAL*1000000),0); 	
