@@ -222,7 +222,7 @@ void XRoute::listRoutes(std::string xidType, XIAXIDRouteTable *rt)
 		vector<XIARouteEntry>::iterator ir;
 		for (ir = routes.begin(); ir < routes.end(); ir++) {
 			XIARouteEntry r = *ir;
-			printf("%s: %d : %s : %ld\n", r.xid.c_str(), r.port, r.nextHop.c_str(), r.flags);
+			printf("%s: %hd : %s : %lx\n", r.xid.c_str(), r.port, r.nextHop.c_str(), r.flags);
 		}
 	} else if (rc == 0) {
 		printf("No routes exist for %s\n", xidType.c_str());

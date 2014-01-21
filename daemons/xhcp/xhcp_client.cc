@@ -108,7 +108,7 @@ void listRoutes(std::string xidType)
 		vector<XIARouteEntry>::iterator ir;
 		for (ir = routes.begin(); ir < routes.end(); ir++) {
 			XIARouteEntry r = *ir;
-			syslog(LOG_INFO, "%s: %d : %s : %ld\n", r.xid.c_str(), r.port, r.nextHop.c_str(), r.flags);
+			syslog(LOG_INFO, "%s: %hd : %s : %lx\n", r.xid.c_str(), r.port, r.nextHop.c_str(), r.flags);
 		}
 	} else if (rc == 0) {
 		syslog(LOG_INFO, "No routes exist for %s\n", xidType.c_str());
@@ -261,7 +261,7 @@ int main(int argc, char *argv[]) {
 			xr.delRoute(myAD);
 		
 			// update AD table (my AD entry)
-			if ((rc = xr.setRoute(AD, DESTINED_FOR_LOCALHOST, empty_str, 0xffff)) != 0)
+			if ((rc = xr.setRoute(AD, DESTINED_FOR_LOCALHOST, empty_str, 0)) != 0)
 				syslog(LOG_WARNING, "error setting route %d\n", rc);
 				
 			myAD = AD;
@@ -281,22 +281,22 @@ int main(int argc, char *argv[]) {
 			// update the next hop for anything point to port 0.
 
 			// update AD (default entry)
-			if ((rc = xr.setRoute(default_AD, 0, gwRHID, 0xffff)) != 0)
+			if ((rc = xr.setRoute(default_AD, 0, gwRHID, 0)) != 0)
 				syslog(LOG_WARNING, "error setting route %d\n", rc);
 				
 			// update 4ID table (default entry)
-			if ((rc = xr.setRoute(default_4ID, 0, gwRHID, 0xffff)) != 0)
+			if ((rc = xr.setRoute(default_4ID, 0, gwRHID, 0)) != 0)
 				syslog(LOG_WARNING, "error setting route %d\n", rc);
 			
 			// update HID table (default entry)
-			if ((rc = xr.setRoute(default_HID, 0, gwRHID, 0xffff)) != 0)
+			if ((rc = xr.setRoute(default_HID, 0, gwRHID, 0)) != 0)
 				syslog(LOG_WARNING, "error setting route %d\n", rc);
 			
 			// update HID table (gateway router HID entry)
-			if ((rc = xr.setRoute(gwRHID, 0, gwRHID, 0xffff)) != 0)
+			if ((rc = xr.setRoute(gwRHID, 0, gwRHID, 0)) != 0)
 				syslog(LOG_WARNING, "error setting route %d\n", rc);
 				
-			if ((rc = xr.setRoute(default_HID, 0, gwRHID, 0xffff)) != 0)
+			if ((rc = xr.setRoute(default_HID, 0, gwRHID, 0)) != 0)
 				syslog(LOG_WARNING, "error setting route %d\n", rc);
 				
 			myGWRHID = gwRHID;

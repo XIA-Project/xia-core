@@ -42,7 +42,7 @@ void listRoutes(std::string xidType)
 		vector<XIARouteEntry>::iterator ir;
 		for (ir = routes.begin(); ir < routes.end(); ir++) {
 			XIARouteEntry r = *ir;
-			syslog(LOG_INFO, "%s: %s | %d | %s | %ld", xidType.c_str(), r.xid.c_str(), r.port, r.nextHop.c_str(), r.flags);
+			syslog(LOG_INFO, "%s: %s | %hd | %s | %lx", xidType.c_str(), r.xid.c_str(), r.port, r.nextHop.c_str(), r.flags);
 		}
 	} else if (rc == 0) {
 		syslog(LOG_INFO, "%s: No routes exist", xidType.c_str());
