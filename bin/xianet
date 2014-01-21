@@ -24,7 +24,7 @@ XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
 CLICKPATH=$XIADIR/click
 CONFPATH=$XIADIR/etc/click/
 CLICK=$CLICKPATH/userlevel/click
-SCRIPT=xia_local_topology.click
+SCRIPT=xia_topology.click
 
 NODECONF=$XIADIR/etc/nodes.conf
 XSOCKCONF=$XIADIR/etc/xsockconf.ini
