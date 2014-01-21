@@ -7,6 +7,8 @@
 #include <arpa/inet.h>
 #include <string>
 #include <vector>
+#include <map>
+#include <time.h>
 
 #include <sys/types.h>
 #include <netdb.h>
@@ -18,6 +20,7 @@
 
 #define DEFAULT_NAME "controller0"
 #define APPNAME "xcontrold"
+#define EXPIRE_TIME 60
 
 char *hostname = NULL;
 char *ident = NULL;
@@ -25,6 +28,7 @@ char *ident = NULL;
 int ctrl_sock;
 RouteState route_state;
 XIARouter xr;
+map<string,time_t> timeStamp;
 
 void timeout_handler(int signum)
 {
@@ -309,6 +313,8 @@ int processRoutingTable(std::map<std::string, RouteEntry> routingTable)
 		}
 		if ((rc = xr.setRoute(it->second.dest, it->second.port, it->second.nextHop, it->second.flags)) != 0)
 			syslog(LOG_ERR, "error setting route %d", rc);
+
+        timeStamp[it->second.dest] = time(NULL);
 	}
 
 	return 1;
@@ -843,6 +849,7 @@ perror("bind");
 	}
 
 	int sock;
+	time_t last_purge = time(NULL);
 	while (1) {
 		if (route_state.send_hello == true) {
 			route_state.send_hello = false;
@@ -878,6 +885,23 @@ perror("bind");
 
 			string msg = recv_message;
             processMsg(msg);
+		}
+
+		time_t now = time(NULL);
+		if (now - last_purge >= EXPIRE_TIME)
+		{
+			last_purge = now;
+			fprintf(stderr, "checking entry\n");
+			map<string, time_t>::iterator iter;
+
+			for (iter = timeStamp.begin(); iter != timeStamp.end(); iter++)	
+			{
+				if (now - iter->second >= EXPIRE_TIME){
+					xr.delRoute(iter->first);
+					timeStamp.erase(iter);
+					syslog(LOG_INFO, "purging host route for : %s", iter->first.c_str());
+				}
+			}
 		}
 	}
 
