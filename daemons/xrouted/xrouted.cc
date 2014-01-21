@@ -7,6 +7,8 @@
 #include <arpa/inet.h>
 #include <string>
 #include <vector>
+#include <map>
+#include <time.h>
 
 #include <sys/types.h>
 #include <netdb.h>
@@ -18,6 +20,7 @@
 
 #define DEFAULT_NAME "router0"
 #define APPNAME "xrouted"
+#define EXPIRE_TIME 60
 
 //#define XR_DEBUG
 
@@ -32,6 +35,7 @@ char *ident = NULL;
 
 RouteState route_state;
 XIARouter xr;
+map<string,time_t> timeStamp;
 
 void listRoutes(std::string xidType)
 {
@@ -205,8 +209,10 @@ int processHostRegister(ControlMessage msg)
 
 	// update the host entry in (click-side) HID table
 	int rc;
-	if ((rc = xr.setRoute(neighbor.HID, neighbor.port, neighbor.HID, 0xffff)) != 0)
+	if ((rc = xr.setRoute(neighbor.HID, neighbor.port, neighbor.HID, 0)) != 0)
 		syslog(LOG_ERR, "unable to set route %d", rc);
+
+	timeStamp[neighbor.HID] = time(NULL);
 
     return 1;
 }
@@ -340,6 +346,8 @@ int processRoutingTable(ControlMessage msg)
 
 		if ((rc = xr.setRoute(hid, port, nextHop, flags)) != 0)
 			syslog(LOG_ERR, "error setting route %d", rc);
+
+        timeStamp[hid] = time(NULL);
  	}
 
 	return 1;
@@ -482,6 +490,7 @@ int main(int argc, char *argv[])
    		exit(-1);
    	}
 
+	time_t last_purge = time(NULL);
 	while (1) {
 		if (route_state.send_hello == true) {
 			route_state.send_hello = false;
@@ -509,6 +518,23 @@ int main(int argc, char *argv[])
 
             std::string msg = recv_message;
             processMsg(msg);
+		}
+
+		time_t now = time(NULL);
+		if (now - last_purge >= EXPIRE_TIME)
+		{
+			last_purge = now;
+			fprintf(stderr, "checking entry\n");
+			map<string, time_t>::iterator iter;
+
+			for (iter = timeStamp.begin(); iter != timeStamp.end(); iter++)	
+			{
+				if (now - iter->second >= EXPIRE_TIME){
+					xr.delRoute(iter->first);
+					timeStamp.erase(iter);
+					syslog(LOG_INFO, "purging host route for : %s", iter->first.c_str());
+				}
+			}
 		}
     }
 
