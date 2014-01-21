@@ -7,6 +7,8 @@
 #include <arpa/inet.h>
 #include <string>
 #include <vector>
+#include <map>
+#include <time.h>
 
 #include <sys/types.h>
 #include <netdb.h>
@@ -18,6 +20,7 @@
 
 #define DEFAULT_NAME "router0"
 #define APPNAME "xrouted"
+#define EXPIRE_TIME 10
 
 char *hostname = NULL;
 char *ident = NULL;
@@ -25,6 +28,7 @@ char *ident = NULL;
 RouteState route_state;
 
 XIARouter xr;
+map<string,time_t> timeStamp;
 
 void listRoutes(std::string xidType)
 {
@@ -187,6 +191,7 @@ void processHostRegister(const char* host_register_msg) {
 	if ((rc = xr.setRoute(hostHID, interface, hostHID, 0xffff)) != 0)
 		syslog(LOG_ERR, "unable to set route %d", rc);
 
+	timeStamp[hostHID] = time(NULL);
 }
 
 // process an incoming Hello message
@@ -673,6 +678,7 @@ int main(int argc, char *argv[])
    	}
 
 
+	time_t last_purge = time(NULL);
 	while (1) {
 		FD_ZERO(&socks);
 		FD_SET(route_state.sock, &socks);
@@ -713,8 +719,26 @@ int main(int argc, char *argv[])
 						break;
 				}
   			}
+
 		}
-    	}
+
+		time_t now = time(NULL);
+		if (now - last_purge >= 10)
+		{
+			last_purge = now;
+			fprintf(stderr, "cheking entry\n");
+			map<string, time_t>::iterator iter;
+
+			for (iter = timeStamp.begin(); iter != timeStamp.end(); iter++)	
+			{
+				if (now - iter->second >= EXPIRE_TIME){
+					xr.delRoute(iter->first);
+					timeStamp.erase(iter);
+					syslog(LOG_INFO, "purging host route for : %s", iter->first.c_str());
+				}
+			}
+		}
+    }
 
 
 	return 0;
