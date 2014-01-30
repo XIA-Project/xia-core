@@ -127,7 +127,7 @@ int click_send(int sockfd, xia::XSocketMsg *xsm)
 	const char *p = p_buf.c_str();
 	while (remaining > 0) {
 
-//LOGF("sending to click: seq: %d type: %d", xsm->sequence(), xsm->type());
+		//LOGF("sending to click: seq: %d type: %d", xsm->sequence(), xsm->type());
 		setWrapped(sockfd, TRUE);
 		rc = sendto(sockfd, p, remaining, 0, (struct sockaddr *)&sa, sizeof(sa));
 		setWrapped(sockfd, FALSE);

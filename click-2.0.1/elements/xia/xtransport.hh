@@ -266,6 +266,11 @@ Might need other things to handle chunking
 class XIAContentModule;   
 
 
+typedef struct {
+	bool forever;
+	Timestamp expiry;
+	HashTable<unsigned short, unsigned int> events;
+} PollEvent;
 
 class XTRANSPORT : public Element { 
   public:
@@ -316,7 +321,7 @@ class XTRANSPORT : public Element {
 	 * Socket states
 	 * ========================= */
     struct sock {
-    	sock(): port(0), isConnected(false), initialized(false), full_src_dag(false), timer_on(false), synack_waiting(false), dataack_waiting(false), teardown_waiting(false), send_buffer_size(DEFAULT_SEND_WIN_SIZE), recv_buffer_size(DEFAULT_RECV_WIN_SIZE), send_base(0), next_send_seqnum(0), recv_base(0), next_recv_seqnum(0), dgram_buffer_start(0), dgram_buffer_end(-1), recv_buffer_count(0), recv_pending(false) {};
+    	sock(): port(0), isConnected(false), initialized(false), full_src_dag(false), timer_on(false), synack_waiting(false), dataack_waiting(false), teardown_waiting(false), send_buffer_size(DEFAULT_SEND_WIN_SIZE), recv_buffer_size(DEFAULT_RECV_WIN_SIZE), send_base(0), next_send_seqnum(0), recv_base(0), next_recv_seqnum(0), dgram_buffer_start(0), dgram_buffer_end(-1), recv_buffer_count(0), recv_pending(false), polling(0), did_poll(false) {};
 
 	/* =========================
 	 * Common Socket states
@@ -345,6 +350,9 @@ class XTRANSPORT : public Element {
 		bool synack_waiting;
 		bool dataack_waiting;
 		bool teardown_waiting;
+
+		bool did_poll;
+		unsigned polling;
 
 		int num_connect_tries; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
 		int num_retransmit_tries; // number of times to try resending data packets
@@ -504,7 +512,6 @@ class XTRANSPORT : public Element {
 		} rcvq_space;    
     } ;
 
-
  
     list<int> xcmp_listeners;   // list of ports wanting xcmp notifications
 
@@ -518,6 +525,8 @@ class XTRANSPORT : public Element {
     // FIXME: can these be rolled into the sock structure?
 	HashTable<unsigned short, int> nxt_xport;
     HashTable<unsigned short, int> hlim;
+
+    HashTable<unsigned short, PollEvent> poll_events;
 
     
     atomic_uint32_t _id;
@@ -559,6 +568,10 @@ class XTRANSPORT : public Element {
     void ProcessNetworkPacket(WritablePacket *p_in);
     void ProcessCachePacket(WritablePacket *p_in);
     void ProcessXhcpPacket(WritablePacket *p_in);
+
+    void CreatePollEvent(unsigned short _sport, xia::X_Poll_Msg *msg);
+    void ProcessPollEvent(unsigned short, unsigned int);
+    bool ProcessPollTimeout(unsigned short, PollEvent& pe);
     /*
     ** Xsockets API handlers
     */
@@ -586,6 +599,7 @@ class XTRANSPORT : public Element {
     void XreadChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void XremoveChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+    void Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 };
 
 

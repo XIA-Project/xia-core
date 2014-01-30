@@ -33,6 +33,8 @@ enum XSocketCallType {
 
   XGETMSG = 26;
   XREADYTOACCEPT = 27;
+
+  XPOLL = 28;
 }
 
 message XSocketMsg {
@@ -68,6 +70,8 @@ message XSocketMsg {
   optional X_IsDualStackRouter_Msg x_isdualstackrouter = 25;
   optional X_GetPeername_Msg x_getpeername = 26;
   optional X_GetSockname_Msg x_getsockname = 27;
+
+  optional X_Poll_Msg x_poll = 28;
 }
 
 message X_Socket_Msg {
@@ -209,6 +213,17 @@ message X_GetPeername_Msg {
 
 message X_GetSockname_Msg {
   optional string dag = 1; // Full DAG of the this socket
+}
+
+message X_Poll_Msg {
+  
+  message PollFD {
+    required int32 port = 1;
+    required uint32 flags = 2;
+  }
+  required int32 timeout = 1;
+  required uint32 nfds = 2;
+  repeated PollFD pfds = 3;
 }
 
 /**************************************************/
