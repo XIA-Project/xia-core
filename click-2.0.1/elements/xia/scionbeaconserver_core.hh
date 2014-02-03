@@ -84,6 +84,7 @@ class SCIONBeaconServerCore : public Element {
         int initialize(ErrorHandler* errh);
         void run_timer(Timer *timer);
             bool run_task(Task *task);
+        void push(int port, Packet *p);
 
         int sendTestMsg();
         

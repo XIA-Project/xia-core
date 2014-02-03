@@ -440,9 +440,10 @@ elementclass XIAController {
     xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> xrc;
 };
 
-// 1-port SCION Beacon Server
-elementclass XIASCIONBeaconServer {
-    $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac |
+// 1-port SCION Beacon Server Core
+elementclass XIASCIONBeaconServerCore {
+    $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac,
+    AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot |
 
     // $local_addr: the full address of the node
     // $local_ad: the node's AD
@@ -456,12 +457,9 @@ elementclass XIASCIONBeaconServer {
 
     xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $click_port, 1, 0);
 
-    xbs::SCIONBeaconServerCore(AID 11111,
-    CONFIG_FILE "./TD1/TDC/AD1/beaconserver/conf/AD1BS.conf",
-    TOPOLOGY_FILE ."/TD1/TDC/AD1/topology1.xml",
-    ROT "./TD1/TDC/AD1/beaconserver/ROT/rot-td1-0.xml");
+    sbs :: SCIONBeaconServerCore(AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot);
 
     input => xlc => output;
 
-    xbs -> xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> xbs;
+    sbs -> xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> sbs;
 };

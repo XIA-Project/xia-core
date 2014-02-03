@@ -60,14 +60,6 @@ int SCIONBeaconServerCore::configure(Vector<String> &conf, ErrorHandler *errh) {
 }
 
 int SCIONBeaconServerCore::initialize(ErrorHandler* errh) {
-    // make the dest DAG (broadcast to other routers)
-    m_ddag = (char*)malloc(snprintf(NULL, 0, "RE %s %s", BHID, SID_XROUTE) + 1);
-    sprintf(m_ddag, "RE %s %s", BHID, SID_XROUTE);	
-
-    // make the src DAG (the one the routing process listens on)
-    m_sdag = (char*) malloc(snprintf(NULL, 0, "RE %s %s %s", MYAD, MYHID, SID_XROUTE) + 1);
-    sprintf(m_sdag, "RE %s %s %s", MYAD, MYHID, SID_XROUTE); 
-#if 0
   
 #ifdef ENABLE_AESNI
   if(!check_for_aes_instructions()) {
@@ -122,7 +114,15 @@ int SCIONBeaconServerCore::initialize(ErrorHandler* errh) {
     exit(-1);
   }
   scionPrinter->printLog(IL, "Load OFG key Done.\n");
-#endif
+
+  // Task 5: Initialize XIA addresses
+    // make the dest DAG (broadcast to other routers)
+    m_ddag = (char*)malloc(snprintf(NULL, 0, "RE %s %s", BHID, SID_XROUTE) + 1);
+    sprintf(m_ddag, "RE %s %s", BHID, SID_XROUTE);	
+
+    // make the src DAG (the one the routing process listens on)
+    m_sdag = (char*) malloc(snprintf(NULL, 0, "RE %s %s %s", MYAD, MYHID, SID_XROUTE) + 1);
+    sprintf(m_sdag, "RE %s %s %s", MYAD, MYHID, SID_XROUTE); 
   
   // start scheduler to received packets
   ScheduleInfo::initialize_task(this, &_task, errh);
@@ -254,6 +254,13 @@ void SCIONBeaconServerCore::loadPrivateKey() {
     }
   _CryptoIsReady = true;
   }
+}
+
+void SCIONBeaconServerCore::push(int port, Packet *p)
+{
+    TransportHeader thdr(p);
+    //printf("beacon0: %s\n", thdr.payload());
+    p->kill();
 }
 
 bool SCIONBeaconServerCore::run_task(Task *task) {

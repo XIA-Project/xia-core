@@ -26,6 +26,7 @@ asm
 xia.mk
 .DS_Store
 *.dSYM
+logs
 
 # ignore session layer files on this branch only
 api/session
