@@ -51,7 +51,7 @@
 CLICK_DECLS
 /*
 TODO:
-        1. Define data structre necessary for PCB's (up path, down path)
+        1. Define data structure necessary for PCB's (up path, down path)
         2. Accepts PCB whenever it comes in..... 
         3. Uplodad PCB to Core only when it is necessary. 
         4. Has a table of PCB
@@ -137,15 +137,18 @@ class SCIONBeaconServer : public Element {
 	  		delete scionPrinter;
         };
         
-        /*CLICK functions*/ 
+        /* click related functions */
         const char *class_name() const {return "SCIONBeaconServer";}
-        const char *port_count() const {return "-/-";}
-        const char *processing() const {return PULL_TO_PUSH;}
+        const char *port_count() const {return "-/-";} // any # of input ports / any # of output ports
+        const char *processing() const {return PUSH;} // same as "h/h"
+
         int configure(Vector<String> &, ErrorHandler *);
         int initialize(ErrorHandler* errh);
         void run_timer(Timer *timer);
         bool run_task(Task *task);
-        /*****/
+        void push(int port, Packet *p);
+
+        int sendHello();
 
 	private:
         /**
@@ -522,6 +525,10 @@ class SCIONBeaconServer : public Element {
 		void initializeOutputPort();
 
     private:
+        /* XIA */
+        char *m_sdag;
+        char *m_ddag;
+
         Timer _timer;
         Task  _task;        
         /** AD AID of pcb server */

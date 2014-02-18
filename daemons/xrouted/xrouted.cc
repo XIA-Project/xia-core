@@ -20,7 +20,7 @@
 
 #define DEFAULT_NAME "router0"
 #define APPNAME "xrouted"
-#define EXPIRE_TIME 60
+#define EXPIRE_TIME 120
 
 //#define XR_DEBUG
 
@@ -197,6 +197,7 @@ int processHostRegister(ControlMessage msg)
     std::string myHID = route_state.myHID;
 
 	NodeStateEntry entry;
+    entry.ad = route_state.myAD;
 	entry.hid = myHID;
 	entry.num_neighbors = route_state.num_neighbors;
 
@@ -243,6 +244,7 @@ int processHello(ControlMessage msg)
     std::string myHID = route_state.myHID;
 
 	NodeStateEntry entry;
+    entry.ad = route_state.myAD;
 	entry.hid = myHID;
 	entry.num_neighbors = route_state.num_neighbors;
 

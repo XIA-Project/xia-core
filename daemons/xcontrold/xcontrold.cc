@@ -20,7 +20,7 @@
 
 #define DEFAULT_NAME "controller0"
 #define APPNAME "xcontrold"
-#define EXPIRE_TIME 60
+#define EXPIRE_TIME 120
 
 char *hostname = NULL;
 char *ident = NULL;
@@ -189,6 +189,17 @@ int processInterdomainLSA(ControlMessage msg)
 	return rc;
 }
 
+int processSCION(std::string msg, int len)
+{
+    sockaddr_x dest;
+    Graph g = Node()
+        * Node("AD:1000000000000000000000000000000000000001")
+        * Node("HID:0000000000000000000000000000000000000001");
+    g.fill_sockaddr(&dest);
+
+    return Xsendto(route_state.sock, msg.c_str(), len, 0, (struct sockaddr *)&dest, sizeof(sockaddr_x));
+}
+
 int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> routingTable)
 {
 	if (destHID == route_state.myHID) {
@@ -220,7 +231,7 @@ int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> rout
 	}
 }
 
-int processMsg(std::string msg)
+int processMsg(std::string msg, int len)
 {
     int type, rc = 0;
     ControlMessage m(msg);
@@ -244,6 +255,9 @@ int processMsg(std::string msg)
 		case CTL_XBGP:
 			rc = processInterdomainLSA(m);
 			break;
+        case 9:
+            rc = processSCION(msg, len);
+            break;
         default:
 			syslog(LOG_ALERT, "Unknown control message: %s\n", msg.c_str());
             break;
@@ -286,6 +300,7 @@ int processHello(ControlMessage msg)
     std::string myHID = route_state.myHID;
 
 	NodeStateEntry entry;
+    entry.ad = route_state.myAD;
 	entry.hid = myHID;
 	entry.num_neighbors = route_state.num_neighbors;
 
@@ -311,7 +326,8 @@ int processRoutingTable(std::map<std::string, RouteEntry> routingTable)
 		if (it->second.dest == SID_XCONTROL) {
 			continue;
 		}
-		if ((rc = xr.setRoute(it->second.dest, it->second.port, it->second.nextHop, it->second.flags)) != 0)
+
+		if ((rc = xr.setRoute(it->second.dest, interfaceNumber("HID", it->second.nextHop), it->second.nextHop, it->second.flags)) != 0)
 			syslog(LOG_ERR, "error setting route %d", rc);
 
         timeStamp[it->second.dest] = time(NULL);
@@ -381,7 +397,7 @@ int processLSA(ControlMessage msg)
 
 	if (route_state.calc_dijstra_ticks >= CALC_DIJKSTRA_INTERVAL)
 	{
-		syslog(LOG_DEBUG, "Calcuating shortest paths\n");
+		//syslog(LOG_DEBUG, "Calculating shortest paths\n");
 
 		// Calculate next hop for ADs
 		std::map<std::string, RouteEntry> ADRoutingTable;
@@ -465,7 +481,7 @@ void populateNeighboringADBorderRouterEntries(string currHID, std::map<std::stri
 			entry.dest = neighborHID;
 			entry.nextHop = neighborHID;
 			entry.port = it->port;
-			//entry.flags = 0;
+			entry.flags = 0;
 		}
 	}
 }
@@ -884,7 +900,7 @@ perror("bind");
 			}
 
 			string msg = recv_message;
-            processMsg(msg);
+            processMsg(msg, dlen);
 		}
 
 		time_t now = time(NULL);

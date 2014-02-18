@@ -440,6 +440,30 @@ elementclass XIAController {
     xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> xrc;
 };
 
+// 2-port controller node
+elementclass XIAController2Port {
+    $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac |
+
+    // $local_addr: the full address of the node
+    // $local_ad: the node's AD
+    // $local_hid: the node's HID
+    // $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
+
+    // input[0], input[1]: a packet arrived at the node
+    // output[0]: forward to interface 0
+    // output[1]: forward to interface 1
+
+    xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $click_port, 2, 0);
+
+    Script(write xrc/n/proc/rt_AD.add $local_ad $DESTINED_FOR_LOCALHOST);    // self AD as destination
+
+	xlc0 :: XIALineCard($local_addr, $local_hid, $mac, 0);
+	xlc1 :: XIALineCard($local_addr, $local_hid, $mac, 1);
+    
+	input => xlc0, xlc1 => output;
+	xrc -> XIAPaintSwitch[0,1] => [1]xlc0[1], [1]xlc1[1]  -> [0]xrc;
+};
+
 // 1-port SCION Beacon Server Core
 elementclass XIASCIONBeaconServerCore {
     $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac,
@@ -458,6 +482,30 @@ elementclass XIASCIONBeaconServerCore {
     xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $click_port, 1, 0);
 
     sbs :: SCIONBeaconServerCore(AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot);
+
+    input => xlc => output;
+
+    sbs -> xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> sbs;
+};
+
+// 1-port SCION Beacon Server
+elementclass XIASCIONBeaconServer {
+    $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac,
+    AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot |
+
+    // $local_addr: the full address of the node
+    // $local_ad: the node's AD
+    // $local_hid: the node's HID
+    // $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
+
+    // input[0]: a packet arrived at the node
+    // output[0]: forward to interface 0
+
+    xlc :: XIALineCard($local_addr, $local_hid, $mac, 0);
+
+    xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $click_port, 1, 0);
+
+    sbs :: SCIONBeaconServer(AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot);
 
     input => xlc => output;
 

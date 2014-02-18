@@ -79,7 +79,7 @@ int sendHello();
 // send control message
 int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> routingTable);
 
-int processMsg(std::string msg);
+int processMsg(std::string msg, int len);
 
 // returns an interface number to a neighbor HID
 int interfaceNumber(std::string xidType, std::string xid);
@@ -98,6 +98,8 @@ int processInterdomainLSA(ControlMessage msg);
 
 // process a LinkStateAdvertisement message 
 int processLSA(ControlMessage msg);
+
+int processSCION(std::string msg, int len);
 
 // compute the shortest path (Dijkstra)
 void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEntry> &networkTable, std::map<std::string, RouteEntry> &routingTable);

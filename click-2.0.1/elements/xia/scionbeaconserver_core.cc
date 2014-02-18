@@ -472,42 +472,14 @@ bool SCIONBeaconServerCore::generateNewPCB() {
 
 }
 
-int SCIONBeaconServerCore::sendTestMsg(){
-	char buffer[1024]; 
-	bzero(buffer, 1024);	
-
-	string msg;
-	msg.append("9^");
-	msg.append(MYAD);
-	msg.append("^");
-	msg.append(MYHID);
-	msg.append("^");
-	strcpy (buffer, msg.c_str());
-
-	WritablePacket *p = Packet::make(0, buffer, strlen(buffer) + 1, 0);
-    TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDGRAMHeader(0); // length
-	WritablePacket *q = thdr->encap(p);
-
-	XIAPath src, dst;
-	src.parse(m_sdag);
-	dst.parse(m_ddag);
-
-	XIAHeaderEncap encap;
-	encap.set_src_path(src);
-	encap.set_dst_path(dst);
-    encap.set_plen(strlen(buffer) + 1 + thdr->hlen());
-
-	output(0).push(encap.encap(q, false));
-	return 0;
-}
-
 /*
     SCIONBeaconServerCore::run_timer
   Periodically generate PCB
 */
 void SCIONBeaconServerCore::run_timer(Timer *){
-    sendTestMsg();
-#if 0
+  sendHello();
+
+  _AIDIsRegister = true; // FIXME
 
   if(m_bROTInitiated){
     // ROT file is ready
@@ -522,7 +494,7 @@ void SCIONBeaconServerCore::run_timer(Timer *){
     #ifdef _SL_DEBUG_BS
     scionPrinter->printLog(IH, "PCB gen rescheduled in %d sec\n", m_iPCBGenPeriod);
     #endif
-    _timer.schedule_after_sec(m_iPCBGenPeriod);
+    _timer.reschedule_after_sec(m_iPCBGenPeriod);
   }else{
     #ifdef _SL_DEBUG_BS
     scionPrinter->printLog(EH, "TDC BS (%llu:%llu): ROT is missing or wrong formatted.\n", m_uAdAid, m_uAid);
@@ -557,10 +529,8 @@ void SCIONBeaconServerCore::run_timer(Timer *){
       *(uint32_t*)(packet+hdrLen) = 0;
       sendPacket(packet, totalLen, PORT_TO_SWITCH,TO_SERVER);
     }
-    _timer.schedule_after_sec(1);     // default speed
+    _timer.reschedule_after_sec(1);     // default speed
   }
-#endif
-    _timer.reschedule_after_sec(5);
 }
 
 /*
@@ -688,11 +658,38 @@ bool SCIONBeaconServerCore::getOfgKey(uint32_t timestamp, aes_context &actx)
 #endif
 }
 
+int SCIONBeaconServerCore::sendHello()
+{
+    string msg;
+    msg.append("0^");
+    msg.append(MYAD);
+    msg.append("^");
+    msg.append(MYHID);
+    msg.append("^");
+
+    WritablePacket *p = Packet::make(DEFAULT_HD_ROOM, msg.c_str(), msg.size() + 1, DEFAULT_TL_ROOM);
+    TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDGRAMHeader(0); // length
+	WritablePacket *q = thdr->encap(p);
+
+	XIAPath src, dst;
+	src.parse(m_sdag);
+	dst.parse(m_ddag);
+
+	XIAHeaderEncap encap;
+	encap.set_src_path(src);
+	encap.set_dst_path(dst);
+    encap.set_plen(msg.size() + 1 + thdr->hlen());
+
+	output(0).push(encap.encap(q, false));
+    return 0;
+}
+
 /*
     SCIONBeaconServerCore::sendPacket
     - Creates click packet and sends packet to the given port
 */
 void SCIONBeaconServerCore::sendPacket(uint8_t* data, uint16_t data_length, int port, int fwd_type){
+#if 0
   #ifdef _SL_DEBUG_BS
   scionPrinter->printLog(IH, "BS (%llu:%llu): sending a packet (%dB) to port (%d)\n", m_uAdAid, m_uAid, data_length, port);
   #endif
@@ -720,6 +717,27 @@ void SCIONBeaconServerCore::sendPacket(uint8_t* data, uint16_t data_length, int 
 
   WritablePacket* outPacket = Packet::make(DEFAULT_HD_ROOM, data, data_length, DEFAULT_TL_ROOM);
   output(port).push(outPacket);
+#endif
+    int n = data_length + 2;
+    char *buf = (char *)malloc(n);
+    buf[0] = '9';
+    buf[1] = '^';
+    memcpy(buf + 2, data, data_length);
+
+    WritablePacket *p = Packet::make(DEFAULT_HD_ROOM, buf, n, DEFAULT_TL_ROOM);
+    TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDGRAMHeader(0); // length
+	WritablePacket *q = thdr->encap(p);
+
+	XIAPath src, dst;
+	src.parse(m_sdag);
+	dst.parse(m_ddag);
+
+	XIAHeaderEncap encap;
+	encap.set_src_path(src);
+	encap.set_dst_path(dst);
+    encap.set_plen(n + thdr->hlen());
+
+	output(0).push(encap.encap(q, false));
 }
 
 bool SCIONBeaconServerCore::parseROT(){

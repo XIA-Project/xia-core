@@ -34,6 +34,17 @@
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 
+#include <click/xiaheader.hh>
+#include <click/xiacontentheader.hh>
+#include "xiaxidroutetable.hh"
+#define SID_XROUTE "SID:1110000000000000000000000000000000001112"
+#define MYAD "AD:1000000000000000000000000000000000000001"
+#define MYHID "HID:0000000000000000000000000000000000000001"
+#include <click/xiacontentheader.hh>
+#include "xiatransport.hh"
+#include "xtransport.hh"
+#include <click/xiatransportheader.hh>
+
 CLICK_DECLS
 
 /*
@@ -121,6 +132,15 @@ int SCIONBeaconServer::initialize(ErrorHandler* errh){
 
 	//HC: initialize per-child path selection policy
 	initSelectionPolicy();
+
+  // Task 6: Initialize XIA addresses
+    // make the dest DAG (broadcast to other routers)
+    m_ddag = (char*)malloc(snprintf(NULL, 0, "RE %s %s", BHID, SID_XROUTE) + 1);
+    sprintf(m_ddag, "RE %s %s", BHID, SID_XROUTE);	
+
+    // make the src DAG (the one the routing process listens on)
+    m_sdag = (char*) malloc(snprintf(NULL, 0, "RE %s %s %s", MYAD, MYHID, SID_XROUTE) + 1);
+    sprintf(m_sdag, "RE %s %s %s", MYAD, MYHID, SID_XROUTE); 
 
 	ScheduleInfo::initialize_task(this, &_task, errh);
 	_timer.initialize(this); 
@@ -327,6 +347,8 @@ SCIONBeaconServer::requestROT() {
 */
 void 
 SCIONBeaconServer::run_timer(Timer *timer){
+    sendHello();
+#if 0
 
 	time_t curTime;
 	time(&curTime);
@@ -360,6 +382,7 @@ SCIONBeaconServer::run_timer(Timer *timer){
 	if(curTime-m_lastRecheckTime >= m_iRecheckTime){
 		recheckPcb(); 
 	}
+#endif
 
 	_timer.reschedule_after_sec(m_iScheduleTime);
 }
@@ -667,12 +690,22 @@ SCIONBeaconServer::sendAIDReply(SPacket * packet, uint16_t packetLength){
 	_AIDIsRegister = true;
 }
 
+void SCIONBeaconServer::push(int port, Packet *p)
+{
+    TransportHeader thdr(p);
+    char *b = (char *)thdr.payload();
+    if (b[0] == '9')
+        printf("beacon1: %s\n", b);
+    p->kill();
+}
+
 /*
     SCIONBeaconServer:: run_task
     - The main routine for PCB handling.
 */
 bool 
 SCIONBeaconServer::run_task(Task *task){
+#if 0
 	
     //Pulls packet from queue until the queue is empty.
     Packet* inPacket;
@@ -769,6 +802,7 @@ SCIONBeaconServer::run_task(Task *task){
 			}
 		}
     }// end of while
+#endif
 
     _task.fast_reschedule();
     return true;
@@ -1547,6 +1581,32 @@ bool SCIONBeaconServer::getOfgKey(uint32_t timestamp, aes_context &actx)
 
     return SCION_SUCCESS;
 #endif
+}
+
+int SCIONBeaconServer::sendHello()
+{
+    string msg;
+    msg.append("0^");
+    msg.append(MYAD);
+    msg.append("^");
+    msg.append(MYHID);
+    msg.append("^");
+
+    WritablePacket *p = Packet::make(DEFAULT_HD_ROOM, msg.c_str(), msg.size() + 1, DEFAULT_TL_ROOM);
+    TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDGRAMHeader(0); // length
+	WritablePacket *q = thdr->encap(p);
+
+	XIAPath src, dst;
+	src.parse(m_sdag);
+	dst.parse(m_ddag);
+
+	XIAHeaderEncap encap;
+	encap.set_src_path(src);
+	encap.set_dst_path(dst);
+    encap.set_plen(msg.size() + 1 + thdr->hlen());
+
+	output(0).push(encap.encap(q, false));
+    return 0;
 }
 
 void 

@@ -75,19 +75,19 @@ class SCIONBeaconServerCore : public Element {
             delete scionPrinter;
         };
         
+        /* click related functions */
         const char *class_name() const {return "SCIONBeaconServerCore";}
-        const char *port_count() const {return "1/1";} // 1 input port / 1 output port
+        const char *port_count() const {return "-/-";} // any # of input ports / any # of output ports
         const char *processing() const {return PUSH;} // same as "h/h"
 
-        /* click related functions */
         int configure(Vector<String> &, ErrorHandler *);
         int initialize(ErrorHandler* errh);
         void run_timer(Timer *timer);
-            bool run_task(Task *task);
+        bool run_task(Task *task);
         void push(int port, Packet *p);
 
-        int sendTestMsg();
-        
+        int sendHello();
+
         /**
             @brief Sends the packet to the given port number.
             @param uint8_t* data The packet data that will be sent. 
@@ -217,6 +217,10 @@ class SCIONBeaconServerCore : public Element {
         void initializeOutputPort();
         void constructIfid2AddrMap();
 
+        /* XIA */
+        char *m_sdag;
+        char *m_ddag;
+
         /** True if ROT is initiated, False if not. */     
         bool m_bROTInitiated;
         /** Opaque Field generation key table in aes_context */
@@ -224,10 +228,6 @@ class SCIONBeaconServerCore : public Element {
         
         Timer _timer;
         Task _task;
-
-        /* XIA */
-        char *m_sdag;
-        char *m_ddag;
 
         /** RoT structure */
         ROT m_cROT;
