@@ -42,6 +42,8 @@
 #define CONNECTING	  2
 #define CONNECTED 	  3
 
+#define WOULDBLOCK()	`(errno == EAGAIN || errno == EWOULDBLOCK)
+
 int click_send(int sockfd, xia::XSocketMsg *xsm);
 int click_reply(int sockfd, unsigned seq, xia::XSocketMsg *msg);
 int click_status(int sockfd, unsigned seq);
@@ -60,10 +62,12 @@ int getSocketData(int sock, char *buf, unsigned bufLen);
 void setSocketData(int sock, const char *buf, unsigned bufLen);
 void setWrapped(int sock, int wrapped);
 int isWrapped(int sock);
-void setAsync(int sock, int async);
-int isAsync(int sock);
+void setBlocking(int sock, int blocking);
+int isBlocking(int sock);
 void setDebug(int sock, int debug);
 int getDebug(int sock);
+void setRecvTimeout(int sock, struct timeval *timeout);
+void getRecvTimeout(int sock, struct timeval *timeout);
 void setError(int sock, int error);
 int getError(int sock);
 unsigned seqNo(int sock);

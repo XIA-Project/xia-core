@@ -120,11 +120,18 @@ int click_send(int sockfd, xia::XSocketMsg *xsm)
 		initialized = 1;
 	}
 
+	if (isBlocking(sockfd)) {
+		// make sure click know if it should reply immediately or not
+		xsm->set_blocking(true);
+	}
+//printf("blocking flag is %d\n", isBlocking(sockfd));
+
 	std::string p_buf;
 	xsm->SerializeToString(&p_buf);
 
 	int remaining = p_buf.size();
 	const char *p = p_buf.c_str();
+//printf("sending %d bytes on %d\n", remaining, sockfd);
 	while (remaining > 0) {
 
 		//LOGF("sending to click: seq: %d type: %d", xsm->sequence(), xsm->type());
@@ -160,6 +167,11 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 {
 	int rc;
 
+	if (isBlocking(sock)) {
+		// make sure click know if it should reply immediately or not
+		msg->set_blocking(true);
+	}
+
 	// FIXME: if someone caches our packet as we start to do the recv, we'll block forever
 	// may need to implement select so that we re-loop frequently so we can pick up our
 	// cached packet
@@ -167,6 +179,7 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 	while (1) {
 		// see if another thread received and cached our packet
 		if ((rc = getCachedPacket(sock, seq, buf, buflen)) > 0) {
+printf("in the cache!\n");
 			LOGF("Got cached response with sequence # %d\n", seq);
 			std::string s(buf, rc);
 			msg->ParseFromString(s);
@@ -194,8 +207,11 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 			rc = recvfrom(sock, buf, buflen - 1 , 0, NULL, NULL);
 			setWrapped(sock, FALSE);
 
+//printf("seq %d received %d bytes\n", seq, rc);
 			if (rc < 0) {
-				LOGF("error(%d) getting reply data from click", errno);
+				if (isBlocking(sock) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
+					LOGF("error(%d) getting reply data from click", errno);
+				}
 				rc = -1;
 				break;
 

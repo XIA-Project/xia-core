@@ -100,17 +100,22 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 	unsigned seq = seqNo(sockfd);
 	xsm.set_sequence(seq);
 
+//printf("Xrecv seq = %d\n", seq);
 	xia::X_Recv_Msg *xrm = xsm.mutable_x_recv();
 	xrm->set_bytes_requested(len);
 
 	if (click_send(sockfd, &xsm) < 0) {
-		LOGF("Error talking to Click: %s", strerror(errno));
+		if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
+			LOGF("Error talking to Click: %s", strerror(errno));
+		}
 		return -1;
 	}
 
 	xsm.Clear();
 	if ((numbytes = click_reply(sockfd, seq, &xsm)) < 0) {
-		LOGF("Error retrieving recv data from Click: %s", strerror(errno));
+		if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
+			LOGF("Error retrieving recv data from Click: %s", strerror(errno));
+		}
 		return -1;
 	}
 
@@ -233,14 +238,18 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		xrm->set_bytes_requested(len);
 
 		if (click_send(sockfd, &xsm) < 0) {
-			LOGF("Error talking to Click: %s", strerror(errno));
+			if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
+				LOGF("Error talking to Click: %s", strerror(errno));
+			}
 			return -1;
 		}
 
 		xsm.Clear();
 
 		if ((numbytes = click_reply(sockfd, seq, &xsm)) < 0) {
-			LOGF("Error retrieving recv data from Click: %s", strerror(errno));
+			if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
+				LOGF("Error retrieving recv data from Click: %s", strerror(errno));
+			}
 			return -1;
 		}
 		xrm = xsm.mutable_x_recvfrom();

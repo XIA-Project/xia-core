@@ -49,8 +49,8 @@ public:
 	int isWrapped() { return (m_wrapped != 0); };
 	void setWrapped(int wrap) { wrap ? m_wrapped++ : m_wrapped--; };
 
-	int isAsync() { return m_async; };
-	void setAsync(int async) { m_async = async; };
+	int isBlocking() { return m_blocking; };
+	void setBlocking(int blocking) { m_blocking = blocking; };
 
 	unsigned seqNo();
 
@@ -59,6 +59,9 @@ public:
 
 	void setDebug(int debug) { m_debug = debug; };
 	int getDebug() { return m_debug; };
+
+	void setRecvTimeout(struct timeval *timeout) { m_timeout.tv_sec = timeout->tv_sec; m_timeout.tv_usec = timeout->tv_usec; };
+	void getRecvTimeout(struct timeval *timeout) {timeout->tv_sec = m_timeout.tv_sec; timeout->tv_usec = m_timeout.tv_usec; };
 
 	void setError(int error) { m_error = error; };
 	int getError() { return m_error; m_error = 0; };
@@ -69,7 +72,7 @@ public:
 private:
 	int m_transportType;
 	int m_connected;
-	int m_async;
+	int m_blocking;
 	int m_wrapped;	// hack for dealing with xwrap stuff
 	int m_debug;
 	int m_error;
@@ -77,6 +80,7 @@ private:
 	sockaddr_x *m_peer;
 	unsigned m_bufLen;
 	unsigned m_sequence;
+	struct timeval m_timeout;
 	pthread_mutex_t m_sequence_lock;
 	map<unsigned, string> m_packets;
 
@@ -108,7 +112,7 @@ void SocketState::init()
 {
 	m_transportType = -1;
 	m_connected = 0;
-	m_async = 0;
+	m_blocking = 1;
 	m_wrapped = 0;
 	m_buf = NULL;
 	m_peer = NULL;
@@ -116,6 +120,8 @@ void SocketState::init()
 	m_sequence = 1;
 	m_debug = 0;
 	m_error = 0;
+	m_timeout.tv_sec = 0;
+	m_timeout.tv_usec = 0;
 	pthread_mutex_init(&m_sequence_lock, NULL);
 }
 
@@ -331,20 +337,20 @@ void setWrapped(int sock, int wrapped)
 		sstate->setWrapped(wrapped);
 }
 
-int isAsync(int sock)
+int isBlocking(int sock)
 {
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
-		return sstate->isAsync();
+		return sstate->isBlocking();
 	else
 		return 0;
 }
 
-void setAsync(int sock, int async)
+void setBlocking(int sock, int blocking)
 {
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
-		sstate->setAsync(async);
+		sstate->setBlocking(blocking);
 }
 
 int getDebug(int sock)
@@ -363,13 +369,20 @@ void setDebug(int sock, int debug)
 		sstate->setDebug(debug);
 }
 
-int getError(int sock)
+void setRecvTimeout(int sock, struct timeval *timeout)
 {
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
-		return sstate->getError();
+		sstate->setRecvTimeout(timeout);
+}
+
+void getRecvTimeout(int sock, struct timeval *timeout)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		sstate->getRecvTimeout(timeout);
 	else
-		return 0;
+		timeout->tv_sec = timeout->tv_usec = 0;
 }
 
 void setError(int sock, int error)
@@ -377,6 +390,15 @@ void setError(int sock, int error)
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
 		sstate->setError(error);
+}
+
+int getError(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		return sstate->getError();
+	else
+		return 0;
 }
 
 void setSocketType(int sock, int tt)
