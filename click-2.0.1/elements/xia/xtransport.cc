@@ -698,7 +698,7 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	p_buf.assign((const char*)p_in->data(), (const char*)p_in->end_data());
 
 	//protobuf message parsing
-    xia::XSocketMsg xia_socket_msg;
+	xia::XSocketMsg xia_socket_msg;
 	xia_socket_msg.ParseFromString(p_buf);
 
 	switch(xia_socket_msg.type()) {
@@ -775,7 +775,6 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 		Xgetsockname(_sport, &xia_socket_msg);
 		break;
 	case xia::XPOLL:
-	printf("got a poll request\n");
 		Xpoll(_sport, &xia_socket_msg);
 		break;
 	default:
@@ -959,7 +958,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 			if (sk->polling) {
 				// tell API we are writble now
-				printf("checking poll event for %d from synack\n", _dport);
 				ProcessPollEvent(_dport, POLLOUT);
 			}
 
@@ -991,13 +989,11 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 					if (sk->polling) {
 						// tell API we are readable
-						printf("checking poll event for %d from data\n", _dport);
 						ProcessPollEvent(_dport, POLLIN);
 					}
 					check_for_and_handle_pending_recv(sk);
 				}
 
-//printf("SYNACK resetting P2S for %d, %p\n", _dport, sk);
 				portToSock.set(_dport, sk); // TODO: why do we need this?
 
 				//In case of Client Mobility...	 Update 'sk->dst_path'
@@ -1084,7 +1080,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 						//sk->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
 					}
 				}
-//printf("ACK: resetting P2S for %d, %p\n", _dport, sk);
 				portToSock.set(_dport, sk);
 
 			} else {
@@ -1109,7 +1104,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 			if (sk->polling) {
 				// tell API we are readable
-				printf("checking poll event for %d from datagram\n", _dport);
 				ProcessPollEvent(_dport, POLLIN);
 			}
 			check_for_and_handle_pending_recv(sk);
@@ -1390,7 +1384,6 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	sk->sock_type = sock_type;
 
 	// Map the source port to sock
-printf("Xsocket setting %d, %p\n", _sport, sk);
 	portToSock.set(_sport, sk);
 
 	portToActive.set(_sport, true);
@@ -1582,7 +1575,11 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 		//No local SID bound yet, so bind ephemeral one
 		sk = new sock();
 	} else {
-//printf("Xconnect: sk already exists for %d\n", _sport);
+		if (sk->synack_waiting) {
+			// a connect is already in progress
+			x_connect_msg->set_status(xia::X_Connect_Msg::XCONNECTING);
+			ReturnResult(_sport, xia_socket_msg, -1, EALREADY);
+		}
 	}
 
 	sk->dst_path = dst_path;
@@ -1669,7 +1666,6 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 	// Store the syn packet for potential retransmission
 	sk->syn_pkt = copy_packet(p, sk);
 
-//printf("setting sk %p for port %d\n", sk, _sport);
 	portToSock.set(_sport, sk);
 	XIAHeader xiah1(p);
 	//String pld((char *)xiah1.payload(), xiah1.plen());
@@ -1807,8 +1803,6 @@ void XTRANSPORT::ProcessPollEvent(unsigned short _sport, unsigned int flags_out)
 		if (sevent == pe.events.end())
 			continue;
 
-		printf("found poll event for %d flags out = %x\n", _sport, flags_out);
-
 		unsigned short port = sevent->first;
 		unsigned int mask = sevent->second;
 
@@ -1828,7 +1822,6 @@ void XTRANSPORT::ProcessPollEvent(unsigned short _sport, unsigned int flags_out)
 		msg->set_nfds(1);
 
 		// do I need to set other flags in the return struct?
-		printf("returning poll result to the API\n");
 		ReturnResult(pollport, &xsm, 1, 0);
 
 		// found the socket, decrement the polling count for all the sockets in the poll instance
@@ -2031,7 +2024,6 @@ void XTRANSPORT::Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 			pfd_out->set_port(port);
 
 			actionable++;
-			printf("port %d has flags %x\n", port, flags_out);
 		}
 	}
 
@@ -2394,6 +2386,11 @@ void XTRANSPORT::Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	if (xia_socket_msg->x_recv().bytes_returned() > 0) {
 		// Return response to API
 		ReturnResult(_sport, xia_socket_msg, xia_socket_msg->x_recv().bytes_returned());
+	} else if (!xia_socket_msg->blocking()) {
+		// we're not blocking and there's no data, so let API know immediately
+		sk->recv_pending = false;
+		ReturnResult(_sport, xia_socket_msg, -1, EWOULDBLOCK);
+
 	} else {
 		// rather than returning a response, wait until we get data
 		sk->recv_pending = true; // when we get data next, send straight to app
@@ -2413,6 +2410,12 @@ void XTRANSPORT::Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	if (xia_socket_msg->x_recvfrom().bytes_returned() > 0) {
 		// Return response to API
 		ReturnResult(_sport, xia_socket_msg, xia_socket_msg->x_recvfrom().bytes_returned());
+
+	} else if (!xia_socket_msg->blocking()) {
+
+		// we're not blocking and there's no data, so let API know immediately
+		ReturnResult(_sport, xia_socket_msg, -1, EWOULDBLOCK);
+
 	} else {
 		// rather than returning a response, wait until we get data
 		sk->recv_pending = true; // when we get data next, send straight to app
