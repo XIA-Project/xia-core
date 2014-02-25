@@ -35,6 +35,10 @@ using namespace std;
 #define XOPT_HLIM 0x07001
 #define XOPT_NEXT_PROTO 0x07002
 
+#ifndef DEBUG
+#define DEBUG 0
+#endif
+
 
 #define UNUSED(x) ((void)(x))
 
