@@ -128,7 +128,7 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 	if (paylen < 0) {
 		errno = r->err_code();
 	}
-	else if (paylen <= len)
+	else if ((size_t)paylen <= len)
 		memcpy(rbuf, payload, paylen);
 	else {
 		// we got back more data than the caller requested

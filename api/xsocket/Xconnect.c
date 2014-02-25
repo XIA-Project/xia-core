@@ -27,6 +27,7 @@
 
 int _connDgram(int sockfd, const sockaddr *addr, socklen_t addrlen)
 {
+	UNUSED(addrlen);
 	int rc = 0;
 
 	if (addr->sa_family == AF_UNSPEC) {
@@ -57,6 +58,7 @@ int _connDgram(int sockfd, const sockaddr *addr, socklen_t addrlen)
 
 int _connStream(int sockfd, const sockaddr *addr, socklen_t addrlen)
 {
+	UNUSED(addrlen);
 	int rc;
 
 	if (addr->sa_family != AF_XIA) {

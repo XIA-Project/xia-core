@@ -61,10 +61,7 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
 	// Xaccept accepts the connection, creates new socket, and returns it.
 
-	int numbytes;
-	char buf[MAXBUFLEN];
 	struct sockaddr_in my_addr;
-	struct sockaddr_in their_addr;
 	socklen_t len;
 	int new_sockfd;
 

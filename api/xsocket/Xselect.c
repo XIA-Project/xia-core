@@ -185,14 +185,14 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 				//printf("poll returned x%0x for %d\n", flags, port);
 
 				int fd = 0;
-				for (int j = 0; j < nfds; j++) {
+				for (unsigned j = 0; j < nfds; j++) {
 					if (port == s2p[j].port) {
 						fd = s2p[j].fd;
 						break;
 					}
 				}
 
-				for (int j = 0; j < nfds; j++) {
+				for (unsigned j = 0; j < nfds; j++) {
 					if (ufds[j].fd == fd) {
 						ufds[j].revents = flags;
 						break;
