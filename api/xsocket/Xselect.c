@@ -60,6 +60,7 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 	// FIXME make sure we free s2p if we exit early
 
 	// if timeout is 0, don't do anything
+	// FIXME should we do a test that returns immediately in this case?
 	if (timeout == 0)
 		return 0;
 
@@ -207,30 +208,127 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 
 
 /*!
-** @brief Perform a minimal select
+** @brief waits for one of a set of Xsockets to become ready to perform I/O.
 **
-** HACK!!! This is a stub to fake select. Xpoll should be used instead.
+** Xsocket specific version of select. See the select man page for more detailed information.
+** This implementation uses Xpoll internally, and is provided to make porting easier. New code
+** should call Xpoll instead.
 **
-** @param ndfs The highest socket number contained in the fd_sets (ignored)
-** @param readfds fd_set containing sockets to check for readability (ignored)
-** @param writefds fd_set containing sockets to check for writability (ignored)
-** @param errorfds fd_set containing sockets to check for errors (ignored)
-** @param timeout amount of time to wait for a socket to change state (ignored)
-** @returns This stub always returns 1
+** @param ndfs The highest socket number contained in the fd_sets plus 1
+** @param readfds fd_set containing sockets to check for readability
+** @param writefds fd_set containing sockets to check for writability
+** @param errorfds fd_set containing sockets to check for errors
+** @param timeout amount of time to wait for a socket to change state
+** @returns greater than 0, number of sockets ready
+** @returns 0 if the timeout expired
+** @returns less than 0 if an error occurs 
 **
-** @warning This is a stub and does not actually perform a select. Use Xpoll instead
-**
+** @warning this function is only valid for stream and datagram sockets. 
 */
 int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struct timeval *timeout)
 {
-	UNUSED(nfds);
-	UNUSED(readfds);
-	UNUSED(writefds);
-	UNUSED(errorfds);
-	UNUSED(timeout);
-	// fake stub to make apps that need select happy-ish until we get select implemented for XIA
+	int count = 0;
+	int to = 0;
 
-	// assumes that user is asking for a single socket, tell them that it is ready even though we
-	// don't know. Current code will block so it's sorta OK for now.
-	return 1;
+	if (timeout == NULL) {
+		// we'll block until an event occurs
+		to = -1;
+	} else {
+		// convert the timeval to milliseconds
+		to = (timeout->tv_sec * 1000) + (timeout->tv_usec / 1000);
+	}
+
+	if (nfds < 0) {
+		errno = EINVAL;	
+		return -1;
+	}
+
+	if (nfds > 0 && readfds == NULL && writefds == NULL && errorfds == NULL) {
+		// there isn't an error that matches this condition in the manpage, using best guess
+		errno = EINVAL;	
+		return -1;
+	} 
+
+
+	// see how many sockets we are watching
+	for (int i = 0; i < nfds; i++) {
+		int flags = 0;
+
+		if (readfds && FD_ISSET(i, readfds))
+			flags |= POLLIN;
+		if (writefds && FD_ISSET(i, writefds))
+			flags |= POLLOUT;
+		if (errorfds && FD_ISSET(i, errorfds))
+			flags |= POLLERR;
+
+		if (flags) {
+			int stype = getSocketType(i);	
+
+			if (stype != SOCK_DGRAM && stype != SOCK_STREAM) {
+				// an invalid Xsocket was specified, return an error
+				errno = EBADF;
+				return -1;
+			}
+		
+			count++;
+		}
+	}
+
+	if (count == 0) {
+		// just do a timeout and return
+		usleep(to * 1000);
+		return 0;
+	}
+
+	// create and fill and a poll struct
+	struct pollfd *pfds = (struct pollfd*)malloc(count * sizeof(struct pollfd));
+	int next = 0;
+
+	for (int i = 0; i < nfds; i++) {
+		int flags = 0;
+
+		if (readfds && FD_ISSET(i, readfds)) {
+			flags |= POLLIN;
+		}
+		if (writefds && FD_ISSET(i, writefds)) {
+			flags |= POLLOUT;
+		}
+		if (errorfds && FD_ISSET(i, errorfds)) {
+			flags |= POLLERR;
+		}
+
+		if (flags) {
+			pfds[next].fd = i;
+			pfds[next].events = flags;
+			next++;
+		}
+	}
+
+	// reset the bit arrays for the return to caller
+	if (readfds)
+		FD_ZERO(readfds);
+	if (writefds)
+		FD_ZERO(writefds);
+	if (errorfds)
+		FD_ZERO(errorfds);
+		
+	// call Xpoll
+	int rc = Xpoll(pfds, next, to);
+
+	// fill the fdsets in with the triggered sockets
+	if (rc > 0) {
+
+		for (int i = 0; i < count; i++) {
+			printf("socket %d out flags:%08x\n", pfds[i].fd, pfds[i].revents);
+			if (readfds && (pfds[i].revents & POLLIN))
+				FD_SET(pfds[i].fd, readfds);
+			if (writefds && (pfds[i].revents & POLLOUT))
+				FD_SET(pfds[i].fd, writefds);
+			if (errorfds && (pfds[i].revents & POLLERR))
+				FD_SET(pfds[i].fd, errorfds);
+		} 
+	}		
+	
+	free(pfds);
+	return rc;
 }
