@@ -87,6 +87,7 @@ class SCIONBeaconServerCore : public Element {
         void push(int port, Packet *p);
 
         int sendHello();
+        void getEgressIngressXIDs(vector<string> &list);
 
         /**
             @brief Sends the packet to the given port number.
@@ -98,7 +99,7 @@ class SCIONBeaconServerCore : public Element {
             creates a new click packet with the given data and send the data to
             the given port.  
         */
-           void sendPacket(uint8_t* data, uint16_t dataLength, int port, int fwd_type=0);    // send packet to nscionswitch
+           void sendPacket(uint8_t* data, uint16_t dataLength, string dest);
         /**
             @brief Get Opaque Field Generation Key.
             @param uint32_t timestamp The timestamp that will decide the Opaque

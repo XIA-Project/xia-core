@@ -189,7 +189,7 @@ int processInterdomainLSA(ControlMessage msg)
 	return rc;
 }
 
-int processSCION(std::string msg, int len)
+int processSCION(uint8_t *data, uint16_t len)
 {
     sockaddr_x dest;
     Graph g = Node()
@@ -197,7 +197,7 @@ int processSCION(std::string msg, int len)
         * Node("HID:0000000000000000000000000000000000000001");
     g.fill_sockaddr(&dest);
 
-    return Xsendto(route_state.sock, msg.c_str(), len, 0, (struct sockaddr *)&dest, sizeof(sockaddr_x));
+    return Xsendto(route_state.sock, data, len, 0, (struct sockaddr *)&dest, sizeof(sockaddr_x));
 }
 
 int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> routingTable)
@@ -231,10 +231,10 @@ int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> rout
 	}
 }
 
-int processMsg(std::string msg, int len)
+int processMsg(uint8_t *data, uint16_t len)
 {
     int type, rc = 0;
-    ControlMessage m(msg);
+    ControlMessage m((char *)data);
 
     m.read(type);
 
@@ -256,10 +256,10 @@ int processMsg(std::string msg, int len)
 			rc = processInterdomainLSA(m);
 			break;
         case 9:
-            rc = processSCION(msg, len);
+            rc = processSCION(data, len);
             break;
         default:
-			syslog(LOG_ALERT, "Unknown control message: %s\n", msg.c_str());
+			syslog(LOG_ALERT, "Unknown control message: %s\n", (char *)data);
             break;
     }
 
@@ -800,7 +800,7 @@ int main(int argc, char *argv[])
 	int selectRetVal, n;
 	//size_t found, start;
 	socklen_t dlen;
-	char recv_message[10240];
+	uint8_t recv_message[10240];
 	sockaddr_x theirDAG;
 	fd_set socks;
 	struct timeval timeoutval;
@@ -899,8 +899,7 @@ perror("bind");
 				perror("recvfrom");
 			}
 
-			string msg = recv_message;
-            processMsg(msg, dlen);
+            processMsg(recv_message, n);
 		}
 
 		time_t now = time(NULL);

@@ -693,10 +693,112 @@ SCIONBeaconServer::sendAIDReply(SPacket * packet, uint16_t packetLength){
 void SCIONBeaconServer::push(int port, Packet *p)
 {
     TransportHeader thdr(p);
-    char *b = (char *)thdr.payload();
-    if (b[0] == '9')
-        printf("beacon1: %s\n", b);
-    p->kill();
+    /*
+    //Pulls packet from queue until the queue is empty.
+    Packet* inPacket;
+    while((inPacket = input(PORT_TO_SWITCH).pull())){
+        
+        //extract and copy packet data to 'packet' to avoid memory sharing problem
+        //and kills packet
+		//SL: this problem may disappear if queue is implemented...
+       	
+		//SL: for IP Encap
+		uint8_t * s_pkt = (uint8_t *) inPacket->data();
+		if(m_vPortInfo[PORT_TO_SWITCH].addr.getType() == HOST_ADDR_IPV4){
+			struct ip * p_iph = (struct ip *)s_pkt;
+			struct udphdr * p_udph = (struct udphdr *)(p_iph+1);
+			if(p_iph->ip_p != SCION_PROTO_NUM || ntohs(p_udph->dest) != SCION_PORT_NUM) {
+				inPacket->kill();
+				return true;
+			}
+			s_pkt += IPHDR_LEN;
+		}
+        */
+
+
+		uint8_t * s_pkt = (uint8_t *) thdr.payload();
+        s_pkt += 2;
+
+        uint16_t type = SPH::getType(s_pkt);
+		uint16_t packetLength = SPH::getTotalLen(s_pkt);
+        uint8_t packet[packetLength];
+
+		//SL: unnecessary?
+		memset(packet, 0, packetLength);
+        memcpy(packet, s_pkt, packetLength);
+        //inPacket->kill();
+
+        p->kill();
+	
+		if(type==BEACON){
+			//PCB arrived        
+			/*BEACON: verifies signature
+			- if passes then add to beacon table, remove signature, and send to Path Server
+			- if not, ignores. 
+			*/
+			if(!m_bROTInitiated){
+				scionPrinter->printLog(IH, "BS (%llu:%llu): No valid ROT file! Ignoring PCB.\n", m_uAdAid, m_uAid);
+				#ifdef _SL_DEBUG_BS
+				printf("BS (%llu:%llu): No valid ROT file! Ignoring PCB.\n", m_uAdAid, m_uAid);
+				#endif
+				//continue;
+                return;
+			}
+			
+			uint32_t ROTVersion = SCIONBeaconLib::getROTver(packet);
+			#ifdef _SL_DEBUG_BS
+			printf("BS (%llu:%llu): Recived RoT version = %d.\n", m_uAdAid, m_uAid, ROTVersion);
+			printf("BS (%llu:%llu): Self RoT version = %d.\n", m_uAdAid, m_uAid, m_cROT.version);
+			#endif
+			//SL: ROT version is changed...
+            if(ROTVersion > m_cROT.version){
+				#ifdef _SL_DEBUG_BS
+				printf("BS (%llu:%llu): RoT version has been changed. Get a new ROT from local CS.\n", m_uAdAid, m_uAid);
+				#endif
+				requestROT(packet,ROTVersion);
+				//continue;
+				return;
+			}// ROT version change handler
+
+
+			processPCB(packet,packetLength);
+
+		}else {
+			switch(type) {
+			case CERT_REP_LOCAL:
+				saveCertificate(packet,packetLength);
+				break;
+
+			case IFID_REP:
+				/*
+				IFID_REP : maps router IFID with neighboring IFID
+				Only active interface ID will be inserted in the ifid_map.
+				The interfaces without any mappings but still in the topology file
+				will not be added (or propagated ) to the beacon.
+				*/
+				//IFIDNEW
+				//SL: Border routers should send IFID_REP as soon as neighbors' IFID is available.
+				//This should be implemented at routers
+
+				updateIfidMap(packet);
+				break;
+
+			case AID_REQ:
+				sendAIDReply(packet,packetLength);
+				break;
+
+			case ROT_REP_LOCAL:
+				#ifdef _SL_DEBUG_BS
+				printf("BS (%llu:%llu): Received ROT_REP_LOCAL packets from local CS.\n", m_uAdAid, m_uAid);
+				#endif
+				saveROT(packet,packetLength);
+				break;
+			default:
+				//scionPrinter->printLog(IH, "BS(%llu:%llu) Unsupported type (%d) packet.\n",m_uAdAid,m_uAid,type);
+				break;
+			}
+		}
+    //}// end of while
 }
 
 /*
@@ -1324,12 +1426,12 @@ uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){
 	pcbMarking* mrkPtr = (pcbMarking*)(pkt+hdrLen+OPAQUE_FIELD_SIZE*2);
 	uint8_t* ptr = (uint8_t*)mrkPtr;
 	uint8_t hops = SCIONBeaconLib::getNumHops(pkt); 
-	
+
 	uint16_t sigLen = mrkPtr->sigLen;
 	uint16_t msgLen = mrkPtr->blkSize;
 	uint8_t srcLen = SPH::getSrcLen(pkt);
 	uint8_t dstLen = SPH::getDstLen(pkt);
-	
+
 	//signature
 	uint8_t sig[sigLen];
 	memcpy(sig, ptr+mrkPtr->blkSize, sigLen);

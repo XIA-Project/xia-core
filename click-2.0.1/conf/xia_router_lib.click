@@ -480,6 +480,8 @@ elementclass XIASCIONBeaconServerCore {
     xlc :: XIALineCard($local_addr, $local_hid, $mac, 0);
 
     xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $click_port, 1, 0);
+    //Script(write xrc/n/proc/rt_AD.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
+    //Script(write xrc/n/proc/rt_HID.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
 
     sbs :: SCIONBeaconServerCore(AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot);
 
@@ -504,6 +506,8 @@ elementclass XIASCIONBeaconServer {
     xlc :: XIALineCard($local_addr, $local_hid, $mac, 0);
 
     xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $click_port, 1, 0);
+    //Script(write xrc/n/proc/rt_AD.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
+    //Script(write xrc/n/proc/rt_HID.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
 
     sbs :: SCIONBeaconServer(AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot);
 
