@@ -36,14 +36,15 @@
 
 #include <click/xiaheader.hh>
 #include <click/xiacontentheader.hh>
-#include "xiaxidroutetable.hh"
-#define SID_XROUTE "SID:1110000000000000000000000000000000001112"
-#define MYAD "AD:1000000000000000000000000000000000000001"
-#define MYHID "HID:0000000000000000000000000000000000000001"
-#include <click/xiacontentheader.hh>
-#include "xiatransport.hh"
-#include "xtransport.hh"
 #include <click/xiatransportheader.hh>
+#include "xiatransport.hh"
+#include "xiaxidroutetable.hh"
+#include "xtransport.hh"
+
+#define SID_XROUTE  "SID:1110000000000000000000000000000000001112"
+
+#define MY_AD       "AD:0000000000000000000000000000000000000001"
+#define MY_HID      "HID:0000000000000000000000000000000000000031"
 
 CLICK_DECLS
 
@@ -108,8 +109,8 @@ int SCIONBeaconServer::initialize(ErrorHandler* errh){
 	m_lastRegTime = m_lastPropTime;
 
 	scionPrinter = new SCIONPrint(m_iLogLevel, m_csLogFile);
-	scionPrinter->printLog(IL, (char*)"BS %llu INIT.\n", m_uAid);
-	scionPrinter->printLog(IL, (char*)"ADAID = %llu, TDID = %llu.\n", m_uAdAid, m_uTdAid);
+	scionPrinter->printLog(IL, (char*)"BS %lu INIT.\n", m_uAid);
+	scionPrinter->printLog(IL, (char*)"ADAID = %lu, TDID = %lu.\n", m_uAdAid, m_uTdAid);
 
 	// task 2: parse ROT (root of trust) file
 	m_bROTInitiated = parseROT();
@@ -139,8 +140,8 @@ int SCIONBeaconServer::initialize(ErrorHandler* errh){
     sprintf(m_ddag, "RE %s %s", BHID, SID_XROUTE);	
 
     // make the src DAG (the one the routing process listens on)
-    m_sdag = (char*) malloc(snprintf(NULL, 0, "RE %s %s %s", MYAD, MYHID, SID_XROUTE) + 1);
-    sprintf(m_sdag, "RE %s %s %s", MYAD, MYHID, SID_XROUTE); 
+    m_sdag = (char*) malloc(snprintf(NULL, 0, "RE %s %s %s", MY_AD, MY_HID, SID_XROUTE) + 1);
+    sprintf(m_sdag, "RE %s %s %s", MY_AD, MY_HID, SID_XROUTE); 
 
 	ScheduleInfo::initialize_task(this, &_task, errh);
 	_timer.initialize(this); 
@@ -283,16 +284,16 @@ bool SCIONBeaconServer::parseROT(String filename){
                 fn = m_sROTFile;
 	
 	if(parser.loadROTFile(fn.c_str())!=ROTParseNoError) {
-		scionPrinter->printLog(IL, (char*)"ERR: ROT File missing at BS %llu.\n", m_uAdAid);
+		scionPrinter->printLog(IL, (char*)"ERR: ROT File missing at BS %lu.\n", m_uAdAid);
 		return false;
 	}else{
 		// ROT found in local folder
     	if(parser.parse(m_cROT)!=ROTParseNoError){
-			scionPrinter->printLog(IL, (char*)"ERR: ROT File parsing error at BS %llu.\n", m_uAdAid);
+			scionPrinter->printLog(IL, (char*)"ERR: ROT File parsing error at BS %lu.\n", m_uAdAid);
 			return false;
 		}
 		if(parser.verifyROT(m_cROT)!=ROTParseNoError){
-			scionPrinter->printLog(IL, (char*)"ERR: ROT File verification error at BS %llu.\n", m_uAdAid);
+			scionPrinter->printLog(IL, (char*)"ERR: ROT File verification error at BS %lu.\n", m_uAdAid);
 			return false;
 		}
 	}
@@ -358,7 +359,7 @@ SCIONBeaconServer::run_timer(Timer *timer){
 	// check if ROT file is missing
 	if(!m_bROTInitiated)
 	{
-		scionPrinter->printLog(IH,"BS (%llu:%llu): ROT is missing or wrong formatted.\n", m_uAdAid, m_uAid);
+		scionPrinter->printLog(IH,(char *)"BS (%lu:%lu): ROT is missing or wrong formatted.\n", m_uAdAid, m_uAid);
 		
 		// send an ROT request (i.e., ROT_REQ_LOCAL) if its AID is registered to SCION switch
 		if(_AIDIsRegister && !m_bROTRequested) 
@@ -486,13 +487,13 @@ SCIONBeaconServer::processPCB(SPacket * packet, uint16_t packetLength){
 	uint8_t type = BEACON;
 
 	//SLN:
-	scionPrinter->printLog(IH,type,ts,srcAddr.numAddr(),m_uAdAid,"%u,RECEIVED\n",packetLength);
+	scionPrinter->printLog(IH,type,ts,srcAddr.numAddr(),m_uAdAid,(char *)"%u,RECEIVED\n",packetLength);
 	
 	//PCB verification
 	if(verifyPcb(packet)!=SCION_SUCCESS){
-		scionPrinter->printLog(WH,type,ts,srcAddr.numAddr(),m_uAdAid,"%u,VERIFICATION FAILED\n", packetLength);
+		scionPrinter->printLog(WH,type,ts,srcAddr.numAddr(),m_uAdAid,(char *)"%u,VERIFICATION FAILED\n", packetLength);
 	}else{
-		scionPrinter->printLog(IL,type,ts,srcAddr.numAddr(),m_uAdAid,"%u,VERIFICATION PASSED\n" ,packetLength);
+		scionPrinter->printLog(IL,type,ts,srcAddr.numAddr(),m_uAdAid,(char *)"%u,VERIFICATION PASSED\n" ,packetLength);
 		//adds pcb to beacon table
 		addPcb(packet);
 
@@ -512,14 +513,14 @@ SCIONBeaconServer::processPCB(SPacket * packet, uint16_t packetLength){
 			keystruct ks;
 			if(getOfgKey(SPH::getTimestamp(packet),ks)) {
 				//SL: OFG key retrieval failure
-				scionPrinter->printLog(EH,type,ts,srcAddr.numAddr(),m_uAdAid,"OFGKEY retrieval failure\n");
+				scionPrinter->printLog(EH,type,ts,srcAddr.numAddr(),m_uAdAid,(char *)"OFGKEY retrieval failure\n");
 				return;
 			}
 #else
 			aes_context  actx;
 			if(getOfgKey(SPH::getTimestamp(packet),actx)) {
 				//SL: OFG key retrieval failure
-				scionPrinter->printLog(EH,type,ts,srcAddr.numAddr(),m_uAdAid,"OFGKEY retrieval failure\n");
+				scionPrinter->printLog(EH,type,ts,srcAddr.numAddr(),m_uAdAid,(char *)"OFGKEY retrieval failure\n");
 				return;
 			}
 #endif
@@ -562,7 +563,7 @@ SCIONBeaconServer::processPCB(SPacket * packet, uint16_t packetLength){
 			}
 		} else {
 			#ifdef _SL_DEBUG_BS
-			printf("AD%llu: no path server exists\n", m_uAdAid);
+			printf("AD%lu: no path server exists\n", m_uAdAid);
 			#endif
 		}
 	}
@@ -582,7 +583,7 @@ SCIONBeaconServer::saveCertificate(SPacket * packet, uint16_t packetLength) {
 	
 	char cFileName[MAX_FILE_LEN];
 	//SL: this should be changed; e.g., parsing from the config file path. 
-	sprintf(cFileName,"./TD1/Non-TDC/AD%llu/beaconserver/certificates/td%llu-ad%llu-0.crt", m_uAdAid, m_uTdAid, target);
+	sprintf(cFileName,"./TD1/Non-TDC/AD%lu/beaconserver/certificates/td%u-ad%lu-0.crt", m_uAdAid, m_uTdAid, target);
 	// erase from the request queue
 	certRequest.erase(target);
 	// write it!
@@ -607,7 +608,7 @@ SCIONBeaconServer::updateIfidMap(SPacket * packet) {
 	uint16_t ifid = ir->request_id;
 	ifid_map.insert(pair<uint16_t, uint16_t>(ifid, nifid));
 
-	scionPrinter->printLog(IH, SPH::getType(packet),"BS (%llu:%llu): IFID received (neighbor:%d - self:%d)\n", m_uAdAid,m_uAid, nifid, ifid);
+	scionPrinter->printLog(IH, SPH::getType(packet),(char *)"BS (%lu:%lu): IFID received (neighbor:%d - self:%d)\n", m_uAdAid,m_uAid, nifid, ifid);
 	//SL:
 	//print information needs to be revised everywhere...
 }
@@ -625,17 +626,17 @@ SCIONBeaconServer::saveROT(SPacket * packet, uint16_t packetLength)
 
 	ROTRequest *req = (ROTRequest *)SPH::getData(packet);
 	int curver = (int)req->currentVersion;
-	scionPrinter->printLog(IL, SPH::getType(packet), "BS (%llu:%llu): ROT Replay cV = %d, pV = %llu\n", m_uAdAid, m_uAid, curver, m_cROT.version);
+	scionPrinter->printLog(IL, SPH::getType(packet), (char *)"BS (%lu:%lu): ROT Replay cV = %d, pV = %lu\n", m_uAdAid, m_uAid, curver, m_cROT.version);
 
 	if(curver>m_cROT.version) {
 	
        //1. verify if the returned ROT is correct
 	   char nFile[100];
        memset(nFile, 0, 100);
-	   sprintf(nFile,"./TD1/Non-TDC/AD%llu/beaconserver/ROT/rot-td%llu-%d.xml", m_uAdAid, m_uTdAid, curver);
+	   sprintf(nFile,"./TD1/Non-TDC/AD%lu/beaconserver/ROT/rot-td%u-%d.xml", m_uAdAid, m_uTdAid, curver);
 
        String rotfn = String(nFile);
-	   scionPrinter->printLog(IL, "BS (%llu:%llu): Update ROT file as %s\n", m_uAdAid, m_uAid, nFile);
+	   scionPrinter->printLog(IL, (char *)"BS (%lu:%lu): Update ROT file as %s\n", m_uAdAid, m_uAid, nFile);
 
 		int offset = SPH::getHdrLen(packet)+sizeof(ROTRequest);
 		int rotLen = packetLength-offset;
@@ -648,13 +649,13 @@ SCIONBeaconServer::saveROT(SPacket * packet, uint16_t packetLength)
        	//1.2. verify using ROTParser
 		m_bROTInitiated = parseROT(rotfn);
         if(m_bROTInitiated == SCION_FAILURE) {
-	    	scionPrinter->printLog(IL, "BS (%llu:%llu) fail to parse ROT.\n", m_uAdAid, m_uAid);
+	    	scionPrinter->printLog(IL, (char *)"BS (%lu:%lu) fail to parse ROT.\n", m_uAdAid, m_uAid);
 	    	// remove file
 	    	remove(nFile);
 	    	return;
         }else{
 	    	m_sROTFile = rotfn;
-	    	scionPrinter->printLog(IL, "BS (%llu:%llu) stored received ROT.\n", m_uAdAid, m_uAid);
+	    	scionPrinter->printLog(IL, (char *)"BS (%lu:%lu) stored received ROT.\n", m_uAdAid, m_uAid);
 	    	m_bROTRequested = false;
 		}
 	}
@@ -684,7 +685,7 @@ SCIONBeaconServer::sendAIDReply(SPacket * packet, uint16_t packetLength){
 	time_t ts = time(NULL);
 
 	//SLT: temporarily blocked...
-	scionPrinter->printLog(IH,type,ts,hdr.src.numAddr(),m_uAdAid,"AID REQ: %u,RECEIVED\n",packetLength);
+	scionPrinter->printLog(IH,type,ts,hdr.src.numAddr(),m_uAdAid,(char *)"AID REQ: %u,RECEIVED\n",packetLength);
 
 	sendPacket(packet, packetLength, PORT_TO_SWITCH); 
 	_AIDIsRegister = true;
@@ -717,7 +718,6 @@ void SCIONBeaconServer::push(int port, Packet *p)
 
 
 		uint8_t * s_pkt = (uint8_t *) thdr.payload();
-        s_pkt += 2;
 
         uint16_t type = SPH::getType(s_pkt);
 		uint16_t packetLength = SPH::getTotalLen(s_pkt);
@@ -737,9 +737,9 @@ void SCIONBeaconServer::push(int port, Packet *p)
 			- if not, ignores. 
 			*/
 			if(!m_bROTInitiated){
-				scionPrinter->printLog(IH, "BS (%llu:%llu): No valid ROT file! Ignoring PCB.\n", m_uAdAid, m_uAid);
+				scionPrinter->printLog(IH, (char *)"BS (%lu:%lu): No valid ROT file! Ignoring PCB.\n", m_uAdAid, m_uAid);
 				#ifdef _SL_DEBUG_BS
-				printf("BS (%llu:%llu): No valid ROT file! Ignoring PCB.\n", m_uAdAid, m_uAid);
+				printf("BS (%lu:%lu): No valid ROT file! Ignoring PCB.\n", m_uAdAid, m_uAid);
 				#endif
 				//continue;
                 return;
@@ -747,13 +747,13 @@ void SCIONBeaconServer::push(int port, Packet *p)
 			
 			uint32_t ROTVersion = SCIONBeaconLib::getROTver(packet);
 			#ifdef _SL_DEBUG_BS
-			printf("BS (%llu:%llu): Recived RoT version = %d.\n", m_uAdAid, m_uAid, ROTVersion);
-			printf("BS (%llu:%llu): Self RoT version = %d.\n", m_uAdAid, m_uAid, m_cROT.version);
+			printf("BS (%lu:%lu): Recived RoT version = %d.\n", m_uAdAid, m_uAid, ROTVersion);
+			printf("BS (%lu:%lu): Self RoT version = %d.\n", m_uAdAid, m_uAid, m_cROT.version);
 			#endif
 			//SL: ROT version is changed...
             if(ROTVersion > m_cROT.version){
 				#ifdef _SL_DEBUG_BS
-				printf("BS (%llu:%llu): RoT version has been changed. Get a new ROT from local CS.\n", m_uAdAid, m_uAid);
+				printf("BS (%lu:%lu): RoT version has been changed. Get a new ROT from local CS.\n", m_uAdAid, m_uAid);
 				#endif
 				requestROT(packet,ROTVersion);
 				//continue;
@@ -789,12 +789,12 @@ void SCIONBeaconServer::push(int port, Packet *p)
 
 			case ROT_REP_LOCAL:
 				#ifdef _SL_DEBUG_BS
-				printf("BS (%llu:%llu): Received ROT_REP_LOCAL packets from local CS.\n", m_uAdAid, m_uAid);
+				printf("BS (%lu:%lu): Received ROT_REP_LOCAL packets from local CS.\n", m_uAdAid, m_uAid);
 				#endif
 				saveROT(packet,packetLength);
 				break;
 			default:
-				//scionPrinter->printLog(IH, "BS(%llu:%llu) Unsupported type (%d) packet.\n",m_uAdAid,m_uAid,type);
+				//scionPrinter->printLog(IH, (char *)"BS(%lu:%lu) Unsupported type (%d) packet.\n",m_uAdAid,m_uAid,type);
 				break;
 			}
 		}
@@ -845,22 +845,22 @@ SCIONBeaconServer::run_task(Task *task){
 			- if not, ignores. 
 			*/
 			if(!m_bROTInitiated){
-				scionPrinter->printLog(IH, "BS (%llu:%llu): No valid ROT file! Ignoring PCB.\n", m_uAdAid, m_uAid);
+				scionPrinter->printLog(IH, (char *)"BS (%lu:%lu): No valid ROT file! Ignoring PCB.\n", m_uAdAid, m_uAid);
 				#ifdef _SL_DEBUG_BS
-				printf("BS (%llu:%llu): No valid ROT file! Ignoring PCB.\n", m_uAdAid, m_uAid);
+				printf("BS (%lu:%lu): No valid ROT file! Ignoring PCB.\n", m_uAdAid, m_uAid);
 				#endif
 				continue;
 			}
 			
 			uint32_t ROTVersion = SCIONBeaconLib::getROTver(packet);
 			#ifdef _SL_DEBUG_BS
-			printf("BS (%llu:%llu): Recived RoT version = %d.\n", m_uAdAid, m_uAid, ROTVersion);
-			printf("BS (%llu:%llu): Self RoT version = %d.\n", m_uAdAid, m_uAid, m_cROT.version);
+			printf("BS (%lu:%lu): Recived RoT version = %d.\n", m_uAdAid, m_uAid, ROTVersion);
+			printf("BS (%lu:%lu): Self RoT version = %d.\n", m_uAdAid, m_uAid, m_cROT.version);
 			#endif
 			//SL: ROT version is changed...
             if(ROTVersion > m_cROT.version){
 				#ifdef _SL_DEBUG_BS
-				printf("BS (%llu:%llu): RoT version has been changed. Get a new ROT from local CS.\n", m_uAdAid, m_uAid);
+				printf("BS (%lu:%lu): RoT version has been changed. Get a new ROT from local CS.\n", m_uAdAid, m_uAid);
 				#endif
 				requestROT(packet,ROTVersion);
 				continue;
@@ -894,12 +894,12 @@ SCIONBeaconServer::run_task(Task *task){
 
 			case ROT_REP_LOCAL:
 				#ifdef _SL_DEBUG_BS
-				printf("BS (%llu:%llu): Received ROT_REP_LOCAL packets from local CS.\n", m_uAdAid, m_uAid);
+				printf("BS (%lu:%lu): Received ROT_REP_LOCAL packets from local CS.\n", m_uAdAid, m_uAid);
 				#endif
 				saveROT(packet,packetLength);
 				break;
 			default:
-				scionPrinter->printLog(IH, "BS(%llu:%llu) Unsupported type (%d) packet.\n",m_uAdAid,m_uAid,type);
+				scionPrinter->printLog(IH, (char *)"BS(%lu:%lu) Unsupported type (%d) packet.\n",m_uAdAid,m_uAid,type);
 				break;
 			}
 		}
@@ -1066,9 +1066,9 @@ SCIONBeaconServer::registerPaths(){
 	for(int i = m_iNumRegisteredPath; i < m_iKval; i++) {
 		if(getPathToRegister(itr)){
 			#ifdef _SL_DEBUG_BS
-			printf("\nAD%llu: %i paths registered to TDC. No more path left to register\n", m_uAdAid,i-1);
+			printf("\nAD%lu: %i paths registered to TDC. No more path left to register\n", m_uAdAid,i-1);
 			#endif
-    		scionPrinter->printLog(IH,PATH_REG, "AD%llu: %i paths registered to TDC. No path to register\n",m_uAdAid,i-1);
+    		scionPrinter->printLog(IH,PATH_REG, (char *)"AD%lu: %i paths registered to TDC. No path to register\n",m_uAdAid,i-1);
 			break;
 		}
 		
@@ -1118,12 +1118,12 @@ SCIONBeaconServer::printPaths(){
         uint8_t* ptr = itr->second.msg+hdrLen+OPAQUE_FIELD_SIZE*2;
         pcbMarking* mrkPtr = (pcbMarking*)ptr;
         for(int i=0;i<itr->second.hops;i++){
-            printf("%llu(%d:%d) | ", mrkPtr->aid,  mrkPtr->ingressIf, mrkPtr->egressIf);
+            printf("%lu(%d:%d) | ", mrkPtr->aid,  mrkPtr->ingressIf, mrkPtr->egressIf);
             ptr+=mrkPtr->sigLen + mrkPtr->blkSize;
             mrkPtr = (pcbMarking*)ptr;
         }
     
-        printf("%llu  %d\n",m_uAdAid, itr->second.registered);
+        printf("%lu  %d\n",m_uAdAid, itr->second.registered);
     
     }
 
@@ -1238,14 +1238,14 @@ SCIONBeaconServer::registerPath(pcb &rpcb){
 	pcbMarking* mrkPtr = (pcbMarking*)ptr;
 
 	for(int i=0;i<numHop;i++){
-		sprintf(buf+offset,"%llu (%u, %u) |", mrkPtr->aid, mrkPtr->ingressIf, mrkPtr->egressIf);
+		sprintf(buf+offset,"%lu (%u, %u) |", mrkPtr->aid, mrkPtr->ingressIf, mrkPtr->egressIf);
 		ptr+=mrkPtr->blkSize;
 		mrkPtr=(pcbMarking*)ptr;
 		offset = strlen(buf);
 	}
      
 	scionPrinter->printLog(IH,PATH_REG,rpcb.timestamp,
-        m_uAdAid,0,"%u,SENT PATH: %s\n",newPacketLength,buf);
+        m_uAdAid,0,(char *)"%u,SENT PATH: %s\n",newPacketLength,buf);
 	sendPacket(newPacket, newPacketLength, PORT_TO_SWITCH, TO_ROUTER);
 	
 	return 0;
@@ -1325,7 +1325,7 @@ int SCIONBeaconServer::propagate(){
 
 		RouterElem cRouter = cItr->second;
 #ifdef _HC_DEBUG_BS
-		printf("HC_DEBUG: %llu:%llu progagating PCBs to %d\n", m_uAdAid, m_uAid, cItr->second.interface.id);
+		printf("HC_DEBUG: %lu:%lu progagating PCBs to %d\n", m_uAdAid, m_uAid, cItr->second.interface.id);
 #endif
 		std::map<uint16_t, SelectionPolicy>::iterator curPolicyIt = m_selPolicies.find(cRouter.interface.id);
 		std::vector<pcb*> selPcbs = curPolicyIt->second.select(beacon_table);
@@ -1376,10 +1376,10 @@ int SCIONBeaconServer::propagate(){
 				
                 if((iItr = ifid_map.find(pRouter.interface.id))==ifid_map.end()){
 					#ifdef _SL_DEBUG_BS
-                    printf("BS (%llu:%llu): Cannot Add Peering Link: IFID (%d) has not been registered\n", 
+                    printf("BS (%lu:%lu): Cannot Add Peering Link: IFID (%d) has not been registered\n", 
 						m_uAdAid,m_uAid,pRouter.interface.id);
 					#endif
-                    scionPrinter->printLog(EH, "Cannot Add Peering Link: IFID (%d) has not been registered\n",
+                    scionPrinter->printLog(EH, (char *)"Cannot Add Peering Link: IFID (%d) has not been registered\n",
 						pRouter.interface.id);
 					//SL+: skip the interface that has not replied IFID_REQ
 					continue;
@@ -1401,7 +1401,7 @@ int SCIONBeaconServer::propagate(){
 			//SLT:TS
 			uint32_t ts = SPH::getTimestamp(msg);
 			uint64_t dst = cRouter.interface.neighbor;
-			scionPrinter->printLog(IH,BEACON,ts,m_uAdAid,dst,"%u,SENT\n",msgLength);
+			scionPrinter->printLog(IH,BEACON,ts,m_uAdAid,dst,(char *)"%u,SENT\n",msgLength);
 			sendPacket(msg, msgLength,PORT_TO_SWITCH, TO_ROUTER);
 			
 			nPropagated++;
@@ -1465,7 +1465,7 @@ uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){
 	// read error?
 	if( ret < 0 ) {
 		#ifdef _SL_DEBUG_BS
-		printf("BS (%llu:%llu): x509parse_crt parsing failed.\n", m_uAdAid, m_uAid);
+		printf("BS (%lu:%lu): x509parse_crt parsing failed.\n", m_uAdAid, m_uAid);
 		#endif
 		x509_free( &TDCert );
 		// TODO: Request a correct ROT with a pre-defined number of trials
@@ -1476,7 +1476,7 @@ uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){
 
 	if(SCIONCryptoLib::verifySig(msg, sig, msgLen, &(TDCert.rsa)) != scionCryptoSuccess) {
 		#ifdef _SL_DEBUG_BS
-		printf("BS (%llu:%llu): Signature verification (TDC) failure\n", m_uAdAid, m_uAid);
+		printf("BS (%lu:%lu): Signature verification (TDC) failure\n", m_uAdAid, m_uAid);
 		#endif
 		x509_free(&TDCert);
         return SCION_FAILURE;
@@ -1537,7 +1537,7 @@ uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){
 			FILE* cFile;
 			if((cFile=fopen((const char*)cert,"r"))==NULL){
 				#ifdef _SL_DEBUG_BS
-				printf("BS (%llu:%llu): Cert of AD %llu does not exist.\n", m_uAdAid, m_uAid, mrkPtr->aid);
+				printf("BS (%lu:%lu): Cert of AD %lu does not exist.\n", m_uAdAid, m_uAid, mrkPtr->aid);
 				#endif
 				// Tenma: reverse the order here since unverified pcbs should be added
 				// brefore we create cert request packets.
@@ -1555,10 +1555,10 @@ uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){
 			int err = x509parse_crtfile(adcert, (const char*)cert);
 			if(err){
 				#ifdef _SL_DEBUG_BS
-				printf("BS (%llu:%llu): fail to extract AD %llu's cert to verify signatures.\n", 
+				printf("BS (%lu:%lu): fail to extract AD %lu's cert to verify signatures.\n", 
 					m_uAdAid, m_uAid, mrkPtr->aid);
 				#endif
-				scionPrinter->printLog(EH, "BS(%llu:%llu): Error Loading Certificate for AD %llu\n", m_uAdAid, m_uAid, mrkPtr->aid);
+				scionPrinter->printLog(EH, (char *)"BS(%lu:%lu): Error Loading Certificate for AD %lu\n", m_uAdAid, m_uAid, mrkPtr->aid);
 				x509_free(adcert);
 				delete adcert;
 				return SCION_FAILURE;		
@@ -1578,7 +1578,7 @@ uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){
 		// Tenma: genSig only uses msg+aid content for signature.
 		if(SCIONCryptoLib::verifySig(content,signature,msgLen+SIZE_AID,&(adcert->rsa))!=scionCryptoSuccess){
 			#ifdef _SL_DEBUG_BS
-			printf("BS (%llu:%llu): Signature verification failed for AD %llu\n", m_uAdAid, m_uAid, mrkPtr->aid);
+			printf("BS (%lu:%lu): Signature verification failed for AD %lu\n", m_uAdAid, m_uAid, mrkPtr->aid);
 			#endif
 			x509_free(adcert);
 			return SCION_FAILURE;
@@ -1689,9 +1689,9 @@ int SCIONBeaconServer::sendHello()
 {
     string msg;
     msg.append("0^");
-    msg.append(MYAD);
+    msg.append(MY_AD);
     msg.append("^");
-    msg.append(MYHID);
+    msg.append(MY_HID);
     msg.append("^");
 
     WritablePacket *p = Packet::make(DEFAULT_HD_ROOM, msg.c_str(), msg.size() + 1, DEFAULT_TL_ROOM);
@@ -1746,7 +1746,7 @@ SCIONBeaconServer::sendPacket(SPacket* data, uint16_t data_length, int port, int
     - Subject to be changed when certificate server is ready. 
 */
 void SCIONBeaconServer::getCertFile(uint8_t* fn, uint64_t target){
-    sprintf((char*)fn,"./TD1/Non-TDC/AD%llu/beaconserver/certificates/td%llu-ad%llu-0.crt",m_uAdAid,m_uTdAid,target); 
+    sprintf((char*)fn,"./TD1/Non-TDC/AD%lu/beaconserver/certificates/td%u-ad%lu-0.crt",m_uAdAid,m_uTdAid,target); 
 }
 
 
@@ -1864,7 +1864,7 @@ void SCIONBeaconServer::requestForCert(SPacket* pkt){
 	
 	// copy CertReq Structure
 	memcpy(newPacket+hdrLen, &newReq, CERT_REQ_SIZE);
-	printf("BS (%llu:%llu): Request Cert to CS (%llu)\n", m_uAdAid, m_uAid,certAddr.numAddr());
+	printf("BS (%lu:%lu): Request Cert to CS (%lu)\n", m_uAdAid, m_uAid,certAddr.numAddr());
 	sendPacket(newPacket, packetLength, PORT_TO_SWITCH, TO_SERVER);
 }
 
@@ -1890,7 +1890,7 @@ SCIONBeaconServer::clearAesKeyMap() {
 	}
 	m_OfgAesCtx.clear();
 	//now exiting the process
-	fprintf(stderr,"AD%llu: Process terminates correctly.\n", m_uAdAid);
+	fprintf(stderr,"AD%lu: Process terminates correctly.\n", m_uAdAid);
 }
 
 
@@ -2095,7 +2095,7 @@ void SelectionPolicy::printPcb(const pcb* p){
     pcbMarking* mrkPtr = (pcbMarking*)ptr;
     printf("HC_DEBUG: timestamp: %u hops: %u | ", p->timestamp, p->hops);
     for(size_t i = 0; i < p->hops; ++i){
-        printf("%llu(%d:%d) | ", mrkPtr->aid,  mrkPtr->ingressIf, mrkPtr->egressIf);
+        printf("%lu(%d:%d) | ", mrkPtr->aid,  mrkPtr->ingressIf, mrkPtr->egressIf);
         ptr+=mrkPtr->sigLen + mrkPtr->blkSize;
         mrkPtr = (pcbMarking*)ptr;
     }

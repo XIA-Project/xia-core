@@ -86,7 +86,7 @@ class SCIONBeaconServerCore : public Element {
         bool run_task(Task *task);
         void push(int port, Packet *p);
 
-        int sendHello();
+        void sendHello();
         void getEgressIngressXIDs(vector<string> &list);
 
         /**
@@ -217,10 +217,6 @@ class SCIONBeaconServerCore : public Element {
 
         void initializeOutputPort();
         void constructIfid2AddrMap();
-
-        /* XIA */
-        char *m_sdag;
-        char *m_ddag;
 
         /** True if ROT is initiated, False if not. */     
         bool m_bROTInitiated;

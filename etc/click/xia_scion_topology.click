@@ -3,7 +3,7 @@ require(library xia_address.click);
 
 controller0 :: XIAController2Port(RE AD0 CHID0, AD0, CHID0, 0.0.0.0, 1500, aa:aa:aa:aa:aa:aa);
 router0 :: XIARouter2Port(RE AD0 RHID0, AD0, RHID0, 0.0.0.0, 1600, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
-beacon0 :: XIASCIONBeaconServerCore(RE AD0 HID0, AD0, HID0, 0.0.0.0, 1700, aa:aa:aa:aa:aa:aa,
+beacon0 :: XIASCIONBeaconServerCore(RE AD0 BHID0, AD0, BHID0, 0.0.0.0, 1700, aa:aa:aa:aa:aa:aa,
         AID 11111,
         CONFIG_FILE "./TD1/TDC/AD1/beaconserver/conf/AD1BS.conf",
         TOPOLOGY_FILE "./TD1/TDC/AD1/topology1.xml",
@@ -12,7 +12,7 @@ beacon0 :: XIASCIONBeaconServerCore(RE AD0 HID0, AD0, HID0, 0.0.0.0, 1700, aa:aa
 controller1 :: XIAController2Port(RE AD1 CHID1, AD1, CHID1, 0.0.0.0, 1800, aa:aa:aa:aa:aa:aa);
 router1 :: XIARouter4Port(RE AD1 RHID1, AD1, RHID1, 0.0.0.0, 1900,
         aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
-beacon1 :: XIASCIONBeaconServer(RE AD1 HID1, AD1, HID1, 0.0.0.0, 2000, aa:aa:aa:aa:aa:aa,
+beacon1 :: XIASCIONBeaconServer(RE AD1 BHID1, AD1, BHID1, 0.0.0.0, 2000, aa:aa:aa:aa:aa:aa,
         AID 11111,
         CONFIG_FILE "./TD1/Non-TDC/AD2/beaconserver/conf/AD2BS.conf",
         TOPOLOGY_FILE "./TD1/Non-TDC/AD2/topology2.xml",
@@ -20,7 +20,7 @@ beacon1 :: XIASCIONBeaconServer(RE AD1 HID1, AD1, HID1, 0.0.0.0, 2000, aa:aa:aa:
 
 controller2 :: XIAController2Port(RE AD2 CHID2, AD2, CHID2, 0.0.0.0, 2100, aa:aa:aa:aa:aa:aa);
 router2 :: XIARouter2Port(RE AD2 RHID2, AD2, RHID2, 0.0.0.0, 2200, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
-beacon2 :: XIASCIONBeaconServer(RE AD2 HID2, AD2, HID2, 0.0.0.0, 2300, aa:aa:aa:aa:aa:aa,
+beacon2 :: XIASCIONBeaconServer(RE AD2 BHID2, AD2, BHID2, 0.0.0.0, 2300, aa:aa:aa:aa:aa:aa,
         AID 11111,
         CONFIG_FILE "./TD1/Non-TDC/AD3/beaconserver/conf/AD3BS.conf",
         TOPOLOGY_FILE "./TD1/Non-TDC/AD3/topology3.xml",
