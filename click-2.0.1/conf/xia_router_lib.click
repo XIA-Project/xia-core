@@ -483,7 +483,8 @@ elementclass XIASCIONBeaconServerCore {
     //Script(write xrc/n/proc/rt_AD.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
     //Script(write xrc/n/proc/rt_HID.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
 
-    sbs :: SCIONBeaconServerCore(AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot);
+    sbs :: SCIONBeaconServerCore(AD $local_ad, HID $local_hid,
+            AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot);
 
     input => xlc => output;
 
@@ -509,7 +510,8 @@ elementclass XIASCIONBeaconServer {
     //Script(write xrc/n/proc/rt_AD.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
     //Script(write xrc/n/proc/rt_HID.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
 
-    sbs :: SCIONBeaconServer(AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot);
+    sbs :: SCIONBeaconServer(AD $local_ad, HID $local_hid,
+            AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot);
 
     input => xlc => output;
 

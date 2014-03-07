@@ -35,14 +35,13 @@
 #include <click/xiaheader.hh>
 #include <click/xiacontentheader.hh>
 #include <click/xiatransportheader.hh>
+#include <click/xid.hh>
+#include <click/standard/xiaxidinfo.hh>
 #include "xiatransport.hh"
 #include "xiaxidroutetable.hh"
 #include "xtransport.hh"
 
 #define SID_XROUTE  "SID:1110000000000000000000000000000000001112"
-
-#define MY_AD       "AD:0000000000000000000000000000000000000000"
-#define MY_HID      "HID:0000000000000000000000000000000000000030"
 
 #define EGRESS_AD   "AD:0000000000000000000000000000000000000000"
 #define EGRESS_HID  "HID:0000000000000000000000000000000000000020"
@@ -57,6 +56,8 @@ CLICK_DECLS
 
 int SCIONBeaconServerCore::configure(Vector<String> &conf, ErrorHandler *errh) {
   if(cp_va_kparse(conf, this, errh,
+	"AD", cpkM, cpString, &m_AD,
+	"HID", cpkM, cpString, &m_HID,
     "AID", cpkM, cpUnsigned64,&m_uAid, 
     "CONFIG_FILE", cpkM, cpString, &m_sConfigFile, 
     "TOPOLOGY_FILE",cpkM, cpString, &m_sTopologyFile,
@@ -66,7 +67,22 @@ int SCIONBeaconServerCore::configure(Vector<String> &conf, ErrorHandler *errh) {
     scionPrinter->printLog(EH, (char *)"ERR: Fault error, exit SCION Network.\n");
     exit(-1);
     }
-    return 0;
+
+    XIAXIDInfo xiaxidinfo;
+    struct click_xia_xid store;
+    XID xid = xid;
+
+    xiaxidinfo.query_xid(m_AD, &store, this);
+    xid = store;
+    m_AD = xid.unparse();
+
+    xiaxidinfo.query_xid(m_HID, &store, this);
+    xid = store;
+    m_HID = xid.unparse();
+
+    //printf("XID: %s %s\n", m_AD.c_str(), m_HID.c_str());
+
+	return 0;
 }
 
 int SCIONBeaconServerCore::initialize(ErrorHandler* errh) {
@@ -355,6 +371,9 @@ bool SCIONBeaconServerCore::run_task(Task *task) {
 }
 
 void SCIONBeaconServerCore::getEgressIngressXIDs(vector<string> &list) {
+    if (!m_AD.compare(DEST_AD) && !m_HID.compare(DEST_HID))
+        return;
+
     string egress = "";
     egress.append(EGRESS_AD);
     egress.append(" ");
@@ -694,12 +713,11 @@ bool SCIONBeaconServerCore::getOfgKey(uint32_t timestamp, aes_context &actx)
 #endif
 }
 
-void SCIONBeaconServerCore::sendHello()
-{
+void SCIONBeaconServerCore::sendHello() {
     string msg = "0^";
-    msg.append(MY_AD);
+    msg.append(m_AD.c_str());
     msg.append("^");
-    msg.append(MY_HID);
+    msg.append(m_HID.c_str());
     msg.append("^");
 
     string dest = "RE ";
@@ -745,9 +763,9 @@ void SCIONBeaconServerCore::sendPacket(uint8_t* data, uint16_t data_length, stri
   output(port).push(outPacket);
 #endif
     string src = "RE ";
-    src.append(MY_AD);
+    src.append(m_AD.c_str());
     src.append(" ");
-    src.append(MY_HID);
+    src.append(m_HID.c_str());
     src.append(" ");
     src.append(SID_XROUTE);
 

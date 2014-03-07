@@ -148,7 +148,8 @@ class SCIONBeaconServer : public Element {
         bool run_task(Task *task);
         void push(int port, Packet *p);
 
-        int sendHello();
+        void sendHello();
+        void getEgressIngressXIDs(vector<string> &list);
 
 	private:
         /**
@@ -337,7 +338,7 @@ class SCIONBeaconServer : public Element {
             creates a new click packet with the given data and send the data to
             the given port.  
         */
-        void sendPacket(uint8_t* data, uint16_t dataLength, int port, int fwd_type=0);
+        void sendPacket(uint8_t* data, uint16_t dataLength, string dest);
         /**
             @brief Gets the certificate file.
             @param uint8_t* fn The buffer that will store the path of the
@@ -525,12 +526,13 @@ class SCIONBeaconServer : public Element {
 		void initializeOutputPort();
 
     private:
-        /* XIA */
-        char *m_sdag;
-        char *m_ddag;
 
         Timer _timer;
         Task  _task;        
+
+        String m_AD;
+        String m_HID;
+
         /** AD AID of pcb server */
         uint64_t m_uAdAid;                  //AD AID of pcb server
         /** TDID of the pcb server */

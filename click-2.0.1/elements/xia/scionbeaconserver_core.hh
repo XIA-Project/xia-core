@@ -99,7 +99,7 @@ class SCIONBeaconServerCore : public Element {
             creates a new click packet with the given data and send the data to
             the given port.  
         */
-           void sendPacket(uint8_t* data, uint16_t dataLength, string dest);
+        void sendPacket(uint8_t* data, uint16_t dataLength, string dest);
         /**
             @brief Get Opaque Field Generation Key.
             @param uint32_t timestamp The timestamp that will decide the Opaque
@@ -225,6 +225,9 @@ class SCIONBeaconServerCore : public Element {
         
         Timer _timer;
         Task _task;
+
+        String m_AD;
+        String m_HID;
 
         /** RoT structure */
         ROT m_cROT;

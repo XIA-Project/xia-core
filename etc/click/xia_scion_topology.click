@@ -13,7 +13,7 @@ controller1 :: XIAController2Port(RE AD1 CHID1, AD1, CHID1, 0.0.0.0, 1800, aa:aa
 router1 :: XIARouter4Port(RE AD1 RHID1, AD1, RHID1, 0.0.0.0, 1900,
         aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
 beacon1 :: XIASCIONBeaconServer(RE AD1 BHID1, AD1, BHID1, 0.0.0.0, 2000, aa:aa:aa:aa:aa:aa,
-        AID 11111,
+        AID 22222,
         CONFIG_FILE "./TD1/Non-TDC/AD2/beaconserver/conf/AD2BS.conf",
         TOPOLOGY_FILE "./TD1/Non-TDC/AD2/topology2.xml",
         ROT "./TD1/Non-TDC/AD2/beaconserver/ROT/rot-td1-0.xml");
@@ -21,7 +21,7 @@ beacon1 :: XIASCIONBeaconServer(RE AD1 BHID1, AD1, BHID1, 0.0.0.0, 2000, aa:aa:a
 controller2 :: XIAController2Port(RE AD2 CHID2, AD2, CHID2, 0.0.0.0, 2100, aa:aa:aa:aa:aa:aa);
 router2 :: XIARouter2Port(RE AD2 RHID2, AD2, RHID2, 0.0.0.0, 2200, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
 beacon2 :: XIASCIONBeaconServer(RE AD2 BHID2, AD2, BHID2, 0.0.0.0, 2300, aa:aa:aa:aa:aa:aa,
-        AID 11111,
+        AID 33333,
         CONFIG_FILE "./TD1/Non-TDC/AD3/beaconserver/conf/AD3BS.conf",
         TOPOLOGY_FILE "./TD1/Non-TDC/AD3/topology3.xml",
         ROT "./TD1/Non-TDC/AD3/beaconserver/ROT/rot-td1-0.xml");

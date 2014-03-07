@@ -37,14 +37,22 @@
 #include <click/xiaheader.hh>
 #include <click/xiacontentheader.hh>
 #include <click/xiatransportheader.hh>
+#include <click/xid.hh>
+#include <click/standard/xiaxidinfo.hh>
 #include "xiatransport.hh"
 #include "xiaxidroutetable.hh"
 #include "xtransport.hh"
 
 #define SID_XROUTE  "SID:1110000000000000000000000000000000001112"
 
-#define MY_AD       "AD:0000000000000000000000000000000000000001"
-#define MY_HID      "HID:0000000000000000000000000000000000000031"
+#define EGRESS_AD   "AD:0000000000000000000000000000000000000001"
+#define EGRESS_HID  "HID:0000000000000000000000000000000000000021"
+
+#define INGRESS_AD  "AD:0000000000000000000000000000000000000002"
+#define INGRESS_HID "HID:0000000000000000000000000000000000000022"
+
+#define DEST_AD     "AD:0000000000000000000000000000000000000002"
+#define DEST_HID    "HID:0000000000000000000000000000000000000032"
 
 CLICK_DECLS
 
@@ -54,6 +62,8 @@ CLICK_DECLS
 */
 int SCIONBeaconServer::configure(Vector<String> &conf, ErrorHandler *errh){
 	if(cp_va_kparse(conf, this, errh, 
+	"AD", cpkM, cpString, &m_AD,
+	"HID", cpkM, cpString, &m_HID,
 	"AID", cpkM, cpUnsigned64, &m_uAid,
 	"CONFIG_FILE", cpkM, cpString, &m_sConfigFile,
 	"TOPOLOGY_FILE", cpkM, cpString, &m_sTopologyFile,
@@ -63,6 +73,21 @@ int SCIONBeaconServer::configure(Vector<String> &conf, ErrorHandler *errh){
 		printf("Fatal error, Exit SCION Network.\n");
 		exit(-1);
 	}
+
+    XIAXIDInfo xiaxidinfo;
+    struct click_xia_xid store;
+    XID xid = xid;
+
+    xiaxidinfo.query_xid(m_AD, &store, this);
+    xid = store;
+    m_AD = xid.unparse();
+
+    xiaxidinfo.query_xid(m_HID, &store, this);
+    xid = store;
+    m_HID = xid.unparse();
+
+    //printf("XID: %s %s\n", m_AD.c_str(), m_HID.c_str());
+
 	return 0;
 }
 /*
@@ -133,15 +158,6 @@ int SCIONBeaconServer::initialize(ErrorHandler* errh){
 
 	//HC: initialize per-child path selection policy
 	initSelectionPolicy();
-
-  // Task 6: Initialize XIA addresses
-    // make the dest DAG (broadcast to other routers)
-    m_ddag = (char*)malloc(snprintf(NULL, 0, "RE %s %s", BHID, SID_XROUTE) + 1);
-    sprintf(m_ddag, "RE %s %s", BHID, SID_XROUTE);	
-
-    // make the src DAG (the one the routing process listens on)
-    m_sdag = (char*) malloc(snprintf(NULL, 0, "RE %s %s %s", MY_AD, MY_HID, SID_XROUTE) + 1);
-    sprintf(m_sdag, "RE %s %s %s", MY_AD, MY_HID, SID_XROUTE); 
 
 	ScheduleInfo::initialize_task(this, &_task, errh);
 	_timer.initialize(this); 
@@ -337,7 +353,8 @@ SCIONBeaconServer::requestROT() {
 	req.currentVersion = 0; //currentVersion == 0 indicates the most recent version
 							//since BS does not have any ROT available
 	*(ROTRequest *)(packet+hdrLen) = req;
-	sendPacket(packet, totalLen, PORT_TO_SWITCH, TO_SERVER);
+	//sendPacket(packet, totalLen, PORT_TO_SWITCH, TO_SERVER);
+	sendPacket(packet, totalLen, "");
 }
 
 /*
@@ -349,7 +366,6 @@ SCIONBeaconServer::requestROT() {
 void 
 SCIONBeaconServer::run_timer(Timer *timer){
     sendHello();
-#if 0
 
 	time_t curTime;
 	time(&curTime);
@@ -383,7 +399,6 @@ SCIONBeaconServer::run_timer(Timer *timer){
 	if(curTime-m_lastRecheckTime >= m_iRecheckTime){
 		recheckPcb(); 
 	}
-#endif
 
 	_timer.reschedule_after_sec(m_iScheduleTime);
 }
@@ -469,7 +484,26 @@ SCIONBeaconServer::requestROT(SPacket * packet, uint32_t rotVer) {
 	req.previousVersion = m_cROT.version;
 	req.currentVersion = rotVer;
 	*(ROTRequest*)(newPacket+hdrLen) = req;
-	sendPacket(newPacket, packetLength, PORT_TO_SWITCH, TO_SERVER);
+	//sendPacket(newPacket, packetLength, PORT_TO_SWITCH, TO_SERVER);
+	sendPacket(newPacket, packetLength, "");
+}
+
+void SCIONBeaconServer::getEgressIngressXIDs(vector<string> &list) {
+    if (!m_AD.compare(DEST_AD) && !m_HID.compare(DEST_HID))
+        return;
+
+    string egress = "";
+    egress.append(EGRESS_AD);
+    egress.append(" ");
+    egress.append(EGRESS_HID);
+
+    string ingress = "";
+    ingress.append(INGRESS_AD);
+    ingress.append(" ");
+    ingress.append(INGRESS_HID);
+
+    list.push_back(egress);
+    list.push_back(ingress);
 }
 
 /*
@@ -559,7 +593,8 @@ SCIONBeaconServer::processPCB(SPacket * packet, uint16_t packetLength){
 			for(it=pathServerRange.first; it!=pathServerRange.second; it++) { 
 				hdr.dst = it->second.addr;
 				SPH::setHeader(newPacket, hdr);
-				sendPacket(newPacket, packetLength, PORT_TO_SWITCH, TO_SERVER);
+				//sendPacket(newPacket, packetLength, PORT_TO_SWITCH, TO_SERVER);
+                sendPacket(newPacket, packetLength, "");
 			}
 		} else {
 			#ifdef _SL_DEBUG_BS
@@ -687,7 +722,8 @@ SCIONBeaconServer::sendAIDReply(SPacket * packet, uint16_t packetLength){
 	//SLT: temporarily blocked...
 	scionPrinter->printLog(IH,type,ts,hdr.src.numAddr(),m_uAdAid,(char *)"AID REQ: %u,RECEIVED\n",packetLength);
 
-	sendPacket(packet, packetLength, PORT_TO_SWITCH); 
+	//sendPacket(packet, packetLength, PORT_TO_SWITCH); 
+	sendPacket(packet, packetLength, "");
 	_AIDIsRegister = true;
 }
 
@@ -764,6 +800,7 @@ void SCIONBeaconServer::push(int port, Packet *p)
 			processPCB(packet,packetLength);
 
 		}else {
+#if 0
 			switch(type) {
 			case CERT_REP_LOCAL:
 				saveCertificate(packet,packetLength);
@@ -797,6 +834,7 @@ void SCIONBeaconServer::push(int port, Packet *p)
 				//scionPrinter->printLog(IH, (char *)"BS(%lu:%lu) Unsupported type (%d) packet.\n",m_uAdAid,m_uAid,type);
 				break;
 			}
+#endif
 		}
     //}// end of while
 }
@@ -1246,7 +1284,8 @@ SCIONBeaconServer::registerPath(pcb &rpcb){
      
 	scionPrinter->printLog(IH,PATH_REG,rpcb.timestamp,
         m_uAdAid,0,(char *)"%u,SENT PATH: %s\n",newPacketLength,buf);
-	sendPacket(newPacket, newPacketLength, PORT_TO_SWITCH, TO_ROUTER);
+	//sendPacket(newPacket, newPacketLength, PORT_TO_SWITCH, TO_ROUTER);
+	sendPacket(newPacket, newPacketLength, "");
 	
 	return 0;
 }
@@ -1321,7 +1360,13 @@ int SCIONBeaconServer::propagate(){
 	//HC: pcb->propagated, pcb->age can be removed, as each customer
 	//has a different set of selected paths
 
-	for(cItr = childRange.first; cItr != childRange.second; cItr++){
+    cItr=childRange.first;
+    vector<string> list;
+    getEgressIngressXIDs(list);
+    //for(cItr=childRange.first;cItr!=childRange.second;cItr++){
+    for (vector<string>::iterator iter = list.begin(); iter < list.end(); iter++) {
+        string egress = *iter++;
+        string ingress = *iter++;
 
 		RouterElem cRouter = cItr->second;
 #ifdef _HC_DEBUG_BS
@@ -1369,6 +1414,7 @@ int SCIONBeaconServer::propagate(){
 			SPH::addDstAddr(msg, cRouter.addr);
 			SCIONBeaconLib::setInterface(msg, cRouter.interface.id);
 
+#if 0
 			//add all the peers
 			for(pItr=peerRange.first;pItr!=peerRange.second;pItr++){
 				RouterElem pRouter = pItr->second;
@@ -1395,6 +1441,7 @@ int SCIONBeaconServer::propagate(){
 				//SL: what is 1 in next to the last argument?
 				//it's TDID;and needs to be defined in the topology file, and router class, and set here for inter-TD peering link
 			}// end of for
+#endif
 
 			SCIONBeaconLib::signPacket(msg, PriKey.len, cRouter.interface.neighbor, &PriKey);
 			uint16_t msgLength = SPH::getTotalLen(msg);
@@ -1402,7 +1449,22 @@ int SCIONBeaconServer::propagate(){
 			uint32_t ts = SPH::getTimestamp(msg);
 			uint64_t dst = cRouter.interface.neighbor;
 			scionPrinter->printLog(IH,BEACON,ts,m_uAdAid,dst,(char *)"%u,SENT\n",msgLength);
-			sendPacket(msg, msgLength,PORT_TO_SWITCH, TO_ROUTER);
+			//sendPacket(msg, msgLength,PORT_TO_SWITCH, TO_ROUTER);
+
+            string dest = "RE ";
+            dest.append(BHID);
+            dest.append(" ");
+            dest.append(egress);
+            dest.append(" ");
+            dest.append(ingress);
+            dest.append(" ");
+            dest.append(DEST_AD);
+            dest.append(" ");
+            dest.append(DEST_HID);
+
+            //printf("DEST: %s\n", dest.c_str());
+
+            sendPacket(msg, msgLength, dest);
 			
 			nPropagated++;
 			if(nPropagated >= m_iKval) break;
@@ -1685,34 +1747,23 @@ bool SCIONBeaconServer::getOfgKey(uint32_t timestamp, aes_context &actx)
 #endif
 }
 
-int SCIONBeaconServer::sendHello()
-{
-    string msg;
-    msg.append("0^");
-    msg.append(MY_AD);
+void SCIONBeaconServer::sendHello() {
+    string msg = "0^";
+    msg.append(m_AD.c_str());
     msg.append("^");
-    msg.append(MY_HID);
+    msg.append(m_HID.c_str());
     msg.append("^");
 
-    WritablePacket *p = Packet::make(DEFAULT_HD_ROOM, msg.c_str(), msg.size() + 1, DEFAULT_TL_ROOM);
-    TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDGRAMHeader(0); // length
-	WritablePacket *q = thdr->encap(p);
+    string dest = "RE ";
+    dest.append(BHID);
+    dest.append(" ");
+    dest.append(SID_XROUTE);
 
-	XIAPath src, dst;
-	src.parse(m_sdag);
-	dst.parse(m_ddag);
-
-	XIAHeaderEncap encap;
-	encap.set_src_path(src);
-	encap.set_dst_path(dst);
-    encap.set_plen(msg.size() + 1 + thdr->hlen());
-
-	output(0).push(encap.encap(q, false));
-    return 0;
+    sendPacket((uint8_t *)msg.c_str(), msg.size(), dest);
 }
 
-void 
-SCIONBeaconServer::sendPacket(SPacket* data, uint16_t data_length, int port, int fwd_type){
+void SCIONBeaconServer::sendPacket(uint8_t* data, uint16_t data_length, string dest) {
+#if 0
 	//SLA:
 	//IPV4 Handling
 	uint8_t ipp[data_length+IPHDR_LEN]; 
@@ -1737,6 +1788,34 @@ SCIONBeaconServer::sendPacket(SPacket* data, uint16_t data_length, int port, int
 
 	WritablePacket* outPacket = Packet::make(DEFAULT_HD_ROOM, data, data_length, DEFAULT_TL_ROOM);
 	output(port).push(outPacket);
+#endif
+    string src = "RE ";
+    src.append(m_AD.c_str());
+    src.append(" ");
+    src.append(m_HID.c_str());
+    src.append(" ");
+    src.append(SID_XROUTE);
+
+	XIAPath src_path, dst_path;
+	src_path.parse(src.c_str());
+	dst_path.parse(dest.c_str());
+
+    XIAHeaderEncap xiah;
+    xiah.set_nxt(CLICK_XIA_NXT_TRN);
+    xiah.set_last(LAST_NODE_DEFAULT);
+    //xiah.set_hlim(hlim.get(_sport));
+    xiah.set_src_path(src_path);
+    xiah.set_dst_path(dst_path);
+
+    WritablePacket *p = Packet::make(DEFAULT_HD_ROOM, data, data_length, DEFAULT_TL_ROOM);
+    TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDGRAMHeader(0); // length
+	WritablePacket *q = thdr->encap(p);
+
+    thdr->update();
+    xiah.set_plen(data_length + thdr->hlen()); // XIA payload = transport header + transport-layer data
+
+    q = xiah.encap(q, false);
+	output(0).push(q);
 }
 
 
@@ -1865,7 +1944,8 @@ void SCIONBeaconServer::requestForCert(SPacket* pkt){
 	// copy CertReq Structure
 	memcpy(newPacket+hdrLen, &newReq, CERT_REQ_SIZE);
 	printf("BS (%lu:%lu): Request Cert to CS (%lu)\n", m_uAdAid, m_uAid,certAddr.numAddr());
-	sendPacket(newPacket, packetLength, PORT_TO_SWITCH, TO_SERVER);
+    //sendPacket(newPacket, packetLength, PORT_TO_SWITCH, TO_SERVER);
+	sendPacket(newPacket, packetLength, "");
 }
 
 void 
