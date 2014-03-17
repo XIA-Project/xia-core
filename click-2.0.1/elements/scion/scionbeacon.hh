@@ -23,9 +23,6 @@
 #include "packetheader.hh"
 #include "define.hh"
 
-#ifdef ENABLE_AESNI
-#include <intel_aesni/iaesni.h>
-#endif
 
 /**
     @brief Structure Representation of the Path Construction Beacon
@@ -60,13 +57,8 @@ struct ofgKey{
 	time_t time;
     /** The actual key in bytes */
     uint8_t key[OFG_KEY_SIZE];
-#ifdef ENABLE_AESNI
-	// for aesni
-	keystruct aesnikey;
-#else
 	/** AES context that will be used in polarssl library */
 	aes_context actx;
-#endif
 };
 
 //SL: why functions are defined as a friend?
@@ -223,13 +215,8 @@ public:
         The main functionality of this function is to build a byte array that
         contains all the necessary fields in the correct order.  
     */
-#ifdef ENABLE_AESNI
-	static uint32_t createMAC(uint32_t ts, uint8_t exp, uint16_t ingress, uint16_t egress, uint64_t prev_of,
-            keystruct* aesnikey);
-#else
 	static uint32_t createMAC(uint32_t ts, uint8_t exp, uint16_t ingress, uint16_t egress, uint64_t prev_of,
             aes_context* ctx);
-#endif
 
     /**
         @brief Verifies the validity of the MAC
@@ -252,13 +239,8 @@ public:
         function returns SCION_SUCCESS. If not the function will return
         SCION_FAILURE. 
     */
-#ifdef ENABLE_AESNI
-	static int verifyMAC(uint32_t ts, uint8_t exp, uint16_t ingress, uint16_t egress, uint64_t prev_of, 
-    uint32_t mac, keystruct* aesnikey);
-#else
 	static int verifyMAC(uint32_t ts, uint8_t exp, uint16_t ingress, uint16_t egress, uint64_t prev_of, 
     uint32_t mac,aes_context* ctx);
-#endif
 
     static uint8_t verifyPCB(uint8_t* pkt);
 
@@ -309,15 +291,9 @@ public:
         Please refer to the packetheader.hh for detail information about the link
         structures.        
     */
-#ifdef ENABLE_AESNI
-	static uint8_t addLink(uint8_t* pkt,uint16_t ingress,uint16_t egress,
-    uint8_t type, uint64_t aid, uint32_t tdid, keystruct* aesnikey, uint8_t ofType,
-    uint8_t exp,uint16_t bwAlloc, uint16_t sigLen);
-#else
 	static uint8_t addLink(uint8_t* pkt,uint16_t ingress,uint16_t egress,
     uint8_t type, uint64_t aid, uint32_t tdid, aes_context* ctx, uint8_t ofType,
     uint8_t exp,uint16_t bwAlloc, uint16_t sigLen);
-#endif
 
     /**
         @brief Adds a peering link to the PCB packet  
@@ -342,15 +318,10 @@ public:
         
         @note The detailed description of peering links is in the class details.  
     */
-#ifdef ENABLE_AESNI
-    static uint8_t addPeer(uint8_t* pkt, uint16_t ingress, uint16_t egress, 
-    uint16_t pegress, uint8_t type, uint64_t aid, uint32_t tdid, 
-    keystruct* aesnikey,uint8_t ofType, uint8_t exp, uint16_t bwAlloc);
-#else
 	static uint8_t addPeer(uint8_t* pkt, uint16_t ingress, uint16_t egress, 
     uint16_t pegress, uint8_t type, uint64_t aid, uint32_t tdid, 
     aes_context* ctx,uint8_t ofType, uint8_t exp, uint16_t bwAlloc);
-#endif
+    
     /**
         @brief Signs the packet
         @param uint8_t* pkt The buffer that contains the packet. 

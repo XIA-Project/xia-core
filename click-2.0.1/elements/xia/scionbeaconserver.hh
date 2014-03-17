@@ -43,10 +43,6 @@
 #include "define.hh"
 #include "scionipencap.hh"
 
-// added by Tenma
-#ifdef ENABLE_AESNI
-#include <intel_aesni/iaesni.h>
-#endif
 
 CLICK_DECLS
 /*
@@ -149,7 +145,6 @@ class SCIONBeaconServer : public Element {
         void push(int port, Packet *p);
 
         void sendHello();
-        void getEgressIngressXIDs(vector<string> &list);
 
 	private:
         /**
@@ -391,12 +386,7 @@ class SCIONBeaconServer : public Element {
             old key is returned.   
              
         */
-        
-#ifdef ENABLE_AESNI
-		bool getOfgKey(uint32_t timestamp, keystruct &ks);
-#else
 		bool getOfgKey(uint32_t timestamp, aes_context &actx);
-#endif
         
         /**
             @brief Removes signature from PCB
@@ -645,6 +635,10 @@ class SCIONBeaconServer : public Element {
             Maps between the owner AID and certificates in x509_cert type 
         */
 		std::map<uint64_t, x509_cert*> m_certMap;
+		
+		// use for XIA temporally 
+		std::multimap<int, EgressIngressPair> m_routepairs;
+		
         SCIONPrint* scionPrinter;
        
         /** 

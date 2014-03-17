@@ -39,10 +39,6 @@
 #include "define.hh"
 #include "scionipencap.hh"
 
-// Tenma, added for AESNI
-#ifdef ENABLE_AESNI
-#include <intel_aesni/iaesni.h>
-#endif
 
 CLICK_DECLS
 
@@ -87,7 +83,6 @@ class SCIONBeaconServerCore : public Element {
         void push(int port, Packet *p);
 
         void sendHello();
-        void getEgressIngressXIDs(vector<string> &list);
 
         /**
             @brief Sends the packet to the given port number.
@@ -100,6 +95,7 @@ class SCIONBeaconServerCore : public Element {
             the given port.  
         */
         void sendPacket(uint8_t* data, uint16_t dataLength, string dest);
+        
         /**
             @brief Get Opaque Field Generation Key.
             @param uint32_t timestamp The timestamp that will decide the Opaque
@@ -114,11 +110,7 @@ class SCIONBeaconServerCore : public Element {
             old key is returned.   
              
         */
-#ifdef ENABLE_AESNI
-		bool getOfgKey(uint32_t timestamp, keystruct &ks);
-#else
 		bool getOfgKey(uint32_t timestamp, aes_context &actx);
-#endif
         
         /**
             @brief Generates PCB packet
@@ -135,8 +127,6 @@ class SCIONBeaconServerCore : public Element {
             this new PCB and this function adds the link according to the policy.
         */
         bool generateNewPCB();    // PCB packet generation
-
-        bool initRsaCtx(rsa_context* rctx);
    
         //SL:
         /**
@@ -154,6 +144,7 @@ class SCIONBeaconServerCore : public Element {
             file.  
         */
         bool initOfgKey();
+        
         /**
             @brief Updates OfgKey to a new value
 
@@ -165,6 +156,7 @@ class SCIONBeaconServerCore : public Element {
             associated with it.  
         */
         bool updateOfgKey();
+        
     private:
         /**
             @brief parse ROT information.
@@ -180,6 +172,7 @@ class SCIONBeaconServerCore : public Element {
             are initialized by initVariable() function.    
         */
         bool parseROT();
+        
         /**
             @brief Parse Topology information using TopoParser. 
 
@@ -194,6 +187,7 @@ class SCIONBeaconServerCore : public Element {
             are initialized by initVariable() function.    
         */
         void parseTopology();
+        
         /**
             @brief Loads the private key for signature generation. 
         
@@ -207,13 +201,13 @@ class SCIONBeaconServerCore : public Element {
             that the cyrpto operation is currently unavailable.    
         */
         void loadPrivateKey();
+        
         /**
             @brief Updates the ifid map
             This function updates the IFID map using the information inside the
             IFID REP packet. 
         */
         void updateIfidMap(uint8_t * packet);
-
 
         void initializeOutputPort();
         void constructIfid2AddrMap();
@@ -281,6 +275,8 @@ class SCIONBeaconServerCore : public Element {
             Indexed by the connected neighbor type.
         */  
         std::multimap<int, RouterElem> m_routers;
+        
+        std::multimap<int, EgressIngressPair> m_routepairs;
         
         /**
             SCION encap element for IP tunneling.

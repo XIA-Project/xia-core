@@ -12,6 +12,8 @@
             <Addr>33333</Addr>
         </CertificateServer>
 	</Servers>
+	
+	<!--
 	<BorderRouters>
 		<Router>
 			<AID>1111</AID>
@@ -54,4 +56,5 @@
 			</Interface>
 		</Router>	
     </BorderRouters>
+    -->
 </Topology>

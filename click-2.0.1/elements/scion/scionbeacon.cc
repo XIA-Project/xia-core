@@ -31,11 +31,7 @@ CLICK_DECLS
     SCIONBeaconLib::createMAC
     - generates MAC with the given ingress,egress,old mac, using the provided key
 */
-#ifdef ENABLE_AESNI
-uint32_t SCIONBeaconLib::createMAC(uint32_t ts, uint8_t exp, uint16_t ingress, uint16_t egress, uint64_t prev_of, keystruct* aesnikey)
-#else
 uint32_t SCIONBeaconLib::createMAC(uint32_t ts, uint8_t exp, uint16_t ingress, uint16_t egress, uint64_t prev_of, aes_context* ctx)
-#endif
 {
     //uint8_t msgSize = MAC_TS_SIZE + EXP_SIZE + sizeof(uint16_t)*2+sizeof(uint64_t);//TS+EXP+Interfaces+previous OF
     uint8_t msgSize = 16;
@@ -51,11 +47,7 @@ uint32_t SCIONBeaconLib::createMAC(uint32_t ts, uint8_t exp, uint16_t ingress, u
     *egif = egress;
     uint64_t* om = (uint64_t*)(msg+MAC_TS_SIZE+EXP_SIZE+sizeof(uint16_t)*2);
     *om = prev_of;
-#ifdef ENABLE_AESNI
-    return (0x00ffffff & SCIONCryptoLib::genMAC(msg, msgSize, aesnikey));
-#else
     return (0x00ffffff & SCIONCryptoLib::genMAC(msg, msgSize, ctx));
-#endif
 }
 
 
@@ -64,18 +56,9 @@ uint32_t SCIONBeaconLib::createMAC(uint32_t ts, uint8_t exp, uint16_t ingress, u
     - check if the given MAC is valid by comparing the target MAC with the newly
       generated MAC.
 */
-#ifdef ENABLE_AESNI
-int SCIONBeaconLib::verifyMAC(uint32_t ts, uint8_t exp, uint16_t ingress, uint16_t egress, uint64_t prev_of, uint32_t mac, keystruct* aesnikey)
-#else
 int SCIONBeaconLib::verifyMAC(uint32_t ts, uint8_t exp, uint16_t ingress, uint16_t egress, uint64_t prev_of, uint32_t mac, aes_context* ctx)
-#endif
 {
-
-#ifdef ENABLE_AESNI
-	uint32_t target = createMAC(ts, exp, ingress, egress, prev_of, aesnikey);
-#else
     uint32_t target = createMAC(ts, exp, ingress, egress, prev_of, ctx);
-#endif
 
 	target = target & 0x00ffffff;
     if(target==mac){
@@ -90,18 +73,11 @@ int SCIONBeaconLib::verifyMAC(uint32_t ts, uint8_t exp, uint16_t ingress, uint16
     SCIONBeaconLib::addLink
     - adds a link ( a pcb marking ) to the beacon. 
 */
-#ifdef ENABLE_AESNI
-uint8_t SCIONBeaconLib::addLink(uint8_t* pkt,uint16_t ingress,uint16_t egress,
-    uint8_t type, uint64_t aid, uint32_t tdid, keystruct* aesnikey, uint8_t ofType,
-    uint8_t exp,uint16_t bwAlloc, uint16_t sigLen)
-#else
 uint8_t SCIONBeaconLib::addLink(uint8_t* pkt,uint16_t ingress,uint16_t egress,
     uint8_t type, uint64_t aid, uint32_t tdid, aes_context* ctx, uint8_t ofType,
     uint8_t exp,uint16_t bwAlloc, uint16_t sigLen)
-#endif
 {
 
-    
     if(!type && egress!=0){
         return SCION_FAILURE;
     }
@@ -126,11 +102,8 @@ uint8_t SCIONBeaconLib::addLink(uint8_t* pkt,uint16_t ingress,uint16_t egress,
     else 
 		prev_of = *(uint64_t *)&of;
 
-#ifdef ENABLE_AESNI
-    uint32_t mac = createMAC(ts, exp, ingress, egress, prev_of, aesnikey);
-#else
 	uint32_t mac = createMAC(ts, exp, ingress, egress, prev_of, ctx);
-#endif
+
 	//SLT:
 	//This part needs to be modified... (e.g., 128B signature size)
 	

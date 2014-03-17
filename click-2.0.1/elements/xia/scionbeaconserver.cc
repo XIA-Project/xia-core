@@ -45,15 +45,6 @@
 
 #define SID_XROUTE  "SID:1110000000000000000000000000000000001112"
 
-#define EGRESS_AD   "AD:0000000000000000000000000000000000000002"
-#define EGRESS_HID  "HID:0000000000000000000000000000000000000024"
-
-#define INGRESS_AD  "AD:0000000000000000000000000000000000000003"
-#define INGRESS_HID "HID:0000000000000000000000000000000000000023"
-
-#define DEST_AD     "AD:0000000000000000000000000000000000000003"
-#define DEST_HID    "HID:0000000000000000000000000000000000033333"
-
 CLICK_DECLS
 
 /*
@@ -90,19 +81,12 @@ int SCIONBeaconServer::configure(Vector<String> &conf, ErrorHandler *errh){
 
 	return 0;
 }
+
 /*
     SCIONBeaconServer:;initialize
     - click function to initialize click variables
 */
-
 int SCIONBeaconServer::initialize(ErrorHandler* errh){
-
-#ifdef ENABLE_AESNI
-	if(!check_for_aes_instructions()) {
-		printf("scion beacon server did not support AESNI instructions.\n");
-		exit(-1);
-	}
-#endif
 
 	// TODO: put it in config file
 	m_iRecheckTime=4;
@@ -134,8 +118,8 @@ int SCIONBeaconServer::initialize(ErrorHandler* errh){
 	m_lastRegTime = m_lastPropTime;
 
 	scionPrinter = new SCIONPrint(m_iLogLevel, m_csLogFile);
-	scionPrinter->printLog(IL, (char*)"BS %lu INIT.\n", m_uAid);
-	scionPrinter->printLog(IL, (char*)"ADAID = %lu, TDID = %lu.\n", m_uAdAid, m_uTdAid);
+	scionPrinter->printLog(IL, (char*)"BS(%s) INIT.\n", m_HID.c_str());
+	scionPrinter->printLog(IL, (char*)"ADAID = %s, TDID = %lu.\n", m_AD.c_str(), m_uTdAid);
 
 	// task 2: parse ROT (root of trust) file
 	m_bROTInitiated = parseROT();
@@ -143,8 +127,8 @@ int SCIONBeaconServer::initialize(ErrorHandler* errh){
 
 	// task 3: parse topology file
 	parseTopology();
-	constructIfid2AddrMap();
-	initializeOutputPort();
+	//constructIfid2AddrMap();
+	//initializeOutputPort();
 	scionPrinter->printLog(IL, (char*)"Parse Topology Done.\n");
 
 	// task 4: read key pair if they already exist
@@ -166,25 +150,6 @@ int SCIONBeaconServer::initialize(ErrorHandler* errh){
 	return 0;
 }
 
-/*
-	SCIONBeaconServer::initializeOutputPort
-	prepare IP header for IP encapsulation
-	if the port is assigned an IP address
-*/
-void SCIONBeaconServer::initializeOutputPort() {
-	
-	portInfo p;
-	p.addr = m_Addr;
-	m_vPortInfo.push_back(p);
-
-	//Initialize port 0; i.e., prepare internal communication
-	if(m_Addr.getType() == HOST_ADDR_IPV4) {
-		m_pIPEncap = new SCIONIPEncap;
-		m_pIPEncap->initialize(m_Addr.getIPv4Addr());
-	}
-}
-
-
 /*SL: Initialize OFG key */
 bool SCIONBeaconServer::initOfgKey() {
 
@@ -195,20 +160,11 @@ bool SCIONBeaconServer::initOfgKey() {
 	m_currOfgKey.time = currTime;
 	memcpy(m_currOfgKey.key, &m_uMkey, OFG_KEY_SIZE);
 
-#ifdef ENABLE_AESNI
-	if(AESKeyExpand((UCHAR*)m_currOfgKey.key, &m_currOfgKey.aesnikey, OFG_KEY_SIZE_BITS)==NULL)
-	{
-		printf("Enc Key setup failure by AESKeyExpand\n");
-		return SCION_FAILURE;
-	}
-#else
 	int err;
 	if(err = aes_setkey_enc(&m_currOfgKey.actx, m_currOfgKey.key, OFG_KEY_SIZE_BITS)) {
 		printf("Enc Key setup failure: %d\n",err*-1);
 		return SCION_FAILURE;
 	}
-#endif
-
 	return SCION_SUCCESS;
 }
 
@@ -217,20 +173,12 @@ bool SCIONBeaconServer::updateOfgKey() {
 	//This function should be updated...
 	m_prevOfgKey.time = m_currOfgKey.time;
 	memcpy(m_prevOfgKey.key, m_currOfgKey.key, OFG_KEY_SIZE);
-
-#ifdef ENABLE_AESNI
-	if(AESKeyExpand((UCHAR*)m_prevOfgKey.key, &m_prevOfgKey.aesnikey, OFG_KEY_SIZE_BITS)==NULL)
-	{
-		printf("Enc Key setup failure by AESNI KeyExpand function.\n");
-		return SCION_FAILURE;
-	}
-#else
+	
 	int err;
 	if(err = aes_setkey_enc(&m_prevOfgKey.actx, m_prevOfgKey.key, OFG_KEY_SIZE_BITS)) {
 		printf("Prev. Enc Key setup failure: %d\n",err*-1);
 		return SCION_FAILURE;
 	}
-#endif
 
 	return SCION_SUCCESS;
 }
@@ -246,7 +194,8 @@ SCIONBeaconServer::parseTopology(){
     TopoParser parser;
     parser.loadTopoFile(m_sTopologyFile.c_str()); 
     parser.parseServers(m_servers);
-    parser.parseRouters(m_routers);
+    // parser.parseRouters(m_routers);
+    parser.parseEgressIngressPairs(m_routepairs);
 
 	std::multimap<int, ServerElem>::iterator itr;
 	for(itr = m_servers.begin(); itr != m_servers.end(); itr++)
@@ -256,14 +205,30 @@ SCIONBeaconServer::parseTopology(){
 		}
 }
 
-/* SLT:
-	Construct ifid2addr map
-*/
-void SCIONBeaconServer::constructIfid2AddrMap() {
-	std::multimap<int, RouterElem>::iterator itr;
-	for(itr = m_routers.begin(); itr!=m_routers.end(); itr++) {
-		ifid2addr.insert(std::pair<uint16_t,HostAddr>(itr->second.interface.id, itr->second.addr));
+//Load RoT file and verify it.
+bool SCIONBeaconServer::parseROT(String filename){
+	ROTParser parser;
+	String fn;
+	if(filename.length())
+        fn = filename;
+    else
+        fn = m_sROTFile;
+	
+	if(parser.loadROTFile(fn.c_str())!=ROTParseNoError) {
+		scionPrinter->printLog(IL, (char*)"ERR: ROT File missing at BS %lu.\n", m_uAdAid);
+		return false;
+	}else{
+		// ROT found in local folder
+    	if(parser.parse(m_cROT)!=ROTParseNoError){
+			scionPrinter->printLog(IL, (char*)"ERR: ROT File parsing error at BS %lu.\n", m_uAdAid);
+			return false;
+		}
+		if(parser.verifyROT(m_cROT)!=ROTParseNoError){
+			scionPrinter->printLog(IL, (char*)"ERR: ROT File verification error at BS %lu.\n", m_uAdAid);
+			return false;
+		}
 	}
+	return true;
 }
 
 
@@ -290,37 +255,10 @@ void SCIONBeaconServer::loadPrivateKey() {
 }
 
 
-//Load RoT file and verify it.
-bool SCIONBeaconServer::parseROT(String filename){
-	ROTParser parser;
-	String fn;
-	if(filename.length())
-                fn = filename;
-        else
-                fn = m_sROTFile;
-	
-	if(parser.loadROTFile(fn.c_str())!=ROTParseNoError) {
-		scionPrinter->printLog(IL, (char*)"ERR: ROT File missing at BS %lu.\n", m_uAdAid);
-		return false;
-	}else{
-		// ROT found in local folder
-    	if(parser.parse(m_cROT)!=ROTParseNoError){
-			scionPrinter->printLog(IL, (char*)"ERR: ROT File parsing error at BS %lu.\n", m_uAdAid);
-			return false;
-		}
-		if(parser.verifyROT(m_cROT)!=ROTParseNoError){
-			scionPrinter->printLog(IL, (char*)"ERR: ROT File verification error at BS %lu.\n", m_uAdAid);
-			return false;
-		}
-	}
-	return true;
-}
-
 /*
 	SLN:
 	Send an ROT request to the (local) certificate server
 */
-
 void
 SCIONBeaconServer::requestROT() {
 	m_bROTRequested = true;
@@ -375,7 +313,7 @@ SCIONBeaconServer::run_timer(Timer *timer){
 	// check if ROT file is missing
 	if(!m_bROTInitiated)
 	{
-		scionPrinter->printLog(IH,(char *)"BS (%lu:%lu): ROT is missing or wrong formatted.\n", m_uAdAid, m_uAid);
+		scionPrinter->printLog(IH,(char *)"BS (%s:%s): ROT is missing or wrong formatted.\n", m_AD.c_str(), m_HID.c_str());
 		
 		// send an ROT request (i.e., ROT_REQ_LOCAL) if its AID is registered to SCION switch
 		if(_AIDIsRegister && !m_bROTRequested) 
@@ -384,7 +322,7 @@ SCIONBeaconServer::run_timer(Timer *timer){
 	
 	// time for registration
 	if(m_iIsRegister && curTime - m_lastRegTime >= m_iRegTime){
-		registerPaths();
+		// registerPaths();
 		time(&m_lastRegTime); //updates the time
 	}
 	
@@ -421,13 +359,8 @@ SCIONBeaconServer::requestROT(SPacket * packet, uint32_t rotVer) {
 	//2. build UP path to the TDC
 	//this is intended to request ROT if the CS of the provider AD is not available
 	//path contains special opaque field (i.e., timestamp)
-#ifdef ENABLE_AESNI
-	keystruct ks;
-	getOfgKey(SPH::getTimestamp(packet),ks);
-#else
 	aes_context actx;
 	getOfgKey(SPH::getTimestamp(packet),actx);
-#endif
 	
 	uint16_t tmpPacketLength = SPH::getTotalLen(packet);
 	tmpPacketLength += PCB_MARKING_SIZE; //reserve space for an additional marking
@@ -435,12 +368,7 @@ SCIONBeaconServer::requestROT(SPacket * packet, uint32_t rotVer) {
 	memcpy(tmpPacket,packet,tmpPacketLength-PCB_MARKING_SIZE);
 
 	uint16_t ingIf = SCIONBeaconLib::getInterface(packet); 
-	
-#ifdef ENABLE_AESNI
-	SCIONBeaconLib::addLink(tmpPacket, ingIf, NON_PCB, 1, m_uAdAid, m_uTdAid, &ks, 0, 0, 0, (uint16_t)PriKey.len);
-#else
 	SCIONBeaconLib::addLink(tmpPacket, ingIf, NON_PCB, 1, m_uAdAid, m_uTdAid, &actx, 0, 0, 0, (uint16_t)PriKey.len);
-#endif
 
 	uint8_t hops = SCIONBeaconLib::getNumHops(packet);
 	hops = hops +2;
@@ -488,29 +416,11 @@ SCIONBeaconServer::requestROT(SPacket * packet, uint32_t rotVer) {
 	sendPacket(newPacket, packetLength, "");
 }
 
-void SCIONBeaconServer::getEgressIngressXIDs(vector<string> &list) {
-    if (!m_AD.compare(DEST_AD) && !m_HID.compare(DEST_HID))
-        return;
-
-    string egress = "";
-    egress.append(EGRESS_AD);
-    egress.append(" ");
-    egress.append(EGRESS_HID);
-
-    string ingress = "";
-    ingress.append(INGRESS_AD);
-    ingress.append(" ");
-    ingress.append(INGRESS_HID);
-
-    list.push_back(egress);
-    list.push_back(ingress);
-}
 
 /*
 	SLN:
 	process a new PCB
 */
-
 void
 SCIONBeaconServer::processPCB(SPacket * packet, uint16_t packetLength){
 
@@ -521,13 +431,13 @@ SCIONBeaconServer::processPCB(SPacket * packet, uint16_t packetLength){
 	uint8_t type = BEACON;
 
 	//SLN:
-	scionPrinter->printLog(IH,type,ts,srcAddr.numAddr(),m_uAdAid,(char *)"%u,RECEIVED\n",packetLength);
+	scionPrinter->printLog(IH,ts,(char *)"BS(%s) RECEIVED PCB (len: %u).\n",m_HID.c_str(), packetLength);
 	
 	//PCB verification
 	if(verifyPcb(packet)!=SCION_SUCCESS){
-		scionPrinter->printLog(WH,type,ts,srcAddr.numAddr(),m_uAdAid,(char *)"%u,VERIFICATION FAILED\n", packetLength);
+		scionPrinter->printLog(IH,ts,(char *)"BS(%s) PCB VERIFY FAIL.\n",m_HID.c_str());
 	}else{
-		scionPrinter->printLog(IL,type,ts,srcAddr.numAddr(),m_uAdAid,(char *)"%u,VERIFICATION PASSED\n" ,packetLength);
+		scionPrinter->printLog(IH,ts,(char *)"BS(%s) PCB VERIFY PASS.\n",m_HID.c_str());
 		//adds pcb to beacon table
 		addPcb(packet);
 
@@ -535,6 +445,7 @@ SCIONBeaconServer::processPCB(SPacket * packet, uint16_t packetLength){
 		//SL: better to make a different ft (since code is too long)
 		//SL: send it to all path servers (not just one... ) 
 		
+		/*
 		//SL: Expiration time needs to be configured by AD's policy
 		uint8_t exp = 0; //expiration time
 
@@ -543,21 +454,13 @@ SCIONBeaconServer::processPCB(SPacket * packet, uint16_t packetLength){
 			std::pair<std::multimap<int, ServerElem>::iterator,std::multimap<int,ServerElem>::iterator> pathServerRange;
 			pathServerRange = m_servers.equal_range(PathServer);
 			
-#ifdef ENABLE_AESNI
-			keystruct ks;
-			if(getOfgKey(SPH::getTimestamp(packet),ks)) {
-				//SL: OFG key retrieval failure
-				scionPrinter->printLog(EH,type,ts,srcAddr.numAddr(),m_uAdAid,(char *)"OFGKEY retrieval failure\n");
-				return;
-			}
-#else
+
 			aes_context  actx;
 			if(getOfgKey(SPH::getTimestamp(packet),actx)) {
 				//SL: OFG key retrieval failure
 				scionPrinter->printLog(EH,type,ts,srcAddr.numAddr(),m_uAdAid,(char *)"OFGKEY retrieval failure\n");
 				return;
 			}
-#endif
 
 			uint16_t ingress = SCIONBeaconLib::getInterface(packet);
 			packetLength += PCB_MARKING_SIZE;
@@ -566,12 +469,7 @@ SCIONBeaconServer::processPCB(SPacket * packet, uint16_t packetLength){
 			uint8_t newPacket[packetLength];
 			memset(newPacket, 0, packetLength);
 			memcpy(newPacket, packet, packetLength-PCB_MARKING_SIZE);
-
-#ifdef ENABLE_AESNI
-			SCIONBeaconLib::addLink(newPacket, ingress, NON_PCB, 1, m_uAdAid, m_uTdAid, &ks, 0,exp,0, (uint16_t)PriKey.len);
-#else
 			SCIONBeaconLib::addLink(newPacket, ingress, NON_PCB, 1, m_uAdAid, m_uTdAid, &actx, 0,exp,0, (uint16_t)PriKey.len);
-#endif
 
 			//removes signature from pcb
 			uint8_t path[packetLength]; 
@@ -594,13 +492,15 @@ SCIONBeaconServer::processPCB(SPacket * packet, uint16_t packetLength){
 				hdr.dst = it->second.addr;
 				SPH::setHeader(newPacket, hdr);
 				//sendPacket(newPacket, packetLength, PORT_TO_SWITCH, TO_SERVER);
-                sendPacket(newPacket, packetLength, "");
+                // comment since we don't implement path servers yet.
+                //sendPacket(newPacket, packetLength, "");
 			}
 		} else {
 			#ifdef _SL_DEBUG_BS
 			printf("AD%lu: no path server exists\n", m_uAdAid);
 			#endif
 		}
+		*/
 	}
 }
 
@@ -762,8 +662,6 @@ void SCIONBeaconServer::push(int port, Packet *p)
 		//SL: unnecessary?
 		memset(packet, 0, packetLength);
         memcpy(packet, s_pkt, packetLength);
-        //inPacket->kill();
-
         p->kill();
 	
 		if(type==BEACON){
@@ -773,30 +671,26 @@ void SCIONBeaconServer::push(int port, Packet *p)
 			- if not, ignores. 
 			*/
 			if(!m_bROTInitiated){
-				scionPrinter->printLog(IH, (char *)"BS (%lu:%lu): No valid ROT file! Ignoring PCB.\n", m_uAdAid, m_uAid);
-				#ifdef _SL_DEBUG_BS
-				printf("BS (%lu:%lu): No valid ROT file! Ignoring PCB.\n", m_uAdAid, m_uAid);
-				#endif
-				//continue;
+				scionPrinter->printLog(IH, (char *)"BS (%s): No valid ROT file. Ignoring PCB.\n", m_AD.c_str(), m_HID.c_str());
                 return;
 			}
 			
 			uint32_t ROTVersion = SCIONBeaconLib::getROTver(packet);
 			#ifdef _SL_DEBUG_BS
-			printf("BS (%lu:%lu): Recived RoT version = %d.\n", m_uAdAid, m_uAid, ROTVersion);
-			printf("BS (%lu:%lu): Self RoT version = %d.\n", m_uAdAid, m_uAid, m_cROT.version);
+			printf("BS (%s): Received RoT version = %d.\n", m_HID.c_str(), ROTVersion);
+			printf("BS (%s): Self RoT version = %d.\n", m_HID.c_str(), m_cROT.version);
 			#endif
+			
 			//SL: ROT version is changed...
             if(ROTVersion > m_cROT.version){
 				#ifdef _SL_DEBUG_BS
-				printf("BS (%lu:%lu): RoT version has been changed. Get a new ROT from local CS.\n", m_uAdAid, m_uAid);
+				printf("BS (%s): RoT version has been changed. Get a new ROT from local CS.\n", m_HID.c_str());
 				#endif
 				requestROT(packet,ROTVersion);
 				//continue;
 				return;
 			}// ROT version change handler
-
-
+			
 			processPCB(packet,packetLength);
 
 		}else {
@@ -845,6 +739,7 @@ void SCIONBeaconServer::push(int port, Packet *p)
 */
 bool 
 SCIONBeaconServer::run_task(Task *task){
+
 #if 0
 	
     //Pulls packet from queue until the queue is empty.
@@ -997,7 +892,6 @@ SCIONBeaconServer::createHash(SPacket* pkt){
     SCIONBeaconServer::addPcb
     -adds verified pcb to the beacon table. 
 */
-
 void SCIONBeaconServer::addPcb(SPacket* pkt) {
 	//if the beacon table is full then remove the oldest pcb
 	//SL: the first element is the oldest since multimap sort elements by the key (i.e., timestamp)...
@@ -1023,6 +917,8 @@ void SCIONBeaconServer::addPcb(SPacket* pkt) {
 
 	memset(newPcb.msg, 0, pktLen);
 	memcpy(newPcb.msg, pkt, pktLen);
+    
+    scionPrinter->printLog(IH, (char *)"Insert PCB into beacon_table (%u, %d, %u).\n", ts, newPcb.hops, newPcb.ingress);
     
 	//SL: multimap orders elements automatically
 	//need to consider how to optimize insertion using iterator (i.e., position)
@@ -1052,6 +948,8 @@ void SCIONBeaconServer::addUnverifiedPcb(SPacket* pkt){
 
 	memset(newPcb.msg, 0, pktLen);
 	memcpy(newPcb.msg, pkt, pktLen);
+	
+	scionPrinter->printLog(IH, (char *)"Insert PCB in unverified_pcbs (%u, %d, %u).\n", ts, newPcb.hops, newPcb.ingress);
 
 	std::pair<uint32_t, pcb> npair = std::pair<uint32_t,pcb>(ts, newPcb);
 	unverified_pcbs.insert(npair);
@@ -1079,7 +977,6 @@ SCIONBeaconServer::registerPaths(){
     /*
         If it is already fully registered. 
     */
-     
     if(m_iNumRegisteredPath>= m_iKval){ //fully registered
 		//if all k paths are already registered, removes 3 registered pcb (just for testing)
 		//SLT: need to check path expiration time
@@ -1188,24 +1085,14 @@ SCIONBeaconServer::registerPath(pcb &rpcb){
 	//2. original pcb received from the upstream
 	memcpy(packet,rpcb.msg,rpcb.totalLength);
 
-#ifdef ENABLE_AESNI
-	keystruct ks;
-	getOfgKey(SPH::getTimestamp(packet),ks);
-#else
 	aes_context actx;
-	getOfgKey(SPH::getTimestamp(packet),actx);
-#endif  
+	getOfgKey(SPH::getTimestamp(packet),actx); 
 
 	//3. add its own marking information to the end
 	//SL: Expiration time needs to be configured by AD's policy
 	uint8_t exp = 0; //expiration time
 	uint16_t sigLen = PriKey.len;
-
-#ifdef ENABLE_AESNI
-	SCIONBeaconLib::addLink(packet, rpcb.ingress, NON_PCB, 1, m_uAdAid, m_uTdAid, &ks,0,exp,0, sigLen);
-#else
 	SCIONBeaconLib::addLink(packet, rpcb.ingress, NON_PCB, 1, m_uAdAid, m_uTdAid, &actx,0,exp,0, sigLen);
-#endif
 
 	//4. Remove signature from PCB
 	//pathContent would get special OF (TS) (without 2nd special OF) + series of markings from TDC to itself
@@ -1336,43 +1223,46 @@ void SCIONBeaconServer::print(SPacket* path, int hops){
 }
 
 
-int SCIONBeaconServer::propagate(){
-
+int SCIONBeaconServer::propagate()
+{	
 	// Nothing should propagate 
-	if(beacon_table.empty()) return 0;
-
-	std::multimap<uint32_t, pcb>::iterator itr;
-	std::multimap<int, RouterElem>::iterator pItr; //iterator for peers
-	std::multimap<int, RouterElem>::iterator cItr; //iterator for child routers
+	if(beacon_table.empty()) {
+		return 0;
+	}
+	
+	//iterators
+	//std::multimap<uint32_t, pcb>::iterator itr;
+	std::multimap<int, EgressIngressPair>::iterator pItr; //child routers iterators
+	std::multimap<int, EgressIngressPair>::iterator cItr; //child routers iterators
 
 	// find all the peer routers
-	std::pair<std::multimap<int, RouterElem>::iterator,
-	std::multimap<int,RouterElem>::iterator> peerRange;
-	peerRange = m_routers.equal_range(Peer);
+	std::pair<std::multimap<int, EgressIngressPair>::iterator,
+	std::multimap<int,EgressIngressPair>::iterator> peerRange;
+	peerRange = m_routepairs.equal_range(Peer);
 
-	//find all the child routers
-	std::pair<std::multimap<int, RouterElem>::iterator,
-	std::multimap<int,RouterElem>::iterator> childRange;
-	childRange = m_routers.equal_range(Child);
-
+	// find child routers
+	std::pair<std::multimap<int, EgressIngressPair>::iterator,
+	std::multimap<int,EgressIngressPair>::iterator> childRange;
+	childRange = m_routepairs.equal_range(Child);
+	
+	// Nothing should propagate 
+	if(m_routepairs.count(Child)==0) 
+	{
+		scionPrinter->printLog(IH, (char*)"BS(%s) is end AD.\n", m_HID.c_str());
+		return 0;
+	}
+	
 	//SL: Expiration time needs to be configured by AD's policy
 	uint8_t exp = 0; //expiration time
 	//HC: pcb->propagated, pcb->age can be removed, as each customer
 	//has a different set of selected paths
+    
+    for(cItr=childRange.first;cItr!=childRange.second;cItr++){
 
-    cItr=childRange.first;
-    vector<string> list;
-    getEgressIngressXIDs(list);
-    //for(cItr=childRange.first;cItr!=childRange.second;cItr++){
-    for (vector<string>::iterator iter = list.begin(); iter < list.end(); iter++) {
-        string egress = *iter++;
-        string ingress = *iter++;
-
-		RouterElem cRouter = cItr->second;
-#ifdef _HC_DEBUG_BS
-		printf("HC_DEBUG: %lu:%lu progagating PCBs to %d\n", m_uAdAid, m_uAid, cItr->second.interface.id);
-#endif
-		std::map<uint16_t, SelectionPolicy>::iterator curPolicyIt = m_selPolicies.find(cRouter.interface.id);
+		EgressIngressPair rpair = cItr->second;
+		
+		uint16_t ifid = (uint16_t)strtoull((const char*)rpair.egress_addr, NULL, 0);
+		std::map<uint16_t, SelectionPolicy>::iterator curPolicyIt = m_selPolicies.find(ifid);
 		std::vector<pcb*> selPcbs = curPolicyIt->second.select(beacon_table);
 		std::vector<pcb*>::iterator it;
 		
@@ -1391,28 +1281,18 @@ int SCIONBeaconServer::propagate(){
 			memset(msg, 0, MAX_PKT_LEN);
 			memcpy(msg, curPcb->msg, curPcb->totalLength);
 
-#ifdef ENABLE_AESNI
-			keystruct ks;
-			getOfgKey(SPH::getTimestamp(msg),ks);
-#else
 			aes_context actx;
 			//SLT:TS
 			//HC: why can't we get timestamp from pcb->timestamp directly?
 			getOfgKey(SPH::getTimestamp(msg),actx);
-#endif
 			
 			uint16_t sigLen = PriKey.len;
-			
-#ifdef ENABLE_AESNI
-			SCIONBeaconLib::addLink(msg,curPcb->ingress,cRouter.interface.id, PCB_TYPE_TRANSIT, 
-				m_uAdAid, m_uTdAid, &ks,0,exp,0, sigLen);
-#else
-			SCIONBeaconLib::addLink(msg,curPcb->ingress,cRouter.interface.id, PCB_TYPE_TRANSIT, 
+			uint16_t egress_id = (uint16_t)strtoull((const char*)rpair.egress_addr, NULL, 0);
+			SCIONBeaconLib::addLink(msg, curPcb->ingress, egress_id, PCB_TYPE_TRANSIT, 
 				m_uAdAid, m_uTdAid, &actx,0,exp,0, sigLen);
-#endif
 
-			SPH::addDstAddr(msg, cRouter.addr);
-			SCIONBeaconLib::setInterface(msg, cRouter.interface.id);
+			SPH::setDstAddr(msg, HostAddr(HOST_ADDR_SCION,(uint64_t)strtoull((const char*)rpair.egress_addr, NULL, 0)));
+			SCIONBeaconLib::setInterface(msg, (uint64_t)strtoull((const char*)rpair.egress_addr, NULL, 0));
 
 #if 0
 			//add all the peers
@@ -1430,40 +1310,51 @@ int SCIONBeaconServer::propagate(){
 					//SL+: skip the interface that has not replied IFID_REQ
 					continue;
 				}
-#ifdef ENABLE_AESNI
-				SCIONBeaconLib::addPeer(msg,pRouter.interface.id, cRouter.interface.id, 
-					iItr->second,PCB_TYPE_PEER, pRouter.interface.neighbor,1, &ks,0,0,0);
-#else
+
                 SCIONBeaconLib::addPeer(msg,pRouter.interface.id, cRouter.interface.id, 
 					iItr->second,PCB_TYPE_PEER, pRouter.interface.neighbor,1, &actx,0,0,0);
-#endif
 				/*TODO*/     
 				//SL: what is 1 in next to the last argument?
 				//it's TDID;and needs to be defined in the topology file, and router class, and set here for inter-TD peering link
 			}// end of for
 #endif
-
-			SCIONBeaconLib::signPacket(msg, PriKey.len, cRouter.interface.neighbor, &PriKey);
+			
+			uint64_t next_aid = strtoull((const char*)rpair.ingress_ad, NULL, 0);
+			SCIONBeaconLib::signPacket(msg, PriKey.len, next_aid, &PriKey);
 			uint16_t msgLength = SPH::getTotalLen(msg);
+			
 			//SLT:TS
 			uint32_t ts = SPH::getTimestamp(msg);
-			uint64_t dst = cRouter.interface.neighbor;
-			scionPrinter->printLog(IH,BEACON,ts,m_uAdAid,dst,(char *)"%u,SENT\n",msgLength);
-			//sendPacket(msg, msgLength,PORT_TO_SWITCH, TO_ROUTER);
-
-            string dest = "RE ";
-            dest.append(BHID);
-            dest.append(" ");
-            dest.append(egress);
-            dest.append(" ");
-            dest.append(ingress);
-            dest.append(" ");
-            dest.append(DEST_AD);
-            dest.append(" ");
-            dest.append(DEST_HID);
-
-            //printf("DEST: %s\n", dest.c_str());
-
+			#ifdef _SL_DEBUG_BS
+			scionPrinter->printLog(IH,BEACON,ts,(char *)m_AD.c_str(),(uint64_t)strtoull((const char*)rpair.ingress_ad, NULL, 0),(char *)"%u,SENT\n",msgLength);
+			#endif
+			
+			string dest = "RE ";
+			dest.append(BHID);
+			dest.append(" ");
+			// egress router
+			dest.append("AD:");
+			dest.append((const char*)rpair.egress_ad);
+			dest.append(" ");
+			dest.append("HID:");
+			dest.append((const char*)rpair.egress_addr);
+			// ingress router
+			dest.append(" ");
+			dest.append("AD:");
+			dest.append((const char*)rpair.ingress_ad);
+			dest.append(" ");
+			dest.append("HID:");
+			dest.append((const char*)rpair.ingress_addr);
+			// destination 
+			dest.append(" ");
+			dest.append("AD:");
+			dest.append((const char*)rpair.dest_ad);
+			dest.append(" ");
+			dest.append("HID:");
+			dest.append((const char*)rpair.dest_addr);
+			
+			scionPrinter->printLog(IH, (char*)"BS(%s) propagate PCB to AD %s.\n", m_HID.c_str(), rpair.dest_ad);
+			
             sendPacket(msg, msgLength, dest);
 			
 			nPropagated++;
@@ -1481,7 +1372,6 @@ int SCIONBeaconServer::propagate(){
     - iterates through PCB and verifies all the signatures 
       in the PCB. 
 */
-
 uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){
 	
 	uint8_t hdrLen = SPH::getHdrLen(pkt);
@@ -1524,6 +1414,7 @@ uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){
 	ret = x509parse_crt(&TDCert, 
 		(const unsigned char*)m_cROT.coreADs.find(mrkPtr->aid)->second.certificate,
 		m_cROT.coreADs.find(mrkPtr->aid)->second.certLen);
+		
 	// read error?
 	if( ret < 0 ) {
 		#ifdef _SL_DEBUG_BS
@@ -1599,7 +1490,7 @@ uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){
 			FILE* cFile;
 			if((cFile=fopen((const char*)cert,"r"))==NULL){
 				#ifdef _SL_DEBUG_BS
-				printf("BS (%lu:%lu): Cert of AD %lu does not exist.\n", m_uAdAid, m_uAid, mrkPtr->aid);
+				printf("BS (%s:%s): Cert of AD %lu does not exist.\n", m_AD.c_str(), m_HID.c_str(), mrkPtr->aid);
 				#endif
 				// Tenma: reverse the order here since unverified pcbs should be added
 				// brefore we create cert request packets.
@@ -1617,15 +1508,15 @@ uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){
 			int err = x509parse_crtfile(adcert, (const char*)cert);
 			if(err){
 				#ifdef _SL_DEBUG_BS
-				printf("BS (%lu:%lu): fail to extract AD %lu's cert to verify signatures.\n", 
-					m_uAdAid, m_uAid, mrkPtr->aid);
+				printf("BS (%s:%s): fail to extract AD %lu's cert to verify signatures.\n", 
+					m_AD.c_str(), m_HID.c_str(), mrkPtr->aid);
 				#endif
-				scionPrinter->printLog(EH, (char *)"BS(%lu:%lu): Error Loading Certificate for AD %lu\n", m_uAdAid, m_uAid, mrkPtr->aid);
+				scionPrinter->printLog(EH, (char *)"BS(%lu:%lu): Error Loading Certificate for AD %lu\n", 
+					m_AD.c_str(), m_HID.c_str(), mrkPtr->aid);
 				x509_free(adcert);
 				delete adcert;
 				return SCION_FAILURE;		
 			}
-		
 			m_certMap.insert(std::pair<uint64_t,x509_cert*>(mrkPtr->aid, adcert));
 		}
 		else {
@@ -1668,29 +1559,16 @@ uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){
     - If the key table is full then remove the first entry (oldest)
       then add the new key
 */
-#ifdef ENABLE_AESNI
-bool SCIONBeaconServer::getOfgKey(uint32_t timestamp, keystruct &ks)
-#else
 bool SCIONBeaconServer::getOfgKey(uint32_t timestamp, aes_context &actx)
-#endif
 {
 
 	if(timestamp > m_currOfgKey.time) {
-#ifdef ENABLE_AESNI
-		ks = m_currOfgKey.aesnikey;
-#else
 		actx = m_currOfgKey.actx;
-#endif
 	} else {
-#ifdef ENABLE_AESNI
-		ks = m_prevOfgKey.aesnikey;
-#else
 		actx = m_prevOfgKey.actx;
-#endif
 	}
     return SCION_SUCCESS;
 
-#ifndef ENABLE_AESNI
 	//SL: following part is left to compare performance later.
 	//////////////////////////////////////////////////////////
     std::map<uint32_t, aes_context*>::iterator itr;
@@ -1744,7 +1622,6 @@ bool SCIONBeaconServer::getOfgKey(uint32_t timestamp, aes_context &actx)
     }
 
     return SCION_SUCCESS;
-#endif
 }
 
 void SCIONBeaconServer::sendHello() {
@@ -1763,6 +1640,7 @@ void SCIONBeaconServer::sendHello() {
 }
 
 void SCIONBeaconServer::sendPacket(uint8_t* data, uint16_t data_length, string dest) {
+
 #if 0
 	//SLA:
 	//IPV4 Handling
@@ -1789,12 +1667,15 @@ void SCIONBeaconServer::sendPacket(uint8_t* data, uint16_t data_length, string d
 	WritablePacket* outPacket = Packet::make(DEFAULT_HD_ROOM, data, data_length, DEFAULT_TL_ROOM);
 	output(port).push(outPacket);
 #endif
+
     string src = "RE ";
     src.append(m_AD.c_str());
     src.append(" ");
     src.append(m_HID.c_str());
     src.append(" ");
     src.append(SID_XROUTE);
+    
+    // scionPrinter->printLog(IH, (char *)"BS(%s)'s src DAG: %s\n", m_AD.c_str(), src.c_str());
 
 	XIAPath src_path, dst_path;
 	src_path.parse(src.c_str());
@@ -1825,10 +1706,8 @@ void SCIONBeaconServer::sendPacket(uint8_t* data, uint16_t data_length, string d
     - Subject to be changed when certificate server is ready. 
 */
 void SCIONBeaconServer::getCertFile(uint8_t* fn, uint64_t target){
-    sprintf((char*)fn,"./TD1/Non-TDC/AD%lu/beaconserver/certificates/td%u-ad%lu-0.crt",m_uAdAid,m_uTdAid,target); 
+    sprintf((char*)fn,"./TD1/Non-TDC/AD%lu/beaconserver/certificates/td%u-ad%lu-0.crt",m_uAdAid, m_uTdAid, target); 
 }
-
-
 
 void SCIONBeaconServer::recheckPcb(){
 	std::multimap<uint32_t, pcb>::iterator itr;
@@ -1889,13 +1768,8 @@ void SCIONBeaconServer::requestForCert(SPacket* pkt){
 	
 	//Add its own opaque field
 	//this is necessary to send a request to upstream, since the egress router should check OF
-#ifdef ENABLE_AESNI
-	keystruct ks;
-	getOfgKey(SPH::getTimestamp(pkt),ks);
-#else
 	aes_context actx;
 	getOfgKey(SPH::getTimestamp(pkt),actx);
-#endif
 	
 	uint16_t tmpPacketLength = SPH::getTotalLen(pkt);
 	tmpPacketLength += PCB_MARKING_SIZE; //reserve space for an additional marking
@@ -1903,12 +1777,8 @@ void SCIONBeaconServer::requestForCert(SPacket* pkt){
 	memcpy(tmpPacket,pkt,tmpPacketLength-PCB_MARKING_SIZE);
 
 	uint16_t ingIf = SCIONBeaconLib::getInterface(pkt);
-	
-#ifdef ENABLE_AESNI
-	SCIONBeaconLib::addLink(tmpPacket, ingIf, NON_PCB, 1, m_uAdAid, m_uTdAid, &ks, 0, 0, 0, (uint16_t)PriKey.len);
-#else
 	SCIONBeaconLib::addLink(tmpPacket, ingIf, NON_PCB, 1, m_uAdAid, m_uTdAid, &actx, 0, 0, 0, (uint16_t)PriKey.len);
-#endif
+	
 	hops = hops+1;
 	
 	//additional OF for itself since PCB has not been marked yet
@@ -1978,24 +1848,35 @@ SCIONBeaconServer::clearAesKeyMap() {
 // TODO: load policies from configuration
 // Currently assign a simple policy for every child for testing purpose 
 void SCIONBeaconServer::initSelectionPolicy(){
+
+	/*
     std::multimap<int, RouterElem>::iterator cItr;
 
     //find all the child routers
     std::pair<std::multimap<int, RouterElem>::iterator,
         std::multimap<int,RouterElem>::iterator> childRange;
     childRange = m_routers.equal_range(Child);
-#ifdef _HC_DEBUG_BS
-    printf("HC_DEBUG: numChildren=%d k=%d beacon_table_size=%d\n", m_routers.count(Child), m_iKval, m_iBeaconTableSize);
-#endif    
+    */
+    
+    std::multimap<int, EgressIngressPair>::iterator cItr; //child routers iterators
+
+	// find all the peer routers
+	std::pair<std::multimap<int, EgressIngressPair>::iterator,
+	std::multimap<int,EgressIngressPair>::iterator> childRange;
+	childRange = m_routepairs.equal_range(Child);
+    
+    scionPrinter->printLog(IH, (char *)"numChildren=%d k=%d beacon_table_size=%d\n", 
+    	m_routepairs.count(Child), m_iKval, m_iBeaconTableSize);    
     
     for(cItr = childRange.first; cItr != childRange.second; ++cItr){
-        RouterElem router = cItr->second;
+        EgressIngressPair rpair = cItr->second;
         SelectionPolicy tmpPl(m_iKval);
         //randomly selected parameters for testing purpose
         tmpPl.setExclusion(2000, 8, 100, std::tr1::unordered_set<uint64_t>());
         tmpPl.setWeight(0.4, 0.4, 0.2);
         tmpPl.setSelectionProbability(0.9);
-        m_selPolicies.insert (std::pair<uint16_t, SelectionPolicy>(cItr->second.interface.id, tmpPl) );
+        uint16_t ifid = (uint16_t)strtoull((const char*)rpair.egress_addr, NULL, 0);
+        m_selPolicies.insert(std::pair<uint16_t, SelectionPolicy>(ifid, tmpPl) );
     }
 }
 
@@ -2180,7 +2061,34 @@ void SelectionPolicy::printPcb(const pcb* p){
         mrkPtr = (pcbMarking*)ptr;
     }
     printf("\n");
-    
+}
+
+/* SLT:
+	Construct ifid2addr map
+*/
+void SCIONBeaconServer::constructIfid2AddrMap() {
+	std::multimap<int, RouterElem>::iterator itr;
+	for(itr = m_routers.begin(); itr!=m_routers.end(); itr++) {
+		ifid2addr.insert(std::pair<uint16_t,HostAddr>(itr->second.interface.id, itr->second.addr));
+	}
+}
+
+/*
+	SCIONBeaconServer::initializeOutputPort
+	prepare IP header for IP encapsulation
+	if the port is assigned an IP address
+*/
+void SCIONBeaconServer::initializeOutputPort() {
+	
+	portInfo p;
+	p.addr = m_Addr;
+	m_vPortInfo.push_back(p);
+
+	//Initialize port 0; i.e., prepare internal communication
+	if(m_Addr.getType() == HOST_ADDR_IPV4) {
+		m_pIPEncap = new SCIONIPEncap;
+		m_pIPEncap->initialize(m_Addr.getIPv4Addr());
+	}
 }
 
 CLICK_ENDDECLS

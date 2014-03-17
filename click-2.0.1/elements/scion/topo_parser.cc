@@ -200,6 +200,58 @@ int TopoParser::parseRouters(multimap<int, RouterElem> &routers){
 }
 
 
+int TopoParser::parseEgressIngressPairs(multimap<int, EgressIngressPair> &pairmap){
+
+    m_iNumRoutePairs=0;
+    if(!m_bIsInit){
+        printf("Topology file has not been opened yet\n");
+        return TopoParseFail;
+    }
+
+    XMLElement *ptr, *ptr2 = NULL;
+    ptr = doc.RootElement()->FirstChildElement("RoutePair");
+
+	if(ptr) {
+		ptr2 = ptr-> FirstChildElement("RPair");
+    }
+    
+	while(ptr2!=NULL){
+			
+		EgressIngressPair rpair;
+			
+		if(!strcmp(ptr2->FirstChildElement("NeighborType")->GetText(), "PARENT")){
+			rpair.ntype = Parent;
+		}else if(!strcmp(ptr2->FirstChildElement("NeighborType")->GetText(), "CHILD")){
+            rpair.ntype = Child;
+        }else if(!strcmp(ptr2->FirstChildElement("NeighborType")->GetText(), "PEER")){
+            rpair.ntype = Peer;
+        }else{
+            printf("Unknown ntype = %s\n",
+            ptr2->FirstChildElement("NeighborType")->GetText());
+            return TopoParseFail;
+        }
+        
+        memcpy(rpair.egress_ad, ptr2->FirstChildElement("EGRESS_AD")->GetText(), 40);
+        memcpy(rpair.egress_addr, ptr2->FirstChildElement("EGRESS_HID")->GetText(), 40);
+        memcpy(rpair.ingress_ad, ptr2->FirstChildElement("INGRESS_AD")->GetText(), 40);
+        memcpy(rpair.ingress_addr, ptr2->FirstChildElement("INGRESS_HID")->GetText(), 40);
+        memcpy(rpair.dest_ad, ptr2->FirstChildElement("DEST_AD")->GetText(), 40);
+        memcpy(rpair.dest_addr, ptr2->FirstChildElement("DEST_HID")->GetText(), 40);
+		
+		rpair.egress_ad[40] = rpair.egress_addr[40] 
+		= rpair.ingress_ad[40] = rpair.ingress_addr[40] 
+		= rpair.dest_ad[40] = rpair.dest_addr[40] 
+		= '\0';
+		
+		pairmap.insert(pair<int, EgressIngressPair>(rpair.ntype, rpair));
+			
+		m_iNumRoutePairs++;
+		ptr2=ptr2->NextSiblingElement();
+    }
+    return TopoParseSuccess;
+}
+
+
 /*not supported yet*/
 int 
 TopoParser::parseGateways(multimap<int, GatewayElem> &gateways) {
@@ -327,7 +379,6 @@ TopoParser::parseAddress(XMLElement * ptr, SCIONElem * elem) {
     uint8_t addrType = 0;
 	string sAddrType;
 	string addr_str;
-	char buf[20];
 
     stringstream s;
 	stringstream ta;
