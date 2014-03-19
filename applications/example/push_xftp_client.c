@@ -45,6 +45,10 @@ char s_hid[MAX_XID_SIZE];
 char my_ad[MAX_XID_SIZE];
 char my_hid[MAX_XID_SIZE];
 
+
+struct addrinfo *ai;
+sockaddr_x *sa;
+
 int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout);
 
 
@@ -101,45 +105,6 @@ int sendCmd(int sock, const char *cmd)
 	return n;
 }
 
-// char** str_split(char* a_str, const char *a_delim)
-// {
-// 	char** result    = 0;
-// 	int count     = 0;
-// 	int str_len = strlen(a_str);
-// 	int del_len = strlen(a_delim);
-// 	int i = 0;
-// 	int j = 0;
-// 	char* last_delim = 0;
-// 	/* Count how many elements will be extracted. */
-// 	for(i = 0 ; i < str_len; i++) 
-// 		for(j = 0 ; j < del_len; j++) 
-// 			if( a_str[i] == a_delim[j]){
-// 				count++;
-// 				last_delim = &a_str[i];
-// 			}
-// 
-// 	 /* Add space for trailing token. */
-// 	count += last_delim < (a_str + strlen(a_str) - 1);
-// 	
-// // 	/* Add space for terminating null string so caller
-// // 	knows where the list of returned strings ends. */
-//  	count++;
-// 
-// 	result = (char **) malloc(sizeof(char*) * count);
-// 	
-// // 	printf ("Splitting string \"%s\" into %i tokens:\n", a_str, count);
-// 	
-// 	i = 0;
-// 	result[i] = strtok(a_str, a_delim);
-// // 	printf ("%s\n",result[i]);
-// 	
-// 	for( i = 1; i < count; i++){
-// 		result[i] = strtok (NULL, a_delim);
-// // 		printf ("%s\n",result[i]);
-// 	}
-// 
-// 	return result;
-// }
 
 void *recvCmd (void *socketid)
 {
@@ -152,6 +117,7 @@ void *recvCmd (void *socketid)
 	
 	//ChunkContext contains size, ttl, policy, and contextID which for now is PID
 	ChunkContext *ctx = XallocCacheSlice(POLICY_FIFO|POLICY_REMOVE_ON_EXIT, 0, 20000000);
+	
 	if (ctx == NULL)
 		die(-2, "Unable to initilize the chunking system\n");
 
@@ -178,7 +144,9 @@ void *recvCmd (void *socketid)
 			say("chunking file %s\n", fname);
 			
 			//Chunking is done by the XputFile which itself uses XputChunk, and fills out the info
-			if ((count = XputFile(ctx, fname, CHUNKSIZE, &info)) < 0) {
+// 			PushChunks( csock, ctx,  strchr(reply, ' ')+1, s_ad, s_hid, info);
+// 			XpushFileto(ctx,fname, 0, (sockaddr*)sa, sizeof(sockaddr_x), &info, CHUNKSIZE);
+			if ((count = XpushFileto(ctx,fname, 0, (sockaddr*)sa, sizeof(sockaddr_x), &info, CHUNKSIZE)) < 0) {
 				warn("unable to serve the file: %s\n", fname);
 				sprintf(reply, "FAIL: File (%s) not found", fname);
 
@@ -186,6 +154,16 @@ void *recvCmd (void *socketid)
 				sprintf(reply, "OK: %d", count);
 			}
 			say("%s\n", reply);
+			
+			
+			for (int i = 0; i < count; i++){
+				say("Remove chunk %s\n", info[i].cid);	
+				XremoveChunk(ctx, info[i].cid);
+			}
+// 			XfreeChunkInfo(info);
+// 			info = NULL;
+// 			count = 0;
+// 			break;
 			
 			
 			//Just tells the receiver how many chunks it should expect.
@@ -197,6 +175,13 @@ void *recvCmd (void *socketid)
 		} else if (strncmp(command, "block", 5) == 0) {
 			char *start = &command[6];
 			char *end = strchr(start, ':');
+			
+			
+			int csock = -1;
+			if ((csock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0)
+				die(-1, "unable to create chunk socket\n");			
+			
+			
 			if (!end) {
 				// we have an invalid command, return error to client
 				sprintf(reply, "FAIL: invalid block command");
@@ -210,13 +195,27 @@ void *recvCmd (void *socketid)
 				for(i = s; i < e && i < count; i++) {
 					strcat(reply, " ");
 					strcat(reply, info[i].cid);
+					
 				}
 			}
 			printf("%s\n", reply);
+// 			char *s = &reply[strchr(reply, ':')+1];
+			printf("%s\n", strchr(reply, ' ')+1);
+			
+			
+			
 			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
 				warn("unable to send reply to client\n");
 				break;
 			}
+			//FIXME reply should only be cid:cid:...
+// 			sleep(5);
+			
+			if (Xsend(sock, "OK: DONE", strlen("OK: DONE"), 0) < 0) {
+				warn("unable to send reply to client\n");
+				break;
+			}
+			
 
 		} else if (strncmp(command, "done", 4) == 0) {
 			say("done sending file: removing the chunks from the cache\n");
@@ -320,12 +319,14 @@ int buildChunkDAGs(ChunkStatus cs[], char *chunks, char *p_ad, char *p_hid)
 	}
 	dag = (char *)malloc(512);
 	sprintf(dag, "RE ( %s %s ) CID:%s", p_ad, p_hid, p);
-//	printf("getting %s\n", p);
+	printf("getting %s\n", dag);
 	cs[n].cidLen = strlen(dag);
 	cs[n].cid = dag;
 	n++;
 	return n;
 }
+
+
 
 int getListedChunks(int csock, FILE *fd, char *chunks, char *p_ad, char *p_hid)
 {
@@ -469,8 +470,15 @@ int initializeClient(const char *name)
 
     // lookup the xia service 
 	daglen = sizeof(dag);
-    if (XgetDAGbyName(name, &dag, &daglen) < 0)
+	if (XgetDAGbyName(name, &dag, &daglen) < 0)
 		die(-1, "unable to locate: %s\n", name);
+	
+	//FIXME: Added for chunk push. Clean up the code here.
+	if (Xgetaddrinfo(name, NULL, NULL, &ai) != 0)
+			die(-1, "unable to lookup name %s\n", name);
+	sa = (sockaddr_x*)ai->ai_addr;
+	Graph cg(sa);
+// 	printf("ai: %s\n", cg.dag_string().c_str());
 
 
 	// create a socket, and listen for incoming connections
@@ -515,7 +523,6 @@ int initializeClient(const char *name)
 	return sock;
 }
 
-//FIXME Apparently XPutFile exists so use that instead.
 //FIXME hardcoded ad-hid format for dag.
 void putFile(int sock, char *ad, char*hid, const char *fin, const char *fout)
 {
@@ -658,3 +665,4 @@ int main(int argc, char **argv)
 	}	
 	return 1;
 }
+

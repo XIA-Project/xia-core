@@ -6,6 +6,7 @@ all:
 	make -C example
 	make -C demo
 	make -C irc
+	make -C multicast
 
 static: all
 

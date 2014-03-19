@@ -523,7 +523,7 @@ Graph::print_graph() const
 		else
 			printf("      ");
 
-		printf("Node %zu: [%s] ", i, nodes_[i].type_string().c_str());
+		printf("Node %lu: [%s] ", i, nodes_[i].type_string().c_str());
 		//printf("%20s", nodes_[i].id());
 		for (std::size_t j = 0; j < Node::ID_LEN; j++)
 			printf("%02x", nodes_[i].id()[j]);
@@ -535,7 +535,7 @@ Graph::print_graph() const
 				first = false;
 				printf(" ->");
 			}
-			printf(" Node %zu", out_edges_[i][j]);
+			printf(" Node %lu", out_edges_[i][j]);
 		}
 		if (is_sink(i))
 			printf(" [SNK]");
@@ -629,9 +629,9 @@ Graph::out_edges_for_index(std::size_t i, std::size_t source_index, std::size_t 
 	{
 		int idx = index_in_dag_string(out_edges_[i][j], source_index, sink_index);
 		char *idx_str;
-		int size = snprintf(NULL, 0, " %zu", idx);
+		int size = snprintf(NULL, 0, " %d", idx);
 		idx_str = (char*)malloc(sizeof(char) * size +1); // +1 for null char (sprintf automatically appends it)
-		sprintf(idx_str, " %zu", idx);
+		sprintf(idx_str, " %d", idx);
 		out_edge_string += idx_str;
 		free(idx_str);
 	}
@@ -1394,6 +1394,7 @@ Graph::get_nodes_of_type(unsigned int type) const
 	for (it = nodes_.begin(); it != nodes_.end(); ++it) {
 		if (it->type() == type) {
 			nodes.push_back(&*it);
+			printf("FOUND IT");
 		}
 	}
 

@@ -726,7 +726,6 @@ int main(int argc, char *argv[])
 		if (now - last_purge >= 10)
 		{
 			last_purge = now;
-			fprintf(stderr, "cheking entry\n");
 			map<string, time_t>::iterator iter;
 
 			for (iter = timeStamp.begin(); iter != timeStamp.end(); iter++)	
