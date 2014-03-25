@@ -165,6 +165,35 @@ XIAHeaderEncap::encap(Packet* p_in, bool adjust_plen) const
     return p;
 }
 
+WritablePacket*
+XIAHeaderEncap::encap_replace(Packet* p_in) const
+{
+
+    size_t header_len = hdr_size();
+    XIAHeader xiah(p_in->xia_header());
+
+    size_t old_len = xiah.hdr_size();
+
+    WritablePacket* p;
+
+    if (old_len < header_len){
+        p = p_in->push(header_len - old_len);
+    }
+    else if(old_len >= header_len){
+        p_in->pull(old_len - header_len);
+        p = p_in->push(0);
+    }
+    if (!p)
+        return NULL;
+
+    memcpy(p->data(), _hdr, header_len);  // copy the header
+    p->set_xia_header(reinterpret_cast<struct click_xia*>(p->data()), header_len);
+    //Timestamp now = Timestamp::now();
+    //p->timestamp_anno() = now;
+
+    return p;
+}
+
 void
 XIAHeaderEncap::update()
 {
