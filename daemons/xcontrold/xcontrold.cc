@@ -230,6 +230,69 @@ int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> rout
 	}
 }
 
+int sendKeepAliveToServiceController()
+{
+    int rc = 1;
+    int type = 0;
+
+    std::map<std::string, ServiceState>::iterator it;
+    for (it = route_state.LocalSidList.begin(); it != route_state.LocalSidList.end(); ++it)
+    {
+        ControlMessage msg(CTL_SID_MANAGE_KA, route_state.myAD, route_state.myHID);
+        msg.append(it->first);
+        msg.append(it->second.weight);
+        // TODO:append some more states
+
+        if (it->second.isController){
+            msg.read(type); // remove it to match the correct format for the process function
+            processServiceKeepAlive(msg); // process locally
+        }
+        else
+        {
+            sockaddr_x ddag;
+            Graph g(it->second.controllerAddr);
+            g.fill_sockaddr(&ddag);
+            int temprc = msg.send(route_state.sock, &ddag);
+            if (temprc < 0) {
+                syslog(LOG_ERR, "error sending SID keep alive to %s", it->second.controllerAddr.c_str());
+            }
+            rc = (temprc < rc)? temprc : rc;
+            //syslog(LOG_DEBUG, "sent SID %s keep alive to %s", it->first.c_str(), it->second.controllerAddr.c_str());
+        }
+    }
+
+    return rc;
+}
+
+int processServiceKeepAlive(ControlMessage msg)
+{
+    int rc = 1;
+    string srcAD, srcHID;
+
+    std::string sid;
+    int weight;
+
+    msg.read(srcAD);
+    msg.read(srcHID);
+    string srcAddr = "RE " + srcAD + " " + srcHID;
+    msg.read(sid);
+    msg.read(weight);
+
+    if (route_state.LocalServiceControllers.find(sid) != route_state.LocalServiceControllers.end())
+    { // if controller is here
+        route_state.LocalServiceControllers[sid].instances[srcAddr].weight = weight; //update attributes
+        // TODO: reply to that instance?
+        //syslog(LOG_DEBUG, "got SID %s keep alive from %s", sid.c_str(), srcAddr.c_str());
+    }
+    else
+    {
+        syslog(LOG_ERR, "got SID %s keep alive to its service controller from %s, but I am not!", sid.c_str(), srcAddr.c_str());
+        rc = -1;
+    }
+
+    return rc;
+}
+
 int sendSidDiscovery()
 {
     int rc = 1;
@@ -244,6 +307,7 @@ int sendSidDiscovery()
     }
     else // prepare the packet TODO: only send updated entries TODO: but don't forget to renew TTL
     {
+        sendKeepAliveToServiceController(); // temporally put it here
         // DOTO: the format of this packet could be reduced much
         // local info
         msg.append(route_state.LocalSidList.size());
@@ -415,12 +479,15 @@ int processMsg(std::string msg)
         case CTL_ROUTING_TABLE:
             // rc = processRoutingTable(m);
             break;
-		case CTL_XBGP:
-			rc = processInterdomainLSA(m);
-			break;
-		case CTL_SID_DISCOVERY:
-			rc = processSidDiscovery(m);
-			break;
+        case CTL_XBGP:
+            rc = processInterdomainLSA(m);
+            break;
+        case CTL_SID_DISCOVERY:
+            rc = processSidDiscovery(m);
+            break;
+        case CTL_SID_MANAGE_KA:
+            rc = processServiceKeepAlive(m);
+            break;
         default:
             perror("unknown routing message");
             break;

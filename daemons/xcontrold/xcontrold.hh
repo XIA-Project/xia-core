@@ -134,6 +134,11 @@ int processInterdomainLSA(ControlMessage msg);
 // process a LinkStateAdvertisement message 
 int processLSA(ControlMessage msg);
 
+// SID routing service management plane: keep alive with its service controller 
+int sendKeepAliveToServiceController();
+
+int processServiceKeepAlive(ControlMessage msg);
+
 // SID routing discovery plane: send and process a sid discovery message
 int sendSidDiscovery();
 
