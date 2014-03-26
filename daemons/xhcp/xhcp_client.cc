@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
 	sockaddr_x ddag;
 	char pkt[XHCP_MAX_PACKET_SIZE];
 	char buffer[XHCP_MAX_PACKET_SIZE]; 	
-	string myAD(""), myGWRHID(""), myGWR4ID(""), myNS_DAG("");
+	string myAD(""), myGWRHID(""), myGWR4ID(""), default_SID("SID:-"), myNS_DAG("");
 	string default_AD("AD:-"), default_HID("HID:-"), default_4ID("IP:-");
 	string empty_str("");
 	string AD, gwRHID, gwR4ID, nsDAG;
@@ -290,6 +290,9 @@ int main(int argc, char *argv[]) {
 			
 			// update HID table (default entry)
 			if ((rc = xr.setRoute(default_HID, 0, gwRHID, 0)) != 0)
+				syslog(LOG_WARNING, "error setting route %d\n", rc);
+
+			if ((rc = xr.setRoute(default_SID, 0, gwRHID, 0)) != 0)
 				syslog(LOG_WARNING, "error setting route %d\n", rc);
 			
 			// update HID table (gateway router HID entry)
