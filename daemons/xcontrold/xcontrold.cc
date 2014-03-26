@@ -17,6 +17,7 @@
 #include "Xsocket.h"
 #include "xcontrold.hh"
 #include "dagaddr.hpp"
+#include "minIni.h"
 
 #define DEFAULT_NAME "controller0"
 #define APPNAME "xcontrold"
@@ -771,11 +772,60 @@ void config(int argc, char** argv)
 	// load the config setting for this hostname
 	set_conf("xsockconf.ini", hostname);
 
+	// load local SIDs
+    set_sid_conf(hostname);
+
 	// note: ident must exist for the life of the app
 	ident = (char *)calloc(strlen(hostname) + strlen (APPNAME) + 4, 1);
 	sprintf(ident, "%s:%s", APPNAME, hostname);
 	openlog(ident, LOG_CONS|LOG_NDELAY|LOG_LOCAL4|verbose, LOG_LOCAL4);
 	setlogmask(LOG_UPTO(level));
+}
+
+void set_sid_conf(const char* myhostname)
+{
+    // read the controller file at etc/controller$i_sid.ini
+    // the file defines which AD has what SIDs
+    // ini style file
+    // the file could be loaded frequently to emulate dynamic service changes
+
+    char full_path[BUF_SIZE];
+    char root[BUF_SIZE];
+    char section_name[BUF_SIZE];
+    char controller_addr[BUF_SIZE];
+    char sid[BUF_SIZE];
+    std::string service_sid;
+    //int weight;
+
+    int section_index = 0;
+    snprintf(full_path, BUF_SIZE, "%s/etc/%s_sid.ini", XrootDir(root, BUF_SIZE), myhostname);
+    route_state.LocalSidList.clear(); // clean and reload all
+    while (ini_getsection(section_index, section_name, BUF_SIZE, full_path)) //enumerate every section, [$name]
+    {
+        //fprintf(stderr, "read %s\n", section_name);
+        ServiceState service_state;
+        ini_gets(section_name, "sid", sid, sid, BUF_SIZE, full_path);
+        service_sid = std::string(sid);
+        service_state.weight = ini_getl(section_name, "weight", 100, full_path);
+        service_state.isController = ini_getbool(section_name, "isController", 0, full_path);
+        // get the address of the service controller
+        ini_gets(section_name, "controllerAddr", controller_addr, controller_addr, BUF_SIZE, full_path);
+        service_state.controllerAddr = std::string(controller_addr);
+        if (service_state.isController) // I am the controller
+        {
+            if (route_state.LocalServiceControllers.find(service_sid) == route_state.LocalServiceControllers.end())
+            { // no service controller yet, create one
+                ServiceController sc;
+                route_state.LocalServiceControllers[service_sid] = sc; // just initialize it
+            }
+        }
+        service_state.archType = ini_getl(section_name, "archType", 0, full_path);
+        //fprintf(stderr, "read state%s, %d, %d, %s\n", sid, service_state.weight, service_state.isController, service_state.controllerAddr.c_str());
+        route_state.LocalSidList[service_sid] = service_state;
+        section_index++;
+    }
+    
+    return;
 }
 
 int main(int argc, char *argv[])

@@ -35,6 +35,32 @@
 #define SID_XCONTROL "SID:1110000000000000000000000000000000001114"
 #define NULL_4ID "IP:4500000000010000fafa00000000000000000000"
 
+#define SERVICE_ARCH_FLAT 0
+#define SERVICE_ARCH_CENTRAL 1 // AD controller report the distance information to the service controller
+#define SERVICE_ARCH_REACTIVE 2 // AD controller send reversed discovery message to each service instance
+#define SERVICE_ARCH_HIERARCHY 3
+
+typedef struct ServiceState
+{
+    // public information
+    int version;
+    int priority;
+    int weight;
+    int isController; // whether this instance is also a service controller, 0 for no
+    std::string controllerAddr; // the address of the service controller
+    int archType; // type of architecture of this service
+    std::map<std::string, int> delays; // the delays from ADs to the instance {AD:delay}
+
+    // local information used for store decision, no re-broadcast
+    bool valid; // is this candidate abandoned by local decision
+    int percentage; // what is the percent of
+} ServiceState;
+
+typedef struct ServiceController
+{
+    std::map<std::string, ServiceState> instances; // the states for each service instances, AD : state pair
+} ServiceController;
+
 typedef struct RouteState {
 	int32_t sock; // socket for routing process
 	
@@ -68,6 +94,10 @@ typedef struct RouteState {
     std::map<std::string, NodeStateEntry> ADNetworkTable; // map DestAD to NodeState entry for ADs
 	std::map<std::string, int32_t> lastSeqTable; // router-HID to their last-seq number
 	std::map<std::string, int32_t> ADLastSeqTable; // router-HID to their last-seq number for ADs
+
+    std::map<std::string, ServiceState> LocalSidList; // services provided by this sid;
+    std::map<std::string, ServiceController> LocalServiceControllers; // AD controller acts as service controllers for local SIDs that need to be the master node (runs controller) for now TODO: an independent service controller daemon
+
 } RouteState;
 
 // initialize the route state
@@ -115,3 +145,6 @@ void printADNetworkTable();
 
 // timer to send Hello and LinkStateAdvertisement messages periodically
 void timeout_handler(int signum);
+
+// read config file to get local SIDs
+void set_sid_conf(const char* myhostname);
