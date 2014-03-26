@@ -48,7 +48,8 @@ elementclass XIAPacketRoute {
 	GPRP :: GenericPostRouteProc -> [0]output;
 	GPRP[1] -> x[0] -> consider_first_path;
 
-	rt_AD, rt_HID, rt_SID, rt_CID, rt_IP :: XIAXIDRouteTable($local_addr, $num_ports);
+	rt_AD, rt_HID, rt_CID, rt_IP :: XIAXIDRouteTable($local_addr, $num_ports);
+    rt_SID :: XIAXIDMultiRouteTable($local_addr, $num_ports);
     c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, [2]output;
 		
     rt_AD[0], rt_HID[0], rt_SID[0], rt_CID[0], rt_IP[0] -> GPRP;		
