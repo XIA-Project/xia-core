@@ -172,7 +172,7 @@ XIAXIDRouteTable::set_handler4(const String &conf, Element *e, void *thunk, Erro
 
 	cp_argvec(conf, args);
 
-	if (args.size() < 2 || args.size() > 4)
+	if (args.size() < 2 || args.size() > 6)
 		return errh->error("invalid route: ", conf.c_str());
 
 	xid_str = args[0];
