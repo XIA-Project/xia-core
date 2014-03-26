@@ -1374,16 +1374,18 @@ perror("bind");
 		{
 			last_purge = now;
 			fprintf(stderr, "checking entry\n");
-			map<string, time_t>::iterator iter;
+			map<string, time_t>::iterator iter = timeStamp.begin();
 
-			for (iter = timeStamp.begin(); iter != timeStamp.end(); iter++)	
-			{
-				if (now - iter->second >= EXPIRE_TIME){
-					xr.delRoute(iter->first);
-					timeStamp.erase(iter);
-					syslog(LOG_INFO, "purging host route for : %s", iter->first.c_str());
-				}
-			}
+            while (iter != timeStamp.end())
+            {
+                if (now - iter->second >= EXPIRE_TIME){
+                    xr.delRoute(iter->first);
+                    syslog(LOG_INFO, "purging host route for : %s", iter->first.c_str());
+                    timeStamp.erase(iter++);
+                } else {
+                    ++iter;
+                }
+            }
 		}
 	}
 
