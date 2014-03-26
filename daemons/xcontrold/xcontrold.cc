@@ -49,6 +49,15 @@ void timeout_handler(int signum)
 	} else {
 		syslog(LOG_ERR, "hello_seq=%d hello_lsa_ratio=%d", route_state.hello_seq, route_state.hello_lsa_ratio);
 	}
+	 //TODO: only send discovery message when necessary
+    if (route_state.sid_discovery_seq < route_state.hello_sid_discovery_ratio) {
+        //wait
+        route_state.sid_discovery_seq++;
+    } else if (route_state.sid_discovery_seq >= route_state.hello_sid_discovery_ratio ) {
+        //send sid discovery message
+        route_state.send_sid_discovery = true;
+        route_state.sid_discovery_seq = 0;
+    }
 	// reset the timer
 	signal(SIGALRM, timeout_handler);
 	ualarm((int)ceil(HELLO_INTERVAL*1000000),0);
@@ -221,6 +230,170 @@ int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> rout
 	}
 }
 
+int sendSidDiscovery()
+{
+    int rc = 1;
+    ControlMessage msg(CTL_SID_DISCOVERY, route_state.myAD, route_state.myAD);
+
+    //broadcast local services
+    if (route_state.LocalSidList.empty() && route_state.SIDADsTable.empty())
+    {
+        // Nothing to send
+        // syslog(LOG_INFO, "%s LocalSidList is empty, nothing to send", route_state.myAD);
+        return rc;
+    }
+    else // prepare the packet TODO: only send updated entries TODO: but don't forget to renew TTL
+    {
+        // DOTO: the format of this packet could be reduced much
+        // local info
+        msg.append(route_state.LocalSidList.size());
+        std::map<std::string, ServiceState>::iterator it;
+        for (it = route_state.LocalSidList.begin(); it != route_state.LocalSidList.end(); ++it)
+        {
+            msg.append(route_state.myAD); //unified form : AD SID pairs TODO: make it compact
+            msg.append(it->first);
+            // TODO: append more attributes/parameters
+            msg.append(it->second.weight);
+            msg.append(it->second.controllerAddr);
+            msg.append(it->second.archType);
+        }
+
+        // rebroadcast services learnt from others
+        msg.append(route_state.SIDADsTable.size());
+        std::map<std::string, std::map<std::string, ServiceState> >::iterator it_sid;
+        for (it_sid = route_state.SIDADsTable.begin(); it_sid != route_state.SIDADsTable.end(); ++it_sid)
+        {
+            msg.append(it_sid->second.size());
+            std::map<std::string, ServiceState>::iterator it_ad;
+            for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad)
+            {
+                msg.append(it_ad->first);
+                msg.append(it_sid->first);
+                // TODO: put information from service_state inside
+                msg.append(it_ad->second.weight);
+                msg.append(it_ad->second.controllerAddr);
+                msg.append(it_ad->second.archType);
+            }
+        }
+    }
+
+    // send it to neighbor ADs
+    // TODO: reuse code: broadcastToADNeighbors(msg)?
+    std::map<std::string, NeighborEntry>::iterator it;
+
+    for (it = route_state.ADNeighborTable.begin(); it != route_state.ADNeighborTable.end(); ++it)
+    {
+        sockaddr_x ddag;
+        Graph g = Node() * Node(it->second.AD) * Node(SID_XCONTROL);
+        g.fill_sockaddr(&ddag);
+
+        //syslog(LOG_INFO, "send inter-AD LSA[%d] to %s", route_state.lsa_seq, it->second.AD.c_str());
+        //syslog(LOG_INFO, "msg: %s", msg.c_str());
+        int temprc = msg.send(route_state.sock, &ddag);
+        if (temprc < 0) {
+            syslog(LOG_ERR, "error sending inter-AD SID discovery to %s", it->second.AD.c_str());
+        }
+        rc = (temprc < rc)? temprc : rc;
+    }
+
+    route_state.sid_discovery_seq = (route_state.sid_discovery_seq + 1) % MAX_SEQNUM;
+    return rc;
+}
+
+int processSidDiscovery(ControlMessage msg)
+{
+    //TODO: add version(time-stamp?) for each entry
+    int rc = 1;
+    string srcAD, srcHID;
+
+    string AD, SID;
+    int records = 0;
+    int weight;
+    int archType;
+    string controllerAddr;
+
+    msg.read(srcAD);
+    msg.read(srcHID);
+    //syslog(LOG_INFO, "Get SID discovery msg from %s", srcAD.c_str());
+
+    // process the entries: AD-SID pairs
+    msg.read(records);//number of entries
+    //syslog(LOG_INFO, "Get %d origin SIDs", records);
+    for (int i = 0; i < records; ++i)
+    {
+        ServiceState service_state;
+        msg.read(AD);
+        msg.read(SID);
+        //TODO: read the parameters from msg, put them into service_state
+        msg.read(weight);
+        msg.read(controllerAddr);
+        msg.read(archType);
+        service_state.weight = weight;
+        service_state.controllerAddr = controllerAddr;
+        service_state.archType = archType;
+        updateSidAdsTable(AD, SID, service_state);
+    }
+
+    //process the re-broadcast entries SID:[ADs]
+    msg.read(records);//number of re-broadcast sids
+    //syslog(LOG_INFO, "Get %d re-broadcast SIDs", records);
+    for (int i = 0; i < records; ++i)
+    {
+        int ad_records = 0;
+        msg.read(ad_records);
+        for (int j = 0; j < ad_records; ++j)
+        {
+            ServiceState service_state;
+            msg.read(AD);
+            msg.read(SID);
+            // TODO: read the parameters from msg
+            msg.read(weight);
+            msg.read(controllerAddr);
+            msg.read(archType);
+            service_state.controllerAddr = controllerAddr;
+            service_state.archType = archType;
+            service_state.weight = weight;
+            updateSidAdsTable(AD, SID, service_state);
+        }
+    }
+
+    //syslog(LOG_INFO, "SID-ADs %lu", route_state.SIDADsTable.size());
+    // rc = processSidDecision(); // use a timeout callback instead?
+    // TODO: read the config file frequently, emulate service failure
+    // TODO: how/when to revoke/remove a entry
+    // TODO: TTL for AD-SID pair for fast failure discovery/recovery
+    return rc;
+}
+
+int updateSidAdsTable(std::string AD, std::string SID, ServiceState service_state)
+{
+    int rc = 1;
+    //TODO: only record ones with newer version
+    //TODO: only update public information
+    if ( route_state.SIDADsTable.count(SID) > 0 )
+    {
+        if (route_state.SIDADsTable[SID].count(AD) > 0 )
+        {
+            //TODO: update if version is newer
+            route_state.SIDADsTable[SID][AD].weight = service_state.weight;
+        }
+        else
+        {
+            // insert new entry
+            route_state.SIDADsTable[SID][AD] = service_state;
+        }
+    }
+    else // no sid record
+    {
+        std::map<std::string, ServiceState> new_map;
+        new_map[AD] = service_state;
+        route_state.SIDADsTable[SID] = new_map;
+    }
+    // TODO: make return value meaningful or make this function return void
+    //syslog(LOG_INFO, "update SID:%s, weight %d from %s", SID.c_str(), service_state.weight, AD.c_str());
+    return rc;
+}
+
 int processMsg(std::string msg)
 {
     int type, rc = 0;
@@ -244,6 +417,9 @@ int processMsg(std::string msg)
             break;
 		case CTL_XBGP:
 			rc = processInterdomainLSA(m);
+			break;
+		case CTL_SID_DISCOVERY:
+			rc = processSidDiscovery(m);
 			break;
         default:
             perror("unknown routing message");
@@ -709,7 +885,9 @@ void initRouteState()
 	route_state.num_neighbors = 0; // number of neighbor routers
 	route_state.lsa_seq = 0;	// LSA sequence number of this router
 	route_state.hello_seq = 0;  // hello seq number of this router
+	route_state.sid_discovery_seq = 0;  // sid discovery seq number of this router
 	route_state.hello_lsa_ratio = (int32_t) ceil(AD_LSA_INTERVAL/HELLO_INTERVAL);
+	route_state.hello_sid_discovery_ratio = (int32_t) ceil(SID_DISCOVERY_INTERVAL/HELLO_INTERVAL);
 	route_state.calc_dijstra_ticks = 0;
 
 	route_state.ctl_seq = 0;	// LSA sequence number of this router
@@ -824,7 +1002,7 @@ void set_sid_conf(const char* myhostname)
         route_state.LocalSidList[service_sid] = service_state;
         section_index++;
     }
-    
+
     return;
 }
 
@@ -909,6 +1087,10 @@ perror("bind");
 			route_state.send_lsa = false;
 			sendInterdomainLSA();
 		}
+		if (route_state.send_sid_discovery == true) {
+            route_state.send_sid_discovery = false;
+            sendSidDiscovery();
+        }
 		FD_ZERO(&socks);
 		FD_SET(route_state.sock, &socks);
 		FD_SET(tempSock, &socks);

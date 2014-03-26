@@ -23,6 +23,7 @@
 
 #define HELLO_INTERVAL 0.1
 #define LSA_INTERVAL 0.3
+#define SID_DISCOVERY_INTERVAL 3.0
 #define AD_LSA_INTERVAL 1
 #define CALC_DIJKSTRA_INTERVAL 4
 #define MAX_HOP_COUNT 50
@@ -76,10 +77,13 @@ typedef struct RouteState {
 	int32_t num_neighbors; // number of neighbor routers
 	int32_t lsa_seq;	// LSA sequence number of this router
 	int32_t hello_seq;  // hello seq number of this router 
-	int32_t hello_lsa_ratio; // frequency ratio of hello:lsa (for timer purpose) 
+    int32_t sid_discovery_seq;    // sid discovery sequence number of this router
+	int32_t hello_lsa_ratio; // frequency ratio of hello:lsa (for timer purpose)
+    int32_t hello_sid_discovery_ratio; // frequency ratio of hello:sid discovery (for timer purpose)
 	int32_t calc_dijstra_ticks;   
 	bool send_hello;  // Should a hello message be sent?
 	bool send_lsa;  // Should a LSA message be sent?
+    bool send_sid_discovery; // Should a sid discovery message be sent?
 
 	int32_t ctl_seq;	// LSA sequence number of this router
 	int32_t ctl_seq_recv;	// LSA sequence number of this router
@@ -97,6 +101,7 @@ typedef struct RouteState {
 
     std::map<std::string, ServiceState> LocalSidList; // services provided by this sid;
     std::map<std::string, ServiceController> LocalServiceControllers; // AD controller acts as service controllers for local SIDs that need to be the master node (runs controller) for now TODO: an independent service controller daemon
+    std::map<std::string, std::map<std::string, ServiceState> > SIDADsTable; //discovery plane: what the controller discovered
 
 } RouteState;
 
@@ -128,6 +133,14 @@ int processInterdomainLSA(ControlMessage msg);
 
 // process a LinkStateAdvertisement message 
 int processLSA(ControlMessage msg);
+
+// SID routing discovery plane: send and process a sid discovery message
+int sendSidDiscovery();
+
+int processSidDiscovery(ControlMessage msg);
+
+// tool function update the SIDADsTable, add or update SID:AD pair into SID:[ADs]
+int updateSidAdsTable(std::string AD, std::string SID, ServiceState service_state);
 
 // compute the shortest path (Dijkstra)
 void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEntry> &networkTable, std::map<std::string, RouteEntry> &routingTable);
