@@ -24,6 +24,7 @@
 #define HELLO_INTERVAL 0.1
 #define LSA_INTERVAL 0.3
 #define SID_DISCOVERY_INTERVAL 3.0
+#define SID_DECISION_INTERVAL 5.0
 #define AD_LSA_INTERVAL 1
 #define CALC_DIJKSTRA_INTERVAL 4
 #define MAX_HOP_COUNT 50
@@ -78,12 +79,15 @@ typedef struct RouteState {
 	int32_t lsa_seq;	// LSA sequence number of this router
 	int32_t hello_seq;  // hello seq number of this router 
     int32_t sid_discovery_seq;    // sid discovery sequence number of this router
+    int32_t sid_decision_seq;    // sid decision sequence number of this router
 	int32_t hello_lsa_ratio; // frequency ratio of hello:lsa (for timer purpose)
     int32_t hello_sid_discovery_ratio; // frequency ratio of hello:sid discovery (for timer purpose)
+    int32_t hello_sid_decision_ratio; // frequency ratio of hello:sid decision (for timer purpose)
 	int32_t calc_dijstra_ticks;   
 	bool send_hello;  // Should a hello message be sent?
 	bool send_lsa;  // Should a LSA message be sent?
     bool send_sid_discovery; // Should a sid discovery message be sent?
+    bool send_sid_decision; // Should a sid decision message be sent?
 
 	int32_t ctl_seq;	// LSA sequence number of this router
 	int32_t ctl_seq_recv;	// LSA sequence number of this router
@@ -143,6 +147,18 @@ int processServiceKeepAlive(ControlMessage msg);
 int sendSidDiscovery();
 
 int processSidDiscovery(ControlMessage msg);
+
+// Decision plane: provide choices for routing to a SID
+int processSidDecision(void);
+
+// interpret the decision for each router and send it to them
+int sendSidRoutingDecision(void);
+
+// send routing table to each router
+int sendSidRoutingTable(std::string destHID, std::map<std::string, std::map<std::string, ServiceState> > ADSIDsTable);
+
+// fill in SID routing for the controller itself
+int processSidRoutingTable(std::map<std::string, std::map<std::string, ServiceState> > ADSIDsTable);
 
 // tool function update the SIDADsTable, add or update SID:AD pair into SID:[ADs]
 int updateSidAdsTable(std::string AD, std::string SID, ServiceState service_state);

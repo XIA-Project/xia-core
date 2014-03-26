@@ -169,6 +169,9 @@ int processMsg(std::string msg)
         case CTL_ROUTING_TABLE:
             rc = processRoutingTable(m);
             break;
+        case CTL_SID_ROUTING_TABLE:
+            rc = processSidRoutingTable(m);
+            break;
         default:
             perror("unknown routing message");
             break;
@@ -351,6 +354,71 @@ int processRoutingTable(ControlMessage msg)
  	}
 
 	return 1;
+}
+
+int processSidRoutingTable(ControlMessage msg)
+{
+    int rc = 1;
+
+    int ad_count = 0;
+    int sid_count = 0;
+    int weight = 0;
+    string srcAD, srcHID, destAD, destHID;
+
+    string AD;
+    string SID;
+
+    msg.read(srcAD);
+    msg.read(srcHID);
+
+    if (srcAD != route_state.myAD)
+        return 1;
+
+    msg.read(destAD);
+    msg.read(destHID);
+    /* Check if intended for me */
+    if ((destAD != route_state.myAD) || (destHID != route_state.myHID))
+        return msg.send(route_state.sock, &route_state.ddag);
+
+    std::vector<XIARouteEntry> xrt;
+    xr.getRoutes("AD", xrt);
+
+    // change vector to map AD:RouteEntry for faster lookup
+    std::map<std::string, XIARouteEntry> ADlookup;
+    vector<XIARouteEntry>::iterator ir;
+    for (ir = xrt.begin(); ir < xrt.end(); ++ir) {
+        ADlookup[ir->xid] = *ir;
+    }
+
+    msg.read(ad_count);
+    for ( int i = 0; i < ad_count; ++i)
+    {
+        msg.read(sid_count);
+        msg.read(AD);
+        XIARouteEntry entry = ADlookup[AD];
+        for ( int j = 0; j < sid_count; ++j)
+        {
+            msg.read(SID);
+            msg.read(weight);
+            //syslog(LOG_INFO, "add route %s, %d, %s, %lu to %s", SID.c_str(), entry.port, entry.nextHop.c_str(), entry.flags, AD.c_str());
+            //rc = xr.delRoute(SID);
+            if (entry.xid == route_state.myAD)
+            {
+                rc = xr.seletiveSetRoute(SID, -2,  entry.nextHop, entry.flags, weight, AD); // use AD as index
+                //SID to local AD, NOTE: no actual server to handle sid here, just put -2 instead, TODO: try to point it to a server instance
+            }
+            else
+            {
+                rc = xr.seletiveSetRoute(SID, entry.port, entry.nextHop, entry.flags, weight, AD);
+            }
+            if (rc < 0 )
+            {
+                syslog(LOG_ERR, "error setting sid route %d", rc);
+            }
+        }
+    }
+
+    return rc;
 }
 
 void initRouteState()

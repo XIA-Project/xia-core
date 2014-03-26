@@ -58,6 +58,14 @@ void timeout_handler(int signum)
         route_state.send_sid_discovery = true;
         route_state.sid_discovery_seq = 0;
     }
+    if (route_state.sid_decision_seq < route_state.hello_sid_decision_ratio) {
+        //wait
+        route_state.sid_decision_seq++;
+    } else if (route_state.sid_decision_seq >= route_state.hello_sid_decision_ratio ) {
+        //send sid decision message
+        route_state.send_sid_decision = true;
+        route_state.sid_decision_seq = 0;
+    }
 	// reset the timer
 	signal(SIGALRM, timeout_handler);
 	ualarm((int)ceil(HELLO_INTERVAL*1000000),0);
@@ -426,6 +434,177 @@ int processSidDiscovery(ControlMessage msg)
     // TODO: read the config file frequently, emulate service failure
     // TODO: how/when to revoke/remove a entry
     // TODO: TTL for AD-SID pair for fast failure discovery/recovery
+    return rc;
+}
+
+int processSidDecision(void)
+{
+    // make decision based on principles like highest priority first, load balancing, nearest...
+    // just do the load balancing so far
+    // TODO: 1.nearest AD first 2.priority first
+    int rc = 1;
+
+    //local balance decision: decide which percentage of traffic each AD should has
+    std::map<std::string, std::map<std::string, ServiceState> >::iterator it_sid;
+    for (it_sid = route_state.SIDADsTable.begin(); it_sid != route_state.SIDADsTable.end(); ++it_sid)
+    {
+        // calculate the percentage for each AD for this SID
+        int total_weight = 0;
+
+        std::map<std::string, ServiceState>::iterator it_ad;
+        // find the total weight
+        for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad)
+        {
+            total_weight += it_ad->second.weight;
+        }
+        // make local decision. map weights to 0..100
+        for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad)
+        {
+            it_ad->second.valid = true;
+            it_ad->second.percentage = (int) 100.0*it_ad->second.weight/total_weight;
+        }
+    }
+    // for debug
+    // dumpSidAdsTable();
+
+    // update every router
+    sendSidRoutingDecision();
+    return rc;
+}
+
+int sendSidRoutingDecision(void)
+{
+    // TODO: when to call this function timeout? new incoming sid discovery?
+    // TODO: if not reusing AD routing table, this function should calculate routing table
+    // for each router
+    // Now we just send the identical decision to every router. The routers will reuse their
+    // own routing table to interpret the decision
+    int rc = 1;
+    // for each router:
+    std::map<std::string, NodeStateEntry>::iterator it_router;
+    for (it_router = route_state.networkTable.begin(); it_router != route_state.networkTable.end(); ++it_router)
+    {
+        if ((it_router->second.ad != route_state.myAD) || (it_router->second.hid == ""))
+        {
+            // Don't calculate routes for external ADs
+            continue;
+        }
+        else if (it_router->second.hid.find(string("SID")) != string::npos)
+        {
+            // Don't calculate routes for SIDs
+            continue;
+        }
+
+        // remap the SIDADsTable
+        std::map<std::string, std::map<std::string, ServiceState> > ADSIDsTable;
+
+        std::map<std::string, std::map<std::string, ServiceState> >::iterator it_sid;
+        for (it_sid = route_state.SIDADsTable.begin(); it_sid != route_state.SIDADsTable.end(); ++it_sid)
+        {
+            std::map<std::string, ServiceState>::iterator it_ad;
+            for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad)
+            {
+                if (it_ad->second.valid) // only send choices we want to use
+                {
+                    if (ADSIDsTable.count(it_ad->first) > 0) // has key AD
+                    {
+                        ADSIDsTable[it_ad->first][it_sid->first] = it_ad->second;
+                    }
+                    else // create a new map for new AD
+                    {
+                        std::map<std::string, ServiceState> new_map;
+                        new_map[it_sid->first] = it_ad->second;
+                        ADSIDsTable[it_ad->first] = new_map;
+                    }
+                }
+            }
+        }
+        // TODO: send table by reference for memory efficiency
+        rc = sendSidRoutingTable(it_router->second.hid, ADSIDsTable);
+    }
+    return rc;
+}
+
+int sendSidRoutingTable(std::string destHID, std::map<std::string, std::map<std::string, ServiceState> > ADSIDsTable)
+{
+    // send routing table to router:destHID. ADSIDsTable is a remapping of SIDADsTable for easier use
+    if (destHID == route_state.myHID)
+    {
+        // If destHID is self, process immediately
+        syslog(LOG_INFO, "set local sid routes");
+        return processSidRoutingTable(ADSIDsTable);
+    }
+    else
+    {
+        // If destHID is not SID, send to relevant router
+        ControlMessage msg(CTL_SID_ROUTING_TABLE, route_state.myAD, route_state.myHID);
+
+        // for checking and resend
+        msg.append(route_state.myAD);
+        msg.append(destHID);
+
+        // TODO: add ctl_seq to guarantee consistency
+        //msg.append(route_state.ctl_seq);
+
+        //Format: #2 AD1:[ #2 SID1(percentage 30),SID2(percentage 100)], AD2[ #1 SID1(percentage 70)]
+
+        msg.append(ADSIDsTable.size());
+        std::map<std::string, std::map<std::string, ServiceState> >::iterator it_ad;
+        for (it_ad = ADSIDsTable.begin(); it_ad != ADSIDsTable.end(); ++it_ad)
+        {
+            msg.append(it_ad->second.size());
+            msg.append(it_ad->first);
+            std::map<std::string, ServiceState>::iterator it_sid;
+            for (it_sid = it_ad->second.begin(); it_sid != it_ad->second.end(); ++it_sid)
+            {
+                msg.append(it_sid->first);
+                // TODO: put information from service_state inside
+                msg.append(it_sid->second.percentage);
+            }
+        }
+        // TODO: update ctl seq
+        //route_state.ctl_seq = (route_state.ctl_seq + 1) % MAX_SEQNUM;
+
+        return msg.send(route_state.sock, &route_state.ddag);
+    }
+}
+
+int processSidRoutingTable(std::map<std::string, std::map<std::string, ServiceState> > ADSIDsTable)
+{
+    int rc = 1;
+
+    std::vector<XIARouteEntry> xrt;
+    xr.getRoutes("AD", xrt);
+
+    //change vector to map AD:RouteEntry for faster lookup
+    std::map<std::string, XIARouteEntry> ADlookup;
+    vector<XIARouteEntry>::iterator ir;
+    for (ir = xrt.begin(); ir < xrt.end(); ++ir) {
+        ADlookup[ir->xid] = *ir;
+    }
+
+    std::map<std::string, std::map<std::string, ServiceState> >::iterator it_ad;
+    for (it_ad = ADSIDsTable.begin(); it_ad != ADSIDsTable.end(); ++it_ad)
+    {
+        XIARouteEntry entry = ADlookup[it_ad->first];
+        //syslog(LOG_INFO, "AD entry: %s, %d, %s, %lu", entry.xid.c_str(), entry.port, entry.nextHop.c_str(), entry.flags);
+        std::map<std::string, ServiceState>::iterator it_sid;
+        for (it_sid = it_ad->second.begin(); it_sid != it_ad->second.end(); ++it_sid)
+        {
+            // TODO: how to use flags to load balance? or add new fields into routing table for this propose
+            syslog(LOG_INFO, "add route %s, %hu, %s, %lu", it_sid->first.c_str(), entry.port, entry.nextHop.c_str(), entry.flags);
+            if (entry.xid == route_state.myAD)
+            {
+                xr.seletiveSetRoute(it_sid->first, -2, entry.nextHop, entry.flags, it_sid->second.weight, it_ad->first); //local AD, FIXME: why is port unsigned short! port could be negative numbers!
+            }
+            else
+            {
+                xr.seletiveSetRoute(it_sid->first, entry.port, entry.nextHop, entry.flags, it_sid->second.weight, it_ad->first);
+            }
+
+        }
+    }
+
     return rc;
 }
 
@@ -1157,6 +1336,10 @@ perror("bind");
 		if (route_state.send_sid_discovery == true) {
             route_state.send_sid_discovery = false;
             sendSidDiscovery();
+        }
+        if (route_state.send_sid_decision == true) {
+            route_state.send_sid_decision = false;
+            processSidDecision();
         }
 		FD_ZERO(&socks);
 		FD_SET(route_state.sock, &socks);

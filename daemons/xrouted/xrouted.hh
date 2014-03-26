@@ -93,5 +93,8 @@ int processLSA(ControlMessage msg);
 // process a control message 
 int processRoutingTable(ControlMessage msg);
 
+// process sid routing table
+int processSidRoutingTable(ControlMessage msg);
+
 // timer to send Hello and LinkStateAdvertisement messages periodically
 void timeout_handler(int signum);
