@@ -21,7 +21,7 @@
 
 #define DEFAULT_NAME "controller0"
 #define APPNAME "xcontrold"
-#define EXPIRE_TIME 60
+#define EXPIRE_TIME 600
 
 char *hostname = NULL;
 char *ident = NULL;

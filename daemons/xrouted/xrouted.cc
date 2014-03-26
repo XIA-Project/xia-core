@@ -20,7 +20,7 @@
 
 #define DEFAULT_NAME "router0"
 #define APPNAME "xrouted"
-#define EXPIRE_TIME 60
+#define EXPIRE_TIME 600
 
 //#define XR_DEBUG
 
