@@ -30,12 +30,6 @@ const int SCION_AES_ENCRYPT = AES_ENCRYPT;
 #undef AES_ENCRYPT
 #include "define.hh"
 
-// Tenma, add for AESNI
-#ifdef ENABLE_AESNI
-#include <intel_aesni/iaesni.h>
-#include <intel_aesni/iaes_asm_interface.h>
-#endif
-
 enum CryptoErrorCode
 {
     scionCryptoSuccess = 0,
@@ -93,11 +87,7 @@ class SCIONCryptoLib{
             This function generates MAC of the msg using the secret key 'ctx'. The
             generated MAC value is returned. 
         */
-#ifdef ENABLE_AESNI
-		static uint32_t genMAC(uint8_t* msg, uint16_t msgSize, keystruct* ks);
-#else
 		static uint32_t genMAC(uint8_t* msg, uint16_t msgSize, aes_context* ctx);
-#endif
         
         /**
             @brief Extracts serial number from a x509_cert

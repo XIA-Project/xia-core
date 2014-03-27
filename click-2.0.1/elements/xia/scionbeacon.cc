@@ -137,15 +137,9 @@ uint8_t SCIONBeaconLib::addLink(uint8_t* pkt,uint16_t ingress,uint16_t egress,
     SCIONBeaconLib::addPeer
     - adds peer link information to the beacon
 */
-#ifdef ENABLE_AESNI
-uint8_t SCIONBeaconLib::addPeer(uint8_t* pkt, uint16_t ingress, uint16_t egress, uint16_t
-pegress, uint8_t type, uint64_t aid, uint32_t tdid, keystruct* aesnikey,uint8_t
-ofType, uint8_t exp, uint16_t bwAlloc)
-#else
 uint8_t SCIONBeaconLib::addPeer(uint8_t* pkt, uint16_t ingress, uint16_t egress, uint16_t
 pegress, uint8_t type, uint64_t aid, uint32_t tdid, aes_context* ctx,uint8_t
 ofType, uint8_t exp, uint16_t bwAlloc)
-#endif
 {
     uint16_t totalLen = SPH::getTotalLen(pkt);
 	uint32_t ts = SPH::getTimestamp(pkt);
@@ -166,11 +160,7 @@ ofType, uint8_t exp, uint16_t bwAlloc)
     if(type==PCB_TYPE_CORE){
         oldMAC = 0;
     }
-#ifdef ENABLE_AESNI
-	uint64_t mac = createMAC(ts, exp, ingress, egress, oldMAC, aesnikey);
-#else
     uint64_t mac = createMAC(ts, exp, ingress, egress, oldMAC, ctx);
-#endif
 	//SL: This part is unnecessary...
 	/*
     if(type){

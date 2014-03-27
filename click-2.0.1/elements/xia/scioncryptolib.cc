@@ -112,11 +112,7 @@ int SCIONCryptoLib::verifySig(uint8_t* msg, uint8_t* sig, int msgSize, rsa_conte
     SCIONCryptoLib::genMAC
     - generates MAC using aes cbc MAC. 
 */
-#ifdef ENABLE_AESNI
-uint32_t SCIONCryptoLib::genMAC(uint8_t* msg, uint16_t msgSize, keystruct* ks)
-#else
 uint32_t SCIONCryptoLib::genMAC(uint8_t* msg, uint16_t msgSize, aes_context* ctx)
-#endif
 {
     uint16_t r = msgSize%16;
     if(r!=0){
@@ -138,11 +134,7 @@ uint32_t SCIONCryptoLib::genMAC(uint8_t* msg, uint16_t msgSize, aes_context* ctx
     unsigned char iv[16];
     memset(iv, 0, 16);
 
-#ifdef ENABLE_AESNI 
-	GetCBCOutput( ks, iv, input, buf);
-#else
 	aes_crypt_cbc(ctx, SCION_AES_ENCRYPT, msgSize, iv, input, buf);
-#endif
     uint32_t* ret = (uint32_t*)(buf+msgSize-4);
     return *ret;
 }
