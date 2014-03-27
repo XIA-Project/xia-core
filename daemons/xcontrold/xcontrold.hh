@@ -47,13 +47,16 @@ typedef struct ServiceState
     // public information
     int version;
     int priority;
-    int weight;
+    int capacity;
+    int capacity_factor;
+    int link_factor;
     int isController; // whether this instance is also a service controller, 0 for no
     std::string controllerAddr; // the address of the service controller
     int archType; // type of architecture of this service
     std::map<std::string, int> delays; // the delays from ADs to the instance {AD:delay}
 
     // local information used for store decision, no re-broadcast
+    double weight; // calculated weight
     bool valid; // is this candidate abandoned by local decision
     int percentage; // what is the percent of
 } ServiceState;
@@ -62,6 +65,12 @@ typedef struct ServiceController
 {
     std::map<std::string, ServiceState> instances; // the states for each service instances, AD : state pair
 } ServiceController;
+
+typedef struct ADPathState// The path state to an AD, network 'weather' report
+{
+    int delay; //in microseconds (ns)
+    int hop_count;
+} ADPathState;
 
 typedef struct RouteState {
 	int32_t sock; // socket for routing process
@@ -103,6 +112,7 @@ typedef struct RouteState {
 	std::map<std::string, int32_t> lastSeqTable; // router-HID to their last-seq number
 	std::map<std::string, int32_t> ADLastSeqTable; // router-HID to their last-seq number for ADs
 
+    std::map<std::string, ADPathState> ADPathStates; // network 'weather' report service
     std::map<std::string, ServiceState> LocalSidList; // services provided by this sid;
     std::map<std::string, ServiceController> LocalServiceControllers; // AD controller acts as service controllers for local SIDs that need to be the master node (runs controller) for now TODO: an independent service controller daemon
     std::map<std::string, std::map<std::string, ServiceState> > SIDADsTable; //discovery plane: what the controller discovered
@@ -155,7 +165,7 @@ int processSidDecision(void);
 int sendSidRoutingDecision(void);
 
 // send routing table to each router
-int sendSidRoutingTable(std::string destHID, std::map<std::string, std::map<std::string, ServiceState> > ADSIDsTable);
+int sendSidRoutingTable(std::string destHID, std::map<std::string, std::map<std::string, ServiceState> > &ADSIDsTable);
 
 // fill in SID routing for the controller itself
 int processSidRoutingTable(std::map<std::string, std::map<std::string, ServiceState> > ADSIDsTable);

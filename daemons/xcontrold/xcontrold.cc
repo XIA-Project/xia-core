@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include <time.h>
+#include <math.h>
 
 #include <sys/types.h>
 #include <netdb.h>
@@ -248,7 +249,7 @@ int sendKeepAliveToServiceController()
     {
         ControlMessage msg(CTL_SID_MANAGE_KA, route_state.myAD, route_state.myHID);
         msg.append(it->first);
-        msg.append(it->second.weight);
+        msg.append(it->second.capacity);
         // TODO:append some more states
 
         if (it->second.isController){
@@ -278,17 +279,17 @@ int processServiceKeepAlive(ControlMessage msg)
     string srcAD, srcHID;
 
     std::string sid;
-    int weight;
+    int capacity;
 
     msg.read(srcAD);
     msg.read(srcHID);
     string srcAddr = "RE " + srcAD + " " + srcHID;
     msg.read(sid);
-    msg.read(weight);
+    msg.read(capacity);
 
     if (route_state.LocalServiceControllers.find(sid) != route_state.LocalServiceControllers.end())
     { // if controller is here
-        route_state.LocalServiceControllers[sid].instances[srcAddr].weight = weight; //update attributes
+        route_state.LocalServiceControllers[sid].instances[srcAddr].capacity = capacity; //update attributes
         // TODO: reply to that instance?
         //syslog(LOG_DEBUG, "got SID %s keep alive from %s", sid.c_str(), srcAddr.c_str());
     }
@@ -325,7 +326,10 @@ int sendSidDiscovery()
             msg.append(route_state.myAD); //unified form : AD SID pairs TODO: make it compact
             msg.append(it->first);
             // TODO: append more attributes/parameters
-            msg.append(it->second.weight);
+            msg.append(it->second.capacity);
+            msg.append(it->second.capacity_factor);
+            msg.append(it->second.link_factor);
+            msg.append(it->second.priority);
             msg.append(it->second.controllerAddr);
             msg.append(it->second.archType);
         }
@@ -342,7 +346,10 @@ int sendSidDiscovery()
                 msg.append(it_ad->first);
                 msg.append(it_sid->first);
                 // TODO: put information from service_state inside
-                msg.append(it_ad->second.weight);
+                msg.append(it_ad->second.capacity);
+                msg.append(it_ad->second.capacity_factor);
+                msg.append(it_ad->second.link_factor);
+                msg.append(it_ad->second.priority);
                 msg.append(it_ad->second.controllerAddr);
                 msg.append(it_ad->second.archType);
             }
@@ -380,7 +387,7 @@ int processSidDiscovery(ControlMessage msg)
 
     string AD, SID;
     int records = 0;
-    int weight;
+    int capacity, capacity_factor, link_factor, priority;
     int archType;
     string controllerAddr;
 
@@ -397,10 +404,16 @@ int processSidDiscovery(ControlMessage msg)
         msg.read(AD);
         msg.read(SID);
         //TODO: read the parameters from msg, put them into service_state
-        msg.read(weight);
+        msg.read(capacity);
+        msg.read(capacity_factor);
+        msg.read(link_factor);
+        msg.read(priority);
         msg.read(controllerAddr);
         msg.read(archType);
-        service_state.weight = weight;
+        service_state.capacity = capacity;
+        service_state.capacity_factor = capacity_factor;
+        service_state.link_factor = link_factor;
+        service_state.priority = priority;
         service_state.controllerAddr = controllerAddr;
         service_state.archType = archType;
         updateSidAdsTable(AD, SID, service_state);
@@ -419,12 +432,18 @@ int processSidDiscovery(ControlMessage msg)
             msg.read(AD);
             msg.read(SID);
             // TODO: read the parameters from msg
-            msg.read(weight);
+            msg.read(capacity);
+            msg.read(capacity_factor);
+            msg.read(link_factor);
+            msg.read(priority);
             msg.read(controllerAddr);
             msg.read(archType);
             service_state.controllerAddr = controllerAddr;
             service_state.archType = archType;
-            service_state.weight = weight;
+            service_state.capacity = capacity;
+            service_state.capacity_factor = capacity_factor;
+            service_state.link_factor = link_factor;
+            service_state.priority = priority;
             updateSidAdsTable(AD, SID, service_state);
         }
     }
@@ -440,8 +459,7 @@ int processSidDiscovery(ControlMessage msg)
 int processSidDecision(void)
 {
     // make decision based on principles like highest priority first, load balancing, nearest...
-    // just do the load balancing so far
-    // TODO: 1.nearest AD first 2.priority first
+    // Using function: (capacity^factor/link^facor)*priority for weight
     int rc = 1;
 
     //local balance decision: decide which percentage of traffic each AD should has
@@ -449,19 +467,27 @@ int processSidDecision(void)
     for (it_sid = route_state.SIDADsTable.begin(); it_sid != route_state.SIDADsTable.end(); ++it_sid)
     {
         // calculate the percentage for each AD for this SID
-        int total_weight = 0;
+        double total_weight = 0;
 
         std::map<std::string, ServiceState>::iterator it_ad;
         // find the total weight
         for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad)
         {
+            int latency = 1000; // default, 1ms
+            if (route_state.ADPathStates.find(it_ad->first) != route_state.ADPathStates.end()){
+                latency = route_state.ADPathStates[it_ad->first].delay;
+            }
+            it_ad->second.weight = pow(it_ad->second.capacity, it_ad->second.capacity_factor)/pow(latency, it_ad->second.link_factor)*it_ad->second.priority;
             total_weight += it_ad->second.weight;
+            //syslog(LOG_INFO, "%s @%s :cap=%d, f=%d, late=%d, f=%d, prio=%d, weight is %f",it_sid->first.c_str(), it_ad->first.c_str(), it_ad->second.capacity, it_ad->second.capacity_factor, latency, it_ad->second.link_factor, it_ad->second.priority, it_ad->second.weight );
         }
+            //syslog(LOG_INFO, "total_weight is %f", total_weight );
         // make local decision. map weights to 0..100
         for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad)
         {
             it_ad->second.valid = true;
             it_ad->second.percentage = (int) 100.0*it_ad->second.weight/total_weight;
+            //syslog(LOG_INFO, "percentage is %d", it_ad->second.percentage );
         }
     }
     // for debug
@@ -480,6 +506,32 @@ int sendSidRoutingDecision(void)
     // Now we just send the identical decision to every router. The routers will reuse their
     // own routing table to interpret the decision
     int rc = 1;
+
+    // remap the SIDADsTable
+    std::map<std::string, std::map<std::string, ServiceState> > ADSIDsTable;
+
+    std::map<std::string, std::map<std::string, ServiceState> >::iterator it_sid;
+    for (it_sid = route_state.SIDADsTable.begin(); it_sid != route_state.SIDADsTable.end(); ++it_sid)
+    {
+        std::map<std::string, ServiceState>::iterator it_ad;
+        for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad)
+        {
+            if (it_ad->second.valid) // only send choices we want to use
+            {
+                if (ADSIDsTable.count(it_ad->first) > 0) // has key AD
+                {
+                    ADSIDsTable[it_ad->first][it_sid->first] = it_ad->second;
+                }
+                else // create a new map for new AD
+                {
+                    std::map<std::string, ServiceState> new_map;
+                    new_map[it_sid->first] = it_ad->second;
+                    ADSIDsTable[it_ad->first] = new_map;
+                }
+            }
+        }
+    }
+
     // for each router:
     std::map<std::string, NodeStateEntry>::iterator it_router;
     for (it_router = route_state.networkTable.begin(); it_router != route_state.networkTable.end(); ++it_router)
@@ -494,44 +546,18 @@ int sendSidRoutingDecision(void)
             // Don't calculate routes for SIDs
             continue;
         }
-
-        // remap the SIDADsTable
-        std::map<std::string, std::map<std::string, ServiceState> > ADSIDsTable;
-
-        std::map<std::string, std::map<std::string, ServiceState> >::iterator it_sid;
-        for (it_sid = route_state.SIDADsTable.begin(); it_sid != route_state.SIDADsTable.end(); ++it_sid)
-        {
-            std::map<std::string, ServiceState>::iterator it_ad;
-            for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad)
-            {
-                if (it_ad->second.valid) // only send choices we want to use
-                {
-                    if (ADSIDsTable.count(it_ad->first) > 0) // has key AD
-                    {
-                        ADSIDsTable[it_ad->first][it_sid->first] = it_ad->second;
-                    }
-                    else // create a new map for new AD
-                    {
-                        std::map<std::string, ServiceState> new_map;
-                        new_map[it_sid->first] = it_ad->second;
-                        ADSIDsTable[it_ad->first] = new_map;
-                    }
-                }
-            }
-        }
-        // TODO: send table by reference for memory efficiency
         rc = sendSidRoutingTable(it_router->second.hid, ADSIDsTable);
     }
     return rc;
 }
 
-int sendSidRoutingTable(std::string destHID, std::map<std::string, std::map<std::string, ServiceState> > ADSIDsTable)
+int sendSidRoutingTable(std::string destHID, std::map<std::string, std::map<std::string, ServiceState> > &ADSIDsTable)
 {
     // send routing table to router:destHID. ADSIDsTable is a remapping of SIDADsTable for easier use
     if (destHID == route_state.myHID)
     {
         // If destHID is self, process immediately
-        syslog(LOG_INFO, "set local sid routes");
+        //syslog(LOG_INFO, "set local sid routes");
         return processSidRoutingTable(ADSIDsTable);
     }
     else
@@ -595,11 +621,11 @@ int processSidRoutingTable(std::map<std::string, std::map<std::string, ServiceSt
             syslog(LOG_INFO, "add route %s, %hu, %s, %lu", it_sid->first.c_str(), entry.port, entry.nextHop.c_str(), entry.flags);
             if (entry.xid == route_state.myAD)
             {
-                xr.seletiveSetRoute(it_sid->first, -2, entry.nextHop, entry.flags, it_sid->second.weight, it_ad->first); //local AD, FIXME: why is port unsigned short! port could be negative numbers!
+                xr.seletiveSetRoute(it_sid->first, -2, entry.nextHop, entry.flags, it_sid->second.percentage, it_ad->first); //local AD, FIXME: why is port unsigned short? port could be negative numbers!
             }
             else
             {
-                xr.seletiveSetRoute(it_sid->first, entry.port, entry.nextHop, entry.flags, it_sid->second.weight, it_ad->first);
+                xr.seletiveSetRoute(it_sid->first, entry.port, entry.nextHop, entry.flags, it_sid->second.percentage, it_ad->first);
             }
 
         }
@@ -618,7 +644,12 @@ int updateSidAdsTable(std::string AD, std::string SID, ServiceState service_stat
         if (route_state.SIDADsTable[SID].count(AD) > 0 )
         {
             //TODO: update if version is newer
-            route_state.SIDADsTable[SID][AD].weight = service_state.weight;
+            route_state.SIDADsTable[SID][AD].capacity = service_state.capacity;
+            route_state.SIDADsTable[SID][AD].capacity_factor = service_state.capacity_factor;
+            route_state.SIDADsTable[SID][AD].link_factor = service_state.link_factor;
+            route_state.SIDADsTable[SID][AD].priority = service_state.priority;
+
+            //TODO: update other parameters
         }
         else
         {
@@ -633,7 +664,7 @@ int updateSidAdsTable(std::string AD, std::string SID, ServiceState service_stat
         route_state.SIDADsTable[SID] = new_map;
     }
     // TODO: make return value meaningful or make this function return void
-    //syslog(LOG_INFO, "update SID:%s, weight %d from %s", SID.c_str(), service_state.weight, AD.c_str());
+    //syslog(LOG_INFO, "update SID:%s, capacity %d, f1 %d, f2 %d, priority %d, from %s", SID.c_str(), service_state.capacity, service_state.capacity_factor, service_state.link_factor, service_state.priority, AD.c_str());
     return rc;
 }
 
@@ -663,6 +694,9 @@ int processMsg(std::string msg)
             break;
         case CTL_SID_DISCOVERY:
             rc = processSidDiscovery(m);
+            break;
+        case CTL_SID_ROUTING_TABLE:
+            //the table msg reflects back, ingore
             break;
         case CTL_SID_MANAGE_KA:
             rc = processServiceKeepAlive(m);
@@ -1219,7 +1253,6 @@ void set_sid_conf(const char* myhostname)
     char controller_addr[BUF_SIZE];
     char sid[BUF_SIZE];
     std::string service_sid;
-    //int weight;
 
     int section_index = 0;
     snprintf(full_path, BUF_SIZE, "%s/etc/%s_sid.ini", XrootDir(root, BUF_SIZE), myhostname);
@@ -1230,7 +1263,10 @@ void set_sid_conf(const char* myhostname)
         ServiceState service_state;
         ini_gets(section_name, "sid", sid, sid, BUF_SIZE, full_path);
         service_sid = std::string(sid);
-        service_state.weight = ini_getl(section_name, "weight", 100, full_path);
+        service_state.capacity = ini_getl(section_name, "capacity", 100, full_path);
+        service_state.capacity_factor = ini_getl(section_name, "capacity_factor", 1, full_path);
+        service_state.link_factor = ini_getl(section_name, "link_factor", 0, full_path);
+        service_state.priority = ini_getl(section_name, "priority", 1, full_path);
         service_state.isController = ini_getbool(section_name, "isController", 0, full_path);
         // get the address of the service controller
         ini_gets(section_name, "controllerAddr", controller_addr, controller_addr, BUF_SIZE, full_path);
@@ -1244,7 +1280,7 @@ void set_sid_conf(const char* myhostname)
             }
         }
         service_state.archType = ini_getl(section_name, "archType", 0, full_path);
-        //fprintf(stderr, "read state%s, %d, %d, %s\n", sid, service_state.weight, service_state.isController, service_state.controllerAddr.c_str());
+        //fprintf(stderr, "read state%s, %d, %d, %s\n", sid, service_state.capacity, service_state.isController, service_state.controllerAddr.c_str());
         route_state.LocalSidList[service_sid] = service_state;
         section_index++;
     }
