@@ -126,18 +126,6 @@ struct Clients{
 	HostAddr addr;
     uint64_t aid;
 };
-
-// tempral use for XIA
-struct EgressIngressPair{
-	uint8_t ntype;
-	unsigned char egress_ad[41];
-    unsigned char egress_addr[41];
-    unsigned char ingress_ad[41];
-    unsigned char ingress_addr[41];
-    unsigned char dest_ad[41];
-    unsigned char dest_addr[41];
-};
-
 /////////////////////////////////////////////////
 
 
@@ -149,7 +137,6 @@ class TopoParser{
        m_iNumServers=0;
        m_iNumGateways=0; 
        m_iNumClients=0;
-       m_iNumRoutePairs=0; // tempral for XIA
     }
     
     
@@ -159,7 +146,6 @@ class TopoParser{
     int m_iNumServers;
     int m_iNumGateways;
     int m_iNumClients;
-    int m_iNumRoutePairs; // tempral for XIA
     XMLDocument doc;
 
 	int parseAddress(XMLElement * ptr, SCIONElem * elem);
@@ -174,9 +160,6 @@ class TopoParser{
     int getNumClients(){ return m_iNumClients;}
     /** @brief Returns the number of gateways */
     int getNumGateways(){ return m_iNumGateways;}
-    // tempral for XIA
-    int getNumRoutePairs(){ return m_iNumRoutePairs;}
-    
     /** @brief Initializes the topo_parser object 
         This function MUST be called before calling any
         of the functions for topo_parser. 
@@ -197,6 +180,6 @@ class TopoParser{
     int parseClients(map<int, ClientElem> &clients);
     int parseIFID2AID(map<uint16_t, uint64_t> &i2amap);
     int parseIFID2AID(map<uint16_t, HostAddr> &i2amap);
-    int parseEgressIngressPairs(multimap<int, EgressIngressPair> &pairmap);
+    
 };
 #endif
