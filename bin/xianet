@@ -17,7 +17,7 @@
 # find the root of the XIA source tree
 # assumes this script is in a directory off the parent of the XIA tree
 # and that the daemons it starts are rooted off of the same location
-#  so XIADIR would be /xia-core assuming the script were /xia-core/tools/xianet
+#  so XIADIR would be /xia-core assuming the script were /xia-core/bin/xianet
 XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
 
 # click parameters
