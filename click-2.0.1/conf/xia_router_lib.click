@@ -464,6 +464,34 @@ elementclass XIAController2Port {
 	xrc -> XIAPaintSwitch[0,1] => [1]xlc0[1], [1]xlc1[1]  -> [0]xrc;
 };
 
+// 4-port controller node
+elementclass XIAController4Port {
+    $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac |
+
+    // $local_addr: the full address of the node
+    // $local_ad: the node's AD
+    // $local_hid: the node's HID
+    // $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
+
+    // input[0], input[1]: a packet arrived at the node
+    // output[0]: forward to interface 0
+    // output[1]: forward to interface 1
+    // output[2]: forward to interface 2
+    // output[3]: forward to interface 3
+
+    xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $click_port, 4, 0);
+
+    Script(write xrc/n/proc/rt_AD.add $local_ad $DESTINED_FOR_LOCALHOST);    // self AD as destination
+
+	xlc0 :: XIALineCard($local_addr, $local_hid, $mac, 0);
+	xlc1 :: XIALineCard($local_addr, $local_hid, $mac, 1);
+	xlc2 :: XIALineCard($local_addr, $local_hid, $mac, 2);
+	xlc3 :: XIALineCard($local_addr, $local_hid, $mac, 3);
+    
+	input => xlc0, xlc1, xlc2, xlc3 => output;
+	xrc -> XIAPaintSwitch[0,1,2,3] => [1]xlc0[1], [1]xlc1[1], [1]xlc2[1], [1]xlc3[1] -> [0]xrc;
+};
+
 // 1-port SCION Beacon Server Core
 elementclass XIASCIONBeaconServerCore {
     $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac,
@@ -516,4 +544,58 @@ elementclass XIASCIONBeaconServer {
     input => xlc => output;
 
     sbs -> xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> sbs;
+};
+
+// 1-port SCION Path Server Core
+elementclass XIASCIONPathServerCore {
+    $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac,
+    AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file |
+
+    // $local_addr: the full address of the node
+    // $local_ad: the node's AD
+    // $local_hid: the node's HID
+    // $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
+
+    // input[0]: a packet arrived at the node
+    // output[0]: forward to interface 0
+
+    xlc :: XIALineCard($local_addr, $local_hid, $mac, 0);
+
+    xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $click_port, 1, 0);
+    //Script(write xrc/n/proc/rt_AD.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
+    //Script(write xrc/n/proc/rt_HID.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
+
+    sps :: SCIONPathServerCore(AD $local_ad, HID $local_hid,
+            AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file);
+
+    input => xlc => output;
+
+    sps -> xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> sps;
+};
+
+// 1-port SCION Path Server
+elementclass XIASCIONPathServer {
+    $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac,
+    AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file |
+
+    // $local_addr: the full address of the node
+    // $local_ad: the node's AD
+    // $local_hid: the node's HID
+    // $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
+
+    // input[0]: a packet arrived at the node
+    // output[0]: forward to interface 0
+
+    xlc :: XIALineCard($local_addr, $local_hid, $mac, 0);
+
+    xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $click_port, 1, 0);
+    //Script(write xrc/n/proc/rt_AD.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
+    //Script(write xrc/n/proc/rt_HID.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
+
+    sps :: SCIONPathServer(AD $local_ad, HID $local_hid,
+            AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file);
+
+    input => xlc => output;
+
+    sps -> xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> sps;
 };
