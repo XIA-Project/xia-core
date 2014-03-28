@@ -93,8 +93,8 @@ class MulticastSource{
     pthread_t _thread;
     pthread_t _thread2;
     sem_t qsem;
-    pthread_mutex_t  mtxlock = PTHREAD_MUTEX_INITIALIZER;
-    pthread_mutex_t  chunksendmtxlock = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_t  mtxlock;
+    pthread_mutex_t  chunksendmtxlock;
 
     Graph *DGramDAG;
     std::map<std::string, Receiver *> *hosts; 
@@ -151,6 +151,8 @@ class MulticastSource{
     void PullChunksRP(std::string cmd);
   
     MulticastSource(std::string sn, std::string sid, unsigned int cs = CHUNKSIZE, int NXIDs=NXIDS ){
+      pthread_mutex_init(&mtxlock, NULL);
+      pthread_mutex_init(&chunksendmtxlock, NULL);
       hosts = new std::map<std::string, Receiver *>;
       RPs = new std::map<std::string, Graph *>;
       MulticastChunks = new std::queue<MulticastChunkData *>;
@@ -166,6 +168,11 @@ class MulticastSource{
       if(cs > (XIA_MAXBUF-500))
 	ChunkSize = XIA_MAXBUF - 500;
     }
+
+	~MulticastSource() {
+		pthread_mutex_destroy(&mtxlock);
+		pthread_mutex_destroy(&chunksendmtxlock);
+	}
   
 
 };
@@ -950,12 +957,6 @@ void MulticastSource::Initialize(){
     say ("\n%s (%s): started\n", TITLE, VERSION);
     say("Datagram service started\n");
 
-    
-    pthread_mutex_init(&mtxlock, NULL);
-  
-
-  
-  
     // create a socket, and listen for incoming connections
     if ((DGramSock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
 	    die(-1, "Unable to create the listening socket\n");

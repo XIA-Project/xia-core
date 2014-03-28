@@ -57,7 +57,6 @@ class MulticastEndhost{
    static void * InternalControlThread(void * This) {((MulticastEndhost *)This)->ControlLoop(); return NULL;}
    pthread_t _thread;
    pthread_t _thread2;
-   pthread_mutex_t  mtxlock = PTHREAD_MUTEX_INITIALIZER;
    std::string fname;
    
     Graph *DGramDAG;
@@ -108,6 +107,7 @@ class MulticastEndhost{
   
 
   }
+
 
  
 };
@@ -612,7 +612,6 @@ void MulticastEndhost::InitializeClient(std::string mySID)
   int rc;
 // 	char sdag[1024];
   char IP[MAX_XID_SIZE];
-  pthread_mutex_init(&mtxlock, NULL);
 
   // create a socket, and listen for incoming connections
   if ((DGramSock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
