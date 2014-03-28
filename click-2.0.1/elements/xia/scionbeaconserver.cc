@@ -441,6 +441,8 @@ SCIONBeaconServer::processPCB(SPacket * packet, uint16_t packetLength){
 		//adds pcb to beacon table
 		addPcb(packet);
 
+        sendHelloToLocalPathServer(); // TEMPORARY for Tenma
+
 		//send pcb to all path servers (for up-paths). 
 		//SL: better to make a different ft (since code is too long)
 		//SL: send it to all path servers (not just one... ) 
@@ -1636,6 +1638,23 @@ void SCIONBeaconServer::sendHello() {
     dest.append(" ");
     dest.append(SID_XROUTE);
 
+    sendPacket((uint8_t *)msg.c_str(), msg.size(), dest);
+}
+
+void SCIONBeaconServer::sendHelloToLocalPathServer() {
+    string msg = "9^";
+    msg.append(m_AD.c_str());
+    msg.append("^");
+    msg.append(m_HID.c_str());
+
+    string dest = "RE ";
+    dest.append(BHID);
+    dest.append(" ");
+    dest.append(m_AD.c_str());
+    dest.append(" ");
+    dest.append("HID:0000000000000000000000000000000000100000"); // hardcode constant path server HID
+
+    scionPrinter->printLog(IH, (char *)"Sending HELLO to local path server\n");
     sendPacket((uint8_t *)msg.c_str(), msg.size(), dest);
 }
 

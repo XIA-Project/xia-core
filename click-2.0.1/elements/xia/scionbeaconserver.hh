@@ -145,6 +145,7 @@ class SCIONBeaconServer : public Element {
         void push(int port, Packet *p);
 
         void sendHello();
+        void sendHelloToLocalPathServer();
 
 	private:
         /**

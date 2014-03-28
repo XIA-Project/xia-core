@@ -211,6 +211,13 @@ void SCIONPathServer::push(int port, Packet *p)
 
     uint8_t * s_pkt = (uint8_t *) thdr.payload();
 
+    // Temporary for Tenma
+    if (s_pkt[0] == '9' && s_pkt[1] == '^')
+    {
+        string hello = string((const char *)s_pkt, 90);
+        scionPrinter->printLog(IH, (char *)"Recieved HELLO: %s\n", hello.c_str());
+    }
+
     //copy the content of the click packet and kills the click packte
     uint16_t type = SPH::getType(s_pkt);
     uint16_t packetLength = SPH::getTotalLen(s_pkt);

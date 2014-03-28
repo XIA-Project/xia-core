@@ -123,6 +123,8 @@ int SCIONBeaconServerCore::initialize(ErrorHandler* errh) {
   }
   scionPrinter->printLog(IL, (char *)"Load OFG key Done.\n");
 
+  scionPrinter->printLog(IH, (char *)"numChildren=%d\n", m_routepairs.count(Child));
+
   // start scheduler to received packets
   ScheduleInfo::initialize_task(this, &_task, errh);
   // Trigger Timer
@@ -163,7 +165,7 @@ void SCIONBeaconServerCore::parseTopology(){
     parser.parseServers(m_servers);
     // parser.parseRouters(m_routers);
     parser.parseEgressIngressPairs(m_routepairs);
-    
+
     std::multimap<int, ServerElem>::iterator itr;
     for(itr = m_servers.begin(); itr != m_servers.end(); itr++)
     	if(itr->second.aid == m_uAid)
