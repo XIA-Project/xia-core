@@ -168,7 +168,7 @@ int sendSidRoutingDecision(void);
 int sendSidRoutingTable(std::string destHID, std::map<std::string, std::map<std::string, ServiceState> > &ADSIDsTable);
 
 // fill in SID routing for the controller itself
-int processSidRoutingTable(std::map<std::string, std::map<std::string, ServiceState> > ADSIDsTable);
+int processSidRoutingTable(std::map<std::string, std::map<std::string, ServiceState> > &ADSIDsTable);
 
 // tool function update the SIDADsTable, add or update SID:AD pair into SID:[ADs]
 int updateSidAdsTable(std::string AD, std::string SID, ServiceState service_state);

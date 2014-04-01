@@ -595,7 +595,7 @@ int sendSidRoutingTable(std::string destHID, std::map<std::string, std::map<std:
     }
 }
 
-int processSidRoutingTable(std::map<std::string, std::map<std::string, ServiceState> > ADSIDsTable)
+int processSidRoutingTable(std::map<std::string, std::map<std::string, ServiceState> > &ADSIDsTable)
 {
     int rc = 1;
 
@@ -618,7 +618,7 @@ int processSidRoutingTable(std::map<std::string, std::map<std::string, ServiceSt
         for (it_sid = it_ad->second.begin(); it_sid != it_ad->second.end(); ++it_sid)
         {
             // TODO: how to use flags to load balance? or add new fields into routing table for this propose
-            syslog(LOG_INFO, "add route %s, %hu, %s, %lu", it_sid->first.c_str(), entry.port, entry.nextHop.c_str(), entry.flags);
+            // syslog(LOG_INFO, "add route %s, %hu, %s, %lu", it_sid->first.c_str(), entry.port, entry.nextHop.c_str(), entry.flags);
             if (entry.xid == route_state.myAD)
             {
                 xr.seletiveSetRoute(it_sid->first, -2, entry.nextHop, entry.flags, it_sid->second.percentage, it_ad->first); //local AD, FIXME: why is port unsigned short? port could be negative numbers!
