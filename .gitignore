@@ -122,6 +122,7 @@ example/xecho
 etc/click/templates/xia_address.click
 etc/click/templates/host.click
 etc/click/templates/router.click
+etc/click/templates/controller.click
 etc/click/templates/dual_stack_host.click
 etc/click/templates/dual_stack_router.click
 

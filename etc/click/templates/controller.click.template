@@ -2,7 +2,7 @@ require(library xia_router_lib.click);
 require(library xia_address.click);
 
 // host instantiation
-$HNAME :: XIAEndHost (RE $ADNAME $HID, $HID, 1500, 0, $MAC0);
+$HNAME :: XIAController (RE $ADNAME $HID, $ADNAME, $HID, $EXTERNAL_IP, 1500, $MAC0);
 
 ######
 sock_server::Socket("UDP", 0.0.0.0, $PORT) -> [0]${HNAME}[0] -> socket_client::Socket("UDP", $SOCK_IP, $PORT);
@@ -10,5 +10,4 @@ sock_server::Socket("UDP", 0.0.0.0, $PORT) -> [0]${HNAME}[0] -> socket_client::S
 FromDevice($IFACE, METHOD LINUX) -> [0]${HNAME}[0] -> ToDevice($IFACE);
 ######
 
-	ControlSocket(tcp, 7777);
-
+    ControlSocket(tcp, 7777);

@@ -12,6 +12,7 @@ from string import Template
 # constants
 hostconfig = "host.click"
 routerconfig = "router.click"
+controllerconfig = "controller.click"
 dualhostconfig = "dual_stack_host.click"
 dualrouterconfig = "dual_stack_router.click"
 xia_addr = "xia_address.click"
@@ -22,6 +23,7 @@ nodetype = "host"
 dual_stack = False
 hostname = ""
 adname = "AD_INIT"
+hidname = ""
 nameserver = "no"
 nameserver_ad = "AD_NAMESERVER"
 nameserver_hid = "HID_NAMESERVER"
@@ -29,11 +31,15 @@ ip_override_addr = None
 interface_filter = None
 interface = None
 socket_ips_ports = None
+output_file = ""
 
 #
 # create a globally unique HID based off of our mac address
 #
 def createHID(prefix="00000000"):
+    global hidname
+    if hidname != "":
+        return hidname
     hid = "HID:" + prefix
     id = uuid.uuid1(uuid.getnode())
     return hid + id.hex
@@ -42,6 +48,9 @@ def createHID(prefix="00000000"):
 # create a globally unique AD based off of router's mac address
 #
 def createAD():
+    global adname
+    if adname != "AD_INIT":
+        return adname
     ad = "AD:10000000"
     id = uuid.uuid1(uuid.getnode())
     return ad + id.hex
@@ -78,10 +87,10 @@ def getOsxInterfaces(skip, use_interface):
     interfaces = interfaces.split('\n')
 
     for interface in interfaces:
-        cmd = 'ifconfig %s | grep ether | tr -s " " | cut -d\  -f2' % interface
+        cmd = "ifconfig %s | grep ether | awk '{print $2}'"% interface
         result = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
         mac = result.stdout.read().strip()
-        cmd = 'ifconfig %s | grep "inet " | cut -d\  -f2' % interface
+        cmd = "ifconfig %s | grep inet | grep -v inet6 |awk '{print $2}'" % interface
         result = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
         ip = result.stdout.read().strip()
 
@@ -108,6 +117,9 @@ def getLinuxInterfaces(ignore_interfaces, specific_interface):
             "/sbin/ifconfig | %s grep -v fake | grep -A 1 HWaddr | %s sed 's/ \+/ /g' | sed s/addr://" % (filters, use_interface),
             shell=True, stdout=subprocess.PIPE)
     result = cmdline.stdout.read().strip()
+
+    if (result.find('HWaddr') < 0): #new ifconfig in linux has OSX style outputs
+        return getOsxInterfaces(ignore_interfaces, specific_interface)
 
     # TODO: eliminate this by making the shell command above smarter
     addrs = []
@@ -203,7 +215,10 @@ def makeHostConfig(hid):
         text = f.read()
         f.close()
 
-        f = open(hostconfig, "w")
+        if output_file == "":
+            f = open(hostconfig, "w")
+        else:
+            f = open(output_file, "w")
 
     except Exception, e:
         print "error opening file for reading and/or writing\n%s" % e
@@ -250,6 +265,74 @@ def makeHostConfig(hid):
     f.close()
 
 #
+# Fill in the controller template file
+#
+def makeControllerConfig(hid):
+
+    interfaces = getInterfaces(interface_filter, interface)
+
+    if (len(interfaces) == 0) and not socket_ips_ports:
+        print "no available interface"
+        exit(1)
+    elif (len(interfaces) > 1):
+        print "multiple interfaces found, using " + interfaces[0][0]
+
+    try:
+        f = open(controllerconfig + "." + ext, "r")
+        text = f.read()
+        f.close()
+
+        if output_file == "":
+            f = open(controllerconfig, "w")
+        else:
+            f = open(output_file, "w")
+
+    except Exception, e:
+        print "error opening file for reading and/or writing\n%s" % e
+        sys.exit(-1)
+
+    (header, socks, body, footer) = text.split("######")
+
+    xchg = {}
+    xchg['HNAME'] = getHostname()
+    xchg['ADNAME'] = adname
+
+    if (nameserver == "no"):
+        xchg['HID'] = hid
+    else:
+        xchg['HID'] = nameserver_hid
+
+    if socket_ips_ports:
+        ip, port = socket_ips_ports.split(',')[0].strip().split(':')
+        xchg['PORT'] = int(port)
+        xchg['SOCK_IP'] = ip
+        xchg['CLIENT'] = 'false' if ip == '0.0.0.0' else 'true'
+        text = header + socks + footer
+    else:
+        text = header + body + footer
+
+    if interfaces:
+        xchg['IFACE'] = interfaces[0][0]
+        xchg['MAC'] = interfaces[0][1]
+        xchg['EXTERNAL_IP'] = interfaces[0][4]
+
+    # create $MAC0 thru $MAC3 replacements (not sure if needed for hosts??)
+    i = 0
+    while i < 4 and i < len(interfaces):
+        repl = 'MAC' + str(i)
+        xchg[repl] = interfaces[i][1]
+        i += 1
+    while i < 4:
+        repl = 'MAC' + str(i)
+        xchg[repl] = "00:00:00:00:00:00"
+        i += 1
+
+    s = Template(text)
+    newtext = s.substitute(xchg)
+    f.write(newtext)
+    f.close()
+
+#
 # fill in the router template
 #
 # the router config file is broken into 4 sections
@@ -265,7 +348,10 @@ def makeRouterConfig(ad, hid):
     interfaces = getInterfaces(interface_filter, interface)
 
     template = '%s.%s' % (routerconfig, ext)
-    outfile = routerconfig
+    if output_file == "":
+        outfile = routerconfig
+    else:
+        outfile = output_file
 
     socket_ip_port_list = [p.strip() for p in socket_ips_ports.split(',')] if socket_ips_ports else []
 
@@ -447,7 +533,10 @@ def makeDualHostConfig(ad, hid, rhid):
         text = f.read()
         f.close()
 
-        f = open(dualhostconfig, "w")
+        if output_file == "":
+            f = open(dualhostconfig, "w")
+        else:
+            f = open(output_file, "w")
 
     except:
         print "error opening file for reading and/or writing"
@@ -611,15 +700,17 @@ def getOptions():
     global nodetype
     global dual_stack
     global adname
+    global hidname
     global nameserver
     global ip_override_addr
     global interface_filter
     global interface
     global socket_ips_ports
+    global output_file
     try:
-        shortopt = "hr4ni:a:m:f:I:tP:"
+        shortopt = "hrc4ni:a:H:m:f:I:tP:o:"
         opts, args = getopt.getopt(sys.argv[1:], shortopt,
-            ["help", "router", "host", "dual-stack", "nameserver", "id=", "ad=", "manual-address=", "interface-filter=", "host-interface=", "socket-ports="])
+            ["help", "router", "host", "controller", "dual-stack", "nameserver", "id=", "ad=", "hid=", "manual-address=", "interface-filter=", "host-interface=", "socket-ports=, output-file="])
     except getopt.GetoptError, err:
         # print     help information and exit:
         print str(err) # will print something like "option -a not recognized"
@@ -631,10 +722,14 @@ def getOptions():
             help()
         elif o in ("-a", "--ad"):
             adname = a
+        elif o in ("-H", "--hid"):
+            hidname = a
         elif o in ("-i", "--id"):
             hostname = a
         elif o in ("-r", "--router"):
             nodetype = "router"
+        elif o in ("-c", "--controller"):
+            nodetype = "controller"
         elif o in ("-t", "--host"):
             nodetype = "host"
         elif o in ("-4", "--dual-stack"):
@@ -649,6 +744,8 @@ def getOptions():
             socket_ips_ports = a
         elif o in ("-n", "--nameserver"):
             nameserver = "yes"
+        elif o in ("-o", "--output-file"):
+            output_file = a
         else:
              assert False, "unhandled option"
 
@@ -657,22 +754,28 @@ def getOptions():
 #
 def help():
     print """
-usage: xconfig [-h] [-rt] [-4] [-n] [-i hostname] [-m ipaddr] [-f if_filter] [-P socket-ports] [-I host-interface]
+usage: xconfig [-h] [-rtc] [-4] [-n] [-i hostname] [-m ipaddr] [-f if_filter] [-P socket-ports] [-I host-interface] [-o output-file]
 where:
   -h            : get help
   --help
 
-  -i <name>      : set HID name tp <name>
+  -i <name>      : set host name tp <name>
   --id=<name>
 
   -a <name>         : set AD name to <name>
   --ad=<name>
+
+  -H <name>         : set HID name to <name>
+  --hid=<name>
 
   -r            : do router config instead of host
   --router
 
   -t            : do a host config (this is the default)
   --host
+
+  -c            : do a controller config instead of host
+  --controller
 
   -4            : do a dual-stack config
   --dual-stack
@@ -691,6 +794,9 @@ where:
 
   -I            : the network interface a host should use, if it has multiple
   --host-interface=<interface>
+
+  -o            : output file to a diffrernt path or name rather than default 
+  --output-file=<path>
 """
     sys.exit()
 
@@ -717,6 +823,8 @@ def main():
             makeDualRouterConfig(ad, rhid)
         else:
             makeRouterConfig(ad, rhid)
+    if (nodetype == "controller"): # (almost) the same template as host
+            makeControllerConfig(hid)
 
 if __name__ == "__main__":
     main()
