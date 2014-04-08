@@ -2,20 +2,16 @@
 <Topology>
 	<Servers>
 		<BeaconServer>
-			<AID>11111</AID>
-            <AddrType>SCION</AddrType>
-            <Addr>11111</Addr>
+			<HID>0000000000000000000000000000000000200000</HID>
         </BeaconServer>
         <PathServer>
-			<AID>22222</AID>
-            <AddrType>SCION</AddrType>
-            <Addr>22222</Addr>
+			<HID>0000000000000000000000000000000000100000</HID>
         </PathServer>
+        <!--
         <CertificateServer>
-			<AID>33333</AID>
-            <AddrType>SCION</AddrType>
-            <Addr>33333</Addr>
+			<HID>0000000000000000000000000000000000200000</HID>
         </CertificateServer>
+        -->
 	</Servers>
 	<RoutePair>
 		<RPair>

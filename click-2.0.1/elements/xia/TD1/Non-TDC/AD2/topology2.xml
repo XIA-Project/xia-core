@@ -2,15 +2,16 @@
 <Topology>
 	<Servers>
 		<BeaconServer>
-            <AID>11111</AID>
-            <AddrType>SCION</AddrType>
-            <Addr>11111</Addr>
+			<HID>0000000000000000000000000000000000200000</HID>
         </BeaconServer>
+        <PathServer>
+			<HID>0000000000000000000000000000000000100000</HID>
+        </PathServer>
+        <!--
         <CertificateServer>
-            <AID>33333</AID>
-            <AddrType>SCION</AddrType>
-            <Addr>33333</Addr>
+			<HID>0000000000000000000000000000000000200000</HID>
         </CertificateServer>
+        -->
 	</Servers>
 	
 	<RoutePair>
@@ -33,49 +34,4 @@
 			<DEST_HID>0000000000000000000000000000000000200000</DEST_HID>
 		</RPair>
     </RoutePair>
-	
-	<!--
-	<BorderRouters>
-		<Router>
-			<AID>1111</AID>
-            <AddrType>SCION</AddrType>
-			<Addr>1111</Addr>
-			<Interface>
-				<IFID>21</IFID>
-				<NeighborAD>1</NeighborAD>
-				<NeighborType>PARENT</NeighborType>
-			</Interface>
-		</Router>	
-		<Router>
-			<AID>2222</AID>
-            <AddrType>SCION</AddrType>
-			<Addr>2222</Addr>
-			<Interface>
-				<IFID>23</IFID>
-				<NeighborAD>3</NeighborAD>
-				<NeighborType>PEER</NeighborType>
-			</Interface>
-		</Router>	
-		<Router>
-			<AID>3333</AID>
-            <AddrType>SCION</AddrType>
-			<Addr>3333</Addr>
-            <Interface>
-				<IFID>25</IFID>
-				<NeighborAD>5</NeighborAD>
-				<NeighborType>CHILD</NeighborType>
-			</Interface>
-		</Router>	
- 		<Router>
-			<AID>4444</AID>
-            <AddrType>SCION</AddrType>
-			<Addr>4444</Addr>
-            <Interface>
-				<IFID>26</IFID>
-				<NeighborAD>6</NeighborAD>
-				<NeighborType>CHILD</NeighborType>
-			</Interface>
-		</Router>	
-    </BorderRouters>
-    -->
 </Topology>

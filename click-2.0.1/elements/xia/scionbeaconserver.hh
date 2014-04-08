@@ -145,7 +145,6 @@ class SCIONBeaconServer : public Element {
         void push(int port, Packet *p);
 
         void sendHello();
-        void sendHelloToLocalPathServer();
 
 	private:
         /**
@@ -621,7 +620,7 @@ class SCIONBeaconServer : public Element {
             List of internal servers.
             Indexed by the server type.
         */
-        std::multimap<int, ServerElem> m_servers;
+        std::multimap<int, Servers> m_servers;
         /**
             List of internal routers.
             Indexed by the connected neighbor type.

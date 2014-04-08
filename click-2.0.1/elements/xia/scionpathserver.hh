@@ -470,7 +470,7 @@ class SCIONPathServer : public Element {
             List of local servers 
             indexted by server type 
         */
-        std::multimap<int, ServerElem> m_servers;
+        std::multimap<int, Servers> m_servers;
         /** 
             List of routers 
             indexted by connected neighbor type 

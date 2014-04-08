@@ -45,7 +45,7 @@ int TopoParser::loadTopoFile(const char* path){
 	TopoParser::parseServers
 	construct a server list from the topology file
 */
-int TopoParser::parseServers(multimap<int, ServerElem> &servers){
+int TopoParser::parseServers(multimap<int, Servers> &servers){
     m_iNumServers=0;
     if(!m_bIsInit){
         printf("Topology file has not been opened yet\n");
@@ -54,29 +54,25 @@ int TopoParser::parseServers(multimap<int, ServerElem> &servers){
     XMLElement *ptr = doc.RootElement()->FirstChildElement("Servers");
     XMLElement *ptr2 = ptr->FirstChildElement();
     
-    ServerElem newServer; 
+    Servers newServer; 
 
 	while(ptr2!=NULL){
-		//every SCION element has AID (which is interpreted in the SCION network)
-		newServer.aid = parseAID(ptr2);
-
-		if(parseAddress(ptr2,(SCIONElem *)&newServer) == TopoParseFail){
-        	ptr2=ptr2->NextSiblingElement();
-			continue;
-		}
-
+		
         if(!strcmp(ptr2->Name(), "BeaconServer")){
             newServer.type=BeaconServer;
-            servers.insert(pair<int, ServerElem>(BeaconServer, newServer));
+            memcpy(newServer.HID, ptr2->FirstChildElement("HID")->GetText(), 40);
+            newServer.HID[40] = '\0';
+            servers.insert(pair<int, Servers>(BeaconServer, newServer));
         }else if(!strcmp(ptr2->Name(), "CertificateServer")){
             newServer.type=CertificateServer;
-            servers.insert(pair<int, ServerElem>(CertificateServer, newServer));
-			//SL: uncommented to attach CS
-			//Note: this kind of temporarily commented out blocks should be marked
-			//otherwise, it's hard for others to work with this file...
+            memcpy(newServer.HID, ptr2->FirstChildElement("HID")->GetText(), 40);
+            newServer.HID[40] = '\0';
+            servers.insert(pair<int, Servers>(CertificateServer, newServer));
         }else if(!strcmp(ptr2->Name(), "PathServer")){
             newServer.type=PathServer;
-            servers.insert(pair<int, ServerElem>(PathServer, newServer));
+            memcpy(newServer.HID, ptr2->FirstChildElement("HID")->GetText(), 40);
+            newServer.HID[40] = '\0';
+            servers.insert(pair<int, Servers>(PathServer, newServer));
         }else{
             printf("Unknown server type=%s\n",ptr2->Name());
             return TopoParseFail;

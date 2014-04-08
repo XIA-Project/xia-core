@@ -207,10 +207,9 @@ class SCIONBeaconServerCore : public Element {
             This function updates the IFID map using the information inside the
             IFID REP packet. 
         */
-        void updateIfidMap(uint8_t * packet);
-
-        void initializeOutputPort();
-        void constructIfid2AddrMap();
+        //void updateIfidMap(uint8_t * packet);
+        //void initializeOutputPort();
+        //void constructIfid2AddrMap();
 
         /** True if ROT is initiated, False if not. */     
         bool m_bROTInitiated;
@@ -260,33 +259,30 @@ class SCIONBeaconServerCore : public Element {
         ofgKey m_prevOfgKey;                    /**<Previous Opaque Field Genration Key */
         
         // topology structures
-        std::map<uint16_t, uint16_t> ifid_map;  /**< Map between local ifid and
-                                                                            neighbor ifid*/
-        std::map<uint16_t, HostAddr> ifid2addr; /** Map between local ifid and
-                                                neighbor's AID */
+        //std::map<uint16_t, uint16_t> ifid_map;  /**< Map between local ifid and neighbor ifid*/
+        //std::map<uint16_t, HostAddr> ifid2addr; /** Map between local ifid and neighbor's AID */
 
         /** 
             List of servers 
             Indexed by the server type.
         */
-        std::multimap<int, ServerElem> m_servers;
+        std::multimap<int, Servers> m_servers;
         /**
             List of routers.
             Indexed by the connected neighbor type.
         */  
-        std::multimap<int, RouterElem> m_routers;
-        
+        //std::multimap<int, RouterElem> m_routers;
         std::multimap<int, EgressIngressPair> m_routepairs;
         
         /**
             SCION encap element for IP tunneling.
         */
-        SCIONIPEncap * m_pIPEncap;
+        //SCIONIPEncap * m_pIPEncap;
         /**
             Port information for IP tunneling that contains address type and
             address of each interface.
         */
-        vector<portInfo> m_vPortInfo;
+        //vector<portInfo> m_vPortInfo;
 
 };
 

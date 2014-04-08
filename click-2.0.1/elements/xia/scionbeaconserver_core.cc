@@ -163,13 +163,7 @@ void SCIONBeaconServerCore::parseTopology(){
     TopoParser parser;
     parser.loadTopoFile(m_sTopologyFile.c_str()); 
     parser.parseServers(m_servers);
-    // parser.parseRouters(m_routers);
     parser.parseEgressIngressPairs(m_routepairs);
-
-    std::multimap<int, ServerElem>::iterator itr;
-    for(itr = m_servers.begin(); itr != m_servers.end(); itr++)
-    	if(itr->second.aid == m_uAid)
-    		m_Addr = itr->second.addr;
 }
 
 void SCIONBeaconServerCore::loadPrivateKey() {
@@ -301,28 +295,8 @@ void SCIONBeaconServerCore::push(int port, Packet *p)
 {
     TransportHeader thdr(p);
     //printf("beacon0: %s\n", thdr.payload());
-    p->kill();
-}
-
-bool SCIONBeaconServerCore::run_task(Task *task) {
-#if 0
-
-  Packet* inPacket;
-  //handle incoming packet from queue 
-  while((inPacket = input(PORT_TO_SWITCH).pull())){
     
-    //SL: for IP Encap
-    uint8_t * s_pkt = (uint8_t *) inPacket->data();
-    if(m_vPortInfo[PORT_TO_SWITCH].addr.getType() == HOST_ADDR_IPV4){
-      struct ip * p_iph = (struct ip *)s_pkt;
-      struct udphdr * p_udph = (struct udphdr *)(p_iph+1);
-      if(p_iph->ip_p != SCION_PROTO_NUM || ntohs(p_udph->dest) != SCION_PORT_NUM) {
-        inPacket->kill();
-        return true;
-      }
-      s_pkt += IPHDR_LEN;
-    }
-
+    uint8_t * s_pkt = (uint8_t *) p->data();
     //copy packet data and kills click packet
     uint16_t packetLength = SPH::getTotalLen(s_pkt);
     uint8_t srcLen = SPH::getSrcLen(s_pkt);
@@ -330,68 +304,60 @@ bool SCIONBeaconServerCore::run_task(Task *task) {
     uint8_t packet[packetLength];
     memset(packet, 0, packetLength);
     memcpy(packet, s_pkt, packetLength);
-    inPacket->kill();
+    p->kill();
+    
     uint16_t type = SPH::getType(packet);
     // uint32_t ts = SPH::getTimestamp(packet);
     uint32_t ts = 0;
 
     switch(type) {
-    case ROT_REP_LOCAL:
-    {
-      #ifdef _SL_DEBUG_BS
-      scionPrinter->printLog(IH, (char *)"TDC BS (%llu:%llu): Received ROT Reply from TDC CS.\n", m_uAdAid, m_uAid); 
-      #endif
-
-      // open a file with 0 size
-      int RotL = packetLength-(COMMON_HEADER_SIZE+srcLen+dstLen);
-      
-      #ifdef _SL_DEBUG_BS
-      scionPrinter->printLog(IH, (char *)"TDC BS (%llu:%llu): Received ROT file size = %d\n", m_uAdAid, m_uAid, RotL);
-      #endif
-      
-      // Write to file defined in Config
-      FILE * rotFile = fopen(m_sROTFile.c_str(), "w+");
-      fwrite(packet+COMMON_HEADER_SIZE+srcLen+dstLen, 1, RotL, rotFile);
-      fclose(rotFile);
-      scionPrinter->printLog(IL, (char *)"TDC BS (%llu:%llu) stored received ROT.\n", m_uAdAid, m_uAid);
-      // try to verify local ROT again!
-      m_bROTInitiated = parseROT();
-    } break;
-    
-    case AID_REQ:
-      #ifdef _SL_DEBUG_BS
-      scionPrinter->printLog(IH, (char *)"TDC BS (%llu:%llu): Received AID_REQ from switch.\n", m_uAdAid, m_uAid); 
-      #endif
-
-      // AID_REQ, reply AID_REP packet to switch  
-      scionPrinter->printLog(IH,type,ts,1,1,(char *)"%u,RECEIVED\n",packetLength);
-      SPH::setType(packet, AID_REP);
-      SPH::setSrcAddr(packet, HostAddr(HOST_ADDR_SCION,m_uAid));
-      sendPacket(packet, packetLength, PORT_TO_SWITCH);
-      _AIDIsRegister = true;  
-      break;
-    
-    case IFID_REP:
-      /*
-      IFID_REP : maps router IFID with neighboring IFID
-      Only active interface ID will be inserted in the ifid_map.
-      The interfaces without any mappings but still in the topology file
-      will not be added (or propagated ) to the beacon.
-      */
-      //IFIDNEW
-      //SL: Border routers should send IFID_REP as soon as neighbors' IFID is available.
-      //This should be implemented at routers
-
-      updateIfidMap(packet);
-      break;
+    	case ROT_REP_LOCAL:
+    	{
+    		#ifdef _SL_DEBUG_BS
+    		scionPrinter->printLog(IH, (char *)"TDC BS (%llu:%llu): Received ROT Reply from TDC CS.\n", m_uAdAid, m_uAid); 
+    		#endif
+    		// open a file with 0 size
+    		int RotL = packetLength-(COMMON_HEADER_SIZE+srcLen+dstLen);
+    		#ifdef _SL_DEBUG_BS
+    		scionPrinter->printLog(IH, (char *)"TDC BS (%llu:%llu): Received ROT file size = %d\n", m_uAdAid, m_uAid, RotL);
+    		#endif
+    		// Write to file defined in Config
+    		FILE * rotFile = fopen(m_sROTFile.c_str(), "w+");
+    		fwrite(packet+COMMON_HEADER_SIZE+srcLen+dstLen, 1, RotL, rotFile);
+    		fclose(rotFile);
+    		scionPrinter->printLog(IL, (char *)"TDC BS (%llu:%llu) stored received ROT.\n", m_uAdAid, m_uAid);
+    		// try to verify local ROT again!
+    		m_bROTInitiated = parseROT();
+    	} 
+    	break;
+    	
+    	/*
+    	case AID_REQ:
+    		#ifdef _SL_DEBUG_BS
+    		scionPrinter->printLog(IH, (char *)"TDC BS (%llu:%llu): Received AID_REQ from switch.\n", m_uAdAid, m_uAid); 
+    		#endif
+    		// AID_REQ, reply AID_REP packet to switch  
+    		scionPrinter->printLog(IH,type,ts,1,1,(char *)"%u,RECEIVED\n",packetLength);
+    		SPH::setType(packet, AID_REP);
+    		SPH::setSrcAddr(packet, HostAddr(HOST_ADDR_SCION,m_uAid));
+    		sendPacket(packet, packetLength, PORT_TO_SWITCH);
+    		_AIDIsRegister = true;  
+    	break;
+    	
+    	case IFID_REP:
+    		updateIfidMap(packet);
+    	break;
+    	*/
+    	
         default:
-      /* Unsupported packets */
-      scionPrinter->printLog(IH, (char *)"TDC BS (%llu:%llu): Unsupported type (%d) packet.\n",  m_uAdAid, m_uAid,type);
-      break;
-    }
-  }//end of while
-#endif
+        	/* Unsupported packets */
+        	// scionPrinter->printLog(IH, (char *)"TDC BS (%llu:%llu): Unsupported type (%d) packet.\n",  m_uAdAid, m_uAid,type);
+        break;
+    }//end of switch
+    
+}
 
+bool SCIONBeaconServerCore::run_task(Task *task) {
   _task.fast_reschedule();
 }
 
@@ -478,24 +444,24 @@ bool SCIONBeaconServerCore::generateNewPCB() {
     uint8_t exp; //expiration time
     
     // for xia, might truncate data here..
-    uint16_t egress_id = (uint16_t)strtoull((const char*)rpair.egress_addr, NULL, 0);
-    uint16_t ingress_id = (uint16_t)strtoull((const char*)rpair.ingress_addr, NULL, 0);
-    SCIONBeaconLib::addLink(msg, ingress_id, egress_id, PCB_TYPE_CORE, m_uAdAid, m_uTdAid, &actx, 0, exp, 0, sigLen);
+    uint16_t egress_id = (uint16_t)strtoull((const char*)rpair.egress_addr, NULL, 10);
+    uint16_t ingress_id = (uint16_t)strtoull((const char*)rpair.ingress_addr, NULL, 10);
+    SCIONBeaconLib::addLink(msg, 0, egress_id, PCB_TYPE_CORE, m_uAdAid, m_uTdAid, &actx, 0, exp, 0, sigLen);
 
     //for SCION switch to forward packet to the right egress router/interface
     //TODO:Addr
-    SPH::setDstAddr(msg, HostAddr(HOST_ADDR_SCION,(uint64_t)strtoull((const char*)rpair.egress_addr, NULL, 0)));
+    SPH::setDstAddr(msg, HostAddr(HOST_ADDR_SCION,(uint64_t)strtoull((const char*)rpair.egress_addr, NULL, 10)));
     // xia does not have interface id yet..
-    SCIONBeaconLib::setInterface(msg, (uint16_t)strtoull((const char*)rpair.egress_addr, NULL, 0));
+    SCIONBeaconLib::setInterface(msg, (uint16_t)strtoull((const char*)rpair.ingress_addr, NULL, 10));
 
     //sign the above marking
-    uint64_t next_aid = strtoull((const char*)rpair.ingress_ad, NULL, 0);
+    uint64_t next_aid = strtoull((const char*)rpair.ingress_ad, NULL, 10);
     SCIONBeaconLib::signPacket(msg, sigLen, next_aid, &PriKey);
     uint16_t msgLength = SPH::getTotalLen(msg);
     //SL: why is this necessary? (setting ADAID to the source address)
     //TODO:Addr
     //SPH::setSrcAid(msg, m_uAdAid);
-    scionPrinter->printLog(IH,BEACON,tv.tv_sec,1,(uint64_t)strtoull((const char*)rpair.ingress_ad, NULL, 0),(char *)"%u,SENT\n",msgLength);
+    scionPrinter->printLog(IH,BEACON,tv.tv_sec,1,(uint64_t)strtoull((const char*)rpair.ingress_ad, NULL, 10),(char *)"%u,SENT\n",msgLength);
     
     string dest = "RE ";
     dest.append(BHID);
@@ -548,7 +514,6 @@ void SCIONBeaconServerCore::run_timer(Timer *){
       #ifdef _SL_DEBUG_BS
       scionPrinter->printLog(IH, (char *)"TDC BS (%llu:%llu): Generate a New PCB.\n",m_uAdAid, m_uAid);
       #endif
-
       generateNewPCB();
       }
     #ifdef _SL_DEBUG_BS
@@ -559,7 +524,8 @@ void SCIONBeaconServerCore::run_timer(Timer *){
     #ifdef _SL_DEBUG_BS
     scionPrinter->printLog(EH, (char *)"TDC BS (%llu:%llu): ROT is missing or wrong formatted.\n", m_uAdAid, m_uAid);
     #endif
-
+    
+	/*
     // Send ROT_REQ_LOCAL while AID Registration Done
     if(_AIDIsRegister) {
       #ifdef _SL_DEBUG_BS
@@ -589,6 +555,8 @@ void SCIONBeaconServerCore::run_timer(Timer *){
       *(uint32_t*)(packet+hdrLen) = 0;
       sendPacket(packet, totalLen, "");
     }
+    */
+    
     _timer.reschedule_after_sec(1);     // default speed
   }
 }
@@ -613,35 +581,7 @@ void SCIONBeaconServerCore::sendHello() {
     - Creates click packet and sends packet to the given port
 */
 void SCIONBeaconServerCore::sendPacket(uint8_t* data, uint16_t data_length, string dest) {
-#if 0
-  #ifdef _SL_DEBUG_BS
-  scionPrinter->printLog(IH, (char *)"BS (%llu:%llu): sending a packet (%dB) to port (%d)\n", m_uAdAid, m_uAid, data_length, port);
-  #endif
-  //SLA:
-  //IPV4 Handling
-  uint8_t ipp[data_length+IPHDR_LEN]; 
-  if(m_vPortInfo[port].addr.getType() == HOST_ADDR_IPV4) {
-    switch(fwd_type) {
-    case TO_SERVER:
-      if(m_pIPEncap->encap(ipp,data,data_length,SPH::getDstAddr(data).getIPv4Addr()) 
-        == SCION_FAILURE)
-        return;
-    break;
-    case TO_ROUTER:{
-      uint16_t iface = SPH::getOutgoingInterface(data);
-      std::map<uint16_t,HostAddr>::iterator itr = ifid2addr.find(iface);
-      if(itr == ifid2addr.end()) return;
-      if(m_pIPEncap->encap(ipp,data,data_length,itr->second.getIPv4Addr()) == SCION_FAILURE)
-        return;
-    } break;
-    default: break;
-    }
-    data = ipp;
-  }
 
-  WritablePacket* outPacket = Packet::make(DEFAULT_HD_ROOM, data, data_length, DEFAULT_TL_ROOM);
-  output(port).push(outPacket);
-#endif
     string src = "RE ";
     src.append(m_AD.c_str());
     src.append(" ");
@@ -672,59 +612,6 @@ void SCIONBeaconServerCore::sendPacket(uint8_t* data, uint16_t data_length, stri
 }
 
 
-/*
-  SCIONBeaconServerCore::initializeOutputPort
-  prepare IP header for IP encapsulation
-  if the port is assigned an IP address
-*/
-void SCIONBeaconServerCore::initializeOutputPort() {
-  
-  portInfo p;
-  p.addr = m_Addr;
-  m_vPortInfo.push_back(p);
-
-  //Initialize port 0; i.e., prepare internal communication
-  if(m_Addr.getType() == HOST_ADDR_IPV4) {
-    m_pIPEncap = new SCIONIPEncap;
-    m_pIPEncap->initialize(m_Addr.getIPv4Addr());
-  }
-}
-
-/* SLT:
-  Construct ifid2addr map
-*/
-void SCIONBeaconServerCore::constructIfid2AddrMap() {
-  std::multimap<int, RouterElem>::iterator itr;
-  for(itr = m_routers.begin(); itr!=m_routers.end(); itr++) {
-    ifid2addr.insert(std::pair<uint16_t,HostAddr>(itr->second.interface.id, itr->second.addr));
-  }
-}
-
-/*
-  SLN:
-  update ifid_map
-*/
-void
-SCIONBeaconServerCore::updateIfidMap(uint8_t * packet) {
-  uint32_t ts = 0;
-  uint64_t src = 0;
-        
-  uint8_t hdrLen = SPH::getHdrLen(packet);
-  uint16_t nifid = *(uint16_t*)(packet+hdrLen);  
-  uint16_t ifid = *(uint16_t*)(packet+hdrLen+IFID_SIZE);
-  ifid_map.insert(pair<uint16_t, uint16_t>(ifid, nifid));
-
-  #ifdef _SL_DEBUG_BS
-  scionPrinter->printLog(IH, (char *)"BS (%llu:%llu): IFID received (neighbor:%d - self:%d)\n", m_uAid,m_uAdAid, nifid, ifid);
-  #endif
-  scionPrinter->printLog(IH, (char *)"BS (%llu:%llu): IFID received (neighbor:%d - self:%d)\n", m_uAid,m_uAdAid, nifid, ifid);
-}
-
 CLICK_ENDDECLS
 EXPORT_ELEMENT(SCIONBeaconServerCore)
-
-
-
-
-
 

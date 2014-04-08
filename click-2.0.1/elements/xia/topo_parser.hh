@@ -103,8 +103,9 @@ struct ClientElem: SCIONElem {
 //SL: need to use singular (a bit confused)
 struct Servers{
     uint8_t type;
-    uint64_t aid;
-    HostAddr addr;
+    //uint64_t aid;
+    //HostAddr addr;
+    unsigned char HID[41];
 };
 
 //SL: why router has a single interface?
@@ -185,7 +186,9 @@ class TopoParser{
     /**
         @brief puts all the servers in the given servers list
     */
-    int parseServers(multimap<int, ServerElem> &servers); 
+    // int parseServers(multimap<int, ServerElem> &servers);
+    // tempral change for XIA
+    int parseServers(multimap<int, Servers> &servers); 
     /**
         @brief puts all the routers in the given routers list
     */
