@@ -684,14 +684,14 @@ XIAXIDMultiRouteTable::lookup_route(int in_ether_port, Packet *p)
     //TODO: bind AD?
     const struct click_xia* hdr = p->xia_header();
     int last = hdr->last;
-    bool rebinded = false; // if the dst path is already binded a AD?
-    String rebind_name = "";
+    bool rescoped = false; // if the dst path is already binded a AD?
+    String rescoped_name = "";
     if (last < 0){
         last += hdr->dnode;
     }
     else{
-        rebinded = true; // This is a shortcut for inter-domain SID. Should have better mechanism. Will not work for AD HID SID bind. TODO: actually check the value of the node
-        rebind_name = XID(hdr->node[last].xid).unparse(); // get the last node's name
+        rescoped = true; // This is a shortcut for inter-domain SID. Should have better mechanism. Will not work for AD HID SID bind. TODO: actually check the value of the node
+        rescoped_name = XID(hdr->node[last].xid).unparse(); // get the last node's name
     }
     const struct click_xia_xid_edge* edge = hdr->node[last].edge;
     const struct click_xia_xid_edge& current_edge = edge[XIA_NEXT_PATH_ANNO(p)];
@@ -764,18 +764,21 @@ XIAXIDMultiRouteTable::lookup_route(int in_ether_port, Packet *p)
                 // TODO: faster/efficient way to do random selection
                 // TODO: other selecting mechanism
                 Vector<XIAMultiRouteData*>::const_iterator it_entry = it.value().begin();
+                bool lookup_success = false; // to detect a illegal rescoped
                 while (it_entry != it.value().end() ){
                     XIAMultiRouteData *xrd_candidate = *it_entry;
-                    if (rebinded && hdr->node[last].xid.type == htonl(CLICK_XIA_XID_TYPE_HID))// if bind to a HID
+                    if (rescoped && hdr->node[last].xid.type == htonl(CLICK_XIA_XID_TYPE_HID))// if bind to a HID
                     {
                         if ( xrd_candidate->port == -2){ // local host entry NOTE: this is a hack. No idea if it's the right thing to do
                             xrd = xrd_candidate;
+                            lookup_success = true;
                             break;
                         }
                     }
-                    else if (rebinded){ // only search for the rebinded one (local AD entry)
-                        if ( xrd_candidate->index == rebind_name ){
+                    else if (rescoped){ // only search for the rescoped one (local AD entry)
+                        if ( xrd_candidate->index == rescoped_name ){
                             xrd = xrd_candidate;
+                            lookup_success = true;
                             break;
                         }
 
@@ -788,13 +791,17 @@ XIAXIDMultiRouteTable::lookup_route(int in_ether_port, Packet *p)
                         else{
                             random -= xrd_candidate->weight;
                         }
+                        lookup_success = true; // success anyway
                     }
 
                     ++it_entry;
                 }
-                if (rebinded){
-                    click_chatter("%s XIAXIDMultiRouteTable:lookup_route: get rebinded SID goto %s", _local_hid.unparse().c_str(), xrd->index.c_str());
-                }else{
+                if (rescoped && lookup_success){
+                    click_chatter("%s XIAXIDMultiRouteTable:lookup_route: get rescoped SID goto %s", _local_hid.unparse().c_str(), xrd->index.c_str());
+                }else if (rescoped && !lookup_success){
+                    click_chatter("%s XIAXIDMultiRouteTable:lookup_route: get illegal rescoped SID goto %s, goto %s instead", _local_hid.unparse().c_str(), rescoped_name.c_str(), xrd->index.c_str());
+                }
+                else{
                     click_chatter("%s XIAXIDMultiRouteTable:lookup_route: 2 or more: %s is selected", _local_hid.unparse().c_str(), xrd->index.c_str());
                     XID new_scope(xrd->index); // for sid routing the index is the string of the selected AD
                     rescope(p, new_scope);
@@ -815,7 +822,7 @@ XIAXIDMultiRouteTable::lookup_route(int in_ether_port, Packet *p)
             if(_rtdata.port != DESTINED_FOR_LOCALHOST && _rtdata.port != FALLBACK && _rtdata.nexthop != NULL) {
                 p->set_nexthop_neighbor_xid_anno(*(_rtdata.nexthop));
             }
-            if ( rebinded && hdr->node[last].xid.type ==  htonl(CLICK_XIA_XID_TYPE_HID) ){
+            if ( rescoped && hdr->node[last].xid.type ==  htonl(CLICK_XIA_XID_TYPE_HID) ){
                 // if already bind to a hid, do not use the default route to send it somewhere else
                 // NOTE: this is a hack, works for preventing redirect flood for sid:XROUTE.
                 // NOTE: is this the right way for interpreting DAG? Does the visited node scope the following nodes?
