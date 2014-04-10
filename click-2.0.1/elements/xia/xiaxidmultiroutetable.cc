@@ -764,7 +764,8 @@ XIAXIDMultiRouteTable::lookup_route(int in_ether_port, Packet *p)
                 // TODO: faster/efficient way to do random selection
                 // TODO: other selecting mechanism
                 Vector<XIAMultiRouteData*>::const_iterator it_entry = it.value().begin();
-                bool lookup_success = false; // to detect a illegal rescoped
+                bool lookup_success = false; // whether the rescoped ine matches one of the candidates, it is to detect a illegal rescoped
+                bool random_success = false; // already decision which one to pick?
                 while (it_entry != it.value().end() ){
                     XIAMultiRouteData *xrd_candidate = *it_entry;
                     if (rescoped && hdr->node[last].xid.type == htonl(CLICK_XIA_XID_TYPE_HID))// if bind to a HID
@@ -783,15 +784,19 @@ XIAXIDMultiRouteTable::lookup_route(int in_ether_port, Packet *p)
                         }
 
                     }
-                    else{ // actually load balance
+                    // actually randomly select the candidates, no matter the packet is rescoped or not. 
+                    // always do it so that we can pretend (if any) the unsuccessful rescope is not there and we rescope the DAG again
+                    if (!random_success){ // if not find one yet, do the round robin
                         if (random <= xrd_candidate->weight){
                             xrd = xrd_candidate;
-                            break;
+                            if (!rescoped) // if not rescoped, job is done!
+                                break;
+                            else // if resccoped, keep on looking for if it is valid
+                                random_success = true; // pick this one, no more round robin
                         }
                         else{
                             random -= xrd_candidate->weight;
                         }
-                        lookup_success = true; // success anyway
                     }
 
                     ++it_entry;
@@ -800,6 +805,8 @@ XIAXIDMultiRouteTable::lookup_route(int in_ether_port, Packet *p)
                     click_chatter("%s XIAXIDMultiRouteTable:lookup_route: get rescoped SID goto %s", _local_hid.unparse().c_str(), xrd->index.c_str());
                 }else if (rescoped && !lookup_success){
                     click_chatter("%s XIAXIDMultiRouteTable:lookup_route: get illegal rescoped SID goto %s, goto %s instead", _local_hid.unparse().c_str(), rescoped_name.c_str(), xrd->index.c_str());
+                    XID new_scope(xrd->index);
+                    rescope(p, new_scope);
                 }
                 else{
                     click_chatter("%s XIAXIDMultiRouteTable:lookup_route: 2 or more: %s is selected", _local_hid.unparse().c_str(), xrd->index.c_str());
