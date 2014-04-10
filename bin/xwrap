@@ -69,5 +69,6 @@ done
 
 shift $((OPTIND-1))
 
-# ececute command
-$@
+# execute command
+cd "$(dirname "$1")"
+./$(basename "$(echo "$@")")
