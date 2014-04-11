@@ -1260,6 +1260,11 @@ void set_sid_conf(const char* myhostname)
     while (ini_getsection(section_index, section_name, BUF_SIZE, full_path)) //enumerate every section, [$name]
     {
         //fprintf(stderr, "read %s\n", section_name);
+        if (ini_getbool(section_name, "enabled", 1, full_path) == 0)
+        {// skip this if not enabled, NOTE: default is enabled=True
+            section_index++;
+            continue;
+        }
         ServiceState service_state;
         ini_gets(section_name, "sid", sid, sid, BUF_SIZE, full_path);
         service_sid = std::string(sid);
