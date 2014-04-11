@@ -443,6 +443,7 @@ int startup(u_short *port)
  // XIA additions to handle different sockaddr struct
  int size;
  struct addrinfo *ai;
+ struct addrinfo hints;
  struct sockaddr *sa;
 
  // XIA pick socket type
@@ -452,7 +453,9 @@ int startup(u_short *port)
 
  // XIA Do appropriate sockaddr generation
  if (xia)  {
-  if (getaddrinfo(NULL, sid, NULL, &ai) < 0)
+  hints.ai_flags = AI_PASSIVE; // generate address to bind
+  hints.ai_family = AF_XIA; // this line is optional, just in case
+  if (getaddrinfo(NULL, sid, &hints, &ai) < 0)
    error_die("getaddrinfo failed\n");
 
   sa = ai->ai_addr;

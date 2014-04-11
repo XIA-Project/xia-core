@@ -830,11 +830,11 @@ XIAXIDMultiRouteTable::lookup_route(int in_ether_port, Packet *p)
                 p->set_nexthop_neighbor_xid_anno(*(_rtdata.nexthop));
             }
             if ( rescoped && hdr->node[last].xid.type ==  htonl(CLICK_XIA_XID_TYPE_HID) ){
-                // if already bind to a hid, do not use the default route to send it somewhere else
-                // NOTE: this is a hack, works for preventing redirect flood for sid:XROUTE.
+                // if already bind to a hid, should we use the default route to send it somewhere else?
+                // NOTE: killing this packet is a hack, it works for preventing redirect flood for sid:XROUTE.
                 // NOTE: is this the right way for interpreting DAG? Does the visited node scope the following nodes?
                 // NOTE: What about AD1->AD2->HID1->AD3->HID2->HID3->SID1, which part is invalid?
-                return UNREACHABLE;
+                return UNREACHABLE; // to be or not to be?
             }
             else{
                 return _rtdata.port;
