@@ -139,6 +139,7 @@ void *accept_request(void *client_v)
  }
 
  close(client);
+ printf("client socket closed \n");
  return NULL;
 }
 
