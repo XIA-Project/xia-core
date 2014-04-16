@@ -548,6 +548,9 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			XIDpair xid_pair;
 			xid_pair.set_src(_destination_xid);
 			xid_pair.set_dst(_source_xid);
+			DAGinfo *daginfo_bind = portToDAGinfo.get_pointer(_dport); // the binded info
+
+			//printf("(%s) SYN my_sport=%d  my_sid_path=%s  his_sid_path=%s\n", (_local_addr.unparse()).c_str(),  _dport,  dst_path.unparse().c_str(), src_path.unparse().c_str());
 
 			HashTable<XIDpair , bool>::iterator it;
 			it = XIDpairToConnectPending.find(xid_pair);
@@ -572,7 +575,9 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				daginfo.sock_type = 0; // 0: Reliable transport, 1: Unreliable transport
 
 				daginfo.dst_path = src_path;
-				daginfo.src_path = dst_path;
+				//printf("SYN Using new s_path %s\n", daginfo_bind->sdag.c_str());
+
+				daginfo.src_path.parse(daginfo_bind->sdag);// use the binded address, because the dst_path of packet may not be the full path
 				daginfo.isConnected = true;
 				daginfo.initialized = true;
 				daginfo.nxt = LAST_NODE_DEFAULT;
@@ -605,7 +610,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			xiah_new.set_last(LAST_NODE_DEFAULT);
 			xiah_new.set_hlim(HLIM_DEFAULT);
 			xiah_new.set_dst_path(src_path);
-			xiah_new.set_src_path(dst_path);
+			xiah_new.set_src_path(daginfo_bind->src_path); // use the full path
 
 			const char* dummy = "Connection_granted";
 			WritablePacket *just_payload_part = WritablePacket::make(256, dummy, strlen(dummy), 0);
@@ -642,7 +647,9 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			_dport = XIDpairToPort.get(xid_pair);
 
 			DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
-
+			// rescope to DAG comes from that host who sent you syn ack
+			//printf("(%s) SYNACK my_sid=%s  his_sid=%s\n, rescope dst_path to %s\n", (_local_addr.unparse()).c_str(), _destination_xid.unparse().c_str(), _source_xid.unparse().c_str(), src_path.unparse().c_str());
+			daginfo->dst_path = src_path;
 			if(!daginfo->synack_waiting) {
 				// Fix for synack storm sending messages up to the API
 				// still need to fix the root cause, but this prevents the API from 
@@ -663,7 +670,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			// Get the dst port from XIDpair table
 			_dport = XIDpairToPort.get(xid_pair);
 
-			//printf("(%s) my_sport=%d  my_sid=%s  his_sid=%s\n", (_local_addr.unparse()).c_str(),  _dport,  _destination_xid.unparse().c_str(), _source_xid.unparse().c_str());
+			//printf("(%s) my_sport=%d  my_sid=%s  his_sid=%s\n", (_local_addr.unparse()).c_str(),  _dport,  dst_path.unparse().c_str(), src_path.unparse().c_str());
 			HashTable<unsigned short, bool>::iterator it1;
 			it1 = portToActive.find(_dport);
 
@@ -1220,7 +1227,7 @@ void XTRANSPORT::Xbind(unsigned short _sport) {
 
 	//String sdag_string((const char*)p_in->data(),(const char*)p_in->end_data());
 //	if (DEBUG)
-//		click_chatter("\nbind requested to %s, length=%d\n", sdag_string.c_str(), (int)p_in->length());
+		//click_chatter("port %d, bind requested to %s\n",_sport, sdag_string.c_str());
 
 	//String str_local_addr=_local_addr.unparse();
 	//str_local_addr=str_local_addr+" "+xid_string;//Make source DAG _local_addr:SID
