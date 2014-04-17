@@ -1376,6 +1376,7 @@ perror("bind");
 		}
 		if (route_state.send_sid_discovery == true) {
             route_state.send_sid_discovery = false;
+            set_sid_conf(hostname); // reload the config file
             sendSidDiscovery();
         }
         if (route_state.send_sid_decision == true) {
