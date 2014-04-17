@@ -1163,7 +1163,7 @@ void initRouteState()
 	memcpy(&route_state.sdag, ai->ai_addr, sizeof(sockaddr_x));
 
 	route_state.num_neighbors = 0; // number of neighbor routers
-	route_state.lsa_seq = 0;	// LSA sequence number of this router
+	route_state.lsa_seq = rand()%MAX_SEQNUM;	// LSA sequence number of this router
 	route_state.hello_seq = 0;  // hello seq number of this router
 	route_state.sid_discovery_seq = 0;  // sid discovery seq number of this router
 	route_state.hello_lsa_ratio = (int32_t) ceil(AD_LSA_INTERVAL/HELLO_INTERVAL);
