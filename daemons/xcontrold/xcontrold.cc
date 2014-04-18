@@ -849,7 +849,7 @@ int processLSA(ControlMessage msg)
 	route_state.networkTable[srcHID] = entry;
 	route_state.calc_dijstra_ticks++;
 
-	if (route_state.calc_dijstra_ticks >= CALC_DIJKSTRA_INTERVAL)
+	if (route_state.calc_dijstra_ticks >= CALC_DIJKSTRA_INTERVAL || route_state.calc_dijstra_ticks  < 0)
 	{
 		syslog(LOG_DEBUG, "Calcuating shortest paths\n");
 
@@ -880,7 +880,7 @@ int processLSA(ControlMessage msg)
 			sendRoutingTable(it1->second.hid, routingTable);
 		}
 
-		route_state.calc_dijstra_ticks = 0;
+		route_state.calc_dijstra_ticks = route_state.calc_dijstra_ticks >0?0:route_state.calc_dijstra_ticks;
 	}
 
 	return 1;
@@ -1182,7 +1182,7 @@ void initRouteState()
 	route_state.sid_discovery_seq = rand()%MAX_SEQNUM;  // sid discovery seq number of this router
 	route_state.hello_lsa_ratio = (int32_t) ceil(AD_LSA_INTERVAL/HELLO_INTERVAL);
 	route_state.hello_sid_discovery_ratio = (int32_t) ceil(SID_DISCOVERY_INTERVAL/HELLO_INTERVAL);
-	route_state.calc_dijstra_ticks = 0;
+	route_state.calc_dijstra_ticks = -8;
 
 	route_state.ctl_seq = 0;	// LSA sequence number of this router
 
