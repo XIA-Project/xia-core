@@ -51,21 +51,21 @@ void timeout_handler(int signum)
 		syslog(LOG_ERR, "hello_seq=%d hello_lsa_ratio=%d", route_state.hello_seq, route_state.hello_lsa_ratio);
 	}
 	 //TODO: only send discovery message when necessary
-    if (route_state.sid_discovery_seq < route_state.hello_sid_discovery_ratio) {
+    if (route_state.sid_discovery_timer < route_state.hello_sid_discovery_ratio) {
         //wait
-        route_state.sid_discovery_seq++;
-    } else if (route_state.sid_discovery_seq >= route_state.hello_sid_discovery_ratio ) {
+        route_state.sid_discovery_timer++;
+    } else if (route_state.sid_discovery_timer >= route_state.hello_sid_discovery_ratio ) {
         //send sid discovery message
         route_state.send_sid_discovery = true;
-        route_state.sid_discovery_seq = 0;
+        route_state.sid_discovery_timer = 0;
     }
-    if (route_state.sid_decision_seq < route_state.hello_sid_decision_ratio) {
+    if (route_state.sid_decision_timer < route_state.hello_sid_decision_ratio) {
         //wait
-        route_state.sid_decision_seq++;
-    } else if (route_state.sid_decision_seq >= route_state.hello_sid_decision_ratio ) {
+        route_state.sid_decision_timer++;
+    } else if (route_state.sid_decision_timer >= route_state.hello_sid_decision_ratio ) {
         //send sid decision message
         route_state.send_sid_decision = true;
-        route_state.sid_decision_seq = 0;
+        route_state.sid_decision_timer = 0;
     }
 	// reset the timer
 	signal(SIGALRM, timeout_handler);
@@ -332,6 +332,7 @@ int sendSidDiscovery()
             msg.append(it->second.priority);
             msg.append(it->second.controllerAddr);
             msg.append(it->second.archType);
+            msg.append(it->second.seq);
         }
 
         // rebroadcast services learnt from others
@@ -352,6 +353,7 @@ int sendSidDiscovery()
                 msg.append(it_ad->second.priority);
                 msg.append(it_ad->second.controllerAddr);
                 msg.append(it_ad->second.archType);
+                msg.append(it_ad->second.seq);
             }
         }
     }
@@ -375,7 +377,8 @@ int sendSidDiscovery()
         rc = (temprc < rc)? temprc : rc;
     }
 
-    route_state.sid_discovery_seq = (route_state.sid_discovery_seq + 1) % MAX_SEQNUM;
+    // increase seq everytime when we send the local entries or when we locally read them?
+    //route_state.sid_discovery_seq = (route_state.sid_discovery_seq + 1) % MAX_SEQNUM;
     return rc;
 }
 
@@ -387,7 +390,7 @@ int processSidDiscovery(ControlMessage msg)
 
     string AD, SID;
     int records = 0;
-    int capacity, capacity_factor, link_factor, priority;
+    int capacity, capacity_factor, link_factor, priority, seq;
     int archType;
     string controllerAddr;
 
@@ -410,12 +413,14 @@ int processSidDiscovery(ControlMessage msg)
         msg.read(priority);
         msg.read(controllerAddr);
         msg.read(archType);
+        msg.read(seq);
         service_state.capacity = capacity;
         service_state.capacity_factor = capacity_factor;
         service_state.link_factor = link_factor;
         service_state.priority = priority;
         service_state.controllerAddr = controllerAddr;
         service_state.archType = archType;
+        service_state.seq = seq;
         updateSidAdsTable(AD, SID, service_state);
     }
 
@@ -438,12 +443,14 @@ int processSidDiscovery(ControlMessage msg)
             msg.read(priority);
             msg.read(controllerAddr);
             msg.read(archType);
-            service_state.controllerAddr = controllerAddr;
-            service_state.archType = archType;
+            msg.read(seq);
             service_state.capacity = capacity;
             service_state.capacity_factor = capacity_factor;
+            service_state.controllerAddr = controllerAddr;
             service_state.link_factor = link_factor;
             service_state.priority = priority;
+            service_state.archType = archType;
+            service_state.seq = seq;
             updateSidAdsTable(AD, SID, service_state);
         }
     }
@@ -638,18 +645,24 @@ int updateSidAdsTable(std::string AD, std::string SID, ServiceState service_stat
 {
     int rc = 1;
     //TODO: only record ones with newer version
-    //TODO: only update public information
+    //TODO: only update publicly useful attributes
+    //TODO: an entry is not there maybe because it is deleted,we should avoid that an older discovery message adds it back again
     if ( route_state.SIDADsTable.count(SID) > 0 )
     {
         if (route_state.SIDADsTable[SID].count(AD) > 0 )
         {
             //TODO: update if version is newer
-            route_state.SIDADsTable[SID][AD].capacity = service_state.capacity;
-            route_state.SIDADsTable[SID][AD].capacity_factor = service_state.capacity_factor;
-            route_state.SIDADsTable[SID][AD].link_factor = service_state.link_factor;
-            route_state.SIDADsTable[SID][AD].priority = service_state.priority;
+            if (route_state.SIDADsTable[SID][AD].seq < service_state.seq || route_state.SIDADsTable[SID][AD].seq - service_state.seq > SEQNUM_WINDOW)
+            {
+                route_state.SIDADsTable[SID][AD].capacity = service_state.capacity;
+                route_state.SIDADsTable[SID][AD].capacity_factor = service_state.capacity_factor;
+                route_state.SIDADsTable[SID][AD].link_factor = service_state.link_factor;
+                route_state.SIDADsTable[SID][AD].priority = service_state.priority;
+                route_state.SIDADsTable[SID][AD].seq = service_state.seq;
 
             //TODO: update other parameters
+            }
+            
         }
         else
         {
@@ -1165,7 +1178,8 @@ void initRouteState()
 	route_state.num_neighbors = 0; // number of neighbor routers
 	route_state.lsa_seq = rand()%MAX_SEQNUM;	// LSA sequence number of this router
 	route_state.hello_seq = 0;  // hello seq number of this router
-	route_state.sid_discovery_seq = 0;  // sid discovery seq number of this router
+    route_state.sid_discovery_timer = 0;  // sid discovery timer of this router
+	route_state.sid_discovery_seq = rand()%MAX_SEQNUM;  // sid discovery seq number of this router
 	route_state.hello_lsa_ratio = (int32_t) ceil(AD_LSA_INTERVAL/HELLO_INTERVAL);
 	route_state.hello_sid_discovery_ratio = (int32_t) ceil(SID_DISCOVERY_INTERVAL/HELLO_INTERVAL);
 	route_state.calc_dijstra_ticks = 0;
@@ -1247,6 +1261,9 @@ void set_sid_conf(const char* myhostname)
     // ini style file
     // the file could be loaded frequently to emulate dynamic service changes
 
+    // time to have some update of the local services
+    route_state.sid_discovery_seq = (route_state.sid_discovery_seq + 1) % MAX_SEQNUM;
+
     char full_path[BUF_SIZE];
     char root[BUF_SIZE];
     char section_name[BUF_SIZE];
@@ -1261,13 +1278,14 @@ void set_sid_conf(const char* myhostname)
     {
         //fprintf(stderr, "read %s\n", section_name);
         if (ini_getbool(section_name, "enabled", 1, full_path) == 0)
-        {// skip this if not enabled, NOTE: default is enabled=True
+        {// skip this if not enabled, NOTE: enabled=True is the default one
             section_index++;
             continue;
         }
         ServiceState service_state;
         ini_gets(section_name, "sid", sid, sid, BUF_SIZE, full_path);
         service_sid = std::string(sid);
+        service_state.seq = route_state.sid_discovery_seq;
         service_state.capacity = ini_getl(section_name, "capacity", 100, full_path);
         service_state.capacity_factor = ini_getl(section_name, "capacity_factor", 1, full_path);
         service_state.link_factor = ini_getl(section_name, "link_factor", 0, full_path);

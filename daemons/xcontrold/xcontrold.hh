@@ -45,7 +45,7 @@
 typedef struct ServiceState
 {
     // public information
-    int version;
+    int seq;
     int priority;
     int capacity;
     int capacity_factor;
@@ -87,8 +87,10 @@ typedef struct RouteState {
 	int32_t num_neighbors; // number of neighbor routers
 	int32_t lsa_seq;	// LSA sequence number of this router
 	int32_t hello_seq;  // hello seq number of this router 
+    int32_t sid_discovery_timer;    // sid discovery timer of this router
     int32_t sid_discovery_seq;    // sid discovery sequence number of this router
     int32_t sid_decision_seq;    // sid decision sequence number of this router
+    int32_t sid_decision_timer;    // sid decision sequence number of this router
 	int32_t hello_lsa_ratio; // frequency ratio of hello:lsa (for timer purpose)
     int32_t hello_sid_discovery_ratio; // frequency ratio of hello:sid discovery (for timer purpose)
     int32_t hello_sid_decision_ratio; // frequency ratio of hello:sid decision (for timer purpose)
