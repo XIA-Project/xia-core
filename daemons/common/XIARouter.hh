@@ -86,8 +86,8 @@ public:
 	// returns 0 success, < 0 on error
 	int addRoute(const std::string &xid, int port, const std::string &next, unsigned long flags);
 	int setRoute(const std::string &xid, int port, const std::string &next, unsigned long flags);
-	int appRoute(const std::string &xid, int port, const std::string &next, unsigned long flags, unsigned weight, const std::string &index);
-	int seletiveSetRoute(const std::string &xid, int port, const std::string &next, unsigned long flags, unsigned weight, const std::string &index);
+	int appRoute(const std::string &xid, int port, const std::string &next, unsigned long flags, int weight, const std::string &index);
+	int seletiveSetRoute(const std::string &xid, int port, const std::string &next, unsigned long flags, int weight, const std::string &index);
 	int delRoute(const std::string &xid);
 	int selectiveDelRoute(const std::string &xid, const std::string &index);
 
@@ -98,7 +98,7 @@ private:
 	ControlSocketClient _cs;
 	ControlSocketClient::err_t _cserr;
 
-	int updateRoute(string cmd, const std::string &xid, int port, const std::string &next, unsigned long flags, unsigned weight, const std::string &index);
+	int updateRoute(string cmd, const std::string &xid, int port, const std::string &next, unsigned long flags, int weight, const std::string &index);
 	string itoa(signed);
 };
 

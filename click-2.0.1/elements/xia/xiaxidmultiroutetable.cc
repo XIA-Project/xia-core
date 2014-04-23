@@ -183,7 +183,7 @@ XIAXIDMultiRouteTable::set_handler4(const String &conf, Element *e, void *thunk,
     Vector<String> args;
     int port = 0;
     unsigned flags = 0;
-    unsigned weight = 100; // default weight use 100%
+    int weight = 100; // default weight use 100%
     String xid_str, index;
     XID *nexthop = NULL;
 
@@ -256,7 +256,7 @@ XIAXIDMultiRouteTable::set_handler4(const String &conf, Element *e, void *thunk,
             }
             xrd = table->_rts[xid][0];
         }
-        else if (update_mode){ // change a entry with a specific index
+        else if (update_mode){ // change an entry with a specific index
             Vector<XIAMultiRouteData*>::iterator it_entry = table->_rts[xid].begin();
             while ( it_entry != table->_rts[xid].end()){// linear search, TODO: hashmap<index, Entry>?
                 if ((*it_entry)-> index == index ){
@@ -265,22 +265,34 @@ XIAXIDMultiRouteTable::set_handler4(const String &conf, Element *e, void *thunk,
                 ++it_entry;
             }
             if (it_entry == table->_rts[xid].end()){// not found
-                xrd = new XIAMultiRouteData();
-                table->_rts[xid].push_back(xrd);
+                if (weight > 0){ //add it
+                    xrd = new XIAMultiRouteData();
+                    table->_rts[xid].push_back(xrd);
+                }
+                else{ //weight <= 0 but nothing to remove
+                    if (nexthop) delete nexthop; // remember to delete the temp variable
+                    return 0;
+                }
             }
             else{
                 xrd = *(it_entry);
+                if (weight <= 0){ // remove it
+                    delete xrd->nexthop; // it is created by new
+                    table->_rts[xid].erase(it_entry);
+                    return 0;
+                }
+
             }
 
         }
+
+        // these codes are shared by set_mode and update_mode
         xrd->port = port;
         xrd->flags = flags;
         xrd->nexthop = nexthop;
         xrd->weight = weight;
         xrd->index = index;
 
-        // TODO: should find the same entry (same port ?) and override the values
-        // TODO: add index (AD?) into XIAMultiRouteData to identify different routes
     }
 
     return 0;

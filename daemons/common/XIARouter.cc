@@ -147,7 +147,7 @@ std::string XIARouter::itoa(signed i)
 	return s;
 }
 
-int XIARouter::updateRoute(string cmd, const std::string &xid, int port, const std::string &next, unsigned long flags, unsigned weight, const std::string &index)
+int XIARouter::updateRoute(string cmd, const std::string &xid, int port, const std::string &next, unsigned long flags, int weight, const std::string &index)
 {
 	string xidtype;
 	string mutableXID(xid);
@@ -169,7 +169,7 @@ int XIARouter::updateRoute(string cmd, const std::string &xid, int port, const s
 	if (getRouter().length() == 0)
 		return  XR_ROUTER_NOT_SET;
 
-	if ( weight > 100)
+	if (weight > 100) // weight <= 0 means to delete it
 		return XR_INVALID_WEIGHT;
 
 	xidtype = mutableXID.substr(0, n);
@@ -208,12 +208,12 @@ int XIARouter::setRoute(const std::string &xid, int port, const std::string &nex
 	return updateRoute("set4", xid, port, next, flags, 100, index);
 }
 
-int XIARouter::appRoute(const std::string &xid, int port, const std::string &next, unsigned long flags, unsigned weight, const std::string &index)
+int XIARouter::appRoute(const std::string &xid, int port, const std::string &next, unsigned long flags, int weight, const std::string &index)
 {
 	return updateRoute("app4", xid, port, next, flags, weight, index);
 }
 
-int XIARouter::seletiveSetRoute(const std::string &xid, int port, const std::string &next, unsigned long flags, unsigned weight, const std::string &index)
+int XIARouter::seletiveSetRoute(const std::string &xid, int port, const std::string &next, unsigned long flags, int weight, const std::string &index)
 {
 	return updateRoute("sel_set4", xid, port, next, flags, weight, index);
 }
