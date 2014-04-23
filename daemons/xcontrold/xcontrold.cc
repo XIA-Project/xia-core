@@ -480,6 +480,9 @@ int processSidDecision(void)
         // find the total weight
         for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad)
         {
+            if (it_ad->second.priority < 0){ // this is the poisoned one, skip
+                continue;
+            }
             int latency = 1000; // default, 1ms
             if (route_state.ADPathStates.find(it_ad->first) != route_state.ADPathStates.end()){
                 latency = route_state.ADPathStates[it_ad->first].delay;
@@ -492,8 +495,15 @@ int processSidDecision(void)
         // make local decision. map weights to 0..100
         for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad)
         {
-            it_ad->second.valid = true;
-            it_ad->second.percentage = (int) 100.0*it_ad->second.weight/total_weight;
+            if (it_ad->second.priority < 0){ // this is the poisoned one
+                //syslog(LOG_DEBUG, "Prepare to delete %s@%s\n", it_sid->first.c_str(), it_ad->first.c_str());
+                it_ad->second.valid = true;
+                it_ad->second.percentage = -1; //mark it to be deleted
+            }
+            else{
+                it_ad->second.valid = true;
+                it_ad->second.percentage = (int) 100.0*it_ad->second.weight/total_weight;
+            }
             //syslog(LOG_INFO, "percentage is %d", it_ad->second.percentage );
         }
     }
@@ -595,7 +605,7 @@ int sendSidRoutingTable(std::string destHID, std::map<std::string, std::map<std:
                 msg.append(it_sid->second.percentage);
             }
         }
-        // TODO: update ctl seq
+        // TODO: update ctl seq NOTE: do we need ctl seq?
         //route_state.ctl_seq = (route_state.ctl_seq + 1) % MAX_SEQNUM;
 
         return msg.send(route_state.sock, &route_state.ddag);
@@ -626,6 +636,9 @@ int processSidRoutingTable(std::map<std::string, std::map<std::string, ServiceSt
         {
             // TODO: how to use flags to load balance? or add new fields into routing table for this propose
             // syslog(LOG_INFO, "add route %s, %hu, %s, %lu", it_sid->first.c_str(), entry.port, entry.nextHop.c_str(), entry.flags);
+            //if (it_sid->second.percentage <= 0)
+            //    syslog(LOG_DEBUG, "Removing routing entry: %s@%s", it_sid->first.c_str(), entry.xid.c_str());
+
             if (entry.xid == route_state.myAD)
             {
                 xr.seletiveSetRoute(it_sid->first, -2, entry.nextHop, entry.flags, it_sid->second.percentage, it_ad->first); //local AD, FIXME: why is port unsigned short? port could be negative numbers!
@@ -651,9 +664,10 @@ int updateSidAdsTable(std::string AD, std::string SID, ServiceState service_stat
     {
         if (route_state.SIDADsTable[SID].count(AD) > 0 )
         {
-            //TODO: update if version is newer
+            //update if version is newer
             if (route_state.SIDADsTable[SID][AD].seq < service_state.seq || route_state.SIDADsTable[SID][AD].seq - service_state.seq > SEQNUM_WINDOW)
             {
+                //syslog(LOG_DEBUG, "Got %d > %d new discovery msg %s@%s, priority%d",service_state.seq, route_state.SIDADsTable[SID][AD].seq, SID.c_str(), AD.c_str(), service_state.priority); 
                 route_state.SIDADsTable[SID][AD].capacity = service_state.capacity;
                 route_state.SIDADsTable[SID][AD].capacity_factor = service_state.capacity_factor;
                 route_state.SIDADsTable[SID][AD].link_factor = service_state.link_factor;
@@ -661,6 +675,9 @@ int updateSidAdsTable(std::string AD, std::string SID, ServiceState service_stat
                 route_state.SIDADsTable[SID][AD].seq = service_state.seq;
 
             //TODO: update other parameters
+            }
+            else{
+                //syslog(LOG_DEBUG, "Got %d < %d old discovery msg %s@%s, priority%d",service_state.seq, route_state.SIDADsTable[SID][AD].seq, SID.c_str(), AD.c_str(), service_state.priority); 
             }
             
         }
@@ -1273,38 +1290,51 @@ void set_sid_conf(const char* myhostname)
 
     int section_index = 0;
     snprintf(full_path, BUF_SIZE, "%s/etc/%s_sid.ini", XrootDir(root, BUF_SIZE), myhostname);
+    std::map<std::string, ServiceState> old_local_list = route_state.LocalSidList; // to check if some entries is being removed. NOTE: may need deep copy in the future or more efficient way to do this 
     route_state.LocalSidList.clear(); // clean and reload all
+
     while (ini_getsection(section_index, section_name, BUF_SIZE, full_path)) //enumerate every section, [$name]
     {
         //fprintf(stderr, "read %s\n", section_name);
-        if (ini_getbool(section_name, "enabled", 1, full_path) == 0)
-        {// skip this if not enabled, NOTE: enabled=True is the default one
-            section_index++;
-            continue;
-        }
-        ServiceState service_state;
         ini_gets(section_name, "sid", sid, sid, BUF_SIZE, full_path);
         service_sid = std::string(sid);
-        service_state.seq = route_state.sid_discovery_seq;
-        service_state.capacity = ini_getl(section_name, "capacity", 100, full_path);
-        service_state.capacity_factor = ini_getl(section_name, "capacity_factor", 1, full_path);
-        service_state.link_factor = ini_getl(section_name, "link_factor", 0, full_path);
-        service_state.priority = ini_getl(section_name, "priority", 1, full_path);
-        service_state.isController = ini_getbool(section_name, "isController", 0, full_path);
-        // get the address of the service controller
-        ini_gets(section_name, "controllerAddr", controller_addr, controller_addr, BUF_SIZE, full_path);
-        service_state.controllerAddr = std::string(controller_addr);
-        if (service_state.isController) // I am the controller
-        {
-            if (route_state.LocalServiceControllers.find(service_sid) == route_state.LocalServiceControllers.end())
-            { // no service controller yet, create one
-                ServiceController sc;
-                route_state.LocalServiceControllers[service_sid] = sc; // just initialize it
+
+        if (ini_getbool(section_name, "enabled", 1, full_path) == 0)
+        {// skip this if not enabled, NOTE: enabled=True is the default one
+         // if an entry was enabled but is disabled now, we should 'poison' other ADs by broadcast this invalidation
+            if (old_local_list.count(service_sid) > 0){ // it was there
+                old_local_list[service_sid].priority = -1; // invalid entry
+                old_local_list[service_sid].seq = route_state.sid_discovery_seq;
+                route_state.LocalSidList[service_sid] = old_local_list[service_sid]; // NOTE: may need deep copy someday
+                //syslog(LOG_DEBUG, "Poisoning %s\n", sid);
             }
+            //else just ignore it
         }
-        service_state.archType = ini_getl(section_name, "archType", 0, full_path);
-        //fprintf(stderr, "read state%s, %d, %d, %s\n", sid, service_state.capacity, service_state.isController, service_state.controllerAddr.c_str());
-        route_state.LocalSidList[service_sid] = service_state;
+        else
+        {
+            ServiceState service_state;
+            service_state.seq = route_state.sid_discovery_seq;
+            service_state.capacity = ini_getl(section_name, "capacity", 100, full_path);
+            service_state.capacity_factor = ini_getl(section_name, "capacity_factor", 1, full_path);
+            service_state.link_factor = ini_getl(section_name, "link_factor", 0, full_path);
+            service_state.priority = ini_getl(section_name, "priority", 1, full_path);
+            service_state.isController = ini_getbool(section_name, "isController", 0, full_path);
+            // get the address of the service controller
+            ini_gets(section_name, "controllerAddr", controller_addr, controller_addr, BUF_SIZE, full_path);
+            service_state.controllerAddr = std::string(controller_addr);
+            if (service_state.isController) // I am the controller
+            {
+                if (route_state.LocalServiceControllers.find(service_sid) == route_state.LocalServiceControllers.end())
+                { // no service controller yet, create one
+                    ServiceController sc;
+                    route_state.LocalServiceControllers[service_sid] = sc; // just initialize it
+                }
+            }
+            service_state.archType = ini_getl(section_name, "archType", 0, full_path);
+            //fprintf(stderr, "read state%s, %d, %d, %s\n", sid, service_state.capacity, service_state.isController, service_state.controllerAddr.c_str());
+            route_state.LocalSidList[service_sid] = service_state;
+        }
+
         section_index++;
     }
 

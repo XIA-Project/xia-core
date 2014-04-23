@@ -402,10 +402,13 @@ int processSidRoutingTable(ControlMessage msg)
             msg.read(weight);
             //syslog(LOG_INFO, "add route %s, %d, %s, %lu to %s", SID.c_str(), entry.port, entry.nextHop.c_str(), entry.flags, AD.c_str());
             //rc = xr.delRoute(SID);
+            if (weight <= 0){
+                //syslog(LOG_DEBUG, "Removing routing entry: %s@%s", SID.c_str(), entry.xid.c_str());
+            }
             if (entry.xid == route_state.myAD)
             {
                 rc = xr.seletiveSetRoute(SID, -2,  entry.nextHop, entry.flags, weight, AD); // use AD as index
-                //SID to local AD, NOTE: no actual server to handle sid here, just put -2 instead, TODO: try to point it to a server instance
+                //SID to local AD, NOTE: no actual server to handle sid here, just put -2 instead, TODO: should point it to a server instance
             }
             else
             {
