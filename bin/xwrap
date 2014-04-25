@@ -71,4 +71,6 @@ shift $((OPTIND-1))
 
 # execute command
 cd "$(dirname "$1")"
-./$(basename "$(echo "$@")")
+./$(basename "$(echo "$@")") &
+trap "kill $!" INT TERM
+wait
