@@ -41,6 +41,9 @@ char *dag;				// used to display the dag on the terminal
 
 #define SERVER_STRING "Server: jdbhttpd/0.1.0\r\n"
 
+pthread_mutex_t mutexsum;
+int total_client = 0;
+
   // XIA changes to accept request are only so it compiles correctly
 void *accept_request(void *);
 void bad_request(int);
@@ -74,45 +77,61 @@ void *accept_request(void *client_v)
                     * program */
  char *query_string = NULL;
 
+ pthread_mutex_lock (&mutexsum);
+ total_client += 1;
+ pthread_mutex_unlock (&mutexsum);
+
+ printf("Accepted, %d client here.\n", total_client);
+
  numchars = get_line(client, buf, sizeof(buf));
+ printf("pass %d.\n", __LINE__-1);
  i = 0; j = 0;
  while (!ISspace(buf[j]) && (i < sizeof(method) - 1))
  {
   method[i] = buf[j];
   i++; j++;
  }
+  printf("pass %d.\n", __LINE__-1);
  method[i] = '\0';
 
  if (strcasecmp(method, "GET") && strcasecmp(method, "POST"))
  {
+  printf("pass %d.\n", __LINE__-1);
   unimplemented(client);
+  pthread_mutex_lock (&mutexsum);
+  total_client -= 1;
+  pthread_mutex_unlock (&mutexsum);
   return NULL;
  }
-
+ printf("pass %d.\n", __LINE__-1);
  if (strcasecmp(method, "POST") == 0)
   cgi = 1;
 
  i = 0;
  while (ISspace(buf[j]) && (j < sizeof(buf)))
   j++;
+ printf("pass %d.\n", __LINE__-1);
  while (!ISspace(buf[j]) && (i < sizeof(url) - 1) && (j < sizeof(buf)))
  {
   url[i] = buf[j];
   i++; j++;
  }
  url[i] = '\0';
-
+ printf("pass %d.\n", __LINE__-1);
  if (strcasecmp(method, "GET") == 0)
  {
   query_string = url;
+  printf("pass %d.\n", __LINE__-1);
   while ((*query_string != '?') && (*query_string != '\0'))
    query_string++;
+  printf("pass %d.\n", __LINE__-1);
   if (*query_string == '?')
   {
    cgi = 1;
    *query_string = '\0';
    query_string++;
   }
+  printf("pass %d.\n", __LINE__-1);
  }
 
  sprintf(path, "htdocs%s", url);
@@ -138,8 +157,11 @@ void *accept_request(void *client_v)
   execute_cgi(client, path, method, query_string);
  }
 
+ printf("client socket closed,  %d remaining clients \n", total_client);
  close(client);
- printf("client socket closed \n");
+ pthread_mutex_lock (&mutexsum);
+ total_client -= 1;
+ pthread_mutex_unlock (&mutexsum);
  return NULL;
 }
 
@@ -443,6 +465,7 @@ int startup(u_short *port)
 
  // XIA additions to handle different sockaddr struct
  int size;
+ int option = 1;
  struct addrinfo *ai;
  struct addrinfo hints;
  struct sockaddr *sa;
@@ -473,6 +496,12 @@ int startup(u_short *port)
   name.sin_port = htons(*port);
   name.sin_addr.s_addr = htonl(INADDR_ANY);
   size = sizeof(struct sockaddr_in);
+  if(setsockopt(httpd,SOL_SOCKET,SO_REUSEPORT,(char*)&option,sizeof(option)) < 0)
+  {
+      printf("setsockopt failed\n");
+      close(httpd);
+      exit(2);
+  }
  }
 
  // XIA bind call modified from original code to account for sockaddr size differences
@@ -551,7 +580,7 @@ void config(int argc, char **argv)
 int main(int argc, char **argv)
 {
  int server_sock = -1;
- u_short port = 0;
+ u_short port = 9734;
  int client_sock = -1;
 
  // XIA using sockaddr_x so that we have enough room in XIA mode

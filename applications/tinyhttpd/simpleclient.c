@@ -48,8 +48,7 @@ int main(int argc, char *argv[])
  int cnt = 1;
  while ( (cnt = read(sockfd, buf, sizeof(buf))) > 0 ) {
 	buf[cnt] = 0;
-    printf("%d\n", cnt);
-	printf("%s\n", buf);
+	//printf("%s\n", buf);
 	if(strstr(buf, "</HTML>") != NULL) {
 		break;
 	}
