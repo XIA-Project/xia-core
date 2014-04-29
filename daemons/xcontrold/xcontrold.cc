@@ -503,6 +503,9 @@ int processSidDecision(void)
             else{
                 it_ad->second.valid = true;
                 it_ad->second.percentage = (int) 100.0*it_ad->second.weight/total_weight;
+                if (it_ad->second.percentage > 100){
+                    syslog(LOG_INFO, "Error setting weight%s @%s :cap=%d, f=%d, prio=%d, weight=%f, total weight=%f",it_sid->first.c_str(), it_ad->first.c_str(), it_ad->second.capacity, it_ad->second.capacity_factor, it_ad->second.priority, it_ad->second.weight, total_weight);
+                }
             }
             //syslog(LOG_INFO, "percentage is %d", it_ad->second.percentage );
         }

@@ -636,18 +636,18 @@ XIAXIDMultiRouteTable::rescope(Packet *p, XID &xid)
     // currently just unparse it into string, add xid and parse back
     // TODO: correctly add a node into a xiapath (should work for multiple edges)
     // TODO: do it fast without expensive calls (modify p directly?)
-    click_chatter("XIAXIDMultiRouteTable:rescope %s", xid.unparse().c_str());
+    //click_chatter("XIAXIDMultiRouteTable:rescope %s", xid.unparse().c_str());
 
     const struct click_xia* hdr = p->xia_header();
     XIAHeader xiah(p->xia_header());
 
-    click_chatter("rescope: orginal header: plen:%d, hlim:%d, nxt:%d", xiah.plen(), xiah.hlim(), xiah.nxt());
+    //click_chatter("rescope: orginal header: plen:%d, hlim:%d, nxt:%d", xiah.plen(), xiah.hlim(), xiah.nxt());
 
     XIAPath dst_path = xiah.dst_path(); //TODO: get rid of these expensive call
     XIAHeaderEncap encap(xiah);
 
     String dst_string = dst_path.unparse_re();
-    click_chatter("rescope: dst string %s", dst_string.c_str());
+    //click_chatter("rescope: dst string %s", dst_string.c_str());
 
     int last = hdr->last; // current visited node
     XID visited; //last visited node
@@ -655,7 +655,7 @@ XIAXIDMultiRouteTable::rescope(Packet *p, XID &xid)
     int index = 0;
 
     if (last >= 0){
-        click_chatter("rescope: last: %d", last);
+        //click_chatter("rescope: last: %d", last);
         visited = XID((*(hdr->node + last)).xid);
         visited_string = visited.unparse();
         index = dst_string.find_left(visited_string);
@@ -664,10 +664,10 @@ XIAXIDMultiRouteTable::rescope(Packet *p, XID &xid)
     }
 
 
-    click_chatter("rescope: index %d find str %s", index, visited_string.c_str());
+    //click_chatter("rescope: index %d find str %s", index, visited_string.c_str());
 
     index += visited_string.length();
-    click_chatter("rescope: cut at index %d", index);
+    //click_chatter("rescope: cut at index %d", index);
 
     String prefix = dst_string.substring(0, index);
     String postfix = dst_string.substring(index);
@@ -675,15 +675,15 @@ XIAXIDMultiRouteTable::rescope(Packet *p, XID &xid)
     String new_name = xid.unparse() + " ";
 
     String new_path_string = prefix + " " + new_name + postfix;
-    click_chatter("rescope: pre %s, post %s, new name %s", prefix.c_str(), postfix.c_str(), new_name.c_str());
+    //click_chatter("rescope: pre %s, post %s, new name %s", prefix.c_str(), postfix.c_str(), new_name.c_str());
 
-    click_chatter("rescope: new dst_path: %s", new_path_string.c_str());
+    //click_chatter("rescope: new dst_path: %s", new_path_string.c_str());
 
     XIAPath new_path;
     new_path.parse_re(new_path_string);
     encap.set_dst_path(new_path);
     encap.encap_replace(p);
-    click_chatter("%s rescope:done", _local_hid.unparse().c_str());
+    //click_chatter("%s rescope:done", _local_hid.unparse().c_str());
 
     return 0;
 }
@@ -772,7 +772,7 @@ XIAXIDMultiRouteTable::lookup_route(int in_ether_port, Packet *p)
                 #else
                 int random = rand()%100;
                 #endif
-                click_chatter("XIAXIDMultiRouteTable:lookup_route: 2 or more: random number is %d", random);
+                //click_chatter("XIAXIDMultiRouteTable:lookup_route: 2 or more: random number is %d", random);
                 // TODO: faster/efficient way to do random selection
                 // TODO: other selecting mechanism
                 Vector<XIAMultiRouteData*>::const_iterator it_entry = it.value().begin();
@@ -814,14 +814,14 @@ XIAXIDMultiRouteTable::lookup_route(int in_ether_port, Packet *p)
                     ++it_entry;
                 }
                 if (rescoped && lookup_success){
-                    click_chatter("%s XIAXIDMultiRouteTable:lookup_route: get rescoped SID goto %s", _local_hid.unparse().c_str(), xrd->index.c_str());
+                    //click_chatter("%s XIAXIDMultiRouteTable:lookup_route: get rescoped SID goto %s", _local_hid.unparse().c_str(), xrd->index.c_str());
                 }else if (rescoped && !lookup_success){
                     click_chatter("%s XIAXIDMultiRouteTable:lookup_route: get illegal rescoped SID goto %s, goto %s instead", _local_hid.unparse().c_str(), rescoped_name.c_str(), xrd->index.c_str());
                     XID new_scope(xrd->index);
                     rescope(p, new_scope);
                 }
                 else{
-                    click_chatter("%s XIAXIDMultiRouteTable:lookup_route: 2 or more: %s is selected", _local_hid.unparse().c_str(), xrd->index.c_str());
+                    //click_chatter("%s XIAXIDMultiRouteTable:lookup_route: 2 or more: %s is selected", _local_hid.unparse().c_str(), xrd->index.c_str());
                     XID new_scope(xrd->index); // for sid routing the index is the string of the selected AD
                     rescope(p, new_scope);
                 }
