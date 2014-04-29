@@ -11,15 +11,17 @@ To use either version, you must ensure two things:
 	   same directory as your python file, or by adding them to the environment
 	   variable PYTHONPATH (with the same syntax as the standard PATH variable)
 
-	3) "../libXsocket.so" is in your LD_LIBRARY_PATH
+	3) "api/lib/libXsocket.so" is in your LD_LIBRARY_PATH
+
+	4) "api/lib/libdagaddr.so" is in your LD_LIBRARY_PATH
 
 To use the object-oriented version of the API, you must additionally ensure:
 
-	4) Your python program imports "./oo_wrapper/xsocket.py"
+	5) Your python program imports "./oo_wrapper/xsocket.py"
 
-	5) "./oo_wrapper/xsocket.py" is in your python module search path (as
+	6) "./oo_wrapper/xsocket.py" is in your python module search path (as
 		described above)
 
 Running "make" in this directory will prepare both variants of the python API
-for use. Running "make" in "XIASocket/API" or running "buildxia" in "tools"
-will do this for you automatically.
+for use. Running "make" in "api/xsocket" or the xia project tree will do this
+for you automatically.

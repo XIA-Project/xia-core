@@ -1,50 +1,55 @@
+include ../../xia.mk
+
 .PHONY: clean doc test
-APIDIR=..
-XLIB=$(APIDIR)/lib
-XINC=$(APIDIR)/include
-CC=g++
-LD=g++
-CFLAGS=-c -Wall -Wextra -Iminini -I$(XINC)
-CPPFLAGS=-c -Wall -Wextra -Iminini -I$(XINC)
-LDFLAGS =-lprotobuf
-SOURCES=Xaccept.c Xbind.c Xclose.c Xconnect.c  XrequestChunk.c  \
-		XgetChunkStatus.c  XreadChunk.c  XputChunk.c Xrecv.c \
-        Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c  Xgetaddrinfo.c \
-		Xsetsockopt.c Xutil.c state.c Xinit.c XupdateAD.c XupdateNameServerDAG.c XgetDAGbyName.c  \
-		minini/minIni.c 
+
+CFLAGS +=-c -Iminini -fpic
+CPPFLAGS=$(CFLAGS)
+LDFLAGS +=-lprotobuf -lc -ldl $(XLIB)/libdagaddr.so
+
+SOURCES=Xaccept.c Xbind.c XbindPush.c Xclose.c Xconnect.c  XrequestChunk.c  Xgetaddrinfo.c \
+	Xfcntl.c XgetChunkStatus.c  XreadChunk.c  XputChunk.c Xrecv.c \
+	Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c  XpushChunkto.c XrecvChunkfrom.c\
+	Xsetsockopt.c Xutil.c state.c Xinit.c XupdateAD.c XupdateNameServerDAG.c XgetDAGbyName.c  \
+	minini/minIni.c 
 OBJS=$(SOURCES:.c=.o) xia.pb.o
 LIB=$(XLIB)/libXsocket.so
+STATICLIB=$(XLIB)/libXsocket.a
 
 all: xia.pb.cc $(LIB)
 	make -C python all
+
+static: xia.pb.cc $(STATICLIB)
 
 xia.pb.cc: xia.proto
 	protoc --cpp_out=. xia.proto
 
 xia.pb.o:
-	$(CC) $(CFLAGS) -fpic xia.pb.cc  -o $@
+	$(CC) $(CFLAGS) xia.pb.cc  -o $@
 
-%.o: %.c xia.pb.cc
-	$(CC) $(CFLAGS) $(LDFLAGS) -fpic $<  -o $@
+%.o: %.c xia.pb.cc $(XINC)/Xsocket.h $(XINC)/xia.h
+	$(CC) $(CFLAGS) $<  -o $@ -lpthread
 
 $(LIB): $(OBJS) 
-	$(LD) -shared -o $@ $(OBJS) $(LDFLAGS) -lc  -l dl
+	$(LD) -shared -o $@ $(OBJS) $(LDFLAGS)
 
-xwrap.so: xwrap.c
-	$(CC) -Wall -fPIC -DPIC -c $<
-	$(LD) -shared -o $@ xwrap.o -ldl
+$(STATICLIB): $(OBJS) 
+	ar rcs $@ $(OBJS)
 
 doc: Xdoc.h $(SOURCES)
 	doxygen XsocketsAPI.cfg
 	make -C python doc
 
-test: $(LIB)
-	make -C test test
+unittest: unittest.cpp  $(LIB) $(XINC)/Xsocket.h $(XINC)/xia.h
+	$(CC) -I$(XINC) -Wall -Wextra $< -o $@ -lgtest $(LIB) $(XLIB)/libdagaddr.so
+
+test: unittest $(LIB)
+	./unittest
 
 clean:
 	-rm -f $(LIB)
+	-rm -f $(STATICLIB)
 	-rm -f *.o xia.pb.*
 	-rm -rf doc
+	-rm -f unittest
 	make -C python clean
-	make -C test clean
 

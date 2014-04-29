@@ -99,7 +99,12 @@ IPRandomize::simple_action(Packet *p_in)
     click_ip *hdr = p->ip_header();
     assert(_zipf_cache);
     //uint32_t seed  = _zipf_cache[_current_cycle]; /* zipf */
-    if (!_ip_cache_initialized && (click_current_thread_id == 1)) {
+
+#if CLICK_USERLEVEL && HAVE_MULTITHREAD && HAVE___THREAD_STORAGE_CLASS
+    if (!_ip_cache_initialized && click_current_thread_id == 1) {
+#else
+    if (!_ip_cache_initialized && click_get_processor()==0) {
+#endif
 		if (_routeTable) { 
 			IPAddress gw;
 			int port;

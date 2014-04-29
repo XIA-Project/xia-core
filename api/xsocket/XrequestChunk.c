@@ -142,7 +142,7 @@ int XrequestChunks(int sockfd, const ChunkStatus *chunks, int numChunks)
 	std::string p_buf;
 	xsm.SerializeToString(&p_buf);
 
-	if ((rc = click_data(sockfd, &xsm)) < 0) {
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}

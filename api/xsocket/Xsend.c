@@ -42,10 +42,17 @@
 ** @returns -1 on failure with errno set to an error compatible with those
 ** returned by the standard send call.
 */
-int Xsend(int sockfd, const void *buf, size_t len, int /*flags*/)
+int Xsend(int sockfd, const void *buf, size_t len, int flags)
 {
-	xia::XSocketCallType type;
+	UNUSED(len);
+
+//`	xia::XSocketCallType type;
 	int rc;
+
+	if (flags) {
+		errno = EOPNOTSUPP;
+		return -1;
+	}
 
 	if (len == 0)
 		return 0;
@@ -76,7 +83,7 @@ int Xsend(int sockfd, const void *buf, size_t len, int /*flags*/)
 	x_send_msg->set_payload(buf, len);
 
 	// send the protobuf containing the user data to click
-	if ((rc = click_data(sockfd, &xsm)) < 0) {
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}

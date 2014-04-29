@@ -71,21 +71,24 @@ struct click_xia {
 #define CLICK_XIA_NXT_TRN       60  /* Transport header */
 
 // XIA extension header
+#pragma pack(push)
+#pragma pack(1)    
 struct click_xia_ext {
     uint8_t nxt;			/* next header */
     uint8_t hlen;			/* header length (not payload length) */
     uint8_t data[0];                    /* extension data */
 };
 
+// XIA control message protocol header (followed by initial packet data)
+struct click_xia_xcmp {
+    uint8_t type;
+    uint8_t code;
+    uint16_t cksum;
+    uint8_t rest[0];
+};
+#pragma pack(pop)
+
 //#define CLICK_XIA_PROTO_XCMP 0
-//
-//// XIA control message protocol header (followed by initial packet data)
-//struct click_xia_xcmp {
-//    uint8_t type;
-//    uint8_t code;
-//    uint8_t rest[0];
-//};
-//
 //// XIA control message protocol header for echo
 //struct click_xia_xcmp_sequenced {
 //    uint8_t type;
@@ -95,18 +98,33 @@ struct click_xia_ext {
 //    uint8_t rest[0];
 //};
 //
-//#define CLICK_XIA_XCMP_ECHO             0                   /* echo request              */
-//#define CLICK_XIA_XCMP_ECHO_REPLY       1                   /* echo reply                */
-//#define CLICK_XIA_XCMP_UNREACH          2                   /* dest unreachable          */
-//#define   CLICK_XIA_XCMP_UNREACH_XID_TYPE           0       /*   unknown XID type        */
-//#define   CLICK_XIA_XCMP_UNREACH_XID                1       /*   unknown XID             */
-//#define   CLICK_XIA_XCMP_UNREACH_PROTO              2       /*   unknown protocol        */
-//#define   CLICK_XIA_XCMP_UNREACH_FRAG               3       /*   frag required           */
-//#define CLICK_XIA_XCMP_TIMXCEED         3                   /* time exceeded             */
-//#define CLICK_XIA_XCMP_PARAMPROB        4                   /* bad header                */
-//#define   CLICK_XIA_XCMP_PARAMPROB_LENGTH           0       /*   invalid length          */
-//#define   CLICK_XIA_XCMP_PARAMPROB_NXIDS            1       /*   invalid number of XIDs  */
-//#define   CLICK_XIA_XCMP_PARAMPROB_NDST             2       /*   invalid number of dests */
-//#define   CLICK_XIA_XCMP_PARAMPROB_LAST             3       /*   invalid last            */
+#define	XCMP_ECHOREPLY		0		/* echo reply		     */
+#define	XCMP_UNREACH		3		/* dest unreachable, codes:  */
+#define	  XCMP_UNREACH_NET		0	/*   bad net		     */
+#define	  XCMP_UNREACH_HOST		1	/*   bad host		     */
+#define	  XCMP_UNREACH_PROTOCOL		2	/*   bad protocol	     */
+#define	  XCMP_UNREACH_PORT		3	/*   bad port		     */
+#define	  XCMP_UNREACH_NEEDFRAG		4	/*   IP_DF caused drop	     */
+#define	  XCMP_UNREACH_SRCFAIL		5	/*   src route failed	     */
+#define	  XCMP_UNREACH_NET_UNKNOWN	6	/*   unknown net	     */
+#define	  XCMP_UNREACH_HOST_UNKNOWN	7	/*   unknown host	     */
+#define	  XCMP_UNREACH_ISOLATED		8	/*   src host isolated	     */
+#define	  XCMP_UNREACH_NET_PROHIB	9	/*   net prohibited access   */
+#define	  XCMP_UNREACH_HOST_PROHIB	10	/*   host prohibited access  */
+#define	  XCMP_UNREACH_TOSNET		11	/*   bad tos for net	     */
+#define	  XCMP_UNREACH_TOSHOST		12	/*   bad tos for host	     */
+#define	  XCMP_UNREACH_FILTER_PROHIB	13	/*   admin prohib	     */
+#define	  XCMP_UNREACH_HOST_PRECEDENCE	14	/*   host prec violation     */
+#define	  XCMP_UNREACH_PRECEDENCE_CUTOFF 15	/*   prec cutoff	     */
+#define	XCMP_REDIRECT		5		/* shorter route, codes:     */
+#define	  XCMP_REDIRECT_NET		0	/*   for network	     */
+#define	  XCMP_REDIRECT_HOST		1	/*   for host		     */
+#define	  XCMP_REDIRECT_TOSNET		2	/*   for tos and net	     */
+#define	  XCMP_REDIRECT_TOSHOST		3	/*   for tos and host	     */
+#define	XCMP_ECHO		8		/* echo service		     */
+#define	XCMP_TIMXCEED		11		/* time exceeded, code:	     */
+#define	  XCMP_TIMXCEED_TRANSIT		0	/*   ttl==0 in transit	     */
+#define	  XCMP_TIMXCEED_REASSEMBLY	1	/*   ttl==0 in reassembly    */
 
+#define BHID "HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 #endif

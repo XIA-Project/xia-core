@@ -1,28 +1,17 @@
-all: nameserver xhcp xrouted
+TARGETS=nameserver xhcp xrouted
+CLEAN=$(addsuffix .build, $(TARGETS))
 
-clean: nameserver_clean xhcp_clean xrouted_clean
+.PHONY: all clean $(TARGETS)
 
-.PHONY: nameserver
-nameserver:
-	make -C $@;
+all: $(TARGETS)
 
-.PHONY: xhcp
-xhcp:
-	make -C $@;
+static: all
 
-.PHONY: xrouted
-xrouted:
-	make -C $@;
+$(TARGETS):
+	make -C $@
 
-.PHONY: nameserver_clean
-nameserver_clean:
-	make -C nameserver clean;
+clean: $(CLEAN)
 
-.PHONY: xhcp_clean
-xhcp_clean:
-	make -C xhcp clean;
-
-.PHONY: xroute_clean
-xrouted_clean:
-	make -C xrouted clean;
+$(CLEAN):
+	-make -C $(basename $@) clean
 

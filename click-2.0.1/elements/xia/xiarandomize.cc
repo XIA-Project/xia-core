@@ -30,7 +30,7 @@ XIARandomize::XIARandomize() : _zipf(1.3)
     _max_cycle = 1000000000;
 
 #if CLICK_USERLEVEL
-#if HAVE_MULTITHREAD
+#if HAVE_MULTITHREAD && HAVE___THREAD_STORAGE_CLASS
     _xsubi_arb[0] = 7 * click_current_thread_id + 1;
     _xsubi_arb[1] = 5 * click_current_thread_id - 1;
     _xsubi_arb[2] = 3 * click_current_thread_id + 1;

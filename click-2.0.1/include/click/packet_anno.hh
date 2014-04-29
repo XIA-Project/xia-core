@@ -134,21 +134,37 @@
 # endif
 #endif
 
+// bytes 48-51
+#define SRC_IP_ANNO_OFFSET 48
+#define SRC_IP_ANNO_SIZE 4
+
+// bytes 52-53
+#define SRC_PORT_ANNO_OFFSET 52
+#define SRC_PORT_ANNO_SIZE 2
+#define SRC_PORT_ANNO(p)        ((p)->anno_u16(SRC_PORT_ANNO_OFFSET))
+#define SET_SRC_PORT_ANNO(p, v)        ((p)->set_anno_u16(SRC_PORT_ANNO_OFFSET, (v)))
+
+// bytes 54-55
+#define DST_PORT_ANNO_OFFSET 54
+#define DST_PORT_ANNO_SIZE 2
+#define DST_PORT_ANNO(p)        ((p)->anno_u16(DST_PORT_ANNO_OFFSET))
+#define SET_DST_PORT_ANNO(p, v)        ((p)->set_anno_u16(DST_PORT_ANNO_OFFSET, (v)))
+
 #if HAVE_XIA
-// bytes 48-55
-#define XIA_NEXT_PATH_ANNO_OFFSET      48
+// bytes 56-63
+#define XIA_NEXT_PATH_ANNO_OFFSET      56
 #define XIA_NEXT_PATH_ANNO_SIZE        8
 #  define XIA_NEXT_PATH_ANNO(p)	((p)->anno_u8(XIA_NEXT_PATH_ANNO_OFFSET))
 #  define SET_XIA_NEXT_PATH_ANNO(p, v) ((p)->set_anno_u8(XIA_NEXT_PATH_ANNO_OFFSET, (v)))
 
-// bytes 56-79
-#define XIA_NEXT_HOP_NEIGHBOR_ANNO_OFFSET      56
+// bytes 64-87
+#define XIA_NEXT_HOP_NEIGHBOR_ANNO_OFFSET      64
 #define XIA_NEXT_HOP_NEIGHBOR_ANNO_SIZE        24
 #define XIA_NEXT_HOP_NEIGHBOR_ANNO(p)	((click_xia_xid *) ((p)->anno_u8() + XIA_NEXT_HOP_NEIGHBOR_ANNO_OFFSET ))
 #define SET_XIA_NEXT_HOP_NEIGHBOR_ANNO(p, v) ((p)->set_anno_u8(XIA_NEXT_HOP_NEIGHBOR_ANNO_OFFSET, (v)))
 
-// bytes 80-81
-#define XIA_PAINT_ANNO_OFFSET   80
+// bytes 88-89
+#define XIA_PAINT_ANNO_OFFSET   88
 #define XIA_PAINT_ANNO_SIZE     2
 #define XIA_PAINT_ANNO(p)			((p)->anno_s16(XIA_PAINT_ANNO_OFFSET))
 #define SET_XIA_PAINT_ANNO(p, v)		((p)->set_anno_s16(XIA_PAINT_ANNO_OFFSET, (v)))

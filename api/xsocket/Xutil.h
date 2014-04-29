@@ -16,23 +16,21 @@
 /*!
   @file Xutil.h
   @brief header for internal helper functions
-*/  
+*/
 #ifndef _Xutil_h
 #define _Xutil_h
 
+#define PATH_SIZE 4096
 
-#define DEBUG
 #ifdef DEBUG
 #define LOG(s) fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, s)
-#define LOGF(fmt, ...) fprintf(stderr, "%s:%d: " fmt"\n", __FILE__, __LINE__, __VA_ARGS__) 
+#define LOGF(fmt, ...) fprintf(stderr, "%s:%d: " fmt"\n", __FILE__, __LINE__, __VA_ARGS__)
 #else
-int x
 #define LOG(s)
 #define LOGF(fmt, ...)
 #endif
 
-int click_data(int sockfd, xia::XSocketMsg *xsm);
-int click_control(int sockfd, xia::XSocketMsg *xsm);
+int click_send(int sockfd, xia::XSocketMsg *xsm);
 int click_reply(int sockfd, char *buf, int buflen);
 int click_reply2(int sockfd, xia::XSocketCallType *type);
 int bind_to_random_port(int sockfd);
@@ -53,4 +51,7 @@ void setWrapped(int sock, int wrapped);
 int isWrapped(int sock);
 void setAsync(int sock, int async);
 int isAsync(int sock);
+int setPeer(int sock, sockaddr_x *addr);
+const sockaddr_x *dgramPeer(int sock);
+
 #endif

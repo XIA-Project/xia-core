@@ -32,6 +32,7 @@ PORT=7777
 MAJOR=1
 MINOR=3
 
+KNOWN_XIDS = [ "AD", "HID", "SID", "CID", "IP" ]
 #
 # class for managing command line configuration options
 #
@@ -232,6 +233,7 @@ class RouterConfig:
 				(alias, xid) = entry.split()
 			
 				# create hash maps to go in both directions
+				xid = xid.lower()
 				self._xids[xid] = alias
 				self._xaliases[alias] = xid
 	#
@@ -266,6 +268,7 @@ class RouterConfig:
 		return xid
 
 	def getAlias(self, xid):
+		xid = xid.lower()
 		alias = xid
 		if xid in self._xids:
 			alias = self._xids[xid]
@@ -302,7 +305,7 @@ class XrouteApp:
 		if (len(self.options.types())):
 			self.types = self.options.types()
 		else:
-			self.types = [ "AD", "HID", "SID", "CID", "IP" ];
+			self.types = KNOWN_XIDS
 
 		# do the actions (if any) in the specified config file
 		if (self.options.commandFile() != None):
@@ -423,7 +426,7 @@ class XrouteApp:
 	def writeData(self, cmd):
 		self.csock.write("WRITE %s\n" % (cmd))
 		code = self.checkStatus(False)
-	
+
 		# the click write handler returns 2 lines of status on an error, and the
 		#second line contains a more useful message, so call it again
 		if code != 200:
@@ -456,7 +459,7 @@ class XrouteApp:
 	# print the specified route table to stdout
 	#
 	def printTable(self, device, table):
-		tfmt = "%s/wrapped/xrc/n/proc/rt_%s.list"
+		tfmt = "%s/xrc/n/proc/rt_%s.list"
 		data = self.readData(tfmt % (device, table))
 
 		text = ""
@@ -478,6 +481,9 @@ class XrouteApp:
 					xid = "(default)"
 				elif self.options.verbose() == False:
 					xid = self.config.getAlias(xid)
+
+				if self.options.verbose() == False:
+					nexthop = self.config.getAlias(nexthop)
 
 				text += "%-5s %-45s %2s%-11s %08x %s\n" % (table, xid, 
 						port, self.portType(port), flags, nexthop) 
@@ -519,8 +525,8 @@ class XrouteApp:
 				found = True
 		if found == False:
 			self.errorExit("device %s unknown" % (device));
-		if table not in ("AD", "HID", "SID", "CID", "IP"):
-			self.errorExit("invaid XID type specified")
+		if table not in (KNOWN_XIDS):
+			print "looking up non-standard XID: %s" % table
 		if (xid == None or xid == ""):
 			self.errorExit("XID not specified")
 		if xid == "default":
@@ -529,7 +535,7 @@ class XrouteApp:
 			# in case we were passed an alias, try to map to an xid
 			xid = self.config.getXID(xid)
 
-		cmd = "%s/wrapped/xrc/n/proc/rt_%s.remove %s" % (device, table, xid)
+		cmd = "%s/xrc/n/proc/rt_%s.remove %s" % (device, table, xid)
 		self.writeData(cmd)
 		print "%s: deleted route for %s:%s" % (device, table, self.config.getAlias(xid))
 
@@ -565,8 +571,8 @@ class XrouteApp:
 				found = True
 		if found == False:
 			self.errorExit("device %s unknown" % (device));
-		if table not in ("AD", "HID", "SID", "CID", "IP"):
-			self.errorExit("invaid XID type specified")
+		if table not in (KNOWN_XIDS):
+			print "attempting to add a route for a non-standard XID: %s" % table
 		if (xid == None or xid == ""):
 			self.errorExit("XID not specified")
 		if xid == "default":
@@ -574,7 +580,7 @@ class XrouteApp:
 		if (port == None or port == ""):
 			self.errorExit("port not specified")
 
-		cmd = "%s/wrapped/xrc/proc/rt_%s.set4 %s,%s,%s,%s" % (device, table, xid, port, nexthop, flags)
+		cmd = "%s/xrc/n/proc/rt_%s.set4 %s,%s,%s,%s" % (device, table, xid, port, nexthop, flags)
 		print cmd
 
 		self.writeData(cmd)
@@ -624,7 +630,7 @@ class XrouteApp:
 	# specified particular devides or xid types on the command line
 	#
 	def dumpCommands(self):
-		tfmt = "%s/wrapped/xrc/n/proc/rt_%s.list"
+		tfmt = "%s/xrc/n/proc/rt_%s.list"
 		ts = datetime.datetime.now()
 		devices = self.config.devices()
 

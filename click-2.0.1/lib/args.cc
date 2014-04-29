@@ -1098,6 +1098,10 @@ BoolArg::parse(const String &str, bool &result, const ArgContext &)
 	result = false;
     else if (len == 3 && memcmp(s, "yes", 3) == 0)
 	result = true;
+    else if (len == 2 && memcmp(s, "!0", 2) == 0)
+    result = true;
+    else if (len == 2 && memcmp(s, "!1", 2) == 0)
+    result = false;
     else
 	return false;
 

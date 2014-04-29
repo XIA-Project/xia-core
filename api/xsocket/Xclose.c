@@ -51,14 +51,16 @@ int Xclose(int sockfd)
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XCLOSE);
 
-	if ((rc = click_control(sockfd, &xsm)) < 0) {
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 
 	} else if ((rc = click_reply2(sockfd, &type)) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
 	}
 
+	setWrapped(sockfd, 1);
 	close(sockfd);
+	setWrapped(sockfd, 0);
 	freeSocketState(sockfd);
 	return rc;
 }

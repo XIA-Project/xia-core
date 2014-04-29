@@ -1,30 +1,35 @@
-.PHONY: clean doc
-APIDIR=../..
-XLIB=$(APIDIR)/lib
-XINC=$(APIDIR)/include
+include ../../../xia.mk
 
-CC=g++
-LD=g++
-CFLAGS=-I$(XINC)
-LDFLAGS=-std=c++0x -L$(XLIB)
+.PHONY: all clean doc
+
 SOURCES=dagaddr.cpp utils.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
-TARGET=$(XLIB)/libdagaddr.so
+LIBS=$(XLIB)/libdagaddr.so
+STATICLIB=$(XLIB)/libdagaddr.a
 
-all: $(TARGET) dagaddr_test
+all: $(LIB) dagaddr_test
+
+static: $(STATICLIB) dagaddr_test
 
 %.o: %.cpp utils.hpp $(XINC)/dagaddr.hpp
-	$(CC) $(CFLAGS) -c -fpic $<  -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) -c -fpic $<  -o $@
 
-$(TARGET): $(OBJECTS) 
-	$(LD) -shared -o $@ $(OBJECTS) $(LDFLAGS) -lc -l dl
+$(LIBS): $(OBJECTS) 
+	$(LD) -shared -o $@ $(OBJECTS) -lc -ldl $(LDFLAGS)
 
-dagaddr_test: test.cpp
-	$(CC) $(CFLAGS) $< -ldagaddr $(LDFLAGS) -o $@
+$(STATICLIB): $(OBJECTS)
+	ar rcs $@ $(OBJECTS)
+	make dagaddr_test LIBS='$(STATICLIB)' LIBFLAGS='-Bstatic -lprotobuf'
+
+dagaddr_test: test.cpp $(LIBS)
+	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@ $(LIBS) $(LIBFLAGS)
 
 doc: mainpage.h $(SOURCES)
 	doxygen Doxyfile
 
+test: dagaddr_test
+	./dagaddr_test
+
 clean:
-	-rm -f *.o *.so dagaddr_test $(TARGET)
+	-rm -f *.o *.so dagaddr_test $(LIBS) $(STATICLIB)
 	-rm -rf ../doc

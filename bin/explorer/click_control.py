@@ -370,20 +370,21 @@ class LegacyRouter(Router):
     def print_path(self, port, direction):
         return '%s/%s%d_print' % (self.name, direction, port)
 
-class MattInstrumentedRouter(Router):
+class MattRouter(Router):
     def get_routes(self, click, kind):
-        return click.readData("%s/wrapped/xrc/n/proc/rt_%s.list" % (self.name, kind))
+        return click.readData("%s/xrc/n/proc/rt_%s.list" % (self.name, kind))
 
     def proc_path(self):
-        return '%s/wrapped/xrc/n/proc' % self.name
+        return '%s/xrc/n/proc' % self.name
 
     def cache_path(self):
-        return '%s/wrapped/xrc/cache' % self.name
+        return '%s/xrc/cache' % self.name
 
     def print_path(self, port, direction):
-        return '%s/print_%s%d' % (self.name, direction, port)
+        pass
 
 
+# Legacy router subclasses
 class EndHost(LegacyRouter):
     pass
 
@@ -393,11 +394,41 @@ class XRouter(LegacyRouter):
 class DualRouter(LegacyRouter):
     pass
 
-class XIAInstrumentedRouter(MattInstrumentedRouter):
-    pass
+# Matt router subclasses
+class XIARouter(MattRouter):
+    def print_path(self, port, direction):
+        return '%s/xlc%d/print_%s' % (self.name, port, direction)
 
-class XIAInstrumentedEndHost(MattInstrumentedRouter):
-    pass
+class XIAEndHost(MattRouter):
+    def print_path(self, port, direction):
+        return '%s/xlc/print_%s' % (self.name, direction)
+
+class MattDualElement(MattRouter):
+    def print_path_ip(self, port, direction):
+        pass
+
+    def set_verbosity_for_port(self, click, port, verbosity):
+        port = int(port)
+        verbosity = int(verbosity)
+        click.writeData("%s.verbosity %d" % (self.print_path(port, 'in'), verbosity))
+        click.writeData("%s.verbosity %d" % (self.print_path(port, 'out'), verbosity))
+        click.writeData("%s.verbosity %d" % (self.print_path_ip(port, 'in'), verbosity))
+        click.writeData("%s.verbosity %d" % (self.print_path_ip(port, 'out'), verbosity))
+        self.get_verbosity_for_port(click, port)
+
+class XIADualRouter(MattDualElement):
+    def print_path(self, port, direction):
+        return '%s/dlc%d/xlc/print_%s' % (self.name, port, direction)
+
+    def print_path_ip(self, port, direction):
+        return '%s/dlc%d/iplc/print_%s' % (self.name, port, direction)
+
+class XIADualEndHost(MattDualElement):
+    def print_path(self, port, direction):
+        return '%s/dlc/xlc/print_%s' % (self.name, direction)
+    
+    def print_path_ip(self, port, direction):
+        return '%s/dlc/iplc/print_%s' % (self.name, direction)
 
 #
 # route info disitlled into an easier to manage object
@@ -451,10 +482,18 @@ class DeviceList:
                     obj = XRouter(device, 1)
                 elif type == 'DualRouter4Port':
                     obj = DualRouter(device, 4)
-                elif type == 'XIAInstrumentedRouter2Port':
-                    obj = XIAInstrumentedRouter(device, 2)
-                elif type == 'XIAInstrumentedEndHost':
-                    obj = XIAInstrumentedEndHost(device, 1)
+                elif type == 'XIARouter2Port':
+                    obj = XIARouter(device, 2)
+                elif type == 'XIARouter4Port':
+                    obj = XIARouter(device, 4)
+                elif type == 'XIAEndHost':
+                    obj = XIAEndHost(device, 1)
+                elif type == 'XIADualRouter2Port':
+                    obj = XIADualRouter(device, 2)
+                elif type == 'XIADualRouter4Port':
+                    obj = XIADualRouter(device, 4)
+                elif type == 'XIADualEndHost':
+                    obj = XIADualEndHost(device, 1)
                 else:
                     print 'WARNING Unsupported Device: %s' % type
                     continue

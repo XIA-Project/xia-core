@@ -1,0 +1,71 @@
+#!/bin/bash
+#
+# Copyright 2013 Carnegie Mellon University
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# FIXME: this is hardcoded to only work with a single filename right now,
+# make it more flexible.
+
+rspec="xia-2r-2h.rspec"
+template="$rspec.template"
+src=$template
+dst=$rspec
+
+help() {
+	cat << EOH
+usage: $0 [-rh] username
+where:
+  -h display this help screen
+  -r create a template from an rspec file
+
+Replaces all occurances of USERNAME in the template with <username> and
+creates a new rspec file that can be uploaded into flack.
+If -r is specified, takes the rspec file as inpput and replaces all
+occurances of <username> with USERNAME and outputs a template file.
+EOH
+exit -1
+}
+
+while getopts "h?r" opt; do
+    case "$opt" in
+    h|\?)
+        help
+        exit 0
+        ;;
+    r)
+		reverse=1
+		src=$rspec
+		dst=$template
+        ;;
+	?)
+		help
+		;;
+    esac
+done
+
+shift $((OPTIND-1))
+[ $# = 0 ] && help
+
+if [ -z "$reverse" ]; then  
+	old="USERNAME"
+	new=$1
+else
+	old=$1
+	new="USERNAME"
+fi
+
+[ ! -f $src ] && echo "file:$src not found" && exit -1
+
+sed -e s/$old/$new/g $src > $dst
+

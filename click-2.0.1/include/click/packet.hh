@@ -322,9 +322,9 @@ class Packet { public:
 
     enum {
 	#if HAVE_XIA
-	anno_size = 82			///< Size of annotation area.
+	anno_size = 90			///< Size of annotation area.
 	#else
-	anno_size = 48			///< Size of annotation area.
+	anno_size = 56			///< Size of annotation area.
 	#endif
     };
 
@@ -400,11 +400,12 @@ class Packet { public:
 
     enum {
 	dst_ip_anno_offset = 0, dst_ip_anno_size = 4,
+    dst_ip6_anno_offset = 0, dst_ip6_anno_size = 16,
 #if HAVE_XIA
-	dst_ip6_anno_offset = 0, dst_ip6_anno_size = 16,
-	nexthop_neighbor_xid_anno_offset = 56, nexthop_neighbor_xid_anno_size = 24
+    src_ip_anno_offset = 52, src_ip_anno_size = 4,
+	nexthop_neighbor_xid_anno_offset = 64, nexthop_neighbor_xid_anno_size = 24
 #else
-	dst_ip6_anno_offset = 0, dst_ip6_anno_size = 16
+	src_ip_anno_offset = 52, src_ip_anno_size = 4
 #endif
     };
     
@@ -430,6 +431,16 @@ class Packet { public:
      *
      * The value is stored in the address annotation area. */
     inline void set_dst_ip_anno(IPAddress addr);
+
+    /** @brief Return the source IPv4 address annotation.
+     *
+     * The value is taken from the address annotation area. */
+    inline IPAddress src_ip_anno() const;
+
+    /** @brief Set the source IPv4 address annotation.
+     *
+     * The value is stored in the address annotation area. */
+    inline void set_src_ip_anno(IPAddress addr);
 
     /** @brief Return a pointer to the annotation area.
      *
@@ -1782,6 +1793,18 @@ inline void
 Packet::set_dst_ip_anno(IPAddress a)
 {
     xanno()->u32[dst_ip_anno_offset / 4] = a.addr();
+}
+
+inline IPAddress
+Packet::src_ip_anno() const
+{
+    return IPAddress(xanno()->u32[src_ip_anno_offset / 4]);
+}
+
+inline void
+Packet::set_src_ip_anno(IPAddress a)
+{
+    xanno()->u32[src_ip_anno_offset / 4] = a.addr();
 }
 
 /** @brief Set the MAC header pointer.

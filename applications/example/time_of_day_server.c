@@ -19,6 +19,7 @@
 
 #include <time.h>
 #include "Xsocket.h"
+#include "dagaddr.hpp"
 
 #define SID0 "SID:0f00000000000000000000000000000123456789"
 #define DAG  "RE %s %s %s"
@@ -27,46 +28,42 @@
 int main()
 {
     int sock;
-    size_t len;
-	char dag[256];
+    socklen_t len;
     char buf[XIA_MAXBUF];
-	char client[256];
+	sockaddr_x client;
 	time_t now;
 	struct tm *t;
 
-	char ad[128], hid[128], fid[128];
-
     // create a datagram socket
-    if ((sock = Xsocket(XSOCK_DGRAM)) < 0) {
+    if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0) {
 		printf("error: unable to create the listening socket.\n");
 		exit(1);
 	}
 
-    // read the localhost AD and HID
-    if ( XreadLocalHostAddr(sock, ad, sizeof(ad), hid, sizeof(hid), fid, sizeof(fid)) < 0 ) {
-    	printf("error: Reading localhost address");
+	struct addrinfo *ai;
+	if (Xgetaddrinfo(NULL, SID0, NULL, &ai) != 0) {
+    	printf("error: unable to create source dag.");
 		exit(1);
 	}
 
-    // make the DAG we will listen on
-    sprintf(dag, DAG, ad, hid, SID0); 
+	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
 
     //Register this service name to the name server
-    if (XregisterName(SNAME, dag) < 0) {
+    if (XregisterName(SNAME, sa) < 0) {
     	printf("error: unable to register name/dag combo");
 		exit(1);
 	}
 
     // bind to the DAG
-    if (Xbind(sock, dag) < 0) {
+    if (Xbind(sock, (struct sockaddr*)sa, sizeof(sockaddr_x)) < 0) {
 		Xclose(sock);
-		printf("error: unable to bind to the dag (%s)\n", dag);
+		printf("error: unable to bind to %s\n", SNAME);
 		exit(1);
 	}
 
     while (1) {
 		len = sizeof(client);
-		if (Xrecvfrom(sock, buf, sizeof(buf), 0, client, &len) < 0) {
+		if (Xrecvfrom(sock, buf, sizeof(buf), 0, (struct sockaddr*)&client, &len) < 0) {
 			printf("error receiving client request\n");
 			// assume it's ok, and just keep listening
 			continue;
@@ -74,17 +71,15 @@ int main()
 
 		// we don't care what the client said, so we'll just ignore it
 
-		// make sure the client's dag is null terminated
-		if (len == sizeof(client))
-			client[len - 1] = 0;
-
 		now = time(NULL);
 		t = gmtime(&now);
 		strftime(buf, sizeof(buf), "%c %Z", t);
-		printf("request from: (%s)\n", client);
+		
+		Graph g(&client);
+		printf("request from:\n%s\n", g.dag_string().c_str());
 			
 		//Reply to client
-		if (Xsendto(sock, buf, strlen(buf) + 1, 0, client, strlen(client)) < 0)
+		if (Xsendto(sock, buf, strlen(buf) + 1, 0, (struct sockaddr*)&client, sizeof(client)) < 0)
 			printf("error sending time to the client\n");
     }
 

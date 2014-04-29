@@ -21,7 +21,6 @@
 
 #include <sys/types.h>
 #include <unistd.h>
-#include <linux/unistd.h>
 
 #include "Xsocket.h"
 #include "Xinit.h"
@@ -37,12 +36,14 @@
 **
 ** Creates an XIA socket of the specified type. 
 **
+** @param family socket family, currently must be AF_XIA
 ** @param transport_type Valid values are: 
-**	\n XSOCK_STREAM for reliable communications (SID)
-**	\n XSOCK_DGRAM for a ligher weight connection, but with 
+**	\n SOCK_STREAM for reliable communications (SID)
+**	\n SOCK_DGRAM for a ligher weight connection, but with 
 **	unguranteed delivery (SID)
 **	\n XSOCK_CHUNK for getting/putting content chunks (CID)
-**	\n XSOCK_RAW for a raw socket that can have direct edits made to the header
+**	\n SOCK_RAW for a raw socket that can have direct edits made to the header
+** @param for posix compatibility, currently must be 0
 **
 ** @returns socket id on success. 
 ** @returns -1 on failure with errno set to an error compatible with those
@@ -56,22 +57,41 @@
 ** to the Xsocket API will have similar results.
 **
 */
-int Xsocket(int transport_type)
+int Xsocket(int family, int transport_type, int protocol)
 {
 	struct sockaddr_in addr;
 	xia::XSocketCallType type;
 	int rc;
 	int sockfd;
 
+	if (family != AF_XIA) {
+		LOG("error: the Xsockets API only supports the AF_XIA family");
+		errno = EAFNOSUPPORT;
+		return -1;
+	}
+
+	if (protocol != 0) {
+		LOG("error: the protocol field is not currently used in the Xsocket API");
+		errno = EINVAL;
+		return -1;
+	}
+
+	/*if (transport_type & SOCK_NONBLOCK || transport_type & SOCK_CLOEXEC) {
+		LOG("error: invalid flags passed as part of the treansport_type");
+		errno = EINVAL;
+		return -1;
+		}*/
+
 	switch (transport_type) {
-		case XSOCK_STREAM:
-		case XSOCK_DGRAM:
+		case SOCK_STREAM:
+		case SOCK_DGRAM:
 		case XSOCK_CHUNK:
-		case XSOCK_RAW:
+		case SOCK_RAW:
 			break;
 		default:
 			// invalid socket type requested
-			errno = EAFNOSUPPORT;
+			LOG("error: invalid transport_type specified");
+			errno = EINVAL;
 			return -1;
 	}
 
@@ -80,17 +100,11 @@ int Xsocket(int transport_type)
 		return -1;
 	}
 
-	// bind to an unused random port number
+	// bind to any random port number
 	addr.sin_family = PF_INET;
-	addr.sin_addr.s_addr = inet_addr(MYADDRESS);
+	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 	addr.sin_port = 0;
 
-	if (bind(sockfd, (const struct sockaddr *)&addr, sizeof(addr)) < 0) {
-		close(sockfd);
-		LOGF("bind error: %s", strerror(errno));
-		return -1;
-	}
-		
 	// protobuf message
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XSOCKET);
@@ -98,7 +112,7 @@ int Xsocket(int transport_type)
 	xia::X_Socket_Msg *x_socket_msg = xsm.mutable_x_socket();
 	x_socket_msg->set_type(transport_type);		
 	
-	if ((rc = click_control(sockfd, &xsm)) < 0) {
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		close(sockfd);
 		return -1;

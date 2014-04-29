@@ -6,7 +6,7 @@
 ** you may not use this file except in compliance with the License.
 ** You may obtain a copy of the License at
 **
-**    http://www.apache.org/licenses/LICENSE-2.0
+**	http://www.apache.org/licenses/LICENSE-2.0
 **
 ** Unless required by applicable law or agreed to in writing, software
 ** distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,29 +19,69 @@
  @brief Implements XgetDAGbyName(), XregisterName(), Xgetpeername() and Xgetsockname()
 */
 #include <errno.h>
+ #include <unistd.h>
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
+#include "xns.h"
+#include "dagaddr.hpp"
 
-#define NS_MAX_PACKET_SIZE 1024
-#define NS_MAX_DAG_LENGTH 1024
+#define ETC_HOSTS "/etc/hosts.xia"
 
-#define NS_TYPE_REGISTER 1
-#define NS_TYPE_QUERY 2
-#define NS_TYPE_RESPONSE 3
-#define NS_TYPE_RESPONSE_ERROR 4
+/*!
+** @brief Lookup a DAG in the hosts.xia file
+**
+** @param name The name of an XIA service or host.
+**
+** @returns a character point to the dag on success
+** @returns NULL on failure
+**
+*/
+char *hostsLookup(const char *name) {
+	char line[512];
+	char *linend;
+	char *dag;
+	char _dag[NS_MAX_DAG_LENGTH];
 
-typedef struct ns_pkt {
-	short type;
-	char* name;
-	char* dag;
-} ns_pkt;
+	// look for an hosts_xia file locally
+	char buf[BUF_SIZE];
+	FILE *hostsfp = fopen(strcat(XrootDir(buf, BUF_SIZE), ETC_HOSTS), "r");
+	int answer_found = 0;
+	if (hostsfp != NULL) {
+		while (fgets(line, 511, hostsfp) != NULL) {
+			linend = line+strlen(line)-1;
+			while (*linend == '\r' || *linend == '\n' || *linend == '\0') {
+				linend--;
+			}
+			*(linend+1) = '\0';
+			if (line[0] == '#') {
+				continue;
+			} else if (!strncmp(line, name, strlen(name))
+						&& line[strlen(name)] == ' ') {
+				strncpy(_dag, line+strlen(name)+1, strlen(line)-strlen(name)-1);
+				_dag[strlen(line)-strlen(name)-1] = '\0';
+				answer_found = 1;
+			}
+		}
+		fclose(hostsfp);
+		if (answer_found) {
+			dag = (char*)malloc(sizeof(_dag) + 1);
+			strcpy(dag, _dag);
+			return dag;
+		}
+	} else {
+		//printf("XIAResolver file error\n");
+	}
+
+	//printf("Name not found in ./hosts_xia\n");
+	return NULL;
+}
 
 
 /*!
 ** @brief Lookup a DAG based using a host or service name.
 **
-** The name should be a string such as www_s.example.xia or host.example.xia. 
+** The name should be a string such as www_s.example.xia or host.example.xia.
 ** By convention services are indicated by '_s' appended to the service name.
 ** The memory returned is dynamically allocated and should be released with a
 ** call to free() when the caller is done with it.
@@ -49,86 +89,213 @@ typedef struct ns_pkt {
 ** This is a very simple implementation of the name query function.
 ** It will be replaces in a future release.
 **
-** @param name The name of an XIA service or host. 
+** @param name The name of an XIA service or host.
 **
 ** @returns a character point to the dag on success
 ** @returns NULL on failure
 **
 */
-char *XgetDAGbyName(const char *name) {
-    int sock;
-    char pkt[NS_MAX_PACKET_SIZE],ddag[NS_MAX_PACKET_SIZE], ns_dag[NS_MAX_PACKET_SIZE]; 
-    char *dag; 
-    char _name[NS_MAX_DAG_LENGTH], _dag[NS_MAX_DAG_LENGTH];      
-    int result;
-    
-    //Open socket
-    sock=Xsocket(XSOCK_DGRAM);
-    
-    //Read the nameserver DAG (the one that the name-query will be sent to)
-    if ( XreadNameServerDAG(sock, ns_dag) < 0 )
-        perror("Reading nameserver address");
+int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
+{
+	int sock;
+	int rc;
+	int result;
+	sockaddr_x ns_dag;
+	char pkt[NS_MAX_PACKET_SIZE];
+	char *dag;
 
-    //Construct a name-query packet	
-    ns_pkt query_pkt;
-    query_pkt.type = NS_TYPE_QUERY;
-    query_pkt.name = (char*)malloc(strlen(name)+1);
-    sprintf(query_pkt.name, "%s", name);
-    //query_pkt.dag = (char*)malloc(strlen(DAG)+1);
-    //sprintf(query_pkt.dag, "%s", DAG);
+	if (!name || *name == 0) {
+		errno = EINVAL;
+		return -1;
+	}
 
-    memset(pkt, 0, sizeof(pkt));
-    int offset = 0;
-    memcpy(pkt, &query_pkt.type, sizeof(query_pkt.type));
-    offset += sizeof(query_pkt.type);
-    memcpy(pkt+offset, query_pkt.name, strlen(query_pkt.name)+1);
-    offset += strlen(query_pkt.name)+1;
-    //memcpy(pkt+offset, query_pkt.dag, strlen(query_pkt.dag)+1);
-    //offset += strlen(query_pkt.dag)+1;
- 
-    //Send a name query to the name server	
-    Xsendto(sock, pkt, offset, 0, ns_dag, strlen(ns_dag)+1);
-    
-    //Check the response from the name server
-    memset(pkt, 0, sizeof(pkt));
-    memset(ddag, 0, sizeof(ddag));
-    size_t ddaglen = sizeof(ddag);
-    int rc = Xrecvfrom(sock, pkt, NS_MAX_PACKET_SIZE, 0, ddag, &ddaglen);
-    if (rc < 0) { perror("recvfrom"); }
+	if (!addr || !addrlen || *addrlen < sizeof(sockaddr_x)) {
+		errno = EINVAL;
+		return -1;
+	}
 
-    memset(_name, '\0', NS_MAX_DAG_LENGTH);
-    memset(_dag, '\0', NS_MAX_DAG_LENGTH);
-   
-    ns_pkt *tmp = (ns_pkt *)pkt;
-    char* tmp_name = (char*)(pkt+sizeof(tmp->type));
-    char* tmp_dag = (char*)(pkt+sizeof(tmp->type)+ strlen(tmp_name)+1);
-    switch (tmp->type) {
-	case NS_TYPE_RESPONSE:
-		sprintf(_name, "%s", tmp_name);
-		sprintf(_dag, "%s", tmp_dag);
+	// see if name is registered in the local hosts.xia file
+	if((dag = hostsLookup(name))) {
+		Graph g(dag);
+		free(dag);
+
+		// check to see if the returned dag was valid
+		// we may want a better check for this in the future
+		if (g.num_nodes() > 0) {
+			std::string s = g.dag_string();
+			g.fill_sockaddr((sockaddr_x*)addr);
+			*addrlen = sizeof(sockaddr_x);
+			return 0;
+		}
+	}
+
+	if (!strncmp(name, "RE ", 3) || !strncmp(name, "DAG ", 4)) {
+
+        // check to see if name is actually a dag to begin with
+        Graph gcheck(name);
+
+        // check to see if the returned dag was valid
+        // we may want a better check for this in the future
+        if (gcheck.num_nodes() > 0) {
+            std::string s = gcheck.dag_string();
+            gcheck.fill_sockaddr((sockaddr_x*)addr);
+            *addrlen = sizeof(sockaddr_x);
+            return 0;
+        }
+    }
+
+	// not found locally, check the name server
+	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
+		return -1;
+
+	//Read the nameserver DAG (the one that the name-query will be sent to)
+	if ( XreadNameServerDAG(sock, &ns_dag) < 0 ) {
+		LOG("Unable to find nameserver address");
+		errno = NO_RECOVERY;
+		return -1;
+	}
+
+	//Construct a name-query packet
+	ns_pkt query_pkt;
+	query_pkt.type = NS_TYPE_QUERY;
+	query_pkt.flags = 0;
+	query_pkt.name = name;
+	query_pkt.dag = NULL;
+	int len = make_ns_packet(&query_pkt, pkt, sizeof(pkt));
+
+	//Send a name query to the name server
+	if ((rc = Xsendto(sock, pkt, len, 0, (const struct sockaddr*)&ns_dag, sizeof(sockaddr_x))) < 0) {
+		int err = errno;
+		LOGF("Error sending name query (%d)", rc);
+		Xclose(sock);
+		errno = err;
+		return -1;
+	}
+
+	//Check the response from the name server
+	memset(pkt, 0, sizeof(pkt));
+	if ((rc = Xrecvfrom(sock, pkt, NS_MAX_PACKET_SIZE, 0, NULL, NULL)) < 0) {
+		int err = errno;
+		LOGF("Error retrieving name query (%d)", rc);
+		Xclose(sock);
+		errno = err;
+		return -1;
+	}
+
+	ns_pkt resp_pkt;
+	get_ns_packet(pkt, rc, &resp_pkt);
+
+	switch (resp_pkt.type) {
+	case NS_TYPE_RESPONSE_QUERY:
 		result = 1;
 		break;
 	case NS_TYPE_RESPONSE_ERROR:
 		result = -1;
-		break;					
+		break;
 	default:
-		fprintf(stderr, "dafault\n");
+		LOG("Unknown nameserver response");
 		result = -1;
 		break;
-    }	        
-    if (result < 0) {
-    	return NULL;
-    }  
-    dag = (char*)malloc(sizeof(_dag) + 1);
-    strcpy(dag, _dag);
-    
-    //Close socket	
-    Xclose(sock);
-    free(query_pkt.name);  
-        
-    return dag;
+	}
+	Xclose(sock);
+
+	if (result < 0) {
+		return result;
+	}
+
+	Graph g(resp_pkt.dag);
+	g.fill_sockaddr(addr);
+	*addrlen = sizeof(sockaddr_x);
+	return 0;
 }
 
+/*
+** called by XregisterName and XregisterHost to do the actual work
+*/
+int _xregister(const char *name, sockaddr_x *DAG, short flags) {
+	int sock;
+	int rc;
+	int result;
+	sockaddr_x ns_dag;
+	char pkt[NS_MAX_PACKET_SIZE];
+
+	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
+		return -1;
+
+	//Read the nameserver DAG (the one that the name-registration will be sent to)
+	if (XreadNameServerDAG(sock, &ns_dag) < 0) {
+		LOG("Unable to find nameserver address");
+		errno = NO_RECOVERY;
+		return -1;
+	}
+
+	if (!name || *name == 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (!DAG) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (DAG->sx_family != AF_XIA) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	Graph g(DAG);
+	if (g.num_nodes() <= 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	//Construct a registration packet
+	ns_pkt register_pkt;
+	register_pkt.type = NS_TYPE_REGISTER;
+	register_pkt.flags = flags;
+	register_pkt.name = name;
+	register_pkt.dag = g.dag_string().c_str();
+	int len = make_ns_packet(&register_pkt, pkt, sizeof(pkt));
+
+	//Send the name registration packet to the name server
+	if ((rc = Xsendto(sock, pkt, len, 0, (const struct sockaddr *)&ns_dag, sizeof(sockaddr_x))) < 0) {
+		int err = errno;
+		LOGF("Error sending name registration (%d)", rc);
+		Xclose(sock);
+		errno = err;
+		return -1;
+	}
+
+	//Check the response from the name server
+	memset(pkt, 0, sizeof(pkt));
+	if ((rc = Xrecvfrom(sock, pkt, NS_MAX_PACKET_SIZE, 0, NULL, NULL)) < 0) {
+		int err = errno;
+		LOGF("Error sending name registration (%d)", rc);
+		Xclose(sock);
+		errno = err;
+		return -1;
+	}
+
+	ns_pkt resp_pkt;
+	get_ns_packet(pkt, rc, &resp_pkt);
+
+	switch (resp_pkt.type) {
+	case NS_TYPE_RESPONSE_REGISTER:
+		result = 0;
+		break;
+	case NS_TYPE_RESPONSE_ERROR:
+		result = -1;
+		break;
+	default:
+		LOGF("Unknown NS packet type (%d)", resp_pkt.type);
+		result = -1;
+		break;
+	 }
+
+	Xclose(sock);
+	return result;
+}
 
 /*!
 ** @brief Register a service or hostname with the name server.
@@ -138,7 +305,7 @@ char *XgetDAGbyName(const char *name) {
 ** The memory returned is dynamically allocated and should be released with a
 ** call to free() when the caller is done with it.
 **
-** This is a very simple implementation and will be replaced in a 
+** This is a very simple implementation and will be replaced in a
 ** future release. This version does not check correctness of the name or dag,
 ** nor does it check to ensure that the client is allowed to bind to name.
 **
@@ -149,82 +316,27 @@ char *XgetDAGbyName(const char *name) {
 ** @returns -1 on failure with errno set
 **
 */
-int XregisterName(const char *name, const char *DAG) {
-    int sock;
-    char pkt[NS_MAX_PACKET_SIZE],ddag[NS_MAX_PACKET_SIZE], ns_dag[NS_MAX_PACKET_SIZE];  
-    char _name[NS_MAX_DAG_LENGTH], _dag[NS_MAX_DAG_LENGTH];    
-    int result;
-
-    //Open socket
-    sock=Xsocket(XSOCK_DGRAM);
-    
-    //Read the nameserver DAG (the one that the name-registration will be sent to)
-    if ( XreadNameServerDAG(sock, ns_dag) < 0 )
-        perror("Reading nameserver address");
-
-    //Construct a registration packet	
-    ns_pkt register_pkt;
-    register_pkt.type = NS_TYPE_REGISTER;
-    register_pkt.name = (char*)malloc(strlen(name)+1);
-    register_pkt.dag = (char*)malloc(strlen(DAG)+1);
-    sprintf(register_pkt.name, "%s", name);
-    sprintf(register_pkt.dag, "%s", DAG);
-
-    memset(pkt, 0, sizeof(pkt));
-    int offset = 0;
-    memcpy(pkt, &register_pkt.type, sizeof(register_pkt.type));
-    offset += sizeof(register_pkt.type);
-    memcpy(pkt+offset, register_pkt.name, strlen(register_pkt.name)+1);
-    offset += strlen(register_pkt.name)+1;
-    memcpy(pkt+offset, register_pkt.dag, strlen(register_pkt.dag)+1);
-    offset += strlen(register_pkt.dag)+1;       
-
-    //Send the name registration packet to the name server	
-    Xsendto(sock, pkt, offset, 0, ns_dag, strlen(ns_dag)+1);
-
-    //Check the response from the name server
-    memset(pkt, 0, sizeof(pkt));
-    memset(ddag, 0, sizeof(ddag));
-    size_t ddaglen = sizeof(ddag);
-    int rc = Xrecvfrom(sock, pkt, NS_MAX_PACKET_SIZE, 0, ddag, &ddaglen);
-    if (rc < 0) { perror("recvfrom"); }
-
-    memset(_name, '\0', NS_MAX_DAG_LENGTH);
-    memset(_dag, '\0', NS_MAX_DAG_LENGTH);
-   
-    ns_pkt *tmp = (ns_pkt *)pkt;
-    char* tmp_name = (char*)(pkt+sizeof(tmp->type));
-    char* tmp_dag = (char*)(pkt+sizeof(tmp->type)+ strlen(tmp_name)+1);
-    switch (tmp->type) {
-	case NS_TYPE_RESPONSE:
-		sprintf(_name, "%s", tmp_name);
-		sprintf(_dag, "%s", tmp_dag);
-		result = 0;
-		break;
-	case NS_TYPE_RESPONSE_ERROR:
-		result = -1;
-		break;					
-	default:
-		fprintf(stderr, "dafault\n");
-		result = -1;
-		break;
-     }	        
-    free(register_pkt.name);
-    free(register_pkt.dag);
-    
-    //Close socket	
-    Xclose(sock);
-    
-    return result;
+int XregisterName(const char *name, sockaddr_x *DAG) {
+	return _xregister(name, DAG, 0);
 }
-	
+
+
+/*
+** only used by xhcp_client to register a host name record
+** Migrate flag is used to trigger updating of related name server records
+**  when the host has moved to a new AD
+*/
+int XregisterHost(const char *name, sockaddr_x *DAG) {
+	return _xregister(name, DAG, NS_FLAGS_MIGRATE);
+}
+
 /*!
 ** @brief Get the full DAG of the remote socket.
 **
 ** @param sockfd An Xsocket of type SOCK_STREAM
-** @param dag A buffer to hold the returned DAG.
-** @param len On input contans the size of the dag buffer, 
-**  on output contains the length of the dag.
+** @param dag A sockaddr to hold the returned DAG.
+** @param len On input contans the size of the sockaddr
+**  on output contains sizeof(sockaddr_x).
 **
 ** @returns 0 on success
 ** @returns -1 on failure with errno set
@@ -233,73 +345,73 @@ int XregisterName(const char *name, const char *DAG) {
 ** @returns errno = ENOTCONN if sockfd is not in a connected state
 **
 */
-int Xgetpeername(int sockfd, char *dag, size_t *len)
+int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
-    int rc;
-    char buf[MAXBUFLEN];
+	int rc;
+	char buf[MAXBUFLEN];
 
-    if (*len == 0)
-        return 0;
+	if (!addr || !addrlen) {
+		LOG("pointer is null!\n");
+		errno = EFAULT;
+		return -1;
+	}
 
-    if (!dag) {
-        LOG("dag pointer is null!\n");
-        errno = EFAULT;
-        return -1;
-    }
+	if (*addrlen < sizeof(sockaddr_x)) {
+		errno = EINVAL;
+		return -1;
+	}
 
-    if (validateSocket(sockfd, XSOCK_STREAM, EOPNOTSUPP) < 0) {
-        LOG("Xgetpeername is only valid with stream sockets.");
-        return -1;
-    }
+	if (validateSocket(sockfd, XSOCK_STREAM, EOPNOTSUPP) < 0) {
+		LOG("Xgetpeername is only valid with stream sockets.");
+		return -1;
+	}
 
-    if (!isConnected(sockfd)) {
-        LOGF("Socket %d is not connected", sockfd);
-        errno = ENOTCONN;
-        return -1;
-    }
+	if (!isConnected(sockfd)) {
+		LOGF("Socket %d is not connected", sockfd);
+		errno = ENOTCONN;
+		return -1;
+	}
 
-    xia::XSocketMsg xsm;
-    xsm.set_type(xia::XGETPEERNAME);
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XGETPEERNAME);
 
-    // send the protobuf containing the user data to click
-    if ((rc = click_control(sockfd, &xsm)) < 0) {
-        LOGF("Error talking to Click: %s", strerror(errno));
-        return -1;
-    }
+	// send the protobuf containing the user data to click
+    if ((rc = click_send(sockfd, &xsm)) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
+		return -1;
+	}
 
-    // get the dag
-    if ((rc = click_reply(sockfd, buf, sizeof(buf))) < 0) {
-        LOGF("Error retrieving status from Click: %s", strerror(errno));
-        return -1;
-    }
+	// get the dag
+	if ((rc = click_reply(sockfd, buf, sizeof(buf))) < 0) {
+		LOGF("Error retrieving status from Click: %s", strerror(errno));
+		return -1;
+	}
 
-    xsm.Clear();
-    xsm.ParseFromString(buf);
+	xsm.Clear();
+	xsm.ParseFromString(buf);
 
-    if (xsm.type() != xia::XGETPEERNAME) {
-        LOGF("error: expected %d, got %d\n", xia::XGETPEERNAME, xsm.type());
-        return -1;
-    }
+	if (xsm.type() != xia::XGETPEERNAME) {
+		LOGF("error: expected %d, got %d\n", xia::XGETPEERNAME, xsm.type());
+		return -1;
+	}
 
-    xia::X_GetPeername_Msg *msg = xsm.mutable_x_getpeername();
+	xia::X_GetPeername_Msg *msg = xsm.mutable_x_getpeername();
 
-    size_t dlen = msg->dag().length();
-    size_t l = MIN(dlen, *len);
+	Graph g(msg->dag().c_str());
 
-    memcpy(dag, msg->dag().c_str(), l);
-    dag[l] = 0;
-    *len = dlen;
+	g.fill_sockaddr((sockaddr_x*)addr);
+	*addrlen = sizeof(sockaddr_x);
 
-    return 0;
+	return 0;
 }
 
 /*!
 ** @brief Get the full DAG of the local socket.
 **
 ** @param sockfd An Xsocket of type SOCK_STREAM
-** @param dag A buffer to hold the returned DAG.
-** @param len On input contans the size of the dag buffer, 
-**  on output contains the length of the dag.
+** @param dag A sockaddr to hold the returned DAG.
+** @param len On input contans the size of the sockaddr,
+**  on output contains sizeof(sockaddr_x).
 **
 ** @returns 0 on success
 ** @returns -1 on failure with errno set
@@ -308,62 +420,138 @@ int Xgetpeername(int sockfd, char *dag, size_t *len)
 ** @returns errno = ENOTCONN if sockfd is not in a connected state
 **
 */
-int Xgetsockname(int sockfd, char *dag, size_t *len)
+int Xgetsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
-    int rc;
-    char buf[MAXBUFLEN];
+	int rc;
+	char buf[MAXBUFLEN];
 
-    if (*len == 0)
-        return 0;
+	if (!addr || !addrlen) {
+		LOG("pointer is null!\n");
+		errno = EFAULT;
+		return -1;
+	}
 
-    if (!dag) {
-        LOG("dag pointer is null!\n");
-        errno = EFAULT;
-        return -1;
-    }
+	if (*addrlen < sizeof(sockaddr_x)) {
+		errno = EINVAL;
+		return -1;
+	}
 
-    if (validateSocket(sockfd, XSOCK_STREAM, EOPNOTSUPP) < 0) {
-        LOG("Xgetsockname is only valid with stream sockets.");
-        return -1;
-    }
+	if (validateSocket(sockfd, XSOCK_STREAM, EOPNOTSUPP) < 0) {
+		LOG("Xgetsockname is only valid with stream sockets.");
+		return -1;
+	}
 
-    if (!isConnected(sockfd)) {
-        LOGF("Socket %d is not connected", sockfd);
-        errno = ENOTCONN;
-        return -1;
-    }
+	if (!isConnected(sockfd)) {
+		LOGF("Socket %d is not connected", sockfd);
+		errno = ENOTCONN;
+		return -1;
+	}
 
-    xia::XSocketMsg xsm;
-    xsm.set_type(xia::XGETSOCKNAME);
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XGETSOCKNAME);
 
-    // send the protobuf containing the user data to click
-    if ((rc = click_control(sockfd, &xsm)) < 0) {
-        LOGF("Error talking to Click: %s", strerror(errno));
-        return -1;
-    }
+	// send the protobuf containing the user data to click
+    if ((rc = click_send(sockfd, &xsm)) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
+		return -1;
+	}
 
-    // get the dag
-    if ((rc = click_reply(sockfd, buf, sizeof(buf))) < 0) {
-        LOGF("Error retrieving status from Click: %s", strerror(errno));
-        return -1;
-    }
+	// get the dag
+	if ((rc = click_reply(sockfd, buf, sizeof(buf))) < 0) {
+		LOGF("Error retrieving status from Click: %s", strerror(errno));
+		return -1;
+	}
 
-    xsm.Clear();
-    xsm.ParseFromString(buf);
+	xsm.Clear();
+	xsm.ParseFromString(buf);
 
-    if (xsm.type() != xia::XGETSOCKNAME) {
-        LOGF("error: expected %d, got %d\n", xia::XGETPEERNAME, xsm.type());
-        return -1;
-    }
+	if (xsm.type() != xia::XGETSOCKNAME) {
+		LOGF("error: expected %d, got %d\n", xia::XGETPEERNAME, xsm.type());
+		return -1;
+	}
 
-    xia::X_GetSockname_Msg *msg = xsm.mutable_x_getsockname();
+	xia::X_GetSockname_Msg *msg = xsm.mutable_x_getsockname();
 
-    size_t dlen = msg->dag().length();
-    size_t l = MIN(dlen, *len);
+	Graph g(msg->dag().c_str());
 
-    memcpy(dag, msg->dag().c_str(), l);
-    dag[l] = 0;
-    *len = dlen;
+	g.fill_sockaddr((sockaddr_x*)addr);
+	*addrlen = sizeof(sockaddr_x);
 
-    return 0;
+	return 0;
+}
+
+int make_ns_packet(ns_pkt *np, char *pkt, int pkt_sz)
+{
+	char *end = pkt;
+
+	// this had better not happen
+	if (!np || !pkt || pkt_sz == 0)
+		return 0;
+
+	memset(pkt, 0, pkt_sz);
+	pkt[0] = np->type;
+	pkt[1] = np->flags;
+	end += 2;
+
+	switch (np->type) {
+		case NS_TYPE_REGISTER:
+			if (np->name == NULL || np->dag == NULL)
+				return 0;
+			strcpy(end, np->name);
+			end += strlen(np->name) + 1;
+
+			strcpy(end, np->dag);
+			end += strlen(np->dag) + 1;
+			break;
+
+		case NS_TYPE_QUERY:
+			if (np->name == NULL)
+				return 0;
+			strcpy(end, np->name);
+			end += strlen(np->name) + 1;
+			break;
+
+		case NS_TYPE_RESPONSE_QUERY:
+			if (np->dag == NULL)
+				return 0;
+			strcpy(end, np->dag);
+			end += strlen(np->dag) + 1;
+			break;
+
+		default:
+			break;
+	}
+
+	return end - pkt;
+}
+
+void get_ns_packet(char *pkt, int sz, ns_pkt *np)
+{
+	if (sz < 2) {
+		// hacky error check
+		np->type = NS_TYPE_RESPONSE_ERROR;
+		return;
+	}
+
+	np->type  = pkt[0];
+	np->flags = pkt[1];
+	np->name  = np->dag = NULL;
+
+	switch (np->type) {
+		case NS_TYPE_QUERY:
+			np->name = &pkt[2];
+			break;
+
+		case NS_TYPE_REGISTER:
+			np->name = &pkt[2];
+			np->dag = np->name + strlen(np->name) + 1;
+			break;
+
+		case NS_TYPE_RESPONSE_QUERY:
+			np->dag = &pkt[2];
+			break;
+
+		default:
+			break;
+	}
 }

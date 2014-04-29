@@ -17,8 +17,17 @@
 #    with this program; if not, write to the Free Software Foundation, Inc.,
 #    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
+import sys
+import os
+                                                                                                                                                                                                                    
+# find the path to xia-core
+XIADIR=os.getcwd()
+while os.path.split(XIADIR)[1] != 'xia-core':
+    XIADIR=os.path.split(XIADIR)[0]
+sys.path.append(XIADIR + '/api/lib')
+
 import struct
-import sys, time, pygame
+import time, pygame
 #import socket
 import fcntl
 from select import select

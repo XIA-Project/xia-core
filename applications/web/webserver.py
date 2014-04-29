@@ -1,12 +1,18 @@
 #!/usr/bin/python
+import sys
+import os
+                                                                                                                                                                                                                    
+# find the path to xia-core
+XIADIR=os.getcwd()
+while os.path.split(XIADIR)[1] != 'xia-core':
+    XIADIR=os.path.split(XIADIR)[0]
+sys.path.append(XIADIR + '/api/lib')
 
 import math
 import socket
-import sys
 import struct
 import time
 import datetime
-import os
 import string
 from c_xsocket import *
 from ctypes import *
@@ -27,7 +33,8 @@ def serveHTTPRequest(request, sock):
     date = datetime.datetime.now().strftime("%a, %d %b %Y %H:%M:%S %Z")  #TODO: fix time zone
     response_data = ''
     http_msg_type = ''
-    http_header = 'Date: %s\nServer: XIA Baby Webserver\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/html\n\n' % date
+    content_length = 250
+    http_header = 'Date: %s\nServer: XIA Baby Webserver\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/html\nX-Length: %d\n\n' % (date, content_length)
 
     # If file exists in cids_by_filename, return its CID (list); otherwise return 404 Not Found
     requested_file = './www/' + request.split(' ')[1][1:]
@@ -46,13 +53,15 @@ def serveHTTPRequest(request, sock):
         http_msg_type = "HTTP/1.1 404 Not Found\n"
 
     # Send response
-    response = http_msg_type + http_header + response_data + 'DONEDONEDONE'
-    last_sent = 0
-    while last_sent < len(response):
-        base = last_sent
-        last_sent = min(len(response), last_sent + 800)
-        Xsend(sock, response[base:last_sent], 0)
+    content_length = len(response_data)
+    http_header = 'Date: %s\nServer: XIA Baby Webserver\nAccess-Control-Allow-Origin: *\nCache-Control: no-cache\nConnection: close\nContent-Type: text/html\nX-Length: %d\n\n' % (date,content_length)
 
+    response = http_msg_type + http_header + response_data
+    last_sent_length = 0;
+    while (content_length + len(http_msg_type) + len(http_header)) > last_sent_length:
+        base = last_sent_length
+        last_sent_length = min(len(response), last_sent_length + 800)
+        Xsend(sock, response[base:last_sent_length], 0)
 
 # Chunk and publish all files in the local www directory.
 # If the file is an html file and contains images also stored in
@@ -140,7 +149,7 @@ def put_content_in_dir(dir):
 def main():
     global myAD, myHID, mySID, my4ID
     # Set up connection with click via Xsocket API
-    set_conf("xsockconf_python.ini", "webserver.py")
+    set_conf("xsockconf.ini", "webserver.py")
         
     try:   
         # Create socket for listening for connections
@@ -160,8 +169,9 @@ def main():
         print '4ID: %s' % my4ID
         listen_dag_re = "RE %s %s %s" % (myAD, myHID, mySID) # dag to listen on; TODO: fix Xbind so this can be DAG format, not just RE
         listen_dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 0 - \n %s 3 - \n %s" % (myAD, my4ID, myHID, mySID)
+
         Xbind(listen_sock, listen_dag_re)
-        print 'Listening on %s' % listen_dag
+        print 'Webserver listening on %s' % listen_dag
 
         # Publish DAG to naming service
         XregisterName("www_s.xiaweb.com.xia", listen_dag)
@@ -174,7 +184,7 @@ def main():
        
         # TODO: use threads instead of processes?
         while(True):
-            accept_sock = Xaccept(listen_sock);
+            (accept_sock, peer) = Xaccept(listen_sock);
             print 'connection accepted'
             child_pid = os.fork()
   

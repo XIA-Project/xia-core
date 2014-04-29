@@ -19,8 +19,8 @@
 #include <fcntl.h>
 using namespace std;
 
-#define HELLO_INTERVAL 1
-#define LSA_INTERVAL 3
+#define HELLO_INTERVAL 0.1
+#define LSA_INTERVAL 0.3
 #define CALC_DIJKSTRA_INTERVAL 4
 #define MAX_HOP_COUNT 50
 #define MAX_SEQNUM 100000
@@ -31,7 +31,7 @@ using namespace std;
 #define HOST_REGISTER 2
 
 
-#define BHID "HID:1111111111111111111111111111111111111111"
+#define BHID "HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 #define SID_XROUTE "SID:1110000000000000000000000000000000001112"
 #define NULL_4ID "IP:4500000000010000fafa00000000000000000000"
 
@@ -67,8 +67,11 @@ typedef struct {
 typedef struct RouteState {
 	int32_t sock; // socket for routing process
 	
-	char * sdag; // src DAG: this router
-	char * ddag; // dest DAG: broadcast HELLO/LSA to other routers
+	sockaddr_x sdag;
+	sockaddr_x ddag;
+
+//	char * sdag; // src DAG: this router
+//	char * ddag; // dest DAG: broadcast HELLO/LSA to other routers
 	char myAD[MAX_XID_SIZE]; // this router AD
 	char myHID[MAX_XID_SIZE]; // this router HID
 	char my4ID[MAX_XID_SIZE]; // not used
@@ -112,7 +115,7 @@ int processHello(const char* hello_msg);
 int processLSA(const char* lsa_msg);
 
 // process a Host Register message 
-int processHostRegister(const char* host_register_msg);
+void processHostRegister(const char* host_register_msg);
 
 // compute the shortest path (Dijkstra)
 void calcShortestPath();

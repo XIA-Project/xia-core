@@ -183,14 +183,12 @@ XIAPrint::should_print(Packet *p)
     	const char *ss = srcXID.unparse().c_str();
     	const char *ds = dstXID.unparse().c_str();
 
-    	// Hack: filtering out daemon traffic (e.g., xroute, xhcp, name-server)
+    	// filter out daemon traffic (xroute and xhcp)
     	if (strcmp(ss, "SID:1110000000000000000000000000000000001111") == 0 ||
     	    strcmp(ss, "SID:1110000000000000000000000000000000001112") == 0 ||
-    		strcmp(ss, "SID:1110000000000000000000000000000000001113") == 0 ||
     		strcmp(ds, "SID:1110000000000000000000000000000000001111") == 0 ||
     		strcmp(ds, "SID:1110000000000000000000000000000000001112") == 0 ||
-    		strcmp(ds, "SID:1110000000000000000000000000000000001113") == 0 ||
-    		strcmp(ds, "HID:1111111111111111111111111111111111111111") == 0) {
+    		strcmp(ds, BHID) == 0) {
     		return 0;
     	}
 		else

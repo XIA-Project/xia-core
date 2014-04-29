@@ -66,13 +66,13 @@ class XCMP : public Element { public:
     u_short in_cksum(u_short *, int);
     
     void sendUp(Packet *p_in);
-    void sendXCMPPacket(Packet *p_in, int type, int code, click_xia_xid*, click_xia_xid*);
+    void sendXCMPPacket(const Packet *p_in, int type, int code, click_xia_xid*, click_xia_xid*, XIAPath*);
 
     void processBadForwarding(Packet *p_in);
     void processUnreachable(Packet *p_in);
     void processExpired(Packet *p_in);
 
-    void gotPing(Packet *p_in);
+    void gotPing(const Packet *p_in);
     void gotPong(Packet *p_in);
     void gotExpired(Packet *p_in);
     void gotUnreachable(Packet *p_in);

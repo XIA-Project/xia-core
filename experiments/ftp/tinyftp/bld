@@ -1,0 +1,6 @@
+#! /bin/bash
+
+cc -o tinyftp \
+-I../../XIASocket/API -I../lib -I. -I.. \
+-g -O2 *.c \
+libXsocket.a -lprotobuf 

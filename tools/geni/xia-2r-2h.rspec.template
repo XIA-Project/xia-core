@@ -1,0 +1,104 @@
+<rspec type="request" generated_by="Flack" generated="2013-04-08T15:09:27Z" xsi:schemaLocation="http://www.geni.net/resources/rspec/3 http://www.geni.net/resources/rspec/3/request.xsd " xmlns:flack="http://www.protogeni.net/resources/rspec/ext/flack/1" xmlns:client="http://www.protogeni.net/resources/rspec/ext/client/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.geni.net/resources/rspec/3">
+  <node client_id="router0" component_manager_id="urn:publicid:IDN+emulab.net+authority+cm" exclusive="true">
+    <vnode name="pc318" xmlns="http://www.protogeni.net/resources/rspec/ext/emulab/1"/>
+    <sliver_type name="raw-pc">
+      <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU11-64-STD"/>
+    </sliver_type>
+    <services>
+      <execute command="sudo su USERNAME -c 'sh /users/USERNAME/build-xia-click-ubuntu11.sh'" shell="sh"/>
+      <install install_path="/users/USERNAME" url="http://xia.cs.cmu.edu/geni/build-xia-click-ubuntu11.sh.tar.gz"/>
+    </services>
+    <interface client_id="PC:if0">
+      <ip address="10.10.1.1" netmask="" type="ipv4"/>
+      <flack:interface_info addressBound="false" bound="false"/>
+    </interface>
+    <interface client_id="PC:if1">
+      <ip address="10.10.2.1" netmask="" type="ipv4"/>
+      <flack:interface_info addressBound="false" bound="false"/>
+    </interface>
+    <flack:node_info x="183" y="260" unbound="true"/>
+  </node>
+  <node client_id="router1" component_manager_id="urn:publicid:IDN+emulab.net+authority+cm" exclusive="true">
+    <vnode name="pc310" xmlns="http://www.protogeni.net/resources/rspec/ext/emulab/1"/>
+    <sliver_type name="raw-pc">
+      <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU11-64-STD"/>
+    </sliver_type>
+    <services>
+      <execute command="sudo su USERNAME -c 'sh /users/USERNAME/build-xia-click-ubuntu11.sh'" shell="sh"/>
+      <install install_path="/users/USERNAME/" url="http://xia.cs.cmu.edu/geni/build-xia-click-ubuntu11.sh.tar.gz"/>
+    </services>
+    <interface client_id="PC-2:if0">
+      <ip address="10.10.2.2" netmask="" type="ipv4"/>
+      <flack:interface_info addressBound="false" bound="false"/>
+    </interface>
+    <interface client_id="router1:if0">
+      <ip address="10.10.3.2" netmask="" type="ipv4"/>
+      <flack:interface_info addressBound="false" bound="false"/>
+    </interface>
+    <flack:node_info x="542" y="238" unbound="true"/>
+  </node>
+  <node client_id="host1" component_manager_id="urn:publicid:IDN+emulab.net+authority+cm" exclusive="true">
+    <vnode name="pc314" xmlns="http://www.protogeni.net/resources/rspec/ext/emulab/1"/>
+    <sliver_type name="raw-pc">
+      <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU11-64-STD"/>
+    </sliver_type>
+    <services>
+      <execute command="sudo su USERNAME -c 'sh /users/USERNAME/build-xia-click-ubuntu11.sh'" shell="sh"/>
+      <install install_path="/users/USERNAME/" url="http://xia.cs.cmu.edu/geni/build-xia-click-ubuntu11.sh.tar.gz"/>
+    </services>
+    <interface client_id="host1:if0">
+      <ip address="10.10.3.1" netmask="" type="ipv4"/>
+      <flack:interface_info addressBound="false" bound="false"/>
+    </interface>
+    <flack:node_info x="626" y="80" unbound="true"/>
+  </node>
+  <node client_id="host0" component_manager_id="urn:publicid:IDN+emulab.net+authority+cm" exclusive="true">
+    <vnode name="pc295" xmlns="http://www.protogeni.net/resources/rspec/ext/emulab/1"/>
+    <sliver_type name="raw-pc">
+      <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU11-64-STD"/>
+    </sliver_type>
+    <services>
+      <execute command="sudo su USERNAME -c 'sh /users/USERNAME/build-xia-click-ubuntu11.sh'" shell="sh"/>
+      <install install_path="/users/USERNAME/" url="http://xia.cs.cmu.edu/geni/build-xia-click-ubuntu11.sh.tar.gz"/>
+    </services>
+    <interface client_id="PC-4:if0">
+      <ip address="10.10.1.2" netmask="" type="ipv4"/>
+      <flack:interface_info addressBound="false" bound="false"/>
+    </interface>
+    <flack:node_info x="89" y="94" unbound="true"/>
+  </node>
+  <link client_id="lan0" vlantag="318">
+    <flack:link_info x="-1" y="-1" unboundVlantag="true" xmlns="http://www.protogeni.net/resources/rspec/ext/flack/1"/>
+    <flack:link_info x="-1" y="-1" unboundVlantag="true" xmlns="http://www.protogeni.net/resources/rspec/ext/flack/1"/>
+    <flack:link_info x="-1" y="-1" unboundVlantag="true" xmlns="http://www.protogeni.net/resources/rspec/ext/flack/1"/>
+    <component_manager name="urn:publicid:IDN+emulab.net+authority+cm"/>
+    <interface_ref client_id="PC:if0"/>
+    <interface_ref client_id="PC-4:if0"/>
+    <property source_id="PC:if0" dest_id="PC-4:if0"/>
+    <property source_id="PC-4:if0" dest_id="PC:if0"/>
+    <link_type name="lan"/>
+    <flack:link_info x="-1" y="-1" unboundVlantag="true"/>
+  </link>
+  <link client_id="lan1" vlantag="273">
+    <flack:link_info x="-1" y="-1" unboundVlantag="true" xmlns="http://www.protogeni.net/resources/rspec/ext/flack/1"/>
+    <flack:link_info x="-1" y="-1" unboundVlantag="true" xmlns="http://www.protogeni.net/resources/rspec/ext/flack/1"/>
+    <flack:link_info x="387" y="296" unboundVlantag="true" xmlns="http://www.protogeni.net/resources/rspec/ext/flack/1"/>
+    <component_manager name="urn:publicid:IDN+emulab.net+authority+cm"/>
+    <interface_ref client_id="PC:if1"/>
+    <interface_ref client_id="PC-2:if0"/>
+    <property source_id="PC:if1" dest_id="PC-2:if0"/>
+    <property source_id="PC-2:if0" dest_id="PC:if1"/>
+    <link_type name="lan"/>
+    <flack:link_info x="387" y="296" unboundVlantag="true"/>
+  </link>
+  <link client_id="lan2" vlantag="301">
+    <flack:link_info x="-1" y="-1" unboundVlantag="true" xmlns="http://www.protogeni.net/resources/rspec/ext/flack/1"/>
+    <component_manager name="urn:publicid:IDN+emulab.net+authority+cm"/>
+    <interface_ref client_id="host1:if0"/>
+    <interface_ref client_id="router1:if0"/>
+    <property source_id="host1:if0" dest_id="router1:if0"/>
+    <property source_id="router1:if0" dest_id="host1:if0"/>
+    <link_type name="lan"/>
+    <flack:link_info x="-1" y="-1" unboundVlantag="true"/>
+  </link>
+</rspec>

@@ -1,21 +1,14 @@
-CC=g++
-LD=g++
+include ../../xia.mk
 
-XIADIR=$(shell cd ../../ && pwd)
+.PHONY: all clean
 
-APIDIR=$(XIADIR)/api
-XINC=$(APIDIR)/include
-XLIB=$(APIDIR)/lib
-BINDIR=../../bin
-
-CFLAGS=-I$(XINC) -ggdb
-LDFLAGS=-lprotobuf -lpthread
-SOURCES=ns.cc $(XLIB)/libXsocket.so
+LDFLAGS += $(LIBS)
+SOURCES=ns.cc
 NS=$(BINDIR)/xnameservice
 
 all: $(NS)
 
-$(NS): $(SOURCES)
+$(NS): $(SOURCES) $(XINC)/Xsocket.h $(XINC)/xns.h
 	$(CC) -o $@ $(CFLAGS) $(SOURCES) $(LDFLAGS)	
 
 clean:

@@ -1,10 +1,14 @@
-require(library ../../click/conf/xia_router_lib.click);
+require(library ../../../click/conf/xia_router_lib.click);
 require(library xia_address.click);
 
 // host instantiation
-$HNAME :: XIAInstrumentedEndHost (RE $ADNAME $HID, $HID, fake0, 172.0.0.2, 172.0.0.1, 01:11:11:11:11:11, 0, $MAC0);
+$HNAME :: XIAEndHost (RE $ADNAME $HID, $HID, 1500, 0, $MAC0);
 
-FromDevice($IFACE, PROMISC true) -> [0]${HNAME}[0] -> ToDevice($IFACE);
+######
+sock_server::Socket("UDP", 0.0.0.0, $PORT) -> [0]${HNAME}[0] -> socket_client::Socket("UDP", $SOCK_IP, $PORT);
+######
+FromDevice($IFACE, METHOD LINUX) -> [0]${HNAME}[0] -> ToDevice($IFACE);
+######
 
 	ControlSocket(tcp, 7777);
 

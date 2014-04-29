@@ -1,0 +1,10 @@
+# NOTE: Copy/rename this file to xiahosts and replace the hostnames 
+# below with the hostnames allocated in your GENI slice.
+#
+# The hostnames are shown in the Flack configuration window.
+
+HOSTS="pc295 pc314"
+ROUTERS="pc318 pc310"
+
+NS_ROUTER="pc318"
+NS_HOST="pc295"

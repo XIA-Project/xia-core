@@ -75,7 +75,7 @@ int XreadChunk(int sockfd, void *rbuf, size_t len, int /* flags */,
 	std::string p_buf;
 	xsm.SerializeToString(&p_buf);
 
-	if ((rc = click_data(sockfd, &xsm)) < 0) {
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
@@ -95,7 +95,7 @@ int XreadChunk(int sockfd, void *rbuf, size_t len, int /* flags */,
 	const char *payload = msg->payload().c_str();
 
 	if (paylen > len) {
-		LOGF("CID is %d bytes, but rbuf is only %d bytes", paylen, len);
+		LOGF("CID is %u bytes, but rbuf is only %lu bytes", paylen, len);
 		errno = EFAULT;
 		return -1;
 	}

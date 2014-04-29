@@ -14,6 +14,7 @@
 ** limitations under the License.
 */
 #include "dagaddr.hpp"
+#include <stdlib.h>
 #include <cstdio>
 
 int main()
@@ -22,6 +23,10 @@ int main()
 	Node n_ad(Node::XID_TYPE_AD, "0606060606060606060606060606060606060606");
 	Node n_hid(Node::XID_TYPE_HID, "0101010101010101010101010101010101010101");
 	Node n_cid(Node::XID_TYPE_CID, "0202020202020202020202020202020202020202");
+
+	printf("n_ad: %s\n", n_ad.to_string().c_str());
+	printf("n_hid: %s\n", n_hid.to_string().c_str());
+	printf("n_cid: %s\n\n", n_cid.to_string().c_str());
 
 	// Path directly to n_cid
 	// n_src -> n_cid
@@ -62,12 +67,11 @@ int main()
 	g4.print_graph();
 	printf("\n");
 
-
 	// TODO: cut here in the example version; stuff below is for testing
 
 	printf("\n\n");
 	printf("g5 = g3 * (SID0 + SID1) * SID2\n");
-	Graph g5 = g3 * (Node(Node::XID_TYPE_SID, "0303030303030303030303030303030303030303") + Node(Node::XID_TYPE_SID, "0404040404040404040404040404040404040404"));// * Node(Node::XID_TYPE_SID, "0505050505050505050505050505050505050505");
+	Graph g5 = g3 * (Node(Node::XID_TYPE_SID, "0303030303030303030303030303030303030303") + Node(Node::XID_TYPE_SID, "0404040404040404040404040404040404040404")) * Node(Node::XID_TYPE_SID, "0505050505050505050505050505050505050505");
 	g5.print_graph();
 	printf("\n");
 	printf("%s\n\n", g5.dag_string().c_str());
@@ -77,6 +81,129 @@ int main()
 	g5_prime.print_graph();
 	printf("\n\n");
 
+	printf("g5_prime2 = Graph(g3)\n");
+	Graph g5_prime2 = Graph(g3);
+	printf("%s\n\n", g5_prime2.dag_string().c_str());
+	printf("g5_prime2 *= SID0\n");
+	g5_prime2 *= Node(Node::XID_TYPE_SID, "0303030303030303030303030303030303030303");
+	printf("%s\n\n", g5_prime2.dag_string().c_str());
+	printf("g5_double = g5 * g3\n");
+	Graph g5_double = g5 * g3;
+	printf("%s\n\n", g5_double.dag_string().c_str());
+
+
+
+
+
+	Node n_ad2(Node::XID_TYPE_AD, "0707070707070707070707070707070707070707");
+	Node n_hid2(Node::XID_TYPE_HID, "0808080808080808080808080808080808080808");
+	Node n_sid("SID:0909090909090909090909090909090909090909");
+
+	printf("g6 = g3 * ((n_cid * n_sid) + (n_cid * n_ad2 * n_sid) + (n_cid * n_ad2 * n_hid2 * n_sid))\n");
+	Graph g6 = g3 * ((n_cid * n_sid) + (n_cid * n_ad2 * n_sid) + (n_cid * n_ad2 * n_hid2 * n_sid));
+	printf("%s\n\n", g6.dag_string().c_str());
+
+	printf("Testing is_final_intent vvv\n");
+
+	printf("g3.is_final_intent(n_cid): %s\n", (g3.is_final_intent(n_cid))?"true":"false");
+	printf("g3.is_final_intent(n_hid): %s\n", (g3.is_final_intent(n_hid))?"true":"false");
+	printf("g3.is_final_intent(n_ad): %s\n", (g3.is_final_intent(n_ad))?"true":"false");
+	
+	printf("g3.is_final_intent(n_cid.id_string()): %s\n", (g3.is_final_intent(n_cid.id_string()))?"true":"false");
+	printf("g3.is_final_intent(n_hid.id_string()): %s\n", (g3.is_final_intent(n_hid.id_string()))?"true":"false");
+	printf("g3.is_final_intent(n_ad.id_string()): %s\n", (g3.is_final_intent(n_ad.id_string()))?"true":"false");
+
+	printf("Testing is_final_intent ^^^\n\n\n");
+
+	printf("Testing next_hop vvv\n");
+
+	printf("g5.next_hop(n_src):\n%s\n", g5.next_hop(n_src).dag_string().c_str());
+	printf("g5.next_hop(n_cid):\n%s\n", g5.next_hop(n_cid).dag_string().c_str());
+	printf("g6.next_hop(n_src):\n%s\n", g6.next_hop(n_src).dag_string().c_str());
+	printf("g6.next_hop(n_cid):\n%s\n\n", g6.next_hop(n_cid).dag_string().c_str());
+
+	printf("g5.next_hop(n_src.id_string()):\n%s\n", g5.next_hop(n_src.id_string()).dag_string().c_str());
+	printf("g5.next_hop(n_cid.id_string()):\n%s\n", g5.next_hop(n_cid.id_string()).dag_string().c_str());
+	printf("g6.next_hop(n_src.id_string()):\n%s\n", g6.next_hop(n_src.id_string()).dag_string().c_str());
+	printf("g6.next_hop(n_cid.id_string()):\n%s\n", g6.next_hop(n_cid.id_string()).dag_string().c_str());
+
+	printf("Testing next_hop ^^^\n\n\n");
+
+
+	printf("Testing first_hop vvv\n");
+
+	printf("g5.first_hop():\n%s\n", g5.first_hop().dag_string().c_str());
+	printf("g6.first_hop():\n%s\n", g6.first_hop().dag_string().c_str());
+
+	printf("Testing first_hop ^^^\n\n\n");
+	
+	
+	printf("Testing next_hop ^^^\n\n\n");
+
+
+	printf("Testing construct_from_re_string vvv\n");
+
+	Graph g7 = Graph("RE AD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 SID:1110000000000000000000000000000000001113");
+	printf("Graph(\"RE AD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 SID:1110000000000000000000000000000000001113\")\n%s\n", g7.dag_string().c_str());
+	Graph g8 = Graph("RE ( AD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 ) SID:1110000000000000000000000000000000001113");
+	printf("Graph(\"RE ( AD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 ) SID:1110000000000000000000000000000000001113\")\n%s\n", g8.dag_string().c_str());
+	//Graph g9 = Graph("RE ( IP:4500000000010000fafa00000000000000000000 ) AD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 SID:0f00000000000000000000000000000000008888");
+	//printf("Graph(\"RE ( IP:4500000000010000fafa00000000000000000000 ) AD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 SID:0f00000000000000000000000000000000008888\")\n%s\n", g9.dag_string().c_str());
+
+	printf("Testing construct_from_re_string ^^^\n\n\n");
+	
+
+	printf("Testing sockaddr_x vvv\n");
+
+	sockaddr_x *s = (sockaddr_x*)malloc(sizeof(sockaddr_x));
+	g6.fill_sockaddr(s);
+	Graph g6_prime = Graph(s);
+	printf("g6_prime.dag_string().c_str():\n%s\n", g6_prime.dag_string().c_str());
+
+	g7.fill_sockaddr(s);
+	Graph g7_prime = Graph(s);
+	printf("g7_prime.dag_string().c_str():\n%s\n", g7_prime.dag_string().c_str());
+
+	printf("Testing sockaddr_x ^^^\n\n\n");
+
+	printf("Testing replace_final_intent vvv\n");
+	Graph g6_new_intent = Graph(g6);
+	g6_new_intent.replace_final_intent(n_cid);
+	printf("g6_new_intent.dag_string().c_str():\n%s\n", g6_new_intent.dag_string().c_str());
+	printf("Testing replace_final_intent ^^^\n\n\n");
+	
+	
+	printf("Testing get_final_intent vvv\n");
+	printf("Final intent of g6_new_intent: %s\n", g6_new_intent.get_final_intent().id_string().c_str());
+	printf("Testing get_final_intent ^^^\n\n\n");
+
+
+
+	printf("Testing string parse error checking vvv\n");
+
+	printf("Testing IP parsing\n");
+	Graph g10 = Graph("RE ( IP:192.168.0.1 ) AD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 SID:1110000000000000000000000000000000001113");
+	printf("g10.dag_string().c_str():\n%s\n", g10.dag_string().c_str());
+
+	printf("\nTesting 4ID parsing\n");
+	Graph g11 = Graph("RE ( IP:4500000000010000fafa000000000000c0a80001 ) AD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 SID:1110000000000000000000000000000000001113");
+	printf("g11.dag_string().c_str():\n%s\n", g11.dag_string().c_str());
+	
+	
+	printf("\nTesting bogus XID type\n");
+	Graph g12 = Graph("RE QD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 SID:1110000000000000000000000000000000001113");
+	printf("g12.dag_string().c_str():\n%s\n", g12.dag_string().c_str());
+	
+	
+	printf("\nTesting short (<40 char) XID string\n");
+	Graph g13 = Graph("RE AD:10000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 SID:1110000000000000000000000000000000001113");
+	printf("g13.dag_string().c_str():\n%s\n", g13.dag_string().c_str());
+	
+	printf("\nTesting non-hex XID string\n");
+	Graph g14 = Graph("RE AD:10000hello0world0qrsxyz00000000000000000 HID:0000000000000000000000000000000000000000 SID:1110000000000000000000000000000000001113");
+	printf("g14.dag_string().c_str():\n%s\n", g14.dag_string().c_str());
+
+	printf("Testing string parse error checking ^^^\n\n\n");
+
 	return 0;
 }
-

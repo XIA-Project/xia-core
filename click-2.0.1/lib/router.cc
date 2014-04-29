@@ -1139,7 +1139,7 @@ Router::initialize(ErrorHandler *errh)
 	initialize_handlers(true, true);
 	for (int ord = 0; all_ok && ord < _elements.size(); ord++) {
 	    int i = _element_configure_order[ord];
-	    assert(element_stage[i] == Element::CLEANUP_CONFIGURED);
+	    //assert(element_stage[i] == Element::CLEANUP_CONFIGURED);
 #if CLICK_DMALLOC
 	    sprintf(dmalloc_buf, "i%d  ", i);
 	    CLICK_DMALLOC_REG(dmalloc_buf);

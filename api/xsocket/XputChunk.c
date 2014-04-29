@@ -53,7 +53,7 @@
 **
 */
 ChunkContext *XallocCacheSlice(unsigned policy, unsigned ttl, unsigned size) {
-    int sockfd = Xsocket(XSOCK_CHUNK);
+    int sockfd = Xsocket(AF_XIA, XSOCK_CHUNK, 0);
     if(sockfd < 0) {
         LOG("Unable to allocate the cache slice.\n");
         return NULL;
@@ -154,7 +154,7 @@ int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkI
     _msg->set_cachesize(ctx->cacheSize);
     _msg->set_cachepolicy(ctx->cachePolicy);
 
-	if ((rc = click_data(ctx->sockfd, &xsm)) < 0) {
+	if ((rc = click_send(ctx->sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
@@ -175,6 +175,7 @@ int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkI
 		info->ttl= _msgReply->ttl();
 		info->timestamp.tv_sec=_msgReply->timestamp();
 		info->timestamp.tv_usec = 0;
+		LOGF(">>>>>> PUT: info->cid: %s \n", _msgReply->cid().c_str()); 
         return 0;
     } else {
         return -1;
@@ -243,7 +244,7 @@ int XputFile(ChunkContext *ctx, const char *fname, unsigned chunkSize, ChunkInfo
 	numChunks = fs.st_size / chunkSize;
 	if (fs.st_size % chunkSize)
 		numChunks ++;
-
+	//FIXME: this should be numChunks, sizeof(ChunkInfo)
 	if (!(infoList = (ChunkInfo*)calloc(numChunks, chunkSize))) {
 		fclose(fp);
 		return -1;
@@ -399,7 +400,7 @@ int XremoveChunk(ChunkContext *ctx, const char *cid)
     _msg->set_contextid(ctx->contextID);
     _msg->set_cid(cid);
 
-	if ((rc = click_data(ctx->sockfd, &xsm)) < 0) {
+	if ((rc = click_send(ctx->sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}

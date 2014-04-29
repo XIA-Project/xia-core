@@ -18,8 +18,16 @@
 
 # simple XIA echo server using datagram sockets
 
-from c_xsocket import *
 import sys
+import os
+
+# find the path to xia-core
+XIADIR=os.getcwd()
+while os.path.split(XIADIR)[1] != 'xia-core':
+    XIADIR=os.path.split(XIADIR)[0]
+sys.path.append(XIADIR + '/api/lib')
+
+from c_xsocket import *
 
 SID = "SID:0f00000000000000000000000000000000001777"
 NAME = "www_s.dgram_echo.aaa.xia"
@@ -27,7 +35,7 @@ NAME = "www_s.dgram_echo.aaa.xia"
 try:
 	sock = Xsocket(XSOCK_DGRAM)
 
-	(ad, hid) = XreadLocalHostAddr(sock)
+	(ad, hid, fid) = XreadLocalHostAddr(sock)
 
 	dag = "RE %s %s %s" % (ad, hid, SID) 
 

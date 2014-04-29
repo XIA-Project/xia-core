@@ -47,7 +47,7 @@ XIAXIDRouteTable::configure(Vector<String> &conf, ErrorHandler *errh)
     _local_addr = local_addr;
     _local_hid = local_addr.xid(local_addr.destination_node());
         
-    String broadcast_xid("HID:1111111111111111111111111111111111111111");  // broadcast HID
+    String broadcast_xid(BHID);  // broadcast HID
     _bcast_xid.parse(broadcast_xid);    
     
 	return 0;

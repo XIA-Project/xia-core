@@ -1,9 +1,9 @@
 #ifndef CLICK_XIARPC_HH
 #define CLICK_XIARPC_HH
+#include "../../userlevel/xia.pb.h"
 #include <click/element.hh>
 #include <click/string.hh>
 #include <click/xiapath.hh>
-#include "../../userlevel/xia.pb.h"
 
 CLICK_DECLS
 

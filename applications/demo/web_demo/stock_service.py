@@ -1,9 +1,16 @@
 #!/usr/bin/python
+import sys
+import os
+                                                                                                                                                                                                                    
+# find the path to xia-core
+XIADIR=os.getcwd()
+while os.path.split(XIADIR)[1] != 'xia-core':
+    XIADIR=os.path.split(XIADIR)[0]
+sys.path.append(XIADIR + '/api/lib')
+
 import c_xsocket 
 from xia_address import * 
 import random
-import sys
-import os
 import time
 from c_xsocket import *
 from ctypes import *
@@ -50,7 +57,7 @@ def update_stockfeed(stock):
 
 stock_name= ["ADA",  "BQB", "CKK", "GPR", "HER", "IAK", "KOY", "LUR", "XIA", "YRY" ]
 stock = map(lambda name: Stock(name), stock_name)
-set_conf("xsockconf_python.ini","stock_service.py")
+set_conf("xsockconf.ini","stock_service.py")
 print_conf()
 
 try:

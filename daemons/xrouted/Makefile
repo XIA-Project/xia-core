@@ -1,23 +1,16 @@
+include ../../xia.mk
+VPATH=../common
+
 .PHONY: all clean
 
-XIADIR=$(shell cd ../../ && pwd)
-
-APIDIR=$(XIADIR)/api
-XINC=$(APIDIR)/include
-XLIB=$(APIDIR)/lib
-BINDIR=../../bin
-
-CC=g++
-CFLAGS1=-Wall -Wextra
-CFLAGS2=-I$(XINC)
-LDFLAGS =  -lprotobuf -lpthread
-SOURCES=xrouted.cc ../common/csclient.cc ../common/XIARouter.cc $(XLIB)/libXsocket.so
+SOURCES=xrouted.cc csclient.cc XIARouter.cc
 XROUTED=$(BINDIR)/xrouted
+LDFLAGS += $(LIBS)
 
 all: $(XROUTED)
 
 $(XROUTED): $(SOURCES)
-	$(CC) -o $@ $(CFLAGS2) $(SOURCES) $(LDFLAGS)
+	$(CC) -o $@ $(CFLAGS) $^ $(LDFLAGS)
 
 clean:
 	-rm $(XROUTED)

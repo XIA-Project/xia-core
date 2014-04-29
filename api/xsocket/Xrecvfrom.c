@@ -27,11 +27,12 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
+#include "dagaddr.hpp"
 
 /*!
 ** @brief receives datagram data on an Xsocket.
 **
-** Xrecvfrom() retrieves data from an Xsocket of type XSOCK_DGRAM. Unlike the 
+** Xrecvfrom() retrieves data from an Xsocket of type XSOCK_DGRAM. Unlike the
 ** standard recvfrom API, it will not work with sockets of type XSOCK_STREAM.
 **
 ** XrecvFrom() does not currently have a non-blocking mode, and will block
@@ -41,7 +42,7 @@
 ** you may then call XrecvFrom() to get the data.
 **
 ** NOTE: in cases where more data is received than specified by the caller,
-** the excess data will be stored in the socket state structure and will 
+** the excess data will be stored in the socket state structure and will
 ** be returned from there rather than from Click. Once the socket state
 ** is drained, requests will be sent through to Click again.
 **
@@ -51,41 +52,57 @@
 ** returned may be less than len bytes.
 ** @param flags (This is not currently used but is kept to be compatible
 ** with the standard sendto socket call.
-** @param sDAG on success, contains the DAG of the sender
-** @param slen contians the size of sDAG when called, replaced with the length
-** of the received sDAG on return. slen MUST be set to the size of sDAG before
-** calling XrecvFrom(). If slen is smaller than the length of the source DAG,
-** the returned DAG is truncated and slen will contain length of the actual DAG.
+** @param addr if non-NULL, filled with the address of the sender on success
+** @param addrlen contians the size of addr when called, replaced with the length
+** of the received addr on return. addrlen MUST be set to the size of addr before
+** calling Xrecvfrom() when addr is non-NULL. If addrlen is smaller than the length
+** of the source DAG, the returned address is truncated and addrlen will contain length
+** of the actual address.
 **
 ** @returns number of bytes received
 ** @returns -1 on failure with errno set.
 */
 int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
-	char* sDAG, size_t* slen)
+	struct sockaddr *addr, socklen_t *addrlen)
 {
     int numbytes;
     char UDPbuf[MAXBUFLEN];
 
-	if (!rbuf || !sDAG || !slen) {
+	if (flags != 0 && flags != MSG_PEEK) {
+		LOGF("unsupported flag %d(s)", flags);
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (!rbuf || (addr && !addrlen)) {
 		LOG("null pointer!\n");
 		errno = EFAULT;
 		return -1;
-	}	
+	}
+
+	if (addr && *addrlen < sizeof(sockaddr_x)) {
+		LOG("addr is not large enough");
+		errno = EINVAL;
+		return -1;
+	}
 
 	if (validateSocket(sockfd, XSOCK_DGRAM, EOPNOTSUPP) < 0) {
 		LOGF("Socket %d must be a datagram socket", sockfd);
 		return -1;
 	}
-	
+
 	// see if we have bytes leftover from a previous Xrecv call
+	// FIXME: this will do the wrong thing for MSG_PEEK
 	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len)) > 0) {
-		// FIXME: we need to also have stashed away the sDAG and
-		// return it as well
-		*sDAG = 0;
-		*slen = 0;
+		if (addr) {
+			*addrlen = sizeof(sockaddr_x);
+			memcpy(addr, dgramPeer(sockfd), sizeof(sockaddr_x));
+		}
+		else if (addrlen)
+			*addrlen = 0;
 		return numbytes;
 	}
-	
+
 	if ((numbytes = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) < 0) {
 		LOGF("Error retrieving recv data from Click: %s", strerror(errno));
 		return -1;
@@ -111,17 +128,29 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		paylen = len;
 	}
 
-	const char *dag = msg->dag().c_str();
-	unsigned l = strlen(dag);
-	if (l + 1 > *slen) {
-		LOGF("sDAG buffer is not large enough, sDAG has been truncated: has %d, needs %d\n", *slen, l + 1);
+	if (addr || (flags & MSG_PEEK)) {
+		Graph g(msg->dag().c_str());
+
+		if (addr) {
+			// FIXME: validate addr
+			g.fill_sockaddr((sockaddr_x*)addr);
+			*addrlen = sizeof(sockaddr_x);
+		}
+
+		// user peeked, so save all of the data
+		if (flags & MSG_PEEK) {
+			sockaddr_x sa;
+
+			if (!addr) {
+				addr = (sockaddr *)&sa;
+				g.fill_sockaddr((sockaddr_x*)addr);
+
+			}
+			printf("len: %d p: %p\n", msg->payload().size(), payload);
+			setSocketData(sockfd, payload, msg->payload().size());
+			setPeer(sockfd, (sockaddr_x *)addr);
+		}
 	}
-    	
-	// leave room for the null terminator, truncate the DAG if necessary
-	int sz = MIN(l, *slen - 1);
-	strncpy(sDAG, dag, sz);
-    sDAG[sz] = 0;
-    *slen = l;
 
     return paylen;
 }

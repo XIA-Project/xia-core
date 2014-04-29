@@ -2,7 +2,15 @@ chunk_copy_client
 chunk_copy_server
 echoclient
 echoclient-datagram
+echoclient-simple
 echoserver
 time_of_day_client
 time_of_day_server
-
+firehose
+drink
+xftp_basic_server
+xftp_basic_client
+push_xftp_server
+push_xftp_client
+push_xftp_recv_server
+push_xftp_recv_client
