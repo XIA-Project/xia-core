@@ -490,12 +490,14 @@ int startup(u_short *port)
   name.sin_port = htons(*port);
   name.sin_addr.s_addr = htonl(INADDR_ANY);
   size = sizeof(struct sockaddr_in);
+#if defined (SO_REUSEPORT)
   if(setsockopt(httpd,SOL_SOCKET,SO_REUSEPORT,(char*)&option,sizeof(option)) < 0)
   {
       printf("setsockopt failed\n");
       close(httpd);
       exit(2);
   }
+#endif
  }
 
  // XIA bind call modified from original code to account for sockaddr size differences
