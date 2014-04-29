@@ -179,7 +179,7 @@ XTRANSPORT::run_timer(Timer *timer)
 					String str = String("^Connection-failed^");
 					WritablePacket *ppp = WritablePacket::make (256, str.c_str(), str.length(), 0);
 
-					if (DEBUG)
+					//if (DEBUG)
 						//click_chatter("Timer: Sent packet to socket with port %d", _sport);
                         output(API_PORT).push(UDPIPPrep(ppp, _sport));
 				}
