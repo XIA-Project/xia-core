@@ -871,7 +871,7 @@ int processLSA(ControlMessage msg)
 
 	if (route_state.calc_dijstra_ticks >= CALC_DIJKSTRA_INTERVAL || route_state.calc_dijstra_ticks  < 0)
 	{
-		syslog(LOG_DEBUG, "Calcuating shortest paths\n");
+		// syslog(LOG_DEBUG, "Calcuating shortest paths\n");
 
 		// Calculate next hop for ADs
 		std::map<std::string, RouteEntry> ADRoutingTable;
