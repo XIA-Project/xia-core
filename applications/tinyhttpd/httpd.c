@@ -84,54 +84,48 @@ void *accept_request(void *client_v)
  printf("Accepted, %d client here.\n", total_client);
 
  numchars = get_line(client, buf, sizeof(buf));
- printf("pass %d.\n", __LINE__-1);
  i = 0; j = 0;
  while (!ISspace(buf[j]) && (i < sizeof(method) - 1))
  {
   method[i] = buf[j];
   i++; j++;
  }
-  printf("pass %d.\n", __LINE__-1);
  method[i] = '\0';
 
  if (strcasecmp(method, "GET") && strcasecmp(method, "POST"))
  {
-  printf("pass %d.\n", __LINE__-1);
   unimplemented(client);
   pthread_mutex_lock (&mutexsum);
   total_client -= 1;
   pthread_mutex_unlock (&mutexsum);
   return NULL;
  }
- printf("pass %d.\n", __LINE__-1);
+
  if (strcasecmp(method, "POST") == 0)
   cgi = 1;
 
  i = 0;
  while (ISspace(buf[j]) && (j < sizeof(buf)))
   j++;
- printf("pass %d.\n", __LINE__-1);
+
  while (!ISspace(buf[j]) && (i < sizeof(url) - 1) && (j < sizeof(buf)))
  {
   url[i] = buf[j];
   i++; j++;
  }
  url[i] = '\0';
- printf("pass %d.\n", __LINE__-1);
+
  if (strcasecmp(method, "GET") == 0)
  {
   query_string = url;
-  printf("pass %d.\n", __LINE__-1);
   while ((*query_string != '?') && (*query_string != '\0'))
    query_string++;
-  printf("pass %d.\n", __LINE__-1);
   if (*query_string == '?')
   {
    cgi = 1;
    *query_string = '\0';
    query_string++;
   }
-  printf("pass %d.\n", __LINE__-1);
  }
 
  sprintf(path, "htdocs%s", url);
@@ -156,12 +150,12 @@ void *accept_request(void *client_v)
  else
   execute_cgi(client, path, method, query_string);
  }
-
- printf("client socket closed,  %d remaining clients \n", total_client);
  close(client);
  pthread_mutex_lock (&mutexsum);
  total_client -= 1;
  pthread_mutex_unlock (&mutexsum);
+ printf("client socket closed,  %d remaining clients \n", total_client);
+
  return NULL;
 }
 
@@ -609,6 +603,11 @@ int main(int argc, char **argv)
   /* accept_request(client_sock); */
   if (pthread_create(&newthread , NULL, accept_request, (void *)(intptr_t)client_sock) != 0)
    perror("pthread_create");
+  //if (fork() == 0)
+  //{
+    //accept_request((void *)(intptr_t)client_sock);
+    //exit(0);
+  //}
  }
 
  close(server_sock);
