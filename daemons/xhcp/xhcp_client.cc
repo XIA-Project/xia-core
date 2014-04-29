@@ -330,6 +330,10 @@ int main(int argc, char *argv[]) {
 			strcpy (buffer, host_register_message.c_str());
 			// send the registraton message to gw router
 			Xsendto(sockfd, buffer, strlen(buffer), 0, (sockaddr*)&pseudo_gw_router_dag, sizeof(pseudo_gw_router_dag));
+			// TODO: Hack to allow intrinsic security code to drop packet
+			// Ideally there should be a handshake with the gateway router
+			sleep(5);
+			Xsendto(sockfd, buffer, strlen(buffer), 0, (sockaddr*)&pseudo_gw_router_dag, sizeof(pseudo_gw_router_dag));
 		}
 
 		//Register this hostname to the name server

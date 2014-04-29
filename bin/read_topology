@@ -90,9 +90,9 @@ for line in lines:
 
 	# which field is port defined in
 	if element.group() == 'XIAEndHost':
-		field = 2
+		field = 3
 	else:
-		field = 4
+		field = 5
 
 	name, fields = line.split('::')
 	fields = fields.split(',')
