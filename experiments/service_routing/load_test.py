@@ -20,37 +20,62 @@ import signal
 import sys
 import os
 import subprocess
+from subprocess import PIPE
 import time
+import re
 
 n1 = None
-LOAD = 100
+LOAD = 200
+processes_id = []
 processes = []
+elapsed_times = []
+
+def report_elapsed_time():
+    for p in processes:
+        out = p.communicate()[0]
+        if elapsed_re.search(out):
+            elapsed_time = elapsed_re.search(out).group(1)
+            if elapsed_time:
+                elapsed_times.append(int(elapsed_time))
+    print len(elapsed_times), "clients finished"
+    print "Elapsed times: min/max/avg: %d / %d / %d" % (min(elapsed_times), 
+        max(elapsed_times), sum(elapsed_times)/len(elapsed_times))
 
 def signal_handler(s, frame):
-    for this_pid in processes:
-        os.kill(this_pid, s)
+    for this_pid in processes_id:
+        try:
+            os.kill(this_pid, s)
+        except OSError, err:
+            pass
+    report_elapsed_time()
+    exit()
 
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
-
+    elapsed_re = re.compile(r'Elapsed time: (\d+)')
     full_path = os.path.realpath(__file__)
     os.chdir(os.path.dirname(full_path)+"/../..")
 
     n1 = time.time()
     for i in xrange(LOAD):
-        processes.append(subprocess.Popen(
+        p = subprocess.Popen(
             'bin/xwrap applications/tinyhttpd/simpleclient', 
             #'bin/xwrap applications/tinyhttpd/simpleclient_orig', 
-            shell=True).pid)
-    while processes:
+            shell=True, stdout=PIPE, stderr=PIPE)
+        processes.append(p)
+        processes_id.append(p.pid)
+    finished = 0
+    while processes_id:
         try:
             pid, retval = os.wait()
-            print '%d/%d finished' % (LOAD - len(processes), LOAD)
-            processes.remove(pid)
+            finished += 1
+            #print '%d/%d finished' % (finished, LOAD)
+            processes_id.remove(pid)
         except OSError, err:
             break
-        
+
     n2 = time.time()
     total_time = (n2-n1)
     print total_time, 'seconds'
-    print total_time/LOAD*1000, 'ms per request'
+    #print total_time/LOAD*1000, 'ms per request'
+    report_elapsed_time()
