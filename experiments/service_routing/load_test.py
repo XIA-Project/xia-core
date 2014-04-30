@@ -25,7 +25,7 @@ import time
 import re
 
 n1 = None
-LOAD = 200
+LOAD = 100
 processes_id = []
 processes = []
 elapsed_times = []
@@ -38,7 +38,7 @@ def report_elapsed_time():
             if elapsed_time:
                 elapsed_times.append(int(elapsed_time))
     print len(elapsed_times), "clients finished"
-    print "Elapsed times: min/max/avg: %d / %d / %d" % (min(elapsed_times), 
+    print "Elapsed times: min/max/avg: %dms/ %dms/ %dms" % (min(elapsed_times), 
         max(elapsed_times), sum(elapsed_times)/len(elapsed_times))
 
 def signal_handler(s, frame):
@@ -65,17 +65,17 @@ if __name__ == "__main__":
         processes.append(p)
         processes_id.append(p.pid)
     finished = 0
-    while processes_id:
-        try:
-            pid, retval = os.wait()
-            finished += 1
-            #print '%d/%d finished' % (finished, LOAD)
-            processes_id.remove(pid)
-        except OSError, err:
-            break
+    #while processes_id:
+    #    try:
+    #        pid, retval = os.wait()
+    #        finished += 1
+    #        #print '%d/%d finished' % (finished, LOAD)
+    #        processes_id.remove(pid)
+    #    except OSError, err:
+    #        break
 
     n2 = time.time()
     total_time = (n2-n1)
-    print total_time, 'seconds'
+    #print total_time, 'seconds'
     #print total_time/LOAD*1000, 'ms per request'
     report_elapsed_time()
