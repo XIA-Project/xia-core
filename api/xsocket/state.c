@@ -46,6 +46,9 @@ public:
 	int isWrapped() { return m_wrapped; };
 	void setWrapped(int wrapped) { m_wrapped = wrapped; };
 
+	int isBlocked() { return m_blocked; };
+	void setBlocked(int blocked) { m_blocked = blocked; };
+
 	int isAsync() { return m_async; };
 	void setAsync(int async) { m_async = async; };
 
@@ -57,6 +60,7 @@ private:
 	int m_connected;
 	int m_async;
 	int m_wrapped;	// hack for dealing with xwrap stuff
+	int m_blocked;	// for dealing with blocked but wrapped calls
 	char *m_buf;
 	unsigned m_bufLen;
 	sockaddr_x *m_peer;
@@ -69,6 +73,7 @@ SocketState::SocketState(int tt)
 	m_connected = 0;
 	m_async = 0;
 	m_wrapped = 0;
+	m_blocked = 0;
 	m_buf = NULL;
 	m_bufLen = 0;
 	m_peer = NULL;
@@ -80,6 +85,7 @@ SocketState::SocketState()
 	m_connected = 0;
 	m_async = 0;
 	m_wrapped = 0;
+	m_blocked = 0;
 	m_buf = NULL;
 	m_bufLen = 0;
 	m_peer = NULL;
@@ -274,6 +280,22 @@ void setWrapped(int sock, int wrapped)
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
 		sstate->setWrapped(wrapped);
+}
+
+int isBlocked(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		return sstate->isBlocked();
+	else
+		return 0;
+}
+
+void setBlocked(int sock, int blocked)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		sstate->setBlocked(blocked);
 }
 
 int isAsync(int sock)
