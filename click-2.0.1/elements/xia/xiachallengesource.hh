@@ -66,7 +66,7 @@ private:
 	bool is_verified(Packet *);
     int _active;
 	int _iface;
-	char* _name;
+	const char* _name;
 	const static size_t router_secret_length = 10;
 	char router_secret[router_secret_length];
 	String pub_path;
