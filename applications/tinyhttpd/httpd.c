@@ -25,6 +25,7 @@
 #include <pthread.h>
 #include <sys/wait.h>
 #include <stdlib.h>
+#include <signal.h>
 
 // XIA changes
 #include <netdb.h>     // for getaddrinfo
@@ -44,6 +45,7 @@ char *dag;				// used to display the dag on the terminal
 pthread_mutex_t mutexsum;
 int total_client = 0;
 
+int server_sock = -1;
   // XIA changes to accept request are only so it compiles correctly
 void *accept_request(void *);
 void bad_request(int);
@@ -571,11 +573,21 @@ void config(int argc, char **argv)
 	 sid = strdup(SID);
 }
 
+void sig_handler(int signo)
+{
+  if (signo == SIGINT){
+    close(server_sock);
+    exit(0);
+  }
+
+}
+
+
 /**********************************************************************/
 
 int main(int argc, char **argv)
 {
- int server_sock = -1;
+ server_sock = -1;
  u_short port = 9734;
  int client_sock = -1;
 
@@ -595,13 +607,18 @@ int main(int argc, char **argv)
  else
   printf("httpd running on port %d\n", port);
 
+ if (signal(SIGINT, sig_handler) == SIG_ERR)
+    printf("\ncan't catch SIGINT\n");
+
  while (1)
  {
   client_sock = accept(server_sock,
 		               (struct sockaddr *)&client_name, 
 					   &client_name_len);
-  if (client_sock == -1)
-   error_die("accept");
+  if (client_sock == -1){
+    close(server_sock);
+    error_die("accept");
+  }
   /* accept_request(client_sock); */
   if (pthread_create(&newthread , NULL, accept_request, (void *)(intptr_t)client_sock) != 0)
    perror("pthread_create");
