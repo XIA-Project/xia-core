@@ -85,6 +85,7 @@ XIAChallengeSource::configure(Vector<String> &conf, ErrorHandler *errh)
                    cpEnd) < 0)
         return -1; // error config
 
+	generate_secret();
 	pub_path.append(key_path.c_str(), strlen(key_path.c_str()));
 	pub_path.append("pub", 3);
 	priv_path.append(key_path.c_str(), strlen(key_path.c_str()));
@@ -107,6 +108,16 @@ XIAChallengeSource::initialize(ErrorHandler *)
     return 0;
 }
 
+void
+XIAChallengeSource::generate_secret()
+{
+    static const char characters[] =
+        "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    for (int i=0;i<router_secret_length;i++) {
+        router_secret[i] = characters[rand() % (sizeof(characters) - 1)];
+    }
+    router_secret[router_secret_length] = 0;
+}
 
 void
 XIAChallengeSource::hash(uint8_t *dig, Packet *p_in)
@@ -124,7 +135,6 @@ XIAChallengeSource::hash(uint8_t *dig, Packet *p_in)
 
 	//return std::string((const char*)digest);
 }
-
 
 void
 XIAChallengeSource::verify_response(Packet *p_in)
@@ -150,7 +160,13 @@ XIAChallengeSource::verify_response(Packet *p_in)
 
 
 	// Verify HMAC: Check if the challenge message really originated from here
-	//HMAC(rs, rs_len, (unsigned char *)&(challenge.body), sizeof(challenge.body), challenge.hmac, &hmac_len);
+	unsigned int hmac_len = 20;
+	uint8_t hmac[hmac_len];
+	HMAC(router_secret, router_secret_length, (unsigned char *)&(response->v.body), sizeof(response->v.body), hmac, &hmac_len);
+	if(memcmp(hmac, response->v.hmac, hmac_len)) {
+		click_chatter("%s> Error: Invalid hmac returned with response", _name);
+		return;
+	}
 
 	// Verify public key: Check if hash(pub) == src_hid
 	char* pem_pub;
@@ -276,10 +292,8 @@ XIAChallengeSource::send_challenge(Packet *p)
 	// HMAC
 	//unsigned char hmac[20];
 	unsigned int hmac_len = 20;
-	char rs[] = "12039123";		// router secret
-	int rs_len = strlen(rs);
 	
-	HMAC(rs, rs_len, (unsigned char *)&(challenge.body), sizeof(challenge.body), challenge.hmac, &hmac_len);
+	HMAC(router_secret, router_secret_length, (unsigned char *)&(challenge.body), sizeof(challenge.body), challenge.hmac, &hmac_len);
 	//for(i=0; i<5; i++)
 	//	click_chatter("HMAC: %02X", challenge.hmac[i]);
 

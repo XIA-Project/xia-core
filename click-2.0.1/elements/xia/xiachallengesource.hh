@@ -59,6 +59,7 @@ class XIAChallengeSource : public Element { public:
     void push(int, Packet *);
 
 private:
+	void generate_secret();
     void hash(uint8_t *, Packet *);
     void send_challenge(Packet *);
 	void verify_response(Packet *);
@@ -66,6 +67,8 @@ private:
     int _active;
 	int _iface;
 	char* _name;
+	const static size_t router_secret_length = 10;
+	char router_secret[router_secret_length];
 	String pub_path;
 	String priv_path;
 	XIAPath _src_path;
