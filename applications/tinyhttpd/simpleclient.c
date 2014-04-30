@@ -7,15 +7,28 @@
 #include <sys/time.h>
 
 #include <stdlib.h>
+#include <signal.h>
 #include <string.h>
 #include <netdb.h>
 #include "xia.h"
 #include "dagaddr.hpp" // only needed to pretty print the dag
 #define SID "SID:8080808080808080808080808080808080808080"
 
+int sockfd;
+
+void watchdog(int sig) 
+{
+  if (sig == SIGALRM){
+    close(sockfd);
+    printf("Timeout! \n");
+    exit(-1);
+  }
+}
+
+
 int main(int argc, char *argv[])
 {
- int sockfd;
+
  int len;
  struct addrinfo *ai;
  int result;
@@ -33,6 +46,9 @@ int main(int argc, char *argv[])
 
  Graph g((sockaddr_x*)ai->ai_addr);
  printf("%s\n", g.dag_string().c_str());
+
+ signal(SIGALRM, watchdog);
+ alarm(5);
 
  len = sizeof(sockaddr_x);
  result = connect(sockfd, ai->ai_addr, len);
