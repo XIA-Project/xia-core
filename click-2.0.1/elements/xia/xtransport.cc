@@ -550,7 +550,10 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			xid_pair.set_dst(_source_xid);
 			DAGinfo *daginfo_bind = portToDAGinfo.get_pointer(_dport); // the binded info
 
-			//printf("(%s) SYN my_sport=%d  my_sid_path=%s  his_sid_path=%s\n", (_local_addr.unparse()).c_str(),  _dport,  dst_path.unparse().c_str(), src_path.unparse().c_str());
+			if (daginfo_bind->teardown_waiting){ // closed socket NOTE: should send RST?
+				click_chatter("socket %d is closed", _dport);
+				return;
+			}
 
 			HashTable<XIDpair , bool>::iterator it;
 			it = XIDpairToConnectPending.find(xid_pair);
