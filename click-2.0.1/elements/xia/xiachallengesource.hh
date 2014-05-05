@@ -48,7 +48,7 @@ class XIAChallengeSource : public Element { public:
 
 	XIAChallengeSource();
     ~XIAChallengeSource();
-    
+
     const char *class_name() const		{ return "XIAChallengeSource"; }
     const char *port_count() const		{ return "1/2"; }
     const char *processing() const		{ return PUSH; }

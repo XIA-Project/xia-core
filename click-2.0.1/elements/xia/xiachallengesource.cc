@@ -1,5 +1,5 @@
 /*
- * xiachallengesource.(cc,hh) -- 
+ * xiachallengesource.(cc,hh) --
  *
  *
  * Copyright 2012 Carnegie Mellon University
@@ -56,13 +56,13 @@ struct click_xia_response {
     struct click_xia_challenge v;
 	uint8_t pub_key[248];
 	uint8_t signature[128];
-	
+
 };
 
 
 XIAChallengeSource::XIAChallengeSource()
 {
-	
+
 }
 
 // no cleanup needed
@@ -97,7 +97,7 @@ XIAChallengeSource::configure(Vector<String> &conf, ErrorHandler *errh)
 		_name = "R0";
 	else
 		_name = "?";
-	
+
 
     return 0;
 }
@@ -131,7 +131,7 @@ XIAChallengeSource::hash(uint8_t *dig, Packet *p_in)
     SHA1_update(&sha_ctx, (unsigned char *)h, plen+hsize);
     SHA1_final(digest, &sha_ctx);
 
-	memcpy(dig, digest, 20); 
+	memcpy(dig, digest, 20);
 
 	//return std::string((const char*)digest);
 }
@@ -174,10 +174,10 @@ XIAChallengeSource::verify_response(Packet *p_in)
 	std::string str((char*)response->pub_key);
 	str.replace(str.find("-----BEGIN RSA PUBLIC KEY-----"), sizeof("-----BEGIN RSA PUBLIC KEY-----"), "");
 	str.replace(str.find("-----END RSA PUBLIC KEY-----"), sizeof("-----END RSA PUBLIC KEY-----"), "");
-	pem_pub = (char*)calloc(strlen(str.c_str())+1, 1); 
+	pem_pub = (char*)calloc(strlen(str.c_str())+1, 1);
 	strcpy(pem_pub, str.c_str());
 	keylen_pub = strlen(pem_pub);
-	
+
 	SHA1_ctx sha_ctx;
     unsigned char hash_pub[20];
     SHA1_init(&sha_ctx);
@@ -198,7 +198,7 @@ XIAChallengeSource::verify_response(Packet *p_in)
 		click_chatter("%s> Error: Invalid public key", _name);
 		return;
 	}
-	
+
 	click_chatter("%s> Public key is authentic", _name);
 
 	// Verify signature: Check if hash(v) == RSA_verify(sig, pub)
@@ -219,9 +219,9 @@ XIAChallengeSource::verify_response(Packet *p_in)
 	int sig_verified = RSA_verify(NID_sha1, digest, sizeof digest, sig_buf, sig_len, rsa);
 	RSA_free(rsa);
 
-	if (!sig_verified) 
-	{ 
-		click_chatter("%s> Error: Invalid signature", _name); 
+	if (!sig_verified)
+	{
+		click_chatter("%s> Error: Invalid signature", _name);
 		return;
 	}
 
@@ -256,7 +256,7 @@ XIAChallengeSource::send_challenge(Packet *p)
 {
 	int i;
 	char* pch;
-	
+
 	// Get the src and dst addresses
 	XIAHeader xiah(p->xia_header());
 	XIAPath src_dag = xiah.src_path();
@@ -286,13 +286,13 @@ XIAChallengeSource::send_challenge(Packet *p)
 
 	hash(challenge.body.hash, p);
 //	click_chatter("hash 1st byte: %0X", challenge.body.hash[0]);
-	
+
 //	click_chatter("test anno: %d", XIA_PAINT_ANNO(p));	//check if anno gives same value as iface
 
 	// HMAC
 	//unsigned char hmac[20];
 	unsigned int hmac_len = 20;
-	
+
 	HMAC(router_secret, router_secret_length, (unsigned char *)&(challenge.body), sizeof(challenge.body), challenge.hmac, &hmac_len);
 	//for(i=0; i<5; i++)
 	//	click_chatter("HMAC: %02X", challenge.hmac[i]);
@@ -301,7 +301,7 @@ XIAChallengeSource::send_challenge(Packet *p)
 	WritablePacket *challenge_p = Packet::make(256, &challenge, sizeof(struct click_xia_challenge), 0);
 	XIAHeaderEncap encap;
 	encap.set_nxt(CLICK_XIA_NXT_XCHAL);
-	encap.set_dst_path(src_dag); 
+	encap.set_dst_path(src_dag);
 	encap.set_src_path(_src_path);	// self addr // TODO: do something smarter here (e.g., don't include original dest SID)
 
 	String hid((char*) challenge.body.src_hid);
@@ -322,7 +322,7 @@ XIAChallengeSource::push(int in_port, Packet *p_in)
 				verify_response(p_in);
 				p_in->kill();	// done verifying. drop response packet
 				return;
-			}				
+			}
 			else if (is_verified(p_in)) {
 				// Just forward the packet
 				click_chatter("%s>   PASSED: Just forward", _name);
@@ -335,9 +335,9 @@ XIAChallengeSource::push(int in_port, Packet *p_in)
 				p_in->kill();	// drop unverified packet
 				return;
 			}
-		} 
+		}
     }
-	
+
     // Just forward the packet
     output(in_port).push(p_in);
 }

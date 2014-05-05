@@ -1,5 +1,5 @@
 /*
- * xiachallengeresponder.(cc,hh) -- 
+ * xiachallengeresponder.(cc,hh) --
  *
  *
  * Copyright 2012 Carnegie Mellon University
@@ -58,7 +58,6 @@ struct click_xia_response {
     struct click_xia_challenge v;
 	uint8_t pub_key[248];
 	uint8_t signature[128];
-	
 };
 
 // no initialization needed
@@ -121,10 +120,10 @@ XIAChallengeResponder::initialize(ErrorHandler *)
 
 void
 XIAChallengeResponder::processChallenge(Packet *p_in)
-{	
+{
 	int i;
 	char* pch;
-	
+
 	// Get the src and dst addresses
 	XIAHeader xiah(p_in->xia_header());
 	XIAPath src_dag = xiah.src_path();
@@ -157,12 +156,12 @@ XIAChallengeResponder::processChallenge(Packet *p_in)
 
 	// Self own public key
 	get_pubkey(response.pub_key);
-	
+
 	// Make the challenge packet header
 	WritablePacket *response_p = Packet::make(256, &response, sizeof(struct click_xia_response), 0);
 	XIAHeaderEncap encap;
 	encap.set_nxt(CLICK_XIA_NXT_XRESP);
-	encap.set_dst_path(src_dag); 
+	encap.set_dst_path(src_dag);
 	encap.set_src_path(dst_dag); // TODO: do something smarter here (e.g., don't include original dest SID)
 
 	output(1).push(encap.encap(response_p));
@@ -173,7 +172,7 @@ XIAChallengeResponder::processChallenge(Packet *p_in)
 void
 XIAChallengeResponder::sign(uint8_t *sig, struct click_xia_challenge *challenge)
 {
-	// Hash 
+	// Hash
     SHA1_ctx sha_ctx;
     unsigned char digest[20];
     SHA1_init(&sha_ctx);
@@ -205,7 +204,7 @@ XIAChallengeResponder::sign(uint8_t *sig, struct click_xia_challenge *challenge)
 
 void
 XIAChallengeResponder::get_pubkey(uint8_t *pub)
-{   
+{
 	FILE *fp = fopen(pub_path.c_str(), "r");
 	RSA *rsa = PEM_read_RSAPublicKey(fp,NULL,NULL,NULL);
 	if(rsa==NULL)
@@ -217,14 +216,14 @@ XIAChallengeResponder::get_pubkey(uint8_t *pub)
 	BIO *bio_pub = BIO_new(BIO_s_mem());
 	PEM_write_bio_RSAPublicKey(bio_pub, rsa);
 	keylen_pub = BIO_pending(bio_pub);
-	pem_pub = (char*)calloc(keylen_pub+1, 1); // Null-terminate 
+	pem_pub = (char*)calloc(keylen_pub+1, 1); // Null-terminate
 	BIO_read(bio_pub, pem_pub, keylen_pub);
 	BIO_free_all(bio_pub);
 //	click_chatter("Own Pub: %s", pem_pub);
 //	click_chatter("keylen: %d", keylen_pub);
 	RSA_free(rsa);
 	fclose(fp);
-	
+
 	memcpy(pub, pem_pub, keylen_pub+1);
 
 	free(pem_pub);
@@ -293,7 +292,7 @@ XIAChallengeResponder::push(int in_port, Packet *p_in)
 				output(in_port).push(p_in);
 				return;
 			}
-		} 
+		}
     } else { // not active
 		output(in_port).push(p_in);
     }
