@@ -109,6 +109,7 @@ XIAChallengeResponder::configure(Vector<String> &conf, ErrorHandler *errh)
 	priv_path.append(key_path.c_str(), strlen(key_path.c_str()));
 	priv_path.append("priv", 4);
 
+	outgoing_header = 0;
     return 0;
 }
 
@@ -136,6 +137,12 @@ XIAChallengeResponder::processChallenge(Packet *p_in)
 	click_chatter("\tiface: %d", challenge->body.iface);
 	click_chatter("\thash 1st byte: %0X", challenge->body.hash[0]);
 	click_chatter("=======================================================================================");
+
+	click_chatter("H> Verifying challenge is in response to a sent packet");
+	if(!check_outgoing_hashes(challenge->body.hash)) {
+		click_chatter("H> FAILED: challenge doesn't match a sent packet");
+		return;
+	}
 
 	click_chatter("H> Sending response...");
 
@@ -223,10 +230,56 @@ XIAChallengeResponder::get_pubkey(uint8_t *pub)
 	free(pem_pub);
 }
 
+void
+XIAChallengeResponder::hash(uint8_t *dig, Packet *p_in)
+{
+    const click_xia *h = p_in->xia_header();
+    int plen = h->plen;
+    int hsize = 8 + (h->dnode+h->snode)*sizeof(click_xia_xid_node);
+    SHA1_ctx sha_ctx;
+    unsigned char digest[20];
+    SHA1_init(&sha_ctx);
+    SHA1_update(&sha_ctx, (unsigned char *)h, plen+hsize);
+    SHA1_final(digest, &sha_ctx);
+
+    memcpy(dig, digest, 20);
+}
+
+bool
+XIAChallengeResponder::check_outgoing_hashes(uint8_t *digest)
+{
+	bool result = false;
+	// Walk through hashes of sent packets until a match is found
+	for(int i=0;i<num_outgoing_hashes;i++) {
+		if(memcmp(digest, outgoing_hashes[i], hash_length) == 0) {
+			click_chatter("H> Found matching header at offset %d", i);
+			result = true;
+			break;
+		}
+	}
+	return result;
+}
+
+void
+XIAChallengeResponder::store_outgoing_hash(Packet *p_in)
+{
+	hash(outgoing_hashes[outgoing_header], p_in);
+	outgoing_header = (outgoing_header + 1) % num_outgoing_hashes;
+}
 
 void
 XIAChallengeResponder::push(int in_port, Packet *p_in)
 {
+	// Packets going to the network
+	if(in_port == 1) {
+		if(_active) {
+			// Store hash in recent packets buffer
+			store_outgoing_hash(p_in);
+		}
+		// Forward packet out on port 2 to be discarded
+		output(2).push(p_in);
+		return;
+	}
     if(_active) {
 		if(in_port == 0) { // Packet from network
 			// Is the packet a challenge packet?

@@ -118,10 +118,15 @@ elementclass XIALineCard {
     count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
     count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -);
 
+    // AIP challenge-response HID verification module
+	xchal :: XIAChallengeSource(KEYPATH $key_path, INTERFACE $num, SRC $local_addr, ACTIVE $isrouter);
+	xresp :: XIAChallengeResponder(KEYPATH $key_path, ACTIVE $ishost);
+
 	// packets to network could be XIA packets or XARP queries (or XCMP messages?)
 	// we only want to print/count the XIA packets
-    toNet :: Tee(2) -> Queue(200) -> [0]output;   // send all packets
+    toNet :: Tee(3) -> Queue(200) -> [0]output;   // send all packets
 	toNet[1] -> statsFilter :: Classifier(12/C0DE, -) -> print_out -> count_final_out -> count_next_out -> Discard;  // only print/count XIP packets
+	toNet[2] -> [1]xresp[2] -> Discard;
 	statsFilter[1] -> Discard;   // don't print/count XARP or XCMP packets
 
 	// On receiving a packet from the host
@@ -130,10 +135,6 @@ elementclass XIALineCard {
 	// On receiving a packet from interface
 	input[0] -> c;
    
-    // AIP challenge-response HID verification module
-	xchal :: XIAChallengeSource(KEYPATH $key_path, INTERFACE $num, SRC $local_addr, ACTIVE $isrouter);
-	xresp :: XIAChallengeResponder(KEYPATH $key_path, ACTIVE $ishost);
-
     // Receiving an XIA packet
     c[2] -> Strip(14) -> MarkXIAHeader() -> [0]xchal[0] -> [0]xresp[0] -> XIAPaint($num) -> print_in -> [1]output; // this should send out to [0]n; 
 

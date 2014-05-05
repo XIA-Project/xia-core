@@ -51,7 +51,7 @@ class XIAChallengeResponder : public Element { public:
     ~XIAChallengeResponder();
 
     const char *class_name() const		{ return "XIAChallengeResponder"; }
-    const char *port_count() const		{ return "1/2"; }
+    const char *port_count() const		{ return "2/3"; }
     const char *processing() const		{ return PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *);
@@ -64,10 +64,17 @@ class XIAChallengeResponder : public Element { public:
 	void get_pubkey(uint8_t *);
 	void sign(uint8_t *, struct click_xia_challenge *);
 	void processChallenge(Packet *);
+	bool check_outgoing_hashes(uint8_t *);
+	void hash(uint8_t *, Packet *);
+	void store_outgoing_hash(Packet *);
 	//void run_timer(Timer *);
 
 
     HashTable<String, short> _hashtable;
+	const static int num_outgoing_hashes = 100;
+	const static int hash_length = 20;
+	uint8_t outgoing_hashes[num_outgoing_hashes][hash_length];
+	int outgoing_header;
    // int _shutoff;
     String pub_path;
 	String priv_path;
