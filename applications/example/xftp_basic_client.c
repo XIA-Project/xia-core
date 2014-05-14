@@ -32,9 +32,12 @@
 #define CHUNKSIZE 1024
 
 #define NUM_CHUNKS	10
+#define NUM_PROMPTS	2
+
 
 // global configuration options
 int verbose = 1;
+bool quick = false;
 
 char s_ad[MAX_XID_SIZE];
 char s_hid[MAX_XID_SIZE];
@@ -548,33 +551,60 @@ int main(int argc, char **argv)
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 	
 	if( argc == 1){
-		say ("No service name passed, using default: %s\n", NAME);
+		say ("No service name passed, using default: %s\nYou can also pass --quick to execute a couple of default commands for quick testing. Requires s.txt to exist. \n", NAME);
 		sock = initializeClient(NAME);
-	} else{
-		name = argv[1];
+		usage();
+	} else if (argc == 2){
+		if( strcmp(argv[1], "--quick") == 0){
+			quick = true;
+			name=NAME;
+		} else{
+			name = argv[1];
+			usage();
+		}
 		say ("Connecting to: %s\n", name);
 		sock = initializeClient(name);
+
+	} else if (argc == 3){
+		if( strcmp(argv[1], "--quick") == 0 ){
+			quick = true;
+			name = argv[2];
+			say ("Connecting to: %s\n", name);
+			sock = initializeClient(name);
+			usage();
+		} else{
+			die(-1, "xftp [--quick] [SID]");
+		}
+		
+	} else{
+		die(-1, "xftp [--quick] [SID]"); 
 	}
-	usage();
+	
 	int i = 0;
-	while(i<2){
+
+
+	
+//		This is for quick testing with a couple of commands
+
+	while(i < NUM_PROMPTS){
 		say(">>");
 		cmd[0] = '\n';
 		fin[0] = '\n';
 		fout[0] = '\n';
 		params = -1;
 		
-		
-  		fgets(cmd, 511, stdin);
+		if(quick){
+			if( i==0 )
+				strcpy(cmd, "put s.txt r.txt");
+			else if( i==1 )
+				strcpy(cmd, "get r.txt sr.txt\n");
+			i++;
+		}else{
+			fgets(cmd, 511, stdin);
+		}
 
-//		This is for quick testing with a couple of commands
-// 		if(i==0)
-// 			strcpy(cmd, "get asd asdsf\n");
-// 		else if(i==1)
-// 			strcpy(cmd, "put a.txt ss.txt\n");
+//		enable this if you want to limit how many times this is done
 // 		i++;
-		
-		
 		
 		if (strncmp(cmd, "get", 3) == 0){
 			params = sscanf(cmd,"get %s %s", fin, fout);
@@ -591,11 +621,11 @@ int main(int argc, char **argv)
 				continue;
 			}
 			
-		  	getFile(sock, s_ad, s_hid, fin, fout);
+			getFile(sock, s_ad, s_hid, fin, fout);
 			
 		}
 		else if (strncmp(cmd, "put", 3) == 0){
- 			params = sscanf(cmd,"put %s %s", fin, fout);
+			params = sscanf(cmd,"put %s %s", fin, fout);
 
 
 			if(params !=2 ){

@@ -1,0 +1,6 @@
+#! /bin/bash
+
+cc -o ftp \
+-I../../../XIASocket/API -I../lib -I. -I.. -I../libinetutils \
+-DHAVE_CONFIG_H  -g -O2 *.c \
+libXsocket.a -lprotobuf -L../libinetutils -linetutils ../lib/libgnu.a

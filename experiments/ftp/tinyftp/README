@@ -1,0 +1,30 @@
+/*********************************************************
+ *    Tiny Ftp Server
+ *    ===============
+ *
+ *
+ *  Copyright 2005 Dimitur Kirov
+ *  dkirov@gmail.com
+ *
+ *   F.N. 42665
+ *
+ *********************************************************/
+
+Tinyftp is a small ftp server. It implements a set of all 
+the neccessary  commands for performing the main actions, 
+suppported by the protocol. The server is based on rfc959. 
+This server does not support "passive" mode, because it needs
+a simultaneous communication on a custom free port for 
+additional data transfers. For this we will need an IPC, which
+hardens the implementation a lot.
+The only valid user, that can log in is "anonymous", because of 
+the different authentication mechanism on different platforms.
+All server options are set from the command line parameters.
+
+"tyniftp -h " - is for a short help message.
+
+This server is tested to run on linux, but maybe it is
+applicable to all unixes. If a platform supports system 
+calls "fork" and "setreuid" and posix type octed permissions 
+mostly it will not have problems running this server. 
+On a SYST question this server is identified like "UNIX".

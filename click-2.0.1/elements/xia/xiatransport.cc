@@ -68,10 +68,23 @@ XIATransport::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+//TODO: remove
+static void say(const char *fmt, ...)
+{
+	if (1) {
+		va_list args;
 
+		va_start(args, fmt);
+		vprintf(fmt, args);
+		va_end(args);
+	}
+}
 
 void XIATransport::push(int port, Packet *p)
 {
+	//TODO:remove
+    printf(">>>>in XIATRANSPORT PUSH");
+
     const struct click_xia* hdr = p->xia_header();
 
     if (!hdr) return;

@@ -247,10 +247,10 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
         ptr_->id[8] = 0xFA;
         ptr_->id[9] = 0xFA;
 
-		ptr_->id[16] = *(((unsigned char*)&ip)+0);   
+		ptr_->id[16] = *(((unsigned char*)&ip)+0);
 		ptr_->id[17] = *(((unsigned char*)&ip)+1);
 		ptr_->id[18] = *(((unsigned char*)&ip)+2);
-		ptr_->id[19] = *(((unsigned char*)&ip)+3); 
+		ptr_->id[19] = *(((unsigned char*)&ip)+3);
 	}
 	else
 	{
@@ -308,7 +308,7 @@ Node::type_string() const
 * @brief Get the node's XID as a string
 *
 * Get the node's XID as a std::string. This string will be 40 characters long
-* (representing 20 bytes in hex). The string does not include the principal 
+* (representing 20 bytes in hex). The string does not include the principal
 * type prefix (e.g., "HID:").
 *
 * @return The node's XID as a string
@@ -382,9 +382,9 @@ Graph::Graph(const Graph& r)
 *
 * @param dag_string The DAG in the string format used by the XSocket API.
 *			Example 1:
-*<div><pre>DAG 2 0 - 
-*AD:4349445f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f 2 1 - 
-*HID:4849445f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f 2 - 
+*<div><pre>DAG 2 0 -
+*AD:4349445f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f 2 1 -
+*HID:4849445f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f 2 -
 *SID:534944305f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f</pre></div>
 *			Example 2:
 *<div><pre>RE ( AD:1000000000000000000000000000000000000000 HID:0000000000000000000000000000000000000000 ) SID:1110000000000000000000000000000000001113</pre></div>
@@ -406,7 +406,7 @@ Graph::Graph(std::string dag_string)
 		add_node(Node());
 	}
 }
-	
+
 /**
 * @brief Create a graph from a sockaddr_x
 *
@@ -509,7 +509,7 @@ Graph::operator+(const Graph& r) const
 * Print the graph. Useful for debugging.
 *
 * @warning The format in which this function prints a graph is not the same
-* 			as the DAG string format used by the XSocket API. To obtain a 
+* 			as the DAG string format used by the XSocket API. To obtain a
 *			string version of the DAG for use with the XSocket API, use
 *			Graph::dag_string() instead.
 */
@@ -523,7 +523,7 @@ Graph::print_graph() const
 		else
 			printf("      ");
 
-		printf("Node %zu: [%s] ", i, nodes_[i].type_string().c_str());
+		printf("Node %lu: [%s] ", i, nodes_[i].type_string().c_str());
 		//printf("%20s", nodes_[i].id());
 		for (std::size_t j = 0; j < Node::ID_LEN; j++)
 			printf("%02x", nodes_[i].id()[j]);
@@ -535,7 +535,7 @@ Graph::print_graph() const
 				first = false;
 				printf(" ->");
 			}
-			printf(" Node %zu", out_edges_[i][j]);
+			printf(" Node %lu", out_edges_[i][j]);
 		}
 		if (is_sink(i))
 			printf(" [SNK]");
@@ -629,17 +629,17 @@ Graph::out_edges_for_index(std::size_t i, std::size_t source_index, std::size_t 
 	{
 		int idx = index_in_dag_string(out_edges_[i][j], source_index, sink_index);
 		char *idx_str;
-		int size = snprintf(NULL, 0, " %zu", idx);
+		int size = snprintf(NULL, 0, " %d", idx);
 		idx_str = (char*)malloc(sizeof(char) * size +1); // +1 for null char (sprintf automatically appends it)
-		sprintf(idx_str, " %zu", idx);
-		out_edge_string += idx_str; 
+		sprintf(idx_str, " %d", idx);
+		out_edge_string += idx_str;
 		free(idx_str);
 	}
 
 	return out_edge_string;
 }
 
-std::size_t 
+std::size_t
 Graph::index_in_dag_string(std::size_t index, std::size_t source_index, std::size_t sink_index) const
 {
 	if (index == sink_index)
@@ -656,8 +656,8 @@ Graph::index_in_dag_string(std::size_t index, std::size_t source_index, std::siz
 
 	return new_index;
 }
-	
-std::size_t 
+
+std::size_t
 Graph::index_from_dag_string_index(int32_t dag_string_index, std::size_t source_index, std::size_t sink_index) const
 {
 	if (dag_string_index == -1) return source_index;
@@ -754,7 +754,7 @@ Graph::dag_string() const
 
 	return dag_string;
 }
-	
+
 
 /**
 * @brief Get the index of the souce node
@@ -764,7 +764,7 @@ Graph::dag_string() const
 *
 * @return The index of the DAG's source node
 */
-std::size_t 
+std::size_t
 Graph::source_index() const
 {
 	for (std::size_t i = 0; i < nodes_.size(); i++)
@@ -813,7 +813,7 @@ Graph::is_final_intent(const Node& n)
 	{
 		if (nodes_[i] == n) return is_sink(i);
 	}
-	
+
 	printf("Warning: is_final_intent: supplied node not found in DAG: %s\n", n.id_string().c_str());
 	return false;
 }
@@ -841,15 +841,15 @@ Graph::is_final_intent(const std::string xid_string)
 	{
 		if (nodes_[i].id_string() == xid_str) return is_final_intent(nodes_[i]);
 	}
-	
+
 	printf("Warning: is_final_intent: supplied node not found in DAG: %s\n", xid_str.c_str());
 	return false;
 }
-	
+
 /**
 * @brief Get the next "intent unit" in the DAG starting at the supplied node
 *
-* Get the next "intent unit" in the DAG starting at the supplied node. An 
+* Get the next "intent unit" in the DAG starting at the supplied node. An
 * intent node is a node that can be reached by following the highest priority
 * out edge of each node beginning with the source. An intent unit is an intent
 * node along with its fallbacks. In the new DAG, the previous intent unit
@@ -880,7 +880,7 @@ Graph::next_hop(const Node& n)
 			}
 		}
 	}
-	
+
 	// if n is the DAG's sink, there is no next hop
 	if (is_sink(nIndex))
 	{
@@ -930,7 +930,7 @@ Graph::next_hop(const Node& n)
 			vector_push_back_unique(to_process, out_edges_[curIndex][i]);
 		}
 	}
-	
+
 	// add edges to the new graph
 	for (std::map<std::size_t, std::size_t>::const_iterator it = old_to_new_map.begin(); it != old_to_new_map.end(); ++it)
 	{
@@ -959,7 +959,7 @@ Graph::next_hop(const Node& n)
 *
 * @return The next intent unit (as a Graph)
 */
-Graph 
+Graph
 Graph::next_hop(const std::string xid_string)
 {
 	std::string xid_str = xid_string;
@@ -973,7 +973,7 @@ Graph::next_hop(const std::string xid_string)
 	{
 		if (nodes_[i].id_string() == xid_str) return next_hop(nodes_[i]);
 	}
-	
+
 	printf("Warning: next_hop: supplied node not found in DAG: %s\n", xid_str.c_str());
 	return Graph();
 
@@ -992,7 +992,7 @@ Graph::first_hop()
 {
 	return next_hop(Node());
 }
-	
+
 /**
 * @brief Get the number of nodes in the DAG
 *
@@ -1021,7 +1021,7 @@ Graph::num_nodes() const
 *
 * @return The node at index i
 */
-Node 
+Node
 Graph::get_node(int i) const
 {
 	std::size_t src_index = -1, sink_index = -1;
@@ -1058,7 +1058,7 @@ Graph::get_out_edges(int i) const
 	}
 
 	std::size_t real_index;
-	if (i == -1) 
+	if (i == -1)
 		real_index = src_index;
 	else
 		real_index = index_from_dag_string_index(i, src_index, sink_index);
@@ -1073,7 +1073,7 @@ Graph::get_out_edges(int i) const
 }
 
 
-void 
+void
 Graph::construct_from_dag_string(std::string dag_string)
 {
 	// Check for malformed DAG string
@@ -1107,7 +1107,7 @@ Graph::construct_from_dag_string(std::string dag_string)
 		{
 			Node n_src;
 			graph_index = add_node(n_src);
-		} 
+		}
 		else
 		{
 			//std::vector<std::string> xid_elems = split(elems[0], ':');
@@ -1116,7 +1116,7 @@ Graph::construct_from_dag_string(std::string dag_string)
 		}
 		dag_idx_to_graph_idx.push_back(graph_index);
 	}
-	
+
 	// Pass 2: add edges
 	for (std::size_t i = 0; i < lines.size(); i++)
 	{
@@ -1162,7 +1162,7 @@ Graph::construct_from_re_string(std::string re_string)
 	// split on ' '
 	std::vector<std::string> components = split(re_string, ' ');
 
-	// keep track of the last "intent" node and last fallback node 
+	// keep track of the last "intent" node and last fallback node
 	// we added to the dag
 	Node n_src;
 	std::size_t last_intent_idx = add_node(n_src);
@@ -1248,36 +1248,36 @@ Graph::check_re_string(std::string re_string)
 *
 * @param s The sockaddr_x struct to be filled in (allocated by caller)
 */
-void 
+void
 Graph::fill_sockaddr(sockaddr_x *s) const
 {
 	s->sx_family = AF_XIA;
 	s->sx_addr.s_count = num_nodes();
 
-	for (int i = 0; i < num_nodes(); i++)                   
-	{                                                            
+	for (int i = 0; i < num_nodes(); i++)
+	{
 		node_t* node = (node_t*)&(s->sx_addr.s_addr[i]); // check this
 
-	    // Set the node's XID and type                           
+	    // Set the node's XID and type
 		node->s_xid.s_type = get_node(i).type();
-	    memcpy(&(node->s_xid.s_id), get_node(i).id(), Node::ID_LEN);   
-	                                                             
-	    // Get the node's out edge list                          
-	    std::vector<std::size_t> out_edges;                      
-	    if (i == num_nodes()-1) {                           
+	    memcpy(&(node->s_xid.s_id), get_node(i).id(), Node::ID_LEN);
+
+	    // Get the node's out edge list
+	    std::vector<std::size_t> out_edges;
+	    if (i == num_nodes()-1) {
 	        out_edges = get_out_edges(-1); // put the source node's edges here
-	    } else {                                                 
-	        out_edges = get_out_edges(i);                   
-	    }                                                        
-	                                                             
-	    // Set the out edges in the header                       
-	    for (uint8_t j = 0; j < EDGES_MAX; j++)              
-	    {                                                        
-	        if (j < out_edges.size())                            
-	            node->s_edge[j] = out_edges[j];                   
-	        else                                                 
+	    } else {
+	        out_edges = get_out_edges(i);
+	    }
+
+	    // Set the out edges in the header
+	    for (uint8_t j = 0; j < EDGES_MAX; j++)
+	    {
+	        if (j < out_edges.size())
+	            node->s_edge[j] = out_edges[j];
+	        else
 	            node->s_edge[j] = EDGE_UNUSED;
-	    }                                                        
+	    }
 	}
 }
 
@@ -1320,7 +1320,7 @@ Graph::from_sockaddr(sockaddr_x *s)
 		for (int j = 0; j < EDGES_MAX; j++)
 		{
 			int to_node = node->s_edge[j];
-			
+
 			if (to_node != EDGE_UNUSED)
 				add_edge(from_node, to_node);
 		}
@@ -1335,11 +1335,25 @@ Graph::from_sockaddr(sockaddr_x *s)
 *
 * @param new_intent The Node to become the DAG's new final intent.
 */
-void 
+void
 Graph::replace_final_intent(const Node& new_intent)
 {
 	std::size_t intent_index = final_intent_index();
 	nodes_[intent_index] = new_intent;
+}
+
+/**
+* @brief Replace the DAG's final intent with the supplied Node.
+*
+* Replace the DAG's final intent with the supplied node.
+*
+* @param new_intent The Node to become the DAG's new final intent.
+*/
+void
+Graph::replace_node_at(int i, const Node& new_node)
+{
+	// FIXME: validate that i is a valid index into the dag
+	nodes_[i] = new_node;
 }
 
 /**
@@ -1372,7 +1386,7 @@ Graph::get_final_intent() const
 *
 * @return List of pointers to nodes of the specified type.
 */
-std::vector<const Node*> 
+std::vector<const Node*>
 Graph::get_nodes_of_type(unsigned int type) const
 {
 	std::vector<const Node*> nodes;
@@ -1380,6 +1394,7 @@ Graph::get_nodes_of_type(unsigned int type) const
 	for (it = nodes_.begin(); it != nodes_.end(); ++it) {
 		if (it->type() == type) {
 			nodes.push_back(&*it);
+			printf("FOUND IT");
 		}
 	}
 

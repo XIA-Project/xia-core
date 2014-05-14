@@ -171,7 +171,9 @@ class XTRANSPORT : public Element {
     HashTable<XID, unsigned short> XIDtoPort;
     HashTable<XIDpair , unsigned short> XIDpairToPort;
     HashTable<unsigned short, DAGinfo> portToDAGinfo;
-
+    HashTable<XID, unsigned short> XIDtoPushPort;
+    
+    
     HashTable<unsigned short, bool> portToActive;
     HashTable<XIDpair , bool> XIDpairToConnectPending;
 
@@ -234,6 +236,8 @@ class XTRANSPORT : public Element {
     void XreadChunk(unsigned short _sport);
     void XremoveChunk(unsigned short _sport);
     void XputChunk(unsigned short _sport);
+    void XpushChunkto(unsigned short _sport, WritablePacket *p_in);
+    void XbindPush(unsigned short _sport);
 };
 
 CLICK_ENDDECLS
