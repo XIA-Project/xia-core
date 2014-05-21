@@ -23,6 +23,7 @@
 #include <click/confparse.hh>
 #include <click/error.hh>
 #include <click/glue.hh>
+#include <click/xid.hh>
 #include <click/xiaheader.hh>
 
 #include <openssl/rsa.h>
@@ -54,7 +55,7 @@ struct click_xia_challenge {
 // XIA challenge reply header
 struct click_xia_response {
     struct click_xia_challenge v;
-	uint8_t pub_key[248];
+	uint8_t pub_key[274];
 	uint8_t signature[128];
 
 };
@@ -75,10 +76,11 @@ XIAChallengeSource::~XIAChallengeSource()
 int
 XIAChallengeSource::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-	String key_path;
+	XID local_hid;
+	String local_hid_str;
 
     if (cp_va_kparse(conf, this, errh,
- 					 "KEYPATH", cpkP + cpkM, cpString, &key_path,
+					 "LOCALHID", cpkP + cpkM, cpXID, &local_hid,
 					 "INTERFACE", cpkP + cpkM, cpInteger, &_iface,
 					 "SRC", cpkP+cpkM, cpXIAPath, &_src_path,
 					 "ACTIVE", 0, cpInteger, &_active,
@@ -86,18 +88,12 @@ XIAChallengeSource::configure(Vector<String> &conf, ErrorHandler *errh)
         return -1; // error config
 
 	generate_secret();
-	pub_path.append(key_path.c_str(), strlen(key_path.c_str()));
-	pub_path.append("pub", 3);
-	priv_path.append(key_path.c_str(), strlen(key_path.c_str()));
-	priv_path.append("priv", 4);
+	local_hid_str = local_hid.unparse().c_str();
+	pub_path = "key/" + local_hid_str.substring(4) + ".pub";
+	priv_path = "key/" + local_hid_str.substring(4);
 
-	if(!strcmp( _src_path.unparse().c_str(), "RE AD:1000000000000000000000000000000000000001 HID:4b1ed30c60b8f301ad818175c652bf1d5f61e24b"))
-		_name = "R1";
-	else if(!strcmp( _src_path.unparse().c_str(), "RE AD:1000000000000000000000000000000000000000 HID:f114f1187fbb008d54d8f99f51999fe20e1151db"))
-		_name = "R0";
-	else
-		_name = "?";
-
+	_name = new char [local_hid_str.length()+1];
+	strcpy(_name, local_hid_str.c_str());
 
     return 0;
 }
@@ -136,10 +132,26 @@ XIAChallengeSource::hash(uint8_t *dig, Packet *p_in)
 	//return std::string((const char*)digest);
 }
 
+int
+XIAChallengeSource::digest_to_hex_string(unsigned char *digest, int digest_len, char *hex_string, int hex_string_len)
+{
+	int i;
+	int retval = -1;
+	if(hex_string_len != (2*digest_len) + 1) {
+		return retval;
+	}
+	for(i=0;i<digest_len;i++) {
+		sprintf(&hex_string[2*i], "%02x", (unsigned int)digest[i]);
+	}
+	hex_string[hex_string_len-1] = '\0';
+	retval = 0;
+	return retval;
+}
+
 void
 XIAChallengeSource::verify_response(Packet *p_in)
 {
-    int i;
+    int i, j;
 	char* pch;
 	char src_hid[48];
 
@@ -169,33 +181,42 @@ XIAChallengeSource::verify_response(Packet *p_in)
 	}
 
 	// Verify public key: Check if hash(pub) == src_hid
-	char* pem_pub;
-	int keylen_pub;
-	std::string str((char*)response->pub_key);
-	str.replace(str.find("-----BEGIN RSA PUBLIC KEY-----"), sizeof("-----BEGIN RSA PUBLIC KEY-----"), "");
-	str.replace(str.find("-----END RSA PUBLIC KEY-----"), sizeof("-----END RSA PUBLIC KEY-----"), "");
-	pem_pub = (char*)calloc(strlen(str.c_str())+1, 1);
-	strcpy(pem_pub, str.c_str());
-	keylen_pub = strlen(pem_pub);
+	//
 
-	SHA1_ctx sha_ctx;
-    unsigned char hash_pub[20];
-    SHA1_init(&sha_ctx);
-    SHA1_update(&sha_ctx, (unsigned char *)pem_pub, keylen_pub);
-    SHA1_final(hash_pub, &sha_ctx);
+	char pem_pub[272];
+	strncpy(pem_pub, (char *)response->pub_key, 272);
 
-	char *pos = (char*)response->v.body.src_hid + 4;	// Convert HID string to byte array
-    unsigned char hid_byte[20];
-    for(i = 0; i < 20; i++) {
-        sscanf(pos, "%2hhx", &hid_byte[i]);
-        pos += 2 * sizeof(char);
-    }
+	// Replace newlines, header and footer
+	char pub_key[272];
+	for(i=strlen("-----BEGIN PUBLIC KEY-----"),j=0;i<272-strlen("-----END PUBLIC KEY-----");i++) {
+		if(pem_pub[i] == '\n') {
+			continue;
+		}
+		pub_key[j] = pem_pub[i];
+		j++;
+	}
+	pub_key[j-1] = '\0';
+	std::string pub_key_string(pub_key);
+	click_chatter("After replacing header and footer: %s", pub_key_string.c_str());
 
+	// Calculate SHA1 hash of public key
+	unsigned char hash_pubkey[20];
+	SHA1((unsigned char *)pub_key_string.c_str(), strlen(pub_key_string.c_str()), hash_pubkey);
+
+	// Convert the SHA1 hash to a hex string
+	char hex_hash_pub[20*2+1];
+	for(i=0;i<20;i++) {
+		sprintf(&hex_hash_pub[2*i], "%02x", (unsigned int)hash_pubkey[i]);
+	}
+	hex_hash_pub[20*2] = '\0';
+	click_chatter("Hash of public key: %s", hex_hash_pub);
+
+	// Compare hex SHA1 hash of public key with sender's HID
 	int pk_verified = 0;
-	pk_verified = !memcmp(hash_pub, hid_byte, 20);
-	if(!pk_verified)
-	{
-		click_chatter("%s> Error: Invalid public key", _name);
+	strncpy(src_hid, (char *)response->v.body.src_hid + 4, 40);
+	pk_verified = !strncmp(src_hid, hex_hash_pub, 40);
+	if(!pk_verified) {
+		click_chatter("%s> Error: Public key does not match sender's address", _name);
 		return;
 	}
 
@@ -203,18 +224,33 @@ XIAChallengeSource::verify_response(Packet *p_in)
 
 	// Verify signature: Check if hash(v) == RSA_verify(sig, pub)
     unsigned char digest[20];
-    SHA1_init(&sha_ctx);
-    SHA1_update(&sha_ctx, (unsigned char *)&(response->v), sizeof(click_xia_challenge));
-    SHA1_final(digest, &sha_ctx);
+	char hex_digest[41];
+	SHA1((unsigned char *) &(response->v), sizeof(click_xia_challenge), digest);
+	if(digest_to_hex_string(digest, 20, hex_digest, 41)) {
+		click_chatter("ERROR: Failed converting hash of challenge to string");
+		return;
+	}
+	click_chatter("Hash of challenge: %s", hex_digest);
+	//SHA1_ctx sha_ctx;
+    //SHA1_init(&sha_ctx);
+    //SHA1_update(&sha_ctx, (unsigned char *)&(response->v), sizeof(click_xia_challenge));
+    //SHA1_final(digest, &sha_ctx);
 
 	BIO *bio_pub = BIO_new(BIO_s_mem());
-	BIO_write(bio_pub, response->pub_key, 247);
-	RSA *rsa = PEM_read_bio_RSAPublicKey(bio_pub, NULL, NULL, NULL);
+	//BIO_write(bio_pub, response->pub_key, 272);
+	BIO_write(bio_pub, pem_pub, 272);
+	RSA *rsa = PEM_read_bio_RSA_PUBKEY(bio_pub, NULL, NULL, NULL);
+	if(!rsa) {
+		click_chatter("%s> ERROR: Unable to read public key from response to RSA", _name);
+		return;
+	}
 
-	unsigned char *sig_buf = NULL;
     unsigned int sig_len = 128;
-    sig_buf = (unsigned char*)malloc(RSA_size(rsa));
+	unsigned char sig_buf[sig_len];
 	memcpy(sig_buf, response->signature, sig_len);
+	char hex_signature[257];
+	digest_to_hex_string(sig_buf, sig_len, hex_signature, 257);
+	click_chatter("%s> Received signature: %s", _name, hex_signature);
 
 	int sig_verified = RSA_verify(NID_sha1, digest, sizeof digest, sig_buf, sig_len, rsa);
 	RSA_free(rsa);

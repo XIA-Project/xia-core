@@ -67,6 +67,7 @@ class XIAChallengeResponder : public Element { public:
 	bool check_outgoing_hashes(uint8_t *);
 	void hash(uint8_t *, Packet *);
 	void store_outgoing_hash(Packet *);
+	int digest_to_hex_string(unsigned char *, int, char *, int );
 	//void run_timer(Timer *);
 
 

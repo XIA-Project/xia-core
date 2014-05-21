@@ -23,6 +23,7 @@
 #include <click/confparse.hh>
 #include <click/error.hh>
 #include <click/glue.hh>
+#include <click/xid.hh>
 #include <click/xiaheader.hh>
 #include <click/packet_anno.hh>
 
@@ -56,7 +57,7 @@ struct click_xia_challenge {
 // XIA challenge reply header
 struct click_xia_response {
     struct click_xia_challenge v;
-	uint8_t pub_key[248];
+	uint8_t pub_key[274];
 	uint8_t signature[128];
 };
 
@@ -91,10 +92,11 @@ XIAChallengeResponder::run_timer(Timer *timer) // TODO: who calls this?
 int
 XIAChallengeResponder::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-	String key_path;
+	XID local_hid;
+	String local_hid_str;
 
     if (cp_va_kparse(conf, this, errh,
-	 		 "KEYPATH", cpkP + cpkM, cpString, &key_path,
+			 "LOCALHID", cpkP + cpkM, cpXID, &local_hid,
 		     "ACTIVE", 0, cpInteger, &_active,
 		     cpEnd) < 0)
         return -1;
@@ -103,10 +105,9 @@ XIAChallengeResponder::configure(Vector<String> &conf, ErrorHandler *errh)
     _timer.initialize(this);
     _timer.schedule_after_sec(SHUTOFF_RESET);*/
 
-	pub_path.append(key_path.c_str(), strlen(key_path.c_str()));
-	pub_path.append("pub", 3);
-	priv_path.append(key_path.c_str(), strlen(key_path.c_str()));
-	priv_path.append("priv", 4);
+	local_hid_str = local_hid.unparse().c_str();
+	pub_path = "key/" + local_hid_str.substring(4) + ".pub";
+	priv_path = "key/" + local_hid_str.substring(4);
 
 	outgoing_header = 0;
     return 0;
@@ -154,6 +155,10 @@ XIAChallengeResponder::processChallenge(Packet *p_in)
 	// Sign challenge struct
 	sign(response.signature, challenge);
 
+	char hex_signature[257];
+	digest_to_hex_string(response.signature, 128, hex_signature, 257);
+	click_chatter("Response Signature: %s", hex_signature);
+
 	// Self own public key
 	get_pubkey(response.pub_key);
 
@@ -168,6 +173,22 @@ XIAChallengeResponder::processChallenge(Packet *p_in)
 }
 
 
+int
+XIAChallengeResponder::digest_to_hex_string(unsigned char *digest, int digest_len, char *hex_string, int hex_string_len)
+{
+    int i;
+    int retval = -1;
+    if(hex_string_len != (2*digest_len) + 1) {
+        return retval;
+    }
+    for(i=0;i<digest_len;i++) {
+        sprintf(&hex_string[2*i], "%02x", (unsigned int)digest[i]);
+    }
+    hex_string[hex_string_len-1] = '\0';
+    retval = 0;
+    return retval;
+}
+
 
 void
 XIAChallengeResponder::sign(uint8_t *sig, struct click_xia_challenge *challenge)
@@ -179,9 +200,16 @@ XIAChallengeResponder::sign(uint8_t *sig, struct click_xia_challenge *challenge)
     SHA1_update(&sha_ctx, (unsigned char *)challenge, sizeof(click_xia_challenge));
     SHA1_final(digest, &sha_ctx);
 
+	char hex_digest[41];
+	if(digest_to_hex_string(digest, 20, hex_digest, 41)) {
+		click_chatter("ERROR: Failed converting challenge hash to hex string");
+		return;
+	}
+	click_chatter("Responder: Hash of challenge: %s", hex_digest);
 	//click_chatter("hash: %X", digest[0]);
 
 	// Encrypt with private key
+	click_chatter("H> Signing with private key from: %s", priv_path.c_str());
 	FILE *fp = fopen(priv_path.c_str(), "r");
 	RSA *rsa = PEM_read_RSAPrivateKey(fp,NULL,NULL,NULL);
 	if(rsa==NULL)
@@ -192,8 +220,10 @@ XIAChallengeResponder::sign(uint8_t *sig, struct click_xia_challenge *challenge)
     sig_buf = (unsigned char*)malloc(RSA_size(rsa));
     if (NULL == sig) { click_chatter("sig malloc failed"); }
 
-    int rc = RSA_sign(NID_sha1, digest, sizeof digest, sig_buf, &sig_len, rsa);
+    //int rc = RSA_sign(NID_sha1, digest, sizeof digest, sig_buf, &sig_len, rsa);
+    int rc = RSA_sign(NID_sha1, digest, 20, sig_buf, &sig_len, rsa);
     if (1 != rc) { click_chatter("RSA_sign failed"); }
+	click_chatter("Responder signature length: %d", sig_len);
 
 	//click_chatter("Sig: %X Len: %d", sig_buf[0], sig_len);
 	memcpy(sig, sig_buf, sig_len);
@@ -205,8 +235,10 @@ XIAChallengeResponder::sign(uint8_t *sig, struct click_xia_challenge *challenge)
 void
 XIAChallengeResponder::get_pubkey(uint8_t *pub)
 {
+	click_chatter("H> Getting public key from: %s", pub_path.c_str());
 	FILE *fp = fopen(pub_path.c_str(), "r");
-	RSA *rsa = PEM_read_RSAPublicKey(fp,NULL,NULL,NULL);
+	RSA *rsa = PEM_read_RSA_PUBKEY(fp,NULL,NULL,NULL);
+	//RSA *rsa = PEM_read_RSAPublicKey(fp,NULL,NULL,NULL);
 	if(rsa==NULL)
 		ERR_print_errors_fp(stderr);
 
@@ -214,7 +246,7 @@ XIAChallengeResponder::get_pubkey(uint8_t *pub)
 	char *pem_pub;
 
 	BIO *bio_pub = BIO_new(BIO_s_mem());
-	PEM_write_bio_RSAPublicKey(bio_pub, rsa);
+	PEM_write_bio_RSA_PUBKEY(bio_pub, rsa);
 	keylen_pub = BIO_pending(bio_pub);
 	pem_pub = (char*)calloc(keylen_pub+1, 1); // Null-terminate
 	BIO_read(bio_pub, pem_pub, keylen_pub);

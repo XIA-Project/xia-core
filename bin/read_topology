@@ -17,16 +17,38 @@
 import sys
 import os
 import re
+import hashlib
+from Crypto.PublicKey import RSA
 
 DEFAULT_PORT=1500
+create_xia_address_click = False
+
+# Directory where all the keys will be dumped
+keydir = 'key'
+
+permanent_xia_addresses = {
+		#"AD0":"AD:1000000000000000000000000000000000000000",
+		#"AD1":"AD:1000000000000000000000000000000000000001",
+		"CID0":"CID:2000000000000000000000000000000000000001",
+		"IPID1":"IP:1.0.0.2",
+		"XHCP_HID0":"HID:1200000000000000000000000000000000000001",
+		"AD_INIT":"AD:1000000000000000000000000000000000000999",
+		"BHID":"HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+		"SID_XHCP":"SID:1110000000000000000000000000000000001111",
+		"SID_XROUTE":"SID:1110000000000000000000000000000000001112",
+		"SID_NS":"SID:1110000000000000000000000000000000001113",
+		}
+
+topology_xia_addresses = {}
 
 def help():
-	print '\nusage: make_sockconf click_conf_file dest_sockconf dest_nodeconf'
+	print '\nusage: make_sockconf click_conf_file dest_sockconf dest_nodeconf dest_xia_addr_click'
 	print 'creates xsockconf.ini and xnodeconf in the current directory based on the'
 	print 'specified template file\n'
 	sys.exit(-1)
 
 def create_output_file(name):
+	f = None
 	try:
 		f = open(name, 'w')
 	except:
@@ -34,10 +56,40 @@ def create_output_file(name):
 
 	return f
 
+def generate_rsa_key():
+	private = RSA.generate(1024)
+	public = private.publickey()
+	return (private.exportKey(), public.exportKey())
+
+def write_key_files(basename, privkey, pubkey):
+	if not os.path.exists(keydir):
+		os.mkdir(keydir)
+	privkeyfilename = os.path.join(keydir, basename)
+	pubkeyfilename = os.path.join(keydir, basename + '.pub')
+	print 'Created key files', privkeyfilename, pubkeyfilename
+	with open(privkeyfilename, 'w') as privkeyfile:
+		privkeyfile.write(privkey + '\n')
+	with open(pubkeyfilename, 'w') as pubkeyfile:
+		pubkeyfile.write(pubkey + '\n')
+
+def create_new_address():
+	# Create a new key pair
+	(privkey, pubkey) = generate_rsa_key()
+	# Create hash of public key to use as device address
+	pubkeyhash = pubkey_hash(pubkey)
+	# Dump the keys in files based on hash name
+	write_key_files(pubkeyhash, privkey, pubkey)
+	return pubkeyhash
+
+def pubkey_hash(pubkey):
+	keylist = pubkey.split('\n')
+	# Strip the first and last line because they just contain text markers
+	key = ''.join(keylist[1:-1])
+	return hashlib.sha1(key).hexdigest()
 
 # start here
 
-if len(sys.argv) != 4:
+if len(sys.argv) != 5:
 	help()
 
 nshost = None
@@ -77,9 +129,16 @@ sockconf.write('[default]\nclick_port=%s\n\n' % DEFAULT_PORT)
 
 nodeconf = create_output_file(sys.argv[3])
 
+xia_address = None
+if sys.argv[1].find('topology'):
+	create_xia_address_click = True
+	xia_address = create_output_file(sys.argv[4])
+	xia_address.write('XIAXIDInfo(\n')
+
 # look for elements of type XIAEndHost, XiaRouter[n]Port, and XIADualRouter[n]Port
 test = re.compile('XIAEndHost|XIARouter\d+Port|XIADualRouter\d+Port')
 
+next_ad = 0
 lines = lines.split(';')
 for line in lines:
 
@@ -89,10 +148,21 @@ for line in lines:
 		continue
 
 	# which field is port defined in
+	field = 0
+	idfield = 0
 	if element.group() == 'XIAEndHost':
-		field = 3
+		field = 2
+		idfield = 1
 	else:
-		field = 5
+		field = 4
+		idfield = 2
+		if xia_address:
+			ad_num = 'AD%d' % next_ad
+			ad_addr = 'AD:%s' % create_new_address()
+			#xia_address.write('\tAD%d AD:%s,\n' % (next_ad, create_new_address()))
+			xia_address.write('\t%s %s,\n' % (ad_num, ad_addr))
+			topology_xia_addresses[ad_num] = ad_addr
+			next_ad = next_ad + 1
 
 	name, fields = line.split('::')
 	fields = fields.split(',')
@@ -100,10 +170,23 @@ for line in lines:
 
 	sockconf.write('[%s]\nclick_port=%s\n\n' % (name, fields[field].strip()))
 	nodeconf.write("%s\t%s\n" % (name, element.group()))
+	if xia_address:
+		dev_name = fields[idfield].strip()
+		dev_addr = 'HID:%s' % create_new_address()
+		#xia_address.write('\t%s HID:%s,\n' % (fields[idfield].strip(), create_new_address()))
+		xia_address.write('\t%s %s,\n' % (dev_name, dev_addr))
+		topology_xia_addresses[dev_name] = dev_addr
 
 if nshost != None:
 	nodeconf.write("%s\t%s\n" % (nshost, 'nameserver'))
 
 sockconf.close
 nodeconf.close
-
+if xia_address:
+	for key, value in permanent_xia_addresses.iteritems():
+		xia_address.write('\t' + ' '.join([key, value]) + ',\n')
+	xia_address.write(');\n')
+	xia_address.close()
+	resolv_conf = create_output_file('etc/resolv.conf')
+	resolv_conf.write('nameserver=RE %s %s %s\n' % (topology_xia_addresses['AD0'], topology_xia_addresses['HID0'], permanent_xia_addresses['SID_NS']))
+	resolv_conf.close()

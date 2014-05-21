@@ -64,9 +64,10 @@ private:
     void send_challenge(Packet *);
 	void verify_response(Packet *);
 	bool is_verified(Packet *);
+	int digest_to_hex_string(unsigned char *, int, char *, int );
     int _active;
 	int _iface;
-	const char* _name;
+	char* _name;
 	const static size_t router_secret_length = 10;
 	char router_secret[router_secret_length];
 	String pub_path;
