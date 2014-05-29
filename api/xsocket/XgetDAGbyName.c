@@ -250,12 +250,14 @@ int _xregister(const char *name, sockaddr_x *DAG, short flags) {
 		return -1;
 	}
 
+	std::string dag_string = g.dag_string();
+
 	//Construct a registration packet
 	ns_pkt register_pkt;
 	register_pkt.type = NS_TYPE_REGISTER;
 	register_pkt.flags = flags;
 	register_pkt.name = name;
-	register_pkt.dag = g.dag_string().c_str();
+	register_pkt.dag = dag_string.c_str();
 	int len = make_ns_packet(&register_pkt, pkt, sizeof(pkt));
 
 	//Send the name registration packet to the name server
