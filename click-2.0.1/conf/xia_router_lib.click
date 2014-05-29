@@ -355,9 +355,9 @@ elementclass XIADualRouter4Port {
 
 
     Script(write xrc/n/proc/rt_AD.add $local_ad $DESTINED_FOR_LOCALHOST);    // self AD as destination
-//    Script(write xrc/n/proc/rt_IP.add IP:$ip0 $DESTINED_FOR_LOCALHOST);  // self as destination for interface 0's IP addr
-//    Script(write xrc/n/proc/rt_IP.add IP:$ip1 $DESTINED_FOR_LOCALHOST);  // self as destination for interface 1's IP addr
-//    Script(write xrc/n/proc/rt_IP.add IP:$ip2 $DESTINED_FOR_LOCALHOST);  // self as destination for interface 2's IP addr
+    Script(write xrc/n/proc/rt_IP.add IP:$ip0 $DESTINED_FOR_LOCALHOST);  // self as destination for interface 0's IP addr
+    Script(write xrc/n/proc/rt_IP.add IP:$ip1 $DESTINED_FOR_LOCALHOST);  // self as destination for interface 1's IP addr
+    Script(write xrc/n/proc/rt_IP.add IP:$ip2 $DESTINED_FOR_LOCALHOST);  // self as destination for interface 2's IP addr
     Script(write xrc/n/proc/rt_IP.add IP:$ip3 $DESTINED_FOR_LOCALHOST);  // self as destination for interface 3's IP addr
     Script(write xrc/n/proc/rt_IP.add - 3); 	// default route for IPv4     TODO: Need real routes somehow
 
