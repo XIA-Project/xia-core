@@ -159,8 +159,8 @@ elementclass IPLineCard {
 	arpq :: ARPQuerier($ip, $mac);
 	arpr :: ARPResponder($ip/32 $mac);
 
-	print_in :: IPPrint(">>> $local_hid (In Port $num)");
-	print_out :: IPPrint("<<< $local_hid (Out Port $num)");
+	print_in :: IPPrint(">>> $ip (In Port $num)");
+	print_out :: XIAPrint("<<< $ip (Out Port $num)");
 
     // TODO: Make a counter for IP
     //count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
