@@ -24,6 +24,7 @@
 #include <syslog.h>
 
 #include "Xsocket.h"
+#include "xns.h"
 #include "xhcp.hh"
 #include "../common/XIARouter.hh"
 #include "dagaddr.hpp"
@@ -348,7 +349,7 @@ int main(int argc, char *argv[]) {
 			Graph hg = (n_src * n_ad * n_hid);
 			hg = hg + (n_src * n_ip * n_ad * n_hid);
 			hg.fill_sockaddr(&hdag);
-			if (XregisterName(fullname, &hdag) < 0 ) {
+			if (XregisterHost(fullname, &hdag) < 0 ) {
 				syslog(LOG_ERR, "error registering new DAG for %s", fullname);
 
 				// reset beacon counter so we try again in a few seconds

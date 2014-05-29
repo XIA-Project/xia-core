@@ -83,7 +83,7 @@ int Xsendto(int sockfd,const void *buf, size_t len, int flags,
 
 	// if buf is too big, send only what we can
 	if (len > XIA_MAXBUF) {
-		LOGF("truncating... requested size (%d) is larger than XIA_MAXBUF (%d)\n", 
+		LOGF("truncating... requested size (%lu) is larger than XIA_MAXBUF (%d)\n", 
 				len, XIA_MAXBUF);
 		len = XIA_MAXBUF;
 	}

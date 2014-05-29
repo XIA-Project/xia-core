@@ -94,7 +94,7 @@ class XIAContentModule {
 	int malicious; // Respond to CID requests with bad data if set to 1
 
     protected:
-    void cache_incoming_local(Packet *p, const XID& srcCID, bool local_putcid);
+    void cache_incoming_local(Packet *p, const XID& srcCID, bool local_putcid, bool pushcid);
     void cache_incoming_forward(Packet *p, const XID& srcCID);
     void cache_incoming_remove(Packet *p, const XID& srcCID);
     void cache_management();
@@ -120,6 +120,7 @@ class XIAContentModule {
     HashTable<XID, int> partial;
     HashTable<XID, int> content;   
     Packet *makeChunkResponse(CChunk * chunk, Packet *p_in);
+    Packet *makeChunkPush(CChunk * chunk, Packet *p_in);
     int MakeSpace(int);    
 
     //Cache Policy
