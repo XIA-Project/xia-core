@@ -526,12 +526,11 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 		std::string p_buf;
 		xsm.SerializeToString(&p_buf);
 
-		WritablePacket *xcmp_pkt = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
-
 		list<int>::iterator i;
 
 		for (i = xcmp_listeners.begin(); i != xcmp_listeners.end(); i++) {
 			int port = *i;
+			WritablePacket *xcmp_pkt = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
 			output(API_PORT).push(UDPIPPrep(xcmp_pkt, port));
 		}
 
@@ -548,6 +547,12 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			XIDpair xid_pair;
 			xid_pair.set_src(_destination_xid);
 			xid_pair.set_dst(_source_xid);
+
+			if (!_dport){ // no one is listening
+				// click_chatter("%s is not open", _destination_xid.unparse().c_str());
+				return;
+			}
+
 			DAGinfo *daginfo_bind = portToDAGinfo.get_pointer(_dport); // the binded info
 
 			if (daginfo_bind->teardown_waiting){ // closed socket NOTE: should send RST?
