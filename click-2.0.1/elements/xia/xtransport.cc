@@ -1293,7 +1293,10 @@ void XTRANSPORT::Xclose(unsigned short _sport)
 	// Set timer
 	daginfo->timer_on = true;
 	daginfo->teardown_waiting = true;
-	daginfo->teardown_expiry = Timestamp::now() + Timestamp::make_msec(_teardown_wait_ms);
+	if (daginfo->sock_type == XSOCKET_RAW) // kill RAW xsock
+		daginfo->teardown_expiry = Timestamp::now();
+	else
+		daginfo->teardown_expiry = Timestamp::now() + Timestamp::make_msec(_teardown_wait_ms);
 
 	if (! _timer.scheduled() || _timer.expiry() >= daginfo->teardown_expiry )
 		_timer.reschedule_at(daginfo->teardown_expiry);
