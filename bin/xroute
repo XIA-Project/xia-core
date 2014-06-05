@@ -20,6 +20,7 @@ import sys
 import getopt
 import datetime
 import telnetlib
+import re
 
 APP_VERSION="0.9"
 TITLE="XIA Route version %s"
@@ -33,6 +34,8 @@ MAJOR=1
 MINOR=3
 
 KNOWN_XIDS = [ "AD", "HID", "SID", "CID", "IP" ]
+
+re_port = re.compile(r"([-,0-9]+)/(\d+)")
 #
 # class for managing command line configuration options
 #
@@ -485,8 +488,14 @@ class XrouteApp:
 				if self.options.verbose() == False:
 					nexthop = self.config.getAlias(nexthop)
 
+				gp = re_port.search(port)
+				if (gp):
+					pt = "%" + gp.group(2)
+					port =  gp.group(1) 
+				else:
+					pt = ""
 				text += "%-5s %-45s %2s%-11s %08x %s\n" % (table, xid, 
-						port, self.portType(port), flags, nexthop) 
+						port, pt+self.portType(port), flags, nexthop) 
 
 
 #		print "text = %s" % (text)

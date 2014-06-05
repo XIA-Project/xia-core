@@ -133,11 +133,9 @@ XIAXIDMultiRouteTable::list_routes_handler(Element *e, void * /*thunk */)
         {
             xrd = *it_entry;
             tbl += xid + ",";
-            tbl += String(xrd->port) + ",";
+            tbl += String(xrd->port) + "/" + String(xrd->weight) + ",";
             tbl += (xrd->nexthop != NULL ? xrd->nexthop->unparse() : "") + ",";
             tbl += String(xrd->flags) + "\n";
-            // TODO: change xia route print to allow extra outputs
-            //tbl += String(xrd->weight) + "\n";
             ++it_entry;
         }
         ++it;
