@@ -11,6 +11,8 @@
 #include <time.h>
 #include <math.h>
 
+#include <pthread.h>
+
 #include <sys/types.h>
 #include <netdb.h>
 #include <stdlib.h>
@@ -483,7 +485,7 @@ int processSidDecision(void)
             if (it_ad->second.priority < 0){ // this is the poisoned one, skip
                 continue;
             }
-            int latency = 1000; // default, 1ms
+            int latency = 1; // default, 1ms
             if (route_state.ADPathStates.find(it_ad->first) != route_state.ADPathStates.end()){
                 latency = route_state.ADPathStates[it_ad->first].delay;
             }
@@ -502,12 +504,12 @@ int processSidDecision(void)
             }
             else{
                 it_ad->second.valid = true;
-                it_ad->second.percentage = (int) 100.0*it_ad->second.weight/total_weight;
+                it_ad->second.percentage = (int) (100.0*it_ad->second.weight/total_weight+0.5);//round
                 if (it_ad->second.percentage > 100){
                     syslog(LOG_INFO, "Error setting weight%s @%s :cap=%d, f=%d, prio=%d, weight=%f, total weight=%f",it_sid->first.c_str(), it_ad->first.c_str(), it_ad->second.capacity, it_ad->second.capacity_factor, it_ad->second.priority, it_ad->second.weight, total_weight);
                 }
             }
-            //syslog(LOG_INFO, "percentage is %d", it_ad->second.percentage );
+            //syslog(LOG_INFO, "percentage for %s@%s is %d",it_sid->first.c_str(),it_ad->first.c_str(), it_ad->second.percentage );
         }
     }
     // for debug
@@ -698,6 +700,96 @@ int updateSidAdsTable(std::string AD, std::string SID, ServiceState service_stat
     }
     // TODO: make return value meaningful or make this function return void
     //syslog(LOG_INFO, "update SID:%s, capacity %d, f1 %d, f2 %d, priority %d, from %s", SID.c_str(), service_state.capacity, service_state.capacity_factor, service_state.link_factor, service_state.priority, AD.c_str());
+    return rc;
+}
+
+void* updatePathThread(void* updating)
+{
+    // do the xping in a thread
+    // updating is a bool* from the creator of this thread that indicates whether a new update thread is necessary
+    // We do not want multiple update threads waiting if the updating is slower than the period the timer calls.
+    // Hence, lock is not the approach we want
+    // FIXME: using "xping 'RE ADx' " is wrong, we should get the latency to 
+    // the involved hosts in that AD, not the closest host from that AD.
+    // FIXME: pinging the ADs one by one takes time, should make it parallel (multi-threaded)
+
+    *((bool*) updating) = true; // do not reenter
+    std::map<std::string, NodeStateEntry>::iterator it_ad;
+
+    for (it_ad = route_state.ADNetworkTable.begin(); it_ad != route_state.ADNetworkTable.end(); ++it_ad)
+    {
+        if (it_ad->first == route_state.myAD){
+            continue;
+        }
+        if (it_ad->first.length() < 3){ // abnormal entry, skip to avoid weird stuff
+            continue;
+        }
+
+        //yslog(LOG_DEBUG, "send ping to %s", it_ad->first.c_str());
+        FILE *in;
+        char buff[BUF_SIZE];
+        char cmd[BUF_SIZE] = "";
+        char root[BUF_SIZE];
+        int latency = -1;
+
+        // send 5 pings (-c), interval 0.1s (-i), each timeout 1s (-t)
+        // XSOCKCONF_SECTION makes sure xping is performed on the right host
+        sprintf(cmd, 
+            "XSOCKCONF_SECTION=%s %s/bin/xping -t 1 -i 0.1 -q -c 5 'RE %s' | tail -1 | awk '{print $5}' | cut -d '/' -f 2",
+            hostname,
+            XrootDir(root, BUF_SIZE), 
+            it_ad->first.c_str());
+        if(!(in = popen(cmd, "r"))){
+            syslog(LOG_DEBUG, "Fail to execute %s", cmd);
+            continue;
+        }
+        while(fgets(buff, sizeof(buff), in) != NULL){
+            if (strlen(buff) > 0){ // avoid bad things
+                //syslog(LOG_DEBUG, "Ping %s result is %s",it_ad->first.c_str(), buff);
+                latency = atoi(buff); // FIXME: atoi cannot detect error
+            }
+        }
+        if (pclose(in) > 0){
+            syslog(LOG_DEBUG, "ping to %s timeout", it_ad->first.c_str());
+        }
+        if (latency >= 0){
+            //syslog(LOG_DEBUG, "latency to %s is %d", it_ad->first.c_str(), latency);
+            ADPathState ADpath_state;
+            ADpath_state.delay = latency>0?latency:9999; // maybe a timeout/atoi failure
+            //This is probably thread-safe TODO: lock
+            route_state.ADPathStates[it_ad->first] = ADpath_state;
+        }
+    }
+    *((bool*) updating) = false; // enter
+    pthread_exit(NULL);
+}
+
+int updateADPathStates(void)
+{   // udpate the states of paths (latency) to each AD
+    // FIXME: routers could have different latencies to the same AD, this 
+    // process should be done in each router
+    //syslog(LOG_DEBUG, "updateADPathStates called , try to send to %lu ADs", route_state.ADNetworkTable.size());
+    int rc = 1;
+    //Don't make the update when the previous one is ongoing
+    static bool updating = false;
+
+    // Create a new thread so that the daemon could receive control messages while waiting for xping
+    pthread_t newthread;
+    if (!updating){
+        if (pthread_create(&newthread , NULL, updatePathThread, &updating)!= 0){
+            perror("pthread_create");
+        }
+        else{
+            pthread_detach(newthread); // leave the thread along
+        }
+    }
+    
+
+    // latency to itself is always 1ms (minimal value) 
+    // FIXME: above is not true! 
+    ADPathState ADpath_state;
+    ADpath_state.delay = 1;
+    route_state.ADPathStates[route_state.myAD] = ADpath_state;
     return rc;
 }
 
@@ -1428,6 +1520,7 @@ perror("bind");
 		if (route_state.send_sid_discovery == true) {
             route_state.send_sid_discovery = false;
             set_sid_conf(hostname); // reload the config file
+            updateADPathStates(); // update latency info
             sendSidDiscovery();
         }
         if (route_state.send_sid_decision == true) {

@@ -68,7 +68,7 @@ typedef struct ServiceController
 
 typedef struct ADPathState// The path state to an AD, network 'weather' report
 {
-    int delay; //in microseconds (ns)
+    int delay; //in milliseconds (ms)
     int hop_count;
 } ADPathState;
 
