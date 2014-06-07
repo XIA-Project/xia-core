@@ -1,6 +1,21 @@
 require(library xia_router_lib.click);
 require(library xia_address.click);
 
+//
+// Topology:
+//
+//      [C0]    [C1]                    [C2]    [C3]    [C4]
+//       |       |                       |       |       |
+//      [R0]----[R1]----[R20]---[R21]---[R2]----[R3]----[R4]
+//       |       |     / |        |      |       |       |  \
+//      [H0]    [H1]  / [H20]   [H21]   [H2]    [H3]    [H4] \
+//                    |                                      |
+//                    +--------------------------------------+
+//  [Ci] - controleri
+//  [Ri] - routeri
+//  [Hi] - hosti
+//
+
 // host & router instantiation
 host0 :: XIAEndHost (RE AD0 HID0, HID0, 1500, 0, aa:aa:aa:aa:aa:aa);
 host1 :: XIAEndHost (RE AD1 HID1, HID1, 11500, 1, aa:aa:aa:aa:aa:aa);
