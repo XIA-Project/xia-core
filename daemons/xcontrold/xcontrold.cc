@@ -493,6 +493,8 @@ void populateADEntries(std::map<std::string, RouteEntry> &routingTable, std::map
 	}
 }
 
+// Run Dijkstra shortest path algorithm, and populate the next hops.
+// This code is hacky to support AD and HID. This can be rewritten better.
 void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEntry> &networkTable, std::map<std::string, RouteEntry> &routingTable)
 {
 	std::map<std::string, NodeStateEntry>::iterator it1;  // Iter for network table
@@ -518,8 +520,9 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEnt
 		it1->second.cost = 10000000;
 	}
 
-	// Visit root node	
 	string currXID;
+
+	// Visit root node (srcHID)
 	unvisited.erase(srcHID);
 	networkTable[srcHID].checked = true;
 	networkTable[srcHID].cost = 0;
