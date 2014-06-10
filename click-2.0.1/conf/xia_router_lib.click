@@ -599,3 +599,28 @@ elementclass XIASCIONPathServer {
 
     sps -> xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> sps;
 };
+
+// 1-port SCION Encap
+elementclass XIASCIONEncap {
+    $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac |
+
+    // $local_addr: the full address of the node
+    // $local_ad: the node's AD
+    // $local_hid: the node's HID
+    // $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
+
+    // input[0]: a packet arrived at the node
+    // output[0]: forward to interface 0
+
+    xlc :: XIALineCard($local_addr, $local_hid, $mac, 0);
+
+    xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $click_port, 1, 0);
+    //Script(write xrc/n/proc/rt_AD.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
+    //Script(write xrc/n/proc/rt_HID.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
+
+    enc :: SCIONEncap(AD $local_ad, HID $local_hid);
+
+    input => xlc => output;
+
+    enc -> xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> enc;
+};

@@ -367,7 +367,7 @@ class SCIONPathServer : public Element {
         
         /**
             @brief Sends up path to the clients
-            @param const HostAddr &requestId The ID of the requsting end host. 
+            @param HostAddr &requestId The ID of the requsting end host. 
             @param uint32_t pref The preference of paths of the host. 
 
             This function sends up path to the client. But in this function the
@@ -375,7 +375,7 @@ class SCIONPathServer : public Element {
             
             Returns 0.
         */
-        int sendUpPath(const HostAddr &requestId, uint32_t pref=0);
+        int sendUpPath(HostAddr &requestId, uint32_t pref=0);
 
         scionHash createHash(uint8_t* pkt);
 

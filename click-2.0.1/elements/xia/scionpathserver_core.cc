@@ -92,14 +92,6 @@ SCIONPathServerCore::parseTopology(){
     TopoParser parser;
     parser.loadTopoFile(m_sTopologyFile.c_str()); 
     parser.parseServers(m_servers);
-    parser.parseRouters(m_routers);
-
-	std::multimap<int, ServerElem>::iterator itr;
-	for(itr = m_servers.begin(); itr != m_servers.end(); itr++)
-		if(itr->second.aid == m_uAid){
-			m_Addr = itr->second.addr;
-			break;
-		}
 }
 
 /*
@@ -171,6 +163,169 @@ void SCIONPathServerCore::push(int port, Packet *p)
     p->kill();
 
     // TODO: copy logic from run_task
+    //variables needed to print log
+    HostAddr src = SPH::getSrcAddr(packet);
+    uint32_t ts = 0;//SPH::getUpTimestamp(packet);
+
+    /*
+    if(type!=PATH_REG) 
+        scionPrinter->printLog(IH,type,ts,src,m_uAdAid,"%u,RECEIVED\n",packetLength);*/
+
+    /*AID_REQ: AID request packet from switch*/
+    if(type==AID_REQ){
+        //set packet header
+        SPH::setType(packet, AID_REP);
+        HostAddr dstAddr(HOST_ADDR_SCION, m_uAid);
+        SPH::setSrcAddr(packet, dstAddr);
+
+        //append its aid
+        //*(uint64_t*)(packet+SCION_HEADER_SIZE) = m_uAid;
+
+        sendPacket(packet, packetLength,0); 
+
+    /*PATH_REG: path registration packet from local pcb server*/
+    }else if(type==PATH_REG){
+        #ifdef _SL_DEBUG 
+        printf("TDC PS: path registration packet received\n");
+        #endif
+        //prints what path is being registered in the log file (should be
+        //removed to a separate function).
+        uint16_t hops = SCIONBeaconLib::getNumHops(packet);
+        uint8_t srcLen = SPH::getSrcLen(packet);
+        uint8_t dstLen = SPH::getDstLen(packet);
+        //uint8_t hdrLen = SPH::getHdrLen(packet);
+        uint8_t hdrLen = SPH::getHdrLen(packet) + 8; // TODO: why are we off by 8?
+        uint8_t* ptr = packet+hdrLen+OPAQUE_FIELD_SIZE;
+        pcbMarking* mrkPtr = (pcbMarking*)ptr;
+        char buf[MAXLINELEN];
+        uint16_t offset = 0;
+        for(int i=0;i<hops;i++){
+            sprintf(buf+offset, "%lu(%u, %u) |"
+                ,mrkPtr->aid,mrkPtr->ingressIf,mrkPtr->egressIf);
+            offset =strlen(buf); 
+            ptr+=mrkPtr->blkSize;
+            mrkPtr = (pcbMarking*)ptr;       
+        }
+        #ifdef _SL_DEBUG 
+        printf("\t buf: %s\n",buf);
+        #endif
+        scionPrinter->printLog(IH,type,(char *)"PS(%llu:%llu),RECEIVED PATH REGISTRATION: %s\n"
+        ,m_uAdAid, m_uAid,buf);
+
+        //parses path and stores
+        parsePath(packet); 
+
+    /*PATH_REQ: path request packet form the local path server*/
+    }else if(type == PATH_REQ){
+        uint8_t hdrLen = SPH::getHdrLen(packet);
+        pathInfo* pi = (pathInfo*)(packet+hdrLen);
+
+        uint8_t srcLen = SPH::getSrcLen(packet);
+        uint8_t dstLen = SPH::getDstLen(packet);
+        specialOpaqueField* sOF =
+        (specialOpaqueField*)(packet+COMMON_HEADER_SIZE+srcLen+dstLen);
+
+        
+        uint8_t hops = sOF->hops;
+        uint16_t pathLength = (hops+1)*OPAQUE_FIELD_SIZE; //from requester to TDC
+        uint64_t target = pi->target;
+        HostAddr requester = SPH::getSrcAddr(packet);
+
+        //reversing the up path to get the down path
+        uint8_t revPath[pathLength];
+        memset(revPath, 0, pathLength);
+        reversePath(packet+COMMON_HEADER_SIZE+srcLen+dstLen, revPath, hops);
+        
+        #ifdef _SL_DEBUG_PS
+        //printf("TDC PS: PATH_REQ received. hops=%d,target=%lu,requester=%lu,srcLen=%d, dstLen=%d, hdrLen=%d\n", 
+            //hops, target, requester.numAddr(), srcLen, dstLen, hdrLen);
+        #endif
+        
+        uint8_t* ptr = revPath+OPAQUE_FIELD_SIZE;
+        opaqueField* hopPtr = (opaqueField*)ptr;
+        #ifdef _SL_DEBUG
+        for(int i=0;i<hops;i++){
+            printf("ingress : %lu, egress: %lu\n", hopPtr->ingressIf, hopPtr->egressIf);
+            ptr+=OPAQUE_FIELD_SIZE;
+            hopPtr = (opaqueField*)ptr;
+        }
+        #endif
+
+        uint16_t interface = ((opaqueField*)(revPath+OPAQUE_FIELD_SIZE))->egressIf;
+        int packetLength = COMMON_HEADER_SIZE+pathLength+srcLen+dstLen+PATH_INFO_SIZE; //PATH_REQ packet len.
+
+        //path look up to send to the local path server
+        std::multimap<uint64_t, std::multimap<uint32_t, path> >::iterator itr;
+        for(itr=paths.begin();itr!=paths.end();itr++){
+            //when the target is found
+            if(itr->first == target){
+                std::multimap<uint32_t, path>::iterator itr2;
+                //adds necessary information to the packet
+                #ifdef _SL_DEBUG_PS
+                //printf("TDC PS: AD%lu -- #of Registered Paths: %lu\n",target,itr->second.size());
+                #endif
+                for(itr2=itr->second.begin();itr2!=itr->second.end();itr2++){
+
+                    uint16_t pathContentLength = itr2->second.pathLength;
+                    uint16_t newPacketLength = packetLength + pathContentLength;
+                    uint8_t newPacket[newPacketLength];
+                    
+                    //1. Set Src/Dest addresses to the requester
+                    HostAddr srcAddr = HostAddr(HOST_ADDR_SCION, m_uAdAid);
+                    memcpy(newPacket, packet, COMMON_HEADER_SIZE);
+                    //set packet header
+                    SPH::setType(newPacket, PATH_REP);
+                    SPH::setSrcAddr(newPacket, srcAddr);
+                    SPH::setDstAddr(newPacket,ifid2addr.find(interface)->second);
+                    
+                    SPH::setHdrLen(newPacket, packetLength-PATH_INFO_SIZE);
+                    SPH::setTotalLen(newPacket,newPacketLength);
+                    //SLT: this part (setting current OF) needs to be revised...
+                    SPH::setCurrOFPtr(newPacket,SCION_ADDR_SIZE*2);
+                    SPH::setDownpathFlag(newPacket);
+                    //SL: set downpath flag modified...
+                    //uint8_t flags = SPH::getFlags(newPacket);
+                    //flags ^= 0x80;
+                    //SPH::setFlags(newPacket, flags);
+                    
+                    //2. Opaque field to the requester AD is copied
+                    memcpy(newPacket+COMMON_HEADER_SIZE+srcLen+dstLen,revPath,(hops+1)*OPAQUE_FIELD_SIZE); 
+                    
+                    //fill in the path info
+                    pathInfo* pathReply = (pathInfo*)(newPacket+packetLength-PATH_INFO_SIZE);
+                    pathReply->target = target;
+                    pathReply->timestamp = itr2->first;
+                    pathReply->totalLength = pathContentLength;
+                    pathReply->numHop = itr2->second.hops;
+                    pathReply->option = 0;
+                    memcpy(newPacket+packetLength,
+                            itr2->second.msg,pathContentLength);
+
+                    try {
+                    char adbuf[41];
+                    snprintf(adbuf, 41, "%040lu", requester.numAddr());
+
+                    string dest = "RE ";
+                    dest.append(BHID);
+                    dest.append(" ");
+                    dest.append("AD:");
+                    dest.append(adbuf);
+                    dest.append(" ");
+                    dest.append("HID:");
+                    dest.append((const char*)"0000000000000000000000000000000000100000");
+
+                    //printf("DEST=%s\n", dest.c_str());
+
+                    //sends reply
+                    sendPacket(newPacket, newPacketLength, dest);
+                    } catch (...) {}
+                }
+            }
+        }
+    }
+    //else{
+        //printf("Unsupported Packet type : Path Server\n");
+    //}
 }
 
 /*
@@ -390,7 +545,8 @@ void SCIONPathServerCore::parsePath(uint8_t* pkt){
     path newPath;
     memset(&newPath, 0, sizeof(path)); 
     uint16_t hops = SCIONBeaconLib::getNumHops(pkt);
-    uint8_t headerLength = SPH::getHdrLen(pkt);
+    //uint8_t headerLength = SPH::getHdrLen(pkt);
+    uint8_t headerLength = SPH::getHdrLen(pkt) + 8; // TODO why are we off by 8?
     specialOpaqueField* sOF = (specialOpaqueField*)(pkt+headerLength);
     uint8_t* ptr = pkt+headerLength+OPAQUE_FIELD_SIZE;
 
@@ -398,6 +554,7 @@ void SCIONPathServerCore::parsePath(uint8_t* pkt){
 
     //parses all the necessary information
     for(int i=0;i<hops;i++){
+         scionPrinter->printLog(IH,(char *)"AID: %d INGRESS: %d EGRESS: %d\n", mrkPtr->aid, mrkPtr->ingressIf, mrkPtr->egressIf);
         newPath.path.push_back(mrkPtr->aid);
         
 		uint8_t* ptr2=ptr+PCB_MARKING_SIZE;
@@ -423,7 +580,7 @@ void SCIONPathServerCore::parsePath(uint8_t* pkt){
     std::multimap<uint64_t, std::multimap<uint32_t, path> >::iterator itr;
     itr=paths.find(newPath.path.back()); 
 	#ifdef _SL_DEBUG_PS
-	printf("NEW PATH REG: paths count=%lu, newpath_adaid=%lu\n", paths.size(), newPath.path.back());
+	//printf("NEW PATH REG: paths count=%lu, newpath_adaid=%lu\n", paths.size(), newPath.path.back());
 	#endif
     if(itr==paths.end()){
         std::multimap<uint32_t, path> newMap = std::multimap<uint32_t, path>();
@@ -437,7 +594,7 @@ void SCIONPathServerCore::parsePath(uint8_t* pkt){
             paths.erase(itr);
         } 
 		#ifdef _SL_DEBUG_PS
-		printf("NEW PATH REG: removing the oldest path out of %d paths\n", m_iNumRegisteredPath);
+		//printf("NEW PATH REG: removing the oldest path out of %d paths\n", m_iNumRegisteredPath);
 		#endif
     }
     newPath.timestamp = sOF->timestamp;//SPH::getUpTimestamp(pkt);

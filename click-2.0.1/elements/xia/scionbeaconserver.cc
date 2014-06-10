@@ -314,10 +314,10 @@ SCIONBeaconServer::run_timer(Timer *timer){
 		if(_AIDIsRegister && !m_bROTRequested) 
 			requestROT();
 	}
-	
+
 	// time for registration
 	if(m_iIsRegister && curTime - m_lastRegTime >= m_iRegTime){
-		// registerPaths();
+		registerPaths();
 		time(&m_lastRegTime); //updates the time
 	}
 	
@@ -849,9 +849,9 @@ void SCIONBeaconServer::addUnverifiedPcb(SPacket* pkt){
 int 
 SCIONBeaconServer::registerPaths()
 {
-    //printf("BS: registering path to TDC, AD%d: Beacon Table Size =%d\n", m_uAdAid, beacon_table.size());
+	scionPrinter->printLog(IH, (char *)"BS: registering path to TDC, AD%d: Beacon Table Size = %d\n", m_uAdAid, beacon_table.size());
 	//SL: indicator showing the process is running
-    fprintf(stderr,".");
+    //fprintf(stderr,".");
 
     if(beacon_table.empty()){
         return 0;
@@ -1052,8 +1052,19 @@ SCIONBeaconServer::registerPath(pcb &rpcb){
 	}
      
 	scionPrinter->printLog(IH, PATH_REG, rpcb.timestamp, m_uAdAid,0,(char *)"%u,SENT PATH: %s\n",newPacketLength,buf);
-	//sendPacket(newPacket, newPacketLength, PORT_TO_SWITCH, TO_ROUTER);
-	sendPacket(newPacket, newPacketLength, "");
+
+    string dest = "RE ";
+    dest.append(BHID);
+    dest.append(" ");
+    // TODO: hardcoded TDC path server
+    dest.append(" ");
+    dest.append("AD:");
+    dest.append((const char*)"0000000000000000000000000000000000000001");
+    dest.append(" ");
+    dest.append("HID:");
+    dest.append((const char*)"0000000000000000000000000000000000100000");
+
+	sendPacket(newPacket, newPacketLength, dest);
 	
 	return 0;
 }

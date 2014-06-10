@@ -242,7 +242,6 @@ void SCIONPathServer::push(int port, Packet *p)
 		}
 		
         // PATH_REP : path reply from the path server core
-        /*
 		case PATH_REP:{
 			uint8_t pathbuf[totalLength]; //for multiple packet transmissions.
 			uint8_t buf[totalLength]; //for multiple packet transmissions.
@@ -288,23 +287,37 @@ void SCIONPathServer::push(int port, Packet *p)
 				scionPrinter->printLog(IH,type,(char *)"PS (%llu:%llu): Sending Downpath to Client: %llu\n", 
 					m_uAdAid, m_uAid, itr->second.numAddr());
 
-            	sendPacket(buf, totalLength, PORT_TO_SWITCH, TO_SERVER);
+                try {
+                char hidbuf[41];
+                snprintf(hidbuf, 41, "%040lu", itr->second.numAddr());
+
+                string dest = "RE ";
+                dest.append(BHID);
+                dest.append(" ");
+                dest.append(m_AD.c_str());
+                dest.append(" ");
+                dest.append("HID:");
+                dest.append(hidbuf);
+
+                //printf("LEN=%d, DEST=%s\n", totalLength, dest.c_str());
+
+            	sendPacket(buf, totalLength, dest);
+                } catch (...) {}
 			}
 			//SL:
 			//Remove the downpath from the pending table
 			pendingDownpathReq.erase(requesters.first, requesters.second);
 			break;
         }
-        */
         
 		// PATH_REQ_LOCAL: path request from client
-		/*
 		case PATH_REQ_LOCAL:{
             uint8_t ts = 0;
 
 			//put path info in the packet
             uint8_t hdrLen = SPH::getHdrLen(packet);
-            pathInfo* pathRequest = (pathInfo*)(packet+hdrLen);
+            //pathInfo* pathRequest = (pathInfo*)(packet+hdrLen);
+            pathInfo* pathRequest = (pathInfo*)(packet+hdrLen+8); // TODO why off by 8?
             uint64_t target = pathRequest->target;
             HostAddr requestId = SPH::getSrcAddr(packet);
 
@@ -315,10 +328,9 @@ void SCIONPathServer::push(int port, Packet *p)
             sendUpPath(requestId);
 			break;
         }
-        */
         
 		default: 
-            // scionPrinter->printLog(IH,type,(char *)"Unsupported Packet type : Path Server.\n");
+            //scionPrinter->printLog(IH,type,(char *)"Unsupported Packet type : Path Server.\n");
 			break;
     }
     
@@ -346,7 +358,7 @@ void SCIONPathServer::run_timer(Timer* timer){
 */
 int SCIONPathServer::sendRequest(uint64_t target, HostAddr requestAid){
     if(upPaths.size()<=0){
-        printf("No up-path exists. \n");
+        //printf("No up-path exists. \n");
         return 0;
     }
 	
@@ -399,7 +411,8 @@ int SCIONPathServer::sendRequest(uint64_t target, HostAddr requestAid){
     pathRequest->option=0;
    
     //Set Src Addr
-    HostAddr srcAddr = HostAddr(HOST_ADDR_SCION, m_uAdAid);
+    uint64_t src_AD = atoi(m_AD.c_str()+4);
+    HostAddr srcAddr = HostAddr(HOST_ADDR_SCION, src_AD);
     HostAddr dstAddr = ifid2addr.find(interface)->second;
 //    printf("dest Addr %llu,interface %lu\n", dstAddr.numAddr(),interface);
     //Set packet header
@@ -410,12 +423,20 @@ int SCIONPathServer::sendRequest(uint64_t target, HostAddr requestAid){
     SPH::setCurrOFPtr(packet, srcLen+dstLen);
     SPH::setTotalLen(packet,packetLength);
 
-
-    //sendPacket(packet, packetLength, PORT_TO_SWITCH, TO_SERVER);
+    string dest = "RE ";
+    dest.append(BHID);
+    dest.append(" ");
+    // TODO: hardcoded TDC path server
+    dest.append(" ");
+    dest.append("AD:");
+    dest.append((const char*)"0000000000000000000000000000000000000001");
+    dest.append(" ");
+    dest.append("HID:");
+    dest.append((const char*)"0000000000000000000000000000000000100000");
+    sendPacket(packet, packetLength, dest);
 
 	if(pendingDownpathReq.count(target) > 1)
 		return 0;
-    
 }
 
 /*
@@ -478,6 +499,7 @@ void SCIONPathServer::parseUpPath(uint8_t* pkt){
     //hop iteration
 	//1. extract AD level path information
     for(int i=0;i<hops;i++){
+        scionPrinter->printLog(IH,(char *)"AID: %d INGRESS: %d EGRESS: %d\n", mrkPtr->aid, mrkPtr->ingressIf, mrkPtr->egressIf);
         newUpPath->path.push_back(mrkPtr->aid);
         uint8_t* ptr2=ptr+PCB_MARKING_SIZE;
         peerMarking* peerPtr = (peerMarking*)ptr2;
@@ -539,7 +561,7 @@ void SCIONPathServer::parseUpPath(uint8_t* pkt){
     SCIONPathServer::sendUpPath
     - send unique up paths to the client
 */
-int SCIONPathServer::sendUpPath(const HostAddr &requestId, uint32_t pref){
+int SCIONPathServer::sendUpPath(HostAddr &requestId, uint32_t pref){
     
     //if none found then ignore
     if(upPaths.size()==0){
@@ -612,7 +634,23 @@ int SCIONPathServer::sendUpPath(const HostAddr &requestId, uint32_t pref){
         SPH::setDstAddr(data, requestId);
         SPH::setTotalLen(data, totalLength+PATH_INFO_SIZE);
         //click_chatter("sending uppath");
-        //sendPacket(data, totalLength+PATH_INFO_SIZE, PORT_TO_SWITCH, TO_SERVER);
+
+        try {
+        char hidbuf[41];
+        snprintf(hidbuf, 41, "%040lu", requestId.numAddr());
+
+        string dest = "RE ";
+        dest.append(BHID);
+        dest.append(" ");
+        dest.append(m_AD.c_str());
+        dest.append(" ");
+        dest.append("HID:");
+        dest.append(hidbuf);
+
+        //printf("LEN=%d, DEST=%s\n", totalLength+PATH_INFO_SIZE, dest.c_str());
+
+        sendPacket(data, totalLength+PATH_INFO_SIZE, dest);
+        } catch (...) {}
     }
 }
 

@@ -29,7 +29,8 @@ path2 :: XIASCIONPathServer(RE AD2 PHID2, AD2, PHID2, 0.0.0.0, 3000, aa:aa:aa:aa
         TOPOLOGY_FILE "./TD1/Non-TDC/AD2/topology2.xml");
 
 controller3 :: XIAController4Port(RE AD3 CHID3, AD3, CHID3, 0.0.0.0, 2100, aa:aa:aa:aa:aa:aa);
-router3 :: XIARouter2Port(RE AD3 RHID3, AD3, RHID3, 0.0.0.0, 2200, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
+router3 :: XIARouter4Port(RE AD3 RHID3, AD3, RHID3, 0.0.0.0, 2200,
+        aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
 beacon3 :: XIASCIONBeaconServer(RE AD3 BHID3, AD3, BHID3, 0.0.0.0, 2300, aa:aa:aa:aa:aa:aa,
         AID 33333,
         CONFIG_FILE "./TD1/Non-TDC/AD3/beaconserver/conf/AD3BS.conf",
@@ -41,7 +42,8 @@ path3 :: XIASCIONPathServer(RE AD3 PHID3, AD3, PHID3, 0.0.0.0, 3300, aa:aa:aa:aa
         TOPOLOGY_FILE "./TD1/Non-TDC/AD3/topology3.xml");
         
 controller4 :: XIAController4Port(RE AD4 CHID4, AD4, CHID4, 0.0.0.0, 2500, aa:aa:aa:aa:aa:aa);
-router4 :: XIARouter2Port(RE AD4 RHID5, AD4, RHID5, 0.0.0.0, 2600, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
+router4 :: XIARouter4Port(RE AD4 RHID5, AD4, RHID5, 0.0.0.0, 2600,
+        aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
 beacon4 :: XIASCIONBeaconServer(RE AD4 BHID4, AD4, BHID4, 0.0.0.0, 2700, aa:aa:aa:aa:aa:aa,
         AID 44444,
         CONFIG_FILE "./TD1/Non-TDC/AD4/beaconserver/conf/AD4BS.conf",
@@ -51,6 +53,8 @@ path4 :: XIASCIONPathServer(RE AD4 PHID4, AD4, PHID4, 0.0.0.0, 3900, aa:aa:aa:aa
         AID 44444,
         CONFIG_FILE "./TD1/Non-TDC/AD4/pathserver/conf/AD4PS.conf",
         TOPOLOGY_FILE "./TD1/Non-TDC/AD4/topology4.xml");
+
+enc4 :: XIASCIONEncap(RE AD4 CHID5, AD4, CHID5, 0.0.0.0, 4000, aa:aa:aa:aa:aa:aa);
 
 controller1[0] -> LinkUnqueue(0.005, 1 GB/s) -> [0]beacon1;
 beacon1[0] -> LinkUnqueue(0.005, 1 GB/s) -> [0]controller1;
@@ -109,6 +113,21 @@ router21[3] -> Idle;
 
 Idle -> [3]router22;
 router22[3] -> Idle;
+
+
+Idle -> [2]router3;
+router3[2] -> Idle;
+
+Idle -> [3]router3;
+router3[3] -> Idle;
+
+
+enc4[0] -> LinkUnqueue(0.005, 1 GB/s) -> [2]router4;
+router4[2] -> LinkUnqueue(0.005, 1 GB/s) -> [0]enc4;
+
+Idle -> [3]router4;
+router4[3] -> Idle;
+
 
 Idle -> [3]controller1[3] -> Idle;
 Idle -> [3]controller2[3] -> Idle;
