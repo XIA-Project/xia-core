@@ -59,7 +59,6 @@
 */
 int Xsocket(int family, int transport_type, int protocol)
 {
-	struct sockaddr_in addr;
 	xia::XSocketCallType type;
 	int rc;
 	int sockfd;
@@ -99,11 +98,6 @@ int Xsocket(int family, int transport_type, int protocol)
 		LOGF("error creating Xsocket: %s", strerror(errno));
 		return -1;
 	}
-
-	// bind to any random port number
-	addr.sin_family = PF_INET;
-	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-	addr.sin_port = 0;
 
 	// protobuf message
 	xia::XSocketMsg xsm;
