@@ -15,6 +15,7 @@ routerconfig = "router.click"
 controllerconfig = "controller.click"
 dualhostconfig = "dual_stack_host.click"
 dualrouterconfig = "dual_stack_router.click"
+backboneADconfig = "backbone_AD.click"
 xia_addr = "xia_address.click"
 ext = "template"
 
@@ -23,6 +24,7 @@ nodetype = "host"
 dual_stack = False
 hostname = ""
 adname = "AD_INIT"
+AD_num = 0
 hidname = ""
 nameserver = "no"
 nameserver_ad = "AD_NAMESERVER"
@@ -327,6 +329,30 @@ def makeControllerConfig(hid):
         xchg[repl] = "00:00:00:00:00:00"
         i += 1
 
+    s = Template(text)
+    newtext = s.substitute(xchg)
+    f.write(newtext)
+    f.close()
+
+#
+# Fill in the backbone AD template file
+#
+def makeBackboneConfig(ADnumber):
+    try:
+        f = open(backboneADconfig + "." + ext, "r")
+        text = f.read()
+        f.close()
+
+        if output_file == "":
+            f = open(backboneADconfig, "w")
+        else:
+            f = open(output_file, "w")
+
+    except Exception, e:
+        print "error opening file for reading and/or writing\n%s" % e
+        sys.exit(-1)
+    xchg = {}
+    xchg['N'] = ADnumber
     s = Template(text)
     newtext = s.substitute(xchg)
     f.write(newtext)
@@ -700,6 +726,7 @@ def getOptions():
     global nodetype
     global dual_stack
     global adname
+    global AD_num
     global hidname
     global nameserver
     global ip_override_addr
@@ -708,9 +735,9 @@ def getOptions():
     global socket_ips_ports
     global output_file
     try:
-        shortopt = "hrc4ni:a:H:m:f:I:tP:o:"
+        shortopt = "hrc4ni:a:b:H:m:f:I:tP:o:"
         opts, args = getopt.getopt(sys.argv[1:], shortopt,
-            ["help", "router", "host", "controller", "dual-stack", "nameserver", "id=", "ad=", "hid=", "manual-address=", "interface-filter=", "host-interface=", "socket-ports=, output-file="])
+            ["help", "router", "host", "controller", "dual-stack", "nameserver", "backbone=", "id=", "ad=", "hid=", "manual-address=", "interface-filter=", "host-interface=", "socket-ports=, output-file="])
     except getopt.GetoptError, err:
         # print     help information and exit:
         print str(err) # will print something like "option -a not recognized"
@@ -746,8 +773,11 @@ def getOptions():
             nameserver = "yes"
         elif o in ("-o", "--output-file"):
             output_file = a
+        elif o in ("-b", "--backboneAD"):
+            AD_num = a
+            nodetype = "backbone"
         else:
-             assert False, "unhandled option"
+            assert False, "unhandled option"
 
 #
 # display helpful information
@@ -823,8 +853,10 @@ def main():
             makeDualRouterConfig(ad, rhid)
         else:
             makeRouterConfig(ad, rhid)
-    if (nodetype == "controller"): # (almost) the same template as host
-            makeControllerConfig(hid)
+    elif (nodetype == "controller"): # (almost) the same template as host
+        makeControllerConfig(hid)
+    elif (nodetype == "backbone"):
+        makeBackboneConfig(AD_num)
 
 if __name__ == "__main__":
     main()

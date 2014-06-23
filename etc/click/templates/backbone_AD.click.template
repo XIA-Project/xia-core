@@ -1,0 +1,71 @@
+require(library xia_router_lib.click);
+require(library xia_address.click);
+
+// A backbone AD with one controller, four routers and one host connected in a local topology
+// 8 open ports can be used for connecting AD/hosts across the Internet.
+// This click file only works with the xia_address.click file with extra aliases.
+
+// Controller instantiation
+controller${N} :: XIAController (RE AD${N} CHID${N}, AD${N}, CHID${N}, 0.0.0.0, 2000, aa:aa:aa:aa:aa:aa);
+
+
+// router0 instantiation
+router${N}_0 :: XIARouter4Port(RE AD${N} RHID${N}_0, AD${N}, RHID${N}_0, 0.0.0.0, 1600, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
+
+// Controller to router0 connections 
+controller${N}[0] -> LinkUnqueue(0.005, 1 GB/s) -> [0]router${N}_0;
+router${N}_0[0] -> LinkUnqueue(0.005, 1 GB/s) -> [0]controller${N};
+
+
+// router1 instantiation
+router${N}_1 :: XIARouter4Port(RE AD${N} RHID${N}_1, AD${N}, RHID${N}_1, 0.0.0.0, 1700, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
+
+// router0 to router1 connections 
+router${N}_1[0] -> LinkUnqueue(0.005, 1 GB/s) -> [1]router${N}_0;
+router${N}_0[1] -> LinkUnqueue(0.005, 1 GB/s) -> [0]router${N}_1;
+
+
+// router2 instantiation
+router${N}_2 :: XIARouter4Port(RE AD${N} RHID${N}_2, AD${N}, RHID${N}_2, 0.0.0.0, 1800, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
+
+// router0 to router2 connections 
+router${N}_2[0] -> LinkUnqueue(0.005, 1 GB/s) -> [2]router${N}_0;
+router${N}_0[2] -> LinkUnqueue(0.005, 1 GB/s) -> [0]router${N}_2;
+
+// router3 instantiation
+router${N}_3 :: XIARouter4Port(RE AD${N} RHID${N}_3, AD${N}, RHID${N}_3, 0.0.0.0, 1900, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
+
+// router0 to router3 connections 
+router${N}_3[0] -> LinkUnqueue(0.005, 1 GB/s) -> [3]router${N}_0;
+router${N}_0[3] -> LinkUnqueue(0.005, 1 GB/s) -> [0]router${N}_3;
+
+// host
+host${N} :: XIAEndHost (RE AD${N} HID${N}, HID${N}, 1500, 0, aa:aa:aa:aa:aa:aa);
+// host0 to router1
+host${N}[0] -> LinkUnqueue(0.005, 1 GB/s) -> [1]router${N}_1;
+router${N}_1[1] -> LinkUnqueue(0.005, 1 GB/s) -> [0]host${N};
+
+
+
+//Open ports
+
+// avoid echo, block traffic from localhost
+allow :: RadixIPLookup(0.0.0.0/0 0);;
+deny :: RadixIPLookup(127.0.0.1 0);;
+deny -> allow -> deny;;// meaningless, only for syntax 
+
+sockR1P2::Socket("UDP", 0.0.0.0, 5001, CLIENT false, DENY deny) -> [2]router${N}_1[2] -> sockR1P2;
+sockR1P3::Socket("UDP", 0.0.0.0, 5002, CLIENT false, DENY deny) -> [3]router${N}_1[3] -> sockR1P3;
+
+sockR2P1::Socket("UDP", 0.0.0.0, 5003, CLIENT false, DENY deny) -> [1]router${N}_2[1] -> sockR2P1;
+sockR2P2::Socket("UDP", 0.0.0.0, 5004, CLIENT false, DENY deny) -> [2]router${N}_2[2] -> sockR2P2;
+sockR2P3::Socket("UDP", 0.0.0.0, 5005, CLIENT false, DENY deny) -> [3]router${N}_2[3] -> sockR2P3;
+
+
+sockR3P1::Socket("UDP", 0.0.0.0, 5006, CLIENT false, DENY deny) -> [1]router${N}_3[1] -> sockR3P1;
+sockR3P2::Socket("UDP", 0.0.0.0, 5007, CLIENT false, DENY deny) -> [2]router${N}_3[2] -> sockR3P2;
+sockR3P3::Socket("UDP", 0.0.0.0, 5008, CLIENT false, DENY deny) -> [3]router${N}_3[3] -> sockR3P3;
+
+
+
+    ControlSocket(tcp, 7777);
