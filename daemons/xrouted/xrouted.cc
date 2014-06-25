@@ -375,6 +375,7 @@ int processSidRoutingTable(ControlMessage msg)
     int ad_count = 0;
     int sid_count = 0;
     int weight = 0;
+    int ctlSeq;
     string srcAD, srcHID, destAD, destHID;
 
     string AD;
@@ -388,9 +389,28 @@ int processSidRoutingTable(ControlMessage msg)
 
     msg.read(destAD);
     msg.read(destHID);
+    msg.read(ctlSeq);
+
     /* Check if intended for me */
     if ((destAD != route_state.myAD) || (destHID != route_state.myHID))
-        return msg.send(route_state.sock, &route_state.ddag);
+    {
+        // only broadcast one time for each
+        int his_ctl_seq = route_state.sid_ctl_seqs[destHID]; // NOTE: default value of int is 0
+        if (ctlSeq <= his_ctl_seq && his_ctl_seq - ctlSeq < 10000)
+        { // seen it before
+            return 1; 
+        }
+        else
+        {
+            route_state.sid_ctl_seqs[destHID] = ctlSeq;
+            return msg.send(route_state.sock, &route_state.ddag);
+        }
+    }
+
+    if (ctlSeq <= route_state.sid_ctl_seq && route_state.sid_ctl_seq - ctlSeq < 10000){
+        return 1;
+    }
+    route_state.sid_ctl_seq = ctlSeq;
 
     std::vector<XIARouteEntry> xrt;
     xr.getRoutes("AD", xrt);

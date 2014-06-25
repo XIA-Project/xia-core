@@ -56,6 +56,9 @@ typedef struct RouteState {
 	int32_t ctl_seq;	// LSA sequence number of this router
 	std::map<std::string, int32_t> ctl_seqs; // Control message sequences for other routers
 
+	int32_t sid_ctl_seq;	// LSA sequence number of this router
+	std::map<std::string, int32_t> sid_ctl_seqs; // Control message sequences for other routers
+
     std::map<std::string, RouteEntry> ADrouteTable; // map DestAD to route entry
     std::map<std::string, RouteEntry> HIDrouteTable; // map DestHID to route entry
 	

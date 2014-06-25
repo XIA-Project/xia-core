@@ -590,9 +590,7 @@ int sendSidRoutingTable(std::string destHID, std::map<std::string, std::map<std:
         // for checking and resend
         msg.append(route_state.myAD);
         msg.append(destHID);
-
-        // TODO: add ctl_seq to guarantee consistency
-        //msg.append(route_state.ctl_seq);
+        msg.append(route_state.sid_ctl_seq);
 
         //Format: #2 AD1:[ #2 SID1(percentage 30),SID2(percentage 100)], AD2[ #1 SID1(percentage 70)]
 
@@ -610,8 +608,8 @@ int sendSidRoutingTable(std::string destHID, std::map<std::string, std::map<std:
                 msg.append(it_sid->second.percentage);
             }
         }
-        // TODO: update ctl seq NOTE: do we need ctl seq?
-        //route_state.ctl_seq = (route_state.ctl_seq + 1) % MAX_SEQNUM;
+
+        route_state.sid_ctl_seq = (route_state.sid_ctl_seq + 1) % MAX_SEQNUM;
 
         return msg.send(route_state.sock, &route_state.ddag);
     }
@@ -973,7 +971,7 @@ int processLSA(ControlMessage msg)
 
 		// Calculate next hop for routers
 		std::map<std::string, NodeStateEntry>::iterator it1;
-		for (it1 = route_state.networkTable.begin(); it1 != route_state.networkTable.end(); it1++)
+		for (it1 = route_state.networkTable.begin(); it1 != route_state.networkTable.end(); ++it1)
 		{
 			if ((it1->second.ad != route_state.myAD) || (it1->second.hid == "")) {
 				// Don't calculate routes for external ADs
@@ -1297,6 +1295,7 @@ void initRouteState()
 	route_state.calc_dijstra_ticks = -8;
 
 	route_state.ctl_seq = 0;	// LSA sequence number of this router
+    route_state.sid_ctl_seq = 0; // TODO: init values should be a random int
 
 	route_state.dual_router_AD = "NULL";
 	// mark if this is a dual XIA-IPv4 router
