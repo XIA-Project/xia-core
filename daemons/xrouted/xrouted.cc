@@ -327,15 +327,27 @@ int processRoutingTable(ControlMessage msg)
 
     // 1. Filter out the already seen LSA
     // If this LSA already seen, ignore this LSA; do nothing
+
+    /* Check if intended for me */
+    if ((destAD != route_state.myAD) || (destHID != route_state.myHID))
+    {
+        // only broadcast one time for each
+        int his_ctl_seq = route_state.ctl_seqs[destHID]; // NOTE: default value of int is 0
+        if (ctlSeq <= his_ctl_seq && his_ctl_seq - ctlSeq < 10000)
+        { // seen it before
+            return 1; 
+        }
+        else
+        {
+            route_state.ctl_seqs[destHID] = ctlSeq;
+            return msg.send(route_state.sock, &route_state.ddag);
+        }
+    }
+
     if (ctlSeq <= route_state.ctl_seq && route_state.ctl_seq - ctlSeq < 10000){
         return 1;
     }
     route_state.ctl_seq = ctlSeq;
-
-    /* Check if intended for me */
-    if ((destAD != route_state.myAD) || (destHID != route_state.myHID)){
-        return msg.send(route_state.sock, &route_state.ddag);
-    }
 
     msg.read(numEntries);
 
