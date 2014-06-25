@@ -133,7 +133,7 @@ int sendLSA()
     msg.append(route_state.num_neighbors);
 
     std::map<std::string, NeighborEntry>::iterator it;
-    for (it = route_state.neighborTable.begin(); it != route_state.neighborTable.end(); it++)
+    for (it = route_state.neighborTable.begin(); it != route_state.neighborTable.end(); ++it)
     {
         msg.append(it->second.AD);
         msg.append(it->second.HID);
@@ -323,19 +323,19 @@ int processRoutingTable(ControlMessage msg)
 
     msg.read(destAD);
     msg.read(destHID);
-
-    /* Check if intended for me */
-    if ((destAD != route_state.myAD) || (destHID != route_state.myHID))
-        return msg.send(route_state.sock, &route_state.ddag);
-
     msg.read(ctlSeq);
 
-  	// 1. Filter out the already seen LSA
+    // 1. Filter out the already seen LSA
     // If this LSA already seen, ignore this LSA; do nothing
-    if (ctlSeq <= route_state.ctl_seq && route_state.ctl_seq - ctlSeq < 10000)
+    if (ctlSeq <= route_state.ctl_seq && route_state.ctl_seq - ctlSeq < 10000){
         return 1;
-
+    }
     route_state.ctl_seq = ctlSeq;
+
+    /* Check if intended for me */
+    if ((destAD != route_state.myAD) || (destHID != route_state.myHID)){
+        return msg.send(route_state.sock, &route_state.ddag);
+    }
 
     msg.read(numEntries);
 
