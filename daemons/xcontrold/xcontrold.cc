@@ -1292,6 +1292,7 @@ void initRouteState()
 	route_state.sid_discovery_seq = rand()%MAX_SEQNUM;  // sid discovery seq number of this router
 	route_state.hello_lsa_ratio = (int32_t) ceil(AD_LSA_INTERVAL/HELLO_INTERVAL);
 	route_state.hello_sid_discovery_ratio = (int32_t) ceil(SID_DISCOVERY_INTERVAL/HELLO_INTERVAL);
+    route_state.hello_sid_decision_ratio = (int32_t) ceil(SID_DECISION_INTERVAL/HELLO_INTERVAL);
 	route_state.calc_dijstra_ticks = -8;
 
 	route_state.ctl_seq = 0;	// LSA sequence number of this router
@@ -1519,11 +1520,11 @@ perror("bind");
 		if (route_state.send_sid_discovery == true) {
             route_state.send_sid_discovery = false;
             set_sid_conf(hostname); // reload the config file
-            updateADPathStates(); // update latency info
             sendSidDiscovery();
         }
         if (route_state.send_sid_decision == true) {
             route_state.send_sid_decision = false;
+            updateADPathStates(); // update latency info
             processSidDecision();
         }
 		FD_ZERO(&socks);

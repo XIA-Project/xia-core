@@ -392,7 +392,12 @@ int processSidRoutingTable(ControlMessage msg)
     msg.read(ctlSeq);
 
     /* Check if intended for me */
-    if ((destAD != route_state.myAD) || (destHID != route_state.myHID))
+    if (destAD != route_state.myAD)
+    {
+        return 1; 
+    }
+
+    if (destHID != route_state.myHID)
     {
         // only broadcast one time for each
         int his_ctl_seq = route_state.sid_ctl_seqs[destHID]; // NOTE: default value of int is 0
