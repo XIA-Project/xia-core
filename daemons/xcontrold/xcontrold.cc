@@ -1183,6 +1183,7 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEnt
 			if (hop_count < MAX_HOP_COUNT) {
 				routingTable[tempHID1].dest = tempHID1;
 				routingTable[tempHID1].nextHop = tempNextHopHID2;
+                routingTable[tempHID1].flags = 0;
 				
 				// Find port of next hop
 				for (it2 = networkTable[srcHID].neighbor_list.begin(); it2 < networkTable[srcHID].neighbor_list.end(); it2++) {
@@ -1225,6 +1226,7 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEnt
 				for (it3 = routingTable.begin(); it3 != routingTable.end(); it3++) {
 					if (it3->second.port == routingTable[tempHID1].port && it3->second.nextHop.find(string("HID")) != string::npos) {
 						routingTable[tempHID1].nextHop = it3->second.nextHop;
+                        routingTable[tempHID1].flags = 0;
 						entryFound = true;
 						break;
 					}
