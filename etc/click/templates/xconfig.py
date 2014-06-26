@@ -353,6 +353,7 @@ def makeBackboneConfig(ADnumber):
         sys.exit(-1)
     xchg = {}
     xchg['N'] = ADnumber
+    xchg['MAC_PREFIX'] = "%0.2X" % int(ADnumber) # generate unique mac address
     s = Template(text)
     newtext = s.substitute(xchg)
     f.write(newtext)
