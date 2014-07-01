@@ -106,7 +106,7 @@ int sendHello()
 */
 int sendInterdomainLSA()
 {
-	int rc = 1;
+    int rc = 1;
     ControlMessage msg(CTL_XBGP, route_state.myAD, route_state.myAD);
 
     msg.append(route_state.dual_router);
@@ -171,12 +171,11 @@ int processInterdomainLSA(ControlMessage msg)
 		}
 	}
 
-	//syslog(LOG_INFO, "inter-AD LSA[%d] from %s", lastSeq, srcAD.c_str());
-
 	route_state.ADLastSeqTable[srcAD] = lastSeq;
 	
 	msg.read(numNeighbors);
 
+    //syslog(LOG_INFO, "inter-AD LSA from %s, %d neighbors", srcAD.c_str(), numNeighbors);
 	// 2. Update the network table
 	NodeStateEntry entry;
 	entry.ad = srcAD;
@@ -961,11 +960,12 @@ int processLSA(ControlMessage msg)
         if (neighbor.AD != route_state.myAD){ // update neighbors
             neighbor.timestamp = time(NULL);
             route_state.ADNeighborTable[neighbor.AD] = neighbor;
+            route_state.ADNeighborTable[neighbor.AD].HID = neighbor.AD; // make the algorithm work
         }
 
 		entry.neighbor_list.push_back(neighbor);
 	}
-
+    extractNeighborADs();
 	route_state.networkTable[srcHID] = entry;
 	route_state.calc_dijstra_ticks++;
 
@@ -974,7 +974,6 @@ int processLSA(ControlMessage msg)
 		// syslog(LOG_DEBUG, "Calcuating shortest paths\n");
 
 		// Calculate next hop for ADs
-        extractNeighborADs();
 		std::map<std::string, RouteEntry> ADRoutingTable;
 		populateRoutingTable(route_state.myAD, route_state.ADNetworkTable, ADRoutingTable);
 		//printADNetworkTable();
@@ -1603,6 +1602,7 @@ perror("bind");
                 if (now - iter2->second.timestamp >= EXPIRE_TIME){
                     syslog(LOG_INFO, "purging AD network : %s", iter2->first.c_str());
                     route_state.neighborTable.erase(iter2++);
+                    route_state.num_neighbors -= 1;
                 } else {
                     ++iter2;
                 }
