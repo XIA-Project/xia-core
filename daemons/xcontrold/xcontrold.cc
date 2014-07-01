@@ -10,6 +10,7 @@
 #include <map>
 #include <time.h>
 #include <math.h>
+#include <algorithm>
 
 #include <pthread.h>
 
@@ -24,7 +25,7 @@
 
 #define DEFAULT_NAME "controller0"
 #define APPNAME "xcontrold"
-#define EXPIRE_TIME 600
+#define EXPIRE_TIME 60
 
 char *hostname = NULL;
 char *ident = NULL;
@@ -33,6 +34,7 @@ int ctrl_sock;
 RouteState route_state;
 XIARouter xr;
 map<string,time_t> timeStamp;
+std::map<std::string, NodeStateEntry> ADNetworkTable_temp;
 
 void timeout_handler(int signum)
 {
@@ -180,6 +182,7 @@ int processInterdomainLSA(ControlMessage msg)
 	entry.ad = srcAD;
 	entry.hid = srcAD;
 	entry.num_neighbors = numNeighbors;
+    entry.timestamp = time(NULL);
 
 	for (int i = 0; i < numNeighbors; i++)
 	{
@@ -714,7 +717,7 @@ void* updatePathThread(void* updating)
     *((bool*) updating) = true; // do not reenter
     std::map<std::string, NodeStateEntry>::iterator it_ad;
 
-    for (it_ad = route_state.ADNetworkTable.begin(); it_ad != route_state.ADNetworkTable.end(); ++it_ad)
+    for (it_ad = ADNetworkTable_temp.begin(); it_ad != ADNetworkTable_temp.end(); ++it_ad)
     {
         if (it_ad->first == route_state.myAD){
             continue;
@@ -774,6 +777,8 @@ int updateADPathStates(void)
     // Create a new thread so that the daemon could receive control messages while waiting for xping
     pthread_t newthread;
     if (!updating){
+        // copy to local, avoid data hazard
+        ADNetworkTable_temp = route_state.ADNetworkTable;
         if (pthread_create(&newthread , NULL, updatePathThread, &updating)!= 0){
             perror("pthread_create");
         }
@@ -856,6 +861,7 @@ int processHello(ControlMessage msg)
     msg.read(neighbor.HID);
     neighbor.port = interfaceNumber("HID", neighbor.HID);
     neighbor.cost = 1; // for now, same cost
+    neighbor.timestamp = time(NULL);
 
     // Index by HID if neighbor in same domain or by AD otherwise
     bool internal = (neighbor.AD == route_state.myAD);
@@ -952,6 +958,10 @@ int processLSA(ControlMessage msg)
 		msg.read(neighbor.HID);
 		msg.read(neighbor.port);
 		msg.read(neighbor.cost);
+        if (neighbor.AD != route_state.myAD){ // update neighbors
+            neighbor.timestamp = time(NULL);
+            route_state.ADNeighborTable[neighbor.AD] = neighbor;
+        }
 
 		entry.neighbor_list.push_back(neighbor);
 	}
@@ -964,6 +974,7 @@ int processLSA(ControlMessage msg)
 		// syslog(LOG_DEBUG, "Calcuating shortest paths\n");
 
 		// Calculate next hop for ADs
+        extractNeighborADs();
 		std::map<std::string, RouteEntry> ADRoutingTable;
 		populateRoutingTable(route_state.myAD, route_state.ADNetworkTable, ADRoutingTable);
 		//printADNetworkTable();
@@ -982,7 +993,7 @@ int processLSA(ControlMessage msg)
 			}
 			std::map<std::string, RouteEntry> routingTable;
 			populateRoutingTable(it1->second.hid, route_state.networkTable, routingTable);
-			extractNeighborADs(routingTable);
+			//extractNeighborADs(routingTable);
 			populateNeighboringADBorderRouterEntries(it1->second.hid, routingTable);
 			populateADEntries(routingTable, ADRoutingTable);
 			//printRoutingTable(it1->second.hid, routingTable);
@@ -996,39 +1007,23 @@ int processLSA(ControlMessage msg)
 	return 1;
 }
 
-int extractNeighborADs(map<string, RouteEntry> routingTable)
+int extractNeighborADs(void)
 {
-	map<string, RouteEntry>::iterator it;
-	for (it = routingTable.begin(); it != routingTable.end(); it++)
-	{
-		if (it->second.dest.find(string("AD:")) == 0) {
-			// If AD, add to AD neighbor table
-			// Update neighbor table
-			NeighborEntry neighbor;
-			neighbor.AD = it->second.dest;
-			neighbor.HID = it->second.dest;
-			neighbor.port = 0; 
-			neighbor.cost = 1; // for now, same cost
+	// Update network table
+	std::string myAD = route_state.myAD;
 
-			// Index by HID if neighbor in same domain or by AD otherwise
-			route_state.ADNeighborTable[neighbor.AD] = neighbor;
+	NodeStateEntry entry;
+	entry.ad = myAD;
+	entry.hid = myAD;
+	entry.num_neighbors = route_state.ADNeighborTable.size();
+    entry.timestamp = time(NULL);
 
-			// Update network table
-			std::string myAD = route_state.myAD;
+	// Add neighbors to network table entry
+	std::map<std::string, NeighborEntry>::iterator it1;
+	for (it1 = route_state.ADNeighborTable.begin(); it1 != route_state.ADNeighborTable.end(); ++it1)
+		entry.neighbor_list.push_back(it1->second);
 
-			NodeStateEntry entry;
-			entry.ad = myAD;
-			entry.hid = myAD;
-			entry.num_neighbors = route_state.ADNeighborTable.size();
-
-			// Add neighbors to network table entry
-			std::map<std::string, NeighborEntry>::iterator it;
-			for (it = route_state.ADNeighborTable.begin(); it != route_state.ADNeighborTable.end(); it++)
-				entry.neighbor_list.push_back(it->second);
-
-			route_state.ADNetworkTable[myAD] = entry;
-		}
-	}
+	route_state.ADNetworkTable[myAD] = entry;
 	return 1;
 }
 
@@ -1037,7 +1032,7 @@ void populateNeighboringADBorderRouterEntries(string currHID, std::map<std::stri
 	vector<NeighborEntry> currNeighborTable = route_state.networkTable[currHID].neighbor_list;
 
 	vector<NeighborEntry>::iterator it;
-	for (it = currNeighborTable.begin(); it != currNeighborTable.end(); it++) { 
+	for (it = currNeighborTable.begin(); it != currNeighborTable.end(); ++it) { 
 		if (it->AD != route_state.myAD) {
 			// Add HID of border routers of neighboring ADs into routing table
 			string neighborHID = it->HID;
@@ -1076,11 +1071,16 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEnt
 	routingTable.clear();
 
 	// Filter out anomalies
-	//@ (When do these appear? Should they not be introduced in the first place? How about SIDs?)	
-	for (it1 = networkTable.begin(); it1 != networkTable.end(); it1++) {
+	//@ (When do these appear? Should they not be introduced in the first place? How about SIDs?)
+    it1 = networkTable.begin();
+	while (it1 != networkTable.end()) {
 		if (it1->second.num_neighbors == 0 || it1->second.ad.empty() || it1->second.hid.empty()) {
-			networkTable.erase(it1);
+			networkTable.erase(it1++);
 		}
+        else{
+            //syslog(LOG_DEBUG, "entry %s: neighbors: %d", it1->first.c_str(), it1->second.neighbor_list.size());
+            ++it1;
+        }
 	}
 
 	unvisited = networkTable;
@@ -1130,8 +1130,10 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEnt
 		int minCost = 10000000;
 		string selectedHID;
 		// Select unvisited node with min cost
-		for (it1=unvisited.begin(); it1 != unvisited.end(); it1++) {
+		for (it1=unvisited.begin(); it1 != unvisited.end(); ++it1) {
+            //syslog(LOG_DEBUG, "it1 %s, %s", it1->second.ad.c_str(), it1->second.hid.c_str());
 			currXID = (it1->second.ad == route_state.myAD) ? it1->second.hid : it1->second.ad;
+            //syslog(LOG_DEBUG, "CurrXID is %s, cost %d", currXID.c_str(), networkTable[currXID].cost);
 			if (networkTable[currXID].cost < minCost) {
 				minCost = networkTable[currXID].cost;
 				selectedHID = currXID;
@@ -1139,7 +1141,8 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEnt
 		}
 		if(selectedHID.empty()) {
 			// Rest of the nodes cannot be reached from the visited set
-			return;
+            //syslog(LOG_DEBUG, "%s has an empty routingTable", srcHID.c_str());
+			break;
 		}
 
 		// Remove selected node from unvisited set
@@ -1166,6 +1169,9 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEnt
 	int hop_count;
 
 	for (it1 = networkTable.begin(); it1 != networkTable.end(); it1++) {
+        if (unvisited.find(it1->first) !=  unvisited.end()){ // the unreachable set
+            continue;
+        }
 		tempHID1 = (it1->second.ad == route_state.myAD) ? it1->second.hid : it1->second.ad;
 		if (tempHID1.find(string("SID")) != string::npos) {
 			// Skip SIDs on first pass
@@ -1197,6 +1203,9 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEnt
 
 	for (it1 = networkTable.begin(); it1 != networkTable.end(); it1++) {
 		tempHID1 = (it1->second.ad == route_state.myAD) ? it1->second.hid : it1->second.ad;
+        if (unvisited.find(it1->first) !=  unvisited.end()){ // the unreachable set
+            continue;
+        }
 		if (tempHID1.find(string("SID")) == string::npos) {
 			// Process SIDs on second pass 
 			continue;
@@ -1572,6 +1581,48 @@ perror("bind");
                     timeStamp.erase(iter++);
                 } else {
                     ++iter;
+                }
+            }
+            
+            map<string, NodeStateEntry>::iterator iter1 = route_state.ADNetworkTable.begin();
+
+            while (iter1 != route_state.ADNetworkTable.end())
+            {
+                if (now - iter1->second.timestamp >= EXPIRE_TIME){
+                    syslog(LOG_INFO, "purging neighbor : %s", iter1->first.c_str());
+                    route_state.ADNetworkTable.erase(iter1++);
+                } else {
+                    ++iter1;
+                }
+            }
+
+            map<string, NeighborEntry>::iterator iter2 = route_state.neighborTable.begin();
+
+            while (iter2 != route_state.neighborTable.end())
+            {
+                if (now - iter2->second.timestamp >= EXPIRE_TIME){
+                    syslog(LOG_INFO, "purging AD network : %s", iter2->first.c_str());
+                    route_state.neighborTable.erase(iter2++);
+                } else {
+                    ++iter2;
+                }
+            }
+
+            map<string, NeighborEntry>::iterator iter3 = route_state.ADNeighborTable.begin();
+
+            while (iter3 != route_state.ADNeighborTable.end())
+            {
+                if (now - iter3->second.timestamp >= EXPIRE_TIME){
+                    syslog(LOG_INFO, "purging AD neighbor : %s", iter3->first.c_str());
+                    //
+                    route_state.ADNetworkTable[route_state.myAD].neighbor_list.erase(
+                        std::remove(route_state.ADNetworkTable[route_state.myAD].neighbor_list.begin(),
+                                    route_state.ADNetworkTable[route_state.myAD].neighbor_list.end(),
+                                    iter3->second),
+                    route_state.ADNetworkTable[route_state.myAD].neighbor_list.end());
+                    route_state.ADNeighborTable.erase(iter3++);
+                } else {
+                    ++iter3;
                 }
             }
 		}

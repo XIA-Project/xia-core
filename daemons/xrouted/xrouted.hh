@@ -33,6 +33,8 @@
 #define SID_XROUTE "SID:1110000000000000000000000000000000001112"
 #define NULL_4ID "IP:4500000000010000fafa00000000000000000000"
 
+#define HELLO_EXPIRE_TIME 10
+
 typedef struct RouteState {
 	int32_t sock; // socket for routing process
 	
@@ -66,6 +68,8 @@ typedef struct RouteState {
 	
     std::map<std::string, NodeStateEntry> networkTable; // map DestHID to NodeState entry
 	std::map<std::string, int32_t> lastSeqTable; // router-HID to their last-seq number
+
+	std::map<std::string,time_t> hello_timeStamp; // timestamp of hello
 	
 } RouteState;
 

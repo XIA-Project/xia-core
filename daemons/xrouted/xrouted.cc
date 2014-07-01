@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include <time.h>
+#include <algorithm>
 
 #include <sys/types.h>
 #include <netdb.h>
@@ -20,7 +21,7 @@
 
 #define DEFAULT_NAME "router0"
 #define APPNAME "xrouted"
-#define EXPIRE_TIME 600
+#define EXPIRE_TIME 60
 
 //#define XR_DEBUG
 
@@ -215,7 +216,7 @@ int processHostRegister(ControlMessage msg)
 	if ((rc = xr.setRoute(neighbor.HID, neighbor.port, neighbor.HID, 0)) != 0)
 		syslog(LOG_ERR, "unable to set route %d", rc);
 
-	timeStamp[neighbor.HID] = time(NULL);
+	route_state.hello_timeStamp[neighbor.HID] = time(NULL);
 
     return 1;
 }
@@ -241,6 +242,8 @@ int processHello(ControlMessage msg)
     bool internal = (neighbor.AD == route_state.myAD);
     route_state.neighborTable[internal ? neighbor.HID : neighbor.AD] = neighbor;
     route_state.num_neighbors = route_state.neighborTable.size();
+
+    route_state.hello_timeStamp[internal ? neighbor.HID : neighbor.AD] = time(NULL);
 
     /* Update network table */
     std::string myHID = route_state.myHID;
@@ -360,7 +363,7 @@ int processRoutingTable(ControlMessage msg)
         msg.read(flags);
 
 		if ((rc = xr.setRoute(hid, port, nextHop, flags)) != 0)
-			syslog(LOG_ERR, "error setting route %d", rc);
+			syslog(LOG_ERR, "error setting route %d: %s, nextHop: %s, port: %d, flags %d", rc, hid.c_str(), nextHop.c_str(), port, flags);
 
         timeStamp[hid] = time(NULL);
  	}
@@ -599,6 +602,7 @@ int main(int argc, char *argv[])
    	}
 
 	time_t last_purge = time(NULL);
+    time_t hello_last_purge = time(NULL);
 	while (1) {
 		if (route_state.send_hello == true) {
 			route_state.send_hello = false;
@@ -633,17 +637,56 @@ int main(int argc, char *argv[])
 		{
 			last_purge = now;
 			fprintf(stderr, "checking entry\n");
-			map<string, time_t>::iterator iter;
+			map<string, time_t>::iterator iter = timeStamp.begin();
 
-			for (iter = timeStamp.begin(); iter != timeStamp.end(); iter++)	
+			while (iter != timeStamp.end())	
 			{
 				if (now - iter->second >= EXPIRE_TIME){
 					xr.delRoute(iter->first);
-					timeStamp.erase(iter);
-					syslog(LOG_INFO, "purging host route for : %s", iter->first.c_str());
-				}
+                    syslog(LOG_INFO, "purging host route for : %s", iter->first.c_str());
+					timeStamp.erase(iter++);
+				} else {
+                    ++iter;
+                }
 			}
 		}
+
+        if (now - hello_last_purge >= HELLO_EXPIRE_TIME)
+        {
+            hello_last_purge = now;
+            //fprintf(stderr, "checking hello entry\n");
+            map<string, time_t>::iterator iter = route_state.hello_timeStamp.begin();
+
+            while (iter !=  route_state.hello_timeStamp.end())
+            {
+                if (now - iter->second >= HELLO_EXPIRE_TIME){
+                    xr.delRoute(iter->first);
+                    syslog(LOG_INFO, "purging hello route for : %s", iter->first.c_str());
+
+
+                    /* Update network table */
+                    std::string myHID = route_state.myHID;
+
+                    // remove the item from neighbor_list
+                    route_state.networkTable[myHID].neighbor_list.erase(
+                        std::remove(route_state.networkTable[myHID].neighbor_list.begin(),
+                                    route_state.networkTable[myHID].neighbor_list.end(),
+                                    route_state.neighborTable[iter->first]),
+                        route_state.networkTable[myHID].neighbor_list.end());
+
+                    if (route_state.neighborTable.erase(iter->first) < 1){
+                         syslog(LOG_INFO, "failed to erase %s from neighbors", iter->first.c_str());
+                    }
+                    route_state.num_neighbors = route_state.neighborTable.size();
+                    route_state.networkTable[myHID].num_neighbors = route_state.num_neighbors;
+
+                    // remove the item and go on
+                    route_state.hello_timeStamp.erase(iter++);
+                } else {
+                    ++iter;
+                }
+            }
+        }
     }
 
 	return 0;

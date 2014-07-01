@@ -30,7 +30,7 @@
 #define MAX_HOP_COUNT 50
 #define MAX_SEQNUM 1000000
 #define MAX_XID_SIZE 100
-#define SEQNUM_WINDOW 10000
+#define SEQNUM_WINDOW 1000
 
 #define BHID "HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 #define SID_XROUTE "SID:1110000000000000000000000000000000001112"
@@ -140,8 +140,8 @@ int interfaceNumber(std::string xidType, std::string xid);
 // process an incoming Hello message
 int processHello(ControlMessage msg);
 
-// extract neighboring AD info from routing table
-int extractNeighborADs(map<string, RouteEntry> routingTable);
+// extract neighboring AD info from LSAs
+int extractNeighborADs(void);
 
 int processRoutingTable(std::map<std::string, RouteEntry> routingTable);
 
