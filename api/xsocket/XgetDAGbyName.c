@@ -215,7 +215,7 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 int _xregister(const char *name, sockaddr_x *DAG, short flags) {
 	int sock;
 	int rc;
-	int result;
+	int result = 0;
 	sockaddr_x ns_dag;
 	char pkt[NS_MAX_PACKET_SIZE];
 
@@ -257,7 +257,7 @@ int _xregister(const char *name, sockaddr_x *DAG, short flags) {
 	register_pkt.name = name;
 	register_pkt.dag = g.dag_string().c_str();
 	int len = make_ns_packet(&register_pkt, pkt, sizeof(pkt));
-
+/*
 	//Send the name registration packet to the name server
 	if ((rc = Xsendto(sock, pkt, len, 0, (const struct sockaddr *)&ns_dag, sizeof(sockaddr_x))) < 0) {
 		int err = errno;
@@ -266,7 +266,7 @@ int _xregister(const char *name, sockaddr_x *DAG, short flags) {
 		errno = err;
 		return -1;
 	}
-
+	
 	//Check the response from the name server
 	memset(pkt, 0, sizeof(pkt));
 	if ((rc = Xrecvfrom(sock, pkt, NS_MAX_PACKET_SIZE, 0, NULL, NULL)) < 0) {
@@ -291,7 +291,7 @@ int _xregister(const char *name, sockaddr_x *DAG, short flags) {
 		LOGF("Unknown NS packet type (%d)", resp_pkt.type);
 		result = -1;
 		break;
-	 }
+	 }*/
 
 	Xclose(sock);
 	return result;
