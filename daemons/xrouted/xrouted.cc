@@ -636,7 +636,7 @@ int main(int argc, char *argv[])
 		if (now - last_purge >= EXPIRE_TIME)
 		{
 			last_purge = now;
-			fprintf(stderr, "checking entry\n");
+			//fprintf(stderr, "checking entry\n");
 			map<string, time_t>::iterator iter = timeStamp.begin();
 
 			while (iter != timeStamp.end())	
