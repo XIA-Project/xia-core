@@ -35,6 +35,10 @@ Related Projects
   * [32 bit debian packages](https://github.com/cjdoucette/wireshark-xia-pkg-i386)
   * [64 bit debian packages](https://github.com/cjdoucette/wireshark-xia-pkg)
 
+Release 1.1.1
+----------------
+* Bug fixes
+* Merged the push branch containing experimental code for push semantics for CIDs.
 
 Release 1.1
 ----------------
