@@ -201,9 +201,7 @@ static void reaper(int sig)
 void echo_stream()
 {
 	int acceptor, sock;
-	char keyhash[XIA_SHA_DIGEST_STR_LEN];
-	char sid_string[sizeof(keyhash) + strlen("SID:")];
-	strcat(sid_string, "SID:");
+	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
 
 	if (signal(SIGCHLD, reaper) == SIG_ERR) {
 		die(-1, "unable to catch SIGCHLD");
@@ -215,10 +213,9 @@ void echo_stream()
 		die(-2, "unable to create the stream socket\n");
 
 	// Generate an SID to use
-	if(generate_keypair(keyhash, XIA_SHA_DIGEST_STR_LEN)) {
+	if(XmakeNewSID(sid_string, sizeof(sid_string))) {
 		die(-1, "Unable to create a temporary SID");
 	}
-	strcat(sid_string, keyhash);
 
 	struct addrinfo *ai;
 	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
@@ -261,6 +258,7 @@ void echo_stream()
 
 		} else if (pid == 0) {
 			process(sock);
+			XremoveSID(sid_string, sizeof(sid_string));
 			exit(0);
 
 		} else {

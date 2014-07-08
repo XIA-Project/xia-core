@@ -32,10 +32,14 @@
 #include <sys/stat.h>
 
 #define XIA_SHA_DIGEST_STR_LEN SHA_DIGEST_LENGTH*2+1
-#define XIA_KEYDIR "key"
 
-// Generate RSA key pair in keydir and return pubkey hash as a string
-int generate_keypair(char *pubkeyhashstr, int hashstrlen);
-int exists_keypair(const char *pubkeyhashstr);
+// Remove keys associated with the given SID
+int XremoveSID(char *sid, int sidlen);
+
+// Create a key pair and return SID based on hash of pubkey
+int XmakeNewSID(char *randomSID, int randomSIDlen);
+
+// Check if keys matching the given SID exist
+int XexistsSID(const char *sid);
 
 #endif

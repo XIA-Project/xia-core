@@ -5,6 +5,7 @@
 #include "Xkeys.h"
 
 #define KEY_BITS 1024
+#define XIA_KEYDIR "key"
 #define MAX_KEYDIR_PATH_LEN 1024
 
 // Convert a SHA1 hash to a hex string
@@ -143,6 +144,45 @@ static const char *get_keydir()
 	return keydir;
 }
 
+int destroy_keypair(char *pubkeyhashstr, int hashstrlen)
+{
+	const char *keydir = get_keydir();
+	char *privfilepath;
+	char *pubfilepath;
+	int privfilepathlen = strlen(keydir) + strlen("/") + hashstrlen + 1;
+	int pubfilepathlen = privfilepathlen + strlen(".pub");
+	if(keydir == NULL) {
+		printf("destroy_keypair: ERROR: Key directory not found\n");
+		return -1;
+	}
+	privfilepath = (char *)calloc(privfilepathlen, 1);
+	pubfilepath = (char *)calloc(pubfilepathlen, 1);
+	if(privfilepath == NULL || pubfilepath == NULL) {
+		printf("destroy_keypair: ERROR: Memory not available\n");
+		return -1;
+	}
+	strcat(privfilepath, keydir);
+	strcat(privfilepath, "/");
+	strncat(privfilepath, pubkeyhashstr, hashstrlen);
+	strcat(pubfilepath, privfilepath);
+	strcat(pubfilepath, ".pub");
+	if(unlink(privfilepath)) {
+		printf("destroy_keypair: ERROR: removing %s\n", privfilepath);
+		return -2;
+	}
+	if(unlink(pubfilepath)) {
+		printf("destroy_keypair: ERROR: removing %s\n", pubfilepath);
+		return -3;
+	}
+	return 0;
+}
+
+int XremoveSID(char *sid, int sidlen)
+{
+	return destroy_keypair(&sid[4], sidlen-4);
+}
+
+
 int generate_keypair(char *pubkeyhashstr, int hashstrlen)
 {
 	int retval = -1;
@@ -228,6 +268,18 @@ cleanup_generate_keypair:
     return retval;
 }
 
+int XmakeNewSID(char *randomSID, int randomSIDlen)
+{
+	char pubkeyhashstr[XIA_SHA_DIGEST_STR_LEN];
+	assert(randomSIDlen >= strlen("SID:") + XIA_SHA_DIGEST_STR_LEN);
+	if(generate_keypair(pubkeyhashstr, XIA_SHA_DIGEST_STR_LEN)) {
+		return -1;
+	}
+	strcpy(randomSID, "SID:");
+	strcat(randomSID, pubkeyhashstr);
+	return 0;
+}
+
 // Check that key files matching pubkeyhashstr exist in keydir
 int exists_keypair(const char *pubkeyhashstr)
 {
@@ -258,6 +310,11 @@ int exists_keypair(const char *pubkeyhashstr)
 	free(privfilepath);
 	free(pubfilepath);
 	return retval;
+}
+
+int XexistsSID(const char *sid)
+{
+	return exists_keypair(&sid[4]);
 }
 
 /*

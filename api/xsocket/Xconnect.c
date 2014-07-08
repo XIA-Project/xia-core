@@ -83,17 +83,14 @@ int Xconnect(int sockfd, const sockaddr *addr, socklen_t addrlen)
 	x_connect_msg->set_ddag(g.dag_string().c_str());
 	// Assign a SID with corresponding keys (unless assigned by bind already)
 	if(!isSIDAssigned(sockfd)) {
-		char keyhash[XIA_SHA_DIGEST_STR_LEN];
 		printf("Xconnect: generating key pair for random SID\n");
-		if(generate_keypair(keyhash, XIA_SHA_DIGEST_STR_LEN)) {
-			LOG("Unable to generate random SID key pair");
-			printf("Xconnect: Unable to generate random SID key pair\n");
-			errno = EINVAL;
+		if(XmakeNewSID(src_SID, sizeof(src_SID))) {
+			LOG("Unable to create a new SID with key pair");
+			printf("Xconnect: Unable to create a new SID with key pair");
 			return -1;
 		}
-        LOGF("Generated key:%s:", keyhash);
-        printf("Generated key:%s:\n", keyhash);
-		sprintf(src_SID, "SID:%s", keyhash);
+        LOGF("Generated SID:%s:", src_SID);
+        printf("Generated SID:%s:\n", src_SID);
 
 		// Convert SID to a default DAG
 		if(Xgetaddrinfo(NULL, src_SID, NULL, &ai)) {
@@ -108,7 +105,7 @@ int Xconnect(int sockfd, const sockaddr *addr, socklen_t addrlen)
 		x_connect_msg->set_sdag(src_g.dag_string().c_str());
 		Xfreeaddrinfo(ai);
 		setSIDAssigned(sockfd);
-		setTempSID(sockfd, keyhash);
+		setTempSID(sockfd, src_SID);
 	}
 	// In Xtransport: send SYN to destination server
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
