@@ -85,7 +85,7 @@ int Xconnect(int sockfd, const sockaddr *addr, socklen_t addrlen)
 	if(!isSIDAssigned(sockfd)) {
 		char keyhash[XIA_SHA_DIGEST_STR_LEN];
 		printf("Xconnect: generating key pair for random SID\n");
-    	if(generate_keypair(XIA_KEYDIR, keyhash, XIA_SHA_DIGEST_STR_LEN)) {
+		if(generate_keypair(keyhash, XIA_SHA_DIGEST_STR_LEN)) {
 			LOG("Unable to generate random SID key pair");
 			printf("Xconnect: Unable to generate random SID key pair\n");
 			errno = EINVAL;

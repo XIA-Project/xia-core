@@ -94,7 +94,7 @@ int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 		LOGF("Xbind: Intent:%s:", intent.c_str());
 		printf("Xbind: Intent:%s:\n", intent.c_str());
 		// Stat <keydir>/<SID>{,.pub}
-		if(!exists_keypair(XIA_KEYDIR, intent.c_str())) {
+		if(!exists_keypair(intent.c_str())) {
 			LOGF("ERROR: Keys for SID:%s not found", intent.c_str());
 			printf("ERROR: Keys for SID:%s not found\n", intent.c_str());
 			errno = EINVAL;

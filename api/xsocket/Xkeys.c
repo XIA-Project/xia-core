@@ -126,7 +126,24 @@ static int dir_exists(const char *keydir)
 	return 1;
 }
 
-int generate_keypair(const char *keydir, char *pubkeyhashstr, int hashstrlen)
+static const char *get_keydir()
+{
+	static const char *keydir = NULL;
+	if(keydir == NULL) {
+		keydir = (const char *)calloc(MAX_KEYDIR_PATH_LEN, 1);
+		if(keydir == NULL) {
+			return NULL;
+		}
+		if(XrootDir((char *)keydir, MAX_KEYDIR_PATH_LEN) == NULL) {
+			return NULL;
+		}
+		strcat((char *)keydir, "/");
+		strcat((char *)keydir, XIA_KEYDIR);
+	}
+	return keydir;
+}
+
+int generate_keypair(char *pubkeyhashstr, int hashstrlen)
 {
 	int retval = -1;
 	int state = 0;
@@ -138,6 +155,13 @@ int generate_keypair(const char *keydir, char *pubkeyhashstr, int hashstrlen)
 	unsigned char pubkeyhash[SHA_DIGEST_LENGTH];
     unsigned long e = RSA_F4;
 
+	const char *keydir = get_keydir();
+	if(keydir == NULL) {
+		printf("generate_keypair: ERROR: Key directory not found\n");
+		goto cleanup_generate_keypair;
+	}
+
+	printf("Key directory:%s:\n", keydir);
 	// Check that the directory provided by user is valid
 	if(!dir_exists(keydir)) {
 		goto cleanup_generate_keypair;
@@ -205,13 +229,20 @@ cleanup_generate_keypair:
 }
 
 // Check that key files matching pubkeyhashstr exist in keydir
-int exists_keypair(const char *keydir, const char *pubkeyhashstr)
+int exists_keypair(const char *pubkeyhashstr)
 {
 	int retval = 0;
 	char *privfilepath;
 	char *pubfilepath;
 	int privfilepathlen;
 	int pubfilepathlen;
+	const char *keydir = get_keydir();
+	if(keydir == NULL) {
+		printf("exists_keypair: ERROR: Key directory not found\n");
+		return retval;
+	}
+
+	printf("Key directory:%s:\n", keydir);
 	if(!dir_exists(keydir)) {
 		return retval;
 	}

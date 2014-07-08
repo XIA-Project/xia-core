@@ -35,7 +35,7 @@
 #define XIA_KEYDIR "key"
 
 // Generate RSA key pair in keydir and return pubkey hash as a string
-int generate_keypair(const char *keydir, char *pubkeyhashstr, int hashstrlen);
-int exists_keypair(const char *keydir, const char *pubkeyhashstr);
+int generate_keypair(char *pubkeyhashstr, int hashstrlen);
+int exists_keypair(const char *pubkeyhashstr);
 
 #endif
