@@ -152,13 +152,13 @@ int destroy_keypair(char *pubkeyhashstr, int hashstrlen)
 	int privfilepathlen = strlen(keydir) + strlen("/") + hashstrlen + 1;
 	int pubfilepathlen = privfilepathlen + strlen(".pub");
 	if(keydir == NULL) {
-		printf("destroy_keypair: ERROR: Key directory not found\n");
+		LOG("destroy_keypair: ERROR: Key directory not found");
 		return -1;
 	}
 	privfilepath = (char *)calloc(privfilepathlen, 1);
 	pubfilepath = (char *)calloc(pubfilepathlen, 1);
 	if(privfilepath == NULL || pubfilepath == NULL) {
-		printf("destroy_keypair: ERROR: Memory not available\n");
+		LOG("destroy_keypair: ERROR: Memory not available");
 		return -1;
 	}
 	strcat(privfilepath, keydir);
@@ -167,11 +167,11 @@ int destroy_keypair(char *pubkeyhashstr, int hashstrlen)
 	strcat(pubfilepath, privfilepath);
 	strcat(pubfilepath, ".pub");
 	if(unlink(privfilepath)) {
-		printf("destroy_keypair: ERROR: removing %s\n", privfilepath);
+		LOGF("destroy_keypair: ERROR: removing %s", privfilepath);
 		return -2;
 	}
 	if(unlink(pubfilepath)) {
-		printf("destroy_keypair: ERROR: removing %s\n", pubfilepath);
+		LOGF("destroy_keypair: ERROR: removing %s", pubfilepath);
 		return -3;
 	}
 	return 0;
@@ -197,13 +197,13 @@ int generate_keypair(char *pubkeyhashstr, int hashstrlen)
 
 	const char *keydir = get_keydir();
 	if(keydir == NULL) {
-		printf("generate_keypair: ERROR: Key directory not found\n");
+		LOG("generate_keypair: ERROR: Key directory not found");
 		goto cleanup_generate_keypair;
 	}
 
-	printf("Key directory:%s:\n", keydir);
 	// Check that the directory provided by user is valid
 	if(!dir_exists(keydir)) {
+		LOG("generate_keypair: ERROR: No key directory");
 		goto cleanup_generate_keypair;
 	}
 
@@ -245,12 +245,10 @@ int generate_keypair(char *pubkeyhashstr, int hashstrlen)
 	if(BIO_read(pubkeybuf, pubkeystr, keylen) <= 0) {
 		goto cleanup_generate_keypair;
 	}
-	//printf("Pubkey:%s:\n", pubkeystr);
 	if(sha1_hash_of_pubkey(pubkeyhash, SHA_DIGEST_LENGTH, pubkeystr, keylen+1)) {
 		goto cleanup_generate_keypair;
 	}
 	sha1_hash_to_hex_string(pubkeyhash, SHA_DIGEST_LENGTH, pubkeyhashstr, hashstrlen);
-	//printf("Pubkeyhash:%s:\n", pubkeyhashstr);
 	if(write_key_files(keydir, pubkeyhashstr, r)) {
 		goto cleanup_generate_keypair;
 	}
@@ -290,11 +288,11 @@ int exists_keypair(const char *pubkeyhashstr)
 	int pubfilepathlen;
 	const char *keydir = get_keydir();
 	if(keydir == NULL) {
-		printf("exists_keypair: ERROR: Key directory not found\n");
+		LOG("exists_keypair: ERROR: Key directory not found");
 		return retval;
 	}
 
-	printf("Key directory:%s:\n", keydir);
+	LOGF("Key directory:%s:", keydir);
 	if(!dir_exists(keydir)) {
 		return retval;
 	}
