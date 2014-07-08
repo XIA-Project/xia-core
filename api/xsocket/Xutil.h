@@ -33,7 +33,6 @@
 int click_send(int sockfd, xia::XSocketMsg *xsm);
 int click_reply(int sockfd, char *buf, int buflen);
 int click_reply2(int sockfd, xia::XSocketCallType *type);
-int bind_to_random_port(int sockfd);
 
 int validateSocket(int sock, int stype, int err);
 
@@ -45,6 +44,10 @@ int getSocketType(int sock);
 void setSocketType(int sock, int tt);
 int isConnected(int sock);
 int setConnected(int sock, int conn);
+int isSIDAssigned(int sock);
+int setSIDAssigned(int sock);
+int isTempSID(int sock);
+void setTempSID(int sock, const char *sid);
 int getSocketData(int sock, char *buf, unsigned bufLen);
 void setSocketData(int sock, const char *buf, unsigned bufLen);
 void setWrapped(int sock, int wrapped);

@@ -1508,16 +1508,14 @@ void XTRANSPORT::Xconnect(unsigned short _sport)
 	String str_local_addr = _local_addr.unparse_re();
 	//String dagstr = daginfo->src_path.unparse_re();
 
-	/* Use src_path set by Xbind() if exists */
+	// API sends a temporary DAG, if permanent not assigned by bind
+	if(x_connect_msg->has_sdag()) {
+		String sdag_string(x_connect_msg->sdag().c_str(), x_connect_msg->sdag().size());
+		daginfo->sdag = sdag_string;
+		daginfo->src_path.parse(sdag_string);
+	}
 	if(daginfo->sdag.length() == 0) {
-		char xid_string[50];
-		random_xid("SID", xid_string);
-
-//		String rand(click_random(1000000, 9999999));
-//		String xid_string = "SID:20000ff00000000000000000000000000" + rand;
-//		str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
-		str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
-		daginfo->src_path.parse_re(str_local_addr);
+		printf("ERROR: Source DAG not available\n");
 	}
 
 	daginfo->nxt = LAST_NODE_DEFAULT;

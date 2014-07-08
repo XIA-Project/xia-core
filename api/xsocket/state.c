@@ -52,6 +52,12 @@ public:
 	const sockaddr_x *peer() { return m_peer; };
 	int setPeer(const sockaddr_x *peer);
 
+	int isSIDAssigned() { return m_sid_assigned; };
+	void setSIDAssigned() { m_sid_assigned = 1; };
+
+	int isTempSID() { return (m_temp_sid == NULL) ? 0 : 1;};
+	void setTempSID(const char *sid);
+
 private:
 	int m_transportType;
 	int m_connected;
@@ -60,6 +66,8 @@ private:
 	char *m_buf;
 	unsigned m_bufLen;
 	sockaddr_x *m_peer;
+	char *m_temp_sid;
+	int m_sid_assigned;
 };
 
 SocketState::SocketState(int tt)
@@ -72,6 +80,8 @@ SocketState::SocketState(int tt)
 	m_buf = NULL;
 	m_bufLen = 0;
 	m_peer = NULL;
+	m_temp_sid = NULL;
+	m_sid_assigned = 0;
 }
 
 SocketState::SocketState()
@@ -130,6 +140,21 @@ void SocketState::setData(const char *buf, unsigned bufLen)
 
 	memcpy(m_buf, buf, bufLen);
 	m_bufLen = bufLen;
+}
+
+void SocketState::setTempSID(const char *sid)
+{
+	if(!sid) {
+		return;
+	}
+	if(m_temp_sid) {
+		delete(m_temp_sid);
+	}
+	m_temp_sid = new char [strlen(sid) + 1];
+	if(!m_temp_sid) {
+		return;
+	}
+	strcpy(m_temp_sid, sid);
 }
 
 class SocketMap
@@ -260,6 +285,22 @@ void setConnected(int sock, int conn)
 		sstate->setConnected(conn);
 }
 
+int isSIDAssigned(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		return sstate->isSIDAssigned();
+	else
+		return 0;
+}
+
+void setSIDAssigned(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		sstate->setSIDAssigned();
+}
+
 int isWrapped(int sock)
 {
 	SocketState *sstate = SocketMap::getMap()->get(sock);
@@ -314,6 +355,24 @@ void setSocketData(int sock, const char *buf, unsigned bufLen)
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
 		sstate->setData(buf, bufLen);
+}
+
+int isTempSID(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if(sstate) {
+		return sstate->isTempSID();
+	} else {
+		return 0;
+	}
+}
+
+void setTempSID(int sock, const char *sid)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if(sstate) {
+		sstate->setTempSID(sid);
+	}
 }
 
 int setPeer(int sock, sockaddr_x *addr)

@@ -23,6 +23,7 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
+#include "Xkeys.h"
 #include "dagaddr.hpp"
 
 /*!
@@ -49,10 +50,13 @@ int Xconnect(int sockfd, const sockaddr *addr, socklen_t addrlen)
 	int rc;
 
 	int numbytes;
+	char src_SID[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
 	char buf[MAXBUFLEN];
 	struct sockaddr_in their_addr;
+	struct addrinfo *ai;
 	socklen_t addr_len;
 
+	printf("Xconnect: called\n");
 	// we can't count on addrlen being set correctly if we are being called via
 	// the wrapper functions as the original source program doesn't know that
 	// a sockaddr_x is larger than a sockaddr	
@@ -77,6 +81,35 @@ int Xconnect(int sockfd, const sockaddr *addr, socklen_t addrlen)
 
 	xia::X_Connect_Msg *x_connect_msg = xsm.mutable_x_connect();
 	x_connect_msg->set_ddag(g.dag_string().c_str());
+	// Assign a SID with corresponding keys (unless assigned by bind already)
+	if(!isSIDAssigned(sockfd)) {
+		char keyhash[XIA_SHA_DIGEST_STR_LEN];
+		printf("Xconnect: generating key pair for random SID\n");
+    	if(generate_keypair(XIA_KEYDIR, keyhash, XIA_SHA_DIGEST_STR_LEN)) {
+			LOG("Unable to generate random SID key pair");
+			printf("Xconnect: Unable to generate random SID key pair\n");
+			errno = EINVAL;
+			return -1;
+		}
+        LOGF("Generated key:%s:", keyhash);
+        printf("Generated key:%s:\n", keyhash);
+		sprintf(src_SID, "SID:%s", keyhash);
+
+		// Convert SID to a default DAG
+		if(Xgetaddrinfo(NULL, src_SID, NULL, &ai)) {
+			LOGF("Unable to convert %s to default DAG", src_SID);
+			printf("Xconnect: Unable to convert %s to default DAG\n", src_SID);
+			return -1;
+		}
+		sockaddr_x *sa = (sockaddr_x *)ai->ai_addr;
+		Graph src_g(sa);
+		// Include the source DAG in message to xtransport
+		printf("Xconnect: random DAG:%s:\n", src_g.dag_string().c_str());
+		x_connect_msg->set_sdag(src_g.dag_string().c_str());
+		Xfreeaddrinfo(ai);
+		setSIDAssigned(sockfd);
+		setTempSID(sockfd, keyhash);
+	}
 	// In Xtransport: send SYN to destination server
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
