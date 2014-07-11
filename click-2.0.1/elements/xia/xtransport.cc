@@ -1342,7 +1342,6 @@ void XTRANSPORT::Xbind(unsigned short _sport) {
 		daginfo->hlim = hlim.get(_sport);
 		daginfo->isConnected = false;
 		daginfo->initialized = true;
-		daginfo->sdag = sdag_string;
 
 		//Check if binding to full DAG or just to SID only
 		Vector<XIAPath::handle_t> xids = daginfo->src_path.next_nodes( daginfo->src_path.source_node() );		
@@ -1405,7 +1404,6 @@ void XTRANSPORT::XbindPush(unsigned short _sport) {
 		daginfo->hlim = hlim.get(_sport);
 		daginfo->isConnected = false;
 		daginfo->initialized = true;
-		daginfo->sdag = sdag_string;
 
 		//Check if binding to full DAG or just to SID only
 		Vector<XIAPath::handle_t> xids = daginfo->src_path.next_nodes( daginfo->src_path.source_node() );		
@@ -1497,7 +1495,6 @@ void XTRANSPORT::Xconnect(unsigned short _sport)
 	daginfo->port = _sport;
 	daginfo->isConnected = true;
 	daginfo->initialized = true;
-	daginfo->ddag = dest;
 	daginfo->seq_num = 0;
 	daginfo->ack_num = 0;
 	daginfo->base = 0;
@@ -1511,12 +1508,10 @@ void XTRANSPORT::Xconnect(unsigned short _sport)
 	// API sends a temporary DAG, if permanent not assigned by bind
 	if(x_connect_msg->has_sdag()) {
 		String sdag_string(x_connect_msg->sdag().c_str(), x_connect_msg->sdag().size());
-		daginfo->sdag = sdag_string;
 		daginfo->src_path.parse(sdag_string);
 	}
-	if(daginfo->sdag.length() == 0) {
-		printf("ERROR: Source DAG not available\n");
-	}
+	// src_path must be set by Xbind() or Xconnect() API
+	assert(daginfo->src_path.is_valid());
 
 	daginfo->nxt = LAST_NODE_DEFAULT;
 	daginfo->last = LAST_NODE_DEFAULT;

@@ -139,8 +139,6 @@ class XTRANSPORT : public Element {
     bool initialized;
     bool full_src_dag; // bind to full dag or just to SID  
     int sock_type; // 0: Reliable transport (SID), 1: Unreliable transport (SID), 2: Content Chunk transport (CID)
-    String sdag;
-    String ddag;
     int num_connect_tries; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
     int num_retransmit_tries; // number of times to try resending data packets
 
