@@ -151,7 +151,6 @@ class XTRANSPORT : public Element {
     HashTable<XID, int> XIDtoStatus; // Content-chunk request status... 1: waiting to be read, 0: waiting for chunk response, -1: failed
     HashTable<XID, bool> XIDtoReadReq; // Indicates whether ReadCID() is called for a specific CID
     HashTable<XID, WritablePacket*> XIDtoCIDresponsePkt;
-    uint32_t seq_num;
     uint32_t ack_num;
     uint32_t base; // the sequence # of the oldest unacked packet
     uint32_t next_seqnum; // the smallest unused sequence # (i.e., the sequence # of the next packet to be sent)

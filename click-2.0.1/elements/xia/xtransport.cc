@@ -594,7 +594,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				daginfo.nxt = LAST_NODE_DEFAULT;
 				daginfo.last = LAST_NODE_DEFAULT;
 				daginfo.hlim = HLIM_DEFAULT;
-				daginfo.seq_num = 0;
+				daginfo.next_seqnum = 0;
 				daginfo.ack_num = 0;
 
 				pending_connection_buf.push(daginfo);
@@ -1495,7 +1495,6 @@ void XTRANSPORT::Xconnect(unsigned short _sport)
 	daginfo->port = _sport;
 	daginfo->isConnected = true;
 	daginfo->initialized = true;
-	daginfo->seq_num = 0;
 	daginfo->ack_num = 0;
 	daginfo->base = 0;
 	daginfo->next_seqnum = 0;
@@ -1597,7 +1596,6 @@ void XTRANSPORT::Xaccept(unsigned short _sport)
 		DAGinfo daginfo = pending_connection_buf.front();
 		daginfo.port = _sport;
 
-		daginfo.seq_num = 0;
 		daginfo.ack_num = 0;
 		daginfo.base = 0;
 		daginfo.hlim = hlim.get(_sport);
@@ -1829,14 +1827,13 @@ void XTRANSPORT::Xsend(unsigned short _sport, WritablePacket *p_in)
 		delete thdr;
 
 		// Store the packet into buffer
-		WritablePacket *tmp = daginfo->sent_pkt[daginfo->seq_num % MAX_WIN_SIZE];
-		daginfo->sent_pkt[daginfo->seq_num % MAX_WIN_SIZE] = copy_packet(p, daginfo);
+		WritablePacket *tmp = daginfo->sent_pkt[daginfo->next_seqnum % MAX_WIN_SIZE];
+		daginfo->sent_pkt[daginfo->next_seqnum % MAX_WIN_SIZE] = copy_packet(p, daginfo);
 		if (tmp)
 			tmp->kill();
 
-		// printf("XSEND: SENT DATA at (%s) seq=%d \n\n", dagstr.c_str(), daginfo->seq_num%MAX_WIN_SIZE);
+		// printf("XSEND: SENT DATA at (%s) seq=%d \n\n", dagstr.c_str(), daginfo->next_seqnum%MAX_WIN_SIZE);
 
-		daginfo->seq_num++;
 		daginfo->next_seqnum++;
 
 		// Set timer
