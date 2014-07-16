@@ -70,7 +70,7 @@ class TransportHeaderEncap : public XIAGenericExtHeaderEncap { public:
                         { return new TransportHeaderEncap(TransportHeader::XSOCK_STREAM, TransportHeader::FIN, seq_num, ack_num, length); };     
 
 	static TransportHeaderEncap* MakeMIGRATEHeader(uint32_t seq_num, uint32_t ack_num, uint16_t length )
-						{ return new TransportHeaderEncap(TransportHeader::XSOCK_STREAM, TransportHeader:MIGRATE, seq_num, ack_num, length); };
+						{ return new TransportHeaderEncap(TransportHeader::XSOCK_STREAM, TransportHeader::MIGRATE, seq_num, ack_num, length); };
 
     static TransportHeaderEncap* MakeMIGRATEACKHeader( uint32_t seq_num, uint32_t ack_num, uint16_t length )
                         { return new TransportHeaderEncap(TransportHeader::XSOCK_STREAM, TransportHeader::MIGRATEACK, seq_num, ack_num, length); };
