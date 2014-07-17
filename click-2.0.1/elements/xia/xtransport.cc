@@ -751,6 +751,40 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				daginfo->initialized = true;
 
 				// 5. Return MIGRATEACK to notify mobile host of change
+				// Construct the payload
+				// For now (timestamp) signature, Pubkey
+				uint8_t *data;
+				uint8_t *dataptr;
+				uint32_t datalen;
+				uint8_t mypubkey[MAX_PUBKEY_SIZE];
+				uint16_t mypubkeylen = MAX_PUBKEY_SIZE;
+				XID my_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+				if(xs_getPubkey(my_xid.unparse().c_str(), mypubkey, &mypubkeylen)) {
+					click_chatter("ProcessNetworkPacket: ERROR: getting Pubkey for MIGRATEACK");
+				}
+				datalen = timestamp.length() + 1 + MAX_SIGNATURE_SIZE + sizeof(uint16_t) + mypubkeylen;
+				data = (uint8_t *) calloc(datalen, 1);
+				if(data == NULL) {
+					click_chatter("ProcessNetworkPacket: ERROR allocating memory for MIGRATEACK");
+				}
+				dataptr = data;
+				strcpy((char *)dataptr, timestamp.c_str());
+				dataptr += timestamp.length() + 1; // null-terminated string
+				uint8_t mysignature[MAX_SIGNATURE_SIZE];
+				uint16_t mysiglen = MAX_SIGNATURE_SIZE;
+				if(xs_sign(my_xid.unparse().c_str(), data, dataptr-data, mysignature, &mysiglen)) {
+					click_chatter("ProcessNetworkPacket: ERROR signing MIGRATEACK");
+				}
+				memcpy(dataptr, &mysiglen, sizeof(uint16_t));
+				dataptr += sizeof(uint16_t);
+				memcpy(dataptr, mysignature, mysiglen);
+				dataptr += mysiglen;
+				memcpy(dataptr, &mypubkeylen, sizeof(uint16_t));
+				dataptr += sizeof(uint16_t);
+				memcpy(dataptr, mypubkey, mypubkeylen);
+				dataptr += mypubkeylen;
+				assert((dataptr-data) == datalen);
+
 				XIAHeaderEncap xiah_new;
 				xiah_new.set_nxt(CLICK_XIA_NXT_TRN);
 				xiah_new.set_last(LAST_NODE_DEFAULT);
@@ -758,19 +792,19 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				xiah_new.set_dst_path(src_path);
 				xiah_new.set_src_path(dst_path);
 
-				const char* dummy = "Migration_granted";
-				WritablePacket *just_payload_part = WritablePacket::make(256, dummy, strlen(dummy), 0);
+				WritablePacket *just_payload_part = WritablePacket::make(256, data, datalen, 0);
+				free(data);
 
 				WritablePacket *p = NULL;
 
-				xiah_new.set_plen(strlen(dummy));
+				xiah_new.set_plen(datalen);
 				//click_chatter("Sent packet to network");
 
 				TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeMIGRATEACKHeader( 0, 0, 0); // #seq, #ack, length
 				p = thdr_new->encap(just_payload_part);
 
 				thdr_new->update();
-				xiah_new.set_plen(strlen(dummy) + thdr_new->hlen()); // XIA payload = transport header + transport-layer data
+				xiah_new.set_plen(datalen + thdr_new->hlen()); // XIA payload = transport header + transport-layer data
 
 				p = xiah_new.encap(p, false);
 
