@@ -11,6 +11,8 @@
 
 
 #define MAX_KEYDIR_PATH_LEN 1024
+#define MAX_PUBKEY_SIZE 2048
+#define MAX_SIGNATURE_SIZE 256
 #define XIA_KEYDIR "key"
 #define XIA_SHA_DIGEST_STR_LEN SHA_DIGEST_LENGTH*2+1
 CLICK_DECLS
@@ -33,14 +35,14 @@ void xs_getSHA1Hash(unsigned char *data, int data_len, uint8_t* digest, int dige
 void xs_hexDigest(uint8_t* digest, int digest_len, char* hex_string, int hex_string_len);
 
 // Verify signature
-int xs_isValidSignature(unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, char *xid);
+int xs_isValidSignature(unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, const char *xid);
 int xs_isValidSignature(unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, uint8_t *pem_pub, int pem_pub_len);
 
 // Sign a given buffer
-int xs_sign(char *xid, unsigned char *data, int datalen, unsigned char *signature, unsigned int siglen);
+int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *signature, uint16_t *siglen);
 
 // Read public key from file
-int xs_getPubkey(char *xid, uint8_t* pubkey, int *pubkey_len);
+int xs_getPubkey(const char *xid, uint8_t* pubkey, uint16_t *pubkey_len);
 
 CLICK_ENDDECLS
 

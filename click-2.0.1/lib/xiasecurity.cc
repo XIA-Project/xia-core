@@ -9,7 +9,6 @@
 
 CLICK_DECLS
 
-#define MAX_PUBKEY_SIZE 2048
 /*
 // Generate HMAC-SHA1
 int xs_HMAC(void* key, int keylen, unsigned char* buf, size_t buflen, unsigned char* hmac, unsigned int* hmac_len)
@@ -70,10 +69,10 @@ void xs_hexDigest(uint8_t* digest, int digest_len, char* hex_string, int hex_str
 
 // Verify signature using public key read from file for given xid
 // NOTE: Public key must be available from local file
-int xs_isValidSignature(unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, char *xid)
+int xs_isValidSignature(unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, const char *xid)
 {
 	uint8_t pem_pub[MAX_PUBKEY_SIZE];
-	int pem_pub_len = MAX_PUBKEY_SIZE;
+	uint16_t pem_pub_len = MAX_PUBKEY_SIZE;
 
 	// Get the public key for given xid
 	if(!xs_getPubkey(xid, pem_pub, &pem_pub_len)) {
@@ -104,7 +103,7 @@ int xs_isValidSignature(unsigned char *data, size_t datalen, unsigned char *sign
 }
 
 // Sign data using private key of the given xid
-int xs_sign(char *xid, unsigned char *data, int datalen, unsigned char *signature, unsigned int *siglen)
+int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *signature, uint16_t *siglen)
 {
 	char *privkeyhash = NULL;
 	int privfilepathlen;
@@ -117,7 +116,7 @@ int xs_sign(char *xid, unsigned char *data, int datalen, unsigned char *signatur
 		return -1;
 	}
 	// Read private key from file in keydir
-	privkeyhash = strchr(xid, ':') + 1;
+	privkeyhash = strchr((char *)xid, ':') + 1;
 	privfilepathlen = strlen(keydir) + strlen("/") + strlen(privkeyhash) + 1;
 	privfilepath = (char *) calloc(privfilepathlen, 1);
 	sprintf(privfilepath, "%s/%s", keydir, privkeyhash);
@@ -146,6 +145,7 @@ int xs_sign(char *xid, unsigned char *data, int datalen, unsigned char *signatur
     sig_buf = (unsigned char*)calloc(RSA_size(rsa), 1);
 	if(!sig_buf) {
 		click_chatter("xs_sign: Failed to allocate memory for signature");
+		return -1;
 	}
 
     //int rc = RSA_sign(NID_sha1, digest, sizeof digest, sig_buf, &sig_len, rsa);
@@ -155,7 +155,7 @@ int xs_sign(char *xid, unsigned char *data, int datalen, unsigned char *signatur
 
     //click_chatter("Sig: %X Len: %d", sig_buf[0], sig_len);
     memcpy(signature, sig_buf, sig_len);
-	*siglen = sig_len;
+	*siglen = (uint16_t) sig_len;
 
     fclose(fp);
 	free(sig_buf);
@@ -165,7 +165,7 @@ int xs_sign(char *xid, unsigned char *data, int datalen, unsigned char *signatur
 }
 
 // Get the public key for a given xid
-int xs_getPubkey(char *xid, uint8_t* pubkey, int *pubkey_len)
+int xs_getPubkey(const char *xid, uint8_t* pubkey, uint16_t *pubkey_len)
 {
 	int pubfilepathlen;
 	char *pubfilepath;
@@ -184,7 +184,7 @@ int xs_getPubkey(char *xid, uint8_t* pubkey, int *pubkey_len)
 		goto xs_getPubkey_cleanup;
 	}
 	// Extract the hex portion of the XID
-	pubkeyhash = strchr(xid, ':') + 1;
+	pubkeyhash = strchr((char *)xid, ':') + 1;
 	pubfilepathlen = strlen(keydir) + strlen("/") + strlen(pubkeyhash) + strlen(".pub") + 1;
 	pubfilepath = (char *) calloc(pubfilepathlen, 1);
 	if(pubfilepath == NULL) {
@@ -227,7 +227,7 @@ xs_getPubkey_cleanup:
 		case 3: RSA_free(rsa);
 		case 2: fclose(fp);
 		case 1: free(pubfilepath);
-	}
+	};
 	return retval;
 }
 

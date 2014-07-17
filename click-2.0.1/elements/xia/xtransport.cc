@@ -670,6 +670,111 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			daginfo->timer_on = false;
 			daginfo->synack_waiting = false;
 			//daginfo->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
+		} else if (thdr.pkt_info() == TransportHeader::MIGRATE) {
+
+			XIDpair xid_pair;
+			xid_pair.set_src(_destination_xid);
+			xid_pair.set_dst(_source_xid);
+
+			// Application does not need to know about migration
+			sendToApplication = false;
+
+			// Get the dst port from XIDpair table
+			_dport = XIDpairToPort.get(xid_pair);
+
+			HashTable<unsigned short, bool>::iterator it1;
+			it1 = portToActive.find(_dport);
+
+			if(it1 != portToActive.end() ) {
+
+				DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
+
+				if (thdr.seq_num() == daginfo->expected_seqnum) {
+					daginfo->expected_seqnum++;
+					//printf("(%s) Accept Received data (now expected seq=%d)\n", (_local_addr.unparse()).c_str(), daginfo->expected_seqnum);
+				} else {
+					sendToApplication = false;
+					printf("expected sequence # %d, received %d\n", daginfo->expected_seqnum, thdr.seq_num());
+					printf("(%s) Discarded Received data\n", (_local_addr.unparse()).c_str());
+				}
+
+				// Verify the MIGRATE request and start using new DAG
+				// No need for an ACK because the operation is idempotent
+				// 1. Retrieve payload (srcDAG, destDAG, seqnum) Signature, Pubkey
+				// 2. Verify hash of pubkey matches srcDAG destination node
+				// 3. Verify Signature using Pubkey
+				// 4. Update DAGinfo dst_path with srcDAG
+				daginfo->dst_path = src_path;
+				daginfo->isConnected = true;
+				daginfo->initialized = true;
+
+				// 5. Return MIGRATEACK to notify mobile host of change
+				XIAHeaderEncap xiah_new;
+				xiah_new.set_nxt(CLICK_XIA_NXT_TRN);
+				xiah_new.set_last(LAST_NODE_DEFAULT);
+				xiah_new.set_hlim(HLIM_DEFAULT);
+				xiah_new.set_dst_path(src_path);
+				xiah_new.set_src_path(dst_path);
+
+				const char* dummy = "Migration_granted";
+				WritablePacket *just_payload_part = WritablePacket::make(256, dummy, strlen(dummy), 0);
+
+				WritablePacket *p = NULL;
+
+				xiah_new.set_plen(strlen(dummy));
+				//click_chatter("Sent packet to network");
+
+				TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeMIGRATEACKHeader( 0, 0, 0); // #seq, #ack, length
+				p = thdr_new->encap(just_payload_part);
+
+				thdr_new->update();
+				xiah_new.set_plen(strlen(dummy) + thdr_new->hlen()); // XIA payload = transport header + transport-layer data
+
+				p = xiah_new.encap(p, false);
+
+				delete thdr_new;
+				output(NETWORK_PORT).push(p);
+
+
+				// 6. Notify the api of MIGRATE reception
+				//   Do we need to? -Nitin
+			} else {
+				printf("ProcessNetworkPacket: ERROR: Migrating non-existent or inactive session\n");
+			}
+		} else if (thdr.pkt_info() == TransportHeader::MIGRATEACK) {
+			sendToApplication = false;
+
+			XIDpair xid_pair;
+			xid_pair.set_src(_destination_xid);
+			xid_pair.set_dst(_source_xid);
+
+			// Get the dst port from XIDpair table
+			_dport = XIDpairToPort.get(xid_pair);
+
+			HashTable<unsigned short, bool>::iterator it1;
+			it1 = portToActive.find(_dport);
+
+			if(it1 != portToActive.end() ) {
+				DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
+
+				// Verify the MIGRATEACK and start using new DAG
+				// 1. Retrieve payload (ack_seq_num) signature, Pubkey
+				// 2. Verify hash of pubkey matches dstDAG destination node
+				// 3. Verify Signature using Pubkey
+				// 4. Update DAGinfo src_path with dstDAG
+				daginfo->src_path = dst_path;
+				//In case of Client Mobility...	 Update 'daginfo->dst_path'
+				//daginfo->dst_path = src_path;
+
+				int expected_seqnum = thdr.ack_num();
+
+				bool resetTimer = false;
+
+				portToDAGinfo.set(_dport, *daginfo);
+
+			} else {
+				//printf("port not found\n");
+			}
 
 		} else if (thdr.pkt_info() == TransportHeader::DATA) {
 			XIDpair xid_pair;
@@ -699,7 +804,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				portToDAGinfo.set(_dport, *daginfo);
 			
 				//In case of Client Mobility...	 Update 'daginfo->dst_path'
-				daginfo->dst_path = src_path;		
+				//daginfo->dst_path = src_path;
 
 				// send the cumulative ACK to the sender
 				//Add XIA headers
@@ -755,7 +860,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
 			
 				//In case of Client Mobility...	 Update 'daginfo->dst_path'
-				daginfo->dst_path = src_path;					
+				//daginfo->dst_path = src_path;
 
 				int expected_seqnum = thdr.ack_num();
 
@@ -1664,6 +1769,103 @@ void XTRANSPORT::Xchangead(unsigned short _sport)
 	}
 	click_chatter("new address is - %s", new_local_addr.c_str());
 	_local_addr.parse(new_local_addr);		
+
+	// Inform all active stream connections about this change
+	for (HashTable<unsigned short, DAGinfo>::iterator iter = portToDAGinfo.begin(); iter != portToDAGinfo.end(); ++iter ) {
+		unsigned short _sport = iter->first;
+		DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
+
+		// Put retransmission of packets on hold until a MIGRATEACK is received
+		daginfo->migrateack_waiting = true;
+
+		// Send MIGRATE message to each corresponding endpoint
+		// src_DAG, dst_DAG, timestamp - Signed by private key
+		// plus the public key (Should really exchange at SYN/SYNACK)
+		uint8_t *data;
+		uint8_t *dataptr;
+		uint32_t datalen;
+		String src_path = daginfo->src_path.unparse_re();
+		String dst_path = daginfo->dst_path.unparse_re();
+		int src_path_len = strlen(src_path.c_str()) + 1;
+		int dst_path_len = strlen(dst_path.c_str()) + 1;
+		Timestamp now = Timestamp::now();
+		String timestamp = now.unparse();
+		int timestamp_len = strlen(timestamp.c_str()) + 1;
+		// Get the public key to include in packet
+		uint8_t pubkey[MAX_PUBKEY_SIZE];
+		uint16_t pubkeylen = MAX_PUBKEY_SIZE;
+		XID src_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+		if(xs_getPubkey(src_xid.unparse().c_str(), pubkey, &pubkeylen)) {
+			click_chatter("Xchangead: ERROR: Pubkey not found:%s:", src_xid.unparse().c_str());
+			return;
+		}
+		datalen = src_path_len + dst_path_len + timestamp_len + sizeof(uint16_t) + pubkeylen + sizeof(uint16_t) + MAX_SIGNATURE_SIZE;
+		data = (uint8_t *)calloc(datalen, 1);
+		if(data == NULL) {
+			click_chatter("Xchangead: ERROR: Cannot allocate memory for Migrate packet");
+			return;
+		}
+		dataptr = data;
+		memcpy(dataptr, src_path.c_str(), src_path_len);
+		dataptr += src_path_len;
+		memcpy(dataptr, dst_path.c_str(), dst_path_len);
+		dataptr += dst_path_len;
+		memcpy(dataptr, timestamp.c_str(), timestamp_len);
+		dataptr += timestamp_len;
+		uint8_t signature[MAX_SIGNATURE_SIZE];
+		uint16_t siglen = MAX_SIGNATURE_SIZE;
+		if(xs_sign(src_xid.unparse().c_str(), data, dataptr-data, signature, &siglen)) {
+			click_chatter("Xchangead: ERROR: Signing Migrate packet");
+			return;
+		}
+		memcpy(dataptr, &siglen, sizeof(uint16_t));
+		dataptr += sizeof(uint16_t);
+		memcpy(dataptr, signature, siglen);
+		dataptr += siglen;
+		memcpy(dataptr, &pubkeylen, sizeof(uint16_t));
+		dataptr += sizeof(uint16_t);
+		memcpy(dataptr, pubkey, pubkeylen);
+		dataptr += pubkeylen;
+		assert((dataptr-data) == datalen);
+
+		//Add XIA headers
+		XIAHeaderEncap xiah;
+		xiah.set_nxt(CLICK_XIA_NXT_TRN);
+		xiah.set_last(LAST_NODE_DEFAULT);
+		xiah.set_hlim(hlim.get(_sport));
+		xiah.set_dst_path(daginfo->dst_path);
+		xiah.set_src_path(daginfo->src_path);
+
+		WritablePacket *just_payload_part = WritablePacket::make(256, data, datalen, 0);
+		free(data);
+
+		WritablePacket *p = NULL;
+
+		TransportHeaderEncap *thdr = TransportHeaderEncap::MakeMIGRATEHeader( 0, -1, 0); // #seq, #ack, length
+
+		p = thdr->encap(just_payload_part);
+
+		thdr->update();
+		xiah.set_plen(datalen + thdr->hlen()); // XIA payload = transport header + transport-layer data
+
+		p = xiah.encap(p, false);
+
+		delete thdr;
+
+		// Set timer
+		daginfo->timer_on = true;
+		daginfo->migrateack_waiting = true;
+		daginfo->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
+
+		if (! _timer.scheduled() || _timer.expiry() >= daginfo->expiry )
+			_timer.reschedule_at(daginfo->expiry);
+
+		// Store the migrate packet for potential retransmission
+		daginfo->migrate_pkt = copy_packet(p, daginfo);
+
+		portToDAGinfo.set(_sport, *daginfo);
+		output(NETWORK_PORT).push(p);
+	}
 }
 
 void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport)

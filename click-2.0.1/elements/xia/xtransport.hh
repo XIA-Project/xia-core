@@ -9,6 +9,7 @@
 #include "xiaxidroutetable.hh"
 #include <click/handlercall.hh>
 #include <click/xiapath.hh>
+#include <click/xiasecurity.hh>
 #include <clicknet/xia.h>
 #include "xiacontentmodule.hh"
 #include "xiaxidroutetable.hh"
@@ -144,6 +145,7 @@ class XTRANSPORT : public Element {
 
     //Vector<WritablePacket*> pkt_buf;
     WritablePacket *syn_pkt;
+    WritablePacket *migrate_pkt;
     WritablePacket *sent_pkt[MAX_WIN_SIZE];
     HashTable<XID, WritablePacket*> XIDtoCIDreqPkt;
     HashTable<XID, Timestamp> XIDtoExpiryTime;
@@ -157,6 +159,7 @@ class XTRANSPORT : public Element {
     uint32_t expected_seqnum; // the sequence # of the next in-order packet (this is used at receiver-side)
     bool timer_on;
     Timestamp expiry;
+    bool migrateack_waiting;
     bool synack_waiting;
     bool dataack_waiting;
     bool teardown_waiting;
