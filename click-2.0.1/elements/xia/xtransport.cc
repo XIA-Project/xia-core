@@ -768,8 +768,11 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 					click_chatter("ProcessNetworkPacket: ERROR allocating memory for MIGRATEACK");
 				}
 				dataptr = data;
+				// Insert timestamp into payload
 				strcpy((char *)dataptr, timestamp.c_str());
 				dataptr += timestamp.length() + 1; // null-terminated string
+
+				// Sign the timestamp and include signature in payload
 				uint8_t mysignature[MAX_SIGNATURE_SIZE];
 				uint16_t mysiglen = MAX_SIGNATURE_SIZE;
 				if(xs_sign(my_xid.unparse().c_str(), data, dataptr-data, mysignature, &mysiglen)) {
@@ -779,12 +782,15 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				dataptr += sizeof(uint16_t);
 				memcpy(dataptr, mysignature, mysiglen);
 				dataptr += mysiglen;
+
+				// Append public key to the signature
 				memcpy(dataptr, &mypubkeylen, sizeof(uint16_t));
 				dataptr += sizeof(uint16_t);
 				memcpy(dataptr, mypubkey, mypubkeylen);
 				dataptr += mypubkeylen;
 				assert((dataptr-data) == datalen);
 
+				// Create a packet with the payload
 				XIAHeaderEncap xiah_new;
 				xiah_new.set_nxt(CLICK_XIA_NXT_TRN);
 				xiah_new.set_last(LAST_NODE_DEFAULT);
