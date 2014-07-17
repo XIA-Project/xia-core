@@ -47,7 +47,7 @@ static const char *get_keydir()
 }
 
 // Generate SHA1 hash of a given buffer
-void xs_getSHA1Hash(unsigned char *data, int data_len, uint8_t* digest, int digest_len)
+void xs_getSHA1Hash(const unsigned char *data, int data_len, uint8_t* digest, int digest_len)
 {
 	assert(digest_len == SHA_DIGEST_LENGTH);
 	SHA1(data, data_len, digest);
@@ -69,7 +69,7 @@ void xs_hexDigest(uint8_t* digest, int digest_len, char* hex_string, int hex_str
 
 // Verify signature using public key read from file for given xid
 // NOTE: Public key must be available from local file
-int xs_isValidSignature(unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, const char *xid)
+int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, const char *xid)
 {
 	uint8_t pem_pub[MAX_PUBKEY_SIZE];
 	uint16_t pem_pub_len = MAX_PUBKEY_SIZE;
@@ -83,7 +83,7 @@ int xs_isValidSignature(unsigned char *data, size_t datalen, unsigned char *sign
 }
 
 // Verify signature using public key in memory
-int xs_isValidSignature(unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, uint8_t *pem_pub, int pem_pub_len)
+int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, uint8_t *pem_pub, int pem_pub_len)
 {
 	int sig_verified;
 
@@ -100,6 +100,11 @@ int xs_isValidSignature(unsigned char *data, size_t datalen, unsigned char *sign
 	sig_verified = RSA_verify(NID_sha1, digest, sizeof digest, signature, siglen, rsa);
 	RSA_free(rsa);
 	return sig_verified;
+}
+
+const char *xs_XIDHash(const char *xid)
+{
+	return strchr((char *)xid, ':') + 1;
 }
 
 // Sign data using private key of the given xid

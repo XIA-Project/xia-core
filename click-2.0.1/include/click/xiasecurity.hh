@@ -28,15 +28,18 @@ int xs_compareHMACs(unsigned char *hmac1, unsigned char *hmac2, unsigned int hma
 int xs_makeRandomBuffer(char *buf, int buf_len);
 */
 
+// Retrieve the hex digest part from a given XID string
+const char *xs_XIDHash(const char *xid);
+
 // Generate SHA1 hash of a given buffer
-void xs_getSHA1Hash(unsigned char *data, int data_len, uint8_t* digest, int digest_len);
+void xs_getSHA1Hash(const unsigned char *data, int data_len, uint8_t* digest, int digest_len);
 
 // Convert a SHA1 digest to a hex string
 void xs_hexDigest(uint8_t* digest, int digest_len, char* hex_string, int hex_string_len);
 
 // Verify signature
-int xs_isValidSignature(unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, const char *xid);
-int xs_isValidSignature(unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, uint8_t *pem_pub, int pem_pub_len);
+int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, const char *xid);
+int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, uint8_t *pem_pub, int pem_pub_len);
 
 // Sign a given buffer
 int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *signature, uint16_t *siglen);

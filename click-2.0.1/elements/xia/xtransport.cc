@@ -689,6 +689,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 				DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
 
+				/*
 				if (thdr.seq_num() == daginfo->expected_seqnum) {
 					daginfo->expected_seqnum++;
 					//printf("(%s) Accept Received data (now expected seq=%d)\n", (_local_addr.unparse()).c_str(), daginfo->expected_seqnum);
@@ -697,12 +698,53 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 					printf("expected sequence # %d, received %d\n", daginfo->expected_seqnum, thdr.seq_num());
 					printf("(%s) Discarded Received data\n", (_local_addr.unparse()).c_str());
 				}
+				*/
 
 				// Verify the MIGRATE request and start using new DAG
-				// No need for an ACK because the operation is idempotent
+				// No need to wait for an ACK because the operation is idempotent
 				// 1. Retrieve payload (srcDAG, destDAG, seqnum) Signature, Pubkey
+				const uint8_t *payload = thdr.payload();
+				int payload_len = xiah.plen() - thdr.hlen();
+				const uint8_t *payloadptr = payload;
+				String remote_DAG((char *)payloadptr, strlen((char *) payloadptr));
+				payloadptr += strlen((char *)payloadptr) + 1;
+				String my_DAG((char *)payloadptr, strlen((char *) payloadptr));
+				payloadptr += strlen((char *)payloadptr) + 1;
+				String timestamp((char *)payloadptr, strlen((char *) payloadptr));
+				payloadptr += strlen((char *)payloadptr) + 1;
+				uint16_t siglen;
+				memcpy(&siglen, payloadptr, 2);
+				payloadptr += 2;
+				uint8_t *signature = (uint8_t *) calloc(siglen, 1);
+				memcpy(signature, payloadptr, siglen);
+				payloadptr += siglen;
+				uint16_t pubkeylen;
+				memcpy(&pubkeylen, payloadptr, 2);
+				payloadptr += 2;
+				uint8_t *pubkey = (uint8_t *) calloc(pubkeylen, 1);
+				memcpy(pubkey, payloadptr, pubkeylen);
+				payloadptr += pubkeylen;
+				assert(payloadptr-payload == payload_len);
+
 				// 2. Verify hash of pubkey matches srcDAG destination node
+				XIAPath src_path;
+				src_path.parse_re(remote_DAG);
+				String src_SID_string = src_path.xid(src_path.destination_node()).unparse();
+				const char *sourceSID = xs_XIDHash(src_SID_string.c_str());
+				uint8_t pubkeyhash[SHA_DIGEST_LENGTH];
+				char pubkeyhash_hexdigest[XIA_SHA_DIGEST_STR_LEN];
+				xs_getSHA1Hash(pubkey, pubkeylen, pubkeyhash, sizeof pubkeyhash);
+				xs_hexDigest(pubkeyhash, sizeof pubkeyhash, pubkeyhash_hexdigest, sizeof pubkeyhash_hexdigest);
+				if(strcmp(pubkeyhash_hexdigest, sourceSID) != 0) {
+					click_chatter("ProcessNetworkPacket: ERROR: MIGRATE pubkey does not match sender address");
+				}
+
 				// 3. Verify Signature using Pubkey
+				size_t signed_datalen = remote_DAG.length() + my_DAG.length() + timestamp.length() + 3;
+				if(!xs_isValidSignature(payload, signed_datalen, signature, siglen, pubkey, pubkeylen)) {
+					click_chatter("ProcessNetworkPacket: ERROR: MIGRATE with invalid signature");
+				}
+
 				// 4. Update DAGinfo dst_path with srcDAG
 				daginfo->dst_path = src_path;
 				daginfo->isConnected = true;
