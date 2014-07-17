@@ -713,14 +713,14 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				String timestamp((char *)payloadptr, strlen((char *) payloadptr));
 				payloadptr += strlen((char *)payloadptr) + 1;
 				uint16_t siglen;
-				memcpy(&siglen, payloadptr, 2);
-				payloadptr += 2;
+				memcpy(&siglen, payloadptr, sizeof(uint16_t));
+				payloadptr += sizeof(uint16_t);
 				uint8_t *signature = (uint8_t *) calloc(siglen, 1);
 				memcpy(signature, payloadptr, siglen);
 				payloadptr += siglen;
 				uint16_t pubkeylen;
-				memcpy(&pubkeylen, payloadptr, 2);
-				payloadptr += 2;
+				memcpy(&pubkeylen, payloadptr, sizeof(uint16_t));
+				payloadptr += sizeof(uint16_t);
 				uint8_t *pubkey = (uint8_t *) calloc(pubkeylen, 1);
 				memcpy(pubkey, payloadptr, pubkeylen);
 				payloadptr += pubkeylen;
@@ -841,9 +841,43 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 				// Verify the MIGRATEACK and start using new DAG
 				// 1. Retrieve payload (ack_seq_num) signature, Pubkey
-				// 2. Verify hash of pubkey matches dstDAG destination node
+				const uint8_t *payload = thdr.payload();
+				int payload_len = xiah.plen() - thdr.hlen();
+				const uint8_t *payloadptr = payload;
+				String timestamp((char *)payloadptr, strlen((char *) payloadptr));
+				payloadptr += strlen((char *)payloadptr) + 1;
+				uint16_t siglen;
+				memcpy(&siglen, payloadptr, sizeof(uint16_t));
+				payloadptr += sizeof(uint16_t);
+				uint8_t *signature = (uint8_t *) calloc(siglen, 1);
+				memcpy(signature, payloadptr, siglen);
+				payloadptr += siglen;
+				uint16_t pubkeylen;
+				memcpy(&pubkeylen, payloadptr, sizeof(uint16_t));
+				payloadptr += sizeof(uint16_t);
+				uint8_t *pubkey = (uint8_t *) calloc(pubkeylen, 1);
+				memcpy(pubkey, payloadptr, pubkeylen);
+				payloadptr += pubkeylen;
+				assert(payloadptr-payload == payload_len);
+
+				// 2. Verify hash of pubkey matches the sender's XID
+				String src_SID_string = daginfo->src_path.xid(daginfo->src_path.destination_node()).unparse();
+				uint8_t pubkeyhash[SHA_DIGEST_LENGTH];
+				char pubkeyhash_hexdigest[XIA_SHA_DIGEST_STR_LEN];
+				xs_getSHA1Hash(pubkey, pubkeylen, pubkeyhash, sizeof pubkeyhash);
+				xs_hexDigest(pubkeyhash, sizeof pubkeyhash, pubkeyhash_hexdigest, sizeof pubkeyhash_hexdigest);
+				if(strcmp(pubkeyhash_hexdigest, xs_HIDHash(src_SID_string.c_str())) != 0) {
+					click_chatter("ProcessNetworkPacket: ERROR: MIGRATE pubkey does not match sender address");
+				}
+
 				// 3. Verify Signature using Pubkey
+				size_t signed_datalen = timestamp.length() + 1;
+				if(!xs_isValidSignature(payload, signed_datalen, signature, siglen, pubkey, pubkeylen)) {
+					click_chatter("ProcessNetworkPacket: ERROR: MIGRATE with invalid signature");
+				}
+
 				// 4. Update DAGinfo src_path with dstDAG
+				// TODO: Include DAG accepted by Migrate in payload and use that here.
 				daginfo->src_path = dst_path;
 				//In case of Client Mobility...	 Update 'daginfo->dst_path'
 				//daginfo->dst_path = src_path;
