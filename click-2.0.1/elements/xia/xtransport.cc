@@ -751,7 +751,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				daginfo->initialized = true;
 
 				// 5. Return MIGRATEACK to notify mobile host of change
-				// Construct the payload
+				// Construct the payload - 'data'
 				// For now (timestamp) signature, Pubkey
 				uint8_t *data;
 				uint8_t *dataptr;
@@ -762,12 +762,17 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				if(xs_getPubkey(my_xid.unparse().c_str(), mypubkey, &mypubkeylen)) {
 					click_chatter("ProcessNetworkPacket: ERROR: getting Pubkey for MIGRATEACK");
 				}
-				datalen = timestamp.length() + 1 + MAX_SIGNATURE_SIZE + sizeof(uint16_t) + mypubkeylen;
+				datalen = remote_DAG.length() + 1 + timestamp.length() + 1 + MAX_SIGNATURE_SIZE + sizeof(uint16_t) + mypubkeylen;
 				data = (uint8_t *) calloc(datalen, 1);
 				if(data == NULL) {
 					click_chatter("ProcessNetworkPacket: ERROR allocating memory for MIGRATEACK");
 				}
 				dataptr = data;
+
+				// Insert the mobile host DAG whose migration has been accepted
+				strcpy((char *)dataptr, remote_DAG.c_str());
+				dataptr += remote_DAG.length() + 1; // null-terminated string
+
 				// Insert timestamp into payload
 				strcpy((char *)dataptr, timestamp.c_str());
 				dataptr += timestamp.length() + 1; // null-terminated string
@@ -844,14 +849,25 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				const uint8_t *payload = thdr.payload();
 				int payload_len = xiah.plen() - thdr.hlen();
 				const uint8_t *payloadptr = payload;
+
+				// Extract the migrated DAG that the fixed host accepted
+				String migrated_DAG((char *)payloadptr, strlen((char *) payloadptr));
+				payloadptr += strlen((char *)payloadptr) + 1;
+
+				// Extract the timestamp corresponding to the migration message that was sent
+				// Helps handle a second migration before the first migration is completed
 				String timestamp((char *)payloadptr, strlen((char *) payloadptr));
 				payloadptr += strlen((char *)payloadptr) + 1;
+
+				// Get the signature (migrated_DAG, timestamp)
 				uint16_t siglen;
 				memcpy(&siglen, payloadptr, sizeof(uint16_t));
 				payloadptr += sizeof(uint16_t);
 				uint8_t *signature = (uint8_t *) calloc(siglen, 1);
 				memcpy(signature, payloadptr, siglen);
 				payloadptr += siglen;
+
+				// Get the Public key of the fixed host
 				uint16_t pubkeylen;
 				memcpy(&pubkeylen, payloadptr, sizeof(uint16_t));
 				payloadptr += sizeof(uint16_t);
@@ -860,13 +876,13 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				payloadptr += pubkeylen;
 				assert(payloadptr-payload == payload_len);
 
-				// 2. Verify hash of pubkey matches the sender's XID
+				// 2. Verify hash of pubkey matches the fixed host's SID
 				String src_SID_string = daginfo->src_path.xid(daginfo->src_path.destination_node()).unparse();
 				uint8_t pubkeyhash[SHA_DIGEST_LENGTH];
 				char pubkeyhash_hexdigest[XIA_SHA_DIGEST_STR_LEN];
 				xs_getSHA1Hash(pubkey, pubkeylen, pubkeyhash, sizeof pubkeyhash);
 				xs_hexDigest(pubkeyhash, sizeof pubkeyhash, pubkeyhash_hexdigest, sizeof pubkeyhash_hexdigest);
-				if(strcmp(pubkeyhash_hexdigest, xs_HIDHash(src_SID_string.c_str())) != 0) {
+				if(strcmp(pubkeyhash_hexdigest, xs_XIDHash(src_SID_string.c_str())) != 0) {
 					click_chatter("ProcessNetworkPacket: ERROR: MIGRATE pubkey does not match sender address");
 				}
 
@@ -876,13 +892,13 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 					click_chatter("ProcessNetworkPacket: ERROR: MIGRATE with invalid signature");
 				}
 
-				// 4. Update DAGinfo src_path with dstDAG
-				// TODO: Include DAG accepted by Migrate in payload and use that here.
-				daginfo->src_path = dst_path;
-				//In case of Client Mobility...	 Update 'daginfo->dst_path'
-				//daginfo->dst_path = src_path;
+				// 4. Update DAGinfo src_path to use the new DAG
+				// TODO: Verify migrated_DAG's destination node is the same as src_path's
+				//       before replacing with the migrated_DAG
+				daginfo->src_path.parse_re(migrated_DAG);
 
-				int expected_seqnum = thdr.ack_num();
+				// 5. The retransmissions can now resume
+				daginfo->migrateack_waiting = false;
 
 				bool resetTimer = false;
 
