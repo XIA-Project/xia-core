@@ -1906,6 +1906,10 @@ void XTRANSPORT::Xchangead(unsigned short _sport)
 	for (HashTable<unsigned short, DAGinfo>::iterator iter = portToDAGinfo.begin(); iter != portToDAGinfo.end(); ++iter ) {
 		unsigned short _sport = iter->first;
 		DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
+		// TODO: use XSOCKET_STREAM?
+		if(daginfo->sock_type != 0) {
+			continue;
+		}
 
 		// Put retransmission of packets on hold until a MIGRATEACK is received
 		daginfo->migrateack_waiting = true;
