@@ -18,18 +18,62 @@
  @file dagaddr.cpp
  @brief Implements dagaddr library
 */
+
+
 #include "dagaddr.hpp"
 #include "utils.hpp"
 #include <cstring>
-#include <cstdio>
 #include <map>
 #include <algorithm>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-
 static const std::size_t vector_find_npos = std::size_t(-1);
+
+/*
+ * load user defined XIDs for use in parsing and unparsing DAGs
+ */
+Node::XidMap Node::load_xids()
+{
+	Node::XidMap ids;
+
+	char path[PATH_SIZE];
+	char name[256], text[256];
+	short id;
+	unsigned len = sizeof(path);
+	char *p;
+
+	if ((p = getenv("XIADIR")) != NULL) {
+		strncpy(path, p, len);
+	} else if (!getcwd(path, len)) {
+		path[0] = 0;
+	}
+
+	p = strstr(path, SOURCE_DIR);
+	if (p) {
+		p += sizeof(SOURCE_DIR) - 1;
+		*p = '\0';
+	}
+	strncat(path, "/etc/xids", len);
+
+	FILE *f = fopen(path, "r");
+	while (!feof(f)) {
+		if (fgets(text, sizeof(text), f)) {
+ 			if (sscanf(text, "%hi %s", &id, name) == 2) {
+				ids[id] = name;
+			}
+		}
+	}
+	fclose(f);
+
+	return ids;
+}
+
+// call the load_xids function at init time to fill in the hash map
+Node::XidMap Node::xids = Node::load_xids();
+
+
 
 template <typename T>
 static std::size_t
@@ -232,8 +276,23 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 		ptr_->type = XID_TYPE_DUMMY_SOURCE;
 	else
 	{
-		ptr_->type = 0;
-		printf("WARNING: Unrecognized XID type: %s\n", type_str.c_str());
+		// see if it's a user defined XID
+		XidMap::const_iterator itr;
+		int found = 0;
+
+		for (itr = Node::xids.begin(); itr != Node::xids.end(); itr++) {
+
+			if (type_str == (*itr).second) {
+				found = 1;
+				ptr_->type = (*itr).first;
+				break;
+			}
+		}
+
+		if (!found) {
+			ptr_->type = 0;
+			printf("WARNING: Unrecognized XID type: %s\n", type_str.c_str());
+		}
 	}
 
 	// If this is a 4ID formatted as an IP address (x.x.x.x), we
@@ -273,7 +332,8 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 /**
 * @brief Return the node's type as a string
 *
-* @return The node's type as a string. Will be one of:
+* The type string will either be one of the following built-in XID types or will match 
+* one of the entries in etc/xids.
 *			\n Node::XID_TYPE_AD_STRING
 *			\n Node::XID_TYPE_HID_STRING
 *			\n Node::XID_TYPE_CID_STRING
@@ -281,6 +341,7 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 *			\n Node::XID_TYPE_IP_STRING
 *			\n Node::XID_TYPE_DUMMY_SOURCE
 *			\n Node:: ID_TYPE_UNKNOWN_STRING
+* @return the node's type as a string
 */
 std::string
 Node::type_string() const
@@ -300,7 +361,11 @@ Node::type_string() const
 		case XID_TYPE_DUMMY_SOURCE:
 			return XID_TYPE_DUMMY_SOURCE_STRING;
 		default:
-			return XID_TYPE_UNKNOWN_STRING;
+			std::string s = xids[this->type()];
+			if (s.empty())
+				s = XID_TYPE_UNKNOWN_STRING;
+
+			return s;
 	}
 }
 
