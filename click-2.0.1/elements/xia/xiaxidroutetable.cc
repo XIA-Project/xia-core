@@ -436,6 +436,7 @@ XIAXIDRouteTable::push(int in_ether_port, Packet *p)
 		return;
 	}
 
+printf("%s\n", this->name().c_str());
     if(in_ether_port == REDIRECT) {
         // if this is an XCMP redirect packet
         process_xcmp_redirect(p);
@@ -536,7 +537,9 @@ XIAXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
     const struct click_xia_xid_node& node = hdr->node[idx];
 
     XIAHeader xiah(p->xia_header());
-    
+
+printf("%30s %d %s\n", this->name().c_str(), in_ether_port, xiah.dst_path().unparse().c_str());
+
     if (_bcast_xid == node.xid) {
     	// Broadcast packet
     	
@@ -579,6 +582,7 @@ XIAXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
 		if (it != _rts.end())
 		{
 			XIARouteData *xrd = (*it).second;
+printf("   match %30s %d %d %s\n", this->name().c_str(), in_ether_port, _rtdata.port, xiah.dst_path().unparse().c_str());
 			// check if outgoing packet
 			if(xrd->port != DESTINED_FOR_LOCALHOST && xrd->port != FALLBACK && xrd->nexthop != NULL) {
 				p->set_nexthop_neighbor_xid_anno(*(xrd->nexthop));
@@ -591,7 +595,8 @@ XIAXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
 			// check if outgoing packet
 			if(_rtdata.port != DESTINED_FOR_LOCALHOST && _rtdata.port != FALLBACK && _rtdata.nexthop != NULL) {
 				p->set_nexthop_neighbor_xid_anno(*(_rtdata.nexthop));
-			}			
+			}
+printf("no match %30s %d %d %s\n", this->name().c_str(), in_ether_port, _rtdata.port, xiah.dst_path().unparse().c_str());
 			return _rtdata.port;
 		}
 	}
