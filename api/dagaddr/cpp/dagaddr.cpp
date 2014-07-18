@@ -58,14 +58,16 @@ Node::XidMap Node::load_xids()
 	strncat(path, "/etc/xids", len);
 
 	FILE *f = fopen(path, "r");
-	while (!feof(f)) {
-		if (fgets(text, sizeof(text), f)) {
- 			if (sscanf(text, "%hi %s", &id, name) == 2) {
-				ids[id] = name;
+	if (f) {
+		while (!feof(f)) {
+			if (fgets(text, sizeof(text), f)) {
+ 				if (sscanf(text, "%hi %s", &id, name) == 2) {
+					ids[id] = name;
+				}
 			}
 		}
+		fclose(f);
 	}
-	fclose(f);
 
 	return ids;
 }

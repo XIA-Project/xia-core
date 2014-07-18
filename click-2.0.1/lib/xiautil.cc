@@ -62,18 +62,17 @@ XidMap::XMap XidMap::load()
 	}
 	strncat(path, "/etc/xids", len);
 
-	printf("reading %s\n", path);
-
 	FILE *f = fopen(path, "r");
-	while (!feof(f)) {
-		if (fgets(text, sizeof(text), f)) {
- 			if (sscanf(text, "%hi %s", &id, name) == 2) {
-				ids[id] = name;
-				printf("XID:: %d %s\n", id, name);
+	if (f) {	
+		while (!feof(f)) {
+			if (fgets(text, sizeof(text), f)) {
+ 				if (sscanf(text, "%hi %s", &id, name) == 2) {
+					ids[id] = name;
+				}
 			}
 		}
+		fclose(f);
 	}
-	fclose(f);
 
 	return ids;
 }
