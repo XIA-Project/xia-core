@@ -44,23 +44,10 @@ char *XrootDir(char *buf, unsigned len) {
 		strncpy(buf, dir, len);
 		return buf;
 	}
-#ifdef __APPLE__
 	if (!getcwd(buf, len)) {
 		buf[0] = 0;
 		return buf;
 	}
-#else
-	int cnt = readlink("/proc/self/exe", buf, MIN(len, PATH_SIZE));
-
-	if (cnt < 0) {
-		buf[0] = 0;
-		return buf;
-	}
-	else if ((unsigned)cnt == len)
-		buf[len - 1] = 0;
-	else
-		buf[cnt] = 0;
-#endif
 	pos = strstr(buf, SOURCE_DIR);
 	if (pos) {
 		pos += sizeof(SOURCE_DIR) - 1;
