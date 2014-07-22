@@ -364,6 +364,13 @@ int sendSidDiscovery()
 
     // send it to neighbor ADs
     // TODO: reuse code: broadcastToADNeighbors(msg)?
+
+    // locallly process first
+    ControlMessage msg1 = msg;
+    int type;
+    msg1.read(type); //offset
+    processSidDiscovery(msg1);
+
     std::map<std::string, NeighborEntry>::iterator it;
 
     for (it = route_state.ADNeighborTable.begin(); it != route_state.ADNeighborTable.end(); ++it)
