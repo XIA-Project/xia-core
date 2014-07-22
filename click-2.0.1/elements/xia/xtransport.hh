@@ -162,6 +162,7 @@ class XTRANSPORT : public Element {
     bool timer_on;
     Timestamp expiry;
     bool migrateack_waiting;
+    String last_migrate_ts;
     bool synack_waiting;
     bool dataack_waiting;
     bool teardown_waiting;

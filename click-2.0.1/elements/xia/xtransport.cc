@@ -925,7 +925,10 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				daginfo->src_path.parse_re(migrated_DAG);
 
 				// 5. TODO: Verify timestamp matches the latest migrate message
-				//
+				if(daginfo->last_migrate_ts.equals(timestamp.c_str(), timestamp.length())) {
+					click_chatter("ProcessNetworkPacket: WARN: timestamp in migrateack did not match migrate timestamp");
+				}
+
 				// 6. The data retransmissions can now resume
 				daginfo->migrateack_waiting = false;
 				daginfo->num_migrate_tries = 0;
@@ -2019,6 +2022,11 @@ void XTRANSPORT::Xchangead(unsigned short _sport)
 
 		delete thdr;
 
+		// Store the migrate packet for potential retransmission
+		daginfo->migrate_pkt = copy_packet(p, daginfo);
+		daginfo->num_migrate_tries++;
+		daginfo->last_migrate_ts = timestamp;
+
 		// Set timer
 		daginfo->timer_on = true;
 		daginfo->migrateack_waiting = true;
@@ -2026,10 +2034,6 @@ void XTRANSPORT::Xchangead(unsigned short _sport)
 
 		if (! _timer.scheduled() || _timer.expiry() >= daginfo->expiry )
 			_timer.reschedule_at(daginfo->expiry);
-
-		// Store the migrate packet for potential retransmission
-		daginfo->migrate_pkt = copy_packet(p, daginfo);
-		daginfo->num_migrate_tries++;
 
 		portToDAGinfo.set(_sport, *daginfo);
 		output(NETWORK_PORT).push(p);
