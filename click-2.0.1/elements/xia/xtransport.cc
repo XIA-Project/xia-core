@@ -189,7 +189,34 @@ XTRANSPORT::run_timer(Timer *timer)
 						//click_chatter("Timer: Sent packet to socket with port %d", _sport);
                         output(API_PORT).push(UDPIPPrep(ppp, _sport));
 				}
+			} else if (daginfo->migrateack_waiting == true && daginfo->expiry <= now ) {
+				//click_chatter("Timer: migrateack waiting\n");
+				if (daginfo->num_migrate_tries <= MAX_CONNECT_TRIES) {
 
+					//click_chatter("Timer: SYN RETRANSMIT! \n");
+					copy = copy_packet(daginfo->migrate_pkt, daginfo);
+					// retransmit migrate
+					XIAHeader xiah(copy);
+					// printf("Timer: (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
+					output(NETWORK_PORT).push(copy);
+
+					daginfo->timer_on = true;
+					daginfo->migrateack_waiting = true;
+					daginfo->expiry = now + Timestamp::make_msec(_ackdelay_ms);
+					daginfo->num_migrate_tries++;
+				} else {
+					// Stop sending the connection request & Report the failure to the application
+					daginfo->timer_on = false;
+					daginfo->migrateack_waiting = false;
+
+					String str = String("^Connection-failed^");
+					WritablePacket *ppp = WritablePacket::make (256, str.c_str(), str.length(), 0);
+
+					if (DEBUG) {
+						//click_chatter("Timer: Sent packet to socket with port %d", _sport);
+                        output(API_PORT).push(UDPIPPrep(ppp, _sport));
+					}
+				}
 			} else if (daginfo->dataack_waiting == true && daginfo->expiry <= now ) {
 
 				// adding check to see if anything was retransmitted. We can get in here with
@@ -845,7 +872,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
 
 				// Verify the MIGRATEACK and start using new DAG
-				// 1. Retrieve payload (ack_seq_num) signature, Pubkey
+				// 1. Retrieve payload (migratedDAG, timestamp) signature, Pubkey
 				const uint8_t *payload = thdr.payload();
 				int payload_len = xiah.plen() - thdr.hlen();
 				const uint8_t *payloadptr = payload;
@@ -897,8 +924,11 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				//       before replacing with the migrated_DAG
 				daginfo->src_path.parse_re(migrated_DAG);
 
-				// 5. The retransmissions can now resume
+				// 5. TODO: Verify timestamp matches the latest migrate message
+				//
+				// 6. The data retransmissions can now resume
 				daginfo->migrateack_waiting = false;
+				daginfo->num_migrate_tries = 0;
 
 				bool resetTimer = false;
 
@@ -1459,6 +1489,7 @@ void XTRANSPORT::Xsocket(unsigned short _sport) {
 	daginfo.teardown_waiting = false;
 	daginfo.isAcceptSocket = false;
 	daginfo.num_connect_tries = 0; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
+	daginfo.num_migrate_tries = 0; // number of migrate tries (Connection will fail after MAX_MIGRATE_TRIES trials)
 	memset(daginfo.sent_pkt, 0, MAX_WIN_SIZE * sizeof(WritablePacket*));
 
 	//Set the socket_type (reliable or not) in DAGinfo
@@ -1998,6 +2029,7 @@ void XTRANSPORT::Xchangead(unsigned short _sport)
 
 		// Store the migrate packet for potential retransmission
 		daginfo->migrate_pkt = copy_packet(p, daginfo);
+		daginfo->num_migrate_tries++;
 
 		portToDAGinfo.set(_sport, *daginfo);
 		output(NETWORK_PORT).push(p);
