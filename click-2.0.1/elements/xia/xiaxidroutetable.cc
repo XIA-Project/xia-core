@@ -218,6 +218,9 @@ XIAXIDRouteTable::set_handler4(const String &conf, Element *e, void *thunk, Erro
 		xrd->port = port;
 		xrd->flags = flags;
 		xrd->nexthop = nexthop;
+        if (table->_rts[xid]){
+            delete table->_rts[xid];
+        }
 		table->_rts[xid] = xrd;
 	}
 
