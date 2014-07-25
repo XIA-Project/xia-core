@@ -179,7 +179,7 @@ elementclass IPLineCard {
 
 	// Receiving an XIA-encapped-in-IP packet; strip the ethernet, IP, and UDP headers, 
 	// leaving bare XIP packet, then paint so we know which port it came in on
-	c[2] -> Strip(14) -> CheckIPHeader() -> MarkIPHeader -> StripIPHeader -> Strip(8) -> MarkXIAHeader
+	c[2] -> Strip(14) -> CheckIPHeader() -> IPClassifier(dst host $ip and dst udp port 13781) -> MarkIPHeader -> StripIPHeader -> Strip(8) -> MarkXIAHeader
 	-> Paint($num) -> [1]output; // this should be send out to [0]n;   	
 
 	// Receiving an ARP Response; return it to querier
