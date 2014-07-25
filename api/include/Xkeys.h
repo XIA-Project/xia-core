@@ -31,7 +31,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#define XIA_SHA_DIGEST_STR_LEN SHA_DIGEST_LENGTH*2+1
+#define XIA_SHA_DIGEST_STR_LEN ((SHA_DIGEST_LENGTH*2)+1)
 
 // Remove keys associated with the given SID
 int XremoveSID(char *sid, int sidlen);

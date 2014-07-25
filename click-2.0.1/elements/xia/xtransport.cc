@@ -1488,6 +1488,7 @@ void XTRANSPORT::Xsocket(unsigned short _sport) {
 	daginfo.timer_on = false;
 	daginfo.synack_waiting = false;
 	daginfo.dataack_waiting = false;
+	daginfo.migrateack_waiting = false;
 	daginfo.num_retransmit_tries = 0;
 	daginfo.teardown_waiting = false;
 	daginfo.isAcceptSocket = false;
@@ -1941,12 +1942,9 @@ void XTRANSPORT::Xchangead(unsigned short _sport)
 		unsigned short _sport = iter->first;
 		DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
 		// TODO: use XSOCKET_STREAM?
-		if(daginfo->sock_type != 0) {
+		if(daginfo->sock_type != SOCK_STREAM) {
 			continue;
 		}
-
-		// Put retransmission of packets on hold until a MIGRATEACK is received
-		daginfo->migrateack_waiting = true;
 
 		// Send MIGRATE message to each corresponding endpoint
 		// src_DAG, dst_DAG, timestamp - Signed by private key
@@ -1956,6 +1954,7 @@ void XTRANSPORT::Xchangead(unsigned short _sport)
 		uint32_t datalen;
 		String src_path = daginfo->src_path.unparse_re();
 		String dst_path = daginfo->dst_path.unparse_re();
+		click_chatter("MIGRATING %s - %s", src_path.c_str(), dst_path.c_str());
 		int src_path_len = strlen(src_path.c_str()) + 1;
 		int dst_path_len = strlen(dst_path.c_str()) + 1;
 		Timestamp now = Timestamp::now();

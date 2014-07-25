@@ -269,7 +269,7 @@ cleanup_generate_keypair:
 int XmakeNewSID(char *randomSID, int randomSIDlen)
 {
 	char pubkeyhashstr[XIA_SHA_DIGEST_STR_LEN];
-	assert(randomSIDlen >= strlen("SID:") + XIA_SHA_DIGEST_STR_LEN);
+	assert(randomSIDlen >= (int) (strlen("SID:") + XIA_SHA_DIGEST_STR_LEN));
 	if(generate_keypair(pubkeyhashstr, XIA_SHA_DIGEST_STR_LEN)) {
 		return -1;
 	}
