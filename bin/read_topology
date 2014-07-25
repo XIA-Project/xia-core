@@ -18,6 +18,7 @@ import sys
 import os
 import re
 import hashlib
+import genkeys
 from Crypto.PublicKey import RSA
 
 DEFAULT_PORT=1500
@@ -55,37 +56,6 @@ def create_output_file(name):
 		print 'unable to open %s for writing' % name
 
 	return f
-
-def generate_rsa_key():
-	private = RSA.generate(1024)
-	public = private.publickey()
-	return (private.exportKey(), public.exportKey())
-
-def write_key_files(basename, privkey, pubkey):
-	if not os.path.exists(keydir):
-		os.mkdir(keydir)
-	privkeyfilename = os.path.join(keydir, basename)
-	pubkeyfilename = os.path.join(keydir, basename + '.pub')
-	print 'Created key files', privkeyfilename, pubkeyfilename
-	with open(privkeyfilename, 'w') as privkeyfile:
-		privkeyfile.write(privkey + '\n')
-	with open(pubkeyfilename, 'w') as pubkeyfile:
-		pubkeyfile.write(pubkey + '\n')
-
-def create_new_address():
-	# Create a new key pair
-	(privkey, pubkey) = generate_rsa_key()
-	# Create hash of public key to use as device address
-	pubkeyhash = pubkey_hash(pubkey)
-	# Dump the keys in files based on hash name
-	write_key_files(pubkeyhash, privkey, pubkey)
-	return pubkeyhash
-
-def pubkey_hash(pubkey):
-	keylist = pubkey.split('\n')
-	# Strip the first and last line because they just contain text markers
-	key = ''.join(keylist[1:-1])
-	return hashlib.sha1(key).hexdigest()
 
 # start here
 
@@ -130,7 +100,7 @@ sockconf.write('[default]\nclick_port=%s\n\n' % DEFAULT_PORT)
 nodeconf = create_output_file(sys.argv[3])
 
 xia_address = None
-if sys.argv[1].find('topology'):
+if 'topology' in sys.argv[1]:
 	create_xia_address_click = True
 	xia_address = create_output_file(sys.argv[4])
 	xia_address.write('XIAXIDInfo(\n')
@@ -158,7 +128,7 @@ for line in lines:
 		idfield = 2
 		if xia_address:
 			ad_num = 'AD%d' % next_ad
-			ad_addr = 'AD:%s' % create_new_address()
+			ad_addr = genkeys.create_new_AD()
 			#xia_address.write('\tAD%d AD:%s,\n' % (next_ad, create_new_address()))
 			xia_address.write('\t%s %s,\n' % (ad_num, ad_addr))
 			topology_xia_addresses[ad_num] = ad_addr
@@ -172,7 +142,7 @@ for line in lines:
 	nodeconf.write("%s\t%s\n" % (name, element.group()))
 	if xia_address:
 		dev_name = fields[idfield].strip()
-		dev_addr = 'HID:%s' % create_new_address()
+		dev_addr = genkeys.create_new_HID()
 		#xia_address.write('\t%s HID:%s,\n' % (fields[idfield].strip(), create_new_address()))
 		xia_address.write('\t%s %s,\n' % (dev_name, dev_addr))
 		topology_xia_addresses[dev_name] = dev_addr
@@ -182,7 +152,8 @@ if nshost != None:
 
 sockconf.close
 nodeconf.close
-if xia_address:
+# For predefined topologies we create xia_address.click and resolv.conf
+if create_xia_address_click:
 	for key, value in permanent_xia_addresses.iteritems():
 		xia_address.write('\t' + ' '.join([key, value]) + ',\n')
 	xia_address.write(');\n')

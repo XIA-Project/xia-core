@@ -316,10 +316,10 @@ elementclass XIARouter4Port {
 
     Script(write xrc/n/proc/rt_AD.add $local_ad $DESTINED_FOR_LOCALHOST);    // self AD as destination
 
-	xlc0 :: XIALineCard($local_addr, $local_hid, $mac0, 0);
-	xlc1 :: XIALineCard($local_addr, $local_hid, $mac1, 1);
-	xlc2 :: XIALineCard($local_addr, $local_hid, $mac2, 2);
-	xlc3 :: XIALineCard($local_addr, $local_hid, $mac3, 3);
+	xlc0 :: XIALineCard($local_addr, $local_hid, $mac0, 0, 0, 1);
+	xlc1 :: XIALineCard($local_addr, $local_hid, $mac1, 1, 0, 0);
+	xlc2 :: XIALineCard($local_addr, $local_hid, $mac2, 2, 0, 0);
+	xlc3 :: XIALineCard($local_addr, $local_hid, $mac3, 3, 0, 0);
     
 	input => xlc0, xlc1, xlc2, xlc3 => output;
 	xrc -> XIAPaintSwitch[0,1,2,3] => [1]xlc0[1], [1]xlc1[1], [1]xlc2[1], [1]xlc3[1] -> [0]xrc;

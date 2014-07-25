@@ -407,7 +407,8 @@ start_click()
 	#  it properly
 	if [ "$NSHOST" != "" ]; then
 		printf "$NSHOST\tnameserver\n" >> $NODECONF
-	elif [ $NAMESERVER -eq 1 -a "$NODETYPE" == "host" ]; then
+	#elif [ $NAMESERVER -eq 1 -a "$NODETYPE" == "host" ]; then
+	elif [ $NAMESERVER -eq 1 ]; then
 		printf "$HOSTNAME\tnameserver\n" >> $NODECONF
 	fi
 
@@ -494,8 +495,7 @@ create_click_config()
 	CONFFLAGS="$CONFFLAGS -i $HOSTNAME"
 	CONFPATH=$XIADIR/etc/click/templates
 
-	cd $CONFPATH
-	python xconfig.py $CONFFLAGS
+	python $XIADIR/bin/xconfig.py $CONFFLAGS
 }
 
 #
