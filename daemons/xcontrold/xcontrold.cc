@@ -1460,6 +1460,12 @@ void set_controller_conf(const char* myhostname)
     UPDATE_CONFIG = ini_getl(section_name, "update_config", UPDATE_CONFIG_D, full_path);
     UPDATE_LATENCY = ini_getl(section_name, "update_latency", UPDATE_LATENCY_D, full_path);
 
+    route_state.hello_ratio = (int32_t) ceil(HELLO_INTERVAL/WAKEUP_INTERVAL);
+    route_state.lsa_ratio = (int32_t) ceil(AD_LSA_INTERVAL/WAKEUP_INTERVAL);
+    route_state.sid_discovery_ratio = (int32_t) ceil(SID_DISCOVERY_INTERVAL/WAKEUP_INTERVAL);
+    route_state.sid_decision_ratio = (int32_t) ceil(SID_DECISION_INTERVAL/WAKEUP_INTERVAL);
+    // TODO: maybe other values should be updated as well
+
     //syslog(LOG_DEBUG, "Read from %s latency update rate: %d\n", section_name, UPDATE_LATENCY);
     return;
 }

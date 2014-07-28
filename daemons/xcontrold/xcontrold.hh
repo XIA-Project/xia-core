@@ -96,7 +96,7 @@ typedef struct RouteState {
     int32_t sid_discovery_seq;    // sid discovery sequence number of this router
     int32_t sid_decision_seq;    // sid decision sequence number of this router
     int32_t sid_decision_timer;    // sid decision sequence number of this router
-    int32_t hello_ratio; // frequency ratio of wakeup:lsa (for timer purpose)
+    int32_t hello_ratio; // frequency ratio of wakeup:hello (for timer purpose)
 	int32_t lsa_ratio; // frequency ratio of wakeup:lsa (for timer purpose)
     int32_t sid_discovery_ratio; // frequency ratio of wakeup:sid discovery (for timer purpose)
     int32_t sid_decision_ratio; // frequency ratio of wakeup:sid decision (for timer purpose)
