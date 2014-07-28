@@ -21,6 +21,7 @@
 #include "../common/Topology.hh"
 #include "../common/XIARouter.hh"
 
+#define WAKEUP_INTERVAL 0.1
 #define EXPIRE_TIME_D 60
 #define HELLO_INTERVAL_D 0.1
 #define LSA_INTERVAL_D 0.3
@@ -89,14 +90,16 @@ typedef struct RouteState {
 	std::string dual_router_AD; // AD (with dual router) -- default AD for 4ID traffic	
 	int32_t num_neighbors; // number of neighbor routers
 	int32_t lsa_seq;	// LSA sequence number of this router
-	int32_t hello_seq;  // hello seq number of this router 
+	int32_t hello_timer;  // hello seq number of this router 
+    int32_t lsa_timer;  // hello seq number of this router 
     int32_t sid_discovery_timer;    // sid discovery timer of this router
     int32_t sid_discovery_seq;    // sid discovery sequence number of this router
     int32_t sid_decision_seq;    // sid decision sequence number of this router
     int32_t sid_decision_timer;    // sid decision sequence number of this router
-	int32_t hello_lsa_ratio; // frequency ratio of hello:lsa (for timer purpose)
-    int32_t hello_sid_discovery_ratio; // frequency ratio of hello:sid discovery (for timer purpose)
-    int32_t hello_sid_decision_ratio; // frequency ratio of hello:sid decision (for timer purpose)
+    int32_t hello_ratio; // frequency ratio of wakeup:lsa (for timer purpose)
+	int32_t lsa_ratio; // frequency ratio of wakeup:lsa (for timer purpose)
+    int32_t sid_discovery_ratio; // frequency ratio of wakeup:sid discovery (for timer purpose)
+    int32_t sid_decision_ratio; // frequency ratio of wakeup:sid decision (for timer purpose)
 	int32_t calc_dijstra_ticks;   
 	bool send_hello;  // Should a hello message be sent?
 	bool send_lsa;  // Should a LSA message be sent?

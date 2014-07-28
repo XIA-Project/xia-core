@@ -54,41 +54,58 @@ std::map<std::string, NodeStateEntry> ADNetworkTable_temp;
 void timeout_handler(int signum)
 {
 	UNUSED(signum);
-
-	if (route_state.hello_seq < route_state.hello_lsa_ratio) {
+    /*
+	if (route_state.hello_timer < route_state.lsa_ratio) {
 		// send Hello
 		route_state.send_hello = true;
 		//sendHello();
-		route_state.hello_seq++;
-	} else if (route_state.hello_seq >= route_state.hello_lsa_ratio) {
+		route_state.hello_timer++;
+	} else if (route_state.hello_timer >= route_state.lsa_ratio) {
 		// it's time to send LSA
 		route_state.send_lsa = true;
 		//sendInterdomainLSA();
 		// reset hello req
-		route_state.hello_seq = 0;
+		route_state.hello_timer = 0;
 	} else {
-		syslog(LOG_ERR, "hello_seq=%d hello_lsa_ratio=%d", route_state.hello_seq, route_state.hello_lsa_ratio);
-	}
+		syslog(LOG_ERR, "hello_timer=%d lsa_ratio=%d", route_state.hello_timer, route_state.lsa_ratio);
+	}*/
+
+    if (route_state.hello_timer < route_state.hello_ratio){
+        route_state.hello_timer++;
+    }
+    else{
+        route_state.send_hello = true;
+        route_state.hello_timer = 0;
+    }
+
+    if (route_state.lsa_timer < route_state.lsa_ratio){
+        route_state.lsa_timer++;
+    }
+    else{
+        route_state.send_lsa = true;
+        route_state.lsa_timer = 0;
+    }
+
 	 //TODO: only send discovery message when necessary
-    if (route_state.sid_discovery_timer < route_state.hello_sid_discovery_ratio) {
+    if (route_state.sid_discovery_timer < route_state.sid_discovery_ratio) {
         //wait
         route_state.sid_discovery_timer++;
-    } else if (route_state.sid_discovery_timer >= route_state.hello_sid_discovery_ratio ) {
+    } else if (route_state.sid_discovery_timer >= route_state.sid_discovery_ratio ) {
         //send sid discovery message
         route_state.send_sid_discovery = true;
         route_state.sid_discovery_timer = 0;
     }
-    if (route_state.sid_decision_timer < route_state.hello_sid_decision_ratio) {
+    if (route_state.sid_decision_timer < route_state.sid_decision_ratio) {
         //wait
         route_state.sid_decision_timer++;
-    } else if (route_state.sid_decision_timer >= route_state.hello_sid_decision_ratio ) {
+    } else if (route_state.sid_decision_timer >= route_state.sid_decision_ratio) {
         //send sid decision message
         route_state.send_sid_decision = true;
         route_state.sid_decision_timer = 0;
     }
 	// reset the timer
 	signal(SIGALRM, timeout_handler);
-	ualarm((int)ceil(HELLO_INTERVAL*1000000),0);
+	ualarm((int)ceil(WAKEUP_INTERVAL*1000000),0);
 }
 
 // send Hello message (1-hop broadcast) with my AD and my HID to the directly connected neighbors
@@ -1319,12 +1336,14 @@ void initRouteState()
 
 	route_state.num_neighbors = 0; // number of neighbor routers
 	route_state.lsa_seq = rand()%MAX_SEQNUM;	// LSA sequence number of this router
-	route_state.hello_seq = 0;  // hello seq number of this router
+	route_state.hello_timer = 0;  // hello timer number of this router
+    route_state.lsa_timer = 0;  // lsa timer number of this router
     route_state.sid_discovery_timer = 0;  // sid discovery timer of this router
 	route_state.sid_discovery_seq = rand()%MAX_SEQNUM;  // sid discovery seq number of this router
-	route_state.hello_lsa_ratio = (int32_t) ceil(AD_LSA_INTERVAL/HELLO_INTERVAL);
-	route_state.hello_sid_discovery_ratio = (int32_t) ceil(SID_DISCOVERY_INTERVAL/HELLO_INTERVAL);
-    route_state.hello_sid_decision_ratio = (int32_t) ceil(SID_DECISION_INTERVAL/HELLO_INTERVAL);
+    route_state.hello_ratio = (int32_t) ceil(HELLO_INTERVAL/WAKEUP_INTERVAL);
+	route_state.lsa_ratio = (int32_t) ceil(AD_LSA_INTERVAL/WAKEUP_INTERVAL);
+	route_state.sid_discovery_ratio = (int32_t) ceil(SID_DISCOVERY_INTERVAL/WAKEUP_INTERVAL);
+    route_state.sid_decision_ratio = (int32_t) ceil(SID_DECISION_INTERVAL/WAKEUP_INTERVAL);
 	route_state.calc_dijstra_ticks = -8;
 
 	route_state.ctl_seq = 0;	// LSA sequence number of this router
@@ -1341,7 +1360,7 @@ void initRouteState()
 
 	// set timer for HELLO/LSA
 	signal(SIGALRM, timeout_handler);
-	ualarm((int)ceil(HELLO_INTERVAL*1000000),0); 	
+	ualarm((int)ceil(WAKEUP_INTERVAL*1000000),0); 	
 }
 
 void help(const char *name)
