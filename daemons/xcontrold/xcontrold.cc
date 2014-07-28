@@ -25,7 +25,22 @@
 
 #define DEFAULT_NAME "controller0"
 #define APPNAME "xcontrold"
-#define EXPIRE_TIME 60
+
+// parameters which could be overwritten by controller file
+// default values are defined in the header file
+int EXPIRE_TIME = EXPIRE_TIME_D;
+double HELLO_INTERVAL = HELLO_INTERVAL_D;
+double LSA_INTERVAL = LSA_INTERVAL_D;
+double SID_DISCOVERY_INTERVAL = SID_DISCOVERY_INTERVAL_D;
+double SID_DECISION_INTERVAL = SID_DECISION_INTERVAL_D;
+double AD_LSA_INTERVAL = AD_LSA_INTERVAL_D;
+double CALC_DIJKSTRA_INTERVAL = CALC_DIJKSTRA_INTERVAL_D;
+int UPDATE_LATENCY = UPDATE_LATENCY_D;
+int UPDATE_CONFIG = UPDATE_CONFIG_D;
+int MAX_HOP_COUNT  = MAX_HOP_COUNT_D;
+int MAX_SEQNUM = MAX_SEQNUM_D;
+int SEQNUM_WINDOW = SEQNUM_WINDOW_D;
+
 
 char *hostname = NULL;
 char *ident = NULL;
@@ -1373,6 +1388,9 @@ void config(int argc, char** argv)
 	// load the config setting for this hostname
 	set_conf("xsockconf.ini", hostname);
 
+    // set controller parameters
+    set_controller_conf(hostname);
+
 	// load local SIDs
     set_sid_conf(hostname);
 
@@ -1382,6 +1400,51 @@ void config(int argc, char** argv)
 	openlog(ident, LOG_CONS|LOG_NDELAY|LOG_LOCAL4|verbose, LOG_LOCAL4);
 	setlogmask(LOG_UPTO(level));
 }
+
+void set_controller_conf(const char* myhostname)
+{
+    // read the controller file at etc/controller.ini
+    // set the parameters 
+    char full_path[BUF_SIZE];
+    char root[BUF_SIZE];
+    char section_name[BUF_SIZE];
+    bool mysection = false; // should read default section or not
+
+    snprintf(full_path, BUF_SIZE, "%s/etc/controllers.ini", XrootDir(root, BUF_SIZE));
+    int section_index = 0;
+    while (ini_getsection(section_index, section_name, BUF_SIZE, full_path))
+    {
+        if (strcmp(section_name, myhostname) == 0) // section for me
+        {
+            mysection = true;
+            break;
+        }
+        section_index++;
+    }
+    if (mysection){
+        strcpy(section_name, myhostname);
+    }
+    else{
+        strcpy(section_name, "default");
+    }
+    // read the values
+    EXPIRE_TIME = ini_getl(section_name, "expert_time", EXPIRE_TIME_D, full_path);
+    HELLO_INTERVAL = ini_getf(section_name, "hello_interval", HELLO_INTERVAL_D, full_path);
+    LSA_INTERVAL = ini_getf(section_name, "LSA_interval", LSA_INTERVAL_D, full_path);
+    SID_DISCOVERY_INTERVAL = ini_getf(section_name, "SID_discovery_interval", SID_DISCOVERY_INTERVAL_D, full_path);
+    SID_DECISION_INTERVAL = ini_getf(section_name, "SID_decision_interval", SID_DECISION_INTERVAL_D, full_path);
+    AD_LSA_INTERVAL = ini_getf(section_name, "AD_LSA_interval", AD_LSA_INTERVAL_D, full_path);
+    CALC_DIJKSTRA_INTERVAL = ini_getf(section_name, "calc_Dijkstra_interval", CALC_DIJKSTRA_INTERVAL_D, full_path);
+    MAX_HOP_COUNT  = ini_getl(section_name, "max_hop_count", MAX_HOP_COUNT_D, full_path);
+    MAX_SEQNUM = ini_getl(section_name, "max_sqenum", MAX_SEQNUM_D, full_path);
+    SEQNUM_WINDOW = ini_getl(section_name, "sqenum_window", SEQNUM_WINDOW_D, full_path);
+    UPDATE_CONFIG = ini_getl(section_name, "update_config", UPDATE_CONFIG_D, full_path);
+    UPDATE_LATENCY = ini_getl(section_name, "update_latency", UPDATE_LATENCY_D, full_path);
+
+    //syslog(LOG_DEBUG, "Read from %s latency update rate: %d\n", section_name, UPDATE_LATENCY);
+    return;
+}
+
 
 void set_sid_conf(const char* myhostname)
 {
@@ -1525,6 +1588,8 @@ perror("bind");
 
 	int sock;
 	time_t last_purge = time(NULL);
+    time_t last_update_config = last_purge;
+    time_t last_update_latency = last_purge;
 	while (1) {
 		if (route_state.send_hello == true) {
 			route_state.send_hello = false;
@@ -1541,7 +1606,6 @@ perror("bind");
         }
         if (route_state.send_sid_decision == true) {
             route_state.send_sid_decision = false;
-            updateADPathStates(); // update latency info
             processSidDecision();
         }
 		FD_ZERO(&socks);
@@ -1573,6 +1637,21 @@ perror("bind");
 		}
 
 		time_t now = time(NULL);
+
+        if (now -last_update_config >= UPDATE_CONFIG)
+        {
+            last_update_config = now;
+            set_controller_conf(hostname);
+            set_sid_conf(hostname);
+
+        }
+
+        if (now - last_update_latency >= UPDATE_LATENCY)
+        {
+            last_update_latency = now;
+            updateADPathStates(); // update latency info
+        }
+
 		if (now - last_purge >= EXPIRE_TIME)
 		{
 			last_purge = now;

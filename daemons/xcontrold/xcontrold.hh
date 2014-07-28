@@ -21,16 +21,19 @@
 #include "../common/Topology.hh"
 #include "../common/XIARouter.hh"
 
-#define HELLO_INTERVAL 0.1
-#define LSA_INTERVAL 0.3
-#define SID_DISCOVERY_INTERVAL 3.0
-#define SID_DECISION_INTERVAL 5.0
-#define AD_LSA_INTERVAL 1
-#define CALC_DIJKSTRA_INTERVAL 4
-#define MAX_HOP_COUNT 50
-#define MAX_SEQNUM 1000000
+#define EXPIRE_TIME_D 60
+#define HELLO_INTERVAL_D 0.1
+#define LSA_INTERVAL_D 0.3
+#define SID_DISCOVERY_INTERVAL_D 3.0
+#define SID_DECISION_INTERVAL_D 5.0
+#define AD_LSA_INTERVAL_D 1
+#define CALC_DIJKSTRA_INTERVAL_D 4
+#define MAX_HOP_COUNT_D 50
+#define MAX_SEQNUM_D 1000000
 #define MAX_XID_SIZE 100
-#define SEQNUM_WINDOW 1000
+#define SEQNUM_WINDOW_D 1000
+#define UPDATE_LATENCY_D 60
+#define UPDATE_CONFIG_D 5
 
 #define BHID "HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 #define SID_XROUTE "SID:1110000000000000000000000000000000001112"
@@ -193,6 +196,9 @@ void printADNetworkTable();
 
 // timer to send Hello and LinkStateAdvertisement messages periodically
 void timeout_handler(int signum);
+
+// read config file to get local SIDs
+void set_controller_conf(const char* myhostname);
 
 // read config file to get local SIDs
 void set_sid_conf(const char* myhostname);
