@@ -1610,6 +1610,7 @@ perror("bind");
 		Xclose(tempSock);
 		exit(-1);
 	}
+    usleep(rand()%1000000); //sleep for a random time less than 1 second 
 
 	int sock;
 	time_t last_purge = time(NULL);
