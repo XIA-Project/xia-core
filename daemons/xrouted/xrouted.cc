@@ -76,25 +76,40 @@ int interfaceNumber(std::string xidType, std::string xid)
 void timeout_handler(int signum)
 {
 	UNUSED(signum);
-
-	XR_LOG("timeout(%d)", route_state.hello_seq);
-	if (route_state.hello_seq < route_state.hello_lsa_ratio) {
+    /*
+	XR_LOG("timeout(%d)", route_state.hello_timer);
+	if (route_state.hello_timer < route_state.lsa_ratio) {
 		// send Hello
 		route_state.send_hello = true;
 		//sendHello();
-		route_state.hello_seq++;
-	} else if (route_state.hello_seq >= route_state.hello_lsa_ratio) {
+		route_state.hello_timer++;
+	} else if (route_state.hello_timer >= route_state.lsa_ratio) {
 		// it's time to send LSA
 		route_state.send_lsa = true;
 		//sendLSA();
 		// reset hello req
-		route_state.hello_seq = 0;
+		route_state.hello_timer = 0;
 	} else {
-		syslog(LOG_ERR, "hello_seq=%d hello_lsa_ratio=%d", route_state.hello_seq, route_state.hello_lsa_ratio);
-	}
+		syslog(LOG_ERR, "hello_timer=%d lsa_ratio=%d", route_state.hello_timer, route_state.lsa_ratio);
+	}*/
+    if (route_state.hello_timer < route_state.hello_ratio){
+        route_state.hello_timer++;
+    }
+    else{
+        route_state.hello_ratio = 0;
+        route_state.send_hello = true;
+    }
+
+    if (route_state.lsa_timer < route_state.lsa_ratio){
+        route_state.lsa_timer++;
+    }
+    else{
+        route_state.lsa_timer = 0;
+        route_state.send_lsa = true;
+    }
 	// reset the timer
 	signal(SIGALRM, timeout_handler);
-	ualarm((int)ceil(HELLO_INTERVAL*1000000),0);
+	ualarm((int)ceil(WAKEUP_INTERVAL*1000000),0);
 }
 
 // send Hello message (1-hop broadcast) with my AD and my HID to the directly connected neighbors
@@ -490,8 +505,10 @@ void initRouteState()
 
 	route_state.num_neighbors = 0; // number of neighbor routers
 	route_state.lsa_seq = rand()%MAX_SEQNUM;	// LSA sequence number of this router
-	route_state.hello_seq = 0;  // hello seq number of this router
-	route_state.hello_lsa_ratio = (int32_t) ceil(LSA_INTERVAL/HELLO_INTERVAL);
+	route_state.hello_timer = 0;  // hello timer of this router
+    route_state.lsa_timer = 0;  // lsa timer of this router
+    route_state.hello_ratio = (int32_t) ceil(HELLO_INTERVAL/WAKEUP_INTERVAL);
+	route_state.lsa_ratio = (int32_t) ceil(LSA_INTERVAL/WAKEUP_INTERVAL);
 	route_state.calc_dijstra_ticks = 0;
 
 	route_state.ctl_seq = 0;	// LSA sequence number of this router
@@ -507,7 +524,7 @@ void initRouteState()
 
 	// set timer for HELLO/LSA
 	signal(SIGALRM, timeout_handler);
-	ualarm((int)ceil(HELLO_INTERVAL*1000000),0); 	
+	ualarm((int)ceil(WAKEUP_INTERVAL*1000000),0); 	
 }
 
 void help(const char *name)
