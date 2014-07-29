@@ -773,8 +773,10 @@ void* updatePathThread(void* updating)
 
         // send 5 pings (-c), interval 0.1s (-i), each timeout 1s (-t)
         // XSOCKCONF_SECTION makes sure xping is performed on the right host
+        // Here we use -f 1 to find the minimal latency instead of average as ping delay is no stable in our current
+        // implementation. Even small traffic like control messages can change the delay dramatically.
         sprintf(cmd, 
-            "XSOCKCONF_SECTION=%s %s/bin/xping -t 1 -i 0.1 -q -c 5 'RE %s' | tail -1 | awk '{print $5}' | cut -d '/' -f 2",
+            "XSOCKCONF_SECTION=%s %s/bin/xping -t 10 -q -c 5 'RE %s' | tail -1 | awk '{print $5}' | cut -d '/' -f 1",
             hostname,
             XrootDir(root, BUF_SIZE), 
             it_ad->first.c_str());
@@ -1610,7 +1612,6 @@ perror("bind");
 		Xclose(tempSock);
 		exit(-1);
 	}
-    usleep(rand()%1000000); //sleep for a random time less than 1 second 
 
 	int sock;
 	time_t last_purge = time(NULL);

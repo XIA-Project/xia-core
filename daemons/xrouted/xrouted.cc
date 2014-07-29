@@ -617,7 +617,6 @@ int main(int argc, char *argv[])
 		Xclose(route_state.sock);
    		exit(-1);
    	}
-    usleep(rand()%1000000); //sleep for a random time less than 1 second 
 
 	time_t last_purge = time(NULL);
     time_t hello_last_purge = time(NULL);
