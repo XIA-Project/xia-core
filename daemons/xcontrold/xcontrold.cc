@@ -509,7 +509,7 @@ int processSidDiscovery(ControlMessage msg)
 int processSidDecision(void)
 {
     // make decision based on principles like highest priority first, load balancing, nearest...
-    // Using function: (capacity^factor/link^facor)*priority for weight
+    // Using function: (capacity^factor/link^factor)*priority for weight
     int rc = 1;
 
     //local balance decision: decide which percentage of traffic each AD should has
@@ -518,19 +518,26 @@ int processSidDecision(void)
     {
         // calculate the percentage for each AD for this SID
         double total_weight = 0;
+        int minimal_latency = 9998;
 
         std::map<std::string, ServiceState>::iterator it_ad;
+        std::string best_ad;
         // find the total weight
         for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad)
         {
             if (it_ad->second.priority < 0){ // this is the poisoned one, skip
                 continue;
             }
-            int latency = 1; // default, 1ms
+            int latency = 9999; // default, 9999ms
             if (route_state.ADPathStates.find(it_ad->first) != route_state.ADPathStates.end()){
                 latency = route_state.ADPathStates[it_ad->first].delay;
             }
-            it_ad->second.weight = pow(it_ad->second.capacity, it_ad->second.capacity_factor)/pow(latency, it_ad->second.link_factor)*it_ad->second.priority;
+            if (it_ad->second.capacity_factor == 0){ // only latency matters find the smallest
+                minimal_latency = minimal_latency > latency?latency:minimal_latency;
+                best_ad = minimal_latency == latency?it_ad->first:best_ad;
+            }
+            it_ad->second.weight = pow(it_ad->second.capacity, it_ad->second.capacity_factor)/
+                                   pow(latency, it_ad->second.link_factor)*it_ad->second.priority;
             total_weight += it_ad->second.weight;
             //syslog(LOG_INFO, "%s @%s :cap=%d, f=%d, late=%d, f=%d, prio=%d, weight is %f",it_sid->first.c_str(), it_ad->first.c_str(), it_ad->second.capacity, it_ad->second.capacity_factor, latency, it_ad->second.link_factor, it_ad->second.priority, it_ad->second.weight );
         }
@@ -545,7 +552,12 @@ int processSidDecision(void)
             }
             else{
                 it_ad->second.valid = true;
-                it_ad->second.percentage = (int) (100.0*it_ad->second.weight/total_weight+0.5);//round
+                if (it_ad->second.capacity_factor == 0){// only latency matters
+                    it_ad->second.percentage = best_ad == it_ad->first?100:0; // go to the closest
+                }
+                else{ // normal
+                    it_ad->second.percentage = (int) (100.0*it_ad->second.weight/total_weight+0.5);//round
+                }
                 if (it_ad->second.percentage > 100){
                     syslog(LOG_INFO, "Error setting weight%s @%s :cap=%d, f=%d, prio=%d, weight=%f, total weight=%f",it_sid->first.c_str(), it_ad->first.c_str(), it_ad->second.capacity, it_ad->second.capacity_factor, it_ad->second.priority, it_ad->second.weight, total_weight);
                 }
