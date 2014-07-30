@@ -73,7 +73,7 @@ class XIAChallengeResponder : public Element { public:
 
     HashTable<String, short> _hashtable;
 	const static int num_outgoing_hashes = 100;
-	const static int hash_length = 20;
+	const static int hash_length = SHA_DIGEST_LENGTH;
 	uint8_t outgoing_hashes[num_outgoing_hashes][hash_length];
 	int outgoing_header;
    // int _shutoff;
