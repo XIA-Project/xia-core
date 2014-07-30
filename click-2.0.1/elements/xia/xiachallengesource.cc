@@ -25,6 +25,7 @@
 #include <click/glue.hh>
 #include <click/xid.hh>
 #include <click/xiaheader.hh>
+#include <click/xiasecurity.hh>
 
 #include <openssl/rsa.h>
 #include <openssl/pem.h>
@@ -113,23 +114,6 @@ XIAChallengeSource::generate_secret()
         router_secret[i] = characters[rand() % (sizeof(characters) - 1)];
     }
     router_secret[router_secret_length] = 0;
-}
-
-void
-XIAChallengeSource::hash(uint8_t *dig, Packet *p_in)
-{
-    const click_xia *h = p_in->xia_header();
-    int plen = h->plen;
-    int hsize = 8 + (h->dnode+h->snode)*sizeof(click_xia_xid_node);
-    SHA1_ctx sha_ctx;
-    unsigned char digest[20];
-    SHA1_init(&sha_ctx);
-    SHA1_update(&sha_ctx, (unsigned char *)h, plen+hsize);
-    SHA1_final(digest, &sha_ctx);
-
-	memcpy(dig, digest, 20);
-
-	//return std::string((const char*)digest);
 }
 
 int
@@ -320,7 +304,7 @@ XIAChallengeSource::send_challenge(Packet *p)
 	challenge.body.iface = _iface;
 //	click_chatter("iface: %d", _iface);
 
-	hash(challenge.body.hash, p);
+	xs_getSHA1Hash(p->data(), p->length(), challenge.body.hash, sizeof challenge.body.hash);
 //	click_chatter("hash 1st byte: %0X", challenge.body.hash[0]);
 
 //	click_chatter("test anno: %d", XIA_PAINT_ANNO(p));	//check if anno gives same value as iface

@@ -60,7 +60,6 @@ class XIAChallengeSource : public Element { public:
 
 private:
 	void generate_secret();
-    void hash(uint8_t *, Packet *);
     void send_challenge(Packet *);
 	void verify_response(Packet *);
 	bool is_verified(Packet *);
