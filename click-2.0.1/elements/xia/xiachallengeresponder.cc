@@ -25,6 +25,7 @@
 #include <click/glue.hh>
 #include <click/xid.hh>
 #include <click/xiaheader.hh>
+#include <click/xiasecurity.hh>
 #include <click/packet_anno.hh>
 
 #include <openssl/rsa.h>
@@ -124,18 +125,20 @@ XIAChallengeResponder::processChallenge(Packet *p_in)
 {
 	int i;
 	char* pch;
+	char hash_str[XIA_SHA_DIGEST_STR_LEN];
 
 	// Get the src and dst addresses
 	XIAHeader xiah(p_in->xia_header());
 	XIAPath src_dag = xiah.src_path();
 	XIAPath dst_dag = xiah.dst_path();
     click_xia_challenge *challenge = (click_xia_challenge *)xiah.payload();
+	xs_hexDigest(challenge->body.hash, 20, hash_str, XIA_SHA_DIGEST_STR_LEN);
 
 	click_chatter("== Challenge Packet detail ============================================================");
-	click_chatter("\tSRC: %s", challenge->body.src_hid);
-	click_chatter("\tDST: %s", challenge->body.dst_hid);
+	click_chatter("\tSRC: %s", (char *)challenge->body.src_hid);
+	click_chatter("\tDST: %s", (char *)challenge->body.dst_hid);
 	click_chatter("\tiface: %d", challenge->body.iface);
-	click_chatter("\thash 1st byte: %0X", challenge->body.hash[0]);
+	click_chatter("\thash: %s", hash_str);
 	click_chatter("=======================================================================================");
 
 	click_chatter("H> Verifying challenge is in response to a sent packet");
@@ -261,21 +264,6 @@ XIAChallengeResponder::get_pubkey(uint8_t *pub)
 	free(pem_pub);
 }
 
-void
-XIAChallengeResponder::hash(uint8_t *dig, Packet *p_in)
-{
-    const click_xia *h = p_in->xia_header();
-    int plen = h->plen;
-    int hsize = 8 + (h->dnode+h->snode)*sizeof(click_xia_xid_node);
-    SHA1_ctx sha_ctx;
-    unsigned char digest[20];
-    SHA1_init(&sha_ctx);
-    SHA1_update(&sha_ctx, (unsigned char *)h, plen+hsize);
-    SHA1_final(digest, &sha_ctx);
-
-    memcpy(dig, digest, 20);
-}
-
 bool
 XIAChallengeResponder::check_outgoing_hashes(uint8_t *digest)
 {
@@ -294,7 +282,7 @@ XIAChallengeResponder::check_outgoing_hashes(uint8_t *digest)
 void
 XIAChallengeResponder::store_outgoing_hash(Packet *p_in)
 {
-	hash(outgoing_hashes[outgoing_header], p_in);
+	xs_getSHA1Hash(p_in->data(), p_in->length(), outgoing_hashes[outgoing_header], SHA_DIGEST_LENGTH);
 	outgoing_header = (outgoing_header + 1) % num_outgoing_hashes;
 }
 
