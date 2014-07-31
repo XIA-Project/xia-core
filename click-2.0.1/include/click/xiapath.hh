@@ -66,6 +66,9 @@ class XIAPath { public:
     // get XID of the node
     XID xid(handle_t node) const;
 
+	// replace XID of matching nodes with a new one
+	bool replace_node_xid(String oldXIDstr, String newXIDstr);
+
     // get handles of connected (next) nodes to the node
     Vector<handle_t> next_nodes(handle_t node) const;
 

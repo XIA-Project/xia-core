@@ -569,6 +569,18 @@ XIAPath::xid(handle_t node) const
     return XID(_nodes[node].xid);
 }
 
+bool
+XIAPath::replace_node_xid(String oldXIDstr, String newXIDstr)
+{
+	for(int i=0; i<_nodes.size(); i++) {
+		if(oldXIDstr.equals(_nodes[i].xid.unparse().c_str(), _nodes[i].xid.unparse().length())) {
+			click_chatter("XIAPath: replacing %s with %s", oldXIDstr.c_str(), newXIDstr.c_str());
+			_nodes[i].xid.parse(newXIDstr);
+		}
+	}
+	return true;
+}
+
 Vector<XIAPath::handle_t>
 XIAPath::next_nodes(handle_t node) const
 {
