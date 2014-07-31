@@ -751,7 +751,10 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				uint8_t *pubkey = (uint8_t *) calloc(pubkeylen, 1);
 				memcpy(pubkey, payloadptr, pubkeylen);
 				payloadptr += pubkeylen;
-				assert(payloadptr-payload == payload_len);
+				if(payloadptr-payload != payload_len) {
+					click_chatter("ProcessNetworkPacket: WARNING: MIGRATE expected payload len=%d, got %d", payload_len, payloadptr-payload);
+				}
+				//assert(payloadptr-payload == payload_len);
 
 				// 2. Verify hash of pubkey matches srcDAG destination node
 				XIAPath src_path;
@@ -820,7 +823,10 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				dataptr += sizeof(uint16_t);
 				memcpy(dataptr, mypubkey, mypubkeylen);
 				dataptr += mypubkeylen;
-				assert((dataptr-data) == datalen);
+				if((dataptr-data) != datalen) {
+					click_chatter("ProcessNetworkPacket: WARNING expected datalen=%d, got %d", datalen, dataptr-data);
+				}
+				//assert((dataptr-data) == datalen);
 
 				// Create a packet with the payload
 				XIAHeaderEncap xiah_new;
@@ -901,7 +907,10 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				uint8_t *pubkey = (uint8_t *) calloc(pubkeylen, 1);
 				memcpy(pubkey, payloadptr, pubkeylen);
 				payloadptr += pubkeylen;
-				assert(payloadptr-payload == payload_len);
+				if(payloadptr-payload != payload_len) {
+					click_chatter("ProcessNetworkPacket: WARNING: MIGRATEACK expected payload len=%d, got %d", payload_len, payloadptr-payload);
+				}
+				//assert(payloadptr-payload == payload_len);
 
 				// 2. Verify hash of pubkey matches the fixed host's SID
 				String src_SID_string = daginfo->src_path.xid(daginfo->src_path.destination_node()).unparse();
@@ -910,13 +919,13 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				xs_getSHA1Hash(pubkey, pubkeylen, pubkeyhash, sizeof pubkeyhash);
 				xs_hexDigest(pubkeyhash, sizeof pubkeyhash, pubkeyhash_hexdigest, sizeof pubkeyhash_hexdigest);
 				if(strcmp(pubkeyhash_hexdigest, xs_XIDHash(src_SID_string.c_str())) != 0) {
-					click_chatter("ProcessNetworkPacket: ERROR: MIGRATE pubkey does not match sender address");
+					click_chatter("ProcessNetworkPacket: ERROR: MIGRATEACK: MIGRATE pubkey does not match sender address");
 				}
 
 				// 3. Verify Signature using Pubkey
 				size_t signed_datalen = timestamp.length() + 1;
 				if(!xs_isValidSignature(payload, signed_datalen, signature, siglen, pubkey, pubkeylen)) {
-					click_chatter("ProcessNetworkPacket: ERROR: MIGRATE with invalid signature");
+					click_chatter("ProcessNetworkPacket: ERROR: MIGRATEACK: MIGRATE with invalid signature");
 				}
 
 				// 4. Update DAGinfo src_path to use the new DAG
@@ -1995,7 +2004,10 @@ void XTRANSPORT::Xchangead(unsigned short _sport)
 		dataptr += sizeof(uint16_t);
 		memcpy(dataptr, pubkey, pubkeylen);
 		dataptr += pubkeylen;
-		assert((dataptr-data) == datalen);
+		if((dataptr - data) != datalen) {
+			click_chatter("Xchangead: WARNING expected datalen=%d got=%d", datalen, (dataptr-data));
+		}
+		//assert((dataptr-data) == datalen);
 
 		//Add XIA headers
 		XIAHeaderEncap xiah;
