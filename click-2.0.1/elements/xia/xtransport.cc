@@ -799,6 +799,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 				click_chatter("ProcessNetworkPacket: MIGRATE: building MIGRATEACK");
 				XID my_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+				click_chatter("ProcessNetworkPacket: MIGRATE: MIGRATEACK get pubkey for:%s:", my_xid.unparse().c_str())
 				if(xs_getPubkey(my_xid.unparse().c_str(), mypubkey, &mypubkeylen)) {
 					click_chatter("ProcessNetworkPacket: ERROR: getting Pubkey for MIGRATEACK");
 				}
@@ -842,7 +843,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 				// Public key
 				memcpy(dataptr, mypubkey, mypubkeylen);
-				click_chatter("ProcessNetworkPacket: MIGRATE: MIGRATEACK pubkey:%s:", pubkey);
+				click_chatter("ProcessNetworkPacket: MIGRATE: MIGRATEACK pubkey:%s:", dataptr);
 				dataptr += mypubkeylen;
 
 				// Total payload length
@@ -939,13 +940,13 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				//assert(payloadptr-payload == payload_len);
 
 				// 2. Verify hash of pubkey matches the fixed host's SID
-				String src_SID_string = daginfo->src_path.xid(daginfo->src_path.destination_node()).unparse();
+				String fixed_SID_string = daginfo->dst_path.xid(daginfo->dst_path.destination_node()).unparse();
 				uint8_t pubkeyhash[SHA_DIGEST_LENGTH];
 				char pubkeyhash_hexdigest[XIA_SHA_DIGEST_STR_LEN];
 				xs_getPubkeyHash(pubkey, pubkeyhash, sizeof pubkeyhash);
 				xs_hexDigest(pubkeyhash, sizeof pubkeyhash, pubkeyhash_hexdigest, sizeof pubkeyhash_hexdigest);
-				if(strcmp(pubkeyhash_hexdigest, xs_XIDHash(src_SID_string.c_str())) != 0) {
-					click_chatter("ProcessNetworkPacket: ERROR: MIGRATEACK: Mismatch: fixedSID: %s, pubkeyhash: %s", src_SID_string.c_str(), pubkeyhash_hexdigest);
+				if(strcmp(pubkeyhash_hexdigest, xs_XIDHash(fixed_SID_string.c_str())) != 0) {
+					click_chatter("ProcessNetworkPacket: ERROR: MIGRATEACK: Mismatch: fixedSID: %s, pubkeyhash: %s", fixed_SID_string.c_str(), pubkeyhash_hexdigest);
 				}
 				click_chatter("ProcessNetworkPacket: Hash of pubkey matches fixed SID");
 
@@ -959,8 +960,8 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				free(pubkey);
 
 				// 4. Verify timestamp matches the latest migrate message
-				if(daginfo->last_migrate_ts.equals(timestamp.c_str(), timestamp.length())) {
-					click_chatter("ProcessNetworkPacket: WARN: timestamp sent: %s, migrateack has: %s", daginfo->last_migrate_ts.c_str(), timestamp.c_str());
+				if(strcmp(daginfo->last_migrate_ts.c_str(), timestamp.c_str()) != 0) {
+					click_chatter("ProcessNetworkPacket: WARN: timestamp sent:%s:, migrateack has:%s:", daginfo->last_migrate_ts.c_str(), timestamp.c_str());
 				}
 				click_chatter("ProcessNetworkPacket: MIGRATEACK: verified timestamp");
 
