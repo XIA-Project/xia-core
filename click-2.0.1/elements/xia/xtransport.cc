@@ -799,7 +799,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 				click_chatter("ProcessNetworkPacket: MIGRATE: building MIGRATEACK");
 				XID my_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
-				click_chatter("ProcessNetworkPacket: MIGRATE: MIGRATEACK get pubkey for:%s:", my_xid.unparse().c_str())
+				click_chatter("ProcessNetworkPacket: MIGRATE: MIGRATEACK get pubkey for:%s:", my_xid.unparse().c_str());
 				if(xs_getPubkey(my_xid.unparse().c_str(), mypubkey, &mypubkeylen)) {
 					click_chatter("ProcessNetworkPacket: ERROR: getting Pubkey for MIGRATEACK");
 				}
