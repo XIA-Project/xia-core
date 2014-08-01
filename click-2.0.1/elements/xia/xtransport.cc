@@ -904,6 +904,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				const uint8_t *payload = thdr.payload();
 				int payload_len = xiah.plen() - thdr.hlen();
 				const uint8_t *payloadptr = payload;
+				size_t signed_datalen;
 
 				// Extract the migrated DAG that the fixed host accepted
 				String migrated_DAG((char *)payloadptr, strlen((char *) payloadptr));
@@ -914,6 +915,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				// Helps handle a second migration before the first migration is completed
 				String timestamp((char *)payloadptr, strlen((char *) payloadptr));
 				payloadptr += strlen((char *)payloadptr) + 1;
+				signed_datalen = payloadptr - payload;
 				click_chatter("ProcessNetworkPacket: MIGRATEACK: timestamp: %s", timestamp.c_str());
 
 				// Get the signature (migrated_DAG, timestamp)
@@ -951,7 +953,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				click_chatter("ProcessNetworkPacket: Hash of pubkey matches fixed SID");
 
 				// 3. Verify Signature using Pubkey
-				size_t signed_datalen = timestamp.length() + 1;
 				if(!xs_isValidSignature(payload, signed_datalen, signature, siglen, pubkey, pubkeylen)) {
 					click_chatter("ProcessNetworkPacket: ERROR: MIGRATEACK: MIGRATE with invalid signature");
 				}
