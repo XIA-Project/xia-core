@@ -1928,6 +1928,12 @@ void XTRANSPORT::Xchangead(unsigned short _sport)
 {
 	UNUSED(_sport);
 
+	// Save the old AD
+	String str_local_addr = _local_addr.unparse();
+	size_t old_AD_start = str_local_addr.find_left("AD:");
+	size_t old_AD_end = str_local_addr.find_left(" ", old_AD_start);
+	String old_AD_str = str_local_addr.substring(old_AD_start, old_AD_end - old_AD_start);
+
 	xia::X_Changead_Msg *x_changead_msg = xia_socket_msg.mutable_x_changead();
 	//String tmp = _local_addr.unparse();
 	//Vector<String> ids;
@@ -1954,6 +1960,9 @@ void XTRANSPORT::Xchangead(unsigned short _sport)
 		if(daginfo->sock_type != SOCK_STREAM) {
 			continue;
 		}
+		// Update src_path in daginfo
+		click_chatter("Xchangead: updating %s to %s in daginfo", old_AD_str.c_str(), AD_str.c_str());
+		daginfo->src_path.replace_node_xid(old_AD_str, AD_str);
 
 		// Send MIGRATE message to each corresponding endpoint
 		// src_DAG, dst_DAG, timestamp - Signed by private key
