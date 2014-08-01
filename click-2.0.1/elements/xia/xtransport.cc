@@ -753,8 +753,9 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				memcpy(&pubkeylen, payloadptr, sizeof(uint16_t));
 				payloadptr += sizeof(uint16_t);
 				click_chatter("ProcessNetworkPacket: MIGRATE: Pubkey length: %d", pubkeylen);
-				uint8_t *pubkey = (uint8_t *) calloc(pubkeylen, 1);
+				char *pubkey = (char *) calloc(pubkeylen, 1);
 				memcpy(pubkey, payloadptr, pubkeylen);
+				click_chatter("ProcessNetworkPacket: MIGRATE: Pubkey:%s:", pubkey);
 				payloadptr += pubkeylen;
 				click_chatter("ProcessNetworkPacket: MIGRATE: pkt len: %d", payloadptr - payload);
 
@@ -765,7 +766,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				const char *sourceSID = xs_XIDHash(src_SID_string.c_str());
 				uint8_t pubkeyhash[SHA_DIGEST_LENGTH];
 				char pubkeyhash_hexdigest[XIA_SHA_DIGEST_STR_LEN];
-				xs_getSHA1Hash(pubkey, pubkeylen, pubkeyhash, sizeof pubkeyhash);
+				xs_getPubkeyHash(pubkey, pubkeyhash, sizeof pubkeyhash);
 				xs_hexDigest(pubkeyhash, sizeof pubkeyhash, pubkeyhash_hexdigest, sizeof pubkeyhash_hexdigest);
 				if(strcmp(pubkeyhash_hexdigest, sourceSID) != 0) {
 					click_chatter("ProcessNetworkPacket: ERROR: MIGRATE pubkey hash: %s SourceSID: %s", pubkeyhash_hexdigest, sourceSID);
@@ -793,7 +794,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				uint8_t *dataptr;
 				uint32_t maxdatalen;
 				uint32_t datalen;
-				uint8_t mypubkey[MAX_PUBKEY_SIZE];
+				char mypubkey[MAX_PUBKEY_SIZE];
 				uint16_t mypubkeylen = MAX_PUBKEY_SIZE;
 
 				click_chatter("ProcessNetworkPacket: MIGRATE: building MIGRATEACK");
@@ -841,6 +842,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 				// Public key
 				memcpy(dataptr, mypubkey, mypubkeylen);
+				click_chatter("ProcessNetworkPacket: MIGRATE: MIGRATEACK pubkey:%s:", pubkey);
 				dataptr += mypubkeylen;
 
 				// Total payload length
@@ -927,8 +929,9 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				memcpy(&pubkeylen, payloadptr, sizeof(uint16_t));
 				click_chatter("ProcessNetworkPacket: MIGRATEACK: pubkeylen: %d", pubkeylen);
 				payloadptr += sizeof(uint16_t);
-				uint8_t *pubkey = (uint8_t *) calloc(pubkeylen, 1);
+				char *pubkey = (char *) calloc(pubkeylen, 1);
 				memcpy(pubkey, payloadptr, pubkeylen);
+				click_chatter("ProcessNetworkPacket: MIGRATEACK: pubkey:%s:", pubkey);
 				payloadptr += pubkeylen;
 				if(payloadptr-payload != payload_len) {
 					click_chatter("ProcessNetworkPacket: WARNING: MIGRATEACK expected payload len=%d, got %d", payload_len, payloadptr-payload);
@@ -939,7 +942,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				String src_SID_string = daginfo->src_path.xid(daginfo->src_path.destination_node()).unparse();
 				uint8_t pubkeyhash[SHA_DIGEST_LENGTH];
 				char pubkeyhash_hexdigest[XIA_SHA_DIGEST_STR_LEN];
-				xs_getSHA1Hash(pubkey, pubkeylen, pubkeyhash, sizeof pubkeyhash);
+				xs_getPubkeyHash(pubkey, pubkeyhash, sizeof pubkeyhash);
 				xs_hexDigest(pubkeyhash, sizeof pubkeyhash, pubkeyhash_hexdigest, sizeof pubkeyhash_hexdigest);
 				if(strcmp(pubkeyhash_hexdigest, xs_XIDHash(src_SID_string.c_str())) != 0) {
 					click_chatter("ProcessNetworkPacket: ERROR: MIGRATEACK: Mismatch: fixedSID: %s, pubkeyhash: %s", src_SID_string.c_str(), pubkeyhash_hexdigest);
@@ -957,7 +960,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 				// 4. Verify timestamp matches the latest migrate message
 				if(daginfo->last_migrate_ts.equals(timestamp.c_str(), timestamp.length())) {
-					click_chatter("ProcessNetworkPacket: WARN: timestamp in migrateack did not match migrate timestamp");
+					click_chatter("ProcessNetworkPacket: WARN: timestamp sent: %s, migrateack has: %s", daginfo->last_migrate_ts.c_str(), timestamp.c_str());
 				}
 				click_chatter("ProcessNetworkPacket: MIGRATEACK: verified timestamp");
 
@@ -2009,7 +2012,7 @@ void XTRANSPORT::Xchangead(unsigned short _sport)
 		String timestamp = now.unparse();
 		int timestamp_len = strlen(timestamp.c_str()) + 1;
 		// Get the public key to include in packet
-		uint8_t pubkey[MAX_PUBKEY_SIZE];
+		char pubkey[MAX_PUBKEY_SIZE];
 		uint16_t pubkeylen = MAX_PUBKEY_SIZE;
 		XID src_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
 		if(xs_getPubkey(src_xid.unparse().c_str(), pubkey, &pubkeylen)) {
@@ -2026,12 +2029,15 @@ void XTRANSPORT::Xchangead(unsigned short _sport)
 		payloadptr = payload;
 		// Source DAG with new AD
 		memcpy(payloadptr, src_path.c_str(), src_path_len);
+		click_chatter("Xchangead: MIGRATE Source DAG: %s", payloadptr);
 		payloadptr += src_path_len;
 		// Destination DAG
 		memcpy(payloadptr, dst_path.c_str(), dst_path_len);
+		click_chatter("Xchangead: MIGRATE Dest DAG: %s", payloadptr);
 		payloadptr += dst_path_len;
 		// Timestamp of this MIGRATE message
 		memcpy(payloadptr, timestamp.c_str(), timestamp_len);
+		click_chatter("Xchangead: MIGRATE Timestamp: %s", timestamp.c_str());
 		payloadptr += timestamp_len;
 		// Sign(SourceDAG, DestinationDAG, Timestamp)
 		uint8_t signature[MAX_SIGNATURE_SIZE];
@@ -2051,6 +2057,7 @@ void XTRANSPORT::Xchangead(unsigned short _sport)
 		payloadptr += sizeof(uint16_t);
 		// Public key of source SID
 		memcpy(payloadptr, pubkey, pubkeylen);
+		click_chatter("Xchangead: MIGRATE: Pubkey:%s: Length: %d", pubkey, pubkeylen);
 		payloadptr += pubkeylen;
 		// Total payload length
 		payloadlen = payloadptr - payload;

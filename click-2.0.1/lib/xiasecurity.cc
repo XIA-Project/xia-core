@@ -67,11 +67,40 @@ void xs_hexDigest(uint8_t* digest, int digest_len, char* hex_string, int hex_str
     hex_string[hex_string_len-1] = '\0';
 }
 
+int xs_getPubkeyHash(char *pubkey, uint8_t *digest, int digest_len)
+{
+	int i, j;
+	char *pubkeystr;
+	int keystartoffset = strlen("-----BEGIN PUBLIC KEY-----\n");
+	int keyendoffset = strlen("-----END PUBLIC KEY-----\n");
+	int keylen = strlen(pubkey) + 1;
+
+	assert(digest != NULL);
+	assert(digest_len == SHA_DIGEST_LENGTH);
+
+	// Strip header, footer and newlines
+	pubkeystr = (char *)calloc(keylen - keystartoffset - keyendoffset, 1);
+	if(pubkeystr == NULL) {
+		click_chatter("xs_getPubkeyHash: ERROR allocating memory for public key");
+		return -1;
+	}
+	for(i=keystartoffset,j=0; i<keylen-keyendoffset-1; i++) {
+		if(pubkey[i] != '\n') {
+			pubkeystr[j++] = pubkey[i];
+		}
+	}
+	click_chatter("xs_getPubkeyHash: Stripped pubkey: %s", pubkeystr);
+	xs_getSHA1Hash((const unsigned char *)pubkeystr, strlen(pubkeystr), digest, digest_len);
+
+	free(pubkeystr);
+	return 0;
+}
+
 // Verify signature using public key read from file for given xid
 // NOTE: Public key must be available from local file
 int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, const char *xid)
 {
-	uint8_t pem_pub[MAX_PUBKEY_SIZE];
+	char pem_pub[MAX_PUBKEY_SIZE];
 	uint16_t pem_pub_len = MAX_PUBKEY_SIZE;
 
 	// Get the public key for given xid
@@ -83,7 +112,7 @@ int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char
 }
 
 // Verify signature using public key in memory
-int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, uint8_t *pem_pub, int pem_pub_len)
+int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, char *pem_pub, int pem_pub_len)
 {
 	int sig_verified;
 
@@ -170,13 +199,13 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
 }
 
 // Get the public key for a given xid
-int xs_getPubkey(const char *xid, uint8_t* pubkey, uint16_t *pubkey_len)
+int xs_getPubkey(const char *xid, char *pubkey, uint16_t *pubkey_len)
 {
 	int pubfilepathlen;
 	char *pubfilepath;
 	char *pubkeyhash;
 	int retval = 0;
-	int state;
+	int state = 0;
 	BIO *bio_pub;
 	RSA *rsa;
 	FILE *fp;
@@ -219,13 +248,14 @@ int xs_getPubkey(const char *xid, uint8_t* pubkey, uint16_t *pubkey_len)
 	}
 	state = 4;
     PEM_write_bio_RSA_PUBKEY(bio_pub, rsa);
-	if(*pubkey_len < BIO_pending(bio_pub)) {
+	if(*pubkey_len < BIO_pending(bio_pub) + 1) {
 		click_chatter("xs_getPubkey: ERROR pubkey buffer too small");
 		retval = -5;
 		goto xs_getPubkey_cleanup;
 	}
     *pubkey_len = BIO_pending(bio_pub);
     BIO_read(bio_pub, pubkey, *pubkey_len);
+	*pubkey_len += 1; // null terminate the string
 xs_getPubkey_cleanup:
 	switch(state) {
 		case 4: BIO_free_all(bio_pub);
