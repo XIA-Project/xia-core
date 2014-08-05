@@ -30,10 +30,7 @@ of new XIA releases and events. This list is open to everyone.
 Related Projects
 ----------------
 - [Native Linux kernel implementation of XIA](https://github.com/AltraMayor/XIA-for-Linux)
-- XIA Wireshark plugin
-  * [Source](https://github.com/cjdoucette/wireshark-xia)
-  * [32 bit debian packages](https://github.com/cjdoucette/wireshark-xia-pkg-i386)
-  * [64 bit debian packages](https://github.com/cjdoucette/wireshark-xia-pkg)
+- [XIA Wireshark plugin](https://github.com/AltraMayor/XIA-for-Linux/wiki/Debugging-the-Linux-kernel#Wireshark_with_XIA_support)
 
 Release 1.1.1
 ----------------
