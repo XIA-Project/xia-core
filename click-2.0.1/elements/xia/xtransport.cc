@@ -764,7 +764,9 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 				// 2. Verify hash of pubkey matches srcDAG destination node
 				XIAPath src_path;
-				src_path.parse(remote_DAG);
+				if(src_path.parse(remote_DAG) == false) {
+					click_chatter("ProcessNetworkPacket: MIGRATE: ERROR parsing remote DAG:%s:", remote_DAG.c_str());
+				}
 				String src_SID_string = src_path.xid(src_path.destination_node()).unparse();
 				const char *sourceSID = xs_XIDHash(src_SID_string.c_str());
 				uint8_t pubkeyhash[SHA_DIGEST_LENGTH];
