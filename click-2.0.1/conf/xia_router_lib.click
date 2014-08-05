@@ -263,6 +263,11 @@ elementclass XIARoutingCore {
 	Script(write n/proc/rt_CID.add - $FALLBACK);	 // no default route for CID; consider other path
 	Script(write n/proc/rt_IP.add - $FALLBACK);		// no default route for IP; consider other path
 
+	// TO ADD A NEW USER DEFINED XID (step 4)
+	// create a default fallback route for the new XID
+	//
+	// Script(write n/proc/rt_FOO.add - $FALLBACK);		// no default route for FOO; consider other path
+
 	// quick fix
 	n[3] -> Discard();
 	Idle() -> [4]xtransport;
