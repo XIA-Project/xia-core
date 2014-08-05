@@ -587,6 +587,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			//printf("syn dport = %d\n", _dport);
 			// Connection request from client...
 
+			click_chatter("ProcessNetworkPacket: SYN: Source: %s, Dest: %s", _source_xid.unparse().c_str(), _destination_xid.unparse().c_str());
 			// First, check if this request is already in the pending queue
 			XIDpair xid_pair;
 			xid_pair.set_src(_destination_xid);
@@ -612,10 +613,12 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				DAGinfo daginfo;
 				daginfo.port = -1; // just for now. This will be updated via Xaccept call
 
-				daginfo.sock_type = 0; // 0: Reliable transport, 1: Unreliable transport
+				daginfo.sock_type = SOCK_STREAM;
 
 				daginfo.dst_path = src_path;
+				click_chatter("ProcessNetworkPacket: SYN: Daginfo.dst_path=%s", daginfo.dst_path.unparse().c_str());
 				daginfo.src_path = dst_path;
+				click_chatter("ProcessNetworkPacket: SYN: Daginfo.src_path=%s", daginfo.src_path.unparse().c_str());
 				daginfo.isConnected = true;
 				daginfo.initialized = true;
 				daginfo.nxt = LAST_NODE_DEFAULT;
@@ -761,7 +764,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 				// 2. Verify hash of pubkey matches srcDAG destination node
 				XIAPath src_path;
-				src_path.parse_re(remote_DAG);
+				src_path.parse(remote_DAG);
 				String src_SID_string = src_path.xid(src_path.destination_node()).unparse();
 				const char *sourceSID = xs_XIDHash(src_SID_string.c_str());
 				uint8_t pubkeyhash[SHA_DIGEST_LENGTH];
@@ -969,7 +972,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				// 5. Update DAGinfo src_path to use the new DAG
 				// TODO: Verify migrated_DAG's destination node is the same as src_path's
 				//       before replacing with the migrated_DAG
-				daginfo->src_path.parse_re(migrated_DAG);
+				daginfo->src_path.parse(migrated_DAG);
 				click_chatter("ProcessNetworkPacket: MIGRATEACK: updated daginfo with newly acknowledged DAG");
 
 				// 6. The data retransmissions can now resume
@@ -1151,7 +1154,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			//Verify mobility info
 			daginfo.dst_path = xiah.src_path();
 			portToDAGinfo.set(_dport, daginfo);
-			click_chatter("Sender moved, update to the new DAG");
+			click_chatter("###############################################################################################################################################################################3############################3Sender moved, update to the new DAG");
 
 		} else {
 			//Unparse dag info
@@ -1534,6 +1537,7 @@ void XTRANSPORT::Xsocket(unsigned short _sport) {
 	daginfo.migrateack_waiting = false;
 	daginfo.num_retransmit_tries = 0;
 	daginfo.teardown_waiting = false;
+	daginfo.isConnected = false;
 	daginfo.isAcceptSocket = false;
 	daginfo.num_connect_tries = 0; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
 	daginfo.num_migrate_tries = 0; // number of migrate tries (Connection will fail after MAX_MIGRATE_TRIES trials)
@@ -1921,6 +1925,8 @@ void XTRANSPORT::Xaccept(unsigned short _sport)
 
 		portToDAGinfo.set(_sport, daginfo);
 
+		click_chatter("Xaccept: Daginfo.src_path:%s", daginfo.src_path.unparse().c_str());
+		click_chatter("Xaccept: Daginfo.dst_path:%s", daginfo.dst_path.unparse().c_str());
 		XID source_xid = daginfo.src_path.xid(daginfo.src_path.destination_node());
 		XID destination_xid = daginfo.dst_path.xid(daginfo.dst_path.destination_node());
 
@@ -1988,10 +1994,18 @@ void XTRANSPORT::Xchangead(unsigned short _sport)
 
 	// Inform all active stream connections about this change
 	for (HashTable<unsigned short, DAGinfo>::iterator iter = portToDAGinfo.begin(); iter != portToDAGinfo.end(); ++iter ) {
-		unsigned short _sport = iter->first;
-		DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
+		unsigned short _migrateport = iter->first;
+		DAGinfo *daginfo = portToDAGinfo.get_pointer(_migrateport);
 		// TODO: use XSOCKET_STREAM?
+		// Skip non-stream connections
 		if(daginfo->sock_type != SOCK_STREAM) {
+			continue;
+		}
+		// Skip inactive ports
+		if(daginfo->isConnected == false) {
+			click_chatter("Xchangead: skipping migration for non-connected port");
+			click_chatter("Xchangead: src_path:%s:", daginfo->src_path.unparse().c_str());
+			click_chatter("Xchangead: dst_path:%s:", daginfo->dst_path.unparse().c_str());
 			continue;
 		}
 		// Update src_path in daginfo
@@ -2005,9 +2019,9 @@ void XTRANSPORT::Xchangead(unsigned short _sport)
 		uint8_t *payloadptr;
 		uint32_t maxpayloadlen;
 		uint32_t payloadlen;
-		String src_path = daginfo->src_path.unparse_re();
-		String dst_path = daginfo->dst_path.unparse_re();
-		click_chatter("MIGRATING %s - %s", src_path.c_str(), dst_path.c_str());
+		String src_path = daginfo->src_path.unparse();
+		String dst_path = daginfo->dst_path.unparse();
+		click_chatter("Xchangead: MIGRATING %s - %s", src_path.c_str(), dst_path.c_str());
 		int src_path_len = strlen(src_path.c_str()) + 1;
 		int dst_path_len = strlen(dst_path.c_str()) + 1;
 		Timestamp now = Timestamp::now();
