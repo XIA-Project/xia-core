@@ -728,12 +728,15 @@ int main(int argc, char *argv[])
 			last_purge = now;
 			map<string, time_t>::iterator iter;
 
-			for (iter = timeStamp.begin(); iter != timeStamp.end(); iter++)	
+			iter = timeStamp.begin();
+			while(iter != timeStamp.end())
 			{
 				if (now - iter->second >= EXPIRE_TIME){
 					xr.delRoute(iter->first);
-					timeStamp.erase(iter);
 					syslog(LOG_INFO, "purging host route for : %s", iter->first.c_str());
+					timeStamp.erase(iter++);
+				} else {
+					++iter;
 				}
 			}
 		}
