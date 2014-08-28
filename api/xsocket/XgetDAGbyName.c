@@ -269,6 +269,40 @@ int _xregister(const char *name, sockaddr_x *DAG, short flags) {
 		return -1;
 	}
 
+	fd_set read_fds;
+	FD_ZERO(&read_fds);
+	FD_SET(sock, &read_fds);
+	struct timeval timeout;
+	timeout.tv_sec = 5;
+	timeout.tv_usec = 0;
+	if(select(sock+1, &read_fds, NULL, NULL, &timeout) == 0) {
+		int intrinsic_security_retries = 10;
+		while(intrinsic_security_retries-- > 0) {
+			//Resend registration in case the first packet was challenged
+			LOGF("Intrinsic security probably dropped registration pkt. Resend:%d", intrinsic_security_retries+1);
+			if ((rc = Xsendto(sock, pkt, len, 0, (const struct sockaddr *)&ns_dag, sizeof(sockaddr_x))) < 0) {
+				int err = errno;
+				LOGF("Error sending name registration (%d)", rc);
+				Xclose(sock);
+				errno = err;
+				return -1;
+			}
+			FD_ZERO(&read_fds);
+			FD_SET(sock, &read_fds);
+			timeout.tv_sec = 5;
+			timeout.tv_usec = 0;
+			if(select(sock+1, &read_fds, NULL, NULL, &timeout) == 0) {
+				continue;
+			} else {
+				break;
+			}
+		}
+		if(intrinsic_security_retries <= 0) {
+			LOG("Error no response from name server after 2 attempts");
+			return -1;
+		}
+	}
+
 	//Check the response from the name server
 	memset(pkt, 0, sizeof(pkt));
 	if ((rc = Xrecvfrom(sock, pkt, NS_MAX_PACKET_SIZE, 0, NULL, NULL)) < 0) {
