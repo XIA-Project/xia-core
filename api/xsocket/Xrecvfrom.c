@@ -111,7 +111,10 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 	std::string str(UDPbuf, numbytes);
 	xia::XSocketMsg xsm;
 
-	xsm.ParseFromString(str);
+	if(xsm.ParseFromString(str) == false) {
+		printf("Xrecvfrom: FAILED parsing response from click\n");
+		return -1;
+	}
 
 	xia::X_Recv_Msg *msg = xsm.mutable_x_recv();
 	unsigned paylen = msg->payload().size();
