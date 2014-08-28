@@ -95,13 +95,18 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *loca
 		return -1;
   	}
 
-	if ((rc = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) < 0) {
+	if ((rc = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) <= 0) {
 		LOGF("Error retrieving status from Click: %s", strerror(errno));
 		return -1;
 	}
 
 	xia::XSocketMsg xsm1;
-	xsm1.ParseFromString(UDPbuf);
+	std::string click_response_string;
+	click_response_string.assign(UDPbuf, rc);
+	if(xsm1.ParseFromString(click_response_string) == false) {
+		LOGF("%s: FAILED parsing click response:%s:", fname, xsm1.DebugString().c_str());
+		return -1;
+	}
 	if (xsm1.type() == xia::XREADLOCALHOSTADDR) {
 		xia::X_ReadLocalHostAddr_Msg *_msg = xsm1.mutable_x_readlocalhostaddr();
 		strncpy(localhostAD, (_msg->ad()).c_str(), lenAD);
@@ -111,6 +116,7 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *loca
 		localhostAD[lenAD - 1] = 0;
 		localhostHID[lenHID - 1] = 0;
 		local4ID[len4ID - 1] = 0;
+		LOGF("XreadLocalHostAddr: AD:%s: HID:%s: 4ID:%s:", localhostAD, localhostHID, local4ID);
 		rc = 0;
 	} else {
 		rc = -1;
