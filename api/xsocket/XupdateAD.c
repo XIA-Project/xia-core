@@ -104,7 +104,7 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *loca
 	std::string click_response_string;
 	click_response_string.assign(UDPbuf, rc);
 	if(xsm1.ParseFromString(click_response_string) == false) {
-		LOGF("%s: FAILED parsing click response:%s:", fname, xsm1.DebugString().c_str());
+		LOGF("XreadLocalHostAddr: FAILED parsing click response:%s:", xsm1.DebugString().c_str());
 		return -1;
 	}
 	if (xsm1.type() == xia::XREADLOCALHOSTADDR) {
