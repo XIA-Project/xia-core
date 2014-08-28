@@ -26,6 +26,8 @@ char *hostname = NULL;
 char *ident = NULL;
 
 RouteState route_state;
+bool sendHelloFlag;
+bool sendLSAFlag;
 
 XIARouter xr;
 map<string,time_t> timeStamp;
@@ -73,11 +75,19 @@ void timeout_handler(int signum)
 
 	if (route_state.hello_seq < route_state.hello_lsa_ratio) {
 		// send Hello
-		sendHello();
+		if(sendHelloFlag == false) {
+			sendHelloFlag = true;
+		} else {
+			syslog(LOG_WARNING, "hello already being sent, repeated request");
+		}
 		route_state.hello_seq++;
 	} else if (route_state.hello_seq == route_state.hello_lsa_ratio) {
 		// it's time to send LSA
-		sendLSA();
+		if(sendHelloFlag == false) {
+			sendLSAFlag = true;
+		} else {
+			syslog(LOG_WARNING, "LSA already being sent, repeated request");
+		}
 		// reset hello req
 		route_state.hello_seq = 0;
 	} else {
@@ -647,6 +657,10 @@ int main(int argc, char *argv[])
     struct timeval timeoutval;
 	vector<string> routers;
 
+	// Initialize global flags
+	sendHelloFlag = false;
+	sendLSAFlag = false;
+
 	config(argc, argv);
 	syslog(LOG_NOTICE, "%s started on %s", APPNAME, hostname);
 
@@ -720,6 +734,14 @@ int main(int argc, char *argv[])
 				}
   			}
 
+		}
+		if(sendHelloFlag == true) {
+			sendHello();
+			sendHelloFlag = false;
+		}
+		if(sendLSAFlag == true) {
+			sendLSA();
+			sendLSAFlag = false;
 		}
 
 		time_t now = time(NULL);
