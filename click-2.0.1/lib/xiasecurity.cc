@@ -71,22 +71,25 @@ int xs_getPubkeyHash(char *pubkey, uint8_t *digest, int digest_len)
 {
 	int i, j;
 	char *pubkeystr;
-	int keystartoffset = strlen("-----BEGIN PUBLIC KEY-----\n");
-	int keyendoffset = strlen("-----END PUBLIC KEY-----\n");
-	int keylen = strlen(pubkey) + 1;
+	char pubkeyheader[] = "-----BEGIN PUBLIC KEY-----\n";
+	char pubkeyfooter[] = "-----END PUBLIC KEY-----\n";
+	int pubkeyheaderlen = sizeof pubkeyheader - 1;
+	char *pubkeystart = strstr(pubkey, pubkeyheader);
+	pubkeystart += pubkeyheaderlen;
+	char *pubkeyend = strstr(pubkey, pubkeyfooter);
 
 	assert(digest != NULL);
 	assert(digest_len == SHA_DIGEST_LENGTH);
 
 	// Strip header, footer and newlines
-	pubkeystr = (char *)calloc(keylen - keystartoffset - keyendoffset, 1);
+	pubkeystr = (char *)calloc(pubkeyend - pubkeystart, 1);
 	if(pubkeystr == NULL) {
 		click_chatter("xs_getPubkeyHash: ERROR allocating memory for public key");
 		return -1;
 	}
-	for(i=keystartoffset,j=0; i<keylen-keyendoffset-1; i++) {
-		if(pubkey[i] != '\n') {
-			pubkeystr[j++] = pubkey[i];
+	for(i=0,j=0; i<pubkeyend-pubkeystart; i++) {
+		if(pubkeystart[i] != '\n') {
+			pubkeystr[j++] = pubkeystart[i];
 		}
 	}
 	click_chatter("xs_getPubkeyHash: Stripped pubkey: %s", pubkeystr);
@@ -209,6 +212,9 @@ int xs_getPubkey(const char *xid, char *pubkey, uint16_t *pubkey_len)
 	BIO *bio_pub;
 	RSA *rsa;
 	FILE *fp;
+
+	// Clear out the user buffer
+	memset(pubkey, 0, (size_t)*pubkey_len);
 
 	// Find the directory where keys are stored
 	const char *keydir = get_keydir();
