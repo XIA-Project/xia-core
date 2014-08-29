@@ -91,6 +91,7 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		return -1;
 	}
 
+	bzero(UDPbuf, MAXBUFLEN);
 	// see if we have bytes leftover from a previous Xrecv call
 	// FIXME: this will do the wrong thing for MSG_PEEK
 	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len)) > 0) {
