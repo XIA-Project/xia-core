@@ -196,13 +196,19 @@ int main(int argc, char *argv[]) {
 	
 	// main looping
 	while(!(quit_flag & 2)) {
+		printf("xhcp_client: Main loop, waiting for beacon\n");
 		// clear out packet
 		memset(pkt, 0, sizeof(pkt));
 		socklen_t ddaglen = sizeof(ddag);
 		int rc = Xrecvfrom(sockfd, pkt, XHCP_MAX_PACKET_SIZE, 0, (struct sockaddr*)&ddag, &ddaglen);
 
 		if (rc < 0) {
-			syslog(LOG_WARNING, "error receiving data");
+			syslog(LOG_WARNING, "ERROR receiving beacon");
+			continue;
+		}
+		printf("xhcp_client: received beacon of size %d\n", rc);
+		if (rc == 0) {
+			printf("xhcp_client: ERROR: zero length beacon, skipping\n");
 			continue;
 		}
 		memset(self_dag, '\0', XHCP_MAX_DAG_LENGTH);
@@ -211,20 +217,25 @@ int main(int argc, char *argv[]) {
 		memset(ns_dag, '\0', XHCP_MAX_DAG_LENGTH);
 		int i;
 		xhcp_pkt *tmp = (xhcp_pkt *)pkt;
+		printf("xhcp_client: Packet has %d entries\n", tmp->num_entries);
 		xhcp_pkt_entry *entry = (xhcp_pkt_entry *)tmp->data;
 		for (i=0; i<tmp->num_entries; i++) {
 			switch (entry->type) {
 				case XHCP_TYPE_AD:
 					sprintf(self_dag, "%s", entry->data);
+					printf("xhcp_client: self_dag:%s:\n", self_dag);
 					break;
 				case XHCP_TYPE_GATEWAY_ROUTER_HID:
 					sprintf(gw_dag, "%s", entry->data);
+					printf("xhcp_client: gw_dag:%s:\n", gw_dag);
 					break;
 				case XHCP_TYPE_GATEWAY_ROUTER_4ID:
 					sprintf(gw_4id, "%s", entry->data);
+					printf("xhcp_client: gw_4id:%s:\n", gw_4id);
 					break;					
 				case XHCP_TYPE_NAME_SERVER_DAG:
 					sprintf(ns_dag, "%s", entry->data);
+					printf("xhcp_client: ns_dag:%s:\n", ns_dag);
 					break;					
 				default:
 					syslog(LOG_WARNING, "invalid xhcp data, discarding...");
@@ -234,9 +245,13 @@ int main(int argc, char *argv[]) {
 		}
 		// validate pkt
 		if (strlen(self_dag) <= 0 || strlen(gw_dag) <= 0 || strlen(gw_4id) <= 0 || strlen(ns_dag) <= 0) {
+			syslog(LOG_WARNING, "xhcp_client:main: ERROR invalid beacon packet received");
+			printf("xhcp_client: main: self_dag:%s: gw_dag:%s: gw_4id:%s: ns_dag:%s:\n", self_dag, gw_dag, gw_4id, ns_dag);
 			continue;
 		}
 		if (adv_selfdag != NULL && adv_gwdag != NULL && adv_nsdag != NULL) {
+			syslog(LOG_WARNING, "xhcp_client: main: ERROR: We should never be here");
+			printf("xhcp_client: main: ERROR: This should never have happened\n");
 			if (!strcmp(adv_selfdag, self_dag) && !strcmp(adv_gwdag, gw_dag) && !strcmp(adv_gw4id, gw_4id) && !strcmp(adv_nsdag, ns_dag)) {
 				continue;
 			}
@@ -254,15 +269,19 @@ int main(int argc, char *argv[]) {
 			changed = 1;
 			syslog(LOG_INFO, "AD updated");
 			// update new AD information
-			if(XupdateAD(sockfd, self_dag, gw_4id) < 0)
+			if(XupdateAD(sockfd, self_dag, gw_4id) < 0) {
 				syslog(LOG_WARNING, "Error updating my AD");
+				printf("xhcp_client: ERROR updating my AD to click\n");
+			}
 		
 			// delete obsolete myAD entry
 			xr.delRoute(myAD);
 		
 			// update AD table (my AD entry)
-			if ((rc = xr.setRoute(AD, DESTINED_FOR_LOCALHOST, empty_str, 0xffff)) != 0)
+			if ((rc = xr.setRoute(AD, DESTINED_FOR_LOCALHOST, empty_str, 0xffff)) != 0) {
 				syslog(LOG_WARNING, "error setting route %d\n", rc);
+				printf("xhcp_client: ERROR setting route\n");
+			}
 				
 			myAD = AD;
 			update_ns = 1;
@@ -305,6 +324,7 @@ int main(int argc, char *argv[]) {
 		// Check if myNS_DAG has been changed
 		if(myNS_DAG.compare(nsDAG) != 0) {
 
+			syslog(LOG_INFO, "nameserver changed");
 			// update new name-server-DAG information
 			XupdateNameServerDAG(sockfd, ns_dag);		
 			myNS_DAG = nsDAG;
@@ -329,20 +349,35 @@ int main(int argc, char *argv[]) {
 			host_register_message.append("^");
 			strcpy (buffer, host_register_message.c_str());
 			// send the registraton message to gw router
+			printf("xhcp_client: sending registration message to gateway router\n");
 			Xsendto(sockfd, buffer, strlen(buffer), 0, (sockaddr*)&pseudo_gw_router_dag, sizeof(pseudo_gw_router_dag));
 			// TODO: Hack to allow intrinsic security code to drop packet
 			// Ideally there should be a handshake with the gateway router
-			sleep(5);
-			Xsendto(sockfd, buffer, strlen(buffer), 0, (sockaddr*)&pseudo_gw_router_dag, sizeof(pseudo_gw_router_dag));
+			if(changed) {
+				sleep(5);
+				printf("xhcp_client: sending registration message again\n");
+				Xsendto(sockfd, buffer, strlen(buffer), 0, (sockaddr*)&pseudo_gw_router_dag, sizeof(pseudo_gw_router_dag));
+			}
 		}
 
 		//Register this hostname to the name server
 		if (update_ns && beacon_reception_count >= XHCP_CLIENT_NAME_REGISTER_WAIT) {	
+			printf("xhcp_client: registering with name server\n");
+			printf("xhcp_client: socket=%d, myrealAD=%s, myHID=%s, my4ID=%s\n", sockfd, myrealAD, myHID, my4ID);
+			int tmpsockfd = Xsocket(AF_XIA, SOCK_DGRAM, 0);
+			if (tmpsockfd < 0) {
+				syslog(LOG_ERR, "unable to create a socket");
+				exit(-1);
+			}
+	
 			// read the localhost HID 
-			if ( XreadLocalHostAddr(sockfd, myrealAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE, my4ID, MAX_XID_SIZE) < 0 ) {
+			if ( XreadLocalHostAddr(tmpsockfd, myrealAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE, my4ID, MAX_XID_SIZE) < 0 ) {
 				syslog(LOG_WARNING, "error reading localhost address"); 
+				Xclose(tmpsockfd);
 				continue;
 			}
+			printf("xhcp_client: XreadLocalHostAddr returned AD:%s: HID:%s\n", myrealAD, myHID);
+			Xclose(tmpsockfd);
 
 			// make the host DAG 
 			Node n_src = Node();

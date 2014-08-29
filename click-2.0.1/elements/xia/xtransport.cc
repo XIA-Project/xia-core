@@ -539,7 +539,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 	XIAPath src_path = xiah.src_path();
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 	
-// 	click_chatter("NetworkPacket, Src: %s, Dest: %s", xiah.dst_path().unparse().c_str(), xiah.src_path().unparse().c_str());
+ 	click_chatter("NetworkPacket, Src: %s, Dest: %s", xiah.dst_path().unparse().c_str(), xiah.src_path().unparse().c_str());
 
 	unsigned short _dport = XIDtoPort.get(_destination_xid);  // This is to be updated for the XSOCK_STREAM type connections below
 
@@ -1128,11 +1128,14 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 	} else if (thdr.type() == TransportHeader::XSOCK_DGRAM) {
 
+ 		click_chatter("DGRAMPacket, Src: %s, Dest: %s", xiah.dst_path().unparse().c_str(), xiah.src_path().unparse().c_str());
 		_dport = XIDtoPort.get(_destination_xid);
+		click_chatter("DGRAMPort:%d:", _dport);
 		DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
 		// check if _destination_sid is of XSOCK_DGRAM
-		if (daginfo->sock_type != XSOCKET_DGRAM) {
-			sendToApplication = false;
+		if (daginfo->sock_type != SOCK_DGRAM) {
+			click_chatter("DGRAMERROR: socket type:%d: expected:%d:, Delivering to application Anyway", daginfo->sock_type, SOCK_DGRAM);
+			//sendToApplication = false;
 		}
 	
 	} else {
@@ -1171,6 +1174,9 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 			std::string p_buf;
 			xsm.SerializeToString(&p_buf);
+ 			click_chatter("Packet, Src: %s, Dest: %s", xiah.dst_path().unparse().c_str(), xiah.src_path().unparse().c_str());
+			click_chatter("xtransport: ProcessNetworkPacket: Pkt contains:%s:", xsm.DebugString().c_str());
+			click_chatter("xtransport: ProcessNetworkPacket: Sending to port:%d:", _dport);
 
 			WritablePacket *p2 = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
 
@@ -1415,7 +1421,6 @@ void XTRANSPORT::ProcessXhcpPacket(WritablePacket *p_in)
 	if (ids.size() < 3) {
 		String new_route((char *)xiah.payload());
 		String new_local_addr = new_route + " " + ids[1];
-		click_chatter("new address is - %s", new_local_addr.c_str());
 		_local_addr.parse(new_local_addr);
 	}
 }
@@ -2007,7 +2012,7 @@ void XTRANSPORT::Xchangead(unsigned short _sport)
 		if(daginfo->isConnected == false) {
 			click_chatter("Xchangead: skipping migration for non-connected port");
 			click_chatter("Xchangead: src_path:%s:", daginfo->src_path.unparse().c_str());
-			click_chatter("Xchangead: dst_path:%s:", daginfo->dst_path.unparse().c_str());
+			//click_chatter("Xchangead: dst_path:%s:", daginfo->dst_path.unparse().c_str());
 			continue;
 		}
 		// Update src_path in daginfo
@@ -2033,10 +2038,12 @@ void XTRANSPORT::Xchangead(unsigned short _sport)
 		char pubkey[MAX_PUBKEY_SIZE];
 		uint16_t pubkeylen = MAX_PUBKEY_SIZE;
 		XID src_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
+		click_chatter("Xchangead: Retrieving pubkey for xid:%s:", src_xid.unparse().c_str());
 		if(xs_getPubkey(src_xid.unparse().c_str(), pubkey, &pubkeylen)) {
 			click_chatter("Xchangead: ERROR: Pubkey not found:%s:", src_xid.unparse().c_str());
 			return;
 		}
+		click_chatter("Xchangead: Pubkey:%s:", pubkey);
 		maxpayloadlen = src_path_len + dst_path_len + timestamp_len + sizeof(uint16_t) + MAX_SIGNATURE_SIZE + sizeof(uint16_t) + pubkeylen;
 		payload = (uint8_t *)calloc(maxpayloadlen, 1);
 		if(payload == NULL) {
@@ -2085,7 +2092,7 @@ void XTRANSPORT::Xchangead(unsigned short _sport)
 		XIAHeaderEncap xiah;
 		xiah.set_nxt(CLICK_XIA_NXT_TRN);
 		xiah.set_last(LAST_NODE_DEFAULT);
-		xiah.set_hlim(hlim.get(_sport));
+		xiah.set_hlim(hlim.get(_migrateport));
 		xiah.set_dst_path(daginfo->dst_path);
 		xiah.set_src_path(daginfo->src_path);
 
@@ -2118,7 +2125,7 @@ void XTRANSPORT::Xchangead(unsigned short _sport)
 		if (! _timer.scheduled() || _timer.expiry() >= daginfo->expiry )
 			_timer.reschedule_at(daginfo->expiry);
 
-		portToDAGinfo.set(_sport, *daginfo);
+		portToDAGinfo.set(_migrateport, *daginfo);
 		output(NETWORK_PORT).push(p);
 	}
 }
@@ -2132,6 +2139,9 @@ void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport)
 	String AD_str = local_addr.substring(AD_found_start, AD_found_end - AD_found_start);
 	String HID_str = _local_hid.unparse();
 	String IP4ID_str = _local_4id.unparse();
+	click_chatter("xtransport: Xreadlocalhostaddr: AD: %s", AD_str.c_str());
+	click_chatter("xtransport: Xreadlocalhostaddr: HID: %s", HID_str.c_str());
+	click_chatter("xtransport: Xreadlocalhostaddr: IP4ID: %s", IP4ID_str.c_str());
 	// return a packet containing localhost AD and HID
 	xia::XSocketMsg _Response;
 	_Response.set_type(xia::XREADLOCALHOSTADDR);
@@ -2141,6 +2151,7 @@ void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport)
 	_msg->set_ip4id(IP4ID_str.c_str());
 	std::string p_buf1;
 	_Response.SerializeToString(&p_buf1);
+	click_chatter("xtransport: Xreadlocalhostaddr: Returning %d bytes containing:%s:", p_buf1.size(), _msg->DebugString().c_str());
 	WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
 	output(API_PORT).push(UDPIPPrep(reply, _sport));
 }
