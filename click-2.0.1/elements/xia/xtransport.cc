@@ -539,7 +539,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 	XIAPath src_path = xiah.src_path();
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 	
- 	click_chatter("NetworkPacket, Src: %s, Dest: %s", xiah.dst_path().unparse().c_str(), xiah.src_path().unparse().c_str());
+	//click_chatter("NetworkPacket, Src: %s, Dest: %s", xiah.dst_path().unparse().c_str(), xiah.src_path().unparse().c_str());
 
 	unsigned short _dport = XIDtoPort.get(_destination_xid);  // This is to be updated for the XSOCK_STREAM type connections below
 
@@ -1128,9 +1128,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 	} else if (thdr.type() == TransportHeader::XSOCK_DGRAM) {
 
- 		click_chatter("DGRAMPacket, Src: %s, Dest: %s", xiah.dst_path().unparse().c_str(), xiah.src_path().unparse().c_str());
 		_dport = XIDtoPort.get(_destination_xid);
-		click_chatter("DGRAMPort:%d:", _dport);
 		DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
 		// check if _destination_sid is of XSOCK_DGRAM
 		if (daginfo->sock_type != SOCK_DGRAM) {
@@ -1174,9 +1172,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 			std::string p_buf;
 			xsm.SerializeToString(&p_buf);
- 			click_chatter("Packet, Src: %s, Dest: %s", xiah.dst_path().unparse().c_str(), xiah.src_path().unparse().c_str());
-			click_chatter("xtransport: ProcessNetworkPacket: Pkt contains:%s:", xsm.DebugString().c_str());
-			click_chatter("xtransport: ProcessNetworkPacket: Sending to port:%d:", _dport);
 
 			WritablePacket *p2 = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
 
