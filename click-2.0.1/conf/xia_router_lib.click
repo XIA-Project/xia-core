@@ -198,7 +198,7 @@ elementclass IPLineCard {
 }
 
 elementclass XIADualLineCard {
-    $local_addr, $local_hid, $mac, $num, $ip , $gw, $ip_active |
+    $local_addr, $local_hid, $mac, $num, $ip , $gw, $ip_active, $ishost, $isrouter |
 
  	// input[0]: a packet arriving from the network
 	// input[1]: a packet arriving from the higher stack (i.e. router or end host)
@@ -214,7 +214,7 @@ elementclass XIADualLineCard {
     Script(write sup.active0 !$ip_active);
     Script(write sup.active1 $ip_active);
 
-	c[0], c[1], c[2] -> xlc :: XIALineCard($local_addr, $local_hid, $mac, $num) -> sup -> toNet;
+	c[0], c[1], c[2] -> xlc :: XIALineCard($local_addr, $local_hid, $mac, $num, $ishost, $isrouter) -> sup -> toNet;
     c[3] -> iplc :: IPLineCard($ip, $num, $mac, $gw) -> [1]sup[1] -> [1]toNet;
 
 	// Packet needs forwarding and has been painted w/ output port;
@@ -370,10 +370,10 @@ elementclass XIADualRouter4Port {
     Script(write xrc/n/proc/rt_IP.add - 3); 	// default route for IPv4     TODO: Need real routes somehow
 
     
-	dlc0 :: XIADualLineCard($local_addr, $local_hid, $mac0, 0, $ip0, $gw0, $ip_active0);
-	dlc1 :: XIADualLineCard($local_addr, $local_hid, $mac1, 1, $ip1, $gw1, $ip_active1);
-	dlc2 :: XIADualLineCard($local_addr, $local_hid, $mac2, 2, $ip2, $gw2, $ip_active2);
-	dlc3 :: XIADualLineCard($local_addr, $local_hid, $mac3, 3, $ip3, $gw3, $ip_active3);
+	dlc0 :: XIADualLineCard($local_addr, $local_hid, $mac0, 0, $ip0, $gw0, $ip_active0, 0, 1);
+	dlc1 :: XIADualLineCard($local_addr, $local_hid, $mac1, 1, $ip1, $gw1, $ip_active1, 0, 1);
+	dlc2 :: XIADualLineCard($local_addr, $local_hid, $mac2, 2, $ip2, $gw2, $ip_active2, 0, 1);
+	dlc3 :: XIADualLineCard($local_addr, $local_hid, $mac3, 3, $ip3, $gw3, $ip_active3, 0, 1);
     
     input => dlc0, dlc1, dlc2, dlc3 => output;
 	xrc -> XIAPaintSwitch[0,1,2,3] => [1]dlc0[1], [1]dlc1[1], [1]dlc2[1], [1]dlc3[1] -> [0]xrc;
@@ -435,7 +435,7 @@ elementclass XIADualEndhost {
     Script(write xrc/n/proc/rt_IP.add - 3); 	// default route for IPv4     TODO: Need real routes somehow
 
     
-	dlc0 :: XIADualLineCard($local_addr, $local_hid, $mac0, 0, $ip0, $gw0, $ip_active0);
+	dlc0 :: XIADualLineCard($local_addr, $local_hid, $mac0, 0, $ip0, $gw0, $ip_active0, 1, 0);
     
     input -> dlc0 -> output;
 	xrc -> XIAPaintSwitch[0] => [1]dlc0[1] -> xrc;
