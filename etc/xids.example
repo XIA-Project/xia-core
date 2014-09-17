@@ -1,0 +1,17 @@
+# This file is for user defined XID principal types that will be loaded by the
+# Xsocket APIs, XIA tools, and click.
+# Additional modifications are also required in the click configiguration and
+# source files before the new principal type is active.
+#
+# copy this file to xids before starting to make it active.
+#
+# built in XIA principals are:
+# 0x10 AD
+# 0x11 HID
+# 0x12 CID
+# 0x13 SID
+# 0x14 IP # (4ID)
+#
+# Entries in this file should be in the form of "value name"
+#
+0x50 FOO	# my new FOO principal type
