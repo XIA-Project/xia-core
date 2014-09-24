@@ -2134,9 +2134,6 @@ void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport)
 	String AD_str = local_addr.substring(AD_found_start, AD_found_end - AD_found_start);
 	String HID_str = _local_hid.unparse();
 	String IP4ID_str = _local_4id.unparse();
-	click_chatter("xtransport: Xreadlocalhostaddr: AD: %s", AD_str.c_str());
-	click_chatter("xtransport: Xreadlocalhostaddr: HID: %s", HID_str.c_str());
-	click_chatter("xtransport: Xreadlocalhostaddr: IP4ID: %s", IP4ID_str.c_str());
 	// return a packet containing localhost AD and HID
 	xia::XSocketMsg _Response;
 	_Response.set_type(xia::XREADLOCALHOSTADDR);
@@ -2146,7 +2143,6 @@ void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport)
 	_msg->set_ip4id(IP4ID_str.c_str());
 	std::string p_buf1;
 	_Response.SerializeToString(&p_buf1);
-	click_chatter("xtransport: Xreadlocalhostaddr: Returning %d bytes containing:%s:", p_buf1.size(), _msg->DebugString().c_str());
 	WritablePacket *reply = WritablePacket::make(256, p_buf1.c_str(), p_buf1.size(), 0);
 	output(API_PORT).push(UDPIPPrep(reply, _sport));
 }
