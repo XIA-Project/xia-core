@@ -116,9 +116,9 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *loca
 		localhostAD[lenAD - 1] = 0;
 		localhostHID[lenHID - 1] = 0;
 		local4ID[len4ID - 1] = 0;
-		LOGF("XreadLocalHostAddr: AD:%s: HID:%s: 4ID:%s:", localhostAD, localhostHID, local4ID);
 		rc = 0;
 	} else {
+		LOG("XreadlocalHostAddr: ERROR: Invalid response for XREADLOCALHOSTADDR request");
 		rc = -1;
 	}	
 	return rc;
