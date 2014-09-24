@@ -707,7 +707,7 @@ XIAContentModule::MakeSpace(int chunkSize)
         delRoute(iter->first);
         CChunk *t=iter->second;
         _contentTable.erase(iter);
-        content.erase(i);
+        content.erase(iter->first);
         delete t;
     }
     return 0;

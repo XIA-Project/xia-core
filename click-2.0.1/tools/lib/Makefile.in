@@ -77,7 +77,7 @@ OBJS = string.o straccum.o glue.o \
 	landmarkt.o lexert.o lexertinfo.o driver.o \
 	confparse.o args.o archive.o processingt.o etraits.o elementmap.o \
 	userutils.o md5.o toolutils.o clp.o \
-	xid.o xiapath.o xiaheader.o xiaextheader.o xiacontentheader.o \
+	xid.o xiapath.o xiaheader.o xiaextheader.o xiacontentheader.o xiautil.o \
 	@LIBOBJS@ @EXTRA_TOOL_OBJS@
 BUILDOBJS = $(patsubst %.o,%.bo,$(OBJS))
 
