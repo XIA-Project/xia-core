@@ -76,9 +76,8 @@ class XIAChallengeResponder : public Element { public:
 	const static int hash_length = SHA_DIGEST_LENGTH;
 	uint8_t outgoing_hashes[num_outgoing_hashes][hash_length];
 	int outgoing_header;
+	String local_hid_str;
    // int _shutoff;
-    String pub_path;
-	String priv_path;
     bool _active;
     //int _ttl;
     //Timer _timer;

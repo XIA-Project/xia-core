@@ -63,6 +63,7 @@ private:
     void send_challenge(Packet *);
 	void verify_response(Packet *);
 	bool is_verified(Packet *);
+	String src_hid_str(Packet *);
 	int digest_to_hex_string(unsigned char *, int, char *, int );
     int _active;
 	int _iface;

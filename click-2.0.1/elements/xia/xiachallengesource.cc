@@ -39,6 +39,13 @@ CLICK_DECLS
 #define CLICK_XIA_NXT_XRESP		66	/*  Response */
 
 
+// NOTE:
+// Challenge = ChallengeComponents, HMAC
+// ChallengeComponents = srcHID, dstHID, interface, originalPacketHash
+// Response = Challenge, Signature, ResponderPubkey
+//
+
+/*
 struct click_xia_challenge_body{
 		// TODO: change to src/dest full DAG
 		uint8_t src_hid[48];
@@ -60,6 +67,7 @@ struct click_xia_response {
 	uint8_t signature[128];
 
 };
+*/
 
 
 XIAChallengeSource::XIAChallengeSource()
@@ -90,8 +98,6 @@ XIAChallengeSource::configure(Vector<String> &conf, ErrorHandler *errh)
 
 	generate_secret();
 	local_hid_str = local_hid.unparse().c_str();
-	pub_path = "key/" + local_hid_str.substring(4) + ".pub";
-	priv_path = "key/" + local_hid_str.substring(4);
 
 	_name = new char [local_hid_str.length()+1];
 	strcpy(_name, local_hid_str.c_str());
@@ -132,139 +138,134 @@ XIAChallengeSource::digest_to_hex_string(unsigned char *digest, int digest_len, 
 	return retval;
 }
 
+// NOTE:
+// Challenge = ChallengeComponents, HMAC
+// ChallengeComponents = srcHID, dstHID, interface, originalPacketHash
+// Response = Challenge, Signature, ResponderPubkey
+//
+
 void
 XIAChallengeSource::verify_response(Packet *p_in)
 {
     int i, j;
 	char* pch;
-	char src_hid[48];
+	uint16_t length;
 
 	// Get the src and dst addresses
 	XIAHeader xiah(p_in->xia_header());
 	XIAPath src_dag = xiah.src_path();
 	XIAPath dst_dag = xiah.dst_path();
-    click_xia_response *response = (click_xia_response *)xiah.payload();
 
+
+	// Extract Response from payload: Challenge, Signature, ResponderPubkey
+	XIASecurityBuffer response((char *)xiah.payload(), xiah.plen());
+	if(response.get_numEntries() != 3) {
+		click_chatter("XIAChallengeSource::verify_response: ERROR: Expected 3 entries, got %d", response.get_numEntries());
+		return;
+	}
+
+	// Extract Challenge from Response
+	length = response.peekUnpackLength();
+	char challengeBlob[length];
+	response.unpack((char *)challengeBlob, &length);
+	XIASecurityBuffer challenge(challengeBlob, length);
+
+	// Extract Signature from Response
+	length = response.peekUnpackLength();
+	char responseSignature[length];
+	response.unpack((char *)responseSignature, &length);
+
+	// Extract Remote Host's Public key from Response
+	length = response.peekUnpackLength();
+	char remotePubkey[length+1]; // null terminate
+	bzero(remotePubkey, length+1);
+	response.unpack((char *)remotePubkey, &length);
+
+	// Extract ChallengeComponents from Challenge
+	length = challenge.peekUnpackLength();
+	char challengeComponents[length];
+	challenge.unpack((char *)challengeComponents, &length);
+	XIASecurityBuffer chalComponents(challengeComponents, length);
+
+	// Extract HMAC from Challenge
+	length = challenge.peekUnpackLength();
+	char hmac[length];
+	challenge.unpack((char *)hmac, &length);
+
+	// Extract src_hid from ChallengeComponents
+	length = chalComponents.peekUnpackLength();
+	char challenge_src_hid[length+1]; // null terminate
+	bzero(challenge_src_hid, length+1);
+	chalComponents.unpack((char *)challenge_src_hid, &length);
+
+	// Extract dst_hid from ChallengeComponents
+	length = chalComponents.peekUnpackLength();
+	char challenge_dst_hid[length+1]; // null terminate
+	bzero(challenge_dst_hid, length+1);
+	chalComponents.unpack((char *)challenge_dst_hid, &length);
+
+	// Extract interface from ChallengeComponents
+	int interface;
+	length = sizeof(int);
+	chalComponents.unpack((char *)&interface, &length);
+
+	// Hash of packet that was originally sent
+	length = chalComponents.peekUnpackLength();
+	char sentPktHash[length];
+	chalComponents.unpack((char *)sentPktHash, &length);
+
+	// Print out debugging info about the response packet
 	click_chatter("== Response Packet detail ============================================================");
-	click_chatter("\tSRC: %s", response->v.body.src_hid);
-	click_chatter("\tDST: %s", response->v.body.dst_hid);
-	click_chatter("\tiface: %d", response->v.body.iface);
-	click_chatter("\thash 1st byte: %0X", response->v.body.hash[0]);
-	click_chatter("\tPub K: \n%s", response->pub_key);
-	click_chatter("\tSig: %X", response->signature[0]);
-	click_chatter("======================================================================================");
-
+	click_chatter("\tSRC:%s:", challenge_src_hid);
+	click_chatter("\tDST:%s:", challenge_dst_hid);
+	click_chatter("\tInterface:%d", interface);
 
 	// Verify HMAC: Check if the challenge message really originated from here
 	unsigned int hmac_len = 20;
-	uint8_t hmac[hmac_len];
-	HMAC(router_secret, router_secret_length, (unsigned char *)&(response->v.body), sizeof(response->v.body), hmac, &hmac_len);
-	if(memcmp(hmac, response->v.hmac, hmac_len)) {
+	unsigned char challenge_hmac[hmac_len];
+	HMAC(router_secret, router_secret_length, (unsigned char *)chalComponents.get_buffer(), chalComponents.size(), challenge_hmac, &hmac_len);
+	if(memcmp(hmac, challenge_hmac, hmac_len)) {
 		click_chatter("%s> Error: Invalid hmac returned with response", _name);
 		return;
 	}
 
 	// Verify public key: Check if hash(pub) == src_hid
-	//
-
-	char pem_pub[272];
-	strncpy(pem_pub, (char *)response->pub_key, 272);
-
-	// Replace newlines, header and footer
-	char pub_key[272];
-	for(i=strlen("-----BEGIN PUBLIC KEY-----"),j=0;i<272-strlen("-----END PUBLIC KEY-----");i++) {
-		if(pem_pub[i] == '\n') {
-			continue;
-		}
-		pub_key[j] = pem_pub[i];
-		j++;
-	}
-	pub_key[j-1] = '\0';
-	std::string pub_key_string(pub_key);
-	click_chatter("After replacing header and footer: %s", pub_key_string.c_str());
-
-	// Calculate SHA1 hash of public key
-	unsigned char hash_pubkey[20];
-	SHA1((unsigned char *)pub_key_string.c_str(), strlen(pub_key_string.c_str()), hash_pubkey);
-
-	// Convert the SHA1 hash to a hex string
-	char hex_hash_pub[20*2+1];
-	for(i=0;i<20;i++) {
-		sprintf(&hex_hash_pub[2*i], "%02x", (unsigned int)hash_pubkey[i]);
-	}
-	hex_hash_pub[20*2] = '\0';
-	click_chatter("Hash of public key: %s", hex_hash_pub);
-
-	// Compare hex SHA1 hash of public key with sender's HID
-	int pk_verified = 0;
-	strncpy(src_hid, (char *)response->v.body.src_hid + 4, 40);
-	pk_verified = !strncmp(src_hid, hex_hash_pub, 40);
-	if(!pk_verified) {
-		click_chatter("%s> Error: Public key does not match sender's address", _name);
+	String src_hid(src_hid_str(p_in));
+	char remotePubkeyHash[SHA_DIGEST_LENGTH];
+	xs_getPubkeyHash(remotePubkey, (uint8_t *)remotePubkeyHash, sizeof remotePubkeyHash);
+	char remotePubkeyHashStr[XIA_SHA_DIGEST_STR_LEN];
+	xs_hexDigest((uint8_t *)remotePubkeyHash, sizeof remotePubkeyHash, remotePubkeyHashStr, sizeof remotePubkeyHashStr);
+	if(strncmp(xs_XIDHash(src_hid.c_str()), remotePubkeyHashStr, sizeof remotePubkeyHashStr) != 0) {
+		click_chatter("%s> Error: RemoteHID:%s: PubkeyHash:%s", _name, src_hid.c_str(), remotePubkeyHashStr);
 		return;
 	}
+	click_chatter("%s> Public key matches source HID", _name);
 
-	click_chatter("%s> Public key is authentic", _name);
-
-	// Verify signature: Check if hash(v) == RSA_verify(sig, pub)
-    unsigned char digest[20];
-	char hex_digest[41];
-	SHA1((unsigned char *) &(response->v), sizeof(click_xia_challenge), digest);
-	if(digest_to_hex_string(digest, 20, hex_digest, 41)) {
-		click_chatter("ERROR: Failed converting hash of challenge to string");
-		return;
-	}
-	click_chatter("Hash of challenge: %s", hex_digest);
-	//SHA1_ctx sha_ctx;
-    //SHA1_init(&sha_ctx);
-    //SHA1_update(&sha_ctx, (unsigned char *)&(response->v), sizeof(click_xia_challenge));
-    //SHA1_final(digest, &sha_ctx);
-
-	BIO *bio_pub = BIO_new(BIO_s_mem());
-	//BIO_write(bio_pub, response->pub_key, 272);
-	BIO_write(bio_pub, pem_pub, 272);
-	RSA *rsa = PEM_read_bio_RSA_PUBKEY(bio_pub, NULL, NULL, NULL);
-	if(!rsa) {
-		click_chatter("%s> ERROR: Unable to read public key from response to RSA", _name);
-		return;
+	// Verify the signature from the original packet sender
+	if(xs_isValidSignature((const unsigned char *)challenge.get_buffer(), challenge.size(), (unsigned char *)responseSignature, sizeof responseSignature, remotePubkey, sizeof remotePubkey) != 1) {
+		click_chatter("%s> XIAChallengeSource::verify_challenge: Invalid signature", _name);
 	}
 
-    unsigned int sig_len = 128;
-	unsigned char sig_buf[sig_len];
-	memcpy(sig_buf, response->signature, sig_len);
-	char hex_signature[257];
-	digest_to_hex_string(sig_buf, sig_len, hex_signature, 257);
-	click_chatter("%s> Received signature: %s", _name, hex_signature);
+	click_chatter("%s> Signature verified. Accept this source HID", _name);
 
-	int sig_verified = RSA_verify(NID_sha1, digest, sizeof digest, sig_buf, sig_len, rsa);
-	RSA_free(rsa);
+	_verified_table[src_hid] = 1;
 
-	if (!sig_verified)
-	{
-		click_chatter("%s> Error: Invalid signature", _name);
-		return;
-	}
+}
 
-	click_chatter("%s> Signature is verified. Accept this HID", _name);
-
-	String hid((char*)response->v.body.src_hid);
-	_verified_table[hid] = 1;
-
+String
+XIAChallengeSource::src_hid_str(Packet *p)
+{
+	XIAHeader xiah(p->xia_header());
+	XIAPath src_dag = xiah.src_path();
+	return src_dag.xid(src_dag.hid_node_for_destination_sid_node()).unparse();
 }
 
 // Check whether pack/et's source HID has been verified
 bool
 XIAChallengeSource::is_verified(Packet *p)
 {
-	char* pch;
-	char src_hid[48];
-    XIAHeader xiah(p->xia_header());
-    XIAPath src_dag = xiah.src_path();
-	pch = strstr ((char*)src_dag.unparse().c_str(), "HID:");
-	strncpy (src_hid, pch, 44);
-	src_hid[44] = '\0';
-	String hid(src_hid);
-	click_chatter("%s> Verifying %s", _name, src_hid);
+	String hid(src_hid_str(p));
+	click_chatter("%s> Verifying %s", _name, hid.c_str());
 
 	return _verified_table[hid] == 1;
 }
@@ -282,52 +283,49 @@ XIAChallengeSource::send_challenge(Packet *p)
 	XIAPath src_dag = xiah.src_path();
 	XIAPath dst_dag = xiah.dst_path();
 
+	// Challenge includes
+	// buf = src_hid + dst_hid + iface + pkt_hash
+	// challenge = buf + hmac(buf)
+
 	// Make the challenge packet payload
-	struct click_xia_challenge challenge;
-	// Src HID
-	pch = strstr ((char*)src_dag.unparse().c_str(), "HID:");
-	strncpy ((char*)challenge.body.src_hid, pch, 4+40);
-	challenge.body.src_hid[44] = '\0';
-//    click_chatter("SRC: %s", challenge.body.src_hid);
-//	click_chatter("Full SRC: %s", src_dag.unparse().c_str());
-	// Dest HID
+	XIASecurityBuffer buf = XIASecurityBuffer(128);
 
-	char* pch2;
-	pch2 = strstr ((char*)dst_dag.unparse().c_str(), "HID:");
-	strncpy ((char*)challenge.body.dst_hid, pch2, 4+40);
-	challenge.body.dst_hid[44] = '\0';
-//    click_chatter("DST: %s", challenge.body.dst_hid);
-//	click_chatter("DST[0]: %c %d", challenge.body.dst_hid[0], challenge.body.dst_hid[0]);
-//	click_chatter("Full DST: %s", dst_dag.unparse().c_str());
+	// Source HID
+	String src_hid_str = src_dag.xid(src_dag.hid_node_for_destination_sid_node()).unparse();
+	buf.pack(src_hid_str.c_str(), src_hid_str.length());
 
-	// Interface number
-	challenge.body.iface = _iface;
-//	click_chatter("iface: %d", _iface);
+	// Destination HID
+	String dst_hid_str = dst_dag.xid(dst_dag.hid_node_for_destination_sid_node()).unparse();
+	buf.pack(dst_hid_str.c_str(), dst_hid_str.length());
 
-	xs_getSHA1Hash(p->data(), p->length(), challenge.body.hash, sizeof challenge.body.hash);
-//	click_chatter("hash 1st byte: %0X", challenge.body.hash[0]);
+	// Interface
+	buf.pack((const char *)&_iface, sizeof(_iface));
 
-//	click_chatter("test anno: %d", XIA_PAINT_ANNO(p));	//check if anno gives same value as iface
+	// Hash of incoming packet
+	unsigned char pkt_hash[SHA_DIGEST_LENGTH];
+	xs_getSHA1Hash(p->data(), p->length(), pkt_hash, sizeof pkt_hash);
+	buf.pack((const char *)pkt_hash, sizeof pkt_hash);
 
-	// HMAC
-	//unsigned char hmac[20];
+	// HMAC computed on all abovementioned entries
+	unsigned char challenge_hmac[20];
 	unsigned int hmac_len = 20;
+	HMAC(router_secret, router_secret_length, (unsigned char *)buf.get_buffer(), buf.size(), challenge_hmac, &hmac_len);
 
-	HMAC(router_secret, router_secret_length, (unsigned char *)&(challenge.body), sizeof(challenge.body), challenge.hmac, &hmac_len);
-	//for(i=0; i<5; i++)
-	//	click_chatter("HMAC: %02X", challenge.hmac[i]);
+	// Build the challenge
+	XIASecurityBuffer challenge = XIASecurityBuffer(512);
+	challenge.pack(buf.get_buffer(), buf.size());
+	challenge.pack((const char *)challenge_hmac, hmac_len);
+
 
 	// Make the challenge packet header
-	WritablePacket *challenge_p = Packet::make(256, &challenge, sizeof(struct click_xia_challenge), 0);
+	WritablePacket *challenge_p = Packet::make(256, challenge.get_buffer(), challenge.size(), 0);
 	XIAHeaderEncap encap;
 	encap.set_nxt(CLICK_XIA_NXT_XCHAL);
 	encap.set_dst_path(src_dag);
 	encap.set_src_path(_src_path);	// self addr // TODO: do something smarter here (e.g., don't include original dest SID)
 
-	String hid((char*) challenge.body.src_hid);
-	XID source_hid(hid);
+	XID source_hid(src_hid_str);
 	challenge_p->set_nexthop_neighbor_xid_anno(source_hid);
-//	click_chatter("Self dag: %s\n=========================", _src_path.unparse().c_str() );
 	output(1).push(encap.encap(challenge_p));
 }
 

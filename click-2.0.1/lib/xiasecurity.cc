@@ -29,6 +29,198 @@ int xs_makeRandomBuffer(char *buf, int buf_len)
 }
 */
 
+/*
+class XIASecurityBuffer {
+    public:
+        XIASecurityBuffer(int initialSize);
+		XIASecurityBuffer(const char *buf, uint16_t len);
+        ~XIASecurityBuffer();
+        bool pack(const char *data, uint16_t length);
+		bool unpack(char *data, uint16_t *length);
+        char *get_buffer();
+        uint16_t size();
+		uint16_t get_numEntries();
+		int peekUnpackLength();
+    private:
+        bool initialize(); // Called on first pack()
+        bool extend(uint32_t length);
+		int numEntriesSize;
+        int initialSize;
+        bool initialized;
+        uint16_t *numEntriesPtr;
+        char *dataPtr;
+        uint32_t remainingSpace;
+        char *_buffer;
+        char *nextPack;
+        char *nextUnpack;
+};
+*/
+
+XIASecurityBuffer::XIASecurityBuffer(int initSize)
+{
+	numEntriesSize = sizeof(uint16_t);
+	initialSize = numEntriesSize + initSize; // numEntries + requested size
+	initialized = false;
+	numEntriesPtr = NULL;
+	dataPtr = NULL;
+	remainingSpace = 0;
+	_buffer = NULL;
+	nextPack = NULL;
+	nextUnpack = NULL;
+}
+
+XIASecurityBuffer::XIASecurityBuffer(const char *buf, uint16_t len)
+{
+	numEntriesSize = sizeof(uint16_t);
+	// Copy the serialized buffer
+	_buffer = (char *)calloc(len, 1);
+	if(_buffer == NULL) {
+		click_chatter("XIASecurityBuffer:: CRITICAL, could not allocate %d bytes for buffer", len);
+	}
+	memcpy(_buffer, buf, len);
+	// Update pointers
+	nextPack = _buffer+len;
+	dataPtr = _buffer + numEntriesSize;
+	numEntriesPtr = (uint16_t *)_buffer;
+	nextUnpack = dataPtr;
+	// Update state variables
+	initialSize = len;
+	remainingSpace = 0;
+	initialized = true;
+}
+
+XIASecurityBuffer::~XIASecurityBuffer()
+{
+	if(_buffer) {
+		free(_buffer);
+	}
+}
+
+bool XIASecurityBuffer::initialize()
+{
+	_buffer = (char *)calloc(initialSize, 1);
+	if(_buffer == NULL) {
+		return false;
+	}
+	numEntriesPtr = (uint16_t *)_buffer;
+	*numEntriesPtr = 0;
+	dataPtr = _buffer + numEntriesSize;
+	remainingSpace = initialSize - numEntriesSize;
+	nextPack = dataPtr;
+	initialized = true;
+	return true;
+}
+
+// Extend buffer to store the length plus length-bytes of data
+bool XIASecurityBuffer::extend(uint32_t length)
+{
+	uint16_t total_bytes = sizeof(uint16_t) + length;
+	// Extend the buffer if needed
+	while(remainingSpace < total_bytes) {
+		int currentDataSize = nextPack - dataPtr;
+		int newSize = numEntriesSize + (2*currentDataSize);
+		int nextUnpackOffset;
+		if(nextUnpack != NULL) {
+			nextUnpackOffset = nextUnpack - _buffer;
+		}
+		char *newbuffer = (char *)realloc(_buffer, newSize);
+		if(newbuffer == NULL) {
+			click_chatter("XIASecurityBuffer::extend: failed extending size beyond %d", currentDataSize);
+			return false;
+		}
+		numEntriesPtr = (uint16_t *)newbuffer;
+		dataPtr = newbuffer + numEntriesSize;
+		remainingSpace = newSize - (currentDataSize + numEntriesSize);
+		nextPack = newbuffer + (currentDataSize + numEntriesSize);
+		if(nextUnpack != NULL) {
+			nextUnpack = newbuffer + nextUnpackOffset;
+		}
+		_buffer = newbuffer;
+		//bzero(_buffer+currentSize, currentSize);
+	}
+	return true;
+}
+
+char *XIASecurityBuffer::get_buffer()
+{
+	if(initialized) {
+		return _buffer;
+	} else {
+		return NULL;
+	}
+}
+
+uint16_t XIASecurityBuffer::size()
+{
+	if(initialized) {
+		return nextPack - _buffer;
+	} else {
+		return 0;
+	}
+}
+
+uint16_t XIASecurityBuffer::get_numEntries()
+{
+	return *numEntriesPtr;
+}
+
+bool XIASecurityBuffer::pack(const char *data, uint16_t length)
+{
+	if(!initialized) {
+		if(initialize() == false) {
+			click_chatter("XIASecurityBuffer::pack: failed initializing memory for data");
+			return false;
+		}
+	}
+	if(extend(length) == false) {
+		click_chatter("XIASecurityBuffer::pack: failed extending memory for additional data");
+		return false;
+	}
+
+	if(nextUnpack == NULL) {
+		nextUnpack = nextPack;
+	}
+	memcpy(nextPack, &length, sizeof(length));
+	nextPack += sizeof(length);
+	memcpy(nextPack, data, length);
+	nextPack += length;
+	remainingSpace -= (sizeof(uint16_t) + length);
+	*numEntriesPtr = *numEntriesPtr + 1;
+	return true;
+}
+
+// Unpack items from buffer, one per call
+// Typical usage: while(unpack(buf, &len)) ... do something
+bool XIASecurityBuffer::unpack(char *data, uint16_t *length)
+{
+	// If we go past the nextPack pointer, no more entries to unpack
+	if(nextUnpack >= nextPack) {
+		click_chatter("XIASecurityBuffer::unpack: ERROR no entries to unpack");
+		return false;
+	}
+
+	if(*length < peekUnpackLength()) {
+		click_chatter("XIASecurityBuffer::unpack: ERROR insufficient buffer space:%d, expected:%d.", *length, peekUnpackLength());
+		return false;
+	}
+	*length = peekUnpackLength();
+	nextUnpack += sizeof(uint16_t);
+	memcpy(data, nextUnpack, *length);
+	nextUnpack += *length;
+	return true;
+}
+
+int XIASecurityBuffer::peekUnpackLength()
+{
+	if(nextUnpack >= nextPack) {
+		click_chatter("XIASecurityBuffer::peekUnpackLength: ERROR reading past end of buffer");
+		return -1;
+	}
+	uint16_t length;
+	memcpy(&length, nextUnpack, sizeof(uint16_t));
+	return (int)length;
+}
+
 static const char *get_keydir()
 {
     static const char *keydir = NULL;
@@ -165,10 +357,10 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
 	// Print the SHA1 hash in human readable form
     char hex_digest[XIA_SHA_DIGEST_STR_LEN];
 	xs_hexDigest(digest, sizeof digest, hex_digest, sizeof hex_digest);
-    click_chatter("xs_sign: Hash of challenge: %s", hex_digest);
+    click_chatter("xs_sign: Hash of given data: %s", hex_digest);
 
     // Encrypt the SHA1 hash with private key
-    click_chatter("H> Signing with private key from: %s", privfilepath);
+    click_chatter("xs_sign: Signing with private key from: %s", privfilepath);
     FILE *fp = fopen(privfilepath, "r");
     RSA *rsa = PEM_read_RSAPrivateKey(fp,NULL,NULL,NULL);
     if(rsa==NULL) {
@@ -188,7 +380,7 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
     //int rc = RSA_sign(NID_sha1, digest, sizeof digest, sig_buf, &sig_len, rsa);
     int rc = RSA_sign(NID_sha1, digest, sizeof digest, sig_buf, &sig_len, rsa);
     if (1 != rc) { click_chatter("RSA_sign failed"); }
-    click_chatter("Responder signature length: %d", sig_len);
+    click_chatter("xs_sign: signature length: %d", sig_len);
 
     //click_chatter("Sig: %X Len: %d", sig_buf[0], sig_len);
     memcpy(signature, sig_buf, sig_len);

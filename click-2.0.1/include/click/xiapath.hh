@@ -8,6 +8,8 @@
 #include <click/vector.hh>
 #include <click/xid.hh>
 
+#define INVALID_NODE_HANDLE 2048
+
 CLICK_DECLS
 class Element;
 
@@ -62,6 +64,9 @@ class XIAPath { public:
 
     // get the handle of the destination node
     handle_t destination_node() const;
+
+	// get the handle of HID node preceding the destination SID node
+	handle_t hid_node_for_destination_sid_node() const;
 
     // get XID of the node
     XID xid(handle_t node) const;

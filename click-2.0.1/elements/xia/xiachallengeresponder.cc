@@ -34,33 +34,16 @@
 
 CLICK_DECLS
 
-#define DEBUG 0
-
 #define CLICK_XIA_NXT_XCHAL		65	/*  Challenge */
 #define CLICK_XIA_NXT_XRESP		66	/*  Response */
 
+#define MAX_SIGNATURE_SIZE 256
 
-struct click_xia_challenge_body{
-		// TODO: change to src/dest full DAG
-		uint8_t src_hid[48];
-		uint8_t dst_hid[48];
-		uint8_t hash[20];
-		uint16_t	iface;
-};
-
-
-// XIA challenge query header
-struct click_xia_challenge {
-	struct click_xia_challenge_body body;
-    uint8_t hmac[20];	// HMAC-SHA1(body, secret)
-};
-
-// XIA challenge reply header
-struct click_xia_response {
-    struct click_xia_challenge v;
-	uint8_t pub_key[274];
-	uint8_t signature[128];
-};
+// NOTE:
+// Challenge = ChallengeComponents, HMAC
+// ChallengeComponents = srcHID, dstHID, interface, originalPacketHash
+// Response = Challenge, Signature, ResponderPubkey
+//
 
 // no initialization needed
 XIAChallengeResponder::XIAChallengeResponder() //: _timer(this)
@@ -94,7 +77,6 @@ int
 XIAChallengeResponder::configure(Vector<String> &conf, ErrorHandler *errh)
 {
 	XID local_hid;
-	String local_hid_str;
 
     if (cp_va_kparse(conf, this, errh,
 			 "LOCALHID", cpkP + cpkM, cpXID, &local_hid,
@@ -107,8 +89,6 @@ XIAChallengeResponder::configure(Vector<String> &conf, ErrorHandler *errh)
     _timer.schedule_after_sec(SHUTOFF_RESET);*/
 
 	local_hid_str = local_hid.unparse().c_str();
-	pub_path = "key/" + local_hid_str.substring(4) + ".pub";
-	priv_path = "key/" + local_hid_str.substring(4);
 
 	outgoing_header = 0;
     return 0;
@@ -120,53 +100,100 @@ XIAChallengeResponder::initialize(ErrorHandler *)
     return 0;
 }
 
+
 void
 XIAChallengeResponder::processChallenge(Packet *p_in)
 {
 	int i;
 	char* pch;
+	uint16_t length;
 	char hash_str[XIA_SHA_DIGEST_STR_LEN];
 
 	// Get the src and dst addresses
 	XIAHeader xiah(p_in->xia_header());
 	XIAPath src_dag = xiah.src_path();
 	XIAPath dst_dag = xiah.dst_path();
-    click_xia_challenge *challenge = (click_xia_challenge *)xiah.payload();
-	xs_hexDigest(challenge->body.hash, 20, hash_str, XIA_SHA_DIGEST_STR_LEN);
+
+	// Retrieve challenge from payload
+	XIASecurityBuffer challenge((const char *)xiah.payload(), xiah.plen());
+
+	// challengeComponents = src_hid, dst_hid, interface, packetHash
+	uint16_t challengeEntriesLength = challenge.peekUnpackLength();
+	char challengeEntries[challengeEntriesLength];
+	challenge.unpack((char *)challengeEntries, &challengeEntriesLength);
+	XIASecurityBuffer challengeComponents(challengeEntries, challengeEntriesLength);
+
+	// hmac
+	length = challenge.peekUnpackLength();
+	char hmac[length];
+	challenge.unpack((char *)hmac, &length);
+
+	// Retrieve the entries in challengeComponents
+	length = challengeComponents.peekUnpackLength();
+	char challenge_src_hid[length + 1];  // null terminate
+	bzero(challenge_src_hid, length + 1);
+	challengeComponents.unpack((char *)challenge_src_hid, &length);
+
+	length = challengeComponents.peekUnpackLength();
+	char challenge_dst_hid[length + 1];  // null terminate
+	bzero(challenge_dst_hid, length + 1);
+	challengeComponents.unpack((char *)challenge_dst_hid, &length);
+
+	length = challengeComponents.peekUnpackLength();
+	int interface;
+	challengeComponents.unpack((char *)&interface, &length);
+
+	length = challengeComponents.peekUnpackLength();
+	uint8_t packetHash[length];
+	challengeComponents.unpack((char *)packetHash, &length);
+
+	xs_hexDigest(packetHash, SHA_DIGEST_LENGTH, hash_str, XIA_SHA_DIGEST_STR_LEN);
 
 	click_chatter("== Challenge Packet detail ============================================================");
-	click_chatter("\tSRC: %s", (char *)challenge->body.src_hid);
-	click_chatter("\tDST: %s", (char *)challenge->body.dst_hid);
-	click_chatter("\tiface: %d", challenge->body.iface);
+	click_chatter("\tSRC: %s", challenge_src_hid);
+	click_chatter("\tDST: %s", challenge_dst_hid);
+	click_chatter("\tiface: %d", interface);
 	click_chatter("\thash: %s", hash_str);
 	click_chatter("=======================================================================================");
 
 	click_chatter("H> Verifying challenge is in response to a sent packet");
-	if(!check_outgoing_hashes(challenge->body.hash)) {
+	if(!check_outgoing_hashes(packetHash)) {
 		click_chatter("H> FAILED: challenge doesn't match a sent packet");
 		return;
 	}
 
 	click_chatter("H> Sending response...");
 
-	// Make the response packet payload
-	struct click_xia_response response;
+	// Build the response payload
+	// challenge, signature, pubkey
 
-	// Challenge packet copy
-	memcpy(&(response.v), challenge, sizeof(click_xia_challenge));
+	// Challenge
+	XIASecurityBuffer response(512);
+	response.pack((char *)challenge.get_buffer(), challenge.size());
 
-	// Sign challenge struct
-	sign(response.signature, challenge);
+	// Signature
+	char signature[MAX_SIGNATURE_SIZE];
+	uint16_t signatureLength = MAX_SIGNATURE_SIZE;
+	xs_sign(local_hid_str.c_str(), (unsigned char *)challenge.get_buffer(), challenge.size(), (unsigned char *)signature, &signatureLength);
+	response.pack((char *)signature, signatureLength);
 
+	/*
 	char hex_signature[257];
-	digest_to_hex_string(response.signature, 128, hex_signature, 257);
+	digest_to_hex_string(signature, signatureLength, hex_signature, 257);
 	click_chatter("Response Signature: %s", hex_signature);
+	*/
 
-	// Self own public key
-	get_pubkey(response.pub_key);
+	// Pubkey
+	char pubkey[MAX_PUBKEY_SIZE];
+	uint16_t pubkeyLength = MAX_PUBKEY_SIZE;
+	if(xs_getPubkey(local_hid_str.c_str(), pubkey, &pubkeyLength)) {
+		click_chatter("XIAChallengeResponder::processChallenge ERROR local public key not found");
+		return;
+	}
+	response.pack((char *)pubkey, pubkeyLength);
 
 	// Make the challenge packet header
-	WritablePacket *response_p = Packet::make(256, &response, sizeof(struct click_xia_response), 0);
+	WritablePacket *response_p = Packet::make(256, response.get_buffer(), response.size(), 0);
 	XIAHeaderEncap encap;
 	encap.set_nxt(CLICK_XIA_NXT_XRESP);
 	encap.set_dst_path(src_dag);
@@ -190,78 +217,6 @@ XIAChallengeResponder::digest_to_hex_string(unsigned char *digest, int digest_le
     hex_string[hex_string_len-1] = '\0';
     retval = 0;
     return retval;
-}
-
-
-void
-XIAChallengeResponder::sign(uint8_t *sig, struct click_xia_challenge *challenge)
-{
-	// Hash
-    SHA1_ctx sha_ctx;
-    unsigned char digest[20];
-    SHA1_init(&sha_ctx);
-    SHA1_update(&sha_ctx, (unsigned char *)challenge, sizeof(click_xia_challenge));
-    SHA1_final(digest, &sha_ctx);
-
-	char hex_digest[41];
-	if(digest_to_hex_string(digest, 20, hex_digest, 41)) {
-		click_chatter("ERROR: Failed converting challenge hash to hex string");
-		return;
-	}
-	click_chatter("Responder: Hash of challenge: %s", hex_digest);
-	//click_chatter("hash: %X", digest[0]);
-
-	// Encrypt with private key
-	click_chatter("H> Signing with private key from: %s", priv_path.c_str());
-	FILE *fp = fopen(priv_path.c_str(), "r");
-	RSA *rsa = PEM_read_RSAPrivateKey(fp,NULL,NULL,NULL);
-	if(rsa==NULL)
-		ERR_print_errors_fp(stderr);
-
- 	unsigned char *sig_buf = NULL;
-    unsigned int sig_len = 0;
-    sig_buf = (unsigned char*)malloc(RSA_size(rsa));
-    if (NULL == sig) { click_chatter("sig malloc failed"); }
-
-    //int rc = RSA_sign(NID_sha1, digest, sizeof digest, sig_buf, &sig_len, rsa);
-    int rc = RSA_sign(NID_sha1, digest, 20, sig_buf, &sig_len, rsa);
-    if (1 != rc) { click_chatter("RSA_sign failed"); }
-	click_chatter("Responder signature length: %d", sig_len);
-
-	//click_chatter("Sig: %X Len: %d", sig_buf[0], sig_len);
-	memcpy(sig, sig_buf, sig_len);
-
-	fclose(fp);
-
-}
-
-void
-XIAChallengeResponder::get_pubkey(uint8_t *pub)
-{
-	click_chatter("H> Getting public key from: %s", pub_path.c_str());
-	FILE *fp = fopen(pub_path.c_str(), "r");
-	RSA *rsa = PEM_read_RSA_PUBKEY(fp,NULL,NULL,NULL);
-	//RSA *rsa = PEM_read_RSAPublicKey(fp,NULL,NULL,NULL);
-	if(rsa==NULL)
-		ERR_print_errors_fp(stderr);
-
-	int keylen_pub;
-	char *pem_pub;
-
-	BIO *bio_pub = BIO_new(BIO_s_mem());
-	PEM_write_bio_RSA_PUBKEY(bio_pub, rsa);
-	keylen_pub = BIO_pending(bio_pub);
-	pem_pub = (char*)calloc(keylen_pub+1, 1); // Null-terminate
-	BIO_read(bio_pub, pem_pub, keylen_pub);
-	BIO_free_all(bio_pub);
-//	click_chatter("Own Pub: %s", pem_pub);
-//	click_chatter("keylen: %d", keylen_pub);
-	RSA_free(rsa);
-	fclose(fp);
-
-	memcpy(pub, pem_pub, keylen_pub+1);
-
-	free(pem_pub);
 }
 
 bool

@@ -17,6 +17,32 @@
 #define XIA_SHA_DIGEST_STR_LEN SHA_DIGEST_LENGTH*2+1
 CLICK_DECLS
 
+// Generic buffer to serialize data to be sent over the wire
+class XIASecurityBuffer {
+    public:
+        XIASecurityBuffer(int initialSize);
+		XIASecurityBuffer(const char *buf, uint16_t len);
+        ~XIASecurityBuffer();
+        bool pack(const char *data, uint16_t length);
+		bool unpack(char *data, uint16_t *length);
+		int peekUnpackLength();
+        char *get_buffer();
+        uint16_t size();
+		uint16_t get_numEntries();
+    private:
+        bool initialize(); // Called on first pack()
+        bool extend(uint32_t length);
+        int numEntriesSize;
+        int initialSize;
+        bool initialized;
+        uint16_t *numEntriesPtr;
+        char *dataPtr;
+        uint32_t remainingSpace;
+        char *_buffer;
+        char *nextPack;
+        char *nextUnpack;
+};
+
 /*
 // Generate HMAC-SHA1
 int xs_HMAC(void* key, int keylen, unsigned char* buf, size_t buflen, unsigned char* hmac, unsigned int* hmac_len);
