@@ -191,6 +191,7 @@ void migrate(const char *name, const char *dag)
 						syslog(LOG_INFO, "migrated name record %s to %s:%s", nm.c_str(),
 							new_ad->type_string().c_str(), new_ad->id_string().c_str());
 						g.replace_node_at(ad_index, *new_ad);
+						name_to_dag_db_table[nm] = g.dag_string();
 					}
 				}
 			}
