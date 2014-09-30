@@ -428,6 +428,26 @@ start_click()
 }
 
 #
+# clean config files and keys
+#
+clean_conf_and_keys()
+{
+	# Verify that XIADIR is not empty
+	if [ "$XIADIR" == "" ]; then
+		echo "ERROR: XIADIR environment variable was empty"
+		exit 1
+	fi
+	# Delete all keys and config files
+	# NOTE: This deletes all application keys also
+	echo "Deleting config files"
+	rm -f $XIADIR/etc/click/templates/*.click
+	echo "Deleting key files"
+	rm -f $XIADIR/key/*
+	echo "Deleting resolv.conf"
+	rm -f $XIADIR/etc/resolv.conf
+}
+
+#
 # start/stop/check the visualizer daemons
 #
 visualizer()
@@ -538,6 +558,9 @@ case $1 in
 		check_service "click"
 		process_nodes "check"
 		visualizer "check"
+		;;
+	clean)
+		clean_conf_and_keys
 		;;
 	check)
 		check_service "click"
