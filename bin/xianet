@@ -495,7 +495,13 @@ create_click_config()
 	CONFFLAGS="$CONFFLAGS -i $HOSTNAME"
 	CONFPATH=$XIADIR/etc/click/templates
 
-	python $XIADIR/bin/xconfig.py $CONFFLAGS
+	if [ ! -f $CONFPATH/$SCRIPT ]; then
+		echo "Building configuration from template"
+		python $XIADIR/bin/xconfig.py $CONFFLAGS
+	else
+		echo -n "NOTE: Config file $CONFPATH/$SCRIPT exists. "
+		echo "Skipped building from template."
+	fi
 }
 
 #
