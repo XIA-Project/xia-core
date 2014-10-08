@@ -23,3 +23,8 @@ sudo bin/xianet -s `hostname -s`.click restart
 sleep 5
 sudo bin/xianet -s `hostname -s`.click restart
 
+# make sure name server has loaded first so the registrations from the other nodes don't get lost
+if [ `hostname -s` != "Host0" ]; then
+	sleep 5
+	sudo bin/xianet -s `hostname -s`.click restart
+fi
