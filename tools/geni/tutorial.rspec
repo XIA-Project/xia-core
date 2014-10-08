@@ -1,0 +1,131 @@
+<rspec type="request" generated_by="Flack" generated="2014-10-02T18:44:33Z" xsi:schemaLocation="http://www.geni.net/resources/rspec/3 http://www.geni.net/resources/rspec/3/request.xsd " xmlns:flack="http://www.protogeni.net/resources/rspec/ext/flack/1" xmlns:client="http://www.protogeni.net/resources/rspec/ext/client/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.geni.net/resources/rspec/3">
+  <node client_id="Router0" exclusive="false" xmlns:rs="http://www.protogeni.net/resources/rspec/ext/emulab/1">
+    <rs:vnode name="pcvm509-8"/>
+    <sliver_type name="emulab-xen">
+      <disk_image name="urn:publicid:IDN+utahddc.geniracks.net+image+ch-geni-net:xiatutorial3"/>
+    </sliver_type>
+    <services>
+      <execute command="sudo /xia-core/bin/demoboot" shell="sh"/>
+    </services>
+    <interface client_id="VM-0:if0">
+      <ip address="10.10.1.2" netmask="" type="ipv4"/>
+      <flack:interface_info addressBound="false" bound="false"/>
+    </interface>
+    <interface client_id="VM-0:if1">
+      <ip address="10.10.2.1" netmask="" type="ipv4"/>
+      <flack:interface_info addressBound="false" bound="false"/>
+    </interface>
+    <flack:node_info x="218" y="138" unbound="true"/>
+  </node>
+    <node client_id="Router1" exclusive="false" xmlns:rs="http://www.protogeni.net/resources/rspec/ext/emulab/1">
+    <rs:vnode name="pcvm509-9"/>
+    <sliver_type name="emulab-xen">
+      <disk_image name="urn:publicid:IDN+utahddc.geniracks.net+image+ch-geni-net:xiatutorial3"/>
+    </sliver_type>
+    <services>
+      <execute command="sudo /xia-core/bin/demoboot" shell="sh"/>
+    </services>
+    <interface client_id="VM-1:if0">
+      <ip address="10.10.2.2" netmask="" type="ipv4"/>
+      <flack:interface_info addressBound="false" bound="false"/>
+    </interface>
+    <interface client_id="VM-1:if1">
+      <ip address="10.10.3.1" netmask="" type="ipv4"/>
+      <flack:interface_info addressBound="false" bound="false"/>
+    </interface>
+    <interface client_id="VM-1:if2">
+      <ip address="10.10.4.1" netmask="" type="ipv4"/>
+      <flack:interface_info addressBound="false" bound="false"/>
+    </interface>
+    <flack:node_info x="420" y="140" unbound="true"/>
+  </node>
+  <node client_id="Host0" exclusive="false" xmlns:rs="http://www.protogeni.net/resources/rspec/ext/emulab/1">
+    <rs:vnode name="pcvm509-7"/>
+    <sliver_type name="emulab-xen">
+      <disk_image name="urn:publicid:IDN+utahddc.geniracks.net+image+ch-geni-net:xiatutorial3"/>
+    </sliver_type>
+    <services>
+      <execute command="sudo /xia-core/bin/demoboot" shell="sh"/>
+    </services>
+    <interface client_id="VM:if0">
+      <ip address="10.10.1.1" netmask="" type="ipv4"/>
+      <flack:interface_info addressBound="false" bound="false"/>
+    </interface>
+    <flack:node_info x="33" y="33" unbound="true"/>
+  </node>
+  <node client_id="Server0" exclusive="false" xmlns:rs="http://www.protogeni.net/resources/rspec/ext/emulab/1">
+    <rs:vnode name="pcvm509-10"/>
+    <sliver_type name="emulab-xen">
+      <disk_image name="urn:publicid:IDN+utahddc.geniracks.net+image+ch-geni-net:xiatutorial3"/>
+    </sliver_type>
+    <services>
+      <execute command="sudo /xia-core/bin/demoboot" shell="sh"/>
+    </services>
+    <interface client_id="VM-1-0:if0">
+      <ip address="10.10.3.2" netmask="" type="ipv4"/>
+      <flack:interface_info addressBound="false" bound="false"/>
+    </interface>
+    <flack:node_info x="573" y="68" unbound="true"/>
+  </node>
+  <node client_id="Server1" exclusive="false" xmlns:rs="http://www.protogeni.net/resources/rspec/ext/emulab/1">
+    <rs:vnode name="pcvm509-11"/>
+    <sliver_type name="emulab-xen">
+      <disk_image name="urn:publicid:IDN+utahddc.geniracks.net+image+ch-geni-net:xiatutorial3"/>
+    </sliver_type>
+    <services>
+      <execute command="sudo /xia-core/bin/demoboot" shell="sh"/>
+    </services>
+    <interface client_id="VM-1-0-0:if0">
+      <ip address="10.10.4.2" netmask="" type="ipv4"/>
+      <flack:interface_info addressBound="false" bound="false"/>
+    </interface>
+    <flack:node_info x="573" y="192" unbound="true"/>
+  </node>
+  <link client_id="lan0">
+    <flack:link_info x="-1" y="-1" unboundVlantag="true" xmlns="http://www.protogeni.net/resources/rspec/ext/flack/1"/>
+    <flack:link_info x="-1" y="-1" unboundVlantag="true" xmlns="http://www.protogeni.net/resources/rspec/ext/flack/1"/>
+    <component_manager name="urn:publicid:IDN+emulab.net+authority+cm"/>
+    <interface_ref client_id="VM:if0"/>
+    <interface_ref client_id="VM-0:if0"/>
+    <property source_id="VM:if0" dest_id="VM-0:if0"/>
+    <property source_id="VM-0:if0" dest_id="VM:if0"/>
+    <link_type name="lan"/>
+    <flack:link_info x="-1" y="-1" unboundVlantag="true"/>
+  </link>
+  <link client_id="lan1">
+    <flack:link_info x="-1" y="-1" unboundVlantag="true" xmlns="http://www.protogeni.net/resources/rspec/ext/flack/1"/>
+    <flack:link_info x="-1" y="-1" unboundVlantag="true" xmlns="http://www.protogeni.net/resources/rspec/ext/flack/1"/>
+    <component_manager name="urn:publicid:IDN+emulab.net+authority+cm"/>
+    <interface_ref client_id="VM-0:if1"/>
+    <interface_ref client_id="VM-1:if0"/>
+    <property source_id="VM-0:if1" dest_id="VM-1:if0"/>
+    <property source_id="VM-1:if0" dest_id="VM-0:if1"/>
+    <link_type name="lan"/>
+    <flack:link_info x="-1" y="-1" unboundVlantag="true"/>
+  </link>
+  <link client_id="lan2">
+    <flack:link_info x="-1" y="-1" unboundVlantag="true" xmlns="http://www.protogeni.net/resources/rspec/ext/flack/1"/>
+    <flack:link_info x="-1" y="-1" unboundVlantag="true" xmlns="http://www.protogeni.net/resources/rspec/ext/flack/1"/>
+    <component_manager name="urn:publicid:IDN+emulab.net+authority+cm"/>
+    <interface_ref client_id="VM-1:if1"/>
+    <interface_ref client_id="VM-1-0:if0"/>
+    <property source_id="VM-1:if1" dest_id="VM-1-0:if0"/>
+    <property source_id="VM-1-0:if0" dest_id="VM-1:if1"/>
+    <link_type name="lan"/>
+    <flack:link_info x="-1" y="-1" unboundVlantag="true"/>
+  </link>
+  <link client_id="lan3">
+    <flack:link_info x="-1" y="-1" unboundVlantag="true" xmlns="http://www.protogeni.net/resources/rspec/ext/flack/1"/>
+    <flack:link_info x="-1" y="-1" unboundVlantag="true" xmlns="http://www.protogeni.net/resources/rspec/ext/flack/1"/>
+    <component_manager name="urn:publicid:IDN+emulab.net+authority+cm"/>
+    <interface_ref client_id="VM-1:if2"/>
+    <interface_ref client_id="VM-1-0-0:if0"/>
+    <property source_id="VM-1:if2" dest_id="VM-1-0-0:if0"/>
+    <property source_id="VM-1-0-0:if0" dest_id="VM-1:if2"/>
+    <link_type name="lan"/>
+    <flack:link_info x="-1" y="-1" unboundVlantag="true"/>
+  </link>
+</rspec>
+
+B
+
