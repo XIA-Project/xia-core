@@ -507,34 +507,34 @@ case $1 in
 	start)
 		start_click
 		process_nodes "start"
-		visualizer "start"
+#		visualizer "start"
 		check_service "click"
 		process_nodes "check"
-		visualizer "check"
+#		visualizer "check"
 		;;
 	stop)
 		process_nodes "stop"
 		kill_service "click"
-		visualizer "stop"
+#		visualizer "stop"
 		check_all_services
 		;;
 	restart|reload)
 		echo "Stopping XIA"
 		process_nodes "stop"
 		kill_service "click"
-		visualizer "stop"
+#		visualizer "stop"
 		echo "Starting XIA"
 		start_click
 		process_nodes "start"
 		visualizer "start"
 		check_service "click"
 		process_nodes "check"
-		visualizer "check"
+#		visualizer "check"
 		;;
 	check)
 		check_service "click"
 		process_nodes "check"
-		visualizer "check"
+#		visualizer "check"
 		;;
 	kill)
 		kill_all_services
