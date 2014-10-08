@@ -78,6 +78,9 @@ int main()
 		strftime(tstamp, sizeof(tstamp), "%c %Z", t);
 		
 		gethostname(hname, sizeof(hname));
+		char *dot = strchr(hname, '.');
+		if (dot)
+			*dot = 0;
 		sprintf(buf, "%s: %s\n", hname, tstamp);
 
 		Graph g(&client);
