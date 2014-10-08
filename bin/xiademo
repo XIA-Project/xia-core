@@ -1,0 +1,4 @@
+#!/bin/sh
+cd /xia-core
+sudo bin/xianet -s `hostname -s`.click $1
+
