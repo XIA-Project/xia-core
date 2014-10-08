@@ -1,0 +1,8 @@
+#!/bin/sh
+
+ssh -o "StrictHostKeyChecking no" -A Router0 -f "sudo /xia-core/bin/xiademo $1"
+ssh -o "StrictHostKeyChecking no" -A Router1 -f "sudo /xia-core/bin/xiademo $1"
+ssh -o "StrictHostKeyChecking no" -A Host0   -f "sudo /xia-core/bin/xiademo $1"
+ssh -o "StrictHostKeyChecking no" -A Server0 -f "sudo /xia-core/bin/xiademo $1"
+ssh -o "StrictHostKeyChecking no" -A Server1 -f "sudo /xia-core/bin/xiademo $1"
+
