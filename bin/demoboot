@@ -20,4 +20,6 @@ done
 
 sleep 10
 sudo bin/xianet -s `hostname -s`.click restart
+sleep 5
+sudo bin/xianet -s `hostname -s`.click restart
 
