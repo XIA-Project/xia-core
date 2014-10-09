@@ -581,6 +581,23 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 		return;
 
 	} else if (thdr.type() == TransportHeader::XSOCK_STREAM) {
+		// Is this packet arriving at a rendezvous server?
+		DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
+		if (daginfo->sock_type == SOCK_RAW) {
+			String src_path = xiah.src_path().unparse();
+			xia::XSocketMsg xsm;
+			xsm.set_type(xia::XRECV);
+			xia::X_Recv_Msg *x_recv_msg = xsm.mutable_x_recv();
+			x_recv_msg->set_dag(src_path.c_str());
+			// Include entire packet (including headers) as payload for API
+			x_recv_msg->set_payload(p_in, p_in->length());
+			std::string p_buf;
+			xsm.SerializeToString(&p_buf);
+			WritablePacket *raw_pkt = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
+			click_chatter("ProcessNetworkPacket: received stream packet on raw socket");
+			output(API_PORT).push(UDPIPPrep(raw_pkt, _dport));
+			return;
+		}
 
 		//printf("stream socket dport = %d\n", _dport);
 		if (thdr.pkt_info() == TransportHeader::SYN) {
