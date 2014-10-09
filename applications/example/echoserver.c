@@ -217,8 +217,11 @@ void echo_stream()
 		die(-1, "Unable to create a temporary SID");
 	}
 
-	struct addrinfo *ai;
-	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
+	struct addrinfo hints, *ai;
+	bzero(&hints, sizeof(hints));
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_family = AF_XIA;
+	if (Xgetaddrinfo(NULL, sid_string, &hints, &ai) != 0)
 		die(-1, "getaddrinfo failure!\n");
 
 	Graph g((sockaddr_x*)ai->ai_addr);
