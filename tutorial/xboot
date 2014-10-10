@@ -1,3 +1,3 @@
 #!/bin/xh
 
-/xia-core/tutorial/xcontrol restart
+/xia-core/tutorial/xnet restart
