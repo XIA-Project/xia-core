@@ -31,10 +31,6 @@
 
 
 unsigned int quit_flag = 0;
-char *adv_selfdag = NULL;
-char *adv_gwdag = NULL;
-char *adv_gw4id = NULL;
-char *adv_nsdag = NULL;
 
 #define DEFAULT_NAME "host0"
 #define EXTENSION "xia"
@@ -131,9 +127,9 @@ int main(int argc, char *argv[]) {
 	unsigned  beacon_reception_count=0;
 	unsigned beacon_response_freq = ceil(XHCP_CLIENT_ADVERTISE_INTERVAL/XHCP_SERVER_BEACON_INTERVAL);
 	int update_ns = 0;
-	char *self_dag = (char *)malloc(XHCP_MAX_DAG_LENGTH);
-	char *gw_dag = (char *)malloc(XHCP_MAX_DAG_LENGTH);
-	char *gw_4id = (char *)malloc(XHCP_MAX_DAG_LENGTH);
+	char *router_ad = (char *)malloc(XHCP_MAX_DAG_LENGTH);
+	char *router_hid = (char *)malloc(XHCP_MAX_DAG_LENGTH);
+	char *router_4id = (char *)malloc(XHCP_MAX_DAG_LENGTH);
 	char *ns_dag = (char *)malloc(XHCP_MAX_DAG_LENGTH);
 	sockaddr_x pseudo_gw_router_dag; // dag for host_register_message (broadcast message), but only the gw router will accept it
 	string host_register_message;
@@ -209,9 +205,9 @@ int main(int argc, char *argv[]) {
 			syslog(LOG_ERR, "xhcp_client: ERROR: zero length beacon, skipping\n");
 			continue;
 		}
-		memset(self_dag, '\0', XHCP_MAX_DAG_LENGTH);
-		memset(gw_dag, '\0', XHCP_MAX_DAG_LENGTH);
-		memset(gw_4id, '\0', XHCP_MAX_DAG_LENGTH);
+		memset(router_ad, '\0', XHCP_MAX_DAG_LENGTH);
+		memset(router_hid, '\0', XHCP_MAX_DAG_LENGTH);
+		memset(router_4id, '\0', XHCP_MAX_DAG_LENGTH);
 		memset(ns_dag, '\0', XHCP_MAX_DAG_LENGTH);
 		int i;
 		xhcp_pkt *tmp = (xhcp_pkt *)pkt;
@@ -219,13 +215,13 @@ int main(int argc, char *argv[]) {
 		for (i=0; i<tmp->num_entries; i++) {
 			switch (entry->type) {
 				case XHCP_TYPE_AD:
-					sprintf(self_dag, "%s", entry->data);
+					sprintf(router_ad, "%s", entry->data);
 					break;
 				case XHCP_TYPE_GATEWAY_ROUTER_HID:
-					sprintf(gw_dag, "%s", entry->data);
+					sprintf(router_hid, "%s", entry->data);
 					break;
 				case XHCP_TYPE_GATEWAY_ROUTER_4ID:
-					sprintf(gw_4id, "%s", entry->data);
+					sprintf(router_4id, "%s", entry->data);
 					break;					
 				case XHCP_TYPE_NAME_SERVER_DAG:
 					sprintf(ns_dag, "%s", entry->data);
@@ -237,20 +233,14 @@ int main(int argc, char *argv[]) {
 			entry = (xhcp_pkt_entry *)((char *)entry + sizeof(entry->type) + strlen(entry->data) + 1);
 		}
 		// validate pkt
-		if (strlen(self_dag) <= 0 || strlen(gw_dag) <= 0 || strlen(gw_4id) <= 0 || strlen(ns_dag) <= 0) {
+		if (strlen(router_ad) <= 0 || strlen(router_hid) <= 0 || strlen(router_4id) <= 0 || strlen(ns_dag) <= 0) {
 			syslog(LOG_WARNING, "xhcp_client:main: ERROR invalid beacon packet received");
 			continue;
 		}
-		if (adv_selfdag != NULL && adv_gwdag != NULL && adv_nsdag != NULL) {
-			syslog(LOG_WARNING, "xhcp_client: main: ERROR: We should never be here");
-			if (!strcmp(adv_selfdag, self_dag) && !strcmp(adv_gwdag, gw_dag) && !strcmp(adv_gw4id, gw_4id) && !strcmp(adv_nsdag, ns_dag)) {
-				continue;
-			}
-		}
 		
-		AD = self_dag;
-		gwRHID = gw_dag;
-		gwR4ID = gw_4id;
+		AD = router_ad;
+		gwRHID = router_hid;
+		gwR4ID = router_4id;
 		nsDAG = ns_dag;
 		
 		changed = 0;
@@ -260,7 +250,7 @@ int main(int argc, char *argv[]) {
 			changed = 1;
 			syslog(LOG_INFO, "AD updated");
 			// update new AD information
-			if(XupdateAD(sockfd, self_dag, gw_4id) < 0) {
+			if(XupdateAD(sockfd, router_ad, router_4id) < 0) {
 				syslog(LOG_WARNING, "Error updating my AD to click");
 			}
 		
