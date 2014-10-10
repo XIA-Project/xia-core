@@ -1,4 +1,4 @@
-include ../../xia.mk
+include ../xia.mk
 
 .PHONY: clean
 

@@ -1,0 +1,93 @@
+<rspec type="request" generated_by="Flack" generated="2014-10-02T18:44:33Z" xsi:schemaLocation="http://www.geni.net/resources/rspec/3 http://www.geni.net/resources/rspec/3/request.xsd " xmlns:flack="http://www.protogeni.net/resources/rspec/ext/flack/1" xmlns:client="http://www.protogeni.net/resources/rspec/ext/client/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.geni.net/resources/rspec/3">
+
+  <node client_id="router0" exclusive="false" xmlns:rs="http://www.protogeni.net/resources/rspec/ext/emulab/1">
+    <sliver_type name="emulab-xen">
+      <disk_image url="https://www.utahddc.geniracks.net/image_metadata.php?uuid=3c18ff5e-4fe9-11e4-9a42-000000000000"
+          name="urn:publicid:IDN+utahddc.geniracks.net+image+ch-geni-net:xiatutorial4"/>
+    </sliver_type>
+    <interface client_id="VM-0:if0">
+      <ip address="10.10.1.2" netmask="255.255.255.0" type="ipv4"/>
+    </interface>
+    <interface client_id="VM-0:if1">
+      <ip address="10.10.2.1" netmask="255.255.255.0" type="ipv4"/>
+    </interface>
+  </node>
+
+    <node client_id="router1" exclusive="false" xmlns:rs="http://www.protogeni.net/resources/rspec/ext/emulab/1">
+    <sliver_type name="emulab-xen">
+      <disk_image url="https://www.utahddc.geniracks.net/image_metadata.php?uuid=3c18ff5e-4fe9-11e4-9a42-000000000000"
+          name="urn:publicid:IDN+utahddc.geniracks.net+image+ch-geni-net:xiatutorial4"/>
+    </sliver_type>
+    <interface client_id="VM-1:if0">
+      <ip address="10.10.2.2" netmask="255.255.255.0" type="ipv4"/>
+    </interface>
+    <interface client_id="VM-1:if1">
+      <ip address="10.10.3.1" netmask="255.255.255.0" type="ipv4"/>
+    </interface>
+    <interface client_id="VM-1:if2">
+      <ip address="10.10.4.1" netmask="255.255.255.0" type="ipv4"/>
+    </interface>
+  </node>
+
+  <node client_id="host0" exclusive="false" xmlns:rs="http://www.protogeni.net/resources/rspec/ext/emulab/1">
+    <sliver_type name="emulab-xen">
+      <disk_image url="https://www.utahddc.geniracks.net/image_metadata.php?uuid=3c18ff5e-4fe9-11e4-9a42-000000000000"
+          name="urn:publicid:IDN+utahddc.geniracks.net+image+ch-geni-net:xiatutorial4"/>
+    </sliver_type>
+    <interface client_id="VM:if0">
+      <ip address="10.10.1.1" netmask="255.255.255.0" type="ipv4"/>
+    </interface>
+  </node>
+
+  <node client_id="server0" exclusive="false" xmlns:rs="http://www.protogeni.net/resources/rspec/ext/emulab/1">
+    <sliver_type name="emulab-xen">
+      <disk_image url="https://www.utahddc.geniracks.net/image_metadata.php?uuid=3c18ff5e-4fe9-11e4-9a42-000000000000"
+          name="urn:publicid:IDN+utahddc.geniracks.net+image+ch-geni-net:xiatutorial4"/>
+    </sliver_type>
+    <interface client_id="VM-1-0:if0">
+      <ip address="10.10.3.2" netmask="255.255.255.0" type="ipv4"/>
+    </interface>
+  </node>
+
+  <node client_id="server1" exclusive="false" xmlns:rs="http://www.protogeni.net/resources/rspec/ext/emulab/1">
+    <sliver_type name="emulab-xen">
+      <disk_image url="https://www.utahddc.geniracks.net/image_metadata.php?uuid=3c18ff5e-4fe9-11e4-9a42-000000000000"
+          name="urn:publicid:IDN+utahddc.geniracks.net+image+ch-geni-net:xiatutorial4"/>
+    </sliver_type>
+    <interface client_id="VM-1-0-0:if0">
+      <ip address="10.10.4.2" netmask="255.255.255.0" type="ipv4"/>
+    </interface>
+  </node>
+
+  <link client_id="lan0">
+    <interface_ref client_id="VM:if0"/>
+    <interface_ref client_id="VM-0:if0"/>
+    <property source_id="VM:if0" dest_id="VM-0:if0"/>
+    <property source_id="VM-0:if0" dest_id="VM:if0"/>
+    <link_type name="lan"/>
+  </link>
+
+  <link client_id="lan1">
+    <interface_ref client_id="VM-0:if1"/>
+    <interface_ref client_id="VM-1:if0"/>
+    <property source_id="VM-0:if1" dest_id="VM-1:if0"/>
+    <property source_id="VM-1:if0" dest_id="VM-0:if1"/>
+    <link_type name="lan"/>
+  </link>
+
+  <link client_id="lan2">
+    <interface_ref client_id="VM-1:if1"/>
+    <interface_ref client_id="VM-1-0:if0"/>
+    <property source_id="VM-1:if1" dest_id="VM-1-0:if0"/>
+    <property source_id="VM-1-0:if0" dest_id="VM-1:if1"/>
+    <link_type name="lan"/>
+  </link>
+
+  <link client_id="lan3">
+    <interface_ref client_id="VM-1:if2"/>
+    <interface_ref client_id="VM-1-0-0:if0"/>
+    <property source_id="VM-1:if2" dest_id="VM-1-0-0:if0"/>
+    <property source_id="VM-1-0-0:if0" dest_id="VM-1:if2"/>
+    <link_type name="lan"/>
+  </link>
+</rspec>
