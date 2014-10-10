@@ -4,7 +4,9 @@
 #
 # This script was written on OS X. To run on linux the following definition should be changed
 #
-omni="/Applications/omniTools-2.6/omni.app/Contents/MacOS/omni"
+omni="/Applications/omniTools-2.6/omni.app/Contents/MacOS/omni --error"
+
+file="*-listimages-*"
 
 if [ $# -ne 4 ]; then
 	echo usage: ximage imagename slicename hostname aggregate
@@ -33,4 +35,13 @@ rm $sname-sliverstatus-utahddc-geniracks-net.json
 
 # create the disk image
 $omni createimage -a $agg $sname $iname -u $urn
-$omni listimages -a $agg
+
+echo paste the following line into your rspec file in place of the old disk image lines
+$omni listimages -a $agg -o
+
+url=`cat $file | tr "\n" " " | tr "\}" "\n" | grep $iname | cut -d \" -f 4`
+urn=`cat $file | tr "\n" " " | tr "\}" "\n" | grep $iname | cut -d \" -f 8`
+rm $file
+
+printf "\n\n<disk_image url=\"$url\"\n\tname=\"$urn\"/>\n\n"
+
