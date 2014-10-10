@@ -1,0 +1,36 @@
+#!/bin/sh
+#
+# creates a disk image from a running node in the specified slice/aggregate
+#
+# This script was written on OS X. To run on linux the following definition should be changed
+#
+omni="/Applications/omniTools-2.6/omni.app/Contents/MacOS/omni"
+
+if [ $# -ne 4 ]; then
+	echo usage: ximage imagename slicename hostname aggregate
+	echo where:
+	echo "    imagename is the name for the new disk image"
+	echo "    slicename is the slice to image from"
+	echo "    hostname is the host in the slice to image"
+	echo "    aggregate is the GENI location where the slice is running"
+	exit 1
+fi
+
+iname=$1
+sname=$2
+hname=$3
+agg=$4
+
+# get a json file containing the status of the nodes in the slice
+$omni sliverstatus -a $agg $sname -o
+
+# really ugly but quick command to extract the urn of the host we want to image
+# ignore the grep error, I have no idea where it's coming from
+urn=`cat $sname-sliverstatus-utahddc-geniracks-net.json| tr '\n' ' ' | tr '}' '\n' | grep geni_client_id | grep $hname | tr "," "\n" | grep sliver_id | cut -d \" -f4`
+
+# delete the json file
+rm $sname-sliverstatus-utahddc-geniracks-net.json
+
+# create the disk image
+$omni createimage -a $agg $sname $iname -u $urn
+$omni listimages -a $agg
