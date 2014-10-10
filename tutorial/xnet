@@ -2,5 +2,5 @@
 
 for node in router0 host0 router1 server0 server1
 do
-	ssh -o "StrictHostKeyChecking no" -A $node -f "sudo /xia-core/bin/xiademo $1"
+	ssh -o "StrictHostKeyChecking no" -A $node -f "sudo /xia-core/tutorial/xnode $1"
 done
