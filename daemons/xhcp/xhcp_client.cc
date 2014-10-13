@@ -29,9 +29,6 @@
 #include "../common/XIARouter.hh"
 #include "dagaddr.hpp"
 
-
-unsigned int quit_flag = 0;
-
 #define DEFAULT_NAME "host0"
 #define EXTENSION "xia"
 #define APPNAME "xhcp_client"
@@ -191,7 +188,7 @@ int main(int argc, char *argv[]) {
 	*/
 	
 	// main looping
-	while(!(quit_flag & 2)) {
+	while(1) {
 		// clear out packet
 		memset(pkt, 0, sizeof(pkt));
 		socklen_t ddaglen = sizeof(ddag);
