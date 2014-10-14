@@ -47,8 +47,9 @@ elementclass XIAPacketRoute {
 	x[1] -> Discard;
 	GPRP :: GenericPostRouteProc -> [0]output;
 	GPRP[1] -> x[0] -> consider_first_path;
-
+    //GENI TUTORIAL: EDIT BEGIN
 	rt_AD, rt_HID, rt_SID, rt_CID, rt_IP :: XIAXIDRouteTable($local_addr, $num_ports);
+    //GENI TUTORIAL: EDIT END
     c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, [2]output;
 		
     rt_AD[0], rt_HID[0], rt_SID[0], rt_CID[0], rt_IP[0] -> GPRP;		

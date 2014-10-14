@@ -579,12 +579,19 @@ XIANEWXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
 		HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(node.xid);
 		if (it != _rts.end())
 		{
+		/* GENI TUTORIAL: EDIT BEGIN
+		 * route entry found
+		 * start forwarding
+		 */
 			XIARouteData *xrd = (*it).second;
+			int port = xrd->port;
 			// check if outgoing packet
 			if(xrd->port != DESTINED_FOR_LOCALHOST && xrd->port != FALLBACK && xrd->nexthop != NULL) {
 				p->set_nexthop_neighbor_xid_anno(*(xrd->nexthop));
 			}
-			return xrd->port;
+			return port;
+		/* GENI TUTORIAL: EDIT END
+		 */
 		}
 		else
 		{
