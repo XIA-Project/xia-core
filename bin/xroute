@@ -453,6 +453,10 @@ class XrouteApp:
 			pt = " (unreach?)"
 		elif port == "-7":
 			pt = " (fallback)"
+		elif int(port) > (1<<16):
+                        p0 = int(port)&0xFF
+                        p1 = (int(port)&0xFFFF)>>8
+			pt = " (%d|%d)"%(p1,p0)
 		return pt
 
 	#
