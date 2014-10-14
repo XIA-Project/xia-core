@@ -1,0 +1,16 @@
+--- ../etc/click/xia_router_lib.click	2014-10-13 21:51:13.882984980 -0400
++++ ../etc/click/xia_router_lib.click	2014-10-13 21:50:40.418891636 -0400
+@@ -47,9 +47,10 @@
+ 	x[1] -> Discard;
+ 	GPRP :: GenericPostRouteProc -> [0]output;
+ 	GPRP[1] -> x[0] -> consider_first_path;
+-    //GENI TUTORIAL: EDIT BEGIN
+-	rt_AD, rt_HID, rt_SID, rt_CID, rt_IP :: XIAXIDRouteTable($local_addr, $num_ports);
+-    //GENI TUTORIAL: EDIT END
++    //GENI TUTORIAL EDIT BEGIN
++	rt_AD, rt_HID, rt_CID, rt_IP :: XIAXIDRouteTable($local_addr, $num_ports);
++    rt_SID :: XIANEWXIDRouteTable($local_addr, $num_ports);
++    //GENI TUTORIAL EDIT END
+     c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, [2]output;
+ 		
+     rt_AD[0], rt_HID[0], rt_SID[0], rt_CID[0], rt_IP[0] -> GPRP;		

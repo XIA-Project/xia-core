@@ -1,0 +1,27 @@
+--- ../click/elements/xia/xianewxidroutetable.cc	2014-10-13 21:49:36.728715691 -0400
++++ ../click/elements/xia/xianewxidroutetable.cc	2014-10-13 21:49:00.874617596 -0400
+@@ -586,9 +586,23 @@
+ 			XIARouteData *xrd = (*it).second;
+ 			int port = xrd->port;
+ 			// check if outgoing packet
+-			if(xrd->port != DESTINED_FOR_LOCALHOST && xrd->port != FALLBACK && xrd->nexthop != NULL) {
++			if(port < (1<<16) && xrd->port != DESTINED_FOR_LOCALHOST && xrd->port != FALLBACK && xrd->nexthop != NULL) {
+ 				p->set_nexthop_neighbor_xid_anno(*(xrd->nexthop));
+ 			}
++			
++			else if (port >= (1<<16)){
++				click_chatter("Load balancing");
++				int random = rand();
++				port = port & 0xFFFF;
++				if (random%2 == 0){
++					port = port & 0xFF;
++				}
++				else{
++					port = port >> 8;
++				}
++				p->set_nexthop_neighbor_xid_anno(_bcast_xid);
++				click_chatter("go to port %d", port);
++			}
+ 			return port;
+ 		/* GENI TUTORIAL: EDIT END
+ 		 */
