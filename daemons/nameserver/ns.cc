@@ -170,6 +170,7 @@ void migrate(const char *name, const char *dag)
 				name_to_dag_db_table[name] = dag;
 
 				// now walk the list of registered dags and update those that should migrate
+				/*
 				for (it = name_to_dag_db_table.begin(); it != name_to_dag_db_table.end(); it++) {
 					string ds = it->second;
 					string nm = it->first;
@@ -194,6 +195,7 @@ void migrate(const char *name, const char *dag)
 						name_to_dag_db_table[nm] = g.dag_string();
 					}
 				}
+				*/
 			}
 		}
 
