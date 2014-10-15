@@ -183,6 +183,8 @@ extern int Xgetpeername(int sockd, struct sockaddr *addr, socklen_t *addrlen);
 extern int Xgetsockname(int sockd, struct sockaddr *addr, socklen_t *addrlen);
 
 extern int Xgetaddrinfo(const char *, const char *, const struct addrinfo *, struct addrinfo **);
+extern bool XreadRVServerAddr(char *, int);
+extern bool XreadRVServerControlAddr(char *, int);
 extern void Xfreeaddrinfo(struct addrinfo *);
 extern const char *Xgai_strerror(int);
 extern int checkXid(const char *xid, const char *type);
