@@ -287,6 +287,9 @@ class XrouteApp:
 	# the main logic of the xroute app
 	#
 	def run(self):
+		# load user defined XIDs
+		self.loadXids()
+
 		# get the command line options
 		self.options = Options()
 		self.options.getOptions()
@@ -363,6 +366,32 @@ class XrouteApp:
 		if (die and code != 200):
 			self.errorExit("error %d: %s" % (code, msg))
 		return code
+
+	#
+	# load XIDs from file
+	#
+	def loadXids(self):
+		xfile = os.path.dirname(os.path.realpath(__file__))
+		tail = xfile.rfind("/")
+		xfile = xfile[:tail] + "/etc/xids"
+
+		try:
+			lines = open(xfile, "r")
+		except:
+			return
+
+		for line in lines:
+			comment = line.find("#")
+			if comment >= 0:
+				line = line[:comment]
+			line = line.strip()
+
+			if (line == ""):
+				continue
+
+			(id, name) = line.split()
+			KNOWN_XIDS.append(name)
+		lines.close()
 
 	#
 	# print the list of known alias to XID mappings to stdout
