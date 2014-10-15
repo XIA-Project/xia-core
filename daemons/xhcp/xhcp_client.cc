@@ -369,6 +369,14 @@ int main(int argc, char *argv[]) {
 				syslog(LOG_INFO, "registered %s as %s", fullname, hg.dag_string().c_str());
 				update_ns = 0;
 			}
+
+			// Also notify the rendezvous service of this change
+			if(XrendezvousUpdate(myHID, &hdag)) {
+				syslog(LOG_ERR, "error updating rendezvous service for %s", myHID);
+				beacon_reception_count = 0;
+			} else {
+				syslog(LOG_INFO, "updated %s as %s at rendezvous", myHID, hg.dag_string().c_str());
+			}
 		}   
 	}	
 	return 0;

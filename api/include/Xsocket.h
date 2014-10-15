@@ -170,6 +170,7 @@ extern int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen)
 
 extern int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen);
 extern int XregisterName(const char *name, sockaddr_x *addr);
+extern int XrendezvousUpdate(const char *hidstr, sockaddr_x *DAG);
 
 extern int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *localhostHID, unsigned lenHID, char *local4ID, unsigned len4ID);
 

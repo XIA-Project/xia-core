@@ -196,6 +196,9 @@ void process_data(int datasock)
 	// Send packet back on the network
 }
 
+#define MAX_XID_STR_SIZE 64
+#define MAX_HID_DAG_STR_SIZE 256
+
 void process_control_message(int controlsock)
 {
 	char packet[RV_MAX_CONTROL_PACKET_SIZE];
@@ -210,6 +213,15 @@ void process_control_message(int controlsock)
 		return;
 	}
 	syslog(LOG_INFO, "Control packet of size:%d received", retval);
+	int index = 0;
+	char hid[MAX_XID_STR_SIZE];
+	char dag[MAX_HID_DAG_STR_SIZE];
+	strcpy(hid, &packet[index]);
+	index = strlen(hid) + 1;
+	strcpy(dag, &packet[index]);
+	index += strlen(dag);
+	syslog(LOG_INFO, "New DAG for %s is %s", hid, dag);
+	syslog(LOG_INFO, "Total data was %d bytes", index+1);
 	// Registration message
 	// Extract HID, newAD, timestamp, Signature, Pubkey
 	// Verify HID not already in table
