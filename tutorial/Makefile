@@ -5,7 +5,7 @@ include ../xia.mk
 LDFLAGS += $(LIBS)
 #CFLAGS += -std=c++0x
 
-TARGETS=lb_client lb_server 
+TARGETS=lb_client lb_server addname
 
 all: $(TARGETS)
 
