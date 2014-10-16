@@ -416,6 +416,7 @@ start_click()
 
 	$CLICK -R $CONFPATH/$SCRIPT &
 	[ $VERBOSE -eq 0 ] && exec 1>&3
+	sleep 2
 
 	get_pid "click"
 	[ "$XPID" == "" ] && printf "Click is not running, aborting...\n" && exit 1
