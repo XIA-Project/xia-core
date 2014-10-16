@@ -225,8 +225,13 @@ void process_control_message(int controlsock)
 	syslog(LOG_INFO, "New DAG for %s is %s", hid, dag);
 	syslog(LOG_INFO, "Total data was %d bytes", index+1);
 
-	// Extract Nodes for AD and HID
-	Graph g(dag);
+	// Extract AD from DAG
+	int ADstringLength = strlen("AD:") + 40 + 1;
+	char ADstring[ADstringLength];
+	bzero(ADstring, ADstringLength);
+	strncpy(ADstring, strstr(dag, "AD:"), ADstringLength-1);
+	HIDtoAD[hid] = ADstring;
+	syslog(LOG_INFO, "Added %s:%s to table", hid, ADstring);
 
 	// Registration message
 	// Extract HID, newAD, timestamp, Signature, Pubkey
