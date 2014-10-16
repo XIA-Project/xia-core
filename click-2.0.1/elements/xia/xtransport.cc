@@ -585,16 +585,21 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 		DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
 		if (daginfo->sock_type == SOCK_RAW) {
 			String src_path = xiah.src_path().unparse();
+			String dst_path = xiah.dst_path().unparse();
+			click_chatter("ProcessNetworkPacket: received stream packet on raw socket");
+			click_chatter("ProcessNetworkPacket: src|%s|", src_path.c_str());
+			click_chatter("ProcessNetworkPacket: dst|%s|", dst_path.c_str());
+			click_chatter("ProcessNetworkPacket: len=%d", p_in->length());
 			xia::XSocketMsg xsm;
 			xsm.set_type(xia::XRECV);
 			xia::X_Recv_Msg *x_recv_msg = xsm.mutable_x_recv();
 			x_recv_msg->set_dag(src_path.c_str());
 			// Include entire packet (including headers) as payload for API
-			x_recv_msg->set_payload(p_in, p_in->length());
+			x_recv_msg->set_payload(p_in->data(), p_in->length());
 			std::string p_buf;
 			xsm.SerializeToString(&p_buf);
 			WritablePacket *raw_pkt = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
-			click_chatter("ProcessNetworkPacket: received stream packet on raw socket");
+			click_chatter("ProcessNetworkPacket: delivering packet to raw socket");
 			output(API_PORT).push(UDPIPPrep(raw_pkt, _dport));
 			return;
 		}
