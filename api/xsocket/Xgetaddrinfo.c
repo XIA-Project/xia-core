@@ -267,7 +267,6 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 		char ad[XID_LEN], hid[XID_LEN], fid[XID_LEN];
 		//char rv_ad[XID_LEN], rv_hid[XID_LEN], rv_sid[XID_LEN];
 		char rv_dag_str[MAX_RV_DAG_SIZE];
-		bool rv_available = false;
 		int rc;
 		int sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
 
@@ -306,8 +305,7 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 		Graph g = (n_src * n_ad * n_hid);
 		if(socktype == SOCK_STREAM) {
 			//rv_available = XreadRVServerAddr(rv_ad, XID_LEN, rv_hid, XID_LEN, rv_sid, XID_LEN);
-			rv_available = XreadRVServerAddr(rv_dag_str, MAX_RV_DAG_SIZE);
-			if(rv_available) {
+			if(XreadRVServerAddr(rv_dag_str, MAX_RV_DAG_SIZE) == 0) {
 				Graph g2 = (n_src * n_ad);
 				Graph rvg(rv_dag_str);
 				printf("Rendezvous DAG:\n%s\n", rvg.dag_string().c_str());
@@ -320,8 +318,8 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 				Graph g2 = (n_src * n_ad * n_rvad * n_rvhid * n_rvsid * n_hid);
 				*/
 				g = g + g3;
+				printf("DAG after adding RV:\n%s\n", g.dag_string().c_str());
 			}
-			printf("DAG after adding RV:\n%s\n", g.dag_string().c_str());
 		}
 
 		if (have4id)

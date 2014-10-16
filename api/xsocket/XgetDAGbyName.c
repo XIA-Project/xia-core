@@ -216,7 +216,7 @@ int XrendezvousUpdate(const char *hidstr, sockaddr_x *DAG)
 {
 	// Find the rendezvous service control address
 	char rvControlDAG[MAX_RV_DAG_SIZE];
-	if(!XreadRVServerControlAddr(rvControlDAG, MAX_RV_DAG_SIZE)) {
+	if(XreadRVServerControlAddr(rvControlDAG, MAX_RV_DAG_SIZE)) {
 		syslog(LOG_INFO, "No RV control address. Skipping update");
 		return 1;
 	}
