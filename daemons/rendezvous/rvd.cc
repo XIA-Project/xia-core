@@ -174,20 +174,34 @@ int getServerSocket(char *sid, int type)
 	return sockfd;
 }
 
+void print_packet_contents(char *packet, int len)
+{
+	int hex_string_len = (len*2) + 1;
+	char hex_string[hex_string_len];
+    int i;
+    for(i=0;i<len;i++) {
+        sprintf(&hex_string[2*i], "%02x", (unsigned int)packet[i]);
+    }
+    hex_string[hex_string_len-1] = '\0';
+	syslog(LOG_INFO, "Packet contents|%s|", hex_string);
+}
+
 void process_data(int datasock)
 {
 	char packet[RV_MAX_DATA_PACKET_SIZE];
-	sockaddr_x ddag;
-	socklen_t ddaglen = sizeof(ddag);
+	sockaddr_x rdag;
+	socklen_t rdaglen = sizeof(rdag);
 	bzero(packet, RV_MAX_DATA_PACKET_SIZE);
 
 	syslog(LOG_INFO, "Reading data packet");
-	int retval = Xrecvfrom(datasock, packet, RV_MAX_DATA_PACKET_SIZE, 0, (struct sockaddr *)&ddag, &ddaglen);
+	int retval = Xrecvfrom(datasock, packet, RV_MAX_DATA_PACKET_SIZE, 0, (struct sockaddr *)&rdag, &rdaglen);
 	if(retval < 0) {
 		syslog(LOG_WARNING, "WARN: No data(%s)", strerror(errno));
 		return;
 	}
-	syslog(LOG_INFO, "Packet of size:%d received", retval);
+	Graph g(&rdag);
+	syslog(LOG_INFO, "Packet of size:%d received from %s:", retval, g.dag_string().c_str());
+	print_packet_contents(packet, retval);
 	// Find the AD->HID->SID this packet was destined to
 	// Verify HID is in table and find newAD
 	// If newAD is different from the AD in XIP header, update it
