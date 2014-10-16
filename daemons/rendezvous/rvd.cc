@@ -101,7 +101,7 @@ void config(int argc, char** argv)
 	// Read Data plane SID from resolv.conf, if needed
 	if(datasid == NULL) {
 		char data_plane_DAG[MAX_RV_DAG_SIZE];
-		if(XreadRVServerAddr(data_plane_DAG, MAX_RV_DAG_SIZE)) {
+		if(XreadRVServerAddr(data_plane_DAG, MAX_RV_DAG_SIZE) == 0) {
 			char *sid = strstr(data_plane_DAG, "SID:");
 			datasid = (char *)calloc(strlen(sid) + 1, 1);
 			if(!datasid) {
@@ -116,7 +116,7 @@ void config(int argc, char** argv)
 	// Read Control plane SID from resolv.conf, if needed
 	if(controlsid == NULL) {
 		char control_plane_DAG[MAX_RV_DAG_SIZE];
-		if(XreadRVServerControlAddr(control_plane_DAG, MAX_RV_DAG_SIZE)) {
+		if(XreadRVServerControlAddr(control_plane_DAG, MAX_RV_DAG_SIZE) == 0) {
 			char *sid = strstr(control_plane_DAG, "SID:");
 			controlsid = (char *)calloc(strlen(sid) + 1, 1);
 			if(!controlsid) {
@@ -213,6 +213,8 @@ void process_control_message(int controlsock)
 		return;
 	}
 	syslog(LOG_INFO, "Control packet of size:%d received", retval);
+
+	// Extract HID and DAG from the message
 	int index = 0;
 	char hid[MAX_XID_STR_SIZE];
 	char dag[MAX_HID_DAG_STR_SIZE];
@@ -222,6 +224,10 @@ void process_control_message(int controlsock)
 	index += strlen(dag);
 	syslog(LOG_INFO, "New DAG for %s is %s", hid, dag);
 	syslog(LOG_INFO, "Total data was %d bytes", index+1);
+
+	// Extract Nodes for AD and HID
+	Graph g(dag);
+
 	// Registration message
 	// Extract HID, newAD, timestamp, Signature, Pubkey
 	// Verify HID not already in table

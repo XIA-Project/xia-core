@@ -70,9 +70,9 @@ const char *xerr_unimplemented = "This feature is not currently supported";
 #define RESOLV_CONF "/etc/resolv.conf"
 
 // Read DAG for rendezvous server data plane from resolv.conf
-bool XreadRVServerAddr(char *rv_dag_str, int rvstrlen)
+int XreadRVServerAddr(char *rv_dag_str, int rvstrlen)
 {
-	bool ret= false;
+	int ret = -1;
 	int rc;
 	// If there is a resolv.conf file with rendezvous info, return that info
 	char root[CONFIG_PATH_BUF_SIZE];
@@ -84,7 +84,7 @@ bool XreadRVServerAddr(char *rv_dag_str, int rvstrlen)
 	rc = ini_gets(NULL, "rendezvous", rv_dag_str, rv_dag_str, rvstrlen, strcat(XrootDir(root, CONFIG_PATH_BUF_SIZE), RESOLV_CONF));
 	if(rc > 0) {
 		printf("XreadRVServerAddr: found server at:%s:\n", rv_dag_str);
-		ret = true;
+		ret = 0;
 	} else {
 		printf("XreadRVServerAddr: Rendezvous server DAG not found:%s:\n", rv_dag_str);
 	}
@@ -92,9 +92,9 @@ bool XreadRVServerAddr(char *rv_dag_str, int rvstrlen)
 }
 
 // Read DAG for rendezvous server control plane from resolv.conf
-bool XreadRVServerControlAddr(char *rv_dag_str, int rvstrlen)
+int XreadRVServerControlAddr(char *rv_dag_str, int rvstrlen)
 {
-	bool ret= false;
+	int ret = -1;
 	int rc;
 	// If there is a resolv.conf file with rendezvous info, return that info
 	char root[CONFIG_PATH_BUF_SIZE];
@@ -106,7 +106,7 @@ bool XreadRVServerControlAddr(char *rv_dag_str, int rvstrlen)
 	rc = ini_gets(NULL, "rendezvousc", rv_dag_str, rv_dag_str, rvstrlen, strcat(XrootDir(root, CONFIG_PATH_BUF_SIZE), RESOLV_CONF));
 	if(rc > 0) {
 		printf("XreadRVServerControlAddr: found server at:%s:\n", rv_dag_str);
-		ret = true;
+		ret = 0;
 	} else {
 		printf("XreadRVServerControlAddr: Rendezvous server DAG not found:%s:\n", rv_dag_str);
 	}
