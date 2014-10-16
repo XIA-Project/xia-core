@@ -1,5 +1,3 @@
 #!/bin/sh
 
-# for some reason start isn't always working on GENI. Start and then do a restart to make sure everything comes up
-/xia-core/tutorial/xnet restart
 /xia-core/tutorial/xnet restart
