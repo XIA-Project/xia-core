@@ -188,23 +188,8 @@ void print_packet_contents(char *packet, int len)
 	syslog(LOG_INFO, "Packet contents|%s|", hex_string);
 }
 
-void process_data(int datasock)
+void print_packet_header(click_xia *xiah)
 {
-	char packet[RV_MAX_DATA_PACKET_SIZE];
-	sockaddr_x rdag;
-	socklen_t rdaglen = sizeof(rdag);
-	bzero(packet, RV_MAX_DATA_PACKET_SIZE);
-
-	syslog(LOG_INFO, "Reading data packet");
-	int retval = Xrecvfrom(datasock, packet, RV_MAX_DATA_PACKET_SIZE, 0, (struct sockaddr *)&rdag, &rdaglen);
-	if(retval < 0) {
-		syslog(LOG_WARNING, "WARN: No data(%s)", strerror(errno));
-		return;
-	}
-	Graph g(&rdag);
-	syslog(LOG_INFO, "Packet of size:%d received from %s:", retval, g.dag_string().c_str());
-	print_packet_contents(packet, retval);
-	click_xia *xiah = reinterpret_cast<struct click_xia *>(packet);
 	syslog(LOG_INFO, "======= RAW PACKET HEADER ========");
 	syslog(LOG_INFO, "ver:%d", xiah->ver);
 	syslog(LOG_INFO, "nxt:%d", xiah->nxt);
@@ -245,6 +230,93 @@ void process_data(int datasock)
 		};
 		syslog(LOG_INFO, "%s:%s", type, hex_string);
 	}
+}
+
+void process_data(int datasock)
+{
+	int packetlen;
+	char packet[RV_MAX_DATA_PACKET_SIZE];
+	sockaddr_x rdag;
+	socklen_t rdaglen = sizeof(rdag);
+	bzero(packet, RV_MAX_DATA_PACKET_SIZE);
+
+	syslog(LOG_INFO, "Reading data packet");
+	int retval = Xrecvfrom(datasock, packet, RV_MAX_DATA_PACKET_SIZE, 0, (struct sockaddr *)&rdag, &rdaglen);
+	if(retval < 0) {
+		syslog(LOG_WARNING, "WARN: No data(%s)", strerror(errno));
+		return;
+	}
+	packetlen = retval;
+	Graph g(&rdag);
+	syslog(LOG_INFO, "Packet of size:%d received from %s:", retval, g.dag_string().c_str());
+	print_packet_contents(packet, retval);
+	click_xia *xiah = reinterpret_cast<struct click_xia *>(packet);
+	print_packet_header(xiah);
+	/*
+	syslog(LOG_INFO, "======= RAW PACKET HEADER ========");
+	syslog(LOG_INFO, "ver:%d", xiah->ver);
+	syslog(LOG_INFO, "nxt:%d", xiah->nxt);
+	syslog(LOG_INFO, "plen:%d", htons(xiah->plen));
+	syslog(LOG_INFO, "hlim:%d", xiah->hlim);
+	syslog(LOG_INFO, "dnode:%d", xiah->dnode);
+	syslog(LOG_INFO, "snode:%d", xiah->snode);
+	syslog(LOG_INFO, "last:%d", xiah->last);
+	int total_nodes = xiah->dnode + xiah->snode;
+	for(int i=0;i<total_nodes;i++) {
+		uint8_t id[20];
+		char hex_string[41];
+		bzero(hex_string, 41);
+		memcpy(id, xiah->node[i].xid.id, 20);
+		for(int j=0;j<20;j++) {
+			sprintf(&hex_string[2*j], "%02x", (unsigned int)id[j]);
+		}
+		char type[10];
+		bzero(type, 10);
+		switch (htonl(xiah->node[i].xid.type)) {
+			case CLICK_XIA_XID_TYPE_AD:
+				strcpy(type, "AD");
+				break;
+			case CLICK_XIA_XID_TYPE_HID:
+				strcpy(type, "HID");
+				break;
+			case CLICK_XIA_XID_TYPE_SID:
+				strcpy(type, "SID");
+				break;
+			case CLICK_XIA_XID_TYPE_CID:
+				strcpy(type, "CID");
+				break;
+			case CLICK_XIA_XID_TYPE_IP:
+				strcpy(type, "4ID");
+				break;
+			default:
+				sprintf(type, "%d", xiah->node[i].xid.type);
+		};
+		syslog(LOG_INFO, "%s:%s", type, hex_string);
+	}
+	*/
+	// Starting at node at offset 0, verify it is an AD node
+	if(htonl(xiah->node[0].xid.type) != CLICK_XIA_XID_TYPE_AD) {
+		syslog(LOG_ERR, "First node in destination DAG is not an AD");
+		return;
+	}
+	// Walk the destination DAG to find HID
+	char hid_str[41];
+	sha1_hash_to_hex_string(xiah->node[xiah->node[0].edge[0].idx].xid.id, 20, hid_str, 41);
+	syslog(LOG_INFO, "DestHost = %s", hid_str);
+	Node hidNode("HID", hid_str);
+	syslog(LOG_INFO, "DestHostID = %s", hidNode.to_string().c_str());
+	std::string ad_string(HIDtoAD[hidNode.to_string()]);
+	Node adNode(ad_string);
+	//char id_hex_string[41];
+	//bzero(id_hex_string, 41);
+	//sha1_hash_to_hex_string((unsigned char *)adNode.id(), 20, id_hex_string, 41);
+	//syslog(LOG_INFO, "AD from table = %s", id_hex_string);
+	memcpy(xiah->node[0].xid.id, adNode.id(), 20);
+	xiah->last = -1;
+	syslog(LOG_INFO, "Updated AD and last pointer in header");
+	print_packet_header(xiah);
+	syslog(LOG_INFO, "Sending the packet out on the network");
+	Xsend(datasock, packet, packetlen, 0);
 	// Find the AD->HID->SID this packet was destined to
 	// Verify HID is in table and find newAD
 	// If newAD is different from the AD in XIP header, update it
