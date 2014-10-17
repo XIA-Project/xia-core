@@ -44,6 +44,10 @@ Node::XidMap Node::load_xids()
 	unsigned len = sizeof(path);
 	char *p;
 
+	// hack to work around name server passing text strings
+	ids[0x50] = "LID"; 
+
+
 	if ((p = getenv("XIADIR")) != NULL) {
 		strncpy(path, p, len);
 	} else if (!getcwd(path, len)) {
