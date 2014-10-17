@@ -2250,11 +2250,70 @@ void XTRANSPORT::Xsend(unsigned short _sport, WritablePacket *p_in)
 	String pktPayload(x_send_msg->payload().c_str(), x_send_msg->payload().size());
 
 	int pktPayloadSize = pktPayload.length();
+	char payload[16384];
+	memcpy(payload, pktPayload.c_str(), pktPayload.length());
 	//click_chatter("pkt %s port %d", pktPayload.c_str(), _sport);
 	//printf("XSEND: %d bytes from (%d)\n", pktPayloadSize, _sport);
 
 	//Find DAG info for that stream
 	DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
+	if(daginfo && daginfo->sock_type == SOCK_RAW) {
+		struct click_xia *xiah = reinterpret_cast<struct click_xia *>(payload);
+		click_chatter("Xsend: xiah->ver = %d", xiah->ver);
+		click_chatter("Xsend: xiah->nxt = %d", xiah->nxt);
+		click_chatter("Xsend: xiah->plen = %d", xiah->plen);
+		click_chatter("Xsend: xiah->hlim = %d", xiah->hlim);
+		click_chatter("Xsend: xiah->dnode = %d", xiah->dnode);
+		click_chatter("Xsend: xiah->snode = %d", xiah->snode);
+		click_chatter("Xsend: xiah->last = %d", xiah->last);
+		int total_nodes = xiah->dnode + xiah->snode;
+		for(int i=0;i<total_nodes;i++) {
+			uint8_t id[20];
+			char hex_string[41];
+			bzero(hex_string, 41);
+			memcpy(id, xiah->node[i].xid.id, 20);
+			for(int j=0;j<20;j++) {
+				sprintf(&hex_string[2*j], "%02x", (unsigned int)id[j]);
+			}
+			char type[10];
+			bzero(type, 10);
+			switch (htonl(xiah->node[i].xid.type)) {
+				case CLICK_XIA_XID_TYPE_AD:
+					strcpy(type, "AD");
+					break;
+				case CLICK_XIA_XID_TYPE_HID:
+					strcpy(type, "HID");
+					break;
+				case CLICK_XIA_XID_TYPE_SID:
+					strcpy(type, "SID");
+					break;
+				case CLICK_XIA_XID_TYPE_CID:
+					strcpy(type, "CID");
+					break;
+				case CLICK_XIA_XID_TYPE_IP:
+					strcpy(type, "4ID");
+					break;
+				default:
+					sprintf(type, "%d", xiah->node[i].xid.type);
+			};
+			click_chatter("Xsend: %s:%s", type, hex_string);
+		}
+
+		XIAHeader xiaheader(xiah);
+		XIAHeaderEncap xiahencap(xiaheader);
+		XIAPath dst_path = xiaheader.dst_path();
+		click_chatter("Xsend: Sending RAW packet to:%s:", dst_path.unparse().c_str());
+		size_t headerlen = xiaheader.hdr_size();
+		char *pktcontents = &payload[headerlen];
+		int pktcontentslen = pktPayloadSize - headerlen;
+		click_chatter("Xsend: Packet size without XIP header:%d", pktcontentslen);
+
+		WritablePacket *p = WritablePacket::make(p_in->headroom() + 1, (const void*)pktcontents, pktcontentslen, p_in->tailroom());
+		p = xiahencap.encap(p, false);
+
+		output(NETWORK_PORT).push(p);
+		return;
+	}
 	if (daginfo && daginfo->isConnected) {
 
 		//Recalculate source path
