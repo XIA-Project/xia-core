@@ -721,6 +721,8 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			// Clear timer
 			daginfo->timer_on = false;
 			daginfo->synack_waiting = false;
+			// Mobility: Rendezvous updates destDAG mid-flight, so update here.
+			daginfo->dst_path = src_path;
 			//daginfo->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
 		} else if (thdr.pkt_info() == TransportHeader::MIGRATE) {
 
