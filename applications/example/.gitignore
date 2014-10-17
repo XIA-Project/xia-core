@@ -14,3 +14,4 @@ push_xftp_server
 push_xftp_client
 push_xftp_recv_server
 push_xftp_recv_client
+sample.txt.*
