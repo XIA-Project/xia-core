@@ -70,7 +70,7 @@ int Xsend(int sockfd, const void *buf, size_t len, int flags)
 		return -1;
 	}
 
-	if (!isConnected(sockfd)) {
+	if (!isConnected(sockfd) && getSocketType(sockfd) != XSOCK_RAW) {
 		LOGF("Socket %d is not connected", sockfd);
 		errno = ENOTCONN;
 		return -1;
