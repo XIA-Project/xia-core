@@ -9,7 +9,7 @@
 #define MAX_KEYDIR_PATH_LEN 1024
 
 // Convert a SHA1 hash to a hex string
-static void sha1_hash_to_hex_string(unsigned char *digest, int digest_len, char *hex_string, int hex_string_len)
+void sha1_hash_to_hex_string(unsigned char *digest, int digest_len, char *hex_string, int hex_string_len)
 {
     int i;
 	assert(digest_len == SHA_DIGEST_LENGTH);
