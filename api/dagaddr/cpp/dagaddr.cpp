@@ -44,9 +44,6 @@ Node::XidMap Node::load_xids()
 	unsigned len = sizeof(path);
 	char *p;
 
-	// hack to work around name server passing text strings
-	ids[0x50] = "LID"; 
-
 
 	if ((p = getenv("XIADIR")) != NULL) {
 		strncpy(path, p, len);
@@ -72,6 +69,9 @@ Node::XidMap Node::load_xids()
 		}
 		fclose(f);
 	}
+
+	// hack to work around name server passing text strings
+	ids[0x50] = "LID"; 
 
 	return ids;
 }

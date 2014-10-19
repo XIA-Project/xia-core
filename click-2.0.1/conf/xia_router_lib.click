@@ -64,11 +64,11 @@ elementclass XIAPacketRoute {
         // order is important!
         //
         // rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, rt_FOO :: XIAXIDRouteTable($local_addr, $num_ports);
-        // c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, rt_FOO, [2]output;
+        // c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, rt_FOO, consider_next_path;
 
     //GENI TUTORIAL: EDIT BEGIN
 	rt_AD, rt_HID, rt_SID, rt_CID, rt_IP :: XIAXIDRouteTable($local_addr, $num_ports);
-	c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, [2]output;
+	c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, consider_next_path;
 	//GENI TUTORIAL: EDIT END
 
 	// TO ADD A NEW USER DEFINED XID (step 3)

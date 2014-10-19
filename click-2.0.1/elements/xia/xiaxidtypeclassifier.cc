@@ -168,7 +168,8 @@ XIAXIDTypeClassifier::match(Packet *p)
                 break;
         }
     }
-    return -1;
+    //return -1;
+    return _patterns.size();
 }
 
 CLICK_ENDDECLS
