@@ -22,10 +22,12 @@
 #include <sstream>
 #include <click/config.h>
 #include <polarssl/x509.h>
+#include <polarssl/x509_crt.h>
 #include <polarssl/config.h>
 #include <polarssl/sha1.h>
 #include <polarssl/havege.h>
 #include <polarssl/base64.h>
+#include <polarssl/pk.h>
 #include "scioncryptolib.hh"
 #include "rot_parser.hh"
 
@@ -214,26 +216,27 @@ int ROTParser::verifyROT(const ROT& rot) {
     }
 
     // read certificates objects
-    x509_cert cert;
-    memset(&cert, 0, sizeof(x509_cert));
-    ret = x509parse_crt(&cert,
+    x509_crt cert;
+    memset(&cert, 0, sizeof(x509_crt));
+    ret = x509_crt_parse(&cert,
       (const unsigned char*)rot.coreADs.find(itr->first)->second.certificate,
       rot.coreADs.find(itr->first)->second.certLen);
     // read error?
     if (ret < 0) {
       printf("ERR: failed!  x509parse_crt returned %d\n", ret);
-      x509_free(&cert);
+      x509_crt_free(&cert);
       return ROTVerifyFail;
     }
-    x509_cert crt;
-    x509_cert *cur = &cert;
+    x509_crt crt;
+    x509_crt *cur = &cert;
     // Check the signature by certificates issued by ADs in TDC
     while (cur != NULL) {
-      if ((ret = rsa_pkcs1_verify(&cur->rsa, RSA_PUBLIC, SIG_RSA_SHA1, 20,
+      
+      if ((ret = rsa_pkcs1_verify(pk_rsa(cur->pk), NULL, NULL, RSA_PUBLIC, POLARSSL_MD_SHA1, 20,
                                   sha1Hash, output)) != 0) {
             printf("ERR: signature verification failed.\n");
         SCIONCryptoLib::PrintPolarSSLError(ret);
-        x509_free(&cert);
+        x509_crt_free(&cert);
         // SL: this is just for testing ROT version change...
         // Temporarily returns true...
         #ifdef _SL_ROT_TEST
@@ -244,7 +247,7 @@ int ROTParser::verifyROT(const ROT& rot) {
       }
       cur = cur->next;
     }
-    x509_free(&cert);
+    x509_crt_free(&cert);
   }
   printf("ROT Verification Done.\n");
   return ROTParseNoError;

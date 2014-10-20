@@ -169,9 +169,19 @@ void SCIONBeaconServerCore::parseTopology(){
 void SCIONBeaconServerCore::loadPrivateKey() {
   if(!_CryptoIsReady) {
     rsa_init(&PriKey, RSA_PKCS_V15, 0);
-    int err = x509parse_keyfile(&PriKey, m_csPrvKeyFile, NULL); 
-    if(err) {
+    
+    int ret;
+    pk_context pk;
+    pk_init( &pk );
+    ret = pk_parse_keyfile( &pk, m_csPrvKeyFile, NULL );
+    if( ret == 0 && ! pk_can_do( &pk, POLARSSL_PK_RSA ) )
+        ret = POLARSSL_ERR_PK_TYPE_MISMATCH;
+    if( ret == 0 )
+        rsa_copy( &PriKey, pk_rsa( pk ) );
+    
+    if( ret != 0) {
       rsa_free(&PriKey);
+      pk_free( &pk );
       scionPrinter->printLog(EH, (char *)"Private key file loading failure, path = %s", m_csPrvKeyFile);
       scionPrinter->printLog(IL, (char *)"Exit SCION Network.");
       exit(0);

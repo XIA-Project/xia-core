@@ -17,12 +17,13 @@
 #ifndef SCIONCRYPTOLIB_HH_INCLUDED
 #define SCIONCRYPTOLIB_HH_INCLUDED
 
-#include<polarssl/x509.h>
-#include<polarssl/rsa.h>
-#include<polarssl/havege.h>
-#include<polarssl/config.h>
-#include<polarssl/sha1.h>
-#include<polarssl/aes.h>
+#include <polarssl/x509.h>
+#include <polarssl/rsa.h>
+#include <polarssl/x509_crt.h>
+#include <polarssl/havege.h>
+#include <polarssl/config.h>
+#include <polarssl/sha1.h>
+#include <polarssl/aes.h>
 /* IPSEC also defines AES_DECRYPT and AES_ENCRYPT */
 const int SCION_AES_DECRYPT = AES_DECRYPT;
 const int SCION_AES_ENCRYPT = AES_ENCRYPT;
@@ -90,11 +91,11 @@ class SCIONCryptoLib{
 		static uint32_t genMAC(uint8_t* msg, uint16_t msgSize, aes_context* ctx);
         
         /**
-            @brief Extracts serial number from a x509_cert
-            @param x509_cert* crt The cerificate file.
+            @brief Extracts serial number from a x509_crt
+            @param x509_crt* crt The cerificate file.
             @param char* p The pointer where the result is stored. 
         */
-        static int GetSerialFromCert(x509_cert* crt, char* p);
+        static int GetSerialFromCert(x509_crt* crt, char* p);
 
 	static void PrintPolarSSLError(int code);
 };

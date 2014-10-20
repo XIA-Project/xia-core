@@ -25,6 +25,8 @@
 #include <click/error.hh>
 #include <polarssl/sha1.h>
 #include <sys/time.h>
+#include <polarssl/x509_crt.h>
+#include <polarssl/pk.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -227,10 +229,19 @@ bool SCIONBeaconServer::parseROT(String filename){
 
 void SCIONBeaconServer::loadPrivateKey() {
 	if(!_CryptoIsReady) {
-		rsa_init(&PriKey, RSA_PKCS_V15, 0);
-		int err = x509parse_keyfile(&PriKey, m_csPrvKeyFile, NULL);
-		if(err) {
+		rsa_init(&PriKey, RSA_PKCS_V15, 0);	
+		int ret;
+		pk_context pk;
+		pk_init( &pk );
+		ret = pk_parse_keyfile( &pk, m_csPrvKeyFile, NULL );
+		if( ret == 0 && ! pk_can_do( &pk, POLARSSL_PK_RSA ) )
+			ret = POLARSSL_ERR_PK_TYPE_MISMATCH;
+		if( ret == 0 )
+			rsa_copy( &PriKey, pk_rsa( pk ) );
+
+		if( ret != 0) {
 			rsa_free(&PriKey);
+			pk_free(&pk);
 			printf("ERR: Private key file loading failure, path = %s\n", (char*)m_csPrvKeyFile);
 			printf("Fatal error, Exit SCION Network.\n");
 			exit(-1);
@@ -1299,10 +1310,10 @@ uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){
 	// Part1: TDCore Signature Verification
 	// Verify Using ROT structure
 	// Get certificate from ROT
-	x509_cert TDCert;
+	x509_crt TDCert;
 	int ret = 0;
-	memset(&TDCert, 0, sizeof(x509_cert));
-	ret = x509parse_crt(&TDCert, 
+	memset(&TDCert, 0, sizeof(x509_crt));
+	ret = x509_crt_parse(&TDCert, 
 		(const unsigned char*)m_cROT.coreADs.find(mrkPtr->aid)->second.certificate,
 		m_cROT.coreADs.find(mrkPtr->aid)->second.certLen);
 		
@@ -1311,27 +1322,27 @@ uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){
 		#ifdef _SL_DEBUG_BS
 		printf("BS (%lu:%lu): x509parse_crt parsing failed.\n", m_uAdAid, m_uAid);
 		#endif
-		x509_free( &TDCert );
+		x509_crt_free( &TDCert );
 		// TODO: Request a correct ROT with a pre-defined number of trials
 		// Add it to Queue
 		addUnverifiedPcb(pkt);
 		return SCION_FAILURE;
 	}
 
-	if(SCIONCryptoLib::verifySig(msg, sig, msgLen, &(TDCert.rsa)) != scionCryptoSuccess) {
+	if(SCIONCryptoLib::verifySig(msg, sig, msgLen, pk_rsa(TDCert.pk)) != scionCryptoSuccess) {
 		#ifdef _SL_DEBUG_BS
 		printf("BS (%lu:%lu): Signature verification (TDC) failure\n", m_uAdAid, m_uAid);
 		#endif
-		x509_free(&TDCert);
+		x509_crt_free(&TDCert);
         return SCION_FAILURE;
 	}else{
-		x509_free( &TDCert );
+		x509_crt_free( &TDCert );
 	}
 	
 	// Non TDC signature verification
 	uint8_t cert[MAX_FILE_LEN];
-	x509_cert * adcert = NULL;
-	std::map<uint64_t,x509_cert*>::iterator it;
+	x509_crt * adcert = NULL;
+	std::map<uint64_t,x509_crt*>::iterator it;
 	
 	pcbMarking* prevMrkPtr = mrkPtr;
 	ptr+=mrkPtr->blkSize+mrkPtr->sigLen;
@@ -1393,10 +1404,10 @@ uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){
 			}
 			fclose(cFile);
 					
-			adcert = new x509_cert;
-			memset(adcert,0,sizeof(x509_cert));
+			adcert = new x509_crt;
+			memset(adcert,0,sizeof(x509_crt));
 
-			int err = x509parse_crtfile(adcert, (const char*)cert);
+			int err = x509_crt_parse_file(adcert, (const char*)cert);
 			if(err){
 				#ifdef _SL_DEBUG_BS
 				printf("BS (%s:%s): fail to extract AD %lu's cert to verify signatures.\n", 
@@ -1404,11 +1415,11 @@ uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){
 				#endif
 				scionPrinter->printLog(EH, (char *)"BS(%lu:%lu): Error Loading Certificate for AD %lu\n", 
 					m_AD.c_str(), m_HID.c_str(), mrkPtr->aid);
-				x509_free(adcert);
+				x509_crt_free(adcert);
 				delete adcert;
 				return SCION_FAILURE;		
 			}
-			m_certMap.insert(std::pair<uint64_t,x509_cert*>(mrkPtr->aid, adcert));
+			m_certMap.insert(std::pair<uint64_t,x509_crt*>(mrkPtr->aid, adcert));
 		}
 		else {
 			adcert = it->second;
@@ -1417,14 +1428,14 @@ uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){
 		//verify this signature
 		//SL: now subChain includes all certificates
 		//need to verify certificate and cache the last one (do this once in a predefined period)
-		//use x509parse_verify, Note: use "x509_cert->next"
+		//use x509parse_verify, Note: use "x509_crt->next"
 			
 		// Tenma: genSig only uses msg+aid content for signature.
-		if(SCIONCryptoLib::verifySig(content,signature,msgLen+SIZE_AID,&(adcert->rsa))!=scionCryptoSuccess){
+		if(SCIONCryptoLib::verifySig(content,signature,msgLen+SIZE_AID,pk_rsa(adcert->pk))!=scionCryptoSuccess){
 			#ifdef _SL_DEBUG_BS
 			printf("BS (%lu:%lu): Signature verification failed for AD %lu\n", m_uAdAid, m_uAid, mrkPtr->aid);
 			#endif
-			x509_free(adcert);
+			x509_crt_free(adcert);
 			return SCION_FAILURE;
 		}
 		
@@ -1713,11 +1724,11 @@ void SCIONBeaconServer::requestForCert(SPacket* pkt){
 
 void 
 SCIONBeaconServer::clearCertificateMap() {
-	std::map<uint64_t, x509_cert*>::iterator it;
-	x509_cert * pChain;
+	std::map<uint64_t, x509_crt*>::iterator it;
+	x509_crt * pChain;
 	for(it=m_certMap.begin(); it!=m_certMap.end(); it++){
 	    pChain = it->second;
-		x509_free(pChain);
+		x509_crt_free(pChain);
 		delete pChain;
 	}
 	m_certMap.clear();

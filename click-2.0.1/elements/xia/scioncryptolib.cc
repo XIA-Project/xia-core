@@ -75,7 +75,7 @@ int SCIONCryptoLib::genSig(uint8_t* msg, uint8_t msgSize, uint8_t* output, uint1
 	sha1(msg, msgSize, sha1Hash);
 	
 	// TODO: No RNG here!!
-	int err = rsa_pkcs1_sign(pkey, 0, 0, RSA_PRIVATE, SIG_RSA_SHA1, SHA1_SIZE, sha1Hash, output);
+	int err = rsa_pkcs1_sign(pkey, NULL, NULL, RSA_PRIVATE, POLARSSL_MD_SHA1, SHA1_SIZE, sha1Hash, output);
 	
 	if(err){
         	printf("ERROR CREATING SIGNATURE.\n");
@@ -99,7 +99,7 @@ int SCIONCryptoLib::verifySig(uint8_t* msg, uint8_t* sig, int msgSize, rsa_conte
 	sha1(msg, msgSize, sha1Hash);
 
 	// Verify the signature
-	int err = rsa_pkcs1_verify(pubKey, RSA_PUBLIC, SIG_RSA_SHA1, SHA1_SIZE, sha1Hash, sig);
+	int err = rsa_pkcs1_verify(pubKey, NULL, NULL, RSA_PUBLIC, POLARSSL_MD_SHA1, SHA1_SIZE, sha1Hash, sig);
 	if(err){
 		printf("ERROR VERIFYING SIGNATURE.\n");
 		PrintPolarSSLError(err);
@@ -139,14 +139,14 @@ uint32_t SCIONCryptoLib::genMAC(uint8_t* msg, uint16_t msgSize, aes_context* ctx
     return *ret;
 }
 
-int SCIONCryptoLib::GetSerialFromCert(x509_cert* crt, char* p)
+int SCIONCryptoLib::GetSerialFromCert(x509_crt* crt, char* p)
 {
 	int ret = 0, i = 0, j = 0;
 	char buf[29];	// max length is 20 bytes and : seperators for 2 bytes
 	
 	if(p==NULL||crt==NULL) return scionCryptoObjectNULLError;
 	
-	ret = x509parse_serial_gets( (char *)buf, sizeof(buf), &crt->serial);
+	ret = x509_serial_gets( (char *)buf, sizeof(buf), &crt->serial);
 	
 	if( ret != -1 )
 	{

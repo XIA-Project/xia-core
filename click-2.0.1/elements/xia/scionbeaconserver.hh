@@ -632,12 +632,12 @@ class SCIONBeaconServer : public Element {
         std::multimap<int, GatewayElem> m_gateways;    
         /**
             List of certificates. 
-            Maps between the owner AID and certificates in x509_cert type 
+            Maps between the owner AID and certificates in x509_crt type 
         */
-		std::map<uint64_t, x509_cert*> m_certMap;
+	std::map<uint64_t, x509_crt*> m_certMap;
 		
-		// use for XIA temporally 
-		std::multimap<int, EgressIngressPair> m_routepairs;
+	// use for XIA temporally 
+	std::multimap<int, EgressIngressPair> m_routepairs;
 		
         SCIONPrint* scionPrinter;
        
