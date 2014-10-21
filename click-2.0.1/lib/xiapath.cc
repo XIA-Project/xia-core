@@ -564,17 +564,21 @@ XIAPath::destination_node() const
 }
 
 XIAPath::handle_t
-XIAPath::hid_node_for_destination_sid_node() const
+XIAPath::hid_node_for_destination_node() const
 {
     // Get the source and destination node handles
     handle_t src = source_node();
     handle_t dest = destination_node();
-    // Verify that the destination is an SID
+	/*
+    // Verify that the destination is an SID or CID
     XID destXID(xid(dest).unparse());
     if(destXID.type() != htonl(CLICK_XIA_XID_TYPE_SID)) {
-        click_chatter("XIAPath:hid_node...() destination node not SID:%s: type:%d:", destXID.unparse().c_str(), destXID.type());
-        return INVALID_NODE_HANDLE;
+		if(destXID.type() != htonl(CLICK_XIA_XID_TYPE_CID)) {
+            click_chatter("XIAPath:hid_node...() destination node not SID:%s: type:%d:", destXID.unparse().c_str(), destXID.type());
+            return INVALID_NODE_HANDLE;
+		}
     }
+	*/
     // Walk from source to destination
     handle_t current_node = src;
     do {
