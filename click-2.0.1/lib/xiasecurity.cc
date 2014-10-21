@@ -1,13 +1,21 @@
 // -*- c-basic-offset: 4; related-file-name: "../include/click/xiasecurity.hh" -*-
+#ifdef CLICK_USERLEVEL
 #include <click/config.h>
 #include <click/xiasecurity.hh>
 #include <click/xiautil.hh>
+#else
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include "Xsecurity.h"
+#include "Xsocket.h"
+#endif // CLICK_USERLEVEL
 #include <openssl/bn.h>
 #include <openssl/rsa.h>
 #include <openssl/pem.h>
 #include <assert.h>
-
-CLICK_DECLS
+#include <stdarg.h>
+#include <stdio.h>
 
 /*
 // Generate HMAC-SHA1
@@ -56,6 +64,15 @@ class XIASecurityBuffer {
 };
 */
 
+void xs_chatter(const char *fmt, ...)
+{
+	va_list val;
+	va_start(val, fmt);
+	vfprintf(stderr, fmt, val);
+	fprintf(stderr, "\n");
+	va_end(val);
+}
+
 XIASecurityBuffer::XIASecurityBuffer(int initSize)
 {
 	numEntriesSize = sizeof(uint16_t);
@@ -75,7 +92,7 @@ XIASecurityBuffer::XIASecurityBuffer(const char *buf, uint16_t len)
 	// Copy the serialized buffer
 	_buffer = (char *)calloc(len, 1);
 	if(_buffer == NULL) {
-		click_chatter("XIASecurityBuffer:: CRITICAL, could not allocate %d bytes for buffer", len);
+		xs_chatter("XIASecurityBuffer:: CRITICAL, could not allocate %d bytes for buffer", len);
 	}
 	memcpy(_buffer, buf, len);
 	// Update pointers
@@ -125,7 +142,7 @@ bool XIASecurityBuffer::extend(uint32_t length)
 		}
 		char *newbuffer = (char *)realloc(_buffer, newSize);
 		if(newbuffer == NULL) {
-			click_chatter("XIASecurityBuffer::extend: failed extending size beyond %d", currentDataSize);
+			xs_chatter("XIASecurityBuffer::extend: failed extending size beyond %d", currentDataSize);
 			return false;
 		}
 		numEntriesPtr = (uint16_t *)newbuffer;
@@ -168,12 +185,12 @@ bool XIASecurityBuffer::pack(const char *data, uint16_t length)
 {
 	if(!initialized) {
 		if(initialize() == false) {
-			click_chatter("XIASecurityBuffer::pack: failed initializing memory for data");
+			xs_chatter("XIASecurityBuffer::pack: failed initializing memory for data");
 			return false;
 		}
 	}
 	if(extend(length) == false) {
-		click_chatter("XIASecurityBuffer::pack: failed extending memory for additional data");
+		xs_chatter("XIASecurityBuffer::pack: failed extending memory for additional data");
 		return false;
 	}
 
@@ -195,12 +212,12 @@ bool XIASecurityBuffer::unpack(char *data, uint16_t *length)
 {
 	// If we go past the nextPack pointer, no more entries to unpack
 	if(nextUnpack >= nextPack) {
-		click_chatter("XIASecurityBuffer::unpack: ERROR no entries to unpack");
+		xs_chatter("XIASecurityBuffer::unpack: ERROR no entries to unpack");
 		return false;
 	}
 
 	if(*length < peekUnpackLength()) {
-		click_chatter("XIASecurityBuffer::unpack: ERROR insufficient buffer space:%d, expected:%d.", *length, peekUnpackLength());
+		xs_chatter("XIASecurityBuffer::unpack: ERROR insufficient buffer space:%d, expected:%d.", *length, peekUnpackLength());
 		return false;
 	}
 	*length = peekUnpackLength();
@@ -213,7 +230,7 @@ bool XIASecurityBuffer::unpack(char *data, uint16_t *length)
 int XIASecurityBuffer::peekUnpackLength()
 {
 	if(nextUnpack >= nextPack) {
-		click_chatter("XIASecurityBuffer::peekUnpackLength: ERROR reading past end of buffer");
+		xs_chatter("XIASecurityBuffer::peekUnpackLength: ERROR reading past end of buffer");
 		return -1;
 	}
 	uint16_t length;
@@ -229,9 +246,15 @@ static const char *get_keydir()
         if(keydir == NULL) {
             return NULL;
         }
+#ifdef CLICK_USERLEVEL
         if(xiaRootDir((char *)keydir, MAX_KEYDIR_PATH_LEN) == NULL) {
             return NULL;
         }
+#else
+		if(XrootDir((char *)keydir, MAX_KEYDIR_PATH_LEN) == NULL) {
+			return NULL;
+		}
+#endif //CLICK_USERLEVEL
         strcat((char *)keydir, "/");
         strcat((char *)keydir, XIA_KEYDIR);
     }
@@ -276,7 +299,7 @@ int xs_getPubkeyHash(char *pubkey, uint8_t *digest, int digest_len)
 	// Strip header, footer and newlines
 	pubkeystr = (char *)calloc(pubkeyend - pubkeystart, 1);
 	if(pubkeystr == NULL) {
-		click_chatter("xs_getPubkeyHash: ERROR allocating memory for public key");
+		xs_chatter("xs_getPubkeyHash: ERROR allocating memory for public key");
 		return -1;
 	}
 	for(i=0,j=0; i<pubkeyend-pubkeystart; i++) {
@@ -284,7 +307,7 @@ int xs_getPubkeyHash(char *pubkey, uint8_t *digest, int digest_len)
 			pubkeystr[j++] = pubkeystart[i];
 		}
 	}
-	click_chatter("xs_getPubkeyHash: Stripped pubkey: %s", pubkeystr);
+	xs_chatter("xs_getPubkeyHash: Stripped pubkey: %s", pubkeystr);
 	xs_getSHA1Hash((const unsigned char *)pubkeystr, strlen(pubkeystr), digest, digest_len);
 
 	free(pubkeystr);
@@ -341,7 +364,7 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
 	// Find the directory where keys are stored
 	const char *keydir = get_keydir();
 	if(keydir == NULL) {
-		click_chatter("xs_sign: Unable to find key directory");
+		xs_chatter("xs_sign: Unable to find key directory");
 		return -1;
 	}
 	// Read private key from file in keydir
@@ -357,14 +380,14 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
 	// Print the SHA1 hash in human readable form
     char hex_digest[XIA_SHA_DIGEST_STR_LEN];
 	xs_hexDigest(digest, sizeof digest, hex_digest, sizeof hex_digest);
-    click_chatter("xs_sign: Hash of given data: %s", hex_digest);
+    xs_chatter("xs_sign: Hash of given data: %s", hex_digest);
 
     // Encrypt the SHA1 hash with private key
-    click_chatter("xs_sign: Signing with private key from: %s", privfilepath);
+    xs_chatter("xs_sign: Signing with private key from: %s", privfilepath);
     FILE *fp = fopen(privfilepath, "r");
     RSA *rsa = PEM_read_RSAPrivateKey(fp,NULL,NULL,NULL);
     if(rsa==NULL) {
-        click_chatter("xs_sign: ERROR reading private key:%s:", privfilepath);
+        xs_chatter("xs_sign: ERROR reading private key:%s:", privfilepath);
 		return -1;
 	}
 
@@ -373,16 +396,16 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
 	assert(*siglen >= RSA_size(rsa));
     sig_buf = (unsigned char*)calloc(RSA_size(rsa), 1);
 	if(!sig_buf) {
-		click_chatter("xs_sign: Failed to allocate memory for signature");
+		xs_chatter("xs_sign: Failed to allocate memory for signature");
 		return -1;
 	}
 
     //int rc = RSA_sign(NID_sha1, digest, sizeof digest, sig_buf, &sig_len, rsa);
     int rc = RSA_sign(NID_sha1, digest, sizeof digest, sig_buf, &sig_len, rsa);
-    if (1 != rc) { click_chatter("RSA_sign failed"); }
-    click_chatter("xs_sign: signature length: %d", sig_len);
+    if (1 != rc) { xs_chatter("RSA_sign failed"); }
+    xs_chatter("xs_sign: signature length: %d", sig_len);
 
-    //click_chatter("Sig: %X Len: %d", sig_buf[0], sig_len);
+    //xs_chatter("Sig: %X Len: %d", sig_buf[0], sig_len);
     memcpy(signature, sig_buf, sig_len);
 	*siglen = (uint16_t) sig_len;
 
@@ -411,7 +434,7 @@ int xs_getPubkey(const char *xid, char *pubkey, uint16_t *pubkey_len)
 	// Find the directory where keys are stored
 	const char *keydir = get_keydir();
 	if(keydir == NULL) {
-		click_chatter("xs_getPubkey: ERROR finding key directory");
+		xs_chatter("xs_getPubkey: ERROR finding key directory");
 		retval = -1;
 		goto xs_getPubkey_cleanup;
 	}
@@ -420,7 +443,7 @@ int xs_getPubkey(const char *xid, char *pubkey, uint16_t *pubkey_len)
 	pubfilepathlen = strlen(keydir) + strlen("/") + strlen(pubkeyhash) + strlen(".pub") + 1;
 	pubfilepath = (char *) calloc(pubfilepathlen, 1);
 	if(pubfilepath == NULL) {
-		click_chatter("xs_getPubkey: ERROR allocating memory to store public key file path");
+		xs_chatter("xs_getPubkey: ERROR allocating memory to store public key file path");
 		retval = -2;
 		goto xs_getPubkey_cleanup;
 	}
@@ -432,7 +455,7 @@ int xs_getPubkey(const char *xid, char *pubkey, uint16_t *pubkey_len)
     rsa = PEM_read_RSA_PUBKEY(fp,NULL,NULL,NULL);
     //RSA *rsa = PEM_read_RSAPublicKey(fp,NULL,NULL,NULL);
     if(rsa==NULL) {
-		click_chatter("xs_getPubkey: ERROR reading public key:%s:", pubfilepath);
+		xs_chatter("xs_getPubkey: ERROR reading public key:%s:", pubfilepath);
 		retval = -3;
 		goto xs_getPubkey_cleanup;
 	}
@@ -440,14 +463,14 @@ int xs_getPubkey(const char *xid, char *pubkey, uint16_t *pubkey_len)
 
     bio_pub = BIO_new(BIO_s_mem());
 	if(bio_pub == NULL) {
-		click_chatter("xs_getPubkey: ERROR allocating BIO for public key");
+		xs_chatter("xs_getPubkey: ERROR allocating BIO for public key");
 		retval = -4;
 		goto xs_getPubkey_cleanup;
 	}
 	state = 4;
     PEM_write_bio_RSA_PUBKEY(bio_pub, rsa);
 	if(*pubkey_len < BIO_pending(bio_pub) + 1) {
-		click_chatter("xs_getPubkey: ERROR pubkey buffer too small");
+		xs_chatter("xs_getPubkey: ERROR pubkey buffer too small");
 		retval = -5;
 		goto xs_getPubkey_cleanup;
 	}
@@ -463,5 +486,3 @@ xs_getPubkey_cleanup:
 	};
 	return retval;
 }
-
-CLICK_ENDDECLS

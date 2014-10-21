@@ -1,21 +1,12 @@
 // -*- c-basic-offset: 4; related-file-name: "../../lib/xiasecurity.cc" -*-
-#ifndef CLICK_XIASECURITY_HH
-#define CLICK_XIASECURITY_HH
-#include <click/config.h>
-#include <click/string.hh>
-#include <click/glue.hh>
-#include <clicknet/xia.h>
-#include <click/packet.hh>
-#include <click/vector.hh>
-#include <click/xid.hh>
-
+#ifndef XSECURITY_H
+#define XSECURITY_H
 
 #define MAX_KEYDIR_PATH_LEN 1024
 #define MAX_PUBKEY_SIZE 2048
 #define MAX_SIGNATURE_SIZE 256
 #define XIA_KEYDIR "key"
 #define XIA_SHA_DIGEST_STR_LEN SHA_DIGEST_LENGTH*2+1
-CLICK_DECLS
 
 // Generic buffer to serialize data to be sent over the wire
 class XIASecurityBuffer {
@@ -75,7 +66,5 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
 
 // Read public key from file
 int xs_getPubkey(const char *xid, char *pubkey, uint16_t *pubkey_len);
-
-CLICK_ENDDECLS
 
 #endif

@@ -10,7 +10,7 @@ SOURCES=Xaccept.c Xbind.c XbindPush.c Xclose.c Xconnect.c  XrequestChunk.c  Xget
 	Xfcntl.c XgetChunkStatus.c  XreadChunk.c  XputChunk.c Xrecv.c \
 	Xrecvfrom.c Xsend.c Xsendto.c Xsocket.c  XpushChunkto.c XrecvChunkfrom.c\
 	Xsetsockopt.c Xutil.c state.c Xinit.c XupdateAD.c XupdateNameServerDAG.c XgetDAGbyName.c  \
-	Xkeys.c minini/minIni.c
+	Xkeys.c Xsecurity.c minini/minIni.c
 OBJS=$(SOURCES:.c=.o) xia.pb.o
 LIB=$(XLIB)/libXsocket.so
 STATICLIB=$(XLIB)/libXsocket.a
