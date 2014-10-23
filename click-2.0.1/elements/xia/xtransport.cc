@@ -812,6 +812,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				click_chatter("ProcessNetworkPacket: MIGRATE: Signature validated");
 
 				// 4. Update DAGinfo dst_path with srcDAG
+				click_chatter("***EWA: Changing partner path due to MIGRATE: From %s to %s", daginfo->dst_path.unparse().c_str(), src_path.unparse().c_str());
 				daginfo->dst_path = src_path;
 				daginfo->isConnected = true;
 				daginfo->initialized = true;
