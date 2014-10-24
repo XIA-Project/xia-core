@@ -2822,6 +2822,14 @@ void XTRANSPORT::XreadChunk(unsigned short _sport)
 
 			HashTable<XID, WritablePacket*>::iterator it2;
 			it2 = daginfo->XIDtoCIDresponsePkt.find(destination_cid);
+			if(it2 == daginfo->XIDtoCIDresponsePkt.end()) {
+				click_chatter("Xtranport: XreadChunk: ERROR no entry in XIAtoCIDResponsePkt");
+				return;
+			}
+			if(it2->second == NULL) {
+				click_chatter("Xtransport::XreadChunk: ERROR invalid val for %s", destination_cid.unparse().c_str());
+				return;
+			}
 			copy = copy_cid_response_packet(it2->second, daginfo);
 
 			XIAHeader xiah(copy->xia_header());
@@ -2849,8 +2857,12 @@ void XTRANSPORT::XreadChunk(unsigned short _sport)
 			click_chatter(">>send chunk to API after read %d\n", _sport);
 			output(API_PORT).push(UDPIPPrep(p2, _sport));
 
+			/*
+			 * Taking out these lines fixes the problem with getting the same CID
+			 * multiple times for subsequent chunks
 			it2->second->kill();
 			daginfo->XIDtoCIDresponsePkt.erase(it2);
+			*/
 
 			portToDAGinfo.set(_sport, *daginfo);
 		}
