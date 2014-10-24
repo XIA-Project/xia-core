@@ -848,6 +848,7 @@ int updateADPathStates(void)
     return rc;
 }
 
+// Process received message.
 int processMsg(std::string msg)
 {
     int type, rc = 0;
@@ -858,7 +859,7 @@ int processMsg(std::string msg)
     switch (type)
     {
         case CTL_HOST_REGISTER:
-//            rc = processHostRegister(m);
+			// Ignore. Controller does not register hosts.
             break;
         case CTL_HELLO:
             rc = processHello(m);
@@ -1029,11 +1030,14 @@ int processLSA(ControlMessage msg)
 		// Calculate next hop for ADs
 		std::map<std::string, RouteEntry> ADRoutingTable;
 		populateRoutingTable(route_state.myAD, route_state.ADNetworkTable, ADRoutingTable);
-		//printADNetworkTable();
-		//printRoutingTable(route_state.myAD, ADRoutingTable);
+
+		// For debugging.
+		// printADNetworkTable();
+		// printRoutingTable(route_state.myAD, ADRoutingTable);
 
 		// Calculate next hop for routers
 		std::map<std::string, NodeStateEntry>::iterator it1;
+		// Iterate through ADs
 		for (it1 = route_state.networkTable.begin(); it1 != route_state.networkTable.end(); ++it1)
 		{
 			if ((it1->second.ad != route_state.myAD) || (it1->second.hid == "")) {
@@ -1044,6 +1048,8 @@ int processLSA(ControlMessage msg)
 				continue;
 			}
 			std::map<std::string, RouteEntry> routingTable;
+
+			// Calculate routing table for HIDs instead it1 AD
 			populateRoutingTable(it1->second.hid, route_state.networkTable, routingTable);
 			//extractNeighborADs(routingTable);
 			populateNeighboringADBorderRouterEntries(it1->second.hid, routingTable);
@@ -1059,6 +1065,7 @@ int processLSA(ControlMessage msg)
 	return 1;
 }
 
+// Extract neighboring AD from the routing table
 int extractNeighborADs(void)
 {
 	// Update network table
@@ -1113,6 +1120,8 @@ void populateADEntries(std::map<std::string, RouteEntry> &routingTable, std::map
 	}
 }
 
+// Run Dijkstra shortest path algorithm, and populate the next hops.
+// This code is hacky to support AD and HID. This can be rewritten better.
 void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEntry> &networkTable, std::map<std::string, RouteEntry> &routingTable)
 {
 	std::map<std::string, NodeStateEntry>::iterator it1;  // Iter for network table
@@ -1143,8 +1152,9 @@ void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEnt
 		it1->second.cost = 10000000;
 	}
 
-	// Visit root node	
 	string currXID;
+
+	// Visit root node (srcHID)
 	unvisited.erase(srcHID);
 	networkTable[srcHID].checked = true;
 	networkTable[srcHID].cost = 0;
@@ -1603,24 +1613,19 @@ int main(int argc, char *argv[])
 		exit(-1);
 	}
 
-	// bind to the controller service 
+	// bind to the controller service
 	struct addrinfo *ai;
 	sockaddr_x tempDAG;
-#if 0
-	Graph bindG = Node() * Node(route_state.myAD) * Node(SID_XCONTROL);
-	bindG.fill_sockaddr(&tempDAG);
-#else
 	if (Xgetaddrinfo(NULL, SID_XCONTROL, NULL, &ai) != 0) {
 		syslog(LOG_ALERT, "unable to bind controller service");
 		exit(-1);
 	}
 	memcpy(&tempDAG, ai->ai_addr, sizeof(sockaddr_x));
-#endif
 
 	if (Xbind(tempSock, (struct sockaddr*)&tempDAG, sizeof(sockaddr_x)) < 0) {
 		Graph g(&tempDAG);
 		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
-perror("bind");
+		perror("bind");
 		Xclose(tempSock);
 		exit(-1);
 	}
@@ -1631,10 +1636,12 @@ perror("bind");
     time_t last_update_latency = last_purge;
 	while (1) {
 		if (route_state.send_hello == true) {
+			// it is time to send hello.
 			route_state.send_hello = false;
 			sendHello();
 		}
 		if (route_state.send_lsa == true) {
+			// it is time to send lsa.
 			route_state.send_lsa = false;
 			sendInterdomainLSA();
 		}
