@@ -33,6 +33,8 @@ enum XSocketCallType {
 
   XPUSHCHUNKTO = 27;
   XBINDPUSH = 28;
+
+  XUPDATERV = 29;
 }
 
 message XSocketMsg {
@@ -70,6 +72,8 @@ message XSocketMsg {
 
   optional X_Pushchunkto_Msg x_pushchunkto= 27;
   optional X_BindPush_Msg x_bindpush= 28;
+
+  optional X_Updaterv_Msg x_updaterv = 29;
 }
  
 message X_Socket_Msg {
@@ -201,6 +205,10 @@ message X_GetPeername_Msg {
 
 message X_GetSockname_Msg {
   optional string dag = 1; // Full DAG of the this socket
+}
+
+message X_Updaterv_Msg {
+  required string rvdag = 1;
 }
 
 /**************************************************/

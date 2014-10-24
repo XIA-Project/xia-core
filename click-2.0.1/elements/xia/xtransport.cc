@@ -516,6 +516,9 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XBINDPUSH:
 		XbindPush(_sport);
 		break;
+	case xia::XUPDATERV:
+		Xupdaterv(_sport);
+		break;
 	default:
 		click_chatter("\n\nERROR: API TRAFFIC !!!\n\n");
 		break;
@@ -1989,6 +1992,77 @@ void XTRANSPORT::Xaccept(unsigned short _sport)
 		click_chatter("\n Xaccept: error\n");
 	}
 }
+
+void XTRANSPORT::Xupdaterv(unsigned short _sport)
+{
+	DAGinfo *daginfo = portToDAGinfo.get_pointer(_sport);
+
+	// Retrieve rendezvous service DAG from user provided argument
+	xia::X_Updaterv_Msg *x_updaterv_msg = xia_socket_msg.mutable_x_updaterv();
+	String rendezvousDAGstr(x_updaterv_msg->rvdag().c_str());
+	String myHID = _local_hid.unparse();
+	click_chatter("Xupdaterv: RV DAG:%s", rendezvousDAGstr.c_str());
+	click_chatter("Xupdaterv: for:%s", myHID.c_str());
+
+	// Inform the Rendezvous server
+	XIAPath localDAG = local_addr();
+	XID localAD = localDAG.xid(localDAG.source_node());
+	click_chatter("Xupdaterv: at:%s", localAD.unparse().c_str());
+	XIAPath rendezvousDAG;
+	rendezvousDAG.parse(rendezvousDAGstr, NULL);
+	String localDAGstr = localDAG.unparse();
+
+	// Prepare control message for rendezvous service
+	XIASecurityBuffer controlMsg = XIASecurityBuffer(1024);
+	controlMsg.pack(myHID.c_str(), myHID.length());
+	controlMsg.pack(localDAGstr.c_str(), localDAGstr.length());
+
+	// Sign the control message
+	char signature[MAX_SIGNATURE_SIZE];
+	uint16_t signatureLength = MAX_SIGNATURE_SIZE;
+	xs_sign(myHID.c_str(), (unsigned char *)controlMsg.get_buffer(), controlMsg.size(), (unsigned char *)signature, &signatureLength);
+
+	// Retrieve public key for this host
+    char pubkey[MAX_PUBKEY_SIZE];
+    uint16_t pubkeyLength = MAX_PUBKEY_SIZE;
+    if(xs_getPubkey(myHID.c_str(), pubkey, &pubkeyLength)) {
+        click_chatter("XIAChallengeResponder::processChallenge ERROR local public key not found");
+        return;
+    }
+
+	// Build signed message (hid, newDAG)Signature, Pubkey
+	XIASecurityBuffer signedMsg = XIASecurityBuffer(2048);
+	signedMsg.pack(controlMsg.get_buffer(), controlMsg.size());
+	signedMsg.pack(signature, signatureLength);
+    signedMsg.pack((char *)pubkey, pubkeyLength);
+
+	// Prepare XIP header
+	XIAHeaderEncap xiah;
+	xiah.set_last(LAST_NODE_DEFAULT);
+	xiah.set_hlim(hlim.get(_sport));
+	xiah.set_dst_path(rendezvousDAG);
+	xiah.set_src_path(daginfo->src_path);
+
+	WritablePacket *just_payload_part = WritablePacket::make(256, (const void*)signedMsg.get_buffer(), signedMsg.size(), 1);
+
+	WritablePacket *p = NULL;
+
+	xiah.set_nxt(CLICK_XIA_NXT_TRN);
+	xiah.set_plen(signedMsg.size());
+
+	//Add XIA Transport headers
+	TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDGRAMHeader(0); // length
+	p = thdr->encap(just_payload_part);
+
+	thdr->update();
+	xiah.set_plen(signedMsg.size() + thdr->hlen()); // XIA payload = transport header + transport-layer data
+
+	p = xiah.encap(p, false);
+	delete thdr;
+
+	output(NETWORK_PORT).push(p);
+}
+
 
 void XTRANSPORT::Xchangead(unsigned short _sport)
 {

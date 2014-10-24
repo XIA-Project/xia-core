@@ -53,6 +53,28 @@ int XupdateAD(int sockfd, char *newad, char *new4id) {
   return 0;
 }
 
+int XupdateRV(int sockfd, char *rvdag)
+{
+	int rc;
+
+	if(!rvdag) {
+		LOG("Rendezvous DAG is NULL!");
+		errno = EFAULT;
+		return -1;
+	}
+
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XUPDATERV);
+
+	xia::X_Updaterv_Msg *x_updaterv_msg = xsm.mutable_x_updaterv();
+	x_updaterv_msg->set_rvdag(rvdag);
+
+	if((rc = click_send(sockfd, &xsm)) < 0) {
+		LOGF("Error asking Click transport to update RV: %s", strerror(errno));
+		return -1;
+	}
+	return 0;
+}
 
 /*!
 ** @brief retrieve the AD and HID associated with this socket.
