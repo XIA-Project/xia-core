@@ -118,7 +118,6 @@ setup()
 				;;
 			R)
 				RENDEZVOUS=1
-				CONFFLAGS="$CONFFLAGS -R"
 				;;
 			t)
 				MAKECONF=$MAKECONF"host"
