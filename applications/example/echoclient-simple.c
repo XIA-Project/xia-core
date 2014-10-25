@@ -107,10 +107,12 @@ void echo_stream()
                 Xclose(sock);
                 exit(1);
         }
-
+        printf("\nKeeping sending echo message \"XIA mobility demo\" every second:\n");
+        char *s = "XIA mobility demo";
+        int dot_c = 0;
         while(1) {
-                printf("\nPlease enter the message (blank line to exit):\n");
-                char *s = fgets(buf, sizeof(buf), stdin);
+                //printf("\nPlease enter the message (blank line to exit):\n");
+                //char *s = fgets(buf, sizeof(buf), stdin);
                 if ((ns = strlen(s)) <= 1)
                         break;
                 
@@ -118,16 +120,24 @@ void echo_stream()
                         printf("error sending message\n");
                         break;
                 }
+                //printf("Sent: %s\n", s);
 
                 if ((nr = Xrecv(sock, reply, sizeof(reply), 0)) < 0) {
                         printf("error receiving message\n");
                         break;
                 }
-
+                int i = 0;
+                for (int i = 0; i < dot_c; i++)
+									printf(".");
+								printf("\n");
+								dot_c++;
+                //printf("Echoed: %s\n", reply);
                 reply[nr] = 0;
                 if (ns != nr)
                         printf("warning: sent %d characters, received %d\n", ns, nr);
-                printf("%s", reply);
+                //printf("%s", reply);
+                //usleep(1000000);
+                sleep(1);
         }
 
         Xclose(sock);

@@ -22,9 +22,10 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include "Xsocket.h"
-#include "Xkeys.h"
 #include "dagaddr.hpp"
 #include <assert.h>
+
+#include "Xkeys.h"
 
 #define VERSION "v1.0"
 #define TITLE "XIA Basic FTP Server"
@@ -44,7 +45,6 @@ char myHID[MAX_XID_SIZE];
 char my4ID[MAX_XID_SIZE];
 
 int getFile(int sock, char *ad, char*hid, const char *fin, const char *fout);
-
 
 /*
 ** write the message to stdout unless in quiet mode
@@ -267,8 +267,6 @@ void *recvCmd (void *socketid)
 int registerReceiver()
 {
     int sock;
-	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
-
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 
 	// create a socket, and listen for incoming connections
@@ -279,32 +277,29 @@ int registerReceiver()
     if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
     	die(-1, "Reading localhost address\n");
 
-    // Generate an SID to use
-    if(XmakeNewSID(sid_string, sizeof(sid_string))) {
-        die(-1, "Unable to create a temporary SID");
-    }
+	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
+    	// Generate an SID to use
+	if(XmakeNewSID(sid_string, sizeof(sid_string))) {
+        	die(-1, "Unable to create a temporary SID");
+    	}
 
-    struct addrinfo hints, *ai;
-    bzero(&hints, sizeof(hints));
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_family = AF_XIA;
-    if (Xgetaddrinfo(NULL, sid_string, &hints, &ai) != 0)
-        die(-1, "getaddrinfo failure!\n");
+	struct addrinfo *ai;
+    //FIXME: SID is hardcoded  fixed: from SID to sid_string
+	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
+		die(-1, "getaddrinfo failure!\n");
 
-    Graph g((sockaddr_x*)ai->ai_addr);
-
-    sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
-	if (Xbind(sock, (struct sockaddr*)sa, sizeof(sockaddr_x)) < 0) {
-		Xclose(sock);
-		 die(-1, "Unable to bind to the dag: %s\n", g.dag_string().c_str());
-	}
-	say("listening on dag: %s\n", g.dag_string().c_str());
-
+	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
 	//FIXME NAME is hard coded
-    if (XregisterName(NAME, sa) < 0 )
-        die(-1, "error registering name: %s\n", NAME);
-    say("\nRegistering DAG with nameserver:\n%s\n", g.dag_string().c_str());
+    if (XregisterName(NAME, dag) < 0 )
+    	die(-1, "error registering name: %s\n", NAME);
 
+	if (Xbind(sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
+		Xclose(sock);
+		 die(-1, "Unable to bind to the dag: %s\n", dag);
+	}
+
+	Graph g(dag);
+	say("listening on dag: %s\n", g.dag_string().c_str());
   return sock;
   
 }
@@ -313,6 +308,7 @@ void *blockingListener(void *socketid)
 {
   int sock = *((int*)socketid);
   int acceptSock;
+
   while (1) {
 		say("Waiting for a client connection\n");
    		

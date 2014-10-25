@@ -341,7 +341,11 @@ elementclass XIARouter4Port {
 	xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $click_port, 4, 0);
 
 	Script(write xrc/n/proc/rt_AD.add $local_ad $DESTINED_FOR_LOCALHOST);	// self AD as destination
-
+	// last two digits: Ishost = enable challenge responder; Isrouter = enable challenger
+	// router interfaces that connect to hosts, so they should have isrouter set. The host interface should have ishost set. The interfaces between routers should have both of those unset. Examples:  
+	// Non-edge router: all bits are set to "0"
+	// Edge router: bits of "xlc1" are set to "0,1" wlan0 by default is the second network inferface 
+	// Host: bits of "xlc0" are set to "0,1" - by using -I iface when launching the daemon to enforce the network interface to be used 
 	xlc0 :: XIALineCard($local_addr, $local_hid, $mac0, 0, 0, 1);
 	xlc1 :: XIALineCard($local_addr, $local_hid, $mac1, 1, 0, 0);
 	xlc2 :: XIALineCard($local_addr, $local_hid, $mac2, 2, 0, 0);

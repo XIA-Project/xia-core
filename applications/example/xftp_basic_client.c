@@ -25,6 +25,8 @@
 #include "dagaddr.hpp"
 #include <assert.h>
 
+#include <sys/time.h>
+
 #define MAX_XID_SIZE 100
 #define VERSION "v1.0"
 #define TITLE "XIA Basic FTP client"
@@ -335,8 +337,6 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *p_ad, char *p_hid)
 	int len;
 	int status;
 	int n = -1;
-	bzero(cs, sizeof(ChunkStatus)*NUM_CHUNKS);
-	bzero(data, sizeof(data));
 	
 	
 	n = buildChunkDAGs(cs, chunks, p_ad, p_hid);
@@ -354,8 +354,8 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *p_ad, char *p_hid)
 				return -1;
 			}
 			say("checking chunk status\n");
+			ctr++;
 		}
-		ctr++;
 
 		status = XgetChunkStatuses(csock, cs, n);
 
@@ -405,7 +405,6 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *p_ad, char *p_hid)
 	return n;
 }
 
-
 //	This is used both to put files and to get files since in case of put I still have to request the file.
 //	Should be fixed with push implementation
 
@@ -437,13 +436,24 @@ int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout
 	FILE *f = fopen(fout, "w");
 
 	offset = 0;
+
+	struct timeval tv;
+	int start_msec, temp_start_msec, temp_end_msec;
+	
+	if (gettimeofday(&tv, NULL) == 0)
+		start_msec = ((tv.tv_sec % 86400) * 1000 + tv.tv_usec / 1000);
+			
 	while (offset < count) {
 		int num = NUM_CHUNKS;
 		if (count - offset < num)
 			num = count - offset;
-
 		// tell the server we want a list of <num> cids starting at location <offset>
+		printf("\nFetched chunks: %d/%d:%.1f%\n\n", offset, count, 100*(double)(offset)/count);
 		sprintf(cmd, "block %d:%d", offset, num);
+		
+		if (gettimeofday(&tv, NULL) == 0)
+			temp_start_msec = ((tv.tv_sec % 86400) * 1000 + tv.tv_usec / 1000);
+					
 		sendCmd(sock, cmd);
 
 		if (getChunkCount(sock, reply, sizeof(reply)) < 1){
@@ -455,8 +465,12 @@ int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout
 			status= -1;
 			break;
 		}
+		if (gettimeofday(&tv, NULL) == 0)
+			temp_end_msec = ((tv.tv_sec % 86400) * 1000 + tv.tv_usec / 1000);
+					
+		printf("Time elapses: %.3f seconds\n", (double)(temp_end_msec - temp_start_msec)/1000);
 	}
-	
+	printf("Time elapses: %.3f seconds in total.\n", (double)(temp_end_msec - start_msec)/1000);	
 	fclose(f);
 
 	if (status < 0) {
@@ -492,8 +506,6 @@ int initializeClient(const char *name)
 		 die(-1, "Unable to bind to the dag: %s\n", dag);
 	}
 
-	
-	
 	rc = XreadLocalHostAddr(sock, my_ad, MAX_XID_SIZE, my_hid, MAX_XID_SIZE, IP, MAX_XID_SIZE);
 
 	if (rc < 0) {
@@ -592,8 +604,6 @@ int main(int argc, char **argv)
 	
 	int i = 0;
 
-
-	
 //		This is for quick testing with a couple of commands
 
 	while(i < NUM_PROMPTS){
