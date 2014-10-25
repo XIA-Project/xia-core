@@ -165,7 +165,8 @@ int main(int argc, char *argv[]) {
 			syslog(LOG_WARNING, "Error sending beacon: %s", strerror(rc));
 		//fprintf(stderr, "XHCP beacon %ld\n", beacon_pkt.seq_num);
 		beacon_pkt.seq_num += 1;
-		sleep(XHCP_SERVER_BEACON_INTERVAL);
+		//sleep(XHCP_SERVER_BEACON_INTERVAL);
+		usleep(100000); // change to beaconing every 100 msecs
 	}
 	free(ad_entry);
 	free(gw_entry);
