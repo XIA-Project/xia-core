@@ -167,11 +167,11 @@ XIAXIDTypeCounter::match(Packet *p)
     uint32_t dst_xid_type = __dstID.type;  //ntohl(__dstID.type);
     struct click_xia_xid __srcID = hdr->node[hdr->dnode + hdr->snode - 1].xid;
     uint32_t src_xid_type = __srcID.type;  //ntohl(__srcID.type);
-#if 0
+#if 1
     // hack to the hack. Filter out weird xid types so the following code doesn't smash the stack
     // for some reason we get garbage data periodically that causes the XID constructor to fail
-    if (src_xid_type > CLICK_XIA_XID_TYPE_IP || dst_xid_type > CLICK_XIA_XID_TYPE_IP)
-	return -1;
+    //if (src_xid_type > CLICK_XIA_XID_TYPE_IP || dst_xid_type > CLICK_XIA_XID_TYPE_IP)
+	//return -1;
 
 //    printf ("%08x %08x\n", ntohl(__dstID.type), ntohl(__srcID.type));
 
@@ -181,13 +181,15 @@ XIAXIDTypeCounter::match(Packet *p)
     const char *ss = srcXID.unparse().c_str();
     const char *ds = dstXID.unparse().c_str();
 
-    // Hack: filtering out daemon traffic (e.g., xroute, xhcp, name-server)
+    // Hack: filtering out daemon traffic (e.g., xroute, xhcp, name-server, xcontroller)
     if (strcmp(ss, "SID:1110000000000000000000000000000000001111") == 0 ||
         strcmp(ss, "SID:1110000000000000000000000000000000001112") == 0 ||
     	strcmp(ss, "SID:1110000000000000000000000000000000001113") == 0 ||
+        strcmp(ss, "SID:1110000000000000000000000000000000001114") == 0 ||
     	strcmp(ds, "SID:1110000000000000000000000000000000001111") == 0 ||
     	strcmp(ds, "SID:1110000000000000000000000000000000001112") == 0 ||
     	strcmp(ds, "SID:1110000000000000000000000000000000001113") == 0 ||
+        strcmp(ds, "SID:1110000000000000000000000000000000001114") == 0 ||
     	strcmp(ds, BHID) == 0) {
     	return -1;
     }
