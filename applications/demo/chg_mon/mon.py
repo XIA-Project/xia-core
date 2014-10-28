@@ -3,7 +3,6 @@ import sys
 import zmq
 import reporting_pb2
 import os
-import pygraphviz
 import networkx as nx
 
 import matplotlib
