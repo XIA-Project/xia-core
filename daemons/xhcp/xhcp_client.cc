@@ -98,10 +98,11 @@ void listRoutes(std::string xidType)
 	int rc;
 	vector<XIARouteEntry> routes;
 	if ((rc = xr.getRoutes(xidType, routes)) > 0) {
+	        syslog(LOG_INFO, "Got >=1 available %s routes:\n", xidType.c_str());
 		vector<XIARouteEntry>::iterator ir;
 		for (ir = routes.begin(); ir < routes.end(); ir++) {
 			XIARouteEntry r = *ir;
-			syslog(LOG_INFO, "%s: %d : %s : %ld\n", r.xid.c_str(), r.port, r.nextHop.c_str(), r.flags);
+			syslog(LOG_INFO, "xid %s: port %d : next hop %s flags : %ld\n", r.xid.c_str(), r.port, r.nextHop.c_str(), r.flags);
 		}
 	} else if (rc == 0) {
 		syslog(LOG_INFO, "No routes exist for %s\n", xidType.c_str());
