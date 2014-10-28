@@ -5,13 +5,16 @@ import reporting_pb2
 import os
 import pygraphviz
 import networkx as nx
+from threading import Thread
+from time import sleep
+
 import wx
 import matplotlib
 matplotlib.use('WXAgg')
 import matplotlib.pyplot as plt
 
 from traitsui.wx.editor import Editor
-from traits.api import HasTraits, Any, Instance
+from traits.api import *
 from traitsui.api import View, Item
 from traitsui.wx.basic_editor_factory import BasicEditorFactory
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigureCanvas
@@ -137,8 +140,8 @@ def tests():
     plt.show()
     return 
 
-def showdag(str1, debug=True):
-    plt.Figure()
+def showdag(str1, intent, whoami, debug=True):
+    fig = plt.figure()
     ## Normalize to DAG text format (not RE format)
     str1 = dagaddr.Graph(str1).dag_string()
     if debug:
@@ -147,10 +150,11 @@ def showdag(str1, debug=True):
     if debug:
         sys.stderr.write("Generated QuickDag: %s\n" % str(q))
     dg, pos, labels = q.toNxDiGraph()
-    nx.draw(dg, pos, with_labels=False, node_size=1500, node_color='w')
+    nx.draw(dg, pos, with_labels=False, node_size=1500, node_color='w',
+            label="DAG for %s as seen by %s" % (intent, whoami))
     nx.draw_networkx_labels(dg, pos, labels)
-    plt.show()
-    return     
+    plt.savefig("%s_from_%s.png"%(intent,whoami))
+    #return fig
     
 class _MPLFigureEditor(Editor):
     scrollable = True
@@ -191,34 +195,81 @@ def watch(socket):
         pb_msg.ParseFromString(msg)
         print(pb_msg)
         print pb_msg.newdag
-        showdag (str(pb_msg.newdag))
+        showdag (str(pb_msg.newdag), str(pb_msg.intent), str(pb_msg.whoami))
         
     return 0
     
 
+class SocketWatcherThread(Thread):
+    """Listens for ZMQ/Protobuf messages"""
+    wants_abort = False
+
+    def run(self):
+        """Wait and do things"""
+        self.socket.connect("tcp://%s:%s" % (SERVER, PORT))
+        self.socket.setsockopt(zmq.SUBSCRIBE, "/dagchange/")
+        pb_msg = reporting_pb2.AddrChange()
+
+        print "running"
+        while not self.wants_abort:
+            header,msg = self.socket.recv_multipart()
+            print(header)
+            pb_msg.ParseFromString(msg)
+            print(pb_msg)
+            self.display(str(pb_msg.newdag))
+            self.dag_show(str(pb_msg.newdag))
+
+class Test (HasTraits):
+    figure = Instance(matplotlib.figure.Figure, ())
+    socket_watcher_thread = Instance(SocketWatcherThread)
+    results_string = String()
+
+    view = View(Item('figure', editor=MPLFigureEditor(), show_label=False),
+                Item('results_string', show_label = False, springy=True),
+            width=400,
+                height=300,
+                resizable=True)
+    
+        
+    def _figure_default(self):
+        figure = matplotlib.figure.Figure()
+        return figure
+            
+    def __init__(self):
+        super(Test, self).__init__()
+        context = zmq.Context()
+        socket = context.socket(zmq.SUB)
+
+        axes = self.figure.add_subplot(111)
+            
+        #Start socket watcher
+        if self.socket_watcher_thread and self.socket_watcher_thread.isAlive():
+            pass
+        else:
+            self.socket_watcher_thread = SocketWatcherThread()
+            self.socket_watcher_thread.socket = socket
+            self.socket_watcher_thread.display = self.add_line
+            self.socket_watcher_thread.dag_show = self.dag_show
+            self.socket_watcher_thread.ax = axes
+            self.socket_watcher_thread.start()
+                
+        def add_line(self, string):
+            self.results_string = self.results_string + "\n" + string
+
+        def dag_show(self, dagstr):
+            showdag(dagstr, self.figure.axes)
+            wx.CallAfter(self.figure.canvas.draw)
+            return
+
 
 def main(args):
-
     ## Init ZMQ
     context = zmq.Context()
     socket = context.socket(zmq.SUB)
-    #watch(socket)
+
+    watch(socket)
     #tests()
 
-    class Test (HasTraits):
-        figure = Instance(matplotlib.figure.Figure, ())
-        
-        view = View(Item('figure', editor=MPLFigureEditor(), show_label=False),
-                    width=400,
-                    height=300,
-                    resizable=True)
-        
-        def __init__(self):
-            super(Test, self).__init__()
-            axes = self.figure.add_subplot(111)
-            
-    
-    Test().configure_traits()
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv))
