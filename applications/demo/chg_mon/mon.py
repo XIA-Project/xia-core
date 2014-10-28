@@ -18,7 +18,7 @@ sys.path.append(XIADIR + '/api/lib')
 import dagaddr
 
 
-SERVER="localhost"
+SERVERS=["localhost","127.0.0.1"]
 PORT = "1234"
 
 class QuickNode:
@@ -64,11 +64,11 @@ class QuickDag:
         self.nodes = []
         self.edges = []
         for idx,entry in enumerate(foo):
-            print entry
+            ##print entry
             n = QuickNode(idx, entry[0], self)
             try:
                 for edge_idx, next_node in enumerate(entry[1]):
-                    print next_node
+                    ##print next_node
                     self.edges.append((idx, int(next_node)+1, edge_idx))
             except IndexError:
                 n._set_sink()
@@ -89,7 +89,7 @@ class QuickDag:
         dg = nx.DiGraph()
         dg.add_nodes_from(self.nodes)
         for (src_idx, dst_idx, edge_idx) in self.edges:
-            print self.nodes[src_idx], dst_idx
+            ##print self.nodes[src_idx], dst_idx
             dg.add_edge(self.nodes[src_idx],
                         self.nodes[dst_idx],
                         priority=edge_idx
@@ -112,18 +112,21 @@ class QuickDag:
         
         return (dg, pos, labels)
 
-def watch(socket):
-    socket.connect("tcp://%s:%s" % (SERVER, PORT))
-    socket.setsockopt(zmq.SUBSCRIBE, "/dagchange/")
+def watch(socket, debug=True):
     
     pb_msg = reporting_pb2.AddrChange()
     
     while True:
         header,msg = socket.recv_multipart()
-        print(header)
+        if debug:
+            sys.stderr.write("Got change message: %s\n" % header)
         pb_msg.ParseFromString(msg)
-        print(pb_msg)
-        print pb_msg.newdag
+        if debug:
+            s = str(pb_msg)
+            new_s = '\n'.join(['\t' + l for l in s.split('\n')])
+            sys.stderr.write(new_s+'\n')
+        ##print(pb_msg)
+        ##print pb_msg.newdag
         showdag (str(pb_msg.newdag), str(pb_msg.intent), str(pb_msg.whoami))
         
     return 0
@@ -168,6 +171,11 @@ def main(args):
     context = zmq.Context()
     socket = context.socket(zmq.SUB)
 
+    for s in SERVERS:
+        socket.connect("tcp://%s:%s" % (s, PORT))
+        sys.stderr.write("Connecting to tcp://%s:%s\n" % (s,PORT))
+    socket.setsockopt(zmq.SUBSCRIBE, "/dagchange/")
+    sys.stderr.write("listening...\n")
     watch(socket)
     #tests()
 
