@@ -5,7 +5,18 @@ import reporting_pb2
 import os
 import pygraphviz
 import networkx as nx
+import wx
+import matplotlib
+matplotlib.use('WXAgg')
 import matplotlib.pyplot as plt
+
+from traitsui.wx.editor import Editor
+from traits.api import HasTraits, Any, Instance
+from traitsui.api import View, Item
+from traitsui.wx.basic_editor_factory import BasicEditorFactory
+from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigureCanvas
+from matplotlib.backends.backend_wx import NavigationToolbar2Wx
+
 
 # find the path to xia-core
 XIADIR=os.getcwd()
@@ -124,9 +135,49 @@ def tests():
     nx.draw(dg, pos, with_labels=False, node_size=1500, node_color='w')
     nx.draw_networkx_labels(dg, pos, labels)
     plt.show()
-
     return 
 
+def showdag(str1, debug=True):
+    plt.Figure()
+    ## Normalize to DAG text format (not RE format)
+    str1 = dagaddr.Graph(str1).dag_string()
+    if debug:
+        sys.stderr.write("Processed DAG to %s\n" % str1)
+    q = QuickDag(str1)
+    if debug:
+        sys.stderr.write("Generated QuickDag: %s\n" % str(q))
+    dg, pos, labels = q.toNxDiGraph()
+    nx.draw(dg, pos, with_labels=False, node_size=1500, node_color='w')
+    nx.draw_networkx_labels(dg, pos, labels)
+    plt.show()
+    return     
+    
+class _MPLFigureEditor(Editor):
+    scrollable = True
+    
+    def init(self, parent):
+        self.control = self._create_canvas(parent)
+        self.set_tooltip()
+    
+    def update_editor(self):
+        pass
+    
+    def _create_canvas(self, parent):
+        """ Create the MPL canvas."""
+        panel= wx.Panel(parent, -1, style=wx.CLIP_CHILDREN)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        panel.SetSizer(sizer)
+
+        mpl_control = FigureCanvas(panel, -1, self.value)
+        sizer.Add(mpl_control, 1, wx.LEFT | wx.TOP | wx.GROW)
+        toolbar = NavigationToolbar2Wx(mpl_control)
+        sizer.Add(toolbar, 0, wx.EXPAND)
+        self.value.canvas.SetMinSize((10,10))
+        return panel
+
+
+class MPLFigureEditor(BasicEditorFactory):
+    klass = _MPLFigureEditor
 
 def watch(socket):
     socket.connect("tcp://%s:%s" % (SERVER, PORT))
@@ -139,6 +190,9 @@ def watch(socket):
         print(header)
         pb_msg.ParseFromString(msg)
         print(pb_msg)
+        print pb_msg.newdag
+        showdag (str(pb_msg.newdag))
+        
     return 0
     
 
@@ -148,8 +202,23 @@ def main(args):
     ## Init ZMQ
     context = zmq.Context()
     socket = context.socket(zmq.SUB)
-    # watch(socket)
-    tests()
+    #watch(socket)
+    #tests()
+
+    class Test (HasTraits):
+        figure = Instance(matplotlib.figure.Figure, ())
+        
+        view = View(Item('figure', editor=MPLFigureEditor(), show_label=False),
+                    width=400,
+                    height=300,
+                    resizable=True)
+        
+        def __init__(self):
+            super(Test, self).__init__()
+            axes = self.figure.add_subplot(111)
+            
+    
+    Test().configure_traits()
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv))
