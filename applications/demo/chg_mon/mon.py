@@ -5,6 +5,8 @@ import reporting_pb2
 import os
 import pygraphviz
 import networkx as nx
+
+import matplotlib
 import matplotlib.pyplot as plt
 
 # find the path to xia-core
@@ -110,6 +112,24 @@ class QuickDag:
         
         return (dg, pos, labels)
 
+def watch(socket):
+    socket.connect("tcp://%s:%s" % (SERVER, PORT))
+    socket.setsockopt(zmq.SUBSCRIBE, "/dagchange/")
+    
+    pb_msg = reporting_pb2.AddrChange()
+    
+    while True:
+        header,msg = socket.recv_multipart()
+        print(header)
+        pb_msg.ParseFromString(msg)
+        print(pb_msg)
+        print pb_msg.newdag
+        showdag (str(pb_msg.newdag), str(pb_msg.intent), str(pb_msg.whoami))
+        
+    return 0
+    
+
+
 def tests():
     str1 = "RE AD:3d6a88606ef8d04ec4b8a5983a570083bace5690 HID:91b536b0c86a91c15cd614ba4adf132387774df4 SID:785fb7e281640ad1a4fc6d6349eac538be395344"
     g = dagaddr.Graph(str1)
@@ -124,32 +144,33 @@ def tests():
     nx.draw(dg, pos, with_labels=False, node_size=1500, node_color='w')
     nx.draw_networkx_labels(dg, pos, labels)
     plt.show()
-
     return 
 
-
-def watch(socket):
-    socket.connect("tcp://%s:%s" % (SERVER, PORT))
-    socket.setsockopt(zmq.SUBSCRIBE, "/dagchange/")
+def showdag(str1, intent, whoami, debug=False):
+    fig = plt.figure()
+    ## Normalize to DAG text format (not RE format)
+    str1 = dagaddr.Graph(str1).dag_string()
+    if debug:
+        sys.stderr.write("Processed DAG to %s\n" % str1)
+    q = QuickDag(str1)
+    if debug:
+        sys.stderr.write("Generated QuickDag: %s\n" % str(q))
+    dg, pos, labels = q.toNxDiGraph()
+    nx.draw(dg, pos, with_labels=False, node_size=1500, node_color='w',
+            label="DAG for %s as seen by %s" % (intent, whoami))
+    nx.draw_networkx_labels(dg, pos, labels)
+    plt.savefig("%s_from_%s.png"%(intent,whoami))
+    #return fig
     
-    pb_msg = reporting_pb2.AddrChange()
-    
-    while True:
-        header,msg = socket.recv_multipart()
-        print(header)
-        pb_msg.ParseFromString(msg)
-        print(pb_msg)
-    return 0
-    
-
 
 def main(args):
-
     ## Init ZMQ
     context = zmq.Context()
     socket = context.socket(zmq.SUB)
-    # watch(socket)
-    tests()
+
+    watch(socket)
+    #tests()
+
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv))
