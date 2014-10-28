@@ -27,6 +27,7 @@
 #include <click/packet.hh>
 #include <queue>
 #include "../../userlevel/xia.pb.h"
+#include "../../userlevel/reporting.pb.h"
 
 using namespace std;
 #endif
@@ -190,6 +191,10 @@ class XTRANSPORT : public Element {
     bool _cksum;
     XIAXIDRouteTable *_routeTable;
     
+    void* zmq_context; //< ZeroMQ socket context for reporting.  Should really be process-global.
+    void *dag_change_pub; //< ZeroMQ publishing socket.
+    AddrChange addr_change_msg; //< Protobuf object for address change messages
+
     //modify routing table
     void addRoute(const XID &sid) {
 		String cmd=sid.unparse() + " " + String(DESTINED_FOR_LOCALHOST);
@@ -200,7 +205,8 @@ class XTRANSPORT : public Element {
         String cmd= sid.unparse();
         HandlerCall::call_write(_routeTable, "remove", cmd);
     }
- 
+       
+   
 
  
   protected:    

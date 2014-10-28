@@ -115,8 +115,9 @@ all: $(INSTALLPROGS) $(INSTALLLIBS)
 
 xia.pb.cc xia.pb.h: xia.proto
 	protoc --cpp_out=. --python_out=../../applications/web $<
+
 reporting.pb.cc reporting.pb.h: reporting.proto
-	protoc --cpp_out=. --python_out=../../applications/web $<
+	protoc --cpp_out=. --python_out=../../applications/demo/chg_mon $<
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(ELEMENTSCONF).mk
@@ -165,7 +166,7 @@ uninstall:
 	for i in $(INSTALLPROGS); do rm -f $(DESTDIR)$(bindir)/$$i; done
 
 clean:
-	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc elements.conf libclick.a xia.pb.h xia.pb.cc
+	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc elements.conf libclick.a xia.pb.h xia.pb.cc reporting.pb.cc reporting.pb.h
 clean-lib:
 	rm -f $(LIBOBJS) libclick.a
 distclean: clean

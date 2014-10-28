@@ -1,3 +1,4 @@
+// -*- c-basic-offset: 4; -*-
 #include "../../userlevel/xia.pb.h"
 #include <click/config.h>
 #include <click/glue.hh>
@@ -13,7 +14,7 @@
 #include <click/xiatransportheader.hh>
 
 #include <fstream>
-
+#include <zmq.h>
 
 
 /*
@@ -45,6 +46,8 @@ XTRANSPORT::XTRANSPORT()
 //	pthread_mutexattr_init(&_lock_attr);
 //	pthread_mutexattr_settype(&_lock_attr, PTHREAD_MUTEX_RECURSIVE);
 //	pthread_mutex_init(&_lock, &_lock_attr);
+
+	zmq_context = zmq_ctx_new ();
 
 	cp_xid_type("SID", &_sid_type); 
 }
@@ -97,6 +100,11 @@ XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	_routeTable = reinterpret_cast<XIAXIDRouteTable*>(routing_table_elem);
 #endif
 
+	dag_change_pub = zmq_socket(zmq_context, ZMQ_PUB);
+	int rc = zmq_bind(dag_change_pub, "tcp://*:1234");
+#pragma message "EWA WARNING: Hardcoded tcp portnumber for monitoring.  Fixme!"
+	assert (rc == 0);
+	click_chatter("*** EWA:  Monitoring (DAG change) ZMQ socket bound to tcp://*:1234");
 	return 0;
 }
 
@@ -812,7 +820,24 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				click_chatter("ProcessNetworkPacket: MIGRATE: Signature validated");
 
 				// 4. Update DAGinfo dst_path with srcDAG
+
+				//XXX EWA: Report
 				click_chatter("***EWA: Changing partner path due to MIGRATE: From %s to %s", daginfo->dst_path.unparse().c_str(), src_path.unparse().c_str());
+				String intent = src_path.xid(src_path.destination_node()).unparse();
+				String whoami = _local_hid.unparse();
+				addr_change_msg.set_intent(intent.c_str());
+				addr_change_msg.set_whoami(whoami.c_str());
+				addr_change_msg.set_newdag(src_path.unparse().c_str());
+				addr_change_msg.set_reason(AddrChange::MIGRATED);
+				std::string p_buf;
+				addr_change_msg.SerializeToString(&p_buf);
+				char header[256];
+				sprintf(header,"/dagchange/%s",intent.c_str());
+				if(zmq_send(dag_change_pub, header, strlen(header)+1, ZMQ_SNDMORE) < 0)
+				    click_chatter("ERROR sending ZMQ message: errno:%d\n", errno);
+				if(zmq_send(dag_change_pub, p_buf.c_str(), p_buf.size(), 0) < 0)
+				    click_chatter("ERROR sending ZMQ message: errno:%d\n", errno);
+
 				daginfo->dst_path = src_path;
 				daginfo->isConnected = true;
 				daginfo->initialized = true;
@@ -2016,8 +2041,25 @@ void XTRANSPORT::Xchangead(unsigned short _sport)
 	} else {
 		new_local_addr = "RE " + AD_str + " " + HID_str;
 	}
-	click_chatter("new address is - %s", new_local_addr.c_str());
-	_local_addr.parse(new_local_addr);		
+	click_chatter("Xchangead: new address is - %s", new_local_addr.c_str());
+	_local_addr.parse(new_local_addr);
+	click_chatter("*** EWA: Changed my local host addr from %s to %s", str_local_addr.c_str(), _local_addr.unparse().c_str());
+	// Report!
+	String intent = _local_addr.xid(_local_addr.destination_node()).unparse();
+	String whoami = _local_addr.xid(_local_addr.destination_node()).unparse(); // Because _local_addr is a dag to my HID.
+	addr_change_msg.set_intent(intent.c_str());
+	addr_change_msg.set_whoami(whoami.c_str());
+	addr_change_msg.set_newdag(_local_addr.unparse().c_str());
+	addr_change_msg.set_reason(AddrChange::EXPLICIT);
+	std::string p_buf;
+	addr_change_msg.SerializeToString(&p_buf);
+	char header[256];
+	sprintf(header,"/dagchange/%s",intent.c_str());
+	if(zmq_send(dag_change_pub, header, strlen(header)+1, ZMQ_SNDMORE) < 0)
+	    click_chatter("ERROR sending ZMQ message: errno:%d\n", errno);
+	if(zmq_send(dag_change_pub, p_buf.c_str(), p_buf.size(), 0) < 0)
+	    click_chatter("ERROR sending ZMQ message: errno:%d\n", errno);
+
 
 	// Inform all active stream connections about this change
 	for (HashTable<unsigned short, DAGinfo>::iterator iter = portToDAGinfo.begin(); iter != portToDAGinfo.end(); ++iter ) {
@@ -2037,6 +2079,7 @@ void XTRANSPORT::Xchangead(unsigned short _sport)
 		}
 		// Update src_path in daginfo
 		click_chatter("Xchangead: updating %s to %s in daginfo", old_AD_str.c_str(), AD_str.c_str());
+		click_chatter("*** EWA: Updating stream socket");
 		daginfo->src_path.replace_node_xid(old_AD_str, AD_str);
 
 		// Send MIGRATE message to each corresponding endpoint
