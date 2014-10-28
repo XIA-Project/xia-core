@@ -1,0 +1,14 @@
+message AddrChange {
+  required string intent = 1;
+  required string newdag = 2;
+  optional string whoami = 3;
+  
+  enum Reason {
+    REFRESH = 0;		// Just repeating what was already known
+    EXPLICIT = 1;		// Explicitly changed by XChangeAD API call
+    MIGRATED = 2;		// Active session migration (by other side)
+  }
+  
+  optional Reason reason = 4;
+}
+  

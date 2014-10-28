@@ -1046,6 +1046,9 @@ AC_SUBST(TOOLDIRS)
 AC_SUBST(TOOL_TARGETS)
 
 
+dnl ZeroMQ
+AC_SEARCH_LIBS([zmq_ctx_new],[zmq])
+
 dnl pcap library
 dnl note: no longer need pcap under Linux
 
