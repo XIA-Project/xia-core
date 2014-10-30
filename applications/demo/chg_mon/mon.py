@@ -7,6 +7,7 @@ import networkx as nx
 
 import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.colors
 
 # find the path to xia-core
 XIADIR=os.getcwd()
@@ -106,10 +107,14 @@ class QuickDag:
                 pos[dst] = (dst_x, dst_y)
         
         labels = {}
+        allcolors = matplotlib.colors.cnames.keys()
+        colorlist = []
+
         for node in self.nodes:
             labels[node] = node.getLabel()
+            colorlist.append(allcolors[(hash(node.getLabel()) % len(allcolors))])
         
-        return (dg, pos, labels)
+        return (dg, pos, labels, colorlist)
 
 def watch(socket, debug=True):
     
@@ -141,9 +146,9 @@ def tests():
     print(str2)
     q = QuickDag(str2)
     print(q)
-    dg, pos, labels = q.toNxDiGraph()
+    dg, pos, labels, colors = q.toNxDiGraph()
     print dg.number_of_edges()
-    nx.draw(dg, pos, with_labels=False, node_size=1500, node_color='w')
+    nx.draw(dg, pos, with_labels=False, node_size=1500, node_color=colors)
     nx.draw_networkx_labels(dg, pos, labels)
     plt.show()
     return 
@@ -157,7 +162,7 @@ def showdag(str1, intent, whoami, debug=False):
     q = QuickDag(str1)
     if debug:
         sys.stderr.write("Generated QuickDag: %s\n" % str(q))
-    dg, pos, labels = q.toNxDiGraph()
+    dg, pos, labels, colors = q.toNxDiGraph()
     nx.draw(dg, pos, with_labels=False, node_size=1500, node_color='w',
             label="DAG for %s as seen by %s" % (intent, whoami))
     nx.draw_networkx_labels(dg, pos, labels)
