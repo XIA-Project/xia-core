@@ -7,6 +7,7 @@ message AddrChange {
     REFRESH = 0;		// Just repeating what was already known
     EXPLICIT = 1;		// Explicitly changed by XChangeAD API call
     MIGRATED = 2;		// Active session migration (by other side)
+    BINDING  = 3;		// Initial binding of other side (XConnect)
   }
   
   optional Reason reason = 4;

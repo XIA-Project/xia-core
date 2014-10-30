@@ -1890,6 +1890,27 @@ void XTRANSPORT::Xconnect(unsigned short _sport)
 	XID source_xid = daginfo->src_path.xid(daginfo->src_path.destination_node());
 	XID destination_xid = daginfo->dst_path.xid(daginfo->dst_path.destination_node());
 
+
+	click_chatter("*** EWA Binding socket in Xconnect");
+
+	// Report!
+	String intent = destination_xid.unparse();
+	String whoami = _local_addr.xid(_local_addr.destination_node()).unparse(); // Because _local_addr is a dag to my HID.
+	String the_dag = daginfo->dst_path.unparse();
+	addr_change_msg.set_intent(intent.c_str());
+	addr_change_msg.set_whoami(whoami.c_str());
+	addr_change_msg.set_newdag(the_dag.c_str());
+	addr_change_msg.set_reason(AddrChange::BINDING);
+	std::string p_buf;
+	addr_change_msg.SerializeToString(&p_buf);
+	char header[256];
+	sprintf(header,"/dagchange/%s",intent.c_str());
+	if(zmq_send(dag_change_pub, header, strlen(header)+1, ZMQ_SNDMORE) < 0)
+	    click_chatter("ERROR sending ZMQ message: errno:%d\n", errno);
+	if(zmq_send(dag_change_pub, p_buf.c_str(), p_buf.size(), 0) < 0)
+	    click_chatter("ERROR sending ZMQ message: errno:%d\n", errno);
+
+
 	XIDpair xid_pair;
 	xid_pair.set_src(source_xid);
 	xid_pair.set_dst(destination_xid);
