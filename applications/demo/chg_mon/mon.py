@@ -139,18 +139,21 @@ def watch(socket, debug=True):
 
 def tests():
     str1 = "RE AD:3d6a88606ef8d04ec4b8a5983a570083bace5690 HID:91b536b0c86a91c15cd614ba4adf132387774df4 SID:785fb7e281640ad1a4fc6d6349eac538be395344"
-    g = dagaddr.Graph(str1)
-    print(g)
-    str2 = g.dag_string()
-    g.print_graph()
-    print(str2)
-    q = QuickDag(str2)
-    print(q)
-    dg, pos, labels, colors = q.toNxDiGraph()
-    print dg.number_of_edges()
-    nx.draw(dg, pos, with_labels=False, node_size=1500, node_color=colors)
-    nx.draw_networkx_labels(dg, pos, labels)
-    plt.show()
+    str2 = "RE AD:3d6a88606ef8d04ec4b8a5983a570083bace5690 HID:01b536b0c86a91c15cd614ba4adf132387774df4 SID:785fb7e281640ad1a4fc6d6349eac538be395344"
+
+    for str in [str1, str2]:
+        g = dagaddr.Graph(str1)
+        print(g)
+        str2 = g.dag_string()
+        g.print_graph()
+        print(str2)
+        q = QuickDag(str2)
+        print(q)
+        dg, pos, labels, colors = q.toNxDiGraph()
+        print dg.number_of_edges()
+        nx.draw(dg, pos, with_labels=False, node_size=1500, node_color=colors, alpha=0.5)
+        nx.draw_networkx_labels(dg, pos, labels)
+        plt.show()
     return 
 
 def showdag(str1, intent, whoami, debug=False):
@@ -163,7 +166,7 @@ def showdag(str1, intent, whoami, debug=False):
     if debug:
         sys.stderr.write("Generated QuickDag: %s\n" % str(q))
     dg, pos, labels, colors = q.toNxDiGraph()
-    nx.draw(dg, pos, with_labels=False, node_size=1500, node_color='w',
+    nx.draw(dg, pos, with_labels=False, node_size=1500, node_color=colors, alpha=0.5,
             label="DAG for %s as seen by %s" % (intent, whoami))
     nx.draw_networkx_labels(dg, pos, labels)
     plt.savefig("%s_from_%s.png"%(intent,whoami))
@@ -171,6 +174,9 @@ def showdag(str1, intent, whoami, debug=False):
     
 
 def main(args):
+
+    tests()
+    return
     ## Init ZMQ
     context = zmq.Context()
     socket = context.socket(zmq.SUB)
