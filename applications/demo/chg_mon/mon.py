@@ -151,8 +151,8 @@ def tests():
         print(q)
         dg, pos, labels, colors = q.toNxDiGraph()
         print dg.number_of_edges()
-        nx.draw(dg, pos, with_labels=False, node_size=1500, node_color='w', alpha=0.5)
-        nx.draw_networkx_labels(dg, pos, labels)
+        nx.draw(dg, pos, with_labels=False, node_size=4000, node_color='w', alpha=0.5)
+        nx.draw_networkx_labels(dg, pos, labels, font_size=25)
         plt.show()
     return 
 
@@ -166,9 +166,9 @@ def showdag(str1, intent, whoami, debug=False):
     if debug:
         sys.stderr.write("Generated QuickDag: %s\n" % str(q))
     dg, pos, labels, colors = q.toNxDiGraph()
-    nx.draw(dg, pos, with_labels=False, node_size=1500, node_color='w', alpha=0.5,
+    nx.draw(dg, pos, with_labels=False, node_size=4000, node_color='w', alpha=0.5,
             label="DAG for %s as seen by %s" % (intent, whoami))
-    nx.draw_networkx_labels(dg, pos, labels)
+    nx.draw_networkx_labels(dg, pos, labels, font_size=25)
     plt.savefig("%s_from_%s.png"%(intent,whoami))
     #return fig
     
@@ -178,6 +178,7 @@ def main(args):
     ## Init ZMQ
     context = zmq.Context()
     socket = context.socket(zmq.SUB)
+    #tests()
 
     for s in SERVERS:
         socket.connect("tcp://%s:%s" % (s, PORT))
@@ -185,7 +186,6 @@ def main(args):
     socket.setsockopt(zmq.SUBSCRIBE, "/dagchange/")
     sys.stderr.write("listening...\n")
     watch(socket)
-    #tests()
 
 
 if __name__ == '__main__':
