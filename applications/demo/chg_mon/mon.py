@@ -151,7 +151,7 @@ def tests():
         print(q)
         dg, pos, labels, colors = q.toNxDiGraph()
         print dg.number_of_edges()
-        nx.draw(dg, pos, with_labels=False, node_size=1500, node_color=colors, alpha=0.5)
+        nx.draw(dg, pos, with_labels=False, node_size=1500, node_color='w', alpha=0.5)
         nx.draw_networkx_labels(dg, pos, labels)
         plt.show()
     return 
@@ -166,7 +166,7 @@ def showdag(str1, intent, whoami, debug=False):
     if debug:
         sys.stderr.write("Generated QuickDag: %s\n" % str(q))
     dg, pos, labels, colors = q.toNxDiGraph()
-    nx.draw(dg, pos, with_labels=False, node_size=1500, node_color=colors, alpha=0.5,
+    nx.draw(dg, pos, with_labels=False, node_size=1500, node_color='w', alpha=0.5,
             label="DAG for %s as seen by %s" % (intent, whoami))
     nx.draw_networkx_labels(dg, pos, labels)
     plt.savefig("%s_from_%s.png"%(intent,whoami))
@@ -175,8 +175,6 @@ def showdag(str1, intent, whoami, debug=False):
 
 def main(args):
 
-    tests()
-    return
     ## Init ZMQ
     context = zmq.Context()
     socket = context.socket(zmq.SUB)
