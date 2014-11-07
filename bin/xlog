@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Copyright 2013 Carnegie Mellon University
 #
@@ -16,12 +16,20 @@
 
 PORT=7777
 
+check() {
+	# see if click is running
+	pid=`ps aux | grep -v grep | grep userlevel/click | tr -s " " | cut -d\  -f2`
+	[ "$pid" == "" ] && printf "Click is not running, aborting...\n" && exit 1
+}
+
 get() {
+	check
 	printf "$1: "
 	printf "read log.$1\nquit\n" | nc localhost $PORT | sed -n '4p'
 }
 
 put() {
+	check
 	printf "write log.$1 $2\nquit\n" | nc localhost $PORT > /dev/null
 }
 
