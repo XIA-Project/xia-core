@@ -34,6 +34,8 @@ ALL_PROCESSES="click xrouted xhcp_serverd xhcp_clientd xnameservice xstats xstat
 NAME=`basename $0`
 VERBOSE=0
 LOG_FLAGS=""
+LOG_LEVEL=6
+V_FLAG="-q"
 CLICK_ONLY=0
 NAMESERVER=0
 RUN_VISUALIZER_CLIENT=0
@@ -93,6 +95,7 @@ setup()
 				;;
 			l)
 				LOG_FLAGS="$LOG_FLAGS -l $OPTARG"
+				LOG_LEVEL=$OPTARG
 				;;
 			s)
 				SCRIPT=$OPTARG
@@ -100,6 +103,7 @@ setup()
 			V)
 				VERBOSE=2
 				LOG_FLAGS="$LOG_FLAGS -v"
+				V_FLAG="-v"
 				;;
 			v)
 				VERBOSE=1
@@ -420,6 +424,7 @@ start_click()
 	get_pid "click"
 	[ "$XPID" == "" ] && printf "Click is not running, aborting...\n" && exit 1
 
+	$XIADIR/bin/xlog -l $LOG_LEVEL 
 	[ $CLICK_ONLY -eq 1 ] && check_service click && exit
 	sleep 1
 }

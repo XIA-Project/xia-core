@@ -15,6 +15,8 @@
 #include <clicknet/udp.h>
 #include <click/string.hh>
 #include <elements/ipsec/sha1_impl.hh>
+#include <click/error.hh>
+#include <click/error-syslog.hh>
 
 
 #if CLICK_USERLEVEL
@@ -103,8 +105,12 @@ class XTRANSPORT : public Element {
     void ReturnResult(int sport, xia::XSocketCallType type, int rc = 0, int err = 0);
     
   private:
+
+
 //  pthread_mutex_t _lock;
 //  pthread_mutexattr_t _lock_attr;
+
+    SyslogErrorHandler *_errh;
 
     Timer _timer;
     
