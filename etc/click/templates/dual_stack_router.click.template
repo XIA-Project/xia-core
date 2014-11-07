@@ -1,7 +1,7 @@
 require(library ../../../click/conf/xia_router_lib.click);
 require(library xia_address.click);
 
-log::XLog(VERBOSE 1, LEVEL 6);
+log::XLog(VERBOSE 0, LEVEL 6);
 
 // router instantiation
 // TODO: If we ever connect more than one port to IP, we somehow need to tell the router about all of its IP addresses in local_addr

@@ -1,7 +1,7 @@
 require(library xia_router_lib.click);
 require(library xia_address.click);
 
-log::XLog(VERBOSE 1, LEVEL 6);
+log::XLog(VERBOSE 0, LEVEL 6);
 
 // host & router instantiation
 host0 :: XIAEndHost (RE AD0 HID0, HID0, 1500, 0, aa:aa:aa:aa:aa:aa);
