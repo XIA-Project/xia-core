@@ -23,6 +23,8 @@
 #include "Xinit.h"
 #include "Xutil.h"
 
+#define MAX_RV_DAG_SIZE 1024
+
 int XupdateAD(int sockfd, char *newad, char *new4id) {
   int rc;
 
@@ -53,15 +55,16 @@ int XupdateAD(int sockfd, char *newad, char *new4id) {
   return 0;
 }
 
-int XupdateRV(int sockfd, char *rvdag)
+int XupdateRV(int sockfd)
 {
 	int rc;
-
-	if(!rvdag) {
-		LOG("Rendezvous DAG is NULL!");
-		errno = EFAULT;
-		return -1;
+	char rvdag[MAX_RV_DAG_SIZE];
+	if(XreadRVServerControlAddr(rvdag, MAX_RV_DAG_SIZE)) {
+		LOG("No rendezvous address, skipping update");
+		return 0;
 	}
+
+	LOGF("Rendezvous location:%s", rvdag);
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XUPDATERV);

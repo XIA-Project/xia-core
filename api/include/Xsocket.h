@@ -176,6 +176,7 @@ extern int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, cha
 
 /* internal only functions */
 extern int XupdateAD(int sockfd, char *newad, char *new4id);
+extern int XupdateRV(int sockfd);
 extern int XupdateNameServerDAG(int sockfd, char *nsDAG);
 extern int XreadNameServerDAG(int sockfd, sockaddr_x *nsDAG);
 extern int XisDualStackRouter(int sockfd);

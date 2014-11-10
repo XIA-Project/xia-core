@@ -371,12 +371,17 @@ int main(int argc, char *argv[]) {
 			}
 
 			// Also notify the rendezvous service of this change
+			if(XupdateRV(sockfd) < 0) {
+				syslog(LOG_ERR, "Unable to update rendezvous server with new locator");
+			}
+			/*
 			if(XrendezvousUpdate(myHID, &hdag)) {
 				syslog(LOG_ERR, "error updating rendezvous service for %s", myHID);
 				beacon_reception_count = 0;
 			} else {
 				syslog(LOG_INFO, "updated %s as %s at rendezvous", myHID, hg.dag_string().c_str());
 			}
+			*/
 		}   
 	}	
 	return 0;

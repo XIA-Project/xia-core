@@ -2000,22 +2000,31 @@ void XTRANSPORT::Xupdaterv(unsigned short _sport)
 	// Retrieve rendezvous service DAG from user provided argument
 	xia::X_Updaterv_Msg *x_updaterv_msg = xia_socket_msg.mutable_x_updaterv();
 	String rendezvousDAGstr(x_updaterv_msg->rvdag().c_str());
-	String myHID = _local_hid.unparse();
-	click_chatter("Xupdaterv: RV DAG:%s", rendezvousDAGstr.c_str());
-	click_chatter("Xupdaterv: for:%s", myHID.c_str());
-
-	// Inform the Rendezvous server
-	XIAPath localDAG = local_addr();
-	XID localAD = localDAG.xid(localDAG.source_node());
-	click_chatter("Xupdaterv: at:%s", localAD.unparse().c_str());
 	XIAPath rendezvousDAG;
 	rendezvousDAG.parse(rendezvousDAGstr, NULL);
+
+	// HID of this host
+	String myHID = _local_hid.unparse();
+
+	// Current local DAG for this host
+	XIAPath localDAG = local_addr();
 	String localDAGstr = localDAG.unparse();
+
+	// Current timestamp as nonce against replay attacks
+	Timestamp now = Timestamp::now();
+	double timestamp = strtod(now.unparse().c_str(), NULL);
+
+	// Message going out to the rendezvous server
+	click_chatter("Xupdaterv: RV DAG:%s", rendezvousDAGstr.c_str());
+	click_chatter("Xupdaterv: for:%s", myHID.c_str());
+	click_chatter("Xupdaterv: at:%s", localDAGstr.c_str());
+	click_chatter("Xupdaterv: timestamp: %f", timestamp);
 
 	// Prepare control message for rendezvous service
 	XIASecurityBuffer controlMsg = XIASecurityBuffer(1024);
 	controlMsg.pack(myHID.c_str(), myHID.length());
 	controlMsg.pack(localDAGstr.c_str(), localDAGstr.length());
+	controlMsg.pack((const char *)&timestamp, (uint16_t) sizeof timestamp);
 
 	// Sign the control message
 	char signature[MAX_SIGNATURE_SIZE];
@@ -2030,7 +2039,7 @@ void XTRANSPORT::Xupdaterv(unsigned short _sport)
         return;
     }
 
-	// Build signed message (hid, newDAG)Signature, Pubkey
+	// Build signed message (hid, newDAG, timestamp)Signature, Pubkey
 	XIASecurityBuffer signedMsg = XIASecurityBuffer(2048);
 	signedMsg.pack(controlMsg.get_buffer(), controlMsg.size());
 	signedMsg.pack(signature, signatureLength);

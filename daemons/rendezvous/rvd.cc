@@ -8,6 +8,7 @@ using namespace std;
 #include <stdint.h>
 #include "clicknetxia.h"
 #include "Xsocket.h"
+#include "Xsecurity.h"
 #include "dagaddr.hpp"
 #include "Xkeys.h"
 
@@ -24,6 +25,8 @@ char *ident = NULL;
 char *datasid = NULL;
 char *controlsid = NULL;
 map<string, string> HIDtoAD;
+map<string, double> HIDtoTimestamp;
+map<string, double>::iterator HIDtoTimestampIterator;
 
 void help(const char *name)
 {
@@ -343,16 +346,75 @@ void process_control_message(int controlsock)
 	}
 	syslog(LOG_INFO, "Control packet of size:%d received", retval);
 
-	// Extract HID and DAG from the message
-	int index = 0;
-	char hid[MAX_XID_STR_SIZE];
-	char dag[MAX_HID_DAG_STR_SIZE];
-	strcpy(hid, &packet[index]);
-	index = strlen(hid) + 1;
-	strcpy(dag, &packet[index]);
-	index += strlen(dag);
-	syslog(LOG_INFO, "New DAG for %s is %s", hid, dag);
-	syslog(LOG_INFO, "Total data was %d bytes", index+1);
+	// Extract control message, signature and pubkey of sender
+	XIASecurityBuffer signedMsg(packet, retval);
+	uint16_t controlMsgLength = signedMsg.peekUnpackLength();
+	char controlMsgBuffer[controlMsgLength];
+	signedMsg.unpack(controlMsgBuffer, &controlMsgLength);
+
+	// The control message
+	XIASecurityBuffer controlMsg(controlMsgBuffer, controlMsgLength);
+
+	// The signature
+	uint16_t signatureLength = signedMsg.peekUnpackLength();
+	char signature[signatureLength];
+	signedMsg.unpack(signature, &signatureLength);
+
+	// The sender's public key
+	uint16_t pubkeyLength = signedMsg.peekUnpackLength();
+	char pubkey[pubkeyLength+1];
+	bzero(pubkey, pubkeyLength+1);
+	signedMsg.unpack(pubkey, &pubkeyLength);
+
+	// Extract HID, DAG & timestamp from the control message
+	uint16_t hidLength = controlMsg.peekUnpackLength();
+	char hid[hidLength+1];
+	bzero(hid, hidLength+1);
+	controlMsg.unpack(hid, &hidLength);
+
+	uint16_t dagLength = controlMsg.peekUnpackLength();
+	char dag[dagLength+1];
+	bzero(dag, dagLength+1);
+	controlMsg.unpack(dag, &dagLength);
+
+	uint16_t timestampLength = controlMsg.peekUnpackLength();
+	assert(timestampLength == (uint16_t) sizeof(double));
+	double timestamp;
+	controlMsg.unpack((char *)&timestamp, &timestampLength);
+
+	// TODO: Verify HID in ddag matches the one in the control message
+	// Verify hash(HID) matches pubkey
+	char pubkeyHash[SHA_DIGEST_LENGTH];
+	xs_getPubkeyHash(pubkey, (uint8_t *)pubkeyHash, sizeof pubkeyHash);
+	char pubkeyHashStr[XIA_SHA_DIGEST_STR_LEN];
+	xs_hexDigest((uint8_t *)pubkeyHash, sizeof pubkeyHash, pubkeyHashStr, sizeof pubkeyHashStr);
+	if(strncmp(xs_XIDHash(hid), pubkeyHashStr, sizeof pubkeyHashStr)) {
+		syslog(LOG_ERR, "ERROR: Mismatch: pubkeyHash|%s| HID|%s|", pubkeyHashStr, xs_XIDHash(hid));
+		return;
+	}
+
+	// Verify signature using pubkey
+	if(!xs_isValidSignature((const unsigned char *)controlMsgBuffer, controlMsgLength, (unsigned char *)signature, signatureLength, pubkey, pubkeyLength)) {
+		syslog(LOG_ERR, "ERROR: Invalid signature");
+		return;
+	}
+
+	// Verify that the timestamp is newer than seen before
+	HIDtoTimestampIterator = HIDtoTimestamp.find(hid);
+	if(HIDtoTimestampIterator == HIDtoTimestamp.end()) {
+		// New host, create an entry and record initial timestamp
+		HIDtoTimestamp[hid] = timestamp;
+		syslog(LOG_INFO, "New timestamp %f for HID|%s|", timestamp, hid);
+	} else {
+		// Verify the last timestamp is older than the one is this message
+		if(HIDtoTimestamp[hid] < timestamp) {
+			HIDtoTimestamp[hid] = timestamp;
+			syslog(LOG_INFO, "Updated timestamp %f for HID|%s|", timestamp, hid);
+		} else {
+			syslog(LOG_ERR, "ERROR: Timestamp previous:%f now:%f", HIDtoTimestamp[hid], timestamp);
+			return;
+		}
+	}
 
 	// Extract AD from DAG
 	int ADstringLength = strlen("AD:") + 40 + 1;

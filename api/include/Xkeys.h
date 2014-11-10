@@ -30,8 +30,8 @@
 #include <openssl/pem.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include "Xsecurity.h"
 
-#define XIA_SHA_DIGEST_STR_LEN ((SHA_DIGEST_LENGTH*2)+1)
 
 void sha1_hash_to_hex_string(unsigned char *digest, int digest_len, char *hex_string, int hex_string_len);
 
