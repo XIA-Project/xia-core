@@ -1420,7 +1420,14 @@ void
 Graph::replace_node_at(int i, const Node& new_node)
 {
 	// FIXME: validate that i is a valid index into the dag
-	nodes_[i] = new_node;
+    std::size_t src_index = -1, sink_index = -1;
+    for (std::size_t j = 0; j < nodes_.size(); j++) 
+    {    
+        if (is_source(j)) src_index = j; 
+        if (is_sink(j)) sink_index = j; 
+    }    
+
+    nodes_[index_from_dag_string_index(i, src_index, sink_index)] = new_node;
 }
 
 /**
