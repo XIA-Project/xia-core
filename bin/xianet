@@ -35,6 +35,8 @@ ALL_PROCESSES="click xrouted xhcp_serverd xhcp_clientd xnameservice xstats xstat
 NAME=`basename $0`
 VERBOSE=0
 LOG_FLAGS=""
+LOG_LEVEL=6
+V_FLAG="-q"
 CLICK_ONLY=0
 NAMESERVER=0
 RENDEZVOUS=0
@@ -96,6 +98,7 @@ setup()
 				;;
 			l)
 				LOG_FLAGS="$LOG_FLAGS -l $OPTARG"
+				LOG_LEVEL=$OPTARG
 				;;
 			s)
 				SCRIPT=$OPTARG
@@ -103,9 +106,11 @@ setup()
 			V)
 				VERBOSE=2
 				LOG_FLAGS="$LOG_FLAGS -v"
+				V_FLAG="-v"
 				;;
 			v)
 				VERBOSE=1
+				V_FLAG="-v"
 				;;
 			4)
 				MAKECONF="dual$MAKECONF"
@@ -450,16 +455,18 @@ start_click()
 		printf "$HOSTNAME\trendezvous\n" >> $NODECONF
 	fi
 
-	if [ $VERBOSE -eq 0 ]; then
-		exec 3>&1  # save stdout handle
-		exec &> /dev/null
-	fi
+#	if [ $VERBOSE -eq 0 ]; then
+#		exec 3>&1  # save stdout handle
+#		exec &> /dev/null
+#	fi
 
 	$CLICK -R $CONFPATH/$SCRIPT &
-	[ $VERBOSE -eq 0 ] && exec 1>&3
+#	[ $VERBOSE -eq 0 ] && exec 1>&3
 
 	get_pid "click"
 	[ "$XPID" == "" ] && printf "Click is not running, aborting...\n" && exit 1
+
+	$XIADIR/bin/xlog $V_FLAG -l $LOG_LEVEL >/dev/null
 
 	[ $CLICK_ONLY -eq 1 ] && check_service click && exit
 	sleep 1
