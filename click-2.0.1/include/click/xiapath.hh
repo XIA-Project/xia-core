@@ -68,6 +68,9 @@ class XIAPath { public:
 	// get the handle of HID node preceding the destination SID/CID node
 	handle_t hid_node_for_destination_node() const;
 
+	// get the handle of the first AD node in DAG towards destination
+	handle_t first_ad_node() const;
+
     // get XID of the node
     XID xid(handle_t node) const;
 
@@ -104,6 +107,16 @@ class XIAPath { public:
 
     // debug
     void dump_state() const;
+
+	// Compare two XIAPath objects but allow a named XID exception
+	int compare_with_exception(XIAPath& other, XID& my_ad, XID& their_ad);
+
+	// Compare two XIAPath objects for equality
+	int compare(XIAPath& other);
+
+	bool operator== (XIAPath& other);
+
+	bool operator!= (XIAPath& other);
 
 protected:
     bool topological_ordering();

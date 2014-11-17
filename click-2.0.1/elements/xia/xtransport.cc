@@ -587,16 +587,16 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 		// Is this packet arriving at a rendezvous server?
 		DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
 		if (daginfo->sock_type == SOCK_RAW) {
-			String src_path = xiah.src_path().unparse();
-			String dst_path = xiah.dst_path().unparse();
+			String src_path_str = src_path.unparse();
+			String dst_path_str = dst_path.unparse();
 			click_chatter("ProcessNetworkPacket: received stream packet on raw socket");
-			click_chatter("ProcessNetworkPacket: src|%s|", src_path.c_str());
-			click_chatter("ProcessNetworkPacket: dst|%s|", dst_path.c_str());
+			click_chatter("ProcessNetworkPacket: src|%s|", src_path_str.c_str());
+			click_chatter("ProcessNetworkPacket: dst|%s|", dst_path_str.c_str());
 			click_chatter("ProcessNetworkPacket: len=%d", p_in->length());
 			xia::XSocketMsg xsm;
 			xsm.set_type(xia::XRECV);
 			xia::X_Recv_Msg *x_recv_msg = xsm.mutable_x_recv();
-			x_recv_msg->set_dag(src_path.c_str());
+			x_recv_msg->set_dag(src_path_str.c_str());
 			// Include entire packet (including headers) as payload for API
 			x_recv_msg->set_payload(p_in->data(), p_in->length());
 			std::string p_buf;
@@ -611,6 +611,40 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 		if (thdr.pkt_info() == TransportHeader::SYN) {
 			//printf("syn dport = %d\n", _dport);
 			// Connection request from client...
+
+			// Received a SYN from a client
+
+			// The DAG that the service bound to
+			XIAPath bound_dag = daginfo->src_path;
+			click_chatter("ProcessNetworkPacket: bound:%s", bound_dag.unparse().c_str());
+			// is the bound_dag same as dst_path in the packet header?
+			if(bound_dag != dst_path) {
+				click_chatter("ProcessNetworkPacket: SYN with DAG possibly modified by a rendezvous server");
+				click_chatter("ProcessNetworkPacket: bound:%s", bound_dag.unparse().c_str());
+				click_chatter("ProcessNetworkPacket: in header:%s", dst_path.unparse().c_str());
+				// Find local AD as of now
+				XIAPath local_dag = local_addr();
+				XID local_ad = local_dag.xid(local_dag.first_ad_node());
+				click_chatter("ProcessNetworkPacket: current network:%s", local_ad.unparse().c_str());
+				XID bound_ad = bound_dag.xid(bound_dag.first_ad_node());
+				click_chatter("ProcessNetworkPacket: bound at network:%s", bound_ad.unparse().c_str());
+				XID packet_ad = dst_path.xid(dst_path.first_ad_node());
+				click_chatter("ProcessNetworkPacket: SYN pkt network:%s", packet_ad.unparse().c_str());
+				// The local AD must be the same as that in the SYN packet
+				if(packet_ad != local_ad) {
+					click_chatter("ProcessNetworkPacket: ERROR: dropping SYN request");
+					click_chatter("ProcessNetworkPacket: SYN AD was:%s but local AD is:%s", packet_ad.unparse().c_str(), local_ad.unparse().c_str());
+					return;
+				}
+				// difference between bound_dag and dst_path must be the bound_ad vs. local_ad
+				if(bound_dag.compare_with_exception(dst_path, bound_ad, local_ad)) {
+					click_chatter("ProcessNetworkPacket: ERROR: Bound to network:%s", bound_ad.unparse().c_str());
+					click_chatter("ProcessNetworkPacket: ERROR: Current network:%s", local_ad.unparse().c_str());
+					click_chatter("ProcessNetworkPacket: ERROR: Wrong AD in packet dst_path:%s", dst_path.unparse().c_str());
+					return;
+				}
+				click_chatter("ProcessNetworkPacket: Allowing DAG different from bound dag");
+			}
 
 			click_chatter("ProcessNetworkPacket: SYN: Source: %s, Dest: %s", _source_xid.unparse().c_str(), _destination_xid.unparse().c_str());
 			// First, check if this request is already in the pending queue
