@@ -1,6 +1,8 @@
 require(library ../../../click/conf/xia_router_lib.click);
 require(library xia_address.click);
 
+log::XLog(VERBOSE 0, LEVEL 6);
+
 // host instantiation
 $HNAME :: XIAEndHost (RE $ADNAME $HID, $HID, 1500, 0, $MAC0);
 

@@ -1,6 +1,8 @@
 require(library ../../../click/conf/xia_router_lib.click);
 require(library xia_address.click);
 
+log::XLog(VERBOSE 0, LEVEL 6);
+
 // router instantiation
 ${HNAME} :: XIARouter4Port(RE $ADNAME $HID, $ADNAME, $HID, $EXTERNAL_IP, 1500, $MAC0, $MAC1, $MAC2, $MAC3);
 

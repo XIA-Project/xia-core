@@ -190,11 +190,11 @@ class Router:
 		next = r.nexthop
 
 		# ignore fallback, etc ports
-		if port > 4 or port < 0:
+		if port > 4 or port < -2:
 			return
 
-		# if port is 4, get our ad or hid from the route line
-		if port == 4:
+		# if port is -2, get our ad or hid from the route line
+		if port == -2:
 			if kind == 'AD':
 				self.ad = r.xid
 			elif kind == 'HID':
@@ -202,6 +202,7 @@ class Router:
 			return
 
 		if kind == 'IP':
+			return #TODO: next hop for IP on endhost has some problem
 			if port >= 0 and port <= 3:
 				if next == None or next == '':
 					next = '-'
@@ -381,7 +382,7 @@ def updateRoutes(click):
 	devices.resetRoutes()
 	for device in devices.devices.itervalues():
 		for kind in ('AD', 'HID', 'IP'):
-			lines = click.readData("%s/n/proc/rt_%s/rt.list" % (device.name, kind))
+			lines = click.readData("%s/xrc/n/proc/rt_%s.list" % (device.name, kind))
 
 			for line in lines.splitlines():
 				rt = Route(kind, line)
@@ -446,9 +447,9 @@ def updateDualStats(click, kind):
 def updateStats(click, kind):
 	s = ''
 	for device in devices.devices.itervalues():
-		for port in device.ports:
-
-			counts = getCounts(click.readData("%s_%s_%d.count" % (device.name, kind, port)))
+		if len(device.ports) == 1: #a host: xlc
+			port = device.ports[0]
+			counts = getCounts(click.readData("%s/xlc/count_%s_out.count" % (device.name, kind)))
 
 			if counts == None:
 				continue
@@ -461,6 +462,21 @@ def updateStats(click, kind):
 			else:
 				device.nextStats[port].update(counts, device.name)
 				s += '%s,%s,%d,OUT,%s\n' % (kind, device.hid, port, device.nextStats[port].csv())
+		else:
+			for port in device.ports: #a router: xlc#port
+				counts = getCounts(click.readData("%s/xlc%d/count_%s_out.count" % (device.name, port, kind)))
+
+				if counts == None:
+					continue
+					
+				if kind == 'final':
+					device.finalStats[port].update(counts, device.name)
+					txt= '%s,%s,%d,OUT,%s\n' % (kind, device.hid, port, device.finalStats[port].csv())
+					s += txt
+
+				else:
+					device.nextStats[port].update(counts, device.name)
+					s += '%s,%s,%d,OUT,%s\n' % (kind, device.hid, port, device.nextStats[port].csv())
 
 	return s
 

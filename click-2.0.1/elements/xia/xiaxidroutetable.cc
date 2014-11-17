@@ -27,7 +27,7 @@ XIAXIDRouteTable::~XIAXIDRouteTable()
 int
 XIAXIDRouteTable::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    click_chatter("XIAXIDRouteTable: configuring %s\n", this->name().c_str());
+    //click_chatter("XIAXIDRouteTable: configuring %s\n", this->name().c_str());
 
 	_principal_type_enabled = 1;
 	_num_ports = 0;
