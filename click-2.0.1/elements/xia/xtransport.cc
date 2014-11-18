@@ -616,10 +616,12 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 			// Received a SYN from a client
 
+			bool usingRendezvousDAG = false;
 			// The DAG that the service bound to
 			XIAPath bound_dag = daginfo->src_path;
 			// is the bound_dag same as dst_path in the packet header?
 			if(bound_dag != dst_path) {
+				// This SYN packet probably came through a rendezvous service
 				click_chatter("ProcessNetworkPacket: SYN with DAG possibly modified by a rendezvous server");
 				// Find local AD as of now
 				XIAPath local_dag = local_addr();
@@ -640,6 +642,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 					return;
 				}
 				click_chatter("ProcessNetworkPacket: Allowing DAG different from bound dag");
+				usingRendezvousDAG = true;
 			}
 
 			// First, check if this request is already in the pending queue
@@ -707,19 +710,59 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			xiah_new.set_dst_path(src_path);
 			xiah_new.set_src_path(dst_path);
 
-			const char* dummy = "Connection_granted";
-			WritablePacket *just_payload_part = WritablePacket::make(256, dummy, strlen(dummy), 0);
+			WritablePacket *just_payload_part;
+			int payloadLength;
+			if(usingRendezvousDAG) {
+				click_chatter("ProcessNetworkPacket: Sending SYNACK with verification for RV DAG");
+				// Destination DAG from the SYN packet
+				String dst_path_str = dst_path.unparse();
+
+				// Current timestamp as nonce against replay attacks
+				Timestamp now = Timestamp::now();
+				double timestamp = strtod(now.unparse().c_str(), NULL);
+
+				// Build the payload with DAG for this service and timestamp
+				XIASecurityBuffer synackPayload(1024);
+				synackPayload.pack(dst_path_str.c_str(), dst_path_str.length());
+				synackPayload.pack((const char *)&timestamp, (uint16_t) sizeof timestamp);
+
+				// Sign the synack payload
+				char signature[MAX_SIGNATURE_SIZE];
+				uint16_t signatureLength = MAX_SIGNATURE_SIZE;
+				xs_sign(_destination_xid.unparse().c_str(), (unsigned char *)synackPayload.get_buffer(), synackPayload.size(), (unsigned char *)signature, &signatureLength);
+
+				// Retrieve public key for this host
+				char pubkey[MAX_PUBKEY_SIZE];
+				uint16_t pubkeyLength = MAX_PUBKEY_SIZE;
+				if(xs_getPubkey(_destination_xid.unparse().c_str(), pubkey, &pubkeyLength)) {
+					click_chatter("ProcessNetworkPacket: ERROR public key not found for %s", _destination_xid.unparse().c_str());
+					return;
+				}
+
+				// Prepare a signed payload (serviceDAG, timestamp)Signature, Pubkey
+				XIASecurityBuffer signedPayload(2048);
+				signedPayload.pack(synackPayload.get_buffer(), synackPayload.size());
+				signedPayload.pack(signature, signatureLength);
+				signedPayload.pack((char *)pubkey, pubkeyLength);
+
+				just_payload_part = WritablePacket::make(256, (const void*)signedPayload.get_buffer(), signedPayload.size(), 1);
+				payloadLength = signedPayload.size();
+			} else {
+				const char* dummy = "Connection_granted";
+				just_payload_part = WritablePacket::make(256, dummy, strlen(dummy), 0);
+				payloadLength = strlen(dummy);
+			}
 
 			WritablePacket *p = NULL;
 
-			xiah_new.set_plen(strlen(dummy));
+			xiah_new.set_plen(payloadLength);
 			//click_chatter("Sent packet to network");
 
 			TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeSYNACKHeader( 0, 0, 0); // #seq, #ack, length
 			p = thdr_new->encap(just_payload_part);
 
 			thdr_new->update();
-			xiah_new.set_plen(strlen(dummy) + thdr_new->hlen()); // XIA payload = transport header + transport-layer data
+			xiah_new.set_plen(payloadLength + thdr_new->hlen()); // XIA payload = transport header + transport-layer data
 
 			p = xiah_new.encap(p, false);
 
@@ -742,7 +785,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			_dport = XIDpairToPort.get(xid_pair);
 
 			DAGinfo *daginfo = portToDAGinfo.get_pointer(_dport);
-
 			if(!daginfo->synack_waiting) {
 				// Fix for synack storm sending messages up to the API
 				// still need to fix the root cause, but this prevents the API from 
@@ -750,11 +792,69 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				sendToApplication = false;
 			}
 
+			if(daginfo->dst_path != src_path) {
+				click_chatter("ProcessNetworkPacket: remote path in SYNACK different from that used in SYN");
+				// Retrieve the signed payload
+				const char *payload = (const char *)thdr.payload();
+				int payload_len = xiah.plen() - thdr.hlen();
+				XIASecurityBuffer signedPayload(payload, payload_len);
+
+				// Retrieve the synack payload
+				uint16_t synackPayloadLength = signedPayload.peekUnpackLength();
+				char synackPayloadBuffer[synackPayloadLength];
+				signedPayload.unpack(synackPayloadBuffer, &synackPayloadLength);
+				XIASecurityBuffer synackPayload(synackPayloadBuffer, synackPayloadLength);
+
+				// The signature
+				uint16_t signatureLength = signedPayload.peekUnpackLength();
+				char signature[signatureLength];
+				signedPayload.unpack(signature, &signatureLength);
+
+				// The public key of the remote SID
+				uint16_t pubkeyLength = signedPayload.peekUnpackLength();
+				char pubkey[pubkeyLength+1];
+				bzero(pubkey, pubkeyLength+1);
+				signedPayload.unpack(pubkey, &pubkeyLength);
+
+				// Verify pubkey matches the remote SID
+				if(!xs_pubkeyMatchesXID(pubkey, _source_xid.unparse().c_str())) {
+					click_chatter("ProcessNetworkPacket: SYNACK: ERROR: pubkey, remote SID mismatch");
+					return;
+				}
+
+				// Verify signature using pubkey
+				if(!xs_isValidSignature((const unsigned char *)synackPayloadBuffer, synackPayloadLength, (unsigned char *)signature, signatureLength, pubkey, pubkeyLength)) {
+					click_chatter("ProcessNetworkPacket: SYNACK: ERROR: invalid signature");
+					return;
+				}
+
+				// Extract remote DAG and timestamp from synack payload
+				uint16_t dagLength = synackPayload.peekUnpackLength();
+				char dag[dagLength+1];
+				bzero(dag, dagLength+1);
+				synackPayload.unpack(dag, &dagLength);
+
+				// TODO: Do we need to verify timestamp? Can't we just drop duplicate SYNACKs?
+				uint16_t timestampLength = synackPayload.peekUnpackLength();
+				assert(timestampLength == (uint16_t) sizeof(double));
+				double timestamp;
+				synackPayload.unpack((char *)&timestamp, &timestampLength);
+
+				// Verify that the signed remote DAG matches src_path in SYNACK header
+				XIAPath remoteDAG;
+				remoteDAG.parse(dag);
+				if(remoteDAG != src_path) {
+					click_chatter("ProcessNetworkPacket: SYNACK: ERROR: Mismatched src_path and remoteDAG: %s vs %s", src_path.unparse().c_str(), remoteDAG.unparse().c_str());
+					return;
+				}
+				click_chatter("ProcessNetworkPacket: SYNACK: verified modification by remote SID");
+				// All checks passed, so update DAGInfo to reflect new path for remote service
+				daginfo->dst_path = src_path;
+			}
+
 			// Clear timer
 			daginfo->timer_on = false;
 			daginfo->synack_waiting = false;
-			// Mobility: Rendezvous updates destDAG mid-flight, so update here.
-			daginfo->dst_path = src_path;
 			//daginfo->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
 		} else if (thdr.pkt_info() == TransportHeader::MIGRATE) {
 
@@ -2059,7 +2159,7 @@ void XTRANSPORT::Xupdaterv(unsigned short _sport)
     char pubkey[MAX_PUBKEY_SIZE];
     uint16_t pubkeyLength = MAX_PUBKEY_SIZE;
     if(xs_getPubkey(myHID.c_str(), pubkey, &pubkeyLength)) {
-        click_chatter("XIAChallengeResponder::processChallenge ERROR local public key not found");
+        click_chatter("Xupdaterv: ERROR public key not found for %s", myHID.c_str());
         return;
     }
 

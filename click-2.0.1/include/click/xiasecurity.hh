@@ -67,4 +67,6 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
 // Read public key from file
 int xs_getPubkey(const char *xid, char *pubkey, uint16_t *pubkey_len);
 
+// Verify that a given pubkey matches the corresponding XID
+int xs_pubkeyMatchesXID(const char *pubkey, const char *xid);
 #endif

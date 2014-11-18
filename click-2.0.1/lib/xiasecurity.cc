@@ -486,3 +486,16 @@ xs_getPubkey_cleanup:
 	};
 	return retval;
 }
+
+int xs_pubkeyMatchesXID(const char *pubkey, const char *xid)
+{
+    char pubkeyHash[SHA_DIGEST_LENGTH];
+    xs_getPubkeyHash((char *)pubkey, (uint8_t *)pubkeyHash, sizeof pubkeyHash);
+    char pubkeyHashStr[XIA_SHA_DIGEST_STR_LEN];
+    xs_hexDigest((uint8_t *)pubkeyHash, sizeof pubkeyHash, pubkeyHashStr, sizeof pubkeyHashStr);
+    if(strncmp(xs_XIDHash(xid), pubkeyHashStr, sizeof pubkeyHashStr)) {
+        xs_chatter("xs_pubkeyMatchesXID: ERROR: Mismatch: pubkeyHash|%s| XID|%s|", pubkeyHashStr, xs_XIDHash(xid));
+        return 0;
+    }
+	return 1;
+}
