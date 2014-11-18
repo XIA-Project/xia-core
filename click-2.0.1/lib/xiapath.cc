@@ -623,7 +623,6 @@ XIAPath::first_ad_node() const
 	while(current_node != dst) {
 		XID currentNodeXID(xid(current_node).unparse());
 		if(currentNodeXID.type() == htonl(CLICK_XIA_XID_TYPE_AD)) {
-			click_chatter("XIAPath::first_ad_node:%s", currentNodeXID.unparse().c_str());
 			return current_node;
 		} else {
 			Vector<XIAPath::handle_t> child_nodes = next_nodes(current_node);
