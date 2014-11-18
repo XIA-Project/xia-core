@@ -382,14 +382,9 @@ void process_control_message(int controlsock)
 	double timestamp;
 	controlMsg.unpack((char *)&timestamp, &timestampLength);
 
-	// TODO: Verify HID in ddag matches the one in the control message
-	// Verify hash(HID) matches pubkey
-	char pubkeyHash[SHA_DIGEST_LENGTH];
-	xs_getPubkeyHash(pubkey, (uint8_t *)pubkeyHash, sizeof pubkeyHash);
-	char pubkeyHashStr[XIA_SHA_DIGEST_STR_LEN];
-	xs_hexDigest((uint8_t *)pubkeyHash, sizeof pubkeyHash, pubkeyHashStr, sizeof pubkeyHashStr);
-	if(strncmp(xs_XIDHash(hid), pubkeyHashStr, sizeof pubkeyHashStr)) {
-		syslog(LOG_ERR, "ERROR: Mismatch: pubkeyHash|%s| HID|%s|", pubkeyHashStr, xs_XIDHash(hid));
+	// Verify hash(pubkey) matches HID
+	if(!xs_pubkeyMatchesXID(pubkey, hid)) {
+		syslog(LOG_ERR, "ERROR: Public key does not match HID of control message sender");
 		return;
 	}
 

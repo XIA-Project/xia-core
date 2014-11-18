@@ -231,12 +231,8 @@ XIAChallengeSource::verify_response(Packet *p_in)
 
 	// Verify public key: Check if hash(pub) == src_hid
 	String src_hid(src_hid_str(p_in));
-	char remotePubkeyHash[SHA_DIGEST_LENGTH];
-	xs_getPubkeyHash(remotePubkey, (uint8_t *)remotePubkeyHash, sizeof remotePubkeyHash);
-	char remotePubkeyHashStr[XIA_SHA_DIGEST_STR_LEN];
-	xs_hexDigest((uint8_t *)remotePubkeyHash, sizeof remotePubkeyHash, remotePubkeyHashStr, sizeof remotePubkeyHashStr);
-	if(strncmp(xs_XIDHash(src_hid.c_str()), remotePubkeyHashStr, sizeof remotePubkeyHashStr) != 0) {
-		click_chatter("%s> Error: RemoteHID:%s: PubkeyHash:%s", _name, src_hid.c_str(), remotePubkeyHashStr);
+	if(!xs_pubkeyMatchesXID(remotePubkey, src_hid.c_str())) {
+		click_chatter("%s> ERROR: %s does not match public key in response", src_hid.c_str());
 		return;
 	}
 	click_chatter("%s> Public key matches source HID", _name);
