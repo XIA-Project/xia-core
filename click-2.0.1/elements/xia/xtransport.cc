@@ -2558,7 +2558,7 @@ void XTRANSPORT::Xsend(unsigned short _sport, WritablePacket *p_in)
 		xiah.set_plen(pktPayloadSize);
 
 
-		_errh->debug("XSEND: (%d) sent packet to %s, from %s\n", _sport, daginfo->dst_path.unparse_re().c_str(), daginfo->src_path.unparse_re().c_str());
+		_errh->debug("XSEND: (%d) sent packet to %s, from %s\n", _sport, daginfo->dst_path.unparse().c_str(), daginfo->src_path.unparse_re().c_str());
 
 		WritablePacket *just_payload_part = WritablePacket::make(p_in->headroom() + 1, (const void*)x_send_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
 
