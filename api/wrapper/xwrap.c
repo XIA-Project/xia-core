@@ -12,27 +12,6 @@
 #include "Xinit.h"
 #include "Xutil.h"
 
-/*
-** FIXME:
-** - are the setwrapped macros needed here anymore, or can they safely just be used in the xsocket api now?
-** - gcc 4.7 as inlined some of the *printf functions, need to find new way to catch them
-** - fclose doesn't capture correctly
-** - implement getline
-** - add support for getdelim (like getline)
-** - fix fcntl to use va_list
-** - don't know how to implement fcloseall
-** - close will have problems when closing dup'd fds
-** - dup functions need to mark the new fd somehow so rhe xsocket api knows it's special
-** - reads/writes are atomic, can't merge multiple writes into a single read at the other end
-** - fputs_unlocked/fgets_unlocked not defined for applications?
-*/
-
-/*
-** See end of file for list of functions remapped and those that are ignored
-*/
-
-#define XIA_PRELOAD
-
 #define TRACE()		{if (_log_trace)   fprintf(_log, "xwrap: %s\r\n", __FUNCTION__);}
 #define STOCK()		{if (_log_trace)   fprintf(_log, "xwrap: %s informational tracing only\r\n", __FUNCTION__);}
 
@@ -44,15 +23,6 @@
 
 #define ALERT()		{if (_log_warning) fprintf(_log, "xwrap: ALERT!!!, %s is not implemented in XIA!\r\n", __FUNCTION__);}
 #define WARNING(...)	{if (_log_warning) fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}
-
-/*
-** If XIA_PRELOAD is defined, the code below will be compiled as a library that
-** can be loaded at runtime into an application giving it XIA support without
-** requiring a recompile. Seed above for functions that require code changes.
-**
-# see the xia-core/bin/xwrap script for usage
-*/
-#ifdef XIA_PRELOAD
 
 /*
 ** Declare a typedef and a function pointer definition that uses it.
@@ -192,7 +162,6 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	GET_FCN(gai_strerror);
 	GET_FCN(getnameinfo);
 }
-#endif // XIA_PRELOAD
 
 
 /******************************************************************************
@@ -229,125 +198,6 @@ int _GetSocketType(int type)
 	return XSOCK_INVALID;
 }
 
-#if 0
-// called by the various <>printf wrappers
-int _vasend(int fd, const char *format, va_list args)
-{
-//	va_list args;
-//	va_start(args, format);
-
-	char *s;
-	int n = vasprintf(&s, format, args);
-
-	markWrapped(fd);
-	int rc = Xsend(fd, s, n, 0);
-	markUnwrapped(fd);
-
-	free(s);
-//	va_end(args);
-
-	return rc;
-}
-
-// get a single character from the socket, called by getc, getchar and associates
-int _xgetc(int fd)
-{
-	char c;
-
-	markWrapped(fd);
-	int rc = Xrecv(fd, &c, 1, 0);
-	markUnwrapped(fd);
-
-	if (rc != -1)
-		rc = c;
-	return rc;
-}
-
-// put a single character to the socket, called by putc, putchar and associates
-int _xputc(int i, int fd)
-{
-	unsigned char c = (unsigned char)i;
-
-	markWrapped(fd);
-	int rc = Xsend(fd, &c, 1, 0);
-	markUnwrapped(fd);
-
-	return rc;
-}
-
-int _xputs(const char *s, int fd)
-{
-	markWrapped(fd);
-	int rc = Xsend(fd, s, strlen(s), 0);
-	markUnwrapped(fd);
-
-	return rc;
-}
-
-
-char *_xgets(int fd, char *s, int n)
-{
-	int i;
-	int rc = -1;
-	char *p = s;
-
-	markWrapped(fd);
-	for (i = 0; i < n - 1; i++) {
-		rc = Xrecv(fd, p, 1, 0);
-		p++;
-		if (rc < 0 || *(p - 1) == '\n')
-			break;
-	}
-	markUnwrapped(fd);
-
-	if (rc < 0 && i == 0)
-		s = NULL;
-	else
-		*p = '\0';
-
-	return s;
-}
-
-int _xfread(void *buf, int size, int n, int fd)
-{
-	markWrapped(fd);
-	int rc = Xrecv(fd, buf, size * n, 0);
-	markUnwrapped(fd);
-
-	if (rc >= 0)
-		rc = rc / size;
-	return rc;
-}
-
-int _xfwrite(const void *buf, int size, int n, int fd)
-{
-	markWrapped(fd);
-	int rc = Xsend(fd, buf, size * n, 0);
-	markUnwrapped(fd);
-
-	if (rc >= 0)
-		rc = rc / size;
-	return rc;
-}
-
-int _xread(int fd, void *buf, size_t count)
-{
-	markWrapped(fd);
-	int rc = Xrecv(fd, buf, count, 0);
-	markUnwrapped(fd);
-
-	return rc;
-}
-
-int _xwrite(int fd, const void *buf, size_t count)
-{
-	markWrapped(fd);
-	int rc = Xsend(fd, buf, count, 0);
-	markUnwrapped(fd);
-
-	return rc;
-}
-#endif
 /******************************************************************************
 **
 ** FUNCTION REMAPPINGS START HERE
@@ -451,7 +301,6 @@ ssize_t send(int fd, const void *buf, size_t n, int flags)
 	TRACE();
 
 	if (shouldWrap(fd)) {
-//	if (isXsocket(fd) {
 		XIAIFY();
 		markWrapped(fd);
 		rc = Xsend(fd, buf, n, flags);
@@ -467,9 +316,7 @@ ssize_t recv(int fd, void *buf, size_t n, int flags)
 	int rc;
 	TRACE();
 	if (shouldWrap(fd)) {
-//	if (isXsocket(fd) {
 		XIAIFY();
-		// FIXME: need to add async support
 		markWrapped(fd);
 		rc = Xrecv(fd, buf, n, flags);
 		markUnwrapped(fd);
@@ -484,9 +331,7 @@ ssize_t sendto(int fd, const void *buf, size_t n, int flags, const struct sockad
 	int rc;
 	TRACE();
 
-//	if (0) {
 	if (shouldWrap(fd)) {
-//	if (isXsocket(fd) {
 		XIAIFY();
 		markWrapped(fd);
 		rc = Xsendto(fd, buf, n, flags, addr, addr_len);
