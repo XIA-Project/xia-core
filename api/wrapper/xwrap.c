@@ -233,17 +233,25 @@ int _GetSocketType(int type)
 	return XSOCK_INVALID;
 }
 
+int _NewPort()
+{
+	return 1024 + (rand() % (32767 - 1024));
+}
+
 // Create a new fake IP address to associate with the given DAG
-int _NewIP(sockaddr_x *sax, struct sockaddr_in *sin)
+int _NewIP(sockaddr_x *sax, struct sockaddr_in *sin, int port)
 {
 	char s[64];
 	char s1[64];
 
-	sprintf(s, "162.254.%d.%d", low_ip, high_ip);
+	if (port == 0)
+		port = _NewPort();
+
+	sprintf(s, "169.254.%d.%d", low_ip, high_ip);
 	inet_aton(s, &sin->sin_addr);
 
 	sin->sin_family = AF_INET;
-	sin->sin_port = 1024 + (rand() % (32767 - 1024));
+	sin->sin_port = port;
 
 	sprintf(s1, "%s-%d", s, sin->sin_port);
 
@@ -483,7 +491,7 @@ int accept(int fd, struct sockaddr *addr, socklen_t *addr_len)
 
 		if (FORCE_XIA()) {
 			// create a new fake IP address/port  to map to
-			_NewIP(&sax, (struct sockaddr_in*)ipaddr);
+			_NewIP(&sax, (struct sockaddr_in*)ipaddr, 0);
 
 			// convert the sockaddr_x to a sockaddr
 			_x2i(&sax, (struct sockaddr_in*)ipaddr);
@@ -583,7 +591,7 @@ ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, 
 			// convert the sockaddr to a sockaddr_x
 			if (_x2i(&sax, (struct sockaddr_in*)ipaddr) < 0) {
 				// we don't have a mapping for this yet, create a fake IP address
-				_NewIP(&sax, (sockaddr_in *)ipaddr);
+				_NewIP(&sax, (sockaddr_in *)ipaddr, 0);
 			}
 		}	
 
@@ -746,7 +754,7 @@ int getpeername(int fd, struct sockaddr *addr, socklen_t *len)
 		if (FORCE_XIA()) {
 			// convert the sockaddr to a sockaddr_x
 			if (_x2i(&sax, (struct sockaddr_in*)ipaddr) < 0) {
-				_NewIP(&sax, (sockaddr_in*)ipaddr);
+				_NewIP(&sax, (sockaddr_in*)ipaddr, 0);
 			}
 		}	
 
@@ -797,7 +805,7 @@ int fcntl (int fd, int cmd, ...)
 	return rc;
 }
 
-int getaddrinfo (const char *name, const char *service, const struct addrinfo *req, struct addrinfo **pai)
+int getaddrinfo (const char *name, const char *service, const struct addrinfo *hints, struct addrinfo **pai)
 {
 	int rc = -1;
 	int tryxia = 1;
@@ -808,37 +816,70 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *r
 	if (FORCE_XIA()) {
 		sockaddr_x sax;
 		char s[64];
+		int socktype = 0;
+		int protocol = 0;
+		int family = AF_INET;
+		int flags = 0;
+		int port;
+		socklen_t len;
 
-		// FIXME: the hints struct will need to be cleaned up
+
 		// FIXME: this assumes that name is an IP string
-		// FIXME: this assumes the service name exists and is actually a port number
 		//  instead of a name
 
-		sprintf(s, "%s-%s", name, service);
+		if (hints) {
+			if (hints->ai_family != AF_UNSPEC && hints->ai_family != AF_INET) {
+				printf("The XIA wrapper only supports AF_INET mappings.\n");
+				errno = EAI_FAMILY;
+				return -1;
+			} else if (hints->ai_flags != 0) {
+				printf("Flags to getaddrinfo are not currently implemented.\n");
+			}
+			socktype = hints->ai_socktype;
+			protocol = hints->ai_protocol;
+		}
 
-		// FIXME: we should look up the name first to see if it's already in the mapping table
-		XgetDAGbyName(s, &sax, NULL);
+		if (service) {
+			port = strtol(service, NULL, 10);
+			if (errno) {
+				// FIXME:is this threadsafe???
+				struct servent *serv = getservbyname(service, NULL);
+				if (serv) {
+					port = serv->s_port;
+				} else {
+					port = _NewPort();
+				}
+				endservent();
+			}
+		} else {
+			port = _NewPort();			
+		}
+
+		sprintf(s, "%s-%d", name, port);
+		XgetDAGbyName(s, &sax, &len);
 
 		struct addrinfo *ai = (struct addrinfo *)calloc(sizeof(struct addrinfo), 1);
 
 		// fill in the blanks
-		ai->ai_family    = AF_INET;
-		ai->ai_socktype  = 0;
-		ai->ai_protocol  = 0;
-		ai->ai_flags     = 0;
+		ai->ai_family    = family;
+		ai->ai_socktype  = socktype;
+		ai->ai_protocol  = protocol;
+		ai->ai_flags     = flags;
 		ai->ai_addrlen   = sizeof(struct sockaddr);
 		ai->ai_next      = NULL;
 
-		_NewIP(&sax, (sockaddr_in *)ai->ai_addr);
+		_NewIP(&sax, (sockaddr_in *)ai->ai_addr, port);
+
+		*pai = ai;
 
 	} else {
 		// try to determine if this is an XIA address lookup
-		if (req) {
+		if (hints) {
 			// they specified hints, see if the family is XIA, or unspecified
-			if (req->ai_family == AF_UNSPEC) {
+			if (hints->ai_family == AF_UNSPEC) {
 				MSG("family is unspec\n");
 				tryxia = 1;
-			} else if (req->ai_family == AF_XIA) {
+			} else if (hints->ai_family == AF_XIA) {
 				MSG("family is XIA\n");
 				tryxia = 1;
 				trynormal = 0;
@@ -862,7 +903,7 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *r
 		if (tryxia) {
 			XIAIFY();
 			MSG("looking up name in XIA\n");
-			rc = Xgetaddrinfo(name, service, req, pai);
+			rc = Xgetaddrinfo(name, service, hints, pai);
 			MSG("Xgetaddrinfo returns %d\n", rc);
 		}
 
@@ -870,7 +911,7 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *r
 		if (trynormal && rc < 0) {	
 			NOXIA();
 			MSG("looking up name normally\n");
-			rc = __real_getaddrinfo(name, service, req, pai);
+			rc = __real_getaddrinfo(name, service, hints, pai);
 		}
 	}
 
