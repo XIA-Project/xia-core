@@ -247,7 +247,7 @@ int _NewIP(sockaddr_x *sax, struct sockaddr_in *sin, int port)
 	if (port == 0)
 		port = _NewPort();
 
-	sprintf(s, "169.254.%d.%d", low_ip, high_ip);
+	sprintf(s, "169.254.%d.%d", high_ip, low_ip);
 	inet_aton(s, &sin->sin_addr);
 
 	sin->sin_family = AF_INET;
@@ -261,7 +261,6 @@ int _NewIP(sockaddr_x *sax, struct sockaddr_in *sin, int port)
 
 	ip2dag[s1] = dag;
 	dag2ip[dag] = s1;
-
 
 	// bump the ip address for next time
 	low_ip++;
@@ -376,11 +375,18 @@ int socket(int domain, int type, int protocol)
 {
 	int fd;
 	TRACE();
+	printf("%d %d %d\n", domain, type, protocol);
 
 	if ((domain == AF_XIA || FORCE_XIA()) && _wrap_socket) {
 		XIAIFY();
+
+		if (protocol != 0) {
+			MSG("Caller specified protocol %d, resetting to 0\n", protocol);
+			protocol = 0;
+		}
+
 		_wrap_socket = 0;
-		fd = Xsocket(domain, type, protocol);
+		fd = Xsocket(AF_XIA, type, protocol);
 		_wrap_socket = 1;
 	} else {
 		fd = __real_socket(domain, type, protocol);
@@ -476,6 +482,8 @@ int accept(int fd, struct sockaddr *addr, socklen_t *addr_len)
 	int rc;
 	sockaddr_x sax;
 	struct sockaddr *ipaddr;
+	socklen_t xlen;
+	socklen_t ipaddr_len = *addr_len;
 
 	TRACE();
 	if (isXsocket(fd)) {
@@ -485,8 +493,10 @@ int accept(int fd, struct sockaddr *addr, socklen_t *addr_len)
 			ipaddr = addr;
 			addr = (struct sockaddr*)&sax;
 		}
+
+		xlen = sizeof(sax);
 		markWrapped(fd);
-		rc = Xaccept(fd, addr, addr_len);
+		rc = Xaccept(fd, addr, &xlen);
 		markUnwrapped(fd);
 
 		if (FORCE_XIA()) {
@@ -824,6 +834,9 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 		socklen_t len;
 
 
+		printf("getaddrinfo:\n");
+		printf("  flags: %08x\n", hints->ai_flags);
+
 		// FIXME: this assumes that name is an IP string
 		//  instead of a name
 
@@ -856,7 +869,12 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 		}
 
 		sprintf(s, "%s-%d", name, port);
-		XgetDAGbyName(s, &sax, &len);
+		printf("%s\n", s);
+		if (XgetDAGbyName(s, &sax, &len) < 0) {
+			printf("name lookup error\n");
+			errno = EAI_NONAME;
+			return -1;
+		}
 
 		struct addrinfo *ai = (struct addrinfo *)calloc(sizeof(struct addrinfo), 1);
 
@@ -868,9 +886,11 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 		ai->ai_addrlen   = sizeof(struct sockaddr);
 		ai->ai_next      = NULL;
 
-		_NewIP(&sax, (sockaddr_in *)ai->ai_addr, port);
+		ai->ai_addr = (struct sockaddr *)calloc(sizeof(struct sockaddr), 1);
 
+		_NewIP(&sax, (sockaddr_in *)ai->ai_addr, port);
 		*pai = ai;
+		rc = 0;
 
 	} else {
 		// try to determine if this is an XIA address lookup
