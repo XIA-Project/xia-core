@@ -253,7 +253,9 @@ int _NewIP(sockaddr_x *sax, struct sockaddr_in *sin, int port)
 	sin->sin_family = AF_INET;
 	sin->sin_port = port;
 
-	sprintf(s1, "%s-%d", s, sin->sin_port);
+	sprintf(s1, "%s-%d", s, ntohs(sin->sin_port));
+printf("nip %s\n", s);
+printf("new ip %s\n", s1);
 
 	Graph g(sax);
 
@@ -295,7 +297,7 @@ char *_IpString(char *s, struct sockaddr_in* sa)
 	char *ip = inet_ntoa(sa->sin_addr);
 
 	// make a name from the ip address and port
-	sprintf(s, "%s-%u", ip, sa->sin_port);
+	sprintf(s, "%s-%u", ip, ntohs(sa->sin_port));
 	printf("%s\n", s);
 	return s;
 }
@@ -305,6 +307,8 @@ int _i2x(struct sockaddr_in *sin, sockaddr_x *sax)
 {
 	char s[64];
 	std::string dag = ip2dag[_IpString(s, sin)];
+
+	printf("dag=%s\n", dag.c_str());
 
 	Graph g(dag);
 	g.fill_sockaddr(sax);
@@ -375,8 +379,8 @@ int socket(int domain, int type, int protocol)
 {
 	int fd;
 	TRACE();
-	printf("%d %d %d\n", domain, type, protocol);
 
+printf("t:%d p:%d %d %d\n", type, protocol, SOCK_STREAM, SOCK_DGRAM);
 	if ((domain == AF_XIA || FORCE_XIA()) && _wrap_socket) {
 		XIAIFY();
 
@@ -483,8 +487,8 @@ int accept(int fd, struct sockaddr *addr, socklen_t *addr_len)
 	sockaddr_x sax;
 	struct sockaddr *ipaddr;
 	socklen_t xlen;
-	socklen_t ipaddr_len = *addr_len;
 
+	printf("accept:%d\n", fd);
 	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -498,6 +502,7 @@ int accept(int fd, struct sockaddr *addr, socklen_t *addr_len)
 		markWrapped(fd);
 		rc = Xaccept(fd, addr, &xlen);
 		markUnwrapped(fd);
+	printf("accept new:%d\n", rc);
 
 		if (FORCE_XIA()) {
 			// create a new fake IP address/port  to map to
@@ -533,6 +538,7 @@ ssize_t recv(int fd, void *buf, size_t n, int flags)
 {
 	int rc;
 	TRACE();
+	printf("recv:%d\n", fd);
 	if (shouldWrap(fd)) {
 		XIAIFY();
 		markWrapped(fd);
@@ -711,25 +717,30 @@ int getsockname(int fd, struct sockaddr *addr, socklen_t *len)
 	int rc;
 	struct sockaddr *ipaddr;
 	sockaddr_x sax;
+	socklen_t oldlen;
 
 	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
 
+		if (FORCE_XIA()) {
+			oldlen = *len;
+			*len = sizeof(sax);
+			ipaddr = addr;
+			addr = (struct sockaddr*)&sax;
+		}
+
 		if (*len < sizeof(sockaddr_x)) {
 			WARNING("not enough room for the XIA sockaddr! have %d, need %ld\n", *len, sizeof(sockaddr_x));
 		}
 
-		if (FORCE_XIA()) {
-			ipaddr = addr;
-			addr = (struct sockaddr*)&sax;
-		}
 		markWrapped(fd);
 		rc = Xgetsockname(fd, addr, len);
 		markUnwrapped(fd);
 
 		// FIXME: WHAT DO WE DO HERE IF THE MAPPING LOOKUP FAILS???
 		if (FORCE_XIA()) {
+			*len = oldlen;
 			// convert the sockaddr to a sockaddr_x
 			_x2i(&sax, (struct sockaddr_in*)ipaddr);
 		}			
@@ -888,7 +899,7 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 
 		ai->ai_addr = (struct sockaddr *)calloc(sizeof(struct sockaddr), 1);
 
-		_NewIP(&sax, (sockaddr_in *)ai->ai_addr, port);
+		_NewIP(&sax, (sockaddr_in *)ai->ai_addr, htons(port));
 		*pai = ai;
 		rc = 0;
 
