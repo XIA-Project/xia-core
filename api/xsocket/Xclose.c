@@ -63,5 +63,6 @@ int Xclose(int sockfd)
 	close(sockfd);
 	setWrapped(sockfd, FALSE);
 	freeSocketState(sockfd);
+
 	return rc;
 }

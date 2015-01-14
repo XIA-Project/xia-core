@@ -186,7 +186,6 @@ printf("in the cache!\n");
 			break;
 
 		} else {
-
 			struct timeval tv;
 			fd_set fds;
 			FD_ZERO(&fds);

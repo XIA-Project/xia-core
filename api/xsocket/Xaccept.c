@@ -65,6 +65,7 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	socklen_t len;
 	int new_sockfd;
 
+printf("XACCEPT %d\n", sockfd);
 	// if an addr buf is passed, we must also have a valid length pointer
 	if (addr != NULL && addrlen == NULL) {
 		errno = EFAULT;
@@ -99,25 +100,36 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		return -1;
 	}
 
+printf("accept fd=%d SOCK_STREAM=%d\n", new_sockfd, SOCK_STREAM);
+	allocSocketState(new_sockfd, SOCK_STREAM);
+
+	
 	// bind to an unused random port number
 	my_addr.sin_family = PF_INET;
 	my_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 	my_addr.sin_port = 0;
 
+	setWrapped(new_sockfd, TRUE);
 	if (bind(new_sockfd, (const struct sockaddr *)&my_addr, sizeof(my_addr)) < 0) {
 		close(new_sockfd);
+		setWrapped(new_sockfd, FALSE);
+
 		LOGF("Error binding new socket to local port: %s", strerror(errno));
 		return -1;
 	}
+
+
 
 	// Tell click what the new socket's port is (but we'll tell click
 	// over the old socket)
 	len = sizeof(my_addr);
 	if(getsockname(new_sockfd, (struct sockaddr *)&my_addr, &len) < 0) {
 		close(new_sockfd);
+		setWrapped(new_sockfd, FALSE);
 		LOGF("Error retrieving new socket's UDP port: %s", strerror(errno));
 		return -1;
 	}
+	setWrapped(new_sockfd, FALSE);
 
 	xia::XSocketMsg xia_socket_msg;
 	xia_socket_msg.set_type(xia::XACCEPT);
@@ -149,7 +161,7 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	if (addrlen)
 		*addrlen = 0;
 
-	allocSocketState(new_sockfd, XSOCK_STREAM);
+
 	setConnState(new_sockfd, CONNECTED);
 
 	return new_sockfd;

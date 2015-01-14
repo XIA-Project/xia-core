@@ -47,7 +47,7 @@ public:
 	void setConnState(int conn) { m_connected = conn; };
 
 	int isWrapped() { return (m_wrapped != 0); };
-	void setWrapped(int wrap) { wrap ? m_wrapped++ : m_wrapped--; };
+	void setWrapped(int wrap) { wrap ? m_wrapped++ : m_wrapped--;};
 
 	int isBlocking() { return m_blocking; };
 	void setBlocking(int blocking) { m_blocking = blocking; };
@@ -69,6 +69,7 @@ public:
 	const sockaddr_x *peer() { return m_peer; };
 	int setPeer(const sockaddr_x *peer);
 
+	void init();
 private:
 	int m_transportType;
 	int m_connected;
@@ -84,7 +85,7 @@ private:
 	pthread_mutex_t m_sequence_lock;
 	map<unsigned, string> m_packets;
 
-	void init();
+
 };
 
 SocketState::SocketState(int tt)
@@ -249,8 +250,16 @@ void SocketMap::add(int sock, int tt)
 {
 	SocketMap *state = getMap();
 	pthread_rwlock_wrlock(&rwlock);
-	if (state->sockets[sock] == 0)
+	if (state->sockets[sock] == 0) {
+//	if (state->sockets.find(sock) == state->sockets.end()) {
+		printf("CORRECT WAY TO ADD SOCKET STATE %d %d\n", sock, tt);
 		state->sockets[sock] = new SocketState(tt);
+	} else {
+		printf("THIS SHOULD NOT HAPPEN! %d\n", sock);
+//		SocketState *sstate = SocketMap::getMap()->get(sock);
+//		sstate->init();
+//		sstate->setTransportType(tt);
+	}
 	pthread_rwlock_unlock(&rwlock);
 }
 
@@ -288,19 +297,22 @@ int SocketState::setPeer(const sockaddr_x *peer)
 
 void allocSocketState(int sock, int tt)
 {
+	printf("ALLOCSOCKETSTATE %d\n", sock);
 	SocketMap::getMap()->add(sock, tt);
 }
 
 void freeSocketState(int sock)
 {
+	printf("FREESOCKETSTATE %d\n", sock);
 	SocketMap::getMap()->remove(sock);
 }
 
 int getSocketType(int sock)
 {
 	SocketState *sstate = SocketMap::getMap()->get(sock);
-	if (sstate)
+	if (sstate) {
 		return sstate->transportType();
+	}
 	else
 		return -1;
 }
@@ -324,8 +336,9 @@ void setConnState(int sock, int conn)
 int isWrapped(int sock)
 {
 	SocketState *sstate = SocketMap::getMap()->get(sock);
-	if (sstate)
+	if (sstate) {
 		return sstate->isWrapped();
+	}
 	else
 		return 0;
 }

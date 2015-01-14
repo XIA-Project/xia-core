@@ -254,6 +254,7 @@ int XregisterName(const char *name, sockaddr_x *DAG) {
 	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
 		return -1;
 
+printf("register: %d\n", sock);
 	//Read the nameserver DAG (the one that the name-registration will be sent to)
 	if (XreadNameServerDAG(sock, &ns_dag) < 0) {
 		LOG("Unable to find nameserver address");
@@ -299,10 +300,12 @@ int XregisterName(const char *name, sockaddr_x *DAG) {
 
 	//Send the name registration packet to the name server
 	//FIXME: use sockaddr here
+printf("register sendto %d\n", sock);
 	Xsendto(sock, pkt, offset, 0, (const struct sockaddr *)&ns_dag, sizeof(sockaddr_x));
 
 	//Check the response from the name server
 	memset(pkt, 0, sizeof(pkt));
+printf("register recvfrom %d\n", sock);
 	int rc = Xrecvfrom(sock, pkt, NS_MAX_PACKET_SIZE, 0, NULL, NULL);
 	if (rc < 0) { perror("recvfrom"); }
 
@@ -329,6 +332,7 @@ int XregisterName(const char *name, sockaddr_x *DAG) {
 	free(register_pkt.name);
 	free(register_pkt.dag);
 
+printf("register closing %d\n", sock);
 	//Close socket
 	Xclose(sock);
 

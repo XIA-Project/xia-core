@@ -207,8 +207,8 @@ void __attribute__ ((constructor)) xwrap_init(void)
 
 // call into the Xsockets API to see if the fd is associated with an Xsocket
 #define isXsocket(s)	 (_pure_xia == 1 || getSocketType(s) != -1)
-#define markWrapped(s)	 (setWrapped(s, 1))
-#define markUnwrapped(s) (setWrapped(s, 0))
+#define markWrapped(s)	 {setWrapped(s, 1);}
+#define markUnwrapped(s) {setWrapped(s, 0);}
 #define shouldWrap(s)	 (isXsocket(s) && !isWrapped(s))
 
 // FIXME: need a different name for this so it doesn't collide with above.
@@ -254,8 +254,6 @@ int _NewIP(sockaddr_x *sax, struct sockaddr_in *sin, int port)
 	sin->sin_port = port;
 
 	sprintf(s1, "%s-%d", s, ntohs(sin->sin_port));
-printf("nip %s\n", s);
-printf("new ip %s\n", s1);
 
 	Graph g(sax);
 
@@ -298,7 +296,7 @@ char *_IpString(char *s, struct sockaddr_in* sa)
 
 	// make a name from the ip address and port
 	sprintf(s, "%s-%u", ip, ntohs(sa->sin_port));
-	printf("%s\n", s);
+	printf("IPSTRING %s\n", s);
 	return s;
 }
 
@@ -308,7 +306,7 @@ int _i2x(struct sockaddr_in *sin, sockaddr_x *sax)
 	char s[64];
 	std::string dag = ip2dag[_IpString(s, sin)];
 
-	printf("dag=%s\n", dag.c_str());
+	printf("i2x dag=%s\n", dag.c_str());
 
 	Graph g(dag);
 	g.fill_sockaddr(sax);
@@ -380,7 +378,7 @@ int socket(int domain, int type, int protocol)
 	int fd;
 	TRACE();
 
-printf("t:%d p:%d %d %d\n", type, protocol, SOCK_STREAM, SOCK_DGRAM);
+printf("SOCKET t:%d p:%d %d %d\n", type, protocol, SOCK_STREAM, SOCK_DGRAM);
 	if ((domain == AF_XIA || FORCE_XIA()) && _wrap_socket) {
 		XIAIFY();
 
@@ -459,7 +457,7 @@ int bind(int fd, const struct sockaddr *addr, socklen_t len)
 	sockaddr_x sax;
 
 	TRACE();
-	if (isXsocket(fd)) {
+	if (shouldWrap(fd) ) {
 		XIAIFY();
 
 		if (FORCE_XIA()) {
@@ -478,6 +476,7 @@ int bind(int fd, const struct sockaddr *addr, socklen_t len)
 	} else {
 		rc = __real_bind(fd, addr, len);
 	}
+
 	return rc;
 }
 
@@ -488,7 +487,7 @@ int accept(int fd, struct sockaddr *addr, socklen_t *addr_len)
 	struct sockaddr *ipaddr;
 	socklen_t xlen;
 
-	printf("accept:%d\n", fd);
+	printf("ACCEPT:%d\n", fd);
 	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -500,9 +499,10 @@ int accept(int fd, struct sockaddr *addr, socklen_t *addr_len)
 
 		xlen = sizeof(sax);
 		markWrapped(fd);
+		_wrap_socket = 0;
 		rc = Xaccept(fd, addr, &xlen);
+		_wrap_socket = 1;
 		markUnwrapped(fd);
-	printf("accept new:%d\n", rc);
 
 		if (FORCE_XIA()) {
 			// create a new fake IP address/port  to map to
@@ -538,7 +538,7 @@ ssize_t recv(int fd, void *buf, size_t n, int flags)
 {
 	int rc;
 	TRACE();
-	printf("recv:%d\n", fd);
+
 	if (shouldWrap(fd)) {
 		XIAIFY();
 		markWrapped(fd);
@@ -614,6 +614,7 @@ ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, 
 	} else {
 		rc = __real_recvfrom(fd, buf, n, flags, addr, addr_len);
 	}
+
 	return rc;
 }
 
@@ -676,8 +677,10 @@ int setsockopt(int fd, int level, int optname, const void *optval, socklen_t opt
 		}
 
 	} else {
+
 		rc = __real_setsockopt(fd, level, optname, optval, optlen);
 	}
+
 	return rc;
 }
 
@@ -698,6 +701,7 @@ int close(int fd)
 {
 	int rc;
 	TRACE();
+printf("XXXXXXXXX CLOSE %d %d %d\n", fd, isXsocket(fd), isWrapped(fd));
 	if (shouldWrap(fd)) {
 		XIAIFY();
 		markWrapped(fd);
@@ -720,7 +724,7 @@ int getsockname(int fd, struct sockaddr *addr, socklen_t *len)
 	socklen_t oldlen;
 
 	TRACE();
-	if (isXsocket(fd)) {
+	if (shouldWrap(fd)) {
 		XIAIFY();
 
 		if (FORCE_XIA()) {
@@ -844,10 +848,6 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 		int port;
 		socklen_t len;
 
-
-		printf("getaddrinfo:\n");
-		printf("  flags: %08x\n", hints->ai_flags);
-
 		// FIXME: this assumes that name is an IP string
 		//  instead of a name
 
@@ -880,7 +880,7 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 		}
 
 		sprintf(s, "%s-%d", name, port);
-		printf("%s\n", s);
+
 		if (XgetDAGbyName(s, &sax, &len) < 0) {
 			printf("name lookup error\n");
 			errno = EAI_NONAME;
