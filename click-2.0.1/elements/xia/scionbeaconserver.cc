@@ -129,8 +129,6 @@ int SCIONBeaconServer::initialize(ErrorHandler* errh){
 
 	// task 3: parse topology file
 	parseTopology();
-	//constructIfid2AddrMap();
-	//initializeOutputPort();
 	scionPrinter->printLog(IL, (char*)"Parse Topology Done.\n");
 
 	// task 4: read key pair if they already exist
@@ -310,6 +308,7 @@ SCIONBeaconServer::requestROT() {
 */
 void 
 SCIONBeaconServer::run_timer(Timer *timer){
+    
     sendHello();
 
 	time_t curTime;
@@ -544,26 +543,6 @@ SCIONBeaconServer::saveCertificate(SPacket * packet, uint16_t packetLength) {
 	fwrite(packet+hdrLen+CERT_INFO_SIZE,1,cLength,cFile);
 	fclose(cFile);
 }
-	
-/*
-	SLN:
-	update ifid_map
-*/
-void
-SCIONBeaconServer::updateIfidMap(SPacket * packet) {
-	uint32_t ts = 0;
-	uint64_t src = 0;
-				
-	uint8_t hdrLen = SPH::getHdrLen(packet);
-	IFIDRequest * ir = (IFIDRequest *)(packet+hdrLen);
-	uint16_t nifid = ir->reply_id;  
-	uint16_t ifid = ir->request_id;
-	ifid_map.insert(pair<uint16_t, uint16_t>(ifid, nifid));
-
-	scionPrinter->printLog(IH, SPH::getType(packet),(char *)"BS (%lu:%lu): IFID received (neighbor:%d - self:%d)\n", m_uAdAid,m_uAid, nifid, ifid);
-	//SL:
-	//print information needs to be revised everywhere...
-}
 
 
 /*
@@ -613,37 +592,6 @@ SCIONBeaconServer::saveROT(SPacket * packet, uint16_t packetLength)
 	}
 }
 
-/*
-	SLN:
-	send AID reply packet to SCION switch
-*/
-void
-SCIONBeaconServer::sendAIDReply(SPacket * packet, uint16_t packetLength){
-	/*AID_REQ : AID request from switch, sends back its AID*/
-	//SL: changed w/ the new packet format...
-	scionHeader hdr;
-	
-	//set src/dst addresses
-	hdr.src = HostAddr(HOST_ADDR_SCION,m_uAid);
-
-	//set common header
-	hdr.cmn.type = AID_REP;
-	hdr.cmn.hdrLen = COMMON_HEADER_SIZE+hdr.src.getLength();
-	hdr.cmn.totalLen = packetLength;
-	
-	SPH::setHeader(packet,hdr);
-
-	uint16_t type = SPH::getType(packet);
-	time_t ts = time(NULL);
-
-	//SLT: temporarily blocked...
-	scionPrinter->printLog(IH,type,ts,hdr.src.numAddr(),m_uAdAid,(char *)"AID REQ: %u,RECEIVED\n",packetLength);
-
-	//sendPacket(packet, packetLength, PORT_TO_SWITCH); 
-	sendPacket(packet, packetLength, "");
-	_AIDIsRegister = true;
-}
-
 void SCIONBeaconServer::push(int port, Packet *p)
 {
     TransportHeader thdr(p);
@@ -659,11 +607,7 @@ void SCIONBeaconServer::push(int port, Packet *p)
     p->kill();
 	
 	if(type==BEACON){
-		//PCB arrived        
-		/*BEACON: verifies signature
-		- if passes then add to beacon table, remove signature, and send to Path Server
-		- if not, ignores. 
-		*/
+		
 		if(!m_bROTInitiated){
 			scionPrinter->printLog(IH, (char *)"BS (%s): No valid ROT file. Ignoring PCB.\n", m_AD.c_str(), m_HID.c_str());
             return;
@@ -684,6 +628,7 @@ void SCIONBeaconServer::push(int port, Packet *p)
 			//continue;
 			return;
 		}// ROT version change handler
+		
 		processPCB(packet,packetLength);
 
 	}else {
@@ -703,25 +648,6 @@ void SCIONBeaconServer::push(int port, Packet *p)
 			default:
 				//scionPrinter->printLog(IH, (char *)"BS(%lu:%lu) Unsupported type (%d) packet.\n",m_uAdAid,m_uAid,type);
 				break;
-				
-			/*
-			case IFID_REP:
-				//IFID_REP : maps router IFID with neighboring IFID
-				//Only active interface ID will be inserted in the ifid_map.
-				//The interfaces without any mappings but still in the topology file
-				//will not be added (or propagated ) to the beacon.
-				
-				//IFIDNEW
-				//SL: Border routers should send IFID_REP as soon as neighbors' IFID is available.
-				//This should be implemented at routers
-
-				updateIfidMap(packet);
-				break;
-
-			case AID_REQ:
-				sendAIDReply(packet,packetLength);
-				break;
-			*/
 		}
 	}
 	
@@ -1956,34 +1882,6 @@ void SelectionPolicy::printPcb(const pcb* p){
         mrkPtr = (pcbMarking*)ptr;
     }
     printf("\n");
-}
-
-/* SLT:
-	Construct ifid2addr map
-*/
-void SCIONBeaconServer::constructIfid2AddrMap() {
-	std::multimap<int, RouterElem>::iterator itr;
-	for(itr = m_routers.begin(); itr!=m_routers.end(); itr++) {
-		ifid2addr.insert(std::pair<uint16_t,HostAddr>(itr->second.interface.id, itr->second.addr));
-	}
-}
-
-/*
-	SCIONBeaconServer::initializeOutputPort
-	prepare IP header for IP encapsulation
-	if the port is assigned an IP address
-*/
-void SCIONBeaconServer::initializeOutputPort() {
-	
-	portInfo p;
-	p.addr = m_Addr;
-	m_vPortInfo.push_back(p);
-
-	//Initialize port 0; i.e., prepare internal communication
-	if(m_Addr.getType() == HOST_ADDR_IPV4) {
-		m_pIPEncap = new SCIONIPEncap;
-		m_pIPEncap->initialize(m_Addr.getIPv4Addr());
-	}
 }
 
 CLICK_ENDDECLS

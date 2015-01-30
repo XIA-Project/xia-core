@@ -301,20 +301,6 @@ class SCIONBeaconServer : public Element {
         void addUnverifiedPcb(uint8_t* pkt);
 	
         /**
-            @brief construct IFID/ADDR mapping.
-
-            This function constructs a interface id to address mapping.
-            Specifically, it mapps the interface ids to the addresses of routers
-            who has the interface ID. The interface ids that each router has is
-            defined in the .conf file and the topology file. 
-
-            This mapping is required when forwarding the PCBs to the downstream
-            ADs. After the propagate() function adds the markings it puts the
-            interface ID to the special opaque field. Then it sets the address as
-            the address of the router who owns that interface ID. 
-        */
-        void constructIfid2AddrMap(); 
-        /**
             @brief UNUSED
         */
         void printPaths();
@@ -497,7 +483,6 @@ class SCIONBeaconServer : public Element {
             @note The fragmentation of the file might be necessary.
         */
 		void saveCertificate(uint8_t * packet, uint16_t packetLength);
-		void updateIfidMap(uint8_t * packet);
         /**
             @brief Saves the ROT to the local file system. 
             @param uint8_t* packet The packet that contains the ROT.
@@ -512,8 +497,6 @@ class SCIONBeaconServer : public Element {
             @note The fragmentation of the file might be necessary.
         */
 		void saveROT(uint8_t * packet, uint16_t packetLength);
-		void sendAIDReply(uint8_t * packet, uint16_t packetLength);
-		void initializeOutputPort();
 
     private:
 
@@ -634,10 +617,10 @@ class SCIONBeaconServer : public Element {
             List of certificates. 
             Maps between the owner AID and certificates in x509_crt type 
         */
-	std::map<uint64_t, x509_crt*> m_certMap;
+		std::map<uint64_t, x509_crt*> m_certMap;
 		
-	// use for XIA temporally 
-	std::multimap<int, EgressIngressPair> m_routepairs;
+		// use for XIA temporally 
+		std::multimap<int, EgressIngressPair> m_routepairs;
 		
         SCIONPrint* scionPrinter;
        
