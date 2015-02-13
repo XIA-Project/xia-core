@@ -3,12 +3,12 @@ require(library xia_address.click);
 
 controller1 :: XIAController4Port(RE AD1 CHID1, AD1, CHID1, 0.0.0.0, 1500, aa:aa:aa:aa:aa:aa);
 router1 :: XIARouter2Port(RE AD1 RHID1, AD1, RHID1, 0.0.0.0, 1600, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
-beacon1 :: XIASCIONBeaconServerCore(RE AD1 BHID1, AD1, BHID1, 0.0.0.0, 1700, aa:aa:aa:aa:aa:aa,
+beacon1 :: XIONBeaconServerCore(RE AD1 BHID1, AD1, BHID1, 0.0.0.0, 1700, aa:aa:aa:aa:aa:aa,
         AID 11111,
         CONFIG_FILE "./TD1/TDC/AD1/beaconserver/conf/AD1BS.conf",
         TOPOLOGY_FILE "./TD1/TDC/AD1/topology1.xml",
         ROT "./TD1/TDC/AD1/beaconserver/ROT/rot-td1-0.xml");
-path1 :: XIASCIONPathServerCore(RE AD1 PHID1, AD1, PHID1, 0.0.0.0, 3700, aa:aa:aa:aa:aa:aa,
+path1 :: XIONPathServerCore(RE AD1 PHID1, AD1, PHID1, 0.0.0.0, 3700, aa:aa:aa:aa:aa:aa,
         AID 11111,
         CONFIG_FILE "./TD1/TDC/AD1/pathserver/conf/AD1PS.conf",
         TOPOLOGY_FILE "./TD1/TDC/AD1/topology1.xml");
@@ -18,12 +18,12 @@ router21 :: XIARouter4Port(RE AD2 RHID2, AD2, RHID2, 0.0.0.0, 1900,
         aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
 router22 :: XIARouter4Port(RE AD2 RHID4, AD2, RHID4, 0.0.0.0, 2400, 
 		aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
-beacon2 :: XIASCIONBeaconServer(RE AD2 BHID2, AD2, BHID2, 0.0.0.0, 2000, aa:aa:aa:aa:aa:aa,
+beacon2 :: XIONBeaconServer(RE AD2 BHID2, AD2, BHID2, 0.0.0.0, 2000, aa:aa:aa:aa:aa:aa,
         AID 22222,
         CONFIG_FILE "./TD1/Non-TDC/AD2/beaconserver/conf/AD2BS.conf",
         TOPOLOGY_FILE "./TD1/Non-TDC/AD2/topology2.xml",
         ROT "./TD1/Non-TDC/AD2/beaconserver/ROT/rot-td1-0.xml");
-path2 :: XIASCIONPathServer(RE AD2 PHID2, AD2, PHID2, 0.0.0.0, 3000, aa:aa:aa:aa:aa:aa,
+path2 :: XIONPathServer(RE AD2 PHID2, AD2, PHID2, 0.0.0.0, 3000, aa:aa:aa:aa:aa:aa,
         AID 22222,
         CONFIG_FILE "./TD1/Non-TDC/AD2/pathserver/conf/AD2PS.conf",
         TOPOLOGY_FILE "./TD1/Non-TDC/AD2/topology2.xml");
@@ -31,12 +31,12 @@ path2 :: XIASCIONPathServer(RE AD2 PHID2, AD2, PHID2, 0.0.0.0, 3000, aa:aa:aa:aa
 controller3 :: XIAController4Port(RE AD3 CHID3, AD3, CHID3, 0.0.0.0, 2100, aa:aa:aa:aa:aa:aa);
 router3 :: XIARouter4Port(RE AD3 RHID3, AD3, RHID3, 0.0.0.0, 2200,
         aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
-beacon3 :: XIASCIONBeaconServer(RE AD3 BHID3, AD3, BHID3, 0.0.0.0, 2300, aa:aa:aa:aa:aa:aa,
+beacon3 :: XIONBeaconServer(RE AD3 BHID3, AD3, BHID3, 0.0.0.0, 2300, aa:aa:aa:aa:aa:aa,
         AID 33333,
         CONFIG_FILE "./TD1/Non-TDC/AD3/beaconserver/conf/AD3BS.conf",
         TOPOLOGY_FILE "./TD1/Non-TDC/AD3/topology3.xml",
         ROT "./TD1/Non-TDC/AD3/beaconserver/ROT/rot-td1-0.xml");
-path3 :: XIASCIONPathServer(RE AD3 PHID3, AD3, PHID3, 0.0.0.0, 3300, aa:aa:aa:aa:aa:aa,
+path3 :: XIONPathServer(RE AD3 PHID3, AD3, PHID3, 0.0.0.0, 3300, aa:aa:aa:aa:aa:aa,
         AID 33333,
         CONFIG_FILE "./TD1/Non-TDC/AD3/pathserver/conf/AD3PS.conf",
         TOPOLOGY_FILE "./TD1/Non-TDC/AD3/topology3.xml");
@@ -44,17 +44,17 @@ path3 :: XIASCIONPathServer(RE AD3 PHID3, AD3, PHID3, 0.0.0.0, 3300, aa:aa:aa:aa
 controller4 :: XIAController4Port(RE AD4 CHID4, AD4, CHID4, 0.0.0.0, 2500, aa:aa:aa:aa:aa:aa);
 router4 :: XIARouter4Port(RE AD4 RHID5, AD4, RHID5, 0.0.0.0, 2600,
         aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
-beacon4 :: XIASCIONBeaconServer(RE AD4 BHID4, AD4, BHID4, 0.0.0.0, 2700, aa:aa:aa:aa:aa:aa,
+beacon4 :: XIONBeaconServer(RE AD4 BHID4, AD4, BHID4, 0.0.0.0, 2700, aa:aa:aa:aa:aa:aa,
         AID 44444,
         CONFIG_FILE "./TD1/Non-TDC/AD4/beaconserver/conf/AD4BS.conf",
         TOPOLOGY_FILE "./TD1/Non-TDC/AD4/topology4.xml",
         ROT "./TD1/Non-TDC/AD4/beaconserver/ROT/rot-td1-0.xml");
-path4 :: XIASCIONPathServer(RE AD4 PHID4, AD4, PHID4, 0.0.0.0, 3900, aa:aa:aa:aa:aa:aa,
+path4 :: XIONPathServer(RE AD4 PHID4, AD4, PHID4, 0.0.0.0, 3900, aa:aa:aa:aa:aa:aa,
         AID 44444,
         CONFIG_FILE "./TD1/Non-TDC/AD4/pathserver/conf/AD4PS.conf",
         TOPOLOGY_FILE "./TD1/Non-TDC/AD4/topology4.xml");
 
-enc4 :: XIASCIONEncap(RE AD4 CHID5, AD4, CHID5, 0.0.0.0, 4000, aa:aa:aa:aa:aa:aa);
+enc4 :: XIONEncap(RE AD4 CHID5, AD4, CHID5, 0.0.0.0, 4000, aa:aa:aa:aa:aa:aa);
 
 controller1[0] -> LinkUnqueue(0.005, 1 GB/s) -> [0]beacon1;
 beacon1[0] -> LinkUnqueue(0.005, 1 GB/s) -> [0]controller1;

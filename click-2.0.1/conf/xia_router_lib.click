@@ -492,8 +492,62 @@ elementclass XIAController4Port {
 	xrc -> XIAPaintSwitch[0,1,2,3] => [1]xlc0[1], [1]xlc1[1], [1]xlc2[1], [1]xlc3[1] -> [0]xrc;
 };
 
+// 1-port SCION Cert Server Core
+elementclass XIONCertServerCore {
+    $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac,
+    AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot |
+
+    // $local_addr: the full address of the node
+    // $local_ad: the node's AD
+    // $local_hid: the node's HID
+    // $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
+
+    // input[0]: a packet arrived at the node
+    // output[0]: forward to interface 0
+
+    xlc :: XIALineCard($local_addr, $local_hid, $mac, 0);
+
+    xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $click_port, 1, 0);
+    //Script(write xrc/n/proc/rt_AD.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
+    //Script(write xrc/n/proc/rt_HID.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
+
+    sbs :: SCIONCertServerCore(AD $local_ad, HID $local_hid,
+            AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot);
+
+    input => xlc => output;
+
+    sbs -> xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> sbs;
+};
+
+// 1-port SCION Cert Server
+elementclass XIONCertServer {
+    $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac,
+    AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot |
+
+    // $local_addr: the full address of the node
+    // $local_ad: the node's AD
+    // $local_hid: the node's HID
+    // $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
+
+    // input[0]: a packet arrived at the node
+    // output[0]: forward to interface 0
+
+    xlc :: XIALineCard($local_addr, $local_hid, $mac, 0);
+
+    xrc :: XIARoutingCore($local_addr, $local_hid, $external_ip, $click_port, 1, 0);
+    //Script(write xrc/n/proc/rt_AD.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
+    //Script(write xrc/n/proc/rt_HID.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
+
+    sbs :: SCIONCertServer(AD $local_ad, HID $local_hid,
+            AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot);
+
+    input => xlc => output;
+
+    sbs -> xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> sbs;
+};
+
 // 1-port SCION Beacon Server Core
-elementclass XIASCIONBeaconServerCore {
+elementclass XIONBeaconServerCore {
     $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac,
     AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot |
 
@@ -520,7 +574,7 @@ elementclass XIASCIONBeaconServerCore {
 };
 
 // 1-port SCION Beacon Server
-elementclass XIASCIONBeaconServer {
+elementclass XIONBeaconServer {
     $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac,
     AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot |
 
@@ -547,7 +601,7 @@ elementclass XIASCIONBeaconServer {
 };
 
 // 1-port SCION Path Server Core
-elementclass XIASCIONPathServerCore {
+elementclass XIONPathServerCore {
     $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac,
     AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file |
 
@@ -574,7 +628,7 @@ elementclass XIASCIONPathServerCore {
 };
 
 // 1-port SCION Path Server
-elementclass XIASCIONPathServer {
+elementclass XIONPathServer {
     $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac,
     AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file |
 
@@ -601,7 +655,7 @@ elementclass XIASCIONPathServer {
 };
 
 // 1-port SCION Encap
-elementclass XIASCIONEncap {
+elementclass XIONEncap {
     $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac |
 
     // $local_addr: the full address of the node
