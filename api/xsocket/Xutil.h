@@ -62,6 +62,8 @@ int getSocketData(int sock, char *buf, unsigned bufLen);
 void setSocketData(int sock, const char *buf, unsigned bufLen);
 void setWrapped(int sock, int wrapped);
 int isWrapped(int sock);
+int isAPI(int sock);
+void setAPI(int sock, int api);
 void setBlocking(int sock, int blocking);
 int isBlocking(int sock);
 void setDebug(int sock, int debug);

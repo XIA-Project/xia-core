@@ -60,6 +60,7 @@ int Xclose(int sockfd)
 	}
 
 	setWrapped(sockfd, TRUE);
+//	(_f_close)(new_sockfd);
 	close(sockfd);
 	setWrapped(sockfd, FALSE);
 	freeSocketState(sockfd);

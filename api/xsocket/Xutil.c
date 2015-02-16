@@ -136,6 +136,7 @@ int click_send(int sockfd, xia::XSocketMsg *xsm)
 
 		//LOGF("sending to click: seq: %d type: %d", xsm->sequence(), xsm->type());
 		setWrapped(sockfd, TRUE);
+//		rc = (_f_sendto)(sockfd, p, remaining, 0, (struct sockaddr *)&sa, sizeof(sa));
 		rc = sendto(sockfd, p, remaining, 0, (struct sockaddr *)&sa, sizeof(sa));
 		setWrapped(sockfd, FALSE);
 
@@ -192,7 +193,12 @@ printf("in the cache!\n");
 			FD_SET(sock, &fds);
 			tv.tv_sec = 0;
 			tv.tv_usec = 10000;
+			setAPI(sock, TRUE);
+			setWrapped(sock, TRUE);
+//			rc = (_f_select)(sock+1, &fds, NULL, NULL, &tv);
 			rc = select(sock+1, &fds, NULL, NULL, &tv);
+			setWrapped(sock, FALSE);
+			setAPI(sock, FALSE);
 			if (rc == 0)
 				continue;
 			else if (rc < 0) {
@@ -203,6 +209,7 @@ printf("in the cache!\n");
 			}
 
 			setWrapped(sock, TRUE);
+//			rc = (_f_recvfrom)(sock, buf, buflen - 1 , 0, NULL, NULL);
 			rc = recvfrom(sock, buf, buflen - 1 , 0, NULL, NULL);
 			setWrapped(sock, FALSE);
 

@@ -63,6 +63,7 @@ int Xfcntl(int sockfd, int cmd, ...)
 
 	switch(cmd) {
 		case F_GETFL:
+//			rc = (_f_fcntl)(sockfd, cmd);
 			rc = fcntl(sockfd, cmd);
 			if (rc >= 0 && isBlocking(sockfd))
 				rc |= O_NONBLOCK;

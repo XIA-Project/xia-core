@@ -60,11 +60,15 @@ public:
 	void setDebug(int debug) { m_debug = debug; };
 	int getDebug() { return m_debug; };
 
+	void setAPI(int api) { api ? m_api++ : m_api--; };
+	int isAPI() { return m_api != 0; };
+
 	void setRecvTimeout(struct timeval *timeout) { m_timeout.tv_sec = timeout->tv_sec; m_timeout.tv_usec = timeout->tv_usec; };
 	void getRecvTimeout(struct timeval *timeout) {timeout->tv_sec = m_timeout.tv_sec; timeout->tv_usec = m_timeout.tv_usec; };
 
 	void setError(int error) { m_error = error; };
 	int getError() { return m_error; m_error = 0; };
+//	int getError() { int e = m_error; m_error = 0; return e; };
 
 	const sockaddr_x *peer() { return m_peer; };
 	int setPeer(const sockaddr_x *peer);
@@ -77,6 +81,7 @@ private:
 	int m_wrapped;	// hack for dealing with xwrap stuff
 	int m_debug;
 	int m_error;
+	int m_api;
 	char *m_buf;
 	sockaddr_x *m_peer;
 	unsigned m_bufLen;
@@ -348,6 +353,22 @@ void setWrapped(int sock, int wrapped)
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
 		sstate->setWrapped(wrapped);
+}
+
+int isAPI(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		return sstate->isAPI();
+	else
+		return FALSE;
+}
+
+void setAPI(int sock, int api)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		sstate->setAPI(api);
 }
 
 int isBlocking(int sock)

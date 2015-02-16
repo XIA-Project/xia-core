@@ -152,6 +152,7 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 
 	// because this isn't a socket from the suer, we will just block until it returns
 	// so don't set to nonblocking
+//	if ((sock = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
 	if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		LOGF("error creating Xpoll socket: %s", strerror(errno));
 		return -1;

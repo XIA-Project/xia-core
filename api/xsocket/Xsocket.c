@@ -93,6 +93,7 @@ int Xsocket(int family, int transport_type, int protocol)
 			return -1;
 	}
 
+//	if ((sockfd = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
 	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		LOGF("error creating Xsocket: %s", strerror(errno));
 		return -1;
@@ -101,10 +102,11 @@ int Xsocket(int family, int transport_type, int protocol)
 	allocSocketState(sockfd, transport_type);
 
 
-struct timeval tv;
-tv.tv_sec = 0;
-tv.tv_usec = 10000;
-setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+	struct timeval tv;
+	tv.tv_sec = 0;
+	tv.tv_usec = 10000;
+//	(_f_setsockopt)(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
 	// protobuf message
 	xia::XSocketMsg xsm;
@@ -117,6 +119,7 @@ setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
+//		(_f_close)(sockfd);
 		close(sockfd);
 		return -1;
 	}
@@ -132,6 +135,7 @@ setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
 	// close the control socket since the underlying Xsocket is no good
 	freeSocketState(sockfd);
-	close(sockfd);
+//	(_f_close)(sockfd);
+	close(sockfd);	
 	return rc;
 }

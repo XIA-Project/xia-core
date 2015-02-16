@@ -32,12 +32,57 @@
 #include <limits.h>
 #include <pthread.h>
 #include <errno.h>
+#include <dlfcn.h> 
+
+#define LIBNAME	"libc.so.6"
 
 using namespace std;
 
 extern "C" {
 
+socket_t _f_socket;
+bind_t _f_bind;
+getsockname_t _f_getsockname;
+setsockopt_t _f_setsockopt;
+close_t _f_close;
+fcntl_t _f_fcntl;
+select_t _f_select;
+sendto_t _f_sendto;
+recvfrom_t _f_recvfrom;
+
+
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+
+void load_func_ptrs()
+{
+	void *handle = dlopen(LIBNAME, RTLD_LAZY);
+
+	if (!handle) {
+		fprintf(stderr, "Unable to locate %s. Is there a different version of libc?", LIBNAME);
+		exit(-1);
+	} 
+
+	printf("handle = %p\n", handle);
+	if(!(_f_socket = (socket_t)dlsym(handle, "socket")))
+		printf("can't find socket!\n");
+	if(!(_f_bind = (bind_t)dlsym(handle, "bind")))
+		printf("can't find bind!\n");
+	if(!(_f_getsockname = (getsockname_t)dlsym(handle, "getsockname")))
+		printf("can't find getsockname!\n");
+	if(!(_f_setsockopt = (setsockopt_t)dlsym(handle, "setsockopt")))
+		printf("can't find setsockopt!\n");
+	if(!(_f_close = (close_t)dlsym(handle, "close")))
+		printf("can't find close!\n");
+	if(!(_f_fcntl = (fcntl_t)dlsym(handle, "fcntl")))
+		printf("can't find fcntl!\n");
+	if(!(_f_select = (select_t)dlsym(handle, "select")))
+		printf("can't find select!\n");
+	if(!(_f_sendto = (sendto_t)dlsym(handle, "sendto")))
+		printf("can't find sendto!\n");
+	if(!(_f_recvfrom = (recvfrom_t)dlsym(handle, "recvfrom")))
+		printf("can't find recvfrom!\n");
+}
+
 
 	/*!
 	** @brief Specify the location of the XSockets configuration file.
@@ -55,6 +100,7 @@ static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 		snprintf(__XSocketConf::master_conf, BUF_SIZE, "%s%s", XrootDir(root, BUF_SIZE), "/etc/xsockconf.ini");
         __InitXSocket::read_conf(filename, sectionname);
+        load_func_ptrs();
 		__XSocketConf::initialized=1;
 		pthread_mutex_unlock(&lock);
     }
@@ -123,6 +169,8 @@ __InitXSocket::__InitXSocket()
 
 	// NOTE: unlikely, but what happens if section_name is NULL?
 	read_conf(inifile, section_name);
+
+    load_func_ptrs();
 }
 
 /*!
