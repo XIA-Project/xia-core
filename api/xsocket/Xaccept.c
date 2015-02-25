@@ -95,8 +95,7 @@ printf("XACCEPT %d\n", sockfd);
 	}
 
 	// Create new socket (this is a socket between API and Xtransport)
-//	if ((new_sockfd = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
-	if ((new_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+	if ((new_sockfd = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		LOGF("Error creating new socket: %s", strerror(errno));
 		return -1;
 	}
@@ -110,11 +109,8 @@ printf("accept fd=%d SOCK_STREAM=%d\n", new_sockfd, SOCK_STREAM);
 	my_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 	my_addr.sin_port = 0;
 
-	setWrapped(new_sockfd, TRUE);
 	if (bind(new_sockfd, (const struct sockaddr *)&my_addr, sizeof(my_addr)) < 0) {
-//		(_f_close)(new_sockfd);
-		close(new_sockfd);
-		setWrapped(new_sockfd, FALSE);
+		(_f_close)(new_sockfd);
 
 		LOGF("Error binding new socket to local port: %s", strerror(errno));
 		return -1;
@@ -125,15 +121,11 @@ printf("accept fd=%d SOCK_STREAM=%d\n", new_sockfd, SOCK_STREAM);
 	// Tell click what the new socket's port is (but we'll tell click
 	// over the old socket)
 	len = sizeof(my_addr);
-//	if((_f_getsockname)(new_sockfd, (struct sockaddr *)&my_addr, &len) < 0) {
-	if(getsockname(new_sockfd, (struct sockaddr *)&my_addr, &len) < 0) {
-//		(_f_close)(new_sockfd);
-		close(new_sockfd);
-		setWrapped(new_sockfd, FALSE);
+	if((_f_getsockname)(new_sockfd, (struct sockaddr *)&my_addr, &len) < 0) {
+		(_f_close)(new_sockfd);
 		LOGF("Error retrieving new socket's UDP port: %s", strerror(errno));
 		return -1;
 	}
-	setWrapped(new_sockfd, FALSE);
 
 	xia::XSocketMsg xia_socket_msg;
 	xia_socket_msg.set_type(xia::XACCEPT);
@@ -152,8 +144,7 @@ printf("accept fd=%d SOCK_STREAM=%d\n", new_sockfd, SOCK_STREAM);
 
 // FIXME: change to use click rely so we get the peer dag!
 	if (click_status(sockfd, seq) < 0) {
-//		(_f_close)(new_sockfd);
-		close(new_sockfd);
+		(_f_close)(new_sockfd);
 		LOGF("Error getting status from Click: %s", strerror(errno));
 		return -1;
 	}

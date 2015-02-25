@@ -61,6 +61,11 @@ int Xsocket(int family, int transport_type, int protocol)
 {
 	int rc;
 	int sockfd;
+	int nonblock = FALSE;
+
+	// force the system to init and load the socket function pointers
+	get_conf();
+
 
 	if (family != AF_XIA) {
 		LOG("error: the Xsockets API only supports the AF_XIA family");
@@ -69,16 +74,20 @@ int Xsocket(int family, int transport_type, int protocol)
 	}
 
 	if (protocol != 0) {
-		LOG("error: the protocol field is not currently used in the Xsocket API");
-		errno = EINVAL;
-		return -1;
+		LOG("warning: the protocol field is not currently used in the Xsocket API");
+		protocol = 0;
 	}
 
-	/*if (transport_type & SOCK_NONBLOCK || transport_type & SOCK_CLOEXEC) {
-		LOG("error: invalid flags passed as part of the treansport_type");
-		errno = EINVAL;
-		return -1;
-		}*/
+
+	if (transport_type & SOCK_CLOEXEC) {
+		LOG("warning: SOCK_CLOEXEC is not currently supported in XIA");
+		}
+
+	if (transport_type && SOCK_NONBLOCK)
+		nonblock = TRUE;
+
+	// get rid of the flags
+	transport_type &= 0x0f;
 
 	switch (transport_type) {
 		case SOCK_STREAM:
@@ -93,20 +102,18 @@ int Xsocket(int family, int transport_type, int protocol)
 			return -1;
 	}
 
-//	if ((sockfd = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
-	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+	if ((sockfd = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		LOGF("error creating Xsocket: %s", strerror(errno));
 		return -1;
 	}
 
 	allocSocketState(sockfd, transport_type);
+	setBlocking(sockfd, nonblock);
 
-
-	struct timeval tv;
-	tv.tv_sec = 0;
-	tv.tv_usec = 10000;
+//	struct timeval tv;
+//	tv.tv_sec = 0;
+//	tv.tv_usec = 10000;
 //	(_f_setsockopt)(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
 	// protobuf message
 	xia::XSocketMsg xsm;
@@ -119,8 +126,7 @@ int Xsocket(int family, int transport_type, int protocol)
 
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
-//		(_f_close)(sockfd);
-		close(sockfd);
+		(_f_close)(sockfd);
 		return -1;
 	}
 
@@ -135,7 +141,6 @@ int Xsocket(int family, int transport_type, int protocol)
 
 	// close the control socket since the underlying Xsocket is no good
 	freeSocketState(sockfd);
-//	(_f_close)(sockfd);
-	close(sockfd);	
+	(_f_close)(sockfd);	
 	return rc;
 }

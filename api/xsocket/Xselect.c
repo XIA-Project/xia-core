@@ -29,6 +29,7 @@ typedef struct {
 	unsigned port;
 } Sock2Port;
 
+
 /*!
 ** @brief waits for one of a set of Xsockets to become ready to perform I/O.
 **
@@ -51,158 +52,156 @@ typedef struct {
 */
 int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 {
-	int sock;
-	int actionable = 0;
-	int active = 0;
+	int sock = 0;
+	int nxfds = 0;
+	int rc, xrc;
 
-	Sock2Port *s2p = (Sock2Port*)calloc(nfds, sizeof(Sock2Port));
-	// FIXME check for error here
-	// FIXME make sure we free s2p if we exit early
-
-	// if timeout is 0, don't do anything
-	// FIXME should we do a test that returns immediately in this case?
-	if (timeout == 0)
-		return 0;
-
-	// it's possible to call with no ufds and just do a timeout
-	// so make sure if ufds is set that we know how many there are
 	if (ufds == NULL && nfds > 0) {
 		errno = EFAULT;
 		return -1;
 	}
 
-	// see how many sockets in the set actually want poll results back
-	for (unsigned i = 0; i < nfds; i++) {
-		if (ufds[i].fd > 0 && (ufds[i].events & (POLLIN | POLLOUT | POLLPRI)))
-			actionable ++;
-	}
+	struct pollfd *rfds = (struct pollfd*)calloc(nfds + 1, sizeof(struct pollfd));
+	Sock2Port *s2p = (Sock2Port*)calloc(nfds, sizeof(Sock2Port));
 
-	if (!actionable) {
-		// just sleep for the specified time
-		if (timeout < 0) {
-			// ERROR this would block forever
-			errno = EINVAL;
-			return -1;
-		}
-		usleep(timeout * 1000);
-		return 0;
-	}
-	
-	actionable = 0;
+	memcpy(rfds, ufds, nfds * sizeof(struct pollfd));
 
 	xia::XSocketMsg xsm;
-	xsm.set_type(xia::XPOLL);
-	xsm.set_sequence(0);
-
 	xia::X_Poll_Msg *pollMsg = xsm.mutable_x_poll();
-	pollMsg->set_timeout(timeout);
-	pollMsg->set_nfds(nfds);
+
+	pollMsg->set_type(xia::X_Poll_Msg::DOPOLL);
 
 	for (unsigned i = 0; i < nfds; i++) {
-		xia::X_Poll_Msg::PollFD *pfd = pollMsg->add_pfds();
 
-		pfd->set_flags(ufds[i].events);
+		ufds[i].revents = 0;
 
-		// click needs the port, so look it up from socket
-		if (ufds[i].fd < 0) {
+		if (ufds[i].fd > 0 && (ufds[i].events & (POLLIN | POLLOUT | POLLPRI))) {
+			if (getSocketType(ufds[i].fd) != XSOCK_INVALID) {
+				// add the Xsocket to the xpoll struct
+				// TODO: should this work for Content sockets?
 
-			// printf("port is negative, we'll skip it\n");
-			pfd->set_port(0);
-			pfd->set_flags(0);
-			ufds[i].revents = 0;
+				xia::X_Poll_Msg::PollFD *pfd = pollMsg->add_pfds();
+				
+				// find the port number associated with this Xsocket
+				struct sockaddr_in sin;
+				socklen_t slen = sizeof(sin);
+				(_f_getsockname)(ufds[i].fd, (struct sockaddr*)&sin, &slen);
+				//printf("sock %d, port %d, flags %x\n", ufds[i].fd, ntohs(sin.sin_port), ufds[i].events);
 
-		// FIXME, we should probably only let this work for stream and datagram sockets
-		} else if (getSocketType(ufds[i].fd) == XSOCK_INVALID) {
-			//printf("socket %d is not a valid Xsocket\n", ufds[i].fd);
+				pfd->set_port(sin.sin_port);
+				s2p[i].fd = ufds[i].fd;
+				s2p[i].port = sin.sin_port;
 
-			ufds[i].revents = POLLNVAL;
-			actionable++;
+				pfd->set_flags(ufds[i].events);
 
-		} else {
-			active ++;
+				nxfds++;
 
-			ufds[i].revents = 0;
+				// disable the socket in the real poll list
+				rfds[i].fd = -rfds[i].fd;
 
-			// find the port number associated with this Xsocket
-			struct sockaddr_in sin;
-			socklen_t slen = sizeof(sin);
-			getsockname(ufds[i].fd, (struct sockaddr*)&sin, &slen);
-			//printf("sock %d, port %d, flags %x\n", ufds[i].fd, ntohs(sin.sin_port), ufds[i].events);
-
-			pfd->set_port(sin.sin_port);
-			s2p[i].fd = ufds[i].fd;
-			s2p[i].port = sin.sin_port;
+			} else {
+				s2p[i].fd = s2p[i].port = 0;
+			}
 		}
-
-
 	}
 
-	if (actionable) {
-		// we hit an error condition, return results immediately
-		return actionable;
-
+	if (nxfds == 0) {
+		// there are no Xsocket to poll for, just do a straight poll with the original data
+		return 	(_f_poll)(ufds, nfds, timeout);
 	}
 
-	if (active == 0) {
-		// no sockets need to be checked, just do a timeout?
-		if (timeout > 0)
-			usleep(timeout * 1000);
-		return 0;
-	}
+	xsm.set_type(xia::XPOLL);
+	xsm.set_sequence(0);
+	pollMsg->set_nfds(nxfds);
 
-	// because this isn't a socket from the suer, we will just block until it returns
-	// so don't set to nonblocking
-//	if ((sock = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
-	if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+
+	// Real sockets in the Poll message are set to 0. They are left in the list to make processing easier
+
+	// the rfds (Real fd) list has the fds flipped negative for the xsockets so they will be ignored 
+	//  for the same reason
+
+	if ((sock = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		LOGF("error creating Xpoll socket: %s", strerror(errno));
-		return -1;
+		rc = -1;
+		goto done;
 	}
+	allocSocketState(sock, SOCK_DGRAM);
 
 	click_send(sock, &xsm);
 
-	int rc = click_reply(sock, 0, &xsm);
-	close(sock);
+	// now we need to do a real poll
+	// it will trigger once click generates an xpoll event or pone of the external fds has an event
 
-	// FIXME check for errors here
+	// add the poll control socket
+	rfds[nfds].fd = sock;
+	rfds[nfds].events = POLLIN;
+	rfds[nfds].revents = 0;
 
-	xia::X_Poll_Msg *pout = xsm.mutable_x_poll();
+	rc = (_f_poll)(rfds, nfds + 1, timeout);
 
-	rc = pout->nfds();
+	if (rc > 0 && rfds[nfds].revents != 0) {
+		
+		// there's data from click!
 
-	if (rc == 0) {
-		// timeout occurred
-	
-	} else if (rc < 0) {
-		// error occurred
-	
-	} else {
-		// we got status back
-
-		// loop thru result mapping port back onto socket
-		for (int i = 0; i < rc; i++) {
-				const xia::X_Poll_Msg::PollFD& pfd_out = pout->pfds(i);
-				unsigned port = pfd_out.port();
-				unsigned flags = pfd_out.flags();
-				
-				//printf("poll returned x%0x for %d\n", flags, port);
-
-				int fd = 0;
-				for (unsigned j = 0; j < nfds; j++) {
-					if (port == s2p[j].port) {
-						fd = s2p[j].fd;
-						break;
-					}
-				}
-
-				for (unsigned j = 0; j < nfds; j++) {
-					if (ufds[j].fd == fd) {
-						ufds[j].revents = flags;
-						break;
-					}
-				}
+		if (click_reply(sock, 0, &xsm) < 0) {
+			LOG("Error getting data from Click\n");
+			rc = -1;
+			goto done;
 		}
+
+		xia::X_Poll_Msg *pout = xsm.mutable_x_poll();
+		xrc = pout->nfds();
+
+		// loop thru returned xsockets
+		for (int i = 0; i < xrc; i++) {
+			const xia::X_Poll_Msg::PollFD& pfd_out = pout->pfds(i);
+			unsigned port = pfd_out.port();
+			unsigned flags = pfd_out.flags();
+				
+			//LOGF("poll returned x%0x for %d\n", flags, port);
+
+			// find the associated socket
+			int fd = 0;
+			for (unsigned j = 0; j < nfds; j++) {
+				if (port == s2p[j].port) {
+					fd = s2p[j].fd;
+					break;
+				}
+			}
+
+			// find the socket in the original poll & update the revents field
+			for (unsigned j = 0; j < nfds; j++) {
+				if (ufds[j].fd == fd) {
+					ufds[j].revents = flags;
+					break;
+				}
+			}
+		}
+
+		// rc is the number of fds returned by poll + plus number of sockets found by click
+		//  minus the event for the control socket 
+		rc += xrc - 1;
+
+	} else {
+		// we need to tell click to cancel the Xpoll event
+		xsm.Clear();
+		xsm.set_type(xia::XPOLL);
+		pollMsg = xsm.mutable_x_poll();
+		pollMsg->set_type(xia::X_Poll_Msg::CANCEL);
+
+		click_send(sock, &xsm);
 	}
 
+
+done:
+	int eno = errno;
+	if (sock > 0) {
+		freeSocketState(sock);
+		(_f_close)(sock);
+	}
+	free(rfds);
+	free(s2p);
+	errno = eno;
 	return rc;
 }
 
@@ -228,82 +227,107 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 */
 int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struct timeval *timeout)
 {
+	fd_set rfds;
+	fd_set wfds;
+	fd_set efds;
+	unsigned nx = 0;
+	int xrc = 0;
+	int sock;
+	int largest = 0;
 	int count = 0;
-	int to = 0;
+	int rc = 0;
 
-	if (timeout == NULL) {
-		// we'll block until an event occurs
-		to = -1;
-	} else {
-		// convert the timeval to milliseconds
-		to = (timeout->tv_sec * 1000) + (timeout->tv_usec / 1000);
-	}
+	FD_ZERO(&rfds);
+	FD_ZERO(&wfds);
+	FD_ZERO(&efds);
 
-	if (nfds < 0) {
-		errno = EINVAL;	
-		return -1;
-	}
+	// if the fd sets are sparse, this will waste space especially if nfds is large
+	Sock2Port *s2p = (Sock2Port*)calloc(nfds, sizeof(Sock2Port));
 
-	if (nfds > 0 && readfds == NULL && writefds == NULL && errorfds == NULL) {
-		// there isn't an error that matches this condition in the manpage, using best guess
-		errno = EINVAL;	
-		return -1;
-	} 
+	// create protobuf message
+	xia::XSocketMsg xsm;
+	xia::X_Poll_Msg *pollMsg = xsm.mutable_x_poll();
+	pollMsg->set_type(xia::X_Poll_Msg::DOPOLL);
 
-
-	// see how many sockets we are watching
 	for (int i = 0; i < nfds; i++) {
+
 		int flags = 0;
-
-		if (readfds && FD_ISSET(i, readfds))
-			flags |= POLLIN;
-		if (writefds && FD_ISSET(i, writefds))
-			flags |= POLLOUT;
-		if (errorfds && FD_ISSET(i, errorfds))
-			flags |= POLLERR;
-
-		if (flags) {
-			int stype = getSocketType(i);	
-
-			if (stype != SOCK_DGRAM && stype != SOCK_STREAM) {
-				// an invalid Xsocket was specified, return an error
-				errno = EBADF;
-				return -1;
-			}
+		int r = 0;
+		int w = 0;
+		int e = 0;
 		
-			count++;
-		}
-	}
-
-	if (count == 0) {
-		// just do a timeout and return
-		usleep(to * 1000);
-		return 0;
-	}
-
-	// create and fill and a poll struct
-	struct pollfd *pfds = (struct pollfd*)malloc(count * sizeof(struct pollfd));
-	int next = 0;
-
-	for (int i = 0; i < nfds; i++) {
-		int flags = 0;
-
 		if (readfds && FD_ISSET(i, readfds)) {
 			flags |= POLLIN;
+			r = i;
 		}
 		if (writefds && FD_ISSET(i, writefds)) {
 			flags |= POLLOUT;
+			w = i;
 		}
 		if (errorfds && FD_ISSET(i, errorfds)) {
 			flags |= POLLERR;
+			e = i;
 		}
 
-		if (flags) {
-			pfds[next].fd = i;
-			pfds[next].events = flags;
-			next++;
+		// is it an xsocket
+		if (flags && getSocketType(i) != XSOCK_INVALID) {
+			// we found an Xsocket, do the Xpoll magic
+			nx++;
+
+			xia::X_Poll_Msg::PollFD *pfd = pollMsg->add_pfds();
+
+			// find the port number associated with this Xsocket
+			struct sockaddr_in sin;
+			socklen_t slen = sizeof(sin);
+			(_f_getsockname)(i, (struct sockaddr*)&sin, &slen);
+			//printf("sock %d, port %d, flags %x\n", ufds[i].fd, ntohs(sin.sin_port), ufds[i].events);
+
+			pfd->set_port(sin.sin_port);
+			s2p[i].fd = i;
+			s2p[i].port = sin.sin_port;
+
+			pfd->set_flags(flags);
+
+		} else {
+			if (i > largest)
+				largest = i;
+
+			// it's a regular fd, put it into the select fdsets
+			if (r != 0)
+				FD_SET(i, &rfds);
+			if (w != 0)
+				FD_SET(i, &wfds);
+			if (e != 0)
+				FD_SET(i, &efds);
+		
+			s2p[i].fd = s2p[i].port = 0;
 		}
 	}
+
+
+	if (nx == 0) {
+		// there were no xsockets in the FD_SETS, just do a normal select
+		rc = (_f_select)(nfds, readfds, writefds, errorfds, timeout);
+		goto done;
+	}
+
+
+
+	// create an control socket
+	if ((sock = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
+		LOGF("error creating Xpoll socket: %s", strerror(errno));
+		goto done;
+	}
+	allocSocketState(sock, SOCK_DGRAM);
+
+	click_send(sock, &xsm);
+
+	// add the control socket to the select read fdset
+	if (sock > largest)
+		largest = sock;
+	FD_SET(sock, &rfds);
+
+	rc = (_f_select)(largest, &rfds, (writefds != NULL ? &wfds : NULL), (errorfds != NULL ? &efds : NULL), timeout);
 
 	// reset the bit arrays for the return to caller
 	if (readfds)
@@ -312,24 +336,89 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 		FD_ZERO(writefds);
 	if (errorfds)
 		FD_ZERO(errorfds);
-		
-	// call Xpoll
-	int rc = Xpoll(pfds, next, to);
 
-	// fill the fdsets in with the triggered sockets
+	// fill the fdsets in with the triggered sockets/fds
+	count = 0;
 	if (rc > 0) {
 
-		for (int i = 0; i < count; i++) {
-			printf("socket %d out flags:%08x\n", pfds[i].fd, pfds[i].revents);
-			if (readfds && (pfds[i].revents & POLLIN))
-				FD_SET(pfds[i].fd, readfds);
-			if (writefds && (pfds[i].revents & POLLOUT))
-				FD_SET(pfds[i].fd, writefds);
-			if (errorfds && (pfds[i].revents & POLLERR))
-				FD_SET(pfds[i].fd, errorfds);
-		} 
+		// get the regular fds
+		for (int i = 0; i < largest; i++) {
+			if (i != sock) {
+				if (readfds && FD_ISSET(i, &rfds)) {
+					FD_SET(i, readfds);
+					count++;
+				}
+				if (writefds && FD_ISSET(i, &wfds)) {
+					FD_SET(i, writefds);
+					count++;
+				}
+				if (errorfds && FD_ISSET(i, &efds)) {
+					FD_SET(i, errorfds);
+					count++;
+				}
+			}
+		}
+
+		if (FD_ISSET(sock, &rfds)) {
+			// we have Xsockets data
+
+			xsm.Clear();
+
+			if (click_reply(sock, 0, &xsm) < 0) {
+				LOG("Error getting data from Click\n");
+				rc = -1;
+				goto done;
+			}
+
+			xia::X_Poll_Msg *pout = xsm.mutable_x_poll();
+			xrc = pout->nfds();
+
+			for (int i = 0; i < xrc; i++) {
+				const xia::X_Poll_Msg::PollFD& pfd_out = pout->pfds(i);
+				int flags = pfd_out.flags();
+				unsigned port = pfd_out.port();
+
+				int fd = 0;
+				for (int j = 0; j < nfds; j++) {
+					if (port == s2p[j].port) {
+						fd = s2p[j].fd;
+						break;
+					}
+				}
+
+				// printf("socket %d out flags:%08x\n", pfds[i].fd, pfds[i].revents);
+				if (readfds && (flags & POLLIN)) {
+					FD_SET(fd, readfds);
+					count++;
+				}
+				if (writefds && (flags & POLLOUT)) {
+					FD_SET(fd, writefds);
+					count++;
+				}
+				if (errorfds && (flags & POLLERR)) {
+					FD_SET(fd, errorfds);
+					count++;
+				}
+			}
+
+		} else {
+			// we need to tell click to cancel the Xpoll event
+			xsm.Clear();
+			xsm.set_type(xia::XPOLL);
+			pollMsg = xsm.mutable_x_poll();
+			pollMsg->set_type(xia::X_Poll_Msg::CANCEL);
+
+			click_send(sock, &xsm);
+		}
 	}		
-	
-	free(pfds);
-	return rc;
+
+done:
+	int eno = errno;
+	if (sock > 0) {
+		freeSocketState(sock);
+		(_f_close)(sock);
+	}
+	free(s2p);
+	errno = eno;
+	return (rc <= 0 ? rc : count);
 }

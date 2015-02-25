@@ -183,6 +183,10 @@ int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen)
 				setError(sockfd, *(int *)optval);
 			break;
 
+		case SO_RCVTIMEO:
+			LOG("We need a way to support this in click!\n");
+			
+
 		default:
 			errno = ENOPROTOOPT;
 			rc = -1;

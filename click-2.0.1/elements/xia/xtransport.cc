@@ -314,35 +314,6 @@ XTRANSPORT::run_timer(Timer *timer)
 		}
 	}
 
-	// check to see if we have any outstanding poll events that we should report to the API
-	// if so they are probably only timeout situations
-	for (HashTable<unsigned short, PollEvent>::iterator it = poll_events.begin(); it != poll_events.end(); it++) {
-		unsigned short port = it->first;
-		PollEvent pe = it->second;
-
-		// printf("in poll hash table\n");
-
-		if (!ProcessPollTimeout(port, pe)) {
-			//printf("found a poll timeout\n");
-
-			// there were no events on this PollEvent, and the timeout hasn't exipred yet
-			// make sure we get rescheduled before the timeout
-			// if Expiry is 0, we'll poll until something happens
-			if (!pe.forever && pe.expiry < earlist_pending_expiry)
-				earlist_pending_expiry = pe.expiry;
-
-		} else {
-			// we responded to the poll, get rid of this poll event
-			poll_events.erase(it);
-		}
-	}
-
-
-	// Set the next timer
-	if (earlist_pending_expiry > now) {
-		_timer.reschedule_at(earlist_pending_expiry);
-	}
-
 //	pthread_mutex_unlock(&_lock);
 }
 
@@ -624,7 +595,7 @@ void XTRANSPORT::resize_recv_buffer(sock *sk, uint32_t new_size) {
 int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk) {
 
 	if (sk->sock_type == XSOCKET_STREAM) {
-//printf("<<< read_from_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", sk->port, sk->recv_base, sk->next_recv_seqnum, sk->recv_buffer_size);
+//		printf("<<< read_from_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", sk->port, sk->recv_base, sk->next_recv_seqnum, sk->recv_buffer_size);
 		xia::X_Recv_Msg *x_recv_msg = xia_socket_msg->mutable_x_recv();
 		int bytes_requested = x_recv_msg->bytes_requested();
 		int bytes_returned = 0;
@@ -645,12 +616,12 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk) {
 			p->kill();
 			sk->recv_buffer[i % sk->recv_buffer_size] = NULL;
 			sk->recv_base++;
-//printf("    port %u grabbing index %d, seqnum %d\n", sk->port, i%sk->recv_buffer_size, i);
+//			printf("    port %u grabbing index %d, seqnum %d\n", sk->port, i%sk->recv_buffer_size, i);
 		}
 		x_recv_msg->set_payload(buf, bytes_returned); // TODO: check this: need to turn buf into String first?
 		x_recv_msg->set_bytes_returned(bytes_returned);
 
-//printf(">>> read_from_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", sk->port, sk->recv_base, sk->next_recv_seqnum, sk->recv_buffer_size);
+//		printf(">>> read_from_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", sk->port, sk->recv_base, sk->next_recv_seqnum, sk->recv_buffer_size);
 		return bytes_returned;
 
 	} else if (sk->sock_type == XSOCKET_DGRAM) {
@@ -846,11 +817,11 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			_dport = XIDpairToPort.get(xid_pair);
 		}
 		sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
-//printf("PNP: s:%s d:%s\n", _source_xid.unparse().c_str(), _destination_xid.unparse().c_str());
-//printf("PNP: dport: %d sock: %p\n", _dport, sk);
+//		printf("PNP: s:%s d:%s\n", _source_xid.unparse().c_str(), _destination_xid.unparse().c_str());
+//		printf("PNP: dport: %d sock: %p\n", _dport, sk);
 		// update remote recv window
-//if (thdr.recv_window() == 0)
-//printf("received STREAM packet on port %u;   recv window = %u\n", _dport, thdr.recv_window());
+//		if (thdr.recv_window() == 0)
+//			printf("received STREAM packet on port %u;   recv window = %u\n", _dport, thdr.recv_window());
 		sk->remote_recv_window = thdr.recv_window();
 		
 
@@ -917,39 +888,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				// printf("%06d conn request already pending\n", _dport);
 //			}
 
-#if 0
-			//2. send SYNACK to client
-			//Add XIA headers
-			XIAHeaderEncap xiah_new;
-			xiah_new.set_nxt(CLICK_XIA_NXT_TRN);
-			xiah_new.set_last(LAST_NODE_DEFAULT);
-			xiah_new.set_hlim(HLIM_DEFAULT);
-			xiah_new.set_dst_path(src_path);
-			xiah_new.set_src_path(dst_path);
-
-			const char* dummy = "Connection_granted";
-			WritablePacket *just_payload_part = WritablePacket::make(256, dummy, strlen(dummy), 0);
-
-			WritablePacket *p = NULL;
-
-			xiah_new.set_plen(strlen(dummy));
-			//click_chatter("Sent packet to network");
-
-			TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeSYNACKHeader( 0, 0, 0, calc_recv_window(new_sk)); // #seq, #ack, length, recv_wind
-			p = thdr_new->encap(just_payload_part);
-
-			thdr_new->update();
-			xiah_new.set_plen(strlen(dummy) + thdr_new->hlen()); // XIA payload = transport header + transport-layer data
-
-			p = xiah_new.encap(p, false);
-
-			delete thdr_new;
-			//XIAHeader xiah1(p);
-			//String pld((char *)xiah1.payload(), xiah1.plen());
-			//printf("\n\n (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), pld.c_str(), xiah1.plen());
-			output(NETWORK_PORT).push(p);
-#endif
-
 		} else if (thdr.pkt_info() == TransportHeader::SYNACK) {
 
 			// Clear timer
@@ -981,11 +919,11 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 				// buffer data, if we have room
 				if (should_buffer_received_packet(p_in, sk)) {
-//printf("<<< add_packet_to_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", sk->port, sk->recv_base, sk->next_recv_seqnum, sk->recv_buffer_size);
+//					printf("<<< add_packet_to_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", sk->port, sk->recv_base, sk->next_recv_seqnum, sk->recv_buffer_size);
 					add_packet_to_recv_buf(p_in, sk);
 					sk->next_recv_seqnum = next_missing_seqnum(sk);
 					// TODO: update recv window
-//printf(">>> add_packet_to_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", sk->port, sk->recv_base, sk->next_recv_seqnum, sk->recv_buffer_size);
+//					printf(">>> add_packet_to_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", sk->port, sk->recv_base, sk->next_recv_seqnum, sk->recv_buffer_size);
 
 					if (sk->polling) {
 						// tell API we are readable
@@ -1107,8 +1045,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				ProcessPollEvent(_dport, POLLIN);
 			}
 			check_for_and_handle_pending_recv(sk);
-
-// FIXME: POLL return POLLIN if necerssary
 		}
 
 	} else {
@@ -1513,7 +1449,7 @@ void XTRANSPORT::Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg) {
 		// Map the source XID to source port (for now, for either type of tranports)
 		XIDtoPort.set(source_xid, _sport);
 		addRoute(source_xid);
-//printf("Xbind, S2P %d, %p\n", _sport, sk);
+//		printf("Xbind, S2P %d, %p\n", _sport, sk);
 		portToSock.set(_sport, sk);
 
 		//click_chatter("Bound");
@@ -1737,7 +1673,7 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 		// Map the src & dst XID pair to source port
 		XIDpairToPort.set(xid_pair, new_port);
-//printf("Xaccept pair to port %d %s %s\n", _sport, source_xid.unparse().c_str(), destination_xid.unparse().c_str());
+		//printf("Xaccept pair to port %d %s %s\n", _sport, source_xid.unparse().c_str(), destination_xid.unparse().c_str());
 
 		portToActive.set(new_port, true);
 
@@ -1745,7 +1681,6 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 		sk->pending_connection_buf.pop();
 
-#if 1
 		XIAHeaderEncap xiah_new;
 		xiah_new.set_nxt(CLICK_XIA_NXT_TRN);
 		xiah_new.set_last(LAST_NODE_DEFAULT);
@@ -1773,7 +1708,6 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		p = xiah_new.encap(p, false);
 		delete thdr_new;
 		output(NETWORK_PORT).push(p);
-#endif
 
 		// Get remote DAG to return to app
 		xia::X_Accept_Msg *x_accept_msg = xia_socket_msg->mutable_x_accept();
@@ -1818,7 +1752,6 @@ void XTRANSPORT::ProcessPollEvent(unsigned short _sport, unsigned int flags_out)
 		pfd->set_flags(flags_out);
 		pfd->set_port(port);
 
-		msg->set_timeout(0);
 		msg->set_nfds(1);
 
 		// do I need to set other flags in the return struct?
@@ -1837,86 +1770,40 @@ void XTRANSPORT::ProcessPollEvent(unsigned short _sport, unsigned int flags_out)
 	}
 }
 
-// This is triggered by the timer, so in nearly all (or all) cases, it will 
-// never return sockets with changed state, but leaving the code to handle changed
-// sockets here for now just in case
-bool XTRANSPORT::ProcessPollTimeout(unsigned short pollport, PollEvent& pe)
+void XTRANSPORT::CancelPollEvent(unsigned short _sport)
 {
-	unsigned actionable = 0;
-	bool timed_out = false;
+	PollEvent pe;
+	unsigned short pollport;
+	HashTable<unsigned short, PollEvent>::iterator it;
 
-	xia::XSocketMsg xsm;
-	xsm.set_type(xia::XPOLL);
-	xia::X_Poll_Msg *msg = xsm.mutable_x_poll();
-	msg->set_timeout(0);
+	// loop thru all the polls that are registered looking for the socket associated with _sport
+	for (it = poll_events.begin(); it != poll_events.end(); it++) {
+		pollport = it->first;
+		pe = it->second;
 
-	for (HashTable<unsigned short, unsigned int>::iterator it = pe.events.begin(); it != pe.events.end(); it++) {
-		unsigned short port = it->first;
-		unsigned int flags = it->second;
-		unsigned int flags_out = 0;
+		if (pollport == _sport)
+			break;
+		pollport = 0;
+	}
+
+	if (pollport == 0) {
+		// we didn't find any events for this control socket
+		// should we report error in this case?
+		return;
+	}
+
+	// we have the poll event associated with this control socket
+
+	// decrement the polling count for all the sockets in the poll instance
+	for (HashTable<unsigned short, unsigned int>::iterator pit = pe.events.begin(); pit != pe.events.end(); pit++) {
+		unsigned short port = pit->first;
 
 		sock *sk = portToSock.get(port);
-		if (sk) {
-
-			if (sk->did_poll) {
-				// skip sockets that were handed by a different concurrent poll request
-				continue;
-			}
-
-			sk->did_poll = true;
-
-			if (sk->teardown_waiting) {
-				// socket is being closed
-				flags_out |= POLLHUP;
-
-			} else {
-				if (flags == POLLIN && sk->recv_pending) 
-					flags_out |= POLLIN;
-
-				if (flags == POLLOUT) {
-					if (sk->sock_type != SOCK_STREAM)
-						flags_out |= POLLOUT;
-					else if (sk->isConnected)
-						flags_out |= POLLOUT;
-
-				}
-			}
-
-		} else {
-			// no socket state structure
-			flags_out |= POLLNVAL;
-		}
-
-		if (flags_out) {
-			// this socket's state has changed, report to the API
-			xia::X_Poll_Msg::PollFD *pfd = msg->add_pfds();
-			pfd->set_flags(flags_out);
-			pfd->set_port(port);
-			actionable++;
-		}
+		sk->polling--;
 	}
 
-	if (actionable == 0 && Timestamp::now() >= pe.expiry) 
-		timed_out = true;
-
-	if (actionable || timed_out) {
-
-		for (HashTable<unsigned short, unsigned int>::iterator it = pe.events.begin(); it != pe.events.end(); it++) {
-			
-			// tell all the sockets in this event that we handled this poll
-			unsigned short port = it->first;
-			sock *sk = portToSock.get(port);
-			if (sk)
-				sk->polling--;
-		}
-
-		// tell API how many sockets changed state
-		msg->set_nfds(actionable);
-
-		ReturnResult(pollport, &xsm, actionable, 0);
-	}
-
-	return (actionable != 0);
+	// get rid of this poll event
+	poll_events.erase(it);
 }
 
 
@@ -1925,7 +1812,7 @@ void XTRANSPORT::CreatePollEvent(unsigned short _sport, xia::X_Poll_Msg *msg)
 	PollEvent pe;
 	uint32_t nfds = msg->nfds();
 
-	// printf("XPOLL Create:\nnfds:%d timeout %d\n", nfds, msg->timeout());
+	// printf("XPOLL Create:\nnfds:%d\n", nfds);
 
 	for (int i = 0; i < nfds; i++) {
 		const xia::X_Poll_Msg::PollFD& pfd = msg->pfds(i);
@@ -1947,96 +1834,92 @@ void XTRANSPORT::CreatePollEvent(unsigned short _sport, xia::X_Poll_Msg *msg)
 
 	// register the poll event 
 	poll_events.set(_sport, pe);
-
-	// determine when the poll should exipre
-	pe.forever = (msg->timeout() == 0 ? true : false);
-	if (!pe.forever) {
-		pe.expiry = Timestamp::now() + Timestamp::make_msec(msg->timeout());
-		if (! _timer.scheduled() || _timer.expiry() >= pe.expiry )
-			_timer.reschedule_at(pe.expiry);
-	}
 }
 
 
 void XTRANSPORT::Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
-	int actionable = 0;
-
 	xia::X_Poll_Msg *poll_in = xia_socket_msg->mutable_x_poll();
-	
-	xia::XSocketMsg msg_out;
-	msg_out.set_type(xia::XPOLL);
-	xia::X_Poll_Msg *poll_out = msg_out.mutable_x_poll();
 
-	unsigned nfds = poll_in->nfds();
+	if (poll_in->type() == xia::X_Poll_Msg::DOPOLL) {
 
-	// printf("XPOLL:\nnfds:%d timeout %d\n", nfds, poll_in->timeout());
-	for (int i = 0; i < nfds; i++) {
-		const xia::X_Poll_Msg::PollFD& pfd_in = poll_in->pfds(i);
+		int actionable = 0;	
+		xia::XSocketMsg msg_out;
+		msg_out.set_type(xia::XPOLL);
+		xia::X_Poll_Msg *poll_out = msg_out.mutable_x_poll();
 
-		int port = pfd_in.port();
-		unsigned flags = pfd_in.flags();
-		// printf("port: %d, flags: %x\n", pfd_in.port(), pfd_in.flags());
+		unsigned nfds = poll_in->nfds();
 
-		// skip over ignored ports
-		if ( port == 0) {
-			// printf("skipping ignored port\n");
-			continue;
-		}
+		// printf("XPOLL:\nnfds:%d\n", nfds);
+		for (int i = 0; i < nfds; i++) {
+			const xia::X_Poll_Msg::PollFD& pfd_in = poll_in->pfds(i);
 
-		sock *sk = portToSock.get(port);
-		unsigned flags_out = 0;
+			int port = pfd_in.port();
+			unsigned flags = pfd_in.flags();
+			// printf("port: %d, flags: %x\n", pfd_in.port(), pfd_in.flags());
 
-		if (!sk) {
-			// no socket state, we'll return an error right away
-			// printf("No socket state found for %d\n", port);
-			flags_out = POLLNVAL;
-		
-		} else {
-			// is there any read data?
-			if (flags & POLLIN) {
-				if (sk->recv_pending) {
-					// printf("read data avaialable on %d\n", port);
-					flags_out |= POLLIN;
-				}
+			// skip over ignored ports
+			if ( port <= 0) {
+				// printf("skipping ignored port\n");
+				continue;
 			}
 
-			if (flags & POLLOUT) {
-				// see if the socket is writable
-				// FIXME should we be looking for anything else (send window, etc...)
-				if (sk->sock_type == SOCK_STREAM) {
-					if (sk->isConnected) {
-						// printf("stream socket is connected, so setting POLLOUT: %d\n", port);
+			sock *sk = portToSock.get(port);
+			unsigned flags_out = 0;
+
+			if (!sk) {
+				// no socket state, we'll return an error right away
+				// printf("No socket state found for %d\n", port);
+				flags_out = POLLNVAL;
+			
+			} else {
+				// is there any read data?
+				if (flags & POLLIN) {
+					if (sk->recv_pending) {
+						// printf("read data avaialable on %d\n", port);
+						flags_out |= POLLIN;
+					}
+				}
+
+				if (flags & POLLOUT) {
+					// see if the socket is writable
+					// FIXME should we be looking for anything else (send window, etc...)
+					if (sk->sock_type == SOCK_STREAM) {
+						if (sk->isConnected) {
+							// printf("stream socket is connected, so setting POLLOUT: %d\n", port);
+							flags_out |= POLLOUT;
+						}
+
+					} else {
+						// printf("assume POLLOUT is always set for datagram sockets: %d\n", port);
 						flags_out |= POLLOUT;
 					}
-
-				} else {
-					// printf("assume POLLOUT is always set for datagram sockets: %d\n", port);
-					flags_out |= POLLOUT;
 				}
+			}
+
+			if (flags_out) {
+				// the socket can respond to the poll immediately
+				xia::X_Poll_Msg::PollFD *pfd_out = poll_out->add_pfds();
+				pfd_out->set_flags(flags_out);
+				pfd_out->set_port(port);
+
+				actionable++;
 			}
 		}
 
-		if (flags_out) {
-			// the socket can respond to the poll immediately
-			xia::X_Poll_Msg::PollFD *pfd_out = poll_out->add_pfds();
-			pfd_out->set_flags(flags_out);
-			pfd_out->set_port(port);
-
-			actionable++;
+		// we can return a result right away
+		if (actionable) {
+			// printf("returning immediately number of actionable sockets is %d\n", actionable);
+			poll_out->set_nfds(actionable);
+			ReturnResult(_sport, &msg_out, actionable, 0);
+		
+		} else {
+			// we can't return a result yet
+			CreatePollEvent(_sport, poll_in);
 		}
-	}
-
-	// we can return a result right away
-	if (actionable || poll_in->timeout() == 0) {
-		// printf("returning immediately number of actionable sockets is %d\n", actionable);
-		poll_out->set_timeout(0);
-		poll_out->set_nfds(actionable);
-		ReturnResult(_sport, &msg_out, actionable, 0);
-	
-	} else {
-		// we can't return a result yet
-		CreatePollEvent(_sport, poll_in);
+	} else { // type == CANCEL
+		// cancel the poll(s) on this control socket
+		CancelPollEvent(_sport);
 	}
 }
 
@@ -2171,10 +2054,10 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 		numUnACKedSentPackets >= sk->send_buffer_size &&  // make sure we have space in send buf
 		numUnACKedSentPackets >= sk->remote_recv_window) { // and receiver has space in recv buf
 
-//if (numUnACKedSentPackets >= sk->send_buffer_size)
-//printf("Not sending -- out of send buf space\n");
-//else if (numUnACKedSentPackets >= sk->remote_recv_window)
-//printf("Not sending -- out of recv buf space\n");
+//		if (numUnACKedSentPackets >= sk->send_buffer_size)
+//			printf("Not sending -- out of send buf space\n");
+//		else if (numUnACKedSentPackets >= sk->remote_recv_window)
+//			printf("Not sending -- out of recv buf space\n");
 
 		rc = 0; // -1;  // set to 0 for now until blocking behavior is fixed
 		ec = EAGAIN;
@@ -2331,8 +2214,8 @@ void XTRANSPORT::Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg,
 
 	sk = portToSock.get(_sport);
 
-//			if (DEBUG)
-//				click_chatter("sent packet from %s, to %s\n", sk->src_path.unparse_re().c_str(), dest.c_str());
+//	if (DEBUG)
+//		click_chatter("sent packet from %s, to %s\n", sk->src_path.unparse_re().c_str(), dest.c_str());
 
 	//Add XIA headers
 	XIAHeaderEncap xiah;
@@ -2459,8 +2342,6 @@ void XTRANSPORT::XrequestChunk(unsigned short _sport, xia::XSocketMsg *xia_socke
 
 			char xid_string[50];
 			random_xid("SID", xid_string);
-//			String rand(click_random(1000000, 9999999));
-//			String xid_string = "SID:20000ff00000000000000000000000000" + rand;
 			str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
 
 			sk->src_path.parse_re(str_local_addr);

@@ -575,7 +575,8 @@ class XTRANSPORT : public Element {
 
     void CreatePollEvent(unsigned short _sport, xia::X_Poll_Msg *msg);
     void ProcessPollEvent(unsigned short, unsigned int);
-    bool ProcessPollTimeout(unsigned short, PollEvent& pe);
+    void CancelPollEvent(unsigned short _sport);
+//    bool ProcessPollTimeout(unsigned short, PollEvent& pe);
     /*
     ** Xsockets API handlers
     */

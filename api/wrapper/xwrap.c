@@ -116,10 +116,6 @@ failed_t failedLookups;
 int low_ip = 1;
 int high_ip = 0;
 
-static __thread int _wrap_socket = 0;	// one copy of this per thread, controls
-										//  whether we should wrap the socket call
-										//  or not when running in pure xia mode.
-
 //****************************************************************************
 // set up logging parameters
 //
@@ -139,7 +135,6 @@ int _pure_xia = 0;
 void __xwrap_setup()
 {
 	srand(time(NULL));
-//	_wrap_socket = 1;
 
 	low_ip = (rand() % 253) + 1;
 	high_ip = rand() % 254;
@@ -148,9 +143,9 @@ void __xwrap_setup()
 		_pure_xia = 1;
 
 	if (getenv("XWRAP_TRACE") != NULL)
-		_log_trace = 0;
+		_log_trace = 1;
 	if (getenv("XWRAP_VERBOSE") != NULL)
-		_log_info = _log_wrap = _log_warning = 1;
+		_log_trace = _log_info = _log_wrap = _log_warning = 1;
 	if (getenv("XWRAP_INFO") != NULL)
 		_log_info = 1;
 	if (getenv("XWRAP_WARNING") != NULL)
@@ -229,9 +224,7 @@ void __attribute__ ((constructor)) xwrap_init(void)
 
 // call into the Xsockets API to see if the fd is associated with an Xsocket
 #define isXsocket(s)	 (getSocketType(s) != -1)
-#define markWrapped(s)	 {setWrapped(s, 1);}
-#define markUnwrapped(s) {setWrapped(s, 0);}
-#define shouldWrap(s)	 (isXsocket(s) && !isWrapped(s))
+#define shouldWrap(s)	 (isXsocket(s))
 //#define shouldWrap(s)	 (isXsocket(s))
 
 
@@ -401,9 +394,7 @@ int _Register(const struct sockaddr *addr, socklen_t len)
 	memcpy(&sa, addr, len);
 
 	// create a DAG (4ID) AD HID SID
-	_wrap_socket = 0;	// Xgetaddrinfo calls xsocket, so we want to let its internal socket call go through
 	Xgetaddrinfo(NULL, _RandomSID(sid, sizeof(sid)), NULL, &ai);
-	_wrap_socket = 1;
 
 	XregisterName(_IpString(name, &sa), (sockaddr_x*)ai->ai_addr);
 
@@ -481,8 +472,7 @@ int socket(int domain, int type, int protocol)
 	TRACE();
 
 //	MSG("SOCKET t:%d p:%d %d %d\n", type, protocol, SOCK_STREAM, SOCK_DGRAM);
-	if ((domain == AF_XIA || (domain == AF_INET && FORCE_XIA())) && _wrap_socket) {
-//	if ((domain == AF_XIA || (domain == AF_INET && FORCE_XIA()))) {
+	if ((domain == AF_XIA || (domain == AF_INET && FORCE_XIA()))) {
 		XIAIFY();
 
 		if (protocol != 0) {
@@ -490,9 +480,7 @@ int socket(int domain, int type, int protocol)
 			protocol = 0;
 		}
 
-		_wrap_socket = 0;
 		fd = Xsocket(AF_XIA, type, protocol);
-		_wrap_socket = 1;
 	} else {
 		fd = __real_socket(domain, type, protocol);
 	}
@@ -511,12 +499,9 @@ int socketpair(int domain, int type, int protocol, int fds[2])
 			return 0;
 		} else {
 			int e = errno;
-			markWrapped(fds[0]);
-			markWrapped(fds[1]);
+
 			Xclose(fds[0]);
 			Xclose(fds[1]);
-			markUnwrapped(fds[0]);
-			markUnwrapped(fds[1]);
 			errno = e;
 			return -1;
 		}
@@ -544,9 +529,7 @@ int connect(int fd, const struct sockaddr *addr, socklen_t len)
 			addr = (struct sockaddr*)&sax;
 		}
 
-		markWrapped(fd);
 		rc= Xconnect(fd, addr, len);
-		markUnwrapped(fd);
 		MSG("rc = %d\n", rc);
 	} else {
 		rc = __real_connect(fd, addr, len);
@@ -572,9 +555,7 @@ int bind(int fd, const struct sockaddr *addr, socklen_t len)
 			addr = (struct sockaddr*)&sax;
 		}
 
-		markWrapped(fd);
 		rc= Xbind(fd, addr, len);
-		markUnwrapped(fd);
 
 	} else {
 		rc = __real_bind(fd, addr, len);
@@ -601,11 +582,7 @@ int accept(int fd, struct sockaddr *addr, socklen_t *addr_len)
 		}
 
 		xlen = sizeof(sax);
-		markWrapped(fd);
-		_wrap_socket = 0;
 		rc = Xaccept(fd, addr, &xlen);
-		_wrap_socket = 1;
-		markUnwrapped(fd);
 
 		if (FORCE_XIA()) {
 			// create a new fake IP address/port  to map to
@@ -628,9 +605,7 @@ ssize_t send(int fd, const void *buf, size_t n, int flags)
 
 	if (shouldWrap(fd)) {
 		XIAIFY();
-		markWrapped(fd);
 		rc = Xsend(fd, buf, n, flags);
-		markUnwrapped(fd);
 	} else {
 		rc = __real_send(fd, buf, n, flags);
 	}
@@ -646,9 +621,7 @@ ssize_t recv(int fd, void *buf, size_t n, int flags)
 
 	if (shouldWrap(fd)) {
 		XIAIFY();
-		markWrapped(fd);
 		rc = Xrecv(fd, buf, n, flags);
-		markUnwrapped(fd);
 	} else {
 		rc = __real_recv(fd, buf, n, flags);
 	}
@@ -681,10 +654,8 @@ ssize_t sendto(int fd, const void *buf, size_t n, int flags, const struct sockad
 			addr = (struct sockaddr*)&sax;
 		}
 
-		markWrapped(fd);
 		rc = Xsendto(fd, buf, n, flags, addr, addr_len);
 		MSG("Xsendto returned %d while sending %ld bytes on fd %d\n", rc, n, fd);
-		markUnwrapped(fd);
 
 	} else {
 		rc = __real_sendto(fd, buf, n, flags, addr, addr_len);
@@ -711,11 +682,9 @@ ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, 
 			addr = (struct sockaddr*)&sax;
 			*addr_len = sizeof(addr);
 			// FIXME we should check to see if addr and addr_len are valid
-		}
+		}  
 
-		markWrapped(fd);
 		rc = Xrecvfrom(fd, buf, n, flags, addr, &slen);
-		markUnwrapped(fd);
 
 		if (FORCE_XIA()) {
 			// convert the sockaddr to a sockaddr_x
@@ -741,9 +710,7 @@ ssize_t read(int fd, void *buf, size_t count)
 	if (isXsocket(fd)) {
 		XIAIFY();
 
-		markWrapped(fd);
 		rc = Xrecv(fd, buf, count, 0);
-		markUnwrapped(fd);
 
 	} else {
 		rc = __real_read(fd, buf, count);
@@ -760,9 +727,7 @@ ssize_t write(int fd, const void *buf, size_t count)
 	if (isXsocket(fd)) {
 		XIAIFY();
 
-		markWrapped(fd);
 		rc = Xsend(fd, buf, count, 0);
-		markUnwrapped(fd);
 
 	} else {
 		rc = __real_write(fd, buf, count);
@@ -772,85 +737,13 @@ ssize_t write(int fd, const void *buf, size_t count)
 
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)
 {
-	int rc;
-	int xify = FALSE;
-	static int last = 0;
-	static int count = 0;
-	int t = time(NULL);
-
-
-	if ((last == 0) || (t - last > 3)) {
-		if (last == 0)
-			count = 1;
-		last = t;
-		MSG("called %d times\n", count);
-		count = 1;
-	//	TRACE();
-	} else {
-		count++;
-	}
-
-	// don't trace as the screen will fill with select messages from click_get
-	//	TRACE();
-
-	// FIXME: we are in trouble if the fdset contains both socket and file descriptors
-	// not sure how to handle it other than to throw a warning message right now
-
-	if (_wrap_socket == 0) {
-		xify = FALSE;
-	} else {
-		// ugh - have to walk the fdsets to see if there's a socket in there
-		
-		for (int i = 0; i < nfds; i++) {
-
-			int found;
-
-			found = FALSE;
-			if (readfds && FD_ISSET(i, readfds))
-				found = TRUE;
-			else if (writefds && FD_ISSET(i, writefds))
-				found = TRUE;
-			else if (exceptfds && FD_ISSET(i, exceptfds))
-				found = TRUE;
-
-
-			if (found) {
-				if (getSocketType(i) != XSOCK_INVALID) {
-//					MSG("select found socket %d\n", i);
-					if (!isAPI(i)) {
-//						MSG("it is not an API socket\n");
-						xify = TRUE;
-					}
-					else {
-//						MSG("it is an API socket!\n");
-					}
-					break;
-				}
-			}
-		}
-
-		// if xify is true, the selector set contains xsockets, but might be
-		// called by the internal select used in click_get so we need to do
-		// another check to see if we should xiaify it
-	}
-
-
-	if (xify) {
-		XIAIFY();
+	TRACE();
 	
-		// select may cover multiple sockets so we can't call setWrapped here
-		//  it also uses multiple socket calls internally, so set the wrap_socket
-		//  flag so it can create a normal socket
-		_wrap_socket = 0;
-		rc = Xselect(nfds, readfds, writefds, exceptfds, timeout);
-		_wrap_socket = 1;
-
-	} else {
-		rc = __real_select(nfds, readfds, writefds, exceptfds, timeout);
-	}
-
-	return rc;
+	// Let Xpoll do all the work of figuring out what fds we are handling	
+	return Xselect(nfds, readfds, writefds, exceptfds, timeout);
 }
+
+
 
 int __poll_chk(struct pollfd *fds, nfds_t nfds, int timeout, __SIZE_TYPE__ __fdslen)
 {
@@ -862,132 +755,10 @@ int __poll_chk(struct pollfd *fds, nfds_t nfds, int timeout, __SIZE_TYPE__ __fds
 
 int poll(struct pollfd *fds, nfds_t nfds, int timeout)
 {
-	int rc;
-	bool xify = FALSE;
-	bool normal = FALSE;
-
 	TRACE();
 
-	// TODO: add code to verify parameters and return proper error codes
-
-	// allocate 
-	struct pollfd *xfds = (struct pollfd*)calloc(sizeof(pollfd), nfds);
-	struct pollfd *ffds = (struct pollfd*)calloc(sizeof(pollfd), nfds);
-
-	memcpy(xfds, fds, nfds * sizeof(struct pollfd));
-	memcpy(ffds, fds, nfds * sizeof(struct pollfd));
-
-//MSG("POLL**********************************************\n");
-
-	for (unsigned i = 0; i < nfds; i++) {
-		if (getSocketType(fds[i].fd) != XSOCK_INVALID) {
-//			MSG("We found an XIA socket %d\n", fds[i].fd);
-			xify = TRUE;
-
-			// stop on the descriptor in the fd set
-			ffds[i].fd = -ffds[i].fd;
-		} else {
-//			MSG("We found a file descriptor %d\n", fds[i].fd);
-			normal = TRUE;
-
-			// stop on the descriptor in the xia set
-			xfds[i].fd = -xfds[i].fd;
-		}
-		fds[i].revents = xfds[i].revents = ffds[i].revents = 0;
-	}
-
-	if (xify && !normal) {
-//		MSG("Doing XIA only poll\n");
-		_wrap_socket = 0;
-		rc = Xpoll(fds, nfds, timeout);
-		_wrap_socket = 1;
-	} else if (normal && !xify) {
-//		MSG("Doing fd only poll\n");
-		rc = __real_poll(fds, nfds, timeout);
-	} else {
-		// we need to do both kinds of polls
-		int rcx, rcf;
-
-//		MSG("doing dual poll\n");
-
-		if (timeout == 0) {
-//			MSG("zero timeout poll\n");
-			// just check and return
-			_wrap_socket = 0;
-			rcx = Xpoll(xfds, nfds, 0);
-			_wrap_socket = 1;
-			rcf = __real_poll(ffds, nfds, 0);
-
-			rc = rcx + rcf;
-		} else {
-			struct timeval start, now;
-			int delay = 100;	// find optimal value for this
-
-//			MSG("poll timeout = %d\n", timeout); 
-
-			// ugh, we have to loop and do short timeouts on each set of pollfds
-			// it's ugly, but I don't see any other way to handle it
-			// FIXME: consider spinning up 2 threads to do it
-
-//			MSG("start = %d:%d\n", (unsigned)start.tv_sec, (unsigned)start.tv_usec);
-
-			gettimeofday(&start, NULL);
-			for (;;) {
-
-//				MSG("calling real poll\n");
-				rc = __real_poll(fds, nfds, delay);
-//				MSG("real poll returns %d\n", rc);
-				if (rc != 0)
-					break;
-
-//				MSG("calling xpoll\n");
-				_wrap_socket = 0;
-				rc = Xpoll(xfds, nfds, delay * 100);
-				_wrap_socket = 1;
-//				MSG("Xpoll returns %d\n", rc);
-				if (rc != 0)
-					break;
-
-				if (timeout > 0) {
-					gettimeofday(&now, NULL);
-//					MSG("current = %d:%d\n", (unsigned)now.tv_sec, (unsigned)now.tv_usec);
-					int secs = now.tv_sec - start.tv_sec;
-					int usecs = now.tv_usec - start.tv_usec;
-					int elapsed = (secs * 1000) + (usecs / 1000); 
-
-//					MSG("elapsed = %d\n", elapsed);
-
-					if (elapsed >= timeout) {
-						// we didn't find anything, time to go
-						MSG("Poll timed out\n");
-						rc = 0;
-						break;
-					}
-				}
-			}
-		}
-
-		// put the results back into the callers pollfd list
-		if (rcx > 0) {
-			for (unsigned i = 0; i < nfds; i++) {
-				if (xfds[i].revents != 0 && xfds[i].revents != POLLNVAL) {
-//					MSG("Got an XIA hit on fd %d:%d\n", xfds[i].fd, xfds[i].revents);
-					fds[i].revents = xfds[i].revents;
-				}
-			}
-		}
-
-		if (rcf > 0) {
-			for (unsigned i = 0; i < nfds; i++) {
-				if (xfds[i].revents != 0) {
-//					MSG("Got a normal hit on fd %d\n", fds[i].fd);
-					fds[i].revents = ffds[i].revents;
-				}
-			}
-		}
-	}
-
-	return rc;
+	// Let Xpoll do all the work of figuring out what fds we are handling
+	return Xpoll(fds, nfds, timeout);
 }
 
 ssize_t sendmsg(int fd, const struct msghdr *message, int flags)
@@ -1020,9 +791,7 @@ int getsockopt(int fd, int level, int optname, void *optval, socklen_t *optlen)
 	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
-		markWrapped(fd);
 		rc =  Xgetsockopt(fd, optname, optval, optlen);
-		markUnwrapped(fd);
 
 		if (rc < 0) {
 			// TODO: add code here to return success for options we can safely ignore
@@ -1040,9 +809,7 @@ int setsockopt(int fd, int level, int optname, const void *optval, socklen_t opt
 	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
-		markWrapped(fd);
 		rc =  Xsetsockopt(fd, optname, optval, optlen);
-		markUnwrapped(fd);
 
 		if (rc < 0) {
 			// TODO: add code here to return success for options we can safely ignore
@@ -1075,9 +842,7 @@ int close(int fd)
 	TRACE();
 	if (shouldWrap(fd)) {
 		XIAIFY();
-		markWrapped(fd);
 		rc = Xclose(fd);
-		markUnwrapped(fd);
 
 		// FIXME: we should clean up entries from the dag2ip and ip2dag maps here
 
@@ -1109,9 +874,7 @@ int getsockname(int fd, struct sockaddr *addr, socklen_t *len)
 			WARNING("not enough room for the XIA sockaddr! have %d, need %ld\n", *len, sizeof(sockaddr_x));
 		}
 
-		markWrapped(fd);
 		rc = Xgetsockname(fd, addr, len);
-		markUnwrapped(fd);
 
 		// FIXME: WHAT DO WE DO HERE IF THE MAPPING LOOKUP FAILS???
 		if (FORCE_XIA()) {
@@ -1143,9 +906,7 @@ int getpeername(int fd, struct sockaddr *addr, socklen_t *len)
 			addr = (struct sockaddr*)&sax;
 		}
 
-		markWrapped(fd);
 		rc = Xgetpeername(fd, addr, len);
-		markUnwrapped(fd);
 
 		if (FORCE_XIA()) {
 			// convert the sockaddr to a sockaddr_x

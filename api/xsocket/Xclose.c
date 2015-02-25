@@ -59,10 +59,7 @@ int Xclose(int sockfd)
 		LOGF("Error getting status from Click: %s", strerror(errno));
 	}
 
-	setWrapped(sockfd, TRUE);
-//	(_f_close)(new_sockfd);
-	close(sockfd);
-	setWrapped(sockfd, FALSE);
+	(_f_close)(sockfd);
 	freeSocketState(sockfd);
 
 	return rc;

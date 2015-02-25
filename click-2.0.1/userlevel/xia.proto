@@ -222,8 +222,12 @@ message X_Poll_Msg {
     required int32 port = 1;
     required uint32 flags = 2;
   }
-  required int32 timeout = 1;
-  required uint32 nfds = 2;
+  enum MsgType {
+    DOPOLL = 1;
+    CANCEL = 2;
+  };
+  required MsgType type = 1;
+  required int32 nfds = 2;
   repeated PollFD pfds = 3;
 }
 

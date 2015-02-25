@@ -135,10 +135,7 @@ int click_send(int sockfd, xia::XSocketMsg *xsm)
 	while (remaining > 0) {
 
 		//LOGF("sending to click: seq: %d type: %d", xsm->sequence(), xsm->type());
-		setWrapped(sockfd, TRUE);
-//		rc = (_f_sendto)(sockfd, p, remaining, 0, (struct sockaddr *)&sa, sizeof(sa));
-		rc = sendto(sockfd, p, remaining, 0, (struct sockaddr *)&sa, sizeof(sa));
-		setWrapped(sockfd, FALSE);
+		rc = (_f_sendto)(sockfd, p, remaining, 0, (struct sockaddr *)&sa, sizeof(sa));
 
 		if (rc == -1) {
 			LOGF("click socket failure: errno = %d", errno);
@@ -173,47 +170,24 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 		msg->set_blocking(true);
 	}
 
-	// FIXME: if someone caches our packet as we start to do the recv, we'll block forever
-	// may need to implement select so that we re-loop frequently so we can pick up our
-	// cached packet
-
 	while (1) {
 		// see if another thread received and cached our packet
 		if ((rc = getCachedPacket(sock, seq, buf, buflen)) > 0) {
-printf("in the cache!\n");
+
 			LOGF("Got cached response with sequence # %d\n", seq);
 			std::string s(buf, rc);
 			msg->ParseFromString(s);
 			break;
 
 		} else {
-			struct timeval tv;
-			fd_set fds;
-			FD_ZERO(&fds);
-			FD_SET(sock, &fds);
-			tv.tv_sec = 0;
-			tv.tv_usec = 10000;
-			setAPI(sock, TRUE);
-			setWrapped(sock, TRUE);
-//			rc = (_f_select)(sock+1, &fds, NULL, NULL, &tv);
-			rc = select(sock+1, &fds, NULL, NULL, &tv);
-			setWrapped(sock, FALSE);
-			setAPI(sock, FALSE);
-			if (rc == 0)
-				continue;
-			else if (rc < 0) {
-				if (errno == EINTR)
-					continue;
-				LOG("select failed");
-				return -1;
-			}
 
-			setWrapped(sock, TRUE);
-//			rc = (_f_recvfrom)(sock, buf, buflen - 1 , 0, NULL, NULL);
-			rc = recvfrom(sock, buf, buflen - 1 , 0, NULL, NULL);
-			setWrapped(sock, FALSE);
+			// we do this with a blocking socket even if the Xsocket is marked as nonblocking.
+			// The UDP socket is treated as an API call rather than a sock so making it 
+			// non-blocking would cause problems 
+			rc = (_f_recvfrom)(sock, buf, buflen - 1 , 0, NULL, NULL);
 
-//printf("seq %d received %d bytes\n", seq, rc);
+			// LOGF("seq %d received %d bytes\n", seq, rc);
+
 			if (rc < 0) {
 				if (isBlocking(sock) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
 					LOGF("error(%d) getting reply data from click", errno);

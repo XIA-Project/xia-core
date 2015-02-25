@@ -47,6 +47,7 @@ setsockopt_t _f_setsockopt;
 close_t _f_close;
 fcntl_t _f_fcntl;
 select_t _f_select;
+poll_t _f_poll;
 sendto_t _f_sendto;
 recvfrom_t _f_recvfrom;
 
@@ -76,6 +77,8 @@ void load_func_ptrs()
 	if(!(_f_fcntl = (fcntl_t)dlsym(handle, "fcntl")))
 		printf("can't find fcntl!\n");
 	if(!(_f_select = (select_t)dlsym(handle, "select")))
+		printf("can't find select!\n");
+	if(!(_f_poll = (poll_t)dlsym(handle, "poll")))
 		printf("can't find select!\n");
 	if(!(_f_sendto = (sendto_t)dlsym(handle, "sendto")))
 		printf("can't find sendto!\n");
