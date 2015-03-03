@@ -25,6 +25,9 @@
 
 #define DEFAULT_NAME "controller0"
 #define APPNAME "xcontrold"
+<<<<<<< HEAD
+#define EXPIRE_TIME 120
+=======
 
 // parameters which could be overwritten by controller file
 // default values are defined in the header file
@@ -41,6 +44,7 @@ int MAX_HOP_COUNT  = MAX_HOP_COUNT_D;
 int MAX_SEQNUM = MAX_SEQNUM_D;
 int SEQNUM_WINDOW = SEQNUM_WINDOW_D;
 
+>>>>>>> sid_routing
 
 char *hostname = NULL;
 char *ident = NULL;
@@ -286,6 +290,9 @@ int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> rout
 	}
 }
 
+<<<<<<< HEAD
+int processMsg(uint8_t *data, uint16_t len)
+=======
 int sendKeepAliveToServiceController()
 {
     int rc = 1;
@@ -860,7 +867,8 @@ int updateADPathStates(void)
 }
 
 // Process received message.
-int processMsg(uint8_t *data, uint16_t len)
+int processMsg(std::string msg)
+>>>>>>> sid_routing
 {
     int type, rc = 0;
     ControlMessage m((char *)data);
@@ -881,6 +889,13 @@ int processMsg(uint8_t *data, uint16_t len)
         case CTL_ROUTING_TABLE:
             // rc = processRoutingTable(m);
             break;
+<<<<<<< HEAD
+		case CTL_XBGP:
+			rc = processInterdomainLSA(m);
+			break;
+        case 9:
+            rc = processSCION(data, len);
+=======
         case CTL_XBGP:
             rc = processInterdomainLSA(m);
             break;
@@ -892,6 +907,7 @@ int processMsg(uint8_t *data, uint16_t len)
             break;
         case CTL_SID_MANAGE_KA:
             rc = processServiceKeepAlive(m);
+>>>>>>> sid_routing
             break;
         default:
 			syslog(LOG_ALERT, "Unknown control message: %s\n", (char *)data);
@@ -1038,7 +1054,11 @@ int processLSA(ControlMessage msg)
 
 	if (route_state.calc_dijstra_ticks >= CALC_DIJKSTRA_INTERVAL || route_state.calc_dijstra_ticks  < 0)
 	{
+<<<<<<< HEAD
+		//syslog(LOG_DEBUG, "Calculating shortest paths\n");
+=======
 		// syslog(LOG_DEBUG, "Calcuating shortest paths\n");
+>>>>>>> sid_routing
 
 		// Calculate next hop for ADs
 		std::map<std::string, RouteEntry> ADRoutingTable;
@@ -1714,6 +1734,18 @@ int main(int argc, char *argv[])
 		{
 			last_purge = now;
 			//fprintf(stderr, "checking entry\n");
+<<<<<<< HEAD
+			map<string, time_t>::iterator iter;
+
+			for (iter = timeStamp.begin(); iter != timeStamp.end(); iter++)	
+			{
+				if (now - iter->second >= EXPIRE_TIME){
+					xr.delRoute(iter->first);
+					timeStamp.erase(iter);
+					syslog(LOG_INFO, "purging host route for : %s", iter->first.c_str());
+				}
+			}
+=======
 			map<string, time_t>::iterator iter = timeStamp.begin();
 
             while (iter != timeStamp.end())
@@ -1769,6 +1801,7 @@ int main(int argc, char *argv[])
                     ++iter3;
                 }
             }
+>>>>>>> sid_routing
 		}
 	}
 

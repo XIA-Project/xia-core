@@ -25,6 +25,7 @@
 #include <pthread.h>
 #include <sys/wait.h>
 #include <stdlib.h>
+#include <signal.h>
 
 // XIA changes
 #include <netdb.h>     // for getaddrinfo
@@ -41,6 +42,10 @@ char *dag;				// used to display the dag on the terminal
 
 #define SERVER_STRING "Server: jdbhttpd/0.1.0\r\n"
 
+pthread_mutex_t mutexsum;
+int total_client = 0;
+
+int server_sock = -1;
   // XIA changes to accept request are only so it compiles correctly
 void *accept_request(void *);
 void bad_request(int);
@@ -74,6 +79,12 @@ void *accept_request(void *client_v)
                     * program */
  char *query_string = NULL;
 
+ pthread_mutex_lock (&mutexsum);
+ total_client += 1;
+ pthread_mutex_unlock (&mutexsum);
+
+ printf("Accepted, %d client here.\n", total_client);
+
  numchars = get_line(client, buf, sizeof(buf));
  i = 0; j = 0;
  while (!ISspace(buf[j]) && (i < sizeof(method) - 1))
@@ -86,6 +97,9 @@ void *accept_request(void *client_v)
  if (strcasecmp(method, "GET") && strcasecmp(method, "POST"))
  {
   unimplemented(client);
+  pthread_mutex_lock (&mutexsum);
+  total_client -= 1;
+  pthread_mutex_unlock (&mutexsum);
   return NULL;
  }
 
@@ -95,6 +109,7 @@ void *accept_request(void *client_v)
  i = 0;
  while (ISspace(buf[j]) && (j < sizeof(buf)))
   j++;
+
  while (!ISspace(buf[j]) && (i < sizeof(url) - 1) && (j < sizeof(buf)))
  {
   url[i] = buf[j];
@@ -137,8 +152,12 @@ void *accept_request(void *client_v)
  else
   execute_cgi(client, path, method, query_string);
  }
-
  close(client);
+ pthread_mutex_lock (&mutexsum);
+ total_client -= 1;
+ pthread_mutex_unlock (&mutexsum);
+ printf("client socket closed,  %d remaining clients \n", total_client);
+
  return NULL;
 }
 
@@ -442,7 +461,9 @@ int startup(u_short *port)
 
  // XIA additions to handle different sockaddr struct
  int size;
+ int option = 1;
  struct addrinfo *ai;
+ struct addrinfo hints;
  struct sockaddr *sa;
 
  // XIA pick socket type
@@ -452,7 +473,9 @@ int startup(u_short *port)
 
  // XIA Do appropriate sockaddr generation
  if (xia)  {
-  if (getaddrinfo(NULL, sid, NULL, &ai) < 0)
+  hints.ai_flags = AI_PASSIVE; // generate address to bind
+  hints.ai_family = AF_XIA; // this line is optional, just in case
+  if (getaddrinfo(NULL, sid, &hints, &ai) < 0)
    error_die("getaddrinfo failed\n");
 
   sa = ai->ai_addr;
@@ -469,6 +492,14 @@ int startup(u_short *port)
   name.sin_port = htons(*port);
   name.sin_addr.s_addr = htonl(INADDR_ANY);
   size = sizeof(struct sockaddr_in);
+#if defined (SO_REUSEPORT)
+  if(setsockopt(httpd,SOL_SOCKET,SO_REUSEPORT,(char*)&option,sizeof(option)) < 0)
+  {
+      printf("setsockopt failed\n");
+      close(httpd);
+      exit(2);
+  }
+#endif
  }
 
  // XIA bind call modified from original code to account for sockaddr size differences
@@ -542,12 +573,22 @@ void config(int argc, char **argv)
 	 sid = strdup(SID);
 }
 
+void sig_handler(int signo)
+{
+  if (signo == SIGINT){
+    close(server_sock);
+    exit(0);
+  }
+
+}
+
+
 /**********************************************************************/
 
 int main(int argc, char **argv)
 {
- int server_sock = -1;
- u_short port = 0;
+ server_sock = -1;
+ u_short port = 9734;
  int client_sock = -1;
 
  // XIA using sockaddr_x so that we have enough room in XIA mode
@@ -566,16 +607,26 @@ int main(int argc, char **argv)
  else
   printf("httpd running on port %d\n", port);
 
+ if (signal(SIGINT, sig_handler) == SIG_ERR)
+    printf("\ncan't catch SIGINT\n");
+
  while (1)
  {
   client_sock = accept(server_sock,
 		               (struct sockaddr *)&client_name, 
 					   &client_name_len);
-  if (client_sock == -1)
-   error_die("accept");
+  if (client_sock == -1){
+    close(server_sock);
+    error_die("accept");
+  }
   /* accept_request(client_sock); */
   if (pthread_create(&newthread , NULL, accept_request, (void *)(intptr_t)client_sock) != 0)
    perror("pthread_create");
+  //if (fork() == 0)
+  //{
+    //accept_request((void *)(intptr_t)client_sock);
+    //exit(0);
+  //}
  }
 
  close(server_sock);

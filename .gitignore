@@ -10,6 +10,8 @@ core
 *~
 *.sw?
 !/visualizations/local_click/Visualizer.swf
+!/tools/visualizations/local_click/Visualizer.swf
+!/tools/visualizations/distributed_click/Visualizer.swf
 tags
 cscope.out
 *.o.cmd
@@ -123,8 +125,11 @@ example/xecho
 etc/click/templates/xia_address.click
 etc/click/templates/host.click
 etc/click/templates/router.click
+etc/click/templates/controller.click
 etc/click/templates/dual_stack_host.click
 etc/click/templates/dual_stack_router.click
+etc/click/templates/backbone_AD.click
+etc/click/xia_topology_local.click
 
 # planetlab
 experiments/planetlab/logs/*.txt

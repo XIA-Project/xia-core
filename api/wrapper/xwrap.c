@@ -402,6 +402,9 @@ void __attribute__ ((constructor)) xwrap_init(void)
 #define markWrapped(s)	 (setWrapped(s, 1))
 #define markUnwrapped(s) (setWrapped(s, 0))
 #define shouldWrap(s)	 (isXsocket(s) && !isWrapped(s))
+#define isXblocked(s)	 (isXsocket(s) && isBlocked(s))
+#define markEnterblocked(s)	 (setBlocked(s, 0))
+#define markQuitblocked(s)	 (setBlocked(s, 1))
 
 // FIXME: need a different name for this so it doesn't collide with above.
 int _GetSocketType(int type)
@@ -868,7 +871,12 @@ int close(int fd)
 		rc = Xclose(fd);
 		markUnwrapped(fd);
 
-	} else {
+	} else if (isXblocked(fd)){
+		markEnterblocked(fd);
+		rc = Xclose(fd);
+		markQuitblocked(fd);
+	}
+	else {
 		rc = __real_close(fd);
 	}
 	return rc;

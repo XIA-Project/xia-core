@@ -29,13 +29,18 @@ typedef struct {
 	uint32_t flags;	// flag 
 } RouteEntry;
 
-typedef struct {
+struct NeighborEntry{
 	std::string AD;		// neigbor AD
 	std::string HID;	// neighbor HID
 	int32_t port;		// interface (outgoing port)
 	int32_t cost; 		// link cost
+    time_t timestamp;   // last time updating this entry
     //int32_t type; // host,router, controller
-} NeighborEntry;
+    bool operator==(const struct NeighborEntry& ne) const
+    {
+        return AD == ne.AD && HID == ne.HID && port == ne.port && cost == ne.cost;
+    }
+};
 
 typedef struct {
     std::string ad;
@@ -46,6 +51,7 @@ typedef struct {
 	bool checked;	// used for calculating the shortest path
 	int32_t cost;	// cost from myAD to destAD
 	std::string prevNode; // previous node along the shortest path from myAD to destAD
+    time_t timestamp; // last time updating this entry
 	
 } NodeStateEntry; // extracted from incoming LSA
 

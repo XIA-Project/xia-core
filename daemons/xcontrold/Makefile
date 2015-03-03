@@ -5,6 +5,7 @@ VPATH=../common
 
 SOURCES=xcontrold.cc csclient.cc ControlMessage.cc XIARouter.cc
 XCONTROLD=$(BINDIR)/xcontrold
+CFLAGS += -I$(APIDIR)/xsocket/minini
 LDFLAGS += $(LIBS)
 
 all: $(XCONTROLD)

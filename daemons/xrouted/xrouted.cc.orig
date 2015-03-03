@@ -656,7 +656,11 @@ int main(int argc, char *argv[])
 		{
 			last_purge = now;
 			//fprintf(stderr, "checking entry\n");
+<<<<<<< HEAD
+			map<string, time_t>::iterator iter;
+=======
 			map<string, time_t>::iterator iter = timeStamp.begin();
+>>>>>>> sid_routing
 
 			while (iter != timeStamp.end())	
 			{

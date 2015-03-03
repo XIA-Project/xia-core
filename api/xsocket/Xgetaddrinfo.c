@@ -254,7 +254,11 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 		Node n_ad  = Node(ad);
 		Node n_hid = Node(hid);
 
-		Graph g = (n_src * n_ad * n_hid);
+		Graph g;
+		if (local)
+			g = (n_src * n_ad * n_hid);
+		else // loopback, src->sid is enough?
+			g = Node(n_src);
 
 		if (have4id)
 			g = g + (n_src * n_ip * n_ad * n_hid);

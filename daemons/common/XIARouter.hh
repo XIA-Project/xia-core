@@ -37,6 +37,7 @@ using namespace std;
 #define XR_ROUTER_NOT_SET		-7
 #define XR_BAD_HOSTNAME			-8
 #define XR_INVALID_XID			-9
+#define XR_INVALID_WEIGHT		-10
 
 #define TOTAL_SPECIAL_CASES 8
 #define DESTINED_FOR_DISCARD -1
@@ -85,7 +86,10 @@ public:
 	// returns 0 success, < 0 on error
 	int addRoute(const std::string &xid, int port, const std::string &next, unsigned long flags);
 	int setRoute(const std::string &xid, int port, const std::string &next, unsigned long flags);
+	int appRoute(const std::string &xid, int port, const std::string &next, unsigned long flags, int weight, const std::string &index);
+	int seletiveSetRoute(const std::string &xid, int port, const std::string &next, unsigned long flags, int weight, const std::string &index);
 	int delRoute(const std::string &xid);
+	int selectiveDelRoute(const std::string &xid, const std::string &index);
 
 	const char *cserror();
 private:
@@ -94,7 +98,7 @@ private:
 	ControlSocketClient _cs;
 	ControlSocketClient::err_t _cserr;
 
-	int updateRoute(std::string cmd, const std::string &xid, int port, const std::string &next, unsigned long flags);
+	int updateRoute(string cmd, const std::string &xid, int port, const std::string &next, unsigned long flags, int weight, const std::string &index);
 	string itoa(signed);
 };
 

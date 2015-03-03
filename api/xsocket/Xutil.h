@@ -30,6 +30,9 @@
 #define LOGF(fmt, ...)
 #endif
 
+#define markTobeblocked(s)     (setBlocked(s, 1))
+#define markAfterblocked(s)  (setBlocked(s, 0))
+
 int click_send(int sockfd, xia::XSocketMsg *xsm);
 int click_reply(int sockfd, char *buf, int buflen);
 int click_reply2(int sockfd, xia::XSocketCallType *type);
@@ -49,6 +52,8 @@ int getSocketData(int sock, char *buf, unsigned bufLen);
 void setSocketData(int sock, const char *buf, unsigned bufLen);
 void setWrapped(int sock, int wrapped);
 int isWrapped(int sock);
+void setBlocked(int sock, int blocked);
+int isBlocked(int sock);
 void setAsync(int sock, int async);
 int isAsync(int sock);
 int setPeer(int sock, sockaddr_x *addr);

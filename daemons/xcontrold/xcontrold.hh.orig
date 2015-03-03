@@ -158,6 +158,9 @@ int processInterdomainLSA(ControlMessage msg);
 // process a LinkStateAdvertisement message 
 int processLSA(ControlMessage msg);
 
+<<<<<<< HEAD
+int processSCION(uint8_t *data, uint16_t len);
+=======
 // SID routing service management plane: keep alive with its service controller 
 int sendKeepAliveToServiceController();
 
@@ -182,6 +185,7 @@ int processSidRoutingTable(std::map<std::string, std::map<std::string, ServiceSt
 
 // tool function update the SIDADsTable, add or update SID:AD pair into SID:[ADs]
 int updateSidAdsTable(std::string AD, std::string SID, ServiceState service_state);
+>>>>>>> sid_routing
 
 // compute the shortest path (Dijkstra)
 void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEntry> &networkTable, std::map<std::string, RouteEntry> &routingTable);

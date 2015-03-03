@@ -154,11 +154,11 @@ XCMP::processBadForwarding(Packet *p_in) {
     const struct click_xia_xid_node& lastnode = shdr->node[last];
     XID lnode(lastnode.xid);
 
-    if(DEBUG)
+    /*if(DEBUG)
         click_chatter("%s: %s sent me a packet that should route on its local network (Dst: %s)\n", 
                       _src_path.unparse().c_str(), hdr.src_path().unparse().c_str(), 
                       XID(lastnode.xid).unparse().c_str());
-
+*/
     // get the next hop information stored in the packet annotation
     XID nxt_hop = p_in->nexthop_neighbor_xid_anno();
 
@@ -231,10 +231,10 @@ XCMP::processExpired(Packet *p_in) {
 void
 XCMP::gotPing(const Packet *p_in) {
     const XIAHeader hdr(p_in);
-    if(DEBUG)
+/*    if(DEBUG)
         click_chatter("%s: PING received; client seq = %u\n", _src_path.unparse().c_str(), 
                       *(uint16_t*)(hdr.payload() + 6));
-
+*/
     sendXCMPPacket(p_in, XCMP_ECHOREPLY, 0, NULL, NULL, NULL);
 
     /*
@@ -259,18 +259,18 @@ XCMP::gotPing(const Packet *p_in) {
 
     //click_chatter("src = %s\n", hdr.src_path().unparse().c_str());
     */
-
+/*
     if(DEBUG)
         click_chatter("%s: PONG sent; client seq = %u\n", _src_path.unparse().c_str(), 
-                      *(uint16_t*)(p_in->data() + 6));
+                      *(uint16_t*)(p_in->data() + 6));*/
 }
 
 // got pong, send up
 void
 XCMP::gotPong(Packet *p_in) {
     XIAHeader hdr(p_in);
-    if(DEBUG)
-        click_chatter("%s: PONG recieved; client seq = %u\n", _src_path.unparse().c_str(), *(uint16_t*)(hdr.payload() + 6));
+/*    if(DEBUG)
+        click_chatter("%s: PONG recieved; client seq = %u\n", _src_path.unparse().c_str(), *(uint16_t*)(hdr.payload() + 6));*/
     sendUp(p_in);
 }
 

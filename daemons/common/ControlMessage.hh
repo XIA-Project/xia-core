@@ -14,6 +14,12 @@ using namespace std;
 #define CTL_HOST_REGISTER  2
 #define CTL_ROUTING_TABLE  3 // TODO: rename to RTU
 #define CTL_XBGP           4
+#define CTL_SID_DISCOVERY  5
+#define CTL_SID_ROUTING_TABLE  6
+#define CTL_SID_MANAGE_KA  7 // keep alive msg to service controller
+#define CTL_SID_RE_DISCOVERY  8 // send to service controller
+#define CTL_AD_PATH_STATE_PING 9
+#define CTL_AD_PATH_STATE_PONG 10
 
 class ControlMessage
 {

@@ -79,7 +79,8 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		LOG("Xaccept is only valid with stream sockets.");
 		return -1;
 	}
-	
+	// Xaccept could be blocked here. If close is called, let it be xclose.
+	markTobeblocked(sockfd);
 	// Wait for connection from client
 	len = sizeof their_addr;
 	if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
@@ -88,7 +89,11 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 				strerror(errno));
 		return -1;
 	}
-        
+
+	// the rest of the call will be over soon NOTE: should this be after click_reply,
+	// as click_reply can also be blocked? 
+	markAfterblocked(sockfd); 
+
 	// Create new socket (this is a socket between API and Xtransport)
 
 	if ((new_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
