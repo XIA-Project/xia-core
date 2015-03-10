@@ -49,8 +49,7 @@ int getFile(int sock, char *ad, char*hid, const char *fin, const char *fout);
 /*
 ** write the message to stdout unless in quiet mode
 */
-void say(const char *fmt, ...)
-{
+void say(const char *fmt, ...) {
 	if (verbose) {
 		va_list args;
 
@@ -63,21 +62,18 @@ void say(const char *fmt, ...)
 /*
 ** always write the message to stdout
 */
-void warn(const char *fmt, ...)
-{
+void warn(const char *fmt, ...) {
 	va_list args;
 
 	va_start(args, fmt);
 	vfprintf(stdout, fmt, args);
 	va_end(args);
-
 }
 
 /*
 ** write the message to stdout, and exit the app
 */
-void die(int ecode, const char *fmt, ...)
-{
+void die(int ecode, const char *fmt, ...) {
 	va_list args;
 
 	va_start(args, fmt);
@@ -87,8 +83,7 @@ void die(int ecode, const char *fmt, ...)
 	exit(ecode);
 }
 
-int sendCmd(int sock, const char *cmd)
-{
+int sendCmd(int sock, const char *cmd) {
 	int n;
 	warn("Sending Command: %s \n", cmd);
 
@@ -100,10 +95,9 @@ int sendCmd(int sock, const char *cmd)
 	return n;
 }
 
-char** str_split(char* a_str, const char *a_delim)
-{
-	char** result    = 0;
-	int count     = 0;
+char** str_split(char* a_str, const char *a_delim) {
+	char** result = 0;
+	int count = 0;
 	int str_len = strlen(a_str);
 	int del_len = strlen(a_delim);
 	int i = 0;
@@ -117,33 +111,30 @@ char** str_split(char* a_str, const char *a_delim)
 				count++;
 				last_delim = &a_str[i];
 			}
-
-	
 	 /* Add space for trailing token. */
 	count += last_delim < (a_str + strlen(a_str) - 1);
 	
-// 	/* Add space for terminating null string so caller
-// 	knows where the list of returned strings ends. */
+ 	/* Add space for terminating null string so caller
+			knows where the list of returned strings ends. */
  	count++;
 
 	result = (char **) malloc(sizeof(char*) * count);
 	
-// 	printf ("Splitting string \"%s\" into %i tokens:\n", a_str, count);
+	// printf ("Splitting string \"%s\" into %i tokens:\n", a_str, count);
 	
 	i = 0;
 	result[i] = strtok(a_str, a_delim);
-// 	printf ("%s\n",result[i]);
+	// printf ("%s\n",result[i]);
 	
-	for( i = 1; i < count; i++){
+	for(i = 1; i < count; i++) {
 		result[i] = strtok (NULL, a_delim);
-// 		printf ("%s\n",result[i]);
+		// printf ("%s\n",result[i]);
 	}
 
 	return result;
 }
 
-void *recvCmd (void *socketid)
-{
+void *recvCmd (void *socketid) {
 	int i, n, count = 0;
 	ChunkInfo *info = NULL;
 	char command[XIA_MAXBUF];
@@ -151,7 +142,7 @@ void *recvCmd (void *socketid)
 	int sock = *((int*)socketid);
 	char *fname;
 	char fin[512], fout[512];
-//  	char **params;
+	// char **params;
 	char ad[MAX_XID_SIZE];
 	char hid[MAX_XID_SIZE];
 
@@ -188,12 +179,10 @@ void *recvCmd (void *socketid)
 			if ((count = XputFile(ctx, fname, CHUNKSIZE, &info)) < 0) {
 				warn("unable to serve the file: %s\n", fname);
 				sprintf(reply, "FAIL: File (%s) not found", fname);
-
 			} else {
 				sprintf(reply, "OK: %d", count);
 			}
 			say("%s\n", reply);
-			
 			
 			//Just tells the receiver how many chunks it should expect.
 			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
@@ -232,20 +221,19 @@ void *recvCmd (void *socketid)
 			XfreeChunkInfo(info);
 			info = NULL;
 			count = 0;
-		
 		}
 		else if (strncmp(command, "put", 3) == 0) {
-// 			fname= &command[4];
+			// fname= &command[4];
 			i = 0;
 			say("Client wants to put a file here. cmd: %s\n" , command);
-//			put %s %s %s %s 
+			//	put %s %s %s %s 
 			i = sscanf(command,"put %s %s %s %s ",ad,hid,fin,fout );
 			if (i != 4){
  				warn("Invalid put command: %s\n" , command);
 			}
 			getFile(sock, ad, hid, fin, fout);
 
-		}else {
+		} else {
 			sprintf(reply, "FAIL: invalid command (%s)\n", command);
 			warn(reply);
 			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
@@ -262,40 +250,38 @@ void *recvCmd (void *socketid)
 	pthread_exit(NULL);
 }
 
-
 //Just registering the service and openning the necessary sockets
-int registerReceiver()
-{
-    int sock;
+int registerReceiver() {
+	int sock;
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 
 	// create a socket, and listen for incoming connections
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		 die(-1, "Unable to create the listening socket\n");
 
-    // read the localhost AD and HID
-    if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
-    	die(-1, "Reading localhost address\n");
+  // read the localhost AD and HID
+  if (XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
+		die(-1, "Reading localhost address\n");
 
 	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
-    	// Generate an SID to use
+   // Generate an SID to use
 	if(XmakeNewSID(sid_string, sizeof(sid_string))) {
-        	die(-1, "Unable to create a temporary SID");
-    	}
+		die(-1, "Unable to create a temporary SID");
+	}
 
 	struct addrinfo *ai;
-    //FIXME: SID is hardcoded  fixed: from SID to sid_string
+  // FIXME: SID is hardcoded  FIXED: from SID to sid_string randomly generated
 	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
 		die(-1, "getaddrinfo failure!\n");
 
 	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
-	//FIXME NAME is hard coded
-    if (XregisterName(NAME, dag) < 0 )
-    	die(-1, "error registering name: %s\n", NAME);
+	// FIXME: NAME is hard coded
+  if (XregisterName(NAME, dag) < 0)
+		die(-1, "error registering name: %s\n", NAME);
 
 	if (Xbind(sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
 		Xclose(sock);
-		 die(-1, "Unable to bind to the dag: %s\n", dag);
+		die(-1, "Unable to bind to the dag: %s\n", dag);
 	}
 
 	Graph g(dag);
@@ -304,8 +290,7 @@ int registerReceiver()
   
 }
 
-void *blockingListener(void *socketid)
-{
+void *blockingListener(void *socketid) {
   int sock = *((int*)socketid);
   int acceptSock;
 
@@ -319,7 +304,7 @@ void *blockingListener(void *socketid)
 		
 		// handle the connection in a new thread
 		pthread_t client;
-	pthread_create(&client, NULL, recvCmd, (void *)&acceptSock);
+		pthread_create(&client, NULL, recvCmd, (void *)&acceptSock);
 	}
 	
 	Xclose(sock); // we should never reach here!
@@ -327,20 +312,17 @@ void *blockingListener(void *socketid)
 }
 
 // not used
-void nonblockingListener(int sock)
-{
+void nonblockingListener(int sock) {
 	pthread_t client;
-       	pthread_create(&client, NULL, blockingListener, (void *)&sock);
-  
+	pthread_create(&client, NULL, blockingListener, (void *)&sock);
 }
 
-int getChunkCount(int sock, char *reply, int sz)
-{
+int getChunkCount(int sock, char *reply, int sz) {
 	int n;
 
 	if ((n = Xrecv(sock, reply, sz, 0))  < 0) {
 		Xclose(sock);
-		 die(-1, "Unable to communicate with the server\n");
+		die(-1, "Unable to communicate with the server\n");
 	}
 
 	if (strncmp(reply, "OK:", 3) != 0) {
@@ -353,22 +335,19 @@ int getChunkCount(int sock, char *reply, int sz)
 }
 
 
-int buildChunkDAGs(ChunkStatus cs[], char *chunks, char *ad, char *hid)
-{
+int buildChunkDAGs(ChunkStatus cs[], char *chunks, char *ad, char *hid) {
 	char *p = chunks;
 	char *next;
 	int n = 0;
 
 	char *dag;
 	
-	
 	// build the list of chunks to retrieve
 	while ((next = strchr(p, ' '))) {
 		*next = 0;
-
 		dag = (char *)malloc(512);
 		sprintf(dag, "RE ( %s %s ) CID:%s", ad, hid, p);
-// 		printf("built dag: %s\n", dag);
+		// printf("built dag: %s\n", dag);
 		cs[n].cidLen = strlen(dag);
 		cs[n].cid = dag;
 		n++;
@@ -376,21 +355,19 @@ int buildChunkDAGs(ChunkStatus cs[], char *chunks, char *ad, char *hid)
 	}
 	dag = (char *)malloc(512);
 	sprintf(dag, "RE ( %s %s ) CID:%s", ad, hid, p);
-// 	printf("built dag: %s\n", dag);
+	// printf("built dag: %s\n", dag);
 	cs[n].cidLen = strlen(dag);
 	cs[n].cid = dag;
 	n++;
 	return n;
 }
 
-int getListedChunks(int csock, FILE *fd, char *chunks, char *ad, char *hid)
-{
+int getListedChunks(int csock, FILE *fd, char *chunks, char *ad, char *hid) {
 	ChunkStatus cs[NUM_CHUNKS];
 	char data[XIA_MAXCHUNK];
 	int len;
 	int status;
 	int n = -1;
-	
 	
 	n = buildChunkDAGs(cs, chunks, ad, hid);
 	
@@ -447,7 +424,7 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *ad, char *hid)
 		}
 
 		// write the chunk to disk
-//		say("writing %d bytes of chunk %s to disk\n", len, cid);
+		// say("writing %d bytes of chunk %s to disk\n", len, cid);
 		fwrite(data, 1, len, fd);
 
 		free(cs[i].cid);
@@ -461,9 +438,7 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *ad, char *hid)
 
 //	This is used both to put files and to get files since in case of put I still have to request the file.
 //	Should be fixed with push implementation
-
-int getFile(int sock, char *ad, char*hid, const char *fin, const char *fout)
-{
+int getFile(int sock, char *ad, char*hid, const char *fin, const char *fout) {
 	int chunkSock;
 	int offset;
 	char cmd[512];
@@ -471,7 +446,6 @@ int getFile(int sock, char *ad, char*hid, const char *fin, const char *fout)
 	int status = 0;
 	
 	//TODO: check the arguments to be correct
-	
 	say("Getting file: %s, write to: %s \n",fin, fout);
 	
 	// send the file request
@@ -524,9 +498,7 @@ int getFile(int sock, char *ad, char*hid, const char *fin, const char *fout)
 	return status;
 }
 
-
-int main()
-{	
+int main() {	
 	int sock = registerReceiver();
 	blockingListener((void *)&sock);
 	return 0;

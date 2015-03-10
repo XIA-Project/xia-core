@@ -125,9 +125,6 @@ void *processRequest (void *socketid)
 				warn("unable to send reply to client\n");
 				break;
 			}
-
-
-
 		} else if (strncmp(command, "block", 5) == 0) {
 			char *start = &command[6];
 			char *end = strchr(start, ':');
@@ -181,8 +178,7 @@ void *processRequest (void *socketid)
 /*
 ** where it all happens
 */
-int main()
-{
+int main() {
 	int sock, acceptSock;
 
 	say ("\n%s (%s): started\n", TITLE, VERSION);
@@ -191,9 +187,9 @@ int main()
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		 die(-1, "Unable to create the listening socket\n");
 
-    // read the localhost AD and HID
-    if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
-    	die(-1, "Reading localhost address\n");
+	// read the localhost AD and HID
+  if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
+		die(-1, "Reading localhost address\n");
 
 	struct addrinfo *ai;
 	if (Xgetaddrinfo(NULL, SID, NULL, &ai) != 0)
@@ -201,8 +197,8 @@ int main()
 
 	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
 
-    if (XregisterName(NAME, dag) < 0 )
-    	die(-1, "error registering name: %s\n", NAME);
+	if (XregisterName(NAME, dag) < 0 )
+		die(-1, "error registering name: %s\n", NAME);
 
 	if (Xbind(sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
 		Xclose(sock);
@@ -212,7 +208,7 @@ int main()
 	Graph g(dag);
 	say("listening on dag: %s\n", g.dag_string().c_str());
 
-   	while (1) {
+	while (1) {
 		say("Waiting for a client connection\n");
    		
 		if ((acceptSock = Xaccept(sock, NULL, NULL)) < 0)
@@ -222,7 +218,7 @@ int main()
 		
 		// handle the connection in a new thread
 		pthread_t client;
-       	pthread_create(&client, NULL, processRequest, (void *)&acceptSock);
+    pthread_create(&client, NULL, processRequest, (void *)&acceptSock);
 	}
 	
 	Xclose(sock); // we should never reach here!

@@ -176,7 +176,7 @@ int getFileData(int csock, FILE *fd, char *chunks)
 		}
 
 		// write the chunk to disk
-//		say("writing %d bytes of chunk %s to disk\n", len, cid);
+		// say("writing %d bytes of chunk %s to disk\n", len, cid);
 		fwrite(data, 1, len, fd);
 
 		free(cs[i].cid);
@@ -187,8 +187,7 @@ int getFileData(int csock, FILE *fd, char *chunks)
 	return n;
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
 	int sock, chunkSock;
 	int offset;
 	sockaddr_x dag;
@@ -209,19 +208,19 @@ int main(int argc, char **argv)
 	fin = argv[1];
 	fout = argv[2];
 
-    // lookup the xia service 
+	// lookup the xia service 
 	daglen = sizeof(dag);
-    if (XgetDAGbyName(NAME, &dag, &daglen) < 0)
+	if (XgetDAGbyName(NAME, &dag, &daglen) < 0)
 		die(-1, "unable to locate: %s\n", NAME);
 
 
 	// create a socket, and listen for incoming connections
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
-		 die(-1, "Unable to create the listening socket\n");
+		die(-1, "Unable to create the listening socket\n");
     
 	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(sock);
-		 die(-1, "Unable to bind to the dag: %s\n", dag);
+		die(-1, "Unable to bind to the dag: %s\n", dag);
 	}
 
 	// save the AD and HID for later. This seems hacky

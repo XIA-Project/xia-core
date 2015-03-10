@@ -50,12 +50,10 @@ char my_hid[MAX_XID_SIZE];
 
 int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout);
 
-
 /*
 ** write the message to stdout unless in quiet mode
 */
-void say(const char *fmt, ...)
-{
+void say(const char *fmt, ...) {
 	if (verbose) {
 		va_list args;
 
@@ -68,21 +66,18 @@ void say(const char *fmt, ...)
 /*
 ** always write the message to stdout
 */
-void warn(const char *fmt, ...)
-{
+void warn(const char *fmt, ...) {
 	va_list args;
 
 	va_start(args, fmt);
 	vfprintf(stdout, fmt, args);
 	va_end(args);
-
 }
 
 /*
 ** write the message to stdout, and exit the app
 */
-void die(int ecode, const char *fmt, ...)
-{
+void die(int ecode, const char *fmt, ...) {
 	va_list args;
 
 	va_start(args, fmt);
@@ -92,8 +87,7 @@ void die(int ecode, const char *fmt, ...)
 	exit(ecode);
 }
 
-int sendCmd(int sock, const char *cmd)
-{ 
+int sendCmd(int sock, const char *cmd) { 
 	int n;
  	warn("Sending Command: %s \n", cmd);
 	if ((n = Xsend(sock, cmd,  strlen(cmd), 0)) < 0) {
@@ -144,8 +138,7 @@ int sendCmd(int sock, const char *cmd)
 // 	return result;
 // }
 
-void *recvCmd (void *socketid)
-{
+void *recvCmd (void *socketid) {
 	int i, n, count = 0;
 	ChunkInfo *info = NULL;
 	char command[XIA_MAXBUF];
@@ -190,7 +183,6 @@ void *recvCmd (void *socketid)
 			}
 			say("%s\n", reply);
 			
-			
 			//Just tells the receiver how many chunks it should expect.
 			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
 				warn("unable to send reply to client\n");
@@ -228,8 +220,7 @@ void *recvCmd (void *socketid)
 			XfreeChunkInfo(info);
 			info = NULL;
 			count = 0;
-			break;
-		
+			break;		
 		}
 		else {
 			sprintf(reply, "FAIL: invalid command (%s)\n", command);
@@ -247,9 +238,7 @@ void *recvCmd (void *socketid)
 	return (void *)1;
 }
 
-
-void *blockingListener(void *socketid)
-{
+void *blockingListener(void *socketid) {
   int sock = *((int*)socketid);
   int acceptSock;
   while (1) {
@@ -262,26 +251,21 @@ void *blockingListener(void *socketid)
 		
 		// handle the connection in a new thread
 		pthread_t client;
-	pthread_create(&client, NULL, recvCmd, (void *)&acceptSock);
+		pthread_create(&client, NULL, recvCmd, (void *)&acceptSock);
 	}
 	
 	Xclose(sock); // we should never reach here!
 	return NULL;
 }
 
-
-
 // not used
-void nonblockingListener(int sock)
-{
+void nonblockingListener(int sock) {
 	pthread_t client;
-       	pthread_create(&client, NULL, blockingListener, (void *)&sock);
-  
+  pthread_create(&client, NULL, blockingListener, (void *)&sock);
 }
 
-int getChunkCount(int sock, char *reply, int sz)
-{
-	int n=-1;
+int getChunkCount(int sock, char *reply, int sz) {
+	int n = -1;
 
 	if ((n = Xrecv(sock, reply, sz, 0))  < 0) {
 		Xclose(sock);
@@ -298,24 +282,19 @@ int getChunkCount(int sock, char *reply, int sz)
 	return n;
 }
 
-
-
-int buildChunkDAGs(ChunkStatus cs[], char *chunks, char *p_ad, char *p_hid)
-{
+int buildChunkDAGs(ChunkStatus cs[], char *chunks, char *p_ad, char *p_hid) {
 	char *p = chunks;
 	char *next;
 	int n = 0;
 
 	char *dag;
 	
-	
 	// build the list of chunks to retrieve
 	while ((next = strchr(p, ' '))) {
 		*next = 0;
-
 		dag = (char *)malloc(512);
 		sprintf(dag, "RE ( %s %s ) CID:%s", p_ad, p_hid, p);
-// 		printf("built dag: %s\n", dag);
+		// printf("built dag: %s\n", dag);
 		cs[n].cidLen = strlen(dag);
 		cs[n].cid = dag;
 		n++;
@@ -323,21 +302,19 @@ int buildChunkDAGs(ChunkStatus cs[], char *chunks, char *p_ad, char *p_hid)
 	}
 	dag = (char *)malloc(512);
 	sprintf(dag, "RE ( %s %s ) CID:%s", p_ad, p_hid, p);
-//	printf("getting %s\n", p);
+	// printf("getting %s\n", p);
 	cs[n].cidLen = strlen(dag);
 	cs[n].cid = dag;
 	n++;
 	return n;
 }
 
-int getListedChunks(int csock, FILE *fd, char *chunks, char *p_ad, char *p_hid)
-{
+int getListedChunks(int csock, FILE *fd, char *chunks, char *p_ad, char *p_hid) {
 	ChunkStatus cs[NUM_CHUNKS];
 	char data[XIA_MAXCHUNK];
 	int len;
 	int status;
 	int n = -1;
-	
 	
 	n = buildChunkDAGs(cs, chunks, p_ad, p_hid);
 	
@@ -354,8 +331,8 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *p_ad, char *p_hid)
 				return -1;
 			}
 			say("checking chunk status\n");
-			ctr++;
 		}
+		ctr++;
 
 		status = XgetChunkStatuses(csock, cs, n);
 
@@ -394,7 +371,7 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *p_ad, char *p_hid)
 		}
 
 		// write the chunk to disk
-//		say("writing %d bytes of chunk %s to disk\n", len, cid);
+		// say("writing %d bytes of chunk %s to disk\n", len, cid);
 		fwrite(data, 1, len, fd);
 
 		free(cs[i].cid);
@@ -407,17 +384,14 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *p_ad, char *p_hid)
 
 //	This is used both to put files and to get files since in case of put I still have to request the file.
 //	Should be fixed with push implementation
-
-int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout)
-{
+int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout) {
 	int chunkSock;
 	int offset;
 	char cmd[512];
 	char reply[512];
 	int status = 0;
 	
-	//TODO: check the arguments to be correct
-	
+	// TODO: check the arguments to be correct
 	// send the file request
 	sprintf(cmd, "get %s",  fin);
 	sendCmd(sock, cmd);
@@ -483,34 +457,32 @@ int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout
 	return status;
 }
 
-int initializeClient(const char *name)
-{
+int initializeClient(const char *name) {
 	int sock, rc;
 	sockaddr_x dag;
 	socklen_t daglen;
 	char sdag[1024];
 	char IP[MAX_XID_SIZE];
 
-    // lookup the xia service 
+	// lookup the xia service 
 	daglen = sizeof(dag);
-    if (XgetDAGbyName(name, &dag, &daglen) < 0)
+	if (XgetDAGbyName(name, &dag, &daglen) < 0)
 		die(-1, "unable to locate: %s\n", name);
-
 
 	// create a socket, and listen for incoming connections
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
-		 die(-1, "Unable to create the listening socket\n");
+		die(-1, "Unable to create the listening socket\n");
     
 	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(sock);
-		 die(-1, "Unable to bind to the dag: %s\n", dag);
+		die(-1, "Unable to bind to the dag: %s\n", dag);
 	}
 
 	rc = XreadLocalHostAddr(sock, my_ad, MAX_XID_SIZE, my_hid, MAX_XID_SIZE, IP, MAX_XID_SIZE);
 
 	if (rc < 0) {
 		Xclose(sock);
-		 die(-1, "Unable to read local address.\n");
+		die(-1, "Unable to read local address.\n");
 	} else{
 		warn("My AD: %s, My HID: %s\n", my_ad, my_hid);
 	}
@@ -519,17 +491,17 @@ int initializeClient(const char *name)
 	// we need to find a better way to deal with this
 	Graph g(&dag);
 	strncpy(sdag, g.dag_string().c_str(), sizeof(sdag));
-//   	say("sdag = %s\n",sdag);
+	// say("sdag = %s\n",sdag);
 	char *ads = strstr(sdag,"AD:");
 	char *hids = strstr(sdag,"HID:");
-// 	i = sscanf(ads,"%s",s_ad );
-// 	i = sscanf(hids,"%s", s_hid);
+	// i = sscanf(ads,"%s",s_ad );
+	// i = sscanf(hids,"%s", s_hid);
 	
-	if(sscanf(ads,"%s",s_ad ) < 1 || strncmp(s_ad,"AD:", 3) !=0){
+	if (sscanf(ads, "%s", s_ad ) < 1 || strncmp(s_ad, "AD:", 3) != 0) {
 		die(-1, "Unable to extract AD.");
 	}
 		
-	if(sscanf(hids,"%s", s_hid) < 1 || strncmp(s_hid,"HID:", 4) !=0 ){
+	if (sscanf(hids,"%s", s_hid) < 1 || strncmp(s_hid, "HID:", 4) != 0) {
 		die(-1, "Unable to extract AD.");
 	}
 
@@ -539,8 +511,7 @@ int initializeClient(const char *name)
 
 //FIXME Apparently XPutFile exists so use that instead.
 //FIXME hardcoded ad-hid format for dag.
-void putFile(int sock, char *ad, char*hid, const char *fin, const char *fout)
-{
+void putFile(int sock, char *ad, char *hid, const char *fin, const char *fout) {
 	char cmd[512];
 	sprintf(cmd, "put %s %s %s %s ",  ad,hid,fin,fout);
 	sendCmd(sock, cmd);
@@ -548,22 +519,19 @@ void putFile(int sock, char *ad, char*hid, const char *fin, const char *fout)
 	say("done with put file\n");
 }
 
-void usage(){
+void usage() {
 	say("usage: get|put <source file> <dest name>\n");
 }
 
-bool file_exists(const char * filename)
-{
-    if (FILE * file = fopen(filename, "r")){
-	fclose(file);
-	return true;
+bool file_exists(const char * filename) {
+	if (FILE * file = fopen(filename, "r")) {
+		fclose(file);
+		return true;
 	}
-    return false;
+	return false;
 }
 
-int main(int argc, char **argv)
-{	
-
+int main(int argc, char **argv) {	
 	const char *name;
 	int sock = -1;
 	char fin[512], fout[512];
@@ -572,109 +540,96 @@ int main(int argc, char **argv)
 	
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 	
-	if( argc == 1){
+	if (argc == 1) {
 		say ("No service name passed, using default: %s\nYou can also pass --quick to execute a couple of default commands for quick testing. Requires s.txt to exist. \n", NAME);
 		sock = initializeClient(NAME);
 		usage();
-	} else if (argc == 2){
-		if( strcmp(argv[1], "--quick") == 0){
+	} else if (argc == 2) {
+		if (strcmp(argv[1], "--quick") == 0) {
 			quick = true;
-			name=NAME;
-		} else{
+			name = NAME;
+		} else {
 			name = argv[1];
 			usage();
 		}
 		say ("Connecting to: %s\n", name);
 		sock = initializeClient(name);
-
-	} else if (argc == 3){
-		if( strcmp(argv[1], "--quick") == 0 ){
-			quick = true;
-			name = argv[2];
-			say ("Connecting to: %s\n", name);
-			sock = initializeClient(name);
-			usage();
-		} else{
-			die(-1, "xftp [--quick] [SID]");
-		}
-		
+	} else if (argc == 3) {
+			if (strcmp(argv[1], "--quick") == 0) {
+				quick = true;
+				name = argv[2];
+				say ("Connecting to: %s\n", name);
+				sock = initializeClient(name);
+				usage();
+			} else{
+				die(-1, "xftp [--quick] [SID]");
+			}
 	} else{
 		die(-1, "xftp [--quick] [SID]"); 
 	}
 	
 	int i = 0;
 
-//		This is for quick testing with a couple of commands
-
-	while(i < NUM_PROMPTS){
+	// This is for quick testing with a couple of commands
+	while (i < NUM_PROMPTS) {
 		say(">>");
 		cmd[0] = '\n';
 		fin[0] = '\n';
 		fout[0] = '\n';
 		params = -1;
 		
-		if(quick){
-			if( i==0 )
+		if (quick) {
+			if (i == 0)
 				strcpy(cmd, "put s.txt r.txt");
-			else if( i==1 )
+			else if (i == 1)
 				strcpy(cmd, "get r.txt sr.txt\n");
 			i++;
-		}else{
+		} else {
 			fgets(cmd, 511, stdin);
 		}
 
-//		enable this if you want to limit how many times this is done
-// 		i++;
+		// enable this if you want to limit how many times this is done
+		// i++;
 		
-		if (strncmp(cmd, "get", 3) == 0){
+		if (strncmp(cmd, "get", 3) == 0) {
 			params = sscanf(cmd,"get %s %s", fin, fout);
 			
-			if(params !=2 ){
+			if (params != 2){
 				sprintf(reply, "FAIL: invalid command (%s)\n", cmd);
 				warn(reply);
 				usage();
 				continue;
 			}
-			
-			if( strcmp(fin, fout) == 0){
+			if (strcmp(fin, fout) == 0) {
 				warn("Since both applications write to the same folder (local case) the names should be different.\n");
 				continue;
 			}
-			
 			getFile(sock, s_ad, s_hid, fin, fout);
-			
 		}
 		else if (strncmp(cmd, "put", 3) == 0){
 			params = sscanf(cmd,"put %s %s", fin, fout);
-
-
-			if(params !=2 ){
+			
+			if (params != 2){
 				sprintf(reply, "FAIL: invalid command (%s)\n", cmd);
 				warn(reply);
 				usage();
 				continue;
 			}
-
-			
-			if(strcmp(fin, fout) == 0){
+			if (strcmp(fin, fout) == 0){
 				warn("Since both applications write to the same folder (local case) the names should be different.\n");
 				continue;
 			}
-			if(!file_exists(fin)){
+			if (!file_exists(fin)) {
 				warn("Source file: %s doesn't exist\n", fin);
 				continue;
 			}
-				
-			
 			putFile(sock, my_ad, my_hid, fin, fout);
-			
 		}
 		else{
 			sprintf(reply, "FAIL: invalid command (%s)\n", cmd);
 			warn(reply);
 			usage();
 		}
-		
 	}	
 	return 1;
 }

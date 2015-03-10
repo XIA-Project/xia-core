@@ -154,7 +154,7 @@ void process(int sock)
 	tv.tv_sec = WAIT_FOR_DATA;
 	tv.tv_usec = 0;
 
-   	while (1) {
+	while (1) {
 		memset(buf, 0, sizeof(buf));
 
 	/*tv.tv_sec = WAIT_FOR_DATA;
@@ -185,7 +185,7 @@ void process(int sock)
 		}
 
 		say("%5d sent %d bytes\n", pid, n);
-   	}
+	}
 	say("%5d closing\n", pid);
 	Xclose(sock);
 }
@@ -193,8 +193,7 @@ void process(int sock)
 static void reaper(int sig)
 {
 	if (sig == SIGCHLD) {
-		while (waitpid(0, NULL, WNOHANG) > 0)
-			;
+		while (waitpid(0, NULL, WNOHANG) > 0);
 	}
 }
 
@@ -230,8 +229,9 @@ void echo_stream()
 
 	printf("\nStream DAG\n%s\n", g.dag_string().c_str());
 
-    if (XregisterName(STREAM_NAME, sa) < 0 )
-    	die(-1, "error registering name: %s\n", STREAM_NAME);
+	if (XregisterName(STREAM_NAME, sa) < 0 )
+		die(-1, "error registering name: %s\n", STREAM_NAME);
+		
 	say("registered name: \n%s\n", STREAM_NAME);
 
 	if (Xbind(acceptor, (struct sockaddr *)sa, sizeof(sockaddr_x)) < 0) {
@@ -239,7 +239,6 @@ void echo_stream()
 	}
 
 	while (1) {
-
 		say("Xsock %4d waiting for a new connection.\n", acceptor);
 		sockaddr_x sa;
 		socklen_t sz = sizeof(sa);

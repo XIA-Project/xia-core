@@ -36,11 +36,11 @@
 char *hostname = NULL;
 char *fullname = NULL;
 char *ident = NULL;
+char *registerHostMessage = NULL;
 
 XIARouter xr;
 
-void help(const char *name)
-{
+void help(const char *name) {
 	printf("\nusage: %s [-l level] [-v] [-c config] [-h hostname]\n", name);
 	printf("where:\n");
 	printf(" -l level    : syslog logging level 0 = LOG_EMERG ... 7 = LOG_DEBUG (default=3:LOG_ERR)\n");
@@ -50,8 +50,7 @@ void help(const char *name)
 	exit(0);
 }
 
-void config(int argc, char** argv)
-{
+void config(int argc, char** argv) {
 	int c;
 	unsigned level = 3;
 	int verbose = 0;
@@ -93,12 +92,11 @@ void config(int argc, char** argv)
 	setlogmask(LOG_UPTO(level));
 }
 
-void listRoutes(std::string xidType)
-{
+void listRoutes(std::string xidType) {
 	int rc;
 	vector<XIARouteEntry> routes;
 	if ((rc = xr.getRoutes(xidType, routes)) > 0) {
-	        syslog(LOG_INFO, "Got >=1 available %s routes:\n", xidType.c_str());
+		syslog(LOG_INFO, "Got >=1 available %s routes:\n", xidType.c_str());
 		vector<XIARouteEntry>::iterator ir;
 		for (ir = routes.begin(); ir < routes.end(); ir++) {
 			XIARouteEntry r = *ir;
@@ -111,26 +109,90 @@ void listRoutes(std::string xidType)
 	}
 }
 
+char *makeRegisterHostMessage(char *myHID) {
+	string host_register_message;
+	if(!registerHostMessage) {
+		registerHostMessage = (char *)calloc(XHCP_MAX_PACKET_SIZE, 1);
+		if(!registerHostMessage) {
+			return registerHostMessage;
+		}
+		host_register_message.clear();
+		host_register_message.append("2^");
+		host_register_message.append(myHID);
+		host_register_message.append("^");
+		strcpy (registerHostMessage, host_register_message.c_str());
+	}
+	return registerHostMessage;
+}
+
+char *getRegisterHostMessage() {
+	return registerHostMessage;
+}
+
+int registerHostWithRouter() {
+	int selectRetVal; 
+  struct timeval timeoutval; 
+  fd_set socks; 
+  int retries = 40;
+  // Separate socket to talk with router
+  // Avoids XHCP beacons interacting with router Ack message
+  // start: measure how long it will take
+  int sockfd = Xsocket(AF_XIA, SOCK_DGRAM, 0);
+	if (sockfd < 0) {
+		syslog(LOG_ERR, "unable to create a socket");
+		return -1;
+	}
+	char *buffer = getRegisterHostMessage();
+	sockaddr_x pseudo_gw_router_dag; // dag for host_register_message (broadcast message), but only the gw router will accept it
+	Graph gw = Node() * Node(BHID) * Node(SID_XROUTE);
+	gw.fill_sockaddr(&pseudo_gw_router_dag);
+	// ends; and how long the total time it takes for this function
+	int msg_len = strlen(buffer);
+	Xsendto(sockfd, buffer, msg_len, 0, (sockaddr*)&pseudo_gw_router_dag, sizeof(pseudo_gw_router_dag));
+	
+	char recv_buf[XHCP_MAX_PACKET_SIZE]; 	
+	while(retries--) {
+		FD_ZERO(&socks);
+		FD_SET(sockfd, &socks);
+		timeoutval.tv_sec = 0;
+		timeoutval.tv_usec = 50000; // every 50 msec, check if any received packets
+
+		selectRetVal = select(sockfd+1, &socks, NULL, NULL, &timeoutval);
+		if (selectRetVal > 0) {
+			socklen_t dlen = sizeof(sockaddr_x);
+			int n = Xrecvfrom(sockfd, recv_buf, XHCP_MAX_PACKET_SIZE, 0, (struct sockaddr*)&pseudo_gw_router_dag, &dlen);
+			if (!strncmp(buffer, recv_buf, msg_len)) {
+				syslog(LOG_INFO, "Received registration Ack from router after %d retries.", 40 - retries);
+				break;
+			}
+		}
+	}
+	Xclose(sockfd);
+	if(!retries) {
+		syslog(LOG_ERR, "Did not receive registration Ack from router");
+		return -1;
+	}
+	return 0;
+}
+
 int main(int argc, char *argv[]) {
 	int rc;
 	sockaddr_x sdag;
 	sockaddr_x hdag;
 	sockaddr_x ddag;
 	char pkt[XHCP_MAX_PACKET_SIZE];
-	char buffer[XHCP_MAX_PACKET_SIZE]; 	
 	string myAD(""), myGWRHID(""), myGWR4ID(""), myNS_DAG("");
 	string default_AD("AD:-"), default_HID("HID:-"), default_4ID("IP:-");
 	string empty_str("");
 	string AD, gwRHID, gwR4ID, nsDAG;
-	unsigned  beacon_reception_count=0;
-	unsigned beacon_response_freq = ceil(XHCP_CLIENT_ADVERTISE_INTERVAL/XHCP_SERVER_BEACON_INTERVAL);
+	unsigned  beacon_reception_count = 0;
+	//unsigned beacon_response_freq = ceil(XHCP_CLIENT_ADVERTISE_INTERVAL/XHCP_SERVER_BEACON_INTERVAL); // every 3/1 = 3 seconds send AD changes to name server
+	unsigned beacon_response_freq = 3; 
 	int update_ns = 0;
 	char *router_ad = (char *)malloc(XHCP_MAX_DAG_LENGTH);
 	char *router_hid = (char *)malloc(XHCP_MAX_DAG_LENGTH);
 	char *router_4id = (char *)malloc(XHCP_MAX_DAG_LENGTH);
 	char *ns_dag = (char *)malloc(XHCP_MAX_DAG_LENGTH);
-	sockaddr_x pseudo_gw_router_dag; // dag for host_register_message (broadcast message), but only the gw router will accept it
-	string host_register_message;
 	char mydummyAD[MAX_XID_SIZE];
 	char myrealAD[MAX_XID_SIZE];
 	char myHID[MAX_XID_SIZE]; 
@@ -140,10 +202,6 @@ int main(int argc, char *argv[]) {
 	config(argc, argv);
 	xr.setRouter(hostname);
 	syslog(LOG_NOTICE, "%s started on %s", APPNAME, hostname);
-
-	// make the response message dest DAG (intended destination: gw router who is running the routing process)
-	Graph gw = Node() * Node(BHID) * Node(SID_XROUTE);
-	gw.fill_sockaddr(&pseudo_gw_router_dag);
 
 	// connect to the click route engine
 	if ((rc = xr.connect()) != 0) {
@@ -155,13 +213,20 @@ int main(int argc, char *argv[]) {
 	int sockfd = Xsocket(AF_XIA, SOCK_DGRAM, 0);
 	if (sockfd < 0) {
 		syslog(LOG_ERR, "unable to create a socket");
-		exit(-1);
+		return -1;
 	}
 	
-   	// read the localhost HID 
-   	if ( XreadLocalHostAddr(sockfd, mydummyAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE, my4ID, MAX_XID_SIZE) < 0 ) {
+   // read the localhost HID 
+	if (XreadLocalHostAddr(sockfd, mydummyAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE, my4ID, MAX_XID_SIZE) < 0 ) {
 		syslog(LOG_ERR, "unable to retrieve local host address");
 		Xclose(sockfd);
+	}
+	
+	// Make a message to be sent to register with a router
+	if(!makeRegisterHostMessage(myHID)) {
+		syslog(LOG_ERR, "Unable to build host registration message");
+		Xclose(sockfd);
+		return -1;
 	}
 
 	// make the src DAG (Actual AD will be updated when receiving XHCP beacons from an XHCP server)
@@ -210,7 +275,7 @@ int main(int argc, char *argv[]) {
 		int i;
 		xhcp_pkt *tmp = (xhcp_pkt *)pkt;
 		xhcp_pkt_entry *entry = (xhcp_pkt_entry *)tmp->data;
-		for (i=0; i<tmp->num_entries; i++) {
+		for (i = 0; i < tmp->num_entries; i++) {
 			switch (entry->type) {
 				case XHCP_TYPE_AD:
 					sprintf(router_ad, "%s", entry->data);
@@ -289,12 +354,17 @@ int main(int argc, char *argv[]) {
 				syslog(LOG_WARNING, "error setting route %d\n", rc);
 			
 			// update HID table (gateway router HID entry)
-			if ((rc = xr.setRoute(gwRHID, 0, gwRHID, 0xffff)) != 0)
+			if ((rc = xr.setRoute(gwRHID, 0, gwRHID, 0xffff)) != 0) {
 				syslog(LOG_WARNING, "error setting route %d\n", rc);
-				
-			if ((rc = xr.setRoute(default_HID, 0, gwRHID, 0xffff)) != 0)
-				syslog(LOG_WARNING, "error setting route %d\n", rc);
-				
+			}
+			
+			// register with the router so it can route our packets to us
+			if(registerHostWithRouter()) {
+				syslog(LOG_WARNING, "error registering with router");
+			}
+			else {
+				syslog(LOG_INFO, "Moved to new AD");	
+			}
 			myGWRHID = gwRHID;
 		}
 		
@@ -313,27 +383,14 @@ int main(int argc, char *argv[]) {
 		}
 
 		beacon_reception_count++;
+		// send gw reg msg every beacon_response_freq seconds 
 		if ((beacon_reception_count % beacon_response_freq) == 0) {
-			// construct a registration message to gw router
-			/* Message format (delimiter=^)
-				message-type{HostRegister = 2}
-				host-HID
-			*/
-			bzero(buffer, XHCP_MAX_PACKET_SIZE);
-			host_register_message.clear();
-			host_register_message.append("2^");
-			host_register_message.append(myHID);
-			host_register_message.append("^");
-			strcpy (buffer, host_register_message.c_str());
-			// send the registraton message to gw router
-			Xsendto(sockfd, buffer, strlen(buffer), 0, (sockaddr*)&pseudo_gw_router_dag, sizeof(pseudo_gw_router_dag));
-			// TODO: Hack to allow intrinsic security code to drop packet
-			// Ideally there should be a handshake with the gateway router
-			if(changed) {
-				sleep(5);
-				syslog(LOG_INFO, "xhcp_client: AD or NS changed, resend registration message");
-				Xsendto(sockfd, buffer, strlen(buffer), 0, (sockaddr*)&pseudo_gw_router_dag, sizeof(pseudo_gw_router_dag));
+			if(registerHostWithRouter()) {
+				syslog(LOG_WARNING, "error registering with router");
 			}
+			else {
+				syslog(LOG_INFO, "Stay in old AD");	
+			}			
 		}
 
 		//Register this hostname to the name server
@@ -345,7 +402,7 @@ int main(int argc, char *argv[]) {
 			}
 	
 			// read the localhost HID 
-			if ( XreadLocalHostAddr(tmpsockfd, myrealAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE, my4ID, MAX_XID_SIZE) < 0 ) {
+			if (XreadLocalHostAddr(tmpsockfd, myrealAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE, my4ID, MAX_XID_SIZE) < 0 ) {
 				syslog(LOG_WARNING, "error reading localhost address"); 
 				Xclose(tmpsockfd);
 				continue;
