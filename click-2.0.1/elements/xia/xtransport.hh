@@ -112,6 +112,7 @@ class XTRANSPORT : public Element {
     Timer _timer;
     
     unsigned _ackdelay_ms;
+		unsigned _migrateackdelay_ms;
     unsigned _teardown_wait_ms;
     
     uint32_t _cid_type, _sid_type;
