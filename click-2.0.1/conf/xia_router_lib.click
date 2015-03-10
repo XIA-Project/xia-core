@@ -346,7 +346,7 @@ elementclass XIARouter4Port {
 	// Non-edge router: all bits are set to "0"
 	// Edge router: bits of "xlc1" are set to "0,1" wlan0 by default is the second network inferface 
 	// Host: bits of "xlc0" are set to "0,1" - by using -I iface when launching the daemon to enforce the network interface to be used 
-	xlc0 :: XIALineCard($local_addr, $local_hid, $mac0, 0, 0, 1);
+	xlc0 :: XIALineCard($local_addr, $local_hid, $mac0, 0, 0, 0);
 	xlc1 :: XIALineCard($local_addr, $local_hid, $mac1, 1, 0, 0);
 	xlc2 :: XIALineCard($local_addr, $local_hid, $mac2, 2, 0, 0);
 	xlc3 :: XIALineCard($local_addr, $local_hid, $mac3, 3, 0, 0);

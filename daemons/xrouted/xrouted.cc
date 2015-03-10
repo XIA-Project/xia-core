@@ -727,6 +727,7 @@ int main(int argc, char *argv[])
 					case HOST_REGISTER:
 						// process the incoming host-register message
   						processHostRegister(msg.c_str());
+							Xsendto(route_state.sock, recv_message, 1024, 0, (struct sockaddr*)&theirDAG, sizeof(theirDAG));
 						break;
 					default:
 						perror("unknown routing message");
