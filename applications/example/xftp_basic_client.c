@@ -37,7 +37,9 @@
 #define NUM_CHUNKS	10
 #define NUM_PROMPTS	2
 
-
+/*
+MAXBUFLEN = XIA_MAXBUF = XIA_MAXCHUNK = 15600
+*/
 // global configuration options
 int verbose = 1;
 bool quick = false;
@@ -98,46 +100,6 @@ int sendCmd(int sock, const char *cmd) {
 	return n;
 }
 
-// char** str_split(char* a_str, const char *a_delim)
-// {
-// 	char** result    = 0;
-// 	int count     = 0;
-// 	int str_len = strlen(a_str);
-// 	int del_len = strlen(a_delim);
-// 	int i = 0;
-// 	int j = 0;
-// 	char* last_delim = 0;
-// 	/* Count how many elements will be extracted. */
-// 	for(i = 0 ; i < str_len; i++) 
-// 		for(j = 0 ; j < del_len; j++) 
-// 			if( a_str[i] == a_delim[j]){
-// 				count++;
-// 				last_delim = &a_str[i];
-// 			}
-// 
-// 	 /* Add space for trailing token. */
-// 	count += last_delim < (a_str + strlen(a_str) - 1);
-// 	
-// // 	/* Add space for terminating null string so caller
-// // 	knows where the list of returned strings ends. */
-//  	count++;
-// 
-// 	result = (char **) malloc(sizeof(char*) * count);
-// 	
-// // 	printf ("Splitting string \"%s\" into %i tokens:\n", a_str, count);
-// 	
-// 	i = 0;
-// 	result[i] = strtok(a_str, a_delim);
-// // 	printf ("%s\n",result[i]);
-// 	
-// 	for( i = 1; i < count; i++){
-// 		result[i] = strtok (NULL, a_delim);
-// // 		printf ("%s\n",result[i]);
-// 	}
-// 
-// 	return result;
-// }
-
 void *recvCmd (void *socketid) {
 	int i, n, count = 0;
 	ChunkInfo *info = NULL;
@@ -159,7 +121,7 @@ void *recvCmd (void *socketid) {
 			warn("socket error while waiting for data, closing connection\n");
 			break;
 		}
-		//Sender does the chunking and then should start the sending commands
+		// Sender does the chunking and then should start the sending commands
 		if (strncmp(command, "get", 3) == 0) {
 			fname = &command[4];
 			say("Server requested file %s\n", fname);
@@ -173,7 +135,7 @@ void *recvCmd (void *socketid) {
 			
 			say("chunking file %s\n", fname);
 			
-			//Chunking is done by the XputFile which itself uses XputChunk, and fills out the info
+			// Chunking is done by the XputFile which itself uses XputChunk, and fills out the info
 			if ((count = XputFile(ctx, fname, CHUNKSIZE, &info)) < 0) {
 				warn("unable to serve the file: %s\n", fname);
 				sprintf(reply, "FAIL: File (%s) not found", fname);
@@ -183,12 +145,12 @@ void *recvCmd (void *socketid) {
 			}
 			say("%s\n", reply);
 			
-			//Just tells the receiver how many chunks it should expect.
+			// Just tells the receiver how many chunks it should expect in total.
 			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
 				warn("unable to send reply to client\n");
 				break;
 			}
-		//Sending the blocks cids
+		// Sending the NUM_CHUNKS of cids
 		} else if (strncmp(command, "block", 5) == 0) {
 			char *start = &command[6];
 			char *end = strchr(start, ':');
@@ -321,6 +283,7 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *p_ad, char *p_hid) 
 	// NOTE: the chunk transport is not currently reliable and chunks may need to be re-requested
 	// ask for the current chunk list again every REREQUEST seconds
 	// chunks already in the local cache will not be refetched from the network 
+	// read the the whole chunk list first before fetching
 	unsigned ctr = 0;
 	while (1) {
 		if (ctr % REREQUEST == 0) {
@@ -402,7 +365,10 @@ int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout
 		return -1;
 	}
 
+	// reply: OK: ***
 	int count = atoi(&reply[4]);
+
+	say("%d chunks in total\n", count);
 
 	if ((chunkSock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0)
 		die(-1, "unable to create chunk socket\n");
@@ -421,20 +387,24 @@ int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout
 		int num = NUM_CHUNKS;
 		if (count - offset < num)
 			num = count - offset;
+
 		// tell the server we want a list of <num> cids starting at location <offset>
 		printf("\nFetched chunks: %d/%d:%.1f%\n\n", offset, count, 100*(double)(offset)/count);
+
 		sprintf(cmd, "block %d:%d", offset, num);
 		
 		if (gettimeofday(&tv, NULL) == 0)
 			temp_start_msec = ((tv.tv_sec % 86400) * 1000 + tv.tv_usec / 1000);
 					
+		// send the requested CID range
 		sendCmd(sock, cmd);
 
-		if (getChunkCount(sock, reply, sizeof(reply)) < 1){
+		if (getChunkCount(sock, reply, sizeof(reply)) < 1) {
 			warn("could not get chunk count. Aborting. \n");
 			return -1;
 		}
 		offset += NUM_CHUNKS;
+		// &reply[4] are the requested CIDs  
 		if (getListedChunks(chunkSock, f, &reply[4], p_ad, p_hid) < 0) {
 			status= -1;
 			break;

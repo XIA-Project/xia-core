@@ -28,12 +28,12 @@
 #include "Xkeys.h"
 
 #define VERSION "v1.0"
-#define TITLE "XIA Basic FTP Server"
+#define TITLE "XIA Advanced FTP Server"
 
 #define MAX_XID_SIZE 100
 // #define DAG  "RE %s %s %s"
-#define SID "SID:00000000dd41b924c1001cfa1e1117a812492434"
-#define NAME "www_s.basicftp.aaa.xia"
+#define SID "SID:00000000dd41b924c1001cfa1e1117a812492435"
+#define NAME "www_s.advftp.aaa.xia"
 
 #define CHUNKSIZE 1024
 #define NUM_CHUNKS	10
