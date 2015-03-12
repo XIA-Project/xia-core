@@ -2779,7 +2779,6 @@ void XTRANSPORT::XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 		src.append(const_cast<char *>(hexBuf), 2);
 	}
 
-	printf("ctxID=%d, length=%d, ttl=%d cid=%s\n", contextID, x_putchunk_msg->payload().size(), ttl, src.c_str());
 	_errh->debug("ctxID=%d, length=%d, ttl=%d cid=%s\n", contextID, x_putchunk_msg->payload().size(), ttl, src.c_str());
 
 	//append local address before CID
@@ -2826,8 +2825,9 @@ void XTRANSPORT::XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	
 	output(CACHE_PORT).push(p);
 
-	// TODO: It looks like we were returning the chunk data with the result before. Any reason?
-	ReturnResult(_sport, xia_socket_msg); // TODO: Error codes?
+	// (for Ack purpose) Reply with a packet with the destination port=source port
+	x_putchunk_msg->set_cid(src.c_str());
+	ReturnResult(_sport, xia_socket_msg, 0, 0);
 }
 
 
