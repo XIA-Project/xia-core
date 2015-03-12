@@ -1,0 +1,73 @@
+#!/bin/bash
+#
+# Copyright 2013 Carnegie Mellon University
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+PORT=7777
+
+check() {
+	# see if click is running
+	pid=`ps aux | grep -v grep | grep userlevel/click | tr -s " " | cut -d\  -f2`
+	[ "$pid" == "" ] && printf "Click is not running, aborting...\n" && exit 1
+}
+
+get() {
+	check
+	printf "$1: "
+	printf "read log.$1\nquit\n" | nc localhost $PORT | sed -n '4p'
+}
+
+put() {
+	check
+	printf "write log.$1 $2\nquit\n" | nc localhost $PORT > /dev/null
+}
+
+help() {
+	cat << EOH
+
+Adjust XIA click logging output
+
+usage: xlog [-vq] [-l <loglevel>]
+
+where:
+  -v output log messages to the console
+  -q disable console logging
+  -l syslog level (0=LOG_EMERG through 7=LOG_DEBUG) default=6 (LOG_INFO)
+
+EOH
+	exit 0
+}
+
+while getopts "hvql:" opt; do
+	case $opt in
+		v)
+			put verbose 1
+			;;
+		q)
+			put verbose 0
+			;;
+		l)
+			put level $OPTARG
+			;;
+		h)
+			help
+			;;
+		\?)
+			help
+			;;
+	esac
+done
+
+get verbose
+get level

@@ -1,8 +1,17 @@
 #pragma once
 
+ #define PATH_SIZE 4096
+ #include <unistd.h>
+ #include <stdio.h>
+ #include <string.h>
+ #include <stdlib.h>
+
+
+
 #include <stdint.h>	// for non-c++0x
 #include <vector>
 #include <string>
+#include <map>
 #include "xia.h"
 
 class Graph;
@@ -27,7 +36,6 @@ public:
 	static const std::string XID_TYPE_CID_STRING;
 	static const std::string XID_TYPE_SID_STRING;
 	static const std::string XID_TYPE_IP_STRING;
-
 
 public:
 	Node();
@@ -54,6 +62,12 @@ public:
 	Graph operator+(const Graph& r) const;
 
 	bool equal_to(const Node& r) const;
+
+	typedef std::map<int, std::string> XidMap;
+	static XidMap xids;
+	static XidMap load_xids();
+
+	
 
 protected:
 	void acquire() const;
@@ -108,6 +122,7 @@ public:
 	void from_sockaddr(const sockaddr_x *s);
 	void replace_final_intent(const Node& new_intent);
 	Node get_final_intent() const;
+	void replace_node_at(int i, const Node& new_node);
 	std::vector<const Node*> get_nodes_of_type(unsigned int type) const;
 
 protected:

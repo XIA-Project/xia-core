@@ -151,7 +151,9 @@ void SocketState::setData(const char *buf, unsigned bufLen)
 	if (!buf || bufLen == 0)
 		return;
 
-	assert(!m_buf && m_bufLen == 0);
+	if (m_buf)
+		delete(m_buf);
+	m_bufLen = 0;
 
 	m_buf = new char [bufLen];
 	if (!m_buf)
@@ -246,16 +248,8 @@ void SocketMap::add(int sock, int tt)
 {
 	SocketMap *state = getMap();
 	pthread_rwlock_wrlock(&rwlock);
-	if (state->sockets[sock] == 0) {
-//	if (state->sockets.find(sock) == state->sockets.end()) {
-		printf("CORRECT WAY TO ADD SOCKET STATE %d %d\n", sock, tt);
+	if (state->sockets[sock] == 0)
 		state->sockets[sock] = new SocketState(tt);
-	} else {
-		printf("THIS SHOULD NOT HAPPEN! %d\n", sock);
-//		SocketState *sstate = SocketMap::getMap()->get(sock);
-//		sstate->init();
-//		sstate->setTransportType(tt);
-	}
 	pthread_rwlock_unlock(&rwlock);
 }
 
@@ -281,11 +275,15 @@ SocketState *SocketMap::get(int sock)
 
 int SocketState::setPeer(const sockaddr_x *peer)
 {
-	if (m_peer != NULL)
+	if (m_peer != NULL) {
 		free(m_peer);
+		m_peer = NULL;
+	}
 
-	m_peer = (sockaddr_x *)malloc(sizeof(sockaddr_x));
-	memcpy(m_peer, peer, sizeof(sockaddr_x));
+	if (peer) {
+		m_peer = (sockaddr_x *)malloc(sizeof(sockaddr_x));
+		memcpy(m_peer, peer, sizeof(sockaddr_x));
+	}
 	return 0;
 }
 
@@ -293,13 +291,11 @@ int SocketState::setPeer(const sockaddr_x *peer)
 
 void allocSocketState(int sock, int tt)
 {
-	printf("ALLOCSOCKETSTATE %d\n", sock);
 	SocketMap::getMap()->add(sock, tt);
 }
 
 void freeSocketState(int sock)
 {
-	printf("FREESOCKETSTATE %d\n", sock);
 	SocketMap::getMap()->remove(sock);
 }
 

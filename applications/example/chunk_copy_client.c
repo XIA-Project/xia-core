@@ -24,6 +24,7 @@
 #define VERSION "v1.0"
 #define TITLE "XIA Chunk File Client"
 #define NAME "www_s.chunkcopy.aaa.xia"
+#define REREQUEST 3
 
 #define NUM_CHUNKS	10
 
@@ -122,15 +123,22 @@ int getFileData(int csock, FILE *fd, char *chunks)
 	cs[n].cid = dag;
 	n++;
 
-	// bring the list of chunks local
-	say("requesting list of %d chunks\n", n);
-	if (XrequestChunks(csock, cs, n) < 0) {
-		say("unable to request chunks\n");
-		return -1;
-	}
-
-	say("checking chunk status\n");
+	// NOTE: the chunk transport is not currently reliable and chunks may need to be re-requested
+	// ask for the current chunk list again every REREQUEST seconds
+	// chunks already in the local cache will not be refetched from the network 
+	unsigned ctr = 0;
 	while (1) {
+		if (ctr % REREQUEST == 0) {
+			// bring the list of chunks local
+			say("%srequesting list of %d chunks\n", (ctr == 0 ? "" : "re-"), n);
+			if (XrequestChunks(csock, cs, n) < 0) {
+				say("unable to request chunks\n");
+				return -1;
+			}
+			say("checking chunk status\n");
+			ctr++;
+		}
+
 		status = XgetChunkStatuses(csock, cs, n);
 
 		if (status == READY_TO_READ)

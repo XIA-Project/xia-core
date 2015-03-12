@@ -23,6 +23,7 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
+#include "dagaddr.hpp"
 
 /*!
 ** @brief Accept a conection from a remote Xsocket
@@ -142,7 +143,7 @@ printf("accept fd=%d SOCK_STREAM=%d\n", new_sockfd, SOCK_STREAM);
 		return -1;
 	}
 
-// FIXME: change to use click rely so we get the peer dag!
+// FIXME: change to use click reply so we get the peer dag!
 	if (click_status(sockfd, seq) < 0) {
 		(_f_close)(new_sockfd);
 		LOGF("Error getting status from Click: %s", strerror(errno));

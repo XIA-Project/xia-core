@@ -90,6 +90,8 @@ XIACache::configure(Vector<String> &conf, ErrorHandler *errh)
 
 void XIACache::push(int port, Packet *p)
 {
+	
+//     click_chatter(">> In XIACAche port: %d", port);
     const struct click_xia* hdr = p->xia_header();
 
     if (!hdr) return;
@@ -103,19 +105,32 @@ void XIACache::push(int port, Packet *p)
 
     XID dstID(__dstID);
     XID srcID(__srcID);
+    
+
 
 
     if(src_xid_type==_cid_type)  //store, this is chunk response
     {
+	for (int i = 0 ; i <hdr->dnode + hdr->snode; i++ ){
+		XID dsthdr(hdr->node[i].xid);
+// 		click_chatter("PUT/REMOVE/FWD: dnode: %d, snode: %d,  i: %d, ID -> %s\n", hdr->dnode , hdr->snode, i, dsthdr.unparse().c_str() );
+	}
+	
 	__dstID =  hdr->node[hdr->dnode - 2].xid;
 	XID dstHID(__dstID);
+// 	click_chatter("dstHID: %s\n", dstHID.unparse().c_str() );
 	_content_module->cache_incoming(p, srcID, dstHID, port); // This may generate chunk response to port 1 (end-host/application)
     }
     else if(dst_xid_type==_cid_type)  //look_up,  chunk request
     {
+	for (int i = 0 ; i <hdr->dnode + hdr->snode; i++ ){
+		XID dsthdr(hdr->node[i].xid);
+// 		click_chatter("REQUEST: dnode: %d, snode: %d,  i: %d, ID -> %s\n", hdr->dnode , hdr->snode, i, dsthdr.unparse().c_str() );
+	}
+	
 	__srcID = hdr->node[hdr->dnode + hdr->snode - 2].xid;
-
 	XID srcHID(__srcID);
+// 	click_chatter("srcHID: %s\n", srcHID.unparse().c_str() );
 
 	/* this sends chunk response to output 0 (network) or to 1 (application, if the request came from application and content is locally cached)  */
 	_content_module->process_request(p, srcHID, dstID);

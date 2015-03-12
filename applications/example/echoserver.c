@@ -232,13 +232,18 @@ void echo_stream()
 	while (1) {
 
 		say("Xsock %4d waiting for a new connection.\n", acceptor);
-		if ((sock = Xaccept(acceptor, NULL, 0)) < 0) {
+		sockaddr_x sa;
+		socklen_t sz = sizeof(sa);
+
+		if ((sock = Xaccept(acceptor, (sockaddr*)&sa, &sz)) < 0) {
 			warn("Xsock %d accept failure! error = %d\n", acceptor, errno);
 			// FIXME: should we die here instead or try and recover?
 			continue;
 		}
 
+		Graph g(&sa);
 		say ("Xsock %4d new session\n", sock);
+		say("peer:%s\n", g.dag_string().c_str()); 
 
 		pid_t pid = fork();
 

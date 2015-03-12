@@ -173,6 +173,7 @@ int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkI
 		info->ttl= _msgReply->ttl();
 		info->timestamp.tv_sec=_msgReply->timestamp();
 		info->timestamp.tv_usec = 0;
+		LOGF(">>>>>> PUT: info->cid: %s \n", _msgReply->cid().c_str()); 
         return 0;
     } else {
         return -1;
@@ -241,7 +242,7 @@ int XputFile(ChunkContext *ctx, const char *fname, unsigned chunkSize, ChunkInfo
 	numChunks = fs.st_size / chunkSize;
 	if (fs.st_size % chunkSize)
 		numChunks ++;
-
+	//FIXME: this should be numChunks, sizeof(ChunkInfo)
 	if (!(infoList = (ChunkInfo*)calloc(numChunks, chunkSize))) {
 		fclose(fp);
 		return -1;

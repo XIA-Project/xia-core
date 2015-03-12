@@ -17,7 +17,7 @@
 # find the root of the XIA source tree
 # assumes this script is in a directory off the parent of the XIA tree
 # and that the daemons it starts are rooted off of the same location
-#  so XIADIR would be /xia-core assuming the script were /xia-core/tools/xianet
+#  so XIADIR would be /xia-core assuming the script were /xia-core/bin/xianet
 XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
 
 # click parameters
@@ -34,6 +34,8 @@ ALL_PROCESSES="click xrouted xhcp_serverd xhcp_clientd xnameservice xstats xstat
 NAME=`basename $0`
 VERBOSE=0
 LOG_FLAGS=""
+LOG_LEVEL=6
+V_FLAG="-q"
 CLICK_ONLY=0
 NAMESERVER=0
 RUN_VISUALIZER_CLIENT=0
@@ -93,6 +95,7 @@ setup()
 				;;
 			l)
 				LOG_FLAGS="$LOG_FLAGS -l $OPTARG"
+				LOG_LEVEL=$OPTARG
 				;;
 			s)
 				SCRIPT=$OPTARG
@@ -100,9 +103,11 @@ setup()
 			V)
 				VERBOSE=2
 				LOG_FLAGS="$LOG_FLAGS -v"
+				V_FLAG="-v"
 				;;
 			v)
 				VERBOSE=1
+				V_FLAG="-v"
 				;;
 			4)
 				MAKECONF="dual$MAKECONF"
@@ -119,7 +124,7 @@ setup()
 				NODETYPE="host"
 				;;
 			f)
-				CONFFLAGS="CONFFLAGS -f $OPTARG"
+				CONFFLAGS="$CONFFLAGS -f $OPTARG"
 				;;
 			I)
 				CONFFLAGS="$CONFFLAGS -I $OPTARG"
@@ -289,7 +294,7 @@ router()
 			check_service $host "xhcp_serverd"
 			;;
 		*)
-			echo "unrecornized action: $action"
+			echo "unrecognized action: $action"
 			;;
 	esac
 }
@@ -305,7 +310,7 @@ host()
 	cd $XIADIR/bin
 	case $action in
 		"start")
-			./xhcp_clientd -h $host $_LOG_FLAGS &
+			./xhcp_clientd -h $host $LOG_FLAGS &
 			sleep 0.5
 			;;
 		"stop")
@@ -315,7 +320,7 @@ host()
 			check_service $host "xhcp_clientd"
 			;;
 		*)
-			echo "unreconized action: $action"
+			echo "unrecognized action: $action"
 			;;
 	esac
 }
@@ -331,7 +336,7 @@ nameserver()
 	cd $XIADIR/bin
 	case $action in
 		"start")
-			./xnameservice i-h $host $LOG_FLAGS &
+			./xnameservice -h $host $LOG_FLAGS &
 			;;
 		"stop")
 			kill_service $host "xnameservice"
@@ -340,7 +345,7 @@ nameserver()
 			check_service $host "xnameservice"
 			;;
 		*)
-			echo "unreconized action: $action"
+			echo "unrecognized action: $action"
 			;;
 	esac
 }
@@ -409,16 +414,18 @@ start_click()
 		printf "$HOSTNAME\tnameserver\n" >> $NODECONF
 	fi
 
-	if [ $VERBOSE -eq 0 ]; then
-		exec 3>&1  # save stdout handle
-		exec &> /dev/null
-	fi
+#	if [ $VERBOSE -eq 0 ]; then
+#		exec 3>&1  # save stdout handle
+#		exec &> /dev/null
+#	fi
 
 	$CLICK -R $CONFPATH/$SCRIPT &
-	[ $VERBOSE -eq 0 ] && exec 1>&3
+#	[ $VERBOSE -eq 0 ] && exec 1>&3
 
 	get_pid "click"
 	[ "$XPID" == "" ] && printf "Click is not running, aborting...\n" && exit 1
+
+	$XIADIR/bin/xlog $V_FLAG -l $LOG_LEVEL >/dev/null
 
 	[ $CLICK_ONLY -eq 1 ] && check_service click && exit
 	sleep 1
@@ -457,7 +464,7 @@ visualizer()
 			check_service "xstats"
 			;;
 		*)
-			echo "unreconized action: $action"
+			echo "unrecognized action: $action"
 			;;
 	esac
 }
@@ -485,7 +492,7 @@ create_click_config()
 			SCRIPT=dual_stack_router.click
 			;;
 		*)
-			echo "error unknow device type: $MAKECONF"
+			echo "error unknown device type: $MAKECONF"
 			exit 1
 	esac
 

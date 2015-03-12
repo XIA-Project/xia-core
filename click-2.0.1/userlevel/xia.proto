@@ -33,8 +33,10 @@ enum XSocketCallType {
 
   XGETMSG = 26;
   XREADYTOACCEPT = 27;
+  XPUSHCHUNKTO = 28;
+  XBINDPUSH = 29;
 
-  XPOLL = 28;
+  XPOLL = 30;
 }
 
 message XSocketMsg {
@@ -73,6 +75,8 @@ message XSocketMsg {
   optional X_GetSockname_Msg x_getsockname = 28;
 
   optional X_Poll_Msg x_poll = 29;
+  optional X_Pushchunkto_Msg x_pushchunkto= 30;
+  optional X_BindPush_Msg x_bindpush= 31;
 }
 
 message X_Socket_Msg {
@@ -100,7 +104,7 @@ message X_Connect_Msg {
 }
 
 message X_Accept_Msg {
-  optional string temp = 1; // currently not used
+  optional string dag = 1; // peer's dag
   required uint32 new_port = 2; // the UDP port for the new API socket
   optional string remote_dag = 3;
 }
@@ -245,6 +249,8 @@ message msg {
     CONNECTSID = 2;
     PUTCID = 3;
     SERVESID = 4;
+/*** IS THIS NECESSARY? ***/
+    PUSHTOCID = 5;
   }
   optional MsgType type = 4;
 
@@ -255,4 +261,21 @@ message msg_response {
   repeated bytes xid = 2;   // can be a list of CID's
   optional string payload = 3;  // bytes or string?
 }
+ 
 
+message X_Pushchunkto_Msg {
+  required string ddag = 1; // dest dag
+  required int32 cachepolicy = 2;
+  required int32 cachesize = 3;
+  required int32 contextid = 4;
+  required int32 TTL = 5;
+  required bytes payload = 6; // data
+  required string cid = 7;
+  required int32 length = 8;
+  optional int64 timestamp = 9; 
+}
+
+
+message X_BindPush_Msg {
+  required string sdag = 1; // bind to src dag 
+} 

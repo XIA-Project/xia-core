@@ -10,3 +10,7 @@ firehose
 drink
 xftp_basic_server
 xftp_basic_client
+push_xftp_server
+push_xftp_client
+push_xftp_recv_server
+push_xftp_recv_client

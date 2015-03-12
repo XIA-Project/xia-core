@@ -16,6 +16,8 @@
 #include <click/string.hh>
 #include <elements/ipsec/sha1_impl.hh>
 #include <click/xiatransportheader.hh>
+#include <click/error.hh>
+#include <click/error-syslog.hh>
 
 
 #if CLICK_USERLEVEL
@@ -297,8 +299,12 @@ class XTRANSPORT : public Element {
     void ReturnResult(int sport, xia::XSocketMsg *xia_socket_msg, int rc = 0, int err = 0);
     
   private:
+
+
 //  pthread_mutex_t _lock;
 //  pthread_mutexattr_t _lock_attr;
+
+    SyslogErrorHandler *_errh;
 
     Timer _timer;
     
@@ -522,7 +528,9 @@ class XTRANSPORT : public Element {
     HashTable<XID, unsigned short> XIDtoPort;
     HashTable<XIDpair , unsigned short> XIDpairToPort;
     HashTable<unsigned short, sock*> portToSock;
-
+    HashTable<XID, unsigned short> XIDtoPushPort;
+    
+    
     HashTable<unsigned short, bool> portToActive;
     HashTable<XIDpair , bool> XIDpairToConnectPending;
 
@@ -603,6 +611,8 @@ class XTRANSPORT : public Element {
     void XgetChunkStatus(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void XreadChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void XremoveChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+    void XpushChunkto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
+    void XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 };

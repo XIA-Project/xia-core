@@ -1,15 +1,17 @@
 require(library ../../../click/conf/xia_router_lib.click);
 require(library xia_address.click);
 
+log::XLog(VERBOSE 0, LEVEL 6);
+
 // host instantiation
 ${HNAME}_host :: XIAEndHost (RE ( IP:$EXT_IPADDR0 ) $ADNAME $HID, $HID, 1500, 0, aa:aa:aa:aa:aa:aa);
 
 // router instantiation
 // TODO: If we ever connect more than one port to IP, we somehow need to tell the router about all of its IP addresses in local_addr
-${HNAME}_router :: XIADualRouter4Port(RE ( IP:$EXTERNAL_IP ) $ADNAME $RHID, $ADNAME, $RHID, $EXTERNAL_IP, 1700, $IP_ACTIVE0, $IPADDR0, $MAC0, 
-                                                                                                                $IP_ACTIVE1, $IPADDR1, $MAC1, 
-                                                                                                                0, 0.0.0.0, aa:aa:aa:aa:aa:aa, 
-                                                                                                                $IP_ACTIVE3, $IPADDR3, $MAC3);
+${HNAME}_router :: XIADualRouter4Port(RE ( IP:$EXTERNAL_IP ) $ADNAME $RHID, $ADNAME, $RHID, $EXTERNAL_IP, 1700, $IP_ACTIVE0, $IPADDR0, $MAC0, $GWADDR0, 
+                                                                                                                $IP_ACTIVE1, $IPADDR1, $MAC1, $GWADDR1,
+                                                                                                                0, 0.0.0.0, aa:aa:aa:aa:aa:aa, 0.0.0.0,
+                                                                                                                $IP_ACTIVE3, $IPADDR3, $MAC3, $GWADDR3);
 
 
 // connect host and router
@@ -21,7 +23,7 @@ ${HNAME}_host[0] -> LinkUnqueue(0.005, 1 GB/s) -> [2]${HNAME}_router[2] -> LinkU
 ######
 sock${NUM}::Socket("TCP", $SOCK_IP, $PORT, CLIENT $CLIENT) -> [$NUM]${HNAME}_router[$NUM] -> sock${NUM};
 ######
-FromDevice($IFACE) -> [$NUM]${HNAME}_router[$NUM] -> ToDevice($IFACE);
+FromDevice($IFACE, METHOD LINUX) -> [$NUM]${HNAME}_router[$NUM] -> ToDevice($IFACE);
 ######
 Idle -> [$NUM]${HNAME}_router[$NUM] -> Discard;
 ######
