@@ -58,12 +58,12 @@ void load_func_ptrs()
 {
 	void *handle = dlopen(LIBNAME, RTLD_LAZY);
 
+	// FIXME: add code to find the name of the library instead of hard coding it.
 	if (!handle) {
 		fprintf(stderr, "Unable to locate %s. Is there a different version of libc?", LIBNAME);
 		exit(-1);
 	} 
 
-	printf("handle = %p\n", handle);
 	if(!(_f_socket = (socket_t)dlsym(handle, "socket")))
 		printf("can't find socket!\n");
 	if(!(_f_bind = (bind_t)dlsym(handle, "bind")))
