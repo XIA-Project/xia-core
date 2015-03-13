@@ -30,7 +30,6 @@
 #define MAX_XID_SIZE 100
 #define VERSION "v1.0"
 #define TITLE "XIA Advanced FTP client"
-#define NAME "www_s.advftp.aaa.xia"
 #define CHUNKSIZE 1024
 #define REREQUEST 3
 
@@ -40,6 +39,7 @@
 /*
 MAXBUFLEN = XIA_MAXBUF = XIA_MAXCHUNK = 15600
 */
+
 // global configuration options
 int verbose = 1;
 bool quick = false;
@@ -49,6 +49,13 @@ char s_hid[MAX_XID_SIZE];
 
 char my_ad[MAX_XID_SIZE];
 char my_hid[MAX_XID_SIZE];
+
+char* ftp_name = "www_s.advftp.aaa.xia";
+char* prefetch_ctx_name = "www_s.prefetch_context_listener.aaa.xia";
+//char* prefetch_ctx_name = "www_s.stream_echo.aaa.xia"; 
+
+int ftp_sock = -1;
+int	prefetch_ctx_sock = -1;
 
 int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout);
 
@@ -92,9 +99,9 @@ void die(int ecode, const char *fmt, ...) {
 int sendCmd(int sock, const char *cmd) { 
 	int n;
  	warn("Sending Command: %s \n", cmd);
-	if ((n = Xsend(sock, cmd,  strlen(cmd), 0)) < 0) {
+	if ((n = Xsend(sock, cmd, strlen(cmd), 0)) < 0) {
 		Xclose(sock);
-		 die(-1, "Unable to communicate\n");
+		die(-1, "Unable to communicate\n");
 	}
 
 	return n;
@@ -399,6 +406,12 @@ int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout
 		// send the requested CID range
 		sendCmd(sock, cmd);
 
+		// say hello to the connext server
+		char* hello = "Hello from context client";		
+		int m = sendCmd(prefetch_ctx_sock, hello); 
+		printf("%d\n");
+		say("Sent hello msg\n");
+
 		if (getChunkCount(sock, reply, sizeof(reply)) < 1) {
 			warn("could not get chunk count. Aborting. \n");
 			return -1;
@@ -508,16 +521,24 @@ int main(int argc, char **argv) {
 	char cmd[512], reply[512];
 	int params = -1;
 	
+	prefetch_ctx_sock = initializeClient(prefetch_ctx_name);
+	// say hello to the connext server
+
+	char* hi = "Hello from context client";		
+
+	sendCmd(prefetch_ctx_sock, hi); 
+	say("Say hi to prefetch client.\n");
+
 	say ("\n%s (%s): started\n", TITLE, VERSION);
-	
+/*	
 	if (argc == 1) {
-		say ("No service name passed, using default: %s\nYou can also pass --quick to execute a couple of default commands for quick testing. Requires s.txt to exist. \n", NAME);
-		sock = initializeClient(NAME);
+		say ("No service name passed, using default: %s\nYou can also pass --quick to execute a couple of default commands for quick testing. Requires s.txt to exist. \n", ftp_name);
+		sock = initializeClient(ftp_name);
 		usage();
 	} else if (argc == 2) {
 		if (strcmp(argv[1], "--quick") == 0) {
 			quick = true;
-			name = NAME;
+			name = ftp_name;
 		} else {
 			name = argv[1];
 			usage();
@@ -600,6 +621,7 @@ int main(int argc, char **argv) {
 			warn(reply);
 			usage();
 		}
-	}	
+	}
+*/	
 	return 1;
 }
