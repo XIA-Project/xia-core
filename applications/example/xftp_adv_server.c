@@ -33,7 +33,6 @@
 #define MAX_XID_SIZE 100
 // #define DAG  "RE %s %s %s"
 #define SID "SID:00000000dd41b924c1001cfa1e1117a812492435"
-#define NAME "www_s.advftp.aaa.xia"
 
 #define CHUNKSIZE 1024
 #define NUM_CHUNKS	10
@@ -43,6 +42,8 @@ int verbose = 1;
 char myAD[MAX_XID_SIZE];
 char myHID[MAX_XID_SIZE];
 char my4ID[MAX_XID_SIZE];
+
+char* name = "www_s.advftp.aaa.xia";
 
 int getFile(int sock, char *ad, char*hid, const char *fin, const char *fout);
 
@@ -228,7 +229,7 @@ void *recvCmd (void *socketid) {
 			i = 0;
 			say("Client wants to put a file here. cmd: %s\n" , command);
 			//	put %s %s %s %s 
-			i = sscanf(command,"put %s %s %s %s ",ad,hid,fin,fout );
+			i = sscanf(command,"put %s %s %s %s ", ad, hid, fin, fout);
 			if (i != 4){
  				warn("Invalid put command: %s\n" , command);
 			}
@@ -277,8 +278,8 @@ int registerReceiver() {
 
 	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
 	// FIXME: NAME is hard coded
-  if (XregisterName(NAME, dag) < 0)
-		die(-1, "error registering name: %s\n", NAME);
+  if (XregisterName(name, dag) < 0)
+		die(-1, "error registering name: %s\n", name);
 
 	if (Xbind(sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
 		Xclose(sock);
@@ -434,7 +435,6 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *ad, char *hid) {
 
 	return n;
 }
-
 
 //	This is used both to put files and to get files since in case of put I still have to request the file.
 //	Should be fixed with push implementation

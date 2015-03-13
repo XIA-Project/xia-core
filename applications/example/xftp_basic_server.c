@@ -33,7 +33,7 @@
 #define MAX_XID_SIZE 100
 // #define DAG  "RE %s %s %s"
 #define SID "SID:00000000dd41b924c1001cfa1e1117a812492434"
-#define NAME "www_s.basicftp.aaa.xia"
+//#define NAME "www_s.basicftp.aaa.xia"
 
 #define CHUNKSIZE 1024
 #define NUM_CHUNKS	10
@@ -43,6 +43,8 @@ int verbose = 1;
 char myAD[MAX_XID_SIZE];
 char myHID[MAX_XID_SIZE];
 char my4ID[MAX_XID_SIZE];
+
+char* name = "www_s.basicftp.aaa.xia"; 
 
 int getFile(int sock, char *ad, char*hid, const char *fin, const char *fout);
 
@@ -91,7 +93,6 @@ int sendCmd(int sock, const char *cmd) {
 		Xclose(sock);
 		 die(-1, "Unable to communicate\n");
 	}
-
 	return n;
 }
 
@@ -105,9 +106,9 @@ char** str_split(char* a_str, const char *a_delim) {
 	char* last_delim = 0;
 
 	/* Count how many elements will be extracted. */
-	for(i = 0 ; i < str_len; i++) 
-		for(j = 0 ; j < del_len; j++) 
-			if( a_str[i] == a_delim[j]){
+	for (i = 0; i < str_len; i++) 
+		for (j = 0; j < del_len; j++) 
+			if (a_str[i] == a_delim[j]) {
 				count++;
 				last_delim = &a_str[i];
 			}
@@ -121,7 +122,6 @@ char** str_split(char* a_str, const char *a_delim) {
 	result = (char **) malloc(sizeof(char*) * count);
 	
 	// printf ("Splitting string \"%s\" into %i tokens:\n", a_str, count);
-	
 	i = 0;
 	result[i] = strtok(a_str, a_delim);
 	// printf ("%s\n",result[i]);
@@ -224,11 +224,11 @@ void *recvCmd (void *socketid) {
 			count = 0;
 		}
 		else if (strncmp(command, "put", 3) == 0) {
-			// fname= &command[4];
+			// fname = &command[4];
 			i = 0;
 			say("Client wants to put a file here. cmd: %s\n" , command);
 			//	put %s %s %s %s 
-			i = sscanf(command,"put %s %s %s %s ",ad,hid,fin,fout );
+			i = sscanf(command, "put %s %s %s %s ", ad, hid, fin, fout);
 			if (i != 4){
  				warn("Invalid put command: %s\n" , command);
 			}
@@ -266,19 +266,19 @@ int registerReceiver() {
 
 	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
 	// Generate an SID to use
-	if(XmakeNewSID(sid_string, sizeof(sid_string))) {
+	if (XmakeNewSID(sid_string, sizeof(sid_string))) {
 		die(-1, "Unable to create a temporary SID");
 	}
 
 	struct addrinfo *ai;
-  // FIXME: SID is hardcoded  FIXED: from SID to sid_string randomly generated
+  // FIXED: from hardcoded SID to sid_string randomly generated
 	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
 		die(-1, "getaddrinfo failure!\n");
 
 	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
 	// FIXME: NAME is hard coded
-  if (XregisterName(NAME, dag) < 0)
-		die(-1, "error registering name: %s\n", NAME);
+  if (XregisterName(name, dag) < 0)
+		die(-1, "error registering name: %s\n", name);
 
 	if (Xbind(sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
 		Xclose(sock);
@@ -333,7 +333,6 @@ int getChunkCount(int sock, char *reply, int sz) {
 
 	return n;
 }
-
 
 int buildChunkDAGs(ChunkStatus cs[], char *chunks, char *ad, char *hid) {
 	char *p = chunks;

@@ -25,6 +25,8 @@
 #include "dagaddr.hpp"
 #include <assert.h>
 
+#include "Xkeys.h"
+
 #define VERSION "v1.0"
 #define TITLE "XIA Basic FTP Server"
 
@@ -498,11 +500,19 @@ int getFile(int sock, char *ad, char*hid, const char *fin, const char *fout)
 	if ((chunkSock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0)
 		die(-1, "unable to create chunk socket\n");
 	
-	
+	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
+
+	// Generate an SID to use
+	if(XmakeNewSID(sid_string, sizeof(sid_string))) {
+		die(-1, "Unable to create a temporary SID");
+	}
+
 	struct addrinfo *ai;
-	//FIXME: SID is hardcoded
-	if (Xgetaddrinfo(NULL, SID, NULL, &ai) != 0)
+
+  // FIXME: SID is hardcoded  FIXED: from SID to sid_string randomly generated
+	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
 		die(-1, "getaddrinfo failure!\n");
+
 	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
 	//FIXME NAME is hard coded
 
@@ -530,9 +540,6 @@ int getFile(int sock, char *ad, char*hid, const char *fin, const char *fout)
 			warn("Received Chunk CID: %s\n", info->cid);
 		}
 		offset++;
-		
-		
-		
 		
 		fwrite(buf1, 1, received, f);
 // 		free(buf1);
