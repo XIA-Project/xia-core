@@ -6,7 +6,7 @@
 ** you may not use this file except in compliance with the License.
 ** You may obtain a copy of the License at
 **
-**    http://www.apache.org/licenses/LICENSE-2.0
+**        http://www.apache.org/licenses/LICENSE-2.0
 **
 ** Unless required by applicable law or agreed to in writing, software
 ** distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,92 +14,35 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
+/*simple interactive echo client using Xsockets */
+
 #include <stdio.h>
 #include <stdarg.h>
-#include <stdlib.h>
+#include <time.h>
 #include <errno.h>
-#include <sys/wait.h>
-#ifdef __APPLE__
-#include <libgen.h>
-#endif
+#include <stdlib.h>
+#include <pthread.h>
 #include "Xsocket.h"
-#include "Xkeys.h"
 #include "dagaddr.hpp"
+#include <assert.h>
 
-#define VERSION "v1.0"
-#define TITLE "XIA Prefetch Server"
+#include "Xkeys.h"
 
 #define MAX_XID_SIZE 100
-#define STREAM_NAME "www_s.stream_prefetch.aaa.xia"
-#define DGRAM_NAME "www_s.dgram_prefetch.aaa.xia"
-#define SID_DGRAM   "SID:0f00000000000000000000000000000000007777"
+#define VERSION "v1.0"
+#define TITLE "XIA Prefetch Client"
 
-// if no data is received from the client for this number of seconds, close the socket
-#define WAIT_FOR_DATA	10
-
-// global configuration options
 int verbose = 1;
-int stream = 1;
-int dgram = 1;
+char myAD[MAX_XID_SIZE];
+char myHID[MAX_XID_SIZE];
+char my4ID[MAX_XID_SIZE];
 
-/*
-** display cmd line options and exit
-*/
-void help(const char *name)
-{
-	printf("\n%s (%s)\n", TITLE, VERSION);
-	printf("usage: %s [-q] \n", name);
-	printf("where:\n");
-	printf(" -q : quiet mode\n");
-	printf(" -s : stream echo\n");
-	printf(" -d : datagram echo\n");
-	printf("\n");
-	exit(0);
-}
-
-/*
-** configure the app
-*/
-void getConfig(int argc, char** argv)
-{
-	int c;
-	int s = 0;
-	int d = 0;
-
-	opterr = 0;
-
-	while ((c = getopt(argc, argv, "hqsd")) != -1) {
-		switch (c) {
-			case 'q':
-				// turn off info messages
-				verbose = 0;
-				break;
-			case 's':
-				s = 1;
-				break;
-			case 'd':
-				d = 1;
-				break;
-			case '?':
-			case 'h':
-			default:
-				// Help Me!
-				help(basename(argv[0]));
-				break;
-		}
-	}
-
-	if (s || d) {
-		stream = s;
-		dgram = d;
-	}
-}
+char* prefetch_pred_name = "www_s.prefetch_prediction_listener.aaa.xia";
 
 /*
 ** write the message to stdout unless in quiet mode
 */
-void say(const char *fmt, ...)
-{
+void say(const char *fmt, ...) {
 	if (verbose) {
 		va_list args;
 
@@ -112,21 +55,18 @@ void say(const char *fmt, ...)
 /*
 ** always write the message to stdout
 */
-void warn(const char *fmt, ...)
-{
+void warn(const char *fmt, ...) {
 	va_list args;
 
 	va_start(args, fmt);
 	vfprintf(stdout, fmt, args);
 	va_end(args);
-
 }
 
 /*
 ** write the message to stdout, and exit the app
 */
-void die(int ecode, const char *fmt, ...)
-{
+void die(int ecode, const char *fmt, ...) {
 	va_list args;
 
 	va_start(args, fmt);
@@ -137,218 +77,442 @@ void die(int ecode, const char *fmt, ...)
 }
 
 /*
-** get data from the client and return it
-** run in a child process that was forked off from the main process.
-*/
-void process(int sock)
-{
-	char buf[XIA_MAXBUF + 1];
-	int n;
-	pid_t pid = getpid();
-
-	fd_set fds;
-	FD_ZERO(&fds);
-	FD_SET(sock, &fds);
-
-	struct timeval tv;
-	tv.tv_sec = WAIT_FOR_DATA;
-	tv.tv_usec = 0;
-
-	while (1) {
-		memset(buf, 0, sizeof(buf));
-
-	/*tv.tv_sec = WAIT_FOR_DATA;
-	tv.tv_usec = 0;
-		 if ((n = select(sock + 1, &fds, NULL, NULL, &tv)) < 0) {
-			 warn("%5d Select failed, closing...\n", pid);
-			 break;
-
-		 } else if (n == 0) {
-			 // we timed out, close the socket
-			 say("%5d timed out on recv\n", pid);
-			 break;
-		 } else if (!FD_ISSET(sock, &fds)) {
-			 // this shouldn't happen!
-			 die(-4, "something is really wrong, exiting\n");
-		 }*/
-
-		if ((n = Xrecv(sock, buf, sizeof(buf), 0)) < 0) {
-			warn("Recv error on socket %d, closing connection\n", pid);
-			break;
-		}
-
-		say("%5d received %d bytes\n", pid, n);
-
-		if ((n = Xsend(sock, buf, n, 0)) < 0) {
-			warn("%5d send error\n", pid);
-			break;
-		}
-
-		say("%5d sent %d bytes\n", pid, n);
+void echo_dgram() {
+	int sock;
+	sockaddr_x sa;
+	socklen_t slen;
+	char buf[2048];
+	char reply[2048];
+	int ns, nr;
+        
+	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0) {
+		printf("error creating socket\n");
+		exit(1);
 	}
-	say("%5d closing\n", pid);
+
+  // lookup the xia service
+	slen = sizeof(sa);
+	if (XgetDAGbyName(DGRAM_NAME, &sa, &slen) != 0) {
+		printf("unable to locate: %s\n", DGRAM_NAME);
+		exit(1);
+	}
+
+	while(1) {
+		printf("\nPlease enter the message (blank line to exit):\n");
+		char *s = fgets(buf, sizeof(buf), stdin);
+		if ((ns = strlen(s)) <= 1)
+			break;
+
+		if (Xsendto(sock, s, ns, 0, (struct sockaddr*) &sa, sizeof(sa)) < 0) {
+			printf("error sending message\n");
+			break;
+		}
+
+		if ((nr = Xrecvfrom(sock, reply, sizeof(reply), 0, NULL, NULL)) < 0) {
+			printf("error receiving message\n");
+			break;
+		}
+
+		reply[nr] = 0;
+		if (ns != nr)
+			printf("warning: sent %d characters, received %d\n", ns, nr);
+		printf("%s", reply);
+	}
+
 	Xclose(sock);
 }
 
-static void reaper(int sig)
-{
-	if (sig == SIGCHLD) {
-		while (waitpid(0, NULL, WNOHANG) > 0);
+void echo_stream() {
+	int sock;
+	sockaddr_x sa;
+	socklen_t slen;
+	char buf[2048];
+	char reply[2048];
+	int ns, nr;
+
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
+		printf("error creating socket\n");
+		exit(1);
 	}
+
+	// lookup the xia service
+	slen = sizeof(sa);
+	if (XgetDAGbyName(STREAM_NAME, &sa, &slen) != 0) {
+		printf("unable to locate: %s\n", STREAM_NAME);
+		exit(1);
+	}
+
+	if (Xconnect(sock, (struct sockaddr*)&sa, sizeof(sa)) < 0) {
+		printf("can't connect to %s\n", STREAM_NAME);
+		Xclose(sock);
+		exit(1);
+	}
+
+	while(1) {
+		printf("\nPlease enter the message (blank line to exit):\n");
+		char *s = fgets(buf, sizeof(buf), stdin);
+		if ((ns = strlen(s)) <= 1)
+			break;
+                
+		if (Xsend(sock, s, ns, 0) < 0) {
+			printf("error sending message\n");
+			break;
+		}
+
+		if ((nr = Xrecv(sock, reply, sizeof(reply), 0)) < 0) {
+			printf("error receiving message\n");
+			break;
+		}
+
+		reply[nr] = 0;
+		if (ns != nr)
+			printf("warning: sent %d characters, received %d\n", ns, nr);
+		printf("%s", reply);
+	}
+
+	Xclose(sock);
+}
+*/
+int sendCmd(int sock, const char *cmd) {
+	int n;
+	warn("Sending Command: %s \n", cmd);
+
+	if ((n = Xsend(sock, cmd,  strlen(cmd), 0)) < 0) {
+		Xclose(sock);
+		 die(-1, "Unable to communicate\n");
+	}
+	return n;
 }
 
-void echo_stream()
-{
-	int acceptor, sock;
-	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
+// prefetch_client receives context updates and send predicted CID_s to prefetch_server
+// handle the CID update first and location/AP later
+void *RecvCmd (void *socketid) {
 
-	if (signal(SIGCHLD, reaper) == SIG_ERR) {
-		die(-1, "unable to catch SIGCHLD");
+	char command[XIA_MAXBUF];
+	char reply[XIA_MAXBUF];
+	int sock = *((int*)socketid);
+	int n;
+
+	while (1) {
+		memset(command, '\0', strlen(command));
+		memset(reply, '\0', strlen(reply));
+
+		if ((n = Xrecv(sock, command, 1024, 0))  < 0) {
+			warn("socket error while waiting for data, closing connection\n");
+			break;
+		}
+		// printf("%d\n", n);
+		if (strncmp(command, "Hello from prefetch client", 26) == 0)
+			say("Received hello from prefetch client\n");
+			// TODO: use XChunk to prefetch
 	}
 
-	say("Stream service started\n");
+	Xclose(sock);
+	say("Socket closed\n");
+	pthread_exit(NULL);
 
-	if ((acceptor = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
-		die(-2, "unable to create the stream socket\n");
+	// start with the current
+/*
+	int i, n, count = 0;
+	ChunkInfo *info = NULL;
+	char command[XIA_MAXBUF];
+	char reply[XIA_MAXBUF];
+	int sock = *((int*)socketid);
+	char *fname;
+	char fin[512], fout[512];
+	// char **params;
+	char ad[MAX_XID_SIZE];
+	char hid[MAX_XID_SIZE];
 
+	//ChunkContext contains size, ttl, policy, and contextID which for now is PID
+	ChunkContext *ctx = XallocCacheSlice(POLICY_FIFO|POLICY_REMOVE_ON_EXIT, 0, 20000000);
+	if (ctx == NULL)
+		die(-2, "Unable to initilize the chunking system\n");
+
+	while (1) {
+		say("waiting for command\n");
+		
+		memset(command, '\0', strlen(command));
+		memset(reply, '\0', strlen(reply));
+		
+		if ((n = Xrecv(sock, command, 1024, 0))  < 0) {
+			warn("socket error while waiting for data, closing connection\n");
+			break;
+		}
+		// Sender does the chunking and then should start the sending commands
+		if (strncmp(command, "get", 3) == 0) {
+			fname = &command[4];
+			say("client requested file %s\n", fname);
+
+			if (info) {
+				// clean up the existing chunks first
+			}
+		
+			info = NULL;
+			count = 0;
+			
+			say("chunking file %s\n", fname);
+			
+			// Chunking is done by the XputFile which itself uses XputChunk, and fills out the info
+			if ((count = XputFile(ctx, fname, CHUNKSIZE, &info)) < 0) {
+				warn("unable to serve the file: %s\n", fname);
+				sprintf(reply, "FAIL: File (%s) not found", fname);
+			} else {
+				sprintf(reply, "OK: %d", count);
+			}
+			say("%s\n", reply);
+			
+			// Just tells the receiver how many chunks it should expect.
+			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
+				warn("unable to send reply to client\n");
+				break;
+			}
+		// Sending the blocks cids
+		} else if (strncmp(command, "block", 5) == 0) {
+			// command: "block %d:%d", offset, num
+			char *start = &command[6];
+			char *end = strchr(start, ':');
+			if (!end) {
+				// we have an invalid command, return error to client
+				sprintf(reply, "FAIL: invalid block command");
+			} else {
+				*end = 0;
+				end++;
+				// FIXME: clean up naming, e is now a count
+				int s = atoi(start);
+				int e = s + atoi(end);
+				strcpy(reply, "OK:");
+				for(i = s; i < e && i < count; i++) {
+					strcat(reply, " ");
+					strcat(reply, info[i].cid);
+				}
+			}
+			// print all the CIDs and send back
+			printf("%s\n", reply);
+			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
+				warn("unable to send reply to client\n");
+				break;
+			}
+		} else if (strncmp(command, "done", 4) == 0) {
+			say("done sending file: removing the chunks from the cache\n");
+			for (i = 0; i < count; i++)
+				XremoveChunk(ctx, info[i].cid);
+			XfreeChunkInfo(info);
+			info = NULL;
+			count = 0;
+		}
+		else if (strncmp(command, "put", 3) == 0) {
+			// fname = &command[4];
+			i = 0;
+			say("Client wants to put a file here. cmd: %s\n" , command);
+			//	put %s %s %s %s 
+			i = sscanf(command, "put %s %s %s %s ", ad, hid, fin, fout);
+			if (i != 4){
+ 				warn("Invalid put command: %s\n" , command);
+			}
+			getFile(sock, ad, hid, fin, fout);
+
+		} else {
+			sprintf(reply, "FAIL: invalid command (%s)\n", command);
+			warn(reply);
+			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
+				warn("unable to send reply to client\n");
+				break;
+			}
+		}
+	}
+	
+	if (info)
+		XfreeChunkInfo(info);
+	XfreeCacheSlice(ctx);
+	Xclose(sock);
+	pthread_exit(NULL);
+*/
+}
+
+// TBD: prefetch_client receives the xftp_client’ CID request, forward it to 
+// the original service (if cache miss) and send the results back to xftp_client
+void *cidRecvCmd (void *socketid) {
+/*
+	int i, n, count = 0;
+	ChunkInfo *info = NULL;
+	char command[XIA_MAXBUF];
+	char reply[XIA_MAXBUF];
+	int sock = *((int*)socketid);
+	char *fname;
+	char fin[512], fout[512];
+	// char **params;
+	char ad[MAX_XID_SIZE];
+	char hid[MAX_XID_SIZE];
+
+	//ChunkContext contains size, ttl, policy, and contextID which for now is PID
+	ChunkContext *ctx = XallocCacheSlice(POLICY_FIFO|POLICY_REMOVE_ON_EXIT, 0, 20000000);
+	if (ctx == NULL)
+		die(-2, "Unable to initilize the chunking system\n");
+
+	while (1) {
+		say("waiting for command\n");
+		
+		memset(command, '\0', strlen(command));
+		memset(reply, '\0', strlen(reply));
+		
+		if ((n = Xrecv(sock, command, 1024, 0))  < 0) {
+			warn("socket error while waiting for data, closing connection\n");
+			break;
+		}
+		// Sender does the chunking and then should start the sending commands
+		if (strncmp(command, "get", 3) == 0) {
+			fname = &command[4];
+			say("client requested file %s\n", fname);
+
+			if (info) {
+				// clean up the existing chunks first
+			}
+		
+			info = NULL;
+			count = 0;
+			
+			say("chunking file %s\n", fname);
+			
+			// Chunking is done by the XputFile which itself uses XputChunk, and fills out the info
+			if ((count = XputFile(ctx, fname, CHUNKSIZE, &info)) < 0) {
+				warn("unable to serve the file: %s\n", fname);
+				sprintf(reply, "FAIL: File (%s) not found", fname);
+			} else {
+				sprintf(reply, "OK: %d", count);
+			}
+			say("%s\n", reply);
+			
+			// Just tells the receiver how many chunks it should expect.
+			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
+				warn("unable to send reply to client\n");
+				break;
+			}
+		// Sending the blocks cids
+		} else if (strncmp(command, "block", 5) == 0) {
+			// command: "block %d:%d", offset, num
+			char *start = &command[6];
+			char *end = strchr(start, ':');
+			if (!end) {
+				// we have an invalid command, return error to client
+				sprintf(reply, "FAIL: invalid block command");
+			} else {
+				*end = 0;
+				end++;
+				// FIXME: clean up naming, e is now a count
+				int s = atoi(start);
+				int e = s + atoi(end);
+				strcpy(reply, "OK:");
+				for(i = s; i < e && i < count; i++) {
+					strcat(reply, " ");
+					strcat(reply, info[i].cid);
+				}
+			}
+			// print all the CIDs and send back
+			printf("%s\n", reply);
+			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
+				warn("unable to send reply to client\n");
+				break;
+			}
+		} else if (strncmp(command, "done", 4) == 0) {
+			say("done sending file: removing the chunks from the cache\n");
+			for (i = 0; i < count; i++)
+				XremoveChunk(ctx, info[i].cid);
+			XfreeChunkInfo(info);
+			info = NULL;
+			count = 0;
+		}
+		else if (strncmp(command, "put", 3) == 0) {
+			// fname = &command[4];
+			i = 0;
+			say("Client wants to put a file here. cmd: %s\n" , command);
+			//	put %s %s %s %s 
+			i = sscanf(command, "put %s %s %s %s ", ad, hid, fin, fout);
+			if (i != 4){
+ 				warn("Invalid put command: %s\n" , command);
+			}
+			getFile(sock, ad, hid, fin, fout);
+
+		} else {
+			sprintf(reply, "FAIL: invalid command (%s)\n", command);
+			warn(reply);
+			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
+				warn("unable to send reply to client\n");
+				break;
+			}
+		}
+	}
+	
+	if (info)
+		XfreeChunkInfo(info);
+	XfreeCacheSlice(ctx);
+	Xclose(sock);
+	pthread_exit(NULL);
+*/
+}
+
+// Just registering the service and openning the necessary sockets
+int registerStreamReceiver(char* name) {
+	int sock;
+
+	// create a socket, and listen for incoming connections
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+		die(-1, "Unable to create the listening socket\n");
+
+  // read the localhost AD and HID
+  if (XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0)
+		die(-1, "Reading localhost address\n");
+
+	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
 	// Generate an SID to use
-	if(XmakeNewSID(sid_string, sizeof(sid_string))) {
+	if (XmakeNewSID(sid_string, sizeof(sid_string))) {
 		die(-1, "Unable to create a temporary SID");
 	}
 
-	struct addrinfo hints, *ai;
-	bzero(&hints, sizeof(hints));
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_family = AF_XIA;
-	if (Xgetaddrinfo(NULL, sid_string, &hints, &ai) != 0)
-		die(-1, "getaddrinfo failure!\n");
-
-	Graph g((sockaddr_x*)ai->ai_addr);
-
-	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
-
-	printf("\nStream DAG\n%s\n", g.dag_string().c_str());
-
-	if (XregisterName(STREAM_NAME, sa) < 0 )
-		die(-1, "error registering name: %s\n", STREAM_NAME);
-		
-	say("registered name: \n%s\n", STREAM_NAME);
-
-	if (Xbind(acceptor, (struct sockaddr *)sa, sizeof(sockaddr_x)) < 0) {
-		die(-3, "unable to bind to the dag\n");
-	}
-
-	while (1) {
-		say("Xsock %4d waiting for a new connection.\n", acceptor);
-		sockaddr_x sa;
-		socklen_t sz = sizeof(sa);
-
-		if ((sock = Xaccept(acceptor, (sockaddr*)&sa, &sz)) < 0) {
-			warn("Xsock %d accept failure! error = %d\n", acceptor, errno);
-			// FIXME: should we die here instead or try and recover?
-			continue;
-		}
-
-		Graph g(&sa);
-		say ("Xsock %4d new session\n", sock);
-		say("peer:%s\n", g.dag_string().c_str()); 
-
-		pid_t pid = fork();
-
-		if (pid == -1) {
-			die(-1, "FORK FAILED\n");
-
-		} else if (pid == 0) {
-			process(sock);
-			XremoveSID(sid_string, sizeof(sid_string));
-			exit(0);
-
-		} else {
-			// FIXME: we need to close the socket in the main process or the file
-			// descriptor limit will be hit. But if Xclose is called, the connection
-			// is torn down in click as well keeping the child process from using it.
-			// for now use a regular close to shut it here without affecting the child.
-			close(sock);
-		}
-	}
-
-	Xclose(acceptor);
-}
-
-void echo_dgram()
-{
-	int sock;
-	char buf[XIA_MAXBUF];
-	sockaddr_x cdag;
-	socklen_t dlen;
-	int n;
-
-	say("Datagram service started\n");
-
-	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
-		die(-2, "unable to create the datagram socket\n");
-
 	struct addrinfo *ai;
-	if (Xgetaddrinfo(NULL, SID_DGRAM, NULL, &ai) != 0)
+  // FIXED: from hardcoded SID to sid_string randomly generated
+	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
 		die(-1, "getaddrinfo failure!\n");
 
-	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
+	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
+	// FIXME: NAME is hard coded
+  if (XregisterName(name, dag) < 0)
+		die(-1, "error registering name: %s\n", name);
 
-	Graph g((sockaddr_x*)ai->ai_addr);
-	printf("\nDatagram DAG\n%s\n", g.dag_string().c_str());
-
-    if (XregisterName(DGRAM_NAME, sa) < 0 )
-    	die(-1, "error registering name: %s\n", DGRAM_NAME);
-	say("registered name: \n%s\n", DGRAM_NAME);
-
-	if (Xbind(sock, (sockaddr *)sa, sizeof(sa)) < 0) {
-		die(-3, "unable to bind to the dag\n");
-	}
-
-	pid_t pid = 0;
-
-	// only need to fork if doing stream echo at the same time
-	if (stream == 1)
-		pid = fork();
-
-	if (pid == 0) {
-		while (1) {
-			say("Dgram Server waiting\n");
-
-			dlen = sizeof(cdag);
-			memset(buf, 0, sizeof(buf));
-			if ((n = Xrecvfrom(sock, buf, sizeof(buf), 0, (struct sockaddr *)&cdag, &dlen)) < 0) {
-				warn("Recv error on socket %d, closing connection\n", pid);
-				break;
-			}
-
-			say("dgram received %d bytes\n", n);
-
-			if ((n = Xsendto(sock, buf, n, 0, (struct sockaddr *)&cdag, dlen)) < 0) {
-				warn("%5d send error\n", pid);
-				break;
-			}
-
-			say("dgram sent %d bytes\n", n);
-		}
-
+	if (Xbind(sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
 		Xclose(sock);
+		die(-1, "Unable to bind to the dag: %s\n", dag);
 	}
+
+	Graph g(dag);
+	say("listening on dag: %s\n", g.dag_string().c_str());
+  return sock;  
 }
 
-int main(int argc, char *argv[])
-{
-	getConfig(argc, argv);
+// FIXME: merge the two functions below
+void *BlockingListener(void *socketid) {
+  int sock = *((int*)socketid);
+  int acceptSock;
 
-	say ("\n%s (%s): started\n", TITLE, VERSION);
+  while (1) {
+		say("Waiting for a client connection\n");
+   		
+		if ((acceptSock = Xaccept(sock, NULL, NULL)) < 0)
+			die(-1, "accept failed\n");
 
-	// if configured, fork off a process to handle datagram connections
-	if (dgram)
-		echo_dgram();
+		say("connected\n");
+		
+		// handle the connection in a new thread
+		pthread_t client;
+		pthread_create(&client, NULL, RecvCmd, (void *)&acceptSock);
+	}
+	
+	Xclose(sock); // we should never reach here!
+	return NULL;
+}
 
-	// if configured, fork off processes as needed to handle stream connections
-	if (stream)
-		echo_stream();
+int main() {
 
-	return 0;
+	int sockfd = registerStreamReceiver(prefetch_pred_name);
+	BlockingListener((void *)&sockfd);
 }
