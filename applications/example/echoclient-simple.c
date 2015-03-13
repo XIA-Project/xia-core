@@ -26,8 +26,7 @@
 #define STREAM_NAME "www_s.stream_echo.aaa.xia"
 #define DGRAM_NAME "www_s.dgram_echo.aaa.xia"
 
-void help()
-{
+void help() {
 	printf("usage: xecho [-ds]\n");
 	printf("where:\n");
 	printf(" -d : use a datagram socket\n");
@@ -35,8 +34,7 @@ void help()
 	exit(1);
 }
 
-void echo_dgram()
-{
+void echo_dgram() {
 	int sock;
 	sockaddr_x sa;
 	socklen_t slen;
@@ -81,8 +79,7 @@ void echo_dgram()
 	Xclose(sock);
 }
 
-void echo_stream()
-{
+void echo_stream() {
 	int sock;
 	sockaddr_x sa;
 	socklen_t slen;
@@ -111,7 +108,6 @@ void echo_stream()
 	char *s = "XIA mobility demo";
 	int dot_c = 0;
 	while(1) {
-		// chenren: measure time as well
 		//printf("\nPlease enter the message (blank line to exit):\n");
 		//char *s = fgets(buf, sizeof(buf), stdin);
 		if ((ns = strlen(s)) <= 1)
@@ -144,8 +140,7 @@ void echo_stream()
 	Xclose(sock);
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
 	int mode = 1;
 
 	printf("%s %s\n", TITLE, VERSION);

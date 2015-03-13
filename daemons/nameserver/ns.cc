@@ -26,8 +26,7 @@ map<std::string, std::string> name_to_dag_db_table; // map name to dag
 char *hostname = NULL;
 char *ident = NULL;
 
-void help(const char *name)
-{
+void help(const char *name) {
 	printf("\nusage: %s [-l level] [-v] [-c config] [-h hostname]\n", name);
 	printf("where:\n");
 	printf(" -l level    : syslog logging level 0 = LOG_EMERG ... 7 = LOG_DEBUG (default=3:LOG_ERR)\n");
@@ -37,8 +36,7 @@ void help(const char *name)
 	exit(0);
 }
 
-void config(int argc, char** argv)
-{
+void config(int argc, char** argv) {
 	int c;
 	unsigned level = 3;
 	int verbose = 0;
@@ -78,12 +76,10 @@ void config(int argc, char** argv)
 }
 
 // return true if the AD has an edge that points to the HID
-int check_pair(Graph &g, int ad, int hid)
-{
+int check_pair(Graph &g, int ad, int hid) {
 	bool found = false;
 
 	// what to do if AD has edges to multiple HIDs?
-
 	if (ad >= 0 && hid >= 0) {
 		std::vector<std::size_t> edges = g.get_out_edges(ad);
 		std::vector<std::size_t>::iterator ei;
@@ -104,8 +100,7 @@ int check_pair(Graph &g, int ad, int hid)
 // If an older host entry is found for this HID, replace the entry, and
 //  find any other names that use the old AD and update them to use the new one
 //  instead.
-void migrate(const char *name, const char *dag)
-{
+void migrate(const char *name, const char *dag) {
 	map<std::string, std::string>::iterator it;
 
 	it = name_to_dag_db_table.find(name);
@@ -139,16 +134,13 @@ void migrate(const char *name, const char *dag)
 		}
 
 		if (check_pair(new_dag, ad_index, hid_index)) {
-
 			// we found the new AD/HID and AD has an out edge to HID
-
 			ad_index = -1;
 			hid_index = -1;
 
 			// this assumes the old DAG only has a single AD and HID in it
 			// and will only reliably work for and dag like AD->HID or IP->(AD->HID)
 			for (int i = 0; i < old_dag.num_nodes(); i++) {
-
 				Node n = old_dag.get_node(i);
 				if (n.type() == Node::XID_TYPE_AD) {
 					ad_index = i;
@@ -161,9 +153,7 @@ void migrate(const char *name, const char *dag)
 			}
 
 			if (check_pair(old_dag, ad_index, hid_index)) {
-
 				// HIDs match, time to update dags in our database
-
 				// this dag has migrated, put new record in table
 				syslog(LOG_INFO, "migrated host record %s to %s:%s", name,
 						new_ad->type_string().c_str(), new_ad->id_string().c_str());
@@ -210,7 +200,6 @@ void migrate(const char *name, const char *dag)
 	}
 }
 
-
 int main(int argc, char *argv[]) {
 	sockaddr_x ddag;
 	int rtype;
@@ -225,22 +214,22 @@ int main(int argc, char *argv[]) {
 	// Xsocket init
 	int sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
 	if (sock < 0) {
-   		syslog(LOG_ALERT, "Unable to create a socket");
-   		exit(-1);
+   	syslog(LOG_ALERT, "Unable to create a socket");
+   	exit(-1);
 	}
 
 	struct addrinfo *ai;
 	if (Xgetaddrinfo(NULL, SID_NS, NULL, &ai) != 0) {
-   		syslog(LOG_ALERT, "unable to get local address");
+		syslog(LOG_ALERT, "unable to get local address");
 		exit(-1);
 	}
 
 	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
 
 	if (Xbind(sock, (struct sockaddr*)sa, sizeof(sockaddr_x)) < 0) {
-   		Graph g(sa);
-   		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
-   		exit(-1);
+		Graph g(sa);
+   	syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
+   	exit(-1);
 	}
 
 	// main looping
@@ -253,49 +242,48 @@ int main(int argc, char *argv[]) {
 			continue;
 		}
 
-   		ns_pkt req_pkt;
-   		get_ns_packet(pkt_in, rc, &req_pkt);
+		ns_pkt req_pkt;
+   	get_ns_packet(pkt_in, rc, &req_pkt);
 
-    	switch (req_pkt.type) {
-		case NS_TYPE_REGISTER:
-			// insert a new entry
+    switch (req_pkt.type) {
+			case NS_TYPE_REGISTER:
+				// insert a new entry
+				if (req_pkt.flags & NS_FLAGS_MIGRATE) {
+					// this should be a host record, if no matching name is in the
+					//  database, just add the record
+					// if the name already exists, check that the HIDs match, and
+					//  if so replace the entry, and update the AD in any name records that
+					//  contain the same HID
+					migrate(req_pkt.name, req_pkt.dag);
+				} else {
+					// just add the new name record
+					syslog(LOG_INFO, "new entry: %s = %s", req_pkt.name, req_pkt.dag);
+					name_to_dag_db_table[req_pkt.name] = req_pkt.dag;
+				}
+				rtype = NS_TYPE_RESPONSE_REGISTER;
+				break;
 
-			if (req_pkt.flags & NS_FLAGS_MIGRATE) {
-				// this should be a host record, if no matching name is in the
-				//  database, just add the record
-				// if the name already exists, check that the HIDs match, and
-				//  if so replace the entry, and update the AD in any name records that
-				//  contain the same HID
-				migrate(req_pkt.name, req_pkt.dag);
-			} else {
-				// just add the new name record
-				syslog(LOG_INFO, "new entry: %s = %s", req_pkt.name, req_pkt.dag);
-				name_to_dag_db_table[req_pkt.name] = req_pkt.dag;
+			case NS_TYPE_QUERY:
+			{
+				map<std::string, std::string>::iterator it;
+				it = name_to_dag_db_table.find(req_pkt.name);
+
+				if (it != name_to_dag_db_table.end()) {
+					dag_str = it->second;
+					rtype = NS_TYPE_RESPONSE_QUERY;
+					syslog(LOG_DEBUG, "Successful name lookup for %s", req_pkt.name);
+				} else {
+					rtype = NS_TYPE_RESPONSE_ERROR;
+					syslog(LOG_DEBUG, "DAG for %s not found", req_pkt.name);
+				}
+
 			}
-			rtype = NS_TYPE_RESPONSE_REGISTER;
 			break;
 
-		case NS_TYPE_QUERY:
-		{
-			map<std::string, std::string>::iterator it;
-			it = name_to_dag_db_table.find(req_pkt.name);
-
-			if(it != name_to_dag_db_table.end()) {
-				dag_str = it->second;
-				rtype = NS_TYPE_RESPONSE_QUERY;
-				syslog(LOG_DEBUG, "Successful name lookup for %s", req_pkt.name);
-			} else {
+			default:
+				syslog(LOG_WARNING, "unrecognized request: %d", req_pkt.type);
 				rtype = NS_TYPE_RESPONSE_ERROR;
-				syslog(LOG_DEBUG, "DAG for %s not found", req_pkt.name);
-			}
-
-		}
-			break;
-
-		default:
-			syslog(LOG_WARNING, "unrecognized request: %d", req_pkt.type);
-			rtype = NS_TYPE_RESPONSE_ERROR;
-			break;
+				break;
 		}
 
 		//Construct a response packet
@@ -317,4 +305,3 @@ int main(int argc, char *argv[]) {
 	}
 	return 0;
 }
-
