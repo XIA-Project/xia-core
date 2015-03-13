@@ -24,6 +24,8 @@
 #include "Xsocket.h"
 #include "dagaddr.hpp"
 
+#include "Xkeys.h"
+
 #define VERSION "v1.0"
 #define TITLE "XIA Chunk File Server"
 
@@ -80,7 +82,7 @@ void die(int ecode, const char *fmt, ...)
 	exit(ecode);
 }
 
-void *processRequest (void *socketid)
+void *processRequest (void *socketid) 
 {
 	int i, n, count = 0;
 	ChunkInfo *info = NULL;
@@ -188,16 +190,25 @@ int main() {
 		 die(-1, "Unable to create the listening socket\n");
 
 	// read the localhost AD and HID
-  if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
+  if (XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0)
 		die(-1, "Reading localhost address\n");
 
+	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
+
+	// Generate an SID to use
+	if(XmakeNewSID(sid_string, sizeof(sid_string))) {
+		die(-1, "Unable to create a temporary SID");
+	}
+
 	struct addrinfo *ai;
-	if (Xgetaddrinfo(NULL, SID, NULL, &ai) != 0)
+
+  // FIXME: SID is hardcoded  FIXED: from SID to sid_string randomly generated
+	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
 		die(-1, "getaddrinfo failure!\n");
 
 	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
-
-	if (XregisterName(NAME, dag) < 0 )
+	// FIXME: NAME is hard coded
+  if (XregisterName(NAME, dag) < 0)
 		die(-1, "error registering name: %s\n", NAME);
 
 	if (Xbind(sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
