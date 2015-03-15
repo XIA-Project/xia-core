@@ -360,9 +360,9 @@ int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout
 	char cmd[512];
 	char reply[512];
 	int status = 0;
-	
-	// TODO: check the arguments to be correct
-	// send the file request
+	char prefetch_cmd[512];
+
+	// send the file request to the xftp server
 	sprintf(cmd, "get %s",  fin);
 	sendCmd(sock, cmd);
 
@@ -406,12 +406,15 @@ int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout
 		// send the requested CID range
 		sendCmd(sock, cmd);
 
-		// say hello to the connext server
-		char* hello = "Hello from context client";		
+		// TODO: send file name and current chunks 
+		sprintf(prefetch_cmd, "get %s %d %d", fin, offset, offset + NUM_CHUNKS - 1);
+		int m = sendCmd(prefetch_ctx_sock, prefetch_cmd); 
+/*
+		char* hello = "Hello from context client";
 		int m = sendCmd(prefetch_ctx_sock, hello); 
 		printf("%d\n");
-		say("Sent hello msg\n");
-
+		say("Sent CID update\n");
+*/
 		if (getChunkCount(sock, reply, sizeof(reply)) < 1) {
 			warn("could not get chunk count. Aborting. \n");
 			return -1;
@@ -520,17 +523,17 @@ int main(int argc, char **argv) {
 	char fin[512], fout[512];
 	char cmd[512], reply[512];
 	int params = -1;
-	
+
 	prefetch_ctx_sock = initializeClient(prefetch_ctx_name);
+
+/*
 	// say hello to the connext server
-
 	char* hi = "Hello from context client";		
-
-	sendCmd(prefetch_ctx_sock, hi); 
+	sendCmd(prefetch_ctx_sock, hi);
 	say("Say hi to prefetch client.\n");
-
+*/
 	say ("\n%s (%s): started\n", TITLE, VERSION);
-/*	
+	
 	if (argc == 1) {
 		say ("No service name passed, using default: %s\nYou can also pass --quick to execute a couple of default commands for quick testing. Requires s.txt to exist. \n", ftp_name);
 		sock = initializeClient(ftp_name);
@@ -552,10 +555,10 @@ int main(int argc, char **argv) {
 				say ("Connecting to: %s\n", name);
 				sock = initializeClient(name);
 				usage();
-			} else{
+			} else {
 				die(-1, "xftp [--quick] [SID]");
 			}
-	} else{
+	} else {
 		die(-1, "xftp [--quick] [SID]"); 
 	}
 	
@@ -579,13 +582,11 @@ int main(int argc, char **argv) {
 			fgets(cmd, 511, stdin);
 		}
 
-		// enable this if you want to limit how many times this is done
-		// i++;
-		
+		// compare the first three characters
 		if (strncmp(cmd, "get", 3) == 0) {
-			params = sscanf(cmd,"get %s %s", fin, fout);
-			
-			if (params != 2){
+			// params is the number of arguments
+			params = sscanf(cmd, "get %s %s", fin, fout);
+			if (params != 2) {
 				sprintf(reply, "FAIL: invalid command (%s)\n", cmd);
 				warn(reply);
 				usage();
@@ -597,16 +598,15 @@ int main(int argc, char **argv) {
 			}
 			getFile(sock, s_ad, s_hid, fin, fout);
 		}
-		else if (strncmp(cmd, "put", 3) == 0){
+		else if (strncmp(cmd, "put", 3) == 0) {
 			params = sscanf(cmd,"put %s %s", fin, fout);
-			
-			if (params != 2){
+			if (params != 2) {
 				sprintf(reply, "FAIL: invalid command (%s)\n", cmd);
 				warn(reply);
 				usage();
 				continue;
 			}
-			if (strcmp(fin, fout) == 0){
+			if (strcmp(fin, fout) == 0) {
 				warn("Since both applications write to the same folder (local case) the names should be different.\n");
 				continue;
 			}
@@ -616,12 +616,12 @@ int main(int argc, char **argv) {
 			}
 			putFile(sock, my_ad, my_hid, fin, fout);
 		}
-		else{
+		else {
 			sprintf(reply, "FAIL: invalid command (%s)\n", cmd);
 			warn(reply);
 			usage();
 		}
 	}
-*/	
+	
 	return 1;
 }
