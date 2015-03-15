@@ -133,6 +133,7 @@ int registerHostWithRouter() {
 	int selectRetVal; 
   struct timeval timeoutval; 
   fd_set socks; 
+	// TODO: hardcode
   int retries = 40;
   // Separate socket to talk with router
   // Avoids XHCP beacons interacting with router Ack message
@@ -151,9 +152,10 @@ int registerHostWithRouter() {
 	Xsendto(sockfd, buffer, msg_len, 0, (sockaddr*)&pseudo_gw_router_dag, sizeof(pseudo_gw_router_dag));
 	
 	char recv_buf[XHCP_MAX_PACKET_SIZE]; 	
-	while(retries--) {
+	while (retries--) {
 		FD_ZERO(&socks);
 		FD_SET(sockfd, &socks);
+		// TODO: hardcode
 		timeoutval.tv_sec = 0;
 		timeoutval.tv_usec = 50000; // every 50 msec, check if any received packets
 
@@ -162,13 +164,15 @@ int registerHostWithRouter() {
 			socklen_t dlen = sizeof(sockaddr_x);
 			int n = Xrecvfrom(sockfd, recv_buf, XHCP_MAX_PACKET_SIZE, 0, (struct sockaddr*)&pseudo_gw_router_dag, &dlen);
 			if (!strncmp(buffer, recv_buf, msg_len)) {
-				syslog(LOG_INFO, "Received registration Ack from router after %d retries.", 40 - retries);
+				// TODO: hardcode
+				syslog(LOG_INFO, "Received registration Ack from router between %d ms and %d ms.", (40-1-retries)*50, (40-retries)*50);
+				//syslog(LOG_INFO, "Received registration Ack from router after %d retries.", 40 + 1 - retries);
 				break;
 			}
 		}
 	}
 	Xclose(sockfd);
-	if(!retries) {
+	if (!retries) {
 		syslog(LOG_ERR, "Did not receive registration Ack from router");
 		return -1;
 	}
@@ -309,11 +313,11 @@ int main(int argc, char *argv[]) {
 		changed = 0;
 
 		// Check if myAD has been changed
-		if(myAD.compare(AD) != 0) {
+		if (myAD.compare(AD) != 0) {
 			changed = 1;
 			syslog(LOG_INFO, "AD updated");
 			// update new AD information
-			if(XupdateAD(sockfd, router_ad, router_4id) < 0) {
+			if (XupdateAD(sockfd, router_ad, router_4id) < 0) {
 				syslog(LOG_WARNING, "Error updating my AD to click");
 			}
 		
@@ -330,7 +334,7 @@ int main(int argc, char *argv[]) {
 		}
 
 		// Check if myGWRouterHID has been changed
-		if(myGWRHID.compare(gwRHID) != 0) {
+		if (myGWRHID.compare(gwRHID) != 0) {
 			changed = 1;
 			syslog(LOG_INFO, "default route updated");
 
@@ -359,7 +363,7 @@ int main(int argc, char *argv[]) {
 			}
 			
 			// register with the router so it can route our packets to us
-			if(registerHostWithRouter()) {
+			if (registerHostWithRouter()) {
 				syslog(LOG_WARNING, "error registering with router");
 			}
 			else {
@@ -385,11 +389,11 @@ int main(int argc, char *argv[]) {
 		beacon_reception_count++;
 		// send gw reg msg every beacon_response_freq seconds 
 		if ((beacon_reception_count % beacon_response_freq) == 0) {
-			if(registerHostWithRouter()) {
+			if (registerHostWithRouter()) {
 				syslog(LOG_WARNING, "error registering with router");
 			}
 			else {
-				syslog(LOG_INFO, "Stay in old AD");	
+				//syslog(LOG_INFO, "Stay in old AD");	
 			}			
 		}
 
