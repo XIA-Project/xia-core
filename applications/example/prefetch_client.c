@@ -49,7 +49,6 @@ char s_hid[MAX_XID_SIZE];
 char my_ad[MAX_XID_SIZE];
 char my_hid[MAX_XID_SIZE];
 
-
 /*
 ** write the message to stdout unless in quiet mode
 */
@@ -86,104 +85,6 @@ void die(int ecode, const char *fmt, ...) {
 	fprintf(stdout, "%s: exiting\n", TITLE);
 	exit(ecode);
 }
-
-/*
-void echo_dgram() {
-	int sock;
-	sockaddr_x sa;
-	socklen_t slen;
-	char buf[2048];
-	char reply[2048];
-	int ns, nr;
-        
-	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0) {
-		printf("error creating socket\n");
-		exit(1);
-	}
-
-  // lookup the xia service
-	slen = sizeof(sa);
-	if (XgetDAGbyName(DGRAM_NAME, &sa, &slen) != 0) {
-		printf("unable to locate: %s\n", DGRAM_NAME);
-		exit(1);
-	}
-
-	while(1) {
-		printf("\nPlease enter the message (blank line to exit):\n");
-		char *s = fgets(buf, sizeof(buf), stdin);
-		if ((ns = strlen(s)) <= 1)
-			break;
-
-		if (Xsendto(sock, s, ns, 0, (struct sockaddr*) &sa, sizeof(sa)) < 0) {
-			printf("error sending message\n");
-			break;
-		}
-
-		if ((nr = Xrecvfrom(sock, reply, sizeof(reply), 0, NULL, NULL)) < 0) {
-			printf("error receiving message\n");
-			break;
-		}
-
-		reply[nr] = 0;
-		if (ns != nr)
-			printf("warning: sent %d characters, received %d\n", ns, nr);
-		printf("%s", reply);
-	}
-
-	Xclose(sock);
-}
-
-void echo_stream() {
-	int sock;
-	sockaddr_x sa;
-	socklen_t slen;
-	char buf[2048];
-	char reply[2048];
-	int ns, nr;
-
-	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
-		printf("error creating socket\n");
-		exit(1);
-	}
-
-	// lookup the xia service
-	slen = sizeof(sa);
-	if (XgetDAGbyName(STREAM_NAME, &sa, &slen) != 0) {
-		printf("unable to locate: %s\n", STREAM_NAME);
-		exit(1);
-	}
-
-	if (Xconnect(sock, (struct sockaddr*)&sa, sizeof(sa)) < 0) {
-		printf("can't connect to %s\n", STREAM_NAME);
-		Xclose(sock);
-		exit(1);
-	}
-
-	while(1) {
-		printf("\nPlease enter the message (blank line to exit):\n");
-		char *s = fgets(buf, sizeof(buf), stdin);
-		if ((ns = strlen(s)) <= 1)
-			break;
-                
-		if (Xsend(sock, s, ns, 0) < 0) {
-			printf("error sending message\n");
-			break;
-		}
-
-		if ((nr = Xrecv(sock, reply, sizeof(reply), 0)) < 0) {
-			printf("error receiving message\n");
-			break;
-		}
-
-		reply[nr] = 0;
-		if (ns != nr)
-			printf("warning: sent %d characters, received %d\n", ns, nr);
-		printf("%s", reply);
-	}
-
-	Xclose(sock);
-}
-*/
 
 int initializeClient(const char *name) {
 	int sock, rc;
@@ -258,6 +159,10 @@ void *ctxRecvCmd (void *socketid) {
 	int sock = *((int*)socketid);
 	int n;
 
+	char fin[512];
+	char fout[512];
+	int start, end;
+
 	while (1) {
 		memset(command, '\0', strlen(command));
 		memset(reply, '\0', strlen(reply));
@@ -267,10 +172,22 @@ void *ctxRecvCmd (void *socketid) {
 			break;
 		}
 		// printf("%d\n", n);
+		// TODO: receive the current CID, predict the future and send to prefetch_server 
+		/*
 		if (strncmp(command, "Hello from context client", 25) == 0) {
 			say("Received hello from context client\n");
 			char* hello = "Hello from prefetch client";
 			sendCmd(sockfd_pred, hello);
+		}
+		*/
+		if (strncmp(command, "get", 3) == 0) {
+			say("Received CID request from context client\n");
+			printf("%s\n", command);
+			sscanf(command, "get %s %d %d", fin, &start, &end);
+			//printf("get %s %d %d\n", fin, start, end);
+			if (start == 0) {
+				sendCmd(sockfd_pred, command);
+			}
 		}
 	}
 
