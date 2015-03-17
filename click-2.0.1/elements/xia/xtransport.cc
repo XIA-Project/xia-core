@@ -1060,10 +1060,8 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 {
-
  	_errh->debug("Got packet from cache");		
 
-	
 	//Extract the SID/CID
 	XIAHeader xiah(p_in->xia_header());
 	XIAPath dst_path = xiah.dst_path();
@@ -1071,14 +1069,14 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 	XID	destination_sid = dst_path.xid(dst_path.destination_node());
 	XID	source_cid = src_path.xid(src_path.destination_node());	
 	
-        ContentHeader ch(p_in);
+	ContentHeader ch(p_in);
 	
-// 	click_chatter("dest %s, src_cid %s, dst_path: %s, src_path: %s\n", 
-// 		      destination_sid.unparse().c_str(), source_cid.unparse().c_str(), dst_path.unparse().c_str(), src_path.unparse().c_str());
-// 	click_chatter("dst_path: %s, src_path: %s, OPCode: %d\n", dst_path.unparse().c_str(), src_path.unparse().c_str(), ch.opcode());
+//	click_chatter("dest %s, src_cid %s, dst_path: %s, src_path: %s\n", 
+//		destination_sid.unparse().c_str(), source_cid.unparse().c_str(), dst_path.unparse().c_str(), src_path.unparse().c_str());
+//	click_chatter("dst_path: %s, src_path: %s, OPCode: %d\n", dst_path.unparse().c_str(), src_path.unparse().c_str(), ch.opcode());
 	
 	
-        if(ch.opcode()==ContentHeader::OP_PUSH){
+	if (ch.opcode()==ContentHeader::OP_PUSH) {
 		// compute the hash and verify it matches the CID
 		String hash = "CID:";
 		char hexBuf[3];
@@ -1100,7 +1098,7 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 		}
 		
 		unsigned short _dport = XIDtoPushPort.get(destination_sid);
-		if(!_dport){
+		if (!_dport) {
 			click_chatter("Couldn't find SID to send to: %s\n", destination_sid.unparse().c_str());
 			return;
 		}
@@ -1116,17 +1114,18 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 		//Unparse dag info
 		String src_path = xiah.src_path().unparse();
 
+// FIXMEFIXMEFIXME
 		xia::XSocketMsg xia_socket_msg;
-		xia_socket_msg.set_type(xia::XPUSHCHUNKTO);
-		xia::X_Pushchunkto_Msg *x_pushchunkto_msg = xia_socket_msg.mutable_x_pushchunkto();
-		x_pushchunkto_msg->set_cid(source_cid.unparse().c_str());
-		x_pushchunkto_msg->set_payload((const char*)xiah.payload(), xiah.plen());
-		x_pushchunkto_msg->set_cachepolicy(ch.cachePolicy());
-		x_pushchunkto_msg->set_ttl(ch.ttl());
-		x_pushchunkto_msg->set_cachesize(ch.cacheSize());
-		x_pushchunkto_msg->set_contextid(ch.contextID());
-		x_pushchunkto_msg->set_length(ch.length());
- 		x_pushchunkto_msg->set_ddag(dst_path.unparse().c_str());
+		xia_socket_msg.set_type(xia::XRECVCHUNKFROM);
+		xia::X_Recvchunkfrom_Msg *x_recvchunkfrom_msg = xia_socket_msg.mutable_x_recvchunkfrom();
+		x_recvchunkfrom_msg->set_cid(source_cid.unparse().c_str());
+		x_recvchunkfrom_msg->set_payload((const char*)xiah.payload(), xiah.plen());
+		x_recvchunkfrom_msg->set_cachepolicy(ch.cachePolicy());
+		x_recvchunkfrom_msg->set_ttl(ch.ttl());
+		x_recvchunkfrom_msg->set_cachesize(ch.cacheSize());
+		x_recvchunkfrom_msg->set_contextid(ch.contextID());
+		x_recvchunkfrom_msg->set_length(ch.length());
+ 		x_recvchunkfrom_msg->set_ddag(dst_path.unparse().c_str());
 
 		std::string p_buf;
 		xia_socket_msg.SerializeToString(&p_buf);
@@ -1138,8 +1137,6 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 
 		output(API_PORT).push(UDPIPPrep(p2, _dport));
 		return;
-		
-		
 	}
 
 	XIDpair xid_pair;
@@ -1557,16 +1554,13 @@ void XTRANSPORT::XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	int rc = 0, ec = 0;
 
 	//Bind XID
-// 	click_chatter("\n\nOK: SOCKET BIND !!!\\n");
 	//get source DAG from protobuf message
 
 	xia::X_BindPush_Msg *x_bindpush_msg = xia_socket_msg->mutable_x_bindpush();
 
 	String sdag_string(x_bindpush_msg->sdag().c_str(), x_bindpush_msg->sdag().size());
 
-	//String sdag_string((const char*)p_in->data(),(const char*)p_in->end_data());
-
-//	_errh->debug("\nbind requested to %s, length=%d\n", sdag_string.c_str(), (int)p_in->length());
+	_errh->debug("\nbind requested to %s\n", sdag_string.c_str());
 
 	//String str_local_addr=_local_addr.unparse();
 	//str_local_addr=str_local_addr+" "+xid_string;//Make source DAG _local_addr:SID

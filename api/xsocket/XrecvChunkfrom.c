@@ -55,7 +55,7 @@
 int XrecvChunkfrom(int sockfd, void *rbuf, size_t len, int flags, ChunkInfo *ci)
 {
 	int rc;
-	char UDPbuf[MAXBUFLEN];
+	int numbytes;
 
 
 	if (flags != 0) {
@@ -85,21 +85,29 @@ int XrecvChunkfrom(int sockfd, void *rbuf, size_t len, int flags, ChunkInfo *ci)
 	}
 
 	xia::XSocketMsg xsm;
-	xsm.set_type(xia::XPUSHCHUNKTO);
+	xsm.set_type(xia::XRECVCHUNKFROM);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
 
+	xia::X_Recvchunkfrom_Msg *msg = xsm.mutable_x_recvchunkfrom();
 
-//	LOG("recvchunk API waiting for chunk ");
-//	if ((rc = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) < 0) {
-//		LOGF("Error retrieving status from Click: %s", strerror(errno));
-//		return -1;
-//	}
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
+		return -1;
+	}
 
-	std::string str(UDPbuf, rc);
-
+	LOG("recvchunk API waiting for chunk ");
 	xsm.Clear();
-	xsm.ParseFromString(str);
-	
-	xia::X_Pushchunkto_Msg *msg = xsm.mutable_x_pushchunkto();
+	if ((numbytes = click_reply(sockfd, seq, &xsm)) < 0) {
+		if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
+			LOGF("Error retrieving recv data from Click: %s", strerror(errno));
+		}
+		return -1;
+	}
+
+//	xia::X_Result_Msg *r = xsm.mutable_x_result();
+	msg = xsm.mutable_x_recvchunkfrom();
+
 	unsigned paylen = msg->payload().size();
 	const char *payload = msg->payload().c_str();
 	//FIXME: This fixes CID:cid to cid. The API should change to return the SDAG instead
@@ -109,7 +117,6 @@ int XrecvChunkfrom(int sockfd, void *rbuf, size_t len, int flags, ChunkInfo *ci)
 	ci->timestamp.tv_sec=msg->timestamp();
 	ci->timestamp.tv_usec = 0;
 	ci->ttl = msg->ttl();
-	
 
 	if (paylen > len) {
 		LOGF("CID is %u bytes, but rbuf is only %lu bytes", paylen, len);

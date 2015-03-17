@@ -37,6 +37,8 @@ enum XSocketCallType {
   XBINDPUSH = 29;
 
   XPOLL = 30;
+
+  XRECVCHUNKFROM = 31;
 }
 
 message XSocketMsg {
@@ -77,6 +79,7 @@ message XSocketMsg {
   optional X_Poll_Msg x_poll = 29;
   optional X_Pushchunkto_Msg x_pushchunkto= 30;
   optional X_BindPush_Msg x_bindpush= 31;
+  optional X_Recvchunkfrom_Msg x_recvchunkfrom = 32;
 }
 
 message X_Socket_Msg {
@@ -272,6 +275,18 @@ message X_Pushchunkto_Msg {
   required bytes payload = 6; // data
   required string cid = 7;
   required int32 length = 8;
+  optional int64 timestamp = 9; 
+}
+
+message X_Recvchunkfrom_Msg {
+  optional string ddag = 1;
+  optional int32 cachepolicy = 2;
+  optional int32 cachesize = 3;
+  optional int32 contextid = 4;
+  optional int32 TTL = 5;
+  optional bytes payload = 6; // data
+  optional string cid = 7;
+  optional int32 length = 8;
   optional int64 timestamp = 9; 
 }
 
