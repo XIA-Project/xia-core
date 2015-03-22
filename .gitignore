@@ -13,7 +13,7 @@ core
 !/tools/visualizations/distributed_click/Visualizer.swf
 tags
 .tags*
-*.sublime*
+*.sublime-workspace
 cscope.out
 *.o.cmd
 *.ko.cmd
