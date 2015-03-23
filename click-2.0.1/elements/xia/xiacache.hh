@@ -31,28 +31,27 @@ output port[1]: connect with RPC, in client, when a chunk is complete, cache wil
 class XIAContentModule;    
 
 class XIACache : public Element { 
-  public:
-    XIACache();
-    ~XIACache();
-    const char *class_name() const		{ return "XIACache"; }
-    const char *port_count() const		{ return "2/2"; }
-    const char *processing() const		{ return PUSH; }
-    int configure(Vector<String> &, ErrorHandler *);         
-    void push(int port, Packet *);            
-    XID local_hid() { return _local_hid; };
-    XIAPath local_addr() { return _local_addr; };
-    void add_handlers();
-    static int write_param(const String &, Element *, void *vparam, ErrorHandler *);
-	static String read_handler(Element *e, void *thunk);
-	int set_malicious(int m);
-	int get_malicious();
+	public:
+		XIACache();
+		~XIACache();
+		const char *class_name() const		{ return "XIACache"; }
+		const char *port_count() const		{ return "2/2"; }
+		const char *processing() const		{ return PUSH; }
+		int configure(Vector<String> &, ErrorHandler *);         
+		void push(int port, Packet *);            
+		XID local_hid() { return _local_hid; };
+		XIAPath local_addr() { return _local_addr; };
+		void add_handlers();
+		static int write_param(const String &, Element *, void *vparam, ErrorHandler *);
+		static String read_handler(Element *e, void *thunk);
+		int set_malicious(int m);
+		int get_malicious();
 
   private:
-    uint32_t _cid_type;
-    XID _local_hid;
-    XIAPath _local_addr;
-    XIAContentModule* _content_module;
-
+		uint32_t _cid_type;
+		XID _local_hid;
+		XIAPath _local_addr;
+		XIAContentModule* _content_module;
 };
 
 CLICK_ENDDECLS

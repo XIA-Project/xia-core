@@ -40,7 +40,6 @@
 #define NUM_CHUNKS	10
 #define NUM_PROMPTS	2
 
-
 int verbose = 1;
 
 char my_ad[MAX_XID_SIZE];
@@ -586,7 +585,6 @@ int getSubFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *f
 	return status;
 }
 
-
 int main() {
 
 	sockfd_ftp = initializeClient(ftp_name); 
@@ -594,5 +592,4 @@ int main() {
 	BlockingListener((void *)&sockfd_prefetch);
 
 	//getSubFile(sockfd_ftp, s_ad, s_hid, "4.png", "my4.png", 0, 1);
-
 }

@@ -75,10 +75,10 @@ extern "C" {
 
 /* CID cache context */
 typedef struct {
-    int sockfd;
-    int contextID;
+	int sockfd;
+	int contextID;
 	unsigned cachePolicy;
-    unsigned cacheSize;
+	unsigned cacheSize;
 	unsigned ttl;
 } ChunkContext;
 
@@ -198,4 +198,3 @@ extern char *XrootDir(char *buf, unsigned len);
 #endif
 
 #endif
-

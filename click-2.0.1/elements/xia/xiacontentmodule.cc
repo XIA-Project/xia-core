@@ -7,97 +7,91 @@ CLICK_DECLS
 #define CACHE_DEBUG 1
 
 unsigned int XIAContentModule::PKTSIZE = PACKETSIZE;
-XIAContentModule::XIAContentModule(XIATransport *transport)
-{
-    _transport = transport;
-    _timer=0;
+XIAContentModule::XIAContentModule(XIATransport *transport) {
+	_transport = transport;
+	_timer = 0;
 }
 
-XIAContentModule::~XIAContentModule()
-{
-    HashTable<XID,CChunk*>::iterator it;
-    CChunk * chunk = NULL;
-    for(it=_partialTable.begin(); it!=_partialTable.end(); it++) {
-        chunk=it->second;
-        delete chunk;
-    }
-    for(it=_oldPartial.begin(); it!=_oldPartial.end(); it++) {
-        chunk=it->second;
-        delete chunk;
-    }
-    for(it=_contentTable.begin(); it!=_contentTable.end(); it++) {
-        chunk=it->second;
-        delete chunk;
-    }
+XIAContentModule::~XIAContentModule() {
+	HashTable<XID,CChunk*>::iterator it;
+	CChunk * chunk = NULL;
+	for (it = _partialTable.begin(); it! = _partialTable.end(); it++) {
+		chunk = it->second;
+		delete chunk;
+	}
+	for (it = _oldPartial.begin(); it != _oldPartial.end(); it++) {
+		chunk = it->second;
+		delete chunk;
+	}
+	for (it = _contentTable.begin(); it != _contentTable.end(); it++) {
+		chunk = it->second;
+		delete chunk;
+	}
 }
 
-Packet * XIAContentModule::makeChunkResponse(CChunk * chunk, Packet *p_in)
-{
-    XIAHeaderEncap encap;
-    XIAHeader hdr(p_in);
+Packet * XIAContentModule::makeChunkResponse(CChunk * chunk, Packet *p_in) {
+	XIAHeaderEncap encap;
+	XIAHeader hdr(p_in);
 
-    encap.set_dst_path(hdr.dst_path());
-    encap.set_src_path(hdr.src_path());
-    encap.set_nxt(CLICK_XIA_NXT_CID);
-    encap.set_plen(chunk->GetSize());
+	encap.set_dst_path(hdr.dst_path());
+	encap.set_src_path(hdr.src_path());
+	encap.set_nxt(CLICK_XIA_NXT_CID);
+	encap.set_plen(chunk->GetSize());
 
-    ContentHeaderEncap  contenth(0, 0, 0, chunk->GetSize());
+	ContentHeaderEncap  contenth(0, 0, 0, chunk->GetSize());
 
-    uint16_t hdrsize = encap.hdr_size()+ contenth.hlen();
-    //build packet
-    WritablePacket *p = Packet::make(hdrsize, chunk->GetPayload() , chunk->GetSize(), 20 );
+	uint16_t hdrsize = encap.hdr_size()+ contenth.hlen();
+	//build packet
+	WritablePacket *p = Packet::make(hdrsize, chunk->GetPayload() , chunk->GetSize(), 20 );
 
-    p=contenth.encap(p);		// add XIA header
-    p=encap.encap( p, false );
+	p = contenth.encap(p);		// add XIA header
+	p = encap.encap(p, false );
 
-    return p;
+	return p;
 }
 
 
-Packet * XIAContentModule::makeChunkPush(CChunk * chunk, Packet *p_in)
-{
-    XIAHeader xhdr(p_in);  // parse xia header and locate nodes and payload
-    ContentHeader ch(p_in);
+Packet * XIAContentModule::makeChunkPush(CChunk * chunk, Packet *p_in) {
+	XIAHeader xhdr(p_in);  // parse xia header and locate nodes and payload
+	ContentHeader ch(p_in);
 
-    const unsigned char *payload=xhdr.payload();
-    int offset=ch.chunk_offset();
-    int length=ch.length();
-    int chunkSize=ch.chunk_length();
+	const unsigned char *payload=xhdr.payload();
+	int offset=ch.chunk_offset();
+	int length=ch.length();
+	int chunkSize=ch.chunk_length();
 	
-    uint32_t contextID=ch.contextID();
-    uint32_t cacheSize=ch.cacheSize();
-    uint32_t cachePolicy=ch.cachePolicy();
-    uint32_t ttl=ch.ttl();	
+	uint32_t contextID=ch.contextID();
+	uint32_t cacheSize=ch.cacheSize();
+	uint32_t cachePolicy=ch.cachePolicy();
+	uint32_t ttl=ch.ttl();	
 		
 	
-    XIAHeaderEncap encap;
-    XIAHeader hdr(p_in);
+	XIAHeaderEncap encap;
+	XIAHeader hdr(p_in);
   
-    encap.set_dst_path(hdr.dst_path());
-    encap.set_src_path(hdr.src_path());
-    encap.set_nxt(CLICK_XIA_NXT_CID);
-    encap.set_plen(chunk->GetSize());
+	encap.set_dst_path(hdr.dst_path());
+	encap.set_src_path(hdr.src_path());
+	encap.set_nxt(CLICK_XIA_NXT_CID);
+	encap.set_plen(chunk->GetSize());
 
-//     ContentHeaderEncap  *contenth = ContentHeaderEncap::MakePushHeader(0,  chunk->GetSize() ); //contenth(0, 0, 0, chunk->GetSize());
-    ContentHeaderEncap  contenth( offset, offset, length, chunkSize, ContentHeader::OP_PUSH, contextID, ttl, cacheSize, cachePolicy);
+	// ContentHeaderEncap  *contenth = ContentHeaderEncap::MakePushHeader(0,  chunk->GetSize() ); //contenth(0, 0, 0, chunk->GetSize());
+	ContentHeaderEncap  contenth( offset, offset, length, chunkSize, ContentHeader::OP_PUSH, contextID, ttl, cacheSize, cachePolicy);
     
     
-    uint16_t hdrsize = encap.hdr_size()+ contenth.hlen();
-    //build packet
-    WritablePacket *p = Packet::make(hdrsize, chunk->GetPayload() , chunk->GetSize(), 20 );
+	uint16_t hdrsize = encap.hdr_size()+ contenth.hlen();
+	//build packet
+	WritablePacket *p = Packet::make(hdrsize, chunk->GetPayload() , chunk->GetSize(), 20 );
 
-    p=contenth.encap(p);		// add XIA header
-    p=encap.encap( p, false );
+	p = contenth.encap(p);		// add XIA header
+	p = encap.encap( p, false );
 	
-    if(CACHE_DEBUG)
-      click_chatter("Push message built in contentmodule \n");
-    
-    return p;
+	if (CACHE_DEBUG)
+		click_chatter("Push message built in contentmodule \n");
+	return p;
 }
 
 
-void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID & dstCID)
-{
+void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID & dstCID) {
 	
     printf("process_request - local HID: %s, src HID: %s,  Dest CID: %s\n", _transport->local_hid().unparse().c_str(), srcHID.unparse().c_str(), dstCID.unparse().c_str());
     HashTable<XID,CChunk*>::iterator it;
@@ -233,8 +227,7 @@ void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID 
     }
 }
 
-void XIAContentModule::cache_incoming_forward(Packet *p, const XID& srcCID)
-{
+void XIAContentModule::cache_incoming_forward(Packet *p, const XID& srcCID) {
     XIAHeader xhdr(p);  // parse xia header and locate nodes and payload
     ContentHeader ch(p);
 
@@ -297,8 +290,7 @@ void XIAContentModule::cache_incoming_forward(Packet *p, const XID& srcCID)
 
 }
 
-void XIAContentModule::cache_incoming_local(Packet* p, const XID& srcCID, bool local_putcid, bool pushcid)
-{
+void XIAContentModule::cache_incoming_local(Packet* p, const XID& srcCID, bool local_putcid, bool pushcid) {
     XIAHeader xhdr(p);  // parse xia header and locate nodes and payload
     ContentHeader ch(p);
 
@@ -449,7 +441,7 @@ void XIAContentModule::cache_incoming_local(Packet* p, const XID& srcCID, bool l
  *
  * @returns Void
  */ 
-void XIAContentModule::applyLocalCachePolicy(int contextID){
+void XIAContentModule::applyLocalCachePolicy(int contextID) {
 #ifdef CLIENTCACHE
     struct cacheMeta *cm=_cacheMetaTable[contextID];
     switch(cm->policy){
@@ -521,7 +513,7 @@ void XIAContentModule::applyLocalCachePolicy(int contextID){
  * 
  * @returns True if it is expired
  */
-bool XIAContentModule::isExpiredContent(struct contentMeta* cm){
+bool XIAContentModule::isExpiredContent(struct contentMeta* cm) {
     int ttl=cm->ttl;
     struct timeval *thisTime=&(cm->timestamp);    
     struct timeval curTime;
@@ -533,7 +525,7 @@ bool XIAContentModule::isExpiredContent(struct contentMeta* cm){
     }
 }
 
-const XID* XIAContentModule::findOldestContent(int contextID){
+const XID* XIAContentModule::findOldestContent(int contextID) {
     struct cacheMeta *cm=_cacheMetaTable[contextID];
     HashTable<XID,CChunk*>::iterator cit;
     cit=_contentTable.begin();
@@ -556,7 +548,7 @@ const XID* XIAContentModule::findOldestContent(int contextID){
     return minID;
 }
 
-void XIAContentModule::cache_incoming_remove(Packet *p, const XID& srcCID){
+void XIAContentModule::cache_incoming_remove(Packet *p, const XID& srcCID) {
     XIAHeader xhdr(p); 
     ContentHeader ch(p);
 
@@ -585,8 +577,7 @@ void XIAContentModule::cache_incoming_remove(Packet *p, const XID& srcCID){
     
 }
 
-void XIAContentModule::cache_management()
-{
+void XIAContentModule::cache_management() {
     HashTable<XID,CChunk*>::iterator cit;
     HashTable<XID,CChunk*>::iterator it;
     CChunk *chunk = NULL;
@@ -622,8 +613,7 @@ void XIAContentModule::cache_management()
 }
 
 /* source ID is the content */
-void XIAContentModule::cache_incoming(Packet *p, const XID& srcCID, const XID& dstHID, int /*port*/)
-{
+void XIAContentModule::cache_incoming(Packet *p, const XID& srcCID, const XID& dstHID, int /*port*/) {
     XIAHeader xhdr(p);  // parse xia header and locate nodes and payload
     ContentHeader ch(p);
     bool local_putcid = (ch.opcode() == ContentHeader::OP_LOCAL_PUTCID);
@@ -650,9 +640,7 @@ void XIAContentModule::cache_incoming(Packet *p, const XID& srcCID, const XID& d
 	}
 }
 
-int
-XIAContentModule::MakeSpace(int chunkSize)
-{
+int XIAContentModule::MakeSpace(int chunkSize) {
     while( usedSize + chunkSize > MAXSIZE) {
         HashTable<XID,int>::iterator i;
         for(i=partial.begin(); i!=partial.end(); i++)
@@ -713,31 +701,27 @@ XIAContentModule::MakeSpace(int chunkSize)
     return 0;
 }
 
-CPart::CPart(unsigned int off, unsigned int len)
-{
-    offset=off;
-    length=len;
+CPart::CPart(unsigned int off, unsigned int len) {
+    offset = off;
+    length = len;
 }
 
-CChunk::CChunk(XID _xid, int chunkSize): deleted(false)
-{
-    size=chunkSize;
-    complete=false;
-    payload=new char[size];
-    xid=_xid;
+CChunk::CChunk(XID _xid, int chunkSize): deleted(false) {
+    size = chunkSize;
+    complete = false;
+    payload = new char[size];
+    xid = _xid;
 }
 
-CChunk::~CChunk()
-{
+CChunk::~CChunk() {
     /* TODO: Memory leak prevention -- CPartList has to be deallocated */
     delete payload;
 }
 
-void CChunk::Merge(CPartList::iterator it)
-{
+void CChunk::Merge(CPartList::iterator it) {
     //std::cout<<"enter Merge: offset is "<< it->offset <<std::endl;
     CPartList::iterator post_it;
-    post_it=it;
+    post_it = it;
     post_it++;
 
     while(1) {
@@ -763,9 +747,7 @@ void CChunk::Merge(CPartList::iterator it)
     }
 }
 
-int
-CChunk::fill(const unsigned char *_payload, unsigned int offset, unsigned int length)
-{
+int CChunk::fill(const unsigned char *_payload, unsigned int offset, unsigned int length) {
     //  std::cout<<"enter fill, payload is "<<_payload<<std::endl;
 
     CPartList::iterator it, post_it;
@@ -791,7 +773,7 @@ CChunk::fill(const unsigned char *_payload, unsigned int offset, unsigned int le
             }
         }
     } else { //not end
-        if(it==parts.begin()) { //begin
+        if (it == parts.begin()) { //begin
             memcpy(off, _payload, length);
             //std::cout<<"push front"<<std::endl;
             parts.push_front(new CPartListNode(p));
@@ -821,19 +803,18 @@ CChunk::fill(const unsigned char *_payload, unsigned int offset, unsigned int le
 }
 
 
-bool
-CChunk::full()
-{
-    if(complete==true) return true;
+bool CChunk::full() {
+	if (complete == true) 
+		return true;
 
-    CPartList::iterator it;
-    it= parts.begin();
+	CPartList::iterator it;
+	it = parts.begin();
 
-    if( it->v.offset==0 && it->v.length==size) {
-        complete=true;
-        return true;
-    }
-    return false;
+	if (it->v.offset == 0 && it->v.length == size) {
+		complete=true;
+		return true;
+	}
+	return false;
 }
 
 CLICK_ENDDECLS
