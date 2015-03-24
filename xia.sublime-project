@@ -83,7 +83,7 @@
 				"click-2.0.1/conf/udpcount.click",
 				"click-2.0.1/conf/udpgen.click",
 				"click-2.0.1/conf/unarp.clickpat",
-				"click-2.0.1/conf/urewrite.click",
+				"click-2.0.1/conf/urewrite.click"
 			],
 			"folder_exclude_patterns":
 			[
@@ -122,16 +122,10 @@
 				"click-2.0.1/elements/wifi",
 				"experiments",
 				"log",
-
+				"click-2.0.1/etc"
 			],
 			"follow_symlinks": true,
 			"path": "."
 		}
 	]
 }
-
-
-
-
-
-
