@@ -321,6 +321,8 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 	}
 	allocSocketState(sock, SOCK_DGRAM);
 
+	pollMsg->set_nfds(nx);
+
 	click_send(sock, &xsm);
 
 	// add the control socket to the select read fdset
@@ -408,6 +410,7 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 			xsm.set_type(xia::XPOLL);
 			pollMsg = xsm.mutable_x_poll();
 			pollMsg->set_type(xia::X_Poll_Msg::CANCEL);
+			pollMsg->set_nfds(0);
 
 			click_send(sock, &xsm);
 		}
