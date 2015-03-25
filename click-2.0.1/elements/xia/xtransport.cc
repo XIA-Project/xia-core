@@ -963,6 +963,11 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 				sk->pending_connection_buf.push(new_sk);
 
+				if (sk->polling) {
+					// tell API we are writeable
+					ProcessPollEvent(_dport, POLLOUT);
+				}
+
 				// Mark these src & dst XID pair
 				XIDpairToConnectPending.set(xid_pair, true);
 
@@ -1454,6 +1459,10 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 		} else if (thdr.pkt_info() == TransportHeader::FIN) {
 			//click_chatter("FIN received, doing nothing\n");
+			if (sk->polling) {
+				// tell API we had an error
+				ProcessPollEvent(_dport, POLLHUP);
+			}
 		}
 		else {
 			click_chatter("UNKNOWN dport = %d hdr=%d\n", _dport, thdr.pkt_info());
@@ -2481,12 +2490,15 @@ void XTRANSPORT::ProcessPollEvent(unsigned short _sport, unsigned int flags_out)
 		xia::XSocketMsg xsm;
 		xsm.set_type(xia::XPOLL);
 		xia::X_Poll_Msg *msg = xsm.mutable_x_poll();
-		
+
+		msg->set_nfds(1);
+		msg->set_type(xia::X_Poll_Msg::RESULT);
+
 		xia::X_Poll_Msg::PollFD *pfd = msg->add_pfds();
 		pfd->set_flags(flags_out);
 		pfd->set_port(port);
 
-		msg->set_nfds(1);
+
 
 		// do I need to set other flags in the return struct?
 		ReturnResult(pollport, &xsm, 1, 0);
@@ -2645,6 +2657,8 @@ void XTRANSPORT::Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		if (actionable) {
 			// printf("returning immediately number of actionable sockets is %d\n", actionable);
 			poll_out->set_nfds(actionable);
+			poll_out->set_type(xia::X_Poll_Msg::RESULT);
+
 			ReturnResult(_sport, &msg_out, actionable, 0);
 		
 		} else {
@@ -3759,6 +3773,6 @@ CLICK_ENDDECLS
 
 EXPORT_ELEMENT(XTRANSPORT)
 ELEMENT_REQUIRES(userlevel)
-ELEMENT_REQUIRES(XIAContentModule)
+ELEMENT_LIBS(-lprotobuf)
 ELEMENT_MT_SAFE(XTRANSPORT)
 ELEMENT_LIBS(-lcrypto -lssl)

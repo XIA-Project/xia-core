@@ -11,7 +11,6 @@
 #include <click/xiapath.hh>
 #include <click/xiasecurity.hh>
 #include <clicknet/xia.h>
-#include "xiacontentmodule.hh"
 #include "xiaxidroutetable.hh"
 #include <clicknet/udp.h>
 #include <click/string.hh>
@@ -269,9 +268,7 @@ output[2]: Network Tx data port
 output[0]: Socket (API) Tx data port
 
 Might need other things to handle chunking
-*/
-
-class XIAContentModule;   
+*/  
 
 
 typedef struct {

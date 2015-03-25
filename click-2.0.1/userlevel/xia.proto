@@ -236,6 +236,7 @@ message X_Poll_Msg {
   enum MsgType {
     DOPOLL = 1;
     CANCEL = 2;
+    RESULT = 3;
   };
   required MsgType type = 1;
   required int32 nfds = 2;

@@ -56,7 +56,11 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 	int nxfds = 0;
 	int rc, xrc;
 
-	if (ufds == NULL && nfds > 0) {
+	if (nfds == 0) {
+		// it's just a timer
+		return 	(_f_poll)(ufds, nfds, timeout);
+
+	} else if (ufds == NULL) {
 		errno = EFAULT;
 		return -1;
 	}
@@ -68,8 +72,6 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 
 	xia::XSocketMsg xsm;
 	xia::X_Poll_Msg *pollMsg = xsm.mutable_x_poll();
-
-	pollMsg->set_type(xia::X_Poll_Msg::DOPOLL);
 
 	for (unsigned i = 0; i < nfds; i++) {
 
@@ -113,7 +115,7 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 	xsm.set_type(xia::XPOLL);
 	xsm.set_sequence(0);
 	pollMsg->set_nfds(nxfds);
-
+	pollMsg->set_type(xia::X_Poll_Msg::DOPOLL);
 
 	// Real sockets in the Poll message are set to 0. They are left in the list to make processing easier
 
@@ -126,7 +128,6 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 		goto done;
 	}
 	allocSocketState(sock, SOCK_DGRAM);
-
 	click_send(sock, &xsm);
 
 	// now we need to do a real poll
@@ -142,7 +143,6 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 	if (rc > 0 && rfds[nfds].revents != 0) {
 		
 		// there's data from click!
-
 		if (click_reply(sock, 0, &xsm) < 0) {
 			LOG("Error getting data from Click\n");
 			rc = -1;
@@ -188,6 +188,7 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 		xsm.set_type(xia::XPOLL);
 		pollMsg = xsm.mutable_x_poll();
 		pollMsg->set_type(xia::X_Poll_Msg::CANCEL);
+		pollMsg->set_nfds(0);
 
 		click_send(sock, &xsm);
 	}
@@ -232,7 +233,7 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 	fd_set efds;
 	unsigned nx = 0;
 	int xrc = 0;
-	int sock;
+	int sock = 0;
 	int largest = 0;
 	int count = 0;
 	int rc = 0;
