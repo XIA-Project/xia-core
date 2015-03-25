@@ -186,6 +186,7 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 		// we need to tell click to cancel the Xpoll event
 		xsm.Clear();
 		xsm.set_type(xia::XPOLL);
+		xsm.set_sequence(0);
 		pollMsg = xsm.mutable_x_poll();
 		pollMsg->set_type(xia::X_Poll_Msg::CANCEL);
 		pollMsg->set_nfds(0);
@@ -247,6 +248,8 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 
 	// create protobuf message
 	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XPOLL);
+	xsm.set_sequence(0);
 	xia::X_Poll_Msg *pollMsg = xsm.mutable_x_poll();
 	pollMsg->set_type(xia::X_Poll_Msg::DOPOLL);
 
@@ -321,6 +324,7 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 	}
 	allocSocketState(sock, SOCK_DGRAM);
 
+	pollMsg->set_type(xia::X_Poll_Msg::DOPOLL);
 	pollMsg->set_nfds(nx);
 
 	click_send(sock, &xsm);
@@ -408,6 +412,7 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 			// we need to tell click to cancel the Xpoll event
 			xsm.Clear();
 			xsm.set_type(xia::XPOLL);
+			xsm.set_sequence(0);
 			pollMsg = xsm.mutable_x_poll();
 			pollMsg->set_type(xia::X_Poll_Msg::CANCEL);
 			pollMsg->set_nfds(0);
