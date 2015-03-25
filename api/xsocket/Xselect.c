@@ -233,7 +233,7 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 	fd_set efds;
 	unsigned nx = 0;
 	int xrc = 0;
-	int sock;
+	int sock = 0;
 	int largest = 0;
 	int count = 0;
 	int rc = 0;
