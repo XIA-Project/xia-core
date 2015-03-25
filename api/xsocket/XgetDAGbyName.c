@@ -327,7 +327,7 @@ int _xregister(const char *name, sockaddr_x *DAG, short flags) {
 	struct timeval timeout;
 	timeout.tv_sec = 5;
 	timeout.tv_usec = 0;
-	if(select(sock+1, &read_fds, NULL, NULL, &timeout) == 0) {
+	if(Xselect(sock+1, &read_fds, NULL, NULL, &timeout) == 0) {
 		LOGF("ERROR: Application should try again. No registration response in %d seconds", (int)timeout.tv_sec);
 		return -1;
 	}
