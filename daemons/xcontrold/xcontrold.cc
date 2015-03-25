@@ -461,6 +461,7 @@ int processSidDiscovery(ControlMessage msg)
         service_state.capacity_factor = capacity_factor;
         service_state.link_factor = link_factor;
         service_state.priority = priority;
+        //syslog(LOG_INFO, "Get broadcast SID %s@%s, p= %d,s=%d",SID.c_str(), AD.c_str(), priority, seq);
         service_state.controllerAddr = controllerAddr;
         service_state.archType = archType;
         service_state.seq = seq;
@@ -492,6 +493,7 @@ int processSidDiscovery(ControlMessage msg)
             service_state.controllerAddr = controllerAddr;
             service_state.link_factor = link_factor;
             service_state.priority = priority;
+            //syslog(LOG_INFO, "Get re-broadcast SID %s@%s, p= %d,s=%d",SID.c_str(), AD.c_str(), priority, seq);
             service_state.archType = archType;
             service_state.seq = seq;
             updateSidAdsTable(AD, SID, service_state);
@@ -718,6 +720,10 @@ int updateSidAdsTable(std::string AD, std::string SID, ServiceState service_stat
     //TODO: an entry is not there maybe because it is deleted,we should avoid that an older discovery message adds it back again
     if ( route_state.SIDADsTable.count(SID) > 0 )
     {
+        if (service_state.seq == 0){
+            syslog(LOG_DEBUG, "recording bad SID seq, abort"); 
+            return -1;
+        }
         if (route_state.SIDADsTable[SID].count(AD) > 0 )
         {
             //update if version is newer
@@ -1358,6 +1364,8 @@ void initRouteState()
 	}
 	memcpy(&route_state.sdag, ai->ai_addr, sizeof(sockaddr_x));
 
+    srand (time(NULL));
+
 	route_state.num_neighbors = 0; // number of neighbor routers
 	route_state.lsa_seq = rand()%MAX_SEQNUM;	// LSA sequence number of this router
 	route_state.hello_timer = 0;  // hello timer number of this router
@@ -1647,7 +1655,6 @@ int main(int argc, char *argv[])
 		}
 		if (route_state.send_sid_discovery == true) {
             route_state.send_sid_discovery = false;
-            set_sid_conf(hostname); // reload the config file
             sendSidDiscovery();
         }
         if (route_state.send_sid_decision == true) {
