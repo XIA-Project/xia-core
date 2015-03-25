@@ -42,14 +42,22 @@ int XupdateAD(int sockfd, char *newad, char *new4id) {
 
   xia::XSocketMsg xsm;
   xsm.set_type(xia::XCHANGEAD);
+  unsigned seq = seqNo(sockfd);
+  xsm.set_sequence(seq);
 
   xia::X_Changead_Msg *x_changead_msg = xsm.mutable_x_changead();
   x_changead_msg->set_ad(newad);
   x_changead_msg->set_ip4id(new4id);
-  
+
   if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
+  }
+
+  // process the reply from click
+  if ((rc = click_status(sockfd, seq)) < 0) {
+    LOGF("Error getting status from Click: %s", strerror(errno));
+    return -1;
   }
 
   return 0;
@@ -98,8 +106,7 @@ int XupdateRV(int sockfd)
 */
 int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *localhostHID, unsigned lenHID, char *local4ID, unsigned len4ID) {
   	int rc;
-  	char UDPbuf[MAXBUFLEN];
-  	
+
  	if (getSocketType(sockfd) == XSOCK_INVALID) {
    	 	LOG("The socket is not a valid Xsocket");
    	 	errno = EBADF;
@@ -114,24 +121,20 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *loca
 
  	xia::XSocketMsg xsm;
   	xsm.set_type(xia::XREADLOCALHOSTADDR);
-  
+  	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
+
   	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
   	}
 
-	if ((rc = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) <= 0) {
+	xia::XSocketMsg xsm1;
+	if ((rc = click_reply(sockfd, seq, &xsm1)) < 0) {
 		LOGF("Error retrieving status from Click: %s", strerror(errno));
 		return -1;
 	}
 
-	xia::XSocketMsg xsm1;
-	std::string click_response_string;
-	click_response_string.assign(UDPbuf, rc);
-	if(xsm1.ParseFromString(click_response_string) == false) {
-		LOGF("XreadLocalHostAddr: FAILED parsing click response:%s:", xsm1.DebugString().c_str());
-		return -1;
-	}
 	if (xsm1.type() == xia::XREADLOCALHOSTADDR) {
 		xia::X_ReadLocalHostAddr_Msg *_msg = xsm1.mutable_x_readlocalhostaddr();
 		strncpy(localhostAD, (_msg->ad()).c_str(), lenAD);
@@ -145,9 +148,9 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *loca
 	} else {
 		LOG("XreadlocalHostAddr: ERROR: Invalid response for XREADLOCALHOSTADDR request");
 		rc = -1;
-	}	
+	}
 	return rc;
-	 
+
 }
 
 
@@ -157,15 +160,14 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *loca
 **
 ** @param sockfd an Xsocket (may be of any type XSOCK_STREAM, etc...)
 **
-** @returns 1 if this is an XIA-IPv4 dual-stack router 
+** @returns 1 if this is an XIA-IPv4 dual-stack router
 ** @returns 0 if this is an XIA router
 ** @returns -1 on failure with errno set
 **
 */
 int XisDualStackRouter(int sockfd) {
   	int rc;
-  	char UDPbuf[MAXBUFLEN];
-  	
+
  	if (getSocketType(sockfd) == XSOCK_INVALID) {
    	 	LOG("The socket is not a valid Xsocket");
    	 	errno = EBADF;
@@ -174,25 +176,26 @@ int XisDualStackRouter(int sockfd) {
 
  	xia::XSocketMsg xsm;
   	xsm.set_type(xia::XISDUALSTACKROUTER);
-  
+  	unsigned seq = seqNo(sockfd);
+  	xsm.set_sequence(seq);
+
   	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
   	}
 
-	if ((rc = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) < 0) {
+	xia::XSocketMsg xsm1;
+	if ((rc = click_reply(sockfd, seq, &xsm1)) < 0) {
 		LOGF("Error retrieving status from Click: %s", strerror(errno));
 		return -1;
 	}
 
-	xia::XSocketMsg xsm1;
-	xsm1.ParseFromString(UDPbuf);
 	if (xsm1.type() == xia::XISDUALSTACKROUTER) {
 		xia::X_IsDualStackRouter_Msg *_msg = xsm1.mutable_x_isdualstackrouter();
 		rc = _msg->flag();
 	} else {
 		rc = -1;
-	}	
+	}
 	return rc;
-	 
+
 }

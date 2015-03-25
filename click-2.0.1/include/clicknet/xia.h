@@ -61,7 +61,7 @@ struct click_xia {
     //uint8_t dints;
     //uint8_t sints;
     int8_t last;			/* index of last visited node (note: integral) */
-    click_xia_xid_node node[0];         /* XID node list */
+    click_xia_xid_node *node;         /* XID node list */
 };
 
 #define CLICK_XIA_NXT_CID       12  /* CID-source specific key-value list */

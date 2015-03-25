@@ -91,7 +91,7 @@ void process(int peer)
 	tv.tv_sec = 5;
 	tv.tv_usec = 0;
 
-	n = select(peer + 1, &fds, NULL, NULL, &tv);
+	n = Xselect(peer + 1, &fds, NULL, NULL, &tv);
 	if (n < 0) {
 		printf("select failed\n");
 		goto done;
@@ -185,8 +185,9 @@ int main(int argc, char **argv)
 	int peer = -1;
 	struct addrinfo hints, *ai;
 
-	signal(SIGINT, handler);
-	signal(SIGTERM, handler);
+// FIXME: put signal handlers back into code once Xselect is working
+//	signal(SIGINT, handler);
+//	signal(SIGTERM, handler);
 
 	configure(argc, argv);
 	say("XIA firehose listening on %s\n", name);
@@ -218,7 +219,7 @@ int main(int argc, char **argv)
 		struct timeval tv;
 		tv.tv_sec = 2;
 		tv.tv_usec = 0;
-		if ((rc = select(sock + 1, &fds, NULL, NULL, &tv)) < 0) {
+		if ((rc = Xselect(sock + 1, &fds, NULL, NULL, &tv)) < 0) {
 			printf("select failed\n");
 			break;
 	
@@ -231,6 +232,7 @@ int main(int argc, char **argv)
 			printf("something is really wrong, exiting\n");
 			break;
 		}
+
 		peer = Xaccept(sock, NULL, NULL);
 		if (peer < 0) {
 			printf("Xaccept failed\n");

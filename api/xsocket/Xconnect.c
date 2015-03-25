@@ -26,58 +26,70 @@
 #include "Xkeys.h"
 #include "dagaddr.hpp"
 
-/*!
-** @brief Initiate a connection on an Xsocket of type XSOCK_STREAM
-**
-** The Xconnect() call connects the socket referred to by sockfd to the
-** SID specified by dDAG. It is only valid for use with sockets created
-** with the XSOCK_STREAM Xsocket type.
-**
-** @note Xconnect() differs from the standard connect API in that it does
-** not currently support use with Xsockets created with the XSOCK_DGRAM
-** socket type.
-**
-** @param sockfd	The control socket
-** @param addr	The address (SID) of the remote service to connect to.
-** @param addrlen The length of addr
-**
-** @returns 0 on success
-** @returns -1 on error with errno set to an error compatible with those
-** returned by the standard connect call.
-*/
-int Xconnect(int sockfd, const sockaddr *addr, socklen_t addrlen)
+int _connDgram(int sockfd, const sockaddr *addr, socklen_t addrlen)
 {
+	UNUSED(addrlen);
+	int rc = 0;
+
+	if (addr->sa_family == AF_UNSPEC) {
+
+		// go back to allowing connections to/from any peer
+		connectDgram(sockfd, NULL);
+
+	} else if (addr->sa_family == AF_XIA) {
+		// validate addr
+		Graph g((sockaddr_x *)addr);
+
+		if (g.num_nodes() == 0) {
+			rc = -1;
+			errno = EHOSTUNREACH;
+
+		// FIXME: can we verify addrlen here?
+
+		} else {
+			connectDgram(sockfd, (sockaddr_x *)addr);
+		}
+	} else {
+		rc = -1;
+		errno = EAFNOSUPPORT;
+	}
+
+	return rc;
+}
+
+int _connStream(int sockfd, const sockaddr *addr, socklen_t addrlen)
+{
+	UNUSED(addrlen);
 	int rc;
-
-	int numbytes;
 	char src_SID[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
-	char buf[MAXBUFLEN];
-	struct sockaddr_in their_addr;
 	struct addrinfo *ai;
-	socklen_t addr_len;
 
-	printf("Xconnect: called\n");
-	// we can't count on addrlen being set correctly if we are being called via
-	// the wrapper functions as the original source program doesn't know that
-	// a sockaddr_x is larger than a sockaddr	
-//	if (!addr || addrlen < sizeof(sockaddr_x)) {
-	if (!addr) {
-		errno = EINVAL;
+	if (addr->sa_family != AF_XIA) {
+		errno = EAFNOSUPPORT;
 		return -1;
 	}
-	if (validateSocket(sockfd, XSOCK_STREAM, EOPNOTSUPP) < 0) {
-		LOG("Xconnect is only valid with stream sockets.");
-		return -1;
-	}
+
+	// FIXME: check addrlen here. check against wrapper, there were problems with it not setting length correctly
 
 	Graph g((sockaddr_x*)addr);
 	if (g.num_nodes() <= 0) {
-		errno = EINVAL;
+		errno = EADDRNOTAVAIL;
+		return -1;
+	}
+
+	int state = getConnState(sockfd);
+	if (state == CONNECTED) {
+		errno = EALREADY;
+		return -1;
+	} else if (state == CONNECTING) {
+		errno = EINPROGRESS;
 		return -1;
 	}
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XCONNECT);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
 
 	xia::X_Connect_Msg *x_connect_msg = xsm.mutable_x_connect();
 	x_connect_msg->set_ddag(g.dag_string().c_str());
@@ -112,28 +124,72 @@ int Xconnect(int sockfd, const sockaddr *addr, socklen_t addrlen)
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
-	// Waiting for SYNACK from destination server
 
-	// FIXME: make this use protobufs
-#if 1	
-	addr_len = sizeof their_addr;
-	setWrapped(sockfd, 1);
-	if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
-			(struct sockaddr *)&their_addr, &addr_len)) == -1) {
-	setWrapped(sockfd, 0);
-		LOGF("Error getting status from Click: %s", strerror(errno));
-		return -1;
-	}
-	setWrapped(sockfd, 0);
+	setConnState(sockfd, CONNECTING);
 
-	if (strcmp(buf, "^Connection-failed^") == 0) {
-		errno = ECONNREFUSED;
-		LOG("Connection Failed");
-		return -1;	    
+	rc = click_status(sockfd, seq);
+	if (rc == -1) {
+		if (errno != EINPROGRESS) {
+			setConnState(sockfd, UNCONNECTED);
+			LOGF("Error retrieving recv data from Click: %s", strerror(errno));
+			return -1;
+		}
 	} else {
-		setConnected(sockfd, 1);
-		return 0; 
+		// something bad happened! we shouldn't get a success code here
 	}
-#endif
+
+	// Waiting for SYNACK from destination server
+    int clickrc = click_reply(sockfd, 0, &xsm);
+    if (clickrc < 0 || xsm.x_connect().status() != xia::X_Connect_Msg::XCONNECTED) {
+        setConnState(sockfd, UNCONNECTED);
+        LOGF("Xconnect failed: %s", strerror(errno));
+        return -1;
+    }
+
+	setConnState(sockfd, CONNECTED);
+	return 0;
+}
+
+/*!
+** @brief Initiate a connection on an Xsocket of type XSOCK_STREAM
+**
+** The Xconnect() call connects the socket referred to by sockfd to the
+** SID specified by dDAG. It is only valid for use with sockets created
+** with the XSOCK_STREAM Xsocket type.
+**
+** @note Xconnect() differs from the standard connect API in that it does
+** not currently support use with Xsockets created with the XSOCK_DGRAM
+** socket type.
+**
+** @param sockfd	The control socket
+** @param addr	The address (SID) of the remote service to connect to.
+** @param addrlen The length of addr
+**
+** @returns 0 on success
+** @returns -1 on error with errno set to an error compatible with those
+** returned by the standard connect call.
+*/
+int Xconnect(int sockfd, const sockaddr *addr, socklen_t addrlen)
+{
+	int stype = getSocketType(sockfd);
+	int rc = -1;
+
+	if (!addr) {
+		errno = EINVAL;
+		rc = -1;
+
+	} else if (stype == SOCK_DGRAM) {
+		rc = _connDgram(sockfd, addr, addrlen);
+
+	} else if (stype == SOCK_STREAM) {
+		rc = _connStream(sockfd, addr, addrlen);
+
+	} else {
+		errno = EBADF;
+		LOG("Invalid socket type, only SOCK_STREAM and SOCK_DGRAM allowed");
+		rc = -1;
+	}
+
+	return rc;
 }
 

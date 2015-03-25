@@ -136,7 +136,7 @@ bool XIASecurityBuffer::extend(uint32_t length)
 	while(remainingSpace < total_bytes) {
 		int currentDataSize = nextPack - dataPtr;
 		int newSize = numEntriesSize + (2*currentDataSize);
-		int nextUnpackOffset;
+		int nextUnpackOffset = 0;
 		if(nextUnpack != NULL) {
 			nextUnpackOffset = nextUnpack - _buffer;
 		}

@@ -32,6 +32,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <poll.h>
 
 #include "xia.h"
 
@@ -51,13 +52,13 @@ extern "C" {
 #define SOCK_DGRAM 2
 #endif
 
-#define XSOCK_INVALID -1			// invalid socket type	
+#define XSOCK_INVALID -1			// invalid socket type
 #define XSOCK_STREAM SOCK_STREAM	// Reliable transport (SID)
 #define XSOCK_DGRAM  SOCK_DGRAM		// Unreliable transport (SID)
 #define XSOCK_RAW	 SOCK_RAW		// Raw XIA socket
 #define XSOCK_CHUNK  4				// Content Chunk transport (CID)
 
-#define REQUEST_FAILED    0x00000001 
+#define REQUEST_FAILED    0x00000001
 #define WAITING_FOR_CHUNK 0x00000002
 #define READY_TO_READ     0x00000004
 #define INVALID_HASH      0x00000008
@@ -91,7 +92,7 @@ typedef struct {
 
 typedef struct {
 	char* cid;
-	size_t cidLen; 
+	size_t cidLen;
 	int status; // 1: ready to be read, 0: waiting for chunk response, -1: failed
 } ChunkStatus;
 
@@ -99,15 +100,15 @@ typedef struct {
 // XIA specific addrinfo flags
 #define XAI_DAGHOST	AI_NUMERICHOST	// if set, name is a dag instead of a generic name string
 #define XAI_XIDSERV	AI_NUMERICSERV	// if set, service is an XID instead of a name string
-#define XAI_FALLBACK 0x1000 		// if set, wrap the dag in parens
+#define XAI_FALLBACK 0x10000 		// if set, wrap the dag in parens
 
 
 // XIA specific getaddrinfo error codes (move to xia.h)
 #define XEAI_UNIMPLEMENTED	-8000
 
 // Xsetsockopt options
-#define XOPT_HLIM		1	// Hop Limit TTL
-#define XOPT_NEXT_PROTO	2	// change the next proto field of the XIA header
+#define XOPT_HLIM		0x07001	// Hop Limit TTL
+#define XOPT_NEXT_PROTO	0x07002	// change the next proto field of the XIA header
 
 // XIA protocol types
 #define XPROTO_XIA_TRANSPORT	0x0e
@@ -132,8 +133,7 @@ extern int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
 extern int Xaccept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags);
 extern int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 extern int Xconnect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
-#define Xselect select
-#define Xpoll poll
+extern int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout);
 #define Xlisten(x, y) 0
 extern int Xrecvfrom(int sockfd,void *rbuf, size_t len, int flags, struct sockaddr *addr, socklen_t *addrlen);
 extern int Xsendto(int sockfd,const void *buf, size_t len, int flags, const struct sockaddr *addr, socklen_t addrlen);
@@ -142,6 +142,7 @@ extern int Xclose(int sock);
 extern int Xrecv(int sockfd, void *rbuf, size_t len, int flags);
 extern int Xsend(int sockfd, const void *buf, size_t len, int flags);
 extern int Xfcntl(int sockfd, int cmd, ...);
+extern int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struct timeval *timeout);
 
 extern int XrequestChunk(int sockfd, char* dag, size_t dagLen);
 extern int XrequestChunks(int sockfd, const ChunkStatus *chunks, int numChunks);
@@ -190,9 +191,9 @@ extern int XreadRVServerControlAddr(char *, int);
 extern void Xfreeaddrinfo(struct addrinfo *);
 extern const char *Xgai_strerror(int);
 extern int checkXid(const char *xid, const char *type);
-extern int checkDag(const char *dag);
 
 extern char *XrootDir(char *buf, unsigned len);
+extern void debug(int sock);
 
 #ifdef __cplusplus
 }

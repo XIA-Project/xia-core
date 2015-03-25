@@ -45,7 +45,6 @@
 */
 int XbindPush(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
-	xia::XSocketCallType type;
 	int rc;
 
 	if (addrlen == 0) {
@@ -73,6 +72,8 @@ int XbindPush(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XBINDPUSH);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
 
 	xia::X_BindPush_Msg *x_bindpush_msg = xsm.mutable_x_bindpush();
 	x_bindpush_msg->set_sdag(g.dag_string().c_str());
@@ -83,16 +84,8 @@ int XbindPush(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 	}
 
 	// process the reply from click
-	if ((rc = click_reply2(sockfd, &type)) < 0) {
+	if ((rc = click_status(sockfd, seq)) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
-		return -1;
-	}
-
-	if (type != xia::XBINDPUSH) {
-		// something bad happened
-		LOGF("Expected type %d, got %d", xia::XBIND, type);
-		errno = ECLICKCONTROL;
-		rc = -1;
 	}
 
 	// if rc is negative, errno will be set with an appropriate error code

@@ -30,25 +30,25 @@
 **
 ** The Xaccept system call is is only valid with Xsockets created with
 ** the XSOCK_STREAM transport type. It accepts the first available connection
-** request for the listening socket, sockfd, creates a new connected socket, 
-** and returns a new Xsocket descriptor referring to that socket. The newly 
-** created socket is not in the listening state. The original socket 
+** request for the listening socket, sockfd, creates a new connected socket,
+** and returns a new Xsocket descriptor referring to that socket. The newly
+** created socket is not in the listening state. The original socket
 ** sockfd is unaffected by this call.
 **
 ** Xaccept does not currently have a non-blocking mode, and will block
 ** until a connection is made. However, the standard socket API calls select
 ** and poll may be used with the Xsocket. Either function will deliver a
 ** readable event when a new connection is attempted and you may then call
-** Xaccept() to get a socket for that connection. 
+** Xaccept() to get a socket for that connection.
 **
-** @note Unlike standard sockets, there is currently no Xlisten function. 
-** Callers must create the listening socket by calling Xsocket with the 
+** @note Unlike standard sockets, there is currently no Xlisten function.
+** Callers must create the listening socket by calling Xsocket with the
 ** XSOCK_STREAM transport_type and bind it to a source DAG with Xbind(). XAccept
 ** may then be called to wait for connections.
 **
 ** @param sockfd	an Xsocket() previously created with the XSOCK_STREAM type,
 ** and bound to a local DAG with Xbind()
-** @param addr if non-NULL, points to a block of memory that will contain the 
+** @param addr if non-NULL, points to a block of memory that will contain the
 ** address of the peer on return
 ** @param addrlen on entry, contains the size of addr, on exit contains the actual
 ** size of the address. addr will be truncated, if the size passed in is smaller than
@@ -62,13 +62,11 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
 	// Xaccept accepts the connection, creates new socket, and returns it.
 
-	int numbytes;
-	char buf[MAXBUFLEN];
 	struct sockaddr_in my_addr;
-	struct sockaddr_in their_addr;
 	socklen_t len;
 	int new_sockfd;
 
+printf("XACCEPT %d\n", sockfd);
 	// if an addr buf is passed, we must also have a valid length pointer
 	if (addr != NULL && addrlen == NULL) {
 		errno = EFAULT;
@@ -79,79 +77,90 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		LOG("Xaccept is only valid with stream sockets.");
 		return -1;
 	}
-	
-	// Wait for connection from client
-	len = sizeof their_addr;
-	if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
-                    (struct sockaddr *)&their_addr, &len)) == -1) {
-		LOGF("Error reading from socket (%d): %s", sockfd, 
-				strerror(errno));
+
+	// Tell click we're ready to accept a pending connection
+	xia::XSocketMsg ready_xsm;
+	ready_xsm.set_type(xia::XREADYTOACCEPT);
+	unsigned seq = seqNo(sockfd);
+	ready_xsm.set_sequence(seq);
+
+	if (click_send(sockfd, &ready_xsm) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
-        
-	// Create new socket (this is a socket between API and Xtransport)
 
-	if ((new_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+	// we'll block waiting for click to tell us there's a pending connection
+	if (click_status(sockfd, seq) < 0) {
+		LOGF("Error getting status from Click: %s", strerror(errno));
+		return -1;
+	}
+
+	// Create new socket (this is a socket between API and Xtransport)
+	if ((new_sockfd = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		LOGF("Error creating new socket: %s", strerror(errno));
 		return -1;
 	}
 
+printf("accept fd=%d SOCK_STREAM=%d\n", new_sockfd, SOCK_STREAM);
+	allocSocketState(new_sockfd, SOCK_STREAM);
+
+	
 	// bind to an unused random port number
 	my_addr.sin_family = PF_INET;
 	my_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 	my_addr.sin_port = 0;
 
 	if (bind(new_sockfd, (const struct sockaddr *)&my_addr, sizeof(my_addr)) < 0) {
-		close(new_sockfd);
+		(_f_close)(new_sockfd);
+
 		LOGF("Error binding new socket to local port: %s", strerror(errno));
 		return -1;
-	}	
-	
-	// Do actual binding in Xtransport
+	}
+
+
+
+	// Tell click what the new socket's port is (but we'll tell click
+	// over the old socket)
+	len = sizeof(my_addr);
+	if((_f_getsockname)(new_sockfd, (struct sockaddr *)&my_addr, &len) < 0) {
+		(_f_close)(new_sockfd);
+		LOGF("Error retrieving new socket's UDP port: %s", strerror(errno));
+		return -1;
+	}
 
 	xia::XSocketMsg xia_socket_msg;
 	xia_socket_msg.set_type(xia::XACCEPT);
+	seq = seqNo(new_sockfd);
+	xia_socket_msg.set_sequence(seq);
+	
+	xia::X_Accept_Msg *x_accept_msg = xia_socket_msg.mutable_x_accept();
+	x_accept_msg->set_new_port(((struct sockaddr_in)my_addr).sin_port);
 
-	if (click_send(new_sockfd, &xia_socket_msg) < 0) {
+	if (click_send(sockfd, &xia_socket_msg) < 0) {
+//		(_f_close)(new_sockfd);
 		close(new_sockfd);
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
 
-	char rbuf[XIA_MAXBUF];
-
-	if (click_reply(new_sockfd, rbuf, sizeof(rbuf)) < 0) {
-		close(new_sockfd);
+// FIXME: change to use click reply so we get the peer dag!
+	if (click_status(sockfd, seq) < 0) {
+		(_f_close)(new_sockfd);
 		LOGF("Error getting status from Click: %s", strerror(errno));
 		return -1;
 	}
 
-	xia::XSocketMsg reply;
-	reply.ParseFromString(rbuf);
-
-	if (reply.type() == xia::XRESULT) {
-		// there was an error in the accept
-		errno = ECONNABORTED;
-		close(new_sockfd);
-		return -1;
-	}
-
-
+	// FIXME: add code to get the peername, and fill in the sockaddr
 	if (addr != NULL) {
 		if (*addrlen < sizeof(sockaddr_x)) {
 			LOG("addr is not large enough to hold a sockaddr_x");
-			memset(addr, 0, *addrlen);
-		} else {
-			xia::X_Accept_Msg *msg = reply.mutable_x_accept();
-			Graph g(msg->dag().c_str());
-			g.fill_sockaddr((sockaddr_x*)addr);
 		}
-
-		*addrlen = sizeof(sockaddr_x);
 	}
+	if (addrlen)
+		*addrlen = 0;
 
-	allocSocketState(new_sockfd, XSOCK_STREAM);
-	setConnected(new_sockfd, 1);
+
+	setConnState(new_sockfd, CONNECTED);
 
 	return new_sockfd;
 }
@@ -161,25 +170,25 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 **
 ** The Xaccept4 system call is is only valid with Xsockets created with
 ** the XSOCK_STREAM transport type. It accepts the first available connection
-** request for the listening socket, sockfd, creates a new connected socket, 
-** and returns a new Xsocket descriptor referring to that socket. The newly 
-** created socket is not in the listening state. The original socket 
+** request for the listening socket, sockfd, creates a new connected socket,
+** and returns a new Xsocket descriptor referring to that socket. The newly
+** created socket is not in the listening state. The original socket
 ** sockfd is unaffected by this call.
 **
 ** Xaccept4 does not currently have a non-blocking mode, and will block
 ** until a connection is made. However, the standard socket API calls select
 ** and poll may be used with the Xsocket. Either function will deliver a
 ** readable event when a new connection is attempted and you may then call
-** Xaccept() to get a socket for that connection. 
+** Xaccept() to get a socket for that connection.
 **
-** @note Unlike standard sockets, there is currently no Xlisten function. 
-** Callers must create the listening socket by calling Xsocket with the 
+** @note Unlike standard sockets, there is currently no Xlisten function.
+** Callers must create the listening socket by calling Xsocket with the
 ** XSOCK_STREAM transport_type and bind it to a source DAG with Xbind(). XAccept
 ** may then be called to wait for connections.
 **
 ** @param sockfd	an Xsocket() previously created with the XSOCK_STREAM type,
 ** and bound to a local DAG with Xbind()
-** @param addr if non-NULL, points to a block of memory that will contain the 
+** @param addr if non-NULL, points to a block of memory that will contain the
 ** address of the peer on return
 ** @param addrlen on entry, contains the size of addr, on exit contains the actual
 ** size of the address. addr will be truncated, if the size passed in is smaller than

@@ -142,8 +142,9 @@ int main(int argc, char **argv)
 	sockaddr_x *sa;
 	int seq = 0;
 
-	signal(SIGINT, handler);
-	signal(SIGTERM, handler);
+// FIXME: put signal handlers back into code once Xselect is working
+//	signal(SIGINT, handler);
+//	signal(SIGTERM, handler);
 	getConfig(argc, argv);
 
 	if (Xgetaddrinfo(NAME, NULL, NULL, &ai) < 0)
@@ -178,7 +179,7 @@ int main(int argc, char **argv)
 		tv.tv_sec = 2;
 		tv.tv_usec = 0;
 
-		if ((n = select(sock + 1, &fds, NULL, NULL, &tv)) < 0) {
+		if ((n = Xselect(sock + 1, &fds, NULL, NULL, &tv)) < 0) {
 			printf("select failed\n");
 			break;
 
