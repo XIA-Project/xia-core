@@ -334,7 +334,7 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 		largest = sock;
 	FD_SET(sock, &rfds);
 
-	rc = (_f_select)(largest, &rfds, (writefds != NULL ? &wfds : NULL), (errorfds != NULL ? &efds : NULL), timeout);
+	rc = (_f_select)(largest + 1, &rfds, (writefds != NULL ? &wfds : NULL), (errorfds != NULL ? &efds : NULL), timeout);
 
 	// reset the bit arrays for the return to caller
 	if (readfds)
