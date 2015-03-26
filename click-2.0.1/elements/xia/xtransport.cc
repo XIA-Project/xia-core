@@ -2317,7 +2317,7 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		int payloadLength;
 		if(usingRendezvousDAG(sk->src_path, new_sk->src_path)) {
 			XID _destination_xid = new_sk->src_path.xid(new_sk->src_path.destination_node());
-			click_chatter("ProcessNetworkPacket: Sending SYNACK with verification for RV DAG");
+			click_chatter("Xaccept: Sending SYNACK with verification for RV DAG");
 			// Destination DAG from the SYN packet
 			String src_path_str = new_sk->src_path.unparse();
 
@@ -2339,7 +2339,7 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 			char pubkey[MAX_PUBKEY_SIZE];
 			uint16_t pubkeyLength = MAX_PUBKEY_SIZE;
 			if(xs_getPubkey(_destination_xid.unparse().c_str(), pubkey, &pubkeyLength)) {
-				click_chatter("ProcessNetworkPacket: ERROR public key not found for %s", _destination_xid.unparse().c_str());
+				click_chatter("Xaccept: ERROR public key not found for %s", _destination_xid.unparse().c_str());
 				return;
 			}
 
