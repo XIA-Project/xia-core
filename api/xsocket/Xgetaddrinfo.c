@@ -102,14 +102,14 @@ int XreadRVServerControlAddr(char *rv_dag_str, int rvstrlen)
 	bzero(rv_dag_str, rvstrlen);
 	bzero(root, CONFIG_PATH_BUF_SIZE);
 	// Read Rendezvous server DAG from xia-core/etc/resolv.conf, if present
-	printf("XreadRVServerControlAddr: reading config file:%s:\n", strcat(XrootDir(root, CONFIG_PATH_BUF_SIZE), RESOLV_CONF));
+	//printf("XreadRVServerControlAddr: reading config file:%s:\n", strcat(XrootDir(root, CONFIG_PATH_BUF_SIZE), RESOLV_CONF));
 	rc = ini_gets(NULL, "rendezvousc", rv_dag_str, rv_dag_str, rvstrlen, strcat(XrootDir(root, CONFIG_PATH_BUF_SIZE), RESOLV_CONF));
 	if(rc > 0) {
 		printf("XreadRVServerControlAddr: found server at:%s:\n", rv_dag_str);
 		ret = 0;
-	} else {
-		printf("XreadRVServerControlAddr: Rendezvous server DAG not found:%s:\n", rv_dag_str);
-	}
+	}// else {
+	//	printf("XreadRVServerControlAddr: Rendezvous server DAG not found:%s:\n", rv_dag_str);
+	//}
 	return ret;
 }
 

@@ -68,7 +68,8 @@ int XupdateRV(int sockfd)
 	int rc;
 	char rvdag[MAX_RV_DAG_SIZE];
 	if(XreadRVServerControlAddr(rvdag, MAX_RV_DAG_SIZE)) {
-		LOG("No rendezvous address, skipping update");
+		// Silently skip rendezvous server update if there is no RV DAG
+		//LOG("No rendezvous address, skipping update");
 		return 0;
 	}
 
