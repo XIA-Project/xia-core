@@ -77,17 +77,17 @@ void timeout_handler(int signum)
 		// send Hello
 		if(sendHelloFlag == false) {
 			sendHelloFlag = true;
-		} else {
-			syslog(LOG_WARNING, "hello already being sent, repeated request");
-		}
+		}// else {
+		//	syslog(LOG_WARNING, "hello already being sent, repeated request");
+		//}
 		route_state.hello_seq++;
 	} else if (route_state.hello_seq == route_state.hello_lsa_ratio) {
 		// it's time to send LSA
 		if(sendHelloFlag == false) {
 			sendLSAFlag = true;
-		} else {
-			syslog(LOG_WARNING, "LSA already being sent, repeated request");
-		}
+		}// else {
+		//	syslog(LOG_WARNING, "LSA already being sent, repeated request");
+		//}
 		// reset hello req
 		route_state.hello_seq = 0;
 	} else {
@@ -699,7 +699,7 @@ int main(int argc, char *argv[])
 		timeoutval.tv_sec = 0;
 		timeoutval.tv_usec = 2000; // every 0.002 sec, check if any received packets
 
-		//selectRetVal = select(route_state.sock+1, &socks, NULL, NULL, &timeoutval);
+		//selectRetVal = Xselect(route_state.sock+1, &socks, NULL, NULL, &timeoutval);
 		//if (selectRetVal > 0) {
 		if (true) {
 			// receiving a Hello or LSA packet
