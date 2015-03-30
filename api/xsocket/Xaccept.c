@@ -110,7 +110,7 @@ printf("accept fd=%d SOCK_STREAM=%d\n", new_sockfd, SOCK_STREAM);
 	my_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 	my_addr.sin_port = 0;
 
-	if (bind(new_sockfd, (const struct sockaddr *)&my_addr, sizeof(my_addr)) < 0) {
+	if ((_f_bind)(new_sockfd, (const struct sockaddr *)&my_addr, sizeof(my_addr)) < 0) {
 		(_f_close)(new_sockfd);
 
 		LOGF("Error binding new socket to local port: %s", strerror(errno));
