@@ -22,6 +22,7 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
+#include "Xkeys.h"
 #include <errno.h>
 
 /*!
@@ -59,6 +60,12 @@ int Xclose(int sockfd)
 		LOGF("Error getting status from Click: %s", strerror(errno));
 	}
 
+	// Delete any temporary keys created for this sockfd
+	if(isTempSID(sockfd)) {
+		if(XremoveSID(getTempSID(sockfd))) {
+			LOGF("ERROR removing key files for %s", getTempSID(sockfd));
+		}
+	}
 	(_f_close)(sockfd);
 	freeSocketState(sockfd);
 

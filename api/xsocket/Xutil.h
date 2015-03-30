@@ -60,6 +60,7 @@ int isSIDAssigned(int sock);
 void setSIDAssigned(int sock);
 int isTempSID(int sock);
 void setTempSID(int sock, const char *sid);
+const char *getTempSID(int sock);
 int getConnState(int sock);
 void setConnState(int sock, int conn);
 int getSocketData(int sock, char *buf, unsigned bufLen);

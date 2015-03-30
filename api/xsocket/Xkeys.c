@@ -149,37 +149,60 @@ int destroy_keypair(char *pubkeyhashstr, int hashstrlen)
 	const char *keydir = get_keydir();
 	char *privfilepath;
 	char *pubfilepath;
+	int rc = 0;
+	int state = 0;
 	int privfilepathlen = strlen(keydir) + strlen("/") + hashstrlen + 1;
 	int pubfilepathlen = privfilepathlen + strlen(".pub");
 	if(keydir == NULL) {
+		rc = -1;
 		LOG("destroy_keypair: ERROR: Key directory not found");
-		return -1;
+		goto destroy_keypair_done;
 	}
 	privfilepath = (char *)calloc(privfilepathlen, 1);
-	pubfilepath = (char *)calloc(pubfilepathlen, 1);
-	if(privfilepath == NULL || pubfilepath == NULL) {
-		LOG("destroy_keypair: ERROR: Memory not available");
-		return -1;
+	if(privfilepath == NULL) {
+		rc = -1;
+		LOG("destroy_keypair: ERROR: Out of memory");
+		goto destroy_keypair_done;
 	}
+	state = 1;
+	pubfilepath = (char *)calloc(pubfilepathlen, 1);
+	if(pubfilepath == NULL) {
+		rc = -1;
+		LOG("destroy_keypair: ERROR: Memory not available");
+		goto destroy_keypair_done;
+	}
+	state = 2;
 	strcat(privfilepath, keydir);
 	strcat(privfilepath, "/");
 	strncat(privfilepath, pubkeyhashstr, hashstrlen);
 	strcat(pubfilepath, privfilepath);
 	strcat(pubfilepath, ".pub");
 	if(unlink(privfilepath)) {
+		rc = -1;
 		LOGF("destroy_keypair: ERROR: removing %s", privfilepath);
-		return -2;
+		goto destroy_keypair_done;
 	}
 	if(unlink(pubfilepath)) {
+		rc = -1;
 		LOGF("destroy_keypair: ERROR: removing %s", pubfilepath);
-		return -3;
+		goto destroy_keypair_done;
 	}
-	return 0;
+destroy_keypair_done:
+	switch(state) {
+		case 2:
+			free(pubfilepath);
+		case 1:
+			free(privfilepath);
+	};
+	return rc;
 }
 
-int XremoveSID(char *sid, int sidlen)
+int XremoveSID(const char *sid)
 {
-	return destroy_keypair(&sid[4], sidlen-4);
+	int sidhashlen = strlen(sid) - 4;
+	char sid_hash[sidhashlen+1];
+	strcpy(sid_hash, &sid[4]);
+	return destroy_keypair(sid_hash, sidhashlen);
 }
 
 

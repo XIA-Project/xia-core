@@ -72,6 +72,7 @@ public:
 
 	int isTempSID() { return (m_temp_sid == NULL) ? 0 : 1;};
 	void setTempSID(const char *sid);
+	const char *getTempSID() {return m_temp_sid;};
 
 	void init();
 private:
@@ -468,6 +469,14 @@ void setTempSID(int sock, const char *sid)
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if(sstate) {
 		sstate->setTempSID(sid);
+	}
+}
+
+const char *getTempSID(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if(sstate) {
+		return sstate->getTempSID();
 	}
 }
 
