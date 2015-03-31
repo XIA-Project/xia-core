@@ -2965,7 +2965,6 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 
 	xia::X_Send_Msg *x_send_msg = xia_socket_msg->mutable_x_send();
 	int pktPayloadSize = x_send_msg->payload().size();
-	click_chatter("XSEND: %d bytes from port (%d) sk->port %d\n", pktPayloadSize, _sport, sk->port);
 
 	char payload[16384];
 	memcpy(payload, x_send_msg->payload().c_str(), pktPayloadSize);
@@ -3382,7 +3381,7 @@ void XTRANSPORT::XrequestChunk(unsigned short _sport, xia::XSocketMsg *xia_socke
 
 		sk = portToSock.get(_sport);
 
-		_errh->debug("sent packet to %s, from %s\n", dest.c_str(), sk->src_path.unparse_re().c_str());
+		//_errh->debug("sent packet to %s, from %s\n", dest.c_str(), sk->src_path.unparse_re().c_str());
 
 		//Add XIA headers
 		XIAHeaderEncap xiah;
