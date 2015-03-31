@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include <time.h>
+#include <errno.h>
 
 #include <sys/types.h>
 #include <netdb.h>
@@ -699,9 +700,8 @@ int main(int argc, char *argv[])
 		timeoutval.tv_sec = 0;
 		timeoutval.tv_usec = 2000; // every 0.002 sec, check if any received packets
 
-		//selectRetVal = Xselect(route_state.sock+1, &socks, NULL, NULL, &timeoutval);
-		//if (selectRetVal > 0) {
-		if (true) {
+		selectRetVal = Xselect(route_state.sock+1, &socks, NULL, NULL, &timeoutval);
+		if (selectRetVal > 0) {
 			// receiving a Hello or LSA packet
 			memset(&recv_message[0], 0, sizeof(recv_message));
 			dlen = sizeof(sockaddr_x);

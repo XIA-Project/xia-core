@@ -50,7 +50,7 @@ int XIARouter::version(std::string &ver)
 int XIARouter::listRouters(std::vector<std::string> &rlist)
 {
 	vector<string> elements;
-	int n;
+	size_t n;
 
 	if (!connected())
 		return XR_NOT_CONNECTED;
@@ -151,7 +151,7 @@ int XIARouter::updateRoute(string cmd, const std::string &xid, int port, const s
 {
 	string xidtype;
 	string mutableXID(xid);
-	unsigned n;
+	size_t n;
 
 	if (!connected())
 		return XR_NOT_CONNECTED;

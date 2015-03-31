@@ -38,6 +38,7 @@ LOG_FLAGS=""
 LOG_LEVEL=6
 V_FLAG="-q"
 CLICK_ONLY=0
+NO_CLICK=0
 NAMESERVER=0
 RENDEZVOUS=0
 RUN_VISUALIZER_CLIENT=0
@@ -58,6 +59,7 @@ usage: $NAME [-cvV4rtnZ] [-l <loglevel>] [-i <hostname>] [-m <ip-addr>]
              [-s <script>] [-N <host>] [-z <statserver>] [start|stop|restart|check|kill]
 where:
   -c only start click
+  -C start everything except click
   -l syslog level (0=LOG_EMERG through 7=LOG_DEBUG) default=3 (LOG_ERR)
   -s run click using the specified script in the $CONFPATH directory.
   -v prints click debug messages to stdout
@@ -91,10 +93,13 @@ setup()
 {
 	local OPTARG=$2
 
-	while getopts "cl:s:qvV4nN:rRthi:m:f:I:z:ZP:" opt; do
+	while getopts "cCl:s:qvV4nN:rRthi:m:f:I:z:ZP:" opt; do
 		case $opt in
 			c)
 				CLICK_ONLY=1
+				;;
+			C)
+				NO_CLICK=1
 				;;
 			l)
 				LOG_FLAGS="$LOG_FLAGS -l $OPTARG"
@@ -578,7 +583,7 @@ printf "\nXIA using script: $SCRIPT\n"
 
 case $1 in
 	start)
-		start_click
+		[ $NO_CLICK != 1 ] && start_click
 		process_nodes "start"
 		visualizer "start"
 		check_service "click"
@@ -587,7 +592,7 @@ case $1 in
 		;;
 	stop)
 		process_nodes "stop"
-		kill_service "click"
+		[ $NO_CLICK != 1 ] && kill_service "click"
 		visualizer "stop"
 		check_all_services
 		;;
