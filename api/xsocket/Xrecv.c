@@ -111,7 +111,6 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 		return -1;
 	}
 
-printf("waiting for data\n");
 	xsm.Clear();
 	if ((numbytes = click_reply(sockfd, seq, &xsm)) < 0) {
 		if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
