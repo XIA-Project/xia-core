@@ -194,7 +194,6 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 		click_send(sock, &xsm);
 	}
 
-
 done:
 	int eno = errno;
 	if (sock > 0) {
@@ -207,7 +206,18 @@ done:
 	return rc;
 }
 
+void XselectCancel(int sock)
+{
+	xia::XSocketMsg xsm;
+	xia::X_Poll_Msg *pollMsg = xsm.mutable_x_poll();
 
+	xsm.set_type(xia::XPOLL);
+	xsm.set_sequence(0);
+	pollMsg->set_type(xia::X_Poll_Msg::CANCEL);
+	pollMsg->set_nfds(0);
+
+	click_send(sock, &xsm);
+}
 
 /*!
 ** @brief waits for one of a set of Xsockets to become ready to perform I/O.
@@ -370,7 +380,6 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 			// we have Xsockets data
 
 			xsm.Clear();
-
 			if (click_reply(sock, 0, &xsm) < 0) {
 				LOG("Error getting data from Click\n");
 				rc = -1;
@@ -410,15 +419,10 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 
 		} else {
 			// we need to tell click to cancel the Xpoll event
-			xsm.Clear();
-			xsm.set_type(xia::XPOLL);
-			xsm.set_sequence(0);
-			pollMsg = xsm.mutable_x_poll();
-			pollMsg->set_type(xia::X_Poll_Msg::CANCEL);
-			pollMsg->set_nfds(0);
-
-			click_send(sock, &xsm);
+			XselectCancel(sock);
 		}
+	} else {
+		XselectCancel(sock);
 	}		
 
 done:
