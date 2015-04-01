@@ -36,7 +36,7 @@ int XSSL_connect(XSSL *xssl) {
 
 	/* Send CLIENT HELLO */
 	sprintf(buf, "CLIENT HELLO");
-	if ((n = Xsend(xssl->sockfd, buf, strlen(buf), 0)) != strlen(buf)) {
+	if ((n = Xsend(xssl->sockfd, buf, strlen(buf), 0)) != (int)strlen(buf)) {
 		ERROR("ERROR sending CLIENT HELLO");
 		return 0;
 	}

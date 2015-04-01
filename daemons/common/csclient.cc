@@ -69,7 +69,7 @@ ControlSocketClient::configure(unsigned int host_ip, unsigned short port)
   }
 
   int major, minor;
-  unsigned int slash, dot;
+  size_t slash, dot;
 
   /*
    * check that we get the expected banner
