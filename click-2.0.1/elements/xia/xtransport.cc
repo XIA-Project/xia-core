@@ -190,7 +190,6 @@ XTRANSPORT::run_timer(Timer *timer)
 					ReturnResult(_sport, &xsm);
 
 					if (sk->polling) {
-						printf("checking poll event for %d from timer\n", _sport);
 						ProcessPollEvent(_sport, POLLHUP);
 					}
 
@@ -431,9 +430,7 @@ uint32_t XTRANSPORT::calc_recv_window(sock *sk) {
 */
 bool XTRANSPORT::should_buffer_received_packet(WritablePacket *p, sock *sk) {
 
-//printf("<<<< should_buffer_received_packet\n");
-
-	if (sk->sock_type == XSOCKET_STREAM) {
+	if (sk->sock_type == SOCK_STREAM) {
 		// check if received_seqnum is within our current recv window
 		// TODO: if we switch to a byte-based, buf size, this needs to change
 		TransportHeader thdr(p);
@@ -442,17 +439,16 @@ bool XTRANSPORT::should_buffer_received_packet(WritablePacket *p, sock *sk) {
 			received_seqnum < sk->next_recv_seqnum + sk->recv_buffer_size) {
 			return true;
 		}
-	} else if (sk->sock_type == XSOCKET_DGRAM) {
+	} else if (sk->sock_type == SOCK_DGRAM) {
 
-//printf("    sk->recv_buffer_size: %u\n    sk->dgram_buffer_start: %u\n    sk->dgram_buffer_end: %u\n\n", sk->recv_buffer_size, sk->dgram_buffer_start, sk->dgram_buffer_end);
-
-		//if ( (sk->dgram_buffer_end + 1) % sk->recv_buffer_size != sk->dgram_buffer_start) {
 		if (sk->recv_buffer_count < sk->recv_buffer_size) {
-//printf("    return: TRUE\n");
+			return true;
+		}
+	} else if (sk->sock_type == SOCK_RAW) {
+		if (sk->recv_buffer_count < sk->recv_buffer_size) {
 			return true;
 		}
 	}
-//printf("    return: FALSE\n");
 	return false;
 }
 
@@ -470,12 +466,12 @@ bool XTRANSPORT::should_buffer_received_packet(WritablePacket *p, sock *sk) {
 void XTRANSPORT::add_packet_to_recv_buf(WritablePacket *p, sock *sk) {
 
 	int index = -1;
-	if (sk->sock_type == XSOCKET_STREAM) {
+	if (sk->sock_type == SOCK_STREAM) {
 		TransportHeader thdr(p);
 		int received_seqnum = thdr.seq_num();
 		index = received_seqnum % sk->recv_buffer_size;
-//printf("    port=%u adding packet to index %d\n", sk->port, index);
-	} else if (sk->sock_type == XSOCKET_DGRAM) {
+
+	} else if (sk->sock_type == SOCK_DGRAM || sk->sock_type == SOCK_RAW) {
 		index = (sk->dgram_buffer_end + 1) % sk->recv_buffer_size;
 		sk->dgram_buffer_end = index;
 		sk->recv_buffer_count++;
@@ -550,17 +546,17 @@ void XTRANSPORT::resize_buffer(WritablePacket* buf[], int max, int type, uint32_
 	// Figure out the new index for each packet in buffer
 	int new_index = -1;
 	for (int i = 0; i < old_size; i++) {
-		if (type == XSOCKET_STREAM) {
+		if (type == SOCK_STREAM) {
 			TransportHeader thdr(buf[i]);
 			new_index = thdr.seq_num() % new_size;
-		} else if (type == XSOCKET_DGRAM) {
+		} else if (type == SOCK_DGRAM) {
 			new_index = (i + *dgram_start) % old_size;
 		}
 		temp[new_index] = buf[i];
 	}
 
 	// For DGRAM socket, reset start and end vars
-	if (type == XSOCKET_DGRAM) {
+	if (type == SOCK_DGRAM) {
 		*dgram_start = 0;
 		*dgram_end = (*dgram_start + *dgram_end) % old_size;
 	}
@@ -598,7 +594,7 @@ void XTRANSPORT::resize_recv_buffer(sock *sk, uint32_t new_size) {
 */
 int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk) {
 
-	if (sk->sock_type == XSOCKET_STREAM) {
+	if (sk->sock_type == SOCK_STREAM) {
 //		printf("<<< read_from_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", sk->port, sk->recv_base, sk->next_recv_seqnum, sk->recv_buffer_size);
 		xia::X_Recv_Msg *x_recv_msg = xia_socket_msg->mutable_x_recv();
 		int bytes_requested = x_recv_msg->bytes_requested();
@@ -628,7 +624,7 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk) {
 //		printf(">>> read_from_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", sk->port, sk->recv_base, sk->next_recv_seqnum, sk->recv_buffer_size);
 		return bytes_returned;
 
-	} else if (sk->sock_type == XSOCKET_DGRAM) {
+	} else if (sk->sock_type == SOCK_DGRAM || sk->sock_type == SOCK_RAW) {
 		xia::X_Recvfrom_Msg *x_recvfrom_msg = xia_socket_msg->mutable_x_recvfrom();
 	
 		// Get just the next packet in the recv buffer (we don't return data from more
@@ -637,12 +633,42 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk) {
 		WritablePacket *p = sk->recv_buffer[sk->dgram_buffer_start];
 
 		if (sk->recv_buffer_count > 0 && p) {
+			// get different sized packages depending on socket type
+			// datagram only wants payload
+			// raw wants transport header too
+			// packet wants it all
 			XIAHeader xiah(p->xia_header());
 			TransportHeader thdr(p);
-			int data_size = xiah.plen() - thdr.hlen();
+			int data_size;
+			String payload;
 
+			switch (sk->sock_type) {
+				case SOCK_DGRAM:
+					data_size = xiah.plen() - thdr.hlen();
+					payload = String((const char*)thdr.payload(), data_size);
+					break;
+
+				case SOCK_RAW:
+				{
+					String header((const char*)xiah.hdr(), xiah.hdr_size());
+					String data((const char*)xiah.payload(), xiah.plen());
+					payload = header + data;
+					data_size = payload.length();
+
+				}
+					break;
+#if 0
+				case SOCK_PACKET:
+					break;
+#endif
+				default:
+					// this should not be possible
+					break;
+			}
+
+			// this part is the same for everyone
 			String src_path = xiah.src_path().unparse();
-			String payload((const char*)thdr.payload(), data_size);
+
 			x_recvfrom_msg->set_payload(payload.c_str(), payload.length());
 			x_recvfrom_msg->set_sender_dag(src_path.c_str());
 			x_recvfrom_msg->set_bytes_returned(data_size);
@@ -663,13 +689,10 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk) {
 
 void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 {
-		
 	//Extract the destination port
 	unsigned short _sport = SRC_PORT_ANNO(p_in);
 
-
 //	_errh->debug("\nPush: Got packet from API sport:%d",ntohs(_sport));
-
 
 	std::string p_buf;
 	p_buf.assign((const char*)p_in->data(), (const char*)p_in->end_data());
@@ -770,9 +793,7 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 
 void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 {
-
 //	_errh->debug("Got packet from network");
-
 
 	//Extract the SID/CID
 	XIAHeader xiah(p_in->xia_header());
@@ -815,7 +836,18 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 		for (i = xcmp_listeners.begin(); i != xcmp_listeners.end(); i++) {
 			int port = *i;
-			output(API_PORT).push(UDPIPPrep(xcmp_pkt, port));
+
+			sock *sk = portToSock.get(port);
+
+			if (sk && sk->sock_type == SOCK_RAW && should_buffer_received_packet(p_in, sk)) {
+				add_packet_to_recv_buf(p_in, sk);
+
+				if (sk->polling) {
+					// tell API we are readable
+					ProcessPollEvent(port, POLLIN);
+				}
+				check_for_and_handle_pending_recv(sk);
+			}
 		}
 
 		return;
@@ -864,7 +896,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				sock *new_sk = new sock();
 				new_sk->port = -1; // just for now. This will be updated via Xaccept call
 
-				new_sk->sock_type = XSOCKET_STREAM;
+				new_sk->sock_type = SOCK_STREAM;
 
 				new_sk->dst_path = src_path;
 				new_sk->src_path = dst_path;
@@ -1051,7 +1083,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 		sock *sk = portToSock.get(_dport);
 
 		// buffer packet if this is a DGRAM socket and we have room
-		if (sk->sock_type == XSOCKET_DGRAM &&
+		if (sk->sock_type == SOCK_DGRAM &&
 			should_buffer_received_packet(p_in, sk)) {
 			add_packet_to_recv_buf(p_in, sk);
 
@@ -2390,7 +2422,7 @@ void XTRANSPORT::Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg,
 
 	WritablePacket *p = NULL;
 
-	if (sk->sock_type == XSOCKET_RAW) {
+	if (sk->sock_type == SOCK_RAW) {
 		xiah.set_nxt(nxt_xport.get(_sport));
 
 		xiah.set_plen(pktPayloadSize);
