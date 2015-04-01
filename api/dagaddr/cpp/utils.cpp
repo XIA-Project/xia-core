@@ -25,6 +25,8 @@ std::string trim(const std::string& str)
 }
 
 int stoi(const std::string& str, int pos, int base) {
+    (void)(pos);    // mark this unused
+
     int output = -1;
 
     switch (base) {
