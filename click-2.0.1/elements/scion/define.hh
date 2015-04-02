@@ -74,11 +74,11 @@
 #define AID_SIZE 8
 
 // SL: variable size host address
-#define MAX_HOST_ADDR_SIZE 20
+#define MAX_HOST_ADDR_SIZE 40
 #define IPV4_SIZE 4
 #define IPV6_SIZE 16
 #define SCION_ADDR_SIZE 8
-#define AIP_SIZE 20
+#define AIP_SIZE 40
 
 
 #define CERT_SIZE 1024

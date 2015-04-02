@@ -69,7 +69,7 @@ int SCIONBeaconServerCore::configure(Vector<String> &conf, ErrorHandler *errh) {
     xid = store;
     m_HID = xid.unparse();
 
-	return 0;
+    return 0;
 }
 
 int SCIONBeaconServerCore::initialize(ErrorHandler* errh) {
@@ -235,67 +235,12 @@ bool SCIONBeaconServerCore::getOfgKey(uint32_t timestamp, aes_context &actx)
         actx = m_prevOfgKey.actx;
     }
     return SCION_SUCCESS;
-    
-    /*
-    //SL: following part is left to compare performance later.
-    //////////////////////////////////////////////////////////
-    std::map<uint32_t, aes_context*>::iterator itr;
-
-    //aes_context actx;
-    memset(&actx, 0, sizeof(aes_context));
-
-    //when the key table is full
-    while(m_OfgAesCtx.size()>KEY_TABLE_SIZE){
-        itr = m_OfgAesCtx.begin();
-        delete itr->second;
-        m_OfgAesCtx.erase(itr);
-    }
-
-    //if key for the timestmpa is not found. 
-    //if((itr=key_table.find(timestamp)) == key_table.end()){
-    if((itr=m_OfgAesCtx.find(timestamp)) == m_OfgAesCtx.end()){
-
-        //concat timestamp with the ofg master key.
-        uint8_t k[SHA1_SIZE];
-        memset(k, 0, SHA1_SIZE);
-        memcpy(k, &timestamp, sizeof(uint32_t));
-        memcpy(k+sizeof(uint32_t), m_uMkey, OFG_KEY_SIZE);
-
-        //creates sha1 hash 
-        uint8_t buf[SHA1_SIZE];
-        memset(buf, 0 , SHA1_SIZE);
-        sha1(k, TS_OFG_KEY_SIZE, buf);
-
-        ofgKey newKey;
-        memset(&newKey, 0, OFG_KEY_SIZE);
-        memcpy(newKey.key, buf, OFG_KEY_SIZE);
-        //key_table.insert(std::pair<uint32_t, ofgKey>(timestamp, newKey));
-        
-        //SL: OFG key aes context to avoid redundant key scheduling
-        //store the aes_context in m_OfgAesCtx
-        aes_context * pActx = new aes_context; 
-        
-        int err;
-        if(err = aes_setkey_enc(pActx, newKey.key, OFG_KEY_SIZE_BITS)) {
-            scionPrinter->printLog(EH, (char *)"OFG Key setup failure: %d\n",err*-1);
-            return SCION_FAILURE;
-        }
-
-        m_OfgAesCtx.insert(std::pair<uint32_t, aes_context*>(timestamp, pActx));
-        actx = *m_OfgAesCtx.find(timestamp)->second;
-    }else{
-        actx = *m_OfgAesCtx.find(timestamp)->second;
-    }
-
-    return SCION_SUCCESS;
-    */
 }
 
 void SCIONBeaconServerCore::push(int port, Packet *p)
 {
     TransportHeader thdr(p);
-    
-    uint8_t *s_pkt = (uint8_t *) p->data();
+    uint8_t *s_pkt = (uint8_t *) thdr.payload();
     //copy packet data and kills click packet
     uint16_t packetLength = SPH::getTotalLen(s_pkt);
     uint8_t srcLen = SPH::getSrcLen(s_pkt);
@@ -314,20 +259,19 @@ void SCIONBeaconServerCore::push(int port, Packet *p)
             // open a file with 0 size
             int RotL = packetLength-(COMMON_HEADER_SIZE+srcLen+dstLen);
             scionPrinter->printLog(IH, (char *)"TDC BS (%s:%s): Received ROT file size = %d\n", m_AD.c_str(), m_HID.c_str(), RotL);
-            
             // Write to file defined in Config
-            /*
-            if(RotL>0)
+            if(RotL)
             {
-    		    FILE * rotFile = fopen(m_sROTFile, "w+");
-    		    fwrite(packet+COMMON_HEADER_SIZE+srcLen+dstLen, 1, RotL, rotFile);
-    		    fclose(rotFile);
-    		    scionPrinter->printLog(IH, (char *)"TDC BS (%s:%s) stored received ROT.\n", m_AD.c_str(), m_HID.c_str());
-    		    // try to verify local ROT again
-    		    m_bROTInitiated = parseROT();
-    		}
-    		*/
-    	}
+                // save ROT file to storage
+                FILE * rotFile = fopen(m_sROTFile, "w+");
+                fwrite(packet+COMMON_HEADER_SIZE+srcLen+dstLen, 1, RotL, rotFile);
+                fclose(rotFile);
+                // try to verify local ROT again
+                m_bROTInitiated = parseROT();
+                if(m_bROTInitiated)
+                    scionPrinter->printLog(IH, (char *)"TDC BS (%s:%s): stored verified ROT.\n", m_AD.c_str(), m_HID.c_str());
+            }
+        }
     		break;
         default:
         	break;
@@ -479,15 +423,14 @@ void SCIONBeaconServerCore::sendHello() {
     sendPacket((uint8_t *)msg.c_str(), msg.size(), dest);
 }
 
-
 /*
     SCIONBeaconServerCore::run_timer
     Periodically generate PCB
 */
 void SCIONBeaconServerCore::run_timer(Timer *){
-	
-	sendHello();
-	
+
+    sendHello();
+
     if(m_bROTInitiated&&_CryptoIsReady){
         // ROT file is ready and private key is ready
         #ifdef _SL_DEBUG_BS
@@ -509,11 +452,8 @@ void SCIONBeaconServerCore::run_timer(Timer *){
     	scionPrinter->printLog(IH, (char *)"TDC BS (%s:%s): Send ROT Request to SCIONCertServerCore.\n", m_AD.c_str(), m_HID.c_str());
     	#endif
     	
-    	const char* format_str = strchr(m_HID.c_str(),':');
-    	HostAddr srcAddr = HostAddr(HOST_ADDR_SCION,(uint64_t)strtoull(format_str, NULL, 10)); 
-    	//put HID as a source address
-    	HostAddr dstAddr = HostAddr(HOST_ADDR_SCION,(uint64_t)strtoull((const char*)m_servers.find(CertificateServer)->second.HID, NULL, 10)); 
-    	//destination address should be CS HID
+    	HostAddr srcAddr = HostAddr(HOST_ADDR_AIP, (uint8_t*)strchr(m_HID.c_str(),':')); 
+    	HostAddr dstAddr = HostAddr(HOST_ADDR_AIP, (uint8_t*)(m_servers.find(CertificateServer)->second.HID) ); 
     	
     	uint8_t hdrLen = COMMON_HEADER_SIZE+srcAddr.getLength()+dstAddr.getLength();
     	uint16_t totalLen = hdrLen + ROT_VERSION_SIZE;
@@ -532,13 +472,13 @@ void SCIONBeaconServerCore::run_timer(Timer *){
     	
     	// version number, try to get 0
     	*(uint32_t*)(packet+hdrLen) = 0;
-    		
-    	scionPrinter->printLog((char *)"Send ROT request (%u, %u) to Cert Server: %s\n", hdr.cmn.type, totalLen, m_servers.find(CertificateServer)->second.HID);
-    		
+ 
     	// use explicit path instead of using destination (AD, HID) only
     	string dest = "RE ";
     	dest.append(" ");
     	dest.append(BHID);
+    	dest.append(" ");
+    	dest.append(m_AD.c_str());
 		dest.append(" ");
     	// cert server 
     	dest.append("HID:");
@@ -546,7 +486,11 @@ void SCIONBeaconServerCore::run_timer(Timer *){
     		
     	sendPacket(packet, totalLen, dest);
     	
-    	_timer.reschedule_after_sec(1);     // default speed
+    	#ifdef _SL_DEBUG_BS
+    	scionPrinter->printLog(IH, (char *)"Send ROT request to local Cert Server.\n");
+    	#endif
+    	
+    	_timer.reschedule_after_sec(5);     // default speed
   }
 }
 

@@ -58,8 +58,8 @@ int SCIONCertServerCore::configure(Vector<String> &conf, ErrorHandler *errh){
             click_chatter("Fatal error, Exit SCION Network.\n");
             exit(-1);
     }
-
-	XIAXIDInfo xiaxidinfo;
+    
+    XIAXIDInfo xiaxidinfo;
     struct click_xia_xid store;
     XID xid = xid;
 
@@ -70,8 +70,8 @@ int SCIONCertServerCore::configure(Vector<String> &conf, ErrorHandler *errh){
     xiaxidinfo.query_xid(m_HID, &store, this);
     xid = store;
     m_HID = xid.unparse();
-
-	return 0;
+    
+    return 0;
 }
 
 int SCIONCertServerCore::initialize(ErrorHandler* errh){
@@ -79,31 +79,32 @@ int SCIONCertServerCore::initialize(ErrorHandler* errh){
     // task 1: parse config file
     Config config;
     config.parseConfigFile((char*)m_sConfigFile.c_str());
-	// get ADAID, AID, TDID
-	m_uAdAid = config.getAdAid();
-	m_uTdAid = config.getTdAid();
-	m_iLogLevel =config.getLogLevel();
-	config.getCSLogFilename((char*)m_csLogFile);
+    
+    // get ADAID, AID, TDID
+    m_uAdAid = config.getAdAid();
+    m_uTdAid = config.getTdAid();
+    m_iLogLevel =config.getLogLevel();
+    config.getCSLogFilename((char*)m_csLogFile);
     config.getPrivateKeyFilename((char*)m_csPrvKeyFile);
     config.getCertFilename((char*)m_csCertFile);
     config.getROTFilename((char*)m_sROTFile);
-
-	// setup scionPrinter for logging
-	scionPrinter = new SCIONPrint(m_iLogLevel, m_csLogFile);
-	scionPrinter->printLog(IH, "TDC CS (%s:%s) INIT.\n", m_AD.c_str(), m_HID.c_str());
-
-	// task 2: parse ROT (root of trust) file
-	parseROT();
-	scionPrinter->printLog(IH, "Parse/Verify ROT Done.\n");
-
-	// task 3: parse topology file
-	parseTopology();
-	scionPrinter->printLog(IH, "Parse Topology Done.\n");
-
-	ScheduleInfo::initialize_task(this, &_task, errh);
-	scionPrinter->printLog(IH, "TDC CS (%s:%s) INIT Done.\n", m_AD.c_str(), m_HID.c_str());
-
-	return 0;
+    
+    // setup scionPrinter for logging
+    scionPrinter = new SCIONPrint(m_iLogLevel, m_csLogFile);
+    scionPrinter->printLog(IH, "TDC CS (%s:%s) INIT.\n", m_AD.c_str(), m_HID.c_str());
+    
+    // task 2: parse ROT (root of trust) file
+    parseROT();
+    scionPrinter->printLog(IH, "Parse/Verify ROT Done.\n");
+    
+    // task 3: parse topology file
+    parseTopology();
+    scionPrinter->printLog(IH, "Parse Topology Done.\n");
+    
+    ScheduleInfo::initialize_task(this, &_task, errh);
+    scionPrinter->printLog(IH, "TDC CS (%s:%s) INIT Done.\n", m_AD.c_str(), m_HID.c_str());
+    
+    return 0;
 }
 
 bool SCIONCertServerCore::run_task(Task *task) {
@@ -179,7 +180,6 @@ void SCIONCertServerCore::parseTopology(){
 void SCIONCertServerCore::push(int port, Packet *p)
 {
     TransportHeader thdr(p);
-    
     uint8_t *s_pkt = (uint8_t *) thdr.payload();
     uint16_t type = SPH::getType(s_pkt);
 	uint16_t packetLength = SPH::getTotalLen(s_pkt);
@@ -188,19 +188,17 @@ void SCIONCertServerCore::push(int port, Packet *p)
 	memset(packet, 0, packetLength);
     memcpy(packet, s_pkt, packetLength);
     
-    // scionPrinter->printLog(IH, "TDC CS received packet (%u, %u)\n", type, packetLength);
-    
-    p->kill();
-    
     switch(type){
     
 		case ROT_REQ_LOCAL:
 		{
-
 			scionPrinter->printLog(IH, "TDC CS received ROT request from BS...\n");
+			XIAHeader xiahdr(p);
+			scionPrinter->printLog(IH, (char *)"XIA src path = %s", xiahdr.src_path().unparse().c_str());
+			scionPrinter->printLog(IH, (char *)"XIA dst path = %s", xiahdr.dst_path().unparse().c_str());
 			
 			// prepare ROT reply packet
-			uint8_t hdrLen = COMMON_HEADER_SIZE+SCION_ADDR_SIZE*2;
+			uint8_t hdrLen = COMMON_HEADER_SIZE+AIP_SIZE*2;
 			uint16_t totalLen = hdrLen + curROTLen;
 			uint8_t rotPacket[totalLen];
 			memset(rotPacket, 0, totalLen);
@@ -208,10 +206,11 @@ void SCIONCertServerCore::push(int port, Packet *p)
 			SPH::setHdrLen(rotPacket, hdrLen);
 			SPH::setType(rotPacket, ROT_REP_LOCAL); 
 			SPH::setTotalLen(rotPacket, totalLen);
+			
 			// fill address
-			HostAddr srcAddr = HostAddr(HOST_ADDR_SCION, (uint64_t)strtoull((const char*)m_HID.c_str(), NULL, 10));
+			HostAddr srcAddr = HostAddr(HOST_ADDR_AIP, (uint8_t*)strchr(m_HID.c_str(),':')); 
 			scionPrinter->printLog(IH, (char *)"Local Beacon Server: %s\n", m_servers.find(BeaconServer)->second.HID);
-			HostAddr dstAddr = HostAddr(HOST_ADDR_SCION, (uint64_t)strtoull((const char*)m_servers.find(BeaconServer)->second.HID, NULL, 10));
+			HostAddr dstAddr = HostAddr(HOST_ADDR_AIP, (uint8_t*)(m_servers.find(BeaconServer)->second.HID));
 			
 			SPH::setSrcAddr(rotPacket, srcAddr);
 			SPH::setDstAddr(rotPacket, dstAddr);
@@ -291,6 +290,7 @@ void SCIONCertServerCore::push(int port, Packet *p)
 		default:
 			break;
 		}
+	p->kill();
 }
 
 /*

@@ -86,54 +86,53 @@ int SCIONBeaconServer::configure(Vector<String> &conf, ErrorHandler *errh){
 */
 int SCIONBeaconServer::initialize(ErrorHandler* errh){
 
-	// TODO: put it in config file
-	m_iRecheckTime=4;
-
-	Config config;
-	config.parseConfigFile((char*)m_sConfigFile.c_str());
-
-	m_uAdAid = config.getAdAid();
-	m_uTdAid = config.getTdAid();
-	m_iRegTime = config.getRTime();
-	m_iPropTime = config.getPTime();
-	
-	m_iLogLevel =config.getLogLevel();
-
-	config.getPrivateKeyFilename((char*)m_csPrvKeyFile);
-	config.getCertFilename((char*)m_csCertFile);
-	config.getOfgmKey((char*)m_uMkey);
-	config.getPCBLogFilename((char*)m_csLogFile);
-	config.getROTFilename((char*)m_sROTFile);
+    // TODO: put it in config file
+    m_iRecheckTime=4;
+    
+    Config config;
+    config.parseConfigFile((char*)m_sConfigFile.c_str());
+    
+    m_uAdAid = config.getAdAid();
+    m_uTdAid = config.getTdAid();
+    m_iRegTime = config.getRTime();
+    m_iPropTime = config.getPTime();
+    m_iLogLevel =config.getLogLevel();
+    
+    config.getPrivateKeyFilename((char*)m_csPrvKeyFile);
+    config.getCertFilename((char*)m_csCertFile);
+    config.getOfgmKey((char*)m_uMkey);
+    config.getPCBLogFilename((char*)m_csLogFile);
+    config.getROTFilename((char*)m_sROTFile);
     
     scionPrinter = new SCIONPrint(m_iLogLevel, m_csLogFile);
-	scionPrinter->printLog(IH, (char*)"BS (%s:%s) INIT.\n", m_AD.c_str(), m_HID.c_str());
+    scionPrinter->printLog(IH, (char*)"BS (%s:%s) INIT.\n", m_AD.c_str(), m_HID.c_str());
     
-	//SL: what is this? Not used anywhere
-	m_iResetTime = config.getResetTime();
-	m_iScheduleTime = SCIONCommonLib::GCD(m_iRegTime, m_iPropTime);
-	scionPrinter->printLog(IH, (char*)"PCB reg = %d, prop = %d, schedule time = %d\n", m_iRegTime, m_iPropTime, m_iScheduleTime);
-	m_iIsRegister = config.getIsRegister(); //whether to register paths to TDC or not
-	m_iKval = config.getNumRegisterPath(); //# of paths that can be registered to TDC
-	m_iBeaconTableSize = config.getPCBQueueSize();
+    //SL: what is this? Not used anywhere
+    m_iResetTime = config.getResetTime();
+    m_iScheduleTime = SCIONCommonLib::GCD(m_iRegTime, m_iPropTime);
+    scionPrinter->printLog(IH, (char*)"PCB reg = %d, prop = %d, schedule time = %d\n", m_iRegTime, m_iPropTime, m_iScheduleTime);
+    m_iIsRegister = config.getIsRegister(); //whether to register paths to TDC or not
+    m_iKval = config.getNumRegisterPath(); //# of paths that can be registered to TDC
+    m_iBeaconTableSize = config.getPCBQueueSize();
+    
+    time(&m_lastPropTime);
+    m_lastRegTime = m_lastPropTime;
+    
+    // task 2: parse ROT (root of trust) file
+    m_bROTInitiated = parseROT();
+    if(m_bROTInitiated)
+        scionPrinter->printLog(IH, (char*)"Parse and Verify ROT Done.\n");
+        
+    // task 3: parse topology file
+    parseTopology();
+    scionPrinter->printLog(IH, (char*)"Parse Topology Done.\n");
 
-	time(&m_lastPropTime);
-	m_lastRegTime = m_lastPropTime;
-	
-	// task 2: parse ROT (root of trust) file
-	m_bROTInitiated = parseROT();
-	if(m_bROTInitiated)
-	    scionPrinter->printLog(IH, (char*)"Parse and Verify ROT Done.\n");
-
-	// task 3: parse topology file
-	parseTopology();
-	scionPrinter->printLog(IH, (char*)"Parse Topology Done.\n");
-
-	// task 4: read key pair if they already exist
-	loadPrivateKey();
-	scionPrinter->printLog(IH, (char*)"PrivateKey Loading Successful.\n");
-
-	// task 5: generate/update OFG key
-	if(!initOfgKey()){
+    // task 4: read key pair if they already exist
+    loadPrivateKey();
+    scionPrinter->printLog(IH, (char*)"PrivateKey Loading Successful.\n");
+    
+    // task 5: generate/update OFG key
+    if(!initOfgKey()){
         scionPrinter->printLog(EH, (char *)"Init OFG key failure.\n");
         click_chatter("ERR: InitOFGKey fail at SCIONBeaconServerCore.\n");
         click_chatter("ERR: Fatal error, exit SCION Network.\n");
@@ -145,19 +144,18 @@ int SCIONBeaconServer::initialize(ErrorHandler* errh){
         click_chatter("ERR: Fatal error, exit SCION Network.\n");
         exit(-1);
     }
-
-	srand(time(NULL));
-
-	//HC: initialize per-child path selection policy
-	initSelectionPolicy();
-
-	ScheduleInfo::initialize_task(this, &_task, errh);
-	_timer.initialize(this); 
-	_timer.schedule_after_sec(m_iScheduleTime);
-	
-	scionPrinter->printLog(IH, (char*)"BS (%s:%s) INIT Done.\n", m_AD.c_str(), m_HID.c_str());
-
-	return 0;
+    
+    srand(time(NULL));
+    
+    //HC: initialize per-child path selection policy
+    initSelectionPolicy();
+    
+    ScheduleInfo::initialize_task(this, &_task, errh);
+    _timer.initialize(this); 
+    _timer.schedule_after_sec(m_iScheduleTime);
+    
+    scionPrinter->printLog(IH, (char*)"BS (%s:%s) INIT Done.\n", m_AD.c_str(), m_HID.c_str());
+    return 0;
 }
 
 /*SL: Initialize OFG key */
@@ -166,14 +164,14 @@ bool SCIONBeaconServer::initOfgKey() {
     time_t currTime;
     time(&currTime);
     //SL: to deal with the case that TDC BS initiate PCB before this BS starts
-	currTime -= 300; //back 5minutes
-	m_currOfgKey.time = currTime;
-	memcpy(m_currOfgKey.key, &m_uMkey, OFG_KEY_SIZE);
-
-	int err;
-	if(err = aes_setkey_enc(&m_currOfgKey.actx, m_currOfgKey.key, OFG_KEY_SIZE_BITS)) {
-		scionPrinter->printLog(EH, (char *)"OFG Key setup failure: %d\n",err*-1);
-        return SCION_FAILURE;
+    currTime -= 300; //back 5minutes
+    m_currOfgKey.time = currTime;
+    memcpy(m_currOfgKey.key, &m_uMkey, OFG_KEY_SIZE);
+    
+    int err;
+    if(err = aes_setkey_enc(&m_currOfgKey.actx, m_currOfgKey.key, OFG_KEY_SIZE_BITS)) {
+	    scionPrinter->printLog(EH, (char *)"OFG Key setup failure: %d\n",err*-1);
+	    return SCION_FAILURE;
 	}
 	return SCION_SUCCESS;
 }
@@ -204,38 +202,38 @@ SCIONBeaconServer::parseTopology(){
     TopoParser parser;
     parser.loadTopoFile(m_sTopologyFile.c_str()); 
     parser.parseServers(m_servers);
-    // parser.parseRouters(m_routers);
     parser.parseEgressIngressPairs(m_routepairs);
 }
 
 //Load RoT file and verify it.
 bool SCIONBeaconServer::parseROT(char* loc){
-	ROTParser parser;
-	char* fn = NULL;
-	ROT tROT;
-	
-	if(loc)
-		fn = loc;
-	else
-		fn = m_sROTFile;
 
+    ROTParser parser;
+    char* fn = NULL;
+    ROT tROT;
+    
+    if(loc)
+	    fn = loc;
+	else
+	    fn = m_sROTFile;
+	
 	if(parser.loadROTFile(fn)!=ROTParseNoError){
-		scionPrinter->printLog(EH, (char *)"ERR: ROT File missing at CS.\n");
-		return SCION_FAILURE;
+	    scionPrinter->printLog(EH, (char *)"ERR: ROT File missing at CS.\n");
+	    return SCION_FAILURE;
 	}
 	scionPrinter->printLog(IH, (char *)"Load ROT OK.\n");
-
+	
 	if(parser.parse(tROT)!=ROTParseNoError){
-		scionPrinter->printLog(EH, (char *)"ERR: ROT File parsing error at CS.\n");
-		return SCION_FAILURE;
+	    scionPrinter->printLog(EH, (char *)"ERR: ROT File parsing error at CS.\n");
+	    return SCION_FAILURE;
 	}
 	scionPrinter->printLog(IH, (char *)"Parse ROT OK.\n");
-
+	
 	if(parser.verifyROT(tROT)!=ROTParseNoError){
-		scionPrinter->printLog(EH, (char *)"ERR: ROT File parsing error at CS.\n");
-		return SCION_FAILURE;
+	    scionPrinter->printLog(EH, (char *)"ERR: ROT File parsing error at CS.\n");
+	    return SCION_FAILURE;
 	}
-
+	
 	//Store the ROT if verification passed.
 	parser.parse(m_cROT);
 	scionPrinter->printLog(IH, (char *)"Verify ROT OK.\n");
@@ -281,41 +279,39 @@ void SCIONBeaconServer::loadPrivateKey() {
 */
 void
 SCIONBeaconServer::requestROT() {
-
 	/*
-	m_bROTRequested = true;
-
-	uint8_t hdrLen = COMMON_HEADER_SIZE+DEFAULT_ADDR_SIZE*2;
-	uint16_t totalLen = hdrLen + ROT_VERSION_SIZE;
-	uint8_t packet[totalLen];
-
-	scionHeader hdr;
-	hdr.cmn.type = ROT_REQ_LOCAL;
-	hdr.cmn.hdrLen = hdrLen;
-	hdr.cmn.totalLen = totalLen;
-
-	hdr.src = HostAddr(HOST_ADDR_SCION, m_uAid);
-	hdr.dst = m_servers.find(CertificateServer)->second.addr;
-
-	SPH::setHeader(packet, hdr);
-
-	// version number, try to get 0
-	//SL: Here, we need to provide the ROT version number to fetch
-	//this request needs to handle many versions simultaneously since BS may 
-	//have outdated version in its local directory
-	//E.g., the most recent version that is locally available is 1, 
-	//yet the current version in PCB is 10. This can happen if BS is turned on
-	//after having been off for a long while.
-	//However, since all certificates are managed/verified by CS, BS only requests
-	//the current version of ROT to CS. 
-	struct ROTRequest req;
-	req.previousVersion = 0;
-	req.currentVersion = 0; //currentVersion == 0 indicates the most recent version
-							//since BS does not have any ROT available
-	*(ROTRequest *)(packet+hdrLen) = req;
-	//sendPacket(packet, totalLen, PORT_TO_SWITCH, TO_SERVER);
-	sendPacket(packet, totalLen, "");
-	*/
+    m_bROTRequested = true;
+    
+    uint8_t hdrLen = COMMON_HEADER_SIZE+DEFAULT_ADDR_SIZE*2;
+    uint16_t totalLen = hdrLen + ROT_VERSION_SIZE;
+    uint8_t packet[totalLen];
+    
+    scionHeader hdr;
+    hdr.cmn.type = ROT_REQ_LOCAL;
+    hdr.cmn.hdrLen = hdrLen;
+    hdr.cmn.totalLen = totalLen;
+    
+    hdr.src = HostAddr(HOST_ADDR_SCION, m_uAid);
+    hdr.dst = HostAddr(HOST_ADDR_SCION, (uint64_t)strtoull((const char*)m_servers.find(CertificateServer)->second.HID, NULL, 10));
+    
+    SPH::setHeader(packet, hdr);
+    
+    struct ROTRequest req;
+    req.previousVersion = 0;
+    req.currentVersion = 0; //currentVersion == 0 indicates the most recent version
+    *(ROTRequest *)(packet+hdrLen) = req;
+    
+    // use explicit path instead of using destination (AD, HID) only
+    string dest = "RE ";
+    dest.append(" ");
+    dest.append(BHID);
+    dest.append(" ");
+    // cert server 
+    dest.append("HID:");
+    dest.append((const char*)m_servers.find(CertificateServer)->second.HID);
+    
+    sendPacket(packet, totalLen, dest);
+    */
 }
 
 /*
@@ -328,39 +324,39 @@ void
 SCIONBeaconServer::run_timer(Timer *timer){
     
     sendHello();
-
-	time_t curTime;
-	time(&curTime);
-	//SL: either use multiple timers or reduce the reschedule interval
-	//currently it's GCD of Reg and Prop Times
-	
-	// check if ROT file is missing
-	if(!m_bROTInitiated)
-	{
-		scionPrinter->printLog(IH, (char *)"BS (%s:%s): ROT is missing or wrong formatted.\n", m_AD.c_str(), m_HID.c_str());
-		// send an ROT request (i.e., ROT_REQ_LOCAL) if its AID is registered to SCION switch
-		if(_AIDIsRegister && !m_bROTRequested) 
-			requestROT();
+    
+    time_t curTime;
+    time(&curTime);
+    //SL: either use multiple timers or reduce the reschedule interval
+    //currently it's GCD of Reg and Prop Times
+    
+    // check if ROT file is missing
+    if(!m_bROTInitiated)
+    {
+        scionPrinter->printLog(IH, (char *)"BS (%s:%s): ROT is missing or wrong formatted.\n", m_AD.c_str(), m_HID.c_str());
+        // send an ROT request (i.e., ROT_REQ_LOCAL) if its AID is registered to SCION switch
+        if(_AIDIsRegister && !m_bROTRequested) 
+		    requestROT();
 	}
-
+	
 	// time for registration
 	if(m_iIsRegister && curTime - m_lastRegTime >= m_iRegTime){
-		registerPaths();
-		time(&m_lastRegTime); //updates the time
+	    registerPaths();
+	    time(&m_lastRegTime); //updates the time
 	}
 	
 	// check ROT and Crypto are ready
 	// time for propagation
 	if(curTime - m_lastPropTime >= m_iPropTime){
-		propagate();
-		time(&m_lastPropTime); //updates the time
+	    propagate();
+	    time(&m_lastPropTime); //updates the time
 	}
 	
 	// recheck unverified PCBs (due to missing certificates)...
 	if(curTime-m_lastRecheckTime >= m_iRecheckTime){
-		recheckPcb(); 
+	    recheckPcb(); 
 	}
-
+	
 	_timer.reschedule_after_sec(m_iScheduleTime);
 }
 
@@ -375,15 +371,13 @@ SCIONBeaconServer::run_timer(Timer *timer){
 void
 SCIONBeaconServer::requestROT(SPacket * packet, uint32_t rotVer) {
 
-	/*
-	//1. Reset the ROTInitiated flag
-	m_bROTInitiated = false;
-	m_bROTRequested = true;
-
-
-	//2. build UP path to the TDC
-	//this is intended to request ROT if the CS of the provider AD is not available
-	//path contains special opaque field (i.e., timestamp)
+    /*
+    // Reset the ROTInitiated flag
+    m_bROTInitiated = m_bROTRequested = true;
+    
+    //2. build UP path to the TDC
+    //this is intended to request ROT if the CS of the provider AD is not available
+    //path contains special opaque field (i.e., timestamp)
 	aes_context actx;
 	getOfgKey(SPH::getTimestamp(packet),actx);
 	
@@ -515,7 +509,7 @@ SCIONBeaconServer::processPCB(SPacket * packet, uint16_t packetLength){
 			for(it=pathServerRange.first; it!=pathServerRange.second; it++) { 
 				
 				// hdr.dst = it->second.addr;
-				scionPrinter->printLog(IH, (char *)"Local PServer: %s\n", it->second.HID);
+				scionPrinter->printLog(IH, (char *)"Local Path Server: %s\n", it->second.HID);
 				hdr.dst = HostAddr(HOST_ADDR_SCION, (uint64_t)strtoull((const char*)it->second.HID, NULL, 10));
 				SPH::setHeader(newPacket, hdr);
 				
@@ -623,7 +617,7 @@ void SCIONBeaconServer::push(int port, Packet *p)
 	if(type==BEACON){
 		
 		if(!m_bROTInitiated){
-			scionPrinter->printLog(IH, (char *)"BS (%s): No valid ROT file. Ignoring PCB.\n", m_AD.c_str(), m_HID.c_str());
+			scionPrinter->printLog(EH, (char *)"BS (%s): No valid ROT file. Ignoring PCB.\n", m_AD.c_str(), m_HID.c_str());
             return;
 		}
 			
@@ -639,9 +633,8 @@ void SCIONBeaconServer::push(int port, Packet *p)
 			printf("BS (%s): RoT version has been changed. Get a new ROT from local CS.\n", m_HID.c_str());
 			#endif
 			requestROT(packet,ROTVersion);
-			//continue;
 			return;
-		}// ROT version change handler
+		} // ROT version change handler
 		
 		processPCB(packet,packetLength);
 

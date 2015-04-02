@@ -212,7 +212,7 @@ void SCIONPathServer::push(int port, Packet *p)
     HostAddr src = SPH::getSrcAddr(packet);
     HostAddr dst = SPH::getDstAddr(packet);
     if(src == m_clients.begin()->second.addr) 
-            src =HostAddr(HOST_ADDR_SCION, m_uAdAid);
+            src = HostAddr(HOST_ADDR_SCION, m_uAdAid);
         
 
     /*AID_REQ : AID request from switch*/
@@ -325,17 +325,7 @@ void SCIONPathServer::push(int port, Packet *p)
 
 void SCIONPathServer::run_timer(Timer* timer){
     sendHello();
-/*    
-        uint8_t packet[COMMON_HEADER_SIZE + PATH_INFO_SIZE];
-        printf("sending test request\n");
-        uint8_t ts = 0;
-        uint64_t target = m_uAdAid;
-        HostAddr requestId = HostAddr(HOST_ADDR_SCION, 5);
-        sendRequest(target, requestId);
-
-        _timer.schedule_after_sec(5);*/
-
-        _timer.reschedule_after_sec(5);
+    _timer.reschedule_after_sec(5);
 }
 
 
@@ -763,43 +753,6 @@ void SCIONPathServer::sendHello() {
 */
 
 void SCIONPathServer::sendPacket(uint8_t* data, uint16_t data_length, string dest) {
-
-#if 0
-    uint16_t type = SPH::getType(data);
-    
-    HostAddr src = SPH::getSrcAddr(data);
-    HostAddr dst = SPH::getDstAddr(data);
-    
-    if(dst == m_servers.find(BeaconServer)->second.addr || dst ==
-        m_servers.find(PathServer)->second.addr || dst==m_clients.begin()->second.addr){
-        dst = HostAddr(HOST_ADDR_SCION, m_uAdAid);
-    }
-	
-	//scionPrinter->printLog(IH,type,ts,src,dst,"%u,SENT\n",data_length);
-	//SLA:
-	uint8_t ipp[data_length+IPHDR_LEN]; 
-	if(m_vPortInfo[port].addr.getType() == HOST_ADDR_IPV4) {
-		switch(fwd_type) {
-		case TO_SERVER:
-			if(m_pIPEncap->encap(ipp,data,data_length,SPH::getDstAddr(data).getIPv4Addr()) 
-				== SCION_FAILURE)
-				return;
-		break;
-		case TO_ROUTER:{
-			uint16_t iface = SPH::getOutgoingInterface(data);
-			std::map<uint16_t,HostAddr>::iterator itr = ifid2addr.find(iface);
-			if(itr == ifid2addr.end()) return;
-			if(m_pIPEncap->encap(ipp,data,data_length,itr->second.getIPv4Addr()) == SCION_FAILURE)
-				return;
-		} break;
-		default: break;
-		}
-		data = ipp;
-	}
-
-    WritablePacket* outPacket= Packet::make(DEFAULT_HD_ROOM, data, data_length, DEFAULT_TL_ROOM);
-    output(port).push(outPacket);
-#endif
 
     string src = "RE ";
     src.append(m_AD.c_str());
