@@ -146,32 +146,37 @@ static const char *get_keydir()
 
 int destroy_keypair(char *pubkeyhashstr, int hashstrlen)
 {
-	const char *keydir = get_keydir();
 	char *privfilepath;
 	char *pubfilepath;
+	int privfilepathlen;
+	int pubfilepathlen;
 	int rc = 0;
 	int state = 0;
-	int privfilepathlen = strlen(keydir) + strlen("/") + hashstrlen + 1;
-	int pubfilepathlen = privfilepathlen + strlen(".pub");
+	const char *keydir = get_keydir();
 	if(keydir == NULL) {
 		rc = -1;
 		LOG("destroy_keypair: ERROR: Key directory not found");
 		goto destroy_keypair_done;
 	}
+	state = 1;
+
+	privfilepathlen = strlen(keydir) + strlen("/") + hashstrlen + 1;
+	pubfilepathlen = privfilepathlen + strlen(".pub");
+
 	privfilepath = (char *)calloc(privfilepathlen, 1);
 	if(privfilepath == NULL) {
 		rc = -1;
 		LOG("destroy_keypair: ERROR: Out of memory");
 		goto destroy_keypair_done;
 	}
-	state = 1;
+	state = 2;
 	pubfilepath = (char *)calloc(pubfilepathlen, 1);
 	if(pubfilepath == NULL) {
 		rc = -1;
 		LOG("destroy_keypair: ERROR: Memory not available");
 		goto destroy_keypair_done;
 	}
-	state = 2;
+	state = 3;
 	strcat(privfilepath, keydir);
 	strcat(privfilepath, "/");
 	strncat(privfilepath, pubkeyhashstr, hashstrlen);
@@ -189,10 +194,12 @@ int destroy_keypair(char *pubkeyhashstr, int hashstrlen)
 	}
 destroy_keypair_done:
 	switch(state) {
-		case 2:
+		case 3:
 			free(pubfilepath);
-		case 1:
+		case 2:
 			free(privfilepath);
+		case 1:
+			free((void *)keydir);
 	};
 	return rc;
 }
@@ -223,6 +230,7 @@ int generate_keypair(char *pubkeyhashstr, int hashstrlen)
 		LOG("generate_keypair: ERROR: Key directory not found");
 		goto cleanup_generate_keypair;
 	}
+	state = 1;
 
 	// Check that the directory provided by user is valid
 	if(!dir_exists(keydir)) {
@@ -235,7 +243,7 @@ int generate_keypair(char *pubkeyhashstr, int hashstrlen)
 	if(bne == NULL) {
 		goto cleanup_generate_keypair;
 	}
-	state = 1;
+	state = 2;
 
     if(BN_set_word(bne, e) != 1) {
         goto cleanup_generate_keypair;
@@ -246,14 +254,14 @@ int generate_keypair(char *pubkeyhashstr, int hashstrlen)
     if(RSA_generate_key_ex(r, KEY_BITS, bne, NULL) != 1) {
         goto cleanup_generate_keypair;
     }
-	state = 2;
+	state = 3;
  
     // Derive filename from hash of public key and write keys to filesystem
 	pubkeybuf = BIO_new(BIO_s_mem());
 	if(pubkeybuf == NULL) {
 		goto cleanup_generate_keypair;
 	}
-	state = 3;
+	state = 4;
 
 	if(PEM_write_bio_RSA_PUBKEY(pubkeybuf, r) != 1) {
 		goto cleanup_generate_keypair;
@@ -263,7 +271,7 @@ int generate_keypair(char *pubkeyhashstr, int hashstrlen)
 	if(pubkeystr == NULL) {
 		goto cleanup_generate_keypair;
 	}
-	state = 4;
+	state = 5;
 
 	if(BIO_read(pubkeybuf, pubkeystr, keylen) <= 0) {
 		goto cleanup_generate_keypair;
@@ -280,10 +288,11 @@ int generate_keypair(char *pubkeyhashstr, int hashstrlen)
  
 cleanup_generate_keypair:
 	switch(state) {
-		case 4: free(pubkeystr);
-		case 3: BIO_free_all(pubkeybuf);
-    	case 2: RSA_free(r);
-    	case 1: BN_free(bne);
+		case 5: free(pubkeystr);
+		case 4: BIO_free_all(pubkeybuf);
+		case 3: RSA_free(r);
+		case 2: BN_free(bne);
+		case 1: free((void *)keydir);
 	};
  
     return retval;
@@ -305,6 +314,7 @@ int XmakeNewSID(char *randomSID, int randomSIDlen)
 int exists_keypair(const char *pubkeyhashstr)
 {
 	int retval = 0;
+	int state = 0;
 	char *privfilepath;
 	char *pubfilepath;
 	int privfilepathlen;
@@ -312,24 +322,40 @@ int exists_keypair(const char *pubkeyhashstr)
 	const char *keydir = get_keydir();
 	if(keydir == NULL) {
 		LOG("exists_keypair: ERROR: Key directory not found");
-		return retval;
+		goto exists_keypair_done;
 	}
+	state = 1;
 
 	LOGF("Key directory:%s:", keydir);
 	if(!dir_exists(keydir)) {
-		return retval;
+		LOG("Key directory does not exist");
+		goto exists_keypair_done;
 	}
 	privfilepathlen = strlen(keydir) + strlen("/") + strlen(pubkeyhashstr) + 1;
 	pubfilepathlen = privfilepathlen + strlen(".pub");
 	privfilepath = (char *)calloc(privfilepathlen, 1);
+	if(privfilepath == NULL) {
+		LOG("Unable to allocate memory to store private-file path");
+		goto exists_keypair_done;
+	}
+	state = 2;
 	pubfilepath = (char *)calloc(pubfilepathlen, 1);
+	if(pubfilepath == NULL) {
+		LOG("Unable to allocate memory to store public-file path");
+		goto exists_keypair_done;
+	}
+	state = 3;
 	sprintf(privfilepath, "%s/%s", keydir, pubkeyhashstr);
 	sprintf(pubfilepath, "%s.pub", privfilepath);
 	if(file_exists(privfilepath) && file_exists(pubfilepath)) {
 		retval = 1;
 	}
-	free(privfilepath);
-	free(pubfilepath);
+exists_keypair_done:
+	switch(state) {
+		case 3: free(pubfilepath);
+		case 2: free(privfilepath);
+		case 1: free((void *)keydir);
+	}
 	return retval;
 }
 
