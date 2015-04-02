@@ -24,9 +24,9 @@ beacon2 :: XIONBeaconServer(RE AD2 BSHID2, AD2, BSHID2, 0.0.0.0, 2300, aa:aa:aa:
 path2 :: XIONPathServer(RE AD2 PSHID2, AD2, PSHID2, 0.0.0.0, 2400, aa:aa:aa:aa:aa:aa,
         CONFIG_FILE "./TD1/Non-TDC/AD2/pathserver/conf/AD2PS.conf",
         TOPOLOGY_FILE "./TD1/Non-TDC/AD2/topology2.xml");     
-//cert2 :: XIONCertServer(RE AD2 CSHID2, AD2, CSHID2, 0.0.0.0, 2500, aa:aa:aa:aa:aa:aa,
-//        CONFIG_FILE "./TD1/Non-TDC/AD2/certserver/conf/AD2CS.conf",
-//        TOPOLOGY_FILE "./TD1/Non-TDC/AD2/topology2.xml");
+cert2 :: XIONCertServer(RE AD2 CSHID2, AD2, CSHID2, 0.0.0.0, 2500, aa:aa:aa:aa:aa:aa,
+        CONFIG_FILE "./TD1/Non-TDC/AD2/certserver/conf/AD2CS.conf",
+        TOPOLOGY_FILE "./TD1/Non-TDC/AD2/topology2.xml");
 
 controller3 :: XIAController4Port(RE AD3 CHID3, AD3, CHID3, 0.0.0.0, 2600, aa:aa:aa:aa:aa:aa);
 router3 :: XIARouter4Port(RE AD3 RHID3, AD3, RHID3, 0.0.0.0, 2700,
@@ -37,9 +37,9 @@ beacon3 :: XIONBeaconServer(RE AD3 BSHID3, AD3, BSHID3, 0.0.0.0, 2800, aa:aa:aa:
 path3 :: XIONPathServer(RE AD3 PSHID3, AD3, PSHID3, 0.0.0.0, 2900, aa:aa:aa:aa:aa:aa,
         CONFIG_FILE "./TD1/Non-TDC/AD3/pathserver/conf/AD3PS.conf",
         TOPOLOGY_FILE "./TD1/Non-TDC/AD3/topology3.xml");
-//cert3 :: XIONCertServer(RE AD3 CSHID3, AD3, CSHID3, 0.0.0.0, 3000, aa:aa:aa:aa:aa:aa,
-//        CONFIG_FILE "./TD1/Non-TDC/AD3/certserver/conf/AD3CS.conf",
-//        TOPOLOGY_FILE "./TD1/Non-TDC/AD3/topology3.xml");
+cert3 :: XIONCertServer(RE AD3 CSHID3, AD3, CSHID3, 0.0.0.0, 3000, aa:aa:aa:aa:aa:aa,
+        CONFIG_FILE "./TD1/Non-TDC/AD3/certserver/conf/AD3CS.conf",
+        TOPOLOGY_FILE "./TD1/Non-TDC/AD3/topology3.xml");
          
 controller4 :: XIAController4Port(RE AD4 CHID4, AD4, CHID4, 0.0.0.0, 3100, aa:aa:aa:aa:aa:aa);
 router4 :: XIARouter4Port(RE AD4 RHID5, AD4, RHID5, 0.0.0.0, 3200,
@@ -50,9 +50,9 @@ beacon4 :: XIONBeaconServer(RE AD4 BSHID4, AD4, BSHID4, 0.0.0.0, 3300, aa:aa:aa:
 path4 :: XIONPathServer(RE AD4 PSHID4, AD4, PSHID4, 0.0.0.0, 3400, aa:aa:aa:aa:aa:aa,
         CONFIG_FILE "./TD1/Non-TDC/AD4/pathserver/conf/AD4PS.conf",
         TOPOLOGY_FILE "./TD1/Non-TDC/AD4/topology4.xml");
-//cert4 :: XIONCertServer(RE AD4 CSHID4, AD4, CSHID4, 0.0.0.0, 3500, aa:aa:aa:aa:aa:aa,
-//        CONFIG_FILE "./TD1/Non-TDC/AD4/certserver/conf/AD4CS.conf",
-//        TOPOLOGY_FILE "./TD1/Non-TDC/AD4/topology4.xml");
+cert4 :: XIONCertServer(RE AD4 CSHID4, AD4, CSHID4, 0.0.0.0, 3500, aa:aa:aa:aa:aa:aa,
+        CONFIG_FILE "./TD1/Non-TDC/AD4/certserver/conf/AD4CS.conf",
+        TOPOLOGY_FILE "./TD1/Non-TDC/AD4/topology4.xml");
 
 enc4 :: XIONEncap(RE AD4 CHID5, AD4, CHID5, 0.0.0.0, 4000, aa:aa:aa:aa:aa:aa);
 
@@ -131,18 +131,19 @@ router4[3] -> Idle;
 controller1[3] -> LinkUnqueue(0.005, 1 GB/s) -> [0]cert1;
 cert1[0] -> LinkUnqueue(0.005, 1 GB/s) -> [3]controller1;
 
-//controller2[3] -> LinkUnqueue(0.005, 1 GB/s) -> [0]cert2;
-//cert2[0] -> LinkUnqueue(0.005, 1 GB/s) -> [3]controller2;
+controller2[3] -> LinkUnqueue(0.005, 1 GB/s) -> [0]cert2;
+cert2[0] -> LinkUnqueue(0.005, 1 GB/s) -> [3]controller2;
 
-//controller3[3] -> LinkUnqueue(0.005, 1 GB/s) -> [0]cert3;
-//cert3[0] -> LinkUnqueue(0.005, 1 GB/s) -> [3]controller3;
+controller3[3] -> LinkUnqueue(0.005, 1 GB/s) -> [0]cert3;
+cert3[0] -> LinkUnqueue(0.005, 1 GB/s) -> [3]controller3;
 
-//controller4[3] -> LinkUnqueue(0.005, 1 GB/s) -> [0]cert4;
-//cert4[0] -> LinkUnqueue(0.005, 1 GB/s) -> [3]controller4;
+controller4[3] -> LinkUnqueue(0.005, 1 GB/s) -> [0]cert4;
+cert4[0] -> LinkUnqueue(0.005, 1 GB/s) -> [3]controller4;
 
-Idle -> [3]controller2[3] -> Idle;
-Idle -> [3]controller3[3] -> Idle;
-Idle -> [3]controller4[3] -> Idle;
+//Idle -> [3]controller1[3] -> Idle;
+//Idle -> [3]controller2[3] -> Idle;
+//Idle -> [3]controller3[3] -> Idle;
+//Idle -> [3]controller4[3] -> Idle;
 
 
 // The following line is required by the xianet script so it can determine the appropriate
