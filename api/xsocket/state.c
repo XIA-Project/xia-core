@@ -172,6 +172,7 @@ int SocketState::getPacket(unsigned seq, char *buf, unsigned buflen)
 	if (it != m_packets.end()) {
 		string s = it->second;
 
+printf("getting a packet\n");
 		rc = MIN(buflen, s.size());
 		memcpy(buf, s.c_str(), rc);
 
@@ -258,6 +259,7 @@ void SocketMap::remove(int sock)
 	SocketMap *state = getMap();
 
 	pthread_rwlock_wrlock(&rwlock);
+	delete state->sockets[sock];
 	state->sockets.erase(sock);
 	pthread_rwlock_unlock(&rwlock);
 }
@@ -423,6 +425,7 @@ unsigned seqNo(int sock)
 
 void cachePacket(int sock, unsigned seq, char *buf, unsigned buflen)
 {
+printf("adding cached packet\n");
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate) {
 		sstate->insertPacket(seq, buf, buflen);
