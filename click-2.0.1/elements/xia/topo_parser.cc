@@ -63,7 +63,7 @@ int TopoParser::parseServers(multimap<int, Servers> &servers){
             memcpy(newServer.HID, ptr2->FirstChildElement("HID")->GetText(), 40);
             newServer.HID[40] = '\0';
             servers.insert(pair<int, Servers>(BeaconServer, newServer));
-        }else if(!strcmp(ptr2->Name(), "CertificateServer")){
+        }else if(!strcmp(ptr2->Name(), "CertServer")){
             newServer.type=CertificateServer;
             memcpy(newServer.HID, ptr2->FirstChildElement("HID")->GetText(), 40);
             newServer.HID[40] = '\0';

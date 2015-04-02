@@ -49,19 +49,16 @@
 CLICK_DECLS
 
 int SCIONCertServer::configure(Vector<String> &conf, ErrorHandler *errh){
-	
-	if(cp_va_kparse(conf, this, errh,
-	"AID", cpkM, cpUnsigned64, &m_uAid,
-	"CONFIG_FILE", cpkM, cpString, &m_sConfigFile,
-	"TOPOLOGY_FILE", cpkM, cpString, &m_sTopologyFile, 
-	"ROT", cpkM, cpString, &m_sROTFile,
-	"Cert", cpkM, cpString, &m_csCert, // tempral store in click file
-	"PrivateKey", cpkM, cpString, &m_csPrvKey, // tempral store in click file
-	cpEnd) <0){
-		printf("ERR: click configuration fail at SCIONCertServer.\n");
-		printf("Exit SCON Network.\n");
-		exit(-1);
-	}
+    if(cp_va_kparse(conf, this, errh,
+        "AD", cpkM, cpString, &m_AD,
+        "HID", cpkM, cpString, &m_HID,
+        "CONFIG_FILE", cpkM, cpString, &m_sConfigFile, 
+        "TOPOLOGY_FILE",cpkM, cpString, &m_sTopologyFile,
+        cpEnd) <0){
+            click_chatter("ERR: click configuration fail at SCIONCertServer.\n");
+            click_chatter("Exit SCON Network.\n");
+            exit(-1);
+    }
 	
 	XIAXIDInfo xiaxidinfo;
     struct click_xia_xid store;
@@ -90,26 +87,28 @@ int SCIONCertServer::initialize(ErrorHandler* errh){
 
 	m_iLogLevel =config.getLogLevel();
 	config.getCSLogFilename(m_csLogFile);
+	config.getROTFilename((char*)m_sROTFile);
 
 	// setup scionPrinter for message logging
 	scionPrinter = new SCIONPrint(m_iLogLevel, m_csLogFile);
-	scionPrinter->printLog(IL, (char*)"CS INIT.\n");
-	scionPrinter->printLog(IL, (char*)"ADAID = %llu, TDID = %llu.\n", m_uAdAid, m_uTdAid);
+	scionPrinter->printLog(IH, (char*)"CS (%s:%s) INIT.\n", m_AD.c_str(), m_HID.c_str());
 
 	// task 2: parse topology file
 	parseTopology();
 	//constructIfid2AddrMap();
 	//initializeOutputPort();
-	scionPrinter->printLog(IL, (char*)"Parse Topology Done.\n");
+	scionPrinter->printLog(IH, (char*)"Parse Topology Done.\n");
 	
 	// task 3: parse ROT (root of trust) file at local folder
 	parseROT();
-	scionPrinter->printLog(IL, (char*)"Parse and Verify ROT Done.\n");
+	scionPrinter->printLog(IH, (char*)"Parse and Verify ROT Done.\n");
 
 	// task4: checking local cert and private key
 	// TODO here
 	
 	ScheduleInfo::initialize_task(this, &_task, errh);
+	scionPrinter->printLog(IH, (char*)"CS (%s:%s) INIT Done.\n", m_AD.c_str(), m_HID.c_str());
+	
 	return 0;
 }
 
@@ -120,45 +119,39 @@ int SCIONCertServer::initialize(ErrorHandler* errh){
 	if filename is given as an argument, parsing only verifies the (temporary) ROT file
 	and returns the results.
 */
-int SCIONCertServer::parseROT(String filename){	
+int SCIONCertServer::parseROT(char* loc){	
 	ROTParser parser;
-	String fn;
+	char* fn = NULL;
 	ROT tROT;
 	
-	if(filename.length())
-		fn = filename;
+	if(loc)
+		fn = loc;
 	else
 		fn = m_sROTFile;
 
-	if(parser.loadROTFile(fn.c_str())!=ROTParseNoError){
-		printf("ERR: ROT File missing at CS.\n");
-		printf("fatal error, Exit SCION Network.\n");
+	if(parser.loadROTFile(fn)!=ROTParseNoError){
+		scionPrinter->printLog(EH, (char*)"ERR: ROT File missing at CS.\n");
 		return SCION_FAILURE;
-		//exit(-1);
 	}
-	scionPrinter->printLog(IL, "Load ROT OK.\n");
+	scionPrinter->printLog(IH, "Load ROT OK.\n");
 
 	if(parser.parse(tROT)!=ROTParseNoError){
-		printf("ERR: ROT File parsing error at CS.\n");
-		printf("Fatal error, Exit SCION Network.\n");
+		scionPrinter->printLog(EH, "ERR: ROT File parsing error at CS.\n");
 		return SCION_FAILURE;
-		//exit(-1);
 	}
-	scionPrinter->printLog(IL, "Parse ROT OK.\n");
+	scionPrinter->printLog(IH, "Parse ROT OK.\n");
 
 	if(parser.verifyROT(tROT)!=ROTParseNoError){
-		printf("ERR: ROT File parsing error at CS.\n");
-		printf("Exit SCION Network.\n");
+		scionPrinter->printLog(EH, "ERR: ROT File parsing error at CS.\n");
 		return SCION_FAILURE;
-		//exit(-1);
 	}
 
 	//Store the ROT if verification passed.
 	parser.parse(m_ROT);
-	scionPrinter->printLog(IL, "Verify ROT OK.\n");
+	scionPrinter->printLog(IH, "Verify ROT OK.\n");
 
 	// prepare ROT for delivery
-	FILE* rotFile = fopen(fn.c_str(), "r");
+	FILE* rotFile = fopen(fn, "r");
 	fseek(rotFile, 0, SEEK_END);
 	curROTLen = ftell(rotFile);
 	rewind(rotFile);
@@ -175,7 +168,7 @@ int SCIONCertServer::parseROT(String filename){
 		offset+=buffLen;
 	}
 	fclose(rotFile);
-	scionPrinter->printLog(IL, "CS: Stored Verified ROT for further delivery.\n");
+	scionPrinter->printLog(IH, "CS: Stored Verified ROT for further delivery.\n");
 	return SCION_SUCCESS;
 }
 
@@ -327,48 +320,43 @@ SCIONCertServer::processROTRequest(uint8_t * packet) {
 	SLN:
 	process certificate reply from an upstream AD
 */
-void
-SCIONCertServer::processROTReply(uint8_t * packet) {
+void SCIONCertServer::processROTReply(uint8_t * packet) {
+	
 	ROTRequest *req = (ROTRequest *)SPH::getData(packet);
 	//SL:
 	//check if the reply contains a higher ROT file
 	//otherwise, don't propagate. Possibly, a bogus ROT request...
 	//ToDo: should an error message be sent to Hosts and m_ROTRequesters cleared?
 	if(req->previousVersion == req->currentVersion) {
-		scionPrinter->printLog("The requested ROT does not exist.\n");
+		scionPrinter->printLog(EH, "The requested ROT does not exist.\n");
 		m_ROTRequests.clear();
 		return;
 	}
 
 	//1. verify if the returned ROT is correct
-	//1.1. store as a temporary file
-	char nFile[100];
-	memset(nFile, 0, 100);
+	char nFile[MAX_FILE_LEN];
+	memset(nFile, 0, MAX_FILE_LEN);
 	sprintf(nFile,"./TD1/Non-TDC/AD%llu/certserver/ROT/rot-td%llu-%d.xml", m_uAdAid, m_uTdAid, req->currentVersion);
-
-	String rotfn = String(nFile);
-	printf("Update ROT file: %s\n", rotfn.c_str());
+	scionPrinter->printLog(IH, "Update ROT file: %s\n", nFile);
 	
-	uint16_t offset = sizeof(ROTRequest);
-	SCL::saveToFile(packet, offset, SPH::getTotalLen(packet), rotfn);
-
-	//1.2. verify using ROTParser
-	if(parseROT(rotfn) == SCION_FAILURE) {
-		//Invalid ROT is delivered.
-		//Revert to the locally verified ROT
-		parseROT();
-		return;
-	}
+	uint16_t packetLength = SPH::getTotalLen(packet);
+	uint16_t offset = SPH::getHdrLen(packet)+sizeof(ROTRequest);
+    uint16_t rotLen = packetLength-offset;
+    // Write to file defined in Config
+    FILE* rotFile = fopen(nFile, "w+");
+    fwrite(packet+offset, 1, rotLen, rotFile);
+    fclose(rotFile);
 	
-	// we do not need to back up again
-	//1.3. backup the previous version and overwrite the received one to the current version of ROT.
-	//String backupFile = m_sROTFile + String(".ver.") + String(req->previousVersion);
-	//rename(m_sROTFile.c_str(), backupFile.c_str());
-	//rename(rotfn.c_str(), m_sROTFile.c_str());
-	m_sROTFile = rotfn;
-	//Load the new ROT file
-	//parseROT();
-
+	if(parseROT(nFile) == SCION_FAILURE) {
+        scionPrinter->printLog(IH, (char *)"CS (%lu:%lu) fail to parse ROT.\n", m_uAdAid, m_uAid);
+        // remove file
+        remove(nFile);
+        return;
+    }else{
+        scionPrinter->printLog(IH, (char *)"CS (%lu:%lu) stored received ROT.\n", m_uAdAid, m_uAid);
+        strncpy( m_sROTFile, nFile, MAX_FILE_LEN );
+    }
+	
 	//2. send it to the requester(s)
 	std::pair<std::multimap<uint32_t,HostAddr>::iterator,std::multimap<uint32_t,HostAddr>::iterator > range
 		= m_ROTRequests.equal_range(req->currentVersion);
@@ -392,7 +380,6 @@ SCIONCertServer::processROTReply(uint8_t * packet) {
 		//SL: the following two lines are not necessary. will test this later...
 		opaqueField* of = (opaqueField*)(packet+COMMON_HEADER_SIZE+currOFPtr);
 		SPH::setDstAddr(packet, ifid2addr.find(of->egressIf)->second);
-
 		//sendPacket(packet, SPH::getTotalLen(packet), PORT_TO_SWITCH, TO_ROUTER);
 	}
 }
@@ -626,6 +613,7 @@ SCIONCertServer::processLocalCertificateRequest(uint8_t * packet) {
 */
 bool SCIONCertServer::run_task(Task *task){
 
+	/*
 	Packet* inPacket;
 	while((inPacket=input(PORT_TO_SWITCH).pull())){
 		
@@ -679,6 +667,8 @@ bool SCIONCertServer::run_task(Task *task){
 			break;
 		}
 	}
+	*/
+	
 	_task.fast_reschedule();
 	return true;
 }

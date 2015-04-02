@@ -1,16 +1,16 @@
 <?xml version="1.0" ?>
 <Topology>
-	<Servers>
-		<BeaconServer>
-			<HID>0000000000000000000000000000000000200000</HID>
+    <Servers>
+        <BeaconServer>
+	    <HID>0000000000000000000000000000000000200000</HID>
         </BeaconServer>
         <PathServer>
-			<HID>0000000000000000000000000000000000100000</HID>
+	    <HID>0000000000000000000000000000000000100000</HID>
         </PathServer>
-        <!--
-        <CertificateServer>
-			<HID>0000000000000000000000000000000000200000</HID>
-        </CertificateServer>
-        -->
-	</Servers>
+	<!--
+        <CertServer>
+	    <HID>0000000000000000000000000000000000300000</HID>
+        </CertServer>
+	-->
+    </Servers>
 </Topology>

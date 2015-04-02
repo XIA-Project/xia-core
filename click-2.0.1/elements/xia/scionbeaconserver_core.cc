@@ -46,17 +46,15 @@
 CLICK_DECLS
 
 int SCIONBeaconServerCore::configure(Vector<String> &conf, ErrorHandler *errh) {
-  if(cp_va_kparse(conf, this, errh,
-	"AD", cpkM, cpString, &m_AD,
-	"HID", cpkM, cpString, &m_HID,
-    "AID", cpkM, cpUnsigned64,&m_uAid, 
-    "CONFIG_FILE", cpkM, cpString, &m_sConfigFile, 
-    "TOPOLOGY_FILE",cpkM, cpString, &m_sTopologyFile,
-    "ROT", cpkM, cpString, &m_sROTFile,
-    cpEnd) <0) {
-    scionPrinter->printLog(EH, (char *)"ERR: click configuration fail at SCIONBeaconServerCore.\n");
-    scionPrinter->printLog(EH, (char *)"ERR: Fault error, exit SCION Network.\n");
-    exit(-1);
+    if(cp_va_kparse(conf, this, errh,
+        "AD", cpkM, cpString, &m_AD,
+        "HID", cpkM, cpString, &m_HID,
+        "CONFIG_FILE", cpkM, cpString, &m_sConfigFile, 
+        "TOPOLOGY_FILE",cpkM, cpString, &m_sTopologyFile,
+        cpEnd) <0) {
+            click_chatter("ERR: click configuration fail at SCIONBeaconServerCore.\n");
+            click_chatter("ERR: Fault error, exit SCION Network.\n");
+            exit(-1);
     }
 
     XIAXIDInfo xiaxidinfo;
@@ -75,86 +73,84 @@ int SCIONBeaconServerCore::configure(Vector<String> &conf, ErrorHandler *errh) {
 }
 
 int SCIONBeaconServerCore::initialize(ErrorHandler* errh) {
+    // task1: Config object get ROT, certificate file, private key path info
+    Config config; 
+    config.parseConfigFile((char*)m_sConfigFile.c_str());
+    config.getPrivateKeyFilename((char*)m_csPrvKeyFile);
+    config.getCertFilename((char*)m_csCertFile);
+    config.getROTFilename((char*)m_sROTFile);
+    config.getOfgmKey((char*)m_uMkey);
+    config.getPCBLogFilename(m_csLogFile);
 
-  // task1: Config object get ROT, certificate file, private key path info
-  Config config; 
-  config.parseConfigFile((char*)m_sConfigFile.c_str());
-  config.getPrivateKeyFilename((char*)m_csPrvKeyFile);
-  config.getCertFilename((char*)m_csCertFile);
-  config.getOfgmKey((char*)m_uMkey);
-  config.getPCBLogFilename(m_csLogFile);
-  
-  // get AID, ADAID, TDID
-  m_uAdAid = config.getAdAid();
-  m_uTdAid = config.getTdAid();
-  m_iLogLevel = config.getLogLevel();
-  m_iPCBGenPeriod = config.getPCBGenPeriod();
+    // get AID, ADAID, TDID
+    m_uAdAid = config.getAdAid();
+    m_uTdAid = config.getTdAid();
+    m_iLogLevel = config.getLogLevel();
+    m_iPCBGenPeriod = config.getPCBGenPeriod();
 
-  // setup looger, scionPrinter
-  scionPrinter = new SCIONPrint(m_iLogLevel, m_csLogFile); 
-  scionPrinter->printLog(IL, (char *)"TDC BS (%s) INIT.\n", m_AD.c_str());
-  scionPrinter->printLog(IL, (char *)"ADAID = %s, TDID = %llu.\n", m_HID.c_str(), m_uTdAid);
+    // setup looger, scionPrinter
+    scionPrinter = new SCIONPrint(m_iLogLevel, m_csLogFile); 
+    scionPrinter->printLog(IH, (char *)"TDC BS (%s:%s) INIT.\n", m_AD.c_str(), m_HID.c_str());
 
-  // task 2: parse ROT (root of trust) file
-  m_bROTInitiated = parseROT();
-  scionPrinter->printLog(IL, (char *)"Parse/Verify ROT Done.\n");
+    // task 2: parse ROT (root of trust) file
+    m_bROTInitiated = parseROT();
+    if(m_bROTInitiated)
+        scionPrinter->printLog(IH, (char *)"Parse/Verify ROT Done.\n");
 
-  // task 3: parse topology file
-  parseTopology();
-  scionPrinter->printLog(IL, (char *)"Parse Topology Done.\n");
-  
-  // task 4: read key pair if they already exist
-  loadPrivateKey();
-  scionPrinter->printLog(IL, (char *)"Load Private Key Done.\n");
-  // for OFG fields
-  if(initOfgKey()==SCION_FAILURE){
-    scionPrinter->printLog(EH, (char *)"Init OFG key failure.\n");
-    scionPrinter->printLog(EH, (char *)"ERR: InitOFGKey fail at SCIONBeaconServerCore.\n");
-    scionPrinter->printLog(EH, (char *)"ERR: Fatal error, exit SCION Network.\n");
-    exit(-1);
-  }
-  if(updateOfgKey()==SCION_FAILURE){
-    scionPrinter->printLog(IL, (char *)"Update OFG key failure.\n");
-        scionPrinter->printLog(EH, (char *)"ERR: updateOFGKey fail at SCIONBeaconServerCore.\n");
-        scionPrinter->printLog(EH, (char *)"ERR: Fatal error, exit SCION Network.\n");
-    exit(-1);
-  }
-  scionPrinter->printLog(IL, (char *)"Load OFG key Done.\n");
+    // task 3: parse topology file
+    parseTopology();
+    scionPrinter->printLog(IH, (char *)"Parse Topology Done.\n");
 
-  scionPrinter->printLog(IH, (char *)"numChildren=%d\n", m_routepairs.count(Child));
+    // task 4: read key pair if they already exist
+    loadPrivateKey();
+    scionPrinter->printLog(IH, (char *)"Load Private Key Done.\n");
 
-  // start scheduler to received packets
-  ScheduleInfo::initialize_task(this, &_task, errh);
-  // Trigger Timer
-  _timer.initialize(this);
-  //SL:
-  //start after other elements are initialized
-  //this part should be considered more carefully later.
-  //e.g., how to handle PCBs propagated before others set up (e.g., ifid config)
-  _timer.schedule_after_sec(5);
-  //_timer.schedule_now();
-  
-  return 0;
+    // for OFG fields
+    if(!initOfgKey()){
+        scionPrinter->printLog(EH, (char *)"Init OFG key failure.\n");
+        click_chatter("ERR: InitOFGKey fail at SCIONBeaconServerCore.\n");
+        click_chatter("ERR: Fatal error, exit SCION Network.\n");
+        exit(-1);
+    }
+    if(!updateOfgKey()){
+        scionPrinter->printLog(IH, (char *)"Update OFG key failure.\n");
+        click_chatter("ERR: updateOFGKey fail at SCIONBeaconServerCore.\n");
+        click_chatter("ERR: Fatal error, exit SCION Network.\n");
+        exit(-1);
+    }
+    scionPrinter->printLog(IH, (char *)"Load OFG key Done.\n");
+    scionPrinter->printLog(IH, (char *)"numChildren=%d\n", m_routepairs.count(Child));
+    scionPrinter->printLog(IH, (char *)"TDC BS (%s:%s) INIT Done.\n", m_AD.c_str(), m_HID.c_str());
+
+    // start scheduler to received packets
+    ScheduleInfo::initialize_task(this, &_task, errh);
+    // Trigger Timer
+    _timer.initialize(this);
+    //start after other elements are initialized
+    //this part should be considered more carefully later.
+    //e.g., how to handle PCBs propagated before others set up (e.g., ifid config)
+    _timer.schedule_after_sec(10);
+    return 0;
 }
 
 bool SCIONBeaconServerCore::parseROT(){
-  ROTParser parser;
-  if(parser.loadROTFile(m_sROTFile.c_str())!=ROTParseNoError){
-    scionPrinter->printLog(IL, (char *)"ERR: ROT File missing at SCIONBeaconServerCore.\n");
-    return false;
-  }else{
-    // ROT found in local folder
-    if(parser.parse(m_cROT)!=ROTParseNoError){
-      scionPrinter->printLog(IL, (char *)"ERR: ROT File parsing error at SCIONBeaconServerCore.\n");
-      return false;
-    }
+    ROTParser parser;
+    if(parser.loadROTFile(m_sROTFile)!=ROTParseNoError){
+        scionPrinter->printLog(EH, (char *)"ERR: ROT File missing at SCIONBeaconServerCore.\n");
+        return SCION_FAILURE;
+    }else{
+        // ROT found in local folder
+        if(parser.parse(m_cROT)!=ROTParseNoError){
+            scionPrinter->printLog(EH, (char *)"ERR: ROT File parsing error at SCIONBeaconServerCore.\n");
+            return SCION_FAILURE;
+        }
 
-    if(parser.verifyROT(m_cROT)!=ROTParseNoError){
-      scionPrinter->printLog(IL, (char *)"ERR: ROT File parsing error at SCIONBeaconServerCore.\n");
-      return false;
+        if(parser.verifyROT(m_cROT)!=ROTParseNoError){
+            scionPrinter->printLog(EH, (char *)"ERR: ROT File parsing error at SCIONBeaconServerCore.\n");
+            return SCION_FAILURE;
+        }
     }
-  }
-  return true;
+    return SCION_SUCCESS;
 }
 
 void SCIONBeaconServerCore::parseTopology(){
@@ -165,54 +161,65 @@ void SCIONBeaconServerCore::parseTopology(){
 }
 
 void SCIONBeaconServerCore::loadPrivateKey() {
-  if(!_CryptoIsReady) {
-    rsa_init(&PriKey, RSA_PKCS_V15, 0);
-    
-    int ret;
-    pk_context pk;
-    pk_init( &pk );
-    ret = pk_parse_keyfile( &pk, m_csPrvKeyFile, NULL );
-    if( ret == 0 && ! pk_can_do( &pk, POLARSSL_PK_RSA ) )
-        ret = POLARSSL_ERR_PK_TYPE_MISMATCH;
-    if( ret == 0 )
-        rsa_copy( &PriKey, pk_rsa( pk ) );
-    
-    if( ret != 0) {
-      rsa_free(&PriKey);
-      pk_free( &pk );
-      scionPrinter->printLog(EH, (char *)"Private key file loading failure, path = %s", m_csPrvKeyFile);
-      scionPrinter->printLog(IL, (char *)"Exit SCION Network.");
-      exit(0);
+    if(!_CryptoIsReady) {
+        rsa_init(&PriKey, RSA_PKCS_V15, 0);
+        int ret;
+        pk_context pk;
+        pk_init( &pk );
+        ret = pk_parse_keyfile( &pk, m_csPrvKeyFile, NULL );
+        if( ret == 0 && ! pk_can_do( &pk, POLARSSL_PK_RSA ) )
+            ret = POLARSSL_ERR_PK_TYPE_MISMATCH;
+        if( ret == 0 )
+            rsa_copy( &PriKey, pk_rsa( pk ) );
+        if( ret != 0) {
+            rsa_free(&PriKey);
+            pk_free( &pk );
+            click_chatter("ERR:Private key file loading failure, path = %s", m_csPrvKeyFile);
+            click_chatter("ERR: Fatal error. Exit SCION Network.");
+            exit(-1);
+        }
+        if(rsa_check_privkey(&PriKey)!=0) {
+            rsa_free(&PriKey);
+            click_chatter("ERR: Private key is not well-formatted, path = %s", m_csPrvKeyFile);
+            click_chatter("ERR: Fatal error. Exit SCION Network.");
+            exit(-1);
+        }
+        _CryptoIsReady = true;
     }
-    if(rsa_check_privkey(&PriKey)!=0) {
-      rsa_free(&PriKey);
-      scionPrinter->printLog(EH, (char *)"ERR: Private key is not well-formatted, path = %s", m_csPrvKeyFile);
-      scionPrinter->printLog(IL, (char *)"Exit SCION Network.");
-      exit(0);
-    }
-  _CryptoIsReady = true;
-  }
 }
 
 /*SL: Initialize OFG key */
 bool SCIONBeaconServerCore::initOfgKey() {
-  
-  time_t currTime;
-  time(&currTime);
+    time_t currTime;
+    time(&currTime);
+    //SL: to deal with the case that TDC BS initiate PCB before this BS starts
+    currTime -= 300; //back 5minutes
 
-  //SL: to deal with the case that TDC BS initiate PCB before this BS starts
-  currTime -= 300; //back 5minutes
+    m_currOfgKey.time = currTime;
+    memcpy(m_currOfgKey.key, &m_uMkey, OFG_KEY_SIZE);
 
-  m_currOfgKey.time = currTime;
-  memcpy(m_currOfgKey.key, &m_uMkey, OFG_KEY_SIZE);
+    int err;
+    if(err = aes_setkey_enc(&m_currOfgKey.actx, m_currOfgKey.key, OFG_KEY_SIZE_BITS)) {
+        scionPrinter->printLog(EH, (char *)"OFG Key setup failure: %d\n",err*-1);
+        return SCION_FAILURE;
+    }
 
-  int err;
-  if(err = aes_setkey_enc(&m_currOfgKey.actx, m_currOfgKey.key, OFG_KEY_SIZE_BITS)) {
-    scionPrinter->printLog(EH, (char *)"Enc Key setup failure: %d\n",err*-1);
-    return SCION_FAILURE;
-  }
+    return SCION_SUCCESS;
+}
 
-  return SCION_SUCCESS;
+/*SL: Update OFG key when a new key is available from CS*/
+bool SCIONBeaconServerCore::updateOfgKey() {
+    //This function should be updated...
+    m_prevOfgKey.time = m_currOfgKey.time;
+    memcpy(m_prevOfgKey.key, m_currOfgKey.key, OFG_KEY_SIZE);
+
+    int err;
+    if(err = aes_setkey_enc(&m_prevOfgKey.actx, m_prevOfgKey.key, OFG_KEY_SIZE_BITS)) {
+        scionPrinter->printLog(EH, (char *)"Prev. OFG Key setup failure: %d\n",err*-1);
+        return SCION_FAILURE;
+    }
+
+    return SCION_SUCCESS;
 }
 
 /*
@@ -222,16 +229,16 @@ bool SCIONBeaconServerCore::initOfgKey() {
 */
 bool SCIONBeaconServerCore::getOfgKey(uint32_t timestamp, aes_context &actx)
 {
-
-  if(timestamp > m_currOfgKey.time) {
-    actx = m_currOfgKey.actx;
-  } else {
-    actx = m_prevOfgKey.actx;
-  }
-  return SCION_SUCCESS;
-
-  //SL: following part is left to compare performance later.
-  //////////////////////////////////////////////////////////
+    if(timestamp > m_currOfgKey.time) {
+        actx = m_currOfgKey.actx;
+    } else {
+        actx = m_prevOfgKey.actx;
+    }
+    return SCION_SUCCESS;
+    
+    /*
+    //SL: following part is left to compare performance later.
+    //////////////////////////////////////////////////////////
     std::map<uint32_t, aes_context*>::iterator itr;
 
     //aes_context actx;
@@ -239,8 +246,8 @@ bool SCIONBeaconServerCore::getOfgKey(uint32_t timestamp, aes_context &actx)
 
     //when the key table is full
     while(m_OfgAesCtx.size()>KEY_TABLE_SIZE){
-    itr = m_OfgAesCtx.begin();
-    delete itr->second;
+        itr = m_OfgAesCtx.begin();
+        delete itr->second;
         m_OfgAesCtx.erase(itr);
     }
 
@@ -263,40 +270,25 @@ bool SCIONBeaconServerCore::getOfgKey(uint32_t timestamp, aes_context &actx)
         memset(&newKey, 0, OFG_KEY_SIZE);
         memcpy(newKey.key, buf, OFG_KEY_SIZE);
         //key_table.insert(std::pair<uint32_t, ofgKey>(timestamp, newKey));
+        
+        //SL: OFG key aes context to avoid redundant key scheduling
+        //store the aes_context in m_OfgAesCtx
+        aes_context * pActx = new aes_context; 
+        
+        int err;
+        if(err = aes_setkey_enc(pActx, newKey.key, OFG_KEY_SIZE_BITS)) {
+            scionPrinter->printLog(EH, (char *)"OFG Key setup failure: %d\n",err*-1);
+            return SCION_FAILURE;
+        }
 
-    //SL: OFG key aes context to avoid redundant key scheduling
-    //store the aes_context in m_OfgAesCtx
-    aes_context * pActx = new aes_context; 
-    
-    int err;
-    if(err = aes_setkey_enc(pActx, newKey.key, OFG_KEY_SIZE_BITS)) {
-      scionPrinter->printLog(EH, (char *)"Enc Key setup failure: %d\n",err*-1);
-      return SCION_FAILURE;
-    }
-
-    m_OfgAesCtx.insert(std::pair<uint32_t, aes_context*>(timestamp, pActx));
-    actx = *m_OfgAesCtx.find(timestamp)->second;
-
+        m_OfgAesCtx.insert(std::pair<uint32_t, aes_context*>(timestamp, pActx));
+        actx = *m_OfgAesCtx.find(timestamp)->second;
     }else{
-    actx = *m_OfgAesCtx.find(timestamp)->second;
+        actx = *m_OfgAesCtx.find(timestamp)->second;
     }
 
     return SCION_SUCCESS;
-}
-
-/*SL: Update OFG key when a new key is available from CS*/
-bool SCIONBeaconServerCore::updateOfgKey() {
-  //This function should be updated...
-  m_prevOfgKey.time = m_currOfgKey.time;
-  memcpy(m_prevOfgKey.key, m_currOfgKey.key, OFG_KEY_SIZE);
-
-  int err;
-  if(err = aes_setkey_enc(&m_prevOfgKey.actx, m_prevOfgKey.key, OFG_KEY_SIZE_BITS)) {
-    scionPrinter->printLog(EH, (char *)"Prev. Enc Key setup failure: %d\n",err*-1);
-    return SCION_FAILURE;
-  }
-
-  return SCION_SUCCESS;
+    */
 }
 
 void SCIONBeaconServerCore::push(int port, Packet *p)
@@ -317,56 +309,46 @@ void SCIONBeaconServerCore::push(int port, Packet *p)
     uint32_t ts = SPH::getTimestamp(packet);
 
     switch(type) {
-    	case ROT_REP_LOCAL:
-    	{
-    		#ifdef _SL_DEBUG_BS
-    		scionPrinter->printLog(IH, (char *)"TDC BS (%llu:%llu): Received ROT Reply from TDC CS.\n", m_uAdAid, m_uAid); 
-    		#endif
-    		// open a file with 0 size
-    		int RotL = packetLength-(COMMON_HEADER_SIZE+srcLen+dstLen);
-    		
-    		#ifdef _SL_DEBUG_BS
-    		scionPrinter->printLog(IH, (char *)"TDC BS (%llu:%llu): Received ROT file size = %d\n", m_uAdAid, m_uAid, RotL);
-    		#endif
-    		// Write to file defined in Config
-    		if(RotL>0)
-    		{
-    			FILE * rotFile = fopen(m_sROTFile.c_str(), "w+");
-    			fwrite(packet+COMMON_HEADER_SIZE+srcLen+dstLen, 1, RotL, rotFile);
-    			fclose(rotFile);
-    			scionPrinter->printLog(IL, (char *)"TDC BS (%llu:%llu) stored received ROT.\n", m_uAdAid, m_uAid);
-    			// try to verify local ROT again
-    			m_bROTInitiated = parseROT();
+        case ROT_REP_LOCAL:
+        {
+            // open a file with 0 size
+            int RotL = packetLength-(COMMON_HEADER_SIZE+srcLen+dstLen);
+            scionPrinter->printLog(IH, (char *)"TDC BS (%s:%s): Received ROT file size = %d\n", m_AD.c_str(), m_HID.c_str(), RotL);
+            
+            // Write to file defined in Config
+            /*
+            if(RotL>0)
+            {
+    		    FILE * rotFile = fopen(m_sROTFile, "w+");
+    		    fwrite(packet+COMMON_HEADER_SIZE+srcLen+dstLen, 1, RotL, rotFile);
+    		    fclose(rotFile);
+    		    scionPrinter->printLog(IH, (char *)"TDC BS (%s:%s) stored received ROT.\n", m_AD.c_str(), m_HID.c_str());
+    		    // try to verify local ROT again
+    		    m_bROTInitiated = parseROT();
     		}
-    		
+    		*/
     	}
     		break;
-    	
         default:
         	break;
-    }//end of switch
-    
+    }
 }
 
 bool SCIONBeaconServerCore::run_task(Task *task) {
-  _task.fast_reschedule();
+    _task.fast_reschedule();
+    return true;
 }
 
 
 bool SCIONBeaconServerCore::generateNewPCB() {
 
     //Create PCB for propagation
-    
-    /*
-     * scion code
-     */
-     
     // get private key length
     uint16_t sigLen = PriKey.len;
     //get current time for timestamp
     timeval tv;
     gettimeofday(&tv, NULL); //use time for lower precision
-     
+
     //create beacon
     uint8_t hdrLen = COMMON_HEADER_SIZE+SCION_ADDR_SIZE*2;
     uint16_t totalLen =hdrLen+OPAQUE_FIELD_SIZE*2+PCB_MARKING_SIZE+sigLen;
@@ -391,7 +373,7 @@ bool SCIONBeaconServerCore::generateNewPCB() {
     SPH::setHeader(buf,hdr);
      
     #ifdef _SL_DEBUG_BS
-    scionPrinter->printLog(IH, (char *)"TDC BS (%s): InitBeacon: ROTVer:%d\n", m_HID.c_str(), m_cROT.version);
+    scionPrinter->printLog(IH, (char *)"TDC BS (%s:%s): InitBeacon: ROTVer:%d\n", m_AD.c_str(), m_HID.c_str(), m_cROT.version);
     #endif
     SCIONBeaconLib::initBeaconInfo(buf,tv.tv_sec,m_uTdAid,m_cROT.version); //SL: {packet,timestamp,tdid,ROT version} 
      
@@ -403,16 +385,15 @@ bool SCIONBeaconServerCore::generateNewPCB() {
     specialOpaqueField sOF = {SPECIAL_OF,tv.tv_sec,m_uTdAid,0}; //SLT: {type, timestamp, tdid, hops}
     SPH::setTimestampOF(buf, sOF);
     #ifdef _SL_DEBUG_BS
-    scionPrinter->printLog(IH, (char *)"TDC BS (%s): timestamp = %d, getTimestamp = %d, total Len = %d\n", m_HID.c_str(), tv.tv_sec, 
+    scionPrinter->printLog(IH, (char *)"TDC BS (%s:%s): timestamp = %d, getTimestamp = %d, total Len = %d\n", m_AD.c_str(), m_HID.c_str(), tv.tv_sec, 
     SPH::getTimestamp(buf), SPH::getTotalLen(buf));
     #endif
      
     //get the OFG key that corresponds to the current timestamp and create aes context (i.e., key schedule)
-    aes_context  actx;
-    if(getOfgKey(tv.tv_sec, actx)) {
+    aes_context actx;
+    if(!getOfgKey(tv.tv_sec, actx)) {
         //OFG key retrieval failure.
-        //print log and continue.
-        scionPrinter->printLog(EH, (char *)"TDC BS (%s): fatal error, fail to  get ofg key.\n", m_HID.c_str());
+        scionPrinter->printLog(EH, (char *)"TDC BS (%s:%s): fatal error, fail to get ofg key.\n", m_AD.c_str(), m_HID.c_str());
         return SCION_FAILURE; //SL: need to define more specific error type
     }
     
@@ -459,22 +440,17 @@ bool SCIONBeaconServerCore::generateNewPCB() {
         dest.append(BHID);
         dest.append(" ");
         // egress router
-        dest.append("AD:");
-        dest.append((const char*)rpair.egress_ad);
-        dest.append(" ");
         dest.append("HID:");
         dest.append((const char*)rpair.egress_addr);
-        // ingress router
+        // destination AD
         dest.append(" ");
         dest.append("AD:");
         dest.append((const char*)rpair.ingress_ad);
+        // ingress router
         dest.append(" ");
         dest.append("HID:");
         dest.append((const char*)rpair.ingress_addr);
-        // destination 
-        dest.append(" ");
-        dest.append("AD:");
-        dest.append((const char*)rpair.dest_ad);
+        // destination beacon server
         dest.append(" ");
         dest.append("HID:");
         dest.append((const char*)rpair.dest_addr);
@@ -483,83 +459,95 @@ bool SCIONBeaconServerCore::generateNewPCB() {
   }
   
   #ifdef _SL_DEBUG_BS
-  scionPrinter->printLog(IH, (char *)"TDC BS(%s): childRange = %d\n",m_HID.c_str(),cCount);
+  scionPrinter->printLog(IH, (char *)"TDC BS (%s:%s): childRange = %d\n", m_AD.c_str(), m_HID.c_str(), cCount);
   #endif
 
 }
+
+void SCIONBeaconServerCore::sendHello() {
+    string msg = "0^";
+    msg.append(m_AD.c_str());
+    msg.append("^");
+    msg.append(m_HID.c_str());
+    msg.append("^");
+
+    string dest = "RE ";
+    dest.append(BHID);
+    dest.append(" ");
+    dest.append(SID_XROUTE);
+
+    sendPacket((uint8_t *)msg.c_str(), msg.size(), dest);
+}
+
 
 /*
     SCIONBeaconServerCore::run_timer
     Periodically generate PCB
 */
 void SCIONBeaconServerCore::run_timer(Timer *){
-
+	
+	sendHello();
+	
     if(m_bROTInitiated&&_CryptoIsReady){
-    	// ROT file is ready and private key is ready
-    	#ifdef _SL_DEBUG_BS
-    	scionPrinter->printLog(IH, (char *)"TDC BS (%llu:%llu): Generate a New PCB.\n",m_uAdAid, m_uAid);
-    	#endif
-    	generateNewPCB();
-    	
+        // ROT file is ready and private key is ready
+        #ifdef _SL_DEBUG_BS
+        scionPrinter->printLog(IH, (char *)"TDC BS (%s:%s): Generate a New PCB.\n", m_AD.c_str(), m_HID.c_str());
+        #endif
+        generateNewPCB();
+
     	#ifdef _SL_DEBUG_BS
     	scionPrinter->printLog(IH, (char *)"PCB gen rescheduled in %d sec\n", m_iPCBGenPeriod);
     	#endif
+    	
     	_timer.reschedule_after_sec(m_iPCBGenPeriod);
     
     }else if(!m_bROTInitiated){
     
     	// Request ROT from Cert Server
     	#ifdef _SL_DEBUG_BS
-    	scionPrinter->printLog(EH, (char *)"TDC BS (%llu:%llu): ROT is missing or wrong formatted.\n", m_uAdAid, m_uAid);
-    	scionPrinter->printLog(IH, (char *)"TDC BS (%llu:%llu): Send ROT Request to SCIONCertServerCore.\n", m_uAdAid, m_uAid);
+    	scionPrinter->printLog(EH, (char *)"TDC BS (%s:%s): ROT is missing or wrong formatted.\n", m_AD.c_str(), m_HID.c_str());
+    	scionPrinter->printLog(IH, (char *)"TDC BS (%s:%s): Send ROT Request to SCIONCertServerCore.\n", m_AD.c_str(), m_HID.c_str());
     	#endif
     	
-    	/*
-    	under development
+    	const char* format_str = strchr(m_HID.c_str(),':');
+    	HostAddr srcAddr = HostAddr(HOST_ADDR_SCION,(uint64_t)strtoull(format_str, NULL, 10)); 
+    	//put HID as a source address
+    	HostAddr dstAddr = HostAddr(HOST_ADDR_SCION,(uint64_t)strtoull((const char*)m_servers.find(CertificateServer)->second.HID, NULL, 10)); 
+    	//destination address should be CS HID
     	
-    	//iterators
-    	std::multimap<int, Servers>::iterator cItr; //child routers iterators
+    	uint8_t hdrLen = COMMON_HEADER_SIZE+srcAddr.getLength()+dstAddr.getLength();
+    	uint16_t totalLen = hdrLen + ROT_VERSION_SIZE;
+    	uint8_t packet[totalLen];
     	
-    	//find child routers
-    	std::pair<std::multimap<int, Servers>::iterator,
-    	std::multimap<int,Servers>::iterator> childRange;
-    	childRange = m_servers.equal_range(Child);
+    	scionHeader hdr;
     	
-    	// TimeStamp OFG field
-    	int cCount = 0;
+    	hdr.cmn.type = ROT_REQ_LOCAL;
+    	hdr.cmn.hdrLen = hdrLen;
+    	hdr.cmn.totalLen = totalLen;
     	
-    	//iterate for all servers
-    	for(cItr=childRange.first;cItr!=childRange.second;cItr++){
+    	hdr.src = srcAddr;
+    	hdr.dst = dstAddr;
     	
-    		const char* format_str = strchr(m_HID.c_str(),':');
-    		HostAddr srcAddr = HostAddr(HOST_ADDR_SCION,(uint64_t)strtoull(format_str, NULL, 10)); //put HID as a source address
-    		HostAddr dstAddr = HostAddr(HOST_ADDR_SCION,(uint64_t)0); //destination address should be CS HID
+    	SPH::setHeader(packet, hdr);
     	
-    		uint8_t hdrLen = COMMON_HEADER_SIZE+srcAddr.getLength()+dstAddr.getLength();
-    		uint16_t totalLen = hdrLen + ROT_VERSION_SIZE;
-    		uint8_t packet[totalLen];
-    	
-    		scionHeader hdr;
-    	
-    		hdr.cmn.type = ROT_REQ_LOCAL;
-    		hdr.cmn.hdrLen = hdrLen;
-    		hdr.cmn.totalLen = totalLen;
-    	
-    		hdr.src = srcAddr;
-    		hdr.dst = dstAddr;
-    	
-    		SPH::setHeader(packet, hdr);
-    	
-    		// version number, try to get 0
-    		//SL: version number should be read from a configuration file
-    		*(uint32_t*)(packet+hdrLen) = 0;
-    		sendPacket(packet, totalLen, "");
-    	}
-    	*/
+    	// version number, try to get 0
+    	*(uint32_t*)(packet+hdrLen) = 0;
+    		
+    	scionPrinter->printLog((char *)"Send ROT request (%u, %u) to Cert Server: %s\n", hdr.cmn.type, totalLen, m_servers.find(CertificateServer)->second.HID);
+    		
+    	// use explicit path instead of using destination (AD, HID) only
+    	string dest = "RE ";
+    	dest.append(" ");
+    	dest.append(BHID);
+		dest.append(" ");
+    	// cert server 
+    	dest.append("HID:");
+    	dest.append((const char*)m_servers.find(CertificateServer)->second.HID);
+    		
+    	sendPacket(packet, totalLen, dest);
     	
     	_timer.reschedule_after_sec(1);     // default speed
   }
-  
 }
 
 /*

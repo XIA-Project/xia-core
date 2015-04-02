@@ -125,16 +125,16 @@ CLICK_DECLS
     SCIONPathServer::configure
     - click configure function for path server
 */
-int 
-SCIONPathServer::configure(Vector<String> &conf, ErrorHandler *errh){
+int SCIONPathServer::configure(Vector<String> &conf, ErrorHandler *errh){
     if(cp_va_kparse(conf, this, errh, 
         "AD", cpkM, cpString, &m_AD,
         "HID", cpkM, cpString, &m_HID,
-        "AID", cpkM, cpUnsigned64, &m_uAid, 
         "CONFIG_FILE", cpkM, cpString, &m_sConfigFile, 
         "TOPOLOGY_FILE", cpkM, cpString, &m_sTopologyFile,
-       cpEnd) <0){
-
+        cpEnd) <0){
+    	    click_chatter("ERR: click configuration fail at SCIONPathServer.\n");
+            click_chatter("ERR: Fault error, exit SCION Network.\n");
+            exit(-1);    
     }
 
     XIAXIDInfo xiaxidinfo;
@@ -217,20 +217,6 @@ void SCIONPathServer::push(int port, Packet *p)
 
     /*AID_REQ : AID request from switch*/
     switch(type) {
-    	
-    	/*
-    	case AID_REQ:{
-            uint32_t ts = 0;      
-            HostAddr dstAddr = HostAddr(HOST_ADDR_SCION, m_uAid);
-            
-            //set packet header
-            SPH::setType(packet, AID_REP);
-            SPH::setSrcAddr(packet, dstAddr);
-            
-            sendPacket(packet, totalLength, 0);
-			break;
-		}
-		*/
 		
         /*UP_PATH: up path from pcb server (pcb with sig removed)*/
 		case UP_PATH:{
@@ -243,14 +229,15 @@ void SCIONPathServer::push(int port, Packet *p)
 		
         // PATH_REP : path reply from the path server core
 		case PATH_REP:{
+		
 			uint8_t pathbuf[totalLength]; //for multiple packet transmissions.
 			uint8_t buf[totalLength]; //for multiple packet transmissions.
             uint8_t hdrLen = SPH::getHdrLen(packet);
             pathInfo* pi = (pathInfo*)(packet+hdrLen);
 
-			#ifdef _SL_DEBUG
+			//#ifdef _SL_DEBUG
             printf("PATH_REP recieved for target AD %llu\n", pi->target);
-			#endif
+			//#endif
 
             specialOpaqueField* sOF =
             (specialOpaqueField*)(packet+hdrLen+PATH_INFO_SIZE);
@@ -266,10 +253,10 @@ void SCIONPathServer::push(int port, Packet *p)
 				std::multimap<uint64_t, HostAddr>::iterator> requesters;
 			requesters = pendingDownpathReq.equal_range(pi->target);
 
-			#ifdef _SL_DEBUG
+			//#ifdef _SL_DEBUG
 			printf("PS (%llu:%llu): Downpath reply to Clients: count = %d\n", 
 				m_uAid, m_uAdAid, pendingDownpathReq.count(pi->target));
-			#endif
+			//#endif
 			
 			for(itr = requesters.first; itr != requesters.second; itr++) {
 				memcpy(buf, packet, totalLength);
@@ -433,6 +420,7 @@ int SCIONPathServer::sendRequest(uint64_t target, HostAddr requestAid){
     dest.append(" ");
     dest.append("HID:");
     dest.append((const char*)"0000000000000000000000000000000000100000");
+    
     sendPacket(packet, packetLength, dest);
 
 	if(pendingDownpathReq.count(target) > 1)

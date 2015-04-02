@@ -83,7 +83,7 @@ class SCIONCertServer : public Element {
         /* click element related */
         const char *class_name() const {return "SCIONCertServer";}
         const char *port_count() const {return "-/-";}
-        const char *processing() const {return PULL_TO_PUSH;}
+        const char *processing() const {return PUSH;}
         bool run_task(Task *task);
         int configure(Vector<String> &, ErrorHandler *);
         int initialize(ErrorHandler* errh);
@@ -117,7 +117,7 @@ class SCIONCertServer : public Element {
           @note This function must be called after all the internal variables
           are initialized by initVariable() function.    
          */
-        int parseROT(String filename = "");
+        int parseROT(char* loc = NULL);
 
         /**
           @brief Sends the packet to the given port number.
@@ -356,8 +356,7 @@ class SCIONCertServer : public Element {
         String m_sConfigFile;
         /** Topology File Name */
         String m_sTopologyFile;
-        /** ROT File Name */
-        String m_sROTFile;
+        
         /** Certificate File name */
         String m_csCert;        //temp certificate file path
         /** Private Key File Name */
@@ -375,6 +374,8 @@ class SCIONCertServer : public Element {
 
         /** Log File Name */
         char m_csLogFile[MAX_FILE_LEN];
+        /** ROT File Name */
+        char m_sROTFile[MAX_FILE_LEN];
         /** SCION Printer */
         SCIONPrint* scionPrinter;
 

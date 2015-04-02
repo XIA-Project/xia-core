@@ -62,9 +62,11 @@ CLICK_DECLS
     end host to build paths. Detailed information about the links are decribed in
     scionbeacon.hh.   
 */
+
 class SCIONBeaconServerCore : public Element {
     public :
-        SCIONBeaconServerCore(): _timer(this), _task(this), _CryptoIsReady(false), _AIDIsRegister(false), m_iPCBGenPeriod(1){};
+        SCIONBeaconServerCore(): _timer(this), _task(this), _CryptoIsReady(false), 
+            _AIDIsRegister(false), m_iPCBGenPeriod(1), m_bROTInitiated(false) {};
         ~SCIONBeaconServerCore()
         {
             if(_CryptoIsReady) rsa_free(&PriKey);
@@ -81,6 +83,7 @@ class SCIONBeaconServerCore : public Element {
         void run_timer(Timer *timer);
         bool run_task(Task *task);
         void push(int port, Packet *p);
+        void sendHello();
 
         /**
             @brief Sends the packet to the given port number.
@@ -214,21 +217,20 @@ class SCIONBeaconServerCore : public Element {
         /** RoT structure */
         ROT m_cROT;
 
-        String m_sConfigFile;                       /**< configuration file name*/
-        String m_sTopologyFile;                     /**<topology file name */
-        String m_sROTFile;                          /**< ROT file*/
-        char m_csCertFile[MAX_FILE_LEN];            /**<certificate file name*/
-        char m_csPrvKeyFile[MAX_FILE_LEN];          /**<private key file name*/
-        char m_csLogFile[MAX_FILE_LEN];             /**<log file name   */
+        String m_sConfigFile;                       /** configuration file name  */
+        String m_sTopologyFile;                     /** topology file name       */
+        char m_csCertFile[MAX_FILE_LEN];            /** certificate file name    */
+        char m_csPrvKeyFile[MAX_FILE_LEN];          /** private key file name    */
+        char m_csLogFile[MAX_FILE_LEN];             /** log file name            */
+        char m_sROTFile[MAX_FILE_LEN];              /** ROT file name            */
 
-        uint64_t m_uAid;                            /**< AID (address)*/
-        HostAddr m_Addr;                            /**< Address in HostAddr type */
-        uint64_t m_uAdAid;                          /**<Administrative Ddomain AID (AD #)*/
-        uint16_t m_uTdAid;                          /**<Trust Domain AID*/
-        uint8_t m_uMkey[MASTER_SECRET_KEY_SIZE];    /**<Master secret key*/
+        uint64_t m_uAid;                            /** AID (address)*/
+        HostAddr m_Addr;                            /** Address in HostAddr type */
+        uint64_t m_uAdAid;                          /** Administrative Ddomain AID (AD #)*/
+        uint16_t m_uTdAid;                          /** Trust Domain AID*/
+        uint8_t m_uMkey[MASTER_SECRET_KEY_SIZE];    /** Master secret key*/
 
-        rsa_context PriKey;                         /**<cryptography object, now we use
-                                                      RSA*/
+        rsa_context PriKey;                         /** cryptography object, now we use RSA*/
         
         // flags
         bool m_bRsaCtxLoad;/**< True if private key is loaded to RSA_CTX */

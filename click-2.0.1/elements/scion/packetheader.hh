@@ -70,8 +70,8 @@ enum PacketType {
 };
 
 enum ReturnValues {
-  SCION_SUCCESS = 0,
-  SCION_FAILURE,
+  SCION_SUCCESS = 1, // TRUE
+  SCION_FAILURE = 0, // FALSE
 };
 
 enum SignatureType {

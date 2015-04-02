@@ -358,6 +358,7 @@ SCIONEncap::handle_data(Packet *p_in, GatewayAddr &dst_gw, bool store)
         _path_info->clearDownPaths();
 	//2. path to the dst AD exists
     } else {
+    
         click_chatter("found a path from %lld to %lld. send the packet.", m_uAdAid, dst_gw.adaid);
         // found a path
 		//SL: Host addresses need to be changed to those of gateways? or destination IPs?...
@@ -449,6 +450,7 @@ SCIONEncap::handle_data(Packet *p_in, GatewayAddr &dst_gw, fullPath &path, bool 
 void
 SCIONEncap::push(int port, Packet *p)
 {
+
 #if 0
     unsigned const char *data = p->data();
 
@@ -512,6 +514,7 @@ SCIONEncap::push(int port, Packet *p)
         }
     //2. input from the connected SCION gateway (for path reply)    
     } else {
+    	
     	//copy the data of the packet and kills click packet
 		int type = SPH::getType((uint8_t*)p->data());
 		uint16_t packetLength = SPH::getTotalLen((uint8_t*)p->data());
@@ -535,13 +538,13 @@ SCIONEncap::push(int port, Packet *p)
 			//1. parse uppath and store it in the path_info
             if (type == UP_PATH) {
 				//#ifdef _SL_DEBUG_GW
-                //printf("Encap (%lu:%lu): uppath received\n", m_uAdAid, m_uAid);
+                printf("Encap (%lu:%lu): uppath received\n", m_uAdAid, m_uAid);
 				//#endif
                 _path_info->parse(packet, 0);
 			//2. parse downpath and store it in the path_info
             } else {
 				//#ifdef _SL_DEBUG_GW
-                //printf("Encap (%lu:%lu): downpath received\n", m_uAdAid, m_uAid);
+                printf("Encap (%lu:%lu): downpath received\n", m_uAdAid, m_uAid);
 				//#endif
                 _path_info->parse(packet, 1);
             }
@@ -578,6 +581,7 @@ SCIONEncap::push(int port, Packet *p)
         }
     }
 #endif
+
 }
 
 void SCIONEncap::sendPacket(uint8_t* data, uint16_t data_length, string dest) {

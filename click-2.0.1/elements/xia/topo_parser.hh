@@ -110,7 +110,7 @@ struct Servers{
 
 //SL: why router has a single interface?
 struct Routers{
-	HostAddr addr;
+    HostAddr addr;
     uint64_t aid;
     uint16_t interfaceID;
     uint64_t neighbor;
@@ -120,18 +120,18 @@ struct Routers{
 struct Gateways{
     uint8_t ptype;
     uint64_t aid;
-	HostAddr addr;
+    HostAddr addr;
 };
 
 struct Clients{
-	HostAddr addr;
+    HostAddr addr;
     uint64_t aid;
 };
 
 // tempral use for XIA
 struct EgressIngressPair{
-	uint8_t ntype;
-	unsigned char egress_ad[41];
+    uint8_t ntype;
+    unsigned char egress_ad[41];
     unsigned char egress_addr[41];
     unsigned char ingress_ad[41];
     unsigned char ingress_addr[41];

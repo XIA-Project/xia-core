@@ -84,11 +84,13 @@ class SCIONCertServerCore : public Element {
 
         const char *class_name() const {return "SCIONCertServerCore";}
         const char *port_count() const {return "-/-";}
-        const char *processing() const {return PULL_TO_PUSH;}
+        const char *processing() const {return PUSH;}
 
         int configure(Vector<String> &, ErrorHandler *);
         int initialize(ErrorHandler* errh);
+        bool run_task(Task *task);
         void push(int port, Packet *p);
+        void sendHello();
 
         /**
           @brief Parse Topology information using TopoParser. 
@@ -143,7 +145,6 @@ class SCIONCertServerCore : public Element {
 
          */
         void getCertFile(uint8_t* fn, uint64_t target);
-        //int  verifyCert(uint8_t* pkt);
         /**
           @brief Reverses the order of the path
           @param uint8_t* path The buffer that contains the original path. 
@@ -197,22 +198,17 @@ class SCIONCertServerCore : public Element {
         // logger
         /** Log Level */
         int m_iLogLevel;
-        /** Log File Name */
-        char m_csLogFile[MAX_FILE_LEN];
         /** SCION Printer */
         SCIONPrint* scionPrinter;
 
         // configuration file parameters
-        /** Configuration File Name */
-        String m_sConfigFile;
-        /** Topology File Name */
-        String m_sTopologyFile;
-        /** ROT File Name */
-        String m_sROTFile;
-        /** Certificate File name */
-        String m_csCert;        //temp certificate file path
-        /** Private Key File Name */
-        String m_csPrvKey;      //temp private key file path
+        String m_sConfigFile;                       /** configuration file name  */
+        String m_sTopologyFile;                     /** topology file name       */
+        char m_csCertFile[MAX_FILE_LEN];            /** certificate file name    */
+        char m_csPrvKeyFile[MAX_FILE_LEN];          /** private key file name    */
+        char m_csLogFile[MAX_FILE_LEN];             /** log file name            */
+        char m_sROTFile[MAX_FILE_LEN];              /** ROT file name            */
+        
         String m_AD;
         String m_HID;
 
@@ -251,9 +247,9 @@ class SCIONCertServerCore : public Element {
         SCIONIPEncap * m_pIPEncap;
         /** List of Port Info for IP tunneling */
         vector<portInfo> m_vPortInfo;	//address type and address of each interface
-        };
+    };
 
-        CLICK_ENDDECLS
+CLICK_ENDDECLS
 
 
 #endif

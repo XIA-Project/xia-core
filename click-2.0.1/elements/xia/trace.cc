@@ -1,1 +1,0 @@
-../scion/trace.cc

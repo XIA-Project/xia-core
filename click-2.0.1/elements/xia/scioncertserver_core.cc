@@ -42,27 +42,23 @@
 
 /*change this to corresponding header*/
 #include "scioncertserver_core.hh"
-
+#include "scionprint.hh"
+#include "rot_parser.hh"
 
 CLICK_DECLS
 
 int SCIONCertServerCore::configure(Vector<String> &conf, ErrorHandler *errh){
+    if(cp_va_kparse(conf, this, errh,
+        "AD", cpkM, cpString, &m_AD,
+        "HID", cpkM, cpString, &m_HID,
+        "CONFIG_FILE", cpkM, cpString, &m_sConfigFile, 
+        "TOPOLOGY_FILE",cpkM, cpString, &m_sTopologyFile,
+        cpEnd) <0) {
+            click_chatter("ERR: click configuration fail at SCIONCertServerCore.\n");
+            click_chatter("Fatal error, Exit SCION Network.\n");
+            exit(-1);
+    }
 
-	if(cp_va_kparse(conf, this, errh,
-	"AD", cpkM, cpString, &m_AD,
-	"HID", cpkM, cpString, &m_HID,
-	"AID", cpkM, cpUnsigned64, &m_uAid,
-	"CONFIG_FILE", cpkM, cpString, &m_sConfigFile,
-	"TOPOLOGY_FILE", cpkM, cpString, &m_sTopologyFile, 
-	"ROT", cpkM, cpString, &m_sROTFile,
-	"Cert", cpkM, cpString, &m_csCert, // tempral store in click file
-	"PrivateKey", cpkM, cpString, &m_csPrvKey, // tempral store in click file
-	cpEnd) <0) {
-		printf("ERR: click configuration fail at SCIONCertServerCore.\n");
-		printf("Fatal error, Exit SCION Network.\n");
-		exit(-1);
-	}
-	
 	XIAXIDInfo xiaxidinfo;
     struct click_xia_xid store;
     XID xid = xid;
@@ -74,64 +70,87 @@ int SCIONCertServerCore::configure(Vector<String> &conf, ErrorHandler *errh){
     xiaxidinfo.query_xid(m_HID, &store, this);
     xid = store;
     m_HID = xid.unparse();
-	
-	
+
 	return 0;
 }
 
 int SCIONCertServerCore::initialize(ErrorHandler* errh){
-	
-	// initialization task
-	// task 1: parse config file
-	Config config;
-	config.parseConfigFile((char*)m_sConfigFile.c_str());
+    // initialization task
+    // task 1: parse config file
+    Config config;
+    config.parseConfigFile((char*)m_sConfigFile.c_str());
 	// get ADAID, AID, TDID
 	m_uAdAid = config.getAdAid();
 	m_uTdAid = config.getTdAid();
 	m_iLogLevel =config.getLogLevel();
-	config.getCSLogFilename(m_csLogFile);
+	config.getCSLogFilename((char*)m_csLogFile);
+    config.getPrivateKeyFilename((char*)m_csPrvKeyFile);
+    config.getCertFilename((char*)m_csCertFile);
+    config.getROTFilename((char*)m_sROTFile);
 
-	// setup scionPrinter for message logging
+	// setup scionPrinter for logging
 	scionPrinter = new SCIONPrint(m_iLogLevel, m_csLogFile);
-	scionPrinter->printLog(IL, "TDC CS INIT.\n");
-	scionPrinter->printLog(IL, "ADAID = %llu, TDID = %llu.\n", m_uAdAid, m_uTdAid);
+	scionPrinter->printLog(IH, "TDC CS (%s:%s) INIT.\n", m_AD.c_str(), m_HID.c_str());
 
 	// task 2: parse ROT (root of trust) file
 	parseROT();
-	scionPrinter->printLog(IL, "Parse/Verify ROT Done.\n");
-	
+	scionPrinter->printLog(IH, "Parse/Verify ROT Done.\n");
+
 	// task 3: parse topology file
-	//parseTopology();
-	//constructIfid2AddrMap();
-	//initializeOutputPort();
-	scionPrinter->printLog(IL, "Parse Topology Done.\n");
+	parseTopology();
+	scionPrinter->printLog(IH, "Parse Topology Done.\n");
 
 	ScheduleInfo::initialize_task(this, &_task, errh);
+	scionPrinter->printLog(IH, "TDC CS (%s:%s) INIT Done.\n", m_AD.c_str(), m_HID.c_str());
+
 	return 0;
 }
 
+bool SCIONCertServerCore::run_task(Task *task) {
+    sendHello();
+    _task.fast_reschedule();
+    return true;
+}
+
+void SCIONCertServerCore::sendHello() {
+    string msg = "0^";
+    msg.append(m_AD.c_str());
+    msg.append("^");
+    msg.append(m_HID.c_str());
+    msg.append("^");
+
+    string dest = "RE ";
+    dest.append(BHID);
+    dest.append(" ");
+    dest.append(SID_XROUTE);
+
+    sendPacket((uint8_t *)msg.c_str(), msg.size(), dest);
+}
+
+
 void SCIONCertServerCore::parseROT(){
 	ROTParser parser;
-	if(parser.loadROTFile(m_sROTFile.c_str())!=ROTParseNoError){
-    	printf("ERR: ROT File missing at TDC CS.\n");
-		printf("Fatal error, Exit SCION Network.\n");
+	if(parser.loadROTFile(m_sROTFile)!=ROTParseNoError){
+    	click_chatter("ERR: ROT File missing at TDC CS.\n");
+		click_chatter("ERR: Fatal error, Exit SCION Network.\n");
 		exit(-1);
 	}
-	scionPrinter->printLog(IL, "Load ROT OK.\n");
+	scionPrinter->printLog(IH, "Load ROT OK.\n");
 	if(parser.parse(rot)!=ROTParseNoError){
-    	printf("ERR: ROT File parsing error at TDC CS.\n");
-		printf("Fatal error, Exit SCION Network.");
+    	click_chatter("ERR: ROT File parsing error at TDC CS.\n");
+		click_chatter("ERR: Fatal error, Exit SCION Network.");
 		exit(-1);
 	}
-	scionPrinter->printLog(IL, "Parse ROT OK.\n");
+	scionPrinter->printLog(IH, "Parse ROT OK.\n");
 	if(parser.verifyROT(rot)!=ROTParseNoError) {
-		printf("ERR: ROT File parsing error at TDC CS.\n");
-		printf("Fatal error, Exit SCION Network.\n");
+		click_chatter("ERR: ROT File parsing error at TDC CS.\n");
+		click_chatter("ERR: Fatal error, Exit SCION Network.\n");
 		exit(-1);
 	}
-	scionPrinter->printLog(IL, "Verify ROT OK.\n");
+	scionPrinter->printLog(IH, "Verify ROT OK.\n");
+	
 	// prepare ROT for delivery
-	FILE* rotFile = fopen(m_sROTFile.c_str(), "r");
+	FILE* rotFile = fopen(m_sROTFile, "r");
 	fseek(rotFile, 0, SEEK_END);
 	curROTLen = ftell(rotFile);
 	rewind(rotFile);
@@ -148,36 +167,39 @@ void SCIONCertServerCore::parseROT(){
 		offset+=buffLen;
 	}
 	fclose(rotFile);
-	scionPrinter->printLog(IL, "Stored Verified ROT for further delivery.\n");
+	scionPrinter->printLog(IH, "Stored Verified ROT for further delivery.\n");
 }
 
 void SCIONCertServerCore::parseTopology(){
 	TopoParser parser;
 	parser.loadTopoFile(m_sTopologyFile.c_str()); 
     parser.parseServers(m_servers);
-    // parser.parseRouters(m_routers);
-    // parser.parseEgressIngressPairs(m_routepairs);
 }
 
 void SCIONCertServerCore::push(int port, Packet *p)
 {
     TransportHeader thdr(p);
     
-    uint8_t * s_pkt = (uint8_t *) thdr.payload();
+    uint8_t *s_pkt = (uint8_t *) thdr.payload();
     uint16_t type = SPH::getType(s_pkt);
 	uint16_t packetLength = SPH::getTotalLen(s_pkt);
     uint8_t packet[packetLength];
 
 	memset(packet, 0, packetLength);
     memcpy(packet, s_pkt, packetLength);
+    
+    // scionPrinter->printLog(IH, "TDC CS received packet (%u, %u)\n", type, packetLength);
+    
     p->kill();
     
     switch(type){
     
-		case ROT_REQ_LOCAL:{
+		case ROT_REQ_LOCAL:
+		{
 
-			scionPrinter->printLog(IH, "TDC CS received ROT request from BS\n");
+			scionPrinter->printLog(IH, "TDC CS received ROT request from BS...\n");
 			
+			// prepare ROT reply packet
 			uint8_t hdrLen = COMMON_HEADER_SIZE+SCION_ADDR_SIZE*2;
 			uint16_t totalLen = hdrLen + curROTLen;
 			uint8_t rotPacket[totalLen];
@@ -187,8 +209,8 @@ void SCIONCertServerCore::push(int port, Packet *p)
 			SPH::setType(rotPacket, ROT_REP_LOCAL); 
 			SPH::setTotalLen(rotPacket, totalLen);
 			// fill address
-			HostAddr srcAddr = HostAddr(HOST_ADDR_SCION, (uint64_t)strtoull((const char*)m_AD.c_str(), NULL, 10));
-			scionPrinter->printLog(IH, (char *)"Local BServer: %s\n", m_servers.find(BeaconServer)->second.HID);
+			HostAddr srcAddr = HostAddr(HOST_ADDR_SCION, (uint64_t)strtoull((const char*)m_HID.c_str(), NULL, 10));
+			scionPrinter->printLog(IH, (char *)"Local Beacon Server: %s\n", m_servers.find(BeaconServer)->second.HID);
 			HostAddr dstAddr = HostAddr(HOST_ADDR_SCION, (uint64_t)strtoull((const char*)m_servers.find(BeaconServer)->second.HID, NULL, 10));
 			
 			SPH::setSrcAddr(rotPacket, srcAddr);
@@ -197,15 +219,14 @@ void SCIONCertServerCore::push(int port, Packet *p)
 			string dest = "RE ";
 			dest.append(BHID);
 			dest.append(" ");
-			dest.append(m_AD.c_str());
-			dest.append(" ");
 			dest.append("HID:");
 			dest.append((const char*)m_servers.find(BeaconServer)->second.HID);
 			
 			memcpy(rotPacket+hdrLen, curROTRaw, curROTLen);
 			sendPacket(rotPacket, totalLen, dest);
-			} 
-			break;
+			
+		} 
+		break;
 
 		case CERT_REQ: { //send chain
 
@@ -355,29 +376,6 @@ SCIONCertServerCore::processROTRequest(uint8_t * packet) {
 	sendPacket(buffer, hdr.cmn.totalLen, dest);
 }
 
-
-/*
-int SCIONCertServerCore::verifyCert(uint8_t* packet){
-
-	// TODO: verify certs
-	uint16_t hops = 0;
-	certInfo* info = (certInfo*)(packet+SCION_HEADER_SIZE+hops*PATH_HOP_SIZE);
-	uint64_t target = info->target;
-	uint16_t length = info->length;
-	char cFileName[MAX_FILE_LEN];
-
-	// should be fixed here since no td and version numbers
-	// file format: td#-ad#-#.crt
-	sprintf(cFileName,"./TD1/TDC/AD%llu/certserver/certificates/td1-ad%llu-0.crt",m_uAdAid,target);
-	printf("%s\n",cFileName);
-	FILE* cFile = fopen(cFileName,"w");
-	fwrite(packet+SCION_HEADER_SIZE+CERT_INFO_SIZE+hops*PATH_HOP_SIZE,1,length,cFile);
-	fclose(cFile);
-
-	return SCION_SUCCESS;
-}
-*/
-
 void SCIONCertServerCore::sendPacket(uint8_t* data, uint16_t data_length, string dest) {
 
     string src = "RE ";
@@ -410,7 +408,7 @@ void SCIONCertServerCore::sendPacket(uint8_t* data, uint16_t data_length, string
 }
 
 void SCIONCertServerCore::getCertFile(uint8_t* fn, uint64_t target){
-	sprintf((char*)fn,"./TD1/TDC/AD%llu/certserver/certificates/td%llu-ad%d-0.crt",m_uAdAid, m_uTdAid, target);
+	sprintf((char*)fn,"./TD1/TDC/AD%llu/certserver/certificates/td%llu-ad%d-0.crt", m_uAdAid, m_uTdAid, target);
 }
 
 void SCIONCertServerCore::reversePath(uint8_t* path, uint8_t* output, uint8_t hops){
@@ -435,7 +433,6 @@ void SCIONCertServerCore::sendROT(){
 	SPH::setTotalLen(packet, packetLen);
 	// sendPacket(packet, packetLen, 0);
 }
-
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(SCIONCertServerCore)

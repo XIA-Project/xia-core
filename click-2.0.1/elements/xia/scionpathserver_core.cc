@@ -52,10 +52,12 @@ int SCIONPathServerCore::configure(Vector<String> &conf, ErrorHandler *errh){
     if(cp_va_kparse(conf, this, errh, 
         "AD", cpkM, cpString, &m_AD,
         "HID", cpkM, cpString, &m_HID,
-        "AID", cpkM, cpUnsigned64, &m_uAid, 
         "CONFIG_FILE", cpkM, cpString, &m_sConfigFile,
         "TOPOLOGY_FILE", cpkM, cpString, &m_sTopologyFile,
-       cpEnd) <0){
+        cpEnd) <0){
+            click_chatter("ERR: click configuration fail at SCIONPathServerCore.\n");
+            click_chatter("ERR: Fault error, exit SCION Network.\n");
+            exit(-1);
     }
 
     XIAXIDInfo xiaxidinfo;
@@ -243,6 +245,7 @@ void SCIONPathServerCore::push(int port, Packet *p)
         
         uint8_t* ptr = revPath+OPAQUE_FIELD_SIZE;
         opaqueField* hopPtr = (opaqueField*)ptr;
+        
         #ifdef _SL_DEBUG
         for(int i=0;i<hops;i++){
             printf("ingress : %lu, egress: %lu\n", hopPtr->ingressIf, hopPtr->egressIf);
@@ -256,14 +259,16 @@ void SCIONPathServerCore::push(int port, Packet *p)
 
         //path look up to send to the local path server
         std::multimap<uint64_t, std::multimap<uint32_t, path> >::iterator itr;
+        
         for(itr=paths.begin();itr!=paths.end();itr++){
             //when the target is found
             if(itr->first == target){
                 std::multimap<uint32_t, path>::iterator itr2;
                 //adds necessary information to the packet
-                #ifdef _SL_DEBUG_PS
-                //printf("TDC PS: AD%lu -- #of Registered Paths: %lu\n",target,itr->second.size());
-                #endif
+                //#ifdef _SL_DEBUG_PS
+                printf("TDC PS: AD%lu -- #of Registered Paths: %lu\n",target,itr->second.size());
+                //#endif
+                
                 for(itr2=itr->second.begin();itr2!=itr->second.end();itr2++){
 
                     uint16_t pathContentLength = itr2->second.pathLength;
@@ -301,7 +306,7 @@ void SCIONPathServerCore::push(int port, Packet *p)
                     memcpy(newPacket+packetLength,
                             itr2->second.msg,pathContentLength);
 
-                    try {
+                    //try {
                     char adbuf[41];
                     snprintf(adbuf, 41, "%040lu", requester.numAddr());
 
@@ -314,11 +319,13 @@ void SCIONPathServerCore::push(int port, Packet *p)
                     dest.append("HID:");
                     dest.append((const char*)"0000000000000000000000000000000000100000");
 
-                    //printf("DEST=%s\n", dest.c_str());
+                    printf("DEST=%s\n", dest.c_str());
 
                     //sends reply
                     sendPacket(newPacket, newPacketLength, dest);
-                    } catch (...) {}
+                    //} catch (...) {
+                    //	printf("catch exception...");
+                    //}
                 }
             }
         }
@@ -648,40 +655,6 @@ void SCIONPathServerCore::sendHello() {
     - creates packet with the given data and sends to the given port
 */
 void SCIONPathServerCore::sendPacket(uint8_t* data, uint16_t data_length, string dest) {
-#if 0
-
-    //variables necessary to print log.
-    //uint16_t type = SPH::getType(data);
-    //HostAddr src = SPH::getSrcAddr(data);
-    //HostAddr dst = SPH::getDstAddr(data);
-	
-	//uint32_t ts = 0;//SPH::getDownTimestamp(data);
-	//scionPrinter->printLog(IH, type, ts,src,dst,"%u,SENT\n",data_length);
-    
-	//SLA:
-	uint8_t ipp[data_length+IPHDR_LEN]; 
-	if(m_vPortInfo[port].addr.getType() == HOST_ADDR_IPV4) {
-		switch(fwd_type) {
-		case TO_SERVER:
-			if(m_pIPEncap->encap(ipp,data,data_length,SPH::getDstAddr(data).getIPv4Addr()) 
-				== SCION_FAILURE)
-				return;
-		break;
-		case TO_ROUTER:{
-			uint16_t iface = SPH::getOutgoingInterface(data);
-			std::map<uint16_t,HostAddr>::iterator itr = ifid2addr.find(iface);
-			if(itr == ifid2addr.end()) return;
-			if(m_pIPEncap->encap(ipp,data,data_length,itr->second.getIPv4Addr()) == SCION_FAILURE)
-				return;
-		} break;
-		default: break;
-		}
-		data = ipp;
-	}
-
-    WritablePacket* outPacket= Packet::make(DEFAULT_HD_ROOM, data, data_length,DEFAULT_TL_ROOM);
-    output(port).push(outPacket);
-#endif
 
     string src = "RE ";
     src.append(m_AD.c_str());
@@ -690,7 +663,7 @@ void SCIONPathServerCore::sendPacket(uint8_t* data, uint16_t data_length, string
     src.append(" ");
     src.append(SID_XROUTE);
     
-    // scionPrinter->printLog(IH, (char *)"BS(%s)'s src DAG: %s\n", m_AD.c_str(), src.c_str());
+    scionPrinter->printLog(IH, (char *)"BS(%s)'s src DAG: %s\n", m_AD.c_str(), src.c_str());
 
 	XIAPath src_path, dst_path;
 	src_path.parse(src.c_str());

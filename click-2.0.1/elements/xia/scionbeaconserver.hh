@@ -107,6 +107,7 @@ class SelectionPolicy;
     @note any comments or documentation regarding the click router is not present
     in this documentation
 */
+
 class SCIONBeaconServer : public Element { 
     public :
         /**
@@ -117,10 +118,9 @@ class SCIONBeaconServer : public Element {
             _AIDIsRegister, m_iIsRegister, m_iNUmRegisterPath, and
             m_iBeaconTableSize values.  
         */
-        SCIONBeaconServer(): _timer(this) ,_task(this), 
-	  	_CryptoIsReady(false), _AIDIsRegister(false), m_iIsRegister(0), 
-	  	m_iNumRegisteredPath(0), m_iBeaconTableSize(300),
-		m_bROTRequested(0){};
+        SCIONBeaconServer(): _timer(this) ,_task(this), _CryptoIsReady(false), _AIDIsRegister(false),
+            m_iIsRegister(0), m_iNumRegisteredPath(0), m_iBeaconTableSize(300), 
+            m_bROTInitiated(false) {};
 
         /**
             @brief SCION Beacon Server Deconstructor.
@@ -175,7 +175,7 @@ class SCIONBeaconServer : public Element {
             @note This function must be called after all the internal variables
             are initialized by initVariable() function.    
         */
-        bool parseROT(String filename = "");
+        bool parseROT(char* loc = NULL);
         
         /**
             @brief verify Certificates in PCB.
@@ -527,13 +527,13 @@ class SCIONBeaconServer : public Element {
         char m_csPrvKeyFile[MAX_FILE_LEN];
         /** Log file name */
         char m_csLogFile[MAX_FILE_LEN];
+        /** ROT file name */
+        char m_sROTFile[MAX_FILE_LEN];
 
         /** Config File */
         String m_sConfigFile;
         /** Topology File */
         String m_sTopologyFile;
-        /** ROT File */
-        String m_sROTFile;
     
         /** UNUSED */
         int m_iFval;

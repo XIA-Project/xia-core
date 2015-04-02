@@ -37,8 +37,8 @@ uint32_t SCIONBeaconLib::createMAC(uint32_t ts, uint8_t exp, uint16_t ingress, u
     uint8_t msgSize = 16;
     uint8_t msg[msgSize];
     memset(msg, 0 , msgSize);
-	//SL: This only works for a little endian
-	memcpy(msg, &ts, MAC_TS_SIZE);
+    //SL: This only works for a little endian
+    memcpy(msg, &ts, MAC_TS_SIZE);
     uint8_t* ex = (uint8_t*)(msg+MAC_TS_SIZE);
     *ex=exp;
     uint16_t* inif = (uint16_t*)(msg+MAC_TS_SIZE+EXP_SIZE);
@@ -60,7 +60,7 @@ int SCIONBeaconLib::verifyMAC(uint32_t ts, uint8_t exp, uint16_t ingress, uint16
 {
     uint32_t target = createMAC(ts, exp, ingress, egress, prev_of, ctx);
 
-	target = target & 0x00ffffff;
+    target = target & 0x00ffffff;
     if(target==mac){
         return SCION_SUCCESS;
     }else{
@@ -94,26 +94,25 @@ uint8_t SCIONBeaconLib::addLink(uint8_t* pkt,uint16_t ingress,uint16_t egress,
         mrkPtr = (pcbMarking*)(mrkItr);
     }
     
-	uint64_t prev_of;
-	opaqueField of= opaqueField(mrkPtr->type, mrkPtr->ingressIf, mrkPtr->egressIf, mrkPtr->mac,0);
+    uint64_t prev_of;
+    opaqueField of= opaqueField(mrkPtr->type, mrkPtr->ingressIf, mrkPtr->egressIf, mrkPtr->mac,0);
     
     if(type==PCB_TYPE_CORE)
         prev_of = 0;
     else 
-		prev_of = *(uint64_t *)&of;
+        prev_of = *(uint64_t *)&of;
 
-	uint32_t mac = createMAC(ts, exp, ingress, egress, prev_of, ctx);
+    uint32_t mac = createMAC(ts, exp, ingress, egress, prev_of, ctx);
 
-	//SLT:
-	//This part needs to be modified... (e.g., 128B signature size)
-	
-	//Note: last two bits of ofType indicate the expiration time
-	ofType = (ofType & 0xfc)|(exp &0x03);
+    //SLT:
+    //This part needs to be modified... (e.g., 128B signature size)	
+    //Note: last two bits of ofType indicate the expiration time
+    ofType = (ofType & 0xfc)|(exp &0x03);
 
-	#ifdef _SL_DEBUG_GW
-	if(ofType) 
-		printf("OFTYPE: %02x -> something unusual is added to the PCB\n",ofType);
-	#endif
+    #ifdef _SL_DEBUG_GW
+    if(ofType) 
+        printf("OFTYPE: %02x -> something unusual is added to the PCB\n",ofType);
+    #endif
 
     if(type){
         pcbMarking newMarking=
@@ -148,8 +147,8 @@ ofType, uint8_t exp, uint16_t bwAlloc)
     uint8_t* mrkItr = (uint8_t*)(pkt+hdrLen+OPAQUE_FIELD_SIZE*2); 
     pcbMarking* mrkPtr = (pcbMarking*)mrkItr;
     
-	//SL: have to find an efficient way to add peer...
-	//run this for every peering links may be unnecessary (though not much)
+    //SL: have to find an efficient way to add peer...
+    //run this for every peering links may be unnecessary (though not much)
 
     for(int i=0;i<hops-1;i++){
         mrkItr += (mrkPtr->blkSize + mrkPtr->sigLen);
@@ -221,22 +220,20 @@ uint8_t SCIONBeaconLib::signPacket(uint8_t* pkt, int sigLen, uint64_t &next_aid,
         size += (prevMrkPtr->sigLen + mrkPtr->blkSize);
     }
     
-	//SL: AID chaining
-	size += SIZE_AID;
+    //SL: AID chaining
+    size += SIZE_AID;
 
-	uint8_t msg[size];
+    uint8_t msg[size];
     memset(msg, 0, size);
     memcpy(msg, ptr, mrkPtr->blkSize);
 
-	if(prevPtr!=NULL){ //Non-Core
-        memcpy(msg+mrkPtr->blkSize, prevPtr+prevMrkPtr->blkSize,
-            prevMrkPtr->sigLen);
-		
-		//SL: AID chaining
-		memcpy(msg+mrkPtr->blkSize+prevMrkPtr->sigLen, &next_aid, SIZE_AID);
+    if(prevPtr!=NULL){ //Non-Core
+        memcpy(msg+mrkPtr->blkSize, prevPtr+prevMrkPtr->blkSize, prevMrkPtr->sigLen);
+	//SL: AID chaining
+	memcpy(msg+mrkPtr->blkSize+prevMrkPtr->sigLen, &next_aid, SIZE_AID);
     } else { //Core
-		memcpy(msg+mrkPtr->blkSize, &next_aid, SIZE_AID);
-	}
+        memcpy(msg+mrkPtr->blkSize, &next_aid, SIZE_AID);
+    }
     
     SCIONCryptoLib::genSig(msg, size, pkt+totalLength, sigLen, ctx);
     SPH::addTotalLen(pkt,sigLen);
@@ -291,7 +288,6 @@ pcbMarking* SCIONBeaconLib::getNextPcbMark(pcbMarking* mrkPtr){
     return (pcbMarking*)ptr;
 }
 
-
 pcbMarking* SCIONBeaconLib::getNextPcbMarkNoSig(pcbMarking* mrkPtr){
     uint8_t* ptr = (uint8_t*)mrkPtr;
     ptr+=mrkPtr->blkSize;
@@ -328,9 +324,9 @@ void SCIONBeaconLib::setNumHops(uint8_t* pkt, uint8_t hops){
 void SCIONBeaconLib::addNumHops(uint8_t* pkt, uint8_t hops){
     uint8_t hdrLen = SPH::getHdrLen(pkt);
     uint8_t curHops = *(uint8_t*)(pkt+hdrLen+7);
-	#ifdef _SL_DEBUG_BS
-	printf("curHops=%d, hops=%d, hdrLen=%d\n", curHops, hops, hdrLen);
-	#endif
+    #ifdef _SL_DEBUG_BS
+    printf("curHops=%d, hops=%d, hdrLen=%d\n", curHops, hops, hdrLen);
+    #endif
     *(uint8_t*)(pkt+hdrLen+7) = curHops + hops;
 }
 uint8_t SCIONBeaconLib::getNumHops(uint8_t* pkt){
@@ -359,9 +355,6 @@ uint16_t SCIONBeaconLib::getInterface(uint8_t* pkt){
     uint8_t hdrLen = SPH::getHdrLen(pkt);
     return *(uint16_t*)(pkt+hdrLen+13);
 }
-
-
-
 
 
 CLICK_ENDDECLS

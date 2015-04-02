@@ -496,7 +496,7 @@ elementclass XIAController4Port {
 // 1-port SCION Cert Server Core
 elementclass XIONCertServerCore {
     $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac,
-    AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot |
+    CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file |
 
     // $local_addr: the full address of the node
     // $local_ad: the node's AD
@@ -512,18 +512,18 @@ elementclass XIONCertServerCore {
     //Script(write xrc/n/proc/rt_AD.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
     //Script(write xrc/n/proc/rt_HID.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
 
-    sbs :: SCIONCertServerCore(AD $local_ad, HID $local_hid,
-            AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot);
+    scs :: SCIONCertServerCore(AD $local_ad, HID $local_hid,
+            CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file);
 
     input => xlc => output;
 
-    sbs -> xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> sbs;
+    scs -> xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> scs;
 };
 
 // 1-port SCION Cert Server
 elementclass XIONCertServer {
     $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac,
-    AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot |
+    CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file |
 
     // $local_addr: the full address of the node
     // $local_ad: the node's AD
@@ -539,18 +539,18 @@ elementclass XIONCertServer {
     //Script(write xrc/n/proc/rt_AD.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
     //Script(write xrc/n/proc/rt_HID.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
 
-    sbs :: SCIONCertServer(AD $local_ad, HID $local_hid,
-            AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot);
+    scs :: SCIONCertServer(AD $local_ad, HID $local_hid,
+            CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file);
 
     input => xlc => output;
 
-    sbs -> xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> sbs;
+    scs -> xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> scs;
 };
 
 // 1-port SCION Beacon Server Core
 elementclass XIONBeaconServerCore {
     $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac,
-    AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot |
+    CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file |
 
     // $local_addr: the full address of the node
     // $local_ad: the node's AD
@@ -567,7 +567,7 @@ elementclass XIONBeaconServerCore {
     //Script(write xrc/n/proc/rt_HID.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
 
     sbs :: SCIONBeaconServerCore(AD $local_ad, HID $local_hid,
-            AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot);
+            CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file);
 
     input => xlc => output;
 
@@ -577,7 +577,7 @@ elementclass XIONBeaconServerCore {
 // 1-port SCION Beacon Server
 elementclass XIONBeaconServer {
     $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac,
-    AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot |
+    CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file |
 
     // $local_addr: the full address of the node
     // $local_ad: the node's AD
@@ -594,7 +594,7 @@ elementclass XIONBeaconServer {
     //Script(write xrc/n/proc/rt_HID.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
 
     sbs :: SCIONBeaconServer(AD $local_ad, HID $local_hid,
-            AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file, ROT $rot);
+            CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file);
 
     input => xlc => output;
 
@@ -604,7 +604,7 @@ elementclass XIONBeaconServer {
 // 1-port SCION Path Server Core
 elementclass XIONPathServerCore {
     $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac,
-    AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file |
+    CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file |
 
     // $local_addr: the full address of the node
     // $local_ad: the node's AD
@@ -621,7 +621,7 @@ elementclass XIONPathServerCore {
     //Script(write xrc/n/proc/rt_HID.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
 
     sps :: SCIONPathServerCore(AD $local_ad, HID $local_hid,
-            AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file);
+            CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file);
 
     input => xlc => output;
 
@@ -631,7 +631,7 @@ elementclass XIONPathServerCore {
 // 1-port SCION Path Server
 elementclass XIONPathServer {
     $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac,
-    AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file |
+    CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file |
 
     // $local_addr: the full address of the node
     // $local_ad: the node's AD
@@ -648,7 +648,7 @@ elementclass XIONPathServer {
     //Script(write xrc/n/proc/rt_HID.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
 
     sps :: SCIONPathServer(AD $local_ad, HID $local_hid,
-            AID $aid, CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file);
+            CONFIG_FILE $config_file, TOPOLOGY_FILE $topology_file);
 
     input => xlc => output;
 

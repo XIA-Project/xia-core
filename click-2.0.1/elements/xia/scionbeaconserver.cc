@@ -54,18 +54,16 @@ CLICK_DECLS
     read configuration file, topology file, and Root of Trust (RoT) file .
 */
 int SCIONBeaconServer::configure(Vector<String> &conf, ErrorHandler *errh){
-	if(cp_va_kparse(conf, this, errh, 
-	"AD", cpkM, cpString, &m_AD,
-	"HID", cpkM, cpString, &m_HID,
-	"AID", cpkM, cpUnsigned64, &m_uAid,
-	"CONFIG_FILE", cpkM, cpString, &m_sConfigFile,
-	"TOPOLOGY_FILE", cpkM, cpString, &m_sTopologyFile,
-	"ROT", cpkM, cpString, &m_sROTFile, // Tenma, tempral exist but should merge into config class
-	cpEnd) <0){
-		printf("ERR: click configuration fail at BS.\n");
-		printf("Fatal error, Exit SCION Network.\n");
-		exit(-1);
-	}
+    if(cp_va_kparse(conf, this, errh, 
+        "AD", cpkM, cpString, &m_AD,
+        "HID", cpkM, cpString, &m_HID,
+        "CONFIG_FILE", cpkM, cpString, &m_sConfigFile,
+        "TOPOLOGY_FILE", cpkM, cpString, &m_sTopologyFile,
+        cpEnd) <0){
+            click_chatter("ERR: click configuration fail at BS.\n");
+            click_chatter("Fatal error, Exit SCION Network.\n");
+            exit(-1);
+    }
 
     XIAXIDInfo xiaxidinfo;
     struct click_xia_xid store;
@@ -79,9 +77,7 @@ int SCIONBeaconServer::configure(Vector<String> &conf, ErrorHandler *errh){
     xid = store;
     m_HID = xid.unparse();
 
-    //printf("XID: %s %s\n", m_AD.c_str(), m_HID.c_str());
-
-	return 0;
+    return 0;
 }
 
 /*
@@ -106,38 +102,50 @@ int SCIONBeaconServer::initialize(ErrorHandler* errh){
 	config.getPrivateKeyFilename((char*)m_csPrvKeyFile);
 	config.getCertFilename((char*)m_csCertFile);
 	config.getOfgmKey((char*)m_uMkey);
-	config.getPCBLogFilename(m_csLogFile);
+	config.getPCBLogFilename((char*)m_csLogFile);
+	config.getROTFilename((char*)m_sROTFile);
+    
+    scionPrinter = new SCIONPrint(m_iLogLevel, m_csLogFile);
+	scionPrinter->printLog(IH, (char*)"BS (%s:%s) INIT.\n", m_AD.c_str(), m_HID.c_str());
     
 	//SL: what is this? Not used anywhere
 	m_iResetTime = config.getResetTime();
 	m_iScheduleTime = SCIONCommonLib::GCD(m_iRegTime, m_iPropTime);
-	printf("PCB reg = %d, prop = %d, schedule time = %d\n",m_iRegTime, m_iPropTime, m_iScheduleTime);
+	scionPrinter->printLog(IH, (char*)"PCB reg = %d, prop = %d, schedule time = %d\n", m_iRegTime, m_iPropTime, m_iScheduleTime);
 	m_iIsRegister = config.getIsRegister(); //whether to register paths to TDC or not
 	m_iKval = config.getNumRegisterPath(); //# of paths that can be registered to TDC
 	m_iBeaconTableSize = config.getPCBQueueSize();
 
 	time(&m_lastPropTime);
 	m_lastRegTime = m_lastPropTime;
-
-	scionPrinter = new SCIONPrint(m_iLogLevel, m_csLogFile);
-	scionPrinter->printLog(IL, (char*)"BS(%s) INIT.\n", m_HID.c_str());
-	scionPrinter->printLog(IL, (char*)"ADAID = %s, TDID = %lu.\n", m_AD.c_str(), m_uTdAid);
-
+	
 	// task 2: parse ROT (root of trust) file
 	m_bROTInitiated = parseROT();
-	scionPrinter->printLog(IL, (char*)"Parse and Verify ROT Done.\n");
+	if(m_bROTInitiated)
+	    scionPrinter->printLog(IH, (char*)"Parse and Verify ROT Done.\n");
 
 	// task 3: parse topology file
 	parseTopology();
-	scionPrinter->printLog(IL, (char*)"Parse Topology Done.\n");
+	scionPrinter->printLog(IH, (char*)"Parse Topology Done.\n");
 
 	// task 4: read key pair if they already exist
 	loadPrivateKey();
-	scionPrinter->printLog(IL, (char*)"PrivateKey Loading Successful.\n");
+	scionPrinter->printLog(IH, (char*)"PrivateKey Loading Successful.\n");
 
 	// task 5: generate/update OFG key
-	initOfgKey();
-	updateOfgKey();
+	if(!initOfgKey()){
+        scionPrinter->printLog(EH, (char *)"Init OFG key failure.\n");
+        click_chatter("ERR: InitOFGKey fail at SCIONBeaconServerCore.\n");
+        click_chatter("ERR: Fatal error, exit SCION Network.\n");
+        exit(-1);
+    }
+    if(!updateOfgKey()){
+        scionPrinter->printLog(IH, (char *)"Update OFG key failure.\n");
+        click_chatter("ERR: updateOFGKey fail at SCIONBeaconServerCore.\n");
+        click_chatter("ERR: Fatal error, exit SCION Network.\n");
+        exit(-1);
+    }
+
 	srand(time(NULL));
 
 	//HC: initialize per-child path selection policy
@@ -146,6 +154,8 @@ int SCIONBeaconServer::initialize(ErrorHandler* errh){
 	ScheduleInfo::initialize_task(this, &_task, errh);
 	_timer.initialize(this); 
 	_timer.schedule_after_sec(m_iScheduleTime);
+	
+	scionPrinter->printLog(IH, (char*)"BS (%s:%s) INIT Done.\n", m_AD.c_str(), m_HID.c_str());
 
 	return 0;
 }
@@ -153,17 +163,17 @@ int SCIONBeaconServer::initialize(ErrorHandler* errh){
 /*SL: Initialize OFG key */
 bool SCIONBeaconServer::initOfgKey() {
 
-	time_t currTime;
-	time(&currTime);
-	//SL: to deal with the case that TDC BS initiate PCB before this BS starts
+    time_t currTime;
+    time(&currTime);
+    //SL: to deal with the case that TDC BS initiate PCB before this BS starts
 	currTime -= 300; //back 5minutes
 	m_currOfgKey.time = currTime;
 	memcpy(m_currOfgKey.key, &m_uMkey, OFG_KEY_SIZE);
 
 	int err;
 	if(err = aes_setkey_enc(&m_currOfgKey.actx, m_currOfgKey.key, OFG_KEY_SIZE_BITS)) {
-		printf("Enc Key setup failure: %d\n",err*-1);
-		return SCION_FAILURE;
+		scionPrinter->printLog(EH, (char *)"OFG Key setup failure: %d\n",err*-1);
+        return SCION_FAILURE;
 	}
 	return SCION_SUCCESS;
 }
@@ -176,8 +186,8 @@ bool SCIONBeaconServer::updateOfgKey() {
 	
 	int err;
 	if(err = aes_setkey_enc(&m_prevOfgKey.actx, m_prevOfgKey.key, OFG_KEY_SIZE_BITS)) {
-		printf("Prev. Enc Key setup failure: %d\n",err*-1);
-		return SCION_FAILURE;
+		scionPrinter->printLog(EH, (char *)"Prev. OFG Key setup failure: %d\n",err*-1);
+        return SCION_FAILURE;
 	}
 
 	return SCION_SUCCESS;
@@ -199,29 +209,37 @@ SCIONBeaconServer::parseTopology(){
 }
 
 //Load RoT file and verify it.
-bool SCIONBeaconServer::parseROT(String filename){
+bool SCIONBeaconServer::parseROT(char* loc){
 	ROTParser parser;
-	String fn;
-	if(filename.length())
-        fn = filename;
-    else
-        fn = m_sROTFile;
+	char* fn = NULL;
+	ROT tROT;
 	
-	if(parser.loadROTFile(fn.c_str())!=ROTParseNoError) {
-		scionPrinter->printLog(IL, (char*)"ERR: ROT File missing at BS %lu.\n", m_uAdAid);
-		return false;
-	}else{
-		// ROT found in local folder
-    	if(parser.parse(m_cROT)!=ROTParseNoError){
-			scionPrinter->printLog(IL, (char*)"ERR: ROT File parsing error at BS %lu.\n", m_uAdAid);
-			return false;
-		}
-		if(parser.verifyROT(m_cROT)!=ROTParseNoError){
-			scionPrinter->printLog(IL, (char*)"ERR: ROT File verification error at BS %lu.\n", m_uAdAid);
-			return false;
-		}
+	if(loc)
+		fn = loc;
+	else
+		fn = m_sROTFile;
+
+	if(parser.loadROTFile(fn)!=ROTParseNoError){
+		scionPrinter->printLog(EH, (char *)"ERR: ROT File missing at CS.\n");
+		return SCION_FAILURE;
 	}
-	return true;
+	scionPrinter->printLog(IH, (char *)"Load ROT OK.\n");
+
+	if(parser.parse(tROT)!=ROTParseNoError){
+		scionPrinter->printLog(EH, (char *)"ERR: ROT File parsing error at CS.\n");
+		return SCION_FAILURE;
+	}
+	scionPrinter->printLog(IH, (char *)"Parse ROT OK.\n");
+
+	if(parser.verifyROT(tROT)!=ROTParseNoError){
+		scionPrinter->printLog(EH, (char *)"ERR: ROT File parsing error at CS.\n");
+		return SCION_FAILURE;
+	}
+
+	//Store the ROT if verification passed.
+	parser.parse(m_cROT);
+	scionPrinter->printLog(IH, (char *)"Verify ROT OK.\n");
+	return SCION_SUCCESS;
 }
 
 
@@ -240,16 +258,16 @@ void SCIONBeaconServer::loadPrivateKey() {
 		if( ret != 0) {
 			rsa_free(&PriKey);
 			pk_free(&pk);
-			printf("ERR: Private key file loading failure, path = %s\n", (char*)m_csPrvKeyFile);
-			printf("Fatal error, Exit SCION Network.\n");
+			click_chatter("ERR: Private key file loading failure, path = %s\n", (char*)m_csPrvKeyFile);
+			click_chatter("Fatal error, Exit SCION Network.\n");
 			exit(-1);
 		}
 		// check private key
 		if(rsa_check_pubkey(&PriKey)!=0)
 		{
 			rsa_free(&PriKey);
-			printf("ERR: Private key is not well-formatted, path = %s\n", (char*)m_csPrvKeyFile);
-			printf("Fatal error, Exit SCION Network.\n");
+			click_chatter("ERR: Private key is not well-formatted, path = %s\n", (char*)m_csPrvKeyFile);
+			click_chatter("Fatal error, Exit SCION Network.\n");
 			exit(-1);
 		}	
 		_CryptoIsReady = true;
@@ -319,7 +337,7 @@ SCIONBeaconServer::run_timer(Timer *timer){
 	// check if ROT file is missing
 	if(!m_bROTInitiated)
 	{
-		scionPrinter->printLog(IH,(char *)"BS (%s:%s): ROT is missing or wrong formatted.\n", m_AD.c_str(), m_HID.c_str());
+		scionPrinter->printLog(IH, (char *)"BS (%s:%s): ROT is missing or wrong formatted.\n", m_AD.c_str(), m_HID.c_str());
 		// send an ROT request (i.e., ROT_REQ_LOCAL) if its AID is registered to SCION switch
 		if(_AIDIsRegister && !m_bROTRequested) 
 			requestROT();
@@ -463,7 +481,7 @@ SCIONBeaconServer::processPCB(SPacket * packet, uint16_t packetLength){
 			pathServerRange = m_servers.equal_range(PathServer);
 
 			aes_context  actx;
-			if(getOfgKey(SPH::getTimestamp(packet),actx)) {
+			if(!getOfgKey(SPH::getTimestamp(packet),actx)) {
 				//SL: OFG key retrieval failure
 				scionPrinter->printLog(EH,type,ts,srcAddr.numAddr(),m_uAdAid,(char *)"OFGKEY retrieval failure\n");
 				return;
@@ -551,45 +569,41 @@ SCIONBeaconServer::saveCertificate(SPacket * packet, uint16_t packetLength) {
 	SL: ROT may not fit into a single file
 	Fragmentation (-> reassembly) needs to be considered immediately
 */
-void
-SCIONBeaconServer::saveROT(SPacket * packet, uint16_t packetLength)
+void SCIONBeaconServer::saveROT(SPacket * packet, uint16_t packetLength)
 {
+    ROTRequest *req = (ROTRequest *)SPH::getData(packet);
+    int curver = (int)req->currentVersion;
+    scionPrinter->printLog(IL, SPH::getType(packet), (char *)"BS (%lu:%lu): ROT Replay cV = %d, pV = %lu\n", m_uAdAid, m_uAid, curver, m_cROT.version);
 
-	ROTRequest *req = (ROTRequest *)SPH::getData(packet);
-	int curver = (int)req->currentVersion;
-	scionPrinter->printLog(IL, SPH::getType(packet), (char *)"BS (%lu:%lu): ROT Replay cV = %d, pV = %lu\n", m_uAdAid, m_uAid, curver, m_cROT.version);
-
-	if(curver>m_cROT.version) {
-	
-       //1. verify if the returned ROT is correct
-	   char nFile[100];
-       memset(nFile, 0, 100);
-	   sprintf(nFile,"./TD1/Non-TDC/AD%lu/beaconserver/ROT/rot-td%u-%d.xml", m_uAdAid, m_uTdAid, curver);
-
-       String rotfn = String(nFile);
-	   scionPrinter->printLog(IL, (char *)"BS (%lu:%lu): Update ROT file as %s\n", m_uAdAid, m_uAid, nFile);
-
-		int offset = SPH::getHdrLen(packet)+sizeof(ROTRequest);
-		int rotLen = packetLength-offset;
-			
-		// Write to file defined in Config
-		FILE* rotFile = fopen(rotfn.c_str(), "w+");
-		fwrite(packet+offset, 1, rotLen, rotFile);
-		fclose(rotFile);
-
-       	//1.2. verify using ROTParser
-		m_bROTInitiated = parseROT(rotfn);
-        if(m_bROTInitiated == SCION_FAILURE) {
-	    	scionPrinter->printLog(IL, (char *)"BS (%lu:%lu) fail to parse ROT.\n", m_uAdAid, m_uAid);
-	    	// remove file
-	    	remove(nFile);
-	    	return;
+    if(curver > m_cROT.version) {
+       //1.Store temp ROT file
+       char nFile[MAX_FILE_LEN];
+       memset(nFile, 0, MAX_FILE_LEN);
+       sprintf(nFile,"./TD1/Non-TDC/AD%llu/certserver/ROT/rot-td%llu-%d.xml", m_uAdAid, m_uTdAid, req->currentVersion);
+       scionPrinter->printLog(IH, (char*)"Update ROT file: %s\n", nFile);
+       
+       uint16_t offset = SPH::getHdrLen(packet)+sizeof(ROTRequest);
+       uint16_t rotLen = packetLength-offset;
+       // Write to file defined in Config
+       FILE* rotFile = fopen(nFile, "w+");
+       fwrite(packet+offset, 1, rotLen, rotFile);
+       fclose(rotFile);
+       
+       //1.2. verify using ROTParser
+       m_bROTInitiated = parseROT(nFile);
+       if(!m_bROTInitiated) {
+           scionPrinter->printLog(IH, (char *)"BS (%lu:%lu) fail to parse ROT.\n", m_uAdAid, m_uAid);
+           // remove file
+           remove(nFile);
+           return;
         }else{
-	    	m_sROTFile = rotfn;
-	    	scionPrinter->printLog(IL, (char *)"BS (%lu:%lu) stored received ROT.\n", m_uAdAid, m_uAid);
-	    	m_bROTRequested = false;
-		}
-	}
+            scionPrinter->printLog(IH, (char *)"BS (%lu:%lu) stored received ROT.\n", m_uAdAid, m_uAid);
+            strncpy( m_sROTFile, nFile, MAX_FILE_LEN );
+            m_bROTRequested = false;
+        }
+    }else{
+    	// downgrade, should be error or attacks!
+    }
 }
 
 void SCIONBeaconServer::push(int port, Packet *p)
@@ -646,7 +660,6 @@ void SCIONBeaconServer::push(int port, Packet *p)
 				break;
 			
 			default:
-				//scionPrinter->printLog(IH, (char *)"BS(%lu:%lu) Unsupported type (%d) packet.\n",m_uAdAid,m_uAid,type);
 				break;
 		}
 	}
@@ -818,10 +831,7 @@ SCIONBeaconServer::registerPaths()
 	std::multimap<uint32_t, pcb>::reverse_iterator itr;
 	
 	for(int i = m_iNumRegisteredPath; i < m_iKval; i++) {
-		if(getPathToRegister(itr)){
-			#ifdef _SL_DEBUG_BS
-			printf("\nAD%lu: %i paths registered to TDC. No more path left to register\n", m_uAdAid,i-1);
-			#endif
+		if(!getPathToRegister(itr)){
     		scionPrinter->printLog(IH, PATH_REG, (char *)"AD%lu: %i paths registered to TDC. No path to register\n",m_uAdAid,i-1);
 			break;
 		}
@@ -843,8 +853,7 @@ SCIONBeaconServer::registerPaths()
 //Currently newest path is the best path to register
 //This should be replaced with a more appropriate policy
 ////////////////////////////////////////////////////////////
-bool
-SCIONBeaconServer::getPathToRegister(std::multimap<uint32_t, pcb>::reverse_iterator &iter) {
+bool SCIONBeaconServer::getPathToRegister(std::multimap<uint32_t, pcb>::reverse_iterator &iter) {
     
     std::multimap<uint32_t, pcb>::reverse_iterator itr;
 
@@ -1161,22 +1170,17 @@ int SCIONBeaconServer::propagate()
 			dest.append(BHID);
 			dest.append(" ");
 			// egress router
-			dest.append("AD:");
-			dest.append((const char*)rpair.egress_ad);
-			dest.append(" ");
 			dest.append("HID:");
 			dest.append((const char*)rpair.egress_addr);
-			// ingress router
+			// destination AD
 			dest.append(" ");
 			dest.append("AD:");
 			dest.append((const char*)rpair.ingress_ad);
+			// ingress router
 			dest.append(" ");
 			dest.append("HID:");
 			dest.append((const char*)rpair.ingress_addr);
-			// destination 
-			dest.append(" ");
-			dest.append("AD:");
-			dest.append((const char*)rpair.dest_ad);
+			// destination beacon server
 			dest.append(" ");
 			dest.append("HID:");
 			dest.append((const char*)rpair.dest_addr);
@@ -1397,6 +1401,7 @@ bool SCIONBeaconServer::getOfgKey(uint32_t timestamp, aes_context &actx)
 	}
     return SCION_SUCCESS;
 
+    /*
 	//SL: following part is left to compare performance later.
 	//////////////////////////////////////////////////////////
     std::map<uint32_t, aes_context*>::iterator itr;
@@ -1450,6 +1455,7 @@ bool SCIONBeaconServer::getOfgKey(uint32_t timestamp, aes_context &actx)
     }
 
     return SCION_SUCCESS;
+    */
 }
 
 void SCIONBeaconServer::sendHello() {
@@ -1468,33 +1474,6 @@ void SCIONBeaconServer::sendHello() {
 }
 
 void SCIONBeaconServer::sendPacket(uint8_t* data, uint16_t data_length, string dest) {
-
-#if 0
-	//SLA:
-	//IPV4 Handling
-	uint8_t ipp[data_length+IPHDR_LEN]; 
-	if(m_vPortInfo[port].addr.getType() == HOST_ADDR_IPV4) {
-		switch(fwd_type) {
-		case TO_SERVER:
-			if(m_pIPEncap->encap(ipp,data,data_length,SPH::getDstAddr(data).getIPv4Addr()) 
-				== SCION_FAILURE)
-				return;
-		break;
-		case TO_ROUTER:{
-			uint16_t iface = SPH::getOutgoingInterface(data);
-			std::map<uint16_t,HostAddr>::iterator itr = ifid2addr.find(iface);
-			if(itr == ifid2addr.end()) return;
-			if(m_pIPEncap->encap(ipp,data,data_length,itr->second.getIPv4Addr()) == SCION_FAILURE)
-				return;
-		} break;
-		default: break;
-		}
-		data = ipp;
-	}
-
-	WritablePacket* outPacket = Packet::make(DEFAULT_HD_ROOM, data, data_length, DEFAULT_TL_ROOM);
-	output(port).push(outPacket);
-#endif
 
     string src = "RE ";
     src.append(m_AD.c_str());
@@ -1648,29 +1627,27 @@ void SCIONBeaconServer::requestForCert(SPacket* pkt){
 	*/
 }
 
-void 
-SCIONBeaconServer::clearCertificateMap() {
-	std::map<uint64_t, x509_crt*>::iterator it;
-	x509_crt * pChain;
-	for(it=m_certMap.begin(); it!=m_certMap.end(); it++){
-	    pChain = it->second;
-		x509_crt_free(pChain);
-		delete pChain;
-	}
-	m_certMap.clear();
+void SCIONBeaconServer::clearCertificateMap() {
+    std::map<uint64_t, x509_crt*>::iterator it;
+    x509_crt * pChain;
+    for(it=m_certMap.begin(); it!=m_certMap.end(); it++){
+        pChain = it->second;
+        x509_crt_free(pChain);
+        delete pChain;
+    }
+    m_certMap.clear();
 }
 
-void 
-SCIONBeaconServer::clearAesKeyMap() {
-	std::map<uint32_t, aes_context*>::iterator it;
-	aes_context * actx;
-	for(it=m_OfgAesCtx.begin(); it!=m_OfgAesCtx.end(); it++){
+void  SCIONBeaconServer::clearAesKeyMap() {
+    std::map<uint32_t, aes_context*>::iterator it;
+    aes_context * actx;
+    for(it=m_OfgAesCtx.begin(); it!=m_OfgAesCtx.end(); it++){
 	    actx = it->second;
 		delete actx;
 	}
 	m_OfgAesCtx.clear();
 	//now exiting the process
-	fprintf(stderr,"AD%lu: Process terminates correctly.\n", m_uAdAid);
+	fprintf(stderr, "AD%lu: Process terminates correctly.\n", m_uAdAid);
 }
 
 
