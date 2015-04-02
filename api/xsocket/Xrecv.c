@@ -100,7 +100,6 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 	unsigned seq = seqNo(sockfd);
 	xsm.set_sequence(seq);
 
-//printf("Xrecv seq = %d\n", seq);
 	xia::X_Recv_Msg *xrm = xsm.mutable_x_recv();
 	xrm->set_bytes_requested(len);
 
