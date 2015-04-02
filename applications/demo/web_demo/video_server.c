@@ -36,8 +36,6 @@
 #endif
 #include "Xsocket.h"
 
-#define DEBUG
-
 #define VERSION "v1.0"
 #define TITLE "XIA Video Server"
 

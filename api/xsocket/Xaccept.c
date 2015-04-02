@@ -66,7 +66,6 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	socklen_t len;
 	int new_sockfd;
 
-printf("XACCEPT %d\n", sockfd);
 	// if an addr buf is passed, we must also have a valid length pointer
 	if (addr != NULL && addrlen == NULL) {
 		errno = EFAULT;
@@ -101,9 +100,7 @@ printf("XACCEPT %d\n", sockfd);
 		return -1;
 	}
 
-printf("accept fd=%d SOCK_STREAM=%d\n", new_sockfd, SOCK_STREAM);
 	allocSocketState(new_sockfd, SOCK_STREAM);
-
 	
 	// bind to an unused random port number
 	my_addr.sin_family = PF_INET;
@@ -128,37 +125,43 @@ printf("accept fd=%d SOCK_STREAM=%d\n", new_sockfd, SOCK_STREAM);
 		return -1;
 	}
 
-	xia::XSocketMsg xia_socket_msg;
-	xia_socket_msg.set_type(xia::XACCEPT);
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XACCEPT);
 	seq = seqNo(new_sockfd);
-	xia_socket_msg.set_sequence(seq);
+	xsm.set_sequence(seq);
 	
-	xia::X_Accept_Msg *x_accept_msg = xia_socket_msg.mutable_x_accept();
+	xia::X_Accept_Msg *x_accept_msg = xsm.mutable_x_accept();
 	x_accept_msg->set_new_port(((struct sockaddr_in)my_addr).sin_port);
 
-	if (click_send(sockfd, &xia_socket_msg) < 0) {
-//		(_f_close)(new_sockfd);
-		close(new_sockfd);
+	if (click_send(sockfd, &xsm) < 0) {
+		(_f_close)(new_sockfd);
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
 
-// FIXME: change to use click reply so we get the peer dag!
-	if (click_status(sockfd, seq) < 0) {
-		(_f_close)(new_sockfd);
-		LOGF("Error getting status from Click: %s", strerror(errno));
+	xsm.Clear();
+	if (click_reply(sockfd, seq, &xsm) < 0) {
+		LOGF("Error retrieving status from Click: %s", strerror(errno));
 		return -1;
 	}
 
-	// FIXME: add code to get the peername, and fill in the sockaddr
-	if (addr != NULL) {
+	if (addr != NULL && *addrlen >= sizeof(sockaddr_x)) {
+
+		xia::X_Accept_Msg *msg = xsm.mutable_x_accept();
+		Graph g(msg->remote_dag().c_str());
+		g.fill_sockaddr((sockaddr_x*)addr);
+
 		if (*addrlen < sizeof(sockaddr_x)) {
 			LOG("addr is not large enough to hold a sockaddr_x");
 		}
-	}
-	if (addrlen)
-		*addrlen = 0;
 
+	} else if (addr) {
+		memset((void*)addr, 0, sizeof(sockaddr_x));
+	}
+
+	if (addrlen) {
+		*addrlen = sizeof(sockaddr_x);
+	}
 
 	setConnState(new_sockfd, CONNECTED);
 

@@ -109,7 +109,8 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 
 	if (nxfds == 0) {
 		// there are no Xsocket to poll for, just do a straight poll with the original data
-		return 	(_f_poll)(ufds, nfds, timeout);
+		rc = (_f_poll)(ufds, nfds, timeout);
+		goto done;
 	}
 
 	xsm.set_type(xia::XPOLL);
@@ -318,14 +319,11 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 		}
 	}
 
-
 	if (nx == 0) {
 		// there were no xsockets in the FD_SETS, just do a normal select
 		rc = (_f_select)(nfds, readfds, writefds, errorfds, timeout);
 		goto done;
 	}
-
-
 
 	// create an control socket
 	if ((sock = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
