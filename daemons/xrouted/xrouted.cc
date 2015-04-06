@@ -710,7 +710,6 @@ int main(int argc, char *argv[])
 						perror("unknown routing message");
 						break;
 				}
-				syslog(LOG_NOTICE, "Processing done");
 			}
 		} else if (selectRetVal < 0) {
 			perror("Xselect failed");
