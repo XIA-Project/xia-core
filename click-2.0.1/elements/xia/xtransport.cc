@@ -2692,9 +2692,17 @@ void XTRANSPORT::Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 			} else {
 				// is there any read data?
 				if (flags & POLLIN) {
-					if (sk->recv_pending) {
-						// printf("read data avaialable on %d\n", port);
-						flags_out |= POLLIN;
+					if (sk->sock_type == SOCK_STREAM) {
+						if (sk->recv_base < sk->next_recv_seqnum) {
+							_errh->debug("Xpoll: read STREAM data avaialable on %d\n", port);
+							flags_out |= POLLIN;
+						}
+
+					} else if (sk->sock_type == SOCK_DGRAM || sk->sock_type == SOCK_RAW) {
+						if (sk->recv_buffer_count > 0) {
+							_errh->debug("Xpoll: read DGRAM data avaialable on %d\n", port);
+							flags_out |= POLLIN;
+						}
 					}
 				}
 
