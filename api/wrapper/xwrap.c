@@ -28,7 +28,7 @@
 #define ALERT()		{if (_log_warning) fprintf(_log, "xwrap: ALERT!!!, %s is not implemented in XIA!\r\n", __FUNCTION__);}
 #define WARNING(...)	{if (_log_warning) fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}
 
-#define FORCE_XIA() (_pure_xia != 0 ? 1 : 0)
+#define FORCE_XIA() (1)
 
 #define NEG_LOOKUP_MAX	15
 #define SID_SIZE 45 // (40 byte XID + 4 bytes SID: + null terminator)
@@ -85,6 +85,7 @@ DECLARE(void, freeaddrinfo, struct addrinfo *ai);
 DECLARE(const char *, gai_strerror, int ecode);
 
 DECLARE(ssize_t, read, int fd, void *buf, size_t count);
+DECLARE(ssize_t, __read_chk, int fd, void *buf, size_t count);
 DECLARE(ssize_t, write, int fd, const void *buf, size_t count);
 DECLARE(int, select, int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
 DECLARE(int, poll, struct pollfd *fds, nfds_t nfds, int timeout);
@@ -102,7 +103,7 @@ DECLARE(int, getservbyport_r, int port, const char *proto, struct servent *resul
 DECLARE(struct servent*, getservbyname, const char *name, const char *proto);
 DECLARE(struct servent*, getservbyport, int port, const char *proto);
 DECLARE(int, getnameinfo, const struct sockaddr *sa, socklen_t salen, char *host, socklen_t hostlen, char *serv, socklen_t servlen, unsigned int flags);
- 
+
 
 typedef std::map<std::string, std::string> ip2dag_t;
 typedef std::map<std::string, std::string> dag2ip_t;
@@ -125,22 +126,12 @@ static int _log_info = 0;
 static int _log_wrap = 0;
 static FILE *_log = NULL;
 
-//****************************************************************************
-// If true treats all sockets as XIA sockets and does funky sockaddr mapping
-// so applications can hopefully be totally unchanged, but use XIA under the
-// covers
-//
-int _pure_xia = 0;
-
 void __xwrap_setup()
 {
 	srand(time(NULL));
 
 	low_ip = (rand() % 253) + 1;
 	high_ip = rand() % 254;
-
-	if (getenv("XWRAP_XIA") != NULL)
-		_pure_xia = 1;
 
 	if (getenv("XWRAP_TRACE") != NULL)
 		_log_trace = 1;
@@ -150,7 +141,7 @@ void __xwrap_setup()
 		_log_info = 1;
 	if (getenv("XWRAP_WARNING") != NULL)
 		_log_warning = 1;
-	if (getenv("XWRAP_WRAP") != NULL)
+	if (getenv("XWRAP_XIA") != NULL)
 		_log_wrap = 1;
 
 	const char *lf = getenv("XWRAP_LOGFILE");
@@ -172,8 +163,7 @@ void __attribute__ ((constructor)) xwrap_init(void)
 
 	if (_log_info || _log_warning || _log_wrap || _log_trace) {
 		fprintf(_log, "loading XIA wrappers (created: %s)\n", __DATE__);
-		if (FORCE_XIA())
-			fprintf(_log, "remapping all socket IO automatically into XIA\n");
+		fprintf(_log, "remapping all socket IO automatically into XIA\n");
 	}
 
 	GET_FCN(socket);
@@ -209,6 +199,7 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	GET_FCN(getnameinfo);
 
 	GET_FCN(read);
+	GET_FCN(__read_chk);
 	GET_FCN(write);
 	GET_FCN(select);
 	GET_FCN(poll);
@@ -264,7 +255,7 @@ int _GetIP(sockaddr_x *sax, struct sockaddr_in *sin, const char *addr, int port)
 	if (port == 0)
 		port = _NewPort();
 
-	if (!addr) { 
+	if (!addr) {
 		sprintf(s, "169.254.%d.%d", high_ip, low_ip);
 		addr = s;
 	}
@@ -298,7 +289,7 @@ int _GetIP(sockaddr_x *sax, struct sockaddr_in *sin, const char *addr, int port)
 	return 0;
 }
 
-// Generate a random SID. This will need to be modified when we 
+// Generate a random SID. This will need to be modified when we
 // add in intrinsic security support
 char *_RandomSID(char *buf, unsigned len)
 {
@@ -315,7 +306,7 @@ char *_RandomSID(char *buf, unsigned len)
 	return buf;
 }
 
-// convert a IPv4 sock addr into a sting in the form of A.B.C.D-port
+// convert a IPv4 sock addr into a string in the form of A.B.C.D-port
 char *_IpString(char *s, const struct sockaddr_in* sa)
 {
 	// FIXME: this doesn't seem threadsafe
@@ -378,7 +369,7 @@ int _x2i(sockaddr_x *sax, sockaddr_in *sin)
 		rc = -1;
 		MSG("No mapping for %s\n", g.dag_string().c_str());
 	}
-	
+
 	return rc;
 }
 
@@ -590,7 +581,7 @@ int accept(int fd, struct sockaddr *addr, socklen_t *addr_len)
 
 			// convert the sockaddr_x to a sockaddr
 			_x2i(&sax, (struct sockaddr_in*)ipaddr);
-		}		
+		}
 
 	} else {
 		rc = __real_accept(fd, addr, addr_len);
@@ -682,7 +673,7 @@ ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, 
 			addr = (struct sockaddr*)&sax;
 			*addr_len = sizeof(addr);
 			// FIXME we should check to see if addr and addr_len are valid
-		}  
+		}
 
 		rc = Xrecvfrom(fd, buf, n, flags, addr, &slen);
 
@@ -692,7 +683,7 @@ ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, 
 				// we don't have a mapping for this yet, create a fake IP address
 				_GetIP(&sax, (sockaddr_in *)ipaddr, NULL, 0);
 			}
-		}	
+		}
 
 	} else {
 		rc = __real_recvfrom(fd, buf, n, flags, addr, addr_len);
@@ -718,6 +709,23 @@ ssize_t read(int fd, void *buf, size_t count)
 	return rc;
 }
 
+ssize_t __read_chk(int fd, void *buf, size_t count)
+{
+	size_t rc;
+
+	TRACE();
+
+	if (isXsocket(fd)) {
+		XIAIFY();
+
+		rc = Xrecv(fd, buf, count, 0);
+
+	} else {
+		rc = __real___read_chk(fd, buf, count);
+	}
+	return rc;
+}
+
 ssize_t write(int fd, const void *buf, size_t count)
 {
 	size_t rc;
@@ -738,8 +746,8 @@ ssize_t write(int fd, const void *buf, size_t count)
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)
 {
 	TRACE();
-	
-	// Let Xpoll do all the work of figuring out what fds we are handling	
+
+	// Let Xpoll do all the work of figuring out what fds we are handling
 	return Xselect(nfds, readfds, writefds, exceptfds, timeout);
 }
 
@@ -881,7 +889,7 @@ int getsockname(int fd, struct sockaddr *addr, socklen_t *len)
 			*len = oldlen;
 			// convert the sockaddr to a sockaddr_x
 			_x2i(&sax, (struct sockaddr_in*)ipaddr);
-		}			
+		}
 
 	} else {
 		rc = __real_getsockname(fd, addr, len);
@@ -913,7 +921,7 @@ int getpeername(int fd, struct sockaddr *addr, socklen_t *len)
 			if (_x2i(&sax, (struct sockaddr_in*)ipaddr) < 0) {
 				_GetIP(&sax, (sockaddr_in*)ipaddr, NULL, 0);
 			}
-		}	
+		}
 
 	} else {
 		return __real_getpeername(fd, addr, len);
@@ -947,7 +955,6 @@ int fcntl (int fd, int cmd, ...)
 {
 	int rc;
 	va_list args;
-
 	TRACE();
 	va_start(args, cmd);
 
@@ -1014,7 +1021,7 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 				endservent();
 			}
 		} else {
-			port = _NewPort();			
+			port = _NewPort();
 		}
 
 
@@ -1092,7 +1099,7 @@ MSG("found name\n%s\n", dag.c_str());
 				MSG("family does not include XIA\n");
 				tryxia = 0;
 			}
-		
+
 		} else if (service) {
 			MSG("service is: %s\n", service);
 			// see if service looks like a DAG
@@ -1112,8 +1119,8 @@ MSG("found name\n%s\n", dag.c_str());
 			MSG("Xgetaddrinfo returns %d\n", rc);
 		}
 
-		// XIA lookup failed, fall back to 
-		if (trynormal && rc < 0) {	
+		// XIA lookup failed, fall back to
+		if (trynormal && rc < 0) {
 			NOXIA();
 			MSG("looking up name normally\n");
 			rc = __real_getaddrinfo(name, service, hints, pai);
@@ -1153,6 +1160,11 @@ struct hostent *gethostbyname (const char *name)
 {
 	TRACE();
 	ALERT();
+
+	// There's no state to work with so we have to assume
+	// everything is for XIA
+
+
 
 	// FIXME: add code here to map between IPv4 and XIA
 
