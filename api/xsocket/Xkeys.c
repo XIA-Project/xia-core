@@ -127,6 +127,10 @@ static int dir_exists(const char *keydir)
 	return 1;
 }
 
+// Find the location of key directory
+// Once found we never look for it again
+// NOTE: Call must NOT free the pointer returned
+// memory is allocated for the key directory only once.
 static const char *get_keydir()
 {
 	static const char *keydir = NULL;
@@ -158,7 +162,6 @@ int destroy_keypair(char *pubkeyhashstr, int hashstrlen)
 		LOG("destroy_keypair: ERROR: Key directory not found");
 		goto destroy_keypair_done;
 	}
-	state = 1;
 
 	privfilepathlen = strlen(keydir) + strlen("/") + hashstrlen + 1;
 	pubfilepathlen = privfilepathlen + strlen(".pub");
@@ -169,14 +172,14 @@ int destroy_keypair(char *pubkeyhashstr, int hashstrlen)
 		LOG("destroy_keypair: ERROR: Out of memory");
 		goto destroy_keypair_done;
 	}
-	state = 2;
+	state = 1;
 	pubfilepath = (char *)calloc(pubfilepathlen, 1);
 	if(pubfilepath == NULL) {
 		rc = -1;
 		LOG("destroy_keypair: ERROR: Memory not available");
 		goto destroy_keypair_done;
 	}
-	state = 3;
+	state = 2;
 	strcat(privfilepath, keydir);
 	strcat(privfilepath, "/");
 	strncat(privfilepath, pubkeyhashstr, hashstrlen);
@@ -194,12 +197,10 @@ int destroy_keypair(char *pubkeyhashstr, int hashstrlen)
 	}
 destroy_keypair_done:
 	switch(state) {
-		case 3:
-			free(pubfilepath);
 		case 2:
-			free(privfilepath);
+			free(pubfilepath);
 		case 1:
-			free((void *)keydir);
+			free(privfilepath);
 	};
 	return rc;
 }
@@ -230,7 +231,6 @@ int generate_keypair(char *pubkeyhashstr, int hashstrlen)
 		LOG("generate_keypair: ERROR: Key directory not found");
 		goto cleanup_generate_keypair;
 	}
-	state = 1;
 
 	// Check that the directory provided by user is valid
 	if(!dir_exists(keydir)) {
@@ -243,7 +243,7 @@ int generate_keypair(char *pubkeyhashstr, int hashstrlen)
 	if(bne == NULL) {
 		goto cleanup_generate_keypair;
 	}
-	state = 2;
+	state = 1;
 
     if(BN_set_word(bne, e) != 1) {
         goto cleanup_generate_keypair;
@@ -254,14 +254,14 @@ int generate_keypair(char *pubkeyhashstr, int hashstrlen)
     if(RSA_generate_key_ex(r, KEY_BITS, bne, NULL) != 1) {
         goto cleanup_generate_keypair;
     }
-	state = 3;
+	state = 2;
  
     // Derive filename from hash of public key and write keys to filesystem
 	pubkeybuf = BIO_new(BIO_s_mem());
 	if(pubkeybuf == NULL) {
 		goto cleanup_generate_keypair;
 	}
-	state = 4;
+	state = 3;
 
 	if(PEM_write_bio_RSA_PUBKEY(pubkeybuf, r) != 1) {
 		goto cleanup_generate_keypair;
@@ -271,7 +271,7 @@ int generate_keypair(char *pubkeyhashstr, int hashstrlen)
 	if(pubkeystr == NULL) {
 		goto cleanup_generate_keypair;
 	}
-	state = 5;
+	state = 4;
 
 	if(BIO_read(pubkeybuf, pubkeystr, keylen) <= 0) {
 		goto cleanup_generate_keypair;
@@ -288,11 +288,10 @@ int generate_keypair(char *pubkeyhashstr, int hashstrlen)
  
 cleanup_generate_keypair:
 	switch(state) {
-		case 5: free(pubkeystr);
-		case 4: BIO_free_all(pubkeybuf);
-		case 3: RSA_free(r);
-		case 2: BN_free(bne);
-		case 1: free((void *)keydir);
+		case 4: free(pubkeystr);
+		case 3: BIO_free_all(pubkeybuf);
+		case 2: RSA_free(r);
+		case 1: BN_free(bne);
 	};
  
     return retval;
@@ -324,7 +323,6 @@ int exists_keypair(const char *pubkeyhashstr)
 		LOG("exists_keypair: ERROR: Key directory not found");
 		goto exists_keypair_done;
 	}
-	state = 1;
 
 	LOGF("Key directory:%s:", keydir);
 	if(!dir_exists(keydir)) {
@@ -338,13 +336,13 @@ int exists_keypair(const char *pubkeyhashstr)
 		LOG("Unable to allocate memory to store private-file path");
 		goto exists_keypair_done;
 	}
-	state = 2;
+	state = 1;
 	pubfilepath = (char *)calloc(pubfilepathlen, 1);
 	if(pubfilepath == NULL) {
 		LOG("Unable to allocate memory to store public-file path");
 		goto exists_keypair_done;
 	}
-	state = 3;
+	state = 2;
 	sprintf(privfilepath, "%s/%s", keydir, pubkeyhashstr);
 	sprintf(pubfilepath, "%s.pub", privfilepath);
 	if(file_exists(privfilepath) && file_exists(pubfilepath)) {
@@ -352,9 +350,8 @@ int exists_keypair(const char *pubkeyhashstr)
 	}
 exists_keypair_done:
 	switch(state) {
-		case 3: free(pubfilepath);
-		case 2: free(privfilepath);
-		case 1: free((void *)keydir);
+		case 2: free(pubfilepath);
+		case 1: free(privfilepath);
 	}
 	return retval;
 }
