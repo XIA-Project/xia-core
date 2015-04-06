@@ -679,7 +679,6 @@ int main(int argc, char *argv[])
 		// every 0.001 sec, check if any received packets
 		selectRetVal = Xselect(route_state.sock+1, &socks, NULL, NULL, &timeoutval);
 		if (selectRetVal > 0) {
-			syslog(LOG_NOTICE, "Receiving packet");
 			// receiving a Hello or LSA packet
 			memset(&recv_message[0], 0, sizeof(recv_message));
 			dlen = sizeof(sockaddr_x);
@@ -687,7 +686,6 @@ int main(int argc, char *argv[])
 			if (n < 0) {
 					perror("recvfrom");
 			}
-			syslog(LOG_NOTICE, "Received packet");
 
 			string msg = recv_message;
 			start = 0;
@@ -698,17 +696,14 @@ int main(int argc, char *argv[])
 				switch (type) {
 					case HELLO:
 						// process the incoming Hello message
-						syslog(LOG_NOTICE, "Processing Hello");
 						processHello(msg.c_str());
 						break;
 					case LSA:
 						// process the incoming LSA message
-						syslog(LOG_NOTICE, "Processing LSA");
 						processLSA(msg.c_str());
 						break;
 					case HOST_REGISTER:
 						// process the incoming host-register message
-						syslog(LOG_NOTICE, "Processing Host registration");
 						processHostRegister(msg.c_str());
 						break;
 					default:
@@ -726,21 +721,17 @@ int main(int argc, char *argv[])
 			// Except when we are sending an LSA
 			if((iteration % LSA_ITERS) != 0) {
 				route_state.hello_seq++;
-				syslog(LOG_NOTICE, "Sending hello");
 				if(sendHello()) {
 					syslog(LOG_WARNING, "ERROR: Failed sending hello");
 				}
-				syslog(LOG_NOTICE, "Sent hello");
 			}
 		}
 		// Send an LSA every 400 ms
 		if((iteration % LSA_ITERS) == 0) {
 			route_state.hello_seq = 0;
-			syslog(LOG_NOTICE, "Sending LSA");
 			if(sendLSA()) {
 				syslog(LOG_WARNING, "ERROR: Failed sending LSA");
 			}
-			syslog(LOG_NOTICE, "Sent LSA");
 		}
 
 		time_t now = time(NULL);
