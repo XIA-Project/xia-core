@@ -84,9 +84,11 @@ class SCIONCertServer : public Element {
         const char *class_name() const {return "SCIONCertServer";}
         const char *port_count() const {return "-/-";}
         const char *processing() const {return PUSH;}
-        bool run_task(Task *task);
+        void run_timer(Timer* timer) ;
         int configure(Vector<String> &, ErrorHandler *);
         int initialize(ErrorHandler* errh);
+        void push(int port, Packet *p);
+        void sendHello();
 
         /* parsing works */
     private:
@@ -197,7 +199,7 @@ class SCIONCertServer : public Element {
           words, this function is not used to reply back to other ADs. For those
           external requests, processCertificateRequest() function is used.  
          */
-        int sendROT(uint32_t ROTVersion, HostAddr srcAddr);
+        void sendROT();
 
         /**
           @brief Determines if the certificate of the given address is already
@@ -241,21 +243,6 @@ class SCIONCertServer : public Element {
          */
         int isROTRequested(uint32_t, HostAddr);
 
-        /**
-          @brief construct IFID/ADDR mapping.
-
-          This function constructs a interface id to address mapping.
-          Specifically, it mapps the interface ids to the addresses of routers
-          who has the interface ID. The interface ids that each router has is
-          defined in the .conf file and the topology file. 
-
-          This mapping is required when forwarding the PCBs to the downstream
-          ADs. After the propagate() function adds the markings it puts the
-          interface ID to the special opaque field. Then it sets the address as
-          the address of the router who owns that interface ID. 
-         */
-        void constructIfid2AddrMap();
-
         //SLN:
         /**
           @brief Handles ROT request packet from the local servers. 
@@ -273,7 +260,6 @@ class SCIONCertServer : public Element {
          */
         void processROTRequest(uint8_t * packet);
         void processROTReply(uint8_t * packet);
-        void processLocalROTRequest(uint8_t * packet);
         /**
           @brief Handles Certificate Request packet
           @param uint8_t* packet that contains the CERT_REQ packet. 

@@ -27,8 +27,12 @@
 #endif
 */
 
-#ifndef _SL_DEBUG_GW
-#define _SL_DEBUG_GW
+#ifndef _DEBUG_BS
+#define _DEBUG_BS
+#endif
+
+#ifndef _DEBUG_CS
+#define _DEBUG_CS
 #endif
 #ifndef _SL_DEBUG_PS
 #define _SL_DEBUG_PS

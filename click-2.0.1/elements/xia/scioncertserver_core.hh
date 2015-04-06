@@ -88,7 +88,7 @@ class SCIONCertServerCore : public Element {
 
         int configure(Vector<String> &, ErrorHandler *);
         int initialize(ErrorHandler* errh);
-        bool run_task(Task *task);
+        void run_timer(Timer *timer);
         void push(int port, Packet *p);
         void sendHello();
 

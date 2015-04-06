@@ -157,10 +157,20 @@ int SCIONPathServer::configure(Vector<String> &conf, ErrorHandler *errh){
     - initialize click variables
 */
 int SCIONPathServer::initialize(ErrorHandler* errh){
-    ScheduleInfo::initialize_task(this, &_task, errh);
+
+    Config config;
+    config.parseConfigFile((char*)m_sConfigFile.c_str());
+    config.getPSLogFilename(m_sLogFile);
+
+    m_iQueueSize = config.getPSQueueSize();
+    m_iNumRetUP = config.getNumRetUP();
+    m_iLogLevel = config.getLogLevel();
+    m_uAdAid = config.getAdAid();
+    scionPrinter = new SCIONPrint(m_iLogLevel, m_sLogFile);
+    parseTopology();
+
     _timer.initialize(this); 
-    _timer.schedule_after_sec(5);
-    initVariables();
+    _timer.schedule_after_sec(10);
     return 0;
 }
 
@@ -170,32 +180,11 @@ int SCIONPathServer::initialize(ErrorHandler* errh){
 */
 void 
 SCIONPathServer::parseTopology(){
-
     TopoParser parser;
     parser.loadTopoFile(m_sTopologyFile.c_str()); 
     parser.parseServers(m_servers);
     parser.parseRouters(m_routers);
     parser.parseClients(m_clients);
-}
-
-/*
-    SCIONPathServer::initVariables
-    - initialize non_click variables
-*/
-void SCIONPathServer::initVariables(){
-    
-    Config config;
-    config.parseConfigFile((char*)m_sConfigFile.c_str());
-    config.getPSLogFilename(m_sLogFile);
-    
-    m_iQueueSize = config.getPSQueueSize();
-    m_iNumRetUP = config.getNumRetUP();
-    m_iLogLevel = config.getLogLevel();
-    m_uAdAid = config.getAdAid();
-    scionPrinter = new SCIONPrint(m_iLogLevel, m_sLogFile);
-    parseTopology();
-    constructIfid2AddrMap();
-	initializeOutputPort();
 }
 
 void SCIONPathServer::push(int port, Packet *p)
@@ -212,17 +201,13 @@ void SCIONPathServer::push(int port, Packet *p)
     HostAddr src = SPH::getSrcAddr(packet);
     HostAddr dst = SPH::getDstAddr(packet);
     if(src == m_clients.begin()->second.addr) 
-            src = HostAddr(HOST_ADDR_SCION, m_uAdAid);
-        
+        src = HostAddr(HOST_ADDR_SCION, m_uAdAid);
 
-    /*AID_REQ : AID request from switch*/
     switch(type) {
 		
-        /*UP_PATH: up path from pcb server (pcb with sig removed)*/
+        // UP_PATH: up path registration from local beacon server
 		case UP_PATH:{
-            uint32_t ts = 0;
-            //parse up path from the beacon server
-            scionPrinter->printLog(IH,type,(char *)"Received Up-path from local beacon server.\n");
+            scionPrinter->printLog(IH, type, (char *)"Received Up-path from local beacon server.\n");
             parseUpPath(packet); 
 			break;
 		}
@@ -328,11 +313,6 @@ void SCIONPathServer::run_timer(Timer* timer){
     _timer.reschedule_after_sec(5);
 }
 
-
-/*
-    SCIONPathServer::sendRequest
-    - sends request to the TDC Path server for down path to 'target' ad
-*/
 int SCIONPathServer::sendRequest(uint64_t target, HostAddr requestAid){
     if(upPaths.size()<=0){
         //printf("No up-path exists. \n");
@@ -446,14 +426,6 @@ SCIONPathServer::buildPath(uint8_t* pkt, uint8_t* output){
 
     }
     return 0;
-}
-
-/*
-    SCIONPathServer::run_tas
-    - main routine of path server
-*/
-bool SCIONPathServer::run_task(Task* task){
-    return true;
 }
 
 /*
@@ -738,12 +710,10 @@ void SCIONPathServer::sendHello() {
     msg.append("^");
     msg.append(m_HID.c_str());
     msg.append("^");
-
     string dest = "RE ";
     dest.append(BHID);
     dest.append(" ");
     dest.append(SID_XROUTE);
-
     sendPacket((uint8_t *)msg.c_str(), msg.size(), dest);
 }
 
@@ -783,35 +753,6 @@ void SCIONPathServer::sendPacket(uint8_t* data, uint16_t data_length, string des
 
     q = xiah.encap(q, false);
 	output(0).push(q);
-}
-
-
-/*
-	SCIONPathServer::initializeOutputPort
-	prepare IP header for IP encapsulation
-	if the port is assigned an IP address
-*/
-void SCIONPathServer::initializeOutputPort() {
-	
-	portInfo p;
-	p.addr = m_Addr;
-	m_vPortInfo.push_back(p);
-
-	//Initialize port 0; i.e., prepare internal communication
-	if(m_Addr.getType() == HOST_ADDR_IPV4) {
-		m_pIPEncap = new SCIONIPEncap;
-		m_pIPEncap->initialize(m_Addr.getIPv4Addr());
-	}
-}
-
-
-
-void
-SCIONPathServer::constructIfid2AddrMap() {
-	std::multimap<int, RouterElem>::iterator itr;
-	for(itr = m_routers.begin(); itr!=m_routers.end(); itr++) {
-		ifid2addr.insert(std::pair<uint16_t,HostAddr>(itr->second.interface.id, itr->second.addr));
-	}
 }
 
 //SLP:

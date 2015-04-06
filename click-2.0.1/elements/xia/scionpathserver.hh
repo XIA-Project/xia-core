@@ -26,9 +26,9 @@
 #include <click/task.hh>
 #include <map>
 #include <vector>
-#include<string.h>
-#include<stdio.h>
-#include<stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include <tr1/unordered_map>
 
@@ -39,8 +39,6 @@
 #include "topo_parser.hh"
 #include "config.hh"
 #include "scionprint.hh"
-//#include "uppath.hh"
-//#include "upqueue.hh"
 #include "scionipencap.hh"
 
 /**
@@ -302,7 +300,6 @@ class SCIONPathServer : public Element {
         int configure(Vector<String> &, ErrorHandler *);
         int initialize(ErrorHandler* errh);
         void run_timer(Timer *);
-        bool run_task(Task* );
 
         void push(int port, Packet *p);
         void sendHello();
@@ -403,7 +400,6 @@ class SCIONPathServer : public Element {
                 the routers. This mapping is required when the servers send out
                 packet to the routers who owns the egress interface ID.         
         */
-        void initVariables();
 
         /**
             @brief Sends the packet to the given port number.
@@ -433,9 +429,6 @@ class SCIONPathServer : public Element {
             are initialized by initVariable() function.    
         */
         void parseTopology();
-        
-        void constructIfid2AddrMap();
-		void initializeOutputPort();
 
 		//SLP:
 		void clearPaths();

@@ -131,17 +131,20 @@ class SCIONBeaconServer : public Element {
 	  		clearCertificateMap();
 	  		clearAesKeyMap();
 	  		delete scionPrinter;
+	  		#ifdef _DEBUG_BS
+	  		click_chatter("BS (%s:%s): terminates correctly.\n",  
+	  		    m_AD.c_str(), m_HID.c_str());
+	  		#endif
         };
         
         /* click related functions */
         const char *class_name() const {return "SCIONBeaconServer";}
-        const char *port_count() const {return "-/-";} // any # of input ports / any # of output ports
-        const char *processing() const {return PUSH;} // same as "h/h"
+        const char *port_count() const {return "-/-";}
+        const char *processing() const {return PUSH;}
 
         int configure(Vector<String> &, ErrorHandler *);
         int initialize(ErrorHandler* errh);
         void run_timer(Timer *timer);
-        bool run_task(Task *task);
         void push(int port, Packet *p);
 
         void sendHello();
@@ -269,12 +272,7 @@ class SCIONBeaconServer : public Element {
             The returned path can be directly put into a DATA packet to forward
             DATA packets.    
         */
-        int buildPath(uint8_t* pkt, uint8_t* output);
-        
-        /**
-            @brief UNUSED
-        */
-        scionHash createHash(uint8_t* pkt);        
+        int buildPath(uint8_t* pkt, uint8_t* output);     
         
         /**
             @brief Adds the given PCB to the beacon_table
@@ -456,8 +454,8 @@ class SCIONBeaconServer : public Element {
             This function sends out ROT request packet to the local certificate
             server.  
         */
-		void requestROT();
-		void requestROT(uint8_t * packet, uint32_t version);
+		void requestROT(uint32_t version = 0);
+		
         /**
             @brief Main Routine of the PCB process
             @param uint8_t* packet The buffer that contains the PCB. 

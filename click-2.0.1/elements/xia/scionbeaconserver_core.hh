@@ -66,22 +66,26 @@ CLICK_DECLS
 class SCIONBeaconServerCore : public Element {
     public :
         SCIONBeaconServerCore(): _timer(this), _task(this), _CryptoIsReady(false), 
-            _AIDIsRegister(false), m_iPCBGenPeriod(1), m_bROTInitiated(false) {};
+            m_iPCBGenPeriod(1), m_bROTInitiated(false) {};
+        
         ~SCIONBeaconServerCore()
         {
             if(_CryptoIsReady) rsa_free(&PriKey);
             delete scionPrinter;
+            #ifdef _DEBUG_BS
+	  		click_chatter("TDC BS (%s:%s): terminates correctly.\n", 
+	  		    m_AD.c_str(), m_HID.c_str());
+	  		#endif
         };
         
         /* click related functions */
         const char *class_name() const {return "SCIONBeaconServerCore";}
-        const char *port_count() const {return "-/-";} // any # of input ports / any # of output ports
-        const char *processing() const {return PUSH;} // same as "h/h"
+        const char *port_count() const {return "-/-";}
+        const char *processing() const {return PUSH;}
 
         int configure(Vector<String> &, ErrorHandler *);
         int initialize(ErrorHandler* errh);
         void run_timer(Timer *timer);
-        bool run_task(Task *task);
         void push(int port, Packet *p);
         void sendHello();
 
@@ -233,9 +237,8 @@ class SCIONBeaconServerCore : public Element {
         rsa_context PriKey;                         /** cryptography object, now we use RSA*/
         
         // flags
-        bool m_bRsaCtxLoad;/**< True if private key is loaded to RSA_CTX */
-        bool _CryptoIsReady;/**< True if Cryptography is ready */
-        bool _AIDIsRegister;/**< True if this AD is registering */
+        bool m_bRsaCtxLoad;  /** True if private key is loaded to RSA_CTX */
+        bool _CryptoIsReady; /** True if Cryptography is ready */
 
         int m_iLogLevel;/**< Log Level */
         SCIONPrint* scionPrinter;/**< SCION Printer */            
@@ -257,8 +260,7 @@ class SCIONBeaconServerCore : public Element {
         /**
             List of routers.
             Indexed by the connected neighbor type.
-        */  
-        //std::multimap<int, RouterElem> m_routers;
+        */
         std::multimap<int, EgressIngressPair> m_routepairs;
 
 };

@@ -95,18 +95,15 @@ struct path{
 */
 class SCIONPathServerCore : public Element { 
     public :
-        SCIONPathServerCore():_timer(this), _task(this){};
+        SCIONPathServerCore(): _timer(this), _task(this){};
         ~SCIONPathServerCore(){delete scionPrinter;};
        
-//        const char *flow_code()  const {return "x/x";}
         const char *class_name() const {return "SCIONPathServerCore";}
         const char *port_count() const {return "-/-";}
         const char *processing() const {return PUSH;} // same as "h/h"
 
         int configure(Vector<String> &, ErrorHandler *);
         int initialize(ErrorHandler* errh);
-        bool run_task(Task *);
-
         void run_timer(Timer *);
         void push(int port, Packet *p);
         void sendHello();
@@ -136,18 +133,6 @@ class SCIONPathServerCore : public Element {
             opposite. 
         */
         void reversePath(uint8_t* path, uint8_t* output, uint8_t hops);
-
-        /**
-            @brief Initializes necessary information in bootstrapping process. 
-            @param void
-            @return void
-
-            This function initializes necessary information that is required for
-            the server to run. The variables include ROT, Topology information.
-            In certain conditions, these function will hang and requests
-            information to other servers. 
-        */
-        void initVariables();
         
         /**
             @brief Sends packet to the specified port
@@ -162,7 +147,6 @@ class SCIONPathServerCore : public Element {
         */
         //void sendPacket(uint8_t* packet, uint16_t packetLength, int port, int fwd_type=0);
         void sendPacket(uint8_t* data, uint16_t dataLength, string dest);
-        void constructIfid2AddrMap();
         /**
             @brief Parses Topology information from the filesystem. 
             @param void
@@ -172,7 +156,7 @@ class SCIONPathServerCore : public Element {
             it in the memory. 
         */
         void parseTopology();
-		void initializeOutputPort();
+		
     private:
         Timer _timer;
         Task _task;

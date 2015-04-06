@@ -7,10 +7,8 @@
         <PathServer>
 	    <HID>0000000000000000000000000000000000100000</HID>
         </PathServer>
-	<!--
         <CertServer>
 	    <HID>0000000000000000000000000000000000300000</HID>
         </CertServer>
-	-->
     </Servers>
 </Topology>

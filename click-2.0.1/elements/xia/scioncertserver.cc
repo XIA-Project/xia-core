@@ -55,8 +55,7 @@ int SCIONCertServer::configure(Vector<String> &conf, ErrorHandler *errh){
         "CONFIG_FILE", cpkM, cpString, &m_sConfigFile, 
         "TOPOLOGY_FILE",cpkM, cpString, &m_sTopologyFile,
         cpEnd) <0){
-            click_chatter("ERR: click configuration fail at SCIONCertServer.\n");
-            click_chatter("Exit SCON Network.\n");
+            click_chatter("Fatal Err: click configuration fail at SCIONCertServer.\n");
             exit(-1);
     }
 	
@@ -91,34 +90,31 @@ int SCIONCertServer::initialize(ErrorHandler* errh){
 
 	// setup scionPrinter for message logging
 	scionPrinter = new SCIONPrint(m_iLogLevel, m_csLogFile);
+	#ifdef _DEBUG_CS
 	scionPrinter->printLog(IH, (char*)"CS (%s:%s) INIT.\n", m_AD.c_str(), m_HID.c_str());
+	#endif
 
 	// task 2: parse topology file
 	parseTopology();
-	//constructIfid2AddrMap();
-	//initializeOutputPort();
+	#ifdef _DEBUG_CS
 	scionPrinter->printLog(IH, (char*)"Parse Topology Done.\n");
+	#endif
 	
 	// task 3: parse ROT (root of trust) file at local folder
 	parseROT();
 	scionPrinter->printLog(IH, (char*)"Parse and Verify ROT Done.\n");
 
 	// task4: checking local cert and private key
-	// TODO here
+	_timer.initialize(this); 
+    _timer.schedule_after_sec(10);
 	
-	ScheduleInfo::initialize_task(this, &_task, errh);
+	#ifdef _DEBUG_CS
 	scionPrinter->printLog(IH, (char*)"CS (%s:%s) INIT Done.\n", m_AD.c_str(), m_HID.c_str());
+	#endif
 	
 	return 0;
 }
 
-
-/*
-    parseROT
-    parses ROT from m_sROTFile, which is defined as an argument in .click file
-	if filename is given as an argument, parsing only verifies the (temporary) ROT file
-	and returns the results.
-*/
 int SCIONCertServer::parseROT(char* loc){	
 	ROTParser parser;
 	char* fn = NULL;
@@ -130,25 +126,35 @@ int SCIONCertServer::parseROT(char* loc){
 		fn = m_sROTFile;
 
 	if(parser.loadROTFile(fn)!=ROTParseNoError){
+	    #ifdef _DEBUG_CS
 		scionPrinter->printLog(EH, (char*)"ERR: ROT File missing at CS.\n");
+		#endif
 		return SCION_FAILURE;
 	}
 	scionPrinter->printLog(IH, "Load ROT OK.\n");
 
 	if(parser.parse(tROT)!=ROTParseNoError){
+	    #ifdef _DEBUG_CS
 		scionPrinter->printLog(EH, "ERR: ROT File parsing error at CS.\n");
+		#endif
 		return SCION_FAILURE;
 	}
+	#ifdef _DEBUG_CS
 	scionPrinter->printLog(IH, "Parse ROT OK.\n");
+	#endif
 
 	if(parser.verifyROT(tROT)!=ROTParseNoError){
+	    #ifdef _DEBUG_CS
 		scionPrinter->printLog(EH, "ERR: ROT File parsing error at CS.\n");
+		#endif
 		return SCION_FAILURE;
 	}
 
 	//Store the ROT if verification passed.
 	parser.parse(m_ROT);
+	#ifdef _DEBUG_CS
 	scionPrinter->printLog(IH, "Verify ROT OK.\n");
+	#endif
 
 	// prepare ROT for delivery
 	FILE* rotFile = fopen(fn, "r");
@@ -168,7 +174,9 @@ int SCIONCertServer::parseROT(char* loc){
 		offset+=buffLen;
 	}
 	fclose(rotFile);
-	scionPrinter->printLog(IH, "CS: Stored Verified ROT for further delivery.\n");
+	#ifdef _DEBUG_CS
+	scionPrinter->printLog(IH, "Stored Verified ROT for further delivery.\n");
+	#endif
 	return SCION_SUCCESS;
 }
 
@@ -176,49 +184,36 @@ void SCIONCertServer::parseTopology(){
 	TopoParser parser;
 	parser.loadTopoFile(m_sTopologyFile.c_str()); 
     parser.parseServers(m_servers);
-    // parser.parseRouters(m_routers);
-    // parser.parseEgressIngressPairs(m_routepairs);
 }
 
-/*
-	SLN:
-	process ROT request, i.e., send ROT reply packet to BS
-*/
-void
-SCIONCertServer::processLocalROTRequest(uint8_t * packet){
-	#ifdef _SL_DEBUG_CS
-	printf("CS (%llu:%llu): Received ROT request from BS (%llu).\n", 
-		m_uAdAid, m_uAid, SPH::getSrcAddr(packet).numAddr());
-	#endif
-
-	uint8_t hdrLen = SPH::getHdrLen(packet);
-	ROTRequest * req = (ROTRequest *)SPH::getData(packet);
-
-	//1. return ROT  if the requested ROT is available from the local repository
-	if(req->currentVersion == m_ROT.version) {
-
-		scionHeader hdr;
-	
-		uint16_t totalLen = hdrLen + curROTLen;
-		uint8_t rotPacket[totalLen];
-		memset(rotPacket, 0, totalLen);
-	
-		// fill address
-		hdr.src = m_Addr; //HostAddr(HOST_ADDR_SCION, m_uAid);
-		hdr.dst = SPH::getSrcAddr(packet);
-	
-		hdr.cmn.type = ROT_REP_LOCAL;
-		hdr.cmn.hdrLen = hdrLen;
-		hdr.cmn.totalLen = totalLen;
-	
-		SPH::setHeader(rotPacket, hdr);
-	
-		memcpy(rotPacket+hdrLen, curROTRaw, curROTLen);
-		//sendPacket(rotPacket, totalLen, PORT_TO_SWITCH, TO_SERVER);
-	//2. if not, request the ROT to the provider AD
-	//note that the request contains the Opaque Field to reach the TDC
-	} else {	
-		int ret;
+void SCIONCertServer::push(int port, Packet *p)
+{
+    TransportHeader thdr(p);
+    uint8_t* s_pkt = (uint8_t *) thdr.payload();
+    uint16_t type = SPH::getType(s_pkt);
+	uint16_t packetLength = SPH::getTotalLen(s_pkt);
+    uint8_t packet[packetLength];
+	memset(packet, 0, packetLength);
+    memcpy(packet, s_pkt, packetLength);
+    
+    switch(type) {
+		case ROT_REQ:
+			//processROTRequest(newPacket); 
+			break;
+		case ROT_REP:
+			//processROTReply(newPacket); 
+			break;
+		case ROT_REQ_LOCAL: {
+		        
+		        uint8_t hdrLen = SPH::getHdrLen(packet);
+		        ROTRequest *req = (ROTRequest *)SPH::getData(packet);
+		        //1. return ROT  if the requested ROT is available from the local repository
+		        if(m_ROT.version >= req->currentVersion) {
+		            sendROT();
+		            //2. if not, request the ROT to the provider AD
+		        } else {
+		            /*
+		        int ret;
 		//if the ROT has not been request,  forward the request packet after changing the type to ROT_REQ
 		if((ret = isROTRequested(req->currentVersion, SPH::getSrcAddr(packet))) == ROT_REQ_NO) {
 			m_ROTRequests.insert(std::pair<uint32_t, HostAddr>(req->currentVersion,SPH::getSrcAddr(packet)));
@@ -250,17 +245,93 @@ SCIONCertServer::processLocalROTRequest(uint8_t * packet){
 				m_ROTRequests.insert(std::pair<uint32_t, HostAddr>(req->currentVersion,SPH::getSrcAddr(packet)));
 		}
 	}
+			*/
+		        }
+		    }
+			break;
+		case CERT_REQ: 
+		    //send chain
+			//processCertificateRequest(packet); 
+			break;
+		case CERT_REP:
+			//processCertificateReply(packet); 
+			break;
+		case CERT_REQ_LOCAL:
+			processLocalCertificateRequest(packet); 
+			break;
+		default:
+			break;
+	}
 }
 
-/*
-	SLN:
-	process ROT request from a child AD
-*/
-void
-SCIONCertServer::processROTRequest(uint8_t * packet) {
-	//1. return ROT if the requested version is available
-	//2. forward it to the upstream otherwise (SL: I think this should not happen) 
-	#ifdef _SL_DEBUG_CS
+void SCIONCertServer::run_timer(Timer* timer) {
+    sendHello();
+    _timer.reschedule_after_sec(5);
+}
+
+void SCIONCertServer::sendHello() {
+    string msg = "0^";
+    msg.append(m_AD.c_str());
+    msg.append("^");
+    msg.append(m_HID.c_str());
+    msg.append("^");
+    string dest = "RE ";
+    dest.append(BHID);
+    dest.append(" ");
+    dest.append(SID_XROUTE);
+    sendPacket((uint8_t *)msg.c_str(), msg.size(), dest);
+}
+
+void SCIONCertServer::sendROT(){
+
+    #ifdef _DEBUG_CS
+	scionPrinter->printLog(IH, (char*)"CS received ROT request from local BS.\n");
+	#endif
+	
+	// send to one of beacon server
+	if(m_servers.find(BeaconServer)!=m_servers.end()){
+
+	    // prepare ROT reply packet
+	    uint8_t hdrLen = COMMON_HEADER_SIZE+AIP_SIZE*2;
+	    uint16_t totalLen = hdrLen + sizeof(struct ROTRequest) + curROTLen;
+	    uint8_t rotPacket[totalLen];
+	    memset(rotPacket, 0, totalLen);
+	    // set length and type
+	    SPH::setHdrLen(rotPacket, hdrLen);
+	    SPH::setType(rotPacket, ROT_REP_LOCAL); 
+	    SPH::setTotalLen(rotPacket, totalLen);
+	    
+	    // fill address
+	    HostAddr srcAddr = HostAddr(HOST_ADDR_AIP, (uint8_t*)strchr(m_HID.c_str(),':')); 
+	    HostAddr dstAddr = HostAddr(HOST_ADDR_AIP, (uint8_t*)(m_servers.find(BeaconServer)->second.HID));
+			
+		SPH::setSrcAddr(rotPacket, srcAddr);
+		SPH::setDstAddr(rotPacket, dstAddr);
+			
+		string dest = "RE ";
+		dest.append(BHID);
+		dest.append(" ");
+		dest.append("HID:");
+		dest.append((const char*)m_servers.find(BeaconServer)->second.HID);
+		
+		// set default version number as 0
+		struct ROTRequest req;
+		req.previousVersion = m_ROT.version;
+		req.currentVersion = m_ROT.version; 
+		*(ROTRequest *)(rotPacket+hdrLen) = req;
+		
+		memcpy(rotPacket+hdrLen+sizeof(struct ROTRequest), curROTRaw, curROTLen);
+		sendPacket(rotPacket, totalLen, dest);
+	}else{
+	    #ifdef _DEBUG_CS
+		scionPrinter->printLog(EH, (char*)"AD (%s) does not has beacon server.\n", m_AD.c_str());
+		#endif
+	}
+}
+
+void SCIONCertServer::processROTRequest(uint8_t * packet) {
+
+	#ifdef _DEBUG_CS
 	printf("CS (%llu:%llu): Received ROT_REQ request from downstream CS.\n", m_uAdAid, m_uAid);
 	#endif
 
@@ -316,10 +387,6 @@ SCIONCertServer::processROTRequest(uint8_t * packet) {
 	//sendPacket(buffer, hdr.cmn.totalLen, PORT_TO_SWITCH,TO_SERVER);
 }
 
-/*
-	SLN:
-	process certificate reply from an upstream AD
-*/
 void SCIONCertServer::processROTReply(uint8_t * packet) {
 	
 	ROTRequest *req = (ROTRequest *)SPH::getData(packet);
@@ -383,12 +450,8 @@ void SCIONCertServer::processROTReply(uint8_t * packet) {
 		//sendPacket(packet, SPH::getTotalLen(packet), PORT_TO_SWITCH, TO_ROUTER);
 	}
 }
-/*
-	SLN:
-	process certificate request from a child AD
-*/
-void
-SCIONCertServer::processCertificateRequest(uint8_t * packet) {
+
+void SCIONCertServer::processCertificateRequest(uint8_t * packet) {
 	printf("CS (%llu:%llu): Received CERT_REQ request from downstream CS.\n", m_uAdAid, m_uAid);
 
 	uint16_t hops = 0; 
@@ -471,12 +534,7 @@ SCIONCertServer::processCertificateRequest(uint8_t * packet) {
 	}
 }
 
-/*
-	SLN:
-	process certificate reply from an upstream AD
-*/
-void
-SCIONCertServer::processCertificateReply(uint8_t * packet) {
+void SCIONCertServer::processCertificateReply(uint8_t * packet) {
 	printf("CS (%llu:%llu): Received CERT_REP request from upstream CS.\n", m_uAdAid, m_uAid);
 	//CERT_REP from upstream CS
 	//verify certificate
@@ -527,17 +585,13 @@ SCIONCertServer::processCertificateReply(uint8_t * packet) {
 	}
 }
 
-/*
-	SLN:
-	process certificate request from beacon server
-	1. provide requested AD's certificate if available
-	2. send a request to the upstream AD otherwise
-*/
-void
-SCIONCertServer::processLocalCertificateRequest(uint8_t * packet) {
+void SCIONCertServer::processLocalCertificateRequest(uint8_t * packet) {
+
 	HostAddr srcAddr = SPH::getSrcAddr(packet);
 	HostAddr dstAddr = SPH::getDstAddr(packet);
-	printf("CS (%llu:%llu): got CERT_REQ_LOCAL from BS (%llu)\n", m_uAdAid, m_uAid, srcAddr.numAddr());
+	#ifdef _DEBUG_CS
+	scionPrinter->printLog(IH, (char*)"CS (%s:%s): Got CERT_REQ_LOCAL from local BS.\n", m_AD.c_str(), m_HID.c_str());
+	#endif
 
 	specialOpaqueField* sOF = (specialOpaqueField*)(packet+COMMON_HEADER_SIZE+srcAddr.getLength()+dstAddr.getLength());
 	uint16_t hops = sOF->hops; 
@@ -550,36 +604,41 @@ SCIONCertServer::processLocalCertificateRequest(uint8_t * packet) {
 
 	for(int i=0;i<numRequest;i++){
 		uint64_t target = req->targets[i];
-		printf("Request target AID = %llu\n", target);
+		#ifdef _DEBUG_CS
+		scionPrinter->printLog(IH, (char*) "Request target AID = %llu\n", target);
+		#endif
 		uint8_t certFile[MAX_FILE_LEN];
 		getCertFile(certFile, target);
 		
 		FILE* cFile;
 		if((cFile=fopen((const char*)certFile,"r"))==NULL){
-			printf("certificate not found, sending upstream\n"); 
+		    #ifdef _DEBUG_CS
+			scionPrinter->printLog(IH, (char*)"certificate not found, sending upstream.\n");
+			#endif 
 			if(!isCertRequested(target, srcAddr)){
 				m_certRequests.insert(std::pair<uint64_t, HostAddr>(target,srcAddr));
 				newReq.targets[newReq.numTargets]=target;
 				newReq.numTargets++;
 				// go to label send upstream
 			}
-
 		}else{
-			printf("CS (%llu:%llu): found AID %llu cert and send it back to BS (%llu)\n", 
-				m_uAdAid, m_uAid, target, srcAddr.numAddr());
+		    #ifdef _DEBUG_CS
+			scionPrinter->printLog(IH, (char*)"CS (%s:%s): found AID %llu cert and send it back to local BS.\n", 
+				m_AD.c_str(), m_HID.c_str(), target);
+			#endif 
+			
 			fseek(cFile,0,SEEK_END);
 			long cSize = ftell(cFile);
 			rewind(cFile);
 			
+			// construct packet for certificates
 			scionHeader hdr;
-			hdr.cmn.hdrLen = COMMON_HEADER_SIZE+SCION_ADDR_SIZE*2;
+			hdr.cmn.hdrLen = COMMON_HEADER_SIZE+AIP_SIZE*2;
 			hdr.cmn.totalLen = hdr.cmn.hdrLen+CERT_INFO_SIZE+cSize;
 			uint8_t certRepPkt[hdr.cmn.totalLen];
-			
 			hdr.cmn.type = CERT_REP_LOCAL;
-			hdr.src = HostAddr(HOST_ADDR_SCION, m_uAid);
-			hdr.dst = srcAddr;
-
+			hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)strchr(m_HID.c_str(),':')); 
+			hdr.dst = HostAddr(HOST_ADDR_AIP, (uint8_t*)(m_servers.find(BeaconServer)->second.HID));
 			SPH::setHeader(certRepPkt,hdr);
 
 			certInfo* info = (certInfo*)(certRepPkt+hdr.cmn.hdrLen);
@@ -587,7 +646,14 @@ SCIONCertServer::processLocalCertificateRequest(uint8_t * packet) {
 			info->length = cSize;
 			fread(certRepPkt+hdr.cmn.hdrLen+CERT_INFO_SIZE,1,cSize,cFile);
 			fclose(cFile);
-			//sendPacket(certRepPkt, hdr.cmn.totalLen, PORT_TO_SWITCH,TO_SERVER);
+			
+			string dest = "RE ";
+			dest.append(BHID);
+			dest.append(" ");
+			dest.append("HID:");
+			dest.append((const char*)m_servers.find(BeaconServer)->second.HID);
+			
+			sendPacket(certRepPkt, hdr.cmn.totalLen, dest);
 		}
 	}
 	
@@ -604,73 +670,9 @@ SCIONCertServer::processLocalCertificateRequest(uint8_t * packet) {
 
 		SPH::setDstAddr(packet, dstAddr);
 		SPH::setCurrOFPtr(packet,SCION_ADDR_SIZE*2);
+		
 		//sendPacket(packet, outPacketLength, PORT_TO_SWITCH,TO_SERVER);
 	}
-}
-
-/*
-	read packets from the incoming NIC and process them based on their type
-*/
-bool SCIONCertServer::run_task(Task *task){
-
-	/*
-	Packet* inPacket;
-	while((inPacket=input(PORT_TO_SWITCH).pull())){
-		
-		uint8_t * s_pkt = (uint8_t *) inPacket->data();
-		//remove IP header if it exists
-		if(m_vPortInfo[PORT_TO_SWITCH].addr.getType() == HOST_ADDR_IPV4){
-			struct ip * p_iph = (struct ip *)s_pkt;
-			struct udphdr * p_udph = (struct udphdr *)(p_iph+1);
-			if(p_iph->ip_p != SCION_PROTO_NUM || ntohs(p_udph->dest) != SCION_PORT_NUM) {
-				inPacket->kill();
-				return true;
-			}
-			s_pkt += IPHDR_LEN;
-		}
-
-		uint16_t inPacketLength = SPH::getTotalLen((uint8_t*)s_pkt);
-		uint8_t newPacket[inPacketLength];
-		memcpy(newPacket, s_pkt, inPacketLength);
-		inPacket->kill();
-		uint16_t type = SPH::getType(newPacket);
-
-		//SL:
-		//the order needs to be changed
-		//Certificate handling might be the most frequent event
-		//Yet, switch-case can be used in CertServer
-		switch(type) {
-		case ROT_REQ:
-			processROTRequest(newPacket); break;
-		case ROT_REP:
-			processROTReply(newPacket); break;
-		case ROT_REQ_LOCAL:
-			processLocalROTRequest(newPacket); break;
-		case CERT_REQ: //send chain
-			processCertificateRequest(newPacket); break;
-		case CERT_REP:
-			processCertificateReply(newPacket); break;
-		case CERT_REQ_LOCAL:
-			processLocalCertificateRequest(newPacket); break;
-		case AID_REQ://aid req from switch
-			#ifdef _SL_DEBUG_CS
-			printf("CS (%llu): AID_REQ received...\n", m_uAdAid);
-			#endif
-			SPH::setType(newPacket, AID_REP);
-			SPH::setSrcAddr(newPacket, HostAddr(HOST_ADDR_SCION, m_uAid));
-			//sendPacket(newPacket, inPacketLength, PORT_TO_SWITCH);
-			break;
-		default: 
-			#ifdef _SL_DEBUG_CS
-			printf("CS(%llu:%llu): unknown packet type: %d\n",m_uAdAid, m_uAid, type);
-			#endif
-			break;
-		}
-	}
-	*/
-	
-	_task.fast_reschedule();
-	return true;
 }
 
 int SCIONCertServer::verifyCert(uint8_t* packet){
@@ -773,8 +775,6 @@ void SCIONCertServer::getCertFile(uint8_t* fn, uint64_t target){
 	sprintf((char*)fn,"./TD1/Non-TDC/AD%llu/certserver/certificates/td%llu-ad%llu-0.crt",m_uAdAid, m_uTdAid, target);
 }
 
-
-
 void SCIONCertServer::reversePath(uint8_t* path, uint8_t* output, uint8_t hops){
 	uint16_t offset = (hops)*OPAQUE_FIELD_SIZE; 
 	uint8_t* ptr = path+OPAQUE_FIELD_SIZE;
@@ -787,24 +787,6 @@ void SCIONCertServer::reversePath(uint8_t* path, uint8_t* output, uint8_t hops){
 		ptr+=OPAQUE_FIELD_SIZE;
 		hopPtr = (opaqueField*)ptr;
 	}
-}
-
-int SCIONCertServer::sendROT(uint32_t ROTVersion, HostAddr srcAddr){
-
-	scionHeader hdr;
-
-	hdr.cmn.type = ROT_REP_LOCAL;
-	hdr.cmn.hdrLen = COMMON_HEADER_SIZE+SCION_ADDR_SIZE*2;
-	hdr.cmn.totalLen = curROTLen + hdr.cmn.hdrLen;
-	hdr.src = HostAddr(HOST_ADDR_SCION, m_uAdAid);
-	hdr.dst = srcAddr;
-
-	uint8_t packet[hdr.cmn.totalLen];
-	SPH::setHeader(packet,hdr);
-	memcpy(packet+hdr.cmn.hdrLen, curROTRaw, curROTLen);
-   
-	//sendPacket(packet, hdr.cmn.totalLen,PORT_TO_SWITCH);
-	return 1;
 }
 
 int SCIONCertServer::isCertRequested(uint64_t target, HostAddr requester){
@@ -839,15 +821,6 @@ int SCIONCertServer::isROTRequested(uint32_t rotVer, HostAddr requester){
 	else
 		return ROT_REQ_OTHER;
 }
-
-
-void SCIONCertServer::constructIfid2AddrMap() {
-    std::multimap<int, RouterElem>::iterator itr;
-    for(itr = m_routers.begin(); itr!=m_routers.end(); itr++) {
-        ifid2addr.insert(std::pair<uint16_t,HostAddr>(itr->second.interface.id, itr->second.addr));
-    }
-}
-
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(SCIONCertServer)
