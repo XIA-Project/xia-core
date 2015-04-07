@@ -925,13 +925,21 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 		sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
 
 		// Is this packet arriving at a rendezvous server?
-		if (sk->sock_type == SOCK_RAW) {
+		if (sk && sk->sock_type == SOCK_RAW && should_buffer_received_packet(p_in, sk)) {
 			String src_path_str = src_path.unparse();
 			String dst_path_str = dst_path.unparse();
 			click_chatter("ProcessNetworkPacket: received stream packet on raw socket");
 			click_chatter("ProcessNetworkPacket: src|%s|", src_path_str.c_str());
 			click_chatter("ProcessNetworkPacket: dst|%s|", dst_path_str.c_str());
 			click_chatter("ProcessNetworkPacket: len=%d", p_in->length());
+
+			add_packet_to_recv_buf(p_in, sk);
+			if(sk->polling) {
+				// tell API we are readable
+				ProcessPollEvent(_dport, POLLIN);
+			}
+			check_for_and_handle_pending_recv(sk);
+			/*
 			xia::XSocketMsg xsm;
 			xsm.set_type(xia::XRECV);
 			xia::X_Recv_Msg *x_recv_msg = xsm.mutable_x_recv();
@@ -944,6 +952,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			WritablePacket *raw_pkt = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
 			click_chatter("ProcessNetworkPacket: delivering packet to raw socket");
 			output(API_PORT).push(UDPIPPrep(raw_pkt, _dport));
+			*/
 			return;
 		}
 
