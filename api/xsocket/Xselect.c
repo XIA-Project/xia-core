@@ -83,7 +83,7 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 				// TODO: should this work for Content sockets?
 
 				xia::X_Poll_Msg::PollFD *pfd = pollMsg->add_pfds();
-				
+
 				// find the port number associated with this Xsocket
 				struct sockaddr_in sin;
 				socklen_t slen = sizeof(sin);
@@ -120,9 +120,8 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 
 	// Real sockets in the Poll message are set to 0. They are left in the list to make processing easier
 
-	// the rfds (Real fd) list has the fds flipped negative for the xsockets so they will be ignored 
+	// the rfds (Real fd) list has the fds flipped negative for the xsockets so they will be ignored
 	//  for the same reason
-
 	if ((sock = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		LOGF("error creating Xpoll socket: %s", strerror(errno));
 		rc = -1;
@@ -141,58 +140,65 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 
 	rc = (_f_poll)(rfds, nfds + 1, timeout);
 
-	if (rc > 0 && rfds[nfds].revents != 0) {
-		
-		// there's data from click!
-		if (click_reply(sock, 0, &xsm) < 0) {
-			LOG("Error getting data from Click\n");
-			rc = -1;
-			goto done;
-		}
+	if (rc > 0) {
+		// go through and update the fds in the output
+		for (unsigned i = 0; i < nfds; i++)
+			ufds[i].revents = rfds[i].revents;
 
-		xia::X_Poll_Msg *pout = xsm.mutable_x_poll();
-		xrc = pout->nfds();
+		// now do click events if any
+		if (rfds[nfds].revents != 0) {
 
-		// loop thru returned xsockets
-		for (int i = 0; i < xrc; i++) {
-			const xia::X_Poll_Msg::PollFD& pfd_out = pout->pfds(i);
-			unsigned port = pfd_out.port();
-			unsigned flags = pfd_out.flags();
-				
-			//LOGF("poll returned x%0x for %d\n", flags, port);
+			if (click_reply(sock, 0, &xsm) < 0) {
+				LOG("Error getting data from Click\n");
+				rc = -1;
+				goto done;
+			}
 
-			// find the associated socket
-			int fd = 0;
-			for (unsigned j = 0; j < nfds; j++) {
-				if (port == s2p[j].port) {
-					fd = s2p[j].fd;
-					break;
+			xia::X_Poll_Msg *pout = xsm.mutable_x_poll();
+			xrc = pout->nfds();
+
+			// loop thru returned xsockets
+			for (int i = 0; i < xrc; i++) {
+				const xia::X_Poll_Msg::PollFD& pfd_out = pout->pfds(i);
+				unsigned port = pfd_out.port();
+				unsigned flags = pfd_out.flags();
+
+				//LOGF("poll returned x%0x for %d\n", flags, port);
+
+				// find the associated socket
+				int fd = 0;
+				for (unsigned j = 0; j < nfds; j++) {
+					if (port == s2p[j].port) {
+						fd = s2p[j].fd;
+						break;
+					}
+				}
+
+				// find the socket in the original poll & update the revents field
+				for (unsigned j = 0; j < nfds; j++) {
+					if (ufds[j].fd == fd) {
+						ufds[j].revents = flags;
+						break;
+					}
 				}
 			}
 
-			// find the socket in the original poll & update the revents field
-			for (unsigned j = 0; j < nfds; j++) {
-				if (ufds[j].fd == fd) {
-					ufds[j].revents = flags;
-					break;
-				}
-			}
+		} else {
+			// we need to tell click to cancel the Xpoll event
+			xsm.Clear();
+			xsm.set_type(xia::XPOLL);
+			xsm.set_sequence(0);
+			pollMsg = xsm.mutable_x_poll();
+			pollMsg->set_type(xia::X_Poll_Msg::CANCEL);
+			pollMsg->set_nfds(0);
+
+			click_send(sock, &xsm);
 		}
 
 		// rc is the number of fds returned by poll + plus number of sockets found by click
-		//  minus the event for the control socket 
-		rc += xrc - 1;
-
-	} else {
-		// we need to tell click to cancel the Xpoll event
-		xsm.Clear();
-		xsm.set_type(xia::XPOLL);
-		xsm.set_sequence(0);
-		pollMsg = xsm.mutable_x_poll();
-		pollMsg->set_type(xia::X_Poll_Msg::CANCEL);
-		pollMsg->set_nfds(0);
-
-		click_send(sock, &xsm);
+		//  minus the event for the control socket
+		if (xrc > 0)
+			rc += xrc - 1;
 	}
 
 done:
