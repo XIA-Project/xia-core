@@ -460,7 +460,7 @@ int main(int argc, char *argv[]) {
 		struct timeval timeout;
 		timeout.tv_sec = 0;
 		timeout.tv_usec = 1000;
-		int retval = select(controlsock+1, &read_fds, NULL, NULL, &timeout);
+		int retval = Xselect(controlsock+1, &read_fds, NULL, NULL, &timeout);
 		if(retval == -1) {
 			syslog(LOG_ERR, "ERROR waiting for data to arrive. Exiting");
 			return 2;
