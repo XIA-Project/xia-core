@@ -245,7 +245,7 @@ int main(int argc, char **argv)
 
 		if(pingflags & FLOOD) {
 			pinger();
-			if( select(32, (fd_set *)&fdmask, 0, 0, &timeout) == 0)
+			if( Xselect(32, (fd_set *)&fdmask, 0, 0, &timeout) == 0)
 				continue;
 		}
 		if ( (cc=Xrecvfrom(s, packet, len, 0, (struct sockaddr*)&from, &fromlen)) < 0) {

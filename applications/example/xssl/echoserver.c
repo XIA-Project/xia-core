@@ -153,7 +153,7 @@ void process(int sock, XSSL_CTX *ctx)
 
 	tv.tv_sec = WAIT_FOR_DATA;
 	tv.tv_usec = 0;
-		 if ((n = select(xssl->sockfd + 1, &fds, NULL, NULL, &tv)) < 0) {
+		 if ((n = Xselect(xssl->sockfd + 1, &fds, NULL, NULL, &tv)) < 0) {
 			 warn("%5d Select failed, closing...\n", pid);
 			 break;
 
