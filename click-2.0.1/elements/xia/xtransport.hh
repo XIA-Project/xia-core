@@ -67,16 +67,16 @@ using namespace std;
 
 #define REQUEST_FAILED		0x00000001
 #define WAITING_FOR_CHUNK	0x00000002
-#define READY_TO_READ		0x00000004
-#define INVALID_HASH		0x00000008
+#define READY_TO_READ			0x00000004
+#define INVALID_HASH			0x00000008
 
-#define HASH_KEYSIZE    20
+#define HASH_KEYSIZE	20
 
-#define API_PORT    0
-#define BAD_PORT       1
-#define NETWORK_PORT    2
-#define CACHE_PORT      3
-#define XHCP_PORT       4
+#define API_PORT			0
+#define BAD_PORT			1
+#define NETWORK_PORT	2
+#define CACHE_PORT		3
+#define XHCP_PORT			4
 
 
 /* TCP params from http://lxr.linux.no/linux+v3.10.2/include/net/tcp.h */
@@ -296,8 +296,6 @@ class XTRANSPORT : public Element {
     void ReturnResult(int sport, xia::XSocketMsg *xia_socket_msg, int rc = 0, int err = 0);
     
   private:
-
-
 //  pthread_mutex_t _lock;
 //  pthread_mutexattr_t _lock_attr;
 
@@ -319,299 +317,300 @@ class XTRANSPORT : public Element {
 
     Packet* UDPIPPrep(Packet *, int);
 
-
-/* TODO: sock (previously named DAGinfo) stores per-socket states for ALL transport protocols. We better make a specialized struct for each protocol
-*	(e.g., xsp_sock, tcp_sock) that is inherited from sock struct. Not sure if HashTable<XID, sock> will work. Use HashTable<XID, sock*> instead?
-*/
+		/* TODO: sock (previously named DAGinfo) stores per-socket states for ALL transport protocols. We better make a specialized struct for each protocol
+		 *	(e.g., xsp_sock, tcp_sock) that is inherited from sock struct. Not sure if HashTable<XID, sock> will work. Use HashTable<XID, sock*> instead?
+		 */
 
 	/* =========================
 	 * Socket states
 	 * ========================= */
     struct sock {
-    	sock(): port(0), isConnected(false), initialized(false), full_src_dag(false), timer_on(false), synack_waiting(false), dataack_waiting(false), teardown_waiting(false), send_buffer_size(DEFAULT_SEND_WIN_SIZE), recv_buffer_size(DEFAULT_RECV_WIN_SIZE), send_base(0), next_send_seqnum(0), recv_base(0), next_recv_seqnum(0), dgram_buffer_start(0), dgram_buffer_end(-1), recv_buffer_count(0), recv_pending(false), polling(0), did_poll(false) {};
+    	sock(): port(0), isConnected(false), initialized(false), 
+							full_src_dag(false), timer_on(false), synack_waiting(false), 
+							dataack_waiting(false), teardown_waiting(false), 
+							send_buffer_size(DEFAULT_SEND_WIN_SIZE), 
+							recv_buffer_size(DEFAULT_RECV_WIN_SIZE), send_base(0), 
+							next_send_seqnum(0), recv_base(0), next_recv_seqnum(0), 
+							dgram_buffer_start(0), dgram_buffer_end(-1), 
+							recv_buffer_count(0), recv_pending(false), polling(0), 
+							did_poll(false) {};
 
-	/* =========================
-	 * Common Socket states
-	 * ========================= */
-		unsigned short port;
-		XIAPath src_path;
-		XIAPath dst_path;
-		int nxt;
-		int last;
-		uint8_t hlim;
+		/* =========================
+		 * Common Socket states
+		 * ========================= */
+			unsigned short port;
+			XIAPath src_path;
+			XIAPath dst_path;
+			int nxt;
+			int last;
+			uint8_t hlim;
 
-		unsigned char sk_state;		// e.g. TCP connection state for tcp_sock
+			unsigned char sk_state;		// e.g. TCP connection state for tcp_sock
 
-		bool full_src_dag; // bind to full dag or just to SID  
-		int sock_type; // 0: Reliable transport (SID), 1: Unreliable transport (SID), 2: Content Chunk transport (CID)
-		String sdag;
-		String ddag;
+			bool full_src_dag; // bind to full dag or just to SID  
+			int sock_type; // 0: Reliable transport (SID), 1: Unreliable transport (SID), 2: Content Chunk transport (CID)
+			String sdag;
+			String ddag;
 
-	/* =========================
-	 * XSP/XChunkP Socket states
-	 * ========================= */
+		/* =========================
+		 * XSP/XChunkP Socket states
+		 * ========================= */
 
-		bool isConnected;
-		bool initialized;
-		bool isAcceptSocket;
-		bool synack_waiting;
-		bool dataack_waiting;
-		bool teardown_waiting;
+			bool isConnected;
+			bool initialized;
+			bool isAcceptSocket;
+			bool synack_waiting;
+			bool dataack_waiting;
+			bool teardown_waiting;
 
-		bool did_poll;
-		unsigned polling;
+			bool did_poll;
+			unsigned polling;
 
-		int num_connect_tries; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
-		int num_retransmit_tries; // number of times to try resending data packets
+			int num_connect_tries; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
+			int num_retransmit_tries; // number of times to try resending data packets
 
-    	queue<sock*> pending_connection_buf;
-		queue<xia::XSocketMsg*> pendingAccepts; // stores accept messages from API when there are no pending connections
-	
-		// send buffer
-    	WritablePacket *send_buffer[MAX_SEND_WIN_SIZE]; // packets we've sent but have not gotten an ACK for // TODO: start smaller, dynamically resize if app asks for more space (up to MAX)?
-		uint32_t send_buffer_size;
-    	uint32_t send_base; // the sequence # of the oldest unacked packet
-    	uint32_t next_send_seqnum; // the smallest unused sequence # (i.e., the sequence # of the next packet to be sent)
-		uint32_t remote_recv_window; // num additional *packets* the receiver has room to buffer
-
-		// receive buffer
-    	WritablePacket *recv_buffer[MAX_RECV_WIN_SIZE]; // packets we've received but haven't delivered to the app // TODO: start smaller, dynamically resize if app asks for more space (up to MAX)?
-		uint32_t recv_buffer_size; // the number of PACKETS we can buffer (received but not delivered to app)
-		uint32_t recv_base; // sequence # of the oldest received packet not delivered to app
-    	uint32_t next_recv_seqnum; // the sequence # of the next in-order packet we expect to receive
-		int dgram_buffer_start; // the first undelivered index in the recv buffer (DGRAM only)
-		int dgram_buffer_end; // the last undelivered index in the recv buffer (DGRAM only)
-		uint32_t recv_buffer_count; // the number of packets in the buffer (DGRAM only)
-		bool recv_pending; // true if we should send received network data to app upon receiving it
-		xia::XSocketMsg *pending_recv_msg;
-
-		//Vector<WritablePacket*> pkt_buf;
-		WritablePacket *syn_pkt;
-		HashTable<XID, WritablePacket*> XIDtoCIDreqPkt;
-		HashTable<XID, Timestamp> XIDtoExpiryTime;
-		HashTable<XID, bool> XIDtoTimerOn;
-		HashTable<XID, int> XIDtoStatus; // Content-chunk request status... 1: waiting to be read, 0: waiting for chunk response, -1: failed
-		HashTable<XID, bool> XIDtoReadReq; // Indicates whether ReadCID() is called for a specific CID
-		HashTable<XID, WritablePacket*> XIDtoCIDresponsePkt;
-		uint32_t seq_num;
-		uint32_t ack_num;
-		bool timer_on;
-		Timestamp expiry;
-		Timestamp teardown_expiry;
-
-	/* =========================================================
-	 * TCP Socket states 
-	 * http://lxr.linux.no/linux+v3.10.2/include/linux/tcp.h
-	 * ========================================================= */
+			queue<sock*> pending_connection_buf;
+			queue<xia::XSocketMsg*> pendingAccepts; // stores accept messages from API when there are no pending connections
 		
-		//uint16_t	tcp_header_len;	/* Bytes of tcp header to send		*/
+			// send buffer
+			WritablePacket *send_buffer[MAX_SEND_WIN_SIZE]; // packets we've sent but have not gotten an ACK for // TODO: start smaller, dynamically resize if app asks for more space (up to MAX)?
+			uint32_t send_buffer_size;
+			uint32_t send_base; // the sequence # of the oldest unacked packet
+			uint32_t next_send_seqnum; // the smallest unused sequence # (i.e., the sequence # of the next packet to be sent)
+			uint32_t remote_recv_window; // num additional *packets* the receiver has room to buffer
 
-	/*
-	 *	RFC793 variables by their proper names. This means you can
-	 *	read the code and the spec side by side (and laugh ...)
-	 *	See RFC793 and RFC1122. The RFC writes these in capitals.
-	 */
-	 	uint32_t	rcv_nxt;	/* What we want to receive next 	*/
-		uint32_t	copied_seq;	/* Head of yet unread data		*/
-		uint32_t	rcv_wup;	/* rcv_nxt on last window update sent	*/
-	 	uint32_t	snd_nxt;	/* Next sequence we send		*/
+			// receive buffer
+			WritablePacket *recv_buffer[MAX_RECV_WIN_SIZE]; // packets we've received but haven't delivered to the app // TODO: start smaller, dynamically resize if app asks for more space (up to MAX)?
+			uint32_t recv_buffer_size; // the number of PACKETS we can buffer (received but not delivered to app)
+			uint32_t recv_base; // sequence # of the oldest received packet not delivered to app
+			uint32_t next_recv_seqnum; // the sequence # of the next in-order packet we expect to receive
+			int dgram_buffer_start; // the first undelivered index in the recv buffer (DGRAM only)
+			int dgram_buffer_end; // the last undelivered index in the recv buffer (DGRAM only)
+			uint32_t recv_buffer_count; // the number of packets in the buffer (DGRAM only)
+			bool recv_pending; // true if we should send received network data to app upon receiving it
+			xia::XSocketMsg *pending_recv_msg;
 
-	 	uint32_t	snd_una;	/* First byte we want an ack for	*/
-	 	uint32_t	snd_sml;	/* Last byte of the most recently transmitted small packet */
-		uint32_t	rcv_tstamp;	/* timestamp of last received ACK (for keepalives) */
-		uint32_t	lsndtime;	/* timestamp of last sent data packet (for restart window) */
+			//Vector<WritablePacket*> pkt_buf;
+			WritablePacket *syn_pkt;
+			HashTable<XID, WritablePacket*> XIDtoCIDreqPkt;
+			HashTable<XID, Timestamp> XIDtoExpiryTime;
+			HashTable<XID, bool> XIDtoTimerOn;
+			HashTable<XID, int> XIDtoStatus; // Content-chunk request status... 1: waiting to be read, 0: waiting for chunk response, -1: failed
+			HashTable<XID, bool> XIDtoReadReq; // Indicates whether ReadCID() is called for a specific CID
+			HashTable<XID, WritablePacket*> XIDtoCIDresponsePkt;
+			uint32_t seq_num;
+			uint32_t ack_num;
+			bool timer_on;
+			Timestamp expiry;
+			Timestamp teardown_expiry;
 
-		uint32_t	tsoffset;	/* timestamp offset */
+		/* =========================================================
+		 * TCP Socket states 
+		 * http://lxr.linux.no/linux+v3.10.2/include/linux/tcp.h
+		 * ========================================================= */
+			
+			//uint16_t	tcp_header_len;	/* Bytes of tcp header to send		*/
+
+		/*
+		 *	RFC793 variables by their proper names. This means you can
+		 *	read the code and the spec side by side (and laugh ...)
+		 *	See RFC793 and RFC1122. The RFC writes these in capitals.
+		 */
+			uint32_t	rcv_nxt;	/* What we want to receive next 	*/
+			uint32_t	copied_seq;	/* Head of yet unread data		*/
+			uint32_t	rcv_wup;	/* rcv_nxt on last window update sent	*/
+			uint32_t	snd_nxt;	/* Next sequence we send		*/
+
+			uint32_t	snd_una;	/* First byte we want an ack for	*/
+			uint32_t	snd_sml;	/* Last byte of the most recently transmitted small packet */
+			uint32_t	rcv_tstamp;	/* timestamp of last received ACK (for keepalives) */
+			uint32_t	lsndtime;	/* timestamp of last sent data packet (for restart window) */
+
+			uint32_t	tsoffset;	/* timestamp offset */
 
 
-		uint32_t	snd_wl1;	/* Sequence for window update		*/
-		uint32_t	snd_wnd;	/* The window we expect to receive	*/
-		uint32_t	max_window;	/* Maximal window ever seen from peer	*/
-		uint32_t	mss_cache;	/* Cached effective mss, not including SACKS */
+			uint32_t	snd_wl1;	/* Sequence for window update		*/
+			uint32_t	snd_wnd;	/* The window we expect to receive	*/
+			uint32_t	max_window;	/* Maximal window ever seen from peer	*/
+			uint32_t	mss_cache;	/* Cached effective mss, not including SACKS */
 
-		uint32_t	window_clamp;	/* Maximal window to advertise		*/
-		uint32_t	rcv_ssthresh;	/* Current window clamp			*/
+			uint32_t	window_clamp;	/* Maximal window to advertise		*/
+			uint32_t	rcv_ssthresh;	/* Current window clamp			*/
 
-		uint16_t	advmss;		/* Advertised MSS			*/
-		uint8_t	unused;
-		uint8_t	nonagle     : 4,/* Disable Nagle algorithm?             */
-			thin_lto    : 1,/* Use linear timeouts for thin streams */
-			thin_dupack : 1,/* Fast retransmit on first dupack      */
-			repair      : 1,
-			frto        : 1;/* F-RTO (RFC5682) activated in CA_Loss */
-		uint8_t	repair_queue;
-		uint8_t	do_early_retrans:1,/* Enable RFC5827 early-retransmit  */
-			syn_data:1,	/* SYN includes data */
-			syn_fastopen:1,	/* SYN includes Fast Open option */
-			syn_data_acked:1;/* data in SYN is acked by SYN-ACK */
-		uint32_t	tlp_high_seq;	/* snd_nxt at the time of TLP retransmit. */
+			uint16_t	advmss;		/* Advertised MSS			*/
+			uint8_t		unused;
+			uint8_t		nonagle     : 4,/* Disable Nagle algorithm?             */
+								thin_lto    : 1,/* Use linear timeouts for thin streams */
+								thin_dupack : 1,/* Fast retransmit on first dupack      */
+								repair      : 1,
+								frto        : 1;/* F-RTO (RFC5682) activated in CA_Loss */
+			uint8_t		repair_queue;
+			uint8_t		do_early_retrans	: 1,/* Enable RFC5827 early-retransmit  */
+								syn_data					: 1,/* SYN includes data */
+								syn_fastopen			: 1,/* SYN includes Fast Open option */
+								syn_data_acked		: 1;/* data in SYN is acked by SYN-ACK */
+			uint32_t	tlp_high_seq;	/* snd_nxt at the time of TLP retransmit. */
 
-	/* RTT measurement */
-		uint32_t	srtt;		/* smoothed round trip time << 3	*/
-		uint32_t	mdev;		/* medium deviation			*/
-		uint32_t	mdev_max;	/* maximal mdev for the last rtt period	*/
-		uint32_t	rttvar;		/* smoothed mdev_max			*/
-		uint32_t	rtt_seq;	/* sequence number to update rttvar	*/
+			/* RTT measurement */
+			uint32_t	srtt;		/* smoothed round trip time << 3	*/
+			uint32_t	mdev;		/* medium deviation			*/
+			uint32_t	mdev_max;	/* maximal mdev for the last rtt period	*/
+			uint32_t	rttvar;		/* smoothed mdev_max			*/
+			uint32_t	rtt_seq;	/* sequence number to update rttvar	*/
 
-		uint32_t	packets_out;	/* Packets which are "in flight"	*/
-		uint32_t	retrans_out;	/* Retransmitted packets out		*/
+			uint32_t	packets_out;	/* Packets which are "in flight"	*/
+			uint32_t	retrans_out;	/* Retransmitted packets out		*/
 
-		uint8_t	reordering;	/* Packet reordering metric.		*/
+			uint8_t	reordering;	/* Packet reordering metric.		*/
 
-		uint8_t	keepalive_probes; /* num of allowed keep alive probes	*/
+			uint8_t	keepalive_probes; /* num of allowed keep alive probes	*/
 
-	/*
-	 *	Slow start and congestion control (see also Nagle, and Karn & Partridge)
-	 */
-	 	uint32_t	snd_ssthresh;	/* Slow start size threshold		*/
-	 	uint32_t	snd_cwnd;	/* Sending congestion window		*/
-		uint32_t	snd_cwnd_cnt;	/* Linear increase counter		*/
-		uint32_t	snd_cwnd_clamp; /* Do not allow snd_cwnd to grow above this */
-		uint32_t	snd_cwnd_used;
-		uint32_t	snd_cwnd_stamp;
-		uint32_t	prior_cwnd;	/* Congestion window at start of Recovery. */
-		uint32_t	prr_delivered;	/* Number of newly delivered packets to
-					 * receiver in Recovery. */
-		uint32_t	prr_out;	/* Total number of pkts sent during Recovery. */
+		/*
+		 *	Slow start and congestion control (see also Nagle, and Karn & Partridge)
+		 */
+			uint32_t	snd_ssthresh;	/* Slow start size threshold		*/
+			uint32_t	snd_cwnd;	/* Sending congestion window		*/
+			uint32_t	snd_cwnd_cnt;	/* Linear increase counter		*/
+			uint32_t	snd_cwnd_clamp; /* Do not allow snd_cwnd to grow above this */
+			uint32_t	snd_cwnd_used;
+			uint32_t	snd_cwnd_stamp;
+			uint32_t	prior_cwnd;	/* Congestion window at start of Recovery. */
+			uint32_t	prr_delivered;	/* Number of newly delivered packets to
+						 * receiver in Recovery. */
+			uint32_t	prr_out;	/* Total number of pkts sent during Recovery. */
 
-	 	uint32_t	rcv_wnd;	/* Current receiver window		*/
-		uint32_t	write_seq;	/* Tail(+1) of data held in tcp send buffer */
-		uint32_t	pushed_seq;	/* Last pushed seq, required to talk to windows */
-		uint32_t	lost_out;	/* Lost packets			*/
-		uint32_t	sacked_out;	/* SACK'd packets			*/
-		uint32_t	fackets_out;	/* FACK'd packets			*/
-		uint32_t	tso_deferred;
+			uint32_t	rcv_wnd;	/* Current receiver window		*/
+			uint32_t	write_seq;	/* Tail(+1) of data held in tcp send buffer */
+			uint32_t	pushed_seq;	/* Last pushed seq, required to talk to windows */
+			uint32_t	lost_out;	/* Lost packets			*/
+			uint32_t	sacked_out;	/* SACK'd packets			*/
+			uint32_t	fackets_out;	/* FACK'd packets			*/
+			uint32_t	tso_deferred;
 
-		// TODO: SACK block readded?
+			// TODO: SACK block readded?
 
-		int     lost_cnt_hint;
-		uint32_t     retransmit_high;	/* L-bits may be on up to this seqno */
+			int     lost_cnt_hint;
+			uint32_t     retransmit_high;	/* L-bits may be on up to this seqno */
 
-		uint32_t	lost_retrans_low;	/* Sent seq after any rxmit (lowest) */
+			uint32_t	lost_retrans_low;	/* Sent seq after any rxmit (lowest) */
 
-		uint32_t	prior_ssthresh; /* ssthresh saved at recovery start	*/
-		uint32_t	high_seq;	/* snd_nxt at onset of congestion	*/
+			uint32_t	prior_ssthresh; /* ssthresh saved at recovery start	*/
+			uint32_t	high_seq;	/* snd_nxt at onset of congestion	*/
 
-		uint32_t	retrans_stamp;	/* Timestamp of the last retransmit,
-					 * also used in SYN-SENT to remember stamp of
-					 * the first SYN. */
-		uint32_t	undo_marker;	/* tracking retrans started here. */
-		int	undo_retrans;	/* number of undoable retransmissions. */
-		uint32_t	total_retrans;	/* Total retransmits for entire connection */
+			uint32_t	retrans_stamp;	/* Timestamp of the last retransmit,
+						 * also used in SYN-SENT to remember stamp of
+						 * the first SYN. */
+			uint32_t	undo_marker;	/* tracking retrans started here. */
+			int	undo_retrans;	/* number of undoable retransmissions. */
+			uint32_t	total_retrans;	/* Total retransmits for entire connection */
 
-		unsigned int		keepalive_time;	  /* time before keep alive takes place */
-		unsigned int		keepalive_intvl;  /* time interval between keep alive probes */
+			unsigned int		keepalive_time;	  /* time before keep alive takes place */
+			unsigned int		keepalive_intvl;  /* time interval between keep alive probes */
 
-		int			linger2;
+			int			linger2;
 
-	/* Receiver side RTT estimation */
-		struct {
-			uint32_t	rtt;
-			uint32_t	seq;
-			uint32_t	time;
-		} rcv_rtt_est;
+		/* Receiver side RTT estimation */
+			struct {
+				uint32_t	rtt;
+				uint32_t	seq;
+				uint32_t	time;
+			} rcv_rtt_est;
 
-	/* Receiver queue space */
-		struct {
-			int	space;
-			uint32_t	seq;
-			uint32_t	time;
-		} rcvq_space;    
-    } ;
+		/* Receiver queue space */
+			struct {
+				int	space;
+				uint32_t	seq;
+				uint32_t	time;
+			} rcvq_space;    
+    };
 
- 
-    list<int> xcmp_listeners;   // list of ports wanting xcmp notifications
+		list<int> xcmp_listeners;   // list of ports wanting xcmp notifications
 
-    HashTable<XID, unsigned short> XIDtoPort;
-    HashTable<XIDpair , unsigned short> XIDpairToPort;
-    HashTable<unsigned short, sock*> portToSock;
-    HashTable<XID, unsigned short> XIDtoPushPort;
+		HashTable<XID, unsigned short> XIDtoPort;
+		HashTable<XIDpair , unsigned short> XIDpairToPort;
+		HashTable<unsigned short, sock*> portToSock;
+		HashTable<XID, unsigned short> XIDtoPushPort;
     
-    
-    HashTable<unsigned short, bool> portToActive;
-    HashTable<XIDpair , bool> XIDpairToConnectPending;
+		HashTable<unsigned short, bool> portToActive;
+		HashTable<XIDpair , bool> XIDpairToConnectPending;
 
     // FIXME: can these be rolled into the sock structure?
-	HashTable<unsigned short, int> nxt_xport;
-    HashTable<unsigned short, int> hlim;
+		HashTable<unsigned short, int> nxt_xport;
+		HashTable<unsigned short, int> hlim;
+		HashTable<unsigned short, PollEvent> poll_events;
 
-    HashTable<unsigned short, PollEvent> poll_events;
-
+		atomic_uint32_t _id;
+		bool _cksum;
+		XIAXIDRouteTable *_routeTable;
     
-    atomic_uint32_t _id;
-    bool _cksum;
-    XIAXIDRouteTable *_routeTable;
-    
-    //modify routing table
-    void addRoute(const XID &sid) {
-		String cmd=sid.unparse() + " " + String(DESTINED_FOR_LOCALHOST);
-        HandlerCall::call_write(_routeTable, "add", cmd);
+    // modify routing table
+		void addRoute(const XID &sid) {
+			String cmd=sid.unparse() + " " + String(DESTINED_FOR_LOCALHOST);
+			HandlerCall::call_write(_routeTable, "add", cmd);
     }   
         
-    void delRoute(const XID &sid) {
-        String cmd= sid.unparse();
-        HandlerCall::call_write(_routeTable, "remove", cmd);
+		void delRoute(const XID &sid) {
+			String cmd= sid.unparse();
+			HandlerCall::call_write(_routeTable, "remove", cmd);
     }
  
-
- 
   protected:    
-    void copy_common(struct sock *sk, XIAHeader &xiahdr, XIAHeaderEncap &xiah);
-    WritablePacket* copy_packet(Packet *, struct sock *);
-    WritablePacket* copy_cid_req_packet(Packet *, struct sock *);
-    WritablePacket* copy_cid_response_packet(Packet *, struct sock *);
+		void copy_common(struct sock *sk, XIAHeader &xiahdr, XIAHeaderEncap &xiah);
+		WritablePacket* copy_packet(Packet *, struct sock *);
+		WritablePacket* copy_cid_req_packet(Packet *, struct sock *);
+		WritablePacket* copy_cid_response_packet(Packet *, struct sock *);
 
-    char *random_xid(const char *type, char *buf);
+		char *random_xid(const char *type, char *buf);
 
-	uint32_t calc_recv_window(sock *sk);
-	bool should_buffer_received_packet(WritablePacket *p, sock *sk);
-	void add_packet_to_recv_buf(WritablePacket *p, sock *sk);
-	void check_for_and_handle_pending_recv(sock *sk);
-	int read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk);
-	uint32_t next_missing_seqnum(sock *sk);
-	void resize_buffer(WritablePacket* buf[], int max, int type, uint32_t old_size, uint32_t new_size, int *dgram_start, int *dgram_end);
-	void resize_send_buffer(sock *sk, uint32_t new_size);
-	void resize_recv_buffer(sock *sk, uint32_t new_size);
+		uint32_t calc_recv_window(sock *sk);
+		bool should_buffer_received_packet(WritablePacket *p, sock *sk);
+		void add_packet_to_recv_buf(WritablePacket *p, sock *sk);
+		void check_for_and_handle_pending_recv(sock *sk);
+		int read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk);
+		uint32_t next_missing_seqnum(sock *sk);
+		void resize_buffer(WritablePacket* buf[], int max, int type, uint32_t old_size, uint32_t new_size, int *dgram_start, int *dgram_end);
+		void resize_send_buffer(sock *sk, uint32_t new_size);
+		void resize_recv_buffer(sock *sk, uint32_t new_size);
 
-    void ProcessAPIPacket(WritablePacket *p_in);
-    void ProcessNetworkPacket(WritablePacket *p_in);
-    void ProcessCachePacket(WritablePacket *p_in);
-    void ProcessXhcpPacket(WritablePacket *p_in);
+		void ProcessAPIPacket(WritablePacket *p_in);
+		void ProcessNetworkPacket(WritablePacket *p_in);
+		void ProcessCachePacket(WritablePacket *p_in);
+		void ProcessXhcpPacket(WritablePacket *p_in);
 
-    void CreatePollEvent(unsigned short _sport, xia::X_Poll_Msg *msg);
-    void ProcessPollEvent(unsigned short, unsigned int);
-    void CancelPollEvent(unsigned short _sport);
-//    bool ProcessPollTimeout(unsigned short, PollEvent& pe);
-    /*
-    ** Xsockets API handlers
-    */
-    void Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xsetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xgetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xupdatenameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xreadnameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xgetpeername(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xgetsockname(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);    
-    void Xisdualstackrouter(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
-    void Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
-	void Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void XrequestChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
-    void XgetChunkStatus(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void XreadChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void XremoveChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void XpushChunkto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
-    void XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void CreatePollEvent(unsigned short _sport, xia::X_Poll_Msg *msg);
+		void ProcessPollEvent(unsigned short, unsigned int);
+		void CancelPollEvent(unsigned short _sport);
+		// bool ProcessPollTimeout(unsigned short, PollEvent& pe);
+    
+    
+    // Xsockets API handlers
+		void Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void Xsetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void Xgetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void Xupdatenameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void Xreadnameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void Xgetpeername(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void Xgetsockname(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);    
+		void Xisdualstackrouter(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
+		void Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
+		void Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void XrequestChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
+		void XgetChunkStatus(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void XreadChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void XremoveChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void XpushChunkto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
+		void XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+		void Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 };
 
 
