@@ -37,6 +37,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <poll.h>
+#include <netdb.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -70,10 +71,16 @@
 extern "C" {
 
 int fcntl(int fd, int cmd, ...);
+int ioctl(int d, int request, ...);
 
-ssize_t __read_chk(int fd, void *buf, size_t count);
+ssize_t __read_chk(int, void *, size_t, size_t);
+ssize_t __recv_chk(int, void *, size_t, size_t, int);
+ssize_t __recvfrom_chk (int, void *__restrict, size_t, size_t, int, __SOCKADDR_ARG, socklen_t *__restrict);
 int __poll_chk(struct pollfd *fds, nfds_t nfds, int timeout, __SIZE_TYPE__ __fdslen);
 
+// Problem definitions. The compiler complains when I do these
+// maybe make an external C only file for definitions with issues?
+//int getnameinfo (const struct sockaddr *, socklen_t, char *, socklen_t, char *, socklen_t, unsigned int);
 }
 
 /*
@@ -249,14 +256,15 @@ void __attribute__ ((constructor)) xwrap_init(void)
 static unsigned short _NewPort()
 {
 	// it doesn't really matter in our case, but stay away from protected ports
-	#define PROTECTED 1023
+	#define PROTECTED 1024
 	
 	// start with a random value
 	static unsigned short port = PROTECTED + (rand() % (USHRT_MAX - PROTECTED));
+	MSG("%d\n", port)
 
-	if (++port == 0) {
+	if (++port < PROTECTED) {
 		// we wrapped, set it back to the base
-		port = PROTECTED + 1;
+		port = PROTECTED;
 	}
 	return port;
 }
@@ -278,6 +286,18 @@ static int _GetIP(sockaddr_x *sax, struct sockaddr_in *sin, const char *addr, in
 	if (!addr) { 
 		sprintf(s, ADDR_MASK, high, low);
 		addr = s;
+#if 0
+		// FIXME: do we want to increment this each time or just set it once for each app?
+		// bump the ip address for next time
+		low++;
+		if (low == 254) {
+			low = 1;
+			high++;
+			if (high == 255) {
+				high = 0;
+			}
+		}
+#endif
 	}
 	inet_aton(addr, &sin->sin_addr);
 
@@ -293,19 +313,10 @@ static int _GetIP(sockaddr_x *sax, struct sockaddr_in *sin, const char *addr, in
 
 		std::string dag = g.dag_string();
 
+//		MSG("%s =>\n%s\n", id, dag.c_str());
+
 		id2dag[id] = dag;
 		dag2id[dag] = id;
-	}
-
-	// FIXME: do we want to increment this each time or just set it once for each app?
-	// bump the ip address for next time
-	low++;
-	if (low == 254) {
-		low = 1;
-		high++;
-		if (high == 255) {
-			high = 0;
-		}
 	}
 
 	return 0;
@@ -418,6 +429,7 @@ static int _Register(const struct sockaddr *addr, socklen_t len)
 	// put it into the mapping tables
 	Graph g((sockaddr_x*)ai->ai_addr);
 	std::string dag = g.dag_string();
+	MSG("registered id:%s\ndag:%s\n", id, dag.c_str());
 
 	id2dag[id] = dag;
 	dag2id[dag] = id;
@@ -478,6 +490,7 @@ static int _Lookup(const struct sockaddr_in *addr, sockaddr_x *sax)
 		Graph g(sax);
 		std::string dag = g.dag_string();
 
+		MSG("id:%s\ndag:%s\n", id, dag.c_str());
 		// found it, add it to our local mapping tables
 		id2dag[id] = dag;
 		dag2id[dag] = id;
@@ -791,30 +804,21 @@ MSG("found name\n%s\n", dag.c_str());
 	return rc;
 }
 
+
 int getpeername(int fd, struct sockaddr *addr, socklen_t *len)
 {
 	int rc;
-	struct sockaddr *ipaddr;
 	sockaddr_x sax;
+	socklen_t slen = sizeof(sax);
 
 	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
-		if (*len < sizeof(sockaddr_x))
-			WARNING("not enough room for the XIA sockaddr! have %d, need %ld\n", *len, sizeof(sockaddr_x));
 
-		if (FORCE_XIA()) {
-			ipaddr = addr;
-			addr = (struct sockaddr*)&sax;
-		}
+		rc = Xgetpeername(fd, (struct sockaddr*)&sax, &slen);
 
-		rc = Xgetpeername(fd, addr, len);
-
-		if (rc == 0 && FORCE_XIA()) {
-			// convert the sockaddr to a sockaddr_x
-			if (_x2i(&sax, (struct sockaddr_in*)ipaddr) < 0) {
-				_GetIP(&sax, (sockaddr_in*)ipaddr, NULL, 0);
-			}
+		if (_x2i(&sax, (struct sockaddr_in*)addr) < 0) {
+			_GetIP(&sax, (sockaddr_in*)addr, NULL, 0);
 		}
 
 	} else {
@@ -826,33 +830,18 @@ int getpeername(int fd, struct sockaddr *addr, socklen_t *len)
 int getsockname(int fd, struct sockaddr *addr, socklen_t *len)
 {
 	int rc;
-	struct sockaddr *ipaddr;
 	sockaddr_x sax;
-	socklen_t oldlen;
+	socklen_t slen = sizeof(sax);
 
 	TRACE();
 	if (shouldWrap(fd)) {
 		XIAIFY();
 
-		if (FORCE_XIA()) {
-			oldlen = *len;
-			*len = sizeof(sax);
-			ipaddr = addr;
-			addr = (struct sockaddr*)&sax;
+		rc = Xgetsockname(fd, (struct sockaddr*)&sax, &slen);
+
+		if (_x2i(&sax, (struct sockaddr_in*)addr) < 0) {
+			_GetIP(&sax, (sockaddr_in*)addr, NULL, 0);
 		}
-
-		if (*len < sizeof(sockaddr_x)) {
-			WARNING("not enough room for the XIA sockaddr! have %d, need %ld\n", *len, sizeof(sockaddr_x));
-		}
-
-		rc = Xgetsockname(fd, addr, len);
-
-		if (rc == 0 && FORCE_XIA()) {
-			*len = oldlen;
-			// convert the sockaddr to a sockaddr_x
-			_x2i(&sax, (struct sockaddr_in*)ipaddr);
-		}
-
 	} else {
 		rc = __real_getsockname(fd, addr, len);
 	}
@@ -877,7 +866,7 @@ int getsockopt(int fd, int level, int optname, void *optval, socklen_t *optlen)
 	return rc;
 }
 
-int ioctl(int d, int request, ...)
+extern "C" int ioctl(int d, int request, ...)
 {
 	int rc;
 	va_list args;
@@ -913,9 +902,13 @@ int listen(int fd, int n)
 
 int poll(struct pollfd *fds, nfds_t nfds, int timeout)
 {
+	int rc;
 	TRACE();
 	// Let Xpoll do all the work of figuring out what fds we are handling
-	return Xpoll(fds, nfds, timeout);
+	MSG("Xpoll: %d %d %08x\n", nfds, fds[0].fd, fds[0].events);
+	rc = Xpoll(fds, nfds, timeout);
+	MSG("Xpoll returns %d %d %08x\n", rc, fds[0].fd, fds[0].revents);
+	return rc;
 }
 
 ssize_t read(int fd, void *buf, size_t count)
@@ -943,6 +936,10 @@ ssize_t recv(int fd, void *buf, size_t n, int flags)
 	if (shouldWrap(fd)) {
 		XIAIFY();
 		rc = Xrecv(fd, buf, n, flags);
+
+		char *c = (char *)buf;
+		c[rc] = 0;
+		MSG("%s\n", c);
 
 	} else {
 		rc = __real_recv(fd, buf, n, flags);
@@ -1002,7 +999,15 @@ ssize_t send(int fd, const void *buf, size_t n, int flags)
 
 	if (shouldWrap(fd)) {
 		XIAIFY();
+
+		// FIXME: debugging code
+		char *p = (char *)buf;
+		p[n] = 0;
+		MSG("%s\n", p);
+		// end debug
+		
 		rc = Xsend(fd, buf, n, flags);
+
 
 	} else {
 		rc = __real_send(fd, buf, n, flags);
@@ -1077,6 +1082,7 @@ int socket(int domain, int type, int protocol)
 			protocol = 0;
 		}
 
+MSG("%d %d %d\n", domain, type, protocol);
 		fd = Xsocket(AF_XIA, type, protocol);
 
 	} else {
@@ -1131,25 +1137,35 @@ ssize_t write(int fd, const void *buf, size_t count)
 ********************************************************************/
 extern "C" int __poll_chk(struct pollfd *fds, nfds_t nfds, int timeout, __SIZE_TYPE__ __fdslen)
 {
+	int rc;
 	UNUSED(__fdslen);
 	TRACE();
-	return Xpoll(fds, nfds, timeout);
+	MSG("%d %d %08x\n", nfds, fds[0].fd, fds[0].events);
+	rc = Xpoll(fds, nfds, timeout);
+	MSG("Xpoll returns %d %d %08x\n", rc, fds[0].fd, fds[0].revents);
+	return rc;
 }
 
-extern "C" ssize_t __read_chk(int fd, void *buf, size_t count)
+extern "C" ssize_t __read_chk (int __fd, void *__buf, size_t __nbytes, size_t __buflen)
 {
-	size_t rc;
-
+	UNUSED(__buflen);
 	TRACE();
+	return read(__fd, __buf, __nbytes);
+}
 
-	if (isXsocket(fd)) {
-		XIAIFY();
-		rc = Xrecv(fd, buf, count, 0);
+extern "C" ssize_t __recv_chk(int __fd, void *__buf, size_t __n, size_t __buflen, int __flags)
+{
+	UNUSED(__buflen);
+	TRACE();
+	return recv(__fd, __buf, __n, __flags);
+}
 
-	} else {
-		rc = __real_read(fd, buf, count);
-	}
-	return rc;
+extern "C" ssize_t __recvfrom_chk (int __fd, void *__restrict __buf, size_t __n, size_t __buflen, int __flags, 
+	__SOCKADDR_ARG __addr, socklen_t *__restrict __addr_len)
+{
+	UNUSED(__buflen);
+	TRACE();
+	return recvfrom(__fd, __buf, __n, __flags, __addr, __addr_len);
 }
 
 /********************************************************************
