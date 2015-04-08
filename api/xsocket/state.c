@@ -67,6 +67,13 @@ public:
 	const sockaddr_x *peer() { return m_peer; };
 	int setPeer(const sockaddr_x *peer);
 
+	int isSIDAssigned() { return m_sid_assigned; };
+	void setSIDAssigned() { m_sid_assigned = 1; };
+
+	int isTempSID() { return (m_temp_sid == NULL) ? 0 : 1;};
+	void setTempSID(const char *sid);
+	const char *getTempSID() {return m_temp_sid;};
+
 	void init();
 private:
 	int m_transportType;
@@ -76,6 +83,8 @@ private:
 	int m_error;
 	char *m_buf;
 	sockaddr_x *m_peer;
+	char *m_temp_sid;
+	int m_sid_assigned;
 	unsigned m_bufLen;
 	unsigned m_sequence;
 	struct timeval m_timeout;
@@ -113,6 +122,8 @@ void SocketState::init()
 	m_blocking = 1;
 	m_buf = NULL;
 	m_peer = NULL;
+	m_temp_sid = NULL;
+	m_sid_assigned = 0;
 	m_bufLen = 0;
 	m_sequence = 1;
 	m_debug = 0;
@@ -161,6 +172,21 @@ void SocketState::setData(const char *buf, unsigned bufLen)
 
 	memcpy(m_buf, buf, bufLen);
 	m_bufLen = bufLen;
+}
+
+void SocketState::setTempSID(const char *sid)
+{
+	if(!sid) {
+		return;
+	}
+	if(m_temp_sid) {
+		delete(m_temp_sid);
+	}
+	m_temp_sid = new char [strlen(sid) + 1];
+	if(!m_temp_sid) {
+		return;
+	}
+	strcpy(m_temp_sid, sid);
 }
 
 int SocketState::getPacket(unsigned seq, char *buf, unsigned buflen)
@@ -327,6 +353,22 @@ void setConnState(int sock, int conn)
 		sstate->setConnState(conn);
 }
 
+int isSIDAssigned(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		return sstate->isSIDAssigned();
+	else
+		return 0;
+}
+
+void setSIDAssigned(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		sstate->setSIDAssigned();
+}
+
 int isBlocking(int sock)
 {
 	SocketState *sstate = SocketMap::getMap()->get(sock);
@@ -412,6 +454,32 @@ void setSocketData(int sock, const char *buf, unsigned bufLen)
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
 		sstate->setData(buf, bufLen);
+}
+
+int isTempSID(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if(sstate) {
+		return sstate->isTempSID();
+	} else {
+		return 0;
+	}
+}
+
+void setTempSID(int sock, const char *sid)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if(sstate) {
+		sstate->setTempSID(sid);
+	}
+}
+
+const char *getTempSID(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if(sstate) {
+		return sstate->getTempSID();
+	}
 }
 
 unsigned seqNo(int sock)

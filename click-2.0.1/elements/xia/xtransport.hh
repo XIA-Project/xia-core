@@ -9,6 +9,7 @@
 #include "xiaxidroutetable.hh"
 #include <click/handlercall.hh>
 #include <click/xiapath.hh>
+#include <click/xiasecurity.hh>
 #include <clicknet/xia.h>
 #include "xiaxidroutetable.hh"
 #include <clicknet/udp.h>
@@ -63,6 +64,7 @@ using namespace std;
 #define DEFAULT_RECV_WIN_SIZE 128
 
 #define MAX_CONNECT_TRIES	 30
+#define MAX_MIGRATE_TRIES	 30
 #define MAX_RETRANSMIT_TRIES 100
 
 #define REQUEST_FAILED		0x00000001
@@ -344,8 +346,6 @@ class XTRANSPORT : public Element {
 
 		bool full_src_dag; // bind to full dag or just to SID  
 		int sock_type; // 0: Reliable transport (SID), 1: Unreliable transport (SID), 2: Content Chunk transport (CID)
-		String sdag;
-		String ddag;
 
 	/* =========================
 	 * XSP/XChunkP Socket states
@@ -357,11 +357,14 @@ class XTRANSPORT : public Element {
 		bool synack_waiting;
 		bool dataack_waiting;
 		bool teardown_waiting;
+		bool migrateack_waiting;
+		String last_migrate_ts;
 
 		bool did_poll;
 		unsigned polling;
 
 		int num_connect_tries; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
+		int num_migrate_tries; // number of migrate tries (Connection closes after MAX_MIGRATE_TRIES trials)
 		int num_retransmit_tries; // number of times to try resending data packets
 
     	queue<sock*> pending_connection_buf;
@@ -387,6 +390,7 @@ class XTRANSPORT : public Element {
 
 		//Vector<WritablePacket*> pkt_buf;
 		WritablePacket *syn_pkt;
+		WritablePacket *migrate_pkt;
 		HashTable<XID, WritablePacket*> XIDtoCIDreqPkt;
 		HashTable<XID, Timestamp> XIDtoExpiryTime;
 		HashTable<XID, bool> XIDtoTimerOn;
@@ -573,6 +577,8 @@ class XTRANSPORT : public Element {
 	void resize_send_buffer(sock *sk, uint32_t new_size);
 	void resize_recv_buffer(sock *sk, uint32_t new_size);
 
+	bool usingRendezvousDAG(XIAPath bound_dag, XIAPath pkt_dag);
+
     void ProcessAPIPacket(WritablePacket *p_in);
     void ProcessNetworkPacket(WritablePacket *p_in);
     void ProcessCachePacket(WritablePacket *p_in);
@@ -612,6 +618,7 @@ class XTRANSPORT : public Element {
     void XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+    void Xupdaterv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 };
 
 

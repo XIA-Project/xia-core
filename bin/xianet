@@ -28,6 +28,7 @@ SCRIPT=xia_local_topology.click
 
 NODECONF=$XIADIR/etc/nodes.conf
 XSOCKCONF=$XIADIR/etc/xsockconf.ini
+XIAADDRCLICK=$XIADIR/etc/click/xia_address.click
 
 ALL_PROCESSES="click xrouted xhcp_serverd xhcp_clientd xnameservice xstats xstatserver"
 
@@ -39,6 +40,7 @@ V_FLAG="-q"
 CLICK_ONLY=0
 NO_CLICK=0
 NAMESERVER=0
+RENDEZVOUS=0
 RUN_VISUALIZER_CLIENT=0
 RUN_VISUALIZER_SERVER=0
 VISUALIZER_SERVER="localhost"
@@ -69,6 +71,7 @@ where:
   -m manually set the node's 4ID IP address
   -P set the TCP socket ports to use (instead of ToDevice/FromDevice)
   -n if generating a click script, this node will be the name server
+  -R if generating a click script, this node will provide rendezvous service
   -f if generating a click script, don't use interfaces matching the supplied string
      (to ignore multiple interfaces, use a comma-separated list)
   -I if generating a click script, use this interface (i.e., pick which interface a host uses)
@@ -90,7 +93,7 @@ setup()
 {
 	local OPTARG=$2
 
-	while getopts "cCl:s:qvV4nN:rthi:m:f:I:z:ZP:" opt; do
+	while getopts "cCl:s:qvV4nN:rRthi:m:f:I:z:ZP:" opt; do
 		case $opt in
 			c)
 				CLICK_ONLY=1
@@ -122,6 +125,9 @@ setup()
 				MAKECONF=$MAKECONF"router"
 				CONFFLAGS="$CONFFLAGS -r"
 				NODETYPE="router"
+				;;
+			R)
+				RENDEZVOUS=1
 				;;
 			t)
 				MAKECONF=$MAKECONF"host"
@@ -356,6 +362,32 @@ nameserver()
 }
 
 #
+# start/stop/check the rendezvous server
+#
+rendezvous()
+{
+	local host=$1
+	local action=$2
+
+	cd $XIADIR/bin
+	case $action in
+		"start")
+			echo ./xrendezvous -h $host $LOG_FLAGS
+			./xrendezvous -h $host $LOG_FLAGS &
+			;;
+		"stop")
+			kill_service $host "xrendezvous"
+			;;
+		"check")
+			check_service $host "xrendezvous"
+			;;
+		*)
+			echo "unrecognized action: $action"
+			;;
+	esac
+}
+
+#
 # read etc/nodes.conf and perform the given action on each node
 # assumes the first host found is the nameserver
 # FIXME: work out a better solution for setting the name server in a local topology
@@ -383,6 +415,9 @@ process_nodes()
 			nameserver)
 				nameserver $name $action
 				;;
+			rendezvous)
+				rendezvous $name $action
+				;;
 			*)
 				echo Unknown device type $name:$type
 				;;
@@ -409,14 +444,20 @@ start_click()
 	fi
 
 	# create xsockconf.ini and nodes.conf from the click config file
-	$XIADIR/bin/read_topology $CONFPATH/$SCRIPT $XSOCKCONF $NODECONF
+	echo "Reading topology and generating $XIAADDRCLICK"
+	$XIADIR/bin/read_topology $CONFPATH/$SCRIPT $XSOCKCONF $NODECONF $XIAADDRCLICK
 
 	# nameserver was configured on cmd line, add it to the nodes file so we control
 	#  it properly
 	if [ "$NSHOST" != "" ]; then
 		printf "$NSHOST\tnameserver\n" >> $NODECONF
-	elif [ $NAMESERVER -eq 1 -a "$NODETYPE" == "host" ]; then
+	#elif [ $NAMESERVER -eq 1 -a "$NODETYPE" == "host" ]; then
+	elif [ $NAMESERVER -eq 1 ]; then
 		printf "$HOSTNAME\tnameserver\n" >> $NODECONF
+	fi
+
+	if [ $RENDEZVOUS -eq 1 ]; then
+		printf "$HOSTNAME\trendezvous\n" >> $NODECONF
 	fi
 
 #	if [ $VERBOSE -eq 0 ]; then
@@ -434,6 +475,26 @@ start_click()
 
 	[ $CLICK_ONLY -eq 1 ] && check_service click && exit
 	sleep 1
+}
+
+#
+# clean config files and keys
+#
+clean_conf_and_keys()
+{
+	# Verify that XIADIR is not empty
+	if [ "$XIADIR" == "" ]; then
+		echo "ERROR: XIADIR environment variable was empty"
+		exit 1
+	fi
+	# Delete all keys and config files
+	# NOTE: This deletes all application keys also
+	echo "Deleting config files"
+	rm -f $XIADIR/etc/click/templates/*.click
+	echo "Deleting key files"
+	rm -f $XIADIR/key/*
+	echo "Deleting resolv.conf"
+	rm -f $XIADIR/etc/resolv.conf
 }
 
 #
@@ -504,8 +565,13 @@ create_click_config()
 	CONFFLAGS="$CONFFLAGS -i $HOSTNAME"
 	CONFPATH=$XIADIR/etc/click/templates
 
-	cd $CONFPATH
-	python xconfig.py $CONFFLAGS
+	if [ ! -f $CONFPATH/$SCRIPT ]; then
+		echo "Building configuration from template"
+		python $XIADIR/bin/xconfig.py $CONFFLAGS
+	else
+		echo -n "NOTE: Config file $CONFPATH/$SCRIPT exists. "
+		echo "Skipped building from template."
+	fi
 }
 
 #
@@ -542,6 +608,9 @@ case $1 in
 		check_service "click"
 		process_nodes "check"
 		visualizer "check"
+		;;
+	clean)
+		clean_conf_and_keys
 		;;
 	check)
 		check_service "click"

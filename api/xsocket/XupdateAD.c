@@ -23,6 +23,8 @@
 #include "Xinit.h"
 #include "Xutil.h"
 
+#define MAX_RV_DAG_SIZE 1024
+
 int XupdateAD(int sockfd, char *newad, char *new4id) {
   int rc;
 
@@ -61,6 +63,30 @@ int XupdateAD(int sockfd, char *newad, char *new4id) {
   return 0;
 }
 
+int XupdateRV(int sockfd)
+{
+	int rc;
+	char rvdag[MAX_RV_DAG_SIZE];
+	if(XreadRVServerControlAddr(rvdag, MAX_RV_DAG_SIZE)) {
+		// Silently skip rendezvous server update if there is no RV DAG
+		//LOG("No rendezvous address, skipping update");
+		return 0;
+	}
+
+	LOGF("Rendezvous location:%s", rvdag);
+
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XUPDATERV);
+
+	xia::X_Updaterv_Msg *x_updaterv_msg = xsm.mutable_x_updaterv();
+	x_updaterv_msg->set_rvdag(rvdag);
+
+	if((rc = click_send(sockfd, &xsm)) < 0) {
+		LOGF("Error asking Click transport to update RV: %s", strerror(errno));
+		return -1;
+	}
+	return 0;
+}
 
 /*!
 ** @brief retrieve the AD and HID associated with this socket.
@@ -121,6 +147,7 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *loca
 		local4ID[len4ID - 1] = 0;
 		rc = 0;
 	} else {
+		LOG("XreadlocalHostAddr: ERROR: Invalid response for XREADLOCALHOSTADDR request");
 		rc = -1;
 	}
 	return rc;

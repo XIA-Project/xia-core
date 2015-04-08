@@ -121,7 +121,7 @@ elementclass RouteEngine {
 
 // Works at layer 2. Expects and outputs raw ethernet frames.
 elementclass XIALineCard {
-	$local_addr, $local_hid, $mac, $num |
+	$local_addr, $local_hid, $mac, $num, $ishost, $isrouter |
 
 	// input[0]: a packet arriving from the network
 	// input[1]: a packet arriving from the higher stack (i.e. router or end host)
@@ -139,10 +139,15 @@ elementclass XIALineCard {
 	count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
 	count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -);
 
+    // AIP challenge-response HID verification module
+	xchal :: XIAChallengeSource(LOCALHID $local_hid, INTERFACE $num, SRC $local_addr, ACTIVE $isrouter);
+	xresp :: XIAChallengeResponder(LOCALHID $local_hid, ACTIVE $ishost);
+
 	// packets to network could be XIA packets or XARP queries (or XCMP messages?)
 	// we only want to print/count the XIA packets
-	toNet :: Tee(2) -> Queue(200) -> [0]output;   // send all packets
+	toNet :: Tee(3) -> Queue(200) -> [0]output;   // send all packets
 	toNet[1] -> statsFilter :: Classifier(12/C0DE, -) -> print_out -> count_final_out -> count_next_out -> Discard;  // only print/count XIP packets
+    toNet[2] -> Strip(14) -> MarkXIAHeader() -> [1]xresp[2] -> Discard
 	statsFilter[1] -> Discard;   // don't print/count XARP or XCMP packets
 
 	// On receiving a packet from the host
@@ -150,9 +155,12 @@ elementclass XIALineCard {
 	
 	// On receiving a packet from interface
 	input[0] -> c;
-	
+   
 	// Receiving an XIA packet
-	c[2] -> Strip(14) -> MarkXIAHeader() -> XIAPaint($num) -> print_in -> [1]output; // this should send out to [0]n; 
+	c[2] -> Strip(14) -> MarkXIAHeader() -> [0]xchal[0] -> [0]xresp[0] -> XIAPaint($num) -> print_in -> [1]output; // this should send out to [0]n; 
+
+	xchal[1] -> xarpq;
+	xresp[1] -> MarkXIAHeader() -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [1]output;
 
 	// On receiving ARP response
 	c[1] -> [1]xarpq -> toNet;
@@ -211,7 +219,7 @@ elementclass IPLineCard {
 }
 
 elementclass XIADualLineCard {
-	$local_addr, $local_hid, $mac, $num, $ip , $gw, $ip_active |
+	$local_addr, $local_hid, $mac, $num, $ip , $gw, $ip_active, $ishost, $isrouter |
 
  	// input[0]: a packet arriving from the network
 	// input[1]: a packet arriving from the higher stack (i.e. router or end host)
@@ -227,7 +235,7 @@ elementclass XIADualLineCard {
 	Script(write sup.active0 !$ip_active);
 	Script(write sup.active1 $ip_active);
 
-	c[0], c[1], c[2] -> xlc :: XIALineCard($local_addr, $local_hid, $mac, $num) -> sup -> toNet;
+	c[0], c[1], c[2] -> xlc :: XIALineCard($local_addr, $local_hid, $mac, $num, $ishost, $isrouter) -> sup -> toNet;
 	c[3] -> iplc :: IPLineCard($ip, $num, $mac, $gw) -> [1]sup[1] -> [1]toNet;
 
 	// Packet needs forwarding and has been painted w/ output port;
@@ -294,7 +302,7 @@ elementclass XIARoutingCore {
 
 // 2-port router 
 elementclass XIARouter2Port {
-	$local_addr, $local_ad, $local_hid, $external_ip, $click_port, 
+    $local_addr, $local_ad, $local_hid, $external_ip, $click_port,
 	$mac0, $mac1, |
 
 	// $local_addr: the full address of the node
@@ -308,9 +316,9 @@ elementclass XIARouter2Port {
 
 	Script(write xrc/n/proc/rt_AD.add $local_ad $DESTINED_FOR_LOCALHOST);	// self AD as destination
 
-	xlc0 :: XIALineCard($local_addr, $local_hid, $mac0, 0);
-	xlc1 :: XIALineCard($local_addr, $local_hid, $mac1, 1);
-	
+	xlc0 :: XIALineCard($local_addr, $local_hid, $mac0, 0, 0, 1);
+	xlc1 :: XIALineCard($local_addr, $local_hid, $mac1, 1, 0, 0);
+    
 	input => xlc0, xlc1 => output;
 	xrc -> XIAPaintSwitch[0,1] => [1]xlc0[1], [1]xlc1[1]  -> [0]xrc;
 };
@@ -334,11 +342,11 @@ elementclass XIARouter4Port {
 
 	Script(write xrc/n/proc/rt_AD.add $local_ad $DESTINED_FOR_LOCALHOST);	// self AD as destination
 
-	xlc0 :: XIALineCard($local_addr, $local_hid, $mac0, 0);
-	xlc1 :: XIALineCard($local_addr, $local_hid, $mac1, 1);
-	xlc2 :: XIALineCard($local_addr, $local_hid, $mac2, 2);
-	xlc3 :: XIALineCard($local_addr, $local_hid, $mac3, 3);
-	
+	xlc0 :: XIALineCard($local_addr, $local_hid, $mac0, 0, 0, 0);
+	xlc1 :: XIALineCard($local_addr, $local_hid, $mac1, 1, 0, 0);
+	xlc2 :: XIALineCard($local_addr, $local_hid, $mac2, 2, 0, 0);
+	xlc3 :: XIALineCard($local_addr, $local_hid, $mac3, 3, 0, 0);
+    
 	input => xlc0, xlc1, xlc2, xlc3 => output;
 	xrc -> XIAPaintSwitch[0,1,2,3] => [1]xlc0[1], [1]xlc1[1], [1]xlc2[1], [1]xlc3[1] -> [0]xrc;
 };
@@ -387,13 +395,13 @@ elementclass XIADualRouter4Port {
 	Script(write xrc/n/proc/rt_IP.add IP:$ip3 $DESTINED_FOR_LOCALHOST);  // self as destination for interface 3's IP addr
 	Script(write xrc/n/proc/rt_IP.add - 3); 	// default route for IPv4	 TODO: Need real routes somehow
 
-	
-	dlc0 :: XIADualLineCard($local_addr, $local_hid, $mac0, 0, $ip0, $gw0, $ip_active0);
-	dlc1 :: XIADualLineCard($local_addr, $local_hid, $mac1, 1, $ip1, $gw1, $ip_active1);
-	dlc2 :: XIADualLineCard($local_addr, $local_hid, $mac2, 2, $ip2, $gw2, $ip_active2);
-	dlc3 :: XIADualLineCard($local_addr, $local_hid, $mac3, 3, $ip3, $gw3, $ip_active3);
-	
-	input => dlc0, dlc1, dlc2, dlc3 => output;
+    
+	dlc0 :: XIADualLineCard($local_addr, $local_hid, $mac0, 0, $ip0, $gw0, $ip_active0, 0, 1);
+	dlc1 :: XIADualLineCard($local_addr, $local_hid, $mac1, 1, $ip1, $gw1, $ip_active1, 0, 1);
+	dlc2 :: XIADualLineCard($local_addr, $local_hid, $mac2, 2, $ip2, $gw2, $ip_active2, 0, 1);
+	dlc3 :: XIADualLineCard($local_addr, $local_hid, $mac3, 3, $ip3, $gw3, $ip_active3, 0, 1);
+    
+    input => dlc0, dlc1, dlc2, dlc3 => output;
 	xrc -> XIAPaintSwitch[0,1,2,3] => [1]dlc0[1], [1]dlc1[1], [1]dlc2[1], [1]dlc3[1] -> [0]xrc;
 };
 
@@ -413,7 +421,7 @@ elementclass XIAEndHost {
 	Script(write xrc/n/proc/rt_IP.add - 0); 	// default route for IPv4	
 	Script(write xrc/n/proc/rt_HID.add - 0); 	// default route for HID (so hosts can reach other hosts on the same AD)
 	
-	input -> xlc :: XIALineCard($local_addr, $local_hid, $mac, 0) -> output;
+	input -> xlc :: XIALineCard($local_addr, $local_hid, $mac, 0, 1, 0) -> output;
 	xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> xrc;
 };
 
@@ -453,7 +461,7 @@ elementclass XIADualEndhost {
 	Script(write xrc/n/proc/rt_IP.add - 3); 	// default route for IPv4	 TODO: Need real routes somehow
 
 	
-	dlc0 :: XIADualLineCard($local_addr, $local_hid, $mac0, 0, $ip0, $gw0, $ip_active0);
+	dlc0 :: XIADualLineCard($local_addr, $local_hid, $mac0, 0, $ip0, $gw0, $ip_active0, 1, 0);
 	
 	input -> dlc0 -> output;
 	xrc -> XIAPaintSwitch[0] => [1]dlc0[1] -> xrc;
