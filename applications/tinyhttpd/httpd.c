@@ -333,6 +333,7 @@ int get_line(int sock, char *buf, int size)
  }
  buf[i] = '\0';
  
+printf("getline: %s\n", buf);
  return(i);
 }
 
