@@ -55,16 +55,16 @@
 #define FORCE_XIA() (1)					// FIXME: get rid of this logic
 
 // Logging Macros ***************************************************
-#define TRACE()			{if (_log_trace)   fprintf(_log, "xwrap: %s\r\n", __FUNCTION__);}
+#define TRACE()		 {if (_log_trace)    fprintf(_log, "xwrap: %s\r\n", __FUNCTION__);}
 
-#define MSG(...)		{if (_log_info)    fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}
+#define MSG(...)	 {if (_log_info)    {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
 
-#define XIAIFY()		{if (_log_wrap)     fprintf(_log, "xwrap: %s redirected to XIA\r\n", __FUNCTION__);}
-#define NOXIA()			{if (_log_wrap)     fprintf(_log, "xwrap: %s used normally\r\n", __FUNCTION__);}
-#define SKIP()			{if (_log_wrap)     fprintf(_log, "xwrap: %s not required/supported in XIA (no-op)\r\n", __FUNCTION__);}
+#define XIAIFY()	 {if (_log_wrap)     fprintf(_log, "xwrap: %s redirected to XIA\r\n", __FUNCTION__);}
+#define NOXIA()		 {if (_log_wrap)     fprintf(_log, "xwrap: %s used normally\r\n", __FUNCTION__);}
+#define SKIP()		 {if (_log_wrap)     fprintf(_log, "xwrap: %s not required/supported in XIA (no-op)\r\n", __FUNCTION__);}
 
-#define ALERT()			{if (_log_warning) fprintf(_log, "xwrap: ALERT!!!, %s is not implemented in XIA!\r\n", __FUNCTION__);}
-#define WARNING(...)	{if (_log_warning) fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}
+#define ALERT()		 {if (_log_warning)  fprintf(_log, "xwrap: ALERT!!!, %s is not implemented in XIA!\r\n", __FUNCTION__);}
+#define WARNING(...) {if (_log_warning) {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
 
 // C style functions to avoid name mangling issue *******************
 extern "C" {
@@ -560,8 +560,7 @@ int close(int fd)
 	TRACE();
 	if (shouldWrap(fd)) {
 		XIAIFY();
-#if 0
-		printf("fd=%d\n", fd);
+
 		// clean up entries in the dag2id and id2dag maps
 		Xgetsockname(fd, (struct sockaddr *)&addr, &len);
 
@@ -571,7 +570,7 @@ int close(int fd)
 
 		dag2id.erase(dag);
 		id2dag.erase(id);
-#endif
+
 		// kill it
 		rc = Xclose(fd);
 
@@ -585,6 +584,7 @@ int connect(int fd, const struct sockaddr *addr, socklen_t len)
 {
 	int rc;
 	sockaddr_x sax;
+	socklen_t slen = sizeof(sax);
 
 	TRACE();
 	if (isXsocket(fd)) {
@@ -595,11 +595,11 @@ int connect(int fd, const struct sockaddr *addr, socklen_t len)
 				
 			_IDstring(id, (sockaddr_in*)addr);
 			WARNING("Unable to lookup %s\n", id);
-			errno = EINVAL;	// FIXME: is there a better return we can use here?
+			errno = ENETUNREACH;
 			return -1;
 		}
 
-		rc= Xconnect(fd, addr, len);
+		rc= Xconnect(fd, (const sockaddr*)&sax, slen);
 
 	} else {
 		rc = __real_connect(fd, addr, len);
