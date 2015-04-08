@@ -77,7 +77,8 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 
 		ufds[i].revents = 0;
 
-		if (ufds[i].fd > 0 && (ufds[i].events & (POLLIN | POLLOUT | POLLPRI))) {
+//		if (ufds[i].fd > 0 && (ufds[i].events & (POLLIN | POLLOUT | POLLPRI))) {
+		if (ufds[i].fd > 0 && (ufds[i].events != 0)) {
 			if (getSocketType(ufds[i].fd) != XSOCK_INVALID) {
 				// add the Xsocket to the xpoll struct
 				// TODO: should this work for Content sockets?
@@ -93,6 +94,21 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 				pfd->set_port(sin.sin_port);
 				s2p[i].fd = ufds[i].fd;
 				s2p[i].port = sin.sin_port;
+
+
+
+				// FIXME: hack for curl - think about better ways to deal with this
+				if (ufds[i].events & POLLRDNORM || ufds[i].events & POLLRDBAND) {
+					ufds[i].events |= POLLIN;
+				}
+
+				if (ufds[i].events & POLLWRNORM || ufds[i].events & POLLWRBAND) {
+					ufds[i].events |= POLLOUT;
+				}
+
+
+
+
 
 				pfd->set_flags(ufds[i].events);
 
@@ -177,6 +193,23 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 				// find the socket in the original poll & update the revents field
 				for (unsigned j = 0; j < nfds; j++) {
 					if (ufds[j].fd == fd) {
+
+
+
+
+						// FIXME: hack for curl - think about better ways to deal with this
+						if (flags && POLLIN && (ufds[i].events &  POLLRDNORM || ufds[i].events & POLLRDBAND)) {
+							flags |= (POLLRDNORM | POLLRDBAND);
+						}
+
+						if (flags && POLLOUT && (ufds[i].events & POLLWRNORM || ufds[i].events & POLLWRBAND)) {
+							flags |= (POLLWRNORM | POLLWRBAND);
+						}
+
+
+
+
+
 						ufds[j].revents = flags;
 						break;
 					}
