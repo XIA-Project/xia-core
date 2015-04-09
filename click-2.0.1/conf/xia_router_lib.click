@@ -316,7 +316,7 @@ elementclass XIARouter2Port {
 
 	Script(write xrc/n/proc/rt_AD.add $local_ad $DESTINED_FOR_LOCALHOST);	// self AD as destination
 
-	xlc0 :: XIALineCard($local_addr, $local_hid, $mac0, 0, 0, 1);
+	xlc0 :: XIALineCard($local_addr, $local_hid, $mac0, 0, 0, 0);
 	xlc1 :: XIALineCard($local_addr, $local_hid, $mac1, 1, 0, 0);
     
 	input => xlc0, xlc1 => output;
@@ -396,10 +396,10 @@ elementclass XIADualRouter4Port {
 	Script(write xrc/n/proc/rt_IP.add - 3); 	// default route for IPv4	 TODO: Need real routes somehow
 
     
-	dlc0 :: XIADualLineCard($local_addr, $local_hid, $mac0, 0, $ip0, $gw0, $ip_active0, 0, 1);
-	dlc1 :: XIADualLineCard($local_addr, $local_hid, $mac1, 1, $ip1, $gw1, $ip_active1, 0, 1);
-	dlc2 :: XIADualLineCard($local_addr, $local_hid, $mac2, 2, $ip2, $gw2, $ip_active2, 0, 1);
-	dlc3 :: XIADualLineCard($local_addr, $local_hid, $mac3, 3, $ip3, $gw3, $ip_active3, 0, 1);
+	dlc0 :: XIADualLineCard($local_addr, $local_hid, $mac0, 0, $ip0, $gw0, $ip_active0, 0, 0);
+	dlc1 :: XIADualLineCard($local_addr, $local_hid, $mac1, 1, $ip1, $gw1, $ip_active1, 0, 0);
+	dlc2 :: XIADualLineCard($local_addr, $local_hid, $mac2, 2, $ip2, $gw2, $ip_active2, 0, 0);
+	dlc3 :: XIADualLineCard($local_addr, $local_hid, $mac3, 3, $ip3, $gw3, $ip_active3, 0, 0);
     
     input => dlc0, dlc1, dlc2, dlc3 => output;
 	xrc -> XIAPaintSwitch[0,1,2,3] => [1]dlc0[1], [1]dlc1[1], [1]dlc2[1], [1]dlc3[1] -> [0]xrc;

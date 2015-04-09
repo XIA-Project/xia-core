@@ -1,4 +1,3 @@
-#include <sys/select.h>
 #include <syslog.h>
 #include <errno.h>
 #include <map>

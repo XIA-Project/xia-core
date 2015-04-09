@@ -37,6 +37,7 @@ XTRANSPORT::XTRANSPORT()
 	isConnected = false;
 
 	_ackdelay_ms = ACK_DELAY;
+	_migrateackdelay_ms = _ackdelay_ms * 10;
 	_teardown_wait_ms = TEARDOWN_DELAY;
 
 //	pthread_mutexattr_init(&_lock_attr);
@@ -212,7 +213,7 @@ XTRANSPORT::run_timer(Timer *timer)
 
 					sk->timer_on = true;
 					sk->migrateack_waiting = true;
-					sk->expiry = now + Timestamp::make_msec(_ackdelay_ms);
+					sk->expiry = now + Timestamp::make_msec(_migrateackdelay_ms);
 					sk->num_migrate_tries++;
 				} else {
 					//click_chatter("retransmit counter for migrate exceeded\n");
@@ -2912,7 +2913,7 @@ void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 		// Set timer
 		sk->timer_on = true;
 		sk->migrateack_waiting = true;
-		sk->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
+		sk->expiry = Timestamp::now() + Timestamp::make_msec(_migrateackdelay_ms);
 
 		if (! _timer.scheduled() || _timer.expiry() >= sk->expiry )
 			_timer.reschedule_at(sk->expiry);

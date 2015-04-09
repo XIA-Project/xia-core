@@ -308,6 +308,7 @@ class XTRANSPORT : public Element {
     Timer _timer;
     
     unsigned _ackdelay_ms;
+    unsigned _migrateackdelay_ms;
     unsigned _teardown_wait_ms;
     
     uint32_t _cid_type, _sid_type;
@@ -330,7 +331,7 @@ class XTRANSPORT : public Element {
 	 * Socket states
 	 * ========================= */
     struct sock {
-    	sock(): port(0), isConnected(false), initialized(false), full_src_dag(false), timer_on(false), synack_waiting(false), dataack_waiting(false), teardown_waiting(false), send_buffer_size(DEFAULT_SEND_WIN_SIZE), recv_buffer_size(DEFAULT_RECV_WIN_SIZE), send_base(0), next_send_seqnum(0), recv_base(0), next_recv_seqnum(0), dgram_buffer_start(0), dgram_buffer_end(-1), recv_buffer_count(0), recv_pending(false), polling(0), did_poll(false) {};
+		sock(): port(0), isConnected(false), initialized(false), full_src_dag(false), timer_on(false), synack_waiting(false), dataack_waiting(false), teardown_waiting(false), migrateack_waiting(false), send_buffer_size(DEFAULT_SEND_WIN_SIZE), recv_buffer_size(DEFAULT_RECV_WIN_SIZE), send_base(0), next_send_seqnum(0), recv_base(0), next_recv_seqnum(0), dgram_buffer_start(0), dgram_buffer_end(-1), recv_buffer_count(0), recv_pending(false), polling(0), did_poll(false) {};
 
 	/* =========================
 	 * Common Socket states
