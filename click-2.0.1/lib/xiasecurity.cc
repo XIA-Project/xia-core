@@ -360,17 +360,24 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
 	char *privkeyhash = NULL;
 	int privfilepathlen;
 	char *privfilepath = NULL;
+	int retval = -1;        // Return failure by default. 0 == success
+	int state = 0;
 
 	// Find the directory where keys are stored
 	const char *keydir = get_keydir();
 	if(keydir == NULL) {
 		xs_chatter("xs_sign: Unable to find key directory");
-		return -1;
+		goto xs_sign_done;
 	}
 	// Read private key from file in keydir
 	privkeyhash = strchr((char *)xid, ':') + 1;
 	privfilepathlen = strlen(keydir) + strlen("/") + strlen(privkeyhash) + 1;
 	privfilepath = (char *) calloc(privfilepathlen, 1);
+	if(privfilepath == NULL) {
+		xs_chatter("xs_sign: Unable to allocate memory for priv file path");
+		goto xs_sign_done;
+	}
+	state = 1;
 	sprintf(privfilepath, "%s/%s", keydir, privkeyhash);
 
 	// Calculate SHA1 hash of given data
@@ -385,10 +392,15 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
     // Encrypt the SHA1 hash with private key
     xs_chatter("xs_sign: Signing with private key from: %s", privfilepath);
     FILE *fp = fopen(privfilepath, "r");
+	if(fp == NULL) {
+		xs_chatter("xs_sign: ERROR opening private kep file: %s", privfilepath);
+		goto xs_sign_done;
+	}
+	state = 2;
     RSA *rsa = PEM_read_RSAPrivateKey(fp,NULL,NULL,NULL);
     if(rsa==NULL) {
         xs_chatter("xs_sign: ERROR reading private key:%s:", privfilepath);
-		return -1;
+		goto xs_sign_done;
 	}
 
     unsigned char *sig_buf = NULL;
@@ -397,23 +409,32 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
     sig_buf = (unsigned char*)calloc(RSA_size(rsa), 1);
 	if(!sig_buf) {
 		xs_chatter("xs_sign: Failed to allocate memory for signature");
-		return -1;
+		goto xs_sign_done;
 	}
+	state = 3;
 
     //int rc = RSA_sign(NID_sha1, digest, sizeof digest, sig_buf, &sig_len, rsa);
     int rc = RSA_sign(NID_sha1, digest, sizeof digest, sig_buf, &sig_len, rsa);
-    if (1 != rc) { xs_chatter("RSA_sign failed"); }
+	if(rc != 1) {
+		xs_chatter("xs_sign: RSA_sign failed");
+		goto xs_sign_done
+	}
     xs_chatter("xs_sign: signature length: %d", sig_len);
 
     //xs_chatter("Sig: %X Len: %d", sig_buf[0], sig_len);
     memcpy(signature, sig_buf, sig_len);
 	*siglen = (uint16_t) sig_len;
 
-    fclose(fp);
-	free(sig_buf);
-	free(privfilepath);
+	// Success
+	retval = 0;
 
-	return 0;
+xs_sign_done:
+	switch(state) {
+		case 3: free(sig_buf);
+		case 2: fclose(fp);
+		case 1: free(privfilepath);
+	}
+	return retval;
 }
 
 // Get the public key for a given xid

@@ -2413,7 +2413,10 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 			// Sign the synack payload
 			char signature[MAX_SIGNATURE_SIZE];
 			uint16_t signatureLength = MAX_SIGNATURE_SIZE;
-			xs_sign(_destination_xid.unparse().c_str(), (unsigned char *)synackPayload.get_buffer(), synackPayload.size(), (unsigned char *)signature, &signatureLength);
+			if(xs_sign(_destination_xid.unparse().c_str(), (unsigned char *)synackPayload.get_buffer(), synackPayload.size(), (unsigned char *)signature, &signatureLength)) {
+				click_chatter("Xaccept: ERROR unable to sign the SYNACK using private key for %s", _destination_xid.unparse().c_str());
+				return;
+			}
 
 			// Retrieve public key for this host
 			char pubkey[MAX_PUBKEY_SIZE];
