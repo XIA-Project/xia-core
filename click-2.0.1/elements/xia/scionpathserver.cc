@@ -30,9 +30,6 @@
 #include <functional>
 #include <tr1/unordered_map>
 #include <list>
-//#include <map>
-//#include "uppath.hh"
-//#include "upqueue.hh"
 #include "scionbeacon.hh"
 #include "scionpathserver.hh"
 
@@ -121,10 +118,7 @@ size_t PathHash::operator()(const scionHash &h) const
 
 CLICK_DECLS
 
-/*
-    SCIONPathServer::configure
-    - click configure function for path server
-*/
+
 int SCIONPathServer::configure(Vector<String> &conf, ErrorHandler *errh){
     if(cp_va_kparse(conf, this, errh, 
         "AD", cpkM, cpString, &m_AD,
@@ -152,10 +146,6 @@ int SCIONPathServer::configure(Vector<String> &conf, ErrorHandler *errh){
     return 0;
 }
 
-/*
-    SCIONPathServer::initialize
-    - initialize click variables
-*/
 int SCIONPathServer::initialize(ErrorHandler* errh){
 
     Config config;
@@ -167,24 +157,29 @@ int SCIONPathServer::initialize(ErrorHandler* errh){
     m_iLogLevel = config.getLogLevel();
     m_uAdAid = config.getAdAid();
     scionPrinter = new SCIONPrint(m_iLogLevel, m_sLogFile);
+    
+    #ifdef _DEBUG_PS
+    scionPrinter->printLog(IH, (char *)"PS (%s:%s) Initializes.\n", 
+    m_AD.c_str(), m_HID.c_str());
+    #endif
+    
     parseTopology();
-
+    #ifdef _DEBUG_PS
+    scionPrinter->printLog(IH, (char *)"Parse Topology Done.\n");
+    scionPrinter->printLog(IH, (char *)"PS (%s:%s) Initialization Done.\n", 
+        m_AD.c_str(), m_HID.c_str());
+    #endif
+    
     _timer.initialize(this); 
     _timer.schedule_after_sec(10);
+    
     return 0;
 }
 
-/*
-    SCIONPathServer::parseTopology
-    - parse topology file using topo parser
-*/
-void 
-SCIONPathServer::parseTopology(){
+void SCIONPathServer::parseTopology(){
     TopoParser parser;
     parser.loadTopoFile(m_sTopologyFile.c_str()); 
     parser.parseServers(m_servers);
-    parser.parseRouters(m_routers);
-    parser.parseClients(m_clients);
 }
 
 void SCIONPathServer::push(int port, Packet *p)
@@ -206,23 +201,25 @@ void SCIONPathServer::push(int port, Packet *p)
     switch(type) {
 		
         // UP_PATH: up path registration from local beacon server
-		case UP_PATH:{
-            scionPrinter->printLog(IH, type, (char *)"Received Up-path from local beacon server.\n");
-            parseUpPath(packet); 
-			break;
+		case UP_PATH: {
+		    #ifdef _DEBUG_PS
+            scionPrinter->printLog(IH, type, (char *)"Received Up-path from local BS. Print Path: \n");
+            #endif
+            parseUpPath(packet);
 		}
+		break;
 		
         // PATH_REP : path reply from the path server core
-		case PATH_REP:{
+		case PATH_REP: {
 		
 			uint8_t pathbuf[totalLength]; //for multiple packet transmissions.
 			uint8_t buf[totalLength]; //for multiple packet transmissions.
             uint8_t hdrLen = SPH::getHdrLen(packet);
             pathInfo* pi = (pathInfo*)(packet+hdrLen);
 
-			//#ifdef _SL_DEBUG
-            printf("PATH_REP recieved for target AD %llu\n", pi->target);
-			//#endif
+			#ifdef _DEBUG_PS
+            scionPrinter->printLog(IH, type, (char*)"PATH_REP recieved for target AD %llu\n", pi->target);
+			#endif
 
             specialOpaqueField* sOF =
             (specialOpaqueField*)(packet+hdrLen+PATH_INFO_SIZE);
@@ -231,19 +228,19 @@ void SCIONPathServer::push(int port, Packet *p)
             pcbMarking* optr = (pcbMarking*)ptr;
             HostAddr dstAddr;
 			
-			//SL:
 			//Now, send reply to all clients in the pending request table
 			std::multimap<uint64_t,HostAddr>::iterator itr;
 			std::pair<std::multimap<uint64_t,HostAddr>::iterator, 
 				std::multimap<uint64_t, HostAddr>::iterator> requesters;
 			requesters = pendingDownpathReq.equal_range(pi->target);
-
-			//#ifdef _SL_DEBUG
-			printf("PS (%llu:%llu): Downpath reply to Clients: count = %d\n", 
+			
+			#ifdef _DEBUG_PS
+			scionPrinter->printLog(IH, (char*)"PS (%llu:%llu): Downpath reply to Clients: count = %d\n", 
 				m_uAid, m_uAdAid, pendingDownpathReq.count(pi->target));
-			//#endif
+			#endif
 			
 			for(itr = requesters.first; itr != requesters.second; itr++) {
+				
 				memcpy(buf, packet, totalLength);
 				//SLP: seems unnecessary
             	//parseDownPath(buf);        
@@ -253,13 +250,11 @@ void SCIONPathServer::push(int port, Packet *p)
             	SPH::setSrcAddr(buf, srcAddr);
             	SPH::setDstAddr(buf, itr->second);
 				
-				#ifdef _SL_DEBUG
-				printf("PS (%llu:%llu): Sending Downpath to Client: %llu\n", m_uAid, m_uAdAid, itr->second.numAddr());
-				#endif
+				#ifdef _DEBUG_PS
 				scionPrinter->printLog(IH,type,(char *)"PS (%llu:%llu): Sending Downpath to Client: %llu\n", 
 					m_uAdAid, m_uAid, itr->second.numAddr());
+				#endif
 
-                try {
                 char hidbuf[41];
                 snprintf(hidbuf, 41, "%040lu", itr->second.numAddr());
 
@@ -271,38 +266,36 @@ void SCIONPathServer::push(int port, Packet *p)
                 dest.append("HID:");
                 dest.append(hidbuf);
 
-                //printf("LEN=%d, DEST=%s\n", totalLength, dest.c_str());
-
-            	sendPacket(buf, totalLength, dest);
-                } catch (...) {}
+            	// sendPacket(buf, totalLength, dest);
 			}
-			//SL:
-			//Remove the downpath from the pending table
+			
 			pendingDownpathReq.erase(requesters.first, requesters.second);
 			break;
         }
         
 		// PATH_REQ_LOCAL: path request from client
-		case PATH_REQ_LOCAL:{
+		case PATH_REQ_LOCAL: {
+            
             uint8_t ts = 0;
-
-			//put path info in the packet
+			// put path info in the packet
             uint8_t hdrLen = SPH::getHdrLen(packet);
-            //pathInfo* pathRequest = (pathInfo*)(packet+hdrLen);
-            pathInfo* pathRequest = (pathInfo*)(packet+hdrLen+8); // TODO why off by 8?
+            pathInfo* pathRequest = (pathInfo*)(packet+hdrLen);
             uint64_t target = pathRequest->target;
             HostAddr requestId = SPH::getSrcAddr(packet);
-
-			scionPrinter->printLog(IH,type,(char *)"PS (%llu:%llu): Request Downpath from Client: %llu\n", 
+            
+            #ifdef _DEBUG_PS
+			scionPrinter->printLog(IH,type,(char *)"PS (%llu:%llu): Request Downpath for Target AD: %llu\n", 
 				m_uAdAid, m_uAid, target);
-            //uint8_t packet[COMMON_HEADER_SIZE + hdrLen + PATH_INFO_SIZE];
+			#endif
+            
+            // for down-path
             sendRequest(target, requestId);
+            // for up-path
             sendUpPath(requestId);
 			break;
         }
         
 		default: 
-            //scionPrinter->printLog(IH,type,(char *)"Unsupported Packet type : Path Server.\n");
 			break;
     }
     
@@ -313,72 +306,56 @@ void SCIONPathServer::run_timer(Timer* timer){
     _timer.reschedule_after_sec(5);
 }
 
-int SCIONPathServer::sendRequest(uint64_t target, HostAddr requestAid){
+int SCIONPathServer::sendRequest(uint64_t target, HostAddr requestAid) {
+
     if(upPaths.size()<=0){
-        //printf("No up-path exists. \n");
+        #ifdef _DEBUG_PS
+        scionPrinter->printLog(IH, (char *)"No down-paths for AD %llu.\n", target);
+        #endif
         return 0;
     }
 	
-	//SL: ToDo
-	//add requestAid to the pending request table
-	//have to decide how often the same path is requested to TDC
-	time_t curTime;
-	curTime = time(NULL);
+	time_t curTime = time(NULL);
 
+    // insert down path 
 	pendingDownpathReq.insert(std::pair<uint64_t, HostAddr>(target, requestAid));
-	#ifdef _SL_DEBUG
-	printf("PS (%llu:%llu): Downpath request to AD: %llu by Client: %llu, count = %d\n", 
-		m_uAid, m_uAdAid, target, requestAid.numAddr(), pendingDownpathReq.count(target));
+	
+	#ifdef _DEBUG_PS
+	scionPrinter->printLog(IH, (char*)"PS send down-path request for AD: %llu.\n", 
+		target);
 	#endif
 
+	/*
 	std::tr1::unordered_map<scionHash, UPQueue*, PathHash>::iterator itr;
     itr = upPaths.begin();
 
-	//SL: msg is the PCB from the TDC
     uint8_t* ptr = itr->second->tailPath()->msg;
     uint16_t hops = itr->second->tailPath()->hops;
-    
 
-    /*build up path (of list) using up paths*/
+    // build up path (of list) using up paths
     uint16_t pathLength = (hops+1)*OPAQUE_FIELD_SIZE; //add 1 for the timestamp OF
     uint8_t path[pathLength];
     uint16_t totalLength = SPH::getTotalLen(ptr);
     memset(path, 0, pathLength);
     buildPath(ptr, path);
+    */
     
-	//SLT:
-	uint8_t srcLen = SCION_ADDR_SIZE;
-	uint8_t dstLen = SCION_ADDR_SIZE;
-
-    //make new packet and append the of list
-    int packetLength=COMMON_HEADER_SIZE+pathLength+PATH_INFO_SIZE+
-        srcLen+dstLen;
-    uint16_t interface = 
-        ((opaqueField*)(path+OPAQUE_FIELD_SIZE))->ingressIf; //ingress interface to itself
-    uint8_t packet[packetLength];
-    memset(packet, 0, packetLength);
-    memcpy(packet, ptr, COMMON_HEADER_SIZE); 
-    memcpy(packet+COMMON_HEADER_SIZE+srcLen+dstLen, path, pathLength);
-   
-    //put path information (target aid, tdid, option, etc)
-    pathInfo* pathRequest = 
-        (pathInfo*)(packet+COMMON_HEADER_SIZE +pathLength+srcLen+dstLen); 
-    pathRequest->target = target;
-    pathRequest->tdid = 0;
-    pathRequest->option=0;
-   
-    //Set Src Addr
-    uint64_t src_AD = atoi(m_AD.c_str()+4);
-    HostAddr srcAddr = HostAddr(HOST_ADDR_SCION, src_AD);
-    HostAddr dstAddr = ifid2addr.find(interface)->second;
-//    printf("dest Addr %llu,interface %lu\n", dstAddr.numAddr(),interface);
-    //Set packet header
-    SPH::setType(packet, PATH_REQ);
-    SPH::setSrcAddr(packet, srcAddr);
-    SPH::setDstAddr(packet, dstAddr);
-    SPH::setHdrLen(packet, COMMON_HEADER_SIZE+srcLen+dstLen+pathLength);
-    SPH::setCurrOFPtr(packet, srcLen+dstLen);
-    SPH::setTotalLen(packet,packetLength);
+    // retrieve a path, send a path request
+    uint16_t length = COMMON_HEADER_SIZE + AIP_SIZE*2 + PATH_INFO_SIZE;
+    uint8_t packet[length];
+    memset(packet, 0, length);
+        
+    scionHeader hdr;
+    hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)strchr(m_HID.c_str(),':'));
+    hdr.dst = HostAddr(HOST_ADDR_AIP, (uint8_t*)(m_servers.find(PathServer)->second.HID));
+    hdr.cmn.type = PATH_REQ;
+    hdr.cmn.totalLen = length;
+    SPH::setHeader(packet,hdr);
+        
+    pathInfo* pathRequest = (pathInfo*)(packet + COMMON_HEADER_SIZE + AIP_SIZE*2);
+    pathRequest->target = target; 
+    pathRequest->tdid = 1;
+    pathRequest->option = 0;
 
     string dest = "RE ";
     dest.append(BHID);
@@ -389,12 +366,11 @@ int SCIONPathServer::sendRequest(uint64_t target, HostAddr requestAid){
     dest.append((const char*)"0000000000000000000000000000000000000001");
     dest.append(" ");
     dest.append("HID:");
-    dest.append((const char*)"0000000000000000000000000000000000100000");
+    dest.append((const char*)m_servers.find(PathServer)->second.HID);
     
-    sendPacket(packet, packetLength, dest);
+    sendPacket(packet, length, dest);
 
-	if(pendingDownpathReq.count(target) > 1)
-		return 0;
+	return pendingDownpathReq.count(target);
 }
 
 /*
@@ -428,28 +404,27 @@ SCIONPathServer::buildPath(uint8_t* pkt, uint8_t* output){
     return 0;
 }
 
-/*
-   SCIONPathServer::parseUpPath
-   - parses up path from the pcb server and stores
-*/
+
 void SCIONPathServer::parseUpPath(uint8_t* pkt){
 
-    //make new struct
+    // prepare path struct
     upPath * newUpPath = new upPath;
     memset(newUpPath, 0, sizeof(upPath));
     uint8_t headerLength = SPH::getHdrLen(pkt);
-    uint8_t* ptr = pkt + headerLength + OPAQUE_FIELD_SIZE; 
-	//SL: the first opaque field is a special opaque field for the timestamp
+    uint8_t* ptr = pkt + headerLength + OPAQUE_FIELD_SIZE;
+    
+	// the first opaque field is a special opaque field for the timestamp
     specialOpaqueField* sOF = (specialOpaqueField*)(pkt+headerLength);
     uint16_t hops = sOF->hops;
 
-    //extract information from the packet and parse them
+    // extract pcb marking from the packet
     pcbMarking* mrkPtr = (pcbMarking*)ptr;
 
-    //hop iteration
-	//1. extract AD level path information
+    // hop iteration
     for(int i=0;i<hops;i++){
+        #ifdef _DEBUG_PS
         scionPrinter->printLog(IH,(char *)"AID: %d INGRESS: %d EGRESS: %d\n", mrkPtr->aid, mrkPtr->ingressIf, mrkPtr->egressIf);
+        #endif
         newUpPath->path.push_back(mrkPtr->aid);
         uint8_t* ptr2=ptr+PCB_MARKING_SIZE;
         peerMarking* peerPtr = (peerMarking*)ptr2;
@@ -469,61 +444,60 @@ void SCIONPathServer::parseUpPath(uint8_t* pkt){
         mrkPtr = (pcbMarking*)ptr;
     }
 
-    //save the packet 
-	//2. copy opaque fields.
+    // save the packet 
+    // copy opaque fields.
     newUpPath->msg = (uint8_t*)malloc(SPH::getTotalLen(pkt));
+    // create hash to see if path exists
     scionHash nhash = createHash(pkt);
     memcpy(newUpPath->msg, pkt, SPH::getTotalLen(pkt));
 
-    //if the queue is full then delete 
-	//3. store to upPaths -- a series of uppath queues
+    // if the queue is full then delete 
+	// store to upPaths -- a series of uppath queues
     if(upPaths.find(nhash) == upPaths.end()) {
-		//SLP:
-		//if the total # of queues (i.e., paths) exceeds the threshold
-		//one of them needs to be removed... (based on a criterion)
-		//criterion needs to be defined
-		//this subroutine should be defined as a function.
+		// if the total # of queues (i.e., paths) exceeds the threshold
+		// one of them needs to be removed... (based on a criterion)
+		// criterion needs to be defined
+		// this subroutine should be defined as a function.
     	if(upPaths.size() >= m_iQueueSize){
-        	//remove all paths in the uppath queue
+        	// remove all paths in the uppath queue
 			std::tr1::unordered_map<scionHash, UPQueue*>::iterator pItr;
-			//SLP: we have to decide which path to removed
-			//currently, the first path in upPaths is removed
+			// we have to decide which path to removed
+			// currently, the first path in upPaths is removed
 			pItr = upPaths.begin();
-			//3.1 dequeue paths in a queue
+			// dequeue paths in a queue
 			while(pItr->second->getSize())
 				pItr->second->dequeue();
-			//3.2 delete queue
+			// delete queue
 			delete pItr->second;
         	upPaths.erase(pItr);
     	}
-		//queue length should be defined in the configuration file
+		// queue length should be defined in the configuration file
         UPQueue* newQueue = new UPQueue(3);
         newQueue->enqueue(newUpPath);
         upPaths.insert(std::pair<scionHash, UPQueue*>(nhash, newQueue));
     }
     else {
+        #ifdef _DEBUG_PS
+        scionPrinter->printLog(IH,(char *)"New path found. Enqueue this path.\n");
+        #endif
         upPaths.find(nhash)->second->enqueue(newUpPath);
     }
 }
 
 
-/*
-    SCIONPathServer::sendUpPath
-    - send unique up paths to the client
-*/
-int SCIONPathServer::sendUpPath(HostAddr &requestId, uint32_t pref){
+int SCIONPathServer::sendUpPath(HostAddr &requestId, uint32_t pref) {
     
     //if none found then ignore
     if(upPaths.size()==0){
+        #ifdef _DEBUG_PS
+        scionPrinter->printLog(IH,(char *)"No up-path available. Wait for local BS.\n");
+        #endif
         return 0;
     }
 
     std::list<upPath> bestPaths;
 
-	//1. Shortest path selection
-	//if different criteria are given,
-	//that should be taken into account below
-	//currently, default is the shortest path (in terms of AD hops)
+	// 1. Shortest path selection
     if (pref == 0) {
         std::multimap<uint16_t, upPath> shortestPaths;
 
@@ -531,10 +505,10 @@ int SCIONPathServer::sendUpPath(HostAddr &requestId, uint32_t pref){
         std::tr1::unordered_map<scionHash, UPQueue*, PathHash>::iterator itr;
         upPath currentUP;
         uint16_t currentUPLen;
-		//1.1 find up to the m_iNumRetUP shortest paths
+		// 1.1 find up to the m_iNumRetUP shortest paths
         for(itr = upPaths.begin();itr!=upPaths.end();++itr){
-            //SLP: only pick the latest path?
-			//return type of tailPath is changed to ptr.
+            // only pick the latest path
+			// return type of tailPath is changed to ptr.
 			currentUP = *itr->second->tailPath();
             currentUPLen = currentUP.hops;
             if (shortestPaths.size() <= m_iNumRetUP)
@@ -550,10 +524,8 @@ int SCIONPathServer::sendUpPath(HostAddr &requestId, uint32_t pref){
         }
 
         std::multimap<uint16_t, upPath>::iterator spItr = shortestPaths.begin();
-        upPath currentShortPath;
-
-		//1.2 add the shortest paths to the bestPaths.
-		//why is this step introduced?
+		// 1.2 add the shortest paths to the bestPaths.
+		// why is this step introduced?
         for (spItr; spItr != shortestPaths.end(); ++spItr)
             bestPaths.push_back(spItr->second);
     }
@@ -561,11 +533,12 @@ int SCIONPathServer::sendUpPath(HostAddr &requestId, uint32_t pref){
 	//2. Send the best paths to the requester (i.e., client)
     std::list<upPath>::iterator bpItr = bestPaths.begin();
     upPath currentBestPath;
+    
     for (bpItr; bpItr != bestPaths.end(); ++bpItr) {
+        
         currentBestPath = *bpItr;
         uint8_t hdrLen = SPH::getHdrLen(currentBestPath.msg);
-        uint16_t totalLength =
-            SPH::getTotalLen(currentBestPath.msg); 
+        uint16_t totalLength = SPH::getTotalLen(currentBestPath.msg); 
         uint8_t data[totalLength+PATH_INFO_SIZE];
         memset(data, 0 , totalLength);
         memcpy(data, currentBestPath.msg, hdrLen);
@@ -575,19 +548,14 @@ int SCIONPathServer::sendUpPath(HostAddr &requestId, uint32_t pref){
 
         memcpy(data+hdrLen+PATH_INFO_SIZE, currentBestPath.msg+hdrLen,
         totalLength-hdrLen);
-
-        HostAddr srcAddr = HostAddr(HOST_ADDR_SCION, m_uAid);
-        //HostAddr dstAddr = clients.begin()->second.addr;
         
         SPH::setType(data, UP_PATH);
-        SPH::setSrcAddr(data, srcAddr);
+        SPH::setSrcAddr(data, HostAddr(HOST_ADDR_AIP, (uint8_t*)strchr(m_HID.c_str(),':')));
         SPH::setDstAddr(data, requestId);
         SPH::setTotalLen(data, totalLength+PATH_INFO_SIZE);
-        //click_chatter("sending uppath");
-
-        try {
+        
         char hidbuf[41];
-        snprintf(hidbuf, 41, "%040lu", requestId.numAddr());
+        requestId.getAIPAddr((uint8_t*)hidbuf);
 
         string dest = "RE ";
         dest.append(BHID);
@@ -597,10 +565,7 @@ int SCIONPathServer::sendUpPath(HostAddr &requestId, uint32_t pref){
         dest.append("HID:");
         dest.append(hidbuf);
 
-        //printf("LEN=%d, DEST=%s\n", totalLength+PATH_INFO_SIZE, dest.c_str());
-
         sendPacket(data, totalLength+PATH_INFO_SIZE, dest);
-        } catch (...) {}
     }
 }
 
@@ -664,18 +629,6 @@ void SCIONPathServer::printDownPath(){
    }
 }
 
-/*
-    SCIONPathServer::createHash
-    - creates unique ID for a path 
-    The difference between this function and the one in pcb server is that
-    this function does not include timestamp when creating scionHash. 
-
-    The reason for this is path server should have to update the same path
-    with different timestamp and this scionHash is the key to compare.
-*/
-//SLP: a series of interfaces represents a unique path
-//this is already computed in parseUpPath function
-//so, needs to be modified... i.e., argument to this function should be a halfPath type.
 scionHash SCIONPathServer::createHash(uint8_t* pkt){
     uint8_t hops = SCIONBeaconLib::getNumHops(pkt);
     uint16_t outputSize = hops*(sizeof(uint16_t)*2+sizeof(uint64_t));
@@ -717,11 +670,6 @@ void SCIONPathServer::sendHello() {
     sendPacket((uint8_t *)msg.c_str(), msg.size(), dest);
 }
 
-/*
-    SCIONPathServer::sendPacket
-    - Prints log message and sends out click packet to the given port. 
-*/
-
 void SCIONPathServer::sendPacket(uint8_t* data, uint16_t data_length, string dest) {
 
     string src = "RE ";
@@ -730,8 +678,6 @@ void SCIONPathServer::sendPacket(uint8_t* data, uint16_t data_length, string des
     src.append(m_HID.c_str());
     src.append(" ");
     src.append(SID_XROUTE);
-    
-    // scionPrinter->printLog(IH, (char *)"BS(%s)'s src DAG: %s\n", m_AD.c_str(), src.c_str());
 
 	XIAPath src_path, dst_path;
 	src_path.parse(src.c_str());
@@ -749,16 +695,14 @@ void SCIONPathServer::sendPacket(uint8_t* data, uint16_t data_length, string des
 	WritablePacket *q = thdr->encap(p);
 
     thdr->update();
-    xiah.set_plen(data_length + thdr->hlen()); // XIA payload = transport header + transport-layer data
+    xiah.set_plen(data_length + thdr->hlen()); 
+    // XIA payload = transport header + transport-layer data
 
     q = xiah.encap(q, false);
 	output(0).push(q);
 }
 
-//SLP:
-/* clear all up- and down-paths */
-void
-SCIONPathServer::clearPaths() {
+void SCIONPathServer::clearPaths() {
 
 	//1. clear up-paths
    	while(upPaths.size() > 0){

@@ -118,8 +118,7 @@ class SCIONPathServerCore : public Element {
         
         */
         void parsePath(uint8_t* pkt);
-
-        void printPaths();
+        void parsePathReq(uint8_t* pkt);
 
         /**
             @brief Reverse the order of the opaque fields inside a path. 

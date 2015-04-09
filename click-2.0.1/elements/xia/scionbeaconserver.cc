@@ -483,7 +483,6 @@ void SCIONBeaconServer::processPCB(SPacket * packet, uint16_t packetLength){
 	uint8_t dstLen = SPH::getDstLen(packet);
 	uint32_t ts = SPH::getTimestamp(packet);
 	HostAddr srcAddr = SPH::getSrcAddr(packet);
-	uint8_t type = BEACON;
 	
 	//PCB verification
 	if(!verifyPcb(packet)){
@@ -534,19 +533,19 @@ void SCIONBeaconServer::processPCB(SPacket * packet, uint16_t packetLength){
 			uint16_t pathLength = removeSignature(newPacket, path);
 			uint8_t hdrLen = COMMON_HEADER_SIZE+srcLen+dstLen;
 			
-			memset(newPacket+hdrLen,0,packetLength-hdrLen);
-			memcpy(newPacket+hdrLen,path, pathLength);
+			memset(newPacket+hdrLen, 0, packetLength-hdrLen);
+			memcpy(newPacket+hdrLen, path, pathLength);
 
 			scionHeader hdr;
 			hdr.cmn.type = UP_PATH;
 			hdr.cmn.hdrLen = hdrLen;
 			hdr.cmn.totalLen = hdrLen+pathLength;
-			hdr.src = HostAddr(HOST_ADDR_SCION, (uint64_t)strtoull((const char*)m_AD.c_str(), NULL, 10));
+			hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)strchr(m_HID.c_str(),':'));
 			
-			//SL: send this packet to all path servers -- done
+			// send this packet to all path servers
 			for(it=pathServerRange.first; it!=pathServerRange.second; it++) { 
 				
-				hdr.dst = HostAddr(HOST_ADDR_SCION, (uint64_t)strtoull((const char*)it->second.HID, NULL, 10));
+				hdr.dst = HostAddr(HOST_ADDR_AIP, (uint8_t*)(it->second.HID));
 				SPH::setHeader(newPacket, hdr);
 				
 				string dest = "RE ";
@@ -558,7 +557,7 @@ void SCIONBeaconServer::processPCB(SPacket * packet, uint16_t packetLength){
 				dest.append((const char*)it->second.HID);
 				
 				#ifdef _DEBUG_BS
-				scionPrinter->printLog(IH, (char *)"Sending Up-Path control packet to local path server.\n");
+				scionPrinter->printLog(IH, (char *)"Sending Up-Path control packet to local PS.\n");
 				#endif
 				sendPacket(newPacket, packetLength, dest);
 			}
@@ -611,7 +610,6 @@ uint16_t SCIONBeaconServer::removeSignature(SPacket* inPacket, uint8_t* path){
 	// 2. copy markings excluding signature
 	for(int i=0;i<numHop;i++){
 		uint16_t blkSize = mrkPtr->blkSize;
-
 		memcpy(buf+offset, ptr, blkSize);
 		ptr+= (blkSize+mrkPtr->sigLen);
 		mrkPtr=(pcbMarking*)ptr;
@@ -695,13 +693,11 @@ int SCIONBeaconServer::registerPaths() {
     }
 
     #ifdef _DEBUG_BS
-	scionPrinter->printLog(IH, (char *)"BS: registering path to TDC for AD %s. Beacon Table Size = %d\n", 
+	scionPrinter->printLog(IH, (char *)"BS: registering path to TDC for %s. Beacon Table Size = %d\n", 
 	    m_AD.c_str(), beacon_table.size());
 	#endif
-    
-    /*
-        If it is already fully registered. 
-    */
+
+    // If it is already fully registered.
     if(m_iNumRegisteredPath >= m_iKval){ 
         //fully registered
 		//if all k paths are already registered, removes 3 registered pcb (just for testing)
@@ -714,9 +710,9 @@ int SCIONBeaconServer::registerPaths() {
             m_iNumRegisteredPath--;
         }
     }
-    
-    //register up to k paths from the newest one in the beacon table 
-	//Note: registered paths are not thrown away in order to compute "path fidelity."
+
+    // register up to k paths from the newest one in the beacon table 
+	// Note: registered paths are not thrown away in order to compute "path fidelity."
     // if k paths are fully registered, then stop.
     
 	//reverse iterator is better to find a best (fresh) path since the key is ordered by timestamp in the map
@@ -725,20 +721,20 @@ int SCIONBeaconServer::registerPaths() {
 	for(int i = m_iNumRegisteredPath; i < m_iKval; i++) {
 		if(!getPathToRegister(itr)){
 		    #ifdef _DEBUG_BS
-    		scionPrinter->printLog(IH, PATH_REG, (char *)"AD %s: %i paths registered to TDC. No path to register.\n",
-    		    m_AD.c_str(), i-1);
+    		scionPrinter->printLog(IH, PATH_REG, (char *)"%s: %i paths registered to TDC. No path to register.\n",
+    		    m_AD.c_str(), m_iNumRegisteredPath);
     		#endif
 			break;
 		}
 		registerPath(itr->second);
-        
-		//post handling of registered paths
-		itr->second.registered=1;
+		// set as true for registered flag
+		itr->second.registered = 1;
         m_iNumRegisteredPath++;
         k_paths.insert(std::pair<uint32_t, pcb>(itr->first, itr->second));
-		//SL: what if path registration failed at TDC for some unknown reason?
-		//need to handle this as a special case in the future (consistency between BS and TDC PS)
+		// what if path registration failed at TDC for some unknown reason?
+		// need to handle this as a special case in the future (consistency between BS and TDC PS)
 	}
+	
     return 0;
 }
 
@@ -769,19 +765,17 @@ void SCIONBeaconServer::printPaths(){
             ptr+=mrkPtr->sigLen + mrkPtr->blkSize;
             mrkPtr = (pcbMarking*)ptr;
         }
-        scionPrinter->printLog((char*)"%lu  %d\n",m_uAdAid, itr->second.registered);
+        scionPrinter->printLog(IH, (char*)"%lu  %d\n",m_uAdAid, itr->second.registered);
     }
 }
 
 int SCIONBeaconServer::registerPath(pcb &rpcb){
 
-	//SLT:ref
 	//1. construct a path by copying pcb to packet
 	uint16_t packetLength = rpcb.totalLength+PCB_MARKING_SIZE;
 	uint8_t packet[packetLength];
 	memset(packet,0,packetLength);
 
-	//SLT:ref
 	//2. original pcb received from the upstream
 	memcpy(packet,rpcb.msg,rpcb.totalLength);
 
@@ -789,10 +783,10 @@ int SCIONBeaconServer::registerPath(pcb &rpcb){
 	getOfgKey(SPH::getTimestamp(packet),actx); 
 
 	//3. add its own marking information to the end
-	//SL: Expiration time needs to be configured by AD's policy
+	//Expiration time needs to be configured by AD's policy
 	uint8_t exp = 0; //expiration time
 	uint16_t sigLen = PriKey.len;
-	SCIONBeaconLib::addLink(packet, rpcb.ingress, NON_PCB, 1, m_uAdAid, m_uTdAid, &actx,0,exp,0, sigLen);
+	SCIONBeaconLib::addLink(packet, rpcb.ingress, NON_PCB, 1, m_uAdAid, m_uTdAid, &actx, 0, exp, 0, sigLen);
 
 	//4. Remove signature from PCB
 	//pathContent would get special OF (TS) (without 2nd special OF) + series of markings from TDC to itself
@@ -802,86 +796,63 @@ int SCIONBeaconServer::registerPath(pcb &rpcb){
 	uint16_t pathContentLength = removeSignature(packet, pathContent);
     
 	// Build path (list of OF) from the pcb
-	//SLT: add 1 for special OF (i.e., timestamp)
-	//5. Now construct a path to the TDC (i.e., a series of OFs to the TDC)
-	uint16_t numHop = SCIONBeaconLib::getNumHops(packet)+1; //added 1 for the special OF (i.e., TS)
-	uint8_t path[numHop*OPAQUE_FIELD_SIZE];
-	buildPath(packet, path);
+	// add 1 for special OF (i.e., timestamp)
+	// 5. Now construct a path to the TDC (i.e., a series of OFs to the TDC)
+	uint16_t numHop = SCIONBeaconLib::getNumHops(packet)+1; 
     
 	//6. at this point we have "path" (TS+OFs to TDC) and "pathContent" that would be registered to TDC PS.
 	uint8_t srcLen = SPH::getSrcLen(packet);
 	uint8_t dstLen = SPH::getDstLen(packet);
 
-	//7. now hdr for path registration include COMMON_HDR + SRC/DST Addr + TS + OFs
-	uint8_t hdrLen = COMMON_HEADER_SIZE+srcLen+dstLen+numHop*OPAQUE_FIELD_SIZE;
+	//7. now hdr for path registration include COMMON_HDR + SRC/DST Addr
+	uint8_t hdrLen = COMMON_HEADER_SIZE+srcLen+dstLen;
 
-	//create new packet
+	// create PATH_REG packet, including header and all OPAQUE FIELDS
 	uint16_t newPacketLength = hdrLen+pathContentLength;
 	uint8_t newPacket[newPacketLength];
-	uint16_t interface = ((opaqueField*)(path+OPAQUE_FIELD_SIZE))->ingressIf;
 
-	//////////////////////////////////////////////////////////////////////////
-	// SL:
-	// A new way to set packet header...
-	// Fill the scionHeader structure and call setHeader
-	// instead of calling individual field as previously done.
+    //set common header
 	scionHeader hdr;
-	//set common header
 	hdr.cmn.type = PATH_REG;
 	hdr.cmn.hdrLen = hdrLen;
 	hdr.cmn.totalLen = newPacketLength;
-	hdr.cmn.currOF = srcLen+dstLen;
-	hdr.cmn.numOF = numHop; //* not a mandatory property for path registration.
-
 	//set src/dst addresses
-	hdr.src = HostAddr(HOST_ADDR_SCION, m_uAdAid);
-	//SL: set destination addr to that of the router holding the interface id.
-	hdr.dst = ifid2addr.find(interface)->second;
-
-	//set opaque fields
-	hdr.n_of = numHop;
-	hdr.p_of = path;
-	
-	//write to the packet
+	hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)strchr(m_HID.c_str(),':'));
+	hdr.dst = HostAddr(HOST_ADDR_AIP, (uint8_t*)(m_servers.find(PathServer)->second.HID));
 	SPH::setHeader(newPacket, hdr);
-	////////////////////////////////////////////////////////////////////////////
-
-	//SLT: 
-	//Here, we need to set special OF to help routers to forward packets
-	specialOpaqueField pSOF = *(specialOpaqueField *)path;
-
-	//SLT: this is already marked by TDC BS when it initiated PCB propagation
-	//Just confirm this is the packet to TDC
-	pSOF.info = 0x80;
-	SPH::setTimestampOF(newPacket, pSOF);
-	SPH::setUppathFlag(newPacket);
-	memcpy(newPacket+hdrLen,pathContent,pathContentLength);
+	memcpy(newPacket+hdrLen, pathContent, pathContentLength);
     
 	char buf[MAXLINELEN];
 	uint16_t offset = 0;
 	uint8_t* ptr = pathContent+OPAQUE_FIELD_SIZE;
 	pcbMarking* mrkPtr = (pcbMarking*)ptr;
 
-	for(int i=0;i<numHop;i++){
+    uint64_t tdc_ad = 0;
+	for(int i=0;i<numHop-1;i++){
+		if(i==0) tdc_ad = mrkPtr->aid;
 		sprintf(buf+offset,"%lu (%u, %u) |", mrkPtr->aid, mrkPtr->ingressIf, mrkPtr->egressIf);
 		ptr+=mrkPtr->blkSize;
 		mrkPtr=(pcbMarking*)ptr;
 		offset = strlen(buf);
 	}
      
-	scionPrinter->printLog(IH, PATH_REG, rpcb.timestamp, m_uAdAid,0,(char *)"%u, SENT PATH: %s\n",newPacketLength,buf);
+    #ifdef _DEBUG_BS
+	scionPrinter->printLog(IH, PATH_REG, rpcb.timestamp, (char *)"%s %u, SENT PATH: %s\n", m_AD.c_str(), newPacketLength, buf);
+	#endif
+	
+	// hacked conversion for AD number to AD identifier
+	char adbuf[41];
+	snprintf(adbuf, 41, "%040lu", tdc_ad);
 
     string dest = "RE ";
     dest.append(BHID);
     dest.append(" ");
-    // TODO: hardcoded TDC path server
-    dest.append(" ");
     dest.append("AD:");
-    dest.append((const char*)"0000000000000000000000000000000000000001");
+    dest.append(adbuf);
     dest.append(" ");
     dest.append("HID:");
-    dest.append((const char*)"0000000000000000000000000000000000100000");
-
+    dest.append((const char*)m_servers.find(PathServer)->second.HID);
+    
 	sendPacket(newPacket, newPacketLength, dest);
 	
 	return 0;
@@ -889,15 +860,12 @@ int SCIONBeaconServer::registerPath(pcb &rpcb){
 
 int SCIONBeaconServer::buildPath(SPacket* pkt, uint8_t* output){
 	
-	//SL: need to make pkt type "const"
-	//to do this, all SPH::getXXX need to be changed
 	uint8_t hdrLen = SPH::getHdrLen(pkt);
+	// TOS OF
+	memcpy(output, pkt+hdrLen, OPAQUE_FIELD_SIZE);
 
-	//SLT:
-	//1. special Opaque Field (TS)
-	memcpy(output, pkt+hdrLen,OPAQUE_FIELD_SIZE);
-
-	uint8_t* ptr = pkt + hdrLen+OPAQUE_FIELD_SIZE*2; //after 2 special OFs, AD marking comes.
+    //after 2 special OFs, AD marking comes.
+	uint8_t* ptr = pkt + hdrLen+OPAQUE_FIELD_SIZE*2; 
 	pcbMarking* mrkPtr = (pcbMarking*)ptr;
 	uint16_t hops = SCIONBeaconLib::getNumHops(pkt);
 	//2. place the pointer to the end of the marking so as to construct a reverse path

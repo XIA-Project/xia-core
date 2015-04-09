@@ -198,7 +198,6 @@ void SCIONBeaconServerCore::loadPrivateKey() {
     }
 }
 
-/*SL: Initialize OFG key */
 bool SCIONBeaconServerCore::initOfgKey() {
     time_t currTime;
     time(&currTime);
@@ -409,10 +408,6 @@ bool SCIONBeaconServerCore::generateNewPCB() {
         dest.append(" ");
         dest.append("HID:");
         dest.append((const char*)rpair.ingress_addr);
-        // destination AD
-        dest.append(" ");
-        dest.append("AD:");
-        dest.append((const char*)rpair.ingress_ad);
         // destination beacon server
         dest.append(" ");
         dest.append("HID:");

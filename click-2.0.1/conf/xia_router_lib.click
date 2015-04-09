@@ -655,9 +655,10 @@ elementclass XIONPathServer {
     sps -> xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> sps;
 };
 
-// 1-port SCION Encap
-elementclass XIONEncap {
-    $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac |
+// 1-port SCION XIONGateway
+elementclass XIONGateway {
+    $local_addr, $local_ad, $local_hid, $external_ip, $click_port, $mac, 
+    TOPOLOGY_FILE $topology_file |
 
     // $local_addr: the full address of the node
     // $local_ad: the node's AD
@@ -673,7 +674,7 @@ elementclass XIONEncap {
     //Script(write xrc/n/proc/rt_AD.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
     //Script(write xrc/n/proc/rt_HID.add - $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
 
-    enc :: SCIONEncap(AD $local_ad, HID $local_hid);
+    enc :: SCIONEncap(AD $local_ad, HID $local_hid, TOPOLOGY_FILE $topology_file);
 
     input => xlc => output;
 

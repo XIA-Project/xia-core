@@ -34,8 +34,8 @@
 #ifndef _DEBUG_CS
 #define _DEBUG_CS
 #endif
-#ifndef _SL_DEBUG_PS
-#define _SL_DEBUG_PS
+#ifndef _DEBUG_PS
+#define _DEBUG_PS
 #endif
 
 /*

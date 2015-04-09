@@ -373,7 +373,16 @@ class SCIONPathServer : public Element {
             Returns 0.
         */
         int sendUpPath(HostAddr &requestId, uint32_t pref=0);
-
+        
+        /*
+        SCIONPathServer::createHash
+        - creates unique ID for a path 
+        The difference between this function and the one in pcb server is that
+        this function does not include timestamp when creating scionHash. 
+        
+        The reason for this is path server should have to update the same path
+        with different timestamp and this scionHash is the key to compare.
+        */
         scionHash createHash(uint8_t* pkt);
 
         /**

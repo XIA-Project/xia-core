@@ -54,8 +54,10 @@ cert4 :: XIONCertServer(RE AD4 CSHID4, AD4, CSHID4, 0.0.0.0, 3500, aa:aa:aa:aa:a
         CONFIG_FILE "./TD1/Non-TDC/AD4/certserver/conf/AD4CS.conf",
         TOPOLOGY_FILE "./TD1/Non-TDC/AD4/topology4.xml");
 
-enc4 :: XIONEncap(RE AD4 CHID5, AD4, CHID5, 0.0.0.0, 4000, aa:aa:aa:aa:aa:aa);
+gw4 :: XIONGateway(RE AD4 CHID5, AD4, CHID5, 0.0.0.0, 4000, aa:aa:aa:aa:aa:aa, 
+        TOPOLOGY_FILE "./TD1/Non-TDC/AD4/topology4.xml");
 
+// controller <-> beacon server
 controller1[0] -> LinkUnqueue(0.005, 1 GB/s) -> [0]beacon1;
 beacon1[0] -> LinkUnqueue(0.005, 1 GB/s) -> [0]controller1;
 
@@ -68,20 +70,7 @@ beacon3[0] -> LinkUnqueue(0.005, 1 GB/s) -> [0]controller3;
 controller4[0] -> LinkUnqueue(0.005, 1 GB/s) -> [0]beacon4;
 beacon4[0] -> LinkUnqueue(0.005, 1 GB/s) -> [0]controller4;
 
-
-controller1[1] -> LinkUnqueue(0.005, 1 GB/s) -> [1]router1;
-router1[1] -> LinkUnqueue(0.005, 1 GB/s) -> [1]controller1;
-
-controller2[1] -> LinkUnqueue(0.005, 1 GB/s) -> [1]router21;
-router21[1] -> LinkUnqueue(0.005, 1 GB/s) -> [1]controller2;
-
-controller3[1] -> LinkUnqueue(0.005, 1 GB/s) -> [1]router3;
-router3[1] -> LinkUnqueue(0.005, 1 GB/s) -> [1]controller3;
-
-controller4[1] -> LinkUnqueue(0.005, 1 GB/s) -> [1]router4;
-router4[1] -> LinkUnqueue(0.005, 1 GB/s) -> [1]controller4;
-
-
+// controller <-> path server
 controller1[2] -> LinkUnqueue(0.005, 1 GB/s) -> [0]path1;
 path1[0] -> LinkUnqueue(0.005, 1 GB/s) -> [2]controller1;
 
@@ -94,7 +83,33 @@ path3[0] -> LinkUnqueue(0.005, 1 GB/s) -> [2]controller3;
 controller4[2] -> LinkUnqueue(0.005, 1 GB/s) -> [0]path4;
 path4[0] -> LinkUnqueue(0.005, 1 GB/s) -> [2]controller4;
 
+// controller <-> cert server
+controller1[3] -> LinkUnqueue(0.005, 1 GB/s) -> [0]cert1;
+cert1[0] -> LinkUnqueue(0.005, 1 GB/s) -> [3]controller1;
 
+controller2[3] -> LinkUnqueue(0.005, 1 GB/s) -> [0]cert2;
+cert2[0] -> LinkUnqueue(0.005, 1 GB/s) -> [3]controller2;
+
+controller3[3] -> LinkUnqueue(0.005, 1 GB/s) -> [0]cert3;
+cert3[0] -> LinkUnqueue(0.005, 1 GB/s) -> [3]controller3;
+
+controller4[3] -> LinkUnqueue(0.005, 1 GB/s) -> [0]cert4;
+cert4[0] -> LinkUnqueue(0.005, 1 GB/s) -> [3]controller4;
+
+// controller <-> edge routers
+controller1[1] -> LinkUnqueue(0.005, 1 GB/s) -> [1]router1;
+router1[1] -> LinkUnqueue(0.005, 1 GB/s) -> [1]controller1;
+
+controller2[1] -> LinkUnqueue(0.005, 1 GB/s) -> [1]router21;
+router21[1] -> LinkUnqueue(0.005, 1 GB/s) -> [1]controller2;
+
+controller3[1] -> LinkUnqueue(0.005, 1 GB/s) -> [1]router3;
+router3[1] -> LinkUnqueue(0.005, 1 GB/s) -> [1]controller3;
+
+controller4[1] -> LinkUnqueue(0.005, 1 GB/s) -> [1]router4;
+router4[1] -> LinkUnqueue(0.005, 1 GB/s) -> [1]controller4;
+
+// edge routers <-> edge routers
 router1[0] -> LinkUnqueue(0.005, 1 GB/s) -> [0]router21;
 router21[0] -> LinkUnqueue(0.005, 1 GB/s) -> [0]router1;
 
@@ -121,29 +136,11 @@ router3[2] -> Idle;
 Idle -> [3]router3;
 router3[3] -> Idle;
 
-enc4[0] -> LinkUnqueue(0.005, 1 GB/s) -> [2]router4;
-router4[2] -> LinkUnqueue(0.005, 1 GB/s) -> [0]enc4;
+gw4[0] -> LinkUnqueue(0.005, 1 GB/s) -> [2]router4;
+router4[2] -> LinkUnqueue(0.005, 1 GB/s) -> [0]gw4;
 
 Idle -> [3]router4;
 router4[3] -> Idle;
-
-// controller <-> cert server
-controller1[3] -> LinkUnqueue(0.005, 1 GB/s) -> [0]cert1;
-cert1[0] -> LinkUnqueue(0.005, 1 GB/s) -> [3]controller1;
-
-controller2[3] -> LinkUnqueue(0.005, 1 GB/s) -> [0]cert2;
-cert2[0] -> LinkUnqueue(0.005, 1 GB/s) -> [3]controller2;
-
-controller3[3] -> LinkUnqueue(0.005, 1 GB/s) -> [0]cert3;
-cert3[0] -> LinkUnqueue(0.005, 1 GB/s) -> [3]controller3;
-
-controller4[3] -> LinkUnqueue(0.005, 1 GB/s) -> [0]cert4;
-cert4[0] -> LinkUnqueue(0.005, 1 GB/s) -> [3]controller4;
-
-//Idle -> [3]controller1[3] -> Idle;
-//Idle -> [3]controller2[3] -> Idle;
-//Idle -> [3]controller3[3] -> Idle;
-//Idle -> [3]controller4[3] -> Idle;
 
 
 // The following line is required by the xianet script so it can determine the appropriate

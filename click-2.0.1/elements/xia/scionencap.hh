@@ -48,43 +48,33 @@ struct PacketCache
 class SCIONEncap : public Element { 
 
 public:
-    SCIONEncap();
+    SCIONEncap(): m_uAdAid(0), _path_info(0),m_bDefaultDestOn(false),
+    m_bClearReversePath(false),_timer(this) {};
     ~SCIONEncap() {
 		delete scionPrinter;
 	};
 
     const char *class_name() const { return "SCIONEncap"; }
     const char *port_count() const {return "-/-";}
-    const char *processing() const {return PUSH;} // same as "h/h"
+    const char *processing() const {return PUSH;}
 
     int configure(Vector<String> &, ErrorHandler *);
-    
 	int initialize(ErrorHandler *);
-	
-	void initVariables();
-
 	void run_timer(Timer *);
-
     void push(int, Packet *);
-	void parseTopology();
-    void constructIfid2AddrMap(); 
 
 private:
     String m_AD;
     String m_HID;
 
 	Timer _timer;
-	//String m_sConfigFile;
-	//String m_sTopologyFile;
+	String m_sTopologyFile;
 	//String m_sAddrTableFile;
 	char m_csLogFile[MAX_FILE_LEN];
 	
 	int m_iLogLevel;
 	
-
-    std::multimap<int, ServerElem> m_servers;
-    std::multimap<int, RouterElem> m_routers;
-    std::map<uint16_t, HostAddr> ifid2addr;
+    std::multimap<int, Servers> m_servers;
 
 	uint64_t m_uAid;
 	uint64_t m_uAdAid;
