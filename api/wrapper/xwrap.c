@@ -67,6 +67,13 @@
 #define ALERT()		 {if (_log_warning)  fprintf(_log, "xwrap: ALERT!!!, %s is not implemented in XIA!\r\n", __FUNCTION__);}
 #define WARNING(...) {if (_log_warning) {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
 
+#ifdef DEBUG
+
+#else
+#define DBG(...) {if (_log_warning) {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
+#define DBG(...)
+#endif
+
 // C style functions to avoid name mangling issue *******************
 extern "C" {
 
@@ -181,7 +188,7 @@ void __attribute__ ((constructor)) xwrap_init(void)
 		fprintf(_log, "remapping all socket IO automatically into XIA\n");
 	}
 
-	// cause the API to load the pointers to the real socket functions
+	// cause the Xsocket API to load the pointers to the real socket functions
 	// for it's own internal use 
 	xapi_load_func_ptrs();
 
@@ -264,6 +271,7 @@ static unsigned short _NewPort()
 	
 	// start with a random value
 	static unsigned short port = PROTECTED + (rand() % (USHRT_MAX - PROTECTED));
+
 	MSG("%d\n", port)
 
 	if (++port < PROTECTED) {
