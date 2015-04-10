@@ -27,7 +27,6 @@ Start or stop the XIA network services.
 
 usage: xwrap [-tixwvX] [-o <logfile>] cmd
 where:
-  -X treat all sockets as XIA
   -t log at entry of every wrapped API call
   -i log informative messages
   -x log XIA related messages
