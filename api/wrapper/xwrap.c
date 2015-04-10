@@ -587,7 +587,7 @@ int close(int fd)
 	TRACE();
 	if (shouldWrap(fd)) {
 		XIAIFY();
-
+#if 0
 		// clean up entries in the dag2id and id2dag maps
 		Xgetsockname(fd, (struct sockaddr *)&addr, &len);
 
@@ -597,7 +597,7 @@ int close(int fd)
 
 		dag2id.erase(dag);
 		id2dag.erase(id);
-
+#endif
 		// kill it
 		rc = Xclose(fd);
 
@@ -1281,6 +1281,7 @@ ssize_t recvmsg(int fd, struct msghdr *message, int flags)
 		return 0;
 
 	} else {
+		NOXIA();
 		return __real_recvmsg(fd, message, flags);
 	}
 }
@@ -1293,6 +1294,7 @@ ssize_t sendmsg(int fd, const struct msghdr *message, int flags)
 		return 0;
 
 	} else {
+		NOXIA();
 		return __real_sendmsg(fd, message, flags);
 	}
 }
