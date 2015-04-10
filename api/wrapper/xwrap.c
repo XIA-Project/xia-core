@@ -587,17 +587,18 @@ int close(int fd)
 	TRACE();
 	if (shouldWrap(fd)) {
 		XIAIFY();
-#if 0
+
 		// clean up entries in the dag2id and id2dag maps
-		Xgetsockname(fd, (struct sockaddr *)&addr, &len);
+		if (Xgetsockname(fd, (struct sockaddr *)&addr, &len) == 0) {
 
-		Graph g(&addr);
-		std::string dag = g.dag_string();
-		std::string id = dag2id[dag];
+			Graph g(&addr);
+			std::string dag = g.dag_string();
+			std::string id = dag2id[dag];
 
-		dag2id.erase(dag);
-		id2dag.erase(id);
-#endif
+			dag2id.erase(dag);
+			id2dag.erase(id);
+		}
+
 		// kill it
 		rc = Xclose(fd);
 
