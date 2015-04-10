@@ -181,6 +181,10 @@ void __attribute__ ((constructor)) xwrap_init(void)
 		fprintf(_log, "remapping all socket IO automatically into XIA\n");
 	}
 
+	// cause the API to load the pointers to the real socket functions
+	// for it's own internal use 
+	xapi_load_func_ptrs();
+
 	// roll the dice
 	srand(time(NULL));
 

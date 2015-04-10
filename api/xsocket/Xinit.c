@@ -54,7 +54,7 @@ recvfrom_t _f_recvfrom;
 
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
-void load_func_ptrs()
+void xapi_load_func_ptrs()
 {
 	void *handle = dlopen(LIBNAME, RTLD_LAZY);
 
@@ -103,7 +103,7 @@ void load_func_ptrs()
 
 		snprintf(__XSocketConf::master_conf, BUF_SIZE, "%s%s", XrootDir(root, BUF_SIZE), "/etc/xsockconf.ini");
         __InitXSocket::read_conf(filename, sectionname);
-        load_func_ptrs();
+        xapi_load_func_ptrs();
 		__XSocketConf::initialized=1;
 		pthread_mutex_unlock(&lock);
     }
@@ -173,7 +173,7 @@ __InitXSocket::__InitXSocket()
 	// NOTE: unlikely, but what happens if section_name is NULL?
 	read_conf(inifile, section_name);
 
-    load_func_ptrs();
+    xapi_load_func_ptrs();
 }
 
 /*!
