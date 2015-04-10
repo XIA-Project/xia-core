@@ -160,15 +160,7 @@ ofType, uint8_t exp, uint16_t bwAlloc)
         oldMAC = 0;
     }
     uint64_t mac = createMAC(ts, exp, ingress, egress, oldMAC, ctx);
-	//SL: This part is unnecessary...
-	/*
-    if(type){
-        pcbMarking newMarking= {aid,ingress,egress,128,PCB_MARKING_SIZE,mac,tdid};
-        memcpy(pkt+totalLen, (uint8_t*)&newMarking, PCB_MARKING_SIZE);
-        SPH::addPacketLen(pkt, PCB_MARKING_SIZE);
-        SPH::addNumOF(pkt ,1); 
-    }else{ //SL: This part is adding a peering link
-	*/
+	
 	peerMarking* pm = (peerMarking*)(pkt+totalLen);
 	//SL: why is this?
 	//A peering link doesn't add AID to the marking

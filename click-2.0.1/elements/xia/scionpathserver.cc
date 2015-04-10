@@ -213,18 +213,18 @@ void SCIONPathServer::push(int port, Packet *p)
 
 			#ifdef _DEBUG_PS
             scionPrinter->printLog(IH, type, (char*)"PATH_REP recieved for target AD %llu\n", pi->target);
+            scionPrinter->printLog(IH, (char*)"PS replies down-path to clients, count = %d\n", 
+				pendingDownpathReq.count((uint64_t)pi->target));
 			#endif
 			
 			//Now, send reply to all clients in the pending request table
 			std::multimap<uint64_t,HostAddr>::iterator itr;
+			
 			std::pair<std::multimap<uint64_t,HostAddr>::iterator, 
 				std::multimap<uint64_t, HostAddr>::iterator> requesters;
 			requesters = pendingDownpathReq.equal_range(pi->target);
 			
-			#ifdef _DEBUG_PS
-			scionPrinter->printLog(IH, (char*)"PS (%llu:%llu): Down-path reply to Clients: count = %d\n", 
-				m_uAid, m_uAdAid, pendingDownpathReq.count(pi->target));
-			#endif
+			
 			
 			for(itr = requesters.first; itr != requesters.second; itr++) {
 				
@@ -240,8 +240,9 @@ void SCIONPathServer::push(int port, Packet *p)
 					m_uAdAid, m_uAid, itr->second.numAddr());
 				#endif
 
-                char hidbuf[40];
-                snprintf(hidbuf, 40, "%040lu", itr->second.numAddr());
+                char hidbuf[AIP_SIZE+1];
+                itr->second.getAIPAddr((uint8_t*)hidbuf);
+                hidbuf[AIP_SIZE] = '\0';
 
                 string dest = "RE ";
                 dest.append(BHID);
@@ -250,6 +251,8 @@ void SCIONPathServer::push(int port, Packet *p)
                 dest.append(" ");
                 dest.append("HID:");
                 dest.append(hidbuf);
+                
+                click_chatter("dest(%llu): %s\n", PATH_REP_LOCAL, dest.c_str());
 
             	sendPacket(buf, totalLength, dest);
 			}
@@ -273,7 +276,12 @@ void SCIONPathServer::push(int port, Packet *p)
 			#endif
             
             // for down-path
-            sendRequest(target, requestId);
+            int num_buffered_requests = sendRequest(target, requestId);
+            #ifdef _DEBUG_PS
+			scionPrinter->printLog(IH,type,(char *)"PS buffered %d requests for Target AD: %llu\n", 
+				num_buffered_requests, target);
+			#endif
+			
             // for up-path
             sendUpPath(requestId);
         }
@@ -540,7 +548,7 @@ int SCIONPathServer::sendUpPath(HostAddr &requestId, uint32_t pref) {
         SPH::setDstAddr(data, requestId);
         SPH::setTotalLen(data, totalLength+PATH_INFO_SIZE);
         
-        char hidbuf[40];
+        char hidbuf[AIP_SIZE];
         requestId.getAIPAddr((uint8_t*)hidbuf);
 
         string dest = "RE ";

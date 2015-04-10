@@ -844,8 +844,8 @@ int SCIONBeaconServer::registerPath(pcb &rpcb){
 	#endif
 	
 	// hacked conversion for AD number to AD identifier
-	char adbuf[41];
-	snprintf(adbuf, 41, "%040lu", tdc_ad);
+	char adbuf[AIP_SIZE+1];
+	sprintf(adbuf, "%040llu", tdc_ad);
 
     string dest = "RE ";
     dest.append(BHID);

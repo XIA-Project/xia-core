@@ -116,18 +116,13 @@ SCIONPathInfo::take_state(Element *e, ErrorHandler *errh)
     //_paths.swap(pinfo->_paths);
 }
 
-void
-SCIONPathInfo::parse(const void *p, int type)
+void SCIONPathInfo::parse(const void *p, int type)
 {
 	//struct for path storage
     halfPath *received_path_ptr = new halfPath();
     memset(received_path_ptr, 0, sizeof(halfPath)); 
     
-	uint8_t srcLen = SPH::getSrcLen((uint8_t *)p);
-	uint8_t dstLen = SPH::getDstLen((uint8_t *)p);
     //extracting information from packet header
-
-	//SL: Caution: downpath includes OF to TDC
 	uint8_t hdrLen = SPH::getHdrLen((uint8_t *)p);
     uint8_t *pkt = (uint8_t *)p + hdrLen;
     uint16_t hops = 0;
@@ -142,10 +137,9 @@ SCIONPathInfo::parse(const void *p, int type)
     if (hops >= 10 || hops <= 0) // TODO
         return; // TODO error
 
-	//#ifdef _SL_DEBUG_GW
-	printf("Parsing received path: Type:%d (0:uppath, 1:downpath), hops: %d\n", type, hops);
-	//printf("Path info: info=%x, ts=%d\n",pFOF->info,pFOF->timestamp);
-	//#endif
+    #ifdef _DEBUG_GW
+	click_chatter("Parsing received path: Type:%d (0:uppath, 1:downpath), hops: %d\n", type, hops);
+	#endif
 
     //1. extract half path information and store it to halfPath struct
 	//iterate through payload and get hop information
@@ -158,9 +152,11 @@ SCIONPathInfo::parse(const void *p, int type)
     for (int i = 0; i < hops; ++i) {
 		//1.1 add ADAID to the path
         received_path_ptr->path.push_back(mrkPtr->aid);
-		#ifdef _SL_DEBUG_GW
-		printf("=> AD%lu (%lu|%lu) ", mrkPtr->aid, mrkPtr->ingressIf, mrkPtr->egressIf);
+		
+		#ifdef _DEBUG_GW
+		click_chatter("=> AD%lu (%lu|%lu) ", mrkPtr->aid, mrkPtr->ingressIf, mrkPtr->egressIf);
 		#endif
+		
 		++ received_path_ptr->hops;
         
 		//1.2 handle if there's any peering link
@@ -187,19 +183,18 @@ SCIONPathInfo::parse(const void *p, int type)
 			}
 		}
 
-		//1.3. move pointer to the next AD's marking
-		//#ifdef _SL_DEBUG_GW
-		//printf(" (%dB) =>", mrkPtr->blkSize);
-		//#endif
         pkt += mrkPtr->blkSize;//+mrkPtr->sigLen;
         mrkPtr = (pcbMarking*)pkt;
     }
-    printf("\n");
+    #ifdef _DEBUG_GW
+    click_chatter("\n");
+    #endif
 
-	//#ifdef _SL_DEBUG_GW
-	//printf("Store %d path: 0: uppath, 1:downpath\n", type);
-	//#endif
-    //2. Store extracted path information
+    #ifdef _DEBUG_GW
+	click_chatter("Store %d path: 0: uppath, 1:downpath\n", type);
+	#endif
+	
+	//2. Store extracted path information
 	//2.1 storing down path
     if (type) {
         uint16_t info_length = pi->totalLength;
@@ -219,9 +214,9 @@ SCIONPathInfo::parse(const void *p, int type)
 		ADAID endpoint = received_path_ptr->path[received_path_ptr->path.size() - 1];
         ADAID core = received_path_ptr->path[0];
 
-		//#ifdef _SL_DEBUG_GW
-		//printf("Storing down path: len = %d,endpoint = %llu, core = %llu\n", info_length,endpoint,core);
-		//#endif
+		#ifdef _DEBUG_GW
+		click_chatter("Storing down path: len = %d,endpoint = %llu, core = %llu\n", info_length,endpoint,core);
+		#endif
 
 		//SL: store to the m_vDownpaths with the endpoint ADAID as a key...
 		//2.1.1 create a new entry
@@ -234,9 +229,10 @@ SCIONPathInfo::parse(const void *p, int type)
             m_vDownpaths[endpoint].push_back(received_path_ptr);
         }
         
-		//#ifdef _SL_DEBUG_GW
-        //printf("\t PathInfo: save down-path from %llu to %llu.\n", core, endpoint);
-		//#endif
+		#ifdef _DEBUG_GW
+        click_chatter("\t PathInfo: save down-path from %llu to %llu.\n", core, endpoint);
+		#endif
+		
 		addDownPath(*(m_vDownpaths[endpoint].back()), m_downpathAdTable[endpoint]);
     
     //2.2 storing up path
@@ -244,9 +240,11 @@ SCIONPathInfo::parse(const void *p, int type)
 	//merge these together after changing the message format...
     } else {
 		uint16_t info_length = SPH::getTotalLen((uint8_t *)p) - hdrLen - PATH_INFO_SIZE;
-		//#ifdef _SL_DEBUG_GW
-		//printf("Storing up path: len = %d\n", info_length);
-		//#endif
+		
+		#ifdef _DEBUG_GW
+		click_chatter("Storing up path: len = %d\n", info_length);
+		#endif
+		
         received_path_ptr->path_marking = new uint8_t[ info_length ];
 		
 		pkt = (uint8_t*)p + hdrLen + PATH_INFO_SIZE;
@@ -269,9 +267,9 @@ SCIONPathInfo::parse(const void *p, int type)
             m_vUppaths[endpoint].push_back(received_path_ptr);
         }
 
-		//#ifdef _SL_DEBUG_GW
-        //printf("\t PathInfo: save up-path from %llu to %llu.\n", core, endpoint);
-		//#endif
+		#ifdef _DEBUG_GW
+        click_chatter("\t PathInfo: save up-path from %llu to %llu.\n", core, endpoint);
+		#endif
         addUpPath(*(m_vUppaths[endpoint].back()));
     }
 }
@@ -279,8 +277,7 @@ SCIONPathInfo::parse(const void *p, int type)
 /*SL: SCIONPathInfo::get_path returns an end-2-end path 
 for a given src and dst AD pair
 */
-bool 
-SCIONPathInfo::get_path(ADAID src, ADAID dst, fullPath& endpath) 
+bool SCIONPathInfo::get_path(ADAID src, ADAID dst, fullPath& endpath) 
 {
     std::map<ADAID, std::vector<halfPath*> >::iterator it_down = m_vDownpaths.find(dst);
     std::map<ADAID, std::vector<halfPath*> >::iterator it_up = m_vUppaths.find(src);
@@ -308,8 +305,7 @@ SCIONPathInfo::get_path(ADAID src, ADAID dst, fullPath& endpath)
    - only OPAQUE FIELDS, HOPS and TIMESTAMPS in the Path are used. 
    - it makes the function rely very little on the Path data structure.
 */
-bool
-SCIONPathInfo::initAdTable(ADAID src, ADAID dst) {
+bool SCIONPathInfo::initAdTable(ADAID src, ADAID dst) {
 
     std::map<ADAID, std::vector<halfPath*> >::iterator it_down = m_vDownpaths.find(dst);
     std::map<ADAID, std::vector<halfPath*> >::iterator it_up = m_vUppaths.find(src);
@@ -336,8 +332,7 @@ SCIONPathInfo::initAdTable(ADAID src, ADAID dst) {
 /*
  Delete an up-path from the up-Path AD table
 */
-void
-SCIONPathInfo::deleteUpPath(halfPath& path) {
+void SCIONPathInfo::deleteUpPath(halfPath& path) {
 //SLP:
 //this should be re-written
 //don't know how this worked before...
@@ -367,8 +362,7 @@ SCIONPathInfo::deleteUpPath(halfPath& path) {
 /*
  Delete a down-path from the down-Path AD table corresponding to the path's destination
 */
-void
-SCIONPathInfo::deleteDownPath(halfPath& path, DownPathADTable& down_path_ad_table) {
+void SCIONPathInfo::deleteDownPath(halfPath& path, DownPathADTable& down_path_ad_table) {
 //SLP:
 //this should be re-written
 //don't know how this worked before...
@@ -394,8 +388,7 @@ SCIONPathInfo::deleteDownPath(halfPath& path, DownPathADTable& down_path_ad_tabl
 /*
  Add ADs on a down path to that path's destination's DownPathADTable
 */
-void
-SCIONPathInfo::addDownPath(halfPath& path, DownPathADTable& down_path_ad_table) {
+void SCIONPathInfo::addDownPath(halfPath& path, DownPathADTable& down_path_ad_table) {
     uint8_t* dwPtr = path.path_marking +OPAQUE_FIELD_SIZE; //first OF is the TS of this PCB
     pcbMarking *dwMrkPtr = (pcbMarking*) dwPtr;
 	//#ifdef _SL_DEBUG_GW
@@ -485,8 +478,7 @@ SL: Get shortest path. If there is no shortcut return false.
    - second, construct a series of opaque fields that correspond to the AD path
    	 which is implemented in constructFullPath()
 */
-bool
-SCIONPathInfo::getShortestPath(DownPathADTable& down_path_ad_table, fullPath& endpath) {
+bool SCIONPathInfo::getShortestPath(DownPathADTable& down_path_ad_table, fullPath& endpath) {
 	//SL: MAX_HOPS needs to be defined in define.hh
     uint64_t upAD = 0, dwAD = 0;
     uint8_t end2end_path_type = PATH_TYPE_TDC; //0- TDC, 1-CROSSOVER, 2-PEER
@@ -508,8 +500,9 @@ SCIONPathInfo::getShortestPath(DownPathADTable& down_path_ad_table, fullPath& en
                upAD = it_up_ad_xover->first;
                dwAD = it_down_ad->first;
 
-			   #ifdef _SL_DEBUG_GW
-			   printf("AD%d:type(%d)\n",it_down_ad->first,it_down_ad->second.type);
+			   #ifdef _DEBUG_GW
+			   click_chatter("AD%d:type(%d)\n",
+			   it_down_ad->first,it_down_ad->second.type);
 			   #endif
 
 				//SL: Check if this ad is a TDC_AD
@@ -560,8 +553,8 @@ SCIONPathInfo::getShortestPath(DownPathADTable& down_path_ad_table, fullPath& en
         constructFullPath(upAD,dwAD,upPath,downPath,end2end_up_hops,end2end_down_hops,end2end_path_type,endpath);
         return true;
     } else {
-		#ifdef _SL_DEBUG_GW
-        printf("A shortcut path doesn't exist\n");
+		#ifdef _DEBUG_GW
+        click_chatter("A shortcut path doesn't exist\n");
 		#endif
         return false;
     }
@@ -591,8 +584,8 @@ uint16_t end2end_up_hops, uint16_t end2end_down_hops, uint8_t end2end_path_type,
 	//However, postpone it until functionality is verified...
 	//1. a path through a crossover AD
 	if (end2end_path_type == PATH_TYPE_XOVR) { //cross-over
-		#ifdef _SL_DEBUG_GW
-		printf("\nConstruct a XOVR path\n");
+		#ifdef _DEBUG_GW
+		click_chatter("\nConstruct a XOVR path\n");
 		#endif
     	up_length = (upHop+2) * OPAQUE_FIELD_SIZE; //add OFs for a special OF and upstream AD
     	down_length = (dwHop+2) * OPAQUE_FIELD_SIZE; //add OFs for a special OF and upstream AD
@@ -608,8 +601,8 @@ uint16_t end2end_up_hops, uint16_t end2end_down_hops, uint8_t end2end_path_type,
 	
 		//1.2. then mark a series of the OF of the selected path
 		//Up-path
-		#ifdef _SL_DEBUG_GW
-		printf("Up path in reverse order (from TDC) upPath.hops = %d, downPath.hops = %d, upHop=%d, dwHop=%d\n",
+		#ifdef _DEBUG_GW
+		click_chatter("Up path in reverse order (from TDC) upPath.hops = %d, downPath.hops = %d, upHop=%d, dwHop=%d\n",
 			upPath.hops, downPath.hops,upHop,dwHop);
 		#endif
         upPtr += OPAQUE_FIELD_SIZE;
@@ -639,8 +632,8 @@ uint16_t end2end_up_hops, uint16_t end2end_down_hops, uint8_t end2end_path_type,
 			else //TDC AD
 				pOF->type = (0x20 | (pOF->type & 0x0f));       
             
-			#ifdef _SL_DEBUG_GW
-			printf("AD%llu =>",mrkPtr->aid);
+			#ifdef _DEBUG_GW
+			click_chatter("AD%llu =>",mrkPtr->aid);
 			#endif
 			offset -= OPAQUE_FIELD_SIZE;
             upPtr += mrkPtr->blkSize;
@@ -649,8 +642,8 @@ uint16_t end2end_up_hops, uint16_t end2end_down_hops, uint8_t end2end_path_type,
 
 		//Down-path
         //1.3 building opaque field list for the down path
-		#ifdef _SL_DEBUG_GW
-		printf("Down path in order (from TDC)...\n");
+		#ifdef _DEBUG_GW
+		click_chatter("Down path in order (from TDC)...\n");
 		#endif
         offset = ((upHop+2)*OPAQUE_FIELD_SIZE);
 
@@ -685,8 +678,8 @@ uint16_t end2end_up_hops, uint16_t end2end_down_hops, uint8_t end2end_path_type,
 			else //TDC AD
 				pOF->type = (0x20 | (pOF->type & 0x0f));       
 
-			#ifdef _SL_DEBUG_GW
-			printf("AD%llu =>",mrkPtr->aid);
+			#ifdef _DEBUG_GW
+			click_chatter("AD%llu =>",mrkPtr->aid);
 			#endif
             offset += OPAQUE_FIELD_SIZE;
             dwPtr += mrkPtr->blkSize;
@@ -697,15 +690,15 @@ uint16_t end2end_up_hops, uint16_t end2end_down_hops, uint8_t end2end_path_type,
         endpath.opaque_field = new uint8_t[endpath.length];
         
 		memcpy(endpath.opaque_field, e2ePath, endpath.length);
-		#ifdef _SL_DEBUG_GW
-		printf("\nPath construction is done\n");
+		#ifdef _DEBUG_GW
+		click_chatter("\nPath construction is done\n");
 		#endif
     }
 
 	//2. path through a peering link
     if (end2end_path_type == PATH_TYPE_PEER) { //peer
-		#ifdef _SL_DEBUG_GW
-		printf("\nConstruct a peering path\n");
+		#ifdef _DEBUG_GW
+		click_chatter("\nConstruct a peering path\n");
 		#endif
     	up_length = (upHop+3) * OPAQUE_FIELD_SIZE; //add OFs for a special OF, itself (to TDC) and upstream AD
     	down_length = (dwHop+3) * OPAQUE_FIELD_SIZE; //add OFs for a special OF, peer AD (to TDC) and upstream AD
@@ -729,8 +722,8 @@ uint16_t end2end_up_hops, uint16_t end2end_down_hops, uint8_t end2end_path_type,
         //building opaque field list for the up path
         uint16_t offset = (upHop+2)*OPAQUE_FIELD_SIZE;
 		opaqueField * pOF;
-		#ifdef _SL_DEBUG_GW
-		printf("Up path in reverse order (from TDC)...\n");
+		#ifdef _DEBUG_GW
+		click_chatter("Up path in reverse order (from TDC)...\n");
 		#endif
 
         for(int i=0;i<upPath.hops;i++){
@@ -746,8 +739,8 @@ uint16_t end2end_up_hops, uint16_t end2end_down_hops, uint8_t end2end_path_type,
                 uint16_t num_peers = (mrkPtr->blkSize-PCB_MARKING_SIZE)/PEER_MARKING_SIZE;
                 for(int j=0;j<num_peers;j++){
                     if(peerPtr->aid == dwAD) { // take the first that meets the need
-						#ifdef _SL_DEBUG_GW
-						printf("Finding peer in UP: ingress IF = %d, egress IF = %d\n", 
+						#ifdef _DEBUG_GW
+						click_chatter("Finding peer in UP: ingress IF = %d, egress IF = %d\n", 
 							peerPtr->ingressIf, peerPtr->egressIf);
 						#endif
                         //add peer link
@@ -778,8 +771,8 @@ uint16_t end2end_up_hops, uint16_t end2end_down_hops, uint8_t end2end_path_type,
 			else //TDC AD
 				pOF->type = (0x20 | (pOF->type & 0x0f));       
             
-			#ifdef _SL_DEBUG_GW
-			printf("AD%llu =>",mrkPtr->aid);
+			#ifdef _DEBUG_GW
+			click_chatter("AD%llu =>",mrkPtr->aid);
 			#endif
 			offset -= OPAQUE_FIELD_SIZE;
             upPtr += mrkPtr->blkSize;
@@ -788,8 +781,8 @@ uint16_t end2end_up_hops, uint16_t end2end_down_hops, uint8_t end2end_path_type,
 
 		//2.3 Downpath
         //adding down path opaque field 
-		#ifdef _SL_DEBUG_GW
-		printf("Down path in order (from TDC)...\n");
+		#ifdef _DEBUG_GW
+		click_chatter("Down path in order (from TDC)...\n");
 		#endif
         offset = ((upHop+3)*OPAQUE_FIELD_SIZE);
     	
@@ -816,8 +809,8 @@ uint16_t end2end_up_hops, uint16_t end2end_down_hops, uint8_t end2end_path_type,
                   peerMarking* peerPtr = (peerMarking*)(dwPtr+PCB_MARKING_SIZE);
                   uint16_t num_peer = (mrkPtr->blkSize-PCB_MARKING_SIZE)/PEER_MARKING_SIZE;
                   for(int j=0;j<num_peer;j++) {
-						#ifdef _SL_DEBUG_GW
-						printf("Finding peer in DN: ingress IF = %d, egress IF = %d\n", 
+						#ifdef _DEBUG_GW
+						click_chatter("Finding peer in DN: ingress IF = %d, egress IF = %d\n", 
 							peerPtr->ingressIf, peerPtr->egressIf);
 						#endif
                       if(peerPtr->aid==upAD && peerPtr->ingressIf==peer_down_path_ingressIf
@@ -828,8 +821,8 @@ uint16_t end2end_up_hops, uint16_t end2end_down_hops, uint8_t end2end_path_type,
                         	pOF->egressIf = mrkPtr->egressIf;
                         	pOF->mac = peerPtr->mac;
                           	offset+=OPAQUE_FIELD_SIZE;
-							#ifdef _SL_DEBUG_GW
-							printf("Peer info: ingress IF = %d, egress IF = %d\n", 
+							#ifdef _DEBUG_GW
+							click_chatter("Peer info: ingress IF = %d, egress IF = %d\n", 
 								pOF->ingressIf, pOF->egressIf);
 							#endif
                           	break;
@@ -851,8 +844,8 @@ uint16_t end2end_up_hops, uint16_t end2end_down_hops, uint8_t end2end_path_type,
 			else //TDC AD
 				pOF->type = (0x20 | (pOF->type & 0x0f));       
             
-			#ifdef _SL_DEBUG_GW
-			printf("AD%llu =>",mrkPtr->aid);
+			#ifdef _DEBUG_GW
+			click_chatter("AD%llu =>",mrkPtr->aid);
 			#endif
 			offset += OPAQUE_FIELD_SIZE;
             dwPtr += mrkPtr->blkSize;
@@ -862,8 +855,8 @@ uint16_t end2end_up_hops, uint16_t end2end_down_hops, uint8_t end2end_path_type,
         endpath.opaque_field = new uint8_t[endpath.length];
         
 		memcpy(endpath.opaque_field, e2ePath, endpath.length);
-		#ifdef _SL_DEBUG_GW
-		printf("Path construction is done\n");
+		#ifdef _DEBUG_GW
+		click_chatter("Path construction is done\n");
 		#endif
     }
 }
@@ -905,9 +898,8 @@ SCIONPathInfo::getCorePath(halfPath& down_path, halfPath& up_path, fullPath& end
     //get opaque field for the up path and put them into the new packet 
 	//SL: add special opaque field first...
 
-	#ifdef _SL_DEBUG_GW
-	printf("End-to-end Path:\n");
-	printf("[Up-path] ");
+	#ifdef _DEBUG_GW
+	click_chatter("End-to-end Path:\n[Up-path] ");
 	#endif
     for (int i = 0; i < upHop; i++){
         opaqueField * pOF = (opaqueField *) (e2ePath + offset);
@@ -918,8 +910,8 @@ SCIONPathInfo::getCorePath(halfPath& down_path, halfPath& up_path, fullPath& end
         pOF->egressIf = mrkPtr->egressIf;
 		//pOF->exp = mrkPtr->exp;
         pOF->mac = mrkPtr->mac;
-		#ifdef _SL_DEBUG_GW
-		printf("(%d | %d) => ",pOF->ingressIf, pOF->egressIf);
+		#ifdef _DEBUG_GW
+		click_chatter("(%d | %d) => ",pOF->ingressIf, pOF->egressIf);
 		#endif
  		//SL: type should be set with a function....
 		
@@ -952,8 +944,8 @@ SCIONPathInfo::getCorePath(halfPath& down_path, halfPath& up_path, fullPath& end
 
     //get opaque field for the down path and put them into the new packet
     mrkPtr = (pcbMarking*)dwPtr;
-	#ifdef _SL_DEBUG_GW
-	printf("\n[Down-path] ");
+	#ifdef _DEBUG_GW
+	click_chatter("\n[Down-path] ");
 	#endif
     for (int i = 0; i < dwHop; i++){
         opaqueField * pOF = (opaqueField *) (e2ePath + offset);
@@ -962,8 +954,8 @@ SCIONPathInfo::getCorePath(halfPath& down_path, halfPath& up_path, fullPath& end
         pOF->egressIf = mrkPtr->egressIf;
 		//pOF->exp = mrkPtr->exp;
         pOF->mac = mrkPtr->mac;
-		#ifdef _SL_DEBUG_GW
-		printf("(%d | %d) => ",pOF->ingressIf, pOF->egressIf);
+		#ifdef _DEBUG_GW
+		click_chatter("(%d | %d) => ",pOF->ingressIf, pOF->egressIf);
 		#endif
 		//SL: type should be set with a function....
 		if(i) //ADs on the downpath
@@ -975,8 +967,8 @@ SCIONPathInfo::getCorePath(halfPath& down_path, halfPath& up_path, fullPath& end
         dwPtr += mrkPtr->blkSize;
         mrkPtr = (pcbMarking*) dwPtr;       
 	}
-	#ifdef _SL_DEBUG_GW
-	printf(" : end\n");
+	#ifdef _DEBUG_GW
+	click_chatter(" : end\n");
 	#endif
 
     endpath.length = up_length + down_length;
@@ -993,8 +985,8 @@ SCIONPathInfo::storeOpaqueField(HostAddr &addr, fullPath &of) {
 
 	//1. reverse the opaque fields to construct a reverse path
 	if(reverseOpaqueField(of) == SCION_FAILURE) {
-		#if SL_DEBUG_GW
-		printf("Failure in reverting Opaque Field\n");
+		#ifdef _DEBUG_GW
+		click_chatter("Failure in reverting Opaque Field\n");
 		#endif
 		return SCION_FAILURE;
 	}

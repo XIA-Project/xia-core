@@ -154,6 +154,7 @@ void SCIONPathServerCore::parsePathReq(uint8_t* pkt){
     
     uint8_t srcLen = SPH::getSrcLen(pkt);
     uint8_t dstLen = SPH::getDstLen(pkt);
+    
 
     //path look up to send to the local path server
     std::multimap<uint64_t, std::multimap<uint32_t, path> >::iterator itr;
@@ -170,7 +171,7 @@ void SCIONPathServerCore::parsePathReq(uint8_t* pkt){
             for(itr2=itr->second.begin();itr2!=itr->second.end();itr2++){
 
                 uint16_t pathContentLength = itr2->second.pathLength;
-                uint16_t newPacketLength = hdrLen + pathContentLength;
+                uint16_t newPacketLength = hdrLen + sizeof(pathInfo) + pathContentLength;
                 uint8_t newPacket[newPacketLength];
                 memset(newPacket, 0, newPacketLength);
                 
@@ -189,26 +190,23 @@ void SCIONPathServerCore::parsePathReq(uint8_t* pkt){
                 pathReply->totalLength = pathContentLength;
                 pathReply->numHop = itr2->second.hops;
                 pathReply->option = 0;
-                memcpy(newPacket+hdrLen, itr2->second.msg, pathContentLength);
-
-                char adbuf[40];
-                snprintf(adbuf, 40, "%040lu", requester.numAddr());
+                memcpy(newPacket+hdrLen+sizeof(pathInfo), itr2->second.msg, pathContentLength);
                 
-                char hidbuf[40];
+                char hidbuf[AIP_SIZE+1];
                 requester.getAIPAddr((uint8_t*)hidbuf);
-
+                hidbuf[AIP_SIZE] = '\0';
+                
                 string dest = "RE ";
                 dest.append(BHID);
                 dest.append(" ");
+                // hard code AD here
                 dest.append("AD:");
-                dest.append(adbuf);
+                dest.append((const char*)"0000000000000000000000000000000000000003");
                 dest.append(" ");
                 dest.append("HID:");
                 dest.append(hidbuf);
-                
-                scionPrinter->printLog(IH, (char*)"dest = %s\n", dest.c_str());
 
-                //sendPacket(newPacket, newPacketLength, dest);
+                sendPacket(newPacket, newPacketLength, dest);
             }
         }
     }

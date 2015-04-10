@@ -100,10 +100,14 @@ void SCIONEncap::push(int port, Packet *p) {
     if (type == UP_PATH || type == PATH_REP_LOCAL) {
         
         if (type == UP_PATH) {
+            #ifdef _DEBUG_GW
 			click_chatter("GW (%lu:%lu): uppath received.\n", m_uAdAid, m_uAid);
+			#endif
 			_path_info->parse(packet, 0);
         } else {
+            #ifdef _DEBUG_GW
 			click_chatter("GW (%lu:%lu): downpath received.\n", m_uAdAid, m_uAid);
+			#endif
 			_path_info->parse(packet, 1);
         }
             
@@ -144,20 +148,20 @@ void SCIONEncap::run_timer(Timer* timer)
         //_path_info->clearUpPaths();
         //_path_info->clearDownPaths();
         m_bClearReversePath = true; //clear paths
-        
+
         // retrieve a path, send a path request
         uint16_t length = COMMON_HEADER_SIZE + AIP_SIZE*2 + PATH_INFO_SIZE;
         uint8_t packet[length];
         memset(packet, 0, length);
-        
+
         scionHeader hdr;
-        hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)strchr(m_HID.c_str(),':'));
+        hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)(strchr(m_HID.c_str(),':')+1));
         hdr.dst = HostAddr(HOST_ADDR_AIP, (uint8_t*)(m_servers.find(PathServer)->second.HID));
         hdr.cmn.type = PATH_REQ_LOCAL;
-        //hdr.cmn.hdrLen = COMMON_HEADER_SIZE + hdr.src.getLength() + hdr.dst.getLength();
+        hdr.cmn.hdrLen = COMMON_HEADER_SIZE + AIP_SIZE*2;
         hdr.cmn.totalLen = length;
         SPH::setHeader(packet,hdr);
-        
+
         pathInfo* pathInformation = (pathInfo*)(packet + COMMON_HEADER_SIZE + AIP_SIZE*2);
         pathInformation->target = 3; 
         // TODO currently hardcoded to AD3 to test path resolution
@@ -171,7 +175,7 @@ void SCIONEncap::run_timer(Timer* timer)
         dest.append(" ");
         dest.append("HID:");
         dest.append((const char*)m_servers.find(PathServer)->second.HID);
-        
+
         sendPacket(packet, length, dest);
     
     }else{
