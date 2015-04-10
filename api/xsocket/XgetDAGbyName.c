@@ -471,6 +471,14 @@ int Xgetsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 
 	xia::X_GetSockname_Msg *msg = xsm.mutable_x_getsockname();
 
+	if (strcmp(msg->dag().c_str(), "RE (invalid)") == 0) {
+
+		// socket is not initialized yet
+		// FIXME: can we do a better return here?
+		errno = EBADF;
+		return -1;
+	}
+
 	Graph g(msg->dag().c_str());
 
 	g.fill_sockaddr((sockaddr_x*)addr);
