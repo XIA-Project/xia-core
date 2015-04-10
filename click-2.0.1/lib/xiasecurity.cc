@@ -362,6 +362,13 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
 	char *privfilepath = NULL;
 	int retval = -1;        // Return failure by default. 0 == success
 	int state = 0;
+	unsigned char *sig_buf = NULL;
+	unsigned int sig_len = 0;
+	int rc;
+	RSA *rsa;
+	uint8_t digest[SHA_DIGEST_LENGTH];
+	char hex_digest[XIA_SHA_DIGEST_STR_LEN];
+	FILE *fp;
 
 	// Find the directory where keys are stored
 	const char *keydir = get_keydir();
@@ -381,30 +388,26 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
 	sprintf(privfilepath, "%s/%s", keydir, privkeyhash);
 
 	// Calculate SHA1 hash of given data
-    uint8_t digest[SHA_DIGEST_LENGTH];
 	xs_getSHA1Hash(data, datalen, digest, sizeof digest);
 
 	// Print the SHA1 hash in human readable form
-    char hex_digest[XIA_SHA_DIGEST_STR_LEN];
 	xs_hexDigest(digest, sizeof digest, hex_digest, sizeof hex_digest);
     xs_chatter("xs_sign: Hash of given data: %s", hex_digest);
 
     // Encrypt the SHA1 hash with private key
     xs_chatter("xs_sign: Signing with private key from: %s", privfilepath);
-    FILE *fp = fopen(privfilepath, "r");
+    fp = fopen(privfilepath, "r");
 	if(fp == NULL) {
 		xs_chatter("xs_sign: ERROR opening private kep file: %s", privfilepath);
 		goto xs_sign_done;
 	}
 	state = 2;
-    RSA *rsa = PEM_read_RSAPrivateKey(fp,NULL,NULL,NULL);
+    rsa = PEM_read_RSAPrivateKey(fp,NULL,NULL,NULL);
     if(rsa==NULL) {
         xs_chatter("xs_sign: ERROR reading private key:%s:", privfilepath);
 		goto xs_sign_done;
 	}
 
-    unsigned char *sig_buf = NULL;
-    unsigned int sig_len = 0;
 	assert(*siglen >= RSA_size(rsa));
     sig_buf = (unsigned char*)calloc(RSA_size(rsa), 1);
 	if(!sig_buf) {
@@ -414,10 +417,10 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
 	state = 3;
 
     //int rc = RSA_sign(NID_sha1, digest, sizeof digest, sig_buf, &sig_len, rsa);
-    int rc = RSA_sign(NID_sha1, digest, sizeof digest, sig_buf, &sig_len, rsa);
+    rc = RSA_sign(NID_sha1, digest, sizeof digest, sig_buf, &sig_len, rsa);
 	if(rc != 1) {
 		xs_chatter("xs_sign: RSA_sign failed");
-		goto xs_sign_done
+		goto xs_sign_done;
 	}
     xs_chatter("xs_sign: signature length: %d", sig_len);
 
