@@ -39,7 +39,7 @@
 #include "topo_parser.hh"
 #include "config.hh"
 #include "scionprint.hh"
-#include "scionipencap.hh"
+//#include "scionipencap.hh"
 
 /**
     @brief UP path struct.
@@ -508,10 +508,6 @@ class SCIONPathServer : public Element {
         /** SCION printer for logging */
         SCIONPrint* scionPrinter;
 
-        /**
-            SCION encap element for IP tunneling.
-        */
-		SCIONIPEncap * m_pIPEncap;
         /**
             Port information for IP tunneling that contains address type and
             address of each interface.

@@ -120,16 +120,10 @@ void SCIONPathServerCore::push(int port, Packet *p) {
     uint16_t type = SPH::getType(s_pkt);
     uint16_t packetLength = SPH::getTotalLen(s_pkt);
     uint8_t packet[packetLength];
-
     memset(packet, 0, packetLength);
     memcpy(packet, s_pkt, packetLength);
     p->kill();
 
-    // TODO: copy logic from run_task
-    // variables needed to print log
-    HostAddr src = SPH::getSrcAddr(packet);
-    uint32_t ts = 0; //SPH::getUpTimestamp(packet);
-    
     if(type==PATH_REG){
         
         #ifdef _DEBUG_PS
@@ -155,36 +149,11 @@ void SCIONPathServerCore::parsePathReq(uint8_t* pkt){
 
     uint8_t hdrLen = SPH::getHdrLen(pkt);
     pathInfo* pi = (pathInfo*)(pkt+hdrLen);
-
-    uint8_t srcLen = SPH::getSrcLen(pkt);
-    uint8_t dstLen = SPH::getDstLen(pkt);
-    specialOpaqueField* sOF =
-    (specialOpaqueField*)(pkt+COMMON_HEADER_SIZE+srcLen+dstLen);
-
-    uint8_t hops = sOF->hops;
-    uint16_t pathLength = (hops+1)*OPAQUE_FIELD_SIZE;
     uint64_t target = pi->target;
     HostAddr requester = SPH::getSrcAddr(pkt);
     
-    //reversing the up path to get the down path
-    uint8_t revPath[pathLength];
-    memset(revPath, 0, pathLength);
-    reversePath(pkt+COMMON_HEADER_SIZE+srcLen+dstLen, revPath, hops);
-    
-    uint8_t* ptr = revPath+OPAQUE_FIELD_SIZE;
-    opaqueField* hopPtr = (opaqueField*)ptr;
-    
-    #ifdef _DEBUG_PS
-    for(int i=0;i<hops;i++){
-        scionPrinter->printLog(IH, (char*)"ingress : %lu, egress: %lu\n", 
-            hopPtr->ingressIf, hopPtr->egressIf);
-        ptr+=OPAQUE_FIELD_SIZE;
-        hopPtr = (opaqueField*)ptr;
-    }
-    #endif
-
-    uint16_t interface = ((opaqueField*)(revPath+OPAQUE_FIELD_SIZE))->egressIf;
-    int packetLength = COMMON_HEADER_SIZE+pathLength+srcLen+dstLen+PATH_INFO_SIZE; //PATH_REQ packet len.
+    uint8_t srcLen = SPH::getSrcLen(pkt);
+    uint8_t dstLen = SPH::getDstLen(pkt);
 
     //path look up to send to the local path server
     std::multimap<uint64_t, std::multimap<uint32_t, path> >::iterator itr;
@@ -193,47 +162,40 @@ void SCIONPathServerCore::parsePathReq(uint8_t* pkt){
         //when the target is found
         if(itr->first == target){
             std::multimap<uint32_t, path>::iterator itr2;
-            //adds necessary information to the packet
             #ifdef _DEBUG_PS
-            scionPrinter->printLog(IH, (char*)"TDC PS: AD%lu -- #of Registered Paths: %lu\n", target, itr->second.size());
+            scionPrinter->printLog(IH, (char*)"TDC PS: AD%lu -- # of Registered Paths: %lu\n", 
+                target, itr->second.size());
             #endif
                 
             for(itr2=itr->second.begin();itr2!=itr->second.end();itr2++){
 
                 uint16_t pathContentLength = itr2->second.pathLength;
-                uint16_t newPacketLength = packetLength + pathContentLength;
+                uint16_t newPacketLength = hdrLen + pathContentLength;
                 uint8_t newPacket[newPacketLength];
-                    
-                //1. Set Src/Dest addresses to the requester
-                HostAddr srcAddr = HostAddr(HOST_ADDR_SCION, m_uAdAid);
-                memcpy(newPacket, pkt, COMMON_HEADER_SIZE);
+                memset(newPacket, 0, newPacketLength);
                 
-                //set packet header
-                SPH::setType(newPacket, PATH_REP);
-                SPH::setSrcAddr(newPacket, srcAddr);
-                SPH::setDstAddr(newPacket,ifid2addr.find(interface)->second);
-                    
-                SPH::setHdrLen(newPacket, packetLength-PATH_INFO_SIZE);
-                SPH::setTotalLen(newPacket,newPacketLength);
-                //SLT: this part (setting current OF) needs to be revised...
-                SPH::setCurrOFPtr(newPacket,SCION_ADDR_SIZE*2);
-                SPH::setDownpathFlag(newPacket);
-                //SL: set downpath flag modified...
-                    
-                //2. Opaque field to the requester AD is copied
-                memcpy(newPacket+COMMON_HEADER_SIZE+srcLen+dstLen,revPath,(hops+1)*OPAQUE_FIELD_SIZE); 
+                //1. Set Src/Dest addresses to the requester
+                scionHeader hdr;
+                hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)(strchr(m_HID.c_str(),':')+1));
+                hdr.dst = requester;
+                hdr.cmn.type = PATH_REP;
+                hdr.cmn.totalLen = newPacketLength;
+                SPH::setHeader(newPacket, hdr);
                     
                 //fill in the path info
-                pathInfo* pathReply = (pathInfo*)(newPacket+packetLength-PATH_INFO_SIZE);
+                pathInfo* pathReply = (pathInfo*)(newPacket+hdrLen);
                 pathReply->target = target;
                 pathReply->timestamp = itr2->first;
                 pathReply->totalLength = pathContentLength;
                 pathReply->numHop = itr2->second.hops;
                 pathReply->option = 0;
-                memcpy(newPacket+packetLength,itr2->second.msg,pathContentLength);
+                memcpy(newPacket+hdrLen, itr2->second.msg, pathContentLength);
 
-                char adbuf[41];
-                snprintf(adbuf, 41, "%040lu", requester.numAddr());
+                char adbuf[40];
+                snprintf(adbuf, 40, "%040lu", requester.numAddr());
+                
+                char hidbuf[40];
+                requester.getAIPAddr((uint8_t*)hidbuf);
 
                 string dest = "RE ";
                 dest.append(BHID);
@@ -242,13 +204,11 @@ void SCIONPathServerCore::parsePathReq(uint8_t* pkt){
                 dest.append(adbuf);
                 dest.append(" ");
                 dest.append("HID:");
-                dest.append((const char*)"0000000000000000000000000000000000100000");
+                dest.append(hidbuf);
+                
+                scionPrinter->printLog(IH, (char*)"dest = %s\n", dest.c_str());
 
-                printf("DEST=%s\n", dest.c_str());
-
-                // sends reply
-                // sendPacket(newPacket, newPacketLength, dest);
-                    
+                //sendPacket(newPacket, newPacketLength, dest);
             }
         }
     }

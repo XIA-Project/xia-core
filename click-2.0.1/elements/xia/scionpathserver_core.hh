@@ -35,7 +35,7 @@
 #include "topo_parser.hh"
 #include "config.hh"
 #include "scionpathserver.hh"
-#include "scionipencap.hh"
+//#include "scionipencap.hh"
 
 CLICK_DECLS
 
@@ -199,10 +199,6 @@ class SCIONPathServerCore : public Element {
         */
         std::multimap<int, RouterElem> m_routers;
 
-        /**
-            SCION encap element for IP tunneling.
-        */
-		SCIONIPEncap * m_pIPEncap;
         /**
             Port information for IP tunneling that contains address type and
             address of each interface.

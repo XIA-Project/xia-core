@@ -329,7 +329,7 @@ bool SCIONBeaconServerCore::generateNewPCB() {
     hdr.cmn.hdrLen = hdrLen;
     // Two opaque fields are used by TDC AD
     hdr.cmn.totalLen = hdrLen+OPAQUE_FIELD_SIZE*2;
-    hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)strchr(m_HID.c_str(),':'));
+    hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)(strchr(m_HID.c_str(),':')+1));
     hdr.dst = HostAddr(HOST_ADDR_AIP, (uint8_t*)"");
     SPH::setHeader(buf, hdr);
      
@@ -456,7 +456,7 @@ void SCIONBeaconServerCore::run_timer(Timer *){
     	    hdr.cmn.type = ROT_REQ_LOCAL;
     	    hdr.cmn.hdrLen = hdrLen;
     	    hdr.cmn.totalLen = totalLen;
-    	    hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)strchr(m_HID.c_str(),':'));
+    	    hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)(strchr(m_HID.c_str(),':')+1));
     	    hdr.dst = HostAddr(HOST_ADDR_AIP, (uint8_t*)(m_servers.find(CertificateServer)->second.HID));
     	    SPH::setHeader(packet, hdr);
     	    

@@ -37,7 +37,7 @@
 #include "config.hh"
 #include "rot_parser.hh"
 #include "define.hh"
-#include "scionipencap.hh"
+//#include "scionipencap.hh"
 
 
 CLICK_DECLS

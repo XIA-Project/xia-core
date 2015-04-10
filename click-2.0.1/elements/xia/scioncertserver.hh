@@ -37,7 +37,7 @@
 #include "topo_parser.hh"
 #include "config.hh"
 #include "scionprint.hh"
-#include "scionipencap.hh"
+//#include "scionipencap.hh"
 
 CLICK_DECLS
 
@@ -394,10 +394,7 @@ class SCIONCertServer : public Element {
         std::multimap<int, GatewayElem> m_gateways;         
         /////////////////////////////////////////////////////////////////////
         std::map<uint16_t, HostAddr> ifid2addr;
-        /**
-            SCION encap element for IP tunneling.
-        */
-        SCIONIPEncap * m_pIPEncap;
+
         /**
             Port information for IP tunneling that contains address type and
             address of each interface.

@@ -56,7 +56,7 @@ int SCIONBeaconServer::configure(Vector<String> &conf, ErrorHandler *errh){
         "CONFIG_FILE", cpkM, cpString, &m_sConfigFile,
         "TOPOLOGY_FILE", cpkM, cpString, &m_sTopologyFile,
         cpEnd) <0){
-            click_chatter("atal error: click configuration fail at SCIONBeaconServer.\n");
+            click_chatter("Fatal error: click configuration fail at SCIONBeaconServer.\n");
             exit(-1);
     }
 
@@ -392,7 +392,7 @@ void SCIONBeaconServer::requestROT(uint32_t version) {
 	    hdr.cmn.type = ROT_REQ_LOCAL;
 	    hdr.cmn.hdrLen = hdrLen;
 	    hdr.cmn.totalLen = totalLen;
-	    hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)strchr(m_HID.c_str(),':'));
+	    hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)(strchr(m_HID.c_str(),':')+1));
 	    hdr.dst = HostAddr(HOST_ADDR_AIP, (uint8_t*)(m_servers.find(CertificateServer)->second.HID));
 	    SPH::setHeader(packet, hdr);
 
@@ -433,6 +433,7 @@ void SCIONBeaconServer::saveROT(SPacket * packet, uint16_t packetLength) {
     SPH::getHdrLen(packet);
     ROTRequest *req = (ROTRequest *)SPH::getData(packet);
     int curver = (int)req->currentVersion;
+
     #ifdef _DEBUG_BS
     scionPrinter->printLog(IH, SPH::getType(packet), (char *)"ROT Replay cV = %d, pV = %lu\n", 
         curver, m_cROT.version);
@@ -477,12 +478,13 @@ void SCIONBeaconServer::saveROT(SPacket * packet, uint16_t packetLength) {
     }
 }
 
-void SCIONBeaconServer::processPCB(SPacket * packet, uint16_t packetLength){
+void SCIONBeaconServer::processPCB(uint8_t* packet, uint16_t packetLength){
 
 	uint8_t srcLen = SPH::getSrcLen(packet);
 	uint8_t dstLen = SPH::getDstLen(packet);
 	uint32_t ts = SPH::getTimestamp(packet);
 	HostAddr srcAddr = SPH::getSrcAddr(packet);
+	HostAddr dstAddr = SPH::getDstAddr(packet);
 	
 	//PCB verification
 	if(!verifyPcb(packet)){
@@ -540,7 +542,7 @@ void SCIONBeaconServer::processPCB(SPacket * packet, uint16_t packetLength){
 			hdr.cmn.type = UP_PATH;
 			hdr.cmn.hdrLen = hdrLen;
 			hdr.cmn.totalLen = hdrLen+pathLength;
-			hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)strchr(m_HID.c_str(),':'));
+			hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)(strchr(m_HID.c_str(),':')+1));
 			
 			// send this packet to all path servers
 			for(it=pathServerRange.first; it!=pathServerRange.second; it++) { 
@@ -557,8 +559,9 @@ void SCIONBeaconServer::processPCB(SPacket * packet, uint16_t packetLength){
 				dest.append((const char*)it->second.HID);
 				
 				#ifdef _DEBUG_BS
-				scionPrinter->printLog(IH, (char *)"Sending Up-Path control packet to local PS.\n");
+				scionPrinter->printLog(IH, (char *)"Sending Up-Path packet to local PS.\n");
 				#endif
+				
 				sendPacket(newPacket, packetLength, dest);
 			}
 			
@@ -817,7 +820,7 @@ int SCIONBeaconServer::registerPath(pcb &rpcb){
 	hdr.cmn.hdrLen = hdrLen;
 	hdr.cmn.totalLen = newPacketLength;
 	//set src/dst addresses
-	hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)strchr(m_HID.c_str(),':'));
+	hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)(strchr(m_HID.c_str(),':')+1));
 	hdr.dst = HostAddr(HOST_ADDR_AIP, (uint8_t*)(m_servers.find(PathServer)->second.HID));
 	SPH::setHeader(newPacket, hdr);
 	memcpy(newPacket+hdrLen, pathContent, pathContentLength);
@@ -1304,7 +1307,7 @@ void SCIONBeaconServer::requestForCert(SPacket* pkt){
 	    hdr.cmn.totalLen = packetLength;
 	    
 	    //set src/dst addresses
-	    hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)strchr(m_HID.c_str(),':'));
+	    hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)(strchr(m_HID.c_str(),':')+1));
 	    hdr.dst = HostAddr(HOST_ADDR_AIP, (uint8_t*)(m_servers.find(CertificateServer)->second.HID));
 	    
 	    //set opaque fields
@@ -1330,12 +1333,14 @@ void SCIONBeaconServer::requestForCert(SPacket* pkt){
     	sendPacket(newPacket, packetLength, dest);
 
         #ifdef _DEBUG_BS
-    	scionPrinter->printLog(EH, (char *)"BS (%s:%s): Request Certs to local CS (%s).\n", m_servers.find(CertificateServer)->second.HID);
+    	scionPrinter->printLog(EH, (char *)"BS (%s:%s): Request Certs to local CS (%s).\n", 
+    	    m_servers.find(CertificateServer)->second.HID);
         #endif
         
 	}else{
 	    #ifdef _DEBUG_BS
-    	scionPrinter->printLog(EH, (char*)"AD (%s) does not has cert server.\n", m_AD.c_str());
+    	scionPrinter->printLog(EH, (char*)"AD (%s) does not has cert server.\n", 
+    	    m_AD.c_str());
     	#endif 
 	}
 	

@@ -429,7 +429,7 @@ void SCIONCertServerCore::sendROT(){
 	    SPH::setTotalLen(rotPacket, totalLen);
 	    
 	    // fill address
-	    HostAddr srcAddr = HostAddr(HOST_ADDR_AIP, (uint8_t*)strchr(m_HID.c_str(),':')); 
+	    HostAddr srcAddr = HostAddr(HOST_ADDR_AIP, (uint8_t*)(strchr(m_HID.c_str(),':')+1)); 
 	    HostAddr dstAddr = HostAddr(HOST_ADDR_AIP, (uint8_t*)(m_servers.find(BeaconServer)->second.HID));
 			
 		SPH::setSrcAddr(rotPacket, srcAddr);

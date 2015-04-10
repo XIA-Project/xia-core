@@ -185,18 +185,12 @@ void SCIONPathServer::parseTopology(){
 void SCIONPathServer::push(int port, Packet *p)
 {
     TransportHeader thdr(p);
-    uint8_t * s_pkt = (uint8_t *) thdr.payload();
+    uint8_t *s_pkt = (uint8_t *) thdr.payload();
     uint16_t totalLength = SPH::getTotalLen(s_pkt);
     uint8_t packet[totalLength];
     memcpy(packet, s_pkt,totalLength);
     uint16_t type = SPH::getType(s_pkt);
     p->kill();
-    
-    //variables needed to print log
-    HostAddr src = SPH::getSrcAddr(packet);
-    HostAddr dst = SPH::getDstAddr(packet);
-    if(src == m_clients.begin()->second.addr) 
-        src = HostAddr(HOST_ADDR_SCION, m_uAdAid);
 
     switch(type) {
 		
@@ -211,7 +205,7 @@ void SCIONPathServer::push(int port, Packet *p)
 		
         // PATH_REP : path reply from the path server core
 		case PATH_REP: {
-		
+
 			uint8_t pathbuf[totalLength]; //for multiple packet transmissions.
 			uint8_t buf[totalLength]; //for multiple packet transmissions.
             uint8_t hdrLen = SPH::getHdrLen(packet);
@@ -220,13 +214,6 @@ void SCIONPathServer::push(int port, Packet *p)
 			#ifdef _DEBUG_PS
             scionPrinter->printLog(IH, type, (char*)"PATH_REP recieved for target AD %llu\n", pi->target);
 			#endif
-
-            specialOpaqueField* sOF =
-            (specialOpaqueField*)(packet+hdrLen+PATH_INFO_SIZE);
-            uint8_t numHops = sOF->hops;
-            uint8_t* ptr = packet+hdrLen+PATH_INFO_SIZE+OPAQUE_FIELD_SIZE;
-            pcbMarking* optr = (pcbMarking*)ptr;
-            HostAddr dstAddr;
 			
 			//Now, send reply to all clients in the pending request table
 			std::multimap<uint64_t,HostAddr>::iterator itr;
@@ -235,19 +222,17 @@ void SCIONPathServer::push(int port, Packet *p)
 			requesters = pendingDownpathReq.equal_range(pi->target);
 			
 			#ifdef _DEBUG_PS
-			scionPrinter->printLog(IH, (char*)"PS (%llu:%llu): Downpath reply to Clients: count = %d\n", 
+			scionPrinter->printLog(IH, (char*)"PS (%llu:%llu): Down-path reply to Clients: count = %d\n", 
 				m_uAid, m_uAdAid, pendingDownpathReq.count(pi->target));
 			#endif
 			
 			for(itr = requesters.first; itr != requesters.second; itr++) {
 				
+				// directly copy the path reply and forward it to client
 				memcpy(buf, packet, totalLength);
-				//SLP: seems unnecessary
-            	//parseDownPath(buf);        
+				
             	SPH::setType(buf, PATH_REP_LOCAL);
-			
-				HostAddr srcAddr = HostAddr(HOST_ADDR_SCION, m_uAid);
-            	SPH::setSrcAddr(buf, srcAddr);
+            	SPH::setSrcAddr(buf, HostAddr(HOST_ADDR_AIP, (uint8_t*)(strchr(m_HID.c_str(),':')+1)));
             	SPH::setDstAddr(buf, itr->second);
 				
 				#ifdef _DEBUG_PS
@@ -255,8 +240,8 @@ void SCIONPathServer::push(int port, Packet *p)
 					m_uAdAid, m_uAid, itr->second.numAddr());
 				#endif
 
-                char hidbuf[41];
-                snprintf(hidbuf, 41, "%040lu", itr->second.numAddr());
+                char hidbuf[40];
+                snprintf(hidbuf, 40, "%040lu", itr->second.numAddr());
 
                 string dest = "RE ";
                 dest.append(BHID);
@@ -266,12 +251,11 @@ void SCIONPathServer::push(int port, Packet *p)
                 dest.append("HID:");
                 dest.append(hidbuf);
 
-            	// sendPacket(buf, totalLength, dest);
+            	sendPacket(buf, totalLength, dest);
 			}
-			
 			pendingDownpathReq.erase(requesters.first, requesters.second);
-			break;
-        }
+		}
+		break;
         
 		// PATH_REQ_LOCAL: path request from client
 		case PATH_REQ_LOCAL: {
@@ -284,7 +268,7 @@ void SCIONPathServer::push(int port, Packet *p)
             HostAddr requestId = SPH::getSrcAddr(packet);
             
             #ifdef _DEBUG_PS
-			scionPrinter->printLog(IH,type,(char *)"PS (%llu:%llu): Request Downpath for Target AD: %llu\n", 
+			scionPrinter->printLog(IH,type,(char *)"PS (%llu:%llu): Request paths for Target AD: %llu\n", 
 				m_uAdAid, m_uAid, target);
 			#endif
             
@@ -292,8 +276,8 @@ void SCIONPathServer::push(int port, Packet *p)
             sendRequest(target, requestId);
             // for up-path
             sendUpPath(requestId);
-			break;
         }
+        break;
         
 		default: 
 			break;
@@ -344,13 +328,14 @@ int SCIONPathServer::sendRequest(uint64_t target, HostAddr requestAid) {
     uint16_t length = COMMON_HEADER_SIZE + AIP_SIZE*2 + PATH_INFO_SIZE;
     uint8_t packet[length];
     memset(packet, 0, length);
-        
+    
     scionHeader hdr;
-    hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)strchr(m_HID.c_str(),':'));
+    hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)(strchr(m_HID.c_str(),':')+1));
     hdr.dst = HostAddr(HOST_ADDR_AIP, (uint8_t*)(m_servers.find(PathServer)->second.HID));
     hdr.cmn.type = PATH_REQ;
+    hdr.cmn.hdrLen = COMMON_HEADER_SIZE + AIP_SIZE*2;
     hdr.cmn.totalLen = length;
-    SPH::setHeader(packet,hdr);
+    SPH::setHeader(packet, hdr);
         
     pathInfo* pathRequest = (pathInfo*)(packet + COMMON_HEADER_SIZE + AIP_SIZE*2);
     pathRequest->target = target; 
@@ -359,7 +344,6 @@ int SCIONPathServer::sendRequest(uint64_t target, HostAddr requestAid) {
 
     string dest = "RE ";
     dest.append(BHID);
-    dest.append(" ");
     // TODO: hardcoded TDC path server
     dest.append(" ");
     dest.append("AD:");
@@ -412,10 +396,8 @@ void SCIONPathServer::parseUpPath(uint8_t* pkt){
     memset(newUpPath, 0, sizeof(upPath));
     uint8_t headerLength = SPH::getHdrLen(pkt);
     uint8_t* ptr = pkt + headerLength + OPAQUE_FIELD_SIZE;
-    
 	// the first opaque field is a special opaque field for the timestamp
-    specialOpaqueField* sOF = (specialOpaqueField*)(pkt+headerLength);
-    uint16_t hops = sOF->hops;
+	uint8_t hops = SCIONBeaconLib::getNumHops(pkt);
 
     // extract pcb marking from the packet
     pcbMarking* mrkPtr = (pcbMarking*)ptr;
@@ -423,7 +405,8 @@ void SCIONPathServer::parseUpPath(uint8_t* pkt){
     // hop iteration
     for(int i=0;i<hops;i++){
         #ifdef _DEBUG_PS
-        scionPrinter->printLog(IH,(char *)"AID: %d INGRESS: %d EGRESS: %d\n", mrkPtr->aid, mrkPtr->ingressIf, mrkPtr->egressIf);
+        scionPrinter->printLog(IH,(char *)"AID: %d INGRESS: %d EGRESS: %d\n", 
+            mrkPtr->aid, mrkPtr->ingressIf, mrkPtr->egressIf);
         #endif
         newUpPath->path.push_back(mrkPtr->aid);
         uint8_t* ptr2=ptr+PCB_MARKING_SIZE;
@@ -475,6 +458,7 @@ void SCIONPathServer::parseUpPath(uint8_t* pkt){
         UPQueue* newQueue = new UPQueue(3);
         newQueue->enqueue(newUpPath);
         upPaths.insert(std::pair<scionHash, UPQueue*>(nhash, newQueue));
+        scionPrinter->printLog(IH,(char *)"upPaths.insert.\n");
     }
     else {
         #ifdef _DEBUG_PS
@@ -482,6 +466,8 @@ void SCIONPathServer::parseUpPath(uint8_t* pkt){
         #endif
         upPaths.find(nhash)->second->enqueue(newUpPath);
     }
+    
+    scionPrinter->printLog(IH, (char*)"parseUpPath done.\n");
 }
 
 
@@ -550,11 +536,11 @@ int SCIONPathServer::sendUpPath(HostAddr &requestId, uint32_t pref) {
         totalLength-hdrLen);
         
         SPH::setType(data, UP_PATH);
-        SPH::setSrcAddr(data, HostAddr(HOST_ADDR_AIP, (uint8_t*)strchr(m_HID.c_str(),':')));
+        SPH::setSrcAddr(data, HostAddr(HOST_ADDR_AIP, (uint8_t*)(strchr(m_HID.c_str(),':')+1)));
         SPH::setDstAddr(data, requestId);
         SPH::setTotalLen(data, totalLength+PATH_INFO_SIZE);
         
-        char hidbuf[41];
+        char hidbuf[40];
         requestId.getAIPAddr((uint8_t*)hidbuf);
 
         string dest = "RE ";
@@ -636,9 +622,9 @@ scionHash SCIONPathServer::createHash(uint8_t* pkt){
     uint8_t buf[outputSize];
     memset(buf, 0, outputSize);
     
-    pcbMarking* hopPtr = (pcbMarking*)(pkt+SCION_HEADER_SIZE);
+    pcbMarking* hopPtr = (pcbMarking*)(pkt+SPH::getHdrLen(pkt)+OPAQUE_FIELD_SIZE);
     
-    uint8_t* ptr = pkt+SCION_HEADER_SIZE;
+    uint8_t* ptr = pkt+SPH::getHdrLen(pkt)+OPAQUE_FIELD_SIZE;
     for(int i=0;i<hops;i++){
         *(uint64_t*)(buf+unit*i)=hopPtr->aid;
         *(uint16_t*)(buf+unit*i+sizeof(uint64_t)) = hopPtr->ingressIf;

@@ -131,21 +131,21 @@ int SCIONCertServer::parseROT(char* loc){
 		#endif
 		return SCION_FAILURE;
 	}
-	scionPrinter->printLog(IH, "Load ROT OK.\n");
+	scionPrinter->printLog(IH, (char*)"Load ROT OK.\n");
 
 	if(parser.parse(tROT)!=ROTParseNoError){
 	    #ifdef _DEBUG_CS
-		scionPrinter->printLog(EH, "ERR: ROT File parsing error at CS.\n");
+		scionPrinter->printLog(EH, (char*)"ERR: ROT File parsing error at CS.\n");
 		#endif
 		return SCION_FAILURE;
 	}
 	#ifdef _DEBUG_CS
-	scionPrinter->printLog(IH, "Parse ROT OK.\n");
+	scionPrinter->printLog(IH, (char*)"Parse ROT OK.\n");
 	#endif
 
 	if(parser.verifyROT(tROT)!=ROTParseNoError){
 	    #ifdef _DEBUG_CS
-		scionPrinter->printLog(EH, "ERR: ROT File parsing error at CS.\n");
+		scionPrinter->printLog(EH, (char*)"ERR: ROT File parsing error at CS.\n");
 		#endif
 		return SCION_FAILURE;
 	}
@@ -153,7 +153,7 @@ int SCIONCertServer::parseROT(char* loc){
 	//Store the ROT if verification passed.
 	parser.parse(m_ROT);
 	#ifdef _DEBUG_CS
-	scionPrinter->printLog(IH, "Verify ROT OK.\n");
+	scionPrinter->printLog(IH, (char*)"Verify ROT OK.\n");
 	#endif
 
 	// prepare ROT for delivery
@@ -175,7 +175,7 @@ int SCIONCertServer::parseROT(char* loc){
 	}
 	fclose(rotFile);
 	#ifdef _DEBUG_CS
-	scionPrinter->printLog(IH, "Stored Verified ROT for further delivery.\n");
+	scionPrinter->printLog(IH, (char*)"Stored Verified ROT for further delivery.\n");
 	#endif
 	return SCION_SUCCESS;
 }
@@ -302,7 +302,7 @@ void SCIONCertServer::sendROT(){
 	    SPH::setTotalLen(rotPacket, totalLen);
 	    
 	    // fill address
-	    HostAddr srcAddr = HostAddr(HOST_ADDR_AIP, (uint8_t*)strchr(m_HID.c_str(),':')); 
+	    HostAddr srcAddr = HostAddr(HOST_ADDR_AIP, (uint8_t*)(strchr(m_HID.c_str(),':')+1)); 
 	    HostAddr dstAddr = HostAddr(HOST_ADDR_AIP, (uint8_t*)(m_servers.find(BeaconServer)->second.HID));
 			
 		SPH::setSrcAddr(rotPacket, srcAddr);
@@ -332,7 +332,7 @@ void SCIONCertServer::sendROT(){
 void SCIONCertServer::processROTRequest(uint8_t * packet) {
 
 	#ifdef _DEBUG_CS
-	printf("CS (%llu:%llu): Received ROT_REQ request from downstream CS.\n", m_uAdAid, m_uAid);
+	scionPrinter->printLog(IH, (char*)"CS (%llu:%llu): Received ROT_REQ request from downstream CS.\n", m_uAdAid, m_uAid);
 	#endif
 
 	uint16_t hops = 0; 
@@ -395,7 +395,7 @@ void SCIONCertServer::processROTReply(uint8_t * packet) {
 	//otherwise, don't propagate. Possibly, a bogus ROT request...
 	//ToDo: should an error message be sent to Hosts and m_ROTRequesters cleared?
 	if(req->previousVersion == req->currentVersion) {
-		scionPrinter->printLog(EH, "The requested ROT does not exist.\n");
+		scionPrinter->printLog(EH, (char*)"The requested ROT does not exist.\n");
 		m_ROTRequests.clear();
 		return;
 	}
@@ -404,7 +404,7 @@ void SCIONCertServer::processROTReply(uint8_t * packet) {
 	char nFile[MAX_FILE_LEN];
 	memset(nFile, 0, MAX_FILE_LEN);
 	sprintf(nFile,"./TD1/Non-TDC/AD%llu/certserver/ROT/rot-td%llu-%d.xml", m_uAdAid, m_uTdAid, req->currentVersion);
-	scionPrinter->printLog(IH, "Update ROT file: %s\n", nFile);
+	scionPrinter->printLog(IH, (char*)"Update ROT file: %s\n", nFile);
 	
 	uint16_t packetLength = SPH::getTotalLen(packet);
 	uint16_t offset = SPH::getHdrLen(packet)+sizeof(ROTRequest);
@@ -434,7 +434,7 @@ void SCIONCertServer::processROTReply(uint8_t * packet) {
 		SPH::setSrcAddr(packet, HostAddr(HOST_ADDR_SCION,m_uAid));
 		SPH::setDstAddr(packet, itr->second);
 		#ifdef _SL_DEBUG_CS
-		printf("CS(%llu:%llu): ROT_REP_LOCAL to BS (%llu) \n",
+		scionPrinter->printLog(IH, (char*)"CS(%llu:%llu): ROT_REP_LOCAL to BS (%llu).\n",
 			m_uAdAid, m_uAid, itr->second.numAddr());
 		#endif
 
@@ -535,7 +535,7 @@ void SCIONCertServer::processCertificateRequest(uint8_t * packet) {
 }
 
 void SCIONCertServer::processCertificateReply(uint8_t * packet) {
-	printf("CS (%llu:%llu): Received CERT_REP request from upstream CS.\n", m_uAdAid, m_uAid);
+	scionPrinter->printLog(IH, (char*)"CS (%llu:%llu): Received CERT_REP request from upstream CS.\n", m_uAdAid, m_uAid);
 	//CERT_REP from upstream CS
 	//verify certificate
 	uint16_t hops = 0; 
@@ -572,7 +572,7 @@ void SCIONCertServer::processCertificateReply(uint8_t * packet) {
 			output(PORT_TO_SWITCH).push(outPacket);
 		}
 	}else{
-		printf("CS(%llu:%llu): certificate verification failed.\n", m_uAdAid, m_uAid);
+		scionPrinter->printLog(IH, (char*)"CS(%llu:%llu): certificate verification failed.\n", m_uAdAid, m_uAid);
 	}
 
 	uint16_t pathLength = SPH::getHdrLen(packet)-COMMON_HEADER_SIZE;
@@ -637,7 +637,7 @@ void SCIONCertServer::processLocalCertificateRequest(uint8_t * packet) {
 			hdr.cmn.totalLen = hdr.cmn.hdrLen+CERT_INFO_SIZE+cSize;
 			uint8_t certRepPkt[hdr.cmn.totalLen];
 			hdr.cmn.type = CERT_REP_LOCAL;
-			hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)strchr(m_HID.c_str(),':')); 
+			hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)(strchr(m_HID.c_str(),':')+1)); 
 			hdr.dst = HostAddr(HOST_ADDR_AIP, (uint8_t*)(m_servers.find(BeaconServer)->second.HID));
 			SPH::setHeader(certRepPkt,hdr);
 

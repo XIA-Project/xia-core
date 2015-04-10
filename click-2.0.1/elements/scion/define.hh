@@ -18,14 +18,6 @@
 #define CLICK_2_0_1_ELEMENTS_SCION_DEFINE_H_
 #endif
 
-/*
-#ifndef _SL_DEBUG
-#define _SL_DEBUG
-#endif
-#ifndef _SL_DEBUG_SW
-#define _SL_DEBUG_SW
-#endif
-*/
 
 #ifndef _DEBUG_BS
 #define _DEBUG_BS
@@ -34,27 +26,15 @@
 #ifndef _DEBUG_CS
 #define _DEBUG_CS
 #endif
+
 #ifndef _DEBUG_PS
 #define _DEBUG_PS
 #endif
 
-/*
-#ifndef _SL_DEBUG_BS
-#define _SL_DEBUG_BS
+#ifndef _DEBUG_GW
+#define _DEBUG_GW
 #endif
-#ifndef _SL_ROT_TEST
-#define _SL_ROT_TEST
-#endif
-#ifndef _SL_DEBUG_CS
-#define _SL_DEBUG_CS
-#endif
-#ifndef _SL_DEBUG_RT
-#define _SL_DEBUG_RT
-#endif
-#ifndef _SL_DEBUG_OF
-#define _SL_DEBUG_OF
-#endif
-*/
+
 
 #ifndef _DEFINE_HH_
 #define _DEFINE_HH_

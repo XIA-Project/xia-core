@@ -41,7 +41,7 @@
 #include "config.hh"
 #include "scionprint.hh"
 #include "define.hh"
-#include "scionipencap.hh"
+//#include "scionipencap.hh"
 
 
 CLICK_DECLS
@@ -621,11 +621,7 @@ class SCIONBeaconServer : public Element {
 		std::multimap<int, EgressIngressPair> m_routepairs;
 		
         SCIONPrint* scionPrinter;
-       
-        /** 
-		    SCION Encapsulator for IP tunneling
-        */
-		SCIONIPEncap * m_pIPEncap;
+
         /**
             Address type and address of each interface.
             Each interface is indexed by the assigned port #

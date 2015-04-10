@@ -37,15 +37,27 @@ HostAddr::HostAddr(uint8_t type, uint32_t addr) {
   memcpy(m_Addr, &addr, IPV4_SIZE);
 }
 
-HostAddr::HostAddr(uint8_t type, uint8_t * addr) {
+HostAddr::HostAddr(uint8_t type, uint8_t* addr) {
   setAddrType(type);
   int size;
-  if (type == HOST_ADDR_IPV6) {
-    size = IPV6_SIZE;
-  } else {
-    size = MAX_HOST_ADDR_SIZE;  // including AIP
+  switch (type) {
+    case HOST_ADDR_SCION:
+      size = SCION_ADDR_SIZE;
+      break;
+    case HOST_ADDR_IPV4:
+      size = IPV4_SIZE;
+      break;
+    case HOST_ADDR_IPV6:
+      size = IPV6_SIZE;
+      break;
+    case HOST_ADDR_AIP:
+      size = AIP_SIZE;
+      break;
+    default:
+      size = MAX_HOST_ADDR_SIZE;
+      break;
   }
-  memcpy(m_Addr, &addr, size);
+  memcpy(m_Addr, addr, size);
 }
 
 HostAddr::~HostAddr() {
