@@ -532,6 +532,7 @@ int accept(int fd, struct sockaddr *addr, socklen_t *addr_len)
 		}		
 
 	} else {
+		NOXIA();
 		rc = __real_accept(fd, addr, addr_len);
 	}
 	return rc;
@@ -558,6 +559,7 @@ int bind(int fd, const struct sockaddr *addr, socklen_t len)
 		rc = Xbind(fd, addr, len);
 
 	} else {
+		NOXIA();
 		rc = __real_bind(fd, addr, len);
 	}
 
@@ -588,6 +590,7 @@ int close(int fd)
 		rc = Xclose(fd);
 
 	} else {
+		NOXIA();
 		rc = __real_close(fd);
 	}
 	return rc;
@@ -615,6 +618,7 @@ int connect(int fd, const struct sockaddr *addr, socklen_t len)
 		rc= Xconnect(fd, (const sockaddr*)&sax, slen);
 
 	} else {
+		NOXIA();
 		rc = __real_connect(fd, addr, len);
 	}
 	return rc;
@@ -822,6 +826,7 @@ int getpeername(int fd, struct sockaddr *addr, socklen_t *len)
 		}
 
 	} else {
+		NOXIA();
 		return __real_getpeername(fd, addr, len);
 	}
 	return rc;
@@ -843,6 +848,7 @@ int getsockname(int fd, struct sockaddr *addr, socklen_t *len)
 			_GetIP(&sax, (sockaddr_in*)addr, NULL, 0);
 		}
 	} else {
+		NOXIA();
 		rc = __real_getsockname(fd, addr, len);
 	}
 	return rc;
@@ -861,6 +867,7 @@ int getsockopt(int fd, int level, int optname, void *optval, socklen_t *optlen)
 		}
 
 	} else {
+		NOXIA();
 		rc = __real_getsockopt(fd, level, optname, optval, optlen);
 	}
 	return rc;
@@ -896,6 +903,7 @@ int listen(int fd, int n)
 		return 0;
 
 	} else {
+		NOXIA();
 		return __real_listen(fd, n);
 	}
 }
@@ -905,7 +913,7 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
 	int rc;
 	TRACE();
 	// Let Xpoll do all the work of figuring out what fds we are handling
-	MSG("Xpoll: %d %d %08x\n", nfds, fds[0].fd, fds[0].events);
+	MSG("Xpoll: %zu %d %08x\n", nfds, fds[0].fd, fds[0].events);
 	rc = Xpoll(fds, nfds, timeout);
 	MSG("Xpoll returns %d %d %08x\n", rc, fds[0].fd, fds[0].revents);
 	return rc;
@@ -923,6 +931,7 @@ ssize_t read(int fd, void *buf, size_t count)
 		rc = Xrecv(fd, buf, count, 0);
 
 	} else {
+		NOXIA();
 		rc = __real_read(fd, buf, count);
 	}
 	return rc;
@@ -942,6 +951,7 @@ ssize_t recv(int fd, void *buf, size_t n, int flags)
 		MSG("%s\n", c);
 
 	} else {
+		NOXIA();
 		rc = __real_recv(fd, buf, n, flags);
 	}
 
@@ -979,6 +989,7 @@ ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, 
 		}	
 
 	} else {
+		NOXIA();
 		rc = __real_recvfrom(fd, buf, n, flags, addr, addr_len);
 	}
 
@@ -1010,6 +1021,7 @@ ssize_t send(int fd, const void *buf, size_t n, int flags)
 
 
 	} else {
+		NOXIA();
 		rc = __real_send(fd, buf, n, flags);
 	}
 	return rc;
@@ -1043,6 +1055,7 @@ ssize_t sendto(int fd, const void *buf, size_t n, int flags, const struct sockad
 		rc = Xsendto(fd, buf, n, flags, addr, addr_len);
 
 	} else {
+		NOXIA();
 		rc = __real_sendto(fd, buf, n, flags, addr, addr_len);
 	}
 
@@ -1063,6 +1076,7 @@ int setsockopt(int fd, int level, int optname, const void *optval, socklen_t opt
 		}
 
 	} else {
+		NOXIA();
 		rc = __real_setsockopt(fd, level, optname, optval, optlen);
 	}
 
@@ -1082,10 +1096,10 @@ int socket(int domain, int type, int protocol)
 			protocol = 0;
 		}
 
-MSG("%d %d %d\n", domain, type, protocol);
 		fd = Xsocket(AF_XIA, type, protocol);
 
 	} else {
+		NOXIA();
 		fd = __real_socket(domain, type, protocol);
 	}
 	return fd;
@@ -1111,6 +1125,7 @@ int socketpair(int domain, int type, int protocol, int fds[2])
 		}
 
 	} else {
+		NOXIA();
 		return __real_socketpair(domain, type, protocol, fds);
 	}
 }
@@ -1127,6 +1142,7 @@ ssize_t write(int fd, const void *buf, size_t count)
 		rc = Xsend(fd, buf, count, 0);
 
 	} else {
+		NOXIA();
 		rc = __real_write(fd, buf, count);
 	}
 	return rc;
@@ -1140,7 +1156,7 @@ extern "C" int __poll_chk(struct pollfd *fds, nfds_t nfds, int timeout, __SIZE_T
 	int rc;
 	UNUSED(__fdslen);
 	TRACE();
-	MSG("%d %d %08x\n", nfds, fds[0].fd, fds[0].events);
+	MSG("%zu %d %08x\n", nfds, fds[0].fd, fds[0].events);
 	rc = Xpoll(fds, nfds, timeout);
 	MSG("Xpoll returns %d %d %08x\n", rc, fds[0].fd, fds[0].revents);
 	return rc;
