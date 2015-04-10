@@ -2416,7 +2416,9 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 			uint16_t signatureLength = MAX_SIGNATURE_SIZE;
 			if(xs_sign(_destination_xid.unparse().c_str(), (unsigned char *)synackPayload.get_buffer(), synackPayload.size(), (unsigned char *)signature, &signatureLength)) {
 				click_chatter("Xaccept: ERROR unable to sign the SYNACK using private key for %s", _destination_xid.unparse().c_str());
-				return;
+				rc = -1;
+				ec = ESTALE;
+				goto Xaccept_done;
 			}
 
 			// Retrieve public key for this host
@@ -2424,7 +2426,9 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 			uint16_t pubkeyLength = MAX_PUBKEY_SIZE;
 			if(xs_getPubkey(_destination_xid.unparse().c_str(), pubkey, &pubkeyLength)) {
 				click_chatter("Xaccept: ERROR public key not found for %s", _destination_xid.unparse().c_str());
-				return;
+				rc = -1;
+				ec = ESTALE;
+				goto Xaccept_done;
 			}
 
 			// Prepare a signed payload (serviceDAG, timestamp)Signature, Pubkey
@@ -2463,8 +2467,10 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	} else {
 		rc = -1;
 		ec = EWOULDBLOCK;
+		goto Xaccept_done;
 	}
 
+Xaccept_done:
 	ReturnResult(_sport, xia_socket_msg, rc, ec);
 }
 
