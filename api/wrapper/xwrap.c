@@ -32,7 +32,6 @@
 **
 **	Remove the FORCE_XIA calls and always default to XIA mode 
 **
-** Don't bother to do ioctl?
 */
 
 #include <stdio.h>
@@ -82,7 +81,6 @@
 extern "C" {
 
 int fcntl(int fd, int cmd, ...);
-int ioctl(int d, int request, ...);
 
 ssize_t __read_chk(int, void *, size_t, size_t);
 ssize_t __recv_chk(int, void *, size_t, size_t, int);
@@ -132,7 +130,6 @@ DECLARE(int, getsockname, int fd, struct sockaddr *addr, socklen_t *len);
 DECLARE(int, getsockopt, int fd, int level, int optname, void *optval, socklen_t *optlen);
 DECLARE(int, fcntl, int fd, int cmd, ...);
 DECLARE(void, freeaddrinfo, struct addrinfo *ai);
-DECLARE(int, ioctl, int d, int request, ...);
 DECLARE(int, listen, int fd, int n);
 DECLARE(int, poll, struct pollfd *fds, nfds_t nfds, int timeout);
 DECLARE(ssize_t, read, int fd, void *buf, size_t count);
@@ -229,7 +226,6 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	GET_FCN(getpeername);
 	GET_FCN(getsockname);
 	GET_FCN(getsockopt);
-//	GET_FCN(ioctl);
 	GET_FCN(listen);
 	GET_FCN(poll);
 	GET_FCN(read);
@@ -934,26 +930,6 @@ int getsockopt(int fd, int level, int optname, void *optval, socklen_t *optlen)
 	return rc;
 }
 
-extern "C" int ioctl(int d, int request, ...)
-{
-	int rc;
-	va_list args;
-
-	TRACE();
-	va_start(args, request);
-
-	if (isXsocket(d)) {
-		// Not sure what ioctl requests should work on an xsocket
-		// just flag it for now
-		ALERT();
-		rc = -1;
-	} else {
-		NOXIA();
-		rc = __real_ioctl(d, request, args);
-	}
-	va_end(args);
-	return rc;
-}
 
 int listen(int fd, int n)
 {
@@ -1153,8 +1129,8 @@ int socket(int domain, int type, int protocol)
 		XIAIFY();
 
 		if (protocol != 0) {
-			MSG("Caller specified protocol %d, resetting to 0\n", protocol);
-			protocol = 0;
+	//		MSG("Caller specified protocol %d, resetting to 0\n", protocol);
+	//		protocol = 0;
 		}
 
 		fd = Xsocket(AF_XIA, type, protocol);
@@ -1324,6 +1300,7 @@ int getservbyport_r (int port, const char *proto, struct servent *result_buf, ch
 
 ssize_t recvmsg(int fd, struct msghdr *message, int flags)
 {
+	int rc;
 	TRACE();
 	if (isXsocket(fd)) {
 		ALERT();
@@ -1333,7 +1310,7 @@ ssize_t recvmsg(int fd, struct msghdr *message, int flags)
 
 	// else {
 		NOXIA();
-		return __real_recvmsg(fd, message, flags);
+		rc = __real_recvmsg(fd, message, flags);
 //	}
 }
 
