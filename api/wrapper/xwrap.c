@@ -15,6 +15,7 @@
 ** limitations under the License.
 */
 
+
 /*
 ** This library is loaded via LD_PRELOAD so that it comes before glibc.
 ** It captures all of the socket related functions so that they can be
@@ -30,7 +31,10 @@
 **	affect the running code, just the checks for buffer sizes.
 **
 **	Remove the FORCE_XIA calls and always default to XIA mode 
+**
+** Don't bother to do ioctl?
 */
+
 #include <stdio.h>
 #include <dlfcn.h>
 #include <stdarg.h>
@@ -39,6 +43,7 @@
 #include <poll.h>
 #include <netdb.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -68,9 +73,8 @@
 #define WARNING(...) {if (_log_warning) {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
 
 #ifdef DEBUG
-
-#else
 #define DBG(...) {if (_log_warning) {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
+#else
 #define DBG(...)
 #endif
 
@@ -225,7 +229,7 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	GET_FCN(getpeername);
 	GET_FCN(getsockname);
 	GET_FCN(getsockopt);
-	GET_FCN(ioctl);
+//	GET_FCN(ioctl);
 	GET_FCN(listen);
 	GET_FCN(poll);
 	GET_FCN(read);
@@ -637,26 +641,70 @@ int connect(int fd, const struct sockaddr *addr, socklen_t len)
 	return rc;
 }
 
+
+
 extern "C" int fcntl (int fd, int cmd, ...)
 {
 	int rc;
 	va_list args;
+	fcn_fcntl f;
 
 	TRACE();
-	va_start(args, cmd);
 
 	if (isXsocket(fd)) {
 		XIAIFY();
-			rc = Xfcntl(fd, cmd, args);
+		f = Xfcntl;
 	
 	} else {
 		NOXIA();
-		rc = __real_fcntl(fd, cmd, args);
+		f = __real_fcntl;
+	}
+
+	va_start(args, cmd);
+
+	switch(cmd) {
+		case F_DUPFD:
+		case F_DUPFD_CLOEXEC:
+		case F_SETFD:
+		case F_SETFL:
+		case F_SETOWN:
+		case F_SETOWN_EX:
+		case F_SETSIG:
+		case F_SETLEASE:
+		case F_NOTIFY:
+		case F_SETPIPE_SZ:
+			rc = (f)(fd, cmd, va_arg(args, int));
+			break;
+
+		case F_GETLK:
+		case F_SETLK:
+		case F_SETLKW:
+			rc = (f)(fd, cmd, va_arg(args, struct flock *));
+			break;
+		 
+		case F_GETFD:
+		case F_GETFL:
+		case F_GETOWN:
+		case F_GETOWN_EX:
+		case F_GETSIG:
+		case F_GETLEASE:
+		case F_GETPIPE_SZ:
+			rc = (f)(fd, cmd);
+			break;
+
+		default:
+			WARNING("Unknown command value (%08x)\n", cmd);
+			errno = EINVAL;
+			rc = -1;
+			break;	
 	}
 
 	va_end(args);
+
 	return rc;
 }
+
+
 
 void freeaddrinfo (struct addrinfo *ai)
 {
