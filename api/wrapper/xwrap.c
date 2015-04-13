@@ -818,7 +818,7 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 //			id2dag[s] = dag;
 //			dag2id[dag] = s;
 
-MSG("found name\n%s\n", dag.c_str());
+			MSG("found name\n%s\n", dag.c_str());
 		}
 
 		struct addrinfo *ai = (struct addrinfo *)calloc(sizeof(struct addrinfo), 1);
@@ -1327,17 +1327,20 @@ ssize_t recvmsg(int fd, struct msghdr *message, int flags)
 	TRACE();
 	if (isXsocket(fd)) {
 		ALERT();
-		return 0;
+//		return 0;
 
-	} else {
+	}
+
+	// else {
 		NOXIA();
 		return __real_recvmsg(fd, message, flags);
-	}
+//	}
 }
 
 ssize_t sendmsg(int fd, const struct msghdr *message, int flags)
 {
 	TRACE();
+	MSG("fd = %d\n", fd);
 	if (isXsocket(fd)) {
 		ALERT();
 		return 0;
