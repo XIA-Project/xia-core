@@ -950,9 +950,9 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
 	int rc;
 	TRACE();
 	// Let Xpoll do all the work of figuring out what fds we are handling
-	MSG("Xpoll: %zu %d %08x\n", nfds, fds[0].fd, fds[0].events);
+//	MSG("Xpoll: %zu %d %08x\n", nfds, fds[0].fd, fds[0].events);
 	rc = Xpoll(fds, nfds, timeout);
-	MSG("Xpoll returns %d %d %08x\n", rc, fds[0].fd, fds[0].revents);
+//	MSG("Xpoll returns %d %d %08x\n", rc, fds[0].fd, fds[0].revents);
 	return rc;
 }
 
@@ -988,7 +988,7 @@ ssize_t recv(int fd, void *buf, size_t n, int flags)
 		MSG("%s\n", c);
 
 	} else {
-		NOXIA();
+//		NOXIA();
 		rc = __real_recv(fd, buf, n, flags);
 	}
 
@@ -1179,7 +1179,7 @@ ssize_t write(int fd, const void *buf, size_t count)
 		rc = Xsend(fd, buf, count, 0);
 
 	} else {
-		NOXIA();
+//		NOXIA();
 		rc = __real_write(fd, buf, count);
 	}
 	return rc;
@@ -1311,6 +1311,8 @@ ssize_t recvmsg(int fd, struct msghdr *message, int flags)
 	// else {
 		NOXIA();
 		rc = __real_recvmsg(fd, message, flags);
+		MSG("rc = %d fd = %d\n", rc, fd);
+		return rc;
 //	}
 }
 
