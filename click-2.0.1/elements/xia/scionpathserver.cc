@@ -213,8 +213,6 @@ void SCIONPathServer::push(int port, Packet *p)
 
 			#ifdef _DEBUG_PS
             scionPrinter->printLog(IH, type, (char*)"PATH_REP recieved for target AD %llu\n", pi->target);
-            scionPrinter->printLog(IH, (char*)"PS replies down-path to clients, count = %d\n", 
-				pendingDownpathReq.count((uint64_t)pi->target));
 			#endif
 			
 			//Now, send reply to all clients in the pending request table
@@ -223,8 +221,6 @@ void SCIONPathServer::push(int port, Packet *p)
 			std::pair<std::multimap<uint64_t,HostAddr>::iterator, 
 				std::multimap<uint64_t, HostAddr>::iterator> requesters;
 			requesters = pendingDownpathReq.equal_range(pi->target);
-			
-			
 			
 			for(itr = requesters.first; itr != requesters.second; itr++) {
 				
@@ -251,8 +247,6 @@ void SCIONPathServer::push(int port, Packet *p)
                 dest.append(" ");
                 dest.append("HID:");
                 dest.append(hidbuf);
-                
-                click_chatter("dest(%llu): %s\n", PATH_REP_LOCAL, dest.c_str());
 
             	sendPacket(buf, totalLength, dest);
 			}
@@ -548,8 +542,9 @@ int SCIONPathServer::sendUpPath(HostAddr &requestId, uint32_t pref) {
         SPH::setDstAddr(data, requestId);
         SPH::setTotalLen(data, totalLength+PATH_INFO_SIZE);
         
-        char hidbuf[AIP_SIZE];
+        char hidbuf[AIP_SIZE+1];
         requestId.getAIPAddr((uint8_t*)hidbuf);
+        hidbuf[AIP_SIZE] = '\0';
 
         string dest = "RE ";
         dest.append(BHID);

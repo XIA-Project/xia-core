@@ -133,13 +133,13 @@ void SCIONPathInfo::parse(const void *p, int type)
    	pkt += PATH_INFO_SIZE;
     specialOpaqueField * pFOF = (specialOpaqueField *) pkt;
     hops = pFOF->hops; 
-
-    if (hops >= 10 || hops <= 0) // TODO
-        return; // TODO error
-
+    
     #ifdef _DEBUG_GW
 	click_chatter("Parsing received path: Type:%d (0:uppath, 1:downpath), hops: %d\n", type, hops);
 	#endif
+    
+    if (hops >= 10 || hops <= 0) // TODO
+        return; // TODO error
 
     //1. extract half path information and store it to halfPath struct
 	//iterate through payload and get hop information

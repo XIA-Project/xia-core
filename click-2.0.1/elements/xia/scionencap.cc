@@ -89,31 +89,69 @@ int SCIONEncap::initialize(ErrorHandler *)
 
 void SCIONEncap::push(int port, Packet *p) {
 
-    TransportHeader thdr(p);
-    uint8_t * s_pkt = (uint8_t *) thdr.payload();
-    uint16_t totalLength = SPH::getTotalLen(s_pkt);
-    uint8_t packet[totalLength];
-    memcpy(packet, s_pkt,totalLength);
-    uint16_t type = SPH::getType(s_pkt);
-    p->kill();
-    
-    if (type == UP_PATH || type == PATH_REP_LOCAL) {
+    if(port == 0)
+    {
+        // from XIA network
+        TransportHeader thdr(p);
+        uint8_t * s_pkt = (uint8_t *) thdr.payload();
+        uint16_t totalLength = SPH::getTotalLen(s_pkt);
+        uint8_t packet[totalLength];
+        memcpy(packet, s_pkt,totalLength);
+        uint16_t type = SPH::getType(s_pkt);
+        p->kill();
         
-        if (type == UP_PATH) {
-            #ifdef _DEBUG_GW
-			click_chatter("GW (%lu:%lu): uppath received.\n", m_uAdAid, m_uAid);
-			#endif
-			_path_info->parse(packet, 0);
-        } else {
-            #ifdef _DEBUG_GW
-			click_chatter("GW (%lu:%lu): downpath received.\n", m_uAdAid, m_uAid);
-			#endif
-			_path_info->parse(packet, 1);
-        }
+        switch(type)
+        {
+            case UP_PATH: {
+                #ifdef _DEBUG_GW
+                click_chatter("GW (%lu:%lu): uppath received.\n", m_uAdAid, m_uAid);
+                #endif
+                _path_info->parse(packet, 0);
+            }
+                break;
             
+            case PATH_REP_LOCAL:{
+                #ifdef _DEBUG_GW
+			    click_chatter("GW (%lu:%lu): downpath received.\n", m_uAdAid, m_uAid);
+			    #endif
+			    _path_info->parse(packet, 1);
+            }
+                break;
+            
+            default:
+                break;
+        }
+        
+        fullPath path;
+		path.opaque_field = NULL;
+		uint64_t src = 4;
+		uint64_t dst = 3;
+		
+		int skip = 1;
+        if(_path_info->get_path(src, dst, path)) {
+            printf("Full path information:\n");
+            #ifdef _DEBUG_GW
+            for(int j = 0; j<(path.length / OPAQUE_FIELD_SIZE); j++){
+                opaqueField *of = (opaqueField *)(path.opaque_field+j*OPAQUE_FIELD_SIZE);
+                if(of->type==0x00&&skip) {
+                    printf("%u ->", of->ingressIf);
+                }
+                    
+                if(of->type==0x20){
+                    printf("%u ->", of->egressIf);
+                    if(skip==0) skip=1;
+                    else if(skip==1) skip=0;
+                }
+			}
+			printf("\n");
+			#endif
+        }
+        
+        if(path.opaque_field)
+		    delete [] path.opaque_field;
+        /*
 		// check if there's any packet in the cache 
 		// and send it to the destination after constructing end-to-end paths.
-		/*
         for (std::list<PacketCache>::iterator it = _cache.begin(); it != _cache.end(); ++it)
         {
             fullPath path;
@@ -121,7 +159,9 @@ void SCIONEncap::push(int port, Packet *p) {
 
             if (_path_info->get_path((ADAID)m_uAdAid, it->dst_gw.adaid, path)) {
                 // send this packet
+                #ifdef _DEBUG_GW
                 click_chatter("sending a saved packet from %ld to %ld.", m_uAdAid, it->dst_gw.adaid);
+                #endif
 				//handling already cached packets, so don't need to cache it again
                 handle_data(it->p, it->dst_gw, false);
                 it = _cache.erase(it);
@@ -133,6 +173,9 @@ void SCIONEncap::push(int port, Packet *p) {
 				delete [] path.opaque_field;
         }
         */
+    }else{
+        // from client socket
+        
     }
 
 }
