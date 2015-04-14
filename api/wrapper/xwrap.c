@@ -235,9 +235,6 @@ static int _GetIP(sockaddr_x *sax, struct sockaddr_in *sin, const char *addr, in
 	char id[ID_LEN];
 
 	// Make an IPv4 sockaddr
-	if (port == 0)
-		port = _NewPort();
-
 	if (!addr) { 
 		sprintf(s, ADDR_MASK, high, low);
 		addr = s;
@@ -631,7 +628,7 @@ int accept(int fd, struct sockaddr *addr, socklen_t *addr_len)
 
 		if (FORCE_XIA()) {
 			// create a new fake IP address/port  to map to
-			_GetIP(&sax, (struct sockaddr_in*)ipaddr, NULL, 0);
+			_GetIP(&sax, (struct sockaddr_in*)ipaddr, NULL, _NewPort());
 
 			// convert the sockaddr_x to a sockaddr
 			_x2i(&sax, (struct sockaddr_in*)ipaddr);
@@ -907,13 +904,13 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 			rc = 0;
 		
 		} else if (flags && AI_NUMERICHOST) {
+			// just make a sockaddr with the passed info
 			sa = (struct sockaddr *)calloc(sizeof(struct sockaddr), 1);
 
-			_GetIP(NULL, (sockaddr_in *)sa, name, htons(port));
 			if (!service) {
-				struct sockaddr_in *sin = (struct sockaddr_in *)sa;
-				sin->sin_port = 0;
+				port = 0;
 			}
+			_GetIP(NULL, (sockaddr_in *)sa, name, htons(port));
 			rc = 0;
 
 		} else {
@@ -1019,15 +1016,12 @@ int getifaddrs(struct ifaddrs **ifap)
 
 	struct sockaddr_in *sin = (struct sockaddr_in*)ifa->ifa_addr;
 	_GetIP(NULL, sin, local_addr, 0);
-	sin->sin_port = 0;
 
 	sin = (struct sockaddr_in*)ifa->ifa_netmask;
 	_GetIP(NULL, sin, NETMASK, 0);
-	sin->sin_port = 0;
 
 	sin = (struct sockaddr_in*)ifa->ifa_broadaddr;
 	_GetIP(NULL, sin, BROADCAST, 0);
-	sin->sin_port = 0;
 
 	// we aren't going to use the real version in the wrapper at all
 	//rc = __real_getifaddrs(ifap);
@@ -1051,7 +1045,7 @@ int getpeername(int fd, struct sockaddr *addr, socklen_t *len)
 		rc = Xgetpeername(fd, (struct sockaddr*)&sax, &slen);
 
 		if (_x2i(&sax, (struct sockaddr_in*)addr) < 0) {
-			_GetIP(&sax, (sockaddr_in*)addr, NULL, 0);
+			_GetIP(&sax, (sockaddr_in*)addr, NULL, _NewPort());
 		}
 
 	} else {
@@ -1076,7 +1070,7 @@ int getsockname(int fd, struct sockaddr *addr, socklen_t *len)
 		rc = Xgetsockname(fd, (struct sockaddr*)&sax, &slen);
 
 		if (_x2i(&sax, (struct sockaddr_in*)addr) < 0) {
-			_GetIP(&sax, (sockaddr_in*)addr, NULL, 0);
+			_GetIP(&sax, (sockaddr_in*)addr, NULL, _NewPort());
 		}
 	} else {
 		NOXIA();
@@ -1206,7 +1200,7 @@ ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, 
 			// convert the sockaddr to a sockaddr_x
 			if (_x2i(&sax, (struct sockaddr_in*)ipaddr) < 0) {
 				// we don't have a mapping for this yet, create a fake IP address
-				_GetIP(&sax, (sockaddr_in *)ipaddr, NULL, 0);
+				_GetIP(&sax, (sockaddr_in *)ipaddr, NULL, _NewPort());
 			}
 		}	
 
