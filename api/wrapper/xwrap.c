@@ -24,6 +24,7 @@
 ** The easiest way to use it is via the xia-core/bin/xwrap script
 */
 
+
 /* FIXME:
 **	The __foo_chk functions currently call the foo function, not the checked
 **	version. This is to avoid having to figure out the extra parameters. We
@@ -31,6 +32,10 @@
 **	affect the running code, just the checks for buffer sizes.
 **
 **	Remove the FORCE_XIA calls and always default to XIA mode 
+**
+**	Check network byte order on ports in getaddrinfo and recvfrom/sendto
+**
+** Change _IPAddress to not generate a port, but use what was passed
 **
 */
 
@@ -825,6 +830,8 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 		}
 
 
+// FIXME: handle 127.x
+// FIXME: what to do if not in table
 
 		if ((name == NULL) || (strcmp(name, "0.0.0.0")) == 0) {
 			// caller wants a sockaddr for itself
@@ -840,7 +847,7 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 		
 		} else if (flags && AI_NUMERICHOST) {
 			sa = (struct sockaddr *)calloc(sizeof(struct sockaddr), 1);
-			
+
 			_GetIP(NULL, (sockaddr_in *)sa, name, htons(port));
 			if (!service) {
 				struct sockaddr_in *sin = (struct sockaddr_in *)sa;
@@ -1519,7 +1526,17 @@ ssize_t recvmsg(int fd, struct msghdr *message, int flags)
 ssize_t sendmsg(int fd, const struct msghdr *message, int flags)
 {
 	TRACE();
-	MSG("fd = %d\n", fd);
+	MSG("fd = %d flags = %08x\n", fd, flags);
+	MSG("msghdr:\n name:%p namelen%zu iov:%p iovlen:%zu control:%p clen:%zu flags:%08x",
+	message->msg_name,
+	(size_t)message->msg_namelen,
+	message->msg_iov,
+	(size_t)message->msg_iovlen,
+	message->msg_control,
+	(size_t)message->msg_controllen,
+	message->msg_flags);
+
+	MSG("msghdr:\n")
 	if (isXsocket(fd)) {
 		ALERT();
 		return 0;
