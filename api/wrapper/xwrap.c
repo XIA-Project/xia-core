@@ -46,7 +46,10 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
 #include <limits.h>
+#include <ifaddrs.h>
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
@@ -54,7 +57,11 @@
 #include <map>
 
 // defines **********************************************************
-#define ADDR_MASK "169.254.%d.%d"		// fake addresses created in this subnet
+#define ADDR_MASK  "169.254.%d.%d"   // fake addresses created in this subnet
+#define NETMASK    "169.254.0.0"     // for getifaddrs
+#define BROADCAST  "169.254.255.255" // for getifaddrs
+#define DEVICENAME "XIA0"            // or do I have to say ETH0 to be sure?
+
 #define ID_LEN (INET_ADDRSTRLEN + 10)	// size of an id string
 #define SID_SIZE 45						// (40 byte XID + 4 bytes SID: + null terminator)
 #define FORCE_XIA() (1)					// FIXME: get rid of this logic
@@ -123,13 +130,15 @@ DECLARE(int, accept, int fd, struct sockaddr *addr, socklen_t *addr_len);
 DECLARE(int, bind, int fd, const struct sockaddr *addr, socklen_t len);
 DECLARE(int, close, int fd);
 DECLARE(int, connect, int fd, const struct sockaddr *addr, socklen_t len);
+DECLARE(void, freeaddrinfo, struct addrinfo *ai);
+DECLARE(void, freeifaddrs, struct ifaddrs *ifa);
 DECLARE(const char *, gai_strerror, int ecode);
 DECLARE(int, getaddrinfo, const char *name, const char *service, const struct addrinfo *req, struct addrinfo **pai);
+DECLARE(int, getifaddrs, struct ifaddrs **ifap);
 DECLARE(int, getpeername, int fd, struct sockaddr *addr, socklen_t *len);
 DECLARE(int, getsockname, int fd, struct sockaddr *addr, socklen_t *len);
 DECLARE(int, getsockopt, int fd, int level, int optname, void *optval, socklen_t *optlen);
 DECLARE(int, fcntl, int fd, int cmd, ...);
-DECLARE(void, freeaddrinfo, struct addrinfo *ai);
 DECLARE(int, listen, int fd, int n);
 DECLARE(int, poll, struct pollfd *fds, nfds_t nfds, int timeout);
 DECLARE(ssize_t, read, int fd, void *buf, size_t count);
@@ -157,6 +166,14 @@ DECLARE(ssize_t, recvmsg, int fd, struct msghdr *message, int flags);
 DECLARE(ssize_t, sendmsg, int fd, const struct msghdr *message, int flags);
 
 
+// Local "IP Address" **********************************************
+static char local_addr[ID_LEN];
+static struct sockaddr local_sa;
+
+// IP address segments (169.254.high.low) **************************
+static unsigned char low;
+static unsigned char high;
+
 // ID (IP-port) <=> DAG mapping tables *****************************
 typedef std::map<std::string, std::string> id2dag_t;
 typedef std::map<std::string, std::string> dag2id_t;
@@ -176,82 +193,6 @@ static int _log_warning = 0;
 static int _log_info = 0;
 static int _log_wrap = 0;
 static FILE *_log = NULL;
-
-/********************************************************************
-**
-** Called at library load time for initialization
-**
-********************************************************************/
-void __attribute__ ((constructor)) xwrap_init(void)
-{
-	if (_log_info || _log_warning || _log_wrap || _log_trace) {
-		fprintf(_log, "loading XIA wrappers (created: %s)\n", __DATE__);
-		fprintf(_log, "remapping all socket IO automatically into XIA\n");
-	}
-
-	// cause the Xsocket API to load the pointers to the real socket functions
-	// for it's own internal use 
-	xapi_load_func_ptrs();
-
-	// roll the dice
-	srand(time(NULL));
-
-	// enable logging
-	if (getenv("XWRAP_TRACE") != NULL)
-		_log_trace = 1;
-	if (getenv("XWRAP_VERBOSE") != NULL)
-		_log_trace = _log_info = _log_wrap = _log_warning = 1;
-	if (getenv("XWRAP_INFO") != NULL)
-		_log_info = 1;
-	if (getenv("XWRAP_WARNING") != NULL)
-		_log_warning = 1;
-	if (getenv("XWRAP_WRAP") != NULL)
-		_log_wrap = 1;
-
-	const char *lf = getenv("XWRAP_LOGFILE");
-	if (lf)
-		_log = fopen(lf, "w");
-	if (!_log)
-		_log = stderr;
-
-	// find and save the real function pointers
-	GET_FCN(accept);
-	GET_FCN(bind);
-	GET_FCN(close);
-	GET_FCN(connect);
-	GET_FCN(fcntl);
-	GET_FCN(freeaddrinfo);
-	GET_FCN(gai_strerror);
-	GET_FCN(getaddrinfo);
-	GET_FCN(getpeername);
-	GET_FCN(getsockname);
-	GET_FCN(getsockopt);
-	GET_FCN(listen);
-	GET_FCN(poll);
-	GET_FCN(read);
-	GET_FCN(recv);
-	GET_FCN(recvfrom);
-	GET_FCN(select);
-	GET_FCN(send);
-	GET_FCN(sendto);
-	GET_FCN(setsockopt);
-	GET_FCN(socket);
-	GET_FCN(socketpair);
-	GET_FCN(write);
-
-	// do the same for the informational functions
-	GET_FCN(gethostbyaddr);
-	GET_FCN(gethostbyaddr_r);
-	GET_FCN(gethostbyname);
-	GET_FCN(gethostbyname_r);
-	GET_FCN(getnameinfo);
-	GET_FCN(getservbyname);
-	GET_FCN(getservbyname_r);
-	GET_FCN(getservbyport);
-	GET_FCN(getservbyport_r);
-	GET_FCN(recvmsg);
-	GET_FCN(sendmsg);
-}
 
 /********************************************************************
 **
@@ -284,10 +225,6 @@ static unsigned short _NewPort()
 // Create a new fake IP address to associate with the given DAG
 static int _GetIP(sockaddr_x *sax, struct sockaddr_in *sin, const char *addr, int port)
 {
-	// pick random IP address numbers 169.254.high.low
-	static unsigned char low = (rand() % 253) + 1;
-	static unsigned char high = rand() % 254;
-
 	char s[ID_LEN];
 	char id[ID_LEN];
 
@@ -298,7 +235,7 @@ static int _GetIP(sockaddr_x *sax, struct sockaddr_in *sin, const char *addr, in
 	if (!addr) { 
 		sprintf(s, ADDR_MASK, high, low);
 		addr = s;
-#if 0
+#if 1
 		// FIXME: do we want to increment this each time or just set it once for each app?
 		// bump the ip address for next time
 		low++;
@@ -511,6 +448,97 @@ static int _Lookup(const struct sockaddr_in *addr, sockaddr_x *sax)
 	return rc;
 }
 
+
+
+/********************************************************************
+**
+** Called at library load time for initialization
+**
+********************************************************************/
+void __attribute__ ((constructor)) xwrap_init(void)
+{
+	if (_log_info || _log_warning || _log_wrap || _log_trace) {
+		fprintf(_log, "loading XIA wrappers (created: %s)\n", __DATE__);
+		fprintf(_log, "remapping all socket IO automatically into XIA\n");
+	}
+
+	// cause the Xsocket API to load the pointers to the real socket functions
+	// for it's own internal use 
+	xapi_load_func_ptrs();
+
+	// roll the dice
+	srand(time(NULL));
+
+	// pick random IP address numbers 169.254.high.low
+	low = (rand() % 253) + 1; // 1..254
+	high = rand() % 254;      // 0..254
+
+	// now set our local IP address
+	// FIXME: what would happen if we tried to use the result from the
+	//  first interface instead of making one up?
+	_GetIP(NULL, (struct sockaddr_in *)&local_sa, NULL, 0);
+	sprintf(local_addr, ADDR_MASK, high, low);
+
+	// enable logging
+	if (getenv("XWRAP_TRACE") != NULL)
+		_log_trace = 1;
+	if (getenv("XWRAP_VERBOSE") != NULL)
+		_log_trace = _log_info = _log_wrap = _log_warning = 1;
+	if (getenv("XWRAP_INFO") != NULL)
+		_log_info = 1;
+	if (getenv("XWRAP_WARNING") != NULL)
+		_log_warning = 1;
+	if (getenv("XWRAP_WRAP") != NULL)
+		_log_wrap = 1;
+
+	const char *lf = getenv("XWRAP_LOGFILE");
+	if (lf)
+		_log = fopen(lf, "w");
+	if (!_log)
+		_log = stderr;
+
+	// find and save the real function pointers
+	GET_FCN(accept);
+	GET_FCN(bind);
+	GET_FCN(close);
+	GET_FCN(connect);
+	GET_FCN(fcntl);
+	GET_FCN(freeaddrinfo);
+	GET_FCN(freeifaddrs);
+	GET_FCN(gai_strerror);
+	GET_FCN(getaddrinfo);
+	GET_FCN(getifaddrs);
+	GET_FCN(getpeername);
+	GET_FCN(getsockname);
+	GET_FCN(getsockopt);
+	GET_FCN(listen);
+	GET_FCN(poll);
+	GET_FCN(read);
+	GET_FCN(recv);
+	GET_FCN(recvfrom);
+	GET_FCN(select);
+	GET_FCN(send);
+	GET_FCN(sendto);
+	GET_FCN(setsockopt);
+	GET_FCN(socket);
+	GET_FCN(socketpair);
+	GET_FCN(write);
+
+	// do the same for the informational functions
+	GET_FCN(gethostbyaddr);
+	GET_FCN(gethostbyaddr_r);
+	GET_FCN(gethostbyname);
+	GET_FCN(gethostbyname_r);
+	GET_FCN(getnameinfo);
+	GET_FCN(getservbyname);
+	GET_FCN(getservbyname_r);
+	GET_FCN(getservbyport);
+	GET_FCN(getservbyport_r);
+	GET_FCN(recvmsg);
+	GET_FCN(sendmsg);
+}
+
+
 /********************************************************************
 **
 ** FUNCTION REMAPPINGS START HERE
@@ -550,6 +578,8 @@ int accept(int fd, struct sockaddr *addr, socklen_t *addr_len)
 	return rc;
 }
 
+
+
 int bind(int fd, const struct sockaddr *addr, socklen_t len)
 {
 	int rc;
@@ -577,6 +607,8 @@ int bind(int fd, const struct sockaddr *addr, socklen_t len)
 
 	return rc;
 }
+
+
 
 int close(int fd)
 {
@@ -608,6 +640,8 @@ int close(int fd)
 	}
 	return rc;
 }
+
+
 
 int connect(int fd, const struct sockaddr *addr, socklen_t len)
 {
@@ -697,6 +731,9 @@ extern "C" int fcntl (int fd, int cmd, ...)
 
 	va_end(args);
 
+	if (rc < 0)
+		MSG("rc = %d: %s\n", rc, strerror(errno));
+
 	return rc;
 }
 
@@ -709,12 +746,27 @@ void freeaddrinfo (struct addrinfo *ai)
 	return __real_freeaddrinfo(ai);
 }
 
+
+
+void freeifaddrs(struct ifaddrs *ifa)
+{
+	TRACE();
+
+	// right now we don't need to do anything special, so let the system do it
+	NOXIA();
+	__real_freeifaddrs(ifa);
+}
+
+
+
 const char *gai_strerror (int ecode)
 {
 	TRACE();
 	// there currently isn't any new XIA functionality for this call
 	return __real_gai_strerror(ecode);
 }
+
+
 
 int getaddrinfo (const char *name, const char *service, const struct addrinfo *hints, struct addrinfo **pai)
 {
@@ -723,6 +775,8 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 	int trynormal = 1;
 
 	TRACE();
+
+	MSG("name = %s service = %s\n", name, service);
 
 	if (hints) {
 		// let's see if we can steal it
@@ -746,9 +800,8 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 		struct sockaddr *sa;
 
 		if (hints) {
-			if (hints->ai_flags != 0) {
-				WARNING("Flags to getaddrinfo are not currently implemented.\n");
-			}
+			flags = hints->ai_flags;
+			MSG("Flags = %08x\n", flags);
 			socktype = hints->ai_socktype;
 			protocol = hints->ai_protocol;
 		}
@@ -772,15 +825,29 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 		}
 
 
-		if (strcmp(name, "0.0.0.0") == 0) {
+
+		if ((name == NULL) || (strcmp(name, "0.0.0.0")) == 0) {
 			// caller wants a sockaddr for itself
 			// create a fake ip address
 			// fill in sax with the bogus ip address
 
 			sa = (struct sockaddr *)calloc(sizeof(struct sockaddr), 1);
-			_GetIP(NULL, (struct sockaddr_in*)sa, NULL, htons(port));
+
+			// use the address we created at boot time
+			_GetIP(NULL, (struct sockaddr_in*)sa, local_addr, htons(port));
 
 			rc = 0;
+		
+		} else if (flags && AI_NUMERICHOST) {
+			sa = (struct sockaddr *)calloc(sizeof(struct sockaddr), 1);
+			
+			_GetIP(NULL, (sockaddr_in *)sa, name, htons(port));
+			if (!service) {
+				struct sockaddr_in *sin = (struct sockaddr_in *)sa;
+				sin->sin_port = 0;
+			}
+			rc = 0;
+
 		} else {
 
 			sprintf(s, "%s-%d", name, port);
@@ -866,6 +933,43 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 }
 
 
+
+int getifaddrs(struct ifaddrs **ifap)
+{
+	int rc = 0;
+	struct ifaddrs *ifa = (struct ifaddrs*)calloc(1, sizeof(struct ifaddrs));
+
+	TRACE();
+
+	ifa->ifa_next      = NULL;
+	ifa->ifa_name      = strdup(DEVICENAME);
+	ifa->ifa_addr      = (struct sockaddr *)calloc(1, sizeof(struct sockaddr));
+	ifa->ifa_netmask   = (struct sockaddr *)calloc(1, sizeof(struct sockaddr));
+	ifa->ifa_broadaddr = (struct sockaddr *)calloc(1, sizeof(struct sockaddr));
+	ifa->ifa_flags     = IFF_UP | IFF_RUNNING | IFF_BROADCAST ;
+	ifa->ifa_data      = NULL;
+
+	struct sockaddr_in *sin = (struct sockaddr_in*)ifa->ifa_addr;
+	_GetIP(NULL, sin, local_addr, 0);
+	sin->sin_port = 0;
+
+	sin = (struct sockaddr_in*)ifa->ifa_netmask;
+	_GetIP(NULL, sin, NETMASK, 0);
+	sin->sin_port = 0;
+
+	sin = (struct sockaddr_in*)ifa->ifa_broadaddr;
+	_GetIP(NULL, sin, BROADCAST, 0);
+	sin->sin_port = 0;
+
+	// we aren't going to use the real version in the wrapper at all
+	//rc = __real_getifaddrs(ifap);
+
+	*ifap = ifa;
+	return rc;
+}
+
+
+
 int getpeername(int fd, struct sockaddr *addr, socklen_t *len)
 {
 	int rc;
@@ -889,6 +993,8 @@ int getpeername(int fd, struct sockaddr *addr, socklen_t *len)
 	return rc;
 }
 
+
+
 int getsockname(int fd, struct sockaddr *addr, socklen_t *len)
 {
 	int rc;
@@ -911,6 +1017,8 @@ int getsockname(int fd, struct sockaddr *addr, socklen_t *len)
 	return rc;
 }
 
+
+
 int getsockopt(int fd, int level, int optname, void *optval, socklen_t *optlen)
 {
 	int rc;
@@ -931,6 +1039,7 @@ int getsockopt(int fd, int level, int optname, void *optval, socklen_t *optlen)
 }
 
 
+
 int listen(int fd, int n)
 {
 	TRACE();
@@ -945,6 +1054,8 @@ int listen(int fd, int n)
 	}
 }
 
+
+
 int poll(struct pollfd *fds, nfds_t nfds, int timeout)
 {
 	int rc;
@@ -955,6 +1066,8 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
 //	MSG("Xpoll returns %d %d %08x\n", rc, fds[0].fd, fds[0].revents);
 	return rc;
 }
+
+
 
 ssize_t read(int fd, void *buf, size_t count)
 {
@@ -973,6 +1086,8 @@ ssize_t read(int fd, void *buf, size_t count)
 	}
 	return rc;
 }
+
+
 
 ssize_t recv(int fd, void *buf, size_t n, int flags)
 {
@@ -994,6 +1109,8 @@ ssize_t recv(int fd, void *buf, size_t n, int flags)
 
 	return rc;
 }
+
+
 
 ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, socklen_t *addr_len)
 {
@@ -1033,12 +1150,16 @@ ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, 
 	return rc;
 }
 
+
+
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)
 {
 	TRACE();
 	// Let Xselect do all the work of figuring out what fds we are handling
 	return Xselect(nfds, readfds, writefds, exceptfds, timeout);
 }
+
+
 
 ssize_t send(int fd, const void *buf, size_t n, int flags)
 {
@@ -1063,6 +1184,8 @@ ssize_t send(int fd, const void *buf, size_t n, int flags)
 	}
 	return rc;
 }
+
+
 
 ssize_t sendto(int fd, const void *buf, size_t n, int flags, const struct sockaddr *addr, socklen_t addr_len)
 {
@@ -1100,15 +1223,56 @@ ssize_t sendto(int fd, const void *buf, size_t n, int flags, const struct sockad
 }
 
 
+
 int setsockopt(int fd, int level, int optname, const void *optval, socklen_t optlen)
 {
 	int rc;
 	TRACE();
+
+	MSG("fd = %d level = %08x optname = %08x\n", fd, level, optname);
 	if (isXsocket(fd)) {
 		XIAIFY();
 		rc =  Xsetsockopt(fd, optname, optval, optlen);
 
 		if (rc < 0) {
+			switch(optname) {
+				case SO_DEBUG:
+				case SO_ERROR:
+				case SO_RCVTIMEO:
+					// handled by Xsetsockopt
+					break;
+
+				case SO_REUSEADDR:
+				case SO_SNDTIMEO:
+				case SO_SNDBUF:
+				case SO_RCVBUF:
+				case SO_LINGER:
+					MSG("Unhandled option returning success %08x\n", optname);
+					rc = 0;
+					break;
+
+				case SO_TYPE:
+				case SO_DONTROUTE:
+				case SO_BROADCAST:
+				case SO_SNDBUFFORCE:
+				case SO_RCVBUFFORCE:
+				case SO_KEEPALIVE:
+				case SO_OOBINLINE:
+				case SO_NO_CHECK:
+				case SO_PRIORITY:
+				case SO_BSDCOMPAT:
+				case SO_REUSEPORT:
+				case SO_PASSCRED:
+				case SO_PEERCRED:
+				case SO_RCVLOWAT:
+				case SO_SNDLOWAT:
+					MSG("Unhandled option returning error %08x\n", optname);
+					break;
+
+				default:
+					MSG("Unknown socket option %08x\n", optname);
+					break;
+			}
 			// TODO: add code here to return success for options we can safely ignore
 		}
 
@@ -1120,6 +1284,8 @@ int setsockopt(int fd, int level, int optname, const void *optval, socklen_t opt
 	return rc;
 }
 
+
+
 int socket(int domain, int type, int protocol)
 {
 	int fd;
@@ -1128,10 +1294,10 @@ int socket(int domain, int type, int protocol)
 	if ((domain == AF_XIA || (domain == AF_INET && FORCE_XIA()))) {
 		XIAIFY();
 
-		if (protocol != 0) {
+	//	if (protocol != 0) {
 	//		MSG("Caller specified protocol %d, resetting to 0\n", protocol);
 	//		protocol = 0;
-		}
+	//	}
 
 		fd = Xsocket(AF_XIA, type, protocol);
 
@@ -1141,6 +1307,8 @@ int socket(int domain, int type, int protocol)
 	}
 	return fd;
 }
+
+
 
 int socketpair(int domain, int type, int protocol, int fds[2])
 {
@@ -1167,6 +1335,8 @@ int socketpair(int domain, int type, int protocol, int fds[2])
 	}
 }
 
+
+
 ssize_t write(int fd, const void *buf, size_t count)
 {
 	size_t rc;
@@ -1185,6 +1355,8 @@ ssize_t write(int fd, const void *buf, size_t count)
 	return rc;
 }
 
+
+
 /********************************************************************
 ** SHADOW FUNCTION MAPPINGS
 ********************************************************************/
@@ -1199,12 +1371,16 @@ extern "C" int __poll_chk(struct pollfd *fds, nfds_t nfds, int timeout, __SIZE_T
 	return rc;
 }
 
+
+
 extern "C" ssize_t __read_chk (int __fd, void *__buf, size_t __nbytes, size_t __buflen)
 {
 	UNUSED(__buflen);
 	TRACE();
 	return read(__fd, __buf, __nbytes);
 }
+
+
 
 extern "C" ssize_t __recv_chk(int __fd, void *__buf, size_t __n, size_t __buflen, int __flags)
 {
@@ -1213,6 +1389,8 @@ extern "C" ssize_t __recv_chk(int __fd, void *__buf, size_t __n, size_t __buflen
 	return recv(__fd, __buf, __n, __flags);
 }
 
+
+
 extern "C" ssize_t __recvfrom_chk (int __fd, void *__restrict __buf, size_t __n, size_t __buflen, int __flags, 
 	__SOCKADDR_ARG __addr, socklen_t *__restrict __addr_len)
 {
@@ -1220,6 +1398,8 @@ extern "C" ssize_t __recvfrom_chk (int __fd, void *__restrict __buf, size_t __n,
 	TRACE();
 	return recvfrom(__fd, __buf, __n, __flags, __addr, __addr_len);
 }
+
+
 
 /********************************************************************
 ** INFO ONLY FUNCTION MAPPINGS
@@ -1233,6 +1413,8 @@ struct hostent *gethostbyaddr (const void *addr, socklen_t len, int type)
 	return __real_gethostbyaddr(addr, len, type);
 }
 
+
+
 int gethostbyaddr_r (const void *addr, socklen_t len, int type, struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errnop)
 {
 	TRACE();
@@ -1241,6 +1423,8 @@ int gethostbyaddr_r (const void *addr, socklen_t len, int type, struct hostent *
 	// FIXME: add code here to map between IPv4 and XIA
 	return __real_gethostbyaddr_r(addr, len, type, result_buf, buf, buflen, result, h_errnop);
 }
+
+
 
 struct hostent *gethostbyname (const char *name)
 {
@@ -1254,6 +1438,8 @@ struct hostent *gethostbyname (const char *name)
 	return __real_gethostbyname(name);
 }
 
+
+
 int gethostbyname_r (const char *name, struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errnop)
 {
 	TRACE();
@@ -1263,12 +1449,16 @@ int gethostbyname_r (const char *name, struct hostent *result_buf, char *buf, si
 	return __real_gethostbyname_r(name, result_buf, buf, buflen, result, h_errnop);
 }
 
+
+
 int getnameinfo (const struct sockaddr *sa, socklen_t salen, char *host, socklen_t hostlen, char *serv, socklen_t servlen, unsigned int flags)
 {
 	TRACE();
 	ALERT();
 	return __real_getnameinfo(sa, salen, host, hostlen, serv, servlen, flags);
 }
+
+
 
 struct servent *getservbyname (const char *name, const char *proto)
 {
@@ -1277,12 +1467,16 @@ struct servent *getservbyname (const char *name, const char *proto)
 	return __real_getservbyname(name, proto);
 }
 
+
+
 int getservbyname_r (const char *name, const char *proto, struct servent *result_buf, char *buf, size_t buflen, struct servent **result)
 {
 	TRACE();
 	ALERT();
 	return __real_getservbyname_r(name, proto, result_buf, buf, buflen, result);
 }
+
+
 
 struct servent *getservbyport (int port, const char *proto)
 {
@@ -1291,12 +1485,16 @@ struct servent *getservbyport (int port, const char *proto)
 	return __real_getservbyport(port, proto);
 }
 
+
+
 int getservbyport_r (int port, const char *proto, struct servent *result_buf, char *buf, size_t buflen, struct servent **result)
 {
 	TRACE();
 	ALERT();
 	return __real_getservbyport_r(port, proto, result_buf, buf, buflen, result);
 }
+
+
 
 ssize_t recvmsg(int fd, struct msghdr *message, int flags)
 {
@@ -1315,6 +1513,8 @@ ssize_t recvmsg(int fd, struct msghdr *message, int flags)
 		return rc;
 //	}
 }
+
+
 
 ssize_t sendmsg(int fd, const struct msghdr *message, int flags)
 {
