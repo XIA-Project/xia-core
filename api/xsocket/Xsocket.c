@@ -73,10 +73,10 @@ int Xsocket(int family, int transport_type, int protocol)
 		return -1;
 	}
 
-	if (protocol != 0) {
-		LOG("warning: the protocol field is not currently used in the Xsocket API");
-		protocol = 0;
-	}
+//	if (protocol != 0) {
+//		LOG("warning: the protocol field is not currently used in the Xsocket API");
+//		protocol = 0;
+//	}
 
 
 	if (transport_type & SOCK_CLOEXEC) {

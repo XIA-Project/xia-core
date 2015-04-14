@@ -79,10 +79,15 @@ LOGF("cmd = SETFL flags = %08x\n", f);
 			if (f & O_NONBLOCK) {
 				LOGF("Blocking (%08x) set to %s\n", O_NONBLOCK, (f & O_NONBLOCK) ? "true" : "false");
 				setBlocking(sockfd, (f & O_NONBLOCK) == 0);
-			} else
-				LOGF("unsupported flags to Xfcntl (%08x)\n", f);
-				rc = -1;
-				errno = EINVAL;
+				rc = 0;
+			} 
+
+			if (f & ~O_NONBLOCK) {
+				LOGF("unsupported flags to Xfcntl (%08x) ignoring\n", f);
+
+//				rc = -1;
+//				errno = EINVAL;
+			}
 			break;
 		}
 		default:
