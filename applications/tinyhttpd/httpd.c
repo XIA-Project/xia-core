@@ -306,35 +306,39 @@ void execute_cgi(int client, const char *path,
 /**********************************************************************/
 int get_line(int sock, char *buf, int size)
 {
- int i = 0;
- char c = '\0';
- int n;
+  char *last = buf + size;
+  char *p = buf;
+  int n;
 
- while ((i < size - 1) && (c != '\n'))
- {
-  n = recv(sock, &c, 1, 0);
-  /* DEBUG printf("%02X\n", c); */
-  if (n > 0)
+  memset(buf, 0, size);
+
+  while ((p != last) && (*p != '\n'))
   {
-   if (c == '\r')
-   {
-    n = recv(sock, &c, 1, MSG_PEEK);
-    /* DEBUG printf("%02X\n", c); */
-    if ((n > 0) && (c == '\n'))
-     recv(sock, &c, 1, 0);
-    else
-     c = '\n';
-   }
-   buf[i] = c;
-   i++;
+    n = recv(sock, p, 1, 0);
+    if (n > 0)
+    {
+      if (*p == '\r')
+      {
+        n = recv(sock, p, 1, MSG_PEEK);
+        /* DEBUG printf("%02X\n", c); */
+        if ((n > 0) && (*p == '\n'))
+          recv(sock, p, 1, 0);
+        else
+          *p = '\n';
+      }
+      if (*p == '\n')
+        break;
+      p++;
+    }
+    else {
+      *p = '\n';
+      break;
+    }
+    printf("%s\n", buf);
   }
-  else
-   c = '\n';
- }
- buf[i] = '\0';
- 
-printf("getline: %s\n", buf);
- return(i);
+
+  printf("getline: %s\n", buf);
+  return(strlen(buf));
 }
 
 /**********************************************************************/
