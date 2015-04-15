@@ -74,22 +74,23 @@
 
 
 // Logging Macros ***************************************************
-#define TRACE()		   {if (_log_trace)    fprintf(_log, "xwrap: %s\r\n", __FUNCTION__);}
+#define TRACE()          {if (_log_trace)    fprintf(_log, "xwrap: %s\r\n", __FUNCTION__);}
 
-#define MSG(...)	   {if (_log_info)    {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
-#define XFER_FLAGS(f)  {if (_log_info)     fprintf(_log, "xwrap: %s flags:%s\n", __FUNCTION__, xferFlags(f));}
-#define AI_FLAGS(f)    {if (_log_info)     fprintf(_log, "xwrap: %s flags:%s\n", __FUNCTION__, aiFlags(f));}
-#define FCNTL_FLAGS(f) {if (_log_info)     fprintf(_log, "xwrap: %s flags:%s\n", __FUNCTION__, fcntlFlags(f));}
-#define AF_VALUE(f)    {if (_log_info)     fprintf(_log, "xwrap: %s family:%s\n", __FUNCTION__, afValue(f));}
-#define OPT_VALUE(f)   {if (_log_info)     fprintf(_log, "xwrap: %s opt:%s\n", __FUNCTION__, optValue(f));}
+#define MSG(...)         {if (_log_info)    {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
+#define XFER_FLAGS(f)    {if (_log_info)     fprintf(_log, "xwrap: %s flags:%s\n", __FUNCTION__, xferFlags(f));}
+#define AI_FLAGS(f)      {if (_log_info)     fprintf(_log, "xwrap: %s flags:%s\n", __FUNCTION__, aiFlags(f));}
+#define FCNTL_FLAGS(f)   {if (_log_info)     fprintf(_log, "xwrap: %s flags:%s\n", __FUNCTION__, fcntlFlags(f));}
+#define AF_VALUE(f)      {if (_log_info)     fprintf(_log, "xwrap: %s family:%s\n", __FUNCTION__, afValue(f));}
+#define OPT_VALUE(f)     {if (_log_info)     fprintf(_log, "xwrap: %s opt:%s\n", __FUNCTION__, optValue(f));}
+#define POLL_FLAGS(i, f) {if (_log_info)     fprintf(_log, "xwrap: %s socket:%u %s\n", __FUNCTION__, i, pollFlags(f));}
+#define XIAIFY()         {if (_log_wrap)     fprintf(_log, "xwrap: %s redirected to XIA\r\n", __FUNCTION__);}
 
-#define XIAIFY()	   {if (_log_wrap)     fprintf(_log, "xwrap: %s redirected to XIA\r\n", __FUNCTION__);}
-//#define NOXIA()      {if (_log_wrap)     fprintf(_log, "xwrap: %s used normally\r\n", __FUNCTION__);}
+//#define NOXIA()        {if (_log_wrap)     fprintf(_log, "xwrap: %s used normally\r\n", __FUNCTION__);}
 #define NOXIA()
-#define SKIP()		   {if (_log_wrap)     fprintf(_log, "xwrap: %s not required/supported in XIA (no-op)\r\n", __FUNCTION__);}
+#define SKIP()           {if (_log_wrap)     fprintf(_log, "xwrap: %s not required/supported in XIA (no-op)\r\n", __FUNCTION__);}
 
-#define ALERT()		   {if (_log_warning)  fprintf(_log, "xwrap: ALERT!!!, %s is not implemented in XIA!\r\n", __FUNCTION__);}
-#define WARNING(...)   {if (_log_warning) {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
+#define ALERT()          {if (_log_warning)  fprintf(_log, "xwrap: ALERT!!!, %s is not implemented in XIA!\r\n", __FUNCTION__);}
+#define WARNING(...)     {if (_log_warning) {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
 
 #ifdef DEBUG
 #define DBG(...) {if (_log_warning) {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
@@ -216,6 +217,21 @@ static FILE *_log = NULL;
 // call into the Xsockets API to see if the fd is associated with an Xsocket
 #define isXsocket(s)	 (getSocketType(s) != -1)
 #define shouldWrap(s)	 (isXsocket(s))
+
+// dump the contents of the pollfds
+void pollDump(struct pollfd *fds, nfds_t nfds, int in)
+{
+	MSG("%s\n", (in ? "PRE" : "POST"));
+	for(nfds_t i = 0; i < nfds; i++) {
+		if (in == 1 && fds[i].events != 0) {
+			POLL_FLAGS(fds[i].fd, fds[i].events);
+
+		} else if (fds[i].revents != 0) {
+			POLL_FLAGS(fds[i].fd, fds[i].revents);
+		}
+	}
+}
+
 
 
 // get a unique port number
@@ -1139,10 +1155,12 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
 {
 	int rc;
 	TRACE();
+
 	// Let Xpoll do all the work of figuring out what fds we are handling
-//	MSG("Xpoll: %zu %d %08x\n", nfds, fds[0].fd, fds[0].events);
+	pollDump(fds, nfds, 1);
 	rc = Xpoll(fds, nfds, timeout);
-//	MSG("Xpoll returns %d %d %08x\n", rc, fds[0].fd, fds[0].revents);
+	pollDump(fds, nfds, 0);
+
 	return rc;
 }
 
@@ -1235,9 +1253,30 @@ ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, 
 
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)
 {
+	int rc;
+
 	TRACE();
 	// Let Xselect do all the work of figuring out what fds we are handling
-	return Xselect(nfds, readfds, writefds, exceptfds, timeout);
+	rc = Xselect(nfds, readfds, writefds, exceptfds, timeout);
+
+#ifdef DEBUG
+	if (rc > 0) {
+		// we found at least one event
+		for (int i = 0; i < nfds; i++) {
+			if (readfds && FD_ISSET(i, readfds)) {
+				MSG("%d = read\n", i);
+			}
+			if (writefds && FD_ISSET(i, writefds)) {
+				MSG("%d = write\n", i);
+			}
+			if (exceptfds && FD_ISSET(i, exceptfds)) {
+				MSG("%d = except\n", i);
+			}
+		}
+	}
+#endif
+
+	return rc;
 }
 
 
@@ -1453,9 +1492,12 @@ extern "C" int __poll_chk(struct pollfd *fds, nfds_t nfds, int timeout, __SIZE_T
 	int rc;
 	UNUSED(__fdslen);
 	TRACE();
-	MSG("%zu %d %08x\n", nfds, fds[0].fd, fds[0].events);
+
+	// Let Xpoll do all the work of figuring out what fds we are handling
+	pollDump(fds, nfds, 1);
 	rc = Xpoll(fds, nfds, timeout);
-	MSG("Xpoll returns %d %d %08x\n", rc, fds[0].fd, fds[0].revents);
+	pollDump(fds, nfds, 0);
+
 	return rc;
 }
 

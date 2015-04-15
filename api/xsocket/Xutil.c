@@ -79,6 +79,22 @@ idrec fcntl_flags[] = {
 	FR(O_WRONLY)
 };
 
+idrec poll_flags[] = {
+	FR(POLLERR),
+	FR(POLLHUP),
+	FR(POLLIN),
+	FR(POLLMSG),
+	FR(POLLNVAL),
+	FR(POLLOUT),
+	FR(POLLPRI),
+	FR(POLLRDBAND),
+	FR(POLLRDHUP),
+	FR(POLLRDNORM),
+	FR(POLLREMOVE),
+	FR(POLLWRBAND),
+	FR(POLLWRNORM)
+};
+
 idrec af_values[] = {
 	FR(AF_FILE),
 	FR(AF_INET),
@@ -381,6 +397,11 @@ const char *aiFlags(size_t f)
 const char *fcntlFlags(size_t f)
 {
 	return getFlags(fcntl_flags, sizeof(fcntl_flags)/sizeof(idrec), f);
+}
+
+const char *pollFlags(size_t f)
+{
+	return getFlags(poll_flags, sizeof(poll_flags)/sizeof(idrec), f);
 }
 
 const char *afValue(size_t f)

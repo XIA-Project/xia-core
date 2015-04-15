@@ -88,6 +88,7 @@ extern "C" {
 const char *xferFlags(size_t f);
 const char *fcntlFlags(size_t f);
 const char *aiFlags(size_t f);
+const char *pollFlags(size_t f);
 const char *afValue(size_t f);
 const char *optValue(size_t f);
 }
