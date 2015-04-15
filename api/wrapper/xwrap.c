@@ -1658,7 +1658,7 @@ ssize_t sendmsg(int fd, const struct msghdr *msg, int flags)
 
 	TRACE();
 
-	MSG("fd:%d flags:%08x\n", fd, flags);
+	 MSG("fd:%d flags:%08x\n", fd, flags);
 	MSG("msghdr:\n name:%p namelen:%zu iov:%p iovlen:%zu control:%p clen:%zu flags:%08x",
 	msg->msg_name,
 	(size_t)msg->msg_namelen,
