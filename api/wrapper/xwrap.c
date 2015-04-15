@@ -31,10 +31,11 @@
 **	should probably call the right functions eventually although it doen't
 **	affect the running code, just the checks for buffer sizes.
 **
+**	- DO THE RIGHT THING FOR SO_ERROR in the API
+**	- implement PEEK
 **	- Remove the FORCE_XIA calls and always default to XIA mode 
 **
 **	- Check network byte order on ports in getaddrinfo and recvfrom/sendto
-**	- Change _IPAddress to not generate a port, but use what was passed
 **	- Do I need to support sendmmsg in addition to sendmsg?
 **	- Add readv/writev support back in
 **
@@ -289,7 +290,7 @@ static int _GetIP(sockaddr_x *sax, struct sockaddr_in *sin, const char *addr, in
 
 		std::string dag = g.dag_string();
 
-//		MSG("%s =>\n%s\n", id, dag.c_str());
+		MSG("%s =>\n%s\n", id, dag.c_str());
 
 		id2dag[id] = dag;
 		dag2id[dag] = id;
@@ -583,6 +584,8 @@ void __attribute__ ((constructor)) xwrap_init(void)
 		_log = fopen(lf, "w");
 	if (!_log)
 		_log = stderr;
+
+	MSG("\n\nMy addr = %s\n\n", local_addr);
 
 	// find and save the real function pointers
 	GET_FCN(accept);
@@ -1104,6 +1107,7 @@ int getsockname(int fd, struct sockaddr *addr, socklen_t *len)
 		if (_x2i(&sax, (struct sockaddr_in*)addr) < 0) {
 			_GetIP(&sax, (sockaddr_in*)addr, NULL, _NewPort());
 		}
+
 	} else {
 		NOXIA();
 		rc = __real_getsockname(fd, addr, len);
@@ -1159,7 +1163,12 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
 	// Let Xpoll do all the work of figuring out what fds we are handling
 	pollDump(fds, nfds, 1);
 	rc = Xpoll(fds, nfds, timeout);
-	pollDump(fds, nfds, 0);
+
+	if (rc > 0) {
+		pollDump(fds, nfds, 0);
+	} else if (rc == 0) {
+		MSG("timeout\n");
+	}
 
 	return rc;
 }
@@ -1201,7 +1210,7 @@ ssize_t recv(int fd, void *buf, size_t n, int flags)
 		MSG("%s\n", c);
 
 	} else {
-//		NOXIA();
+		NOXIA();
 		rc = __real_recv(fd, buf, n, flags);
 	}
 
@@ -1351,7 +1360,6 @@ int setsockopt(int fd, int level, int optname, const void *optval, socklen_t opt
 	int rc;
 	TRACE();
 
-	MSG("fd = %d level = %08x optname = %08x\n", fd, level, optname);
 	if (isXsocket(fd)) {
 		XIAIFY();
 		OPT_VALUE(optname);
@@ -1373,7 +1381,7 @@ int setsockopt(int fd, int level, int optname, const void *optval, socklen_t opt
 				case SO_LINGER:
 				case SO_KEEPALIVE:
 				case SO_REUSEPORT:
-					MSG("Unhandled option returning success %08x\n", optname);
+					MSG("Unhandled option returning success %s\n", optValue(optname));
 					rc = 0;
 					break;
 
@@ -1390,11 +1398,11 @@ int setsockopt(int fd, int level, int optname, const void *optval, socklen_t opt
 				case SO_PEERCRED:
 				case SO_RCVLOWAT:
 				case SO_SNDLOWAT:
-					MSG("Unhandled option returning error %08x\n", optname);
+					MSG("Unhandled option returning error %s\n", optValue(optname));
 					break;
 
 				default:
-					MSG("Unknown socket option %08x\n", optname);
+					MSG("Unknown socket option command %s\n", optValue(optname));
 					break;
 			}
 			// TODO: add code here to return success for options we can safely ignore
@@ -1496,7 +1504,12 @@ extern "C" int __poll_chk(struct pollfd *fds, nfds_t nfds, int timeout, __SIZE_T
 	// Let Xpoll do all the work of figuring out what fds we are handling
 	pollDump(fds, nfds, 1);
 	rc = Xpoll(fds, nfds, timeout);
-	pollDump(fds, nfds, 0);
+
+	if (rc > 0) {
+		pollDump(fds, nfds, 0);
+	} else if (rc == 0) {
+		MSG("timeout\n");
+	}
 
 	return rc;
 }
