@@ -123,6 +123,7 @@ int SCIONBeaconServerCore::initialize(ErrorHandler* errh) {
         click_chatter("Fatal ERR: update OFG Key fail.\n");
         exit(-1);
     }
+
     #ifdef _DEBUG_BS
     scionPrinter->printLog(IH, (char *)"Load OFG key Done.\n");
     scionPrinter->printLog(IH, (char *)"TDC BS (%s:%s) Initialization Done.\n", 
@@ -166,6 +167,9 @@ bool SCIONBeaconServerCore::parseROT(){
 void SCIONBeaconServerCore::parseTopology(){
     TopoParser parser;
     parser.loadTopoFile(m_sTopologyFile.c_str()); 
+    // TODO: replace topology configuration here
+    // Beacon server could retrieve other server's
+    // information, e.g., DAG from the controller.
     parser.parseServers(m_servers);
     parser.parseEgressIngressPairs(m_routepairs);
 }
@@ -304,9 +308,9 @@ void SCIONBeaconServerCore::push(int port, Packet *p)
                 // downgrade, should be error or attacks!
     	    }
         }
-    		break;
+    	    break;
         default:
-        	break;
+            break;
     }
 }
 
@@ -503,8 +507,8 @@ void SCIONBeaconServerCore::sendPacket(uint8_t* data, uint16_t data_length, stri
     src.append(SID_XROUTE);
 
     XIAPath src_path, dst_path;
-	src_path.parse(src.c_str());
-	dst_path.parse(dest.c_str());
+    src_path.parse(src.c_str());
+    dst_path.parse(dest.c_str());
 
     XIAHeaderEncap xiah;
     xiah.set_nxt(CLICK_XIA_NXT_TRN);

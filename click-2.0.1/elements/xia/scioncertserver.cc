@@ -59,7 +59,7 @@ int SCIONCertServer::configure(Vector<String> &conf, ErrorHandler *errh){
             exit(-1);
     }
 	
-	XIAXIDInfo xiaxidinfo;
+    XIAXIDInfo xiaxidinfo;
     struct click_xia_xid store;
     XID xid = xid;
 
@@ -71,7 +71,7 @@ int SCIONCertServer::configure(Vector<String> &conf, ErrorHandler *errh){
     xid = store;
     m_HID = xid.unparse();
 	
-	return 0;
+    return 0;
 }
 
 int SCIONCertServer::initialize(ErrorHandler* errh){
@@ -181,8 +181,9 @@ int SCIONCertServer::parseROT(char* loc){
 }
 
 void SCIONCertServer::parseTopology(){
-	TopoParser parser;
-	parser.loadTopoFile(m_sTopologyFile.c_str()); 
+    TopoParser parser;
+    // TODO: retrieve topology from the controller
+    parser.loadTopoFile(m_sTopologyFile.c_str()); 
     parser.parseServers(m_servers);
 }
 
@@ -191,29 +192,32 @@ void SCIONCertServer::push(int port, Packet *p)
     TransportHeader thdr(p);
     uint8_t* s_pkt = (uint8_t *) thdr.payload();
     uint16_t type = SPH::getType(s_pkt);
-	uint16_t packetLength = SPH::getTotalLen(s_pkt);
+    uint16_t packetLength = SPH::getTotalLen(s_pkt);
     uint8_t packet[packetLength];
-	memset(packet, 0, packetLength);
+    memset(packet, 0, packetLength);
     memcpy(packet, s_pkt, packetLength);
     
     switch(type) {
-		case ROT_REQ:
-			//processROTRequest(newPacket); 
-			break;
-		case ROT_REP:
-			//processROTReply(newPacket); 
-			break;
-		case ROT_REQ_LOCAL: {
+        // TODO: finish testing for recursive ROT request/response and Cert request/response
+        case ROT_REQ:
+            //processROTRequest(newPacket); 
+            break;
+
+        case ROT_REP:
+            //processROTReply(newPacket); 
+            break;
+
+        case ROT_REQ_LOCAL: {
 		        
-		        uint8_t hdrLen = SPH::getHdrLen(packet);
-		        ROTRequest *req = (ROTRequest *)SPH::getData(packet);
-		        //1. return ROT  if the requested ROT is available from the local repository
-		        if(m_ROT.version >= req->currentVersion) {
-		            sendROT();
-		            //2. if not, request the ROT to the provider AD
-		        } else {
-		            /*
-		        int ret;
+            uint8_t hdrLen = SPH::getHdrLen(packet);
+            ROTRequest *req = (ROTRequest *)SPH::getData(packet);
+            //1. return ROT  if the requested ROT is available from the local repository
+            if(m_ROT.version >= req->currentVersion) {
+                sendROT();
+                //2. if not, request the ROT to the provider AD
+            } else {
+            /*
+            int ret;
 		//if the ROT has not been request,  forward the request packet after changing the type to ROT_REQ
 		if((ret = isROTRequested(req->currentVersion, SPH::getSrcAddr(packet))) == ROT_REQ_NO) {
 			m_ROTRequests.insert(std::pair<uint32_t, HostAddr>(req->currentVersion,SPH::getSrcAddr(packet)));
@@ -249,19 +253,20 @@ void SCIONCertServer::push(int port, Packet *p)
 		        }
 		    }
 			break;
-		case CERT_REQ: 
+	        case CERT_REQ: 
 		    //send chain
 			//processCertificateRequest(packet); 
 			break;
 		case CERT_REP:
 			//processCertificateReply(packet); 
 			break;
-		case CERT_REQ_LOCAL:
-			processLocalCertificateRequest(packet); 
-			break;
-		default:
-			break;
-	}
+
+        case CERT_REQ_LOCAL:
+            processLocalCertificateRequest(packet); 
+            break;
+        default:
+            break;
+    }
 }
 
 void SCIONCertServer::run_timer(Timer* timer) {

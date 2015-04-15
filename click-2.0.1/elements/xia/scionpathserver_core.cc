@@ -104,6 +104,7 @@ int SCIONPathServerCore::initialize(ErrorHandler* errh){
 
 void SCIONPathServerCore::parseTopology(){
     TopoParser parser;
+    // TODO: retrieve server information from the controller
     parser.loadTopoFile(m_sTopologyFile.c_str()); 
     parser.parseServers(m_servers);
 }
@@ -198,7 +199,7 @@ void SCIONPathServerCore::parsePathReq(uint8_t* pkt){
                 string dest = "RE ";
                 dest.append(BHID);
                 dest.append(" ");
-                // hard code AD here
+                // TODO: remove hard code AD here
                 dest.append("AD:");
                 dest.append((const char*)"0000000000000000000000000000000000000004");
                 dest.append(" ");
@@ -324,9 +325,9 @@ void SCIONPathServerCore::sendPacket(uint8_t* data, uint16_t data_length, string
     src.append(" ");
     src.append(SID_XROUTE);
 
-	XIAPath src_path, dst_path;
-	src_path.parse(src.c_str());
-	dst_path.parse(dest.c_str());
+    XIAPath src_path, dst_path;
+    src_path.parse(src.c_str());
+    dst_path.parse(dest.c_str());
 
     XIAHeaderEncap xiah;
     xiah.set_nxt(CLICK_XIA_NXT_TRN);
@@ -337,7 +338,7 @@ void SCIONPathServerCore::sendPacket(uint8_t* data, uint16_t data_length, string
 
     WritablePacket *p = Packet::make(DEFAULT_HD_ROOM, data, data_length, DEFAULT_TL_ROOM);
     TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDGRAMHeader(0); // length
-	WritablePacket *q = thdr->encap(p);
+    WritablePacket *q = thdr->encap(p);
 
     thdr->update();
     xiah.set_plen(data_length + thdr->hlen()); // XIA payload = transport header + transport-layer data

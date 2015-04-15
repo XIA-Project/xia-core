@@ -56,8 +56,7 @@ UPQueue::UPQueue(size_t max_size)
 
 UPQueue::~UPQueue()
 {
-	//SLP: already deleted in dequeue()
-	delete[] paths;
+    delete[] paths;
 }
 
 bool UPQueue::isEmpty() const
@@ -178,6 +177,7 @@ int SCIONPathServer::initialize(ErrorHandler* errh){
 
 void SCIONPathServer::parseTopology(){
     TopoParser parser;
+    // TODO: retrieve topology information from the controller
     parser.loadTopoFile(m_sTopologyFile.c_str()); 
     parser.parseServers(m_servers);
 }
@@ -195,25 +195,25 @@ void SCIONPathServer::push(int port, Packet *p)
     switch(type) {
 		
         // UP_PATH: up path registration from local beacon server
-		case UP_PATH: {
-		    #ifdef _DEBUG_PS
+        case UP_PATH: {
+            #ifdef _DEBUG_PS
             scionPrinter->printLog(IH, type, (char *)"Received Up-path from local BS. Print Path: \n");
             #endif
             parseUpPath(packet);
-		}
-		break;
+        }
+	    break;
 		
         // PATH_REP : path reply from the path server core
-		case PATH_REP: {
+	case PATH_REP: {
 
-			uint8_t pathbuf[totalLength]; //for multiple packet transmissions.
-			uint8_t buf[totalLength]; //for multiple packet transmissions.
+            uint8_t pathbuf[totalLength]; //for multiple packet transmissions.
+	    uint8_t buf[totalLength]; //for multiple packet transmissions.
             uint8_t hdrLen = SPH::getHdrLen(packet);
             pathInfo* pi = (pathInfo*)(packet+hdrLen);
 
-			#ifdef _DEBUG_PS
+            #ifdef _DEBUG_PS
             scionPrinter->printLog(IH, type, (char*)"PATH_REP recieved for target AD %llu\n", pi->target);
-			#endif
+            #endif
 			
 			//Now, send reply to all clients in the pending request table
 			std::multimap<uint64_t,HostAddr>::iterator itr;
@@ -254,8 +254,8 @@ void SCIONPathServer::push(int port, Packet *p)
 		}
 		break;
         
-		// PATH_REQ_LOCAL: path request from client
-		case PATH_REQ_LOCAL: {
+            // PATH_REQ_LOCAL: path request from client
+        case PATH_REQ_LOCAL: {
             
             uint8_t ts = 0;
 			// put path info in the packet
@@ -265,9 +265,9 @@ void SCIONPathServer::push(int port, Packet *p)
             HostAddr requestId = SPH::getSrcAddr(packet);
             
             #ifdef _DEBUG_PS
-			scionPrinter->printLog(IH,type,(char *)"PS (%llu:%llu): Request paths for Target AD: %llu\n", 
+            scionPrinter->printLog(IH,type,(char *)"PS (%llu:%llu): Request paths for Target AD: %llu\n", 
 				m_uAdAid, m_uAid, target);
-			#endif
+            #endif
             
             // for down-path
             int num_buffered_requests = sendRequest(target, requestId);
@@ -279,10 +279,10 @@ void SCIONPathServer::push(int port, Packet *p)
             // for up-path
             sendUpPath(requestId);
         }
-        break;
+            break;
         
-		default: 
-			break;
+        default: 
+            break;
     }
     
 }
@@ -346,7 +346,7 @@ int SCIONPathServer::sendRequest(uint64_t target, HostAddr requestAid) {
 
     string dest = "RE ";
     dest.append(BHID);
-    // TODO: hardcoded TDC path server
+    // TODO: remove hardcoded TDC path server
     dest.append(" ");
     dest.append("AD:");
     dest.append((const char*)"0000000000000000000000000000000000000001");
@@ -356,7 +356,7 @@ int SCIONPathServer::sendRequest(uint64_t target, HostAddr requestAid) {
     
     sendPacket(packet, length, dest);
 
-	return pendingDownpathReq.count(target);
+    return pendingDownpathReq.count(target);
 }
 
 /*
@@ -668,9 +668,9 @@ void SCIONPathServer::sendPacket(uint8_t* data, uint16_t data_length, string des
     src.append(" ");
     src.append(SID_XROUTE);
 
-	XIAPath src_path, dst_path;
-	src_path.parse(src.c_str());
-	dst_path.parse(dest.c_str());
+    XIAPath src_path, dst_path;
+    src_path.parse(src.c_str());
+    dst_path.parse(dest.c_str());
 
     XIAHeaderEncap xiah;
     xiah.set_nxt(CLICK_XIA_NXT_TRN);

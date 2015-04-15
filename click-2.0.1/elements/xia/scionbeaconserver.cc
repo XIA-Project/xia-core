@@ -177,30 +177,33 @@ bool SCIONBeaconServer::initOfgKey() {
 	    scionPrinter->printLog(EH, (char *)"OFG Key setup failure.\n");
 	    #endif
 	    return SCION_FAILURE;
-	}
-	return SCION_SUCCESS;
+    }
+    return SCION_SUCCESS;
 }
 
 bool SCIONBeaconServer::updateOfgKey() {
-	//This function should be updated...
-	m_prevOfgKey.time = m_currOfgKey.time;
-	memcpy(m_prevOfgKey.key, m_currOfgKey.key, OFG_KEY_SIZE);
+    
+    //This function should be updated...
+    m_prevOfgKey.time = m_currOfgKey.time;
+    memcpy(m_prevOfgKey.key, m_currOfgKey.key, OFG_KEY_SIZE);
 	
-	int err;
-	if(err = aes_setkey_enc(&m_prevOfgKey.actx, m_prevOfgKey.key, 
-	    OFG_KEY_SIZE_BITS)) {
-	    #ifdef _DEBUG_BS
-		scionPrinter->printLog(EH, (char *)"Prev. OFG Key setup failure.\n");
-		#endif
+    int err;
+    if(err = aes_setkey_enc(&m_prevOfgKey.actx, m_prevOfgKey.key, 
+        OFG_KEY_SIZE_BITS)) {
+	#ifdef _DEBUG_BS
+        scionPrinter->printLog(EH, (char *)"Prev. OFG Key setup failure.\n");
+        #endif
         return SCION_FAILURE;
-	}
+    }
 
-	return SCION_SUCCESS;
+    return SCION_SUCCESS;
 }
 
 void SCIONBeaconServer::parseTopology(){
     TopoParser parser;
     parser.loadTopoFile(m_sTopologyFile.c_str()); 
+    // TODO: retrieve related topology information
+    // form the controller
     parser.parseServers(m_servers);
     parser.parseEgressIngressPairs(m_routepairs);
 }
@@ -212,77 +215,77 @@ bool SCIONBeaconServer::parseROT(char* loc){
     ROT tROT;
     
     if(loc)
-	    fn = loc;
-	else
-	    fn = m_sROTFile;
+	fn = loc;
+    else
+        fn = m_sROTFile;
 	
-	if(parser.loadROTFile(fn)!=ROTParseNoError){
-	    #ifdef _DEBUG_BS
-	    scionPrinter->printLog(EH, (char *)"ROT missing at BS.\n");
-	    #endif
-	    return SCION_FAILURE;
-	}
-	#ifdef _DEBUG_BS
-	scionPrinter->printLog(IH, (char *)"Load ROT OK.\n");
-	#endif
+    if(parser.loadROTFile(fn)!=ROTParseNoError){
+        #ifdef _DEBUG_BS
+        scionPrinter->printLog(EH, (char *)"ROT missing at BS.\n");
+        #endif
+        return SCION_FAILURE;
+    }
+    #ifdef _DEBUG_BS
+    scionPrinter->printLog(IH, (char *)"Load ROT OK.\n");
+    #endif
 	
-	if(parser.parse(tROT)!=ROTParseNoError){
-	    #ifdef _DEBUG_BS
-	    scionPrinter->printLog(EH, (char *)"ERR: ROT parsing error at BS.\n");
-	    #endif
-	    return SCION_FAILURE;
-	}
-	#ifdef _DEBUG_BS
-	scionPrinter->printLog(IH, (char *)"Parse ROT OK.\n");
-	#endif
+    if(parser.parse(tROT)!=ROTParseNoError){
+        #ifdef _DEBUG_BS
+        scionPrinter->printLog(EH, (char *)"ERR: ROT parsing error at BS.\n");
+        #endif
+        return SCION_FAILURE;
+    }
+    #ifdef _DEBUG_BS
+    scionPrinter->printLog(IH, (char *)"Parse ROT OK.\n");
+    #endif
 	
-	if(parser.verifyROT(tROT)!=ROTParseNoError){
-	    #ifdef _DEBUG_BS
-	    scionPrinter->printLog(EH, (char *)"ROT parsing verifying at BS.\n");
-	    #endif
-	    return SCION_FAILURE;
-	}
-	#ifdef _DEBUG_BS
-	scionPrinter->printLog(IH, (char *)"Verify ROT OK.\n");
-	#endif
+    if(parser.verifyROT(tROT)!=ROTParseNoError){
+        #ifdef _DEBUG_BS
+        scionPrinter->printLog(EH, (char *)"ROT parsing verifying at BS.\n");
+        #endif
+        return SCION_FAILURE;
+    }
+    #ifdef _DEBUG_BS
+    scionPrinter->printLog(IH, (char *)"Verify ROT OK.\n");
+    #endif
 	
-	//Store the ROT if verification passed.
-	parser.parse(m_cROT);
-	#ifdef _DEBUG_BS
-	scionPrinter->printLog(IH, (char *)"Verify ROT OK.\n");
-	#endif
-	return SCION_SUCCESS;
+    //Store the ROT if verification passed.
+    parser.parse(m_cROT);
+    #ifdef _DEBUG_BS
+    scionPrinter->printLog(IH, (char *)"Verify ROT OK.\n");
+    #endif
+    return SCION_SUCCESS;
 }
 
 void SCIONBeaconServer::loadPrivateKey() {
     if(!_CryptoIsReady) {
-		rsa_init(&PriKey, RSA_PKCS_V15, 0);	
-		int ret;
-		pk_context pk;
-		pk_init( &pk );
-		ret = pk_parse_keyfile( &pk, m_csPrvKeyFile, NULL );
-		if( ret == 0 && ! pk_can_do( &pk, POLARSSL_PK_RSA ) )
-			ret = POLARSSL_ERR_PK_TYPE_MISMATCH;
-		if( ret == 0 )
-			rsa_copy( &PriKey, pk_rsa( pk ) );
+        rsa_init(&PriKey, RSA_PKCS_V15, 0);	
+	int ret;
+	pk_context pk;
+	pk_init( &pk );
+	ret = pk_parse_keyfile( &pk, m_csPrvKeyFile, NULL );
+	if( ret == 0 && ! pk_can_do( &pk, POLARSSL_PK_RSA ) )
+	    ret = POLARSSL_ERR_PK_TYPE_MISMATCH;
+	if( ret == 0 )
+	    rsa_copy( &PriKey, pk_rsa( pk ) );
 
-		if( ret != 0) {
-			rsa_free(&PriKey);
-			pk_free(&pk);
-			click_chatter("Fatal error: Private key file loading failure, path = %s\n", 
-			    (char*)m_csPrvKeyFile);
-			exit(-1);
-		}
-		// check private key
-		if(rsa_check_pubkey(&PriKey)!=0)
-		{
-			rsa_free(&PriKey);
-			click_chatter("Fatal error: Private key is not well-formatted, path = %s\n", 
-			    (char*)m_csPrvKeyFile);
-			exit(-1);
-		}	
-		_CryptoIsReady = true;
+	if( ret != 0) {
+	    rsa_free(&PriKey);
+	    pk_free(&pk);
+	    click_chatter("Fatal error: Private key file loading failure, path = %s\n", 
+	    (char*)m_csPrvKeyFile);
+            exit(-1);
 	}
+	// check private key
+	if(rsa_check_pubkey(&PriKey)!=0)
+	{
+	    rsa_free(&PriKey);
+	    click_chatter("Fatal error: Private key is not well-formatted, path = %s\n", 
+	        (char*)m_csPrvKeyFile);
+	    exit(-1);
+	}	
+	_CryptoIsReady = true;
+    }
 }
 
 void SCIONBeaconServer::run_timer(Timer *timer){
@@ -300,27 +303,26 @@ void SCIONBeaconServer::run_timer(Timer *timer){
         #endif
         requestROT();
         
-	}else{
-	    // time for registration
-	    if(m_iIsRegister && curTime - m_lastRegTime >= m_iRegTime) {
-	        registerPaths();
-	        time(&m_lastRegTime); //updates the time
-	    }
+    }else{
+        // time for registration
+        if(m_iIsRegister && curTime - m_lastRegTime >= m_iRegTime) {
+            registerPaths();
+            time(&m_lastRegTime); //updates the time
+        }
 	    
-	    // check ROT and Crypto are ready
-	    // time for propagation
-	    if(curTime - m_lastPropTime >= m_iPropTime){
-	        propagate();
-	        time(&m_lastPropTime); //updates the time
-	    }
+        // check ROT and Crypto are ready
+        // time for propagation
+        if(curTime - m_lastPropTime >= m_iPropTime){
+            propagate();
+            time(&m_lastPropTime); //updates the time
+        }
 	    
-	    // recheck unverified PCBs (due to missing certificates)...
-	    if(curTime-m_lastRecheckTime >= m_iRecheckTime){
-	        recheckPcb(); 
-	    }
-	}
-	
-	_timer.reschedule_after_sec(m_iScheduleTime);
+        // recheck unverified PCBs (due to missing certificates)...
+        if(curTime-m_lastRecheckTime >= m_iRecheckTime){
+            recheckPcb(); 
+        }
+    }
+    _timer.reschedule_after_sec(m_iScheduleTime);
 }
 
 void SCIONBeaconServer::push(int port, Packet *p)
@@ -328,9 +330,9 @@ void SCIONBeaconServer::push(int port, Packet *p)
     TransportHeader thdr(p);
     uint8_t* s_pkt = (uint8_t *)thdr.payload();
     uint16_t type = SPH::getType(s_pkt);
-	uint16_t packetLength = SPH::getTotalLen(s_pkt);
+    uint16_t packetLength = SPH::getTotalLen(s_pkt);
     uint8_t packet[packetLength];
-	memset(packet, 0, packetLength);
+    memset(packet, 0, packetLength);
     memcpy(packet, s_pkt, packetLength);
     p->kill();
     
@@ -369,32 +371,32 @@ void SCIONBeaconServer::push(int port, Packet *p)
         
         case ROT_REP_LOCAL:
             #ifdef _DEBUG_BS
-			scionPrinter->printLog(IH, (char*)"BS (%s:%s): Received ROT_REP_LOCAL from local CS.\n", 
-			    m_AD.c_str(), m_HID.c_str());
-			#endif
-			saveROT(packet, packetLength);
-			break;
+            scionPrinter->printLog(IH, (char*)"BS (%s:%s): Received ROT_REP_LOCAL from local CS.\n", 
+		    m_AD.c_str(), m_HID.c_str());
+            #endif
+            saveROT(packet, packetLength);
+            break;
 			
-		default:
-			break;
-	}
+        default:
+            break;
+    }
 }
 
 void SCIONBeaconServer::requestROT(uint32_t version) {
 	
     if(m_servers.find(CertificateServer)!=m_servers.end()){
-	    // Request ROT from Cert Server
-	    uint8_t hdrLen = COMMON_HEADER_SIZE+AIP_SIZE*2;
-	    uint16_t totalLen = hdrLen + sizeof(struct ROTRequest);
-	    uint8_t packet[totalLen];
+        // Request ROT from Cert Server
+        uint8_t hdrLen = COMMON_HEADER_SIZE+AIP_SIZE*2;
+        uint16_t totalLen = hdrLen + sizeof(struct ROTRequest);
+        uint8_t packet[totalLen];
 	    
-	    scionHeader hdr;
-	    hdr.cmn.type = ROT_REQ_LOCAL;
-	    hdr.cmn.hdrLen = hdrLen;
-	    hdr.cmn.totalLen = totalLen;
-	    hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)(strchr(m_HID.c_str(),':')+1));
-	    hdr.dst = HostAddr(HOST_ADDR_AIP, (uint8_t*)(m_servers.find(CertificateServer)->second.HID));
-	    SPH::setHeader(packet, hdr);
+        scionHeader hdr;
+        hdr.cmn.type = ROT_REQ_LOCAL;
+        hdr.cmn.hdrLen = hdrLen;
+        hdr.cmn.totalLen = totalLen;
+        hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)(strchr(m_HID.c_str(),':')+1));
+        hdr.dst = HostAddr(HOST_ADDR_AIP, (uint8_t*)(m_servers.find(CertificateServer)->second.HID));
+        SPH::setHeader(packet, hdr);
 
     	// set default version number as 0
     	struct ROTRequest req;
@@ -409,7 +411,7 @@ void SCIONBeaconServer::requestROT(uint32_t version) {
     	dest.append(BHID);
     	dest.append(" ");
     	dest.append(m_AD.c_str());
-		dest.append(" ");
+        dest.append(" ");
     	// local cert server 
     	dest.append("HID:");
     	dest.append((const char*)m_servers.find(CertificateServer)->second.HID);
@@ -421,11 +423,11 @@ void SCIONBeaconServer::requestROT(uint32_t version) {
 Send ROT request to local cert server.\n", m_AD.c_str(), m_HID.c_str());
         #endif
         
-	}else{
-	    #ifdef _DEBUG_BS
-    	scionPrinter->printLog(EH, (char*)"AD (%s) does not has cert server.\n", m_AD.c_str());
-    	#endif 
-	}
+    }else{
+        #ifdef _DEBUG_BS
+        scionPrinter->printLog(EH, (char*)"AD (%s) does not has cert server.\n", m_AD.c_str());
+        #endif 
+    }
 }
 
 void SCIONBeaconServer::saveROT(SPacket * packet, uint16_t packetLength) {
@@ -575,51 +577,51 @@ void SCIONBeaconServer::processPCB(uint8_t* packet, uint16_t packetLength){
 }
 
 void SCIONBeaconServer::saveCertificate(SPacket * packet, uint16_t packetLength) {
-	uint8_t hdrLen = SPH::getHdrLen(packet);
-	certInfo* info = (certInfo*)(packet+hdrLen);
-	uint64_t target = info->target;
-	uint16_t cLength = info->length;
+    uint8_t hdrLen = SPH::getHdrLen(packet);
+    certInfo* info = (certInfo*)(packet+hdrLen);
+    uint64_t target = info->target;
+    uint16_t cLength = info->length;
 	
-	char cFileName[MAX_FILE_LEN]; 
-	sprintf(cFileName,"./TD1/Non-TDC/AD%lu/beaconserver/certificates/td%u-ad%lu-0.crt", m_uAdAid, m_uTdAid, target);
-	// erase from the request queue
-	certRequest.erase(target);
-	// store certificate
-	FILE* cFile = fopen(cFileName,"w");
-	fwrite(packet+hdrLen+CERT_INFO_SIZE,1,cLength,cFile);
-	fclose(cFile);
+    char cFileName[MAX_FILE_LEN]; 
+    sprintf(cFileName,"./TD1/Non-TDC/AD%lu/beaconserver/certificates/td%u-ad%lu-0.crt", m_uAdAid, m_uTdAid, target);
+    // erase from the request queue
+    certRequest.erase(target);
+    // store certificate
+    FILE* cFile = fopen(cFileName,"w");
+    fwrite(packet+hdrLen+CERT_INFO_SIZE,1,cLength,cFile);
+    fclose(cFile);
 	
-	#ifdef _DEBUG_BS
-	scionPrinter->printLog(IH, (char*)"BS saves certificate at %s.\n", cFileName);
-	#endif
+    #ifdef _DEBUG_BS
+    scionPrinter->printLog(IH, (char*)"BS saves certificate at %s.\n", cFileName);
+    #endif
 }
 
 uint16_t SCIONBeaconServer::removeSignature(SPacket* inPacket, uint8_t* path){
 
-	uint16_t totalLength = SPH::getTotalLen(inPacket);
-	uint16_t numHop = SCIONBeaconLib::getNumHops(inPacket);
-	uint8_t buf[totalLength];
-	memset(buf, 0, totalLength);
-	uint8_t hdrLen = SPH::getHdrLen(inPacket);
+    uint16_t totalLength = SPH::getTotalLen(inPacket);
+    uint16_t numHop = SCIONBeaconLib::getNumHops(inPacket);
+    uint8_t buf[totalLength];
+    memset(buf, 0, totalLength);
+    uint8_t hdrLen = SPH::getHdrLen(inPacket);
 
-	// buf has special OF + series of OFs
-	// 1. copy the special opaque field (TS) to the buffer.
-	memcpy(buf, inPacket+hdrLen, OPAQUE_FIELD_SIZE);
+    // buf has special OF + series of OFs
+    // 1. copy the special opaque field (TS) to the buffer.
+    memcpy(buf, inPacket+hdrLen, OPAQUE_FIELD_SIZE);
 
-	uint8_t* ptr = inPacket+hdrLen+OPAQUE_FIELD_SIZE*2;
-	pcbMarking* mrkPtr = (pcbMarking*)ptr;
-	uint16_t offset = OPAQUE_FIELD_SIZE;
+    uint8_t* ptr = inPacket+hdrLen+OPAQUE_FIELD_SIZE*2;
+    pcbMarking* mrkPtr = (pcbMarking*)ptr;
+    uint16_t offset = OPAQUE_FIELD_SIZE;
 
-	// 2. copy markings excluding signature
-	for(int i=0;i<numHop;i++){
-		uint16_t blkSize = mrkPtr->blkSize;
-		memcpy(buf+offset, ptr, blkSize);
-		ptr+= (blkSize+mrkPtr->sigLen);
-		mrkPtr=(pcbMarking*)ptr;
-		offset+=blkSize;
-	}
-	memcpy(path, buf, offset);
-	return offset;
+    // 2. copy markings excluding signature
+    for(int i=0;i<numHop;i++){
+	uint16_t blkSize = mrkPtr->blkSize;
+	memcpy(buf+offset, ptr, blkSize);
+	ptr+= (blkSize+mrkPtr->sigLen);
+	mrkPtr=(pcbMarking*)ptr;
+	offset+=blkSize;
+    }
+    memcpy(path, buf, offset);
+    return offset;
 }
 
 void SCIONBeaconServer::addPcb(SPacket* pkt) {
@@ -843,7 +845,7 @@ int SCIONBeaconServer::registerPath(pcb &rpcb){
 	scionPrinter->printLog(IH, PATH_REG, rpcb.timestamp, (char *)"%s %u, SENT PATH: %s\n", m_AD.c_str(), newPacketLength, buf);
 	#endif
 	
-	// hacked conversion for AD number to AD identifier
+	// TODO: remove hacked conversion for AD number to AD identifier
 	char adbuf[AIP_SIZE+1];
 	sprintf(adbuf, "%040llu", tdc_ad);
 
@@ -1202,9 +1204,9 @@ void SCIONBeaconServer::sendPacket(uint8_t* data, uint16_t data_length, string d
     src.append(" ");
     src.append(SID_XROUTE);
 
-	XIAPath src_path, dst_path;
-	src_path.parse(src.c_str());
-	dst_path.parse(dest.c_str());
+    XIAPath src_path, dst_path;
+    src_path.parse(src.c_str());
+    dst_path.parse(dest.c_str());
 
     XIAHeaderEncap xiah;
     xiah.set_nxt(CLICK_XIA_NXT_TRN);
@@ -1231,14 +1233,14 @@ void SCIONBeaconServer::getCertFile(uint8_t* fn, uint64_t target){
 }
 
 void SCIONBeaconServer::recheckPcb(){
-	std::multimap<uint32_t, pcb>::iterator itr;
-	for(itr=unverified_pcbs.begin();itr!=unverified_pcbs.end();itr++){
-		if(verifyPcb(itr->second.msg)==SCION_SUCCESS){
-			addPcb(itr->second.msg);
-			free(itr->second.msg);
-			unverified_pcbs.erase(itr);
-		}
-	}
+    std::multimap<uint32_t, pcb>::iterator itr;
+    for(itr=unverified_pcbs.begin();itr!=unverified_pcbs.end();itr++){
+        if(verifyPcb(itr->second.msg)==SCION_SUCCESS){
+            addPcb(itr->second.msg);
+            free(itr->second.msg);
+            unverified_pcbs.erase(itr);
+        }
+    }
 }
 
 void SCIONBeaconServer::requestForCert(SPacket* pkt){
@@ -1357,14 +1359,14 @@ void SCIONBeaconServer::clearCertificateMap() {
     m_certMap.clear();
 }
 
-void  SCIONBeaconServer::clearAesKeyMap() {
+void SCIONBeaconServer::clearAesKeyMap() {
     std::map<uint32_t, aes_context*>::iterator it;
     aes_context * actx;
     for(it=m_OfgAesCtx.begin(); it!=m_OfgAesCtx.end(); it++){
-	    actx = it->second;
-		delete actx;
-	}
-	m_OfgAesCtx.clear();
+        actx = it->second;
+        delete actx;
+    }
+    m_OfgAesCtx.clear();
 }
 
 

@@ -47,7 +47,7 @@ int SCIONEncap::configure(Vector<String> &conf, ErrorHandler *errh)
         "HID", cpkM, cpString, &m_HID,
         "TOPOLOGY_FILE", cpkM, cpString, &m_sTopologyFile,
        cpEnd) <0){
-           click_chatter("atal error: click configuration fail at SCIONEncap.\n");
+            click_chatter("Fatal error: click configuration fail at SCIONEncap.\n");
             exit(-1);
     }
 
@@ -71,18 +71,18 @@ int SCIONEncap::initialize(ErrorHandler *)
 
     TopoParser parser;
     parser.loadTopoFile(m_sTopologyFile.c_str()); 
-	// Encap only needs to know PS location
+    // TODO: retrieve server locations from the controller
     parser.parseServers(m_servers);
 
     if (!_path_info){
-		#ifdef _DEBUG_GW
-		click_chatter("A new path info is being created...\n");
-		#endif
+        #ifdef _DEBUG_GW
+        click_chatter("A new path info is being created...\n");
+	#endif
         _path_info = new SCIONPathInfo;
-	}
+    }
 
-	_timer.initialize(this);
-	_timer.schedule_after_sec(5);
+    _timer.initialize(this);
+    _timer.schedule_after_sec(5);
 
     return 0;
 }
@@ -112,9 +112,9 @@ void SCIONEncap::push(int port, Packet *p) {
             
             case PATH_REP_LOCAL:{
                 #ifdef _DEBUG_GW
-			    click_chatter("GW (%lu:%lu): downpath received.\n", m_uAdAid, m_uAid);
-			    #endif
-			    _path_info->parse(packet, 1);
+                click_chatter("GW (%lu:%lu): downpath received.\n", m_uAdAid, m_uAid);
+                #endif
+                _path_info->parse(packet, 1);
             }
                 break;
             
@@ -123,11 +123,11 @@ void SCIONEncap::push(int port, Packet *p) {
         }
         
         fullPath path;
-		path.opaque_field = NULL;
-		uint64_t src = 4;
-		uint64_t dst = 3;
+	path.opaque_field = NULL;
+	uint64_t src = 4;
+	uint64_t dst = 3;
 		
-		int skip = 1;
+	int skip = 1;
         if(_path_info->get_path(src, dst, path)) {
             printf("Full path information:\n");
             #ifdef _DEBUG_GW
@@ -142,13 +142,13 @@ void SCIONEncap::push(int port, Packet *p) {
                     if(skip==0) skip=1;
                     else if(skip==1) skip=0;
                 }
-			}
-			printf("\n");
-			#endif
+	    }
+	    printf("\n");
+	    #endif
         }
         
         if(path.opaque_field)
-		    delete [] path.opaque_field;
+            delete [] path.opaque_field;
         /*
 		// check if there's any packet in the cache 
 		// and send it to the destination after constructing end-to-end paths.
@@ -223,11 +223,11 @@ void SCIONEncap::run_timer(Timer* timer)
     
     }else{
         #ifdef _DEBUG_GW
-		click_chatter((char*)"AD (%s) does not has path server.\n", m_AD.c_str());
-		#endif
+        click_chatter((char*)"AD (%s) does not has path server.\n", m_AD.c_str());
+        #endif
     }
     
-	_timer.reschedule_after_sec(5);
+    _timer.reschedule_after_sec(5);
 }
 
 #if 0

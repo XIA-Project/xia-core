@@ -141,51 +141,52 @@ void SCIONCertServerCore::sendHello() {
 
 
 void SCIONCertServerCore::parseROT(){
-	ROTParser parser;
-	if(parser.loadROTFile(m_sROTFile)!=ROTParseNoError){
-    	click_chatter("Fatal error: ROT File missing at TDC CS.\n");
-		exit(-1);
-	}
-	scionPrinter->printLog(IH, "Load ROT OK.\n");
-	if(parser.parse(rot)!=ROTParseNoError){
-    	click_chatter("Fatal error: ROT File parsing error at TDC CS.\n");
-		exit(-1);
-	}
-	scionPrinter->printLog(IH, "Parse ROT OK.\n");
-	if(parser.verifyROT(rot)!=ROTParseNoError) {
-		click_chatter("Fatal error: ROT File verifying error at TDC CS.\n");
-		exit(-1);
-	}
-	#ifdef _DEBUG_CS
-	scionPrinter->printLog(IH, "Verify ROT OK.\n");
-	#endif
+    ROTParser parser;
+    if(parser.loadROTFile(m_sROTFile)!=ROTParseNoError){
+        click_chatter("Fatal error: ROT File missing at TDC CS.\n");
+        exit(-1);
+    }
+    scionPrinter->printLog(IH, "Load ROT OK.\n");
+    if(parser.parse(rot)!=ROTParseNoError){
+        click_chatter("Fatal error: ROT File parsing error at TDC CS.\n");
+        exit(-1);
+    }
+    scionPrinter->printLog(IH, "Parse ROT OK.\n");
+    if(parser.verifyROT(rot)!=ROTParseNoError) {
+        click_chatter("Fatal error: ROT File verifying error at TDC CS.\n");
+        exit(-1);
+    }
+    #ifdef _DEBUG_CS
+    scionPrinter->printLog(IH, "Verify ROT OK.\n");
+    #endif
 
-	// prepare ROT for delivery
-	FILE* rotFile = fopen(m_sROTFile, "r");
-	fseek(rotFile, 0, SEEK_END);
-	curROTLen = ftell(rotFile);
-	rewind(rotFile);
-	curROTRaw = (char*)malloc(curROTLen*sizeof(char));
+    // prepare ROT for delivery
+    FILE* rotFile = fopen(m_sROTFile, "r");
+    fseek(rotFile, 0, SEEK_END);
+    curROTLen = ftell(rotFile);
+    rewind(rotFile);
+    curROTRaw = (char*)malloc(curROTLen*sizeof(char));
 
-	char buffer[128];
-	int offset =0;
+    char buffer[128];
+    int offset =0;
 
-	while(!feof(rotFile)){
-		memset(buffer, 0, 128);
-		fgets(buffer, 128, rotFile);
-		int buffLen = strlen(buffer);
-		memcpy(curROTRaw+offset, buffer, buffLen);
-		offset+=buffLen;
-	}
-	fclose(rotFile);
-	#ifdef _DEBUG_CS
-	scionPrinter->printLog(IH, (char*)"Stored Verified ROT for ROT Requests.\n");
-	#endif
+    while(!feof(rotFile)){
+        memset(buffer, 0, 128);
+        fgets(buffer, 128, rotFile);
+        int buffLen = strlen(buffer);
+        memcpy(curROTRaw+offset, buffer, buffLen);
+        offset+=buffLen;
+    }
+    fclose(rotFile);
+    #ifdef _DEBUG_CS
+    scionPrinter->printLog(IH, (char*)"Stored Verified ROT for ROT Requests.\n");
+    #endif
 }
 
 void SCIONCertServerCore::parseTopology(){
-	TopoParser parser;
-	parser.loadTopoFile(m_sTopologyFile.c_str()); 
+    TopoParser parser;
+    // TODO: retrieve topology from the controller
+    parser.loadTopoFile(m_sTopologyFile.c_str()); 
     parser.parseServers(m_servers);
 }
 
@@ -193,7 +194,7 @@ void SCIONCertServerCore::push(int port, Packet *p) {
     TransportHeader thdr(p);
     uint8_t *s_pkt = (uint8_t *) thdr.payload();
     uint16_t type = SPH::getType(s_pkt);
-	uint16_t packetLength = SPH::getTotalLen(s_pkt);
+    uint16_t packetLength = SPH::getTotalLen(s_pkt);
     uint8_t packet[packetLength];
 
 	memset(packet, 0, packetLength);
@@ -201,20 +202,21 @@ void SCIONCertServerCore::push(int port, Packet *p) {
     
     switch(type){
         case ROT_REQ_LOCAL: {
-            XIAHeader xiahdr(p);
-            #ifdef _DEBUG_CS
-            scionPrinter->printLog(IH, (char *)"XIA src path = %s", xiahdr.src_path().unparse().c_str());
-            scionPrinter->printLog(IH, (char *)"XIA dst path = %s", xiahdr.dst_path().unparse().c_str());
-            #endif
+            //XIAHeader xiahdr(p);
+            //#ifdef _DEBUG_CS
+            //scionPrinter->printLog(IH, (char *)"XIA src path = %s", xiahdr.src_path().unparse().c_str());
+            //scionPrinter->printLog(IH, (char *)"XIA dst path = %s", xiahdr.dst_path().unparse().c_str());
+            //#endif
             
             ROTRequest * req = (ROTRequest *)SPH::getData(packet);
             if(req->currentVersion == rot.version) {
                 sendROT();
             }
-		}
-		break;
+	}
+	    break;
 
-		case CERT_REQ: { //send chain
+	// TODO: finish testing for recursive CERT_REQ request packet
+        case CERT_REQ: { //send chain
 
 			uint16_t hops = 0;
 			uint16_t hopPtr = 0;
@@ -271,6 +273,7 @@ void SCIONCertServerCore::push(int port, Packet *p) {
 		} 
 			break;
 			
+                // TODO: finish testing for recursive ROT_REQ request packet
 		case ROT_REQ:
 			processROTRequest(packet);
 			break;
@@ -391,22 +394,22 @@ void SCIONCertServerCore::sendPacket(uint8_t* data, uint16_t data_length, string
 }
 
 void SCIONCertServerCore::getCertFile(uint8_t* fn, uint64_t target) {
-	sprintf((char*)fn,"./TD1/TDC/AD%llu/certserver/certificates/td%llu-ad%llu-0.crt", 
-	m_uAdAid, m_uTdAid, target);
+    sprintf((char*)fn,"./TD1/TDC/AD%llu/certserver/certificates/td%llu-ad%llu-0.crt", 
+    m_uAdAid, m_uTdAid, target);
 }
 
 void SCIONCertServerCore::reversePath(uint8_t* path, uint8_t* output, uint8_t hops) {
-	uint16_t offset = (hops)*OPAQUE_FIELD_SIZE; 
-	uint8_t* ptr = path+OPAQUE_FIELD_SIZE;
-	memcpy(output, path, OPAQUE_FIELD_SIZE);
-	opaqueField* hopPtr = (opaqueField*)ptr; 
+    uint16_t offset = (hops)*OPAQUE_FIELD_SIZE; 
+    uint8_t* ptr = path+OPAQUE_FIELD_SIZE;
+    memcpy(output, path, OPAQUE_FIELD_SIZE);
+    opaqueField* hopPtr = (opaqueField*)ptr; 
 	
-	for(int i=0;i<hops;i++){
-		memcpy(output+offset, ptr, OPAQUE_FIELD_SIZE);
-		offset-=OPAQUE_FIELD_SIZE;
-		ptr+=OPAQUE_FIELD_SIZE;
-		hopPtr = (opaqueField*)ptr;
-	}
+    for(int i=0;i<hops;i++){
+        memcpy(output+offset, ptr, OPAQUE_FIELD_SIZE);
+        offset-=OPAQUE_FIELD_SIZE;
+        ptr+=OPAQUE_FIELD_SIZE;
+        hopPtr = (opaqueField*)ptr;
+    }
 }
 
 void SCIONCertServerCore::sendROT(){
