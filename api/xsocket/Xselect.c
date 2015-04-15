@@ -77,7 +77,6 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 
 		ufds[i].revents = 0;
 
-//		if (ufds[i].fd > 0 && (ufds[i].events & (POLLIN | POLLOUT | POLLPRI))) {
 		if (ufds[i].fd > 0 && (ufds[i].events != 0)) {
 			if (getSocketType(ufds[i].fd) != XSOCK_INVALID) {
 				// add the Xsocket to the xpoll struct
