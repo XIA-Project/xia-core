@@ -75,7 +75,7 @@ int Xfcntl(int sockfd, int cmd, ...)
 			int f = va_arg(args, int);
 			va_end(args);
 			if (f & O_NONBLOCK) {
-				LOGF("Blocking set to %s", (f & O_NONBLOCK) ? "true" : "false");
+				LOGF("Blocking set to %s", (f & O_NONBLOCK) ? "false" : "true");
 				setBlocking(sockfd, (f & O_NONBLOCK) == 0);
 				rc = 0;
 			} 
