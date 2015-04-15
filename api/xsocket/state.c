@@ -39,7 +39,7 @@ public:
 	int transportType() { return m_transportType; };
 	void setTransportType(int tt) {m_transportType = tt; };
 
-	int data(char *buf, unsigned bufLen);
+	int data(char *buf, unsigned bufLen, bool peek);
 	void setData(const char *buf, unsigned bufLen);
 	int dataLen() { return m_bufLen; };
 
@@ -122,7 +122,7 @@ void SocketState::init()
 	pthread_mutex_init(&m_sequence_lock, NULL);
 }
 
-int SocketState::data(char *buf, unsigned bufLen)
+int SocketState::data(char *buf, unsigned bufLen, bool peek)
 {
 	if (m_bufLen == 0) {
 		// we don't have anything stashed away
@@ -132,16 +132,19 @@ int SocketState::data(char *buf, unsigned bufLen)
 		// give the caller as much as we can, and hang on to the rest
 		// for later
 		memcpy(buf, m_buf, bufLen);
-		m_bufLen -= bufLen;
+		if (!peek)
+			m_bufLen -= bufLen;
 		memmove(m_buf, m_buf + bufLen, m_bufLen);
 
 	} else {
 		// get rid of the data and reset our state
 		bufLen = m_bufLen;
 		memcpy(buf, m_buf, m_bufLen);
-		delete(m_buf);
-		m_buf = (char *)0;
-		m_bufLen = 0;
+		if (!peek) {
+			delete(m_buf);
+			m_buf = (char *)0;
+			m_bufLen = 0;
+		}
 	}
 	return bufLen;
 }
@@ -396,13 +399,22 @@ void setSocketType(int sock, int tt)
 		sstate->setTransportType(tt);
 }
 
-int getSocketData(int sock, char *buf, unsigned bufLen)
+int getSocketData(int sock, char *buf, unsigned bufLen, bool peek)
 {
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
-		return sstate->data(buf, bufLen);
+		return sstate->data(buf, bufLen, peek);
 	else
 		return 0;
+}
+
+int getSocketDataLen(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		return sstate->dataLen();
+	else
+		return 0;	
 }
 
 void setSocketData(int sock, const char *buf, unsigned bufLen)

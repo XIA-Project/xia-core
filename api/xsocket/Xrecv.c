@@ -60,11 +60,9 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags, sockaddr_x *addr, 
 int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 {
 	int numbytes;
+	int peek = (flags & MSG_PEEK);
 
-	if (flags) {
-		errno = EOPNOTSUPP;
-		return -1;
-	}
+	//LOGF("len:%zu peek:%d\n", len, peek);
 
 	if (len == 0)
 		return 0;
@@ -92,8 +90,10 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 	}
 
 	// see if we have bytes leftover from a previous Xrecv call
-	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len)) > 0)
+	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len, peek)) > 0) {
+		//LOGF("getting %zu bytes from cache peek:%d", len, peek);
 		return numbytes;
+	}
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XRECV);
@@ -126,15 +126,34 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 
 	if (paylen < 0) {
 		errno = r->err_code();
-	}
-	else if ((size_t)paylen <= len)
+	
+	} else if ((size_t)paylen <= len) {
+		//LOG("returning it all");
 		memcpy(rbuf, payload, paylen);
-	else {
+		if (peek) {
+			//LOG("caching it all");
+			// save it all since they peeked
+			setSocketData(sockfd, payload, paylen);
+		}
+
+	} else {
+		//LOG("need to cache");
 		// we got back more data than the caller requested
 		// stash the extra away for subsequent Xrecv calls
 		memcpy(rbuf, payload, len);
-		paylen -= len;
-		setSocketData(sockfd, payload + len, paylen);
+
+		if (peek) {
+			// keep all of it
+			//LOG("and caching it all because peek");
+			setSocketData(sockfd, payload, paylen);
+
+		} else {
+			// keep only what they haven't seen
+			//LOG("only keeping some");
+			paylen -= len;
+			setSocketData(sockfd, payload + len, paylen);
+		}
+
 		paylen = len;
 	}
 	return paylen;
@@ -195,12 +214,7 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 	sockaddr_x *addr, socklen_t *addrlen)
 {
     int numbytes;
-
-	if (flags != 0) {
-		LOG("flags is not suppored at this time");
-		errno = EINVAL;
-		return -1;
-	}
+    int peek = (flags & MSG_PEEK);
 
 	if (!rbuf || (addr && !addrlen)) {
 		LOG("null pointer!\n");
@@ -215,7 +229,7 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 	}
 
 	// see if we have bytes leftover from a previous Xrecv call
-	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len)) > 0) {
+	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len, peek)) > 0) {
 		// FIXME: we need to also have stashed away the sDAG and
 		// return it as well
 		*addrlen = 0;
@@ -266,14 +280,32 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		errno = r->err_code();
 
 	} else if ((unsigned)paylen <= len) {
+		//LOG("returning it all");
 		memcpy(rbuf, payload, paylen);
+		if (peek) {
+			//LOG("caching it all");
+			// save it all since they peeked
+			setSocketData(sockfd, payload, paylen);
+		}
 
 	} else {
+		//LOG("need to cache");
 		// we got back more data than the caller requested
 		// stash the extra away for subsequent Xrecv calls
 		memcpy(rbuf, payload, len);
-		paylen -= len;
-		setSocketData(sockfd, payload + len, paylen);
+
+		if (peek) {
+			// keep all of it
+			//LOG("and caching it all because peek");
+			setSocketData(sockfd, payload, paylen);
+
+		} else {
+			// keep only what they haven't seen
+			//LOG("only keeping some");
+			paylen -= len;
+			setSocketData(sockfd, payload + len, paylen);
+		}
+
 		paylen = len;
 	}
 
