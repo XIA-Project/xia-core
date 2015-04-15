@@ -42,7 +42,14 @@
 #define CONNECTING	  2
 #define CONNECTED 	  3
 
-#define WOULDBLOCK()	`(errno == EAGAIN || errno == EWOULDBLOCK)
+// ID->Name mapping (SO_DEBUG, AF_XIA, etc...)
+ typedef struct {
+	size_t id;
+	const char *name;
+} idrec;
+
+
+#define WOULDBLOCK() (errno == EAGAIN || errno == EWOULDBLOCK)
 
 int click_send(int sockfd, xia::XSocketMsg *xsm);
 int click_reply(int sockfd, unsigned seq, xia::XSocketMsg *msg);
@@ -76,5 +83,13 @@ const sockaddr_x *dgramPeer(int sock);
 
 int _xsendto(int sockfd, const void *buf, size_t len, int flags, const sockaddr_x *addr, socklen_t addrlen);
 int _xrecvfromconn(int sockfd, void *buf, size_t len, int flags);
+
+extern "C" {
+const char *xferFlags(size_t f);
+const char *fcntlFlags(size_t f);
+const char *aiFlags(size_t f);
+const char *afValue(size_t f);
+const char *optValue(size_t f);
+}
 
 #endif

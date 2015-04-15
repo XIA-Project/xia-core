@@ -72,17 +72,24 @@
 #define SID_SIZE 45						// (40 byte XID + 4 bytes SID: + null terminator)
 #define FORCE_XIA() (1)					// FIXME: get rid of this logic
 
+
 // Logging Macros ***************************************************
-#define TRACE()		 {if (_log_trace)    fprintf(_log, "xwrap: %s\r\n", __FUNCTION__);}
+#define TRACE()		   {if (_log_trace)    fprintf(_log, "xwrap: %s\r\n", __FUNCTION__);}
 
-#define MSG(...)	 {if (_log_info)    {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
+#define MSG(...)	   {if (_log_info)    {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
+#define XFER_FLAGS(f)  {if (_log_info)     fprintf(_log, "xwrap: %s flags:%s\n", __FUNCTION__, xferFlags(f));}
+#define AI_FLAGS(f)    {if (_log_info)     fprintf(_log, "xwrap: %s flags:%s\n", __FUNCTION__, aiFlags(f));}
+#define FCNTL_FLAGS(f) {if (_log_info)     fprintf(_log, "xwrap: %s flags:%s\n", __FUNCTION__, fcntlFlags(f));}
+#define AF_VALUE(f)    {if (_log_info)     fprintf(_log, "xwrap: %s family:%s\n", __FUNCTION__, afValue(f));}
+#define OPT_VALUE(f)   {if (_log_info)     fprintf(_log, "xwrap: %s opt:%s\n", __FUNCTION__, optValue(f));}
 
-#define XIAIFY()	 {if (_log_wrap)     fprintf(_log, "xwrap: %s redirected to XIA\r\n", __FUNCTION__);}
-#define NOXIA()		 {if (_log_wrap)     fprintf(_log, "xwrap: %s used normally\r\n", __FUNCTION__);}
-#define SKIP()		 {if (_log_wrap)     fprintf(_log, "xwrap: %s not required/supported in XIA (no-op)\r\n", __FUNCTION__);}
+#define XIAIFY()	   {if (_log_wrap)     fprintf(_log, "xwrap: %s redirected to XIA\r\n", __FUNCTION__);}
+//#define NOXIA()      {if (_log_wrap)     fprintf(_log, "xwrap: %s used normally\r\n", __FUNCTION__);}
+#define NOXIA()
+#define SKIP()		   {if (_log_wrap)     fprintf(_log, "xwrap: %s not required/supported in XIA (no-op)\r\n", __FUNCTION__);}
 
-#define ALERT()		 {if (_log_warning)  fprintf(_log, "xwrap: ALERT!!!, %s is not implemented in XIA!\r\n", __FUNCTION__);}
-#define WARNING(...) {if (_log_warning) {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
+#define ALERT()		   {if (_log_warning)  fprintf(_log, "xwrap: ALERT!!!, %s is not implemented in XIA!\r\n", __FUNCTION__);}
+#define WARNING(...)   {if (_log_warning) {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
 
 #ifdef DEBUG
 #define DBG(...) {if (_log_warning) {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
@@ -172,7 +179,7 @@ DECLARE(ssize_t, recvmsg, int fd, struct msghdr *msg, int flags);
 DECLARE(ssize_t, sendmsg, int fd, const struct msghdr *msg, int flags);
 
 
-// Local "IP Address" **********************************************
+// local "IP" address **********************************************
 static char local_addr[ID_LEN];
 static struct sockaddr local_sa;
 
@@ -209,6 +216,7 @@ static FILE *_log = NULL;
 // call into the Xsockets API to see if the fd is associated with an Xsocket
 #define isXsocket(s)	 (getSocketType(s) != -1)
 #define shouldWrap(s)	 (isXsocket(s))
+
 
 // get a unique port number
 static unsigned short _NewPort()
@@ -766,8 +774,16 @@ extern "C" int fcntl (int fd, int cmd, ...)
 		case F_SETLEASE:
 		case F_NOTIFY:
 		case F_SETPIPE_SZ:
-			rc = (f)(fd, cmd, va_arg(args, int));
+		{
+			int x = va_arg(args, int);
+
+			if (cmd == F_SETFL) {
+				FCNTL_FLAGS(x);
+			}
+
+			rc = (f)(fd, cmd, x);
 			break;
+		}
 
 		case F_GETLK:
 		case F_SETLK:
@@ -864,7 +880,7 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 
 		if (hints) {
 			flags = hints->ai_flags;
-			MSG("Flags = %08x\n", flags);
+			AI_FLAGS(flags);
 			socktype = hints->ai_socktype;
 			protocol = hints->ai_protocol;
 		}
@@ -1087,6 +1103,7 @@ int getsockopt(int fd, int level, int optname, void *optval, socklen_t *optlen)
 	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
+		OPT_VALUE(optname);
 		rc =  Xgetsockopt(fd, optname, optval, optlen);
 
 		if (rc < 0) {
@@ -1158,6 +1175,7 @@ ssize_t recv(int fd, void *buf, size_t n, int flags)
 
 	if (shouldWrap(fd)) {
 		XIAIFY();
+		XFER_FLAGS(flags);
 		rc = Xrecv(fd, buf, n, flags);
 
 		char *c = (char *)buf;
@@ -1185,6 +1203,7 @@ ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, 
 
 	if (shouldWrap(fd)) {
 		XIAIFY();
+		XFER_FLAGS(flags);
 
 		if (FORCE_XIA()) {
 			slen = (socklen_t)sizeof(sax);
@@ -1230,6 +1249,7 @@ ssize_t send(int fd, const void *buf, size_t n, int flags)
 
 	if (shouldWrap(fd)) {
 		XIAIFY();
+		XFER_FLAGS(flags);
 
 		// FIXME: debugging code
 		char *p = (char *)buf;
@@ -1258,6 +1278,7 @@ ssize_t sendto(int fd, const void *buf, size_t n, int flags, const struct sockad
 
 	if (shouldWrap(fd)) {
 		XIAIFY();
+		XFER_FLAGS(flags);
 
 		if (FORCE_XIA()) {
 
@@ -1294,6 +1315,8 @@ int setsockopt(int fd, int level, int optname, const void *optval, socklen_t opt
 	MSG("fd = %d level = %08x optname = %08x\n", fd, level, optname);
 	if (isXsocket(fd)) {
 		XIAIFY();
+		OPT_VALUE(optname);
+
 		rc =  Xsetsockopt(fd, optname, optval, optlen);
 
 		if (rc < 0) {
@@ -1355,13 +1378,16 @@ int socket(int domain, int type, int protocol)
 
 	if ((domain == AF_XIA || (domain == AF_INET && FORCE_XIA()))) {
 		XIAIFY();
+		AF_VALUE(domain);
 
-	//	if (protocol != 0) {
-	//		MSG("Caller specified protocol %d, resetting to 0\n", protocol);
-	//		protocol = 0;
-	//	}
+		// is it unspecified, or TCP, or UDP?
+		if (protocol != 0 && protocol != 6 && protocol != 17) {
+			MSG("unknown protocol (%d) returning error", protocol);
+			errno = EINVAL;
+			return -1;
+		}
 
-		fd = Xsocket(AF_XIA, type, protocol);
+		fd = Xsocket(AF_XIA, type, 0);
 
 	} else {
 		NOXIA();
@@ -1411,7 +1437,7 @@ ssize_t write(int fd, const void *buf, size_t count)
 		rc = Xsend(fd, buf, count, 0);
 
 	} else {
-//		NOXIA();
+		NOXIA();
 		rc = __real_write(fd, buf, count);
 	}
 	return rc;

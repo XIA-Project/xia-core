@@ -63,7 +63,6 @@ int Xfcntl(int sockfd, int cmd, ...)
 
 	switch(cmd) {
 		case F_GETFL:
-LOG("cmd = GETFL\n");
 			rc = (_f_fcntl)(sockfd, cmd);
 			if (rc >= 0 && isBlocking(sockfd))
 				rc |= O_NONBLOCK;
@@ -74,24 +73,20 @@ LOG("cmd = GETFL\n");
 			va_list args;
 			va_start(args, cmd);
 			int f = va_arg(args, int);
-LOGF("cmd = SETFL flags = %08x\n", f);
 			va_end(args);
 			if (f & O_NONBLOCK) {
-				LOGF("Blocking (%08x) set to %s\n", O_NONBLOCK, (f & O_NONBLOCK) ? "true" : "false");
+				LOGF("Blocking set to %s", (f & O_NONBLOCK) ? "true" : "false");
 				setBlocking(sockfd, (f & O_NONBLOCK) == 0);
 				rc = 0;
 			} 
 
 			if (f & ~O_NONBLOCK) {
-				LOGF("unsupported flags to Xfcntl (%08x) ignoring\n", f);
-
-//				rc = -1;
-//				errno = EINVAL;
+				LOGF("unsupported flag(s) found (%s) ignoring...", fcntlFlags(f & ~O_NONBLOCK));
 			}
 			break;
 		}
 		default:
-			LOGF("Invalid command specified to Xfcntl: %08x\n", cmd);
+			LOGF("Invalid command specified to Xfcntl: %08x", cmd);
 			rc = -1;
 			break;
 	}

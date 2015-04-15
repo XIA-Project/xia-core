@@ -22,6 +22,10 @@
 #include "Xutil.h"
 #include <errno.h>
 
+// for printfing param values
+#include <fcntl.h>
+#include <netdb.h>
+
 #define CONTROL 1
 #define DATA 2
 
@@ -31,6 +35,86 @@
 // this should be larger than the size of the maximum amount XIA can transfer, but smaller than localhost MTU
 // optimally, XIA_MAXBUF would be calculated based off of this and the maximum size of a protobuf message
 #define XIA_INTERNAL_BUFSIZE	(16 * 1024)
+
+
+// dump contents of various parameters passed to functions
+#define FR(f) { f, #f }
+
+idrec xfer_flags[] = {
+	FR(MSG_CMSG_CLOEXEC),
+	FR(MSG_CONFIRM),
+	FR(MSG_DONTROUTE),
+	FR(MSG_DONTWAIT),
+	FR(MSG_EOR),
+	FR(MSG_ERRQUEUE),
+	FR(MSG_MORE),
+	FR(MSG_NOSIGNAL),
+	FR(MSG_PEEK),
+	FR(MSG_TRUNC),
+	FR(MSG_WAITALL)
+};
+
+idrec ai_flags[] = {
+	FR(AI_ADDRCONFIG),
+	FR(AI_ALL),
+	FR(AI_CANONIDN),
+	FR(AI_CANONNAME),
+	FR(AI_IDN),
+	FR(AI_IDN_ALLOW_UNASSIGNED),
+	FR(AI_IDN_USE_STD3_ASCII_RULES),
+	FR(AI_NUMERICHOST),
+	FR(AI_NUMERICSERV),
+	FR(AI_PASSIVE),
+	FR(AI_V4MAPPED)
+};
+
+idrec fcntl_flags[] = {
+	FR(O_APPEND),
+	FR(O_ASYNC),
+	FR(O_CLOEXEC),
+	FR(O_DIRECT),
+	FR(O_NOATIME),
+	FR(O_NONBLOCK),
+	FR(O_RDWR),
+	FR(O_WRONLY)
+};
+
+idrec af_values[] = {
+	FR(AF_FILE),
+	FR(AF_INET),
+	FR(AF_INET6),
+	FR(AF_LOCAL),
+	FR(AF_PACKET),
+	FR(AF_UNIX),
+	FR(AF_UNSPEC),
+	FR(AF_XIA)
+};
+
+idrec opt_values[] = {
+	FR(SO_BROADCAST),
+	FR(SO_BSDCOMPAT),
+	FR(SO_DEBUG),
+	FR(SO_DONTROUTE),
+	FR(SO_ERROR),
+	FR(SO_KEEPALIVE),
+	FR(SO_LINGER),
+	FR(SO_NO_CHECK),
+	FR(SO_OOBINLINE),
+	FR(SO_PASSCRED),
+	FR(SO_PEERCRED),
+	FR(SO_PRIORITY),
+	FR(SO_RCVBUF),
+	FR(SO_RCVBUFFORCE),
+	FR(SO_RCVLOWAT),
+	FR(SO_RCVTIMEO),
+	FR(SO_REUSEADDR),
+	FR(SO_REUSEPORT),
+	FR(SO_SNDBUF),
+	FR(SO_SNDBUFFORCE),
+	FR(SO_SNDLOWAT),
+	FR(SO_SNDTIMEO),
+	FR(SO_TYPE)
+};
 
 /*!
 * @brief Prints some debug information
@@ -43,7 +127,7 @@ void debug(int sock) {
 	if(getsockname(sock, (struct sockaddr *)&my_addr, &len) < 0) {
 		printf("Error retrieving socket's UDP port: %s", strerror(errno));
 	}
-	
+
 	printf("[ sock %d/%d, thread %p ]\t", sock, ((struct sockaddr_in)my_addr).sin_port, (void*)pthread_self());
 }
 
@@ -169,8 +253,8 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 		} else {
 
 			// we do this with a blocking socket even if the Xsocket is marked as nonblocking.
-			// The UDP socket is treated as an API call rather than a sock so making it 
-			// non-blocking would cause problems 
+			// The UDP socket is treated as an API call rather than a sock so making it
+			// non-blocking would cause problems
 			rc = (_f_recvfrom)(sock, buf, buflen - 1 , 0, NULL, NULL);
 
 			// LOGF("seq %d received %d bytes\n", seq, rc);
@@ -227,6 +311,86 @@ int click_status(int sock, unsigned seq)
 	}
 
 	return rc;
+}
+
+// print out the list of flags in the bitmap
+// called via the FOO_FLAGS macro
+static const char *getFlags(idrec *table, size_t size, size_t f)
+{
+	static char s[1024];
+	size_t mask = 0;
+
+	if (f == 0){
+		return "0";
+	}
+
+	s[0] = 0;
+	int found = 0;
+	for (size_t i = 0; i < size; i++) {
+		mask |= table[i].id;
+
+		if (f & table[i].id) {
+			if (found) {
+				strcat(s, " ");
+			}
+			strcat(s, table[i].name);
+			found = 1;
+		}
+	}
+
+	size_t remaining = f & ~mask;
+	if (remaining) {
+		size_t len = strlen(s);
+		sprintf(s+len, "UNKNOWN(0x%08x)", (int)remaining);
+	}
+
+	return s;
+}
+
+// print out name of the parameter
+// called via the FOO_VALUE macro
+static const char *getValue(idrec *table, size_t size, size_t v)
+{
+	static char s[64];
+
+	if (v == 0) {
+		return "0";
+	}
+
+	for (size_t i = 0; i < size; i++) {
+
+		if (v == table[i].id) {
+			return table[i].name;
+		}
+	}
+
+	sprintf(s, "UNKNOWN(%zu)", v);
+	return s;
+}
+
+const char *xferFlags(size_t f)
+{
+	return getFlags(xfer_flags, sizeof(xfer_flags)/sizeof(idrec), f);
+}
+
+const char *aiFlags(size_t f)
+{
+	return getFlags(ai_flags, sizeof(ai_flags)/sizeof(idrec), f);
+}
+
+const char *fcntlFlags(size_t f)
+{
+	return getFlags(fcntl_flags, sizeof(fcntl_flags)/sizeof(idrec), f);
+}
+
+const char *afValue(size_t f)
+{
+	return getValue(af_values, sizeof(af_values)/sizeof(idrec), f);
+}
+
+const char *optValue(size_t f)
+{
+	return getValue(opt_values, sizeof(opt_values)/sizeof(idrec), f);
 }
 
 
