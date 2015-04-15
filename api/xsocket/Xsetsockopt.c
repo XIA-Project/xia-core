@@ -258,10 +258,13 @@ int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen)
 			break;
 
 		case SO_ERROR:
-			if (ssoCheckSize(optlen, sizeof(int)) < 0)
+			if (ssoCheckSize(optlen, sizeof(int)) < 0) {
 				rc = -1;
-			else
-				*(int *)optval = getError(sockfd);
+
+			} else {
+//				*(int *)optval = getError(sockfd);
+				*(int *)optval = 0;
+			}
 			break;
 
 		// FIXME: implement these!
