@@ -83,17 +83,15 @@ int SCIONPathServerCore::initialize(ErrorHandler* errh){
     m_iNumRegisteredPath = config.getNumRegisterPath();
     m_uAdAid = config.getAdAid();
     
-    scionPrinter = new SCIONPrint(m_iLogLevel, m_sLogFile);
+    scionPrinter = new SCIONPrint(m_iLogLevel, m_sLogFile, this->class_name());
     #ifdef _DEBUG_PS
-    scionPrinter->printLog(IH, (char *)"TDC PS (%s:%s) Initializes.\n", 
-    m_AD.c_str(), m_HID.c_str());
+    scionPrinter->printLog(IH, (char *)"Initializes.\n");
     #endif
     
     parseTopology();
     #ifdef _DEBUG_PS
     scionPrinter->printLog(IH, (char *)"Parse Topology Done.\n");
-    scionPrinter->printLog(IH, (char *)"TDC PS (%s:%s) Initialization Done.\n", 
-        m_AD.c_str(), m_HID.c_str());
+    scionPrinter->printLog(IH, (char *)"Initialization Done.\n");
     #endif
     
     _timer.initialize(this); 
@@ -128,7 +126,7 @@ void SCIONPathServerCore::push(int port, Packet *p) {
     if(type==PATH_REG){
         
         #ifdef _DEBUG_PS
-        scionPrinter->printLog(IH,type,(char*)"TDC PS Received PATH REGISTRATION.\n");
+        scionPrinter->printLog(IH, type, (char*)"Received PATH REGISTRATION.\n");
         #endif
 
         //parses path and store registered paths
@@ -137,7 +135,7 @@ void SCIONPathServerCore::push(int port, Packet *p) {
     }else if(type == PATH_REQ){
         
         #ifdef _DEBUG_PS
-        scionPrinter->printLog(IH,type,(char*)"TDC PS Received PATH REQUEST.\n");
+        scionPrinter->printLog(IH, type, (char*)"Received PATH REQUEST.\n");
         #endif
         
         //parses path request and send back path info
@@ -164,7 +162,7 @@ void SCIONPathServerCore::parsePathReq(uint8_t* pkt){
         if(itr->first == target){
             std::multimap<uint32_t, path>::iterator itr2;
             #ifdef _DEBUG_PS
-            scionPrinter->printLog(IH, (char*)"TDC PS: AD%lu -- # of Registered Paths: %lu\n", 
+            scionPrinter->printLog(IH, (char*)"AD%lu -- # of Registered Paths: %lu\n", 
                 target, itr->second.size());
             #endif
                 
@@ -270,7 +268,7 @@ void SCIONPathServerCore::parsePath(uint8_t* pkt){
     itr=paths.find(newPath.path.back()); 
 	
 	#ifdef _DEBUG_PS
-	scionPrinter->printLog(IH,(char*)"NEW PATH REG: paths count=%lu, newpath_adaid=%lu\n", 
+	scionPrinter->printLog(IH, (char*)"NEW PATH REG: paths count=%lu, newpath_adaid=%lu\n", 
 	    paths.size(), newPath.path.back());
 	#endif
     
@@ -286,7 +284,7 @@ void SCIONPathServerCore::parsePath(uint8_t* pkt){
             paths.erase(itr);
         } 
 		#ifdef _DEBUG_PS
-		scionPrinter->printLog(IH,(char*)"NEW PATH REG: removing the oldest path out of %d paths\n", m_iNumRegisteredPath);
+		scionPrinter->printLog(IH, (char*)"NEW PATH REG: removing the oldest path out of %d paths\n", m_iNumRegisteredPath);
 		#endif
     }
     newPath.timestamp = sOF->timestamp; //SPH::getUpTimestamp(pkt);

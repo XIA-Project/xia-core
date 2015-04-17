@@ -88,10 +88,9 @@ int SCIONBeaconServerCore::initialize(ErrorHandler* errh) {
     m_iPCBGenPeriod = config.getPCBGenPeriod();
 
     // setup looger, scionPrinter
-    scionPrinter = new SCIONPrint(m_iLogLevel, m_csLogFile);
+    scionPrinter = new SCIONPrint(m_iLogLevel, m_csLogFile, this->class_name());
     #ifdef _DEBUG_BS
-    scionPrinter->printLog(IH, (char *)"TDC BS (%s:%s) Initializes.\n", 
-    m_AD.c_str(), m_HID.c_str());
+    scionPrinter->printLog(IH, (char *)"Initializes.\n");
     #endif
 
     // task 2: parse ROT (root of trust) file
@@ -126,8 +125,7 @@ int SCIONBeaconServerCore::initialize(ErrorHandler* errh) {
 
     #ifdef _DEBUG_BS
     scionPrinter->printLog(IH, (char *)"Load OFG key Done.\n");
-    scionPrinter->printLog(IH, (char *)"TDC BS (%s:%s) Initialization Done.\n", 
-        m_AD.c_str(), m_HID.c_str());
+    scionPrinter->printLog(IH, (char *)"Initialization Done.\n");
     #endif
 
     // Trigger Timer
@@ -142,21 +140,21 @@ bool SCIONBeaconServerCore::parseROT(){
     ROTParser parser;
     if(parser.loadROTFile(m_sROTFile)!=ROTParseNoError){
         #ifdef _DEBUG_BS
-        scionPrinter->printLog(EH, (char *)"ROT missing at TDC BS.\n");
+        scionPrinter->printLog(WH, (char *)"ROT missing.\n");
         #endif
         return SCION_FAILURE;
     }else{
         // ROT found in local folder
         if(parser.parse(m_cROT)!=ROTParseNoError){
             #ifdef _DEBUG_BS
-            scionPrinter->printLog(EH, (char *)"ROT parse error at TDC BS.\n");
+            scionPrinter->printLog(WH, (char *)"ROT parse error.\n");
             #endif
             return SCION_FAILURE;
         }
 
         if(parser.verifyROT(m_cROT)!=ROTParseNoError){
             #ifdef _DEBUG_BS
-            scionPrinter->printLog(EH, (char *)"ROT verify error at TDC BS.\n");
+            scionPrinter->printLog(WH, (char *)"ROT verify error.\n");
              #endif
             return SCION_FAILURE;
         }
@@ -273,7 +271,7 @@ void SCIONBeaconServerCore::push(int port, Packet *p)
             ROTRequest *req = (ROTRequest *)SPH::getData(packet);
             int curver = (int)req->currentVersion;
             #ifdef _DEBUG_BS
-            scionPrinter->printLog(IH, SPH::getType(packet), (char *)"ROT Replay cV = %d, pV = %lu\n", 
+            scionPrinter->printLog(IH, SPH::getType(packet), (char*)"ROT Replay cV = %d, pV = %lu\n", 
                 curver, m_cROT.version);
             #endif
             
@@ -283,9 +281,7 @@ void SCIONBeaconServerCore::push(int port, Packet *p)
                 uint16_t rotLen = packetLength-offset;
                 // Write to file defined in Config
                 #ifdef _DEBUG_BS
-                scionPrinter->printLog(IH, type, 
-                (char *)"TDC BS (%s:%s): Received ROT file (size = %d).\n", 
-                m_AD.c_str(), m_HID.c_str(), rotLen);
+                scionPrinter->printLog(IH, type, (char *)"Received ROT file (size = %d).\n", rotLen);
                 #endif
                 // Write to file defined in Config
                 if(rotLen)
@@ -298,8 +294,7 @@ void SCIONBeaconServerCore::push(int port, Packet *p)
                     m_bROTInitiated = parseROT();
                     if(m_bROTInitiated) {
                         #ifdef _DEBUG_BS
-                        scionPrinter->printLog(IH, 
-                        (char *)"TDC BS (%s:%s): stored verified ROT.\n", 
+                        scionPrinter->printLog(IH, (char *)"Stored verified ROT.\n", 
                         m_AD.c_str(), m_HID.c_str());
                         #endif
                     }
@@ -338,8 +333,7 @@ bool SCIONBeaconServerCore::generateNewPCB() {
     SPH::setHeader(buf, hdr);
      
     #ifdef _DEBUG_BS
-    scionPrinter->printLog(IH, (char *)"TDC BS (%s:%s): Init Beacon with ROT Version: %d\n", 
-        m_AD.c_str(), m_HID.c_str(), m_cROT.version);
+    scionPrinter->printLog(IH, (char *)"Init Beacon with ROT Version: %d\n", m_cROT.version);
     #endif
     SCIONBeaconLib::initBeaconInfo(buf,tv.tv_sec,m_uTdAid,m_cROT.version);
      
@@ -353,8 +347,7 @@ bool SCIONBeaconServerCore::generateNewPCB() {
     if(!getOfgKey(tv.tv_sec, actx)) {
         //OFG key retrieval failure.
         #ifdef _DEBUG_BS
-        scionPrinter->printLog(EH, (char *)"TDC BS (%s:%s): fail to get ofg key. Stop PCB generation.\n", 
-            m_AD.c_str(), m_HID.c_str());
+        scionPrinter->printLog(EH, (char *)"fail to get ofg key. Stop PCB generation.\n");
         #endif
         return SCION_FAILURE;
     }
@@ -421,8 +414,7 @@ bool SCIONBeaconServerCore::generateNewPCB() {
     }
   
     #ifdef _DEBUG_BS
-    scionPrinter->printLog(IH, (char *)"TDC BS (%s:%s) delivers beacons to %d domains.\n",
-        m_AD.c_str(), m_HID.c_str(), cCount);
+    scionPrinter->printLog(IH, (char *)"delivers beacons to %d domains.\n", cCount);
     #endif
 }
 
@@ -484,13 +476,13 @@ void SCIONBeaconServerCore::run_timer(Timer *){
     	    sendPacket(packet, totalLen, dest);
     	    
     	    #ifdef _DEBUG_BS
-    	    scionPrinter->printLog(EH, (char *)"TDC BS (%s:%s): ROT is missing or wrong formatted. \
-Send ROT request to local cert server.\n", m_AD.c_str(), m_HID.c_str());
+    	    scionPrinter->printLog(WH, (char *)"ROT is missing or wrong formatted. \
+Send ROT request to local cert server.\n");
             #endif
     	}else{
-    	   #ifdef _DEBUG_BS
-    	   scionPrinter->printLog(EH, (char*)"AD (%s) does not has cert server.\n", m_AD.c_str());
-    	   #endif 
+    	    #ifdef _DEBUG_BS
+    	    scionPrinter->printLog(EH, (char*)"AD (%s) does not has cert server.\n", m_AD.c_str());
+    	    #endif 
     	}
 
     	_timer.reschedule_after_sec(5);     // default speed

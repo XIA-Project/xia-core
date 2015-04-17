@@ -90,10 +90,9 @@ int SCIONCertServerCore::initialize(ErrorHandler* errh){
     config.getROTFilename((char*)m_sROTFile);
 
     // setup scionPrinter for logging
-    scionPrinter = new SCIONPrint(m_iLogLevel, m_csLogFile);
+    scionPrinter = new SCIONPrint(m_iLogLevel, m_csLogFile, this->class_name());
     #ifdef _DEBUG_CS
-    scionPrinter->printLog(IH, (char*)"TDC CS (%s:%s) Initializes.\n", m_AD.c_str(), 
-    m_HID.c_str());
+    scionPrinter->printLog(IH, (char*)"Initializes.\n");
     #endif
 
     // task 2: parse ROT (root of trust) file
@@ -109,8 +108,7 @@ int SCIONCertServerCore::initialize(ErrorHandler* errh){
     #endif
 
     #ifdef _DEBUG_CS
-    scionPrinter->printLog(IH, (char*)"TDC CS (%s:%s) Initialization Done.\n", 
-    m_AD.c_str(), m_HID.c_str());
+    scionPrinter->printLog(IH, (char*)"Initialization Done.\n");
     #endif
     
     // Trigger Timer
@@ -157,7 +155,7 @@ void SCIONCertServerCore::parseROT(){
         exit(-1);
     }
     #ifdef _DEBUG_CS
-    scionPrinter->printLog(IH, "Verify ROT OK.\n");
+    scionPrinter->printLog(IH, (char*)"Verify ROT OK.\n");
     #endif
 
     // prepare ROT for delivery
@@ -215,7 +213,7 @@ void SCIONCertServerCore::push(int port, Packet *p) {
 	}
 	    break;
 
-	// TODO: finish testing for recursive CERT_REQ request packet
+	    // TODO: finish testing for recursive CERT_REQ request packet
         case CERT_REQ: { //send chain
 
 			uint16_t hops = 0;
@@ -289,7 +287,7 @@ void SCIONCertServerCore::processROTRequest(uint8_t * packet) {
 	//1. return ROT if the requested version is available
 	//2. forward it to the upstream otherwise (SL: I think this should not happen) 
 	#ifdef _SL_DEBUG_CS
-	printf("CS (%llu:%llu): Received ROT_REQ request from downstream CS.\n", m_uAdAid, m_uAid);
+	printf("Received ROT_REQ request from downstream CS.\n");
 	#endif
 
 	uint16_t hops = 0; 
@@ -324,8 +322,7 @@ void SCIONCertServerCore::processROTRequest(uint8_t * packet) {
 	hdr.dst = ifid2addr.find(of->egressIf)->second;
 
 	#ifdef _SL_DEBUG_CS
-	printf("CS(%llu:%llu): ROT_REP: currOFPtr = %d, n_of = %d\n", 
-		m_uAdAid, m_uAid, currOFPtr, hdr.n_of);
+	printf(" ROT_REP: currOFPtr = %d, n_of = %d\n", currOFPtr, hdr.n_of);
 	#endif
 	
 	uint8_t buffer[hdr.cmn.totalLen];
@@ -344,8 +341,7 @@ void SCIONCertServerCore::processROTRequest(uint8_t * packet) {
 	if(req->currentVersion != rot.version)
 		req->currentVersion = rot.version;
 	#ifdef _DEBUG_CS
-	printf("CS (%llu:%llu): ROT_REP: req version = %d, send version = %d\n", 
-		m_uAdAid, m_uAid, req->currentVersion, rot.version);
+	printf("ROT_REP: req version = %d, send version = %d\n", req->currentVersion, rot.version);
 	#endif
 	//copy the ROT
 	memcpy(buffer+hdr.cmn.hdrLen+sizeof(ROTRequest), curROTRaw, curROTLen);	
@@ -415,7 +411,7 @@ void SCIONCertServerCore::reversePath(uint8_t* path, uint8_t* output, uint8_t ho
 void SCIONCertServerCore::sendROT(){
 
     #ifdef _DEBUG_CS
-	scionPrinter->printLog(IH, (char*)"TDC CS received ROT request from local BS.\n");
+	scionPrinter->printLog(IH, (char*)"received ROT request from local BS.\n");
 	#endif
 	
 	// send to one of beacon server

@@ -155,18 +155,16 @@ int SCIONPathServer::initialize(ErrorHandler* errh){
     m_iNumRetUP = config.getNumRetUP();
     m_iLogLevel = config.getLogLevel();
     m_uAdAid = config.getAdAid();
-    scionPrinter = new SCIONPrint(m_iLogLevel, m_sLogFile);
+    scionPrinter = new SCIONPrint(m_iLogLevel, m_sLogFile, this->class_name());
     
     #ifdef _DEBUG_PS
-    scionPrinter->printLog(IH, (char *)"PS (%s:%s) Initializes.\n", 
-    m_AD.c_str(), m_HID.c_str());
+    scionPrinter->printLog(IH, (char *)"Initializes.\n");
     #endif
     
     parseTopology();
     #ifdef _DEBUG_PS
     scionPrinter->printLog(IH, (char *)"Parse Topology Done.\n");
-    scionPrinter->printLog(IH, (char *)"PS (%s:%s) Initialization Done.\n", 
-        m_AD.c_str(), m_HID.c_str());
+    scionPrinter->printLog(IH, (char *)"Initialization Done.\n");
     #endif
     
     _timer.initialize(this); 
@@ -232,8 +230,7 @@ void SCIONPathServer::push(int port, Packet *p)
             	SPH::setDstAddr(buf, itr->second);
 				
 				#ifdef _DEBUG_PS
-				scionPrinter->printLog(IH,type,(char *)"PS (%llu:%llu): Sending Downpath to Client: %llu\n", 
-					m_uAdAid, m_uAid, itr->second.numAddr());
+				scionPrinter->printLog(IH,type,(char *)"Sending Downpath to Client: %llu\n", itr->second.numAddr());
 				#endif
 
                 char hidbuf[AIP_SIZE+1];
@@ -265,8 +262,7 @@ void SCIONPathServer::push(int port, Packet *p)
             HostAddr requestId = SPH::getSrcAddr(packet);
             
             #ifdef _DEBUG_PS
-            scionPrinter->printLog(IH,type,(char *)"PS (%llu:%llu): Request paths for Target AD: %llu\n", 
-				m_uAdAid, m_uAid, target);
+            scionPrinter->printLog(IH,type,(char *)"Request paths for Target AD: %llu\n", target);
             #endif
             
             // for down-path
@@ -307,7 +303,7 @@ int SCIONPathServer::sendRequest(uint64_t target, HostAddr requestAid) {
 	pendingDownpathReq.insert(std::pair<uint64_t, HostAddr>(target, requestAid));
 	
 	#ifdef _DEBUG_PS
-	scionPrinter->printLog(IH, (char*)"PS send down-path request for AD: %llu.\n", 
+	scionPrinter->printLog(IH, (char*)"send down-path request for AD: %llu.\n", 
 		target);
 	#endif
 
@@ -363,8 +359,7 @@ int SCIONPathServer::sendRequest(uint64_t target, HostAddr requestAid) {
     SCIONPathServer::buildPath
     - build a path (list of opaque field) using path information 
 */
-int 
-SCIONPathServer::buildPath(uint8_t* pkt, uint8_t* output){
+int SCIONPathServer::buildPath(uint8_t* pkt, uint8_t* output){
 
     uint8_t hdrLen = SPH::getHdrLen(pkt);
 
@@ -460,11 +455,13 @@ void SCIONPathServer::parseUpPath(uint8_t* pkt){
         UPQueue* newQueue = new UPQueue(3);
         newQueue->enqueue(newUpPath);
         upPaths.insert(std::pair<scionHash, UPQueue*>(nhash, newQueue));
-        scionPrinter->printLog(IH,(char *)"upPaths.insert.\n");
+        #ifdef _DEBUG_PS
+        scionPrinter->printLog(IH, (char *)"upPaths.insert.\n");
+        #endif
     }
     else {
         #ifdef _DEBUG_PS
-        scionPrinter->printLog(IH,(char *)"New path found. Enqueue this path.\n");
+        scionPrinter->printLog(IH, (char *)"New path found. Enqueue this path.\n");
         #endif
         upPaths.find(nhash)->second->enqueue(newUpPath);
     }

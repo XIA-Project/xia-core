@@ -89,9 +89,9 @@ int SCIONCertServer::initialize(ErrorHandler* errh){
 	config.getROTFilename((char*)m_sROTFile);
 
 	// setup scionPrinter for message logging
-	scionPrinter = new SCIONPrint(m_iLogLevel, m_csLogFile);
+	scionPrinter = new SCIONPrint(m_iLogLevel, m_csLogFile, this->class_name());
 	#ifdef _DEBUG_CS
-	scionPrinter->printLog(IH, (char*)"CS (%s:%s) INIT.\n", m_AD.c_str(), m_HID.c_str());
+	scionPrinter->printLog(IH, (char*)"Initializes.\n");
 	#endif
 
 	// task 2: parse topology file
@@ -109,7 +109,7 @@ int SCIONCertServer::initialize(ErrorHandler* errh){
     _timer.schedule_after_sec(10);
 	
 	#ifdef _DEBUG_CS
-	scionPrinter->printLog(IH, (char*)"CS (%s:%s) INIT Done.\n", m_AD.c_str(), m_HID.c_str());
+	scionPrinter->printLog(IH, (char*)"Initialization Done.\n");
 	#endif
 	
 	return 0;
@@ -127,7 +127,7 @@ int SCIONCertServer::parseROT(char* loc){
 
 	if(parser.loadROTFile(fn)!=ROTParseNoError){
 	    #ifdef _DEBUG_CS
-		scionPrinter->printLog(EH, (char*)"ERR: ROT File missing at CS.\n");
+		scionPrinter->printLog(WH, (char*)"ROT File missing.\n");
 		#endif
 		return SCION_FAILURE;
 	}
@@ -135,7 +135,7 @@ int SCIONCertServer::parseROT(char* loc){
 
 	if(parser.parse(tROT)!=ROTParseNoError){
 	    #ifdef _DEBUG_CS
-		scionPrinter->printLog(EH, (char*)"ERR: ROT File parsing error at CS.\n");
+		scionPrinter->printLog(WH, (char*)"ROT File parsing error.\n");
 		#endif
 		return SCION_FAILURE;
 	}
@@ -145,7 +145,7 @@ int SCIONCertServer::parseROT(char* loc){
 
 	if(parser.verifyROT(tROT)!=ROTParseNoError){
 	    #ifdef _DEBUG_CS
-		scionPrinter->printLog(EH, (char*)"ERR: ROT File parsing error at CS.\n");
+		scionPrinter->printLog(WH, (char*)"ROT File parsing error.\n");
 		#endif
 		return SCION_FAILURE;
 	}
@@ -216,6 +216,7 @@ void SCIONCertServer::push(int port, Packet *p)
                 sendROT();
                 //2. if not, request the ROT to the provider AD
             } else {
+            
             /*
             int ret;
 		//if the ROT has not been request,  forward the request packet after changing the type to ROT_REQ
@@ -253,10 +254,12 @@ void SCIONCertServer::push(int port, Packet *p)
 		        }
 		    }
 			break;
-	        case CERT_REQ: 
+			
+	    case CERT_REQ: 
 		    //send chain
 			//processCertificateRequest(packet); 
 			break;
+			
 		case CERT_REP:
 			//processCertificateReply(packet); 
 			break;
@@ -264,6 +267,7 @@ void SCIONCertServer::push(int port, Packet *p)
         case CERT_REQ_LOCAL:
             processLocalCertificateRequest(packet); 
             break;
+            
         default:
             break;
     }
@@ -290,7 +294,7 @@ void SCIONCertServer::sendHello() {
 void SCIONCertServer::sendROT(){
 
     #ifdef _DEBUG_CS
-	scionPrinter->printLog(IH, (char*)"CS received ROT request from local BS.\n");
+	scionPrinter->printLog(IH, (char*)"received ROT request from local BS.\n");
 	#endif
 	
 	// send to one of beacon server
@@ -337,7 +341,7 @@ void SCIONCertServer::sendROT(){
 void SCIONCertServer::processROTRequest(uint8_t * packet) {
 
 	#ifdef _DEBUG_CS
-	scionPrinter->printLog(IH, (char*)"CS (%llu:%llu): Received ROT_REQ request from downstream CS.\n", m_uAdAid, m_uAid);
+	scionPrinter->printLog(IH, (char*)"Received ROT_REQ request from downstream CS.\n");
 	#endif
 
 	uint16_t hops = 0; 
@@ -420,12 +424,12 @@ void SCIONCertServer::processROTReply(uint8_t * packet) {
     fclose(rotFile);
 	
 	if(parseROT(nFile) == SCION_FAILURE) {
-        scionPrinter->printLog(IH, (char *)"CS (%lu:%lu) fail to parse ROT.\n", m_uAdAid, m_uAid);
+        scionPrinter->printLog(IH, (char *)"fail to parse ROT.\n");
         // remove file
         remove(nFile);
         return;
     }else{
-        scionPrinter->printLog(IH, (char *)"CS (%lu:%lu) stored received ROT.\n", m_uAdAid, m_uAid);
+        scionPrinter->printLog(IH, (char *)"stored received ROT.\n");
         strncpy( m_sROTFile, nFile, MAX_FILE_LEN );
     }
 	
@@ -439,8 +443,7 @@ void SCIONCertServer::processROTReply(uint8_t * packet) {
 		SPH::setSrcAddr(packet, HostAddr(HOST_ADDR_SCION,m_uAid));
 		SPH::setDstAddr(packet, itr->second);
 		#ifdef _SL_DEBUG_CS
-		scionPrinter->printLog(IH, (char*)"CS(%llu:%llu): ROT_REP_LOCAL to BS (%llu).\n",
-			m_uAdAid, m_uAid, itr->second.numAddr());
+		scionPrinter->printLog(IH, (char*)"ROT_REP_LOCAL to BS (%llu).\n", itr->second.numAddr());
 		#endif
 
 		//sendPacket(packet, SPH::getTotalLen(packet), PORT_TO_SWITCH, TO_SERVER);
@@ -457,7 +460,9 @@ void SCIONCertServer::processROTReply(uint8_t * packet) {
 }
 
 void SCIONCertServer::processCertificateRequest(uint8_t * packet) {
-	printf("CS (%llu:%llu): Received CERT_REQ request from downstream CS.\n", m_uAdAid, m_uAid);
+    #ifdef _SL_DEBUG_CS
+	scionPrinter->printLog(IH, (char*)"Received CERT_REQ request from downstream CS.\n");
+	#endif
 
 	uint16_t hops = 0; 
 	uint16_t hdrLen = SPH::getHdrLen(packet);
@@ -478,12 +483,16 @@ void SCIONCertServer::processCertificateRequest(uint8_t * packet) {
 		FILE* cFile;
 
 		if((cFile=fopen((const char*)certFile,"r"))==NULL){
-			printf("CS (%llu:%llu): certificate not found, sending up stream.\n", m_uAdAid, target);
-			
+		    #ifdef _SL_DEBUG_CS
+			scionPrinter->printLog(IH, (char*)"certificate not found, sending up stream.\n");
+			#endif
+
 			newReq.targets[newReq.numTargets]=target;
 			newReq.numTargets++;
 		}else{
-			printf("CS (%llu:%llu): certificate found sending down stream.\n", m_uAdAid, target);
+		    #ifdef _SL_DEBUG_CS
+			scionPrinter->printLog(IH, (char*)"certificate found sending down stream.\n");
+			#endif
 			
 			uint8_t downPath[(hops+1)*OPAQUE_FIELD_SIZE];
 			reversePath(packet+COMMON_HEADER_SIZE+SCION_ADDR_SIZE*2, downPath, hops);
@@ -540,7 +549,11 @@ void SCIONCertServer::processCertificateRequest(uint8_t * packet) {
 }
 
 void SCIONCertServer::processCertificateReply(uint8_t * packet) {
-	scionPrinter->printLog(IH, (char*)"CS (%llu:%llu): Received CERT_REP request from upstream CS.\n", m_uAdAid, m_uAid);
+
+    #ifdef _SL_DEBUG_CS
+	scionPrinter->printLog(IH, (char*)"Received CERT_REP request from upstream CS.\n");
+	#endif
+
 	//CERT_REP from upstream CS
 	//verify certificate
 	uint16_t hops = 0; 
@@ -577,7 +590,9 @@ void SCIONCertServer::processCertificateReply(uint8_t * packet) {
 			output(PORT_TO_SWITCH).push(outPacket);
 		}
 	}else{
-		scionPrinter->printLog(IH, (char*)"CS(%llu:%llu): certificate verification failed.\n", m_uAdAid, m_uAid);
+        #ifdef _SL_DEBUG_CS
+		scionPrinter->printLog(IH, (char*)"certificate verification failed.\n", m_uAdAid, m_uAid);
+		#endif
 	}
 
 	uint16_t pathLength = SPH::getHdrLen(packet)-COMMON_HEADER_SIZE;
@@ -595,7 +610,7 @@ void SCIONCertServer::processLocalCertificateRequest(uint8_t * packet) {
 	HostAddr srcAddr = SPH::getSrcAddr(packet);
 	HostAddr dstAddr = SPH::getDstAddr(packet);
 	#ifdef _DEBUG_CS
-	scionPrinter->printLog(IH, (char*)"CS (%s:%s): Got CERT_REQ_LOCAL from local BS.\n", m_AD.c_str(), m_HID.c_str());
+	scionPrinter->printLog(IH, (char*)"Got CERT_REQ_LOCAL from local BS.\n");
 	#endif
 
 	specialOpaqueField* sOF = (specialOpaqueField*)(packet+COMMON_HEADER_SIZE+srcAddr.getLength()+dstAddr.getLength());
@@ -610,7 +625,7 @@ void SCIONCertServer::processLocalCertificateRequest(uint8_t * packet) {
 	for(int i=0;i<numRequest;i++){
 		uint64_t target = req->targets[i];
 		#ifdef _DEBUG_CS
-		scionPrinter->printLog(IH, (char*) "Request target AID = %llu\n", target);
+		scionPrinter->printLog(IH, (char*)"Request target AID = %llu\n", target);
 		#endif
 		uint8_t certFile[MAX_FILE_LEN];
 		getCertFile(certFile, target);
@@ -628,8 +643,7 @@ void SCIONCertServer::processLocalCertificateRequest(uint8_t * packet) {
 			}
 		}else{
 		    #ifdef _DEBUG_CS
-			scionPrinter->printLog(IH, (char*)"CS (%s:%s): found AID %llu cert and send it back to local BS.\n", 
-				m_AD.c_str(), m_HID.c_str(), target);
+			scionPrinter->printLog(IH, (char*)"found AID %llu cert and send it back to local BS.\n", target);
 			#endif 
 			
 			fseek(cFile,0,SEEK_END);
@@ -671,7 +685,9 @@ void SCIONCertServer::processLocalCertificateRequest(uint8_t * packet) {
 
 		opaqueField* of = (opaqueField*)(packet+COMMON_HEADER_SIZE+SCION_ADDR_SIZE*2+OPAQUE_FIELD_SIZE);
 		HostAddr dstAddr = ifid2addr.find(of->ingressIf)->second;     
-		printf("ifid : %lu , destination : %llu\n", of->ingressIf, dstAddr.numAddr());
+		#ifdef _DEBUG_CS
+		scionPrinter->printLog(IH, (char*)"ifid : %lu , destination : %llu\n", of->ingressIf, dstAddr.numAddr());
+		#endif 
 
 		SPH::setDstAddr(packet, dstAddr);
 		SPH::setCurrOFPtr(packet,SCION_ADDR_SIZE*2);
@@ -700,7 +716,9 @@ int SCIONCertServer::verifyCert(uint8_t* packet){
 	// read target
 	ret = x509_crt_parse(&TargetCert, CertBuf, length);
 	if( ret < 0 ) {
-		printf("CS (%llu:%llu): x509_crt_parse fails for target Cert.\n", m_uAdAid, m_uAid);
+	    #ifdef _DEBUG_CS
+		scionPrinter->printLog(IH, (char*)"x509_crt_parse fails for target Cert.\n");
+		#endif 
 		x509_crt_free( &TargetCert );
 		return SCION_FAILURE;
 	}
@@ -713,7 +731,9 @@ int SCIONCertServer::verifyCert(uint8_t* packet){
 		m_ROT.coreADs.find(1)->second.certLen);
 	
 	if( ret < 0 ) {
-		printf("CS (%llu:%llu): x509parse_crt fails for ROT cert.\n", m_uAdAid, m_uAid);
+	    #ifdef _DEBUG_CS
+		scionPrinter->printLog(IH, (char*)"x509parse_crt fails for ROT cert.\n");
+		#endif
 		x509_crt_free( &TDCert );
 		return SCION_FAILURE;
 	}
@@ -722,7 +742,9 @@ int SCIONCertServer::verifyCert(uint8_t* packet){
 	int flag = 0;
 	ret = x509_crt_verify(&TargetCert, &TDCert, NULL, NULL, &flag, NULL, NULL);
 	if(ret!=0) {
-		printf("CS (%llu:%llu): fail to verify received cert by ROT file.\n", m_uAdAid, m_uAid);
+	    #ifdef _DEBUG_CS
+		scionPrinter->printLog(IH, (char*)"fail to verify received cert by ROT file.\n");
+		#endif
 		x509_crt_free(&TargetCert);
 		x509_crt_free(&TDCert);
 		return SCION_FAILURE;
@@ -731,11 +753,15 @@ int SCIONCertServer::verifyCert(uint8_t* packet){
 	x509_crt_free(&TargetCert);
 	x509_crt_free(&TDCert);
 	
-	printf("save target cert.\n");
+	#ifdef _DEBUG_CS
+	scionPrinter->printLog(IH, (char*)"save target cert.\n");
+	#endif
 	char cFileName[MAX_FILE_LEN];
 	//SL: this part should be changed; parse path from config file
 	sprintf(cFileName,"./TD1/Non-TDC/AD%llu/certserver/certificates/td%llu-ad%llu-0.crt", m_uAdAid, m_uTdAid, target);
-	printf("CS (%llu:%llu): Verify %s using ROT file.\n", m_uAdAid, m_uAid, cFileName);
+	#ifdef _DEBUG_CS
+	scionPrinter->printLog(IH, (char*)"Verify %s using ROT file.\n", cFileName);
+	#endif
 
 	FILE* cFile = fopen(cFileName,"w");
 	fwrite(CertBuf, 1, length, cFile);

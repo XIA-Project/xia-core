@@ -95,10 +95,9 @@ int SCIONBeaconServer::initialize(ErrorHandler* errh){
     config.getPCBLogFilename((char*)m_csLogFile);
     config.getROTFilename((char*)m_sROTFile);
 
-    scionPrinter = new SCIONPrint(m_iLogLevel, m_csLogFile);
+    scionPrinter = new SCIONPrint(m_iLogLevel, m_csLogFile, this->class_name());
     #ifdef _DEBUG_BS
-    scionPrinter->printLog(IH, (char*)"BS (%s:%s) Initializes.\n", 
-    m_AD.c_str(), m_HID.c_str());
+    scionPrinter->printLog(IH, (char*)"Initializes.\n");
     #endif
 
     m_iResetTime = config.getResetTime();
@@ -154,8 +153,7 @@ int SCIONBeaconServer::initialize(ErrorHandler* errh){
     _timer.schedule_after_sec(10);
     
     #ifdef _DEBUG_BS
-    scionPrinter->printLog(IH, (char*)"BS (%s:%s) Initialization Done.\n",
-        m_AD.c_str(), m_HID.c_str());
+    scionPrinter->printLog(IH, (char*)"Initialization Done.\n");
     #endif
 
     return 0;
@@ -215,13 +213,13 @@ bool SCIONBeaconServer::parseROT(char* loc){
     ROT tROT;
     
     if(loc)
-	fn = loc;
+        fn = loc;
     else
         fn = m_sROTFile;
 	
     if(parser.loadROTFile(fn)!=ROTParseNoError){
         #ifdef _DEBUG_BS
-        scionPrinter->printLog(EH, (char *)"ROT missing at BS.\n");
+        scionPrinter->printLog(WH, (char *)"ROT missing.\n");
         #endif
         return SCION_FAILURE;
     }
@@ -231,7 +229,7 @@ bool SCIONBeaconServer::parseROT(char* loc){
 	
     if(parser.parse(tROT)!=ROTParseNoError){
         #ifdef _DEBUG_BS
-        scionPrinter->printLog(EH, (char *)"ERR: ROT parsing error at BS.\n");
+        scionPrinter->printLog(WH, (char *)"ERR: ROT parsing error.\n");
         #endif
         return SCION_FAILURE;
     }
@@ -241,13 +239,10 @@ bool SCIONBeaconServer::parseROT(char* loc){
 	
     if(parser.verifyROT(tROT)!=ROTParseNoError){
         #ifdef _DEBUG_BS
-        scionPrinter->printLog(EH, (char *)"ROT parsing verifying at BS.\n");
+        scionPrinter->printLog(WH, (char *)"ROT verify error.\n");
         #endif
         return SCION_FAILURE;
     }
-    #ifdef _DEBUG_BS
-    scionPrinter->printLog(IH, (char *)"Verify ROT OK.\n");
-    #endif
 	
     //Store the ROT if verification passed.
     parser.parse(m_cROT);
@@ -260,31 +255,30 @@ bool SCIONBeaconServer::parseROT(char* loc){
 void SCIONBeaconServer::loadPrivateKey() {
     if(!_CryptoIsReady) {
         rsa_init(&PriKey, RSA_PKCS_V15, 0);	
-	int ret;
-	pk_context pk;
-	pk_init( &pk );
-	ret = pk_parse_keyfile( &pk, m_csPrvKeyFile, NULL );
-	if( ret == 0 && ! pk_can_do( &pk, POLARSSL_PK_RSA ) )
-	    ret = POLARSSL_ERR_PK_TYPE_MISMATCH;
-	if( ret == 0 )
-	    rsa_copy( &PriKey, pk_rsa( pk ) );
+        int ret;
+        pk_context pk;
+        pk_init( &pk );
+        ret = pk_parse_keyfile( &pk, m_csPrvKeyFile, NULL );
+        if( ret == 0 && ! pk_can_do( &pk, POLARSSL_PK_RSA ) )
+            ret = POLARSSL_ERR_PK_TYPE_MISMATCH;
+        if( ret == 0 )
+            rsa_copy( &PriKey, pk_rsa( pk ) );
 
-	if( ret != 0) {
-	    rsa_free(&PriKey);
-	    pk_free(&pk);
-	    click_chatter("Fatal error: Private key file loading failure, path = %s\n", 
-	    (char*)m_csPrvKeyFile);
+        if( ret != 0) {
+            rsa_free(&PriKey);
+            pk_free(&pk);
+            click_chatter("Fatal error: Private key file loading failure, path = %s\n", 
+                (char*)m_csPrvKeyFile);
             exit(-1);
-	}
-	// check private key
-	if(rsa_check_pubkey(&PriKey)!=0)
-	{
-	    rsa_free(&PriKey);
-	    click_chatter("Fatal error: Private key is not well-formatted, path = %s\n", 
-	        (char*)m_csPrvKeyFile);
-	    exit(-1);
-	}	
-	_CryptoIsReady = true;
+        }
+        // check private key
+        if(rsa_check_pubkey(&PriKey)!=0) {
+            rsa_free(&PriKey);
+            click_chatter("Fatal error: Private key is not well-formatted, path = %s\n", 
+                (char*)m_csPrvKeyFile);
+            exit(-1);
+        }
+        _CryptoIsReady = true;
     }
 }
 
@@ -298,8 +292,7 @@ void SCIONBeaconServer::run_timer(Timer *timer){
     // check if ROT file is missing
     if(!m_bROTInitiated) {
         #ifdef _DEBUG_BS
-        scionPrinter->printLog(IH, (char *)"BS (%s:%s): ROT is missing or wrong formatted.\n", 
-            m_AD.c_str(), m_HID.c_str());
+        scionPrinter->printLog(WH, (char *)"ROT is missing or wrong formatted.\n");
         #endif
         requestROT();
         
@@ -343,14 +336,13 @@ void SCIONBeaconServer::push(int port, Packet *p)
                 if(m_bROTInitiated){
                     uint32_t ROTVersion = SCIONBeaconLib::getROTver(packet);
                     #ifdef _DEBUG_BS
-                    scionPrinter->printLog(IH, (char*)"BS (%s): Received Beacon with RoT ver = %d, self RoT ver = %d.\n", 
-                        m_HID.c_str(), ROTVersion, m_cROT.version);
+                    scionPrinter->printLog(IH, (char*)"Received Beacon with RoT ver = %d, self RoT ver = %d.\n", 
+                        ROTVersion, m_cROT.version);
                     #endif
                     // ROT version handler
                     if(ROTVersion > m_cROT.version){
                         #ifdef _DEBUG_BS
-                        scionPrinter->printLog(IH, (char*)"BS (%s): RoT version has been changed. Get a new ROT from local CS.\n",
-                            m_HID.c_str());
+                        scionPrinter->printLog(IH, (char*)"RoT version has been changed. Get a new ROT from local CS.\n");
                         #endif
 			            requestROT(ROTVersion);
 			        }else{
@@ -358,8 +350,7 @@ void SCIONBeaconServer::push(int port, Packet *p)
 			        }
                 }else{
                     #ifdef _DEBUG_BS
-                    scionPrinter->printLog(EH, (char *)"BS (%s): No valid ROT file. Ignoring PCB.\n", 
-                        m_AD.c_str(), m_HID.c_str());
+                    scionPrinter->printLog(WH, (char *)"No valid ROT file. Ignoring PCB.\n");
                     #endif
                 }
             }
@@ -371,8 +362,7 @@ void SCIONBeaconServer::push(int port, Packet *p)
         
         case ROT_REP_LOCAL:
             #ifdef _DEBUG_BS
-            scionPrinter->printLog(IH, (char*)"BS (%s:%s): Received ROT_REP_LOCAL from local CS.\n", 
-		    m_AD.c_str(), m_HID.c_str());
+            scionPrinter->printLog(IH, (char*)"Received ROT_REP_LOCAL from local CS.\n");
             #endif
             saveROT(packet, packetLength);
             break;
@@ -419,8 +409,8 @@ void SCIONBeaconServer::requestROT(uint32_t version) {
     	sendPacket(packet, totalLen, dest);
 
         #ifdef _DEBUG_BS
-    	scionPrinter->printLog(EH, (char *)"BS (%s:%s): ROT is missing or wrong formatted. \
-Send ROT request to local cert server.\n", m_AD.c_str(), m_HID.c_str());
+    	scionPrinter->printLog(WH, (char *)"ROT is missing or wrong formatted. \
+Send ROT request to local cert server.\n");
         #endif
         
     }else{
@@ -464,14 +454,14 @@ void SCIONBeaconServer::saveROT(SPacket * packet, uint16_t packetLength) {
        m_bROTInitiated = parseROT(nFile);
        if(!m_bROTInitiated) {
            #ifdef _DEBUG_BS
-           scionPrinter->printLog(IH, (char *)"BS fails to parse received ROT.\n");
+           scionPrinter->printLog(WH, (char *)"fails to parse received ROT.\n");
            #endif
            // remove file
            remove(nFile);
            return;
         }else{
             #ifdef _DEBUG_BS
-            scionPrinter->printLog(IH, (char *)"BS stores received ROT.\n");
+            scionPrinter->printLog(IH, (char *)"stores received ROT.\n");
             #endif
             strncpy( m_sROTFile, nFile, MAX_FILE_LEN );
         }
@@ -492,15 +482,13 @@ void SCIONBeaconServer::processPCB(uint8_t* packet, uint16_t packetLength){
 	if(!verifyPcb(packet)){
 	
 	    #ifdef _DEBUG_BS
-		scionPrinter->printLog(IH,ts,(char *)"BS (%s:%s) PCB VERIFY FAIL.\n",
-	        m_AD.c_str(), m_HID.c_str());
+		scionPrinter->printLog(IH, ts, (char *)"PCB VERIFY FAIL.\n");
 	    #endif
 
 	}else{
 	
 	    #ifdef _DEBUG_BS
-		scionPrinter->printLog(IH,ts,(char *)"BS (%s:%s) PCB VERIFY PASS.\n",
-		    m_AD.c_str(), m_HID.c_str());
+		scionPrinter->printLog(IH,ts,(char *)"PCB VERIFY PASS.\n");
 		#endif
 		
 		//adds pcb to beacon table
@@ -518,7 +506,7 @@ void SCIONBeaconServer::processPCB(uint8_t* packet, uint16_t packetLength){
 			aes_context  actx;
 			if(!getOfgKey(SPH::getTimestamp(packet),actx)) {
 			    #ifdef _DEBUG_BS
-				scionPrinter->printLog(EH,ts,(char *)"OFG KEY retrieval failure at BS.\n");
+				scionPrinter->printLog(EH,ts,(char *)"OFG KEY retrieval failure.\n");
 				#endif
 				return;
 			}
@@ -592,7 +580,7 @@ void SCIONBeaconServer::saveCertificate(SPacket * packet, uint16_t packetLength)
     fclose(cFile);
 	
     #ifdef _DEBUG_BS
-    scionPrinter->printLog(IH, (char*)"BS saves certificate at %s.\n", cFileName);
+    scionPrinter->printLog(IH, (char*)"saves certificate at %s.\n", cFileName);
     #endif
 }
 
@@ -698,7 +686,7 @@ int SCIONBeaconServer::registerPaths() {
     }
 
     #ifdef _DEBUG_BS
-	scionPrinter->printLog(IH, (char *)"BS: registering path to TDC for %s. Beacon Table Size = %d\n", 
+	scionPrinter->printLog(IH, (char *)"registers path to TDC for %s. Beacon Table Size = %d\n", 
 	    m_AD.c_str(), beacon_table.size());
 	#endif
 
@@ -999,8 +987,7 @@ int SCIONBeaconServer::propagate() {
 			dest.append((const char*)rpair.dest_addr);
 			
 			#ifdef _DEBUG_BS
-			scionPrinter->printLog(IH, (char*)"BS(%s) propagate PCB to AD %s.\n", 
-			    m_HID.c_str(), rpair.dest_ad);
+			scionPrinter->printLog(IH, (char*)"propagate PCB to AD %s.\n", rpair.dest_ad);
 			#endif
 			
             sendPacket(msg, msgLength, dest);
@@ -1057,8 +1044,7 @@ uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){
 	// certificate not exist yet
 	if( ret < 0 ) {
 	    #ifdef _DEBUG_BS
-		scionPrinter->printLog(EH, (char*)"BS (%s:%s): x509parse_crt parsing failed.\n", 
-		    m_AD.c_str(), m_HID.c_str());
+		scionPrinter->printLog(EH, (char*)"x509parse_crt parsing failed.\n");
 		#endif
 		x509_crt_free( &TDCert );
 		// Add it to Queue
@@ -1068,8 +1054,7 @@ uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){
 
 	if(SCIONCryptoLib::verifySig(msg, sig, msgLen, pk_rsa(TDCert.pk)) != scionCryptoSuccess) {
 	    #ifdef _DEBUG_BS
-		scionPrinter->printLog(EH, (char*)"BS (%s:%s): Signature verification (TDC) failure\n", 
-		    m_AD.c_str(), m_HID.c_str());
+		scionPrinter->printLog(EH, (char*)"Signature verification (TDC) failure.\n");
 		#endif
 		x509_crt_free(&TDCert);
         return SCION_FAILURE;
@@ -1125,8 +1110,7 @@ uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){
 			FILE* cFile;
 			if((cFile=fopen((const char*)cert,"r"))==NULL){
 			    #ifdef _DEBUG_BS
-				scionPrinter->printLog(EH, (char*)"BS (%s:%s): Certificate of AD %lu does not exist.\n", 
-				    m_AD.c_str(), m_HID.c_str(), mrkPtr->aid);
+				scionPrinter->printLog(WH, (char*)"Certificate of AD %lu does not exist.\n", mrkPtr->aid);
 				#endif
 				addUnverifiedPcb(pkt);
 				requestForCert(pkt); 
@@ -1140,8 +1124,7 @@ uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){
 			int err = x509_crt_parse_file(adcert, (const char*)cert);
 			if(err){
 			    #ifdef _DEBUG_BS
-				scionPrinter->printLog(EH, (char*)"BS (%s:%s): fail to extract AD %lu's cert to verify signatures.\n", 
-					m_AD.c_str(), m_HID.c_str(), mrkPtr->aid);
+				scionPrinter->printLog(EH, (char*)"fail to extract AD %lu's cert to verify signatures.\n", mrkPtr->aid);
 				#endif
 				x509_crt_free(adcert);
 				delete adcert;
@@ -1159,7 +1142,7 @@ uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){
 		// use x509parse_verify, Note: use "x509_crt->next"
 		if(SCIONCryptoLib::verifySig(content,signature,msgLen+SIZE_AID,pk_rsa(adcert->pk))!=scionCryptoSuccess){
 		    #ifdef _DEBUG_BS
-			scionPrinter->printLog(EH, (char*)"BS (%lu:%lu): Signature verification failed for AD %lu\n", m_uAdAid, m_uAid, mrkPtr->aid);
+			scionPrinter->printLog(EH, (char*)"Signature verification failed for AD %lu\n", mrkPtr->aid);
 			#endif
 			x509_crt_free(adcert);
 			return SCION_FAILURE;
@@ -1335,8 +1318,7 @@ void SCIONBeaconServer::requestForCert(SPacket* pkt){
     	sendPacket(newPacket, packetLength, dest);
 
         #ifdef _DEBUG_BS
-    	scionPrinter->printLog(EH, (char *)"BS (%s:%s): Request Certs to local CS (%s).\n", 
-    	    m_servers.find(CertificateServer)->second.HID);
+    	scionPrinter->printLog(IH, (char *)"Request Certs from local CS.\n");
         #endif
         
 	}else{

@@ -73,9 +73,9 @@ class SCIONBeaconServerCore : public Element {
             if(_CryptoIsReady) rsa_free(&PriKey);
             delete scionPrinter;
             #ifdef _DEBUG_BS
-	  		click_chatter("TDC BS (%s:%s): terminates correctly.\n", 
-	  		    m_AD.c_str(), m_HID.c_str());
-	  		#endif
+            click_chatter("TDC BS (%s:%s): terminates correctly.\n", 
+                m_AD.c_str(), m_HID.c_str());
+	    #endif
         };
         
         /* click related functions */
