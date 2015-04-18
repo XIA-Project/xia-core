@@ -1,1 +1,3 @@
 unittest
+doc/*
+python/doc/build/*
