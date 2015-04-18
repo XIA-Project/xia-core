@@ -15,7 +15,7 @@
 */
 /*!
 ** @file Xselect.c
-** @brief implements Xselect()
+** @brief implements Xselect() and Xpoll()
 */
 #include <sys/select.h>
 #include <sys/poll.h>
@@ -34,6 +34,9 @@ typedef struct {
 ** @brief waits for one of a set of Xsockets to become ready to perform I/O.
 **
 ** Xsocket specific version of poll. See the poll man page for more detailed information.
+** This function is compatible with Xsockets as well as regular sockets and fds. Xsockets
+** are polled via click, and regular sockets and fds are handled through the normal poll
+** API.
 **
 ** #include <sys/poll.h>
 **
@@ -47,8 +50,6 @@ typedef struct {
 ** @returns 0 if timeout occured
 ** @returns a positive integer indicating the number of sockets with return events
 ** @retuns -1 with errno set if an error occured
-**
-** @warning this function is only valid for stream and datagram sockets. 
 */
 int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 {
@@ -262,8 +263,9 @@ void XselectCancel(int sock)
 ** @brief waits for one of a set of Xsockets to become ready to perform I/O.
 **
 ** Xsocket specific version of select. See the select man page for more detailed information.
-** This implementation uses Xpoll internally, and is provided to make porting easier. New code
-** should call Xpoll instead.
+** This function is compatible with Xsockets as well as regular sockets and fds. Xsockets
+** are handled with the Xpoll APIs via click, and regular sockets and fds are handled 
+** through the normal select API.
 **
 ** @param ndfs The highest socket number contained in the fd_sets plus 1
 ** @param readfds fd_set containing sockets to check for readability
