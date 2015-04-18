@@ -434,10 +434,11 @@ int startup(u_short *port)
   error_die("socket");
  memset(&name, 0, sizeof(name));
 
- inet_aton("1.2.3.4", &name.sin_addr);
+ //inet_aton("1.2.3.4", &name.sin_addr);
  name.sin_family = AF_INET;
  name.sin_port = htons(*port);
- //name.sin_addr.s_addr = htonl(INADDR_ANY);
+ name.sin_addr.s_addr = INADDR_ANY;
+ 
  if (bind(httpd, (struct sockaddr *)&name, sizeof(name)) < 0)
   error_die("bind");
  if (*port == 0)  /* if dynamically allocating a port */

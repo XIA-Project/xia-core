@@ -32,11 +32,9 @@
 **	affect the running code, just the checks for buffer sizes.
 **
 **	- DO THE RIGHT THING FOR SO_ERROR in the API
-**	- implement PEEK
 **	- Remove the FORCE_XIA calls and always default to XIA mode 
 **
 **	- Check network byte order on ports in getaddrinfo and recvfrom/sendto
-**	- Do I need to support sendmmsg in addition to sendmsg?
 **	- Add readv/writev support back in
 **
 */
@@ -62,17 +60,15 @@
 #include "Xutil.h"
 #include "dagaddr.hpp"
 #include <map>
+#include <vector>
 
 // defines **********************************************************
 #define ADDR_MASK  "169.254.%d.%d"   // fake addresses created in this subnet
-#define NETMASK    "169.254.0.0"     // for getifaddrs
-#define BROADCAST  "169.254.255.255" // for getifaddrs
-#define DEVICENAME "XIA0"            // or do I have to say ETH0 to be sure?
+#define DEVICENAME "eth0"
 
 #define ID_LEN (INET_ADDRSTRLEN + 10)	// size of an id string
 #define SID_SIZE 45						// (40 byte XID + 4 bytes SID: + null terminator)
 #define FORCE_XIA() (1)					// FIXME: get rid of this logic
-
 
 // Logging Macros ***************************************************
 #define TRACE()          {if (_log_trace)    fprintf(_log, "xwrap: %s\r\n", __FUNCTION__);}
@@ -182,19 +178,23 @@ DECLARE(ssize_t, sendmsg, int fd, const struct msghdr *msg, int flags);
 
 
 // local "IP" address **********************************************
+// When running in a local topology this means the client and server
+// hosts end up with the same IP which can be a little confusing as
+// they are running on different XIA hosts
+struct ifaddrs default_ifa;
 static char local_addr[ID_LEN];
 static struct sockaddr local_sa;
 
-// IP address segments (169.254.high.low) **************************
-static unsigned char low;
-static unsigned char high;
+typedef std::vector<std::string> address_t;
+
+static address_t addresses;
 
 // ID (IP-port) <=> DAG mapping tables *****************************
 typedef std::map<std::string, std::string> id2dag_t;
 typedef std::map<std::string, std::string> dag2id_t;
 
-id2dag_t id2dag;
-dag2id_t dag2id;
+static id2dag_t id2dag;
+static dag2id_t dag2id;
 
 // Negative name lookups are saved here ****************************
 #define NEG_LOOKUP_LIFETIME	15	// duration in seconds of a negative lookup
@@ -218,6 +218,8 @@ static FILE *_log = NULL;
 // call into the Xsockets API to see if the fd is associated with an Xsocket
 #define isXsocket(s)	 (getSocketType(s) != -1)
 #define shouldWrap(s)	 (isXsocket(s))
+
+
 
 // dump the contents of the pollfds
 void pollDump(struct pollfd *fds, nfds_t nfds, int in)
@@ -250,12 +252,18 @@ static unsigned short _NewPort()
 		// we wrapped, set it back to the base
 		port = PROTECTED;
 	}
-	return port;
+	return htons(port);
 }
+
+
 
 // Create a new fake IP address to associate with the given DAG
 static int _GetIP(sockaddr_x *sax, struct sockaddr_in *sin, const char *addr, int port)
 {
+	// pick random IP address numbers 169.254.high.low
+	static unsigned char low = (rand() % 253) + 1; // 1..254
+	static unsigned char high = rand() % 254;      // 0..254
+
 	char s[ID_LEN];
 	char id[ID_LEN];
 
@@ -267,7 +275,7 @@ static int _GetIP(sockaddr_x *sax, struct sockaddr_in *sin, const char *addr, in
 		// FIXME: do we want to increment this each time or just set it once for each app?
 		// bump the ip address for next time
 		low++;
-		if (low == 254) {
+		if (low == 255) {
 			low = 1;
 			high++;
 			if (high == 255) {
@@ -299,6 +307,8 @@ static int _GetIP(sockaddr_x *sax, struct sockaddr_in *sin, const char *addr, in
 	return 0;
 }
 
+
+
 // Generate a random SID
 static char *_NewSID(char *buf, unsigned len)
 {
@@ -314,6 +324,8 @@ static char *_NewSID(char *buf, unsigned len)
 
 	return buf;
 }
+
+
 
 // convert a IPv4 sockaddr into an id string in the form of A.B.C.D-port
 static char *_IDstring(char *s, const struct sockaddr_in* sa)
@@ -352,6 +364,8 @@ static int _i2x(struct sockaddr_in *sin, sockaddr_x *sax)
 	return rc;
 }
 
+
+
 // map from XIA to IP
 static int _x2i(sockaddr_x *sax, sockaddr_in *sin)
 {  
@@ -375,7 +389,7 @@ static int _x2i(sockaddr_x *sax, sockaddr_in *sin)
 		*p++ = 0;
 
 		inet_aton(id, &sin->sin_addr);
-		sin->sin_port = atoi(p);
+		sin->sin_port = htons(atoi(p));
 		sin->sin_family = AF_INET;
 
 	} else {
@@ -386,6 +400,8 @@ static int _x2i(sockaddr_x *sax, sockaddr_in *sin)
 	return rc;
 }
 
+
+
 // create a dag with sid for this sockaddr and register it with
 // the xia name server. Also create a mapping to go from ip->xia and xia-ip
 static int _Register(const struct sockaddr *addr, socklen_t len)
@@ -395,7 +411,9 @@ static int _Register(const struct sockaddr *addr, socklen_t len)
 	struct sockaddr_in sa;
 	struct addrinfo *ai;
 
-	memcpy(&sa, addr, len);
+	// use our default ip address withe the caller's port
+	memcpy(&sa, &local_sa, len);
+	sa.sin_port = ((sockaddr_in *)addr)->sin_port;
 
 	// create a DAG for this host in the form of "(4ID) AD HID SID"
 	Xgetaddrinfo(NULL, _NewSID(sid, sizeof(sid)), NULL, &ai);
@@ -413,6 +431,8 @@ static int _Register(const struct sockaddr *addr, socklen_t len)
 
 	return 1;
 }
+
+
 
 // check to see if we had a failed id lookup
 // they are cached for 15 seconds then purged to allow
@@ -436,6 +456,8 @@ static int _NegativeLookup(std::string id)
 
 	return rc;
 }
+
+
 
 // try to find a DAG associated with the IPv4 ip.port id
 static int _Lookup(const struct sockaddr_in *addr, sockaddr_x *sax)
@@ -477,6 +499,8 @@ static int _Lookup(const struct sockaddr_in *addr, sockaddr_x *sax)
 }
 
 
+
+// calculate the number of bytes in the iovec
 static size_t _iovSize(struct iovec *iov, size_t iovcnt)
 {
 	size_t size = 0;
@@ -538,6 +562,85 @@ static int _iovUnpack(struct iovec *iov, size_t iovcnt, char *buf, size_t len)
 
 
 
+// figure out the IP addresses that refer to this machine
+// and pick a default one to use for our fake addressing
+int _GetLocalIPs()
+{
+	struct ifaddrs *ifa;
+	struct ifaddrs *p;
+	struct ifaddrs *def_ifa;
+	char ip[ID_LEN];
+	bool found = false;
+
+	// we want INADDR_ANY
+	addresses.push_back("0.0.0.0");
+
+	__real_getifaddrs(&ifa);
+
+	for (p = ifa; p != NULL; p = p->ifa_next) {
+		if (p->ifa_addr->sa_family == AF_INET) {
+
+			struct sockaddr_in *sa = (struct sockaddr_in*)p->ifa_addr;
+
+			inet_ntop(AF_INET, (void *)&sa->sin_addr, ip, ID_LEN);
+			MSG("%s:%s\n", p->ifa_name, ip);
+
+			addresses.push_back(ip);
+
+			// prefer ETH0 as our default addrfess
+			// but take others if it's not there
+			if (!found) {
+				def_ifa = p;
+				strcpy(local_addr, ip);
+
+				if (strcasecmp(p->ifa_name, "ETH0") == 0) {
+					found = true;
+				}
+			}
+		}
+	}
+
+	// this test had better be true!
+	// save off the ifaddr we want to reply to apps with
+	if (def_ifa) {
+		p = def_ifa;
+		memcpy(&default_ifa, p, sizeof(struct ifaddr));
+		default_ifa.ifa_next = NULL;
+
+		default_ifa.ifa_addr = (struct sockaddr *)malloc(sizeof(struct sockaddr));
+		default_ifa.ifa_netmask = (struct sockaddr *)malloc(sizeof(struct sockaddr));
+		default_ifa.ifa_broadaddr = (struct sockaddr *)malloc(sizeof(struct sockaddr));
+
+		memcpy(default_ifa.ifa_addr, p->ifa_addr, sizeof(struct sockaddr));
+		memcpy(default_ifa.ifa_netmask, p->ifa_netmask, sizeof(struct sockaddr));
+		memcpy(default_ifa.ifa_broadaddr, p->ifa_broadaddr, sizeof(struct sockaddr));
+	}
+
+	__real_freeifaddrs(ifa);
+
+	// save default addr as a sockaddr_in too
+	_GetIP(NULL, (struct sockaddr_in *)&local_sa, local_addr, 0);
+
+	MSG("My Default IP = %s\n", local_addr);
+	return 0;
+}
+
+
+
+
+static bool _isLocalAddr(const char* addr)
+{
+	if (addr == NULL)
+		return false;
+
+	address_t::iterator it = find(addresses.begin(), addresses.end(), addr);
+
+	return it != addresses.end();
+}
+
+
+
+
 /********************************************************************
 **
 ** Called at library load time for initialization
@@ -550,22 +653,12 @@ void __attribute__ ((constructor)) xwrap_init(void)
 		fprintf(_log, "remapping all socket IO automatically into XIA\n");
 	}
 
-	// cause the Xsocket API to load the pointers to the real socket functions
-	// for it's own internal use 
-	xapi_load_func_ptrs();
-
 	// roll the dice
 	srand(time(NULL));
 
-	// pick random IP address numbers 169.254.high.low
-	low = (rand() % 253) + 1; // 1..254
-	high = rand() % 254;      // 0..254
-
-	// now set our local IP address
-	// FIXME: what would happen if we tried to use the result from the
-	//  first interface instead of making one up?
-	_GetIP(NULL, (struct sockaddr_in *)&local_sa, NULL, 0);
-	sprintf(local_addr, ADDR_MASK, high, low);
+	// cause the Xsocket API to load the pointers to the real socket functions
+	// for it's own internal use 
+	xapi_load_func_ptrs();
 
 	// enable logging
 	if (getenv("XWRAP_TRACE") != NULL)
@@ -584,8 +677,6 @@ void __attribute__ ((constructor)) xwrap_init(void)
 		_log = fopen(lf, "w");
 	if (!_log)
 		_log = stderr;
-
-	MSG("\n\nMy addr = %s\n\n", local_addr);
 
 	// find and save the real function pointers
 	GET_FCN(accept);
@@ -626,6 +717,8 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	GET_FCN(getservbyport_r);
 	GET_FCN(recvmsg);
 	GET_FCN(sendmsg);
+
+	_GetLocalIPs();
 }
 
 
@@ -674,21 +767,31 @@ int bind(int fd, const struct sockaddr *addr, socklen_t len)
 {
 	int rc;
 	sockaddr_x sax;
+	sockaddr_in sin;
 
 	TRACE();
 	if (shouldWrap(fd) ) {
 		XIAIFY();
 
+		// swap in our local ip for whatever the caller used
+		memcpy(&sin, &local_sa, sizeof(sockaddr_in));
+		sin.sin_port = ((struct sockaddr_in*)addr)->sin_port;
+
 		if (FORCE_XIA()) {
 			// create a mapping from IP/port to a dag and register it
-			_Register(addr, len);
+			_Register((struct sockaddr*)&sin, len);
+
+			char id[ID_LEN];	
+			_IDstring(id, &sin);
+			MSG("id:%s\n", id);
 
 			// convert the sockaddr to a sockaddr_x
-			_i2x((struct sockaddr_in*)addr, &sax);
-			addr = (struct sockaddr*)&sax;
+			MSG("before\n");
+			_i2x(&sin, &sax);
+			MSG("after\n");
 		}
 
-		rc = Xbind(fd, addr, len);
+		rc = Xbind(fd, (struct sockaddr *)&sax, len);
 
 	} else {
 		NOXIA();
@@ -868,44 +971,56 @@ const char *gai_strerror (int ecode)
 
 int getaddrinfo (const char *name, const char *service, const struct addrinfo *hints, struct addrinfo **pai)
 {
-	int rc = -1;
-	int tryxia = 1;
-	int trynormal = 1;
+	int socktype = 0;
+	int protocol = 0;
+	int family = 0;
+	int flags = 0;
+	int rc = 0;
+	int tryxia = 0;
+	bool localonly = false;
 
 	TRACE();
 
-	MSG("name = %s service = %s\n", name, service);
-
 	if (hints) {
 		// let's see if we can steal it
-		if (hints->ai_family != AF_UNSPEC && 
-			hints->ai_family != AF_INET && 
-			hints->ai_family != AF_XIA) {
+		if (hints->ai_family == AF_UNSPEC || 
+			hints->ai_family == AF_INET || 
+			hints->ai_family == AF_XIA) {
 		
-			tryxia = 0;
+			tryxia = 1;
 		}
+
+		socktype = hints->ai_socktype;
+		protocol = hints->ai_protocol;
+
+		if (hints->ai_flags != 0) {
+	
+			AI_FLAGS(hints->ai_flags);
+			flags = hints->ai_flags;
+
+			if (flags & AI_PASSIVE) {
+				localonly = true;
+			}
+		}
+	} else {
+		// no family specified, so we're taking it and 
+		// hopefully will be correct
+		tryxia = 1;
 	}
 
-	if (FORCE_XIA() && tryxia) {
-		sockaddr_x sax;
-		char s[64];
-		int socktype = 0;
-		int protocol = 0;
-		int family = AF_INET;
-		int flags = 0;
-		int port;
-		socklen_t len = sizeof(sax);
-		struct sockaddr *sa;
+	MSG("name:%s svc:%s st:%d pro:%d fam:%d\n", name, service, socktype, protocol, family);
 
-		if (hints) {
-			flags = hints->ai_flags;
-			AI_FLAGS(flags);
-			socktype = hints->ai_socktype;
-			protocol = hints->ai_protocol;
-		}
+	if (tryxia) {
+		char s[ID_LEN];
+		unsigned short port;
+		struct sockaddr *sa;
+		sockaddr_x sax;
+		socklen_t len = sizeof(sax);
+
+		family = AF_XIA;
 
 		if (service) {
-			port = strtol(service, NULL, 10);
+			port = htons(strtol(service, NULL, 10));
 			if (errno == EINVAL) {
 				// service was not an integer
 
@@ -922,22 +1037,25 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 			port = _NewPort();
 		}
 
+		printf("local check\n");
 
-// FIXME: handle 127.x
-// FIXME: what to do if not in table
+		if (localonly || _isLocalAddr(name)) {
+			localonly = true;
+			MSG("getting address for local machine\n");
+		} else {
+			MSG("need to do name resolution\n");
+		}
 
-		if ((name == NULL) || (strcmp(name, "0.0.0.0")) == 0) {
+		if (localonly) {
 			// caller wants a sockaddr for itself
-			// create a fake ip address
-			// fill in sax with the bogus ip address
+			// use our default ip address, regardless of what they gave us
 
 			sa = (struct sockaddr *)calloc(sizeof(struct sockaddr), 1);
-
-			// use the address we created at boot time
-			_GetIP(NULL, (struct sockaddr_in*)sa, local_addr, htons(port));
-
+			memcpy(sa, &local_sa, sizeof(struct sockaddr));
+			((sockaddr_in *)sa)->sin_port = port;
+			MSG("returning address:%s port:%u\n", local_addr, htons(port));
 			rc = 0;
-		
+
 		} else if (flags && AI_NUMERICHOST) {
 			// just make a sockaddr with the passed info
 			sa = (struct sockaddr *)calloc(sizeof(struct sockaddr), 1);
@@ -950,7 +1068,7 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 
 		} else {
 
-			sprintf(s, "%s-%d", name, port);
+			sprintf(s, "%s-%d", name, ntohs(port));
 
 			if (_NegativeLookup(s)) {
 				// we've already failed to look up this name
@@ -959,8 +1077,6 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 			}
 			MSG("addr=%s\n", s);
 
-//			if (_Lookup(s, NULL, &sax) < 0)
-//				return -1;
 			if (XgetDAGbyName(s, &sax, &len) < 0) {
 				MSG("name lookup failed for %s\n", s);
 
@@ -970,16 +1086,10 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 			}
 
 			sa = (struct sockaddr *)calloc(sizeof(struct sockaddr), 1);
-//			sockaddr_in *sin = (struct sockaddr_in *)sa;
 			_GetIP(&sax, (sockaddr_in *)sa, name, htons(port));
-//			inet_aton(name, &sin->sin_addr);
-//			sin->sin_family = AF_INET;
-//			sin->sin_port = htons(port);
 
 			Graph g(&sax);
 			std::string dag = g.dag_string();
-//			id2dag[s] = dag;
-//			dag2id[dag] = s;
 
 			MSG("found name\n%s\n", dag.c_str());
 		}
@@ -999,41 +1109,16 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 		rc = 0;
 
 	} else {
-		// try to determine if this is an XIA address lookup
-		if (hints) {
-			// they specified hints, see if the family is XIA, or unspecified
-			if (hints->ai_family == AF_UNSPEC) {
-				MSG("family is unspec\n");
-				tryxia = 1;
-			} else if (hints->ai_family == AF_XIA) {
-				MSG("family is XIA\n");
-				tryxia = 1;
-				trynormal = 0;
-					tryxia = 0;
-				tryxia = 0;
-			}
-		}
-
-		if (tryxia) {
-			XIAIFY();
-			MSG("looking up name in XIA\n");
-			rc = Xgetaddrinfo(name, service, hints, pai);
-			MSG("Xgetaddrinfo returns %d\n", rc);
-		}
-
 		// XIA lookup failed, fall back to
-		if (trynormal && rc < 0) {
-			NOXIA();
-			MSG("looking up name normally\n");
-			rc = __real_getaddrinfo(name, service, hints, pai);
-		}
+		NOXIA();
+		rc = __real_getaddrinfo(name, service, hints, pai);
 	}
 
 	return rc;
 }
 
 
-
+// FIXME: do I still need to fake this if I'm using the real IP address for things?
 int getifaddrs(struct ifaddrs **ifap)
 {
 	int rc = 0;
@@ -1046,17 +1131,12 @@ int getifaddrs(struct ifaddrs **ifap)
 	ifa->ifa_addr      = (struct sockaddr *)calloc(1, sizeof(struct sockaddr));
 	ifa->ifa_netmask   = (struct sockaddr *)calloc(1, sizeof(struct sockaddr));
 	ifa->ifa_broadaddr = (struct sockaddr *)calloc(1, sizeof(struct sockaddr));
-	ifa->ifa_flags     = IFF_UP | IFF_RUNNING | IFF_BROADCAST ;
+	ifa->ifa_flags     = IFF_UP | IFF_RUNNING | IFF_BROADCAST;
 	ifa->ifa_data      = NULL;
 
-	struct sockaddr_in *sin = (struct sockaddr_in*)ifa->ifa_addr;
-	_GetIP(NULL, sin, local_addr, 0);
-
-	sin = (struct sockaddr_in*)ifa->ifa_netmask;
-	_GetIP(NULL, sin, NETMASK, 0);
-
-	sin = (struct sockaddr_in*)ifa->ifa_broadaddr;
-	_GetIP(NULL, sin, BROADCAST, 0);
+	memcpy(ifa->ifa_addr, default_ifa.ifa_addr, sizeof(struct sockaddr));
+	memcpy(ifa->ifa_netmask, default_ifa.ifa_netmask, sizeof(struct sockaddr));
+	memcpy(ifa->ifa_broadaddr, default_ifa.ifa_broadaddr, sizeof(struct sockaddr));
 
 	// we aren't going to use the real version in the wrapper at all
 	//rc = __real_getifaddrs(ifap);
@@ -1644,7 +1724,9 @@ ssize_t recvmsg(int fd, struct msghdr *msg, int flags)
 	int rc;
 	TRACE();
 
-	MSG("fd:%d flags:%08x\n", fd, flags);
+	if (flags) {
+		XFER_FLAGS(flags);
+	}
 	MSG("msghdr:\n name:%p namelen:%zu iov:%p iovlen:%zu control:%p clen:%zu flags:%08x",
 	msg->msg_name,
 	(size_t)msg->msg_namelen,
@@ -1668,6 +1750,9 @@ ssize_t recvmsg(int fd, struct msghdr *msg, int flags)
 			return -1;
 		}
 
+		// make the buffer larger than we expect in case we have to deal with 
+		// a TRUNC issue as I don't want any extra data hanging out in the
+		// saved data
 		size_t size = _iovSize(msg->msg_iov, msg->msg_iovlen) * 2;
 		char *buf = (char *)malloc(size);
 
