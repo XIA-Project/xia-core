@@ -249,7 +249,7 @@ XTRANSPORT::run_timer(Timer *timer)
 				// TODO: make sure that -1 is the only condition that will cause us to get a bad XID
 				if (sk->src_path.destination_node() != -1) {
 					XID source_xid = sk->src_path.xid(sk->src_path.destination_node());
-					if (!sk->isAcceptSocket) {
+					if (!sk->isListenSocket) {
 
 						//click_chatter("deleting route %s from port %d\n", source_xid.unparse().c_str(), _sport);
 						delRoute(source_xid);
@@ -719,6 +719,9 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 		break;
 	case xia::XCONNECT:
 		Xconnect(_sport, &xia_socket_msg);
+		break;
+	case xia::XLISTEN:
+		Xlisten(_sport, &xia_socket_msg);
 		break;
 	case xia::XREADYTOACCEPT:
 		XreadyToAccept(_sport, &xia_socket_msg);
@@ -1436,7 +1439,7 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	sk->dataack_waiting = false;
 	sk->num_retransmit_tries = 0;
 	sk->teardown_waiting = false;
-	sk->isAcceptSocket = false;
+	sk->isListenSocket = false;
 	sk->num_connect_tries = 0; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
 	memset(sk->send_buffer, 0, sk->send_buffer_size * sizeof(WritablePacket*));
 	memset(sk->recv_buffer, 0, sk->recv_buffer_size * sizeof(WritablePacket*));
@@ -1808,6 +1811,18 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 	ReturnResult(_sport, xia_socket_msg, -1, EINPROGRESS);
 }
 
+
+void XTRANSPORT::Xlisten(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
+{
+	sock *sk = portToSock.get(_sport);
+	sk->isListenSocket = true;
+
+	// we just want to mark the socket as listenening and return right away.
+	// may need to copy some logic from readyToAccept
+
+	ReturnResult(_sport, xia_socket_msg);
+}
+
 void XTRANSPORT::XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
 	// If there is already a pending connection, return true now
@@ -1845,7 +1860,7 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		new_sk->hlim = hlim.get(new_port);
 		new_sk->next_send_seqnum = 0;
 		new_sk->next_recv_seqnum = 0;
-		new_sk->isAcceptSocket = true; // FIXME backwards? shouldn't sk be the accpet socket?
+		new_sk->isListenSocket = true; // FIXME backwards? shouldn't sk be the accpet socket?
 		memset(new_sk->send_buffer, 0, new_sk->send_buffer_size * sizeof(WritablePacket*));
 		memset(new_sk->recv_buffer, 0, new_sk->recv_buffer_size * sizeof(WritablePacket*));
 		//new_sk->pending_connection_buf = new queue<sock>();

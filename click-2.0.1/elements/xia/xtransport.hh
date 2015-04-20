@@ -353,7 +353,7 @@ class XTRANSPORT : public Element {
 
 		bool isConnected;
 		bool initialized;
-		bool isAcceptSocket;
+		bool isListenSocket;
 		bool synack_waiting;
 		bool dataack_waiting;
 		bool teardown_waiting;
@@ -591,6 +591,7 @@ class XTRANSPORT : public Element {
     void Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+    void Xlisten(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
