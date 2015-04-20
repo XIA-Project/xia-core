@@ -71,7 +71,7 @@
 #define FORCE_XIA() (1)					// FIXME: get rid of this logic
 
 // Logging Macros ***************************************************
-#define TRACE()          {if (_log_trace)    fprintf(_log, "xwrap: %s\r\n", __FUNCTION__);}
+#define TRACE()          {if (_log_trace)    fprintf(_log, "xwrap: %\n", __FUNCTION__);}
 
 #define MSG(...)         {if (_log_info)    {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
 #define XFER_FLAGS(f)    {if (_log_info)     fprintf(_log, "xwrap: %s flags:%s\n", __FUNCTION__, xferFlags(f));}
@@ -80,13 +80,13 @@
 #define AF_VALUE(f)      {if (_log_info)     fprintf(_log, "xwrap: %s family:%s\n", __FUNCTION__, afValue(f));}
 #define OPT_VALUE(f)     {if (_log_info)     fprintf(_log, "xwrap: %s opt:%s\n", __FUNCTION__, optValue(f));}
 #define POLL_FLAGS(i, f) {if (_log_info)     fprintf(_log, "xwrap: %s socket:%u %s\n", __FUNCTION__, i, pollFlags(f));}
-#define XIAIFY()         {if (_log_wrap)     fprintf(_log, "xwrap: %s redirected to XIA\r\n", __FUNCTION__);}
+#define XIAIFY()         {if (_log_wrap)     fprintf(_log, "xwrap: %s redirected to XIA\n", __FUNCTION__);}
 
-//#define NOXIA()        {if (_log_wrap)     fprintf(_log, "xwrap: %s used normally\r\n", __FUNCTION__);}
+//#define NOXIA()        {if (_log_wrap)     fprintf(_log, "xwrap: %s used normally\n", __FUNCTION__);}
 #define NOXIA()
-#define SKIP()           {if (_log_wrap)     fprintf(_log, "xwrap: %s not required/supported in XIA (no-op)\r\n", __FUNCTION__);}
+#define SKIP()           {if (_log_wrap)     fprintf(_log, "xwrap: %s not required/supported in XIA (no-op)\n", __FUNCTION__);}
 
-#define ALERT()          {if (_log_warning)  fprintf(_log, "xwrap: ALERT!!!, %s is not implemented in XIA!\r\n", __FUNCTION__);}
+#define ALERT()          {if (_log_warning)  fprintf(_log, "xwrap: ALERT!!!, %s is not implemented in XIA!\n", __FUNCTION__);}
 #define WARNING(...)     {if (_log_warning) {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
 
 #ifdef DEBUG
