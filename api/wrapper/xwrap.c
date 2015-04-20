@@ -222,7 +222,7 @@ static FILE *_log = NULL;
 
 
 // dump the contents of the pollfds
-void pollDump(struct pollfd *fds, nfds_t nfds, int in)
+static void pollDump(struct pollfd *fds, nfds_t nfds, int in)
 {
 	MSG("%s\n", (in ? "PRE" : "POST"));
 	for(nfds_t i = 0; i < nfds; i++) {
@@ -573,7 +573,7 @@ static bool _isLocalAddr(const char* addr)
 
 	bool found = (it != addresses.end());
 
-	MSG("%s: found:%d\n", addr, found);
+	MSG("%p %s: found:%d\n", &addresses, addr, found);
 	return found;
 }
 
@@ -582,7 +582,7 @@ static bool _isLocalAddr(const char* addr)
 
 // figure out the IP addresses that refer to this machine
 // and pick a default one to use for our fake addressing
-int _GetLocalIPs()
+static int _GetLocalIPs()
 {
 	struct ifaddrs *ifa;
 	struct ifaddrs *p;
