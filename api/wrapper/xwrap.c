@@ -566,6 +566,8 @@ static int _iovUnpack(struct iovec *iov, size_t iovcnt, char *buf, size_t len)
 // see if the given IP address is local to our machine
 static bool _isLocalAddr(const char* addr)
 {
+	MSG("local addr size = %zu\n", addresses.size());
+
 	if (addr == NULL || strlen(addr) == 0)
 		return true;
 
@@ -641,12 +643,6 @@ static int _GetLocalIPs()
 
 	MSG("My Default IP = %s\n", local_addr);
 
-#if 1
-	MSG("\nTesting....\n");
-	_isLocalAddr("0.0.0.0");
-	_isLocalAddr("127.0.0.1");
-	_isLocalAddr("192.168.1.1");
-#endif
 	return 0;
 }
 
@@ -730,8 +726,6 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	GET_FCN(sendmsg);
 
 	_GetLocalIPs();
-	// FIXME: remove debug line
-	_isLocalAddr("0.0.0.0");
 }
 
 
@@ -998,6 +992,12 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 	*/
 
 	TRACE();
+
+	// UGLY HACK - where did the data in this table go????
+	if (addresses.size() == 0) {
+		MSG("addresses table is empty! reloading...\n");
+		_GetLocalIPs();
+	}
 
 	*pai = NULL;
 
