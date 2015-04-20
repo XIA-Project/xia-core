@@ -32,7 +32,7 @@
 **	affect the running code, just the checks for buffer sizes.
 **
 **	- DO THE RIGHT THING FOR SO_ERROR in the API
-**	- Remove the FORCE_XIA calls and always default to XIA mode 
+**	- Remove the FORCE_XIA calls and always default to XIA mode
 **
 **	- Check network byte order on ports in getaddrinfo and recvfrom/sendto
 **	- Add readv/writev support back in
@@ -242,7 +242,7 @@ static unsigned short _NewPort()
 {
 	// it doesn't really matter in our case, but stay away from protected ports
 	#define PROTECTED 1024
-	
+
 	// start with a random value
 	static unsigned short port = PROTECTED + (rand() % (USHRT_MAX - PROTECTED));
 
@@ -268,7 +268,7 @@ static int _GetIP(sockaddr_x *sax, struct sockaddr_in *sin, const char *addr, in
 	char id[ID_LEN];
 
 	// Make an IPv4 sockaddr
-	if (!addr) { 
+	if (!addr) {
 		sprintf(s, ADDR_MASK, high, low);
 		addr = s;
 #if 1
@@ -368,13 +368,13 @@ static int _i2x(struct sockaddr_in *sin, sockaddr_x *sax)
 
 // map from XIA to IP
 static int _x2i(sockaddr_x *sax, sockaddr_in *sin)
-{  
+{
 	char id[ID_LEN];
 	Graph g(sax);
 	int rc = 0;
 
-	/* 
-	** NOTE: This depends on the created dag string 
+	/*
+	** NOTE: This depends on the created dag string
 	** always looking the same across calls. It will
 	** fail if the dag elements are reordered.
 	*/
@@ -396,7 +396,7 @@ static int _x2i(sockaddr_x *sax, sockaddr_in *sin)
 		rc = -1;
 		MSG("No mapping for %s\n", g.dag_string().c_str());
 	}
-	
+
 	return rc;
 }
 
@@ -448,7 +448,7 @@ static int _NegativeLookup(std::string id)
 		if (time(NULL) - t >= NEG_LOOKUP_LIFETIME) {
 			failedLookups.erase(it);
 			MSG("clearing negative lookup entry for %s\n", id.c_str());
-		
+
 		} else {
 			rc = -1;
 		}
@@ -627,15 +627,15 @@ int _GetLocalIPs()
 
 
 
-
+// see if the given IP address is local to our machine
 static bool _isLocalAddr(const char* addr)
 {
-	if (addr == NULL)
-		return false;
+	if (addr == NULL || strlen(addr) == 0)
+		return true;
 
 	address_t::iterator it = find(addresses.begin(), addresses.end(), addr);
 
-	return it != addresses.end();
+	return (it != addresses.end());
 }
 
 
@@ -657,7 +657,7 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	srand(time(NULL));
 
 	// cause the Xsocket API to load the pointers to the real socket functions
-	// for it's own internal use 
+	// for it's own internal use
 	xapi_load_func_ptrs();
 
 	// enable logging
@@ -752,7 +752,7 @@ int accept(int fd, struct sockaddr *addr, socklen_t *addr_len)
 
 			// convert the sockaddr_x to a sockaddr
 			_x2i(&sax, (struct sockaddr_in*)ipaddr);
-		}		
+		}
 
 	} else {
 		NOXIA();
@@ -781,7 +781,7 @@ int bind(int fd, const struct sockaddr *addr, socklen_t len)
 			// create a mapping from IP/port to a dag and register it
 			_Register((struct sockaddr*)&sin, len);
 
-			char id[ID_LEN];	
+			char id[ID_LEN];
 			_IDstring(id, &sin);
 			MSG("id:%s\n", id);
 
@@ -808,7 +808,7 @@ int close(int fd)
 	sockaddr_x addr;
 	socklen_t len = sizeof(addr);
 	int rc;
-	
+
 	TRACE();
 	if (shouldWrap(fd)) {
 		XIAIFY();
@@ -848,7 +848,7 @@ int connect(int fd, const struct sockaddr *addr, socklen_t len)
 
 		if (_Lookup((sockaddr_in *)addr, &sax) != 0) {
 			char id[ID_LEN];
-				
+
 			_IDstring(id, (sockaddr_in*)addr);
 			WARNING("Unable to lookup %s\n", id);
 			errno = ENETUNREACH;
@@ -877,7 +877,7 @@ extern "C" int fcntl (int fd, int cmd, ...)
 	if (isXsocket(fd)) {
 		XIAIFY();
 		f = Xfcntl;
-	
+
 	} else {
 		NOXIA();
 		f = __real_fcntl;
@@ -912,7 +912,7 @@ extern "C" int fcntl (int fd, int cmd, ...)
 		case F_SETLKW:
 			rc = (f)(fd, cmd, va_arg(args, struct flock *));
 			break;
-		 
+
 		case F_GETFD:
 		case F_GETFL:
 		case F_GETOWN:
@@ -927,7 +927,7 @@ extern "C" int fcntl (int fd, int cmd, ...)
 			WARNING("Unknown command value (%08x)\n", cmd);
 			errno = EINVAL;
 			rc = -1;
-			break;	
+			break;
 	}
 
 	va_end(args);
@@ -976,25 +976,37 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 	int family = 0;
 	int flags = 0;
 	int rc = 0;
-	int tryxia = 0;
+	unsigned short port = 0;
 	bool localonly = false;
+
+	/*
+	** NOTES:
+	**	The AI_ALL, AI_V4MAPPED, AI_ADDRCONFIG, AI_CANONIDN, & AI_IDN* flags are ignored
+	*/
 
 	TRACE();
 
+	*pai = NULL;
+
+	if (name == NULL && service == NULL) {
+		return EAI_NONAME;
+	}
+
 	if (hints) {
 		// let's see if we can steal it
-		if (hints->ai_family == AF_UNSPEC || 
-			hints->ai_family == AF_INET || 
-			hints->ai_family == AF_XIA) {
-		
-			tryxia = 1;
+		if (hints->ai_family == AF_UNSPEC || hints->ai_family == AF_INET) {
+			family = AF_INET;
+		} else if (hints->ai_family == AF_XIA) {
+			family = AF_XIA;
+		} else {
+			family = hints->ai_family;
 		}
 
 		socktype = hints->ai_socktype;
 		protocol = hints->ai_protocol;
 
 		if (hints->ai_flags != 0) {
-	
+
 			AI_FLAGS(hints->ai_flags);
 			flags = hints->ai_flags;
 
@@ -1003,41 +1015,41 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 			}
 		}
 	} else {
-		// no family specified, so we're taking it and 
+		// no family specified, so we're taking it and
 		// hopefully will be correct
-		tryxia = 1;
+		family = AF_INET;
 	}
 
 	MSG("name:%s svc:%s st:%d pro:%d fam:%d\n", name, service, socktype, protocol, family);
 
-	if (tryxia) {
+	if (family == AF_INET) {
+		// we're going to hijack the IPv4 name lookup
+
 		char s[ID_LEN];
-		unsigned short port;
 		struct sockaddr *sa;
 		sockaddr_x sax;
 		socklen_t len = sizeof(sax);
 
-		family = AF_XIA;
-
 		if (service) {
+			if (flags & AI_NUMERICSERV) {
+				localonly = true;
+			}
 			port = htons(strtol(service, NULL, 10));
 			if (errno == EINVAL) {
 				// service was not an integer
 
-				// FIXME:is this threadsafe???
+				if (flags & AI_NUMERICSERV) {
+					// FIXME: is this correct, need more research on this flag
+					return EAI_SERVICE;
+				}
+
 				struct servent *serv = getservbyname(service, NULL);
 				if (serv) {
 					port = serv->s_port;
-				} else {
-					port = _NewPort();
 				}
 				endservent();
 			}
-		} else {
-			port = _NewPort();
 		}
-
-		printf("local check\n");
 
 		if (localonly || _isLocalAddr(name)) {
 			localonly = true;
@@ -1059,11 +1071,7 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 		} else if (flags && AI_NUMERICHOST) {
 			// just make a sockaddr with the passed info
 			sa = (struct sockaddr *)calloc(sizeof(struct sockaddr), 1);
-
-			if (!service) {
-				port = 0;
-			}
-			_GetIP(NULL, (sockaddr_in *)sa, name, htons(port));
+			_GetIP(NULL, (sockaddr_in *)sa, name, port);
 			rc = 0;
 
 		} else {
@@ -1072,26 +1080,28 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 
 			if (_NegativeLookup(s)) {
 				// we've already failed to look up this name
-				errno = EAI_NONAME;
-				return -1;
+				rc = EAI_NONAME;
+				goto done;
 			}
-			MSG("addr=%s\n", s);
 
+			MSG("id=%s\n", s);
+
+			// fixme - this should use Xgetaddrinfo
 			if (XgetDAGbyName(s, &sax, &len) < 0) {
 				MSG("name lookup failed for %s\n", s);
 
 				failedLookups[s] = time(NULL);
-				errno = EAI_NONAME;
-				return -1;
+				rc =  EAI_NONAME;
+				goto done;
 			}
 
 			sa = (struct sockaddr *)calloc(sizeof(struct sockaddr), 1);
-			_GetIP(&sax, (sockaddr_in *)sa, name, htons(port));
+			_GetIP(&sax, (sockaddr_in *)sa, name, port);
 
 			Graph g(&sax);
 			std::string dag = g.dag_string();
 
-			MSG("found name\n%s\n", dag.c_str());
+			MSG("found id\n%s\n", dag.c_str());
 		}
 
 		struct addrinfo *ai = (struct addrinfo *)calloc(sizeof(struct addrinfo), 1);
@@ -1105,15 +1115,29 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 		ai->ai_next      = NULL;
 		ai->ai_addr 	 = sa;
 
+		if (flags & AI_CANONNAME) {
+			char *cname =(char *)malloc(ID_LEN);
+			char id[ID_LEN];
+
+			inet_ntop(AF_INET, &sa, id, ID_LEN);
+			sprintf(cname, "%s-%d", id, ntohs(((struct sockaddr_in*)sa)->sin_port));
+
+		} else {
+			ai->ai_canonname = NULL;
+		}
+
 		*pai = ai;
 		rc = 0;
+
+	} else if (family == AF_XIA) {
+		rc= Xgetaddrinfo(name, service, hints, pai);
 
 	} else {
 		// XIA lookup failed, fall back to
 		NOXIA();
 		rc = __real_getaddrinfo(name, service, hints, pai);
 	}
-
+done:
 	return rc;
 }
 
@@ -1318,7 +1342,7 @@ ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, 
 			addr = (struct sockaddr*)&sax;
 			*addr_len = sizeof(addr);
 			// FIXME we should check to see if addr and addr_len are valid
-		}  
+		}
 
 		rc = Xrecvfrom(fd, buf, n, flags, addr, &slen);
 
@@ -1328,7 +1352,7 @@ ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, 
 				// we don't have a mapping for this yet, create a fake IP address
 				_GetIP(&sax, (sockaddr_in *)ipaddr, NULL, _NewPort());
 			}
-		}	
+		}
 
 	} else {
 		NOXIA();
@@ -1384,7 +1408,7 @@ ssize_t send(int fd, const void *buf, size_t n, int flags)
 		p[n] = 0;
 		MSG("%s\n", p);
 		// end debug
-		
+
 		rc = Xsend(fd, buf, n, flags);
 
 
@@ -1614,7 +1638,7 @@ extern "C" ssize_t __recv_chk(int __fd, void *__buf, size_t __n, size_t __buflen
 
 
 
-extern "C" ssize_t __recvfrom_chk (int __fd, void *__restrict __buf, size_t __n, size_t __buflen, int __flags, 
+extern "C" ssize_t __recvfrom_chk (int __fd, void *__restrict __buf, size_t __n, size_t __buflen, int __flags,
 	__SOCKADDR_ARG __addr, socklen_t *__restrict __addr_len)
 {
 	UNUSED(__buflen);
@@ -1750,7 +1774,7 @@ ssize_t recvmsg(int fd, struct msghdr *msg, int flags)
 			return -1;
 		}
 
-		// make the buffer larger than we expect in case we have to deal with 
+		// make the buffer larger than we expect in case we have to deal with
 		// a TRUNC issue as I don't want any extra data hanging out in the
 		// saved data
 		size_t size = _iovSize(msg->msg_iov, msg->msg_iovlen) * 2;
