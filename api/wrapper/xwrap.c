@@ -562,6 +562,24 @@ static int _iovUnpack(struct iovec *iov, size_t iovcnt, char *buf, size_t len)
 
 
 
+
+// see if the given IP address is local to our machine
+static bool _isLocalAddr(const char* addr)
+{
+	if (addr == NULL || strlen(addr) == 0)
+		return true;
+
+	address_t::iterator it = find(addresses.begin(), addresses.end(), addr);
+
+	bool found = (it != addresses.end());
+
+	MSG("%s: found:%d\n", addr, found);
+	return found;
+}
+
+
+
+
 // figure out the IP addresses that refer to this machine
 // and pick a default one to use for our fake addressing
 int _GetLocalIPs()
@@ -622,22 +640,15 @@ int _GetLocalIPs()
 	_GetIP(NULL, (struct sockaddr_in *)&local_sa, local_addr, 0);
 
 	MSG("My Default IP = %s\n", local_addr);
+
+#if 1
+	MSG("\nTesting....\n");
+	_isLocalAddr("0.0.0.0");
+	_isLocalAddr("127.0.0.1");
+	_isLocalAddr("192.168.1.1");
+#endif
 	return 0;
 }
-
-
-
-// see if the given IP address is local to our machine
-static bool _isLocalAddr(const char* addr)
-{
-	if (addr == NULL || strlen(addr) == 0)
-		return true;
-
-	address_t::iterator it = find(addresses.begin(), addresses.end(), addr);
-
-	return (it != addresses.end());
-}
-
 
 
 
@@ -719,6 +730,8 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	GET_FCN(sendmsg);
 
 	_GetLocalIPs();
+	// FIXME: remove debug line
+	_isLocalAddr("0.0.0.0");
 }
 
 
