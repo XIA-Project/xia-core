@@ -480,6 +480,7 @@ const char *getTempSID(int sock)
 	if(sstate) {
 		return sstate->getTempSID();
 	}
+	return NULL;
 }
 
 unsigned seqNo(int sock)
