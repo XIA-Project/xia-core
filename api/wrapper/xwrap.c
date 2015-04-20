@@ -71,7 +71,7 @@
 #define FORCE_XIA() (1)					// FIXME: get rid of this logic
 
 // Logging Macros ***************************************************
-#define TRACE()          {if (_log_trace)    fprintf(_log, "xwrap: %\n", __FUNCTION__);}
+#define TRACE()          {if (_log_trace)    fprintf(_log, "xwrap: %s\n", __FUNCTION__);}
 
 #define MSG(...)         {if (_log_info)    {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
 #define XFER_FLAGS(f)    {if (_log_info)     fprintf(_log, "xwrap: %s flags:%s\n", __FUNCTION__, xferFlags(f));}
