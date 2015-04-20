@@ -15,7 +15,6 @@
 ** limitations under the License.
 */
 
-
 /*
 ** This library is loaded via LD_PRELOAD so that it comes before glibc.
 ** It captures all of the socket related functions so that they can be
@@ -23,7 +22,6 @@
 **
 ** The easiest way to use it is via the xia-core/bin/xwrap script
 */
-
 
 /* FIXME:
 **	- The __foo_chk functions currently call the foo function, not the checked
@@ -34,7 +32,6 @@
 **	- DO THE RIGHT THING FOR SO_ERROR in the API
 **	- Remove the FORCE_XIA calls and always default to XIA mode
 **
-**	- Check network byte order on ports in getaddrinfo and recvfrom/sendto
 **	- Add readv/writev support back in
 **
 */
@@ -1258,16 +1255,21 @@ int getsockopt(int fd, int level, int optname, void *optval, socklen_t *optlen)
 
 int listen(int fd, int n)
 {
+	int rc = 0;
+
 	TRACE();
 	if (isXsocket(fd)) {
-		// XIA doesn't have a listen function yet, so just return success
-		SKIP();
-		return 0;
+		XIAIFY();
+
+		// FIXME: uncomment when ready to test listen logic
+		// rc = Xlisten(fd, n);
 
 	} else {
 		NOXIA();
-		return __real_listen(fd, n);
+		rc = __real_listen(fd, n);
 	}
+
+	return rc;
 }
 
 
@@ -1340,30 +1342,30 @@ ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, 
 {
 	int rc;
 	sockaddr_x sax;
-	struct sockaddr *ipaddr;
-	socklen_t slen;
+	socklen_t slen = sizeof(sax);
+	sockaddr_x *addrx = NULL;
+	bool do_address = false;
 
 	TRACE();
 
-	if (shouldWrap(fd)) {
+	if(isXsocket(fd)) {
 		XIAIFY();
 		XFER_FLAGS(flags);
 
-		if (FORCE_XIA()) {
-			slen = (socklen_t)sizeof(sax);
-			ipaddr = addr;
-			addr = (struct sockaddr*)&sax;
-			*addr_len = sizeof(addr);
-			// FIXME we should check to see if addr and addr_len are valid
+		if (addr != NULL) {
+			do_address = true;
+			addrx = &sax;
 		}
 
-		rc = Xrecvfrom(fd, buf, n, flags, addr, &slen);
+		MSG("fd:%d size:%d addr:%p\n", fd, n, addr);
 
-		if (rc >= 0 && FORCE_XIA()) {
+		rc = Xrecvfrom(fd, buf, n, flags, (struct sockaddr*)addrx, &slen);
+
+		if (rc >= 0 && do_address) {
 			// convert the sockaddr to a sockaddr_x
-			if (_x2i(&sax, (struct sockaddr_in*)ipaddr) < 0) {
+			if (_x2i(&sax, (struct sockaddr_in*)addr) < 0) {
 				// we don't have a mapping for this yet, create a fake IP address
-				_GetIP(&sax, (sockaddr_in *)ipaddr, NULL, _NewPort());
+				_GetIP(&sax, (sockaddr_in *)addr, NULL, _NewPort());
 			}
 		}
 

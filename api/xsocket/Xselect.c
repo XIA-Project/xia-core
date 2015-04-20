@@ -56,6 +56,7 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 	int sock = 0;
 	int nxfds = 0;
 	int rc, xrc;
+	unsigned dataReady = 0;
 
 	if (nfds == 0) {
 		// it's just a timer
@@ -83,6 +84,12 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 				// add the Xsocket to the xpoll struct
 				// TODO: should this work for Content sockets?
 
+				if (getSocketDataLen(ufds[i].fd) && (ufds[i].events & POLLIN)) {
+					dataReady++;
+					ufds[i].revents = POLLIN;
+					continue;
+				}
+
 				xia::X_Poll_Msg::PollFD *pfd = pollMsg->add_pfds();
 
 				// find the port number associated with this Xsocket
@@ -95,8 +102,6 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 				s2p[i].fd = ufds[i].fd;
 				s2p[i].port = sin.sin_port;
 
-
-
 				// FIXME: hack for curl - think about better ways to deal with this
 				if (ufds[i].events & POLLRDNORM || ufds[i].events & POLLRDBAND) {
 					ufds[i].events |= POLLIN;
@@ -105,10 +110,6 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 				if (ufds[i].events & POLLWRNORM || ufds[i].events & POLLWRBAND) {
 					ufds[i].events |= POLLOUT;
 				}
-
-
-
-
 
 				pfd->set_flags(ufds[i].events);
 
@@ -121,6 +122,12 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 				s2p[i].fd = s2p[i].port = 0;
 			}
 		}
+	}
+
+	if (dataReady) {
+		errno = 0;
+		rc = dataReady;
+		goto done;
 	}
 
 	if (nxfds == 0) {
@@ -283,16 +290,19 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 	fd_set rfds;
 	fd_set wfds;
 	fd_set efds;
+	fd_set immediate_fds;
 	unsigned nx = 0;
 	int xrc = 0;
 	int sock = 0;
 	int largest = 0;
 	int count = 0;
 	int rc = 0;
+	unsigned dataReady = 0;
 
 	FD_ZERO(&rfds);
 	FD_ZERO(&wfds);
 	FD_ZERO(&efds);
+	FD_ZERO(&immediate_fds);
 
 	// if the fd sets are sparse, this will waste space especially if nfds is large
 	Sock2Port *s2p = (Sock2Port*)calloc(nfds, sizeof(Sock2Port));
@@ -326,6 +336,14 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 
 		// is it an xsocket
 		if (flags && getSocketType(i) != XSOCK_INVALID) {
+
+			// there's already data ready to return
+			if ((flags & POLLIN) && getSocketDataLen(i)) {
+				dataReady++;
+				FD_SET(i, &immediate_fds);
+				continue;
+			}
+
 			// we found an Xsocket, do the Xpoll magic
 			nx++;
 
@@ -357,6 +375,13 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 		
 			s2p[i].fd = s2p[i].port = 0;
 		}
+	}
+
+	if (dataReady) {
+		memcpy(readfds, &immediate_fds, sizeof(fd_set));
+		errno = 0;
+		count = dataReady;
+		goto done;
 	}
 
 	if (nx == 0) {

@@ -81,7 +81,13 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 
 	int stype = getSocketType(sockfd);
 	if (stype == SOCK_DGRAM) {
-		return _xrecvfromconn(sockfd, rbuf, len, flags);
+		if ((numbytes = getSocketData(sockfd, (char *)rbuf, len, peek)) > 0) {
+			//LOGF("getting %zu bytes from cache peek:%d", len, peek);
+			return numbytes;
+		} else {
+
+			return _xrecvfromconn(sockfd, rbuf, len, flags);
+		}
 
 	} else if (stype != SOCK_STREAM) {
 		LOGF("Socket %d must be a stream or datagram socket", sockfd);
