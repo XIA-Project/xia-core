@@ -1038,7 +1038,7 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 		char s[ID_LEN];
 		struct sockaddr *sa;
 		sockaddr_x sax;
-		socklen_t len = sizeof(sax);
+//		socklen_t len = sizeof(sax);
 
 		if (service) {
 			if (flags & AI_NUMERICSERV) {
@@ -1078,7 +1078,7 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 			MSG("returning address:%s port:%u\n", local_addr, htons(port));
 			rc = 0;
 
-		} else if (flags && AI_NUMERICHOST) {
+		} else if (flags & AI_NUMERICHOST) {
 			// just make a sockaddr with the passed info
 			sa = (struct sockaddr *)calloc(sizeof(struct sockaddr), 1);
 			_GetIP(NULL, (sockaddr_in *)sa, name, port);
@@ -1096,16 +1096,26 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 
 			MSG("id=%s\n", s);
 
+// WTF is going on here???
+// FIX ME!
+// need some way to look up and ip address and this seems to
+// be looping
+// 
+			sa = (struct sockaddr *)calloc(sizeof(struct sockaddr), 1);
+			_GetIP(NULL, (struct sockaddr_in*)sa, name, ntohs(port));
+
+			if (_Lookup((struct sockaddr_in *)sa, &sax) < 0) {
+
 			// fixme - this should use Xgetaddrinfo
-			if (XgetDAGbyName(s, &sax, &len) < 0) {
+//			if (XgetDAGbyName(s, &sax, &len) < 0) {
 				MSG("name lookup failed for %s\n", s);
 
 				failedLookups[s] = time(NULL);
 				rc =  EAI_NONAME;
+				free(sa);
 				goto done;
 			}
 
-			sa = (struct sockaddr *)calloc(sizeof(struct sockaddr), 1);
 			_GetIP(&sax, (sockaddr_in *)sa, name, port);
 
 			Graph g(&sax);
@@ -1357,7 +1367,7 @@ ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, 
 			addrx = &sax;
 		}
 
-		MSG("fd:%d size:%d addr:%p\n", fd, n, addr);
+		MSG("fd:%d size:%zu addr:%p\n", fd, n, addr);
 
 		rc = Xrecvfrom(fd, buf, n, flags, (struct sockaddr*)addrx, &slen);
 
@@ -1542,7 +1552,7 @@ int socket(int domain, int type, int protocol)
 	int fd;
 	TRACE();
 
-	if ((domain == AF_XIA || (domain == AF_INET && FORCE_XIA()))) {
+	if (domain == AF_XIA || domain == AF_INET) {
 		XIAIFY();
 		AF_VALUE(domain);
 
@@ -1563,14 +1573,15 @@ int socket(int domain, int type, int protocol)
 }
 
 
-
+// FIXME - do I really need this. Seems like it is only useful for
+// unix_domain sockets and sendmsg/recvmsg
 int socketpair(int domain, int type, int protocol, int fds[2])
 {
 	TRACE();
-	if (domain == AF_XIA || (domain == AF_INET && FORCE_XIA())) {
+	if (domain == AF_XIA || domain == AF_INET) {
 		XIAIFY();
-		fds[0] = socket(domain, type, protocol);
-		fds[1] = socket(domain, type, protocol);
+		fds[0] = socket(AF_XIA, type, protocol);
+		fds[1] = socket(AF_XIA, type, protocol);
 
 		if (fds[0] >= 0 && fds[1] >= 0) {
 			return 0;
