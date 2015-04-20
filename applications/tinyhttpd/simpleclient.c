@@ -11,13 +11,12 @@
 #include "dagaddr.hpp" // only needed to pretty print the dag
 #define SID "SID:8080808080808080808080808080808080808080"
 
-int main(int argc, char *argv[])
+int main()
 {
  int sockfd;
  int len;
  struct addrinfo *ai;
  int result;
- char ch = 'A';
  char buf[10000];
 
  sockfd = socket(AF_XIA, SOCK_STREAM, 0);
