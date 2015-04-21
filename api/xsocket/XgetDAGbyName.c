@@ -77,6 +77,131 @@ char *hostsLookup(const char *name) {
 	return NULL;
 }
 
+// User passes a buffer and we fill it in
+int XgetNamebyDAG(char *name, int namelen, sockaddr_x *addr, socklen_t *addrlen)
+{
+	int sock;
+	int rc;
+	int result;
+	sockaddr_x ns_dag;
+	char pkt[NS_MAX_PACKET_SIZE];
+
+	if (!name) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (!addr || !addrlen || *addrlen < sizeof(sockaddr_x)) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	/* TODO: Do we need to look at hosts.xia for reverse lookup? -Nitin
+	// see if name is registered in the local hosts.xia file
+	if((dag = hostsLookup(name))) {
+		Graph g(dag);
+		free(dag);
+
+		// check to see if the returned dag was valid
+		// we may want a better check for this in the future
+		if (g.num_nodes() > 0) {
+			std::string s = g.dag_string();
+			g.fill_sockaddr((sockaddr_x*)addr);
+			*addrlen = sizeof(sockaddr_x);
+			return 0;
+		}
+	}
+
+	if (!strncmp(name, "RE ", 3) || !strncmp(name, "DAG ", 4)) {
+
+        // check to see if name is actually a dag to begin with
+        Graph gcheck(name);
+
+        // check to see if the returned dag was valid
+        // we may want a better check for this in the future
+        if (gcheck.num_nodes() > 0) {
+            std::string s = gcheck.dag_string();
+            gcheck.fill_sockaddr((sockaddr_x*)addr);
+            *addrlen = sizeof(sockaddr_x);
+            return 0;
+        }
+    }
+	*/
+
+	// Prepare to talk to the nameserver
+	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
+		return -1;
+
+	//Read the nameserver DAG (the one that the name-query will be sent to)
+	if ( XreadNameServerDAG(sock, &ns_dag) < 0 ) {
+		LOG("Unable to find nameserver address");
+		errno = NO_RECOVERY;
+		return -1;
+	}
+
+	//Construct a name-query packet
+	Graph g(addr);
+	char *addrstr = (char *)calloc(strlen(g.dag_string().c_str()), 1);
+	if(addrstr == NULL) {
+		LOG("Unable to allocate memory to store DAG");
+		errno = NO_RECOVERY;
+		return -1;
+	}
+	strcpy(addrstr, (const char *)g.dag_string().c_str());
+	ns_pkt query_pkt;
+	query_pkt.type = NS_TYPE_RQUERY;
+	query_pkt.flags = 0;
+	query_pkt.name = NULL;
+	query_pkt.dag = addrstr;
+	int len = make_ns_packet(&query_pkt, pkt, sizeof(pkt));
+	free(addrstr);
+
+	//Send a name query to the name server
+	if ((rc = Xsendto(sock, pkt, len, 0, (const struct sockaddr*)&ns_dag, sizeof(sockaddr_x))) < 0) {
+		int err = errno;
+		LOGF("Error sending name query (%d)", rc);
+		Xclose(sock);
+		errno = err;
+		return -1;
+	}
+
+	//Check the response from the name server
+	memset(pkt, 0, sizeof(pkt));
+	if ((rc = Xrecvfrom(sock, pkt, NS_MAX_PACKET_SIZE, 0, NULL, NULL)) < 0) {
+		int err = errno;
+		LOGF("Error retrieving name query (%d)", rc);
+		Xclose(sock);
+		errno = err;
+		return -1;
+	}
+
+	ns_pkt resp_pkt;
+	get_ns_packet(pkt, rc, &resp_pkt);
+
+	switch (resp_pkt.type) {
+	case NS_TYPE_RESPONSE_RQUERY:
+		result = 1;
+		break;
+	case NS_TYPE_RESPONSE_ERROR:
+		result = -1;
+		break;
+	default:
+		LOG("Unknown nameserver response");
+		result = -1;
+		break;
+	}
+	Xclose(sock);
+
+	if (result < 0) {
+		return result;
+	}
+
+	bzero(name, namelen);
+	strncpy(name, resp_pkt.name, namelen-1);
+	return 0;
+}
+
+
 
 /*!
 ** @brief Lookup a DAG based using a host or service name.

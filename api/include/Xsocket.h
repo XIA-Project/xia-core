@@ -169,6 +169,7 @@ extern void print_conf();
 extern int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen);
 extern int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen);
 
+extern int XgetNamebyDAG(char *name, int namelen, sockaddr_x *addr, socklen_t *addrlen);
 extern int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen);
 extern int XregisterName(const char *name, sockaddr_x *addr);
 
