@@ -23,6 +23,7 @@
 #include <libgen.h>
 #endif
 #include "Xsocket.h"
+#include "Xkeys.h"
 #include "dagaddr.hpp"
 
 #define VERSION "v1.0"
@@ -31,7 +32,6 @@
 #define MAX_XID_SIZE 100
 #define STREAM_NAME "www_s.stream_echo.aaa.xia"
 #define DGRAM_NAME "www_s.dgram_echo.aaa.xia"
-#define SID_STREAM  "SID:0f00000000000000000000000000000000000888"
 #define SID_DGRAM   "SID:0f00000000000000000000000000000000008888"
 
 // if no data is received from the client for this number of seconds, close the socket
@@ -201,6 +201,7 @@ static void reaper(int sig)
 void echo_stream()
 {
 	int acceptor, sock;
+	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
 
 	if (signal(SIGCHLD, reaper) == SIG_ERR) {
 		die(-1, "unable to catch SIGCHLD");
@@ -211,8 +212,16 @@ void echo_stream()
 	if ((acceptor = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		die(-2, "unable to create the stream socket\n");
 
-	struct addrinfo *ai;
-	if (Xgetaddrinfo(NULL, SID_STREAM, NULL, &ai) != 0)
+	// Generate an SID to use
+	if(XmakeNewSID(sid_string, sizeof(sid_string))) {
+		die(-1, "Unable to create a temporary SID");
+	}
+
+	struct addrinfo hints, *ai;
+	bzero(&hints, sizeof(hints));
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_family = AF_XIA;
+	if (Xgetaddrinfo(NULL, sid_string, &hints, &ai) != 0)
 		die(-1, "getaddrinfo failure!\n");
 
 	Graph g((sockaddr_x*)ai->ai_addr);
@@ -252,6 +261,11 @@ void echo_stream()
 
 		} else if (pid == 0) {
 			process(sock);
+			if(XremoveSID((const char *)sid_string)) {
+				say("Unable to remove keys for SID %s.\n", sid_string);
+			}else {
+				say("Removed keys for temporary SID %s.\n", sid_string);
+			}
 			exit(0);
 
 		} else {

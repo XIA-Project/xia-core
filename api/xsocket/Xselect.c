@@ -53,9 +53,10 @@ typedef struct {
 */
 int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 {
+	int rc;
 	int sock = 0;
 	int nxfds = 0;
-	int rc, xrc;
+	int xrc = 0;
 	unsigned dataReady = 0;
 
 	if (nfds == 0) {
@@ -281,8 +282,7 @@ void XselectCancel(int sock)
 ** @param timeout amount of time to wait for a socket to change state
 ** @returns greater than 0, number of sockets ready
 ** @returns 0 if the timeout expired
-** @returns less than 0 if an error occurs 
-**
+** @returns less than 0 if an error occurs
 ** @warning this function is only valid for stream and datagram sockets. 
 */
 int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struct timeval *timeout)
@@ -320,7 +320,7 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 		int r = 0;
 		int w = 0;
 		int e = 0;
-		
+
 		if (readfds && FD_ISSET(i, readfds)) {
 			flags |= POLLIN;
 			r = i;
@@ -372,7 +372,7 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 				FD_SET(i, &wfds);
 			if (e != 0)
 				FD_SET(i, &efds);
-		
+
 			s2p[i].fd = s2p[i].port = 0;
 		}
 	}
@@ -486,7 +486,7 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 		}
 	} else {
 		XselectCancel(sock);
-	}		
+	}
 
 done:
 	int eno = errno;
