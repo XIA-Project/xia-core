@@ -79,7 +79,7 @@ char *hostsLookup(const char *name) {
 }
 
 // User passes a buffer and we fill it in
-int XgetNamebyDAG(char *name, int namelen, sockaddr_x *addr, socklen_t *addrlen)
+int XgetNamebyDAG(char *name, int namelen, const sockaddr_x *addr, socklen_t *addrlen)
 {
 	int sock;
 	int rc;
@@ -142,13 +142,15 @@ int XgetNamebyDAG(char *name, int namelen, sockaddr_x *addr, socklen_t *addrlen)
 
 	//Construct a name-query packet
 	Graph g(addr);
-	char *addrstr = (char *)calloc(strlen(g.dag_string().c_str()), 1);
+	char *addrstr = strdup(g.dag_string().c_str());
 	if(addrstr == NULL) {
 		LOG("Unable to allocate memory to store DAG");
 		errno = NO_RECOVERY;
 		return -1;
 	}
-	strcpy(addrstr, (const char *)g.dag_string().c_str());
+
+	LOGF("Looking for name associated with: %s\n", addrstr);
+
 	ns_pkt query_pkt;
 	query_pkt.type = NS_TYPE_RQUERY;
 	query_pkt.flags = 0;
@@ -707,6 +709,13 @@ int make_ns_packet(ns_pkt *np, char *pkt, int pkt_sz)
 			break;
 
 		case NS_TYPE_RESPONSE_QUERY:
+			if (np->dag == NULL)
+				return 0;
+			strcpy(end, np->dag);
+			end += strlen(np->dag) + 1;
+			break;
+
+		case NS_TYPE_RQUERY:
 			if (np->dag == NULL)
 				return 0;
 			strcpy(end, np->dag);

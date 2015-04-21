@@ -277,7 +277,7 @@ static unsigned short _NewPort()
 ** d) If called as _GetIP(&sax, &sockaddr_in, NULL, port)
 **   do the same as (b) and create an internal mapping between the DAG and sockaddr
 */
-static int _GetIP(sockaddr_x *sax, struct sockaddr_in *sin, const char *addr, int port)
+static int _GetIP(const sockaddr_x *sax, struct sockaddr_in *sin, const char *addr, int port)
 {
 	// pick random IP address numbers 169.254.high.low
 	static unsigned char low = (rand() % 253) + 1; // 1..254
@@ -391,7 +391,7 @@ static int _i2x(struct sockaddr_in *sin, sockaddr_x *sax)
 
 
 // map from XIA to IP
-static int _x2i(sockaddr_x *sax, sockaddr_in *sin)
+static int _x2i(const sockaddr_x *sax, sockaddr_in *sin)
 {
 	char id[ID_LEN];
 	Graph g(sax);
@@ -475,6 +475,50 @@ static int _NegativeLookup(std::string id)
 
 		} else {
 			rc = -1;
+		}
+	}
+
+	return rc;
+}
+
+
+
+// try to find the IPv4 ID/port ID associated with the given DAG
+static int _ReverseLookup(const sockaddr_x *sax, struct sockaddr_in *sin)
+{
+	int rc = 0;
+	char id[ID_LEN];
+	socklen_t slen = sizeof(sockaddr_x);
+
+	if (_x2i(sax, sin) < 0) {
+		// we don't have a local mapping for this yet
+
+		// See if it's in the nameserver
+//		if ( XgetNamebyDAG(id, ID_LEN, sax, &slen) >= 0) {
+		if (0) {
+			// found on the name server
+			MSG("reverse lookup = %s\n", id);
+
+			// chop name into ip address and port
+			char *p = strchr(id, '-');
+			*p++ = 0;
+
+			inet_pton(AF_INET, id, &sin->sin_addr);
+			sin->sin_port = htons(atoi(p));
+			sin->sin_family = AF_INET;
+
+			// put it into the mapping tables
+			Graph g(sax);
+			std::string dag = g.dag_string();
+			MSG("registered id:%s\ndag:%s\n", id, dag.c_str());
+
+			id2dag[id] = dag;
+			dag2id[dag] = id;
+
+		} else {
+			MSG("not found creating fake address\n");
+			// create a fake IP address
+			_GetIP(sax, sin, NULL, _NewPort());
 		}
 	}
 
@@ -1400,10 +1444,7 @@ ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, 
 
 		if (rc >= 0 && do_address) {
 			// convert the sockaddr to a sockaddr_x
-			if (_x2i(&sax, (struct sockaddr_in*)addr) < 0) {
-				// we don't have a mapping for this yet, create a fake IP address
-				_GetIP(&sax, (sockaddr_in *)addr, NULL, _NewPort());
-			}
+			_ReverseLookup(addrx, (struct sockaddr_in*)addr);
 		}
 
 	} else {
