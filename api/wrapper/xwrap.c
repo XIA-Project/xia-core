@@ -55,6 +55,7 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
+#include "Xkeys.h"
 #include "dagaddr.hpp"
 #include <map>
 #include <vector>
@@ -211,11 +212,9 @@ static FILE *_log = NULL;
 ** Helper functions
 **
 ********************************************************************/
-
 // call into the Xsockets API to see if the fd is associated with an Xsocket
 #define isXsocket(s)	 (getSocketType(s) != -1)
 #define shouldWrap(s)	 (isXsocket(s))
-
 
 
 // dump the contents of the pollfds
@@ -338,7 +337,12 @@ static char *_NewSID(char *buf, unsigned len)
 		WARNING("buf is only %d chars long, it needs to be %d. Truncating...\n", len, SID_SIZE);
 	}
 
-	snprintf(buf, len, "SID:44444ff0000000000000000000000000%08x", rand());
+	if (XmakeNewSID(buf, len)) {
+		MSG("Unable to create a new SID\n");
+		return NULL;
+	}
+
+//	snprintf(buf, len, "SID:44444ff0000000000000000000000000%08x", rand());
 
 	return buf;
 }

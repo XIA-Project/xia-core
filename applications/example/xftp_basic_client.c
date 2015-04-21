@@ -335,6 +335,8 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *p_ad, char *p_hid)
 	int len;
 	int status;
 	int n = -1;
+	bzero(cs, sizeof(ChunkStatus)*NUM_CHUNKS);
+	bzero(data, sizeof(data));
 	
 	
 	n = buildChunkDAGs(cs, chunks, p_ad, p_hid);
@@ -352,8 +354,8 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *p_ad, char *p_hid)
 				return -1;
 			}
 			say("checking chunk status\n");
-			ctr++;
 		}
+		ctr++;
 
 		status = XgetChunkStatuses(csock, cs, n);
 

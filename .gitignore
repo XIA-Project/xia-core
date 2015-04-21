@@ -30,6 +30,9 @@ xia.mk
 .DS_Store
 *.dSYM
 
+# directories
+key
+
 # ignore session layer files on this branch only
 api/session
 applications/example/session

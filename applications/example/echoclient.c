@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <poll.h>
 #ifdef __APPLE__
 #include <libgen.h>
 #endif
@@ -195,7 +196,7 @@ char *randomString(char *buf, int size)
 int process(int sock)
 {
         int size;
-        int sent, received;
+        int sent, received, rc;
         char buf1[XIA_MAXBUF + 1], buf2[XIA_MAXBUF + 1];
 
         if (pktSize == 0)
@@ -208,6 +209,13 @@ int process(int sock)
                 die(-4, "Send error %d on socket %d\n", errno, sock);
 
         say("Xsock %4d sent %d of %d bytes\n", sock, sent, size);
+
+        struct pollfd pfds[2];
+        pfds[0].fd = sock;
+        pfds[0].events = POLLIN;
+        if ((rc = Xpoll(pfds, 1, 5000)) <= 0) {
+                die(-5, "Poll returned %d\n", rc);
+        }
 
         memset(buf2, 0, sizeof(buf2));
         if ((received = Xrecv(sock, buf2, sizeof(buf2), 0)) < 0)
