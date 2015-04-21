@@ -254,7 +254,30 @@ static unsigned short _NewPort()
 
 
 
-// Create a new fake IP address to associate with the given DAG
+/* Naming swiss army knife
+** inputs:
+**	addr: if non-NULL, use the address to create an ID and optionally map
+**        to the specified DAG, otherwise create a new fake IP address
+** port:  port to put into sin and for creating the ID string. Is specified
+**        in network byte order
+**  sax: if non-null, associate the DAG with sin in the internal mapping
+**       tables
+**
+** outputs:
+**  sin: sockaddr built from the IP address (or generated IP) and port
+**
+** returns:
+**  currently always returns success
+**
+** a) If called as _GetIP(NULL, &sockaddr_in, ip, port)
+**   fill in the sockaddr with the specified ip and port
+** b) If called as _GetIP(NULL, &sockaddr_in, NULL, port)
+**   create a fake IP address and fill in the sockaddr with it and port
+** c) If called as _GetIP(&sax, &sockaddr_in, ip, port)
+**   do the same as (a) and create an internal mapping between the DAG and sockaddr
+** d) If called as _GetIP(&sax, &sockaddr_in, NULL, port)
+**   do the same as (b) and create an internal mapping between the DAG and sockaddr
+*/
 static int _GetIP(sockaddr_x *sax, struct sockaddr_in *sin, const char *addr, int port)
 {
 	// pick random IP address numbers 169.254.high.low
@@ -268,8 +291,7 @@ static int _GetIP(sockaddr_x *sax, struct sockaddr_in *sin, const char *addr, in
 	if (!addr) {
 		sprintf(s, ADDR_MASK, high, low);
 		addr = s;
-#if 1
-		// FIXME: do we want to increment this each time or just set it once for each app?
+
 		// bump the ip address for next time
 		low++;
 		if (low == 255) {
@@ -279,9 +301,8 @@ static int _GetIP(sockaddr_x *sax, struct sockaddr_in *sin, const char *addr, in
 				high = 0;
 			}
 		}
-#endif
 	}
-	inet_aton(addr, &sin->sin_addr);
+	inet_pton(AF_INET, addr, &sin->sin_addr);
 
 	sin->sin_family = AF_INET;
 	sin->sin_port = port;
@@ -325,16 +346,18 @@ static char *_NewSID(char *buf, unsigned len)
 
 
 // convert a IPv4 sockaddr into an id string in the form of A.B.C.D-port
-static char *_IDstring(char *s, const struct sockaddr_in* sa)
+static char *_IDstring(char *s, unsigned len, const struct sockaddr_in* sa)
 {
 	char ip[ID_LEN];
 
 	inet_ntop(AF_INET, &sa->sin_addr, ip, INET_ADDRSTRLEN);
 
 	// make an id from the ip address and port
-	sprintf(s, "%s-%u", ip, ntohs(sa->sin_port));
+	snprintf(s, len, "%s-%u", ip, ntohs(sa->sin_port));
 	return s;
 }
+
+
 
 // map from IP to XIA
 static int _i2x(struct sockaddr_in *sin, sockaddr_x *sax)
@@ -342,7 +365,7 @@ static int _i2x(struct sockaddr_in *sin, sockaddr_x *sax)
 	char s[ID_LEN];
 	int rc = 0;
 
-	id2dag_t::iterator it = id2dag.find(_IDstring(s, sin));
+	id2dag_t::iterator it = id2dag.find(_IDstring(s, ID_LEN, sin));
 
 	if (it != id2dag.end()) {
 
@@ -385,7 +408,7 @@ static int _x2i(sockaddr_x *sax, sockaddr_in *sin)
 		char *p = strchr(id, '-');
 		*p++ = 0;
 
-		inet_aton(id, &sin->sin_addr);
+		inet_pton(AF_INET, id, &sin->sin_addr);
 		sin->sin_port = htons(atoi(p));
 		sin->sin_family = AF_INET;
 
@@ -416,7 +439,7 @@ static int _Register(const struct sockaddr *addr, socklen_t len)
 	Xgetaddrinfo(NULL, _NewSID(sid, sizeof(sid)), NULL, &ai);
 
 	// register it in the name server with the ip-port id
-	XregisterName(_IDstring(id, &sa), (sockaddr_x*)ai->ai_addr);
+	XregisterName(_IDstring(id, ID_LEN, &sa), (sockaddr_x*)ai->ai_addr);
 
 	// put it into the mapping tables
 	Graph g((sockaddr_x*)ai->ai_addr);
@@ -468,10 +491,10 @@ static int _Lookup(const struct sockaddr_in *addr, sockaddr_x *sax)
 		return rc;
 	}
 
-	_IDstring(id, addr);
+	_IDstring(id, ID_LEN, addr);
 
 	if (_NegativeLookup(id)) {
-		return -1;
+		return EAI_NONAME;
 	}
 
 	MSG("Looking up mapping for %s in the nameserver\n", id);
@@ -480,7 +503,7 @@ static int _Lookup(const struct sockaddr_in *addr, sockaddr_x *sax)
 		WARNING("Mapping server lookup failed for %s\n", id);
 
 		failedLookups[id] = time(NULL);
-		rc = -1;
+		rc = EAI_NONAME;
 
 	} else {
 		Graph g(sax);
@@ -490,6 +513,26 @@ static int _Lookup(const struct sockaddr_in *addr, sockaddr_x *sax)
 		// found it, add it to our local mapping tables
 		id2dag[id] = dag;
 		dag2id[dag] = id;
+	}
+
+	return rc;
+}
+
+
+
+static int _LookupStr(const char *id, unsigned short port, struct sockaddr *sa, sockaddr_x *sax)
+{
+	int rc = 0;
+	struct sockaddr_in sin;
+
+	inet_pton(AF_INET, id, &sin.sin_addr);
+	sin.sin_port = port;
+	sin.sin_family = AF_INET;
+
+	rc = _Lookup(&sin, sax);
+
+	if ((rc = _Lookup(&sin, sax)) == 0) {
+		memcpy(sa, &sin, sizeof(struct sockaddr));
 	}
 
 	return rc;
@@ -786,7 +829,7 @@ int bind(int fd, const struct sockaddr *addr, socklen_t len)
 			_Register((struct sockaddr*)&sin, len);
 
 			char id[ID_LEN];
-			_IDstring(id, &sin);
+			_IDstring(id, ID_LEN, &sin);
 			MSG("id:%s\n", id);
 
 			// convert the sockaddr to a sockaddr_x
@@ -853,7 +896,7 @@ int connect(int fd, const struct sockaddr *addr, socklen_t len)
 		if (_Lookup((sockaddr_in *)addr, &sax) != 0) {
 			char id[ID_LEN];
 
-			_IDstring(id, (sockaddr_in*)addr);
+			_IDstring(id, ID_LEN, (sockaddr_in*)addr);
 			WARNING("Unable to lookup %s\n", id);
 			errno = ENETUNREACH;
 			return -1;
@@ -1068,11 +1111,12 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 			MSG("need to do name resolution\n");
 		}
 
+		sa = (struct sockaddr *)calloc(sizeof(struct sockaddr), 1);
+
 		if (localonly) {
 			// caller wants a sockaddr for itself
 			// use our default ip address, regardless of what they gave us
 
-			sa = (struct sockaddr *)calloc(sizeof(struct sockaddr), 1);
 			memcpy(sa, &local_sa, sizeof(struct sockaddr));
 			((sockaddr_in *)sa)->sin_port = port;
 			MSG("returning address:%s port:%u\n", local_addr, htons(port));
@@ -1080,34 +1124,14 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 
 		} else if (flags & AI_NUMERICHOST) {
 			// just make a sockaddr with the passed info
-			sa = (struct sockaddr *)calloc(sizeof(struct sockaddr), 1);
 			_GetIP(NULL, (sockaddr_in *)sa, name, port);
 			rc = 0;
 
 		} else {
-
 			sprintf(s, "%s-%d", name, ntohs(port));
 
-			if (_NegativeLookup(s)) {
-				// we've already failed to look up this name
-				rc = EAI_NONAME;
-				goto done;
-			}
+			if (_LookupStr(name, port, sa, &sax) < 0) {
 
-			MSG("id=%s\n", s);
-
-// WTF is going on here???
-// FIX ME!
-// need some way to look up and ip address and this seems to
-// be looping
-// 
-			sa = (struct sockaddr *)calloc(sizeof(struct sockaddr), 1);
-			_GetIP(NULL, (struct sockaddr_in*)sa, name, ntohs(port));
-
-			if (_Lookup((struct sockaddr_in *)sa, &sax) < 0) {
-
-			// fixme - this should use Xgetaddrinfo
-//			if (XgetDAGbyName(s, &sax, &len) < 0) {
 				MSG("name lookup failed for %s\n", s);
 
 				failedLookups[s] = time(NULL);
@@ -1115,8 +1139,6 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 				free(sa);
 				goto done;
 			}
-
-			_GetIP(&sax, (sockaddr_in *)sa, name, port);
 
 			Graph g(&sax);
 			std::string dag = g.dag_string();
@@ -1139,8 +1161,9 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 			char *cname =(char *)malloc(ID_LEN);
 			char id[ID_LEN];
 
-			inet_ntop(AF_INET, &sa, id, ID_LEN);
+			inet_ntop(AF_INET, &((struct sockaddr_in*)sa)->sin_addr, id, ID_LEN);
 			sprintf(cname, "%s-%d", id, ntohs(((struct sockaddr_in*)sa)->sin_port));
+			ai->ai_canonname = cname;
 
 		} else {
 			ai->ai_canonname = NULL;
@@ -1336,7 +1359,7 @@ ssize_t recv(int fd, void *buf, size_t n, int flags)
 
 		char *c = (char *)buf;
 		c[rc] = 0;
-		MSG("%s\n", c);
+		MSG("data: %s\n", c);
 
 	} else {
 		NOXIA();
@@ -1394,6 +1417,7 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struc
 	int rc;
 
 	TRACE();
+
 	// Let Xselect do all the work of figuring out what fds we are handling
 	rc = Xselect(nfds, readfds, writefds, exceptfds, timeout);
 
@@ -1462,7 +1486,7 @@ ssize_t sendto(int fd, const void *buf, size_t n, int flags, const struct sockad
 			if (_Lookup((sockaddr_in *)addr, &sax) != 0) {
 				char id[ID_LEN];
 
-				_IDstring(id, (sockaddr_in*)addr);
+				_IDstring(id, ID_LEN, (sockaddr_in*)addr);
 				WARNING("Unable to lookup %s\n", id);
 				errno = EINVAL;	// FIXME: is there a better return we can use here?
 				return -1;
