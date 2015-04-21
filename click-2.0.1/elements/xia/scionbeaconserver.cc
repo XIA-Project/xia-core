@@ -754,7 +754,7 @@ void SCIONBeaconServer::printPaths(){
         pcbMarking* mrkPtr = (pcbMarking*)ptr;
         scionPrinter->printLog(IH, (char *)"Path info:");
         for(int i=0;i<itr->second.hops;i++){
-        	scionPrinter->printLog((char*)" %lu(%d:%d) | ", mrkPtr->aid,  mrkPtr->ingressIf, mrkPtr->egressIf);
+            scionPrinter->printLog((char*)" %lu(%d:%d) | ", mrkPtr->aid,  mrkPtr->ingressIf, mrkPtr->egressIf);
             ptr+=mrkPtr->sigLen + mrkPtr->blkSize;
             mrkPtr = (pcbMarking*)ptr;
         }
@@ -764,78 +764,78 @@ void SCIONBeaconServer::printPaths(){
 
 int SCIONBeaconServer::registerPath(pcb &rpcb){
 
-	//1. construct a path by copying pcb to packet
-	uint16_t packetLength = rpcb.totalLength+PCB_MARKING_SIZE;
-	uint8_t packet[packetLength];
-	memset(packet,0,packetLength);
+    //1. construct a path by copying pcb to packet
+    uint16_t packetLength = rpcb.totalLength+PCB_MARKING_SIZE;
+    uint8_t packet[packetLength];
+    memset(packet,0,packetLength);
 
-	//2. original pcb received from the upstream
-	memcpy(packet,rpcb.msg,rpcb.totalLength);
+    //2. original pcb received from the upstream
+    memcpy(packet,rpcb.msg,rpcb.totalLength);
 
-	aes_context actx;
-	getOfgKey(SPH::getTimestamp(packet),actx); 
+    aes_context actx;
+    getOfgKey(SPH::getTimestamp(packet),actx); 
 
-	//3. add its own marking information to the end
-	//Expiration time needs to be configured by AD's policy
-	uint8_t exp = 0; //expiration time
-	uint16_t sigLen = PriKey.len;
-	SCIONBeaconLib::addLink(packet, rpcb.ingress, NON_PCB, 1, m_uAdAid, m_uTdAid, &actx, 0, exp, 0, sigLen);
+    //3. add its own marking information to the end
+    //Expiration time needs to be configured by AD's policy
+    uint8_t exp = 0; //expiration time
+    uint16_t sigLen = PriKey.len;
+    SCIONBeaconLib::addLink(packet, rpcb.ingress, NON_PCB, 1, m_uAdAid, m_uTdAid, &actx, 0, exp, 0, sigLen);
 
-	//4. Remove signature from PCB
-	//pathContent would get special OF (TS) (without 2nd special OF) + series of markings from TDC to itself
-	//this would be registered to PS in TDC
-	uint8_t pathContent[packetLength];
-	memset(pathContent,0,packetLength);
-	uint16_t pathContentLength = removeSignature(packet, pathContent);
+    //4. Remove signature from PCB
+    //pathContent would get special OF (TS) (without 2nd special OF) + series of markings from TDC to itself
+    //this would be registered to PS in TDC
+    uint8_t pathContent[packetLength];
+    memset(pathContent,0,packetLength);
+    uint16_t pathContentLength = removeSignature(packet, pathContent);
     
-	// Build path (list of OF) from the pcb
-	// add 1 for special OF (i.e., timestamp)
-	// 5. Now construct a path to the TDC (i.e., a series of OFs to the TDC)
-	uint16_t numHop = SCIONBeaconLib::getNumHops(packet)+1; 
+    // Build path (list of OF) from the pcb
+    // add 1 for special OF (i.e., timestamp)
+    // 5. Now construct a path to the TDC (i.e., a series of OFs to the TDC)
+    uint16_t numHop = SCIONBeaconLib::getNumHops(packet)+1; 
     
-	//6. at this point we have "path" (TS+OFs to TDC) and "pathContent" that would be registered to TDC PS.
-	uint8_t srcLen = SPH::getSrcLen(packet);
-	uint8_t dstLen = SPH::getDstLen(packet);
+    //6. at this point we have "path" (TS+OFs to TDC) and "pathContent" that would be registered to TDC PS.
+    uint8_t srcLen = SPH::getSrcLen(packet);
+    uint8_t dstLen = SPH::getDstLen(packet);
 
-	//7. now hdr for path registration include COMMON_HDR + SRC/DST Addr
-	uint8_t hdrLen = COMMON_HEADER_SIZE+srcLen+dstLen;
+    //7. now hdr for path registration include COMMON_HDR + SRC/DST Addr
+    uint8_t hdrLen = COMMON_HEADER_SIZE+srcLen+dstLen;
 
-	// create PATH_REG packet, including header and all OPAQUE FIELDS
-	uint16_t newPacketLength = hdrLen+pathContentLength;
-	uint8_t newPacket[newPacketLength];
+    // create PATH_REG packet, including header and all OPAQUE FIELDS
+    uint16_t newPacketLength = hdrLen+pathContentLength;
+    uint8_t newPacket[newPacketLength];
 
     //set common header
-	scionHeader hdr;
-	hdr.cmn.type = PATH_REG;
-	hdr.cmn.hdrLen = hdrLen;
-	hdr.cmn.totalLen = newPacketLength;
-	//set src/dst addresses
-	hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)(strchr(m_HID.c_str(),':')+1));
-	hdr.dst = HostAddr(HOST_ADDR_AIP, (uint8_t*)(m_servers.find(PathServer)->second.HID));
-	SPH::setHeader(newPacket, hdr);
-	memcpy(newPacket+hdrLen, pathContent, pathContentLength);
+    scionHeader hdr;
+    hdr.cmn.type = PATH_REG;
+    hdr.cmn.hdrLen = hdrLen;
+    hdr.cmn.totalLen = newPacketLength;
+    //set src/dst addresses
+    hdr.src = HostAddr(HOST_ADDR_AIP, (uint8_t*)(strchr(m_HID.c_str(),':')+1));
+    hdr.dst = HostAddr(HOST_ADDR_AIP, (uint8_t*)(m_servers.find(PathServer)->second.HID));
+    SPH::setHeader(newPacket, hdr);
+    memcpy(newPacket+hdrLen, pathContent, pathContentLength);
     
-	char buf[MAXLINELEN];
-	uint16_t offset = 0;
-	uint8_t* ptr = pathContent+OPAQUE_FIELD_SIZE;
-	pcbMarking* mrkPtr = (pcbMarking*)ptr;
+    char buf[MAXLINELEN];
+    uint16_t offset = 0;
+    uint8_t* ptr = pathContent+OPAQUE_FIELD_SIZE;
+    pcbMarking* mrkPtr = (pcbMarking*)ptr;
 
     uint64_t tdc_ad = 0;
-	for(int i=0;i<numHop-1;i++){
-		if(i==0) tdc_ad = mrkPtr->aid;
-		sprintf(buf+offset,"%lu (%u, %u) |", mrkPtr->aid, mrkPtr->ingressIf, mrkPtr->egressIf);
-		ptr+=mrkPtr->blkSize;
-		mrkPtr=(pcbMarking*)ptr;
-		offset = strlen(buf);
-	}
+    for(int i=0;i<numHop-1;i++){
+        if(i==0) tdc_ad = mrkPtr->aid;
+        sprintf(buf+offset,"%lu (%u, %u) |", mrkPtr->aid, mrkPtr->ingressIf, mrkPtr->egressIf);
+        ptr+=mrkPtr->blkSize;
+        mrkPtr=(pcbMarking*)ptr;
+        offset = strlen(buf);
+    }
      
     #ifdef _DEBUG_BS
-	scionPrinter->printLog(IH, PATH_REG, rpcb.timestamp, (char *)"%s %u, SENT PATH: %s\n", m_AD.c_str(), newPacketLength, buf);
-	#endif
+    scionPrinter->printLog(IH, PATH_REG, rpcb.timestamp, (char *)"%s %u, SENT PATH: %s\n", m_AD.c_str(), newPacketLength, buf);
+    #endif
 	
-	// TODO: remove hacked conversion for AD number to AD identifier
-	char adbuf[AIP_SIZE+1];
-	sprintf(adbuf, "%040llu", tdc_ad);
+    // TODO: remove hacked conversion for AD number to AD identifier
+    char adbuf[AIP_SIZE+1];
+    sprintf(adbuf, "%040llu", tdc_ad);
 
     string dest = "RE ";
     dest.append(BHID);
@@ -846,9 +846,9 @@ int SCIONBeaconServer::registerPath(pcb &rpcb){
     dest.append("HID:");
     dest.append((const char*)m_servers.find(PathServer)->second.HID);
     
-	sendPacket(newPacket, newPacketLength, dest);
+    sendPacket(newPacket, newPacketLength, dest);
 	
-	return 0;
+    return 0;
 }
 
 int SCIONBeaconServer::buildPath(SPacket* pkt, uint8_t* output){
@@ -876,14 +876,14 @@ int SCIONBeaconServer::buildPath(SPacket* pkt, uint8_t* output){
 }
 
 void SCIONBeaconServer::print(SPacket* path, int hops){
-	uint8_t* ptr = path;
-	opaqueField* pathPtr = (opaqueField*)(ptr+OPAQUE_FIELD_SIZE);
-	for(int i=0;i<hops;i++){
-		printf("ingress=%u egress=%u\n",pathPtr->ingressIf,
-		pathPtr->egressIf);
-		ptr += OPAQUE_FIELD_SIZE;
-		pathPtr = (opaqueField*)ptr;
-	}
+    uint8_t* ptr = path;
+    opaqueField* pathPtr = (opaqueField*)(ptr+OPAQUE_FIELD_SIZE);
+    for(int i=0;i<hops;i++){
+        printf("ingress=%u egress=%u\n",pathPtr->ingressIf,
+        pathPtr->egressIf);
+        ptr += OPAQUE_FIELD_SIZE;
+        pathPtr = (opaqueField*)ptr;
+    }
 }
 
 int SCIONBeaconServer::propagate() {	
@@ -995,9 +995,9 @@ int SCIONBeaconServer::propagate() {
 			nPropagated++;
 			if(nPropagated >= m_iKval) break;
 		}
-	}
+    }
 	
-	return SCION_SUCCESS;
+    return SCION_SUCCESS;
 }
 
 uint8_t SCIONBeaconServer::verifyPcb(SPacket* pkt){

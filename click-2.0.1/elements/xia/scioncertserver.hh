@@ -199,7 +199,7 @@ class SCIONCertServer : public Element {
           words, this function is not used to reply back to other ADs. For those
           external requests, processCertificateRequest() function is used.  
          */
-        void sendROT();
+        void sendROT(const char* dest_dag);
 
         /**
           @brief Determines if the certificate of the given address is already
@@ -319,7 +319,7 @@ class SCIONCertServer : public Element {
           packet and sends the request packet to the upstream ADs just as
           processCertificateRequest() function does.    
          */
-        void processLocalCertificateRequest(uint8_t * packet);
+        void processLocalCertificateRequest(uint8_t * packet, const char* dest_dag);
         void initializeOutputPort();
 
     private:

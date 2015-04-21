@@ -336,7 +336,7 @@ class SCIONPathServer : public Element {
             The returned path can be directly put into a DATA packet to forward
             DATA packets.    
         */
-        int buildPath(uint8_t* pkt, uint8_t* output);
+        uint64_t GetTDCoreADNum(uint8_t* pkt);
         
         /**
             @brief Sends path request to the TDC Path Server

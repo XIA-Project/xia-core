@@ -118,7 +118,7 @@ class SCIONPathServerCore : public Element {
         
         */
         void parsePath(uint8_t* pkt);
-        void parsePathReq(uint8_t* pkt);
+        void parsePathReq(uint8_t* pkt, const char* dest_dag);
 
         /**
             @brief Reverse the order of the opaque fields inside a path. 
@@ -146,15 +146,7 @@ class SCIONPathServerCore : public Element {
         */
         //void sendPacket(uint8_t* packet, uint16_t packetLength, int port, int fwd_type=0);
         void sendPacket(uint8_t* data, uint16_t dataLength, string dest);
-        /**
-            @brief Parses Topology information from the filesystem. 
-            @param void
-            @return void
-
-            This function parses the topology file from the filesystem and stores
-            it in the memory. 
-        */
-        void parseTopology();
+       
 		
     private:
         Timer _timer;

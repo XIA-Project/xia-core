@@ -88,23 +88,10 @@ int SCIONPathServerCore::initialize(ErrorHandler* errh){
     scionPrinter->printLog(IH, (char *)"Initializes.\n");
     #endif
     
-    parseTopology();
-    #ifdef _DEBUG_PS
-    scionPrinter->printLog(IH, (char *)"Parse Topology Done.\n");
-    scionPrinter->printLog(IH, (char *)"Initialization Done.\n");
-    #endif
-    
     _timer.initialize(this); 
     _timer.schedule_after_sec(10);
     
     return 0;
-}
-
-void SCIONPathServerCore::parseTopology(){
-    TopoParser parser;
-    // TODO: retrieve server information from the controller
-    parser.loadTopoFile(m_sTopologyFile.c_str()); 
-    parser.parseServers(m_servers);
 }
 
 void SCIONPathServerCore::run_timer(Timer* timer) {
@@ -121,7 +108,6 @@ void SCIONPathServerCore::push(int port, Packet *p) {
     uint8_t packet[packetLength];
     memset(packet, 0, packetLength);
     memcpy(packet, s_pkt, packetLength);
-    p->kill();
 
     if(type==PATH_REG){
         
@@ -138,22 +124,22 @@ void SCIONPathServerCore::push(int port, Packet *p) {
         scionPrinter->printLog(IH, type, (char*)"Received PATH REQUEST.\n");
         #endif
         
+        // get SRC Dag 
+        XIAHeader xiahdr(p);
+        //scionPrinter->printLog(IH, (char *)"XIA src path = %s\n", xiahdr.src_path().unparse_re().c_str());
         //parses path request and send back path info
-        parsePathReq(packet);
+        parsePathReq(packet, xiahdr.src_path().unparse_re().c_str());
     }
-    
+    p->kill();
 }
 
-void SCIONPathServerCore::parsePathReq(uint8_t* pkt){
+void SCIONPathServerCore::parsePathReq(uint8_t* pkt, const char* dest_dag){
 
     uint8_t hdrLen = SPH::getHdrLen(pkt);
     pathInfo* pi = (pathInfo*)(pkt+hdrLen);
     uint64_t target = pi->target;
     HostAddr requester = SPH::getSrcAddr(pkt);
     
-    uint8_t srcLen = SPH::getSrcLen(pkt);
-    uint8_t dstLen = SPH::getDstLen(pkt);
-
     //path look up to send to the local path server
     std::multimap<uint64_t, std::multimap<uint32_t, path> >::iterator itr;
         
@@ -190,19 +176,10 @@ void SCIONPathServerCore::parsePathReq(uint8_t* pkt){
                 pathReply->option = 0;
                 memcpy(newPacket+hdrLen+PATH_INFO_SIZE, itr2->second.msg, pathContentLength);
                 
-                char hidbuf[AIP_SIZE+1];
-                requester.getAIPAddr((uint8_t*)hidbuf);
-                hidbuf[AIP_SIZE] = '\0';
-                
                 string dest = "RE ";
                 dest.append(BHID);
                 dest.append(" ");
-                // TODO: remove hard code AD here
-                dest.append("AD:");
-                dest.append((const char*)"0000000000000000000000000000000000000004");
-                dest.append(" ");
-                dest.append("HID:");
-                dest.append(hidbuf);
+                dest.append(dest_dag);
 
                 sendPacket(newPacket, newPacketLength, dest);
             }
@@ -247,10 +224,10 @@ void SCIONPathServerCore::parsePath(uint8_t* pkt){
         #endif
         newPath.path.push_back(mrkPtr->aid);
         
-		uint8_t* ptr2=ptr+PCB_MARKING_SIZE;
+        uint8_t* ptr2=ptr+PCB_MARKING_SIZE;
         peerMarking* peerPtr = (peerMarking*)ptr2;
-		uint8_t numPeers = (mrkPtr->blkSize-PCB_MARKING_SIZE)/PEER_MARKING_SIZE;
-		newPath.hops++;
+        uint8_t numPeers = (mrkPtr->blkSize-PCB_MARKING_SIZE)/PEER_MARKING_SIZE;
+        newPath.hops++;
         
         for(int j=0;j<numPeers;j++){
             newPath.peers.insert(std::pair<uint64_t,uint64_t>(mrkPtr->aid,peerPtr->aid));
@@ -267,30 +244,27 @@ void SCIONPathServerCore::parsePath(uint8_t* pkt){
     std::multimap<uint64_t, std::multimap<uint32_t, path> >::iterator itr;
     itr=paths.find(newPath.path.back()); 
 	
-	#ifdef _DEBUG_PS
-	scionPrinter->printLog(IH, (char*)"NEW PATH REG: paths count=%lu, newpath_adaid=%lu\n", 
-	    paths.size(), newPath.path.back());
-	#endif
+    #ifdef _DEBUG_PS
+    scionPrinter->printLog(IH, (char*)"NEW PATH REG: paths count=%lu, newpath_adaid=%lu\n", 
+        paths.size(), newPath.path.back());
+    #endif
     
     if(itr==paths.end()){
         std::multimap<uint32_t, path> newMap = std::multimap<uint32_t, path>();
         itr=paths.insert(std::pair<uint64_t,std::multimap<uint32_t,path>
         >(newPath.path.back(), newMap));
     }else if(itr->second.size() >= m_iNumRegisteredPath){
-		//return;
         free(itr->second.begin()->second.msg);
         itr->second.erase(itr->second.begin());
         if(itr->second.size()==0){
             paths.erase(itr);
-        } 
-		#ifdef _DEBUG_PS
-		scionPrinter->printLog(IH, (char*)"NEW PATH REG: removing the oldest path out of %d paths\n", m_iNumRegisteredPath);
-		#endif
+        }
+        #ifdef _DEBUG_PS
+        scionPrinter->printLog(IH, (char*)"NEW PATH REG: removing the oldest path out of %d paths\n", m_iNumRegisteredPath);
+        #endif
     }
     newPath.timestamp = sOF->timestamp; //SPH::getUpTimestamp(pkt);
-    uint16_t pathLength =
-        SPH::getTotalLen(pkt)-
-        SPH::getHdrLen(pkt);
+    uint16_t pathLength = SPH::getTotalLen(pkt)- SPH::getHdrLen(pkt);
     newPath.msg = (uint8_t*)malloc(pathLength);
     memset(newPath.msg, 0, pathLength);
     memcpy(newPath.msg,
@@ -342,7 +316,7 @@ void SCIONPathServerCore::sendPacket(uint8_t* data, uint16_t data_length, string
     xiah.set_plen(data_length + thdr->hlen()); // XIA payload = transport header + transport-layer data
 
     q = xiah.encap(q, false);
-	output(0).push(q);
+    output(0).push(q);
 }
 
 CLICK_ENDDECLS

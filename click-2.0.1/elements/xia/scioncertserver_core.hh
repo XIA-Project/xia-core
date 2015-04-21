@@ -178,7 +178,7 @@ class SCIONCertServerCore : public Element {
           words, this function is not used to reply back to other ADs. For those
           external requests, processCertificateRequest() function is used.  
          */
-        void sendROT();
+        void sendROT(const char* dest_dag);
 
         void processROTRequest(uint8_t * packet);
     private:

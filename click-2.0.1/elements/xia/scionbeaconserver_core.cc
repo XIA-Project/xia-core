@@ -511,14 +511,14 @@ void SCIONBeaconServerCore::sendPacket(uint8_t* data, uint16_t data_length, stri
 
     WritablePacket *p = Packet::make(DEFAULT_HD_ROOM, data, data_length, DEFAULT_TL_ROOM);
     TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDGRAMHeader(0); // length
-	WritablePacket *q = thdr->encap(p);
+    WritablePacket *q = thdr->encap(p);
 
     thdr->update();
     // XIA payload = transport header + transport-layer data
     xiah.set_plen(data_length + thdr->hlen());
 
     q = xiah.encap(q, false);
-	output(0).push(q);
+    output(0).push(q);
 }
 
 CLICK_ENDDECLS

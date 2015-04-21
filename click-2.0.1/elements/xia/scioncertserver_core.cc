@@ -189,41 +189,39 @@ void SCIONCertServerCore::parseTopology(){
 }
 
 void SCIONCertServerCore::push(int port, Packet *p) {
+    
     TransportHeader thdr(p);
     uint8_t *s_pkt = (uint8_t *) thdr.payload();
     uint16_t type = SPH::getType(s_pkt);
     uint16_t packetLength = SPH::getTotalLen(s_pkt);
     uint8_t packet[packetLength];
 
-	memset(packet, 0, packetLength);
+    memset(packet, 0, packetLength);
     memcpy(packet, s_pkt, packetLength);
     
     switch(type){
         case ROT_REQ_LOCAL: {
-            //XIAHeader xiahdr(p);
-            //#ifdef _DEBUG_CS
-            //scionPrinter->printLog(IH, (char *)"XIA src path = %s", xiahdr.src_path().unparse().c_str());
-            //scionPrinter->printLog(IH, (char *)"XIA dst path = %s", xiahdr.dst_path().unparse().c_str());
-            //#endif
+            XIAHeader xiahdr(p);
+            //scionPrinter->printLog(IH, (char *)"XIA src path = %s\n", xiahdr.src_path().unparse_re().c_str());
             
             ROTRequest * req = (ROTRequest *)SPH::getData(packet);
             if(req->currentVersion == rot.version) {
-                sendROT();
+                sendROT(xiahdr.src_path().unparse_re().c_str());
             }
 	}
-	    break;
+        break;
 
-	    // TODO: finish testing for recursive CERT_REQ request packet
+	// TODO: finish testing for recursive CERT_REQ request packet
         case CERT_REQ: { //send chain
 
-			uint16_t hops = 0;
-			uint16_t hopPtr = 0;
-			certReq* req= (certReq*)(packet+SCION_HEADER_SIZE+hops*PATH_HOP_SIZE);      
-			certReq newReq = certReq();
-			newReq.numTargets=0;
+            uint16_t hops = 0;
+            uint16_t hopPtr = 0;
+            certReq* req= (certReq*)(packet+SCION_HEADER_SIZE+hops*PATH_HOP_SIZE);      
+            certReq newReq = certReq();
+            newReq.numTargets=0;
 
-			for(int i=0;i<req->numTargets;i++){
-				uint64_t target = req->targets[i];
+	    for(int i=0;i<req->numTargets;i++){
+                uint64_t target = req->targets[i];
 				uint8_t certFile[MAX_FILE_LEN];
 				printf("Cert Request Target = %llu in %llu\n", target, m_uAdAid);
 				getCertFile(certFile, target);
@@ -284,78 +282,78 @@ void SCIONCertServerCore::push(int port, Packet *p) {
 
 void SCIONCertServerCore::processROTRequest(uint8_t * packet) {
 
-	//1. return ROT if the requested version is available
-	//2. forward it to the upstream otherwise (SL: I think this should not happen) 
-	#ifdef _SL_DEBUG_CS
-	printf("Received ROT_REQ request from downstream CS.\n");
-	#endif
+    //1. return ROT if the requested version is available
+    //2. forward it to the upstream otherwise (SL: I think this should not happen) 
+    #ifdef _SL_DEBUG_CS
+    printf("Received ROT_REQ request from downstream CS.\n");
+    #endif
 
-	uint16_t hops = 0; 
-	uint16_t hdrLen = SPH::getHdrLen(packet);
-	specialOpaqueField* sOF = (specialOpaqueField *)SPH::getFirstOF(packet);
-	hops = sOF->hops;
+    uint16_t hops = 0; 
+    uint16_t hdrLen = SPH::getHdrLen(packet);
+    specialOpaqueField* sOF = (specialOpaqueField *)SPH::getFirstOF(packet);
+    hops = sOF->hops;
 
-	//ROTRequest* req= (ROTRequest*)SPH::getData(packet);
+    //ROTRequest* req= (ROTRequest*)SPH::getData(packet);
 
-	uint8_t downPath[(hops+1)*OPAQUE_FIELD_SIZE];
-	reversePath(SPH::getFirstOF(packet), downPath, hops);
+    uint8_t downPath[(hops+1)*OPAQUE_FIELD_SIZE];
+    reversePath(SPH::getFirstOF(packet), downPath, hops);
 	
-	//1. Set header
-	scionHeader hdr;
+    //1. Set header
+    scionHeader hdr;
 
-	hdr.src = HostAddr(HOST_ADDR_SCION, m_uAid);
-	hdr.cmn.type = ROT_REP;
-	hdr.cmn.hdrLen = COMMON_HEADER_SIZE+SCION_ADDR_SIZE*2+(hops+1)*OPAQUE_FIELD_SIZE;
-	hdr.cmn.totalLen = hdr.cmn.hdrLen + sizeof(ROTRequest) + curROTLen;
+    hdr.src = HostAddr(HOST_ADDR_SCION, m_uAid);
+    hdr.cmn.type = ROT_REP;
+    hdr.cmn.hdrLen = COMMON_HEADER_SIZE+SCION_ADDR_SIZE*2+(hops+1)*OPAQUE_FIELD_SIZE;
+    hdr.cmn.totalLen = hdr.cmn.hdrLen + sizeof(ROTRequest) + curROTLen;
 	
-	//2. Set Opaque Fields
-	hdr.cmn.timestamp = COMMON_HEADER_SIZE+SCION_ADDR_SIZE*2;
-	hdr.n_of =  hops + 1;
-	hdr.p_of = downPath;
+    //2. Set Opaque Fields
+    hdr.cmn.timestamp = COMMON_HEADER_SIZE+SCION_ADDR_SIZE*2;
+    hdr.n_of =  hops + 1;
+    hdr.p_of = downPath;
 	
-	uint16_t currOFPtr = SPH::getCurrOFPtr(packet);
-	uint16_t offset = currOFPtr-SCION_ADDR_SIZE*2;
-	hdr.cmn.currOF = SCION_ADDR_SIZE*2+(hops+1)*OPAQUE_FIELD_SIZE-offset;
-	currOFPtr = hdr.cmn.currOF;
+    uint16_t currOFPtr = SPH::getCurrOFPtr(packet);
+    uint16_t offset = currOFPtr-SCION_ADDR_SIZE*2;
+    hdr.cmn.currOF = SCION_ADDR_SIZE*2+(hops+1)*OPAQUE_FIELD_SIZE-offset;
+    currOFPtr = hdr.cmn.currOF;
 
-	opaqueField* of = (opaqueField*)(downPath+currOFPtr-SCION_ADDR_SIZE*2);
-	hdr.dst = ifid2addr.find(of->egressIf)->second;
+    opaqueField* of = (opaqueField*)(downPath+currOFPtr-SCION_ADDR_SIZE*2);
+    hdr.dst = ifid2addr.find(of->egressIf)->second;
 
-	#ifdef _SL_DEBUG_CS
-	printf(" ROT_REP: currOFPtr = %d, n_of = %d\n", currOFPtr, hdr.n_of);
-	#endif
+    #ifdef _SL_DEBUG_CS
+    printf(" ROT_REP: currOFPtr = %d, n_of = %d\n", currOFPtr, hdr.n_of);
+    #endif
 	
-	uint8_t buffer[hdr.cmn.totalLen];
-	SPH::setHeader(buffer,hdr);
-	SPH::setDownpathFlag(buffer);
+    uint8_t buffer[hdr.cmn.totalLen];
+    SPH::setHeader(buffer,hdr);
+    SPH::setDownpathFlag(buffer);
 	
-	//3. copy ROT
-	ROTRequest * req = (ROTRequest*)(buffer+hdr.cmn.hdrLen);
-	//copy the ROT request hdr, telling the recipient the request version is being returned
-	memcpy(req, SPH::getData(packet), sizeof(ROTRequest));	
-	//If the requested ROT version is higher than the currently available one,
-	//it indicates something wrong happened (i.e., unverified PCB propagated to a customer AD,
-	//implying bogus PCB injection.
-	//For now, we assume currentVersion = previousVersion +1. Otherwise, all versions of ROT
-	//starting from previousVersion+1 to currentVersion should be provided to the requester.
-	if(req->currentVersion != rot.version)
-		req->currentVersion = rot.version;
-	#ifdef _DEBUG_CS
-	printf("ROT_REP: req version = %d, send version = %d\n", req->currentVersion, rot.version);
-	#endif
-	//copy the ROT
-	memcpy(buffer+hdr.cmn.hdrLen+sizeof(ROTRequest), curROTRaw, curROTLen);	
+    //3. copy ROT
+    ROTRequest * req = (ROTRequest*)(buffer+hdr.cmn.hdrLen);
+    //copy the ROT request hdr, telling the recipient the request version is being returned
+    memcpy(req, SPH::getData(packet), sizeof(ROTRequest));	
+    //If the requested ROT version is higher than the currently available one,
+    //it indicates something wrong happened (i.e., unverified PCB propagated to a customer AD,
+    //implying bogus PCB injection.
+    //For now, we assume currentVersion = previousVersion +1. Otherwise, all versions of ROT
+    //starting from previousVersion+1 to currentVersion should be provided to the requester.
+    if(req->currentVersion != rot.version)
+        req->currentVersion = rot.version;
+    #ifdef _DEBUG_CS
+    printf("ROT_REP: req version = %d, send version = %d\n", req->currentVersion, rot.version);
+    #endif
+    //copy the ROT
+    memcpy(buffer+hdr.cmn.hdrLen+sizeof(ROTRequest), curROTRaw, curROTLen);	
 
-	//4. Send ROT
-	string dest = "RE ";
-	dest.append(BHID);
-	dest.append(" ");
-	dest.append(m_AD.c_str());
-	dest.append(" ");
-	dest.append("HID:");
-	dest.append((const char*)m_servers.find(BeaconServer)->second.HID);
+    //4. Send ROT
+    string dest = "RE ";
+    dest.append(BHID);
+    dest.append(" ");
+    dest.append(m_AD.c_str());
+    dest.append(" ");
+    dest.append("HID:");
+    dest.append((const char*)m_servers.find(BeaconServer)->second.HID);
 					
-	sendPacket(buffer, hdr.cmn.totalLen, dest);
+    sendPacket(buffer, hdr.cmn.totalLen, dest);
 }
 
 void SCIONCertServerCore::sendPacket(uint8_t* data, uint16_t data_length, string dest) {
@@ -368,8 +366,8 @@ void SCIONCertServerCore::sendPacket(uint8_t* data, uint16_t data_length, string
     src.append(SID_XROUTE);
 
     XIAPath src_path, dst_path;
-	src_path.parse(src.c_str());
-	dst_path.parse(dest.c_str());
+    src_path.parse(src.c_str());
+    dst_path.parse(dest.c_str());
 
     XIAHeaderEncap xiah;
     xiah.set_nxt(CLICK_XIA_NXT_TRN);
@@ -408,54 +406,45 @@ void SCIONCertServerCore::reversePath(uint8_t* path, uint8_t* output, uint8_t ho
     }
 }
 
-void SCIONCertServerCore::sendROT(){
+void SCIONCertServerCore::sendROT(const char* dest_dag){
 
     #ifdef _DEBUG_CS
-	scionPrinter->printLog(IH, (char*)"received ROT request from local BS.\n");
-	#endif
-	
-	// send to one of beacon server
-	if(m_servers.find(BeaconServer)!=m_servers.end()){
+    scionPrinter->printLog(IH, (char*)"received ROT request from local BS.\n");
+    #endif
 
-	    // prepare ROT reply packet
-	    uint8_t hdrLen = COMMON_HEADER_SIZE+AIP_SIZE*2;
-	    uint16_t totalLen = hdrLen + sizeof(struct ROTRequest) + curROTLen;
-	    uint8_t rotPacket[totalLen];
-	    memset(rotPacket, 0, totalLen);
-	    // set length and type
-	    SPH::setHdrLen(rotPacket, hdrLen);
-	    SPH::setType(rotPacket, ROT_REP_LOCAL); 
-	    SPH::setTotalLen(rotPacket, totalLen);
+    // prepare ROT reply packet
+    uint8_t hdrLen = COMMON_HEADER_SIZE+AIP_SIZE*2;
+    uint16_t totalLen = hdrLen + sizeof(struct ROTRequest) + curROTLen;
+    uint8_t rotPacket[totalLen];
+    memset(rotPacket, 0, totalLen);
+    // set length and type
+    SPH::setHdrLen(rotPacket, hdrLen);
+    SPH::setType(rotPacket, ROT_REP_LOCAL); 
+    SPH::setTotalLen(rotPacket, totalLen);
 	    
-	    // fill address
-	    HostAddr srcAddr = HostAddr(HOST_ADDR_AIP, (uint8_t*)(strchr(m_HID.c_str(),':')+1)); 
-	    HostAddr dstAddr = HostAddr(HOST_ADDR_AIP, (uint8_t*)(m_servers.find(BeaconServer)->second.HID));
+    // fill address
+    HostAddr srcAddr = HostAddr(HOST_ADDR_AIP, (uint8_t*)(strchr(m_HID.c_str(),':')+1)); 
+    HostAddr dstAddr = HostAddr(HOST_ADDR_AIP, (uint8_t*)(m_servers.find(BeaconServer)->second.HID));
 			
-		SPH::setSrcAddr(rotPacket, srcAddr);
-		SPH::setDstAddr(rotPacket, dstAddr);
-			
-		string dest = "RE ";
-		dest.append(BHID);
-		dest.append(" ");
-		dest.append("HID:");
-		dest.append((const char*)m_servers.find(BeaconServer)->second.HID);
+    SPH::setSrcAddr(rotPacket, srcAddr);
+    SPH::setDstAddr(rotPacket, dstAddr);
 		
-		// set default version number as 0
-		struct ROTRequest req;
-		req.previousVersion = rot.version;
-		req.currentVersion = rot.version; 
-		*(ROTRequest *)(rotPacket+hdrLen) = req;
+    string dest = "RE ";
+    dest.append(BHID);
+    dest.append(" ");
+    dest.append(dest_dag);
 		
-		memcpy(rotPacket+hdrLen+sizeof(struct ROTRequest), curROTRaw, curROTLen);
-		sendPacket(rotPacket, totalLen, dest);
-	}else{
-	    #ifdef _DEBUG_CS
-		scionPrinter->printLog(EH, (char*)"AD (%s) does not has beacon server.\n", m_AD.c_str());
-		#endif
-	}
+    // set default version number as 0
+    struct ROTRequest req;
+    req.previousVersion = rot.version;
+    req.currentVersion = rot.version; 
+    *(ROTRequest *)(rotPacket+hdrLen) = req;
+		
+    memcpy(rotPacket+hdrLen+sizeof(struct ROTRequest), curROTRaw, curROTLen);
+    sendPacket(rotPacket, totalLen, dest);
+
 }
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(SCIONCertServerCore)
-
 
