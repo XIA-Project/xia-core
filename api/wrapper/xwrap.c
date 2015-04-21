@@ -1811,6 +1811,8 @@ ssize_t recvmsg(int fd, struct msghdr *msg, int flags)
 	msg->msg_flags);
 
 	if (isXsocket(fd)) {
+		XIAIFY();
+
 		int connected = (getConnState(fd) == CONNECTED);
 
 		if (msg == NULL || msg->msg_iov == NULL) {
@@ -1883,6 +1885,7 @@ ssize_t sendmsg(int fd, const struct msghdr *msg, int flags)
 	msg->msg_flags);
 
 	if (isXsocket(fd)) {
+		XIAIFY();
 		int connected = (getConnState(fd) == CONNECTED);
 
 		if (msg == NULL || msg->msg_iov == NULL) {
