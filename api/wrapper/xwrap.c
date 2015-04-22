@@ -494,8 +494,7 @@ static int _ReverseLookup(const sockaddr_x *sax, struct sockaddr_in *sin)
 		// we don't have a local mapping for this yet
 
 		// See if it's in the nameserver
-//		if ( XgetNamebyDAG(id, ID_LEN, sax, &slen) >= 0) {
-		if (0) {
+		if ( XgetNamebyDAG(id, ID_LEN, sax, &slen) >= 0) {
 			// found on the name server
 			MSG("reverse lookup = %s\n", id);
 
