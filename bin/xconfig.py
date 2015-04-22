@@ -6,16 +6,20 @@ import sys
 import uuid
 import getopt
 import socket
+import genkeys
 import subprocess
 from string import Template
 
 # constants
-hostconfig = "host.click"
-routerconfig = "router.click"
-dualhostconfig = "dual_stack_host.click"
-dualrouterconfig = "dual_stack_router.click"
-xia_addr = "xia_address.click"
+templatedir = "etc/click/templates"
 ext = "template"
+srcdir = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
+hostconfig = os.path.join(srcdir, templatedir, "host.click")
+routerconfig = os.path.join(srcdir, templatedir, "router.click")
+dualhostconfig = os.path.join(srcdir, templatedir, "dual_stack_host.click")
+dualrouterconfig = os.path.join(srcdir, templatedir, "dual_stack_router.click")
+xia_addr = os.path.join(srcdir, templatedir, "xia_address.click")
+resolvconfpath = os.path.join(srcdir, 'etc/resolv.conf')
 
 # default to host mode
 nodetype = "host"
@@ -33,18 +37,14 @@ socket_ips_ports = None
 #
 # create a globally unique HID based off of our mac address
 #
-def createHID(prefix="00000000"):
-    hid = "HID:" + prefix
-    id = uuid.uuid1(uuid.getnode())
-    return hid + id.hex
+def createHID():
+    return genkeys.create_new_HID()
 
 #
 # create a globally unique AD based off of router's mac address
 #
 def createAD():
-    ad = "AD:10000000"
-    id = uuid.uuid1(uuid.getnode())
-    return ad + id.hex
+    return genkeys.create_new_AD()
 
 #
 # make a short hostname
@@ -287,6 +287,11 @@ def makeGenericRouterConfig(num_ports, ad, hid, socket_ip_port_list, xia_interfa
 
     (header, socks_interfaces, raw_interfaces, unused_interfaces, footer) = text.split("######")
 
+    # If nameserver will run on this router, create a resolv.conf file
+    if nameserver == "yes":
+        with open(resolvconfpath, 'w') as resolvconf:
+            resolvconf.write('nameserver=RE %s %s %s\n' % (ad, hid, 'SID:1110000000000000000000000000000000001113'))
+            print 'NOTE: Copy %s to all other nodes' % resolvconfpath
 
     # Assign ports to one of:
     # socket port -- uses click socket element to connect to other end of "wire"
@@ -339,10 +344,7 @@ def makeGenericRouterConfig(num_ports, ad, hid, socket_ip_port_list, xia_interfa
     tpl = Template(header)
 
     xchg = {}
-    if (nameserver == "no"):
-        xchg['ADNAME'] = ad
-    else:
-        xchg['ADNAME'] = nameserver_ad
+    xchg['ADNAME'] = ad
     xchg['HNAME'] = getHostname()
     xchg['HID'] = hid
 
@@ -702,7 +704,7 @@ def main():
     getOptions()
 
     hid = createHID()
-    rhid = createHID("20000000")
+    rhid = createHID()
     makeXIAAddrConfig(hid)
 
     if (nodetype == "host"):

@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include "Xsocket.h"
+#include "Xkeys.h"
 #include "dagaddr.hpp"
 #include <assert.h>
 
@@ -266,6 +267,8 @@ void *recvCmd (void *socketid)
 int registerReceiver()
 {
     int sock;
+	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
+
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 
 	// create a socket, and listen for incoming connections
@@ -276,23 +279,32 @@ int registerReceiver()
     if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
     	die(-1, "Reading localhost address\n");
 
-	struct addrinfo *ai;
-    //FIXME: SID is hardcoded
-	if (Xgetaddrinfo(NULL, SID, NULL, &ai) != 0)
-		die(-1, "getaddrinfo failure!\n");
+    // Generate an SID to use
+    if(XmakeNewSID(sid_string, sizeof(sid_string))) {
+        die(-1, "Unable to create a temporary SID");
+    }
 
-	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
-	//FIXME NAME is hard coded
-    if (XregisterName(NAME, dag) < 0 )
-    	die(-1, "error registering name: %s\n", NAME);
+    struct addrinfo hints, *ai;
+    bzero(&hints, sizeof(hints));
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_family = AF_XIA;
+    if (Xgetaddrinfo(NULL, sid_string, &hints, &ai) != 0)
+        die(-1, "getaddrinfo failure!\n");
 
-	if (Xbind(sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
+    Graph g((sockaddr_x*)ai->ai_addr);
+
+    sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
+	if (Xbind(sock, (struct sockaddr*)sa, sizeof(sockaddr_x)) < 0) {
 		Xclose(sock);
-		 die(-1, "Unable to bind to the dag: %s\n", dag);
+		 die(-1, "Unable to bind to the dag: %s\n", g.dag_string().c_str());
 	}
-
-	Graph g(dag);
 	say("listening on dag: %s\n", g.dag_string().c_str());
+
+	//FIXME NAME is hard coded
+    if (XregisterName(NAME, sa) < 0 )
+        die(-1, "error registering name: %s\n", NAME);
+    say("\nRegistering DAG with nameserver:\n%s\n", g.dag_string().c_str());
+
   return sock;
   
 }

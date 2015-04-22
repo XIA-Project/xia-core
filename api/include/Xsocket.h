@@ -169,13 +169,16 @@ extern void print_conf();
 extern int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen);
 extern int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen);
 
+extern int XgetNamebyDAG(char *name, int namelen, const sockaddr_x *addr, socklen_t *addrlen);
 extern int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen);
 extern int XregisterName(const char *name, sockaddr_x *addr);
+extern int XrendezvousUpdate(const char *hidstr, sockaddr_x *DAG);
 
 extern int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *localhostHID, unsigned lenHID, char *local4ID, unsigned len4ID);
 
 /* internal only functions */
 extern int XupdateAD(int sockfd, char *newad, char *new4id);
+extern int XupdateRV(int sockfd);
 extern int XupdateNameServerDAG(int sockfd, char *nsDAG);
 extern int XreadNameServerDAG(int sockfd, sockaddr_x *nsDAG);
 extern int XisDualStackRouter(int sockfd);
@@ -184,6 +187,8 @@ extern int Xgetpeername(int sockd, struct sockaddr *addr, socklen_t *addrlen);
 extern int Xgetsockname(int sockd, struct sockaddr *addr, socklen_t *addrlen);
 
 extern int Xgetaddrinfo(const char *, const char *, const struct addrinfo *, struct addrinfo **);
+extern int XreadRVServerAddr(char *, int);
+extern int XreadRVServerControlAddr(char *, int);
 extern void Xfreeaddrinfo(struct addrinfo *);
 extern const char *Xgai_strerror(int);
 extern int checkXid(const char *xid, const char *type);
