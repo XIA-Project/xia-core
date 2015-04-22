@@ -728,6 +728,13 @@ int make_ns_packet(ns_pkt *np, char *pkt, int pkt_sz)
 			end += strlen(np->dag) + 1;
 			break;
 
+		case NS_TYPE_RESPONSE_RQUERY:
+			if (np-name == NULL)
+				return 0;
+			strcpy(end, np->name);
+			end += strlen(np->name) + 1;
+			break;
+
 		default:
 			break;
 	}
