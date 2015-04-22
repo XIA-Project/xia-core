@@ -300,6 +300,8 @@ int registerReceiver()
 	}
 	say("listening on dag: %s\n", g.dag_string().c_str());
 
+	Xlisten(sock, 5);
+
 	//FIXME NAME is hard coded
     if (XregisterName(NAME, sa) < 0 )
         die(-1, "error registering name: %s\n", NAME);
