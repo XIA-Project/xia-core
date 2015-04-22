@@ -752,6 +752,10 @@ void get_ns_packet(char *pkt, int sz, ns_pkt *np)
 			np->name = &pkt[2];
 			break;
 
+		case NS_TYPE_RQUERY:
+			np->dag = &pkt[2];
+			break;
+
 		case NS_TYPE_REGISTER:
 			np->name = &pkt[2];
 			np->dag = np->name + strlen(np->name) + 1;
