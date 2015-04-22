@@ -359,6 +359,7 @@ class XTRANSPORT : public Element {
 		bool dataack_waiting;
 		bool teardown_waiting;
 		bool migrateack_waiting;
+		unsigned backlog;
 		String last_migrate_ts;
 
 		bool did_poll;

@@ -119,7 +119,7 @@ void SocketState::init()
 {
 	m_transportType = -1;
 	m_connected = 0;
-	m_blocking = 1;
+	m_blocking = TRUE;
 	m_buf = NULL;
 	m_peer = NULL;
 	m_temp_sid = NULL;
@@ -378,7 +378,7 @@ int isBlocking(int sock)
 	if (sstate)
 		return sstate->isBlocking();
 	else
-		return 0;
+		return TRUE;
 }
 
 void setBlocking(int sock, int blocking)

@@ -34,12 +34,6 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags, sockaddr_x *addr, 
 ** sockfd must have previously been connected via Xaccept() or
 ** Xconnect().
 **
-** Xrecv() does not currently have a non-blocking mode, and will block
-** until a data is available on sockfd. However, the standard socket API
-** calls select and poll may be used with the Xsocket. Either function
-** will deliver a readable event when a new connection is attempted and
-** you may then call Xrecv() to get the data.
-**
 ** NOTE: in cases where more data is received than specified by the caller,
 ** the excess data will be stored at the API level. Subsequent Xrecv calls
 ** return the stored data until it is drained, and will then resume requesting
@@ -170,12 +164,6 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 **
 ** Xrecvfrom() retrieves data from an Xsocket of type XSOCK_DGRAM. Unlike the
 ** standard recvfrom API, it will not work with sockets of type XSOCK_STREAM.
-**
-** XrecvFrom() does not currently have a non-blocking mode, and will block
-** until a data is available on sockfd. However, the standard socket API
-** calls select and poll may be used with the Xsocket. Either function
-** will deliver a readable event when a new connection is attempted and
-** you may then call XrecvFrom() to get the data.
 **
 ** NOTE: in cases where more data is received than specified by the caller,
 ** the excess data will be stored in the socket state structure and will
