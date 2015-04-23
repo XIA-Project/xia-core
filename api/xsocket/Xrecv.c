@@ -62,8 +62,6 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 	int numbytes;
 	int peek = (flags & MSG_PEEK);
 
-	//LOGF("len:%zu peek:%d\n", len, peek);
-
 	if (len == 0)
 		return 0;
 
@@ -81,24 +79,12 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 
 	int stype = getSocketType(sockfd);
 	if (stype == SOCK_DGRAM) {
-		if ((numbytes = getSocketData(sockfd, (char *)rbuf, len, peek)) > 0) {
-			//LOGF("getting %zu bytes from cache peek:%d", len, peek);
-			return numbytes;
-		} else {
-
-			return _xrecvfromconn(sockfd, rbuf, len, flags);
-		}
+		return _xrecvfromconn(sockfd, rbuf, len, flags);
 
 	} else if (stype != SOCK_STREAM) {
 		LOGF("Socket %d must be a stream or datagram socket", sockfd);
 		errno = EOPNOTSUPP;
 		return -1;
-	}
-
-	// see if we have bytes leftover from a previous Xrecv call
-	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len, peek)) > 0) {
-		//LOGF("getting %zu bytes from cache peek:%d", len, peek);
-		return numbytes;
 	}
 
 	xia::XSocketMsg xsm;
@@ -108,6 +94,7 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 
 	xia::X_Recv_Msg *xrm = xsm.mutable_x_recv();
 	xrm->set_bytes_requested(len);
+	xrm->set_peek(peek);
 
 	if (click_send(sockfd, &xsm) < 0) {
 		if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
@@ -134,32 +121,13 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 		errno = r->err_code();
 	
 	} else if ((size_t)paylen <= len) {
-		//LOG("returning it all");
 		memcpy(rbuf, payload, paylen);
-		if (peek) {
-			//LOG("caching it all");
-			// save it all since they peeked
-			setSocketData(sockfd, payload, paylen);
-		}
 
 	} else {
-		//LOG("need to cache");
+		// THIS SHOULD NOT HAPPEN ANYMORE
 		// we got back more data than the caller requested
-		// stash the extra away for subsequent Xrecv calls
+
 		memcpy(rbuf, payload, len);
-
-		if (peek) {
-			// keep all of it
-			//LOG("and caching it all because peek");
-			setSocketData(sockfd, payload, paylen);
-
-		} else {
-			// keep only what they haven't seen
-			//LOG("only keeping some");
-			paylen -= len;
-			setSocketData(sockfd, payload + len, paylen);
-		}
-
 		paylen = len;
 	}
 	return paylen;
@@ -234,20 +202,13 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		return -1;
 	}
 
-	// see if we have bytes leftover from a previous Xrecv call
-	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len, peek)) > 0) {
-		// FIXME: we need to also have stashed away the sDAG and
-		// return it as well
-		*addrlen = 0;
-		return numbytes;
-	}
-
 	xia::XSocketMsg xsm;
 	unsigned seq;
 	const char *payload;
 	int paylen;
 	xia::X_Recvfrom_Msg *xrm;
 
+// FIXME: why is this loop here?
 	while (1) {
 		xsm.set_type(xia::XRECVFROM);
 		seq = seqNo(sockfd);
@@ -255,6 +216,7 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 
 		xrm = xsm.mutable_x_recvfrom();
 		xrm->set_bytes_requested(len);
+		xrm->set_peek(peek);
 
 		if (click_send(sockfd, &xsm) < 0) {
 			if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
@@ -286,32 +248,11 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		errno = r->err_code();
 
 	} else if ((unsigned)paylen <= len) {
-		//LOG("returning it all");
 		memcpy(rbuf, payload, paylen);
-		if (peek) {
-			//LOG("caching it all");
-			// save it all since they peeked
-			setSocketData(sockfd, payload, paylen);
-		}
 
 	} else {
-		//LOG("need to cache");
-		// we got back more data than the caller requested
-		// stash the extra away for subsequent Xrecv calls
+		// TRUNCATE
 		memcpy(rbuf, payload, len);
-
-		if (peek) {
-			// keep all of it
-			//LOG("and caching it all because peek");
-			setSocketData(sockfd, payload, paylen);
-
-		} else {
-			// keep only what they haven't seen
-			//LOG("only keeping some");
-			paylen -= len;
-			setSocketData(sockfd, payload + len, paylen);
-		}
-
 		paylen = len;
 	}
 

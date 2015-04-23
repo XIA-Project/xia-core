@@ -39,10 +39,6 @@ public:
 	int transportType() { return m_transportType; };
 	void setTransportType(int tt) {m_transportType = tt; };
 
-	int data(char *buf, unsigned bufLen, bool peek);
-	void setData(const char *buf, unsigned bufLen);
-	int dataLen() { return m_bufLen; };
-
 	int getConnState() { return m_connected; };
 	void setConnState(int conn) { m_connected = conn; };
 
@@ -81,11 +77,9 @@ private:
 	int m_blocking;
 	int m_debug;
 	int m_error;
-	char *m_buf;
 	sockaddr_x *m_peer;
 	char *m_temp_sid;
 	int m_sid_assigned;
-	unsigned m_bufLen;
 	unsigned m_sequence;
 	struct timeval m_timeout;
 	pthread_mutex_t m_sequence_lock;
@@ -107,8 +101,6 @@ SocketState::SocketState()
 
 SocketState::~SocketState()
 {
-	if (m_buf)
-		delete(m_buf);
 	if (m_peer)
 		free(m_peer);
 	m_packets.clear();
@@ -120,61 +112,15 @@ void SocketState::init()
 	m_transportType = -1;
 	m_connected = 0;
 	m_blocking = 1;
-	m_buf = NULL;
 	m_peer = NULL;
 	m_temp_sid = NULL;
 	m_sid_assigned = 0;
-	m_bufLen = 0;
 	m_sequence = 1;
 	m_debug = 0;
 	m_error = 0;
 	m_timeout.tv_sec = 0;
 	m_timeout.tv_usec = 0;
 	pthread_mutex_init(&m_sequence_lock, NULL);
-}
-
-int SocketState::data(char *buf, unsigned bufLen, bool peek)
-{
-	if (m_bufLen == 0) {
-		// we don't have anything stashed away
-		return 0;
-
-	} else if (m_bufLen > bufLen) {
-		// give the caller as much as we can, and hang on to the rest
-		// for later
-		memcpy(buf, m_buf, bufLen);
-		if (!peek)
-			m_bufLen -= bufLen;
-		memmove(m_buf, m_buf + bufLen, m_bufLen);
-
-	} else {
-		// get rid of the data and reset our state
-		bufLen = m_bufLen;
-		memcpy(buf, m_buf, m_bufLen);
-		if (!peek) {
-			delete(m_buf);
-			m_buf = (char *)0;
-			m_bufLen = 0;
-		}
-	}
-	return bufLen;
-}
-
-void SocketState::setData(const char *buf, unsigned bufLen)
-{
-	if (!buf || bufLen == 0)
-		return;
-
-	if (m_buf)
-		delete(m_buf);
-	m_bufLen = 0;
-
-	m_buf = new char [bufLen];
-	if (!m_buf)
-		return;
-
-	memcpy(m_buf, buf, bufLen);
-	m_bufLen = bufLen;
 }
 
 void SocketState::setTempSID(const char *sid)
@@ -443,31 +389,6 @@ void setSocketType(int sock, int tt)
 		sstate->setTransportType(tt);
 }
 
-int getSocketData(int sock, char *buf, unsigned bufLen, bool peek)
-{
-	SocketState *sstate = SocketMap::getMap()->get(sock);
-	if (sstate)
-		return sstate->data(buf, bufLen, peek);
-	else
-		return 0;
-}
-
-int getSocketDataLen(int sock)
-{
-	SocketState *sstate = SocketMap::getMap()->get(sock);
-	if (sstate)
-		return sstate->dataLen();
-	else
-		return 0;	
-}
-
-void setSocketData(int sock, const char *buf, unsigned bufLen)
-{
-	SocketState *sstate = SocketMap::getMap()->get(sock);
-	if (sstate)
-		sstate->setData(buf, bufLen);
-}
-
 int isTempSID(int sock)
 {
 	SocketState *sstate = SocketMap::getMap()->get(sock);
@@ -547,56 +468,3 @@ const sockaddr_x *dgramPeer(int sock)
 		peer = sstate->peer();
 	return peer;
 }
-
-#if 0
-int main()
-{
-	char buf[1024];
-	int len;
-
-	// should be invalid
-	printf("socket %d tt %d\n", 0, getSocketType(0));
-
-	// should be valid, then invalid
-	allocSocketState(5, 1);
-	printf("socket %d tt %d\n", 5, getSocketType(5));
-	freeSocketState(5);
-
-	allocSocketState(2, 3);
-	printf("socket %d tt %d conn %d\n", 2, getSocketType(2), isConnected(2));
-	setConnected(2, 1);
-	printf("socket %d tt %d conn %d\n", 2, getSocketType(2), isConnected(2));
-
-
-	allocSocketState(55, 2);
-	printf("socket %d tt %d\n", 55, getSocketType(55));
-	setSocketType(55, 3);
-	printf("socket %d tt %d\n", 55, getSocketType(55));
-
-	len = getSocketData(55, buf, 1024);
-	printf("socket %d buflen %d\n", 55, len);
-
-	const char *p = "0123456789";
-	setSocketData(55, p, 10);
-	len = getSocketData(55, buf, 5);
-	buf[5] = 0;
-	printf("sock %d len %d buf %s\n", 55, len, buf);
-	len = getSocketData(55, buf, 1024);
-	buf[len] = 0;
-	printf("sock %d len %d buf %s\n", 55, len, buf);
-
-	setSocketData(2, p, 10);
-	len = getSocketData(2, buf, 1024);
-	buf[len] = 0;
-	printf("sock %d len %d buf %s\n", 2, len, buf);
-	len = getSocketData(2, buf, 1024);
-	buf[len] = 0;
-	printf("sock %d len %d buf %s\n", 2, len, buf);
-
-	len = getSocketData(100, buf, 1024);
-	printf("sock %d len %d\n", 100, len);
-}
-#endif
-
-//}
-

@@ -57,7 +57,6 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 	int sock = 0;
 	int nxfds = 0;
 	int xrc = 0;
-	unsigned dataReady = 0;
 
 	if (nfds == 0) {
 		// it's just a timer
@@ -84,12 +83,6 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 			if (getSocketType(ufds[i].fd) != XSOCK_INVALID) {
 				// add the Xsocket to the xpoll struct
 				// TODO: should this work for Content sockets?
-
-				if (getSocketDataLen(ufds[i].fd) && (ufds[i].events & POLLIN)) {
-					dataReady++;
-					ufds[i].revents = POLLIN;
-					continue;
-				}
 
 				xia::X_Poll_Msg::PollFD *pfd = pollMsg->add_pfds();
 
@@ -123,12 +116,6 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 				s2p[i].fd = s2p[i].port = 0;
 			}
 		}
-	}
-
-	if (dataReady) {
-		errno = 0;
-		rc = dataReady;
-		goto done;
 	}
 
 	if (nxfds == 0) {
@@ -297,7 +284,6 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 	int largest = 0;
 	int count = 0;
 	int rc = 0;
-	unsigned dataReady = 0;
 
 	FD_ZERO(&rfds);
 	FD_ZERO(&wfds);
@@ -337,13 +323,6 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 		// is it an xsocket
 		if (flags && getSocketType(i) != XSOCK_INVALID) {
 
-			// there's already data ready to return
-			if ((flags & POLLIN) && getSocketDataLen(i)) {
-				dataReady++;
-				FD_SET(i, &immediate_fds);
-				continue;
-			}
-
 			// we found an Xsocket, do the Xpoll magic
 			nx++;
 
@@ -375,13 +354,6 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 
 			s2p[i].fd = s2p[i].port = 0;
 		}
-	}
-
-	if (dataReady) {
-		memcpy(readfds, &immediate_fds, sizeof(fd_set));
-		errno = 0;
-		count = dataReady;
-		goto done;
 	}
 
 	if (nx == 0) {
