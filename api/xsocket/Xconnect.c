@@ -119,6 +119,7 @@ int _connStream(int sockfd, const sockaddr *addr, socklen_t addrlen)
 		setSIDAssigned(sockfd);
 		setTempSID(sockfd, src_SID);
 	}
+
 	// In Xtransport: send SYN to destination server
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));

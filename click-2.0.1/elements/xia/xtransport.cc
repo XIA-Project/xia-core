@@ -1014,8 +1014,25 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 
 		if (thdr.pkt_info() == TransportHeader::SYN) {
-			//click_chatter("syn dport = %d\n", _dport);
 			// Connection request from client...
+
+			if (!sk->isListenSocket) {
+				// we aren't marked to accept connecctions, drop it
+				// FIXME: is this the right behavior, or should we send a RST?
+
+				click_chatter("SYN received on a non-listening socket (port:%u), dropping...\n", _dport);
+				return;
+			}
+
+			if (sk->pending_connection_buf.size() >= sk->backlog) {
+				// the backlog is full, we can;t take it right now, drop it
+				// FIXME: is this the right behavior, or should we send a RST?
+
+				click_chatter("SYN received but backlog is full (port:%u), dropping...\n", _dport);
+				return; 
+			}
+
+			//click_chatter("syn dport = %d\n", _dport);
 
 			//sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
 
@@ -2370,28 +2387,38 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 
 void XTRANSPORT::Xlisten(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
+	// we just want to mark the socket as listenening and return right away.
+
+	xia::X_Listen_Msg *x_listen_msg = xia_socket_msg->mutable_x_listen();
+
 	sock *sk = portToSock.get(_sport);
 	sk->isListenSocket = true;
-
-	// we just want to mark the socket as listenening and return right away.
-	// may need to copy some logic from readyToAccept
+	sk->backlog = x_listen_msg->backlog();
 
 	ReturnResult(_sport, xia_socket_msg);
 }
 
 void XTRANSPORT::XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
-	// If there is already a pending connection, return true now
-	// If not, add this request to the pendingAccept queue
 	sock *sk = portToSock.get(_sport);
 
+	click_chatter("blocking = %d\n", xia_socket_msg->blocking());
+
 	if (!sk->pending_connection_buf.empty()) {
+		// If there is already a pending connection, return true now
 		ReturnResult(_sport, xia_socket_msg);
-	} else {
-		// xia_socket_msg is saved on the stack; allocate a copy on the heap
+
+	} else if (xia_socket_msg->blocking()) {
+		// If not and we are blocking, add this request to the pendingAccept queue and wait
+
+		// xia_socket_msg is on the stack; allocate a copy on the heap
 		xia::XSocketMsg *xsm_cpy = new xia::XSocketMsg();
 		xsm_cpy->CopyFrom(*xia_socket_msg);
 		sk->pendingAccepts.push(xsm_cpy);
+
+	} else {
+		// socket is non-blocking and nothing is ready yet
+		ReturnResult(_sport, xia_socket_msg, -1, EWOULDBLOCK);
 	}
 }
 

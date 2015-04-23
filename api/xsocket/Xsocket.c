@@ -43,7 +43,8 @@
 **	unguranteed delivery (SID)
 **	\n XSOCK_CHUNK for getting/putting content chunks (CID)
 **	\n SOCK_RAW for a raw socket that can have direct edits made to the header
-** @param for posix compatibility, currently must be 0
+**	\n SOCK_NONBLOCK may be or'd into the transport_type to create the socket in nonblocking mode
+** @param for posix compatibility, currently ignored
 **
 ** @returns socket id on success.
 ** @returns -1 on failure with errno set to an error compatible with those
@@ -61,7 +62,7 @@ int Xsocket(int family, int transport_type, int protocol)
 {
 	int rc;
 	int sockfd;
-	int nonblock = FALSE;
+	int block = TRUE;
 
 	// force the system to init and load the socket function pointers
 	get_conf();
@@ -82,7 +83,7 @@ int Xsocket(int family, int transport_type, int protocol)
 	}
 
 	if (transport_type & SOCK_NONBLOCK) {
-		nonblock = TRUE;
+		block = FALSE;
 	}
 
 	// get rid of the flags
@@ -107,12 +108,7 @@ int Xsocket(int family, int transport_type, int protocol)
 	}
 
 	allocSocketState(sockfd, transport_type);
-	setBlocking(sockfd, nonblock);
-
-//	struct timeval tv;
-//	tv.tv_sec = 0;
-//	tv.tv_usec = 10000;
-//	(_f_setsockopt)(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+	setBlocking(sockfd, block);
 
 	// protobuf message
 	xia::XSocketMsg xsm;

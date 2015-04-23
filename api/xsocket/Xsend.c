@@ -50,69 +50,11 @@ int Xsend(int sockfd, const void *buf, size_t len, int flags)
 	#define fmsg  "%s is not currently supported, clearing...\n"
 	int rc;
 
-	if (flags & MSG_OOB) {			// Process out-of-band data
-		LOGF(fmsg, "MSG_OOB");
+	if (flags) {
+		LOGF("flags:%s\n", xferFlags(flags));
+		LOG("Resetting flags to 0 for now...");
 	}
-	if (flags & MSG_PEEK) {			// Peek at incoming messages
-		LOGF(fmsg, "MSG_PEEK");
-	}
-	if (flags & MSG_DONTROUTE) {	// Don't use local routing
-		LOGF(fmsg, "MSG_DONTROUTE");
-	}
-	if (flags & MSG_DONTROUTE){		// Don't use local routing
-		LOGF(fmsg, "MSG_DONTROUTE");
-	}
-	if (flags & MSG_CTRUNC) {		// Control data lost before delivery
-		LOGF(fmsg, "MSG_CTRUNC");
-	}
-	if (flags & MSG_DONTROUTE) {	// Don't use local routing
-		LOGF(fmsg, "MSG_DONTROUTE");
-	}
-	if (flags & MSG_PROXY) {		// Supply or ask second address
-		LOGF(fmsg, "MSG_PROXY");
-	}
-	if (flags & MSG_TRUNC) {
-		LOGF(fmsg, "MSG_TRUNC");
-	}
-	if (flags & MSG_DONTWAIT) {		// Nonblocking IO
-		LOGF(fmsg, "MSG_DONTWAIT");
-	}
-	if (flags & MSG_EOR) {			// End of record 
-		LOGF(fmsg, "MSG_EOR");
-	}
-	if (flags & MSG_WAITALL) {		// Wait for a full request
-		LOGF(fmsg, "MSG_WAITALL");
-	}
-	if (flags & MSG_FIN) {
-		LOGF(fmsg, "MSG_FIN");
-	}
-	if (flags & MSG_SYN) {
-		LOGF(fmsg, "MSG_SYN");
-	}
-	if (flags & MSG_CONFIRM) {		// Confirm path validity
-		LOGF(fmsg, "MSG_CONFIRM");
-	}
-	if (flags & MSG_RST) {
-		LOGF(fmsg, "MSG_RST");
-	}
-	if (flags & MSG_ERRQUEUE) {		// Fetch message from error queue
-		LOGF(fmsg, "MSG_ERRQUEUE");
-	}
-	if (flags & MSG_NOSIGNAL) {		// Do not generate SIGPIPE
-		LOGF(fmsg, "MSG_NOSIGNAL");
-	}
-	if (flags & MSG_MORE) {			// Sender will send more
-		LOGF(fmsg, "MSG_MORE");
-	}
-	if (flags & MSG_WAITFORONE) {	// Wait for at least one packet to return
-		LOGF(fmsg, "MSG_WAITFORONE");
-	}
-	if (flags & MSG_FASTOPEN) {		// Send data in TCP SYN
-		LOGF(fmsg, "MSG_FASTOPEN");
-	}
-	if (flags & MSG_CMSG_CLOEXEC) {	// Set close_on_exit for file descriptor received through SCM_RIGHTS
-		LOGF(fmsg, "MSG_CMSG_CLOEXEC");
-	}
+
 	flags = 0;
 
 	if (len == 0)

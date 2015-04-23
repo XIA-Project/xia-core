@@ -87,12 +87,16 @@ int XgetNamebyDAG(char *name, int namelen, const sockaddr_x *addr, socklen_t *ad
 	sockaddr_x ns_dag;
 	char pkt[NS_MAX_PACKET_SIZE];
 
+	Graph gph(addr);
+	LOGF("Looking up name for DAG:%s\n", gph.dag_string().c_str());
 	if (!name) {
+		LOG("ERROR: name argument was null\n");
 		errno = EINVAL;
 		return -1;
 	}
 
 	if (!addr || !addrlen || *addrlen < sizeof(sockaddr_x)) {
+		LOG("ERROR: addr or addrlen were invalid\n");
 		errno = EINVAL;
 		return -1;
 	}
@@ -183,9 +187,11 @@ int XgetNamebyDAG(char *name, int namelen, const sockaddr_x *addr, socklen_t *ad
 
 	switch (resp_pkt.type) {
 	case NS_TYPE_RESPONSE_RQUERY:
+		LOG("Got valid reverse query response");
 		result = 1;
 		break;
 	case NS_TYPE_RESPONSE_ERROR:
+		LOG("Got invalid reverse query response");
 		result = -1;
 		break;
 	default:
@@ -722,6 +728,13 @@ int make_ns_packet(ns_pkt *np, char *pkt, int pkt_sz)
 			end += strlen(np->dag) + 1;
 			break;
 
+		case NS_TYPE_RESPONSE_RQUERY:
+			if (np->name == NULL)
+				return 0;
+			strcpy(end, np->name);
+			end += strlen(np->name) + 1;
+			break;
+
 		default:
 			break;
 	}
@@ -746,6 +759,10 @@ void get_ns_packet(char *pkt, int sz, ns_pkt *np)
 			np->name = &pkt[2];
 			break;
 
+		case NS_TYPE_RQUERY:
+			np->dag = &pkt[2];
+			break;
+
 		case NS_TYPE_REGISTER:
 			np->name = &pkt[2];
 			np->dag = np->name + strlen(np->name) + 1;
@@ -753,6 +770,10 @@ void get_ns_packet(char *pkt, int sz, ns_pkt *np)
 
 		case NS_TYPE_RESPONSE_QUERY:
 			np->dag = &pkt[2];
+			break;
+
+		case NS_TYPE_RESPONSE_RQUERY:
+			np->name = &pkt[2];
 			break;
 
 		default:

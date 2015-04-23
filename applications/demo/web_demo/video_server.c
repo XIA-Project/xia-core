@@ -269,6 +269,9 @@ int main(int argc, char *argv[])
 	if(Xbind(sock, (struct sockaddr*)dag, sizeof(sockaddr_x)) < 0)
 		 die(-1, "Unable to bind to the dag: %s\n", dag);
 
+
+	Xlisten(sock, 5);
+	
 	// we're done with this
 	Xfreeaddrinfo(ai);
 

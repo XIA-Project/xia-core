@@ -43,15 +43,24 @@
 idrec xfer_flags[] = {
 	FR(MSG_CMSG_CLOEXEC),
 	FR(MSG_CONFIRM),
+	FR(MSG_CTRUNC),
+	FR(MSG_DONTROUTE),
 	FR(MSG_DONTROUTE),
 	FR(MSG_DONTWAIT),
 	FR(MSG_EOR),
 	FR(MSG_ERRQUEUE),
+	FR(MSG_FASTOPEN),
+	FR(MSG_FIN),
 	FR(MSG_MORE),
 	FR(MSG_NOSIGNAL),
+	FR(MSG_OOB),
 	FR(MSG_PEEK),
+	FR(MSG_PROXY),
+	FR(MSG_RST),
+	FR(MSG_SYN),
 	FR(MSG_TRUNC),
-	FR(MSG_WAITALL)
+	FR(MSG_WAITALL),
+	FR(MSG_WAITFORONE)
 };
 
 idrec ai_flags[] = {
@@ -211,14 +220,13 @@ int click_send(int sockfd, xia::XSocketMsg *xsm)
 		// make sure click know if it should reply immediately or not
 		xsm->set_blocking(true);
 	}
-//printf("blocking flag is %d\n", isBlocking(sockfd));
 
 	std::string p_buf;
 	xsm->SerializeToString(&p_buf);
 
 	int remaining = p_buf.size();
 	const char *p = p_buf.c_str();
-//printf("sending %d bytes on %d\n", remaining, sockfd);
+
 	while (remaining > 0) {
 
 		//LOGF("sending to click: seq: %d type: %d", xsm->sequence(), xsm->type());
