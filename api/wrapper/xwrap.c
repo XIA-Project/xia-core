@@ -506,6 +506,8 @@ static int _ReverseLookup(const sockaddr_x *sax, struct sockaddr_in *sin)
 			sin->sin_port = htons(atoi(p));
 			sin->sin_family = AF_INET;
 
+			*(p-1) = '-';
+
 			// put it into the mapping tables
 			Graph g(sax);
 			std::string dag = g.dag_string();
