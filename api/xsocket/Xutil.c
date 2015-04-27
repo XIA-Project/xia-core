@@ -77,7 +77,7 @@ idrec ai_flags[] = {
 	FR(AI_V4MAPPED)
 };
 
-idrec proto_flags[] = {
+idrec proto_values[] = {
 	FR(IPPROTO_IP),
 	FR(IPPROTO_ICMP),
 	FR(IPPROTO_IGMP),
@@ -459,7 +459,10 @@ const char *optValue(size_t f)
 	return getValue(opt_values, sizeof(opt_values)/sizeof(idrec), f);
 }
 
-
+const char *protoValue(size_t f)
+{
+	return getValue(proto_values, sizeof(proto_values)/sizeof(idrec), f);
+}
 
 int checkXid(const char *xid, const char *type)
 {

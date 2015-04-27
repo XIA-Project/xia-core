@@ -2073,25 +2073,27 @@ void XTRANSPORT::Xgetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_
 	// click_chatter("\nGet Socket Option\n");
 	xia::X_Getsockopt_Msg *x_sso_msg = xia_socket_msg->mutable_x_getsockopt();
 
+	sock *sk = portToSock.get(_sport);
+
 	// click_chatter("opt = %d\n", x_sso_msg->opt_type());
 	switch (x_sso_msg->opt_type())
 	{
-	case XOPT_HLIM:
-	{
-		x_sso_msg->set_int_opt(hlim.get(_sport));
-		//click_chatter("gso:hlim:%d\n", hlim.get(_sport));
-	}
-	break;
+		case XOPT_HLIM:
+			x_sso_msg->set_int_opt(hlim.get(_sport));
+			//click_chatter("gso:hlim:%d\n", hlim.get(_sport));
+			break;
 
-	case XOPT_NEXT_PROTO:
-	{
-		x_sso_msg->set_int_opt(nxt_xport.get(_sport));
-	}
-	break;
+		case XOPT_NEXT_PROTO:
+			x_sso_msg->set_int_opt(nxt_xport.get(_sport));
+			break;
 
-	default:
-		// unsupported option
-		break;
+		case SO_ACCEPTCONN:
+			x_sso_msg->set_int_opt(sk->isListenSocket);
+			break;
+
+		default:
+			// unsupported option
+			break;
 	}
 
 	ReturnResult(_sport, xia_socket_msg); // TODO: return code
@@ -3450,6 +3452,7 @@ void XTRANSPORT::Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	} else if (!xia_socket_msg->blocking()) {
 
 		// we're not blocking and there's no data, so let API know immediately
+		sk->recv_pending = false;
 		ReturnResult(_sport, xia_socket_msg, -1, EWOULDBLOCK);
 
 	} else {

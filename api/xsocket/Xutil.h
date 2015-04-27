@@ -63,6 +63,8 @@ void allocSocketState(int sock, int tt);
 void freeSocketState(int sock);
 int getSocketType(int sock);
 void setSocketType(int sock, int tt);
+int getProtocol(int sock);
+void setProtocol(int sock, int p);
 int isSIDAssigned(int sock);
 void setSIDAssigned(int sock);
 int isTempSID(int sock);
@@ -94,6 +96,7 @@ const char *aiFlags(size_t f);
 const char *pollFlags(size_t f);
 const char *afValue(size_t f);
 const char *optValue(size_t f);
+const char *protoValue(size_t f);
 }
 
 #endif

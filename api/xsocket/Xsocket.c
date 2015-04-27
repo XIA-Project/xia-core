@@ -74,10 +74,6 @@ int Xsocket(int family, int transport_type, int protocol)
 		return -1;
 	}
 
-	if (protocol != 0) {
-		LOG("warning: the protocol field is ignored in the Xsocket API");
-	}
-
 	if (transport_type & SOCK_CLOEXEC) {
 		LOG("warning: SOCK_CLOEXEC is not currently supported in XIA");
 	}
@@ -109,6 +105,7 @@ int Xsocket(int family, int transport_type, int protocol)
 
 	allocSocketState(sockfd, transport_type);
 	setBlocking(sockfd, block);
+	setProtocol(sockfd, protocol);
 
 	// protobuf message
 	xia::XSocketMsg xsm;
@@ -136,6 +133,6 @@ int Xsocket(int family, int transport_type, int protocol)
 
 	// close the control socket since the underlying Xsocket is no good
 	freeSocketState(sockfd);
-	(_f_close)(sockfd);	
+	(_f_close)(sockfd);
 	return rc;
 }

@@ -39,6 +39,9 @@ public:
 	int transportType() { return m_transportType; };
 	void setTransportType(int tt) {m_transportType = tt; };
 
+	int protocol() { return m_protocol; };
+	void setProtocol(int p) {m_protocol = p; };
+
 	int getConnState() { return m_connected; };
 	void setConnState(int conn) { m_connected = conn; };
 
@@ -73,6 +76,7 @@ public:
 	void init();
 private:
 	int m_transportType;
+	int m_protocol;
 	int m_connected;
 	int m_blocking;
 	int m_debug;
@@ -110,6 +114,7 @@ SocketState::~SocketState()
 void SocketState::init()
 {
 	m_transportType = -1;
+	m_protocol = 0;
 	m_connected = 0;
 	m_blocking = TRUE;
 	m_peer = NULL;
@@ -286,6 +291,16 @@ int getSocketType(int sock)
 		return -1;
 }
 
+int getProtocol(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate) {
+		return sstate->protocol();
+	}
+	else
+		return 0;
+}
+
 int getConnState(int sock)
 {
 	SocketState *sstate = SocketMap::getMap()->get(sock);
@@ -387,6 +402,13 @@ void setSocketType(int sock, int tt)
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
 		sstate->setTransportType(tt);
+}
+
+void setProtocol(int sock, int p)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		sstate->setProtocol(p);
 }
 
 int isTempSID(int sock)
