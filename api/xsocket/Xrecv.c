@@ -196,50 +196,38 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 	int paylen;
 	xia::X_Recvfrom_Msg *xrm;
 
-// FIXME: why is this loop here?
-	while (1) {
-		xsm.set_type(xia::XRECVFROM);
-		seq = seqNo(sockfd);
-		xsm.set_sequence(seq);
+	xsm.set_type(xia::XRECVFROM);
+	seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
 
-		xrm = xsm.mutable_x_recvfrom();
-		xrm->set_bytes_requested(len);
-		xrm->set_peek(peek);
+	xrm = xsm.mutable_x_recvfrom();
+	xrm->set_bytes_requested(len);
+	xrm->set_peek(peek);
 
-		if (click_send(sockfd, &xsm) < 0) {
-			if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
-				LOGF("Error talking to Click: %s", strerror(errno));
-			}
-			return -1;
+	if (click_send(sockfd, &xsm) < 0) {
+		if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
+			LOGF("Error talking to Click: %s", strerror(errno));
 		}
-
-		xsm.Clear();
-
-		if ((numbytes = click_reply(sockfd, seq, &xsm)) < 0) {
-			if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
-				LOGF("Error retrieving recv data from Click: %s", strerror(errno));
-			}
-			return -1;
-		}
-		xrm = xsm.mutable_x_recvfrom();
-		payload = xrm->payload().c_str();
-		paylen = xrm->bytes_returned();
-
-		if (paylen != 0) {
-			break;
-		}
+		return -1;
 	}
 
-	xia::X_Result_Msg *r = xsm.mutable_x_result();
+	xsm.Clear();
 
-	if (paylen < 0) {
-		errno = r->err_code();
+	if ((numbytes = click_reply(sockfd, seq, &xsm)) < 0) {
+		if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
+			LOGF("Error retrieving recv data from Click: %s", strerror(errno));
+		}
+		return -1;
+	}
+	xrm = xsm.mutable_x_recvfrom();
+	payload = xrm->payload().c_str();
+	paylen = xrm->bytes_returned();
 
-	} else if ((unsigned)paylen <= len) {
+	if ((unsigned)paylen <= len) {
 		memcpy(rbuf, payload, paylen);
 
 	} else {
-		// TRUNCATE
+		// TRUNCATE and discard the extra tail
 		memcpy(rbuf, payload, len);
 		paylen = len;
 	}

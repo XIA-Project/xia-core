@@ -77,6 +77,33 @@ idrec ai_flags[] = {
 	FR(AI_V4MAPPED)
 };
 
+idrec proto_flags[] = {
+	FR(IPPROTO_IP),
+	FR(IPPROTO_ICMP),
+	FR(IPPROTO_IGMP),
+	FR(IPPROTO_IPIP),
+	FR(IPPROTO_TCP),
+	FR(IPPROTO_EGP),
+	FR(IPPROTO_PUP),
+	FR(IPPROTO_UDP),
+	FR(IPPROTO_IDP),
+	FR(IPPROTO_TP),
+	FR(IPPROTO_DCCP),
+	FR(IPPROTO_IPV6),
+	FR(IPPROTO_RSVP),
+	FR(IPPROTO_GRE),
+	FR(IPPROTO_ESP),
+	FR(IPPROTO_AH),
+	FR(IPPROTO_MTP),
+	FR(IPPROTO_BEETPH),
+	FR(IPPROTO_ENCAP),
+	FR(IPPROTO_PIM),
+	FR(IPPROTO_COMP),
+	FR(IPPROTO_SCTP),
+	FR(IPPROTO_UDPLITE),
+	FR(IPPROTO_RAW)
+};
+
 idrec fcntl_flags[] = {
 	FR(O_APPEND),
 	FR(O_ASYNC),
@@ -312,10 +339,20 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 
 int click_reply(int sock, unsigned seq, xia::XSocketMsg *msg)
 {
+	int rc;
 	char buf[XIA_INTERNAL_BUFSIZE];
 	unsigned buflen = sizeof(buf);
 
-	return click_get(sock, seq, buf, buflen, msg);
+	if ((rc = click_get(sock, seq, buf, buflen, msg)) >= 0) {
+
+		xia::X_Result_Msg *res = msg->mutable_x_result();
+
+		rc = res->return_code();
+		if (rc == -1)
+			errno = res->err_code();
+	}
+
+	return rc;
 }
 
 int click_status(int sock, unsigned seq)
