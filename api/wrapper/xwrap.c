@@ -594,8 +594,13 @@ static size_t _iovSize(struct iovec *iov, size_t iovcnt)
 {
 	size_t size = 0;
 
-	for (size_t i = 0; i < iovcnt; i++)
+	MSG("%zu: ");
+
+	for (size_t i = 0; i < iovcnt; i++) {
 		size += iov[i].iov_len;
+		fprintf(_log, "%d ", iov[i].iov_len);
+	}
+	fprintf(_log, "\n");
 
 	return size;
 }
@@ -1406,9 +1411,10 @@ ssize_t recv(int fd, void *buf, size_t n, int flags)
 		XFER_FLAGS(flags);
 		rc = Xrecv(fd, buf, n, flags);
 
-		char *c = (char *)buf;
-		c[rc] = 0;
-		MSG("data: %s\n", c);
+		MSG("bufsize = %zu\n", n);
+//		char *c = (char *)buf;
+//		c[rc] = 0;
+//		MSG("data: %s\n", c);
 
 	} else {
 		NOXIA();
@@ -1497,6 +1503,7 @@ ssize_t send(int fd, const void *buf, size_t n, int flags)
 	if (shouldWrap(fd)) {
 		XIAIFY();
 		XFER_FLAGS(flags);
+		MSG("buf size = %zu\n", n);
 
 		// FIXME: debugging code
 		char *p = (char *)buf;
@@ -1541,6 +1548,7 @@ ssize_t sendto(int fd, const void *buf, size_t n, int flags, const struct sockad
 			addr_len = sizeof(sax);
 			addr = (struct sockaddr*)&sax;
 		}
+		MSG("bufsize = %zu\n", n);
 
 		rc = Xsendto(fd, buf, n, flags, addr, addr_len);
 
