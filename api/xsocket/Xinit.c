@@ -33,6 +33,8 @@
 #include <pthread.h>
 #include <errno.h>
 #include <dlfcn.h> 
+#include <sys/ioctl.h>
+#include <net/if.h>
 
 #define LIBNAME	"libc.so.6"
 
@@ -50,6 +52,9 @@ select_t _f_select;
 poll_t _f_poll;
 sendto_t _f_sendto;
 recvfrom_t _f_recvfrom;
+
+size_t mtu_api;
+size_t mtu_wire = 1500;
 
 
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
@@ -86,27 +91,43 @@ void xapi_load_func_ptrs()
 		printf("can't find recvfrom!\n");
 }
 
+static size_t mtu()
+{
+	struct ifreq ifr;
 
-	/*!
-	** @brief Specify the location of the XSockets configuration file.
-	**
-	** Specifies the name of a config file to read, and (re)loads the
-	** conf file.
-	**
-	** @returns void
-	*/
-    void set_conf(const char *filename, const char* sectionname)
-    {
-		pthread_mutex_lock(&lock);
+	int sock = (_f_socket)(AF_INET, SOCK_DGRAM, 0);
 
-		char root[BUF_SIZE];
+	strncpy(ifr.ifr_name, "lo", IFNAMSIZ - 1);
+	ifr.ifr_addr.sa_family = AF_INET;
+	ioctl(sock, SIOCGIFMTU, &ifr);
+	(_f_close)(sock);
 
-		snprintf(__XSocketConf::master_conf, BUF_SIZE, "%s%s", XrootDir(root, BUF_SIZE), "/etc/xsockconf.ini");
-        __InitXSocket::read_conf(filename, sectionname);
-        xapi_load_func_ptrs();
-		__XSocketConf::initialized=1;
-		pthread_mutex_unlock(&lock);
-    }
+	LOGF("API MTU = %d\n", ifr.ifr_mtu);
+	return ifr.ifr_mtu;
+}
+
+
+/*!
+** @brief Specify the location of the XSockets configuration file.
+**
+** Specifies the name of a config file to read, and (re)loads the
+** conf file.
+**
+** @returns void
+*/
+void set_conf(const char *filename, const char* sectionname)
+{
+	pthread_mutex_lock(&lock);
+
+	char root[BUF_SIZE];
+
+	snprintf(__XSocketConf::master_conf, BUF_SIZE, "%s%s", XrootDir(root, BUF_SIZE), "/etc/xsockconf.ini");
+    __InitXSocket::read_conf(filename, sectionname);
+    xapi_load_func_ptrs();
+	__XSocketConf::initialized=1;
+	pthread_mutex_unlock(&lock);
+}
+
 
 } /* extern C */
 
@@ -174,6 +195,8 @@ __InitXSocket::__InitXSocket()
 	read_conf(inifile, section_name);
 
     xapi_load_func_ptrs();
+
+    mtu_api = mtu();
 }
 
 /*!
