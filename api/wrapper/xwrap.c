@@ -594,11 +594,11 @@ static size_t _iovSize(struct iovec *iov, size_t iovcnt)
 {
 	size_t size = 0;
 
-	MSG("%zu: ");
+	MSG("%zu: ", iovcnt);
 
 	for (size_t i = 0; i < iovcnt; i++) {
 		size += iov[i].iov_len;
-		fprintf(_log, "%d ", iov[i].iov_len);
+		fprintf(_log, "%zu ", iov[i].iov_len);
 	}
 	fprintf(_log, "\n");
 
