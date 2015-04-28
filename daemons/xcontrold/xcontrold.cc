@@ -465,6 +465,7 @@ int processSidDiscovery(ControlMessage msg)
         service_state.controllerAddr = controllerAddr;
         service_state.archType = archType;
         service_state.seq = seq;
+        service_state.percentage = 0;
         updateSidAdsTable(AD, SID, service_state);
     }
 
@@ -496,6 +497,7 @@ int processSidDiscovery(ControlMessage msg)
             //syslog(LOG_INFO, "Get re-broadcast SID %s@%s, p= %d,s=%d",SID.c_str(), AD.c_str(), priority, seq);
             service_state.archType = archType;
             service_state.seq = seq;
+            service_state.percentage = 0;
             updateSidAdsTable(AD, SID, service_state);
         }
     }
@@ -508,7 +510,286 @@ int processSidDiscovery(ControlMessage msg)
     return rc;
 }
 
-int processSidDecision(void)
+int querySidDecision(void)
+{
+    // New design. Report local information to sid controller. Then wait for answer.
+    syslog(LOG_DEBUG, "Sending SID decision queries for %lu SIDs", route_state.SIDADsTable.size() );
+    int rc = 1;
+    std::map<std::string, std::map<std::string, ServiceState> >::iterator it_sid;
+
+    for (it_sid = route_state.SIDADsTable.begin(); it_sid != route_state.SIDADsTable.end(); ++it_sid)
+    {
+        // for each SID, generate a report packet.
+        // packet format: SID/#options/optionAD1/Latency1,capacity1/optionAD2/Latency2...
+        // TODO: tell the sid controller local traffic rate
+        syslog(LOG_DEBUG, "Sending SID decision queries for %s", it_sid->first.c_str() );
+        ControlMessage msg(CTL_SID_DECISION_QUERY, route_state.myAD, route_state.myHID);
+        msg.append(it_sid->first); // SID
+        
+        std::map<std::string, ServiceState>::iterator it_ad;
+        std::string best_ad; // the cloest controller
+        int minimal_latency = 9999; // smallest latency
+        int num_ADs = 0; // number of available ADs
+
+        for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad)
+        { // first pass, count #ADs
+            if (it_ad->second.priority < 0){ // this is the poisoned one, skip
+                continue;
+            }
+            num_ADs++;
+        }
+        syslog(LOG_DEBUG, "Found %d replicas", num_ADs );
+        msg.append(num_ADs); // the number of ADs
+        for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad)
+        { // second pass, find the cloest one, creat the message
+            if (it_ad->second.priority < 0){ // this is the poisoned one, skip
+                continue;
+            }
+            int latency = 9998; // default, 9999-1ms
+            if (route_state.ADPathStates.find(it_ad->first) != route_state.ADPathStates.end()){
+                latency = route_state.ADPathStates[it_ad->first].delay;
+            }
+            minimal_latency = minimal_latency > latency?latency:minimal_latency;
+            best_ad = minimal_latency == latency?it_ad->first:best_ad; // find the cloest
+
+            msg.append(it_ad->first);// append AD 
+            msg.append(latency); // latency/ms
+            msg.append(it_ad->second.capacity); //capacity
+        }
+        syslog(LOG_DEBUG, "Going to send to %s", best_ad.c_str() );
+
+        // send the msg
+        if (best_ad == route_state.myAD){ // I'm the one
+            syslog(LOG_DEBUG, "Sending SID decision query locally");
+            int type;
+            msg.read(type); // remove it to match the correct format for the process function
+            processSidDecisionQuery(msg); // process locally
+
+        }
+        else
+        {
+            sockaddr_x ddag;
+            Graph g = Node() * Node(best_ad) * Node(SID_XCONTROL);
+            g.fill_sockaddr(&ddag);
+            int temprc = msg.send(route_state.sock, &ddag);
+            if (temprc < 0) {
+                syslog(LOG_ERR, "error sending SID decision query to %s", best_ad.c_str());
+            }
+            rc = (temprc < rc)? temprc : rc;
+            syslog(LOG_DEBUG, "sent SID %s decision query to %s", it_sid->first.c_str(),
+                                     best_ad.c_str());
+        }
+    }
+    return rc;
+}
+
+int processSidDecisionQuery(ControlMessage msg)
+{
+    // work out a decision for each query
+    // TODO: This could/should be async
+    syslog(LOG_DEBUG, "Processing SID decision query");
+    int rc = 1;
+    string srcAD, srcHID;
+
+    string AD, SID;
+    int records = 0;
+    int latency;
+    int capacity;
+
+    msg.read(srcAD);
+    msg.read(srcHID);
+    syslog(LOG_INFO, "Get SID query msg from %s", srcAD.c_str());
+
+    // process the entries: AD-latency pairs
+    msg.read(SID); // what sid
+
+    // check if I am the SID controller
+    std::map<std::string, ServiceState>::iterator it_sid;
+    it_sid = route_state.LocalSidList.find(SID);
+    if (it_sid == route_state.LocalSidList.end()){
+        // not found, I'm not the right controller to talk to
+        syslog(LOG_INFO, "I'm not the controller for %s", SID.c_str());
+        // TODO: reply error msg to the source
+    }
+    msg.read(records);//number of entries
+    syslog(LOG_INFO, "Get %d latencies for %s", records, SID.c_str());
+
+    std::map<std::string, DecisionIO> decisions;
+    for (int i = 0; i < records; ++i)
+    {
+        msg.read(AD);
+        msg.read(latency);
+        msg.read(capacity);
+        DecisionIO dio;
+        dio.capacity = capacity;
+        dio.latency = latency;
+        dio.percentage = 0;
+        decisions[AD] = dio;
+        syslog(LOG_INFO, "Get %d ms for %s", latency, AD.c_str());
+    }
+    // compute the weights
+    // rate is not implemented yet
+    it_sid->second.decision(srcAD, 0, &decisions);
+
+    //TODO: reply the query
+    ControlMessage re_msg(CTL_SID_DECISION_ANSWER, route_state.myAD, route_state.myHID);
+    re_msg.append(SID); // SID
+    re_msg.append(decisions.size()); // SID
+    std::map<std::string, DecisionIO>::iterator it_ds;
+    for (it_ds = decisions.begin(); it_ds != decisions.end(); ++it_ds){
+        re_msg.append(it_ds->first);
+        re_msg.append(it_ds->second.percentage);
+    }
+
+    // send the msg
+    if (srcAD == route_state.myAD){ // I'm the one
+        syslog(LOG_DEBUG, "Sending SID decision locally");
+        int type;
+        re_msg.read(type); // remove it to match the correct format for the process function
+        processSidDecisionAnswer(re_msg); // process locally
+    }
+    else
+    {
+        sockaddr_x ddag;
+        Graph g = Node() * Node(srcAD) * Node(SID_XCONTROL);
+        g.fill_sockaddr(&ddag);
+        int temprc = re_msg.send(route_state.sock, &ddag);
+        if (temprc < 0) {
+            syslog(LOG_ERR, "error sending SID decision answer to %s", srcAD.c_str());
+        }
+        rc = (temprc < rc)? temprc : rc;
+        syslog(LOG_DEBUG, "sent SID %s decision answer to %s", SID.c_str(), srcAD.c_str());
+    }
+
+    return rc;
+
+}
+
+/*Pre-define some decision function here*/
+int Latency_first(std::string srcAD, int rate, std::map<std::string, DecisionIO>* decision)
+{
+    syslog(LOG_DEBUG, "Decision function: Latency_first for %s", srcAD.c_str());
+    if (srcAD == "" || rate < 0){
+        syslog(LOG_INFO, "Error parameters");
+        return -1;
+    }
+    string best_ad;
+    std::map<std::string, DecisionIO>::iterator it_ad;
+    int minimal_latency = 9999; // smallest latency
+
+    for (it_ad = decision->begin(); it_ad != decision->end(); ++it_ad)
+    { // first pass, just find the minimal latency
+        minimal_latency = minimal_latency > it_ad->second.latency?it_ad->second.latency:minimal_latency;
+        best_ad = minimal_latency == it_ad->second.latency?it_ad->first:best_ad; // find the closest
+    }
+
+    for (it_ad = decision->begin(); it_ad != decision->end(); ++it_ad)
+    { // second pass, assign weight
+        if (it_ad->first ==  best_ad){
+            it_ad->second.percentage = 100;
+        }
+        else{
+            it_ad->second.percentage = 0;
+        }
+    }
+    return 0;
+}
+
+int Load_balance(std::string srcAD, int rate, std::map<std::string, DecisionIO>* decision)
+{
+    if (srcAD == "" || rate < 0){
+        syslog(LOG_INFO, "Error parameters");
+        return -1;
+    }
+    if (decision == NULL || decision->empty()){
+        syslog(LOG_INFO, "Get 0 entries to decide!");
+        return -1;
+    }
+    std::map<std::string, DecisionIO>::iterator it_ad;
+    int weight = 0;
+
+    for (it_ad = decision->begin(); it_ad != decision->end(); ++it_ad)
+    { // first pass, count capacity
+        weight += it_ad->second.capacity;
+    }
+    for (it_ad = decision->begin(); it_ad != decision->end(); ++it_ad)
+    { // second pass, assign weight
+        it_ad->second.percentage = 100.0 * it_ad->second.capacity / weight + 0.5; //round
+    }
+
+    return 0;
+}
+
+
+int processSidDecisionAnswer(ControlMessage msg)
+{ // When getting the answer, set local weight
+  // the answer is per SID, when to update routing table? 
+    syslog(LOG_DEBUG, "Processing SID decision");
+    string srcAD, srcHID;
+    string AD, SID;
+
+    int percentage = 0;
+    int records = 0;
+
+    msg.read(srcAD);
+    msg.read(srcHID);
+
+    // process the entries: AD-latency pairs
+    msg.read(SID); // what sid
+    msg.read(records); // number of records
+    syslog(LOG_INFO, "Get %s, %d answer msg from %s", SID.c_str(), records, srcAD.c_str());
+
+    std::map<std::string, std::map<std::string, ServiceState> >::iterator it_sid;
+    it_sid = route_state.SIDADsTable.find(SID);
+    if (it_sid == route_state.SIDADsTable.end()){
+        syslog(LOG_INFO, "No record for %s", SID.c_str());
+        return -1;
+    }
+    std::map<std::string, ServiceState>::iterator it_ad;
+    // check the to-be-deleted entries first
+    for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad){
+        if (it_ad->second.priority < 0){
+            it_ad->second.percentage = -1;
+        }
+    } 
+
+    for (int i = 0; i < records; i++){
+        msg.read(AD); 
+        msg.read(percentage);
+        syslog(LOG_INFO, "Get %s, %d %%", AD.c_str(), percentage);
+        std::map<std::string, ServiceState>::iterator it_ad = it_sid->second.find(AD);
+
+        it_ad->second.valid = true; // valid is not implemented yet
+        if (it_ad == it_sid->second.end()){
+            syslog(LOG_INFO, "No record for %s@%s", SID.c_str(), AD.c_str());
+        }
+        else{
+            it_ad->second.percentage = percentage;
+            if (percentage > 100){
+                syslog(LOG_INFO, "Invalid weight: %d", percentage);
+            }
+            if (it_ad->second.priority < 0){
+                syslog(LOG_INFO, "To-be-deleted record received, %s@%s, it's OK", SID.c_str(), AD.c_str());
+            }
+        }
+    }
+/*
+    for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad){
+        syslog(LOG_INFO, "DEBUG: %s weight: %d",it_ad->first.c_str(), it_ad->second.percentage );
+    } 
+*/
+    // for debug
+    // dumpSidAdsTable();
+
+    // update every router
+    // temporally put it here.
+    sendSidRoutingDecision();
+
+    return 0;
+}
+
+
+int processSidDecision(void) // to be deleted
 {
     // make decision based on principles like highest priority first, load balancing, nearest...
     // Using function: (capacity^factor/link^factor)*priority for weight
@@ -582,6 +863,7 @@ int sendSidRoutingDecision(void)
     // for each router
     // Now we just send the identical decision to every router. The routers will reuse their
     // own routing table to interpret the decision
+    syslog(LOG_DEBUG, "Processing SID decision routes");
     int rc = 1;
 
     // remap the SIDADsTable
@@ -887,6 +1169,12 @@ int processMsg(std::string msg)
             break;
         case CTL_SID_MANAGE_KA:
             rc = processServiceKeepAlive(m);
+            break;
+        case CTL_SID_DECISION_QUERY:
+            rc = processSidDecisionQuery(m);
+            break;
+        case CTL_SID_DECISION_ANSWER:
+            rc = processSidDecisionAnswer(m);
             break;
         default:
             perror("unknown routing message");
@@ -1479,7 +1767,7 @@ void set_controller_conf(const char* myhostname)
         strcpy(section_name, "default");
     }
     // read the values
-    EXPIRE_TIME = ini_getl(section_name, "expert_time", EXPIRE_TIME_D, full_path);
+    EXPIRE_TIME = ini_getl(section_name, "expire_time", EXPIRE_TIME_D, full_path);
     HELLO_INTERVAL = ini_getf(section_name, "hello_interval", HELLO_INTERVAL_D, full_path);
     LSA_INTERVAL = ini_getf(section_name, "LSA_interval", LSA_INTERVAL_D, full_path);
     SID_DISCOVERY_INTERVAL = ini_getf(section_name, "SID_discovery_interval", SID_DISCOVERY_INTERVAL_D, full_path);
@@ -1563,6 +1851,19 @@ void set_sid_conf(const char* myhostname)
                 }
             }
             service_state.archType = ini_getl(section_name, "archType", 0, full_path);
+            int decision_type = ini_getl(section_name, "decisiontype", 0, full_path);
+            switch (decision_type)
+            {
+                case LATENCY_FIRST:
+                    service_state.decision = &Latency_first;
+                    break;
+                case PURE_LOADBALANCE:
+                    service_state.decision = &Load_balance;
+                    break;
+                default:
+                    syslog(LOG_DEBUG, "unknow decision function %s\n", sid);
+            }
+                
             //fprintf(stderr, "read state%s, %d, %d, %s\n", sid, service_state.capacity, service_state.isController, service_state.controllerAddr.c_str());
             route_state.LocalSidList[service_sid] = service_state;
         }
@@ -1659,7 +1960,8 @@ int main(int argc, char *argv[])
         }
         if (route_state.send_sid_decision == true) {
             route_state.send_sid_decision = false;
-            processSidDecision();
+            //processSidDecision();
+            querySidDecision();
         }
 		FD_ZERO(&socks);
 		FD_SET(route_state.sock, &socks);

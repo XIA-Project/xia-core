@@ -41,23 +41,37 @@
 #define SID_XCONTROL "SID:1110000000000000000000000000000000001114"
 #define NULL_4ID "IP:4500000000010000fafa00000000000000000000"
 
-#define SERVICE_ARCH_FLAT 0
-#define SERVICE_ARCH_CENTRAL 1 // AD controller report the distance information to the service controller
-#define SERVICE_ARCH_REACTIVE 2 // AD controller send reversed discovery message to each service instance
-#define SERVICE_ARCH_HIERARCHY 3
+
+// predefine some decision function
+#define LATENCY_FIRST  0
+#define PURE_LOADBALANCE 1 
+#define USER_DEFINDED_FUN_1 2 
+#define USER_DEFINDED_FUN_2 3
+
+typedef struct DecisionIO // the struct for decison input and output
+{
+    int capacity;
+    int latency;
+    int percentage;
+
+} DecisionIO;
 
 typedef struct ServiceState
 {
     // public information
     int seq;
-    int priority;
-    int capacity;
-    int capacity_factor;
-    int link_factor;
+    int priority; // to be moved to controller-only
+    int capacity; // should be a controller-only info, but we still announce it
+    int capacity_factor; // to be moved to controller-only
+    int link_factor; // to be moved to controller-only
     int isController; // whether this instance is also a service controller, 0 for no
     std::string controllerAddr; // the address of the service controller
     int archType; // type of architecture of this service
     std::map<std::string, int> delays; // the delays from ADs to the instance {AD:delay}
+
+    // SID-controller-only info
+    // the decision funtion pointer: srcAD, rate, *decisionPut
+    int (*decision)(std::string, int, std::map<std::string, DecisionIO>*);
 
     // local information used for store decision, no re-broadcast
     double weight; // calculated weight
@@ -123,7 +137,7 @@ typedef struct RouteState {
 	std::map<std::string, int32_t> ADLastSeqTable; // router-HID to their last-seq number for ADs
 
     std::map<std::string, ADPathState> ADPathStates; // network 'weather' report service
-    std::map<std::string, ServiceState> LocalSidList; // services provided by this sid;
+    std::map<std::string, ServiceState> LocalSidList; // services provided by this AD
     std::map<std::string, ServiceController> LocalServiceControllers; // AD controller acts as service controllers for local SIDs that need to be the master node (runs controller) for now TODO: an independent service controller daemon
     std::map<std::string, std::map<std::string, ServiceState> > SIDADsTable; //discovery plane: what the controller discovered
 
@@ -169,7 +183,11 @@ int sendSidDiscovery();
 int processSidDiscovery(ControlMessage msg);
 
 // Decision plane: provide choices for routing to a SID
-int processSidDecision(void);
+int processSidDecisionQuery(ControlMessage msg);
+
+int processSidDecisionAnswer(ControlMessage msg);
+
+int processSidDecision(void); // to be removed
 
 // interpret the decision for each router and send it to them
 int sendSidRoutingDecision(void);
@@ -205,3 +223,8 @@ void set_controller_conf(const char* myhostname);
 
 // read config file to get local SIDs
 void set_sid_conf(const char* myhostname);
+
+// several pre-defined decision functions
+int Latency_first(std::string srcAD, int rate, std::map<std::string, DecisionIO>* decsion);
+
+int Load_balance(std::string srcAD, int rate, std::map<std::string, DecisionIO>* decsion);

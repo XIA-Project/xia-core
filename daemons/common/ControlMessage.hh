@@ -20,6 +20,8 @@ using namespace std;
 #define CTL_SID_RE_DISCOVERY  8 // send to service controller
 #define CTL_AD_PATH_STATE_PING 9
 #define CTL_AD_PATH_STATE_PONG 10
+#define CTL_SID_DECISION_QUERY 11
+#define CTL_SID_DECISION_ANSWER 12
 
 class ControlMessage
 {
