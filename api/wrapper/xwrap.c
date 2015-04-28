@@ -1411,10 +1411,7 @@ ssize_t recv(int fd, void *buf, size_t n, int flags)
 		XFER_FLAGS(flags);
 		rc = Xrecv(fd, buf, n, flags);
 
-		MSG("bufsize = %zu\n", n);
-//		char *c = (char *)buf;
-//		c[rc] = 0;
-//		MSG("data: %s\n", c);
+		MSG("fd:%d size:%zu returned:%d\n", fd, n, rc);
 
 	} else {
 		NOXIA();
@@ -1445,9 +1442,9 @@ ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, 
 			addrx = &sax;
 		}
 
-		MSG("fd:%d size:%zu addr:%p\n", fd, n, addr);
-
 		rc = Xrecvfrom(fd, buf, n, flags, (struct sockaddr*)addrx, &slen);
+
+		MSG("fd:%d size:%zu returned:%d\n", fd, n, rc);
 
 		if (rc >= 0 && do_address) {
 			// convert the sockaddr to a sockaddr_x
@@ -1457,6 +1454,79 @@ ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, 
 	} else {
 		NOXIA();
 		rc = __real_recvfrom(fd, buf, n, flags, addr, addr_len);
+	}
+
+	return rc;
+}
+
+
+
+ssize_t recvmsg(int fd, struct msghdr *msg, int flags)
+{
+	int rc;
+	TRACE();
+
+	if (flags) {
+		XFER_FLAGS(flags);
+	}
+
+	MSG("msghdr:\n name:%p namelen:%zu iov:%p iovlen:%zu control:%p clen:%zu flags:%08x\n",
+	msg->msg_name,
+	(size_t)msg->msg_namelen,
+	msg->msg_iov,
+	(size_t)msg->msg_iovlen,
+	msg->msg_control,
+	(size_t)msg->msg_controllen,
+	msg->msg_flags);
+
+	if (isXsocket(fd)) {
+		XIAIFY();
+
+		int connected = (getConnState(fd) == CONNECTED);
+
+		if (msg == NULL || msg->msg_iov == NULL) {
+			errno = EFAULT;
+			return -1;
+		}
+
+		if (getSocketType(fd) != SOCK_DGRAM) {
+			errno = ENOTSOCK;
+			return -1;
+		}
+
+		size_t size = _iovSize(msg->msg_iov, msg->msg_iovlen);
+		char *buf = (char *)malloc(size);
+
+		if (connected) {
+			rc = recv(fd, buf, size, flags);
+		} else {
+
+			struct sockaddr *sa = (struct sockaddr *)msg->msg_name;
+			socklen_t *len = (sa != NULL ? &msg->msg_namelen : NULL);
+
+			rc = recvfrom(fd, buf, size, flags, sa, len);
+			MSG("returned:%d\n", rc);
+		}
+
+		if (rc > 0) {
+			size = _iovUnpack(msg->msg_iov, msg->msg_iovlen, buf, rc);
+			if (size < (socklen_t)rc) {
+				// set the truncated flag
+				msg->msg_flags = MSG_TRUNC;
+			}
+
+		} else if (rc < 0) {
+			msg->msg_flags = MSG_ERRQUEUE; // is this ok?
+
+		} else {
+			msg->msg_flags = 0;
+		}
+
+		free(buf);
+
+	} else {
+		NOXIA();
+		rc = __real_recvmsg(fd, msg, flags);
 	}
 
 	return rc;
@@ -1503,21 +1573,79 @@ ssize_t send(int fd, const void *buf, size_t n, int flags)
 	if (shouldWrap(fd)) {
 		XIAIFY();
 		XFER_FLAGS(flags);
-		MSG("buf size = %zu\n", n);
-
-		// FIXME: debugging code
-		char *p = (char *)buf;
-		p[n] = 0;
-		MSG("%s\n", p);
-		// end debug
+		MSG("sending:%zu\n", n);
 
 		rc = Xsend(fd, buf, n, flags);
-
 
 	} else {
 		NOXIA();
 		rc = __real_send(fd, buf, n, flags);
 	}
+	return rc;
+}
+
+
+
+ssize_t sendmsg(int fd, const struct msghdr *msg, int flags)
+{
+	int rc;
+
+	TRACE();
+
+	 MSG("fd:%d flags:%08x\n", fd, flags);
+	MSG("msghdr:\n name:%p namelen:%zu iov:%p iovlen:%zu control:%p clen:%zu flags:%08x\n",
+	msg->msg_name,
+	(size_t)msg->msg_namelen,
+	msg->msg_iov,
+	(size_t)msg->msg_iovlen,
+	msg->msg_control,
+	(size_t)msg->msg_controllen,
+	msg->msg_flags);
+
+	if (isXsocket(fd)) {
+		XIAIFY();
+		int connected = (getConnState(fd) == CONNECTED);
+
+		if (msg == NULL || msg->msg_iov == NULL) {
+			errno = EFAULT;
+			return -1;
+		}
+
+		if (getSocketType(fd) != SOCK_DGRAM) {
+			errno = ENOTSOCK;
+			return -1;
+		}
+
+		if (!connected && msg->msg_name == NULL) {
+			errno = EFAULT;
+			return -1;
+		}
+
+		if (msg->msg_control != NULL) {
+			WARNING("XIA unable to handle control info.");
+			rc = EOPNOTSUPP;
+			return -1;
+		}
+
+		// let's try to send this thing!
+		char *buf = NULL;
+		size_t size = _iovPack(msg->msg_iov, msg->msg_iovlen, &buf);
+
+		MSG("sending:%zu\n", size);
+
+		if (connected) {
+			rc = send(fd, buf, size, flags);
+
+		} else {
+			rc = sendto(fd, buf, size, flags, (struct sockaddr*)msg->msg_name, msg->msg_namelen);
+		}
+		free(buf);
+
+	} else {
+		NOXIA();
+		rc = __real_sendmsg(fd, msg, flags);
+	}
+
 	return rc;
 }
 
@@ -1548,7 +1676,7 @@ ssize_t sendto(int fd, const void *buf, size_t n, int flags, const struct sockad
 			addr_len = sizeof(sax);
 			addr = (struct sockaddr*)&sax;
 		}
-		MSG("bufsize = %zu\n", n);
+		MSG("sending:%zu\n", n);
 
 		rc = Xsendto(fd, buf, n, flags, addr, addr_len);
 
@@ -1843,143 +1971,4 @@ int getservbyport_r (int port, const char *proto, struct servent *result_buf, ch
 	TRACE();
 	ALERT();
 	return __real_getservbyport_r(port, proto, result_buf, buf, buflen, result);
-}
-
-
-
-ssize_t recvmsg(int fd, struct msghdr *msg, int flags)
-{
-	int rc;
-	TRACE();
-
-	if (flags) {
-		XFER_FLAGS(flags);
-	}
-	MSG("msghdr:\n name:%p namelen:%zu iov:%p iovlen:%zu control:%p clen:%zu flags:%08x",
-	msg->msg_name,
-	(size_t)msg->msg_namelen,
-	msg->msg_iov,
-	(size_t)msg->msg_iovlen,
-	msg->msg_control,
-	(size_t)msg->msg_controllen,
-	msg->msg_flags);
-
-	if (isXsocket(fd)) {
-		XIAIFY();
-
-		int connected = (getConnState(fd) == CONNECTED);
-
-		if (msg == NULL || msg->msg_iov == NULL) {
-			errno = EFAULT;
-			return -1;
-		}
-
-		if (getSocketType(fd) != SOCK_DGRAM) {
-			// FIXME: may need to add support for this later
-			errno = ENOTSOCK;
-			return -1;
-		}
-
-		// make the buffer larger than we expect in case we have to deal with
-		// a TRUNC issue as I don't want any extra data hanging out in the
-		// saved data
-		size_t size = _iovSize(msg->msg_iov, msg->msg_iovlen) * 2;
-		char *buf = (char *)malloc(size);
-
-		if (connected) {
-			rc = recv(fd, buf, size, flags);
-		} else {
-
-			struct sockaddr *sa = (struct sockaddr *)msg->msg_name;
-			socklen_t *len = (sa != NULL ? &msg->msg_namelen : NULL);
-
-			rc = recvfrom(fd, buf, size, flags, sa, len);
-		}
-
-		if (rc > 0) {
-			size = _iovUnpack(msg->msg_iov, msg->msg_iovlen, buf, rc);
-			if (size < (socklen_t)rc) {
-				// set the truncated flag
-				msg->msg_flags = MSG_TRUNC;
-			}
-
-		} else if (rc < 0) {
-			msg->msg_flags = MSG_ERRQUEUE; // is this ok?
-
-		} else {
-			msg->msg_flags = 0;
-		}
-
-		free(buf);
-
-	} else {
-		NOXIA();
-		rc = __real_recvmsg(fd, msg, flags);
-	}
-
-	return rc;
-}
-
-
-
-ssize_t sendmsg(int fd, const struct msghdr *msg, int flags)
-{
-	int rc;
-
-	TRACE();
-
-	 MSG("fd:%d flags:%08x\n", fd, flags);
-	MSG("msghdr:\n name:%p namelen:%zu iov:%p iovlen:%zu control:%p clen:%zu flags:%08x",
-	msg->msg_name,
-	(size_t)msg->msg_namelen,
-	msg->msg_iov,
-	(size_t)msg->msg_iovlen,
-	msg->msg_control,
-	(size_t)msg->msg_controllen,
-	msg->msg_flags);
-
-	if (isXsocket(fd)) {
-		XIAIFY();
-		int connected = (getConnState(fd) == CONNECTED);
-
-		if (msg == NULL || msg->msg_iov == NULL) {
-			errno = EFAULT;
-			return -1;
-		}
-
-		if (getSocketType(fd) != SOCK_DGRAM) {
-			// FIXME: may need to add support for this later
-			errno = ENOTSOCK;
-			return -1;
-		}
-
-		if (!connected && msg->msg_name == NULL) {
-			errno = EFAULT;
-			return -1;
-		}
-
-		if (msg->msg_control != NULL) {
-			WARNING("XIA unable to handle control info.");
-			rc = EOPNOTSUPP;
-			return -1;
-		}
-
-		// let's try to send this thing!
-		char *buf = NULL;
-		size_t size = _iovPack(msg->msg_iov, msg->msg_iovlen, &buf);
-
-		if (connected) {
-			rc = send(fd, buf, size, flags);
-
-		} else {
-			rc = sendto(fd, buf, size, flags, (struct sockaddr*)msg->msg_name, msg->msg_namelen);
-		}
-		free(buf);
-
-	} else {
-		NOXIA();
-		rc = __real_sendmsg(fd, msg, flags);
-	}
-
-	return rc;
 }
