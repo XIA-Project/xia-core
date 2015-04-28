@@ -60,6 +60,8 @@
 #include <map>
 #include <vector>
 
+//#define PRINTBUFS
+
 // defines **********************************************************
 #define ADDR_MASK  "169.254.%d.%d"   // fake addresses created in this subnet
 #define DEVICENAME "eth0"
@@ -1348,8 +1350,7 @@ int listen(int fd, int n)
 	if (isXsocket(fd)) {
 		XIAIFY();
 
-		// FIXME: uncomment when ready to test listen logic
-		// rc = Xlisten(fd, n);
+		rc = Xlisten(fd, n);
 
 	} else {
 		NOXIA();
@@ -1381,7 +1382,7 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
 
 
 
-ssize_t read(int fd, void *buf, size_t count)
+ssize_t read(int fd, void *buf, size_t n)
 {
 	size_t rc;
 
@@ -1390,11 +1391,18 @@ ssize_t read(int fd, void *buf, size_t count)
 	if (isXsocket(fd)) {
 		XIAIFY();
 
-		rc = Xrecv(fd, buf, count, 0);
+		rc = Xrecv(fd, buf, n, 0);
+
+#ifdef PRINTBUFS
+		char *s = (char *)malloc(n+1);
+		memcpy(s, buf, n);
+		s[n] = 0;
+		MSG("%s\n", s);
+#endif
 
 	} else {
 		NOXIA();
-		rc = __real_read(fd, buf, count);
+		rc = __real_read(fd, buf, n);
 	}
 	return rc;
 }
@@ -1412,6 +1420,13 @@ ssize_t recv(int fd, void *buf, size_t n, int flags)
 		rc = Xrecv(fd, buf, n, flags);
 
 		MSG("fd:%d size:%zu returned:%d\n", fd, n, rc);
+
+#ifdef PRINTBUFS
+		char *s = (char *)malloc(n+1);
+		memcpy(s, buf, n);
+		s[n] = 0;
+		MSG("%s\n", s);
+#endif
 
 	} else {
 		NOXIA();
@@ -1575,6 +1590,12 @@ ssize_t send(int fd, const void *buf, size_t n, int flags)
 		XFER_FLAGS(flags);
 		MSG("sending:%zu\n", n);
 
+#ifdef PRINTBUFS
+		char *s = (char *)malloc(n+1);
+		memcpy(s, buf, n);
+		s[n] = 0;
+		MSG("%s\n", s);
+#endif
 		rc = Xsend(fd, buf, n, flags);
 
 	} else {
@@ -1808,7 +1829,7 @@ int socketpair(int domain, int type, int protocol, int fds[2])
 
 
 
-ssize_t write(int fd, const void *buf, size_t count)
+ssize_t write(int fd, const void *buf, size_t n)
 {
 	size_t rc;
 
@@ -1817,11 +1838,18 @@ ssize_t write(int fd, const void *buf, size_t count)
 	if (isXsocket(fd)) {
 		XIAIFY();
 
-		rc = Xsend(fd, buf, count, 0);
+#ifdef PRINTBUFS
+		char *s = (char *)malloc(n+1);
+		memcpy(s, buf, n);
+		s[n] = 0;
+		MSG("%s\n", s);
+#endif
+
+		rc = Xsend(fd, buf, n, 0);
 
 	} else {
 		NOXIA();
-		rc = __real_write(fd, buf, count);
+		rc = __real_write(fd, buf, n);
 	}
 	return rc;
 }
