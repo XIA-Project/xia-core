@@ -1329,7 +1329,13 @@ int getsockopt(int fd, int level, int optname, void *optval, socklen_t *optlen)
 		OPT_VALUE(optname);
 		rc =  Xgetsockopt(fd, optname, optval, optlen);
 
-		if (rc < 0) {
+		if (rc == 0) {
+			if (optname == SO_DOMAIN && *(int*)optval == AF_XIA) {
+				// keep hiding xia from the application
+				*(int*)optval = AF_INET;
+			}
+		} else {
+
 			// TODO: add code here to return success for options we can safely ignore
 		}
 
