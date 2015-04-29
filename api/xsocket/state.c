@@ -59,10 +59,6 @@ public:
 	void setRecvTimeout(struct timeval *timeout) { m_timeout.tv_sec = timeout->tv_sec; m_timeout.tv_usec = timeout->tv_usec; };
 	void getRecvTimeout(struct timeval *timeout) {timeout->tv_sec = m_timeout.tv_sec; timeout->tv_usec = m_timeout.tv_usec; };
 
-	void setError(int error) { m_error = error; };
-	int getError() { int e = m_error; m_error = 0;return e; };
-//	int getError() { int e = m_error; m_error = 0; return e; };
-
 	const sockaddr_x *peer() { return m_peer; };
 	int setPeer(const sockaddr_x *peer);
 
@@ -80,7 +76,6 @@ private:
 	int m_connected;
 	int m_blocking;
 	int m_debug;
-	int m_error;
 	sockaddr_x *m_peer;
 	char *m_temp_sid;
 	int m_sid_assigned;
@@ -122,7 +117,6 @@ void SocketState::init()
 	m_sid_assigned = 0;
 	m_sequence = 1;
 	m_debug = 0;
-	m_error = 0;
 	m_timeout.tv_sec = 0;
 	m_timeout.tv_usec = 0;
 	pthread_mutex_init(&m_sequence_lock, NULL);
@@ -347,6 +341,8 @@ void setBlocking(int sock, int blocking)
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
 		sstate->setBlocking(blocking);
+
+	Xsetsockopt(sock, XOPT_BLOCK, (void*)&blocking, sizeof(blocking));
 }
 
 int getDebug(int sock)
@@ -379,22 +375,6 @@ void getRecvTimeout(int sock, struct timeval *timeout)
 		sstate->getRecvTimeout(timeout);
 	else
 		timeout->tv_sec = timeout->tv_usec = 0;
-}
-
-void setError(int sock, int error)
-{
-	SocketState *sstate = SocketMap::getMap()->get(sock);
-	if (sstate)
-		sstate->setError(error);
-}
-
-int getError(int sock)
-{
-	SocketState *sstate = SocketMap::getMap()->get(sock);
-	if (sstate)
-		return sstate->getError();
-	else
-		return 0;
 }
 
 void setSocketType(int sock, int tt)

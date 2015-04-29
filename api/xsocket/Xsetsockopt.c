@@ -183,20 +183,22 @@ int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen)
 			break;
 		}
 
-		// handle these values in the API ***************************
+		case XOPT_BLOCK:
+		{
+			rc = ssoPutInt(sockfd, optname, (const int *)optval, optlen);
+			break;
+		}
+
+		// this is handled in the API & in click ********************
 
 		case SO_DEBUG:
-			if (ssoCheckSize(&optlen, sizeof(int)) < 0)
+			if (ssoCheckSize(&optlen, sizeof(int)) < 0) {
 				rc = -1;
-			else
+			}
+			else {
 				setDebug(sockfd, *(int *)optval);
-			break;
-
-		case SO_ERROR:
-			if (ssoCheckSize(&optlen, sizeof(int)) < 0)
-				rc = -1;
-			else
-				setError(sockfd, *(int *)optval);
+				rc = ssoPutInt(sockfd, optname, (const int *)optval, optlen);
+			}
 			break;
 
 
@@ -326,25 +328,18 @@ int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen)
 		case XOPT_HLIM:
 		case XOPT_NEXT_PROTO:
 		case SO_ACCEPTCONN:
+		case SO_ERROR:
 			rc = ssoGetInt(sockfd, optname, (int *)optval, optlen);
 			break;
 
 		case SO_DEBUG:
+			// stored in the API & in click, return from the API
 			rc = ssoGetParam(getDebug(sockfd), optval, optlen);
 			break;
 
 		case SO_DOMAIN:
 			// FIXME: conver this to AF_INET in wrapper
 			rc = ssoGetParam(AF_XIA, optval, optlen);
-			break;
-
-		case SO_ERROR:
-			rc = ssoGetParam(getDebug(sockfd), optval, optlen);
-			if (rc == 0) {
-				// FIXME: get the real error from connect
-				*(int *)optval = 0;
-				// *(int *)optval = getError(sockfd);
-			}
 			break;
 
 		case SO_PROTOCOL:

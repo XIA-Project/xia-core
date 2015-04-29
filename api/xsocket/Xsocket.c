@@ -104,8 +104,6 @@ int Xsocket(int family, int transport_type, int protocol)
 	}
 
 	allocSocketState(sockfd, transport_type);
-	setBlocking(sockfd, block);
-	setProtocol(sockfd, protocol);
 
 	// protobuf message
 	xia::XSocketMsg xsm;
@@ -128,6 +126,8 @@ int Xsocket(int family, int transport_type, int protocol)
 	}
 
 	if (rc == 0) {
+		setBlocking(sockfd, block);
+		setProtocol(sockfd, protocol);
 		return sockfd;
 	}
 

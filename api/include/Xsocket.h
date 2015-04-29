@@ -109,6 +109,7 @@ typedef struct {
 // Xsetsockopt options
 #define XOPT_HLIM		0x07001	// Hop Limit TTL
 #define XOPT_NEXT_PROTO	0x07002	// change the next proto field of the XIA header
+#define XOPT_BLOCK		0x07003
 
 // XIA protocol types
 #define XPROTO_XIA_TRANSPORT	0x0e

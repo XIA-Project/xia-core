@@ -74,11 +74,12 @@ int Xfcntl(int sockfd, int cmd, ...)
 			va_start(args, cmd);
 			int f = va_arg(args, int);
 			va_end(args);
-			if (f & O_NONBLOCK) {
-				LOGF("Blocking set to %s", (f & O_NONBLOCK) ? "false" : "true");
-				setBlocking(sockfd, (f & O_NONBLOCK) == 0);
-				rc = 0;
-			} 
+
+			int block = (f & O_NONBLOCK) ? false : true;
+
+			LOGF("Blocking set to %s", block ? "true" : "false");
+			setBlocking(sockfd, block);
+			rc = 0;
 
 			if (f & ~O_NONBLOCK) {
 				LOGF("unsupported flag(s) found (%s) ignoring...", fcntlFlags(f & ~O_NONBLOCK));

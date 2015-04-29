@@ -36,6 +36,7 @@ using namespace std;
 // FIXME: put these in a std location that can be found by click and the API
 #define XOPT_HLIM 0x07001
 #define XOPT_NEXT_PROTO 0x07002
+#define XOPT_BLOCK 0x07003
 
 #ifndef DEBUG
 #define DEBUG 0
@@ -331,7 +332,7 @@ class XTRANSPORT : public Element {
 	 * Socket states
 	 * ========================= */
     struct sock {
-		sock(): port(0), isConnected(false), initialized(false), full_src_dag(false), timer_on(false), synack_waiting(false), dataack_waiting(false), teardown_waiting(false), migrateack_waiting(false), send_buffer_size(DEFAULT_SEND_WIN_SIZE), recv_buffer_size(DEFAULT_RECV_WIN_SIZE), send_base(0), next_send_seqnum(0), recv_base(0), next_recv_seqnum(0), dgram_buffer_start(0), dgram_buffer_end(-1), recv_buffer_count(0), recv_pending(false), polling(0), did_poll(false) {};
+		sock(): port(0), so_error(0), isConnected(false), isBlocking(true), initialized(false), full_src_dag(false), timer_on(false), synack_waiting(false), dataack_waiting(false), teardown_waiting(false), migrateack_waiting(false), send_buffer_size(DEFAULT_SEND_WIN_SIZE), recv_buffer_size(DEFAULT_RECV_WIN_SIZE), send_base(0), next_send_seqnum(0), recv_base(0), next_recv_seqnum(0), dgram_buffer_start(0), dgram_buffer_end(-1), recv_buffer_count(0), recv_pending(false), polling(0), did_poll(false) {};
 
 	/* =========================
 	 * Common Socket states
@@ -355,11 +356,14 @@ class XTRANSPORT : public Element {
 		bool isConnected;
 		bool initialized;
 		bool isListenSocket;
+		bool isBlocking;
 		bool synack_waiting;
 		bool dataack_waiting;
 		bool teardown_waiting;
 		bool migrateack_waiting;
 		unsigned backlog;
+		int so_error;		// used by non-blocking connect, accessed via getsockopt(SO_ERROR)
+		int so_debug;		// set/read via SO_DEBUG. could be used for tracing
 		String last_migrate_ts;
 
 		bool did_poll;
