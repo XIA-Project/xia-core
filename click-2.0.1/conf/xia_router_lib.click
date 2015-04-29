@@ -52,10 +52,13 @@ elementclass XIAPacketRoute {
 	consider_first_path => c, [2]output;
 	consider_next_path => c, [2]output;
 
-	x :: XCMP($local_addr);
-	x[1] -> Discard;
+	//NITIN disable XCMP REDIRECT messages
+	//NITIN x :: XCMP($local_addr);
+	//NITIN x[1] -> Discard;
 	GPRP :: GenericPostRouteProc -> [0]output;
-	GPRP[1] -> x[0] -> consider_first_path;
+	//NITIN disable XCMP REDIRECT messages
+	//NITIN GPRP[1] -> x[0] -> consider_first_path;
+	GPRP[1] -> consider_first_path;
 
 	// TO ADD A NEW USER DEFINED XID (step 2)
 	// add rt_XID_NAME as the last entry in the list of rt_xxx in the following 2 lines
@@ -78,7 +81,8 @@ elementclass XIAPacketRoute {
 	rt_AD[2], rt_HID[2], rt_SID[2], rt_CID[2], rt_IP[2] -> consider_next_path;
 	rt_AD[3], rt_HID[3],			rt_CID[3], rt_IP[3] -> Discard;
 			  			 rt_SID[3]					    -> [3]output;
-	rt_AD[4], rt_HID[4], rt_SID[4], rt_CID[4], rt_IP[4] -> x; // xcmp redirect message
+	//NITIN disable XCMP REDIRECT messages
+	//NITIN rt_AD[4], rt_HID[4], rt_SID[4], rt_CID[4], rt_IP[4] -> x; // xcmp redirect message
 };
 
 
@@ -292,8 +296,11 @@ elementclass XIARoutingCore {
 	srcTypeClassifier[0] -> Discard;	// do not send CID responses directly to RPC;
 	c[0] -> x[0] -> [0]n; // new (response) XCMP packets destined for some other machine
 	
-	x[1] -> rsw :: XIAPaintSwitch -> [2]xtransport; // XCMP packets destined for this machine
-	rsw[1] -> XIAPaint($REDIRECT) -> [0]n; // XCMP redirect packet, so a route update will be done.
+	//NITIN disable XCMP REDIRECT messages
+	//NITIN x[1] -> rsw :: XIAPaintSwitch -> [2]xtransport; // XCMP packets destined for this machine
+	x[1] -> [2]xtransport; // XCMP packets destined for this machine
+	//NITIN disable XCMP REDIRECT messages
+	//NITIN rsw[1] -> XIAPaint($REDIRECT) -> [0]n; // XCMP redirect packet, so a route update will be done.
 
 	n[2] -> [0]cache[0] -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [1]n;
 	// For get and put cid

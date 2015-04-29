@@ -142,6 +142,8 @@ XCMP::sendXCMPPacket(const Packet *p_in, int type, int code, click_xia_xid *last
 
 
 // processes a data packet that should be been sent somewhere else
+//NITIN disable XCMP redirect messages
+/*
 void
 XCMP::processBadForwarding(Packet *p_in) {
     XIAHeader hdr(p_in);
@@ -169,6 +171,7 @@ XCMP::processBadForwarding(Packet *p_in) {
 
     return;
 }
+*/
 
 // processes a data packet that was undeliverable
 void
@@ -294,6 +297,8 @@ XCMP::gotUnreachable(Packet *p_in) {
 }
 
 // got redirect packet, send up
+//NITIN disable XCMP REDIRECT messages
+/*
 void
 XCMP::gotRedirect(Packet *p_in) {
     if(DEBUG)
@@ -352,6 +357,7 @@ XCMP::gotRedirect(Packet *p_in) {
 
     p_in->kill();
 }
+*/
 
 // process packet and send out proper xcmp message.
 // returns false if packet was not flagged as bad in any way.
@@ -359,10 +365,13 @@ bool
 XCMP::processPacket(Packet *p_in) {
     XIAHeader hdr(p_in);
 	// check if this packet is painted for redirection
+	//NITIN disable XCMP REDIRECT messages
+	/*
     if(XIA_PAINT_ANNO(p_in) <= -1*TOTAL_SPECIAL_CASES) { // need to send XCMP REDIRECT
 		processBadForwarding(p_in);
         return true;
     }
+	*/
 
 	// check to see if this packet can't make it to its destination
 	// we need to send a DESTINATION XID Unreachable message to the src
@@ -405,9 +414,12 @@ XCMP::gotXCMPPacket(Packet *p_in) {
         gotUnreachable(p_in);
 		break;
 		
+	//NITIN disable XCMP REDIRECT messages
+	/*
     case XCMP_REDIRECT: // redirect
         gotRedirect(p_in);
         break;
+		*/
 
     default:
         // BAD MESSAGE TYPE

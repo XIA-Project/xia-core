@@ -445,12 +445,15 @@ XIAXIDRouteTable::push(int in_ether_port, Packet *p)
     	port = lookup_route(in_ether_port, p);
     }
 
+	//NITIN disable XCMP Redirect packets
+	/*
     if(port == in_ether_port && in_ether_port !=DESTINED_FOR_LOCALHOST && in_ether_port !=DESTINED_FOR_DISCARD) { // need to inform XCMP that this is a redirect
 	  // "local" and "discard" shouldn't send a redirect
 	  Packet *q = p->clone();
 	  SET_XIA_PAINT_ANNO(q, (XIA_PAINT_ANNO(q)+TOTAL_SPECIAL_CASES)*-1);
 	  output(4).push(q); 
     }
+	*/
     if (port >= 0) {
 	  SET_XIA_PAINT_ANNO(p,port);
 	  output(0).push(p);
