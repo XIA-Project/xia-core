@@ -153,15 +153,18 @@ DECLARE(int, fcntl, int fd, int cmd, ...);
 DECLARE(int, listen, int fd, int n);
 DECLARE(int, poll, struct pollfd *fds, nfds_t nfds, int timeout);
 DECLARE(ssize_t, read, int fd, void *buf, size_t count);
+DECLARE(ssize_t, readv, int fd, const struct iovec *iov, int iovcnt);
 DECLARE(ssize_t, recv, int fd, void *buf, size_t n, int flags);
 DECLARE(ssize_t, recvfrom, int fd, void *buf, size_t n, int flags, struct sockaddr *addr, socklen_t *addr_len);
 DECLARE(int, select, int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
 DECLARE(ssize_t, send, int fd, const void *buf, size_t n, int flags);
 DECLARE(ssize_t, sendto, int fd, const void *buf, size_t n, int flags, const struct sockaddr *addr, socklen_t addr_len);
 DECLARE(int, setsockopt, int fd, int level, int optname, const void *optval, socklen_t optlen);
+DECLARE(int, shutdown, int fd, int how);
 DECLARE(int, socket, int domain, int type, int protocol);
 DECLARE(int, socketpair, int domain, int type, int protocol, int fds[2]);
 DECLARE(ssize_t, write, int fd, const void *buf, size_t count);
+DECLARE(ssize_t, writev, int fd, const struct iovec *iov, int iovcnt);
 
 // not ported to XIA, remapped for warning purposes *****************
 DECLARE(struct hostent *,gethostbyaddr, const void *addr, socklen_t len, int type);
@@ -592,7 +595,7 @@ static int _LookupStr(const char *id, unsigned short port, struct sockaddr *sa, 
 
 
 // calculate the number of bytes in the iovec
-static size_t _iovSize(struct iovec *iov, size_t iovcnt)
+static size_t _iovSize(const struct iovec *iov, size_t iovcnt)
 {
 	size_t size = 0;
 
@@ -610,7 +613,7 @@ static size_t _iovSize(struct iovec *iov, size_t iovcnt)
 
 
 // Flatten an iovec into a single buffer
-static size_t _iovPack(struct iovec *iov, size_t iovcnt, char **buf)
+static size_t _iovPack(const struct iovec *iov, size_t iovcnt, char **buf)
 {
 	size_t size = _iovSize(iov, iovcnt);
 	char *p;
@@ -628,7 +631,7 @@ static size_t _iovPack(struct iovec *iov, size_t iovcnt, char **buf)
 
 
 // unload a buffer into an iovec
-static int _iovUnpack(struct iovec *iov, size_t iovcnt, char *buf, size_t len)
+static int _iovUnpack(const struct iovec *iov, size_t iovcnt, char *buf, size_t len)
 {
 	int rc = 0;
 	size_t size = 0;
@@ -798,15 +801,18 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	GET_FCN(listen);
 	GET_FCN(poll);
 	GET_FCN(read);
+	GET_FCN(readv);
 	GET_FCN(recv);
 	GET_FCN(recvfrom);
 	GET_FCN(select);
 	GET_FCN(send);
 	GET_FCN(sendto);
 	GET_FCN(setsockopt);
+	GET_FCN(shutdown);
 	GET_FCN(socket);
 	GET_FCN(socketpair);
 	GET_FCN(write);
+	GET_FCN(writev);	
 
 	// do the same for the informational functions
 	GET_FCN(gethostbyaddr);
@@ -1415,6 +1421,38 @@ ssize_t read(int fd, void *buf, size_t n)
 
 
 
+
+ssize_t readv(int fd, const struct iovec *iov, int iovcnt)
+{
+	int rc;
+
+	TRACE();
+
+	if (isXsocket(fd)) {
+		XIAIFY();
+
+		// FIXME: handle EINVAL processing (probably will never occur so low priority)
+
+		// make a buffer as large as available space in the iovec
+		size_t size = _iovSize(iov, iovcnt);
+		char *buf = (char *)malloc(size);
+
+		rc = Xrecv(fd, buf, size, 0);
+
+		if (rc >= 0) {
+			rc = _iovUnpack(iov, iovcnt, buf, rc);
+		}
+		free(buf);
+
+	} else {
+		rc = __real_readv(fd, iov, iovcnt);
+	}
+	return rc;
+}
+
+
+
+
 ssize_t recv(int fd, void *buf, size_t n, int flags)
 {
 	int rc;
@@ -1780,6 +1818,37 @@ int setsockopt(int fd, int level, int optname, const void *optval, socklen_t opt
 
 
 
+int shutdown(int fd, int how)
+{
+	int rc;
+	TRACE();
+
+	if (isXsocket(fd)) {
+		XIAIFY();
+
+		if (how != SHUT_RD && how != SHUT_WR && how != SHUT_RDWR) {
+			errno = EINVAL;
+			rc = -1;
+
+		} else if (getConnState(fd) != CONNECTED) {
+			errno = ENOTCONN; 
+			rc = -1;
+		
+		} else {
+			// we don't have anything like shutdown in XIA, so lie and say we did something
+			rc = 0;
+		}		
+	
+	} else {
+		NOXIA();
+		rc = __real_shutdown(fd, how);
+	}
+
+	return rc;
+}
+
+
+
 int socket(int domain, int type, int protocol)
 {
 	int fd;
@@ -1856,6 +1925,33 @@ ssize_t write(int fd, const void *buf, size_t n)
 	} else {
 		NOXIA();
 		rc = __real_write(fd, buf, n);
+	}
+	return rc;
+}
+
+
+
+
+ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
+{
+	int rc;
+
+	TRACE();
+	if (isXsocket(fd)) {
+		XIAIFY();
+
+		// writev is atomic, so put everything into a buffer instead of
+		// writing out each individual iovec
+		char *buf = NULL;
+		size_t size = _iovPack(iov, iovcnt, &buf);
+
+		MSG("sending:%zu\n", size);
+
+		rc = send(fd, buf, size, 0);
+		free(buf);
+
+	} else {
+		rc = __real_writev(fd, iov, iovcnt);
 	}
 	return rc;
 }

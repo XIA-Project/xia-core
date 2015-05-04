@@ -327,6 +327,7 @@ int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen)
 		// get these values from click ******************************
 		case XOPT_HLIM:
 		case XOPT_NEXT_PROTO:
+		case XOPT_ERROR_PEEK:
 		case SO_ACCEPTCONN:
 		case SO_ERROR:
 			rc = ssoGetInt(sockfd, optname, (int *)optval, optlen);

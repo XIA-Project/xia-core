@@ -2122,6 +2122,11 @@ void XTRANSPORT::Xgetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_
 			sk->so_error = 0;
 			break;
 
+		case XOPT_ERROR_PEEK:
+			// same as SO_ERROR, but doesn't reset the error code
+			x_sso_msg->set_int_opt(sk->so_error);
+			break;
+
 		default:
 			// unsupported option
 			break;

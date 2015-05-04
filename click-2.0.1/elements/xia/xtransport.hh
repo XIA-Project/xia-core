@@ -34,9 +34,10 @@ using namespace std;
 #endif
 
 // FIXME: put these in a std location that can be found by click and the API
-#define XOPT_HLIM 0x07001
+#define XOPT_HLIM       0x07001
 #define XOPT_NEXT_PROTO 0x07002
-#define XOPT_BLOCK 0x07003
+#define XOPT_BLOCK      0x07003
+#define XOPT_ERROR_PEEK 0x07004
 
 #ifndef DEBUG
 #define DEBUG 0

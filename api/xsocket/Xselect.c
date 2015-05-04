@@ -30,6 +30,21 @@ typedef struct {
 } Sock2Port;
 
 
+static void setNBConnState(int fd)
+{
+	// if this was for a non-blocking connect, set connected state appropriately
+	if (getConnState(fd) == CONNECTING) {
+
+		int e;
+		socklen_t sz = sizeof(e);
+
+		Xgetsockopt(fd, XOPT_ERROR_PEEK, (void*)&e, &sz);
+		setConnState(fd, e == 0 ? CONNECTED : UNCONNECTED);
+	}
+
+	// else don't do anything special
+}
+
 /*!
 ** @brief waits for one of a set of Xsockets to become ready to perform I/O.
 **
@@ -189,8 +204,10 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 				for (unsigned j = 0; j < nfds; j++) {
 					if (ufds[j].fd == fd) {
 
-
-
+						// if a non-blocking connect is in progress, set connected state appropriately
+						if (flags && POLLOUT) {
+							setNBConnState(fd);
+						}
 
 						// FIXME: hack for curl - think about better ways to deal with this
 						if (flags && POLLIN && (ufds[i].events &  POLLRDNORM || ufds[i].events & POLLRDBAND)) {
@@ -200,10 +217,6 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 						if (flags && POLLOUT && (ufds[i].events & POLLWRNORM || ufds[i].events & POLLWRBAND)) {
 							flags |= (POLLWRNORM | POLLWRBAND);
 						}
-
-
-
-
 
 						ufds[j].revents = flags;
 						break;
@@ -445,6 +458,9 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 				if (writefds && (flags & POLLOUT)) {
 					FD_SET(fd, writefds);
 					count++;
+
+					// if a non-blocking connect is in progress, set connected state appropriately
+					setNBConnState(fd);
 				}
 				if (errorfds && (flags & POLLERR)) {
 					FD_SET(fd, errorfds);
