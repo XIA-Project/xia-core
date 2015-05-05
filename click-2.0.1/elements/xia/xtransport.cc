@@ -349,6 +349,11 @@ XTRANSPORT::run_timer(Timer *timer)
 		}
 	}
 
+	// Set the next timer
+	if (earlist_pending_expiry > now) {
+		_timer.reschedule_at(earlist_pending_expiry);
+	}
+
 //	pthread_mutex_unlock(&_lock);
 }
 
