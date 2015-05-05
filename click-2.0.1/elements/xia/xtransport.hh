@@ -365,6 +365,7 @@ class XTRANSPORT : public Element {
 		unsigned backlog;
 		int so_error;		// used by non-blocking connect, accessed via getsockopt(SO_ERROR)
 		int so_debug;		// set/read via SO_DEBUG. could be used for tracing
+		int interface_id;	// port of the interface the packets arrive on
 		String last_migrate_ts;
 
 		bool did_poll;

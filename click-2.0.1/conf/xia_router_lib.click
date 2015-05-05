@@ -154,7 +154,8 @@ elementclass XIALineCard {
 	input[1] -> xarpq;
 	
 	// On receiving a packet from interface
-	input[0] -> c;
+	// also, save the source port so we can use it in xtransport
+	input[0] -> XIAPaint(ANNO $SRC_PORT_ANNO, COLOR $num) -> c;
    
 	// Receiving an XIA packet
 	c[2] -> Strip(14) -> MarkXIAHeader() -> [0]xchal[0] -> [0]xresp[0] -> XIAPaint($num) -> print_in -> [1]output; // this should send out to [0]n; 

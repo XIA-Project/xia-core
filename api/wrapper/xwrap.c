@@ -594,74 +594,6 @@ static int _LookupStr(const char *id, unsigned short port, struct sockaddr *sa, 
 
 
 
-// calculate the number of bytes in the iovec
-static size_t _iovSize(const struct iovec *iov, size_t iovcnt)
-{
-	size_t size = 0;
-
-	MSG("%zu: ", iovcnt);
-
-	for (size_t i = 0; i < iovcnt; i++) {
-		size += iov[i].iov_len;
-		fprintf(_log, "%zu ", iov[i].iov_len);
-	}
-	fprintf(_log, "\n");
-
-	return size;
-}
-
-
-
-// Flatten an iovec into a single buffer
-static size_t _iovPack(const struct iovec *iov, size_t iovcnt, char **buf)
-{
-	size_t size = _iovSize(iov, iovcnt);
-	char *p;
-
-	p = *buf = (char *)malloc(size);
-
-	for (size_t i = 0; i < iovcnt; i++) {
-		memcpy(p, iov[i].iov_base, iov[i].iov_len);
-		p += iov[i].iov_len;
-	}
-
-	return size;
-}
-
-
-
-// unload a buffer into an iovec
-static int _iovUnpack(const struct iovec *iov, size_t iovcnt, char *buf, size_t len)
-{
-	int rc = 0;
-	size_t size = 0;
-	char *p = buf;
-
-	size = _iovSize(iov, iovcnt);
-
-	if (size < len) {
-		// there's more data than we have room for
-		rc = -1;
-	}
-
-	for (size_t i = 0; i < iovcnt; i++) {
-		if (size == 0 || len == 0)
-			break;
-
-		int cnt = MIN(size, iov[i].iov_len);
-
-		memcpy(iov[i].iov_base, p, cnt);
-		p += cnt;
-		size -= cnt;
-		len -= cnt;
-	}
-
-	return rc;
-}
-
-
-
-
 // see if the given IP address is local to our machine
 static bool _isLocalAddr(const char* addr)
 {
@@ -1525,63 +1457,9 @@ ssize_t recvmsg(int fd, struct msghdr *msg, int flags)
 	int rc;
 	TRACE();
 
-	if (flags) {
-		XFER_FLAGS(flags);
-	}
-
-	MSG("msghdr:\n name:%p namelen:%zu iov:%p iovlen:%zu control:%p clen:%zu flags:%08x\n",
-	msg->msg_name,
-	(size_t)msg->msg_namelen,
-	msg->msg_iov,
-	(size_t)msg->msg_iovlen,
-	msg->msg_control,
-	(size_t)msg->msg_controllen,
-	msg->msg_flags);
-
 	if (isXsocket(fd)) {
 		XIAIFY();
-
-		int connected = (getConnState(fd) == CONNECTED);
-
-		if (msg == NULL || msg->msg_iov == NULL) {
-			errno = EFAULT;
-			return -1;
-		}
-
-		if (getSocketType(fd) != SOCK_DGRAM) {
-			errno = ENOTSOCK;
-			return -1;
-		}
-
-		size_t size = _iovSize(msg->msg_iov, msg->msg_iovlen);
-		char *buf = (char *)malloc(size);
-
-		if (connected) {
-			rc = recv(fd, buf, size, flags);
-		} else {
-
-			struct sockaddr *sa = (struct sockaddr *)msg->msg_name;
-			socklen_t *len = (sa != NULL ? &msg->msg_namelen : NULL);
-
-			rc = recvfrom(fd, buf, size, flags, sa, len);
-			MSG("returned:%d\n", rc);
-		}
-
-		if (rc > 0) {
-			size = _iovUnpack(msg->msg_iov, msg->msg_iovlen, buf, rc);
-			if (size < (socklen_t)rc) {
-				// set the truncated flag
-				msg->msg_flags = MSG_TRUNC;
-			}
-
-		} else if (rc < 0) {
-			msg->msg_flags = MSG_ERRQUEUE; // is this ok?
-
-		} else {
-			msg->msg_flags = 0;
-		}
-
-		free(buf);
+		rc = Xrecvmsg(fd, msg, flags);
 
 	} else {
 		NOXIA();
@@ -1657,54 +1535,10 @@ ssize_t sendmsg(int fd, const struct msghdr *msg, int flags)
 
 	TRACE();
 
-	 MSG("fd:%d flags:%08x\n", fd, flags);
-	MSG("msghdr:\n name:%p namelen:%zu iov:%p iovlen:%zu control:%p clen:%zu flags:%08x\n",
-	msg->msg_name,
-	(size_t)msg->msg_namelen,
-	msg->msg_iov,
-	(size_t)msg->msg_iovlen,
-	msg->msg_control,
-	(size_t)msg->msg_controllen,
-	msg->msg_flags);
-
 	if (isXsocket(fd)) {
 		XIAIFY();
-		int connected = (getConnState(fd) == CONNECTED);
 
-		if (msg == NULL || msg->msg_iov == NULL) {
-			errno = EFAULT;
-			return -1;
-		}
-
-		if (getSocketType(fd) != SOCK_DGRAM) {
-			errno = ENOTSOCK;
-			return -1;
-		}
-
-		if (!connected && msg->msg_name == NULL) {
-			errno = EFAULT;
-			return -1;
-		}
-
-		if (msg->msg_control != NULL) {
-			WARNING("XIA unable to handle control info.");
-			rc = EOPNOTSUPP;
-			return -1;
-		}
-
-		// let's try to send this thing!
-		char *buf = NULL;
-		size_t size = _iovPack(msg->msg_iov, msg->msg_iovlen, &buf);
-
-		MSG("sending:%zu\n", size);
-
-		if (connected) {
-			rc = send(fd, buf, size, flags);
-
-		} else {
-			rc = sendto(fd, buf, size, flags, (struct sockaddr*)msg->msg_name, msg->msg_namelen);
-		}
-		free(buf);
+		rc = Xsendmsg(fd, msg, flags);
 
 	} else {
 		NOXIA();

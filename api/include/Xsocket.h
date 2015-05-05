@@ -138,7 +138,10 @@ extern int Xconnect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 extern int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout);
 extern int Xlisten(int sockfd, int backlog);
 extern int Xrecvfrom(int sockfd,void *rbuf, size_t len, int flags, struct sockaddr *addr, socklen_t *addrlen);
+extern ssize_t Xrecvmsg(int fd, const struct msghdr *msg, int flags);
 extern int Xsendto(int sockfd,const void *buf, size_t len, int flags, const struct sockaddr *addr, socklen_t addrlen);
+extern ssize_t Xsendmsg(int fd, const struct msghdr *msg, int flags);
+
 
 extern int Xclose(int sock);
 extern int Xrecv(int sockfd, void *rbuf, size_t len, int flags);

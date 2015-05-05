@@ -906,7 +906,6 @@ bool XTRANSPORT::usingRendezvousDAG(XIAPath bound_dag, XIAPath pkt_dag)
 
 void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 {
-
 	//	_errh->debug("Got packet from network");
 
 	//Extract the SID/CID
@@ -1654,6 +1653,8 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 		if (sk->sock_type == SOCK_DGRAM &&
 			should_buffer_received_packet(p_in, sk)) {
 			add_packet_to_recv_buf(p_in, sk);
+
+			sk->interface_id = SRC_PORT_ANNO(p_in);
 
 			if (sk->polling) {
 				// tell API we are readable
