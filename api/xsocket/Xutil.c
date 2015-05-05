@@ -408,6 +408,67 @@ static const char *getFlags(idrec *table, size_t size, size_t f)
 	return s;
 }
 
+// calculate the number of bytes in the iovec
+size_t _iovSize(const struct iovec *iov, size_t iovcnt)
+{
+	size_t size = 0;
+
+	for (size_t i = 0; i < iovcnt; i++) {
+		size += iov[i].iov_len;
+	}
+
+	return size;
+}
+
+
+
+// Flatten an iovec into a single buffer
+size_t _iovPack(const struct iovec *iov, size_t iovcnt, char **buf)
+{
+	size_t size = _iovSize(iov, iovcnt);
+	char *p;
+
+	p = *buf = (char *)malloc(size);
+
+	for (size_t i = 0; i < iovcnt; i++) {
+		memcpy(p, iov[i].iov_base, iov[i].iov_len);
+		p += iov[i].iov_len;
+	}
+
+	return size;
+}
+
+
+
+// unload a buffer into an iovec
+int _iovUnpack(const struct iovec *iov, size_t iovcnt, char *buf, size_t len)
+{
+	int rc = 0;
+	size_t size = 0;
+	char *p = buf;
+
+	size = _iovSize(iov, iovcnt);
+
+	if (size < len) {
+		// there's more data than we have room for
+		rc = -1;
+	}
+
+	for (size_t i = 0; i < iovcnt; i++) {
+		if (size == 0 || len == 0)
+			break;
+
+		int cnt = MIN(size, iov[i].iov_len);
+
+		memcpy(iov[i].iov_base, p, cnt);
+		p += cnt;
+		size -= cnt;
+		len -= cnt;
+	}
+
+	return rc;
+}
+
 // print out name of the parameter
 // called via the FOO_VALUE macro
 static const char *getValue(idrec *table, size_t size, size_t v)

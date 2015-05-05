@@ -87,6 +87,12 @@ const sockaddr_x *dgramPeer(int sock);
 int _xsendto(int sockfd, const void *buf, size_t len, int flags, const sockaddr_x *addr, socklen_t addrlen);
 int _xrecvfromconn(int sockfd, void *buf, size_t len, int flags);
 
+size_t _iovSize(const struct iovec *iov, size_t iovcnt);
+size_t _iovPack(const struct iovec *iov, size_t iovcnt, char **buf);
+int _iovUnpack(const struct iovec *iov, size_t iovcnt, char *buf, size_t len);
+
+
+
 extern "C" {
 const char *xferFlags(size_t f);
 const char *fcntlFlags(size_t f);
