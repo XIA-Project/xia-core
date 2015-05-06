@@ -27,6 +27,8 @@
 
 #include <sys/time.h>
 
+#include "prefetch_utils.h"
+
 #define MAX_XID_SIZE 100
 #define VERSION "v1.0"
 #define TITLE "XIA Advanced FTP client"
@@ -41,7 +43,6 @@ MAXBUFLEN = XIA_MAXBUF = XIA_MAXCHUNK = 15600
 */
 
 // global configuration options
-int verbose = 1;
 bool quick = false;
 
 char s_ad[MAX_XID_SIZE];
@@ -50,62 +51,18 @@ char s_hid[MAX_XID_SIZE];
 char my_ad[MAX_XID_SIZE];
 char my_hid[MAX_XID_SIZE];
 
-char* ftp_name = "www_s.advftp.aaa.xia";
+char* ftp_name = "www_s.ftp.advanced.aaa.xia";
+char* prefetch_client_name = "www_s.client.prefetch.aaa.xia";
+char* prefetch_profile_name = "www_s.profile.prefetch..aaa.xia";
+char* prefetch_pred_name = "www_s.prediction.prefetch.aaa.xia";
+char* prefetch_exec_name = "www_s.executer.prefetch.aaa.xia";
+
 char* prefetch_ctx_name = "www_s.prefetch_context_listener.aaa.xia";
-//char* prefetch_ctx_name = "www_s.stream_echo.aaa.xia"; 
 
 int ftp_sock = -1;
 int	prefetch_ctx_sock = -1;
 
 int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout);
-
-/*
-** write the message to stdout unless in quiet mode
-*/
-void say(const char *fmt, ...) {
-	if (verbose) {
-		va_list args;
-
-		va_start(args, fmt);
-		vprintf(fmt, args);
-		va_end(args);
-	}
-}
-
-/*
-** always write the message to stdout
-*/
-void warn(const char *fmt, ...) {
-	va_list args;
-
-	va_start(args, fmt);
-	vfprintf(stdout, fmt, args);
-	va_end(args);
-}
-
-/*
-** write the message to stdout, and exit the app
-*/
-void die(int ecode, const char *fmt, ...) {
-	va_list args;
-
-	va_start(args, fmt);
-	vfprintf(stdout, fmt, args);
-	va_end(args);
-	fprintf(stdout, "%s: exiting\n", TITLE);
-	exit(ecode);
-}
-
-int sendCmd(int sock, const char *cmd) { 
-	int n;
- 	warn("Sending Command: %s \n", cmd);
-	if ((n = Xsend(sock, cmd, strlen(cmd), 0)) < 0) {
-		Xclose(sock);
-		die(-1, "Unable to communicate\n");
-	}
-
-	return n;
-}
 
 void *recvCmd (void *socketid) {
 	int i, n, count = 0;

@@ -28,18 +28,24 @@
 
 #include "Xkeys.h"
 
+#include "prefetch_utils.h"
+
 #define MAX_XID_SIZE 100
 #define VERSION "v1.0"
 #define TITLE "XIA Prefetch Client"
 
-int verbose = 1;
 char myAD[MAX_XID_SIZE];
 char myHID[MAX_XID_SIZE];
 char my4ID[MAX_XID_SIZE];
 
-char* prefetch_ctx_name = "www_s.prefetch_context_listener.aaa.xia";
-char* prefetch_cid_name = "www_s.prefetch_cidcache_listener.aaa.xia";
-char* prefetch_pred_name = "www_s.prefetch_prediction_listener.aaa.xia";
+char* ftp_name = "www_s.ftp.advanced.aaa.xia";
+char* prefetch_client_name = "www_s.client.prefetch.aaa.xia";
+char* prefetch_profile_name = "www_s.profile.prefetch..aaa.xia";
+char* prefetch_pred_name = "www_s.prediction.prefetch.aaa.xia";
+char* prefetch_exec_name = "www_s.executer.prefetch.aaa.xia";
+
+//char* prefetch_ctx_name = "www_s.prefetch_context_listener.aaa.xia";
+//char* prefetch_pred_name = "www_s.prefetch_prediction_listener.aaa.xia";
 
 int sockfd_ctx, sockfd_cid, sockfd_pred;
 
@@ -49,42 +55,6 @@ char s_hid[MAX_XID_SIZE];
 char my_ad[MAX_XID_SIZE];
 char my_hid[MAX_XID_SIZE];
 
-/*
-** write the message to stdout unless in quiet mode
-*/
-void say(const char *fmt, ...) {
-	if (verbose) {
-		va_list args;
-
-		va_start(args, fmt);
-		vprintf(fmt, args);
-		va_end(args);
-	}
-}
-
-/*
-** always write the message to stdout
-*/
-void warn(const char *fmt, ...) {
-	va_list args;
-
-	va_start(args, fmt);
-	vfprintf(stdout, fmt, args);
-	va_end(args);
-}
-
-/*
-** write the message to stdout, and exit the app
-*/
-void die(int ecode, const char *fmt, ...) {
-	va_list args;
-
-	va_start(args, fmt);
-	vfprintf(stdout, fmt, args);
-	va_end(args);
-	fprintf(stdout, "%s: exiting\n", TITLE);
-	exit(ecode);
-}
 
 int initializeClient(const char *name) {
 	int sock, rc;
@@ -136,18 +106,6 @@ int initializeClient(const char *name) {
 
 	warn("Service AD: %s, Service HID: %s\n", s_ad, s_hid);
 	return sock;
-}
-
-int sendCmd(int sock, const char *cmd) {
-
-	int n;
-	warn("Sending Command: %s \n", cmd);
-
-	if ((n = Xsend(sock, cmd,  strlen(cmd), 0)) < 0) {
-		Xclose(sock);
-		 die(-1, "Unable to communicate\n");
-	}
-	return n;
 }
 
 // prefetch_client receives context updates and send predicted CID_s to prefetch_server
@@ -523,8 +481,8 @@ int main() {
 	sockfd_ctx = registerStreamReceiver(prefetch_ctx_name);
 	ctxBlockingListener((void *)&sockfd_ctx);
 	
-	sockfd_cid = registerStreamReceiver(prefetch_cid_name);
-	cidBlockingListener((void *)&sockfd_cid);	
+	//sockfd_cid = registerStreamReceiver(prefetch_cid_name);
+	//cidBlockingListener((void *)&sockfd_cid);	
 
 /*
 

@@ -30,6 +30,8 @@
 
 #include "Xkeys.h"
 
+#include "prefetch_utils.h"
+
 #define MAX_XID_SIZE 100
 #define VERSION "v1.0"
 #define TITLE "XIA Prefetch Client"
@@ -40,7 +42,6 @@
 #define NUM_CHUNKS	10
 #define NUM_PROMPTS	2
 
-int verbose = 1;
 
 char my_ad[MAX_XID_SIZE];
 char my_hid[MAX_XID_SIZE];
@@ -58,54 +59,6 @@ char* ftp_name = "www_s.advftp.aaa.xia";
 int	sockfd_prefetch, sockfd_ftp;
 
 int getSubFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout, int start, int end);
-
-/*
-** write the message to stdout unless in quiet mode
-*/
-void say(const char *fmt, ...) {
-	if (verbose) {
-		va_list args;
-
-		va_start(args, fmt);
-		vprintf(fmt, args);
-		va_end(args);
-	}
-}
-
-/*
-** always write the message to stdout
-*/
-void warn(const char *fmt, ...) {
-	va_list args;
-
-	va_start(args, fmt);
-	vfprintf(stdout, fmt, args);
-	va_end(args);
-}
-
-/*
-** write the message to stdout, and exit the app
-*/
-void die(int ecode, const char *fmt, ...) {
-	va_list args;
-
-	va_start(args, fmt);
-	vfprintf(stdout, fmt, args);
-	va_end(args);
-	fprintf(stdout, "%s: exiting\n", TITLE);
-	exit(ecode);
-}
-
-int sendCmd(int sock, const char *cmd) {
-	int n;
-	warn("Sending Command: %s\n", cmd);
-
-	if ((n = Xsend(sock, cmd, strlen(cmd), 0)) < 0) {
-		Xclose(sock);
-		die(-1, "Unable to communicate\n");
-	}
-	return n;
-}
 
 // prefetch_client receives context updates and send predicted CID_s to prefetch_server
 // handle the CID update first and location/AP later

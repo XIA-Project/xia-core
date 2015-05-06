@@ -15,7 +15,7 @@ XIAContentModule::XIAContentModule(XIATransport *transport) {
 XIAContentModule::~XIAContentModule() {
 	HashTable<XID,CChunk*>::iterator it;
 	CChunk * chunk = NULL;
-	for (it = _partialTable.begin(); it! = _partialTable.end(); it++) {
+	for (it = _partialTable.begin(); it!= _partialTable.end(); it++) {
 		chunk = it->second;
 		delete chunk;
 	}
