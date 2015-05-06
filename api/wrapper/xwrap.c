@@ -1438,7 +1438,7 @@ ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, 
 		MSG("fd:%d size:%zu returned:%d\n", fd, n, rc);
 
 		if (rc >= 0 && do_address) {
-			// convert the sockaddr to a sockaddr_x
+			// convert the sockaddr_x to a sockaddr
 			_ReverseLookup(addrx, (struct sockaddr_in*)addr);
 		}
 
@@ -1455,11 +1455,29 @@ ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, 
 ssize_t recvmsg(int fd, struct msghdr *msg, int flags)
 {
 	int rc;
+	bool do_address = false;
+	struct msghdr mh;
+	sockaddr_x sax;
+
 	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
-		rc = Xrecvmsg(fd, msg, flags);
+
+		memcpy(&mh, msg, sizeof(struct msghdr));
+
+		if (mh.msg_name != NULL) {
+			do_address = true;
+			mh.msg_name = &sax;
+			mh.msg_namelen = sizeof(sax);
+		}
+
+		rc = Xrecvmsg(fd, &mh, flags);
+
+		if (rc >= 0 && do_address) {
+			// convert the sockaddr_x to a sockaddr
+			_ReverseLookup(&sax, (struct sockaddr_in*)msg->msg_name);
+		}
 
 	} else {
 		NOXIA();
@@ -1532,13 +1550,29 @@ ssize_t send(int fd, const void *buf, size_t n, int flags)
 ssize_t sendmsg(int fd, const struct msghdr *msg, int flags)
 {
 	int rc;
+	struct msghdr mh;
+	sockaddr_x sax;
 
 	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
 
-		rc = Xsendmsg(fd, msg, flags);
+		if (_Lookup((sockaddr_in *)msg->msg_name, &sax) != 0) {
+			char id[ID_LEN];
+
+			_IDstring(id, ID_LEN, (sockaddr_in*)msg->msg_name);
+			WARNING("Unable to lookup %s\n", id);
+			errno = EINVAL;	// FIXME: is there a better return we can use here?
+			return -1;
+		}
+
+		// make an XIA specific msg header with translated address
+		memcpy(&mh, msg, sizeof(struct msghdr));
+		mh.msg_name = (struct sockaddr*)&sax;
+		mh.msg_namelen = sizeof(sax);
+
+		rc = Xsendmsg(fd, &mh, flags);
 
 	} else {
 		NOXIA();
