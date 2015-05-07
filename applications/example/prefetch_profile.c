@@ -16,38 +16,17 @@
 */
 /*simple interactive echo client using Xsockets */
 
-#include <stdio.h>
-#include <stdarg.h>
-#include <time.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <pthread.h>
-#include "Xsocket.h"
-#include "dagaddr.hpp"
-#include <assert.h>
-
-#include <sys/time.h>
-
-#include "Xkeys.h"
 
 #include "prefetch_utils.h"
 
-#define MAX_XID_SIZE 100
 #define VERSION "v1.0"
-#define TITLE "XIA Prefetch Profiles"
+#define TITLE "XIA Prefetch Executer"
 
-#define CHUNKSIZE 1024
-#define REREQUEST 3
+char src_ad[MAX_XID_SIZE];
+char src_hid[MAX_XID_SIZE];
 
-#define NUM_CHUNKS	10
-#define NUM_PROMPTS	2
-
-
-char my_ad[MAX_XID_SIZE];
-char my_hid[MAX_XID_SIZE];
-
-char s_ad[MAX_XID_SIZE];
-char s_hid[MAX_XID_SIZE];
+char dst_ad[MAX_XID_SIZE];
+char dst_hid[MAX_XID_SIZE];
 
 char myAD[MAX_XID_SIZE];
 char myHID[MAX_XID_SIZE];
@@ -55,13 +34,13 @@ char my4ID[MAX_XID_SIZE];
 
 char* ftp_name = "www_s.ftp.advanced.aaa.xia";
 char* prefetch_client_name = "www_s.client.prefetch.aaa.xia";
-char* prefetch_profile_name = "www_s.profile.prefetch..aaa.xia";
+char* prefetch_profile_name = "www_s.profile.prefetch.aaa.xia";
 char* prefetch_pred_name = "www_s.prediction.prefetch.aaa.xia";
 char* prefetch_exec_name = "www_s.executer.prefetch.aaa.xia";
 
 int	sockfd_prefetch, sockfd_ftp;
 
-int getSubFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout, int start, int end);
+int getSubFile(int sock, char *dst_ad, char* dst_hid, const char *fin, const char *fout, int start, int end);
 
 // prefetch_client receives context updates and send predicted CID_s to prefetch_server
 // handle the CID update first and location/AP later
@@ -93,7 +72,7 @@ void *RecvCmd (void *socketid) {
 		if (strncmp(command, "get", 3) == 0) {
 			sscanf(command, "get %s %d %d", fin, &start, &end);
 			printf("get %s %d %d\n", fin, start, end);
-			getSubFile(sockfd_ftp, s_ad, s_hid, fin, fin, start, end);
+			getSubFile(sockfd_ftp, dst_ad, dst_hid, fin, fin, start, end); // TODO: why fin, fin?
 		}
 	}
 
@@ -220,46 +199,8 @@ void *RecvCmd (void *socketid) {
 */
 }
 
-// Just registering the service and openning the necessary sockets
-int registerStreamReceiver(char* name) {
-	int sock;
-
-	// create a socket, and listen for incoming connections
-	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
-		die(-1, "Unable to create the listening socket\n");
-
-  // read the localhost AD and HID
-  if (XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0)
-		die(-1, "Reading localhost address\n");
-
-	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
-	// Generate an SID to use
-	if (XmakeNewSID(sid_string, sizeof(sid_string))) {
-		die(-1, "Unable to create a temporary SID");
-	}
-
-	struct addrinfo *ai;
-  // FIXED: from hardcoded SID to sid_string randomly generated
-	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
-		die(-1, "getaddrinfo failure!\n");
-
-	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
-	// FIXME: NAME is hard coded
-  if (XregisterName(name, dag) < 0)
-		die(-1, "error registering name: %s\n", name);
-
-	if (Xbind(sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
-		Xclose(sock);
-		die(-1, "Unable to bind to the dag: %s\n", dag);
-	}
-
-	Graph g(dag);
-	say("listening on dag: %s\n", g.dag_string().c_str());
-  return sock;  
-}
-
 // FIXME: merge the two functions below
-void *BlockingListener(void *socketid) {
+void *blockingListener(void *socketid) {
   int sock = *((int*)socketid);
   int acceptSock;
 
@@ -280,180 +221,10 @@ void *BlockingListener(void *socketid) {
 	return NULL;
 }
 
-int getChunkCount(int sock, char *reply, int sz) {
-	int n = -1;
-
-	if ((n = Xrecv(sock, reply, sz, 0))  < 0) {
-		Xclose(sock);
-		 die(-1, "Unable to communicate with the server\n");
-	}
-
-	if (strncmp(reply, "OK:", 3) != 0) {
-		warn( "%s\n", reply);
-		return -1;
-	}
-
-	reply[n] = 0;
-
-	return n;
-}
-
-int buildChunkDAGs(ChunkStatus cs[], char *chunks, char *p_ad, char *p_hid) {
-	char *p = chunks;
-	char *next;
-	int n = 0;
-
-	char *dag;
-	
-	// build the list of chunks to retrieve
-	while ((next = strchr(p, ' '))) {
-		*next = 0;
-		dag = (char *)malloc(512);
-		sprintf(dag, "RE ( %s %s ) CID:%s", p_ad, p_hid, p);
-		// printf("built dag: %s\n", dag);
-		cs[n].cidLen = strlen(dag);
-		cs[n].cid = dag;
-		n++;
-		p = next + 1;
-	}
-	dag = (char *)malloc(512);
-	sprintf(dag, "RE ( %s %s ) CID:%s", p_ad, p_hid, p);
-	// printf("getting %s\n", p);
-	cs[n].cidLen = strlen(dag);
-	cs[n].cid = dag;
-	n++;
-	return n;
-}
-
-int getListedChunks(int csock, FILE *fd, char *chunks, char *p_ad, char *p_hid) {
-	ChunkStatus cs[NUM_CHUNKS];
-	char data[XIA_MAXCHUNK];
-	int len;
-	int status;
-	int n = -1;
-	
-	n = buildChunkDAGs(cs, chunks, p_ad, p_hid);
-	
-	// NOTE: the chunk transport is not currently reliable and chunks may need to be re-requested
-	// ask for the current chunk list again every REREQUEST seconds
-	// chunks already in the local cache will not be refetched from the network 
-	// read the the whole chunk list first before fetching
-	unsigned ctr = 0;
-	while (1) {
-		if (ctr % REREQUEST == 0) {
-			// bring the list of chunks local
-			say("%srequesting list of %d chunks\n", (ctr == 0 ? "" : "re-"), n);
-			if (XrequestChunks(csock, cs, n) < 0) {
-				say("unable to request chunks\n");
-				return -1;
-			}
-			say("checking chunk status\n");
-		}
-		ctr++;
-
-		status = XgetChunkStatuses(csock, cs, n);
-
-		if (status == READY_TO_READ)
-			break;
-
-		else if (status < 0) {
-			say("error getting chunk status\n");
-			return -1;
-
-		} else if (status & WAITING_FOR_CHUNK) {
-			// one or more chunks aren't ready.
-			say("waiting... one or more chunks aren't ready yet\n");
-		
-		} else if (status & INVALID_HASH) {
-			die(-1, "one or more chunks has an invalid hash");
-		
-		} else if (status & REQUEST_FAILED) {
-			die(-1, "no chunks found\n");
-
-		} else {
-			say("unexpected result\n");
-		}
-		sleep(1);
-	}
-
-	say("all chunks ready\n");
-
-	for (int i = 0; i < n; i++) {
-		char *cid = strrchr(cs[i].cid, ':');
-		cid++;
-		say("reading chunk %s\n", cid);
-		if ((len = XreadChunk(csock, data, sizeof(data), 0, cs[i].cid, cs[i].cidLen)) < 0) {
-			say("error getting chunk\n");
-			return -1;
-		}
-
-		// write the chunk to disk
-		// say("writing %d bytes of chunk %s to disk\n", len, cid);
-		fwrite(data, 1, len, fd);
-
-		free(cs[i].cid);
-		cs[i].cid = NULL;
-		cs[i].cidLen = 0;
-	}
-
-	return n;
-}
-
-int initializeClient(const char *name) {
-	int sock, rc;
-	sockaddr_x dag;
-	socklen_t daglen;
-	char sdag[1024];
-	char IP[MAX_XID_SIZE];
-
-	// lookup the xia service 
-	daglen = sizeof(dag);
-	if (XgetDAGbyName(name, &dag, &daglen) < 0)
-		die(-1, "unable to locate: %s\n", name);
-
-	// create a socket, and listen for incoming connections
-	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
-		die(-1, "Unable to create the listening socket\n");
-    
-	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
-		Xclose(sock);
-		die(-1, "Unable to bind to the dag: %s\n", dag);
-	}
-
-	rc = XreadLocalHostAddr(sock, my_ad, MAX_XID_SIZE, my_hid, MAX_XID_SIZE, IP, MAX_XID_SIZE);
-
-	if (rc < 0) {
-		Xclose(sock);
-		die(-1, "Unable to read local address.\n");
-	} else{
-		warn("My AD: %s, My HID: %s\n", my_ad, my_hid);
-	}
-	
-	// save the AD and HID for later. This seems hacky
-	// we need to find a better way to deal with this
-	Graph g(&dag);
-	strncpy(sdag, g.dag_string().c_str(), sizeof(sdag));
-	// say("sdag = %s\n",sdag);
-	char *ads = strstr(sdag,"AD:");
-	char *hids = strstr(sdag,"HID:");
-	// i = sscanf(ads,"%s",s_ad );
-	// i = sscanf(hids,"%s", s_hid);
-	
-	if (sscanf(ads, "%s", s_ad ) < 1 || strncmp(s_ad, "AD:", 3) != 0) {
-		die(-1, "Unable to extract AD.");
-	}
-		
-	if (sscanf(hids,"%s", s_hid) < 1 || strncmp(s_hid, "HID:", 4) != 0) {
-		die(-1, "Unable to extract AD.");
-	}
-
-	warn("Service AD: %s, Service HID: %s\n", s_ad, s_hid);
-	return sock;
-}
 
 //	This is used both to put files and to get files since in case of put I still have to request the file.
 //	Should be fixed with push implementation
-int getSubFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout, int start, int end) {
+int getSubFile(int sock, char *dst_ad, char* dst_hid, const char *fin, const char *fout, int start, int end) {
 	int chunkSock;
 	int offset;
 	char cmd[512];
@@ -519,7 +290,7 @@ int getSubFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *f
 		}
 		offset += NUM_CHUNKS;
 		// &reply[4] are the requested CIDs  
-		if (getListedChunks(chunkSock, f, &reply[4], p_ad, p_hid) < 0) {
+		if (getListedChunks(chunkSock, f, &reply[4], dst_ad, dst_hid) < 0) {
 			status= -1;
 			break;
 		}
@@ -543,9 +314,9 @@ int getSubFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *f
 
 int main() {
 
-	sockfd_ftp = initializeClient(ftp_name); 
-	sockfd_prefetch = registerStreamReceiver(prefetch_pred_name);
-	BlockingListener((void *)&sockfd_prefetch);
+	sockfd_ftp = initializeClient(ftp_name, src_ad, src_hid, dst_ad, dst_hid); 
+	sockfd_prefetch = registerStreamReceiver(prefetch_pred_name, myAD, myHID, my4ID);
+	blockingListener((void *)&sockfd_prefetch);
 
 	//getSubFile(sockfd_ftp, s_ad, s_hid, "4.png", "my4.png", 0, 1);
 }
