@@ -636,7 +636,7 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk) {
 
 		xia::X_Recv_Msg *x_recv_msg = xia_socket_msg->mutable_x_recv();
 		int bytes_requested = x_recv_msg->bytes_requested();
-		bool peek = x_recv_msg->peek();
+		bool peek = x_recv_msg->flags() & MSG_PEEK;
 		int bytes_returned = 0;
 
 		// FIXME - this should use the recv buffer size
@@ -702,7 +702,7 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk) {
 	} else if (sk->sock_type == SOCK_DGRAM || sk->sock_type == SOCK_RAW) {
 		xia::X_Recvfrom_Msg *x_recvfrom_msg = xia_socket_msg->mutable_x_recvfrom();
 	
-		bool peek = x_recvfrom_msg->peek();
+		bool peek = x_recvfrom_msg->flags() & MSG_PEEK;
 
 		// Get just the next packet in the recv buffer (we don't return data from more
 		// than one packet in case the packets came from different senders). If no
@@ -746,6 +746,9 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk) {
 			// this part is the same for everyone
 			String src_path = xiah.src_path().unparse();
 
+			uint16_t iface = SRC_PORT_ANNO(p);
+
+			x_recvfrom_msg->set_interface_id(iface);
 			x_recvfrom_msg->set_payload(payload.c_str(), payload.length());
 			x_recvfrom_msg->set_sender_dag(src_path.c_str());
 			x_recvfrom_msg->set_bytes_returned(data_size);

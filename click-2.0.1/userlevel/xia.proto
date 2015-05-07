@@ -133,14 +133,14 @@ message X_Send_Msg {
 }
 
 message X_Recv_Msg {
-  optional bool peek = 1; // currently not used
+  optional int32 flags = 1;
   optional bytes payload = 2;
   optional int32 bytes_requested = 3;
   optional int32 bytes_returned = 4; // necessary? this will be the result return code as well
 }
 
 message X_Recvfrom_Msg {
-  optional bool peek = 1;
+  optional int32 flags = 1;
   optional int32 interface_id = 2;
   optional string sender_dag = 3;
   optional bytes payload = 4;

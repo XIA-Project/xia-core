@@ -91,6 +91,8 @@ size_t _iovSize(const struct iovec *iov, size_t iovcnt);
 size_t _iovPack(const struct iovec *iov, size_t iovcnt, char **buf);
 int _iovUnpack(const struct iovec *iov, size_t iovcnt, char *buf, size_t len);
 
+int _xrecvfromconn(int sockfd, void *buf, size_t len, int flags, int *iface);
+int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags, sockaddr_x *addr, socklen_t *addrlen, int *iface);
 
 
 extern "C" {

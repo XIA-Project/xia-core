@@ -29,6 +29,12 @@ ssize_t Xrecvmsg(int fd, struct msghdr *msg, int flags)
 {
 	int rc;
 	char *buf;
+	int iface = 0;
+
+	if (validateSocket(fd, XSOCK_DGRAM, EOPNOTSUPP) < 0) {
+		LOGF("Socket %d must be a datagram socket", fd);
+		return -1;
+	}
 
 	if (flags) {
 		LOGF("Flags: %s\n", xferFlags(flags));
@@ -50,11 +56,6 @@ ssize_t Xrecvmsg(int fd, struct msghdr *msg, int flags)
 		return -1;
 	}
 
-	if (getSocketType(fd) != SOCK_DGRAM) {
-		errno = ENOTSOCK;
-		return -1;
-	}
-
 	size_t size = _iovSize(msg->msg_iov, msg->msg_iovlen);
 
 	if (msg->msg_iovlen > 1) {
@@ -64,13 +65,13 @@ ssize_t Xrecvmsg(int fd, struct msghdr *msg, int flags)
 	}
 
 	if (connected) {
-		rc = Xrecv(fd, buf, size, flags);
+		rc = _xrecvfromconn(fd, buf, size, flags, &iface);
 	} else {
 
-		struct sockaddr *sa = (struct sockaddr *)msg->msg_name;
-		socklen_t *len = (sa != NULL ? &msg->msg_namelen : NULL);
+		sockaddr_x *sax = (sockaddr_x *)msg->msg_name;
+		socklen_t *len = (sax != NULL ? &msg->msg_namelen : NULL);
 
-		rc = Xrecvfrom(fd, buf, size, flags, sa, len);
+		rc = _xrecvfrom(fd, buf, size, flags, sax, len, &iface);
 		LOGF("returned:%d\n", rc);
 	}
 
@@ -89,6 +90,21 @@ ssize_t Xrecvmsg(int fd, struct msghdr *msg, int flags)
 			msg->msg_flags = MSG_TRUNC;
 		}
 
+		struct cmsghdr *cmsg;
+		struct in_pktinfo *pinfo;
+
+		for (cmsg = CMSG_FIRSTHDR(msg); cmsg != NULL; cmsg = CMSG_NXTHDR(msg, cmsg)) {
+
+			if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_PKTINFO) {
+				pinfo = (struct in_pktinfo*) CMSG_DATA(cmsg);
+				pinfo->ipi_ifindex = iface;
+				// FIXME: remaining fields in the control msg are ignored
+
+			} else {
+				LOGF("unsupported control type %d\n", cmsg->cmsg_type);
+			}
+		}
+
 	} else if (rc < 0) {
 		msg->msg_flags = MSG_ERRQUEUE; // is this ok?
 
@@ -96,7 +112,9 @@ ssize_t Xrecvmsg(int fd, struct msghdr *msg, int flags)
 		msg->msg_flags = 0;
 	}
 
-	free(buf);
+	if (msg->msg_iovlen > 1) {
+		free(buf);
+	}
 
 	return rc;
 }
@@ -134,11 +152,9 @@ ssize_t sendmsg(int fd, const struct msghdr *msg, int flags)
 		return -1;
 	}
 
-//	if (msg->msg_control != NULL) {
-//		WARNING("XIA unable to handle control info.");
-//		rc = EOPNOTSUPP;
-//		return -1;
-//	}
+	if (msg->msg_control != NULL) {
+		LOG("XIA unable to handle control info on sendmsg.");
+	}
 
 	// let's try to send this thing!
 	char *buf = NULL;

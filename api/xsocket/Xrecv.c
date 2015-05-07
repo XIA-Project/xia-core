@@ -24,9 +24,6 @@
 #include "Xutil.h"
 #include "dagaddr.hpp"
 
-int _xrecvfromconn(int sockfd, void *buf, size_t len, int flags);
-int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags, sockaddr_x *addr, socklen_t *addrlen);
-
 /*!
 ** @brief Receive data from an Xsocket
 **
@@ -54,7 +51,17 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags, sockaddr_x *addr, 
 int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 {
 	int numbytes;
-	int peek = (flags & MSG_PEEK);
+	int iface = 0;
+
+	int stype = getSocketType(sockfd);
+	if (stype == SOCK_DGRAM) {
+		return _xrecvfromconn(sockfd, rbuf, len, flags, &iface);
+
+	} else if (stype != SOCK_STREAM) {
+		LOGF("Socket %d must be a stream or datagram socket", sockfd);
+		errno = EOPNOTSUPP;
+		return -1;
+	}
 
 	if (len == 0)
 		return 0;
@@ -71,15 +78,7 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 		return -1;
 	}
 
-	int stype = getSocketType(sockfd);
-	if (stype == SOCK_DGRAM) {
-		return _xrecvfromconn(sockfd, rbuf, len, flags);
 
-	} else if (stype != SOCK_STREAM) {
-		LOGF("Socket %d must be a stream or datagram socket", sockfd);
-		errno = EOPNOTSUPP;
-		return -1;
-	}
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XRECV);
@@ -88,7 +87,7 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 
 	xia::X_Recv_Msg *xrm = xsm.mutable_x_recv();
 	xrm->set_bytes_requested(len);
-	xrm->set_peek(peek);
+	xrm->set_flags(flags);
 
 	if (click_send(sockfd, &xsm) < 0) {
 		if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
@@ -157,6 +156,8 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 	struct sockaddr *addr, socklen_t *addrlen)
 {
+	int iface = 0;
+
 	if (validateSocket(sockfd, XSOCK_DGRAM, EOPNOTSUPP) < 0) {
 		LOGF("Socket %d must be a datagram socket", sockfd);
 		return -1;
@@ -168,15 +169,14 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		return -1;
 	}
 
-	return _xrecvfrom(sockfd, rbuf, len, flags, (sockaddr_x *)addr, addrlen);
+	return _xrecvfrom(sockfd, rbuf, len, flags, (sockaddr_x *)addr, addrlen, &iface);
 }
 
 
 int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
-	sockaddr_x *addr, socklen_t *addrlen)
+	sockaddr_x *addr, socklen_t *addrlen, int *iface)
 {
     int numbytes;
-    int peek = (flags & MSG_PEEK);
 
 	if (!rbuf || (addr && !addrlen)) {
 		LOG("null pointer!\n");
@@ -202,7 +202,7 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 
 	xrm = xsm.mutable_x_recvfrom();
 	xrm->set_bytes_requested(len);
-	xrm->set_peek(peek);
+	xrm->set_flags(flags);
 
 	if (click_send(sockfd, &xsm) < 0) {
 		if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
@@ -222,6 +222,8 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 	xrm = xsm.mutable_x_recvfrom();
 	payload = xrm->payload().c_str();
 	paylen = xrm->bytes_returned();
+
+	*iface = xrm->interface_id();
 
 	if ((unsigned)paylen <= len) {
 		memcpy(rbuf, payload, paylen);
@@ -243,7 +245,7 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
     return paylen;
 }
 
-int _xrecvfromconn(int sockfd, void *rbuf, size_t len, int flags)
+int _xrecvfromconn(int sockfd, void *rbuf, size_t len, int flags, int *iface)
 {
 
 	int rc;
@@ -256,12 +258,28 @@ int _xrecvfromconn(int sockfd, void *rbuf, size_t len, int flags)
 		return -1;
 	}
 
+	if (len == 0)
+		return 0;
+
+	if (!rbuf) {
+		LOG("buffer pointer is null!\n");
+		errno = EFAULT;
+		return -1;
+	}
+
+	if (getConnState(sockfd) != CONNECTED) {
+		LOGF("Socket %d is not connected", sockfd);
+		errno = ENOTCONN;
+		return -1;
+	}
+
 	Node nPeer = g.get_final_intent();
 
+	// the loop discards packets that are received on the socket and are not from our connected peer
 	while (1) {
 
 		addrlen = sizeof(sa);
-		rc = _xrecvfrom(sockfd, rbuf, len, flags, &sa, &addrlen);
+		rc = _xrecvfrom(sockfd, rbuf, len, flags, &sa, &addrlen, iface);
 
 		if (rc < 0)
 			return rc;
