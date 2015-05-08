@@ -20,7 +20,6 @@
 #define REREQUEST 3
 
 #define NUM_CHUNKS	10
-#define NUM_PROMPTS	2
 
 /*
 #define MAXBUFLEN = XIA_MAXBUF = XIA_MAXCHUNK = 15600
@@ -58,5 +57,7 @@ int buildChunkDAGs(ChunkStatus cs[], char *chunks, char *dst_ad, char *dst_hid);
 int getListedChunks(int csock, FILE *fd, char *chunks, char *dst_ad, char *dst_hid);
 
 int registerStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID);
+
+void *blockListener(void *socketid, void *recvFuntion (void *tempid));
 
 #endif

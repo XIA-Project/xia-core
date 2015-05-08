@@ -310,3 +310,24 @@ int registerStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) {
 	say("listening on dag: %s\n", g.dag_string().c_str());
   return sock;  
 }
+
+void *blockListener(void *socketid, void *recvFuntion (void *tempid)) {
+  int sock = *((int*)socketid);
+  int acceptSock;
+
+  while (1) {
+		say("Waiting for a client connection\n");
+   		
+		if ((acceptSock = Xaccept(sock, NULL, NULL)) < 0)
+			die(-1, "accept failed\n");
+
+		say("connected\n");
+		
+		// handle the connection in a new thread
+		pthread_t client;
+		pthread_create(&client, NULL, recvFuntion, (void *)&acceptSock);
+	}
+	
+	Xclose(sock); // we should never reach here!
+	return NULL;
+}

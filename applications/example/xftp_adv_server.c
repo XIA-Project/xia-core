@@ -36,9 +36,6 @@ void *recvCmd (void *socketid) {
 	char reply[XIA_MAXBUF];
 	int sock = *((int*)socketid);
 	char *fname;
-	char fin[512], fout[512];
-	char ad[MAX_XID_SIZE];
-	char hid[MAX_XID_SIZE];
 
 	//ChunkContext contains size, ttl, policy, and contextID which for now is PID
 	ChunkContext *ctx = XallocCacheSlice(POLICY_FIFO|POLICY_REMOVE_ON_EXIT, 0, 20000000);

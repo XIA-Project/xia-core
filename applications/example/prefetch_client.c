@@ -16,18 +16,6 @@
 */
 /*simple interactive echo client using Xsockets */
 
-#include <stdio.h>
-#include <stdarg.h>
-#include <time.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <pthread.h>
-#include "Xsocket.h"
-#include "dagaddr.hpp"
-#include <assert.h>
-
-#include "Xkeys.h"
-
 #include "prefetch_utils.h"
 
 #define VERSION "v1.0"
@@ -37,24 +25,19 @@ char myAD[MAX_XID_SIZE];
 char myHID[MAX_XID_SIZE];
 char my4ID[MAX_XID_SIZE];
 
-char src_ad[MAX_XID_SIZE];
-char src_hid[MAX_XID_SIZE];
+char prefetchProfileAD[MAX_XID_SIZE];
+char prefetchProfileHID[MAX_XID_SIZE];
 
-char dst_ad[MAX_XID_SIZE];
-char dst_hid[MAX_XID_SIZE];
-
-
-char* ftp_name = "www_s.ftp.advanced.aaa.xia";
-char* prefetch_client_name = "www_s.client.prefetch.aaa.xia";
 char* prefetch_profile_name = "www_s.profile.prefetch.aaa.xia";
-char* prefetch_pred_name = "www_s.prediction.prefetch.aaa.xia";
-char* prefetch_exec_name = "www_s.executer.prefetch.aaa.xia";
 
+// TODO: handoff msg reception
 // TODO: clean up
 char* prefetch_ctx_name = "www_s.prefetch_context_listener.aaa.xia";
 //char* prefetch_pred_name = "www_s.prefetch_prediction_listener.aaa.xia";
 
-int sockfd_ctx, sockfd_cid, sockfd_pred;
+int sockfd_ctx;
+int sockfd_cid;
+int sockfd_pred;
 
 
 // prefetch_client receives context updates and send predicted CID_s to prefetch_server
@@ -425,7 +408,8 @@ void *ctxBlockingListener(void *socketid) {
 
 int main() {
 
-	sockfd_pred = initializeClient(prefetch_pred_name, src_ad, src_hid, dst_ad, dst_hid);
+	// TODOL change to profile
+	sockfd_pred = initializeClient(prefetch_profile_name, myAD, myHID, prefetchProfileAD, prefetchProfileHID);
 
 	sockfd_ctx = registerStreamReceiver(prefetch_ctx_name);
 	ctxBlockingListener((void *)&sockfd_ctx);

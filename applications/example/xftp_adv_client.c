@@ -32,25 +32,27 @@
 #define VERSION "v1.0"
 #define TITLE "XIA Advanced FTP client"
 
-// global configuration options
-bool quick = false;
+#define NUM_PROMPTS	2
 
-char src_ad[MAX_XID_SIZE];
-char src_hid[MAX_XID_SIZE];
+char myAD[MAX_XID_SIZE];
+char myHID[MAX_XID_SIZE];
 
-char dst_ad[MAX_XID_SIZE];
-char dst_hid[MAX_XID_SIZE];
+char ftpAD[MAX_XID_SIZE];
+char ftpHID[MAX_XID_SIZE];
+
+char prefetchClientAD[MAX_XID_SIZE];
+char prefetchClientHID[MAX_XID_SIZE];
+
+char prefetchProfileAD[MAX_XID_SIZE];
+char prefetchProfileHID[MAX_XID_SIZE];
 
 char *ftp_name = "www_s.ftp.advanced.aaa.xia";
 char *prefetch_client_name = "www_s.client.prefetch.aaa.xia";
 char *prefetch_profile_name = "www_s.profile.prefetch.aaa.xia";
-char *prefetch_pred_name = "www_s.prediction.prefetch.aaa.xia";
-char *prefetch_exec_name = "www_s.executer.prefetch.aaa.xia";
 
-//char *prefetch_ctx_name = "www_s.prefetch_context_listener.aaa.xia";
-
-int ftp_sock = -1;
-int	prefetch_ctx_sock = -1;
+int ftpSock;
+int prefetchClientSock;
+int	prefetchProfileSock;
 
 int getFile(int sock, char *p_ad, char *p_hid, const char *fin, const char *fout) {
 	int chunkSock;
@@ -70,8 +72,7 @@ int getFile(int sock, char *p_ad, char *p_hid, const char *fin, const char *fout
 		return -1;
 	}
 
-	// reply: OK: ***
-	int count = atoi(&reply[4]);
+	int count = atoi(&reply[4]); 	// reply: OK: ***
 
 	say("%d chunks in total\n", count);
 
@@ -83,7 +84,9 @@ int getFile(int sock, char *p_ad, char *p_hid, const char *fin, const char *fout
 	offset = 0;
 
 	struct timeval tv;
-	int start_msec, temp_start_msec, temp_end_msec;
+	int start_msec = 0;
+	int temp_start_msec = 0;
+	int temp_end_msec = 0;
 	
 	if (gettimeofday(&tv, NULL) == 0)
 		start_msec = ((tv.tv_sec % 86400) * 1000 + tv.tv_usec / 1000);
@@ -142,8 +145,7 @@ int getFile(int sock, char *p_ad, char *p_hid, const char *fin, const char *fout
 }
 
 int main(int argc, char **argv) {	
-	const char *name;
-	int sock = -1;
+
 	char fin[512], fout[512];
 	char cmd[512], reply[512];
 	int params = -1;
@@ -157,59 +159,21 @@ int main(int argc, char **argv) {
 */
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 	
-	if (argc == 1) {
-		say ("No service name passed, using default: %s\nYou can also pass --quick to execute a couple of default commands for quick testing. Requires s.txt to exist. \n", ftp_name);
-		sock = initializeClient(ftp_name, src_ad, src_hid, dst_ad, dst_hid);
-		usage();
-	} 
-	else if (argc == 2) {
-		if (strcmp(argv[1], "--quick") == 0) {
-			quick = true;
-			name = ftp_name;
-		} 
-		else {
-			name = argv[1];
-			usage();
-		}
-		say ("Connecting to: %s\n", name);
-		sock = initializeClient(name, src_ad, src_hid, dst_ad, dst_hid);
-	} 
-	else if (argc == 3) {
-		if (strcmp(argv[1], "--quick") == 0) {
-			quick = true;
-			name = argv[2];
-			say ("Connecting to: %s\n", name, src_ad, src_hid);
-			sock = initializeClient(name, src_ad, src_hid, dst_ad, dst_hid);
-			usage();
-		} 
-		else {
-			die(-1, "xftp [--quick] [SID]");
-		}
-	} 
-	else {
-		die(-1, "xftp [--quick] [SID]"); 
-	}
-	
-	int i = 0;
+	ftpSock = initializeClient(ftp_name, myAD, myHID, ftpAD, ftpHID);
+	//prefetchClientSock = initializeClient(prefetch_client_name, myAD, myHID, prefetchClientAD, prefetchClientHID);
+	//prefetchProfileSock = initializeClient(prefetch_profile_name, myAD, myHID, prefetchProfileAD, prefetchProfileHID);
 
-	// This is for quick testing with a couple of commands
-	while (i < NUM_PROMPTS) {
+	usage();
+
+	while (1) {
 		say(">>");
 		cmd[0] = '\n';
 		fin[0] = '\n';
 		fout[0] = '\n';
 		params = -1;
 		
-		if (quick) {
-			if (i == 0)
-				strcpy(cmd, "put s.txt r.txt");
-			else if (i == 1)
-				strcpy(cmd, "get r.txt sr.txt\n");
-			i++;
-		} 
-		else {
-			fgets(cmd, 511, stdin);
-		}
+		fgets(cmd, 511, stdin); // read input into cmd
+
 		// compare the first three characters
 		if (strncmp(cmd, "get", 3) == 0) {
 			// params is the number of arguments
@@ -224,7 +188,7 @@ int main(int argc, char **argv) {
 				warn("Since both applications write to the same folder (local case) the names should be different.\n");
 				continue;
 			}
-			getFile(sock, dst_ad, dst_hid, fin, fout);
+			getFile(ftpSock, ftpAD, ftpHID, fin, fout);
 		}
 		else {
 			sprintf(reply, "FAIL: invalid command (%s)\n", cmd);
@@ -232,6 +196,5 @@ int main(int argc, char **argv) {
 			usage();
 		}
 	}
-	
 	return 1;
 }
