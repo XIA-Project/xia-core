@@ -47,146 +47,11 @@ char *prefetch_profile_name = "www_s.profile.prefetch.aaa.xia";
 char *prefetch_pred_name = "www_s.prediction.prefetch.aaa.xia";
 char *prefetch_exec_name = "www_s.executer.prefetch.aaa.xia";
 
-char *prefetch_ctx_name = "www_s.prefetch_context_listener.aaa.xia";
+//char *prefetch_ctx_name = "www_s.prefetch_context_listener.aaa.xia";
 
 int ftp_sock = -1;
 int	prefetch_ctx_sock = -1;
 
-int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout);
-
-void *recvCmd (void *socketid) {
-	int i, n, count = 0;
-	ChunkInfo *info = NULL;
-	char command[XIA_MAXBUF];
-	char reply[XIA_MAXBUF];
-	int sock = *((int*)socketid);
-	char *fname;
-	
-	//ChunkContext contains size, ttl, policy, and contextID which for now is PID
-	ChunkContext *ctx = XallocCacheSlice(POLICY_FIFO|POLICY_REMOVE_ON_EXIT, 0, 20000000);
-	if (ctx == NULL)
-		die(-2, "Unable to initilize the chunking system\n");
-
-	while (1) {
-		say("waiting for server command\n");
-		memset(command, '\0', strlen(command));
-		memset(reply, '\0', strlen(reply));
-		if ((n = Xrecv(sock, command, 1024, 0))  < 0) {
-			warn("socket error while waiting for data, closing connection\n");
-			break;
-		}
-		// Sender does the chunking and then should start the sending commands
-		if (strncmp(command, "get", 3) == 0) {
-			fname = &command[4];
-			say("Server requested file %s\n", fname);
-
-			if (info) {
-				// clean up the existing chunks first
-			}
-		
-			info = NULL;
-			count = 0;
-			
-			say("chunking file %s\n", fname);
-			
-			// Chunking is done by the XputFile which itself uses XputChunk, and fills out the info
-			if ((count = XputFile(ctx, fname, CHUNKSIZE, &info)) < 0) {
-				warn("unable to serve the file: %s\n", fname);
-				sprintf(reply, "FAIL: File (%s) not found", fname);
-			} 
-			else {
-				sprintf(reply, "OK: %d", count);
-			}
-			say("%s\n", reply);
-			
-			// Just tells the receiver how many chunks it should expect in total.
-			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
-				warn("unable to send reply to client\n");
-				break;
-			}
-		} 
-		else if (strncmp(command, "block", 5) == 0) {
-			char *start = &command[6];
-			char *end = strchr(start, ':');
-			if (!end) {
-				// we have an invalid command, return error to client
-				sprintf(reply, "FAIL: invalid block command");
-			} 
-			else {
-				*end = 0;
-				end++;
-				// FIXME: clean up naming, e is now a count
-				int s = atoi(start);
-				int e = s + atoi(end);
-				strcpy(reply, "OK:");
-				for(i = s; i < e && i < count; i++) {
-					strcat(reply, " ");
-					strcat(reply, info[i].cid);
-				}
-			}
-			printf("%s\n", reply);
-			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
-				warn("unable to send reply to client\n");
-				break;
-			}
-		} 
-		else if (strncmp(command, "done", 4) == 0) {
-			say("done sending file: removing the chunks from the cache\n");
-			for (int i = 0; i < count; i++)
-				XremoveChunk(ctx, info[i].cid);
-			XfreeChunkInfo(info);
-			info = NULL;
-			count = 0;
-			break;		
-		}
-		else {
-			sprintf(reply, "FAIL: invalid command (%s)\n", command);
-			warn(reply);
-			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
-				warn("unable to send reply to client\n");
-				break;
-			}
-		}
-	}
-	
-	if (info)
-		XfreeChunkInfo(info);
-	XfreeCacheSlice(ctx);
-	return (void *)1;
-}
-
-void *blockingListener(void *socketid) {
-  int sock = *((int*)socketid);
-  int acceptSock;
-  while (1) {
-		say("Waiting for a client connection\n");
-   		
-		if ((acceptSock = Xaccept(sock, NULL, NULL)) < 0)
-			die(-1, "accept failed\n");
-
-		say("connected\n");
-		
-		// handle the connection in a new thread
-		pthread_t client;
-		pthread_create(&client, NULL, recvCmd, (void *)&acceptSock);
-	}
-	
-	Xclose(sock); // we should never reach here!
-	return NULL;
-}
-
-//FIXME Apparently XPutFile exists so use that instead.
-//FIXME hardcoded ad-hid format for dag.
-void putFile(int sock, char *ad, char *hid, const char *fin, const char *fout) {
-	char cmd[512];
-	sprintf(cmd, "put %s %s %s %s ", ad, hid, fin, fout);
-	sendCmd(sock, cmd);
-	recvCmd((void *)&sock);
-	say("done with put file\n");
-}
-
-//	This is used both to put files and to get files since in case of put I still have to request the file.
-//	Should be fixed with push implementation
 int getFile(int sock, char *p_ad, char *p_hid, const char *fin, const char *fout) {
 	int chunkSock;
 	int offset;
@@ -196,7 +61,7 @@ int getFile(int sock, char *p_ad, char *p_hid, const char *fin, const char *fout
 	char prefetch_cmd[512];
 
 	// send the file request to the xftp server
-	sprintf(cmd, "get %s",  fin);
+	sprintf(cmd, "get %s", fin);
 	sendCmd(sock, cmd);
 
 	// get back number of chunks in the file
@@ -283,8 +148,7 @@ int main(int argc, char **argv) {
 	char cmd[512], reply[512];
 	int params = -1;
 
-	prefetch_ctx_sock = initializeClient(prefetch_ctx_name, src_ad, src_hid, dst_ad, dst_hid);
-
+	//prefetch_ctx_sock = initializeClient(prefetch_ctx_name, src_ad, src_hid, dst_ad, dst_hid);
 /*
 	// say hello to the connext server
 	char* hi = "Hello from context client";		
@@ -346,7 +210,6 @@ int main(int argc, char **argv) {
 		else {
 			fgets(cmd, 511, stdin);
 		}
-
 		// compare the first three characters
 		if (strncmp(cmd, "get", 3) == 0) {
 			// params is the number of arguments
@@ -362,24 +225,6 @@ int main(int argc, char **argv) {
 				continue;
 			}
 			getFile(sock, dst_ad, dst_hid, fin, fout);
-		}
-		else if (strncmp(cmd, "put", 3) == 0) {
-			params = sscanf(cmd,"put %s %s", fin, fout);
-			if (params != 2) {
-				sprintf(reply, "FAIL: invalid command (%s)\n", cmd);
-				warn(reply);
-				usage();
-				continue;
-			}
-			if (strcmp(fin, fout) == 0) {
-				warn("Since both applications write to the same folder (local case) the names should be different.\n");
-				continue;
-			}
-			if (!file_exists(fin)) {
-				warn("Source file: %s doesn't exist\n", fin);
-				continue;
-			}
-			putFile(sock, src_ad, src_hid, fin, fout);
 		}
 		else {
 			sprintf(reply, "FAIL: invalid command (%s)\n", cmd);

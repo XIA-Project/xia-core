@@ -37,7 +37,6 @@ void *recvCmd (void *socketid) {
 	int sock = *((int*)socketid);
 	char *fname;
 	char fin[512], fout[512];
-	// char **params;
 	char ad[MAX_XID_SIZE];
 	char hid[MAX_XID_SIZE];
 
@@ -48,15 +47,14 @@ void *recvCmd (void *socketid) {
 
 	while (1) {
 		say("waiting for command\n");
-		
 		memset(command, '\0', strlen(command));
 		memset(reply, '\0', strlen(reply));
 		
-		if ((n = Xrecv(sock, command, 1024, 0))  < 0) {
+		if ((n = Xrecv(sock, command, 1024, 0)) < 0) {
 			warn("socket error while waiting for data, closing connection\n");
 			break;
 		}
-		// Sender does the chunking and then should start the sending commands
+		// Server chunk the content and then should start the sending commands
 		if (strncmp(command, "get", 3) == 0) {
 			fname = &command[4];
 			say("client requested file %s\n", fname);
@@ -80,21 +78,19 @@ void *recvCmd (void *socketid) {
 			}
 			say("%s\n", reply);
 			
-			// Just tells the receiver how many chunks it should expect.
+			// send the total number of chunks back
 			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
 				warn("unable to send reply to client\n");
 				break;
 			}
 		} 
-		// Sending the blocks cids
+		// sending the cids (info[i].cid) back
 		else if (strncmp(command, "block", 5) == 0) {
 			// command: "block %d:%d", offset, num
-			char *start = &command[6];
-			char *end = strchr(start, ':');
-			if (!end) {
-				// we have an invalid command, return error to client
-				sprintf(reply, "FAIL: invalid block command");
-			} 
+			char *start = &command[6]; // offset
+			char *end = strchr(start, ':'); // get 
+			if (!end) 
+				sprintf(reply, "FAIL: invalid block command");			
 			else {
 				*end = 0;
 				end++;
@@ -102,12 +98,11 @@ void *recvCmd (void *socketid) {
 				int s = atoi(start);
 				int e = s + atoi(end);
 				strcpy(reply, "OK:");
-				for(i = s; i < e && i < count; i++) {
+				for (i = s; i < e && i < count; i++) {
 					strcat(reply, " ");
 					strcat(reply, info[i].cid);
 				}
 			}
-			// print all the CIDs and send back
 			printf("%s\n", reply);
 			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
 				warn("unable to send reply to client\n");
