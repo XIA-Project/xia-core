@@ -2,9 +2,6 @@
 
 int verbose = 1;
 
-/*
-** write the message to stdout unless in quiet mode
-*/
 void say(const char *fmt, ...) {
 	if (verbose) {
 		va_list args;
@@ -15,9 +12,6 @@ void say(const char *fmt, ...) {
 	}
 }
 
-/*
-** always write the message to stdout
-*/
 void warn(const char *fmt, ...) {
 	va_list args;
 
@@ -26,9 +20,6 @@ void warn(const char *fmt, ...) {
 	va_end(args);
 }
 
-/*
-** write the message to stdout, and exit the app
-*/
 void die(int ecode, const char *fmt, ...) {
 	va_list args;
 
@@ -49,9 +40,9 @@ char** str_split(char* a_str, const char *a_delim) {
 	char* last_delim = 0;
 
 	/* Count how many elements will be extracted. */
-	for(i = 0 ; i < str_len; i++) 
-		for(j = 0 ; j < del_len; j++) 
-			if( a_str[i] == a_delim[j]){
+	for (i = 0; i < str_len; i++) 
+		for (j = 0; j < del_len; j++) 
+			if(a_str[i] == a_delim[j]) {
 				count++;
 				last_delim = &a_str[i];
 			}
@@ -62,7 +53,7 @@ char** str_split(char* a_str, const char *a_delim) {
 			knows where the list of returned strings ends. */
  	count++;
 
-	result = (char **) malloc(sizeof(char*) * count);
+	result = (char **)malloc(sizeof(char*) * count);
 	
 	// printf ("Splitting string \"%s\" into %i tokens:\n", a_str, count);
 	
@@ -91,15 +82,40 @@ bool file_exists(const char * filename) {
 }
 
 int sendCmd(int sock, const char *cmd) {
-	int n;
-	warn("Sending Command: %s \n", cmd);
 
+	warn("Sending Command: %s \n", cmd);
+	int n;
 	if ((n = Xsend(sock, cmd,  strlen(cmd), 0)) < 0) {
 		Xclose(sock);
 		 die(-1, "Unable to communicate\n");
 	}
-
 	return n;
+}
+
+int sayHello(int sock, const char *helloMsg) {
+	int m = sendCmd(sock, helloMsg); 
+	return m;
+}
+
+int hearHello(int sock) { //, const char *helloMsg) {
+	char command[XIA_MAXBUF];
+	memset(command, '\0', strlen(command));
+	int n;
+	if ((n = Xrecv(sock, command, RECV_BUF_SIZE, 0))  < 0) {
+		warn("socket error while waiting for data, closing connection\n");
+	}
+	printf("%s\n", command);	
+	return n;
+	/*
+	if (strncmp(command, "get", 3) == 0) {
+		sscanf(command, "get %s %d %d", fin, &start, &end);
+		printf("get %s %d %d\n", fin, start, end);
+	if (strncmp(command, "Hello from context client", 25) == 0) {
+		say("Received hello from context client\n");
+		char* hello = "Hello from prefetch client";
+		sendCmd(prefetchProfileSock, hello);
+	}	
+	*/
 }
 
 int initializeClient(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid) {
@@ -139,8 +155,6 @@ int initializeClient(const char *name, char *src_ad, char *src_hid, char *dst_ad
 	// say("sdag = %s\n",sdag);
 	char *ads = strstr(sdag,"AD:");
 	char *hids = strstr(sdag,"HID:");
-	// i = sscanf(ads,"%s",s_ad );
-	// i = sscanf(hids,"%s", s_hid);
 	
 	if (sscanf(ads, "%s", dst_ad) < 1 || strncmp(dst_ad, "AD:", 3) != 0) {
 		die(-1, "Unable to extract AD.");
@@ -233,18 +247,17 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *dst_ad, char *dst_h
 		else if (status < 0) {
 			say("error getting chunk status\n");
 			return -1;
-
-		} else if (status & WAITING_FOR_CHUNK) {
-			// one or more chunks aren't ready.
+		} 
+		else if (status & WAITING_FOR_CHUNK) {
 			say("waiting... one or more chunks aren't ready yet\n");
-		
-		} else if (status & INVALID_HASH) {
+		} 
+		else if (status & INVALID_HASH) {
 			die(-1, "one or more chunks has an invalid hash");
-		
-		} else if (status & REQUEST_FAILED) {
+		} 
+		else if (status & REQUEST_FAILED) {
 			die(-1, "no chunks found\n");
-
-		} else {
+		} 
+		else {
 			say("unexpected result\n");
 		}
 		sleep(1);
@@ -260,8 +273,6 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *dst_ad, char *dst_h
 			say("error getting chunk\n");
 			return -1;
 		}
-
-		// write the chunk to disk
 		// say("writing %d bytes of chunk %s to disk\n", len, cid);
 		fwrite(data, 1, len, fd);
 
@@ -269,11 +280,10 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *dst_ad, char *dst_h
 		cs[i].cid = NULL;
 		cs[i].cidLen = 0;
 	}
-
 	return n;
 }
 
-// Just registering the service and openning the necessary sockets
+// register the service with the name server and open the necessary sockets
 int registerStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) {
 	int sock;
 
@@ -292,7 +302,7 @@ int registerStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) {
 	}
 
 	struct addrinfo *ai;
-  // FIXED: from hardcoded SID to sid_string randomly generated
+
 	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
 		die(-1, "getaddrinfo failure!\n");
 
@@ -311,14 +321,14 @@ int registerStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) {
   return sock;  
 }
 
-void *blockListener(void *socketid, void *recvFuntion (void *tempid)) {
-  int sock = *((int*)socketid);
+void *blockListener(void *listenID, void *recvFuntion (void *)) {
+  int listenSock = *((int*)listenID);
   int acceptSock;
 
   while (1) {
 		say("Waiting for a client connection\n");
    		
-		if ((acceptSock = Xaccept(sock, NULL, NULL)) < 0)
+		if ((acceptSock = Xaccept(listenSock, NULL, NULL)) < 0)
 			die(-1, "accept failed\n");
 
 		say("connected\n");
@@ -328,6 +338,6 @@ void *blockListener(void *socketid, void *recvFuntion (void *tempid)) {
 		pthread_create(&client, NULL, recvFuntion, (void *)&acceptSock);
 	}
 	
-	Xclose(sock); // we should never reach here!
+	Xclose(listenSock); // we should never reach here!
 	return NULL;
 }
