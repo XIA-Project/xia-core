@@ -35,6 +35,7 @@
 #define SEQNUM_WINDOW_D 1000
 #define UPDATE_LATENCY_D 60
 #define UPDATE_CONFIG_D 5
+#define ENABLE_SID_CTL_D 0
 
 #define BHID "HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 #define SID_XROUTE "SID:1110000000000000000000000000000000001112"
@@ -47,6 +48,12 @@
 #define PURE_LOADBALANCE 1 
 #define USER_DEFINDED_FUN_1 2 
 #define USER_DEFINDED_FUN_2 3
+
+// architectures of controllers of a SID
+#define ARCH_DIST 0 //purely distributed no coordination
+#define ARCH_CENT 1 //all queries are forwardded to one leader controller
+#define ARCH_SYNC 2 //states are synced among controllers, every controller replies to queries
+
 
 typedef struct DecisionIO // the struct for decison input and output
 {
@@ -64,9 +71,9 @@ typedef struct ServiceState
     int capacity; // should be a controller-only info, but we still announce it
     int capacity_factor; // to be moved to controller-only
     int link_factor; // to be moved to controller-only
-    int isController; // whether this instance is also a service controller, 0 for no
-    std::string controllerAddr; // the address of the service controller
-    int archType; // type of architecture of this service
+    int isLeader; // whether this instance is also a service controller, 0 for no
+    std::string leaderAddr; // the address of the service controller
+    int archType; // the architecture of the controllers
     std::map<std::string, int> delays; // the delays from ADs to the instance {AD:delay}
 
     // SID-controller-only info
@@ -172,8 +179,8 @@ int processInterdomainLSA(ControlMessage msg);
 // process a LinkStateAdvertisement message 
 int processLSA(ControlMessage msg);
 
-// SID routing service management plane: keep alive with its service controller 
-int sendKeepAliveToServiceController();
+// SID service side coordination : keep alive with the leader controller
+int sendKeepAliveToServiceControllerLeader();
 
 int processServiceKeepAlive(ControlMessage msg);
 

@@ -40,6 +40,7 @@ int UPDATE_CONFIG = UPDATE_CONFIG_D;
 int MAX_HOP_COUNT  = MAX_HOP_COUNT_D;
 int MAX_SEQNUM = MAX_SEQNUM_D;
 int SEQNUM_WINDOW = SEQNUM_WINDOW_D;
+int ENABLE_SID_CTL = ENABLE_SID_CTL_D;
 
 
 char *hostname = NULL;
@@ -275,7 +276,7 @@ int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> rout
 	}
 }
 
-int sendKeepAliveToServiceController()
+int sendKeepAliveToServiceControllerLeader()
 {
     int rc = 1;
     int type = 0;
@@ -288,21 +289,21 @@ int sendKeepAliveToServiceController()
         msg.append(it->second.capacity);
         // TODO:append some more states
 
-        if (it->second.isController){
+        if (it->second.isLeader){
             msg.read(type); // remove it to match the correct format for the process function
             processServiceKeepAlive(msg); // process locally
         }
         else
         {
             sockaddr_x ddag;
-            Graph g(it->second.controllerAddr);
+            Graph g(it->second.leaderAddr);
             g.fill_sockaddr(&ddag);
             int temprc = msg.send(route_state.sock, &ddag);
             if (temprc < 0) {
-                syslog(LOG_ERR, "error sending SID keep alive to %s", it->second.controllerAddr.c_str());
+                syslog(LOG_ERR, "error sending SID keep alive to %s", it->second.leaderAddr.c_str());
             }
             rc = (temprc < rc)? temprc : rc;
-            //syslog(LOG_DEBUG, "sent SID %s keep alive to %s", it->first.c_str(), it->second.controllerAddr.c_str());
+            //syslog(LOG_DEBUG, "sent SID %s keep alive to %s", it->first.c_str(), it->second.leaderAddr.c_str());
         }
     }
 
@@ -331,7 +332,7 @@ int processServiceKeepAlive(ControlMessage msg)
     }
     else
     {
-        syslog(LOG_ERR, "got SID %s keep alive to its service controller from %s, but I am not!", sid.c_str(), srcAddr.c_str());
+        syslog(LOG_ERR, "got %s keep alive to its service controller from %s, but I am not its leader!", sid.c_str(), srcAddr.c_str());
         rc = -1;
     }
 
@@ -352,7 +353,7 @@ int sendSidDiscovery()
     }
     else // prepare the packet TODO: only send updated entries TODO: but don't forget to renew TTL
     {
-        sendKeepAliveToServiceController(); // temporally put it here
+        sendKeepAliveToServiceControllerLeader(); // temporally put it here
         // DOTO: the format of this packet could be reduced much
         // local info
         msg.append(route_state.LocalSidList.size());
@@ -366,7 +367,7 @@ int sendSidDiscovery()
             msg.append(it->second.capacity_factor);
             msg.append(it->second.link_factor);
             msg.append(it->second.priority);
-            msg.append(it->second.controllerAddr);
+            msg.append(it->second.leaderAddr);
             msg.append(it->second.archType);
             msg.append(it->second.seq);
         }
@@ -387,7 +388,7 @@ int sendSidDiscovery()
                 msg.append(it_ad->second.capacity_factor);
                 msg.append(it_ad->second.link_factor);
                 msg.append(it_ad->second.priority);
-                msg.append(it_ad->second.controllerAddr);
+                msg.append(it_ad->second.leaderAddr);
                 msg.append(it_ad->second.archType);
                 msg.append(it_ad->second.seq);
             }
@@ -435,7 +436,7 @@ int processSidDiscovery(ControlMessage msg)
     int records = 0;
     int capacity, capacity_factor, link_factor, priority, seq;
     int archType;
-    string controllerAddr;
+    string leaderAddr;
 
     msg.read(srcAD);
     msg.read(srcHID);
@@ -454,7 +455,7 @@ int processSidDiscovery(ControlMessage msg)
         msg.read(capacity_factor);
         msg.read(link_factor);
         msg.read(priority);
-        msg.read(controllerAddr);
+        msg.read(leaderAddr);
         msg.read(archType);
         msg.read(seq);
         service_state.capacity = capacity;
@@ -462,7 +463,7 @@ int processSidDiscovery(ControlMessage msg)
         service_state.link_factor = link_factor;
         service_state.priority = priority;
         //syslog(LOG_INFO, "Get broadcast SID %s@%s, p= %d,s=%d",SID.c_str(), AD.c_str(), priority, seq);
-        service_state.controllerAddr = controllerAddr;
+        service_state.leaderAddr = leaderAddr;
         service_state.archType = archType;
         service_state.seq = seq;
         service_state.percentage = 0;
@@ -486,12 +487,12 @@ int processSidDiscovery(ControlMessage msg)
             msg.read(capacity_factor);
             msg.read(link_factor);
             msg.read(priority);
-            msg.read(controllerAddr);
+            msg.read(leaderAddr);
             msg.read(archType);
             msg.read(seq);
             service_state.capacity = capacity;
             service_state.capacity_factor = capacity_factor;
-            service_state.controllerAddr = controllerAddr;
+            service_state.leaderAddr = leaderAddr;
             service_state.link_factor = link_factor;
             service_state.priority = priority;
             //syslog(LOG_INFO, "Get re-broadcast SID %s@%s, p= %d,s=%d",SID.c_str(), AD.c_str(), priority, seq);
@@ -614,54 +615,86 @@ int processSidDecisionQuery(ControlMessage msg)
     msg.read(records);//number of entries
     syslog(LOG_INFO, "Get %d latencies for %s", records, SID.c_str());
 
-    std::map<std::string, DecisionIO> decisions;
-    for (int i = 0; i < records; ++i)
-    {
-        msg.read(AD);
-        msg.read(latency);
-        msg.read(capacity);
-        DecisionIO dio;
-        dio.capacity = capacity;
-        dio.latency = latency;
-        dio.percentage = 0;
-        decisions[AD] = dio;
-        syslog(LOG_INFO, "Get %d ms for %s", latency, AD.c_str());
-    }
-    // compute the weights
-    // rate is not implemented yet
-    it_sid->second.decision(srcAD, 0, &decisions);
+    if (it_sid->second.archType == ARCH_CENT && !it_sid->second.isLeader){ // should forward to the leader
 
-    //TODO: reply the query
-    ControlMessage re_msg(CTL_SID_DECISION_ANSWER, route_state.myAD, route_state.myHID);
-    re_msg.append(SID); // SID
-    re_msg.append(decisions.size()); // SID
-    std::map<std::string, DecisionIO>::iterator it_ds;
-    for (it_ds = decisions.begin(); it_ds != decisions.end(); ++it_ds){
-        re_msg.append(it_ds->first);
-        re_msg.append(it_ds->second.percentage);
-    }
-
-    // send the msg
-    if (srcAD == route_state.myAD){ // I'm the one
-        syslog(LOG_DEBUG, "Sending SID decision locally");
-        int type;
-        re_msg.read(type); // remove it to match the correct format for the process function
-        processSidDecisionAnswer(re_msg); // process locally
-    }
-    else
-    {
+        // are we forging src addr?
+        // should use new control message type CTL_SID_DECISION_FORWARD?
+        ControlMessage f_msg(CTL_SID_DECISION_QUERY, srcAD, srcHID);
+        // TODO: is there a cheaper way to copy the whole message?
+        f_msg.append(records);
+        for (int i = 0; i < records; ++i)
+        {
+            msg.read(AD);
+            msg.read(latency);
+            msg.read(capacity);
+            f_msg.append(AD);
+            f_msg.append(latency);
+            f_msg.append(capacity);
+        }
         sockaddr_x ddag;
-        Graph g = Node() * Node(srcAD) * Node(SID_XCONTROL);
+        syslog(LOG_INFO, "Send forward query %s", it_sid->second.leaderAddr.c_str());
+        Graph g(it_sid->second.leaderAddr);
         g.fill_sockaddr(&ddag);
-        int temprc = re_msg.send(route_state.sock, &ddag);
+        int temprc = msg.send(route_state.sock, &ddag);
         if (temprc < 0) {
-            syslog(LOG_ERR, "error sending SID decision answer to %s", srcAD.c_str());
+            syslog(LOG_ERR, "error sending SID query forwarding to %s", it_sid->second.leaderAddr.c_str());
         }
         rc = (temprc < rc)? temprc : rc;
-        syslog(LOG_DEBUG, "sent SID %s decision answer to %s", SID.c_str(), srcAD.c_str());
+        return rc;
+
+    }
+    else{
+        std::map<std::string, DecisionIO> decisions;
+        for (int i = 0; i < records; ++i)
+        {
+            msg.read(AD);
+            msg.read(latency);
+            msg.read(capacity);
+            DecisionIO dio;
+            dio.capacity = capacity;
+            dio.latency = latency;
+            dio.percentage = 0;
+            decisions[AD] = dio;
+            syslog(LOG_INFO, "Get %d ms for %s", latency, AD.c_str());
+        }
+        // compute the weights
+        // rate is not implemented yet
+        it_sid->second.decision(srcAD, 0, &decisions);
+
+        //reply the query
+        ControlMessage re_msg(CTL_SID_DECISION_ANSWER, route_state.myAD, route_state.myHID);
+        re_msg.append(SID); // SID
+        re_msg.append(decisions.size()); // SID
+        std::map<std::string, DecisionIO>::iterator it_ds;
+        for (it_ds = decisions.begin(); it_ds != decisions.end(); ++it_ds){
+            re_msg.append(it_ds->first);
+            re_msg.append(it_ds->second.percentage);
+        }
+
+        // send the msg
+        if (srcAD == route_state.myAD){ // I'm the one
+            syslog(LOG_DEBUG, "Sending SID decision locally");
+            int type;
+            re_msg.read(type); // remove it to match the correct format for the process function
+            processSidDecisionAnswer(re_msg); // process locally
+        }
+        else
+        {
+            sockaddr_x ddag;
+            Graph g = Node() * Node(srcAD) * Node(SID_XCONTROL);
+            g.fill_sockaddr(&ddag);
+            int temprc = re_msg.send(route_state.sock, &ddag);
+            if (temprc < 0) {
+                syslog(LOG_ERR, "error sending SID decision answer to %s", srcAD.c_str());
+            }
+            rc = (temprc < rc)? temprc : rc;
+            syslog(LOG_DEBUG, "sent SID %s decision answer to %s", SID.c_str(), srcAD.c_str());
+        }
+
+        return rc;
     }
 
-    return rc;
+    
 
 }
 
@@ -722,9 +755,14 @@ int Load_balance(std::string srcAD, int rate, std::map<std::string, DecisionIO>*
 
 
 int processSidDecisionAnswer(ControlMessage msg)
-{ // When getting the answer, set local weight
-  // the answer is per SID, when to update routing table? 
+{ // When got the answer, set local weight
+  // The answer is per SID, when to update routing table? 
     syslog(LOG_DEBUG, "Processing SID decision");
+    if (!ENABLE_SID_CTL) {
+        // if SID control plane is disabled
+        // we should not get such a ctl message
+        return 0;
+    }
     string srcAD, srcHID;
     string AD, SID;
 
@@ -1747,7 +1785,7 @@ void set_controller_conf(const char* myhostname)
     char full_path[BUF_SIZE];
     char root[BUF_SIZE];
     char section_name[BUF_SIZE];
-    bool mysection = false; // should read default section or not
+    bool mysection = false; // read default section or my section
 
     snprintf(full_path, BUF_SIZE, "%s/etc/controllers.ini", XrootDir(root, BUF_SIZE));
     int section_index = 0;
@@ -1779,6 +1817,7 @@ void set_controller_conf(const char* myhostname)
     SEQNUM_WINDOW = ini_getl(section_name, "sqenum_window", SEQNUM_WINDOW_D, full_path);
     UPDATE_CONFIG = ini_getl(section_name, "update_config", UPDATE_CONFIG_D, full_path);
     UPDATE_LATENCY = ini_getl(section_name, "update_latency", UPDATE_LATENCY_D, full_path);
+    ENABLE_SID_CTL = ini_getl(section_name, "enable_SID_ctl", ENABLE_SID_CTL_D, full_path);
 
     route_state.hello_ratio = (int32_t) ceil(HELLO_INTERVAL/WAKEUP_INTERVAL);
     route_state.lsa_ratio = (int32_t) ceil(AD_LSA_INTERVAL/WAKEUP_INTERVAL);
@@ -1838,11 +1877,11 @@ void set_sid_conf(const char* myhostname)
             service_state.capacity_factor = ini_getl(section_name, "capacity_factor", 1, full_path);
             service_state.link_factor = ini_getl(section_name, "link_factor", 0, full_path);
             service_state.priority = ini_getl(section_name, "priority", 1, full_path);
-            service_state.isController = ini_getbool(section_name, "isController", 0, full_path);
+            service_state.isLeader = ini_getbool(section_name, "isleader", 0, full_path);
             // get the address of the service controller
-            ini_gets(section_name, "controllerAddr", controller_addr, controller_addr, BUF_SIZE, full_path);
-            service_state.controllerAddr = std::string(controller_addr);
-            if (service_state.isController) // I am the controller
+            ini_gets(section_name, "leaderaddr", controller_addr, controller_addr, BUF_SIZE, full_path);
+            service_state.leaderAddr = std::string(controller_addr);
+            if (service_state.isLeader) // I am the leader
             {
                 if (route_state.LocalServiceControllers.find(service_sid) == route_state.LocalServiceControllers.end())
                 { // no service controller yet, create one
@@ -1864,7 +1903,7 @@ void set_sid_conf(const char* myhostname)
                     syslog(LOG_DEBUG, "unknow decision function %s\n", sid);
             }
                 
-            //fprintf(stderr, "read state%s, %d, %d, %s\n", sid, service_state.capacity, service_state.isController, service_state.controllerAddr.c_str());
+            //fprintf(stderr, "read state%s, %d, %d, %s\n", sid, service_state.capacity, service_state.isLeader, service_state.leaderAddr.c_str());
             route_state.LocalSidList[service_sid] = service_state;
         }
 
@@ -1961,7 +2000,12 @@ int main(int argc, char *argv[])
         if (route_state.send_sid_decision == true) {
             route_state.send_sid_decision = false;
             //processSidDecision();
-            querySidDecision();
+            if (ENABLE_SID_CTL) {
+                querySidDecision();
+            }
+            else{
+                syslog(LOG_ALERT, "SID Control not enabled");
+            }
         }
 		FD_ZERO(&socks);
 		FD_SET(route_state.sock, &socks);
