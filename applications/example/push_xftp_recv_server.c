@@ -295,6 +295,8 @@ int registerReceiver()
 		warn("XBIND PUSH SUCCESFUL");
 	}
 
+	Xlisten(sock, 5);
+
 	Graph g(dag);
 	say("listening on dag: %s\n", g.dag_string().c_str());
   return sock;

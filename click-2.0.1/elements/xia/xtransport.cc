@@ -184,18 +184,22 @@ XTRANSPORT::run_timer(Timer *timer)
 
 					sk->timer_on = false;
 					sk->synack_waiting = false;
+					sk->so_error = ETIMEDOUT;
 
-					// Notify API that the connection failed
-					xia::XSocketMsg xsm;
+					if (!sk->isBlocking) {
+						// Notify API that the connection failed
+						xia::XSocketMsg xsm;
 
-					//_errh->debug("Timer: Sent packet to socket with port %d", _sport);
-					xsm.set_type(xia::XCONNECT);
-					xsm.set_sequence(0); // TODO: what should This be?
-					xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
-					connect_msg->set_status(xia::X_Connect_Msg::XFAILED);
-					ReturnResult(_sport, &xsm);
+						//_errh->debug("Timer: Sent packet to socket with port %d", _sport);
+						xsm.set_type(xia::XCONNECT);
+						xsm.set_sequence(0); // TODO: what should This be?
+						xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
+						connect_msg->set_status(xia::X_Connect_Msg::XFAILED);
+						ReturnResult(_sport, &xsm, -1, ETIMEDOUT);
+					}
 
 					if (sk->polling) {
+						// for alerting non-blocking connects
 						ProcessPollEvent(_sport, POLLHUP);
 					}
 
@@ -274,7 +278,7 @@ XTRANSPORT::run_timer(Timer *timer)
 				// TODO: make sure that -1 is the only condition that will cause us to get a bad XID
 				if (sk->src_path.destination_node() != -1) {
 					XID source_xid = sk->src_path.xid(sk->src_path.destination_node());
-					if (!sk->isAcceptSocket) {
+					if (!sk->isListenSocket) {
 
 						//click_chatter("deleting route %s from port %d\n", source_xid.unparse().c_str(), _sport);
 						delRoute(source_xid);
@@ -629,12 +633,20 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk) {
 
 	if (sk->sock_type == SOCK_STREAM) {
 //		printf("<<< read_from_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", sk->port, sk->recv_base, sk->next_recv_seqnum, sk->recv_buffer_size);
+
 		xia::X_Recv_Msg *x_recv_msg = xia_socket_msg->mutable_x_recv();
 		int bytes_requested = x_recv_msg->bytes_requested();
+		bool peek = x_recv_msg->flags() & MSG_PEEK;
 		int bytes_returned = 0;
-		char buf[1024*1024]; // TODO: pick a buf size
-		memset(buf, 0, 1024*1024);
-		for (int i = sk->recv_base; i < sk->next_recv_seqnum; i++) {
+
+		// FIXME - this should use the recv buffer size
+		char buf[64*1024]; // TODO: pick a buf size
+		memset(buf, 0, 64*1024);
+		int i;
+
+		// FIXME: make sure bytes requested is <= recv buffer size
+
+		for (i = sk->recv_base; i < sk->next_recv_seqnum; i++) {
 
 			if (bytes_returned >= bytes_requested) break;
 
@@ -643,16 +655,46 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk) {
 			TransportHeader thdr(p);
 			size_t data_size = xiah.plen() - thdr.hlen();
 
-			memcpy((void*)(&buf[bytes_returned]), (const void*)thdr.payload(), data_size);
+			const char *payload = (char *)thdr.payload();
+			uint16_t tail = XIA_TAIL_ANNO(p);
+
+			if (tail) {
+				click_chatter("packet (%d) has %d bytes of %d remaining\n", i % sk->recv_buffer_size, data_size - tail, data_size);
+				data_size -= tail;
+				payload += tail;
+			}
+
+			memcpy((void*)(&buf[bytes_returned]), (const void *)payload, data_size);
 			bytes_returned += data_size;
 
-			p->kill();
-			sk->recv_buffer[i % sk->recv_buffer_size] = NULL;
-			sk->recv_base++;
+			// leave the data if the user peeked
+			if (!peek) {
+				if (bytes_returned <= bytes_requested) {
+					// it's safe to delete this packet
+//					click_chatter("deleting packet %d\n", i % sk->recv_buffer_size);
+					p->kill();
+					sk->recv_buffer[i % sk->recv_buffer_size] = NULL;
+					sk->recv_base++;
+
+				} else {
+					// we need to keep the tail data the application didn't ask for
+					// update this packet to shrink the data
+					int extra = bytes_returned - bytes_requested;
+					tail = xiah.plen() - thdr.hlen() - extra;
+
+					click_chatter("keeping the last %d bytes in packet %d\n", extra, i % sk->recv_buffer_size);
+					SET_XIA_TAIL_ANNO(p, tail);
+				}
+			} else {
+				click_chatter("peeking, so leaving all data behind for packet %d\n", i % sk->recv_buffer_size);
+			}
 //			printf("    port %u grabbing index %d, seqnum %d\n", sk->port, i%sk->recv_buffer_size, i);
 		}
-		x_recv_msg->set_payload(buf, bytes_returned); // TODO: check this: need to turn buf into String first?
+
+		x_recv_msg->set_payload(buf, bytes_returned);
 		x_recv_msg->set_bytes_returned(bytes_returned);
+
+		click_chatter("returning %d bytes out of %d requested\n", bytes_returned, bytes_requested);
 
 //		printf(">>> read_from_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", sk->port, sk->recv_base, sk->next_recv_seqnum, sk->recv_buffer_size);
 		return bytes_returned;
@@ -660,6 +702,8 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk) {
 	} else if (sk->sock_type == SOCK_DGRAM || sk->sock_type == SOCK_RAW) {
 		xia::X_Recvfrom_Msg *x_recvfrom_msg = xia_socket_msg->mutable_x_recvfrom();
 	
+		bool peek = x_recvfrom_msg->flags() & MSG_PEEK;
+
 		// Get just the next packet in the recv buffer (we don't return data from more
 		// than one packet in case the packets came from different senders). If no
 		// packet is available, we indicate to the app that we returned 0 bytes.
@@ -702,15 +746,25 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk) {
 			// this part is the same for everyone
 			String src_path = xiah.src_path().unparse();
 
+			uint16_t iface = SRC_PORT_ANNO(p);
+
+			x_recvfrom_msg->set_interface_id(iface);
 			x_recvfrom_msg->set_payload(payload.c_str(), payload.length());
 			x_recvfrom_msg->set_sender_dag(src_path.c_str());
 			x_recvfrom_msg->set_bytes_returned(data_size);
 
-			p->kill();
-			sk->recv_buffer[sk->dgram_buffer_start] = NULL;
-			sk->recv_buffer_count--;
-			sk->dgram_buffer_start = (sk->dgram_buffer_start + 1) % sk->recv_buffer_size;
+			if (!peek) {
+				// NOTE: bytes beyond what the app asked for will be discarded, 
+				// they are not saved for the next recv like streaming socket data
+
+				p->kill();
+				sk->recv_buffer[sk->dgram_buffer_start] = NULL;
+				sk->recv_buffer_count--;
+				sk->dgram_buffer_start = (sk->dgram_buffer_start + 1) % sk->recv_buffer_size;
+			}
+
 			return data_size;
+
 		} else {
 			x_recvfrom_msg->set_bytes_returned(0);
 			return 0;
@@ -752,6 +806,9 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 		break;
 	case xia::XCONNECT:
 		Xconnect(_sport, &xia_socket_msg);
+		break;
+	case xia::XLISTEN:
+		Xlisten(_sport, &xia_socket_msg);
 		break;
 	case xia::XREADYTOACCEPT:
 		XreadyToAccept(_sport, &xia_socket_msg);
@@ -857,7 +914,6 @@ bool XTRANSPORT::usingRendezvousDAG(XIAPath bound_dag, XIAPath pkt_dag)
 
 void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 {
-
 	//	_errh->debug("Got packet from network");
 
 	//Extract the SID/CID
@@ -969,8 +1025,25 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 
 		if (thdr.pkt_info() == TransportHeader::SYN) {
-			//click_chatter("syn dport = %d\n", _dport);
 			// Connection request from client...
+
+			if (!sk->isListenSocket) {
+				// we aren't marked to accept connecctions, drop it
+				// FIXME: is this the right behavior, or should we send a RST?
+
+				click_chatter("SYN received on a non-listening socket (port:%u), dropping...\n", _dport);
+				return;
+			}
+
+			if (sk->pending_connection_buf.size() >= sk->backlog) {
+				// the backlog is full, we can;t take it right now, drop it
+				// FIXME: is this the right behavior, or should we send a RST?
+
+				click_chatter("SYN received but backlog is full (port:%u), dropping...\n", _dport);
+				return; 
+			}
+
+			//click_chatter("syn dport = %d\n", _dport);
 
 			//sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
 
@@ -1000,7 +1073,9 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				new_sk->dst_path = src_path;
 				new_sk->src_path = dst_path;
 				new_sk->isConnected = true;
+				new_sk->so_error = 0;
 				new_sk->initialized = true;
+				new_sk->isBlocking = true;
 				new_sk->nxt = LAST_NODE_DEFAULT;
 				new_sk->last = LAST_NODE_DEFAULT;
 				new_sk->hlim = HLIM_DEFAULT;
@@ -1012,10 +1087,12 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 				//new_sk->pendingAccepts = new queue<xia::XSocketMsg*>();
 
 				sk->pending_connection_buf.push(new_sk);
+				sk->so_error = 0;
 
 				if (sk->polling) {
 					// tell API we are writeable
-					ProcessPollEvent(_dport, POLLOUT);
+					ProcessPollEvent(_dport, POLLIN|POLLOUT);
+					click_chatter("sending pollout after syn received\n");
 				}
 
 			// Mark these src & dst XID pair
@@ -1095,6 +1172,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			// Clear timer
 			sk->timer_on = false;
 			sk->synack_waiting = false;
+			sk->so_error = 0;	// let's API know connect is a success when non blocking
 
 			if (sk->polling) {
 				// tell API we are writble now
@@ -1103,14 +1181,17 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 
 			//sk->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
 
-			// Notify API that the connection is established
-			xia::XSocketMsg xsm;
-			xsm.set_type(xia::XCONNECT);
-			xsm.set_sequence(0); // TODO: what should this be?
-			xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
-			connect_msg->set_ddag(src_path.unparse().c_str());
-			connect_msg->set_status(xia::X_Connect_Msg::XCONNECTED);
-			ReturnResult(_dport, &xsm);
+			if (sk->isBlocking) {
+				// Notify API that the connection is established
+				xia::XSocketMsg xsm;
+				xsm.set_type(xia::XCONNECT);
+				xsm.set_sequence(0); // TODO: what should this be?
+				xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
+				connect_msg->set_ddag(src_path.unparse().c_str());
+				connect_msg->set_status(xia::X_Connect_Msg::XCONNECTED);
+				ReturnResult(_dport, &xsm);
+			}
+
 		} else if (thdr.pkt_info() == TransportHeader::MIGRATE) {
 
 			XIDpair xid_pair;
@@ -1581,6 +1662,8 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			should_buffer_received_packet(p_in, sk)) {
 			add_packet_to_recv_buf(p_in, sk);
 
+			sk->interface_id = SRC_PORT_ANNO(p_in);
+
 			if (sk->polling) {
 				// tell API we are readable
 				ProcessPollEvent(_dport, POLLIN);
@@ -1933,14 +2016,16 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	//Set the source port in sock
 	sock *sk = new sock();
 	sk->port = _sport;
+	sk->isBlocking = true;
 	sk->timer_on = false;
 	sk->synack_waiting = false;
 	sk->dataack_waiting = false;
 	sk->migrateack_waiting = false;
 	sk->num_retransmit_tries = 0;
 	sk->teardown_waiting = false;
+	sk->isListenSocket = false;
 	sk->isConnected = false;
-	sk->isAcceptSocket = false;
+	sk->so_error = 0;
 	sk->num_connect_tries = 0; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
 	sk->num_migrate_tries = 0; // number of migrate tries (Connection will fail after MAX_MIGRATE_TRIES trials)
 	memset(sk->send_buffer, 0, sk->send_buffer_size * sizeof(WritablePacket*));
@@ -1972,32 +2057,41 @@ void XTRANSPORT::Xsetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_
 
 	// click_chatter("\nSet Socket Option\n");
 	xia::X_Setsockopt_Msg *x_sso_msg = xia_socket_msg->mutable_x_setsockopt();
+	sock *sk = portToSock.get(_sport);
 
 	switch (x_sso_msg->opt_type())
 	{
-	case XOPT_HLIM:
-	{
-		int hl = x_sso_msg->int_opt();
+		case XOPT_HLIM:
+		{
+			int hl = x_sso_msg->int_opt();
 
-		hlim.set(_sport, hl);
-		//click_chatter("sso:hlim:%d\n",hl);
-	}
-	break;
-
-	case XOPT_NEXT_PROTO:
-	{
-		int nxt = x_sso_msg->int_opt();
-		nxt_xport.set(_sport, nxt);
-		if (nxt == CLICK_XIA_NXT_XCMP)
-			xcmp_listeners.push_back(_sport);
-		else
-			xcmp_listeners.remove(_sport);
-	}
-	break;
-
-	default:
-		// unsupported option
+			hlim.set(_sport, hl);
+			//click_chatter("sso:hlim:%d\n",hl);
+		}
 		break;
+
+		case XOPT_NEXT_PROTO:
+		{
+			int nxt = x_sso_msg->int_opt();
+			nxt_xport.set(_sport, nxt);
+			if (nxt == CLICK_XIA_NXT_XCMP)
+				xcmp_listeners.push_back(_sport);
+			else
+				xcmp_listeners.remove(_sport);
+		}
+		break;
+
+		case XOPT_BLOCK:
+			sk->isBlocking = x_sso_msg->int_opt();
+			break;
+
+		case SO_DEBUG:
+			sk->so_debug = x_sso_msg->int_opt();
+			break;
+
+		default:
+			// unsupported option
+			break;
 	}
 
 	ReturnResult(_sport, xia_socket_msg); // TODO: return code
@@ -2010,25 +2104,41 @@ void XTRANSPORT::Xgetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_
 	// click_chatter("\nGet Socket Option\n");
 	xia::X_Getsockopt_Msg *x_sso_msg = xia_socket_msg->mutable_x_getsockopt();
 
+	sock *sk = portToSock.get(_sport);
+
 	// click_chatter("opt = %d\n", x_sso_msg->opt_type());
 	switch (x_sso_msg->opt_type())
 	{
-	case XOPT_HLIM:
-	{
-		x_sso_msg->set_int_opt(hlim.get(_sport));
-		//click_chatter("gso:hlim:%d\n", hlim.get(_sport));
-	}
-	break;
+		case XOPT_HLIM:
+			x_sso_msg->set_int_opt(hlim.get(_sport));
+			//click_chatter("gso:hlim:%d\n", hlim.get(_sport));
+			break;
 
-	case XOPT_NEXT_PROTO:
-	{
-		x_sso_msg->set_int_opt(nxt_xport.get(_sport));
-	}
-	break;
+		case XOPT_NEXT_PROTO:
+			x_sso_msg->set_int_opt(nxt_xport.get(_sport));
+			break;
 
-	default:
-		// unsupported option
-		break;
+		case SO_ACCEPTCONN:
+			x_sso_msg->set_int_opt(sk->isListenSocket);
+			break;
+
+		case SO_DEBUG:
+			x_sso_msg->set_int_opt(sk->so_debug);
+			break;
+
+		case SO_ERROR:
+			x_sso_msg->set_int_opt(sk->so_error);
+			sk->so_error = 0;
+			break;
+
+		case XOPT_ERROR_PEEK:
+			// same as SO_ERROR, but doesn't reset the error code
+			x_sso_msg->set_int_opt(sk->so_error);
+			break;
+
+		default:
+			// unsupported option
+			break;
 	}
 
 	ReturnResult(_sport, xia_socket_msg); // TODO: return code
@@ -2190,10 +2300,6 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 {
 	//click_chatter("Xconect: connecting %d\n", _sport);
 
-	//isConnected=true;
-	//String dest((const char*)p_in->data(),(const char*)p_in->end_data());
-	//click_chatter("\nconnect to %s, length=%d\n",dest.c_str(),(int)p_in->length());
-
 	xia::X_Connect_Msg *x_connect_msg = xia_socket_msg->mutable_x_connect();
 
 	String dest(x_connect_msg->ddag().c_str());
@@ -2205,18 +2311,17 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 	dst_path.parse(dest);
 
 	sock *sk = portToSock.get(_sport);
-	//click_chatter("connect %d %x",_sport, sk);
 
-	if(!sk) {
-		//click_chatter("Create DAGINFO connect %d %x",_sport, sk);
-		//No local SID bound yet, so bind ephemeral one
+	if (!sk) {
+		// FIXME: WHY WOULD THIS HAPPEN?
+		click_chatter("Create sk in connect %d %x",_sport, sk);
 		sk = new sock();
-	} else {
-		if (sk->synack_waiting) {
-			// a connect is already in progress
-			x_connect_msg->set_status(xia::X_Connect_Msg::XCONNECTING);
-			ReturnResult(_sport, xia_socket_msg, -1, EALREADY);
-		}
+
+	} else if (sk->synack_waiting) {
+		// a connect is already in progress
+		x_connect_msg->set_status(xia::X_Connect_Msg::XCONNECTING);
+		sk->so_error = EALREADY;
+		ReturnResult(_sport, xia_socket_msg, -1, EALREADY);
 	}
 
 	sk->dst_path = dst_path;
@@ -2318,22 +2423,47 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 	// will wait until it gets another message from xtransport notifying it that
 	// the other end responded and the connection has been established.
 	x_connect_msg->set_status(xia::X_Connect_Msg::XCONNECTING);
+	sk->so_error = EINPROGRESS;
 	ReturnResult(_sport, xia_socket_msg, -1, EINPROGRESS);
+}
+
+
+void XTRANSPORT::Xlisten(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
+{
+	// we just want to mark the socket as listenening and return right away.
+
+	xia::X_Listen_Msg *x_listen_msg = xia_socket_msg->mutable_x_listen();
+
+	click_chatter("Xlisten\n");
+
+	sock *sk = portToSock.get(_sport);
+	sk->isListenSocket = true;
+	sk->backlog = x_listen_msg->backlog();
+
+	ReturnResult(_sport, xia_socket_msg);
 }
 
 void XTRANSPORT::XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
-	// If there is already a pending connection, return true now
-	// If not, add this request to the pendingAccept queue
 	sock *sk = portToSock.get(_sport);
 
+	click_chatter("blocking = %d\n", xia_socket_msg->blocking());
+
 	if (!sk->pending_connection_buf.empty()) {
+		// If there is already a pending connection, return true now
 		ReturnResult(_sport, xia_socket_msg);
-	} else {
-		// xia_socket_msg is saved on the stack; allocate a copy on the heap
+
+	} else if (xia_socket_msg->blocking()) {
+		// If not and we are blocking, add this request to the pendingAccept queue and wait
+
+		// xia_socket_msg is on the stack; allocate a copy on the heap
 		xia::XSocketMsg *xsm_cpy = new xia::XSocketMsg();
 		xsm_cpy->CopyFrom(*xia_socket_msg);
 		sk->pendingAccepts.push(xsm_cpy);
+
+	} else {
+		// socket is non-blocking and nothing is ready yet
+		ReturnResult(_sport, xia_socket_msg, -1, EWOULDBLOCK);
 	}
 }
 
@@ -2361,10 +2491,11 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		new_sk->seq_num = 0;
 		new_sk->ack_num = 0;
 		new_sk->send_base = 0;
+		new_sk->isBlocking = true;
 		new_sk->hlim = hlim.get(new_port);
 		new_sk->next_send_seqnum = 0;
 		new_sk->next_recv_seqnum = 0;
-		new_sk->isAcceptSocket = true; // FIXME backwards? shouldn't sk be the accpet socket?
+		new_sk->isListenSocket = true; // FIXME backwards? shouldn't sk be the accpet socket?
 		memset(new_sk->send_buffer, 0, new_sk->send_buffer_size * sizeof(WritablePacket*));
 		memset(new_sk->recv_buffer, 0, new_sk->recv_buffer_size * sizeof(WritablePacket*));
 		//new_sk->pending_connection_buf = new queue<sock>();
@@ -2724,7 +2855,7 @@ void XTRANSPORT::Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 					} else if (sk->sock_type == SOCK_DGRAM || sk->sock_type == SOCK_RAW) {
 						if (sk->recv_buffer_count > 0) {
-							_errh->debug("Xpoll: read DGRAM data avaialable on %d\n", port);
+//							_errh->debug("Xpoll: read DGRAM data avaialable on %d\n", port);
 							flags_out |= POLLIN;
 						}
 					}
@@ -3031,7 +3162,7 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 	xia::X_Send_Msg *x_send_msg = xia_socket_msg->mutable_x_send();
 	int pktPayloadSize = x_send_msg->payload().size();
 
-	char payload[16384];
+	char payload[65536];
 	memcpy(payload, x_send_msg->payload().c_str(), pktPayloadSize);
 	//click_chatter("XSEND: %d bytes from (%d)\n", pktPayloadSize, _sport);
 
@@ -3329,13 +3460,16 @@ void XTRANSPORT::Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	sock *sk = portToSock.get(_sport);
 	if(sk->port != _sport) {
 		click_chatter("Xtransport::Xrecv: ERROR sk->port %d _sport %d", sk->port, _sport);
+		// FIXME: do something with the error
 	}
+
 	read_from_recv_buf(xia_socket_msg, sk);
 
 	if (xia_socket_msg->x_recv().bytes_returned() > 0) {
 		// Return response to API
 		ReturnResult(_sport, xia_socket_msg, xia_socket_msg->x_recv().bytes_returned());
 	} else if (!xia_socket_msg->blocking()) {
+
 		// we're not blocking and there's no data, so let API know immediately
 		sk->recv_pending = false;
 		ReturnResult(_sport, xia_socket_msg, -1, EWOULDBLOCK);
@@ -3351,9 +3485,16 @@ void XTRANSPORT::Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	}
 }
 
+// FIXME: this is identical to Xrecv except for the protobuf type
+// perhaps they should be combined
 void XTRANSPORT::Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
 	sock *sk = portToSock.get(_sport);
+	if(sk->port != _sport) {
+		click_chatter("Xtransport::Xrecvfrom: ERROR sk->port %d _sport %d", sk->port, _sport);
+		// FIXME: do something with the error
+	}
+
 	read_from_recv_buf(xia_socket_msg, sk);
 
 	if (xia_socket_msg->x_recvfrom().bytes_returned() > 0) {
@@ -3363,6 +3504,7 @@ void XTRANSPORT::Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	} else if (!xia_socket_msg->blocking()) {
 
 		// we're not blocking and there's no data, so let API know immediately
+		sk->recv_pending = false;
 		ReturnResult(_sport, xia_socket_msg, -1, EWOULDBLOCK);
 
 	} else {

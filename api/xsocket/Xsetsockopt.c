@@ -100,6 +100,17 @@ int ssoPutInt(int sockfd, int optname, const int *optval, socklen_t optlen)
 	return 0;
 }
 
+int ssoGetParam(int param, void *optval, socklen_t *optlen)
+{
+	if (ssoCheckSize(optlen, sizeof(int)) < 0) {
+		return -1;
+	}
+
+	*(int *)optval = param;
+	*optlen = sizeof(int);
+	return 0;
+}
+
 /*!
 ** @brief Xsocket implemention of the standard setsockopt function.
 **
@@ -141,6 +152,9 @@ int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen)
 		return -1;
 	}
 	switch (optname) {
+
+		// send these values to click *******************************
+
 		case XOPT_HLIM:
 		{
 			int hlim = *(const int *)optval;
@@ -169,31 +183,102 @@ int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen)
 			break;
 		}
 
+		case XOPT_BLOCK:
+		{
+			rc = ssoPutInt(sockfd, optname, (const int *)optval, optlen);
+			break;
+		}
+
+		// this is handled in the API & in click ********************
+
 		case SO_DEBUG:
-			if (ssoCheckSize(&optlen, sizeof(int)) < 0)
+			if (ssoCheckSize(&optlen, sizeof(int)) < 0) {
 				rc = -1;
-			else
+			}
+			else {
 				setDebug(sockfd, *(int *)optval);
+				rc = ssoPutInt(sockfd, optname, (const int *)optval, optlen);
+			}
 			break;
 
-		case SO_ERROR:
-			if (ssoCheckSize(&optlen, sizeof(int)) < 0)
-				rc = -1;
-			else
-				setError(sockfd, *(int *)optval);
-			break;
 
+		// SHOIULD IMPLEMENT! ***************************************
+		// FIXME: implement these!
+		case SO_SNDBUF:
+		case SO_RCVBUF:
+		case SO_SNDTIMEO:
 		case SO_RCVTIMEO:
-			LOG("We need a way to support this in click!\n");
-			
+		case SO_LINGER:
+		case SO_REUSEADDR:
+			LOGF("Uh Oh, we need support for %s in XIA\n", optValue(optname));
+			rc = 0;
+			break;
 
+		// FIXME: MAY NEED ******************************************
+
+		case SO_BROADCAST:
+			// FIXME: can we just go ahead and mark this as success?
+			// or do we need to do something to check to see if bradcast DAGS are allowed on this socket?
+			if (getSocketType(sockfd) == SOCK_DGRAM) {
+				rc = -1;
+				errno = ENOPROTOOPT;
+				break;
+			}
+			// else silently ignore
+			break;
+
+		case SO_RCVLOWAT:
+		case SO_SNDLOWAT:
+			// Probably will never need to support this
+			// return the default linux value of 1
+			rc = 0;
+			break;
+
+
+		// CAN SAFELY IGNORE ****************************************
+
+		case SO_KEEPALIVE:
+			// we don't have keepalive so lie and say we did it
+			rc = 0;
+			break;
+
+		case SO_BSDCOMPAT:
+			// safe to mark as unsupported, being phased out on linux anyway
+			errno = ENOPROTOOPT;
+			rc = -1;
+			break;
+
+		// READ ONLY OPTIONS ****************************************
+		case SO_ACCEPTCONN:
+		case SO_DOMAIN:
+		case SO_PROTOCOL:
+		case SO_TYPE:
+			LOGF("Option %s is read only\n", optValue(optname));
+			errno = ENOPROTOOPT;
+			rc = -1;
+			break;
+
+		// NOT SUPPORTED/DOESN"T MAKE SENSE IN XIA ******************
+		case SO_BINDTODEVICE:	// should we support this one when we get multihoming?
+		case SO_DONTROUTE:
+		case SO_MARK:
+		case SO_OOBINLINE:
+		case SO_PASSCRED:
+		case SO_PEERCRED:
+		case SO_PRIORITY:
+		case SO_RCVBUFFORCE:
+		case SO_SNDBUFFORCE:
+		case SO_TIMESTAMP:
 		default:
+			// return generic error
+			LOGF("Option %s not supported in XIA\n", optValue(optname));
 			errno = ENOPROTOOPT;
 			rc = -1;
 	}
 
 	return rc;
 }
+
 
 /*!
 ** @brief Xsocket implemention of the standard getsockopt function.
@@ -238,42 +323,101 @@ int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen)
 	}
 
 	switch (optname) {
+
+		// get these values from click ******************************
 		case XOPT_HLIM:
 		case XOPT_NEXT_PROTO:
+		case XOPT_ERROR_PEEK:
+		case SO_ACCEPTCONN:
+		case SO_ERROR:
 			rc = ssoGetInt(sockfd, optname, (int *)optval, optlen);
 			break;
 
-		case SO_TYPE:
-			if (ssoCheckSize(optlen, sizeof(int)) < 0)
-				rc = -1;
-			else
-				*(int *)optval = getSocketType(sockfd);
-			break;
-
 		case SO_DEBUG:
-			if (ssoCheckSize(optlen, sizeof(int)) < 0)
-				rc = -1;
-			else
-				*(int *)optval = getDebug(sockfd);
+			// stored in the API & in click, return from the API
+			rc = ssoGetParam(getDebug(sockfd), optval, optlen);
 			break;
 
-		case SO_ERROR:
-			if (ssoCheckSize(optlen, sizeof(int)) < 0)
-				rc = -1;
-			else
-				*(int *)optval = getError(sockfd);
+		case SO_DOMAIN:
+			// FIXME: conver this to AF_INET in wrapper
+			rc = ssoGetParam(AF_XIA, optval, optlen);
 			break;
 
+		case SO_PROTOCOL:
+			rc = ssoGetParam(getProtocol(sockfd), optval, optlen);
+			break;
+
+		case SO_TYPE:
+			ssoGetParam(getSocketType(sockfd), optval, optlen);
+			break;
+
+
+		// SHOIULD IMPLEMENT! ***************************************
 		// FIXME: implement these!
 		case SO_SNDBUF:
 		case SO_RCVBUF:
 		case SO_SNDTIMEO:
 		case SO_RCVTIMEO:
 		case SO_LINGER:
+			LOGF("Uh Oh, we need support for %s in XIA\n", optValue(optname));
 			rc = -1;
 			break;
 
+		// FIXME: MAY NEED ******************************************
+
+		case SO_BROADCAST:
+			// FIXME: can we just go ahead and mark this as success?
+			// or do we need to do something to check to see if bradcast DAGS are allowed on this socket?
+			if (getSocketType(sockfd) == SOCK_DGRAM) {
+				rc = -1;
+				errno = ENOPROTOOPT;
+				break;
+			}
+			// else silently ignore
+			break;
+
+		case SO_REUSEADDR:
+			// just say it's not enabled
+			ssoGetParam(0, optval, optlen);
+			rc = 0;
+			break;
+
+		case SO_RCVLOWAT:
+		case SO_SNDLOWAT:
+			// Probably will never need to support this
+			// return the default linux value of 1
+			rc = ssoGetParam(1, optval, optlen);
+			break;
+
+
+		// CAN SAFELY IGNORE ****************************************
+
+		case SO_KEEPALIVE:
+			// we don't have keepalive so lie and say we do
+			ssoGetParam(0, optval, optlen);
+			rc = 0;
+			break;
+
+		case SO_BSDCOMPAT:
+			// safe to mark as unsupported, being phased out on linux anyway
+			errno = ENOPROTOOPT;
+			rc = -1;
+			break;
+
+		// NOT SUPPORTED/DOESN"T MAKE SENSE IN XIA ******************
+		case SO_BINDTODEVICE:	// should we support this one when we get multihoming?
+		case SO_DONTROUTE:
+		case SO_MARK:
+		case SO_OOBINLINE:
+		case SO_PASSCRED:
+		case SO_PEERCRED:
+		case SO_PRIORITY:
+		case SO_RCVBUFFORCE:
+		case SO_SNDBUFFORCE:
+		case SO_TIMESTAMP:
 		default:
+			// return generic error
+			LOGF("Option %s not supported in XIA\n", optValue(optname));
 			errno = ENOPROTOOPT;
 			rc = -1;
 	}

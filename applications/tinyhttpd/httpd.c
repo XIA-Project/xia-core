@@ -26,22 +26,10 @@
 #include <sys/wait.h>
 #include <stdlib.h>
 
-// XIA changes
-#include <netdb.h>     // for getaddrinfo
-#include "xia.h"       // for AF_XIA and sockaddr_x definitions
-#include "dagaddr.hpp" // only needed to pretty print the dag
-#define SID "SID:8080808080808080808080808080808080808080"
-
-int xia = 0;			// if true run as an XIA app
-char *sid = NULL;		// if user wants to specify the SID from the cmd line
-char *dag;				// used to display the dag on the terminal
-// end XIA
-
 #define ISspace(x) isspace((int)(x))
 
 #define SERVER_STRING "Server: jdbhttpd/0.1.0\r\n"
 
-  // XIA changes to accept request are only so it compiles correctly
 void *accept_request(void *);
 void bad_request(int);
 void cat(int, FILE *);
@@ -60,9 +48,9 @@ void unimplemented(int);
  * return.  Process the request appropriately.
  * Parameters: the socket connected to the client */
 /**********************************************************************/
-void *accept_request(void *client_v)
+void *accept_request(void *cl)
 {
- int client = (int)(intptr_t)client_v;
+  int client = (int)(intptr_t)cl;
  char buf[1024];
  int numchars;
  char method[255];
@@ -118,7 +106,6 @@ void *accept_request(void *client_v)
  sprintf(path, "htdocs%s", url);
  if (path[strlen(path) - 1] == '/')
   strcat(path, "index.html");
-
  if (stat(path, &st) == -1) {
   while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
    numchars = get_line(client, buf, sizeof(buf));
@@ -126,16 +113,16 @@ void *accept_request(void *client_v)
  }
  else
  {
- if ((st.st_mode & S_IFMT) == S_IFDIR)
-  strcat(path, "/index.html");
- if ((st.st_mode & S_IXUSR) ||
-  (st.st_mode & S_IXGRP) ||
-  (st.st_mode & S_IXOTH)    )
-  cgi = 1;
- if (!cgi)
-  serve_file(client, path);
- else
-  execute_cgi(client, path, method, query_string);
+  if ((st.st_mode & S_IFMT) == S_IFDIR)
+   strcat(path, "/index.html");
+  if ((st.st_mode & S_IXUSR) ||
+      (st.st_mode & S_IXGRP) ||
+      (st.st_mode & S_IXOTH)    )
+   cgi = 1;
+  if (!cgi)
+   serve_file(client, path);
+  else
+   execute_cgi(client, path, method, query_string);
  }
 
  close(client);
@@ -319,35 +306,39 @@ void execute_cgi(int client, const char *path,
 /**********************************************************************/
 int get_line(int sock, char *buf, int size)
 {
- int i = 0;
- char c = '\0';
- int n;
+  char *last = buf + size;
+  char *p = buf;
+  int n;
 
- while ((i < size - 1) && (c != '\n'))
- {
-  n = recv(sock, &c, 1, 0);
-  /* DEBUG printf("%02X\n", c); */
-  if (n > 0)
+  memset(buf, 0, size);
+
+  while ((p != last) && (*p != '\n'))
   {
-   if (c == '\r')
-   {
-    n = recv(sock, &c, 1, MSG_PEEK);
-    /* DEBUG printf("%02X\n", c); */
-    if ((n > 0) && (c == '\n'))
-     recv(sock, &c, 1, 0);
-    else
-     c = '\n';
-   }
-   buf[i] = c;
-   i++;
+    n = recv(sock, p, 1, 0);
+    if (n > 0)
+    {
+      if (*p == '\r')
+      {
+        n = recv(sock, p, 1, MSG_PEEK);
+        /* DEBUG printf("%02X\n", c); */
+        if ((n > 0) && (*p == '\n'))
+          recv(sock, p, 1, 0);
+        else
+          *p = '\n';
+      }
+      if (*p == '\n')
+        break;
+      p++;
+    }
+    else {
+      *p = '\n';
+      break;
+    }
+    printf("%s\n", buf);
   }
-  else
-   c = '\n';
- }
- buf[i] = '\0';
- 
- printf("received cmd: %s\n", buf);
- return(i);
+
+  printf("getline: %s\n", buf);
+  return(strlen(buf));
 }
 
 /**********************************************************************/
@@ -410,8 +401,6 @@ void serve_file(int client, const char *filename)
  int numchars = 1;
  char buf[1024];
 
- printf("serving file %s\n", filename);
-
  buf[0] = 'A'; buf[1] = '\0';
  while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
   numchars = get_line(client, buf, sizeof(buf));
@@ -440,47 +429,21 @@ int startup(u_short *port)
  int httpd = 0;
  struct sockaddr_in name;
 
- // XIA additions to handle different sockaddr struct
- int size;
- struct addrinfo *ai;
- struct sockaddr *sa;
-
- // XIA pick socket type
- httpd = socket(xia ? AF_XIA : PF_INET, SOCK_STREAM, 0);
+ httpd = socket(PF_INET, SOCK_STREAM, 0);
  if (httpd == -1)
   error_die("socket");
+ memset(&name, 0, sizeof(name));
 
- // XIA Do appropriate sockaddr generation
- if (xia)  {
-  if (getaddrinfo(NULL, sid, NULL, &ai) < 0)
-   error_die("getaddrinfo failed\n");
-
-  sa = ai->ai_addr;
-  size = sizeof(sockaddr_x);
-
-  // not needed except to pretty print the dag to the console
-  Graph g((sockaddr_x*)sa);
-  dag = strdup(g.dag_string().c_str());
-
- } else {
-  sa = (struct sockaddr*)&name;
-  memset(&name, 0, sizeof(name));
-  name.sin_family = AF_INET;
-  name.sin_port = htons(*port);
-  name.sin_addr.s_addr = htonl(INADDR_ANY);
-  size = sizeof(struct sockaddr_in);
- }
-
- // XIA bind call modified from original code to account for sockaddr size differences
- if (bind(httpd, sa, size) < 0)
+ //inet_aton("1.2.3.4", &name.sin_addr);
+ name.sin_family = AF_INET;
+ name.sin_port = htons(*port);
+ name.sin_addr.s_addr = INADDR_ANY;
+ 
+ if (bind(httpd, (struct sockaddr *)&name, sizeof(name)) < 0)
   error_die("bind");
-
- // XIA this code was only to get port number, not needed on XIA,
- // but could be modified to retrieve the dag in the sockaddr if desired
- // we already have it from above in this case
- if (xia == 0 && *port == 0)  /* if dynamically allocating a port */
+ if (*port == 0)  /* if dynamically allocating a port */
  {
-  unsigned namelen = sizeof(name);
+  socklen_t namelen = sizeof(name);
   if (getsockname(httpd, (struct sockaddr *)&name, &namelen) == -1)
    error_die("getsockname");
   *port = ntohs(name.sin_port);
@@ -517,64 +480,29 @@ void unimplemented(int client)
  send(client, buf, strlen(buf), 0);
 }
 
-// XIA, added cmd line switch to put us into xia mode if desired
-void config(int argc, char **argv)
-{
- char c;
- opterr = 0;
-
- while ((c = getopt(argc, argv, "xs:p:")) != -1) {
-  switch (c) {
-   case 's':
-    sid = strdup(optarg);
-    break;
-   case 'x':
-    xia = 1;
-    break;
-   default:
-    // Help Me!
-	printf("httpd [-x] [-s sid]\n");
-	printf(" -x : run as XIA (requres being run with xwrap\n");
-	printf(" -s : use the specified sid instead of the default\n");
-  }
- }
- if (sid == NULL)
-	 sid = strdup(SID);
-}
-
 /**********************************************************************/
 
-int main(int argc, char **argv)
+int main(void)
 {
  int server_sock = -1;
- u_short port = 0;
+ u_short port = 80;
  int client_sock = -1;
-
- // XIA using sockaddr_x so that we have enough room in XIA mode
- //  struct is cast to a sockaddr/sockaddr_in so is an annoying change
- //  but doesn't cause any problems
- sockaddr_x client_name;
+ struct sockaddr_in client_name;
  socklen_t client_name_len = sizeof(client_name);
  pthread_t newthread;
 
- config(argc, argv);
-
  server_sock = startup(&port);
-
- if (xia)
-  printf("httpd running on %s\n", dag);
- else
-  printf("httpd running on port %d\n", port);
+ printf("httpd running on port %d\n", port);
 
  while (1)
  {
   client_sock = accept(server_sock,
-		               (struct sockaddr *)&client_name, 
-					   &client_name_len);
+                       (struct sockaddr *)&client_name,
+                       &client_name_len);
   if (client_sock == -1)
    error_die("accept");
-  /* accept_request(client_sock); */
-  if (pthread_create(&newthread , NULL, accept_request, (void *)(intptr_t)client_sock) != 0)
+ /* accept_request(client_sock); */
+if (pthread_create(&newthread , NULL, accept_request, (void *)(intptr_t)client_sock) != 0)
    perror("pthread_create");
  }
 

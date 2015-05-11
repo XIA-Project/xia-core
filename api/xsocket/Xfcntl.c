@@ -74,11 +74,20 @@ int Xfcntl(int sockfd, int cmd, ...)
 			va_start(args, cmd);
 			int f = va_arg(args, int);
 			va_end(args);
-			setBlocking(sockfd, (f & O_NONBLOCK) == 0);
+
+			int block = (f & O_NONBLOCK) ? false : true;
+
+			LOGF("Blocking set to %s", block ? "true" : "false");
+			setBlocking(sockfd, block);
+			rc = 0;
+
+			if (f & ~O_NONBLOCK) {
+				LOGF("unsupported flag(s) found (%s) ignoring...", fcntlFlags(f & ~O_NONBLOCK));
+			}
 			break;
 		}
 		default:
-			LOGF("Invalid command specified: %08x\n", cmd);
+			LOGF("Invalid command specified to Xfcntl: %08x", cmd);
 			rc = -1;
 			break;
 	}

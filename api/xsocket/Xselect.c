@@ -15,7 +15,7 @@
 */
 /*!
 ** @file Xselect.c
-** @brief implements Xselect()
+** @brief implements Xselect() and Xpoll()
 */
 #include <sys/select.h>
 #include <sys/poll.h>
@@ -30,10 +30,28 @@ typedef struct {
 } Sock2Port;
 
 
+static void setNBConnState(int fd)
+{
+	// if this was for a non-blocking connect, set connected state appropriately
+	if (getConnState(fd) == CONNECTING) {
+
+		int e;
+		socklen_t sz = sizeof(e);
+
+		Xgetsockopt(fd, XOPT_ERROR_PEEK, (void*)&e, &sz);
+		setConnState(fd, e == 0 ? CONNECTED : UNCONNECTED);
+	}
+
+	// else don't do anything special
+}
+
 /*!
 ** @brief waits for one of a set of Xsockets to become ready to perform I/O.
 **
 ** Xsocket specific version of poll. See the poll man page for more detailed information.
+** This function is compatible with Xsockets as well as regular sockets and fds. Xsockets
+** are polled via click, and regular sockets and fds are handled through the normal poll
+** API.
 **
 ** #include <sys/poll.h>
 **
@@ -47,14 +65,13 @@ typedef struct {
 ** @returns 0 if timeout occured
 ** @returns a positive integer indicating the number of sockets with return events
 ** @retuns -1 with errno set if an error occured
-**
-** @warning this function is only valid for stream and datagram sockets.
 */
 int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 {
+	int rc;
 	int sock = 0;
 	int nxfds = 0;
-	int rc, xrc;
+	int xrc = 0;
 
 	if (nfds == 0) {
 		// it's just a timer
@@ -77,7 +94,7 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 
 		ufds[i].revents = 0;
 
-		if (ufds[i].fd > 0 && (ufds[i].events & (POLLIN | POLLOUT | POLLPRI))) {
+		if (ufds[i].fd > 0 && (ufds[i].events != 0)) {
 			if (getSocketType(ufds[i].fd) != XSOCK_INVALID) {
 				// add the Xsocket to the xpoll struct
 				// TODO: should this work for Content sockets?
@@ -93,6 +110,15 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 				pfd->set_port(sin.sin_port);
 				s2p[i].fd = ufds[i].fd;
 				s2p[i].port = sin.sin_port;
+
+				// FIXME: hack for curl - think about better ways to deal with this
+				if (ufds[i].events & POLLRDNORM || ufds[i].events & POLLRDBAND) {
+					ufds[i].events |= POLLIN;
+				}
+
+				if (ufds[i].events & POLLWRNORM || ufds[i].events & POLLWRBAND) {
+					ufds[i].events |= POLLOUT;
+				}
 
 				pfd->set_flags(ufds[i].events);
 
@@ -177,6 +203,21 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 				// find the socket in the original poll & update the revents field
 				for (unsigned j = 0; j < nfds; j++) {
 					if (ufds[j].fd == fd) {
+
+						// if a non-blocking connect is in progress, set connected state appropriately
+						if (flags && POLLOUT) {
+							setNBConnState(fd);
+						}
+
+						// FIXME: hack for curl - think about better ways to deal with this
+						if (flags && POLLIN && (ufds[i].events &  POLLRDNORM || ufds[i].events & POLLRDBAND)) {
+							flags |= (POLLRDNORM | POLLRDBAND);
+						}
+
+						if (flags && POLLOUT && (ufds[i].events & POLLWRNORM || ufds[i].events & POLLWRBAND)) {
+							flags |= (POLLWRNORM | POLLWRBAND);
+						}
+
 						ufds[j].revents = flags;
 						break;
 					}
@@ -230,8 +271,9 @@ void XselectCancel(int sock)
 ** @brief waits for one of a set of Xsockets to become ready to perform I/O.
 **
 ** Xsocket specific version of select. See the select man page for more detailed information.
-** This implementation uses Xpoll internally, and is provided to make porting easier. New code
-** should call Xpoll instead.
+** This function is compatible with Xsockets as well as regular sockets and fds. Xsockets
+** are handled with the Xpoll APIs via click, and regular sockets and fds are handled 
+** through the normal select API.
 **
 ** @param ndfs The highest socket number contained in the fd_sets plus 1
 ** @param readfds fd_set containing sockets to check for readability
@@ -241,14 +283,14 @@ void XselectCancel(int sock)
 ** @returns greater than 0, number of sockets ready
 ** @returns 0 if the timeout expired
 ** @returns less than 0 if an error occurs
-**
-** @warning this function is only valid for stream and datagram sockets.
+** @warning this function is only valid for stream and datagram sockets. 
 */
 int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struct timeval *timeout)
 {
 	fd_set rfds;
 	fd_set wfds;
 	fd_set efds;
+	fd_set immediate_fds;
 	unsigned nx = 0;
 	int xrc = 0;
 	int sock = 0;
@@ -259,6 +301,7 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 	FD_ZERO(&rfds);
 	FD_ZERO(&wfds);
 	FD_ZERO(&efds);
+	FD_ZERO(&immediate_fds);
 
 	// if the fd sets are sparse, this will waste space especially if nfds is large
 	Sock2Port *s2p = (Sock2Port*)calloc(nfds, sizeof(Sock2Port));
@@ -292,6 +335,7 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 
 		// is it an xsocket
 		if (flags && getSocketType(i) != XSOCK_INVALID) {
+
 			// we found an Xsocket, do the Xpoll magic
 			nx++;
 
@@ -414,6 +458,9 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 				if (writefds && (flags & POLLOUT)) {
 					FD_SET(fd, writefds);
 					count++;
+
+					// if a non-blocking connect is in progress, set connected state appropriately
+					setNBConnState(fd);
 				}
 				if (errorfds && (flags & POLLERR)) {
 					FD_SET(fd, errorfds);

@@ -232,6 +232,8 @@ void echo_stream()
 		die(-3, "unable to bind to the dag\n");
 	}
 
+	Xlisten(acceptor, 5);
+
 	while (1) {
 
 		say("Xsock %4d waiting for a new connection.\n", acceptor);

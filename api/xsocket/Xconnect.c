@@ -93,32 +93,33 @@ int _connStream(int sockfd, const sockaddr *addr, socklen_t addrlen)
 
 	xia::X_Connect_Msg *x_connect_msg = xsm.mutable_x_connect();
 	x_connect_msg->set_ddag(g.dag_string().c_str());
+
 	// Assign a SID with corresponding keys (unless assigned by bind already)
 	if(!isSIDAssigned(sockfd)) {
-		printf("Xconnect: generating key pair for random SID\n");
+		LOG("Xconnect: generating key pair for random SID\n");
 		if(XmakeNewSID(src_SID, sizeof(src_SID))) {
 			LOG("Unable to create a new SID with key pair");
-			printf("Xconnect: Unable to create a new SID with key pair");
 			return -1;
 		}
         LOGF("Generated SID:%s:", src_SID);
-        printf("Generated SID:%s:\n", src_SID);
 
 		// Convert SID to a default DAG
 		if(Xgetaddrinfo(NULL, src_SID, NULL, &ai)) {
 			LOGF("Unable to convert %s to default DAG", src_SID);
-			printf("Xconnect: Unable to convert %s to default DAG\n", src_SID);
 			return -1;
 		}
+
 		sockaddr_x *sa = (sockaddr_x *)ai->ai_addr;
 		Graph src_g(sa);
+
 		// Include the source DAG in message to xtransport
-		printf("Xconnect: random DAG:%s:\n", src_g.dag_string().c_str());
+		LOGF("Xconnect: random DAG:%s:\n", src_g.dag_string().c_str());
 		x_connect_msg->set_sdag(src_g.dag_string().c_str());
 		Xfreeaddrinfo(ai);
 		setSIDAssigned(sockfd);
 		setTempSID(sockfd, src_SID);
 	}
+
 	// In Xtransport: send SYN to destination server
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
@@ -133,9 +134,13 @@ int _connStream(int sockfd, const sockaddr *addr, socklen_t addrlen)
 			setConnState(sockfd, UNCONNECTED);
 			LOGF("Error retrieving recv data from Click: %s", strerror(errno));
 			return -1;
+		} else if (!isBlocking(sockfd)) {
+			// we're non blocking, tell app to go about its business
+			return -1;
 		}
 	} else {
 		// something bad happened! we shouldn't get a success code here
+		LOG("this success is an error!\n");
 	}
 
 	// Waiting for SYNACK from destination server

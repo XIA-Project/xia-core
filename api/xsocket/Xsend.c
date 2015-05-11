@@ -47,12 +47,15 @@ int _xsendto(int sockfd, const void *buf, size_t len, int flags, const sockaddr_
 */
 int Xsend(int sockfd, const void *buf, size_t len, int flags)
 {
+	#define fmsg  "%s is not currently supported, clearing...\n"
 	int rc;
 
 	if (flags) {
-		errno = EOPNOTSUPP;
-		return -1;
+		LOGF("flags:%s\n", xferFlags(flags));
+		LOG("Resetting flags to 0 for now...");
 	}
+
+	flags = 0;
 
 	if (len == 0)
 		return 0;
@@ -88,7 +91,6 @@ int Xsend(int sockfd, const void *buf, size_t len, int flags)
 	xsm.set_type(xia::XSEND);
 	unsigned seq = seqNo(sockfd);
 	xsm.set_sequence(seq);
-//printf("Xsend seq=%d \n", seq);
 
 	xia::X_Send_Msg *x_send_msg = xsm.mutable_x_send();
 	x_send_msg->set_payload(buf, len);
@@ -201,14 +203,12 @@ int _xsendto(int sockfd, const void *buf, size_t len, int flags,
 	x_sendto_msg->set_payload((const char*)buf, len);
 
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
-		printf("send error\n");
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
 
 	// process the reply from click
 	if ((rc = click_status(sockfd, seq)) < 0) {
-		printf("receive error\n");
 		LOGF("Error getting status from Click: %s", strerror(errno));
 		return -1;
 

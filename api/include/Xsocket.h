@@ -109,6 +109,8 @@ typedef struct {
 // Xsetsockopt options
 #define XOPT_HLIM		0x07001	// Hop Limit TTL
 #define XOPT_NEXT_PROTO	0x07002	// change the next proto field of the XIA header
+#define XOPT_BLOCK		0x07003
+#define XOPT_ERROR_PEEK 0x07004
 
 // XIA protocol types
 #define XPROTO_XIA_TRANSPORT	0x0e
@@ -134,9 +136,12 @@ extern int Xaccept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int f
 extern int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 extern int Xconnect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 extern int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout);
-#define Xlisten(x, y) 0
+extern int Xlisten(int sockfd, int backlog);
 extern int Xrecvfrom(int sockfd,void *rbuf, size_t len, int flags, struct sockaddr *addr, socklen_t *addrlen);
+extern ssize_t Xrecvmsg(int fd, struct msghdr *msg, int flags);
 extern int Xsendto(int sockfd,const void *buf, size_t len, int flags, const struct sockaddr *addr, socklen_t addrlen);
+extern ssize_t Xsendmsg(int fd, const struct msghdr *msg, int flags);
+
 
 extern int Xclose(int sock);
 extern int Xrecv(int sockfd, void *rbuf, size_t len, int flags);
@@ -169,6 +174,7 @@ extern void print_conf();
 extern int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen);
 extern int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen);
 
+extern int XgetNamebyDAG(char *name, int namelen, const sockaddr_x *addr, socklen_t *addrlen);
 extern int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen);
 extern int XregisterName(const char *name, sockaddr_x *addr);
 extern int XrendezvousUpdate(const char *hidstr, sockaddr_x *DAG);

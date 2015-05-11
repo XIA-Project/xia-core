@@ -51,8 +51,6 @@ int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 	int rc;
 	int transport_type;
 
-	printf("Xbind: called\n");
-
 	if (addrlen == 0) {
 		errno = EINVAL;
 		return -1;

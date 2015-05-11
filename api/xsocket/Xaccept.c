@@ -35,17 +35,6 @@
 ** created socket is not in the listening state. The original socket
 ** sockfd is unaffected by this call.
 **
-** Xaccept does not currently have a non-blocking mode, and will block
-** until a connection is made. However, the standard socket API calls select
-** and poll may be used with the Xsocket. Either function will deliver a
-** readable event when a new connection is attempted and you may then call
-** Xaccept() to get a socket for that connection.
-**
-** @note Unlike standard sockets, there is currently no Xlisten function.
-** Callers must create the listening socket by calling Xsocket with the
-** XSOCK_STREAM transport_type and bind it to a source DAG with Xbind(). XAccept
-** may then be called to wait for connections.
-**
 ** @param sockfd	an Xsocket() previously created with the XSOCK_STREAM type,
 ** and bound to a local DAG with Xbind()
 ** @param addr if non-NULL, points to a block of memory that will contain the
@@ -88,9 +77,12 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		return -1;
 	}
 
-	// we'll block waiting for click to tell us there's a pending connection
+	// if blocking, wait for click to tell us there's a pending connection
+	// else return EWOULDBLOCK
 	if (click_status(sockfd, seq) < 0) {
-		LOGF("Error getting status from Click: %s", strerror(errno));
+		if (isBlocking(sockfd) || !WOULDBLOCK()) {
+			LOGF("Error getting status from Click: %s", strerror(errno));
+		}
 		return -1;
 	}
 
@@ -178,17 +170,6 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 ** created socket is not in the listening state. The original socket
 ** sockfd is unaffected by this call.
 **
-** Xaccept4 does not currently have a non-blocking mode, and will block
-** until a connection is made. However, the standard socket API calls select
-** and poll may be used with the Xsocket. Either function will deliver a
-** readable event when a new connection is attempted and you may then call
-** Xaccept() to get a socket for that connection.
-**
-** @note Unlike standard sockets, there is currently no Xlisten function.
-** Callers must create the listening socket by calling Xsocket with the
-** XSOCK_STREAM transport_type and bind it to a source DAG with Xbind(). XAccept
-** may then be called to wait for connections.
-**
 ** @param sockfd	an Xsocket() previously created with the XSOCK_STREAM type,
 ** and bound to a local DAG with Xbind()
 ** @param addr if non-NULL, points to a block of memory that will contain the
@@ -204,11 +185,24 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 */
 int Xaccept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
 {
-	if (flags != 0) {
-		LOG("error: flags are not currently allowed in the XIA version of accept4");
-		errno = EINVAL;
-		return - 1;
+	int block = TRUE;
+
+	if (flags ) {
+		if (flags & SOCK_NONBLOCK) {
+			block = FALSE;
+		} else {
+			flags &= ~SOCK_NONBLOCK;
+			LOGF("error: unsupported flags: %s", xferFlags(flags));
+			errno = EINVAL;
+			return - 1;
+		}
 	}
 
-	return Xaccept(sockfd, addr, addrlen);
+	int rc = Xaccept(sockfd, addr, addrlen);
+
+	if (block == FALSE) {
+		setBlocking(sockfd, FALSE);
+	}
+
+	return rc;
 }
