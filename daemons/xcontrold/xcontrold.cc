@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <algorithm>
 #include <time.h>
 #include <math.h>
 #include <algorithm>
@@ -320,19 +321,18 @@ int processServiceKeepAlive(ControlMessage msg)
 
     msg.read(srcAD);
     msg.read(srcHID);
-    string srcAddr = "RE " + srcAD + " " + srcHID;
     msg.read(sid);
     msg.read(capacity);
 
-    if (route_state.LocalServiceControllers.find(sid) != route_state.LocalServiceControllers.end())
+    if (route_state.LocalServiceLeaders.find(sid) != route_state.LocalServiceLeaders.end())
     { // if controller is here
-        route_state.LocalServiceControllers[sid].instances[srcAddr].capacity = capacity; //update attributes
+        route_state.LocalServiceLeaders[sid].instances[srcAD].capacity = capacity; //update attributes
         // TODO: reply to that instance?
         //syslog(LOG_DEBUG, "got SID %s keep alive from %s", sid.c_str(), srcAddr.c_str());
     }
     else
     {
-        syslog(LOG_ERR, "got %s keep alive to its service controller from %s, but I am not its leader!", sid.c_str(), srcAddr.c_str());
+        syslog(LOG_ERR, "got %s keep alive to its service leader from %s, but I am not its leader!", sid.c_str(), srcAD.c_str());
         rc = -1;
     }
 
@@ -514,19 +514,28 @@ int processSidDiscovery(ControlMessage msg)
 int querySidDecision(void)
 {
     // New design. Report local information to sid controller. Then wait for answer.
-    syslog(LOG_DEBUG, "Sending SID decision queries for %lu SIDs", route_state.SIDADsTable.size() );
+    //syslog(LOG_DEBUG, "Sending SID decision queries for %lu SIDs", route_state.SIDADsTable.size() );
     int rc = 1;
     std::map<std::string, std::map<std::string, ServiceState> >::iterator it_sid;
 
     for (it_sid = route_state.SIDADsTable.begin(); it_sid != route_state.SIDADsTable.end(); ++it_sid)
     {
         // for each SID, generate a report packet.
-        // packet format: SID/#options/optionAD1/Latency1,capacity1/optionAD2/Latency2...
-        // TODO: tell the sid controller local traffic rate
-        syslog(LOG_DEBUG, "Sending SID decision queries for %s", it_sid->first.c_str() );
+        // packet format: SID/rate/#options/optionAD1/Latency1,capacity1/optionAD2/Latency2...
+
+        //syslog(LOG_DEBUG, "Sending SID decision queries for %s", it_sid->first.c_str() );
         ControlMessage msg(CTL_SID_DECISION_QUERY, route_state.myAD, route_state.myHID);
         msg.append(it_sid->first); // SID
-        
+        int rate = 0;
+        if (route_state.SIDRateTabel.find(it_sid->first) != route_state.SIDRateTabel.end()){
+            rate = route_state.SIDRateTabel[it_sid->first];
+        }
+        if (rate < 0){ // it should not happen
+            rate = 0;
+        }
+
+        msg.append(rate);
+
         std::map<std::string, ServiceState>::iterator it_ad;
         std::string best_ad; // the cloest controller
         int minimal_latency = 9999; // smallest latency
@@ -539,7 +548,7 @@ int querySidDecision(void)
             }
             num_ADs++;
         }
-        syslog(LOG_DEBUG, "Found %d replicas", num_ADs );
+        //syslog(LOG_DEBUG, "Found %d replicas", num_ADs );
         msg.append(num_ADs); // the number of ADs
         for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad)
         { // second pass, find the cloest one, creat the message
@@ -557,11 +566,11 @@ int querySidDecision(void)
             msg.append(latency); // latency/ms
             msg.append(it_ad->second.capacity); //capacity
         }
-        syslog(LOG_DEBUG, "Going to send to %s", best_ad.c_str() );
+        //syslog(LOG_DEBUG, "Going to send to %s", best_ad.c_str() );
 
         // send the msg
         if (best_ad == route_state.myAD){ // I'm the one
-            syslog(LOG_DEBUG, "Sending SID decision query locally");
+            //syslog(LOG_DEBUG, "Sending SID decision query locally");
             int type;
             msg.read(type); // remove it to match the correct format for the process function
             processSidDecisionQuery(msg); // process locally
@@ -577,8 +586,8 @@ int querySidDecision(void)
                 syslog(LOG_ERR, "error sending SID decision query to %s", best_ad.c_str());
             }
             rc = (temprc < rc)? temprc : rc;
-            syslog(LOG_DEBUG, "sent SID %s decision query to %s", it_sid->first.c_str(),
-                                     best_ad.c_str());
+            //syslog(LOG_DEBUG, "sent SID %s decision query to %s", it_sid->first.c_str(),
+                                     //best_ad.c_str());
         }
     }
     return rc;
@@ -588,7 +597,7 @@ int processSidDecisionQuery(ControlMessage msg)
 {
     // work out a decision for each query
     // TODO: This could/should be async
-    syslog(LOG_DEBUG, "Processing SID decision query");
+    //syslog(LOG_DEBUG, "Processing SID decision query");
     int rc = 1;
     string srcAD, srcHID;
 
@@ -596,13 +605,15 @@ int processSidDecisionQuery(ControlMessage msg)
     int records = 0;
     int latency;
     int capacity;
+    int rate = 0;
 
     msg.read(srcAD);
     msg.read(srcHID);
-    syslog(LOG_INFO, "Get SID query msg from %s", srcAD.c_str());
 
     // process the entries: AD-latency pairs
     msg.read(SID); // what sid
+    msg.read(rate);
+    //syslog(LOG_INFO, "Get %s query msg from %s, rate %d",SID.c_str(), srcAD.c_str(), rate);
 
     // check if I am the SID controller
     std::map<std::string, ServiceState>::iterator it_sid;
@@ -613,7 +624,7 @@ int processSidDecisionQuery(ControlMessage msg)
         // TODO: reply error msg to the source
     }
     msg.read(records);//number of entries
-    syslog(LOG_INFO, "Get %d latencies for %s", records, SID.c_str());
+    //syslog(LOG_INFO, "Get %d latencies for %s", records, SID.c_str());
 
     if (it_sid->second.archType == ARCH_CENT && !it_sid->second.isLeader){ // should forward to the leader
 
@@ -621,6 +632,8 @@ int processSidDecisionQuery(ControlMessage msg)
         // should use new control message type CTL_SID_DECISION_FORWARD?
         ControlMessage f_msg(CTL_SID_DECISION_QUERY, srcAD, srcHID);
         // TODO: is there a cheaper way to copy the whole message?
+        f_msg.append(SID);
+        f_msg.append(rate);
         f_msg.append(records);
         for (int i = 0; i < records; ++i)
         {
@@ -632,10 +645,10 @@ int processSidDecisionQuery(ControlMessage msg)
             f_msg.append(capacity);
         }
         sockaddr_x ddag;
-        syslog(LOG_INFO, "Send forward query %s", it_sid->second.leaderAddr.c_str());
+        //syslog(LOG_INFO, "Send forward query %s", it_sid->second.leaderAddr.c_str());
         Graph g(it_sid->second.leaderAddr);
         g.fill_sockaddr(&ddag);
-        int temprc = msg.send(route_state.sock, &ddag);
+        int temprc = f_msg.send(route_state.sock, &ddag);
         if (temprc < 0) {
             syslog(LOG_ERR, "error sending SID query forwarding to %s", it_sid->second.leaderAddr.c_str());
         }
@@ -655,11 +668,10 @@ int processSidDecisionQuery(ControlMessage msg)
             dio.latency = latency;
             dio.percentage = 0;
             decisions[AD] = dio;
-            syslog(LOG_INFO, "Get %d ms for %s", latency, AD.c_str());
+            //syslog(LOG_INFO, "Get %d ms for %s", latency, AD.c_str());
         }
         // compute the weights
-        // rate is not implemented yet
-        it_sid->second.decision(srcAD, 0, &decisions);
+        it_sid->second.decision(SID, srcAD, rate, &decisions);
 
         //reply the query
         ControlMessage re_msg(CTL_SID_DECISION_ANSWER, route_state.myAD, route_state.myHID);
@@ -673,7 +685,7 @@ int processSidDecisionQuery(ControlMessage msg)
 
         // send the msg
         if (srcAD == route_state.myAD){ // I'm the one
-            syslog(LOG_DEBUG, "Sending SID decision locally");
+            //syslog(LOG_DEBUG, "Sending SID decision locally");
             int type;
             re_msg.read(type); // remove it to match the correct format for the process function
             processSidDecisionAnswer(re_msg); // process locally
@@ -688,7 +700,7 @@ int processSidDecisionQuery(ControlMessage msg)
                 syslog(LOG_ERR, "error sending SID decision answer to %s", srcAD.c_str());
             }
             rc = (temprc < rc)? temprc : rc;
-            syslog(LOG_DEBUG, "sent SID %s decision answer to %s", SID.c_str(), srcAD.c_str());
+            //syslog(LOG_DEBUG, "sent SID %s decision answer to %s", SID.c_str(), srcAD.c_str());
         }
 
         return rc;
@@ -699,9 +711,9 @@ int processSidDecisionQuery(ControlMessage msg)
 }
 
 /*Pre-define some decision function here*/
-int Latency_first(std::string srcAD, int rate, std::map<std::string, DecisionIO>* decision)
+int Latency_first(std::string, std::string srcAD, int rate, std::map<std::string, DecisionIO>* decision)
 {
-    syslog(LOG_DEBUG, "Decision function: Latency_first for %s", srcAD.c_str());
+    //syslog(LOG_DEBUG, "Decision function %s: Latency_first for %s", SID.c_str(), srcAD.c_str());
     if (srcAD == "" || rate < 0){
         syslog(LOG_INFO, "Error parameters");
         return -1;
@@ -728,8 +740,9 @@ int Latency_first(std::string srcAD, int rate, std::map<std::string, DecisionIO>
     return 0;
 }
 
-int Load_balance(std::string srcAD, int rate, std::map<std::string, DecisionIO>* decision)
+int Load_balance(std::string, std::string srcAD, int rate, std::map<std::string, DecisionIO>* decision)
 {
+    //syslog(LOG_DEBUG, "Decision function %s: load balance for %s", SID.c_str(), srcAD.c_str());
     if (srcAD == "" || rate < 0){
         syslog(LOG_INFO, "Error parameters");
         return -1;
@@ -753,11 +766,187 @@ int Load_balance(std::string srcAD, int rate, std::map<std::string, DecisionIO>*
     return 0;
 }
 
+/* a helper function to compare ClientLatency*/
+bool compareCL(const ClientLatency &a, const ClientLatency &b)
+{
+    return a.latency > b.latency;
+}
+
+
+int Rate_load_balance(std::string SID, std::string srcAD, int rate, std::map<std::string, DecisionIO>* decision)
+{ // balance the load depending on the capacity of replicas and traffic rate of client domains
+    if (srcAD == "" || rate < 0){
+        syslog(LOG_INFO, "Error parameters");
+        return -1;
+    }
+    if (decision == NULL || decision->empty()){
+        syslog(LOG_INFO, "Get 0 entries to decide!");
+        return -1;
+    }
+    //update rate first
+    route_state.LocalServiceLeaders[SID].rates[srcAD] = rate;
+    std::map<std::string, int> rates = route_state.LocalServiceLeaders[SID].rates;
+    std::map<std::string, int>::iterator dumpit;
+    
+    /*mark the 0 rate client as -1*/
+    for (dumpit = rates.begin(); dumpit != rates.end(); ++dumpit){
+        if (dumpit->second == 0){
+            dumpit->second = -1;
+        }
+    }
+
+    std::map<std::string, int> capacities;
+
+    // update latency
+    std::map<std::string, DecisionIO>::iterator it_ad;
+    for (it_ad = decision->begin(); it_ad != decision->end(); ++it_ad)
+    { // update latency 
+        route_state.LocalServiceLeaders[SID].latencies[it_ad->first][srcAD] = it_ad->second.latency;
+        capacities[it_ad->first] = it_ad->second.capacity;
+        //syslog(LOG_DEBUG, "record capacity %s %d", it_ad->first.c_str(), it_ad->second.capacity);
+    }
+
+    // compute the weight 
+
+    //first, convert to lists sorted by latency
+    std::map<std::string, std::vector<ClientLatency> > latency_map;
+    std::map<std::string, std::map<std::string, int> >::iterator it = route_state.LocalServiceLeaders[SID].latencies.begin();
+    for (; it != route_state.LocalServiceLeaders[SID].latencies.end(); ++it){
+        //syslog(LOG_DEBUG, "convert %s", it->first.c_str());
+
+        std::vector<ClientLatency> cls;
+        std::map<std::string, int>::iterator it2 = it->second.begin();
+        for ( ; it2 != it->second.end(); ++it2){
+            //syslog(LOG_DEBUG, "convert2 %s %d", it2->first.c_str(), it2->second);
+            ClientLatency cl;
+            cl.AD = it2->first;
+            cl.latency = it2->second;
+            cls.push_back(cl);
+        }
+        std::sort(cls.begin(), cls.end(), compareCL);
+        latency_map[it->first] = cls;
+    }
+
+    //second, heuristic allocation, for each replica, allocate all traffic from its closet client, then repeat.
+    std::map<std::string, std::vector<ClientLatency> >::iterator it_lp;
+    std::map<std::string, std::vector<ClientLatency> >::iterator it_best;
+    while (1){
+        it_best = latency_map.end();
+        std::string AD;
+        for (it_lp = latency_map.begin(); it_lp != latency_map.end(); ++it_lp){
+            /*clean up*/
+            if (it_lp->second.empty()){ // this list is empty
+                continue;
+            }
+            if (capacities[it_lp->first] <= 0){
+                while (!it_lp->second.empty()){ // no more capacity, clean up
+                    AD = it_lp->second.back().AD;
+                    if (rates[AD] >= 0){ // have demand
+                        it_lp->second.pop_back(); // remove it
+                    }
+                    else{
+                        //keep the -1 item, stop cleaning
+                        break;
+                    }
+                }
+            }
+            while(1){ // find one that need to be allocated
+                if (it_lp->second.empty()){ // this list is empty
+                    break;
+                }
+                AD = it_lp->second.back().AD;
+                if (rates.find(AD) == rates.end() || rates[AD] == 0){ // already allocated this client
+                    it_lp->second.pop_back();
+                    continue;
+                }
+                else{
+                    break;
+                }
+            }
+            if (it_lp->second.empty()){ // this list is empty
+                continue;
+            }
+            /*find the smallest one*/
+            if (it_best == latency_map.end() || it_best->second.back().latency > it_lp->second.back().latency){
+                it_best = it_lp;
+            }
+        }
+        if (it_best == latency_map.end()){ // nothing left
+            //syslog(LOG_ERR, "allocation done");
+            break;
+        }
+        else{
+            //syslog(LOG_ERR, "find best %s %d", it_best->second.back().AD.c_str(), it_best->second.back().latency);
+        }
+        /*allocate max capacity of the corresponding replica to the client with the smallest latency*/
+        // we do this for all the client but only record the allocation for srcAD
+        AD = it_best->second.back().AD;
+        std::string replica = it_best->first;
+        if (rates[AD] == -1){ // this is a zero request rate one, just allocate it to the closest replica
+            if (AD == srcAD){
+                (*decision)[replica].percentage = 100; // any value
+                //syslog(LOG_ERR, "allocate0 100%%: for %s", srcAD.c_str());
+            }
+            rates[AD] = 0; //mark it done
+            it_best->second.pop_back();
+        }
+        else if (rates[AD] >= capacities[replica]){ // allocate the remaining capacity of that replica
+            rates[AD] -= capacities[replica];
+            it_best->second.pop_back();
+            if (AD == srcAD){
+                (*decision)[replica].percentage = capacities[replica];
+                //syslog(LOG_ERR, "allocate1 %d: for %s", capacities[replica], srcAD.c_str());
+            }
+            capacities[replica] = 0;
+            while (!it_best->second.empty()){ // no more capacity, clean up
+                AD = it_best->second.back().AD;
+                if (rates[AD] >= 0){ // have demand
+                    it_best->second.pop_back(); // remove it
+                }
+                else{
+                    //keep the -1 item, stop cleaning
+                    break;
+                }
+            }
+            //it_best->second.clear();
+        }
+        else{ // capacity > rates[AD]
+            capacities[replica] -= rates[AD];
+            if (AD == srcAD){
+                (*decision)[replica].percentage = rates[AD];
+                //syslog(LOG_ERR, "allocate2 %d: for %s", rates[AD], srcAD.c_str());
+
+            }
+            rates[AD] = 0;
+            it_best->second.pop_back();
+        }
+    }
+    //syslog(LOG_DEBUG, "Finish R_LB");
+
+    //normalize the percentage
+    int sum = 0;
+    for (it_ad = decision->begin(); it_ad != decision->end(); ++it_ad)
+    { // compute the sum 
+        sum += it_ad->second.percentage;
+        //syslog(LOG_DEBUG, "record percentage %s %d", it_ad->first.c_str(), it_ad->second.percentage);
+    }
+    if (sum == 0){
+        syslog(LOG_ERR, "R_LB: sum = 0!");
+        return -1;
+    }
+    for (it_ad = decision->begin(); it_ad != decision->end(); ++it_ad)
+    { // update percentage
+        it_ad->second.percentage = 100.0 * it_ad->second.percentage / sum + 0.5; // +0.5 to round
+    }
+   
+    return 0;
+}
+
 
 int processSidDecisionAnswer(ControlMessage msg)
 { // When got the answer, set local weight
   // The answer is per SID, when to update routing table? 
-    syslog(LOG_DEBUG, "Processing SID decision");
+    //syslog(LOG_DEBUG, "Processing SID decision");
     if (!ENABLE_SID_CTL) {
         // if SID control plane is disabled
         // we should not get such a ctl message
@@ -775,12 +964,12 @@ int processSidDecisionAnswer(ControlMessage msg)
     // process the entries: AD-latency pairs
     msg.read(SID); // what sid
     msg.read(records); // number of records
-    syslog(LOG_INFO, "Get %s, %d answer msg from %s", SID.c_str(), records, srcAD.c_str());
+    //syslog(LOG_INFO, "Get %s, %d answer msg from %s", SID.c_str(), records, srcAD.c_str());
 
     std::map<std::string, std::map<std::string, ServiceState> >::iterator it_sid;
     it_sid = route_state.SIDADsTable.find(SID);
     if (it_sid == route_state.SIDADsTable.end()){
-        syslog(LOG_INFO, "No record for %s", SID.c_str());
+        syslog(LOG_ERR, "No record for %s", SID.c_str());
         return -1;
     }
     std::map<std::string, ServiceState>::iterator it_ad;
@@ -794,20 +983,20 @@ int processSidDecisionAnswer(ControlMessage msg)
     for (int i = 0; i < records; i++){
         msg.read(AD); 
         msg.read(percentage);
-        syslog(LOG_INFO, "Get %s, %d %%", AD.c_str(), percentage);
+        //syslog(LOG_INFO, "Get %s, %d %%", AD.c_str(), percentage);
         std::map<std::string, ServiceState>::iterator it_ad = it_sid->second.find(AD);
 
         it_ad->second.valid = true; // valid is not implemented yet
         if (it_ad == it_sid->second.end()){
-            syslog(LOG_INFO, "No record for %s@%s", SID.c_str(), AD.c_str());
+            syslog(LOG_ERR, "No record for %s@%s", SID.c_str(), AD.c_str());
         }
         else{
             it_ad->second.percentage = percentage;
             if (percentage > 100){
-                syslog(LOG_INFO, "Invalid weight: %d", percentage);
+                syslog(LOG_ERR, "Invalid weight: %d", percentage);
             }
             if (it_ad->second.priority < 0){
-                syslog(LOG_INFO, "To-be-deleted record received, %s@%s, it's OK", SID.c_str(), AD.c_str());
+                syslog(LOG_ALERT, "To-be-deleted record received, %s@%s, it's OK", SID.c_str(), AD.c_str());
             }
         }
     }
@@ -901,7 +1090,7 @@ int sendSidRoutingDecision(void)
     // for each router
     // Now we just send the identical decision to every router. The routers will reuse their
     // own routing table to interpret the decision
-    syslog(LOG_DEBUG, "Processing SID decision routes");
+    //syslog(LOG_DEBUG, "Processing SID decision routes");
     int rc = 1;
 
     // remap the SIDADsTable
@@ -1858,9 +2047,24 @@ void set_sid_conf(const char* myhostname)
         ini_gets(section_name, "sid", sid, sid, BUF_SIZE, full_path);
         service_sid = std::string(sid);
 
-        if (ini_getbool(section_name, "enabled", 1, full_path) == 0)
+        /*first read the synthetic load as a client domain*/
+        int s_load = ini_getl(section_name, "synthetic_load", 0, full_path);
+        if (s_load == 0){ // synthetic load is not set, make sure it won't overwrite the existing value
+            if (route_state.SIDRateTabel.find(service_sid) == route_state.SIDRateTabel.end()){
+                route_state.SIDRateTabel[service_sid] = 0;
+            }
+            else{
+                // do nothing
+            }
+        }
+        else{
+            route_state.SIDRateTabel[service_sid] = s_load;
+        }
+
+
+        if (ini_getbool(section_name, "enabled", 0, full_path) == 0)
         {// skip this if not enabled, NOTE: enabled=True is the default one
-         // if an entry was enabled but is disabled now, we should 'poison' other ADs by broadcast this invalidation
+         // if an entry was enabled but is disabled now, we should 'poison' other ADs by broadcasting this invalidation
             if (old_local_list.count(service_sid) > 0){ // it was there
                 old_local_list[service_sid].priority = -1; // invalid entry
                 old_local_list[service_sid].seq = route_state.sid_discovery_seq;
@@ -1883,10 +2087,10 @@ void set_sid_conf(const char* myhostname)
             service_state.leaderAddr = std::string(controller_addr);
             if (service_state.isLeader) // I am the leader
             {
-                if (route_state.LocalServiceControllers.find(service_sid) == route_state.LocalServiceControllers.end())
+                if (route_state.LocalServiceLeaders.find(service_sid) == route_state.LocalServiceLeaders.end())
                 { // no service controller yet, create one
-                    ServiceController sc;
-                    route_state.LocalServiceControllers[service_sid] = sc; // just initialize it
+                    ServiceLeader sc;
+                    route_state.LocalServiceLeaders[service_sid] = sc; // just initialize it
                 }
             }
             service_state.archType = ini_getl(section_name, "archType", 0, full_path);
@@ -1899,8 +2103,11 @@ void set_sid_conf(const char* myhostname)
                 case PURE_LOADBALANCE:
                     service_state.decision = &Load_balance;
                     break;
+                case RATE_LOADBALANCE:
+                    service_state.decision = &Rate_load_balance;
+                    break;
                 default:
-                    syslog(LOG_DEBUG, "unknow decision function %s\n", sid);
+                    syslog(LOG_DEBUG, "unknown decision function %s\n", sid);
             }
                 
             //fprintf(stderr, "read state%s, %d, %d, %s\n", sid, service_state.capacity, service_state.isLeader, service_state.leaderAddr.c_str());

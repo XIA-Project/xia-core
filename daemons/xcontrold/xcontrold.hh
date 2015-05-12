@@ -46,8 +46,9 @@
 // predefine some decision function
 #define LATENCY_FIRST  0
 #define PURE_LOADBALANCE 1 
-#define USER_DEFINDED_FUN_1 2 
-#define USER_DEFINDED_FUN_2 3
+#define RATE_LOADBALANCE 2
+#define USER_DEFINDED_FUN_1 3 
+#define USER_DEFINDED_FUN_2 4
 
 // architectures of controllers of a SID
 #define ARCH_DIST 0 //purely distributed no coordination
@@ -77,8 +78,8 @@ typedef struct ServiceState
     std::map<std::string, int> delays; // the delays from ADs to the instance {AD:delay}
 
     // SID-controller-only info
-    // the decision funtion pointer: srcAD, rate, *decisionPut
-    int (*decision)(std::string, int, std::map<std::string, DecisionIO>*);
+    // the decision funtion pointer: SID, srcAD, rate, *decisionPut
+    int (*decision)(std::string, std::string, int, std::map<std::string, DecisionIO>*);
 
     // local information used for store decision, no re-broadcast
     double weight; // calculated weight
@@ -86,10 +87,19 @@ typedef struct ServiceState
     int percentage; // what is the percent of
 } ServiceState;
 
-typedef struct ServiceController
+typedef struct ClientLatency
+{
+    std::string AD;
+    int latency;
+} ClientLatency;
+
+
+typedef struct ServiceLeader
 {
     std::map<std::string, ServiceState> instances; // the states for each service instances, AD : state pair
-} ServiceController;
+    std::map<std::string, int> rates; // the global view of reported rates from the client domains
+    std::map<std::string, std::map<std::string, int> > latencies; // the global view of reported latencies domains, <replica: <client: latency> >
+} ServiceLeader;
 
 typedef struct ADPathState// The path state to an AD, network 'weather' report
 {
@@ -145,8 +155,9 @@ typedef struct RouteState {
 
     std::map<std::string, ADPathState> ADPathStates; // network 'weather' report service
     std::map<std::string, ServiceState> LocalSidList; // services provided by this AD
-    std::map<std::string, ServiceController> LocalServiceControllers; // AD controller acts as service controllers for local SIDs that need to be the master node (runs controller) for now TODO: an independent service controller daemon
+    std::map<std::string, ServiceLeader> LocalServiceLeaders; // AD controller acts as service controllers for local SIDs that need to be the master node (runs controller) for now TODO: an independent service controller daemon
     std::map<std::string, std::map<std::string, ServiceState> > SIDADsTable; //discovery plane: what the controller discovered
+    std::map<std::string, int> SIDRateTabel; //record the traffic rate from local domain for each SID
 
 } RouteState;
 
@@ -232,6 +243,8 @@ void set_controller_conf(const char* myhostname);
 void set_sid_conf(const char* myhostname);
 
 // several pre-defined decision functions
-int Latency_first(std::string srcAD, int rate, std::map<std::string, DecisionIO>* decsion);
+int Latency_first(std::string SID, std::string srcAD, int rate, std::map<std::string, DecisionIO>* decsion);
 
-int Load_balance(std::string srcAD, int rate, std::map<std::string, DecisionIO>* decsion);
+int Load_balance(std::string SID, std::string srcAD, int rate, std::map<std::string, DecisionIO>* decsion);
+
+int Rate_load_balance(std::string SID, std::string srcAD, int rate, std::map<std::string, DecisionIO>* decision);
