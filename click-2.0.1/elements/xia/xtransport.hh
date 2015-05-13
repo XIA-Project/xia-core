@@ -53,7 +53,7 @@ using namespace std;
 #define RANDOM_XID_FMT		"%s:30000ff0000000000000000000000000%08x"
 #define UDP_HEADER_SIZE		8
 
-#define XSOCKET_INVALID -1	// invalid socket type	
+#define XSOCKET_INVALID -1	// invalid socket type
 #define XSOCKET_STREAM	1	// Reliable transport (SID)
 #define XSOCKET_DGRAM	2	// Unreliable transport (SID)
 #define XSOCKET_RAW		3	// Raw XIA socket
@@ -66,6 +66,7 @@ using namespace std;
 #define DEFAULT_RECV_WIN_SIZE 128
 
 #define MAX_CONNECT_TRIES	 30
+#define MAX_CLOSE_TRIES 30 // added by chenren
 #define MAX_MIGRATE_TRIES	 30
 #define MAX_RETRANSMIT_TRIES 100
 
@@ -82,6 +83,15 @@ using namespace std;
 #define CACHE_PORT      3
 #define XHCP_PORT       4
 
+// chenren add
+#define NOTCONNECTED 0
+#define CONNECTING -1
+#define CONNECTED 1
+
+#define ACTIVE 0
+#define CLOSING -1
+#define CLOSED 1
+// chenren add
 
 /* TCP params from http://lxr.linux.no/linux+v3.10.2/include/net/tcp.h */
 
@@ -137,7 +147,7 @@ using namespace std;
 #define TCP_TIMEWAIT_LEN (60*HZ) /* how long to wait to destroy TIME-WAIT
 				  * state, about 60 seconds	*/
 #define TCP_FIN_TIMEOUT	TCP_TIMEWAIT_LEN
-                                 /* BSD style FIN_WAIT2 deadlock breaker.
+	                             /* BSD style FIN_WAIT2 deadlock breaker.
 				  * It used to be 3min, new value is 60sec,
 				  * to combine FIN-WAIT-2 timeout with
 				  * TIME-WAIT timer.
@@ -190,7 +200,7 @@ using namespace std;
 /*
  *	TCP option
  */
- 
+
 #define TCPOPT_NOP		1	/* Padding */
 #define TCPOPT_EOL		0	/* End of options */
 #define TCPOPT_MSS		2	/* Segment size negotiating */
@@ -235,7 +245,7 @@ enum {
 	TCP_NSTATES	/* Leave at the end! */
 };
 
-/* 
+/*
  * (BSD)
  * Flags used when sending segments in tcp_output.  Basic flags (TH_RST,
  * TH_ACK,TH_SYN,TH_FIN) are totally determined by state, with the proviso
@@ -254,23 +264,23 @@ enum {
 //		TH_FIN|TH_ACK,		/* 8, LAST_ACK */
 //		TH_ACK,			/* 9, FIN_WAIT_2 */
 //		TH_ACK,			/* 10, TIME_WAIT */
-//	};	
+//	};
 
 CLICK_DECLS
 
 /**
-XTRANSPORT:   
+XTRANSPORT:
 input port[0]:  api port
 input port[1]:  Unused
 input port[2]:  Network Rx data port
 input port[3]:  in from cache
 
 output[3]: To cache for putCID
-output[2]: Network Tx data port 
+output[2]: Network Tx data port
 output[0]: Socket (API) Tx data port
 
 Might need other things to handle chunking
-*/  
+*/
 
 
 typedef struct {
@@ -279,50 +289,50 @@ typedef struct {
 	HashTable<unsigned short, unsigned int> events;
 } PollEvent;
 
-class XTRANSPORT : public Element { 
+class XTRANSPORT : public Element {
   public:
-    XTRANSPORT();
-    ~XTRANSPORT();
-    const char *class_name() const		{ return "XTRANSPORT"; }
-    const char *port_count() const		{ return "5/4"; }
-    const char *processing() const		{ return PUSH; }
-    int configure(Vector<String> &, ErrorHandler *);         
-    void push(int port, Packet *);            
-    XID local_hid() { return _local_hid; };
-    XIAPath local_addr() { return _local_addr; };
-    XID local_4id() { return _local_4id; };
-    void add_handlers();
-    static int write_param(const String &, Element *, void *vparam, ErrorHandler *);
-    
-    int initialize(ErrorHandler *);
-    void run_timer(Timer *timer);
+	XTRANSPORT();
+	~XTRANSPORT();
+	const char *class_name() const		{ return "XTRANSPORT"; }
+	const char *port_count() const		{ return "5/4"; }
+	const char *processing() const		{ return PUSH; }
+	int configure(Vector<String> &, ErrorHandler *);
+	void push(int port, Packet *);
+	XID local_hid() { return _local_hid; };
+	XIAPath local_addr() { return _local_addr; };
+	XID local_4id() { return _local_4id; };
+	void add_handlers();
+	static int write_param(const String &, Element *, void *vparam, ErrorHandler *);
 
-    void ReturnResult(int sport, xia::XSocketMsg *xia_socket_msg, int rc = 0, int err = 0);
-    
+	int initialize(ErrorHandler *);
+	void run_timer(Timer *timer);
+
+	void ReturnResult(int sport, xia::XSocketMsg *xia_socket_msg, int rc = 0, int err = 0);
+
   private:
 
 
 //  pthread_mutex_t _lock;
 //  pthread_mutexattr_t _lock_attr;
 
-    SyslogErrorHandler *_errh;
+	SyslogErrorHandler *_errh;
 
-    Timer _timer;
-    
-    unsigned _ackdelay_ms;
+	Timer _timer;
+
+	unsigned _ackdelay_ms;
     unsigned _migrateackdelay_ms;
-    unsigned _teardown_wait_ms;
-    
-    uint32_t _cid_type, _sid_type;
-    XID _local_hid;
-    XIAPath _local_addr;
-    XID _local_4id;
-    XID _null_4id;
-    bool _is_dual_stack_router;
-    bool isConnected;
-    XIAPath _nameserver_addr;
+	unsigned _teardown_wait_ms;
 
-    Packet* UDPIPPrep(Packet *, int);
+	uint32_t _cid_type, _sid_type;
+	XID _local_hid;
+	XIAPath _local_addr;
+	XID _local_4id;
+	XID _null_4id;
+	bool _is_dual_stack_router;
+	bool connState;
+	XIAPath _nameserver_addr;
+
+	Packet* UDPIPPrep(Packet *, int);
 
 
 /* TODO: sock (previously named DAGinfo) stores per-socket states for ALL transport protocols. We better make a specialized struct for each protocol
@@ -332,8 +342,17 @@ class XTRANSPORT : public Element {
 	/* =========================
 	 * Socket states
 	 * ========================= */
-    struct sock {
-		sock(): port(0), so_error(0), isConnected(false), isBlocking(true), initialized(false), full_src_dag(false), timer_on(false), synack_waiting(false), dataack_waiting(false), teardown_waiting(false), migrateack_waiting(false), send_buffer_size(DEFAULT_SEND_WIN_SIZE), recv_buffer_size(DEFAULT_RECV_WIN_SIZE), send_base(0), next_send_seqnum(0), recv_base(0), next_recv_seqnum(0), dgram_buffer_start(0), dgram_buffer_end(-1), recv_buffer_count(0), recv_pending(false), polling(0), did_poll(false) {};
+	struct sock {
+		sock(): port(0), connState(NOTCONNECTED), closeState(ACTIVE), isBlocking(true), initialized(false), // chenren: changed connState and closeState from false to 0
+							full_src_dag(false), timer_on(false), synack_waiting(false),
+							synackack_waiting(false), finack_waiting(false), finackack_waiting(false), // chenren: added
+							so_error(0), dataack_waiting(false), teardown_waiting(false),
+							send_buffer_size(DEFAULT_SEND_WIN_SIZE),
+							recv_buffer_size(DEFAULT_RECV_WIN_SIZE), send_base(0),
+							next_send_seqnum(0), recv_base(0), next_recv_seqnum(0),
+							dgram_buffer_start(0), dgram_buffer_end(-1),
+							recv_buffer_count(0), recv_pending(false), polling(0),
+							did_poll(false) {};
 
 	/* =========================
 	 * Common Socket states
@@ -347,18 +366,22 @@ class XTRANSPORT : public Element {
 
 		unsigned char sk_state;		// e.g. TCP connection state for tcp_sock
 
-		bool full_src_dag; // bind to full dag or just to SID  
+		bool full_src_dag; // bind to full dag or just to SID
 		int sock_type; // 0: Reliable transport (SID), 1: Unreliable transport (SID), 2: Content Chunk transport (CID)
 
 	/* =========================
 	 * XSP/XChunkP Socket states
 	 * ========================= */
 
-		bool isConnected;
+			int connState; 	// chenren: change bool to int; {-1,0,1} represents pending, closed and connected
+			int	closeState; 		// chenren: added: {-1,0,1} represents pending, connected and closed
 		bool initialized;
 		bool isListenSocket;
 		bool isBlocking;
 		bool synack_waiting;
+			bool synackack_waiting; // chenren: used for synack retransmission
+			bool finack_waiting;		// chenren: used for fin retransmission
+			bool finackack_waiting; // chenren: used for finack retransmission
 		bool dataack_waiting;
 		bool teardown_waiting;
 		bool migrateack_waiting;
@@ -374,10 +397,10 @@ class XTRANSPORT : public Element {
 		int num_connect_tries; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
 		int num_migrate_tries; // number of migrate tries (Connection closes after MAX_MIGRATE_TRIES trials)
 		int num_retransmit_tries; // number of times to try resending data packets
-
+			int num_close_tries; // chenren: added for closing connections
     	queue<sock*> pending_connection_buf;
 		queue<xia::XSocketMsg*> pendingAccepts; // stores accept messages from API when there are no pending connections
-	
+
 		// send buffer
     	WritablePacket *send_buffer[MAX_SEND_WIN_SIZE]; // packets we've sent but have not gotten an ACK for // TODO: start smaller, dynamically resize if app asks for more space (up to MAX)?
 		uint32_t send_buffer_size;
@@ -399,6 +422,9 @@ class XTRANSPORT : public Element {
 		//Vector<WritablePacket*> pkt_buf;
 		WritablePacket *syn_pkt;
 		WritablePacket *migrate_pkt;
+			WritablePacket *synack_pkt; // chenren: for retransmission
+			WritablePacket *fin_pkt; 		// chenren: for retransmission
+			WritablePacket *finack_pkt; // chenren: for retransmission
 		HashTable<XID, WritablePacket*> XIDtoCIDreqPkt;
 		HashTable<XID, Timestamp> XIDtoExpiryTime;
 		HashTable<XID, bool> XIDtoTimerOn;
@@ -408,14 +434,19 @@ class XTRANSPORT : public Element {
 		uint32_t seq_num;
 		uint32_t ack_num;
 		bool timer_on;
-		Timestamp expiry;
+			Timestamp expiry; // chenren: used for syn packet retransmission
 		Timestamp teardown_expiry;
+			Timestamp synackack_expiry; // chenren: added
+			Timestamp finack_expiry; // chenren: added
+			Timestamp finackack_expiry; // chenren: added
+
+			queue<uint32_t> rto_ests; // chenren: TODO: add RTO estimation later
 
 	/* =========================================================
-	 * TCP Socket states 
+	 * TCP Socket states
 	 * http://lxr.linux.no/linux+v3.10.2/include/linux/tcp.h
 	 * ========================================================= */
-		
+
 		//uint16_t	tcp_header_len;	/* Bytes of tcp header to send		*/
 
 	/*
@@ -528,46 +559,46 @@ class XTRANSPORT : public Element {
 			int	space;
 			uint32_t	seq;
 			uint32_t	time;
-		} rcvq_space;    
+		} rcvq_space;
     } ;
 
- 
+
     list<int> xcmp_listeners;   // list of ports wanting xcmp notifications
 
     HashTable<XID, unsigned short> XIDtoPort;
     HashTable<XIDpair , unsigned short> XIDpairToPort;
     HashTable<unsigned short, sock*> portToSock;
     HashTable<XID, unsigned short> XIDtoPushPort;
-    
-    
+
+
     HashTable<unsigned short, bool> portToActive;
     HashTable<XIDpair , bool> XIDpairToConnectPending;
 
-    // FIXME: can these be rolled into the sock structure?
+	// FIXME: can these be rolled into the sock structure?
 	HashTable<unsigned short, int> nxt_xport;
     HashTable<unsigned short, int> hlim;
 
     HashTable<unsigned short, PollEvent> poll_events;
 
-    
+
     atomic_uint32_t _id;
     bool _cksum;
     XIAXIDRouteTable *_routeTable;
-    
-    //modify routing table
-    void addRoute(const XID &sid) {
-		String cmd=sid.unparse() + " " + String(DESTINED_FOR_LOCALHOST);
-        HandlerCall::call_write(_routeTable, "add", cmd);
-    }   
-        
-    void delRoute(const XID &sid) {
-        String cmd= sid.unparse();
-        HandlerCall::call_write(_routeTable, "remove", cmd);
-    }
- 
 
- 
-  protected:    
+	// modify routing table
+    void addRoute(const XID &sid) {
+			String cmd = sid.unparse() + " " + String(DESTINED_FOR_LOCALHOST);
+        HandlerCall::call_write(_routeTable, "add", cmd);
+	}
+
+    void delRoute(const XID &sid) {
+			String cmd = sid.unparse();
+        HandlerCall::call_write(_routeTable, "remove", cmd);
+	}
+
+
+
+  protected:
     void copy_common(struct sock *sk, XIAHeader &xiahdr, XIAHeaderEncap &xiah);
     WritablePacket* copy_packet(Packet *, struct sock *);
     WritablePacket* copy_cid_req_packet(Packet *, struct sock *);
@@ -613,7 +644,7 @@ class XTRANSPORT : public Element {
     void Xupdatenameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void Xreadnameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void Xgetpeername(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xgetsockname(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);    
+    void Xgetsockname(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void Xisdualstackrouter(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
     void Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
