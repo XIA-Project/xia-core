@@ -2104,6 +2104,7 @@ void set_sid_conf(const char* myhostname)
                     route_state.LocalServiceLeaders[service_sid] = sc; // just initialize it
                 }
             }
+            service_state.archType = ini_getl(section_name, "archType", 0, full_path);
             service_state.priority = ini_getl(section_name, "priority", 1, full_path);
             service_state.internal_delay = ini_getl(section_name, "internaldelay", 0, full_path);
             int decision_type = ini_getl(section_name, "decisiontype", 0, full_path);
