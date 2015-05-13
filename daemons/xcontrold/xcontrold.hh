@@ -52,11 +52,11 @@
 
 // architectures of controllers of a SID
 #define ARCH_DIST 0 //purely distributed no coordination
-#define ARCH_CENT 1 //all queries are forwardded to one leader controller
+#define ARCH_CENT 1 //all queries are forwarded to one leader controller
 #define ARCH_SYNC 2 //states are synced among controllers, every controller replies to queries
 
 
-typedef struct DecisionIO // the struct for decison input and output
+typedef struct DecisionIO // the struct for decision input and output
 {
     int capacity;
     int latency;
@@ -75,10 +75,11 @@ typedef struct ServiceState
     int isLeader; // whether this instance is also a service controller, 0 for no
     std::string leaderAddr; // the address of the service controller
     int archType; // the architecture of the controllers
+    int internal_delay; // the internal delay of this service
     std::map<std::string, int> delays; // the delays from ADs to the instance {AD:delay}
 
     // SID-controller-only info
-    // the decision funtion pointer: SID, srcAD, rate, *decisionPut
+    // the decision function pointer: SID, srcAD, rate, *decisionPut
     int (*decision)(std::string, std::string, int, std::map<std::string, DecisionIO>*);
 
     // local information used for store decision, no re-broadcast

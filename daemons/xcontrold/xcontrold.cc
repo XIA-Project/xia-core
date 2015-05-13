@@ -288,6 +288,7 @@ int sendKeepAliveToServiceControllerLeader()
         ControlMessage msg(CTL_SID_MANAGE_KA, route_state.myAD, route_state.myHID);
         msg.append(it->first);
         msg.append(it->second.capacity);
+        msg.append(it->second.internal_delay);
         // TODO:append some more states
 
         if (it->second.isLeader){
@@ -317,16 +318,19 @@ int processServiceKeepAlive(ControlMessage msg)
     string srcAD, srcHID;
 
     std::string sid;
-    int capacity;
+    int capacity, delay;
 
     msg.read(srcAD);
     msg.read(srcHID);
     msg.read(sid);
     msg.read(capacity);
+    msg.read(delay);
 
     if (route_state.LocalServiceLeaders.find(sid) != route_state.LocalServiceLeaders.end())
     { // if controller is here
-        route_state.LocalServiceLeaders[sid].instances[srcAD].capacity = capacity; //update attributes
+        //update attributes
+        route_state.LocalServiceLeaders[sid].instances[srcAD].capacity = capacity; 
+        route_state.LocalServiceLeaders[sid].instances[srcAD].internal_delay = delay; 
         // TODO: reply to that instance?
         //syslog(LOG_DEBUG, "got SID %s keep alive from %s", sid.c_str(), srcAddr.c_str());
     }
@@ -711,7 +715,7 @@ int processSidDecisionQuery(ControlMessage msg)
 }
 
 /*Pre-define some decision function here*/
-int Latency_first(std::string, std::string srcAD, int rate, std::map<std::string, DecisionIO>* decision)
+int Latency_first(std::string SID, std::string srcAD, int rate, std::map<std::string, DecisionIO>* decision)
 {
     //syslog(LOG_DEBUG, "Decision function %s: Latency_first for %s", SID.c_str(), srcAD.c_str());
     if (srcAD == "" || rate < 0){
@@ -724,8 +728,13 @@ int Latency_first(std::string, std::string srcAD, int rate, std::map<std::string
 
     for (it_ad = decision->begin(); it_ad != decision->end(); ++it_ad)
     { // first pass, just find the minimal latency
-        minimal_latency = minimal_latency > it_ad->second.latency?it_ad->second.latency:minimal_latency;
-        best_ad = minimal_latency == it_ad->second.latency?it_ad->first:best_ad; // find the closest
+        // e2e latency + internal delay
+        int delay = it_ad->second.latency;
+        if ( route_state.LocalServiceLeaders[SID].instances.find(it_ad->first) != route_state.LocalServiceLeaders[SID].instances.end()){
+            delay += route_state.LocalServiceLeaders[SID].instances[it_ad->first].internal_delay; 
+        }
+        minimal_latency = minimal_latency > delay?delay:minimal_latency;
+        best_ad = minimal_latency == delay?it_ad->first:best_ad; // find the closest
     }
 
     for (it_ad = decision->begin(); it_ad != decision->end(); ++it_ad)
@@ -827,10 +836,12 @@ int Rate_load_balance(std::string SID, std::string srcAD, int rate, std::map<std
         latency_map[it->first] = cls;
     }
 
-    //second, heuristic allocation, for each replica, allocate all traffic from its closet client, then repeat.
+    //second, heuristic allocation, allocate full capacity to the client-replica pair with the smallest latency, then repeat.
+
     std::map<std::string, std::vector<ClientLatency> >::iterator it_lp;
     std::map<std::string, std::vector<ClientLatency> >::iterator it_best;
     while (1){
+        /*find the pair*/
         it_best = latency_map.end();
         std::string AD;
         for (it_lp = latency_map.begin(); it_lp != latency_map.end(); ++it_lp){
@@ -2093,7 +2104,8 @@ void set_sid_conf(const char* myhostname)
                     route_state.LocalServiceLeaders[service_sid] = sc; // just initialize it
                 }
             }
-            service_state.archType = ini_getl(section_name, "archType", 0, full_path);
+            service_state.priority = ini_getl(section_name, "priority", 1, full_path);
+            service_state.internal_delay = ini_getl(section_name, "internaldelay", 0, full_path);
             int decision_type = ini_getl(section_name, "decisiontype", 0, full_path);
             switch (decision_type)
             {
