@@ -93,179 +93,6 @@ using namespace std;
 #define CLOSED 1
 // chenren add
 
-/* TCP params from http://lxr.linux.no/linux+v3.10.2/include/net/tcp.h */
-
-/* Offer an initial receive window of 10 mss. */
-#define TCP_DEFAULT_INIT_RCVWND	10
-
-/* Minimal accepted MSS. It is (60+60+8) - (20+20). */
-#define TCP_MIN_MSS		88U
-
-/* The least MTU to use for probing */
-#define TCP_BASE_MSS		512
-
-/* After receiving this amount of duplicate ACKs fast retransmit starts. */
-#define TCP_FASTRETRANS_THRESH 3
-
-/* Maximal reordering. */
-#define TCP_MAX_REORDERING	127
-
-/* Maximal number of ACKs sent quickly to accelerate slow-start. */
-#define TCP_MAX_QUICKACKS	16U
-
-
-#define TCP_RETR1	3	/*
-				 * This is how many retries it does before it
-				 * tries to figure out if the gateway is
-				 * down. Minimal RFC value is 3; it corresponds
-				 * to ~3sec-8min depending on RTO.
-				 */
-
-#define TCP_RETR2	15	/*
-				 * This should take at least
-				 * 90 minutes to time out.
-				 * RFC1122 says that the limit is 100 sec.
-				 * 15 is ~13-30min depending on RTO.
-				 */
-
-#define TCP_SYN_RETRIES	 6	/* This is how many retries are done
-				 * when active opening a connection.
-				 * RFC1122 says the minimum retry MUST
-				 * be at least 180secs.  Nevertheless
-				 * this value is corresponding to
-				 * 63secs of retransmission with the
-				 * current initial RTO.
-				 */
-
-#define TCP_SYNACK_RETRIES 5	/* This is how may retries are done
-				 * when passive opening a connection.
-				 * This is corresponding to 31secs of
-				 * retransmission with the current
-				 * initial RTO.
-				 */
-
-#define TCP_TIMEWAIT_LEN (60*HZ) /* how long to wait to destroy TIME-WAIT
-				  * state, about 60 seconds	*/
-#define TCP_FIN_TIMEOUT	TCP_TIMEWAIT_LEN
-	                             /* BSD style FIN_WAIT2 deadlock breaker.
-				  * It used to be 3min, new value is 60sec,
-				  * to combine FIN-WAIT-2 timeout with
-				  * TIME-WAIT timer.
-				  */
-
-#define TCP_DELACK_MAX	((unsigned)(HZ/5))	/* maximal time to delay before sending an ACK */
-#if HZ >= 100
-#define TCP_DELACK_MIN	((unsigned)(HZ/25))	/* minimal time to delay before sending an ACK */
-#define TCP_ATO_MIN	((unsigned)(HZ/25))
-#else
-#define TCP_DELACK_MIN	4U
-#define TCP_ATO_MIN	4U
-#endif
-#define TCP_RTO_MAX	((unsigned)(120*HZ))
-#define TCP_RTO_MIN	((unsigned)(HZ/5))
-#define TCP_TIMEOUT_INIT ((unsigned)(1*HZ))	/* RFC6298 2.1 initial RTO value	*/
-#define TCP_TIMEOUT_FALLBACK ((unsigned)(3*HZ))	/* RFC 1122 initial RTO value, now
-						 * used as a fallback RTO for the
-						 * initial data transmission if no
-						 * valid RTT sample has been acquired,
-						 * most likely due to retrans in 3WHS.
-						 */
-
-#define TCP_RESOURCE_PROBE_INTERVAL ((unsigned)(HZ/2U)) /* Maximal interval between probes
-					                 * for local resources.
-					                 */
-
-#define TCP_KEEPALIVE_TIME	(120*60*HZ)	/* two hours */
-#define TCP_KEEPALIVE_PROBES	9		/* Max of 9 keepalive probes	*/
-#define TCP_KEEPALIVE_INTVL	(75*HZ)
-
-#define MAX_TCP_KEEPIDLE	32767
-#define MAX_TCP_KEEPINTVL	32767
-#define MAX_TCP_KEEPCNT		127
-#define MAX_TCP_SYNCNT		127
-
-#define TCP_SYNQ_INTERVAL	(HZ/5)	/* Period of SYNACK timer */
-
-#define TCP_PAWS_24DAYS	(60 * 60 * 24 * 24)
-#define TCP_PAWS_MSL	60		/* Per-host timestamps are invalidated
-					 * after this time. It should be equal
-					 * (or greater than) TCP_TIMEWAIT_LEN
-					 * to provide reliability equal to one
-					 * provided by timewait state.
-					 */
-#define TCP_PAWS_WINDOW	1		/* Replay window for per-host
-					 * timestamps. It must be less than
-					 * minimal timewait lifetime.
-					 */
-/*
- *	TCP option
- */
-
-#define TCPOPT_NOP		1	/* Padding */
-#define TCPOPT_EOL		0	/* End of options */
-#define TCPOPT_MSS		2	/* Segment size negotiating */
-
-
-/*
- *     TCP option lengths
- */
-#define TCPOLEN_MSS            4
-
-
-/* But this is what stacks really send out. */
-#define TCPOLEN_MSS_ALIGNED		4
-
-/* Flags in tp->nonagle */
-#define TCP_NAGLE_OFF		1	/* Nagle's algo is disabled */
-#define TCP_NAGLE_CORK		2	/* Socket is corked	    */
-#define TCP_NAGLE_PUSH		4	/* Cork is overridden for already queued data */
-
-/* TCP thin-stream limits */
-#define TCP_THIN_LINEAR_RETRIES 6       /* After 6 linear retries, do exp. backoff */
-
-/* TCP initial congestion window as per draft-hkchu-tcpm-initcwnd-01 */
-#define TCP_INIT_CWND		10
-
-#define TCP_INFINITE_SSTHRESH 0x7fffffff
-
-//  Definitions for the TCP protocol sk_state field.
-enum {
-	TCP_ESTABLISHED = 0,
-	TCP_SYN_SENT,
-	TCP_SYN_RECV,
-	TCP_FIN_WAIT1,
-	TCP_FIN_WAIT2,
-	TCP_TIME_WAIT,
-	TCP_CLOSE,
-	TCP_CLOSE_WAIT,
-	TCP_LAST_ACK,
-	TCP_LISTEN,
-	TCP_CLOSING,	/* Now a valid state */
-
-	TCP_NSTATES	/* Leave at the end! */
-};
-
-/*
- * (BSD)
- * Flags used when sending segments in tcp_output.  Basic flags (TH_RST,
- * TH_ACK,TH_SYN,TH_FIN) are totally determined by state, with the proviso
- * that TH_FIN is sent only if all data queued for output is included in the
- * segment. See definition of flags in xiatransportheader.hh
- */
-//static const uint8_t	tcp_outflags[TCP_NSTATES] = {
-//		TH_RST|TH_ACK,		/* 0, CLOSED */
-//		0,			/* 1, LISTEN */
-//		TH_SYN,			/* 2, SYN_SENT */
-//		TH_SYN|TH_ACK,		/* 3, SYN_RECEIVED */
-//		TH_ACK,			/* 4, ESTABLISHED */
-//		TH_ACK,			/* 5, CLOSE_WAIT */
-//		TH_FIN|TH_ACK,		/* 6, FIN_WAIT_1 */
-//		TH_FIN|TH_ACK,		/* 7, CLOSING */
-//		TH_FIN|TH_ACK,		/* 8, LAST_ACK */
-//		TH_ACK,			/* 9, FIN_WAIT_2 */
-//		TH_ACK,			/* 10, TIME_WAIT */
-//	};
-
 CLICK_DECLS
 
 /**
@@ -310,11 +137,6 @@ class XTRANSPORT : public Element {
 	void ReturnResult(int sport, xia::XSocketMsg *xia_socket_msg, int rc = 0, int err = 0);
 
   private:
-
-
-//  pthread_mutex_t _lock;
-//  pthread_mutexattr_t _lock_attr;
-
 	SyslogErrorHandler *_errh;
 
 	Timer _timer;
@@ -329,7 +151,6 @@ class XTRANSPORT : public Element {
 	XID _local_4id;
 	XID _null_4id;
 	bool _is_dual_stack_router;
-	bool connState;
 	XIAPath _nameserver_addr;
 
 	Packet* UDPIPPrep(Packet *, int);
@@ -364,8 +185,6 @@ class XTRANSPORT : public Element {
 		int last;
 		uint8_t hlim;
 
-		unsigned char sk_state;		// e.g. TCP connection state for tcp_sock
-
 		bool full_src_dag; // bind to full dag or just to SID
 		int sock_type; // 0: Reliable transport (SID), 1: Unreliable transport (SID), 2: Content Chunk transport (CID)
 
@@ -373,22 +192,22 @@ class XTRANSPORT : public Element {
 	 * XSP/XChunkP Socket states
 	 * ========================= */
 
-			int connState; 	// chenren: change bool to int; {-1,0,1} represents pending, closed and connected
-			int	closeState; 		// chenren: added: {-1,0,1} represents pending, connected and closed
+		int connState; 			// chenren: change bool to int; {-1,0,1} represents pending, closed and connected
+		int	closeState; 		// chenren: added: {-1,0,1} represents pending, connected and closed
 		bool initialized;
 		bool isListenSocket;
 		bool isBlocking;
 		bool synack_waiting;
-			bool synackack_waiting; // chenren: used for synack retransmission
-			bool finack_waiting;		// chenren: used for fin retransmission
-			bool finackack_waiting; // chenren: used for finack retransmission
+		bool synackack_waiting; // chenren: used for synack retransmission
+		bool finack_waiting;	// chenren: used for fin retransmission
+		bool finackack_waiting; // chenren: used for finack retransmission
 		bool dataack_waiting;
 		bool teardown_waiting;
 		bool migrateack_waiting;
 		unsigned backlog;
-		int so_error;		// used by non-blocking connect, accessed via getsockopt(SO_ERROR)
-		int so_debug;		// set/read via SO_DEBUG. could be used for tracing
-		int interface_id;	// port of the interface the packets arrive on
+		int so_error;			// used by non-blocking connect, accessed via getsockopt(SO_ERROR)
+		int so_debug;			// set/read via SO_DEBUG. could be used for tracing
+		int interface_id;		// port of the interface the packets arrive on
 		String last_migrate_ts;
 
 		bool did_poll;
@@ -397,7 +216,7 @@ class XTRANSPORT : public Element {
 		int num_connect_tries; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
 		int num_migrate_tries; // number of migrate tries (Connection closes after MAX_MIGRATE_TRIES trials)
 		int num_retransmit_tries; // number of times to try resending data packets
-			int num_close_tries; // chenren: added for closing connections
+		int num_close_tries; // chenren: added for closing connections
     	queue<sock*> pending_connection_buf;
 		queue<xia::XSocketMsg*> pendingAccepts; // stores accept messages from API when there are no pending connections
 
@@ -422,9 +241,9 @@ class XTRANSPORT : public Element {
 		//Vector<WritablePacket*> pkt_buf;
 		WritablePacket *syn_pkt;
 		WritablePacket *migrate_pkt;
-			WritablePacket *synack_pkt; // chenren: for retransmission
-			WritablePacket *fin_pkt; 		// chenren: for retransmission
-			WritablePacket *finack_pkt; // chenren: for retransmission
+		WritablePacket *synack_pkt; // chenren: for retransmission
+		WritablePacket *fin_pkt; 	// chenren: for retransmission
+		WritablePacket *finack_pkt; // chenren: for retransmission
 		HashTable<XID, WritablePacket*> XIDtoCIDreqPkt;
 		HashTable<XID, Timestamp> XIDtoExpiryTime;
 		HashTable<XID, bool> XIDtoTimerOn;
@@ -434,132 +253,13 @@ class XTRANSPORT : public Element {
 		uint32_t seq_num;
 		uint32_t ack_num;
 		bool timer_on;
-			Timestamp expiry; // chenren: used for syn packet retransmission
+		Timestamp expiry; // chenren: used for syn packet retransmission
 		Timestamp teardown_expiry;
-			Timestamp synackack_expiry; // chenren: added
-			Timestamp finack_expiry; // chenren: added
-			Timestamp finackack_expiry; // chenren: added
+		Timestamp synackack_expiry; // chenren: added
+		Timestamp finack_expiry; // chenren: added
+		Timestamp finackack_expiry; // chenren: added
 
-			queue<uint32_t> rto_ests; // chenren: TODO: add RTO estimation later
-
-	/* =========================================================
-	 * TCP Socket states
-	 * http://lxr.linux.no/linux+v3.10.2/include/linux/tcp.h
-	 * ========================================================= */
-
-		//uint16_t	tcp_header_len;	/* Bytes of tcp header to send		*/
-
-	/*
-	 *	RFC793 variables by their proper names. This means you can
-	 *	read the code and the spec side by side (and laugh ...)
-	 *	See RFC793 and RFC1122. The RFC writes these in capitals.
-	 */
-	 	uint32_t	rcv_nxt;	/* What we want to receive next 	*/
-		uint32_t	copied_seq;	/* Head of yet unread data		*/
-		uint32_t	rcv_wup;	/* rcv_nxt on last window update sent	*/
-	 	uint32_t	snd_nxt;	/* Next sequence we send		*/
-
-	 	uint32_t	snd_una;	/* First byte we want an ack for	*/
-	 	uint32_t	snd_sml;	/* Last byte of the most recently transmitted small packet */
-		uint32_t	rcv_tstamp;	/* timestamp of last received ACK (for keepalives) */
-		uint32_t	lsndtime;	/* timestamp of last sent data packet (for restart window) */
-
-		uint32_t	tsoffset;	/* timestamp offset */
-
-
-		uint32_t	snd_wl1;	/* Sequence for window update		*/
-		uint32_t	snd_wnd;	/* The window we expect to receive	*/
-		uint32_t	max_window;	/* Maximal window ever seen from peer	*/
-		uint32_t	mss_cache;	/* Cached effective mss, not including SACKS */
-
-		uint32_t	window_clamp;	/* Maximal window to advertise		*/
-		uint32_t	rcv_ssthresh;	/* Current window clamp			*/
-
-		uint16_t	advmss;		/* Advertised MSS			*/
-		uint8_t	unused;
-		uint8_t	nonagle     : 4,/* Disable Nagle algorithm?             */
-			thin_lto    : 1,/* Use linear timeouts for thin streams */
-			thin_dupack : 1,/* Fast retransmit on first dupack      */
-			repair      : 1,
-			frto        : 1;/* F-RTO (RFC5682) activated in CA_Loss */
-		uint8_t	repair_queue;
-		uint8_t	do_early_retrans:1,/* Enable RFC5827 early-retransmit  */
-			syn_data:1,	/* SYN includes data */
-			syn_fastopen:1,	/* SYN includes Fast Open option */
-			syn_data_acked:1;/* data in SYN is acked by SYN-ACK */
-		uint32_t	tlp_high_seq;	/* snd_nxt at the time of TLP retransmit. */
-
-	/* RTT measurement */
-		uint32_t	srtt;		/* smoothed round trip time << 3	*/
-		uint32_t	mdev;		/* medium deviation			*/
-		uint32_t	mdev_max;	/* maximal mdev for the last rtt period	*/
-		uint32_t	rttvar;		/* smoothed mdev_max			*/
-		uint32_t	rtt_seq;	/* sequence number to update rttvar	*/
-
-		uint32_t	packets_out;	/* Packets which are "in flight"	*/
-		uint32_t	retrans_out;	/* Retransmitted packets out		*/
-
-		uint8_t	reordering;	/* Packet reordering metric.		*/
-
-		uint8_t	keepalive_probes; /* num of allowed keep alive probes	*/
-
-	/*
-	 *	Slow start and congestion control (see also Nagle, and Karn & Partridge)
-	 */
-	 	uint32_t	snd_ssthresh;	/* Slow start size threshold		*/
-	 	uint32_t	snd_cwnd;	/* Sending congestion window		*/
-		uint32_t	snd_cwnd_cnt;	/* Linear increase counter		*/
-		uint32_t	snd_cwnd_clamp; /* Do not allow snd_cwnd to grow above this */
-		uint32_t	snd_cwnd_used;
-		uint32_t	snd_cwnd_stamp;
-		uint32_t	prior_cwnd;	/* Congestion window at start of Recovery. */
-		uint32_t	prr_delivered;	/* Number of newly delivered packets to
-					 * receiver in Recovery. */
-		uint32_t	prr_out;	/* Total number of pkts sent during Recovery. */
-
-	 	uint32_t	rcv_wnd;	/* Current receiver window		*/
-		uint32_t	write_seq;	/* Tail(+1) of data held in tcp send buffer */
-		uint32_t	pushed_seq;	/* Last pushed seq, required to talk to windows */
-		uint32_t	lost_out;	/* Lost packets			*/
-		uint32_t	sacked_out;	/* SACK'd packets			*/
-		uint32_t	fackets_out;	/* FACK'd packets			*/
-		uint32_t	tso_deferred;
-
-		// TODO: SACK block readded?
-
-		int     lost_cnt_hint;
-		uint32_t     retransmit_high;	/* L-bits may be on up to this seqno */
-
-		uint32_t	lost_retrans_low;	/* Sent seq after any rxmit (lowest) */
-
-		uint32_t	prior_ssthresh; /* ssthresh saved at recovery start	*/
-		uint32_t	high_seq;	/* snd_nxt at onset of congestion	*/
-
-		uint32_t	retrans_stamp;	/* Timestamp of the last retransmit,
-					 * also used in SYN-SENT to remember stamp of
-					 * the first SYN. */
-		uint32_t	undo_marker;	/* tracking retrans started here. */
-		int	undo_retrans;	/* number of undoable retransmissions. */
-		uint32_t	total_retrans;	/* Total retransmits for entire connection */
-
-		unsigned int		keepalive_time;	  /* time before keep alive takes place */
-		unsigned int		keepalive_intvl;  /* time interval between keep alive probes */
-
-		int			linger2;
-
-	/* Receiver side RTT estimation */
-		struct {
-			uint32_t	rtt;
-			uint32_t	seq;
-			uint32_t	time;
-		} rcv_rtt_est;
-
-	/* Receiver queue space */
-		struct {
-			int	space;
-			uint32_t	seq;
-			uint32_t	time;
-		} rcvq_space;
+		queue<uint32_t> rto_ests; // chenren: TODO: add RTO estimation later
     } ;
 
 
@@ -626,7 +326,6 @@ class XTRANSPORT : public Element {
     void CreatePollEvent(unsigned short _sport, xia::X_Poll_Msg *msg);
     void ProcessPollEvent(unsigned short, unsigned int);
     void CancelPollEvent(unsigned short _sport);
-//    bool ProcessPollTimeout(unsigned short, PollEvent& pe);
     /*
     ** Xsockets API handlers
     */
@@ -659,6 +358,22 @@ class XTRANSPORT : public Element {
     void XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
     void Xupdaterv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+
+    void ProcessAckPacket(WritablePacket *p_in);
+    void ProcessXcmpPacket(WritablePacket*p_in);
+    void ProcessMigratePacket(WritablePacket *p_in);
+    void ProcessMigrateAck(WritablePacket *p_in);
+    void ProcessSynPacket(WritablePacket *p_in);
+    void ProcessSynAckPacket(WritablePacket *p_in);
+    void ProcessStreamDataPacket(WritablePacket *p_in);
+    void ProcessFinPacket(WritablePacket *p_in);
+    void ProcessFinAckPacket(WritablePacket *p_in);
+    void ProcessDatagramPacket(WritablePacket *p_in);
+
+    int HandleStreamRawPacket(WritablePacket *p_in);
+
+    void RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now);
+
 };
 
 
