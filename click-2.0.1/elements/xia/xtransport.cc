@@ -233,7 +233,7 @@ bool XTRANSPORT::RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &no
 		// We have not yet notified the API that an accept was in progress, so we don't need to let
 		// it know about this failure.
 
-		// FIXME: Tear down the connection setp state
+		// FIXME: Tear down the connection setup state
 		// XIDPairToPort
 		// XIDPairToConnectPending
 		// anything else?
@@ -268,7 +268,6 @@ bool XTRANSPORT::RetransmitFIN(sock *sk, unsigned short _sport, Timestamp &now)
 	}
 	else {
 		// The App initiated the FIN and close returned right away, so there's nothing to tell it at this point
-		// FIXME: check for blocking, and notify outstanding reads/writes, not connect!
 
 		// Stop sending the termination request
 		sk->timer_on = false;
@@ -333,14 +332,12 @@ bool XTRANSPORT::RetransmitMIGRATE(sock *sk, unsigned short _sport, Timestamp &n
 
 bool XTRANSPORT::RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now)
 {
-	// adding check to see if anything was retransmitted. We can get in here with
-	// no packets in the sk->send_bufer array waiting to go and will stay here forever
 	bool retransmit_sent = false;
 	bool tear_down = false;
 
 	if (sk->num_retransmit_tries < MAX_RETRANSMIT_TRIES) {
 
-	click_chatter("Timer: DATA RETRANSMIT at from (%s) from_port=%d send_base=%d next_seq=%d \n\n", (_local_addr.unparse()).c_str(), _sport, sk->send_base, sk->next_send_seqnum );
+		click_chatter("Timer: DATA RETRANSMIT at from (%s) from_port=%d send_base=%d next_seq=%d \n\n", (_local_addr.unparse()).c_str(), _sport, sk->send_base, sk->next_send_seqnum );
 
 		// retransmit data
 		for (unsigned int i = sk->send_base; i < sk->next_send_seqnum; i++) {
@@ -2173,7 +2170,19 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 	output(NETWORK_PORT).push(p);
 
 	// tell API we had an error
-	// FIXME: if a blocking operation is in progress (recv, etc) let the API know
+	if (sk->isBlocking) {
+		if (sk->recv_pending) {
+			// The api is blocking on a recv, return an error
+			// FIXME: is this the right error?
+			ReturnResult(sk->port, sk->pending_recv_msg, 0, 0);
+			// ReturnResult(sk->port, sk->pending_recv_msg, -1, EPIPE);
+
+			sk->recv_pending = false;
+			delete sk->pending_recv_msg;
+			sk->pending_recv_msg = NULL;
+		}
+		// FIXME: any other places that could be blocking?
+	}
 	if (sk->polling) {
 		ProcessPollEvent(_dport, POLLHUP);
 	}
