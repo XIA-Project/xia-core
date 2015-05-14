@@ -433,6 +433,32 @@ elementclass XIAEndHost {
 	xrc -> XIAPaintSwitch[0] -> [1]xlc[1] -> xrc;
 };
 
+// 2-port endhost node with sockets
+elementclass XIAEndHost2Port {
+	$local_addr0, $local_hid0, $local_addr1, $local_hid1, $click_port, $enable_local_cache, $mac0, $mac1 |
+	// $local_addr0: the full address to reach first interface
+	// $local_hid0: the HID for the first interface
+	// $local_addr1: the full address to reach second interface
+	// $local_hid1: the HID for the second interface
+
+	// input[0]: a packet arrived at the node on interface 0
+	// input[1]: a packet arrived at the node on interface 1
+	// output[0]: forward to interface 0
+	// output[1]: forward to interface 1
+
+	xrc :: XIARoutingCore($local_addr0, $local_hid0, 0.0.0.0, $click_port, 2, 0);
+
+	// TODO: Verify that these default routes should be set up -NITIN
+	Script(write xrc/n/proc/rt_AD.add - 0);       // default route for AD
+	Script(write xrc/n/proc/rt_IP.add - 0);       // default route for IPv4
+	Script(write xrc/n/proc/rt_HID.add - 0);      // default route for HID (so hosts can reach other hosts on the same AD)
+
+	xlc0 :: XIALineCard($local_addr0, $local_hid0, $mac0, 0, 0, 0);
+	xlc1 :: XIALineCard($local_addr1, $local_hid1, $mac1, 1, 0, 0);
+	input => xlc0, xlc1 => output;
+	xrc -> XIAPaintSwitch[0,1] => [1]xlc0[1], [1]xlc1[1] -> xrc;
+};
+
 // Endhost node with XRoute process running and IP support
 elementclass XIADualEndhost {
 	$local_addr, $local_ad, $local_hid, $external_ip, $click_port, 
