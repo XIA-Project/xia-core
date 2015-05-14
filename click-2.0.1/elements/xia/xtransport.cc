@@ -21,6 +21,9 @@
 ** - fix cid header size issue so we work correctly with the linux version
 ** - there are still some small memory leaks happening when stream sockets are created/used/closed
 **   (problem does not happen if sockets are just opened and closed)
+*
+* TCP Stuff:
+*  if we receive a SYN, should it reset the SYNACK retransmit count to 0?
 */
 
 /*
@@ -185,7 +188,6 @@ bool XTRANSPORT::RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now)
 
 	} else {
 		// Stop sending the connection request & Report the failure to the application
-
 		sk->timer_on = false;
 		sk->synack_waiting = false;
 		sk->so_error = ETIMEDOUT;
@@ -227,25 +229,24 @@ bool XTRANSPORT::RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &no
 		sk->num_connect_tries++;
 	}
 	else {
+		// SYNACK retransmit has timed out
+		// We have not yet notified the API that an accept was in progress, so we don't need to let
+		// it know about this failure.
 
-		// FIXME: check for blocking, and this should notify accept, not connect!
-	
-		// Stop sending the connection request & Report the failure to the application
+		// FIXME: Tear down the connection setp state
+		// XIDPairToPort
+		// XIDPairToConnectPending
+		// anything else?
+
+//		XIDpairToConnectPending.erase(xid_pair);
+//		XIDpairToPort.erase(xid_pair);
+
+		// sk belongs to the listening socket, so we just leave it alone
+		// FIXME: this timer is global to the listening socket, so turning it off for one
+		// connection attempt turns it off for all conn attempts - bad!
 		sk->timer_on = false;
 		sk->synackack_waiting = false;
 		click_chatter("Turn off timer because sk->num_connect_tries > MAX_CONNECT_TRIES\n");
-		// Notify API that the connection failed
-		xia::XSocketMsg xsm;
-		//_errh->debug("Timer: Sent packet to socket with port %d", _sport);
-		xsm.set_type(xia::XCONNECT);
-		xsm.set_sequence(0); // TODO: what should This be?
-		xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
-		connect_msg->set_status(xia::X_Connect_Msg::XFAILED);
-		ReturnResult(_sport, &xsm);
-
-		if (sk->polling) {
-			ProcessPollEvent(_sport, POLLHUP);
-		}
 	}
 	return false;
 }
@@ -266,25 +267,13 @@ bool XTRANSPORT::RetransmitFIN(sock *sk, unsigned short _sport, Timestamp &now)
 		sk->num_close_tries++;
 	}
 	else {
+		// The App initiated the FIN and close returned right away, so there's nothing to tell it at this point
 		// FIXME: check for blocking, and notify outstanding reads/writes, not connect!
 
-		// Stop sending the termination request & Report the failure to the application
+		// Stop sending the termination request
 		sk->timer_on = false;
 		sk->finack_waiting = false;
 		click_chatter("Turn off timer because sk->num_close_tries > MAX_CLOSE_TRIES\n");
-
-		// Notify API that the connection failed
-		xia::XSocketMsg xsm;
-		//_errh->debug("Timer: Sent packet to socket with port %d", _sport);
-		xsm.set_type(xia::XCONNECT); // chenren: TODO: Dan: what it should do? as as finackack
-		xsm.set_sequence(0); // TODO: what should This be?
-		xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
-		connect_msg->set_status(xia::X_Connect_Msg::XFAILED);
-		ReturnResult(_sport, &xsm);
-
-		if (sk->polling) {
-			ProcessPollEvent(_sport, POLLHUP);
-		}
 	}
 	return false;
 }
@@ -305,26 +294,13 @@ bool XTRANSPORT::RetransmitFINACK(sock *sk, unsigned short _sport, Timestamp &no
 		sk->num_close_tries++;
 	}
 	else {
-		// FIXME: check for blocking, and notify outstanding reads/writes, not connect!
+		// We already told the api we are closing when the FIN was received
+		// There's nothing more to tell it now if the FINACK transmission failed
 
-		// Stop sending the connection request & Report the failure to the application
+		// Stop sending the termination response
 		sk->timer_on = false;
 		sk->finackack_waiting = false;
 		click_chatter("Turn off timer because sk->num_close_tries > MAX_CLOSE_TRIES\n");
-
-
-		// Notify API that the connection failed
-		xia::XSocketMsg xsm;
-		//_errh->debug("Timer: Sent packet to socket with port %d", _sport);
-		xsm.set_type(xia::XCONNECT);
-		xsm.set_sequence(0); // TODO: what should This be?
-		xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
-		connect_msg->set_status(xia::X_Connect_Msg::XFAILED);
-		ReturnResult(_sport, &xsm);
-
-		if (sk->polling) {
-			ProcessPollEvent(_sport, POLLHUP);
-		}
 	}
 	return false;
 }
@@ -348,6 +324,8 @@ bool XTRANSPORT::RetransmitMIGRATE(sock *sk, unsigned short _sport, Timestamp &n
 	} else {
 		//click_chatter("retransmit counter for migrate exceeded\n");
 		// FIXME: what cleanup should happen here? same as for data retransmits?
+		sk->timer_on = false;
+		sk->migrateack_waiting = false;
 	}
 
 	return false;
@@ -380,6 +358,9 @@ bool XTRANSPORT::RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now)
 
 		tear_down = true;
 		sk->timer_on = false;
+
+		// FIXME: a lot of this teardown needs happen on FIN as well, so move it to a function that 
+		// both can call possibly into TeardownSocket
 
 		click_chatter("Turn off the timer because sk->teardown_waiting == true with port = %d\n", _sport);
 
@@ -1946,39 +1927,13 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 
 	unsigned short _dport;
 
-#if 0
-	// FIXME: original code to find _dport
-	// FIXME: clean up this logic
-	// if connecting, use dest_xid to find port
-	//   otherwise use pair to find the port
-	//   can't we just look at conn state instead of using PairToConnect?
-
-	HashTable<XIDpair, bool>::iterator it_temp;
-	it_temp = XIDpairToConnectPending.find(xid_pair);
-
-	// FIXME: XXXX double check this logic
-	// if it's a SYN or an ACK of SYNACK, then dport is listening port, otherwise updated to the accept port
-	if (thdr.pkt_info() == TransportHeader::SYN) {
-
-	} else if ((thdr.pkt_info() == TransportHeader::ACK && it_temp != XIDpairToConnectPending.end())) {
-
-	} else {
-		click_chatter("XIDtoPort -> port was %d\n", _dport);
-
-		_dport = XIDpairToPort.get(xid_pair);
-
-		click_chatter("XIDpairToPort -> port is now %d\n", _dport);
-		click_chatter("Update dport to %d at %ld\n", _dport, Timestamp::now());
-	}
-#endif
-
-
-	// FIXME: distilation of above
 	HashTable<XIDpair, bool>::iterator it_temp;
 	it_temp = XIDpairToConnectPending.find(xid_pair);
 
 	if (it_temp != XIDpairToConnectPending.end()) {
+		// connect is in progress so pair to port is not set up yet, use the listen socket's port
 		_dport = XIDtoPort.get(_destination_xid);
+
 	} else { 
 		_dport = XIDpairToPort.get(xid_pair);
 	}
@@ -2169,6 +2124,7 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 
 	portToSock.set(_dport, sk);
 
+	// FIXME: this should probably only happen in the close call, not on a FIN
 	xcmp_listeners.remove(_dport);
 
 	//sk->dst_path = src_path;
@@ -2215,7 +2171,9 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 	//click_chatter("\n\n (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), pld.c_str(), xiah1.plen());
 
 	output(NETWORK_PORT).push(p);
+
 	// tell API we had an error
+	// FIXME: if a blocking operation is in progress (recv, etc) let the API know
 	if (sk->polling) {
 		ProcessPollEvent(_dport, POLLHUP);
 	}
