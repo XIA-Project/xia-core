@@ -77,10 +77,6 @@ XTRANSPORT::XTRANSPORT()
 	_migrateackdelay_ms = _ackdelay_ms * 10;
 	_teardown_wait_ms = TEARDOWN_DELAY;
 
-//	pthread_mutexattr_init(&_lock_attr);
-//	pthread_mutexattr_settype(&_lock_attr, PTHREAD_MUTEX_RECURSIVE);
-//	pthread_mutex_init(&_lock, &_lock_attr);
-
 	cp_xid_type("SID", &_sid_type);
 }
 
@@ -93,7 +89,6 @@ XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	Element* routing_table_elem;
 	bool is_dual_stack_router;
 	_is_dual_stack_router = false;
-
 
 	if (cp_va_kparse(conf, this, errh,
 					 "LOCAL_ADDR", cpkP + cpkM, cpXIAPath, &local_addr,
@@ -147,9 +142,6 @@ XTRANSPORT::~XTRANSPORT()
 	hlim.clear();
 	xcmp_listeners.clear();
 	nxt_xport.clear();
-
-//	pthread_mutex_destroy(&_lock);
-//	pthread_mutexattr_destroy(&_lock_attr);
 }
 
 
@@ -158,8 +150,6 @@ XTRANSPORT::initialize(ErrorHandler *)
 {
 	_errh = (SyslogErrorHandler*)ErrorHandler::default_handler();
 	_timer.initialize(this);
-	//_timer.schedule_after_msec(1000);
-	//_timer.unschedule();
 	return 0;
 }
 
@@ -174,7 +164,7 @@ char *XTRANSPORT::random_xid(const char *type, char *buf)
 	return buf;
 }
 
-void XTRANSPORT::RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now)
+bool XTRANSPORT::RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now)
 {
 	//click_chatter("Timer: synack waiting\n");
 
@@ -218,7 +208,307 @@ void XTRANSPORT::RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now)
 			// for alerting non-blocking connects
 			ProcessPollEvent(_sport, POLLHUP);
 		}
+	}
+	return false;
+}
 
+bool XTRANSPORT::RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &now)
+{
+	if (sk->num_connect_tries <= MAX_CONNECT_TRIES) {
+		click_chatter("Timer: SYNACK RETRANSMIT! \n");
+		WritablePacket *copy = copy_packet(sk->synack_pkt, sk); // chenren: added for retransmission
+		XIAHeader xiah(copy);
+		// click_chatter("Timer: (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
+		output(NETWORK_PORT).push(copy);
+		// reset
+		sk->timer_on = true;
+		sk->synackack_waiting = true;
+		sk->synackack_expiry = now + Timestamp::make_msec(_ackdelay_ms);
+		sk->num_connect_tries++;
+	}
+	else {
+
+		// FIXME: check for blocking, and this should notify accept, not connect!
+	
+		// Stop sending the connection request & Report the failure to the application
+		sk->timer_on = false;
+		sk->synackack_waiting = false;
+		click_chatter("Turn off timer because sk->num_connect_tries > MAX_CONNECT_TRIES\n");
+		// Notify API that the connection failed
+		xia::XSocketMsg xsm;
+		//_errh->debug("Timer: Sent packet to socket with port %d", _sport);
+		xsm.set_type(xia::XCONNECT);
+		xsm.set_sequence(0); // TODO: what should This be?
+		xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
+		connect_msg->set_status(xia::X_Connect_Msg::XFAILED);
+		ReturnResult(_sport, &xsm);
+
+		if (sk->polling) {
+			ProcessPollEvent(_sport, POLLHUP);
+		}
+	}
+	return false;
+}
+
+bool XTRANSPORT::RetransmitFIN(sock *sk, unsigned short _sport, Timestamp &now)
+{
+	click_chatter("Timer: finack waiting\n");
+	if (sk->num_close_tries <= MAX_CLOSE_TRIES) {
+		click_chatter("Timer: FIN RETRANSMIT! \n");
+		WritablePacket *copy = copy_packet(sk->fin_pkt, sk); // chenren: added for retransmission
+		XIAHeader xiah(copy);
+		// click_chatter("Timer: (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
+		output(NETWORK_PORT).push(copy);
+		// reset
+		sk->timer_on = true;
+		sk->finack_waiting = true;
+		sk->finack_expiry = now + Timestamp::make_msec(_ackdelay_ms);
+		sk->num_close_tries++;
+	}
+	else {
+		// FIXME: check for blocking, and notify outstanding reads/writes, not connect!
+
+		// Stop sending the termination request & Report the failure to the application
+		sk->timer_on = false;
+		sk->finack_waiting = false;
+		click_chatter("Turn off timer because sk->num_close_tries > MAX_CLOSE_TRIES\n");
+
+		// Notify API that the connection failed
+		xia::XSocketMsg xsm;
+		//_errh->debug("Timer: Sent packet to socket with port %d", _sport);
+		xsm.set_type(xia::XCONNECT); // chenren: TODO: Dan: what it should do? as as finackack
+		xsm.set_sequence(0); // TODO: what should This be?
+		xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
+		connect_msg->set_status(xia::X_Connect_Msg::XFAILED);
+		ReturnResult(_sport, &xsm);
+
+		if (sk->polling) {
+			ProcessPollEvent(_sport, POLLHUP);
+		}
+	}
+	return false;
+}
+
+bool XTRANSPORT::RetransmitFINACK(sock *sk, unsigned short _sport, Timestamp &now)
+{
+	// click_chatter("Timer: synack waiting\n");
+	if (sk->num_close_tries <= MAX_CLOSE_TRIES) {
+		click_chatter("Timer: FINACK RETRANSMIT! \n");
+		WritablePacket *copy = copy_packet(sk->finack_pkt, sk); // chenren: added for retransmission
+		XIAHeader xiah(copy);
+		// click_chatter("Timer: (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
+		output(NETWORK_PORT).push(copy);
+		// reset
+		sk->timer_on = true;
+		sk->synackack_waiting = true;
+		sk->finackack_expiry = now + Timestamp::make_msec(_ackdelay_ms);
+		sk->num_close_tries++;
+	}
+	else {
+		// FIXME: check for blocking, and notify outstanding reads/writes, not connect!
+
+		// Stop sending the connection request & Report the failure to the application
+		sk->timer_on = false;
+		sk->finackack_waiting = false;
+		click_chatter("Turn off timer because sk->num_close_tries > MAX_CLOSE_TRIES\n");
+
+
+		// Notify API that the connection failed
+		xia::XSocketMsg xsm;
+		//_errh->debug("Timer: Sent packet to socket with port %d", _sport);
+		xsm.set_type(xia::XCONNECT);
+		xsm.set_sequence(0); // TODO: what should This be?
+		xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
+		connect_msg->set_status(xia::X_Connect_Msg::XFAILED);
+		ReturnResult(_sport, &xsm);
+
+		if (sk->polling) {
+			ProcessPollEvent(_sport, POLLHUP);
+		}
+	}
+	return false;
+}
+
+bool XTRANSPORT::RetransmitMIGRATE(sock *sk, unsigned short _sport, Timestamp &now)
+{
+	//click_chatter("Timer: migrateack waiting\n");
+	if (sk->num_migrate_tries <= MAX_MIGRATE_TRIES) {
+
+		//click_chatter("Timer: SYN RETRANSMIT! \n");
+		WritablePacket *copy = copy_packet(sk->migrate_pkt, sk);
+		// retransmit migrate
+		XIAHeader xiah(copy);
+		// printf("Timer: (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
+		output(NETWORK_PORT).push(copy);
+
+		sk->timer_on = true;
+		sk->migrateack_waiting = true;
+		sk->expiry = now + Timestamp::make_msec(_migrateackdelay_ms);
+		sk->num_migrate_tries++;
+	} else {
+		//click_chatter("retransmit counter for migrate exceeded\n");
+		// FIXME: what cleanup should happen here? same as for data retransmits?
+	}
+
+	return false;
+}
+
+bool XTRANSPORT::RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now)
+{
+	// adding check to see if anything was retransmitted. We can get in here with
+	// no packets in the sk->send_bufer array waiting to go and will stay here forever
+	bool retransmit_sent = false;
+	bool tear_down = false;
+
+	if (sk->num_retransmit_tries < MAX_RETRANSMIT_TRIES) {
+
+	click_chatter("Timer: DATA RETRANSMIT at from (%s) from_port=%d send_base=%d next_seq=%d \n\n", (_local_addr.unparse()).c_str(), _sport, sk->send_base, sk->next_send_seqnum );
+
+		// retransmit data
+		for (unsigned int i = sk->send_base; i < sk->next_send_seqnum; i++) {
+			if (sk->send_buffer[i % sk->send_buffer_size] != NULL) {
+				WritablePacket *copy = copy_packet(sk->send_buffer[i % sk->send_buffer_size], sk);
+				XIAHeader xiah(copy);
+				//click_chatter("Timer: (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
+				//click_chatter("pusing the retransmit pkt\n");
+				output(NETWORK_PORT).push(copy);
+				retransmit_sent = true;
+			}
+		}
+	} else {
+		//click_chatter("retransmit counter exceeded\n");
+
+		tear_down = true;
+		sk->timer_on = false;
+
+		click_chatter("Turn off the timer because sk->teardown_waiting == true with port = %d\n", _sport);
+
+		portToActive.set(_sport, false);
+		// XID source_xid = portToSock.get(_sport).xid;
+		// this check for -1 prevents a segfault cause by bad XIDs
+		// it may happen in other cases, but opening a XSOCK_STREAM socket, calling
+		// XreadLocalHostAddr and then closing the socket without doing anything else will cause the problem
+		// TODO: make sure that -1 is the only condition that will cause us to get a bad XID
+		if (sk->src_path.destination_node() != -1) {
+			XID source_xid = sk->src_path.xid(sk->src_path.destination_node());
+			if (!sk->isListenSocket) {
+				click_chatter("Tear down: deleting route %s from port %d\n", source_xid.unparse().c_str(), _sport);
+				delRoute(source_xid);
+				XIDtoPort.erase(source_xid);
+			}
+		}
+
+		portToSock.erase(_sport);
+		portToActive.erase(_sport);
+		hlim.erase(_sport);
+
+		nxt_xport.erase(_sport);
+		xcmp_listeners.remove(_sport);
+		for (int i = 0; i < sk->send_buffer_size; i++) {
+			if (sk->send_buffer[i] != NULL) {
+				sk->send_buffer[i]->kill();
+				sk->send_buffer[i] = NULL;
+			}
+		}
+		for (int i = 0; i < sk->recv_buffer_size; i++) {
+			if (sk->recv_buffer[i] != NULL) {
+				sk->recv_buffer[i]->kill();
+				sk->recv_buffer[i] = NULL;
+			}
+		}
+// FIXME: XXXX clean up socket state
+//					delete sk->syn_pkt;
+//					delete sk_>synack_pkt; // chenren: for retransmission
+//					delete sk->fin_pkt; 		// chenren: for retransmission
+//					delete sk->finack_pkt; // chenren: for retransmission
+		delete sk;
+	}
+
+
+
+	if (retransmit_sent) {
+		//click_chatter("resetting retransmit timer for %d\n", _sport);
+		sk->timer_on = true;
+		sk->dataack_waiting = true;
+		sk->num_retransmit_tries++;
+		sk->expiry = now + Timestamp::make_msec(_ackdelay_ms);
+	} else {
+		//click_chatter("terminating retransmit timer for %d\n", _sport);
+		sk->timer_on = false;
+		sk->dataack_waiting = false;
+		sk->num_retransmit_tries = 0;
+	}
+
+	return tear_down;
+}
+
+bool XTRANSPORT::TearDownSocket(sock *sk, unsigned short _sport, Timestamp &now)
+{
+	sk->timer_on = false;
+	portToActive.set(_sport, false);
+
+	//XID source_xid = portToSock.get(_sport).xid;
+
+	// this check for -1 prevents a segfault cause by bad XIDs
+	// it may happen in other cases, but opening a XSOCK_STREAM socket, calling
+	// XreadLocalHostAddr and then closing the socket without doing anything else will
+	// cause the problem
+	// TODO: make sure that -1 is the only condition that will cause us to get a bad XID
+	if (sk->src_path.destination_node() != -1) {
+		XID source_xid = sk->src_path.xid(sk->src_path.destination_node());
+		if (!sk->isListenSocket) {
+
+			//click_chatter("deleting route %s from port %d\n", source_xid.unparse().c_str(), _sport);
+			delRoute(source_xid);
+			XIDtoPort.erase(source_xid);
+		}
+	}
+
+	delete sk;
+	portToSock.erase(_sport);
+	portToActive.erase(_sport);
+	hlim.erase(_sport);
+
+	nxt_xport.erase(_sport);
+	xcmp_listeners.remove(_sport);
+	for (int i = 0; i < sk->send_buffer_size; i++) {
+		if (sk->send_buffer[i] != NULL) {
+			sk->send_buffer[i]->kill();
+			sk->send_buffer[i] = NULL;
+		}
+	}
+
+	return true;
+}
+
+bool XTRANSPORT::RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp &now, Timestamp &earlist_pending_expiry)
+{
+	for (HashTable<XID, bool>::iterator it = sk->XIDtoTimerOn.begin(); it != sk->XIDtoTimerOn.end(); ++it ) {
+		XID requested_cid = it->first;
+		bool timer_on = it->second;
+
+		HashTable<XID, Timestamp>::iterator it2;
+		it2 = sk->XIDtoExpiryTime.find(requested_cid);
+		Timestamp cid_req_expiry = it2->second;
+
+		if (timer_on == true && cid_req_expiry <= now) {
+			//click_chatter("CID-REQ RETRANSMIT! \n");
+			//retransmit cid-request
+			HashTable<XID, WritablePacket*>::iterator it3;
+			it3 = sk->XIDtoCIDreqPkt.find(requested_cid);
+			WritablePacket *copy = copy_cid_req_packet(it3->second, sk);
+			XIAHeader xiah(copy);
+			//click_chatter("\n\n (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
+			output(NETWORK_PORT).push(copy);
+
+			cid_req_expiry  = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
+			sk->XIDtoExpiryTime.set(requested_cid, cid_req_expiry);
+			sk->XIDtoTimerOn.set(requested_cid, true);
+		}
+
+		if (timer_on == true && cid_req_expiry > now && ( cid_req_expiry < earlist_pending_expiry || earlist_pending_expiry == now ) ) {
+			earlist_pending_expiry = cid_req_expiry;
+		}
 	}
 }
 
@@ -228,308 +518,55 @@ void XTRANSPORT::run_timer(Timer *timer)
 
 	Timestamp now = Timestamp::now();
 	Timestamp earlist_pending_expiry = now;
-	bool tear_down = false;
-
-	WritablePacket *copy;
-
 
 	for (HashTable<unsigned short, sock*>::iterator iter = portToSock.begin(); iter != portToSock.end(); ++iter ) {
 		unsigned short _sport = iter->first;
 		sock *sk = portToSock.get(_sport);
-		tear_down = false;
-
-		// reset the concurrent poll flag so we know we can return a result to the next poll request
-		sk->did_poll = false;
+		bool tear_down = false;
 
 		// click_chatter("Port: %d, timer_on: %d, now: %ld, dataack_waiting: %d, expiry: %ld, teardown_waiting: %ld, teardown_expiry: %ld\n", _sport, sk->timer_on, now/1000, sk->dataack_waiting, sk->expiry/1000, sk->teardown_waiting, sk->teardown_expiry/1000);
 
-		// check if pending
 		if (sk->timer_on == true) {
-			// retransmit syn after timeout
 			if (sk->synack_waiting == true && sk->expiry <= now ) {
 				RetransmitSYN(sk, _sport, now);
 
-// FIXME: XXXX Reduce cut & paste & add test for blocking to all of these below!!!!!
 			} else if (sk->synackack_waiting == true && sk->synackack_expiry <= now) {
-				if (sk->num_connect_tries <= MAX_CONNECT_TRIES) {
-					click_chatter("Timer: SYNACK RETRANSMIT! \n");
-					copy = copy_packet(sk->synack_pkt, sk); // chenren: added for retransmission
-					XIAHeader xiah(copy);
-					// click_chatter("Timer: (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
-					output(NETWORK_PORT).push(copy);
-					// reset
-					sk->timer_on = true;
-					sk->synackack_waiting = true;
-					sk->synackack_expiry = now + Timestamp::make_msec(_ackdelay_ms);
-					sk->num_connect_tries++;
-				}
-				else {
-					// Stop sending the connection request & Report the failure to the application
-					sk->timer_on = false;
-					sk->synackack_waiting = false;
-					click_chatter("Turn off timer because sk->num_connect_tries > MAX_CONNECT_TRIES\n");
-					// Notify API that the connection failed
-					xia::XSocketMsg xsm;
-					//_errh->debug("Timer: Sent packet to socket with port %d", _sport);
-					xsm.set_type(xia::XCONNECT);
-					xsm.set_sequence(0); // TODO: what should This be?
-					xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
-					connect_msg->set_status(xia::X_Connect_Msg::XFAILED);
-					ReturnResult(_sport, &xsm);
+				tear_down = RetransmitSYNACK(sk, _sport, now);
 
-					if (sk->polling) {
-						ProcessPollEvent(_sport, POLLHUP);
-					}
-				}
 			} else if (sk->finack_waiting == true && sk->finack_expiry <= now) {
-				click_chatter("Timer: finack waiting\n");
-				if (sk->num_close_tries <= MAX_CLOSE_TRIES) {
-					click_chatter("Timer: FIN RETRANSMIT! \n");
-					copy = copy_packet(sk->fin_pkt, sk); // chenren: added for retransmission
-					XIAHeader xiah(copy);
-					// click_chatter("Timer: (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
-					output(NETWORK_PORT).push(copy);
-					// reset
-					sk->timer_on = true;
-					sk->finack_waiting = true;
-					sk->finack_expiry = now + Timestamp::make_msec(_ackdelay_ms);
-					sk->num_close_tries++;
-				}
-				else {
-					// Stop sending the termination request & Report the failure to the application
-					sk->timer_on = false;
-					sk->finack_waiting = false;
-					click_chatter("Turn off timer because sk->num_close_tries > MAX_CLOSE_TRIES\n");
+				tear_down = RetransmitFIN(sk, _sport, now);
 
-					// Notify API that the connection failed
-					xia::XSocketMsg xsm;
-					//_errh->debug("Timer: Sent packet to socket with port %d", _sport);
-					xsm.set_type(xia::XCONNECT); // chenren: TODO: Dan: what it should do? as as finackack
-					xsm.set_sequence(0); // TODO: what should This be?
-					xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
-					connect_msg->set_status(xia::X_Connect_Msg::XFAILED);
-					ReturnResult(_sport, &xsm);
+			} else if (sk->finackack_waiting == true && sk->finackack_expiry <= now) {
+				tear_down = RetransmitFINACK(sk, _sport, now);
 
-					if (sk->polling) {
-						ProcessPollEvent(_sport, POLLHUP);
-					}
-				}
-			}
-			else if (sk->finackack_waiting == true && sk->finackack_expiry <= now) {
-				// click_chatter("Timer: synack waiting\n");
-				if (sk->num_close_tries <= MAX_CLOSE_TRIES) {
-					click_chatter("Timer: FINACK RETRANSMIT! \n");
-					copy = copy_packet(sk->finack_pkt, sk); // chenren: added for retransmission
-					XIAHeader xiah(copy);
-					// click_chatter("Timer: (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
-					output(NETWORK_PORT).push(copy);
-					// reset
-					sk->timer_on = true;
-					sk->synackack_waiting = true;
-					sk->finackack_expiry = now + Timestamp::make_msec(_ackdelay_ms);
-					sk->num_close_tries++;
-				}
-				else {
-					// Stop sending the connection request & Report the failure to the application
-					sk->timer_on = false;
-					sk->finackack_waiting = false;
-					click_chatter("Turn off timer because sk->num_close_tries > MAX_CLOSE_TRIES\n");
-
-
-					// Notify API that the connection failed
-					xia::XSocketMsg xsm;
-					//_errh->debug("Timer: Sent packet to socket with port %d", _sport);
-					xsm.set_type(xia::XCONNECT);
-					xsm.set_sequence(0); // TODO: what should This be?
-					xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
-					connect_msg->set_status(xia::X_Connect_Msg::XFAILED);
-					ReturnResult(_sport, &xsm);
-
-					if (sk->polling) {
-						ProcessPollEvent(_sport, POLLHUP);
-					}
-				}
 			} else if (sk->migrateack_waiting == true && sk->expiry <= now ) {
-				//click_chatter("Timer: migrateack waiting\n");
-				if (sk->num_migrate_tries <= MAX_MIGRATE_TRIES) {
+				tear_down = RetransmitMIGRATE(sk, _sport, now);
 
-					//click_chatter("Timer: SYN RETRANSMIT! \n");
-					copy = copy_packet(sk->migrate_pkt, sk);
-					// retransmit migrate
-					XIAHeader xiah(copy);
-					// printf("Timer: (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
-					output(NETWORK_PORT).push(copy);
-
-					sk->timer_on = true;
-					sk->migrateack_waiting = true;
-					sk->expiry = now + Timestamp::make_msec(_migrateackdelay_ms);
-					sk->num_migrate_tries++;
-				} else {
-					//click_chatter("retransmit counter for migrate exceeded\n");
-					// FIXME what cleanup should happen here? same as for data retransmits?
-					// should we do a NAK?
-				}
 			} else if (sk->dataack_waiting == true && sk->expiry <= now ) {
-
-				// adding check to see if anything was retransmitted. We can get in here with
-				// no packets in the sk->send_bufer array waiting to go and will stay here forever
-				bool retransmit_sent = false;
-
-				if (sk->num_retransmit_tries < MAX_RETRANSMIT_TRIES) {
-
-				//click_chatter("Timer: DATA RETRANSMIT at from (%s) from_port=%d send_base=%d next_seq=%d \n\n", (_local_addr.unparse()).c_str(), _sport, sk->send_base, sk->next_send_seqnum );
-
-					// retransmit data
-					for (unsigned int i = sk->send_base; i < sk->next_send_seqnum; i++) {
-						if (sk->send_buffer[i % sk->send_buffer_size] != NULL) {
-							copy = copy_packet(sk->send_buffer[i % sk->send_buffer_size], sk);
-							XIAHeader xiah(copy);
-							//click_chatter("Timer: (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
-							//click_chatter("pusing the retransmit pkt\n");
-							output(NETWORK_PORT).push(copy);
-							retransmit_sent = true;
-						}
-					}
-				} else {
-					//click_chatter("retransmit counter exceeded\n");
-
-					tear_down = true;
-					sk->timer_on = false;
-
-					click_chatter("Turn off the timer because sk->teardown_waiting == true with port = %d\n", _sport);
-
-					portToActive.set(_sport, false);
-					// XID source_xid = portToSock.get(_sport).xid;
-					// this check for -1 prevents a segfault cause by bad XIDs
-					// it may happen in other cases, but opening a XSOCK_STREAM socket, calling
-					// XreadLocalHostAddr and then closing the socket without doing anything else will cause the problem
-					// TODO: make sure that -1 is the only condition that will cause us to get a bad XID
-					if (sk->src_path.destination_node() != -1) {
-						XID source_xid = sk->src_path.xid(sk->src_path.destination_node());
-						if (!sk->isListenSocket) {
-							click_chatter("Tear down: deleting route %s from port %d\n", source_xid.unparse().c_str(), _sport);
-							delRoute(source_xid);
-							XIDtoPort.erase(source_xid);
-						}
-					}
-
-					portToSock.erase(_sport);
-					portToActive.erase(_sport);
-					hlim.erase(_sport);
-
-					nxt_xport.erase(_sport);
-					xcmp_listeners.remove(_sport);
-					for (int i = 0; i < sk->send_buffer_size; i++) {
-						if (sk->send_buffer[i] != NULL) {
-							sk->send_buffer[i]->kill();
-							sk->send_buffer[i] = NULL;
-						}
-					}
-					for (int i = 0; i < sk->recv_buffer_size; i++) {
-						if (sk->recv_buffer[i] != NULL) {
-							sk->recv_buffer[i]->kill();
-							sk->recv_buffer[i] = NULL;
-						}
-					}
-// FIXME: XXXX clean up socket state
-//					delete sk->syn_pkt;
-//					delete sk_>synack_pkt; // chenren: for retransmission
-//					delete sk->fin_pkt; 		// chenren: for retransmission
-//					delete sk->finack_pkt; // chenren: for retransmission
-					delete sk;
-				}
-
-				if (retransmit_sent) {
-					//click_chatter("resetting retransmit timer for %d\n", _sport);
-					sk->timer_on = true;
-					sk->dataack_waiting = true;
-					sk->num_retransmit_tries++;
-					sk->expiry = now + Timestamp::make_msec(_ackdelay_ms);
-				} else {
-					//click_chatter("terminating retransmit timer for %d\n", _sport);
-					sk->timer_on = false;
-					sk->dataack_waiting = false;
-					sk->num_retransmit_tries = 0;
-				}
+				tear_down = RetransmitDATA(sk, _sport, now);
 
 			} else if (sk->teardown_waiting == true && sk->teardown_expiry <= now) {
-				tear_down = true;
-				sk->timer_on = false;
-				portToActive.set(_sport, false);
-
-				//XID source_xid = portToSock.get(_sport).xid;
-
-				// this check for -1 prevents a segfault cause by bad XIDs
-				// it may happen in other cases, but opening a XSOCK_STREAM socket, calling
-				// XreadLocalHostAddr and then closing the socket without doing anything else will
-				// cause the problem
-				// TODO: make sure that -1 is the only condition that will cause us to get a bad XID
-				if (sk->src_path.destination_node() != -1) {
-					XID source_xid = sk->src_path.xid(sk->src_path.destination_node());
-					if (!sk->isListenSocket) {
-
-						//click_chatter("deleting route %s from port %d\n", source_xid.unparse().c_str(), _sport);
-						delRoute(source_xid);
-						XIDtoPort.erase(source_xid);
-					}
-				}
-
-				delete sk;
-				portToSock.erase(_sport);
-				portToActive.erase(_sport);
-				hlim.erase(_sport);
-
-				nxt_xport.erase(_sport);
-				xcmp_listeners.remove(_sport);
-				for (int i = 0; i < sk->send_buffer_size; i++) {
-					if (sk->send_buffer[i] != NULL) {
-						sk->send_buffer[i]->kill();
-						sk->send_buffer[i] = NULL;
-					}
-				}
+				tear_down = TearDownSocket(sk, _sport, now);
 			}
 		}
 
 		if (tear_down == false) {
 
 			// find the (next) earlist expiry
-			if (sk->timer_on == true && sk->expiry > now && ( sk->expiry < earlist_pending_expiry || earlist_pending_expiry == now ) ) {
-				earlist_pending_expiry = sk->expiry;
-			}
-			if (sk->timer_on == true && sk->teardown_expiry > now && ( sk->teardown_expiry < earlist_pending_expiry || earlist_pending_expiry == now ) ) {
-				earlist_pending_expiry = sk->teardown_expiry;
+			if (sk->timer_on == true) {
+				if (sk->expiry > now && (sk->expiry < earlist_pending_expiry || earlist_pending_expiry == now)) {
+					earlist_pending_expiry = sk->expiry;
+				}
+				if (sk->teardown_expiry > now && (sk->teardown_expiry < earlist_pending_expiry || earlist_pending_expiry == now)) {
+					earlist_pending_expiry = sk->teardown_expiry;
+				}
 			}
 
-
+			// FIXMME: why is this here instead of with the other retransmits?
 			// check for CID request cases
-			for (HashTable<XID, bool>::iterator it = sk->XIDtoTimerOn.begin(); it != sk->XIDtoTimerOn.end(); ++it ) {
-				XID requested_cid = it->first;
-				bool timer_on = it->second;
+			RetransmitCIDRequest(sk, _sport, now, earlist_pending_expiry);
 
-				HashTable<XID, Timestamp>::iterator it2;
-				it2 = sk->XIDtoExpiryTime.find(requested_cid);
-				Timestamp cid_req_expiry = it2->second;
-
-				if (timer_on == true && cid_req_expiry <= now) {
-					//click_chatter("CID-REQ RETRANSMIT! \n");
-					//retransmit cid-request
-					HashTable<XID, WritablePacket*>::iterator it3;
-					it3 = sk->XIDtoCIDreqPkt.find(requested_cid);
-					copy = copy_cid_req_packet(it3->second, sk);
-					XIAHeader xiah(copy);
-					//click_chatter("\n\n (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
-					output(NETWORK_PORT).push(copy);
-
-					cid_req_expiry  = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
-					sk->XIDtoExpiryTime.set(requested_cid, cid_req_expiry);
-					sk->XIDtoTimerOn.set(requested_cid, true);
-				}
-
-				if (timer_on == true && cid_req_expiry > now && ( cid_req_expiry < earlist_pending_expiry || earlist_pending_expiry == now ) ) {
-					earlist_pending_expiry = cid_req_expiry;
-				}
-			}
-
+			// FIXME: WHY?????
 			portToSock.set(_sport, sk);
 			if(_sport != sk->port) {
 				click_chatter("Xtransport::run_timer ERROR: _sport %d, sk->port %d", _sport, sk->port);
@@ -541,8 +578,6 @@ void XTRANSPORT::run_timer(Timer *timer)
 	if (earlist_pending_expiry > now) {
 		_timer.reschedule_at(earlist_pending_expiry);
 	}
-
-//	pthread_mutex_unlock(&_lock);
 }
 
 void XTRANSPORT::copy_common(sock *sk, XIAHeader &xiahdr, XIAHeaderEncap &xiah) {

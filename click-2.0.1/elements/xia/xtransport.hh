@@ -172,8 +172,7 @@ class XTRANSPORT : public Element {
 							recv_buffer_size(DEFAULT_RECV_WIN_SIZE), send_base(0),
 							next_send_seqnum(0), recv_base(0), next_recv_seqnum(0),
 							dgram_buffer_start(0), dgram_buffer_end(-1),
-							recv_buffer_count(0), recv_pending(false), polling(0),
-							did_poll(false) {};
+							recv_buffer_count(0), recv_pending(false), polling(0) {};
 
 	/* =========================
 	 * Common Socket states
@@ -210,7 +209,6 @@ class XTRANSPORT : public Element {
 		int interface_id;		// port of the interface the packets arrive on
 		String last_migrate_ts;
 
-		bool did_poll;
 		unsigned polling;
 
 		int num_connect_tries; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
@@ -372,7 +370,15 @@ class XTRANSPORT : public Element {
 
     int HandleStreamRawPacket(WritablePacket *p_in);
 
-    void RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now);
+    bool RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp &now, Timestamp &erlist_pending_expiry);
+    bool RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now);
+    bool RetransmitFIN(sock *sk, unsigned short _sport, Timestamp &now);
+    bool RetransmitFINACK(sock *sk, unsigned short _sport, Timestamp &now);
+    bool RetransmitMIGRATE(sock *sk, unsigned short _sport, Timestamp &now);
+    bool RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now);
+    bool RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &now);
+
+    bool TearDownSocket(sock *sk, unsigned short _sport, Timestamp &now);
 
 };
 
