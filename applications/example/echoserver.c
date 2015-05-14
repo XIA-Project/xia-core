@@ -150,27 +150,29 @@ void process(int sock)
 	FD_ZERO(&fds);
 	FD_SET(sock, &fds);
 
+#ifdef USE_SELECT
 	struct timeval tv;
 	tv.tv_sec = WAIT_FOR_DATA;
 	tv.tv_usec = 0;
-
+#endif
    	while (1) {
 		memset(buf, 0, sizeof(buf));
+#ifdef USE_SELECT
+		tv.tv_sec = WAIT_FOR_DATA;
+		tv.tv_usec = 0;
+		 if ((n = Xselect(sock + 1, &fds, NULL, NULL, &tv)) < 0) {
+			 warn("%5d Select failed, closing...\n", pid);
+			 break;
 
-		// tv.tv_sec = WAIT_FOR_DATA;
-		// tv.tv_usec = 0;
-		//  if ((n = Xselect(sock + 1, &fds, NULL, NULL, &tv)) < 0) {
-		// 	 warn("%5d Select failed, closing...\n", pid);
-		// 	 break;
-
-		//  } else if (n == 0) {
-		// 	 // we timed out, close the socket
-		// 	 say("%5d timed out on recv\n", pid);
-		// 	 break;
-		//  } else if (!FD_ISSET(sock, &fds)) {
-		// 	 // this shouldn't happen!
-		// 	 die(-4, "something is really wrong, exiting\n");
-		//  }
+		 } else if (n == 0) {
+			 // we timed out, close the socket
+			 say("%5d timed out on recv\n", pid);
+			 break;
+		 } else if (!FD_ISSET(sock, &fds)) {
+			 // this shouldn't happen!
+			 die(-4, "something is really wrong, exiting\n");
+		 }
+#endif
 
 		if ((n = Xrecv(sock, buf, sizeof(buf), 0)) < 0) {
 			warn("Recv error on socket %d, closing connection\n", pid);
