@@ -157,23 +157,26 @@ void process(int sock)
    	while (1) {
 		memset(buf, 0, sizeof(buf));
 
-		tv.tv_sec = WAIT_FOR_DATA;
-		tv.tv_usec = 0;
-		 if ((n = Xselect(sock + 1, &fds, NULL, NULL, &tv)) < 0) {
-			 warn("%5d Select failed, closing...\n", pid);
-			 break;
+		// tv.tv_sec = WAIT_FOR_DATA;
+		// tv.tv_usec = 0;
+		//  if ((n = Xselect(sock + 1, &fds, NULL, NULL, &tv)) < 0) {
+		// 	 warn("%5d Select failed, closing...\n", pid);
+		// 	 break;
 
-		 } else if (n == 0) {
-			 // we timed out, close the socket
-			 say("%5d timed out on recv\n", pid);
-			 break;
-		 } else if (!FD_ISSET(sock, &fds)) {
-			 // this shouldn't happen!
-			 die(-4, "something is really wrong, exiting\n");
-		 }
+		//  } else if (n == 0) {
+		// 	 // we timed out, close the socket
+		// 	 say("%5d timed out on recv\n", pid);
+		// 	 break;
+		//  } else if (!FD_ISSET(sock, &fds)) {
+		// 	 // this shouldn't happen!
+		// 	 die(-4, "something is really wrong, exiting\n");
+		//  }
 
 		if ((n = Xrecv(sock, buf, sizeof(buf), 0)) < 0) {
 			warn("Recv error on socket %d, closing connection\n", pid);
+			break;
+		} else if (n == 0) {
+			warn("%d client closed the connection\n", pid);
 			break;
 		}
 
