@@ -39,7 +39,7 @@ class TransportHeader : public XIAGenericExtHeader { public:
 
     enum { TYPE, PKT_INFO, SRC_XID, DST_XID, SEQ_NUM, ACK_NUM, LENGTH, RECV_WINDOW}; 
     enum { XSOCK_STREAM=1, XSOCK_DGRAM, XSOCK_RAW, XSOCK_CHUNK};
-    enum { SYN=1, SYNACK, DATA, ACK, FIN, FINACK, MIGRATE, MIGRATEACK};
+    enum { SYN=1, SYNACK, DATA, ACK, FIN, FINACK, MIGRATE, MIGRATEACK, RST};
     
     //enum { OP_REQUEST=1, OP_RESPONSE, OP_LOCAL_PUTCID, OP_REDUNDANT_REQUEST};
 };
@@ -72,6 +72,9 @@ class TransportHeaderEncap : public XIAGenericExtHeaderEncap { public:
 
     static TransportHeaderEncap* MakeFINACKHeader( uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window ) 
                         { return new TransportHeaderEncap(TransportHeader::XSOCK_STREAM, TransportHeader::FINACK, seq_num, ack_num, length, recv_window); };
+
+    static TransportHeaderEncap* MakeRSTHeader( uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window )
+                        { return new TransportHeaderEncap(TransportHeader::XSOCK_STREAM, TransportHeader::RST, seq_num, ack_num, length, recv_window); };
 
     static TransportHeaderEncap* MakeMIGRATEHeader(uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window )
                         { return new TransportHeaderEncap(TransportHeader::XSOCK_STREAM, TransportHeader::MIGRATE, seq_num, ack_num, length, recv_window); };
