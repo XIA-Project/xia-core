@@ -27,6 +27,7 @@
 */
 
 /*
+ * CHENREN'S NOTES
  * Notes: 1. ACKheader's #ack might be wrong: sk->next_recv_seqnum = next_missing_seqnum(sk);
  *
  * old version
@@ -74,7 +75,7 @@ XTRANSPORT::XTRANSPORT()
 	: _timer(this)
 {
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
-	_id = 0;
+//	_id = 0;
 
 	_ackdelay_ms = ACK_DELAY;
 	_migrateackdelay_ms = _ackdelay_ms * 10;
@@ -356,7 +357,7 @@ bool XTRANSPORT::RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now)
 		tear_down = true;
 		sk->timer_on = false;
 
-		// FIXME: a lot of this teardown needs happen on FIN as well, so move it to a function that 
+		// FIXME: a lot of this teardown needs happen on FIN as well, so move it to a function that
 		// both can call possibly into TeardownSocket
 
 		click_chatter("Turn off the timer because sk->teardown_waiting == true with port = %d\n", _sport);
@@ -725,7 +726,10 @@ void XTRANSPORT::add_packet_to_recv_buf(WritablePacket *p, sock *sk) {
 * @param sk
 */
 void XTRANSPORT::check_for_and_handle_pending_recv(sock *sk) {
+click_chatter("check for 1\n");
+
 	if (sk->recv_pending) {
+click_chatter("check for 2\n");
 		int bytes_returned = read_from_recv_buf(sk->pending_recv_msg, sk);
 		ReturnResult(sk->port, sk->pending_recv_msg, bytes_returned);
 
@@ -733,6 +737,7 @@ void XTRANSPORT::check_for_and_handle_pending_recv(sock *sk) {
 		delete sk->pending_recv_msg;
 		sk->pending_recv_msg = NULL;
 	}
+click_chatter("check for 3\n");
 }
 
 /**
@@ -845,11 +850,15 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk) {
 		memset(buf, 0, 64*1024);
 		int i;
 
+
+click_chatter("read_from_recv_buf 1\n");
 		// FIXME: make sure bytes requested is <= recv buffer size
 
 		for (i = sk->recv_base; i < sk->next_recv_seqnum; i++) {
+click_chatter("read_from_recv_buf 2\n");
 
 			if (bytes_returned >= bytes_requested) break;
+click_chatter("read_from_recv_buf 3\n");
 
 			WritablePacket *p = sk->recv_buffer[i % sk->recv_buffer_size];
 			XIAHeader xiah(p->xia_header());
@@ -891,6 +900,7 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk) {
 			}
 //			printf("    port %u grabbing index %d, seqnum %d\n", sk->port, i%sk->recv_buffer_size, i);
 		}
+click_chatter("read_from_recv_buf 4\n");
 
 		x_recv_msg->set_payload(buf, bytes_returned);
 		x_recv_msg->set_bytes_returned(bytes_returned);
@@ -1119,11 +1129,11 @@ bool XTRANSPORT::usingRendezvousDAG(XIAPath bound_dag, XIAPath pkt_dag)
 void XTRANSPORT::ProcessMigratePacket(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
-	
+
 	XIAPath dst_path = xiah.dst_path();
 	XIAPath src_path = xiah.src_path();
 
-	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);	
+	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 
 	TransportHeader thdr(p_in);
@@ -1133,7 +1143,7 @@ void XTRANSPORT::ProcessMigratePacket(WritablePacket *p_in)
 	xid_pair.set_dst(_source_xid);
 
 	unsigned short _dport = XIDpairToPort.get(xid_pair);
-	
+
 	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
 
 	_errh->debug("ProcessMigrate: %s from port %d at %ld.\n", _source_xid.unparse().c_str(), _dport, Timestamp::now());
@@ -1305,11 +1315,11 @@ void XTRANSPORT::ProcessMigratePacket(WritablePacket *p_in)
 void XTRANSPORT::ProcessMigrateAck(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
-	
+
 	XIAPath dst_path = xiah.dst_path();
 	XIAPath src_path = xiah.src_path();
 
-	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);	
+	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 
 	TransportHeader thdr(p_in);
@@ -1319,7 +1329,7 @@ void XTRANSPORT::ProcessMigrateAck(WritablePacket *p_in)
 	xid_pair.set_dst(_source_xid);
 
 	unsigned short _dport = XIDpairToPort.get(xid_pair);
-	
+
 	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
 
 	_errh->debug("HandleMigrateAck: %s from port %d at %ld.\n", _source_xid.unparse().c_str(), _dport, Timestamp::now());
@@ -1460,11 +1470,11 @@ void XTRANSPORT::ProcessXcmpPacket(WritablePacket *p_in)
 void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
-	
+
 	XIAPath dst_path = xiah.dst_path();
 	XIAPath src_path = xiah.src_path();
 
-	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);	
+	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 
 	TransportHeader thdr(p_in);
@@ -1474,8 +1484,8 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 	xid_pair.set_dst(_source_xid);
 
 	// unlike the other stream handlers, there is no pair yet, so use dest_xid to get port
-	unsigned short _dport = XIDtoPort.get(_destination_xid); 
-	
+	unsigned short _dport = XIDtoPort.get(_destination_xid);
+
 	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
 
 	_errh->debug("ProcessSynPacket: %s from port %d at %ld.\n", _source_xid.unparse().c_str(), _dport, Timestamp::now());
@@ -1545,7 +1555,7 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 			uint16_t signatureLength = MAX_SIGNATURE_SIZE;
 			if(xs_sign(_destination_xid.unparse().c_str(), (unsigned char *)synackPayload.get_buffer(), synackPayload.size(), (unsigned char *)signature, &signatureLength)) {
 				click_chatter("Xaccept: ERROR unable to sign the SYNACK using private key for %s", _destination_xid.unparse().c_str());
-#if 0						
+#if 0
 // FIXME XXXX what to do here?
 
 if blocking returnresult error
@@ -1565,15 +1575,15 @@ poll error
 			uint16_t pubkeyLength = MAX_PUBKEY_SIZE;
 			if(xs_getPubkey(_destination_xid.unparse().c_str(), pubkey, &pubkeyLength)) {
 				click_chatter("Xaccept: ERROR public key not found for %s", _destination_xid.unparse().c_str());
-#if 0					
-// FIXME XXXX what to do here?	
+#if 0
+// FIXME XXXX what to do here?
 				rc = -1;
 				ec = ESTALE;
 				goto Xaccept_done;
 
 if blocking returnresult error
 else
-poll error					
+poll error
 #else
 				return;
 #endif
@@ -1633,11 +1643,11 @@ poll error
 int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
-	
+
 	XIAPath dst_path = xiah.dst_path();
 	XIAPath src_path = xiah.src_path();
 
-	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);	
+	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 
 	TransportHeader thdr(p_in);
@@ -1646,8 +1656,8 @@ int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 	xid_pair.set_src(_destination_xid);
 	xid_pair.set_dst(_source_xid);
 
-	unsigned short _dport = XIDtoPort.get(_destination_xid); 
-	
+	unsigned short _dport = XIDtoPort.get(_destination_xid);
+
 	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
 
 	// it's not a raw packet, so tell ProcessNetworkPacket to handle it
@@ -1681,11 +1691,11 @@ int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
-	
+
 	XIAPath dst_path = xiah.dst_path();
 	XIAPath src_path = xiah.src_path();
 
-	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);	
+	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 
 	TransportHeader thdr(p_in);
@@ -1695,7 +1705,7 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 	xid_pair.set_dst(_source_xid);
 
 	unsigned short _dport = XIDpairToPort.get(xid_pair);
-	
+
 	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
 
 	if(sk->dst_path != src_path) {
@@ -1822,11 +1832,11 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 void XTRANSPORT::ProcessStreamDataPacket(WritablePacket*p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
-	
+
 	XIAPath dst_path = xiah.dst_path();
 	XIAPath src_path = xiah.src_path();
 
-	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);	
+	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 
 	TransportHeader thdr(p_in);
@@ -1836,10 +1846,12 @@ void XTRANSPORT::ProcessStreamDataPacket(WritablePacket*p_in)
 	xid_pair.set_dst(_source_xid);
 
 	unsigned short _dport = XIDpairToPort.get(xid_pair);
-	
+
 	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
 
+	click_chatter("in recv data packet\n");
 	if (sk) {
+	click_chatter("in recv data packet 1\n");
 		//printf("(%s) my_sport=%u  my_sid=%s  his_sid=%s\n", (_local_addr.unparse()).c_str(),  _dport,  _destination_xid.unparse().c_str(), _source_xid.unparse().c_str());
 		HashTable<unsigned short, bool>::iterator it1;
 		it1 = portToActive.find(_dport);
@@ -1858,6 +1870,8 @@ void XTRANSPORT::ProcessStreamDataPacket(WritablePacket*p_in)
 					// tell API we are readable
 					ProcessPollEvent(_dport, POLLIN);
 				}
+
+				click_chatter("in recv data packet 1a\n");
 				check_for_and_handle_pending_recv(sk);
 			}
 
@@ -1877,6 +1891,8 @@ void XTRANSPORT::ProcessStreamDataPacket(WritablePacket*p_in)
 			xiah_new.set_hlim(HLIM_DEFAULT);
 			xiah_new.set_dst_path(src_path);
 			xiah_new.set_src_path(dst_path);
+
+			click_chatter("in recv data packet 2\n");
 
 			const char* dummy = "cumulative_ACK";
 			WritablePacket *just_payload_part = WritablePacket::make(256, dummy, strlen(dummy), 0);
@@ -1909,11 +1925,11 @@ void XTRANSPORT::ProcessStreamDataPacket(WritablePacket*p_in)
 void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
-	
+
 	XIAPath dst_path = xiah.dst_path();
 	XIAPath src_path = xiah.src_path();
 
-	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);	
+	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 
 	TransportHeader thdr(p_in);
@@ -1931,7 +1947,7 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 		// connect is in progress so pair to port is not set up yet, use the listen socket's port
 		_dport = XIDtoPort.get(_destination_xid);
 
-	} else { 
+	} else {
 		_dport = XIDpairToPort.get(xid_pair);
 	}
 
@@ -2031,7 +2047,7 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 	// chenren: handler for FINACK's ACK ends
 
 	// chenren: data ACK
-	else if (sk->connState == CONNECTED && sk->closeState == ACTIVE) {
+	else if (sk->connState == CONNECTED && sk->closeState == ESTABLISHED) {
 		click_chatter("Receives the ACK of DATA.\n");
 		// chenren
 		if (sk) {
@@ -2086,17 +2102,19 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 				//click_chatter("port not found\n");
 			}
 		} // chenren
+	} else {
+		click_chatter("sk was null or some other error!\n");
 	}
 }
 
 void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
-	
+
 	XIAPath dst_path = xiah.dst_path();
 	XIAPath src_path = xiah.src_path();
 
-	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);	
+	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 
 	TransportHeader thdr(p_in);
@@ -2106,7 +2124,7 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 	xid_pair.set_dst(_source_xid);
 
 	unsigned short _dport = XIDpairToPort.get(xid_pair);
-	
+
 	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
 
 	// prevent it from sending FIN after receiving FINACK
@@ -2191,11 +2209,11 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 void XTRANSPORT::ProcessFinAckPacket(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
-	
+
 	XIAPath dst_path = xiah.dst_path();
 	XIAPath src_path = xiah.src_path();
 
-	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);	
+	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 
 	TransportHeader thdr(p_in);
@@ -2205,7 +2223,7 @@ void XTRANSPORT::ProcessFinAckPacket(WritablePacket *p_in)
 	xid_pair.set_dst(_source_xid);
 
 	unsigned short _dport = XIDpairToPort.get(xid_pair);
-	
+
 	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
 
 	sk->dst_path = src_path;
@@ -2305,6 +2323,53 @@ void XTRANSPORT::ProcessDatagramPacket(WritablePacket *p_in)
 	}
 }
 
+void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
+{
+	XIAHeader xiah(p_in->xia_header());
+	TransportHeader thdr(p_in);
+
+	click_chatter("stream packet of type %d\n", thdr.pkt_info());
+
+	// FIXME: creating variables is duplicated in this function and the one below
+	// that is called if this returns 0. Is it better to make the variable here
+	//  and pass all of them to the handlers?
+
+	// Is this packet arriving at a rendezvous server?
+	if (HandleStreamRawPacket(p_in)) {
+		// we handled it, no further processing is needed
+		return;
+	}
+
+	switch(thdr.pkt_info()) {
+		case TransportHeader::ACK:
+			ProcessAckPacket(p_in);
+			break;
+		case TransportHeader::DATA:
+			ProcessStreamDataPacket(p_in);
+			break;
+		case TransportHeader::SYN:
+			ProcessSynPacket(p_in);
+			break;
+		case TransportHeader::SYNACK:
+			ProcessSynAckPacket(p_in);
+			break;
+		case TransportHeader::MIGRATE:
+			ProcessMigratePacket(p_in);
+			break;
+		case TransportHeader::MIGRATEACK:
+			ProcessMigrateAck(p_in);
+			break;
+		case TransportHeader::FIN:
+			ProcessFinPacket(p_in);
+			break;
+		case TransportHeader::FINACK:
+			ProcessFinAckPacket(p_in);
+			break;
+		default:
+			click_chatter("ProcessNetworkPacket: Unknown Packet Type:%d\n", thdr.pkt_info());
+	}
+}
+
 
 void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 {
@@ -2315,52 +2380,15 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 		// pass the packet to all sockets that registered for XMCP packets
 		ProcessXcmpPacket(p_in);
 		return;
-	} 
+	}
 
 	switch(thdr.type()) {
-		case TransportHeader::XSOCK_DGRAM:
-			ProcessDatagramPacket(p_in);
+		case TransportHeader::XSOCK_STREAM:
+			ProcessStreamPacket(p_in);
 			break;
 
-		case TransportHeader::XSOCK_STREAM:
-			// Is this packet arriving at a rendezvous server?
-
-			// FIXME: creating variables is duplicated in this function and the one below
-			// that is called if this returns 0. Is it better to make the variable here
-			//  and pass all of them to the handlers?
-			if (HandleStreamRawPacket(p_in)) {
-				// we handled it, no further processing is needed
-				return; 
-			}
-
-			switch(thdr.pkt_info()) {
-				case TransportHeader::ACK:
-					ProcessAckPacket(p_in);
-					break;
-				case TransportHeader::DATA:
-					ProcessStreamDataPacket(p_in);
-					break;
-				case TransportHeader::SYN:
-					ProcessSynPacket(p_in);
-					break;
-				case TransportHeader::SYNACK:
-					ProcessSynAckPacket(p_in);
-					break;
-				case TransportHeader::MIGRATE:
-					ProcessMigratePacket(p_in);
-					break;
-				case TransportHeader::MIGRATEACK:
-					ProcessMigrateAck(p_in);
-					break;
-				case TransportHeader::FIN:
-					ProcessFinPacket(p_in);
-					break;
-				case TransportHeader::FINACK:
-					ProcessFinAckPacket(p_in);
-					break;
-				default:
-					click_chatter("ProcessNetworkPacket: Unknown Packet Type:%d\n", thdr.pkt_info());
-			}
+		case TransportHeader::XSOCK_DGRAM:
+			ProcessDatagramPacket(p_in);
 			break;
 
 		default:
@@ -2416,7 +2444,7 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 
 		sock *sk = portToSock.get(_dport);
 		// check if _destination_sid is of XSOCK_DGRAM
-		if (sk->sock_type != XSOCKET_CHUNK) {
+		if (sk->sock_type != SOCK_CHUNK) {
 			click_chatter("This is not a chunk socket. dport: %i, Socktype: %i", _dport, sk->sock_type);
 		}
 
@@ -2719,7 +2747,7 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	sk->num_retransmit_tries = 0;
 	sk->teardown_waiting = false;
 	sk->connState = NOTCONNECTED;
-	sk->closeState = ACTIVE;
+	sk->closeState = ESTABLISHED;
 	sk->isListenSocket = false;
 	sk->so_error = 0;
 	sk->num_connect_tries = 0; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
@@ -2974,36 +3002,12 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	sock *sk = portToSock.get(_sport);
 	if (sk) {
 		// Xclose is called only if it never receives FIN
-		if (sk->sock_type == SOCK_STREAM && sk->closeState == ACTIVE) {
-			/*
-			// Recalculate source path
-			XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
-			String str_local_addr = _local_addr.unparse_re() + " " + source_xid.unparse();
-			// Make source DAG _local_addr:SID
-			String dagstr = sk->src_path.unparse_re();
-
-			// Client Mobility...
-			if (dagstr.length() != 0 && dagstr != str_local_addr) {
-				// Moved!
-				// 1. Update 'sk->src_path'
-				sk->src_path.parse_re(str_local_addr);
-			}
-
-			// Case of initial binding to only SID
-			if (sk->full_src_dag == false) {
-				sk->full_src_dag = true;
-				String str_local_addr = _local_addr.unparse_re();
-				XID front_xid = sk->src_path.xid(sk->src_path.destination_node());
-				String xid_string = front_xid.unparse();
-				str_local_addr = str_local_addr + " " + xid_string; // Make source DAG _local_addr:SID
-				sk->src_path.parse_re(str_local_addr);
-			}
-			*/
+		if (sk->sock_type == SOCK_STREAM && sk->closeState == ESTABLISHED) {
 			// Add XIA headers
 			XIAHeaderEncap xiah_new;
 			xiah_new.set_nxt(CLICK_XIA_NXT_TRN);
 			xiah_new.set_last(LAST_NODE_DEFAULT);
-			xiah_new.set_hlim(HLIM_DEFAULT); // xiah.set_hlim(hlim.get(_sport));??
+			xiah_new.set_hlim(HLIM_DEFAULT);
 			xiah_new.set_dst_path(sk->dst_path);
 			xiah_new.set_src_path(sk->src_path);
 
@@ -3659,8 +3663,6 @@ void XTRANSPORT::Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
-	UNUSED(_sport);
-
 	// Save the old AD
 	String str_local_addr = _local_addr.unparse();
 	size_t old_AD_start = str_local_addr.find_left("AD:");
@@ -3689,7 +3691,6 @@ void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	for (HashTable<unsigned short, sock*>::iterator iter = portToSock.begin(); iter != portToSock.end(); ++iter ) {
 		unsigned short _migrateport = iter->first;
 		sock *sk = portToSock.get(_migrateport);
-		// TODO: use XSOCKET_STREAM?
 		// Skip non-stream connections
 		if(sk->sock_type != SOCK_STREAM) {
 			continue;
@@ -3841,8 +3842,6 @@ void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_
 
 void XTRANSPORT::Xupdatenameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
-	UNUSED(_sport);
-
 	xia::X_Updatenameserverdag_Msg *x_updatenameserverdag_msg = xia_socket_msg->mutable_x_updatenameserverdag();
 	String ns_dag(x_updatenameserverdag_msg->dag().c_str());
 	//click_chatter("new nameserver address is - %s", ns_dag.c_str());
@@ -4215,7 +4214,7 @@ void XTRANSPORT::Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		// FIXME: do something with the error
 	}
 
-	if (sk && sk->closeState == ACTIVE) {
+	if (sk && sk->closeState == ESTABLISHED) {
 		read_from_recv_buf(xia_socket_msg, sk);
 
 		if (xia_socket_msg->x_recv().bytes_returned() > 0) {

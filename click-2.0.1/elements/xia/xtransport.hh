@@ -34,18 +34,13 @@ using namespace std;
 #endif
 
 // FIXME: put these in a std location that can be found by click and the API
-#define XOPT_HLIM       0x07001
+// XIA Specific commands for [get|set]sockopt
+#define XOPT_HLIM	   0x07001
 #define XOPT_NEXT_PROTO 0x07002
-#define XOPT_BLOCK      0x07003
+#define XOPT_BLOCK	  0x07003
 #define XOPT_ERROR_PEEK 0x07004
 
-#ifndef DEBUG
-#define DEBUG 0
-#endif
-
-
-#define UNUSED(x) ((void)(x))
-
+// various constants
 #define ACK_DELAY			300
 #define TEARDOWN_DELAY		240000
 #define HLIM_DEFAULT		250
@@ -53,62 +48,38 @@ using namespace std;
 #define RANDOM_XID_FMT		"%s:30000ff0000000000000000000000000%08x"
 #define UDP_HEADER_SIZE		8
 
-#define XSOCKET_INVALID -1	// invalid socket type
-#define XSOCKET_STREAM	1	// Reliable transport (SID)
-#define XSOCKET_DGRAM	2	// Unreliable transport (SID)
-#define XSOCKET_RAW		3	// Raw XIA socket
-#define XSOCKET_CHUNK	4	// Content Chunk transport (CID)
+// SOCK_STREAM, etc from std socket definitions
+#define SOCK_CHUNK		4
 
 // TODO: switch these to bytes, not packets?
-#define MAX_SEND_WIN_SIZE 256  // in packets, not bytes
-#define MAX_RECV_WIN_SIZE 256
+#define MAX_SEND_WIN_SIZE	 256  // in packets, not bytes
+#define MAX_RECV_WIN_SIZE	 256
 #define DEFAULT_SEND_WIN_SIZE 128
 #define DEFAULT_RECV_WIN_SIZE 128
 
 #define MAX_CONNECT_TRIES	 30
-#define MAX_CLOSE_TRIES 30 // added by chenren
-#define MAX_MIGRATE_TRIES	 30
+#define MAX_CLOSE_TRIES	  30
+#define MAX_MIGRATE_TRIES	30
 #define MAX_RETRANSMIT_TRIES 100
 
-#define REQUEST_FAILED		0x00000001
-#define WAITING_FOR_CHUNK	0x00000002
-#define READY_TO_READ		0x00000004
-#define INVALID_HASH		0x00000008
+#define REQUEST_FAILED	0x00000001
+#define WAITING_FOR_CHUNK 0x00000002
+#define READY_TO_READ	 0x00000004
+#define INVALID_HASH	  0x00000008
 
-#define HASH_KEYSIZE    20
+#define HASH_KEYSIZE 20
 
-#define API_PORT    0
-#define BAD_PORT       1
-#define NETWORK_PORT    2
-#define CACHE_PORT      3
-#define XHCP_PORT       4
+#define API_PORT	 0
+#define BAD_PORT	 1  // FIXME why do we still have this?
+#define NETWORK_PORT 2
+#define CACHE_PORT   3
+#define XHCP_PORT	4
 
-// chenren add
-#define NOTCONNECTED 0
-#define CONNECTING -1
-#define CONNECTED 1
-
-#define ACTIVE 0
-#define CLOSING -1
-#define CLOSED 1
-// chenren add
+enum StreamState {INACTIVE = 1, LISTEN, SYN_RCVD, SYN_SENT, ESTABLISHED, FIN_WAIT1, FIN_WAIT2, CLOSING, CLOSE_WAIT, LAST_ACK, CLOSED,
+// FIXME: these below should go away
+NOTCONNECTED, CONNECTING, CONNECTED};
 
 CLICK_DECLS
-
-/**
-XTRANSPORT:
-input port[0]:  api port
-input port[1]:  Unused
-input port[2]:  Network Rx data port
-input port[3]:  in from cache
-
-output[3]: To cache for putCID
-output[2]: Network Tx data port
-output[0]: Socket (API) Tx data port
-
-Might need other things to handle chunking
-*/
-
 
 typedef struct {
 	bool forever;
@@ -116,33 +87,36 @@ typedef struct {
 	HashTable<unsigned short, unsigned int> events;
 } PollEvent;
 
+
 class XTRANSPORT : public Element {
-  public:
+public:
 	XTRANSPORT();
 	~XTRANSPORT();
-	const char *class_name() const		{ return "XTRANSPORT"; }
-	const char *port_count() const		{ return "5/4"; }
-	const char *processing() const		{ return PUSH; }
+
+	const char *class_name() const { return "XTRANSPORT"; }
+	const char *port_count() const { return "5/4"; }
+	const char *processing() const { return PUSH; }
+
 	int configure(Vector<String> &, ErrorHandler *);
 	void push(int port, Packet *);
-	XID local_hid() { return _local_hid; };
-	XIAPath local_addr() { return _local_addr; };
-	XID local_4id() { return _local_4id; };
-	void add_handlers();
-	static int write_param(const String &, Element *, void *vparam, ErrorHandler *);
-
 	int initialize(ErrorHandler *);
 	void run_timer(Timer *timer);
 
-	void ReturnResult(int sport, xia::XSocketMsg *xia_socket_msg, int rc = 0, int err = 0);
+	XID local_hid()	  { return _local_hid; };
+	XIAPath local_addr() { return _local_addr; };
+	XID local_4id()	  { return _local_4id; };
+	void add_handlers();
 
-  private:
+	static int write_param(const String &, Element *, void *vparam, ErrorHandler *);
+
+
+private:
 	SyslogErrorHandler *_errh;
 
 	Timer _timer;
 
 	unsigned _ackdelay_ms;
-    unsigned _migrateackdelay_ms;
+	unsigned _migrateackdelay_ms;
 	unsigned _teardown_wait_ms;
 
 	uint32_t _cid_type, _sid_type;
@@ -164,145 +138,181 @@ class XTRANSPORT : public Element {
 	 * Socket states
 	 * ========================= */
 	struct sock {
-		sock(): port(0), connState(NOTCONNECTED), closeState(ACTIVE), isBlocking(true), initialized(false), // chenren: changed connState and closeState from false to 0
-							full_src_dag(false), timer_on(false), synack_waiting(false),
-							synackack_waiting(false), finack_waiting(false), finackack_waiting(false), // chenren: added
-							so_error(0), dataack_waiting(false), teardown_waiting(false),
-							send_buffer_size(DEFAULT_SEND_WIN_SIZE),
-							recv_buffer_size(DEFAULT_RECV_WIN_SIZE), send_base(0),
-							next_send_seqnum(0), recv_base(0), next_recv_seqnum(0),
-							dgram_buffer_start(0), dgram_buffer_end(-1),
-							recv_buffer_count(0), recv_pending(false), polling(0) {};
+		// sock(): port(0), state(INACTIVE), connState(INACTIVE), closeState(ESTABLISHED),
+		// 		so_error(0), isBlocking(true), polling(0), initialized(false),
+		// 		full_src_dag(false), timer_on(false),
+		// 		synack_waiting(false), synackack_waiting(false),
+		// 		finack_waiting(false), finackack_waiting(false),
+		// 		dataack_waiting(false), teardown_waiting(false),
+		// 		send_base(0), next_send_seqnum(0), send_buffer_size(DEFAULT_SEND_WIN_SIZE),
+		// 		recv_base(0), next_recv_seqnum(0), recv_buffer_size(DEFAULT_RECV_WIN_SIZE),
+		// 		dgram_buffer_start(0), dgram_buffer_end(-1),
+		// 		recv_buffer_count(0), recv_pending(false) {};
+
+		sock() {
+			port = so_error = polling = 0;
+			s_state = connState = closeState = INACTIVE;
+
+			isBlocking = true;
+			initialized = timer_on = full_src_dag = false;
+
+			synack_waiting = synackack_waiting = false;
+			finack_waiting = finackack_waiting = false;
+			dataack_waiting = teardown_waiting = false;
+
+			migrateack_waiting = false;
+			num_migrate_tries = 0;
+
+			send_base = next_send_seqnum = 0;
+			recv_base = next_recv_seqnum = recv_buffer_count = 0;
+			recv_pending = false;
+			send_buffer_size = recv_buffer_size = DEFAULT_RECV_WIN_SIZE;
+
+			dgram_buffer_start = 0;
+			dgram_buffer_end = -1;
+
+			last = LAST_NODE_DEFAULT;
+			hlim = HLIM_DEFAULT;
+
+		}
 
 	/* =========================
 	 * Common Socket states
 	 * ========================= */
-		unsigned short port;
-		XIAPath src_path;
-		XIAPath dst_path;
-		int nxt;
-		int last;
-		uint8_t hlim;
-
-		bool full_src_dag; // bind to full dag or just to SID
-		int sock_type; // 0: Reliable transport (SID), 1: Unreliable transport (SID), 2: Content Chunk transport (CID)
-
-	/* =========================
-	 * XSP/XChunkP Socket states
-	 * ========================= */
-
-		int connState; 			// chenren: change bool to int; {-1,0,1} represents pending, closed and connected
-		int	closeState; 		// chenren: added: {-1,0,1} represents pending, connected and closed
-		bool initialized;
-		bool isListenSocket;
+		unsigned short port;		// API Port
+		int sock_type;
 		bool isBlocking;
-		bool synack_waiting;
-		bool synackack_waiting; // chenren: used for synack retransmission
-		bool finack_waiting;	// chenren: used for fin retransmission
-		bool finackack_waiting; // chenren: used for finack retransmission
+		bool initialized;			// FIXME: do we really need this?
+		int so_error;				// used by non-blocking connect, accessed via getsockopt(SO_ERROR)
+		int so_debug;				// set/read via SO_DEBUG. could be used for tracing
+		int interface_id;			// port of the interface the packets arrive on
+		unsigned polling;			// # of outstanding poll/select requests on this socket
+		bool recv_pending;			// true if we should send received network data to app upon receiving it
+		bool timer_on;				// if true timer is enabled
+		Timestamp expiry;			// when timer should fire next
+
+		XIAPath src_path;			// peer DAG
+		XIAPath dst_path;			// our DAG
+		int nxt;					// next transport header type
+		int last;					// FIXME: do we need this?
+		uint8_t hlim;				// hlim/ttl
+
+		bool full_src_dag;			// bind to full dag or just to SID
+
+		/* =========================
+		 * "TCP" state
+		 * ========================= */
+		StreamState s_state;
+		StreamState connState;		// FIXME: roll into s_state
+		StreamState	closeState;		// FIXME: roll into s_state
+		unsigned backlog;			// max # of outstanding connections
+		uint32_t seq_num;
+		uint32_t ack_num;
+		bool isListenSocket;		// FIXME: can this be replaced by s_state == LISTEN?
+		bool synack_waiting;		// FIXME: can these waiting states be replaces by s_state?
+		bool synackack_waiting;
+		bool finack_waiting;
+		bool finackack_waiting;
 		bool dataack_waiting;
 		bool teardown_waiting;
-		bool migrateack_waiting;
-		unsigned backlog;
-		int so_error;			// used by non-blocking connect, accessed via getsockopt(SO_ERROR)
-		int so_debug;			// set/read via SO_DEBUG. could be used for tracing
-		int interface_id;		// port of the interface the packets arrive on
-		String last_migrate_ts;
+		int num_connect_tries;		// FIXME: can these all be flattened into one variable?
+		int num_retransmit_tries;
+		int num_close_tries;
+		WritablePacket *syn_pkt;	// FIXME: can these all be flattened into one?
+		WritablePacket *synack_pkt;
+		WritablePacket *fin_pkt;
+		WritablePacket *finack_pkt;
 
-		unsigned polling;
+		Timestamp teardown_expiry;	// FIXME: can these all be flattened into expiry?
+		Timestamp synackack_expiry;
+		Timestamp finack_expiry;
+		Timestamp finackack_expiry;
 
-		int num_connect_tries; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
-		int num_migrate_tries; // number of migrate tries (Connection closes after MAX_MIGRATE_TRIES trials)
-		int num_retransmit_tries; // number of times to try resending data packets
-		int num_close_tries; // chenren: added for closing connections
-    	queue<sock*> pending_connection_buf;
-		queue<xia::XSocketMsg*> pendingAccepts; // stores accept messages from API when there are no pending connections
+		// connect/accept
+		queue<sock*> pending_connection_buf;	// list of outstanding connections waiting to be accepted
+		queue<xia::XSocketMsg*> pendingAccepts;	// stores accept messages from API when there are no pending connections
 
 		// send buffer
-    	WritablePacket *send_buffer[MAX_SEND_WIN_SIZE]; // packets we've sent but have not gotten an ACK for // TODO: start smaller, dynamically resize if app asks for more space (up to MAX)?
 		uint32_t send_buffer_size;
-    	uint32_t send_base; // the sequence # of the oldest unacked packet
-    	uint32_t next_send_seqnum; // the smallest unused sequence # (i.e., the sequence # of the next packet to be sent)
-		uint32_t remote_recv_window; // num additional *packets* the receiver has room to buffer
+		uint32_t send_base;				// the sequence # of the oldest unacked packet
+		uint32_t next_send_seqnum;		// the smallest unused sequence # (i.e., the sequence # of the next packet to be sent)
+		uint32_t remote_recv_window;	// num additional *packets* the receiver has room to buffer
+		WritablePacket *send_buffer[MAX_SEND_WIN_SIZE]; // packets we've sent but have not gotten an ACK for
 
-		// receive buffer
-    	WritablePacket *recv_buffer[MAX_RECV_WIN_SIZE]; // packets we've received but haven't delivered to the app // TODO: start smaller, dynamically resize if app asks for more space (up to MAX)?
-		uint32_t recv_buffer_size; // the number of PACKETS we can buffer (received but not delivered to app)
-		uint32_t recv_base; // sequence # of the oldest received packet not delivered to app
-    	uint32_t next_recv_seqnum; // the sequence # of the next in-order packet we expect to receive
-		int dgram_buffer_start; // the first undelivered index in the recv buffer (DGRAM only)
-		int dgram_buffer_end; // the last undelivered index in the recv buffer (DGRAM only)
-		uint32_t recv_buffer_count; // the number of packets in the buffer (DGRAM only)
-		bool recv_pending; // true if we should send received network data to app upon receiving it
+		/* =========================
+		 * shared tcp/udp receive buffers
+		 * ========================= */
+		WritablePacket *recv_buffer[MAX_RECV_WIN_SIZE]; // packets we've received but haven't delivered to the app
+		uint32_t recv_buffer_size;		// the number of PACKETS we can buffer (received but not delivered to app)
+		uint32_t recv_base;				// sequence # of the oldest received packet not delivered to app
+		uint32_t next_recv_seqnum;		// the sequence # of the next in-order packet we expect to receive
+		int dgram_buffer_start;			// the first undelivered index in the recv buffer (DGRAM only)
+		int dgram_buffer_end;			// the last undelivered index in the recv buffer (DGRAM only)
+		uint32_t recv_buffer_count;		// the number of packets in the buffer (DGRAM only)
 		xia::XSocketMsg *pending_recv_msg;
 
-		//Vector<WritablePacket*> pkt_buf;
-		WritablePacket *syn_pkt;
+		/* =========================
+		 * tcp connection migration
+		 * ========================= */
+		bool migrateack_waiting;
+		String last_migrate_ts;
+		int num_migrate_tries;			// number of migrate tries (Connection closes after MAX_MIGRATE_TRIES trials)
 		WritablePacket *migrate_pkt;
-		WritablePacket *synack_pkt; // chenren: for retransmission
-		WritablePacket *fin_pkt; 	// chenren: for retransmission
-		WritablePacket *finack_pkt; // chenren: for retransmission
+
+		/* =========================
+		 * Chunk States
+		* ========================= */
 		HashTable<XID, WritablePacket*> XIDtoCIDreqPkt;
 		HashTable<XID, Timestamp> XIDtoExpiryTime;
 		HashTable<XID, bool> XIDtoTimerOn;
-		HashTable<XID, int> XIDtoStatus; // Content-chunk request status... 1: waiting to be read, 0: waiting for chunk response, -1: failed
-		HashTable<XID, bool> XIDtoReadReq; // Indicates whether ReadCID() is called for a specific CID
+		HashTable<XID, int> XIDtoStatus;	// Content-chunk request status... 1: waiting to be read, 0: waiting for chunk response, -1: failed
+		HashTable<XID, bool> XIDtoReadReq;	// Indicates whether ReadCID() is called for a specific CID
 		HashTable<XID, WritablePacket*> XIDtoCIDresponsePkt;
-		uint32_t seq_num;
-		uint32_t ack_num;
-		bool timer_on;
-		Timestamp expiry; // chenren: used for syn packet retransmission
-		Timestamp teardown_expiry;
-		Timestamp synackack_expiry; // chenren: added
-		Timestamp finack_expiry; // chenren: added
-		Timestamp finackack_expiry; // chenren: added
+	} ;
 
-		queue<uint32_t> rto_ests; // chenren: TODO: add RTO estimation later
-    } ;
+protected:
+	XIAXIDRouteTable *_routeTable;
 
+	// list of ports wanting xcmp notifications
+	list<int> xcmp_listeners;
 
-    list<int> xcmp_listeners;   // list of ports wanting xcmp notifications
+	// outstanding poll/selects indexed by API port #
+	HashTable<unsigned short, PollEvent> poll_events;
 
-    HashTable<XID, unsigned short> XIDtoPort;
-    HashTable<XIDpair , unsigned short> XIDpairToPort;
-    HashTable<unsigned short, sock*> portToSock;
-    HashTable<XID, unsigned short> XIDtoPushPort;
+	// For Content Push APIs
+	HashTable<XID, unsigned short> XIDtoPushPort;
 
+	// FIXME: change these to be *toSock instead of *toPort
+	HashTable<XID, unsigned short> XIDtoPort;
+	HashTable<XIDpair , unsigned short> XIDpairToPort;
 
-    HashTable<unsigned short, bool> portToActive;
-    HashTable<XIDpair , bool> XIDpairToConnectPending;
+	// find sock structure based on API port #
+	HashTable<unsigned short, sock*> portToSock;
+
+	// FIXME: change this to hold a sock instead of a bool we don't look at
+	HashTable<XIDpair , bool> XIDpairToConnectPending;
+
+	// FIXME: this can be eliminated in the code
+	HashTable<unsigned short, bool> portToActive;
 
 	// FIXME: can these be rolled into the sock structure?
 	HashTable<unsigned short, int> nxt_xport;
-    HashTable<unsigned short, int> hlim;
-
-    HashTable<unsigned short, PollEvent> poll_events;
+	HashTable<unsigned short, int> hlim;
 
 
-    atomic_uint32_t _id;
-    bool _cksum;
-    XIAXIDRouteTable *_routeTable;
+	// atomic_uint32_t _id;	// FIXME: is this a click thing, or can we delete it?
 
-	// modify routing table
-    void addRoute(const XID &sid) {
-			String cmd = sid.unparse() + " " + String(DESTINED_FOR_LOCALHOST);
-        HandlerCall::call_write(_routeTable, "add", cmd);
-	}
+	/* =========================
+	 * Xtransport Methods
+	* ========================= */
+	void ReturnResult(int sport, xia::XSocketMsg *xia_socket_msg, int rc = 0, int err = 0);
 
-    void delRoute(const XID &sid) {
-			String cmd = sid.unparse();
-        HandlerCall::call_write(_routeTable, "remove", cmd);
-	}
+	void copy_common(struct sock *sk, XIAHeader &xiahdr, XIAHeaderEncap &xiah);
+	WritablePacket* copy_packet(Packet *, struct sock *);
+	WritablePacket* copy_cid_req_packet(Packet *, struct sock *);
+	WritablePacket* copy_cid_response_packet(Packet *, struct sock *);
 
-
-
-  protected:
-    void copy_common(struct sock *sk, XIAHeader &xiahdr, XIAHeaderEncap &xiah);
-    WritablePacket* copy_packet(Packet *, struct sock *);
-    WritablePacket* copy_cid_req_packet(Packet *, struct sock *);
-    WritablePacket* copy_cid_response_packet(Packet *, struct sock *);
-
-    char *random_xid(const char *type, char *buf);
+	char *random_xid(const char *type, char *buf);
 
 	uint32_t calc_recv_window(sock *sk);
 	bool should_buffer_received_packet(WritablePacket *p, sock *sk);
@@ -316,70 +326,85 @@ class XTRANSPORT : public Element {
 
 	bool usingRendezvousDAG(XIAPath bound_dag, XIAPath pkt_dag);
 
-    void ProcessAPIPacket(WritablePacket *p_in);
-    void ProcessNetworkPacket(WritablePacket *p_in);
-    void ProcessCachePacket(WritablePacket *p_in);
-    void ProcessXhcpPacket(WritablePacket *p_in);
+	void ProcessAPIPacket(WritablePacket *p_in);
+	void ProcessNetworkPacket(WritablePacket *p_in);
+	void ProcessCachePacket(WritablePacket *p_in);
+	void ProcessXhcpPacket(WritablePacket *p_in);
 
-    void CreatePollEvent(unsigned short _sport, xia::X_Poll_Msg *msg);
-    void ProcessPollEvent(unsigned short, unsigned int);
-    void CancelPollEvent(unsigned short _sport);
-    /*
-    ** Xsockets API handlers
-    */
-    void Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xsetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xgetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xlisten(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void CreatePollEvent(unsigned short _sport, xia::X_Poll_Msg *msg);
+	void ProcessPollEvent(unsigned short, unsigned int);
+	void CancelPollEvent(unsigned short _sport);
+	/*
+	** Xsockets API handlers
+	*/
+	void Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xsetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xgetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xlisten(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xupdatenameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xreadnameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xgetpeername(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xgetsockname(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xisdualstackrouter(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
-    void Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
+	void Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xupdatenameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xreadnameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xgetpeername(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xgetsockname(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xisdualstackrouter(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
+	void Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
 	void Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void XrequestChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
-    void XgetChunkStatus(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void XreadChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void XremoveChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void XpushChunkto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
-    void XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-    void Xupdaterv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void XrequestChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
+	void XgetChunkStatus(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void XreadChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void XremoveChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void XpushChunkto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
+	void XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xupdaterv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 
-    void ProcessAckPacket(WritablePacket *p_in);
-    void ProcessXcmpPacket(WritablePacket*p_in);
-    void ProcessMigratePacket(WritablePacket *p_in);
-    void ProcessMigrateAck(WritablePacket *p_in);
-    void ProcessSynPacket(WritablePacket *p_in);
-    void ProcessSynAckPacket(WritablePacket *p_in);
-    void ProcessStreamDataPacket(WritablePacket *p_in);
-    void ProcessFinPacket(WritablePacket *p_in);
-    void ProcessFinAckPacket(WritablePacket *p_in);
-    void ProcessDatagramPacket(WritablePacket *p_in);
+	// protocol handlers
+	void ProcessDatagramPacket(WritablePacket *p_in);
+	void ProcessStreamPacket(WritablePacket *p_in);
+	int HandleStreamRawPacket(WritablePacket *p_in);
 
-    int HandleStreamRawPacket(WritablePacket *p_in);
+	// socket teardown
+	bool TearDownSocket(sock *sk, unsigned short _sport, Timestamp &now);
 
-    bool RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp &now, Timestamp &erlist_pending_expiry);
-    bool RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now);
-    bool RetransmitFIN(sock *sk, unsigned short _sport, Timestamp &now);
-    bool RetransmitFINACK(sock *sk, unsigned short _sport, Timestamp &now);
-    bool RetransmitMIGRATE(sock *sk, unsigned short _sport, Timestamp &now);
-    bool RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now);
-    bool RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &now);
+	// TCP state handlers
+	void ProcessAckPacket(WritablePacket *p_in);
+	void ProcessXcmpPacket(WritablePacket*p_in);
+	void ProcessMigratePacket(WritablePacket *p_in);
+	void ProcessMigrateAck(WritablePacket *p_in);
+	void ProcessSynPacket(WritablePacket *p_in);
+	void ProcessSynAckPacket(WritablePacket *p_in);
+	void ProcessStreamDataPacket(WritablePacket *p_in);
+	void ProcessFinPacket(WritablePacket *p_in);
+	void ProcessFinAckPacket(WritablePacket *p_in);
 
-    bool TearDownSocket(sock *sk, unsigned short _sport, Timestamp &now);
+	// timer retransmit handlers
+	bool RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp &now, Timestamp &erlist_pending_expiry);
+	bool RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now);
+	bool RetransmitFIN(sock *sk, unsigned short _sport, Timestamp &now);
+	bool RetransmitFINACK(sock *sk, unsigned short _sport, Timestamp &now);
+	bool RetransmitMIGRATE(sock *sk, unsigned short _sport, Timestamp &now);
+	bool RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now);
+	bool RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &now);
 
+	// modify routing table
+	void addRoute(const XID &sid) {
+		String cmd = sid.unparse() + " " + String(DESTINED_FOR_LOCALHOST);
+		HandlerCall::call_write(_routeTable, "add", cmd);
+	}
+
+	void delRoute(const XID &sid) {
+		String cmd = sid.unparse();
+		HandlerCall::call_write(_routeTable, "remove", cmd);
+	}
 };
 
 
