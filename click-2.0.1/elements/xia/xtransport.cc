@@ -1681,6 +1681,8 @@ int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 		return 0;
 	}
 
+	click_chatter("STATE:%d CONNSTATE:%d\n", sk->state, sk->connState);
+
 	// it's not a raw packet, so tell ProcessNetworkPacket to handle it
 	if (!sk || sk->sock_type != SOCK_RAW) {
 		return 0;
@@ -1802,6 +1804,7 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 	sk->synack_waiting = false;
 	sk->so_error = 0;	// let's API know connect is a success when non blocking
 	sk->connState = CONNECTED; // chenren
+	sk->state = ESTABLISHED;
 
 	click_chatter("Turn off the timer because receiving the SYNACK\n");
 
@@ -1998,8 +2001,9 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 		new_sk->sock_type = SOCK_STREAM;
 		new_sk->dst_path = src_path;
 		new_sk->src_path = dst_path;
-		new_sk->connState = CONNECTED; // chenren
-		new_sk->closeState = ESTABLISHED; // chenren
+		new_sk->connState = CONNECTED;
+		new_sk->state = ESTABLISHED;
+
 		new_sk->initialized = true;
 		new_sk->nxt = LAST_NODE_DEFAULT;
 		new_sk->last = LAST_NODE_DEFAULT;
@@ -2035,7 +2039,7 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 	// chenren: handler for SYNACK's ACK ends
 
 	// chenren: handler for FINACK's ACK starts
-	else if (sk->connState == CONNECTED && sk->closeState == CLOSING) {
+	else if (sk->connState == CONNECTED && sk->state == CLOSING) {
 		click_chatter("ACK of FINACK received on port %d! \n", sk->port);
 		if (sk) {
 			//click_chatter("Cleaning the state start...\n");
@@ -2079,7 +2083,7 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 	// chenren: handler for FINACK's ACK ends
 
 	// chenren: data ACK
-	else if (sk->connState == CONNECTED && sk->closeState == ESTABLISHED) {
+	else if (sk->connState == CONNECTED && sk->state == ESTABLISHED) {
 		click_chatter("Receives the ACK of DATA.\n");
 		// chenren
 		if (sk) {
@@ -2166,7 +2170,7 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 	}
 
 	// prevent it from sending FIN after receiving FINACK
-	sk->closeState = CLOSING;
+	sk->state = CLOSING;
 	// Set timer
 	sk->timer_on = true;
 	sk->teardown_waiting = true;
@@ -2793,8 +2797,15 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	sk->migrateack_waiting = false;
 	sk->num_retransmit_tries = 0;
 	sk->teardown_waiting = false;
+
 	sk->connState = NOTCONNECTED;
-	sk->closeState = ESTABLISHED;
+
+	if (sock_type == SOCK_STREAM) {
+		sk->state = INACTIVE;
+	} else {
+		sk->state = ESTABLISHED;
+	}
+	
 	sk->isListenSocket = false;
 	sk->so_error = 0;
 	sk->num_connect_tries = 0; // number of xconnect tries (Xconnect will fail after MAX_CONNECT_TRIES trials)
@@ -3049,7 +3060,7 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	sock *sk = portToSock.get(_sport);
 	if (sk) {
 		// Xclose is called only if it never receives FIN
-		if (sk->sock_type == SOCK_STREAM && sk->closeState == ESTABLISHED) {
+		if (sk->sock_type == SOCK_STREAM && sk->state == ESTABLISHED) {
 			// Add XIA headers
 			XIAHeaderEncap xiah_new;
 			xiah_new.set_nxt(CLICK_XIA_NXT_TRN);
@@ -3320,9 +3331,8 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		new_sk->hlim = hlim.get(new_port);
 		new_sk->next_send_seqnum = 0;
 		new_sk->next_recv_seqnum = 0;
-		new_sk->isListenSocket = true; // FIXME backwards? shouldn't sk be the accept socket?
-		new_sk->closeState = ESTABLISHED;
-		new_sk->s_state = ESTABLISHED;
+		new_sk->state = ESTABLISHED;
+		new_sk->isListenSocket = true;	// FIXME: is this right?
 		memset(new_sk->send_buffer, 0, new_sk->send_buffer_size * sizeof(WritablePacket*));
 		memset(new_sk->recv_buffer, 0, new_sk->recv_buffer_size * sizeof(WritablePacket*));
 		//new_sk->pending_connection_buf = new queue<sock>();
@@ -4263,7 +4273,7 @@ void XTRANSPORT::Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		// FIXME: do something with the error
 	}
 
-	if (sk && sk->closeState == ESTABLISHED) {
+	if (sk && sk->state == ESTABLISHED) {
 		read_from_recv_buf(xia_socket_msg, sk);
 
 		if (xia_socket_msg->x_recv().bytes_returned() > 0) {

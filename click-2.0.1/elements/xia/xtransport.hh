@@ -75,7 +75,7 @@ using namespace std;
 #define CACHE_PORT   3
 #define XHCP_PORT	4
 
-enum StreamState {INACTIVE = 1, LISTEN, SYN_RCVD, SYN_SENT, ESTABLISHED, FIN_WAIT1, FIN_WAIT2, CLOSING, CLOSE_WAIT, LAST_ACK, CLOSED,
+enum SocketState {INACTIVE = 1, LISTEN, SYN_RCVD, SYN_SENT, ESTABLISHED, FIN_WAIT1, FIN_WAIT2, CLOSING, CLOSE_WAIT, LAST_ACK, CLOSED,
 // FIXME: these below should go away
 NOTCONNECTED, CONNECTING, CONNECTED};
 
@@ -151,7 +151,7 @@ private:
 
 		sock() {
 			port = so_error = polling = 0;
-			s_state = connState = closeState = INACTIVE;
+			state = connState = INACTIVE;
 
 			isBlocking = true;
 			initialized = timer_on = full_src_dag = false;
@@ -181,6 +181,7 @@ private:
 	 * ========================= */
 		unsigned short port;		// API Port
 		int sock_type;
+		SocketState state;
 		bool isBlocking;
 		bool initialized;			// FIXME: do we really need this?
 		int so_error;				// used by non-blocking connect, accessed via getsockopt(SO_ERROR)
@@ -202,9 +203,7 @@ private:
 		/* =========================
 		 * "TCP" state
 		 * ========================= */
-		StreamState s_state;
-		StreamState connState;		// FIXME: roll into s_state
-		StreamState	closeState;		// FIXME: roll into s_state
+		SocketState connState;		// FIXME: roll into s_state
 		unsigned backlog;			// max # of outstanding connections
 		uint32_t seq_num;
 		uint32_t ack_num;
