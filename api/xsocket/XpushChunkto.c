@@ -99,6 +99,8 @@ int XpushChunkto(const ChunkContext *ctx, const char *buf, size_t len, int flags
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XPUSHCHUNKTO);
+	unsigned seq = seqNo(ctx->sockfd);
+	xsm.set_sequence(seq);
 
 	xia::X_Pushchunkto_Msg *x_pushchunkto = xsm.mutable_x_pushchunkto();
 
@@ -106,7 +108,7 @@ int XpushChunkto(const ChunkContext *ctx, const char *buf, size_t len, int flags
 	Graph g((sockaddr_x*)addr);
 	std::string s = g.dag_string();
 	
-//  	printf("Destination DAG in API Call: %s \n", s.c_str());
+//	printf("Destination DAG in API Call: %s \n", s.c_str());
 
 	x_pushchunkto->set_ddag(s.c_str());
 	x_pushchunkto->set_payload((const char*)buf, len);
@@ -124,11 +126,10 @@ int XpushChunkto(const ChunkContext *ctx, const char *buf, size_t len, int flags
 		return -1;
 	}
 
-	// because we don't have queueing or seperate control and data sockets, we 
-	// can't get status back reliably on a datagram socket as multiple peers
-	// could be talking to it at the same time and the control messages can get
-	// mixed up with the data packets. So just assume that all went well and tell
-	// the caller we sent the data
+	// process the reply from click
+	if ((rc = click_status(ctx->sockfd, seq)) < 0) {
+		LOGF("Error getting status from Click: %s", strerror(errno));
+	}
 
 	return len;
 }

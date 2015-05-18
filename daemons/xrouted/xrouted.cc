@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include <time.h>
+#include <errno.h>
 
 #include <sys/types.h>
 #include <netdb.h>
@@ -67,31 +68,12 @@ int interfaceNumber(std::string xidType, std::string xid)
 }
 
 
-void timeout_handler(int signum)
-{
-	UNUSED(signum);
-
-	if (route_state.hello_seq < route_state.hello_lsa_ratio) {
-		// send Hello
-		sendHello();
-		route_state.hello_seq++;
-	} else if (route_state.hello_seq == route_state.hello_lsa_ratio) {
-		// it's time to send LSA
-		sendLSA();
-		// reset hello req
-		route_state.hello_seq = 0;
-	} else {
-		syslog(LOG_ERR, "hello_seq=%d hello_lsa_ratio=%d", route_state.hello_seq, route_state.hello_lsa_ratio);
-	}
-	// reset the timer
-	signal(SIGALRM, timeout_handler);
-	ualarm((int)ceil(HELLO_INTERVAL*1000000),0);
-}
-
 // send Hello message (1-hop broadcast)
 int sendHello(){
 	// Send my AD and my HID to the directly connected neighbors
+	int rc;
 	char buffer[1024];
+	int buflen;
 	bzero(buffer, 1024);
 
 	/* Message format (delimiter=^)
@@ -106,13 +88,20 @@ int sendHello(){
 	hello.append(route_state.myHID);
 	hello.append("^");
 	strcpy (buffer, hello.c_str());
-	Xsendto(route_state.sock, buffer, strlen(buffer), 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
-	return 1;
+	buflen = strlen(buffer);
+	rc = Xsendto(route_state.sock, buffer, buflen, 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
+	if(rc != buflen) {
+		syslog(LOG_WARNING, "ERROR sending hello. Tried sending %d bytes but rc=%d", buflen, rc);
+		return -1;
+	}
+	return 0;
 }
 
 // send LinkStateAdvertisement message (flooding)
 int sendLSA() {
+	int rc;
 	char buffer[1024];
+	int buflen;
 	bzero(buffer, 1024);
 	/* Message format (delimiter=^)
 		message-type{Hello=0 or LSA=1}
@@ -158,8 +147,13 @@ int sendLSA() {
 	// increase the LSA seq
 	route_state.lsa_seq++;
 	route_state.lsa_seq = route_state.lsa_seq % MAX_SEQNUM;
-	Xsendto(route_state.sock, buffer, strlen(buffer), 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
-	return 1;
+	buflen = strlen(buffer);
+	rc = Xsendto(route_state.sock, buffer, buflen, 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
+	if(rc != buflen) {
+		syslog(LOG_WARNING, "ERROR sending LSA. Tried sending %d bytes but rc=%d", buflen, rc);
+		return -1;
+	}
+	return 0;
 }
 
 // process a Host Register message
@@ -568,7 +562,6 @@ void initRouteState()
 	route_state.num_neighbors = 0; // number of neighbor routers
 	route_state.lsa_seq = 0;	// LSA sequence number of this router
 	route_state.hello_seq = 0;  // hello seq number of this router
-	route_state.hello_lsa_ratio = (int32_t) ceil(LSA_INTERVAL/HELLO_INTERVAL);
 	route_state.calc_dijstra_ticks = 0;
 
 	route_state.dual_router_AD = "NULL";
@@ -579,18 +572,14 @@ void initRouteState()
 	} else {
 		route_state.dual_router = 0;
 	}
-
-	// set timer for HELLO/LSA
-	signal(SIGALRM, timeout_handler);
-	ualarm((int)ceil(HELLO_INTERVAL*1000000),0); 	
 }
 
 void help(const char *name)
 {
 	printf("\nusage: %s [-l level] [-v] [-c config] [-h hostname]\n", name);
 	printf("where:\n");
-	printf(" -l level    : syslog logging level 0 = LOG_EMERG ... 7 = LOG_DEBUG (default=3:LOG_ERR)");
-	printf(" -v          : log to the console as well as syslog");
+	printf(" -l level    : syslog logging level 0 = LOG_EMERG ... 7 = LOG_DEBUG (default=3:LOG_ERR)\n");
+	printf(" -v          : log to the console as well as syslog\n");
 	printf(" -h hostname : click device name (default=router0)\n");
 	printf("\n");
 	exit(0);
@@ -679,47 +668,69 @@ int main(int argc, char *argv[])
 
 
 	time_t last_purge = time(NULL);
+	int iteration = 0;
 	while (1) {
+		iteration++;
 		FD_ZERO(&socks);
 		FD_SET(route_state.sock, &socks);
 		timeoutval.tv_sec = 0;
-		timeoutval.tv_usec = 2000; // every 0.002 sec, check if any received packets
+		timeoutval.tv_usec = MAIN_LOOP_USEC *2; // Main loop runs every 1000 usec
 
-		selectRetVal = select(route_state.sock+1, &socks, NULL, NULL, &timeoutval);
+		// every 0.001 sec, check if any received packets
+		selectRetVal = Xselect(route_state.sock+1, &socks, NULL, NULL, &timeoutval);
 		if (selectRetVal > 0) {
 			// receiving a Hello or LSA packet
 			memset(&recv_message[0], 0, sizeof(recv_message));
 			dlen = sizeof(sockaddr_x);
 			n = Xrecvfrom(route_state.sock, recv_message, 1024, 0, (struct sockaddr*)&theirDAG, &dlen);
 			if (n < 0) {
-	    			perror("recvfrom");
+					perror("recvfrom");
 			}
 
 			string msg = recv_message;
 			start = 0;
 			found=msg.find("^");
-  			if (found!=string::npos) {
-  				string msg_type = msg.substr(start, found-start);
-  				int type = atoi(msg_type.c_str());
+			if (found!=string::npos) {
+				string msg_type = msg.substr(start, found-start);
+				int type = atoi(msg_type.c_str());
 				switch (type) {
 					case HELLO:
 						// process the incoming Hello message
-    						processHello(msg.c_str());
+						processHello(msg.c_str());
 						break;
 					case LSA:
 						// process the incoming LSA message
-  						processLSA(msg.c_str());
+						processLSA(msg.c_str());
 						break;
 					case HOST_REGISTER:
 						// process the incoming host-register message
-  						processHostRegister(msg.c_str());
+						processHostRegister(msg.c_str());
 						break;
 					default:
 						perror("unknown routing message");
 						break;
 				}
-  			}
-
+			}
+		} else if (selectRetVal < 0) {
+			perror("Xselect failed");
+			syslog(LOG_WARNING, "ERROR: Xselect returned %d", selectRetVal);
+		}
+		// Send HELLO every 100 ms
+		if((iteration % HELLO_ITERS) == 0) {
+			// Except when we are sending an LSA
+			if((iteration % LSA_ITERS) != 0) {
+				route_state.hello_seq++;
+				if(sendHello()) {
+					syslog(LOG_WARNING, "ERROR: Failed sending hello");
+				}
+			}
+		}
+		// Send an LSA every 400 ms
+		if((iteration % LSA_ITERS) == 0) {
+			route_state.hello_seq = 0;
+			if(sendLSA()) {
+				syslog(LOG_WARNING, "ERROR: Failed sending LSA");
+			}
 		}
 
 		time_t now = time(NULL);
@@ -728,12 +739,15 @@ int main(int argc, char *argv[])
 			last_purge = now;
 			map<string, time_t>::iterator iter;
 
-			for (iter = timeStamp.begin(); iter != timeStamp.end(); iter++)	
+			iter = timeStamp.begin();
+			while(iter != timeStamp.end())
 			{
 				if (now - iter->second >= EXPIRE_TIME){
 					xr.delRoute(iter->first);
-					timeStamp.erase(iter);
 					syslog(LOG_INFO, "purging host route for : %s", iter->first.c_str());
+					timeStamp.erase(iter++);
+				} else {
+					++iter;
 				}
 			}
 		}

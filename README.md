@@ -32,6 +32,19 @@ Related Projects
 - [Native Linux kernel implementation of XIA](https://github.com/AltraMayor/XIA-for-Linux)
 - [XIA Wireshark plugin](https://github.com/AltraMayor/XIA-for-Linux/wiki/Debugging-the-Linux-kernel#Wireshark_with_XIA_support)
 
+Release 1.2
+-----------
+* Intrinsic security for HID and SID principal types
+* Mobility Support
+  - Active session migration
+  - Mobile service migration via rendezvous service.
+* The xwrap interposition library now converts unmodified sockets applications to run over XIA (experimental)
+* API changes
+  - Non-blocking I/O is now supported
+  - The Xlisten call is no longer optional in server applications
+* Syslog support in click and the daemon apps
+* Many fixes
+
 Release 1.1.1
 ----------------
 * Bug fixes

@@ -6,3 +6,6 @@ define($DESTINED_FOR_BROADCAST -4)
 define($REDIRECT -5)
 define($UNREACHABLE -6)
 define($FALLBACK -7)
+
+define($SRC_PORT_ANNO 52
+	)

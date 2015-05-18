@@ -170,6 +170,7 @@ void migrate(const char *name, const char *dag)
 				name_to_dag_db_table[name] = dag;
 
 				// now walk the list of registered dags and update those that should migrate
+				/*
 				for (it = name_to_dag_db_table.begin(); it != name_to_dag_db_table.end(); it++) {
 					string ds = it->second;
 					string nm = it->first;
@@ -191,8 +192,10 @@ void migrate(const char *name, const char *dag)
 						syslog(LOG_INFO, "migrated name record %s to %s:%s", nm.c_str(),
 							new_ad->type_string().c_str(), new_ad->id_string().c_str());
 						g.replace_node_at(ad_index, *new_ad);
+						name_to_dag_db_table[nm] = g.dag_string();
 					}
 				}
+				*/
 			}
 		}
 
@@ -214,7 +217,7 @@ int main(int argc, char *argv[]) {
 
 	char pkt_out[NS_MAX_PACKET_SIZE];
 	char pkt_in[NS_MAX_PACKET_SIZE];
-	string dag_str;
+	string response_str;
 
 	config(argc, argv);
 	syslog(LOG_NOTICE, "%s started on %s", APPNAME, hostname);
@@ -278,16 +281,30 @@ int main(int argc, char *argv[]) {
 			it = name_to_dag_db_table.find(req_pkt.name);
 
 			if(it != name_to_dag_db_table.end()) {
-				dag_str = it->second;
+				response_str = it->second;
 				rtype = NS_TYPE_RESPONSE_QUERY;
 				syslog(LOG_DEBUG, "Successful name lookup for %s", req_pkt.name);
 			} else {
 				rtype = NS_TYPE_RESPONSE_ERROR;
 				syslog(LOG_DEBUG, "DAG for %s not found", req_pkt.name);
 			}
-
-		}
 			break;
+		}
+
+		case NS_TYPE_RQUERY:
+		{
+			map<std::string, std::string>::iterator it;
+			// Walk the table and look for a matching DAG
+			for(it=name_to_dag_db_table.begin(); it!=name_to_dag_db_table.end(); it++) {
+				if(strcmp(it->second.c_str(), req_pkt.dag) != 0) {
+					continue;
+				}
+				response_str = it->first;
+				rtype = NS_TYPE_RESPONSE_RQUERY;
+				syslog(LOG_DEBUG, "Successful DAG lookup for %s", req_pkt.dag);
+			}
+			break;
+		}
 
 		default:
 			syslog(LOG_WARNING, "unrecognized request: %d", req_pkt.type);
@@ -300,8 +317,8 @@ int main(int argc, char *argv[]) {
 
 		response_pkt.type = rtype;
 		response_pkt.flags = 0;
-		response_pkt.name = NULL;
-		response_pkt.dag = (rtype == NS_TYPE_RESPONSE_QUERY) ? dag_str.c_str() : NULL;
+		response_pkt.name = (rtype == NS_TYPE_RESPONSE_RQUERY) ? response_str.c_str(): NULL;
+		response_pkt.dag = (rtype == NS_TYPE_RESPONSE_QUERY) ? response_str.c_str() : NULL;
 		// pack it up to go on the wire
 		int len = make_ns_packet(&response_pkt, pkt_out, sizeof(pkt_out));
 

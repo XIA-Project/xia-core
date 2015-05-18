@@ -20,6 +20,7 @@
 */
 #include <errno.h>
 #include <netdb.h>
+#include "minIni.h"
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
@@ -64,7 +65,53 @@ const char *xerr_unimplemented = "This feature is not currently supported";
  	return msg;
  }
 
+#define MAX_RV_DAG_SIZE 2048
+#define CONFIG_PATH_BUF_SIZE 1024
+#define RESOLV_CONF "/etc/resolv.conf"
 
+// Read DAG for rendezvous server data plane from resolv.conf
+int XreadRVServerAddr(char *rv_dag_str, int rvstrlen)
+{
+	int ret = -1;
+	int rc;
+	// If there is a resolv.conf file with rendezvous info, return that info
+	char root[CONFIG_PATH_BUF_SIZE];
+	// clear out the buffers
+	bzero(rv_dag_str, rvstrlen);
+	bzero(root, CONFIG_PATH_BUF_SIZE);
+	// Read Rendezvous server DAG from xia-core/etc/resolv.conf, if present
+	printf("XreadRVServerAddr: reading config file:%s:\n", strcat(XrootDir(root, CONFIG_PATH_BUF_SIZE), RESOLV_CONF));
+	rc = ini_gets(NULL, "rendezvous", rv_dag_str, rv_dag_str, rvstrlen, strcat(XrootDir(root, CONFIG_PATH_BUF_SIZE), RESOLV_CONF));
+	if(rc > 0) {
+		printf("XreadRVServerAddr: found server at:%s:\n", rv_dag_str);
+		ret = 0;
+	} else {
+		printf("XreadRVServerAddr: Rendezvous server DAG not found:%s:\n", rv_dag_str);
+	}
+	return ret;
+}
+
+// Read DAG for rendezvous server control plane from resolv.conf
+int XreadRVServerControlAddr(char *rv_dag_str, int rvstrlen)
+{
+	int ret = -1;
+	int rc;
+	// If there is a resolv.conf file with rendezvous info, return that info
+	char root[CONFIG_PATH_BUF_SIZE];
+	// clear out the buffers
+	bzero(rv_dag_str, rvstrlen);
+	bzero(root, CONFIG_PATH_BUF_SIZE);
+	// Read Rendezvous server DAG from xia-core/etc/resolv.conf, if present
+	//printf("XreadRVServerControlAddr: reading config file:%s:\n", strcat(XrootDir(root, CONFIG_PATH_BUF_SIZE), RESOLV_CONF));
+	rc = ini_gets(NULL, "rendezvousc", rv_dag_str, rv_dag_str, rvstrlen, strcat(XrootDir(root, CONFIG_PATH_BUF_SIZE), RESOLV_CONF));
+	if(rc > 0) {
+		printf("XreadRVServerControlAddr: found server at:%s:\n", rv_dag_str);
+		ret = 0;
+	}// else {
+	//	printf("XreadRVServerControlAddr: Rendezvous server DAG not found:%s:\n", rv_dag_str);
+	//}
+	return ret;
+}
 
 /*
 ** NOTE: although we currently check them, we don't use the protocol or socktype fields of the hints structure.
@@ -108,15 +155,15 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 		}
 
 		if (socktype != 0 &&
-			socktype != XSOCK_STREAM &&
-			socktype != XSOCK_DGRAM &&
+			socktype != SOCK_STREAM &&
+			socktype != SOCK_DGRAM &&
 			socktype != XSOCK_CHUNK) {
 			// make sure it's one of our socket types.
 			// FIXME: should raw be allowed?
 			return EAI_SOCKTYPE;
 		}
 
-		if (name == NULL) {
+		if (name == NULL || strlen(name) == 0) {
 			// user wants up to look up the local AD:HID
 			// currently we have the same behavior whether or not passive is set
 			// this could change in the future
@@ -139,7 +186,6 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 			// same flag bit as AI_NUMERICSERV
 			// we don't have ports, but if this is set, treat the service string
 			//  as an XID and append it to the end of the DAG returned in the sockaddr
-
 			if (!service)
 				return EAI_BADFLAGS;
 
@@ -188,7 +234,7 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 			fallback = 1;
 		}
 
-	} else if (name == NULL) {
+	} else if (name == NULL || strlen(name) == 0) {
 		// hints doesn't exist and NAME is null, so make loopback
 		loopback = 1;
 	}
@@ -218,6 +264,8 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 		*/
 
 		char ad[XID_LEN], hid[XID_LEN], fid[XID_LEN];
+		//char rv_ad[XID_LEN], rv_hid[XID_LEN], rv_sid[XID_LEN];
+		char rv_dag_str[MAX_RV_DAG_SIZE];
 		int rc;
 		int sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
 
@@ -253,8 +301,25 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 		Node n_ip  = Node(fid);
 		Node n_ad  = Node(ad);
 		Node n_hid = Node(hid);
-
 		Graph g = (n_src * n_ad * n_hid);
+		if(socktype == SOCK_STREAM) {
+			//rv_available = XreadRVServerAddr(rv_ad, XID_LEN, rv_hid, XID_LEN, rv_sid, XID_LEN);
+			if(XreadRVServerAddr(rv_dag_str, MAX_RV_DAG_SIZE) == 0) {
+				Graph g2 = (n_src * n_ad);
+				Graph rvg(rv_dag_str);
+				printf("Rendezvous DAG:\n%s\n", rvg.dag_string().c_str());
+				Graph g3 = g2 * rvg * (n_hid);
+				printf("Rendezvous Fallback:\n%s\n", g3.dag_string().c_str());
+				/*
+				Node n_rvad = Node(rv_ad);
+				Node n_rvhid = Node(rv_hid);
+				Node n_rvsid = Node(rv_sid);
+				Graph g2 = (n_src * n_ad * n_rvad * n_rvhid * n_rvsid * n_hid);
+				*/
+				g = g + g3;
+				printf("DAG after adding RV:\n%s\n", g.dag_string().c_str());
+			}
+		}
 
 		if (have4id)
 			g = g + (n_src * n_ip * n_ad * n_hid);

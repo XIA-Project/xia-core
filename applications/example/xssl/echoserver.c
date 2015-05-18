@@ -153,7 +153,7 @@ void process(int sock, XSSL_CTX *ctx)
 
 	tv.tv_sec = WAIT_FOR_DATA;
 	tv.tv_usec = 0;
-		 if ((n = select(xssl->sockfd + 1, &fds, NULL, NULL, &tv)) < 0) {
+		 if ((n = Xselect(xssl->sockfd + 1, &fds, NULL, NULL, &tv)) < 0) {
 			 warn("%5d Select failed, closing...\n", pid);
 			 break;
 
@@ -231,6 +231,8 @@ void echo_stream()
 	if (Xbind(acceptor, (struct sockaddr *)sa, sizeof(sockaddr_x)) < 0) {
 		die(-3, "unable to bind to the dag\n");
 	}
+
+	Xlisten(acceptor, 5);
 
 	while (1) {
 

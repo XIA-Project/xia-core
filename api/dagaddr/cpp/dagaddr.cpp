@@ -483,7 +483,7 @@ Graph::Graph(std::string dag_string)
 *
 * @param s The sockaddr_x
 */
-Graph::Graph(sockaddr_x *s)
+Graph::Graph(const sockaddr_x *s)
 {
 	from_sockaddr(s);
 }
@@ -694,11 +694,11 @@ Graph::out_edges_for_index(std::size_t i, std::size_t source_index, std::size_t 
 	std::string out_edge_string;
 	for (std::size_t j = 0; j < out_edges_[i].size(); j++)
 	{
-		int idx = index_in_dag_string(out_edges_[i][j], source_index, sink_index);
+		size_t idx = index_in_dag_string(out_edges_[i][j], source_index, sink_index);
 		char *idx_str;
-		int size = snprintf(NULL, 0, " %d", idx);
+		int size = snprintf(NULL, 0, " %zu", idx);
 		idx_str = (char*)malloc(sizeof(char) * size +1); // +1 for null char (sprintf automatically appends it)
-		sprintf(idx_str, " %d", idx);
+		sprintf(idx_str, " %zu", idx);
 		out_edge_string += idx_str;
 		free(idx_str);
 	}
@@ -1101,7 +1101,6 @@ Graph::get_node(int i) const
 	return nodes_[index_from_dag_string_index(i, src_index, sink_index)];
 }
 
-
 /**
 * @brief Get the out edges for a node
 *
@@ -1319,6 +1318,11 @@ void
 Graph::fill_sockaddr(sockaddr_x *s) const
 {
 	s->sx_family = AF_XIA;
+#ifdef __APPLE__
+	// the length field is not big enough for the size of a sockaddr_x
+	// we don't use it anywhere in our code, so just set it to a known state.
+	s->sx_len = 0;
+#endif
 	s->sx_addr.s_count = num_nodes();
 
 	for (int i = 0; i < num_nodes(); i++)
@@ -1358,14 +1362,16 @@ Graph::fill_sockaddr(sockaddr_x *s) const
 * @param s The sockaddr_x.
 */
 void
-Graph::from_sockaddr(sockaddr_x *s)
+Graph::from_sockaddr(const sockaddr_x *s)
 {
+	// FIXME: check to be sure it's really a sockaddr_x!
+
 	int num_nodes = s->sx_addr.s_count;
 	// First add nodes to the graph and remember their new indices
 	std::vector<uint8_t> graph_indices;
 	for (int i = 0; i < num_nodes; i++)
 	{
-		node_t *node = &(s->sx_addr.s_addr[i]);
+		const node_t *node = &(s->sx_addr.s_addr[i]);
 		Node n = Node(node->s_xid.s_type, &(node->s_xid.s_id), 0); // 0 means nothing
 		graph_indices.push_back(add_node(n));
 	}
@@ -1376,7 +1382,7 @@ Graph::from_sockaddr(sockaddr_x *s)
 	// Add edges
 	for (int i = 0; i < num_nodes; i++)
 	{
-		node_t *node = &(s->sx_addr.s_addr[i]);
+		const node_t *node = &(s->sx_addr.s_addr[i]);
 
 		int from_node;
 		if (i == num_nodes-1)
@@ -1420,8 +1426,16 @@ void
 Graph::replace_node_at(int i, const Node& new_node)
 {
 	// FIXME: validate that i is a valid index into the dag
-	nodes_[i] = new_node;
+	std::size_t src_index = -1, sink_index = -1;
+	for (std::size_t j = 0; j < nodes_.size(); j++)
+	{
+		if (is_source(j)) src_index = j;
+		if (is_sink(j)) sink_index = j;
+	}
+
+	nodes_[index_from_dag_string_index(i, src_index, sink_index)] = new_node;
 }
+
 
 /**
 * @brief Return the final intent of the DAG.

@@ -290,6 +290,8 @@ int registerReceiver()
 		 die(-1, "Unable to bind to the dag: %s\n", dag);
 	}
 
+	Xlisten(sock, 5);
+
 	Graph g(dag);
 	say("listening on dag: %s\n", g.dag_string().c_str());
   return sock;

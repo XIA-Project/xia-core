@@ -22,6 +22,7 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
+#include "Xkeys.h"
 #include <errno.h>
 #include "dagaddr.hpp"
 
@@ -30,7 +31,7 @@
 **
 ** Assign the specified DAG to to the Xsocket referred to by sockfd. The DAG's
 ** final intent should be a valid SID.
-** 
+**
 ** It is necessary to assign a local DAG using Xbind() before an XSOCK_STREAM
 ** socket may receive connections (see accept()).
 **
@@ -47,8 +48,8 @@
 */
 int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
-	xia::XSocketCallType type;
 	int rc;
+	int transport_type;
 
 	if (addrlen == 0) {
 		errno = EINVAL;
@@ -61,7 +62,8 @@ int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 		return -1;
 	}
 
-	if (getSocketType(sockfd) == XSOCK_INVALID) {
+	transport_type = getSocketType(sockfd);
+	if (transport_type == XSOCK_INVALID) {
 		LOG("The socket is not a valid Xsocket");
 		errno = EBADF;
 		return -1;
@@ -73,8 +75,36 @@ int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 		return -1;
 	}
 
+	// Verify access to keys for the user provided SID (SOCK_STREAM only)
+	if (transport_type == SOCK_STREAM) {
+		// Extract source SID from g
+		std::string intent_type = g.get_final_intent().type_string();
+		LOGF("Xbind: Intent type:%s:", intent_type.c_str());
+		if(intent_type.compare("SID") != 0) {
+			LOGF("ERROR: Final intent %s is not SID", intent_type.c_str());
+			printf("ERROR: Final intent %s is not SID\n", intent_type.c_str());
+			errno = EINVAL;
+			return -1;
+		}
+		std::string intent = g.get_final_intent().to_string();
+		LOGF("Xbind: Intent:%s:", intent.c_str());
+		printf("Xbind: Intent:%s:\n", intent.c_str());
+		// Stat <keydir>/<SID>{,.pub}
+		if(!XexistsSID(intent.c_str())) {
+			LOGF("ERROR: Keys for SID:%s not found", intent.c_str());
+			printf("ERROR: Keys for SID:%s not found\n", intent.c_str());
+			errno = EINVAL;
+			return -1;
+		}
+
+		// This socket has a valid user provided SID with keys
+		setSIDAssigned(sockfd);
+	}
+
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XBIND);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
 
 	xia::X_Bind_Msg *x_bind_msg = xsm.mutable_x_bind();
 	x_bind_msg->set_sdag(g.dag_string().c_str());
@@ -85,16 +115,8 @@ int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 	}
 
 	// process the reply from click
-	if ((rc = click_reply2(sockfd, &type)) < 0) {
+	if ((rc = click_status(sockfd, seq)) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
-		return -1;
-	}
-
-	if (type != xia::XBIND) {
-		// something bad happened
-		LOGF("Expected type %d, got %d", xia::XBIND, type);
-		errno = ECLICKCONTROL;
-		rc = -1;
 	}
 
 	// if rc is negative, errno will be set with an appropriate error code

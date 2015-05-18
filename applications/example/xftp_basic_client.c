@@ -246,37 +246,6 @@ void *recvCmd (void *socketid)
 }
 
 
-void *blockingListener(void *socketid)
-{
-  int sock = *((int*)socketid);
-  int acceptSock;
-  while (1) {
-		say("Waiting for a client connection\n");
-   		
-		if ((acceptSock = Xaccept(sock, NULL, NULL)) < 0)
-			die(-1, "accept failed\n");
-
-		say("connected\n");
-		
-		// handle the connection in a new thread
-		pthread_t client;
-	pthread_create(&client, NULL, recvCmd, (void *)&acceptSock);
-	}
-	
-	Xclose(sock); // we should never reach here!
-	return NULL;
-}
-
-
-
-// not used
-void nonblockingListener(int sock)
-{
-	pthread_t client;
-       	pthread_create(&client, NULL, blockingListener, (void *)&sock);
-  
-}
-
 int getChunkCount(int sock, char *reply, int sz)
 {
 	int n=-1;
@@ -335,6 +304,8 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *p_ad, char *p_hid)
 	int len;
 	int status;
 	int n = -1;
+	bzero(cs, sizeof(ChunkStatus)*NUM_CHUNKS);
+	bzero(data, sizeof(data));
 	
 	
 	n = buildChunkDAGs(cs, chunks, p_ad, p_hid);
@@ -352,8 +323,8 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *p_ad, char *p_hid)
 				return -1;
 			}
 			say("checking chunk status\n");
-			ctr++;
 		}
+		ctr++;
 
 		status = XgetChunkStatuses(csock, cs, n);
 

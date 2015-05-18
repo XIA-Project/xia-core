@@ -36,6 +36,8 @@
 #define CHUNKSIZE 1024
 #define NUM_CHUNKS	10
 
+#define UNUSED(x)	(void)(x)
+
 int verbose = 1;
 char myAD[MAX_XID_SIZE];
 char myHID[MAX_XID_SIZE];
@@ -293,6 +295,8 @@ int registerReceiver()
 		warn("XBIND PUSH SUCCESFUL");
 	}
 
+	Xlisten(sock, 5);
+
 	Graph g(dag);
 	say("listening on dag: %s\n", g.dag_string().c_str());
   return sock;
@@ -471,6 +475,9 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *ad, char *hid)
 
 int getFile(int sock, char *ad, char*hid, const char *fin, const char *fout)
 {
+	UNUSED(ad);
+	UNUSED(hid);
+
 	int chunkSock;
 	int offset;
 	char cmd[512];

@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
+export XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
 XLIB=$XIADIR/api/lib
 
 export LD_PRELOAD="$XLIB/xwrap.so $XLIB/libXsocket.so $XLIB/libdagaddr.so"
@@ -60,7 +60,7 @@ while getopts "o:tvwx" opt; do
 			;;	 
 		w)
 			export XWRAP_WARNING=1
-			;;	 
+			;;
 		\?)
 			help
 			;;

@@ -207,11 +207,11 @@ main(int argc, char *argv[]) {
 		FD_SET(srv, &rd);
 		tv.tv_sec = 120;
 		tv.tv_usec = 0;
-		i = select(srv + 1, &rd, 0, 0, &tv);
+		i = Xselect(srv + 1, &rd, 0, 0, &tv);
 		if(i < 0) {
 			if(errno == EINTR)
 				continue;
-			eprint("sic: error on select():");
+			eprint("sic: error on Xselect():");
 		}
 		else if(i == 0) {
 			if(time(NULL) - trespond >= 300)

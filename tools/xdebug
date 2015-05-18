@@ -1,0 +1,7 @@
+#
+# simple script to attach gdb to a running click process
+#
+XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
+
+sudo gdb $(XIADIR)/click-2.0.1/userlevel/click `ps -eo pid,comm | grep click | cut -f1 -d " "`
+

@@ -322,7 +322,7 @@ class Packet { public:
 
     enum {
 	#if HAVE_XIA
-	anno_size = 90			///< Size of annotation area.
+	anno_size = 92			///< Size of annotation area.
 	#else
 	anno_size = 56			///< Size of annotation area.
 	#endif

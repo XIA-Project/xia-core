@@ -18,6 +18,7 @@
 /* xtods - a stupidly simple gettimeofday server that returns the time in a string the result using localtime */
 
 #include <time.h>
+#include <netinet/in.h>
 #include "Xsocket.h"
 #include "dagaddr.hpp"
 
@@ -28,11 +29,11 @@
 int main()
 {
     int sock;
-    socklen_t len;
     char buf[XIA_MAXBUF];
 	sockaddr_x client;
 	time_t now;
 	struct tm *t;
+	int iface;
 
     // create a datagram socket
     if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0) {
@@ -62,11 +63,48 @@ int main()
 	}
 
     while (1) {
-		len = sizeof(client);
-		if (Xrecvfrom(sock, buf, sizeof(buf), 0, (struct sockaddr*)&client, &len) < 0) {
+		// Use Xrecvmsg to get interface (click port) the connection came in on
+		// lots of fun setup! maybe this can be streamlined a bit
+		struct msghdr msg;
+		struct iovec iov;
+		struct in_pktinfo pi;
+
+		struct cmsghdr *cmsg;
+		struct in_pktinfo *pinfo;
+
+		msg.msg_name = &client;
+		msg.msg_namelen = sizeof(client);
+		msg.msg_iov = &iov;
+		msg.msg_iovlen = 1;
+
+		iov.iov_base = buf;
+		iov.iov_len = XIA_MAXBUF;
+
+		char cbuf[CMSG_SPACE(sizeof pi)];
+
+		msg.msg_control = cbuf;
+		msg.msg_controllen = sizeof(cbuf);
+		cmsg = CMSG_FIRSTHDR(&msg);
+		cmsg->cmsg_level = IPPROTO_IP;
+		cmsg->cmsg_type = IP_PKTINFO;
+		cmsg->cmsg_len = CMSG_LEN(sizeof(pi));
+
+		msg.msg_controllen = cmsg->cmsg_len;
+
+		if (Xrecvmsg(sock, &msg, 0) < 0) {
 			printf("error receiving client request\n");
 			// assume it's ok, and just keep listening
 			continue;
+
+		} else {
+
+			// get the interface it came in on
+			for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+				if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_PKTINFO) {
+					pinfo = (struct in_pktinfo*) CMSG_DATA(cmsg);
+					iface = pinfo->ipi_ifindex;
+				}
+			}
 		}
 
 		// we don't care what the client said, so we'll just ignore it
@@ -76,7 +114,7 @@ int main()
 		strftime(buf, sizeof(buf), "%c %Z", t);
 		
 		Graph g(&client);
-		printf("request from:\n%s\n", g.dag_string().c_str());
+		printf("request on click port %hd from:\n%s\n", iface, g.dag_string().c_str());
 			
 		//Reply to client
 		if (Xsendto(sock, buf, strlen(buf) + 1, 0, (struct sockaddr*)&client, sizeof(client)) < 0)

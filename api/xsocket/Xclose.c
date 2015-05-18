@@ -22,6 +22,7 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
+#include "Xkeys.h"
 #include <errno.h>
 
 /*!
@@ -38,7 +39,6 @@
 */
 int Xclose(int sockfd)
 {
-	xia::XSocketCallType type;
 	int rc;
 
 	if (getSocketType(sockfd) == XSOCK_INVALID)
@@ -50,17 +50,24 @@ int Xclose(int sockfd)
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XCLOSE);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
 
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 
-	} else if ((rc = click_reply2(sockfd, &type)) < 0) {
+	} else if ((rc = click_status(sockfd, seq)) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
 	}
 
-	setWrapped(sockfd, 1);
-	close(sockfd);
-	setWrapped(sockfd, 0);
+	// Delete any temporary keys created for this sockfd
+	if(isTempSID(sockfd)) {
+		if(XremoveSID(getTempSID(sockfd))) {
+			LOGF("ERROR removing key files for %s", getTempSID(sockfd));
+		}
+	}
+	(_f_close)(sockfd);
 	freeSocketState(sockfd);
+
 	return rc;
 }

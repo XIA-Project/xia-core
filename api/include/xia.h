@@ -47,9 +47,18 @@ typedef struct {
 	node_t        s_addr[NODES_MAX];
 } x_addr_t;
 
+
 typedef struct {
+	// common sockaddr fields
+#ifdef __APPLE__
+	unsigned char sx_len; // not actually large enough for sizeof(sockaddr_x)
+	unsigned char sx_family;
+#else
 	unsigned short sx_family;
-	x_addr_t sx_addr;
+#endif
+
+	// XIA specific fields
+	x_addr_t      sx_addr;
 } sockaddr_x;
 
 #endif // XIA_H
