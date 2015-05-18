@@ -15,6 +15,10 @@
 
 #include <fstream>
 
+
+#define DBG(s) _errh->debug(stderr, "%s:%d: %s\n", __FILE__, __LINE__, s)
+#define DBGF(fmt, ...) _errh->debug(stderr, "%s:%d: " fmt"\n", __FILE__, __LINE__, __VA_ARGS__)
+
 /*
 ** FIXME:
 ** - implement a backoff delay on retransmits so we don't flood the connection
@@ -503,6 +507,12 @@ void XTRANSPORT::run_timer(Timer *timer)
 		sock *sk = portToSock.get(_sport);
 		bool tear_down = false;
 
+		if (!sk) {
+			// this shouldn't happen
+			click_chatter("run_timer: sk == NULL!\n");
+			continue;
+		}
+
 		// click_chatter("Port: %d, timer_on: %d, now: %ld, dataack_waiting: %d, expiry: %ld, teardown_waiting: %ld, teardown_expiry: %ld\n", _sport, sk->timer_on, now/1000, sk->dataack_waiting, sk->expiry/1000, sk->teardown_waiting, sk->teardown_expiry/1000);
 
 		if (sk->timer_on == true) {
@@ -726,10 +736,8 @@ void XTRANSPORT::add_packet_to_recv_buf(WritablePacket *p, sock *sk) {
 * @param sk
 */
 void XTRANSPORT::check_for_and_handle_pending_recv(sock *sk) {
-click_chatter("check for 1\n");
 
 	if (sk->recv_pending) {
-click_chatter("check for 2\n");
 		int bytes_returned = read_from_recv_buf(sk->pending_recv_msg, sk);
 		ReturnResult(sk->port, sk->pending_recv_msg, bytes_returned);
 
@@ -737,7 +745,6 @@ click_chatter("check for 2\n");
 		delete sk->pending_recv_msg;
 		sk->pending_recv_msg = NULL;
 	}
-click_chatter("check for 3\n");
 }
 
 /**
@@ -850,15 +857,11 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk) {
 		memset(buf, 0, 64*1024);
 		int i;
 
-
-click_chatter("read_from_recv_buf 1\n");
 		// FIXME: make sure bytes requested is <= recv buffer size
 
 		for (i = sk->recv_base; i < sk->next_recv_seqnum; i++) {
-click_chatter("read_from_recv_buf 2\n");
 
 			if (bytes_returned >= bytes_requested) break;
-click_chatter("read_from_recv_buf 3\n");
 
 			WritablePacket *p = sk->recv_buffer[i % sk->recv_buffer_size];
 			XIAHeader xiah(p->xia_header());
@@ -900,7 +903,6 @@ click_chatter("read_from_recv_buf 3\n");
 			}
 //			printf("    port %u grabbing index %d, seqnum %d\n", sk->port, i%sk->recv_buffer_size, i);
 		}
-click_chatter("read_from_recv_buf 4\n");
 
 		x_recv_msg->set_payload(buf, bytes_returned);
 		x_recv_msg->set_bytes_returned(bytes_returned);
@@ -1145,6 +1147,11 @@ void XTRANSPORT::ProcessMigratePacket(WritablePacket *p_in)
 	unsigned short _dport = XIDpairToPort.get(xid_pair);
 
 	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
+	if (!sk) {
+		// FIXME: we need to fix the state machine so this doesn't happen!
+		click_chatter("ProcessMigratePacket: sk == NULL\n");
+		return;
+	}
 
 	_errh->debug("ProcessMigrate: %s from port %d at %ld.\n", _source_xid.unparse().c_str(), _dport, Timestamp::now());
 
@@ -1330,7 +1337,12 @@ void XTRANSPORT::ProcessMigrateAck(WritablePacket *p_in)
 
 	unsigned short _dport = XIDpairToPort.get(xid_pair);
 
-	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
+	sock *sk = portToSock.get(_dport);
+	if (!sk) {
+		// FIXME: we need to fix the state machine so this doesn't happen!
+		click_chatter("ProcessMigrateAckPacket: sk == NULL\n");
+		return;
+	}
 
 	_errh->debug("HandleMigrateAck: %s from port %d at %ld.\n", _source_xid.unparse().c_str(), _dport, Timestamp::now());
 
@@ -1486,8 +1498,12 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 	// unlike the other stream handlers, there is no pair yet, so use dest_xid to get port
 	unsigned short _dport = XIDtoPort.get(_destination_xid);
 
-	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
-
+	sock *sk = portToSock.get(_dport);
+	if (!sk) {
+		// FIXME: we need to fix the state machine so this doesn't happen!
+		click_chatter("ProcessSynPacket: sk == NULL\n");
+		return;
+	}
 	_errh->debug("ProcessSynPacket: %s from port %d at %ld.\n", _source_xid.unparse().c_str(), _dport, Timestamp::now());
 
 	if (!sk->isListenSocket) {
@@ -1659,6 +1675,11 @@ int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 	unsigned short _dport = XIDtoPort.get(_destination_xid);
 
 	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
+	if (!sk) {
+		// FIXME: we need to fix the state machine so this doesn't happen!
+		click_chatter("ProcessStreamRawPacket: sk == NULL\n");
+		return 0;
+	}
 
 	// it's not a raw packet, so tell ProcessNetworkPacket to handle it
 	if (!sk || sk->sock_type != SOCK_RAW) {
@@ -1707,6 +1728,11 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 	unsigned short _dport = XIDpairToPort.get(xid_pair);
 
 	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
+	if (!sk) {
+		// FIXME: we need to fix the state machine so this doesn't happen!
+		click_chatter("ProcessSynAckDataPacket: sk == NULL\n");
+		return;
+	}
 
 	if(sk->dst_path != src_path) {
 		click_chatter("ProcessNetworkPacket: remote path in SYNACK different from that used in SYN");
@@ -1847,11 +1873,13 @@ void XTRANSPORT::ProcessStreamDataPacket(WritablePacket*p_in)
 
 	unsigned short _dport = XIDpairToPort.get(xid_pair);
 
-	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
-
-	click_chatter("in recv data packet\n");
+	sock *sk = portToSock.get(_dport);
+	if (!sk) {
+		// FIXME: we need to fix the state machine so this doesn't happen!
+		click_chatter("ProcessStreamDataPacket: sk == NULL\n");
+		return;
+	}
 	if (sk) {
-	click_chatter("in recv data packet 1\n");
 		//printf("(%s) my_sport=%u  my_sid=%s  his_sid=%s\n", (_local_addr.unparse()).c_str(),  _dport,  _destination_xid.unparse().c_str(), _source_xid.unparse().c_str());
 		HashTable<unsigned short, bool>::iterator it1;
 		it1 = portToActive.find(_dport);
@@ -1871,7 +1899,6 @@ void XTRANSPORT::ProcessStreamDataPacket(WritablePacket*p_in)
 					ProcessPollEvent(_dport, POLLIN);
 				}
 
-				click_chatter("in recv data packet 1a\n");
 				check_for_and_handle_pending_recv(sk);
 			}
 
@@ -1951,8 +1978,12 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 		_dport = XIDpairToPort.get(xid_pair);
 	}
 
-	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
-
+	sock *sk = portToSock.get(_dport);
+	if (!sk) {
+		// FIXME: we need to fix the state machine so this doesn't happen!
+		click_chatter("ProcessAckPacket: sk == NULL\n");
+		return;
+	}
 
 	// chenren: handler for SYNACK's ACK begins
 	// push this socket into pending_connection_buf and let Xaccept handle that
@@ -1968,6 +1999,7 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 		new_sk->dst_path = src_path;
 		new_sk->src_path = dst_path;
 		new_sk->connState = CONNECTED; // chenren
+		new_sk->closeState = ESTABLISHED; // chenren
 		new_sk->initialized = true;
 		new_sk->nxt = LAST_NODE_DEFAULT;
 		new_sk->last = LAST_NODE_DEFAULT;
@@ -2127,6 +2159,12 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 
 	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
 
+	if (!sk) {
+		// FIXME: we need to fix the state machine so this doesn't happen!
+		click_chatter("ProcessFinPacket: sk == NULL\n");
+		return;
+	}
+
 	// prevent it from sending FIN after receiving FINACK
 	sk->closeState = CLOSING;
 	// Set timer
@@ -2226,6 +2264,12 @@ void XTRANSPORT::ProcessFinAckPacket(WritablePacket *p_in)
 
 	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
 
+	if (!sk) {
+		// FIXME: we need to fix the state machine so this doesn't happen!
+		click_chatter("ProcessFinAckPacket: sk == NULL\n");
+		return;
+	}
+
 	sk->dst_path = src_path;
 	sk->finack_waiting = false;
 
@@ -2308,6 +2352,11 @@ void XTRANSPORT::ProcessDatagramPacket(WritablePacket *p_in)
 	unsigned short _dport = XIDtoPort.get(_destination_xid);  // This is to be updated for the XSOCK_STREAM type connections below
 
 	sock *sk = portToSock.get(_dport);
+	if (!sk) {
+		// FIXME: we need to fix the state machine so this doesn't happen!
+		click_chatter("ProcessDatagramPacket: sk == NULL\n");
+		return;
+	}
 
 	// buffer packet if this is a DGRAM socket and we have room
 	if (sk->sock_type == SOCK_DGRAM && should_buffer_received_packet(p_in, sk)) {
@@ -2327,8 +2376,6 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
 	TransportHeader thdr(p_in);
-
-	click_chatter("stream packet of type %d\n", thdr.pkt_info());
 
 	// FIXME: creating variables is duplicated in this function and the one below
 	// that is called if this returns 0. Is it better to make the variable here
@@ -3274,6 +3321,8 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		new_sk->next_send_seqnum = 0;
 		new_sk->next_recv_seqnum = 0;
 		new_sk->isListenSocket = true; // FIXME backwards? shouldn't sk be the accept socket?
+		new_sk->closeState = ESTABLISHED;
+		new_sk->s_state = ESTABLISHED;
 		memset(new_sk->send_buffer, 0, new_sk->send_buffer_size * sizeof(WritablePacket*));
 		memset(new_sk->recv_buffer, 0, new_sk->recv_buffer_size * sizeof(WritablePacket*));
 		//new_sk->pending_connection_buf = new queue<sock>();
