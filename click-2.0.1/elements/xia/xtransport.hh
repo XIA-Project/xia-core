@@ -75,9 +75,7 @@ using namespace std;
 #define CACHE_PORT   3
 #define XHCP_PORT	4
 
-enum SocketState {INACTIVE = 1, LISTEN, SYN_RCVD, SYN_SENT, ESTABLISHED, FIN_WAIT1, FIN_WAIT2, CLOSING, CLOSE_WAIT, LAST_ACK, CLOSED,
-// FIXME: these below should go away
-NOTCONNECTED, CONNECTING, CONNECTED};
+enum SocketState {INACTIVE = 0, LISTEN, SYN_RCVD, SYN_SENT, ESTABLISHED, FIN_WAIT1, FIN_WAIT2, CLOSING, CLOSE_WAIT, LAST_ACK, CLOSED};
 
 CLICK_DECLS
 
@@ -156,7 +154,7 @@ private:
 			isBlocking = true;
 			initialized = timer_on = full_src_dag = false;
 
-			synack_waiting = synackack_waiting = false;
+			synackack_waiting = false;
 			finack_waiting = finackack_waiting = false;
 			dataack_waiting = teardown_waiting = false;
 
@@ -208,7 +206,6 @@ private:
 		uint32_t seq_num;
 		uint32_t ack_num;
 		bool isListenSocket;		// FIXME: can this be replaced by s_state == LISTEN?
-		bool synack_waiting;		// FIXME: can these waiting states be replaces by s_state?
 		bool synackack_waiting;
 		bool finack_waiting;
 		bool finackack_waiting;
