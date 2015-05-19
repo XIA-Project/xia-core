@@ -12,12 +12,9 @@
 #include "xiatransport.hh"
 #include "xtransport.hh"
 #include <click/xiatransportheader.hh>
+#include "xlog.hh"
 
 #include <fstream>
-
-
-#define DBG(s) _errh->debug(stderr, "%s:%d: %s\n", __FILE__, __LINE__, s)
-#define DBGF(fmt, ...) _errh->debug(stderr, "%s:%d: " fmt"\n", __FILE__, __LINE__, __VA_ARGS__)
 
 /*
 ** FIXME:
@@ -987,7 +984,7 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	//Extract the destination port
 	unsigned short _sport = SRC_PORT_ANNO(p_in);
 
-//	_errh->debug("\nPush: Got packet from API sport:%d",ntohs(_sport));
+	DBG("Push: Got packet from API sport:%d",ntohs(_sport));
 
 	std::string p_buf;
 	p_buf.assign((const char*)p_in->data(), (const char*)p_in->end_data());
@@ -4829,7 +4826,6 @@ void XTRANSPORT::XpushChunkto(unsigned short _sport, xia::XSocketMsg *xia_socket
 
 	p = contenth.encap(just_payload_part);
 	p = xiah.encap(p, true);
-
 
 // 	XID	source_sid = sk->src_path.xid(sk->src_path.destination_node());
 // 	XID	destination_cid = dst_path.xid(dst_path.destination_node());
