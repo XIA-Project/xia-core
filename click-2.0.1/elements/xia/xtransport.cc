@@ -368,7 +368,6 @@ bool XTRANSPORT::RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now)
 
 		click_chatter("Turn off the timer because sk->teardown_waiting == true with port = %d\n", _sport);
 
-		portToActive.set(_sport, false);
 		// XID source_xid = portToSock.get(_sport).xid;
 		// this check for -1 prevents a segfault cause by bad XIDs
 		// it may happen in other cases, but opening a XSOCK_STREAM socket, calling
@@ -384,7 +383,6 @@ bool XTRANSPORT::RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now)
 		}
 
 		portToSock.erase(_sport);
-		portToActive.erase(_sport);
 		hlim.erase(_sport);
 
 		nxt_xport.erase(_sport);
@@ -430,7 +428,6 @@ bool XTRANSPORT::RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now)
 bool XTRANSPORT::TearDownSocket(sock *sk, unsigned short _sport, Timestamp &now)
 {
 	sk->timer_on = false;
-	portToActive.set(_sport, false);
 
 	//XID source_xid = portToSock.get(_sport).xid;
 
@@ -451,7 +448,6 @@ bool XTRANSPORT::TearDownSocket(sock *sk, unsigned short _sport, Timestamp &now)
 
 	delete sk;
 	portToSock.erase(_sport);
-	portToActive.erase(_sport);
 	hlim.erase(_sport);
 
 	nxt_xport.erase(_sport);
@@ -588,12 +584,10 @@ void XTRANSPORT::run_timer(Timer *timer)
 void XTRANSPORT::copy_common(sock *sk, XIAHeader &xiahdr, XIAHeaderEncap &xiah) {
 
 	//Recalculate source path
-TRACE();
 	XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
 	String str_local_addr = _local_addr.unparse_re() + " " + source_xid.unparse();
 	//Make source DAG _local_addr:SID
 	String dagstr = sk->src_path.unparse_re();
-TRACE();
 
 	//Client Mobility...
 	if (dagstr.length() != 0 && dagstr != str_local_addr) {
@@ -601,7 +595,6 @@ TRACE();
 		// 1. Update 'sk->src_path'
 		sk->src_path.parse_re(str_local_addr);
 	}
-TRACE();
 
 	xiah.set_nxt(xiahdr.nxt());
 	xiah.set_last(xiahdr.last());
@@ -615,7 +608,6 @@ WritablePacket *XTRANSPORT::copy_packet(Packet *p, sock *sk) {
 
 	XIAHeader xiahdr(p);
 	XIAHeaderEncap xiah;
-TRACE();
 
 	copy_common(sk, xiahdr, xiah);
 
@@ -1173,168 +1165,159 @@ void XTRANSPORT::ProcessMigratePacket(WritablePacket *p_in)
 
 	_errh->debug("ProcessMigrate: %s from port %d at %ld.\n", _source_xid.unparse().c_str(), _dport, Timestamp::now());
 
-	HashTable<unsigned short, bool>::iterator it1;
-	it1 = portToActive.find(_dport);
+	// Verify the MIGRATE request and start using new DAG
+	// No need to wait for an ACK because the operation is idempotent
+	// 1. Retrieve payload (srcDAG, destDAG, seqnum) Signature, Pubkey
+	const uint8_t *payload = thdr.payload();
+	//int payload_len = xiah.plen() - thdr.hlen();
+	const uint8_t *payloadptr = payload;
+	String remote_DAG((char *)payloadptr, strlen((char *) payloadptr));
+	payloadptr += strlen((char *)payloadptr) + 1;
+	click_chatter("ProcessNetworkPacket: MIGRATE: remote DAG: %s", remote_DAG.c_str());
+	String my_DAG((char *)payloadptr, strlen((char *) payloadptr));
+	payloadptr += strlen((char *)payloadptr) + 1;
+	click_chatter("ProcessNetworkPacket: MIGRATE: my DAG: %s", my_DAG.c_str());
+	String timestamp((char *)payloadptr, strlen((char *) payloadptr));
+	payloadptr += strlen((char *)payloadptr) + 1;
+	click_chatter("ProcessNetworkPacket: MIGRATE: Timestamp: %s", timestamp.c_str());
+	uint16_t siglen;
+	memcpy(&siglen, payloadptr, sizeof(uint16_t));
+	payloadptr += sizeof(uint16_t);
+	click_chatter("ProcessNetworkPacket: MIGRATE: Signature length: %d", siglen);
+	uint8_t *signature = (uint8_t *) calloc(siglen, 1);
+	memcpy(signature, payloadptr, siglen);
+	payloadptr += siglen;
+	uint16_t pubkeylen;
+	memcpy(&pubkeylen, payloadptr, sizeof(uint16_t));
+	payloadptr += sizeof(uint16_t);
+	click_chatter("ProcessNetworkPacket: MIGRATE: Pubkey length: %d", pubkeylen);
+	char *pubkey = (char *) calloc(pubkeylen, 1);
+	memcpy(pubkey, payloadptr, pubkeylen);
+	click_chatter("ProcessNetworkPacket: MIGRATE: Pubkey:%s:", pubkey);
+	payloadptr += pubkeylen;
+	click_chatter("ProcessNetworkPacket: MIGRATE: pkt len: %d", payloadptr - payload);
 
-	if(it1 != portToActive.end() ) {
-
-		// Verify the MIGRATE request and start using new DAG
-		// No need to wait for an ACK because the operation is idempotent
-		// 1. Retrieve payload (srcDAG, destDAG, seqnum) Signature, Pubkey
-		const uint8_t *payload = thdr.payload();
-		//int payload_len = xiah.plen() - thdr.hlen();
-		const uint8_t *payloadptr = payload;
-		String remote_DAG((char *)payloadptr, strlen((char *) payloadptr));
-		payloadptr += strlen((char *)payloadptr) + 1;
-		click_chatter("ProcessNetworkPacket: MIGRATE: remote DAG: %s", remote_DAG.c_str());
-		String my_DAG((char *)payloadptr, strlen((char *) payloadptr));
-		payloadptr += strlen((char *)payloadptr) + 1;
-		click_chatter("ProcessNetworkPacket: MIGRATE: my DAG: %s", my_DAG.c_str());
-		String timestamp((char *)payloadptr, strlen((char *) payloadptr));
-		payloadptr += strlen((char *)payloadptr) + 1;
-		click_chatter("ProcessNetworkPacket: MIGRATE: Timestamp: %s", timestamp.c_str());
-		uint16_t siglen;
-		memcpy(&siglen, payloadptr, sizeof(uint16_t));
-		payloadptr += sizeof(uint16_t);
-		click_chatter("ProcessNetworkPacket: MIGRATE: Signature length: %d", siglen);
-		uint8_t *signature = (uint8_t *) calloc(siglen, 1);
-		memcpy(signature, payloadptr, siglen);
-		payloadptr += siglen;
-		uint16_t pubkeylen;
-		memcpy(&pubkeylen, payloadptr, sizeof(uint16_t));
-		payloadptr += sizeof(uint16_t);
-		click_chatter("ProcessNetworkPacket: MIGRATE: Pubkey length: %d", pubkeylen);
-		char *pubkey = (char *) calloc(pubkeylen, 1);
-		memcpy(pubkey, payloadptr, pubkeylen);
-		click_chatter("ProcessNetworkPacket: MIGRATE: Pubkey:%s:", pubkey);
-		payloadptr += pubkeylen;
-		click_chatter("ProcessNetworkPacket: MIGRATE: pkt len: %d", payloadptr - payload);
-
-		// 2. Verify hash of pubkey matches srcDAG destination node
-		XIAPath src_path;
-		if(src_path.parse(remote_DAG) == false) {
-			click_chatter("ProcessNetworkPacket: MIGRATE: ERROR parsing remote DAG:%s:", remote_DAG.c_str());
-		}
-		String src_SID_string = src_path.xid(src_path.destination_node()).unparse();
-		const char *sourceSID = xs_XIDHash(src_SID_string.c_str());
-		uint8_t pubkeyhash[SHA_DIGEST_LENGTH];
-		char pubkeyhash_hexdigest[XIA_SHA_DIGEST_STR_LEN];
-		xs_getPubkeyHash(pubkey, pubkeyhash, sizeof pubkeyhash);
-		xs_hexDigest(pubkeyhash, sizeof pubkeyhash, pubkeyhash_hexdigest, sizeof pubkeyhash_hexdigest);
-		if(strcmp(pubkeyhash_hexdigest, sourceSID) != 0) {
-			click_chatter("ProcessNetworkPacket: ERROR: MIGRATE pubkey hash: %s SourceSID: %s", pubkeyhash_hexdigest, sourceSID);
-		}
-		click_chatter("ProcessNetworkPacket: MIGRATE: Source SID matches pubkey hash");
-
-		// 3. Verify Signature using Pubkey
-		size_t signed_datalen = remote_DAG.length() + my_DAG.length() + timestamp.length() + 3;
-		if(!xs_isValidSignature(payload, signed_datalen, signature, siglen, pubkey, pubkeylen)) {
-			click_chatter("ProcessNetworkPacket: ERROR: MIGRATE with invalid signature");
-		}
-		free(signature);
-		free(pubkey);
-		click_chatter("ProcessNetworkPacket: MIGRATE: Signature validated");
-
-		// 4. Update socket state dst_path with srcDAG
-		sk->dst_path = src_path;
-		assert(sk->state == ESTABLISHED);
-		assert(sk->initialized == true);
-
-		// 5. Return MIGRATEACK to notify mobile host of change
-		// Construct the payload - 'data'
-		// For now (timestamp) signature, Pubkey
-		uint8_t *data;
-		uint8_t *dataptr;
-		uint32_t maxdatalen;
-		uint32_t datalen;
-		char mypubkey[MAX_PUBKEY_SIZE];
-		uint16_t mypubkeylen = MAX_PUBKEY_SIZE;
-
-		click_chatter("ProcessNetworkPacket: MIGRATE: building MIGRATEACK");
-		XID my_xid = sk->src_path.xid(sk->src_path.destination_node());
-		click_chatter("ProcessNetworkPacket: MIGRATE: MIGRATEACK get pubkey for:%s:", my_xid.unparse().c_str());
-		if(xs_getPubkey(my_xid.unparse().c_str(), mypubkey, &mypubkeylen)) {
-			click_chatter("ProcessNetworkPacket: ERROR: getting Pubkey for MIGRATEACK");
-		}
-		maxdatalen = remote_DAG.length() + 1 + timestamp.length() + 1 + MAX_SIGNATURE_SIZE + sizeof(uint16_t) + mypubkeylen;
-		data = (uint8_t *) calloc(maxdatalen, 1);
-		if(data == NULL) {
-			click_chatter("ProcessNetworkPacket: ERROR allocating memory for MIGRATEACK");
-		}
-		dataptr = data;
-
-		// Insert the mobile host DAG whose migration has been accepted
-		strcpy((char *)dataptr, remote_DAG.c_str());
-		click_chatter("ProcessNetworkPacket: MIGRATE: MIGRATEACK remoteDAG: %s", (char *)dataptr);
-		dataptr += remote_DAG.length() + 1; // null-terminated string
-
-		// Insert timestamp into payload
-		strcpy((char *)dataptr, timestamp.c_str());
-		click_chatter("ProcessNetworkPacket: MIGRATE: MIGRATEACK timestamp: %s", (char *)dataptr);
-		dataptr += timestamp.length() + 1; // null-terminated string
-
-		// Sign(mobileDAG, Timestamp)
-		uint8_t mysignature[MAX_SIGNATURE_SIZE];
-		uint16_t mysiglen = MAX_SIGNATURE_SIZE;
-		if(xs_sign(my_xid.unparse().c_str(), data, dataptr-data, mysignature, &mysiglen)) {
-			click_chatter("ProcessNetworkPacket: ERROR signing MIGRATEACK");
-		}
-
-		// Signature length
-		memcpy(dataptr, &mysiglen, sizeof(uint16_t));
-		click_chatter("ProcessNetworkPacket: MIGRATE: MIGRATEACK siglen: %d", mysiglen);
-		dataptr += sizeof(uint16_t);
-
-		// Signature
-		memcpy(dataptr, mysignature, mysiglen);
-		dataptr += mysiglen;
-
-		// Public key length
-		memcpy(dataptr, &mypubkeylen, sizeof(uint16_t));
-		click_chatter("ProcessNetworkPacket: MIGRATE: MIGRATEACK pubkeylen: %d", mypubkeylen);
-		dataptr += sizeof(uint16_t);
-
-		// Public key
-		memcpy(dataptr, mypubkey, mypubkeylen);
-		click_chatter("ProcessNetworkPacket: MIGRATE: MIGRATEACK pubkey:%s:", dataptr);
-		dataptr += mypubkeylen;
-
-		// Total payload length
-		datalen = dataptr - data;
-		click_chatter("ProcessNetworkPacket: MIGRATE: MIGRATEACK len: %d", datalen);
-
-		// Create a packet with the payload
-		XIAHeaderEncap xiah_new;
-		xiah_new.set_nxt(CLICK_XIA_NXT_TRN);
-		xiah_new.set_last(LAST_NODE_DEFAULT);
-		xiah_new.set_hlim(HLIM_DEFAULT);
-		xiah_new.set_dst_path(src_path);
-		xiah_new.set_src_path(dst_path);
-
-		WritablePacket *just_payload_part = WritablePacket::make(256, data, datalen, 0);
-		free(data);
-
-		WritablePacket *p = NULL;
-
-		xiah_new.set_plen(datalen);
-		//click_chatter("Sent packet to network");
-
-		TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeMIGRATEACKHeader( 0, 0, 0, calc_recv_window(sk)); // #seq, #ack, length
-		p = thdr_new->encap(just_payload_part);
-
-		thdr_new->update();
-		xiah_new.set_plen(datalen + thdr_new->hlen()); // XIA payload = transport header + transport-layer data
-
-		p = xiah_new.encap(p, false);
-
-		delete thdr_new;
-		output(NETWORK_PORT).push(p);
-
-		// 6. Notify the api of MIGRATE reception
-		//   Do we need to? -Nitin
-	} else {
-		printf("ProcessNetworkPacket: ERROR: Migrating non-existent or inactive session\n");
+	// 2. Verify hash of pubkey matches srcDAG destination node
+	if(src_path.parse(remote_DAG) == false) {
+		click_chatter("ProcessNetworkPacket: MIGRATE: ERROR parsing remote DAG:%s:", remote_DAG.c_str());
 	}
+	String src_SID_string = src_path.xid(src_path.destination_node()).unparse();
+	const char *sourceSID = xs_XIDHash(src_SID_string.c_str());
+	uint8_t pubkeyhash[SHA_DIGEST_LENGTH];
+	char pubkeyhash_hexdigest[XIA_SHA_DIGEST_STR_LEN];
+	xs_getPubkeyHash(pubkey, pubkeyhash, sizeof pubkeyhash);
+	xs_hexDigest(pubkeyhash, sizeof pubkeyhash, pubkeyhash_hexdigest, sizeof pubkeyhash_hexdigest);
+	if(strcmp(pubkeyhash_hexdigest, sourceSID) != 0) {
+		click_chatter("ProcessNetworkPacket: ERROR: MIGRATE pubkey hash: %s SourceSID: %s", pubkeyhash_hexdigest, sourceSID);
+	}
+	click_chatter("ProcessNetworkPacket: MIGRATE: Source SID matches pubkey hash");
+
+	// 3. Verify Signature using Pubkey
+	size_t signed_datalen = remote_DAG.length() + my_DAG.length() + timestamp.length() + 3;
+	if(!xs_isValidSignature(payload, signed_datalen, signature, siglen, pubkey, pubkeylen)) {
+		click_chatter("ProcessNetworkPacket: ERROR: MIGRATE with invalid signature");
+	}
+	free(signature);
+	free(pubkey);
+	click_chatter("ProcessNetworkPacket: MIGRATE: Signature validated");
+
+	// 4. Update socket state dst_path with srcDAG
+	sk->dst_path = src_path;
+	assert(sk->state == ESTABLISHED);
+	assert(sk->initialized == true);
+
+	// 5. Return MIGRATEACK to notify mobile host of change
+	// Construct the payload - 'data'
+	// For now (timestamp) signature, Pubkey
+	uint8_t *data;
+	uint8_t *dataptr;
+	uint32_t maxdatalen;
+	uint32_t datalen;
+	char mypubkey[MAX_PUBKEY_SIZE];
+	uint16_t mypubkeylen = MAX_PUBKEY_SIZE;
+
+	click_chatter("ProcessNetworkPacket: MIGRATE: building MIGRATEACK");
+	XID my_xid = sk->src_path.xid(sk->src_path.destination_node());
+	click_chatter("ProcessNetworkPacket: MIGRATE: MIGRATEACK get pubkey for:%s:", my_xid.unparse().c_str());
+	if(xs_getPubkey(my_xid.unparse().c_str(), mypubkey, &mypubkeylen)) {
+		click_chatter("ProcessNetworkPacket: ERROR: getting Pubkey for MIGRATEACK");
+	}
+	maxdatalen = remote_DAG.length() + 1 + timestamp.length() + 1 + MAX_SIGNATURE_SIZE + sizeof(uint16_t) + mypubkeylen;
+	data = (uint8_t *) calloc(maxdatalen, 1);
+	if(data == NULL) {
+		click_chatter("ProcessNetworkPacket: ERROR allocating memory for MIGRATEACK");
+	}
+	dataptr = data;
+
+	// Insert the mobile host DAG whose migration has been accepted
+	strcpy((char *)dataptr, remote_DAG.c_str());
+	click_chatter("ProcessNetworkPacket: MIGRATE: MIGRATEACK remoteDAG: %s", (char *)dataptr);
+	dataptr += remote_DAG.length() + 1; // null-terminated string
+
+	// Insert timestamp into payload
+	strcpy((char *)dataptr, timestamp.c_str());
+	click_chatter("ProcessNetworkPacket: MIGRATE: MIGRATEACK timestamp: %s", (char *)dataptr);
+	dataptr += timestamp.length() + 1; // null-terminated string
+
+	// Sign(mobileDAG, Timestamp)
+	uint8_t mysignature[MAX_SIGNATURE_SIZE];
+	uint16_t mysiglen = MAX_SIGNATURE_SIZE;
+	if(xs_sign(my_xid.unparse().c_str(), data, dataptr-data, mysignature, &mysiglen)) {
+		click_chatter("ProcessNetworkPacket: ERROR signing MIGRATEACK");
+	}
+
+	// Signature length
+	memcpy(dataptr, &mysiglen, sizeof(uint16_t));
+	click_chatter("ProcessNetworkPacket: MIGRATE: MIGRATEACK siglen: %d", mysiglen);
+	dataptr += sizeof(uint16_t);
+
+	// Signature
+	memcpy(dataptr, mysignature, mysiglen);
+	dataptr += mysiglen;
+
+	// Public key length
+	memcpy(dataptr, &mypubkeylen, sizeof(uint16_t));
+	click_chatter("ProcessNetworkPacket: MIGRATE: MIGRATEACK pubkeylen: %d", mypubkeylen);
+	dataptr += sizeof(uint16_t);
+
+	// Public key
+	memcpy(dataptr, mypubkey, mypubkeylen);
+	click_chatter("ProcessNetworkPacket: MIGRATE: MIGRATEACK pubkey:%s:", dataptr);
+	dataptr += mypubkeylen;
+
+	// Total payload length
+	datalen = dataptr - data;
+	click_chatter("ProcessNetworkPacket: MIGRATE: MIGRATEACK len: %d", datalen);
+
+	// Create a packet with the payload
+	XIAHeaderEncap xiah_new;
+	xiah_new.set_nxt(CLICK_XIA_NXT_TRN);
+	xiah_new.set_last(LAST_NODE_DEFAULT);
+	xiah_new.set_hlim(HLIM_DEFAULT);
+	xiah_new.set_dst_path(src_path);
+	xiah_new.set_src_path(dst_path);
+
+	WritablePacket *just_payload_part = WritablePacket::make(256, data, datalen, 0);
+	free(data);
+
+	WritablePacket *p = NULL;
+
+	xiah_new.set_plen(datalen);
+	//click_chatter("Sent packet to network");
+
+	TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeMIGRATEACKHeader( 0, 0, 0, calc_recv_window(sk)); // #seq, #ack, length
+	p = thdr_new->encap(just_payload_part);
+
+	thdr_new->update();
+	xiah_new.set_plen(datalen + thdr_new->hlen()); // XIA payload = transport header + transport-layer data
+
+	p = xiah_new.encap(p, false);
+
+	delete thdr_new;
+	output(NETWORK_PORT).push(p);
+
+	// 6. Notify the api of MIGRATE reception
+	//   Do we need to? -Nitin
 }
 
 void XTRANSPORT::ProcessMigrateAck(WritablePacket *p_in)
@@ -1357,104 +1340,101 @@ void XTRANSPORT::ProcessMigrateAck(WritablePacket *p_in)
 
 	sock *sk = portToSock.get(_dport);
 	if (!sk) {
-		// FIXME: we need to fix the state machine so this doesn't happen!
-		click_chatter("ProcessMigrateAckPacket: sk == NULL\n");
+		// This should never happen
+		ERROR("ProcessMigrateAckPacket: sk == NULL\n");
 		return;
 	}
 
-	_errh->debug("HandleMigrateAck: %s from port %d at %ld.\n", _source_xid.unparse().c_str(), _dport, Timestamp::now());
+	if (!sk->state == ESTABLISHED) {
+		// This should never happen!
+		ERROR("ProcessMigrateAckPacket: socket is not connected\n");
+		return;	
+	}
 
-	HashTable<unsigned short, bool>::iterator it1;
-	it1 = portToActive.find(_dport);
+	DBG("HandleMigrateAck: %s from port %d at %ld.\n", _source_xid.unparse().c_str(), _dport, Timestamp::now());
 
-	if(it1 != portToActive.end() ) {
+	// Verify the MIGRATEACK and start using new DAG
+	// 1. Retrieve payload (migratedDAG, timestamp) signature, Pubkey
+	const uint8_t *payload = thdr.payload();
+	int payload_len = xiah.plen() - thdr.hlen();
+	const uint8_t *payloadptr = payload;
+	size_t signed_datalen;
 
-		// Verify the MIGRATEACK and start using new DAG
-		// 1. Retrieve payload (migratedDAG, timestamp) signature, Pubkey
-		const uint8_t *payload = thdr.payload();
-		int payload_len = xiah.plen() - thdr.hlen();
-		const uint8_t *payloadptr = payload;
-		size_t signed_datalen;
+	// Extract the migrated DAG that the fixed host accepted
+	String migrated_DAG((char *)payloadptr, strlen((char *) payloadptr));
+	payloadptr += strlen((char *)payloadptr) + 1;
+	click_chatter("ProcessNetworkPacket: MIGRATEACK: migrated DAG: %s", migrated_DAG.c_str());
 
-		// Extract the migrated DAG that the fixed host accepted
-		String migrated_DAG((char *)payloadptr, strlen((char *) payloadptr));
-		payloadptr += strlen((char *)payloadptr) + 1;
-		click_chatter("ProcessNetworkPacket: MIGRATEACK: migrated DAG: %s", migrated_DAG.c_str());
+	// Extract the timestamp corresponding to the migration message that was sent
+	// Helps handle a second migration before the first migration is completed
+	String timestamp((char *)payloadptr, strlen((char *) payloadptr));
+	payloadptr += strlen((char *)payloadptr) + 1;
+	signed_datalen = payloadptr - payload;
+	click_chatter("ProcessNetworkPacket: MIGRATEACK: timestamp: %s", timestamp.c_str());
 
-		// Extract the timestamp corresponding to the migration message that was sent
-		// Helps handle a second migration before the first migration is completed
-		String timestamp((char *)payloadptr, strlen((char *) payloadptr));
-		payloadptr += strlen((char *)payloadptr) + 1;
-		signed_datalen = payloadptr - payload;
-		click_chatter("ProcessNetworkPacket: MIGRATEACK: timestamp: %s", timestamp.c_str());
+	// Get the signature (migrated_DAG, timestamp)
+	uint16_t siglen;
+	memcpy(&siglen, payloadptr, sizeof(uint16_t));
+	click_chatter("ProcessNetworkPacket: MIGRATEACK: siglen: %d", siglen);
+	payloadptr += sizeof(uint16_t);
+	uint8_t *signature = (uint8_t *) calloc(siglen, 1);
+	memcpy(signature, payloadptr, siglen);
+	payloadptr += siglen;
 
-		// Get the signature (migrated_DAG, timestamp)
-		uint16_t siglen;
-		memcpy(&siglen, payloadptr, sizeof(uint16_t));
-		click_chatter("ProcessNetworkPacket: MIGRATEACK: siglen: %d", siglen);
-		payloadptr += sizeof(uint16_t);
-		uint8_t *signature = (uint8_t *) calloc(siglen, 1);
-		memcpy(signature, payloadptr, siglen);
-		payloadptr += siglen;
+	// Get the Public key of the fixed host
+	uint16_t pubkeylen;
+	memcpy(&pubkeylen, payloadptr, sizeof(uint16_t));
+	click_chatter("ProcessNetworkPacket: MIGRATEACK: pubkeylen: %d", pubkeylen);
+	payloadptr += sizeof(uint16_t);
+	char *pubkey = (char *) calloc(pubkeylen, 1);
+	memcpy(pubkey, payloadptr, pubkeylen);
+	click_chatter("ProcessNetworkPacket: MIGRATEACK: pubkey:%s:", pubkey);
+	payloadptr += pubkeylen;
+	if(payloadptr-payload != payload_len) {
+		click_chatter("ProcessNetworkPacket: WARNING: MIGRATEACK expected payload len=%d, got %d", payload_len, payloadptr-payload);
+	}
+	//assert(payloadptr-payload == payload_len);
 
-		// Get the Public key of the fixed host
-		uint16_t pubkeylen;
-		memcpy(&pubkeylen, payloadptr, sizeof(uint16_t));
-		click_chatter("ProcessNetworkPacket: MIGRATEACK: pubkeylen: %d", pubkeylen);
-		payloadptr += sizeof(uint16_t);
-		char *pubkey = (char *) calloc(pubkeylen, 1);
-		memcpy(pubkey, payloadptr, pubkeylen);
-		click_chatter("ProcessNetworkPacket: MIGRATEACK: pubkey:%s:", pubkey);
-		payloadptr += pubkeylen;
-		if(payloadptr-payload != payload_len) {
-			click_chatter("ProcessNetworkPacket: WARNING: MIGRATEACK expected payload len=%d, got %d", payload_len, payloadptr-payload);
-		}
-		//assert(payloadptr-payload == payload_len);
+	// 2. Verify hash of pubkey matches the fixed host's SID
+	String fixed_SID_string = sk->dst_path.xid(sk->dst_path.destination_node()).unparse();
+	uint8_t pubkeyhash[SHA_DIGEST_LENGTH];
+	char pubkeyhash_hexdigest[XIA_SHA_DIGEST_STR_LEN];
+	xs_getPubkeyHash(pubkey, pubkeyhash, sizeof pubkeyhash);
+	xs_hexDigest(pubkeyhash, sizeof pubkeyhash, pubkeyhash_hexdigest, sizeof pubkeyhash_hexdigest);
+	if(strcmp(pubkeyhash_hexdigest, xs_XIDHash(fixed_SID_string.c_str())) != 0) {
+		click_chatter("ProcessNetworkPacket: ERROR: MIGRATEACK: Mismatch: fixedSID: %s, pubkeyhash: %s", fixed_SID_string.c_str(), pubkeyhash_hexdigest);
+	}
+	click_chatter("ProcessNetworkPacket: Hash of pubkey matches fixed SID");
 
-		// 2. Verify hash of pubkey matches the fixed host's SID
-		String fixed_SID_string = sk->dst_path.xid(sk->dst_path.destination_node()).unparse();
-		uint8_t pubkeyhash[SHA_DIGEST_LENGTH];
-		char pubkeyhash_hexdigest[XIA_SHA_DIGEST_STR_LEN];
-		xs_getPubkeyHash(pubkey, pubkeyhash, sizeof pubkeyhash);
-		xs_hexDigest(pubkeyhash, sizeof pubkeyhash, pubkeyhash_hexdigest, sizeof pubkeyhash_hexdigest);
-		if(strcmp(pubkeyhash_hexdigest, xs_XIDHash(fixed_SID_string.c_str())) != 0) {
-			click_chatter("ProcessNetworkPacket: ERROR: MIGRATEACK: Mismatch: fixedSID: %s, pubkeyhash: %s", fixed_SID_string.c_str(), pubkeyhash_hexdigest);
-		}
-		click_chatter("ProcessNetworkPacket: Hash of pubkey matches fixed SID");
+	// 3. Verify Signature using Pubkey
+	if(!xs_isValidSignature(payload, signed_datalen, signature, siglen, pubkey, pubkeylen)) {
+		click_chatter("ProcessNetworkPacket: ERROR: MIGRATEACK: MIGRATE with invalid signature");
+	}
+	click_chatter("ProcessNetworkPacket: MIGRATEACK: Signature verified");
+	free(signature);
+	free(pubkey);
 
-		// 3. Verify Signature using Pubkey
-		if(!xs_isValidSignature(payload, signed_datalen, signature, siglen, pubkey, pubkeylen)) {
-			click_chatter("ProcessNetworkPacket: ERROR: MIGRATEACK: MIGRATE with invalid signature");
-		}
-		click_chatter("ProcessNetworkPacket: MIGRATEACK: Signature verified");
-		free(signature);
-		free(pubkey);
+	// 4. Verify timestamp matches the latest migrate message
+	if(strcmp(sk->last_migrate_ts.c_str(), timestamp.c_str()) != 0) {
+		click_chatter("ProcessNetworkPacket: WARN: timestamp sent:%s:, migrateack has:%s:", sk->last_migrate_ts.c_str(), timestamp.c_str());
+	}
+	click_chatter("ProcessNetworkPacket: MIGRATEACK: verified timestamp");
 
-		// 4. Verify timestamp matches the latest migrate message
-		if(strcmp(sk->last_migrate_ts.c_str(), timestamp.c_str()) != 0) {
-			click_chatter("ProcessNetworkPacket: WARN: timestamp sent:%s:, migrateack has:%s:", sk->last_migrate_ts.c_str(), timestamp.c_str());
-		}
-		click_chatter("ProcessNetworkPacket: MIGRATEACK: verified timestamp");
+	// 5. Update socket state src_path to use the new DAG
+	// TODO: Verify migrated_DAG's destination node is the same as src_path's
+	//       before replacing with the migrated_DAG
+	sk->src_path.parse(migrated_DAG);
+	click_chatter("ProcessNetworkPacket: MIGRATEACK: updated sock state with newly acknowledged DAG");
 
-		// 5. Update socket state src_path to use the new DAG
-		// TODO: Verify migrated_DAG's destination node is the same as src_path's
-		//       before replacing with the migrated_DAG
-		sk->src_path.parse(migrated_DAG);
-		click_chatter("ProcessNetworkPacket: MIGRATEACK: updated sock state with newly acknowledged DAG");
+	// 6. The data retransmissions can now resume
+	sk->migrateack_waiting = false;
+	sk->num_migrate_tries = 0;
 
-		// 6. The data retransmissions can now resume
-		sk->migrateack_waiting = false;
-		sk->num_migrate_tries = 0;
+	bool resetTimer = false;
 
-		bool resetTimer = false;
-
-		portToSock.set(_dport, sk);
-		if(_dport != sk->port) {
-			click_chatter("ProcessNetworkPacket:MIGRATEACK: ERROR _dport %d, sk->port %d", _dport, sk->port);
-		}
-
-	} else {
-		//printf("port not found\n");
+	portToSock.set(_dport, sk);
+	if(_dport != sk->port) {
+		click_chatter("ProcessNetworkPacket:MIGRATEACK: ERROR _dport %d, sk->port %d", _dport, sk->port);
 	}
 }
 
@@ -1907,12 +1887,7 @@ void XTRANSPORT::ProcessStreamDataPacket(WritablePacket*p_in)
 		return;
 	}
 	if (sk) {
-		//printf("(%s) my_sport=%u  my_sid=%s  his_sid=%s\n", (_local_addr.unparse()).c_str(),  _dport,  _destination_xid.unparse().c_str(), _source_xid.unparse().c_str());
-		HashTable<unsigned short, bool>::iterator it1;
-		it1 = portToActive.find(_dport);
-
-		if(it1 != portToActive.end() ) {
-
+		if(sk->state == ESTABLISHED) {
 			// buffer data, if we have room
 			if (should_buffer_received_packet(p_in, sk)) {
 	//					printf("<<< add_packet_to_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", sk->port, sk->recv_base, sk->next_recv_seqnum, sk->recv_buffer_size);
@@ -2053,7 +2028,6 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 			sk->finackack_waiting = false;
 			sk->timer_on = false;
 			sk->teardown_waiting = false;
-			portToActive.set(_dport, false);
 			click_chatter("Turn off the timer because receiving the FINACK\n");
 			// XID source_xid = portToSock.get(_sport).xid;
 			// this check for -1 prevents a segfault cause by bad XIDs
@@ -2070,7 +2044,6 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 				}
 			}
 			portToSock.erase(_dport);
-			portToActive.erase(_dport);
 			hlim.erase(_dport);
 
 			nxt_xport.erase(_dport);
@@ -2096,54 +2069,47 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 		if (sk) {
 			sk->remote_recv_window = thdr.recv_window();
 
-			HashTable<unsigned short, bool>::iterator it1;
-			it1 = portToActive.find(_dport);
+			//In case of Client Mobility...	 Update 'sk->dst_path'
+			sk->dst_path = src_path;
 
-			if (it1 != portToActive.end()) {
-				//In case of Client Mobility...	 Update 'sk->dst_path'
-				sk->dst_path = src_path;
+			int remote_next_seqnum_expected = thdr.ack_num();
 
-				int remote_next_seqnum_expected = thdr.ack_num();
+			bool resetTimer = false;
 
-				bool resetTimer = false;
-
-				// Clear all Acked packets
-				for (int i = sk->send_base; i < remote_next_seqnum_expected; i++) {
-					int idx = i % sk->send_buffer_size;
-					if (sk->send_buffer[idx]) {
-						sk->send_buffer[idx]->kill();
-						sk->send_buffer[idx] = NULL;
-					}
-					resetTimer = true;
+			// Clear all Acked packets
+			for (int i = sk->send_base; i < remote_next_seqnum_expected; i++) {
+				int idx = i % sk->send_buffer_size;
+				if (sk->send_buffer[idx]) {
+					sk->send_buffer[idx]->kill();
+					sk->send_buffer[idx] = NULL;
 				}
+				resetTimer = true;
+			}
 
-				// Update the variables
-				sk->send_base = remote_next_seqnum_expected;
+			// Update the variables
+			sk->send_base = remote_next_seqnum_expected;
 
-				// Reset timer
-				if (resetTimer) {
-					sk->timer_on = true;
-					sk->dataack_waiting = true;
-					// FIXME: should we reset retransmit_tries here?
-					sk->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
+			// Reset timer
+			if (resetTimer) {
+				sk->timer_on = true;
+				sk->dataack_waiting = true;
+				// FIXME: should we reset retransmit_tries here?
+				sk->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
 
-					if (!_timer.scheduled() || _timer.expiry() >= sk->expiry)
-						_timer.reschedule_at(sk->expiry);
+				if (!_timer.scheduled() || _timer.expiry() >= sk->expiry)
+					_timer.reschedule_at(sk->expiry);
 
-					if (sk->send_base == sk->next_send_seqnum) {
-						// Clear timer
-						sk->timer_on = false;
-						sk->dataack_waiting = false;
-						sk->num_retransmit_tries = 0;
-						click_chatter("Turn off the timer because sk->send_base == sk->next_send_seqnum\n");
-						//sk->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
-					}
+				if (sk->send_base == sk->next_send_seqnum) {
+					// Clear timer
+					sk->timer_on = false;
+					sk->dataack_waiting = false;
+					sk->num_retransmit_tries = 0;
+					click_chatter("Turn off the timer because sk->send_base == sk->next_send_seqnum\n");
+					//sk->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
 				}
-				portToSock.set(_dport, sk);
 			}
-			else {
-				//click_chatter("port not found\n");
-			}
+			portToSock.set(_dport, sk);
+
 		} // chenren
 	} else {
 		click_chatter("sk was null or some other error!\n");
@@ -2319,7 +2285,6 @@ void XTRANSPORT::ProcessFinAckPacket(WritablePacket *p_in)
 		click_chatter("Cleaning the state based on receiving FINACK starts\n");
 		sk->timer_on = false;
 		sk->teardown_waiting = false;
-		portToActive.set(_dport, false);
 		click_chatter("Turn off the timer because receiving the FINACK");
 		// XID source_xid = portToSock.get(_sport).xid;
 		// this check for -1 prevents a segfault cause by bad XIDs
@@ -2337,7 +2302,6 @@ void XTRANSPORT::ProcessFinAckPacket(WritablePacket *p_in)
 		}
 
 		portToSock.erase(_dport);
-		portToActive.erase(_dport);
 		hlim.erase(_dport);
 
 		nxt_xport.erase(_dport);
@@ -2831,8 +2795,6 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 	// Map the source port to sock
 	portToSock.set(_sport, sk);
-
-	portToActive.set(_sport, true);
 
 	hlim.set(_sport, HLIM_DEFAULT);
 	nxt_xport.set(_sport, CLICK_XIA_NXT_TRN);
@@ -3370,8 +3332,6 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		// Map the src & dst XID pair to source port
 		XIDpairToPort.set(xid_pair, new_port);
 		//printf("Xaccept pair to port %d %s %s\n", _sport, source_xid.unparse().c_str(), destination_xid.unparse().c_str());
-
-		portToActive.set(new_port, true);
 
 		// click_chatter("XACCEPT: (%s) my_sport=%d  my_sid=%s  his_sid=%s \n\n", (_local_addr.unparse()).c_str(), _sport, source_xid.unparse().c_str(), destination_xid.unparse().c_str());
 

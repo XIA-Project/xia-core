@@ -288,9 +288,6 @@ protected:
 	// FIXME: change this to hold a sock instead of a bool we don't look at
 	HashTable<XIDpair , struct sock*> XIDpairToConnectPending;
 
-	// FIXME: this can be eliminated in the code
-	HashTable<unsigned short, bool> portToActive;
-
 	// FIXME: can these be rolled into the sock structure?
 	HashTable<unsigned short, int> nxt_xport;
 	HashTable<unsigned short, int> hlim;
