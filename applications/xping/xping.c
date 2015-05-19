@@ -155,7 +155,7 @@ int main(int argc, char **argv)
                 break;
             case 't':
                 argc--, av++;
-                catcher_timeout = atoi(av[0]);
+                catcher_timeout = atof(av[0]);
                 break;
             case 's':
                 argc--, av++;
@@ -275,7 +275,7 @@ int main(int argc, char **argv)
  */
 void catcher()
 {
-	int waittime;
+	double waittime;
 
 	pinger();
     nCatcher+=interval;
@@ -294,9 +294,12 @@ void catcher()
 			if (waittime == 0)
 				waittime = 1; //interval;
 		} else
-			waittime = MAXWAIT;
+			waittime = catcher_timeout-nCatcher>0?catcher_timeout-nCatcher:MAXWAIT;
 		signal(SIGALRM, (sighandler_t)finish);
-		alarm(waittime);
+		if (waittime < 1)
+            ualarm((int)(waittime*1000000), 0);
+        else
+            alarm((int)waittime);
 	}
 }
 
