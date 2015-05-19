@@ -278,15 +278,15 @@ protected:
 	// For Content Push APIs
 	HashTable<XID, unsigned short> XIDtoPushPort;
 
-	// FIXME: change these to be *toSock instead of *toPort
-	HashTable<XID, unsigned short> XIDtoPort;
-	HashTable<XIDpair , unsigned short> XIDpairToPort;
+	// incoming connection to socket mapping
+	HashTable<XID, sock*> XIDtoSock;
+	HashTable<XIDpair , sock*> XIDpairToSock;
 
 	// find sock structure based on API port #
 	HashTable<unsigned short, sock*> portToSock;
 
 	// FIXME: change this to hold a sock instead of a bool we don't look at
-	HashTable<XIDpair , struct sock*> XIDpairToConnectPending;
+	HashTable<XIDpair , sock*> XIDpairToConnectPending;
 
 	// FIXME: can these be rolled into the sock structure?
 	HashTable<unsigned short, int> nxt_xport;

@@ -137,12 +137,13 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 XTRANSPORT::~XTRANSPORT()
 {
 	//Clear all hashtable entries
-	XIDtoPort.clear();
+	XIDtoSock.clear();
 	portToSock.clear();
 	XIDtoPushPort.clear();
-	XIDpairToPort.clear();
+	XIDpairToSock.clear();
 	XIDpairToConnectPending.clear();
 
+	// FIXME: we should clete the contents of the above hash tables as needed
 	hlim.clear();
 	xcmp_listeners.clear();
 	nxt_xport.clear();
@@ -236,12 +237,12 @@ bool XTRANSPORT::RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &no
 		// it know about this failure.
 
 		// FIXME: Tear down the connection setup state
-		// XIDPairToPort
+		// XIDPairToSock
 		// XIDPairToConnectPending
 		// anything else?
 
 //		XIDpairToConnectPending.erase(xid_pair);
-//		XIDpairToPort.erase(xid_pair);
+//		XIDpairToSock.erase(xid_pair);
 
 		// sk belongs to the listening socket, so we just leave it alone
 
@@ -378,7 +379,7 @@ bool XTRANSPORT::RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now)
 			if (sk->state != LISTEN) {
 				click_chatter("Tear down: deleting route %s from port %d\n", source_xid.unparse().c_str(), _sport);
 				delRoute(source_xid);
-				XIDtoPort.erase(source_xid);
+				XIDtoSock.erase(source_xid);
 			}
 		}
 
@@ -442,7 +443,7 @@ bool XTRANSPORT::TearDownSocket(sock *sk, unsigned short _sport, Timestamp &now)
 
 			//click_chatter("deleting route %s from port %d\n", source_xid.unparse().c_str(), _sport);
 			delRoute(source_xid);
-			XIDtoPort.erase(source_xid);
+			XIDtoSock.erase(source_xid);
 		}
 	}
 
@@ -1154,14 +1155,15 @@ void XTRANSPORT::ProcessMigratePacket(WritablePacket *p_in)
 	xid_pair.set_src(_destination_xid);
 	xid_pair.set_dst(_source_xid);
 
-	unsigned short _dport = XIDpairToPort.get(xid_pair);
+	sock *sk= XIDpairToSock.get(xid_pair);
 
-	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
 	if (!sk) {
 		// FIXME: we need to fix the state machine so this doesn't happen!
 		click_chatter("ProcessMigratePacket: sk == NULL\n");
 		return;
 	}
+
+	unsigned short _dport = sk->port;
 
 	_errh->debug("ProcessMigrate: %s from port %d at %ld.\n", _source_xid.unparse().c_str(), _dport, Timestamp::now());
 
@@ -1336,14 +1338,13 @@ void XTRANSPORT::ProcessMigrateAck(WritablePacket *p_in)
 	xid_pair.set_src(_destination_xid);
 	xid_pair.set_dst(_source_xid);
 
-	unsigned short _dport = XIDpairToPort.get(xid_pair);
-
-	sock *sk = portToSock.get(_dport);
+	sock *sk = XIDpairToSock.get(xid_pair);
 	if (!sk) {
 		// This should never happen
 		ERROR("ProcessMigrateAckPacket: sk == NULL\n");
 		return;
 	}
+	unsigned short _dport = sk->port;
 
 	if (!sk->state == ESTABLISHED) {
 		// This should never happen!
@@ -1494,9 +1495,9 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 	xid_pair.set_dst(_source_xid);
 
 	// unlike the other stream handlers, there is no pair yet, so use dest_xid to get port
-	unsigned short _dport = XIDtoPort.get(_destination_xid);
+	sock *sk = XIDtoSock.get(_destination_xid);
+	unsigned short _dport = sk->port;
 
-	sock *sk = portToSock.get(_dport);
 	if (!sk) {
 		// FIXME: we need to fix the state machine so this doesn't happen!
 		WARN("ProcessSynPacket: sk == NULL\n");
@@ -1678,14 +1679,14 @@ int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 	xid_pair.set_src(_destination_xid);
 	xid_pair.set_dst(_source_xid);
 
-	unsigned short _dport = XIDtoPort.get(_destination_xid);
+	sock *sk = XIDtoSock.get(_destination_xid);
 
-	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
 	if (!sk) {
 		// FIXME: we need to fix the state machine so this doesn't happen!
-		click_chatter("ProcessStreamRawPacket: sk == NULL\n");
+		T_ERROR("sk == NULL\n");
 		return 0;
 	}
+	unsigned short _dport = sk->port;
 
 	click_chatter("STATE:%d\n", sk->state);
 
@@ -1733,14 +1734,13 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 	xid_pair.set_src(_destination_xid);
 	xid_pair.set_dst(_source_xid);
 
-	unsigned short _dport = XIDpairToPort.get(xid_pair);
-
-	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
+	sock *sk= XIDpairToSock.get(xid_pair);
 	if (!sk) {
 		// FIXME: we need to fix the state machine so this doesn't happen!
 		click_chatter("ProcessSynAckDataPacket: sk == NULL\n");
 		return;
 	}
+	unsigned short _dport = sk->port;
 
 	if(sk->dst_path != src_path) {
 		click_chatter("ProcessNetworkPacket: remote path in SYNACK different from that used in SYN");
@@ -1878,14 +1878,14 @@ void XTRANSPORT::ProcessStreamDataPacket(WritablePacket*p_in)
 	xid_pair.set_src(_destination_xid);
 	xid_pair.set_dst(_source_xid);
 
-	unsigned short _dport = XIDpairToPort.get(xid_pair);
-
-	sock *sk = portToSock.get(_dport);
+	sock *sk = XIDpairToSock.get(xid_pair);
 	if (!sk) {
 		// FIXME: we need to fix the state machine so this doesn't happen!
 		click_chatter("ProcessStreamDataPacket: sk == NULL\n");
 		return;
 	}
+	unsigned short _dport = sk->port;
+
 	if (sk) {
 		if(sk->state == ESTABLISHED) {
 			// buffer data, if we have room
@@ -1967,25 +1967,26 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 	xid_pair.set_src(_destination_xid);
 	xid_pair.set_dst(_source_xid);
 
-	unsigned short _dport;
-
 	HashTable<XIDpair, struct sock*>::iterator it;
 	it = XIDpairToConnectPending.find(xid_pair);
 
+	sock *sk;
+
 	if (it != XIDpairToConnectPending.end()) {
 		// connect is in progress so pair to port is not set up yet, use the listen socket's port
-		_dport = XIDtoPort.get(_destination_xid);
+		sk = XIDtoSock.get(_destination_xid);
 
 	} else {
-		_dport = XIDpairToPort.get(xid_pair);
+		sk = XIDpairToSock.get(xid_pair);
 	}
 
-	sock *sk = portToSock.get(_dport);
 	if (!sk) {
 		// FIXME: we need to fix the state machine so this doesn't happen!
 		click_chatter("ProcessAckPacket: sk == NULL\n");
 		return;
 	}
+
+	unsigned short _dport = sk->port;
 
 	// chenren: handler for SYNACK's ACK begins
 	// push this socket into pending_connection_buf and let Xaccept handle that
@@ -2040,7 +2041,7 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 				if (!sk->isListenSocket) {
 					click_chatter("deleting route %s from port %d\n", source_xid.unparse().c_str(), _dport);
 					delRoute(source_xid);
-					XIDtoPort.erase(source_xid);
+					XIDtoSock.erase(source_xid);
 				}
 			}
 			portToSock.erase(_dport);
@@ -2132,15 +2133,14 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 	xid_pair.set_src(_destination_xid);
 	xid_pair.set_dst(_source_xid);
 
-	unsigned short _dport = XIDpairToPort.get(xid_pair);
-
-	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
-
+	sock *sk = XIDpairToSock.get(xid_pair);
 	if (!sk) {
 		// FIXME: we need to fix the state machine so this doesn't happen!
 		click_chatter("ProcessFinPacket: sk == NULL\n");
 		return;
 	}
+
+	unsigned short _dport = sk->port;
 
 	// prevent it from sending FIN after receiving FINACK
 	sk->state = CLOSING;
@@ -2237,15 +2237,14 @@ void XTRANSPORT::ProcessFinAckPacket(WritablePacket *p_in)
 	xid_pair.set_src(_destination_xid);
 	xid_pair.set_dst(_source_xid);
 
-	unsigned short _dport = XIDpairToPort.get(xid_pair);
-
-	sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
-
+	sock *sk = XIDpairToSock.get(xid_pair);
 	if (!sk) {
 		// FIXME: we need to fix the state machine so this doesn't happen!
 		click_chatter("ProcessFinAckPacket: sk == NULL\n");
 		return;
 	}
+
+	unsigned short _dport = sk->port;
 
 	sk->dst_path = src_path;
 	sk->finack_waiting = false;
@@ -2297,7 +2296,7 @@ void XTRANSPORT::ProcessFinAckPacket(WritablePacket *p_in)
 			if (!sk->isListenSocket) {
 				click_chatter("deleting route %s from port %d\n", source_xid.unparse().c_str(), _dport);
 				delRoute(source_xid);
-				XIDtoPort.erase(source_xid);
+				XIDtoSock.erase(source_xid);
 			}
 		}
 
@@ -2324,14 +2323,14 @@ void XTRANSPORT::ProcessDatagramPacket(WritablePacket *p_in)
 	XIAPath dst_path = xiah.dst_path();
 	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
 
-	unsigned short _dport = XIDtoPort.get(_destination_xid);  // This is to be updated for the XSOCK_STREAM type connections below
+	sock *sk = XIDtoSock.get(_destination_xid);  // This is to be updated for the XSOCK_STREAM type connections below
 
-	sock *sk = portToSock.get(_dport);
 	if (!sk) {
 		// FIXME: we need to fix the state machine so this doesn't happen!
 		click_chatter("ProcessDatagramPacket: sk == NULL\n");
 		return;
 	}
+	unsigned short _dport = sk->port;
 
 	// buffer packet if this is a DGRAM socket and we have room
 	if (sk->sock_type == SOCK_DGRAM && should_buffer_received_packet(p_in, sk)) {
@@ -2512,7 +2511,8 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 	xid_pair.set_src(destination_sid);
 	xid_pair.set_dst(source_cid);
 
-	unsigned short _dport = XIDpairToPort.get(xid_pair);
+	sock *sk = XIDpairToSock.get(xid_pair);
+	unsigned short _dport = sk->port;
 
 // 	click_chatter(">>packet from processCACHEpackets %d\n", _dport);
 // 	click_chatter("CachePacket, Src: %s, Dest: %s, Local: %s", xiah.dst_path().unparse().c_str(),
@@ -2520,14 +2520,12 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 	click_chatter("CachePacket, dest: %s, src_cid %s OPCode: %d \n", destination_sid.unparse().c_str(), source_cid.unparse().c_str(), ch.opcode());
 // 	click_chatter("dst_path: %s, src_path: %s, OPCode: %d\n", dst_path.unparse().c_str(), src_path.unparse().c_str(), ch.opcode());
 
-	if(_dport) {
+	if (_dport) {
 		//TODO: Refine the way we change DAG in case of migration. Use some control bits. Add verification
 		//sock sk=portToSock.get(_dport);
 		//sk.dst_path=xiah.src_path();
 		//portToSock.set(_dport,sk);
 		//ENDTODO
-
-		sock *sk = portToSock.get(_dport);
 
 		// Reset timer or just Remove the corresponding entry in the hash tables (Done below)
 		HashTable<XID, WritablePacket*>::iterator it1;
@@ -2922,6 +2920,7 @@ void XTRANSPORT::Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg) {
 		sk->last = LAST_NODE_DEFAULT;
 		sk->hlim = hlim.get(_sport);
 		sk->initialized = true;
+		sk->port = _sport;
 
 		//Check if binding to full DAG or just to SID only
 		Vector<XIAPath::handle_t> xids = sk->src_path.next_nodes( sk->src_path.source_node() );
@@ -2939,7 +2938,7 @@ void XTRANSPORT::Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg) {
 		//TODO: Add a check to see if XID is already being used
 
 		// Map the source XID to source port (for now, for either type of tranports)
-		XIDtoPort.set(source_xid, _sport);
+		XIDtoSock.set(source_xid, sk);
 		addRoute(source_xid);
 //		printf("Xbind, S2P %d, %p\n", _sport, sk);
 		portToSock.set(_sport, sk);
@@ -3174,10 +3173,10 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 	// Map the src & dst XID pair to source port()
 	//click_chatter("setting pair to port1 %d\n", _sport);
 
-	XIDpairToPort.set(xid_pair, _sport);
+	XIDpairToSock.set(xid_pair, sk);
 
 	// Map the source XID to source port
-	XIDtoPort.set(source_xid, _sport);
+	XIDtoSock.set(source_xid, sk);
 	addRoute(source_xid);
 
 	// click_chatter("XCONNECT: set %d %x",_sport, sk);
@@ -3330,7 +3329,7 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		xid_pair.set_dst(destination_xid);
 
 		// Map the src & dst XID pair to source port
-		XIDpairToPort.set(xid_pair, new_port);
+		XIDpairToSock.set(xid_pair, new_sk);
 		//printf("Xaccept pair to port %d %s %s\n", _sport, source_xid.unparse().c_str(), destination_xid.unparse().c_str());
 
 		// click_chatter("XACCEPT: (%s) my_sport=%d  my_sid=%s  his_sid=%s \n\n", (_local_addr.unparse()).c_str(), _sport, source_xid.unparse().c_str(), destination_xid.unparse().c_str());
@@ -4169,7 +4168,7 @@ void XTRANSPORT::Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg,
 
 		XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
 
-		XIDtoPort.set(source_xid, _sport); //Maybe change the mapping to XID->sock?
+		XIDtoSock.set(source_xid, sk); //Maybe change the mapping to XID->sock?
 		addRoute(source_xid);
 	}
 
@@ -4351,7 +4350,7 @@ void XTRANSPORT::XrequestChunk(unsigned short _sport, xia::XSocketMsg *xia_socke
 
 			XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
 
-			XIDtoPort.set(source_xid, _sport); //Maybe change the mapping to XID->sock?
+			XIDtoSock.set(source_xid, sk);
 			addRoute(source_xid);
 
 		}
@@ -4409,7 +4408,7 @@ void XTRANSPORT::XrequestChunk(unsigned short _sport, xia::XSocketMsg *xia_socke
 		xid_pair.set_dst(destination_cid);
 
 		// Map the src & dst XID pair to source port
-		XIDpairToPort.set(xid_pair, _sport);
+		XIDpairToSock.set(xid_pair, sk);
 
 		// Store the packet into buffer
 		WritablePacket *copy_req_pkt = copy_cid_req_packet(p, sk);
@@ -4736,7 +4735,7 @@ void XTRANSPORT::XpushChunkto(unsigned short _sport, xia::XSocketMsg *xia_socket
 
 		XID source_xid = sk->src_path.xid(sk->src_path.destination_node());
 
-		XIDtoPort.set(source_xid, _sport); //Maybe change the mapping to XID->DAGinfo?
+		XIDtoSock.set(source_xid, sk);
 		addRoute(source_xid);
 
 	}
@@ -4816,7 +4815,7 @@ void XTRANSPORT::XpushChunkto(unsigned short _sport, xia::XSocketMsg *xia_socket
 	xid_pair.set_dst(destination_sid);
 
 	// Map the src & dst XID pair to source port
-	XIDpairToPort.set(xid_pair, _sport);
+	XIDpairToSock.set(xid_pair, sk);
 
 
 	portToSock.set(_sport, sk);
