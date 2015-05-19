@@ -9,7 +9,7 @@ CLICK_DECLS
 #define NOTICE(...) _errh->notice(__VA_ARGS__)  // level 5
 #define WARN(...)   _errh->warning(__VA_ARGS__) // level 4
 #define ERROR(...)  _errh->error(__VA_ARGS__)   // level 3
-#define ALERT(...)  _errh->fatal(__VA_ARGS__)   // level -1
+//#define ALERT(...)  _errh->fatal(__VA_ARGS__)   // level -1
 #define TRACE()     _errh->debug("%s: %d", __FUNCTION__, __LINE__)
 
 class XLog : public Element { public:
