@@ -105,25 +105,11 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	_local_addr = local_addr;
 	_local_hid = local_addr.xid(local_addr.destination_node());
 	_local_4id = local_4id;
+	
 	// IP:0.0.0.0 indicates NULL 4ID
 	_null_4id.parse("IP:0.0.0.0");
 
 	_is_dual_stack_router = is_dual_stack_router;
-
-	/*
-	// If a valid 4ID is given, it is included (as a fallback) in the local_addr
-	if(_local_4id != _null_4id) {
-		String str_local_addr = _local_addr.unparse();
-		size_t AD_found_start = str_local_addr.find_left("AD:");
-		size_t AD_found_end = str_local_addr.find_left(" ", AD_found_start);
-		String AD_str = str_local_addr.substring(AD_found_start, AD_found_end - AD_found_start);
-		String HID_str = _local_hid.unparse();
-		String IP4ID_str = _local_4id.unparse();
-		String new_local_addr = "RE ( " + IP4ID_str + " ) " + AD_str + " " + HID_str;
-		//click_chatter("new address is - %s", new_local_addr.c_str());
-		_local_addr.parse(new_local_addr);
-	}
-	*/
 
 #if USERLEVEL
 	_routeTable = dynamic_cast<XIAXIDRouteTable*>(routing_table_elem);

@@ -149,7 +149,7 @@ private:
 
 		sock() {
 			port = so_error = polling = 0;
-			state = connState = INACTIVE;
+			state = INACTIVE;
 
 			isBlocking = true;
 			initialized = timer_on = full_src_dag = false;
@@ -180,7 +180,7 @@ private:
 		int sock_type;
 		SocketState state;
 		bool isBlocking;
-		bool initialized;			// FIXME: do we really need this?
+		bool initialized;			// FIXME: used by dgram and chunks. can we replace it?
 		int so_error;				// used by non-blocking connect, accessed via getsockopt(SO_ERROR)
 		int so_debug;				// set/read via SO_DEBUG. could be used for tracing
 		int interface_id;			// port of the interface the packets arrive on
@@ -200,7 +200,6 @@ private:
 		/* =========================
 		 * "TCP" state
 		 * ========================= */
-		SocketState connState;		// FIXME: roll into s_state
 		unsigned backlog;			// max # of outstanding connections
 		uint32_t seq_num;
 		uint32_t ack_num;
