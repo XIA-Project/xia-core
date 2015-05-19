@@ -1249,7 +1249,10 @@ int updateSidAdsTable(std::string AD, std::string SID, ServiceState service_stat
             //update if version is newer
             if (route_state.SIDADsTable[SID][AD].seq < service_state.seq || route_state.SIDADsTable[SID][AD].seq - service_state.seq > SEQNUM_WINDOW)
             {
-                //syslog(LOG_DEBUG, "Got %d > %d new discovery msg %s@%s, priority%d",service_state.seq, route_state.SIDADsTable[SID][AD].seq, SID.c_str(), AD.c_str(), service_state.priority); 
+                //syslog(LOG_DEBUG, "Got %d > %d new discovery msg %s@%s, priority%d",service_state.seq, route_state.SIDADsTable[SID][AD].seq, SID.c_str(), AD.c_str(), service_state.priority);
+                if (route_state.SIDADsTable[SID][AD].capacity != service_state.capacity){
+                    route_state.send_sid_decision = true; // update decision
+                }
                 route_state.SIDADsTable[SID][AD].capacity = service_state.capacity;
                 route_state.SIDADsTable[SID][AD].capacity_factor = service_state.capacity_factor;
                 route_state.SIDADsTable[SID][AD].link_factor = service_state.link_factor;
@@ -1335,6 +1338,11 @@ void* updatePathThread(void* updating)
             //syslog(LOG_DEBUG, "latency to %s is %d", it_ad->first.c_str(), latency);
             ADPathState ADpath_state;
             ADpath_state.delay = latency>0?latency:9999; // maybe a timeout/atoi failure
+            int delta = route_state.ADPathStates[it_ad->first].delay - ADpath_state.delay;
+            if ( delta > 5 || delta < -5 ){
+                route_state.send_sid_decision = true; // re-query the decision because latency is changed
+                //TODO: only query that SID.
+            }
             //This is probably thread-safe TODO: lock
             route_state.ADPathStates[it_ad->first] = ADpath_state;
         }
@@ -2124,6 +2132,9 @@ void set_sid_conf(const char* myhostname)
             }
                 
             //fprintf(stderr, "read state%s, %d, %d, %s\n", sid, service_state.capacity, service_state.isLeader, service_state.leaderAddr.c_str());
+            if (route_state.LocalSidList[service_sid].capacity != service_state.capacity){
+                route_state.send_sid_discovery = true; //update
+            }
             route_state.LocalSidList[service_sid] = service_state;
         }
 
@@ -2279,8 +2290,9 @@ int main(int argc, char *argv[])
 
             while (iter != timeStamp.end())
             {
-                if (now - iter->second >= EXPIRE_TIME){
+                if (now - iter->second >= EXPIRE_TIME*10){
                     xr.delRoute(iter->first);
+                    last_update_latency = 0; // force update latency
                     syslog(LOG_INFO, "purging host route for : %s", iter->first.c_str());
                     timeStamp.erase(iter++);
                 } else {
@@ -2292,8 +2304,9 @@ int main(int argc, char *argv[])
 
             while (iter1 != route_state.ADNetworkTable.end())
             {
-                if (now - iter1->second.timestamp >= EXPIRE_TIME){
+                if (now - iter1->second.timestamp >= EXPIRE_TIME*10){
                     syslog(LOG_INFO, "purging neighbor : %s", iter1->first.c_str());
+                    last_update_latency = 0; // force update latency
                     route_state.ADNetworkTable.erase(iter1++);
                 } else {
                     ++iter1;
@@ -2305,6 +2318,7 @@ int main(int argc, char *argv[])
             while (iter2 != route_state.neighborTable.end())
             {
                 if (now - iter2->second.timestamp >= EXPIRE_TIME){
+                    last_update_latency = 0; // force update latency
                     syslog(LOG_INFO, "purging AD network : %s", iter2->first.c_str());
                     route_state.neighborTable.erase(iter2++);
                     route_state.num_neighbors -= 1;
@@ -2317,9 +2331,10 @@ int main(int argc, char *argv[])
 
             while (iter3 != route_state.ADNeighborTable.end())
             {
-                if (now - iter3->second.timestamp >= EXPIRE_TIME){
+                if (now - iter3->second.timestamp >= EXPIRE_TIME*10){
+                    last_update_latency = 0; // force update latency
                     syslog(LOG_INFO, "purging AD neighbor : %s", iter3->first.c_str());
-                    //
+
                     route_state.ADNetworkTable[route_state.myAD].neighbor_list.erase(
                         std::remove(route_state.ADNetworkTable[route_state.myAD].neighbor_list.begin(),
                                     route_state.ADNetworkTable[route_state.myAD].neighbor_list.end(),
