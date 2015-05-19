@@ -216,6 +216,8 @@ bool XTRANSPORT::RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now)
 
 bool XTRANSPORT::RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &now)
 {
+	bool rc = false;
+
 	if (sk->num_connect_tries <= MAX_CONNECT_TRIES) {
 		click_chatter("Timer: SYNACK RETRANSMIT! \n");
 		WritablePacket *copy = copy_packet(sk->synack_pkt, sk); // chenren: added for retransmission
@@ -242,17 +244,17 @@ bool XTRANSPORT::RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &no
 //		XIDpairToPort.erase(xid_pair);
 
 		// sk belongs to the listening socket, so we just leave it alone
-		// FIXME: this timer is global to the listening socket, so turning it off for one
-		// connection attempt turns it off for all conn attempts - bad!
-		sk->timer_on = false;
-		sk->state = INACTIVE;
+
 		click_chatter("Turn off timer because sk->num_connect_tries > MAX_CONNECT_TRIES\n");
+		rc = true;
 	}
-	return false;
+	return rc;
 }
 
 bool XTRANSPORT::RetransmitFIN(sock *sk, unsigned short _sport, Timestamp &now)
 {
+	bool rc = false;
+
 	click_chatter("Timer: finack waiting\n");
 	if (sk->num_close_tries <= MAX_CLOSE_TRIES) {
 		click_chatter("Timer: FIN RETRANSMIT! \n");
@@ -273,12 +275,15 @@ bool XTRANSPORT::RetransmitFIN(sock *sk, unsigned short _sport, Timestamp &now)
 		sk->timer_on = false;
 		sk->finack_waiting = false;
 		click_chatter("Turn off timer because sk->num_close_tries > MAX_CLOSE_TRIES\n");
+		rc = true;
 	}
-	return false;
+	return rc;
 }
 
 bool XTRANSPORT::RetransmitFINACK(sock *sk, unsigned short _sport, Timestamp &now)
 {
+	bool rc = true;
+
 	// click_chatter("Timer: synack waiting\n");
 	if (sk->num_close_tries <= MAX_CLOSE_TRIES) {
 		click_chatter("Timer: FINACK RETRANSMIT! \n");
@@ -300,12 +305,14 @@ bool XTRANSPORT::RetransmitFINACK(sock *sk, unsigned short _sport, Timestamp &no
 		sk->timer_on = false;
 		sk->finackack_waiting = false;
 		click_chatter("Turn off timer because sk->num_close_tries > MAX_CLOSE_TRIES\n");
+		rc = true;
 	}
-	return false;
+	return rc;
 }
 
 bool XTRANSPORT::RetransmitMIGRATE(sock *sk, unsigned short _sport, Timestamp &now)
 {
+	bool rc = false;
 	//click_chatter("Timer: migrateack waiting\n");
 	if (sk->num_migrate_tries <= MAX_MIGRATE_TRIES) {
 
@@ -327,7 +334,7 @@ bool XTRANSPORT::RetransmitMIGRATE(sock *sk, unsigned short _sport, Timestamp &n
 		sk->migrateack_waiting = false;
 	}
 
-	return false;
+	return rc;
 }
 
 bool XTRANSPORT::RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now)
@@ -514,9 +521,6 @@ void XTRANSPORT::run_timer(Timer *timer)
 			if (sk->state == SYN_SENT == true && sk->expiry <= now ) {
 				RetransmitSYN(sk, _sport, now);
 
-			} else if (sk->state == SYN_RCVD && sk->synackack_expiry <= now) {
-				tear_down = RetransmitSYNACK(sk, _sport, now);
-
 			} else if (sk->finack_waiting == true && sk->finack_expiry <= now) {
 				tear_down = RetransmitFIN(sk, _sport, now);
 
@@ -558,6 +562,23 @@ void XTRANSPORT::run_timer(Timer *timer)
 		}
 	}
 
+	for (HashTable<XIDpair , struct sock*>::iterator it = XIDpairToConnectPending.begin(); it != XIDpairToConnectPending.end(); ++it) {
+		sock *sk = it->second;
+		bool tear_down = false;
+
+		// now do any in progress accepts
+		if (sk->state == SYN_RCVD && sk->synackack_expiry <= now) {
+			tear_down = RetransmitSYNACK(sk, 0, now);
+		}
+
+		if (tear_down) {
+			// we couldn't sync up with the peer
+			sk->timer_on = false;
+			sk->state = INACTIVE;
+			// FIXME: kill the socket hard
+		}
+	}
+
 	// Set the next timer
 	if (earlist_pending_expiry > now) {
 		_timer.reschedule_at(earlist_pending_expiry);
@@ -567,10 +588,12 @@ void XTRANSPORT::run_timer(Timer *timer)
 void XTRANSPORT::copy_common(sock *sk, XIAHeader &xiahdr, XIAHeaderEncap &xiah) {
 
 	//Recalculate source path
+TRACE();
 	XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
 	String str_local_addr = _local_addr.unparse_re() + " " + source_xid.unparse();
 	//Make source DAG _local_addr:SID
 	String dagstr = sk->src_path.unparse_re();
+TRACE();
 
 	//Client Mobility...
 	if (dagstr.length() != 0 && dagstr != str_local_addr) {
@@ -578,6 +601,7 @@ void XTRANSPORT::copy_common(sock *sk, XIAHeader &xiahdr, XIAHeaderEncap &xiah) 
 		// 1. Update 'sk->src_path'
 		sk->src_path.parse_re(str_local_addr);
 	}
+TRACE();
 
 	xiah.set_nxt(xiahdr.nxt());
 	xiah.set_last(xiahdr.last());
@@ -591,6 +615,8 @@ WritablePacket *XTRANSPORT::copy_packet(Packet *p, sock *sk) {
 
 	XIAHeader xiahdr(p);
 	XIAHeaderEncap xiah;
+TRACE();
+
 	copy_common(sk, xiahdr, xiah);
 
 	TransportHeader thdr(p);
@@ -984,7 +1010,7 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	//Extract the destination port
 	unsigned short _sport = SRC_PORT_ANNO(p_in);
 
-	DBG("Push: Got packet from API sport:%d",ntohs(_sport));
+	// DBG("Push: Got packet from API sport:%d",ntohs(_sport));
 
 	std::string p_buf;
 	p_buf.assign((const char*)p_in->data(), (const char*)p_in->end_data());
@@ -1493,43 +1519,34 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 	sock *sk = portToSock.get(_dport);
 	if (!sk) {
 		// FIXME: we need to fix the state machine so this doesn't happen!
-		click_chatter("ProcessSynPacket: sk == NULL\n");
+		WARN("ProcessSynPacket: sk == NULL\n");
 		return;
 	}
-	_errh->debug("ProcessSynPacket: %s from port %d at %ld.\n", _source_xid.unparse().c_str(), _dport, Timestamp::now());
+	DBG("ProcessSynPacket: %s from port %d at %ld.\n", _source_xid.unparse().c_str(), _dport, Timestamp::now());
 
 	if (sk->state != LISTEN) {
 		// we aren't marked to accept connecctions, drop it
 
-		click_chatter("SYN received on a non-listening socket (port:%u), dropping...\n", _dport);
+		WARN("SYN received on a non-listening socket (port:%u), dropping...\n", _dport);
 		return;
 	}
 
 	if (sk->pending_connection_buf.size() >= sk->backlog) {
 		// the backlog is full, we can't take it right now, drop it
 
-		click_chatter("SYN received but backlog is full (port:%u), dropping...\n", _dport);
+		WARN("SYN received but backlog is full (port:%u), dropping...\n", _dport);
 		return;
 	}
 
-	//click_chatter("syn dport = %d\n", _dport);
-
-	//sock *sk = portToSock.get(_dport); // TODO: check that mapping exists
-
-	// Received a SYN from a client
-
 	// First, check if this request is already in the pending queue
-	HashTable<XIDpair , bool>::iterator it;
+	HashTable<XIDpair , struct sock*>::iterator it;
 	it = XIDpairToConnectPending.find(xid_pair);
 
 	if (it == XIDpairToConnectPending.end()) {
 		// if this is new request, put it in the queue
 
-		// 1. prepare new Daginfo and store it
-		// 2. send SYNACK to client
-
-		click_chatter("New SYN\n");
-		//1. Prepare new sock for this connection
+		// send SYNACK to client
+		INFO("New SYN\n");
 
 		XIAHeaderEncap xiah_new;
 		xiah_new.set_nxt(CLICK_XIA_NXT_TRN);
@@ -1545,7 +1562,7 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 		int payloadLength;
 		if(usingRendezvousDAG(sk->src_path, dst_path)) {
 			XID _destination_xid = dst_path.xid(dst_path.destination_node());
-			click_chatter("Xaccept: Sending SYNACK with verification for RV DAG");
+			INFO("Xaccept: Sending SYNACK with verification for RV DAG");
 			// Destination DAG from the SYN packet
 			String src_path_str = dst_path.unparse();
 
@@ -1562,7 +1579,7 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 			char signature[MAX_SIGNATURE_SIZE];
 			uint16_t signatureLength = MAX_SIGNATURE_SIZE;
 			if(xs_sign(_destination_xid.unparse().c_str(), (unsigned char *)synackPayload.get_buffer(), synackPayload.size(), (unsigned char *)signature, &signatureLength)) {
-				click_chatter("Xaccept: ERROR unable to sign the SYNACK using private key for %s", _destination_xid.unparse().c_str());
+				ERROR("Xaccept: ERROR unable to sign the SYNACK using private key for %s", _destination_xid.unparse().c_str());
 #if 0
 // FIXME XXXX what to do here?
 
@@ -1582,7 +1599,7 @@ poll error
 			char pubkey[MAX_PUBKEY_SIZE];
 			uint16_t pubkeyLength = MAX_PUBKEY_SIZE;
 			if(xs_getPubkey(_destination_xid.unparse().c_str(), pubkey, &pubkeyLength)) {
-				click_chatter("Xaccept: ERROR public key not found for %s", _destination_xid.unparse().c_str());
+				ERROR("Xaccept: ERROR public key not found for %s", _destination_xid.unparse().c_str());
 #if 0
 // FIXME XXXX what to do here?
 				rc = -1;
@@ -1625,23 +1642,43 @@ poll error
 		p = xiah_new.encap(p, false);
 		delete thdr_new;
 
+		// Mark these src & dst XID pair
+		// Prepare new sock for this connection
+		sock *new_sk = new sock();
+		new_sk->port = -1; // just for now. This will be updated via Xaccept call
+
 		// chenren: enable timer for synack retransmission
 		// Set timer
-		sk->timer_on = true;
-		sk->state = SYN_RCVD;
-		sk->synackack_expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
-		sk->synack_pkt = copy_packet(p, sk);
+		new_sk->timer_on = true;
+		new_sk->state = SYN_RCVD;
+		new_sk->synackack_expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
+TRACE();
 
-		if (! _timer.scheduled() || _timer.expiry() >= sk->synackack_expiry)
-			_timer.reschedule_at(sk->synackack_expiry);
+		if (! _timer.scheduled() || _timer.expiry() >= new_sk->synackack_expiry)
+			_timer.reschedule_at(new_sk->synackack_expiry);
 
-		// Store the syn packet for potential retransmission
+		new_sk->sock_type = SOCK_STREAM;
+		new_sk->dst_path = src_path;
+		new_sk->src_path = dst_path;
+
+		new_sk->initialized = true;
+		new_sk->nxt = LAST_NODE_DEFAULT;
+		new_sk->last = LAST_NODE_DEFAULT;
+		new_sk->hlim = HLIM_DEFAULT;
+		new_sk->seq_num = 0;
+		new_sk->ack_num = 0;
+		memset(new_sk->send_buffer, 0, new_sk->send_buffer_size * sizeof(WritablePacket*));
+		memset(new_sk->recv_buffer, 0, new_sk->recv_buffer_size * sizeof(WritablePacket*));
+
+		new_sk->synack_pkt = copy_packet(p, new_sk);
+
+		XIDpairToConnectPending.set(xid_pair, new_sk);
 
 		output(NETWORK_PORT).push(p);
 		click_chatter("SYNACK sent! \n");
 
-		// Mark these src & dst XID pair
-		XIDpairToConnectPending.set(xid_pair, true);
+	} else {
+		// we've already seen it, ignore it
 	}
 }
 
@@ -1957,10 +1994,10 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 
 	unsigned short _dport;
 
-	HashTable<XIDpair, bool>::iterator it_temp;
-	it_temp = XIDpairToConnectPending.find(xid_pair);
+	HashTable<XIDpair, struct sock*>::iterator it;
+	it = XIDpairToConnectPending.find(xid_pair);
 
-	if (it_temp != XIDpairToConnectPending.end()) {
+	if (it != XIDpairToConnectPending.end()) {
 		// connect is in progress so pair to port is not set up yet, use the listen socket's port
 		_dport = XIDtoPort.get(_destination_xid);
 
@@ -1977,34 +2014,18 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 
 	// chenren: handler for SYNACK's ACK begins
 	// push this socket into pending_connection_buf and let Xaccept handle that
-	HashTable<XIDpair, bool>::iterator it;
-	it = XIDpairToConnectPending.find(xid_pair);
-
 	if (it != XIDpairToConnectPending.end()) {
 		click_chatter("Receives the ACK of SYNACK at %ld.\n", Timestamp::now());
-		sock *new_sk = new sock();
-		new_sk->port = -1; // just for now. This will be updated via Xaccept call
 
-		new_sk->sock_type = SOCK_STREAM;
-		new_sk->dst_path = src_path;
-		new_sk->src_path = dst_path;
+		sock *new_sk = it->second;
 		new_sk->state = ESTABLISHED;
-
 		new_sk->initialized = true;
-		new_sk->nxt = LAST_NODE_DEFAULT;
-		new_sk->last = LAST_NODE_DEFAULT;
-		new_sk->hlim = HLIM_DEFAULT;
-		new_sk->seq_num = 0;
-		new_sk->ack_num = 0;
-		memset(new_sk->send_buffer, 0, new_sk->send_buffer_size * sizeof(WritablePacket*));
-		memset(new_sk->recv_buffer, 0, new_sk->recv_buffer_size * sizeof(WritablePacket*));
 
 		// Clear timer
-		sk->timer_on = false;
-		sk->state = ESTABLISHED;
-
-		sk->pending_connection_buf.push(new_sk);
 		click_chatter("Turn off the timer and push into pending_connection_buf at %ld.\n", Timestamp::now());
+		new_sk->timer_on = false;
+		
+		sk->pending_connection_buf.push(new_sk);
 
 		// If the app is ready for a new connection, alert it
 		if (!sk->pendingAccepts.empty()) {
@@ -2379,27 +2400,35 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 
 	switch(thdr.pkt_info()) {
 		case TransportHeader::ACK:
+			TRACE();
 			ProcessAckPacket(p_in);
 			break;
 		case TransportHeader::DATA:
+			TRACE();
 			ProcessStreamDataPacket(p_in);
 			break;
 		case TransportHeader::SYN:
+			TRACE();
 			ProcessSynPacket(p_in);
 			break;
 		case TransportHeader::SYNACK:
+			TRACE();
 			ProcessSynAckPacket(p_in);
 			break;
 		case TransportHeader::MIGRATE:
+			TRACE();
 			ProcessMigratePacket(p_in);
 			break;
 		case TransportHeader::MIGRATEACK:
+			TRACE();
 			ProcessMigrateAck(p_in);
 			break;
 		case TransportHeader::FIN:
+			TRACE();
 			ProcessFinPacket(p_in);
 			break;
 		case TransportHeader::FINACK:
+			TRACE();
 			ProcessFinAckPacket(p_in);
 			break;
 		default:
@@ -3326,20 +3355,8 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 			click_chatter("Xtransport: Socket on port %d is now connected\n", new_port);
 		}
 		new_sk->port = new_port;
-
-		new_sk->seq_num = 0;
-		new_sk->ack_num = 0;
-		new_sk->send_base = 0;
-		new_sk->isBlocking = true;
-		new_sk->hlim = hlim.get(new_port);
-		new_sk->next_send_seqnum = 0;
-		new_sk->next_recv_seqnum = 0;
 		new_sk->state = ESTABLISHED;
 		new_sk->isListenSocket = true; // FIXME: if we don't do this, this socket will remove the route to the listening dag
-		memset(new_sk->send_buffer, 0, new_sk->send_buffer_size * sizeof(WritablePacket*));
-		memset(new_sk->recv_buffer, 0, new_sk->recv_buffer_size * sizeof(WritablePacket*));
-		//new_sk->pending_connection_buf = new queue<sock>();
-		//new_sk->pendingAccepts = new queue<xia::XSocketMsg*>();
 
 		portToSock.set(new_port, new_sk);
 

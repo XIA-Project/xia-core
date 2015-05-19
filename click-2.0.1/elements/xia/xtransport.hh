@@ -286,7 +286,7 @@ protected:
 	HashTable<unsigned short, sock*> portToSock;
 
 	// FIXME: change this to hold a sock instead of a bool we don't look at
-	HashTable<XIDpair , bool> XIDpairToConnectPending;
+	HashTable<XIDpair , struct sock*> XIDpairToConnectPending;
 
 	// FIXME: this can be eliminated in the code
 	HashTable<unsigned short, bool> portToActive;
