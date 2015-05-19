@@ -169,7 +169,6 @@ private:
 			dgram_buffer_start = 0;
 			dgram_buffer_end = -1;
 
-			last = LAST_NODE_DEFAULT;
 			hlim = HLIM_DEFAULT;
 
 		}
@@ -192,11 +191,11 @@ private:
 
 		XIAPath src_path;			// peer DAG
 		XIAPath dst_path;			// our DAG
-		int nxt;					// next transport header type
-		int last;					// FIXME: do we need this?
 		uint8_t hlim;				// hlim/ttl
 
 		bool full_src_dag;			// bind to full dag or just to SID
+
+		unsigned short nxt_xport;
 
 		/* =========================
 		 * "TCP" state
@@ -285,13 +284,8 @@ protected:
 	// find sock structure based on API port #
 	HashTable<unsigned short, sock*> portToSock;
 
-	// FIXME: change this to hold a sock instead of a bool we don't look at
+	// servers keep track of in process connect attempts here
 	HashTable<XIDpair , sock*> XIDpairToConnectPending;
-
-	// FIXME: can these be rolled into the sock structure?
-	HashTable<unsigned short, int> nxt_xport;
-	HashTable<unsigned short, int> hlim;
-
 
 	// atomic_uint32_t _id;	// FIXME: is this a click thing, or can we delete it?
 

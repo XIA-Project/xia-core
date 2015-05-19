@@ -144,9 +144,8 @@ XTRANSPORT::~XTRANSPORT()
 	XIDpairToConnectPending.clear();
 
 	// FIXME: we should clete the contents of the above hash tables as needed
-	hlim.clear();
+
 	xcmp_listeners.clear();
-	nxt_xport.clear();
 }
 
 
@@ -384,9 +383,7 @@ bool XTRANSPORT::RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now)
 		}
 
 		portToSock.erase(_sport);
-		hlim.erase(_sport);
 
-		nxt_xport.erase(_sport);
 		xcmp_listeners.remove(_sport);
 		for (int i = 0; i < sk->send_buffer_size; i++) {
 			if (sk->send_buffer[i] != NULL) {
@@ -449,9 +446,7 @@ bool XTRANSPORT::TearDownSocket(sock *sk, unsigned short _sport, Timestamp &now)
 
 	delete sk;
 	portToSock.erase(_sport);
-	hlim.erase(_sport);
 
-	nxt_xport.erase(_sport);
 	xcmp_listeners.remove(_sport);
 	for (int i = 0; i < sk->send_buffer_size; i++) {
 		if (sk->send_buffer[i] != NULL) {
@@ -1643,8 +1638,6 @@ TRACE();
 		new_sk->src_path = dst_path;
 
 		new_sk->initialized = true;
-		new_sk->nxt = LAST_NODE_DEFAULT;
-		new_sk->last = LAST_NODE_DEFAULT;
 		new_sk->hlim = HLIM_DEFAULT;
 		new_sk->seq_num = 0;
 		new_sk->ack_num = 0;
@@ -2045,9 +2038,7 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 				}
 			}
 			portToSock.erase(_dport);
-			hlim.erase(_dport);
 
-			nxt_xport.erase(_dport);
 			xcmp_listeners.remove(_dport);
 			for (int i = 0; i < sk->send_buffer_size; i++) {
 				if (sk->send_buffer[i] != NULL) {
@@ -2301,9 +2292,7 @@ void XTRANSPORT::ProcessFinAckPacket(WritablePacket *p_in)
 		}
 
 		portToSock.erase(_dport);
-		hlim.erase(_dport);
 
-		nxt_xport.erase(_dport);
 		xcmp_listeners.remove(_dport);
 		for (int i = 0; i < sk->send_buffer_size; i++) {
 			if (sk->send_buffer[i] != NULL) {
@@ -2794,8 +2783,8 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	// Map the source port to sock
 	portToSock.set(_sport, sk);
 
-	hlim.set(_sport, HLIM_DEFAULT);
-	nxt_xport.set(_sport, CLICK_XIA_NXT_TRN);
+	sk->hlim = HLIM_DEFAULT;
+	sk->nxt_xport = CLICK_XIA_NXT_TRN;
 
 	// click_chatter("XSOCKET: sport=%hu\n", _sport);
 
@@ -2817,7 +2806,7 @@ void XTRANSPORT::Xsetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_
 		{
 			int hl = x_sso_msg->int_opt();
 
-			hlim.set(_sport, hl);
+			sk->hlim = hl;
 			//click_chatter("sso:hlim:%d\n",hl);
 		}
 		break;
@@ -2825,7 +2814,7 @@ void XTRANSPORT::Xsetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_
 		case XOPT_NEXT_PROTO:
 		{
 			int nxt = x_sso_msg->int_opt();
-			nxt_xport.set(_sport, nxt);
+			sk->nxt_xport = nxt;
 			if (nxt == CLICK_XIA_NXT_XCMP)
 				xcmp_listeners.push_back(_sport);
 			else
@@ -2861,12 +2850,12 @@ void XTRANSPORT::Xgetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_
 	// click_chatter("opt = %d\n", x_sso_msg->opt_type());
 	switch (x_sso_msg->opt_type()) {
 		case XOPT_HLIM:
-			x_sso_msg->set_int_opt(hlim.get(_sport));
+			x_sso_msg->set_int_opt(sk->hlim);
 			//click_chatter("gso:hlim:%d\n", hlim.get(_sport));
 			break;
 
 		case XOPT_NEXT_PROTO:
-			x_sso_msg->set_int_opt(nxt_xport.get(_sport));
+			x_sso_msg->set_int_opt(sk->nxt_xport);
 			break;
 
 		case SO_ACCEPTCONN:
@@ -2916,9 +2905,6 @@ void XTRANSPORT::Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg) {
 	//Set the source DAG in sock
 	sock *sk = portToSock.get(_sport);
 	if (sk->src_path.parse(sdag_string)) {
-		sk->nxt = LAST_NODE_DEFAULT;
-		sk->last = LAST_NODE_DEFAULT;
-		sk->hlim = hlim.get(_sport);
 		sk->initialized = true;
 		sk->port = _sport;
 
@@ -2977,9 +2963,6 @@ void XTRANSPORT::XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	//Set the source DAG in sock
 	sock *sk = portToSock.get(_sport);
 	if (sk->src_path.parse(sdag_string)) {
-		sk->nxt = LAST_NODE_DEFAULT;
-		sk->last = LAST_NODE_DEFAULT;
-		sk->hlim = hlim.get(_sport);
 		sk->state = INACTIVE;
 		sk->initialized = true;
 
@@ -3159,10 +3142,6 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 	// src_path must be set by Xbind() or Xconnect() API
 	assert(sk->src_path.is_valid());
 
-	sk->nxt = LAST_NODE_DEFAULT;
-	sk->last = LAST_NODE_DEFAULT;
-	sk->hlim = hlim.get(_sport);
-
 	XID source_xid = sk->src_path.xid(sk->src_path.destination_node());
 	XID destination_xid = sk->dst_path.xid(sk->dst_path.destination_node());
 
@@ -3187,7 +3166,7 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 	XIAHeaderEncap xiah;
 	xiah.set_nxt(CLICK_XIA_NXT_TRN);
 	xiah.set_last(LAST_NODE_DEFAULT);
-	xiah.set_hlim(hlim.get(_sport));
+	xiah.set_hlim(sk->hlim);
 	xiah.set_dst_path(dst_path);
 	xiah.set_src_path(sk->src_path);
 
@@ -3302,8 +3281,8 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 	click_chatter("Xtranport::Xaccept _sport %d, new_port %d\n", _sport, new_port);
 
-	hlim.set(new_port, HLIM_DEFAULT);
-	nxt_xport.set(new_port, CLICK_XIA_NXT_TRN);
+	sk->hlim = HLIM_DEFAULT;
+	sk->nxt_xport = CLICK_XIA_NXT_TRN;
 
 	if (!sk->pending_connection_buf.empty()) {
 		sock *new_sk = sk->pending_connection_buf.front();
@@ -3458,7 +3437,7 @@ void XTRANSPORT::Xupdaterv(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	// Prepare XIP header
 	XIAHeaderEncap xiah;
 	xiah.set_last(LAST_NODE_DEFAULT);
-	xiah.set_hlim(hlim.get(_sport));
+	xiah.set_hlim(sk->hlim);
 	xiah.set_dst_path(rendezvousDAG);
 	xiah.set_src_path(sk->src_path);
 
@@ -3817,7 +3796,7 @@ void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 		XIAHeaderEncap xiah;
 		xiah.set_nxt(CLICK_XIA_NXT_TRN);
 		xiah.set_last(LAST_NODE_DEFAULT);
-		xiah.set_hlim(hlim.get(_migrateport));
+		xiah.set_hlim(sk->hlim);
 		xiah.set_dst_path(sk->dst_path);
 		xiah.set_src_path(sk->src_path);
 
@@ -4068,7 +4047,7 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 		XIAHeaderEncap xiah;
 		xiah.set_nxt(CLICK_XIA_NXT_TRN);
 		xiah.set_last(LAST_NODE_DEFAULT);
-		xiah.set_hlim(hlim.get(_sport));
+		xiah.set_hlim(sk->hlim);
 		xiah.set_dst_path(sk->dst_path);
 		xiah.set_src_path(sk->src_path);
 		xiah.set_plen(pktPayloadSize);
@@ -4163,9 +4142,6 @@ void XTRANSPORT::Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg,
 
 		sk->src_path.parse_re(str_local_addr);
 
-		sk->last = LAST_NODE_DEFAULT;
-		sk->hlim = hlim.get(_sport);
-
 		XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
 
 		XIDtoSock.set(source_xid, sk); //Maybe change the mapping to XID->sock?
@@ -4203,7 +4179,7 @@ void XTRANSPORT::Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg,
 	XIAHeaderEncap xiah;
 
 	xiah.set_last(LAST_NODE_DEFAULT);
-	xiah.set_hlim(hlim.get(_sport));
+	xiah.set_hlim(sk->hlim);
 	xiah.set_dst_path(dst_path);
 	xiah.set_src_path(sk->src_path);
 
@@ -4212,7 +4188,7 @@ void XTRANSPORT::Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg,
 	WritablePacket *p = NULL;
 
 	if (sk->sock_type == SOCK_RAW) {
-		xiah.set_nxt(nxt_xport.get(_sport));
+		xiah.set_nxt(sk->nxt_xport);
 
 		xiah.set_plen(pktPayloadSize);
 		p = xiah.encap(just_payload_part, false);
@@ -4345,9 +4321,6 @@ void XTRANSPORT::XrequestChunk(unsigned short _sport, xia::XSocketMsg *xia_socke
 
 			sk->src_path.parse_re(str_local_addr);
 
-			sk->last = LAST_NODE_DEFAULT;
-			sk->hlim = hlim.get(_sport);
-
 			XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
 
 			XIDtoSock.set(source_xid, sk);
@@ -4385,7 +4358,7 @@ void XTRANSPORT::XrequestChunk(unsigned short _sport, xia::XSocketMsg *xia_socke
 		XIAHeaderEncap xiah;
 		xiah.set_nxt(CLICK_XIA_NXT_CID);
 		xiah.set_last(LAST_NODE_DEFAULT);
-		xiah.set_hlim(hlim.get(_sport));
+		xiah.set_hlim(sk->hlim);
 		xiah.set_dst_path(dst_path);
 		xiah.set_src_path(sk->src_path);
 		xiah.set_plen(pktPayloadSize);
@@ -4659,7 +4632,7 @@ void XTRANSPORT::XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	//Add XIA headers
 	XIAHeaderEncap xiah;
 	xiah.set_last(LAST_NODE_DEFAULT);
-	xiah.set_hlim(hlim.get(_sport));
+	xiah.set_hlim(HLIM_DEFAULT);
 	xiah.set_dst_path(_local_addr);
 	xiah.set_src_path(src_path);
 	xiah.set_nxt(CLICK_XIA_NXT_CID);
@@ -4730,9 +4703,6 @@ void XTRANSPORT::XpushChunkto(unsigned short _sport, xia::XSocketMsg *xia_socket
 
 		sk->src_path.parse_re(str_local_addr);
 
-		sk->last = LAST_NODE_DEFAULT;
-		sk->hlim = hlim.get(_sport);
-
 		XID source_xid = sk->src_path.xid(sk->src_path.destination_node());
 
 		XIDtoSock.set(source_xid, sk);
@@ -4782,7 +4752,7 @@ void XTRANSPORT::XpushChunkto(unsigned short _sport, xia::XSocketMsg *xia_socket
 	XIAHeaderEncap xiah;
 	xiah.set_nxt(CLICK_XIA_NXT_CID);
 	xiah.set_last(LAST_NODE_DEFAULT);
-	xiah.set_hlim(hlim.get(_sport));
+	xiah.set_hlim(sk->hlim);
 	xiah.set_dst_path(dst_path);
 	xiah.set_src_path(cid_src_path); //FIXME: is this the correct way to do it? Do we need SID? AD->HID->SID->CID
 	xiah.set_plen(pktPayloadSize);
