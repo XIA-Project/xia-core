@@ -154,7 +154,6 @@ private:
 			isBlocking = true;
 			initialized = timer_on = full_src_dag = false;
 
-			synackack_waiting = false;
 			finack_waiting = finackack_waiting = false;
 			dataack_waiting = teardown_waiting = false;
 
@@ -177,15 +176,15 @@ private:
 	 * Common Socket states
 	 * ========================= */
 		unsigned short port;		// API Port
-		int sock_type;
-		SocketState state;
-		bool isBlocking;
+		int sock_type;				// STREAM, DGRAM, RAW, CHUNK
+		SocketState state;			// Socket state (Mainly for STREAM)
+		bool isBlocking;			// true if socket is blocking (default)
 		bool initialized;			// FIXME: used by dgram and chunks. can we replace it?
 		int so_error;				// used by non-blocking connect, accessed via getsockopt(SO_ERROR)
-		int so_debug;				// set/read via SO_DEBUG. could be used for tracing
+		int so_debug;				// set/read via SO_DEBUG. could be used for tracing in the future
 		int interface_id;			// port of the interface the packets arrive on
 		unsigned polling;			// # of outstanding poll/select requests on this socket
-		bool recv_pending;			// true if we should send received network data to app upon receiving it
+		bool recv_pending;			// true if API is waiting to receive data
 		bool timer_on;				// if true timer is enabled
 		Timestamp expiry;			// when timer should fire next
 
@@ -204,7 +203,6 @@ private:
 		uint32_t seq_num;
 		uint32_t ack_num;
 		bool isListenSocket;		// FIXME: can this be replaced by s_state == LISTEN?
-		bool synackack_waiting;
 		bool finack_waiting;
 		bool finackack_waiting;
 		bool dataack_waiting;
@@ -212,10 +210,7 @@ private:
 		int num_connect_tries;		// FIXME: can these all be flattened into one variable?
 		int num_retransmit_tries;
 		int num_close_tries;
-		WritablePacket *syn_pkt;	// FIXME: can these all be flattened into one?
-		WritablePacket *synack_pkt;
-		WritablePacket *fin_pkt;
-		WritablePacket *finack_pkt;
+		WritablePacket *pkt;		// Control packet waiting to be ack'd (FIXME: could this just go in the send buffer?)
 
 		Timestamp teardown_expiry;	// FIXME: can these all be flattened into expiry?
 		Timestamp synackack_expiry;

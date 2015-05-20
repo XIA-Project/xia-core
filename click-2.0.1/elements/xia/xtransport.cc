@@ -105,7 +105,7 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	_local_addr = local_addr;
 	_local_hid = local_addr.xid(local_addr.destination_node());
 	_local_4id = local_4id;
-	
+
 	// IP:0.0.0.0 indicates NULL 4ID
 	_null_4id.parse("IP:0.0.0.0");
 
@@ -160,7 +160,7 @@ bool XTRANSPORT::RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now)
 	if (sk->num_connect_tries <= MAX_CONNECT_TRIES) {
 		click_chatter("Timer: SYN RETRANSMIT! \n");
 
-		WritablePacket *copy = copy_packet(sk->syn_pkt, sk);
+		WritablePacket *copy = copy_packet(sk->pkt, sk);
 		// retransmit syn
 		XIAHeader xiah(copy);
 		// click_chatter("Timer: (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
@@ -206,7 +206,7 @@ bool XTRANSPORT::RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &no
 
 	if (sk->num_connect_tries <= MAX_CONNECT_TRIES) {
 		click_chatter("Timer: SYNACK RETRANSMIT! \n");
-		WritablePacket *copy = copy_packet(sk->synack_pkt, sk); // chenren: added for retransmission
+		WritablePacket *copy = copy_packet(sk->pkt, sk); // chenren: added for retransmission
 		XIAHeader xiah(copy);
 		// click_chatter("Timer: (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
 		output(NETWORK_PORT).push(copy);
@@ -244,7 +244,7 @@ bool XTRANSPORT::RetransmitFIN(sock *sk, unsigned short _sport, Timestamp &now)
 	click_chatter("Timer: finack waiting\n");
 	if (sk->num_close_tries <= MAX_CLOSE_TRIES) {
 		click_chatter("Timer: FIN RETRANSMIT! \n");
-		WritablePacket *copy = copy_packet(sk->fin_pkt, sk); // chenren: added for retransmission
+		WritablePacket *copy = copy_packet(sk->pkt, sk); // chenren: added for retransmission
 		XIAHeader xiah(copy);
 		// click_chatter("Timer: (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
 		output(NETWORK_PORT).push(copy);
@@ -273,7 +273,7 @@ bool XTRANSPORT::RetransmitFINACK(sock *sk, unsigned short _sport, Timestamp &no
 	// click_chatter("Timer: synack waiting\n");
 	if (sk->num_close_tries <= MAX_CLOSE_TRIES) {
 		click_chatter("Timer: FINACK RETRANSMIT! \n");
-		WritablePacket *copy = copy_packet(sk->finack_pkt, sk); // chenren: added for retransmission
+		WritablePacket *copy = copy_packet(sk->pkt, sk); // chenren: added for retransmission
 		XIAHeader xiah(copy);
 		// click_chatter("Timer: (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
 		output(NETWORK_PORT).push(copy);
@@ -384,10 +384,7 @@ bool XTRANSPORT::RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now)
 			}
 		}
 // FIXME: XXXX clean up socket state
-//					delete sk->syn_pkt;
-//					delete sk_>synack_pkt; // chenren: for retransmission
-//					delete sk->fin_pkt; 		// chenren: for retransmission
-//					delete sk->finack_pkt; // chenren: for retransmission
+//					delete sk->pkt;
 		delete sk;
 	}
 
@@ -1630,7 +1627,7 @@ TRACE();
 		memset(new_sk->send_buffer, 0, new_sk->send_buffer_size * sizeof(WritablePacket*));
 		memset(new_sk->recv_buffer, 0, new_sk->recv_buffer_size * sizeof(WritablePacket*));
 
-		new_sk->synack_pkt = copy_packet(p, new_sk);
+		new_sk->pkt = copy_packet(p, new_sk);
 
 		XIDpairToConnectPending.set(xid_pair, new_sk);
 
@@ -2170,7 +2167,7 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 		_timer.reschedule_at(sk->finackack_expiry);
 
 	// Store the syn packet for potential retransmission
-	sk->finack_pkt = copy_packet(p, sk);
+	sk->pkt = copy_packet(p, sk);
 
 	XIAHeader xiah1(p);
 	String pld((char *)xiah1.payload(), xiah1.plen());
@@ -3040,7 +3037,7 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 				_timer.reschedule_at(sk->finack_expiry);
 
 			// Store the syn packet for potential retransmission
-			sk->fin_pkt = copy_packet(p, sk);
+			sk->pkt = copy_packet(p, sk);
 
 			XIAHeader xiah1(p);
 			String pld((char *)xiah1.payload(), xiah1.plen());
@@ -3106,7 +3103,6 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 
 	sk->dst_path = dst_path;
 	sk->port = _sport;
-//	sk->connState = CONNECTING;
 	sk->state = SYN_SENT;
 
 	sk->initialized = true;
@@ -3182,7 +3178,7 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 		_timer.reschedule_at(sk->expiry);
 
 	// Store the syn packet for potential retransmission
-	sk->syn_pkt = copy_packet(p, sk);
+	sk->pkt = copy_packet(p, sk);
 
 	portToSock.set(_sport, sk);
 	if(_sport != sk->port) {
