@@ -260,14 +260,18 @@ def makeHostConfig(hid):
 # footer - boilerplate
 
 def makeRouterConfig(ad, hid):
+    makeRouterConfigToFile(ad, hid, routerconfig)
+
+def makeRouterConfigToFile(ad, hid, outfile):
     global interface_filter, interface
 
     interfaces = getInterfaces(interface_filter, interface)
+    print "Got these interfaces:", interfaces
 
-    template = '%s.%s' % (routerconfig, ext)
-    outfile = routerconfig
+    template = '%s.%s' % (outfile, ext)
 
     socket_ip_port_list = [p.strip() for p in socket_ips_ports.split(',')] if socket_ips_ports else []
+    print "Socket ip port list contains:", socket_ip_port_list
 
     makeGenericRouterConfig(4, ad, hid, socket_ip_port_list, interfaces, [], template, outfile)
 
@@ -277,6 +281,7 @@ def makeGenericRouterConfig(num_ports, ad, hid, socket_ip_port_list, xia_interfa
     dummy_ip = '0.0.0.0'
     dummy_mac = '00:00:00:00:00:00'
 
+    print "Opening template and output click file"
     try:
         f = open(template, 'r')
         text = f.read()
@@ -703,16 +708,21 @@ def main():
 
     getOptions()
 
+    print "Creating HID"
     hid = createHID()
     rhid = createHID()
     makeXIAAddrConfig(hid)
 
+    print "Checking type of node to create"
     if (nodetype == "host"):
+        print "Creating host"
         if dual_stack:
+            print "Creating dual stack host"
             ad = createAD()
             makeDualHostConfig(ad, hid, rhid)
         else:
-            makeHostConfig(hid)
+            print "Calling makeRouterConfig"
+            makeRouterConfigToFile("AD_INIT", hid, hostconfig)
     elif nodetype == "router":
         ad = createAD()
         if dual_stack:
