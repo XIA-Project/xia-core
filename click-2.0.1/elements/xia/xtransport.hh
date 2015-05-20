@@ -371,6 +371,8 @@ protected:
 	bool RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now);
 	bool RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &now);
 
+	void MigrateFailure(sock *sk);
+
 	// modify routing table
 	void addRoute(const XID &sid) {
 		String cmd = sid.unparse() + " " + String(DESTINED_FOR_LOCALHOST);

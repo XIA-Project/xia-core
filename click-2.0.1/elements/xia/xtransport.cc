@@ -25,6 +25,8 @@
 *
 * TCP Stuff:
 *  if we receive a SYN, should it reset the SYNACK retransmit count to 0?
+*
+* Could we replace XIDPairToConnectPending with the current socket state?
 */
 
 /*
@@ -1456,6 +1458,24 @@ void XTRANSPORT::ProcessXcmpPacket(WritablePacket *p_in)
 	}
 }
 
+void XTRANSPORT::MigrateFailure(sock *sk)
+{
+	// FIXME: this should probably be a general error handler
+	if (sk->polling) {
+		// tell API we are in trouble
+		ProcessPollEvent(sk->port, POLLHUP);
+	}
+
+	if (sk->isBlocking && sk->recv_pending) {
+		// The api is blocking on a recv, return an error
+		ReturnResult(sk->port, sk->pending_recv_msg, -1, ESTALE);
+
+		sk->recv_pending = false;
+		delete sk->pending_recv_msg;
+		sk->pending_recv_msg = NULL;
+	}
+}
+
 void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
@@ -1474,13 +1494,14 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 
 	// unlike the other stream handlers, there is no pair yet, so use dest_xid to get port
 	sock *sk = XIDtoSock.get(_destination_xid);
-	unsigned short _dport = sk->port;
 
 	if (!sk) {
 		// FIXME: we need to fix the state machine so this doesn't happen!
 		WARN("ProcessSynPacket: sk == NULL\n");
 		return;
 	}
+	unsigned short _dport = sk->port;
+
 	DBG("ProcessSynPacket: %s from port %d at %ld.\n", _source_xid.unparse().c_str(), _dport, Timestamp::now());
 
 	if (sk->state != LISTEN) {
@@ -1505,7 +1526,7 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 		// if this is new request, put it in the queue
 
 		// send SYNACK to client
-		INFO("New SYN\n");
+		INFO("Handling new SYN\n");
 
 		XIAHeaderEncap xiah_new;
 		xiah_new.set_nxt(CLICK_XIA_NXT_TRN);
@@ -1521,7 +1542,7 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 		int payloadLength;
 		if(usingRendezvousDAG(sk->src_path, dst_path)) {
 			XID _destination_xid = dst_path.xid(dst_path.destination_node());
-			INFO("Xaccept: Sending SYNACK with verification for RV DAG");
+			T_INFO("Sending SYNACK with verification for RV DAG");
 			// Destination DAG from the SYN packet
 			String src_path_str = dst_path.unparse();
 
@@ -1538,20 +1559,9 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 			char signature[MAX_SIGNATURE_SIZE];
 			uint16_t signatureLength = MAX_SIGNATURE_SIZE;
 			if(xs_sign(_destination_xid.unparse().c_str(), (unsigned char *)synackPayload.get_buffer(), synackPayload.size(), (unsigned char *)signature, &signatureLength)) {
-				ERROR("Xaccept: ERROR unable to sign the SYNACK using private key for %s", _destination_xid.unparse().c_str());
-#if 0
-// FIXME XXXX what to do here?
-
-if blocking returnresult error
-else
-poll error
-
-				rc = -1;
-				ec = ESTALE;
-				goto Xaccept_done;
-#else
+				T_ERROR("ERROR unable to sign the SYNACK using private key for %s", _destination_xid.unparse().c_str());
+				MigrateFailure(sk);
 				return;
-#endif
 			}
 
 			// Retrieve public key for this host
@@ -1559,18 +1569,8 @@ poll error
 			uint16_t pubkeyLength = MAX_PUBKEY_SIZE;
 			if(xs_getPubkey(_destination_xid.unparse().c_str(), pubkey, &pubkeyLength)) {
 				ERROR("Xaccept: ERROR public key not found for %s", _destination_xid.unparse().c_str());
-#if 0
-// FIXME XXXX what to do here?
-				rc = -1;
-				ec = ESTALE;
-				goto Xaccept_done;
-
-if blocking returnresult error
-else
-poll error
-#else
+				MigrateFailure(sk);
 				return;
-#endif
 			}
 
 			// Prepare a signed payload (serviceDAG, timestamp)Signature, Pubkey
@@ -1680,10 +1680,10 @@ int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 
 	String src_path_str = src_path.unparse();
 	String dst_path_str = dst_path.unparse();
-	click_chatter("ProcessNetworkPacket: received stream packet on raw socket");
-	click_chatter("ProcessNetworkPacket: src|%s|", src_path_str.c_str());
-	click_chatter("ProcessNetworkPacket: dst|%s|", dst_path_str.c_str());
-	click_chatter("ProcessNetworkPacket: len=%d", p_in->length());
+	T_INFO("received stream packet on raw socket");
+	T_INFO("src|%s|", src_path_str.c_str());
+	T_INFO("dst|%s|", dst_path_str.c_str());
+	T_INFO("len=%d", p_in->length());
 
 	add_packet_to_recv_buf(p_in, sk);
 	if(sk->polling) {
@@ -1696,6 +1696,8 @@ int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 
 void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 {
+	// We may have already received this, so be sure to check to see if we are safe to delete things
+
 	XIAHeader xiah(p_in->xia_header());
 
 	XIAPath dst_path = xiah.dst_path();
@@ -1713,13 +1715,14 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 	sock *sk= XIDpairToSock.get(xid_pair);
 	if (!sk) {
 		// FIXME: we need to fix the state machine so this doesn't happen!
-		click_chatter("ProcessSynAckDataPacket: sk == NULL\n");
+		T_INFO("sk == NULL\n");
 		return;
 	}
 	unsigned short _dport = sk->port;
 
+	// FIXME: this should become a migrate function
 	if(sk->dst_path != src_path) {
-		click_chatter("ProcessNetworkPacket: remote path in SYNACK different from that used in SYN");
+		T_INFO("remote path in SYNACK different from that used in SYN");
 		// Retrieve the signed payload
 		const char *payload = (const char *)thdr.payload();
 		int payload_len = xiah.plen() - thdr.hlen();
@@ -1744,13 +1747,13 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 
 		// Verify pubkey matches the remote SID
 		if(!xs_pubkeyMatchesXID(pubkey, _source_xid.unparse().c_str())) {
-			click_chatter("ProcessNetworkPacket: SYNACK: ERROR: pubkey, remote SID mismatch");
+			T_INFO("SYNACK: ERROR: pubkey, remote SID mismatch");
 			return;
 		}
 
 		// Verify signature using pubkey
 		if(!xs_isValidSignature((const unsigned char *)synackPayloadBuffer, synackPayloadLength, (unsigned char *)signature, signatureLength, pubkey, pubkeyLength)) {
-			click_chatter("ProcessNetworkPacket: SYNACK: ERROR: invalid signature");
+			T_INFO("SYNACK: ERROR: invalid signature");
 			return;
 		}
 
@@ -1770,52 +1773,54 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 		XIAPath remoteDAG;
 		remoteDAG.parse(dag);
 		if(remoteDAG != src_path) {
-			click_chatter("ProcessNetworkPacket: SYNACK: ERROR: Mismatched src_path and remoteDAG: %s vs %s", src_path.unparse().c_str(), remoteDAG.unparse().c_str());
+			T_INFO("SYNACK: ERROR: Mismatched src_path and remoteDAG: %s vs %s", src_path.unparse().c_str(), remoteDAG.unparse().c_str());
 			return;
 		}
-		click_chatter("ProcessNetworkPacket: SYNACK: verified modification by remote SID");
+		T_INFO("SYNACK: verified modification by remote SID");
 		// All checks passed, so update DAGInfo to reflect new path for remote service
 		sk->dst_path = src_path;
 	}
 
-	click_chatter("Received SYNACK!\n");
-	sk->remote_recv_window = thdr.recv_window(); // chenren
+	T_INFO("Received SYNACK!\n");
+	sk->remote_recv_window = thdr.recv_window();
 
-	// Clear timer
-	sk->timer_on = false;
-	sk->so_error = 0;	// let's API know connect is a success when non blocking
-	sk->state = ESTABLISHED;
+	// Enable socket and clear retransmit timer
+	// if state == established, we've already done the stuff below
+	if (sk->state == SYN_SENT) {
+	
+		T_DBG("Turn off the timer because receiving the SYNACK\n");
+		sk->timer_on = false;
+		sk->so_error = 0;	// let's API know connect is a success when non blocking
+		sk->state = ESTABLISHED;
+		sk->pkt->kill();
+		sk->pkt = NULL;
 
-	click_chatter("Turn off the timer because receiving the SYNACK\n");
+		if (sk->polling) {
+			// tell API we are writble now
+			ProcessPollEvent(_dport, POLLIN | POLLOUT);
+		}
 
-// FIXME XXXX not in chenren's code - why?
-	if (sk->polling) {
-		// tell API we are writble now
-		ProcessPollEvent(_dport, POLLOUT);
+		if (sk->isBlocking) {
+			// Notify API that the connection is established
+			xia::XSocketMsg xsm;
+			xsm.set_type(xia::XCONNECT);
+			xsm.set_sequence(0);
+			xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
+			connect_msg->set_ddag(src_path.unparse().c_str());
+			connect_msg->set_status(xia::X_Connect_Msg::XCONNECTED);
+			ReturnResult(_dport, &xsm);
+		}
 	}
-// end missing
-	//sk->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
 
-	if (sk->isBlocking) {
-		// Notify API that the connection is established
-		xia::XSocketMsg xsm;
-		xsm.set_type(xia::XCONNECT);
-		xsm.set_sequence(0); // TODO: what should this be?
-		xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
-		connect_msg->set_ddag(src_path.unparse().c_str());
-		connect_msg->set_status(xia::X_Connect_Msg::XCONNECTED);
-		ReturnResult(_dport, &xsm);
-	}
-
-	// chenren: send SYNACK's ACK back to server begins:
-	// Add XIA headers
+	// now ACK the SYNACK
+	// FIXME: Heaxer building should be common code
 	XIAHeaderEncap xiah_new;
 	xiah_new.set_nxt(CLICK_XIA_NXT_TRN);
 	xiah_new.set_last(LAST_NODE_DEFAULT);
 	xiah_new.set_hlim(HLIM_DEFAULT);
 	xiah_new.set_dst_path(src_path);
 	xiah_new.set_src_path(dst_path);
-	const char* dummy = "SYNACK's ACK";
+	const char* dummy = "SYNACK-ACK";
 	WritablePacket *just_payload_part = WritablePacket::make(256, dummy, strlen(dummy), 0);
 	WritablePacket *p = NULL;
 	xiah_new.set_plen(strlen(dummy));
@@ -1829,13 +1834,7 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 	String pld((char *)xiah1.payload(), xiah1.plen());
 	//click_chatter("\n\n (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), pld.c_str(), xiah1.plen());
 	output(NETWORK_PORT).push(p);
-	click_chatter("Send ACK of SYNACK back at %ld...\n", Timestamp::now());
-	// warning: client don't check state status, which seems to be a bug
-	if (sk->polling) {
-		// tell API we are writble now
-		ProcessPollEvent(_dport, POLLOUT);
-	}
-	// chenren: send ACK back to server ends
+	INFO("Send ACK of SYNACK back at %ld...\n", Timestamp::now());
 }
 
 void XTRANSPORT::ProcessStreamDataPacket(WritablePacket*p_in)
@@ -2333,6 +2332,8 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 		return;
 	}
 
+	// FIXME: it might be clearer to have this table be based on current socket state
+	// but that would require rewriting more code, so leaving as is for now
 	switch(thdr.pkt_info()) {
 		case TransportHeader::ACK:
 			TRACE();
