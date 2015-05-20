@@ -213,7 +213,7 @@ bool XTRANSPORT::RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &no
 		// reset
 		sk->timer_on = true;
 		sk->state = SYN_RCVD;
-		sk->synackack_expiry = now + Timestamp::make_msec(_ackdelay_ms);
+		sk->expiry = now + Timestamp::make_msec(_ackdelay_ms);
 		sk->num_connect_tries++;
 	}
 	else {
@@ -251,7 +251,7 @@ bool XTRANSPORT::RetransmitFIN(sock *sk, unsigned short _sport, Timestamp &now)
 		// reset
 		sk->timer_on = true;
 		sk->finack_waiting = true;
-		sk->finack_expiry = now + Timestamp::make_msec(_ackdelay_ms);
+		sk->expiry = now + Timestamp::make_msec(_ackdelay_ms);
 		sk->num_close_tries++;
 	}
 	else {
@@ -280,7 +280,7 @@ bool XTRANSPORT::RetransmitFINACK(sock *sk, unsigned short _sport, Timestamp &no
 		// reset
 		sk->timer_on = true;
 		sk->finackack_waiting = true;
-		sk->finackack_expiry = now + Timestamp::make_msec(_ackdelay_ms);
+		sk->expiry = now + Timestamp::make_msec(_ackdelay_ms);
 		sk->num_close_tries++;
 	}
 	else {
@@ -496,10 +496,10 @@ void XTRANSPORT::run_timer(Timer *timer)
 			if (sk->state == SYN_SENT == true && sk->expiry <= now ) {
 				RetransmitSYN(sk, _sport, now);
 
-			} else if (sk->finack_waiting == true && sk->finack_expiry <= now) {
+			} else if (sk->finack_waiting == true && sk->expiry <= now) {
 				tear_down = RetransmitFIN(sk, _sport, now);
 
-			} else if (sk->finackack_waiting == true && sk->finackack_expiry <= now) {
+			} else if (sk->finackack_waiting == true && sk->expiry <= now) {
 				tear_down = RetransmitFINACK(sk, _sport, now);
 
 			} else if (sk->migrateack_waiting == true && sk->expiry <= now ) {
@@ -508,7 +508,7 @@ void XTRANSPORT::run_timer(Timer *timer)
 			} else if (sk->dataack_waiting == true && sk->expiry <= now ) {
 				tear_down = RetransmitDATA(sk, _sport, now);
 
-			} else if (sk->teardown_waiting == true && sk->teardown_expiry <= now) {
+			} else if (sk->teardown_waiting == true && sk->expiry <= now) {
 				tear_down = TearDownSocket(sk, _sport, now);
 			}
 		}
@@ -520,8 +520,8 @@ void XTRANSPORT::run_timer(Timer *timer)
 				if (sk->expiry > now && (sk->expiry < earlist_pending_expiry || earlist_pending_expiry == now)) {
 					earlist_pending_expiry = sk->expiry;
 				}
-				if (sk->teardown_expiry > now && (sk->teardown_expiry < earlist_pending_expiry || earlist_pending_expiry == now)) {
-					earlist_pending_expiry = sk->teardown_expiry;
+				if (sk->expiry > now && (sk->expiry < earlist_pending_expiry || earlist_pending_expiry == now)) {
+					earlist_pending_expiry = sk->expiry;
 				}
 			}
 
@@ -542,7 +542,7 @@ void XTRANSPORT::run_timer(Timer *timer)
 		bool tear_down = false;
 
 		// now do any in progress accepts
-		if (sk->state == SYN_RCVD && sk->synackack_expiry <= now) {
+		if (sk->state == SYN_RCVD && sk->expiry <= now) {
 			tear_down = RetransmitSYNACK(sk, 0, now);
 		}
 
@@ -1610,11 +1610,11 @@ poll error
 		// Set timer
 		new_sk->timer_on = true;
 		new_sk->state = SYN_RCVD;
-		new_sk->synackack_expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
+		new_sk->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
 TRACE();
 
-		if (! _timer.scheduled() || _timer.expiry() >= new_sk->synackack_expiry)
-			_timer.reschedule_at(new_sk->synackack_expiry);
+		if (! _timer.scheduled() || _timer.expiry() >= new_sk->expiry)
+			_timer.reschedule_at(new_sk->expiry);
 
 		new_sk->sock_type = SOCK_STREAM;
 		new_sk->dst_path = src_path;
@@ -2121,10 +2121,10 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 	// Set timer
 	sk->timer_on = true;
 	sk->teardown_waiting = true;
-	sk->teardown_expiry = Timestamp::now() + Timestamp::make_msec(_teardown_wait_ms);
+	sk->expiry = Timestamp::now() + Timestamp::make_msec(_teardown_wait_ms);
 
-	if (! _timer.scheduled() || _timer.expiry() >= sk->teardown_expiry)
-		_timer.reschedule_at(sk->teardown_expiry);
+	if (! _timer.scheduled() || _timer.expiry() >= sk->expiry)
+		_timer.reschedule_at(sk->expiry);
 
 	portToSock.set(_dport, sk);
 
@@ -2161,10 +2161,10 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 	// Set timer
 	sk->timer_on = true;
 	sk->finackack_waiting = true;
-	sk->finackack_expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
+	sk->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
 
-	if (! _timer.scheduled() || _timer.expiry() >= sk->finackack_expiry)
-		_timer.reschedule_at(sk->finackack_expiry);
+	if (! _timer.scheduled() || _timer.expiry() >= sk->expiry)
+		_timer.reschedule_at(sk->expiry);
 
 	// Store the syn packet for potential retransmission
 	sk->pkt = copy_packet(p, sk);
@@ -3031,10 +3031,10 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 			// Set timer
 			sk->timer_on = true;
 			sk->finack_waiting = true;
-			sk->finack_expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
+			sk->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
 
-			if (! _timer.scheduled() || _timer.expiry() >= sk->finack_expiry)
-				_timer.reschedule_at(sk->finack_expiry);
+			if (! _timer.scheduled() || _timer.expiry() >= sk->expiry)
+				_timer.reschedule_at(sk->expiry);
 
 			// Store the syn packet for potential retransmission
 			sk->pkt = copy_packet(p, sk);
@@ -3061,10 +3061,10 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	// Set timer
 	sk->timer_on = true;
 	sk->teardown_waiting = true;
-	sk->teardown_expiry = Timestamp::now() + Timestamp::make_msec(_teardown_wait_ms);
+	sk->expiry = Timestamp::now() + Timestamp::make_msec(_teardown_wait_ms);
 
-	if (! _timer.scheduled() || _timer.expiry() >= sk->teardown_expiry)
-		_timer.reschedule_at(sk->teardown_expiry);
+	if (! _timer.scheduled() || _timer.expiry() >= sk->expiry)
+		_timer.reschedule_at(sk->expiry);
 
 	portToSock.set(_sport, sk);
 	xcmp_listeners.remove(_sport);

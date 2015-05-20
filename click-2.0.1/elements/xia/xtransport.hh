@@ -212,11 +212,6 @@ private:
 		int num_close_tries;
 		WritablePacket *pkt;		// Control packet waiting to be ack'd (FIXME: could this just go in the send buffer?)
 
-		Timestamp teardown_expiry;	// FIXME: can these all be flattened into expiry?
-		Timestamp synackack_expiry;
-		Timestamp finack_expiry;
-		Timestamp finackack_expiry;
-
 		// connect/accept
 		queue<sock*> pending_connection_buf;	// list of outstanding connections waiting to be accepted
 		queue<xia::XSocketMsg*> pendingAccepts;	// stores accept messages from API when there are no pending connections
