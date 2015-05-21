@@ -75,7 +75,7 @@ using namespace std;
 #define CACHE_PORT   3
 #define XHCP_PORT	4
 
-enum SocketState {INACTIVE = 0, LISTEN, SYN_RCVD, SYN_SENT, ESTABLISHED, FIN_WAIT1, FIN_WAIT2, CLOSING, CLOSE_WAIT, LAST_ACK, CLOSED};
+enum SocketState {INACTIVE = 0, LISTEN, SYN_RCVD, SYN_SENT, ESTABLISHED, FIN_WAIT1, FIN_WAIT2, TIME_WAIT, CLOSING, CLOSE_WAIT, LAST_ACK, CLOSED};
 
 CLICK_DECLS
 
@@ -371,7 +371,10 @@ protected:
 	bool RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now);
 	bool RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &now);
 
+	void SendControlPacket(int type, sock *sk, const char *, XIAPath &src_path, XIAPath &dst_path);
 	void MigrateFailure(sock *sk);
+	void ScheduleTimer(sock *sk, int delay);
+
 
 	// modify routing table
 	void addRoute(const XID &sid) {
