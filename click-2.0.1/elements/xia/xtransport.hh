@@ -137,27 +137,48 @@ private:
 	 * ========================= */
 	struct sock {
 		sock() {
-			port = so_error = polling = 0;
+			port = 0;
+			sock_type = 0;
 			state = INACTIVE;
-
 			isBlocking = true;
-			initialized = timer_on = full_src_dag = false;
-
-			finack_waiting = finackack_waiting = false;
-			dataack_waiting = teardown_waiting = false;
-
-			migrateack_waiting = false;
-			num_migrate_tries = 0;
-
-			send_base = next_send_seqnum = 0;
-			recv_base = next_recv_seqnum = recv_buffer_count = 0;
+			initialized = false;
+			so_error = 0;
+			so_debug = false;
+			interface_id = -1;
+			polling = false;
 			recv_pending = false;
-			send_buffer_size = recv_buffer_size = DEFAULT_RECV_WIN_SIZE;
-
+			timer_on = false;
+			hlim = HLIM_DEFAULT;
+			full_src_dag = false;
+			nxt_xport =
+			backlog = 5;
+			seq_num = 0;
+			ack_num = 0;
+			isAcceptedSocket = false;
+			finack_waiting = false;
+			finackack_waiting = false;
+			dataack_waiting = false;
+			teardown_waiting = false;
+			num_connect_tries = 0;
+			num_retransmit_tries = 0;
+			num_close_tries = 0;
+			pkt = NULL;
+			send_buffer_size = DEFAULT_RECV_WIN_SIZE;
+			send_base = 0;
+			next_send_seqnum = 0;
+			remote_recv_window = 0;
+			recv_buffer_size = DEFAULT_RECV_WIN_SIZE;
+			recv_base = 0;
+			next_recv_seqnum = 0;
 			dgram_buffer_start = 0;
 			dgram_buffer_end = -1;
-
-			hlim = HLIM_DEFAULT;
+			recv_buffer_count = 0;
+			pending_recv_msg = NULL;
+			migrateack_waiting = false;
+			last_migrate_ts = 0;
+			num_migrate_tries = 0;
+			migrate_pkt = NULL;
+			recv_pending = false;
 		}
 
 	/* =========================
@@ -190,7 +211,7 @@ private:
 		unsigned backlog;			// max # of outstanding connections
 		uint32_t seq_num;
 		uint32_t ack_num;
-		bool isListenSocket;		// FIXME: can this be replaced by s_state == LISTEN?
+		bool isAcceptedSocket;		// true if this socket is generated due to an accept
 		bool finack_waiting;
 		bool finackack_waiting;
 		bool dataack_waiting;
@@ -337,7 +358,7 @@ protected:
 	int HandleStreamRawPacket(WritablePacket *p_in);
 
 	// socket teardown
-	bool TearDownSocket(sock *sk, unsigned short _sport, Timestamp &now);
+	bool TeardownSocket(sock *sk);
 
 	// TCP state handlers
 	void ProcessAckPacket(WritablePacket *p_in);
@@ -364,6 +385,8 @@ protected:
 	void ScheduleTimer(sock *sk, int delay);
 
 	static const char *StateStr(SocketState state);
+	static const char *SocketTypeStr(int);
+
 	static String Netstat(Element *e, void *thunk);
 
 

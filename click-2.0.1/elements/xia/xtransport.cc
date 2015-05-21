@@ -363,41 +363,76 @@ bool XTRANSPORT::RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now)
 	return tear_down;
 }
 
-bool XTRANSPORT::TearDownSocket(sock *sk, unsigned short _sport, Timestamp &now)
+bool XTRANSPORT::TeardownSocket(sock *sk)
 {
+	XID src_xid;
+	XID dst_xid;
+	bool have_src = 0;
+	bool have_dst = 0;
+
+	T_INFO("Tearing down %s socket %d\n", SocketTypeStr(sk->sock_type), sk->port);
+
+	if (sk->src_path.destination_node() != -1) {
+		src_xid = sk->src_path.xid(sk->src_path.destination_node());
+		have_src = true;
+	}
+	if (sk->dst_path.destination_node() != -1) {
+		dst_xid = sk->dst_path.xid(sk->dst_path.destination_node());
+		have_dst = true;
+	}
+
+	xcmp_listeners.remove(sk->port);
+
+	if (sk->sock_type == SOCK_STREAM) {
+		if (have_src && have_dst) {
+			XIDpair xid_pair;
+			xid_pair.set_src(dst_xid);
+			xid_pair.set_dst(src_xid);
+
+			XIDpairToConnectPending.erase(xid_pair);
+			XIDpairToSock.erase(xid_pair);
+		}
+
+		// FIXME:delete these too
+		//queue<sock*> pending_connection_buf;
+		//queue<xia::XSocketMsg*> pendingAccepts;
+		for (int i = 0; i < sk->send_buffer_size; i++) {
+			if (sk->send_buffer[i] != NULL) {
+				sk->send_buffer[i]->kill();
+				sk->send_buffer[i] = NULL;
+			}
+		}
+	}
+
+	if (!sk->isAcceptedSocket) {
+		// we only do this if the socket wasn't generateed due to an accept
+
+		if (have_src) {
+			T_DBG("deleting route for %d %s\n", sk->port, src_xid.unparse().c_str());
+			delRoute(src_xid);
+			XIDtoSock.erase(src_xid);
+		} else {
+			T_DBG("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXID not found for %d\n", sk->port);
+
+		}
+	} else {
+		T_DBG("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX %d is an accepted socket\n", sk->port);
+	}
+
+	if (sk->sock_type == SOCK_CHUNK) {
+		// FIXME: delete this stuff!
+		//HashTable<XID, WritablePacket*> XIDtoCIDreqPkt;
+		//HashTable<XID, Timestamp> XIDtoExpiryTime;
+		//HashTable<XID, bool> XIDtoTimerOn;
+		//HashTable<XID, int> XIDtoStatus;	// Content-chunk request status... 1: waiting to be read, 0: waiting for chunk response, -1: failed
+		//HashTable<XID, bool> XIDtoReadReq;	// Indicates whether ReadCID() is called for a specific CID
+		//HashTable<XID, WritablePacket*> XIDtoCIDresponsePkt;
+	}
+
+	portToSock.erase(sk->port);
+
 	if (sk->pkt) {
 		sk->pkt->kill();
-	}
-
-	// FIXME: need better check here
-	if (!sk->isListenSocket) {
-		// we don't want to delete SIDs if socket was an accepted socket
-
-		// this check for -1 prevents a segfault cause by bad XIDs
-		// it may happen in other cases, but opening a XSOCK_STREAM socket, calling
-		// XreadLocalHostAddr and then closing the socket without doing anything else will
-		// cause the problem
-		if (sk->src_path.destination_node() != -1) {
-
-			XID source_xid = sk->src_path.xid(sk->src_path.destination_node());
-			delRoute(source_xid);
-			XIDtoSock.erase(source_xid);
-		}
-	}
-	if (sk->sock_type == SOCK_STREAM) {
-		// XIDpairToConnectPending.erase()
-		// XIDPairToSock.erase()
-	}
-
-	portToSock.erase(_sport);
-
-	xcmp_listeners.remove(_sport);
-
-	for (int i = 0; i < sk->send_buffer_size; i++) {
-		if (sk->send_buffer[i] != NULL) {
-			sk->send_buffer[i]->kill();
-			sk->send_buffer[i] = NULL;
-		}
 	}
 
 	for (int i = 0; i < sk->recv_buffer_size; i++) {
@@ -477,7 +512,7 @@ void XTRANSPORT::run_timer(Timer *timer)
 				tear_down = RetransmitDATA(sk, _sport, now);
 
 			} else if (sk->teardown_waiting == true && sk->expiry <= now) {
-				tear_down = TearDownSocket(sk, _sport, now);
+			//	tear_down = TeardownSocket(sk);
 			}
 		}
 
@@ -951,7 +986,6 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	//protobuf message parsing
 	xia::XSocketMsg xia_socket_msg;
 	xia_socket_msg.ParseFromString(p_buf);
-
 	switch(xia_socket_msg.type()) {
 	case xia::XSOCKET:
 		Xsocket(_sport, &xia_socket_msg);
@@ -1963,48 +1997,21 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 		}
 		// finish the connection handshake
 		XIDpairToConnectPending.erase(xid_pair);
-	
-	} else if (sk->state == CLOSING) {
+
+	} else if (sk->state == FIN_WAIT1) {
 		T_INFO("Socket %d FINACK-ACK received\n", sk->port);
-		if (sk) {
-			//click_chatter("Cleaning the state start...\n");
-			sk->finackack_waiting = false;
-			sk->timer_on = false;
-			sk->teardown_waiting = false;
-			click_chatter("Turn off the timer because receiving the FINACK\n");
-			// XID source_xid = portToSock.get(_sport).xid;
-			// this check for -1 prevents a segfault cause by bad XIDs
-			// it may happen in other cases, but opening a XSOCK_STREAM socket, calling
-			// XreadLocalHostAddr and then closing the socket without doing anything else will cause the problem
-			// TODO: make sure that -1 is the only condition that will cause us to get a bad XID
 
-			if (sk->src_path.destination_node() != -1) {
-				XID source_xid = sk->src_path.xid(sk->src_path.destination_node());
-				if (!sk->isListenSocket) {
-					click_chatter("deleting route %s from port %d\n", source_xid.unparse().c_str(), sk->port);
-					delRoute(source_xid);
-					XIDtoSock.erase(source_xid);
-				}
-			}
-			portToSock.erase(sk->port);
+		sk->finackack_waiting = false;
+		sk->timer_on = true;
+		sk->teardown_waiting = true;
+		sk->state = FIN_WAIT2;
+		ScheduleTimer(sk, _teardown_wait_ms);
 
-			xcmp_listeners.remove(sk->port);
-			for (int i = 0; i < sk->send_buffer_size; i++) {
-				if (sk->send_buffer[i] != NULL) {
-					sk->send_buffer[i]->kill();
-					sk->send_buffer[i] = NULL;
-				}
-			}
-			click_chatter("Cleaning the state: before delete sk with port %d\n", sk->port);
-			delete sk;
-			//click_chatter("Cleaning the state: after delete sk\n");
-			click_chatter("Cleaning the state: ending...\n");
-		}
-	}
-	// chenren: handler for FINACK's ACK ends
+	} else if (sk->state == LAST_ACK) {
+		T_INFO("Socket %d FINACK-ACK received\n", sk->port);
+		TeardownSocket(sk);
 
-	// chenren: data ACK
-	else if (sk->state == CONNECTED) {
+	} else if (sk->state == CONNECTED) {
 		T_INFO("Socket %d DATA-ACK received\n", sk->port);
 		// chenren
 		if (sk) {
@@ -2137,7 +2144,6 @@ void XTRANSPORT::ProcessFinAckPacket(WritablePacket *p_in)
 
 	unsigned short _dport = sk->port;
 
-//	sk->finack_waiting = false;
 	sk->timer_on = false;
 	// FIXME: deal with active vs passive close
 	sk->state = TIME_WAIT;
@@ -2154,38 +2160,10 @@ void XTRANSPORT::ProcessFinAckPacket(WritablePacket *p_in)
 		// this teardown needs to hppen in the timewait section
 
 		click_chatter("Cleaning the state based on receiving FINACK starts\n");
-		sk->timer_on = false;
-		sk->teardown_waiting = false;
-		click_chatter("Turn off the timer because receiving the FINACK");
-//		sk->state = CLOSED;
-		// XID source_xid = portToSock.get(_sport).xid;
-		// this check for -1 prevents a segfault cause by bad XIDs
-		// it may happen in other cases, but opening a XSOCK_STREAM socket, calling
-		// XreadLocalHostAddr and then closing the socket without doing anything else will cause the problem
-		// TODO: make sure that -1 is the only condition that will cause us to get a bad XID
-
-		if (sk->src_path.destination_node() != -1) {
-			XID source_xid = sk->src_path.xid(sk->src_path.destination_node());
-			if (!sk->isListenSocket) {
-				click_chatter("deleting route %s from port %d\n", source_xid.unparse().c_str(), _dport);
-				delRoute(source_xid);
-				XIDtoSock.erase(source_xid);
-			}
-		}
-
-		portToSock.erase(_dport);
-
-		xcmp_listeners.remove(_dport);
-		for (int i = 0; i < sk->send_buffer_size; i++) {
-			if (sk->send_buffer[i] != NULL) {
-				sk->send_buffer[i]->kill();
-				sk->send_buffer[i] = NULL;
-			}
-		}
-		delete sk;
-		click_chatter("Cleaning the state based on receiving FINACK ends\n");
+		sk->timer_on = true;
+		sk->teardown_waiting = true;
+		ScheduleTimer(sk, _teardown_wait_ms);
 	}
-// chenren: add handler for receiving FIN and FINACK ends
 }
 
 void XTRANSPORT::ProcessDatagramPacket(WritablePacket *p_in)
@@ -2887,41 +2865,43 @@ void XTRANSPORT::XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
 	sock *sk = portToSock.get(_sport);
-	bool tear_down = false;
+	bool teardown = true;
 
 	T_INFO("closing %d\n", _sport);
 
 	if (!sk) {
 		// this shouldn't happen!
 		T_ERROR("Invalid socket %d\n", _sport);
+		goto done;
 	}
 
 	if (sk->sock_type == SOCK_STREAM) {
 
-		if (sk->state == CONNECTED) {
+		if (sk->state == CONNECTED || sk->state == CLOSE_WAIT) {
+			// schedule a close
+			if (sk->state == CONNECTED) {
+				sk->state = FIN_WAIT1;
+			} else {
+				sk->state = LAST_ACK;
+			}
+
+			teardown = false;
+			// tell the other side we're closing
 			sk->timer_on = true;
-//			sk->finack_waiting = true;
-			sk->state = FIN_WAIT1;
 			const char *payload = "FIN";
 			SendControlPacket(TransportHeader::FIN, sk, payload, strlen(payload), sk->dst_path, sk->src_path);
 
 		} else {
 			// it's unconnected, or in listen state, or already in progress closing
-			tear_down = true;
+			// ok to do this if we're in SYN_RCVD or SYN_SENT?
 		}
-
-	} else {
-		// it's a datagram or chunk socket. We can just close it right away
-		tear_down = true;
 	}
 
-	if (tear_down) {
-		// Set timer
-		sk->timer_on = true;
-		sk->teardown_waiting = true;
-		ScheduleTimer(sk, _teardown_wait_ms);
+	if (teardown) {
+		TeardownSocket(sk);
 	}
 
+done:
 	ReturnResult(_sport, xia_socket_msg);
 }
 
@@ -3024,7 +3004,6 @@ void XTRANSPORT::Xlisten(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	sock *sk = portToSock.get(_sport);
 	if (sk->state == INACTIVE) {
 		sk->state = LISTEN;
-		sk->isListenSocket = true;
 		sk->backlog = x_listen_msg->backlog();
 	} else {
 		// FIXME: what is the correct error code to return
@@ -3086,7 +3065,7 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		}
 		new_sk->port = new_port;
 		new_sk->state = CONNECTED;
-		new_sk->isListenSocket = true; // FIXME: if we don't do this, this socket will remove the route to the listening dag
+		new_sk->isAcceptedSocket = true;
 
 		portToSock.set(new_port, new_sk);
 
@@ -4571,6 +4550,18 @@ void XTRANSPORT::XpushChunkto(unsigned short _sport, xia::XSocketMsg *xia_socket
 	ReturnResult(_sport, xia_socket_msg, 0, 0);
 }
 
+const char *XTRANSPORT::SocketTypeStr(int stype)
+{
+	const char *s = "???";
+	switch (stype) {
+		case SOCK_STREAM: s = "STREAM"; break;
+		case SOCK_DGRAM:  s = "DGRAM";  break;
+		case SOCK_RAW:    s = "RAW";    break;
+		case SOCK_CHUNK:  s = "CHUNK";  break;
+	}
+	return s;
+}
+
 const char *XTRANSPORT::StateStr(SocketState state)
 {
 	const char *s = "???";
@@ -4605,30 +4596,20 @@ String XTRANSPORT::Netstat(Element *e, void *)
 	for (HashTable<unsigned short, sock*>::iterator it = xt->portToSock.begin(); it != xt->portToSock.end(); ++it) {
 		unsigned short _sport = it->first;
 		sock *sk = it->second;
-		const char *type;
-		const char *state;
-		XID source_xid;
-
+		const char *type = SocketTypeStr(sk->sock_type);
+		const char *state = "";
 		const char *xid = "";
-
-		switch (sk->sock_type) {
-			case SOCK_STREAM: type = "STREAM"; break;
-			case SOCK_DGRAM:  type = "DGRAM";  break;
-			case SOCK_RAW:    type = "RAW";    break;
-			case SOCK_CHUNK: type = "CHUNK";  break;
-		}
+		XID source_xid;
 
 		if (sk->sock_type == SOCK_STREAM) {
 			state = StateStr(sk->state);
-		} else {
-			state = "";
 		}
 
 		if (sk->src_path.destination_node() != -1) {
-
-		source_xid = sk->src_path.xid(sk->src_path.destination_node());
-		xid = source_xid.unparse().c_str();
+			source_xid = sk->src_path.xid(sk->src_path.destination_node());
+			xid = source_xid.unparse().c_str();
 		}
+
 		sprintf(line, "%-5d  %-6s  %-10s  %s\n", _sport, type, state, xid);
 		table += line;
 	}
