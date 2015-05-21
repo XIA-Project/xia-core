@@ -375,6 +375,8 @@ protected:
 	void MigrateFailure(sock *sk);
 	void ScheduleTimer(sock *sk, int delay);
 
+	static String Netstat(Element *e, void *thunk);
+
 
 	// modify routing table
 	void addRoute(const XID &sid) {

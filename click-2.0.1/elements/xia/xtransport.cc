@@ -2639,6 +2639,7 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam,
 
 void XTRANSPORT::add_handlers() {
 	add_write_handler("local_addr", write_param, (void *)H_MOVE);
+	add_read_handler("netstat", Netstat, 0);
 }
 
 /*
@@ -4597,6 +4598,52 @@ void XTRANSPORT::XpushChunkto(unsigned short _sport, xia::XSocketMsg *xia_socket
 
 	output(NETWORK_PORT).push(p);
 	ReturnResult(_sport, xia_socket_msg, 0, 0);
+}
+
+String XTRANSPORT::Netstat(Element *e, void *)
+{
+	String table;
+	char line[512];
+	XTRANSPORT* xt = static_cast<XTRANSPORT*>(e);
+
+	sprintf(line, "%-5s %-6s %-11s\n", "PORT", "TYPE", "STATE");
+	table += line;
+	sprintf(line, "========================\n");
+	table += line;
+
+	for (HashTable<unsigned short, sock*>::iterator it = xt->portToSock.begin(); it != xt->portToSock.end(); ++it) {
+		unsigned short _sport = it->first;
+		sock *sk = it->second;
+		const char *type;
+		const char *state;
+
+		switch (sk->sock_type) {
+			case SOCK_STREAM: type = "STREAM"; break;
+			case SOCK_DGRAM:  type = "DGRAM";  break;
+			case SOCK_RAW:    type = "RAW";    break;
+			case SOCK_CHUNK: type = "CHUNK";  break;
+		}
+
+		switch(sk->state) {
+			case INACTIVE: state = "INACTIVE"; break;
+			case LISTEN: state = "LISTEN"; break;
+			case SYN_RCVD: state = "SYN_RCVD"; break;
+			case SYN_SENT: state = "SYN_SENT"; break;
+			case ESTABLISHED: state = "ESTABLISHED"; break;
+			case FIN_WAIT1: state = "FIN_WAIT1"; break;
+			case FIN_WAIT2: state = "FIN_WAIT2"; break;
+			case TIME_WAIT: state = "TIME_WAIT"; break;
+			case CLOSING: state = "CLOSING"; break;
+			case CLOSE_WAIT: state = "CLOSE_WAIT"; break;
+			case LAST_ACK: state = "LAST_ACK"; break;
+			case CLOSED: state = "CLOSED"; break;
+		}
+
+		sprintf(line, "%-5d %-6s %-11s\n", _sport, type, state);
+		table += line;
+	}
+
+	return table;
 }
 
 CLICK_ENDDECLS
