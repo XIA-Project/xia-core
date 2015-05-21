@@ -24,6 +24,23 @@ TransportHeaderEncap::TransportHeaderEncap(char type, char pkt_info, uint32_t se
     this->update();
 }
 
+const char *TransportHeader::TypeStr(char type)
+{
+    const char *t;
+
+    switch (type) {
+        case SYN:        t = "SYN"; break;
+        case SYNACK:     t = "SYNACK"; break;
+        case DATA:       t = "DATA"; break;
+        case ACK:        t = "ACK"; break;
+        case FIN:        t = "FIN"; break;
+        case FINACK:     t = "FINACK"; break;
+        case MIGRATE:    t = "MIGRATE"; break;
+        case MIGRATEACK: t = "MIGRATEACK"; break;
+        case RST:        t = "RST"; break;
+    }
+    return t;
+}
 /*
 TransportHeaderEncap::TransportHeaderEncap(uint8_t opcode, uint32_t chunk_offset, uint16_t length)
 {

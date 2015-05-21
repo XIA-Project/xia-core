@@ -359,10 +359,11 @@ protected:
 	bool RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now);
 	bool RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &now);
 
-	void SendControlPacket(int type, sock *sk, const char *, XIAPath &src_path, XIAPath &dst_path);
+	void SendControlPacket(int type, sock *sk, const void *, size_t plen, XIAPath &src_path, XIAPath &dst_path);
 	void MigrateFailure(sock *sk);
 	void ScheduleTimer(sock *sk, int delay);
 
+	static const char *StateStr(SocketState state);
 	static String Netstat(Element *e, void *thunk);
 
 

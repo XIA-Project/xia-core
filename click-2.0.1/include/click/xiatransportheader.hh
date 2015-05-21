@@ -40,6 +40,8 @@ class TransportHeader : public XIAGenericExtHeader { public:
     enum { TYPE, PKT_INFO, SRC_XID, DST_XID, SEQ_NUM, ACK_NUM, LENGTH, RECV_WINDOW}; 
     enum { XSOCK_STREAM=1, XSOCK_DGRAM, XSOCK_RAW, XSOCK_CHUNK};
     enum { SYN=1, SYNACK, DATA, ACK, FIN, FINACK, MIGRATE, MIGRATEACK, RST};
+
+    static const char *TypeStr(char type);
     
     //enum { OP_REQUEST=1, OP_RESPONSE, OP_LOCAL_PUTCID, OP_REDUNDANT_REQUEST};
 };
@@ -84,7 +86,6 @@ class TransportHeaderEncap : public XIAGenericExtHeaderEncap { public:
 
     static TransportHeaderEncap* MakeDGRAMHeader( uint16_t length ) 
                         { return new TransportHeaderEncap(TransportHeader::XSOCK_DGRAM, TransportHeader::DATA, -1, -1, length, -1); }; 
-
 };
 
 

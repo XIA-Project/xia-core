@@ -356,7 +356,8 @@ bool XTRANSPORT::RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now)
 		tear_down = true;
 		sk->timer_on = false;
 		// FIXME: get paths so we can send the RST
-		// SendControlPacket(TransportHeader::RST, sk, "RST", src_path, dst_path);
+		const char *payload = "RST";
+		///SendControlPacket(TransportHeader::RST, sk, payload, strlen(payload), src_path, dst_path);
 	}
 
 	return tear_down;
@@ -1644,7 +1645,7 @@ int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 	return 1;
 }
 
-void XTRANSPORT::SendControlPacket(int type, sock *sk, const char *dummy, XIAPath &src_path, XIAPath &dst_path)
+void XTRANSPORT::SendControlPacket(int type, sock *sk, const void *payload, size_t plen, XIAPath &src_path, XIAPath &dst_path)
 {
 	WritablePacket *p = NULL;
 	WritablePacket *just_payload_part;
@@ -1666,11 +1667,9 @@ void XTRANSPORT::SendControlPacket(int type, sock *sk, const char *dummy, XIAPat
 			MakeHeader = TransportHeaderEncap::MakeFINACKHeader;
 			break;
 		case TransportHeader::FIN:
-			dummy = "FIN";
 			MakeHeader = TransportHeaderEncap::MakeFINHeader;
 			break;
 		case TransportHeader::RST:
-			dummy = "RST";
 			MakeHeader = TransportHeaderEncap::MakeRSTHeader;
 			break;
 #if 0
@@ -1681,32 +1680,28 @@ void XTRANSPORT::SendControlPacket(int type, sock *sk, const char *dummy, XIAPat
 		case TransportHeader::DATA:
 			MakeHeader = TransportHeaderEncap::MakeDATAHeader;
 			break;
-#endif
-/*
 		case TransportHeader::MIGRATE:
-			dummy = "MIGRATE";
 			MakeHeader = TransportHeaderEncap::MakeMIGRATEHeader;
 			break;
 		case TransportHeader::MIGRATEACK:
-			dummy = "MIGRATE-ACK";
 			MakeHeader = TransportHeaderEncap::MakeMIGRATEACKHeader;
 			break;
-
-*/
+#endif
 		default:
+			T_ERROR("Unknown packet type (%d)\n", type);
 			return;
 	}
 
-	T_INFO("socket %d sending %s packet\n", sk->port, dummy);
+	T_INFO("socket %d sending %s packet\n", sk->port, TransportHeader::TypeStr(type));
 
 	xiah_new.set_nxt(CLICK_XIA_NXT_TRN);
 	xiah_new.set_last(LAST_NODE_DEFAULT);
 	xiah_new.set_hlim(sk->hlim);
 	xiah_new.set_dst_path(src_path);
 	xiah_new.set_src_path(dst_path);
-	xiah_new.set_plen(strlen(dummy));
+	xiah_new.set_plen(plen);
 
-	just_payload_part = WritablePacket::make(256, dummy, strlen(dummy), 0);
+	just_payload_part = WritablePacket::make(256, payload, plen, 0);
 
 	// #seq, #ack, length, recv_wind
 	thdr_new = MakeHeader(0, seq, 0, calc_recv_window(sk));
@@ -1715,7 +1710,7 @@ void XTRANSPORT::SendControlPacket(int type, sock *sk, const char *dummy, XIAPat
 	thdr_new->update();
 
 	// XIA payload = transport header + transport-layer data
-	xiah_new.set_plen(strlen(dummy) + thdr_new->hlen());
+	xiah_new.set_plen(plen + thdr_new->hlen());
 	p = xiah_new.encap(p, false);
 
 	output(NETWORK_PORT).push(p);
@@ -1849,7 +1844,8 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 		}
 	}
 
-	SendControlPacket(TransportHeader::ACK, sk, "SYNACK-ACK", src_path, dst_path);
+	const char *payload = "SYNACK-ACK";
+	SendControlPacket(TransportHeader::ACK, sk, payload, strlen(payload), src_path, dst_path);
 }
 
 void XTRANSPORT::ProcessStreamDataPacket(WritablePacket*p_in)
@@ -1892,31 +1888,8 @@ void XTRANSPORT::ProcessStreamDataPacket(WritablePacket*p_in)
 			}
 
 			// send the cumulative ACK to the sender
-			//Add XIA headers
-			XIAHeaderEncap xiah_new;
-			xiah_new.set_nxt(CLICK_XIA_NXT_TRN);
-			xiah_new.set_last(LAST_NODE_DEFAULT);
-			xiah_new.set_hlim(HLIM_DEFAULT);
-			xiah_new.set_dst_path(src_path);
-			xiah_new.set_src_path(dst_path);
-
-			const char* dummy = "cumulative_ACK";
-			WritablePacket *just_payload_part = WritablePacket::make(256, dummy, strlen(dummy), 0);
-
-			WritablePacket *p = NULL;
-
-			xiah_new.set_plen(strlen(dummy));
-
-			TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeACKHeader( 0, sk->next_recv_seqnum, 0, calc_recv_window(sk)); // #seq, #ack, length, recv_wind
-			p = thdr_new->encap(just_payload_part);
-
-			thdr_new->update();
-			xiah_new.set_plen(strlen(dummy) + thdr_new->hlen()); // XIA payload = transport header + transport-layer data
-
-			p = xiah_new.encap(p, false);
-			delete thdr_new;
-
-			output(NETWORK_PORT).push(p);
+			const char* payload = "cumulative_ACK";
+			SendControlPacket(TransportHeader::ACK, sk, payload, strlen(payload), src_path, dst_path);
 
 		} else {
 			click_chatter("destination port not found: %d\n", _dport);
@@ -2120,7 +2093,8 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 
 	sk->timer_on = true;
 	sk->finackack_waiting = true;
-	SendControlPacket(TransportHeader::FINACK, sk, "FINACK", src_path, dst_path);
+	const char *payload = "FINACK";
+	SendControlPacket(TransportHeader::FINACK, sk, payload, strlen(payload), src_path, dst_path);
 
 	// tell API peer requested close
 	if (sk->isBlocking) {
@@ -2173,7 +2147,8 @@ void XTRANSPORT::ProcessFinAckPacket(WritablePacket *p_in)
 		sk->pkt = NULL;
 	}
 
-	SendControlPacket(TransportHeader::ACK, sk, "FINACK-ACK", src_path, dst_path);
+	const char *payload = "FINACK-ACK";
+	SendControlPacket(TransportHeader::ACK, sk, payload, strlen(payload), src_path, dst_path);
 
 	if (sk) {
 		// this teardown needs to hppen in the timewait section
@@ -2927,7 +2902,8 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 			sk->timer_on = true;
 //			sk->finack_waiting = true;
 			sk->state = FIN_WAIT1;
-			SendControlPacket(TransportHeader::FIN, sk, "FIN", sk->dst_path, sk->src_path);
+			const char *payload = "FIN";
+			SendControlPacket(TransportHeader::FIN, sk, payload, strlen(payload), sk->dst_path, sk->src_path);
 
 		} else {
 			// it's unconnected, or in listen state, or already in progress closing
@@ -3021,7 +2997,8 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 	sk->timer_on = true;
 	sk->state = SYN_SENT;
 
-	SendControlPacket(TransportHeader::SYN, sk, "SYN", dst_path, sk->src_path);
+	const char *payload = "SYN";
+	SendControlPacket(TransportHeader::SYN, sk, payload, strlen(payload), dst_path, sk->src_path);
 
 	// We return EINPROGRESS no matter what. If we're in non-blocking mode, the
 	// API will pass EINPROGRESS on to the app. If we're in blocking mode, the API
@@ -3853,6 +3830,7 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 			sk->src_path.parse_re(str_local_addr);
 		}
 
+		_errh->debug("XSEND: (%d) sent packet to %s, from %s\n", _sport, sk->dst_path.unparse_re().c_str(), sk->src_path.unparse_re().c_str());
 		//Add XIA headers
 		XIAHeaderEncap xiah;
 		xiah.set_nxt(CLICK_XIA_NXT_TRN);
@@ -3861,9 +3839,6 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 		xiah.set_dst_path(sk->dst_path);
 		xiah.set_src_path(sk->src_path);
 		xiah.set_plen(pktPayloadSize);
-
-
-		_errh->debug("XSEND: (%d) sent packet to %s, from %s\n", _sport, sk->dst_path.unparse_re().c_str(), sk->src_path.unparse_re().c_str());
 
 		WritablePacket *just_payload_part = WritablePacket::make(p_in->headroom() + 1, (const void*)x_send_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
 
@@ -3999,10 +3974,6 @@ void XTRANSPORT::Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg,
 	} else {
 		xiah.set_nxt(CLICK_XIA_NXT_TRN);
 		xiah.set_plen(pktPayloadSize);
-
-		//p = xiah.encap(just_payload_part, true);
-		//click_chatter("\n\nSEND: %s ---> %s\n\n", sk->src_path.unparse_re().c_str(), dest.c_str());
-		//click_chatter("payload=%s len=%d \n\n", x_sendto_msg->payload().c_str(), pktPayloadSize);
 
 		//Add XIA Transport headers
 		TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDGRAMHeader(0); // length
@@ -4600,6 +4571,26 @@ void XTRANSPORT::XpushChunkto(unsigned short _sport, xia::XSocketMsg *xia_socket
 	ReturnResult(_sport, xia_socket_msg, 0, 0);
 }
 
+const char *XTRANSPORT::StateStr(SocketState state)
+{
+	const char *s = "???";
+	switch(state) {
+		case INACTIVE:   s = "INACTIVE";   break;
+		case LISTEN:     s = "LISTEN";     break;
+		case SYN_RCVD:   s = "SYN_RCVD";   break;
+		case SYN_SENT:   s = "SYN_SENT";   break;
+		case CONNECTED:  s = "CONNECTED";  break;
+		case FIN_WAIT1:  s = "FIN_WAIT1";  break;
+		case FIN_WAIT2:  s = "FIN_WAIT2";  break;
+		case TIME_WAIT:  s = "TIME_WAIT";  break;
+		case CLOSING:    s = "CLOSING";    break;
+		case CLOSE_WAIT: s = "CLOSE_WAIT"; break;
+		case LAST_ACK:   s = "LAST_ACK";   break;
+		case CLOSED:     s = "CLOSED";     break;
+	}
+	return s;
+}
+
 String XTRANSPORT::Netstat(Element *e, void *)
 {
 	String table;
@@ -4628,20 +4619,7 @@ String XTRANSPORT::Netstat(Element *e, void *)
 		}
 
 		if (sk->sock_type == SOCK_STREAM) {
-			switch(sk->state) {
-				case INACTIVE: state = "INACTIVE"; break;
-				case LISTEN: state = "LISTEN"; break;
-				case SYN_RCVD: state = "SYN_RCVD"; break;
-				case SYN_SENT: state = "SYN_SENT"; break;
-				case CONNECTED: state = "CONNECTED"; break;
-				case FIN_WAIT1: state = "FIN_WAIT1"; break;
-				case FIN_WAIT2: state = "FIN_WAIT2"; break;
-				case TIME_WAIT: state = "TIME_WAIT"; break;
-				case CLOSING: state = "CLOSING"; break;
-				case CLOSE_WAIT: state = "CLOSE_WAIT"; break;
-				case LAST_ACK: state = "LAST_ACK"; break;
-				case CLOSED: state = "CLOSED"; break;
-			}
+			state = StateStr(sk->state);
 		} else {
 			state = "";
 		}
