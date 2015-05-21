@@ -150,7 +150,7 @@ private:
 			timer_on = false;
 			hlim = HLIM_DEFAULT;
 			full_src_dag = false;
-			nxt_xport =
+			nxt_xport = CLICK_XIA_NXT_TRN;
 			backlog = 5;
 			seq_num = 0;
 			ack_num = 0;
@@ -383,6 +383,7 @@ protected:
 	void SendControlPacket(int type, sock *sk, const void *, size_t plen, XIAPath &src_path, XIAPath &dst_path);
 	void MigrateFailure(sock *sk);
 	void ScheduleTimer(sock *sk, int delay);
+	void CancelRetransmit(sock *sk);
 
 	static const char *StateStr(SocketState state);
 	static const char *SocketTypeStr(int);
