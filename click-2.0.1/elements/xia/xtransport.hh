@@ -42,7 +42,7 @@ using namespace std;
 
 // various constants
 #define ACK_DELAY			300
-#define TEARDOWN_DELAY		240000
+#define TEARDOWN_DELAY		120000
 #define HLIM_DEFAULT		250
 #define LAST_NODE_DEFAULT	-1
 #define RANDOM_XID_FMT		"%s:30000ff0000000000000000000000000%08x"
@@ -387,6 +387,7 @@ protected:
 
 	static const char *StateStr(SocketState state);
 	static const char *SocketTypeStr(int);
+	void ChangeState(sock *sk, SocketState state);
 
 	static String Netstat(Element *e, void *thunk);
 

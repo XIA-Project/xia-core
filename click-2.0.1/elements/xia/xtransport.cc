@@ -7,76 +7,27 @@
 #include <click/packet_anno.hh>
 #include <click/packet.hh>
 #include <click/vector.hh>
-
 #include <click/xiacontentheader.hh>
 #include "xiatransport.hh"
 #include "xtransport.hh"
 #include <click/xiatransportheader.hh>
 #include "xlog.hh"
 
-#include <fstream>
-
 /*
 ** FIXME:
+** - set saner retransmit values before we get backoff code
 ** - implement a backoff delay on retransmits so we don't flood the connection
 ** - fix cid header size issue so we work correctly with the linux version
-*
-* TCP Stuff:
-*  if we receive a SYN, should it reset the SYNACK retransmit count to 0?
-*
-* Could we replace XIDPairToConnectPending with the current socket state?
+** - if we receive a duplicate SYN, should it reset the SYNACK retransmit count to 0?
+** - check for memory leaks
+** - see various FIXMEs in the code
 */
-
-/*
- * CHENREN'S NOTES
- * Notes: 1. ACKheader's #ack might be wrong: sk->next_recv_seqnum = next_missing_seqnum(sk);
- *
- * old version
- * TransportHeaderEncap *thdr = TransportHeaderEncap::MakeSYNHeader(0, -1, 0, calc_recv_window(sk)); // #seq, #ack, length, recv_wind
- * TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeSYNACKHeader(0, 0, 0, calc_recv_window(new_sk));
- * TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDATAHeader(sk->next_send_seqnum, sk->ack_num, 0, calc_recv_window(sk));
- * TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeACKHeader(0, sk->next_recv_seqnum, 0, calc_recv_window(sk));
- *
- * added in new version
- * TransportHeaderEncap *thdr = TransportHeaderEncap::MakeFINHeader(sk->next_send_seqnum, sk->ack_num, 0, calc_recv_window(sk));
- * TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeFINACKHeader(0, sk->next_recv_seqnum, 0, calc_recv_window(new_sk));
- * TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeACKHeader(0, sk->next_recv_seqnum, 0, calc_recv_window(new_sk)); // ACK for SYNACK
- * TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeACKHeader(0, sk->next_recv_seqnum, 0, calc_recv_window(new_sk)); // ACK for FINACK
- *
- * Actions:
- * retransmit SYNACK; find and send FIN msg to Xsocket; add RTO for retransmission; create pending in 1873 - 1899 into syn handler
- * Q:
- * DATA: #seq = #old_seq + 1 (last ACK's #seq); #ack = #old_ack; ACK: #seq = 0; #ack = #seq of received DATA's  + 1 // http://packetlife.net/blog/2010/jun/7/understanding-tcp-sequence-acknowledgment-numbers/
- * how to ensure keep transmitting packets contrainsted by the window size?
- * need to report anything to API when close connection? send a pollUP?
- * How poll works?
- * Connection:
- * Client:
- * 	- Xconnect() create client socket if not done in Xsocket, send SYN to network, report XCONNECTING to API;
- * 	- processNetworkPacket() receives SYNACK: signal API for polling, *send ACK* and report XCONNECTED to API
- * Server:
- *  - processNetworkPacket() receives SYN: create server socket, push that into pending connection buffer, signal the API for polling, alert???
- * 	- Xaccept() pop the server socket from the pending connection buffer, send SYNACK to network, report client address to API and *wait for ACK* below
- *  - *processNetworkPacket() receives ACK of SYNACK:*: what to do? send to API about what? where is the point to start to send data???
- *
- * Termination (Client/Server): closer side can't send packet but receive
- * 	- Xclose() send FIN and timeout for tear down
- * 	- processNetworkPacket receives FIN: send FINACK, and timeout for tear down
- * 	- processNetworkPacket receives FINACK: send ACK and tear down immediately
- * 	- processNetworkPacket receives ACK of FINACK: close immediately
- *
- * Data flow (Client/Server):
- * 	- processNetworkPacket receives DATA: put data into buffer, signal API for pulling, send ACK
- *  - processNetworkPacket receives ACK: clear all the Acked packets in the buffer, update window variables, reset timer
- */
 
 CLICK_DECLS
 
-XTRANSPORT::XTRANSPORT()
-	: _timer(this)
+XTRANSPORT::XTRANSPORT() : _timer(this)
 {
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
-//	_id = 0;
 
 	_ackdelay_ms = ACK_DELAY;
 	_migrateackdelay_ms = _ackdelay_ms * 10;
@@ -122,6 +73,7 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 
 XTRANSPORT::~XTRANSPORT()
 {
+	// click is shutting down, so we can get away with being lazy here
 	//Clear all hashtable entries
 	XIDtoSock.clear();
 	portToSock.clear();
@@ -129,14 +81,13 @@ XTRANSPORT::~XTRANSPORT()
 	XIDpairToSock.clear();
 	XIDpairToConnectPending.clear();
 
-	// FIXME: we should clete the contents of the above hash tables as needed
-
 	xcmp_listeners.clear();
 }
 
 
 int XTRANSPORT::initialize(ErrorHandler *)
 {
+	// XLog installed the syslog error handler, use it!
 	_errh = (SyslogErrorHandler*)ErrorHandler::default_handler();
 	_timer.initialize(this);
 	return 0;
@@ -170,8 +121,8 @@ bool XTRANSPORT::RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now)
 		WritablePacket *copy = copy_packet(sk->pkt, sk);
 		output(NETWORK_PORT).push(copy);
 
+		ChangeState(sk, SYN_SENT);
 		sk->timer_on = true;
-		sk->state = SYN_SENT;
 		sk->expiry = now + Timestamp::make_msec(_ackdelay_ms);
 		sk->num_connect_tries++;
 
@@ -180,7 +131,7 @@ bool XTRANSPORT::RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now)
 
 		// Stop sending the connection request & Report the failure to the application
 		sk->timer_on = false;
-		sk->state = INACTIVE;
+		ChangeState(sk, INACTIVE);
 		sk->so_error = ETIMEDOUT;
 
 		// Notify API that the connection failed
@@ -213,7 +164,6 @@ bool XTRANSPORT::RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &no
 		output(NETWORK_PORT).push(copy);
 
 		sk->timer_on = true;
-		sk->state = SYN_RCVD;
 		sk->expiry = now + Timestamp::make_msec(_ackdelay_ms);
 		sk->num_connect_tries++;
 	}
@@ -244,8 +194,7 @@ bool XTRANSPORT::RetransmitFIN(sock *sk, unsigned short _sport, Timestamp &now)
 		output(NETWORK_PORT).push(copy);
 
 		sk->timer_on = true;
-//		sk->finack_waiting = true;
-		sk->state = FIN_WAIT1;
+		ChangeState(sk, FIN_WAIT1);
 		sk->expiry = now + Timestamp::make_msec(_ackdelay_ms);
 		sk->num_close_tries++;
 	}
@@ -255,36 +204,7 @@ bool XTRANSPORT::RetransmitFIN(sock *sk, unsigned short _sport, Timestamp &now)
 
 		// Stop sending the termination request
 		sk->timer_on = false;
-		sk->state = CLOSED;
-//		sk->finack_waiting = false;
-		rc = true;
-	}
-	return rc;
-}
-
-bool XTRANSPORT::RetransmitFINACK(sock *sk, unsigned short _sport, Timestamp &now)
-{
-	bool rc = true;
-
-	if (sk->num_close_tries <= MAX_CLOSE_TRIES) {
-		T_INFO("Socket %d FINACK retransmit\n", _sport);
-
-		WritablePacket *copy = copy_packet(sk->pkt, sk); // chenren: added for retransmission
-		output(NETWORK_PORT).push(copy);
-
-		sk->timer_on = true;
-		sk->finackack_waiting = true;
-		sk->expiry = now + Timestamp::make_msec(_ackdelay_ms);
-		sk->num_close_tries++;
-
-	} else {
-		// We already told the api we are closing when the FIN was received
-		// There's nothing more to tell it now if the FINACK transmission failed
-		T_INFO("Socket %d FINACK retransmit count exceeded\n", _sport);
-
-		// Stop sending the termination response
-		sk->timer_on = false;
-		sk->finackack_waiting = false;
+		ChangeState(sk, CLOSED);
 		rc = true;
 	}
 	return rc;
@@ -368,6 +288,8 @@ bool XTRANSPORT::TeardownSocket(sock *sk)
 
 	T_INFO("Tearing down %s socket %d\n", SocketTypeStr(sk->sock_type), sk->port);
 
+	CancelRetransmit(sk);
+
 	if (sk->src_path.destination_node() != -1) {
 		src_xid = sk->src_path.xid(sk->src_path.destination_node());
 		have_src = true;
@@ -407,16 +329,11 @@ bool XTRANSPORT::TeardownSocket(sock *sk)
 			T_DBG("deleting route for %d %s\n", sk->port, src_xid.unparse().c_str());
 			delRoute(src_xid);
 			XIDtoSock.erase(src_xid);
-		} else {
-			T_DBG("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXID not found for %d\n", sk->port);
-
 		}
-	} else {
-		T_DBG("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX %d is an accepted socket\n", sk->port);
 	}
 
 	if (sk->sock_type == SOCK_CHUNK) {
-		// FIXME: delete this stuff!
+		// FIXME: delete this stuff of chunk sockets will leak!
 		//HashTable<XID, WritablePacket*> XIDtoCIDreqPkt;
 		//HashTable<XID, Timestamp> XIDtoExpiryTime;
 		//HashTable<XID, bool> XIDtoTimerOn;
@@ -426,8 +343,6 @@ bool XTRANSPORT::TeardownSocket(sock *sk)
 	}
 
 	portToSock.erase(sk->port);
-
-	CancelRetransmit(sk);
 
 	for (int i = 0; i < sk->recv_buffer_size; i++) {
 		if (sk->recv_buffer[i] != NULL) {
@@ -451,13 +366,10 @@ bool XTRANSPORT::RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp
 		Timestamp cid_req_expiry = it2->second;
 
 		if (timer_on == true && cid_req_expiry <= now) {
-			//click_chatter("CID-REQ RETRANSMIT! \n");
 			//retransmit cid-request
 			HashTable<XID, WritablePacket*>::iterator it3;
 			it3 = sk->XIDtoCIDreqPkt.find(requested_cid);
 			WritablePacket *copy = copy_cid_req_packet(it3->second, sk);
-			XIAHeader xiah(copy);
-			//click_chatter("\n\n (%s) send=%s  len=%d \n\n", (_local_addr.unparse()).c_str(), (char *)xiah.payload(), xiah.plen());
 			output(NETWORK_PORT).push(copy);
 
 			cid_req_expiry  = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
@@ -493,25 +405,25 @@ void XTRANSPORT::run_timer(Timer *timer)
 			if (sk->state == SYN_SENT && sk->expiry <= now ) {
 				RetransmitSYN(sk, _sport, now);
 
-			} else if (sk->state == FIN_WAIT1 && sk->expiry <= now) {
+			} else if ((sk->state == FIN_WAIT1 || sk->state == LAST_ACK) && sk->expiry <= now) {
 				tear_down = RetransmitFIN(sk, _sport, now);
 
-			} else if (sk->finackack_waiting == true && sk->expiry <= now) {
-				tear_down = RetransmitFINACK(sk, _sport, now);
-
-			} else if (sk->migrateack_waiting == true && sk->expiry <= now ) {
+			} else if (sk->state == CONNECTED && sk->migrateack_waiting && sk->expiry <= now ) {
 				tear_down = RetransmitMIGRATE(sk, _sport, now);
 
-			} else if (sk->dataack_waiting == true && sk->expiry <= now ) {
+			} else if (sk->state == CONNECTED && sk->dataack_waiting && sk->expiry <= now ) {
 				tear_down = RetransmitDATA(sk, _sport, now);
 
+			// FIXME: THis can be set if state == TIME_WAIT and delete teardown_waiting...
 			} else if (sk->teardown_waiting == true && sk->expiry <= now) {
-			//	tear_down = TeardownSocket(sk);
+				TeardownSocket(sk);
+				tear_down = true;
 			}
 		}
 
 		if (tear_down == false) {
 
+// FIXME: is this already set above??????
 			// find the (next) earlist expiry
 			if (sk->timer_on == true) {
 				if (sk->expiry > now && (sk->expiry < earlist_pending_expiry || earlist_pending_expiry == now)) {
@@ -525,12 +437,6 @@ void XTRANSPORT::run_timer(Timer *timer)
 			// FIXMME: why is this here instead of with the other retransmits?
 			// check for CID request cases
 			RetransmitCIDRequest(sk, _sport, now, earlist_pending_expiry);
-
-			// FIXME: WHY?????
-			portToSock.set(_sport, sk);
-			if(_sport != sk->port) {
-				click_chatter("Xtransport::run_timer ERROR: _sport %d, sk->port %d", _sport, sk->port);
-			}
 		}
 	}
 
@@ -545,14 +451,17 @@ void XTRANSPORT::run_timer(Timer *timer)
 
 		if (tear_down) {
 			// Teardown will be dealt with in the retransmit function
+			// FIXME: anything here????
 		}
 	}
 
+// FIXME: check to see if retransmitters are resetting the timer
 	// Set the next timer
 	if (earlist_pending_expiry > now) {
 		_timer.reschedule_at(earlist_pending_expiry);
 	}
 }
+
 
 void XTRANSPORT::copy_common(sock *sk, XIAHeader &xiahdr, XIAHeaderEncap &xiah) {
 
@@ -1590,7 +1499,7 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 
 		// Prepare new sock for this connection
 		sock *new_sk = new sock();
-		new_sk->state = SYN_RCVD;
+		ChangeState(new_sk, SYN_RCVD);
 		new_sk->port = 0; // just for now. This will be updated via Xaccept call
 		new_sk->sock_type = SOCK_STREAM;
 		new_sk->dst_path = src_path;
@@ -1614,6 +1523,9 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 	} else {
 		// we've already seen it, ignore it
 		T_INFO("Socket %d received duplicate SYN\n", sk->port);
+
+		// FIXME: is this OK?
+		it->second->num_retransmit_tries = 0;
 	}
 }
 
@@ -1855,7 +1767,7 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 
 		// enable the socket
 		sk->so_error = 0;	// lets API know connect is a success when non blocking
-		sk->state = CONNECTED;
+		ChangeState(sk, CONNECTED);
 
 		if (sk->polling) {
 			// tell API we are connected now
@@ -1962,13 +1874,13 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 		return;
 	}
 
-	T_INFO("socket %d processing ACK\n");
+	T_INFO("socket %d processing ACK\n", sk->port);
 
 	if (it != XIDpairToConnectPending.end()) {
 		T_INFO("Socket %d SYNACK-ACK received\n", sk->port);
 
 		sock *new_sk = it->second;
-		new_sk->state = CONNECTED;
+		ChangeState(new_sk, CONNECTED);
 		new_sk->initialized = true;
 
 		// Clear timer
@@ -1995,17 +1907,30 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 		XIDpairToConnectPending.erase(xid_pair);
 
 	} else if (sk->state == FIN_WAIT1) {
-		T_INFO("Socket %d FINACK-ACK received\n", sk->port);
+		T_INFO("Socket %d FIN-ACK received\n", sk->port);
 
-		sk->finackack_waiting = false;
-		sk->timer_on = true;
-		sk->teardown_waiting = true;
-		sk->state = FIN_WAIT2;
-		ScheduleTimer(sk, _teardown_wait_ms);
+		ChangeState(sk, FIN_WAIT2);
+
+		// FIXME: OK to start teardown?
+//		sk->timer_on = true;
+//		sk->teardown_waiting = true;
+//		ScheduleTimer(sk, _teardown_wait_ms);
 
 	} else if (sk->state == LAST_ACK) {
-		T_INFO("Socket %d FINACK-ACK received\n", sk->port);
+		// passive close
+
+		T_INFO("Socket %d FIN-ACK received\n", sk->port);
 		TeardownSocket(sk);
+
+	} else if (sk->state == CLOSING) {
+		// Simultaneous close
+		T_INFO("Socket %d FIN-ACK received\n", sk->port);
+
+		ChangeState(sk, TIME_WAIT);
+
+		sk->timer_on = true;
+		sk->teardown_waiting = true;
+		ScheduleTimer(sk, _teardown_wait_ms);
 
 	} else if (sk->state == CONNECTED) {
 		T_INFO("Socket %d DATA-ACK received\n", sk->port);
@@ -2080,25 +2005,47 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 		return;
 	}
 
-	unsigned short _dport = sk->port;
+	if (sk->state == FIN_WAIT2) {
+		// Active shutdown
+		T_INFO("Socket %d moved to FIN_WAIT2\n", sk->port);
 
-	// prevent it from sending FIN after receiving FINACK
-	sk->state = CLOSING;
-	// Set timer
-	sk->timer_on = true;
-	sk->teardown_waiting = true;
-	ScheduleTimer(sk, _teardown_wait_ms);
+		const char *payload = "ACK";
+		SendControlPacket(TransportHeader::ACK, sk, payload, strlen(payload), src_path, dst_path);
 
-	portToSock.set(_dport, sk);
+		ChangeState(sk, TIME_WAIT);
+	
+		sk->timer_on = true;
+		sk->teardown_waiting = true;
+		ScheduleTimer(sk, _teardown_wait_ms);
 
-	// FIXME: this should probably only happen in the close call, not on a FIN
-	xcmp_listeners.remove(_dport);
+	} else if (sk->state == FIN_WAIT1) {
+		// simultaneous shutdown
+		T_INFO("Socket %d moved to CLOSING\n", sk->port);
 
-	sk->timer_on = true;
-	sk->finackack_waiting = true;
-	const char *payload = "FINACK";
-	SendControlPacket(TransportHeader::FINACK, sk, payload, strlen(payload), src_path, dst_path);
+		ChangeState(sk, CLOSING);
 
+		const char *payload = "ACK";
+		SendControlPacket(TransportHeader::ACK, sk, payload, strlen(payload), src_path, dst_path);
+
+		// let FIN retransmit timer continue
+
+	} else if (sk->state == CONNECTED) {
+		// Passive shutdown
+		T_INFO("Socket %d moved to CLOSE_WAIT\n", sk->port);
+
+		ChangeState(sk, CLOSE_WAIT);
+
+		const char *payload = "ACK";
+		SendControlPacket(TransportHeader::ACK, sk, payload, strlen(payload), src_path, dst_path);
+
+		// wait for app to call close
+
+	} else {
+		T_WARN("Socket %d received FIN out of band\n", sk->port);
+		return;
+	}
+
+	// FIXME: is this OK here?
 	// tell API peer requested close
 	if (sk->isBlocking) {
 		if (sk->recv_pending) {
@@ -2111,7 +2058,7 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 		}
 	}
 	if (sk->polling) {
-		ProcessPollEvent(_dport, POLLHUP);
+		ProcessPollEvent(sk->port, POLLHUP);
 	}
 }
 
@@ -2124,7 +2071,7 @@ void XTRANSPORT::CancelRetransmit(sock *sk)
 		sk->pkt = NULL;
 	}
 }
-
+#if 0
 void XTRANSPORT::ProcessFinAckPacket(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
@@ -2167,6 +2114,7 @@ void XTRANSPORT::ProcessFinAckPacket(WritablePacket *p_in)
 		ScheduleTimer(sk, _teardown_wait_ms);
 	}
 }
+#endif
 
 void XTRANSPORT::ProcessDatagramPacket(WritablePacket *p_in)
 {
@@ -2236,9 +2184,9 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 		case TransportHeader::FIN:
 			ProcessFinPacket(p_in);
 			break;
-		case TransportHeader::FINACK:
-			ProcessFinAckPacket(p_in);
-			break;
+//		case TransportHeader::FINACK:
+//			ProcessFinAckPacket(p_in);
+//			break;
 		case TransportHeader::RST:
 			break;
 		default:
@@ -2612,9 +2560,9 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	sk->sock_type = sock_type;
 
 	if (sock_type == SOCK_STREAM) {
-		sk->state = INACTIVE;
+		ChangeState(sk, INACTIVE);
 	} else {
-		sk->state = CONNECTED;
+		ChangeState(sk, CONNECTED);
 	}
 
 	memset(sk->send_buffer, 0, sk->send_buffer_size * sizeof(WritablePacket*));
@@ -2798,7 +2746,7 @@ void XTRANSPORT::XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	//Set the source DAG in sock
 	sock *sk = portToSock.get(_sport);
 	if (sk->src_path.parse(sdag_string)) {
-		sk->state = INACTIVE;
+		ChangeState(sk, INACTIVE);
 		sk->initialized = true;
 
 		//Check if binding to full DAG or just to SID only
@@ -2858,9 +2806,9 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		if (sk->state == CONNECTED || sk->state == CLOSE_WAIT) {
 			// schedule a close
 			if (sk->state == CONNECTED) {
-				sk->state = FIN_WAIT1;
+				ChangeState(sk, FIN_WAIT1);
 			} else {
-				sk->state = LAST_ACK;
+				ChangeState(sk, LAST_ACK);
 			}
 
 			teardown = false;
@@ -2907,7 +2855,7 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 
 	sk->dst_path = dst_path;
 	sk->port = _sport;
-	sk->state = SYN_SENT;
+	ChangeState(sk, SYN_SENT);
 	sk->initialized = true;	// FIXME: needed for Streaming???
 	sk->num_connect_tries++;
 
@@ -2941,7 +2889,7 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 
 	// Prepare SYN packet
 	sk->timer_on = true;
-	sk->state = SYN_SENT;
+	ChangeState(sk, SYN_SENT);
 
 	const char *payload = "SYN";
 	SendControlPacket(TransportHeader::SYN, sk, payload, strlen(payload), dst_path, sk->src_path);
@@ -2969,7 +2917,7 @@ void XTRANSPORT::Xlisten(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 	sock *sk = portToSock.get(_sport);
 	if (sk->state == INACTIVE || sk->state == LISTEN) {
-		sk->state = LISTEN;
+		ChangeState(sk, LISTEN);
 		sk->backlog = x_listen_msg->backlog();
 	} else {
 		// FIXME: what is the correct error code to return
@@ -3030,7 +2978,7 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 			click_chatter("Xtransport: Socket on port %d is now connected\n", new_port);
 		}
 		new_sk->port = new_port;
-		new_sk->state = CONNECTED;
+		ChangeState(new_sk, CONNECTED);
 		new_sk->isAcceptedSocket = true;
 
 		portToSock.set(new_port, new_sk);
@@ -4581,6 +4529,12 @@ String XTRANSPORT::Netstat(Element *e, void *)
 	}
 
 	return table;
+}
+
+void XTRANSPORT::ChangeState(sock *sk, SocketState state)
+{
+	T_INFO("socket %d changing state from %s to %s\n", sk->port, StateStr(sk->state), StateStr(state));
+	sk->state = state;
 }
 
 CLICK_ENDDECLS
