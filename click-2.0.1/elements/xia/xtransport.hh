@@ -75,7 +75,7 @@ using namespace std;
 #define CACHE_PORT   3
 #define XHCP_PORT	4
 
-enum SocketState {INACTIVE = 0, LISTEN, SYN_RCVD, SYN_SENT, ESTABLISHED, FIN_WAIT1, FIN_WAIT2, TIME_WAIT, CLOSING, CLOSE_WAIT, LAST_ACK, CLOSED};
+enum SocketState {INACTIVE = 0, LISTEN, SYN_RCVD, SYN_SENT, CONNECTED, FIN_WAIT1, FIN_WAIT2, TIME_WAIT, CLOSING, CLOSE_WAIT, LAST_ACK, CLOSED};
 
 CLICK_DECLS
 
@@ -136,17 +136,6 @@ private:
 	 * Socket states
 	 * ========================= */
 	struct sock {
-		// sock(): port(0), state(INACTIVE), connState(INACTIVE), closeState(ESTABLISHED),
-		// 		so_error(0), isBlocking(true), polling(0), initialized(false),
-		// 		full_src_dag(false), timer_on(false),
-		// 		synack_waiting(false), synackack_waiting(false),
-		// 		finack_waiting(false), finackack_waiting(false),
-		// 		dataack_waiting(false), teardown_waiting(false),
-		// 		send_base(0), next_send_seqnum(0), send_buffer_size(DEFAULT_SEND_WIN_SIZE),
-		// 		recv_base(0), next_recv_seqnum(0), recv_buffer_size(DEFAULT_RECV_WIN_SIZE),
-		// 		dgram_buffer_start(0), dgram_buffer_end(-1),
-		// 		recv_buffer_count(0), recv_pending(false) {};
-
 		sock() {
 			port = so_error = polling = 0;
 			state = INACTIVE;
@@ -169,7 +158,6 @@ private:
 			dgram_buffer_end = -1;
 
 			hlim = HLIM_DEFAULT;
-
 		}
 
 	/* =========================

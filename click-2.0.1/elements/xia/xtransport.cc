@@ -1164,7 +1164,7 @@ void XTRANSPORT::ProcessMigratePacket(WritablePacket *p_in)
 
 	// 4. Update socket state dst_path with srcDAG
 	sk->dst_path = src_path;
-	assert(sk->state == ESTABLISHED);
+	assert(sk->state == CONNECTED);
 	assert(sk->initialized == true);
 
 	// 5. Return MIGRATEACK to notify mobile host of change
@@ -1285,7 +1285,7 @@ void XTRANSPORT::ProcessMigrateAck(WritablePacket *p_in)
 	}
 	unsigned short _dport = sk->port;
 
-	if (!sk->state == ESTABLISHED) {
+	if (!sk->state == CONNECTED) {
 		// This should never happen!
 		ERROR("ProcessMigrateAckPacket: socket is not connected\n");
 		return;
@@ -1820,7 +1820,7 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 	sk->remote_recv_window = thdr.recv_window();
 
 	// Enable socket and clear retransmits
-	// if state == established, we've already done the stuff below
+	// if state == CONNECTED, we've already done the stuff below
 	if (sk->state == SYN_SENT) {
 		// clean up
 		T_DBG("Turn off the timer because receiving the SYNACK\n");
@@ -1830,7 +1830,7 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 
 		// enable the socket
 		sk->so_error = 0;	// lets API know connect is a success when non blocking
-		sk->state = ESTABLISHED;
+		sk->state = CONNECTED;
 
 		if (sk->polling) {
 			// tell API we are connected now
@@ -1877,7 +1877,7 @@ void XTRANSPORT::ProcessStreamDataPacket(WritablePacket*p_in)
 	unsigned short _dport = sk->port;
 
 	if (sk) {
-		if(sk->state == ESTABLISHED) {
+		if(sk->state == CONNECTED) {
 			// buffer data, if we have room
 			if (should_buffer_received_packet(p_in, sk)) {
 				add_packet_to_recv_buf(p_in, sk);
@@ -1967,7 +1967,7 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 		T_INFO("Socket %d SYNACK-ACK received\n", sk->port);
 
 		sock *new_sk = it->second;
-		new_sk->state = ESTABLISHED;
+		new_sk->state = CONNECTED;
 		new_sk->initialized = true;
 
 		// Clear timer
@@ -2031,7 +2031,7 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 	// chenren: handler for FINACK's ACK ends
 
 	// chenren: data ACK
-	else if (sk->state == ESTABLISHED) {
+	else if (sk->state == CONNECTED) {
 		T_INFO("Socket %d DATA-ACK received\n", sk->port);
 		// chenren
 		if (sk) {
@@ -2669,7 +2669,7 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	if (sock_type == SOCK_STREAM) {
 		sk->state = INACTIVE;
 	} else {
-		sk->state = ESTABLISHED;
+		sk->state = CONNECTED;
 	}
 
 	sk->so_error = 0;
@@ -2923,7 +2923,7 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 	if (sk->sock_type == SOCK_STREAM) {
 
-		if (sk->state == ESTABLISHED) {
+		if (sk->state == CONNECTED) {
 			sk->timer_on = true;
 //			sk->finack_waiting = true;
 			sk->state = FIN_WAIT1;
@@ -3026,7 +3026,7 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 	// We return EINPROGRESS no matter what. If we're in non-blocking mode, the
 	// API will pass EINPROGRESS on to the app. If we're in blocking mode, the API
 	// will wait until it gets another message from xtransport notifying it that
-	// the other end responded and the connection has been established.
+	// the other end responded and the connection has been CONNECTED.
 	x_connect_msg->set_status(xia::X_Connect_Msg::XCONNECTING);
 	sk->so_error = EINPROGRESS;
 	ReturnResult(_sport, xia_socket_msg, -1, EINPROGRESS);
@@ -3102,13 +3102,13 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 		click_chatter("Get front element from and assign port number %d.", new_port);
 
-		if(new_sk->state != ESTABLISHED) {
+		if(new_sk->state != CONNECTED) {
 			click_chatter("Xtransport: Xaccept: ERROR: sock from pending_connection_buf !isconnected\n");
 		} else {
 			click_chatter("Xtransport: Socket on port %d is now connected\n", new_port);
 		}
 		new_sk->port = new_port;
-		new_sk->state = ESTABLISHED;
+		new_sk->state = CONNECTED;
 		new_sk->isListenSocket = true; // FIXME: if we don't do this, this socket will remove the route to the listening dag
 
 		portToSock.set(new_port, new_sk);
@@ -3450,7 +3450,7 @@ void XTRANSPORT::Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 					// see if the socket is writable
 					// FIXME should we be looking for anything else (send window, etc...)
 					if (sk->sock_type == SOCK_STREAM) {
-						if (sk->state == ESTABLISHED) {
+						if (sk->state == CONNECTED) {
 							// printf("stream socket is connected, so setting POLLOUT: %d\n", port);
 							flags_out |= POLLOUT;
 						}
@@ -3526,7 +3526,7 @@ void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 			continue;
 		}
 		// Skip inactive ports
-		if(sk->state != ESTABLISHED) {
+		if(sk->state != CONNECTED) {
 			click_chatter("Xchangead: skipping migration for non-connected port");
 			click_chatter("Xchangead: src_path:%s:", sk->src_path.unparse().c_str());
 			//click_chatter("Xchangead: dst_path:%s:", sk->dst_path.unparse().c_str());
@@ -3805,7 +3805,7 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 	}
 
 	// Make sure socket is connected
-	if (rc == 0 && sk->state != ESTABLISHED) {
+	if (rc == 0 && sk->state != CONNECTED) {
 		click_chatter("Xsend: ERROR: Socket on port %d was not connected!\n", sk->port);
 		rc = -1;
 		ec = ENOTCONN;
@@ -4031,7 +4031,7 @@ void XTRANSPORT::Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		// FIXME: do something with the error
 	}
 
-	if (sk && sk->state == ESTABLISHED) {
+	if (sk && sk->state == CONNECTED) {
 		read_from_recv_buf(xia_socket_msg, sk);
 
 		if (xia_socket_msg->x_recv().bytes_returned() > 0) {
@@ -4606,9 +4606,9 @@ String XTRANSPORT::Netstat(Element *e, void *)
 	char line[512];
 	XTRANSPORT* xt = static_cast<XTRANSPORT*>(e);
 
-	sprintf(line, "%-5s %-6s %-11s\n", "PORT", "TYPE", "STATE");
+	sprintf(line, "%-5s  %-6s  %-10s  %s\n", "PORT", "TYPE", "STATE",  "XID");
 	table += line;
-	sprintf(line, "========================\n");
+	sprintf(line, "=======================================================================\n");
 	table += line;
 
 	for (HashTable<unsigned short, sock*>::iterator it = xt->portToSock.begin(); it != xt->portToSock.end(); ++it) {
@@ -4616,6 +4616,9 @@ String XTRANSPORT::Netstat(Element *e, void *)
 		sock *sk = it->second;
 		const char *type;
 		const char *state;
+		XID source_xid;
+
+		const char *xid = "";
 
 		switch (sk->sock_type) {
 			case SOCK_STREAM: type = "STREAM"; break;
@@ -4624,22 +4627,31 @@ String XTRANSPORT::Netstat(Element *e, void *)
 			case SOCK_CHUNK: type = "CHUNK";  break;
 		}
 
-		switch(sk->state) {
-			case INACTIVE: state = "INACTIVE"; break;
-			case LISTEN: state = "LISTEN"; break;
-			case SYN_RCVD: state = "SYN_RCVD"; break;
-			case SYN_SENT: state = "SYN_SENT"; break;
-			case ESTABLISHED: state = "ESTABLISHED"; break;
-			case FIN_WAIT1: state = "FIN_WAIT1"; break;
-			case FIN_WAIT2: state = "FIN_WAIT2"; break;
-			case TIME_WAIT: state = "TIME_WAIT"; break;
-			case CLOSING: state = "CLOSING"; break;
-			case CLOSE_WAIT: state = "CLOSE_WAIT"; break;
-			case LAST_ACK: state = "LAST_ACK"; break;
-			case CLOSED: state = "CLOSED"; break;
+		if (sk->sock_type == SOCK_STREAM) {
+			switch(sk->state) {
+				case INACTIVE: state = "INACTIVE"; break;
+				case LISTEN: state = "LISTEN"; break;
+				case SYN_RCVD: state = "SYN_RCVD"; break;
+				case SYN_SENT: state = "SYN_SENT"; break;
+				case CONNECTED: state = "CONNECTED"; break;
+				case FIN_WAIT1: state = "FIN_WAIT1"; break;
+				case FIN_WAIT2: state = "FIN_WAIT2"; break;
+				case TIME_WAIT: state = "TIME_WAIT"; break;
+				case CLOSING: state = "CLOSING"; break;
+				case CLOSE_WAIT: state = "CLOSE_WAIT"; break;
+				case LAST_ACK: state = "LAST_ACK"; break;
+				case CLOSED: state = "CLOSED"; break;
+			}
+		} else {
+			state = "";
 		}
 
-		sprintf(line, "%-5d %-6s %-11s\n", _sport, type, state);
+		if (sk->src_path.destination_node() != -1) {
+
+		source_xid = sk->src_path.xid(sk->src_path.destination_node());
+		xid = source_xid.unparse().c_str();
+		}
+		sprintf(line, "%-5d  %-6s  %-10s  %s\n", _sport, type, state, xid);
 		table += line;
 	}
 
