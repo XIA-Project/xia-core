@@ -178,11 +178,6 @@ String XTRANSPORT::Netstat(Element *e, void *)
 	char line[512];
 	XTRANSPORT* xt = static_cast<XTRANSPORT*>(e);
 
-	sprintf(line, "%-5s  %-6s  %-10s  %s\n", "PORT", "TYPE", "STATE",  "XID");
-	table += line;
-	sprintf(line, "=======================================================================\n");
-	table += line;
-
 	for (HashTable<unsigned short, sock*>::iterator it = xt->portToSock.begin(); it != xt->portToSock.end(); ++it) {
 		unsigned short _sport = it->first;
 		sock *sk = it->second;
@@ -540,7 +535,8 @@ bool XTRANSPORT::RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &no
 		// FIXME: Tear down the connection setup state
 		// XIDPairToSock.erase();
 		// XIDPairToConnectPending(erase);
-		// close accepted socket immediately
+
+		TeardownSocket(sk);
 		rc = true;
 	}
 	return rc;
@@ -717,7 +713,9 @@ void XTRANSPORT::run_timer(Timer *timer)
 			}
 		}
 
-		if (tear_down == false) {
+		if (tear_down) {
+
+		} else {
 
 // FIXME: is this already set above??????
 			// find the (next) earlist expiry
@@ -2655,6 +2653,7 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 
 	p_in->kill();
 }
+
 
 
 void XTRANSPORT::ReturnResult(int sport, xia::XSocketMsg *xia_socket_msg, int rc, int err)

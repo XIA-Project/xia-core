@@ -35,9 +35,9 @@ using namespace std;
 
 // FIXME: put these in a std location that can be found by click and the API
 // XIA Specific commands for [get|set]sockopt
-#define XOPT_HLIM	   0x07001
+#define XOPT_HLIM	    0x07001
 #define XOPT_NEXT_PROTO 0x07002
-#define XOPT_BLOCK	  0x07003
+#define XOPT_BLOCK	    0x07003
 #define XOPT_ERROR_PEEK 0x07004
 
 // various constants
@@ -52,19 +52,19 @@ using namespace std;
 #define SOCK_CHUNK		4
 
 // TODO: switch these to bytes, not packets?
-#define MAX_SEND_WIN_SIZE	 256  // in packets, not bytes
-#define MAX_RECV_WIN_SIZE	 256
+#define MAX_SEND_WIN_SIZE	  256  // in packets, not bytes
+#define MAX_RECV_WIN_SIZE	  256
 #define DEFAULT_SEND_WIN_SIZE 128
 #define DEFAULT_RECV_WIN_SIZE 128
 
 #define MAX_CONNECT_TRIES	 30
-#define MAX_CLOSE_TRIES	  30
-#define MAX_MIGRATE_TRIES	30
+#define MAX_CLOSE_TRIES	     30
+#define MAX_MIGRATE_TRIES	 30
 #define MAX_RETRANSMIT_TRIES 100
 
-#define REQUEST_FAILED	0x00000001
+#define REQUEST_FAILED	  0x00000001
 #define WAITING_FOR_CHUNK 0x00000002
-#define READY_TO_READ	 0x00000004
+#define READY_TO_READ	  0x00000004
 #define INVALID_HASH	  0x00000008
 
 #define HASH_KEYSIZE 20
@@ -73,7 +73,7 @@ using namespace std;
 #define BAD_PORT	 1  // FIXME why do we still have this?
 #define NETWORK_PORT 2
 #define CACHE_PORT   3
-#define XHCP_PORT	4
+#define XHCP_PORT	 4
 
 enum SocketState {INACTIVE = 0, LISTEN, SYN_RCVD, SYN_SENT, CONNECTED, FIN_WAIT1, FIN_WAIT2, TIME_WAIT, CLOSING, CLOSE_WAIT, LAST_ACK, CLOSED};
 
@@ -127,10 +127,6 @@ private:
 
 	Packet* UDPIPPrep(Packet *, int);
 
-
-/* TODO: sock (previously named DAGinfo) stores per-socket states for ALL transport protocols. We better make a specialized struct for each protocol
-*	(e.g., xsp_sock, tcp_sock) that is inherited from sock struct. Not sure if HashTable<XID, sock> will work. Use HashTable<XID, sock*> instead?
-*/
 
 	/* =========================
 	 * Socket states
@@ -402,7 +398,5 @@ protected:
 	}
 };
 
-
 CLICK_ENDDECLS
-
 #endif

@@ -324,9 +324,9 @@ class XnetstatApp:
 	def getSocketTable(self, device):
 		text  = device
 		text += "\n"
-		#text += "%-5s %-45s %-13s %-8s NEXT HOP\n" % ("TYPE", "XID", "PORT", "FLAGS")
-		#text +=  "-" * 120
-		#text += "\n"
+		text += "%-5s  %-6s  %-10s  %s\n" % ("PORT", "TYPE", "STATE",  "XID")
+		text +=  "=" * 72
+		text += "\n"
 		text += self.printSocketTable(device)
 		return text
 
