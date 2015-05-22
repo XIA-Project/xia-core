@@ -386,8 +386,6 @@ protected:
 	static String Netstat(Element *e, void *thunk);
 	static int purge(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
 
-
-
 	// modify routing table
 	void addRoute(const XID &sid) {
 		String cmd = sid.unparse() + " " + String(DESTINED_FOR_LOCALHOST);
