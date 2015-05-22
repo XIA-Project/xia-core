@@ -195,7 +195,7 @@ String XTRANSPORT::Netstat(Element *e, void *)
 			xid = source_xid.unparse().c_str();
 		}
 
-		sprintf(line, "%-5d  %-6s  %-10s  %s\n", _sport, type, state, xid);
+		sprintf(line, "%d,%s,%s,%s\n", _sport, type, state, xid);
 		table += line;
 	}
 

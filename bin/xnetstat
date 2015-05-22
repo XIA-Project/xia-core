@@ -279,7 +279,17 @@ class XnetstatApp:
 		text =""
 		sockets = data.split("\n")
 		for socket in sockets:
-			text += socket + "\n"
+			parts = socket.split(",")
+
+			if len(parts) != 4:
+				continue
+
+			port  = parts[0]
+			type  = parts[1]
+			state = parts[2]
+			xid   = parts[3]
+
+			text += "%-5s  %-6s  %-10s  %s\n" % (port, type, state, xid)
 		return text
 
 
@@ -325,7 +335,7 @@ class XnetstatApp:
 		text  = device
 		text += "\n"
 		text += "%-5s  %-6s  %-10s  %s\n" % ("PORT", "TYPE", "STATE",  "XID")
-		text +=  "=" * 72
+		text +=  "=" * 71
 		text += "\n"
 		text += self.printSocketTable(device)
 		return text
