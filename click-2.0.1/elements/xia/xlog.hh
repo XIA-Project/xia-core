@@ -5,18 +5,12 @@
 CLICK_DECLS
 
 #define TRACE()     _errh->debug("%s: %d", __FUNCTION__, __LINE__)
-#define DBG(...)    _errh->debug(__VA_ARGS__)   // level 7
-#define INFO(...)   _errh->message(__VA_ARGS__) // level 6
-#define NOTICE(...) _errh->notice(__VA_ARGS__)  // level 5
-#define WARN(...)   _errh->warning(__VA_ARGS__) // level 4
-#define ERROR(...)  _errh->error(__VA_ARGS__)   // level 3
-//#define ALERT(...)  _errh->fatal(__VA_ARGS__)   // level -1
 
-#define T_DBG(...)    _errh->ldebug(__FUNCTION__, __VA_ARGS__)   // level 7
-#define T_INFO(...)   _errh->lmessage(__FUNCTION__, __VA_ARGS__) // level 6
-#define T_NOTICE(...) _errh->lnotice(__FUNCTION__, __VA_ARGS__)  // level 5
-#define T_WARN(...)   _errh->lwarning(__FUNCTION__, __VA_ARGS__) // level 4
-#define T_ERROR(...)  _errh->lerror(__FUNCTION__, __VA_ARGS__)   // level 3
+#define DBG(...)    _errh->ldebug(__FUNCTION__, __VA_ARGS__)   // level 7
+#define INFO(...)   _errh->lmessage(__FUNCTION__, __VA_ARGS__) // level 6
+#define NOTICE(...) _errh->lnotice(__FUNCTION__, __VA_ARGS__)  // level 5
+#define WARN(...)   _errh->lwarning(__FUNCTION__, __VA_ARGS__) // level 4
+#define ERROR(...)  _errh->lerror(__FUNCTION__, __VA_ARGS__)   // level 3
 //#define T_ALERT(...)  _errh->fatal(__FUNCTION__, __VA_ARGS__)  // level -1
 
 class XLog : public Element { public:

@@ -19,7 +19,7 @@
 ** - implement a backoff delay on retransmits so we don't flood the connection
 ** - fix cid header size issue so we work correctly with the linux version
 ** - if we receive a duplicate SYN, should it reset the SYNACK retransmit count to 0?
-** - check for memory leaks
+** - check for memory leaks (slow leak caused by open/close of stream sockets)
 ** - see various FIXMEs in the code
 */
 
@@ -116,7 +116,7 @@ void XTRANSPORT::ScheduleTimer(sock *sk, int delay)
 bool XTRANSPORT::RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now)
 {
 	if (sk->num_connect_tries <= MAX_CONNECT_TRIES) {
-		T_INFO("Socket %d SYN retransmit\n", _sport);
+		INFO("Socket %d SYN retransmit\n", _sport);
 
 		WritablePacket *copy = copy_packet(sk->pkt, sk);
 		output(NETWORK_PORT).push(copy);
@@ -127,7 +127,7 @@ bool XTRANSPORT::RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now)
 		sk->num_connect_tries++;
 
 	} else {
-		T_INFO("Socket %d SYN retransmit count exceeded\n", _sport);
+		INFO("Socket %d SYN retransmit count exceeded\n", _sport);
 
 		// Stop sending the connection request & Report the failure to the application
 		sk->timer_on = false;
@@ -158,7 +158,7 @@ bool XTRANSPORT::RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &no
 	bool rc = false;
 
 	if (sk->num_connect_tries <= MAX_CONNECT_TRIES) {
-		T_INFO("Socket %d SYNACK retransmit\n", _sport);
+		INFO("Socket %d SYNACK retransmit\n", _sport);
 
 		WritablePacket *copy = copy_packet(sk->pkt, sk);
 		output(NETWORK_PORT).push(copy);
@@ -168,7 +168,7 @@ bool XTRANSPORT::RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &no
 		sk->num_connect_tries++;
 	}
 	else {
-		T_INFO("Socket %d SYNACK retransmit count exceeded\n", _sport);
+		INFO("Socket %d SYNACK retransmit count exceeded\n", _sport);
 
 		// We have not yet notified the API that an accept was in progress, so we don't need to let
 		// it know about this failure.
@@ -188,7 +188,7 @@ bool XTRANSPORT::RetransmitFIN(sock *sk, unsigned short _sport, Timestamp &now)
 	bool rc = false;
 
 	if (sk->num_close_tries <= MAX_CLOSE_TRIES) {
-		T_INFO("Socket %d FIN retransmit\n", _sport);
+		INFO("Socket %d FIN retransmit\n", _sport);
 
 		WritablePacket *copy = copy_packet(sk->pkt, sk);
 		output(NETWORK_PORT).push(copy);
@@ -200,7 +200,7 @@ bool XTRANSPORT::RetransmitFIN(sock *sk, unsigned short _sport, Timestamp &now)
 	}
 	else {
 		// The App initiated the FIN and close returned right away, so there's nothing to tell it
-		T_INFO("Socket %d FIN retransmit count exceeded\n", _sport);
+		INFO("Socket %d FIN retransmit count exceeded\n", _sport);
 
 		// Stop sending the termination request
 		sk->timer_on = false;
@@ -215,7 +215,7 @@ bool XTRANSPORT::RetransmitMIGRATE(sock *sk, unsigned short _sport, Timestamp &n
 	bool rc = false;
 
 	if (sk->num_migrate_tries <= MAX_MIGRATE_TRIES) {
-		T_INFO("Socket %d MIGRATE retransmit\n", _sport);
+		INFO("Socket %d MIGRATE retransmit\n", _sport);
 
 		WritablePacket *copy = copy_packet(sk->migrate_pkt, sk);
 		output(NETWORK_PORT).push(copy);
@@ -226,7 +226,7 @@ bool XTRANSPORT::RetransmitMIGRATE(sock *sk, unsigned short _sport, Timestamp &n
 		sk->num_migrate_tries++;
 
 	} else {
-		T_INFO("Socket %d MIGRATE retransmit count exceeded\n", _sport);
+		INFO("Socket %d MIGRATE retransmit count exceeded\n", _sport);
 		// FIXME: send RST?
 		sk->timer_on = false;
 		sk->migrateack_waiting = false;
@@ -243,7 +243,7 @@ bool XTRANSPORT::RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now)
 
 	if (sk->num_retransmit_tries < MAX_RETRANSMIT_TRIES) {
 
-		T_INFO("Socket %d  DATA RETRANSMIT (%s) send_base=%d next_seq=%d \n\n",
+		INFO("Socket %d  DATA RETRANSMIT (%s) send_base=%d next_seq=%d \n\n",
 			_sport, (_local_addr.unparse()).c_str(), sk->send_base, sk->next_send_seqnum);
 
 		// retransmit data
@@ -267,7 +267,7 @@ bool XTRANSPORT::RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now)
 		}
 
 	} else {
-		T_WARN("Socket %d ata retransmit count exceeded, shutting down\n", _sport);
+		WARN("Socket %d ata retransmit count exceeded, shutting down\n", _sport);
 
 		tear_down = true;
 		sk->timer_on = false;
@@ -286,7 +286,7 @@ bool XTRANSPORT::TeardownSocket(sock *sk)
 	bool have_src = 0;
 	bool have_dst = 0;
 
-	T_INFO("Tearing down %s socket %d\n", SocketTypeStr(sk->sock_type), sk->port);
+	INFO("Tearing down %s socket %d\n", SocketTypeStr(sk->sock_type), sk->port);
 
 	CancelRetransmit(sk);
 
@@ -326,7 +326,7 @@ bool XTRANSPORT::TeardownSocket(sock *sk)
 		// we only do this if the socket wasn't generateed due to an accept
 
 		if (have_src) {
-			T_DBG("deleting route for %d %s\n", sk->port, src_xid.unparse().c_str());
+			DBG("deleting route for %d %s\n", sk->port, src_xid.unparse().c_str());
 			delRoute(src_xid);
 			XIDtoSock.erase(src_xid);
 		}
@@ -397,7 +397,7 @@ void XTRANSPORT::run_timer(Timer *timer)
 
 		if (!sk) {
 			// this shouldn't happen
-			T_ERROR("Socket %d sk == NULL!\n", _sport);
+			ERROR("Socket %d sk == NULL!\n", _sport);
 			continue;
 		}
 
@@ -1394,11 +1394,11 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 
 	if (!sk) {
 		// FIXME: we need to fix the state machine so this doesn't happen!
-		T_WARN("sk == NULL\n");
+		WARN("sk == NULL\n");
 		return;
 	}
 
-	T_INFO("socket %d received SYN\n", sk->port);
+	INFO("socket %d received SYN\n", sk->port);
 
 	if (sk->state != LISTEN) {
 		// we aren't marked to accept connecctions, drop it
@@ -1421,7 +1421,7 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 		// if this is new request, put it in the queue
 
 		// send SYNACK to client
-		T_INFO("Socket %d Handling new SYN\n", sk->port);
+		INFO("Socket %d Handling new SYN\n", sk->port);
 
 		XIAHeaderEncap xiah_new;
 		xiah_new.set_nxt(CLICK_XIA_NXT_TRN);
@@ -1438,7 +1438,7 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 		// FIXME: move to a separate function
 		if(usingRendezvousDAG(sk->src_path, dst_path)) {
 			XID _destination_xid = dst_path.xid(dst_path.destination_node());
-			T_INFO("Sending SYNACK with verification for RV DAG");
+			INFO("Sending SYNACK with verification for RV DAG");
 			// Destination DAG from the SYN packet
 			String src_path_str = dst_path.unparse();
 
@@ -1455,7 +1455,7 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 			char signature[MAX_SIGNATURE_SIZE];
 			uint16_t signatureLength = MAX_SIGNATURE_SIZE;
 			if(xs_sign(_destination_xid.unparse().c_str(), (unsigned char *)synackPayload.get_buffer(), synackPayload.size(), (unsigned char *)signature, &signatureLength)) {
-				T_ERROR("ERROR unable to sign the SYNACK using private key for %s", _destination_xid.unparse().c_str());
+				ERROR("ERROR unable to sign the SYNACK using private key for %s", _destination_xid.unparse().c_str());
 				MigrateFailure(sk);
 				return;
 			}
@@ -1518,11 +1518,11 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 		XIDpairToConnectPending.set(xid_pair, new_sk);
 
 		output(NETWORK_PORT).push(p);
-		T_INFO("Sent SYNACK from new socket\n");
+		INFO("Sent SYNACK from new socket\n");
 
 	} else {
 		// we've already seen it, ignore it
-		T_INFO("Socket %d received duplicate SYN\n", sk->port);
+		INFO("Socket %d received duplicate SYN\n", sk->port);
 
 		// FIXME: is this OK?
 		it->second->num_retransmit_tries = 0;
@@ -1549,7 +1549,7 @@ int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 
 	if (!sk) {
 		// FIXME: we need to fix the state machine so this doesn't happen!
-		T_ERROR("sk == NULL\n");
+		ERROR("sk == NULL\n");
 		return 0;
 	}
 	unsigned short _dport = sk->port;
@@ -1563,16 +1563,16 @@ int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 	if (!should_buffer_received_packet(p_in, sk)) {
 		return 1;
 	}
-	T_INFO("socket %d STATE:%d\n", sk->port, sk->state);
+	INFO("socket %d STATE:%d\n", sk->port, sk->state);
 
-	T_DBG("%s from port %d at %ld.\n", _source_xid.unparse().c_str(), _dport, Timestamp::now());
+	DBG("%s from port %d at %ld.\n", _source_xid.unparse().c_str(), _dport, Timestamp::now());
 
 	String src_path_str = src_path.unparse();
 	String dst_path_str = dst_path.unparse();
-	T_INFO("received stream packet on raw socket");
-	T_INFO("src|%s|", src_path_str.c_str());
-	T_INFO("dst|%s|", dst_path_str.c_str());
-	T_INFO("len=%d", p_in->length());
+	INFO("received stream packet on raw socket");
+	INFO("src|%s|", src_path_str.c_str());
+	INFO("dst|%s|", dst_path_str.c_str());
+	INFO("len=%d", p_in->length());
 
 	add_packet_to_recv_buf(p_in, sk);
 	if(sk->polling) {
@@ -1626,11 +1626,11 @@ void XTRANSPORT::SendControlPacket(int type, sock *sk, const void *payload, size
 			break;
 #endif
 		default:
-			T_ERROR("Unknown packet type (%d)\n", type);
+			ERROR("Unknown packet type (%d)\n", type);
 			return;
 	}
 
-	T_INFO("socket %d sending %s packet\n", sk->port, TransportHeader::TypeStr(type));
+	INFO("socket %d sending %s packet\n", sk->port, TransportHeader::TypeStr(type));
 
 	xiah_new.set_nxt(CLICK_XIA_NXT_TRN);
 	xiah_new.set_last(LAST_NODE_DEFAULT);
@@ -1683,21 +1683,21 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 	sock *sk= XIDpairToSock.get(xid_pair);
 	if (!sk) {
 		// FIXME: we need to fix the state machine so this doesn't happen!
-		T_INFO("sk == NULL\n");
+		INFO("sk == NULL\n");
 		return;
 	}
 	unsigned short _dport = sk->port;
-	T_INFO("Socket %d received SYNACK!\n", _dport);
+	INFO("Socket %d received SYNACK!\n", _dport);
 
 	if (sk->state != CONNECTED && sk->state != SYN_SENT) {
 		// We can not accept SYNACKs now, drop it
-		T_INFO("Socket %d received out of band SYNACK\n", sk->port);
+		INFO("Socket %d received out of band SYNACK\n", sk->port);
 		return;
 	}
 
 	// FIXME: this should become a migrate function
 	if(sk->dst_path != src_path) {
-		T_INFO("remote path in SYNACK different from that used in SYN");
+		INFO("remote path in SYNACK different from that used in SYN");
 		// Retrieve the signed payload
 		const char *payload = (const char *)thdr.payload();
 		int payload_len = xiah.plen() - thdr.hlen();
@@ -1722,13 +1722,13 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 
 		// Verify pubkey matches the remote SID
 		if(!xs_pubkeyMatchesXID(pubkey, _source_xid.unparse().c_str())) {
-			T_INFO("SYNACK: ERROR: pubkey, remote SID mismatch");
+			INFO("SYNACK: ERROR: pubkey, remote SID mismatch");
 			return;
 		}
 
 		// Verify signature using pubkey
 		if(!xs_isValidSignature((const unsigned char *)synackPayloadBuffer, synackPayloadLength, (unsigned char *)signature, signatureLength, pubkey, pubkeyLength)) {
-			T_INFO("SYNACK: ERROR: invalid signature");
+			INFO("SYNACK: ERROR: invalid signature");
 			return;
 		}
 
@@ -1748,10 +1748,10 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 		XIAPath remoteDAG;
 		remoteDAG.parse(dag);
 		if(remoteDAG != src_path) {
-			T_INFO("SYNACK: ERROR: Mismatched src_path and remoteDAG: %s vs %s", src_path.unparse().c_str(), remoteDAG.unparse().c_str());
+			INFO("SYNACK: ERROR: Mismatched src_path and remoteDAG: %s vs %s", src_path.unparse().c_str(), remoteDAG.unparse().c_str());
 			return;
 		}
-		T_INFO("SYNACK: verified modification by remote SID");
+		INFO("SYNACK: verified modification by remote SID");
 		// All checks passed, so update DAGInfo to reflect new path for remote service
 		sk->dst_path = src_path;
 	}
@@ -1870,14 +1870,14 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 
 	if (!sk) {
 		// FIXME: we need to fix the state machine so this doesn't happen!
-		T_INFO("sk == NULL\n");
+		INFO("sk == NULL\n");
 		return;
 	}
 
-	T_INFO("socket %d processing ACK\n", sk->port);
+	INFO("socket %d processing ACK\n", sk->port);
 
 	if (it != XIDpairToConnectPending.end()) {
-		T_INFO("Socket %d SYNACK-ACK received\n", sk->port);
+		INFO("Socket %d SYNACK-ACK received\n", sk->port);
 
 		sock *new_sk = it->second;
 		ChangeState(new_sk, CONNECTED);
@@ -1907,7 +1907,7 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 		XIDpairToConnectPending.erase(xid_pair);
 
 	} else if (sk->state == FIN_WAIT1) {
-		T_INFO("Socket %d FIN-ACK received\n", sk->port);
+		INFO("Socket %d FIN-ACK received\n", sk->port);
 
 		ChangeState(sk, FIN_WAIT2);
 
@@ -1919,12 +1919,12 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 	} else if (sk->state == LAST_ACK) {
 		// passive close
 
-		T_INFO("Socket %d FIN-ACK received\n", sk->port);
+		INFO("Socket %d FIN-ACK received\n", sk->port);
 		TeardownSocket(sk);
 
 	} else if (sk->state == CLOSING) {
 		// Simultaneous close
-		T_INFO("Socket %d FIN-ACK received\n", sk->port);
+		INFO("Socket %d FIN-ACK received\n", sk->port);
 
 		ChangeState(sk, TIME_WAIT);
 
@@ -1933,7 +1933,7 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 		ScheduleTimer(sk, _teardown_wait_ms);
 
 	} else if (sk->state == CONNECTED) {
-		T_INFO("Socket %d DATA-ACK received\n", sk->port);
+		INFO("Socket %d DATA-ACK received\n", sk->port);
 		// chenren
 		if (sk) {
 			sk->remote_recv_window = thdr.recv_window();
@@ -1978,7 +1978,7 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 
 		} // chenren
 	} else {
-		T_INFO("Socket %d unknown ACK received\n", sk->port);
+		INFO("Socket %d unknown ACK received\n", sk->port);
 	}
 }
 
@@ -2007,7 +2007,7 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 
 	if (sk->state == FIN_WAIT2) {
 		// Active shutdown
-		T_INFO("Socket %d moved to FIN_WAIT2\n", sk->port);
+		INFO("Socket %d moved to FIN_WAIT2\n", sk->port);
 
 		const char *payload = "ACK";
 		SendControlPacket(TransportHeader::ACK, sk, payload, strlen(payload), src_path, dst_path);
@@ -2020,7 +2020,7 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 
 	} else if (sk->state == FIN_WAIT1) {
 		// simultaneous shutdown
-		T_INFO("Socket %d moved to CLOSING\n", sk->port);
+		INFO("Socket %d moved to CLOSING\n", sk->port);
 
 		ChangeState(sk, CLOSING);
 
@@ -2031,7 +2031,7 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 
 	} else if (sk->state == CONNECTED) {
 		// Passive shutdown
-		T_INFO("Socket %d moved to CLOSE_WAIT\n", sk->port);
+		INFO("Socket %d moved to CLOSE_WAIT\n", sk->port);
 
 		ChangeState(sk, CLOSE_WAIT);
 
@@ -2041,7 +2041,7 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 		// wait for app to call close
 
 	} else {
-		T_WARN("Socket %d received FIN out of band\n", sk->port);
+		WARN("Socket %d received FIN out of band\n", sk->port);
 		return;
 	}
 
@@ -2553,7 +2553,7 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	xia::X_Socket_Msg *x_socket_msg = xia_socket_msg->mutable_x_socket();
 	int sock_type = x_socket_msg->type();
 
-	T_INFO("Xtransport::Xsocket: create %s socket %d\n", SocketTypeStr(sock_type), _sport);
+	INFO("Xtransport::Xsocket: create %s socket %d\n", SocketTypeStr(sock_type), _sport);
 
 	sock *sk = new sock();
 	sk->port = _sport;
@@ -2793,11 +2793,11 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	sock *sk = portToSock.get(_sport);
 	bool teardown = true;
 
-	T_INFO("closing %d\n", _sport);
+	INFO("closing %d\n", _sport);
 
 	if (!sk) {
 		// this shouldn't happen!
-		T_ERROR("Invalid socket %d\n", _sport);
+		ERROR("Invalid socket %d\n", _sport);
 		goto done;
 	}
 
@@ -2843,7 +2843,7 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 
 	if (!sk) {
 		// FIXME: WHY WOULD THIS HAPPEN?
-		T_ERROR("SK NOT FOUND IN CONNECT for port %d, creating?????", _sport);
+		ERROR("SK NOT FOUND IN CONNECT for port %d, creating?????", _sport);
 		sk = new sock();
 
 	} else if (sk->state != INACTIVE) {
@@ -2913,7 +2913,7 @@ void XTRANSPORT::Xlisten(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 	xia::X_Listen_Msg *x_listen_msg = xia_socket_msg->mutable_x_listen();
 
-	T_INFO("Socket %d Xlisten\n", _sport);
+	INFO("Socket %d Xlisten\n", _sport);
 
 	sock *sk = portToSock.get(_sport);
 	if (sk->state == INACTIVE || sk->state == LISTEN) {
@@ -4533,7 +4533,7 @@ String XTRANSPORT::Netstat(Element *e, void *)
 
 void XTRANSPORT::ChangeState(sock *sk, SocketState state)
 {
-	T_INFO("socket %d changing state from %s to %s\n", sk->port, StateStr(sk->state), StateStr(state));
+	INFO("socket %d changing state from %s to %s\n", sk->port, StateStr(sk->state), StateStr(state));
 	sk->state = state;
 }
 
