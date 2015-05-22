@@ -45,6 +45,8 @@ class Options:
 		self._devices = []
 		self._types = []
 		self._sort = 0
+		self._purge = False
+		self._flush = False
 
 	#
 	# parse the command line so we can do stuff
@@ -54,7 +56,7 @@ class Options:
 			# FIXME: make the option names more meaningful
 			shortopt = "hd:t:s:"
 			opts, args = getopt.getopt(sys.argv[1:], shortopt, 
-				["help", "host=", "port=", "device=", "type=", "sort="])
+				["help", "host=", "port=", "device=", "type=", "sort=", "purge", "flush"])
 		except getopt.GetoptError, err:
 			# print	 help information and exit:
 			print str(err) # will print something like "option -a not recognized"
@@ -68,6 +70,10 @@ class Options:
 				self._host = a
 			elif o in ("--port"):
 				self._port = a
+			elif o in ("--flush"):
+				self._flush = True
+			elif o in ("--purge"):
+				self._purge = True
 			elif o in ("-d", "--device"):
 				self._devices.append(a)
 			elif o in ("-t", "--type"):
@@ -101,6 +107,10 @@ where:
   -s<field>
   --sort=<field>   : sort output on (p)ort, (t)ype, (s)tate, or (x)id
                      default = port
+
+  --flush          : purge all STREAM sockets in TIME_WAIT state
+
+  --purge          : purge *ALL* STREAM sockets
 """
 		sys.exit()
 
@@ -119,6 +129,11 @@ where:
 	def sort(self):
 		return self._sort
 
+	def flush(self):
+		return self._flush
+
+	def purge(self):
+		return self._purge
 #
 # contains the configuration information
 # retrieved from click
@@ -193,8 +208,17 @@ class XnetstatApp:
 		else:
 			self.types = SOCKET_TYPES
 
-		for device in self.devices:
-			print(self.getSocketTable(device))
+
+		if (self.options.purge()):
+			for device in self.devices:
+				self.purge(device)
+
+		elif (self.options.flush()):
+			for device in self.devices:
+				self.flush(device)
+		else:
+			for device in self.devices:
+				print(self.getSocketTable(device))
 
 		self.shutdown()
 
@@ -281,6 +305,17 @@ class XnetstatApp:
 		#second line contains a more useful message, so call it again
 		if code != 200:
 			self.checkStatus(True)
+
+	#
+	#
+	#
+	def purge(self, device):
+		print "%s: Purging ALL Stream" % device
+		self.writeData("%s/xrc/xtransport.purge" % device)
+
+	def flush(self, device):
+		print "%s: Purging sockets in TIME_WAIT state" % device
+		self.writeData("%s/xrc/xtransport.flush" % device)
 
 	#
 	# print the specified socket table to stdout

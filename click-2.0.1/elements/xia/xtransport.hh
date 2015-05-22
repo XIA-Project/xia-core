@@ -384,6 +384,8 @@ protected:
 	void ChangeState(sock *sk, SocketState state);
 
 	static String Netstat(Element *e, void *thunk);
+	static int purge(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
+
 
 
 	// modify routing table

@@ -169,7 +169,29 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorH
 	}
 	return 0;
 }
+int XTRANSPORT::purge(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
+{
+	XTRANSPORT* xt = static_cast<XTRANSPORT*>(e);
+	int count = 0;
+	int purge = thunk != 0;
 
+	// If purge is true, kill all stream sockets
+	// else kill those in TIME_WAIT state
+
+	for (HashTable<unsigned short, sock*>::iterator it = xt->portToSock.begin(); it != xt->portToSock.end(); ++it) {
+		unsigned short _sport = it->first;
+		sock *sk = it->second;
+
+		if (sk->sock_type == SOCK_STREAM) {
+			if (purge || sk->state == TIME_WAIT) {
+				count++;
+				xt->_errh->warning("purging %d\n", sk->port);
+				xt->TeardownSocket(sk);
+			}
+		}
+	}
+	return count;
+}
 
 
 String XTRANSPORT::Netstat(Element *e, void *)
@@ -206,6 +228,8 @@ String XTRANSPORT::Netstat(Element *e, void *)
 
 void XTRANSPORT::add_handlers() {
 	add_write_handler("local_addr", write_param, (void *)H_MOVE);
+	add_write_handler("purge", purge, (void*)1);
+	add_write_handler("flush", purge, 0);
 	add_read_handler("netstat", Netstat, 0);
 }
 
