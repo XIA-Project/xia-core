@@ -21,7 +21,7 @@ import getopt
 import datetime
 import telnetlib
 
-APP_VERSION="0.1"
+APP_VERSION="1.0"
 TITLE="XIA netstat version %s"
 
 # default Click host and port (can be changed on cmd line)
@@ -32,7 +32,7 @@ PORT=7777
 MAJOR=1
 MINOR=3
 
-KNOWN_TYPES = [ "STREAM", "DGRAM", "RAW", "CHUNK" ]
+SOCKET_TYPES = [ "STREAM", "DGRAM", "RAW", "CHUNK" ]
 
 #
 # class for managing command line configuration options
@@ -44,6 +44,7 @@ class Options:
 		self._port = PORT
 		self._devices = []
 		self._types = []
+		self._sort = 0
 
 	#
 	# parse the command line so we can do stuff
@@ -51,9 +52,9 @@ class Options:
 	def getOptions(self):
 		try:
 			# FIXME: make the option names more meaningful
-			shortopt = "hpnvif:d:a:r:"
+			shortopt = "hd:t:s:"
 			opts, args = getopt.getopt(sys.argv[1:], shortopt, 
-				["help", "host=", "port=", "device=", "type="])
+				["help", "host=", "port=", "device=", "type=", "sort="])
 		except getopt.GetoptError, err:
 			# print	 help information and exit:
 			print str(err) # will print something like "option -a not recognized"
@@ -67,10 +68,14 @@ class Options:
 				self._host = a
 			elif o in ("--port"):
 				self._port = a
-			elif o in ("--device"):
+			elif o in ("-d", "--device"):
 				self._devices.append(a)
-			elif o in ("--type"):
-				self._types.append(a)
+			elif o in ("-t", "--type"):
+				self._types.append(a.upper())
+			elif o in ("-s", "--sort"):
+				s = "ptsx".find(a[0])
+				if s >= 0:
+					self._sort = s
 			else:
 			 	assert False, "unhandled option"
 
@@ -79,18 +84,23 @@ class Options:
 	#
 	def help(self):
 		print """
-usage: xnetstat [-hpnvif:d:a:r:] [commands]
+usage: xnetstat [-hd:t:s:] [commands]
 where:
-  -h <host>        : specify the click host address
-  --host=<host>
+  -host=<host>     : specify the click host address
 
   --port=<port>    : specify the click control port
 
+  -d<device>
   --device=<device>: only output info for the specified device (router0)
 	                 can be specified multiple times on the command line
 
+  -t<type>
   --type=<stype>   : only output information for the specified Socket type
                      can be specified multile times on the command line
+
+  -s<field>
+  --sort=<field>   : sort output on (p)ort, (t)ype, (s)tate, or (x)id
+                     default = port
 """
 		sys.exit()
 
@@ -105,6 +115,9 @@ where:
 
 	def types(self):
 		return self._types
+
+	def sort(self):
+		return self._sort
 
 #
 # contains the configuration information
@@ -178,7 +191,7 @@ class XnetstatApp:
 		if (len(self.options.types())):
 			self.types = self.options.types()
 		else:
-			self.types = KNOWN_TYPES
+			self.types = SOCKET_TYPES
 
 		for device in self.devices:
 			print(self.getSocketTable(device))
@@ -277,56 +290,23 @@ class XnetstatApp:
 		data = self.readData(tfmt % (device))
 
 		text =""
-		sockets = data.split("\n")
-		for socket in sockets:
-			parts = socket.split(",")
-
-			if len(parts) != 4:
+		sockets = []
+		lines = data.split("\n")
+		for line in lines:
+			socket = line.split(",")
+			if len(socket) != 4:
 				continue
 
-			port  = parts[0]
-			type  = parts[1]
-			state = parts[2]
-			xid   = parts[3]
+			if socket[1] in self.types:
+				socket[0] = int(socket[0])
+				sockets.append(socket)
 
-			text += "%-5s  %-6s  %-10s  %s\n" % (port, type, state, xid)
+		sockets.sort(key=lambda tup: tup[self.options.sort()])
+
+		for socket in sockets:
+			text += "%-5s  %-6s  %-10s  %s\n" % (socket[0], socket[1], socket[2], socket[3])
 		return text
 
-
-	def printTableOld(self, device, table):
-		tfmt = "%s/xrc/xtransport.netstat"
-		data = self.readData(tfmt % (device, table))
-
-		text = ""
-		routes = data.split("\n")
-		for route in routes:
-			parts = route.split(",")
-
-			if len(parts) != 4:
-				if len(parts) > 1:
-					print "invalid route line: %d %s\n" % (len(parts), route)
-				continue	
-			xid = parts[0]
-			port = parts[1]
-			nexthop = parts[2]
-			flags = int(parts[3])
-
-			if port != -1:
-				if xid == "-":
-					xid = "(default)"
-				elif self.options.verbose() == False:
-					xid = self.config.getAlias(xid)
-
-				if self.options.verbose() == False:
-					nexthop = self.config.getAlias(nexthop)
-
-				text += "%-5s %-45s %2s%-11s %08x %s\n" % (table, xid, 
-						port, self.portType(port), flags, nexthop) 
-
-
-#		print "text = %s" % (text)
-
-		return text
 
 	#
 	# format the route table header and loop through the requested XID tables
