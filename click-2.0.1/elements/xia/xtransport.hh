@@ -155,13 +155,13 @@ private:
 			seq_num = 0;
 			ack_num = 0;
 			isAcceptedSocket = false;
-			finack_waiting = false;
-			finackack_waiting = false;
 			dataack_waiting = false;
 			teardown_waiting = false;
+
 			num_connect_tries = 0;
-			num_retransmit_tries = 0;
+			num_retransmits = 0;
 			num_close_tries = 0;
+			
 			pkt = NULL;
 			send_buffer_size = DEFAULT_RECV_WIN_SIZE;
 			send_base = 0;
@@ -212,12 +212,10 @@ private:
 		uint32_t seq_num;
 		uint32_t ack_num;
 		bool isAcceptedSocket;		// true if this socket is generated due to an accept
-		bool finack_waiting;
-		bool finackack_waiting;
 		bool dataack_waiting;
 		bool teardown_waiting;
 		int num_connect_tries;		// FIXME: can these all be flattened into one variable?
-		int num_retransmit_tries;
+		int num_retransmits;
 		int num_close_tries;
 		WritablePacket *pkt;		// Control packet waiting to be ack'd (FIXME: could this just go in the send buffer?)
 
