@@ -50,7 +50,7 @@ HOSTNAME=$(hostname -s | tr -C -d 'a-zA-Z0-9')
 
 # for debugging
 VALGRIND=""
-
+VGLOG="valgrind.log"
 
 help()
 {
@@ -173,7 +173,8 @@ setup()
 				RUN_VISUALIZER_SERVER=1
 				;;
 			g)
-				VALGRIND="valgrind --leak-check=yes"
+				#VALGRIND="valgrind --log-file=$VGLOG --leak-check=yes --gen-suppressions=all"
+				VALGRIND="valgrind --log-file=$VGLOG --leak-check=yes"
 				;;
 			h)
 				help
@@ -469,6 +470,8 @@ start_click()
 		printf "$HOSTNAME\trendezvous\n" >> $NODECONF
 	fi
 
+	[ "$VALGRIND" != "" ] && echo Logging valgrind output to $VGLOG
+
 	$VALGRIND $CLICK -R $CONFPATH/$SCRIPT &
 
 	get_pid "click"
@@ -477,7 +480,7 @@ start_click()
 	$XIADIR/bin/xlog $V_FLAG -l $LOG_LEVEL >/dev/null
 
 	[ $CLICK_ONLY -eq 1 ] && check_service click && exit
-	sleep 1
+	sleep 2
 }
 
 #
