@@ -495,7 +495,7 @@ void XTRANSPORT::CancelRetransmit(sock *sk)
 
 bool XTRANSPORT::RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now)
 {
-	if (sk->num_connect_tries <= MAX_CONNECT_TRIES) {
+	if (sk->num_connect_tries <= MAX_RETRANSMIT_TRIES) {
 		DBG("Socket %d SYN retransmit\n", _sport);
 
 		ChangeState(sk, SYN_SENT);
@@ -539,7 +539,7 @@ bool XTRANSPORT::RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &no
 {
 	bool rc = false;
 
-	if (sk->num_connect_tries <= MAX_CONNECT_TRIES) {
+	if (sk->num_connect_tries <= MAX_RETRANSMIT_TRIES) {
 		DBG("Socket %d SYNACK retransmit\n", _sport);
 
 		sk->timer_on = true;
@@ -554,12 +554,6 @@ bool XTRANSPORT::RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &no
 
 		// We have not yet notified the API that an accept was in progress, so we don't need to let
 		// it know about this failure.
-
-		// FIXME: is sk the accepting socket or the accepted socket?
-		// FIXME: Tear down the connection setup state
-		// XIDPairToSock.erase();
-		// XIDPairToConnectPending(erase);
-
 		TeardownSocket(sk);
 		rc = true;
 	}
@@ -572,7 +566,7 @@ bool XTRANSPORT::RetransmitFIN(sock *sk, unsigned short _sport, Timestamp &now)
 {
 	bool rc = false;
 
-	if (sk->num_close_tries <= MAX_CLOSE_TRIES) {
+	if (sk->num_close_tries <= MAX_RETRANSMIT_TRIES) {
 		DBG("Socket %d FIN retransmit\n", _sport);
 
 		sk->timer_on = true;
@@ -601,7 +595,7 @@ bool XTRANSPORT::RetransmitMIGRATE(sock *sk, unsigned short _sport, Timestamp &n
 {
 	bool rc = false;
 
-	if (sk->num_migrate_tries <= MAX_MIGRATE_TRIES) {
+	if (sk->num_migrate_tries <= MAX_RETRANSMIT_TRIES) {
 		DBG("Socket %d MIGRATE retransmit\n", _sport);
 
 		sk->timer_on = true;
@@ -666,7 +660,7 @@ bool XTRANSPORT::RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now)
 
 
 
-bool XTRANSPORT::RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp &now, Timestamp &earlist_pending_expiry)
+bool XTRANSPORT::RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp &now, Timestamp &earliest_pending_expiry)
 {
 	for (HashTable<XID, bool>::iterator it = sk->XIDtoTimerOn.begin(); it != sk->XIDtoTimerOn.end(); ++it ) {
 		XID requested_cid = it->first;
@@ -690,8 +684,8 @@ bool XTRANSPORT::RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp
 			sk->XIDtoTimerOn.set(requested_cid, true);
 		}
 
-		if (timer_on == true && cid_req_expiry > now && ( cid_req_expiry < earlist_pending_expiry || earlist_pending_expiry == now ) ) {
-			earlist_pending_expiry = cid_req_expiry;
+		if (timer_on == true && cid_req_expiry > now && ( cid_req_expiry < earliest_pending_expiry || earliest_pending_expiry == now ) ) {
+			earliest_pending_expiry = cid_req_expiry;
 		}
 	}
 }
@@ -703,7 +697,7 @@ void XTRANSPORT::run_timer(Timer *timer)
 	assert(timer == &_timer);
 
 	Timestamp now = Timestamp::now();
-	Timestamp earlist_pending_expiry = now;
+	Timestamp earliest_pending_expiry = now;
 
 	for (HashTable<unsigned short, sock*>::iterator iter = portToSock.begin(); iter != portToSock.end(); ++iter ) {
 		unsigned short _sport = iter->first;
@@ -736,42 +730,37 @@ void XTRANSPORT::run_timer(Timer *timer)
 			}
 		}
 
-		if (tear_down) {
-
-		} else {
-
-			// find the (next) earlist expiry
+		if (!tear_down) {
+			// find the (next) earliest expiry
 			if (sk->timer_on == true) {
-				if (sk->expiry > now && (sk->expiry < earlist_pending_expiry || earlist_pending_expiry == now)) {
-					earlist_pending_expiry = sk->expiry;
+				if (sk->expiry > now && (sk->expiry < earliest_pending_expiry || earliest_pending_expiry == now)) {
+					earliest_pending_expiry = sk->expiry;
 				}
 			}
 
-			// FIXMME: why is this here instead of with the other retransmits?
+			// FIXME: why is this here instead of with the other retransmits?
 			// check for CID request cases
-			RetransmitCIDRequest(sk, _sport, now, earlist_pending_expiry);
+			RetransmitCIDRequest(sk, _sport, now, earliest_pending_expiry);
 		}
 	}
 
+	// FIXME: since sock is in PortToSock, could this be in the loop above?
 	for (HashTable<XIDpair , struct sock*>::iterator it = XIDpairToConnectPending.begin(); it != XIDpairToConnectPending.end(); ++it) {
 		sock *sk = it->second;
-		bool tear_down = false;
 
 		// now do any in progress accepts
 		if (sk->state == SYN_RCVD && sk->expiry <= now) {
-			tear_down = RetransmitSYNACK(sk, 0, now);
-		}
-
-		if (tear_down) {
-			// Teardown will be dealt with in the retransmit function
-			// FIXME: anything here????
+			if (RetransmitSYNACK(sk, 0, now) == false) {
+				if (sk->expiry > now && (sk->expiry < earliest_pending_expiry || earliest_pending_expiry == now)) {
+					earliest_pending_expiry = sk->expiry;
+				}
+			}
 		}
 	}
 
-// FIXME: check to see if retransmitters are resetting the timer
 	// Set the next timer
-	if (earlist_pending_expiry > now) {
-		_timer.reschedule_at(earlist_pending_expiry);
+	if (earliest_pending_expiry > now) {
+		_timer.reschedule_at(earliest_pending_expiry);
 	}
 }
 
@@ -2653,12 +2642,7 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	sock *sk = new sock();
 	sk->port = _sport;
 	sk->sock_type = sock_type;
-
-	if (sock_type == SOCK_STREAM) {
-		ChangeState(sk, INACTIVE);
-	} else {
-		sk->state = INACTIVE;
-	}
+	sk->state = INACTIVE;
 
 	memset(sk->send_buffer, 0, sk->send_buffer_size * sizeof(WritablePacket*));
 	memset(sk->recv_buffer, 0, sk->recv_buffer_size * sizeof(WritablePacket*));
