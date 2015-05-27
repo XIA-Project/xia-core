@@ -31,12 +31,7 @@ CLICK_DECLS
 XTRANSPORT::XTRANSPORT() : _timer(this)
 {
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
-
-	_ackdelay_ms = ACK_DELAY;
-	_migrateackdelay_ms = _ackdelay_ms * 10;
-	_teardown_wait_ms = TEARDOWN_DELAY;
-
-	cp_xid_type("SID", &_sid_type);
+	cp_xid_type("SID", &_sid_type);	// FIXME: why isn't this a constant?
 }
 
 
@@ -507,7 +502,7 @@ bool XTRANSPORT::RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now)
 
 		ChangeState(sk, SYN_SENT);
 		sk->timer_on = true;
-		sk->expiry = now + Timestamp::make_msec(_ackdelay_ms);
+		sk->expiry = now + Timestamp::make_msec(ACK_DELAY);
 		sk->num_connect_tries++;
 
 		WritablePacket *copy = copy_packet(sk->pkt, sk);
@@ -550,7 +545,7 @@ bool XTRANSPORT::RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &no
 		DBG("Socket %d SYNACK retransmit\n", _sport);
 
 		sk->timer_on = true;
-		sk->expiry = now + Timestamp::make_msec(_ackdelay_ms);
+		sk->expiry = now + Timestamp::make_msec(ACK_DELAY);
 		sk->num_connect_tries++;
 
 		WritablePacket *copy = copy_packet(sk->pkt, sk);
@@ -584,7 +579,7 @@ bool XTRANSPORT::RetransmitFIN(sock *sk, unsigned short _sport, Timestamp &now)
 
 		sk->timer_on = true;
 		ChangeState(sk, FIN_WAIT1);
-		sk->expiry = now + Timestamp::make_msec(_ackdelay_ms);
+		sk->expiry = now + Timestamp::make_msec(ACK_DELAY);
 		sk->num_close_tries++;
 
 		WritablePacket *copy = copy_packet(sk->pkt, sk);
@@ -613,7 +608,7 @@ bool XTRANSPORT::RetransmitMIGRATE(sock *sk, unsigned short _sport, Timestamp &n
 
 		sk->timer_on = true;
 		sk->migrateack_waiting = true;
-		sk->expiry = now + Timestamp::make_msec(_migrateackdelay_ms);
+		sk->expiry = now + Timestamp::make_msec(MIGRATEACK_DELAY);
 		sk->num_migrate_tries++;
 
 		WritablePacket *copy = copy_packet(sk->migrate_pkt, sk);
@@ -654,7 +649,7 @@ bool XTRANSPORT::RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now)
 		if (retransmit_sent) {
 			sk->timer_on = true;
 			sk->num_retransmits++;
-			sk->expiry = now + Timestamp::make_msec(_ackdelay_ms);
+			sk->expiry = now + Timestamp::make_msec(ACK_DELAY);
 		} else {
 			CancelRetransmit(sk);
 		}
@@ -692,7 +687,7 @@ bool XTRANSPORT::RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp
 			WritablePacket *copy = copy_cid_req_packet(it3->second, sk);
 			output(NETWORK_PORT).push(copy);
 
-			cid_req_expiry  = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
+			cid_req_expiry  = Timestamp::now() + Timestamp::make_msec(ACK_DELAY);
 			sk->XIDtoExpiryTime.set(requested_cid, cid_req_expiry);
 			sk->XIDtoTimerOn.set(requested_cid, true);
 		}
@@ -1327,7 +1322,7 @@ void XTRANSPORT::SendControlPacket(int type, sock *sk, const void *payload, size
 
 	if (sk->timer_on) {
 		sk->num_retransmits = 0;
-		ScheduleTimer(sk, _ackdelay_ms);
+		ScheduleTimer(sk, ACK_DELAY);
 
 		// save the packet so we can resend it
 		// FIXME couldn't this go into the send buffer now?
@@ -1872,7 +1867,7 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 		memset(new_sk->send_buffer, 0, new_sk->send_buffer_size * sizeof(WritablePacket*));
 		memset(new_sk->recv_buffer, 0, new_sk->recv_buffer_size * sizeof(WritablePacket*));
 
-		ScheduleTimer(new_sk, _ackdelay_ms);
+		ScheduleTimer(new_sk, ACK_DELAY);
 
 		XIDpairToConnectPending.set(xid_pair, new_sk);
 
@@ -2199,7 +2194,7 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 		INFO("Socket %d FIN-ACK received\n", sk->port);
 
 		ChangeState(sk, TIME_WAIT);
-		ScheduleTimer(sk, _teardown_wait_ms);
+		ScheduleTimer(sk, TEARDOWN_DELAY);
 
 	} else if (sk->state == CONNECTED) {
 		INFO("Socket %d DATA-ACK received\n", sk->port);
@@ -2232,7 +2227,7 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 				CancelRetransmit(sk);
 			} else {
 				// FIXME: should we reset retransmit_tries here?
-				ScheduleTimer(sk, _ackdelay_ms);
+				ScheduleTimer(sk, ACK_DELAY);
 			}
 		}
 		portToSock.set(sk->port, sk);
@@ -2274,7 +2269,7 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 		SendControlPacket(TransportHeader::ACK, sk, payload, strlen(payload), src_path, dst_path);
 
 		ChangeState(sk, TIME_WAIT);
-		ScheduleTimer(sk, _teardown_wait_ms);
+		ScheduleTimer(sk, TEARDOWN_DELAY);
 
 	} else if (sk->state == FIN_WAIT1) {
 		// simultaneous shutdown
@@ -2807,7 +2802,7 @@ void XTRANSPORT::Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg) {
 		XID front_xid = sk->src_path.xid( xids[0] );
 		struct click_xia_xid head_xid = front_xid.xid();
 		uint32_t head_xid_type = head_xid.type;
-		if(head_xid_type == _sid_type) {
+		if (head_xid_type == _sid_type) {
 			sk->full_src_dag = false;
 		} else {
 			sk->full_src_dag = true;
@@ -2863,7 +2858,7 @@ void XTRANSPORT::XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 
 		struct click_xia_xid head_xid = front_xid.xid();
 		uint32_t head_xid_type = head_xid.type;
-		if(head_xid_type == _sid_type) {
+		if (head_xid_type == _sid_type) {
 			sk->full_src_dag = false;
 		} else {
 			sk->full_src_dag = true;
@@ -3614,7 +3609,7 @@ void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 
 		// Set timer
 		sk->migrateack_waiting = true;
-		ScheduleTimer(sk, _migrateackdelay_ms);
+		ScheduleTimer(sk, MIGRATEACK_DELAY);
 
 		portToSock.set(_migrateport, sk);
 		if(_migrateport != sk->port) {
@@ -3877,7 +3872,7 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 
 		// Set timer
 		sk->num_retransmits = 0;
-		ScheduleTimer(sk, _ackdelay_ms);
+		ScheduleTimer(sk, ACK_DELAY);
 
 		portToSock.set(_sport, sk);
 		if(_sport != sk->port) {
@@ -4180,7 +4175,7 @@ void XTRANSPORT::XrequestChunk(unsigned short _sport, xia::XSocketMsg *xia_socke
 		sk->XIDtoReadReq.set(destination_cid, false);
 
 		// Set timer
-		Timestamp cid_req_expiry  = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
+		Timestamp cid_req_expiry  = Timestamp::now() + Timestamp::make_msec(ACK_DELAY);
 		sk->XIDtoExpiryTime.set(destination_cid, cid_req_expiry);
 		sk->XIDtoTimerOn.set(destination_cid, true);
 

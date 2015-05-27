@@ -42,6 +42,7 @@ using namespace std;
 
 // various constants
 #define ACK_DELAY			300
+#define MIGRATEACK_DELAY	3000
 #define TEARDOWN_DELAY		120000
 #define HLIM_DEFAULT		250
 #define LAST_NODE_DEFAULT	-1
@@ -112,10 +113,6 @@ private:
 	SyslogErrorHandler *_errh;
 
 	Timer _timer;
-
-	unsigned _ackdelay_ms;
-	unsigned _migrateackdelay_ms;
-	unsigned _teardown_wait_ms;
 
 	uint32_t _cid_type, _sid_type;
 	XID _local_hid;
