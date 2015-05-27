@@ -252,8 +252,10 @@ XIAXIDRouteTable::remove_handler(const String &xid_str, Element *e, void *, Erro
 			return errh->error("nonexistent XID: ", xid_str.c_str());
 
 		XIARouteData *xrd = (XIARouteData*)it.value();
+		if (xrd->nexthop) {
+			delete xrd->nexthop;
+		}
 
-		// FIXME: delete the nxthop xid if any
 		table->_rts.erase(it);
 		delete xrd;
 	}
