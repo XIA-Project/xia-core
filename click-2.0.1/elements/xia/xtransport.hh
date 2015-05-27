@@ -151,8 +151,6 @@ private:
 			seq_num = 0;
 			ack_num = 0;
 			isAcceptedSocket = false;
-			dataack_waiting = false;
-			teardown_waiting = false;
 
 			num_connect_tries = 0;
 			num_retransmits = 0;
@@ -208,8 +206,6 @@ private:
 		uint32_t seq_num;
 		uint32_t ack_num;
 		bool isAcceptedSocket;		// true if this socket is generated due to an accept
-		bool dataack_waiting;
-		bool teardown_waiting;
 		int num_connect_tries;		// FIXME: can these all be flattened into one variable?
 		int num_retransmits;
 		int num_close_tries;

@@ -327,7 +327,7 @@ int main(int argc, char **argv)
 	srand(time(NULL));
 	getConfig(argc, argv);
 
-	signal(SIGINT, quithandler);
+//	signal(SIGINT, quithandler);
 
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 
