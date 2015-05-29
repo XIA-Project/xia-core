@@ -23,11 +23,11 @@
 
 #define MAX_XID_SIZE 100
 #define RECV_BUF_SIZE 1024
-#define XIA_MAX_BUF 15600 // TODO: double check with Dan later
+#define XIA_MAX_BUF 15600 // TODO: double check with Dan later why and is it a real limitation?
 
 #define CHUNKSIZE 1024
 #define REREQUEST 3
-#define NUM_CHUNKS 10
+#define NUM_CHUNKS 1
 
 //#define MAXBUFLEN = XIA_MAXBUF = XIA_MAXCHUNK = 15600
 
@@ -42,15 +42,23 @@ void die(int ecode, const char *fmt, ...);
 
 char** str_split(char* a_str, const char *a_delim);
 
-void usage();
+// result the string result of system command
+char* execSystem(char* cmd);
 
 bool file_exists(const char * filename);
+
+long now_msec();
 
 int sendCmd(int sock, const char *cmd);
 
 int sayHello(int sock, const char *helloMsg);
 
 int hearHello(int sock);
+
+// assume there is only one SID or the first SID encounted is the final intent
+char* XgetRemoteSID(int sock);
+
+int XgetNetADHID(const char *name, char *ad, char *hid);
 
 // make connection, instantiate src_ad, src_hid, dst_ad, dst_hid 
 int initializeClient(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid);

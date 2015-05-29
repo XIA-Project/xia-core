@@ -7,13 +7,13 @@ char myAD[MAX_XID_SIZE];
 char myHID[MAX_XID_SIZE];
 char my4ID[MAX_XID_SIZE];
 
-char *name = "www_s.ftp.advanced.aaa.xia";
+char name[] = "www_s.ftp.advanced.aaa.xia";
 
 void *recvCmd (void *socketid) {
 	int i, n, count = 0;
 	ChunkInfo *info = NULL;
-	char command[XIA_MAX_BUF];
-	char reply[XIA_MAX_BUF]; // meta data: it's very simple at this phase: count + CIDs
+	char cmd[XIA_MAX_BUF];
+	char reply[XIA_MAX_BUF]; // meta data: as simple as: count + CIDs
 	int sock = *((int*)socketid);
 	char *fname;
 
@@ -24,21 +24,20 @@ void *recvCmd (void *socketid) {
 
 	while (1) {
 		say("waiting for command\n");
-		memset(command, '\0', strlen(command));
+		memset(cmd, '\0', strlen(cmd));
 		memset(reply, '\0', strlen(reply));
 		
-		if ((n = Xrecv(sock, command, RECV_BUF_SIZE, 0)) < 0) {
+		if ((n = Xrecv(sock, cmd, RECV_BUF_SIZE, 0)) < 0) {
 			warn("socket error while waiting for data, closing connection\n");
 			break;
 		}
 
-		if (strncmp(command, "get", 3) == 0) {
-			fname = &command[4];
+		if (strncmp(cmd, "get", 3) == 0) {
+			fname = &cmd[4];
 			say("client requested file %s\n", fname);
 
-			if (info) {
+			if (info)
 				XfreeChunkInfo(info); // clean up the existing chunks first
-			}
 			info = NULL;
 			
 			say("Chunking file %s\n", fname);
@@ -63,65 +62,7 @@ void *recvCmd (void *socketid) {
 				break;
 			}
 		} 	
-
-		/*
-		// Server chunk the content and then should start the sending commands
-		if (strncmp(command, "get", 3) == 0) {
-			fname = &command[4];
-			say("client requested file %s\n", fname);
-
-			if (info) {
-				// clean up the existing chunks first
-			}
-		
-			info = NULL;
-			count = 0;
-			
-			say("chunking file %s\n", fname);
-			
-			// Chunking is done by the XputFile which itself uses XputChunk, and fills out the info
-			if ((count = XputFile(ctx, fname, CHUNKSIZE, &info)) < 0) {
-				warn("unable to serve the file: %s\n", fname);
-				sprintf(reply, "FAIL: File (%s) not found", fname);
-			} 
-			else {
-				sprintf(reply, "OK: %d", count);
-			}
-			say("%s\n", reply);
-			
-			// send the total number of chunks back
-			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
-				warn("unable to send reply to client\n");
-				break;
-			}
-		} 
-		// sending the cids (info[i].cid) back
-		else if (strncmp(command, "block", 5) == 0) {
-			// command: "block %d:%d", offset, num
-			char *start = &command[6]; // offset
-			char *end = strchr(start, ':'); // get 
-			if (!end) 
-				sprintf(reply, "FAIL: invalid block command");			
-			else {
-				*end = 0;
-				end++;
-				// FIXME: clean up naming, e is now a count
-				int s = atoi(start);
-				int e = s + atoi(end);
-				strcpy(reply, "OK:");
-				for (i = s; i < e && i < count; i++) {
-					strcat(reply, " ");
-					strcat(reply, info[i].cid);
-				}
-			}
-			printf("%s\n", reply);
-			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
-				warn("unable to send reply to client\n");
-				break;
-			}
-		} 
-		*/
-		else if (strncmp(command, "done", 4) == 0) {
+		else if (strncmp(cmd, "done", 4) == 0) {
 			say("done sending file: removing the chunks from the cache\n");
 			for (i = 0; i < count; i++)
 				XremoveChunk(ctx, info[i].cid);
@@ -130,7 +71,7 @@ void *recvCmd (void *socketid) {
 			count = 0;
 		} 
 		else {
-			sprintf(reply, "FAIL: invalid command (%s)\n", command);
+			sprintf(reply, "FAIL: invalid command (%s)\n", cmd);
 			warn(reply);
 			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
 				warn("unable to send reply to client\n");

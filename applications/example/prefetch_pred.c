@@ -3,160 +3,93 @@
 #define VERSION "v1.0"
 #define TITLE "XIA Prefetch Prediction"
 
-char src_ad[MAX_XID_SIZE];
-char src_hid[MAX_XID_SIZE];
+using namespace std;
 
-char dst_ad[MAX_XID_SIZE];
-char dst_hid[MAX_XID_SIZE];
+char prefetchProfileAD[MAX_XID_SIZE];
+char prefetchProfileHID[MAX_XID_SIZE];
+
+char prefetchExecAD[MAX_XID_SIZE];
+char prefetchExecHID[MAX_XID_SIZE];
 
 char myAD[MAX_XID_SIZE];
 char myHID[MAX_XID_SIZE];
 char my4ID[MAX_XID_SIZE];
 
-char* ftp_name = "www_s.ftp.advanced.aaa.xia";
-char* prefetch_client_name = "www_s.client.prefetch.aaa.xia";
-char* prefetch_profile_name = "www_s.profile.prefetch.aaa.xia";
-char* prefetch_pred_name = "www_s.prediction.prefetch.aaa.xia";
-char* prefetch_exec_name = "www_s.executer.prefetch.aaa.xia";
+char prefetch_profile_name[] = "www_s.profile.prefetch.aaa.xia";
+char prefetch_pred_name[] = "www_s.prediction.prefetch.aaa.xia";
+char prefetch_exec_name[] = "www_s.executer.prefetch.aaa.xia";
 
-int	sockfd_prefetch, sockfd_ftp;
+int	prefetchProfileSock, prefetchPredSock, prefetchExecSock;
 
-int getSubFile(int sock, char *dst_ad, char* dst_hid, const char *fin, const char *fout, int start, int end);
+vector<char *> SIDs;
 
-// prefetch_client receives context updates and send predicted CID_s to prefetch_server
-// handle the CID update first and location/AP later
-void *RecvCmd (void *socketid) {
+int prefetch_chunk_num = 3; // number of chunks to prefetch
 
-	char command[XIA_MAXBUF];
-	char reply[XIA_MAXBUF];
+// TODO: incoporate BW estimation to figure out number of chunks to prefetch
+// nitin: how to manage different connections (client SID)? each one should be a thread? 
+// which variables belong to all threads and which for local thread?
+
+// receive the SID from prefetch profile 
+void *regCmd (void *socketid) {
+
+	char cmd[XIA_MAXBUF]; // receive from prefetch profile of the new SID 
 	int sock = *((int*)socketid);
-	int n;
-	char fin[512];
-	char fout[512];
-	int start, end;
+	int n = -1;
 
 	while (1) {
-		memset(command, '\0', strlen(command));
-		memset(reply, '\0', strlen(reply));
 
-		if ((n = Xrecv(sock, command, 1024, 0))  < 0) {
+		memset(cmd, '\0', strlen(cmd));
+
+		// receive SID from prefetch profile after xftp client register with it
+		if ((n = Xrecv(sock, cmd, sizeof(cmd), 0)) < 0) {
 			warn("socket error while waiting for data, closing connection\n");
 			break;
 		}
-		// printf("%d\n", n);
-		/*
-		if (strncmp(command, "Hello from prefetch client", 26) == 0)
-			say("Received hello from prefetch client\n");
-		*/
-		printf("%s\n", command);
-		// TODO: use XChunk to prefetch: establish connection and start from the next 10 chunks
-		if (strncmp(command, "get", 3) == 0) {
-			sscanf(command, "get %s %d %d", fin, &start, &end);
-			printf("get %s %d %d\n", fin, start, end);
-			getSubFile(sockfd_ftp, dst_ad, dst_hid, fin, fin, start, end); // TODO: why fin, fin?
+
+		if (strncmp(cmd, "sid", 3) == 0) {
+			SIDs.push_back(strtok(cmd, " ")); // TODO: change it is not existed before
 		}
 	}
-
 	Xclose(sock);
 	say("Socket closed\n");
 	pthread_exit(NULL);
 }
 
-//	This is used both to put files and to get files since in case of put I still have to request the file.
-//	Should be fixed with push implementation
-int getSubFile(int sock, char *dst_ad, char* dst_hid, const char *fin, const char *fout, int start, int end) {
-	int chunkSock;
-	int offset;
-	char cmd[512];
-	char reply[512];
-	int status = 0;
-	
-	// send the file request
-	//printf("%sspace\n", fin);
-	sprintf(cmd, "get %s", fin);
-	sendCmd(sock, cmd);
+// send number of chunks to prefetch and get CIDs from prefetch_profile, and send the list to prefetch_exec
+int prefetch(int prefetchProfileSock, int prefetchExecSock) {
 
-	// get back number of chunks in the file
-	if (getChunkCount(sock, reply, sizeof(reply)) < 1){
-		warn("could not get chunk count. Aborting. \n");
-		return -1;
-	}
+	char cmd[XIA_MAXBUF];
+	char reply[XIA_MAXBUF];
 
-	// reply: OK: ***
-	int count = atoi(&reply[4]);
+	int n = -1;
 
-	say("%d chunks in total\n", count);
-
-	if ((chunkSock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0)
-		die(-1, "unable to create chunk socket\n");
-
-	FILE *f = fopen(fout, "w");
-
-	offset = start;
-
-	struct timeval tv;
-	int start_msec, temp_start_msec, temp_end_msec;
-	
-	if (gettimeofday(&tv, NULL) == 0)
-		start_msec = ((tv.tv_sec % 86400) * 1000 + tv.tv_usec / 1000);
-			
-	// TODO: when to end?
-	while (offset < count) {
-		int num = NUM_CHUNKS;
-		if (count - offset < num)
-			num = count - offset;
-
-		// tell the server we want a list of <num> cids starting at location <offset>
-		printf("\nFetched chunks: %d/%d:%.1f%\n\n", offset, count, 100*(double)(offset)/count);
-
-		sprintf(cmd, "block %d:%d", offset, num);
-		
-		if (gettimeofday(&tv, NULL) == 0)
-			temp_start_msec = ((tv.tv_sec % 86400) * 1000 + tv.tv_usec / 1000);
-					
-		// send the requested CID range
-		sendCmd(sock, cmd);
-
-/*
-		// say hello to the connext server
-		char* hello = "Hello from context client";		
-		int m = sendCmd(prefetch_ctx_sock, hello); 
-		printf("%d\n");
-		say("Sent hello msg\n");
-*/
-		if (getChunkCount(sock, reply, sizeof(reply)) < 1) {
-			warn("could not get chunk count. Aborting. \n");
-			return -1;
+	// get chunks to prefetch for different SIDs one by one, and forward to prefetch executer
+	while (1) {
+		// TODO: optimize: put different SID's into one msg
+		for (unsigned int i = 0; i < SIDs.size(); i++) {
+			memset(cmd, '\0', strlen(cmd));
+			memset(reply, '\0', strlen(reply));
+			sprintf(cmd, "prefetch %s %d", SIDs[i], prefetch_chunk_num);
+			sendCmd(prefetchProfileSock, cmd);
+			if ((n = Xrecv(prefetchProfileSock, reply, sizeof(reply), 0))  < 0) {
+				warn("socket error while waiting for data, closing connection\n");
+				break;
+			}
+			// forward the CID to prefetch to prefetch executer if any
+			if (strncmp(reply, "prefetch", 8) == 0 && strncmp(reply, "prefetch none", 13) != 0) {
+				sendCmd(prefetchExecSock, reply);
+			}
 		}
-		offset += NUM_CHUNKS;
-		// &reply[4] are the requested CIDs  
-		if (getListedChunks(chunkSock, f, &reply[4], dst_ad, dst_hid) < 0) {
-			status= -1;
-			break;
-		}
-		if (gettimeofday(&tv, NULL) == 0)
-			temp_end_msec = ((tv.tv_sec % 86400) * 1000 + tv.tv_usec / 1000);
-					
-		printf("Time elapses: %.3f seconds\n", (double)(temp_end_msec - temp_start_msec)/1000);
+		usleep(100000); // TODO: investigate 
 	}
-	printf("Time elapses: %.3f seconds in total.\n", (double)(temp_end_msec - start_msec)/1000);	
-	fclose(f);
-
-	if (status < 0) {
-		unlink(fin);
-	}
-
-	say("Received file %s\n", fout);
-	sendCmd(sock, "done");
-	Xclose(chunkSock);
-	return status;
+	return -1;
 }
 
 int main() {
 
-	sockfd_ftp = initializeClient(ftp_name, src_ad, src_hid, dst_ad, dst_hid); 
-	sockfd_prefetch = registerStreamReceiver(prefetch_pred_name, myAD, myHID, my4ID);
-	blockListener((void *)&sockfd_prefetch, RecvCmd);
-
-	//getSubFile(sockfd_ftp, s_ad, s_hid, "4.png", "my4.png", 0, 1);
+	prefetchProfileSock = initializeClient(prefetch_profile_name, myAD, myHID, prefetchProfileAD, prefetchProfileHID); 
+	prefetchExecSock = initializeClient(prefetch_exec_name, myAD, myHID, prefetchExecAD, prefetchExecHID);
+	prefetchPredSock = registerStreamReceiver(prefetch_pred_name, myAD, myHID, my4ID);
+	blockListener((void *)&prefetchPredSock, regCmd);	
+	prefetch(prefetchProfileSock, prefetchExecSock);
 }

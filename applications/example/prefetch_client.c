@@ -10,10 +10,10 @@ char my4ID[MAX_XID_SIZE];
 char prefetchProfileAD[MAX_XID_SIZE];
 char prefetchProfileHID[MAX_XID_SIZE];
 
-char *prefetch_client_name = "www_s.client.prefetch.aaa.xia";
-char *prefetch_profile_name = "www_s.profile.prefetch.aaa.xia";
+char prefetch_client_name[] = "www_s.client.prefetch.aaa.xia";
+char prefetch_profile_name[] = "www_s.profile.prefetch.aaa.xia";
 
-int netMonSock; // TODO: later
+int netMonSock; // TODO: monitor connectivity and handoff
 int prefetchClientSock;
 int prefetchProfileSock;
 
@@ -101,3 +101,12 @@ int main() {
 	prefetchClientSock = registerStreamReceiver(prefetch_client_name, myAD, myHID, my4ID);
 	blockListener((void *)&prefetchClientSock, metaRecvCmd);
 }
+
+/*
+	while(1) {
+		char *ssid = execSystem("iwgetid -r");
+		std::cerr<<ssid<<std::endl;
+		usleep(1000000);
+	}
+
+	*/

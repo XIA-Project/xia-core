@@ -5,7 +5,6 @@ int verbose = 1;
 void say(const char *fmt, ...) {
 	if (verbose) {
 		va_list args;
-
 		va_start(args, fmt);
 		vprintf(fmt, args);
 		va_end(args);
@@ -14,7 +13,6 @@ void say(const char *fmt, ...) {
 
 void warn(const char *fmt, ...) {
 	va_list args;
-
 	va_start(args, fmt);
 	vfprintf(stdout, fmt, args);
 	va_end(args);
@@ -22,7 +20,6 @@ void warn(const char *fmt, ...) {
 
 void die(int ecode, const char *fmt, ...) {
 	va_list args;
-
 	va_start(args, fmt);
 	vfprintf(stdout, fmt, args);
 	va_end(args);
@@ -42,7 +39,7 @@ char** str_split(char* a_str, const char *a_delim) {
 	/* Count how many elements will be extracted. */
 	for (i = 0; i < str_len; i++) 
 		for (j = 0; j < del_len; j++) 
-			if(a_str[i] == a_delim[j]) {
+			if (a_str[i] == a_delim[j]) {
 				count++;
 				last_delim = &a_str[i];
 			}
@@ -61,7 +58,7 @@ char** str_split(char* a_str, const char *a_delim) {
 	result[i] = strtok(a_str, a_delim);
 	// printf ("%s\n",result[i]);
 	
-	for(i = 1; i < count; i++) {
+	for (i = 1; i < count; i++) {
 		result[i] = strtok (NULL, a_delim);
 		// printf ("%s\n",result[i]);
 	}
@@ -69,8 +66,20 @@ char** str_split(char* a_str, const char *a_delim) {
 	return result;
 }
 
-void usage() {
-	say("usage: get|put <source file> <dest name>\n");
+char* execSystem(char* cmd) {
+	FILE* pipe = popen(cmd, "r");
+	if (!pipe) return NULL;
+  char buffer[128];
+  std::string result = "";
+  while (!feof(pipe)) {
+		if (fgets(buffer, 128, pipe) != NULL)
+			result += buffer;
+	}
+	pclose(pipe);
+	result.erase(result.end()-1, result.end()); // remove the newline character
+	char *rv = new char[result.length() + 1];
+	strcpy(rv, result.c_str());
+	return rv;
 }
 
 bool file_exists(const char * filename) {
@@ -81,8 +90,15 @@ bool file_exists(const char * filename) {
 	return false;
 }
 
-int sendCmd(int sock, const char *cmd) {
+long now_msec() {
+	struct timeval tv;
+	if (gettimeofday(&tv, NULL) == 0)
+		return ((tv.tv_sec % 86400) * 1000 + tv.tv_usec / 1000);	
+	else
+		return -1;
+}
 
+int sendCmd(int sock, const char *cmd) {
 	warn("Sending Command: %s \n", cmd);
 	int n;
 	if ((n = Xsend(sock, cmd,  strlen(cmd), 0)) < 0) {
@@ -98,6 +114,7 @@ int sayHello(int sock, const char *helloMsg) {
 }
 
 int hearHello(int sock) { //, const char *helloMsg) {
+
 	char command[XIA_MAXBUF];
 	memset(command, '\0', strlen(command));
 	int n;
@@ -118,7 +135,47 @@ int hearHello(int sock) { //, const char *helloMsg) {
 	*/
 }
 
+char* XgetRemoteSID(int sock) {
+
+	sockaddr_x dag;
+	socklen_t daglen = sizeof(dag);
+	char sdag[1024];
+
+	if (Xgetpeername(sock, (struct sockaddr*)&dag, &daglen) < 0)
+		die(-1, "unable to locate: %s\n", sock);
+
+	Graph g(&dag);
+	strncpy(sdag, g.dag_string().c_str(), sizeof(sdag));
+	char *cursor = strstr(sdag, "SID:"); // find the first occurance of "SID:"
+	return &cursor[4];
+}
+
+// hacky way: by looking up name service only local to the network
+int XgetNetADHID(const char *name, char *ad, char *hid) {
+
+	sockaddr_x dag;
+	socklen_t daglen = sizeof(dag);
+	char sdag[1024];
+	if (XgetDAGbyName(name, &dag, &daglen) < 0)
+		die(-1, "unable to locate: %s\n", name);
+	Graph g(&dag);
+	strncpy(sdag, g.dag_string().c_str(), sizeof(sdag));
+	// say("sdag = %s\n",sdag);
+	char *ads = strstr(sdag, "AD:"); 		// first occurrence
+	char *hids = strstr(sdag, "HID:");
+
+	if (sscanf(ads, "%s", ad) < 1 || strncmp(ad, "AD:", 3) != 0) {
+		die(-1, "Unable to extract AD.");
+	}
+	if (sscanf(hids, "%s", hid) < 1 || strncmp(hid, "HID:", 4) != 0) {
+		die(-1, "Unable to extract HID.");
+	}
+
+	return 1;
+}
+
 int initializeClient(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid) {
+
 	int sock, rc;
 	sockaddr_x dag;
 	socklen_t daglen;
@@ -144,26 +201,24 @@ int initializeClient(const char *name, char *src_ad, char *src_hid, char *dst_ad
 	if (rc < 0) {
 		Xclose(sock);
 		die(-1, "Unable to read local address.\n");
-	} else{
+	} 
+	else{
 		warn("My AD: %s, My HID: %s\n", src_ad, src_hid);
 	}
 	
-	// save the AD and HID for later. This seems hacky
-	// we need to find a better way to deal with this
+	// save the AD and HID for later. This seems hacky we need to find a better way to deal with this
 	Graph g(&dag);
 	strncpy(sdag, g.dag_string().c_str(), sizeof(sdag));
 	// say("sdag = %s\n",sdag);
-	char *ads = strstr(sdag,"AD:");
-	char *hids = strstr(sdag,"HID:");
+	char *ads = strstr(sdag, "AD:");
+	char *hids = strstr(sdag, "HID:");
 	
 	if (sscanf(ads, "%s", dst_ad) < 1 || strncmp(dst_ad, "AD:", 3) != 0) {
 		die(-1, "Unable to extract AD.");
 	}
-		
 	if (sscanf(hids, "%s", dst_hid) < 1 || strncmp(dst_hid, "HID:", 4) != 0) {
 		die(-1, "Unable to extract HID.");
 	}
-
 	warn("Service AD: %s, Service HID: %s\n", dst_ad, dst_hid);
 	return sock;
 }
@@ -175,18 +230,17 @@ int getChunkCount(int sock, char *reply, int sz) {
 		Xclose(sock);
 		 die(-1, "Unable to communicate with the server\n");
 	}
-
 	if (strncmp(reply, "OK:", 3) != 0) {
 		warn( "%s\n", reply);
 		return -1;
 	}
-
 	reply[n] = 0;
 
 	return n;
 }
 
 int buildChunkDAGs(ChunkStatus cs[], char *chunks, char *dst_ad, char *dst_hid) {
+
 	char *p = chunks;
 	char *next;
 	int n = 0;
@@ -214,6 +268,7 @@ int buildChunkDAGs(ChunkStatus cs[], char *chunks, char *dst_ad, char *dst_hid) 
 }
 
 int getListedChunks(int csock, FILE *fd, char *chunks, char *dst_ad, char *dst_hid) {
+
 	ChunkStatus cs[NUM_CHUNKS];
 	char data[XIA_MAXCHUNK];
 	int len;
@@ -227,7 +282,9 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *dst_ad, char *dst_h
 	// chunks already in the local cache will not be refetched from the network 
 	// read the the whole chunk list first before fetching
 	unsigned ctr = 0;
+
 	while (1) {
+
 		if (ctr % REREQUEST == 0) {
 			// bring the list of chunks local
 			say("%srequesting list of %d chunks\n", (ctr == 0 ? "" : "re-"), n);
@@ -285,6 +342,7 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *dst_ad, char *dst_h
 
 // register the service with the name server and open the necessary sockets
 int registerStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) {
+
 	int sock;
 
 	// create a socket, and listen for incoming connections
@@ -307,7 +365,7 @@ int registerStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) {
 		die(-1, "getaddrinfo failure!\n");
 
 	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
-	// FIXME: NAME is hard coded
+
   if (XregisterName(name, dag) < 0)
 		die(-1, "error registering name: %s\n", name);
 
@@ -338,6 +396,7 @@ void *blockListener(void *listenID, void *recvFuntion (void *)) {
 		pthread_create(&client, NULL, recvFuntion, (void *)&acceptSock);
 	}
 	
-	Xclose(listenSock); // we should never reach here!
+	Xclose(listenSock);
+
 	return NULL;
 }
