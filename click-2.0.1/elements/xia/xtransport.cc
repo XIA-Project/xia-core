@@ -1845,6 +1845,7 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 		new_sk->src_path = dst_path;
 		new_sk->isAcceptedSocket = true;
 		new_sk->pkt = copy_packet(p, new_sk);
+		new_sk->refcount = 1;
 
 		memset(new_sk->send_buffer, 0, new_sk->send_buffer_size * sizeof(WritablePacket*));
 		memset(new_sk->recv_buffer, 0, new_sk->recv_buffer_size * sizeof(WritablePacket*));
@@ -2643,6 +2644,7 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	sk->port = _sport;
 	sk->sock_type = sock_type;
 	sk->state = INACTIVE;
+	sk->refcount = 1;
 
 	memset(sk->send_buffer, 0, sk->send_buffer_size * sizeof(WritablePacket*));
 	memset(sk->recv_buffer, 0, sk->recv_buffer_size * sizeof(WritablePacket*));
@@ -2787,6 +2789,18 @@ void XTRANSPORT::Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 
 
+void XTRANSPORT::XFork(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
+{
+	xia::X_Fork_Msg *msg = xia_socket_msg->mutable_x_fork();
+	int increment = msg->increment() ? 1 : -1;
+
+	// loop through list of ports and modify the ref counter
+
+	ReturnResult(_sport, xia_socket_msg);
+}
+
+
+
 // FIXME: This way of doing things is a bit hacky.
 void XTRANSPORT::XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
@@ -2850,6 +2864,13 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	if (!sk) {
 		// this shouldn't happen!
 		ERROR("Invalid socket %d\n", _sport);
+		goto done;
+	}
+
+	assert(sk->refcount != 0);
+
+	if (--sk->refcount != 0) {
+		// the app was forked and not everyone has closed the socket yet
 		goto done;
 	}
 

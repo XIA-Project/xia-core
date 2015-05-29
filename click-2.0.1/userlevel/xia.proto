@@ -12,36 +12,29 @@ enum XSocketCallType {
   XRECVFROM = 9;
   XSETSOCKOPT = 10;
   XGETSOCKOPT = 11;
-
   XPUTCHUNK = 12;
   XREQUESTCHUNK = 13;
   XGETCHUNKSTATUS = 14;
   XREADCHUNK = 15;
   XREMOVECHUNK =16;
-
   XREQUESTFAILED = 17;
   //XRESULT = 18;
-
   XCHANGEAD = 19;
   XREADLOCALHOSTADDR = 20;
   XUPDATENAMESERVERDAG = 21;
   XREADNAMESERVERDAG = 22;
-
   XISDUALSTACKROUTER = 23;
   XGETPEERNAME = 24;
   XGETSOCKNAME = 25;
-
   XGETMSG = 26;
   XREADYTOACCEPT = 27;
   XPUSHCHUNKTO = 28;
   XBINDPUSH = 29;
-
   XPOLL = 30;
-
   XRECVCHUNKFROM = 31;
   XLISTEN = 32;
-
   XUPDATERV = 33;
+  XFORK = 34;
 }
 
 message XSocketMsg {
@@ -86,6 +79,7 @@ message XSocketMsg {
 
   optional X_Updaterv_Msg x_updaterv = 33;
   optional X_Listen_Msg x_listen = 34;
+  optional X_Fork_Msg x_fork = 35;
 }
 
 message X_Socket_Msg {
@@ -307,6 +301,10 @@ message X_Recvchunkfrom_Msg {
   optional int64 timestamp = 9; 
 }
 
+message X_Fork_Msg {
+  required bool increment = 1;
+  repeated uint32 port = 2;
+}
 
 message X_BindPush_Msg {
   required string sdag = 1; // bind to src dag 

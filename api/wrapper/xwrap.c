@@ -52,6 +52,7 @@
 #include <net/if.h>
 #include <limits.h>
 #include <ifaddrs.h>
+#include <unistd.h>
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
@@ -150,6 +151,7 @@ DECLARE(int, getpeername, int fd, struct sockaddr *addr, socklen_t *len);
 DECLARE(int, getsockname, int fd, struct sockaddr *addr, socklen_t *len);
 DECLARE(int, getsockopt, int fd, int level, int optname, void *optval, socklen_t *optlen);
 DECLARE(int, fcntl, int fd, int cmd, ...);
+DECLARE(pid_t, fork, void);
 DECLARE(int, listen, int fd, int n);
 DECLARE(int, poll, struct pollfd *fds, nfds_t nfds, int timeout);
 DECLARE(ssize_t, read, int fd, void *buf, size_t count);
@@ -722,6 +724,7 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	GET_FCN(close);
 	GET_FCN(connect);
 	GET_FCN(fcntl);
+	GET_FCN(fork);
 	GET_FCN(freeaddrinfo);
 	GET_FCN(freeifaddrs);
 	GET_FCN(gai_strerror);
@@ -786,6 +789,12 @@ int accept(int fd, struct sockaddr *addr, socklen_t *addr_len)
 
 		xlen = sizeof(sax);
 		rc = Xaccept(fd, addr, &xlen);
+
+		if (rc >= 0) {
+			errno = 0;
+		}
+
+		MSG("RC = %d errno = %d ===============================================\n", rc, errno);
 
 		if (FORCE_XIA()) {
 			// create a new fake IP address/port  to map to
@@ -977,6 +986,13 @@ extern "C" int fcntl (int fd, int cmd, ...)
 		MSG("rc = %d: %s\n", rc, strerror(errno));
 
 	return rc;
+}
+
+pid_t fork(void)
+{
+	TRACE();
+
+	return __real_fork();
 }
 
 

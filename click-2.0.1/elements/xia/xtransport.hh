@@ -145,7 +145,7 @@ private:
 			seq_num = 0;
 			ack_num = 0;
 			isAcceptedSocket = false;
-
+			refcount = 0;
 			num_connect_tries = 0;
 			num_retransmits = 0;
 			num_close_tries = 0;
@@ -184,6 +184,7 @@ private:
 		bool recv_pending;			// true if API is waiting to receive data
 		bool timer_on;				// if true timer is enabled
 		Timestamp expiry;			// when timer should fire next
+		unsigned refcount;			// bumped whenever owning app is forked
 
 		XIAPath src_path;			// peer DAG
 		XIAPath dst_path;			// our DAG
@@ -335,6 +336,7 @@ protected:
 	void XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xupdaterv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void XFork(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 
 	// protocol handlers
 	void ProcessDatagramPacket(WritablePacket *p_in);
