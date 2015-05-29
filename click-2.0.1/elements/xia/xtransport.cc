@@ -998,7 +998,7 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk)
 			uint16_t tail = XIA_TAIL_ANNO(p);
 
 			if (tail) {
-				DBG("packet (%d) has %d bytes of %d remaining\n", i % sk->recv_buffer_size, data_size - tail, data_size);
+				DBG("%d: packet (%d) has %d bytes of %d remaining\n", sk->port, i % sk->recv_buffer_size, data_size - tail, data_size);
 				data_size -= tail;
 				payload += tail;
 			}
@@ -1020,7 +1020,7 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk)
 					int extra = bytes_returned - bytes_requested;
 					tail = xiah.plen() - thdr.hlen() - extra;
 
-					DBG("keeping the last %d bytes in packet %d\n", extra, i % sk->recv_buffer_size);
+					DBG("%d: keeping the last %d bytes in packet %d\n", sk->port, extra, i % sk->recv_buffer_size);
 					SET_XIA_TAIL_ANNO(p, tail);
 				}
 			} else {
@@ -1031,7 +1031,7 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk)
 		x_recv_msg->set_payload(buf, bytes_returned);
 		x_recv_msg->set_bytes_returned(bytes_returned);
 
-		DBG("returning %d bytes out of %d requested\n", bytes_returned, bytes_requested);
+		DBG("%d: returning %d bytes out of %d requested\n", sk->port, bytes_returned, bytes_requested);
 
 		return bytes_returned;
 
@@ -2151,7 +2151,7 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 		}
 		if (sk->polling) {
 			// tell API we are writeable
-			ProcessPollEvent(sk->port, POLLOUT); // chenren: change from POLLOUT to POLL
+			ProcessPollEvent(sk->port, POLLOUT);
 		}
 		// finish the connection handshake
 		XIDpairToConnectPending.erase(xid_pair);
@@ -2277,7 +2277,6 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 		return;
 	}
 
-	// FIXME: is this OK here?
 	// tell API peer requested close
 	if (sk->isBlocking) {
 		if (sk->recv_pending) {
@@ -2290,7 +2289,7 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 		}
 	}
 	if (sk->polling) {
-		ProcessPollEvent(sk->port, POLLHUP);
+		ProcessPollEvent(sk->port, POLLIN|POLLHUP);
 	}
 }
 
@@ -3199,6 +3198,7 @@ void XTRANSPORT::Xupdaterv(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 
 // note this is only going to return status for a single socket in the poll response
 // the only time we will return multiple sockets is when poll returns immediately
+// TODO: is it worth changing this to possibly return more than one event?
 void XTRANSPORT::ProcessPollEvent(unsigned short _sport, unsigned int flags_out)
 {
 	// loop thru all the polls that are registered looking for the socket associated with _sport
@@ -3353,7 +3353,9 @@ void XTRANSPORT::Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 				if (flags & POLLIN) {
 					if (sk->sock_type == SOCK_STREAM) {
 						if (sk->recv_base < sk->next_recv_seqnum) {
-							DBG("Xpoll: read STREAM data avaialable on %d\n", port);
+							flags_out |= POLLIN;
+						} else if (sk->state == CLOSE_WAIT) {
+							// other end closed, app needs to know!
 							flags_out |= POLLIN;
 						}
 
@@ -3937,13 +3939,19 @@ void XTRANSPORT::Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		// FIXME: do something with the error
 	}
 
-	if (sk && sk->state == CONNECTED) {
+	if (sk && (sk->state == CONNECTED || sk->state == CLOSE_WAIT)) {
 		read_from_recv_buf(xia_socket_msg, sk);
 
 		if (xia_socket_msg->x_recv().bytes_returned() > 0) {
 			// Return response to API
 			ReturnResult(_sport, xia_socket_msg, xia_socket_msg->x_recv().bytes_returned());
-		} else if (!xia_socket_msg->blocking()) {
+
+		} else if (sk->state == CLOSE_WAIT) {
+			// other end has closed, tell app there's nothing to read
+			// what if other end is doing retransmits??
+			ReturnResult(_sport, xia_socket_msg, 0);
+
+		}else if (!xia_socket_msg->blocking()) {
 
 			// we're not blocking and there's no data, so let API know immediately
 			sk->recv_pending = false;
