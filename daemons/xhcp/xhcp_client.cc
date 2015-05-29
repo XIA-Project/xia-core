@@ -26,6 +26,8 @@
 #include "Xsocket.h"
 #include "xns.h"
 #include "xhcp.hh"
+#include "xhcp_beacon.hh"
+#include "xhcp_interface.hh"
 #include "../common/XIARouter.hh"
 #include "dagaddr.hpp"
 
@@ -110,9 +112,142 @@ void listRoutes(std::string xidType)
 	}
 }
 
-int main(int argc, char *argv[]) {
+// Setup connection with Click
+// Create an Xsocket
+// Bind to receive SID_XHCP beacons
+// Return: socket descriptor to listen for beacons
+int initialize()
+{
+	int retval = -1;
 	int rc;
-	sockaddr_x sdag;
+	int sockfd;
+	int state = 0;
+	sockaddr_x xhcp_dag;
+	Graph g;
+
+	// Set up a connection with Click
+	xr.setRouter(hostname);
+	syslog(LOG_NOTICE, "%s started on %s", APPNAME, hostname);
+
+	// connect to the click route engine
+	if ((rc = xr.connect()) != 0) {
+		syslog(LOG_ERR, "unable to connect to click! (%d)\n", rc);
+		goto initialize_cleanup;
+	}
+	state = 1;
+
+    // Xsocket init
+    sockfd = Xsocket(AF_XIA, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        syslog(LOG_ERR, "unable to create a socket");
+		goto initialize_cleanup;
+    }
+	state = 2;
+
+	// DAG to listen for XHCP beacons
+	g = Node() * Node(SID_XHCP);
+	g.fill_sockaddr(&xhcp_dag);
+
+	// Bind socket to listen for beacons
+	if (Xbind(sockfd, (struct sockaddr*)&xhcp_dag, sizeof(xhcp_dag)) < 0) {
+		syslog(LOG_ERR, "unable to bind to %s", g.dag_string().c_str());
+		goto initialize_cleanup;
+	}
+	
+	// All good return socket descriptor
+	retval = sockfd;
+
+
+initialize_cleanup:
+	// On error, close all state and return negative value
+	if(retval < 0) {
+		switch(state) {
+			case 2:
+				Xclose(sockfd);
+			case 1:
+				xr.close();
+		};
+	}
+	return retval;
+}
+
+// Read a beacon from sockfd and return interface and beacon contents
+int get_beacon(int sockfd, int *iface, char *beacon, int beaconlen)
+{
+	int retval = -1;
+	sockaddr_x client;
+	struct msghdr msg;
+	struct iovec iov;
+	struct in_pktinfo pi;
+
+	struct cmsghdr *cmsg;
+	struct in_pktinfo *pinfo;
+
+	assert(beaconlen == XIA_MAXBUF);
+
+	msg.msg_name = &client;
+	msg.msg_namelen = sizeof(client);
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+
+	iov.iov_base = beacon;
+	iov.iov_len = XIA_MAXBUF;
+
+	char cbuf[CMSG_SPACE(sizeof pi)];
+
+	msg.msg_control = cbuf;
+	msg.msg_controllen = sizeof(cbuf);
+	cmsg = CMSG_FIRSTHDR(&msg);
+	cmsg->cmsg_level = IPPROTO_IP;
+	cmsg->cmsg_type = IP_PKTINFO;
+	cmsg->cmsg_len = CMSG_LEN(sizeof(pi));
+
+	if (Xrecvmsg(sockfd, &msg, 0) < 0) {
+		printf("error receiving beacon\n");
+		retval = -1;
+	} else {
+		// get the interface it came in on
+		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+			if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_PKTINFO) {
+				pinfo = (struct in_pktinfo*) CMSG_DATA(cmsg);
+				*iface = pinfo->ipi_ifindex;
+				retval = 0;
+			}
+		}
+	}
+
+	if(retval == 0) {
+		Graph g(&client);
+		printf("beacon on click port %hd from:\n%s\n", *iface, g.dag_string().c_str());
+	}
+	return retval;
+}
+
+int main(int argc, char *argv[]) {
+	int sockfd;
+
+	// Parse the arguments
+	config(argc, argv);
+	// A table with columns: InterfaceNumber, InterfaceName, InterfaceHID, AD, RHID, R4ID, NameServer
+	XHCPInterface interfaces[XHCP_MAX_INTERFACES];
+	/*
+	// A pointer to the default Interface.
+	int default_interface = -1;
+	*/
+	// Receive beacon from an interface.
+	if((sockfd = initialize()) < 0) {
+		syslog(LOG_ERR, "Failed to set up beacon receiver\n");
+		return -1;
+	}
+	// If AD changes - update XupdateAD(iface, HID, AD, R4ID) - Xtransport updates DAG for iface in XIAInterfaceTable (Interface, DAG). Set DESTINED_FOR_LOCALHOST route for new AD and delete route for old AD.
+	// if RHID changes for default interface - set default routes for AD, HID, 4ID and RHID to go to newRHID.
+	// For all RHID changes - delete route for old RHID and add route for new RHID in its place.
+	// If NS changes - Do we allow more than one name server here?????
+	// How do we send register broadcast message only on a specific interface?
+	// Do we register all DAGs with name server or just the default one? May be best to have an API that just gets the DAG instead of components.
+	/*
+	int rc;
+	//NITIN sockaddr_x sdag;
 	sockaddr_x hdag;
 	sockaddr_x ddag;
 	char pkt[XHCP_MAX_PACKET_SIZE];
@@ -136,42 +271,17 @@ int main(int argc, char *argv[]) {
 	char my4ID[MAX_XID_SIZE];	
 	int changed;
 
-	config(argc, argv);
-	xr.setRouter(hostname);
-	syslog(LOG_NOTICE, "%s started on %s", APPNAME, hostname);
-
 	// make the response message dest DAG (intended destination: gw router who is running the routing process)
 	Graph gw = Node() * Node(BHID) * Node(SID_XROUTE);
 	gw.fill_sockaddr(&pseudo_gw_router_dag);
 
-	// connect to the click route engine
-	if ((rc = xr.connect()) != 0) {
-		syslog(LOG_ERR, "unable to connect to click! (%d)\n", rc);
-		return -1;
-	}
-	
-	// Xsocket init
-	int sockfd = Xsocket(AF_XIA, SOCK_DGRAM, 0);
-	if (sockfd < 0) {
-		syslog(LOG_ERR, "unable to create a socket");
-		exit(-1);
-	}
-	
    	// read the localhost HID 
    	if ( XreadLocalHostAddr(sockfd, mydummyAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE, my4ID, MAX_XID_SIZE) < 0 ) {
 		syslog(LOG_ERR, "unable to retrieve local host address");
 		Xclose(sockfd);
 	}
+	*/
 
-	// make the src DAG (Actual AD will be updated when receiving XHCP beacons from an XHCP server)
-	Graph g = Node() * Node(SID_XHCP);
-	g.fill_sockaddr(&sdag);
-
-	if (Xbind(sockfd, (struct sockaddr*)&sdag, sizeof(sdag)) < 0) {
-		syslog(LOG_ERR, "unable to bind to %s", g.dag_string().c_str());
-		Xclose(sockfd);
-		exit(-1);
-	}
 	
 	/* Main operation:
 		1. receive myAD, gateway router HID, and Name-Server-DAG information from XHCP server
@@ -189,51 +299,48 @@ int main(int argc, char *argv[]) {
 	
 	// main looping
 	while(1) {
-		// clear out packet
-		memset(pkt, 0, sizeof(pkt));
-		socklen_t ddaglen = sizeof(ddag);
-		int rc = Xrecvfrom(sockfd, pkt, XHCP_MAX_PACKET_SIZE, 0, (struct sockaddr*)&ddag, &ddaglen);
+		int iface;
+		char buf[XIA_MAXBUF];
 
-		if (rc < 0) {
-			syslog(LOG_ERR, "ERROR receiving beacon");
+		if(get_beacon(sockfd, &iface, buf, XIA_MAXBUF)) {
+			syslog(LOG_ERR, "ERROR receiving beacon\n");
 			continue;
 		}
-		if (rc == 0) {
-			syslog(LOG_ERR, "xhcp_client: ERROR: zero length beacon, skipping\n");
-			continue;
-		}
-		memset(router_ad, '\0', XHCP_MAX_DAG_LENGTH);
-		memset(router_hid, '\0', XHCP_MAX_DAG_LENGTH);
-		memset(router_4id, '\0', XHCP_MAX_DAG_LENGTH);
-		memset(ns_dag, '\0', XHCP_MAX_DAG_LENGTH);
-		int i;
-		xhcp_pkt *tmp = (xhcp_pkt *)pkt;
-		xhcp_pkt_entry *entry = (xhcp_pkt_entry *)tmp->data;
-		for (i=0; i<tmp->num_entries; i++) {
-			switch (entry->type) {
-				case XHCP_TYPE_AD:
-					sprintf(router_ad, "%s", entry->data);
-					break;
-				case XHCP_TYPE_GATEWAY_ROUTER_HID:
-					sprintf(router_hid, "%s", entry->data);
-					break;
-				case XHCP_TYPE_GATEWAY_ROUTER_4ID:
-					sprintf(router_4id, "%s", entry->data);
-					break;					
-				case XHCP_TYPE_NAME_SERVER_DAG:
-					sprintf(ns_dag, "%s", entry->data);
-					break;					
-				default:
-					syslog(LOG_WARNING, "invalid xhcp data, discarding...");
-					break;
-			}
-			entry = (xhcp_pkt_entry *)((char *)entry + sizeof(entry->type) + strlen(entry->data) + 1);
-		}
+		XHCPBeacon beacon(buf);
+		/*
 		// validate pkt
 		if (strlen(router_ad) <= 0 || strlen(router_hid) <= 0 || strlen(router_4id) <= 0 || strlen(ns_dag) <= 0) {
 			syslog(LOG_WARNING, "xhcp_client:main: ERROR invalid beacon packet received");
 			continue;
 		}
+		*/
+		if(interfaces[iface].isActive()) {
+			printf("Updating routing for interface %d\n", iface);
+			if(interfaces[iface].getAD().compare(beacon.getAD())) {
+				printf("AD for interface %d changed from %s to %s\n", iface, interfaces[iface].getAD().c_str(), beacon.getAD().c_str());
+				interfaces[iface].setAD(beacon.getAD());
+			}
+			if(interfaces[iface].getRouterHID().compare(beacon.getRouterHID())) {
+				printf("Router for interface %d changed from %s to %s\n", iface, interfaces[iface].getRouterHID().c_str(), beacon.getRouterHID().c_str());
+				interfaces[iface].setRouterHID(beacon.getRouterHID());
+			}
+			if(interfaces[iface].getRouter4ID().compare(beacon.getRouter4ID())) {
+				printf("Router 4ID for interface %d changed from %s to %s\n", iface, interfaces[iface].getRouter4ID().c_str(), beacon.getRouter4ID().c_str());
+				interfaces[iface].setRouter4ID(beacon.getRouter4ID());
+			}
+			if(interfaces[iface].getNameServerDAG().compare(beacon.getNameServerDAG())) {
+				printf("Name server for interface %d changed from %s to %s\n", iface, interfaces[iface].getNameServerDAG().c_str(), beacon.getNameServerDAG().c_str());
+				interfaces[iface].setNameServerDAG(beacon.getNameServerDAG());
+			}
+		} else {
+			printf("Creating new entry for interface %d\n", iface);
+			interfaces[iface].setID(iface);
+			interfaces[iface].setAD(beacon.getAD());
+			interfaces[iface].setRouterHID(beacon.getRouterHID());
+			interfaces[iface].setRouter4ID(beacon.getRouter4ID());
+			interfaces[iface].setNameServerDAG(beacon.getNameServerDAG());
+		}
+		/*
 		
 		AD = router_ad;
 		gwRHID = router_hid;
@@ -291,9 +398,6 @@ int main(int argc, char *argv[]) {
 			if ((rc = xr.setRoute(gwRHID, 0, gwRHID, 0xffff)) != 0)
 				syslog(LOG_WARNING, "error setting route %d\n", rc);
 				
-			if ((rc = xr.setRoute(default_HID, 0, gwRHID, 0xffff)) != 0)
-				syslog(LOG_WARNING, "error setting route %d\n", rc);
-				
 			myGWRHID = gwRHID;
 		}
 		
@@ -314,10 +418,10 @@ int main(int argc, char *argv[]) {
 		beacon_reception_count++;
 		if ((beacon_reception_count % beacon_response_freq) == 0) {
 			// construct a registration message to gw router
-			/* Message format (delimiter=^)
-				message-type{HostRegister = 2}
-				host-HID
-			*/
+			// Message format (delimiter=^)
+				// message-type{HostRegister = 2}
+				// host-HID
+			//
 			bzero(buffer, XHCP_MAX_PACKET_SIZE);
 			host_register_message.clear();
 			host_register_message.append("2^");
@@ -374,15 +478,15 @@ int main(int argc, char *argv[]) {
 			if(XupdateRV(sockfd) < 0) {
 				syslog(LOG_ERR, "Unable to update rendezvous server with new locator");
 			}
-			/*
+
 			if(XrendezvousUpdate(myHID, &hdag)) {
 				syslog(LOG_ERR, "error updating rendezvous service for %s", myHID);
 				beacon_reception_count = 0;
 			} else {
 				syslog(LOG_INFO, "updated %s as %s at rendezvous", myHID, hg.dag_string().c_str());
 			}
-			*/
 		}   
+*/
 	}	
 	return 0;
 }
