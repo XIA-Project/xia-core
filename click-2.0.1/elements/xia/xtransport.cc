@@ -647,7 +647,7 @@ bool XTRANSPORT::RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now)
 		}
 
 	} else {
-		WARN("Socket %d ata retransmit count exceeded, shutting down\n", _sport);
+		WARN("Socket %d data retransmit count exceeded, shutting down\n", _sport);
 
 		tear_down = true;
 		// FIXME: get paths so we can send the RST
@@ -2013,6 +2013,7 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 	}
 
 	sk->remote_recv_window = thdr.recv_window();
+	sk->so_error = 0;
 
 	// Enable socket and clear retransmits
 	// if state == CONNECTED, we've already done the stuff below
@@ -2151,7 +2152,7 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 		}
 		if (sk->polling) {
 			// tell API we are writeable
-			ProcessPollEvent(sk->port, POLLOUT);
+			ProcessPollEvent(sk->port, POLLIN|POLLOUT);
 		}
 		// finish the connection handshake
 		XIDpairToConnectPending.erase(xid_pair);
@@ -2938,10 +2939,6 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 
 	ChangeState(sk, SYN_SENT);
 
-	// Prepare SYN packet
-	const char *payload = "SYN";
-	SendControlPacket(TransportHeader::SYN, sk, payload, strlen(payload), dst_path, sk->src_path);
-
 	// We return EINPROGRESS no matter what. If we're in non-blocking mode, the
 	// API will pass EINPROGRESS on to the app. If we're in blocking mode, the API
 	// will wait until it gets another message from xtransport notifying it that
@@ -2949,6 +2946,10 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 	x_connect_msg->set_status(xia::X_Connect_Msg::XCONNECTING);
 	sk->so_error = EINPROGRESS;
 	ReturnResult(_sport, xia_socket_msg, -1, EINPROGRESS);
+
+	// Prepare SYN packet
+	const char *payload = "SYN";
+	SendControlPacket(TransportHeader::SYN, sk, payload, strlen(payload), dst_path, sk->src_path);
 }
 
 
