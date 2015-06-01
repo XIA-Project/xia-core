@@ -31,6 +31,8 @@
 #include "../../userlevel/xia.pb.h"
 
 using namespace std;
+using namespace xia;
+
 #endif
 
 // FIXME: put these in a std location that can be found by click and the API
@@ -50,6 +52,12 @@ using namespace std;
 #define UDP_HEADER_SIZE		8
 
 // SOCK_STREAM, etc from std socket definitions
+#define XSOCKET_INVALID -1  // invalid socket type  
+#define XSOCKET_STREAM  1   // Reliable transport (SID)
+#define XSOCKET_DGRAM   2   // Unreliable transport (SID)
+#define XSOCKET_RAW     3   // Raw XIA socket
+#define XSOCKET_CHUNK   4   // Content Chunk transport (CID)
+
 #define SOCK_CHUNK		4
 
 // TODO: switch these to bytes, not packets?
@@ -104,7 +112,7 @@ public:
 	void add_handlers();
 
 	static int write_param(const String &, Element *, void *vparam, ErrorHandler *);
-
+	ErrorHandler *error_handler()   { return _errhandler; }
 
 private:
 	SyslogErrorHandler *_errh;
@@ -274,6 +282,7 @@ protected:
 	/* =========================
 	 * Xtransport Methods
 	* ========================= */
+public:
 	void ReturnResult(int sport, xia::XSocketMsg *xia_socket_msg, int rc = 0, int err = 0);
 
 	void copy_common(struct sock *sk, XIAHeader &xiahdr, XIAHeaderEncap &xiah);
@@ -386,7 +395,84 @@ protected:
 		String cmd = sid.unparse();
 		HandlerCall::call_write(_routeTable, "remove", cmd);
 	}
+
+
+	    ErrorHandler    *_errhandler;
+
 };
+
+enum HandlerState { CREATE, INITIALIZE, ACTIVE, SHUTDOWN, CLOSE };
+class XGenericTransport : public Element {
+public:
+    friend class XTRANSPORT;
+    XGenericTransport (XTRANSPORT *transport, unsigned short port, int type);
+    XGenericTransport() { };
+    const char *class_name() const      { return "GENERIC_TRANSPORT"; }
+    void push(WritablePacket *p){};
+    // virtual Packet *pull(const int port) = 0;
+    int read_from_recv_buf(XSocketMsg *xia_socket_msg) ;
+    // virtual ~XGenericTransport();
+    const unsigned short get_port() {return port;}
+    int get_type() { return type; }
+    void set_state(const HandlerState s) {state = s;}
+    HandlerState get_state() { return state; }
+    XIAPath get_src_path() {return src_path;}
+    void set_src_path(XIAPath p) {src_path = p;}
+    XIAPath get_dst_path() {return dst_path;}
+    void set_dst_path(XIAPath p) {dst_path = p;}
+    int get_nxt() {return nxt;}
+    void set_nxt(int n) {nxt = n;}
+    int get_last() {return last;}
+    void set_last(int n) {last = n;}
+    uint8_t get_hlim() {return hlim;}
+    void set_hlim(uint8_t n) {hlim = n;}
+    bool is_full_src_dag() {return full_src_dag;}
+    void set_full_src_dag(bool f) {full_src_dag = f;}
+    String get_sdag() {return sdag;}
+    void set_sdag(String s) {sdag = s;}
+    String get_ddag() {return ddag;}
+    void set_ddag(String s) {ddag = s;}
+    bool is_did_poll() {return did_poll;}
+    void set_did_poll(bool d) {did_poll = d;}
+    unsigned get_polling() {return polling;}
+    void increase_polling() {polling++;}
+    void decrease_polling() {polling--;}
+    bool is_recv_pending() {return recv_pending;}
+    void set_recv_pending(bool r) {recv_pending = r;}
+    void set_pending_recv_msg(XSocketMsg *msg) {pending_recv_msg = msg;}
+    XIDpair get_key() {return key;}
+    void set_key(XIDpair k) {key = k;}
+
+
+    XTRANSPORT *get_transport() { return transport; }
+protected:
+    unsigned short port;
+    XTRANSPORT *transport;
+    HandlerState state;
+    XIAPath src_path;
+    XIAPath dst_path;
+    XIDpair key;
+
+    int nxt;
+    int last;
+    uint8_t hlim;
+
+
+    bool full_src_dag; // bind to full dag or just to SID
+    int type; // 0: Reliable transport (SID), 1: Unreliable transport (SID), 2: Content Chunk transport (CID)
+    String sdag;
+    String ddag;
+
+    bool did_poll;
+    unsigned polling;
+    bool recv_pending; // true if we should send received network data to app upon receiving it
+    XSocketMsg *pending_recv_msg;
+    ErrorHandler    *_errh;
+
+private:
+    
+};
+
 
 CLICK_ENDDECLS
 #endif

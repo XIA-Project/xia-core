@@ -27,6 +27,17 @@
 */
 
 CLICK_DECLS
+XGenericTransport::XGenericTransport(
+    XTRANSPORT *transport,
+    unsigned short port,
+    int type) : state(CREATE) {
+    port = port;
+    transport = transport;
+    type = type;
+    _errh = transport -> error_handler();
+    hlim = HLIM_DEFAULT;
+    nxt = CLICK_XIA_NXT_TRN;
+}
 
 XTRANSPORT::XTRANSPORT() : _timer(this)
 {
