@@ -61,9 +61,6 @@
 #include <map>
 #include <vector>
 
-//#define PRINTBUFS
-//#define POLLDUMP
-
 // defines **********************************************************
 #define ADDR_MASK  "169.254.%d.%d"   // fake addresses created in this subnet
 #define DEVICENAME "eth0"
@@ -213,6 +210,7 @@ static int _log_trace = 0;
 static int _log_warning = 0;
 static int _log_info = 0;
 static int _log_wrap = 0;
+static int _log_dump = 0;
 static FILE *_log = NULL;
 
 /********************************************************************
@@ -668,7 +666,9 @@ static int _GetLocalIPs()
 
 static void selectDump(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int in)
 {
-#ifdef POLLDUMP
+//	if (!_log_dump)
+		return;
+
 	MSG("%s\n", (in ? "PRE" : "POST"));
 	for (int i = 0; i < nfds; i++) {
 		if (readfds && FD_ISSET(i, readfds)) {
@@ -681,7 +681,6 @@ static void selectDump(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exce
 			MSG("%d = except\n", i);
 		}
 	}
-#endif
 }
 
 
@@ -689,7 +688,9 @@ static void selectDump(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exce
 // dump the contents of the pollfds
 static void pollDump(struct pollfd *fds, nfds_t nfds, int in)
 {
-#ifdef POLLDUMP
+//	if (!_log_dump)
+		return;
+
 	MSG("%s\n", (in ? "PRE" : "POST"));
 	for(nfds_t i = 0; i < nfds; i++) {
 		if (in == 1 && fds[i].events != 0) {
@@ -699,19 +700,21 @@ static void pollDump(struct pollfd *fds, nfds_t nfds, int in)
 			POLL_FLAGS(fds[i].fd, fds[i].revents);
 		}
 	}
-#endif
 }
 
 
 
-void DumpBuf(int fd, int type, const void *buf, size_t len)
+void bufferDump(int fd, int type, const void *buf, size_t len)
 {
-	MSG("%d: %s...\n", fd, type == 0 ? "reading" : "writing");
+	if (!_log_dump)
+		return;
+	
+	MSG("%d: %s...\n", fd, (type == 0 ? "READING" : "WRITING"));
 
-	char *s = (char *)malloc(len + 1);
+	char *s = (char *)malloc(len + 10);
 	memcpy(s, buf, len);
 	s[len] = 0;
-	MSG("%s\n", s);
+	MSG("buf: %s\n", s);
 	free(s);
 }
 
@@ -739,6 +742,8 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	// enable logging
 	if (getenv("XWRAP_TRACE") != NULL)
 		_log_trace = 1;
+	if (getenv("XWRAP_DUMP") != NULL)
+		_log_dump = 1;
 	if (getenv("XWRAP_VERBOSE") != NULL)
 		_log_trace = _log_info = _log_wrap = _log_warning = 1;
 	if (getenv("XWRAP_INFO") != NULL)
@@ -1371,7 +1376,7 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
 	if (rc > 0) {
 		pollDump(fds, nfds, 0);
 	} else if (rc == 0) {
-		MSG("timeout\n");
+//		MSG("timeout\n");
 	}
 
 	return rc;
@@ -1389,10 +1394,7 @@ ssize_t read(int fd, void *buf, size_t n)
 		XIAIFY();
 
 		rc = Xrecv(fd, buf, n, 0);
-
-#ifdef PRINTBUFS
-		DumpBuf(fd, 0, buf, rc);
-#endif
+		bufferDump(fd, 0, buf, rc);
 
 	} else {
 		NOXIA();
@@ -1444,10 +1446,7 @@ ssize_t recv(int fd, void *buf, size_t n, int flags)
 		XIAIFY();
 		XFER_FLAGS(flags);
 		rc = Xrecv(fd, buf, n, flags);
-
-#ifdef PRINTBUFS
-		DumpBuf(fd, 0, buf, rc);
-#endif
+		bufferDump(fd, 0, buf, rc);
 
 	} else {
 		NOXIA();
@@ -1564,10 +1563,7 @@ ssize_t send(int fd, const void *buf, size_t n, int flags)
 		XIAIFY();
 		XFER_FLAGS(flags);
 		MSG("sending:%zu\n", n);
-
-#ifdef PRINTBUFS
-		DumpBuf(fd, 1, buf, n);
-#endif
+		bufferDump(fd, 1, buf, n);
 
 		rc = Xsend(fd, buf, n, flags);
 
@@ -1814,9 +1810,7 @@ ssize_t write(int fd, const void *buf, size_t n)
 	if (isXsocket(fd)) {
 		XIAIFY();
 
-#ifdef PRINTBUFS
-		DumpBuf(fd, 1, buf, n);
-#endif
+		bufferDump(fd, 1, buf, n);
 		rc = Xsend(fd, buf, n, 0);
 
 	} else {
