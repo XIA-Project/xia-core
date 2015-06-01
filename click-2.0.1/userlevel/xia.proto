@@ -302,8 +302,9 @@ message X_Recvchunkfrom_Msg {
 }
 
 message X_Fork_Msg {
-  required bool increment = 1;
-  repeated uint32 port = 2;
+  optional bool increment = 1;
+  optional uint32 count = 2;
+  repeated uint32 ports = 3;
 }
 
 message X_BindPush_Msg {

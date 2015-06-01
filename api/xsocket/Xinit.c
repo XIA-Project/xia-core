@@ -52,6 +52,7 @@ select_t _f_select;
 poll_t _f_poll;
 sendto_t _f_sendto;
 recvfrom_t _f_recvfrom;
+fork_t _f_fork;
 
 size_t mtu_api;
 size_t mtu_wire = 1500;
@@ -89,6 +90,8 @@ void xapi_load_func_ptrs()
 		printf("can't find sendto!\n");
 	if(!(_f_recvfrom = (recvfrom_t)dlsym(handle, "recvfrom")))
 		printf("can't find recvfrom!\n");
+	if(!(_f_fork = (fork_t)dlsym(handle, "fork")))
+		printf("can't find fork!\n");
 }
 
 static size_t mtu()

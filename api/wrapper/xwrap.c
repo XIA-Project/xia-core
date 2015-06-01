@@ -62,6 +62,7 @@
 #include <vector>
 
 //#define PRINTBUFS
+//#define POLLDUMP
 
 // defines **********************************************************
 #define ADDR_MASK  "169.254.%d.%d"   // fake addresses created in this subnet
@@ -222,22 +223,6 @@ static FILE *_log = NULL;
 // call into the Xsockets API to see if the fd is associated with an Xsocket
 #define isXsocket(s)	 (getSocketType(s) != -1)
 #define shouldWrap(s)	 (isXsocket(s))
-
-
-// dump the contents of the pollfds
-static void pollDump(struct pollfd *fds, nfds_t nfds, int in)
-{
-	MSG("%s\n", (in ? "PRE" : "POST"));
-	for(nfds_t i = 0; i < nfds; i++) {
-		if (in == 1 && fds[i].events != 0) {
-			POLL_FLAGS(fds[i].fd, fds[i].events);
-
-		} else if (fds[i].revents != 0) {
-			POLL_FLAGS(fds[i].fd, fds[i].revents);
-		}
-	}
-}
-
 
 
 // get a unique port number
@@ -681,6 +666,57 @@ static int _GetLocalIPs()
 
 
 
+static void selectDump(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int in)
+{
+#ifdef POLLDUMP
+	MSG("%s\n", (in ? "PRE" : "POST"));
+	for (int i = 0; i < nfds; i++) {
+		if (readfds && FD_ISSET(i, readfds)) {
+			MSG("%d = read\n", i);
+		}
+		if (writefds && FD_ISSET(i, writefds)) {
+			MSG("%d = write\n", i);
+		}
+		if (exceptfds && FD_ISSET(i, exceptfds)) {
+			MSG("%d = except\n", i);
+		}
+	}
+#endif
+}
+
+
+
+// dump the contents of the pollfds
+static void pollDump(struct pollfd *fds, nfds_t nfds, int in)
+{
+#ifdef POLLDUMP
+	MSG("%s\n", (in ? "PRE" : "POST"));
+	for(nfds_t i = 0; i < nfds; i++) {
+		if (in == 1 && fds[i].events != 0) {
+			POLL_FLAGS(fds[i].fd, fds[i].events);
+
+		} else if (fds[i].revents != 0) {
+			POLL_FLAGS(fds[i].fd, fds[i].revents);
+		}
+	}
+#endif
+}
+
+
+
+void DumpBuf(int fd, int type, const void *buf, size_t len)
+{
+	MSG("%d: %s...\n", fd, type == 0 ? "reading" : "writing");
+
+	char *s = (char *)malloc(len + 1);
+	memcpy(s, buf, len);
+	s[len] = 0;
+	MSG("%s\n", s);
+	free(s);
+}
+
+
+
 /********************************************************************
 **
 ** Called at library load time for initialization
@@ -862,6 +898,7 @@ int close(int fd)
 	TRACE();
 	if (shouldWrap(fd)) {
 		XIAIFY();
+		MSG("closing %d\n", fd);
 
 		// clean up entries in the dag2id and id2dag maps
 		if (Xgetsockname(fd, (struct sockaddr *)&addr, &len) == 0) {
@@ -992,7 +1029,7 @@ pid_t fork(void)
 {
 	TRACE();
 
-	return __real_fork();
+	return Xfork();
 }
 
 
@@ -1354,10 +1391,7 @@ ssize_t read(int fd, void *buf, size_t n)
 		rc = Xrecv(fd, buf, n, 0);
 
 #ifdef PRINTBUFS
-		char *s = (char *)malloc(n+1);
-		memcpy(s, buf, n);
-		s[n] = 0;
-		MSG("%s\n", s);
+		DumpBuf(fd, 0, buf, rc);
 #endif
 
 	} else {
@@ -1411,13 +1445,8 @@ ssize_t recv(int fd, void *buf, size_t n, int flags)
 		XFER_FLAGS(flags);
 		rc = Xrecv(fd, buf, n, flags);
 
-		MSG("fd:%d size:%zu returned:%d\n", fd, n, rc);
-
 #ifdef PRINTBUFS
-		char *s = (char *)malloc(n+1);
-		memcpy(s, buf, n);
-		s[n] = 0;
-		MSG("%s\n", s);
+		DumpBuf(fd, 0, buf, rc);
 #endif
 
 	} else {
@@ -1511,25 +1540,15 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struc
 
 	TRACE();
 
+	selectDump(nfds, readfds, writefds, exceptfds, 0);
+
 	// Let Xselect do all the work of figuring out what fds we are handling
 	rc = Xselect(nfds, readfds, writefds, exceptfds, timeout);
 
-#ifdef DEBUG
 	if (rc > 0) {
 		// we found at least one event
-		for (int i = 0; i < nfds; i++) {
-			if (readfds && FD_ISSET(i, readfds)) {
-				MSG("%d = read\n", i);
-			}
-			if (writefds && FD_ISSET(i, writefds)) {
-				MSG("%d = write\n", i);
-			}
-			if (exceptfds && FD_ISSET(i, exceptfds)) {
-				MSG("%d = except\n", i);
-			}
-		}
+		selectDump(nfds, readfds, writefds, exceptfds, 1);
 	}
-#endif
 
 	return rc;
 }
@@ -1547,11 +1566,9 @@ ssize_t send(int fd, const void *buf, size_t n, int flags)
 		MSG("sending:%zu\n", n);
 
 #ifdef PRINTBUFS
-		char *s = (char *)malloc(n+1);
-		memcpy(s, buf, n);
-		s[n] = 0;
-		MSG("%s\n", s);
+		DumpBuf(fd, 1, buf, n);
 #endif
+
 		rc = Xsend(fd, buf, n, flags);
 
 	} else {
@@ -1798,12 +1815,8 @@ ssize_t write(int fd, const void *buf, size_t n)
 		XIAIFY();
 
 #ifdef PRINTBUFS
-		char *s = (char *)malloc(n+1);
-		memcpy(s, buf, n);
-		s[n] = 0;
-		MSG("%s\n", s);
+		DumpBuf(fd, 1, buf, n);
 #endif
-
 		rc = Xsend(fd, buf, n, 0);
 
 	} else {

@@ -213,7 +213,7 @@ String XTRANSPORT::Netstat(Element *e, void *)
 			xid = source_xid.unparse().c_str();
 		}
 
-		sprintf(line, "%d,%s,%s,%s\n", _sport, type, state, xid);
+		sprintf(line, "%d,%s,%s,%s,%d\n", _sport, type, state, xid, sk->refcount);
 		table += line;
 	}
 
@@ -2606,6 +2606,9 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XUPDATERV:
 		Xupdaterv(_sport, &xia_socket_msg);
 		break;
+	case xia::XFORK:
+		Xfork(_sport, &xia_socket_msg);
+		break;
 	default:
 		ERROR("ERROR: Unknown API request\n");
 		break;
@@ -2789,13 +2792,30 @@ void XTRANSPORT::Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 
 
-void XTRANSPORT::XFork(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xfork(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
 	xia::X_Fork_Msg *msg = xia_socket_msg->mutable_x_fork();
+	int count = msg->count();
 	int increment = msg->increment() ? 1 : -1;
 
-	// loop through list of ports and modify the ref counter
+	xia_socket_msg->PrintDebugString();
 
+	DBG("Xfork=======================\n");
+	// loop through list of ports and modify the ref counter
+	for (int i = 0; i < count; i++) {
+		int port = msg->ports(i);
+
+		DBG("port = %d\n", port);
+
+		sock *sk = portToSock.get(port);
+		if (sk) {
+			DBG("incrementing refcount for %d\n", port);
+			sk->refcount += increment;
+			assert(sk->refcount > 0);
+		}
+	}
+
+	DBG("Xfork returning\n");
 	ReturnResult(_sport, xia_socket_msg);
 }
 
@@ -2859,7 +2879,7 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	sock *sk = portToSock.get(_sport);
 	bool teardown_now = true;
 
-	INFO("closing %d %d sk = %p state=%s\n", _sport, sk->port, sk, StateStr(sk->state));
+	INFO("closing %d %d sk = %p state=%s refcount=%d\n", _sport, sk->port, sk, StateStr(sk->state), sk->refcount);
 
 	if (!sk) {
 		// this shouldn't happen!

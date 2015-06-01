@@ -10,7 +10,7 @@ SOURCES= Xaccept.c Xbind.c Xclose.c Xconnect.c Xfcntl.c Xgetaddrinfo.c \
 	XgetChunkStatus.c XgetDAGbyName.c Xinit.c XputChunk.c XreadChunk.c \
 	Xrecv.c XrequestChunk.c Xselect.c Xsend.c Xsetsockopt.c Xsocket.c \
 	XupdateAD.c XupdateNameServerDAG.c Xutil.c Xlisten.c state.c \
-	XbindPush.c XpushChunkto.c XrecvChunkfrom.c Xmsg.c \
+	XbindPush.c XpushChunkto.c XrecvChunkfrom.c Xmsg.c Xfork.c \
 	minini/minIni.c \
 	Xkeys.c Xsecurity.c
 
