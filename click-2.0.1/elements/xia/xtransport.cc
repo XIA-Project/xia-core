@@ -2695,6 +2695,10 @@ void XTRANSPORT::Xsetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_
 			sk->so_debug = x_sso_msg->int_opt();
 			break;
 
+		case SO_ERROR:
+			sk->so_error = x_sso_msg->int_opt();
+			break;
+
 		default:
 			// unsupported option
 			break;

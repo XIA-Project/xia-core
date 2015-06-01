@@ -1671,6 +1671,7 @@ int setsockopt(int fd, int level, int optname, const void *optval, socklen_t opt
 					// handled by Xsetsockopt
 					break;
 
+				case SO_DONTROUTE:
 				case SO_REUSEADDR:
 				case SO_SNDTIMEO:
 				case SO_SNDBUF:
@@ -1683,7 +1684,6 @@ int setsockopt(int fd, int level, int optname, const void *optval, socklen_t opt
 					break;
 
 				case SO_TYPE:
-				case SO_DONTROUTE:
 				case SO_BROADCAST:
 				case SO_SNDBUFFORCE:
 				case SO_RCVBUFFORCE:
