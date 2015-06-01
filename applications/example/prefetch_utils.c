@@ -340,8 +340,54 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *dst_ad, char *dst_h
 	return n;
 }
 
-// register the service with the name server and open the necessary sockets
+// update with XListen
 int registerStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) {
+
+	int sock;
+
+	// create a socket, and listen for incoming connections
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+		die(-1, "Unable to create the listening socket\n");
+
+	// read the localhost AD and HID
+	if (XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0)
+		die(-1, "Reading localhost address\n");
+
+	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
+	// Generate an SID to use
+	if (XmakeNewSID(sid_string, sizeof(sid_string))) {
+		die(-1, "Unable to create a temporary SID");
+	}
+
+	struct addrinfo hints, *ai;
+	bzero(&hints, sizeof(hints));
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_family = AF_XIA;
+
+	if (Xgetaddrinfo(NULL, sid_string, &hints, &ai) != 0)
+		die(-1, "getaddrinfo failure!\n");
+
+	Graph g((sockaddr_x*)ai->ai_addr);
+
+	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
+
+	if (Xbind(sock, (struct sockaddr*)sa, sizeof(sockaddr_x)) < 0) {
+		Xclose(sock);
+		 die(-1, "Unable to bind to the dag: %s\n", g.dag_string().c_str());
+	}
+	say("listening on dag: %s\n", g.dag_string().c_str());
+
+	Xlisten(sock, 5);
+
+	if (XregisterName(name, sa) < 0 )
+		die(-1, "error registering name: %s\n", name);
+	say("\nRegistering DAG with nameserver:\n%s\n", g.dag_string().c_str());
+
+  return sock;
+}
+
+// register the service with the name server and open the necessary sockets
+int oldRegisterStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) {
 
 	int sock;
 
