@@ -3,6 +3,8 @@
 #define VERSION "v1.0"
 #define TITLE "XIA Advanced FTP client"
 
+#define POLL_USEC 1000000
+
 using namespace std;
 
 char myAD[MAX_XID_SIZE];
@@ -16,8 +18,9 @@ char currAD[MAX_XID_SIZE];
 char currNetHID[MAX_XID_SIZE];
 */
 
-char *lastSSID;
-char *currSSID;
+string lastSSID, currSSID;
+
+string cmdGetSSID = "iwgetid -r";
 
 char ftpServAD[MAX_XID_SIZE];
 char ftpServHID[MAX_XID_SIZE];
@@ -38,10 +41,9 @@ char ftp_name[] = "www_s.ftp.advanced.aaa.xia";
 char prefetch_client_name[] = "www_s.client.prefetch.aaa.xia";
 char prefetch_profile_name[] = "www_s.profile.prefetch.aaa.xia";
 
-int ftpSock;
-int prefetchClientSock;
-int	prefetchProfileSock;
+int ftpSock, prefetchClientSock, prefetchProfileSock;
 
+// TODO: 12 is the max number of chunks to fetch at one time for 1024 K
 int getFileBasic(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fout) {
 	int chunkSock;
 	char cmd[XIA_MAX_BUF];
@@ -185,22 +187,22 @@ int getFileAdv(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fou
 		// TODO: coordinate probe or not when fetching from previous network
 		printf("Fetching chunk %d / %d\n", i+1, cid_num);
 
-		currSSID = execSystem("iwgetid -r");
+		currSSID = execSystem(cmdGetSSID);
 
 		// TODO: ask Dan about blocking optimization 
-		if (currSSID == NULL) {
+		if (currSSID.empty()) {
 			while (1) {
 				usleep(50000); // TODO: need further optimization
-				currSSID = execSystem("iwgetid -r"); 
-				if (currSSID != NULL) 
+				currSSID = execSystem(cmdGetSSID); 
+				if (!currSSID.empty()) 
 					break;
 			}
 		}
 		// network change before sending probe information: send registration message; TODO: make a function for that
-		if (strcmp (lastSSID, currSSID) != 0 && currSSID != NULL) {
+		if (lastSSID != currSSID && !currSSID.empty()) {
 			cerr<<"Network changed\n";
 			// TODO: part of prefetch_profile_name should be SSID 
-			strcpy(lastSSID, currSSID);			
+			lastSSID = currSSID;			
 			strcpy(lastFetchAD, currFetchAD);
 			strcpy(lastFetchHID, currFetchHID);
 
@@ -229,7 +231,7 @@ int getFileAdv(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fou
 		memset(cmd, '\0', strlen(cmd));
 		memset(reply, '\0', strlen(reply));
 
-		strcat(cmd, "fetch ");
+		strcat(cmd, "poll ");
 		strcat(cmd, CIDs[i]);
 
 		while (1) {
@@ -243,7 +245,7 @@ int getFileAdv(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fou
 			// some chunks are already available to fetch
 			if (strncmp(reply, "available none", 14) != 0) 
 				break; 
-			usleep(100000); // probe every 100 ms
+			usleep(POLL_USEC); // probe every 100 ms
 		}
 		// receive probe message to see what chunks are available ends
 
@@ -260,10 +262,10 @@ int getFileAdv(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fou
 		int n = CIDS_DONE.size();
 
 		// network change before constructing chunk request: get chunks from previous network
-		if (strcmp (lastSSID, currSSID) != 0 && currSSID != NULL) {
+		if (lastSSID != currSSID && !currSSID.empty()) {
 			cerr<<"Network changed\n";
 			// TODO: part of prefetch_profile_name should be SSID 
-			strcpy(lastSSID, currSSID);			
+			lastSSID = currSSID;			
 			strcpy(lastFetchAD, currFetchAD);
 			strcpy(lastFetchHID, currFetchHID);
 
@@ -297,7 +299,7 @@ int getFileAdv(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fou
 			}			
 		}
 
-		else if (strcmp (lastSSID, currSSID) == 0) {
+		else if (lastSSID == currSSID) {
 			for (unsigned int j = 0; j < CIDS_DONE.size(); j++) {
 				char *dag = (char *)malloc(512);
 				sprintf(dag, "RE ( %s %s ) CID:%s", currFetchAD, currFetchHID, CIDS_DONE[j]);
@@ -311,10 +313,10 @@ int getFileAdv(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fou
 
 		while (1) {
 			// Network changed, no need to update dest dag
-			if (strcmp (lastSSID, currSSID) != 0 && currSSID != NULL) {
+			if (lastSSID != currSSID && !currSSID.empty()) {
 				cerr<<"Network changed\n";
 				// TODO: part of prefetch_profile_name should be SSID 
-				strcpy(lastSSID, currSSID);			
+				lastSSID = currSSID;
 				strcpy(lastFetchAD, currFetchAD);
 				strcpy(lastFetchHID, currFetchHID);
 
@@ -402,11 +404,11 @@ int main(int argc, char **argv) {
 
 		ftpSock = initializeClient(ftp_name, myAD, myHID, ftpServAD, ftpServHID);
 
-		//prefetchProfileSock = initializeClient(prefetch_profile_name, myAD, myHID, prefetchProfileAD, prefetchProfileHID);		
+		prefetchProfileSock = initializeClient(prefetch_profile_name, myAD, myHID, prefetchProfileAD, prefetchProfileHID);		
 
 		// TODO: handle when SSID is null
-		lastSSID = execSystem("iwgetid -r");
-		currSSID = execSystem("iwgetid -r");
+		lastSSID = execSystem(cmdGetSSID);
+		currSSID = execSystem(cmdGetSSID);
 
 		getFileAdv(ftpSock, ftpServAD, ftpServHID, fin, fout);
 	}

@@ -45,7 +45,7 @@ char** str_split(char* a_str, const char *a_delim);
 char* string2char(std::string str);
 
 // result the string result of system command
-char* execSystem(char* cmd);
+std::string execSystem(std::string);
 
 bool file_exists(const char * filename);
 

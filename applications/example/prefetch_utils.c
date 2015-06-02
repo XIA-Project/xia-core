@@ -72,8 +72,8 @@ char* string2char(std::string str) {
 	return cstr;
 } 
 
-char* execSystem(char* cmd) {
-	FILE* pipe = popen(cmd, "r");
+std::string execSystem(std::string cmd) {
+	FILE* pipe = popen(string2char(cmd), "r");
 	if (!pipe) return NULL;
   char buffer[128];
   std::string result = "";
@@ -82,10 +82,10 @@ char* execSystem(char* cmd) {
 			result += buffer;
 	}
 	pclose(pipe);
+
+	if (result.empty()) return result; 	
 	result.erase(result.end()-1, result.end()); // remove the newline character
-	char *rv = new char[result.length() + 1];
-	strcpy(rv, result.c_str());
-	return rv;
+	return result;
 }
 
 bool file_exists(const char * filename) {
