@@ -291,7 +291,7 @@ class sock : public Element {
     int read_from_recv_buf(XSocketMsg *xia_socket_msg) ;
     // virtual ~XGenericTransport();
     const unsigned short get_port() {return port;}
-    int get_type() { return type; }
+    int get_type() { return sock_type; }
     void set_state(const HandlerState s) {hstate = s;}
     HandlerState get_state() { return hstate; }
     XIAPath get_src_path() {return src_path;}
@@ -411,7 +411,6 @@ protected:
     int last;
 
 
-    int type; // 0: Reliable transport (SID), 1: Unreliable transport (SID), 2: Content Chunk transport (CID)
     String sdag;
     String ddag;
 

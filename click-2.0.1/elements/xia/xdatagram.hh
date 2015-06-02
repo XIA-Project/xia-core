@@ -57,19 +57,19 @@ public:
 	int read_from_recv_buf(XSocketMsg *xia_socket_msg);
 private:
 
-	void push(WritablePacket *p_in);
-	bool should_buffer_received_packet(WritablePacket *p);
-	void add_packet_to_recv_buf(WritablePacket *p);
-	void check_for_and_handle_pending_recv();
+	// void push(WritablePacket *p_in);
+	// bool should_buffer_received_packet(WritablePacket *p);
+	// void add_packet_to_recv_buf(WritablePacket *p);
+	// void check_for_and_handle_pending_recv();
 
 	// receive buffer
-	WritablePacket *recv_buffer[MAX_RECV_WIN_SIZE]; // packets we've received but haven't delivered to the app // TODO: start smaller, dynamically resize if app asks for more space (up to MAX)?
-	uint32_t recv_buffer_size; // the number of PACKETS we can buffer (received but not delivered to app)
-	uint32_t recv_base; // sequence # of the oldest received packet not delivered to app
-	uint32_t next_recv_seqnum; // the sequence # of the next in-order packet we expect to receive
-	int dgram_buffer_start; // the first undelivered index in the recv buffer (DGRAM only)
-	int dgram_buffer_end; // the last undelivered index in the recv buffer (DGRAM only)
-	uint32_t recv_buffer_count; // the number of packets in the buffer (DGRAM only)
+	// WritablePacket *recv_buffer[MAX_RECV_WIN_SIZE]; // packets we've received but haven't delivered to the app // TODO: start smaller, dynamically resize if app asks for more space (up to MAX)?
+	// uint32_t recv_buffer_size; // the number of PACKETS we can buffer (received but not delivered to app)
+	// uint32_t recv_base; // sequence # of the oldest received packet not delivered to app
+	// uint32_t next_recv_seqnum; // the sequence # of the next in-order packet we expect to receive
+	// int dgram_buffer_start; // the first undelivered index in the recv buffer (DGRAM only)
+	// int dgram_buffer_end; // the last undelivered index in the recv buffer (DGRAM only)
+	// uint32_t recv_buffer_count; // the number of packets in the buffer (DGRAM only)
 
 } ;
 

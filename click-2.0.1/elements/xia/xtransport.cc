@@ -12,7 +12,7 @@
 #include "xtransport.hh"
 #include <click/xiatransportheader.hh>
 #include "xlog.hh"
-
+#include "xdatagram.hh"
 /*
 ** FIXME:
 ** - set saner retransmit values before we get backoff code
@@ -42,9 +42,50 @@ sock::sock(
     XTRANSPORT *transport,
     unsigned short port,
     int type) : hstate(CREATE) {
+	cout << "fuck you\n";
+				port = 0;
+			sock_type = 0;
+			state = INACTIVE;
+			isBlocking = true;
+			initialized = false;
+			so_error = 0;
+			so_debug = false;
+			interface_id = -1;
+			polling = false;
+			recv_pending = false;
+			timer_on = false;
+			hlim = HLIM_DEFAULT;
+			full_src_dag = false;
+			nxt_xport = CLICK_XIA_NXT_TRN;
+			backlog = 5;
+			seq_num = 0;
+			ack_num = 0;
+			isAcceptedSocket = false;
+
+			num_connect_tries = 0;
+			num_retransmits = 0;
+			num_close_tries = 0;
+			
+			pkt = NULL;
+			send_buffer_size = DEFAULT_RECV_WIN_SIZE;
+			send_base = 0;
+			next_send_seqnum = 0;
+			remote_recv_window = 0;
+			recv_buffer_size = DEFAULT_RECV_WIN_SIZE;
+			recv_base = 0;
+			next_recv_seqnum = 0;
+			dgram_buffer_start = 0;
+			dgram_buffer_end = -1;
+			recv_buffer_count = 0;
+			pending_recv_msg = NULL;
+			migrateack_waiting = false;
+			last_migrate_ts = 0;
+			num_migrate_tries = 0;
+			migrate_pkt = NULL;
+			recv_pending = false;
     port = port;
     transport = transport;
-    type = type;
+    sock_type = type;
     _errh = transport -> error_handler();
     hlim = HLIM_DEFAULT;
     nxt = CLICK_XIA_NXT_TRN;
@@ -2701,15 +2742,31 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	int sock_type = x_socket_msg->type();
 
 	printf("create %s socket %d\n", SocketTypeStr(sock_type), _sport);
-
-	sock *sk = new sock();
+	sock *sk = NULL;
+switch (sock_type) {
+	case SOCK_STREAM: {
+		cout << "\t\t\t\tThis is a stream socket\n";
+		sk = new sock(this, _sport,sock_type);
 	sk->port = _sport;
 	sk->sock_type = sock_type;
 	sk->state = INACTIVE;
 
 	memset(sk->send_buffer, 0, sk->send_buffer_size * sizeof(WritablePacket*));
 	memset(sk->recv_buffer, 0, sk->recv_buffer_size * sizeof(WritablePacket*));
-	// XDatagram datagram(this, _sport);
+	break;
+	}
+	case SOCK_DGRAM: {
+		cout << "\t\t\t\tThis is a datagram socket\n";
+		sk = new sock(this, _sport,sock_type);
+	sk->port = _sport;
+	sk->sock_type = sock_type;
+	sk->state = INACTIVE;
+
+	memset(sk->send_buffer, 0, sk->send_buffer_size * sizeof(WritablePacket*));
+	memset(sk->recv_buffer, 0, sk->recv_buffer_size * sizeof(WritablePacket*));
+	break;
+	}
+}
 	// 	// portToHandler.set(_sport, &datagram);
 	// Map the source port to sock
 	portToSock.set(_sport, sk);
