@@ -61,6 +61,24 @@ size_t mtu_wire = 1500;
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 
+
+static size_t mtu()
+{
+	struct ifreq ifr;
+
+	int sock = (_f_socket)(AF_INET, SOCK_DGRAM, 0);
+
+	strncpy(ifr.ifr_name, "lo", IFNAMSIZ - 1);
+	ifr.ifr_addr.sa_family = AF_INET;
+	ioctl(sock, SIOCGIFMTU, &ifr);
+	(_f_close)(sock);
+
+	LOGF("API MTU = %d\n", ifr.ifr_mtu);
+	return ifr.ifr_mtu;
+}
+
+
+
 // Run at library load time to initialize function pointers
 void __attribute__ ((constructor)) api_init()
 {
@@ -94,6 +112,9 @@ void __attribute__ ((constructor)) api_init()
 		printf("can't find recvfrom!\n");
 	if(!(_f_fork = (fork_t)dlsym(handle, "fork")))
 		printf("can't find fork!\n");
+
+    mtu_api = mtu();
+    get_conf();
 }
 
 // Run at library unload time to close sockets left open by the app
@@ -111,22 +132,6 @@ void __attribute__ ((destructor)) api_destruct(void)
 }
 
 
-
-
-static size_t mtu()
-{
-	struct ifreq ifr;
-
-	int sock = (_f_socket)(AF_INET, SOCK_DGRAM, 0);
-
-	strncpy(ifr.ifr_name, "lo", IFNAMSIZ - 1);
-	ifr.ifr_addr.sa_family = AF_INET;
-	ioctl(sock, SIOCGIFMTU, &ifr);
-	(_f_close)(sock);
-
-	LOGF("API MTU = %d\n", ifr.ifr_mtu);
-	return ifr.ifr_mtu;
-}
 
 
 /*!
@@ -214,8 +219,6 @@ __InitXSocket::__InitXSocket()
 
 	// NOTE: unlikely, but what happens if section_name is NULL?
 	read_conf(inifile, section_name);
-
-    mtu_api = mtu();
 }
 
 /*!

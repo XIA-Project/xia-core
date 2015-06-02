@@ -64,10 +64,6 @@ int Xsocket(int family, int transport_type, int protocol)
 	int sockfd;
 	int block = TRUE;
 
-	// force the system to init and load the socket function pointers
-	get_conf();
-
-
 	if (family != AF_XIA) {
 		LOG("error: the Xsockets API only supports the AF_XIA family");
 		errno = EAFNOSUPPORT;
