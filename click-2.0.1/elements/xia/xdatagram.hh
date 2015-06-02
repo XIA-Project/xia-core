@@ -48,7 +48,7 @@ CLICK_DECLS
 
 class XIAContentModule;   
 
-class XDatagram : public XGenericTransport {
+class XDatagram : public sock {
 
 public:
 	XDatagram(XTRANSPORT *transport, unsigned short port);

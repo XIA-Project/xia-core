@@ -17,7 +17,7 @@
 CLICK_DECLS
 
 XDatagram::XDatagram(XTRANSPORT *transport, unsigned short port)
-	: XGenericTransport(transport, port, XSOCKET_DGRAM) {}
+	: sock(transport, port, XSOCKET_DGRAM) {}
 
 void
 XDatagram::push(WritablePacket *p_in) {

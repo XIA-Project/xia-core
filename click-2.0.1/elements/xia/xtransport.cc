@@ -39,6 +39,48 @@ XGenericTransport::XGenericTransport(
     nxt = CLICK_XIA_NXT_TRN;
 }
 
+sock::sock() {
+			port = 0;
+			sock_type = 0;
+			state = INACTIVE;
+			isBlocking = true;
+			initialized = false;
+			so_error = 0;
+			so_debug = false;
+			interface_id = -1;
+			polling = false;
+			recv_pending = false;
+			timer_on = false;
+			hlim = HLIM_DEFAULT;
+			full_src_dag = false;
+			nxt_xport = CLICK_XIA_NXT_TRN;
+			backlog = 5;
+			seq_num = 0;
+			ack_num = 0;
+			isAcceptedSocket = false;
+
+			num_connect_tries = 0;
+			num_retransmits = 0;
+			num_close_tries = 0;
+			
+			pkt = NULL;
+			send_buffer_size = DEFAULT_RECV_WIN_SIZE;
+			send_base = 0;
+			next_send_seqnum = 0;
+			remote_recv_window = 0;
+			recv_buffer_size = DEFAULT_RECV_WIN_SIZE;
+			recv_base = 0;
+			next_recv_seqnum = 0;
+			dgram_buffer_start = 0;
+			dgram_buffer_end = -1;
+			recv_buffer_count = 0;
+			pending_recv_msg = NULL;
+			migrateack_waiting = false;
+			last_migrate_ts = 0;
+			num_migrate_tries = 0;
+			migrate_pkt = NULL;
+			recv_pending = false;
+		}
 XTRANSPORT::XTRANSPORT() : _timer(this)
 {
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
@@ -2648,7 +2690,7 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	xia::X_Socket_Msg *x_socket_msg = xia_socket_msg->mutable_x_socket();
 	int sock_type = x_socket_msg->type();
 
-	INFO("create %s socket %d\n", SocketTypeStr(sock_type), _sport);
+	printf("create %s socket %d\n", SocketTypeStr(sock_type), _sport);
 
 	sock *sk = new sock();
 	sk->port = _sport;
@@ -2657,7 +2699,8 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 	memset(sk->send_buffer, 0, sk->send_buffer_size * sizeof(WritablePacket*));
 	memset(sk->recv_buffer, 0, sk->recv_buffer_size * sizeof(WritablePacket*));
-
+	// XDatagram datagram(this, _sport);
+	// 	// portToHandler.set(_sport, &datagram);
 	// Map the source port to sock
 	portToSock.set(_sport, sk);
 
