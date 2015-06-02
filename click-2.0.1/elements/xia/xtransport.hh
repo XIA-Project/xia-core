@@ -13,12 +13,15 @@
 #include <clicknet/xia.h>
 #include "xiaxidroutetable.hh"
 #include <clicknet/udp.h>
+#include <clicknet/tcp.h>
 #include <click/string.hh>
 #include <elements/ipsec/sha1_impl.hh>
 #include <click/xiatransportheader.hh>
 #include <click/error.hh>
 #include <click/error-syslog.hh>
 
+#include "clicknet/tcp_timer.h"
+#include "clicknet/tcp_var.h"
 
 #if CLICK_USERLEVEL
 #include <list>
@@ -45,7 +48,7 @@ using namespace xia;
 // various constants
 #define ACK_DELAY			300
 #define MIGRATEACK_DELAY	3000
-#define TEARDOWN_DELAY		120000
+#define TEARDOWN_DELAY		240000
 #define HLIM_DEFAULT		250
 #define LAST_NODE_DEFAULT	-1
 #define RANDOM_XID_FMT		"%s:30000ff0000000000000000000000000%08x"
@@ -92,6 +95,24 @@ typedef struct {
 	HashTable<unsigned short, unsigned int> events;
 } PollEvent;
 
+#ifndef TCP_GLOBALS
+#define TCP_GLOBALS
+struct tcp_globals 
+{ 
+        int     tcp_keepidle; 
+        int     tcp_keepintvl; 
+        int     tcp_maxidle; 
+        int     tcp_mssdflt; 
+        int     tcp_rttdflt; 
+        int     so_flags;
+        int     so_idletime; 
+        int     window_scale; 
+        bool    use_timestamp; 
+        uint32_t tcp_now;
+        tcp_seq_t so_recv_buffer_size; 
+};
+#endif
+
 class sock;
 
 class XTRANSPORT : public Element {
@@ -131,7 +152,21 @@ private:
 
 	Packet* UDPIPPrep(Packet *, int);
 
+public:
+	/* TCP related fields */
+    tcp_globals *globals()  { return &_tcp_globals; }
+    uint32_t tcp_now()      { return _tcp_globals.tcp_now; }
+    int verbosity()             { return _verbosity; }
+    // Element Handler Methods
+    static String read_verb(Element*, void*);
+    static int write_verb(const String&, Element*, void*, ErrorHandler*);
+    tcpstat         _tcpstat;
+    Timer           *_fast_ticks;
+    Timer           *_slow_ticks;
+    int         _verbosity;
 
+    tcp_globals     _tcp_globals;
+	ErrorHandler    *_errhandler;
 	
 
 protected:
@@ -274,9 +309,6 @@ public:
 		String cmd = sid.unparse();
 		HandlerCall::call_write(_routeTable, "remove", cmd);
 	}
-
-
-	    ErrorHandler    *_errhandler;
 
 };
 

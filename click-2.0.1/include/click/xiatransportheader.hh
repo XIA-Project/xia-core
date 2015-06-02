@@ -9,7 +9,7 @@
 #include <click/xiaheader.hh>
 #include <click/xiaextheader.hh>
 #include <click/xid.hh>
-
+#include <clicknet/tcp.h>
 CLICK_DECLS
 
 class TransportHeaderEncap;
@@ -21,6 +21,11 @@ class TransportHeader : public XIAGenericExtHeader { public:
     //uint8_t opcode() { if (!exists(OPCODE)) return 0 ; return *(const uint8_t*)_map[OPCODE].data();};  
     uint8_t type() { if (!exists(TYPE)) return 0 ; return *(const uint8_t*)_map[TYPE].data();}; 
     
+    void* header() {
+        if (!exists(HEADER)) return NULL;
+        return (void *)(_map[HEADER].data());
+    }
+
     bool exists(uint8_t key) { return (_map.find(key)!=_map.end()); }
     
     uint8_t pkt_info() { if (!exists(PKT_INFO)) return 0 ; return *(const uint8_t*)_map[PKT_INFO].data();}; 
@@ -37,7 +42,7 @@ class TransportHeader : public XIAGenericExtHeader { public:
     //uint32_t chunk_length() { if (!exists(CHUNK_LENGTH)) return 0; return *(const uint32_t*)_map[CHUNK_LENGTH].data();};  
     
 
-    enum { TYPE, PKT_INFO, SRC_XID, DST_XID, SEQ_NUM, ACK_NUM, LENGTH, RECV_WINDOW}; 
+    enum { TYPE, HEADER, PKT_INFO, SRC_XID, DST_XID, SEQ_NUM, ACK_NUM, LENGTH, RECV_WINDOW}; 
     enum { XSOCK_STREAM=1, XSOCK_DGRAM, XSOCK_RAW, XSOCK_CHUNK};
     enum { SYN=1, SYNACK, DATA, ACK, FIN, FINACK, MIGRATE, MIGRATEACK, RST};
 
@@ -56,7 +61,18 @@ class TransportHeaderEncap : public XIAGenericExtHeaderEncap { public:
 
     //static TransportHeaderEncap* MakeRequestHeader() { return new TransportHeaderEncap(TransportHeader::OP_REQUEST,0,0); };
     //static TransportHeaderEncap* MakeRPTRequestHeader() { return new TransportHeaderEncap(TransportHeader::OP_REDUNDANT_REQUEST,0,0); };
+    TransportHeaderEncap(char type);
     
+    static TransportHeaderEncap* MakeTCPHeader(click_tcp *tcph) {
+    TransportHeaderEncap* hdr = new TransportHeaderEncap(TransportHeader::XSOCK_STREAM);
+    hdr->map()[TransportHeader::HEADER] = String((const char*)tcph, sizeof(struct click_tcp));
+    hdr -> update();
+     return hdr;
+        // TransportHeaderEncap *hdr = new TransportHeader(TransportHeader::XSOCK_STREAM);
+       
+        // return hdr;
+    }
+
     static TransportHeaderEncap* MakeSYNHeader( uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window ) 
                         { return new TransportHeaderEncap(TransportHeader::XSOCK_STREAM, TransportHeader::SYN, seq_num, ack_num, length, recv_window); };
 
