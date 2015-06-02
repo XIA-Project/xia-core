@@ -66,6 +66,12 @@ char** str_split(char* a_str, const char *a_delim) {
 	return result;
 }
 
+char* string2char(std::string str) {
+	char *cstr = new char[str.length() + 1];
+	strcpy(cstr, str.c_str());	
+	return cstr;
+} 
+
 char* execSystem(char* cmd) {
 	FILE* pipe = popen(cmd, "r");
 	if (!pipe) return NULL;
