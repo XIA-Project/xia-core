@@ -19,14 +19,23 @@ char ftpServAD[MAX_XID_SIZE];
 char ftpServHID[MAX_XID_SIZE];
 
 char prefetch_profile_name[] = "www_s.profile.prefetch.aaa.xia";
-char prefetch_pred_name[] = "www_s.prediction.prefetch.aaa.xia";
-char prefetch_exec_name[] = "www_s.executer.prefetch.aaa.xia";
+//char prefetch_pred_name[] = "www_s.prediction.prefetch.aaa.xia";
+//char prefetch_exec_name[] = "www_s.executer.prefetch.aaa.xia";
 char ftp_name[] = "www_s.ftp.advanced.aaa.xia";
 
+
+// TODO: profile figure out the chunks and put into queues
+// TODO: optimize sleep(1)
+// TODO: netMon function to update prefetching window
+// Question: how many chunks can API support to get in one time? can we stopping retransmit request in application
+
 // profile section starts
-int profileServerSock, profilePredSock;
+//int profileServerSock, profilePredSock;
+int profileServerSock, ftpSock;
 
 pthread_mutex_t profileLock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t windowLock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t bufLock = PTHREAD_MUTEX_INITIALIZER;
 
 #define BLANK 0; // initilized
 #define REQ 1; // requested by router
@@ -39,9 +48,13 @@ struct chunkStatus {
 	int prefetch;
 };
 
-map<string, vector<chunkStatus> > profile;
+map<char *, vector<chunkStatus> > profile;
+map<char *, int> window; // prefetching window
+map<char *, vector<char *> > buf; // chunk buffer to prefetch
 
-void xftp_client_reg_handler(int sock, char *cmd) {
+int prefetch_chunk_num = 3; // default number of chunks to prefetch
+
+void reg_handler(int sock, char *cmd) {
 	// format: reg cid_num cid1 cid2 ...
 	char cmd_arr[strlen(cmd)];
 	strcpy(cmd_arr, cmd);
@@ -60,15 +73,12 @@ void xftp_client_reg_handler(int sock, char *cmd) {
 	pthread_mutex_lock(&profileLock);	
 	profile[SID] = css;
 	pthread_mutex_unlock(&profileLock);
-
-	// let prefetch_pred know a new SID to keep track	
-	char reply[strlen(SID)+4];
-	strcat(reply, "sid ");
-	strcat(reply, SID);
-	sendCmd(profilePredSock, reply);
+	pthread_mutex_lock(&windowLock);	
+	window[SID] = prefetch_chunk_num;
+	pthread_mutex_unlock(&windowLock);	
 }
 
-void xftp_client_fetch_handler(int sock, char *cmd) {
+void poll_handler(int sock, char *cmd) {
 
 	char cmd_arr[strlen(cmd)];
 	strcpy(cmd_arr, cmd);
@@ -78,7 +88,7 @@ void xftp_client_fetch_handler(int sock, char *cmd) {
 
 	char reply[XIA_MAX_BUF];
 	// reply format: available cid1 cid2, ...
-	strcat(reply, "available");
+	//strcat(reply, "available");
 	pthread_mutex_lock(&profileLock);
 	vector<chunkStatus> css = profile[SID];
 
@@ -87,7 +97,7 @@ void xftp_client_fetch_handler(int sock, char *cmd) {
 		if (strcmp(css[i].CID, CID) == 0) {
 			unsigned j = i;
 			while (1) {
-				// mark fetchByClient as "true" when the chunk is available after probe				
+				// mark fetch as "true" when the chunk is available after probe				
 				if (css[j].prefetch == 2) {
 					css[j].fetch = true;
 					strcat(reply, " ");										
@@ -102,10 +112,134 @@ void xftp_client_fetch_handler(int sock, char *cmd) {
 			}
 		}
 	}
+
+	pthread_mutex_lock(&bufLock);
+
+	vector<char *> CIDs = buf[SID];
+
+	for (unsigned int i = 0; i < css.size(); i++) {
+		// find the first one not fetched by client yet		
+		if (css[i].fetch == false) {
+			for (unsigned int j = i; j < i + window[SID]; j++) {
+				if (css[j].prefetch == 0) { 
+					CIDs.push_back(css[j].CID);
+					css[j].prefetch = REQ; // marked as requested by router
+				}
+			}
+		}
+	}
+	pthread_mutex_unlock(&bufLock);	
+
 	pthread_mutex_unlock(&profileLock);
 	sendCmd(sock, reply);
 }
 
+// TODO
+void *netMon(void *) {
+	// go through all the SID
+	while (1) {
+		prefetch_chunk_num = 3;		
+	}
+	pthread_exit(NULL);
+}
+
+void *prefetchExec(void *) {
+
+	while (1) {
+		// pop out the chunks for prefetching 
+		pthread_mutex_lock(&bufLock);	
+
+		for (map<char *, vector<char *> >::iterator I = buf.begin(); I != buf.end(); ++I) {
+			if ((*I).second.size() > 0) {
+				char *SID = (*I).first;
+				vector<char *> CIDs = (*I).second; // or I->second // TODO: check!
+
+				int chunkSock;
+
+				if ((chunkSock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0)
+					die(-1, "unable to create chunk socket\n");
+
+				ChunkStatus cs[CIDs.size()];
+				char data[XIA_MAXCHUNK];
+				int len;
+				int status;
+				int n = CIDs.size();
+
+				for (unsigned int i = 0; i < CIDs.size(); i++) {
+					char *dag = (char *)malloc(512);
+					sprintf(dag, "RE ( %s %s ) CID:%s", ftpServAD, ftpServHID, CIDs[i]);
+					cs[i].cidLen = strlen(dag);
+					cs[i].cid = dag; // cs[i].cid is a DAG, not just the CID
+				}
+
+				unsigned ctr = 0;
+
+				while (1) {
+
+					// Retransmit chunks request every REREQUEST seconds if not ready
+					if (ctr % REREQUEST == 0) {
+						// bring the list of chunks local
+						say("%srequesting list of %d chunks\n", (ctr == 0 ? "" : "re-"), n);
+						if (XrequestChunks(chunkSock, cs, n) < 0) {
+							say("unable to request chunks\n");
+							pthread_exit(NULL); // TODO: check again
+						}
+						say("checking chunk status\n");
+					}
+					ctr++;
+
+					status = XgetChunkStatuses(chunkSock, cs, n);
+
+					if (status == READY_TO_READ)
+						break;
+					else if (status < 0) 
+						die(-1, "error getting chunk status\n"); 
+					else if (status & WAITING_FOR_CHUNK) 
+						say("waiting... one or more chunks aren't ready yet\n");
+					else if (status & INVALID_HASH) 
+						die(-1, "one or more chunks has an invalid hash");
+					else if (status & REQUEST_FAILED)
+						die(-1, "no chunks found\n");
+					else 
+						say("unexpected result\n");
+
+					sleep(1); 
+				}
+
+				// update DONE to profile
+	  		pthread_mutex_lock(&profileLock);
+
+				vector<chunkStatus> css = profile[SID];
+
+				for (unsigned int i = 0; i < CIDs.size(); i++) {
+					if ((len = XreadChunk(chunkSock, data, sizeof(data), 0, cs[i].cid, cs[i].cidLen)) < 0) {
+						say("error getting chunk\n");
+						pthread_exit(NULL); // TODO: check again
+					}
+					else {
+						for (unsigned int j = 0; j < css.size(); j++) {
+							if (strcmp(css[j].CID, CIDs[i]) == 0) 
+								css[j].prefetch = DONE;
+						}							
+					}
+				}
+
+	 	 		pthread_mutex_unlock(&profileLock);
+
+				(*I).second.clear();
+				// TODO: timeout the chunks by free(cs[i].cid); cs[j].cid = NULL; cs[j].cidLen = 0;			
+				//for (vector<chunkStatus>::iterator J = (*I).second.begin(); J != (*I).second.end(); ++J) {
+				//	cout<<(*I).first<<"\t"<<(*J).CID<<"\t"<<(*J).timestamp<<"\t"<<(*J).fetch<<"\t"<<(*J).prefetch<<endl;
+				//}
+			}
+		}
+		pthread_mutex_unlock(&bufLock);
+		sleep(1);
+	}
+	pthread_exit(NULL);
+}
+
+/*
 void prefetch_pred_handler(int sock, char *cmd) {
 	// format: prefetch SID prefetch_chunk_num 
 	char cmd_arr[strlen(cmd)];
@@ -158,17 +292,11 @@ void prefetch_exec_handler(int sock, char *cmd) {
 				css[i].prefetch = DONE;
 		}		
 	}
-	/*
-	for (int i = 0; i < cid_num; i++) {
-		for (unsigned int j = 0; j < css.size(); j++) {
-			if (strcmp(css[j].CID, strtok(NULL, " ")) == 0) 
-				css[j].prefetch = DONE;
-		}
-	}*/
+
   pthread_mutex_unlock(&profileLock);
 }
-
-void *profileDBCmd (void *socketid) {
+*/
+void *clientReqCmd (void *socketid) {
 
 	char cmd[XIA_MAXBUF];
 	char reply[XIA_MAXBUF];
@@ -184,12 +312,15 @@ void *profileDBCmd (void *socketid) {
 		}
 		// reg msg from xftp client
 		if (strncmp(cmd, "reg", 3) == 0) {
-			xftp_client_reg_handler(sock, cmd);
+			say("Receive a reg message\n");
+			reg_handler(sock, cmd);
 		}
 		// fetch probe from xftp client: fetch CID
-		else if (strncmp(cmd, "fetch", 5) == 0) {
-			xftp_client_fetch_handler(sock, cmd);
+		else if (strncmp(cmd, "poll", 4) == 0) {
+			say("Receive a polling message");
+			poll_handler(sock, cmd);
 		}
+		/*
 		// prefetch request from prefetch pred
 		else if (strncmp(cmd, "prefetch", 8) == 0) {
 			prefetch_pred_handler(sock, cmd);
@@ -198,13 +329,14 @@ void *profileDBCmd (void *socketid) {
 		else if (strncmp(cmd, "prefetched", 10) == 0) {
 			prefetch_exec_handler(sock, cmd);
 		}
-		/*
-		for (map<string, vector<chunkStatus> >::iterator I = profile.begin(); I != profile.end(); ++I) {
+		*/
+		
+		for (map<char *, vector<chunkStatus> >::iterator I = profile.begin(); I != profile.end(); ++I) {
 			for (vector<chunkStatus>::iterator J = (*I).second.begin(); J != (*I).second.end(); ++J) {
-				cout<<(*I).first<<"\t"<<(*J).CID<<"\t"<<(*J).timestamp<<"\t"<<(*J).reqByClient<<"\t"<<(*J).prefetch<<endl;
+				cout<<(*I).first<<"\t"<<(*J).CID<<"\t"<<(*J).timestamp<<"\t"<<(*J).fetch<<"\t"<<(*J).prefetch<<endl;
 			}
 		}	
-		*/
+		
 	}
 	Xclose(sock);
 	say("Socket closed\n");
@@ -212,6 +344,7 @@ void *profileDBCmd (void *socketid) {
 }
 // profile section ends
 
+/*
 // prediction section starts
 int	predProfileSock, predServerSock, predExecSock;
 
@@ -279,6 +412,7 @@ int prefetch(int predProfileSock, int predExecSock) {
 	return -1;
 }
 // prediction section ends
+
 
 // execution section starts
 int	ftpSock, execProfileSock, execServerSock;
@@ -384,9 +518,20 @@ void *execCmd (void *socketid) {
 	pthread_exit(NULL);
 }
 // execution section ends
+*/
 
 int main() {
 
+	pthread_t thread_pred, thread_exec;
+	pthread_create(&thread_pred, NULL, netMon, NULL);	// TODO: 
+	pthread_create(&thread_exec, NULL, prefetchExec, NULL); // dequeue, prefetch and update profile
+
+	ftpSock = initializeClient(ftp_name, myAD, myHID, ftpServAD, ftpServHID); // purpose is to get ftpServAD and ftpServHID for building chunk request
+
+	profileServerSock = registerStreamReceiver(prefetch_profile_name, myAD, myHID, my4ID);
+	blockListener((void *)&profileServerSock, clientReqCmd);
+	return 0;	
+/*
 	// profile initilization starts
 	profilePredSock = initializeClient(prefetch_pred_name, myAD, myHID, prefetchPredAD, prefetchPredHID);	
 	profileServerSock = registerStreamReceiver(prefetch_profile_name, myAD, myHID, my4ID);
@@ -407,6 +552,6 @@ int main() {
 	execServerSock = registerStreamReceiver(prefetch_exec_name, myAD, myHID, my4ID);
 	blockListener((void *)&execServerSock, execCmd);
 	// execution initilization ends
+*/
 
-	return 0;
 }

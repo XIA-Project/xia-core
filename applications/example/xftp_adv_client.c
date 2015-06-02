@@ -297,7 +297,7 @@ int getFileAdv(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fou
 			}			
 		}
 
-		else if (strcmp (lastSSID, currSSID) != 0) {
+		else if (strcmp (lastSSID, currSSID) == 0) {
 			for (unsigned int j = 0; j < CIDS_DONE.size(); j++) {
 				char *dag = (char *)malloc(512);
 				sprintf(dag, "RE ( %s %s ) CID:%s", currFetchAD, currFetchHID, CIDS_DONE[j]);
@@ -402,7 +402,7 @@ int main(int argc, char **argv) {
 
 		ftpSock = initializeClient(ftp_name, myAD, myHID, ftpServAD, ftpServHID);
 
-		prefetchProfileSock = initializeClient(prefetch_profile_name, myAD, myHID, prefetchProfileAD, prefetchProfileHID);		
+		//prefetchProfileSock = initializeClient(prefetch_profile_name, myAD, myHID, prefetchProfileAD, prefetchProfileHID);		
 
 		// TODO: handle when SSID is null
 		lastSSID = execSystem("iwgetid -r");
