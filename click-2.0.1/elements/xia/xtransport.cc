@@ -148,13 +148,52 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	bool is_dual_stack_router;
 	_is_dual_stack_router = false;
 
-	if (cp_va_kparse(conf, this, errh,
+	/* Configure tcp relevant information */
+	 memset(&_tcpstat, 0, sizeof(_tcpstat)); 
+    _errhandler = errh; 
+
+    /* _empty_note.initialize(Notifier::EMPTY_NOTIFIER, router()); */
+    
+    _tcp_globals.tcp_keepidle 	    = 120; 
+    _tcp_globals.tcp_keepintvl 	    = 120; 
+    _tcp_globals.tcp_maxidle   	    = 120; 
+    _tcp_globals.tcp_now 		    = 0; 
+    _tcp_globals.so_recv_buffer_size = 0x10000; 
+    _tcp_globals.tcp_mssdflt	    = 1420; 
+    _tcp_globals.tcp_rttdflt	    = TCPTV_SRTTDFLT / PR_SLOWHZ;
+    _tcp_globals.so_flags	   	 	= 0; 
+    _tcp_globals.so_idletime	    = 0; 
+    _verbosity 						= VERB_ERRORS; 
+
+    bool so_flags_array[32]; 
+    bool t_flags_array[10]; 
+    memset(so_flags_array, 0, 32 * sizeof(bool)); 
+    memset(t_flags_array, 0, 10 * sizeof(bool)); 
+
+	assert (cp_va_kparse(conf, this, errh,
 					 "LOCAL_ADDR", cpkP + cpkM, cpXIAPath, &local_addr,
 					 "LOCAL_4ID", cpkP + cpkM, cpXID, &local_4id,
 					 "ROUTETABLENAME", cpkP + cpkM, cpElement, &routing_table_elem,
 					 "IS_DUAL_STACK_ROUTER", 0, cpBool, &is_dual_stack_router,
-					 cpEnd) < 0)
-		return -1;
+					 "IDLETIME", 0, cpUnsigned, &(_tcp_globals.so_idletime),
+					"MAXSEG", 	0, cpUnsignedShort, &(_tcp_globals.tcp_mssdflt), 
+					"RCVBUF", 	0, cpUnsigned, &(_tcp_globals.so_recv_buffer_size),
+					"WINDOW_SCALING", 0, cpUnsigned, &(_tcp_globals.window_scale),
+					"USE_TIMESTAMPS", 0, cpBool, &(_tcp_globals.use_timestamp),
+					"FIN_AFTER_TCP_FIN",  0, cpBool, &(so_flags_array[8]), 
+					"FIN_AFTER_TCP_IDLE", 0, cpBool, &(so_flags_array[9]), 
+					"FIN_AFTER_UDP_IDLE", 0, cpBool, &(so_flags_array[10]), 
+					"VERBOSITY", 0, cpUnsigned, &(_verbosity), // not sure we need this
+					 cpEnd) >= 0);
+		// return -1;
+
+for (int i = 0; i < 32; i++) { 
+	if (so_flags_array[i])
+	    _tcp_globals.so_flags |= ( 1 << i ) ; 
+    }
+    _tcp_globals.so_idletime *= PR_SLOWHZ; 
+    if (_tcp_globals.window_scale > TCP_MAX_WINSHIFT) 
+		_tcp_globals.window_scale = TCP_MAX_WINSHIFT; 
 
 	_local_addr = local_addr;
 	_local_hid = local_addr.xid(local_addr.destination_node());
@@ -191,11 +230,21 @@ XTRANSPORT::~XTRANSPORT()
 
 
 
-int XTRANSPORT::initialize(ErrorHandler *)
+int XTRANSPORT::initialize(ErrorHandler *errh)
 {
 	// XLog installed the syslog error handler, use it!
 	_errh = (SyslogErrorHandler*)ErrorHandler::default_handler();
 	_timer.initialize(this);
+
+	_fast_ticks = new Timer(this);
+	_fast_ticks->initialize(this);
+	_fast_ticks->schedule_after_msec(TCP_FAST_TICK_MS); 
+	
+	_slow_ticks = new Timer(this);
+	_slow_ticks->initialize(this);
+	_slow_ticks->schedule_after_msec(TCP_SLOW_TICK_MS); 
+
+	_errhandler = errh; 
 	return 0;
 }
 

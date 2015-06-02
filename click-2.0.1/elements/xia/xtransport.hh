@@ -84,6 +84,19 @@ using namespace xia;
 #define CACHE_PORT   3
 #define XHCP_PORT	 4
 
+// Verbosity Bitmask definitions, directly from tcpspeaker code
+#define VERB_NONE       0
+#define VERB_ALL        0xffffffff
+#define VERB_ERRORS     0x01
+#define VERB_WARNINGS   0x02
+#define VERB_INFO       0x04
+#define VERB_DEBUG      0x08
+#define VERB_TIMERS      0x09
+#define VERB_MFD_QUEUES 0x10 // for the MFD Handler Queues
+#define VERB_PACKETS    0x20 // triggered on packet handling/traversal events
+#define VERB_DISPATCH   0x40 // for anything related to interconnecting handlers
+#define VERB_MFH_STATE  0x80 // for the 5-state statemachine of MFH
+
 enum SocketState {INACTIVE = 0, LISTEN, SYN_RCVD, SYN_SENT, CONNECTED, FIN_WAIT1, FIN_WAIT2, TIME_WAIT, CLOSING, CLOSE_WAIT, LAST_ACK, CLOSED};
 enum HandlerState { CREATE, INITIALIZE, ACTIVE, SHUTDOWN, CLOSE };
 
