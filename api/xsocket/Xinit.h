@@ -62,7 +62,6 @@ typedef int (*poll_t)(struct pollfd*, nfds_t, int);
 typedef ssize_t (*recvfrom_t)(int, void*, size_t, int, struct sockaddr*, socklen_t*);
 typedef int (*fork_t)(void);
 
-extern void xapi_load_func_ptrs();
 extern socket_t _f_socket;
 extern bind_t _f_bind;
 extern getsockname_t _f_getsockname;

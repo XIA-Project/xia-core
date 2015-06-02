@@ -735,10 +735,6 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	// roll the dice
 	srand(time(NULL));
 
-	// cause the Xsocket API to load the pointers to the real socket functions
-	// for it's own internal use
-	xapi_load_func_ptrs();
-
 	// enable logging
 	if (getenv("XWRAP_TRACE") != NULL)
 		_log_trace = 1;
