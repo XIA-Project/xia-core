@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Copyright 2013 Carnegie Mellon University
 #
@@ -13,11 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-export XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
-XLIB=$XIADIR/api/lib
-
-export LD_PRELOAD="$XLIB/xwrap.so $XLIB/libXsocket.so $XLIB/libdagaddr.so"
 
 help ()
 {
@@ -42,6 +37,8 @@ EOH
 	exit 0
 }
 
+
+[[ "$#" == "0" ]] && help
 
 while getopts "o:h:tivwxd" opt; do
 	case $opt in
@@ -69,13 +66,17 @@ while getopts "o:h:tivwxd" opt; do
 		d)
 			export XWRAP_DUMP=1
 			;;
-		\?)
+		*)
 			help
 			;;
 	esac
 done
-
 shift $((OPTIND-1))
+
+export XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
+XLIB=$XIADIR/api/lib
+
+export LD_PRELOAD="$XLIB/xwrap.so $XLIB/libXsocket.so $XLIB/libdagaddr.so"
 
 # ececute command
 $@
