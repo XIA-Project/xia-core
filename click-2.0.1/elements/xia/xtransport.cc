@@ -38,7 +38,17 @@ XGenericTransport::XGenericTransport(
     hlim = HLIM_DEFAULT;
     nxt = CLICK_XIA_NXT_TRN;
 }
-
+sock::sock(
+    XTRANSPORT *transport,
+    unsigned short port,
+    int type) : hstate(CREATE) {
+    port = port;
+    transport = transport;
+    type = type;
+    _errh = transport -> error_handler();
+    hlim = HLIM_DEFAULT;
+    nxt = CLICK_XIA_NXT_TRN;
+}
 sock::sock() {
 			port = 0;
 			sock_type = 0;

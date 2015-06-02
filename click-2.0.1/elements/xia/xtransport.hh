@@ -323,7 +323,7 @@ class sock : public Element {
 
 
     XTRANSPORT *get_transport() { return transport; }
-	sock(XTRANSPORT *transport, unsigned short port, int type){};
+	sock(XTRANSPORT *transport, unsigned short port, int type);
 	sock();
 	/* =========================
 	 * Common Socket states
