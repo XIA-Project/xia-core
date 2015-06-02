@@ -40,11 +40,11 @@ XGenericTransport::XGenericTransport(
 }
 sock::sock(
     XTRANSPORT *transport,
-    unsigned short port,
+    unsigned short apiport,
     int type) : hstate(CREATE) {
-	cout << "fuck you\n";
-				port = 0;
-			sock_type = 0;
+	cout << "fuck you" << apiport<<endl;
+				// port = 0;
+			// sock_type = 0;
 			state = INACTIVE;
 			isBlocking = true;
 			initialized = false;
@@ -83,7 +83,7 @@ sock::sock(
 			num_migrate_tries = 0;
 			migrate_pkt = NULL;
 			recv_pending = false;
-    port = port;
+    port = apiport;
     transport = transport;
     sock_type = type;
     _errh = transport -> error_handler();
@@ -2757,13 +2757,14 @@ switch (sock_type) {
 	}
 	case SOCK_DGRAM: {
 		cout << "\t\t\t\tThis is a datagram socket\n";
-		sk = new sock(this, _sport,sock_type);
-	sk->port = _sport;
-	sk->sock_type = sock_type;
-	sk->state = INACTIVE;
+		sk = new XDatagram(this, _sport);
+	// assert(sk->port == _sport);
+	// assert(sk->sock_type == sock_type);
+	// 	cout << sk->port << "==" <<_sport<<endl;
+	// assert(sk->state == INACTIVE);
 
-	memset(sk->send_buffer, 0, sk->send_buffer_size * sizeof(WritablePacket*));
-	memset(sk->recv_buffer, 0, sk->recv_buffer_size * sizeof(WritablePacket*));
+	// memset(sk->send_buffer, 0, sk->send_buffer_size * sizeof(WritablePacket*));
+	// memset(sk->recv_buffer, 0, sk->recv_buffer_size * sizeof(WritablePacket*));
 	break;
 	}
 }
