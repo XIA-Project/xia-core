@@ -29,6 +29,10 @@
 #define REREQUEST 3
 #define NUM_CHUNKS 1
 
+#define GETSSID "iwgetid -r"
+
+using namespace std;
+
 //#define MAXBUFLEN = XIA_MAXBUF = XIA_MAXCHUNK = 15600
 
 // write the message to stdout unless in quiet mode
@@ -44,17 +48,21 @@ char** str_split(char* a_str, const char *a_delim);
 
 char *randomString(char *buf, int size);
 
-char* string2char(std::string str);
+char* string2char(string str);
 
 // result the string result of system command
-std::string execSystem(std::string);
+string execSystem(string cmd);
 
 bool file_exists(const char * filename);
 
 // Unix epoch time in msec
 long now_msec();
 
-int sendCmd(int sock, const char *cmd);
+string netConnStatus(string lastSSID);
+
+int getReply(int sock, const char *cmd, char *reply, sockaddr_x *sa, int timeout, int tries);
+
+int sendStreamCmd(int sock, const char *cmd);
 
 int sayHello(int sock, const char *helloMsg);
 
@@ -65,8 +73,10 @@ char* XgetRemoteSID(int sock);
 
 int XgetNetADHID(const char *name, char *ad, char *hid);
 
+int initDatagramClient(const char *name, struct addrinfo *ai, sockaddr_x *sa);
+
 // make connection, instantiate src_ad, src_hid, dst_ad, dst_hid 
-int initializeClient(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid);
+int initStreamClient(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid);
 
 int getChunkCount(int sock, char *reply, int sz);
 

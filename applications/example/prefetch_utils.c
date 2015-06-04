@@ -2,7 +2,10 @@
 
 int verbose = 1;
 
-void say(const char *fmt, ...) {
+string cmdGetSSID = "iwgetid -r";
+
+void say(const char *fmt, ...) 
+{
 	if (verbose) {
 		va_list args;
 		va_start(args, fmt);
@@ -11,14 +14,16 @@ void say(const char *fmt, ...) {
 	}
 }
 
-void warn(const char *fmt, ...) {
+void warn(const char *fmt, ...) 
+{
 	va_list args;
 	va_start(args, fmt);
 	vfprintf(stdout, fmt, args);
 	va_end(args);
 }
 
-void die(int ecode, const char *fmt, ...) {
+void die(int ecode, const char *fmt, ...) 
+{
 	va_list args;
 	va_start(args, fmt);
 	vfprintf(stdout, fmt, args);
@@ -27,7 +32,8 @@ void die(int ecode, const char *fmt, ...) {
 	exit(ecode);
 }
 
-char** str_split(char* a_str, const char *a_delim) {
+char** str_split(char* a_str, const char *a_delim) 
+{
 	char** result = 0;
 	int count = 0;
 	int str_len = strlen(a_str);
@@ -66,10 +72,9 @@ char** str_split(char* a_str, const char *a_delim) {
 	return result;
 }
 
-/*
-** create a semi-random alphanumeric string of the specified size
-*/
-char *randomString(char *buf, int size) {
+// create a semi-random alphanumeric string of the specified size
+char *randomString(char *buf, int size) 
+{
 	int i;
 	static const char *filler = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	static int refresh = 1;
@@ -89,17 +94,19 @@ char *randomString(char *buf, int size) {
 	return buf;
 }
 
-char* string2char(std::string str) {
+char* string2char(string str) 
+{
 	char *cstr = new char[str.length() + 1];
 	strcpy(cstr, str.c_str());	
 	return cstr;
 } 
 
-std::string execSystem(std::string cmd) {
+string execSystem(string cmd) 
+{
 	FILE* pipe = popen(string2char(cmd), "r");
 	if (!pipe) return NULL;
   char buffer[128];
-  std::string result = "";
+  string result = "";
   while (!feof(pipe)) {
 		if (fgets(buffer, 128, pipe) != NULL)
 			result += buffer;
@@ -111,7 +118,8 @@ std::string execSystem(std::string cmd) {
 	return result;
 }
 
-bool file_exists(const char * filename) {
+bool file_exists(const char * filename) 
+{
 	if (FILE * file = fopen(filename, "r")) {
 		fclose(file);
 		return true;
@@ -119,7 +127,8 @@ bool file_exists(const char * filename) {
 	return false;
 }
 
-long now_msec() {
+long now_msec() 
+{
 	struct timeval tv;
 	if (gettimeofday(&tv, NULL) == 0)
 		return ((tv.tv_sec * 1000000L + tv.tv_usec) / 1000);
@@ -127,7 +136,58 @@ long now_msec() {
 		return -1;
 }
 
-int sendCmd(int sock, const char *cmd) {
+string netConnStatus(string lastSSID) 
+{
+	string currSSID = execSystem(GETSSID);
+
+	if (currSSID.empty())	
+		return "empty";
+	else {
+		if (currSSID == lastSSID) 
+			return "same";
+		else 
+			return currSSID;
+	}
+}
+
+// used when client is mobile TODO: detect network
+int getReply(int sock, const char *cmd, char *reply, sockaddr_x *sa, int timeout, int tries) 
+{
+	int sent, received, rc;
+
+	for (int i = 0; i < tries; i++) {
+		string currSSID = execSystem(GETSSID);
+		if (currSSID.empty())
+			return -2;
+		else {
+			if ((sent = Xsendto(sock, cmd, strlen(cmd), 0, (sockaddr*)sa, sizeof(sockaddr_x))) < 0) {
+				die(-4, "Send error %d on socket %d\n", errno, sock);
+			}
+
+			say("Xsock %4d sent %d bytes\n", sock, sent);
+
+			struct pollfd pfds[2];
+			pfds[0].fd = sock;
+			pfds[0].events = POLLIN;
+			if ((rc = Xpoll(pfds, 1, timeout)) <= 0) {
+				say("Will poll next time\n");
+				//die(-5, "Poll returned %d\n", rc);
+			}
+
+			memset(reply, 0, strlen(reply));
+			if ((received = Xrecvfrom(sock, reply, strlen(reply), 0, NULL, NULL)) < 0)
+				die(-5, "Receive error %d on socket %d\n", errno, sock);
+			else {
+				say("Xsock %4d received %d bytes\n", sock, received);
+				return received;
+			}
+		}
+	}
+	return -3; 
+}
+
+int sendStreamCmd(int sock, const char *cmd) 
+{
 	warn("Sending Command: %s \n", cmd);
 	int n;
 	if ((n = Xsend(sock, cmd,  strlen(cmd), 0)) < 0) {
@@ -137,13 +197,14 @@ int sendCmd(int sock, const char *cmd) {
 	return n;
 }
 
-int sayHello(int sock, const char *helloMsg) {
-	int m = sendCmd(sock, helloMsg); 
+int sayHello(int sock, const char *helloMsg) 
+{
+	int m = sendStreamCmd(sock, helloMsg); 
 	return m;
 }
 
-int hearHello(int sock) { //, const char *helloMsg) {
-
+int hearHello(int sock) 
+{ 
 	char command[XIA_MAXBUF];
 	memset(command, '\0', strlen(command));
 	int n;
@@ -164,8 +225,8 @@ int hearHello(int sock) { //, const char *helloMsg) {
 	*/
 }
 
-char* XgetRemoteSID(int sock) {
-
+char* XgetRemoteSID(int sock) 
+{
 	sockaddr_x dag;
 	socklen_t daglen = sizeof(dag);
 	char sdag[1024];
@@ -180,8 +241,8 @@ char* XgetRemoteSID(int sock) {
 }
 
 // hacky way: by looking up name service only local to the network
-int XgetNetADHID(const char *name, char *ad, char *hid) {
-
+int XgetNetADHID(const char *name, char *ad, char *hid) 
+{
 	sockaddr_x dag;
 	socklen_t daglen = sizeof(dag);
 	char sdag[1024];
@@ -203,8 +264,26 @@ int XgetNetADHID(const char *name, char *ad, char *hid) {
 	return 1;
 }
 
-int initializeClient(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid) {
+int initDatagramClient(const char *name, struct addrinfo *ai, sockaddr_x *sa) 
+{
+	if (Xgetaddrinfo(name, NULL, NULL, &ai) != 0)
+		die(-1, "unable to lookup name %s\n", name);
+	sa = (sockaddr_x*)ai->ai_addr;
 
+	Graph g(sa);
+	printf("\n%s\n", g.dag_string().c_str());
+
+	int sock;
+	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0) {
+		die(-2, "unable to create the socket\n");
+	}
+	say("Xsock %4d created\n", sock);
+
+	return sock;
+}
+
+int initStreamClient(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid) 
+{
 	int sock, rc;
 	sockaddr_x dag;
 	socklen_t daglen;
@@ -252,7 +331,8 @@ int initializeClient(const char *name, char *src_ad, char *src_hid, char *dst_ad
 	return sock;
 }
 
-int getChunkCount(int sock, char *reply, int sz) {
+int getChunkCount(int sock, char *reply, int sz) 
+{
 	int n = -1;
 
 	if ((n = Xrecv(sock, reply, sz, 0))  < 0) {
@@ -268,8 +348,8 @@ int getChunkCount(int sock, char *reply, int sz) {
 	return n;
 }
 
-int buildChunkDAGs(ChunkStatus cs[], char *chunks, char *dst_ad, char *dst_hid) {
-
+int buildChunkDAGs(ChunkStatus cs[], char *chunks, char *dst_ad, char *dst_hid) 
+{
 	char *p = chunks;
 	char *next;
 	int n = 0;
@@ -296,8 +376,8 @@ int buildChunkDAGs(ChunkStatus cs[], char *chunks, char *dst_ad, char *dst_hid) 
 	return n;
 }
 
-int getListedChunks(int csock, FILE *fd, char *chunks, char *dst_ad, char *dst_hid) {
-
+int getListedChunks(int csock, FILE *fd, char *chunks, char *dst_ad, char *dst_hid) 
+{
 	ChunkStatus cs[NUM_CHUNKS];
 	char data[XIA_MAXCHUNK];
 	int len;
@@ -369,8 +449,8 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *dst_ad, char *dst_h
 	return n;
 }
 
-int registerDatagramReceiver(char* name) {
-
+int registerDatagramReceiver(char* name) 
+{
 	int sock;
 
 	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
@@ -403,8 +483,8 @@ int registerDatagramReceiver(char* name) {
 }
 
 // update with XListen
-int registerStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) {
-
+int registerStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) 
+{
 	int sock;
 
 	// create a socket, and listen for incoming connections
@@ -449,8 +529,8 @@ int registerStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) {
 }
 
 // register the service with the name server and open the necessary sockets
-int deprecatedRegisterStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) {
-
+int deprecatedRegisterStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) 
+{
 	int sock;
 
 	// create a socket, and listen for incoming connections
@@ -487,7 +567,8 @@ int deprecatedRegisterStreamReceiver(char* name, char *myAD, char *myHID, char *
   return sock;  
 }
 
-void *blockListener(void *listenID, void *recvFuntion (void *)) {
+void *blockListener(void *listenID, void *recvFuntion (void *)) 
+{
   int listenSock = *((int*)listenID);
   int acceptSock;
 

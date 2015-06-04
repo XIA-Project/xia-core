@@ -9,14 +9,13 @@
 
 using namespace std;
 
+bool prefetch = true;
 bool wireless = true;
-
-char myAD[MAX_XID_SIZE];
-char myHID[MAX_XID_SIZE];
 
 string lastSSID, currSSID;
 
-string cmdGetSSID = "iwgetid -r";
+char myAD[MAX_XID_SIZE];
+char myHID[MAX_XID_SIZE];
 
 char ftpServAD[MAX_XID_SIZE];
 char ftpServHID[MAX_XID_SIZE];
@@ -39,19 +38,27 @@ char prefetch_profile_name[] = "www_s.profile.prefetch.aaa.xia";
 
 int ftpSock, prefetchProfileSock; // prefetchClientSock
 
+//string cmdGetSSID = "iwgetid -r";
+
+struct addrinfo *ai;
+sockaddr_x *sa;
+
 // TODO: be careful to update prefetchProfileSock for sendCmd(prefetchProfileSock, cmd);
+
 // format: rootname.SSID
-char *getPrefetchProfileName() {
+char *getPrefetchProfileName() 
+{
 	if (wireless == false)
 		return prefetch_profile_name;
 	else {
-		string prefetch_profile_name_local = string(prefetch_profile_name) + "." + execSystem(cmdGetSSID);
+		string prefetch_profile_name_local = string(prefetch_profile_name) + "." + execSystem(GETSSID);
 		return string2char(prefetch_profile_name_local);
 	}
 } 
 
 // TODO: 12 is the max number of chunks to fetch at one time for 1024 K
-int getFileBasic(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fout) {
+int getFileBasic(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fout) 
+{
 	int chunkSock;
 	char cmd[XIA_MAX_BUF];
 	char reply[XIA_MAX_BUF];
@@ -60,7 +67,7 @@ int getFileBasic(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *f
 
 	// send the file request to the xftp server
 	sprintf(cmd, "get %s", fin);
-	sendCmd(sock, cmd);
+	sendStreamCmd(sock, cmd);
 
 	// receive the CID list
 	if ((n = Xrecv(sock, reply, sizeof(reply), 0)) < 0) {
@@ -82,6 +89,7 @@ int getFileBasic(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *f
 	}*/
 	if ((chunkSock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0)
 		die(-1, "unable to create chunk socket\n");
+
 	FILE *fd = fopen(fout, "w");
 
 	for (int i = 0; i < cid_num; i++) {
@@ -142,13 +150,14 @@ int getFileBasic(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *f
 	}
 	fclose(fd);
 	say("Received file %s\n", fout);
-	sendCmd(sock, "done"); 	// chunk fetching ends
+	sendStreamCmd(sock, "done"); 	// chunk fetching ends
 	Xclose(chunkSock);
 	
 	return status;
 }
 
-int getFileAdv(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fout) {
+int getFileAdv(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fout) 
+{
 	int chunkSock;
 	char cmd[XIA_MAX_BUF];
 	char reply[XIA_MAX_BUF];
@@ -162,7 +171,7 @@ int getFileAdv(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fou
 
 	// send the file request to the xftp server
 	sprintf(cmd, "get %s", fin);
-	sendCmd(sock, cmd);
+	sendStreamCmd(sock, cmd);
 
 	// receive the CID list
 	if ((n = Xrecv(sock, reply, sizeof(reply), 0)) < 0) {
@@ -172,7 +181,7 @@ int getFileAdv(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fou
 
 	// send the registration message out
 	sprintf(cmd, "reg %s", reply);
-	sendCmd(prefetchProfileSock, cmd);
+	sendStreamCmd(prefetchProfileSock, cmd);
 	cerr<<"send the registration message out\n";
 	// chunk fetching begins
 	char reply_arr[strlen(reply)];
@@ -194,14 +203,14 @@ int getFileAdv(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fou
 		// TODO: coordinate probe or not when fetching from previous network
 		printf("Fetching chunk %d / %d\n", i+1, cid_num);
 
-		currSSID = execSystem(cmdGetSSID);
+		currSSID = execSystem(GETSSID);
 
 		// TODO: ask Dan about blocking optimization 
 		if (currSSID.empty()) {
 			cerr<<"No network\n";
 			while (1) {
 				usleep(50000); // TODO: need further optimization
-				currSSID = execSystem(cmdGetSSID); 
+				currSSID = execSystem(GETSSID); 
 				if (!currSSID.empty()) {
 					cerr<<"Network back\n";
 					break;
@@ -232,9 +241,9 @@ int getFileAdv(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fou
 				strcat(cmd, " ");
 				strcat(cmd, CIDs[j]);
 			}
-			prefetchProfileSock = initializeClient(getPrefetchProfileName(), myAD, myHID, prefetchProfileAD, prefetchProfileHID);		
+			prefetchProfileSock = initStreamClient(getPrefetchProfileName(), myAD, myHID, prefetchProfileAD, prefetchProfileHID);		
 			cerr<<"Ready to send registration message with updated CID list\n"<<cmd<<endl;
-			sendCmd(prefetchProfileSock, cmd);
+			sendStreamCmd(prefetchProfileSock, cmd);
 			cerr<<"Sent registration message with updated CID list\n";
 			cerr<<cmd<<endl;
 		}
@@ -249,7 +258,7 @@ int getFileAdv(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fou
 		while (1) {
 
 			// TODO: check network changed? if so break and send reg message
-			sendCmd(prefetchProfileSock, cmd);
+			sendStreamCmd(prefetchProfileSock, cmd);
 			int rcvLen = -1;
 			if ((rcvLen = Xrecv(prefetchProfileSock, reply, sizeof(reply), 0))  < 0) {
 				warn("socket error while waiting for data, closing connection\n");
@@ -275,14 +284,14 @@ int getFileAdv(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fou
 		int status;
 		int n = CIDS_DONE.size();
 
-		currSSID = execSystem(cmdGetSSID);
+		currSSID = execSystem(GETSSID);
 
 		// TODO: ask Dan about blocking optimization 
 		if (currSSID.empty()) {
 			cerr<<"No network\n";
 			while (1) {
 				usleep(50000); // TODO: need further optimization
-				currSSID = execSystem(cmdGetSSID); 
+				currSSID = execSystem(GETSSID); 
 				if (!currSSID.empty()) {
 					cerr<<"Network back\n";
 					break;
@@ -316,9 +325,9 @@ int getFileAdv(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fou
 
 			// update prefetchProfileSock
 			cerr<<"Updating prefetchProfileSock...\n";			
-			prefetchProfileSock = initializeClient(getPrefetchProfileName(), myAD, myHID, prefetchProfileAD, prefetchProfileHID);		
+			prefetchProfileSock = initStreamClient(getPrefetchProfileName(), myAD, myHID, prefetchProfileAD, prefetchProfileHID);		
 			cerr<<"Updated prefetchProfileSock\n";			
-			sendCmd(prefetchProfileSock, cmd);
+			sendStreamCmd(prefetchProfileSock, cmd);
 			cerr<<"Send registration message with updated CID list\n";
 			cerr<<cmd<<endl;
 
@@ -344,13 +353,13 @@ int getFileAdv(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fou
 
 		while (1) {
 
-			currSSID = execSystem(cmdGetSSID);
+			currSSID = execSystem(GETSSID);
 
 			if (currSSID.empty()) {
 				cerr<<"No network\n";
 				while (1) {
 					usleep(50000); // TODO: need further optimization
-					currSSID = execSystem(cmdGetSSID); 
+					currSSID = execSystem(GETSSID); 
 					if (!currSSID.empty()) {
 						cerr<<"Network back\n";
 						break;
@@ -374,14 +383,15 @@ int getFileAdv(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fou
 				char *rest_cid_num_str;
 				sprintf(rest_cid_num_str, " %d", rest_cid_num);
 				strcat(cmd, rest_cid_num_str);
+
 				// TODO: change the starting point
 				for (int j = i + n; j < cid_num; j++) {
 					strcat(cmd, " ");
 					strcat(cmd, CIDs[j]);
 				}
 				// update prefetchProfileSock
-				prefetchProfileSock = initializeClient(getPrefetchProfileName(), myAD, myHID, prefetchProfileAD, prefetchProfileHID);						
-				sendCmd(prefetchProfileSock, cmd);
+				prefetchProfileSock = initStreamClient(getPrefetchProfileName(), myAD, myHID, prefetchProfileAD, prefetchProfileHID);						
+				sendStreamCmd(prefetchProfileSock, cmd);
 				cerr<<"Send registration message with updated CID list\n";
 				cerr<<cmd<<endl;
 			}	
@@ -432,21 +442,44 @@ int getFileAdv(int sock, char *ftpServAD, char *ftpServHID, char *fin, char *fou
 	}
 	fclose(fd);
 	say("Received file %s\n", fout);
-	sendCmd(sock, "done"); 
+	sendStreamCmd(sock, "done"); 
 	Xclose(chunkSock);
 	
 	return status;
 }
 
-int main(int argc, char **argv) {	
-
+int main(int argc, char **argv) 
+{	
 	if (argc == 2) {
 		say ("\n%s (%s): started\n", TITLE, VERSION);		
 		char *fin = argv[1];
 		char fout[strlen(fin)+2];
 		sprintf(fout, "my%s", fin);
 
+		// TODO: handle when SSID is null
+		lastSSID = execSystem(GETSSID);
+		currSSID = execSystem(GETSSID);
+
+		ftpSock = initStreamClient(ftp_name, myAD, myHID, ftpServAD, ftpServHID);
+
+		if (prefetch == true) {
+			prefetchProfileSock = initDatagramClient(getPrefetchProfileName(), ai, sa);
+			//prefetchProfileSock = initStreamClient(getPrefetchProfileName(), myAD, myHID, prefetchProfileAD, prefetchProfileHID);
+			getFileAdv(ftpSock, ftpServAD, ftpServHID, fin, fout);
+		}
+		else {
+			getFileBasic(ftpSock, ftpServAD, ftpServHID, fin, fout);
+		}
+	}
+	else {
+		 die(-1, "Please input the filename as the second argument\n");
+	}
+
+	return 0;
+}
+
 		///////////////////////////////
+		/*
 		struct addrinfo *ai;
 		sockaddr_x *sa;
 
@@ -499,20 +532,4 @@ int main(int argc, char **argv) {
 					ssock, sent, received);
 		}
 		///////////////////////////////
-
-		ftpSock = initializeClient(ftp_name, myAD, myHID, ftpServAD, ftpServHID);
-
-		prefetchProfileSock = initializeClient(getPrefetchProfileName(), myAD, myHID, prefetchProfileAD, prefetchProfileHID);		
-
-		// TODO: handle when SSID is null
-		lastSSID = execSystem(cmdGetSSID);
-		currSSID = execSystem(cmdGetSSID);
-
-		//getFileAdv(ftpSock, ftpServAD, ftpServHID, fin, fout);
-	}
-	else {
-		 die(-1, "Please input the filename as the second argument\n");
-	}
-
-	return 0;
-}
+		*/

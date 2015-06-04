@@ -9,7 +9,8 @@ char my4ID[MAX_XID_SIZE];
 
 char name[] = "www_s.ftp.advanced.aaa.xia";
 
-void *recvCmd (void *socketid) {
+void *recvCmd (void *socketid) 
+{
 	int i, n, count = 0;
 	ChunkInfo *info = NULL;
 	char cmd[XIA_MAX_BUF];
@@ -87,7 +88,8 @@ void *recvCmd (void *socketid) {
 	pthread_exit(NULL);
 }
 
-int main() {	
+int main() 
+{	
 	int ftpListenSock = registerStreamReceiver(name, myAD, myHID, my4ID);
 	blockListener((void *)&ftpListenSock, recvCmd);
 	return 0;

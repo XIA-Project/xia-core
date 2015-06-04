@@ -25,8 +25,9 @@ char ftpServHID[MAX_XID_SIZE];
 char prefetch_profile_name[] = "www_s.profile.prefetch.aaa.xia";
 char ftp_name[] = "www_s.ftp.advanced.aaa.xia";
 
-string cmdGetSSID = "iwgetid -r";
+//string cmdGetSSID = "iwgetid -r";
 
+// TODO: start to prefetch as soon as receive reg msg
 // TODO: optimize sleep(1)
 // TODO: netMon function to update prefetching window
 // TODO: timeout the SID entry and remove the chunks accordingly? maybe leave a few
@@ -42,38 +43,6 @@ pthread_mutex_t bufLock = PTHREAD_MUTEX_INITIALIZER;
 #define REQ 1 	// requested by router
 #define DONE 2	// available in cache
 
-/*
-void echo_dgram()
-{
-	int sock = registerDatagramReceiver(prefetch_profile_name);
-	char buf[XIA_MAXBUF];
-	sockaddr_x cdag;
-	socklen_t dlen;
-	int n;
-
-	while (1) {
-		say("Dgram Server waiting\n");
-
-		dlen = sizeof(cdag);
-		memset(buf, 0, sizeof(buf));
-		if ((n = Xrecvfrom(sock, buf, sizeof(buf), 0, (struct sockaddr *)&cdag, &dlen)) < 0) {
-			warn("Recv error on socket, closing connection\n");
-			break;
-		}
-
-		say("dgram received %d bytes\n", n);
-
-		if ((n = Xsendto(sock, buf, n, 0, (struct sockaddr *)&cdag, dlen)) < 0) {
-			warn("send error\n");
-			break;
-		}
-
-		say("dgram sent %d bytes\n", n);
-	}
-
-	Xclose(sock);
-}
-*/
 struct chunkStatus {
 	string CID;
 	long timestamp; // msec
@@ -87,7 +56,8 @@ map<string, vector<string> > buf; // chunk buffer to prefetch
 
 int prefetch_chunk_num = 3; // default number of chunks to prefetch
 
-void reg_handler(int sock, char *cmd, sockaddr_x cdag, socklen_t dlen) {
+void reg_handler(int sock, char *cmd)  //void reg_handler(int sock, char *cmd, sockaddr_x cdag, socklen_t dlen) 
+{
 	// format: reg cid_num cid1 cid2 ...
 	char cmd_arr[strlen(cmd)];
 	strcpy(cmd_arr, cmd);
@@ -132,19 +102,20 @@ void reg_handler(int sock, char *cmd, sockaddr_x cdag, socklen_t dlen) {
 	buf[SID] = CIDs;
 	pthread_mutex_unlock(&windowLock);
 
+	/* used for XDP
 	char reply[XIA_MAX_BUF] = "reg ACK";
 	int n;
 	if ((n = Xsendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&cdag, dlen)) < 0) {
 		warn("send error\n");
 		return;
 	}
-
+	*/
 	cerr<<"Finish reg"<<endl;
 	return;
 }
 
-void poll_handler(int sock, char *cmd, sockaddr_x cdag, socklen_t dlen) {
-
+void poll_handler(int sock, char *cmd) //void poll_handler(int sock, char *cmd, sockaddr_x cdag, socklen_t dlen) 
+{ 
 	char cmd_arr[strlen(cmd)];
 	strcpy(cmd_arr, cmd);
 	string SID = XgetRemoteSID(sock);
@@ -192,7 +163,8 @@ void poll_handler(int sock, char *cmd, sockaddr_x cdag, socklen_t dlen) {
 	// find the first chunk not fetched yet
 	p = 0;
 	while (p < profile[SID].size()) {
-		if (profile[SID][p].fetch == false) break;
+		if (profile[SID][p].fetch == false) 
+			break;
 		p++;
 	}
 
@@ -201,13 +173,15 @@ void poll_handler(int sock, char *cmd, sockaddr_x cdag, socklen_t dlen) {
 	i = p;
 	while (i < p + window[SID]) {
 		// TODO: looks ugly, improve later: if i < profile[SID].size(), blablabla
-		if (i == profile[SID].size()) break;		
+		if (i == profile[SID].size()) 
+			break;		
 		if (profile[SID][i].prefetch == BLANK) { 
 			buf[SID].push_back(profile[SID][i].CID);
 			profile[SID][i].prefetch = REQ; // marked as requested by router
 		}
 		i++;
-		if (i == profile[SID].size()) break;
+		if (i == profile[SID].size()) 
+			break;
 	}
 
 	say("\nPrint profile table in poll_handler\n");
@@ -227,17 +201,43 @@ void poll_handler(int sock, char *cmd, sockaddr_x cdag, socklen_t dlen) {
 	pthread_mutex_unlock(&profileLock);
 	say("Unlock the profile by poll handler and send poll reply msg out\n");
 
+	sendStreamCmd(sock, reply);
+	/* using XDP
 	int n;
 	if ((n = Xsendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&cdag, dlen)) < 0) {
 		warn("send error\n");
 		return;
-	}
+	}*/
 
 	return;
 }
 
-void *clientReqCmd (void *socketid) {
+void *clientReqCmd (void *socketid) 
+{
+ 	// stream protocol
+	char cmd[XIA_MAXBUF];
+	int sock = *((int*)socketid);
+	int n = -1;
 
+	while (1) {
+		memset(cmd, '\0', strlen(cmd));
+		if ((n = Xrecv(sock, cmd, sizeof(cmd), 0))  < 0) {
+			warn("socket error while waiting for data, closing connection\n");
+			break;
+		}
+		// reg msg from xftp client
+		if (strncmp(cmd, "reg", 3) == 0) {
+			say("Receive a reg message\n");
+			reg_handler(sock, cmd);
+		}
+		// fetch probe from xftp client: fetch CID
+		else if (strncmp(cmd, "poll", 4) == 0) {
+			say("Receive a polling message\n");
+			poll_handler(sock, cmd);
+		}	
+	}
+
+/* datagram protocol
 	char cmd[XIA_MAXBUF];
 
 	int sock = *((int*)socketid);
@@ -268,36 +268,15 @@ void *clientReqCmd (void *socketid) {
 		}	
 
 	}
-/* stream protocol
-	char cmd[XIA_MAXBUF];
-	int sock = *((int*)socketid);
-	int n = -1;
-
-	while (1) {
-		memset(cmd, '\0', strlen(cmd));
-		if ((n = Xrecv(sock, cmd, sizeof(cmd), 0))  < 0) {
-			warn("socket error while waiting for data, closing connection\n");
-			break;
-		}
-		// reg msg from xftp client
-		if (strncmp(cmd, "reg", 3) == 0) {
-			say("Receive a reg message\n");
-			reg_handler(sock, cmd);
-		}
-		// fetch probe from xftp client: fetch CID
-		else if (strncmp(cmd, "poll", 4) == 0) {
-			say("Receive a polling message\n");
-			poll_handler(sock, cmd);
-		}	
-	}
-*/
+*/	
 	Xclose(sock);
 	say("Socket closed\n");
 	pthread_exit(NULL);
 }
 
 // TODO: netMon
-void *prefetchPred(void *) {
+void *prefetchPred(void *) 
+{
 	// go through all the SID
 	while (1) {
 		//prefetch_chunk_num = 3;		
@@ -305,8 +284,8 @@ void *prefetchPred(void *) {
 	pthread_exit(NULL);
 }
 
-void *prefetchExec(void *) {
-
+void *prefetchExec(void *) 
+{
 	while (1) {
 
 		// update DONE to profile
@@ -411,24 +390,58 @@ void *prefetchExec(void *) {
 	pthread_exit(NULL);
 }
 
-int main() {
-
+int main() 
+{
 	pthread_t thread_pred, thread_exec;
 	pthread_create(&thread_pred, NULL, prefetchPred, NULL);	// TODO: 
 	pthread_create(&thread_exec, NULL, prefetchExec, NULL); // dequeue, prefetch and update profile
 
-	ftpSock = initializeClient(ftp_name, myAD, myHID, ftpServAD, ftpServHID); // get ftpServAD and ftpServHID for building chunk request
+	ftpSock = initStreamClient(ftp_name, myAD, myHID, ftpServAD, ftpServHID); // get ftpServAD and ftpServHID for building chunk request
+
+	string prefetch_profile_name_local = string(prefetch_profile_name) + "." + execSystem(GETSSID);
 
 	if (wireless == true) {
-		string prefetch_profile_name_local = string(prefetch_profile_name) + "." + execSystem(cmdGetSSID);
-		//profileServerSock = registerStreamReceiver(string2char(prefetch_profile_name_local), myAD, myHID, my4ID);
-		profileServerSock = registerDatagramReceiver(string2char(prefetch_profile_name_local));
+		profileServerSock = registerStreamReceiver(string2char(prefetch_profile_name_local), myAD, myHID, my4ID);
+		//profileServerSock = registerDatagramReceiver(string2char(prefetch_profile_name_local));
 	}
 	else 
-		//profileServerSock = registerStreamReceiver(string2char(prefetch_profile_name_local), myAD, myHID, my4ID);
-		profileServerSock = registerDatagramReceiver(prefetch_profile_name);
+		profileServerSock = registerStreamReceiver(string2char(prefetch_profile_name_local), myAD, myHID, my4ID);
+		//profileServerSock = registerDatagramReceiver(prefetch_profile_name);
 
-	//blockListener((void *)&profileServerSock, clientReqCmd);
+	blockListener((void *)&profileServerSock, clientReqCmd);
+
 	return 0;	
-
 }
+
+/*
+void echo_dgram()
+{
+	int sock = registerDatagramReceiver(prefetch_profile_name);
+	char buf[XIA_MAXBUF];
+	sockaddr_x cdag;
+	socklen_t dlen;
+	int n;
+
+	while (1) {
+		say("Dgram Server waiting\n");
+
+		dlen = sizeof(cdag);
+		memset(buf, 0, sizeof(buf));
+		if ((n = Xrecvfrom(sock, buf, sizeof(buf), 0, (struct sockaddr *)&cdag, &dlen)) < 0) {
+			warn("Recv error on socket, closing connection\n");
+			break;
+		}
+
+		say("dgram received %d bytes\n", n);
+
+		if ((n = Xsendto(sock, buf, n, 0, (struct sockaddr *)&cdag, dlen)) < 0) {
+			warn("send error\n");
+			break;
+		}
+
+		say("dgram sent %d bytes\n", n);
+	}
+
+	Xclose(sock);
+}
+*/
