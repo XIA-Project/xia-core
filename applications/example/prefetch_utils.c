@@ -66,6 +66,29 @@ char** str_split(char* a_str, const char *a_delim) {
 	return result;
 }
 
+/*
+** create a semi-random alphanumeric string of the specified size
+*/
+char *randomString(char *buf, int size) {
+	int i;
+	static const char *filler = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	static int refresh = 1;
+	int samples = strlen(filler);
+
+	if (!(--refresh)) {
+		// refresh rand every now and then so it doesn't degenerate too much
+		// use a prime number to keep it interesting
+		srand(time(NULL));
+		refresh = 997;
+	}
+	for (i = 0; i < size - 1; i ++) {
+		buf[i] = filler[rand() % samples];
+	}
+	buf[size - 1] = 0;
+
+	return buf;
+}
+
 char* string2char(std::string str) {
 	char *cstr = new char[str.length() + 1];
 	strcpy(cstr, str.c_str());	
@@ -109,7 +132,7 @@ int sendCmd(int sock, const char *cmd) {
 	int n;
 	if ((n = Xsend(sock, cmd,  strlen(cmd), 0)) < 0) {
 		Xclose(sock);
-		 die(-1, "Unable to communicate\n");
+		die(-1, "Unable to communicate\n");
 	}
 	return n;
 }
