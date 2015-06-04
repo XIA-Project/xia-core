@@ -106,23 +106,30 @@ void poll_handler(int sock, char *cmd) {
 	char reply[XIA_MAX_BUF] = "available";
 	cerr<<"Reply msg is initialized: "<<reply<<endl;
 	// reply format: available cid1 cid2, ...
+	say("Locking the profile by poll handler\n");	
 	pthread_mutex_lock(&profileLock);
-	say("Lock the profile\n");	
+	say("Locked the profile by poll handler\n");	
 
-	unsigned int p;
-	// return the CIDs which chunks are available 
-	for (p = 0; p < profile[SID].size(); p++) {
-		if (profile[SID][p].CID == CID) 
-			break;
+	say("Locking the buf by poll handler\n");
+	pthread_mutex_lock(&bufLock);
+	say("Locked the buf by poll handler\n");
+
+	unsigned int p = 0;
+	// find the requested CID index  
+	while (p < profile[SID].size()) {
+		if (profile[SID][p].CID == CID) break;
+		p++;
 	}
-	cerr<<p<<endl;
-	unsigned int c = 0;
 
-	for (unsigned i = p; i < profile[SID].size(); i++) {
+	cerr<<"Chunks are avaiable starting from index "<<p<<endl;
+	unsigned int c = 0;
+	unsigned i;
+	// return all the CIDs available starting from p
+	for (i = p; i < profile[SID].size(); i++) {
 		// mark fetch as "true" when the chunk is available after probe				
 		if (profile[SID][i].prefetch == DONE) {
 			profile[SID][i].fetch = true;
-			strcat(reply, " ");										
+			strcat(reply, " ");
 			strcat(reply, string2char(profile[SID][i].CID));
 			c++;
 		}
@@ -133,22 +140,34 @@ void poll_handler(int sock, char *cmd) {
 
 	cerr<<reply<<endl;
 
-	pthread_mutex_lock(&bufLock);
-	say("Lock the buf\n");
-
-	for (unsigned int p = 0; p < profile[SID].size(); p++) {
-		// find the first one not fetched by client yet		
-		if (profile[SID][p].fetch == false) 
-			break;
+	// find the first chunk not fetched yet
+	p = 0;
+	while (p < profile[SID].size()) {
+		if (profile[SID][p].fetch == false) break;
+		p++;
 	}
 
+	cerr<<"Chunks to be prefetched starting from index "<<p<<endl;
+	// push push the chunks and marked as requested range from p to p + window
+	i = p;
+	while (i < p + window[SID]) {
+		// TODO: ugly, improve later
+		if (i == profile[SID].size()) break;		
+		if (profile[SID][i].prefetch == BLANK) { 
+			buf[SID].push_back(profile[SID][i].CID);
+			profile[SID][i].prefetch = REQ; // marked as requested by router
+		}
+		i++;
+		if (i == profile[SID].size()) break;
+	}
+	/*
 	for (unsigned int i = p; i < p + window[SID]; i++) {
-		if (profile[SID][i].prefetch == 0) { 
+		if (profile[SID][i].prefetch == BLANK) { 
 			buf[SID].push_back(profile[SID][i].CID);
 			profile[SID][i].prefetch = REQ; // marked as requested by router
 		}
 	}
-
+*/
 	say("\nPrint profile table in poll_handler\n");
 	for (map<string, vector<chunkStatus> >::iterator I = profile.begin(); I != profile.end(); ++I) {
 		for (vector<chunkStatus>::iterator J = (*I).second.begin(); J != (*I).second.end(); ++J) {
@@ -157,14 +176,14 @@ void poll_handler(int sock, char *cmd) {
 	}	
 	say("\n");
 
-	cerr<<SID<<": the chunks are pushed into the queue:\n";
+	cerr<<"SID: "<<SID<<" - chunks to be pushed into the queue:\n";
 	for (unsigned i = 0; i < buf[SID].size(); i++)
 		cerr<<buf[SID][i]<<endl;
 
 	pthread_mutex_unlock(&bufLock);	
-	say("Unlock the buf\n");
+	say("Unlock the buf by poll handler\n");
 	pthread_mutex_unlock(&profileLock);
-	say("Unlock the profile\n");
+	say("Unlock the profile by poll handler and send poll reply msg out\n");
 	sendCmd(sock, reply);
 	return;
 }
@@ -227,15 +246,21 @@ void *prefetchPred(void *) {
 void *prefetchExec(void *) {
 
 	while (1) {
-		say("Pulling the chunks from buf...\n");
+
+		// update DONE to profile
+		cerr<<"Locking the profile by prefetch executor to update chunks DONE\n";
+	  pthread_mutex_lock(&profileLock);
+		cerr<<"Locked the profile by prefetch to update chunks DONE\n";
+
+		say("Locking the buf by prefetch executor and ready to pull the chunks from buf...\n");
 		// pop out the chunks for prefetching 
 		pthread_mutex_lock(&bufLock);	
-
+		say("Locked the buf by prefetch executor and ready to pull the chunks from buf...\n");
 		for (map<string, vector<string> >::iterator I = buf.begin(); I != buf.end(); ++I) {
 			if ((*I).second.size() > 0) {
 				string SID = (*I).first;
-				cerr<<"SID: "<<SID<<endl;
-				say("Here are the chunks in the buf\n");
+				cerr<<"SID: "<<SID<<"chunks to be pulled from the queue\n";
+
 				for (unsigned int i = 0; i < (*I).second.size(); i++) 
 					cerr<<(*I).second[i]<<endl;
 
@@ -291,29 +316,34 @@ void *prefetchExec(void *) {
 					sleep(1); 
 				}
 
-				// update DONE to profile
-	  		pthread_mutex_lock(&profileLock);
-
 				for (unsigned int i = 0; i < (*I).second.size(); i++) {
 					if ((len = XreadChunk(chunkSock, data, sizeof(data), 0, cs[i].cid, cs[i].cidLen)) < 0) {
 						say("error getting chunk\n");
 						pthread_exit(NULL); // TODO: check again
 					}
 					else {
+						say("update chunks DONE information...\n");
 						for (unsigned int j = 0; j < profile[SID].size(); j++) {
 							if (profile[SID][j].CID == (*I).second[i]) 
 								profile[SID][j].prefetch = DONE;
 						}							
 					}
 				}
-
-	 	 		pthread_mutex_unlock(&profileLock);
-
 				(*I).second.clear();
 				// TODO: timeout the chunks by free(cs[i].cid); cs[j].cid = NULL; cs[j].cidLen = 0;			
 			}
 		}
+		say("\nPrint profile table after updating DONE\n");
+		for (map<string, vector<chunkStatus> >::iterator I = profile.begin(); I != profile.end(); ++I) {
+			for (vector<chunkStatus>::iterator J = (*I).second.begin(); J != (*I).second.end(); ++J) {
+				cerr<<(*I).first<<"\t"<<(*J).CID<<"\t"<<(*J).timestamp<<"\t"<<(*J).fetch<<"\t"<<(*J).prefetch<<endl;
+			}
+		}	
+		say("\n");
+
 		pthread_mutex_unlock(&bufLock);
+	 	pthread_mutex_unlock(&profileLock);
+		cerr<<"Unlock the profile to update chunks DONE\n";
 		sleep(1);
 	}
 	pthread_exit(NULL);
@@ -325,7 +355,7 @@ int main() {
 	//pthread_create(&thread_pred, NULL, prefetchPred, NULL);	// TODO: 
 	pthread_create(&thread_exec, NULL, prefetchExec, NULL); // dequeue, prefetch and update profile
 
-	ftpSock = initializeClient(ftp_name, myAD, myHID, ftpServAD, ftpServHID); // purpose is to get ftpServAD and ftpServHID for building chunk request
+	ftpSock = initializeClient(ftp_name, myAD, myHID, ftpServAD, ftpServHID); // get ftpServAD and ftpServHID for building chunk request
 
 	profileServerSock = registerStreamReceiver(prefetch_profile_name, myAD, myHID, my4ID);
 	blockListener((void *)&profileServerSock, clientReqCmd);
