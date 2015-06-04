@@ -99,7 +99,7 @@ bool file_exists(const char * filename) {
 long now_msec() {
 	struct timeval tv;
 	if (gettimeofday(&tv, NULL) == 0)
-		return ((tv.tv_sec % 86400) * 1000 + tv.tv_usec / 1000);	
+		return ((tv.tv_sec * 1000000L + tv.tv_usec) / 1000);
 	else
 		return -1;
 }

@@ -49,6 +49,7 @@ std::string execSystem(std::string);
 
 bool file_exists(const char * filename);
 
+// Unix epoch time in msec
 long now_msec();
 
 int sendCmd(int sock, const char *cmd);

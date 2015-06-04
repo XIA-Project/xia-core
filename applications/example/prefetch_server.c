@@ -2,6 +2,7 @@
 
 using namespace std;
 
+bool wireless = true;
 char myAD[MAX_XID_SIZE];
 char myHID[MAX_XID_SIZE];
 char my4ID[MAX_XID_SIZE];
@@ -21,9 +22,11 @@ char ftpServHID[MAX_XID_SIZE];
 char prefetch_profile_name[] = "www_s.profile.prefetch.aaa.xia";
 char ftp_name[] = "www_s.ftp.advanced.aaa.xia";
 
+string cmdGetSSID = "iwgetid -r";
 
 // TODO: optimize sleep(1)
 // TODO: netMon function to update prefetching window
+// TODO: timeout the SID entry and remove the chunks accordingly? maybe leave a few
 // Question: how many chunks can API support to get in one time? 12; can we stopping retransmit request in application
 
 int profileServerSock, ftpSock;
@@ -68,6 +71,10 @@ void reg_handler(int sock, char *cmd) {
 		css.push_back(cs);
 	}
 	pthread_mutex_lock(&profileLock);	
+	if (profile.count(SID)) { 
+		profile.erase(SID);
+		cerr<<"SID is registered before, being replaced...\n";
+	}
 	profile[SID] = css;
 	pthread_mutex_unlock(&profileLock);
 
@@ -147,11 +154,11 @@ void poll_handler(int sock, char *cmd) {
 		p++;
 	}
 
-	cerr<<"Chunks to be prefetched starting from index "<<p<<endl;
+	cerr<<"Chunks to be prefetched starting from index: "<<p<<endl;
 	// push push the chunks and marked as requested range from p to p + window
 	i = p;
 	while (i < p + window[SID]) {
-		// TODO: ugly, improve later
+		// TODO: looks ugly, improve later: if i < profile[SID].size(), blablabla
 		if (i == profile[SID].size()) break;		
 		if (profile[SID][i].prefetch == BLANK) { 
 			buf[SID].push_back(profile[SID][i].CID);
@@ -160,14 +167,7 @@ void poll_handler(int sock, char *cmd) {
 		i++;
 		if (i == profile[SID].size()) break;
 	}
-	/*
-	for (unsigned int i = p; i < p + window[SID]; i++) {
-		if (profile[SID][i].prefetch == BLANK) { 
-			buf[SID].push_back(profile[SID][i].CID);
-			profile[SID][i].prefetch = REQ; // marked as requested by router
-		}
-	}
-*/
+
 	say("\nPrint profile table in poll_handler\n");
 	for (map<string, vector<chunkStatus> >::iterator I = profile.begin(); I != profile.end(); ++I) {
 		for (vector<chunkStatus>::iterator J = (*I).second.begin(); J != (*I).second.end(); ++J) {
@@ -206,27 +206,11 @@ void *clientReqCmd (void *socketid) {
 		if (strncmp(cmd, "reg", 3) == 0) {
 			say("Receive a reg message\n");
 			reg_handler(sock, cmd);
-			/*
-			say("\nPrint profile table after reg_handler\n");
-			for (map<string, vector<chunkStatus> >::iterator I = profile.begin(); I != profile.end(); ++I) {
-				for (vector<chunkStatus>::iterator J = (*I).second.begin(); J != (*I).second.end(); ++J) {
-					cerr<<(*I).first<<"\t"<<(*J).CID<<"\t"<<(*J).timestamp<<"\t"<<(*J).fetch<<"\t"<<(*J).prefetch<<endl;
-				}
-			}	
-			say("\n");*/
 		}
 		// fetch probe from xftp client: fetch CID
 		else if (strncmp(cmd, "poll", 4) == 0) {
 			say("Receive a polling message\n");
 			poll_handler(sock, cmd);
-			/*
-			say("\nPrint after poll_handler\n");
-			for (map<string, vector<chunkStatus> >::iterator I = profile.begin(); I != profile.end(); ++I) {
-				for (vector<chunkStatus>::iterator J = (*I).second.begin(); J != (*I).second.end(); ++J) {
-					cerr<<(*I).first<<"\t"<<(*J).CID<<"\t"<<(*J).timestamp<<"\t"<<(*J).fetch<<"\t"<<(*J).prefetch<<endl;
-				}
-			}
-			say("\n"); */
 		}	
 	}
 	Xclose(sock);
@@ -238,7 +222,7 @@ void *clientReqCmd (void *socketid) {
 void *prefetchPred(void *) {
 	// go through all the SID
 	while (1) {
-		prefetch_chunk_num = 3;		
+		//prefetch_chunk_num = 3;		
 	}
 	pthread_exit(NULL);
 }
@@ -352,12 +336,18 @@ void *prefetchExec(void *) {
 int main() {
 
 	pthread_t thread_pred, thread_exec;
-	//pthread_create(&thread_pred, NULL, prefetchPred, NULL);	// TODO: 
+	pthread_create(&thread_pred, NULL, prefetchPred, NULL);	// TODO: 
 	pthread_create(&thread_exec, NULL, prefetchExec, NULL); // dequeue, prefetch and update profile
 
 	ftpSock = initializeClient(ftp_name, myAD, myHID, ftpServAD, ftpServHID); // get ftpServAD and ftpServHID for building chunk request
 
-	profileServerSock = registerStreamReceiver(prefetch_profile_name, myAD, myHID, my4ID);
+	if (wireless == true) {
+		string prefetch_profile_name_local = string(prefetch_profile_name) + "." + execSystem(cmdGetSSID);
+		profileServerSock = registerStreamReceiver(string2char(prefetch_profile_name_local), myAD, myHID, my4ID);
+	}
+	else 
+		profileServerSock = registerStreamReceiver(prefetch_profile_name, myAD, myHID, my4ID);
+
 	blockListener((void *)&profileServerSock, clientReqCmd);
 	return 0;	
 
