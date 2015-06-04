@@ -92,7 +92,7 @@ message X_Bind_Msg {
 }
 
 message X_Close_Msg {
-  optional bytes payload = 1; // data
+  optional uint32 refcount = 1; // # of processes holding this socket open
 }
 
 message X_Connect_Msg {
