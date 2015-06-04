@@ -72,6 +72,7 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	unsigned seq = seqNo(sockfd);
 	ready_xsm.set_sequence(seq);
 
+LOGF("READY_TO_ACCEPT sending ------------------------------------%d: seq:%d", sockfd, ready_xsm.sequence());
 	if (click_send(sockfd, &ready_xsm) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
@@ -85,6 +86,7 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		}
 		return -1;
 	}
+LOGF("READY_TO_ACCEPT received ------------------------------------%d: seq:%d", sockfd, ready_xsm.sequence());
 
 	// Create new socket (this is a socket between API and Xtransport)
 	if ((new_sockfd = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
@@ -125,6 +127,7 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	xia::X_Accept_Msg *x_accept_msg = xsm.mutable_x_accept();
 	x_accept_msg->set_new_port(((struct sockaddr_in)my_addr).sin_port);
 
+LOGF("ACCEPT sending ------------------------------------%d: seq:%d", sockfd, ready_xsm.sequence());
 	if (click_send(sockfd, &xsm) < 0) {
 		(_f_close)(new_sockfd);
 		LOGF("Error talking to Click: %s", strerror(errno));
@@ -136,6 +139,7 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		LOGF("Error retrieving status from Click: %s", strerror(errno));
 		return -1;
 	}
+LOGF("ACCEPT received ------------------------------------%d: seq:%d", sockfd, ready_xsm.sequence());
 
 	if (addr != NULL && *addrlen >= sizeof(sockaddr_x)) {
 

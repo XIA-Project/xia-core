@@ -3066,7 +3066,7 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	unsigned short new_port = xia_socket_msg->x_accept().new_port();
 	sock *sk = portToSock.get(_sport);
 
-	DBG("_sport %d, new_port %d\n", _sport, new_port);
+	DBG("_sport %d, new_port %d seq:%d\n", _sport, new_port, xia_socket_msg->sequence());
 
 	sk->hlim = HLIM_DEFAULT;
 	sk->nxt_xport = CLICK_XIA_NXT_TRN;
@@ -3157,12 +3157,15 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		x_accept_msg->set_remote_dag(new_sk->dst_path.unparse().c_str()); // remote endpoint is dest from our perspective
 
 	} else {
+		// FIXME: how is this happening on a blocking socket?????????
 		rc = -1;
 		ec = EWOULDBLOCK;
 		goto Xaccept_done;
 	}
 
 Xaccept_done:
+
+DBG("rc:%d errno:%d\n", rc, ec);
 	ReturnResult(_sport, xia_socket_msg, rc, ec);
 }
 
