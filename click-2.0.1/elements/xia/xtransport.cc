@@ -724,13 +724,15 @@ void XTRANSPORT::run_timer(Timer *timer)
 				tear_down = RetransmitDATA(sk, _sport, now);
 
 			} else if (sk->state == TIME_WAIT && sk->expiry <= now) {
-				DBG("tearing down socket %p %d %s\n", sk, sk->port, StateStr(sk->state));
-				TeardownSocket(sk);
 				tear_down = true;
 			}
 		}
 
-		if (!tear_down) {
+		if (tear_down) {
+			DBG("tearing down socket %p %d %s\n", sk, sk->port, StateStr(sk->state));
+			TeardownSocket(sk);
+
+		} else {
 			// find the (next) earliest expiry
 			if (sk->timer_on == true) {
 				if (sk->expiry > now && (sk->expiry < earliest_pending_expiry || earliest_pending_expiry == now)) {
