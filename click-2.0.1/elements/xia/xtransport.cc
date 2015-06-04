@@ -2072,6 +2072,8 @@ void XTRANSPORT::ProcessStreamDataPacket(WritablePacket*p_in)
 
 	} else {
 		if (sk->state >= CONNECTED) {
+			DBG("data received on %d\n", sk->port);
+
 			// buffer data, if we have room
 			if (should_buffer_received_packet(p_in, sk)) {
 				add_packet_to_recv_buf(p_in, sk);
@@ -2923,6 +2925,9 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	}
 
 done:
+	xia::X_Close_Msg *xcm = xia_socket_msg->mutable_x_close();
+	xcm->set_refcount(sk->refcount);
+
 	ReturnResult(_sport, xia_socket_msg);
 }
 
