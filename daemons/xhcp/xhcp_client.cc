@@ -341,7 +341,10 @@ int main(int argc, char *argv[]) {
 		int rc;
 		int iface;
 		char buf[XIA_MAXBUF];
-		bool ad_changed, rhid_changed, r4id_changed, ns_changed = false;
+		bool ad_changed = false;
+		bool rhid_changed = false;
+		bool r4id_changed = false;
+		bool ns_changed = false;
 
 		if(get_beacon(sockfd, &iface, buf, XIA_MAXBUF)) {
 			syslog(LOG_ERR, "ERROR receiving beacon\n");
