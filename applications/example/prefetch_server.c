@@ -1,8 +1,11 @@
 #include "prefetch_utils.h"
 
+//#define TEST_NAME "www_s.dgram_echo.aaa.xia"
+//#define SID_DGRAM "SID:0f00000000000000000000000000000000008888"
 using namespace std;
 
 bool wireless = true;
+
 char myAD[MAX_XID_SIZE];
 char myHID[MAX_XID_SIZE];
 char my4ID[MAX_XID_SIZE];
@@ -39,6 +42,38 @@ pthread_mutex_t bufLock = PTHREAD_MUTEX_INITIALIZER;
 #define REQ 1 	// requested by router
 #define DONE 2	// available in cache
 
+/*
+void echo_dgram()
+{
+	int sock = registerDatagramReceiver(prefetch_profile_name);
+	char buf[XIA_MAXBUF];
+	sockaddr_x cdag;
+	socklen_t dlen;
+	int n;
+
+	while (1) {
+		say("Dgram Server waiting\n");
+
+		dlen = sizeof(cdag);
+		memset(buf, 0, sizeof(buf));
+		if ((n = Xrecvfrom(sock, buf, sizeof(buf), 0, (struct sockaddr *)&cdag, &dlen)) < 0) {
+			warn("Recv error on socket, closing connection\n");
+			break;
+		}
+
+		say("dgram received %d bytes\n", n);
+
+		if ((n = Xsendto(sock, buf, n, 0, (struct sockaddr *)&cdag, dlen)) < 0) {
+			warn("send error\n");
+			break;
+		}
+
+		say("dgram sent %d bytes\n", n);
+	}
+
+	Xclose(sock);
+}
+*/
 struct chunkStatus {
 	string CID;
 	long timestamp; // msec
@@ -52,7 +87,7 @@ map<string, vector<string> > buf; // chunk buffer to prefetch
 
 int prefetch_chunk_num = 3; // default number of chunks to prefetch
 
-void reg_handler(int sock, char *cmd) {
+void reg_handler(int sock, char *cmd, sockaddr_x cdag, socklen_t dlen) {
 	// format: reg cid_num cid1 cid2 ...
 	char cmd_arr[strlen(cmd)];
 	strcpy(cmd_arr, cmd);
@@ -97,11 +132,18 @@ void reg_handler(int sock, char *cmd) {
 	buf[SID] = CIDs;
 	pthread_mutex_unlock(&windowLock);
 
+	char reply[XIA_MAX_BUF] = "reg ACK";
+	int n;
+	if ((n = Xsendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&cdag, dlen)) < 0) {
+		warn("send error\n");
+		return;
+	}
+
 	cerr<<"Finish reg"<<endl;
 	return;
 }
 
-void poll_handler(int sock, char *cmd) {
+void poll_handler(int sock, char *cmd, sockaddr_x cdag, socklen_t dlen) {
 
 	char cmd_arr[strlen(cmd)];
 	strcpy(cmd_arr, cmd);
@@ -184,20 +226,55 @@ void poll_handler(int sock, char *cmd) {
 	say("Unlock the buf by poll handler\n");
 	pthread_mutex_unlock(&profileLock);
 	say("Unlock the profile by poll handler and send poll reply msg out\n");
-	sendCmd(sock, reply);
+
+	int n;
+	if ((n = Xsendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&cdag, dlen)) < 0) {
+		warn("send error\n");
+		return;
+	}
+
 	return;
 }
 
 void *clientReqCmd (void *socketid) {
 
 	char cmd[XIA_MAXBUF];
-	char reply[XIA_MAXBUF];
+
 	int sock = *((int*)socketid);
-	int n;
+	int n = -1;
+
+	sockaddr_x cdag;
+	socklen_t dlen;
+
+	while (1) {
+		say("Dgram Server waiting\n");
+
+		dlen = sizeof(cdag);
+		memset(cmd, 0, sizeof(cmd));
+		if ((n = Xrecvfrom(sock, cmd, sizeof(cmd), 0, (struct sockaddr *)&cdag, &dlen)) < 0) {
+			warn("Recv error on socket, closing connection\n");
+			break;
+		}
+		//say("dgram received %d bytes\n", n);
+		// reg msg from xftp client
+		if (strncmp(cmd, "reg", 3) == 0) {
+			say("Receive a reg message\n");
+			reg_handler(sock, cmd, cdag, dlen);
+		}
+		// fetch probe from xftp client: fetch CID
+		else if (strncmp(cmd, "poll", 4) == 0) {
+			say("Receive a polling message\n");
+			poll_handler(sock, cmd, cdag, dlen);
+		}	
+
+	}
+/* stream protocol
+	char cmd[XIA_MAXBUF];
+	int sock = *((int*)socketid);
+	int n = -1;
 
 	while (1) {
 		memset(cmd, '\0', strlen(cmd));
-		memset(reply, '\0', strlen(reply));
 		if ((n = Xrecv(sock, cmd, sizeof(cmd), 0))  < 0) {
 			warn("socket error while waiting for data, closing connection\n");
 			break;
@@ -213,6 +290,7 @@ void *clientReqCmd (void *socketid) {
 			poll_handler(sock, cmd);
 		}	
 	}
+*/
 	Xclose(sock);
 	say("Socket closed\n");
 	pthread_exit(NULL);
@@ -343,12 +421,14 @@ int main() {
 
 	if (wireless == true) {
 		string prefetch_profile_name_local = string(prefetch_profile_name) + "." + execSystem(cmdGetSSID);
-		profileServerSock = registerStreamReceiver(string2char(prefetch_profile_name_local), myAD, myHID, my4ID);
+		//profileServerSock = registerStreamReceiver(string2char(prefetch_profile_name_local), myAD, myHID, my4ID);
+		profileServerSock = registerDatagramReceiver(string2char(prefetch_profile_name_local));
 	}
 	else 
-		profileServerSock = registerStreamReceiver(prefetch_profile_name, myAD, myHID, my4ID);
+		//profileServerSock = registerStreamReceiver(string2char(prefetch_profile_name_local), myAD, myHID, my4ID);
+		profileServerSock = registerDatagramReceiver(prefetch_profile_name);
 
-	blockListener((void *)&profileServerSock, clientReqCmd);
+	//blockListener((void *)&profileServerSock, clientReqCmd);
 	return 0;	
 
 }

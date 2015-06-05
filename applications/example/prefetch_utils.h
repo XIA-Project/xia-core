@@ -74,7 +74,9 @@ int buildChunkDAGs(ChunkStatus cs[], char *chunks, char *dst_ad, char *dst_hid);
 
 int getListedChunks(int csock, FILE *fd, char *chunks, char *dst_ad, char *dst_hid);
 
-int oldRegisterStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID);
+int registerDatagramReceiver(char* name);
+
+int deprecatedRegisterStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID);
 
 int registerStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID);
 

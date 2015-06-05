@@ -369,6 +369,39 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *dst_ad, char *dst_h
 	return n;
 }
 
+int registerDatagramReceiver(char* name) {
+
+	int sock;
+
+	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
+		die(-2, "unable to create the datagram socket\n");
+
+	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
+	// Generate an SID to use
+	if (XmakeNewSID(sid_string, sizeof(sid_string))) {
+		die(-1, "Unable to create a temporary SID");
+	}
+
+	struct addrinfo *ai;
+	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
+		die(-1, "getaddrinfo failure!\n");
+
+	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
+
+	Graph g((sockaddr_x*)ai->ai_addr);
+	printf("\nDatagram DAG\n%s\n", g.dag_string().c_str());
+
+	if (XregisterName(name, sa) < 0)
+		die(-1, "error registering name: %s\n", name);
+
+	say("registered name: \n%s\n", name);
+
+	if (Xbind(sock, (sockaddr *)sa, sizeof(sa)) < 0) {
+		die(-3, "unable to bind to the dag\n");
+	}
+	return sock;
+}
+
 // update with XListen
 int registerStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) {
 
@@ -416,7 +449,7 @@ int registerStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) {
 }
 
 // register the service with the name server and open the necessary sockets
-int oldRegisterStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) {
+int deprecatedRegisterStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) {
 
 	int sock;
 
