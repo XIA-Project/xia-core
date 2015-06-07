@@ -191,7 +191,7 @@ private:
 	int verbosity();
 };
 
-class XStream  : public XGenericTransport {
+class XStream  : public sock {
 
 public:
 	XStream(XTRANSPORT *transport, unsigned short port);
@@ -217,7 +217,7 @@ public:
 	bool has_pullable_data() { return !_q_recv.is_empty() && SEQ_LT(_q_recv.first(), tp->rcv_nxt); }
 	void print_state(StringAccum &sa);
 
-    XTRANSPORT *get_transport() { return transport; }
+    // XTRANSPORT *get_transport() { return transport; }
 	tcpcb 		*tp;
 private:
     void set_state(const HandlerState s);
@@ -290,7 +290,7 @@ inline int
 XStream::verbosity()  { return get_transport()->verbosity(); }
 
 inline int
-TCPQueue::verbosity() { return _con->XGenericTransport::get_transport()->verbosity(); }
+TCPQueue::verbosity() { return _con->sock::get_transport()->verbosity(); }
 
 inline int
 TCPFifo::verbosity()  { return _con->get_transport()->verbosity(); }

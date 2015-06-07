@@ -1616,7 +1616,7 @@ XStream::set_state(const HandlerState new_state) {
 	
 	HandlerState old_state = get_state(); 
 
-	XGenericTransport::set_state(new_state); 
+	sock::set_state(new_state); 
 	
 
 	if ((old_state == CREATE) && new_state == (INITIALIZE))
@@ -1863,7 +1863,7 @@ XStream::tcp_newtcpcb()
 
 
 XStream::XStream(XTRANSPORT *transport, const unsigned short port)
-	: XGenericTransport(transport, port, XSOCKET_STREAM), _q_recv(this), _q_usr_input(this)
+	: sock(transport, port, XSOCKET_STREAM), _q_recv(this), _q_usr_input(this)
 {
 
     tp = tcp_newtcpcb();

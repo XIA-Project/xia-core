@@ -13,6 +13,7 @@
 #include <click/xiatransportheader.hh>
 #include "xlog.hh"
 #include "xdatagram.hh"
+#include "xstream.hh"
 /*
 ** FIXME:
 ** - set saner retransmit values before we get backoff code
@@ -39,7 +40,7 @@ XGenericTransport::XGenericTransport(
     nxt = CLICK_XIA_NXT_TRN;
 }
 sock::sock(
-    XTRANSPORT *transport,
+    XTRANSPORT *trans,
     unsigned short apiport,
     int type) : hstate(CREATE) {
 	cout << "fuck you" << apiport<<endl;
@@ -84,7 +85,7 @@ sock::sock(
 			migrate_pkt = NULL;
 			recv_pending = false;
     port = apiport;
-    transport = transport;
+    transport = trans;
     sock_type = type;
     _errh = transport -> error_handler();
     hlim = HLIM_DEFAULT;
@@ -2795,13 +2796,14 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 switch (sock_type) {
 	case SOCK_STREAM: {
 		cout << "\t\t\t\tThis is a stream socket\n";
-		sk = new sock(this, _sport,sock_type);
-	sk->port = _sport;
-	sk->sock_type = sock_type;
-	sk->state = INACTIVE;
+		sk = new XStream(this, _sport);
+	// 	sk = new sock(this, _sport,sock_type);
+	// sk->port = _sport;
+	// sk->sock_type = sock_type;
+	// sk->state = INACTIVE;
 
-	memset(sk->send_buffer, 0, sk->send_buffer_size * sizeof(WritablePacket*));
-	memset(sk->recv_buffer, 0, sk->recv_buffer_size * sizeof(WritablePacket*));
+	// memset(sk->send_buffer, 0, sk->send_buffer_size * sizeof(WritablePacket*));
+	// memset(sk->recv_buffer, 0, sk->recv_buffer_size * sizeof(WritablePacket*));
 	break;
 	}
 	case SOCK_DGRAM: {
