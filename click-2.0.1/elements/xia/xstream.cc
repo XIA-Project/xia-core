@@ -1024,6 +1024,7 @@ again:
 
     /*222*/
 send:
+	cout << "So send"<<endl;
     optlen = 0;
     hdrlen = sizeof(click_tcp);
 
@@ -1072,6 +1073,7 @@ send:
 		// Remove this clause after it's been debugged and timestamps are working properly
 		//debug_output(VERB_DEBUG, "[%s] timestamp: NOT setting timestamp", SPKRNAME);
 	}
+		printf("1076\n");
 		
     hdrlen += optlen; 
 
@@ -1102,23 +1104,26 @@ send:
 		// p = Packet::make(sizeof(click_ip) + sizeof(click_tcp) + optlen);
 		/* TODO: errorhandling */
     }
+		printf("1107\n");
 
     /*339*/
     if (flags & TH_FIN && tp->t_flags & TF_SENTFIN && 
 	    tp->snd_nxt == tp->snd_max) 
 	tp->snd_nxt -- ; 
-
+printf("1113\n");
 	// @Harald: Is there a reason that the persist timer was not being checked?
 	if (len || (flags & (TH_SYN | TH_FIN)) || tp->t_timer[TCPT_PERSIST]) 
 		ti.th_seq = htonl(tp->snd_nxt); 
     else 
 		ti.th_seq = htonl(tp->snd_max);
-
+printf("1119\n");
     ti.th_ack = htonl(tp->rcv_nxt);
-
-    if (optlen) {
-		memcpy((&ti + 1), opt, optlen); 
-    } 
+printf("1121+++++++%d\n",optlen);
+  //   if (optlen) {
+  //   	printf("1123\n");
+		// memcpy((&ti + 1), opt, optlen); 
+		// printf("1125\n");
+  //   } 
     ti.th_off = (sizeof(click_tcp) + optlen) >> 2;
     ti.th_flags = flags; 
 
@@ -1126,6 +1131,7 @@ send:
     /* receiver window calculations */ 
 
     /*TODO: silly window */
+		printf("1132\n");
 
 	// Correct window if it is too large or too small
     if (win > (long) TCP_MAXWIN << tp->rcv_scale)
@@ -1143,6 +1149,7 @@ send:
 		tp->snd_up = tp->snd_una; 
     }
     /* TODO: do we need to set p->length here ??? */
+		printf("1150\n");
 
     /*400*/
 	if (tp->t_force == 0  || tp->t_timer[TCPT_PERSIST] == 0) {
@@ -1178,7 +1185,8 @@ send:
 	} else if (SEQ_GT(tp->snd_nxt + len, tp->snd_max)) {
 		tp->snd_max = tp->snd_nxt + len; 
 	}
-
+		// assert(0);
+	printf("1189+%p\n",p);
 	// THE MAGIC MOMENT! Our beloved tcp data segment goes to be wrapped in IP and
 	// sent to its tcp-speaking destination :-)
 	//Add XIA headers
@@ -1190,13 +1198,18 @@ send:
 	xiah.set_src_path(src_path);
 
 	TransportHeaderEncap *send_hdr = TransportHeaderEncap::MakeTCPHeader(&ti);
+	if (p==NULL)
+	{
+		p= WritablePacket::make(4);
+	}
+	printf("1203\n");
 	tcp_payload = send_hdr->encap(p);
 	send_hdr -> update();
 	xiah.set_plen(p -> length() + send_hdr->hlen()); // XIA payload = transport header + transport-layer data
 	tcp_payload = xiah.encap(tcp_payload, false);
 	delete send_hdr;
 	get_transport()->output(NETWORK_PORT).push(tcp_payload);
-
+	printf("1207\n");
 
 	/* Data has been sent out at this point. If we advertised a positive window
 	 * and if this new window advertisement will result in us recieving a higher
@@ -1212,7 +1225,7 @@ send:
     if (sendalot) {
 		goto again; 
 	}
-
+	printf("1223\n");
     return; 
 }
 
@@ -1595,8 +1608,11 @@ XStream::usropen()
 	}
     //debug_output(VERB_STATES,"[%s] usropen with state <%s>, initial seq num <%d> \n", 
     	// dispatcher()->name().c_str(), tcpstates[tp->t_state], tp->iss); 
-    if (tp->t_state == TCPS_CLOSED || tp->t_state == TCPS_LISTEN)
+    if (tp->t_state == TCPS_CLOSED || tp->t_state == TCPS_LISTEN) {
+    	cout << "we are good\n";
 		tcp_set_state(TCPS_SYN_SENT); 
+    }
+	cout << "we are good+1\n";
     tcp_output(); 
 }
 
