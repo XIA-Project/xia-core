@@ -137,25 +137,40 @@ void XTRANSPORT::push(int port, Packet *p_input)
 ** HANDLER FUNCTIONS
 *************************************************************/
 // ?????????
-enum {H_MOVE};
+enum {NETWORK_DAG, HID};
 
 int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorHandler *errh)
 {
 	XTRANSPORT *f = static_cast<XTRANSPORT *>(e);
 	switch(reinterpret_cast<intptr_t>(vparam)) {
-	case H_MOVE:
+	case NETWORK_DAG:
 	{
-		XIAPath local_addr;
+		XIAPath network_dag;
 		if (cp_va_kparse(conf, f, errh,
-						 "LOCAL_ADDR", cpkP + cpkM, cpXIAPath, &local_addr,
+						 "LOCAL_ADDR", cpkP + cpkM, cpXIAPath, &network_dag,
 						 cpEnd) < 0)
 			return -1;
-		f->_local_addr = local_addr;
-		click_chatter("Moved to %s", local_addr.unparse().c_str());
-		f->_local_hid = local_addr.xid(local_addr.destination_node());
+		f->_network_dag = network_dag;
+		click_chatter("Network is now %s", network_dag.unparse().c_str());
+		//f->_local_hid = network_dag.xid(network_dag.destination_node());
+		String network_dag_str = f->_network_dag.unparse();
+		String hid_str = f->_hid.unparse();
+		String local_addr_str = network_dag_str + " " + hid_str;
+		f->_local_addr.parse(local_addr_str);
+		click_chatter("Local address: %s", f->_local_addr.unparse().c_str());
+		break;
 
 	}
-	break;
+	case HID:
+	{
+		XID hid;
+		if (cp_va_kparse(conf, f, errh,
+					"HID", cpkP + cpkM, cpXID, &hid, cpEnd) < 0)
+			return -1;
+		f->_hid = hid;
+		click_chatter("HID assigned: %s", hid.unparse().c_str());
+		break;
+	}
 	default:
 		break;
 	}
@@ -224,7 +239,9 @@ String XTRANSPORT::Netstat(Element *e, void *)
 
 void XTRANSPORT::add_handlers()
 {
-	add_write_handler("local_addr", write_param, (void *)H_MOVE);
+	//add_write_handler("local_addr", write_param, (void *)H_MOVE);
+	add_write_handler("network_dag", write_param, (void *)NETWORK_DAG);
+	add_write_handler("hid", write_param, (void *)HID);
 	add_write_handler("purge", purge, (void*)1);
 	add_write_handler("flush", purge, 0);
 	add_read_handler("netstat", Netstat, 0);

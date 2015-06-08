@@ -114,6 +114,8 @@ private:
 	uint32_t _cid_type, _sid_type;
 	XID _local_hid;
 	XIAPath _local_addr;
+	XIAPath _network_dag;
+	XID _hid;
 	XID _local_4id;
 	XID _null_4id;
 	bool _is_dual_stack_router;
