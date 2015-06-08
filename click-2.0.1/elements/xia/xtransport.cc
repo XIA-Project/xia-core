@@ -1352,6 +1352,7 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 		// we handled it, no further processing is needed
 		return;
 	}
+	INFO("Inside ProcessStreamPacket");
 	XIAHeader xiah(p_in->xia_header());
 	XIAPath dst_path = xiah.dst_path();
 	XIAPath src_path = xiah.src_path();
@@ -3131,7 +3132,7 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 		assert(tcp_conn->src_path.is_valid());
 		tcp_conn->set_nxt(LAST_NODE_DEFAULT);
 		tcp_conn->set_last(LAST_NODE_DEFAULT);
-		tcp_conn->usropen();
+		
 		XID source_xid = tcp_conn->src_path.xid(tcp_conn->src_path.destination_node());
 		XID destination_xid = tcp_conn->dst_path.xid(tcp_conn->dst_path.destination_node());
 
@@ -3147,7 +3148,7 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 
 		// Make us routable
 		addRoute(source_xid);
-
+		tcp_conn->usropen();
 		ChangeState(tcp_conn, SYN_SENT);
 
 		// We return EINPROGRESS no matter what. If we're in non-blocking mode, the
