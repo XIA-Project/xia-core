@@ -219,6 +219,7 @@ public:
 
     // XTRANSPORT *get_transport() { return transport; }
 	tcpcb 		*tp;
+	sock *listening_sock;
 private:
     void set_state(const HandlerState s);
 

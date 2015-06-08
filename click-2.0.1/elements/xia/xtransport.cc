@@ -1289,7 +1289,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
 	TransportHeader thdr(p_in);
-
 	if (xiah.nxt() == CLICK_XIA_NXT_XCMP) {
 		// pass the packet to all sockets that registered for XMCP packets
 		ProcessXcmpPacket(p_in);
@@ -1348,48 +1347,75 @@ void XTRANSPORT::ProcessDatagramPacket(WritablePacket *p_in)
 *************************************************************/
 void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 {
-	XIAHeader xiah(p_in->xia_header());
-	TransportHeader thdr(p_in);
-
-	// FIXME: creating variables is duplicated in this function and the one below
-	// that is called if this returns 0. Is it better to make the variable here
-	//  and pass all of them to the handlers?
-
 	// Is this packet arriving at a rendezvous server?
 	if (HandleStreamRawPacket(p_in)) {
 		// we handled it, no further processing is needed
 		return;
 	}
+	XIAHeader xiah(p_in->xia_header());
+	XIAPath dst_path = xiah.dst_path();
+	XIAPath src_path = xiah.src_path();
+	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
+	XID	_source_xid = src_path.xid(src_path.destination_node());
+	
+	XIDpair xid_pair;
+	xid_pair.set_src(_destination_xid);
+	xid_pair.set_dst(_source_xid);
+    TransportHeader thdr(p_in);
 
-	// FIXME: it might be clearer to have this table be based on current socket state
-	// but that would require rewriting more code, so leaving as is for now
-	switch (thdr.pkt_info()) {
-	case TransportHeader::ACK:
-		ProcessAckPacket(p_in);
-		break;
-	case TransportHeader::DATA:
-		ProcessStreamDataPacket(p_in);
-		break;
-	case TransportHeader::SYN:
-		ProcessSynPacket(p_in);
-		break;
-	case TransportHeader::SYNACK:
-		ProcessSynAckPacket(p_in);
-		break;
-	case TransportHeader::MIGRATE:
-		ProcessMigratePacket(p_in);
-		break;
-	case TransportHeader::MIGRATEACK:
-		ProcessMigrateAck(p_in);
-		break;
-	case TransportHeader::FIN:
-		ProcessFinPacket(p_in);
-		break;
-	case TransportHeader::RST:
-		break;
-	default:
-		ERROR("Unknown Packet Type:%d\n", thdr.pkt_info());
-	}
+    sock *handler = XIDpairToSock.get(xid_pair);
+    if (handler != NULL)
+    {
+    	INFO("We are in the normal case");
+    	handler -> push(p_in);
+    } else {
+    	click_tcp *tcph = (click_tcp *)thdr.header();
+    	if (tcph->th_flags == TH_SYN) {
+    		// unlike the other stream handlers, there is no pair yet, so use dest_xid to get port
+			sock *sk = XIDtoSock.get(_destination_xid);
+
+			if (!sk) {
+				// FIXME: we need to fix the state machine so this doesn't happen!
+				WARN("sk == NULL\n");
+				return;
+			}
+
+			INFO("socket %d received SYN\n", sk->port);
+
+			if (sk->state != LISTEN) {
+				// we aren't marked to accept connecctions, drop it
+				WARN("SYN received on a non-listening socket (port:%u), dropping...\n", sk->port);
+				return;
+			}
+
+			if (sk->pending_connection_buf.size() >= sk->backlog) {
+				// the backlog is full, we can't take it right now, drop it
+
+				WARN("SYN received but backlog is full (port:%u), dropping...\n", sk->port);
+				return;
+			}
+
+			// First, check if this request is already in the pending queue
+			HashTable<XIDpair , struct sock*>::iterator it;
+			it = XIDpairToConnectPending.find(xid_pair);
+
+			if (it == XIDpairToConnectPending.end()) {
+				// if this is new request, put it in the queue
+
+				// send SYNACK to client
+				INFO("Socket %d Handling new SYN\n", sk->port);
+				// Prepare new sock for this connection
+				XStream *new_sk = new XStream(this, 0); // just for now. This will be updated via Xaccept call
+				new_sk->dst_path = src_path;
+				new_sk->src_path = dst_path;
+				new_sk->listening_sock = sk;
+				XIDpairToConnectPending.set(xid_pair, new_sk);
+				new_sk->push(p_in);
+			}
+    	}
+    }
+
+
 }
 
 
