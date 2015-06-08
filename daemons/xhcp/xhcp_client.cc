@@ -172,7 +172,7 @@ initialize_cleanup:
 }
 
 // Read a beacon from sockfd and return interface and beacon contents
-int get_beacon(int sockfd, int *iface, char *beacon, int beaconlen)
+int get_beacon(int sockfd, int *ifID, char *beacon, int beaconlen)
 {
 	int retval = -1;
 	sockaddr_x client;
@@ -210,7 +210,7 @@ int get_beacon(int sockfd, int *iface, char *beacon, int beaconlen)
 		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
 			if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_PKTINFO) {
 				pinfo = (struct in_pktinfo*) CMSG_DATA(cmsg);
-				*iface = pinfo->ipi_ifindex;
+				*ifID = pinfo->ipi_ifindex;
 				retval = 0;
 			}
 		}
@@ -218,7 +218,7 @@ int get_beacon(int sockfd, int *iface, char *beacon, int beaconlen)
 
 	if(retval == 0) {
 		Graph g(&client);
-		printf("beacon on click port %hd from:\n%s\n", *iface, g.dag_string().c_str());
+		printf("beacon on interface %hd from:\n%s\n", *ifID, g.dag_string().c_str());
 	}
 	return retval;
 }
@@ -278,7 +278,7 @@ int main(int argc, char *argv[]) {
 		syslog(LOG_ERR, "Failed to set up beacon receiver\n");
 		return -1;
 	}
-	// If AD changes - update XupdateAD(iface, HID, AD, R4ID) - Xtransport updates DAG for iface in XIAInterfaceTable (Interface, DAG). Set DESTINED_FOR_LOCALHOST route for new AD and delete route for old AD.
+	// If AD changes - update XupdateAD(ifID, HID, AD, R4ID) - Xtransport updates DAG for ifID in XIAInterfaceTable (Interface, DAG). Set DESTINED_FOR_LOCALHOST route for new AD and delete route for old AD.
 	// if RHID changes for default interface - set default routes for AD, HID, 4ID and RHID to go to newRHID.
 	// For all RHID changes - delete route for old RHID and add route for new RHID in its place.
 	// If NS changes - Do we allow more than one name server here?????
@@ -339,18 +339,19 @@ int main(int argc, char *argv[]) {
 	// main looping
 	while(1) {
 		int rc;
-		int iface;
+		int ifID;
 		char buf[XIA_MAXBUF];
 		bool ad_changed = false;
 		bool rhid_changed = false;
 		bool r4id_changed = false;
 		bool ns_changed = false;
 
-		if(get_beacon(sockfd, &iface, buf, XIA_MAXBUF)) {
+		if(get_beacon(sockfd, &ifID, buf, XIA_MAXBUF)) {
 			syslog(LOG_ERR, "ERROR receiving beacon\n");
 			continue;
 		}
 		XHCPBeacon beacon(buf);
+		XHCPInterface &iface = interfaces[ifID];
 		/*
 		// validate pkt
 		if (strlen(router_ad) <= 0 || strlen(router_hid) <= 0 || strlen(router_4id) <= 0 || strlen(ns_dag) <= 0) {
@@ -358,27 +359,27 @@ int main(int argc, char *argv[]) {
 			continue;
 		}
 		*/
-		if(interfaces[iface].isActive()) {
-			if(interfaces[iface].getAD().compare(beacon.getAD())) {
+		if(iface.isActive()) {
+			if(iface.getAD().compare(beacon.getAD())) {
 				ad_changed = true;
 			}
-			if(interfaces[iface].getRouterHID().compare(beacon.getRouterHID())) {
+			if(iface.getRouterHID().compare(beacon.getRouterHID())) {
 				rhid_changed = true;
 			}
-			if(interfaces[iface].getRouter4ID().compare(beacon.getRouter4ID())) {
+			if(iface.getRouter4ID().compare(beacon.getRouter4ID())) {
 				r4id_changed = true;
 			}
-			if(interfaces[iface].getNameServerDAG().compare(beacon.getNameServerDAG())) {
+			if(iface.getNameServerDAG().compare(beacon.getNameServerDAG())) {
 				ns_changed = true;
 			}
 		} else {
-			printf("Creating new entry for interface %d\n", iface);
+			printf("Creating new entry for interface %d\n", ifID);
 			//TODO:NITIN: setName(), setHID() after getting it from new Xgetifaddrs()
-			interfaces[iface].setID(iface);
-			interfaces[iface].setAD(beacon.getAD());
-			interfaces[iface].setRouterHID(beacon.getRouterHID());
-			interfaces[iface].setRouter4ID(beacon.getRouter4ID());
-			interfaces[iface].setNameServerDAG(beacon.getNameServerDAG());
+			iface.setID(ifID);
+			iface.setAD(beacon.getAD());
+			iface.setRouterHID(beacon.getRouterHID());
+			iface.setRouter4ID(beacon.getRouter4ID());
+			iface.setNameServerDAG(beacon.getNameServerDAG());
 			ad_changed = true;
 			rhid_changed = true;
 			r4id_changed = true;
@@ -387,16 +388,16 @@ int main(int argc, char *argv[]) {
 
 		if(ad_changed) {
 			// Update Click
-			//if(XupdateAD(iface, beacon.getAD(), becon.getRouter4ID) < 0) {
+			//if(XupdateAD(ifID, beacon.getAD(), becon.getRouter4ID) < 0) {
 			//	syslog(LOG_WARNING, "Error updating new AD in Click");
 			//}
-			xr.delRoute(interfaces[iface].getAD().c_str());
+			xr.delRoute(iface.getAD().c_str());
 
 			if((rc = xr.setRoute(beacon.getAD().c_str(), DESTINED_FOR_LOCALHOST, empty_str, 0xffff)) != 0) {
 				syslog(LOG_WARNING, "error setting route %d\n", rc);
 			}
-			printf("AD for interface %d changed from %s to %s\n", iface, interfaces[iface].getAD().c_str(), beacon.getAD().c_str());
-			interfaces[iface].setAD(beacon.getAD());
+			printf("AD for interface %d changed from %s to %s\n", ifID, iface.getAD().c_str(), beacon.getAD().c_str());
+			iface.setAD(beacon.getAD());
 
 			listRoutes("AD");
 			listRoutes("HID");
@@ -404,13 +405,13 @@ int main(int argc, char *argv[]) {
 
 		if(rhid_changed) {
 			// Delete old gateway router HID from routing table
-			xr.delRoute(interfaces[iface].getRouterHID().c_str());
+			xr.delRoute(iface.getRouterHID().c_str());
 
 			// TODO: These default next-hops shouldn't be hard coded; when we get a message
 			// telling us what the router's HID is, we should look through the tables and
 			// update the next hop for anything point to port 0.
 
-			if(iface == default_interface) {
+			if(ifID == default_interface) {
 				// update AD (default entry)
 				if ((rc = xr.setRoute(default_AD, 0, beacon.getRouterHID().c_str(), 0xffff)) != 0)
 					syslog(LOG_WARNING, "error setting route %d\n", rc);
@@ -428,28 +429,28 @@ int main(int argc, char *argv[]) {
 			if ((rc = xr.setRoute(beacon.getRouterHID().c_str(), 0, beacon.getRouterHID().c_str(), 0xffff)) != 0)
 				syslog(LOG_WARNING, "error setting route %d\n", rc);
 
-			printf("Router for interface %d changed from %s to %s\n", iface, interfaces[iface].getRouterHID().c_str(), beacon.getRouterHID().c_str());
-			interfaces[iface].setRouterHID(beacon.getRouterHID());
+			printf("Router for interface %d changed from %s to %s\n", ifID, iface.getRouterHID().c_str(), beacon.getRouterHID().c_str());
+			iface.setRouterHID(beacon.getRouterHID());
 		}
 
 		if(r4id_changed) {
 			// TODO:NITIN: This should never change without RHID changing
 			// If this is not true then the default_4ID route needs to change
-			printf("Router 4ID for interface %d changed from %s to %s\n", iface, interfaces[iface].getRouter4ID().c_str(), beacon.getRouter4ID().c_str());
-			interfaces[iface].setRouter4ID(beacon.getRouter4ID());
+			printf("Router 4ID for interface %d changed from %s to %s\n", ifID, iface.getRouter4ID().c_str(), beacon.getRouter4ID().c_str());
+			iface.setRouter4ID(beacon.getRouter4ID());
 		}
 
 		if(ns_changed) {
-			if(iface == default_interface) {
+			if(ifID == default_interface) {
 				syslog(LOG_INFO, "Default nameserver changed");
 				// update new name-server-DAG information
 				XupdateNameServerDAG(sockfd, beacon.getNameServerDAG().c_str());
 			}
-			printf("Name server for interface %d changed from %s to %s\n", iface, interfaces[iface].getNameServerDAG().c_str(), beacon.getNameServerDAG().c_str());
-			interfaces[iface].setNameServerDAG(beacon.getNameServerDAG());
+			printf("Name server for interface %d changed from %s to %s\n", ifID, iface.getNameServerDAG().c_str(), beacon.getNameServerDAG().c_str());
+			iface.setNameServerDAG(beacon.getNameServerDAG());
 		}
 		if(gw_register_countdown-- <= 0) {
-			register_with_gw_router(sockfd, interfaces[iface].getHID(), ad_changed);
+			register_with_gw_router(sockfd, iface.getHID(), ad_changed);
 			gw_register_countdown = ceil(XHCP_CLIENT_ADVERTISE_INTERVAL/XHCP_SERVER_BEACON_INTERVAL);
 		}
 		/*
