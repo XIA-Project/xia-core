@@ -225,7 +225,7 @@ int hearHello(int sock)
 	*/
 }
 
-char* XgetRemoteSID(int sock) 
+int XgetRemoteAddr(int sock, char *ad, char *hid, char *sid) 
 {
 	sockaddr_x dag;
 	socklen_t daglen = sizeof(dag);
@@ -236,11 +236,23 @@ char* XgetRemoteSID(int sock)
 
 	Graph g(&dag);
 	strncpy(sdag, g.dag_string().c_str(), sizeof(sdag));
-	char *cursor = strstr(sdag, "SID:"); // find the first occurance of "SID:"
-	return &cursor[4];
+	// say("sdag = %s\n",sdag);	
+	char *ads = strstr(sdag, "AD:");	// first occurrence
+	char *hids = strstr(sdag, "HID:");	
+	char *sids = strstr(sdag, "SID:"); 
+	if (sscanf(ads, "%s", ad) < 1 || strncmp(ad, "AD:", 3) != 0) {
+		die(-1, "Unable to extract AD.");
+	}
+	if (sscanf(hids, "%s", hid) < 1 || strncmp(hid, "HID:", 4) != 0) {
+		die(-1, "Unable to extract HID.");
+	}
+	if (sscanf(sids, "%s", sid) < 1 || strncmp(hid, "SID:", 4) != 0) {
+		die(-1, "Unable to extract SID.");
+	}
+	return 1;	
 }
 
-// hacky way: by looking up name service only local to the network
+// hacky way: by looking up name server of the local network service
 int XgetNetADHID(const char *name, char *ad, char *hid) 
 {
 	sockaddr_x dag;
@@ -251,7 +263,7 @@ int XgetNetADHID(const char *name, char *ad, char *hid)
 	Graph g(&dag);
 	strncpy(sdag, g.dag_string().c_str(), sizeof(sdag));
 	// say("sdag = %s\n",sdag);
-	char *ads = strstr(sdag, "AD:"); 		// first occurrence
+	char *ads = strstr(sdag, "AD:");	// first occurrence
 	char *hids = strstr(sdag, "HID:");
 
 	if (sscanf(ads, "%s", ad) < 1 || strncmp(ad, "AD:", 3) != 0) {

@@ -58,6 +58,7 @@ bool file_exists(const char * filename);
 // Unix epoch time in msec
 long now_msec();
 
+// get the SSID name from "iwgetid -r" command
 string netConnStatus(string lastSSID);
 
 int getReply(int sock, const char *cmd, char *reply, sockaddr_x *sa, int timeout, int tries);
@@ -68,8 +69,8 @@ int sayHello(int sock, const char *helloMsg);
 
 int hearHello(int sock);
 
-// assume there is only one SID or the first SID encounted is the final intent
-char* XgetRemoteSID(int sock);
+// assume there is no fallback and only one SID or the first SID encounted is the final intent
+int XgetRemoteAddr(int sock, char *ad, char *hid, char *sid);
 
 int XgetNetADHID(const char *name, char *ad, char *hid);
 
