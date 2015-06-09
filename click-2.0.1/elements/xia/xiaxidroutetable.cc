@@ -101,7 +101,34 @@ XIAXIDRouteTable::write_handler(const String &str, Element *e, void *thunk, Erro
     switch ((intptr_t)thunk) {
 		case PRINCIPAL_TYPE_ENABLED:
 			return t->set_enabled(atoi(str.c_str()));
+		case ROUTE_TABLE_NETWORK_DAG:
+		{
+			XIAPath network_dag;
+			if (cp_va_kparse(str, t, errh,
+							 "LOCAL_ADDR", cpkP + cpkM, cpXIAPath, &network_dag,
+							 cpEnd) < 0)
+				return -1;
+			t->_network_dag = network_dag;
+			click_chatter("Network is now %s", network_dag.unparse().c_str());
+			//t->_local_hid = network_dag.xid(network_dag.destination_node());
+			String network_dag_str = t->_network_dag.unparse();
+			String hid_str = t->_local_hid.unparse();
+			String local_addr_str = network_dag_str + " " + hid_str;
+			t->_local_addr.parse(local_addr_str);
+			click_chatter("Local address: %s", t->_local_addr.unparse().c_str());
+			return 0;
 
+		}
+		case ROUTE_TABLE_HID:
+		{
+			XID hid;
+			if (cp_va_kparse(str, t, errh,
+						"HID", cpkP + cpkM, cpXID, &hid, cpEnd) < 0)
+				return -1;
+			t->_local_hid = hid;
+			click_chatter("HID assigned: %s", t->_local_hid.unparse().c_str());
+			return 0;
+		}
 		default:
 			return -1;
     }
