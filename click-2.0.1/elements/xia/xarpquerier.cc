@@ -437,6 +437,17 @@ XARPQuerier::write_handler(const String &str, Element *e, void *thunk, ErrorHand
 	q->_xarp_queries = q->_drops = q->_xarp_responses = 0;
 	q->_xarpt->clear();
 	return 0;
+    case h_hid:
+    {
+        XID hid;
+        if (cp_va_kparse(str, q, errh,
+                    "HID", cpkP + cpkM, cpXID, &hid, cpEnd) < 0)
+            return -1;
+        q->_my_xid = hid;
+		q->_my_xid_configured = true;
+        click_chatter("HID assigned: %s", q->_my_xid.unparse().c_str());
+        return 0;
+    }
     default:
 	return -1;
     }
@@ -455,6 +466,7 @@ XARPQuerier::add_handlers()
     add_write_handler("insert", write_handler, h_insert);
     add_write_handler("delete", write_handler, h_delete);
     add_write_handler("clear", write_handler, h_clear);
+    add_write_handler("hid", write_handler, h_hid);
 }
 
 CLICK_ENDDECLS
