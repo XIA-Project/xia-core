@@ -94,6 +94,34 @@ XIAChallengeResponder::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+enum {NETWORK_DAG, HID};
+
+int XIAChallengeResponder::write_param(const String &conf, Element *e, void *vparam, ErrorHandler *errh)
+{
+    XIAChallengeResponder *f = static_cast<XIAChallengeResponder *>(e);
+    switch(reinterpret_cast<intptr_t>(vparam)) {
+    case HID:
+    {
+        XID hid;
+        if (cp_va_kparse(conf, f, errh,
+                    "HID", cpkP + cpkM, cpXID, &hid, cpEnd) < 0)
+            return -1;
+        f->local_hid_str = hid.unparse();
+        click_chatter("HID assigned: %s", f->local_hid_str.c_str());
+        break;
+    }
+    default:
+        break;
+    }
+    return 0;
+}
+
+void XIAChallengeResponder::add_handlers()
+{
+    //add_write_handler("network_dag", write_param, (void *)NETWORK_DAG);
+    add_write_handler("hid", write_param, (void *)HID);
+}
+
 int
 XIAChallengeResponder::initialize(ErrorHandler *)
 {
