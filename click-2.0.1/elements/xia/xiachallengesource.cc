@@ -111,6 +111,53 @@ XIAChallengeSource::initialize(ErrorHandler *)
     return 0;
 }
 
+enum {NETWORK_DAG, HID};
+
+int XIAChallengeSource::write_param(const String &conf, Element *e, void *vparam, ErrorHandler *errh)
+{
+    XIAChallengeSource *f = static_cast<XIAChallengeSource *>(e);
+    switch(reinterpret_cast<intptr_t>(vparam)) {
+    case NETWORK_DAG:
+    {
+        XIAPath network_dag;
+        if (cp_va_kparse(conf, f, errh,
+                         "LOCAL_ADDR", cpkP + cpkM, cpXIAPath, &network_dag,
+                         cpEnd) < 0)
+            return -1;
+        f->_network_dag = network_dag;
+        click_chatter("Network is now %s", network_dag.unparse().c_str());
+        //f->_local_hid = network_dag.xid(network_dag.destination_node());
+        String network_dag_str = f->_network_dag.unparse();
+        String hid_str = f->_hid.unparse();
+        String src_path_str = network_dag_str + " " + hid_str;
+        f->_src_path.parse(src_path_str);
+        click_chatter("Local address: %s", f->_src_path.unparse().c_str());
+        break;
+
+    }
+    case HID:
+    {
+        XID hid;
+        if (cp_va_kparse(conf, f, errh,
+                    "HID", cpkP + cpkM, cpXID, &hid, cpEnd) < 0)
+            return -1;
+        f->_hid = hid;
+        click_chatter("HID assigned: %s", hid.unparse().c_str());
+        break;
+    }
+    default:
+        break;
+    }
+    return 0;
+}
+
+void XIAChallengeSource::add_handlers()
+{
+    //add_write_handler("src_path", write_param, (void *)H_MOVE);
+    add_write_handler("network_dag", write_param, (void *)NETWORK_DAG);
+    add_write_handler("hid", write_param, (void *)HID);
+}
+
 void
 XIAChallengeSource::generate_secret()
 {
