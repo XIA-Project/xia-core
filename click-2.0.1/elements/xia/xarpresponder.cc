@@ -52,11 +52,12 @@ XARPResponder::add(Vector<Entry> &v, const String &arg, ErrorHandler *errh) cons
     bool have_ena = false;
     
     if (cp_va_kparse(words, this, errh,
-	             "XID", cpkP + cpkM, cpXID, &_my_xid,
 	             "ETH", cpkP + cpkM, cpEtherAddress, &_my_en,
 	             cpEnd) < 0)
 	return -1;    
     
+	/* NITIN - disabled because HID is assigned by write handler due
+	 * to multihoming support
     v.push_back(Entry());
     v.back().xida = _my_xid;    
     
@@ -67,6 +68,7 @@ XARPResponder::add(Vector<Entry> &v, const String &arg, ErrorHandler *errh) cons
     }
     
     v.back().ena = ena; 
+	*/
     return 0;  
 }
 
