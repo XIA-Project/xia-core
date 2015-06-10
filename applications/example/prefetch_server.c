@@ -2,7 +2,7 @@
 
 using namespace std;
 
-bool wireless = true;
+bool wireless = false;
 
 char myAD[MAX_XID_SIZE];
 char myHID[MAX_XID_SIZE];
@@ -372,7 +372,7 @@ int main()
 	if (wireless == true)
 		profileServerSock = registerStreamReceiver(string2char(prefetch_profile_name_local), myAD, myHID, my4ID);
 	else 
-		profileServerSock = registerStreamReceiver(string2char(prefetch_profile_name_local), myAD, myHID, my4ID);
+		profileServerSock = registerStreamReceiver(prefetch_profile_name, myAD, myHID, my4ID);
 
 	blockListener((void *)&profileServerSock, clientReqCmd);
 
