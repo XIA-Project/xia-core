@@ -2,8 +2,6 @@
 
 int verbose = 1;
 
-string cmdGetSSID = "iwgetid -r";
-
 void say(const char *fmt, ...) 
 {
 	if (verbose) {
@@ -136,9 +134,29 @@ long now_msec()
 		return -1;
 }
 
+string getSSID()
+{
+	string ssid = execSystem(GETSSID_CMD);
+
+	// TODO: ask Dan about blocking optimization 
+	if (ssid.empty()) {
+		// cerr<<"No network\n";
+		while (1) {
+			usleep(100000); // TODO: need further optimization
+			ssid = execSystem(GETSSID_CMD); 
+			if (!ssid.empty()) {
+				// cerr<<"Network back\n";
+				break;
+			}
+		}
+	}
+	return ssid;
+}
+
+// app level
 string netConnStatus(string lastSSID) 
 {
-	string currSSID = execSystem(GETSSID);
+	string currSSID = execSystem(GETSSID_CMD);
 
 	if (currSSID.empty())	
 		return "empty";
@@ -156,7 +174,7 @@ int getReply(int sock, const char *cmd, char *reply, sockaddr_x *sa, int timeout
 	int sent, received, rc;
 
 	for (int i = 0; i < tries; i++) {
-		string currSSID = execSystem(GETSSID);
+		string currSSID = execSystem(GETSSID_CMD);
 		if (currSSID.empty())
 			return -2;
 		else {
@@ -252,8 +270,7 @@ int XgetRemoteAddr(int sock, char *ad, char *hid, char *sid)
 	return 1;	
 }
 
-// hacky way: by looking up name server of the local network service
-int XgetNetADHID(const char *name, char *ad, char *hid) 
+int XgetServADHID(const char *name, char *ad, char *hid) 
 {
 	sockaddr_x dag;
 	socklen_t daglen = sizeof(dag);

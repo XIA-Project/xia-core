@@ -29,7 +29,7 @@
 #define REREQUEST 3
 #define NUM_CHUNKS 1
 
-#define GETSSID "iwgetid -r"
+#define GETSSID_CMD "iwgetid -r"
 
 using namespace std;
 
@@ -44,19 +44,21 @@ void warn(const char *fmt, ...);
 // write the message to stdout, and exit the app
 void die(int ecode, const char *fmt, ...);
 
-char** str_split(char* a_str, const char *a_delim);
+char **str_split(char *a_str, const char *a_delim);
 
 char *randomString(char *buf, int size);
 
-char* string2char(string str);
+char *string2char(string str);
 
 // result the string result of system command
 string execSystem(string cmd);
 
-bool file_exists(const char * filename);
+bool file_exists(const char *filename);
 
 // Unix epoch time in msec
 long now_msec();
+
+string getSSID();
 
 // get the SSID name from "iwgetid -r" command
 string netConnStatus(string lastSSID);
@@ -72,7 +74,7 @@ int hearHello(int sock);
 // assume there is no fallback and only one SID or the first SID encounted is the final intent
 int XgetRemoteAddr(int sock, char *ad, char *hid, char *sid);
 
-int XgetNetADHID(const char *name, char *ad, char *hid);
+int XgetServADHID(const char *name, char *ad, char *hid);
 
 int initDatagramClient(const char *name, struct addrinfo *ai, sockaddr_x *sa);
 
@@ -87,9 +89,9 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *dst_ad, char *dst_h
 
 int registerDatagramReceiver(char* name);
 
-int deprecatedRegisterStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID);
+int deprecatedRegisterStreamReceiver(char *name, char *myAD, char *myHID, char *my4ID);
 
-int registerStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID);
+int registerStreamReceiver(char *name, char *myAD, char *myHID, char *my4ID);
 
 void *blockListener(void *listenID, void *recvFuntion (void *));
 

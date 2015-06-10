@@ -409,7 +409,7 @@ int main()
 
 	ftpSock = initStreamClient(ftp_name, myAD, myHID, ftpServAD, ftpServHID); // get ftpServAD and ftpServHID for building chunk request
 
-	string prefetch_profile_name_local = string(prefetch_profile_name) + "." + execSystem(GETSSID);
+	string prefetch_profile_name_local = string(prefetch_profile_name) + "." + execSystem(GETSSID_CMD);
 
 	if (wireless == true)
 		profileServerSock = registerStreamReceiver(string2char(prefetch_profile_name_local), myAD, myHID, my4ID);
