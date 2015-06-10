@@ -47,7 +47,6 @@ int
 XCMP::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (cp_va_kparse(conf, this, errh,
-                     "SRC", cpkP+cpkM, cpXIAPath, &_src_path,
                      cpEnd) < 0)
         return -1;
 
