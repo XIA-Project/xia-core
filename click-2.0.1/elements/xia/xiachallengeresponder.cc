@@ -76,10 +76,7 @@ XIAChallengeResponder::run_timer(Timer *timer) // TODO: who calls this?
 int
 XIAChallengeResponder::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-	XID local_hid;
-
     if (cp_va_kparse(conf, this, errh,
-			 "LOCALHID", cpkP + cpkM, cpXID, &local_hid,
 		     "ACTIVE", 0, cpInteger, &_active,
 		     cpEnd) < 0)
         return -1;
@@ -87,8 +84,6 @@ XIAChallengeResponder::configure(Vector<String> &conf, ErrorHandler *errh)
     _ttl = 0;
     _timer.initialize(this);
     _timer.schedule_after_sec(SHUTOFF_RESET);*/
-
-	local_hid_str = local_hid.unparse().c_str();
 
 	outgoing_header = 0;
     return 0;
