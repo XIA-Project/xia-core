@@ -85,22 +85,14 @@ XIAChallengeSource::~XIAChallengeSource()
 int
 XIAChallengeSource::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-	XID local_hid;
-	String local_hid_str;
-
     if (cp_va_kparse(conf, this, errh,
-					 "LOCALHID", cpkP + cpkM, cpXID, &local_hid,
 					 "INTERFACE", cpkP + cpkM, cpInteger, &_iface,
-					 "SRC", cpkP+cpkM, cpXIAPath, &_src_path,
 					 "ACTIVE", 0, cpInteger, &_active,
                    cpEnd) < 0)
         return -1; // error config
 
 	generate_secret();
-	local_hid_str = local_hid.unparse().c_str();
 
-	_name = new char [local_hid_str.length()+1];
-	strcpy(_name, local_hid_str.c_str());
 
     return 0;
 }
@@ -142,7 +134,10 @@ int XIAChallengeSource::write_param(const String &conf, Element *e, void *vparam
                     "HID", cpkP + cpkM, cpXID, &hid, cpEnd) < 0)
             return -1;
         f->_hid = hid;
-        click_chatter("HID assigned: %s", hid.unparse().c_str());
+        String local_hid_str = f->_hid.unparse();
+        f->_name = new char [local_hid_str.length()+1];
+        strcpy(f->_name, local_hid_str.c_str());
+        click_chatter("HID assigned: %s", f->_hid.unparse().c_str());
         break;
     }
     default:
