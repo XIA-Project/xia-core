@@ -94,7 +94,6 @@ XARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
 	conf.push_back(conf[0]);
 	
     if (cp_va_kparse(conf, this, errh,
-	             "XID", cpkP + cpkM, cpXID, &_my_xid,
 	             "ETH", cpkP + cpkM, cpEtherAddress, &_my_en,
 	             cpEnd) < 0)
 	return -1;
@@ -106,8 +105,6 @@ XARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
 	.complete() < 0)
 	return -1;
     */
-
-    _my_xid_configured = true;	
 
     if (!have_broadcast) {
     	String _bcast_xid(BHID);  // Broadcast HID
