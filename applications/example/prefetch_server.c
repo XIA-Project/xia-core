@@ -1,7 +1,5 @@
 #include "prefetch_utils.h"
 
-//#define TEST_NAME "www_s.dgram_echo.aaa.xia"
-//#define SID_DGRAM "SID:0f00000000000000000000000000000000008888"
 using namespace std;
 
 bool wireless = true;
@@ -29,11 +27,13 @@ char ftpServHID[MAX_XID_SIZE];
 char prefetch_profile_name[] = "www_s.profile.prefetch.aaa.xia";
 char ftp_name[] = "www_s.ftp.advanced.aaa.xia";
 
+// TODO: reject when not from my network in reg
+// TODO: stop prefetching when change network in poll
 // TODO: start to prefetch as soon as receive reg msg
 // TODO: optimize sleep(1)
-// TODO: netMon function to update prefetching window
+// TODO: trafficMon function to update prefetching window
 // TODO: timeout the SID entry and remove the chunks accordingly? maybe leave a few
-// TODO: stop retransmit request in application
+// TODO: stop retransmit request in application?
 
 int profileServerSock, ftpSock;
 
@@ -59,7 +59,7 @@ map<string, string> SIDToAD; // store the mapping between SID and AD of peer. On
 
 int prefetch_chunk_num = 3; // default number of chunks to prefetch
 
-void reg_handler(int sock, char *cmd)  //void reg_handler(int sock, char *cmd, sockaddr_x cdag, socklen_t dlen) 
+void reg_handler(int sock, char *cmd) 
 {
 	// cmd format: reg cid_num cid1 cid2 ...
 	char cmd_arr[strlen(cmd)];
@@ -107,19 +107,12 @@ void reg_handler(int sock, char *cmd)  //void reg_handler(int sock, char *cmd, s
 
 	// set the mapping up to be checked later for polling
 	SIDToAD[remoteSID] = remoteAD;
-	/* used for XDP
-	char reply[XIA_MAX_BUF] = "reg ACK";
-	int n;
-	if ((n = Xsendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&cdag, dlen)) < 0) {
-		warn("send error\n");
-		return;
-	}
-	*/
+
 	cerr<<"Finish reg"<<endl;
 	return;
 }
 
-void poll_handler(int sock, char *cmd) //void poll_handler(int sock, char *cmd, sockaddr_x cdag, socklen_t dlen) 
+void poll_handler(int sock, char *cmd) 
 { 
 	char cmd_arr[strlen(cmd)];
 	strcpy(cmd_arr, cmd);
@@ -215,12 +208,6 @@ void poll_handler(int sock, char *cmd) //void poll_handler(int sock, char *cmd, 
 	say("Unlock the profile by poll handler and send poll reply msg out\n");
 
 	sendStreamCmd(sock, reply);
-	/* using XDP as alternative
-	int n;
-	if ((n = Xsendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&cdag, dlen)) < 0) {
-		warn("send error\n");
-		return;
-	}*/
 
 	return;
 }
@@ -250,38 +237,6 @@ void *clientReqCmd (void *socketid)
 		}	
 	}
 
-/* datagram protocol
-	char cmd[XIA_MAXBUF];
-
-	int sock = *((int*)socketid);
-	int n = -1;
-
-	sockaddr_x cdag;
-	socklen_t dlen;
-
-	while (1) {
-		say("Dgram Server waiting\n");
-
-		dlen = sizeof(cdag);
-		memset(cmd, 0, sizeof(cmd));
-		if ((n = Xrecvfrom(sock, cmd, sizeof(cmd), 0, (struct sockaddr *)&cdag, &dlen)) < 0) {
-			warn("Recv error on socket, closing connection\n");
-			break;
-		}
-		//say("dgram received %d bytes\n", n);
-		// reg msg from xftp client
-		if (strncmp(cmd, "reg", 3) == 0) {
-			say("Receive a reg message\n");
-			reg_handler(sock, cmd, cdag, dlen);
-		}
-		// fetch probe from xftp client: fetch CID
-		else if (strncmp(cmd, "poll", 4) == 0) {
-			say("Receive a polling message\n");
-			poll_handler(sock, cmd, cdag, dlen);
-		}	
-
-	}
-*/	
 	Xclose(sock);
 	say("Socket closed\n");
 	pthread_exit(NULL);
@@ -413,15 +368,67 @@ int main()
 
 	if (wireless == true)
 		profileServerSock = registerStreamReceiver(string2char(prefetch_profile_name_local), myAD, myHID, my4ID);
-		//profileServerSock = registerDatagramReceiver(string2char(prefetch_profile_name_local));
 	else 
 		profileServerSock = registerStreamReceiver(string2char(prefetch_profile_name_local), myAD, myHID, my4ID);
-		//profileServerSock = registerDatagramReceiver(prefetch_profile_name);
 
 	blockListener((void *)&profileServerSock, clientReqCmd);
 
 	return 0;	
 }
+
+/*
+void *clientReqCmd (void *socketid) 
+{
+
+ 	//datagram protocol
+	char cmd[XIA_MAXBUF];
+
+	int sock = *((int*)socketid);
+	int n = -1;
+
+	sockaddr_x cdag;
+	socklen_t dlen;
+
+	while (1) {
+		say("Dgram Server waiting\n");
+
+		dlen = sizeof(cdag);
+		memset(cmd, 0, sizeof(cmd));
+		if ((n = Xrecvfrom(sock, cmd, sizeof(cmd), 0, (struct sockaddr *)&cdag, &dlen)) < 0) {
+			warn("Recv error on socket, closing connection\n");
+			break;
+		}
+		//say("dgram received %d bytes\n", n);
+		// reg msg from xftp client
+		if (strncmp(cmd, "reg", 3) == 0) {
+			say("Receive a reg message\n");
+			reg_handler(sock, cmd, cdag, dlen);
+		}
+		// fetch probe from xftp client: fetch CID
+		else if (strncmp(cmd, "poll", 4) == 0) {
+			say("Receive a polling message\n");
+			poll_handler(sock, cmd, cdag, dlen);
+		}	
+
+	}
+
+ //void reg_handler(int sock, char *cmd, sockaddr_x cdag, socklen_t dlen) 
+	char reply[XIA_MAX_BUF] = "reg ACK";
+	int n;
+	if ((n = Xsendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&cdag, dlen)) < 0) {
+		warn("send error\n");
+		return;
+	}
+
+//void poll_handler(int sock, char *cmd, sockaddr_x cdag, socklen_t dlen) 
+	// using XDP as alternative
+	int n;
+	if ((n = Xsendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&cdag, dlen)) < 0) {
+		warn("send error\n");
+		return;
+	}
+
+*/	
 
 /*
 void echo_dgram()
