@@ -36,17 +36,12 @@ XIAXIDRouteTable::configure(Vector<String> &conf, ErrorHandler *errh)
     _rtdata.flags = 0;
     _rtdata.nexthop = NULL;
 
-    XIAPath local_addr;
 
     if (cp_va_kparse(conf, this, errh,
-		"LOCAL_ADDR", cpkP+cpkM, cpXIAPath, &local_addr,
 		"NUM_PORT", cpkP+cpkM, cpInteger, &_num_ports,
 		cpEnd) < 0)
 	return -1;
 
-    _local_addr = local_addr;
-    _local_hid = local_addr.xid(local_addr.destination_node());
-        
     String broadcast_xid(BHID);  // broadcast HID
     _bcast_xid.parse(broadcast_xid);    
     
