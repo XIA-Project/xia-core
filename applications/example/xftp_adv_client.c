@@ -59,7 +59,7 @@ FILE *fd;
 vector<char *> content;
 vector<int> content_len;
 
-int thread_c = 1;
+int thread_c = 0;
 // TODO: be careful to update prefetchProfileSock for sendCmd(prefetchProfileSock, cmd);
 // format: rootname.SSID
 char *getPrefetchProfileName() 
@@ -229,8 +229,9 @@ int getFileBasic(int sock)
 
 void *fetchFromAccessNet(void *) 
 {
-	int thread_id = c;
-	cerr<<"Thread id "<<thread_id<<" was launched\n";
+	thread_c++;
+	int thread_id = thread_c;
+	cerr<<"Thread id "<<thread_id<<": "<<" was launched\n";
 	// send the registration message out
 	char cmd[XIA_MAX_BUF];
 	char reply[XIA_MAX_BUF];
@@ -239,11 +240,11 @@ void *fetchFromAccessNet(void *)
 
 	// open the socket 
 	int prefetchProfileSock;
-cerr<<"Before prefetchProfileSock connected\n";
+cerr<<"Thread id "<<thread_id<<": "<<"Before prefetchProfileSock connected\n";
 cerr<<getPrefetchProfileName()<<endl;
 	if ((prefetchProfileSock = initStreamClient(getPrefetchProfileName(), myAD, myHID, prefetchProfileAD, prefetchProfileHID)) < 0)
 		die(-1, "unable to create prefetchProfileSock\n");
-cerr<<"prefetchProfileSock connected\n";
+cerr<<"Thread id "<<thread_id<<": "<<"prefetchProfileSock connected\n";
 
 	memset(cmd, '\0', strlen(cmd));
 	strcat(cmd, "reg");
@@ -258,12 +259,12 @@ cerr<<"prefetchProfileSock connected\n";
 	for (unsigned i = p; i < CIDs.size(); i++) {
 		strcat(cmd, " ");
 		strcat(cmd, string2char(CIDs[i]));
-cerr<<CIDs[i]<<endl;
+//cerr<<CIDs[i]<<endl;
 	}
 
 	// construct the reg message
 	sendStreamCmd(prefetchProfileSock, cmd);
-cerr<<"send the registration message out\n";
+cerr<<"Thread id "<<thread_id<<": "<<"send the registration message out\n";
 
 	// chunk fetching begins
 	int chunkSock;
@@ -276,7 +277,7 @@ cerr<<"send the registration message out\n";
 
 		// network change before sending probe information: send registration message; TODO: make a function for that
 		if (lastSSID != currSSID) {
-cerr<<"Network changed before sending probe information, create another thread to continute\n";
+cerr<<"Thread id "<<thread_id<<": "<<"Network changed before sending probe information, create another thread to continute\n";
 			lastSSID = currSSID;
 			ssidChange = true;			
 			pthread_t thread_fetchFromNewAccessNet; 
@@ -299,7 +300,7 @@ cerr<<"Fetching chunk "<<i+1<<" / "<<CIDs.size()<<endl;
 			currSSID = getSSID();
 			// network change before getting CIDs from polling
 			if (lastSSID != currSSID) {
-cerr<<"Network changed before sending probe information, create another thread to continute\n";
+cerr<<"Thread id "<<thread_id<<": "<<"Network changed before sending probe information, create another thread to continute\n";
 				lastSSID = currSSID;
 				ssidChange = true;
 				pthread_t thread_fetchFromNewAccessNet; 
@@ -344,7 +345,7 @@ cerr<<"Network changed before sending probe information, create another thread t
 
 		// network change before constructing chunk request: get chunks from previous network
 		if (lastSSID != currSSID) {
-			cerr<<"Network changed before constructing chunk request\n";
+cerr<<"Thread id "<<thread_id<<": "<<"Network changed before constructing chunk request\n";
 			lastSSID = currSSID;
 			ssidChange = true;
 			pthread_create(&thread_fetchFromNewAccessNet, NULL, fetchFromAccessNet, NULL);	
@@ -364,7 +365,7 @@ cerr<<"Network changed before sending probe information, create another thread t
 			currSSID = getSSID();
 			// Network changed in the middle of fetching chunks
 			if (lastSSID != currSSID) {
-				cerr<<"Network changed during sending chunk request\n";
+cerr<<"Thread id "<<thread_id<<": "<<"Network changed during sending chunk request\n";
 				lastSSID = currSSID;
 				ssidChange = true;
 				pthread_create(&thread_fetchFromNewAccessNet, NULL, fetchFromAccessNet, NULL);	
@@ -421,7 +422,7 @@ cerr<<"Network changed before sending probe information, create another thread t
 			cs[j].cidLen = 0;
 		}
 		if (ssidChange == true) {
-			cerr<<"Finished fetching all the chunks from old network, waiting for other threaeds\n";
+cerr<<"Thread id "<<thread_id<<": "<<"Finished fetching all the chunks from old network, waiting for other threaeds\n";
 			pthread_join(thread_fetchFromNewAccessNet, NULL);
 			pthread_exit(NULL);
 		}
