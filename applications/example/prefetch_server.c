@@ -2,8 +2,6 @@
 
 using namespace std;
 
-bool wireless = false;
-
 char myAD[MAX_XID_SIZE];
 char myHID[MAX_XID_SIZE];
 char my4ID[MAX_XID_SIZE];
@@ -26,6 +24,8 @@ char ftpServHID[MAX_XID_SIZE];
 
 char prefetch_profile_name[] = "www_s.profile.prefetch.aaa.xia";
 char ftp_name[] = "www_s.ftp.advanced.aaa.xia";
+
+string prefetch_profile_name_local = string(prefetch_profile_name) + "." + execSystem(GETSSID_CMD);
 
 // TODO: reject when not from my network in reg
 // TODO: stop prefetching when change network in poll
@@ -359,23 +359,29 @@ void *prefetchExec(void *)
 	pthread_exit(NULL);
 }
 
-int main() 
+int main(int argc, char **argv) 
 {
-	pthread_t thread_pred, thread_exec;
-	pthread_create(&thread_pred, NULL, prefetchPred, NULL);	// TODO: 
-	pthread_create(&thread_exec, NULL, prefetchExec, NULL); // dequeue, prefetch and update profile
+	if (argc == 2) {
+		if (string(argv[1]) == "wireless") 
+			profileServerSock = registerStreamReceiver(string2char(prefetch_profile_name_local), myAD, myHID, my4ID);
+		else if (string(argv[1]) == "wired")
+			profileServerSock = registerStreamReceiver(prefetch_profile_name, myAD, myHID, my4ID);
+		else {
+			cerr<<"Provide \"wireless\" or \"wired\" as the second argument\n";
+			return 0;
+		}
 
-	ftpSock = initStreamClient(ftp_name, myAD, myHID, ftpServAD, ftpServHID); // get ftpServAD and ftpServHID for building chunk request
+		ftpSock = initStreamClient(ftp_name, myAD, myHID, ftpServAD, ftpServHID); // get ftpServAD and ftpServHID for building chunk request
 
-	string prefetch_profile_name_local = string(prefetch_profile_name) + "." + execSystem(GETSSID_CMD);
+		pthread_t thread_pred, thread_exec;
+		pthread_create(&thread_pred, NULL, prefetchPred, NULL);	// TODO: 
+		pthread_create(&thread_exec, NULL, prefetchExec, NULL); // dequeue, prefetch and update profile
 
-	if (wireless == true)
-		profileServerSock = registerStreamReceiver(string2char(prefetch_profile_name_local), myAD, myHID, my4ID);
-	else 
-		profileServerSock = registerStreamReceiver(prefetch_profile_name, myAD, myHID, my4ID);
-
-	blockListener((void *)&profileServerSock, clientReqCmd);
-
+		blockListener((void *)&profileServerSock, clientReqCmd);
+	}
+	else {
+		cerr<<"Provide \"wireless\" or \"wired\" as the second argument\n";
+	}
 	return 0;	
 }
 
