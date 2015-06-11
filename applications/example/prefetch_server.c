@@ -40,6 +40,8 @@ int profileServerSock, ftpSock;
 pthread_mutex_t profileLock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t windowLock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t bufLock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t timeLock = PTHREAD_MUTEX_INITIALIZER;
+
 
 #define BLANK 0	// initilized
 #define REQ 1 	// requested by router
@@ -56,6 +58,7 @@ map<string, vector<chunkStatus> > profile;
 map<string, int> window; // prefetching window
 map<string, vector<string> > buf; // chunk buffer to prefetch
 map<string, string> SIDToAD; // store the mapping between SID and AD of peer. Once the SID move to another AD, stop prefetching
+map<string, long> SIDToTime; // store the timestamp last seen
 
 int prefetch_chunk_num = 3; // default number of chunks to prefetch
 
@@ -110,6 +113,10 @@ void reg_handler(int sock, char *cmd)
 
 	// set the mapping up to be checked later for polling
 	SIDToAD[remoteSID] = remoteAD;
+
+	pthread_mutex_lock(&timeLock);	
+	SIDToTime[remoteSID] = now_msec();
+	pthread_mutex_unlock(&timeLock);
 
 	cerr<<"Finish reg"<<endl;
 	return;
@@ -209,6 +216,10 @@ void poll_handler(int sock, char *cmd)
 	//say("Unlock the buf by poll handler\n");
 	pthread_mutex_unlock(&profileLock);
 	//say("Unlock the profile by poll handler and send poll reply msg out\n");
+
+	pthread_mutex_lock(&timeLock);	
+	SIDToTime[remoteSID] = now_msec();
+	pthread_mutex_unlock(&timeLock);
 
 	sendStreamCmd(sock, reply);
 
@@ -342,8 +353,8 @@ void *prefetchExec(void *)
 				(*I).second.clear();
 				// TODO: timeout the chunks by free(cs[i].cid); cs[j].cid = NULL; cs[j].cidLen = 0;			
 			}
-		}
-		say("\nPrint profile table after updating DONE\n");
+		} 
+		//say("\nPrint profile table after updating DONE\n");
 		for (map<string, vector<chunkStatus> >::iterator I = profile.begin(); I != profile.end(); ++I) {
 			for (vector<chunkStatus>::iterator J = (*I).second.begin(); J != (*I).second.end(); ++J) {
 				cerr<<(*I).first<<"\t"<<(*J).CID<<"\t"<<(*J).timestamp<<"\t"<<(*J).fetch<<"\t"<<(*J).prefetch<<endl;
@@ -359,11 +370,26 @@ void *prefetchExec(void *)
 	pthread_exit(NULL);
 }
 
+void *profileMgt(void *) {
+	while (1) {
+		pthread_mutex_lock(&timeLock);
+		for (map<string, long>::iterator I = SIDToTime.begin(); I != SIDToTime.end(); ++I) {
+			if (now_msec() - (*I).second >= 10000) {
+				SIDToTime.erase(remoteSID);
+			}
+		}	
+		pthread_mutex_unlock(&timeLock);
+		sleep(1);
+	}
+	pthread_exit(NULL);	
+}
+
 int main() 
 {
-	pthread_t thread_pred, thread_exec;
+	pthread_t thread_pred, thread_exec, thread_mgt;
 	pthread_create(&thread_pred, NULL, prefetchPred, NULL);	// TODO: 
 	pthread_create(&thread_exec, NULL, prefetchExec, NULL); // dequeue, prefetch and update profile
+	pthread_create(&thread_mgt, NULL, profileMgt, NULL); // dequeue, prefetch and update profile
 
 	ftpSock = initStreamClient(ftp_name, myAD, myHID, ftpServAD, ftpServHID); // get ftpServAD and ftpServHID for building chunk request
 

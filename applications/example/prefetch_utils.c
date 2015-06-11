@@ -321,18 +321,19 @@ int initStreamClient(const char *name, char *src_ad, char *src_hid, char *dst_ad
 
 	// lookup the xia service 
 	daglen = sizeof(dag);
+
 	if (XgetDAGbyName(name, &dag, &daglen) < 0)
 		die(-1, "unable to locate: %s\n", name);
-
+cerr<<"Got DAG by name\n";
 	// create a socket, and listen for incoming connections
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		die(-1, "Unable to create the listening socket\n");
-    
+cerr<<"Created socket\n";    
 	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(sock);
 		die(-1, "Unable to bind to the dag: %s\n", dag);
 	}
-
+cerr<<"Connected to peer\n";
 	rc = XreadLocalHostAddr(sock, src_ad, MAX_XID_SIZE, src_hid, MAX_XID_SIZE, IP, MAX_XID_SIZE);
 
 	if (rc < 0) {
