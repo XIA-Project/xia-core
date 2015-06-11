@@ -321,7 +321,7 @@ int initStreamClient(const char *name, char *src_ad, char *src_hid, char *dst_ad
 
 	// lookup the xia service 
 	daglen = sizeof(dag);
-
+cerr<<"Before got DAG by name\n";
 	if (XgetDAGbyName(name, &dag, &daglen) < 0)
 		die(-1, "unable to locate: %s\n", name);
 cerr<<"Got DAG by name\n";

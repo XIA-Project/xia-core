@@ -239,9 +239,15 @@ int process(int sock)
 		//say("Xsock %4d received %d bytes\n", sock, received);
 
 		if (sent != received || strcmp(buf1, buf2) != 0)
-			warn("Xsock %4d received data different from sent data! (bytes sent/recv'd: %d/%d)\n",
-					sock, sent, received);
+			warn("Xsock %4d received data different from sent data! (bytes sent/recv'd: %d/%d)\n", sock, sent, received);
 		usleep(1000000);
+		// test for udp
+		if (Xgetaddrinfo(STREAM_NAME, NULL, NULL, &ai) != 0)
+			die(-1, "unable to lookup name %s\n", STREAM_NAME);
+		sa = (sockaddr_x*)ai->ai_addr;
+
+		Graph g(sa);
+		printf("\n%s\n", g.dag_string().c_str());		
 	}
 	return 0;
 }

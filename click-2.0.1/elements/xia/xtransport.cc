@@ -671,7 +671,7 @@ bool XTRANSPORT::RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp
 		Timestamp cid_req_expiry = it2->second;
 
 		if (timer_on == true && cid_req_expiry <= now) {
-			DBG("Socket %d  Chunk RETRANSMIT (%s)", sk->port);
+			//DBG("Socket %d  Chunk RETRANSMIT (%s)", sk->port);
 
 			//retransmit cid-request
 			HashTable<XID, WritablePacket*>::iterator it3;

@@ -59,6 +59,7 @@ FILE *fd;
 vector<char *> content;
 vector<int> content_len;
 
+int thread_c = 1;
 // TODO: be careful to update prefetchProfileSock for sendCmd(prefetchProfileSock, cmd);
 // format: rootname.SSID
 char *getPrefetchProfileName() 
@@ -228,7 +229,8 @@ int getFileBasic(int sock)
 
 void *fetchFromAccessNet(void *) 
 {
-	cerr<<"New thread was launched\n";
+	int thread_id = c;
+	cerr<<"Thread id "<<thread_id<<" was launched\n";
 	// send the registration message out
 	char cmd[XIA_MAX_BUF];
 	char reply[XIA_MAX_BUF];
@@ -238,6 +240,7 @@ void *fetchFromAccessNet(void *)
 	// open the socket 
 	int prefetchProfileSock;
 cerr<<"Before prefetchProfileSock connected\n";
+cerr<<getPrefetchProfileName()<<endl;
 	if ((prefetchProfileSock = initStreamClient(getPrefetchProfileName(), myAD, myHID, prefetchProfileAD, prefetchProfileHID)) < 0)
 		die(-1, "unable to create prefetchProfileSock\n");
 cerr<<"prefetchProfileSock connected\n";
@@ -276,9 +279,9 @@ cerr<<"send the registration message out\n";
 cerr<<"Network changed before sending probe information, create another thread to continute\n";
 			lastSSID = currSSID;
 			ssidChange = true;			
-			pthread_t thread_fetchFromCurrAccessNet; 
-			pthread_create(&thread_fetchFromCurrAccessNet, NULL, fetchFromAccessNet, NULL);
-			pthread_join(thread_fetchFromCurrAccessNet, NULL);
+			pthread_t thread_fetchFromNewAccessNet; 
+			pthread_create(&thread_fetchFromNewAccessNet, NULL, fetchFromAccessNet, NULL);
+			pthread_join(thread_fetchFromNewAccessNet, NULL);
 			pthread_exit(NULL);
 		}
 
@@ -299,9 +302,9 @@ cerr<<"Fetching chunk "<<i+1<<" / "<<CIDs.size()<<endl;
 cerr<<"Network changed before sending probe information, create another thread to continute\n";
 				lastSSID = currSSID;
 				ssidChange = true;
-				pthread_t thread_fetchFromCurrAccessNet; 
-				pthread_create(&thread_fetchFromCurrAccessNet, NULL, fetchFromAccessNet, NULL);
-				pthread_join(thread_fetchFromCurrAccessNet, NULL);
+				pthread_t thread_fetchFromNewAccessNet; 
+				pthread_create(&thread_fetchFromNewAccessNet, NULL, fetchFromAccessNet, NULL);
+				pthread_join(thread_fetchFromNewAccessNet, NULL);
 				pthread_exit(NULL);
 			}
 			sendStreamCmd(prefetchProfileSock, cmd);
@@ -310,7 +313,7 @@ cerr<<"Network changed before sending probe information, create another thread t
 				warn("socket error while waiting for data, closing connection\n");
 				break;
 			}
-			cerr<<reply<<endl;
+			cerr<<"Reply: "<<reply<<endl;
 			// some chunks are already available to fetch
 			if (strncmp(reply, "available none", 14) != 0) 
 				break; 
@@ -335,7 +338,7 @@ cerr<<"Network changed before sending probe information, create another thread t
 		int status = -1;
 		int n = CIDs_DONE.size();
 
-		pthread_t thread_fetchFromCurrAccessNet; 
+		pthread_t thread_fetchFromNewAccessNet; 
 
 		currSSID = getSSID();
 
@@ -344,7 +347,7 @@ cerr<<"Network changed before sending probe information, create another thread t
 			cerr<<"Network changed before constructing chunk request\n";
 			lastSSID = currSSID;
 			ssidChange = true;
-			pthread_create(&thread_fetchFromCurrAccessNet, NULL, fetchFromAccessNet, NULL);	
+			pthread_create(&thread_fetchFromNewAccessNet, NULL, fetchFromAccessNet, NULL);	
 		}
 
 		for (unsigned int j = 0; j < CIDs_DONE.size(); j++) {
@@ -353,7 +356,6 @@ cerr<<"Network changed before sending probe information, create another thread t
 			cs[j].cidLen = strlen(dag);
 			cs[j].cid = dag; // cs[i].cid is a DAG, not just the CID
 		}
-
 		// TODO: add ftpServAD and ftpServHID as fallbacks
 
 		unsigned ctr = 0;
@@ -365,7 +367,7 @@ cerr<<"Network changed before sending probe information, create another thread t
 				cerr<<"Network changed during sending chunk request\n";
 				lastSSID = currSSID;
 				ssidChange = true;
-				pthread_create(&thread_fetchFromCurrAccessNet, NULL, fetchFromAccessNet, NULL);	
+				pthread_create(&thread_fetchFromNewAccessNet, NULL, fetchFromAccessNet, NULL);	
 			}	
 			// retransmit chunks request every REREQUEST seconds if not ready
 			if (ctr % REREQUEST == 0) {
@@ -407,20 +409,20 @@ cerr<<"Network changed before sending probe information, create another thread t
 			//say("writing %d bytes of chunk %s to disk\n", len, cid);
 			chunkProfile[string(CIDs_DONE[j])].fetch = DONE;
 			
-			pthread_mutex_lock(&fileLock);
+			//pthread_mutex_lock(&fileLock);
 			int id = getIndex(string(CIDs_DONE[j]), CIDs);
 			cerr<<CIDs_DONE[j]<<endl;
 			content[id] = data;
 			content_len[id] = len;
-			pthread_mutex_unlock(&fileLock);
+			//pthread_mutex_unlock(&fileLock);
 			//fwrite(data, 1, len, fd);
 			free(cs[j].cid);
 			cs[j].cid = NULL;
 			cs[j].cidLen = 0;
 		}
 		if (ssidChange == true) {
-			cerr<<"Finished fetching from all the chunks from old network changed, waiting for other threaeds\n";
-			pthread_join(thread_fetchFromCurrAccessNet, NULL);
+			cerr<<"Finished fetching all the chunks from old network, waiting for other threaeds\n";
+			pthread_join(thread_fetchFromNewAccessNet, NULL);
 			pthread_exit(NULL);
 		}
 		i = i + n - 1;

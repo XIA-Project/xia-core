@@ -42,7 +42,6 @@ pthread_mutex_t windowLock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t bufLock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t timeLock = PTHREAD_MUTEX_INITIALIZER;
 
-
 #define BLANK 0	// initilized
 #define REQ 1 	// requested by router
 #define DONE 2	// available in cache
@@ -360,7 +359,7 @@ void *prefetchExec(void *)
 				cerr<<(*I).first<<"\t"<<(*J).CID<<"\t"<<(*J).timestamp<<"\t"<<(*J).fetch<<"\t"<<(*J).prefetch<<endl;
 			}
 		}	
-		say("\n");
+		//say("\n");
 
 		pthread_mutex_unlock(&bufLock);
 	 	pthread_mutex_unlock(&profileLock);
@@ -375,11 +374,11 @@ void *profileMgt(void *) {
 		pthread_mutex_lock(&timeLock);
 		for (map<string, long>::iterator I = SIDToTime.begin(); I != SIDToTime.end(); ++I) {
 			if (now_msec() - (*I).second >= 10000) {
-				SIDToTime.erase(remoteSID);
+				SIDToTime.erase((*I).first);
 			}
 		}	
 		pthread_mutex_unlock(&timeLock);
-		sleep(1);
+		sleep(3);
 	}
 	pthread_exit(NULL);	
 }
@@ -410,90 +409,3 @@ int main(int argc, char **argv)
 	}
 	return 0;	
 }
-
-/*
-void *clientReqCmd (void *socketid) 
-{
-
- 	//datagram protocol
-	char cmd[XIA_MAXBUF];
-
-	int sock = *((int*)socketid);
-	int n = -1;
-
-	sockaddr_x cdag;
-	socklen_t dlen;
-
-	while (1) {
-		say("Dgram Server waiting\n");
-
-		dlen = sizeof(cdag);
-		memset(cmd, 0, sizeof(cmd));
-		if ((n = Xrecvfrom(sock, cmd, sizeof(cmd), 0, (struct sockaddr *)&cdag, &dlen)) < 0) {
-			warn("Recv error on socket, closing connection\n");
-			break;
-		}
-		//say("dgram received %d bytes\n", n);
-		// reg msg from xftp client
-		if (strncmp(cmd, "reg", 3) == 0) {
-			say("Receive a reg message\n");
-			reg_handler(sock, cmd, cdag, dlen);
-		}
-		// fetch probe from xftp client: fetch CID
-		else if (strncmp(cmd, "poll", 4) == 0) {
-			say("Receive a polling message\n");
-			poll_handler(sock, cmd, cdag, dlen);
-		}	
-
-	}
-
- //void reg_handler(int sock, char *cmd, sockaddr_x cdag, socklen_t dlen) 
-	char reply[XIA_MAX_BUF] = "reg ACK";
-	int n;
-	if ((n = Xsendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&cdag, dlen)) < 0) {
-		warn("send error\n");
-		return;
-	}
-
-//void poll_handler(int sock, char *cmd, sockaddr_x cdag, socklen_t dlen) 
-	// using XDP as alternative
-	int n;
-	if ((n = Xsendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&cdag, dlen)) < 0) {
-		warn("send error\n");
-		return;
-	}
-
-*/	
-
-/*
-void echo_dgram()
-{
-	int sock = registerDatagramReceiver(prefetch_profile_name);
-	char buf[XIA_MAXBUF];
-	sockaddr_x cdag;
-	socklen_t dlen;
-	int n;
-
-	while (1) {
-		say("Dgram Server waiting\n");
-
-		dlen = sizeof(cdag);
-		memset(buf, 0, sizeof(buf));
-		if ((n = Xrecvfrom(sock, buf, sizeof(buf), 0, (struct sockaddr *)&cdag, &dlen)) < 0) {
-			warn("Recv error on socket, closing connection\n");
-			break;
-		}
-
-		say("dgram received %d bytes\n", n);
-
-		if ((n = Xsendto(sock, buf, n, 0, (struct sockaddr *)&cdag, dlen)) < 0) {
-			warn("send error\n");
-			break;
-		}
-
-		say("dgram sent %d bytes\n", n);
-	}
-
-	Xclose(sock);
-}
-*/
