@@ -69,16 +69,19 @@ void reg_handler(int sock, char *cmd)
 	cerr<<"Peer SID: "<<remoteSID<<endl; 	
 	cout<<cmd_arr<<endl;
 	strtok(cmd_arr, " "); // skip the "reg"
-	int cid_num = atoi(strtok(NULL, " "));
+
 	vector<chunkStatus> css;
-	for (int i = 0; i < cid_num; i++) {
+
+	char *CID_temp;
+	while ((CID_temp = strtok(NULL, " ")) != NULL) {
 		chunkStatus cs;
-		cs.CID = strtok(NULL, " ");
+		cs.CID = CID_temp;
 		cs.timestamp = now_msec(); 
 		cs.fetch = false;
 		cs.prefetch = BLANK;
 		css.push_back(cs);
-	}
+	} 
+
 	pthread_mutex_lock(&profileLock);	
 	if (profile.count(remoteSID)) { 
 		profile.erase(remoteSID);
@@ -125,13 +128,13 @@ void poll_handler(int sock, char *cmd)
 	// reply format: available cid1 cid2, ...	
 	char reply[XIA_MAX_BUF] = "available";
 	cerr<<"Reply msg is initialized: "<<reply<<endl;
-	say("Locking the profile by poll handler\n");	
+	//say("Locking the profile by poll handler\n");	
 	pthread_mutex_lock(&profileLock);
-	say("Locked the profile by poll handler\n");	
+	//say("Locked the profile by poll handler\n");	
 
-	say("Locking the buf by poll handler\n");
+	//say("Locking the buf by poll handler\n");
 	pthread_mutex_lock(&bufLock);
-	say("Locked the buf by poll handler\n");
+	//say("Locked the buf by poll handler\n");
 
 	unsigned int p = 0;
 	// find the requested CID index  
@@ -203,9 +206,9 @@ void poll_handler(int sock, char *cmd)
 	}
 
 	pthread_mutex_unlock(&bufLock);	
-	say("Unlock the buf by poll handler\n");
+	//say("Unlock the buf by poll handler\n");
 	pthread_mutex_unlock(&profileLock);
-	say("Unlock the profile by poll handler and send poll reply msg out\n");
+	//say("Unlock the profile by poll handler and send poll reply msg out\n");
 
 	sendStreamCmd(sock, reply);
 
@@ -256,14 +259,14 @@ void *prefetchExec(void *)
 {
 	while (1) {
 		// update DONE to profile
-		cerr<<"Locking the profile by prefetch executor to update chunks DONE\n";
+		//cerr<<"Locking the profile by prefetch executor to update chunks DONE\n";
 		pthread_mutex_lock(&profileLock);
-		cerr<<"Locked the profile by prefetch to update chunks DONE\n";
+		//cerr<<"Locked the profile by prefetch to update chunks DONE\n";
 
-		say("Locking the buf by prefetch executor and ready to pull the chunks from buf...\n");
+		//say("Locking the buf by prefetch executor and ready to pull the chunks from buf...\n");
 		// pop out the chunks for prefetching 
 		pthread_mutex_lock(&bufLock);	
-		say("Locked the buf by prefetch executor and ready to pull the chunks from buf...\n");
+		//say("Locked the buf by prefetch executor and ready to pull the chunks from buf...\n");
 		for (map<string, vector<string> >::iterator I = buf.begin(); I != buf.end(); ++I) {
 			if ((*I).second.size() > 0) {
 				string SID = (*I).first;
@@ -350,7 +353,7 @@ void *prefetchExec(void *)
 
 		pthread_mutex_unlock(&bufLock);
 	 	pthread_mutex_unlock(&profileLock);
-		cerr<<"Unlock the profile to update chunks DONE\n";
+		//cerr<<"Unlock the profile to update chunks DONE\n";
 		sleep(1);
 	}
 	pthread_exit(NULL);
