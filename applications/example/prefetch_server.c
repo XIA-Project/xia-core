@@ -302,7 +302,7 @@ void *prefetchExec(void *)
 	while (1) {
 		// update DONE to profile
 		cerr<<"Locking the profile by prefetch executor to update chunks DONE\n";
-	  pthread_mutex_lock(&profileLock);
+		pthread_mutex_lock(&profileLock);
 		cerr<<"Locked the profile by prefetch to update chunks DONE\n";
 
 		say("Locking the buf by prefetch executor and ready to pull the chunks from buf...\n");
@@ -338,7 +338,6 @@ void *prefetchExec(void *)
 				unsigned ctr = 0;
 
 				while (1) {
-
 					// Retransmit chunks request every REREQUEST seconds if not ready
 					if (ctr % REREQUEST == 0) {
 						// bring the list of chunks local

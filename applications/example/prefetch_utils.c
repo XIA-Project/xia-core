@@ -246,7 +246,7 @@ int XgetRemoteAddr(int sock, char *ad, char *hid, char *sid)
 	if (sscanf(hids, "%s", hid) < 1 || strncmp(hid, "HID:", 4) != 0) {
 		die(-1, "Unable to extract HID.");
 	}
-	if (sscanf(sids, "%s", sid) < 1 || strncmp(hid, "SID:", 4) != 0) {
+	if (sscanf(sids, "%s", sid) < 1 || strncmp(sid, "SID:", 4) != 0) {
 		die(-1, "Unable to extract SID.");
 	}
 	return 1;	
