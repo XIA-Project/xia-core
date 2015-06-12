@@ -92,6 +92,11 @@ char *randomString(char *buf, int size)
 	return buf;
 }
 
+char *getPrefetchServiceName() 
+{
+	return string2char(string(PREFETCH_NAME) + "." + getAD());
+} 
+
 char* string2char(string str) 
 {
 	char *cstr = new char[str.length() + 1];
@@ -151,6 +156,23 @@ string getSSID()
 		}
 	}
 	return ssid;
+}
+
+string getAD() 
+{
+	int sock; 
+
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+		die(-1, "Unable to create the listening socket\n");
+
+	char ad[MAX_XID_SIZE], hid[MAX_XID_SIZE], ip[MAX_XID_SIZE];
+
+	if (XreadLocalHostAddr(sock, ad, sizeof(ad), hid, sizeof(hid), ip, sizeof(ip)) < 0)
+		die(-1, "Reading localhost address\n");
+
+	Xclose(sock);
+
+	return string(ad);
 }
 
 void getNewAD(char *old_ad) 
@@ -343,7 +365,7 @@ int initStreamClient(const char *name, char *src_ad, char *src_hid, char *dst_ad
 
 	// lookup the xia service 
 	daglen = sizeof(dag);
-cerr<<"Before got DAG by name\n";
+cerr<<"Before got DAG by name: "<<name<<"\n";
 	if (XgetDAGbyName(name, &dag, &daglen) < 0)
 		die(-1, "unable to locate: %s\n", name);
 cerr<<"Got DAG by name\n";
@@ -640,4 +662,12 @@ void *blockListener(void *listenID, void *recvFuntion (void *))
 	Xclose(listenSock);
 
 	return NULL;
+}
+
+int getIndex(string target, vector<string> pool) {
+	for (unsigned i = 0; i < pool.size(); i++) {
+		if (target == pool[i])
+			return i;
+	}
+	return -1;
 }

@@ -29,6 +29,8 @@
 #define REREQUEST 3
 #define NUM_CHUNKS 1
 
+#define PREFETCH_NAME "www_s.prefetch.aaa.xia"
+
 #define GETSSID_CMD "iwgetid -r"
 
 using namespace std;
@@ -48,6 +50,9 @@ char **str_split(char *a_str, const char *a_delim);
 
 char *randomString(char *buf, int size);
 
+// format: PREFETCH_NAME.AD:"AD"
+char *getPrefetchServiceName();
+
 char *string2char(string str);
 
 // result the string result of system command
@@ -60,6 +65,9 @@ long now_msec();
 
 string getSSID();
 
+string getAD();
+
+// poll until new AD is returned
 void getNewAD(char *old_ad);
 
 // get the SSID name from "iwgetid -r" command
@@ -96,5 +104,7 @@ int deprecatedRegisterStreamReceiver(char *name, char *myAD, char *myHID, char *
 int registerStreamReceiver(char *name, char *myAD, char *myHID, char *my4ID);
 
 void *blockListener(void *listenID, void *recvFuntion (void *));
+
+int getIndex(string target, vector<string> pool);
 
 #endif

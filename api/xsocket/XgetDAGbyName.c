@@ -27,6 +27,8 @@
 #include "xns.h"
 #include "dagaddr.hpp"
 
+#include <assert.h>
+
 #define ETC_HOSTS "/etc/hosts.xia"
 
 /*!
@@ -295,18 +297,19 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 	query_pkt.name = name;
 	query_pkt.dag = NULL;
 	int len = make_ns_packet(&query_pkt, pkt, sizeof(pkt));
-printf("Sending nameservice queny\n");
+printf("Sending nameservice queny with length %d\n", len);
+assert(len > 0);
 	//Send a name query to the name server
 	if ((rc = Xsendto(sock, pkt, len, 0, (const struct sockaddr*)&ns_dag, sizeof(sockaddr_x))) < 0) {
-printf("Sent %d bytes\n", rc);
 		int err = errno;
+		printf("Error: sent %d bytes\n", rc);
 		LOGF("Error sending name query (%d)", rc);
 		Xclose(sock);
 		errno = err;
 		return -1;
 	}
-	
-printf("Before Xrecvfrom\n");
+	// TODO: reties =4 for, if time out, then Xsendto again  Xsekect(readfdf = sock, timeout)<0
+printf("Sent %d bytes and begin to Xrecvfrom\n", rc);
 	//Check the response from the name server
 	memset(pkt, 0, sizeof(pkt));
 	if ((rc = Xrecvfrom(sock, pkt, NS_MAX_PACKET_SIZE, 0, NULL, NULL)) < 0) {
@@ -317,6 +320,9 @@ printf("Error retrieving name query (%d)", err);
 		errno = err;
 		return -1;
 	}
+
+Graph gns(&ns_dag);
+printf("Nameserver DAG: %s\n", gns.dag_string().c_str());
 
 	ns_pkt resp_pkt;
 	get_ns_packet(pkt, rc, &resp_pkt);

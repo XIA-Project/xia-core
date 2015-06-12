@@ -8,7 +8,6 @@
 using namespace std;
 
 bool prefetch = true;
-bool wireless = true;
 
 string lastSSID, currSSID;
 
@@ -33,8 +32,7 @@ char prefetchProfileAD[MAX_XID_SIZE];
 char prefetchProfileHID[MAX_XID_SIZE];
 
 char ftp_name[] = "www_s.ftp.advanced.aaa.xia";
-char prefetch_client_name[] = "www_s.client.prefetch.aaa.xia";
-char prefetch_profile_name[] = "www_s.profile.prefetch.aaa.xia";
+//char prefetch_client_name[] = "www_s.client.prefetch.aaa.xia";
 
 int ftpSock, prefetchProfileSock, netMonSock; // prefetchClientSock
 
@@ -61,47 +59,15 @@ FILE *fd;
 vector<char *> content;
 vector<int> content_len;
 
-int thread_c = 0;
-// TODO: be careful to update prefetchProfileSock for sendCmd(prefetchProfileSock, cmd);
-// format: rootname.SSID
-char *getPrefetchProfileName() 
-{
-	if (wireless == false)
-		return prefetch_profile_name;
-	else {
-		string prefetch_profile_name_local = string(prefetch_profile_name) + "." + execSystem(GETSSID_CMD);
-		return string2char(prefetch_profile_name_local);
-	}
-} 
-
-void printAD() {
-	int sock; 
-
-	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
-		die(-1, "Unable to create the listening socket\n");
-	char ad[MAX_XID_SIZE], hid[MAX_XID_SIZE], ip[MAX_XID_SIZE];
-
-	if (XreadLocalHostAddr(sock, ad, sizeof(ad), hid, sizeof(hid), ip, sizeof(ip)) < 0)
-		die(-1, "Reading localhost address\n");
-	cerr<<"Current AD: "<<ad<<endl;
-	Xclose(sock);
-	return;
-}
-
-int getIndex(string target, vector<string> pool) {
-	for (unsigned i = 0; i < pool.size(); i++) {
-		if (target == pool[i])
-			return i;
-	}
-	return -1;
-}
+int thread_c = 0; // keep tracking the number of threads
 
 void *netMon(void *) 
 {
 	int sock; 
 
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
-	//	die(-1, "Unable to create the listening socket\n");
+		die(-1, "Unable to create the listening socket\n");
+
 	netChange = false;
 	netChangeACK = false;
 	char last_ad[MAX_XID_SIZE], curr_ad[MAX_XID_SIZE], hid[MAX_XID_SIZE], ip[MAX_XID_SIZE];
@@ -115,7 +81,7 @@ void *netMon(void *)
 	{
 		if (XreadLocalHostAddr(sock, curr_ad, sizeof(curr_ad), hid, sizeof(hid), ip, sizeof(ip)) < 0)
 			die(-1, "Reading localhost address\n");		
-		cerr<<"Current AD: "<<curr_ad<<endl;
+//cerr<<"Current AD: "<<curr_ad<<endl;
 /*
 		if (strcmp(last_ad, curr_ad) != 0) {
 			cerr<<"AD changed!\n";
@@ -247,8 +213,9 @@ void *fetchFromAccessNet(void *)
 {
 	thread_c++;
 	int thread_id = thread_c;
+	char *data;
 	cerr<<"Thread id "<<thread_id<<": "<<"Is launched\n";
-	printAD();
+cerr<<getAD()<<endl;
 	// send the registration message out
 	char cmd[XIA_MAX_BUF];
 	char reply[XIA_MAX_BUF];
@@ -257,12 +224,12 @@ void *fetchFromAccessNet(void *)
 
 	// open the socket 
 	int prefetchProfileSock;
-cerr<<"Thread id "<<thread_id<<": "<<"Looking up name of "<<getPrefetchProfileName()<<endl;
-	if ((prefetchProfileSock = initStreamClient(getPrefetchProfileName(), myAD, myHID, prefetchProfileAD, prefetchProfileHID)) < 0)
+cerr<<"Thread id "<<thread_id<<": "<<"Looking up name of "<<getPrefetchServiceName()<<endl;
+	if ((prefetchProfileSock = initStreamClient(getPrefetchServiceName(), myAD, myHID, prefetchProfileAD, prefetchProfileHID)) < 0)
 		die(-1, "unable to create prefetchProfileSock\n");
 cerr<<"Thread id "<<thread_id<<": "<<"prefetchProfileSock connected\n";
 
-	memset(cmd, '\0', strlen(cmd));
+	memset(cmd, '\0', XIA_MAX_BUF);
 	strcat(cmd, "reg");
 
 	// find the first CID neither requested nor available as the starting point to register; TODO: assume it's linear
@@ -281,7 +248,6 @@ cerr<<"Thread id "<<thread_id<<": "<<"prefetchProfileSock connected\n";
 	// construct the reg message
 	sendStreamCmd(prefetchProfileSock, cmd);
 cerr<<"Thread id "<<thread_id<<": "<<"send the registration message out\n";
-
 	// chunk fetching begins
 	int chunkSock;
 	if ((chunkSock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0)
@@ -290,11 +256,10 @@ cerr<<"Thread id "<<thread_id<<": "<<"send the registration message out\n";
 	// begin to poll the fetch chunks 
 	for (unsigned int i = p; i < CIDs.size(); i++) {
 		currSSID = getSSID();
-
 		// network change before sending probe information: send registration message; TODO: make a function for that
 		if (lastSSID != currSSID) {
 cerr<<"Thread id "<<thread_id<<": "<<"Network changed before sending probe information, create another thread to continute\n";
-getNewAD(myAD);
+			getNewAD(myAD);
 			lastSSID = currSSID;
 			ssidChange = true;			
 			pthread_t thread_fetchFromNewAccessNet; 
@@ -304,21 +269,20 @@ getNewAD(myAD);
 		}
 
 		// send probe message to see what chunks are available start
-		memset(cmd, '\0', strlen(cmd));
-		memset(reply, '\0', strlen(reply));
+		memset(cmd, '\0', XIA_MAX_BUF);
+		memset(reply, '\0', XIA_MAX_BUF);
 
 		strcat(cmd, "poll ");
 		strcat(cmd, string2char(CIDs[i]));
 
 cerr<<"Fetching chunk "<<i+1<<" / "<<CIDs.size()<<endl;
-
 		// sending polling information
 		while (1) {
 			currSSID = getSSID();
 			// network change before getting CIDs from polling
 			if (lastSSID != currSSID) {
 cerr<<"Thread id "<<thread_id<<": "<<"Network changed before sending probe information, create another thread to continute\n";
-getNewAD(currAD);
+				getNewAD(currAD);
 				lastSSID = currSSID;
 				ssidChange = true;
 				pthread_t thread_fetchFromNewAccessNet; 
@@ -343,16 +307,15 @@ getNewAD(currAD);
 		strtok(reply, " "); // skip "available"
 		vector<char *> CIDs_DONE;
 		char* CID_DONE;
-		XgetServADHID(getPrefetchProfileName(), myAD, netHID);					
+		XgetServADHID(getPrefetchServiceName(), myAD, netHID);					
 		while ((CID_DONE = strtok(NULL, " ")) != NULL) {
 			CIDs_DONE.push_back(CID_DONE);
 			chunkProfile[string(CID_DONE)].fetch = REQ;
 			chunkProfile[string(CID_DONE)].timestamp = now_msec();
 			chunkProfile[string(CID_DONE)].fromNet = myAD;
 		} 
-		//say("Some chunks are available to fetch\n");
 		ChunkStatus cs[CIDs_DONE.size()];
-		char data[XIA_MAXCHUNK];
+		//char data[XIA_MAXCHUNK];
 		int len;
 		int status = -1;
 		int n = CIDs_DONE.size();
@@ -364,7 +327,7 @@ getNewAD(currAD);
 		// network change before constructing chunk request: get chunks from previous network
 		if (lastSSID != currSSID) {
 cerr<<"Thread id "<<thread_id<<": "<<"Network changed before constructing chunk request\n";
-getNewAD(currAD);
+			getNewAD(currAD);
 			lastSSID = currSSID;
 			ssidChange = true;
 			pthread_create(&thread_fetchFromNewAccessNet, NULL, fetchFromAccessNet, NULL);	
@@ -385,7 +348,7 @@ getNewAD(currAD);
 			// Network changed in the middle of fetching chunks
 			if (lastSSID != currSSID) {
 cerr<<"Thread id "<<thread_id<<": "<<"Network changed during sending chunk request\n";
-getNewAD(currAD);
+				getNewAD(currAD);
 				lastSSID = currSSID;
 				ssidChange = true;
 				pthread_create(&thread_fetchFromNewAccessNet, NULL, fetchFromAccessNet, NULL);	
@@ -423,26 +386,27 @@ getNewAD(currAD);
 		say("Chunk is ready\n");
 
 		for (unsigned int j = 0; j < CIDs_DONE.size(); j++) {
-			if ((len = XreadChunk(chunkSock, data, sizeof(data), 0, cs[j].cid, cs[j].cidLen)) < 0) {
+			data = (char*)calloc(XIA_MAXCHUNK, 1);			
+			if ((len = XreadChunk(chunkSock, data, XIA_MAXCHUNK, 0, cs[j].cid, cs[j].cidLen)) < 0) {  
 				say("error getting chunk\n");
 				pthread_exit(NULL);
 			}
 			//say("writing %d bytes of chunk %s to disk\n", len, cid);
 			chunkProfile[string(CIDs_DONE[j])].fetch = DONE;
 			
-			//pthread_mutex_lock(&fileLock);
+			pthread_mutex_lock(&fileLock);
 			int id = getIndex(string(CIDs_DONE[j]), CIDs);
-			cerr<<CIDs_DONE[j]<<endl;
+cerr<<id<<"\t"<<CIDs_DONE[j]<<endl;
 			content[id] = data;
 			content_len[id] = len;
-			//pthread_mutex_unlock(&fileLock);
+			pthread_mutex_unlock(&fileLock);
 			//fwrite(data, 1, len, fd);
 			free(cs[j].cid);
 			cs[j].cid = NULL;
 			cs[j].cidLen = 0;
 		}
 		if (ssidChange == true) {
-cerr<<"Thread id "<<thread_id<<": "<<"Finished fetching all the chunks from old network, waiting for other threaeds\n";
+cerr<<"Thread id "<<thread_id<<": "<<"Finished fetching all the chunks from old network, waiting for other threads\n";
 			pthread_join(thread_fetchFromNewAccessNet, NULL);
 			pthread_exit(NULL);
 		}
@@ -483,7 +447,7 @@ int getFileAdv(int sock)
 
 	char reply_arr[strlen(reply)];
 	strcpy(reply_arr, reply);
-	cerr<<reply_arr<<endl;
+cerr<<reply_arr<<endl;
 	int cid_num = atoi(strtok(reply_arr, " "));
 	char *tempCID;
 	for (int i = 0; i < cid_num; i++) {
@@ -493,7 +457,7 @@ int getFileAdv(int sock)
 		cl.fetch = BLANK;
 		cl.timestamp = 0;
 		cl.fromNet = "";
-		chunkProfile[string(tempCID)] = cl; 
+		chunkProfile[string(tempCID)] = cl;
 		content.push_back('\0');
 		content_len.push_back(0);
 	}
@@ -501,10 +465,9 @@ int getFileAdv(int sock)
 	pthread_create(&thread_fetchFromAccessNet, NULL, fetchFromAccessNet, NULL);
 	pthread_join(thread_fetchFromAccessNet, NULL);
 
-	//cerr<<"Finish fetching all the chunks, writing to file...\n";
 	for (unsigned int i = 0; i < content.size(); i++) {
-		fwrite(content[i], 1, content_len[i], fd);	
-		//cerr<<content[i]<<"\n"<<content_len[i]<<endl;
+		fwrite(content[i], 1, content_len[i], fd);
+		free(content[i]);	
 	}
 
 	fclose(fd);
@@ -540,8 +503,7 @@ int main(int argc, char **argv)
 			else {
 				getFileAdv(ftpSock);
 				return 0;
-			}
-			
+			}		
 		}
 		else {
 			 die(-1, "Please input the filename as the second argument\n");
