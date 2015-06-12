@@ -153,6 +153,28 @@ string getSSID()
 	return ssid;
 }
 
+void getNewAD(char *old_ad) 
+{
+	int sock; 
+
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+		die(-1, "Unable to create the listening socket\n");
+	char new_ad[MAX_XID_SIZE], hid[MAX_XID_SIZE], ip[MAX_XID_SIZE];
+
+	while (1) {
+		if (XreadLocalHostAddr(sock, new_ad, sizeof(new_ad), hid, sizeof(hid), ip, sizeof(ip)) < 0)
+			die(-1, "Reading localhost address\n");
+		if (strcmp(new_ad, old_ad) != 0) {
+			cerr<<"AD changed!"<<endl;
+			strcpy(old_ad, new_ad);
+			Xclose(sock);
+			return;			
+		}
+		sleep(1);
+	}
+	return;
+}
+
 // app level
 string netConnStatus(string lastSSID) 
 {
