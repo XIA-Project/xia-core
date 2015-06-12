@@ -46,6 +46,8 @@ pthread_mutex_t timeLock = PTHREAD_MUTEX_INITIALIZER;
 #define REQ 1 	// requested by router
 #define DONE 2	// available in cache
 
+#define PURGE_SEC 120
+
 struct chunkStatus {
 	string CID;
 	long timestamp; // msec
@@ -68,7 +70,10 @@ void reg_handler(int sock, char *cmd)
 	strcpy(cmd_arr, cmd);
 
 	XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID); // get client ftp's
-	cerr<<"Peer SID: "<<remoteSID<<endl; 	
+cerr<<"Peer AD: "<<remoteAD<<endl;
+cerr<<"Peer HID: "<<remoteHID<<endl;
+cerr<<"Peer SID: "<<remoteSID<<endl;
+
 	cout<<cmd_arr<<endl;
 	strtok(cmd_arr, " "); // skip the "reg"
 
@@ -353,13 +358,13 @@ void *prefetchExec(void *)
 				// TODO: timeout the chunks by free(cs[i].cid); cs[j].cid = NULL; cs[j].cidLen = 0;			
 			}
 		} 
-		//say("\nPrint profile table after updating DONE\n");
+		say("\nPrint profile table after updating DONE\n");
 		for (map<string, vector<chunkStatus> >::iterator I = profile.begin(); I != profile.end(); ++I) {
 			for (vector<chunkStatus>::iterator J = (*I).second.begin(); J != (*I).second.end(); ++J) {
 				cerr<<(*I).first<<"\t"<<(*J).CID<<"\t"<<(*J).timestamp<<"\t"<<(*J).fetch<<"\t"<<(*J).prefetch<<endl;
 			}
 		}	
-		//say("\n");
+		say("\n");
 
 		pthread_mutex_unlock(&bufLock);
 	 	pthread_mutex_unlock(&profileLock);
@@ -369,15 +374,27 @@ void *prefetchExec(void *)
 	pthread_exit(NULL);
 }
 
-void *profileMgt(void *) {
+void *profileMgt(void *) 
+{
 	while (1) {
-		pthread_mutex_lock(&timeLock);
 		for (map<string, long>::iterator I = SIDToTime.begin(); I != SIDToTime.end(); ++I) {
-			if (now_msec() - (*I).second >= 10000) {
-				SIDToTime.erase((*I).first);
+			if (now_msec() - (*I).second >= PURGE_SEC * 1000) {
+				string SID = (*I).first;
+				cerr<<"Deleting "<<SID<<endl;
+				pthread_mutex_lock(&timeLock);
+				SIDToTime.erase(SID);
+				pthread_mutex_unlock(&timeLock);
+				pthread_mutex_lock(&profileLock);
+				profile.erase(SID);
+				pthread_mutex_unlock(&profileLock);
+				pthread_mutex_lock(&windowLock);
+				window.erase(SID);
+				pthread_mutex_unlock(&windowLock);
+				pthread_mutex_lock(&bufLock);
+				buf.erase(SID);
+				pthread_mutex_unlock(&bufLock);
 			}
 		}	
-		pthread_mutex_unlock(&timeLock);
 		sleep(3);
 	}
 	pthread_exit(NULL);	
