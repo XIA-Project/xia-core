@@ -10,30 +10,12 @@ char remoteAD[MAX_XID_SIZE];
 char remoteHID[MAX_XID_SIZE];
 char remoteSID[MAX_XID_SIZE];
 
-char prefetchProfileAD[MAX_XID_SIZE];
-char prefetchProfileHID[MAX_XID_SIZE];
-
-char prefetchPredAD[MAX_XID_SIZE];
-char prefetchPredHID[MAX_XID_SIZE];
-
-char prefetchExecAD[MAX_XID_SIZE];
-char prefetchExecHID[MAX_XID_SIZE];
-
 char ftpServAD[MAX_XID_SIZE];
 char ftpServHID[MAX_XID_SIZE];
 
-char prefetch_profile_name[] = "www_s.profile.prefetch.aaa.xia";
-char ftp_name[] = "www_s.ftp.advanced.aaa.xia";
-
-string prefetch_profile_name_local = string(prefetch_profile_name) + "." + execSystem(GETSSID_CMD);
-
-// TODO: reject when not from my network in reg
-// TODO: stop prefetching when change network in poll
-// TODO: start to prefetch as soon as receive reg msg
 // TODO: optimize sleep(1)
 // TODO: trafficMon function to update prefetching window
-// TODO: timeout the SID entry and remove the chunks accordingly? maybe leave a few
-// TODO: stop retransmit request in application?
+// TODO: move retransmit request from app to xtransport?
 
 int profileServerSock, ftpSock;
 
@@ -56,7 +38,7 @@ struct chunkStatus {
 };
 
 map<string, vector<chunkStatus> > profile;
-map<string, int> window; // prefetching window
+map<string, unsigned int> window; // prefetching window
 map<string, vector<string> > buf; // chunk buffer to prefetch
 map<string, string> SIDToAD; // store the mapping between SID and AD of peer. Once the SID move to another AD, stop prefetching
 map<string, long> SIDToTime; // store the timestamp last seen
@@ -70,11 +52,23 @@ void reg_handler(int sock, char *cmd)
 	strcpy(cmd_arr, cmd);
 
 	XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID); // get client ftp's
-cerr<<"Peer AD: "<<remoteAD<<endl;
-cerr<<"Peer HID: "<<remoteHID<<endl;
-cerr<<"Peer SID: "<<remoteSID<<endl;
 
-	cout<<cmd_arr<<endl;
+	if (strcmp(remoteAD, myAD) != 0) {
+cerr<<"Reject reg from non-local request"<<endl;
+		return;
+	}
+
+	pthread_mutex_lock(&windowLock);	
+	window[remoteSID] = prefetch_chunk_num; // TODO: to optimize
+	pthread_mutex_unlock(&windowLock);
+
+	vector<string> CIDs;
+	pthread_mutex_lock(&windowLock);	
+	buf[remoteSID] = CIDs;
+	pthread_mutex_unlock(&windowLock);
+
+cerr<<cmd_arr<<endl;
+
 	strtok(cmd_arr, " "); // skip the "reg"
 
 	vector<chunkStatus> css;
@@ -92,37 +86,39 @@ cerr<<"Peer SID: "<<remoteSID<<endl;
 	pthread_mutex_lock(&profileLock);	
 	if (profile.count(remoteSID)) { 
 		profile.erase(remoteSID);
-		cerr<<"SID is registered before, being replaced...\n";
+cerr<<"SID is registered before, being replaced...\n";
 	}
 	profile[remoteSID] = css;
+
+	pthread_mutex_lock(&bufLock);
+	for (unsigned int i = 0; i < window[remoteSID]; i++) {
+		// TODO: looks ugly, improve later: if i < profile[SID].size(), blablabla
+		if (i == profile[remoteSID].size()) {
+			break;
+		}
+		if (profile[remoteSID][i].prefetch == BLANK) { 
+			buf[remoteSID].push_back(profile[remoteSID][i].CID);
+			profile[remoteSID][i].prefetch = REQ; // marked as requested by router
+		}
+	}
+	pthread_mutex_unlock(&bufLock);
 	pthread_mutex_unlock(&profileLock);
 
-	say("\nPrint profile table in reg_handler\n");
+cerr<<"\nPrint profile table in reg_handler\n";
 	for (map<string, vector<chunkStatus> >::iterator I = profile.begin(); I != profile.end(); ++I) {
 		for (vector<chunkStatus>::iterator J = (*I).second.begin(); J != (*I).second.end(); ++J) {
-			cerr<<(*I).first<<"\t"<<(*J).CID<<"\t"<<(*J).timestamp<<"\t"<<(*J).fetch<<"\t"<<(*J).prefetch<<endl;
+cerr<<(*I).first<<"\t"<<(*J).CID<<"\t"<<(*J).timestamp<<"\t"<<(*J).fetch<<"\t"<<(*J).prefetch<<endl;
 		}
 	}	
-	say("\n");
-
-	pthread_mutex_lock(&windowLock);	
-	window[remoteSID] = prefetch_chunk_num;
-	pthread_mutex_unlock(&windowLock);
-
-	vector<string> CIDs;
-
-	pthread_mutex_lock(&windowLock);	
-	buf[remoteSID] = CIDs;
-	pthread_mutex_unlock(&windowLock);
 
 	// set the mapping up to be checked later for polling
 	SIDToAD[remoteSID] = remoteAD;
 
-	pthread_mutex_lock(&timeLock);	
+	pthread_mutex_lock(&timeLock);
 	SIDToTime[remoteSID] = now_msec();
 	pthread_mutex_unlock(&timeLock);
+cerr<<"Finish reg"<<endl;
 
-	cerr<<"Finish reg"<<endl;
 	return;
 }
 
@@ -131,21 +127,16 @@ void poll_handler(int sock, char *cmd)
 	char cmd_arr[strlen(cmd)];
 	strcpy(cmd_arr, cmd);
 	XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID); // get client ftp's SID
-	cerr<<"Peer SID: "<<remoteSID<<endl; 
+cerr<<"Peer SID: "<<remoteSID<<endl; 
 	strtok(cmd_arr, " "); // skip the "fetch"
 	string CID = strtok(NULL, " ");
-	cerr<<CID<<endl;
+cerr<<CID<<endl;
 
 	// reply format: available cid1 cid2, ...	
 	char reply[XIA_MAX_BUF] = "available";
-	cerr<<"Reply msg is initialized: "<<reply<<endl;
-	//say("Locking the profile by poll handler\n");	
+cerr<<"Reply msg is initialized: "<<reply<<endl;
 	pthread_mutex_lock(&profileLock);
-	//say("Locked the profile by poll handler\n");	
-
-	//say("Locking the buf by poll handler\n");
 	pthread_mutex_lock(&bufLock);
-	//say("Locked the buf by poll handler\n");
 
 	unsigned int p = 0;
 	// find the requested CID index  
@@ -172,10 +163,10 @@ void poll_handler(int sock, char *cmd)
 	if (c == 0) 
 		strcat(reply, " none");	
 
-	cerr<<reply<<endl;
+cerr<<"Reply: "<<reply<<endl;
 
 	if (remoteAD == SIDToAD[remoteSID]) {
-		cerr<<"Same network, continute to prefetch\n";
+cerr<<"Same network, continute to prefetch\n";
 		// find the first chunk not fetched yet
 		p = 0;
 		while (p < profile[remoteSID].size()) {
@@ -183,8 +174,7 @@ void poll_handler(int sock, char *cmd)
 				break;
 			p++;
 		}
-
-		cerr<<"Chunks to be prefetched starting from index: "<<p<<endl;
+cerr<<"Prefetching chunks starting from index: "<<p<<endl;
 		// push push the chunks and marked as requested range from p to p + window
 		i = p;
 		while (i < p + window[remoteSID]) {
@@ -203,23 +193,19 @@ void poll_handler(int sock, char *cmd)
 		say("\nPrint profile table in poll_handler\n");
 		for (map<string, vector<chunkStatus> >::iterator I = profile.begin(); I != profile.end(); ++I) {
 			for (vector<chunkStatus>::iterator J = (*I).second.begin(); J != (*I).second.end(); ++J) {
-				cerr<<(*I).first<<"\t"<<(*J).CID<<"\t"<<(*J).timestamp<<"\t"<<(*J).fetch<<"\t"<<(*J).prefetch<<endl;
+cerr<<(*I).first<<"\t"<<(*J).CID<<"\t"<<(*J).timestamp<<"\t"<<(*J).fetch<<"\t"<<(*J).prefetch<<endl;
 			}
 		}	
-		say("\n");
-
-		cerr<<"SID: "<<remoteSID<<" - chunks to be pushed into the queue:\n";
+cerr<<"SID: "<<remoteSID<<" - chunks to be pushed into the queue:\n";
 		for (unsigned i = 0; i < buf[remoteSID].size(); i++)
-			cerr<<buf[remoteSID][i]<<endl;
+cerr<<buf[remoteSID][i]<<endl;
 	}
 	else {
-		cerr<<"Client network changed, stop prefetching\n";
+cerr<<"Client network changed, stop prefetching\n";
 	}
 
 	pthread_mutex_unlock(&bufLock);	
-	//say("Unlock the buf by poll handler\n");
 	pthread_mutex_unlock(&profileLock);
-	//say("Unlock the profile by poll handler and send poll reply msg out\n");
 
 	pthread_mutex_lock(&timeLock);	
 	SIDToTime[remoteSID] = now_msec();
@@ -230,7 +216,7 @@ void poll_handler(int sock, char *cmd)
 	return;
 }
 
-void *clientReqCmd (void *socketid) 
+void *clientReqCmd(void *socketid) 
 {
  	// stream protocol
 	char cmd[XIA_MAXBUF];
@@ -238,7 +224,7 @@ void *clientReqCmd (void *socketid)
 	int n = -1;
 
 	while (1) {
-		memset(cmd, '\0', strlen(cmd));
+		memset(cmd, '\0', XIA_MAXBUF);
 		if ((n = Xrecv(sock, cmd, sizeof(cmd), 0))  < 0) {
 			warn("socket error while waiting for data, closing connection\n");
 			break;
@@ -274,22 +260,17 @@ void *prefetchExec(void *)
 {
 	while (1) {
 		// update DONE to profile
-		//cerr<<"Locking the profile by prefetch executor to update chunks DONE\n";
 		pthread_mutex_lock(&profileLock);
-		//cerr<<"Locked the profile by prefetch to update chunks DONE\n";
-
-		//say("Locking the buf by prefetch executor and ready to pull the chunks from buf...\n");
 		// pop out the chunks for prefetching 
 		pthread_mutex_lock(&bufLock);	
-		//say("Locked the buf by prefetch executor and ready to pull the chunks from buf...\n");
 		for (map<string, vector<string> >::iterator I = buf.begin(); I != buf.end(); ++I) {
 			if ((*I).second.size() > 0) {
 				string SID = (*I).first;
-				cerr<<"SID: "<<SID<<"chunks to be pulled from the queue\n";
+cerr<<"SID: "<<SID<<"chunks to be pulled from the queue\n";
 
-				for (unsigned int i = 0; i < (*I).second.size(); i++) 
-					cerr<<(*I).second[i]<<endl;
-
+				for (unsigned int i = 0; i < (*I).second.size(); i++) {
+cerr<<(*I).second[i]<<endl;
+				}
 				int chunkSock;
 
 				if ((chunkSock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0)
@@ -347,7 +328,7 @@ void *prefetchExec(void *)
 						pthread_exit(NULL); // TODO: check again
 					}
 					else {
-						say("update chunks DONE information...\n");
+cerr<<"update chunks DONE information...\n";
 						for (unsigned int j = 0; j < profile[SID].size(); j++) {
 							if (profile[SID][j].CID == (*I).second[i]) 
 								profile[SID][j].prefetch = DONE;
@@ -361,14 +342,13 @@ void *prefetchExec(void *)
 		say("\nPrint profile table after updating DONE\n");
 		for (map<string, vector<chunkStatus> >::iterator I = profile.begin(); I != profile.end(); ++I) {
 			for (vector<chunkStatus>::iterator J = (*I).second.begin(); J != (*I).second.end(); ++J) {
-				cerr<<(*I).first<<"\t"<<(*J).CID<<"\t"<<(*J).timestamp<<"\t"<<(*J).fetch<<"\t"<<(*J).prefetch<<endl;
+cerr<<(*I).first<<"\t"<<(*J).CID<<"\t"<<(*J).timestamp<<"\t"<<(*J).fetch<<"\t"<<(*J).prefetch<<endl;
 			}
 		}	
-		say("\n");
 
 		pthread_mutex_unlock(&bufLock);
 	 	pthread_mutex_unlock(&profileLock);
-		//cerr<<"Unlock the profile to update chunks DONE\n";
+
 		sleep(1);
 	}
 	pthread_exit(NULL);
@@ -400,29 +380,18 @@ void *profileMgt(void *)
 	pthread_exit(NULL);	
 }
 
-int main(int argc, char **argv) 
+int main() 
 {
-	if (argc == 2) {
-		if (string(argv[1]) == "wireless") 
-			profileServerSock = registerStreamReceiver(string2char(prefetch_profile_name_local), myAD, myHID, my4ID);
-		else if (string(argv[1]) == "wired")
-			profileServerSock = registerStreamReceiver(prefetch_profile_name, myAD, myHID, my4ID);
-		else {
-			cerr<<"Provide \"wireless\" or \"wired\" as the second argument\n";
-			return 0;
-		}
+	profileServerSock = registerStreamReceiver(getPrefetchServiceName(), myAD, myHID, my4ID);
 
-		ftpSock = initStreamClient(ftp_name, myAD, myHID, ftpServAD, ftpServHID); // get ftpServAD and ftpServHID for building chunk request
+	ftpSock = initStreamClient(FTP_NAME, myAD, myHID, ftpServAD, ftpServHID); // get ftpServAD and ftpServHID for building chunk request
 
-		pthread_t thread_pred, thread_exec, thread_mgt;
-		pthread_create(&thread_pred, NULL, prefetchPred, NULL);	// TODO: 
-		pthread_create(&thread_exec, NULL, prefetchExec, NULL); // dequeue, prefetch and update profile
-		pthread_create(&thread_mgt, NULL, profileMgt, NULL); // dequeue, prefetch and update profile
+	pthread_t thread_pred, thread_exec, thread_mgt;
+	pthread_create(&thread_pred, NULL, prefetchPred, NULL);	// TODO: 
+	pthread_create(&thread_exec, NULL, prefetchExec, NULL); // dequeue, prefetch and update profile
+	pthread_create(&thread_mgt, NULL, profileMgt, NULL); // dequeue, prefetch and update profile
 
-		blockListener((void *)&profileServerSock, clientReqCmd);
-	}
-	else {
-		cerr<<"Provide \"wireless\" or \"wired\" as the second argument\n";
-	}
+	blockListener((void *)&profileServerSock, clientReqCmd);
+
 	return 0;	
 }

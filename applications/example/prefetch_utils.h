@@ -29,6 +29,7 @@
 #define REREQUEST 3
 #define NUM_CHUNKS 1
 
+#define FTP_NAME "www_s.ftp.aaa.xia"
 #define PREFETCH_NAME "www_s.prefetch.aaa.xia"
 
 #define GETSSID_CMD "iwgetid -r"
