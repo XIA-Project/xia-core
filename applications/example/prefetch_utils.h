@@ -60,6 +60,8 @@ long now_msec();
 
 string getSSID();
 
+void getNewAD(char *old_ad);
+
 // get the SSID name from "iwgetid -r" command
 string netConnStatus(string lastSSID);
 

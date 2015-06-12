@@ -264,24 +264,23 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 	}
 
 	if (!strncmp(name, "RE ", 3) || !strncmp(name, "DAG ", 4)) {
+		// check to see if name is actually a dag to begin with
+    Graph gcheck(name);
 
-        // check to see if name is actually a dag to begin with
-        Graph gcheck(name);
-
-        // check to see if the returned dag was valid
-        // we may want a better check for this in the future
-        if (gcheck.num_nodes() > 0) {
-            std::string s = gcheck.dag_string();
-            gcheck.fill_sockaddr((sockaddr_x*)addr);
-            *addrlen = sizeof(sockaddr_x);
-            return 0;
-        }
+		// check to see if the returned dag was valid
+    // we may want a better check for this in the future
+		if (gcheck.num_nodes() > 0) {
+			std::string s = gcheck.dag_string();
+			gcheck.fill_sockaddr((sockaddr_x*)addr);
+			*addrlen = sizeof(sockaddr_x);
+			return 0;
     }
-printf("Before Xsocket\n");
+	}
+//printf("Before Xsocket\n");
 	// not found locally, check the name server
 	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
 		return -1;
-printf("Before XreadNameServerDAG\n");
+//printf("Before XreadNameServerDAG\n");
 	//Read the nameserver DAG (the one that the name-query will be sent to)
 	if ( XreadNameServerDAG(sock, &ns_dag) < 0 ) {
 		LOG("Unable to find nameserver address");
@@ -296,15 +295,17 @@ printf("Before XreadNameServerDAG\n");
 	query_pkt.name = name;
 	query_pkt.dag = NULL;
 	int len = make_ns_packet(&query_pkt, pkt, sizeof(pkt));
-printf("Before Xsendto queny\n");
+printf("Sending nameservice queny\n");
 	//Send a name query to the name server
 	if ((rc = Xsendto(sock, pkt, len, 0, (const struct sockaddr*)&ns_dag, sizeof(sockaddr_x))) < 0) {
+printf("Sent %d bytes\n", rc);
 		int err = errno;
 		LOGF("Error sending name query (%d)", rc);
 		Xclose(sock);
 		errno = err;
 		return -1;
 	}
+	
 printf("Before Xrecvfrom\n");
 	//Check the response from the name server
 	memset(pkt, 0, sizeof(pkt));
@@ -319,7 +320,7 @@ printf("Error retrieving name query (%d)", err);
 
 	ns_pkt resp_pkt;
 	get_ns_packet(pkt, rc, &resp_pkt);
-printf("Before switch\n");
+// printf("Before switch\n");
 
 	switch (resp_pkt.type) {
 	case NS_TYPE_RESPONSE_QUERY:
@@ -338,7 +339,6 @@ printf("Before switch\n");
 	if (result < 0) {
 		return result;
 	}
-printf("Result: %d\n", result);
 
 	Graph g(resp_pkt.dag);
 	g.fill_sockaddr(addr);
