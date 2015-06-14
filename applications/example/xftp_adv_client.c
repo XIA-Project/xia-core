@@ -25,13 +25,9 @@ char ftpServHID[MAX_XID_SIZE];
 char fetchAD[MAX_XID_SIZE];
 char fetchHID[MAX_XID_SIZE];
 
-char prefetchClientAD[MAX_XID_SIZE];
-char prefetchClientHID[MAX_XID_SIZE];
-
 char prefetchProfileAD[MAX_XID_SIZE];
 char prefetchProfileHID[MAX_XID_SIZE];
 
-char ftp_name[] = "www_s.ftp.advanced.aaa.xia";
 //char prefetch_client_name[] = "www_s.client.prefetch.aaa.xia";
 
 int ftpSock, prefetchProfileSock, netMonSock; // prefetchClientSock
@@ -315,7 +311,6 @@ cerr<<"Thread id "<<thread_id<<": "<<"Network changed before sending probe infor
 			chunkProfile[string(CID_DONE)].fromNet = myAD;
 		} 
 		ChunkStatus cs[CIDs_DONE.size()];
-		//char data[XIA_MAXCHUNK];
 		int len;
 		int status = -1;
 		int n = CIDs_DONE.size();
@@ -490,7 +485,7 @@ int main(int argc, char **argv)
 			lastSSID = execSystem(GETSSID_CMD);
 			currSSID = execSystem(GETSSID_CMD);
 
-			ftpSock = initStreamClient(ftp_name, myAD, myHID, ftpServAD, ftpServHID);
+			ftpSock = initStreamClient(FTP_NAME, myAD, myHID, ftpServAD, ftpServHID);
 			strcpy(currAD, myAD);
 
 			//pthread_t thread_netMon;

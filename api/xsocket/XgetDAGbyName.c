@@ -31,6 +31,9 @@
 
 #define ETC_HOSTS "/etc/hosts.xia"
 
+#define NS_LOOKUP_RETRY_NUM 30
+#define NS_LOOKUP_WAIT_MSEC 1000
+
 /*!
 ** @brief Lookup a DAG in the hosts.xia file
 **
@@ -284,7 +287,7 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 		return -1;
 //printf("Before XreadNameServerDAG\n");
 	//Read the nameserver DAG (the one that the name-query will be sent to)
-	if ( XreadNameServerDAG(sock, &ns_dag) < 0 ) {
+	if (XreadNameServerDAG(sock, &ns_dag) < 0 ) {
 		LOG("Unable to find nameserver address");
 		errno = NO_RECOVERY;
 		return -1;
@@ -302,12 +305,33 @@ assert(len > 0);
 	//Send a name query to the name server
 	if ((rc = Xsendto(sock, pkt, len, 0, (const struct sockaddr*)&ns_dag, sizeof(sockaddr_x))) < 0) {
 		int err = errno;
-		printf("Error: sent %d bytes\n", rc);
+printf("Error: sent %d bytes\n", rc);
 		LOGF("Error sending name query (%d)", rc);
 		Xclose(sock);
 		errno = err;
 		return -1;
 	}
+
+	for (int i = 0; i < NS_LOOKUP_RETRY_NUM; i++) {
+		struct pollfd pfds[2];
+		pfds[0].fd = sock;
+		pfds[0].events = POLLIN;
+		if ((rc = Xpoll(pfds, 1, NS_LOOKUP_WAIT_MSEC)) <= 0) {
+			//die(-5, "Poll returned %d\n", rc);
+			if ((rc = Xsendto(sock, pkt, len, 0, (const struct sockaddr*)&ns_dag, sizeof(sockaddr_x))) < 0) {
+				int err = errno;
+				LOGF("Error sending name query (%d)", rc);
+				Xclose(sock);
+				errno = err;
+				return -1;
+			}
+printf("Retried %d times...\n", i+1);		
+		}
+		else {
+			break;
+		}
+	}
+	
 	// TODO: reties =4 for, if time out, then Xsendto again  Xsekect(readfdf = sock, timeout)<0
 printf("Sent %d bytes and begin to Xrecvfrom\n", rc);
 	//Check the response from the name server
@@ -329,16 +353,16 @@ printf("Nameserver DAG: %s\n", gns.dag_string().c_str());
 // printf("Before switch\n");
 
 	switch (resp_pkt.type) {
-	case NS_TYPE_RESPONSE_QUERY:
-		result = 1;
-		break;
-	case NS_TYPE_RESPONSE_ERROR:
-		result = -1;
-		break;
-	default:
-		LOG("Unknown nameserver response");
-		result = -1;
-		break;
+		case NS_TYPE_RESPONSE_QUERY:
+			result = 1;
+			break;
+		case NS_TYPE_RESPONSE_ERROR:
+			result = -1;
+			break;
+		default:
+			LOG("Unknown nameserver response");
+			result = -1;
+			break;
 	}
 	Xclose(sock);
 
