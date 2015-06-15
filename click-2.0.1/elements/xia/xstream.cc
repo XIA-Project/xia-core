@@ -76,7 +76,7 @@ XStream::tcp_input(WritablePacket *p)
     {
     	click_chatter("Invalid header\n");
     }
-
+    cout<<"tcp_input"<<endl;
     get_transport()->_tcpstat.tcps_rcvtotal++; 
 
     /* we need to copy ti, since we need it later */

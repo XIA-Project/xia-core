@@ -1368,7 +1368,7 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
     if (handler != NULL)
     {
     	INFO("We are in the normal case");
-    	handler -> push(p_in);
+    	((XStream *)handler) -> push(p_in);
     } else {
     	click_tcp *tcph = (click_tcp *)thdr.header();
     	if (tcph->th_flags == TH_SYN) {
