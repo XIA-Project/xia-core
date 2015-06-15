@@ -3,11 +3,11 @@ require(library xia_address.click);
 
 
 // host & router instantiation
-host0 :: XIAEndHost (RE AD0 HID0, HID0, 1500, 0, aa:aa:aa:aa:aa:aa);
-host1 :: XIAEndHost (RE AD1 HID1, HID1, 1600, 1, aa:aa:aa:aa:aa:aa);
+host0 :: XIAEndHost (1500, 0, aa:aa:aa:aa:aa:aa);
+host1 :: XIAEndHost (1600, 1, aa:aa:aa:aa:aa:aa);
 
-router0 :: XIARouter2Port(RE AD0 RHID0, AD0, RHID0, 0.0.0.0, 1700, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
-router1 :: XIARouter2Port(RE AD1 RHID1, AD1, RHID1, 0.0.0.0, 1800, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
+router0 :: XIARouter2Port(AD0, 0.0.0.0, 1700, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
+router1 :: XIARouter2Port(AD1, 0.0.0.0, 1800, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
 
 // The following line is required by the xianet script so it can determine the appropriate
 // host/router pair to run the nameserver on
