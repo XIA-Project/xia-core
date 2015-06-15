@@ -64,6 +64,9 @@ if len(sys.argv) != 5:
 
 nshost = None
 
+# pattern for comment containing nameserver host name
+ns_pattern = re.compile('//\s*(\w+)\s*::\s*nameserver')
+
 # slurp in the config file stripping comments and whitespace
 lines = ''
 try:
@@ -71,17 +74,10 @@ try:
 		for line in conf_file:
 
 			# see if there is a comment indicating nameserver host
-			# comment must be on a line by itself
 			# '// host :: nameserver'
-			if line.find('nameserver') >= 0:
-				i = line.find('//')
-				if i >= 0:
-					ns = line[i+2:]
-					i = ns.find('::')
-					if i >= 0:
-						ns = ns[:i-1]
-						nshost = ns.strip()
-					continue
+			match = ns_pattern.match(line)
+			if match:
+				nshost = match.group(1)
 
 			# get rid of comments and whitespace
 			line = line.partition('//')[0]
