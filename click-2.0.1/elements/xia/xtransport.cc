@@ -1365,11 +1365,17 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
     TransportHeader thdr(p_in);
 
     sock *handler = XIDpairToSock.get(xid_pair);
+    sock *handler2 = XIDpairToConnectPending.get(xid_pair);
     if (handler != NULL)
     {
     	INFO("We are in the normal case");
     	((XStream *)handler) -> push(p_in);
-    } else {
+    } else if (handler2 != NULL)
+    {
+    	INFO("We are in the second case");
+    	((XStream *)handler2) -> push(p_in);
+    } 
+    else {
     	click_tcp *tcph = (click_tcp *)thdr.header();
     	if (tcph->th_flags == TH_SYN) {
     		// unlike the other stream handlers, there is no pair yet, so use dest_xid to get port

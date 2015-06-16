@@ -76,7 +76,7 @@ XStream::tcp_input(WritablePacket *p)
     {
     	click_chatter("Invalid header\n");
     }
-    cout<<"tcp_input"<<endl;
+    printf("Tcp input with state %d\n", tp->t_state);
     get_transport()->_tcpstat.tcps_rcvtotal++; 
 
     /* we need to copy ti, since we need it later */
@@ -324,6 +324,7 @@ XStream::tcp_input(WritablePacket *p)
 
 			if (tiflags & TH_ACK && SEQ_GT(tp->snd_una, tp->iss)) {
 				tcp_set_state(TCPS_ESTABLISHED);
+				printf("Client side 3way handshake is done.\n");
 				if (polling) {
 					// tell API we are writble now
 					get_transport()->ProcessPollEvent(port, POLLOUT);
@@ -558,6 +559,7 @@ XStream::tcp_input(WritablePacket *p)
 		if (SEQ_GT(tp->snd_una, ti.ti_ack) || SEQ_GT(ti.ti_ack, tp->snd_max)) {
 			goto dropwithreset;
 		}
+		printf("Server side 3way handshake is done.\n");
 	    tcp_set_state(TCPS_ESTABLISHED);
 	    if ((tp->t_flags & (TF_RCVD_SCALE | TF_REQ_SCALE)) == 
 		    (TF_RCVD_SCALE | TF_REQ_SCALE)) { 
