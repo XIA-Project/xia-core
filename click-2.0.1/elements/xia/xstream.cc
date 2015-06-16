@@ -321,7 +321,7 @@ XStream::tcp_input(WritablePacket *p)
 			tp->irs = ti.ti_seq; 
 			_tcp_rcvseqinit(tp); 
 			tp->t_flags |= TF_ACKNOW; 
-
+			tp->iss = tp->snd_una-1;		// The initial sequence number should be fixed later !!!!!!!!!!!
 			if (tiflags & TH_ACK && SEQ_GT(tp->snd_una, tp->iss)) {
 				tcp_set_state(TCPS_ESTABLISHED);
 				printf("Client side 3way handshake is done.\n");
