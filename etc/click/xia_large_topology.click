@@ -11,10 +11,10 @@ host31 :: XIAEndHost (1800, 3, aa:aa:aa:aa:aa:aa);
 host32 :: XIAEndHost (1900, 4, aa:aa:aa:aa:aa:aa);
 host33 :: XIAEndHost (2000, 5, aa:aa:aa:aa:aa:aa);
 
-router0 :: XIARouter4Port(AD0, 0.0.0.0, 2100, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
-router1 :: XIARouter2Port(AD1, 0.0.0.0, 2200, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
-router2 :: XIARouter2Port(AD2, 0.0.0.0, 2300, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
-router3 :: XIARouter4Port(AD3, 0.0.0.0, 2400, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
+router0 :: XIARouter4Port(2100, 0.0.0.0, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
+router1 :: XIARouter2Port(2200, 0.0.0.0, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
+router2 :: XIARouter2Port(2300, 0.0.0.0, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
+router3 :: XIARouter4Port(2400, 0.0.0.0, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
 
 
 // The following line is required by the xianet script so it can determine the appropriate
