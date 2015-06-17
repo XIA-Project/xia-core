@@ -12,13 +12,32 @@ from string import Template
 
 # constants
 templatedir = "etc/click/templates"
-ext = "template"
+configdir = 'etc/click'
+ext = 'template'
+hostclick = 'host.click'
+routerclick = 'router.click'
+dualhostclick = 'dual_stack_host.click'
+dualrouterclick = 'dual_stack_router.click'
+
+# Find where we are running out of
 srcdir = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
-hostconfig = os.path.join(srcdir, templatedir, "host.click")
-routerconfig = os.path.join(srcdir, templatedir, "router.click")
-dualhostconfig = os.path.join(srcdir, templatedir, "dual_stack_host.click")
-dualrouterconfig = os.path.join(srcdir, templatedir, "dual_stack_router.click")
-resolvconfpath = os.path.join(srcdir, 'etc/resolv.conf')
+
+# Update complete paths for template and config dirs
+# NOTE: Must be done before calls to get_config/template_path functions
+templatedir = os.path.join(srcdir, templatedir)
+configdir = os.path.join(srcdir, configdir)
+
+# Template locations
+hosttemplate = get_template_path(hostclick)
+routertemplate = get_template_path(routerclick)
+dualhosttemplate = get_template_path(dualhostclick)
+dualroutertemplate = get_template_path(dualrouterclick)
+
+# Output config file locations
+hostconfig = get_config_path(hostclick)
+routerconfig = get_config_path(routerclick)
+dualhostconfig = get_config_path(dualhostclick)
+dualrouterconfig = get_config_path(dualrouterclick)
 
 # default to host mode
 nodetype = "host"
@@ -32,6 +51,18 @@ ip_override_addr = None
 interface_filter = None
 interface = None
 socket_ips_ports = None
+
+#
+# Get the location of a template file
+#
+def get_template_path(click_file):
+    return os.path.join(templatedir, '%s.%s' % (click_file, ext))
+
+#
+# Get the location for output config file
+#
+def get_config_path(click_file):
+    return os.path.join(configdir, click_file)
 
 #
 # create a globally unique HID based off of our mac address
@@ -168,7 +199,7 @@ def makeHostConfig():
         print "multiple interfaces found, using " + interfaces[0][0]
 
     try:
-        f = open(hostconfig + "." + ext, "r")
+        f = open(hosttemplate, "r")
         text = f.read()
         f.close()
 
@@ -227,15 +258,13 @@ def makeHostConfig():
 # footer - boilerplate
 
 def makeRouterConfig():
-    makeRouterConfigToFile(routerconfig)
+    makeRouterConfigToFile(routertemplate, routerconfig)
 
-def makeRouterConfigToFile(outfile):
+def makeRouterConfigToFile(template, outfile):
     global interface_filter
 
     interfaces = getInterfaces(interface_filter)
     print "Got these interfaces:", interfaces
-
-    template = '%s.%s' % (outfile, ext)
 
     socket_ip_port_list = [p.strip() for p in socket_ips_ports.split(',')] if socket_ips_ports else []
     print "Socket ip port list contains:", socket_ip_port_list
@@ -409,7 +438,7 @@ def makeDualHostConfig(ad):
     xia_interfaces = getInterfaces(filter, None)
 
     try:
-        f = open(dualhostconfig + "." + ext, "r")
+        f = open(dualhosttemplate, "r")
         text = f.read()
         f.close()
 
@@ -559,12 +588,9 @@ def makeDualRouterConfig(ad):
     ip_interfaces = getInterfaces(None, interface)
     xia_interfaces = getInterfaces(filter, None)
 
-    template = '%s.%s' % (dualrouterconfig, ext)
-    outfile = dualrouterconfig
-
     socket_ip_port_list = [p.strip() for p in socket_ips_ports.split(',')] if socket_ips_ports else []
 
-    makeGenericRouterConfig(4, ad, socket_ip_port_list, xia_interfaces, ip_interfaces, template, outfile)
+    makeGenericRouterConfig(4, ad, socket_ip_port_list, xia_interfaces, ip_interfaces, dualroutertemplate, dualrouterconfig)
 
 
 #
@@ -661,7 +687,7 @@ def main():
             makeDualHostConfig(ad)
         else:
             print "Calling makeRouterConfig"
-            makeRouterConfigToFile(hostconfig)
+            makeRouterConfigToFile(hosttemplate, hostconfig)
     elif nodetype == "router":
         ad = createAD()
         if dual_stack:
