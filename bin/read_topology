@@ -17,143 +17,81 @@
 import sys
 import os
 import re
-import hashlib
 import genkeys
-from Crypto.PublicKey import RSA
 
 DEFAULT_PORT=1500
-create_xia_address_click = False
-
-# Directory where all the keys will be dumped
-keydir = 'key'
-
-permanent_xia_addresses = {
-		#"AD0":"AD:1000000000000000000000000000000000000000",
-		#"AD1":"AD:1000000000000000000000000000000000000001",
-		"CID0":"CID:2000000000000000000000000000000000000001",
-		"IPID1":"IP:1.0.0.2",
-		"XHCP_HID0":"HID:1200000000000000000000000000000000000001",
-		"AD_INIT":"AD:1000000000000000000000000000000000000999",
-		"BHID":"HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
-		"SID_XHCP":"SID:1110000000000000000000000000000000001111",
-		"SID_XROUTE":"SID:1110000000000000000000000000000000001112",
-		"SID_NS":"SID:1110000000000000000000000000000000001113",
-		}
-
-topology_xia_addresses = {}
 
 def help():
-	print '\nusage: make_sockconf click_conf_file dest_sockconf dest_nodeconf dest_xia_addr_click'
-	print 'creates xsockconf.ini and xnodeconf in the current directory based on the'
-	print 'specified template file\n'
+	print '\nUsage: %s click_conf_file dest_sockconf dest_nodeconf' % sys.argv[0]
+	print 'creates xsockconf.ini and nodes.conf in the current directory based on the'
+	print 'specified click_conf_file\n'
 	sys.exit(-1)
 
 def create_output_file(name):
-	f = None
 	try:
-		f = open(name, 'w')
+		return open(name, 'w')
 	except:
-		print 'unable to open %s for writing' % name
-
-	return f
+		print 'ERROR: unable to open %s for writing\n' % name
+		help()
 
 # start here
 
-if len(sys.argv) != 5:
+# We take exactly 3 arguments
+if len(sys.argv) != 4:
 	help()
+topology_conf_file = sys.argv[1]
+sockconf_ini_file  = sys.argv[2]
+nodes_conf_file	   = sys.argv[3]
 
-nshost = None
+# Create the xsockconf.ini file
+sockconf = create_output_file(sockconf_ini_file)
+sockconf.write('# Generated from %s\n\n' % os.path.basename(topology_conf_file))
+sockconf.write('[default]\nclick_port=%s\n\n' % DEFAULT_PORT)
+
+# Create the nodes.conf file
+nodeconf = create_output_file(nodes_conf_file)
 
 # pattern for comment containing nameserver host name
 ns_pattern = re.compile('//\s*(\w+)\s*::\s*nameserver')
 
-# slurp in the config file stripping comments and whitespace
-lines = ''
-try:
-	with open(sys.argv[1]) as conf_file:
-		for line in conf_file:
+# pattern for a Click element instantiation
+# hostname :: element_type (argument1, argument2, ...)
+element_pattern = re.compile('^(\w+)\s*::\s*(\w+)\s*\((.+)\);')
 
-			# see if there is a comment indicating nameserver host
-			# '// host :: nameserver'
+# Nameserver hostname
+nshost = None
+
+# Read the bootstrapping click config file that defines the topology
+try:
+	with open(topology_conf_file) as conf_file:
+		for line in conf_file:
+			# Read nameserver from comment: '// host :: nameserver'
 			match = ns_pattern.match(line)
 			if match:
 				nshost = match.group(1)
-
-			# get rid of comments and whitespace
-			line = line.partition('//')[0]
-			line = line.strip()
-			if len(line) == 0:
 				continue
-			lines += line
+
+			# Look for Click host/router definitions
+			match = element_pattern.match(line)
+			if not match:
+				continue
+
+			# We found a Click host/router instance
+			hostname  = match.group(1)
+			elemtype  = match.group(2)
+			arguments = match.group(3).replace(' ','').split(',')
+
+			# Write a sockconf entry for this hostname
+			sockconf.write('[%s]\nclick_port=%s\n\n' % (hostname, arguments[0])))
+
+			# Create a nodes.conf entry for this hostname
+			nodeconf.write("%s\t%s\n" % (hostname, elemtype))
 except:
 	help()
 
-
-sockconf = create_output_file(sys.argv[2])
-sockconf.write('# Generated from %s\n\n' % os.path.basename(sys.argv[1]))
-sockconf.write('[default]\nclick_port=%s\n\n' % DEFAULT_PORT)
-
-nodeconf = create_output_file(sys.argv[3])
-
-xia_address = None
-if 'topology' in sys.argv[1]:
-	create_xia_address_click = True
-	xia_address = create_output_file(sys.argv[4])
-	xia_address.write('XIAXIDInfo(\n')
-
-# look for elements of type XIAEndHost, XiaRouter[n]Port, and XIADualRouter[n]Port
-test = re.compile('XIAEndHost|XIARouter\d+Port|XIADualRouter\d+Port')
-
-next_ad = 0
-lines = lines.split(';')
-for line in lines:
-
-	# find lines with an element definition
-	element = re.search(test, line)
-	if element == None:
-		continue
-
-	# which field is port defined in
-	field = 0
-	idfield = 0
-	if element.group() == 'XIAEndHost':
-		field = 2
-		idfield = 1
-	else:
-		field = 4
-		idfield = 2
-		if xia_address:
-			ad_num = 'AD%d' % next_ad
-			ad_addr = genkeys.create_new_AD()
-			#xia_address.write('\tAD%d AD:%s,\n' % (next_ad, create_new_address()))
-			xia_address.write('\t%s %s,\n' % (ad_num, ad_addr))
-			topology_xia_addresses[ad_num] = ad_addr
-			next_ad = next_ad + 1
-
-	name, fields = line.split('::')
-	fields = fields.split(',')
-	name = name.strip()
-
-	sockconf.write('[%s]\nclick_port=%s\n\n' % (name, fields[field].strip()))
-	nodeconf.write("%s\t%s\n" % (name, element.group()))
-	if xia_address:
-		dev_name = fields[idfield].strip()
-		dev_addr = genkeys.create_new_HID()
-		#xia_address.write('\t%s HID:%s,\n' % (fields[idfield].strip(), create_new_address()))
-		xia_address.write('\t%s %s,\n' % (dev_name, dev_addr))
-		topology_xia_addresses[dev_name] = dev_addr
-
+# Add nameserver (if found) at the end of nodes.conf
 if nshost != None:
 	nodeconf.write("%s\t%s\n" % (nshost, 'nameserver'))
 
 sockconf.close
 nodeconf.close
-# For predefined topologies we create xia_address.click and resolv.conf
-if create_xia_address_click:
-	for key, value in permanent_xia_addresses.iteritems():
-		xia_address.write('\t' + ' '.join([key, value]) + ',\n')
-	xia_address.write(');\n')
-	xia_address.close()
-	resolv_conf = create_output_file('etc/resolv.conf')
-	resolv_conf.write('nameserver=RE %s %s %s\n' % (topology_xia_addresses['AD0'], topology_xia_addresses['HID0'], permanent_xia_addresses['SID_NS']))
-	resolv_conf.close()
