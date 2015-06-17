@@ -88,8 +88,8 @@ using namespace xia;
 struct mini_tcpip
 {
 	uint16_t ti_len;
-	uint16_t ti_seq;
-	uint16_t ti_ack;
+	uint32_t ti_seq;
+	uint32_t ti_ack;
 	uint16_t ti_off;
 	uint16_t ti_flags;
 	uint16_t ti_win;

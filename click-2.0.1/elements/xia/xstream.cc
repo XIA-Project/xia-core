@@ -87,7 +87,9 @@ XStream::tcp_input(WritablePacket *p)
     ti.ti_flags = tcph->th_flags;
     ti.ti_win = ntohs(tcph->th_win);
     ti.ti_urp = ntohs(tcph->th_urp);
-
+	printf("tcpinput flag is %d\n", ti.ti_flags);
+	printf("tcpinput seq is %d\n", (ti.ti_seq));
+	printf("tcpinput ack is %d\n", (ti.ti_ack));
     /*205 packet should be sane, skip tests */ 
     off = ti.ti_off << 2; 
 
@@ -299,7 +301,7 @@ XStream::tcp_input(WritablePacket *p)
 			/* 530 */
 		case TCPS_SYN_SENT:
 			if ((tiflags & TH_ACK) && 
-				(SEQ_LEQ(ti.ti_ack, tp->snd_una) ||
+				(SEQ_LEQ(ti.ti_ack, tp->iss) ||
 				 SEQ_GT(ti.ti_ack, tp->snd_max))) 
 			goto dropwithreset;
 
@@ -1212,7 +1214,9 @@ printf("1121+++++++%d\n",optlen);
 	delete send_hdr;
 	get_transport()->output(NETWORK_PORT).push(tcp_payload);
 	printf("1207\n");
-
+	printf("tcpoutput flag is %d\n", ti.th_flags);
+	printf("tcpoutput seq is %d\n", ntohl(ti.th_seq));
+	printf("tcpoutput ack is %d\n", ntohl(ti.th_ack));
 	/* Data has been sent out at this point. If we advertised a positive window
 	 * and if this new window advertisement will result in us recieving a higher
 	 * sequence numbered segment than before this window announcement, we record
@@ -1603,11 +1607,12 @@ void
 XStream::usropen() 
 { 
 	if (tp->iss == 0) {
-		tp->iss = 0x11111111; 
+		tp->iss = 0x11111; 
 		//debug_output(VERB_ERRORS, "Setting initial sequence to [%d], because it was 0", tp->iss);
 		// Setting a non-zero initial sequence number because I see some weird
 		// problems in wireshark when initial seq is 0
 	}
+	_tcp_sendseqinit(tp);
     //debug_output(VERB_STATES,"[%s] usropen with state <%s>, initial seq num <%d> \n", 
     	// dispatcher()->name().c_str(), tcpstates[tp->t_state], tp->iss); 
     if (tp->t_state == TCPS_CLOSED || tp->t_state == TCPS_LISTEN) {
