@@ -125,7 +125,6 @@ example/xcmptraceroute
 example/xecho
 
 # output from scripts
-etc/click/templates/xia_address.click
 etc/click/templates/host.click
 etc/click/templates/router.click
 etc/click/templates/dual_stack_host.click
