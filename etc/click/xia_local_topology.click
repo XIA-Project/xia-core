@@ -11,7 +11,7 @@ router1 :: XIARouter2Port(1800, 0.0.0.0, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
 
 // The following line is required by the xianet script so it can determine the appropriate
 // host/router pair to run the nameserver on
-// host0 :: nameserver
+// router0 :: nameserver
 
 // interconnection -- host - ad
 host0[0] -> LinkUnqueue(0.005, 1 GB/s) -> [0]router0;
