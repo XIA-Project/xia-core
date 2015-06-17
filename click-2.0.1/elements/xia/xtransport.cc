@@ -45,15 +45,12 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	_is_dual_stack_router = false;
 
 	if (cp_va_kparse(conf, this, errh,
-					 "LOCAL_ADDR", cpkP + cpkM, cpXIAPath, &local_addr,
 					 "LOCAL_4ID", cpkP + cpkM, cpXID, &local_4id,
 					 "ROUTETABLENAME", cpkP + cpkM, cpElement, &routing_table_elem,
 					 "IS_DUAL_STACK_ROUTER", 0, cpBool, &is_dual_stack_router,
 					 cpEnd) < 0)
 		return -1;
 
-	_local_addr = local_addr;
-	_local_hid = local_addr.xid(local_addr.destination_node());
 	_local_4id = local_4id;
 
 	// IP:0.0.0.0 indicates NULL 4ID
