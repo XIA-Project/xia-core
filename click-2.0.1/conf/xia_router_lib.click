@@ -405,7 +405,7 @@ elementclass XIADualRouter4Port {
 
 // endhost node with sockets
 elementclass XIAEndHost {
-	$click_port, $enable_local_cache, $mac0, $mac1, $mac2, $mac3 |
+	$click_port, $mac0, $mac1, $mac2, $mac3 |
 
 
 	// input: a packet arrived at the node

@@ -4,12 +4,12 @@ require(library xia_address.click);
 log::XLog(VERBOSE 0, LEVEL 6);
 
 // host & router instantiation
-host0 :: XIAEndHost (1500, 0, aa:aa:aa:aa:aa:aa);
-host1 :: XIAEndHost (1600, 1, aa:aa:aa:aa:aa:aa);
-host2 :: XIAEndHost (1700, 2, aa:aa:aa:aa:aa:aa);
-host31 :: XIAEndHost (1800, 3, aa:aa:aa:aa:aa:aa);
-host32 :: XIAEndHost (1900, 4, aa:aa:aa:aa:aa:aa);
-host33 :: XIAEndHost (2000, 5, aa:aa:aa:aa:aa:aa);
+host0 :: XIAEndHost (1500, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
+host1 :: XIAEndHost (1600, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
+host2 :: XIAEndHost (1700, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
+host31 :: XIAEndHost (1800, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
+host32 :: XIAEndHost (1900, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
+host33 :: XIAEndHost (2000, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
 
 router0 :: XIARouter4Port(2100, 0.0.0.0, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
 router1 :: XIARouter2Port(2200, 0.0.0.0, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);

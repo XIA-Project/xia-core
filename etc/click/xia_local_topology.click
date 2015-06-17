@@ -3,8 +3,8 @@ require(library xia_address.click);
 
 
 // host & router instantiation
-host0 :: XIAEndHost (1500, 0, aa:aa:aa:aa:aa:aa);
-host1 :: XIAEndHost (1600, 1, aa:aa:aa:aa:aa:aa);
+host0 :: XIAEndHost (1500, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
+host1 :: XIAEndHost (1600, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
 
 router0 :: XIARouter2Port(1700, 0.0.0.0, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
 router1 :: XIARouter2Port(1800, 0.0.0.0, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
