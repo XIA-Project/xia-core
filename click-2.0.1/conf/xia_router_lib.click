@@ -308,7 +308,7 @@ elementclass XIARoutingCore {
 
 // 2-port router 
 elementclass XIARouter2Port {
-    $local_ad, $external_ip, $click_port,
+    $click_port, $external_ip,
 	$mac0, $mac1, |
 
 	// $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
@@ -319,8 +319,6 @@ elementclass XIARouter2Port {
 	
 	xrc :: XIARoutingCore($external_ip, $click_port, 2, 0);
 
-	Script(write xrc/n/proc/rt_AD.add $local_ad $DESTINED_FOR_LOCALHOST);	// self AD as destination
-
 	xlc0 :: XIALineCard($mac0, 0, 0, 0);
 	xlc1 :: XIALineCard($mac1, 1, 0, 0);
     
@@ -330,7 +328,7 @@ elementclass XIARouter2Port {
 
 // 4-port router node 
 elementclass XIARouter4Port {
-	$local_ad, $external_ip, $click_port,
+	$click_port, $external_ip,
 	$mac0, $mac1, $mac2, $mac3 |
 
 	// $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
@@ -344,8 +342,6 @@ elementclass XIARouter4Port {
 	
 	xrc :: XIARoutingCore($external_ip, $click_port, 4, 0);
 
-	Script(write xrc/n/proc/rt_AD.add $local_ad $DESTINED_FOR_LOCALHOST);	// self AD as destination
-
 	xlc0 :: XIALineCard($mac0, 0, 0, 0);
 	xlc1 :: XIALineCard($mac1, 1, 0, 0);
 	xlc2 :: XIALineCard($mac2, 2, 0, 0);
@@ -357,7 +353,7 @@ elementclass XIARouter4Port {
 
 // 4-port router node with XRoute process running and IP support
 elementclass XIADualRouter4Port {
-	$local_ad, $external_ip, $click_port,
+	$click_port, $local_ad, $external_ip,
 	$ip_active0, $ip0, $mac0, $gw0,
 	$ip_active1, $ip1, $mac1, $gw1,
 	$ip_active2, $ip2, $mac2, $gw2,
