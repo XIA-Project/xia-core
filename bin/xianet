@@ -568,7 +568,6 @@ create_click_config()
 	esac
 
 	CONFFLAGS="$CONFFLAGS -i $HOSTNAME"
-	CONFPATH=$XIADIR/etc/click/templates
 
 	if [ ! -f $CONFPATH/$SCRIPT ]; then
 		echo "Building configuration from template"
