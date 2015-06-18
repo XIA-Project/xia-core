@@ -279,7 +279,7 @@ XStream::tcp_input(WritablePacket *p)
 				tp->iss = iss; 
 			} else {
 				printf("tcpinput TCPS_LISTEN: You should pick a correct tcpiss\n");
-				tp->iss = 1; /* TODO: sensible iss function */
+				tp->iss = 0x11111; /* TODO: sensible iss function */
 				//tp->iss = _tcp_iss(); /* suggested sensible iss function */
 			}
 			tp->irs = ti.ti_seq; 
