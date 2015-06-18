@@ -92,7 +92,6 @@ XStream::tcp_input(WritablePacket *p)
 	printf("tcpinput ack is %d\n", (ti.ti_ack));
     /*205 packet should be sane, skip tests */ 
     off = ti.ti_off << 2; 
-
     if (off < sizeof(click_tcp)) {
 		get_transport()->_tcpstat.tcps_rcvbadoff++; 
 	    p->kill();
@@ -246,7 +245,7 @@ XStream::tcp_input(WritablePacket *p)
 		}
 
 	print_tcpstats(p, "tcp_input (sp)");
-	
+	printf("Slow path begins\n");
     /* 438 TCP "Slow Path" processing begins here */
 	WritablePacket *copy = WritablePacket::make(0, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
 
@@ -1139,12 +1138,12 @@ printf("1113\n");
 printf("1119\n");
     ti.th_ack = htonl(tp->rcv_nxt);
 printf("1121+++++++%d\n",optlen);
-	  //   if (optlen) {
-	  //   	printf("1123\n");
+	    if (optlen) {
+	    	printf("1123\n");
 			// memcpy((&ti + 1), opt, optlen); 
-			// printf("1125\n");
-			// ti.th_off = (sizeof(click_tcp) + optlen) >> 2;
-	  //   } 
+			printf("1125\n");
+			ti.th_off = (sizeof(click_tcp) + optlen) >> 2;
+	    } 
     
     ti.th_flags = flags; 
 
