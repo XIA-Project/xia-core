@@ -92,7 +92,7 @@ XStream::tcp_input(WritablePacket *p)
 	printf("tcpinput ack is %d\n", (ti.ti_ack));
     /*205 packet should be sane, skip tests */ 
     off = ti.ti_off << 2; 
-    if (off < sizeof(click_tcp)) {
+    if (0&&off < sizeof(click_tcp)) {
 		get_transport()->_tcpstat.tcps_rcvbadoff++; 
 	    p->kill();
 		return;
@@ -278,7 +278,7 @@ XStream::tcp_input(WritablePacket *p)
 				tp->iss = iss; 
 			} else {
 				printf("tcpinput TCPS_LISTEN: You should pick a correct tcpiss\n");
-				tp->iss = 0x11111; /* TODO: sensible iss function */
+				tp->iss = 0x1; /* TODO: sensible iss function */
 				//tp->iss = _tcp_iss(); /* suggested sensible iss function */
 			}
 			tp->irs = ti.ti_seq; 
