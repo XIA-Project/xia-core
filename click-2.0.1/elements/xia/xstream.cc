@@ -80,7 +80,7 @@ XStream::tcp_input(WritablePacket *p)
     get_transport()->_tcpstat.tcps_rcvtotal++; 
 
     /* we need to copy ti, since we need it later */
-    ti.ti_len = (uint16_t)(xiah.plen() - thdr.hlen());
+    ti.ti_len = (uint16_t)(xiah.plen() - thdr.hlen());	// make sure that this is right
     ti.ti_seq = ntohl(tcph->th_seq);
     ti.ti_ack = ntohl(tcph->th_ack);
     ti.ti_off = tcph->th_off;
@@ -147,7 +147,8 @@ XStream::tcp_input(WritablePacket *p)
 		tp->snd_nxt == tp->snd_max) {
 
 			// We have entered the fast path
-			print_tcpstats(p, "tcp_input (fp)");
+			printf("tcpinput: Enter the fast path\n");
+			// print_tcpstats(p, "tcp_input (fp)");
 
 			/* If last ACK falls within this segment's sequence numbers,
 			 *  record the timestamp. */
@@ -162,7 +163,7 @@ XStream::tcp_input(WritablePacket *p)
 					SEQ_LEQ(ti.ti_ack, tp->snd_max) &&
 					tp->snd_cwnd >= tp->snd_wnd) {
 
-					/* this is a pure ack for outstanding data. */
+					cout << "this is a pure ack for outstanding data" << endl;
 					//debug_output(VERB_TCP, "[%s] got pure ack: [%u]", SPKRNAME, ti.ti_ack);
 					++(get_transport()->_tcpstat.tcps_predack);
 					if (ts_present)
@@ -249,8 +250,7 @@ XStream::tcp_input(WritablePacket *p)
     /* 438 TCP "Slow Path" processing begins here */
 	WritablePacket *copy = WritablePacket::make(0, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
 
-    int win; 
-	win = so_recv_buffer_space();
+    int win = so_recv_buffer_space();
 	if (win < 0) { win = 0; }
 	tp->rcv_wnd = max(win, (int)(tp->rcv_adv - tp->rcv_nxt)); 
 
@@ -278,6 +278,7 @@ XStream::tcp_input(WritablePacket *p)
 			if (iss) {
 				tp->iss = iss; 
 			} else {
+				printf("tcpinput TCPS_LISTEN: You should pick a correct tcpiss\n");
 				tp->iss = 1; /* TODO: sensible iss function */
 				//tp->iss = _tcp_iss(); /* suggested sensible iss function */
 			}
@@ -323,7 +324,6 @@ XStream::tcp_input(WritablePacket *p)
 			tp->irs = ti.ti_seq; 
 			_tcp_rcvseqinit(tp); 
 			tp->t_flags |= TF_ACKNOW; 
-			tp->iss = tp->snd_una-1;		// The initial sequence number should be fixed later !!!!!!!!!!!
 			if (tiflags & TH_ACK && SEQ_GT(tp->snd_una, tp->iss)) {
 				tcp_set_state(TCPS_ESTABLISHED);
 				printf("Client side 3way handshake is done.\n");
@@ -438,6 +438,20 @@ XStream::tcp_input(WritablePacket *p)
 			get_transport()->_tcpstat.tcps_rcvpartduppack++;
 			get_transport()->_tcpstat.tcps_rcvpartdupbyte += todrop;
 		}
+
+		/* alternatively */
+		// if (todrop > ti.ti_len ||
+		// 	topdrop == ti.ti_len && (tiflags & TH_FIN) == 0) {
+		// 	tiflags &= ~TH_FIN;
+		// 	tp->t_flags |= TF_ACKNOW;
+		// 	todrop = ti.ti_len;
+		// 	get_transport()->_tcpstat.tcps_rcvdupbyte += todrop; 
+		// 	get_transport()->_tcpstat.tcps_rcvduppack++; 
+		// } else {
+		// 	get_transport()->_tcpstat.tcps_rcvpartduppack++;
+		// 	get_transport()->_tcpstat.tcps_rcvpartdupbyte += todrop;
+		// }
+
 		copy->pull(todrop);
 		ti.ti_seq += todrop;
 		ti.ti_len -= todrop;
@@ -554,8 +568,9 @@ XStream::tcp_input(WritablePacket *p)
 		goto dropwithreset;
 	}
 
+	assert(tiflags & TH_ACK);
 
-    /* 791 */
+    /* 791 ack processing */
     switch (tp->t_state) { 
 	case TCPS_SYN_RECEIVED: 
 		if (SEQ_GT(tp->snd_una, ti.ti_ack) || SEQ_GT(ti.ti_ack, tp->snd_max)) {
@@ -688,7 +703,7 @@ XStream::tcp_input(WritablePacket *p)
 		u_int cw = tp->snd_cwnd;
 		u_int incr = tp->t_maxseg;
 		if (cw > tp->snd_ssthresh ) 
-		    incr = incr * incr / cw; 
+		    incr = incr * incr / cw + incr / 8; 
 		tp->snd_cwnd = min(cw + incr, (u_int) TCP_MAXWIN << tp->snd_scale); 
 		//debug_output(VERB_TCP, "[%s] now: [%u] cwnd: %u, increase: %u", SPKRNAME, get_transport()->tcp_now(), tp->snd_cwnd, incr); 		
 	    }
@@ -707,7 +722,7 @@ XStream::tcp_input(WritablePacket *p)
 	    }
 	    tp->snd_una = ti.ti_ack; 
 	    if (SEQ_LT(tp->snd_nxt, tp->snd_una))
-		tp->snd_nxt = tp->snd_una; 
+			tp->snd_nxt = tp->snd_una; 
 
 	    /* 957 */ 
 	    switch (tp->t_state) { 
@@ -755,9 +770,9 @@ XStream::tcp_input(WritablePacket *p)
 step6: 
 	/* Check for ACK flag AND any one of the following 3 conditions */
 	if ((tiflags & TH_ACK) && 
-		(SEQ_LT(tp->snd_wl1, ti.ti_seq) || 
-		(tp->snd_wl1 == ti.ti_seq && (SEQ_LT(tp->snd_wl2, ti.ti_ack))) || 
-		(tp->snd_wl2 == ti.ti_ack && tiwin > tp->snd_wnd))) { 
+		(SEQ_LT(tp->snd_wl1, ti.ti_seq) || tp->snd_wl1 == ti.ti_seq && 
+	     (SEQ_LT(tp->snd_wl2, ti.ti_ack) || 
+		  tp->snd_wl2 == ti.ti_ack && tiwin > tp->snd_wnd))) { 
 
 		/* Keep track of pure window updates */
 		if (ti.ti_len == 0 && tp->snd_wl2 == ti.ti_ack && tiwin > tp->snd_wnd)
@@ -773,20 +788,20 @@ step6:
     }
 
     /*1038 TODO: Urgent data processing */
-	if ((tiflags & TH_URG) && ti.ti_urp &&
-		TCPS_HAVERCVDFIN(tp->t_state) == 0) {
-			if (false) {
-				//if (ti.ti_urp + so_recv_buffer_size > so_recv_buffer_size)
-				ti.ti_urp = 0;
-				tiflags &= ~TH_URG;
-				goto dodata;
-		}
+	// if ((tiflags & TH_URG) && ti.ti_urp &&
+	// 	TCPS_HAVERCVDFIN(tp->t_state) == 0) {
+	// 		if (false) {
+	// 			//if (ti.ti_urp + so_recv_buffer_size > so_recv_buffer_size)
+	// 			ti.ti_urp = 0;
+	// 			tiflags &= ~TH_URG;
+	// 			goto dodata;
+	// 	}
 
-		if (SEQ_GT(ti.ti_seq + ti.ti_urp, tp->rcv_up)) {
-			// do some stuf pg 984
-		}
-		// more stuff goes here from pg 984
-	}
+	// 	if (SEQ_GT(ti.ti_seq + ti.ti_urp, tp->rcv_up)) {
+	// 		// do some stuf pg 984
+	// 	}
+	// 	// more stuff goes here from pg 984
+	// }
 
     /*1094*/
 dodata: 
@@ -1002,6 +1017,7 @@ again:
 		if (2 * adv >= so_recv_buffer_size )
 			goto send;
     } else {
+    	printf("\t\t\t\twin <= 0!!!\n");
 		//debug_output(VERB_TCPSTATS, "[%s] win: [%u]  (radv: [%u] rnxt: [%u]) [%u]", SPKRNAME, win, tp->rcv_adv, tp->rcv_nxt, tp->rcv_adv-tp->rcv_nxt);
 	}
 
@@ -1071,7 +1087,7 @@ send:
 		u_long *lp = (u_long*) (opt + optlen); 
 		*lp++ = htonl(TCPOPT_TSTAMP_HDR); 
 		*lp++ = htonl(get_transport()->tcp_now()); 
-		*lp++ = htonl(tp->ts_recent); 
+		*lp = htonl(tp->ts_recent); 
 		optlen += TCPOLEN_TSTAMP_APPA; 
     } else { 
 		// Remove this clause after it's been debugged and timestamps are working properly
@@ -1123,12 +1139,13 @@ printf("1113\n");
 printf("1119\n");
     ti.th_ack = htonl(tp->rcv_nxt);
 printf("1121+++++++%d\n",optlen);
-  //   if (optlen) {
-  //   	printf("1123\n");
-		// memcpy((&ti + 1), opt, optlen); 
-		// printf("1125\n");
-  //   } 
-    ti.th_off = (sizeof(click_tcp) + optlen) >> 2;
+    if (optlen) {
+    	printf("1123\n");
+		memcpy((&ti + 1), opt, optlen); 
+		printf("1125\n");
+		ti.th_off = (sizeof(click_tcp) + optlen) >> 2;
+    } 
+    
     ti.th_flags = flags; 
 
     /*370*/
@@ -1238,6 +1255,7 @@ printf("1121+++++++%d\n",optlen);
 void
 XStream::tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags)
 {
+	printf("tcp_respond is called, there is bug sending a packet\n");
 	click_tcp th;
 
 	int win = min(so_recv_buffer_space(),  TCP_MAXWIN << tp->rcv_scale); 
@@ -1251,7 +1269,6 @@ XStream::tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags)
 	}
 	
 /*	setports(th->th_sport, _con_id._ports); */
-
 	th.th_flags2 = 0; 
 	th.th_seq =   htonl(seq); 
 	th.th_ack =   htonl(ack); 
@@ -1617,7 +1634,8 @@ XStream::usropen()
     	// dispatcher()->name().c_str(), tcpstates[tp->t_state], tp->iss); 
     if (tp->t_state == TCPS_CLOSED || tp->t_state == TCPS_LISTEN) {
     	cout << "we are good\n";
-		tcp_set_state(TCPS_SYN_SENT); 
+		tcp_set_state(TCPS_SYN_SENT);
+		tp->t_timer[TCPT_KEEP] = TCPTV_KEEP_INIT;
     }
 	cout << "we are good+1\n";
     tcp_output(); 

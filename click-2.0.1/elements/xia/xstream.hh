@@ -59,7 +59,7 @@ using namespace xia;
 
 #define NETWORK_PORT    2
 
-#define MAX_TCPOPTLEN 40
+#define MAX_TCPOPTLEN 32
 
 #define TCP_REXMTVAL(tp) \
 	(((tp)->t_srtt >> TCP_RTT_SHIFT) + (tp)->t_rttvar)
