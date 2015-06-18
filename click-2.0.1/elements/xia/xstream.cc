@@ -1139,12 +1139,12 @@ printf("1113\n");
 printf("1119\n");
     ti.th_ack = htonl(tp->rcv_nxt);
 printf("1121+++++++%d\n",optlen);
-    if (optlen) {
-    	printf("1123\n");
-		memcpy((&ti + 1), opt, optlen); 
-		printf("1125\n");
-		ti.th_off = (sizeof(click_tcp) + optlen) >> 2;
-    } 
+	  //   if (optlen) {
+	  //   	printf("1123\n");
+			// memcpy((&ti + 1), opt, optlen); 
+			// printf("1125\n");
+			// ti.th_off = (sizeof(click_tcp) + optlen) >> 2;
+	  //   } 
     
     ti.th_flags = flags; 
 
