@@ -80,7 +80,8 @@ XStream::tcp_input(WritablePacket *p)
     get_transport()->_tcpstat.tcps_rcvtotal++; 
 
     /* we need to copy ti, since we need it later */
-    ti.ti_len = (uint16_t)(xiah.plen() - thdr.hlen());	// make sure that this is right
+    // ti.ti_len = (uint16_t)(xiah.plen() - thdr.hlen());	// make sure that this is right
+    ti.ti_len=0;
     ti.ti_seq = ntohl(tcph->th_seq);
     ti.ti_ack = ntohl(tcph->th_ack);
     ti.ti_off = tcph->th_off;
