@@ -182,7 +182,7 @@ public:
 	ErrorHandler    *_errhandler;
 	
 
-protected:
+public:
 	XIAXIDRouteTable *_routeTable;
 
 	// list of ports wanting xcmp notifications
@@ -329,6 +329,7 @@ public:
 	 * Socket states
 	 * ========================= */
 class sock : public Element {
+	friend class XTRANSPORT;
 	public:
 		const char *class_name() const      { return "GENERIC_TRANSPORT"; }
     void push(WritablePacket *p){};

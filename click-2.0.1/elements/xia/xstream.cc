@@ -589,6 +589,24 @@ XStream::tcp_input(WritablePacket *p)
 			goto dropwithreset;
 		}
 		printf("Server side 3way handshake is done.\n");
+		listening_sock->pending_connection_buf.push(this);
+
+		// push this socket into pending_connection_buf and let Xaccept handle that
+
+		// If the app is ready for a new connection, alert it
+		if (!listening_sock->pendingAccepts.empty()) {
+			xia::XSocketMsg *acceptXSM = listening_sock->pendingAccepts.front();
+			get_transport() -> ReturnResult(listening_sock->port, acceptXSM);
+			listening_sock->pendingAccepts.pop();
+			delete acceptXSM;
+		}
+		if (listening_sock->polling) {
+			// tell API we are writeable
+			get_transport() -> ProcessPollEvent(listening_sock->port, POLLIN|POLLOUT);
+		}
+		// finish the connection handshake
+		get_transport() -> XIDpairToConnectPending.erase(key);
+
 	    tcp_set_state(TCPS_ESTABLISHED);
 	    if ((tp->t_flags & (TF_RCVD_SCALE | TF_REQ_SCALE)) == 
 		    (TF_RCVD_SCALE | TF_REQ_SCALE)) { 

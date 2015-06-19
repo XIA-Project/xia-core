@@ -1416,6 +1416,7 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 				new_sk->dst_path = src_path;
 				new_sk->src_path = dst_path;
 				new_sk->listening_sock = sk;
+				new_sk->set_key(xid_pair);
 				XIDpairToConnectPending.set(xid_pair, new_sk);
 				new_sk->push(p_in);
 			}
