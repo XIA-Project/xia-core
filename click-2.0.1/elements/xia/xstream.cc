@@ -67,6 +67,7 @@ XStream::tcp_input(WritablePacket *p)
     int 	iss = 0; 
     int 	todrop, acked, ourfinisacked, needoutput = 0;
     struct 	mini_tcpip  ti; 
+
 //  tcp_seq_t	tseq; 
     XIAHeader xiah(p->xia_header());
     TransportHeader thdr(p);
@@ -80,17 +81,22 @@ XStream::tcp_input(WritablePacket *p)
     get_transport()->_tcpstat.tcps_rcvtotal++; 
 
     /* we need to copy ti, since we need it later */
-    // ti.ti_len = (uint16_t)(xiah.plen() - thdr.hlen());	// make sure that this is right
-    ti.ti_len=0;
     ti.ti_seq = ntohl(tcph->th_seq);
     ti.ti_ack = ntohl(tcph->th_ack);
     ti.ti_off = tcph->th_off;
     ti.ti_flags = tcph->th_flags;
     ti.ti_win = ntohs(tcph->th_win);
     ti.ti_urp = ntohs(tcph->th_urp);
+    if (ti.ti_flags > 0)	// Assume no URG/PSH exists
+	    ti.ti_len=0;
+	else
+    	ti.ti_len = (uint16_t)strlen((const char*)thdr.payload());	// make sure that this is right
+
+    
 	printf("tcpinput flag is %d\n", ti.ti_flags);
 	printf("tcpinput seq is %d\n", (ti.ti_seq));
 	printf("tcpinput ack is %d\n", (ti.ti_ack));
+	printf("tcpinput data length is %d\n", ti.ti_len);
     /*205 packet should be sane, skip tests */ 
     off = ti.ti_off << 2; 
     if (0&&off < sizeof(click_tcp)) {
@@ -248,7 +254,12 @@ XStream::tcp_input(WritablePacket *p)
 	print_tcpstats(p, "tcp_input (sp)");
 	printf("Slow path begins\n");
     /* 438 TCP "Slow Path" processing begins here */
-	WritablePacket *copy = WritablePacket::make(0, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
+    WritablePacket *copy = NULL;
+    if (ti.ti_len)
+    {
+    	copy = WritablePacket::make(0, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
+    }
+	
 
     int win = so_recv_buffer_space();
 	if (win < 0) { win = 0; }
@@ -451,7 +462,7 @@ XStream::tcp_input(WritablePacket *p)
 		// 	get_transport()->_tcpstat.tcps_rcvpartduppack++;
 		// 	get_transport()->_tcpstat.tcps_rcvpartdupbyte += todrop;
 		// }
-
+		printf("becareful 465\n");
 		copy->pull(todrop);
 		ti.ti_seq += todrop;
 		ti.ti_len -= todrop;
@@ -511,6 +522,7 @@ XStream::tcp_input(WritablePacket *p)
 		} else {
 			get_transport()->_tcpstat.tcps_rcvbyteafterwin += todrop;
 		}
+		printf("becareful 535\n");
 		copy->pull(todrop); 
 		ti.ti_len -= todrop;
 		tiflags &= ~(TH_PUSH|TH_FIN);
@@ -807,7 +819,7 @@ step6:
 dodata: 
     if ((ti.ti_len || (tiflags & TH_FIN)) &&  
 	    TCPS_HAVERCVDFIN(tp->t_state) == 0) { 
-
+    	printf("becareful 822\n");
 		/* begin TCP_REASS */ 
 		if (ti.ti_seq == tp->rcv_nxt && 
 			tp->t_state == TCPS_ESTABLISHED) {
@@ -846,8 +858,11 @@ dodata:
 		// TODO len calculation @Harald: What exactly needs to be done?
 		len = ti.ti_len; 
     } else {
-		copy -> kill();
-		p->kill();
+    	if (copy != NULL)
+    	{
+    		copy -> kill();
+    	}
+		// p->kill();		// don't know why comment this in order to prevent deadlock
 		tiflags &= ~TH_FIN;
     }
 
@@ -895,6 +910,7 @@ dropafterack:
 	/* Drop incoming segment and send an ACK. */
 	if (tiflags & TH_RST)
 		goto drop;
+	printf("becareful 913\n");
 	copy -> kill();
 	p->kill();
 	tp->t_flags |= TF_ACKNOW;
@@ -919,6 +935,7 @@ dropwithreset:
 
 drop:
     //debug_output(VERB_TCP, "[%s] tcpcon::input drop", SPKRNAME); 
+	printf("becareful 938\n");
 	copy -> kill();
     p->kill();
     return ;
