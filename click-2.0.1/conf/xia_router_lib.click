@@ -133,7 +133,7 @@ elementclass XIALineCard {
 	// setup XARP module
 	c :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/C0DE);  // XARP (query) or XARP (response) or XIP
 	xarpq :: XARPQuerier($mac);
-	xarpr :: XARPResponder(mac);
+	xarpr :: XARPResponder($mac);
 
 	print_in :: XIAPrint(">>> (In Iface $num) ");
 	print_out :: XIAPrint("<<< (Out Iface $num)");
