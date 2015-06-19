@@ -73,6 +73,8 @@ XIAXIDRouteTable::add_handlers()
 	add_data_handlers("drops", Handler::OP_READ, &_drops);
 	add_read_handler("list", list_routes_handler, 0);
 	add_write_handler("enabled", write_handler, (void *)PRINCIPAL_TYPE_ENABLED);
+	add_write_handler("hid", write_handler, (void *)ROUTE_TABLE_HID);
+	add_write_handler("network_dag", write_handler, (void *)ROUTE_TABLE_NETWORK_DAG);
 	add_read_handler("enabled", read_handler, (void *)PRINCIPAL_TYPE_ENABLED);
 }
 
