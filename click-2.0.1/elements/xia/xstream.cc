@@ -87,6 +87,13 @@ XStream::tcp_input(WritablePacket *p)
     ti.ti_flags = tcph->th_flags;
     ti.ti_win = ntohs(tcph->th_win);
     ti.ti_urp = ntohs(tcph->th_urp);
+
+    const char *pay = (const char*)thdr.payload();
+    printf("%s\n", pay);
+    printf("length %d\n", (int)strlen(pay));
+
+
+
     if (ti.ti_flags > 0)	// Assume no URG/PSH exists
 	    ti.ti_len=0;
 	else
@@ -1005,7 +1012,8 @@ again:
     off = tp->snd_nxt - tp->snd_una; 
     win = min(tp->snd_wnd, tp->snd_cwnd); 
     flags = tcp_outflags[tp->t_state]; 
-
+    printf("flags: %d\n", flags);
+    printf("t_state %d\n", tp->t_state);
     /*80*/
     if (tp->t_force) { 
 		if (win == 0) { 
@@ -1258,7 +1266,9 @@ printf("1121+++++++%d\n",optlen);
 	TransportHeaderEncap *send_hdr = TransportHeaderEncap::MakeTCPHeader(&ti);
 	if (p==NULL)
 	{
-		p= WritablePacket::make(4);
+						p = WritablePacket::make(256, '\0', 0, 0);
+
+
 	}
 	printf("1203\n");
 	tcp_payload = send_hdr->encap(p);

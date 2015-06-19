@@ -43,7 +43,6 @@ sock::sock(
     XTRANSPORT *trans,
     unsigned short apiport,
     int type) : hstate(CREATE) {
-	cout << "fuck you" << apiport << endl;
 	// port = 0;
 	// sock_type = 0;
 	state = INACTIVE;
