@@ -90,8 +90,10 @@ XARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
     }
 
     IPAddress my_mask;
+	/* TODO: NITIN ASK DAN why this exists? Makes kparse unhappy below
     if (conf.size() == 1)
 	conf.push_back(conf[0]);
+	*/
 	
     if (cp_va_kparse(conf, this, errh,
 	             "ETH", cpkP + cpkM, cpEtherAddress, &_my_en,
@@ -141,13 +143,11 @@ XARPQuerier::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
 	return -1;
 
     IPAddress my_ip, my_mask;
-    XID my_xid;
     EtherAddress my_en;
     if (conf.size() == 1)
 	conf.push_back(conf[0]);
 	
     if (cp_va_kparse(conf, this, errh,
-	             "XID", cpkP + cpkM, cpXID, &_my_xid,
 	             "ETH", cpkP + cpkM, cpEtherAddress, &_my_en,
 	             cpEnd) < 0)
 	return -1;
@@ -165,10 +165,9 @@ XARPQuerier::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
         _my_bcast_xid.parse(_bcast_xid);
     }
 
-    if ((my_xid != _my_xid || my_en != _my_en) && _my_xarpt)
+    if ((my_en != _my_en) && _my_xarpt)
 	_xarpt->clear();
 
-    _my_xid = my_xid;
     _my_en = my_en;
     String _bcast_xid(BHID);  // Broadcast HID
     _my_bcast_xid.parse(_bcast_xid);
