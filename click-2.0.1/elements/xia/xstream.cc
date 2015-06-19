@@ -336,6 +336,7 @@ XStream::tcp_input(WritablePacket *p)
 			_tcp_rcvseqinit(tp); 
 			tp->t_flags |= TF_ACKNOW; 
 			if (tiflags & TH_ACK && SEQ_GT(tp->snd_una, tp->iss)) {
+	    		get_transport() -> ChangeState(this, CONNECTED);
 				tcp_set_state(TCPS_ESTABLISHED);
 				printf("Client side 3way handshake is done.\n");
 				if (polling) {
@@ -606,6 +607,7 @@ XStream::tcp_input(WritablePacket *p)
 		}
 		// finish the connection handshake
 		get_transport() -> XIDpairToConnectPending.erase(key);
+	    get_transport() -> ChangeState(this, CONNECTED);
 
 	    tcp_set_state(TCPS_ESTABLISHED);
 	    if ((tp->t_flags & (TF_RCVD_SCALE | TF_REQ_SCALE)) == 
