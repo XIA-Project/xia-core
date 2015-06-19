@@ -28,6 +28,7 @@ SCRIPT=xia_local_topology.click
 
 NODECONF=$XIADIR/etc/nodes.conf
 XSOCKCONF=$XIADIR/etc/xsockconf.ini
+ADDRCONF=$XIADIR/etc/address.conf
 
 ALL_PROCESSES="click xrouted xhcp_serverd xhcp_clientd xnameservice xstats xstatserver"
 
@@ -480,6 +481,9 @@ start_click()
 
 	[ $CLICK_ONLY -eq 1 ] && check_service click && exit
 	sleep 2
+
+	echo "Reading $NODECONF and assigning addresses in $ADDRCONF if needed"
+	$XIADIR/bin/assign_addresses.py $NODECONF $ADDRCONF
 }
 
 #
