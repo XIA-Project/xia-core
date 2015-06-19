@@ -1261,7 +1261,10 @@ printf("1121+++++++%d\n",optlen);
 	printf("1203\n");
 	tcp_payload = send_hdr->encap(p);
 	send_hdr -> update();
-	xiah.set_plen(p -> length() + send_hdr->hlen()); // XIA payload = transport header + transport-layer data
+	if (p == NULL)
+		xiah.set_plen(send_hdr->hlen()); // XIA payload = transport header + transport-layer data
+	else
+		xiah.set_plen(p -> length() + send_hdr->hlen()); // XIA payload = transport header + transport-layer data
 	tcp_payload = xiah.encap(tcp_payload, false);
 	delete send_hdr;
 	get_transport()->output(NETWORK_PORT).push(tcp_payload);
