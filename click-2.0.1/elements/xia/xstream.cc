@@ -87,23 +87,12 @@ XStream::tcp_input(WritablePacket *p)
     ti.ti_flags = tcph->th_flags;
     ti.ti_win = ntohs(tcph->th_win);
     ti.ti_urp = ntohs(tcph->th_urp);
-
-    const char *pay = (const char*)thdr.payload();
-    printf("%s\n", pay);
-    printf("length %d\n", (int)strlen(pay));
-
-
-
-    if (ti.ti_flags > 0)	// Assume no URG/PSH exists
-	    ti.ti_len=0;
-	else
-    	ti.ti_len = (uint16_t)strlen((const char*)thdr.payload());	// make sure that this is right
-
-    
+    ti.ti_len = (uint16_t)(xiah.plen() - thdr.hlen());
+	   
 	printf("tcpinput flag is %d\n", ti.ti_flags);
 	printf("tcpinput seq is %d\n", (ti.ti_seq));
 	printf("tcpinput ack is %d\n", (ti.ti_ack));
-	printf("tcpinput data length is %d\n", ti.ti_len);
+	printf("tcpinput data length is %d\n", (int)ti.ti_len);
     /*205 packet should be sane, skip tests */ 
     off = ti.ti_off << 2; 
     if (0&&off < sizeof(click_tcp)) {
@@ -1266,9 +1255,8 @@ printf("1121+++++++%d\n",optlen);
 	TransportHeaderEncap *send_hdr = TransportHeaderEncap::MakeTCPHeader(&ti);
 	if (p==NULL)
 	{
-						p = WritablePacket::make(256, '\0', 0, 0);
-
-
+		printf("a control packet is sent\n");
+		p = WritablePacket::make(0, '\0', 0, 0);
 	}
 	printf("1203\n");
 	tcp_payload = send_hdr->encap(p);
