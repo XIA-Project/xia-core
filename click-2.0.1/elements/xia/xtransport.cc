@@ -848,6 +848,7 @@ bool XTRANSPORT::RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp
 
 void XTRANSPORT::run_timer(Timer *timer)
 {
+	return;
 	assert(timer == &_timer);
 
 	Timestamp now = Timestamp::now();
@@ -3962,15 +3963,6 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 		ec = ENOTCONN;
 	}
 
-	// FIXME: in blocking mode, send should block until buffer space is available?
-	int numUnACKedSentPackets = sk->next_send_seqnum - sk->send_base;
-	if (rc == 0 &&
-	        numUnACKedSentPackets >= sk->send_buffer_size &&  // make sure we have space in send buf
-	        numUnACKedSentPackets >= sk->remote_recv_window) { // and receiver has space in recv buf
-
-		rc = 0; // -1;  // FIXME: set to 0 for now until blocking behavior is fixed
-		ec = EAGAIN;
-	}
 
 	// If everything is OK so far, try sending
 	if (rc == 0) {
@@ -4001,48 +3993,21 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 
 		DBG("(%d) sent packet to %s, from %s\n", _sport, sk->dst_path.unparse_re().c_str(), sk->src_path.unparse_re().c_str());
 		//Add XIA headers
-		XIAHeaderEncap xiah;
-		xiah.set_nxt(CLICK_XIA_NXT_TRN);
-		xiah.set_last(LAST_NODE_DEFAULT);
-		xiah.set_hlim(sk->hlim);
-		xiah.set_dst_path(sk->dst_path);
-		xiah.set_src_path(sk->src_path);
-		xiah.set_plen(pktPayloadSize);
 
-		WritablePacket *just_payload_part = WritablePacket::make(p_in->headroom() + 1, (const void*)x_send_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
-
-		WritablePacket *p = NULL;
-
-		//Add XIA Transport headers
-		TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDATAHeader(sk->next_send_seqnum, sk->ack_num, 0, calc_recv_window(sk) ); // #seq, #ack, length, recv_wind
-		p = thdr->encap(just_payload_part);
-
-		thdr->update();
-		xiah.set_plen(pktPayloadSize + thdr->hlen()); // XIA payload = transport header + transport-layer data
-
-		p = xiah.encap(p, false);
-
-		delete thdr;
-
-		// Store the packet into buffer
-		WritablePacket *tmp = sk->send_buffer[sk->seq_num % sk->send_buffer_size];
-		sk->send_buffer[sk->seq_num % sk->send_buffer_size] = copy_packet(p, sk);
-		if (tmp)
-			tmp->kill();
-
-		sk->seq_num++;
-		sk->next_send_seqnum++;
-
-		// Set timer
-		sk->num_retransmits = 0;
-		ScheduleTimer(sk, ACK_DELAY);
+		WritablePacket *payload = WritablePacket::make(p_in->headroom() + 1, (const void*)x_send_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
+		if (sk -> get_type() == SOCK_STREAM)
+		{
+			dynamic_cast<XStream *>(sk)->usrsend(payload);
+		} else if (sk -> get_type() == SOCK_DGRAM)
+		{
+			/* code */
+		}
 
 		portToSock.set(_sport, sk);
 		if (_sport != sk->port) {
 			ERROR("ERROR _sport %d, sk->port %d", _sport, sk->port);
 		}
 
-		output(NETWORK_PORT).push(p);
 	}
 
 	x_send_msg->clear_payload(); // clear payload before returning result

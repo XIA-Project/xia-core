@@ -1596,6 +1596,7 @@ XStream::tcp_mss(u_int offer) {
 int 
 XStream::usrsend(WritablePacket *p)
 { 
+	printf("usrsend: I wanna send\n");
 	// Sanity Check: We should never recieve a packet after our tcp state is
 	// beyond CLOSE_WAIT.
     if (tp->t_state > TCPS_CLOSE_WAIT) { 
@@ -1626,6 +1627,7 @@ XStream::usrsend(WritablePacket *p)
 	// }
 
 	if (p) {
+		printf("usrsend: Push into _q_usr_input\n");
 		retval = _q_usr_input.push(p); 
 	}
 
