@@ -27,6 +27,18 @@ srcdir = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
 templatedir = os.path.join(srcdir, templatedir)
 configdir = os.path.join(srcdir, configdir)
 
+#
+# Get the location of a template file
+#
+def get_template_path(click_file):
+    return os.path.join(templatedir, '%s.%s' % (click_file, ext))
+
+#
+# Get the location for output config file
+#
+def get_config_path(click_file):
+    return os.path.join(configdir, click_file)
+
 # Template locations
 hosttemplate = get_template_path(hostclick)
 routertemplate = get_template_path(routerclick)
@@ -51,18 +63,6 @@ ip_override_addr = None
 interface_filter = None
 interface = None
 socket_ips_ports = None
-
-#
-# Get the location of a template file
-#
-def get_template_path(click_file):
-    return os.path.join(templatedir, '%s.%s' % (click_file, ext))
-
-#
-# Get the location for output config file
-#
-def get_config_path(click_file):
-    return os.path.join(configdir, click_file)
 
 #
 # create a globally unique HID based off of our mac address
@@ -619,6 +619,8 @@ def getOptions():
     for o, a in opts:
         if o in ("-h", "--help"):
             help()
+        elif o in ("-i", "--id"):
+            hostname = a
         elif o in ("-r", "--router"):
             nodetype = "router"
         elif o in ("-t", "--host"):
@@ -636,7 +638,7 @@ def getOptions():
         elif o in ("-n", "--nameserver"):
             nameserver = "yes"
         else:
-             assert False, "unhandled option"
+             assert False, "unhandled option %s" % o
 
 #
 # display helpful information
@@ -647,6 +649,9 @@ usage: xconfig [-h] [-rt] [-4] [-n] [-i hostname] [-m ipaddr] [-f if_filter] [-P
 where:
   -h            : get help
   --help
+
+  -i <name>      : set HID name tp <name>
+  --id=<name>
 
   -r            : do router config instead of host
   --router
