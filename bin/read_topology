@@ -56,7 +56,7 @@ ns_pattern = re.compile('//\s*(\w+)\s*::\s*nameserver')
 
 # pattern for a Click element instantiation
 # hostname :: element_type (argument1, argument2, ...)
-element_pattern = re.compile('^(\w+)\s*::\s*(\w+)\s*\((.+)\);')
+element_pattern = re.compile('^(\w+)\s*::\s*(XIA\w+)\s*\((.+)\);')
 
 # Nameserver hostname
 nshost = None
@@ -82,7 +82,7 @@ try:
 			arguments = match.group(3).replace(' ','').split(',')
 
 			# Write a sockconf entry for this hostname
-			sockconf.write('[%s]\nclick_port=%s\n\n' % (hostname, arguments[0])))
+			sockconf.write('[%s]\nclick_port=%s\n\n' % (hostname, arguments[0]))
 
 			# Create a nodes.conf entry for this hostname
 			nodeconf.write("%s\t%s\n" % (hostname, elemtype))
