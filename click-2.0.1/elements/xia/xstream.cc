@@ -1253,18 +1253,18 @@ printf("1121+++++++%d\n",optlen);
 	xiah.set_src_path(src_path);
 
 	TransportHeaderEncap *send_hdr = TransportHeaderEncap::MakeTCPHeader(&ti);
+	int payload_length = 0;
 	if (p==NULL)
 	{
 		printf("a control packet is sent\n");
 		p = WritablePacket::make(0, '\0', 0, 0);
+	} else {
+		payload_length = p -> length();
 	}
-	printf("1203\n");
+	printf("1203 with payload_length %d\n", payload_length);
 	tcp_payload = send_hdr->encap(p);
 	send_hdr -> update();
-	if (p == NULL)
-		xiah.set_plen(send_hdr->hlen()); // XIA payload = transport header + transport-layer data
-	else
-		xiah.set_plen(p -> length() + send_hdr->hlen()); // XIA payload = transport header + transport-layer data
+	xiah.set_plen(payload_length + send_hdr->hlen()); // XIA payload = transport header + transport-layer data
 	tcp_payload = xiah.encap(tcp_payload, false);
 	delete send_hdr;
 	get_transport()->output(NETWORK_PORT).push(tcp_payload);
