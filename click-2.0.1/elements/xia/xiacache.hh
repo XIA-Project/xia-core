@@ -39,7 +39,7 @@ class XIACache : public Element {
     const char *processing() const		{ return PUSH; }
     int configure(Vector<String> &, ErrorHandler *);         
     void push(int port, Packet *);            
-    XID local_hid() { return _local_hid; };
+    XID local_hid() { return _hid; };
     XIAPath local_addr() { return _local_addr; };
     void add_handlers();
     static int write_param(const String &, Element *, void *vparam, ErrorHandler *);
@@ -49,8 +49,9 @@ class XIACache : public Element {
 
   private:
     uint32_t _cid_type;
-    XID _local_hid;
+    XID _hid;
     XIAPath _local_addr;
+	XIAPath _network_dag;
     XIAContentModule* _content_module;
 
 };
