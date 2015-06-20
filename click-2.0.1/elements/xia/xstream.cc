@@ -1881,8 +1881,8 @@ void XStream::check_for_and_handle_pending_recv() {
 * @return  The number of bytes read from the buffer.
 */
 int XStream::read_from_recv_buf(XSocketMsg *xia_socket_msg) {
-
-//		printf("<<< read_from_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", tcp_conn->port, tcp_conn->recv_base, tcp_conn->next_recv_seqnum, tcp_conn->recv_buffer_size);
+printf("read_from_recv_buf\n");
+		// printf("<<< read_from_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", tcp_conn->port, tcp_conn->recv_base, tcp_conn->next_recv_seqnum, tcp_conn->recv_buffer_size);
 	xia::X_Recv_Msg *x_recv_msg = xia_socket_msg->mutable_x_recv();
 	int bytes_requested = x_recv_msg->bytes_requested();
 	int bytes_returned = 0;

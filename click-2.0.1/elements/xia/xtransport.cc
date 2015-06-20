@@ -4135,7 +4135,12 @@ void XTRANSPORT::Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	}
 
 	if (sk && (sk->state == CONNECTED || sk->state == CLOSE_WAIT)) {
-		read_from_recv_buf(xia_socket_msg, sk);
+		
+		if (sk -> sock_type == SOCK_STREAM)
+		{
+			((XStream *)sk) -> read_from_recv_buf(xia_socket_msg);
+		}
+		// read_from_recv_buf(xia_socket_msg, sk);
 
 		if (xia_socket_msg->x_recv().bytes_returned() > 0) {
 			// Return response to API
