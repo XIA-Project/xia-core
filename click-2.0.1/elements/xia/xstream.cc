@@ -1629,7 +1629,18 @@ XStream::usrsend(WritablePacket *p)
 
 	if (p) {
 		printf("usrsend: Push into _q_usr_input\n");
-		retval = _q_usr_input.push(p); 
+		WritablePacket *wp = NULL;
+		uint32_t length = p -> length();
+		uint32_t remaining = 0;
+		char buf[512];
+		memset(buf, 0, 512);
+		while (remaining > 0) {
+			memcpy((void*)buf, (const void*)p->data(), 512);
+			wp = WritablePacket::make((const void*)buf, 512);
+			p -> pull(512);
+			retval = _q_usr_input.push(wp);
+			remaining -= 512; 
+		} 
 	}
 
 	//  These are the states where we expect to recieve packets
