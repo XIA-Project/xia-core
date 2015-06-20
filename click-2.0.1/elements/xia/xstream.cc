@@ -1631,10 +1631,11 @@ XStream::usrsend(WritablePacket *p)
 		printf("usrsend: Push into _q_usr_input\n");
 		WritablePacket *wp = NULL;
 		uint32_t length = p -> length();
-		uint32_t remaining = 0;
+		uint32_t remaining = length;
 		char buf[512];
 		memset(buf, 0, 512);
 		while (remaining > 0) {
+			printf("the remaining is %d\n", remaining);
 			memcpy((void*)buf, (const void*)p->data(), 512);
 			wp = WritablePacket::make((const void*)buf, 512);
 			p -> pull(512);
