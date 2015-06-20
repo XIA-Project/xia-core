@@ -324,6 +324,7 @@ public:
 	}
 
 };
+ typedef HashTable<XIDpair, sock*>::iterator ConnIterator; 
 
 /* =========================
 	 * Socket states

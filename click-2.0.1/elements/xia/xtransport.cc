@@ -843,10 +843,37 @@ bool XTRANSPORT::RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp
 	}
 }
 
-
-
 void XTRANSPORT::run_timer(Timer *timer)
 {
+	    ConnIterator i = XIDpairToSock.begin(); 
+    XStream *con = NULL; 
+
+    if (timer == _fast_ticks) {
+		for (; i; i++) {
+			if (i->second->get_type() == XSOCKET_STREAM)
+			{
+				con = dynamic_cast<XStream *>(i->second);
+				con->fasttimo(); 
+			}
+		}
+		_fast_ticks->reschedule_after_msec(TCP_FAST_TICK_MS);
+    } else if (timer == _slow_ticks) {
+		for (; i; i++) {
+			if (i->second->get_type() == XSOCKET_STREAM)
+			{
+			con = dynamic_cast<XStream *>(i->second);
+			con->slowtimo(); 
+			if (con->get_state() == TCPS_CLOSED) {
+				delete con;
+				break;
+			}
+		}
+		}
+		_slow_ticks->reschedule_after_msec(TCP_SLOW_TICK_MS);
+		(globals()->tcp_now)++; 
+    } else {
+		// debug_output(VERB_TIMERS, "%u: XTRANSPORT::run_timer: unknown timer", tcp_now()); 
+	}
 	return;
 	assert(timer == &_timer);
 
