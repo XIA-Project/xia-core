@@ -1634,13 +1634,16 @@ XStream::usrsend(WritablePacket *p)
 		uint32_t remaining = length;
 		char buf[512];
 		memset(buf, 0, 512);
+		printf("the remaining is %d\n", remaining);
 		while (remaining > 0) {
-			printf("the remaining is %d\n", remaining);
-			memcpy((void*)buf, (const void*)p->data(), 512);
-			wp = WritablePacket::make((const void*)buf, 512);
-			p -> pull(512);
+			int size = remaining > 512 ? 512 : remaining;
+			memcpy((void*)buf, (const void*)p->data(), size);
+			wp = WritablePacket::make((const void*)buf, size);
+			if (size == 512)
+				p -> pull(512);
 			retval = _q_usr_input.push(wp);
 			remaining -= 512; 
+			printf("the remaining is %d\n", remaining);
 		} 
 	}
 
