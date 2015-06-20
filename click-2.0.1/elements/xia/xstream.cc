@@ -1630,8 +1630,7 @@ XStream::usrsend(WritablePacket *p)
 	if (p) {
 		printf("usrsend: Push into _q_usr_input\n");
 		WritablePacket *wp = NULL;
-		uint32_t length = p -> length();
-		uint32_t remaining = length;
+		int remaining = (int)p -> length();
 		char buf[512];
 		memset(buf, 0, 512);
 		printf("the remaining is %d\n", remaining);
