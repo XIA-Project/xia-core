@@ -576,12 +576,12 @@ bool XTRANSPORT::TeardownSocket(sock *sk)
 		// FIXME:delete these too
 		//queue<sock*> pending_connection_buf;
 		//queue<xia::XSocketMsg*> pendingAccepts;
-		for (int i = 0; i < sk->send_buffer_size; i++) {
-			if (sk->send_buffer[i] != NULL) {
-				sk->send_buffer[i]->kill();
-				sk->send_buffer[i] = NULL;
-			}
-		}
+		// for (int i = 0; i < sk->send_buffer_size; i++) {
+		// 	if (sk->send_buffer[i] != NULL) {
+		// 		sk->send_buffer[i]->kill();
+		// 		sk->send_buffer[i] = NULL;
+		// 	}
+		// }
 	}
 
 	if (!sk->isAcceptedSocket) {
@@ -606,12 +606,12 @@ bool XTRANSPORT::TeardownSocket(sock *sk)
 
 	portToSock.erase(sk->port);
 
-	for (int i = 0; i < sk->recv_buffer_size; i++) {
-		if (sk->recv_buffer[i] != NULL) {
-			sk->recv_buffer[i]->kill();
-			sk->recv_buffer[i] = NULL;
-		}
-	}
+	// for (int i = 0; i < sk->recv_buffer_size; i++) {
+	// 	if (sk->recv_buffer[i] != NULL) {
+	// 		sk->recv_buffer[i]->kill();
+	// 		sk->recv_buffer[i] = NULL;
+	// 	}
+	// }
 
 	delete sk;
 	return true;

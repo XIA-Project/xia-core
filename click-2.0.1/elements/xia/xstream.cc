@@ -1642,6 +1642,7 @@ XStream::usrsend(WritablePacket *p)
 void 
 XStream::usrclosed() 
 { 
+	printf("usrclosed is called \n");
     switch (tp->t_state) { 
 		case TCPS_CLOSED:
 		case TCPS_LISTEN:
