@@ -89,10 +89,10 @@ XStream::tcp_input(WritablePacket *p)
     ti.ti_urp = ntohs(tcph->th_urp);
     ti.ti_len = (uint16_t)(xiah.plen() - thdr.hlen());
 	   
-	printf("tcpinput flag is %d\n", ti.ti_flags);
-	printf("tcpinput seq is %d\n", (ti.ti_seq));
-	printf("tcpinput ack is %d\n", (ti.ti_ack));
-	printf("tcpinput data length is %d\n", (int)ti.ti_len);
+	printf("\t\t\ttcpinput flag is %d\n", ti.ti_flags);
+	printf("\t\t\ttcpinput seq is %d\n", (ti.ti_seq));
+	printf("\t\t\ttcpinput ack is %d\n", (ti.ti_ack));
+	printf("\t\t\ttcpinput data length is %d\n", (int)ti.ti_len);
     /*205 packet should be sane, skip tests */ 
     off = ti.ti_off << 2; 
     if (0&&off < sizeof(click_tcp)) {
@@ -334,7 +334,7 @@ XStream::tcp_input(WritablePacket *p)
 			if (tiflags & TH_ACK && SEQ_GT(tp->snd_una, tp->iss)) {
 	    		get_transport() -> ChangeState(this, CONNECTED);
 				tcp_set_state(TCPS_ESTABLISHED);
-				printf("Client side 3way handshake is done.\n");
+				printf("\t\t\t\tClient side 3way handshake is done.\n");
 				if (polling) {
 					// tell API we are writble now
 					get_transport()->ProcessPollEvent(port, POLLOUT);
@@ -585,7 +585,7 @@ XStream::tcp_input(WritablePacket *p)
 		if (SEQ_GT(tp->snd_una, ti.ti_ack) || SEQ_GT(ti.ti_ack, tp->snd_max)) {
 			goto dropwithreset;
 		}
-		printf("Server side 3way handshake is done.\n");
+		printf("\t\t\t\tServer side 3way handshake is done.\n");
 		listening_sock->pending_connection_buf.push(this);
 
 		// push this socket into pending_connection_buf and let Xaccept handle that
@@ -1001,8 +1001,8 @@ again:
     off = tp->snd_nxt - tp->snd_una; 
     win = min(tp->snd_wnd, tp->snd_cwnd); 
     flags = tcp_outflags[tp->t_state]; 
-    printf("flags: %d\n", flags);
-    printf("t_state %d\n", tp->t_state);
+    // printf("flags: %d\n", flags);
+    // printf("t_state %d\n", tp->t_state);
     /*80*/
     if (tp->t_force) { 
 		if (win == 0) { 
@@ -1078,7 +1078,7 @@ again:
 
     /*222*/
 send:
-	cout << "So send"<<endl;
+	// cout << "So send"<<endl;
     optlen = 0;
     hdrlen = sizeof(click_tcp);
 
@@ -1127,7 +1127,7 @@ send:
 		// Remove this clause after it's been debugged and timestamps are working properly
 		//debug_output(VERB_DEBUG, "[%s] timestamp: NOT setting timestamp", SPKRNAME);
 	}
-		printf("1076\n");
+		// printf("1076\n");
 		
     hdrlen += optlen; 
 
@@ -1158,25 +1158,25 @@ send:
 		// p = Packet::make(sizeof(click_ip) + sizeof(click_tcp) + optlen);
 		/* TODO: errorhandling */
     }
-		printf("1107\n");
+		// printf("1107\n");
 
     /*339*/
     if (flags & TH_FIN && tp->t_flags & TF_SENTFIN && 
 	    tp->snd_nxt == tp->snd_max) 
 	tp->snd_nxt -- ; 
-printf("1113\n");
+// printf("1113\n");
 	// @Harald: Is there a reason that the persist timer was not being checked?
 	if (len || (flags & (TH_SYN | TH_FIN)) || tp->t_timer[TCPT_PERSIST]) 
 		ti.th_seq = htonl(tp->snd_nxt); 
     else 
 		ti.th_seq = htonl(tp->snd_max);
-printf("1119\n");
+// printf("1119\n");
     ti.th_ack = htonl(tp->rcv_nxt);
-printf("1121+++++++%d\n",optlen);
+// printf("1121+++++++%d\n",optlen);
 	    if (optlen) {
-	    	printf("1123\n");
+	    	// printf("1123\n");
 			// memcpy((&ti + 1), opt, optlen); 
-			printf("1125\n");
+			// printf("1125\n");
 			ti.th_off = (sizeof(click_tcp) + optlen) >> 2;
 	    } 
     
@@ -1186,7 +1186,7 @@ printf("1121+++++++%d\n",optlen);
     /* receiver window calculations */ 
 
     /*TODO: silly window */
-		printf("1132\n");
+		// printf("1132\n");
 
 	// Correct window if it is too large or too small
     if (win > (long) TCP_MAXWIN << tp->rcv_scale)
@@ -1204,7 +1204,7 @@ printf("1121+++++++%d\n",optlen);
 		tp->snd_up = tp->snd_una; 
     }
     /* TODO: do we need to set p->length here ??? */
-		printf("1150\n");
+		// printf("1150\n");
 
     /*400*/
 	if (tp->t_force == 0  || tp->t_timer[TCPT_PERSIST] == 0) {
@@ -1241,7 +1241,7 @@ printf("1121+++++++%d\n",optlen);
 		tp->snd_max = tp->snd_nxt + len; 
 	}
 		// assert(0);
-	printf("1189+%p\n",p);
+	// printf("1189+%p\n",p);
 	// THE MAGIC MOMENT! Our beloved tcp data segment goes to be wrapped in IP and
 	// sent to its tcp-speaking destination :-)
 	//Add XIA headers
@@ -1261,17 +1261,17 @@ printf("1121+++++++%d\n",optlen);
 	} else {
 		payload_length = p -> length();
 	}
-	printf("1203 with payload_length %d\n", payload_length);
+	printf("\t\t\ttcpoutput with payload_length %d\n", payload_length);
 	tcp_payload = send_hdr->encap(p);
 	send_hdr -> update();
 	xiah.set_plen(payload_length + send_hdr->hlen()); // XIA payload = transport header + transport-layer data
 	tcp_payload = xiah.encap(tcp_payload, false);
 	delete send_hdr;
 	get_transport()->output(NETWORK_PORT).push(tcp_payload);
-	printf("1207\n");
-	printf("tcpoutput flag is %d\n", ti.th_flags);
-	printf("tcpoutput seq is %d\n", ntohl(ti.th_seq));
-	printf("tcpoutput ack is %d\n", ntohl(ti.th_ack));
+	// printf("1207\n");
+	printf("\t\t\ttcpoutput flag is %d\n", ti.th_flags);
+	printf("\t\t\ttcpoutput seq is %d\n", ntohl(ti.th_seq));
+	printf("\t\t\ttcpoutput ack is %d\n", ntohl(ti.th_ack));
 	/* Data has been sent out at this point. If we advertised a positive window
 	 * and if this new window advertisement will result in us recieving a higher
 	 * sequence numbered segment than before this window announcement, we record
@@ -1286,7 +1286,7 @@ printf("1121+++++++%d\n",optlen);
     if (sendalot) {
 		goto again; 
 	}
-	printf("1223\n");
+	// printf("1223\n");
     return; 
 }
 
