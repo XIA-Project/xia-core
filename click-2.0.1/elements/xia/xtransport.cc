@@ -236,13 +236,13 @@ int XTRANSPORT::initialize(ErrorHandler *errh)
 	_errh = (SyslogErrorHandler*)ErrorHandler::default_handler();
 	_timer.initialize(this);
 
-	// _fast_ticks = new Timer(this);
-	// _fast_ticks->initialize(this);
-	// _fast_ticks->schedule_after_msec(TCP_FAST_TICK_MS);
-
-	// _slow_ticks = new Timer(this);
-	// _slow_ticks->initialize(this);
-	// _slow_ticks->schedule_after_msec(TCP_SLOW_TICK_MS);
+	_fast_ticks = new Timer(this);
+	_fast_ticks->initialize(this);
+	_fast_ticks->schedule_after_msec(TCP_FAST_TICK_MS); 
+	
+	_slow_ticks = new Timer(this);
+	_slow_ticks->initialize(this);
+	_slow_ticks->schedule_after_msec(TCP_SLOW_TICK_MS); 
 
 	_errhandler = errh;
 	return 0;
@@ -845,6 +845,7 @@ bool XTRANSPORT::RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp
 
 void XTRANSPORT::run_timer(Timer *timer)
 {
+	printf("run_timer\n");
 	    ConnIterator i = XIDpairToSock.begin(); 
     XStream *con = NULL; 
 
