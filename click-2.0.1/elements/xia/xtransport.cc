@@ -3061,24 +3061,12 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		goto done;
 	}
 
-	if (sk->sock_type == SOCK_STREAM) {
-
-		if (sk->state == CONNECTED || sk->state == CLOSE_WAIT) {
-			// schedule a close
-			if (sk->state == CONNECTED) {
-				ChangeState(sk, FIN_WAIT1);
-			} else {
-				ChangeState(sk, LAST_ACK);
-			}
-
-			teardown_now = false;
-			// tell the other side we're closing
-			const char *payload = "FIN";
-			SendControlPacket(TransportHeader::FIN, sk, payload, strlen(payload), sk->dst_path, sk->src_path);
-
-		} else {
-			// it's unconnected, or in listen state, or already in progress closing
-		}
+	if (sk -> get_type() == SOCK_STREAM)
+	{
+		dynamic_cast<XStream *>(sk)->usrclosed();
+	} else if (sk -> get_type() == SOCK_DGRAM)
+	{
+		/* code */
 	}
 
 	if (teardown_now) {
@@ -4139,8 +4127,10 @@ void XTRANSPORT::Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		if (sk -> sock_type == SOCK_STREAM)
 		{
 			((XStream *)sk) -> read_from_recv_buf(xia_socket_msg);
+		} else if (sk -> sock_type == SOCK_DGRAM)
+		{
+			((XStream *)sk) -> read_from_recv_buf(xia_socket_msg);
 		}
-		// read_from_recv_buf(xia_socket_msg, sk);
 
 		if (xia_socket_msg->x_recv().bytes_returned() > 0) {
 			// Return response to API
