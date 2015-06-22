@@ -845,7 +845,7 @@ bool XTRANSPORT::RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp
 
 void XTRANSPORT::run_timer(Timer *timer)
 {
-	printf("run_timer\n");
+	// printf("run_timer\n");
 	    ConnIterator i = XIDpairToSock.begin(); 
     XStream *con = NULL; 
 
