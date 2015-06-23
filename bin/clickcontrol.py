@@ -70,33 +70,50 @@ class ClickControl:
             return False
         return True
 
-    # A list of all elements with HID write handler
-    def hidElements(self, hostname, hosttype):
-        # XCMP and linecard elements
-        linecard_elements = ['xarpq', 'xarpr', 'xchal', 'xresp']
-
-        # Xtransport and XCMP elements in RouteEngine and RoutingCore
-        hid_elements = ['xrc/xtransport.hid', 'xrc/n/x.hid', 'xrc/x.hid']
-
+    # Get a list of elements' write handlers
+    def getElements(self, hostname, hosttype, handler_name, iface_elem, elements):
         # Routing tables for each principal type
         for principal in principals:
-            hid_elements.append('xrc/n/proc/rt_%s.hid' % principal)
+            elements.append('xrc/n/proc/rt_%s' % principal)
 
         # Iterate over the number of interfaces for this host type
         for i in range(numIfaces[hosttype]):
-            # XCMP element for each interface
-            hid_elements.append('xlc%d/x.hid' % i)
             # Elements inside each interface card
-            for elem in linecard_elements:
-                hid_elements.append('xlc%d/%s.hid' % (i, elem))
+            for elem in iface_elem:
+                elements.append('xlc%d/%s' % (i, elem))
 
         # Prepend hostname to each hid_element
-        return [hostname + '/' + e for e in hid_elements]
+        return [hostname + '/' + e + '.' + handler_name for e in elements]
+
+    # A list of all elements with HID write handler
+    def hidElements(self, hostname, hosttype):
+        # Elements in line card that need to be notified
+        iface_elem = ['x', 'xarpq', 'xarpr', 'xchal', 'xresp']
+
+        # Xtransport and XCMP elements in RouteEngine and RoutingCore
+        hid_elem = ['xrc/xtransport', 'xrc/n/x', 'xrc/x']
+        return getElements(self, hostname, hosttype, 'hid', iface_elem, hid_elem)
 
     # Assign an HID to a given host
     def assignHID(self, hostname, hosttype, hid):
         for element in self.hidElements(hostname, hosttype):
             if not self.writeCommand(element + ' ' + hid):
+                return False
+        return True
+
+    # A list of all elements with Network DAG write handler
+    def networkDagElements(self, hostname, hosttype):
+        # Elements in line card that need to be notified
+        iface_elem = ['x', 'xchal']
+
+        # Xtransport and XCMP elements in RouteEngine and RoutingCore
+        dag_elem = ['xrc/transport', 'xrc/n/x', 'xrc/x']
+        return getElements(self, hostname, hosttype, 'network_dag', iface_elem, dag_elem)
+
+    # Assign a Network dag to a given host
+    def assignNetworkDAG(self, hostname, hosttype, dag):
+        for element in self.networkDagElements(hostname, hosttype):
+            if not self.writeCommand(element + ' ' + dag):
                 return False
         return True
 
@@ -106,6 +123,8 @@ if __name__ == "__main__":
     hostname = socket.gethostname()
     hosttype = 'XIAEndHost'
     hid = 'HID:abf1014f0cc6b4d98b6748f23a7a8f22a3f7b199'
+    network_dag = 'RE AD:abf1014f0cc6b4d98b6748f23a7a8f22a0000000'
     # Here's how this library should be used
     with ClickControl() as click:
         click.assignHID(hostname, hosttype, hid)
+        click.assignNetworkDAG(hostnam, hosttype, dag)

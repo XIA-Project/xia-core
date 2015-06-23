@@ -72,9 +72,15 @@ def configure_click(click, config):
             hostname = match.group(1)
             hosttype = match.group(2)
             hid = match.group(3)
+            # Routers have AD and HID in their arguments
             if 'Router' in hosttype:
                 ad, hid = hid.split(' ')
+            # Assign HID to this host
             click.assignHID(hostname, hosttype, hid)
+            # Assign AD to routers
+            if ad:
+                network_dag = 'RE %s' % ad
+                click.assignNetworkDAG(hostname, hosttype, network_dag)
 
 if __name__ == "__main__":
     # If address.conf doesn't exist create it
