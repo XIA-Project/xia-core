@@ -92,7 +92,7 @@ class ClickControl:
 
         # Xtransport and XCMP elements in RouteEngine and RoutingCore
         hid_elem = ['xrc/xtransport', 'xrc/n/x', 'xrc/x']
-        return getElements(self, hostname, hosttype, 'hid', iface_elem, hid_elem)
+        return self.getElements(hostname, hosttype, 'hid', iface_elem, hid_elem)
 
     # Assign an HID to a given host
     def assignHID(self, hostname, hosttype, hid):
@@ -107,8 +107,8 @@ class ClickControl:
         iface_elem = ['x', 'xchal']
 
         # Xtransport and XCMP elements in RouteEngine and RoutingCore
-        dag_elem = ['xrc/transport', 'xrc/n/x', 'xrc/x']
-        return getElements(self, hostname, hosttype, 'network_dag', iface_elem, dag_elem)
+        dag_elem = ['xrc/xtransport', 'xrc/n/x', 'xrc/x']
+        return self.getElements(hostname, hosttype, 'network_dag', iface_elem, dag_elem)
 
     # Assign a Network dag to a given host
     def assignNetworkDAG(self, hostname, hosttype, dag):
