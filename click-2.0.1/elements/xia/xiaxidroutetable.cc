@@ -102,7 +102,7 @@ XIAXIDRouteTable::write_handler(const String &str, Element *e, void *thunk, Erro
 		{
 			XIAPath network_dag;
 			if (cp_va_kparse(str, t, errh,
-							 "LOCAL_ADDR", cpkP + cpkM, cpXIAPath, &network_dag,
+							 "ROUTE_TABLE_NETWORK_DAG", cpkP + cpkM, cpXIAPath, &network_dag,
 							 cpEnd) < 0)
 				return -1;
 			t->_network_dag = network_dag;

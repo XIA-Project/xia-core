@@ -113,7 +113,7 @@ int XIAChallengeSource::write_param(const String &conf, Element *e, void *vparam
     {
         XIAPath network_dag;
         if (cp_va_kparse(conf, f, errh,
-                         "LOCAL_ADDR", cpkP + cpkM, cpXIAPath, &network_dag,
+                         "NETWORK_DAG", cpkP + cpkM, cpXIAPath, &network_dag,
                          cpEnd) < 0)
             return -1;
         f->_network_dag = network_dag;
