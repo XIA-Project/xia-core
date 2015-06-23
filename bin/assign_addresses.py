@@ -29,23 +29,35 @@ if len(sys.argv) != 3:
 
 nodesconf = sys.argv[1]
 addressconf = sys.argv[2]
+ns_sid = 'SID:1110000000000000000000000000000000001113'
+
+# We create resolv.conf in the same directory as address.conf
+resolvconfpath = os.path.join(os.path.dirname(addressconf), 'resolv.conf')
+router_dags = {}
 
 # Patterns to look for in config files
 
 # e.g. router0 XIARouter4Port (AD:<cryptoAD> HID:<cryptoHID>)
 # e.g. host0 XIAEndHost (HID:<cryptoHID>)
 addrconfpattern = re.compile('^(\w+)\s+(\w+)\s+\((.+)\)')
+nspattern = re.compile('^(\w+)\s+nameserver')
 
 # e.g. "host0    XIAEndHost"
 nodeconfpattern = re.compile('^(\w+)\s+(\w+)')
 
 # Assign ADs and HIDs for routers and just HIDs for hosts
 def assign_xids(outfile, hostname, hosttype):
+    # Nameserver entry has no args
+    if hosttype == 'nameserver':
+        outfile.write('%s %s\n' % (hostname, hosttype))
+        return
+
+    # All other host/router entries have arguments in parentheses
     outfile.write('%s %s (' % (hostname, hosttype))
 
     # Assign an AD for every router
     if 'Router' in hosttype:
-        outfile.write('%s ' % genkey.create_new_AD())
+        outfile.write('%s ' % genkeys.create_new_AD())
 
     # Assign the same HID for every interface this host has
     hid = genkeys.create_new_HID()
@@ -67,6 +79,7 @@ def process_config(infile, outfile):
 def configure_click(click, config):
     for line in config:
         ad = None
+        # Read in XIA host addresses from address.conf
         match = addrconfpattern.match(line)
         if match:
             hostname = match.group(1)
@@ -81,6 +94,13 @@ def configure_click(click, config):
             if ad:
                 network_dag = 'RE %s' % ad
                 click.assignNetworkDAG(hostname, hosttype, network_dag)
+                router_dags[hostname] = network_dag + ' ' + hid
+        # Write resolv.conf if nameserver runs here
+        match = nspattern.match(line)
+        if match:
+            # TODO: error out if a dag is not available for hostname
+            with open(resolvconfpath, 'w') as resolvconf:
+                resolvconf.write('nameserver=%s %s\n' % (router_dags[hostname], ns_sid))
 
 if __name__ == "__main__":
     # If address.conf doesn't exist create it
