@@ -148,13 +148,13 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorH
 						 cpEnd) < 0)
 			return -1;
 		f->_network_dag = network_dag;
-		click_chatter("Network is now %s", network_dag.unparse().c_str());
+		click_chatter("XTRANSPORT: Network is now %s", network_dag.unparse().c_str());
 		//f->_local_hid = network_dag.xid(network_dag.destination_node());
 		String network_dag_str = f->_network_dag.unparse();
 		String hid_str = f->_hid.unparse();
 		String local_addr_str = network_dag_str + " " + hid_str;
 		f->_local_addr.parse(local_addr_str);
-		click_chatter("Local address: %s", f->_local_addr.unparse().c_str());
+		click_chatter("XTRANSPORT: Local address: %s", f->_local_addr.unparse().c_str());
 		break;
 
 	}
@@ -165,7 +165,7 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorH
 					"HID", cpkP + cpkM, cpXID, &hid, cpEnd) < 0)
 			return -1;
 		f->_hid = hid;
-		click_chatter("HID assigned: %s", hid.unparse().c_str());
+		click_chatter("XTRANSPORT: HID assigned: %s", hid.unparse().c_str());
 		break;
 	}
 	default:
@@ -3141,7 +3141,7 @@ void XTRANSPORT::Xupdaterv(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	rendezvousDAG.parse(rendezvousDAGstr, NULL);
 
 	// HID of this host
-	String myHID = _local_hid.unparse();
+	String myHID = _hid.unparse();
 
 	// Current local DAG for this host
 	XIAPath localDAG = local_addr();
@@ -3437,7 +3437,7 @@ void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	//Vector<String> ids;
 	//cp_spacevec(tmp, ids);
 	String AD_str(x_changead_msg->ad().c_str());
-	String HID_str = _local_hid.unparse();
+	String HID_str = _hid.unparse();
 	String IP4ID_str(x_changead_msg->ip4id().c_str());
 	_local_4id.parse(IP4ID_str);
 	String new_local_addr;
@@ -3585,10 +3585,13 @@ void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_
 {
 	// read the localhost AD and HID
 	String local_addr = _local_addr.unparse();
+	click_chatter("Xreadlocalhostaddr: found local addr: %s", local_addr.c_str());
 	size_t AD_found_start = local_addr.find_left("AD:");
 	size_t AD_found_end = local_addr.find_left(" ", AD_found_start);
 	String AD_str = local_addr.substring(AD_found_start, AD_found_end - AD_found_start);
-	String HID_str = _local_hid.unparse();
+	click_chatter("Xreadlocalhostaddr: AD found: %s", AD_str.c_str());
+	String HID_str = _hid.unparse();
+	click_chatter("Xreadlocalhostaddr: HID found: %s", HID_str.c_str());
 	String IP4ID_str = _local_4id.unparse();
 	// return a packet containing localhost AD and HID
 	xia::X_ReadLocalHostAddr_Msg *_msg = xia_socket_msg->mutable_x_readlocalhostaddr();

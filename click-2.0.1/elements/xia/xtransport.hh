@@ -98,7 +98,7 @@ public:
 	int initialize(ErrorHandler *);
 	void run_timer(Timer *timer);
 
-	XID local_hid()	  { return _local_hid; };
+	XID local_hid()	  { return _hid; };
 	XIAPath local_addr() { return _local_addr; };
 	XID local_4id()	  { return _local_4id; };
 	void add_handlers();
@@ -112,7 +112,6 @@ private:
 	Timer _timer;
 
 	uint32_t _cid_type, _sid_type;
-	XID _local_hid;
 	XIAPath _local_addr;
 	XIAPath _network_dag;
 	XID _hid;
