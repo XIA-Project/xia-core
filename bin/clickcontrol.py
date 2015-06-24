@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import re
 import sys
 import socket
 
@@ -23,6 +25,33 @@ numIfaces = {'XIAEndHost':4, 'XIARouter4Port':4, 'XIARouter2Port':2}
 # Principal types
 principals = ['AD', 'HID', 'SID', 'CID', 'IP']
 
+# Pattern to read AD from a network DAG
+adInDagPattern = re.compile('RE\s+(AD:\w+)')
+
+# Click constants from etc/click/xia_constants.click
+xiaconstantsclick = 'etc/click/xia_constants.click'
+xiaconstantpattern = re.compile('define\((\$\w+)\s+([-\w]+)\)')
+
+# Pattern to help us find the source directory we are running from
+srcdirpattern = re.compile('.+\/xia-core')
+
+# Find the source directory 'xia-core' for this source tree
+def get_srcdir():
+    match = srcdirpattern.match(os.getcwd())
+    return match.group(0)
+
+def getxiaconstants():
+    global xiaconstantsclick
+    xia_constants = {}
+    xiaconstantsclick = os.path.join(get_srcdir(), xiaconstantsclick)
+    print 'Reading in %s' % xiaconstantsclick
+    with open(xiaconstantsclick) as constants:
+        for line in constants:
+            match = xiaconstantpattern.match(line)
+            if match:
+                xia_constants[match.group(1)] = match.group(2)
+    print xia_constants
+    return xia_constants
 
 class ClickControl:
     ''' Click controller
@@ -33,6 +62,7 @@ class ClickControl:
     # Initialize a socket to talk to Click
     def __init__(self, clickhost='localhost', port=7777):
         self.initialized = False
+        self.xia_constants = getxiaconstants()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             self.sock.connect((clickhost, port))
@@ -70,6 +100,24 @@ class ClickControl:
             return False
         return True
 
+    # Add a destined_for_localhost route table entry for given XID
+    def addLocalRoute(self, hostname, xid):
+        table = 'xrc/n/proc/rt_'
+        if 'HID' in xid:
+            table = table + 'HID'
+        elif 'AD' in xid:
+            table = table + 'AD'
+        else:
+            print 'ERROR: No table for xid', xid
+            return False
+        # Call write handler for
+        destined_for_localhost = self.xia_constants['$DESTINED_FOR_LOCALHOST']
+        cmd = '%s/%s.add %s %s' % (hostname, table, xid, destined_for_localhost)
+        print 'Adding route: %s' % cmd
+        if not self.writeCommand(cmd):
+            return False
+        return True
+
     # Get a list of elements' write handlers
     def getElements(self, hostname, hosttype, handler_name, iface_elem, elements):
         # Routing tables for each principal type
@@ -99,6 +147,8 @@ class ClickControl:
         for element in self.hidElements(hostname, hosttype):
             if not self.writeCommand(element + ' ' + hid):
                 return False
+        if not self.addLocalRoute(hostname, hid):
+            return False
         return True
 
     # A list of all elements with Network DAG write handler
@@ -115,6 +165,13 @@ class ClickControl:
         for element in self.networkDagElements(hostname, hosttype):
             if not self.writeCommand(element + ' ' + dag):
                 return False
+        match = adInDagPattern.match(dag)
+        if not match:
+            print 'No AD found in Network DAG'
+            return False
+        ad = match.group(1)
+        if not self.addLocalRoute(hostname, ad):
+            return False
         return True
 
 # If this library is run by itself, it does a unit test that
