@@ -845,6 +845,7 @@ bool XTRANSPORT::RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp
 
 void XTRANSPORT::run_timer(Timer *timer)
 {
+	return;
 	// printf("run_timer\n");
 	    ConnIterator i = XIDpairToSock.begin(); 
     XStream *con = NULL; 
@@ -3091,6 +3092,7 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 	if (sk -> get_type() == SOCK_STREAM)
 	{
+		teardown_now = false;
 		dynamic_cast<XStream *>(sk)->usrclosed();
 	} else if (sk -> get_type() == SOCK_DGRAM)
 	{
