@@ -321,6 +321,7 @@ protected:
 	void Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xgetifaddrs(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xupdatenameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xreadnameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xgetpeername(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);

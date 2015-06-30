@@ -18,8 +18,13 @@ class XIAInterfaceTable {
 		bool remove(int iface);
 		bool remove(String dag);
 		bool remove(XIAPath dag);
+		String getDAG(int iface) {
+			return interfaceToDag[iface];
+		}
+		int size() {
+			return numInterfaces;
+		}
 	private:
-		bool numentries();
 		void _erase(int iface, String dag);
 		void _insert(int iface, String dag);
 

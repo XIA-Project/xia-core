@@ -2606,6 +2606,9 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XREADLOCALHOSTADDR:
 		Xreadlocalhostaddr(_sport, &xia_socket_msg);
 		break;
+	case xia::XGETIFADDRS:
+		Xgetifaddrs(_sport, &xia_socket_msg);
+		break;
 	case xia::XUPDATENAMESERVERDAG:
 		Xupdatenameserverdag(_sport, &xia_socket_msg);
 		break;
@@ -3640,6 +3643,25 @@ void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_
 	_msg->set_hid(HID_str.c_str());
 	_msg->set_ip4id(IP4ID_str.c_str());
 
+	ReturnResult(_sport, xia_socket_msg);
+}
+
+
+
+void XTRANSPORT::Xgetifaddrs(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
+{
+	xia::X_GetIfAddrs_Msg *_msg = xia_socket_msg->mutable_x_getifaddrs();
+	// Read the _interfaces table
+	for(int i=0; i<_interfaces.size(); i++) {
+		char iface_name[16];
+		sprintf(iface_name, "iface%d", i);
+		// Return a packet with info about all known interfaces
+		xia::X_GetIfAddrs_Msg::IfAddr *ifaddr = _msg->add_ifaddrs();
+		ifaddr->set_iface_name(iface_name);
+		ifaddr->set_flags(0);
+		ifaddr->set_src_addr_str(_interfaces.getDAG(i).c_str());
+		ifaddr->set_dst_addr_str(_interfaces.getDAG(i).c_str());
+	}
 	ReturnResult(_sport, xia_socket_msg);
 }
 
