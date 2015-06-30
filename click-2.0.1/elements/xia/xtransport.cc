@@ -543,6 +543,7 @@ WritablePacket *XTRANSPORT::copy_cid_response_packet(Packet *p, sock *sk)
 
 bool XTRANSPORT::TeardownSocket(sock *sk)
 {
+	INFO("TeardownSocket is called");
 	XID src_xid;
 	XID dst_xid;
 	bool have_src = 0;
@@ -845,8 +846,8 @@ bool XTRANSPORT::RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp
 
 void XTRANSPORT::run_timer(Timer *timer)
 {
-	printf("run_timer\n");
 	    ConnIterator i = XIDpairToSock.begin(); 
+	    // ConnIterator i = XIDpairToConnectPending.begin(); 
     XStream *con = NULL; 
 
     if (timer == _fast_ticks) {
@@ -1380,7 +1381,7 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 		// we handled it, no further processing is needed
 		return;
 	}
-	INFO("Inside ProcessStreamPacket");
+	// INFO("Inside ProcessStreamPacket");
 	XIAHeader xiah(p_in->xia_header());
 	XIAPath dst_path = xiah.dst_path();
 	XIAPath src_path = xiah.src_path();
@@ -1396,11 +1397,11 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
     sock *handler2 = XIDpairToConnectPending.get(xid_pair);
     if (handler != NULL)
     {
-    	INFO("We are in the normal case");
+    	// INFO("We are in the normal case");
     	((XStream *)handler) -> push(p_in);
     } else if (handler2 != NULL)
     {
-    	INFO("We are in the second case");
+    	// INFO("We are in the second case");
     	((XStream *)handler2) -> push(p_in);
     } 
     else {
@@ -1415,7 +1416,7 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 				return;
 			}
 
-			INFO("socket %d received SYN\n", sk->port);
+			// INFO("socket %d received SYN\n", sk->port);
 
 			if (sk->state != LISTEN) {
 				// we aren't marked to accept connecctions, drop it
@@ -1438,7 +1439,7 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 				// if this is new request, put it in the queue
 
 				// send SYNACK to client
-				INFO("Socket %d Handling new SYN\n", sk->port);
+				// INFO("Socket %d Handling new SYN\n", sk->port);
 				// Prepare new sock for this connection
 				XStream *new_sk = new XStream(this, 0); // just for now. This will be updated via Xaccept call
 				new_sk->dst_path = src_path;
