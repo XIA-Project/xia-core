@@ -885,6 +885,21 @@ dodata:
     /*1116*/
     /* FIN processing */
 	if ( tiflags & TH_FIN ) {
+		// tell API peer requested close
+		if (isBlocking) {
+			if (recv_pending) {
+				// The api is blocking on a recv, return 0 bytes available
+				get_transport() -> ReturnResult(port, pending_recv_msg, 0, 0);
+
+				recv_pending = false;
+				delete pending_recv_msg;
+				pending_recv_msg = NULL;
+			}
+		}
+		if (polling) {
+			get_transport() -> ProcessPollEvent(port, POLLIN|POLLHUP);
+		}
+
 		if (TCPS_HAVERCVDFIN(tp->t_state) == 0) { 
 			tp->t_flags |= TF_ACKNOW; 
 			tp->rcv_nxt++;
