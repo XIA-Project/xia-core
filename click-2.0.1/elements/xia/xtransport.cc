@@ -847,7 +847,7 @@ bool XTRANSPORT::RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp
 void XTRANSPORT::run_timer(Timer *timer)
 {
 	    ConnIterator i = XIDpairToSock.begin(); 
-	    // ConnIterator i = XIDpairToConnectPending.begin(); 
+	    ConnIterator j = XIDpairToConnectPending.begin(); 
     XStream *con = NULL; 
 
     if (timer == _fast_ticks) {
@@ -858,12 +858,30 @@ void XTRANSPORT::run_timer(Timer *timer)
 				con->fasttimo(); 
 			}
 		}
+		for (; j; j++) {
+			if (j->second->get_type() == XSOCKET_STREAM)
+			{
+				con = dynamic_cast<XStream *>(j->second);
+				con->fasttimo(); 
+			}
+		}
 		_fast_ticks->reschedule_after_msec(TCP_FAST_TICK_MS);
     } else if (timer == _slow_ticks) {
 		for (; i; i++) {
 			if (i->second->get_type() == XSOCKET_STREAM)
 			{
 			con = dynamic_cast<XStream *>(i->second);
+			con->slowtimo(); 
+			if (con->get_state() == TCPS_CLOSED) {
+				delete con;
+				break;
+			}
+		}
+		}
+		for (; j; j++) {
+			if (j->second->get_type() == XSOCKET_STREAM)
+			{
+			con = dynamic_cast<XStream *>(j->second);
 			con->slowtimo(); 
 			if (con->get_state() == TCPS_CLOSED) {
 				delete con;
