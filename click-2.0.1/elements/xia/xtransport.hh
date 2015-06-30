@@ -16,6 +16,7 @@
 #include <click/string.hh>
 #include <elements/ipsec/sha1_impl.hh>
 #include <click/xiatransportheader.hh>
+#include <click/xiaifacetable.hh>
 #include <click/error.hh>
 #include <click/error-syslog.hh>
 
@@ -117,7 +118,9 @@ private:
 	XID _hid;
 	XID _local_4id;
 	XID _null_4id;
+	XIAInterfaceTable _interfaces;
 	bool _is_dual_stack_router;
+	int _num_ports;
 	XIAPath _nameserver_addr;
 
 	Packet* UDPIPPrep(Packet *, int);

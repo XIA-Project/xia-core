@@ -48,6 +48,7 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 					 "LOCAL_4ID", cpkP + cpkM, cpXID, &local_4id,
 					 "ROUTETABLENAME", cpkP + cpkM, cpElement, &routing_table_elem,
 					 "IS_DUAL_STACK_ROUTER", 0, cpBool, &is_dual_stack_router,
+					 "NUM_PORTS", cpkP+cpkM, cpInteger, &_num_ports,
 					 cpEnd) < 0)
 		return -1;
 
@@ -134,7 +135,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 ** HANDLER FUNCTIONS
 *************************************************************/
 // ?????????
-enum {NETWORK_DAG, HID};
+enum {IFACE_DAG, NETWORK_DAG, HID};
 
 int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorHandler *errh)
 {
@@ -155,8 +156,38 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorH
 		String local_addr_str = network_dag_str + " " + hid_str;
 		f->_local_addr.parse(local_addr_str);
 		click_chatter("XTRANSPORT: Local address: %s", f->_local_addr.unparse().c_str());
+		// If a network_dag was assigned, this is a router
+		// So assign the same DAG to all interfaces
+		for(int i=0; i<f->_num_ports; i++) {
+			if(!f->_interfaces.update(i, local_addr_str)) {
+				click_chatter("ERROR: Updating dag: %s to iface: %d", local_addr_str.c_str(), i);
+				return -1;
+			}
+		}
 		break;
 
+	}
+	case IFACE_DAG:
+	{
+		String interface_dag;
+		if (cp_va_kparse(conf, f, errh,
+					"IFACE_DAG", cpkP + cpkM, cpString, &interface_dag,
+					cpEnd) < 0) {
+			return -1;
+		}
+		// interface_dag is a string containing an iface id and dag
+		int space_index = interface_dag.find_left(' ');
+		if(space_index == -1) {
+			click_chatter("ERROR: Invalid <interface> <dag> entry");
+			return -1;
+		}
+		int ifaceID = atoi(interface_dag.substring(0, space_index).c_str());
+		if(!f->_interfaces.add(ifaceID, interface_dag.substring(space_index+1))) {
+			click_chatter("ERROR: Unable to add iface:%d dag:%s", ifaceID,
+					interface_dag.substring(space_index+1).c_str());
+			return -1;
+		}
+		break;
 	}
 	case HID:
 	{
@@ -166,6 +197,15 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorH
 			return -1;
 		f->_hid = hid;
 		click_chatter("XTRANSPORT: HID assigned: %s", hid.unparse().c_str());
+		// Apply the same HID to all interfaces with DAG *->HID
+		String hid_dag = "RE " + hid.unparse();
+		click_chatter("XTRANSPORT: Assigning address for all interfaces: %s", hid_dag.c_str());
+		for(int i=0; i<f->_num_ports; i++) {
+			if(!f->_interfaces.add(i, hid_dag)) {
+				click_chatter("ERROR: Assigning dag: %s to iface: %d", hid_dag.c_str(), i);
+				return -1;
+			}
+		}
 		break;
 	}
 	default:
@@ -237,6 +277,7 @@ String XTRANSPORT::Netstat(Element *e, void *)
 void XTRANSPORT::add_handlers()
 {
 	//add_write_handler("local_addr", write_param, (void *)H_MOVE);
+	add_write_handler("iface_dag", write_param, (void *)IFACE_DAG);
 	add_write_handler("network_dag", write_param, (void *)NETWORK_DAG);
 	add_write_handler("hid", write_param, (void *)HID);
 	add_write_handler("purge", purge, (void*)1);
