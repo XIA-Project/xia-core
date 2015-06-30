@@ -1736,10 +1736,6 @@ XStream::set_state(const HandlerState new_state) {
 	if ((new_state == SHUTDOWN) && tcp_state() <= TCPS_ESTABLISHED) 
 	    usrclosed(); 
 
-	if (new_state == CLOSE) { 
-	    tcp_set_state(TCPS_CLOSED); 
-	    /* tcp_output(); */
-	} 
 } 
 
 // NOT SURE WE NEED THIS
