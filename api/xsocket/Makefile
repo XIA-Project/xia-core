@@ -12,7 +12,7 @@ SOURCES= Xaccept.c Xbind.c Xclose.c Xconnect.c Xfcntl.c Xgetaddrinfo.c \
 	XupdateAD.c XupdateNameServerDAG.c Xutil.c Xlisten.c state.c \
 	XbindPush.c XpushChunkto.c XrecvChunkfrom.c Xmsg.c \
 	minini/minIni.c \
-	Xkeys.c Xsecurity.c
+	Xkeys.c Xsecurity.c Xgetifaddrs.c
 
 OBJS=$(SOURCES:.c=.o) xia.pb.o
 LIB=$(XLIB)/libXsocket.so
