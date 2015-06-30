@@ -261,27 +261,43 @@ XStream::tcp_set_state(short state) {
 	 * way of handling those is found */
 
 	switch (state) {
-	case TCPS_ESTABLISHED:
-		set_state(ACTIVE);
-		// debug_output(VERB_STATES, "[%s] Flow: [%s]: Setting stateless SYN: [%d]", get_transport()->name().c_str(), sa.c_str(), tp->t_sl_flags);
-		break;
-	case TCPS_CLOSE_WAIT:
-	case TCPS_FIN_WAIT_1:
-	case TCPS_LAST_ACK:
-		// tp->t_sl_flags = TH_FIN;
-		/*
-		for (int port = 0; port <= 2; port++)
-		if ( ( output_port_dispatch(port) & MFD_DISPATCH_SCHEDULER) == MFD_DISPATCH_MFD_DIRECT ) {
-		    static_cast<MultiFlowHandler *>(output(port))->shutdown(output(port).remote_port());
-		}
-		*/
-		set_state(SHUTDOWN);
-		// debug_output(VERB_STATES, "[%s] Flow: [%s]: Setting stateless FIN: [%d]", get_transport()->name().c_str(), sa.c_str(), tp->t_sl_flags);
-		break;
 	case TCPS_CLOSED:
 		set_state(CLOSE);
-		// tp->t_sl_flags = TH_RST;
-		// debug_output(VERB_STATES, "[%s] Flow: [%s]: Setting stateless RST: [%d]", get_transport()->name().c_str(), sa.c_str(), tp->t_sl_flags);
+		get_transport() -> ChangeState(this, CLOSED);
+		break;
+	case TCPS_LISTEN:
+		get_transport() -> ChangeState(this, LISTEN);
+		break;
+	case TCPS_SYN_SENT:
+		get_transport() -> ChangeState(this, SYN_SENT);
+		break;
+	case TCPS_SYN_RECEIVED:
+		get_transport() -> ChangeState(this, SYN_RCVD);
+		break;
+	case TCPS_ESTABLISHED:
+		get_transport() -> ChangeState(this, CONNECTED);
+		set_state(ACTIVE);
+		break;
+	case TCPS_CLOSE_WAIT:
+		get_transport() -> ChangeState(this, CLOSE_WAIT);
+		set_state(SHUTDOWN);
+		break;
+	case TCPS_FIN_WAIT_1:
+		get_transport() -> ChangeState(this, FIN_WAIT1);
+		set_state(SHUTDOWN);
+		break;
+	case TCPS_CLOSING:
+		get_transport() -> ChangeState(this, CLOSING);
+		break;
+	case TCPS_LAST_ACK:
+		get_transport() -> ChangeState(this, LAST_ACK);
+		set_state(SHUTDOWN);
+		break;
+	case TCPS_FIN_WAIT_2:
+		get_transport() -> ChangeState(this, FIN_WAIT2);
+		break;
+	case TCPS_TIME_WAIT:
+		get_transport() -> ChangeState(this, TIME_WAIT);
 		break;
 	}
 };
