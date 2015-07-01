@@ -16,8 +16,8 @@ class XIAInterfaceTable {
 		bool add(int iface, String dag);
 		bool add(int iface, XIAPath dag);
 		bool remove(int iface);
-		bool remove(String dag);
-		bool remove(XIAPath dag);
+		//bool remove(String dag);
+		//bool remove(XIAPath dag);
 		String getDAG(int iface) {
 			return interfaceToDag[iface];
 		}
@@ -33,8 +33,8 @@ class XIAInterfaceTable {
 		HashTable<int, String> interfaceToDag;
 		HashTable<int, String>::iterator ifaceDagIter;
 		// Mapping from DAG to corresponding interface
-		HashTable<String, int> dagToInterface;
-		HashTable<String, int>::iterator dagIfaceIter;
+		//HashTable<String, int> dagToInterface;
+		//HashTable<String, int>::iterator dagIfaceIter;
 
 		int numInterfaces;
 };
