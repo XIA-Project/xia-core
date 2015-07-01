@@ -1336,21 +1336,24 @@ XStream::tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags)
 	th.th_sum = 0; 
 	th.th_off = (sizeof(click_tcp)) >> 2;
 
-	WritablePacket *p = NULL;
 	//Add XIA headers
-	XIAHeaderEncap xiah_new;
-	xiah_new.set_nxt(CLICK_XIA_NXT_TRN);
-	xiah_new.set_last(LAST_NODE_DEFAULT);
-	xiah_new.set_hlim(hlim);
-	xiah_new.set_dst_path(get_dst_path());
-	xiah_new.set_src_path(get_src_path());
-	TransportHeaderEncap *tcph = TransportHeaderEncap::MakeTCPHeader(&th);
-	p = tcph -> encap(NULL);
-	tcph -> update();
-	xiah_new.set_plen(tcph->hlen());
-	p = xiah_new.encap(p, false);
-	delete tcph;
-	get_transport()->output(NETWORK_PORT).push(p);
+	XIAHeaderEncap xiah;
+	xiah.set_nxt(CLICK_XIA_NXT_TRN);
+	xiah.set_last(LAST_NODE_DEFAULT);
+	xiah.set_hlim(hlim);
+	xiah.set_dst_path(dst_path);
+	xiah.set_src_path(src_path);
+
+	TransportHeaderEncap *send_hdr = TransportHeaderEncap::MakeTCPHeader(&th);
+	printf("a control packet is sent\n");
+	WritablePacket *p =  WritablePacket::make(0, '\0', 0, 0);
+	WritablePacket *tcp_payload = send_hdr->encap(p);
+	send_hdr -> update();
+	xiah.set_plen(send_hdr->hlen()); // XIA payload = transport header + transport-layer data
+	tcp_payload = xiah.encap(tcp_payload, false);
+	delete send_hdr;
+	get_transport()->output(NETWORK_PORT).push(tcp_payload);
+
 }
 
 tcp_seq_t
