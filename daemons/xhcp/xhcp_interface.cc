@@ -26,9 +26,10 @@ XHCPInterface::XHCPInterface(int id=-1, std::string name="",
 		std::string r4id="", std::string ns_dag="");
 		*/
 
-XHCPInterface::XHCPInterface(int id, std::string name, std::string hid, std::string ad, std::string rhid, std::string r4id, std::string ns_dag)
+XHCPInterface::XHCPInterface(int id, bool active, std::string name, std::string hid, std::string ad, std::string rhid, std::string r4id, std::string ns_dag)
 {
 	_id = id;
+	_active = active;
 	_name = name;
 	_hid = hid;
 	_ad = ad;
@@ -114,10 +115,7 @@ void XHCPInterface::setNameServerDAG(std::string ns_dag)
 
 bool XHCPInterface::isActive()
 {
-	if(_id == -1) {
-		return false;
-	}
-	return true;
+	return _active;
 }
 
 bool XHCPInterface::operator==(const XHCPInterface& other)

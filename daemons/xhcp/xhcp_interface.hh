@@ -4,7 +4,7 @@
 
 class XHCPInterface {
 	public:
-		XHCPInterface(int id=-1, std::string name="",
+		XHCPInterface(int id=-1, bool active=false, std::string name="",
 		        std::string hid="", std::string ad="", std::string rhid="",
 		        std::string r4id="", std::string ns_dag="");
 		//XHCPInterface(int id, std::string name, std::string hid, std::string ad, std::string rhid, std::string r4id, std::string ns_dag);
@@ -17,6 +17,7 @@ class XHCPInterface {
 		std::string getRouter4ID();
 		std::string getNameServerDAG();
 		void setID(int);
+		void setActive() { _active = true;}
 		void setName(std::string);
 		void setHID(std::string);
 		void setAD(std::string);
@@ -27,6 +28,7 @@ class XHCPInterface {
 		bool operator==(const XHCPInterface& other);
 	private:
 		int _id;
+		bool _active; // Interfaces turn active after receiving a beacon
 		std::string _name;
 		std::string _hid;
 		std::string _ad;

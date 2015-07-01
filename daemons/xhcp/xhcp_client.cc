@@ -116,7 +116,7 @@ void listRoutes(std::string xidType)
 // Create an Xsocket
 // Bind to receive SID_XHCP beacons
 // Return: socket descriptor to listen for beacons
-int initialize()
+int initialize(std::vector<XHCPInterface> &interfaces)
 {
 	int retval = -1;
 	int rc;
@@ -124,6 +124,8 @@ int initialize()
 	int state = 0;
 	sockaddr_x xhcp_dag;
 	Graph g;
+	struct ifaddrs *ifaddr, *ifa;
+	int ifaceId;
 
 	// Set up a connection with Click
 	xr.setRouter(hostname);
@@ -136,38 +138,64 @@ int initialize()
 	}
 	state = 1;
 
+	// Get information on available interfaces on this system
+	if(Xgetifaddrs(&ifaddr)) {
+		syslog(LOG_ERR, "Unable to get interface info");
+		goto initialize_cleanup;
+	}
+	state = 2;
+
+	printf("XHCP Client: Reading interface info\n");
+	for(ifaceId=0, ifa=ifaddr; ifa!=NULL; ifa = ifa->ifa_next, ifaceId++) {
+		XHCPInterface &interface = interfaces[ifaceId];
+		interface.setID(ifaceId);
+		printf("XHCP Client: interface id: %d\n", ifaceId);
+		interface.setName(ifa->ifa_name);
+		printf("XHCP Client: interface name: %s\n", ifa->ifa_name);
+		sockaddr_x *dag = (sockaddr_x *)ifa->ifa_addr;
+		Graph g(dag);
+		printf("XHCP Client: address: %s\n", g.dag_string().c_str());
+		interface.setHID(strstr(g.dag_string().c_str(), "HID:"));
+		printf("XHCP Client: interface HID: %s\n", strstr(g.dag_string().c_str(), "HID:"));
+	}
+
     // Xsocket init
     sockfd = Xsocket(AF_XIA, SOCK_DGRAM, 0);
     if (sockfd < 0) {
         syslog(LOG_ERR, "unable to create a socket");
 		goto initialize_cleanup;
     }
-	state = 2;
+	state = 3;
 
 	// DAG to listen for XHCP beacons
 	g = Node() * Node(SID_XHCP);
 	g.fill_sockaddr(&xhcp_dag);
+	printf("XHCP Client: binding to %s\n", g.dag_string().c_str());
 
 	// Bind socket to listen for beacons
 	if (Xbind(sockfd, (struct sockaddr*)&xhcp_dag, sizeof(xhcp_dag)) < 0) {
 		syslog(LOG_ERR, "unable to bind to %s", g.dag_string().c_str());
 		goto initialize_cleanup;
 	}
-	
+
 	// All good return socket descriptor
 	retval = sockfd;
 
 
 initialize_cleanup:
 	// On error, close all state and return negative value
-	if(retval < 0) {
-		switch(state) {
-			case 2:
+	switch(state) {
+		case 3:
+			if(retval < 0) {
 				Xclose(sockfd);
-			case 1:
+			}
+		case 2:
+			Xfreeifaddrs(ifaddr);
+		case 1:
+			if(retval < 0) {
 				xr.close();
-		};
-	}
+			}
+	};
 	return retval;
 }
 
@@ -239,6 +267,7 @@ void register_with_gw_router(int sockfd, std::string hid, bool ad_changed)
 
 	// make the response message dest DAG (intended destination: gw router who is running the routing process)
 	Graph gw = Node() * Node(BHID) * Node(SID_XROUTE);
+	printf("Registering with gateway router at ...%s...\n", gw.dag_string().c_str());
 	gw.fill_sockaddr(&pseudo_gw_router_dag);
 
 	bzero(buffer, XHCP_MAX_PACKET_SIZE);
@@ -246,6 +275,7 @@ void register_with_gw_router(int sockfd, std::string hid, bool ad_changed)
 	host_register_message.append("2^");
 	host_register_message.append(hid.c_str());
 	host_register_message.append("^");
+	printf("Host registration message: ...%s...\n", host_register_message.c_str());
 	strcpy (buffer, host_register_message.c_str());
 	// send the registraton message to gw router
 	Xsendto(sockfd, buffer, strlen(buffer), 0, (sockaddr*)&pseudo_gw_router_dag, sizeof(pseudo_gw_router_dag));
@@ -268,13 +298,13 @@ int main(int argc, char *argv[]) {
 	// Parse the arguments
 	config(argc, argv);
 	// A table with columns: InterfaceNumber, InterfaceName, InterfaceHID, AD, RHID, R4ID, NameServer
-	XHCPInterface interfaces[XHCP_MAX_INTERFACES];
+	std::vector<XHCPInterface> interfaces(XHCP_MAX_INTERFACES);
 
 	// The default interface
 	int default_interface = 0;
 
 	// Receive beacon from an interface.
-	if((sockfd = initialize()) < 0) {
+	if((sockfd = initialize(interfaces)) < 0) {
 		syslog(LOG_ERR, "Failed to set up beacon receiver\n");
 		return -1;
 	}
@@ -376,6 +406,7 @@ int main(int argc, char *argv[]) {
 			printf("Creating new entry for interface %d\n", ifID);
 			//TODO:NITIN: setName(), setHID() after getting it from new Xgetifaddrs()
 			iface.setID(ifID);
+			iface.setActive();
 			iface.setAD(beacon.getAD());
 			iface.setRouterHID(beacon.getRouterHID());
 			iface.setRouter4ID(beacon.getRouter4ID());
