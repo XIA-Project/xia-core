@@ -548,6 +548,7 @@ XStream::tcp_input(WritablePacket *p)
 	 *	Close the tcb.
 	 */
 	if (tiflags & TH_RST) {
+		printf("551\n");
 		switch (tp->t_state) {
 		case TCPS_SYN_RECEIVED:
 			tp->so_error = ECONNREFUSED;
@@ -835,7 +836,12 @@ step6:
 dodata: 
     if ((ti.ti_len || (tiflags & TH_FIN)) &&  
 	    TCPS_HAVERCVDFIN(tp->t_state) == 0) { 
-    	printf("becareful 822\n");
+    	/* If the receive buffer is empty and this is an out-order packet,
+    	   drop it until we receive the first packet */ 
+    	if (ti.ti_seq > tp->rcv_nxt && tp->t_state == TCPS_ESTABLISHED &&
+    		_q_recv.is_empty()) 
+    		goto drop;
+    	printf("becareful 843\n");
 		/* begin TCP_REASS */ 
 		if (ti.ti_seq == tp->rcv_nxt && 
 			tp->t_state == TCPS_ESTABLISHED) {

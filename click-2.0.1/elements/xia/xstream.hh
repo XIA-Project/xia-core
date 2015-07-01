@@ -259,11 +259,11 @@ XStream::tcp_set_state(short state) {
 
 	/* stateless flags are disabled for now untill a better
 	 * way of handling those is found */
-
 	switch (state) {
 	case TCPS_CLOSED:
 		set_state(CLOSE);
 		get_transport() -> ChangeState(this, CLOSED);
+		get_transport() -> TeardownSocket(this); // buggy
 		break;
 	case TCPS_LISTEN:
 		get_transport() -> ChangeState(this, LISTEN);
