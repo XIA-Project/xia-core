@@ -256,7 +256,7 @@ elementclass XIARoutingCore {
 
 	n :: RouteEngine($num_ports);
 	
-	xtransport::XTRANSPORT(IP:$external_ip, n/proc/rt_SID, IS_DUAL_STACK_ROUTER $is_dual_stack, $num_ports);
+	xtransport::XTRANSPORT(IP:$external_ip, n/proc/rt_SID, $num_ports, IS_DUAL_STACK_ROUTER $is_dual_stack);
 
 	XIAFromHost($click_port) -> xtransport;
 	Idle -> [1]xtransport;

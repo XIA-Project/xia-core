@@ -47,8 +47,8 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	if (cp_va_kparse(conf, this, errh,
 					 "LOCAL_4ID", cpkP + cpkM, cpXID, &local_4id,
 					 "ROUTETABLENAME", cpkP + cpkM, cpElement, &routing_table_elem,
-					 "IS_DUAL_STACK_ROUTER", 0, cpBool, &is_dual_stack_router,
 					 "NUM_PORTS", cpkP+cpkM, cpInteger, &_num_ports,
+					 "IS_DUAL_STACK_ROUTER", 0, cpBool, &is_dual_stack_router,
 					 cpEnd) < 0)
 		return -1;
 
@@ -206,6 +206,8 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorH
 				return -1;
 			}
 		}
+		// Also use the HID dag as our local address until we have a network dag
+		f->_local_addr.parse(hid_dag);
 		break;
 	}
 	default:
