@@ -31,6 +31,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <ifaddrs.h>
 #include <arpa/inet.h>
 #include <poll.h>
 
@@ -180,6 +181,8 @@ extern int XregisterName(const char *name, sockaddr_x *addr);
 extern int XrendezvousUpdate(const char *hidstr, sockaddr_x *DAG);
 
 extern int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *localhostHID, unsigned lenHID, char *local4ID, unsigned len4ID);
+extern int Xgetifaddrs(struct ifaddrs **ifap);
+extern void Xfreeifaddrs(struct ifaddrs *ifa);
 
 /* internal only functions */
 extern int XupdateAD(int sockfd, char *newad, char *new4id);

@@ -34,9 +34,11 @@ int add_ifaddr(struct ifaddrs **ifap, const xia::X_GetIfAddrs_Msg::IfAddr& ifadd
 	int retval = -1;
 	int state = 0;
 
+	printf("Creating a new ifaddr\n");
 	// Create a new struct ifaddrs
 	struct ifaddrs *_ifaddr = (struct ifaddrs*) calloc(sizeof(struct ifaddrs), 1);
 	if(!_ifaddr) {
+		LOG("Unable to allocate memory to hold ifaddr");
 		goto add_ifaddr_done;
 	}
 	state = 1;    // _ifaddr needs to be freed
@@ -47,10 +49,12 @@ int add_ifaddr(struct ifaddrs **ifap, const xia::X_GetIfAddrs_Msg::IfAddr& ifadd
 	// Store interface name
 	_ifaddr->ifa_name = (char *) calloc(ifaddr.iface_name().size()+1, 1);
 	if(!_ifaddr->ifa_name) {
+		LOG("Unable to allocate memory to hold interface name");
 		goto add_ifaddr_done;
 	}
 	state = 2;    // _ifaddr->ifa_name needs freeing
 	strcpy(_ifaddr->ifa_name, ifaddr.iface_name().c_str());
+	printf("Adding interface %s\n", ifaddr.iface_name().c_str());
 
 	// Store flags
 	_ifaddr->ifa_flags = ifaddr.flags();
@@ -58,12 +62,14 @@ int add_ifaddr(struct ifaddrs **ifap, const xia::X_GetIfAddrs_Msg::IfAddr& ifadd
 	// Store interface DAG
 	_ifaddr->ifa_addr = (struct sockaddr *) calloc(sizeof(sockaddr_x), 1);
 	if(!_ifaddr->ifa_addr) {
+		LOG("Unable to allocate memory to hold interface address");
 		goto add_ifaddr_done;
 	}
 	state = 3;
 	{
 		Graph gs(ifaddr.src_addr_str().c_str());
 		gs.fill_sockaddr((sockaddr_x *)_ifaddr->ifa_addr);
+		printf("with address: %s\n", ifaddr.src_addr_str().c_str());
 	}
 
 	// Netmask is always NULL for XIA
@@ -76,6 +82,7 @@ int add_ifaddr(struct ifaddrs **ifap, const xia::X_GetIfAddrs_Msg::IfAddr& ifadd
 	}
 	state = 4;
 	{
+		printf("with dst_addr: %s\n", ifaddr.dst_addr_str().c_str());
 		Graph gd(ifaddr.dst_addr_str().c_str());
 		gd.fill_sockaddr((sockaddr_x *)_ifaddr->ifa_dstaddr);
 	}
@@ -134,17 +141,20 @@ int Xgetifaddrs(struct ifaddrs **ifap)
 	unsigned seq = seqNo(sockfd);
 	xsm.set_sequence(seq);
 
+	printf("Xgetifaddrs: sending request to Click\n");
     if ((rc = click_send(sockfd, &xsm)) < 0) {
         LOGF("Error talking to Click: %s", strerror(errno));
         return -1;
     }
 
+	printf("Xgetifaddrs: waiting for Click response\n");
     xia::XSocketMsg xsm1;
     if ((rc = click_reply(sockfd, seq, &xsm1)) < 0) {
         LOGF("Error retrieving status from Click: %s", strerror(errno));
         return -1;
     }
 
+	printf("Xgetifaddrs: converting Click response to struct ifaddrs\n");
 	// Send list of interfaces up to the application
     if (xsm1.type() == xia::XGETIFADDRS) {
         xia::X_GetIfAddrs_Msg *msg = xsm1.mutable_x_getifaddrs();
