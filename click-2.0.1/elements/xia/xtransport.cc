@@ -46,6 +46,7 @@ sock::sock(
 	// port = 0;
 	// sock_type = 0;
 	state = INACTIVE;
+	bool reap = false;
 	isBlocking = true;
 	initialized = false;
 	so_error = 0;
@@ -242,7 +243,11 @@ int XTRANSPORT::initialize(ErrorHandler *errh)
 	
 	_slow_ticks = new Timer(this);
 	_slow_ticks->initialize(this);
-	_slow_ticks->schedule_after_msec(TCP_SLOW_TICK_MS); 
+	_slow_ticks->schedule_after_msec(TCP_SLOW_TICK_MS);
+
+	_reaper = new Timer(this);
+	_reaper->initialize(this);
+	_reaper->schedule_after_msec(5); 
 
 	_errhandler = errh;
 	return 0;
@@ -852,14 +857,16 @@ void XTRANSPORT::run_timer(Timer *timer)
 
     if (timer == _fast_ticks) {
 		for (; i; i++) {
-			if (i->second->get_type() == XSOCKET_STREAM)
+			if (i->second->get_type() == XSOCKET_STREAM &&
+				!i->second->reap)
 			{
 				con = dynamic_cast<XStream *>(i->second);
 				con->fasttimo(); 
 			}
 		}
 		for (; j; j++) {
-			if (j->second->get_type() == XSOCKET_STREAM)
+			if (j->second->get_type() == XSOCKET_STREAM &&
+				!j->second->reap)
 			{
 				con = dynamic_cast<XStream *>(j->second);
 				con->fasttimo(); 
@@ -868,7 +875,8 @@ void XTRANSPORT::run_timer(Timer *timer)
 		_fast_ticks->reschedule_after_msec(TCP_FAST_TICK_MS);
     } else if (timer == _slow_ticks) {
 		for (; i; i++) {
-			if (i->second->get_type() == XSOCKET_STREAM)
+			if (i->second->get_type() == XSOCKET_STREAM &&
+				!i->second->reap)
 			{
 			con = dynamic_cast<XStream *>(i->second);
 			con->slowtimo(); 
@@ -879,7 +887,8 @@ void XTRANSPORT::run_timer(Timer *timer)
 		}
 		}
 		for (; j; j++) {
-			if (j->second->get_type() == XSOCKET_STREAM)
+			if (j->second->get_type() == XSOCKET_STREAM &&
+				!j->second->reap)
 			{
 			con = dynamic_cast<XStream *>(j->second);
 			con->slowtimo(); 
@@ -891,7 +900,14 @@ void XTRANSPORT::run_timer(Timer *timer)
 		}
 		_slow_ticks->reschedule_after_msec(TCP_SLOW_TICK_MS);
 		(globals()->tcp_now)++; 
-    } else {
+    } else if (timer == _reaper) {
+    	for (; i; i++) {
+    		if (i->second->reap)
+    		{
+    			TeardownSocket(i->second);
+    		}
+    	}
+		_reaper->schedule_after_msec(5); 
 		// debug_output(VERB_TIMERS, "%u: XTRANSPORT::run_timer: unknown timer", tcp_now()); 
 	}
 	return;

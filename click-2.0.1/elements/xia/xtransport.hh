@@ -176,6 +176,7 @@ public:
     tcpstat         _tcpstat;
     Timer           *_fast_ticks;
     Timer           *_slow_ticks;
+    Timer           *_reaper;
     int         _verbosity;
 
     tcp_globals     _tcp_globals;
@@ -449,6 +450,7 @@ class sock : public Element {
 		HashTable<XID, bool> XIDtoReadReq;	// Indicates whether ReadCID() is called for a specific CID
 		HashTable<XID, WritablePacket*> XIDtoCIDresponsePkt;
 
+		bool reap;
 protected:
     XTRANSPORT *transport;
     HandlerState hstate;

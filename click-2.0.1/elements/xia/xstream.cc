@@ -1329,7 +1329,7 @@ XStream::tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags)
 	
 /*	setports(th->th_sport, _con_id._ports); */
 	th.th_flags2 = 0; 
-	th.th_seq =   htonl(seq); 
+	th.th_seq =   htonl(seq+1); 
 	th.th_ack =   htonl(ack); 
 	th.th_flags = flags; 
 	th.th_urp = 0; 
@@ -1923,7 +1923,7 @@ printf("read_from_recv_buf\n");
 	int bytes_returned = 0;
 	char buf[1024*1024]; // TODO: pick a buf size
 	memset(buf, 0, 1024*1024);
-	while (!_q_recv.is_empty()) {
+	while (has_pullable_data()) {
 
 		if (bytes_returned >= bytes_requested) break;
 

@@ -263,7 +263,7 @@ XStream::tcp_set_state(short state) {
 	case TCPS_CLOSED:
 		set_state(CLOSE);
 		get_transport() -> ChangeState(this, CLOSED);
-		get_transport() -> TeardownSocket(this); // buggy
+		reap = true;
 		break;
 	case TCPS_LISTEN:
 		get_transport() -> ChangeState(this, LISTEN);
