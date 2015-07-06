@@ -22,17 +22,17 @@
 
 /*
 XHCPInterface::XHCPInterface(int id=-1, std::string name="",
-		std::string hid="", std::string ad="", std::string rhid="",
+		std::string hid="", std::string ndag="", std::string rhid="",
 		std::string r4id="", std::string ns_dag="");
 		*/
 
-XHCPInterface::XHCPInterface(int id, bool active, std::string name, std::string hid, std::string ad, std::string rhid, std::string r4id, std::string ns_dag)
+XHCPInterface::XHCPInterface(int id, bool active, std::string name, std::string hid, std::string ndag, std::string rhid, std::string r4id, std::string ns_dag)
 {
 	_id = id;
 	_active = active;
 	_name = name;
 	_hid = hid;
-	_ad = ad;
+	_ndag = ndag;
 	_router_hid = rhid;
 	_router_4id = r4id;
 	_nameserver_dag = ns_dag;
@@ -73,14 +73,14 @@ void XHCPInterface::setHID(std::string hid)
 	_hid = hid;
 }
 
-std::string XHCPInterface::getAD()
+std::string XHCPInterface::getNetworkDAG()
 {
-	return _ad;
+	return _ndag;
 }
 
-void XHCPInterface::setAD(std::string ad)
+void XHCPInterface::setNetworkDAG(std::string ndag)
 {
-	_ad = ad;
+	_ndag = ndag;
 }
 
 std::string XHCPInterface::getRouterHID()
@@ -121,7 +121,7 @@ bool XHCPInterface::isActive()
 bool XHCPInterface::operator==(const XHCPInterface& other)
 {
 	if(_id != other._id) return false;
-	if(!_ad.compare(other._ad)) return false;
+	if(!_ndag.compare(other._ndag)) return false;
 	if(!_router_hid.compare(other._router_hid)) return false;
 	if(!_router_4id.compare(other._router_4id)) return false;
 	if(!_nameserver_dag.compare(other._nameserver_dag)) return false;

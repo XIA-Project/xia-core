@@ -73,7 +73,7 @@ int main(int argc, char *argv[]) {
 	sockaddr_x ddag;
 	sockaddr_x ns_dag;
 	char pkt[XHCP_MAX_PACKET_SIZE];
-	char myAD[MAX_XID_SIZE];
+	char myNetworkDAG[MAX_NDAG_SIZE];
 	char gw_router_hid[MAX_XID_SIZE];
 	char gw_router_4id[MAX_XID_SIZE];
 
@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
 	g.fill_sockaddr(&ddag);
 
 	// read the localhost AD and HID (currently, XHCP server running on gw router)
-	if ( XreadLocalHostAddr(sockfd, myAD, MAX_XID_SIZE, gw_router_hid, MAX_XID_SIZE, gw_router_4id, MAX_XID_SIZE) < 0 ) {
+	if ( XreadLocalHostAddr(sockfd, myNetworkDAG, MAX_NDAG_SIZE, gw_router_hid, MAX_XID_SIZE, gw_router_4id, MAX_XID_SIZE) < 0 ) {
 		syslog(LOG_ERR, "unable to get local address");
 		exit(-1);
 	}
@@ -121,16 +121,16 @@ int main(int argc, char *argv[]) {
 	xhcp_pkt beacon_pkt;
 	beacon_pkt.seq_num = 0;
 	beacon_pkt.num_entries = 4;
-	xhcp_pkt_entry *ad_entry = (xhcp_pkt_entry*)malloc(sizeof(short)+strlen(myAD)+1);
+	xhcp_pkt_entry *ndag_entry = (xhcp_pkt_entry*)malloc(sizeof(short)+strlen(myNetworkDAG)+1);
 	xhcp_pkt_entry *gw_entry = (xhcp_pkt_entry*)malloc(sizeof(short)+strlen(gw_router_hid)+1);
 	xhcp_pkt_entry *gw_entry_4id = (xhcp_pkt_entry*)malloc(sizeof(short)+strlen(gw_router_4id)+1);
 	xhcp_pkt_entry *ns_entry = (xhcp_pkt_entry*)malloc(sizeof(short)+strlen(ns)+1);
 
-	ad_entry->type = XHCP_TYPE_AD;
+	ndag_entry->type = XHCP_TYPE_NDAG;
 	gw_entry->type = XHCP_TYPE_GATEWAY_ROUTER_HID;
 	gw_entry_4id->type = XHCP_TYPE_GATEWAY_ROUTER_4ID;
 	ns_entry->type = XHCP_TYPE_NAME_SERVER_DAG;
-	sprintf(ad_entry->data, "%s", myAD);
+	sprintf(ndag_entry->data, "%s", myNetworkDAG);
 	sprintf(gw_entry->data, "%s", gw_router_hid);
 	sprintf(gw_entry_4id->data, "%s", gw_router_4id);
 	sprintf(ns_entry->data, "%s", ns);
@@ -143,10 +143,10 @@ int main(int argc, char *argv[]) {
 		int offset = 0;
 		memcpy(pkt, &beacon_pkt, sizeof(beacon_pkt.seq_num)+sizeof(beacon_pkt.num_entries));
 		offset += sizeof(beacon_pkt.seq_num)+sizeof(beacon_pkt.num_entries);
-		memcpy(pkt+offset, &ad_entry->type, sizeof(ad_entry->type));
-		offset += sizeof(ad_entry->type);
-		memcpy(pkt+offset, ad_entry->data, strlen(ad_entry->data)+1);
-		offset += strlen(ad_entry->data)+1;
+		memcpy(pkt+offset, &ndag_entry->type, sizeof(ndag_entry->type));
+		offset += sizeof(ndag_entry->type);
+		memcpy(pkt+offset, ndag_entry->data, strlen(ndag_entry->data)+1);
+		offset += strlen(ndag_entry->data)+1;
 		memcpy(pkt+offset, &gw_entry->type, sizeof(gw_entry->type));
 		offset += sizeof(gw_entry->type);
 		memcpy(pkt+offset, gw_entry->data, strlen(gw_entry->data)+1);
@@ -167,7 +167,7 @@ int main(int argc, char *argv[]) {
 		beacon_pkt.seq_num += 1;
 		sleep(XHCP_SERVER_BEACON_INTERVAL);
 	}
-	free(ad_entry);
+	free(ndag_entry);
 	free(gw_entry);
 	free(gw_entry_4id);
 	free(ns_entry);

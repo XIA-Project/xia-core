@@ -251,7 +251,7 @@ int get_beacon(int sockfd, int *ifID, char *beacon, int beaconlen)
 	return retval;
 }
 
-void register_with_gw_router(int sockfd, std::string hid, bool ad_changed)
+void register_with_gw_router(int sockfd, std::string hid, bool network_changed)
 {
 	// TODO:NITIN: Create socket with source address bound to beacon's interface
 	// Then register with gw router on that socket
@@ -281,7 +281,7 @@ void register_with_gw_router(int sockfd, std::string hid, bool ad_changed)
 	Xsendto(sockfd, buffer, strlen(buffer), 0, (sockaddr*)&pseudo_gw_router_dag, sizeof(pseudo_gw_router_dag));
 	// TODO: Hack to allow intrinsic security code to drop packet
 	// Ideally there should be a handshake with the gateway router
-	if(ad_changed) {
+	if(network_changed) {
 		sleep(5);
 		syslog(LOG_INFO, "xhcp_client: AD or NS changed, resend registration message");
 		Xsendto(sockfd, buffer, strlen(buffer), 0, (sockaddr*)&pseudo_gw_router_dag, sizeof(pseudo_gw_router_dag));
@@ -371,7 +371,7 @@ int main(int argc, char *argv[]) {
 		int rc;
 		int ifID;
 		char buf[XIA_MAXBUF];
-		bool ad_changed = false;
+		bool network_changed = false;
 		bool rhid_changed = false;
 		bool r4id_changed = false;
 		bool ns_changed = false;
@@ -390,8 +390,8 @@ int main(int argc, char *argv[]) {
 		}
 		*/
 		if(iface.isActive()) {
-			if(iface.getAD().compare(beacon.getAD())) {
-				ad_changed = true;
+			if(iface.getNetworkDAG().compare(beacon.getNetworkDAG())) {
+				network_changed = true;
 			}
 			if(iface.getRouterHID().compare(beacon.getRouterHID())) {
 				rhid_changed = true;
@@ -407,28 +407,30 @@ int main(int argc, char *argv[]) {
 			//TODO:NITIN: setName(), setHID() after getting it from new Xgetifaddrs()
 			iface.setID(ifID);
 			iface.setActive();
-			iface.setAD(beacon.getAD());
+			iface.setNetworkDAG(beacon.getNetworkDAG());
 			iface.setRouterHID(beacon.getRouterHID());
 			iface.setRouter4ID(beacon.getRouter4ID());
 			iface.setNameServerDAG(beacon.getNameServerDAG());
-			ad_changed = true;
+			network_changed = true;
 			rhid_changed = true;
 			r4id_changed = true;
 			ns_changed = true;
 		}
 
-		if(ad_changed) {
+		if(network_changed) {
 			// Update Click
 			//if(XupdateAD(ifID, beacon.getAD(), becon.getRouter4ID) < 0) {
 			//	syslog(LOG_WARNING, "Error updating new AD in Click");
 			//}
-			xr.delRoute(iface.getAD().c_str());
+			xr.delRoute(XnetworkDAGIntentAD(iface.getNetworkDAG().c_str()));
+			printf("Deleted route for %s\n", XnetworkDAGIntentAD(iface.getNetworkDAG().c_str()));
 
-			if((rc = xr.setRoute(beacon.getAD().c_str(), DESTINED_FOR_LOCALHOST, empty_str, 0xffff)) != 0) {
+			if((rc = xr.setRoute(XnetworkDAGIntentAD(beacon.getNetworkDAG().c_str()), DESTINED_FOR_LOCALHOST, empty_str, 0xffff)) != 0) {
 				syslog(LOG_WARNING, "error setting route %d\n", rc);
 			}
-			printf("AD for interface %d changed from %s to %s\n", ifID, iface.getAD().c_str(), beacon.getAD().c_str());
-			iface.setAD(beacon.getAD());
+			printf("Created localhost route for %s\n", XnetworkDAGIntentAD(beacon.getNetworkDAG().c_str()));
+			printf("NetworkDAG for interface %d changing from %s to %s\n", ifID, iface.getNetworkDAG().c_str(), beacon.getNetworkDAG().c_str());
+			iface.setNetworkDAG(beacon.getNetworkDAG());
 
 			listRoutes("AD");
 			listRoutes("HID");
@@ -481,7 +483,7 @@ int main(int argc, char *argv[]) {
 			iface.setNameServerDAG(beacon.getNameServerDAG());
 		}
 		if(gw_register_countdown-- <= 0) {
-			register_with_gw_router(sockfd, iface.getHID(), ad_changed);
+			register_with_gw_router(sockfd, iface.getHID(), network_changed);
 			gw_register_countdown = ceil(XHCP_CLIENT_ADVERTISE_INTERVAL/XHCP_SERVER_BEACON_INTERVAL);
 		}
 		/*

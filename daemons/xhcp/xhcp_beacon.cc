@@ -28,7 +28,7 @@ XHCPBeacon::XHCPBeacon(int id=-1, std::string name="",
 
 XHCPBeacon::XHCPBeacon(std::string ad, std::string rhid, std::string r4id, std::string ns_dag)
 {
-	_ad = ad;
+	_ndag = ad;
 	_router_hid = rhid;
 	_router_4id = r4id;
 	_nameserver_dag = ns_dag;
@@ -42,9 +42,9 @@ XHCPBeacon::XHCPBeacon(char *buf)
 	xhcp_pkt_entry *entry = (xhcp_pkt_entry *)tmp->data;
 	for (i=0; i<tmp->num_entries; i++) {
 		switch (entry->type) {
-			case XHCP_TYPE_AD:
-				_ad = entry->data;
-				printf("Router AD: %s\n", _ad.c_str());
+			case XHCP_TYPE_NDAG:
+				_ndag = entry->data;
+				printf("Router NDAG: %s\n", _ndag.c_str());
 				break;
 			case XHCP_TYPE_GATEWAY_ROUTER_HID:
 				_router_hid = entry->data;
@@ -71,14 +71,14 @@ XHCPBeacon::~XHCPBeacon()
 	// Cleanup
 }
 
-std::string XHCPBeacon::getAD()
+std::string XHCPBeacon::getNetworkDAG()
 {
-	return _ad;
+	return _ndag;
 }
 
-void XHCPBeacon::setAD(std::string ad)
+void XHCPBeacon::setNetworkDAG(std::string ad)
 {
-	_ad = ad;
+	_ndag = ad;
 }
 
 std::string XHCPBeacon::getRouterHID()
@@ -113,7 +113,7 @@ void XHCPBeacon::setNameServerDAG(std::string ns_dag)
 
 bool XHCPBeacon::operator==(const XHCPBeacon& other)
 {
-	if(!_ad.compare(other._ad)) return false;
+	if(!_ndag.compare(other._ndag)) return false;
 	if(!_router_hid.compare(other._router_hid)) return false;
 	if(!_router_4id.compare(other._router_4id)) return false;
 	if(!_nameserver_dag.compare(other._nameserver_dag)) return false;
