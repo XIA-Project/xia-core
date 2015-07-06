@@ -190,6 +190,7 @@ extern int XupdateRV(int sockfd);
 extern int XupdateNameServerDAG(int sockfd, const char *nsDAG);
 extern int XreadNameServerDAG(int sockfd, sockaddr_x *nsDAG);
 extern int XisDualStackRouter(int sockfd);
+extern const char *XnetworkDAGIntentAD(const char *network_dag);
 
 extern int Xgetpeername(int sockd, struct sockaddr *addr, socklen_t *addrlen);
 extern int Xgetsockname(int sockd, struct sockaddr *addr, socklen_t *addrlen);
