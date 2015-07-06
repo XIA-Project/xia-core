@@ -198,7 +198,9 @@ char *randomString(char *buf, int size)
 int process(int sock)
 {
 	int size;
-	int sent, received, rc;
+	int sent = 0;
+	int received = 0;
+	int rc = 0;
 	char buf1[XIA_MAXBUF + 1], buf2[XIA_MAXBUF + 1];
 
 	if (pktSize == 0)
@@ -220,10 +222,15 @@ int process(int sock)
 	}
 
 	memset(buf2, 0, sizeof(buf2));
-	if ((received = Xrecv(sock, buf2, sizeof(buf2), 0)) < 0)
-		die(-5, "Receive error %d on socket %d\n", errno, sock);
+	int count = 0;
+	while ((count = Xrecv(sock, buf2, sizeof(buf2), 0)) > 0) {
+		say("%5d received %d bytes\n", sock, count);
+		received += count;
+	}
+	// if ((received = Xrecv(sock, buf2, sizeof(buf2), 0)) < 0)
+	// 	die(-5, "Receive error %d on socket %d\n", errno, sock);
 
-	say("Xsock %4d received %d bytes\n", sock, received);
+	say("Xsock %4d received %d bytes in total\n", sock, received);
 
 	if (sent != received || strcmp(buf1, buf2) != 0)
 		warn("Xsock %4d received data different from sent data! (bytes sent/recv'd: %d/%d)\n",

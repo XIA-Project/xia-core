@@ -143,7 +143,7 @@ void die(int ecode, const char *fmt, ...)
 void process(int sock)
 {
 	char buf[XIA_MAXBUF + 1];
-	int n;
+	int n = 0;
 	pid_t pid = getpid();
 
 	fd_set fds;
@@ -174,15 +174,19 @@ void process(int sock)
 		 }
 #endif
 
-		if ((n = Xrecv(sock, buf, sizeof(buf), 0)) < 0) {
-			warn("Recv error on socket %d, closing connection\n", pid);
-			break;
-		} else if (n == 0) {
-			warn("%d client closed the connection\n", pid);
-			break;
+		// if ((n = Xrecv(sock, buf, sizeof(buf), 0)) < 0) {
+		// 	warn("Recv error on socket %d, closing connection\n", pid);
+		// 	break;
+		// } else if (n == 0) {
+		// 	warn("%d client closed the connection\n", pid);
+		// 	break;
+		// }
+		int count = 0;
+		while ((count = Xrecv(sock, buf, sizeof(buf), 0)) > 0) {
+			say("%5d received %d bytes\n", pid, count);
+			n += count;
 		}
-
-		say("%5d received %d bytes\n", pid, n);
+		say("%5d received %d bytes in total\n", pid, n);
 
 		if ((n = Xsend(sock, buf, n, 0)) < 0) {
 			warn("%5d send error\n", pid);
