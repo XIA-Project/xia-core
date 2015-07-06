@@ -536,9 +536,11 @@ void updateClickRoutingTable() {
 }
 
 
-
 void initRouteState()
 {
+	char network_dag[256];
+	const char *last_ad;
+
 	// make the dest DAG (broadcast to other routers)
 	Graph g = Node() * Node(BHID) * Node(SID_XROUTE);
 	g.fill_sockaddr(&route_state.ddag);
@@ -550,6 +552,11 @@ void initRouteState()
 		syslog(LOG_ALERT, "Unable to read local XIA address");
 		exit(-1);
 	}
+	// Extract the last AD from the network dag - read backwards
+	if((last_ad = XnetworkDAGIntentAD((const char *)network_dag)) == NULL) {
+		syslog(LOG_ALERT, "Unable to read AD from network dag: %s.", network_dag);
+	}
+	strcpy(route_state.myAD, last_ad);
 
 	// make the src DAG (the one the routing process listens on)
 	struct addrinfo *ai;
