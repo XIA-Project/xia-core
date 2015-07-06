@@ -247,7 +247,7 @@ int XTRANSPORT::initialize(ErrorHandler *errh)
 
 	_reaper = new Timer(this);
 	_reaper->initialize(this);
-	_reaper->schedule_after_msec(5); 
+	_reaper->schedule_after_msec(700); 
 
 	_errhandler = errh;
 	return 0;
@@ -907,7 +907,7 @@ void XTRANSPORT::run_timer(Timer *timer)
     			TeardownSocket(i->second);
     		}
     	}
-		_reaper->schedule_after_msec(5); 
+		_reaper->schedule_after_msec(700); 
 		// debug_output(VERB_TIMERS, "%u: XTRANSPORT::run_timer: unknown timer", tcp_now()); 
 	}
 	return;

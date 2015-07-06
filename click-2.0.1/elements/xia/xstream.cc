@@ -972,9 +972,9 @@ dropwithreset:
 
 drop:
     //debug_output(VERB_TCP, "[%s] tcpcon::input drop", SPKRNAME); 
-	printf("becareful 938\n");
-	copy -> kill();
-    p->kill();
+	if (copy != NULL) copy -> kill();
+    if (p != NULL) p->kill();
+	printf("drop: 938\n");
     return ;
 }
 
