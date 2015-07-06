@@ -25,10 +25,10 @@
 
 #define MAX_RV_DAG_SIZE 1024
 
-int XupdateAD(int sockfd, char *newad, char *new4id) {
+int XupdateAD(int sockfd, int interface, char *newnetwork, char *new4id) {
   int rc;
 
-  if (!newad) {
+  if (!newnetwork) {
     LOG("new ad is NULL!");
     errno = EFAULT;
     return -1;
@@ -46,7 +46,8 @@ int XupdateAD(int sockfd, char *newad, char *new4id) {
   xsm.set_sequence(seq);
 
   xia::X_Changead_Msg *x_changead_msg = xsm.mutable_x_changead();
-  x_changead_msg->set_ad(newad);
+  x_changead_msg->set_interface(interface);
+  x_changead_msg->set_dag(newnetwork);
   x_changead_msg->set_ip4id(new4id);
 
   if ((rc = click_send(sockfd, &xsm)) < 0) {
@@ -96,8 +97,8 @@ int XupdateRV(int sockfd)
 ** applications.
 **
 ** @param sockfd an Xsocket (may be of any type XSOCK_STREAM, etc...)
-** @param localhostAD buffer to receive the AD for this host
-** @param lenAD size of the localhostAD buffer
+** @param localhostNetworkDAG buffer to receive the AD for this host
+** @param lenDAG size of the localhostNetworkDAG buffer
 ** @param localhostHID buffer to receive the HID for this host
 ** @param lenHID size of the localhostHID buffer
 **
@@ -105,7 +106,7 @@ int XupdateRV(int sockfd)
 ** @returns -1 on failure with errno set
 **
 */
-int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *localhostHID, unsigned lenHID, char *local4ID, unsigned len4ID) {
+int XreadLocalHostAddr(int sockfd, char *localhostNetworkDAG, unsigned lenDAG, char *localhostHID, unsigned lenHID, char *local4ID, unsigned len4ID) {
   	int rc;
 
  	if (getSocketType(sockfd) == XSOCK_INVALID) {
@@ -114,7 +115,7 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *loca
   		return -1;
  	}
 
-	if (localhostAD == NULL || localhostHID == NULL || local4ID == NULL) {
+	if (localhostNetworkDAG == NULL || localhostHID == NULL || local4ID == NULL) {
 		LOG("NULL pointer!");
 		errno = EINVAL;
 		return -1;
@@ -138,11 +139,11 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *loca
 
 	if (xsm1.type() == xia::XREADLOCALHOSTADDR) {
 		xia::X_ReadLocalHostAddr_Msg *_msg = xsm1.mutable_x_readlocalhostaddr();
-		strncpy(localhostAD, (_msg->ad()).c_str(), lenAD);
+		strncpy(localhostNetworkDAG, (_msg->ndag()).c_str(), lenDAG);
 		strncpy(localhostHID, (_msg->hid()).c_str(), lenHID);
 		strncpy(local4ID, (_msg->ip4id()).c_str(), len4ID);
 		// put in null terminators in case buffers were too short
-		localhostAD[lenAD - 1] = 0;
+		localhostNetworkDAG[lenDAG - 1] = 0;
 		localhostHID[lenHID - 1] = 0;
 		local4ID[len4ID - 1] = 0;
 		rc = 0;

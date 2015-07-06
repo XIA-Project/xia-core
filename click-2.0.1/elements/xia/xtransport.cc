@@ -3472,7 +3472,15 @@ void XTRANSPORT::Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
-	// Save the old AD
+	// sock may need to store _hid, _sid, _network_dag to allow _network_dag to change
+	// Find the interface corresponding to this change
+	// If the interface is the default interface:
+	//     * Update xrc/xtransport, xrc/n/proc/rt_*, xrc/n/x, xrc/x
+	//     * Update _network_dag, _local_addr just like the network_dag handler
+	// For the interface:
+	//     * Update xlcn/xchal, xlcn/x
+	// For all active stream sockets, associated with the interface
+	//     * Update _network_dag and hence the src_path
 	String str_local_addr = _local_addr.unparse();
 	size_t old_AD_start = str_local_addr.find_left("AD:");
 	size_t old_AD_end = str_local_addr.find_left(" ", old_AD_start);
@@ -3482,20 +3490,27 @@ void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	//String tmp = _local_addr.unparse();
 	//Vector<String> ids;
 	//cp_spacevec(tmp, ids);
-	String AD_str(x_changead_msg->ad().c_str());
+	int interface = x_changead_msg->interface();
+	String Network_DAG_str(x_changead_msg->dag().c_str());
 	String HID_str = _hid.unparse();
 	String IP4ID_str(x_changead_msg->ip4id().c_str());
+	// TODO: If interface is the default interface:
 	_local_4id.parse(IP4ID_str);
 	String new_local_addr;
 	// If a valid 4ID is given, it is included (as a fallback) in the local_addr
 	if(_local_4id != _null_4id) {
-		new_local_addr = "RE ( " + IP4ID_str + " ) " + AD_str + " " + HID_str;
+		new_local_addr = "RE ( " + IP4ID_str + " ) " + Network_DAG_str + " " + HID_str;
 	} else {
-		new_local_addr = "RE " + AD_str + " " + HID_str;
+		new_local_addr = "RE " + Network_DAG_str + " " + HID_str;
 	}
 	NOTICE("new address is - %s", new_local_addr.c_str());
+	_network_dag.parse(Network_DAG_str);
 	_local_addr.parse(new_local_addr);
 
+	//TODO: Notify all other elements of the change
+	// xrc/xtransport, xlcn/xchal xrc/n/proc/rt_AD,HID,SID,CID,IP xrc/n/x, xlcn/x, xrc/x
+
+	/*
 	// Inform all active stream connections about this change
 	for (HashTable<unsigned short, sock*>::iterator iter = portToSock.begin(); iter != portToSock.end(); ++iter ) {
 		unsigned short _migrateport = iter->first;
@@ -3622,6 +3637,7 @@ void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 		}
 		output(NETWORK_PORT).push(p);
 	}
+*/
 	ReturnResult(_sport, xia_socket_msg);
 }
 
@@ -3630,18 +3646,14 @@ void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
 	// read the localhost AD and HID
-	String local_addr = _local_addr.unparse();
-	click_chatter("Xreadlocalhostaddr: found local addr: %s", local_addr.c_str());
-	size_t AD_found_start = local_addr.find_left("AD:");
-	size_t AD_found_end = local_addr.find_left(" ", AD_found_start);
-	String AD_str = local_addr.substring(AD_found_start, AD_found_end - AD_found_start);
-	click_chatter("Xreadlocalhostaddr: AD found: %s", AD_str.c_str());
+	String network_dag = _network_dag.unparse();
+	click_chatter("Xreadlocalhostaddr: found network dag: %s", network_dag.c_str());
 	String HID_str = _hid.unparse();
 	click_chatter("Xreadlocalhostaddr: HID found: %s", HID_str.c_str());
 	String IP4ID_str = _local_4id.unparse();
 	// return a packet containing localhost AD and HID
 	xia::X_ReadLocalHostAddr_Msg *_msg = xia_socket_msg->mutable_x_readlocalhostaddr();
-	_msg->set_ad(AD_str.c_str());
+	_msg->set_ndag(network_dag.c_str());
 	_msg->set_hid(HID_str.c_str());
 	_msg->set_ip4id(IP4ID_str.c_str());
 

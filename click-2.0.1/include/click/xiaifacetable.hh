@@ -24,6 +24,8 @@ class XIAInterfaceTable {
 		int size() {
 			return numInterfaces;
 		}
+		void set_default(int interface) { _default_interface = interface;}
+		int default_interface() { return _default_interface;}
 	private:
 		void _erase(int iface, String dag);
 		void _insert(int iface, String dag);
@@ -37,5 +39,6 @@ class XIAInterfaceTable {
 		//HashTable<String, int>::iterator dagIfaceIter;
 
 		int numInterfaces;
+		int _default_interface;
 };
 #endif

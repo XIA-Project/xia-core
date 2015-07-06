@@ -8,6 +8,7 @@
 XIAInterfaceTable::XIAInterfaceTable()
 {
 	numInterfaces = 0;
+	set_default(0);    // For now, first interface is the default
 }
 
 XIAInterfaceTable::~XIAInterfaceTable()
@@ -45,7 +46,7 @@ bool XIAInterfaceTable::add(int iface, XIAPath dag)
 {
 	return add(iface, dag.unparse());
 }
-	
+
 // Update existing entry in both tables.
 // Return false if entry does not exist in either table
 bool XIAInterfaceTable::update(int iface, String dag)

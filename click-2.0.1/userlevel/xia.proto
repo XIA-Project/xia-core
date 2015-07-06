@@ -208,12 +208,13 @@ message X_Requestfailed_Msg {
 }
 
 message X_Changead_Msg {
-  required string ad = 1;
-  optional string ip4id = 2;
+  required int32 interface = 1;
+  required string dag = 2;
+  optional string ip4id = 3;
 }
 
 message X_ReadLocalHostAddr_Msg {
-  optional string ad = 1;
+  optional string ndag = 1;
   optional string hid = 2;
   optional string ip4id = 3;
 }
