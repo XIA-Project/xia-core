@@ -2034,6 +2034,10 @@ TCPQueue::~TCPQueue() {}
 int 
 TCPQueue::push(WritablePacket * p, tcp_seq_t seq, tcp_seq_t seq_nxt)
 {
+	if (p == NULL)
+	{
+		return -1;
+	}
     TCPQueueElt *qe = NULL ; 
     TCPQueueElt *wrk = NULL ; 
     // StringAccum sa;
