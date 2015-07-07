@@ -135,3 +135,7 @@ etc/click/templates/dual_stack_router.click
 experiments/planetlab/logs/*.txt
 experiments/planetlab/logs/tunneling
 experiments/planetlab/logs/fourid
+
+# xcache
+xcache
+xcache_cmd_pb2.py

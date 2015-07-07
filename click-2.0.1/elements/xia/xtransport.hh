@@ -116,6 +116,7 @@ private:
 	XIAPath _local_addr;
 	XID _local_4id;
 	XID _null_4id;
+	XID _xcache_sid;
 	bool _is_dual_stack_router;
 	XIAPath _nameserver_addr;
 
@@ -317,6 +318,7 @@ protected:
 	void Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void XreadXcacheSid(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xupdatenameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xreadnameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xgetpeername(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);

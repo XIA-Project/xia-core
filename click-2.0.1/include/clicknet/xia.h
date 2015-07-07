@@ -2,6 +2,8 @@
 #ifndef CLICKNET_XIA_H
 #define CLICKNET_XIA_H
 
+#include <stdint.h>
+
 /*
  * <clicknet/xia.h> -- XIA packet header, only works in user-level click
  * 

@@ -8,7 +8,6 @@
 #include <click/packet.hh>
 #include <click/vector.hh>
 #include <click/xiacontentheader.hh>
-#include "xiatransport.hh"
 #include "xtransport.hh"
 #include <click/xiatransportheader.hh>
 #include "xlog.hh"
@@ -43,6 +42,7 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	Element* routing_table_elem;
 	bool is_dual_stack_router;
 	_is_dual_stack_router = false;
+    char xidString[50];
 
 	if (cp_va_kparse(conf, this, errh,
 					 "LOCAL_ADDR", cpkP + cpkM, cpXIAPath, &local_addr,
@@ -54,6 +54,11 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 
 	_local_addr = local_addr;
 	_local_hid = local_addr.xid(local_addr.destination_node());
+
+    /* TODO: How should we choose xcacheSid? */
+    random_xid("SID", xidString);
+    _xcache_sid.parse(xidString);
+
 	_local_4id = local_4id;
 
 	// IP:0.0.0.0 indicates NULL 4ID
@@ -2551,6 +2556,9 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XREADLOCALHOSTADDR:
 		Xreadlocalhostaddr(_sport, &xia_socket_msg);
 		break;
+	case xia::XREADXCACHESID:
+		XreadXcacheSid(_sport, &xia_socket_msg);
+		break;
 	case xia::XUPDATENAMESERVERDAG:
 		Xupdatenameserverdag(_sport, &xia_socket_msg);
 		break;
@@ -3585,6 +3593,15 @@ void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_
 	ReturnResult(_sport, xia_socket_msg);
 }
 
+
+void XTRANSPORT::XreadXcacheSid(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
+{
+	String xcacheSid = _xcache_sid.unparse();
+	xia::X_ReadXcacheSid_Msg *_msg = xia_socket_msg->mutable_x_readxcachesid();
+
+	_msg->set_sid(xcacheSid.c_str());
+    ReturnResult(_sport, xia_socket_msg);
+}
 
 
 void XTRANSPORT::Xupdatenameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)

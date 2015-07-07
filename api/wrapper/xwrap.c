@@ -57,6 +57,7 @@
 #include "Xutil.h"
 #include "Xkeys.h"
 #include "dagaddr.hpp"
+#include <algorithm>
 #include <map>
 #include <vector>
 

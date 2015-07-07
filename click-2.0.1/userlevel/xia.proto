@@ -42,6 +42,8 @@ enum XSocketCallType {
   XLISTEN = 32;
 
   XUPDATERV = 33;
+
+  XREADXCACHESID = 34;
 }
 
 message XSocketMsg {
@@ -86,6 +88,7 @@ message XSocketMsg {
 
   optional X_Updaterv_Msg x_updaterv = 33;
   optional X_Listen_Msg x_listen = 34;
+  optional X_ReadXcacheSid_Msg x_readxcachesid = 35;
 }
 
 message X_Socket_Msg {
@@ -311,3 +314,7 @@ message X_Recvchunkfrom_Msg {
 message X_BindPush_Msg {
   required string sdag = 1; // bind to src dag 
 } 
+
+message X_ReadXcacheSid_Msg {
+  optional string sid = 1;
+}
