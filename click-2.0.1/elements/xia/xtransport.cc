@@ -46,7 +46,7 @@ sock::sock(
 	// port = 0;
 	// sock_type = 0;
 	state = INACTIVE;
-	bool reap = false;
+	reap = false;
 	isBlocking = true;
 	initialized = false;
 	so_error = 0;
@@ -902,8 +902,10 @@ void XTRANSPORT::run_timer(Timer *timer)
 		(globals()->tcp_now)++; 
     } else if (timer == _reaper) {
     	for (; i; i++) {
+    		INFO("This is %d, %d",i->second->port,i->second->reap);
     		if (i->second->reap)
     		{
+    			INFO("Going to remove %d", i->second->port);
     			TeardownSocket(i->second);
     		}
     	}
