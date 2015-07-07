@@ -10,13 +10,13 @@
 #define UNIX_SERVER_SOCKET "/tmp/xcache.socket"
 
 struct xcacheChunk {
-  char cid[CIDLEN];
-  void *buf;
-  size_t len;
+	char cid[CIDLEN];
+	void *buf;
+	size_t len;
 };
 
 struct xcacheSlice {
-  uint32_t contextId;
+	uint32_t contextId;
 };
 
 int XcacheInit(void);

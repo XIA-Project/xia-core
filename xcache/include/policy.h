@@ -13,18 +13,18 @@
 
 class XcachePolicy  {
 public:
-  virtual int store(XcacheMeta *) {
-    return 0;
-  };
-  virtual int get(XcacheMeta *) {
-    return 0;
-  };
-  virtual int remove(XcacheMeta *) {
-    return 0;
-  };
-  virtual XcacheMeta *evict() {
-    return NULL;
-  };
+	virtual int store(XcacheMeta *) {
+		return 0;
+	};
+	virtual int get(XcacheMeta *) {
+		return 0;
+	};
+	virtual int remove(XcacheMeta *) {
+		return 0;
+	};
+	virtual XcacheMeta *evict() {
+		return NULL;
+	};
 };
 
 /**

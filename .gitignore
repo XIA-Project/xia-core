@@ -137,5 +137,5 @@ experiments/planetlab/logs/tunneling
 experiments/planetlab/logs/fourid
 
 # xcache
-xcache
+bin/xcache
 xcache_cmd_pb2.py

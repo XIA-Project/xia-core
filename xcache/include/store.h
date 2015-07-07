@@ -16,51 +16,51 @@ class XcacheMeta;
  */
 
 class XcacheContentStore {
-  /* TODO Configuration parameters to be added here */
+	/* TODO Configuration parameters to be added here */
 
 public: 
-  /**
-   * store():
-   * @brief Store method for the content store
-   * @param meta: Metadata of the content to be stored
-   * @param data: Actual Data to be stored
-   * @returns >=0: On successfully storing content
-   * @returns <0: On failure
-   * Return values are crucial. These values are used by the store manager to
-   * take policy decisions.
-   */
-  virtual int store(XcacheMeta *meta, std::string data) {
-    /* Ignoring compiler error for unused attribute */
-    (void)meta;
-    (void)data;
+	/**
+	 * store():
+	 * @brief Store method for the content store
+	 * @param meta: Metadata of the content to be stored
+	 * @param data: Actual Data to be stored
+	 * @returns >=0: On successfully storing content
+	 * @returns <0: On failure
+	 * Return values are crucial. These values are used by the store manager to
+	 * take policy decisions.
+	 */
+	virtual int store(XcacheMeta *meta, std::string data) {
+		/* Ignoring compiler error for unused attribute */
+		(void)meta;
+		(void)data;
 
-    return 0;
-  };
+		return 0;
+	};
 
-  /**
-   * get():
-   * @brief Get method for the content store
-   * @param meta: Key
-   * @returns data: Actual data. The store should read the content in memory as
-   *                a std::string and then pass it back to the storeManager.
-   */
-  virtual std::string get(XcacheMeta *meta) {
-    /* Ignoring compiler error for unused attribute */
-    (void)meta;
+	/**
+	 * get():
+	 * @brief Get method for the content store
+	 * @param meta: Key
+	 * @returns data: Actual data. The store should read the content in memory as
+	 *                a std::string and then pass it back to the storeManager.
+	 */
+	virtual std::string get(XcacheMeta *meta) {
+		/* Ignoring compiler error for unused attribute */
+		(void)meta;
 
-    return NULL;
-  };
+		return NULL;
+	};
 
-  /**
-   * print():
-   * @brief Print the current status of the store.
-   * Hints:
-   * - Number of bytes allocated by the store
-   * - Occupied percentage
-   * - Average store latency / byte
-   */
-  virtual void print(void) {
-  };
+	/**
+	 * print():
+	 * @brief Print the current status of the store.
+	 * Hints:
+	 * - Number of bytes allocated by the store
+	 * - Occupied percentage
+	 * - Average store latency / byte
+	 */
+	virtual void print(void) {
+	};
 };
 
 /**

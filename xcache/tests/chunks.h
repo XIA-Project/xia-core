@@ -16,11 +16,11 @@
 */
 static void __attribute__((unused)) say(const char *fmt, ...)
 {
-  va_list args;
+	va_list args;
 
-  va_start(args, fmt);
-  vprintf(fmt, args);
-  va_end(args);
+	va_start(args, fmt);
+	vprintf(fmt, args);
+	va_end(args);
 }
 
 /*
@@ -28,11 +28,11 @@ static void __attribute__((unused)) say(const char *fmt, ...)
 */
 static void __attribute__((unused)) warn(const char *fmt, ...)
 {
-  va_list args;
+	va_list args;
 
-  va_start(args, fmt);
-  vfprintf(stdout, fmt, args);
-  va_end(args);
+	va_start(args, fmt);
+	vfprintf(stdout, fmt, args);
+	va_end(args);
 }
 
 /*
@@ -40,13 +40,13 @@ static void __attribute__((unused)) warn(const char *fmt, ...)
 */
 static void __attribute__((unused)) die(int ecode, const char *fmt, ...)
 {
-  va_list args;
+	va_list args;
 
-  va_start(args, fmt);
-  vfprintf(stdout, fmt, args);
-  va_end(args);
-  fprintf(stdout, "exiting\n");
-  exit(ecode);
+	va_start(args, fmt);
+	vfprintf(stdout, fmt, args);
+	va_end(args);
+	fprintf(stdout, "exiting\n");
+	exit(ecode);
 }
 
 #endif

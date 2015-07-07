@@ -12,48 +12,48 @@ class XcachePolicy;
 
 class XcacheSlice {
 private:
-  std::map<std::string, XcacheMeta *> metaMap;
-  uint64_t maxSize, currentSize;
-  int32_t contextID;
+	std::map<std::string, XcacheMeta *> metaMap;
+	uint64_t maxSize, currentSize;
+	int32_t contextID;
 
-  uint64_t ttl;
-  XcachePolicy policy;
+	uint64_t ttl;
+	XcachePolicy policy;
 
 public:
-  XcacheSlice(int32_t contextID);
+	XcacheSlice(int32_t contextID);
 
-  void setTtl(uint32_t ttl) {
-    this->ttl = ttl;
-  }
+	void setTtl(uint32_t ttl) {
+		this->ttl = ttl;
+	}
 
-  void setSize(uint64_t size) {
-    this->maxSize = size;
-  }
+	void setSize(uint64_t size) {
+		this->maxSize = size;
+	}
 
 
-  void setPolicy(XcachePolicy);
+	void setPolicy(XcachePolicy);
 
-  void addMeta(XcacheMeta *);
+	void addMeta(XcacheMeta *);
 
-  int store(XcacheMeta *);
+	int store(XcacheMeta *);
 
-  std::string search(XcacheCommand *);
+	std::string search(XcacheCommand *);
 
-  void removeMeta(XcacheMeta *);
+	void removeMeta(XcacheMeta *);
 
-  void flush(XcacheMeta *);
+	void flush(XcacheMeta *);
 
-  void makeRoom(XcacheMeta *);
+	void makeRoom(XcacheMeta *);
 
-  void status(void);
+	void status(void);
 
-  bool alreadyHasMeta(XcacheMeta *);
+	bool alreadyHasMeta(XcacheMeta *);
 
-  int32_t getContextId(void) {
-    return contextID;
-  };
+	int32_t getContextId(void) {
+		return contextID;
+	};
 
-  bool hasRoom(XcacheMeta *);
+	bool hasRoom(XcacheMeta *);
 };
 
 #endif

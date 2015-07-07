@@ -15,21 +15,21 @@
 
 class XcacheStoreManager {
 private:
-  /* Vector of all the stores */
-  std::vector<XcacheContentStore *> storeVector;
+	/* Vector of all the stores */
+	std::vector<XcacheContentStore *> storeVector;
 
 public:
-  XcacheStoreManager();
+	XcacheStoreManager();
 
-  /**
-   * store():
-   * @brief Select a content store to store this data and actually store it.
-   * @param meta:   Metadata of the object to be stored
-   * @param data:   Data to be stored.
-   * @returns >= 0: On successfully storing the data
-   * @returns < 0:  On failure
-   */
-  int store(XcacheMeta *meta, std::string data);
+	/**
+	 * store():
+	 * @brief Select a content store to store this data and actually store it.
+	 * @param meta:   Metadata of the object to be stored
+	 * @param data:   Data to be stored.
+	 * @returns >= 0: On successfully storing the data
+	 * @returns < 0:  On failure
+	 */
+	int store(XcacheMeta *meta, std::string data);
 };
 
 #endif

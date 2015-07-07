@@ -96,7 +96,7 @@ int sendCmd(int sock, const char *cmd)
  	warn("Sending Command: %s \n", cmd);
 	if ((n = Xsend(sock, cmd,  strlen(cmd), 0)) < 0) {
 		Xclose(sock);
-		 die(-1, "Unable to communicate\n");
+		die(-1, "Unable to communicate\n");
 	}
 
 	return n;
@@ -104,21 +104,21 @@ int sendCmd(int sock, const char *cmd)
 
 int getChunkCount(int sock, char *reply, int sz)
 {
-  int n=-1;
+	int n=-1;
 
-  if ((n = Xrecv(sock, reply, sz, 0))  < 0) {
-    Xclose(sock);
-    die(-1, "Unable to communicate with the server\n");
-  }
+	if ((n = Xrecv(sock, reply, sz, 0))  < 0) {
+		Xclose(sock);
+		die(-1, "Unable to communicate with the server\n");
+	}
 
-  if (strncmp(reply, "OK:", 3) != 0) {
-    warn( "%s\n", reply);
-    return -1;
-  }
+	if (strncmp(reply, "OK:", 3) != 0) {
+		warn( "%s\n", reply);
+		return -1;
+	}
 
-  reply[n] = 0;
+	reply[n] = 0;
 
-  return n;
+	return n;
 }
 
 
@@ -163,23 +163,23 @@ int buildChunkDAGs(sockaddr_x addresses[], char *chunks, char *p_ad, char *p_hid
 
 int getListedChunks(int csock, FILE *fd, char *chunks, char *p_ad, char *p_hid, int n_chunks)
 {
-  sockaddr_x chunkAddresses[n_chunks];
-  struct xcacheChunk chunk;
-  char data[XIA_MAXCHUNK];
-  int len;
-  int status;
-  int n = -1;
+	sockaddr_x chunkAddresses[n_chunks];
+	struct xcacheChunk chunk;
+	char data[XIA_MAXCHUNK];
+	int len;
+	int status;
+	int n = -1;
 	
-  n = buildChunkDAGs(chunkAddresses, chunks, p_ad, p_hid, n_chunks);
+	n = buildChunkDAGs(chunkAddresses, chunks, p_ad, p_hid, n_chunks);
 	
-  for(int i = 0; i < n; i++) {
-    if(XcacheGetChunk(NULL, &chunk, &chunkAddresses[i], sizeof(chunkAddresses[i]), 0) < 0) {
-      die(-1, "XcacheGetChunk Failed\n");
-    }
-    fwrite(chunk.buf, 1, chunk.len, fd);
-  }
+	for(int i = 0; i < n; i++) {
+		if(XcacheGetChunk(NULL, &chunk, &chunkAddresses[i], sizeof(chunkAddresses[i]), 0) < 0) {
+			die(-1, "XcacheGetChunk Failed\n");
+		}
+		fwrite(chunk.buf, 1, chunk.len, fd);
+	}
   
-  return n;
+	return n;
 }
 
 
@@ -262,18 +262,18 @@ int initializeClient(const char *name)
 
 	// create a socket, and listen for incoming connections
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
-		 die(-1, "Unable to create the listening socket\n");
+		die(-1, "Unable to create the listening socket\n");
     
 	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(sock);
-		 die(-1, "Unable to bind to the dag: %s\n", dag);
+		die(-1, "Unable to bind to the dag: %s\n", dag);
 	}
 
 	rc = XreadLocalHostAddr(sock, my_ad, MAX_XID_SIZE, my_hid, MAX_XID_SIZE, IP, MAX_XID_SIZE);
 
 	if (rc < 0) {
 		Xclose(sock);
-		 die(-1, "Unable to read local address.\n");
+		die(-1, "Unable to read local address.\n");
 	} else{
 		warn("My AD: %s, My HID: %s\n", my_ad, my_hid);
 	}
@@ -307,8 +307,8 @@ void usage(){
 bool file_exists(const char * filename)
 {
     if (FILE * file = fopen(filename, "r")){
-	fclose(file);
-	return true;
+		fclose(file);
+		return true;
 	}
     return false;
 }

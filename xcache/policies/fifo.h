@@ -5,27 +5,27 @@
 
 class FifoPolicy:public XcachePolicy {
 public:
-  int store(XcacheMeta *meta) {
-    /* Ignoring compiler error for unused attribute */
-    (void)meta;
+	int store(XcacheMeta *meta) {
+		/* Ignoring compiler error for unused attribute */
+		(void)meta;
 
-    return 1;
-  }
-  int get(XcacheMeta *meta) {
-    /* Ignoring compiler error for unused attribute */
-    (void)meta;
+		return 1;
+	}
+	int get(XcacheMeta *meta) {
+		/* Ignoring compiler error for unused attribute */
+		(void)meta;
 
-    return 1;
-  }
-  int remove(XcacheMeta *meta) {
-    /* Ignoring compiler error for unused attribute */
-    (void)meta;
+		return 1;
+	}
+	int remove(XcacheMeta *meta) {
+		/* Ignoring compiler error for unused attribute */
+		(void)meta;
 
-    return 1;
-  }
-  XcacheMeta *evict() {
-    return NULL;
-  }
+		return 1;
+	}
+	XcacheMeta *evict() {
+		return NULL;
+	}
 };
 
 #endif

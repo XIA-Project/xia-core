@@ -92,7 +92,7 @@ int sendCmd(int sock, const char *cmd)
 
 	if ((n = Xsend(sock, cmd,  strlen(cmd), 0)) < 0) {
 		Xclose(sock);
-		 die(-1, "Unable to communicate\n");
+		die(-1, "Unable to communicate\n");
 	}
 
 	return n;
@@ -114,83 +114,83 @@ void *recvCmd(void *socketid)
 
 	//ChunkContext contains size, ttl, policy, and contextID which for now is PID
     if(XcacheAllocateSlice(&slice, 20000000, 1000, 0) < 0)
-      die(-2, "Unable to allocate slice\n");
+		die(-2, "Unable to allocate slice\n");
 
 	while (1) {
-      say("waiting for command\n");
+		say("waiting for command\n");
 		
-      memset(command, '\0', strlen(command));
-      memset(reply, '\0', strlen(reply));
+		memset(command, '\0', strlen(command));
+		memset(reply, '\0', strlen(reply));
 		
-      if ((n = Xrecv(sock, command, 1024, 0))  < 0) {
-        warn("socket error while waiting for data, closing connection\n");
-        break;
-      }
-      //Sender does the chunking and then should start the sending commands
-      if (strncmp(command, "get", 3) == 0) {
-        fname = &command[4];
-        say("client requested file %s\n", fname);
+		if ((n = Xrecv(sock, command, 1024, 0))  < 0) {
+			warn("socket error while waiting for data, closing connection\n");
+			break;
+		}
+		//Sender does the chunking and then should start the sending commands
+		if (strncmp(command, "get", 3) == 0) {
+			fname = &command[4];
+			say("client requested file %s\n", fname);
 
-        if (info) {
-          // clean up the existing chunks first
-        }
+			if (info) {
+				// clean up the existing chunks first
+			}
 		
-        info = NULL;
-        count = 0;
+			info = NULL;
+			count = 0;
 			
-        say("chunking file %s\n", fname);
+			say("chunking file %s\n", fname);
 			
-        //Chunking is done by the XputFile which itself uses XputChunk, and fills out the info
-        if ((count = XcachePutFile(&slice, fname, CHUNKSIZE, &info)) < 0) {
-          warn("unable to serve the file: %s\n", fname);
-          sprintf(reply, "FAIL: File (%s) not found", fname);
-        } else {
-          sprintf(reply, "OK: %d", count);
-        }
-        say("%s\n", reply);
+			//Chunking is done by the XputFile which itself uses XputChunk, and fills out the info
+			if ((count = XcachePutFile(&slice, fname, CHUNKSIZE, &info)) < 0) {
+				warn("unable to serve the file: %s\n", fname);
+				sprintf(reply, "FAIL: File (%s) not found", fname);
+			} else {
+				sprintf(reply, "OK: %d", count);
+			}
+			say("%s\n", reply);
 			
 			
-        //Just tells the receiver how many chunks it should expect.
-        if (Xsend(sock, reply, strlen(reply), 0) < 0) {
-          warn("unable to send reply to client\n");
-          break;
-        }
-		//Sending the blocks cids
-      }
-      else if (strncmp(command, "block", 5) == 0) {
-        char *start = &command[6];
-        char *end = strchr(start, ':');
-        if (!end) {
-          // we have an invalid command, return error to client
-          sprintf(reply, "FAIL: invalid block command");
-        } else {
-          *end = 0;
-          end++;
-          // FIXME: clean up naming, e is now a count
-          int s = atoi(start);
-          int e = s + atoi(end);
-          strcpy(reply, "OK:");
-          for(i = s; i < e && i < count; i++) {
-            strcat(reply, " ");
-            strcat(reply, info[i].cid);
-          }
-        }
-        printf("%s\n", reply);
-        if (Xsend(sock, reply, strlen(reply), 0) < 0) {
-          warn("unable to send reply to client\n");
-          break;
-        }
+			//Just tells the receiver how many chunks it should expect.
+			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
+				warn("unable to send reply to client\n");
+				break;
+			}
+			//Sending the blocks cids
+		}
+		else if (strncmp(command, "block", 5) == 0) {
+			char *start = &command[6];
+			char *end = strchr(start, ':');
+			if (!end) {
+				// we have an invalid command, return error to client
+				sprintf(reply, "FAIL: invalid block command");
+			} else {
+				*end = 0;
+				end++;
+				// FIXME: clean up naming, e is now a count
+				int s = atoi(start);
+				int e = s + atoi(end);
+				strcpy(reply, "OK:");
+				for(i = s; i < e && i < count; i++) {
+					strcat(reply, " ");
+					strcat(reply, info[i].cid);
+				}
+			}
+			printf("%s\n", reply);
+			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
+				warn("unable to send reply to client\n");
+				break;
+			}
 
-      }
-      else if (strncmp(command, "done", 4) == 0) {
-        say("done sending file: removing the chunks from the cache\n");
-        /* for (i = 0; i < count; i++) */
-        /*   XremoveChunk(ctx, info[i].cid); */
-        /* XfreeChunkInfo(info); */
-        info = NULL;
-        count = 0;
+		}
+		else if (strncmp(command, "done", 4) == 0) {
+			say("done sending file: removing the chunks from the cache\n");
+			/* for (i = 0; i < count; i++) */
+			/*   XremoveChunk(ctx, info[i].cid); */
+			/* XfreeChunkInfo(info); */
+			info = NULL;
+			count = 0;
 		
-      }
+		}
 	}
 	
 	/* if (info) */
@@ -204,57 +204,57 @@ void *recvCmd(void *socketid)
 //Just registering the service and openning the necessary sockets
 int registerReceiver()
 {
-  int sock;
-  say ("\n%s (%s): started\n", TITLE, VERSION);
+	int sock;
+	say ("\n%s (%s): started\n", TITLE, VERSION);
 
-  // create a socket, and listen for incoming connections
-  if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
-    die(-1, "Unable to create the listening socket\n");
+	// create a socket, and listen for incoming connections
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+		die(-1, "Unable to create the listening socket\n");
 
-  // read the localhost AD and HID
-  if (XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
-    die(-1, "Reading localhost address\n");
+	// read the localhost AD and HID
+	if (XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
+		die(-1, "Reading localhost address\n");
 
-  struct addrinfo *ai;
-  //FIXME: SID is hardcoded
-  if (Xgetaddrinfo(NULL, SID, NULL, &ai) != 0)
-    die(-1, "getaddrinfo failure!\n");
+	struct addrinfo *ai;
+	//FIXME: SID is hardcoded
+	if (Xgetaddrinfo(NULL, SID, NULL, &ai) != 0)
+		die(-1, "getaddrinfo failure!\n");
 
-  sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
-  //FIXME NAME is hard coded
-  if (XregisterName(NAME, dag) < 0 )
-    die(-1, "error registering name: %s\n", NAME);
+	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
+	//FIXME NAME is hard coded
+	if (XregisterName(NAME, dag) < 0 )
+		die(-1, "error registering name: %s\n", NAME);
 
-  if (Xbind(sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
-    Xclose(sock);
-    die(-1, "Unable to bind to the dag: %s\n", dag);
-  }
+	if (Xbind(sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
+		Xclose(sock);
+		die(-1, "Unable to bind to the dag: %s\n", dag);
+	}
 
-  Graph g(dag);
-  say("listening on dag: %s\n", g.dag_string().c_str());
-  return sock;
+	Graph g(dag);
+	say("listening on dag: %s\n", g.dag_string().c_str());
+	return sock;
   
 }
 
 void *blockingListener(void *socketid)
 {
-  int sock = *((int*)socketid);
-  int acceptSock;
-  while (1) {
-    say("Waiting for a client connection\n");
+	int sock = *((int*)socketid);
+	int acceptSock;
+	while (1) {
+		say("Waiting for a client connection\n");
    		
-    if ((acceptSock = Xaccept(sock, NULL, NULL)) < 0)
-      die(-1, "accept failed\n");
+		if ((acceptSock = Xaccept(sock, NULL, NULL)) < 0)
+			die(-1, "accept failed\n");
 
-    say("connected\n");
+		say("connected\n");
 		
-    // handle the connection in a new thread
-    pthread_t client;
-	pthread_create(&client, NULL, recvCmd, (void *)&acceptSock);
-  }
+		// handle the connection in a new thread
+		pthread_t client;
+		pthread_create(&client, NULL, recvCmd, (void *)&acceptSock);
+	}
 	
-  Xclose(sock); // we should never reach here!
-  return NULL;
+	Xclose(sock); // we should never reach here!
+	return NULL;
 }
 
 int main()

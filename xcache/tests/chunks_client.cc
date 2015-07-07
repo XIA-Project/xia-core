@@ -19,23 +19,23 @@ int initializeClient(const char *name)
     // lookup the xia service 
 	daglen = sizeof(dag);
     if (XgetDAGbyName(name, &dag, &daglen) < 0)
-      die(-1, "unable to locate: %s\n", name);
+		die(-1, "unable to locate: %s\n", name);
 
 
 	// create a socket, and listen for incoming connections
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
-		 die(-1, "Unable to create the listening socket\n");
+		die(-1, "Unable to create the listening socket\n");
     
 	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(sock);
-		 die(-1, "Unable to bind to the dag: %s\n", dag);
+		die(-1, "Unable to bind to the dag: %s\n", dag);
 	}
 
 	rc = XreadLocalHostAddr(sock, my_ad, MAX_XID_SIZE, my_hid, MAX_XID_SIZE, IP, MAX_XID_SIZE);
 
 	if (rc < 0) {
 		Xclose(sock);
-		 die(-1, "Unable to read local address.\n");
+		die(-1, "Unable to read local address.\n");
 	} else{
 		warn("My AD: %s, My HID: %s\n", my_ad, my_hid);
 	}
@@ -65,7 +65,7 @@ int initializeClient(const char *name)
 
 int main(void)
 {
-  int sock = initializeClient(CHUNKS_NAME);
+	int sock = initializeClient(CHUNKS_NAME);
 
-  return 0;
+	return 0;
 }
