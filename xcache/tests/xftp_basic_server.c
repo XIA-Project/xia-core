@@ -25,13 +25,13 @@
 #include "Xsocket.h"
 #include "dagaddr.hpp"
 #include <assert.h>
+#include "Xkeys.h"
 
 #define VERSION "v1.0"
 #define TITLE "XIA Basic FTP Server"
 
 #define MAX_XID_SIZE 100
 // #define DAG  "RE %s %s %s"
-#define SID "SID:00000000dd41b924c1001cfa1e1117a812492434"
 #define NAME "www_s.basicftp.aaa.xia"
 
 #define CHUNKSIZE 1024
@@ -205,6 +205,8 @@ void *recvCmd(void *socketid)
 int registerReceiver()
 {
 	int sock;
+	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
+
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 
 	// create a socket, and listen for incoming connections
@@ -216,8 +218,12 @@ int registerReceiver()
 		die(-1, "Reading localhost address\n");
 
 	struct addrinfo *ai;
-	//FIXME: SID is hardcoded
-	if (Xgetaddrinfo(NULL, SID, NULL, &ai) != 0)
+
+	if(XmakeNewSID(sid_string, sizeof(sid_string))) {
+		die(-1, "Unable to create a temporary SID");
+	}
+
+	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
 		die(-1, "getaddrinfo failure!\n");
 
 	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
