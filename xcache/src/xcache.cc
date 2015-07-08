@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <iostream>
 #include "controller.h"
 #include "../click-2.0.1/include/clicknet/xia.h"
@@ -6,6 +7,9 @@ int main(void)
 {
 	XcacheController ctrl;
 	XcacheMeta meta;
+
+	// FIXME: Hardcoded name
+	remove("/tmp/xcache.socket");
 
 	ctrl.run();
 	return 0;
