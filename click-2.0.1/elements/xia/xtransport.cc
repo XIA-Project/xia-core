@@ -2572,8 +2572,8 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XREADLOCALHOSTADDR:
 		Xreadlocalhostaddr(_sport, &xia_socket_msg);
 		break;
-	case xia::XREADXCACHESID:
-		XreadXcacheSid(_sport, &xia_socket_msg);
+	case xia::XSETXCACHESID:
+		XsetXcacheSid(_sport, &xia_socket_msg);
 		break;
 	case xia::XUPDATENAMESERVERDAG:
 		Xupdatenameserverdag(_sport, &xia_socket_msg);
@@ -3612,13 +3612,11 @@ void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_
 }
 
 
-void XTRANSPORT::XreadXcacheSid(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::XsetXcacheSid(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
-	String xcacheSid = _xcache_sid.unparse();
-	xia::X_ReadXcacheSid_Msg *_msg = xia_socket_msg->mutable_x_readxcachesid();
+	xia::X_SetXcacheSid_Msg *_msg = xia_socket_msg->mutable_x_setxcachesid();
 
-	_msg->set_sid(xcacheSid.c_str());
-    ReturnResult(_sport, xia_socket_msg);
+	_xcache_sid.parse(_msg->sid().c_str());
 }
 
 

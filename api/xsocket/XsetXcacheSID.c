@@ -41,7 +41,7 @@
 ** @returns -1 on failure with errno set
 **
 */
-int XreadXcacheSID(int sockfd, char *xcacheSID, unsigned lenXcacheSID) {
+int XsetXcacheSID(int sockfd, char *xcacheSID, unsigned lenXcacheSID) {
 	int seq, rc;
   	
  	if (getSocketType(sockfd) == XSOCK_INVALID) {
@@ -57,7 +57,9 @@ int XreadXcacheSID(int sockfd, char *xcacheSID, unsigned lenXcacheSID) {
 	}
 
  	xia::XSocketMsg xsm;
-  	xsm.set_type(xia::XREADXCACHESID);
+	xia::X_SetXcacheSid_Msg *msg = xsm.mutable_x_setxcachesid();
+  	xsm.set_type(xia::XSETXCACHESID);
+	msg->set_sid(xcacheSID, lenXcacheSID);
     seq = seqNo(sockfd);
     xsm.set_sequence(seq);
 
@@ -65,23 +67,6 @@ int XreadXcacheSID(int sockfd, char *xcacheSID, unsigned lenXcacheSID) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
   	}
-
-    xsm.Clear();
-
-	if ((rc = click_reply(sockfd, seq, &xsm)) < 0) {
-		LOGF("Error retrieving status from Click: %s", strerror(errno));
-		return -1;
-	}
-
-	if (xsm.type() == xia::XREADXCACHESID) {
-		xia::X_ReadXcacheSid_Msg *_msg = xsm.mutable_x_readxcachesid();
-		strncpy(xcacheSID, (_msg->sid()).c_str(), lenXcacheSID);
-		// put in null terminators in case buffers were too short
-		xcacheSID[lenXcacheSID - 1] = 0;
-		rc = 0;
-	} else {
-		rc = -1;
-	}	
 
 	return rc;
 }

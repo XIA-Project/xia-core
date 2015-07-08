@@ -258,20 +258,25 @@ int XcacheController::search(XcacheCommand *resp, XcacheCommand *cmd)
 
 int XcacheController::startXcache(void)
 {
-	char xcacheSID[MAX_XID_SIZE];
+	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
 	int xcacheSock;
 
 	if ((xcacheSock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		return -1;
 
-	if(XreadXcacheSID(xcacheSock, xcacheSID, sizeof(xcacheSID)) < 0)
+	if(XmakeNewSID(sid_string, sizeof(sid_string))) {
+		std::cout << "Could not allocate SID for xcache\n";
+		return -1;
+	}
+
+	if(XsetXcacheSID(xcacheSock, sid_string, strlen(sid_string)) < 0)
 		return -1;
 
-	std::cout << "XcacheSID is " << xcacheSID << "\n";
+	std::cout << "XcacheSID is " << sid_string << "\n";
 
 	struct addrinfo *ai;
 
-	if (Xgetaddrinfo(NULL, xcacheSID, NULL, &ai) != 0)
+	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
 		return -1;
 
 	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
