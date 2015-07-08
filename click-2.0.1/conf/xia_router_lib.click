@@ -262,8 +262,6 @@ elementclass XIARoutingCore {
 
 	xtransport[1] -> Discard; // Port 1 is unused for now.
 	
-	cache :: XIACache($local_addr, n/proc/rt_CID, PACKET_SIZE 1400, MALICIOUS 0);
-
 	Script(write n/proc/rt_HID.add $local_hid $DESTINED_FOR_LOCALHOST);  // self RHID as destination
 	Script(write n/proc/rt_HID.add BHID $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
 	Script(write n/proc/rt_HID.add - $FALLBACK);
@@ -296,9 +294,7 @@ elementclass XIARoutingCore {
 	x[1] -> rsw :: XIAPaintSwitch -> [2]xtransport; // XCMP packets destined for this machine
 	rsw[1] -> XIAPaint($REDIRECT) -> [0]n; // XCMP redirect packet, so a route update will be done.
 
-	n[2] -> [0]cache[0] -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [1]n;
 	// For get and put cid
-	xtransport[3] -> [1]cache[1] -> [3]xtransport;
 }
 
 // 2-port router 
