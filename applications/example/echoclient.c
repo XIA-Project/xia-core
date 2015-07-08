@@ -201,15 +201,13 @@ int process(int sock)
 	int sent = 0;
 	int received = 0;
 	int rc = 0;
-	char buf1[XIA_MAXBUF + 1], buf2[XIA_MAXBUF + 1];
-	char temp[512];
+	char buf1[XIA_MAXBUF + 1], buf2[XIA_MAXBUF + 1], temp[XIA_MAXBUF + 1];
 
 	if (pktSize == 0)
 		size = (rand() % XIA_MAXBUF) + 1;
 	else
 		size = pktSize;
 	randomString(buf1, size);
-	memset(temp, 0, 512);
 
 	if ((sent = Xsend(sock, buf1, size, 0)) < 0)
 		die(-4, "Send error %d on socket %d\n", errno, sock);
@@ -224,11 +222,13 @@ int process(int sock)
 	}
 
 	memset(buf2, 0, sizeof(buf2));
+	memset(temp, 0, sizeof(temp));
 	int count = 0;
-	while (sent != received && (count = Xrecv(sock, temp, 512, 0)) > 0) {
+	while (sent != received && (count = Xrecv(sock, temp, sizeof(temp), 0)) > 0) {
 		say("%5d received %d bytes\n", sock, count);
 		received += count;
 		strncat(buf2, temp, count);
+		memset(temp, 0, sizeof(temp));
 	}
 	// if ((received = Xrecv(sock, buf2, sizeof(buf2), 0)) < 0)
 	// 	die(-5, "Receive error %d on socket %d\n", errno, sock);
