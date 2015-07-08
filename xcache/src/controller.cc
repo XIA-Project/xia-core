@@ -115,6 +115,8 @@ int XcacheController::fetchContentRemote(XcacheCommand *resp, XcacheCommand *cmd
 		return BAD;
 	}
 
+	std::cout << "Fetching content from remote\n";
+
 	if(Xconnect(sock, (struct sockaddr *)dag.c_str(), daglen) < 0) {
 		return BAD;
 	}

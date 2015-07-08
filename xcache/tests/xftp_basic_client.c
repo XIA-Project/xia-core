@@ -161,7 +161,7 @@ int buildChunkDAGs(sockaddr_x addresses[], char *chunks, char *p_ad, char *p_hid
 	return n;
 }
 
-int getListedChunks(int csock, FILE *fd, char *chunks, char *p_ad, char *p_hid, int n_chunks)
+int getListedChunks(FILE *fd, char *chunks, char *p_ad, char *p_hid, int n_chunks)
 {
 	sockaddr_x chunkAddresses[n_chunks];
 	struct xcacheChunk chunk;
@@ -173,6 +173,7 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *p_ad, char *p_hid, 
 	n = buildChunkDAGs(chunkAddresses, chunks, p_ad, p_hid, n_chunks);
 	
 	for(int i = 0; i < n; i++) {
+		printf("Calling XcacheGetChunk\n");
 		if(XcacheGetChunk(NULL, &chunk, &chunkAddresses[i], sizeof(chunkAddresses[i]), 0) < 0) {
 			die(-1, "XcacheGetChunk Failed\n");
 		}
@@ -208,9 +209,6 @@ int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout
 
 	int count = atoi(&reply[4]);
 
-	if ((chunkSock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0)
-		die(-1, "unable to create chunk socket\n");
-
 	FILE *f = fopen(fout, "w");
 
 	offset = 0;
@@ -228,7 +226,7 @@ int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout
 			return -1;
 		}
 		offset += NUM_CHUNKS;
-		if (getListedChunks(chunkSock, f, &reply[4], p_ad, p_hid, num) < 0) {
+		if (getListedChunks(f, &reply[4], p_ad, p_hid, num) < 0) {
 			status= -1;
 			break;
 		}
@@ -242,7 +240,6 @@ int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout
 
 	say("Received file %s\n", fout);
 	sendCmd(sock, "done");
-	Xclose(chunkSock);
 	return status;
 }
 
