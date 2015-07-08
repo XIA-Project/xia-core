@@ -370,6 +370,7 @@ protected:
 	void MigrateFailure(sock *sk);
 	void ScheduleTimer(sock *sk, int delay);
 	void CancelRetransmit(sock *sk);
+	sock *XID2Sock(XID dest_xid);
 
 	static const char *StateStr(SocketState state);
 	static const char *SocketTypeStr(int);

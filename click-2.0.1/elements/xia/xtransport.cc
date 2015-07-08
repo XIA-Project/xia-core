@@ -1171,7 +1171,7 @@ void XTRANSPORT::ProcessDatagramPacket(WritablePacket *p_in)
 	XIAPath dst_path = xiah.dst_path();
 	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
 
-	sock *sk = XIDtoSock.get(_destination_xid);  // This is to be updated for the XSOCK_STREAM type connections below
+	sock *sk = XID2Sock(_destination_xid);  // This is to be updated for the XSOCK_STREAM type connections below
 
 	if (!sk) {
 		WARN("ProcessDatagramPacket: sk == NULL\n");
@@ -1716,6 +1716,22 @@ void XTRANSPORT::MigrateFailure(sock *sk)
 	}
 }
 
+XTRANSPORT::sock *XTRANSPORT::XID2Sock(XID dest_xid)
+{
+	sock *sk = XIDtoSock.get(dest_xid);
+
+	if (sk)
+		return sk;
+
+	if (dest_xid.type() == CLICK_XIA_XID_TYPE_CID) {
+		// Packet destined to a CID. Handling it specially.
+		// FIXME: This is hackish. Maybe give users the ability to
+		// register their own rules?
+		return XIDtoSock.get(_xcache_sid);
+	}
+
+	return NULL;
+}
 
 
 void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
@@ -1735,7 +1751,7 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 	xid_pair.set_dst(_source_xid);
 
 	// unlike the other stream handlers, there is no pair yet, so use dest_xid to get port
-	sock *sk = XIDtoSock.get(_destination_xid);
+	sock *sk = XID2Sock(_destination_xid);
 
 	if (!sk) {
 		// FIXME: we need to fix the state machine so this doesn't happen!
@@ -1888,7 +1904,7 @@ int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 	xid_pair.set_src(_destination_xid);
 	xid_pair.set_dst(_source_xid);
 
-	sock *sk = XIDtoSock.get(_destination_xid);
+	sock *sk = XID2Sock(_destination_xid);
 
 	if (!sk) {
 		ERROR("sk == NULL\n");
@@ -2124,7 +2140,7 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 
 	if (it != XIDpairToConnectPending.end()) {
 		// connect is in progress so pair to port is not set up yet, use the listen socket's port
-		sk = XIDtoSock.get(_destination_xid);
+		sk = XID2Sock(_destination_xid);
 
 	} else {
 		sk = XIDpairToSock.get(xid_pair);
@@ -2897,6 +2913,8 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 	String dest(x_connect_msg->ddag().c_str());
 	XIAPath dst_path;
 	sock *sk = portToSock.get(_sport);
+
+	std::cout << "Reached Xconnect with Dest = " << dest << "\n";
 
 	dst_path.parse(dest);
 

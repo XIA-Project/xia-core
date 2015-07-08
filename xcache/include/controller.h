@@ -46,6 +46,7 @@ public:
 		}
 	}
 
+	int fetchContentRemote(XcacheCommand *, XcacheCommand *);
 	void handleCli(void);
 	void handleUdp(int);
 	int handleCmd(XcacheCommand *, XcacheCommand *);

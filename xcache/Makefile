@@ -2,9 +2,10 @@ include ../xia.mk
 CC=g++
 XCACHEDIR=$(PWD)
 CLICKDIR=$(PWD)/../click-2.0.1/
-CFLAGS+=-g -I$(CLICKDIR)/include/click -I$(XCACHEDIR)/include -I$(XCACHEDIR)/bin -I$(XCACHEDIR) -I$(XCACHEDIR)/proto -Wall -Werror -fdiagnostics-color -static
+CFLAGS+=-g -I$(CLICKDIR)/include/click -I$(XCACHEDIR)/include -I$(XCACHEDIR)/bin -I$(XCACHEDIR) -I$(XCACHEDIR)/proto -Wall -Werror
 LDFLAGS= $(LIBS)
 export ## Make variables available to subsequent makefiles
+
 
 TARGETS=proto src api
 

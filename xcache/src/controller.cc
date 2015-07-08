@@ -101,6 +101,37 @@ void XcacheController::handleUdp(int s)
 	IGNORE_PARAM(s);
 }
 
+int XcacheController::fetchContentRemote(XcacheCommand *resp, XcacheCommand *cmd)
+{
+	int ret, sock;
+	socklen_t daglen;
+
+	std::string dag(cmd->dag());
+	daglen = dag.length();
+
+	sock = Xsocket(AF_XIA, SOCK_STREAM, 0);
+	if(sock < 0) {
+		return BAD;
+	}
+
+	if(Xconnect(sock, (struct sockaddr *)dag.c_str(), daglen) < 0) {
+		return BAD;
+	}
+
+	std::string data;
+	char buf[512];
+	while((ret = Xrecv(sock, buf, 512, 0)) == 512) {
+		data += buf;
+	}
+	data += buf;
+
+	std::cout << "Received DATA!!!!!!!!!!!!!! " << data << "\n";
+	resp->set_cmd(XcacheCommand::XCACHE_RESPONSE);
+	resp->set_data(data);
+
+	return OK_SEND_RESPONSE;
+}
+
 int XcacheController::handleCmd(XcacheCommand *resp, XcacheCommand *cmd)
 {
 	int ret = OK_NO_RESPONSE;
@@ -113,8 +144,10 @@ int XcacheController::handleCmd(XcacheCommand *resp, XcacheCommand *cmd)
 		std::cout << "Received NEWSLICE command \n";
 		ret = newSlice(resp, cmd);
 	} else if(cmd->cmd() == XcacheCommand::XCACHE_GETCHUNK) {
+		// FIXME: Handle local fetch
 		std::cout << "Received GETCHUNK command \n";
-		ret = search(resp, cmd);
+		ret = fetchContentRemote(resp, cmd);
+		// ret = search(resp, cmd);
 	} else if(cmd->cmd() == XcacheCommand::XCACHE_STATUS) {
 		std::cout << "Received STATUS command \n";
 		status();
