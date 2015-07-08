@@ -293,7 +293,8 @@ elementclass XIARoutingCore {
 	
 	x[1] -> rsw :: XIAPaintSwitch -> [2]xtransport; // XCMP packets destined for this machine
 	rsw[1] -> XIAPaint($REDIRECT) -> [0]n; // XCMP redirect packet, so a route update will be done.
-
+	n[2] -> [1]n; // Harshad dirty hack FIXME: Remove both ports
+	xtransport[3]->[3]xtransport; // Harshad dirty hack FIXME: Remove both ports
 	// For get and put cid
 }
 
