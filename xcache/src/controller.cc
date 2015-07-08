@@ -287,6 +287,8 @@ int XcacheController::startXcache(void)
 		return -1;
 	}
 
+	Xlisten(xcacheSock, 5);
+
 	Graph g(dag);
 	std::cout << "listening on dag: " << g.dag_string() << "\n";
 	return xcacheSock;
