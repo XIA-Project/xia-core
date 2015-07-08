@@ -131,7 +131,7 @@ int buildChunkDAGs(sockaddr_x addresses[], char *chunks, char *p_ad, char *p_hid
     Node n_src;
     Node n_ad(Node::XID_TYPE_AD, p_ad);
     Node n_hid(Node::XID_TYPE_HID, p_hid);
-	char *dag;
+
 	
 	
 	// build the list of chunks to retrieve
@@ -149,7 +149,7 @@ int buildChunkDAGs(sockaddr_x addresses[], char *chunks, char *p_ad, char *p_hid
 		p = next + 1;
 
 	}
-	dag = (char *)malloc(512);
+
     Node n_cid(Node::XID_TYPE_CID, p);
     Graph primaryIntent = n_src * n_cid;
     Graph gFallback = n_src * n_ad * n_hid * n_cid;
@@ -250,6 +250,8 @@ int initializeClient(const char *name)
 	socklen_t daglen;
 	char sdag[1024];
 	char IP[MAX_XID_SIZE];
+
+	XcacheInit();
 
     // lookup the xia service 
 	daglen = sizeof(dag);

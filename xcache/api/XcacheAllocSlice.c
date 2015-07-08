@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "xcachePriv.h"
 #include "xcache.h"
 
@@ -6,6 +7,8 @@ int XcacheAllocateSlice(struct xcacheSlice *slice, int32_t cache_size, int32_t t
 {
 	int ret;
 	XcacheCommand cmd;
+
+	printf("Lib: Sending Xcache Allocate Slice command\n");
 
 	cmd.set_cmd(XcacheCommand::XCACHE_NEWSLICE);
 	cmd.set_ttl(ttl);

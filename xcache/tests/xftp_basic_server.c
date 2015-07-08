@@ -240,6 +240,8 @@ int registerReceiver()
 
 	Graph g(dag);
 	say("listening on dag: %s\n", g.dag_string().c_str());
+	XcacheInit();
+
 	return sock;
   
 }

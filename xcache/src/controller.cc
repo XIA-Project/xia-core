@@ -315,6 +315,8 @@ void XcacheController::run(void)
 
 	xcache_set_timeout(&timeout);
 
+	std::cout << "Entering The Loop\n";
+
 	while(1) {
 		memcpy(&fds, &allfds, sizeof(fd_set));
 
@@ -323,8 +325,9 @@ void XcacheController::run(void)
 			max = MAX(max, *iter);
 		}
 
-		n = select(max + 1, &fds, NULL, NULL, &timeout);
+		n = select(max + 1, &fds, NULL, NULL, NULL);
 
+		std::cout << "Broken\n";
 		if(FD_ISSET(s, &fds)) {
 			std::cout << "Action on UDP" << std::endl;
 			handleUdp(s);
@@ -340,20 +343,23 @@ void XcacheController::run(void)
 		for(iter = activeConnections.begin(); iter != activeConnections.end();) {
 			if(FD_ISSET(*iter, &fds)) {
 				char buf[512] = "";
-				std::string buffer;
+				std::string buffer("");
 				XcacheCommand resp, cmd;
 				int ret;
 
 				do {
-					ret = read(*iter, buf, 512);
+					printf("Reading\n");
+					ret = recv(*iter, buf, 512, 0);
 					if(ret == 0)
 						break;
 
-					buffer.append(buf);
+					printf("ret = %d\n", ret);
+					buffer.append(buf, ret);
 				} while(ret == 512);
 
 				if(ret != 0) {
 					bool parseSuccess = cmd.ParseFromString(buffer);
+					printf("%s: Controller received %lu bytes\n", __func__, buffer.length());
 					if(!parseSuccess) {
 						std::cout << "[ERROR] Protobuf could not parse\n;";
 					} else {

@@ -12,10 +12,28 @@ int xcache_sock;
 
 int send_command(XcacheCommand *cmd)
 {
+	int ret;
+	int remaining, sent;
+
 	std::string cmd_on_wire;
 
 	cmd->SerializeToString(&cmd_on_wire);
-	return write(xcache_sock, cmd_on_wire.c_str(), cmd_on_wire.length());
+
+	remaining = cmd_on_wire.length();
+	sent = 0;
+	do {
+		int to_send;
+
+		to_send = remaining < 512 ? remaining : 512;
+		ret = send(xcache_sock, cmd_on_wire.c_str() + sent, to_send, 0);
+
+		remaining -= to_send;
+		sent += to_send;
+	} while(remaining > 0);
+
+	printf("%s: Lib sent %d bytes\n", __func__, ret);
+
+	return ret;
 }
 
 int get_response_blocking(XcacheCommand *cmd)
