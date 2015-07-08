@@ -7,12 +7,6 @@ int main(void)
 {
 	XcacheController ctrl;
 	XcacheMeta meta;
-	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
-
-	if(XmakeNewSID(sid_string, sizeof(sid_string))) {
-		std::cout << "Could not allocate SID for xcache\n";
-		return -1;
-	}
 
 	// FIXME: Hardcoded name
 	remove("/tmp/xcache.socket");
