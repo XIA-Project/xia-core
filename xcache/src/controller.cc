@@ -12,6 +12,7 @@
 #include "controller.h"
 #include <iostream>
 #include "Xsocket.h"
+#include "Xkeys.h"
 #include "dagaddr.hpp"
 
 #define IGNORE_PARAM(__param) ((void)__param)
