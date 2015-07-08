@@ -349,7 +349,9 @@ void XcacheController::run(void)
 					} else {
 						if(handleCmd(&resp, &cmd) == OK_SEND_RESPONSE) {
 							resp.SerializeToString(&buffer);
-							write(*iter, buffer.c_str(), buffer.length());
+							if(write(*iter, buffer.c_str(), buffer.length()) < 0) {
+								ctd::cout << "FIXME: handle return value of write\n";
+							}
 						}
 					}
 				}
