@@ -8,6 +8,7 @@ XcacheMeta::XcacheMeta(XcacheCommand *cmd)
 	refCount = 0;
 	store = NULL;
 	cid = cmd->cid();
+	len = cmd->cid().length();
 }
 
 XcacheMeta::XcacheMeta()

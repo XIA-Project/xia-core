@@ -40,7 +40,10 @@ void XcacheSlice::makeRoom(XcacheMeta *meta)
 {
 	while(!hasRoom(meta)) {
 		XcacheMeta *toRemove = policy.evict();
-		removeMeta(toRemove);
+		if(toRemove)
+			removeMeta(toRemove);
+		else
+			std::cout << "FIXME: Policy returns nothing to evict\n";
 	}
 }
 
