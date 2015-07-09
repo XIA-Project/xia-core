@@ -21,22 +21,24 @@
 
 #include "Xkeys.h"
 
+// TODO: make the api: fallback if not prefetch client found 
 #define MAX_XID_SIZE 100
 #define RECV_BUF_SIZE 1024
-#define XIA_MAX_BUF 15600 // TODO: double check with Dan later why and is it a real limitation?
+#define XIA_MAX_BUF 15600 // TODO: improve later
 
 #define CHUNKSIZE 1024
 #define REREQUEST 3
 #define NUM_CHUNKS 1
 
 #define FTP_NAME "www_s.ftp.aaa.xia"
-#define PREFETCH_NAME "www_s.prefetch.aaa.xia"
+#define PREFETCH_SERVER_NAME "www_s.prefetch_server.aaa.xia"
+#define PREFETCH_CLIENT_NAME "www_s.prefetch_client.aaa.xia"
 
 #define GETSSID_CMD "iwgetid -r"
 
-using namespace std;
+#define PURGE_SEC 120
 
-//#define MAXBUFLEN = XIA_MAXBUF = XIA_MAXCHUNK = 15600
+using namespace std;
 
 // write the message to stdout unless in quiet mode
 void say(const char *fmt, ...);
@@ -51,8 +53,17 @@ char **str_split(char *a_str, const char *a_delim);
 
 char *randomString(char *buf, int size);
 
-// format: PREFETCH_NAME.AD:"AD"
+// format: cid1 cid2, ... cidn
+vector<string> cidList(char *cids_str);
+
+
+// format: PREFETCH_SERVER_NAME.getAD()
 char *getPrefetchServiceName();
+
+// format: PREFETCH_CLIENT_NAME.getHID()
+char *getPrefetchClientName();
+
+char *getXftpName();
 
 char *string2char(string str);
 
@@ -68,7 +79,9 @@ string getSSID();
 
 string getAD();
 
-// poll until new AD is returned
+string getHID();
+
+// block and poll until new AD is returned
 void getNewAD(char *old_ad);
 
 // get the SSID name from "iwgetid -r" command
@@ -92,20 +105,68 @@ int initDatagramClient(const char *name, struct addrinfo *ai, sockaddr_x *sa);
 // make connection, instantiate src_ad, src_hid, dst_ad, dst_hid 
 int initStreamClient(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid);
 
+int registerDatagramReceiver(char* name);
+
+// register the service with the name server and open the necessary sockets, update with XListen
+int registerStreamReceiver(char *name, char *myAD, char *myHID, char *my4ID);
+
+// bind the receiving function
+void *blockListener(void *listenID, void *recvFuntion (void *));
+
+int getIndex(string target, vector<string> pool);
+
+// update the CID list to the local prefetching service
+int updateManifest(int sock, vector<string> CIDs);
+
+// prefetch client setup a socket connection with in-network prefetch service
+int registerPrefetchService(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid);
+
+// xftp_client setup a socket connection with prefetch client
+int registerPrefetchClient(const char *name);
+
+// construct the msg and send to prefetch client
+int XrequestChunkPrefetch(int sock, const ChunkStatus *cs);
+
+// TODO
+// int XrequestChunksAdv(int csock, const ChunkStatus *chunks, int numChunks, string serviceName, vector<string> CIDs);
+
+#endif
+
+/* reference 
+
+#define MAXBUFLEN = XIA_MAXBUF = XIA_MAXCHUNK = 15600
+
+typedef struct {
+    int sockfd;
+    int contextID;
+	unsigned cachePolicy;
+    unsigned cacheSize;
+	unsigned ttl;
+} ChunkContext;
+
+typedef struct {
+	int size;
+	char cid[CID_HASH_SIZE + 1];
+	int32_t ttl;
+	struct timeval timestamp;
+} ChunkInfo;
+
+typedef struct {
+	char* cid;
+	size_t cidLen;
+	int status; // 1: ready to be read, 0: waiting for chunk response, -1: failed
+} ChunkStatus;
+
+*/
+
+/* deprecated
+
+int deprecatedRegisterStreamReceiver(char *name, char *myAD, char *myHID, char *my4ID);
+
 int getChunkCount(int sock, char *reply, int sz);
 
 int buildChunkDAGs(ChunkStatus cs[], char *chunks, char *dst_ad, char *dst_hid);
 
 int getListedChunks(int csock, FILE *fd, char *chunks, char *dst_ad, char *dst_hid);
 
-int registerDatagramReceiver(char* name);
-
-int deprecatedRegisterStreamReceiver(char *name, char *myAD, char *myHID, char *my4ID);
-
-int registerStreamReceiver(char *name, char *myAD, char *myHID, char *my4ID);
-
-void *blockListener(void *listenID, void *recvFuntion (void *));
-
-int getIndex(string target, vector<string> pool);
-
-#endif
+*/

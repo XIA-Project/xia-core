@@ -92,9 +92,33 @@ char *randomString(char *buf, int size)
 	return buf;
 }
 
+vector<string> cidList(char *cids_str) 
+{
+	char cids_str_arr[strlen(cids_str)];
+	strcpy(cids_str_arr, cids_str);
+	vector<string> CIDs;
+	char *CID;
+	CIDs.push_back(strtok(cids_str_arr, " "));	
+	while ((CID = strtok(NULL, " ")) != NULL) {
+		CIDs.push_back(CID);
+	}
+
+	return CIDs;
+}
+
 char *getPrefetchServiceName() 
 {
-	return string2char(string(PREFETCH_NAME) + "." + getAD());
+	return string2char(string(PREFETCH_SERVER_NAME) + "." + getAD());
+} 
+
+char *getPrefetchClientName() 
+{
+	return string2char(string(PREFETCH_CLIENT_NAME) + "." + getHID());
+} 
+
+char *getXftpName() 
+{
+	return string2char(string(FTP_NAME));
 } 
 
 char* string2char(string str) 
@@ -173,6 +197,23 @@ string getAD()
 	Xclose(sock);
 
 	return string(ad);
+}
+
+string getHID() 
+{
+	int sock; 
+
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+		die(-1, "Unable to create the listening socket\n");
+
+	char ad[MAX_XID_SIZE], hid[MAX_XID_SIZE], ip[MAX_XID_SIZE];
+
+	if (XreadLocalHostAddr(sock, ad, sizeof(ad), hid, sizeof(hid), ip, sizeof(ip)) < 0)
+		die(-1, "Reading localhost address\n");
+
+	Xclose(sock);
+
+	return string(hid);
 }
 
 void getNewAD(char *old_ad) 
@@ -365,19 +406,19 @@ int initStreamClient(const char *name, char *src_ad, char *src_hid, char *dst_ad
 
 	// lookup the xia service 
 	daglen = sizeof(dag);
-cerr<<"Before got DAG by name: "<<name<<"\n";
+//cerr<<"Before got DAG by name: "<<name<<"\n";
 	if (XgetDAGbyName(name, &dag, &daglen) < 0)
 		die(-1, "unable to locate: %s\n", name);
-cerr<<"Got DAG by name\n";
+//cerr<<"Got DAG by name\n";
 	// create a socket, and listen for incoming connections
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		die(-1, "Unable to create the listening socket\n");
-cerr<<"Created socket\n";    
+//cerr<<"Created socket\n";    
 	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(sock);
 		die(-1, "Unable to bind to the dag: %s\n", dag);
 	}
-cerr<<"Connected to peer\n";
+//cerr<<"Connected to peer\n";
 	rc = XreadLocalHostAddr(sock, src_ad, MAX_XID_SIZE, src_hid, MAX_XID_SIZE, IP, MAX_XID_SIZE);
 
 	if (rc < 0) {
@@ -403,6 +444,258 @@ cerr<<"Connected to peer\n";
 	}
 	warn("Service AD: %s, Service HID: %s\n", dst_ad, dst_hid);
 	return sock;
+}
+
+int registerDatagramReceiver(char* name) 
+{
+	int sock;
+
+	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
+		die(-2, "unable to create the datagram socket\n");
+
+	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
+	// Generate an SID to use
+	if (XmakeNewSID(sid_string, sizeof(sid_string))) {
+		die(-1, "Unable to create a temporary SID");
+	}
+
+	struct addrinfo *ai;
+	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
+		die(-1, "getaddrinfo failure!\n");
+
+	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
+
+	Graph g((sockaddr_x*)ai->ai_addr);
+	printf("\nDatagram DAG\n%s\n", g.dag_string().c_str());
+
+	if (XregisterName(name, sa) < 0)
+		die(-1, "error registering name: %s\n", name);
+
+	say("registered name: \n%s\n", name);
+
+	if (Xbind(sock, (sockaddr *)sa, sizeof(sa)) < 0) {
+		die(-3, "unable to bind to the dag\n");
+	}
+	return sock;
+}
+
+int registerStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) 
+{
+	int sock;
+
+	// create a socket, and listen for incoming connections
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+		die(-1, "Unable to create the listening socket\n");
+
+	// read the localhost AD and HID
+	if (XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0)
+		die(-1, "Reading localhost address\n");
+
+	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
+	// Generate an SID to use
+	if (XmakeNewSID(sid_string, sizeof(sid_string))) {
+		die(-1, "Unable to create a temporary SID");
+	}
+
+	struct addrinfo hints, *ai;
+	bzero(&hints, sizeof(hints));
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_family = AF_XIA;
+
+	if (Xgetaddrinfo(NULL, sid_string, &hints, &ai) != 0)
+		die(-1, "getaddrinfo failure!\n");
+
+	Graph g((sockaddr_x*)ai->ai_addr);
+
+	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
+
+	if (Xbind(sock, (struct sockaddr*)sa, sizeof(sockaddr_x)) < 0) {
+		Xclose(sock);
+		 die(-1, "Unable to bind to the dag: %s\n", g.dag_string().c_str());
+	}
+	say("listening on dag: %s\n", g.dag_string().c_str());
+
+	Xlisten(sock, 5);
+
+	if (XregisterName(name, sa) < 0 )
+		die(-1, "error registering name: %s\n", name);
+	say("\nRegistering DAG with nameserver:\n%s\n", g.dag_string().c_str());
+
+  return sock;
+}
+
+void *blockListener(void *listenID, void *recvFuntion (void *)) 
+{
+  int listenSock = *((int*)listenID);
+  int acceptSock;
+
+  while (1) {
+		say("Waiting for a client connection\n");
+   		
+		if ((acceptSock = Xaccept(listenSock, NULL, NULL)) < 0)
+			die(-1, "accept failed\n");
+		say("connected\n");
+		
+		pthread_t client;
+		pthread_create(&client, NULL, recvFuntion, (void *)&acceptSock);
+	}
+	
+	Xclose(listenSock);
+
+	return NULL;
+}
+
+int getIndex(string target, vector<string> pool) {
+	for (unsigned i = 0; i < pool.size(); i++) {
+		if (target == pool[i])
+			return i;
+	}
+	return -1;
+}
+
+int registerPrefetchService(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid) 
+{
+	int sock, rc;
+	sockaddr_x dag;
+	socklen_t daglen;
+	char sdag[1024];
+	char IP[MAX_XID_SIZE];
+
+	// lookup the xia service 
+	daglen = sizeof(dag);
+	if (XgetDAGbyName(name, &dag, &daglen) < 0)
+		die(-1, "unable to locate: %s\n", name);
+	// create a socket, and listen for incoming connections
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+		die(-1, "Unable to create the listening socket\n");
+	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
+		Xclose(sock);
+		die(-1, "Unable to bind to the dag: %s\n", dag);
+	}
+	rc = XreadLocalHostAddr(sock, src_ad, MAX_XID_SIZE, src_hid, MAX_XID_SIZE, IP, MAX_XID_SIZE);
+
+	if (rc < 0) {
+		Xclose(sock);
+		die(-1, "Unable to read local address.\n");
+	} 
+	else{
+		warn("My AD: %s, My HID: %s\n", src_ad, src_hid);
+	}
+	
+	// save the AD and HID for later. This seems hacky we need to find a better way to deal with this
+	Graph g(&dag);
+	strncpy(sdag, g.dag_string().c_str(), sizeof(sdag));
+	// say("sdag = %s\n",sdag);
+	char *ads = strstr(sdag, "AD:");
+	char *hids = strstr(sdag, "HID:");
+	
+	if (sscanf(ads, "%s", dst_ad) < 1 || strncmp(dst_ad, "AD:", 3) != 0) {
+		die(-1, "Unable to extract AD.");
+	}
+	if (sscanf(hids, "%s", dst_hid) < 1 || strncmp(dst_hid, "HID:", 4) != 0) {
+		die(-1, "Unable to extract HID.");
+	}
+	warn("Service AD: %s, Service HID: %s\n", dst_ad, dst_hid);
+
+	return sock;
+}
+
+int registerPrefetchClient(const char *name) 
+{
+	int sock;
+	sockaddr_x dag;
+	socklen_t daglen;
+
+	// lookup the xia service 
+	daglen = sizeof(dag);
+
+	if (XgetDAGbyName(name, &dag, &daglen) < 0)
+		die(-1, "unable to locate: %s\n", name);
+	// create a socket, and listen for incoming connections
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+		die(-1, "Unable to create the listening socket\n");
+	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
+		Xclose(sock);
+		die(-1, "Unable to bind to the dag: %s\n", dag);
+	}
+	return sock;
+}
+
+int updateManifest(int sock, vector<string> CIDs) 
+{
+	char cmd[XIA_MAX_BUF];
+	memset(cmd, '\0', strlen(cmd));
+	char cids[XIA_MAX_BUF];
+	memset(cids, '\0', strlen(cids));
+
+	for (unsigned int i = 0; i < CIDs.size(); i++) {
+		strcat(cids, " ");
+		strcat(cids, string2char(CIDs[i]));
+	}	
+	// TODO: check total length of cids should not exceed max buf
+	sprintf(cmd, "reg%s", cids);
+	int n = sendStreamCmd(sock, cmd);
+
+	return n;
+}
+
+// TODO: XIA_MAX_BUF needs to be augmented
+int XrequestChunkPrefetch(int sock, const ChunkStatus *cs) {
+	char cmd[XIA_MAX_BUF];
+	memset(cmd, '\0', strlen(cmd));
+
+	// TODO: check total length of cids should not exceed max buf
+	sprintf(cmd, "fetch %ld %s", cs[0].cidLen, cs[0].cid);
+	int n = sendStreamCmd(sock, cmd); 	
+	return n;
+}
+
+/*
+int XrequestChunksAdv(int sockfd, const ChunkStatus *chunks, int numChunks, string serviceName, vector<string> CIDS) {
+	// send if no prefetch client, as notmal; other wise, send argrments as part of msg using xsp
+	// need to pass AD, HID, SID etc, maybe sockfd is enogh
+	return 0;
+}
+*/
+
+/* deprecated
+
+int deprecatedRegisterStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) 
+{
+	int sock;
+
+	// create a socket, and listen for incoming connections
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+		die(-1, "Unable to create the listening socket\n");
+
+  // read the localhost AD and HID
+  if (XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0)
+		die(-1, "Reading localhost address\n");
+
+	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
+	// Generate an SID to use
+	if (XmakeNewSID(sid_string, sizeof(sid_string))) {
+		die(-1, "Unable to create a temporary SID");
+	}
+
+	struct addrinfo *ai;
+
+	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
+		die(-1, "getaddrinfo failure!\n");
+
+	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
+
+  if (XregisterName(name, dag) < 0)
+		die(-1, "error registering name: %s\n", name);
+
+	if (Xbind(sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
+		Xclose(sock);
+		die(-1, "Unable to bind to the dag: %s\n", dag);
+	}
+
+	Graph g(dag);
+	say("listening on dag: %s\n", g.dag_string().c_str());
+  return sock;  
 }
 
 int getChunkCount(int sock, char *reply, int sz) 
@@ -523,151 +816,4 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *dst_ad, char *dst_h
 	return n;
 }
 
-int registerDatagramReceiver(char* name) 
-{
-	int sock;
-
-	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
-		die(-2, "unable to create the datagram socket\n");
-
-	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
-	// Generate an SID to use
-	if (XmakeNewSID(sid_string, sizeof(sid_string))) {
-		die(-1, "Unable to create a temporary SID");
-	}
-
-	struct addrinfo *ai;
-	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
-		die(-1, "getaddrinfo failure!\n");
-
-	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
-
-	Graph g((sockaddr_x*)ai->ai_addr);
-	printf("\nDatagram DAG\n%s\n", g.dag_string().c_str());
-
-	if (XregisterName(name, sa) < 0)
-		die(-1, "error registering name: %s\n", name);
-
-	say("registered name: \n%s\n", name);
-
-	if (Xbind(sock, (sockaddr *)sa, sizeof(sa)) < 0) {
-		die(-3, "unable to bind to the dag\n");
-	}
-	return sock;
-}
-
-// update with XListen
-int registerStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) 
-{
-	int sock;
-
-	// create a socket, and listen for incoming connections
-	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
-		die(-1, "Unable to create the listening socket\n");
-
-	// read the localhost AD and HID
-	if (XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0)
-		die(-1, "Reading localhost address\n");
-
-	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
-	// Generate an SID to use
-	if (XmakeNewSID(sid_string, sizeof(sid_string))) {
-		die(-1, "Unable to create a temporary SID");
-	}
-
-	struct addrinfo hints, *ai;
-	bzero(&hints, sizeof(hints));
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_family = AF_XIA;
-
-	if (Xgetaddrinfo(NULL, sid_string, &hints, &ai) != 0)
-		die(-1, "getaddrinfo failure!\n");
-
-	Graph g((sockaddr_x*)ai->ai_addr);
-
-	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
-
-	if (Xbind(sock, (struct sockaddr*)sa, sizeof(sockaddr_x)) < 0) {
-		Xclose(sock);
-		 die(-1, "Unable to bind to the dag: %s\n", g.dag_string().c_str());
-	}
-	say("listening on dag: %s\n", g.dag_string().c_str());
-
-	Xlisten(sock, 5);
-
-	if (XregisterName(name, sa) < 0 )
-		die(-1, "error registering name: %s\n", name);
-	say("\nRegistering DAG with nameserver:\n%s\n", g.dag_string().c_str());
-
-  return sock;
-}
-
-// register the service with the name server and open the necessary sockets
-int deprecatedRegisterStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) 
-{
-	int sock;
-
-	// create a socket, and listen for incoming connections
-	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
-		die(-1, "Unable to create the listening socket\n");
-
-  // read the localhost AD and HID
-  if (XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0)
-		die(-1, "Reading localhost address\n");
-
-	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
-	// Generate an SID to use
-	if (XmakeNewSID(sid_string, sizeof(sid_string))) {
-		die(-1, "Unable to create a temporary SID");
-	}
-
-	struct addrinfo *ai;
-
-	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
-		die(-1, "getaddrinfo failure!\n");
-
-	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
-
-  if (XregisterName(name, dag) < 0)
-		die(-1, "error registering name: %s\n", name);
-
-	if (Xbind(sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
-		Xclose(sock);
-		die(-1, "Unable to bind to the dag: %s\n", dag);
-	}
-
-	Graph g(dag);
-	say("listening on dag: %s\n", g.dag_string().c_str());
-  return sock;  
-}
-
-void *blockListener(void *listenID, void *recvFuntion (void *)) 
-{
-  int listenSock = *((int*)listenID);
-  int acceptSock;
-
-  while (1) {
-		say("Waiting for a client connection\n");
-   		
-		if ((acceptSock = Xaccept(listenSock, NULL, NULL)) < 0)
-			die(-1, "accept failed\n");
-
-		say("connected\n");
-		
-		// handle the connection in a new thread
-		pthread_t client;
-		pthread_create(&client, NULL, recvFuntion, (void *)&acceptSock);
-	}
-	
-	Xclose(listenSock);
-
-	return NULL;
-}
-
-int getIndex(string target, vector<string> pool) {
-	for (unsigned i = 0; i < pool.size(); i++) {
-		if (target == pool[i])
-			return i;
-	}
-	return -1;
-}
+*/

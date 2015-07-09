@@ -88,7 +88,7 @@ void *recvCmd (void *socketid)
 
 int main() 
 {	
-	int ftpListenSock = registerStreamReceiver(FTP_NAME, myAD, myHID, my4ID);
+	int ftpListenSock = registerStreamReceiver(getXftpName(), myAD, myHID, my4ID);
 	blockListener((void *)&ftpListenSock, recvCmd);
 	return 0;
 }
