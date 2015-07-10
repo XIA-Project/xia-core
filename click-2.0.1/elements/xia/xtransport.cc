@@ -160,7 +160,7 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	_tcp_globals.tcp_maxidle   	    = 120;
 	_tcp_globals.tcp_now 		    = 0;
 	_tcp_globals.so_recv_buffer_size = 0x10000;
-	_tcp_globals.tcp_mssdflt	    = 1420;
+	_tcp_globals.tcp_mssdflt	    = 1024;
 	_tcp_globals.tcp_rttdflt	    = TCPTV_SRTTDFLT / PR_SLOWHZ;
 	_tcp_globals.so_flags	   	 	= 0;
 	_tcp_globals.so_idletime	    = 0;
@@ -902,7 +902,7 @@ void XTRANSPORT::run_timer(Timer *timer)
 		(globals()->tcp_now)++; 
     } else if (timer == _reaper) {
     	for (; i; i++) {
-    		INFO("This is %d, %d",i->second->port,i->second->reap);
+    		// INFO("This is %d, %d",i->second->port,i->second->reap);
     		if (i->second->reap)
     		{
     			INFO("Going to remove %d", i->second->port);
@@ -4200,6 +4200,7 @@ void XTRANSPORT::Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 		if (xia_socket_msg->x_recv().bytes_returned() > 0) {
 			// Return response to API
+			INFO("Read %d bytes", xia_socket_msg->x_recv().bytes_returned());
 			ReturnResult(_sport, xia_socket_msg, xia_socket_msg->x_recv().bytes_returned());
 
 		} else if (sk->state == CLOSE_WAIT) {

@@ -1363,7 +1363,9 @@ XStream::so_recv_buffer_space() {
 
 
 void 
-XStream::fasttimo() { 
+XStream::fasttimo() {
+    	// printf("_fast_ticks");
+
 	if ( tp->t_flags & TF_DELACK) { 
 		tp->t_flags &= ~TF_DELACK; 
 		tp->t_flags |= TF_ACKNOW; 
@@ -1373,6 +1375,8 @@ XStream::fasttimo() {
 
 void 
 XStream::slowtimo() { 
+    	// printf("_slow_ticks");
+
 	int i; 
 	//debug_output(VERB_TIMERS, "[%s] now: [%u] Timers: %s %d %s %d %s %d %s %d %s %d", 
 	// SPKRNAME,
@@ -1658,16 +1662,16 @@ XStream::usrsend(WritablePacket *p)
 		char buf[512];
 		memset(buf, 0, 512);
 		printf("the remaining is %d\n", remaining);
-		while (remaining > 0) {
-			int size = remaining > 512 ? 512 : remaining;
-			memcpy((void*)buf, (const void*)p->data(), size);
-			wp = WritablePacket::make((const void*)buf, size);
-			if (size == 512)
-				p -> pull(512);
-			retval = _q_usr_input.push(wp);
-			remaining -= 512; 
-			printf("the remaining is %d\n", remaining);
-		} 
+		// while (remaining > 0) {
+		// 	int size = remaining > 512 ? 512 : remaining;
+		// 	memcpy((void*)buf, (const void*)p->data(), size);
+		// 	wp = WritablePacket::make((const void*)buf, size);
+		// 	if (size == 512)
+		// 		p -> pull(512);
+			retval = _q_usr_input.push(p);
+		// 	remaining -= 512; 
+		// 	printf("the remaining is %d\n", remaining);
+		// } 
 	}
 
 	//  These are the states where we expect to recieve packets
