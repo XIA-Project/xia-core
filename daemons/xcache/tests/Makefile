@@ -1,4 +1,4 @@
-include ../../xia.mk
+include ../../../xia.mk
 CC=g++
 CFLAGS+=-g -I../../click/include/click
 LDFLAGS+=$(LIBS)

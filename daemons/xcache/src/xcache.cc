@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <iostream>
 #include "controller.h"
-#include "../click-2.0.1/include/clicknet/xia.h"
+#include "clicknet/xia.h"
 
 int main(void)
 {

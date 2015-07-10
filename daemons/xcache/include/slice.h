@@ -3,7 +3,7 @@
 
 #include <iostream>
 #include <map>
-#include "../click-2.0.1/include/clicknet/xia.h"
+#include "clicknet/xia.h"
 #include "policy.h"
 #include <stdint.h>
 

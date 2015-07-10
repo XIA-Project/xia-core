@@ -201,6 +201,7 @@ int XcacheController::store(XcacheCommand *cmd)
 {
 	XcacheSlice *slice;
 	XcacheMeta *meta;
+	std::string emptyStr("");
 	std::map<std::string, XcacheMeta *>::iterator i = metaMap.find(cmd->cid());
 
 	std::cout << "Reached " << __func__ << std::endl;
@@ -223,6 +224,12 @@ int XcacheController::store(XcacheCommand *cmd)
 		std::cout << "Slice store failed\n";
 		return -1;
 	}
+
+	std::string tempCID("CID:");
+	tempCID += meta->getCid();
+
+	std::cout << "Setting Route for " << tempCID << "\n";
+	std::cout << "RV=" << xr.setRoute(tempCID, DESTINED_FOR_LOCALHOST, emptyStr, 0) << "\n";
 
 	return storeManager.store(meta, cmd->data());
 }
@@ -300,13 +307,21 @@ void XcacheController::run(void)
 {
 	fd_set fds, allfds;
 	struct timeval timeout;
-	int max, libsocket, s, n;
+	int max, libsocket, s, n, rc;
+
 	std::vector<int> activeConnections;
 	std::vector<int>::iterator iter;
 
 	s = xcache_create_click_socket(1444);
 	libsocket = xcache_create_lib_socket();
+
 	startXcache();
+	if ((rc = xr.connect()) != 0) {
+		std::cout << "unable to connect to click " << rc << "\n";
+		return;
+	}
+
+	xr.setRouter("host0"); // FIXME: Hardcoded name
 
 	FD_ZERO(&fds);
 	FD_SET(s, &allfds);

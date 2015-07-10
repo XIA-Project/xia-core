@@ -6,6 +6,7 @@
 #include "slice.h"
 #include "meta.h"
 #include "store_manager.h"
+#include "XIARouter.hh"
 
 /**
  * XcacheController:
@@ -24,6 +25,7 @@ private:
 	int startXcache(void);
 	XcacheSlice *lookupSlice(XcacheCommand *);
 	XcacheStoreManager storeManager;
+	XIARouter xr;
 
 public:
 	XcacheController() {

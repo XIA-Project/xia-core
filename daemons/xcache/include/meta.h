@@ -1,7 +1,7 @@
 #ifndef __META_H__
 #define __META_H__
 
-#include "../click-2.0.1/include/clicknet/xia.h"
+#include "clicknet/xia.h"
 #include <iostream>
 #include <map>
 #include <iostream>
