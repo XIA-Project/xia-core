@@ -880,10 +880,6 @@ void XTRANSPORT::run_timer(Timer *timer)
 			{
 			con = dynamic_cast<XStream *>(i->second);
 			con->slowtimo(); 
-			if (con->get_state() == TCPS_CLOSED) {
-				delete con;
-				break;
-			}
 		}
 		}
 		for (; j; j++) {
@@ -892,10 +888,6 @@ void XTRANSPORT::run_timer(Timer *timer)
 			{
 			con = dynamic_cast<XStream *>(j->second);
 			con->slowtimo(); 
-			if (con->get_state() == TCPS_CLOSED) {
-				delete con;
-				break;
-			}
 		}
 		}
 		_slow_ticks->reschedule_after_msec(TCP_SLOW_TICK_MS);
