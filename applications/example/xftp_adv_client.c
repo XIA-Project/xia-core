@@ -15,7 +15,7 @@ char myHID[MAX_XID_SIZE];
 char ftpServAD[MAX_XID_SIZE];
 char ftpServHID[MAX_XID_SIZE];
 
-int ftpSock, prefetchClientSock;
+int ftpSock, prefetchManagerSock;
 
 // TODO: move retransmit request from app to xtransport?
 // TODO: optimize sleep(1)
@@ -50,8 +50,8 @@ int getFile(int sock)
 
 	// update CID list to the locali prefetching service.
 	if (prefetch) {
-		if ((n = updateManifest(prefetchClientSock, CIDs) < 0)) {
-			Xclose(prefetchClientSock);
+		if ((n = updateManifest(prefetchManagerSock, CIDs) < 0)) {
+			Xclose(prefetchManagerSock);
 			die(-1, "Unable to communicate with the local prefetching service\n");
 		}
 	}
@@ -70,22 +70,28 @@ int getFile(int sock)
 		int status;
 		int n = 1;
 		char *dag = (char *)malloc(512);
-
-		sprintf(dag, "RE ( %s %s ) CID:%s", ftpServAD, ftpServHID, string2char(CIDs[i]));
+		sprintf(dag, "RE ( %s %s ) CID:%s", myAD, myHID, string2char(CIDs[i]));
+		//sprintf(dag, "RE ( %s %s ) CID:%s", ftpServAD, ftpServHID, string2char(CIDs[i]));
 		cs[0].cidLen = strlen(dag);
 		cs[0].cid = dag; // cs[i].cid is a DAG, not just the CID
 		unsigned ctr = 0;
 
 		while (1) {
+			// Resend a chunk request every REREQUEST seconds
 			if (ctr % REREQUEST == 0) {
 				// bring the list of chunks local
 				say("%srequesting list of %d chunks\n", (ctr == 0 ? "" : "re-"), n);
 
 				if (prefetch) {
-					if (XrequestChunkPrefetch(prefetchClientSock, cs) < 0) {
+					if (XrequestChunkPrefetch(prefetchManagerSock, cs) < 0) {
 						say("unable to request chunks\n");
 						return -1;
 					}
+					// TODO: this is a hacky way, need to fix later
+					if (XrequestChunks(chunkSock, cs, n) < 0) {
+						say("unable to request chunks\n");
+						return -1;
+					}					
 				}
 				else {
 					if (XrequestChunks(chunkSock, cs, n) < 0) {
@@ -93,7 +99,7 @@ int getFile(int sock)
 						return -1;
 					}
 				}
-				say("checking chunk status\n");
+				//say("checking chunk status\n");
 			}
 			ctr++;
 
@@ -103,8 +109,9 @@ int getFile(int sock)
 				break;
 			else if (status < 0) 
 				die(-1, "error getting chunk status\n"); 
-			else if (status & WAITING_FOR_CHUNK) 
-				say("waiting... one or more chunks aren't ready yet\n");
+			else if (status & WAITING_FOR_CHUNK) {
+				//say("waiting... one or more chunks aren't ready yet\n");
+			}
 			else if (status & INVALID_HASH) 
 				die(-1, "one or more chunks has an invalid hash");
 			else if (status & REQUEST_FAILED)
@@ -112,7 +119,7 @@ int getFile(int sock)
 			else 
 				say("unexpected result\n");
 
-			sleep(1);
+			usleep(100000);
 		}
 
 		say("Chunk is ready\n");
@@ -145,9 +152,9 @@ int main(int argc, char **argv)
 
 			ftpSock = initStreamClient(getXftpName(), myAD, myHID, ftpServAD, ftpServHID);
 
-			prefetchClientSock = registerPrefetchClient(getPrefetchClientName());
+			prefetchManagerSock = registerPrefetchManager(getPrefetchManagerName());
 
-			if (prefetchClientSock == -1) {
+			if (prefetchManagerSock == -1) {
 				say("No local prefetching service running\n");
 				prefetch = false;
 			}

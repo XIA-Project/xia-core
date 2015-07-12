@@ -32,7 +32,7 @@
 
 #define FTP_NAME "www_s.ftp.aaa.xia"
 #define PREFETCH_SERVER_NAME "www_s.prefetch_server.aaa.xia"
-#define PREFETCH_CLIENT_NAME "www_s.prefetch_client.aaa.xia"
+#define PREFETCH_MANAGER_NAME "www_s.prefetch_client.aaa.xia"
 
 #define GETSSID_CMD "iwgetid -r"
 
@@ -60,8 +60,8 @@ vector<string> cidList(char *cids_str);
 // format: PREFETCH_SERVER_NAME.getAD()
 char *getPrefetchServiceName();
 
-// format: PREFETCH_CLIENT_NAME.getHID()
-char *getPrefetchClientName();
+// format: PREFETCH_MANAGER_NAME.getHID()
+char *getPrefetchManagerName();
 
 char *getXftpName();
 
@@ -122,7 +122,7 @@ int updateManifest(int sock, vector<string> CIDs);
 int registerPrefetchService(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid);
 
 // xftp_client setup a socket connection with prefetch client
-int registerPrefetchClient(const char *name);
+int registerPrefetchManager(const char *name);
 
 // construct the msg and send to prefetch client
 int XrequestChunkPrefetch(int sock, const ChunkStatus *cs);

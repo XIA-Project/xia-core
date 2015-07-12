@@ -111,9 +111,9 @@ char *getPrefetchServiceName()
 	return string2char(string(PREFETCH_SERVER_NAME) + "." + getAD());
 } 
 
-char *getPrefetchClientName() 
+char *getPrefetchManagerName() 
 {
-	return string2char(string(PREFETCH_CLIENT_NAME) + "." + getHID());
+	return string2char(string(PREFETCH_MANAGER_NAME) + "." + getHID());
 } 
 
 char *getXftpName() 
@@ -600,7 +600,7 @@ int registerPrefetchService(const char *name, char *src_ad, char *src_hid, char 
 	return sock;
 }
 
-int registerPrefetchClient(const char *name) 
+int registerPrefetchManager(const char *name) 
 {
 	int sock;
 	sockaddr_x dag;

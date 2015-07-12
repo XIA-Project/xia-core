@@ -203,7 +203,7 @@ cerr<<(*I).second[i]<<endl;
 					else 
 						say("unexpected result\n");
 
-					sleep(1); 
+					usleep(100000); 
 				}
 
 				for (unsigned int i = 0; i < (*I).second.size(); i++) {
