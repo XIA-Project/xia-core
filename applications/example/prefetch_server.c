@@ -128,7 +128,7 @@ void *prefetchCmd(void *socketid)
 		}
 		if (strncmp(cmd, "prefetch", 8) == 0) {
 			say("Receive a prefetch message\n");
-			prefetchControl(sock, cmd);
+			prefetchControl(sock, cmd+9);
 		}	
 	}
 
@@ -150,7 +150,8 @@ void *prefetchData(void *)
 		for (map<string, vector<string> >::iterator I = SIDToBuf.begin(); I != SIDToBuf.end(); ++I) {
 			if ((*I).second.size() > 0) {
 				string SID = (*I).first;
-cerr<<"SID: "<<SID<<"chunks to be pulled from the queue\n";
+cerr<<"SID: "<<SID<<endl;
+cerr<<"Chunks to be pulled from the queue:\n";
 				for (unsigned int i = 0; i < (*I).second.size(); i++) {
 cerr<<(*I).second[i]<<endl;
 				}
