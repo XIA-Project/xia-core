@@ -17,18 +17,17 @@ char ftpServHID[MAX_XID_SIZE];
 
 int ftpSock, prefetchManagerSock;
 
-// TODO: move retransmit request from app to xtransport?
-// TODO: optimize sleep(1)
-
-// 12 is the max NUM_CHUNKS to fetch at one time for 1024 K
 int getFile(int sock) 
 {
 	FILE *fd = fopen(fout, "w");
 
+	int chunkSock;
+	int n;
+	int status = -1;
+
 	char cmd[XIA_MAX_BUF];
 	char reply[XIA_MAX_BUF];
-	int n = -1;
-	int status = 0;
+
 	vector<string> CIDs;
 
 	// send the file request to the xftp server
@@ -48,14 +47,13 @@ int getFile(int sock)
 		CIDs.push_back(string(strtok(NULL, " ")));
 	}
 
-	// update CID list to the locali prefetching service.
+	// update CID list to the local prefetching service.
 	if (prefetch) {
 		if ((n = updateManifest(prefetchManagerSock, CIDs) < 0)) {
 			Xclose(prefetchManagerSock);
 			die(-1, "Unable to communicate with the local prefetching service\n");
 		}
 	}
-	int chunkSock;
 
 	if ((chunkSock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0) {
 		die(-1, "unable to create chunk socket\n");
@@ -70,6 +68,7 @@ int getFile(int sock)
 		int status;
 		int n = 1;
 		char *dag = (char *)malloc(512);
+		// TODO: figure out our
 		sprintf(dag, "RE ( %s %s ) CID:%s", myAD, myHID, string2char(CIDs[i]));
 		//sprintf(dag, "RE ( %s %s ) CID:%s", ftpServAD, ftpServHID, string2char(CIDs[i]));
 		cs[0].cidLen = strlen(dag);
@@ -112,14 +111,14 @@ int getFile(int sock)
 			else if (status & WAITING_FOR_CHUNK) {
 				//say("waiting... one or more chunks aren't ready yet\n");
 			}
-			else if (status & INVALID_HASH) 
+			else if (status & INVALID_HASH)
 				die(-1, "one or more chunks has an invalid hash");
 			else if (status & REQUEST_FAILED)
 				die(-1, "no chunks found\n");
 			else 
 				say("unexpected result\n");
 
-			usleep(100000);
+			usleep(CHUNK_REQUEST_DELAY_MSEC*1000);
 		}
 
 		say("Chunk is ready\n");
@@ -158,7 +157,6 @@ int main(int argc, char **argv)
 				say("No local prefetching service running\n");
 				prefetch = false;
 			}
-
 			getFile(ftpSock);
 
 			return 0;

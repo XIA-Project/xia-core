@@ -26,9 +26,10 @@
 #define RECV_BUF_SIZE 1024
 #define XIA_MAX_BUF 15600 // TODO: improve later
 
-#define CHUNKSIZE 1024
+#define CHUNKSIZE 1024 
+
 #define REREQUEST 3
-#define NUM_CHUNKS 1
+#define NUM_CHUNKS 1 // 12 is the max NUM_CHUNKS to fetch at one time for 1024 K
 
 #define FTP_NAME "www_s.ftp.aaa.xia"
 #define PREFETCH_SERVER_NAME "www_s.prefetch_server.aaa.xia"
@@ -36,7 +37,11 @@
 
 #define GETSSID_CMD "iwgetid -r"
 
-#define PURGE_SEC 120
+#define PURGE_DELAY_SEC 120
+#define MGT_DELAY_SEC 10
+#define LOOP_DELAY_MSEC 100
+#define SCAN_DELAY_MSEC 10
+#define CHUNK_REQUEST_DELAY_MSEC 100
 
 using namespace std;
 
@@ -49,13 +54,10 @@ void warn(const char *fmt, ...);
 // write the message to stdout, and exit the app
 void die(int ecode, const char *fmt, ...);
 
-char **str_split(char *a_str, const char *a_delim);
-
 char *randomString(char *buf, int size);
 
 // format: cid1 cid2, ... cidn
 vector<string> cidList(char *cids_str);
-
 
 // format: PREFETCH_SERVER_NAME.getAD()
 char *getPrefetchServiceName();
@@ -81,10 +83,10 @@ string getAD();
 
 string getHID();
 
-// block and poll until new AD is returned
+// block and poll until new AD is returned; used when SSID changed is detected
 void getNewAD(char *old_ad);
 
-// get the SSID name from "iwgetid -r" command
+// get the SSID name from "iwgetid -r" command; app level approach
 string netConnStatus(string lastSSID);
 
 int getReply(int sock, const char *cmd, char *reply, sockaddr_x *sa, int timeout, int tries);
@@ -156,17 +158,5 @@ typedef struct {
 	size_t cidLen;
 	int status; // 1: ready to be read, 0: waiting for chunk response, -1: failed
 } ChunkStatus;
-
-*/
-
-/* deprecated
-
-int deprecatedRegisterStreamReceiver(char *name, char *myAD, char *myHID, char *my4ID);
-
-int getChunkCount(int sock, char *reply, int sz);
-
-int buildChunkDAGs(ChunkStatus cs[], char *chunks, char *dst_ad, char *dst_hid);
-
-int getListedChunks(int csock, FILE *fd, char *chunks, char *dst_ad, char *dst_hid);
 
 */
