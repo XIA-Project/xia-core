@@ -949,8 +949,8 @@ dropafterack:
 	if (tiflags & TH_RST)
 		goto drop;
 	printf("becareful 913\n");
-	copy -> kill();
-	p->kill();
+	if (copy != NULL) copy -> kill();
+    if (p != NULL) p->kill();
 	tp->t_flags |= TF_ACKNOW;
 	tcp_output(); 
 	return;
