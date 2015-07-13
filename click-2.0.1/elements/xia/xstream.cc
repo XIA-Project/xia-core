@@ -416,7 +416,7 @@ XStream::tcp_input(WritablePacket *p)
     /* 635 646 */ 
     /* Determine if we need to trim the head off of an incoming segment */ 
     todrop = tp->rcv_nxt - ti.ti_seq; 
-
+    printf("tp -> rcv_nxt %d, tiseq %d\n", (int)tp->rcv_nxt, (int)ti.ti_seq);
 
 	// todrop is > 0 IF the incoming segment begins prior to the end of the last
 	// recieved segment (a.k.a. tp->rcv_nxt)
@@ -461,6 +461,7 @@ XStream::tcp_input(WritablePacket *p)
 		// }
 		printf("becareful 465\n");
 		copy->pull(todrop);
+		printf("bad\n");
 		ti.ti_seq += todrop;
 		ti.ti_len -= todrop;
 		if (ti.ti_urp > todrop) { 
@@ -1427,12 +1428,14 @@ XStream::tcp_timers (int timer) {
 		  break; 
 		case TCPT_KEEP: 
 		  if ( tp->t_state < TCPS_ESTABLISHED) {
+		  	printf("1431\n");
 			// Notify API that the connection failed
 			XSocketMsg xsm;
 			xsm.set_type(xia::XCONNECT);
 			xsm.set_sequence(0); // TODO: what should This be?
 			xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
 			connect_msg->set_status(xia::X_Connect_Msg::XFAILED);
+			connect_msg->set_ddag(dst_path.unparse().c_str());
 			get_transport()->ReturnResult(port, &xsm);
 
 			if (polling) {
