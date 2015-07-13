@@ -460,7 +460,7 @@ XStream::tcp_input(WritablePacket *p)
 		// 	get_transport()->_tcpstat.tcps_rcvpartdupbyte += todrop;
 		// }
 		printf("becareful 465\n");
-		copy->pull(todrop);
+		if (copy != NULL) copy->pull(todrop);
 		printf("bad\n");
 		ti.ti_seq += todrop;
 		ti.ti_len -= todrop;
