@@ -77,6 +77,12 @@ class XIAPath { public:
 	// replace XID of matching nodes with a new one
 	bool replace_node_xid(String oldXIDstr, String newXIDstr);
 
+	// First child node for the given node
+	handle_t first_hop_from_node(handle_t node) const;
+
+	// Replace intent HID node with a new one
+	bool replace_intent_hid(XID new_hid);
+
     // get handles of connected (next) nodes to the node
     Vector<handle_t> next_nodes(handle_t node) const;
 
