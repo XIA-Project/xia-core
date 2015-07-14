@@ -3481,31 +3481,43 @@ void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	//     * Update xlcn/xchal, xlcn/x
 	// For all active stream sockets, associated with the interface
 	//     * Update _network_dag and hence the src_path
-	String str_local_addr = _local_addr.unparse();
-	size_t old_AD_start = str_local_addr.find_left("AD:");
-	size_t old_AD_end = str_local_addr.find_left(" ", old_AD_start);
-	String old_AD_str = str_local_addr.substring(old_AD_start, old_AD_end - old_AD_start);
-
-	xia::X_Changead_Msg *x_changead_msg = xia_socket_msg->mutable_x_changead();
+	//String str_local_addr = _local_addr.unparse();
+	//size_t old_AD_start = str_local_addr.find_left("AD:");
+	//size_t old_AD_end = str_local_addr.find_left(" ", old_AD_start);
+	//String old_AD_str = str_local_addr.substring(old_AD_start, old_AD_end - old_AD_start);
 	//String tmp = _local_addr.unparse();
 	//Vector<String> ids;
 	//cp_spacevec(tmp, ids);
+
+	// Retrieve interface number and router's DAG from API message
+	XIAPath router_dag;
+	xia::X_Changead_Msg *x_changead_msg = xia_socket_msg->mutable_x_changead();
 	int interface = x_changead_msg->interface();
-	String Network_DAG_str(x_changead_msg->dag().c_str());
-	String HID_str = _hid.unparse();
+	click_chatter("XTRANSPORT:Xchangead Updating interface: %d", interface);
+	router_dag.parse(x_changead_msg->dag().c_str());
+	click_chatter("XTRANSPORT:Xchangead Router addr: %s", router_dag.unparse().c_str());
 	String IP4ID_str(x_changead_msg->ip4id().c_str());
-	// TODO: If interface is the default interface:
-	_local_4id.parse(IP4ID_str);
-	String new_local_addr;
-	// If a valid 4ID is given, it is included (as a fallback) in the local_addr
-	if(_local_4id != _null_4id) {
-		new_local_addr = "RE ( " + IP4ID_str + " ) " + Network_DAG_str + " " + HID_str;
-	} else {
-		new_local_addr = "RE " + Network_DAG_str + " " + HID_str;
+	click_chatter("XTRANSPORT:Xchangead Router 4ID: %s (ignored unless in addr above)", IP4ID_str.c_str());
+
+	// Replace intent HID in router's DAG to form new_dag
+	XIAPath new_dag = router_dag;
+	if(!new_dag.replace_intent_hid(_hid)) {
+		click_chatter("XTRANSPORT:Xchangead ERROR replacing intent HID in %s", new_dag.unparse().c_str());
+		return;
 	}
-	NOTICE("new address is - %s", new_local_addr.c_str());
-	_network_dag.parse(Network_DAG_str);
-	_local_addr.parse(new_local_addr);
+
+	// If default interface:
+	if(interface == _interfaces.default_interface()) {
+		// TODO: Update xrc/n/proc/rt_*, xrc/n/x, xrc/x
+		// TODO: Update _network_dag
+		_local_addr = new_dag;
+		click_chatter("XTRANSPORT:Xchangead system addr changed to %s", _local_addr.unparse().c_str());
+	}
+	char linecardname[16];
+	sprintf(linecardname, "xlc%d", interface);
+	//TODO: Update <linecardname>/xchal, <linecardname>/x
+
+	NOTICE("new address is - %s", _local_addr.unparse().c_str());
 
 	//TODO: Notify all other elements of the change
 	// xrc/xtransport, xlcn/xchal xrc/n/proc/rt_AD,HID,SID,CID,IP xrc/n/x, xlcn/x, xrc/x
@@ -3646,15 +3658,14 @@ void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
 	// read the localhost AD and HID
-	String network_dag = _network_dag.unparse();
-	click_chatter("Xreadlocalhostaddr: found network dag: %s", network_dag.c_str());
-	String HID_str = _hid.unparse();
-	click_chatter("Xreadlocalhostaddr: HID found: %s", HID_str.c_str());
+	// TODO: Change from using _local_addr to _interfaces.default_dag()
+	String dag_str = _local_addr.unparse();
+	click_chatter("Xreadlocalhostaddr: dag: %s", dag_str.c_str());
 	String IP4ID_str = _local_4id.unparse();
+	click_chatter("Xreadlocalhostaddr: 4ID: %s", IP4ID_str.c_str());
 	// return a packet containing localhost AD and HID
 	xia::X_ReadLocalHostAddr_Msg *_msg = xia_socket_msg->mutable_x_readlocalhostaddr();
-	_msg->set_ndag(network_dag.c_str());
-	_msg->set_hid(HID_str.c_str());
+	_msg->set_dag(dag_str.c_str());
 	_msg->set_ip4id(IP4ID_str.c_str());
 
 	ReturnResult(_sport, xia_socket_msg);

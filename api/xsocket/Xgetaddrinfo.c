@@ -65,7 +65,6 @@ const char *xerr_unimplemented = "This feature is not currently supported";
  	return msg;
  }
 
-#define MAX_RV_DAG_SIZE 2048
 #define CONFIG_PATH_BUF_SIZE 1024
 #define RESOLV_CONF "/etc/resolv.conf"
 
@@ -263,9 +262,9 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 		** at some point in the future local and loopback may require different code
 		*/
 
-		char ad[XID_LEN], hid[XID_LEN], fid[XID_LEN];
+		char dag[XIA_MAX_DAG_STR_SIZE], fid[XID_LEN];
 		//char rv_ad[XID_LEN], rv_hid[XID_LEN], rv_sid[XID_LEN];
-		char rv_dag_str[MAX_RV_DAG_SIZE];
+		char rv_dag_str[XIA_MAX_DAG_STR_SIZE];
 		int rc;
 		int sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
 
@@ -273,7 +272,19 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 			return EAI_SYSTEM;
 		}
 
-		rc = XreadLocalHostAddr(sock, ad, XID_LEN, hid, XID_LEN, fid, XID_LEN);
+		rc = XreadLocalHostAddr(sock, dag, XIA_MAX_DAG_STR_SIZE, fid, XID_LEN);
+
+		// Retrieve AD and HID from the system DAG
+		// TODO: Revisit how we are building DAGs here, with the new
+		//       multihoming paradigm that the base DAG should be
+		//       provided by the router and hosts should not change it
+		Graph g_localhost(dag);
+		std::string ad = g_localhost.intent_AD_str();
+		std::string hid = g_localhost.intent_HID_str();
+		if(ad.size() == 0 || hid.size() == 0) {
+			printf("ERROR: Unable to read localhost AD or HID\n");
+			return EAI_SYSTEM;
+		}
 
 		Xclose(sock);
 		if (rc < 0) {
@@ -299,12 +310,12 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 
 		Node n_src = Node();
 		Node n_ip  = Node(fid);
-		Node n_ad  = Node(ad);
-		Node n_hid = Node(hid);
+		Node n_ad  = Node(ad.c_str());
+		Node n_hid = Node(hid.c_str());
 		Graph g = (n_src * n_ad * n_hid);
 		if(socktype == SOCK_STREAM) {
 			//rv_available = XreadRVServerAddr(rv_ad, XID_LEN, rv_hid, XID_LEN, rv_sid, XID_LEN);
-			if(XreadRVServerAddr(rv_dag_str, MAX_RV_DAG_SIZE) == 0) {
+			if(XreadRVServerAddr(rv_dag_str, XIA_MAX_DAG_STR_SIZE) == 0) {
 				Graph g2 = (n_src * n_ad);
 				Graph rvg(rv_dag_str);
 				printf("Rendezvous DAG:\n%s\n", rvg.dag_string().c_str());

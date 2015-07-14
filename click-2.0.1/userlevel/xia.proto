@@ -214,9 +214,8 @@ message X_Changead_Msg {
 }
 
 message X_ReadLocalHostAddr_Msg {
-  optional string ndag = 1;
-  optional string hid = 2;
-  optional string ip4id = 3;
+  optional string dag = 1;
+  optional string ip4id = 2;
 }
 
 message X_GetIfAddrs_Msg {

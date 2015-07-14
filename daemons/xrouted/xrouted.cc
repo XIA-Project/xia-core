@@ -538,8 +538,7 @@ void updateClickRoutingTable() {
 
 void initRouteState()
 {
-	char network_dag[256];
-	const char *last_ad;
+	char dag[MAX_DAG_SIZE];
 
 	// make the dest DAG (broadcast to other routers)
 	Graph g = Node() * Node(BHID) * Node(SID_XROUTE);
@@ -547,16 +546,16 @@ void initRouteState()
 
 	syslog(LOG_INFO, "xroute Broadcast DAG: %s", g.dag_string().c_str());
 
-	// read the localhost AD and HID
-	if ( XreadLocalHostAddr(route_state.sock, route_state.myAD, MAX_XID_SIZE, route_state.myHID, MAX_XID_SIZE, route_state.my4ID, MAX_XID_SIZE) < 0 ) {
+	// read the localhost DAG and 4ID
+	if ( XreadLocalHostAddr(route_state.sock, dag, MAX_DAG_SIZE, route_state.my4ID, MAX_XID_SIZE) < 0 ) {
 		syslog(LOG_ALERT, "Unable to read local XIA address");
 		exit(-1);
 	}
-	// Extract the last AD from the network dag - read backwards
-	if((last_ad = XnetworkDAGIntentAD((const char *)network_dag)) == NULL) {
-		syslog(LOG_ALERT, "Unable to read AD from network dag: %s.", network_dag);
-	}
-	strcpy(route_state.myAD, last_ad);
+
+	// Retrieve AD and HID from highest priority path to intent
+	Graph g_localhost(dag);
+	strcpy(route_state.myAD, g_localhost.intent_AD_str().c_str());
+	strcpy(route_state.myHID, g_localhost.intent_HID_str().c_str());
 
 	// make the src DAG (the one the routing process listens on)
 	struct addrinfo *ai;

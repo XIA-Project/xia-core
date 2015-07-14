@@ -180,12 +180,12 @@ extern int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 extern int XregisterName(const char *name, sockaddr_x *addr);
 extern int XrendezvousUpdate(const char *hidstr, sockaddr_x *DAG);
 
-extern int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *localhostHID, unsigned lenHID, char *local4ID, unsigned len4ID);
+extern int XreadLocalHostAddr(int sockfd, char *localhostDAG, unsigned lenDAG, char *local4ID, unsigned len4ID);
 extern int Xgetifaddrs(struct ifaddrs **ifap);
 extern void Xfreeifaddrs(struct ifaddrs *ifa);
 
 /* internal only functions */
-extern int XupdateAD(int sockfd, char *newad, char *new4id);
+extern int XupdateAD(int sockfd, int interface, const char *rdag, const char *r4id);
 extern int XupdateRV(int sockfd);
 extern int XupdateNameServerDAG(int sockfd, const char *nsDAG);
 extern int XreadNameServerDAG(int sockfd, sockaddr_x *nsDAG);

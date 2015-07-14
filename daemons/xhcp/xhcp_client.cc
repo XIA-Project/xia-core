@@ -390,7 +390,7 @@ int main(int argc, char *argv[]) {
 		}
 		*/
 		if(iface.isActive()) {
-			if(iface.getNetworkDAG().compare(beacon.getNetworkDAG())) {
+			if(iface.getRouterDAG().compare(beacon.getRouterDAG())) {
 				network_changed = true;
 			}
 			if(iface.getRouterHID().compare(beacon.getRouterHID())) {
@@ -407,7 +407,7 @@ int main(int argc, char *argv[]) {
 			//TODO:NITIN: setName(), setHID() after getting it from new Xgetifaddrs()
 			iface.setID(ifID);
 			iface.setActive();
-			iface.setNetworkDAG(beacon.getNetworkDAG());
+			iface.setRouterDAG(beacon.getRouterDAG());
 			iface.setRouterHID(beacon.getRouterHID());
 			iface.setRouter4ID(beacon.getRouter4ID());
 			iface.setNameServerDAG(beacon.getNameServerDAG());
@@ -419,18 +419,20 @@ int main(int argc, char *argv[]) {
 
 		if(network_changed) {
 			// Update Click
-			//if(XupdateAD(ifID, beacon.getAD(), becon.getRouter4ID) < 0) {
-			//	syslog(LOG_WARNING, "Error updating new AD in Click");
-			//}
-			xr.delRoute(XnetworkDAGIntentAD(iface.getNetworkDAG().c_str()));
-			printf("Deleted route for %s\n", XnetworkDAGIntentAD(iface.getNetworkDAG().c_str()));
+			if(XupdateAD(sockfd, ifID, beacon.getRouterDAG().c_str(), beacon.getRouter4ID().c_str()) < 0) {
+				syslog(LOG_WARNING, "Error updating new AD in Click");
+			}
+			Graph old_dag(iface.getRouterDAG().c_str());
+			xr.delRoute(old_dag.intent_AD_str().c_str());
+			printf("Deleted route for %s\n", old_dag.intent_AD_str().c_str());
 
-			if((rc = xr.setRoute(XnetworkDAGIntentAD(beacon.getNetworkDAG().c_str()), DESTINED_FOR_LOCALHOST, empty_str, 0xffff)) != 0) {
+			Graph new_dag(beacon.getRouterDAG().c_str());
+			if((rc = xr.setRoute(new_dag.intent_AD_str().c_str(), DESTINED_FOR_LOCALHOST, empty_str, 0xffff)) != 0) {
 				syslog(LOG_WARNING, "error setting route %d\n", rc);
 			}
-			printf("Created localhost route for %s\n", XnetworkDAGIntentAD(beacon.getNetworkDAG().c_str()));
-			printf("NetworkDAG for interface %d changing from %s to %s\n", ifID, iface.getNetworkDAG().c_str(), beacon.getNetworkDAG().c_str());
-			iface.setNetworkDAG(beacon.getNetworkDAG());
+			printf("Created localhost route for %s\n", new_dag.intent_AD_str().c_str());
+			printf("RouterDAG for interface %d changing from %s to %s\n", ifID, iface.getRouterDAG().c_str(), beacon.getRouterDAG().c_str());
+			iface.setRouterDAG(beacon.getRouterDAG());
 
 			listRoutes("AD");
 			listRoutes("HID");
