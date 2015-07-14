@@ -4232,7 +4232,7 @@ void XTRANSPORT::Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 		// FIXME: do something with the error
 	}
 
-	read_from_recv_buf(xia_socket_msg, sk);
+	((XStream *)sk) -> read_from_recv_buf(xia_socket_msg);
 
 	if (xia_socket_msg->x_recvfrom().bytes_returned() > 0) {
 		ReturnResult(_sport, xia_socket_msg, xia_socket_msg->x_recvfrom().bytes_returned());
