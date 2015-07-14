@@ -1768,7 +1768,7 @@ XStream::_tcp_dooptions(u_char *cp, int cnt, uint8_t th_flags,
 
 	//debug_output(VERB_DEBUG, "[%s] tcp_dooption cnt [%u]\n", SPKRNAME, cnt);
 	for (; cnt > 0; cnt -= optlen, cp += optlen) { 
-
+		printf("1771\n");
 		opt = cp[0]; 
 		if (opt == TCPOPT_EOL) {
 			//debug_output(VERB_DEBUG, "b1");
