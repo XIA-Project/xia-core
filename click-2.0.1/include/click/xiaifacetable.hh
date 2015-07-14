@@ -26,6 +26,7 @@ class XIAInterfaceTable {
 		}
 		void set_default(int interface) { _default_interface = interface;}
 		int default_interface() { return _default_interface;}
+		String default_dag() { return interfaceToDag[_default_interface];}
 	private:
 		void _erase(int iface, String dag);
 		void _insert(int iface, String dag);
