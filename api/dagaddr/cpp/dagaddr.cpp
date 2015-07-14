@@ -756,6 +756,74 @@ Graph::index_from_dag_string_index(int32_t dag_string_index, std::size_t source_
 }
 
 /**
+ * @brief Return the AD for the Graph's intent node
+ *
+ * Get the AD string on first path to intent node
+ * Note: This function is essentially identical to intent_HID_str()
+ *
+ * @return The AD if found, empty string otherwise
+ */
+std::string
+Graph::intent_AD_str() const
+{
+	std::string ad;
+	std::size_t curIndex;
+	std::size_t source = source_index();
+	std::size_t intent = final_intent_index();
+	std::vector<Node> first_path;
+	// Build first_path by walking first hops from source to intent node
+	for(curIndex=source; curIndex!=intent; curIndex=out_edges_[curIndex][0]) {
+		// Save each node visited
+		first_path.push_back(get_node(curIndex));
+	}
+	// Push the intent also onto first path, in case the AD is the intent
+	first_path.push_back(get_node(curIndex));
+	// Walk the first_path backwards and return first AD found
+	std::vector<Node>::iterator it;
+	for(it=first_path.end(); it!=first_path.begin(); it--) {
+		if((*it).type() == Node::XID_TYPE_AD) {
+			ad = (*it).to_string();
+			break;
+		}
+	}
+	return ad;
+}
+
+/*
+ * @brief Return the HID for the Graph's intent node
+ *
+ * Get the HID string on first path to intent node
+ * Note: This function is essentially identical to intent_AD_str()
+ *
+ * @return The HID if found, empty string otherwise
+ */
+std::string
+Graph::intent_HID_str() const
+{
+	std::string hid;
+	std::size_t curIndex;
+	std::size_t source = source_index();
+	std::size_t intent = final_intent_index();
+	std::vector<Node> first_path;
+	// Build first_path by walking first hops from source to intent node
+	for(curIndex=source; curIndex!=intent; curIndex=out_edges_[curIndex][0]) {
+		// Save each node visited
+		first_path.push_back(get_node(curIndex));
+	}
+	// Push the intent also onto first path, in case the HID is the intent
+	first_path.push_back(get_node(curIndex));
+	// Walk the first_path backwards and return first HID found
+	std::vector<Node>::iterator it;
+	for(it=first_path.end(); it!=first_path.begin(); it--) {
+		if((*it).type() == Node::XID_TYPE_HID) {
+			hid = (*it).to_string();
+			break;
+		}
+	}
+	return hid;
+}
+
+/**
 * @brief Return the graph in string form
 *
 * Get the DAG string representation of the graph. This string is suitable for

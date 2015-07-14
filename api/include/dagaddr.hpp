@@ -110,6 +110,8 @@ public:
 
 	void print_graph() const;
 	std::string dag_string() const;
+	std::string intent_AD_str() const;
+	std::string intent_HID_str() const;
 	bool is_final_intent(const Node& n);
 	bool is_final_intent(const std::string xid_string);
 	Graph next_hop(const Node& n);
