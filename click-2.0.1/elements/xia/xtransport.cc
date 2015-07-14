@@ -4004,7 +4004,7 @@ void XTRANSPORT::Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 // perhaps they should be combined
 void XTRANSPORT::Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
-	cout << "XRECVFROM IS CALLED" <<endl;
+	// cout << "XRECVFROM IS CALLED" <<endl;
 
 	// FIXME: do we even need this check???
 	sock *sk = portToSock.get(_sport);

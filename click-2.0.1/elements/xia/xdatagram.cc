@@ -67,7 +67,7 @@ XDatagram::check_for_and_handle_pending_recv() {
 
 int
 XDatagram::read_from_recv_buf(XSocketMsg *xia_socket_msg) {
-	printf("read_from_recv_buf in datagram\n");
+	// printf("read_from_recv_buf in datagram\n");
 	X_Recvfrom_Msg *x_recvfrom_msg = xia_socket_msg->mutable_x_recvfrom();
 
 	// Get just the next packet in the recv buffer (we don't return data from more
