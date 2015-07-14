@@ -29,6 +29,7 @@ XDatagram::push(WritablePacket *p_in) {
 		// buffer packet if this is a DGRAM socket and we have room
 	if (should_buffer_received_packet(p_in)) {
 		add_packet_to_recv_buf(p_in);
+		interface_id = SRC_PORT_ANNO(p_in);
 		if (polling) {
 			// tell API we are readable
 			get_transport()->ProcessPollEvent(port, POLLIN);

@@ -652,102 +652,6 @@ void XTRANSPORT::CancelRetransmit(sock *sk)
 }
 
 
-bool XTRANSPORT::RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now)
-{
-	if (sk->num_connect_tries <= MAX_RETRANSMIT_TRIES) {
-		DBG("Socket %d SYN retransmit\n", _sport);
-
-		ChangeState(sk, SYN_SENT);
-		sk->timer_on = true;
-		sk->expiry = now + Timestamp::make_msec(ACK_DELAY);
-		sk->num_connect_tries++;
-
-		WritablePacket *copy = copy_packet(sk->pkt, sk);
-		output(NETWORK_PORT).push(copy);
-
-	} else {
-		WARN("Socket %d SYN retransmit count exceeded\n", _sport);
-
-		// Stop sending the connection request & Report the failure to the application
-		CancelRetransmit(sk);
-		ChangeState(sk, INACTIVE);
-		sk->so_error = ETIMEDOUT;
-
-		// Notify API that the connection failed
-		if (!sk->isBlocking) {
-			xia::XSocketMsg xsm;
-
-			xsm.set_type(xia::XCONNECT);
-			xsm.set_sequence(0);
-			xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
-			connect_msg->set_status(xia::X_Connect_Msg::XFAILED);
-			ReturnResult(_sport, &xsm, -1, ETIMEDOUT);
-		}
-
-		if (sk->polling) {
-			// alert non-blocking connects
-			ProcessPollEvent(_sport, POLLHUP);
-		}
-	}
-	return false;
-}
-
-
-
-bool XTRANSPORT::RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &now)
-{
-	bool rc = false;
-
-	if (sk->num_connect_tries <= MAX_RETRANSMIT_TRIES) {
-		DBG("Socket %d SYNACK retransmit\n", _sport);
-
-		sk->timer_on = true;
-		sk->expiry = now + Timestamp::make_msec(ACK_DELAY);
-		sk->num_connect_tries++;
-
-		WritablePacket *copy = copy_packet(sk->pkt, sk);
-		output(NETWORK_PORT).push(copy);
-	}
-	else {
-		WARN("Socket %d SYNACK retransmit count exceeded\n", _sport);
-
-		// We have not yet notified the API that an accept was in progress, so we don't need to let
-		// it know about this failure.
-		TeardownSocket(sk);
-		rc = true;
-	}
-	return rc;
-}
-
-
-
-bool XTRANSPORT::RetransmitFIN(sock *sk, unsigned short _sport, Timestamp &now)
-{
-	bool rc = false;
-
-	if (sk->num_close_tries <= MAX_RETRANSMIT_TRIES) {
-		DBG("Socket %d FIN retransmit\n", _sport);
-
-		sk->timer_on = true;
-		ChangeState(sk, FIN_WAIT1);
-		sk->expiry = now + Timestamp::make_msec(ACK_DELAY);
-		sk->num_close_tries++;
-
-		WritablePacket *copy = copy_packet(sk->pkt, sk);
-		output(NETWORK_PORT).push(copy);
-	}
-	else {
-		// The App initiated the FIN and close returned right away, so there's nothing to tell it
-		WARN("Socket %d FIN retransmit count exceeded\n", _sport);
-
-		// Stop sending the termination request
-		CancelRetransmit(sk);
-		ChangeState(sk, CLOSED);
-		rc = true;
-	}
-	return rc;
-}
-
 
 
 bool XTRANSPORT::RetransmitMIGRATE(sock *sk, unsigned short _sport, Timestamp &now)
@@ -775,49 +679,6 @@ bool XTRANSPORT::RetransmitMIGRATE(sock *sk, unsigned short _sport, Timestamp &n
 
 	return rc;
 }
-
-
-
-bool XTRANSPORT::RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now)
-{
-	bool retransmit_sent = false;
-	bool tear_down = false;
-
-	if (sk->num_retransmits < MAX_RETRANSMIT_TRIES) {
-
-		DBG("Socket %d  DATA RETRANSMIT (%s) send_base=%d next_seq=%d \n\n",
-		    _sport, (_local_addr.unparse()).c_str(), sk->send_base, sk->next_send_seqnum);
-
-		// retransmit data
-		for (unsigned int i = sk->send_base; i < sk->next_send_seqnum; i++) {
-			if (sk->send_buffer[i % sk->send_buffer_size] != NULL) {
-				WritablePacket *copy = copy_packet(sk->send_buffer[i % sk->send_buffer_size], sk);
-				output(NETWORK_PORT).push(copy);
-				retransmit_sent = true;
-			}
-		}
-
-		if (retransmit_sent) {
-			sk->timer_on = true;
-			sk->num_retransmits++;
-			sk->expiry = now + Timestamp::make_msec(ACK_DELAY);
-		} else {
-			CancelRetransmit(sk);
-		}
-
-	} else {
-		WARN("Socket %d data retransmit count exceeded, shutting down\n", _sport);
-
-		tear_down = true;
-		// FIXME: get paths so we can send the RST
-		const char *payload = "RST";
-		//SendControlPacket(TransportHeader::RST, sk, payload, strlen(payload), src_path, dst_path);
-	}
-
-	return tear_down;
-}
-
-
 
 bool XTRANSPORT::RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp &now, Timestamp &earliest_pending_expiry)
 {
@@ -905,74 +766,7 @@ void XTRANSPORT::run_timer(Timer *timer)
 		// debug_output(VERB_TIMERS, "%u: XTRANSPORT::run_timer: unknown timer", tcp_now()); 
 	}
 	return;
-	assert(timer == &_timer);
-
-	Timestamp now = Timestamp::now();
-	Timestamp earliest_pending_expiry = now;
-
-	for (HashTable<unsigned short, sock*>::iterator iter = portToSock.begin(); iter != portToSock.end(); ++iter ) {
-		unsigned short _sport = iter->first;
-		sock *sk = portToSock.get(_sport);
-		bool tear_down = false;
-
-		if (!sk) {
-			// this shouldn't happen
-			ERROR("Socket %d sk == NULL!\n", _sport);
-			continue;
-		}
-
-		if (sk->timer_on == true) {
-			if (sk->state == SYN_SENT && sk->expiry <= now ) {
-				RetransmitSYN(sk, _sport, now);
-
-			} else if ((sk->state == FIN_WAIT1 || sk->state == LAST_ACK) && sk->expiry <= now) {
-				tear_down = RetransmitFIN(sk, _sport, now);
-
-			} else if (sk->state == CONNECTED && sk->migrateack_waiting && sk->expiry <= now ) {
-				tear_down = RetransmitMIGRATE(sk, _sport, now);
-
-			} else if (sk->state == CONNECTED && sk->expiry <= now ) {
-				tear_down = RetransmitDATA(sk, _sport, now);
-
-			} else if (sk->state == TIME_WAIT && sk->expiry <= now) {
-				DBG("tearing down socket %p %d %s\n", sk, sk->port, StateStr(sk->state));
-				TeardownSocket(sk);
-				tear_down = true;
-			}
-		}
-
-		if (!tear_down) {
-			// find the (next) earliest expiry
-			if (sk->timer_on == true) {
-				if (sk->expiry > now && (sk->expiry < earliest_pending_expiry || earliest_pending_expiry == now)) {
-					earliest_pending_expiry = sk->expiry;
-				}
-			}
-
-			// FIXME: why is this here instead of with the other retransmits?
-			// check for CID request cases
-			RetransmitCIDRequest(sk, _sport, now, earliest_pending_expiry);
-		}
-	}
-
-	// FIXME: since sock is in PortToSock, could this be in the loop above?
-	for (HashTable<XIDpair , struct sock*>::iterator it = XIDpairToConnectPending.begin(); it != XIDpairToConnectPending.end(); ++it) {
-		sock *sk = it->second;
-
-		// now do any in progress accepts
-		if (sk->state == SYN_RCVD && sk->expiry <= now) {
-			if (RetransmitSYNACK(sk, 0, now) == false) {
-				if (sk->expiry > now && (sk->expiry < earliest_pending_expiry || earliest_pending_expiry == now)) {
-					earliest_pending_expiry = sk->expiry;
-				}
-			}
-		}
-	}
-
-	// Set the next timer
-	if (earliest_pending_expiry > now) {
-		_timer.reschedule_at(earliest_pending_expiry);
-	}
+	
 }
 
 
@@ -1382,20 +1176,7 @@ void XTRANSPORT::ProcessDatagramPacket(WritablePacket *p_in)
 		WARN("ProcessDatagramPacket: sk == NULL\n");
 		return;
 	}
-	unsigned short _dport = sk->port;
-
-	// buffer packet if this is a DGRAM socket and we have room
-	if (sk->sock_type == SOCK_DGRAM && should_buffer_received_packet(p_in, sk)) {
-		add_packet_to_recv_buf(p_in, sk);
-
-		sk->interface_id = SRC_PORT_ANNO(p_in);
-
-		if (sk->polling) {
-			// tell API we are readable
-			ProcessPollEvent(_dport, POLLIN);
-		}
-		check_for_and_handle_pending_recv(sk);
-	}
+	dynamic_cast<XDatagram *>(sk)->push(p_in);
 }
 
 
@@ -4161,7 +3942,7 @@ void XTRANSPORT::Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg,
 		delete thdr;
 	}
 
-	dynamic_cast<XDatagram *>(sk)->push(p);
+	output(NETWORK_PORT).push(p);
 
 	rc = pktPayloadSize;
 	x_sendto_msg->clear_payload();
@@ -4232,7 +4013,7 @@ void XTRANSPORT::Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 		// FIXME: do something with the error
 	}
 
-	((XStream *)sk) -> read_from_recv_buf(xia_socket_msg);
+	dynamic_cast<XDatagram *>(sk) -> read_from_recv_buf(xia_socket_msg);
 
 	if (xia_socket_msg->x_recvfrom().bytes_returned() > 0) {
 		ReturnResult(_sport, xia_socket_msg, xia_socket_msg->x_recvfrom().bytes_returned());
