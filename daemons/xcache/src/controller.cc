@@ -14,6 +14,7 @@
 #include "Xsocket.h"
 #include "Xkeys.h"
 #include "dagaddr.hpp"
+#include "xcache_sock.h"
 
 #define IGNORE_PARAM(__param) ((void)__param)
 
@@ -22,8 +23,6 @@
 #define OK_SEND_RESPONSE 1
 #define OK_NO_RESPONSE 0
 #define BAD -1
-
-#define UNIX_SERVER_SOCKET "/tmp/xcache.socket"
 
 static int context_id = 0;
 
@@ -49,11 +48,18 @@ static int xcache_create_lib_socket(void)
 {
 	struct sockaddr_un my_addr;
 	int s;
+	char socket_name[512];
 
 	s = socket(AF_UNIX, SOCK_SEQPACKET, 0);
 
 	my_addr.sun_family = AF_UNIX;
-	strcpy(my_addr.sun_path, UNIX_SERVER_SOCKET);
+	if(get_xcache_sock_name(socket_name, 512) < 0) {
+		return -1;
+	}
+
+	remove(socket_name);
+
+	strcpy(my_addr.sun_path, socket_name);
 
 	bind(s, (struct sockaddr *)&my_addr, sizeof(my_addr));
 	listen(s, 100);
@@ -120,6 +126,8 @@ int XcacheController::fetchContentRemote(XcacheCommand *resp, XcacheCommand *cmd
 	if(Xconnect(sock, (struct sockaddr *)dag.c_str(), daglen) < 0) {
 		return BAD;
 	}
+
+	std::cout << "-------------XCACHE_NOW_CONNECTED-----------------------\n";
 
 	std::string data;
 	char buf[512];
@@ -266,41 +274,63 @@ int XcacheController::search(XcacheCommand *resp, XcacheCommand *cmd)
 	return OK_SEND_RESPONSE;
 }
 
-int XcacheController::startXcache(void)
+void *XcacheController::startXcache(void *arg)
 {
+	XcacheController *ctrl = (XcacheController *)arg;
+	ctrl = ctrl; //fixme
 	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
-	int xcacheSock;
+	int xcacheSock, acceptSock;
 
 	if ((xcacheSock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
-		return -1;
+		return NULL;
 
 	if(XmakeNewSID(sid_string, sizeof(sid_string))) {
 		std::cout << "Could not allocate SID for xcache\n";
-		return -1;
+		return NULL;
 	}
 
 	if(XsetXcacheSID(xcacheSock, sid_string, strlen(sid_string)) < 0)
-		return -1;
+		return NULL;
 
 	std::cout << "XcacheSID is " << sid_string << "\n";
 
 	struct addrinfo *ai;
 
 	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
-		return -1;
+		return NULL;
 
 	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
 
 	if (Xbind(xcacheSock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
 		Xclose(xcacheSock);
-		return -1;
+		return NULL;
 	}
 
 	Xlisten(xcacheSock, 5);
 
 	Graph g(dag);
 	std::cout << "listening on dag: " << g.dag_string() << "\n";
-	return xcacheSock;
+
+	while(1) {
+		sockaddr_x mypath;
+		socklen_t mypath_len = sizeof(mypath);
+
+		std::cout << "XcacheSender waiting for incoming connections\n";
+		if ((acceptSock = XacceptAs(xcacheSock, (struct sockaddr *)&mypath, &mypath_len, NULL, NULL)) < 0) {
+			std::cout << "Xaccept failed\n";
+			pthread_exit(NULL);
+		}
+
+		// FIXME: Send appropriate data, perform actual search,
+		// make updates in slices / policies / stores
+
+		std::cout << "Accept Success\n";
+ 		Graph g(&mypath);
+ 		std::cout << "They want " << g.get_final_intent().to_string() << "\n";
+#define DATA "IfYouReceiveThis!"
+ 		Xsend(acceptSock, DATA, strlen(DATA), 0);
+ 		Xclose(acceptSock);
+	}
 }
 
 void XcacheController::run(void)
@@ -308,6 +338,7 @@ void XcacheController::run(void)
 	fd_set fds, allfds;
 	struct timeval timeout;
 	int max, libsocket, s, n, rc;
+	pthread_t xcacheSender;
 
 	std::vector<int> activeConnections;
 	std::vector<int>::iterator iter;
@@ -315,13 +346,13 @@ void XcacheController::run(void)
 	s = xcache_create_click_socket(1444);
 	libsocket = xcache_create_lib_socket();
 
-	startXcache();
+	pthread_create(&xcacheSender, NULL, startXcache, NULL);
 	if ((rc = xr.connect()) != 0) {
 		std::cout << "unable to connect to click " << rc << "\n";
 		return;
 	}
 
-	xr.setRouter("host0"); // FIXME: Hardcoded name
+	xr.setRouter(hostname); 
 
 	FD_ZERO(&fds);
 	FD_SET(s, &allfds);
@@ -340,7 +371,7 @@ void XcacheController::run(void)
 			max = MAX(max, *iter);
 		}
 
-		n = select(max + 1, &fds, NULL, NULL, NULL);
+		n = Xselect(max + 1, &fds, NULL, NULL, NULL);
 
 		std::cout << "Broken\n";
 		if(FD_ISSET(s, &fds)) {

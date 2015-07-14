@@ -119,17 +119,10 @@ elementclass RouteEngine {
 	// output[1]: arrived at destination node; go to RPC
 	// output[2]: arrived at destination node; go to cache
 
-	srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
 	proc :: XIAPacketRoute($local_addr, $num_ports);
-//	p1 :: XIAPrint(">>> $local_hid (Going to cache) ");
 
-	input[0] -> srcTypeClassifier;
+	input[0] -> proc
 	input[1] -> proc;
-
-	srcTypeClassifier[0] -> cidFork :: Tee(2) -> [2]output;  // To cache (for content caching)
-	cidFork[1] -> proc;				 // Main routing process
-
-	srcTypeClassifier[1] -> proc;	   // Main routing process
 
 	proc[0] -> [0]output;			   // Forward to other interface
 
@@ -138,6 +131,8 @@ elementclass RouteEngine {
 	proc[2] -> XIAPaint($UNREACHABLE) -> x::XCMP($local_addr) -> proc; 
 	x[1] -> Discard;
   
+	Idle() -> [2]output;
+
 	// hack to use DHCP functionality
 	proc[3] -> [3]output;
 };
@@ -309,9 +304,7 @@ elementclass XIARoutingCore {
 	n[0] -> output;
 	input -> [0]n;
 
-	srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
-	n[1] -> c[1] -> srcTypeClassifier[1] -> [2]xtransport[2] -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [0]n;
-	srcTypeClassifier[0] -> Discard;	// do not send CID responses directly to RPC;
+	n[1] -> c[1] -> [2]xtransport[2] -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [0]n;
 	c[0] -> x[0] -> [0]n; // new (response) XCMP packets destined for some other machine
 	
 	x[1] -> rsw :: XIAPaintSwitch -> [2]xtransport; // XCMP packets destined for this machine

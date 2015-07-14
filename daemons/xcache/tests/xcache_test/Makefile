@@ -10,4 +10,4 @@ all: $(TARGETS)
 	$(CC) $(CFLAGS) $^ ../../api/libxcache.a -o $@ -lprotobuf  $(LDFLAGS)
 
 clean:
-	rm -f xcache_test
+	rm -f xcache_test $(TARGETS)

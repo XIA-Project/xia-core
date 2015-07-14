@@ -132,6 +132,7 @@ typedef struct {
 //Function list
 extern int Xsocket(int family, int transport_type, int protocol);
 extern int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+extern int XacceptAs(int sockfd, struct sockaddr *remote_addr, socklen_t *remote_addrlen, struct sockaddr *addr, socklen_t *addrlen);
 extern int Xaccept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags);
 extern int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 extern int Xconnect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);

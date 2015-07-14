@@ -11,4 +11,4 @@ client:
 	$(CC) $(CFLAGS) xftp_basic_client.c ../api/libxcache.a -o xftp_basic_client -lprotobuf $(LDFLAGS)
 
 clean:
-	rm -f chunks_server chunks_client
+	rm -f chunks_server chunks_client xftp_basic_client xftp_basic_server

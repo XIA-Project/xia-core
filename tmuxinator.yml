@@ -43,6 +43,6 @@ windows:
   #     layout: even-horizontal
   #     panes:
   # - router-0: ssh -p 30523  hshirwad@pc3.utah.geniracks.net
-  - server-0: ssh -p 30525  hshirwad@pc3.utah.geniracks.net
-  - server-1: ssh -p 30526  hshirwad@pc3.utah.geniracks.net
-  - router-1: ssh -p 30524  hshirwad@pc3.utah.geniracks.net
+  # - server-0: ssh -p 30525  hshirwad@pc3.utah.geniracks.net
+  # - server-1: ssh -p 30526  hshirwad@pc3.utah.geniracks.net
+  #  - router-1: ssh -p 30524  hshirwad@pc3.utah.geniracks.net

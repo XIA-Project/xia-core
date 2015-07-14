@@ -29,6 +29,7 @@ SCRIPT=xia_local_topology.click
 NODECONF=$XIADIR/etc/nodes.conf
 XSOCKCONF=$XIADIR/etc/xsockconf.ini
 XIAADDRCLICK=$XIADIR/etc/click/xia_address.click
+RESOLVCONF=$XIADIR/etc/resolv.conf
 
 ALL_PROCESSES="click xrouted xhcp_serverd xhcp_clientd xnameservice xstats xstatserver"
 
@@ -455,7 +456,7 @@ start_click()
 
 	# create xsockconf.ini and nodes.conf from the click config file
 	echo "Reading topology and generating $XIAADDRCLICK"
-	$XIADIR/bin/read_topology $CONFPATH/$SCRIPT $XSOCKCONF $NODECONF $XIAADDRCLICK
+	$XIADIR/bin/read_topology $CONFPATH/$SCRIPT $XSOCKCONF $NODECONF $RESOLVCONF $XIAADDRCLICK
 
 	# nameserver was configured on cmd line, add it to the nodes file so we control
 	#  it properly

@@ -43,7 +43,7 @@ permanent_xia_addresses = {
 topology_xia_addresses = {}
 
 def help():
-	print '\nusage: make_sockconf click_conf_file dest_sockconf dest_nodeconf dest_xia_addr_click'
+	print '\nusage: make_sockconf click_conf_file dest_sockconf dest_nodeconf resolv_conf dest_xia_addr_click'
 	print 'creates xsockconf.ini and xnodeconf in the current directory based on the'
 	print 'specified template file\n'
 	sys.exit(-1)
@@ -59,7 +59,7 @@ def create_output_file(name):
 
 # start here
 
-if len(sys.argv) != 5:
+if len(sys.argv) != 6:
 	help()
 
 nshost = None
@@ -102,7 +102,7 @@ nodeconf = create_output_file(sys.argv[3])
 xia_address = None
 if 'topology' in sys.argv[1]:
 	create_xia_address_click = True
-	xia_address = create_output_file(sys.argv[4])
+	xia_address = create_output_file(sys.argv[5])
 	xia_address.write('XIAXIDInfo(\n')
 
 # look for elements of type XIAEndHost, XiaRouter[n]Port, and XIADualRouter[n]Port
@@ -158,6 +158,6 @@ if create_xia_address_click:
 		xia_address.write('\t' + ' '.join([key, value]) + ',\n')
 	xia_address.write(');\n')
 	xia_address.close()
-	resolv_conf = create_output_file('etc/resolv.conf')
+	resolv_conf = create_output_file(sys.argv[4])
 	resolv_conf.write('nameserver=RE %s %s %s\n' % (topology_xia_addresses['AD0'], topology_xia_addresses['HID0'], permanent_xia_addresses['SID_NS']))
 	resolv_conf.close()

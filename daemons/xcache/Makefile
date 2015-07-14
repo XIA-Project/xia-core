@@ -8,15 +8,15 @@ COMMON_INCLUDE=$(COMMON_PATH)
 CLICKDIR=$(XIADIR)/click-2.0.1/
 CLICKINCLUDE=$(CLICKDIR)/include
 
-CFLAGS+=-g -I$(CLICKINCLUDE) -I$(COMMON_INCLUDE) -I$(XCACHEDIR)/include -I$(XCACHEDIR)/bin -I$(XCACHEDIR) -I$(XCACHEDIR)/proto -Wall -Werror
-LDFLAGS= $(LIBS)
+CFLAGS+=-g -I$(CLICKINCLUDE) -I$(XCACHEDIR)/common -I$(COMMON_INCLUDE) -I$(XCACHEDIR)/include -I$(XCACHEDIR)/bin -I$(XCACHEDIR) -I$(XCACHEDIR)/proto -Wall -Werror
+LDFLAGS= $(LIBS) -lpthread
 XCACHE_BINDIR=$(XCACHEDIR)/bin/
 COMMON=$(COMMON_PATH)/csclient.o $(COMMON_PATH)/XIARouter.o
 
 export ## Make variables available to subsequent makefiles
 
 
-TARGETS=proto src api
+TARGETS=proto src api common
 
 .PHONY: $(TARGETS) bin
 

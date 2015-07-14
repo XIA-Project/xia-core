@@ -124,6 +124,8 @@ message X_Accept_Msg {
   optional string dag = 1; // peer's dag
   required uint32 new_port = 2; // the UDP port for the new API socket
   optional string remote_dag = 3;
+  optional bool sendmypath = 4;
+  optional string self_dag = 5;
 }
 
 message X_Sendto_Msg {

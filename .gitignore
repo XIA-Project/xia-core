@@ -139,3 +139,7 @@ experiments/planetlab/logs/fourid
 # xcache
 bin/xcache
 xcache_cmd_pb2.py
+xftp_basic_client
+xftp_basic_server
+xcache_server
+xcache_client

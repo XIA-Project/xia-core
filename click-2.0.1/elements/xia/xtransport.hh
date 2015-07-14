@@ -168,6 +168,7 @@ private:
 			num_migrate_tries = 0;
 			migrate_pkt = NULL;
 			recv_pending = false;
+			xcacheSock = false;
 		}
 
 	/* =========================
@@ -246,6 +247,7 @@ private:
 		HashTable<XID, int> XIDtoStatus;	// Content-chunk request status... 1: waiting to be read, 0: waiting for chunk response, -1: failed
 		HashTable<XID, bool> XIDtoReadReq;	// Indicates whether ReadCID() is called for a specific CID
 		HashTable<XID, WritablePacket*> XIDtoCIDresponsePkt;
+		bool xcacheSock;
 	} ;
 
 protected:
@@ -378,6 +380,8 @@ protected:
 
 	static String Netstat(Element *e, void *thunk);
 	static int purge(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
+
+	XIAPath alterCIDDstPath(XIAPath dstPath);
 
 	// modify routing table
 	void addRoute(const XID &sid) {

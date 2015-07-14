@@ -8,6 +8,10 @@
 #include "store_manager.h"
 #include "XIARouter.hh"
 
+struct xcache_conf {
+	char hostname[128];
+};
+
 /**
  * XcacheController:
  * @brief Abstract class that defines a eviction policy
@@ -20,32 +24,21 @@ class XcacheController {
 private:
 	std::map<std::string, XcacheMeta *> metaMap;
 	std::map<int32_t, XcacheSlice *> sliceMap;
+	std::string hostname;
 
 	int newSlice(XcacheCommand *, XcacheCommand *);
-	int startXcache(void);
 	XcacheSlice *lookupSlice(XcacheCommand *);
 	XcacheStoreManager storeManager;
 	XIARouter xr;
 
 public:
+	static void *startXcache(void *);
+
 	XcacheController() {
-		std::cout << "Reached Constructor\n";
 	}
 
-	void addMeta(std::string str, XcacheMeta *meta) {
-		std::cout << "Reached AddMeta\n";
-		metaMap[str] = meta;
-	}
-
-	void searchMeta(std::string str) {
-		std::map<std::string, XcacheMeta *>::iterator i = metaMap.find(str);
-
-		std::cout << "Reached SearchMeta\n";
-		if(i != metaMap.end()) {
-			i->second->print();
-		} else {
-			std::cout << "Not Found\n";
-		}
+	void setConf(struct xcache_conf *conf) {
+		hostname = std::string(conf->hostname);
 	}
 
 	int fetchContentRemote(XcacheCommand *, XcacheCommand *);
