@@ -18,82 +18,82 @@ CLICK_DECLS
 
 XDatagram::XDatagram(XTRANSPORT *transport, unsigned short port)
 	: sock(transport, port, XSOCKET_DGRAM) {
-		cout << "\t\tCreatign a " << port << endl;
+		// cout << "\t\tCreatign a " << port << endl;
 		memset(send_buffer, 0, send_buffer_size * sizeof(WritablePacket*));
 	memset(recv_buffer, 0, recv_buffer_size * sizeof(WritablePacket*));
 
 	}
 
-// void
-// XDatagram::push(WritablePacket *p_in) {
-// 		// buffer packet if this is a DGRAM socket and we have room
-// 	if (should_buffer_received_packet(p_in)) {
-// 		add_packet_to_recv_buf(p_in);
-// 		if (polling) {
-// 			// tell API we are readable
-// 			get_transport()->ProcessPollEvent(port, POLLIN);
-// 		}
-// 		check_for_and_handle_pending_recv();
-// 	}
-// }
+void
+XDatagram::push(WritablePacket *p_in) {
+		// buffer packet if this is a DGRAM socket and we have room
+	if (should_buffer_received_packet(p_in)) {
+		add_packet_to_recv_buf(p_in);
+		if (polling) {
+			// tell API we are readable
+			get_transport()->ProcessPollEvent(port, POLLIN);
+		}
+		check_for_and_handle_pending_recv();
+	}
+}
 
-// bool 
-// XDatagram::should_buffer_received_packet(WritablePacket *p) {
-// 	if (recv_buffer_count < recv_buffer_size) return true;
-// 	else return false;
-// }
+bool 
+XDatagram::should_buffer_received_packet(WritablePacket *p) {
+	if (recv_buffer_count < recv_buffer_size) return true;
+	else return false;
+}
 
-// void 
-// XDatagram::add_packet_to_recv_buf(WritablePacket *p) {
-// 	int index = (dgram_buffer_end + 1) % recv_buffer_size;
-// 	dgram_buffer_end = index;
-// 	recv_buffer_count++;
-// 	WritablePacket *p_cpy = p->clone()->uniqueify();
-// 	recv_buffer[index] = p_cpy;
-// }
+void 
+XDatagram::add_packet_to_recv_buf(WritablePacket *p) {
+	int index = (dgram_buffer_end + 1) % recv_buffer_size;
+	dgram_buffer_end = index;
+	recv_buffer_count++;
+	WritablePacket *p_cpy = p->clone()->uniqueify();
+	recv_buffer[index] = p_cpy;
+}
 
-// void
-// XDatagram::check_for_and_handle_pending_recv() {
-// 	if (recv_pending) {
-// 		int bytes_returned = read_from_recv_buf(pending_recv_msg);
-// 		get_transport()->ReturnResult(port, pending_recv_msg, bytes_returned);
+void
+XDatagram::check_for_and_handle_pending_recv() {
+	if (recv_pending) {
+		int bytes_returned = read_from_recv_buf(pending_recv_msg);
+		get_transport()->ReturnResult(port, pending_recv_msg, bytes_returned);
 
-// 		recv_pending = false;
-// 		delete pending_recv_msg;
-// 		pending_recv_msg = NULL;
-// 	}
-// }
+		recv_pending = false;
+		delete pending_recv_msg;
+		pending_recv_msg = NULL;
+	}
+}
 
-// int
-// XDatagram::read_from_recv_buf(XSocketMsg *xia_socket_msg) {
-// 	X_Recvfrom_Msg *x_recvfrom_msg = xia_socket_msg->mutable_x_recvfrom();
+int
+XDatagram::read_from_recv_buf(XSocketMsg *xia_socket_msg) {
+	X_Recvfrom_Msg *x_recvfrom_msg = xia_socket_msg->mutable_x_recvfrom();
 
-// 	// Get just the next packet in the recv buffer (we don't return data from more
-// 	// than one packet in case the packets came from different senders). If no
-// 	// packet is available, we indicate to the app that we returned 0 bytes.
-// 	WritablePacket *p = recv_buffer[dgram_buffer_start];
+	// Get just the next packet in the recv buffer (we don't return data from more
+	// than one packet in case the packets came from different senders). If no
+	// packet is available, we indicate to the app that we returned 0 bytes.
+	WritablePacket *p = recv_buffer[dgram_buffer_start];
 
-// 	if (recv_buffer_count > 0 && p) {
-// 		XIAHeader xiah(p->xia_header());
-// 		TransportHeader thdr(p);
-// 		int data_size = xiah.plen() - thdr.hlen();
+	if (recv_buffer_count > 0 && p) {
+		XIAHeader xiah(p->xia_header());
+		TransportHeader thdr(p);
+		int data_size = xiah.plen() - thdr.hlen();
 
-// 		String src_path = xiah.src_path().unparse();
-// 		String payload((const char*)thdr.payload(), data_size);
-// 		x_recvfrom_msg->set_payload(payload.c_str(), payload.length());
-// 		x_recvfrom_msg->set_sender_dag(src_path.c_str());
-// 		x_recvfrom_msg->set_bytes_returned(data_size);
+		String src_path = xiah.src_path().unparse();
+		String payload((const char*)thdr.payload(), data_size);
+		x_recvfrom_msg->set_payload(payload.c_str(), payload.length());
+		x_recvfrom_msg->set_sender_dag(src_path.c_str());
+		x_recvfrom_msg->set_bytes_returned(data_size);
 
-// 		p->kill();
-// 		recv_buffer[dgram_buffer_start] = NULL;
-// 		recv_buffer_count--;
-// 		dgram_buffer_start = (dgram_buffer_start + 1) % recv_buffer_size;
-// 		return data_size;
-// 	} else {
-// 		x_recvfrom_msg->set_bytes_returned(0);
-// 		return 0;
-// 	}
-// }
+		p->kill();
+		recv_buffer[dgram_buffer_start] = NULL;
+		recv_buffer_count--;
+		dgram_buffer_start = (dgram_buffer_start + 1) % recv_buffer_size;
+		return data_size;
+	} else {
+		x_recvfrom_msg->set_bytes_returned(0);
+		return 0;
+	}
+}
 
 CLICK_ENDDECLS
 
