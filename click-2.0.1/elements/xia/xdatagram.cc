@@ -19,8 +19,8 @@ CLICK_DECLS
 XDatagram::XDatagram(XTRANSPORT *transport, unsigned short port)
 	: sock(transport, port, XSOCKET_DGRAM) {
 		// cout << "\t\tCreatign a " << port << endl;
-		memset(send_buffer, 0, send_buffer_size * sizeof(WritablePacket*));
-	memset(recv_buffer, 0, recv_buffer_size * sizeof(WritablePacket*));
+		memset(send_buffer, 0, MAX_SEND_WIN_SIZE * sizeof(WritablePacket*));
+	memset(recv_buffer, 0, MAX_RECV_WIN_SIZE * sizeof(WritablePacket*));
 
 	}
 
