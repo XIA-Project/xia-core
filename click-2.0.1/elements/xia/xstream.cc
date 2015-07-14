@@ -62,7 +62,7 @@ XStream::tcp_input(WritablePacket *p)
     u_long		ts_val, ts_ecr;
     int			len; //,tlen; /* seems to be unused */
     unsigned	off, optlen;
-    // u_char		*optp;
+    u_char		*optp;
     int		ts_present = 0;
     int 	iss = 0; 
     int 	todrop, acked, ourfinisacked, needoutput = 0;
@@ -106,7 +106,9 @@ XStream::tcp_input(WritablePacket *p)
 		tp->t_timer[TCPT_IDLE] = get_transport()->globals()->so_idletime; 
 
     /*237*/
-    // optlen = off - sizeof(click_tcp);
+    optlen = off - sizeof(click_tcp);
+    printf("\t\t\ttcpinput option length is %d\n", (int)optlen);
+    optp = thdr.tcpopt();
     // optp   = (u_char *)iph + 40;
 
 	/* TODO Timestamp prediction */
@@ -125,7 +127,7 @@ XStream::tcp_input(WritablePacket *p)
     tp->t_timer[TCPT_KEEP] = get_transport()->globals()->tcp_keepidle; 
 
     /*344*/
-	// _tcp_dooptions(optp, optlen, tcph, &ts_present, &ts_val, &ts_ecr);
+	_tcp_dooptions(optp, optlen, ti.ti_flags, &ts_present, &ts_val, &ts_ecr);
 
     /*347 TCP "Fast Path" packet processing */ 
 
@@ -1194,7 +1196,7 @@ send:
 		ti.th_seq = htonl(tp->snd_max);
 // printf("1119\n");
     ti.th_ack = htonl(tp->rcv_nxt);
-// printf("1121+++++++%d\n",optlen);
+printf("1121+++++++%d\n",optlen);
 	    if (optlen) {
 	    	// printf("1123\n");
 			// memcpy((&ti + 1), opt, optlen); 
@@ -1274,7 +1276,7 @@ send:
 	xiah.set_dst_path(dst_path);
 	xiah.set_src_path(src_path);
 
-	TransportHeaderEncap *send_hdr = TransportHeaderEncap::MakeTCPHeader(&ti);
+	TransportHeaderEncap *send_hdr = TransportHeaderEncap::MakeTCPHeader(&ti, opt, optlen);
 	int payload_length = 0;
 	if (p==NULL)
 	{
@@ -1294,6 +1296,8 @@ send:
 	printf("\t\t\ttcpoutput flag is %d\n", ti.th_flags);
 	printf("\t\t\ttcpoutput seq is %d\n", ntohl(ti.th_seq));
 	printf("\t\t\ttcpoutput ack is %d\n", ntohl(ti.th_ack));
+	printf("\t\t\ttcpoutput off is %d\n", ti.th_off);
+	printf("\t\t\ttcpoutput optlen is %d\n", optlen);
 	/* Data has been sent out at this point. If we advertised a positive window
 	 * and if this new window advertisement will result in us recieving a higher
 	 * sequence numbered segment than before this window announcement, we record
@@ -1754,124 +1758,120 @@ XStream::set_state(const HandlerState new_state) {
 
 } 
 
-// NOT SURE WE NEED THIS
-// void 
-// XStream::_tcp_dooptions(u_char *cp, int cnt, const TransportHeader * ti, 
-// 	int * ts_present, u_long *ts_val, u_long *ts_ecr) 
-// { 
-// 	uint16_t mss;
-// 	int opt, optlen; 
-// 	optlen = 0; 
+void 
+XStream::_tcp_dooptions(u_char *cp, int cnt, uint8_t th_flags, 
+	int * ts_present, u_long *ts_val, u_long *ts_ecr) 
+{ 
+	uint16_t mss;
+	int opt, optlen; 
+	optlen = 0; 
 
-// 	//debug_output(VERB_DEBUG, "[%s] tcp_dooption cnt [%u]\n", SPKRNAME, cnt);
-// 	for (; cnt > 0; cnt -= optlen, cp += optlen) { 
+	//debug_output(VERB_DEBUG, "[%s] tcp_dooption cnt [%u]\n", SPKRNAME, cnt);
+	for (; cnt > 0; cnt -= optlen, cp += optlen) { 
 
-// 		//debug_output(VERB_DEBUG, "[%s] processing opt: optlen:<%u>,cnt:<%u>", SPKRNAME, 
-// 				optlen, cnt);
-// 		opt = cp[0]; 
-// 		if (opt == TCPOPT_EOL) {
-// 			//debug_output(VERB_DEBUG, "b1");
-// 			break; 
-// 		}
-// 		if (opt == TCPOPT_NOP) 
-// 			optlen = 1; 
-// 		else {
-// 			if (cnt < 2){
-// 				//debug_output(VERB_DEBUG, "b2");
-// 				break; 
-// 			}
-// 			optlen = cp[1]; 
-// 			if (optlen < 1 || optlen > cnt ) {
-// 				//debug_output(VERB_DEBUG, "b3, optlen: [%x] cnt: [%x]", optlen, cnt);
-// 				break;
-// 			}
-// 		}
-// 		//debug_output(VERB_DEBUG, "[%s] doopts: Entering options switch stmt, optlen [%x]", SPKRNAME, optlen);
-// 		switch (opt) { 
-// 			case TCPOPT_MAXSEG:
-// 					//debug_output(VERB_DEBUG, "[%s] doopts: case MAXSEG", SPKRNAME);
-// 				if (optlen != TCPOLEN_MAXSEG) {
-// 					//debug_output(VERB_DEBUG, "[%s] doopts: optlen: [%x] maxseg: [%x]", SPKRNAME, optlen, TCPOLEN_MAXSEG);
-// 					continue;
-// 				}
-// 				if (!(ti->tcp_hdr.th_flags & TH_SYN)) {
-// 					//debug_output(VERB_DEBUG, "[%s] tcp_dooption SYN flag not set", SPKRNAME);
-// 					continue;
-// 				}
-// 				memcpy((char*) &mss, (char*) cp + 2, sizeof(mss)); 
-// 				////debug_output(VERB_DEBUG, "[%s] doopts: mss p0: [%x]", SPKRNAME, mss);
-// 				mss = ntohs(mss); 
-// 				////debug_output(VERB_DEBUG, "[%s] doopts: mss p1: [%x]", SPKRNAME, mss);
-// 				tcp_mss(mss); 
-// //				tp->t_maxseg = ntohs((u_short)*((char*)cp + 2)); //BUG WHY are we
-// //				setting this twice? once here and once in the line above?!
-// //				//debug_output(VERB_DEBUG, "[%s] doopts: mss p2: [%x]", SPKRNAME, mss);
-// 				//avila this is 5... something here is broken. statically
-// 				//setting MSS whenever it dips below 800
-// //				if (tp->t_maxseg < 800 || tp->t_maxseg > 1460) {
-// //					tp->t_maxseg = 1400;
-// //					//debug_output(VERB_ERRORS, "doopts: Recieved MAXSEG value [%d], setting to 1400", tp->t_maxseg);
-// //				}
-// 				break;
+		opt = cp[0]; 
+		if (opt == TCPOPT_EOL) {
+			//debug_output(VERB_DEBUG, "b1");
+			break; 
+		}
+		if (opt == TCPOPT_NOP) 
+			optlen = 1; 
+		else {
+			if (cnt < 2){
+				//debug_output(VERB_DEBUG, "b2");
+				break; 
+			}
+			optlen = cp[1]; 
+			if (optlen < 1 || optlen > cnt ) {
+				//debug_output(VERB_DEBUG, "b3, optlen: [%x] cnt: [%x]", optlen, cnt);
+				break;
+			}
+		}
+		//debug_output(VERB_DEBUG, "[%s] doopts: Entering options switch stmt, optlen [%x]", SPKRNAME, optlen);
+		switch (opt) { 
+			case TCPOPT_MAXSEG:
+					//debug_output(VERB_DEBUG, "[%s] doopts: case MAXSEG", SPKRNAME);
+				if (optlen != TCPOLEN_MAXSEG) {
+					//debug_output(VERB_DEBUG, "[%s] doopts: optlen: [%x] maxseg: [%x]", SPKRNAME, optlen, TCPOLEN_MAXSEG);
+					continue;
+				}
+				if (!(th_flags & TH_SYN)) {
+					//debug_output(VERB_DEBUG, "[%s] tcp_dooption SYN flag not set", SPKRNAME);
+					continue;
+				}
+				memcpy((char*) &mss, (char*) cp + 2, sizeof(mss)); 
+				////debug_output(VERB_DEBUG, "[%s] doopts: mss p0: [%x]", SPKRNAME, mss);
+				mss = ntohs(mss); 
+				////debug_output(VERB_DEBUG, "[%s] doopts: mss p1: [%x]", SPKRNAME, mss);
+				tcp_mss(mss); 
+//				tp->t_maxseg = ntohs((u_short)*((char*)cp + 2)); //BUG WHY are we
+//				setting this twice? once here and once in the line above?!
+//				//debug_output(VERB_DEBUG, "[%s] doopts: mss p2: [%x]", SPKRNAME, mss);
+				//avila this is 5... something here is broken. statically
+				//setting MSS whenever it dips below 800
+//				if (tp->t_maxseg < 800 || tp->t_maxseg > 1460) {
+//					tp->t_maxseg = 1400;
+//					//debug_output(VERB_ERRORS, "doopts: Recieved MAXSEG value [%d], setting to 1400", tp->t_maxseg);
+//				}
+				break;
 
-// 			case TCPOPT_TIMESTAMP:
-// 				//debug_output(VERB_DEBUG, "[%s] doopts: case TIMESTAMP", SPKRNAME);
-// 				if (optlen != TCPOLEN_TIMESTAMP)
-// 					continue;
-// 				*ts_present = 1; 
-// 				bcopy((char *)cp + 2, (char *)ts_val, sizeof(*ts_val)); //FIXME: Misaligned
-// 				*ts_val = ntohl(*ts_val); 
-// 				bcopy((char *)cp + 6, (char *)ts_ecr, sizeof(*ts_ecr)); //FIXME: Misaligned
-// 				*ts_ecr = ntohl(*ts_ecr); 
+			case TCPOPT_TIMESTAMP:
+				//debug_output(VERB_DEBUG, "[%s] doopts: case TIMESTAMP", SPKRNAME);
+				if (optlen != TCPOLEN_TIMESTAMP)
+					continue;
+				*ts_present = 1; 
+				bcopy((char *)cp + 2, (char *)ts_val, sizeof(*ts_val)); //FIXME: Misaligned
+				*ts_val = ntohl(*ts_val); 
+				bcopy((char *)cp + 6, (char *)ts_ecr, sizeof(*ts_ecr)); //FIXME: Misaligned
+				*ts_ecr = ntohl(*ts_ecr); 
 
-// 				//debug_output(VERB_DEBUG, "[%s] doopts: ts_val [%u] ts_ecr [%u]", SPKRNAME, *ts_val, *ts_ecr);
-// 				if (ti->tcp_hdr.th_flags & TH_SYN) { 
-// 					//debug_output(VERB_DEBUG, "[%s] doopts: recvd a SYN timetamp, ENABLING TIMESTAMPS", SPKRNAME);
-// 					tp->t_flags |= TF_RCVD_TSTMP; 
-// 					tp->ts_recent = *ts_val; 
-// 					tp->ts_recent_age = get_transport()->tcp_now(); 
-// 				}
-// 				break;
-// #ifdef UNDEF 
-// 			case TCPOPT_SACK_PERMITTED:
-// 				//debug_output(VERB_DEBUG, "[%s] doopts: case SACK", SPKRNAME);
-// 				if (optlen != TCPOLEN_SACK_PERMITTED)
-// 					continue;
-// 				if (!(flags & TO_SYN))
-// 					continue;
-// 				if (!tcp_do_sack)
-// 					continue;
-// 				to->to_flags |= TOF_SACKPERM;
-// 				break;
-// 				case TCPOPT_SACK:
-// 				if (optlen <= 2 || (optlen - 2) % TCPOLEN_SACK != 0)
-// 					continue;
-// 				if (flags & TO_SYN)
-// 					continue;
-// 				to->to_flags |= TOF_SACK;
-// 				to->to_nsacks = (optlen - 2) / TCPOLEN_SACK;
-// 				to->to_sacks = cp + 2;
-// 				tcpstat.tcps_sack_rcv_blocks++;
-// 				break;
-// #endif 
-// 			case TCPOPT_WSCALE:
-// 				//debug_output(VERB_DEBUG, "[%s] doopts: case WSCALE", SPKRNAME);
-// 				if (optlen != TCPOLEN_WSCALE) 
-// 					continue;
-// 				if (!(ti->tcp_hdr.th_flags & TH_SYN)) 
-// 					continue;
-// 				tp->t_flags |=  TF_RCVD_SCALE;
+				//debug_output(VERB_DEBUG, "[%s] doopts: ts_val [%u] ts_ecr [%u]", SPKRNAME, *ts_val, *ts_ecr);
+				if (th_flags & TH_SYN) { 
+					//debug_output(VERB_DEBUG, "[%s] doopts: recvd a SYN timetamp, ENABLING TIMESTAMPS", SPKRNAME);
+					tp->t_flags |= TF_RCVD_TSTMP; 
+					tp->ts_recent = *ts_val; 
+					tp->ts_recent_age = get_transport()->tcp_now(); 
+				}
+				break;
+#ifdef UNDEF 
+			case TCPOPT_SACK_PERMITTED:
+				//debug_output(VERB_DEBUG, "[%s] doopts: case SACK", SPKRNAME);
+				if (optlen != TCPOLEN_SACK_PERMITTED)
+					continue;
+				if (!(flags & TO_SYN))
+					continue;
+				if (!tcp_do_sack)
+					continue;
+				to->to_flags |= TOF_SACKPERM;
+				break;
+				case TCPOPT_SACK:
+				if (optlen <= 2 || (optlen - 2) % TCPOLEN_SACK != 0)
+					continue;
+				if (flags & TO_SYN)
+					continue;
+				to->to_flags |= TOF_SACK;
+				to->to_nsacks = (optlen - 2) / TCPOLEN_SACK;
+				to->to_sacks = cp + 2;
+				tcpstat.tcps_sack_rcv_blocks++;
+				break;
+#endif 
+			case TCPOPT_WSCALE:
+				//debug_output(VERB_DEBUG, "[%s] doopts: case WSCALE", SPKRNAME);
+				if (optlen != TCPOLEN_WSCALE) 
+					continue;
+				if (!(th_flags & TH_SYN)) 
+					continue;
+				tp->t_flags |=  TF_RCVD_SCALE;
 				
-// 				tp->requested_s_scale = min(cp[2], TCP_MAX_WINSHIFT); 
-// 				//debug_output(VERB_DEBUG, "[%s] WSCALE set, flags [%x], req_s_sc [%x]\n", SPKRNAME,
-// 						tp->t_flags, tp->requested_s_scale );
-// 				break;
-// 			default: 
-// 			continue; 
-// 		}
-//     }
-// 	//debug_output(VERB_DEBUG, "[%s] doopts: finished", SPKRNAME);
-// }
+				tp->requested_s_scale = min(cp[2], TCP_MAX_WINSHIFT); 
+				//debug_output(VERB_DEBUG, "[%s] WSCALE set, flags [%x], req_s_sc [%x]\n", SPKRNAME,
+				break;
+			default: 
+			continue; 
+		}
+    }
+	//debug_output(VERB_DEBUG, "[%s] doopts: finished", SPKRNAME);
+}
 
 
 void

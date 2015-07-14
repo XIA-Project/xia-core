@@ -26,6 +26,11 @@ class TransportHeader : public XIAGenericExtHeader { public:
         return (void *)(_map[HEADER].data());
     }
 
+    u_char* tcpopt() {
+        if (!exists(TCPOPT)) return NULL;
+        return (u_char *)(_map[TCPOPT].data());
+    }
+
     bool exists(uint8_t key) { return (_map.find(key)!=_map.end()); }
     
     uint8_t pkt_info() { if (!exists(PKT_INFO)) return 0 ; return *(const uint8_t*)_map[PKT_INFO].data();}; 
@@ -42,7 +47,7 @@ class TransportHeader : public XIAGenericExtHeader { public:
     //uint32_t chunk_length() { if (!exists(CHUNK_LENGTH)) return 0; return *(const uint32_t*)_map[CHUNK_LENGTH].data();};  
     
 
-    enum { TYPE, HEADER, PKT_INFO, SRC_XID, DST_XID, SEQ_NUM, ACK_NUM, LENGTH, RECV_WINDOW}; 
+    enum { TYPE, HEADER, TCPOPT, PKT_INFO, SRC_XID, DST_XID, SEQ_NUM, ACK_NUM, LENGTH, RECV_WINDOW}; 
     enum { XSOCK_STREAM=1, XSOCK_DGRAM, XSOCK_RAW, XSOCK_CHUNK};
     enum { SYN=1, SYNACK, DATA, ACK, FIN, FINACK, MIGRATE, MIGRATEACK, RST};
 
@@ -68,9 +73,14 @@ class TransportHeaderEncap : public XIAGenericExtHeaderEncap { public:
     hdr->map()[TransportHeader::HEADER] = String((const char*)tcph, sizeof(struct click_tcp));
     hdr -> update();
      return hdr;
-        // TransportHeaderEncap *hdr = new TransportHeader(TransportHeader::XSOCK_STREAM);
-       
-        // return hdr;
+    }
+
+    static TransportHeaderEncap* MakeTCPHeader(click_tcp *tcph, u_char *opt, unsigned optlen) {
+    TransportHeaderEncap* hdr = new TransportHeaderEncap(TransportHeader::XSOCK_STREAM);
+    hdr->map()[TransportHeader::HEADER] = String((const char*)tcph, sizeof(struct click_tcp));
+    hdr->map()[TransportHeader::TCPOPT] = String((const char*)opt, optlen);
+    hdr -> update();
+     return hdr;
     }
 
     static TransportHeaderEncap* MakeSYNHeader( uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window ) 

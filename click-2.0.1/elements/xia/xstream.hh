@@ -223,8 +223,8 @@ public:
 private:
     void set_state(const HandlerState s);
 
-	void 		_tcp_dooptions(u_char *cp, int cnt, const click_tcp *ti,
-	                           int *ts_present, u_long *ts_val, u_long *ts_ecr);
+	void 		_tcp_dooptions(u_char *cp, int cnt, uint8_t th_flags, 
+	int * ts_present, u_long *ts_val, u_long *ts_ecr);
 	void 		tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags);
 	void		tcp_setpersist();
 	void		tcp_drop(int err);
