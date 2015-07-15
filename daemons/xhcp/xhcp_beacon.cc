@@ -34,6 +34,7 @@ XHCPBeacon::XHCPBeacon(char *buf)
 	std::string buffer(buf);
 	std::istringstream ss(buffer);
 	std::getline(ss, _dag, ',');
+	std::getline(ss, _router_hid, ',');
 	std::getline(ss, _router_4id, ',');
 	std::getline(ss, _nameserver_dag, ',');
 }
@@ -90,3 +91,12 @@ bool XHCPBeacon::operator==(const XHCPBeacon& other)
 	return true;
 }
 
+std::string XHCPBeacon::to_string()
+{
+	std::ostringstream ss;
+	ss << _dag + ',';
+	ss << _router_hid + ',';
+	ss << _router_4id + ',';
+	ss << _nameserver_dag + ',' << std::endl;
+	return ss.str();
+}

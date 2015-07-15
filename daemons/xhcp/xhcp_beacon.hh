@@ -15,7 +15,8 @@ class XHCPBeacon {
 		void setRouter4ID(std::string);
 		void setNameServerDAG(std::string);
 		bool operator==(const XHCPBeacon& other);
-		std::string to_string() { return _dag + "," + _router_4id + "," + _nameserver_dag; }
+		//std::string to_string() { return _dag + "," + _router_4id + "," + _nameserver_dag; }
+		std::string to_string();
 	private:
 		std::string _dag;
 		std::string _router_hid;
