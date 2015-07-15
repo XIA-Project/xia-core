@@ -2,94 +2,94 @@
 #include "meta.h"
 #include "policy.h"
 
-XcacheSlice::XcacheSlice(int32_t contextID)
+xcache_slice::xcache_slice(int32_t context_id)
 {
-	/* TODO: Policy is always FIFO */
+	/* FIXME: Policy is always FIFO */
 	FifoPolicy fifo;
 
-	maxSize = currentSize = ttl = 0;
+	max_size = current_size = ttl = 0;
 	policy = fifo;
 
-	this->contextID = contextID;
+	this->context_id = context_id;
 
 }
 
-void XcacheSlice::addMeta(XcacheMeta *meta)
+void xcache_slice::add_meta(xcache_meta *meta)
 {
-	metaMap[meta->getCid()] = meta;
-	meta->addedToSlice(this);
+	meta_map[meta->get_cid()] = meta;
+	meta->added_to_slice(this);
 }
 
-bool XcacheSlice::hasRoom(XcacheMeta *meta)
+bool xcache_slice::has_room(xcache_meta *meta)
 {
-	if(maxSize - currentSize >= meta->getLength())
+	if(max_size - current_size >= meta->get_length())
 		return true;
 	return false;
 }
 
-void XcacheSlice::removeMeta(XcacheMeta *meta)
+void xcache_slice::remove_meta(xcache_meta *meta)
 {
-	std::map<std::string, XcacheMeta *>::iterator iter;
+	std::map<std::string, xcache_meta *>::iterator iter;
 
-	iter = metaMap.find(meta->getCid());
-	metaMap.erase(iter);
-	meta->removedFromSlice(this);
+	iter = meta_map.find(meta->get_cid());
+	meta_map.erase(iter);
+	meta->removed_from_slice(this);
 }
 
-void XcacheSlice::makeRoom(XcacheMeta *meta)
+void xcache_slice::make_room(xcache_meta *meta)
 {
-	while(!hasRoom(meta)) {
-		XcacheMeta *toRemove = policy.evict();
+	while(!has_room(meta)) {
+		xcache_meta *toRemove = policy.evict();
 		if(toRemove)
-			removeMeta(toRemove);
+			remove_meta(toRemove);
 		else
 			std::cout << "FIXME: Policy returns nothing to evict\n";
 	}
 }
 
-bool XcacheSlice::alreadyHasMeta(XcacheMeta *meta)
+bool xcache_slice::already_has_meta(xcache_meta *meta)
 {
-	std::map<std::string, XcacheMeta *>::iterator iter;
+	std::map<std::string, xcache_meta *>::iterator iter;
 
-	iter = metaMap.find(meta->getCid());
-	if(iter != metaMap.end())
+	iter = meta_map.find(meta->get_cid());
+	if(iter != meta_map.end())
 		return true;
 	return false;
 }
 
-int XcacheSlice::store(XcacheMeta *meta)
+int xcache_slice::store(xcache_meta *meta)
 {
-	if(alreadyHasMeta(meta))
+	if(already_has_meta(meta))
 		return -1;
 
-	makeRoom(meta);
-	addMeta(meta);
+	make_room(meta);
+	add_meta(meta);
 	return policy.store(meta);
 }
 
-std::string XcacheSlice::search(XcacheCommand *cmd)
+std::string xcache_slice::search(xcache_cmd *cmd)
 {
-	std::map<std::string, XcacheMeta *>::iterator i;
+	std::map<std::string, xcache_meta *>::iterator i;
 
-	i = metaMap.find(cmd->cid());
-	if(i != metaMap.end()) {
+	i = meta_map.find(cmd->cid());
+	if(i != meta_map.end()) {
 		return i->second->get();
 	}
 
 	return "";
 }
 
-void XcacheSlice::setPolicy(XcachePolicy policy)
+void xcache_slice::set_policy(xcache_policy policy)
 {
 	this->policy = policy;
 }
 
-void XcacheSlice::status(void)
+void xcache_slice::status(void)
 {
-	std::map<std::string, XcacheMeta *>::iterator i;
+	std::map<std::string, xcache_meta *>::iterator i;
 
-	std::cout << "Slice [" << contextID << "]\n";
-	for(i = metaMap.begin(); i != metaMap.end(); ++i) {
+	std::cout << "Slice [" << context_id << "]\n";
+	for(i = meta_map.begin(); i != meta_map.end(); ++i) {
 		i->second->status();
 	}
 }

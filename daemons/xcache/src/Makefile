@@ -4,6 +4,7 @@ OBJS += controller.o
 OBJS += slice.o
 OBJS += meta.o
 OBJS += store_manager.o
+OBJS += logger.o
 
 all: $(OBJS)
 

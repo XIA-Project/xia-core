@@ -4,31 +4,30 @@
 #include "meta.h"
 
 /**
- * XcachePolicy:
- * @brief Abstract class that defines a eviction policy
+ * Abstract class that defines a eviction policy.
  * Xcache eviction policy decides which content object to evict. The policy module
  * does not need to care about actually storing the data. It only deals in terms of
  * "meta"data.
  */
 
-class XcachePolicy  {
+class xcache_policy  {
 public:
-	virtual int store(XcacheMeta *) {
+	virtual int store(xcache_meta *) {
 		return 0;
 	};
-	virtual int get(XcacheMeta *) {
+	virtual int get(xcache_meta *) {
 		return 0;
 	};
-	virtual int remove(XcacheMeta *) {
+	virtual int remove(xcache_meta *) {
 		return 0;
 	};
-	virtual XcacheMeta *evict() {
+	virtual xcache_meta *evict() {
 		return NULL;
 	};
 };
 
-/**
- * All the policies are implemented in header files. The corresponding header files
+/*
+ * All the policies are implemented c++ objects. The corresponding header files
  * must be included here.
  */
 #include "policies/fifo.h"

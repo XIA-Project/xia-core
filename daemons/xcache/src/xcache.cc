@@ -3,6 +3,7 @@
 #include "controller.h"
 #include "clicknet/xia.h"
 #include <getopt.h>
+#include "logger.h"
 
 static char version[] = "0.1";
 
@@ -18,7 +19,17 @@ static void usage(char *argv[])
 	printf("  -h, --host=HOSTNAME       Specify the host on which this daemon should run.\n");
 	printf("                            Default host = \"router0\"\n");
 	printf("  -v, --version             Displays xcache version.\n");
+	printf("  -l, --log-level=level     Set xcache log level (From LOG_ERROR = %d to LOG_INFO = %d).\n",
+		   LOG_ERROR, LOG_INFO);
 	printf("  --help                    Displays this help.\n");
+}
+
+static void set_log_level(int l)
+{
+	struct logger_config conf;
+
+	conf.level = l;
+	configure_logger(&conf);
 }
 
 static void sethostname(struct xcache_conf *conf, char *hostname)
@@ -29,7 +40,7 @@ static void sethostname(struct xcache_conf *conf, char *hostname)
 int main(int argc, char *argv[])
 {
 	int c;
-	XcacheController ctrl;
+	xcache_controller ctrl;
 	struct xcache_conf conf;
 
 	strcpy(conf.hostname, "router0");
@@ -38,6 +49,7 @@ int main(int argc, char *argv[])
 		{"host", required_argument, 0, 0},
 		{"help", no_argument, 0, 0},
 		{"version", no_argument, 0, 0},
+		{"log_level", required_argument, 0, 0},
 		{0, 0, 0, 0},
 	};
 
@@ -59,14 +71,19 @@ int main(int argc, char *argv[])
 			} else if(!strcmp(options[option_index].name, "version")) {
 				display_version();
 				return 0;
+			} else if(!strcmp(options[option_index].name, "log_level")) {
+				set_log_level(strtol(optarg, NULL, 0));
+				return 0;
 			} else {
 				usage(argv);
 				return 1;
 			}
 			break;
-			
 		case 'h':
 			sethostname(&conf, optarg);
+			break;
+		case 'l':
+			set_log_level(strtol(optarg, NULL, 0));
 			break;
 		case 'v':
 			display_version();
@@ -78,7 +95,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	ctrl.setConf(&conf);
+	ctrl.set_conf(&conf);
 	ctrl.run();
 	return 0;
 }

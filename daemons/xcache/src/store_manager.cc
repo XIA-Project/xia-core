@@ -1,15 +1,15 @@
 #include "meta.h"
 #include "store_manager.h"
 
-int XcacheStoreManager::store(XcacheMeta *meta, std::string data)
+int xcache_store_manager::store(xcache_meta *meta, std::string data)
 {
 	int ret = -1;
 
 	std::cout << "StoreManager: Store\n";
-	for(std::vector<XcacheContentStore *>::iterator i = storeVector.begin(); i != storeVector.end(); ++i) {
+	for(std::vector<xcache_content_store *>::iterator i = store_vector.begin(); i != store_vector.end(); ++i) {
 		ret = (*i)->store(meta, data);
 		if(ret >= 0) {
-			meta->setStore(*i);
+			meta->set_store(*i);
 			break;
 		}
 	}
@@ -17,7 +17,7 @@ int XcacheStoreManager::store(XcacheMeta *meta, std::string data)
 	return ret;
 }
 
-XcacheStoreManager::XcacheStoreManager()
+xcache_store_manager::xcache_store_manager()
 {
-	storeVector.push_back(new MemHt());
+	store_vector.push_back(new MemHt());
 }

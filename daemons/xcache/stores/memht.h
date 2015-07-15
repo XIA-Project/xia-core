@@ -10,16 +10,16 @@
  * In memory hash table using C++'s stl
  */
 
-class MemHt:public XcacheContentStore {
+class MemHt:public xcache_content_store {
 private:
-	std::map<XcacheMeta *, std::string> memht;
+	std::map<xcache_meta *, std::string> memht;
 
 public:
 	MemHt()
 	{
 	}
 
-	int store(XcacheMeta *meta, std::string data)
+	int store(xcache_meta *meta, std::string data)
 	{
 		std::cout << "Reached MemHt::" << __func__ << " Storing " << data << "\n";
 		memht[meta] = data;
@@ -27,7 +27,7 @@ public:
 		return 0;
 	}
 
-	std::string get(XcacheMeta *meta)
+	std::string get(xcache_meta *meta)
 	{
 		std::cout << "Memht get\n";
 		return memht[meta];

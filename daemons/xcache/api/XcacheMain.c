@@ -10,7 +10,7 @@
 
 int xcache_sock;
 
-int send_command(XcacheCommand *cmd)
+int send_command(xcache_cmd *cmd)
 {
 	int ret;
 	int remaining, sent;
@@ -36,7 +36,7 @@ int send_command(XcacheCommand *cmd)
 	return ret;
 }
 
-int get_response_blocking(XcacheCommand *cmd)
+int get_response_blocking(xcache_cmd *cmd)
 {
 	char buf[512] = "";
 	std::string buffer;
@@ -51,7 +51,7 @@ int get_response_blocking(XcacheCommand *cmd)
 	} while(ret == 512);
 
 	if(ret == 0) {
-		cmd->set_cmd(XcacheCommand::XCACHE_ERROR);
+		cmd->set_cmd(xcache_cmd::XCACHE_ERROR);
 		return -1;
 	} else {
 		cmd->ParseFromString(buffer);

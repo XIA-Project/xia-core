@@ -3,15 +3,15 @@ CC=g++
 .PHONY: all clean
 
 XCACHEDIR=$(XIADIR)/daemons/xcache
-COMMON_PATH=$(XCACHEDIR)/../common
-COMMON_INCLUDE=$(COMMON_PATH)
+DAEMONS_COMMON_PATH=$(XCACHEDIR)/../common
+DAEMONS_COMMON_INCLUDE=$(DAEMONS_COMMON_PATH)
 CLICKDIR=$(XIADIR)/click-2.0.1/
 CLICKINCLUDE=$(CLICKDIR)/include
 
-CFLAGS+=-g -I$(CLICKINCLUDE) -I$(XCACHEDIR)/common -I$(COMMON_INCLUDE) -I$(XCACHEDIR)/include -I$(XCACHEDIR)/bin -I$(XCACHEDIR) -I$(XCACHEDIR)/proto -Wall -Werror
+CFLAGS+=-g -I$(CLICKINCLUDE) -I$(XCACHEDIR)/common -I$(DAEMONS_COMMON_INCLUDE) -I$(XCACHEDIR)/include -I$(XCACHEDIR)/bin -I$(XCACHEDIR) -I$(XCACHEDIR)/proto -Wall -Werror
 LDFLAGS= $(LIBS) -lpthread
 XCACHE_BINDIR=$(XCACHEDIR)/bin/
-COMMON=$(COMMON_PATH)/csclient.o $(COMMON_PATH)/XIARouter.o
+DAEMONS_COMMON=$(DAEMONS_COMMON_PATH)/csclient.o $(DAEMONS_COMMON_PATH)/XIARouter.o
 
 export ## Make variables available to subsequent makefiles
 
@@ -26,8 +26,8 @@ all: bin
 %.o: %.cc
 	$(CC) $(CFLAGS) -o $@ -c $^
 
-common: $(COMMON)
-	mv $(COMMON_PATH)/*.o $(XCACHE_BINDIR) 
+daemons_common: $(DAEMONS_COMMON)
+	mv $(DAEMONS_COMMON_PATH)/*.o $(XCACHE_BINDIR) 
 
 $(TARGETS):
 	make -C $@
@@ -38,7 +38,7 @@ $(TARGETS):
 		fi; \
 	done
 
-bin: common $(TARGETS)
+bin: daemons_common $(TARGETS)
 	make -C $@
 
 clean:

@@ -3,35 +3,32 @@
 
 #define IGNORE_PARAM(__param) ((void)__param)
 
-XcacheMeta::XcacheMeta(XcacheCommand *cmd)
+xcache_meta::xcache_meta(xcache_cmd *cmd)
 {
-	refCount = 0;
 	store = NULL;
 	cid = cmd->cid();
 	len = cmd->cid().length();
 }
 
-XcacheMeta::XcacheMeta()
+xcache_meta::xcache_meta()
 {
-	refCount = 0;
 	store = NULL;
 }
 
-void XcacheMeta::status(void)
+void xcache_meta::status(void)
 {
-	std::cout << "[" << cid << "] ref = " << refCount << "\n";
+	std::cout << "[" << cid << "]\n";
 	std::cout << "\tDATA: [" << store->get(this) << "]\n";
 }
 
-void XcacheMeta::addedToSlice(XcacheSlice *slice)
+void xcache_meta::added_to_slice(xcache_slice *slice)
 {
-	ref();
-	sliceMap[slice->getContextId()] = slice;
+	slice_map[slice->get_context_id()] = slice;
 }
 
-void XcacheMeta::removedFromSlice(XcacheSlice *slice)
+void xcache_meta::removed_from_slice(xcache_slice *slice)
 {
+	// FIXME: Actually remove from this slice
 	IGNORE_PARAM(slice);
-	deref();  
 }
 

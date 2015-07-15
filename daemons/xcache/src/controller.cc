@@ -11,6 +11,7 @@
 #include <errno.h>
 #include "controller.h"
 #include <iostream>
+#include "logger.h"
 #include "Xsocket.h"
 #include "Xkeys.h"
 #include "dagaddr.hpp"
@@ -67,48 +68,23 @@ static int xcache_create_lib_socket(void)
 	return s;
 }
 
-static void xcache_set_timeout(struct timeval *t)
+void xcache_controller::status(void)
 {
-	t->tv_sec = 1;
-	t->tv_usec = 0;
-}
+	std::map<int32_t, xcache_slice *>::iterator i;
 
-void XcacheController::handleCli(void)
-{
-	char buf[512], *ret;
-  
-	ret = fgets(buf, 512, stdin);
-
-	if(ret) {
-		std::cout << "Received: " << buf;
-		if(strncmp(buf, "store", strlen("store")) == 0) {
-			std::cout << "Store Request" << std::endl;
-		} else if(strncmp(buf, "search", strlen("search")) == 0) {
-			std::cout << "Search Request" << std::endl;
-		} else if(strncmp(buf, "status", strlen("status")) == 0) {
-			std::cout << "status Request" << std::endl;
-		} 
-	}
-}
-
-
-void XcacheController::status(void)
-{
-	std::map<int32_t, XcacheSlice *>::iterator i;
-
-	std::cout << "[Status]\n";
-	for(i = sliceMap.begin(); i != sliceMap.end(); ++i) {
+	LOG_INFO("[Status]\n");
+	for(i = slice_map.begin(); i != slice_map.end(); ++i) {
 		i->second->status();
 	}
 }
 
 
-void XcacheController::handleUdp(int s)
+void xcache_controller::handle_udp(int s)
 {
 	IGNORE_PARAM(s);
 }
 
-int XcacheController::fetchContentRemote(XcacheCommand *resp, XcacheCommand *cmd)
+int xcache_controller::fetch_content_remote(xcache_cmd *resp, xcache_cmd *cmd)
 {
 	int ret, sock;
 	socklen_t daglen;
@@ -121,46 +97,47 @@ int XcacheController::fetchContentRemote(XcacheCommand *resp, XcacheCommand *cmd
 		return BAD;
 	}
 
-	std::cout << "Fetching content from remote\n";
+	LOG_INFO("Fetching content from remote\n");
 
 	if(Xconnect(sock, (struct sockaddr *)dag.c_str(), daglen) < 0) {
 		return BAD;
 	}
 
-	std::cout << "-------------XCACHE_NOW_CONNECTED-----------------------\n";
+	LOG_INFO("Xcache client now connected with remote\n");
 
 	std::string data;
 	char buf[512];
+
 	while((ret = Xrecv(sock, buf, 512, 0)) == 512) {
 		data += buf;
 	}
 	data += buf;
 
-	std::cout << "Received DATA!!!!!!!!!!!!!! " << data << "\n";
-	resp->set_cmd(XcacheCommand::XCACHE_RESPONSE);
+	LOG_INFO("Data received = %s\n", data.c_str());
+	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
 	resp->set_data(data);
 
 	return OK_SEND_RESPONSE;
 }
 
-int XcacheController::handleCmd(XcacheCommand *resp, XcacheCommand *cmd)
+int xcache_controller::handle_cmd(xcache_cmd *resp, xcache_cmd *cmd)
 {
 	int ret = OK_NO_RESPONSE;
-	XcacheCommand response;
+	xcache_cmd response;
 
-	if(cmd->cmd() == XcacheCommand::XCACHE_STORE) {
-		std::cout << "Received STORE command \n";
+	if(cmd->cmd() == xcache_cmd::XCACHE_STORE) {
+		LOG_INFO("Received Store command\n");
 		ret = store(cmd);
-	} else if(cmd->cmd() == XcacheCommand::XCACHE_NEWSLICE) {
-		std::cout << "Received NEWSLICE command \n";
-		ret = newSlice(resp, cmd);
-	} else if(cmd->cmd() == XcacheCommand::XCACHE_GETCHUNK) {
+	} else if(cmd->cmd() == xcache_cmd::XCACHE_NEWSLICE) {
+		LOG_INFO("Received Newslice command\n");
+		ret = new_slice(resp, cmd);
+	} else if(cmd->cmd() == xcache_cmd::XCACHE_GETCHUNK) {
 		// FIXME: Handle local fetch
-		std::cout << "Received GETCHUNK command \n";
-		ret = fetchContentRemote(resp, cmd);
+		LOG_INFO("Received Getchunk command\n");
+		ret = fetch_content_remote(resp, cmd);
 		// ret = search(resp, cmd);
-	} else if(cmd->cmd() == XcacheCommand::XCACHE_STATUS) {
-		std::cout << "Received STATUS command \n";
+	} else if(cmd->cmd() == xcache_cmd::XCACHE_STATUS) {
+		LOG_INFO("Received Status command\n");
 		status();
 	}
 
@@ -168,105 +145,106 @@ int XcacheController::handleCmd(XcacheCommand *resp, XcacheCommand *cmd)
 }
 
 
-XcacheSlice *XcacheController::lookupSlice(XcacheCommand *cmd)
+xcache_slice *xcache_controller::lookup_slice(xcache_cmd *cmd)
 {
-	std::map<int32_t, XcacheSlice *>::iterator i = sliceMap.find(cmd->contextid());
+	std::map<int32_t, xcache_slice *>::iterator i = slice_map.find(cmd->context_id());
 
-	if(i != sliceMap.end()) {
-		std::cout << "[Success] Slice Exists.\n";
+	if(i != slice_map.end()) {
+		LOG_INFO("Slice found.\n");
 		return i->second;
 	} else {
 		/* TODO use default slice */
-		std::cout << "Slice does not exist. Falling back to default slice.\n";
+		LOG_INFO("Using default slice\n");
 		return NULL;
 	}
 }
 
 
-int XcacheController::newSlice(XcacheCommand *resp, XcacheCommand *cmd)
+int xcache_controller::new_slice(xcache_cmd *resp, xcache_cmd *cmd)
 {
-	XcacheSlice *slice;
+	xcache_slice *slice;
 
-	if(lookupSlice(cmd)) {
+	if(lookup_slice(cmd)) {
 		/* Slice already exists */
 		return -1;
 	}
 
-	slice = new XcacheSlice(++context_id);
+	slice = new xcache_slice(++context_id);
 
-	//  slice->setPolicy(cmd->cachepolicy());
-	slice->setTtl(cmd->ttl());
-	slice->setSize(cmd->cachesize());
+	// FIXME: Set policy too. slice->set_policy(cmd->cachepolicy());
+	slice->set_ttl(cmd->ttl());
+	slice->set_size(cmd->cache_size());
 
-	sliceMap[slice->getContextId()] = slice;
-	resp->set_cmd(XcacheCommand::XCACHE_RESPONSE);
-	resp->set_contextid(slice->getContextId());
+	slice_map[slice->get_context_id()] = slice;
+	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
+	resp->set_context_id(slice->get_context_id());
 
 	return OK_SEND_RESPONSE;
 }
 
-int XcacheController::store(XcacheCommand *cmd)
+int xcache_controller::store(xcache_cmd *cmd)
 {
-	XcacheSlice *slice;
-	XcacheMeta *meta;
-	std::string emptyStr("");
-	std::map<std::string, XcacheMeta *>::iterator i = metaMap.find(cmd->cid());
+	int rv;
+	xcache_slice *slice;
+	xcache_meta *meta;
+	std::string empty_str("");
+	std::map<std::string, xcache_meta *>::iterator i = meta_map.find(cmd->cid());
 
-	std::cout << "Reached " << __func__ << std::endl;
-
-	if(i != metaMap.end()) {
+	/* FIXME: Add proper errnos */
+	if(i != meta_map.end()) {
 		meta = i->second;
-		std::cout << "Meta Exsits." << std::endl;
+		LOG_INFO("Meta Exsits.\n");
 	} else {
 		/* New object - Allocate a meta */
-		meta = new XcacheMeta(cmd);
-		metaMap[cmd->cid()] = meta;
-		std::cout << "New Meta." << std::endl;
+		meta = new xcache_meta(cmd);
+		meta_map[cmd->cid()] = meta;
+		LOG_INFO("New Meta.\n");
 	}
 
-	slice = lookupSlice(cmd);
+	slice = lookup_slice(cmd);
 	if(!slice)
 		return -1;
 
 	if(slice->store(meta) < 0) {
-		std::cout << "Slice store failed\n";
+		LOG_ERROR("Slice store failed\n");
 		return -1;
 	}
 
-	std::string tempCID("CID:");
-	tempCID += meta->getCid();
+	std::string temp_cid("CID:");
+	temp_cid += meta->get_cid();
 
-	std::cout << "Setting Route for " << tempCID << "\n";
-	std::cout << "RV=" << xr.setRoute(tempCID, DESTINED_FOR_LOCALHOST, emptyStr, 0) << "\n";
+	LOG_DEBUG("Setting Route for %s.\n", temp_cid.c_str());
+	rv = xr.setRoute(temp_cid, DESTINED_FOR_LOCALHOST, empty_str, 0);
+	LOG_DEBUG("Route Setting Returned %d\n", rv);
 
-	return storeManager.store(meta, cmd->data());
+	return store_manager.store(meta, cmd->data());
 }
 
-int XcacheController::search(XcacheCommand *resp, XcacheCommand *cmd)
+int xcache_controller::search(xcache_cmd *resp, xcache_cmd *cmd)
 {
-	int xcacheRecvSock = Xsocket(AF_XIA, SOCK_STREAM, 0);
+	int xcache_recv_sock = Xsocket(AF_XIA, SOCK_STREAM, 0);
 
 	IGNORE_PARAM(resp);
 
 #ifdef TODOEnableLocalSearch
-	XcacheSlice *slice;
+	xcache_slice *slice;
 	Graph g(cmd->dag);
 
 	std::cout << "Search Request\n";
-	slice = lookupSlice(cmd);
+	slice = lookup_slice(cmd);
 	if(!slice) {
-		resp->set_cmd(XcacheCommand::XCACHE_ERROR);
+		resp->set_cmd(xcache_cmd::XCACHE_ERROR);
 	} else {
 		std::string data = slice->search(cmd);
 
-		resp->set_cmd(XcacheCommand::XCACHE_RESPONSE);
+		resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
 		resp->set_data(data);
 		std::cout << "Looked up Data = " << data << "\n";
 	}
 #else
   
-	if(Xconnect(xcacheRecvSock, (struct sockaddr *)&cmd->dag(), sizeof(cmd->dag())) < 0) {
-		std::cout << "TODO THIS IS ERROR\n";
+	if(Xconnect(xcache_recv_sock, (struct sockaddr *)&cmd->dag(), sizeof(cmd->dag())) < 0) {
+		LOG_ERROR("Xconnect failed.\n");
 	};
 
 #endif
@@ -274,22 +252,22 @@ int XcacheController::search(XcacheCommand *resp, XcacheCommand *cmd)
 	return OK_SEND_RESPONSE;
 }
 
-void *XcacheController::startXcache(void *arg)
+void *xcache_controller::start_xcache(void *arg)
 {
-	XcacheController *ctrl = (XcacheController *)arg;
+	xcache_controller *ctrl = (xcache_controller *)arg;
 	ctrl = ctrl; //fixme
 	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
-	int xcacheSock, acceptSock;
+	int xcache_sock, accept_sock;
 
-	if ((xcacheSock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+	if ((xcache_sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		return NULL;
 
 	if(XmakeNewSID(sid_string, sizeof(sid_string))) {
-		std::cout << "Could not allocate SID for xcache\n";
+		LOG_ERROR("XmakeNewSID failed\n");
 		return NULL;
 	}
 
-	if(XsetXcacheSID(xcacheSock, sid_string, strlen(sid_string)) < 0)
+	if(XsetXcacheSID(xcache_sock, sid_string, strlen(sid_string)) < 0)
 		return NULL;
 
 	std::cout << "XcacheSID is " << sid_string << "\n";
@@ -301,54 +279,52 @@ void *XcacheController::startXcache(void *arg)
 
 	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
 
-	if (Xbind(xcacheSock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
-		Xclose(xcacheSock);
+	if (Xbind(xcache_sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
+		Xclose(xcache_sock);
 		return NULL;
 	}
 
-	Xlisten(xcacheSock, 5);
+	Xlisten(xcache_sock, 5);
 
 	Graph g(dag);
-	std::cout << "listening on dag: " << g.dag_string() << "\n";
+	LOG_INFO("Listening on dag: %s\n", g.dag_string().c_str());
 
 	while(1) {
 		sockaddr_x mypath;
 		socklen_t mypath_len = sizeof(mypath);
 
-		std::cout << "XcacheSender waiting for incoming connections\n";
-		if ((acceptSock = XacceptAs(xcacheSock, (struct sockaddr *)&mypath, &mypath_len, NULL, NULL)) < 0) {
-			std::cout << "Xaccept failed\n";
+		LOG_INFO("XcacheSender waiting for incoming connections\n");
+		if ((accept_sock = XacceptAs(xcache_sock, (struct sockaddr *)&mypath, &mypath_len, NULL, NULL)) < 0) {
+			LOG_ERROR("Xaccept failed\n");
 			pthread_exit(NULL);
 		}
 
 		// FIXME: Send appropriate data, perform actual search,
 		// make updates in slices / policies / stores
 
-		std::cout << "Accept Success\n";
+		LOG_INFO("Accept Success\n");
  		Graph g(&mypath);
- 		std::cout << "They want " << g.get_final_intent().to_string() << "\n";
 #define DATA "IfYouReceiveThis!"
- 		Xsend(acceptSock, DATA, strlen(DATA), 0);
- 		Xclose(acceptSock);
+ 		Xsend(accept_sock, DATA, strlen(DATA), 0);
+ 		Xclose(accept_sock);
 	}
 }
 
-void XcacheController::run(void)
+void xcache_controller::run(void)
 {
 	fd_set fds, allfds;
-	struct timeval timeout;
-	int max, libsocket, s, n, rc;
-	pthread_t xcacheSender;
+	int max, libsocket, s, rc;
+	pthread_t xcache_sender;
 
-	std::vector<int> activeConnections;
+	std::vector<int> active_conns;
 	std::vector<int>::iterator iter;
 
 	s = xcache_create_click_socket(1444);
 	libsocket = xcache_create_lib_socket();
 
-	pthread_create(&xcacheSender, NULL, startXcache, NULL);
+	pthread_create(&xcache_sender, NULL, start_xcache, NULL);
 	if ((rc = xr.connect()) != 0) {
-		std::cout << "unable to connect to click " << rc << "\n";
+		LOG_ERROR("Unable to connect to click %d \n", rc);
 		return;
 	}
 
@@ -357,80 +333,72 @@ void XcacheController::run(void)
 	FD_ZERO(&fds);
 	FD_SET(s, &allfds);
 	FD_SET(libsocket, &allfds);
-	//#define MAX(_a, _b) ((_a > _b) ? (_a) : (_b))
 
-	xcache_set_timeout(&timeout);
-
-	std::cout << "Entering The Loop\n";
+	LOG_INFO("Entering The Loop\n");
 
 	while(1) {
 		memcpy(&fds, &allfds, sizeof(fd_set));
 
 		max = MAX(libsocket, s);
-		for(iter = activeConnections.begin(); iter != activeConnections.end(); ++iter) {
+		for(iter = active_conns.begin(); iter != active_conns.end(); ++iter) {
 			max = MAX(max, *iter);
 		}
 
-		n = Xselect(max + 1, &fds, NULL, NULL, NULL);
+		Xselect(max + 1, &fds, NULL, NULL, NULL);
 
-		std::cout << "Broken\n";
+		LOG_INFO("Broken\n");
 		if(FD_ISSET(s, &fds)) {
-			std::cout << "Action on UDP" << std::endl;
-			handleUdp(s);
+			handle_udp(s);
 		}
 
 		if(FD_ISSET(libsocket, &fds)) {
 			int new_connection = accept(libsocket, NULL, 0);
-			std::cout << "Action on libsocket" << std::endl;
-			activeConnections.push_back(new_connection);
+			LOG_INFO("Action on libsocket\n");
+			active_conns.push_back(new_connection);
 			FD_SET(new_connection, &allfds);
 		}
 
-		for(iter = activeConnections.begin(); iter != activeConnections.end();) {
-			if(FD_ISSET(*iter, &fds)) {
-				char buf[512] = "";
-				std::string buffer("");
-				XcacheCommand resp, cmd;
-				int ret;
+		for(iter = active_conns.begin(); iter != active_conns.end();) {
+			if(!FD_ISSET(*iter, &fds)) {
+				++iter;
+				continue;
+			}
 
-				do {
-					printf("Reading\n");
-					ret = recv(*iter, buf, 512, 0);
-					if(ret == 0)
-						break;
+			char buf[512] = "";
+			std::string buffer("");
+			xcache_cmd resp, cmd;
+			int ret;
 
-					printf("ret = %d\n", ret);
-					buffer.append(buf, ret);
-				} while(ret == 512);
+			do {
+				ret = recv(*iter, buf, 512, 0);
+				if(ret == 0)
+					break;
 
-				if(ret != 0) {
-					bool parseSuccess = cmd.ParseFromString(buffer);
-					printf("%s: Controller received %lu bytes\n", __func__, buffer.length());
-					if(!parseSuccess) {
-						std::cout << "[ERROR] Protobuf could not parse\n;";
-					} else {
-						if(handleCmd(&resp, &cmd) == OK_SEND_RESPONSE) {
-							resp.SerializeToString(&buffer);
-							if(write(*iter, buffer.c_str(), buffer.length()) < 0) {
-								std::cout << "FIXME: handle return value of write\n";
-							}
+				buffer.append(buf, ret);
+			} while(ret == 512);
+
+			if(ret != 0) {
+				bool parse_success = cmd.ParseFromString(buffer);
+				LOG_INFO("Controller received %lu bytes\n", buffer.length());
+				if(!parse_success) {
+					LOG_ERROR("[ERROR] Protobuf could not parse\n");
+				} else {
+					if(handle_cmd(&resp, &cmd) == OK_SEND_RESPONSE) {
+						resp.SerializeToString(&buffer);
+						if(write(*iter, buffer.c_str(), buffer.length()) < 0) {
+							LOG_ERROR("FIXME: handle return value of write\n");
 						}
 					}
 				}
+			}
 
-				if(ret == 0) {
-					std::cout << "Closing\n";
-					close(*iter);
-					FD_CLR(*iter, &allfds);
-					activeConnections.erase(iter);
-					continue;
-				}
+			if(ret == 0) {
+				close(*iter);
+				FD_CLR(*iter, &allfds);
+				active_conns.erase(iter);
+				continue;
 			}
 			++iter;
-		}
-
-		if((n == 0) && (timeout.tv_sec == 0) && (timeout.tv_usec == 0)) {
-			// std::cout << "Timeout" << std::endl;
 		}
 	}
 }

@@ -6,30 +6,28 @@
 #include "store.h"
 
 /**
- * XcacheStoreManager:
- * @brief Efficiently manage various content stores
- * XcacheStoreManager keeps a list of available content stores (XcacheContentStore).
+ * Efficiently manage various content stores.
+ * xcache_store_manager keeps a list of available content stores (xcache_content_store).
  * On invocation of member function store(), store manager dynamically decides
  * which content store should be used to store this particular content object.
  */
 
-class XcacheStoreManager {
+class xcache_store_manager {
 private:
 	/* Vector of all the stores */
-	std::vector<XcacheContentStore *> storeVector;
+	std::vector<xcache_content_store *> store_vector;
 
 public:
-	XcacheStoreManager();
+	xcache_store_manager();
 
 	/**
-	 * store():
-	 * @brief Select a content store to store this data and actually store it.
+	 * Select a content store to store this data and actually store it.
 	 * @param meta:   Metadata of the object to be stored
 	 * @param data:   Data to be stored.
 	 * @returns >= 0: On successfully storing the data
 	 * @returns < 0:  On failure
 	 */
-	int store(XcacheMeta *meta, std::string data);
+	int store(xcache_meta *meta, std::string data);
 };
 
 #endif

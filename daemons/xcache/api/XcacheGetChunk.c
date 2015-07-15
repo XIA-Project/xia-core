@@ -6,17 +6,17 @@
 /* API */
 int XcacheGetChunk(xcacheSlice *slice, xcacheChunk *chunk, sockaddr_x *addr, socklen_t len, int flags)
 {
-	XcacheCommand cmd;
+	xcache_cmd cmd;
 
 	/* Flags currently unused */
 	(void)flags;
 
 	printf("Inside %s\n", __func__);
 
-	cmd.set_cmd(XcacheCommand::XCACHE_GETCHUNK);
+	cmd.set_cmd(xcache_cmd::XCACHE_GETCHUNK);
 
 	if(slice)
-		cmd.set_contextid(slice->contextId);
+		cmd.set_context_id(slice->context_id);
 
 	cmd.set_dag(addr, len);
 

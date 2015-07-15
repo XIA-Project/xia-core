@@ -3,27 +3,27 @@
 
 #include "policy.h"
 
-class FifoPolicy:public XcachePolicy {
+class FifoPolicy:public xcache_policy {
 public:
-	int store(XcacheMeta *meta) {
+	int store(xcache_meta *meta) {
 		/* Ignoring compiler error for unused attribute */
 		(void)meta;
 
 		return 1;
 	}
-	int get(XcacheMeta *meta) {
+	int get(xcache_meta *meta) {
 		/* Ignoring compiler error for unused attribute */
 		(void)meta;
 
 		return 1;
 	}
-	int remove(XcacheMeta *meta) {
+	int remove(xcache_meta *meta) {
 		/* Ignoring compiler error for unused attribute */
 		(void)meta;
 
 		return 1;
 	}
-	XcacheMeta *evict() {
+	xcache_meta *evict() {
 		return NULL;
 	}
 };

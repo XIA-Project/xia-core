@@ -1,7 +1,7 @@
 /* Protocol between libxsocket and Xcache */
 
-message XcacheCommand {
-	enum requestType {
+message xcache_cmd {
+	enum req_type {
 		XCACHE_STORE = 1;
 		XCACHE_NEWSLICE = 2;
 		XCACHE_GETCHUNK = 3;
@@ -12,13 +12,13 @@ message XcacheCommand {
 		XCACHE_STATUS = 8;
 	};
   
-	required requestType cmd = 1;
+	required req_type cmd = 1;
 
-	optional int32 contextId = 2;
+	optional int32 context_id = 2;
 	optional bytes cid = 3;
 	optional bytes dag = 4;
 	optional bytes data = 5;
 	optional int32 ttl = 6;
-	optional int32 cacheSize = 7;
-	optional int32 cachePolicy = 8;
+	optional int32 cache_size = 7;
+	optional int32 cache_policy = 8;
 };

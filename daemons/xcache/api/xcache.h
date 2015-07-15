@@ -7,8 +7,6 @@
 
 #define CIDLEN 512
 
-#define UNIX_SERVER_SOCKET "/tmp/xcache.socket"
-
 struct xcacheChunk {
 	char cid[CIDLEN];
 	void *buf;
@@ -16,7 +14,7 @@ struct xcacheChunk {
 };
 
 struct xcacheSlice {
-	uint32_t contextId;
+	uint32_t context_id;
 };
 
 int XcacheInit(void);

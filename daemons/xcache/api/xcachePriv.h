@@ -5,7 +5,7 @@
 
 extern int xcache_sock;
 
-int send_command(XcacheCommand *cmd);
-int get_response_blocking(XcacheCommand *cmd);
+int send_command(xcache_cmd *cmd);
+int get_response_blocking(xcache_cmd *cmd);
 
 #endif
