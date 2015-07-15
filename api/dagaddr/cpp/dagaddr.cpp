@@ -770,20 +770,14 @@ Graph::intent_AD_str() const
 	std::size_t curIndex;
 	std::size_t source = source_index();
 	std::size_t intent = final_intent_index();
-	std::vector<Node> first_path;
+	printf("Graph::intent_AD_str called on %s.\n", this->dag_string().c_str());
 	// Build first_path by walking first hops from source to intent node
 	for(curIndex=source; curIndex!=intent; curIndex=out_edges_[curIndex][0]) {
 		// Save each node visited
-		first_path.push_back(get_node(curIndex));
-	}
-	// Push the intent also onto first path, in case the AD is the intent
-	first_path.push_back(get_node(curIndex));
-	// Walk the first_path backwards and return first AD found
-	std::vector<Node>::iterator it;
-	for(it=first_path.end(); it!=first_path.begin(); it--) {
-		if((*it).type() == Node::XID_TYPE_AD) {
-			ad = (*it).to_string();
-			break;
+		Node n = get_node(curIndex);
+		if(n.type_string().compare(Node::XID_TYPE_AD_STRING) == 0) {
+			ad = n.to_string();
+			printf("Graph::intent_AD_str Found ad: %s\n", ad.c_str());
 		}
 	}
 	return ad;
@@ -804,20 +798,14 @@ Graph::intent_HID_str() const
 	std::size_t curIndex;
 	std::size_t source = source_index();
 	std::size_t intent = final_intent_index();
-	std::vector<Node> first_path;
+	printf("Graph::intent_HID_str called on %s.\n", this->dag_string().c_str());
 	// Build first_path by walking first hops from source to intent node
 	for(curIndex=source; curIndex!=intent; curIndex=out_edges_[curIndex][0]) {
 		// Save each node visited
-		first_path.push_back(get_node(curIndex));
-	}
-	// Push the intent also onto first path, in case the HID is the intent
-	first_path.push_back(get_node(curIndex));
-	// Walk the first_path backwards and return first HID found
-	std::vector<Node>::iterator it;
-	for(it=first_path.end(); it!=first_path.begin(); it--) {
-		if((*it).type() == Node::XID_TYPE_HID) {
-			hid = (*it).to_string();
-			break;
+		Node n = get_node(curIndex);
+		if(n.type_string().compare(Node::XID_TYPE_HID_STRING) == 0) {
+			hid = n.to_string();
+			printf("Graph::intent_HID_str Found hid: %s\n", hid.c_str());
 		}
 	}
 	return hid;
