@@ -41,10 +41,8 @@ struct chunkProfile {
 
 map<string, vector<string> > SIDToCIDs;
 map<string, map<string, chunkProfile> > SIDToProfile;
-map<string, int> SIDToWindow; // prefetching window
+map<string, unsigned int> SIDToWindow; // prefetching window
 map<string, long> SIDToTime; // store the timestamp last seen
-
-unsigned int prefetch_chunk_num = 3; // default number of chunks to prefetch
 
 int localPrefetchSock, ftpSock;
 
@@ -62,7 +60,7 @@ pthread_mutex_t timeLock = PTHREAD_MUTEX_INITIALIZER;
 //int netMonSock;
 bool netChange, netChangeACK;
 
-// TODO: mem leak, update timestamp and mon function
+// TODO: mem leak
 void regHandler(int sock, char *cmd)
 {
 	XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID); 
@@ -70,19 +68,18 @@ void regHandler(int sock, char *cmd)
 //cerr<<cmd<<endl;
 
 	pthread_mutex_lock(&windowLock);	
-	SIDToWindow[remoteSID] = prefetch_chunk_num;
+	SIDToWindow[remoteSID] = PREFETCH_WIN_INIT;
 	pthread_mutex_unlock(&windowLock);
-//cerr<<"Done with SIDToWindow"<<endl;
 
 	pthread_mutex_lock(&timeLock);	
 	SIDToTime[remoteSID] = now_msec();
 	pthread_mutex_unlock(&timeLock);
-//cerr<<"Done with SIDToTime"<<endl;
 
 	vector<string> CIDs = strVector(cmd);
 cerr<<"Ready to enter profileLock"<<endl;		
-	pthread_mutex_lock(&profileLock);	
+
 	SIDToCIDs[remoteSID] = CIDs;
+
 	for (unsigned int i = 0; i < CIDs.size(); i++) {
 		chunkProfile cp;
 		cp.fetchState = BLANK;
@@ -93,9 +90,10 @@ cerr<<"Ready to enter profileLock"<<endl;
 		cp.fetchFinishTimestamp = 0;	
 		cp.prefetchStartTimestamp = 0;	
 		cp.prefetchFinishTimestamp = 0;	
+		pthread_mutex_lock(&profileLock);
 		SIDToProfile[remoteSID][CIDs[i]] = cp;
+		pthread_mutex_unlock(&profileLock);
 	}	
-	pthread_mutex_unlock(&profileLock);	
 cerr<<"Quit the profileLock and finish reg"<<endl;
 
 	return;
@@ -112,12 +110,12 @@ cerr<<"Receving Command: "<<cmd<<endl;
 	sscanf(cmd, "%ld RE ( %s %s ) CID:%s", &cidLen, ftpServAD, ftpServHID, CID);
 //cerr<<ftpServAD<<"\t"<<ftpServHID<<"\t"<<CID<<endl;
 
-	pthread_mutex_lock(&profileLock);
-	if (SIDToProfile[remoteSID][CID].fetchState != READY) {
+	if (SIDToProfile[remoteSID][CID].fetchState == BLANK) {
+		pthread_mutex_lock(&profileLock);
 		SIDToProfile[remoteSID][CID].fetchState = PENDING;
+		pthread_mutex_unlock(&profileLock);
 	}
-	pthread_mutex_unlock(&profileLock);
-//cerr<<"Done with SIDToProfile"<<endl;	
+cerr<<CID<<" fetch state: "<<SIDToProfile[remoteSID][CID].fetchState<<endl;
 	free(CID);
 	return;
 }
@@ -204,9 +202,7 @@ cerr<<(*I).second[i]<<endl;
 						CIDs_prefetching.push_back((*I).second[i]);
 					}
 				}
-
-				// TODO: non-block fasion 
-				// send the prefetching list to the prefetch service and receive message back and update prefetch state
+				// send the prefetching list to the prefetch service and receive message back one by one and update prefetch state
 				if (CIDs_prefetching.size() > 0) {
 					pthread_mutex_lock(&profileLock);
 					sprintf(cmd, "prefetch");
@@ -216,7 +212,9 @@ cerr<<(*I).second[i]<<endl;
 						SIDToProfile[SID][CIDs_prefetching[i]].fetchAD = prefetchHID;						
 						strcat(cmd, " ");
 						strcat(cmd, string2char(CIDs_prefetching[i]));
-					}				
+					}
+					pthread_mutex_unlock(&profileLock);				
+							
 					sendStreamCmd(netPrefetchSock, cmd);
 					// receive chunk ready msg one by one
 					for (unsigned i = 0; i < CIDs_prefetching.size(); i++) {
@@ -229,21 +227,14 @@ cerr<<reply<<endl;
 						if (strncmp(reply, "ready", 5) == 0) {
 							vector<string> prefetched_info = strVector(reply+6);
 							if (CIDs_prefetching[i] == prefetched_info[0]) {
+								pthread_mutex_lock(&profileLock);								
 								SIDToProfile[SID][CIDs_prefetching[i]].prefetchStartTimestamp = string2long(prefetched_info[1]);							
 								SIDToProfile[SID][CIDs_prefetching[i]].prefetchFinishTimestamp = string2long(prefetched_info[2]);
-								SIDToProfile[SID][CIDs_prefetching[i]].prefetchState = READY;		
+								SIDToProfile[SID][CIDs_prefetching[i]].prefetchState = READY;
+								pthread_mutex_unlock(&profileLock);
 							}
-							/*												
-							for (unsigned j = 0; j < prefetched_info.size(); j++) {
-								// SIDToProfile[SID][CIDs_prefetched[i]].prefetchFinishTimestamp = now_msec();
-								// SIDToProfile[SID][CIDs_prefetched[i]].prefetchFinishTimestamp = now_msec();								
-								SIDToProfile[SID][CIDs_prefetched[i]].prefetchState = READY;							
-								// SIDToProfile[SID][CIDs_prefetched[i]].prefetchFinishTimestamp = now_msec();
-							}
-							*/
 						}
 					}
-					pthread_mutex_unlock(&profileLock);	
 				}
 			}
 		}
@@ -315,8 +306,8 @@ void *fetchData(void *)
 						if (status == READY_TO_READ) {
 							pthread_mutex_lock(&profileLock);	
 							for (unsigned int i = 0; i < CIDs_fetching.size(); i++) {
-								SIDToProfile[SID][CIDs_fetching[i]].fetchState = READY;
 								SIDToProfile[SID][CIDs_fetching[i]].fetchFinishTimestamp = now_msec();								
+								SIDToProfile[SID][CIDs_fetching[i]].fetchState = READY;
 //cerr<<CIDs[i]<<"\t fetch state: ready\n";
 							}
 							pthread_mutex_unlock(&profileLock);		
@@ -421,12 +412,55 @@ void *netMon(void *)
 	pthread_exit(NULL);
 }
 
-// TODO: pktMon
 void *windowPred(void *) 
 {
-	// go through all the SID
+	long fetch_latency;
+	long prefetch_latency;
 	while (1) {
-		//prefetch_chunk_num = 3;
+		for (map<string, vector<string> >::iterator I = SIDToCIDs.begin(); I != SIDToCIDs.end(); ++I) {
+			string SID = (*I).first;
+			vector<string> CIDs;
+			for (unsigned int i = 0; i < (*I).second.size(); i++) {
+				if (SIDToProfile[SID][(*I).second[i]].fetchState == READY) {
+					CIDs.push_back((*I).second[i]);
+				}
+			}
+			fetch_latency = 0;
+			prefetch_latency = 0;
+			if (CIDs.size() > 0 && CIDs.size() <= PREFETCH_WIN_RECENT_NUM) {
+				for (unsigned int i = 0; i < (*I).second.size(); i++) {
+					fetch_latency += SIDToProfile[SID][CIDs[i]].fetchFinishTimestamp - SIDToProfile[SID][CIDs[i]].fetchStartTimestamp;
+					prefetch_latency += SIDToProfile[SID][CIDs[i]].prefetchFinishTimestamp - SIDToProfile[SID][CIDs[i]].prefetchStartTimestamp;					
+				}
+				pthread_mutex_lock(&windowLock);
+				if (prefetch_latency > fetch_latency) {
+					SIDToWindow[SID] += 1;
+				}
+				else {
+					if (SIDToWindow[remoteSID] > 1) {
+						SIDToWindow[SID] -= 1;					
+					}
+				}
+				pthread_mutex_unlock(&windowLock);
+			}
+			else if (CIDs.size() > PREFETCH_WIN_RECENT_NUM) {
+				for (unsigned int i = (*I).second.size() - 1; i > (*I).second.size() - i - PREFETCH_WIN_RECENT_NUM; i--) {
+					fetch_latency += SIDToProfile[SID][CIDs[i]].fetchFinishTimestamp - SIDToProfile[SID][CIDs[i]].fetchStartTimestamp;
+					prefetch_latency += SIDToProfile[SID][CIDs[i]].prefetchFinishTimestamp - SIDToProfile[SID][CIDs[i]].prefetchStartTimestamp;					
+				}
+				pthread_mutex_lock(&windowLock);
+				if (prefetch_latency > fetch_latency) {
+					SIDToWindow[SID] += 1;
+				}
+				else {
+					if (SIDToWindow[remoteSID] > 1) {
+						SIDToWindow[SID] -= 1;					
+					}
+				}
+				pthread_mutex_unlock(&windowLock);
+			}
+		}
+		sleep(PREFETCH_WIN_PRED_DELAY_SEC);
 	}
 	pthread_exit(NULL);
 }
@@ -458,7 +492,7 @@ cerr<<"Deleting "<<SID<<endl;
 
 int main() 
 {
-	pthread_t thread_netMon, thread_windowPred, thread_mgt, thread_fetchData, thread_prefetchData;
+	pthread_t thread_windowPred, thread_mgt, thread_fetchData, thread_prefetchData; // TODO: thread_netMon
 	//pthread_create(&thread_netMon, NULL, netMon, NULL);	// TODO: improve the netMon function
 	pthread_create(&thread_windowPred, NULL, windowPred, NULL);	// TODO: improve the netMon function
 	pthread_create(&thread_mgt, NULL, profileMgt, NULL); // dequeue, prefetch and update profile	
