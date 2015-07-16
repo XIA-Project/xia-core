@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <string.h>
 #include <map>
@@ -21,14 +22,13 @@
 
 #include "Xkeys.h"
 
-// TODO: make the api: fallback if not prefetch client found 
 #define MAX_XID_SIZE 100
 #define RECV_BUF_SIZE 1024
 #define XIA_MAX_BUF 15600 // TODO: improve later
 
 #define CHUNKSIZE 1024 
 
-#define REREQUEST 3
+#define REREQUEST 30
 #define NUM_CHUNKS 1 // 12 is the max NUM_CHUNKS to fetch at one time for 1024 K
 
 #define FTP_NAME "www_s.ftp.aaa.xia"
@@ -41,7 +41,12 @@
 #define MGT_DELAY_SEC 10
 #define LOOP_DELAY_MSEC 100
 #define SCAN_DELAY_MSEC 10
-#define CHUNK_REQUEST_DELAY_MSEC 100
+#define CHUNK_REQUEST_DELAY_MSEC 10
+
+
+#define BLANK 0	// initilized: by registration message
+#define PENDING 1 // chunk is being fetched/prefetched 
+#define READY 2	// chunk is available in the local/network cache 
 
 using namespace std;
 
@@ -57,7 +62,7 @@ void die(int ecode, const char *fmt, ...);
 char *randomString(char *buf, int size);
 
 // format: cid1 cid2, ... cidn
-vector<string> cidList(char *cids_str);
+vector<string> strVector(char *strs);
 
 // format: PREFETCH_SERVER_NAME.getAD()
 char *getPrefetchServiceName();
@@ -68,6 +73,8 @@ char *getPrefetchManagerName();
 char *getXftpName();
 
 char *string2char(string str);
+
+long string2long(string str);
 
 // result the string result of system command
 string execSystem(string cmd);
@@ -89,6 +96,7 @@ void getNewAD(char *old_ad);
 // get the SSID name from "iwgetid -r" command; app level approach
 string netConnStatus(string lastSSID);
 
+// used when client is mobile TODO: detect network
 int getReply(int sock, const char *cmd, char *reply, sockaddr_x *sa, int timeout, int tries);
 
 int sendStreamCmd(int sock, const char *cmd);
@@ -129,14 +137,18 @@ int registerPrefetchManager(const char *name);
 // construct the msg and send to prefetch client
 int XrequestChunkPrefetch(int sock, const ChunkStatus *cs);
 
-// TODO
-// int XrequestChunksAdv(int csock, const ChunkStatus *chunks, int numChunks, string serviceName, vector<string> CIDs);
+char *chunkReqDag2cid(char *dag);
 
 #endif
 
 /* reference 
 
 #define MAXBUFLEN = XIA_MAXBUF = XIA_MAXCHUNK = 15600
+
+#define REQUEST_FAILED	  0x00000001
+#define WAITING_FOR_CHUNK 0x00000002
+#define READY_TO_READ	  0x00000004
+#define INVALID_HASH	  0x00000008
 
 typedef struct {
     int sockfd;

@@ -52,18 +52,18 @@ char *randomString(char *buf, int size)
 	return buf;
 }
 
-vector<string> cidList(char *cids_str) 
+vector<string> strVector(char *strs) 
 {
-	char cids_str_arr[strlen(cids_str)];
-	strcpy(cids_str_arr, cids_str);
-	vector<string> CIDs;
-	char *CID;
-	CIDs.push_back(strtok(cids_str_arr, " "));	
-	while ((CID = strtok(NULL, " ")) != NULL) {
-		CIDs.push_back(CID);
+	char str_arr[strlen(strs)];
+	strcpy(str_arr, strs);
+	vector<string> strVec;
+	char *str;
+	strVec.push_back(strtok(str_arr, " "));	
+	while ((str = strtok(NULL, " ")) != NULL) {
+		strVec.push_back(str);
 	}
 
-	return CIDs;
+	return strVec;
 }
 
 char *getPrefetchServiceName() 
@@ -87,6 +87,14 @@ char* string2char(string str)
 	strcpy(cstr, str.c_str());	
 	return cstr;
 } 
+
+long string2long(string str) 
+{
+	stringstream buffer(str);
+	long var;
+	buffer >> var;
+	return var;
+}
 
 string execSystem(string cmd) 
 {
@@ -127,14 +135,13 @@ string getSSID()
 {
 	string ssid = execSystem(GETSSID_CMD);
 
-	// TODO: ask Dan about blocking optimization 
 	if (ssid.empty()) {
-		// cerr<<"No network\n";
+// cerr<<"No network\n";
 		while (1) {
-			usleep(LOOP_DELAY_MSEC * 1000);
+			usleep(SCAN_DELAY_MSEC * 1000);
 			ssid = execSystem(GETSSID_CMD); 
 			if (!ssid.empty()) {
-				// cerr<<"Network back\n";
+// cerr<<"Network back\n";
 				break;
 			}
 		}
@@ -193,7 +200,7 @@ void getNewAD(char *old_ad)
 			Xclose(sock);
 			return;			
 		}
-		usleep(LOOP_DELAY_MSEC * 1000);
+		usleep(SCAN_DELAY_MSEC * 1000);
 	}
 	return;
 }
@@ -202,17 +209,19 @@ string netConnStatus(string lastSSID)
 {
 	string currSSID = execSystem(GETSSID_CMD);
 
-	if (currSSID.empty())	
+	if (currSSID.empty())	{
 		return "empty";
+	}
 	else {
-		if (currSSID == lastSSID) 
+		if (currSSID == lastSSID) {
 			return "same";
-		else 
+		}
+		else {
 			return currSSID;
+		}
 	}
 }
 
-// used when client is mobile TODO: detect network
 int getReply(int sock, const char *cmd, char *reply, sockaddr_x *sa, int timeout, int tries) 
 {
 	int sent, received, rc;
@@ -476,8 +485,9 @@ int registerStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID)
 
 	Xlisten(sock, 5);
 
-	if (XregisterName(name, sa) < 0 )
+	if (XregisterName(name, sa) < 0 ) {
 		die(-1, "error registering name: %s\n", name);
+	}
 	say("\nRegistering DAG with nameserver:\n%s\n", g.dag_string().c_str());
 
   return sock;
@@ -491,8 +501,9 @@ void *blockListener(void *listenID, void *recvFuntion (void *))
   while (1) {
 		say("Waiting for a client connection\n");
    		
-		if ((acceptSock = Xaccept(listenSock, NULL, NULL)) < 0)
+		if ((acceptSock = Xaccept(listenSock, NULL, NULL)) < 0){
 			die(-1, "accept failed\n");
+		}
 		say("connected\n");
 		
 		pthread_t client;
@@ -609,10 +620,14 @@ int XrequestChunkPrefetch(int sock, const ChunkStatus *cs) {
 	return n;
 }
 
-/*
-int XrequestChunksAdv(int sockfd, const ChunkStatus *chunks, int numChunks, string serviceName, vector<string> CIDS) {
-	// send if no prefetch client, as notmal; other wise, send argrments as part of msg using xsp
-	// need to pass AD, HID, SID etc, maybe sockfd is enogh
-	return 0;
+// TODO: right now it's hacky, need to fix the way reading XIDs when including fallback DAG
+char *chunkReqDag2cid(char *dag) {
+	size_t cidLen;
+	char *AD = (char *)malloc(512); 		
+	char *HID = (char *)malloc(512); 
+	char *CID = (char *)malloc(512); 
+	sscanf(dag, "%ld RE ( %s %s ) CID:%s", &cidLen, AD, HID, CID);
+	free(AD);
+	free(HID);
+	return CID;
 }
-*/
