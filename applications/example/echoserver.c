@@ -271,12 +271,6 @@ void echo_stream()
 			Xclose(acceptor);
 
 			process(sock);
-
-			if(XremoveSID((const char *)sid_string)) {
-				say("Unable to remove keys for SID %s.\n", sid_string);
-			}else {
-				say("Removed keys for temporary SID %s.\n", sid_string);
-			}
 			exit(0);
 
 		} else {
