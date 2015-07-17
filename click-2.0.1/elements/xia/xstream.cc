@@ -1057,9 +1057,20 @@ again:
 
     win = so_recv_buffer_space(); 
 
-    /*131 No silly window avoidance, we send all packets imediately */ 
-    if (len) 
-	    goto send; 
+    /*131 Silly window avoidance */ 
+	if (len) {
+		if (len == tp->t_maxseg)
+			goto send;
+		if ((idle || tp->t_flags & TF_NODELAY) &&
+		    len + off >= _q_usr_input.byte_length())
+			goto send;
+		if (tp->t_force)
+			goto send;
+		if (len >= tp->max_sndwnd / 2)
+			goto send;
+		if (SEQ_LT(tp->snd_nxt, tp->snd_max))
+			goto send;
+	}
 	
     /*154*/
     if (win > 0) { 
@@ -1276,6 +1287,8 @@ printf("1121+++++++%d\n",optlen);
 	xiah.set_dst_path(dst_path);
 	xiah.set_src_path(src_path);
 
+	ti.th_sport = 0xABCD;
+	ti.th_dport = 0XEF01;
 	TransportHeaderEncap *send_hdr = TransportHeaderEncap::MakeTCPHeader(&ti, opt, optlen);
 	int payload_length = 0;
 	if (p==NULL)
