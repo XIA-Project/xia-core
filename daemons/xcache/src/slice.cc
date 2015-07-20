@@ -1,3 +1,4 @@
+#include "logger.h"
 #include "slice.h"
 #include "meta.h"
 #include "policy.h"
@@ -22,6 +23,8 @@ void xcache_slice::add_meta(xcache_meta *meta)
 
 bool xcache_slice::has_room(xcache_meta *meta)
 {
+	LOG_INFO("Max = %Lu, Current = %Lu, Req = %Lu\n", max_size, current_size, meta->get_length());
+
 	if(max_size - current_size >= meta->get_length())
 		return true;
 	return false;
@@ -42,8 +45,8 @@ void xcache_slice::make_room(xcache_meta *meta)
 		xcache_meta *toRemove = policy.evict();
 		if(toRemove)
 			remove_meta(toRemove);
-		else
-			std::cout << "FIXME: Policy returns nothing to evict\n";
+		// else
+		// 	std::cout << "FIXME: Policy returns nothing to evict\n";
 	}
 }
 
@@ -67,16 +70,12 @@ int xcache_slice::store(xcache_meta *meta)
 	return policy.store(meta);
 }
 
-std::string xcache_slice::search(xcache_cmd *cmd)
+int xcache_slice::get(xcache_meta *meta)
 {
-	std::map<std::string, xcache_meta *>::iterator i;
+	(void) meta;
 
-	i = meta_map.find(cmd->cid());
-	if(i != meta_map.end()) {
-		return i->second->get();
-	}
-
-	return "";
+	/* FIXME: Invoke policy functions */
+	return 0;
 }
 
 void xcache_slice::set_policy(xcache_policy policy)

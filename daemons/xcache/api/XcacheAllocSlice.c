@@ -12,7 +12,7 @@ int XcacheAllocateSlice(struct xcacheSlice *slice, int32_t cache_size, int32_t t
 
 	cmd.set_cmd(xcache_cmd::XCACHE_NEWSLICE);
 	cmd.set_ttl(ttl);
-	cmd.set_cache_policy(cache_size);
+	cmd.set_cache_size(cache_size);
 	cmd.set_cache_policy(cache_policy);
 
 	if((ret = send_command(&cmd)) < 0) {

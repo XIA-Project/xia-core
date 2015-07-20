@@ -16,6 +16,7 @@
 #include "Xkeys.h"
 #include "dagaddr.hpp"
 #include "xcache_sock.h"
+#include <openssl/sha.h>
 
 #define IGNORE_PARAM(__param) ((void)__param)
 
@@ -23,7 +24,7 @@
 
 #define OK_SEND_RESPONSE 1
 #define OK_NO_RESPONSE 0
-#define BAD -1
+#define FAILED -1
 
 static int context_id = 0;
 
@@ -88,19 +89,23 @@ int xcache_controller::fetch_content_remote(xcache_cmd *resp, xcache_cmd *cmd)
 {
 	int ret, sock;
 	socklen_t daglen;
+	sockaddr_x addr;
 
-	std::string dag(cmd->dag());
-	daglen = dag.length();
+	daglen = cmd->dag().length();
+	daglen = daglen;
+
+	memcpy(&addr, cmd->dag().c_str(), cmd->dag().length());
+	Graph g(&addr);
 
 	sock = Xsocket(AF_XIA, SOCK_STREAM, 0);
 	if(sock < 0) {
-		return BAD;
+		return FAILED;
 	}
 
-	LOG_INFO("Fetching content from remote\n");
+	LOG_INFO("Fetching content from remote DAG = %s\n", g.dag_string().c_str());
 
-	if(Xconnect(sock, (struct sockaddr *)dag.c_str(), daglen) < 0) {
-		return BAD;
+	if(Xconnect(sock, (struct sockaddr *)&addr, daglen) < 0) {
+		return FAILED;
 	}
 
 	LOG_INFO("Xcache client now connected with remote\n");
@@ -120,6 +125,26 @@ int xcache_controller::fetch_content_remote(xcache_cmd *resp, xcache_cmd *cmd)
 	return OK_SEND_RESPONSE;
 }
 
+int xcache_controller::fetch_content_local(xcache_cmd *resp, xcache_cmd *cmd)
+{
+	std::map<std::string, xcache_meta *>::iterator i = meta_map.find(cmd->cid());
+	xcache_meta *meta;
+	std::string data;
+
+	LOG_INFO("Fetching content from local\n");
+	
+	if(i == meta_map.end())
+		/* We could not find the content locally */
+		return FAILED;
+
+	meta = i->second;
+	data = meta->get();
+
+	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
+	resp->set_data(data);
+
+	return OK_SEND_RESPONSE;
+}
 int xcache_controller::handle_cmd(xcache_cmd *resp, xcache_cmd *cmd)
 {
 	int ret = OK_NO_RESPONSE;
@@ -132,10 +157,11 @@ int xcache_controller::handle_cmd(xcache_cmd *resp, xcache_cmd *cmd)
 		LOG_INFO("Received Newslice command\n");
 		ret = new_slice(resp, cmd);
 	} else if(cmd->cmd() == xcache_cmd::XCACHE_GETCHUNK) {
-		// FIXME: Handle local fetch
 		LOG_INFO("Received Getchunk command\n");
-		ret = fetch_content_remote(resp, cmd);
-		// ret = search(resp, cmd);
+		ret = fetch_content_local(resp, cmd);
+		if(ret == FAILED) {
+			ret = fetch_content_remote(resp, cmd);
+		}
 	} else if(cmd->cmd() == xcache_cmd::XCACHE_STATUS) {
 		LOG_INFO("Received Status command\n");
 		status();
@@ -159,7 +185,6 @@ xcache_slice *xcache_controller::lookup_slice(xcache_cmd *cmd)
 	}
 }
 
-
 int xcache_controller::new_slice(xcache_cmd *resp, xcache_cmd *cmd)
 {
 	xcache_slice *slice;
@@ -173,6 +198,7 @@ int xcache_controller::new_slice(xcache_cmd *resp, xcache_cmd *cmd)
 
 	// FIXME: Set policy too. slice->set_policy(cmd->cachepolicy());
 	slice->set_ttl(cmd->ttl());
+	LOG_INFO("Setting %Lu\n", cmd->cache_size());
 	slice->set_size(cmd->cache_size());
 
 	slice_map[slice->get_context_id()] = slice;
@@ -180,6 +206,28 @@ int xcache_controller::new_slice(xcache_cmd *resp, xcache_cmd *cmd)
 	resp->set_context_id(slice->get_context_id());
 
 	return OK_SEND_RESPONSE;
+}
+
+
+static std::string hex_str(unsigned char *data, int len)
+{
+	char hexmap[] = {'0', '1', '2', '3', '4', '5', '6', '7',
+					 '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+	std::string s(len * 2, ' ');
+	for (int i = 0; i < len; ++i) {
+		s[2 * i]     = hexmap[(data[i] & 0xF0) >> 4];
+		s[2 * i + 1] = hexmap[data[i] & 0x0F];
+	}
+	return s;
+}
+
+static std::string compute_cid(const char *data, size_t len)
+{
+	unsigned char digest[SHA_DIGEST_LENGTH];
+
+	SHA1((unsigned char *)data, len, digest);
+
+	return hex_str(digest, SHA_DIGEST_LENGTH);
 }
 
 int xcache_controller::store(xcache_cmd *cmd)
@@ -217,40 +265,11 @@ int xcache_controller::store(xcache_cmd *cmd)
 	rv = xr.setRoute(temp_cid, DESTINED_FOR_LOCALHOST, empty_str, 0);
 	LOG_DEBUG("Route Setting Returned %d\n", rv);
 
+	std::cout << "Computed CID " << compute_cid(cmd->data().c_str(), cmd->data().length()) << "\n";
+
 	return store_manager.store(meta, cmd->data());
 }
 
-int xcache_controller::search(xcache_cmd *resp, xcache_cmd *cmd)
-{
-	int xcache_recv_sock = Xsocket(AF_XIA, SOCK_STREAM, 0);
-
-	IGNORE_PARAM(resp);
-
-#ifdef TODOEnableLocalSearch
-	xcache_slice *slice;
-	Graph g(cmd->dag);
-
-	std::cout << "Search Request\n";
-	slice = lookup_slice(cmd);
-	if(!slice) {
-		resp->set_cmd(xcache_cmd::XCACHE_ERROR);
-	} else {
-		std::string data = slice->search(cmd);
-
-		resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
-		resp->set_data(data);
-		std::cout << "Looked up Data = " << data << "\n";
-	}
-#else
-  
-	if(Xconnect(xcache_recv_sock, (struct sockaddr *)&cmd->dag(), sizeof(cmd->dag())) < 0) {
-		LOG_ERROR("Xconnect failed.\n");
-	};
-
-#endif
-
-	return OK_SEND_RESPONSE;
-}
 
 void *xcache_controller::start_xcache(void *arg)
 {
@@ -270,7 +289,7 @@ void *xcache_controller::start_xcache(void *arg)
 	if(XsetXcacheSID(xcache_sock, sid_string, strlen(sid_string)) < 0)
 		return NULL;
 
-	std::cout << "XcacheSID is " << sid_string << "\n";
+	LOG_DEBUG("XcacheSID is %s\n", sid_string);
 
 	struct addrinfo *ai;
 
@@ -304,6 +323,9 @@ void *xcache_controller::start_xcache(void *arg)
 
 		LOG_INFO("Accept Success\n");
  		Graph g(&mypath);
+		Node cid(g.get_final_intent());
+
+
 #define DATA "IfYouReceiveThis!"
  		Xsend(accept_sock, DATA, strlen(DATA), 0);
  		Xclose(accept_sock);

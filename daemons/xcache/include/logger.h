@@ -20,9 +20,9 @@ enum {
 };
 
 /* Basic logging macro */
-#define LOG(_level, fmt, ...)								\
-	do {													\
-		if(_level <= level)									\
+#define LOG(_level, fmt, ...)										\
+	do {															\
+		if(_level <= logger_config.level)							\
 			log(__func__, __LINE__, fmt, ##__VA_ARGS__);	\
 	} while(0)
 
@@ -32,13 +32,12 @@ enum {
 #define LOG_WARN(...) LOG(LOG_WARN, __VA_ARGS__)
 #define LOG_INFO(...) LOG(LOG_INFO, __VA_ARGS__)
 
-/* Current log level */
-extern int level;
-
 /* Configure logging */
 void configure_logger(struct logger_config *);
 
 /* Actuall logging function */
 void log(const char *func, int line, const char *fmt, ...);
+
+extern struct logger_config logger_config;
 
 #endif

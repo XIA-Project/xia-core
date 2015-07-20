@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
 	while(1) {
 		int option_index = 0;
 
-		c = getopt_long(argc, argv, "vh:", options, &option_index);
+		c = getopt_long(argc, argv, "vl:h:", options, &option_index);
 		if(c == -1)
 			break;
 
@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
 				display_version();
 				return 0;
 			} else if(!strcmp(options[option_index].name, "log_level")) {
-				set_log_level(strtol(optarg, NULL, 0));
+				set_log_level(strtol(optarg, NULL, 10));
 				return 0;
 			} else {
 				usage(argv);
@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
 			sethostname(&conf, optarg);
 			break;
 		case 'l':
-			set_log_level(strtol(optarg, NULL, 0));
+			set_log_level(strtol(optarg, NULL, 10));
 			break;
 		case 'v':
 			display_version();

@@ -52,6 +52,7 @@ public:
 	 * FIXME: What do we need to do in the constructor?
 	 */
 	xcache_controller() {
+		hostname.assign("host0");
 	}
 
 	/**
@@ -76,6 +77,11 @@ public:
 	 * chunk is found locally, then no need to fetch from remote.
 	 */
 	int fetch_content_remote(xcache_cmd *, xcache_cmd *);
+
+	/**
+	 * Fetch content locally.
+	 */
+	int fetch_content_local(xcache_cmd *, xcache_cmd *);
 
 	void handle_udp(int); /* Hopefully will go away */
 

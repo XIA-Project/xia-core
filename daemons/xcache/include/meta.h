@@ -62,10 +62,7 @@ public:
 	/**
 	 * Actually read the content.
 	 */
-	std::string get(void) {
-		// FIXME: What about policy decisions?
-		return store->get(this);
-	}
+	std::string get(void);
 
 	/**
 	 * Print information about the meta.

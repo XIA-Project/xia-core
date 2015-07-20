@@ -14,7 +14,7 @@ core
 tags
 .tags*
 *.sublime-workspace
-cscope.out
+*cscope*
 *.o.cmd
 *.ko.cmd
 *.ko

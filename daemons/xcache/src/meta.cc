@@ -10,6 +10,20 @@ xcache_meta::xcache_meta(xcache_cmd *cmd)
 	len = cmd->cid().length();
 }
 
+std::string xcache_meta::get(void)
+{
+
+	std::map<uint32_t, xcache_slice *>::iterator i;
+
+	for(i = slice_map.begin(); i != slice_map.end(); ++i) {
+		xcache_slice *slice = i->second;
+
+		slice->get(this);
+	}
+
+	return store->get(this);
+}
+
 xcache_meta::xcache_meta()
 {
 	store = NULL;
