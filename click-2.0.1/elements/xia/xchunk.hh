@@ -19,12 +19,6 @@
 #include "xtransport.hh"
 #include "clicknet/tcp_fsm.h"
 
-
-static u_char	tcp_outflags[TCP_NSTATES] = {
-    TH_RST|TH_ACK, 0, TH_SYN, TH_SYN|TH_ACK,
-    TH_ACK, TH_ACK,
-    TH_FIN|TH_ACK, TH_FIN|TH_ACK, TH_FIN|TH_ACK, TH_ACK, TH_ACK,
-};
 #if CLICK_USERLEVEL
 #include <list>
 #include <stdio.h>
@@ -64,44 +58,44 @@ using namespace xia;
 #define TCP_REXMTVAL(tp) \
 	(((tp)->t_srtt >> TCP_RTT_SHIFT) + (tp)->t_rttvar)
 
-/*
- * (BSD)
- * Flags used when sending segments in tcp_output.  Basic flags (TH_RST,
- * TH_ACK,TH_SYN,TH_FIN) are totally determined by state, with the proviso
- * that TH_FIN is sent only if all data queued for output is included in the
- * segment. See definition of flags in xiatransportheader.hh
- */
-//static const uint8_t  tcp_outflags[TCP_NSTATES] = {
-//      TH_RST|TH_ACK,      /* 0, CLOSED */
-//      0,          /* 1, LISTEN */
-//      TH_SYN,         /* 2, SYN_SENT */
-//      TH_SYN|TH_ACK,      /* 3, SYN_RECEIVED */
-//      TH_ACK,         /* 4, ESTABLISHED */
-//      TH_ACK,         /* 5, CLOSE_WAIT */
-//      TH_FIN|TH_ACK,      /* 6, FIN_WAIT_1 */
-//      TH_FIN|TH_ACK,      /* 7, CLOSING */
-//      TH_FIN|TH_ACK,      /* 8, LAST_ACK */
-//      TH_ACK,         /* 9, FIN_WAIT_2 */
-//      TH_ACK,         /* 10, TIME_WAIT */
-//  };
-
-struct mini_tcpip
-{
-	uint16_t ti_len;
-	uint32_t ti_seq;
-	uint32_t ti_ack;
-	uint16_t ti_off;
-	uint16_t ti_flags;
-	uint16_t ti_win;
-	uint16_t ti_urp;
-};
 
 #define TCPOUTFLAGS
 
 CLICK_DECLS
 
 class XChunk;
-// Queue of packets from transport to socket layer
+
+class XChunk  : public sock {
+
+public:
+	XChunk(XTRANSPORT *transport, unsigned short port);
+	XChunk(){};
+	~XChunk() {};
+	int read_from_recv_buf(XSocketMsg *xia_socket_msg);
+	void check_for_and_handle_pending_recv();
+	/* TCP related core functions */
+	void 	tcp_input(WritablePacket *p);
+	void 	tcp_output();
+	int		usrsend(WritablePacket *p);
+	void    usrclosed() ;
+	void 	usropen();
+	void	tcp_timers(int timer);
+	void 	fasttimo();
+	void 	slowtimo();
+	void push(Packet *_p);
+	int verbosity();
+#define SO_STATE_HASDATA	0x01
+#define SO_STATE_ISCHOKED   0x10
+
+	// short state() const { return tp->t_state; }
+	bool has_pullable_data() { return !_q_recv.is_empty() && SEQ_LT(_q_recv.first(), tp->rcv_nxt); }
+	void print_state(StringAccum &sa);
+
+    // XTRANSPORT *get_transport() { return transport; }
+	tcpcb 		*tp;
+	sock *listening_sock;
+private:
+	// Queue of packets from transport to socket layer
 class TCPQueue {
 
 	class TCPQueueElt {
@@ -190,37 +184,6 @@ private:
 	XChunk *_con;   /* The XChunk to which I belong */
 	int verbosity();
 };
-
-class XChunk  : public sock {
-
-public:
-	XChunk(XTRANSPORT *transport, unsigned short port);
-	XChunk(){};
-	~XChunk() {};
-	int read_from_recv_buf(XSocketMsg *xia_socket_msg);
-	void check_for_and_handle_pending_recv();
-	/* TCP related core functions */
-	void 	tcp_input(WritablePacket *p);
-	void 	tcp_output();
-	int		usrsend(WritablePacket *p);
-	void    usrclosed() ;
-	void 	usropen();
-	void	tcp_timers(int timer);
-	void 	fasttimo();
-	void 	slowtimo();
-	void push(Packet *_p);
-	int verbosity();
-#define SO_STATE_HASDATA	0x01
-#define SO_STATE_ISCHOKED   0x10
-
-	// short state() const { return tp->t_state; }
-	bool has_pullable_data() { return !_q_recv.is_empty() && SEQ_LT(_q_recv.first(), tp->rcv_nxt); }
-	void print_state(StringAccum &sa);
-
-    // XTRANSPORT *get_transport() { return transport; }
-	tcpcb 		*tp;
-	sock *listening_sock;
-private:
     void set_state(const HandlerState s);
 
 	void 		_tcp_dooptions(u_char *cp, int cnt, uint8_t th_flags, 
@@ -308,10 +271,10 @@ inline int
 XChunk::verbosity()  { return get_transport()->verbosity(); }
 
 inline int
-TCPQueue::verbosity() { return _con->sock::get_transport()->verbosity(); }
+XChunk::TCPQueue::verbosity() { return _con->sock::get_transport()->verbosity(); }
 
 inline int
-TCPFifo::verbosity()  { return _con->get_transport()->verbosity(); }
+XChunk::TCPFifo::verbosity()  { return _con->get_transport()->verbosity(); }
 
 
 

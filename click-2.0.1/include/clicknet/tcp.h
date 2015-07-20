@@ -51,6 +51,17 @@ struct click_tcp {
     uint16_t    th_urp;         /* 18-19 urgent pointer          */
 };
 
+struct mini_tcpip
+{
+    uint16_t ti_len;
+    uint32_t ti_seq;
+    uint32_t ti_ack;
+    uint16_t ti_off;
+    uint16_t ti_flags;
+    uint16_t ti_win;
+    uint16_t ti_urp;
+};
+
 /*
  * TCP sequence number comparisons
  */

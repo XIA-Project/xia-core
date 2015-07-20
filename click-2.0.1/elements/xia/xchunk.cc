@@ -8,7 +8,7 @@
 #include <click/vector.hh>
 
 
-#include "XChunk.hh"
+#include "xchunk.hh"
 #include "xtransport.hh"
 #include <click/xiatransportheader.hh>
 
@@ -32,6 +32,14 @@
 #define _tcp_sendseqinit(tp) \
     (tp)->snd_una = (tp)->snd_nxt = (tp)->snd_max = \
 (tp)->snd_up = (tp)->iss
+
+extern int	tcp_backoff[TCP_MAXRXTSHIFT + 1];
+
+static u_char	tcp_outflags_c[TCP_NSTATES] = {
+    TH_RST|TH_ACK, 0, TH_SYN, TH_SYN|TH_ACK,
+    TH_ACK, TH_ACK,
+    TH_FIN|TH_ACK, TH_FIN|TH_ACK, TH_FIN|TH_ACK, TH_ACK, TH_ACK,
+};
 
 CLICK_DECLS
 
@@ -1024,7 +1032,7 @@ again:
 	 * first data byte to send - a.k.a. bytes already sent, but unacked*/
     off = tp->snd_nxt - tp->snd_una; 
     win = min(tp->snd_wnd, tp->snd_cwnd); 
-    flags = tcp_outflags[tp->t_state]; 
+    flags = tcp_outflags_c[tp->t_state]; 
     // printf("flags: %d\n", flags);
     // printf("t_state %d\n", tp->t_state);
     /*80*/
@@ -1419,9 +1427,6 @@ XChunk::slowtimo() {
 	if (tp->t_rtt) 
 	    tp->t_rtt++;
 }
-
-int	tcp_backoff[TCP_MAXRXTSHIFT + 1] =
-    { 1, 2, 4, 8, 16, 32, 64, 64, 64, 64, 64, 64, 64 };
 
 void
 XChunk::tcp_timers (int timer) { 
@@ -2041,18 +2046,18 @@ XChunk::XChunk(XTRANSPORT *transport, const unsigned short port)
  *  queues doesn't help, since we need to be able to queue packets in random
  *  order.
  */ 
-TCPQueue::TCPQueue(XChunk *con)
+XChunk::TCPQueue::TCPQueue(XChunk *con)
 { 
 	_con = con ;
 	_q_first = _q_last = _q_tail = NULL; 
 }
 
 
-TCPQueue::~TCPQueue() {}
+XChunk::TCPQueue::~TCPQueue() {}
 
 
 int 
-TCPQueue::push(WritablePacket * p, tcp_seq_t seq, tcp_seq_t seq_nxt)
+XChunk::TCPQueue::push(WritablePacket * p, tcp_seq_t seq, tcp_seq_t seq_nxt)
 {
 	if (p == NULL)
 	{
@@ -2089,7 +2094,7 @@ TCPQueue::push(WritablePacket * p, tcp_seq_t seq, tcp_seq_t seq_nxt)
 		if (!qe) { return -2; }
 		_q_first = _q_last = _q_tail = qe; 
 		qe->nxt = NULL; 
-		//debug_output(VERB_TCPQUEUE, "[%s] TCPQueue::push (empty)", _con->SPKRNAME); 
+		//debug_output(VERB_TCPQUEUE, "[%s] XChunk::TCPQueue::push (empty)", _con->SPKRNAME); 
 		//debug_output(VERB_TCPQUEUE, "%s", pretty_print(sa, 60)->c_str()); 
 		return 0; 
     }
@@ -2114,7 +2119,7 @@ TCPQueue::push(WritablePacket * p, tcp_seq_t seq, tcp_seq_t seq_nxt)
 		if (_q_last == NULL)
 			loop_last();
 
-		//debug_output(VERB_TCPQUEUE, "[%s] TCPQueue::push (%s)", _con->SPKRNAME,
+		//debug_output(VERB_TCPQUEUE, "[%s] XChunk::TCPQueue::push (%s)", _con->SPKRNAME,
 			// perfect?"perfect tail":"tail"); 
 		//debug_output(VERB_TCPQUEUE, "%s", pretty_print(sa, 60)->c_str()); 
 		return 0; 
@@ -2160,7 +2165,7 @@ TCPQueue::push(WritablePacket * p, tcp_seq_t seq, tcp_seq_t seq_nxt)
 		if (_q_first->seq_nxt < _q_first->nxt->seq)
 			_q_last = _q_first;
 
-		//debug_output(VERB_TCPQUEUE, "[%s] TCPQueue::push (head)", _con->SPKRNAME); 
+		//debug_output(VERB_TCPQUEUE, "[%s] XChunk::TCPQueue::push (head)", _con->SPKRNAME); 
 		//debug_output(VERB_TCPQUEUE, "%s", pretty_print(sa, 60)->c_str()); 
 		return 0; 
 	} 
@@ -2224,14 +2229,14 @@ TCPQueue::push(WritablePacket * p, tcp_seq_t seq, tcp_seq_t seq_nxt)
 
 	loop_last();
     
-	//debug_output(VERB_TCPQUEUE, "[%s] TCPQueue::push (default)", _con->SPKRNAME); 
+	//debug_output(VERB_TCPQUEUE, "[%s] XChunk::TCPQueue::push (default)", _con->SPKRNAME); 
 	//debug_output(VERB_TCPQUEUE, "%s", pretty_print(sa, 60)->c_str()); 
     return 0; 
 }
 
 /* In the case that we closed a gap, we can move _q_last toward _q_tail */
 void
-TCPQueue::loop_last()
+XChunk::TCPQueue::loop_last()
 {
 	// If q_last is null, begin at q_first (important in CASE3)
 	TCPQueueElt *wrk = (_q_last ? _q_last : _q_first);
@@ -2245,7 +2250,7 @@ TCPQueue::loop_last()
 }
 
 WritablePacket * 
-TCPQueue::pull_front()
+XChunk::TCPQueue::pull_front()
 {
 	WritablePacket	*p = NULL; 
 	TCPQueueElt 	*e = NULL; 
@@ -2286,7 +2291,7 @@ TCPQueue::pull_front()
 
 
 StringAccum *
-TCPQueue::pretty_print(StringAccum &sa, int signed_width)
+XChunk::TCPQueue::pretty_print(StringAccum &sa, int signed_width)
 { 
 	tcp_seq_t head = 0;
 	tcp_seq_t exp = 0;
@@ -2358,7 +2363,7 @@ TCPQueue::pretty_print(StringAccum &sa, int signed_width)
 }
 
 
-TCPFifo::TCPFifo(XChunk *con)
+XChunk::TCPFifo::TCPFifo(XChunk *con)
 { 
 	_con = con;
 	_q = (WritablePacket**) CLICK_LALLOC(sizeof(WritablePacket *) * FIFO_SIZE); 
@@ -2366,7 +2371,7 @@ TCPFifo::TCPFifo(XChunk *con)
 }
 
 
-TCPFifo::~TCPFifo()
+XChunk::TCPFifo::~TCPFifo()
 { 
 	for (int i=_tail; i!= _head; i = (i + 1) % FIFO_SIZE)
 	    _q[i]->kill(); 
@@ -2375,12 +2380,12 @@ TCPFifo::~TCPFifo()
 
 
 int
-TCPFifo::push(WritablePacket *p)
+XChunk::TCPFifo::push(WritablePacket *p)
 { 
-	//click_chatter("tcpfifo::push pushing [%x]", p);
+	//click_chatter("XChunk::TCPFifo::push pushing [%x]", p);
 	if ((_head + 1) % FIFO_SIZE == _tail) {
 	    p->kill(); 
-		//click_chatter("tcpfifo::push had to kill packet");
+		//click_chatter("XChunk::TCPFifo::push had to kill packet");
 	    return -1 ; 
 	}
 	_q[_head] = p; 
@@ -2392,7 +2397,7 @@ TCPFifo::push(WritablePacket *p)
 
 /* the function name lies: retval of 2 actually means "2 or more" */
 int
-TCPFifo::pkts_to_send(int offset, int win)
+XChunk::TCPFifo::pkts_to_send(int offset, int win)
 { 
 	if (is_empty()) return 0; 
 	if (offset >= win) return 0; 
@@ -2421,7 +2426,7 @@ TCPFifo::pkts_to_send(int offset, int win)
 
 /* get a piece of payload starting at <offset> bytes from the tail */ 
 WritablePacket * 
-TCPFifo::get(tcp_seq_t offset)
+XChunk::TCPFifo::get(tcp_seq_t offset)
 { 
 	WritablePacket * retval; 
 	int wp = _tail; 
@@ -2449,7 +2454,7 @@ TCPFifo::get(tcp_seq_t offset)
 
 
 WritablePacket *
-TCPFifo::pull()
+XChunk::TCPFifo::pull()
 { 
 	WritablePacket *p; 
 	if (_head == _tail) return NULL; 
@@ -2463,7 +2468,7 @@ TCPFifo::pull()
 /* Drop <offset> bytes from tail of the fifo by killing the packet and possibly
  * taking excess bytes from the last packet */ 
 void 
-TCPFifo::drop_until(tcp_seq_t offset) 
+XChunk::TCPFifo::drop_until(tcp_seq_t offset) 
 { 
 	tcp_seq_t wo = 0; 
 	

@@ -25,6 +25,7 @@ static u_char	tcp_outflags[TCP_NSTATES] = {
     TH_ACK, TH_ACK,
     TH_FIN|TH_ACK, TH_FIN|TH_ACK, TH_FIN|TH_ACK, TH_ACK, TH_ACK,
 };
+
 #if CLICK_USERLEVEL
 #include <list>
 #include <stdio.h>
@@ -84,17 +85,6 @@ using namespace xia;
 //      TH_ACK,         /* 9, FIN_WAIT_2 */
 //      TH_ACK,         /* 10, TIME_WAIT */
 //  };
-
-struct mini_tcpip
-{
-	uint16_t ti_len;
-	uint32_t ti_seq;
-	uint32_t ti_ack;
-	uint16_t ti_off;
-	uint16_t ti_flags;
-	uint16_t ti_win;
-	uint16_t ti_urp;
-};
 
 #define TCPOUTFLAGS
 
