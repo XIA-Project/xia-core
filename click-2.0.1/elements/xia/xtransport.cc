@@ -14,6 +14,7 @@
 #include "xlog.hh"
 #include "xdatagram.hh"
 #include "xstream.hh"
+#include "xchunk.hh"
 /*
 ** FIXME:
 ** - set saner retransmit values before we get backoff code
