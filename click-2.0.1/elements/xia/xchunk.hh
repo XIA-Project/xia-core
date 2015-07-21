@@ -19,6 +19,8 @@
 #include "xtransport.hh"
 #include "clicknet/tcp_fsm.h"
 
+
+
 #if CLICK_USERLEVEL
 #include <list>
 #include <stdio.h>
@@ -58,66 +60,56 @@ using namespace xia;
 #define TCP_REXMTVAL(tp) \
 	(((tp)->t_srtt >> TCP_RTT_SHIFT) + (tp)->t_rttvar)
 
+/*
+ * (BSD)
+ * Flags used when sending segments in tcp_output.  Basic flags (TH_RST,
+ * TH_ACK,TH_SYN,TH_FIN) are totally determined by state, with the proviso
+ * that TH_FIN is sent only if all data queued for output is included in the
+ * segment. See definition of flags in xiatransportheader.hh
+ */
+//static const uint8_t  tcp_outflags[TCP_NSTATES] = {
+//      TH_RST|TH_ACK,      /* 0, CLOSED */
+//      0,          /* 1, LISTEN */
+//      TH_SYN,         /* 2, SYN_SENT */
+//      TH_SYN|TH_ACK,      /* 3, SYN_RECEIVED */
+//      TH_ACK,         /* 4, ESTABLISHED */
+//      TH_ACK,         /* 5, CLOSE_WAIT */
+//      TH_FIN|TH_ACK,      /* 6, FIN_WAIT_1 */
+//      TH_FIN|TH_ACK,      /* 7, CLOSING */
+//      TH_FIN|TH_ACK,      /* 8, LAST_ACK */
+//      TH_ACK,         /* 9, FIN_WAIT_2 */
+//      TH_ACK,         /* 10, TIME_WAIT */
+//  };
 
 #define TCPOUTFLAGS
 
 CLICK_DECLS
 
 class XChunk;
+// Queue of packets from transport to socket layer
+class CTCPQueue {
 
-class XChunk  : public sock {
-
-public:
-	XChunk(XTRANSPORT *transport, unsigned short port);
-	XChunk(){};
-	~XChunk() {};
-	int read_from_recv_buf(XSocketMsg *xia_socket_msg);
-	void check_for_and_handle_pending_recv();
-	/* TCP related core functions */
-	void 	tcp_input(WritablePacket *p);
-	void 	tcp_output();
-	int		usrsend(WritablePacket *p);
-	void    usrclosed() ;
-	void 	usropen();
-	void	tcp_timers(int timer);
-	void 	fasttimo();
-	void 	slowtimo();
-	void push(Packet *_p);
-	int verbosity();
-#define SO_STATE_HASDATA	0x01
-#define SO_STATE_ISCHOKED   0x10
-
-	// short state() const { return tp->t_state; }
-	bool has_pullable_data() { return !_q_recv.is_empty() && SEQ_LT(_q_recv.first(), tp->rcv_nxt); }
-	void print_state(StringAccum &sa);
-
-    // XTRANSPORT *get_transport() { return transport; }
-	tcpcb 		*tp;
-	sock *listening_sock;
-private:
-	// Queue of packets from transport to socket layer
-class TCPQueue {
-
-	class TCPQueueElt {
+	class CTCPQueueElt {
 	public:
-		TCPQueueElt(WritablePacket *p, tcp_seq_t s, tcp_seq_t n) {
+		CTCPQueueElt(WritablePacket *p, tcp_seq_t s, tcp_seq_t n) {
 			_p = p;
 			seq = s;
 			seq_nxt = n;
 			nxt = NULL;
 		}
 
-		~TCPQueueElt() {};
+		~CTCPQueueElt() {};
 		WritablePacket 	*_p;
-		TCPQueueElt 	*nxt;
+		CTCPQueueElt 	*nxt;
 		tcp_seq_t		seq;
 		tcp_seq_t		seq_nxt;
 	};
 
 public:
-	TCPQueue(XChunk *con);
-	TCPQueue(){};
-	~TCPQueue();
+	CTCPQueue(XChunk *con) {_con = con ;
+	_q_first = _q_last = _q_tail = NULL; };
+	// CTCPQueue(){};
+	// ~CTCPQueue();
 
 	int push(WritablePacket *p, tcp_seq_t seq, tcp_seq_t seq_nxt);
 	void loop_last();
@@ -143,25 +135,29 @@ private:
 	int verbosity();
 	XChunk *_con;   /* The XChunk to which I belong */
 
-	TCPQueueElt *_q_first; /* The first segment in the queue
+	CTCPQueueElt *_q_first; /* The first segment in the queue
 							 (a.k.a. the head element) */
-	TCPQueueElt *_q_last;  /* The last segment of ordered data
+	CTCPQueueElt *_q_last;  /* The last segment of ordered data
 							 in the queue (a.k.a. the last
 							 segment before a gap occurs)  */
-	TCPQueueElt *_q_tail;   /* The very last segment in the queue
+	CTCPQueueElt *_q_tail;   /* The very last segment in the queue
 							 (a.k.a. the next expected in-order
 							 ariving segment should be inserted
 							 after this segment )  */
 };
 
 // Queue of packets from socket layer to transport
-class TCPFifo
+class CTCPFifo
 {
 public:
 #define FIFO_SIZE 256
-	TCPFifo(XChunk *con);
-	TCPFifo(){};
-	~TCPFifo();
+	CTCPFifo(XChunk *con) {
+			_con = con;
+	_q = (WritablePacket**) CLICK_LALLOC(sizeof(WritablePacket *) * FIFO_SIZE); 
+	_head = _tail = _bytes = 0; 
+};
+	// CTCPFifo(){};
+	~CTCPFifo() {};
 	int 	push(WritablePacket *);
 	int 	pkt_length() { return (_head - _tail) % FIFO_SIZE; }
 	bool 	is_empty() { return ( 0 == pkt_length()) ; }
@@ -184,6 +180,37 @@ private:
 	XChunk *_con;   /* The XChunk to which I belong */
 	int verbosity();
 };
+
+class XChunk  : public sock {
+
+public:
+	XChunk(XTRANSPORT *transport, unsigned short port);
+	// XChunk(){};
+	// ~XChunk() {};
+	int read_from_recv_buf(XSocketMsg *xia_socket_msg);
+	void check_for_and_handle_pending_recv();
+	/* TCP related core functions */
+	void 	tcp_input(WritablePacket *p);
+	void 	tcp_output();
+	int		usrsend(WritablePacket *p);
+	void    usrclosed() ;
+	void 	usropen();
+	void	tcp_timers(int timer);
+	void 	fasttimo();
+	void 	slowtimo();
+	void push(Packet *_p);
+	int verbosity();
+#define SO_STATE_HASDATA	0x01
+#define SO_STATE_ISCHOKED   0x10
+
+	// short state() const { return tp->t_state; }
+	bool has_pullable_data() { return !_q_recv.is_empty() && SEQ_LT(_q_recv.first(), tp->rcv_nxt); }
+	void print_state(StringAccum &sa);
+
+    // XTRANSPORT *get_transport() { return transport; }
+	tcpcb 		*tp;
+	sock *listening_sock;
+private:
     void set_state(const HandlerState s);
 
 	void 		_tcp_dooptions(u_char *cp, int cnt, uint8_t th_flags, 
@@ -201,12 +228,23 @@ private:
 	short tcp_state() const { return tp->t_state; }
 
 	
-	TCPFifo		_q_usr_input;
-	TCPQueue	_q_recv;
+	CTCPFifo		_q_usr_input;
+	CTCPQueue	_q_recv;
 	tcp_seq_t	so_recv_buffer_size;
 	int			_so_state;
 
 } ;
+
+XChunk::XChunk(XTRANSPORT *transport, const unsigned short port):
+sock(transport, port, XSOCKET_CHUNK) , _q_usr_input(this), _q_recv(this){
+
+
+    so_recv_buffer_size = get_transport()->globals()->so_recv_buffer_size; 
+    
+    _so_state = 0; 
+
+}
+
 
 /* THE method where we register, and handle any TCP State Updates */
 inline void
@@ -271,10 +309,10 @@ inline int
 XChunk::verbosity()  { return get_transport()->verbosity(); }
 
 inline int
-XChunk::TCPQueue::verbosity() { return _con->sock::get_transport()->verbosity(); }
+CTCPQueue::verbosity() { return _con->sock::get_transport()->verbosity(); }
 
 inline int
-XChunk::TCPFifo::verbosity()  { return _con->get_transport()->verbosity(); }
+CTCPFifo::verbosity()  { return _con->get_transport()->verbosity(); }
 
 
 
