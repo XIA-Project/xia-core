@@ -2144,23 +2144,24 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 		ChangeState(new_sk, CONNECTED);
 		CancelRetransmit(new_sk);
 
+		// push this socket into pending_connection_buf and let Xaccept handle that
 		sk->pending_connection_buf.push(new_sk);
 
-		// push this socket into pending_connection_buf and let Xaccept handle that
+		// finish the connection handshake
+		XIDpairToConnectPending.erase(xid_pair);
 
+		if (sk->polling) {
+			// tell API we are live
+			ProcessPollEvent(sk->port, POLLIN|POLLOUT);
+		}
 		// If the app is ready for a new connection, alert it
 		if (!sk->pendingAccepts.empty()) {
 			xia::XSocketMsg *acceptXSM = sk->pendingAccepts.front();
-			ReturnResult(sk->port, acceptXSM);
+			// FIXME: can I just use pop in the line above?
 			sk->pendingAccepts.pop();
+			ReturnResult(sk->port, acceptXSM);
 			delete acceptXSM;
 		}
-		if (sk->polling) {
-			// tell API we are writeable
-			ProcessPollEvent(sk->port, POLLIN|POLLOUT);
-		}
-		// finish the connection handshake
-		XIDpairToConnectPending.erase(xid_pair);
 
 	} else if (sk->state == FIN_WAIT1) {
 		INFO("Socket %d FIN-ACK received\n", sk->port);
@@ -2884,16 +2885,20 @@ void XTRANSPORT::XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 
 void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
+	int control_port = _sport;
+
+	xia::X_Close_Msg *xcm = xia_socket_msg->mutable_x_close();
+	_sport = xcm->port();
+
 	sock *sk = portToSock.get(_sport);
 	bool teardown_now = true;
-
-	INFO("closing %d %d sk = %p state=%s refcount=%d\n", _sport, sk->port, sk, StateStr(sk->state), sk->refcount);
 
 	if (!sk) {
 		// this shouldn't happen!
 		ERROR("Invalid socket %d\n", _sport);
 		goto done;
 	}
+	INFO("closing %d %d sk = %p state=%s refcount=%d\n", _sport, sk->port, sk, StateStr(sk->state), sk->refcount);
 
 	assert(sk->refcount != 0);
 
@@ -2927,10 +2932,10 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	}
 
 done:
-	xia::X_Close_Msg *xcm = xia_socket_msg->mutable_x_close();
+//	INFO("Close :%d seq:%d\n", sk->port, xcm->sequence());
 	xcm->set_refcount(sk->refcount);
-
-	ReturnResult(_sport, xia_socket_msg);
+	xcm->set_delkeys(sk->isAcceptedSocket == false);
+	ReturnResult(control_port, xia_socket_msg);
 }
 
 
@@ -3040,6 +3045,7 @@ void XTRANSPORT::XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_sock
 
 		ReturnResult(_sport, xia_socket_msg);
 
+
 	} else if (xia_socket_msg->blocking()) {
 		// If not and we are blocking, add this request to the pendingAccept queue and wait
 
@@ -3067,6 +3073,8 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	sock *sk = portToSock.get(_sport);
 
 	DBG("_sport %d, new_port %d seq:%d\n", _sport, new_port, xia_socket_msg->sequence());
+	DBG("p buf size = %d\n", sk->pending_connection_buf.size());
+	DBG("blocking = %d\n", sk->isBlocking);
 
 	sk->hlim = HLIM_DEFAULT;
 	sk->nxt_xport = CLICK_XIA_NXT_TRN;
@@ -3157,15 +3165,14 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		x_accept_msg->set_remote_dag(new_sk->dst_path.unparse().c_str()); // remote endpoint is dest from our perspective
 
 	} else {
-		// FIXME: how is this happening on a blocking socket?????????
+		// FIXME: THIS BETTER NOT HAPPEN!
+		INFO("Got EWOULDBLOCK on a blocking accept!");
 		rc = -1;
 		ec = EWOULDBLOCK;
 		goto Xaccept_done;
 	}
 
 Xaccept_done:
-
-DBG("rc:%d errno:%d\n", rc, ec);
 	ReturnResult(_sport, xia_socket_msg, rc, ec);
 }
 

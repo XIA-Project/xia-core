@@ -63,13 +63,7 @@ static int makeList(bool increment)
 		fm->set_increment(increment);
 		fm->set_count(count);
 
-		// make socket by hand so it doen't show in click's socket list
-		if ((sock = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
-			LOGF("error creating Xpoll socket: %s", strerror(errno));
-			rc = -1;
-			goto done;
-		}
-		allocSocketState(sock, SOCK_DGRAM);
+		sock = MakeApiSocket(SOCK_DGRAM);
 
 		LOG("sending socket list to click");
 		if ((rc = click_send(sock, &xsm)) < 0) {

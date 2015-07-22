@@ -127,6 +127,7 @@ void __attribute__ ((destructor)) api_destruct(void)
 	SMap::iterator it;
 
 	for (it = sockets->begin(); it != sockets->end(); it++) {
+		LOGF("closing %d", it->first);
 		Xclose(it->first);
 	}
 }

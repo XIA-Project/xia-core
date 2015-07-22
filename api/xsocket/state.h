@@ -33,7 +33,7 @@ class SocketState
 {
 public:
 	SocketState();
-	SocketState(int tt);
+	SocketState(int tt, unsigned short port = 0);
 	~SocketState();
 
 	int transportType() { return m_transportType; };
@@ -65,6 +65,9 @@ public:
 	int isSIDAssigned() { return m_sid_assigned; };
 	void setSIDAssigned() { m_sid_assigned = 1; };
 
+	unsigned short port() { return m_port; };
+	void setPort(unsigned short port) { m_port = port; };
+
 	int isTempSID() { return (m_temp_sid == NULL) ? 0 : 1;};
 	void setTempSID(const char *sid);
 	const char *getTempSID() {return m_temp_sid;};
@@ -80,6 +83,7 @@ private:
 	char *m_temp_sid;
 	int m_sid_assigned;
 	unsigned m_sequence;
+	unsigned short m_port;
 	struct timeval m_timeout;
 	pthread_mutex_t m_sequence_lock;
 	map<unsigned, string> m_packets;
@@ -95,7 +99,7 @@ public:
 
 	static SocketMap *getMap();
 
-	void add(int sock, int tt);
+	void add(int sock, int tt, unsigned short port);
 	void remove(int sock);
 	SocketState *get(int sock);
 	void lock(void) { pthread_rwlock_rdlock(&rwlock); };

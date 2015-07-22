@@ -23,16 +23,18 @@
 #include <pthread.h>
 #include <string.h>
 #include <assert.h>
+#include <errno.h>
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
 #include "state.h"
 
 
-SocketState::SocketState(int tt)
+SocketState::SocketState(int tt, unsigned short port)
 {
 	init();
 	m_transportType = tt;
+	m_port = port;
 }
 
 SocketState::SocketState()
@@ -44,6 +46,8 @@ SocketState::~SocketState()
 {
 	if (m_peer)
 		free(m_peer);
+	if (m_temp_sid)
+		delete(m_temp_sid);
 	m_packets.clear();
 	pthread_mutex_destroy(&m_sequence_lock);
 }
@@ -61,6 +65,7 @@ void SocketState::init()
 	m_debug = 0;
 	m_timeout.tv_sec = 0;
 	m_timeout.tv_usec = 0;
+	m_port = 0;
 	pthread_mutex_init(&m_sequence_lock, NULL);
 }
 
@@ -88,7 +93,6 @@ int SocketState::getPacket(unsigned seq, char *buf, unsigned buflen)
 	if (it != m_packets.end()) {
 		string s = it->second;
 
-printf("getting a packet\n");
 		rc = MIN(buflen, s.size());
 		memcpy(buf, s.c_str(), rc);
 
@@ -105,12 +109,12 @@ void SocketState::insertPacket(unsigned seq, char *buf, unsigned buflen)
 }
 
 unsigned SocketState::seqNo()
-{ 
+{
 	pthread_mutex_lock(&m_sequence_lock);
 	unsigned seq = m_sequence++;
 	pthread_mutex_unlock(&m_sequence_lock);
 
-	return seq; 
+	return seq;
 }
 
 
@@ -145,12 +149,12 @@ SocketMap *SocketMap::getMap()
 	return instance;
 }
 
-void SocketMap::add(int sock, int tt)
+void SocketMap::add(int sock, int tt, unsigned short port)
 {
 	SocketMap *state = getMap();
 	pthread_rwlock_wrlock(&rwlock);
 	if (state->sockets[sock] == 0)
-		state->sockets[sock] = new SocketState(tt);
+		state->sockets[sock] = new SocketState(tt, port);
 	pthread_rwlock_unlock(&rwlock);
 }
 
@@ -191,9 +195,9 @@ int SocketState::setPeer(const sockaddr_x *peer)
 
 // extern "C" {
 
-void allocSocketState(int sock, int tt)
+void allocSocketState(int sock, int tt, unsigned short port)
 {
-	SocketMap::getMap()->add(sock, tt);
+	SocketMap::getMap()->add(sock, tt, port);
 }
 
 void freeSocketState(int sock)
@@ -349,6 +353,15 @@ unsigned seqNo(int sock)
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
 		return sstate->seqNo();
+	else
+		return 0;
+}
+
+unsigned short getPort(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		return sstate->port();
 	else
 		return 0;
 }

@@ -94,12 +94,11 @@ int Xsocket(int family, int transport_type, int protocol)
 			return -1;
 	}
 
-	if ((sockfd = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
+
+	if ((sockfd = MakeApiSocket(transport_type)) == -1) {
 		LOGF("error creating Xsocket: %s", strerror(errno));
 		return -1;
 	}
-
-	allocSocketState(sockfd, transport_type);
 
 	// protobuf message
 	xia::XSocketMsg xsm;
