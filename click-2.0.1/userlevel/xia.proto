@@ -22,7 +22,7 @@ enum XSocketCallType {
   XREQUESTFAILED = 17;
   //XRESULT = 18;
 
-  XCHANGEAD = 19;
+  XUPDATEDAG = 19;
   XREADLOCALHOSTADDR = 20;
   XUPDATENAMESERVERDAG = 21;
   XREADNAMESERVERDAG = 22;
@@ -72,7 +72,7 @@ message XSocketMsg {
   optional X_Requestfailed_Msg x_requestfailed= 20;
   optional X_Result_Msg x_result = 21;
 
-  optional X_Changead_Msg x_changead = 22;
+  optional X_Updatedag_Msg x_updatedag = 22;
   optional X_ReadLocalHostAddr_Msg x_readlocalhostaddr = 23;
   optional X_Updatenameserverdag_Msg x_updatenameserverdag = 24;
   optional X_ReadNameServerDag_Msg x_readnameserverdag = 25;
@@ -207,7 +207,7 @@ message X_Requestfailed_Msg {
   optional string temp = 2; // currently not used
 }
 
-message X_Changead_Msg {
+message X_Updatedag_Msg {
   required int32 interface = 1;
   required string dag = 2;
   optional string ip4id = 3;

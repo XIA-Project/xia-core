@@ -419,7 +419,7 @@ int main(int argc, char *argv[]) {
 
 		if(network_changed) {
 			// Update Click
-			if(XupdateAD(sockfd, ifID, beacon.getRouterDAG().c_str(), beacon.getRouter4ID().c_str()) < 0) {
+			if(XupdateDAG(sockfd, ifID, beacon.getRouterDAG().c_str(), beacon.getRouter4ID().c_str()) < 0) {
 				syslog(LOG_WARNING, "Error updating new AD in Click");
 			}
 			Graph old_dag(iface.getRouterDAG().c_str());

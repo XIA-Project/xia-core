@@ -2575,8 +2575,8 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XACCEPT:
 		Xaccept(_sport, &xia_socket_msg);
 		break;
-	case xia::XCHANGEAD:
-		Xchangead(_sport, &xia_socket_msg);
+	case xia::XUPDATEDAG:
+		Xupdatedag(_sport, &xia_socket_msg);
 		break;
 	case xia::XREADLOCALHOSTADDR:
 		Xreadlocalhostaddr(_sport, &xia_socket_msg);
@@ -3443,7 +3443,7 @@ void XTRANSPORT::Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 
 
-void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xupdatedag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
 	// sock may need to store _hid, _sid, _network_dag to allow _network_dag to change
 	// Find the interface corresponding to this change
@@ -3464,18 +3464,18 @@ void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 
 	// Retrieve interface number and router's DAG from API message
 	XIAPath router_dag;
-	xia::X_Changead_Msg *x_changead_msg = xia_socket_msg->mutable_x_changead();
-	int interface = x_changead_msg->interface();
-	click_chatter("XTRANSPORT:Xchangead Updating interface: %d", interface);
-	router_dag.parse(x_changead_msg->dag().c_str());
-	click_chatter("XTRANSPORT:Xchangead Router addr: %s", router_dag.unparse().c_str());
-	String IP4ID_str(x_changead_msg->ip4id().c_str());
-	click_chatter("XTRANSPORT:Xchangead Router 4ID: %s (ignored unless in addr above)", IP4ID_str.c_str());
+	xia::X_Updatedag_Msg *x_updatedag_msg = xia_socket_msg->mutable_x_updatedag();
+	int interface = x_updatedag_msg->interface();
+	click_chatter("XTRANSPORT:Xupdatedag Updating interface: %d", interface);
+	router_dag.parse(x_updatedag_msg->dag().c_str());
+	click_chatter("XTRANSPORT:Xupdatedag Router addr: %s", router_dag.unparse().c_str());
+	String IP4ID_str(x_updatedag_msg->ip4id().c_str());
+	click_chatter("XTRANSPORT:Xupdatedag Router 4ID: %s (ignored unless in addr above)", IP4ID_str.c_str());
 
 	// Replace intent HID in router's DAG to form new_dag
 	XIAPath new_dag = router_dag;
 	if(!new_dag.replace_intent_hid(_hid)) {
-		click_chatter("XTRANSPORT:Xchangead ERROR replacing intent HID in %s", new_dag.unparse().c_str());
+		click_chatter("XTRANSPORT:Xupdatedag ERROR replacing intent HID in %s", new_dag.unparse().c_str());
 		return;
 	}
 
@@ -3484,7 +3484,7 @@ void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 		// TODO: Update xrc/n/proc/rt_*, xrc/n/x, xrc/x
 		// TODO: Update _network_dag
 		_local_addr = new_dag;
-		click_chatter("XTRANSPORT:Xchangead system addr changed to %s", _local_addr.unparse().c_str());
+		click_chatter("XTRANSPORT:Xupdatedag system addr changed to %s", _local_addr.unparse().c_str());
 	}
 	char linecardname[16];
 	sprintf(linecardname, "xlc%d", interface);

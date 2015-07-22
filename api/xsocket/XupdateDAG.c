@@ -15,7 +15,7 @@
 ** limitations under the License.
 */
 /*!
- @file XupdateAD.c
+ @file XupdateDAG.c
  @brief Implements XreadLocalHostAddr()
 */
 #include <errno.h>
@@ -25,7 +25,7 @@
 
 #define MAX_RV_DAG_SIZE 1024
 
-int XupdateAD(int sockfd, int interface, const char *rdag, const char *r4id) {
+int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id) {
   int rc;
 
   if (!rdag) {
@@ -41,14 +41,14 @@ int XupdateAD(int sockfd, int interface, const char *rdag, const char *r4id) {
   }
 
   xia::XSocketMsg xsm;
-  xsm.set_type(xia::XCHANGEAD);
+  xsm.set_type(xia::XUPDATEDAG);
   unsigned seq = seqNo(sockfd);
   xsm.set_sequence(seq);
 
-  xia::X_Changead_Msg *x_changead_msg = xsm.mutable_x_changead();
-  x_changead_msg->set_interface(interface);
-  x_changead_msg->set_dag(rdag);
-  x_changead_msg->set_ip4id(r4id);
+  xia::X_Updatedag_Msg *x_updatedag_msg = xsm.mutable_x_updatedag();
+  x_updatedag_msg->set_interface(interface);
+  x_updatedag_msg->set_dag(rdag);
+  x_updatedag_msg->set_ip4id(r4id);
 
   if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));

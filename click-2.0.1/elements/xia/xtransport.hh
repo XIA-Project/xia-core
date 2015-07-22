@@ -318,7 +318,7 @@ protected:
 	void Xlisten(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xupdatedag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xgetifaddrs(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xupdatenameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
