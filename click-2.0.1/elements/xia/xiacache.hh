@@ -51,7 +51,6 @@ class XIACache : public Element {
     uint32_t _cid_type;
     XID _hid;
     XIAPath _local_addr;
-	XIAPath _network_dag;
     XIAContentModule* _content_module;
 
 };

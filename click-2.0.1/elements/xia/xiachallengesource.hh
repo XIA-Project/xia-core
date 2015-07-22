@@ -75,7 +75,6 @@ private:
 	String pub_path;
 	String priv_path;
 	XIAPath _src_path;
-	XIAPath _network_dag;
 	XID _hid;
     HashTable<String, short> _verified_table;
 };

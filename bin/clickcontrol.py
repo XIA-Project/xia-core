@@ -158,13 +158,14 @@ class ClickControl:
 
         # Xtransport and XCMP elements in RouteEngine and RoutingCore
         dag_elem = ['xrc/xtransport', 'xrc/n/x', 'xrc/x']
-        return self.getElements(hostname, hosttype, 'network_dag', iface_elem, dag_elem)
+        return self.getElements(hostname, hosttype, 'dag', iface_elem, dag_elem)
 
     # Assign a Network dag to a given host
-    def assignNetworkDAG(self, hostname, hosttype, dag):
+    def assignDAG(self, hostname, hosttype, dag):
         for element in self.networkDagElements(hostname, hosttype):
             if not self.writeCommand(element + ' ' + dag):
                 return False
+        # Add a route to the local AD
         match = adInDagPattern.match(dag)
         if not match:
             print 'No AD found in Network DAG'
@@ -180,8 +181,8 @@ if __name__ == "__main__":
     hostname = socket.gethostname()
     hosttype = 'XIAEndHost'
     hid = 'HID:abf1014f0cc6b4d98b6748f23a7a8f22a3f7b199'
-    network_dag = 'RE AD:abf1014f0cc6b4d98b6748f23a7a8f22a0000000'
+    dag = 'RE AD:abf1014f0cc6b4d98b6748f23a7a8f22a0000000' + ' ' + hid
     # Here's how this library should be used
     with ClickControl() as click:
         click.assignHID(hostname, hosttype, hid)
-        click.assignNetworkDAG(hostnam, hosttype, dag)
+        click.assignDAG(hostname, hosttype, dag)

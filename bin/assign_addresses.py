@@ -92,9 +92,9 @@ def configure_click(click, config):
             click.assignHID(hostname, hosttype, hid)
             # Assign AD to routers
             if ad:
-                network_dag = 'RE %s' % ad
-                click.assignNetworkDAG(hostname, hosttype, network_dag)
-                router_dags[hostname] = network_dag + ' ' + hid
+                router_dag = 'RE %s %s' % (ad, hid)
+                click.assignDAG(hostname, hosttype, router_dag)
+                router_dags[hostname] = router_dag
         # Write resolv.conf if nameserver runs here
         match = nspattern.match(line)
         if match:

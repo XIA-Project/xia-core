@@ -85,7 +85,6 @@ class XCMP : public Element { public:
 
     // source XIAPath of the local host
     XIAPath _src_path;
-    XIAPath _network_dag;
     XID _hid;
 };
 

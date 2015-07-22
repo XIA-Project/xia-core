@@ -59,27 +59,21 @@ XCMP::initialize(ErrorHandler *)
     return 0;
 }
 
-enum {NETWORK_DAG, HID};
+enum {DAG, HID};
 
 int XCMP::write_param(const String &conf, Element *e, void *vparam, ErrorHandler *errh)
 {
     XCMP *f = static_cast<XCMP *>(e);
     switch(reinterpret_cast<intptr_t>(vparam)) {
-    case NETWORK_DAG:
+    case DAG:
     {
-        XIAPath network_dag;
+        XIAPath dag;
         if (cp_va_kparse(conf, f, errh,
-                         "NETWORK_DAG", cpkP + cpkM, cpXIAPath, &network_dag,
+                         "DAG", cpkP + cpkM, cpXIAPath, &dag,
                          cpEnd) < 0)
             return -1;
-        f->_network_dag = network_dag;
-        click_chatter("Network is now %s", network_dag.unparse().c_str());
-        //f->_local_hid = network_dag.xid(network_dag.destination_node());
-        String network_dag_str = f->_network_dag.unparse();
-        String hid_str = f->_hid.unparse();
-        String src_path_str = network_dag_str + " " + hid_str;
-        f->_src_path.parse(src_path_str);
-        click_chatter("Local address: %s", f->_src_path.unparse().c_str());
+        f->_src_path = dag;
+        click_chatter("XCMP: DAG is now %s", f->_src_path.unparse().c_str());
         break;
 
     }
@@ -102,7 +96,7 @@ int XCMP::write_param(const String &conf, Element *e, void *vparam, ErrorHandler
 void XCMP::add_handlers()
 {
     //add_write_handler("src_path", write_param, (void *)H_MOVE);
-    add_write_handler("network_dag", write_param, (void *)NETWORK_DAG);
+    add_write_handler("dag", write_param, (void *)DAG);
     add_write_handler("hid", write_param, (void *)HID);
 }
 

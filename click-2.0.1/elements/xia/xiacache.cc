@@ -152,27 +152,21 @@ int XIACache::get_malicious()
 	return _content_module->malicious;
 }
 
-enum {NETWORK_DAG, HID, MALICIOUS};
+enum {DAG, HID, MALICIOUS};
 
 int XIACache::write_param(const String &conf, Element *e, void *vparam,
                 ErrorHandler *errh)
 {
     XIACache *f = static_cast<XIACache *>(e);
     switch(reinterpret_cast<intptr_t>(vparam)) {
-        case NETWORK_DAG: {
-            XIAPath network_dag;
+        case DAG: {
+            XIAPath dag;
             if (cp_va_kparse(conf, f, errh,
-				"NETWORK_DAG", cpkP+cpkM, cpXIAPath, &network_dag,
+				"DAG", cpkP+cpkM, cpXIAPath, &dag,
 				cpEnd) < 0)
 		    return -1;
-            f->_network_dag = network_dag;
-			click_chatter("XIACache: Network is now %s", f->_network_dag.unparse().c_str());
-			String network_dag_str = f->_network_dag.unparse();
-			String hid_str = f->_hid.unparse();
-			String local_addr_str = network_dag_str + " " + hid_str;
-            //click_chatter("%s",local_addr.unparse().c_str());
-            f->_local_addr.parse(local_addr_str);
-			click_chatter("XIACache: Local address: %s", f->_local_addr.unparse().c_str());
+            f->_local_addr = dag;
+			click_chatter("XIACache: DAG is now %s", f->_local_addr.unparse().c_str());
 			break;
         }
 		case HID: {
@@ -208,7 +202,7 @@ XIACache::read_handler(Element *e, void *thunk)
 }
 
 void XIACache::add_handlers() {
-    add_write_handler("network_dag", write_param, (void *)NETWORK_DAG);
+    add_write_handler("dag", write_param, (void *)DAG);
     add_write_handler("hid", write_param, (void *)HID);
 	add_write_handler("malicious", write_param, (void*)MALICIOUS);
 	add_read_handler("malicious", read_handler, (void*)MALICIOUS);

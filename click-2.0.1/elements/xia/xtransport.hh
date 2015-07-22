@@ -114,7 +114,6 @@ private:
 
 	uint32_t _cid_type, _sid_type;
 	XIAPath _local_addr;
-	XIAPath _network_dag;
 	XID _hid;
 	XID _local_4id;
 	XID _null_4id;

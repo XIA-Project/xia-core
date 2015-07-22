@@ -89,7 +89,7 @@ XIAChallengeResponder::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-enum {NETWORK_DAG, HID};
+enum {DAG, HID};
 
 int XIAChallengeResponder::write_param(const String &conf, Element *e, void *vparam, ErrorHandler *errh)
 {
@@ -113,7 +113,7 @@ int XIAChallengeResponder::write_param(const String &conf, Element *e, void *vpa
 
 void XIAChallengeResponder::add_handlers()
 {
-    //add_write_handler("network_dag", write_param, (void *)NETWORK_DAG);
+    //add_write_handler("dag", write_param, (void *)DAG);
     add_write_handler("hid", write_param, (void *)HID);
 }
 

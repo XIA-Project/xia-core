@@ -74,7 +74,7 @@ XIAXIDRouteTable::add_handlers()
 	add_read_handler("list", list_routes_handler, 0);
 	add_write_handler("enabled", write_handler, (void *)PRINCIPAL_TYPE_ENABLED);
 	add_write_handler("hid", write_handler, (void *)ROUTE_TABLE_HID);
-	add_write_handler("network_dag", write_handler, (void *)ROUTE_TABLE_NETWORK_DAG);
+	add_write_handler("dag", write_handler, (void *)ROUTE_TABLE_DAG);
 	add_read_handler("enabled", read_handler, (void *)PRINCIPAL_TYPE_ENABLED);
 }
 
@@ -98,21 +98,15 @@ XIAXIDRouteTable::write_handler(const String &str, Element *e, void *thunk, Erro
     switch ((intptr_t)thunk) {
 		case PRINCIPAL_TYPE_ENABLED:
 			return t->set_enabled(atoi(str.c_str()));
-		case ROUTE_TABLE_NETWORK_DAG:
+		case ROUTE_TABLE_DAG:
 		{
-			XIAPath network_dag;
+			XIAPath dag;
 			if (cp_va_kparse(str, t, errh,
-							 "ROUTE_TABLE_NETWORK_DAG", cpkP + cpkM, cpXIAPath, &network_dag,
+							 "ROUTE_TABLE_DAG", cpkP + cpkM, cpXIAPath, &dag,
 							 cpEnd) < 0)
 				return -1;
-			t->_network_dag = network_dag;
-			click_chatter("Network is now %s", network_dag.unparse().c_str());
-			//t->_local_hid = network_dag.xid(network_dag.destination_node());
-			String network_dag_str = t->_network_dag.unparse();
-			String hid_str = t->_local_hid.unparse();
-			String local_addr_str = network_dag_str + " " + hid_str;
-			t->_local_addr.parse(local_addr_str);
-			click_chatter("Local address: %s", t->_local_addr.unparse().c_str());
+			t->_local_addr = dag;
+			click_chatter("XIAXIDRouteTable: DAG is now %s", t->_local_addr.unparse().c_str());
 			return 0;
 
 		}

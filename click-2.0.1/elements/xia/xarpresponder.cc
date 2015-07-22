@@ -239,7 +239,7 @@ XARPResponder::remove_handler(const String &s, Element *e, void *, ErrorHandler 
     return errh->error("%s not found", xid.unparse().c_str());
 }
 
-enum {NETWORK_DAG, HID};
+enum {DAG, HID};
 
 int XARPResponder::write_param(const String &conf, Element *e, void *vparam, ErrorHandler *errh)
 {
