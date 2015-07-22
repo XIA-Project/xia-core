@@ -1,5 +1,5 @@
-#ifndef PREFETCH_UTILS_FILE
-#define PREFETCH_UTILS_FILE
+#ifndef STAGE_UTILS_FILE
+#define STAGE_UTILS_FILE
 
 #include <stdio.h>
 #include <iostream>
@@ -28,23 +28,23 @@
 
 #define CHUNKSIZE 1024 
 
-#define REREQUEST 30
+#define REREQUEST 3
 #define NUM_CHUNKS 1 // 12 is the max NUM_CHUNKS to fetch at one time for 1024 K
 
 #define FTP_NAME "www_s.ftp.aaa.xia"
-#define PREFETCH_SERVER_NAME "www_s.prefetch_server.aaa.xia"
-#define PREFETCH_MANAGER_NAME "www_s.prefetch_client.aaa.xia"
+#define STAGE_SERVER_NAME "www_s.prefetch_server.aaa.xia"
+#define STAGE_MANAGER_NAME "www_s.prefetch_client.aaa.xia"
 
 #define GETSSID_CMD "iwgetid -r"
 
-#define PURGE_DELAY_SEC 120
+#define PURGE_DELAY_SEC 10
 #define MGT_DELAY_SEC 10
-#define PREFETCH_WIN_INIT 3
-#define PREFETCH_WIN_PRED_DELAY_SEC 3
-#define PREFETCH_WIN_RECENT_NUM 3
+#define STAGE_WIN_INIT 3
+#define STAGE_WIN_PRED_DELAY_SEC 3
+#define STAGE_WIN_RECENT_NUM 3
 #define LOOP_DELAY_MSEC 100
 #define SCAN_DELAY_MSEC 10
-#define CHUNK_REQUEST_DELAY_MSEC 10
+#define CHUNK_REQUEST_DELAY_MSEC 300
 
 
 #define BLANK 0	// initilized: by registration message
@@ -67,11 +67,11 @@ char *randomString(char *buf, int size);
 // format: cid1 cid2, ... cidn
 vector<string> strVector(char *strs);
 
-// format: PREFETCH_SERVER_NAME.getAD()
-char *getPrefetchServiceName();
+// format: STAGE_SERVER_NAME.getAD()
+char *getStageServiceName();
 
-// format: PREFETCH_MANAGER_NAME.getHID()
-char *getPrefetchManagerName();
+// format: STAGE_MANAGER_NAME.getHID()
+char *getStageManagerName();
 
 char *getXftpName();
 
@@ -128,17 +128,17 @@ void *blockListener(void *listenID, void *recvFuntion (void *));
 
 int getIndex(string target, vector<string> pool);
 
-// update the CID list to the local prefetching service
+// update the CID list to the local staging service
 int updateManifest(int sock, vector<string> CIDs);
 
-// prefetch client setup a socket connection with in-network prefetch service
-int registerPrefetchService(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid);
+// stage manager setup a socket connection with in-network stage service
+int registerStageService(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid);
 
-// xftp_client setup a socket connection with prefetch client
-int registerPrefetchManager(const char *name);
+// xftp_client setup a socket connection with stage manager
+int registerStageManager(const char *name);
 
-// construct the msg and send to prefetch client
-int XrequestChunkPrefetch(int sock, const ChunkStatus *cs);
+// construct the msg and send to stage client
+int XrequestChunkStage(int sock, const ChunkStatus *cs);
 
 char *chunkReqDag2cid(char *dag);
 

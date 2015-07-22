@@ -1,4 +1,4 @@
-#include "prefetch_utils.h"
+#include "stage_utils.h"
 
 using namespace std;
 
@@ -13,11 +13,17 @@ char remoteSID[MAX_XID_SIZE];
 char ftpServAD[MAX_XID_SIZE];
 char ftpServHID[MAX_XID_SIZE];
 
-int prefetchServerSock, ftpSock;
+int stageServerSock, ftpSock;
 
 pthread_mutex_t profileLock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t bufLock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t timeLock = PTHREAD_MUTEX_INITIALIZER;
+
+pthread_mutex_t controlLock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t  controlCond = PTHREAD_COND_INITIALIZER;
+
+pthread_mutex_t dataLock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t  dataCond = PTHREAD_COND_INITIALIZER;
 
 struct chunkProfile {
 	int fetchState;
@@ -25,19 +31,24 @@ struct chunkProfile {
 	long fetchFinishTimestamp;
 };
 
-map<string, map<string, chunkProfile> > SIDToProfile;	// prefetch state
-map<string, vector<string> > SIDToBuf; // chunk buffer to prefetch
+map<string, map<string, chunkProfile> > SIDToProfile;	// stage state
+map<string, vector<string> > SIDToBuf; // chunk buffer to stage
 map<string, long> SIDToTime; // timestamp last seen
 
-// TODO: non-blocking fasion -- prefetch manager can send another prefetching request before get a ready response
-void prefetchControl(int sock, char *cmd) 
+// TODO: non-blocking fasion -- stage manager can send another stage request before get a ready response
+// put the CIDs into the stage buffer, and "ready" msg one by one
+void stageControl(int sock, char *cmd) 
 { 
-	XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID); // get prefetch client's SID
+	pthread_mutex_lock(&timeLock);	
+	SIDToTime[remoteSID] = now_msec();
+	pthread_mutex_unlock(&timeLock);
+
+	XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID); // get stage manager's SID
 //cerr<<"Peer SID: "<<remoteSID<<endl; 
 
 	vector<string> CIDs = strVector(cmd);
 
-	pthread_mutex_lock(&profileLock);	
+	pthread_mutex_lock(&profileLock);
 	for (unsigned int i = 0; i < CIDs.size(); i++) {
 		SIDToProfile[remoteSID][CIDs[i]].fetchState = BLANK;
 		SIDToProfile[remoteSID][CIDs[i]].fetchStartTimestamp = 0;
@@ -45,9 +56,9 @@ void prefetchControl(int sock, char *cmd)
 	}
 	pthread_mutex_unlock(&profileLock);	
 
-	// put the CIDs into the buffer to be prefetched
-	pthread_mutex_lock(&bufLock);	
-	if (SIDToBuf.count(remoteSID)) { 
+	// put the CIDs into the buffer to be staged
+	pthread_mutex_lock(&bufLock);
+	if (SIDToBuf.count(remoteSID)) {
 		for (unsigned int i = 0; i < CIDs.size(); i++) {
 			SIDToBuf[remoteSID].push_back(CIDs[i]);
 		}
@@ -55,28 +66,41 @@ void prefetchControl(int sock, char *cmd)
 	else {
 		SIDToBuf[remoteSID] = CIDs;		
 	}
-	pthread_mutex_unlock(&bufLock);		
+	pthread_mutex_unlock(&bufLock);
 
-	pthread_mutex_lock(&timeLock);	
-	SIDToTime[remoteSID] = now_msec();
-	pthread_mutex_unlock(&timeLock);
+	pthread_mutex_lock(&controlLock); 
+	pthread_cond_signal(&controlCond);
+	pthread_mutex_unlock(&controlLock);	
 
 	// send the chunk ready msg one by one
 	for (unsigned int i = 0; i < CIDs.size(); i++) {
 		while (1) {
+			pthread_mutex_lock(&dataLock); 
+			pthread_cond_wait(&dataCond, &dataLock);	
 			if (SIDToProfile[remoteSID][CIDs[i]].fetchState == READY) {
 				char reply[XIA_MAX_BUF];
 				sprintf(reply, "ready %s %ld %ld", string2char(CIDs[i]), SIDToProfile[remoteSID][CIDs[i]].fetchStartTimestamp, SIDToProfile[remoteSID][CIDs[i]].fetchFinishTimestamp);									
 				sendStreamCmd(sock, reply);
 				break;
 			}
-			usleep(SCAN_DELAY_MSEC*1000);
+			//usleep(SCAN_DELAY_MSEC*1000);
 		}
 	}
+
+	pthread_mutex_lock(&profileLock);
+	SIDToProfile.erase(remoteSID);
+	pthread_mutex_unlock(&profileLock);
+	pthread_mutex_lock(&bufLock);
+	SIDToBuf.erase(remoteSID);
+	pthread_mutex_unlock(&bufLock);
+	pthread_mutex_lock(&timeLock);
+	SIDToTime.erase(remoteSID);
+	pthread_mutex_unlock(&timeLock);
+
 	return;
 }
 
-void *prefetchCmd(void *socketid) 
+void *stageCmd(void *socketid) 
 {
 	char cmd[XIA_MAXBUF];
 	int sock = *((int*)socketid);
@@ -88,9 +112,9 @@ void *prefetchCmd(void *socketid)
 			warn("socket error while waiting for data, closing connection\n");
 			break;
 		}
-		if (strncmp(cmd, "prefetch", 8) == 0) {
-			say("Receive a prefetch message\n");
-			prefetchControl(sock, cmd+9);
+		if (strncmp(cmd, "stage", 5) == 0) {
+			say("Receive a stage message\n");
+			stageControl(sock, cmd+6);
 		}	
 	}
 
@@ -99,9 +123,9 @@ void *prefetchCmd(void *socketid)
 	pthread_exit(NULL);
 }
 
-// read the CID from the prefetch buffer, execute prefetching, and update profile 
 // TODO: paralize getting chunks for each SID, i.e. fair scheduling
-void *prefetchData(void *) 
+// read the CID from the stage buffer, execute staging, and update profile 
+void *stageData(void *) 
 {
 	int chunkSock;
 
@@ -110,8 +134,10 @@ void *prefetchData(void *)
 	}
 
 	while (1) {
-		// pop out the chunks for prefetching 
-		pthread_mutex_lock(&bufLock);	
+		pthread_mutex_lock(&controlLock); 
+		pthread_cond_wait(&controlCond, &controlLock);			
+		// pop out the chunks for staging 
+		pthread_mutex_lock(&bufLock);
 		for (map<string, vector<string> >::iterator I = SIDToBuf.begin(); I != SIDToBuf.end(); ++I) {
 			if ((*I).second.size() > 0) {
 				string SID = (*I).first;
@@ -144,6 +170,7 @@ void *prefetchData(void *)
 
 					status = XgetChunkStatuses(chunkSock, cs, n);
 
+					// update status for each chunk
 					if (status == READY_TO_READ) {
 						pthread_mutex_lock(&profileLock);
 						for (unsigned int i = 0; i < (*I).second.size(); i++) {
@@ -152,11 +179,16 @@ void *prefetchData(void *)
 									SIDToProfile[SID][(*I).second[i]].fetchFinishTimestamp = now_msec();
 								}								
 								SIDToProfile[SID][(*I).second[i]].fetchState = READY;
+
 							}
 						}
+						pthread_mutex_lock(&dataLock); 
+						pthread_cond_signal(&dataCond);
+						pthread_mutex_unlock(&dataLock);							
 						pthread_mutex_unlock(&profileLock);
 						break;
 					}
+					// selectively update status for each chunk
 					else if (status & WAITING_FOR_CHUNK) {
 						pthread_mutex_lock(&profileLock); 
 						for (unsigned int i = 0; i < (*I).second.size(); i++) {
@@ -165,6 +197,9 @@ void *prefetchData(void *)
 									SIDToProfile[SID][(*I).second[i]].fetchFinishTimestamp = now_msec();
 								}		
 								SIDToProfile[SID][(*I).second[i]].fetchState = READY;
+								pthread_mutex_lock(&dataLock); 
+								pthread_cond_signal(&dataCond);
+								pthread_mutex_unlock(&dataLock);									
 							}
 						}
 						pthread_mutex_unlock(&profileLock);
@@ -180,7 +215,7 @@ void *prefetchData(void *)
 					else 
 						say("unexpected result\n");
 
-					usleep(CHUNK_REQUEST_DELAY_MSEC*1000); 
+					//usleep(CHUNK_REQUEST_DELAY_MSEC*1000); 
 				}
 
 				(*I).second.clear(); // clear the buf
@@ -188,8 +223,8 @@ void *prefetchData(void *)
 			}
 		} 
 		pthread_mutex_unlock(&bufLock);
-
-		usleep(LOOP_DELAY_MSEC*1000);
+		pthread_mutex_unlock(&controlLock); 
+		//usleep(LOOP_DELAY_MSEC*1000);
 	}
 	pthread_exit(NULL);
 }
@@ -219,13 +254,13 @@ void *profileMgt(void *)
 
 int main() 
 {
-	pthread_t thread_prefetch, thread_mgt;
-	pthread_create(&thread_prefetch, NULL, prefetchData, NULL); // dequeue, prefetch and update profile
-	pthread_create(&thread_mgt, NULL, profileMgt, NULL); // dequeue, prefetch and update profile
+	pthread_t thread_stage, thread_mgt;
+	pthread_create(&thread_stage, NULL, stageData, NULL); // dequeue, stage and update profile
+	pthread_create(&thread_mgt, NULL, profileMgt, NULL);
 
 	ftpSock = initStreamClient(getXftpName(), myAD, myHID, ftpServAD, ftpServHID); // get ftpServAD and ftpServHID for building chunk request
-	prefetchServerSock = registerStreamReceiver(getPrefetchServiceName(), myAD, myHID, my4ID);
-	blockListener((void *)&prefetchServerSock, prefetchCmd);
+	stageServerSock = registerStreamReceiver(getStageServiceName(), myAD, myHID, my4ID);
+	blockListener((void *)&stageServerSock, stageCmd);
 
 	return 0;	
 }
@@ -234,7 +269,7 @@ int main()
 cerr<<"\nPrint profile table after updating DONE\n";
 		for (map<string, vector<chunkStatus> >::iterator I = SIDToProfile.begin(); I != SIDToProfile.end(); ++I) {
 			for (vector<chunkStatus>::iterator J = (*I).second.begin(); J != (*I).second.end(); ++J) {
-cerr<<(*I).first<<"\t"<<(*J).CID<<"\t"<<(*J).timestamp<<"\t"<<(*J).prefetch<<endl;
+cerr<<(*I).first<<"\t"<<(*J).CID<<"\t"<<(*J).timestamp<<"\t"<<(*J).stage<<endl;
 			}
 		}	
 */

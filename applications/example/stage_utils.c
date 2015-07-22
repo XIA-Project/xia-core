@@ -1,4 +1,4 @@
-#include "prefetch_utils.h"
+#include "stage_utils.h"
 
 int verbose = 1;
 
@@ -66,14 +66,14 @@ vector<string> strVector(char *strs)
 	return strVec;
 }
 
-char *getPrefetchServiceName() 
+char *getStageServiceName() 
 {
-	return string2char(string(PREFETCH_SERVER_NAME) + "." + getAD());
+	return string2char(string(STAGE_SERVER_NAME) + "." + getAD());
 } 
 
-char *getPrefetchManagerName() 
+char *getStageManagerName() 
 {
-	return string2char(string(PREFETCH_MANAGER_NAME) + "." + getHID());
+	return string2char(string(STAGE_MANAGER_NAME) + "." + getHID());
 } 
 
 char *getXftpName() 
@@ -523,7 +523,7 @@ int getIndex(string target, vector<string> pool) {
 	return -1;
 }
 
-int registerPrefetchService(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid) 
+int registerStageService(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid) 
 {
 	int sock, rc;
 	sockaddr_x dag;
@@ -570,7 +570,7 @@ int registerPrefetchService(const char *name, char *src_ad, char *src_hid, char 
 	return sock;
 }
 
-int registerPrefetchManager(const char *name) 
+int registerStageManager(const char *name) 
 {
 	int sock;
 	sockaddr_x dag;
@@ -610,7 +610,7 @@ int updateManifest(int sock, vector<string> CIDs)
 }
 
 // TODO: XIA_MAX_BUF needs to be augmented
-int XrequestChunkPrefetch(int sock, const ChunkStatus *cs) {
+int XrequestChunkStage(int sock, const ChunkStatus *cs) {
 	char cmd[XIA_MAX_BUF];
 	memset(cmd, '\0', strlen(cmd));
 

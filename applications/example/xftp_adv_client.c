@@ -1,11 +1,11 @@
-#include "prefetch_utils.h"
+#include "stage_utils.h"
 
 #define VERSION "v1.0"
 #define TITLE "XIA Advanced FTP client"
 
 using namespace std;
 
-bool prefetch = true;
+bool stage = true;
 
 char fin[256], fout[256];
 
@@ -15,7 +15,7 @@ char myHID[MAX_XID_SIZE];
 char ftpServAD[MAX_XID_SIZE];
 char ftpServHID[MAX_XID_SIZE];
 
-int ftpSock, prefetchManagerSock;
+int ftpSock, stageManagerSock;
 
 int getFile(int sock) 
 {
@@ -47,10 +47,10 @@ int getFile(int sock)
 		CIDs.push_back(string(strtok(NULL, " ")));
 	}
 
-	// update CID list to the local prefetching service.
-	if (prefetch) {
-		if ((n = updateManifest(prefetchManagerSock, CIDs) < 0)) {
-			Xclose(prefetchManagerSock);
+	// update CID list to the local staging service.
+	if (stage) {
+		if ((n = updateManifest(stageManagerSock, CIDs) < 0)) {
+			Xclose(stageManagerSock);
 			die(-1, "Unable to communicate with the local prefetching service\n");
 		}
 	}
@@ -59,6 +59,8 @@ int getFile(int sock)
 		die(-1, "unable to create chunk socket\n");
 	}
 
+	long startTime = now_msec();
+	unsigned bytes = 0;
 	// chunk fetching begins
 	for (int i = 0; i < cid_num; i++) {
 		printf("Fetching chunk %d / %d\n", i+1, cid_num);
@@ -66,9 +68,9 @@ int getFile(int sock)
 		char data[XIA_MAXCHUNK];
 		int len;
 		int status;
-		int n = 1;
+		int n = NUM_CHUNKS; 
 		char *dag = (char *)malloc(512);
-		// TODO: figure out with Peter
+
 		sprintf(dag, "RE ( %s %s ) CID:%s", myAD, myHID, string2char(CIDs[i]));
 		//sprintf(dag, "RE ( %s %s ) CID:%s", ftpServAD, ftpServHID, string2char(CIDs[i]));
 		cs[0].cidLen = strlen(dag);
@@ -79,9 +81,8 @@ int getFile(int sock)
 			if (ctr % REREQUEST == 0) {
 				// bring the list of chunks local
 //say("%srequesting list of %d chunks\n", (ctr == 0 ? "" : "re-"), n);
-
-				if (prefetch) {
-					if (XrequestChunkPrefetch(prefetchManagerSock, cs) < 0) {
+				if (stage) {
+					if (XrequestChunkStage(stageManagerSock, cs) < 0) {
 						say("unable to request chunks\n");
 						return -1;
 					}
@@ -131,9 +132,11 @@ int getFile(int sock)
 		free(cs[0].cid);
 		cs[0].cid = NULL;
 		cs[0].cidLen = 0;
+		bytes += len;
 	}
 	fclose(fd);
-	say("Received file %s\n", fout);
+	long finishTime = now_msec();
+	say("Received file %s at %f MB/s\n", fout, (float)(finishTime - startTime) / (1000 * (float)bytes / 1024));
 	sendStreamCmd(sock, "done"); 	// chunk fetching ends
 	Xclose(chunkSock);
 	Xclose(sock);	
@@ -150,11 +153,11 @@ int main(int argc, char **argv)
 
 			ftpSock = initStreamClient(getXftpName(), myAD, myHID, ftpServAD, ftpServHID);
 
-			prefetchManagerSock = registerPrefetchManager(getPrefetchManagerName());
+			stageManagerSock = registerStageManager(getStageManagerName());
 
-			if (prefetchManagerSock == -1) {
-				say("No local prefetching service running\n");
-				prefetch = false;
+			if (stageManagerSock == -1) {
+				say("No local staging service running\n");
+				stage = false;
 			}
 			getFile(ftpSock);
 
