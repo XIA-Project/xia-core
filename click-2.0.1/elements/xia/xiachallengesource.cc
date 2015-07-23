@@ -131,7 +131,7 @@ int XIAChallengeSource::write_param(const String &conf, Element *e, void *vparam
         String local_hid_str = f->_hid.unparse();
         f->_name = new char [local_hid_str.length()+1];
         strcpy(f->_name, local_hid_str.c_str());
-        click_chatter("HID assigned: %s", f->_hid.unparse().c_str());
+        click_chatter("XIAChallengeSource: HID assigned: %s", f->_hid.unparse().c_str());
         break;
     }
     default:

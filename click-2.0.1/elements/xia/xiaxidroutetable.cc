@@ -117,7 +117,7 @@ XIAXIDRouteTable::write_handler(const String &str, Element *e, void *thunk, Erro
 						"HID", cpkP + cpkM, cpXID, &hid, cpEnd) < 0)
 				return -1;
 			t->_local_hid = hid;
-			click_chatter("HID assigned: %s", t->_local_hid.unparse().c_str());
+			click_chatter("XIAXIDRouteTable: HID assigned: %s", t->_local_hid.unparse().c_str());
 			return 0;
 		}
 		default:

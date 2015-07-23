@@ -84,7 +84,7 @@ int XCMP::write_param(const String &conf, Element *e, void *vparam, ErrorHandler
                     "HID", cpkP + cpkM, cpXID, &hid, cpEnd) < 0)
             return -1;
         f->_hid = hid;
-        click_chatter("HID assigned: %s", hid.unparse().c_str());
+        click_chatter("XCMP: HID assigned: %s", hid.unparse().c_str());
         break;
     }
     default:

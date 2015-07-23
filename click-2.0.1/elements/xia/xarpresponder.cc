@@ -267,7 +267,7 @@ int XARPResponder::write_param(const String &conf, Element *e, void *vparam, Err
 		v.back().ena = ar->_my_en;
 		normalize(v, true, errh);
 		ar->_v.swap(v);
-        click_chatter("HID assigned: %s", ar->_my_xid.unparse().c_str());
+        click_chatter("XARPResponder: HID assigned: %s", ar->_my_xid.unparse().c_str());
         break;
     }
     default:

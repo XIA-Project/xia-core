@@ -441,7 +441,7 @@ XARPQuerier::write_handler(const String &str, Element *e, void *thunk, ErrorHand
             return -1;
         q->_my_xid = hid;
 		q->_my_xid_configured = true;
-        click_chatter("HID assigned: %s", q->_my_xid.unparse().c_str());
+        click_chatter("XARPQuerier: HID assigned: %s", q->_my_xid.unparse().c_str());
         return 0;
     }
     default:

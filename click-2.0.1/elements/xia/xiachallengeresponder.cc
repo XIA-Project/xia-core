@@ -102,7 +102,7 @@ int XIAChallengeResponder::write_param(const String &conf, Element *e, void *vpa
                     "HID", cpkP + cpkM, cpXID, &hid, cpEnd) < 0)
             return -1;
         f->local_hid_str = hid.unparse();
-        click_chatter("HID assigned: %s", f->local_hid_str.c_str());
+        click_chatter("XIAChallengeResponder: HID assigned: %s", f->local_hid_str.c_str());
         break;
     }
     default:
