@@ -308,7 +308,7 @@ elementclass XIARoutingCore {
 
 // 2-port router 
 elementclass XIARouter2Port {
-    $hostname, $click_port, $external_ip,
+    $click_port, $hostname, $external_ip,
 	$mac0, $mac1, |
 
 	// $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
@@ -328,7 +328,7 @@ elementclass XIARouter2Port {
 
 // 4-port router node 
 elementclass XIARouter4Port {
-	$hostname, $click_port, $external_ip,
+	$click_port, $hostname, $external_ip,
 	$mac0, $mac1, $mac2, $mac3 |
 
 	// $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
@@ -353,7 +353,7 @@ elementclass XIARouter4Port {
 
 // 4-port router node with XRoute process running and IP support
 elementclass XIADualRouter4Port {
-	$hostname, $click_port, $local_ad, $external_ip,
+	$click_port, $hostname, $local_ad, $external_ip,
 	$ip_active0, $ip0, $mac0, $gw0,
 	$ip_active1, $ip1, $mac1, $gw1,
 	$ip_active2, $ip2, $mac2, $gw2,
@@ -405,7 +405,7 @@ elementclass XIADualRouter4Port {
 
 // endhost node with sockets
 elementclass XIAEndHost {
-	$hostname, $click_port, $mac0, $mac1, $mac2, $mac3 |
+	$click_port, $hostname, $mac0, $mac1, $mac2, $mac3 |
 
 
 	// input: a packet arrived at the node
@@ -428,7 +428,7 @@ elementclass XIAEndHost {
 
 // Endhost node with XRoute process running and IP support
 elementclass XIADualEndhost {
-	$hostname, $local_ad, $external_ip, $click_port,
+	$local_ad, $external_ip, $click_port, $hostname,
 	$ip_active0, $ip0, $mac0, $gw0, 
 	$malicious_cache |
 
