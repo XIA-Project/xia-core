@@ -44,6 +44,7 @@ enum XSocketCallType {
   XUPDATERV = 33;
 
   XGETIFADDRS = 34;
+  XGETHOSTNAME = 35;
 }
 
 message XSocketMsg {
@@ -90,6 +91,7 @@ message XSocketMsg {
   optional X_Listen_Msg x_listen = 34;
 
   optional X_GetIfAddrs_Msg x_getifaddrs = 35;
+  optional X_GetHostName_Msg x_gethostname = 36;
 }
 
 message X_Socket_Msg {
@@ -228,6 +230,10 @@ message X_GetIfAddrs_Msg {
   }
 
   repeated IfAddr ifaddrs = 1;
+}
+
+message X_GetHostName_Msg {
+  required string hostname = 1;
 }
 
 message X_Updatenameserverdag_Msg {

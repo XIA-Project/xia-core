@@ -2585,6 +2585,9 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XREADLOCALHOSTADDR:
 		Xreadlocalhostaddr(_sport, &xia_socket_msg);
 		break;
+	case xia::XGETHOSTNAME:
+		Xgethostname(_sport, &xia_socket_msg);
+		break;
 	case xia::XGETIFADDRS:
 		Xgetifaddrs(_sport, &xia_socket_msg);
 		break;
@@ -3645,6 +3648,15 @@ void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_
 	_msg->set_dag(dag_str.c_str());
 	_msg->set_ip4id(IP4ID_str.c_str());
 
+	ReturnResult(_sport, xia_socket_msg);
+}
+
+
+
+void XTRANSPORT::Xgethostname(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
+{
+	xia::X_GetHostName_Msg *_msg = xia_socket_msg->mutable_x_gethostname();
+	_msg->set_hostname(_hostname.c_str());
 	ReturnResult(_sport, xia_socket_msg);
 }
 
