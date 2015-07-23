@@ -136,3 +136,13 @@ int Xsocket(int family, int transport_type, int protocol)
 	(_f_close)(sockfd);
 	return rc;
 }
+
+int getXcacheInPort(void)
+{
+	return strtol(CACHEINPORT, NULL, 0);
+}
+
+int getXcacheOutPort(void)
+{
+	return strtol(CACHEOUTPORT, NULL, 0);
+}

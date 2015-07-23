@@ -7,6 +7,7 @@
 #include "meta.h"
 #include "store_manager.h"
 #include "XIARouter.hh"
+#include "cache.h"
 
 struct xcache_conf {
 	char hostname[128];
@@ -44,6 +45,8 @@ private:
 	 * @See file store.h for details.
 	 */
 	xcache_store_manager store_manager;
+	xcache_cache cache;
+
 	XIARouter xr;
 
 public:
@@ -81,9 +84,7 @@ public:
 	/**
 	 * Fetch content locally.
 	 */
-	int fetch_content_local(xcache_cmd *, xcache_cmd *);
-
-	void handle_udp(int); /* Hopefully will go away */
+	int fetch_content_local(xcache_cmd *, std::string);
 
 	/**
 	 * Handles commands received from the API.
@@ -108,11 +109,12 @@ public:
 	/**
 	 * Stores content locally.
 	 */
-	int store(xcache_cmd *);
+	int store(xcache_cmd *, xcache_cmd *);
 
 	/**
 	 * Remove content.
 	 */
 	void remove(void);
 };
+
 #endif

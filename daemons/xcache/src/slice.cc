@@ -3,6 +3,8 @@
 #include "meta.h"
 #include "policy.h"
 
+DEFINE_LOG_MACROS(SLICE)
+
 xcache_slice::xcache_slice(int32_t context_id)
 {
 	/* FIXME: Policy is always FIFO */
@@ -23,7 +25,7 @@ void xcache_slice::add_meta(xcache_meta *meta)
 
 bool xcache_slice::has_room(xcache_meta *meta)
 {
-	LOG_INFO("Max = %Lu, Current = %Lu, Req = %Lu\n", max_size, current_size, meta->get_length());
+	LOG_SLICE_INFO("Max = %Lu, Current = %Lu, Req = %Lu\n", max_size, current_size, meta->get_length());
 
 	if(max_size - current_size >= meta->get_length())
 		return true;

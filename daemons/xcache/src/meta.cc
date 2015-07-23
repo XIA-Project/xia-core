@@ -1,13 +1,15 @@
 #include "slice.h"
 #include "meta.h"
 
+DEFINE_LOG_MACROS(META)
+
 #define IGNORE_PARAM(__param) ((void)__param)
 
-xcache_meta::xcache_meta(xcache_cmd *cmd)
+xcache_meta::xcache_meta(std::string cid)
 {
 	store = NULL;
-	cid = cmd->cid();
-	len = cmd->cid().length();
+	this->cid = cid;
+	len = 0;
 }
 
 std::string xcache_meta::get(void)

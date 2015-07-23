@@ -5,6 +5,8 @@
 #include <getopt.h>
 #include "logger.h"
 
+DEFINE_LOG_MACROS(XCACHE)
+
 static char version[] = "0.1";
 
 static void display_version(void)
@@ -14,22 +16,33 @@ static void display_version(void)
 
 static void usage(char *argv[])
 {
+	int i;
+	char mask[][128] = {
+		"Controller",
+		"Cache",
+		"Slice",
+		"Meta",
+		"Stores",
+		"Policies",
+		"Xcache",
+	};
+
 	display_version();
 	printf("Usage: %s [OPTIONS]\n", argv[0]);
 	printf("  -h, --host=HOSTNAME       Specify the host on which this daemon should run.\n");
-	printf("                            Default host = \"router0\"\n");
+	printf("                            Default host = \"host0\"\n");
 	printf("  -v, --version             Displays xcache version.\n");
 	printf("  -l, --log-level=level     Set xcache log level (From LOG_ERROR = %d to LOG_INFO = %d).\n",
 		   LOG_ERROR, LOG_INFO);
+	printf("  -m, --log-mask=<num>      Set xcache log Mask. Following are the mask values for various modules\n");
+	for(i = LOG_CTRL; i < LOG_END; i++) {
+		printf("                            Mask for module \"%s\": 0x%4.4x\n",
+			   mask[i], 0x1 << i);
+	}
+
+
+	printf("                            Default Mask = 0xFFFF (Enables all logs)\n");
 	printf("  --help                    Displays this help.\n");
-}
-
-static void set_log_level(int l)
-{
-	struct logger_config conf;
-
-	conf.level = l;
-	configure_logger(&conf);
 }
 
 static void sethostname(struct xcache_conf *conf, char *hostname)
@@ -42,6 +55,10 @@ int main(int argc, char *argv[])
 	int c;
 	xcache_controller ctrl;
 	struct xcache_conf conf;
+	struct logger_config logger_conf;
+
+	logger_conf.level = 0;
+	logger_conf.mask = LOG_ALL;
 
 	strcpy(conf.hostname, "router0");
 
@@ -50,13 +67,14 @@ int main(int argc, char *argv[])
 		{"help", no_argument, 0, 0},
 		{"version", no_argument, 0, 0},
 		{"log_level", required_argument, 0, 0},
+		{"log_mask", required_argument, 0, 0},
 		{0, 0, 0, 0},
 	};
 
 	while(1) {
 		int option_index = 0;
 
-		c = getopt_long(argc, argv, "vl:h:", options, &option_index);
+		c = getopt_long(argc, argv, "vl:m:h:", options, &option_index);
 		if(c == -1)
 			break;
 
@@ -72,8 +90,11 @@ int main(int argc, char *argv[])
 				display_version();
 				return 0;
 			} else if(!strcmp(options[option_index].name, "log_level")) {
-				set_log_level(strtol(optarg, NULL, 10));
+				logger_conf.level = strtol(optarg, NULL, 10);
 				return 0;
+			} else if(!strcmp(options[option_index].name, "log_mask")) {
+				logger_conf.mask = strtol(optarg, NULL, 0);
+				break;
 			} else {
 				usage(argv);
 				return 1;
@@ -83,7 +104,10 @@ int main(int argc, char *argv[])
 			sethostname(&conf, optarg);
 			break;
 		case 'l':
-			set_log_level(strtol(optarg, NULL, 10));
+			logger_conf.level = strtol(optarg, NULL, 10);
+			break;
+		case 'm':
+			logger_conf.mask = strtol(optarg, NULL, 0);
 			break;
 		case 'v':
 			display_version();
@@ -95,6 +119,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	configure_logger(&logger_conf);
 	ctrl.set_conf(&conf);
 	ctrl.run();
 	return 0;
@@ -117,4 +142,3 @@ bool operator<(const struct click_xia_xid& x, const struct click_xia_xid& y)
 
 	return false;
 }
-

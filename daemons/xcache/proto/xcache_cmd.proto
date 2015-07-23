@@ -5,11 +5,17 @@ message xcache_cmd {
 		XCACHE_STORE = 1;
 		XCACHE_NEWSLICE = 2;
 		XCACHE_GETCHUNK = 3;
-		XCACHE_TIMEOUT = 4;
-		XCACHE_CLEAR = 5;
-		XCACHE_RESPONSE = 6;
-		XCACHE_ERROR = 7;
-		XCACHE_STATUS = 8;
+		XCACHE_REQUESTCHUNK = 4;
+		XCACHE_TIMEOUT = 5;
+		XCACHE_CLEAR = 6;
+		XCACHE_RESPONSE = 7;
+		XCACHE_ERROR = 8;
+		XCACHE_GET_STATUS = 9;
+	};
+
+	enum status_type {
+		XCACHE_OK = 1;
+		XCACHE_ERR_EXISTS = 2;
 	};
   
 	required req_type cmd = 1;
@@ -21,4 +27,5 @@ message xcache_cmd {
 	optional int32 ttl = 6;
 	optional int32 cache_size = 7;
 	optional int32 cache_policy = 8;
+	optional status_type status = 9;
 };

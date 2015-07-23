@@ -202,6 +202,9 @@ extern int checkXid(const char *xid, const char *type);
 
 extern char *XrootDir(char *buf, unsigned len);
 extern void debug(int sock);
+	
+extern int getXcacheInPort(void);
+extern int getXcacheOutPort(void);
 
 #ifdef __cplusplus
 }

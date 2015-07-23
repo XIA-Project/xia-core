@@ -58,18 +58,17 @@ int XcachePutFile(struct xcacheSlice *slice, const char *fname, unsigned chunkSi
 			chunkList[i].buf = buf;
 			chunkList[i].len = count;
       
-			if ((rc = XcachePutChunk(slice, &chunkList[i])) < 0)
+			rc = XcachePutChunk(slice, &chunkList[i]);
+			if(rc < 0)
 				break;
+			if(rc == xcache_cmd::XCACHE_ERR_EXISTS) {
+				continue;
+			}
 			i++;
 		}
 	}
 
-	if (i != numChunks) {
-		// FIXME: something happened, what do we want to do in this case?
-		rc = -1;
-	}
-	else
-		rc = i;
+	rc = i;
 
 	*chunks = chunkList;
 	fclose(fp);

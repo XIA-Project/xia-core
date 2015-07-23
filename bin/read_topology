@@ -22,6 +22,8 @@ import genkeys
 from Crypto.PublicKey import RSA
 
 DEFAULT_PORT=1500
+DEFAULT_CACHE_IN_PORT=1501
+DEFAULT_CACHE_OUT_PORT=1502
 create_xia_address_click = False
 
 # Directory where all the keys will be dumped
@@ -95,7 +97,9 @@ except:
 
 sockconf = create_output_file(sys.argv[2])
 sockconf.write('# Generated from %s\n\n' % os.path.basename(sys.argv[1]))
-sockconf.write('[default]\nclick_port=%s\n\n' % DEFAULT_PORT)
+sockconf.write('[default]\nclick_port=%s\n' % DEFAULT_PORT)
+sockconf.write('cache_in_port=%s\n' % DEFAULT_CACHE_IN_PORT)
+sockconf.write('cache_out_port=%s\n\n' % DEFAULT_CACHE_OUT_PORT)
 
 nodeconf = create_output_file(sys.argv[3])
 
@@ -121,10 +125,14 @@ for line in lines:
 	field = 0
 	idfield = 0
 	if element.group() == 'XIAEndHost':
-		field = 2
+		click_port_field = 2
+                cache_in_field = 3
+                cache_out_field = 4
 		idfield = 1
 	else:
-		field = 4
+		click_port_field = 4
+                cache_in_field = 5
+                cache_out_field = 6
 		idfield = 2
 		if xia_address:
 			ad_num = 'AD%d' % next_ad
@@ -138,7 +146,9 @@ for line in lines:
 	fields = fields.split(',')
 	name = name.strip()
 
-	sockconf.write('[%s]\nclick_port=%s\n\n' % (name, fields[field].strip()))
+	sockconf.write('[%s]\nclick_port=%s\n' % (name, fields[click_port_field].strip()))
+	sockconf.write('cache_in_port=%s\n' % (fields[cache_in_field].strip()))
+	sockconf.write('cache_out_port=%s\n\n' % (fields[cache_out_field].strip()))
 	nodeconf.write("%s\t%s\n" % (name, element.group()))
 	if xia_address:
 		dev_name = fields[idfield].strip()

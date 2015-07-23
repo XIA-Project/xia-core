@@ -34,7 +34,7 @@ public:
 	/**
 	 * Another Constructor.
 	 */
-	xcache_meta(xcache_cmd *);
+	xcache_meta(std::string);
 
 	/**
 	 * Set Content store for this meta.
@@ -77,5 +77,6 @@ public:
 		return cid;
 	}
 };
+
 
 #endif

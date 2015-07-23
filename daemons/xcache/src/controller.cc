@@ -28,22 +28,27 @@
 
 static int context_id = 0;
 
-static int xcache_create_click_socket(int port)
+DEFINE_LOG_MACROS(CTRL)
+
+static std::string hex_str(unsigned char *data, int len)
 {
-	struct sockaddr_in si_me;
-    int s;
+	char hexmap[] = {'0', '1', '2', '3', '4', '5', '6', '7',
+					 '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+	std::string s(len * 2, ' ');
+	for (int i = 0; i < len; ++i) {
+		s[2 * i]     = hexmap[(data[i] & 0xF0) >> 4];
+		s[2 * i + 1] = hexmap[data[i] & 0x0F];
+	}
+	return s;
+}
 
-    if ((s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
-		return -1;
+static std::string compute_cid(const char *data, size_t len)
+{
+	unsigned char digest[SHA_DIGEST_LENGTH];
 
-    memset((char *)&si_me, 0, sizeof(si_me));
-    si_me.sin_family = AF_INET;
-    si_me.sin_port = htons(port);
-    si_me.sin_addr.s_addr = htonl(INADDR_ANY);
-    if (bind(s, (struct sockaddr *)&si_me, sizeof(si_me)) == -1)
-		return -1;
+	SHA1((unsigned char *)data, len, digest);
 
-    return s;
+	return hex_str(digest, SHA_DIGEST_LENGTH);
 }
 
 static int xcache_create_lib_socket(void)
@@ -73,16 +78,10 @@ void xcache_controller::status(void)
 {
 	std::map<int32_t, xcache_slice *>::iterator i;
 
-	LOG_INFO("[Status]\n");
+	LOG_CTRL_INFO("[Status]\n");
 	for(i = slice_map.begin(); i != slice_map.end(); ++i) {
 		i->second->status();
 	}
-}
-
-
-void xcache_controller::handle_udp(int s)
-{
-	IGNORE_PARAM(s);
 }
 
 int xcache_controller::fetch_content_remote(xcache_cmd *resp, xcache_cmd *cmd)
@@ -102,36 +101,47 @@ int xcache_controller::fetch_content_remote(xcache_cmd *resp, xcache_cmd *cmd)
 		return FAILED;
 	}
 
-	LOG_INFO("Fetching content from remote DAG = %s\n", g.dag_string().c_str());
+	LOG_CTRL_INFO("Fetching content from remote DAG = %s\n", g.dag_string().c_str());
 
 	if(Xconnect(sock, (struct sockaddr *)&addr, daglen) < 0) {
 		return FAILED;
 	}
 
-	LOG_INFO("Xcache client now connected with remote\n");
+	LOG_CTRL_INFO("Xcache client now connected with remote\n");
 
 	std::string data;
-	char buf[512];
+	char buf[512] = {0};
 
+	// FIXME: This is really bad way of receiving data.
 	while((ret = Xrecv(sock, buf, 512, 0)) == 512) {
-		data += buf;
+		std::string temp(buf, ret);
+
+		LOG_CTRL_INFO("Waiting\n");
+		data += temp;
+		memset(buf, 0, 512);
 	}
 	data += buf;
 
-	LOG_INFO("Data received = %s\n", data.c_str());
+	Node expected_cid(g.get_final_intent());
+	std::string computed_cid = compute_cid(data.c_str(), data.length());
+	// FIXME: Incorrect data received.
+	LOG_CTRL_INFO("Data received = %s\n", data.c_str());
+	LOG_CTRL_INFO("CIDs: Exptected = %s, Computed = %s\n", expected_cid.id_string().c_str(),
+			 computed_cid.c_str());
+	
 	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
 	resp->set_data(data);
 
 	return OK_SEND_RESPONSE;
 }
 
-int xcache_controller::fetch_content_local(xcache_cmd *resp, xcache_cmd *cmd)
+int xcache_controller::fetch_content_local(xcache_cmd *resp, std::string cid)
 {
-	std::map<std::string, xcache_meta *>::iterator i = meta_map.find(cmd->cid());
+	std::map<std::string, xcache_meta *>::iterator i = meta_map.find(cid);
 	xcache_meta *meta;
 	std::string data;
 
-	LOG_INFO("Fetching content from local\n");
+	LOG_CTRL_INFO("Fetching content from local\n");
 	
 	if(i == meta_map.end())
 		/* We could not find the content locally */
@@ -145,25 +155,26 @@ int xcache_controller::fetch_content_local(xcache_cmd *resp, xcache_cmd *cmd)
 
 	return OK_SEND_RESPONSE;
 }
+
 int xcache_controller::handle_cmd(xcache_cmd *resp, xcache_cmd *cmd)
 {
 	int ret = OK_NO_RESPONSE;
 	xcache_cmd response;
 
 	if(cmd->cmd() == xcache_cmd::XCACHE_STORE) {
-		LOG_INFO("Received Store command\n");
-		ret = store(cmd);
+		LOG_CTRL_INFO("Received Store command\n");
+		ret = store(resp, cmd);
 	} else if(cmd->cmd() == xcache_cmd::XCACHE_NEWSLICE) {
-		LOG_INFO("Received Newslice command\n");
+		LOG_CTRL_INFO("Received Newslice command\n");
 		ret = new_slice(resp, cmd);
 	} else if(cmd->cmd() == xcache_cmd::XCACHE_GETCHUNK) {
-		LOG_INFO("Received Getchunk command\n");
-		ret = fetch_content_local(resp, cmd);
+		LOG_CTRL_INFO("Received Getchunk command\n");
+		ret = fetch_content_local(resp, cmd->cid());
 		if(ret == FAILED) {
 			ret = fetch_content_remote(resp, cmd);
 		}
-	} else if(cmd->cmd() == xcache_cmd::XCACHE_STATUS) {
-		LOG_INFO("Received Status command\n");
+	} else if(cmd->cmd() == xcache_cmd::XCACHE_GET_STATUS) {
+		LOG_CTRL_INFO("Received Status command\n");
 		status();
 	}
 
@@ -176,11 +187,11 @@ xcache_slice *xcache_controller::lookup_slice(xcache_cmd *cmd)
 	std::map<int32_t, xcache_slice *>::iterator i = slice_map.find(cmd->context_id());
 
 	if(i != slice_map.end()) {
-		LOG_INFO("Slice found.\n");
+		LOG_CTRL_INFO("Slice found.\n");
 		return i->second;
 	} else {
 		/* TODO use default slice */
-		LOG_INFO("Using default slice\n");
+		LOG_CTRL_INFO("Using default slice\n");
 		return NULL;
 	}
 }
@@ -198,7 +209,7 @@ int xcache_controller::new_slice(xcache_cmd *resp, xcache_cmd *cmd)
 
 	// FIXME: Set policy too. slice->set_policy(cmd->cachepolicy());
 	slice->set_ttl(cmd->ttl());
-	LOG_INFO("Setting %Lu\n", cmd->cache_size());
+	LOG_CTRL_INFO("Setting %Lu\n", cmd->cache_size());
 	slice->set_size(cmd->cache_size());
 
 	slice_map[slice->get_context_id()] = slice;
@@ -209,65 +220,50 @@ int xcache_controller::new_slice(xcache_cmd *resp, xcache_cmd *cmd)
 }
 
 
-static std::string hex_str(unsigned char *data, int len)
-{
-	char hexmap[] = {'0', '1', '2', '3', '4', '5', '6', '7',
-					 '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
-	std::string s(len * 2, ' ');
-	for (int i = 0; i < len; ++i) {
-		s[2 * i]     = hexmap[(data[i] & 0xF0) >> 4];
-		s[2 * i + 1] = hexmap[data[i] & 0x0F];
-	}
-	return s;
-}
-
-static std::string compute_cid(const char *data, size_t len)
-{
-	unsigned char digest[SHA_DIGEST_LENGTH];
-
-	SHA1((unsigned char *)data, len, digest);
-
-	return hex_str(digest, SHA_DIGEST_LENGTH);
-}
-
-int xcache_controller::store(xcache_cmd *cmd)
+int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd)
 {
 	int rv;
 	xcache_slice *slice;
 	xcache_meta *meta;
-	std::string empty_str("");
-	std::map<std::string, xcache_meta *>::iterator i = meta_map.find(cmd->cid());
+	std::string empty_str(""), cid = compute_cid(cmd->data().c_str(), cmd->data().length());
+	std::map<std::string, xcache_meta *>::iterator i = meta_map.find(cid);
 
 	/* FIXME: Add proper errnos */
 	if(i != meta_map.end()) {
 		meta = i->second;
-		LOG_INFO("Meta Exsits.\n");
+		LOG_CTRL_INFO("Meta Exsits.\n");
+		resp->set_cmd(xcache_cmd::XCACHE_ERROR);
+		resp->set_status(xcache_cmd::XCACHE_ERR_EXISTS);
+		return OK_SEND_RESPONSE;
 	} else {
 		/* New object - Allocate a meta */
-		meta = new xcache_meta(cmd);
-		meta_map[cmd->cid()] = meta;
-		LOG_INFO("New Meta.\n");
+		meta = new xcache_meta(cid);
+		meta_map[cid] = meta;
+		LOG_CTRL_INFO("New Meta %s len = %d.\n", cid.c_str(), (int)cmd->data().length());
 	}
 
 	slice = lookup_slice(cmd);
-	if(!slice)
-		return -1;
-
+	if(!slice) {
+		return FAILED;
+	}
 	if(slice->store(meta) < 0) {
-		LOG_ERROR("Slice store failed\n");
-		return -1;
+		LOG_CTRL_ERROR("Slice store failed\n");
+		return FAILED;
 	}
 
 	std::string temp_cid("CID:");
-	temp_cid += meta->get_cid();
+	temp_cid += cid;
 
-	LOG_DEBUG("Setting Route for %s.\n", temp_cid.c_str());
+	LOG_CTRL_DEBUG("Setting Route for %s.\n", temp_cid.c_str());
 	rv = xr.setRoute(temp_cid, DESTINED_FOR_LOCALHOST, empty_str, 0);
-	LOG_DEBUG("Route Setting Returned %d\n", rv);
+	LOG_CTRL_DEBUG("Route Setting Returned %d\n", rv);
 
-	std::cout << "Computed CID " << compute_cid(cmd->data().c_str(), cmd->data().length()) << "\n";
+	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
+	resp->set_cid(cid);
 
-	return store_manager.store(meta, cmd->data());
+	store_manager.store(meta, cmd->data());
+
+	return OK_SEND_RESPONSE;
 }
 
 
@@ -282,14 +278,14 @@ void *xcache_controller::start_xcache(void *arg)
 		return NULL;
 
 	if(XmakeNewSID(sid_string, sizeof(sid_string))) {
-		LOG_ERROR("XmakeNewSID failed\n");
+		LOG_CTRL_ERROR("XmakeNewSID failed\n");
 		return NULL;
 	}
 
 	if(XsetXcacheSID(xcache_sock, sid_string, strlen(sid_string)) < 0)
 		return NULL;
 
-	LOG_DEBUG("XcacheSID is %s\n", sid_string);
+	LOG_CTRL_DEBUG("XcacheSID is %s\n", sid_string);
 
 	struct addrinfo *ai;
 
@@ -306,76 +302,109 @@ void *xcache_controller::start_xcache(void *arg)
 	Xlisten(xcache_sock, 5);
 
 	Graph g(dag);
-	LOG_INFO("Listening on dag: %s\n", g.dag_string().c_str());
+	LOG_CTRL_INFO("Listening on dag: %s\n", g.dag_string().c_str());
 
 	while(1) {
 		sockaddr_x mypath;
 		socklen_t mypath_len = sizeof(mypath);
 
-		LOG_INFO("XcacheSender waiting for incoming connections\n");
+		LOG_CTRL_INFO("XcacheSender waiting for incoming connections\n");
 		if ((accept_sock = XacceptAs(xcache_sock, (struct sockaddr *)&mypath, &mypath_len, NULL, NULL)) < 0) {
-			LOG_ERROR("Xaccept failed\n");
+			LOG_CTRL_ERROR("Xaccept failed\n");
 			pthread_exit(NULL);
 		}
 
 		// FIXME: Send appropriate data, perform actual search,
 		// make updates in slices / policies / stores
 
-		LOG_INFO("Accept Success\n");
+		LOG_CTRL_INFO("Accept Success\n");
  		Graph g(&mypath);
 		Node cid(g.get_final_intent());
+		xcache_cmd resp;
 
+		LOG_CTRL_INFO("CID = %s\n", cid.id_string().c_str());
 
-#define DATA "IfYouReceiveThis!"
- 		Xsend(accept_sock, DATA, strlen(DATA), 0);
+		if(ctrl->fetch_content_local(&resp, cid.id_string()) < 0) {
+			LOG_CTRL_ERROR("This should not happen.\n");
+		}
+
+		LOG_CTRL_INFO("Sending %s[%d]\n", resp.data().c_str(), resp.data().length());
+		//FIXME: Max size should be 64K
+ 		Xsend(accept_sock, resp.data().c_str(), resp.data().length(), 0);
  		Xclose(accept_sock);
 	}
+}
+
+#define API_CHUNKSIZE 129
+
+static int send_response(int fd, const char *buf, size_t len)
+{
+	int ret = 0;
+	size_t off = 0;
+
+#ifndef MIN
+#define MIN(__x, __y) ((__x) < (__y) ? (__x) : (__y))
+#endif
+
+	while(off < len) {
+		size_t remaining = len - off;
+
+		if((ret = write(fd, buf + off, MIN(remaining, API_CHUNKSIZE))) < 0) {
+			return ret;
+		}
+		off += API_CHUNKSIZE;
+	}
+
+	return ret;
 }
 
 void xcache_controller::run(void)
 {
 	fd_set fds, allfds;
-	int max, libsocket, s, rc;
+	int max, libsocket, rc;
 	pthread_t xcache_sender;
+	struct cache_args args;
 
 	std::vector<int> active_conns;
 	std::vector<int>::iterator iter;
 
-	s = xcache_create_click_socket(1444);
 	libsocket = xcache_create_lib_socket();
 
-	pthread_create(&xcache_sender, NULL, start_xcache, NULL);
+	args.cache = &cache;
+	args.cache_in_port = getXcacheInPort();
+	args.cache_out_port = getXcacheOutPort();
+	args.ctrl = this;
+	
+	cache.spawn_thread(&args);
+
+	pthread_create(&xcache_sender, NULL, start_xcache, (void *)this);
 	if ((rc = xr.connect()) != 0) {
-		LOG_ERROR("Unable to connect to click %d \n", rc);
+		LOG_CTRL_ERROR("Unable to connect to click %d \n", rc);
 		return;
 	}
 
 	xr.setRouter(hostname); 
 
 	FD_ZERO(&fds);
-	FD_SET(s, &allfds);
 	FD_SET(libsocket, &allfds);
 
-	LOG_INFO("Entering The Loop\n");
+	LOG_CTRL_INFO("Entering The Loop\n");
 
 	while(1) {
 		memcpy(&fds, &allfds, sizeof(fd_set));
 
-		max = MAX(libsocket, s);
+		max = libsocket;
 		for(iter = active_conns.begin(); iter != active_conns.end(); ++iter) {
 			max = MAX(max, *iter);
 		}
 
 		Xselect(max + 1, &fds, NULL, NULL, NULL);
 
-		LOG_INFO("Broken\n");
-		if(FD_ISSET(s, &fds)) {
-			handle_udp(s);
-		}
+		LOG_CTRL_INFO("Broken\n");
 
 		if(FD_ISSET(libsocket, &fds)) {
 			int new_connection = accept(libsocket, NULL, 0);
-			LOG_INFO("Action on libsocket\n");
+			LOG_CTRL_INFO("Action on libsocket\n");
 			active_conns.push_back(new_connection);
 			FD_SET(new_connection, &allfds);
 		}
@@ -393,33 +422,36 @@ void xcache_controller::run(void)
 
 			do {
 				ret = recv(*iter, buf, 512, 0);
-				if(ret == 0)
+				LOG_CTRL_INFO("Recv returned %d\n", ret);
+				if(ret <= 0)
 					break;
 
 				buffer.append(buf, ret);
 			} while(ret == 512);
 
-			if(ret != 0) {
+			if(ret <= 0) {
+				LOG_CTRL_DEBUG("Client Disconnected.\n");
+				close(*iter);
+				FD_CLR(*iter, &allfds);
+				active_conns.erase(iter);
+				continue;
+			} else if(ret != 0) {
 				bool parse_success = cmd.ParseFromString(buffer);
-				LOG_INFO("Controller received %lu bytes\n", buffer.length());
+				LOG_CTRL_INFO("Controller received %lu bytes\n", buffer.length());
 				if(!parse_success) {
-					LOG_ERROR("[ERROR] Protobuf could not parse\n");
+					LOG_CTRL_ERROR("[ERROR] Protobuf could not parse\n");
 				} else {
 					if(handle_cmd(&resp, &cmd) == OK_SEND_RESPONSE) {
 						resp.SerializeToString(&buffer);
-						if(write(*iter, buffer.c_str(), buffer.length()) < 0) {
-							LOG_ERROR("FIXME: handle return value of write\n");
+						if(send_response(*iter, buffer.c_str(), buffer.length()) < 0) {
+							LOG_CTRL_ERROR("FIXME: handle return value of write\n");
+						} else {
+							LOG_CTRL_INFO("Data sent to client\n");
 						}
 					}
 				}
 			}
 
-			if(ret == 0) {
-				close(*iter);
-				FD_CLR(*iter, &allfds);
-				active_conns.erase(iter);
-				continue;
-			}
 			++iter;
 		}
 	}

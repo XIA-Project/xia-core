@@ -57,7 +57,6 @@ public:
 
 	void set_size(uint64_t size) {
 		this->max_size = size;
-		LOG_INFO("-------------------------------------- %Lu\n", this->max_size);
 	}
 
 	void set_policy(xcache_policy);

@@ -5,6 +5,7 @@ OBJS += slice.o
 OBJS += meta.o
 OBJS += store_manager.o
 OBJS += logger.o
+OBJS += cache.o
 
 all: $(OBJS)
 

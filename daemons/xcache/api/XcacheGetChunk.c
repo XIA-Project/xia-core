@@ -29,10 +29,12 @@ int XcacheGetChunk(xcacheSlice *slice, xcacheChunk *chunk, sockaddr_x *addr, soc
 
 	printf("Waiting for a response from xcache\n");
 	if(get_response_blocking(&cmd) >= 0) {
-		printf("Got a valid response from xcache\n");
 		/* Got a valid response from Xcache */
 		chunk->len = cmd.data().length();
 		chunk->buf = malloc(chunk->len);
+		printf("Got a valid response from xcache, chunk = %s, len = %lu\n",
+			   cmd.data().c_str(), cmd.data().length());
+		/* Got a valid response from Xcache */
 		memcpy(chunk->buf, cmd.data().c_str(), cmd.data().length());
 		return 0;
 	}
