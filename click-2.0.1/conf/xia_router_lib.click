@@ -249,14 +249,14 @@ elementclass XIADualLineCard {
 }
 
 elementclass XIARoutingCore {
-	$external_ip, $click_port, $num_ports, $is_dual_stack |
+	$hostname, $external_ip, $click_port, $num_ports, $is_dual_stack |
 
 	// input[0]: packet to route
 	// output[0]: packet to be forwarded out a given port based on paint value
 
 	n :: RouteEngine($num_ports);
 	
-	xtransport::XTRANSPORT(IP:$external_ip, n/proc/rt_SID, $num_ports, IS_DUAL_STACK_ROUTER $is_dual_stack);
+	xtransport::XTRANSPORT($hostname, IP:$external_ip, n/proc/rt_SID, $num_ports, IS_DUAL_STACK_ROUTER $is_dual_stack);
 
 	XIAFromHost($click_port) -> xtransport;
 	Idle -> [1]xtransport;
@@ -308,7 +308,7 @@ elementclass XIARoutingCore {
 
 // 2-port router 
 elementclass XIARouter2Port {
-    $click_port, $external_ip,
+    $hostname, $click_port, $external_ip,
 	$mac0, $mac1, |
 
 	// $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
@@ -317,7 +317,7 @@ elementclass XIARouter2Port {
 	// output[0]: forward to interface 0
 	// output[1]: forward to interface 1
 	
-	xrc :: XIARoutingCore($external_ip, $click_port, 2, 0);
+	xrc :: XIARoutingCore($hostname, $external_ip, $click_port, 2, 0);
 
 	xlc0 :: XIALineCard($mac0, 0, 0, 0);
 	xlc1 :: XIALineCard($mac1, 1, 0, 0);
@@ -328,7 +328,7 @@ elementclass XIARouter2Port {
 
 // 4-port router node 
 elementclass XIARouter4Port {
-	$click_port, $external_ip,
+	$hostname, $click_port, $external_ip,
 	$mac0, $mac1, $mac2, $mac3 |
 
 	// $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
@@ -340,7 +340,7 @@ elementclass XIARouter4Port {
 	// output[2]: forward to interface 2
 	// output[3]: forward to interface 3
 	
-	xrc :: XIARoutingCore($external_ip, $click_port, 4, 0);
+	xrc :: XIARoutingCore($hostname, $external_ip, $click_port, 4, 0);
 
 	xlc0 :: XIALineCard($mac0, 0, 0, 0);
 	xlc1 :: XIALineCard($mac1, 1, 0, 0);
@@ -353,7 +353,7 @@ elementclass XIARouter4Port {
 
 // 4-port router node with XRoute process running and IP support
 elementclass XIADualRouter4Port {
-	$click_port, $local_ad, $external_ip,
+	$hostname, $click_port, $local_ad, $external_ip,
 	$ip_active0, $ip0, $mac0, $gw0,
 	$ip_active1, $ip1, $mac1, $gw1,
 	$ip_active2, $ip2, $mac2, $gw2,
@@ -383,7 +383,7 @@ elementclass XIADualRouter4Port {
 	// output[2]: forward to interface 2
 	// output[3]: forward to interface 3
 	
-	xrc :: XIARoutingCore($external_ip, $click_port, 4, 1);
+	xrc :: XIARoutingCore($hostname, $external_ip, $click_port, 4, 1);
 
 
 	Script(write xrc/n/proc/rt_AD.add $local_ad $DESTINED_FOR_LOCALHOST);	// self AD as destination
@@ -405,13 +405,13 @@ elementclass XIADualRouter4Port {
 
 // endhost node with sockets
 elementclass XIAEndHost {
-	$click_port, $mac0, $mac1, $mac2, $mac3 |
+	$hostname, $click_port, $mac0, $mac1, $mac2, $mac3 |
 
 
 	// input: a packet arrived at the node
 	// output: forward to interface 0
 	
-	xrc :: XIARoutingCore(0.0.0.0, $click_port, 4, 0);
+	xrc :: XIARoutingCore($hostname, 0.0.0.0, $click_port, 4, 0);
 
 	Script(write xrc/n/proc/rt_AD.add - 0);	  // default route for AD
 	Script(write xrc/n/proc/rt_IP.add - 0); 	// default route for IPv4	
@@ -428,7 +428,7 @@ elementclass XIAEndHost {
 
 // Endhost node with XRoute process running and IP support
 elementclass XIADualEndhost {
-	$local_ad, $external_ip, $click_port,
+	$hostname, $local_ad, $external_ip, $click_port,
 	$ip_active0, $ip0, $mac0, $gw0, 
 	$malicious_cache |
 
@@ -452,7 +452,7 @@ elementclass XIADualEndhost {
 	// input[0]: a packet arrived at the node
 	// output[0]: forward to interface 0
 	
-	xrc :: XIARoutingCore($external_ip, $click_port, 4, $malicious_cache, 1);
+	xrc :: XIARoutingCore($hostname, $external_ip, $click_port, 4, $malicious_cache, 1);
 
 
 	Script(write xrc/n/proc/rt_AD.add $local_ad $DESTINED_FOR_LOCALHOST);	// self AD as destination
