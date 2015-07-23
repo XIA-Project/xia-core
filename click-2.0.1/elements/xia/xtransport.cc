@@ -39,12 +39,14 @@ XTRANSPORT::XTRANSPORT() : _timer(this)
 int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 {
 	XIAPath local_addr;
+	String hostname;
 	XID local_4id;
 	Element* routing_table_elem;
 	bool is_dual_stack_router;
 	_is_dual_stack_router = false;
 
 	if (cp_va_kparse(conf, this, errh,
+					 "HOSTNAME", cpkP + cpkM, cpString, &hostname,
 					 "LOCAL_4ID", cpkP + cpkM, cpXID, &local_4id,
 					 "ROUTETABLENAME", cpkP + cpkM, cpElement, &routing_table_elem,
 					 "NUM_PORTS", cpkP+cpkM, cpInteger, &_num_ports,
@@ -53,6 +55,8 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 		return -1;
 
 	_local_4id = local_4id;
+	_hostname = hostname;
+	click_chatter("XTRANSPORT: hostname is %s", _hostname.c_str());
 
 	// IP:0.0.0.0 indicates NULL 4ID
 	_null_4id.parse("IP:0.0.0.0");
