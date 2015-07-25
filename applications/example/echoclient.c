@@ -217,7 +217,7 @@ int process(int sock)
 	struct pollfd pfds[2];
 	pfds[0].fd = sock;
 	pfds[0].events = POLLIN;
-	if ((rc = Xpoll(pfds, 1, 5000)) <= 0) {
+	if ((rc = Xpoll(pfds, 1, 50000)) <= 0) {
 		die(-5, "Poll returned %d\n", rc);
 	}
 
