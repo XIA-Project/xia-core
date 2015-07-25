@@ -288,7 +288,7 @@ XStream::tcp_input(WritablePacket *p)
 				tp->iss = iss; 
 			} else {
 				printf("tcpinput TCPS_LISTEN: You should pick a correct tcpiss\n");
-				tp->iss = 0x1; /* TODO: sensible iss function */
+				tp->iss = click_random(0, 0xffffffff); /* TODO: sensible iss function */
 				//tp->iss = _tcp_iss(); /* suggested sensible iss function */
 			}
 			tp->irs = ti.ti_seq; 
@@ -1599,6 +1599,19 @@ XStream::tcp_xmit_timer(short rtt) {
 void
 XStream::tcp_drop(int err)
 {
+	// Notify API that the connection failed
+	XSocketMsg xsm;
+	xsm.set_type(xia::XCONNECT);
+	xsm.set_sequence(0); // TODO: what should This be?
+	xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
+	connect_msg->set_status(xia::X_Connect_Msg::XFAILED);
+	connect_msg->set_ddag(dst_path.unparse().c_str());
+	get_transport()->ReturnResult(port, &xsm);
+
+	if (polling) {
+		printf("checking poll event for %d from timer\n", port);
+		get_transport()->ProcessPollEvent(port, POLLHUP);
+	}
 	tp->so_error = err; 
 	tcp_set_state(TCPS_CLOSED); 
 	if (TCPS_HAVERCVDSYN(tp->t_state)) {
