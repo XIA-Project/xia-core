@@ -74,7 +74,41 @@ void regHandler(int sock, char *cmd)
 	SIDToTime[remoteSID] = now_msec();
 	pthread_mutex_unlock(&timeLock);
 
-	vector<string> CIDs = strVector(cmd);
+	vector<string> CIDs;
+
+	if (strncmp(cmd, "reg cont", 8) == 0) {
+		say("Receiving partial chunk list\n");
+		char cmd_arr[strlen(cmd+9)];
+		strcpy(cmd_arr, cmd+9);
+		char *cid;
+		CIDs.push_back(strtok(cmd_arr, " "));	
+		while ((cid = strtok(NULL, " ")) != NULL) {
+			CIDs.push_back(cid);
+		}
+	}
+	while (1) {
+		memset(cmd, '\0', XIA_MAX_BUF);		
+		if ((Xrecv(sock, cmd, sizeof(cmd), 0)) < 0) {
+			Xclose(sock);
+			die(-1, "Unable to communicate with the server\n");
+		}
+		if (strncmp(cmd, "reg cont", 8) == 0) {
+			say("Receiving partial chunk list\n");
+			char cmd_arr[strlen(cmd+9)];
+			strcpy(cmd_arr, cmd+9);
+			char *cid;
+			CIDs.push_back(strtok(cmd_arr, " "));	
+			while ((cid = strtok(NULL, " ")) != NULL) {
+				CIDs.push_back(cid);
+			}
+		}
+		else if (strncmp(cmd, "reg done", 8) == 0) {
+			say("Finish receiving all the CIDs\n");
+			break;
+		}
+	}
+
+//	vector<string> CIDs = strVector(cmd);
 
 	SIDToCIDs[remoteSID] = CIDs;
 
@@ -142,7 +176,7 @@ void *clientCmd(void *socketid)
 		// registration msg from xftp client: reg CID1, CID2, ... CIDn
 		if (strncmp(cmd, "reg", 3) == 0) {
 			say("Receive a chunk list registration message\n");
-			regHandler(sock, cmd+4);
+			regHandler(sock, cmd);
 		}
 		// chunk request from xftp client: fetch CID
 		else if (strncmp(cmd, "fetch", 5) == 0) {

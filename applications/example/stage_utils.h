@@ -25,6 +25,7 @@
 #define MAX_XID_SIZE 100
 #define RECV_BUF_SIZE 1024
 #define XIA_MAX_BUF 15600 // TODO: improve later
+#define MAX_CID_NUM 20 // TODO: improve later
 
 #define CHUNKSIZE 1024 
 

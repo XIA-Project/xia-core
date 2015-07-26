@@ -35,6 +35,32 @@ int getFile(int sock)
 	sendStreamCmd(sock, cmd);
 
 	// receive the CID list from xftp server
+	while (1) {
+		memset(reply, '\0', XIA_MAX_BUF);		
+		if ((n = Xrecv(sock, reply, sizeof(reply), 0)) < 0) {
+			Xclose(sock);
+			die(-1, "Unable to communicate with the server\n");
+		}
+
+		if (strncmp(reply, "cont", 4) == 0) {
+			say("Receiving partial chunk list\n");
+			char reply_arr[strlen(reply+5)];
+			strcpy(reply_arr, reply+5);
+			char *cid;
+			CIDs.push_back(strtok(reply_arr, " "));	
+			while ((cid = strtok(NULL, " ")) != NULL) {
+				CIDs.push_back(cid);
+			}
+		}
+
+		else if (strncmp(reply, "done", 4) == 0) {
+			say("Finish receiving all the CIDs\n");
+			break;
+		}
+	}
+
+/*
+	// receive the CID list from xftp server
 	if ((n = Xrecv(sock, reply, sizeof(reply), 0)) < 0) {
 		Xclose(sock);
 		die(-1, "Unable to communicate with the server\n");
@@ -46,6 +72,8 @@ int getFile(int sock)
 	for (int i = 0; i < cid_num; i++) {
 		CIDs.push_back(string(strtok(NULL, " ")));
 	}
+*/
+
 
 	// update CID list to the local staging service.
 	if (stage) {
@@ -62,8 +90,8 @@ int getFile(int sock)
 	long startTime = now_msec();
 	unsigned bytes = 0;
 	// chunk fetching begins
-	for (int i = 0; i < cid_num; i++) {
-		printf("Fetching chunk %d / %d\n", i+1, cid_num);
+	for (unsigned int i = 0; i < CIDs.size(); i++) {
+		printf("Fetching chunk %u / %lu\n", i+1, CIDs.size());
 		ChunkStatus cs[NUM_CHUNKS]; // NUM_CHUNKS == 1 for now
 		char data[XIA_MAXCHUNK];
 		int len;

@@ -12,7 +12,7 @@ void *recvCmd (void *socketid)
 	int i, n, count = 0;
 	ChunkInfo *info = NULL;
 	char cmd[XIA_MAX_BUF];
-	char reply[XIA_MAX_BUF]; // meta data: as simple as: count + CIDs
+	char reply[XIA_MAX_BUF];
 	int sock = *((int*)socketid);
 	char *fname;
 
@@ -33,7 +33,7 @@ void *recvCmd (void *socketid)
 
 		if (strncmp(cmd, "get", 3) == 0) {
 			fname = &cmd[4];
-			say("client requested file %s\n", fname);
+			say("Client requested file %s\n", fname);
 
 			if (info)
 				XfreeChunkInfo(info); // clean up the existing chunks first
@@ -47,8 +47,34 @@ void *recvCmd (void *socketid)
 				sprintf(reply, "FAIL: File (%s) not found", fname);
 			} 
 			else {
-				sprintf(reply, "%d", count);
+				int offset = 0;
+				int num;
+				while (offset < count) {
+					num = MAX_CID_NUM;
+					if (count - offset < MAX_CID_NUM) {
+						num = count - offset;
+					}
+					count -= MAX_CID_NUM;
+					memset(reply, '\0', strlen(reply));
+					sprintf(reply, "cond");
+					for (int i = offset; i < offset + num; i++) {
+						strcat(reply, " ");
+						strcat(reply, info[i].cid);
+					}
+					offset += MAX_CID_NUM;
+					if (Xsend(sock, reply, strlen(reply), 0) < 0) {
+						warn("unable to send reply to client\n");
+						break;
+					}					
+				}
+				memset(reply, '\0', strlen(reply));
+				sprintf(reply, "done");	
+				if (Xsend(sock, reply, strlen(reply), 0) < 0) {
+					warn("unable to send reply to client\n");
+					break;
+				}								
 			}
+			/*
 			for (i = 0; i < count; i++) {
 				strcat(reply, " ");
 				strcat(reply, info[i].cid);
@@ -60,6 +86,8 @@ void *recvCmd (void *socketid)
 				warn("unable to send reply to client\n");
 				break;
 			}
+			*/
+
 		} 	
 		else if (strncmp(cmd, "done", 4) == 0) {
 			say("done sending file: removing the chunks from the cache\n");

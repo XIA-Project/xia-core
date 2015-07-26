@@ -593,7 +593,35 @@ int registerStageManager(const char *name)
 
 int updateManifest(int sock, vector<string> CIDs) 
 {
-	char cmd[XIA_MAX_BUF];
+	char cmd[XIA_MAX_BUF];		
+	int offset = 0;
+	int count = CIDs.size();
+	int num;
+	while (offset < count) {
+		num = MAX_CID_NUM;
+		if (count - offset < MAX_CID_NUM) {
+			num = count - offset;
+		}
+		count -= MAX_CID_NUM;
+		memset(cmd, '\0', strlen(cmd));
+		sprintf(cmd, "reg cond");
+		for (int i = offset; i < offset + num; i++) {
+			strcat(cmd, " ");
+			strcat(cmd, string2char(CIDs[i]));
+		}
+		offset += MAX_CID_NUM;
+		if (Xsend(sock, cmd, strlen(cmd), 0) < 0) {
+			warn("unable to send reply to client\n");
+			break;
+		}					
+	}
+	memset(cmd, '\0', strlen(cmd));
+	sprintf(cmd, "reg done");	
+	if (Xsend(sock, cmd, strlen(cmd), 0) < 0) {
+		warn("unable to send reply to client\n");
+	}		
+/*	
+	char cmd[XIA_MAX_BUF];	
 	memset(cmd, '\0', strlen(cmd));
 	char cids[XIA_MAX_BUF];
 	memset(cids, '\0', strlen(cids));
@@ -607,6 +635,8 @@ int updateManifest(int sock, vector<string> CIDs)
 	int n = sendStreamCmd(sock, cmd);
 
 	return n;
+*/	
+	return 0;
 }
 
 // TODO: XIA_MAX_BUF needs to be augmented
