@@ -3486,17 +3486,48 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, xia::XSocketMsg *xia_socket_m
 		return;
 	}
 
+	// Put the new DAG back into the xia_socket_msg to return to API
+	x_updatedag_msg->set_dag(new_dag.unparse().c_str());
+
+
+	// Build strings to reach all write handlers that need updating
+	char linecardname[16];
+	sprintf(linecardname, "xlc%d", interface);
+	String linecardstr(linecardname);
+	String linecardelem = _hostname + "/" + linecardstr;
+
+	// XIAChallengeSource in XIALineCard being updated
+	String xchal_handler_str = linecardelem + "/xchal.dag";
+	click_chatter("XTRANSPORT:Xupdatedag notifying: %s", xchal_handler_str.c_str());
+	HandlerCall::call_write(xchal_handler_str.c_str(), new_dag.unparse().c_str(), this);
+
+	// XCMP in XIALineCard being updated
+	String xlc_xcmp_handler_str = linecardelem + "/x.dag";
+	click_chatter("XTRANSPORT::Xupdatedag notifying: %s", xlc_xcmp_handler_str.c_str());
+	HandlerCall::call_write(xlc_xcmp_handler_str.c_str(), new_dag.unparse().c_str(), this);
+
 	// If default interface:
 	if(interface == _interfaces.default_interface()) {
 		// TODO: Update xrc/n/proc/rt_*, xrc/n/x, xrc/x
 		// TODO: Update _network_dag
+		// XCMP in RoutingCore
+		String xrc_str = _hostname + "/xrc/x.dag";
+		HandlerCall::call_write(xrc_str.c_str(), new_dag.unparse().c_str(), this);
+		// XCMP in RouteEngine
+		String route_engine_str = _hostname + "/xrc/n/x.dag";
+		HandlerCall::call_write(route_engine_str.c_str(), new_dag.unparse().c_str(), this);
+		// All the XIAXIDRouteTable elements
+		std::string routetables[5] = {"rt_AD", "rt_HID", "rt_SID", "rt_CID", "rt_IP"};
+		for(int i=0; i<5; i++) {
+			String route_table_str = _hostname + "/xrc/n/proc/" + routetables[i].c_str() + ".dag";
+			click_chatter("XTRANSPORT:Xupdatedag notifying: %s", route_table_str.c_str());
+			HandlerCall::call_write(route_table_str.c_str(), new_dag.unparse().c_str(), this);
+		}
+		// Update the _local_addr in XTRANSPORT
 		_local_addr = new_dag;
 		click_chatter("XTRANSPORT:Xupdatedag system addr changed to %s", _local_addr.unparse().c_str());
-	}
-	char linecardname[16];
-	sprintf(linecardname, "xlc%d", interface);
-	//TODO: Update <linecardname>/xchal, <linecardname>/x
 
+	}
 	NOTICE("new address is - %s", _local_addr.unparse().c_str());
 
 	//TODO: Notify all other elements of the change
