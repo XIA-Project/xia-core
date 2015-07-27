@@ -195,7 +195,7 @@ void getNewAD(char *old_ad)
 		if (XreadLocalHostAddr(sock, new_ad, sizeof(new_ad), hid, sizeof(hid), ip, sizeof(ip)) < 0)
 			die(-1, "Reading localhost address\n");
 		if (strcmp(new_ad, old_ad) != 0) {
-			cerr<<"AD changed!"<<endl;
+cerr<<"AD changed!"<<endl;
 			strcpy(old_ad, new_ad);
 			Xclose(sock);
 			return;			
@@ -579,14 +579,17 @@ int registerStageManager(const char *name)
 	// lookup the xia service 
 	daglen = sizeof(dag);
 
-	if (XgetDAGbyName(name, &dag, &daglen) < 0)
-		die(-1, "unable to locate: %s\n", name);
+	if (XgetDAGbyName(name, &dag, &daglen) < 0) {
+		warn("unable to locate: %s\n", name);
+	}
 	// create a socket, and listen for incoming connections
-	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
-		die(-1, "Unable to create the listening socket\n");
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
+		warn("Unable to create the listening socket\n");
+	}
 	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(sock);
-		die(-1, "Unable to bind to the dag: %s\n", dag);
+		warn("Unable to bind to the dag: %s\n", dag);
+		sock = -1;		
 	}
 	return sock;
 }
@@ -602,7 +605,6 @@ int updateManifest(int sock, vector<string> CIDs)
 		if (count - offset < MAX_CID_NUM) {
 			num = count - offset;
 		}
-		count -= MAX_CID_NUM;
 		memset(cmd, '\0', strlen(cmd));
 		sprintf(cmd, "reg cond");
 		for (int i = offset; i < offset + num; i++) {
@@ -613,7 +615,7 @@ int updateManifest(int sock, vector<string> CIDs)
 		if (Xsend(sock, cmd, strlen(cmd), 0) < 0) {
 			warn("unable to send reply to client\n");
 			break;
-		}					
+		}
 	}
 	memset(cmd, '\0', strlen(cmd));
 	sprintf(cmd, "reg done");	
@@ -639,13 +641,24 @@ int updateManifest(int sock, vector<string> CIDs)
 	return 0;
 }
 
-// TODO: XIA_MAX_BUF needs to be augmented
+// TODO: add fallback
 int XrequestChunkStage(int sock, const ChunkStatus *cs) {
 	char cmd[XIA_MAX_BUF];
 	memset(cmd, '\0', strlen(cmd));
 
+	char AD[MAX_XID_SIZE], HID[MAX_XID_SIZE], IP[MAX_XID_SIZE];
+
+	if (XreadLocalHostAddr(sock, AD, sizeof(AD), HID, sizeof(HID), IP, sizeof(IP)) < 0)
+		die(-1, "Reading localhost address\n");
+
+	char *CID = chunkReqDag2cid(cs[0].cid);
+
+	// rewrite the AD and HID of the chunk request
+	char *dag = (char *)malloc(512);
+	sprintf(dag, "RE ( %s %s ) CID:%s", AD, HID, CID);
+
 	// TODO: check total length of cids should not exceed max buf
-	sprintf(cmd, "fetch %ld %s", cs[0].cidLen, cs[0].cid);
+	sprintf(cmd, "fetch %ld %s", strlen(dag), dag);
 	int n = sendStreamCmd(sock, cmd); 	
 	return n;
 }

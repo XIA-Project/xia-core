@@ -20,7 +20,6 @@ int ftpSock, stageManagerSock;
 int getFile(int sock) 
 {
 	FILE *fd = fopen(fout, "w");
-
 	int chunkSock;
 	int n;
 	int status = -1;
@@ -41,7 +40,6 @@ int getFile(int sock)
 			Xclose(sock);
 			die(-1, "Unable to communicate with the server\n");
 		}
-
 		if (strncmp(reply, "cont", 4) == 0) {
 			say("Receiving partial chunk list\n");
 			char reply_arr[strlen(reply+5)];
@@ -58,22 +56,6 @@ int getFile(int sock)
 			break;
 		}
 	}
-
-/*
-	// receive the CID list from xftp server
-	if ((n = Xrecv(sock, reply, sizeof(reply), 0)) < 0) {
-		Xclose(sock);
-		die(-1, "Unable to communicate with the server\n");
-	}
-
-	char reply_arr[strlen(reply)];
-	strcpy(reply_arr, reply);
-	int cid_num = atoi(strtok(reply_arr, " "));
-	for (int i = 0; i < cid_num; i++) {
-		CIDs.push_back(string(strtok(NULL, " ")));
-	}
-*/
-
 
 	// update CID list to the local staging service.
 	if (stage) {
@@ -99,8 +81,7 @@ int getFile(int sock)
 		int n = NUM_CHUNKS; 
 		char *dag = (char *)malloc(512);
 
-		sprintf(dag, "RE ( %s %s ) CID:%s", myAD, myHID, string2char(CIDs[i]));
-		//sprintf(dag, "RE ( %s %s ) CID:%s", ftpServAD, ftpServHID, string2char(CIDs[i]));
+		sprintf(dag, "RE ( %s %s ) CID:%s", ftpServAD, ftpServHID, string2char(CIDs[i]));
 		cs[0].cidLen = strlen(dag);
 		cs[0].cid = dag; // cs[i].cid is a DAG, not just the CID
 		unsigned ctr = 0;
@@ -126,7 +107,6 @@ int getFile(int sock)
 						return -1;
 					}
 				}
-//say("checking chunk status\n");
 			}
 			ctr++;
 
@@ -137,14 +117,18 @@ int getFile(int sock)
 			else if (status & WAITING_FOR_CHUNK) {
 //say("waiting... one or more chunks aren't ready yet\n");
 			}
-			else if (status & INVALID_HASH)
+			else if (status & INVALID_HASH) {
 				die(-1, "one or more chunks has an invalid hash");
-			else if (status & REQUEST_FAILED)
+			}
+			else if (status & REQUEST_FAILED) {
 				die(-1, "no chunks found\n");
-			else if (status < 0) 
+			}
+			else if (status < 0) {
 				die(-1, "error getting chunk status\n"); 
-			else 
+			}
+			else {
 				say("unexpected result\n");
+			}
 
 			usleep(CHUNK_REQUEST_DELAY_MSEC*1000);
 		}
@@ -152,7 +136,7 @@ int getFile(int sock)
 		say("Chunk is ready\n");
 
 		if ((len = XreadChunk(chunkSock, data, sizeof(data), 0, cs[0].cid, cs[0].cidLen)) < 0) {
-			say("error getting chunk\n");
+			warn("error getting chunk\n");
 			return -1;
 		}
 //say("writing %d bytes of chunk %s to disk\n", len, cid);
@@ -180,9 +164,7 @@ int main(int argc, char **argv)
 			sprintf(fout, "my%s", fin);
 
 			ftpSock = initStreamClient(getXftpName(), myAD, myHID, ftpServAD, ftpServHID);
-
 			stageManagerSock = registerStageManager(getStageManagerName());
-
 			if (stageManagerSock == -1) {
 				say("No local staging service running\n");
 				stage = false;

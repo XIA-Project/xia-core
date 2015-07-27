@@ -33,8 +33,8 @@
 #define NUM_CHUNKS 1 // 12 is the max NUM_CHUNKS to fetch at one time for 1024 K
 
 #define FTP_NAME "www_s.ftp.aaa.xia"
-#define STAGE_SERVER_NAME "www_s.prefetch_server.aaa.xia"
-#define STAGE_MANAGER_NAME "www_s.prefetch_client.aaa.xia"
+#define STAGE_SERVER_NAME "www_s.stage_server.aaa.xia"
+#define STAGE_MANAGER_NAME "www_s.stage_manager.aaa.xia"
 
 #define GETSSID_CMD "iwgetid -r"
 

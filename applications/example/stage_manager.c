@@ -75,7 +75,7 @@ void regHandler(int sock, char *cmd)
 	pthread_mutex_unlock(&timeLock);
 
 	vector<string> CIDs;
-
+cerr<<cmd<<endl;
 	if (strncmp(cmd, "reg cont", 8) == 0) {
 		say("Receiving partial chunk list\n");
 		char cmd_arr[strlen(cmd+9)];
@@ -92,6 +92,7 @@ void regHandler(int sock, char *cmd)
 			Xclose(sock);
 			die(-1, "Unable to communicate with the server\n");
 		}
+cerr<<cmd<<endl;		
 		if (strncmp(cmd, "reg cont", 8) == 0) {
 			say("Receiving partial chunk list\n");
 			char cmd_arr[strlen(cmd+9)];
