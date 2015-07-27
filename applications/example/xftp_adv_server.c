@@ -18,8 +18,9 @@ void *recvCmd (void *socketid)
 
 	// ChunkContext contains size, ttl, policy, and contextID which for now is PID
 	ChunkContext *ctx = XallocCacheSlice(POLICY_FIFO|POLICY_REMOVE_ON_EXIT, 0, 20000000);
-	if (ctx == NULL)
+	if (ctx == NULL) {
 		die(-2, "Unable to initilize the chunking system\n");
+	}
 
 	while (1) {
 		say("waiting for command\n");
@@ -35,8 +36,9 @@ void *recvCmd (void *socketid)
 			fname = &cmd[4];
 			say("Client requested file %s\n", fname);
 
-			if (info)
+			if (info) {
 				XfreeChunkInfo(info); // clean up the existing chunks first
+			}
 			info = NULL;
 			
 			say("Chunking file %s\n", fname);
@@ -54,10 +56,9 @@ void *recvCmd (void *socketid)
 					if (count - offset < MAX_CID_NUM) {
 						num = count - offset;
 					}
-					count -= MAX_CID_NUM;
 					memset(reply, '\0', strlen(reply));
-					sprintf(reply, "cond");
-					for (int i = offset; i < offset + num; i++) {
+					sprintf(reply, "cont");
+					for (i = offset; i < offset + num; i++) {
 						strcat(reply, " ");
 						strcat(reply, info[i].cid);
 					}
@@ -65,7 +66,9 @@ void *recvCmd (void *socketid)
 					if (Xsend(sock, reply, strlen(reply), 0) < 0) {
 						warn("unable to send reply to client\n");
 						break;
-					}					
+					}
+					// 1 ms seems to be stable
+					usleep(1000);
 				}
 				memset(reply, '\0', strlen(reply));
 				sprintf(reply, "done");	
@@ -74,25 +77,12 @@ void *recvCmd (void *socketid)
 					break;
 				}								
 			}
-			/*
-			for (i = 0; i < count; i++) {
-				strcat(reply, " ");
-				strcat(reply, info[i].cid);
-			}
-			say("%s\n", reply);
-			
-			// send the master chunk back (chunk count and the CIDs)
-			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
-				warn("unable to send reply to client\n");
-				break;
-			}
-			*/
-
 		} 	
 		else if (strncmp(cmd, "done", 4) == 0) {
 			say("done sending file: removing the chunks from the cache\n");
-			for (i = 0; i < count; i++)
+			for (i = 0; i < count; i++) {
 				XremoveChunk(ctx, info[i].cid);
+			}
 			XfreeChunkInfo(info);
 			info = NULL;
 			count = 0;
@@ -107,8 +97,9 @@ void *recvCmd (void *socketid)
 		}
 	}
 	
-	if (info)
+	if (info) {
 		XfreeChunkInfo(info);
+	}
 	XfreeCacheSlice(ctx);
 	Xclose(sock);
 	pthread_exit(NULL);
