@@ -1,6 +1,6 @@
 CC=protoc
 
-OBJS=xcache_cmd.pb.o
+OBJS=xcache_cmd.pb.o xcache_cache_click.pb.o
 
 all: $(OBJS)
 

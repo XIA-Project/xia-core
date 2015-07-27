@@ -2,13 +2,13 @@
 #include "xcachePriv.h"
 
 /* API */
-int XcachePutChunk(xcacheSlice *slice, xcacheChunk *chunk)
+int XputChunk(ChunkContext *ctx, const char *data, unsigned length, ChunkInfo *info)
 {
 	xcache_cmd cmd;
 
 	cmd.set_cmd(xcache_cmd::XCACHE_STORE);
-	cmd.set_context_id(slice->context_id);
-	cmd.set_data(chunk->buf, chunk->len);
+	cmd.set_context_id(ctx->contextID);
+	cmd.set_data(data, length);
 
 	if(send_command(&cmd) < 0) {
 		printf("%s: Error in sending command to xcache\n", __func__);
@@ -29,7 +29,7 @@ int XcachePutChunk(xcacheSlice *slice, xcacheChunk *chunk)
 	}
 
 	printf("%s: Got a response from server\n", __func__);
-	strcpy(chunk->cid, cmd.cid().c_str());
+	strcpy(info->cid, cmd.cid().c_str());
 
 	return xcache_cmd::XCACHE_OK;
 }

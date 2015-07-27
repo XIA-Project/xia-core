@@ -8,6 +8,7 @@
 #include "store_manager.h"
 #include "XIARouter.hh"
 #include "cache.h"
+#include <errno.h>
 
 struct xcache_conf {
 	char hostname[128];
@@ -15,6 +16,8 @@ struct xcache_conf {
 
 class xcache_controller {
 private:
+	pthread_mutex_t meta_map_lock;
+
 	/**
 	 * Map of metadata.
 	 */
@@ -38,7 +41,7 @@ private:
 	/**
 	 * Lookup a slice based on context ID.
 	 */
-	xcache_slice *lookup_slice(xcache_cmd *);
+	xcache_slice *lookup_slice(int);
 
 	/**
 	 * Manages various content stores.
@@ -48,6 +51,7 @@ private:
 	xcache_cache cache;
 
 	XIARouter xr;
+	int context_id;
 
 public:
 	/**
@@ -55,7 +59,18 @@ public:
 	 * FIXME: What do we need to do in the constructor?
 	 */
 	xcache_controller() {
+		xcache_slice *slice = new xcache_slice(0);
+
+#define DEFAULT_SLICE_TTL 10000
+#define DEFAULT_SLICE_SIZE 2000000
+
+		slice->set_ttl(DEFAULT_SLICE_TTL);
+		slice->set_ttl(DEFAULT_SLICE_SIZE);
+		slice_map[0] = slice;
 		hostname.assign("host0");
+		pthread_mutex_init(&meta_map_lock, NULL);
+		
+		context_id = 1;
 	}
 
 	/**
@@ -115,6 +130,60 @@ public:
 	 * Remove content.
 	 */
 	void remove(void);
+
+	xcache_meta *acquire_meta(std::string cid) {
+		lock_meta_map();
+
+		std::map<std::string, xcache_meta *>::iterator i = meta_map.find(cid);
+		if(i == meta_map.end()) {
+			/* We could not find the content locally */
+			unlock_meta_map();
+			return NULL;
+		}
+
+		xcache_meta *meta = i->second;
+		meta->lock();
+
+		return meta;
+	}
+
+	void release_meta(xcache_meta *meta) {
+		unlock_meta_map();
+		if(meta)
+			meta->unlock();
+	}
+
+	inline int lock_meta_map(void) {
+		int rv;
+//		std::cout << getpid() << " LOCKING METAMAP\n";
+		rv = pthread_mutex_lock(&meta_map_lock);
+		if(rv != 0) {
+//			std::cout << "LOCKING FAILED " << errno << "\n";
+		} else {
+//			std::cout << getpid() << " LOCKED METAMAP\n";
+		}
+		return rv;
+	}
+
+	inline int unlock_meta_map(void) {
+		int rv;
+//		std::cout << getpid() << " UNLOCKING METAMAP\n";
+		rv = pthread_mutex_unlock(&meta_map_lock);
+		if(rv != 0) {
+//			std::cout << "UNLOCKING FAILED " << errno << "\n";
+		}
+		return 0;
+	}
+
+	int register_meta(xcache_meta *);
+
+	int __store(xcache_slice *slice, xcache_meta *meta, const std::string *data);
+
+	void add_meta(xcache_meta *meta) {
+		lock_meta_map();
+		meta_map[meta->get_cid()] = meta;
+		unlock_meta_map();
+	}
 };
 
 #endif

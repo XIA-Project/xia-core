@@ -10,11 +10,11 @@ xcache_meta::xcache_meta(std::string cid)
 	store = NULL;
 	this->cid = cid;
 	len = 0;
+	pthread_mutex_init(&meta_lock, NULL);
 }
 
 std::string xcache_meta::get(void)
 {
-
 	std::map<uint32_t, xcache_slice *>::iterator i;
 
 	for(i = slice_map.begin(); i != slice_map.end(); ++i) {
@@ -26,9 +26,20 @@ std::string xcache_meta::get(void)
 	return store->get(this);
 }
 
+std::string xcache_meta::safe_get(void)
+{
+	std::string data;
+
+	this->lock();
+	data = get(this);
+	this->unlock();
+
+	return data;
+}
 xcache_meta::xcache_meta()
 {
 	store = NULL;
+	pthread_mutex_init(&meta_lock, NULL);
 }
 
 void xcache_meta::status(void)

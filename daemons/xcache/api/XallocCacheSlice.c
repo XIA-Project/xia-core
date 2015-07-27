@@ -3,10 +3,11 @@
 #include "xcache.h"
 
 /* API */
-int XcacheAllocateSlice(struct xcacheSlice *slice, int32_t cache_size, int32_t ttl, int32_t cache_policy)
+ChunkContext *XallocCacheSlice(int32_t cache_size, int32_t ttl, int32_t cache_policy)
 {
 	int ret;
 	xcache_cmd cmd;
+	ChunkContext *ctx = NULL;
 
 	printf("Lib: Sending Xcache Allocate Slice command\n");
 
@@ -16,14 +17,13 @@ int XcacheAllocateSlice(struct xcacheSlice *slice, int32_t cache_size, int32_t t
 	cmd.set_cache_policy(cache_policy);
 
 	if((ret = send_command(&cmd)) < 0) {
-		return ret;
+		return NULL;
 	}
 
 	if((ret = get_response_blocking(&cmd)) >= 0) {
-		slice->context_id = cmd.context_id();
-	} else {
-		slice->context_id = -1;
+		ctx = (ChunkContext *)malloc(sizeof(ChunkContext));
+		ctx->contextID = cmd.context_id();
 	}
 
-	return ret;
+	return ctx;
 }

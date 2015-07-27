@@ -4,21 +4,16 @@
 #include "xcachePriv.h"
 
 /* API */
-int XcacheGetChunk(xcacheSlice *slice, xcacheChunk *chunk, sockaddr_x *addr, socklen_t len, int flags)
+int XgetChunk(int sockfd, sockaddr_x *addr, socklen_t addrlen, void *rbuf, size_t buflen)
 {
 	xcache_cmd cmd;
 
-	/* Flags currently unused */
-	(void)flags;
+	(void)sockfd; //FIXME: What does sockfd mean?
 
 	printf("Inside %s\n", __func__);
 
 	cmd.set_cmd(xcache_cmd::XCACHE_GETCHUNK);
-
-	if(slice)
-		cmd.set_context_id(slice->context_id);
-
-	cmd.set_dag(addr, len);
+	cmd.set_dag(addr, addrlen);
 
 	if(send_command(&cmd) < 0) {
 		printf("Error in sending command to xcache\n");
@@ -30,13 +25,11 @@ int XcacheGetChunk(xcacheSlice *slice, xcacheChunk *chunk, sockaddr_x *addr, soc
 	printf("Waiting for a response from xcache\n");
 	if(get_response_blocking(&cmd) >= 0) {
 		/* Got a valid response from Xcache */
-		chunk->len = cmd.data().length();
-		chunk->buf = malloc(chunk->len);
+		memcpy(rbuf, cmd.data().c_str(), MIN(cmd.data().length(), buflen));
 		printf("Got a valid response from xcache, chunk = %s, len = %lu\n",
 			   cmd.data().c_str(), cmd.data().length());
 		/* Got a valid response from Xcache */
-		memcpy(chunk->buf, cmd.data().c_str(), cmd.data().length());
-		return 0;
+		return MIN(cmd.data().length(), buflen);
 	}
 	printf("Did not get a valid response from xcache\n");
 

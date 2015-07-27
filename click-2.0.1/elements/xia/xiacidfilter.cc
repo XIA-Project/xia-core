@@ -5,6 +5,7 @@
 #include <click/glue.hh>
 #include <click/packet_anno.hh>
 #include <iostream>
+#include <click/xiatransportheader.hh>
 
 CLICK_DECLS
 
@@ -23,13 +24,6 @@ int XIACidFilter::configure(Vector<String> &confStr, ErrorHandler *errh)
 	(void)confStr;
 	(void)errh;
 
-	if (cp_va_kparse(confStr, this, errh,
-					 "LOCAL_ADDR", cpkP + cpkM, cpXIAPath, &local_addr,
-					 cpEnd) < 0) {
-		
-		std::cout << "Configuration Failed\n";
-		return -1;
-	}
 	return 0;
 
 	// FIXME: Do we need to configure something?
@@ -37,8 +31,16 @@ int XIACidFilter::configure(Vector<String> &confStr, ErrorHandler *errh)
 
 void XIACidFilter::handleXtransportPacket(Packet *p)
 {
-	std::cout << "CID FILTER Packet received from xtransport\n";
-	checked_output_push(PORT_OUT_XCACHE, p);
+	WritablePacket *pIn = p->uniqueify();
+	XIAHeader xiah(pIn->xia_header());
+	TransportHeader thdr(pIn);
+
+	if(thdr.pkt_info() != TransportHeader::DATA)
+		return;
+
+	WritablePacket *pReply = WritablePacket::make(0, thdr.payload(), xiah.plen() - thdr.hlen(), 0);
+
+	checked_output_push(PORT_OUT_XCACHE, pReply);
 }
 
 void XIACidFilter::handleXcachePacket(Packet *p)

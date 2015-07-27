@@ -23,9 +23,10 @@ echo XIADIR=$(pwd) >> $OUTPUT
 cat >> $OUTPUT << EOF
 APIDIR=\$(XIADIR)/api
 BINDIR=\$(XIADIR)/bin
+XCACHEAPIDIR=\$(XIADIR)/daemons/xcache/api
 ETC=\$(XIADIR)/etc
 XLIB=\$(APIDIR)/lib
-XINC=\$(APIDIR)/include
+XINC=\$(APIDIR)/include \$(XCACHEAPIDIR)
 
 CC=g++
 LD=g++
@@ -36,6 +37,7 @@ ifeq (\$(wildcard \$(XLIB)/libXsocket.a),)
 else
 	LIBS=\$(XLIB)/libXsocket.a \$(XLIB)/libdagaddr.a \$(XLIB)/libXssl.a -Bstatic -lprotobuf
 endif
+LIBS+=$(XCACHEAPIDIR)/libxcache.a
 
 ifdef DEBUG
 CFLAGS +=-ggdb -DDEBUG

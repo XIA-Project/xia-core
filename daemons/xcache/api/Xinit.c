@@ -5,7 +5,7 @@
 #include "xcachePriv.h"
 #include "../common/xcache_sock.h"
 
-int XcacheInit(void)
+int Xinit(void)
 {
 	struct sockaddr_un xcache_addr;
 	char sock_name[512];

@@ -7,20 +7,35 @@
 
 #define CIDLEN 512
 
-struct xcacheChunk {
-	char cid[CIDLEN];
-	void *buf;
-	size_t len;
-};
+/* CID cache context */
+typedef struct {
+    int sockfd; //FIXME: What does this mean?
+    int contextID;
+#if 0
+	unsigned cachePolicy;
+    unsigned cacheSize;
+	unsigned ttl;
+#endif
+} ChunkContext;
 
-struct xcacheSlice {
-	uint32_t context_id;
-};
+typedef struct {
+	int size;
+	char cid[CID_HASH_SIZE + 1];
+	int32_t ttl; //FIXME: unused
+	struct timeval timestamp; //FIXME: unused
+} ChunkInfo;
 
-int XcacheInit(void);
-int XcacheGetChunk(xcacheSlice *slice, xcacheChunk *chunk, sockaddr_x *addr, socklen_t len, int flags);
-int XcacheAllocateSlice(struct xcacheSlice *slice, int32_t cache_size, int32_t ttl, int32_t cache_policy);
-int XcachePutChunk(xcacheSlice *slice, xcacheChunk *chunk);
-int XcachePutFile(struct xcacheSlice *slice, const char *fname, unsigned chunkSize, struct xcacheChunk **chunks);
+typedef struct {
+	char* cid;
+	size_t cidLen;
+	int status; // 1: ready to be read, 0: waiting for chunk response, -1: failed
+} ChunkStatus;
+
+
+int Xinit(void);
+int XgetChunk(int sockfd, sockaddr_x *addr, socklen_t addr_len, void *rbuf, size_t len);
+ChunkContext *XallocCacheSlice(int32_t cache_size, int32_t ttl, int32_t cache_policy);
+int XputChunk(ChunkContext *ctx, const char *data, unsigned length, ChunkInfo *info);
+int XputFile(ChunkContext *ctx, const char *fname, unsigned chunkSize, ChunkInfo **chunks);
 
 #endif

@@ -4,18 +4,18 @@
 #include "xcache.h"
 #include "xcachePriv.h"
 
-int XcachePutFile(struct xcacheSlice *slice, const char *fname, unsigned chunkSize, struct xcacheChunk **chunks)
+int XputFile(ChunkContext *ctx, const char *fname, unsigned chunkSize, ChunkInfo **chunks)
 {
 	FILE *fp;
 	struct stat fs;
-	struct xcacheChunk *chunkList;
+	ChunkInfo *chunkList;
 	unsigned numChunks;
 	unsigned i;
 	int rc;
 	int count;
 	char *buf;
 
-	if (slice == NULL) {
+	if (ctx == NULL) {
 		errno = EFAULT;
 		return -1;
 	}
@@ -33,14 +33,14 @@ int XcachePutFile(struct xcacheSlice *slice, const char *fname, unsigned chunkSi
 	if (stat(fname, &fs) != 0)
 		return -1;
 
-	if (!(fp= fopen(fname, "rb")))
+	if (!(fp = fopen(fname, "rb")))
 		return -1;
 
 	numChunks = fs.st_size / chunkSize;
 	if (fs.st_size % chunkSize)
 		numChunks ++;
 	//FIXME: this should be numChunks, sizeof(ChunkInfo)
-	if (!(chunkList = (struct xcacheChunk *)calloc(numChunks, chunkSize))) {
+	if (!(chunkList = (ChunkInfo *)calloc(numChunks, chunkSize))) {
 		fclose(fp);
 		return -1;
 	}
@@ -53,12 +53,8 @@ int XcachePutFile(struct xcacheSlice *slice, const char *fname, unsigned chunkSi
 
 	i = 0;
 	while (!feof(fp)) {
-	
 		if ((count = fread(buf, sizeof(char), chunkSize, fp)) > 0) {
-			chunkList[i].buf = buf;
-			chunkList[i].len = count;
-      
-			rc = XcachePutChunk(slice, &chunkList[i]);
+			rc = XputChunk(ctx, buf, count, &chunkList[i]);
 			if(rc < 0)
 				break;
 			if(rc == xcache_cmd::XCACHE_ERR_EXISTS) {

@@ -3,7 +3,10 @@
 
 #include <click/element.hh>
 #include <clicknet/xia.h>
-#include <click/xiapath.hh>
+#if CLICK_USERLEVEL
+#include "../../userlevel/xcache.pb.h"
+#endif
+
 CLICK_DECLS
 
 
@@ -17,8 +20,8 @@ CLICK_DECLS
  */
 
 class XIACidFilter : public Element {
+private:
 public:
-	XIAPath local_addr;
 	XIACidFilter();
 	~XIACidFilter();
 	const char *class_name() const		{ return "XIACidFilter"; }
@@ -28,7 +31,6 @@ public:
 	void push(int port, Packet *);
 	void handleXcachePacket(Packet *p);
 	void handleXtransportPacket(Packet *p);
-private:
 };
 
 CLICK_ENDDECLS

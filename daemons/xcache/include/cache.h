@@ -22,6 +22,8 @@ struct cache_args {
 class xcache_cache {
 private:
 	static xcache_controller *ctrl;
+	std::map<std::string, std::string *> ongoing_downloads;
+
 public:
 	/**
 	 * A Constructor.
@@ -29,6 +31,7 @@ public:
 	xcache_cache() {
 	}
 
+	void process_pkt(xcache_controller *ctrl, char *pkt, size_t len);
 	static void *run(void *);
 	static int create_click_socket(int);
 	static void spawn_thread(struct cache_args *);
