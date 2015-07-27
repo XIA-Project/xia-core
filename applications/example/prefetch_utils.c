@@ -1,4 +1,4 @@
-#include "stage_utils.h"
+#include "prefetch_utils.h"
 
 int verbose = 1;
 
@@ -30,6 +30,46 @@ void die(int ecode, const char *fmt, ...)
 	exit(ecode);
 }
 
+char** str_split(char* a_str, const char *a_delim) 
+{
+	char** result = 0;
+	int count = 0;
+	int str_len = strlen(a_str);
+	int del_len = strlen(a_delim);
+	int i = 0;
+	int j = 0;
+	char* last_delim = 0;
+
+	/* Count how many elements will be extracted. */
+	for (i = 0; i < str_len; i++) 
+		for (j = 0; j < del_len; j++) 
+			if (a_str[i] == a_delim[j]) {
+				count++;
+				last_delim = &a_str[i];
+			}
+	 /* Add space for trailing token. */
+	count += last_delim < (a_str + strlen(a_str) - 1);
+	
+ 	/* Add space for terminating null string so caller
+			knows where the list of returned strings ends. */
+ 	count++;
+
+	result = (char **)malloc(sizeof(char*) * count);
+	
+	// printf ("Splitting string \"%s\" into %i tokens:\n", a_str, count);
+	
+	i = 0;
+	result[i] = strtok(a_str, a_delim);
+	// printf ("%s\n",result[i]);
+	
+	for (i = 1; i < count; i++) {
+		result[i] = strtok (NULL, a_delim);
+		// printf ("%s\n",result[i]);
+	}
+
+	return result;
+}
+
 // create a semi-random alphanumeric string of the specified size
 char *randomString(char *buf, int size) 
 {
@@ -52,28 +92,28 @@ char *randomString(char *buf, int size)
 	return buf;
 }
 
-vector<string> strVector(char *strs) 
+vector<string> cidList(char *cids_str) 
 {
-	char str_arr[strlen(strs)];
-	strcpy(str_arr, strs);
-	vector<string> strVec;
-	char *str;
-	strVec.push_back(strtok(str_arr, " "));	
-	while ((str = strtok(NULL, " ")) != NULL) {
-		strVec.push_back(str);
+	char cids_str_arr[strlen(cids_str)];
+	strcpy(cids_str_arr, cids_str);
+	vector<string> CIDs;
+	char *CID;
+	CIDs.push_back(strtok(cids_str_arr, " "));	
+	while ((CID = strtok(NULL, " ")) != NULL) {
+		CIDs.push_back(CID);
 	}
 
-	return strVec;
+	return CIDs;
 }
 
-char *getStageServiceName() 
+char *getPrefetchServiceName() 
 {
-	return string2char(string(STAGE_SERVER_NAME) + "." + getAD());
+	return string2char(string(PREFETCH_SERVER_NAME) + "." + getAD());
 } 
 
-char *getStageManagerName() 
+char *getPrefetchManagerName() 
 {
-	return string2char(string(STAGE_MANAGER_NAME) + "." + getHID());
+	return string2char(string(PREFETCH_MANAGER_NAME) + "." + getHID());
 } 
 
 char *getXftpName() 
@@ -87,14 +127,6 @@ char* string2char(string str)
 	strcpy(cstr, str.c_str());	
 	return cstr;
 } 
-
-long string2long(string str) 
-{
-	stringstream buffer(str);
-	long var;
-	buffer >> var;
-	return var;
-}
 
 string execSystem(string cmd) 
 {
@@ -135,13 +167,14 @@ string getSSID()
 {
 	string ssid = execSystem(GETSSID_CMD);
 
+	// TODO: ask Dan about blocking optimization 
 	if (ssid.empty()) {
-// cerr<<"No network\n";
+		// cerr<<"No network\n";
 		while (1) {
-			usleep(SCAN_DELAY_MSEC * 1000);
+			usleep(100000); // TODO: need further optimization
 			ssid = execSystem(GETSSID_CMD); 
 			if (!ssid.empty()) {
-// cerr<<"Network back\n";
+				// cerr<<"Network back\n";
 				break;
 			}
 		}
@@ -195,33 +228,32 @@ void getNewAD(char *old_ad)
 		if (XreadLocalHostAddr(sock, new_ad, sizeof(new_ad), hid, sizeof(hid), ip, sizeof(ip)) < 0)
 			die(-1, "Reading localhost address\n");
 		if (strcmp(new_ad, old_ad) != 0) {
-cerr<<"AD changed!"<<endl;
+			cerr<<"AD changed!"<<endl;
 			strcpy(old_ad, new_ad);
 			Xclose(sock);
 			return;			
 		}
-		usleep(SCAN_DELAY_MSEC * 1000);
+		sleep(1);
 	}
 	return;
 }
 
+// app level
 string netConnStatus(string lastSSID) 
 {
 	string currSSID = execSystem(GETSSID_CMD);
 
-	if (currSSID.empty())	{
+	if (currSSID.empty())	
 		return "empty";
-	}
 	else {
-		if (currSSID == lastSSID) {
+		if (currSSID == lastSSID) 
 			return "same";
-		}
-		else {
+		else 
 			return currSSID;
-		}
 	}
 }
 
+// used when client is mobile TODO: detect network
 int getReply(int sock, const char *cmd, char *reply, sockaddr_x *sa, int timeout, int tries) 
 {
 	int sent, received, rc;
@@ -485,9 +517,8 @@ int registerStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID)
 
 	Xlisten(sock, 5);
 
-	if (XregisterName(name, sa) < 0 ) {
+	if (XregisterName(name, sa) < 0 )
 		die(-1, "error registering name: %s\n", name);
-	}
 	say("\nRegistering DAG with nameserver:\n%s\n", g.dag_string().c_str());
 
   return sock;
@@ -501,9 +532,8 @@ void *blockListener(void *listenID, void *recvFuntion (void *))
   while (1) {
 		say("Waiting for a client connection\n");
    		
-		if ((acceptSock = Xaccept(listenSock, NULL, NULL)) < 0){
+		if ((acceptSock = Xaccept(listenSock, NULL, NULL)) < 0)
 			die(-1, "accept failed\n");
-		}
 		say("connected\n");
 		
 		pthread_t client;
@@ -523,7 +553,7 @@ int getIndex(string target, vector<string> pool) {
 	return -1;
 }
 
-int registerStageService(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid) 
+int registerPrefetchService(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid) 
 {
 	int sock, rc;
 	sockaddr_x dag;
@@ -570,7 +600,7 @@ int registerStageService(const char *name, char *src_ad, char *src_hid, char *ds
 	return sock;
 }
 
-int registerStageManager(const char *name) 
+int registerPrefetchManager(const char *name) 
 {
 	int sock;
 	sockaddr_x dag;
@@ -579,52 +609,21 @@ int registerStageManager(const char *name)
 	// lookup the xia service 
 	daglen = sizeof(dag);
 
-	if (XgetDAGbyName(name, &dag, &daglen) < 0) {
-		warn("unable to locate: %s\n", name);
-	}
+	if (XgetDAGbyName(name, &dag, &daglen) < 0)
+		die(-1, "unable to locate: %s\n", name);
 	// create a socket, and listen for incoming connections
-	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
-		warn("Unable to create the listening socket\n");
-	}
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+		die(-1, "Unable to create the listening socket\n");
 	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(sock);
-		warn("Unable to bind to the dag: %s\n", dag);
-		sock = -1;		
+		die(-1, "Unable to bind to the dag: %s\n", dag);
 	}
 	return sock;
 }
 
 int updateManifest(int sock, vector<string> CIDs) 
 {
-	char cmd[XIA_MAX_BUF];		
-	int offset = 0;
-	int count = CIDs.size();
-	int num;
-	while (offset < count) {
-		num = MAX_CID_NUM;
-		if (count - offset < MAX_CID_NUM) {
-			num = count - offset;
-		}
-		memset(cmd, '\0', strlen(cmd));
-		sprintf(cmd, "reg cont");
-		for (int i = offset; i < offset + num; i++) {
-			strcat(cmd, " ");
-			strcat(cmd, string2char(CIDs[i]));
-		}
-		offset += MAX_CID_NUM;
-		if (Xsend(sock, cmd, strlen(cmd), 0) < 0) {
-			warn("unable to send reply to client\n");
-			break;
-		}
-		usleep(1000);
-	}
-	memset(cmd, '\0', strlen(cmd));
-	sprintf(cmd, "reg done");	
-	if (Xsend(sock, cmd, strlen(cmd), 0) < 0) {
-		warn("unable to send reply to client\n");
-	}		
-/*	
-	char cmd[XIA_MAX_BUF];	
+	char cmd[XIA_MAX_BUF];
 	memset(cmd, '\0', strlen(cmd));
 	char cids[XIA_MAX_BUF];
 	memset(cids, '\0', strlen(cids));
@@ -638,42 +637,183 @@ int updateManifest(int sock, vector<string> CIDs)
 	int n = sendStreamCmd(sock, cmd);
 
 	return n;
-*/	
-	return 0;
 }
 
-// TODO: add fallback
-int XrequestChunkStage(int sock, const ChunkStatus *cs) {
+// TODO: XIA_MAX_BUF needs to be augmented
+int XrequestChunkPrefetch(int sock, const ChunkStatus *cs) {
 	char cmd[XIA_MAX_BUF];
 	memset(cmd, '\0', strlen(cmd));
+
+	// TODO: check total length of cids should not exceed max buf
 	sprintf(cmd, "fetch %ld %s", cs[0].cidLen, cs[0].cid);
+	int n = sendStreamCmd(sock, cmd); 	
+	return n;
+}
 
 /*
-	char AD[MAX_XID_SIZE], HID[MAX_XID_SIZE], IP[MAX_XID_SIZE];
+int XrequestChunksAdv(int sockfd, const ChunkStatus *chunks, int numChunks, string serviceName, vector<string> CIDS) {
+	// send if no prefetch client, as notmal; other wise, send argrments as part of msg using xsp
+	// need to pass AD, HID, SID etc, maybe sockfd is enogh
+	return 0;
+}
+*/
 
-	if (XreadLocalHostAddr(sock, AD, sizeof(AD), HID, sizeof(HID), IP, sizeof(IP)) < 0)
+/* deprecated
+
+int deprecatedRegisterStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) 
+{
+	int sock;
+
+	// create a socket, and listen for incoming connections
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+		die(-1, "Unable to create the listening socket\n");
+
+  // read the localhost AD and HID
+  if (XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0)
 		die(-1, "Reading localhost address\n");
 
-	char *CID = chunkReqDag2cid(cs[0].cid);
+	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
+	// Generate an SID to use
+	if (XmakeNewSID(sid_string, sizeof(sid_string))) {
+		die(-1, "Unable to create a temporary SID");
+	}
 
-	// rewrite the AD and HID of the chunk request
-	char *dag = (char *)malloc(512);
-	sprintf(dag, "RE ( %s %s ) CID:%s", AD, HID, CID);
+	struct addrinfo *ai;
 
-	sprintf(cmd, "fetch %ld %s", strlen(dag), dag);
-*/	
-	int n = sendStreamCmd(sock, cmd);
+	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
+		die(-1, "getaddrinfo failure!\n");
+
+	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
+
+  if (XregisterName(name, dag) < 0)
+		die(-1, "error registering name: %s\n", name);
+
+	if (Xbind(sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
+		Xclose(sock);
+		die(-1, "Unable to bind to the dag: %s\n", dag);
+	}
+
+	Graph g(dag);
+	say("listening on dag: %s\n", g.dag_string().c_str());
+  return sock;  
+}
+
+int getChunkCount(int sock, char *reply, int sz) 
+{
+	int n = -1;
+
+	if ((n = Xrecv(sock, reply, sz, 0))  < 0) {
+		Xclose(sock);
+		 die(-1, "Unable to communicate with the server\n");
+	}
+	if (strncmp(reply, "OK:", 3) != 0) {
+		warn( "%s\n", reply);
+		return -1;
+	}
+	reply[n] = 0;
 
 	return n;
 }
 
-// TODO: right now it's hacky, need to fix the way reading XIDs when including fallback DAG
-char *chunkReqDag2cid(char *dag) {
-	char *cid = (char *)malloc(512);
-	char *cids = strstr(dag, "CID:"); 
-	if (sscanf(cids, "%s", cid) < 1 || strncmp(cid, "CID:", 4) != 0) {
-		die(-1, "Unable to extract AD.");
+int buildChunkDAGs(ChunkStatus cs[], char *chunks, char *dst_ad, char *dst_hid) 
+{
+	char *p = chunks;
+	char *next;
+	int n = 0;
+
+	char *dag;
+	
+	// build the list of chunks to retrieve
+	while ((next = strchr(p, ' '))) {
+		*next = 0;
+		dag = (char *)malloc(512);
+		sprintf(dag, "RE ( %s %s ) CID:%s", dst_ad, dst_hid, p);
+		// printf("built dag: %s\n", dag);
+		cs[n].cidLen = strlen(dag);
+		cs[n].cid = dag;
+		n++;
+		p = next + 1;
 	}
-cerr<<"CID: "<<cid+4<<endl;	
-	return cid+4;
+	dag = (char *)malloc(512);
+	sprintf(dag, "RE ( %s %s ) CID:%s", dst_ad, dst_hid, p);
+	// printf("getting %s\n", p);
+	cs[n].cidLen = strlen(dag);
+	cs[n].cid = dag;
+	n++;
+	return n;
 }
+
+int getListedChunks(int csock, FILE *fd, char *chunks, char *dst_ad, char *dst_hid) 
+{
+	ChunkStatus cs[NUM_CHUNKS];
+	char data[XIA_MAXCHUNK];
+	int len;
+	int status;
+	int n = -1;
+	
+	n = buildChunkDAGs(cs, chunks, dst_ad, dst_hid);
+	
+	// NOTE: the chunk transport is not currently reliable and chunks may need to be re-requested
+	// ask for the current chunk list again every REREQUEST seconds
+	// chunks already in the local cache will not be refetched from the network 
+	// read the the whole chunk list first before fetching
+	unsigned ctr = 0;
+
+	while (1) {
+
+		if (ctr % REREQUEST == 0) {
+			// bring the list of chunks local
+			say("%srequesting list of %d chunks\n", (ctr == 0 ? "" : "re-"), n);
+			if (XrequestChunks(csock, cs, n) < 0) {
+				say("unable to request chunks\n");
+				return -1;
+			}
+			say("checking chunk status\n");
+		}
+		ctr++;
+
+		status = XgetChunkStatuses(csock, cs, n);
+
+		if (status == READY_TO_READ)
+			break;
+
+		else if (status < 0) {
+			say("error getting chunk status\n");
+			return -1;
+		} 
+		else if (status & WAITING_FOR_CHUNK) {
+			say("waiting... one or more chunks aren't ready yet\n");
+		} 
+		else if (status & INVALID_HASH) {
+			die(-1, "one or more chunks has an invalid hash");
+		} 
+		else if (status & REQUEST_FAILED) {
+			die(-1, "no chunks found\n");
+		} 
+		else {
+			say("unexpected result\n");
+		}
+		sleep(1);
+	}
+
+	say("all chunks ready\n");
+
+	for (int i = 0; i < n; i++) {
+		char *cid = strrchr(cs[i].cid, ':');
+		cid++;
+		say("reading chunk %s\n", cid);
+		if ((len = XreadChunk(csock, data, sizeof(data), 0, cs[i].cid, cs[i].cidLen)) < 0) {
+			say("error getting chunk\n");
+			return -1;
+		}
+		// say("writing %d bytes of chunk %s to disk\n", len, cid);
+		fwrite(data, 1, len, fd);
+
+		free(cs[i].cid);
+		cs[i].cid = NULL;
+		cs[i].cidLen = 0;
+	}
+	return n;
+}
+
+*/

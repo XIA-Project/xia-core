@@ -1,9 +1,8 @@
-#ifndef STAGE_UTILS_FILE
-#define STAGE_UTILS_FILE
+#ifndef PREFETCH_UTILS_FILE
+#define PREFETCH_UTILS_FILE
 
 #include <stdio.h>
 #include <iostream>
-#include <sstream>
 #include <string>
 #include <string.h>
 #include <map>
@@ -22,35 +21,22 @@
 
 #include "Xkeys.h"
 
+// TODO: make the api: fallback if not prefetch client found 
 #define MAX_XID_SIZE 100
 #define RECV_BUF_SIZE 1024
 #define XIA_MAX_BUF 15600 // TODO: improve later
-#define MAX_CID_NUM 20 // TODO: improve later
 
-#define CHUNKSIZE 1024 
-
+#define CHUNKSIZE 1024
 #define REREQUEST 3
-#define NUM_CHUNKS 1 // 12 is the max NUM_CHUNKS to fetch at one time for 1024 K
+#define NUM_CHUNKS 1
 
 #define FTP_NAME "www_s.ftp.aaa.xia"
-#define STAGE_SERVER_NAME "www_s.stage_server.aaa.xia"
-#define STAGE_MANAGER_NAME "www_s.stage_manager.aaa.xia"
+#define PREFETCH_SERVER_NAME "www_s.prefetch_server.aaa.xia"
+#define PREFETCH_MANAGER_NAME "www_s.prefetch_client.aaa.xia"
 
 #define GETSSID_CMD "iwgetid -r"
 
-#define PURGE_DELAY_SEC 10
-#define MGT_DELAY_SEC 10
-#define STAGE_WIN_INIT 3
-#define STAGE_WIN_PRED_DELAY_SEC 3
-#define STAGE_WIN_RECENT_NUM 3
-#define LOOP_DELAY_MSEC 100
-#define SCAN_DELAY_MSEC 10
-#define CHUNK_REQUEST_DELAY_MSEC 100
-
-
-#define BLANK 0	// initilized: by registration message
-#define PENDING 1 // chunk is being fetched/prefetched 
-#define READY 2	// chunk is available in the local/network cache 
+#define PURGE_SEC 120
 
 using namespace std;
 
@@ -63,22 +49,23 @@ void warn(const char *fmt, ...);
 // write the message to stdout, and exit the app
 void die(int ecode, const char *fmt, ...);
 
+char **str_split(char *a_str, const char *a_delim);
+
 char *randomString(char *buf, int size);
 
 // format: cid1 cid2, ... cidn
-vector<string> strVector(char *strs);
+vector<string> cidList(char *cids_str);
 
-// format: STAGE_SERVER_NAME.getAD()
-char *getStageServiceName();
 
-// format: STAGE_MANAGER_NAME.getHID()
-char *getStageManagerName();
+// format: PREFETCH_SERVER_NAME.getAD()
+char *getPrefetchServiceName();
+
+// format: PREFETCH_MANAGER_NAME.getHID()
+char *getPrefetchManagerName();
 
 char *getXftpName();
 
 char *string2char(string str);
-
-long string2long(string str);
 
 // result the string result of system command
 string execSystem(string cmd);
@@ -94,13 +81,12 @@ string getAD();
 
 string getHID();
 
-// block and poll until new AD is returned; used when SSID changed is detected
+// block and poll until new AD is returned
 void getNewAD(char *old_ad);
 
-// get the SSID name from "iwgetid -r" command; app level approach
+// get the SSID name from "iwgetid -r" command
 string netConnStatus(string lastSSID);
 
-// used when client is mobile TODO: detect network
 int getReply(int sock, const char *cmd, char *reply, sockaddr_x *sa, int timeout, int tries);
 
 int sendStreamCmd(int sock, const char *cmd);
@@ -129,30 +115,26 @@ void *blockListener(void *listenID, void *recvFuntion (void *));
 
 int getIndex(string target, vector<string> pool);
 
-// update the CID list to the local staging service
+// update the CID list to the local prefetching service
 int updateManifest(int sock, vector<string> CIDs);
 
-// stage manager setup a socket connection with in-network stage service
-int registerStageService(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid);
+// prefetch client setup a socket connection with in-network prefetch service
+int registerPrefetchService(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid);
 
-// xftp_client setup a socket connection with stage manager
-int registerStageManager(const char *name);
+// xftp_client setup a socket connection with prefetch client
+int registerPrefetchManager(const char *name);
 
-// construct the msg and send to stage client
-int XrequestChunkStage(int sock, const ChunkStatus *cs);
+// construct the msg and send to prefetch client
+int XrequestChunkPrefetch(int sock, const ChunkStatus *cs);
 
-char *chunkReqDag2cid(char *dag);
+// TODO
+// int XrequestChunksAdv(int csock, const ChunkStatus *chunks, int numChunks, string serviceName, vector<string> CIDs);
 
 #endif
 
 /* reference 
 
 #define MAXBUFLEN = XIA_MAXBUF = XIA_MAXCHUNK = 15600
-
-#define REQUEST_FAILED	  0x00000001
-#define WAITING_FOR_CHUNK 0x00000002
-#define READY_TO_READ	  0x00000004
-#define INVALID_HASH	  0x00000008
 
 typedef struct {
     int sockfd;
@@ -174,5 +156,17 @@ typedef struct {
 	size_t cidLen;
 	int status; // 1: ready to be read, 0: waiting for chunk response, -1: failed
 } ChunkStatus;
+
+*/
+
+/* deprecated
+
+int deprecatedRegisterStreamReceiver(char *name, char *myAD, char *myHID, char *my4ID);
+
+int getChunkCount(int sock, char *reply, int sz);
+
+int buildChunkDAGs(ChunkStatus cs[], char *chunks, char *dst_ad, char *dst_hid);
+
+int getListedChunks(int csock, FILE *fd, char *chunks, char *dst_ad, char *dst_hid);
 
 */
