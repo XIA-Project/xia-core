@@ -56,9 +56,18 @@ int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id) {
   }
 
   // process the reply from click
-  if ((rc = click_status(sockfd, seq)) < 0) {
+  xia::XSocketMsg xsm1;
+  if ((rc = click_reply(sockfd, seq, &xsm1)) < 0) {
     LOGF("Error getting status from Click: %s", strerror(errno));
     return -1;
+  }
+  if(xsm1.type() == xia::XUPDATEDAG) {
+	  xia::X_Updatedag_Msg *msg = xsm1.mutable_x_updatedag();
+	  std::string newDAG = msg->dag();
+	  printf("XupdateDAG: Click updated DAG: %s\n", newDAG.c_str());
+  } else {
+	  LOG("XupdateDAG: ERROR: Invalid response for XUPDATEDAG");
+	  return -1;
   }
 
   return 0;
