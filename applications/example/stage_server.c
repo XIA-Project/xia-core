@@ -68,22 +68,22 @@ void stageControl(int sock, char *cmd)
 	}
 	pthread_mutex_unlock(&bufLock);
 
-	pthread_mutex_lock(&controlLock); 
-	pthread_cond_signal(&controlCond);
-	pthread_mutex_unlock(&controlLock);	
+//	pthread_mutex_lock(&controlLock); 
+//	pthread_cond_signal(&controlCond);
+//	pthread_mutex_unlock(&controlLock);	
 
 	// send the chunk ready msg one by one
 	for (unsigned int i = 0; i < CIDs.size(); i++) {
 		while (1) {
-			pthread_mutex_lock(&dataLock); 
-			pthread_cond_wait(&dataCond, &dataLock);	
+			//pthread_mutex_lock(&dataLock); 
+			//pthread_cond_wait(&dataCond, &dataLock);	
 			if (SIDToProfile[remoteSID][CIDs[i]].fetchState == READY) {
 				char reply[XIA_MAX_BUF];
 				sprintf(reply, "ready %s %ld %ld", string2char(CIDs[i]), SIDToProfile[remoteSID][CIDs[i]].fetchStartTimestamp, SIDToProfile[remoteSID][CIDs[i]].fetchFinishTimestamp);									
 				sendStreamCmd(sock, reply);
 				break;
 			}
-			//usleep(SCAN_DELAY_MSEC*1000);
+			usleep(SCAN_DELAY_MSEC*1000);
 		}
 	}
 
@@ -134,8 +134,8 @@ void *stageData(void *)
 	}
 
 	while (1) {
-		pthread_mutex_lock(&controlLock); 
-		pthread_cond_wait(&controlCond, &controlLock);			
+		//pthread_mutex_lock(&controlLock); 
+		//pthread_cond_wait(&controlCond, &controlLock);			
 		// pop out the chunks for staging 
 		pthread_mutex_lock(&bufLock);
 		for (map<string, vector<string> >::iterator I = SIDToBuf.begin(); I != SIDToBuf.end(); ++I) {
@@ -182,9 +182,9 @@ void *stageData(void *)
 
 							}
 						}
-						pthread_mutex_lock(&dataLock); 
-						pthread_cond_signal(&dataCond);
-						pthread_mutex_unlock(&dataLock);							
+						//pthread_mutex_lock(&dataLock); 
+						//pthread_cond_signal(&dataCond);
+						//pthread_mutex_unlock(&dataLock);							
 						pthread_mutex_unlock(&profileLock);
 						break;
 					}
@@ -197,9 +197,9 @@ void *stageData(void *)
 									SIDToProfile[SID][(*I).second[i]].fetchFinishTimestamp = now_msec();
 								}		
 								SIDToProfile[SID][(*I).second[i]].fetchState = READY;
-								pthread_mutex_lock(&dataLock); 
-								pthread_cond_signal(&dataCond);
-								pthread_mutex_unlock(&dataLock);									
+								//pthread_mutex_lock(&dataLock); 
+								//pthread_cond_signal(&dataCond);
+								//pthread_mutex_unlock(&dataLock);									
 							}
 						}
 						pthread_mutex_unlock(&profileLock);
@@ -223,8 +223,8 @@ void *stageData(void *)
 			}
 		} 
 		pthread_mutex_unlock(&bufLock);
-		pthread_mutex_unlock(&controlLock); 
-		//usleep(LOOP_DELAY_MSEC*1000);
+		//pthread_mutex_unlock(&controlLock); 
+		usleep(LOOP_DELAY_MSEC*1000);
 	}
 	pthread_exit(NULL);
 }
