@@ -3479,12 +3479,19 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, xia::XSocketMsg *xia_socket_m
 	String IP4ID_str(x_updatedag_msg->ip4id().c_str());
 	click_chatter("XTRANSPORT:Xupdatedag Router 4ID: %s (ignored unless in addr above)", IP4ID_str.c_str());
 
+	// Find the old dag that we will be replacing
+	XIAPath old_dag;
+	old_dag.parse(_interfaces.getDAG(interface));
+
 	// Replace intent HID in router's DAG to form new_dag
 	XIAPath new_dag = router_dag;
 	if(!new_dag.replace_intent_hid(_hid)) {
 		click_chatter("XTRANSPORT:Xupdatedag ERROR replacing intent HID in %s", new_dag.unparse().c_str());
 		return;
 	}
+
+	// Update the XIAInterfaceTable with new dag
+	_interfaces.update(interface, new_dag);
 
 	// Put the new DAG back into the xia_socket_msg to return to API
 	x_updatedag_msg->set_dag(new_dag.unparse().c_str());
@@ -3508,8 +3515,6 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, xia::XSocketMsg *xia_socket_m
 
 	// If default interface:
 	if(interface == _interfaces.default_interface()) {
-		// TODO: Update xrc/n/proc/rt_*, xrc/n/x, xrc/x
-		// TODO: Update _network_dag
 		// XCMP in RoutingCore
 		String xrc_str = _hostname + "/xrc/x.dag";
 		HandlerCall::call_write(xrc_str.c_str(), new_dag.unparse().c_str(), this);
@@ -3526,12 +3531,9 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, xia::XSocketMsg *xia_socket_m
 		// Update the _local_addr in XTRANSPORT
 		_local_addr = new_dag;
 		click_chatter("XTRANSPORT:Xupdatedag system addr changed to %s", _local_addr.unparse().c_str());
-
+		NOTICE("new system address is - %s", _local_addr.unparse().c_str());
 	}
-	NOTICE("new address is - %s", _local_addr.unparse().c_str());
 
-	//TODO: Notify all other elements of the change
-	// xrc/xtransport, xlcn/xchal xrc/n/proc/rt_AD,HID,SID,CID,IP xrc/n/x, xlcn/x, xrc/x
 
 	/*
 	// Inform all active stream connections about this change
@@ -3548,6 +3550,14 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, xia::XSocketMsg *xia_socket_m
 			INFO("src_path:%s:", sk->src_path.unparse().c_str());
 			continue;
 		}
+		// TODO: Multi-homing
+		// Retrieve SID from old src_path (unless available in sk already)
+		// Append SID to new_dag to form new src_path
+		// Replace src_path with the new src_path
+		// Send the migrate message
+		//
+		//
+
 		// Update src_path in sk
 		INFO("updating %s to %s in sk", old_AD_str.c_str(), AD_str.c_str());
 		sk->src_path.replace_node_xid(old_AD_str, AD_str);
