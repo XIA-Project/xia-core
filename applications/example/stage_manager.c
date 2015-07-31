@@ -23,9 +23,25 @@ char currAD[MAX_XID_SIZE];
 char fetchAD[MAX_XID_SIZE];
 char fetchHID[MAX_XID_SIZE];
 
+// chenren
+char prefetchAD[MAX_XID_SIZE];
+char prefetchHID[MAX_XID_SIZE];
+
 string lastSSID, currSSID;
 
 struct chunkProfile {
+// chenren
+	
+	int fetchState;
+	int prefetchState;	
+	string fetchAD;
+	string fetchHID;	
+	long fetchStartTimestamp;
+	long fetchFinishTimestamp;	
+	long prefetchStartTimestamp;	
+	long prefetchFinishTimestamp;		
+
+/*	
 	int fetchState;
 	int stageState;	
 	string fetchAD;
@@ -34,6 +50,7 @@ struct chunkProfile {
 	long fetchFinishTimestamp;	
 	long stageStartTimestamp;	
 	long stageFinishTimestamp;	
+*/	
 };
 
 map<string, vector<string> > SIDToCIDs;
@@ -43,7 +60,9 @@ map<string, long> SIDToTime; // store the timestamp last seen
 
 int stageSock, ftpSock;
 
-bool netStageOn = true;
+// chenren
+//bool netStageOn = true;
+bool netPrefetchOn = true;
 
 int thread_c = 0;
 
@@ -73,10 +92,11 @@ cerr<<"Receiving partial chunk list"<<endl;
 		char cmd_arr[strlen(cmd+9)];
 		strcpy(cmd_arr, cmd+9);
 		char *cid;
-		pthread_mutex_lock(&cidVecLock);			
+		pthread_mutex_lock(&cidVecLock);		
 		SIDToCIDs[remoteSID].push_back(strtok(cmd_arr, " "));	
 		while ((cid = strtok(NULL, " ")) != NULL) {
 			SIDToCIDs[remoteSID].push_back(cid);
+cerr<<cid<<endl;
 		}
 		pthread_mutex_unlock(&cidVecLock);			
 		return;
@@ -92,7 +112,20 @@ cerr<<"Receiving partial chunk list"<<endl;
 		SIDToTime[remoteSID] = now_msec();
 		pthread_mutex_unlock(&timeLock);	
 
+		map<string, chunkProfile> profile;
 		for (unsigned int i = 0; i < SIDToCIDs[remoteSID].size(); i++) {
+// chenren			
+			chunkProfile cp;
+			cp.fetchState = BLANK;
+			cp.prefetchState = BLANK;
+			cp.fetchAD = "";
+			cp.fetchHID = "";
+			cp.fetchStartTimestamp = 0;
+			cp.fetchFinishTimestamp = 0;	
+			cp.prefetchStartTimestamp = 0;	
+			cp.prefetchFinishTimestamp = 0;
+			profile[SIDToCIDs[remoteSID][i]] = cp;
+/*
 			chunkProfile cp;
 			cp.fetchState = BLANK;
 			cp.stageState = BLANK;
@@ -102,12 +135,15 @@ cerr<<"Receiving partial chunk list"<<endl;
 			cp.fetchFinishTimestamp = 0;	
 			cp.stageStartTimestamp = 0;	
 			cp.stageFinishTimestamp = 0;	
-			pthread_mutex_lock(&profileLock);
-			SIDToProfile[remoteSID][SIDToCIDs[remoteSID][i]] = cp;
-			pthread_mutex_unlock(&profileLock);
-cerr<<i<<"\t"<<SIDToCIDs[remoteSID][i]<<endl;
+			profile[SIDToCIDs[remoteSID][i]] = cp;			
+*/
+
+//cerr<<i<<"\t"<<SIDToCIDs[remoteSID][i]<<endl;
 		}	
-//cerr<<"Quit the profileLock and finish reg"<<endl;
+		pthread_mutex_lock(&profileLock);
+		SIDToProfile[remoteSID] = profile;
+		pthread_mutex_unlock(&profileLock);
+cerr<<"Quit the profileLock and finish reg"<<endl;
 		//pthread_mutex_lock(&stageLock); 
 		//pthread_cond_signal(&stageCond);
 		//pthread_mutex_unlock(&stageLock);	
@@ -127,10 +163,15 @@ cerr<<cmd<<endl;
 	if (SIDToProfile[remoteSID][CID].fetchState == BLANK) {
 		pthread_mutex_lock(&profileLock);
 		SIDToProfile[remoteSID][CID].fetchState = PENDING;
+cerr<<"Change from BLANK to PENDING\n";		
 		pthread_mutex_unlock(&profileLock);
 	}
 //cerr<<CID<<" fetch state: "<<SIDToProfile[remoteSID][CID].fetchState<<endl;
 	free(CID);
+
+	pthread_mutex_lock(&timeLock);	
+	SIDToTime[remoteSID] = now_msec();
+	pthread_mutex_unlock(&timeLock);	
 
 //	pthread_mutex_lock(&stageLock); 
 //	pthread_cond_signal(&stageCond);
@@ -164,13 +205,225 @@ void *clientCmd(void *socketid)
 		else if (strncmp(cmd, "fetch", 5) == 0) {
 			say("Receive a chunk request\n");
 			delegationHandler(sock, cmd+6);
-		}	
+		}
+		usleep(10000);
 	}
 	Xclose(sock);
 	say("Socket closed\n");
 	pthread_exit(NULL);
 }
 
+// WORKING version
+void *prefetchData(void *) 
+{
+	thread_c++;
+	int thread_id = thread_c;
+cerr<<"Thread id "<<thread_id<<": "<<"Is launched\n";
+cerr<<"Current "<<getAD()<<endl;
+
+	// TODO: consider bootstrap for each individual SID
+	bool bootstrap = true;
+	bool finish = false;
+	// chenren
+	//int netPrefetchSock = registerPrefetchService(getPrefetchServiceName(), myAD, myHID, prefetchAD, prefetchHID); 
+	int netPrefetchSock = registerStageService(getStageServiceName(), myAD, myHID, stageAD, stageHID); 
+	
+	if (netPrefetchSock == -1) {
+		netPrefetchOn = false;
+	}
+
+	// TODO: need to handle the case that new SID joins dynamically
+	// TODO: handle no in-net prefetching service
+	while (1) {
+		for (map<string, vector<string> >::iterator I = SIDToCIDs.begin(); I != SIDToCIDs.end(); ++I) {
+			if ((*I).second.size() > 0) {
+				// network change hander
+				currSSID = getSSID();
+
+				if (lastSSID != currSSID) {
+			cerr<<"Thread id "<<thread_id<<": "<<"Network changed, create another thread to continute\n";
+					getNewAD(myAD);
+					lastSSID = currSSID;
+					//ssidChange = true;			
+					pthread_t thread_prefetchData; 
+					pthread_create(&thread_prefetchData, NULL, prefetchData, NULL);
+					finish = true; // need to finish
+				}
+
+				char cmd[XIA_MAX_BUF];
+				char reply[XIA_MAX_BUF];
+				int n = -1;
+				memset(cmd, '\0', strlen(cmd));
+				memset(reply, '\0', strlen(reply));
+				
+				string SID = (*I).first;
+//cerr<<"SID: "<<SID<<"chunks to be pulled from the queue\n";				
+				vector<string> CIDs;
+				// find the right list to fetch
+				int s = -1;
+				for (unsigned int i = 0; i < (*I).second.size(); i++) {
+//cerr<<(*I).second[i]<<endl;
+					// start from the first CID not yet prefetched if it is the first time to prefetch 
+					if (bootstrap) {
+						if (SIDToProfile[SID][(*I).second[i]].prefetchState == BLANK) {
+							s = (int)i;
+							bootstrap = false;
+							break;
+						}
+					}
+					// start from the first CID not yet fetched 
+					else {
+						if (SIDToProfile[SID][(*I).second[i]].fetchState != READY) {
+							s = (int)i;
+							break;
+						}
+					}
+				}
+				// all the chunks are prefetched
+				if (s == -1) {
+					break;
+				}
+				int e = s + SIDToWindow[SID];
+				if (e > (int)(*I).second.size()) {
+					e = (int)(*I).second.size();
+				}
+//cerr<<s<<"\t"<<e<<endl;
+				pthread_mutex_lock(&profileLock);	
+
+				// only update the state of the chunks not prefetched yet 
+				for (int i = s; i < e; i++) {
+					if (SIDToProfile[SID][(*I).second[i]].prefetchState == BLANK) {
+cerr<<(*I).second[i]<<endl;						
+						CIDs.push_back((*I).second[i]);
+						SIDToProfile[SID][(*I).second[i]].prefetchState = PENDING;					
+						SIDToProfile[SID][(*I).second[i]].fetchAD = prefetchAD;
+						SIDToProfile[SID][(*I).second[i]].fetchAD = prefetchHID;
+					}
+				}
+
+				// send the prefetching list to the prefetch service and receive message back and update prefetch state
+				// TODO: non-block fasion 
+				if (CIDs.size() > 0) {
+					sprintf(cmd, "prefetch");
+					for (unsigned i = 0; i < CIDs.size(); i++) {
+						strcat(cmd, " ");
+						strcat(cmd, string2char(CIDs[i]));
+					}				
+					sendStreamCmd(netPrefetchSock, cmd);
+
+					if ((n = Xrecv(netPrefetchSock, reply, sizeof(reply), 0)) < 0) {
+						Xclose(netPrefetchSock);
+						die(-1, "Unable to communicate with the server\n");
+					}
+	cerr<<reply<<endl;
+					// update "ready" to prefetch state
+					if (strncmp(reply, "ready", 5) == 0) {
+						vector<string> CIDs_prefetched = strVector(reply+6);
+						for (unsigned i = 0; i < CIDs_prefetched.size(); i++) {
+							SIDToProfile[SID][CIDs_prefetched[i]].prefetchState = READY;
+						}
+					}	
+				}
+				pthread_mutex_unlock(&profileLock);
+			}
+		}
+		// after looping all the SIDs
+		if (finish) {
+			pthread_exit(NULL);
+		}
+		usleep(500);
+	}
+	pthread_exit(NULL);
+}
+
+// WORKING version
+// data plane of prefetching: find the pending chunk, construct the dag and send the pending chunk request, 
+void *fetchData(void *) 
+{
+	while (1) {
+		for (map<string, vector<string> >::iterator I = SIDToCIDs.begin(); I != SIDToCIDs.end(); ++I) {
+			if ((*I).second.size() > 0) {
+				string SID = (*I).first;
+//cerr<<"SID: "<<SID<<"chunks to be pulled from the queue\n";				
+				vector<string> CIDs;
+				// find the CID to fetch behalf of the xftp client
+				for (unsigned int i = 0; i < (*I).second.size(); i++) {
+//cerr<<(*I).second[i]<<endl;
+					if (SIDToProfile[SID][(*I).second[i]].fetchState == PENDING && SIDToProfile[SID][(*I).second[i]].prefetchState == READY) {
+cerr<<(*I).second[i]<<"\t fetch state: PENDING state\t prefetch state: READY\n"; 
+						CIDs.push_back((*I).second[i]);
+					}
+				}	
+				if (CIDs.size() > 0) {			
+					int chunkSock;
+
+					if ((chunkSock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0)
+						die(-1, "unable to create chunk socket\n");
+
+					// TODO: check the size is smaller than the max chunk to fetch at one time
+					ChunkStatus cs[CIDs.size()];
+					int status;
+					int n = CIDs.size();
+
+					for (unsigned int i = 0; i < CIDs.size(); i++) {
+						char *dag = (char *)malloc(512);
+						sprintf(dag, "RE ( %s %s ) CID:%s", string2char(SIDToProfile[SID][CIDs[i]].fetchAD), string2char(SIDToProfile[SID][CIDs[i]].fetchHID), string2char(CIDs[i]));
+	cerr<<dag<<endl;					
+						cs[i].cidLen = strlen(dag);
+						cs[i].cid = dag; // cs[i].cid is a DAG, not just the CID
+					}
+
+					unsigned ctr = 0;
+
+					while (1) {
+						// Retransmit chunks request every REREQUEST seconds if not ready
+						if (ctr % REREQUEST == 0) {
+							// bring the list of chunks local
+							say("%srequesting list of %d chunks\n", (ctr == 0 ? "" : "re-"), n);
+							if (XrequestChunks(chunkSock, cs, n) < 0) {
+								say("unable to request chunks\n");
+								pthread_exit(NULL); // TODO: check again
+							}
+							//say("checking chunk status\n");
+						}
+						ctr++;
+
+						status = XgetChunkStatuses(chunkSock, cs, n);
+
+						if (status == READY_TO_READ) {
+							pthread_mutex_lock(&profileLock);	
+							for (unsigned int i = 0; i < CIDs.size(); i++) {
+								SIDToProfile[SID][CIDs[i]].fetchState = READY;
+cerr<<CIDs[i]<<"\t fetch state: ready\n";
+							}
+							pthread_mutex_unlock(&profileLock);		
+							break;
+						}
+						else if (status < 0) 
+							die(-1, "error getting chunk status\n"); 
+						else if (status & WAITING_FOR_CHUNK) {
+							//say("waiting... one or more chunks aren't ready yet\n");
+						}
+						else if (status & INVALID_HASH) 
+							die(-1, "one or more chunks has an invalid hash");
+						else if (status & REQUEST_FAILED)
+							die(-1, "no chunks found\n");
+						else 
+							say("unexpected result\n");
+
+						usleep(100000); 
+					}
+				}
+				// TODO: timeout the chunks by free(cs[i].cid); cs[j].cid = NULL; cs[j].cidLen = 0;			
+			}
+		} 
+	}
+	// 	big loop, SIDToProfile[remoteSID][CID].fetchState = PENDING and prefetch state == done, construct dag, fetch data, update
+	pthread_exit(NULL);
+}
+
+
+/*
 // TODO: scheduling 
 // control plane: figure out the right CIDs to stage, change the stage state from BLANK to PENDING to READY
 void *stageData(void *) 
@@ -397,6 +650,7 @@ cerr<<"after get status\n";
 	}
 	pthread_exit(NULL);
 }
+*/
 
 // TODO: make it as a library
 void *netMon(void *) 
@@ -447,6 +701,7 @@ void *netMon(void *)
 	pthread_exit(NULL);
 }
 
+/*
 void *winPred(void *) 
 {
 	long fetch_latency;
@@ -500,26 +755,36 @@ void *winPred(void *)
 	pthread_exit(NULL);
 }
 
+*/
+
 // TODO: if the SID's all CIDs have READY fetch state, then remove
 void *profileMgt(void *) 
 {
 	while (1) {
+		/*
 		for (map<string, long>::iterator I = SIDToTime.begin(); I != SIDToTime.end(); ++I) {
-			if (now_msec() - (*I).second >= PURGE_DELAY_SEC*1000) {
+			if (now_msec() - (*I).second >= PURGE_DELAY_SEC*1000) {				
 				string SID = (*I).first;
-cerr<<"Deleting "<<SID<<endl;
-				pthread_mutex_lock(&timeLock);
-				SIDToTime.erase(SID);
-				pthread_mutex_unlock(&timeLock);
+cerr<<"Deleting profile of "<<SID<<endl;
 				pthread_mutex_lock(&profileLock);
 				SIDToProfile.erase(SID);
-				SIDToCIDs.erase(SID);
 				pthread_mutex_unlock(&profileLock);
+cerr<<"Deleting CIDs of "<<SID<<endl;
+				pthread_mutex_lock(&cidVecLock);
+				SIDToCIDs.erase(SID);
+				pthread_mutex_unlock(&cidVecLock);
+cerr<<"Deleting window of "<<SID<<endl;				
 				pthread_mutex_lock(&windowLock);
 				SIDToWindow.erase(SID);
 				pthread_mutex_unlock(&windowLock);
+cerr<<"Deleting time of "<<SID<<endl;				
+				pthread_mutex_lock(&timeLock);
+				SIDToTime.erase(SID);
+				pthread_mutex_unlock(&timeLock);
 			}
+
 		}	
+		*/
 		sleep(MGT_DELAY_SEC);
 	}
 	pthread_exit(NULL);	
@@ -527,20 +792,30 @@ cerr<<"Deleting "<<SID<<endl;
 
 int main() 
 {
+	// chenren
+/*	
 	pthread_t thread_winPred, thread_mgt, thread_fetchData, thread_stageData; // TODO: thread_netMon
 	//pthread_create(&thread_netMon, NULL, netMon, NULL);	// TODO: improve the netMon function
-	pthread_create(&thread_winPred, NULL, winPred, NULL);	// TODO: improve the netMon function
+	//pthread_create(&thread_winPred, NULL, winPred, NULL);	// TODO: improve the netMon function
 	pthread_create(&thread_mgt, NULL, profileMgt, NULL); // dequeue, stage and update profile	
 	pthread_create(&thread_fetchData, NULL, fetchData, NULL);		
 	pthread_create(&thread_stageData, NULL, stageData, NULL);	
+*/
+
+	pthread_t thread_netMon, thread_mgt, thread_fetchData, thread_prefetchData;
+	pthread_create(&thread_netMon, NULL, netMon, NULL);	// TODO: improve the netMon function
+	pthread_create(&thread_mgt, NULL, profileMgt, NULL); // dequeue, prefetch and update profile	
+	pthread_create(&thread_fetchData, NULL, fetchData, NULL);		
+	pthread_create(&thread_prefetchData, NULL, prefetchData, NULL);	
 
 	ftpSock = initStreamClient(getXftpName(), myAD, myHID, ftpServAD, ftpServHID); // get ftpServAD and ftpServHID for building chunk request
 	// TODO: handle when SSID is null
 	lastSSID = execSystem(GETSSID_CMD);
 	currSSID = execSystem(GETSSID_CMD);
 	strcpy(currAD, myAD);
-
-	stageSock = registerStreamReceiver(getStageManagerName(), myAD, myHID, my4ID); // communicate with client app
+	// chenren:
+	//stageSock = registerStreamReceiver(getPrefetchManagerName(), myAD, myHID, my4ID); // communicate with client app
+	stageSock = registerStreamReceiver(getStageManagerName(), myAD, myHID, my4ID); // communicate with client app	
 	blockListener((void *)&stageSock, clientCmd);
 
 	return 0;	
@@ -553,4 +828,110 @@ cerr<<"\nPrint profile table in reg_handler\n";
 cerr<<(*I).first<<"\t"<<(*J).CID<<"\t"<<(*J).timestamp<<"\t"<<(*J).fetch<<"\t"<<(*J).stage<<endl;
 		}
 	}	
+*/
+
+/*
+	cerr<<"print profile table:\n";
+	for (map<string, map<string, chunkProfile> >::iterator I = SIDToProfile.begin(); I != SIDToProfile.end(); ++I) {
+		map<string, chunkProfile> temp = I->second;
+		for (map<string, chunkProfile>::iterator J = temp.begin(); J != temp.end(); ++J) {
+cerr<<(*I).first<<"\t"<<(*J).first<<endl;//<<"\t"<<J->second.fetchState<<endl;
+		}
+	}
+*/
+
+
+/*
+void regHandler(int sock, char *cmd)
+{
+	XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID); 
+//cerr<<"Peer SID: "<<remoteSID<<endl; 
+cerr<<cmd<<endl;
+
+	pthread_mutex_lock(&windowLock);	
+	SIDToWindow[remoteSID] = STAGE_WIN_INIT; // TODO: to optimize
+	pthread_mutex_unlock(&windowLock);
+
+	pthread_mutex_lock(&timeLock);	
+	SIDToTime[remoteSID] = now_msec();
+	pthread_mutex_unlock(&timeLock);
+
+	vector<string> CIDs = strVector(cmd);
+	pthread_mutex_lock(&profileLock);	
+	SIDToCIDs[remoteSID] = CIDs;
+	for (unsigned int i = 0; i < CIDs.size(); i++) {
+		chunkProfile cs;
+		cs.fetchState = BLANK;
+		cs.stageState = BLANK;
+		cs.fetchAD = "";
+		cs.fetchHID = "";
+		cs.fetchStartTimestamp = 0;
+		cs.fetchFinishTimestamp = 0;	
+		cs.stageStartTimestamp = 0;	
+		cs.stageFinishTimestamp = 0;	
+		SIDToProfile[remoteSID][CIDs[i]] = cs;
+	}	
+	pthread_mutex_unlock(&profileLock);	
+
+cerr<<"Finish reg"<<endl;
+
+	return;
+}
+
+// TODO: change from 0 to 1 or intercept if it has been requested, 
+void prefetchHandler(int sock, char *cmd) {
+cerr<<"Receving Command: "<<cmd<<endl; 
+	XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID); 
+	size_t cidLen;
+	//char *cidDag = (char *)malloc(512);
+	char *CID = (char *)malloc(512); // TODO: optimize the size?
+	// TODO: right now it's hacky, need to fix the way reading XIDs when including fallback DAG
+	sscanf(cmd, "%ld RE ( %s %s ) CID:%s", &cidLen, ftpServAD, ftpServHID, CID);
+	//sscanf(cmd, "%ld %s", &cidLen, cidDag);
+//cerr<<cidLen<<"\t"<<cidDag<<endl;
+//	sscanf(cidDag, "RE ( %s %s ) CID:%s", ftpServAD, ftpServHID, CID);
+cerr<<ftpServAD<<"\t"<<ftpServHID<<"\t"<<CID<<endl;
+
+	// TODO: if existed, do we need to update timestamp?
+	pthread_mutex_lock(&profileLock);
+	if (SIDToProfile[remoteSID][CID].fetchState != READY) {
+		SIDToProfile[remoteSID][CID].fetchState = PENDING;
+		SIDToProfile[remoteSID][CID].fetchStartTimestamp = now_msec();
+	}
+	else {
+		cerr<<CID<<": It's ready!\n";
+	}
+	pthread_mutex_unlock(&profileLock);
+	free(CID);
+	return;
+}
+
+void *clientCmd(void *socketid) 
+{
+	char cmd[XIA_MAXBUF];
+	int sock = *((int*)socketid);
+	int n = -1;
+
+	while (1) {
+		memset(cmd, '\0', XIA_MAXBUF);
+		if ((n = Xrecv(sock, cmd, sizeof(cmd), 0))  < 0) {
+			warn("socket error while waiting for data, closing connection\n");
+			break;
+		} 
+		// reg msg from xftp client: reg CID1, CID2, ... CIDn
+		if (strncmp(cmd, "reg", 3) == 0) {
+			say("Receive a chunk list registration message\n");
+			regHandler(sock, cmd+4);
+		}
+		// chunk request from xftp client: fetch CID
+		else if (strncmp(cmd, "fetch", 5) == 0) {
+			say("Receive a chunk request\n");
+			prefetchHandler(sock, cmd+6);
+		}	
+	}
+
+	Xclose(sock);
+	say("Socket closed\n");
+	pthread_exit(NULL);
+}
 */

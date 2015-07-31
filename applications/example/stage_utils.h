@@ -36,6 +36,9 @@
 #define STAGE_SERVER_NAME "www_s.stage_server.aaa.xia"
 #define STAGE_MANAGER_NAME "www_s.stage_manager.aaa.xia"
 
+#define PREFETCH_SERVER_NAME "www_s.prefetch_server.aaa.xia"
+#define PREFETCH_MANAGER_NAME "www_s.prefetch_client.aaa.xia"
+
 #define GETSSID_CMD "iwgetid -r"
 
 #define PURGE_DELAY_SEC 10
@@ -142,6 +145,17 @@ int registerStageManager(const char *name);
 int XrequestChunkStage(int sock, const ChunkStatus *cs);
 
 char *chunkReqDag2cid(char *dag);
+
+char *getPrefetchManagerName();
+
+char *getPrefetchServiceName();
+
+int registerPrefetchManager(const char *name);
+
+int registerPrefetchService(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid);
+
+int updateManifestOld(int sock, vector<string> CIDs);
+
 
 #endif
 

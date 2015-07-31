@@ -612,17 +612,20 @@ int updateManifest(int sock, vector<string> CIDs)
 			strcat(cmd, string2char(CIDs[i]));
 		}
 		offset += MAX_CID_NUM;
-		if (Xsend(sock, cmd, strlen(cmd), 0) < 0) {
+		sendStreamCmd(sock, cmd);
+/*		if (Xsend(sock, cmd, strlen(cmd), 0) < 0) {
 			warn("unable to send reply to client\n");
 			break;
-		}
-		usleep(1000);
+		}*/
+		usleep(10000);
 	}
 	memset(cmd, '\0', strlen(cmd));
 	sprintf(cmd, "reg done");	
 	if (Xsend(sock, cmd, strlen(cmd), 0) < 0) {
 		warn("unable to send reply to client\n");
 	}		
+	usleep(10000);
+
 /*	
 	char cmd[XIA_MAX_BUF];	
 	memset(cmd, '\0', strlen(cmd));
@@ -676,4 +679,103 @@ char *chunkReqDag2cid(char *dag) {
 	}
 cerr<<"CID: "<<cid+4<<endl;	
 	return cid+4;
+}
+
+char *getPrefetchManagerName() 
+{
+	return string2char(string(PREFETCH_MANAGER_NAME) + "." + getHID());
+} 
+
+char *getPrefetchServiceName() 
+{
+	return string2char(string(PREFETCH_SERVER_NAME) + "." + getAD());
+} 
+
+int registerPrefetchManager(const char *name) 
+{
+	int sock;
+	sockaddr_x dag;
+	socklen_t daglen;
+
+	// lookup the xia service 
+	daglen = sizeof(dag);
+
+	if (XgetDAGbyName(name, &dag, &daglen) < 0) {
+		warn("unable to locate: %s\n", name);
+	}
+	// create a socket, and listen for incoming connections
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
+		warn("Unable to create the listening socket\n");
+	}
+	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
+		Xclose(sock);
+		warn("Unable to bind to the dag: %s\n", dag);
+		sock = -1;		
+	}
+	return sock;
+}
+
+int registerPrefetchService(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid) 
+{
+	int sock, rc;
+	sockaddr_x dag;
+	socklen_t daglen;
+	char sdag[1024];
+	char IP[MAX_XID_SIZE];
+
+	// lookup the xia service 
+	daglen = sizeof(dag);
+	if (XgetDAGbyName(name, &dag, &daglen) < 0)
+		die(-1, "unable to locate: %s\n", name);
+	// create a socket, and listen for incoming connections
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+		die(-1, "Unable to create the listening socket\n");
+	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
+		Xclose(sock);
+		die(-1, "Unable to bind to the dag: %s\n", dag);
+	}
+	rc = XreadLocalHostAddr(sock, src_ad, MAX_XID_SIZE, src_hid, MAX_XID_SIZE, IP, MAX_XID_SIZE);
+
+	if (rc < 0) {
+		Xclose(sock);
+		die(-1, "Unable to read local address.\n");
+	} 
+	else{
+		warn("My AD: %s, My HID: %s\n", src_ad, src_hid);
+	}
+	
+	// save the AD and HID for later. This seems hacky we need to find a better way to deal with this
+	Graph g(&dag);
+	strncpy(sdag, g.dag_string().c_str(), sizeof(sdag));
+	// say("sdag = %s\n",sdag);
+	char *ads = strstr(sdag, "AD:");
+	char *hids = strstr(sdag, "HID:");
+	
+	if (sscanf(ads, "%s", dst_ad) < 1 || strncmp(dst_ad, "AD:", 3) != 0) {
+		die(-1, "Unable to extract AD.");
+	}
+	if (sscanf(hids, "%s", dst_hid) < 1 || strncmp(dst_hid, "HID:", 4) != 0) {
+		die(-1, "Unable to extract HID.");
+	}
+	warn("Service AD: %s, Service HID: %s\n", dst_ad, dst_hid);
+
+	return sock;
+}
+
+int updateManifestOld(int sock, vector<string> CIDs) 
+{
+	char cmd[XIA_MAX_BUF];
+	memset(cmd, '\0', strlen(cmd));
+	char cids[XIA_MAX_BUF];
+	memset(cids, '\0', strlen(cids));
+
+	for (unsigned int i = 0; i < CIDs.size(); i++) {
+		strcat(cids, " ");
+		strcat(cids, string2char(CIDs[i]));
+	}	
+	// TODO: check total length of cids should not exceed max buf
+	sprintf(cmd, "reg%s", cids);
+	int n = sendStreamCmd(sock, cmd);
+
+	return n;
 }
