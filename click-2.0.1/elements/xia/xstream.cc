@@ -182,7 +182,6 @@ XStream::tcp_input(WritablePacket *p)
 					// We can now drop data we know was recieved by the other side
 					_q_usr_input.drop_until(acked); 
 					tp->snd_una = ti.ti_ack;
-					p->kill(); 
 
 					/* If all outstanding data are acked, stop
 					 * retransmit timer, otherwise restart timer
