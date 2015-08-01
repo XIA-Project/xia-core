@@ -59,9 +59,7 @@ int getFile(int sock)
 
 	// update CID list to the local staging service.
 	if (stage) {
-		// chenren
-		if ((n = updateManifest(stageManagerSock, CIDs) < 0)) {		
-		//if ((n = updateManifestOld(stageManagerSock, CIDs) < 0)) {
+		if ((n = updateManifest(stageManagerSock, CIDs) < 0)) {
 			Xclose(stageManagerSock);
 			die(-1, "Unable to communicate with the local prefetching service\n");
 		}
@@ -152,7 +150,7 @@ int getFile(int sock)
 	}
 	fclose(fd);
 	long finishTime = now_msec();
-	say("Received file %s at %f MB/s\n", fout, (float)(finishTime - startTime) / (1000 * (float)bytes / 1024));
+	say("Received file %s at %f MB/s (Time: %lu msec, Size: %d bytes)\n", fout, (1000 * (float)bytes / 1024) / (float)(finishTime - startTime) , finishTime - startTime, bytes);
 	sendStreamCmd(sock, "done"); 	// chunk fetching ends
 	Xclose(chunkSock);
 	Xclose(sock);	
@@ -168,10 +166,7 @@ int main(int argc, char **argv)
 			sprintf(fout, "my%s", fin);
 
 			ftpSock = initStreamClient(getXftpName(), myAD, myHID, ftpServAD, ftpServHID);
-			// chenren
 			stageManagerSock = registerStageManager(getStageManagerName());
-			//stageManagerSock = registerPrefetchManager(getPrefetchManagerName());
-	cerr<<stageManagerSock<<endl;
 			if (stageManagerSock == -1) {
 				say("No local staging service running\n");
 				stage = false;
