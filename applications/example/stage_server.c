@@ -44,7 +44,6 @@ void stageControl(int sock, char *cmd)
 	pthread_mutex_unlock(&timeLock);
 
 	XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID); // get stage manager's SID
-//cerr<<"Peer SID: "<<remoteSID<<endl; 
 
 	vector<string> CIDs = strVector(cmd);
 
@@ -72,6 +71,27 @@ void stageControl(int sock, char *cmd)
 //	pthread_cond_signal(&controlCond);
 //	pthread_mutex_unlock(&controlLock);	
 
+/*
+	// send ready messge in batch
+	while (1) {
+		unsigned int c = 0;
+		for (unsigned int i = 0; i < CIDs.size(); i++) {
+			if (SIDToProfile[remoteSID][CIDs[i]].fetchState == READY) {
+				c++;	
+			}		
+		}
+		if (c == CIDs.size()) {
+			char reply[XIA_MAX_BUF] = "ready";
+			for (unsigned int i = 0; i < CIDs.size(); i++) {
+				strcat(reply, " ");
+				strcat(reply, string2char(CIDs[i]));		
+			}
+			sendStreamCmd(sock, reply); 	
+			return;	
+		}
+		usleep(100000);
+	}
+*/
 	// send the chunk ready msg one by one
 	for (unsigned int i = 0; i < CIDs.size(); i++) {
 		while (1) {
@@ -83,7 +103,7 @@ void stageControl(int sock, char *cmd)
 				sendStreamCmd(sock, reply);
 				break;
 			}
-			usleep(SCAN_DELAY_MSEC*1000);
+			usleep(SCAN_DELAY_MSEC*1000); // chenren: check timing issue
 		}
 	}
 
@@ -100,29 +120,6 @@ void stageControl(int sock, char *cmd)
 	return;
 }
 
-void *stageCmd(void *socketid) 
-{
-	char cmd[XIA_MAXBUF];
-	int sock = *((int*)socketid);
-	int n = -1;
-
-	while (1) {
-		memset(cmd, '\0', XIA_MAXBUF);
-		if ((n = Xrecv(sock, cmd, sizeof(cmd), 0))  < 0) {
-			warn("socket error while waiting for data, closing connection\n");
-			break;
-		}
-		if (strncmp(cmd, "stage", 5) == 0) {
-			say("Receive a stage message\n");
-			stageControl(sock, cmd+6);
-		}	
-	}
-
-	Xclose(sock);
-	say("Socket closed\n");
-	pthread_exit(NULL);
-}
-
 // TODO: paralize getting chunks for each SID, i.e. fair scheduling
 // read the CID from the stage buffer, execute staging, and update profile 
 void *stageData(void *) 
@@ -134,9 +131,9 @@ void *stageData(void *)
 	}
 
 	while (1) {
+		// pop out the chunks for staging 		
 		//pthread_mutex_lock(&controlLock); 
 		//pthread_cond_wait(&controlCond, &controlLock);			
-		// pop out the chunks for staging 
 		pthread_mutex_lock(&bufLock);
 		for (map<string, vector<string> >::iterator I = SIDToBuf.begin(); I != SIDToBuf.end(); ++I) {
 			if ((*I).second.size() > 0) {
@@ -151,7 +148,9 @@ void *stageData(void *)
 					sprintf(dag, "RE ( %s %s ) CID:%s", ftpServAD, ftpServHID, string2char((*I).second[i]));
 					cs[i].cidLen = strlen(dag);
 					cs[i].cid = dag; // cs[i].cid is a DAG, not just the CID
+					pthread_mutex_lock(&profileLock);					
 					SIDToProfile[SID][(*I).second[i]].fetchStartTimestamp = now_msec();
+					pthread_mutex_unlock(&profileLock);
 				}
 
 				unsigned ctr = 0;
@@ -214,7 +213,6 @@ void *stageData(void *)
 					}					
 					else 
 						say("unexpected result\n");
-
 					//usleep(CHUNK_REQUEST_DELAY_MSEC*1000); 
 				}
 
@@ -224,8 +222,31 @@ void *stageData(void *)
 		} 
 		pthread_mutex_unlock(&bufLock);
 		//pthread_mutex_unlock(&controlLock); 
-		usleep(LOOP_DELAY_MSEC*1000);
+		usleep(SCAN_DELAY_MSEC*1000);
 	}
+	pthread_exit(NULL);
+}
+
+void *stageCmd(void *socketid) 
+{
+	char cmd[XIA_MAXBUF];
+	int sock = *((int*)socketid);
+	int n = -1;
+
+	while (1) {
+		memset(cmd, '\0', XIA_MAXBUF);
+		if ((n = Xrecv(sock, cmd, sizeof(cmd), 0))  < 0) {
+			warn("socket error while waiting for data, closing connection\n");
+			break;
+		}	
+		if (strncmp(cmd, "stage", 5) == 0) {
+			say("Receive a stage message\n");
+			stageControl(sock, cmd+6);
+		}	
+	}
+
+	Xclose(sock);
+	say("Socket closed\n");
 	pthread_exit(NULL);
 }
 
@@ -249,6 +270,7 @@ void *profileMgt(void *)
 		}	
 		sleep(MGT_DELAY_SEC);
 	}
+
 	pthread_exit(NULL);	
 }
 
@@ -256,7 +278,7 @@ int main()
 {
 	pthread_t thread_stage, thread_mgt;
 	pthread_create(&thread_stage, NULL, stageData, NULL); // dequeue, stage and update profile
-	pthread_create(&thread_mgt, NULL, profileMgt, NULL);
+	//pthread_create(&thread_mgt, NULL, profileMgt, NULL);
 
 	ftpSock = initStreamClient(getXftpName(), myAD, myHID, ftpServAD, ftpServHID); // get ftpServAD and ftpServHID for building chunk request
 	stageServerSock = registerStreamReceiver(getStageServiceName(), myAD, myHID, my4ID);
