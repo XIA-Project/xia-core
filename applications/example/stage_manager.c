@@ -43,7 +43,6 @@ map<string, long> SIDToTime; // store the timestamp last seen
 
 int stageSock, ftpSock;
 
-// chenren
 bool netStageOn = true;
 
 int thread_c = 0;
@@ -105,9 +104,7 @@ cerr<<cid<<endl;
 			cp.fetchFinishTimestamp = 0;	
 			cp.stageStartTimestamp = 0;	
 			cp.stageFinishTimestamp = 0;	
-			profile[SIDToCIDs[remoteSID][i]] = cp;			
-
-
+			profile[SIDToCIDs[remoteSID][i]] = cp;
 //cerr<<i<<"\t"<<SIDToCIDs[remoteSID][i]<<endl;
 		}	
 		pthread_mutex_lock(&profileLock);
@@ -204,7 +201,7 @@ cerr<<"Current "<<getAD()<<endl;
 	}
 
 	// TODO: need to handle the case that new SID joins dynamically
-	// TODO: handle no in-net prefetching service
+	// TODO: handle no in-net staging service
 	while (1) {
 		//pthread_mutex_lock(&stageLock); 
 		//pthread_cond_wait(&stageCond, &stageLock);			
@@ -236,7 +233,7 @@ cerr<<"Thread id "<<thread_id<<": "<<"Network changed, create another thread to 
 				int s = -1;
 				for (unsigned int i = 0; i < (*I).second.size(); i++) {
 //cerr<<(*I).second[i]<<endl;
-					// start from the first CID not yet prefetched if it is the first time to prefetch 
+					// start from the first CID not yet staged if it is the first time to stage 
 					if (bootstrap) {
 						if (SIDToProfile[SID][(*I).second[i]].stageState == BLANK) {
 							s = (int)i;
@@ -252,7 +249,7 @@ cerr<<"Thread id "<<thread_id<<": "<<"Network changed, create another thread to 
 						}
 					}
 				}
-				// all the chunks are prefetched
+				// all the chunks are staged
 				if (s == -1) {
 					break;
 				}
@@ -262,7 +259,7 @@ cerr<<"Thread id "<<thread_id<<": "<<"Network changed, create another thread to 
 				}
 //cerr<<s<<"\t"<<e<<endl;
 				pthread_mutex_lock(&profileLock);	
-				// only update the state of the chunks not prefetched yet 
+				// only update the state of the chunks not staged yet 
 				for (int i = s; i < e; i++) {
 					if (SIDToProfile[SID][(*I).second[i]].stageState == BLANK) {
 cerr<<(*I).second[i]<<endl;						
@@ -274,7 +271,7 @@ cerr<<(*I).second[i]<<endl;
 				}
 				pthread_mutex_unlock(&profileLock);
 
-				// send the prefetching list to the prefetch service and receive message back and update prefetch state
+				// send the staging list to the stage service and receive message back and update stage state
 				// TODO: non-block fasion 
 				if (CIDs.size() > 0) {
 					sprintf(cmd, "stage");
@@ -284,12 +281,34 @@ cerr<<(*I).second[i]<<endl;
 					}				
 					sendStreamCmd(netStageSock, cmd);
 
+					// receive chunk ready msg one by one
+					for (unsigned i = 0; i < CIDs.size(); i++) {
+						memset(reply, '\0', strlen(reply));
+						if ((n = Xrecv(netStageSock, reply, sizeof(reply), 0)) < 0) {
+							Xclose(netStageSock);
+							die(-1, "Unable to communicate with the server\n");
+						}
+//cerr<<reply<<endl;
+						// update "ready" to stage state
+						if (strncmp(reply, "ready", 5) == 0) {
+							vector<string> staged_info = strVector(reply+6);
+							if (CIDs[i] == staged_info[0]) {
+								pthread_mutex_lock(&profileLock);								
+								SIDToProfile[SID][CIDs[i]].stageStartTimestamp = string2long(staged_info[1]);							
+								SIDToProfile[SID][CIDs[i]].stageFinishTimestamp = string2long(staged_info[2]);
+								SIDToProfile[SID][CIDs[i]].stageState = READY;
+								pthread_mutex_unlock(&profileLock);
+							}
+						}
+					}
+/*
+					// receive chunk ready msg in batch
 					if ((n = Xrecv(netStageSock, reply, sizeof(reply), 0)) < 0) {
 						Xclose(netStageSock);
 						die(-1, "Unable to communicate with the server\n");
 					}
-	cerr<<reply<<endl;
-					// update "ready" to prefetch state
+	//cerr<<reply<<endl;
+					// update "ready" to stage state
 					if (strncmp(reply, "ready", 5) == 0) {
 						vector<string> CIDs_staging = strVector(reply+6);
 						pthread_mutex_lock(&profileLock);							
@@ -298,6 +317,7 @@ cerr<<(*I).second[i]<<endl;
 						}
 						pthread_mutex_unlock(&profileLock);
 					}	
+*/					
 				}
 			}
 		}
@@ -305,14 +325,14 @@ cerr<<(*I).second[i]<<endl;
 		if (finish) {
 			pthread_exit(NULL);
 		}
-		usleep(10000);
+		usleep(SCAN_DELAY_MSEC*1000);
 		//pthread_mutex_unlock(&fetchLock); 		
 	}
 	pthread_exit(NULL);
 }
 
 // WORKING version
-// data plane of prefetching: find the pending chunk, construct the dag and send the pending chunk request, 
+// data plane of staging: find the pending chunk, construct the dag and send the pending chunk request, 
 void *fetchData(void *) 
 {
 	int chunkSock;
@@ -334,10 +354,10 @@ void *fetchData(void *)
 				for (unsigned int i = 0; i < (*I).second.size(); i++) {
 //cerr<<(*I).second[i]<<endl;
 					if (SIDToProfile[SID][(*I).second[i]].fetchState == PENDING && SIDToProfile[SID][(*I).second[i]].stageState == READY) {
-cerr<<(*I).second[i]<<"\t fetch state: PENDING state\t prefetch state: READY\n"; 
+cerr<<(*I).second[i]<<"\t fetch state: PENDING; \t stage state: READY\n"; 
 						CIDs_fetching.push_back((*I).second[i]);
 					}
-				}	
+				}
 				if (CIDs_fetching.size() > 0) {			
 					// TODO: check the size is smaller than the max chunk to fetch at one time
 					ChunkStatus cs[CIDs_fetching.size()];
@@ -395,17 +415,16 @@ cerr<<CIDs_fetching[i]<<"\t fetch state: ready\n";
 						else 
 							say("unexpected result\n");
 
-						usleep(100000); 
+						usleep(CHUNK_REQUEST_DELAY_MSEC*1000); 
 					}
 				}
 				// TODO: timeout the chunks by free(cs[i].cid); cs[j].cid = NULL; cs[j].cidLen = 0;			
 			}
 		} 
 		usleep(LOOP_DELAY_MSEC*1000);		
-
 		//pthread_mutex_unlock(&fetchLock); 		
 	}
-	// 	big loop, SIDToProfile[remoteSID][CID].fetchState = PENDING and prefetch state == done, construct dag, fetch data, update
+	// 	big loop, SIDToProfile[remoteSID][CID].fetchState = PENDING and stage state == done, construct dag, fetch data, update
 	pthread_exit(NULL);
 }
 
@@ -414,22 +433,25 @@ void *netMon(void *)
 {
 	int sock; 
 
-	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
 		die(-1, "Unable to create the listening socket\n");
+	}
 
 	netChange = false;
 	netChangeACK = false;
 	char last_ad[MAX_XID_SIZE], curr_ad[MAX_XID_SIZE], hid[MAX_XID_SIZE], ip[MAX_XID_SIZE];
 
-	if (XreadLocalHostAddr(sock, curr_ad, sizeof(curr_ad), hid, sizeof(hid), ip, sizeof(ip)) < 0)
+	if (XreadLocalHostAddr(sock, curr_ad, sizeof(curr_ad), hid, sizeof(hid), ip, sizeof(ip)) < 0) {
 		die(-1, "Reading localhost address\n");
+	}
 
 	strcpy(last_ad, curr_ad);
 
 	while (1) 
 	{
-		if (XreadLocalHostAddr(sock, curr_ad, sizeof(curr_ad), hid, sizeof(hid), ip, sizeof(ip)) < 0)
+		if (XreadLocalHostAddr(sock, curr_ad, sizeof(curr_ad), hid, sizeof(hid), ip, sizeof(ip)) < 0) {
 			die(-1, "Reading localhost address\n");		
+		}
 //cerr<<"Current AD: "<<curr_ad<<endl;
 		if (strcmp(last_ad, curr_ad) != 0) {
 			cerr<<"AD changed!\n";
@@ -549,20 +571,10 @@ cerr<<"Deleting time of "<<SID<<endl;
 
 int main() 
 {
-	// chenren
-/*	
-	pthread_t thread_winPred, thread_mgt, thread_fetchData, thread_stageData; // TODO: thread_netMon
-	//pthread_create(&thread_netMon, NULL, netMon, NULL);	// TODO: improve the netMon function
-	//pthread_create(&thread_winPred, NULL, winPred, NULL);	// TODO: improve the netMon function
-	pthread_create(&thread_mgt, NULL, profileMgt, NULL); // dequeue, stage and update profile	
-	pthread_create(&thread_fetchData, NULL, fetchData, NULL);		
-	pthread_create(&thread_stageData, NULL, stageData, NULL);	
-*/
-
 	pthread_t thread_winPred, thread_mgt, thread_netMon, thread_fetchData, thread_stageData; // TODO: thread_netMon
 	pthread_create(&thread_netMon, NULL, netMon, NULL);	// TODO: improve the netMon function
 	//pthread_create(&thread_winPred, NULL, winPred, NULL);	// TODO: improve the netMon function	
-	pthread_create(&thread_mgt, NULL, profileMgt, NULL); // dequeue, prefetch and update profile	
+	pthread_create(&thread_mgt, NULL, profileMgt, NULL); // dequeue, stage and update profile	
 	pthread_create(&thread_fetchData, NULL, fetchData, NULL);		
 	pthread_create(&thread_stageData, NULL, stageData, NULL);	
 
@@ -824,13 +836,7 @@ cerr<<"after get status\n";
 	}
 	pthread_exit(NULL);
 }
-
-
-
-
-
 */
-
 
 /*
 cerr<<"\nPrint profile table in reg_handler\n";
@@ -842,7 +848,7 @@ cerr<<(*I).first<<"\t"<<(*J).CID<<"\t"<<(*J).timestamp<<"\t"<<(*J).fetch<<"\t"<<
 */
 
 /*
-	cerr<<"print profile table:\n";
+cerr<<"print profile table:\n";
 	for (map<string, map<string, chunkProfile> >::iterator I = SIDToProfile.begin(); I != SIDToProfile.end(); ++I) {
 		map<string, chunkProfile> temp = I->second;
 		for (map<string, chunkProfile>::iterator J = temp.begin(); J != temp.end(); ++J) {

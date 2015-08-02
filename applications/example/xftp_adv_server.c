@@ -67,8 +67,7 @@ void *recvCmd (void *socketid)
 						warn("unable to send reply to client\n");
 						break;
 					}
-					// 1 ms seems to be stable
-					usleep(1000);
+					usleep(SCAN_DELAY_MSEC);
 				}
 				memset(reply, '\0', strlen(reply));
 				sprintf(reply, "done");	

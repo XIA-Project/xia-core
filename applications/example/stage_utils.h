@@ -24,13 +24,14 @@
 
 #define MAX_XID_SIZE 100
 #define RECV_BUF_SIZE 1024
-#define XIA_MAX_BUF 15600 // TODO: improve later
-#define MAX_CID_NUM 20 // TODO: improve later
+#define XIA_MAX_BUF 15600 
+#define MAX_CID_NUM 20
 
 #define CHUNKSIZE 1024 
 
-#define REREQUEST 3
+#define REREQUEST 6
 #define NUM_CHUNKS 1 // 12 is the max NUM_CHUNKS to fetch at one time for 1024 K
+#define CHUNK_REQUEST_DELAY_MSEC 10
 
 #define FTP_NAME "www_s.ftp.aaa.xia"
 #define STAGE_SERVER_NAME "www_s.stage_server.aaa.xia"
@@ -48,8 +49,6 @@
 #define STAGE_WIN_RECENT_NUM 3
 #define LOOP_DELAY_MSEC 100
 #define SCAN_DELAY_MSEC 10
-#define CHUNK_REQUEST_DELAY_MSEC 100
-
 
 #define BLANK 0	// initilized: by registration message
 #define PENDING 1 // chunk is being fetched/prefetched 
@@ -144,6 +143,7 @@ int registerStageManager(const char *name);
 // construct the msg and send to stage client
 int XrequestChunkStage(int sock, const ChunkStatus *cs);
 
+/*
 char *chunkReqDag2cid(char *dag);
 
 char *getPrefetchManagerName();
@@ -155,7 +155,7 @@ int registerPrefetchManager(const char *name);
 int registerPrefetchService(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid);
 
 int updateManifestOld(int sock, vector<string> CIDs);
-
+*/
 
 #endif
 

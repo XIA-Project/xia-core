@@ -533,11 +533,13 @@ int registerStageService(const char *name, char *src_ad, char *src_hid, char *ds
 
 	// lookup the xia service 
 	daglen = sizeof(dag);
-	if (XgetDAGbyName(name, &dag, &daglen) < 0)
+	if (XgetDAGbyName(name, &dag, &daglen) < 0) {
 		die(-1, "unable to locate: %s\n", name);
+	}
 	// create a socket, and listen for incoming connections
-	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
 		die(-1, "Unable to create the listening socket\n");
+	}
 	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(sock);
 		die(-1, "Unable to bind to the dag: %s\n", dag);
@@ -613,35 +615,15 @@ int updateManifest(int sock, vector<string> CIDs)
 		}
 		offset += MAX_CID_NUM;
 		sendStreamCmd(sock, cmd);
-/*		if (Xsend(sock, cmd, strlen(cmd), 0) < 0) {
-			warn("unable to send reply to client\n");
-			break;
-		}*/
-		usleep(10000);
+		usleep(SCAN_DELAY_MSEC*000);
 	}
 	memset(cmd, '\0', strlen(cmd));
 	sprintf(cmd, "reg done");	
 	if (Xsend(sock, cmd, strlen(cmd), 0) < 0) {
 		warn("unable to send reply to client\n");
 	}		
-	usleep(10000);
+	usleep(SCAN_DELAY_MSEC*000);
 
-/*	
-	char cmd[XIA_MAX_BUF];	
-	memset(cmd, '\0', strlen(cmd));
-	char cids[XIA_MAX_BUF];
-	memset(cids, '\0', strlen(cids));
-
-	for (unsigned int i = 0; i < CIDs.size(); i++) {
-		strcat(cids, " ");
-		strcat(cids, string2char(CIDs[i]));
-	}	
-	// TODO: check total length of cids should not exceed max buf
-	sprintf(cmd, "reg%s", cids);
-	int n = sendStreamCmd(sock, cmd);
-
-	return n;
-*/	
 	return 0;
 }
 
@@ -670,6 +652,7 @@ int XrequestChunkStage(int sock, const ChunkStatus *cs) {
 	return n;
 }
 
+/*
 // TODO: right now it's hacky, need to fix the way reading XIDs when including fallback DAG
 char *chunkReqDag2cid(char *dag) {
 	char *cid = (char *)malloc(512);
@@ -779,3 +762,4 @@ int updateManifestOld(int sock, vector<string> CIDs)
 
 	return n;
 }
+*/

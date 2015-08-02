@@ -1,7 +1,7 @@
 #include "stage_utils.h"
 
 #define VERSION "v1.0"
-#define TITLE "XIA Advanced FTP client"
+#define TITLE "XIA Baseline FTP client"
 
 using namespace std;
 
@@ -15,7 +15,7 @@ char myHID[MAX_XID_SIZE];
 char ftpServAD[MAX_XID_SIZE];
 char ftpServHID[MAX_XID_SIZE];
 
-int ftpSock, stageManagerSock;
+int ftpSock;
 
 int getFile(int sock) 
 {
@@ -61,14 +61,6 @@ int getFile(int sock)
 		}
 	}
 
-	// update CID list to the local staging service if exists.
-	if (stage) {
-		if ((n = updateManifest(stageManagerSock, CIDs) < 0)) {
-			Xclose(stageManagerSock);
-			die(-1, "Unable to communicate with the local prefetching service\n");
-		}
-	}
-
 	vector<unsigned int> chunkSize; // in bytes
 	vector<long> latency;
 	long fetchTime = now_msec();
@@ -95,24 +87,9 @@ int getFile(int sock)
 			if (ctr % REREQUEST == 0) {
 				// bring the list of chunks local
 //say("%srequesting list of %d chunks\n", (ctr == 0 ? "" : "re-"), n);
-				if (stage) {
-					if (XrequestChunkStage(stageManagerSock, cs) < 0) {
-						say("unable to request chunks\n");
-						return -1;
-					}
-					sprintf(dag, "RE ( %s %s ) CID:%s", myAD, myHID, string2char(CIDs[i]));
-					cs[0].cidLen = strlen(dag);
-					cs[0].cid = dag; // cs[i].cid is a DAG, not just the CID					
-					if (XrequestChunks(chunkSock, cs, n) < 0) {
-						say("unable to request chunks\n");
-						return -1;
-					}
-				}
-				else {
-					if (XrequestChunks(chunkSock, cs, n) < 0) {
-						say("unable to request chunks\n");
-						return -1;
-					}
+				if (XrequestChunks(chunkSock, cs, n) < 0) {
+					say("unable to request chunks\n");
+					return -1;
 				}
 			}
 			ctr++;
@@ -137,7 +114,6 @@ int getFile(int sock)
 			else {
 				say("unexpected result\n");
 			}
-
 			usleep(CHUNK_REQUEST_DELAY_MSEC*1000);
 		}
 
@@ -177,11 +153,6 @@ int main(int argc, char **argv)
 			sprintf(fout, "my%s", fin);
 
 			ftpSock = initStreamClient(getXftpName(), myAD, myHID, ftpServAD, ftpServHID);
-			stageManagerSock = registerStageManager(getStageManagerName());
-			if (stageManagerSock == -1) {
-				say("No local staging service running\n");
-				stage = false;
-			}
 			getFile(ftpSock);
 
 			return 0;
