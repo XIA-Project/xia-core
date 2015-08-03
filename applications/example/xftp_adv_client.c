@@ -71,6 +71,9 @@ int getFile(int sock)
 
 	vector<unsigned int> chunkSize; // in bytes
 	vector<long> latency;
+	vector<long> chunkStartTime;
+	vector<long> chunkFinishTime;
+
 	long fetchTime = now_msec();
 	long startTime = now_msec();
 	unsigned int bytes = 0;
@@ -155,13 +158,15 @@ int getFile(int sock)
 		bytes += len;
 		chunkSize.push_back(len); 
 		latency.push_back(now_msec()-fetchTime);
+		chunkStartTime.push_back(fetchTime);
+		chunkFinishTime.push_back(now_msec());
 	}
 	fclose(fd);
 	long finishTime = now_msec();
 	say("Received file %s at %f MB/s (Time: %lu msec, Size: %d bytes)\n", fout, (1000 * (float)bytes / 1024) / (float)(finishTime - startTime) , finishTime - startTime, bytes);
 	sendStreamCmd(sock, "done"); 	// chunk fetching ends
 	for (unsigned int i = 0; i < CIDs.size(); i++) {
-		cout<<CIDs[i]<<"\t"<<chunkSize[i]<<" B\t"<<latency[i]<<endl;
+		cout<<fout<<"\t"<<CIDs[i]<<"\t"<<chunkSize[i]<<" B\t"<<latency[i]<<"\t"<<chunkStartTime[i]<<"\t"<<chunkFinishTime[i]<<endl;
 	}
 	Xclose(chunkSock);
 	Xclose(sock);	
