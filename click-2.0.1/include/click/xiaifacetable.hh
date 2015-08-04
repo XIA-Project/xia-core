@@ -21,6 +21,7 @@ class XIAInterfaceTable {
 		String getDAG(int iface) {
 			return interfaceToDag[iface];
 		}
+		int getIface(String dag);
 		int size() {
 			return numInterfaces;
 		}

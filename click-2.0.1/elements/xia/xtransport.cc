@@ -1879,6 +1879,11 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 		new_sk->src_path = dst_path;
 		new_sk->isAcceptedSocket = true;
 		new_sk->pkt = copy_packet(p, new_sk);
+		int iface;
+		// Interface card matching src_path to use during migration
+		if((iface = IfaceFromSIDPath(new_sk->src_path)) != -1) {
+			new_sk->outgoing_iface = iface;
+		}
 
 		memset(new_sk->send_buffer, 0, new_sk->send_buffer_size * sizeof(WritablePacket*));
 		memset(new_sk->recv_buffer, 0, new_sk->recv_buffer_size * sizeof(WritablePacket*));
@@ -2782,6 +2787,19 @@ void XTRANSPORT::Xgetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_
 	ReturnResult(_sport, xia_socket_msg);
 }
 
+// Find interface corresponding to the SID DAG
+// Returns interface number or -1 or error
+int XTRANSPORT::IfaceFromSIDPath(XIAPath sidPath)
+{
+	XIAPath interface_dag = sidPath;
+	//TODO: check dest node in sidPath is an SID
+	if(interface_dag.remove_node(interface_dag.destination_node())) {
+		click_chatter("Xtransport::IfaceFromSIDPath couldn't remove node");
+		return -1;
+	}
+	return _interfaces.getIface(interface_dag.unparse());
+}
+
 void XTRANSPORT::Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
 	int rc = 0, ec = 0;
@@ -2809,6 +2827,13 @@ void XTRANSPORT::Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 		XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
 		//TODO: Add a check to see if XID is already being used
+
+		// Try to determine the outgoing interface based on src_path
+		// TODO: Should we do this only for stream sockets?
+		int iface;
+		if((iface = IfaceFromSIDPath(sk->src_path)) != -1) {
+			sk->outgoing_iface = iface;
+		}
 
 		// Map the source XID to source port (for now, for either type of tranports)
 		XIDtoSock.set(source_xid, sk);
@@ -2960,6 +2985,12 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 	// FIXME: is it possible for us not to have a source dag
 	//   and if so, we should return an error
 	assert(sk->src_path.is_valid());
+
+	// Determine outgoing interface based on src_path. Needed for migration
+	int iface;
+	if((iface = IfaceFromSIDPath(sk->src_path)) != -1) {
+		sk->outgoing_iface = iface;
+	}
 
 	XID source_xid = sk->src_path.xid(sk->src_path.destination_node());
 	XID destination_xid = sk->dst_path.xid(sk->dst_path.destination_node());
@@ -3452,15 +3483,6 @@ void XTRANSPORT::Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 void XTRANSPORT::Xupdatedag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
-	// sock may need to store _hid, _sid, _network_dag to allow _network_dag to change
-	// Find the interface corresponding to this change
-	// If the interface is the default interface:
-	//     * Update xrc/xtransport, xrc/n/proc/rt_*, xrc/n/x, xrc/x
-	//     * Update _network_dag, _local_addr just like the network_dag handler
-	// For the interface:
-	//     * Update xlcn/xchal, xlcn/x
-	// For all active stream sockets, associated with the interface
-	//     * Update _network_dag and hence the src_path
 	//String str_local_addr = _local_addr.unparse();
 	//size_t old_AD_start = str_local_addr.find_left("AD:");
 	//size_t old_AD_end = str_local_addr.find_left(" ", old_AD_start);
@@ -3535,7 +3557,6 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, xia::XSocketMsg *xia_socket_m
 	}
 
 
-	/*
 	// Inform all active stream connections about this change
 	for (HashTable<unsigned short, sock*>::iterator iter = portToSock.begin(); iter != portToSock.end(); ++iter ) {
 		unsigned short _migrateport = iter->first;
@@ -3550,17 +3571,25 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, xia::XSocketMsg *xia_socket_m
 			INFO("src_path:%s:", sk->src_path.unparse().c_str());
 			continue;
 		}
-		// TODO: Multi-homing
-		// Retrieve SID from old src_path (unless available in sk already)
-		// Append SID to new_dag to form new src_path
-		// Replace src_path with the new src_path
-		// Send the migrate message
-		//
-		//
+		// Skip sockets not using the interface whose dag changed
+		if(sk->outgoing_iface != interface) {
+			INFO("skipping migration for unchanged interface");
+			INFO("src_path:%s:", sk->src_path.unparse().c_str());
+			continue;
+		}
 
-		// Update src_path in sk
-		INFO("updating %s to %s in sk", old_AD_str.c_str(), AD_str.c_str());
-		sk->src_path.replace_node_xid(old_AD_str, AD_str);
+		// Retrieve SID from old src_path (unless available in sk already)
+		XID sid = sk->src_path.xid(sk->src_path.destination_node());
+
+		// Append SID to the new dag
+		XIAPath new_sid_dag = new_dag;
+		XIAPath::handle_t hid_handle = new_sid_dag.destination_node();
+		XIAPath::handle_t sid_handle = new_sid_dag.add_node(sid);
+		if(!new_sid_dag.add_edge(hid_handle, sid_handle)) {
+			INFO("Failed adding edge from HID to SID in new_dag");
+		}
+		INFO("Updating %s to %s in sk", sk->src_path.unparse().c_str(), new_sid_dag.unparse().c_str());
+		sk->src_path = new_sid_dag;
 
 		// Send MIGRATE message to each corresponding endpoint
 		// src_DAG, dst_DAG, timestamp - Signed by private key
@@ -3670,7 +3699,6 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, xia::XSocketMsg *xia_socket_m
 		}
 		output(NETWORK_PORT).push(p);
 	}
-*/
 	ReturnResult(_sport, xia_socket_msg);
 }
 

@@ -139,6 +139,7 @@ private:
 			so_error = 0;
 			so_debug = false;
 			interface_id = -1;
+			outgoing_iface = -1;
 			polling = false;
 			recv_pending = false;
 			timer_on = false;
@@ -184,6 +185,7 @@ private:
 		int so_error;				// used by non-blocking connect, accessed via getsockopt(SO_ERROR)
 		int so_debug;				// set/read via SO_DEBUG. could be used for tracing in the future
 		int interface_id;			// port of the interface the packets arrive on
+		int outgoing_iface;         // interface matching src_path (if any)
 		unsigned polling;			// # of outstanding poll/select requests on this socket
 		bool recv_pending;			// true if API is waiting to receive data
 		bool timer_on;				// if true timer is enabled
@@ -381,6 +383,7 @@ protected:
 
 	static String Netstat(Element *e, void *thunk);
 	static int purge(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
+	int IfaceFromSIDPath(XIAPath sidPath);
 
 	// modify routing table
 	void addRoute(const XID &sid) {

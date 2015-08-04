@@ -92,6 +92,17 @@ bool XIAInterfaceTable::remove(int iface)
 	return true;
 }
 
+int XIAInterfaceTable::getIface(String dag)
+{
+	ifaceDagIter = interfaceToDag.begin();
+	for(;ifaceDagIter!=interfaceToDag.end();ifaceDagIter++) {
+		if(dag.compare(ifaceDagIter.value()) == 0) {
+			return ifaceDagIter.key();
+		}
+	}
+	return -1;
+}
+
 // Remove entry from both tables for dag
 // Returns false if entry does not exist in either table
 /*
