@@ -1,0 +1,94 @@
+.TH XcacheNotifications 8 "05 May 2015" "1.0" "XIA Manual Pages"
+.SH NAME
+XcacheNotifications \- Xcache Notifications.
+.SH SYNOPSIS
+.nf
+.B "#include <xcache.h>"
+.sp
+.BR "int XregisterNotification(int events, void (*func)(int event, const char *cid, int cidlen));"
+.BR "int XprocessNotification(int xcacheSock);"
+.fi
+
+.SH DESCRIPTION
+Xcache Notifications is a mechanism used by Xcache Daemon to notify
+applications about the happening of events. Applications register to
+the events of their interest by calling
+.I XregisterNotification
+function.
+The argument
+.I event
+is the event for which the application is registering. Following
+events are supported.
+
+.B "XCE_CHUNKARRIVED"
+.RS
+Chunk arrived.
+.RE
+.B "XCE_CHUNKEVICTED"
+.RS
+Chunk evicted.
+.RE
+.B "XCE_SLICEEXPIRED"
+.RS
+Slice expired.
+.RE
+
+Applications can register to multiple events by a single call to
+.I XregisterNotification().
+This achieved by setting
+.I events
+to bitwise-OR of multiple events.
+The argument
+.I func
+is a function pointer to the function that needs to be invoked on
+happening of any event in set
+.I events.
+.I func
+knows about the exact event in its first argument
+.I event.
+.I func
+knows about the CID of the chunk on which that particular event
+happened as the second argument
+.I cid.
+.I cid
+is of length
+.I cidlen.
+
+Xcache sends these notifications on
+.B ALL
+the sockets allocated by
+.B XcacheSocket(8).
+Normally, applications should not need more than one such
+socket. Application does not need to parse and process any notification
+by itself. Function
+.B XprocessNotification()
+parses the incoming notification and invokes appropriate registered
+function.
+.B xcacheSock
+must be allocated
+.B XcacheSocket()
+call.
+
+.SH RETURN VALUE
+On success
+.B XregisterNotification()
+returns 0. On failure it returns -1.
+.B XprocessNotification()
+returns the number of notifications received.
+.SH ERRORS
+.B ENOTCONN	
+XcacheSock is not connected.
+
+.B EHOSTDOWN	
+Xcache is not running.
+.B 
+.\".SH NOTES
+
+.SH EXAMPLE
+
+.SH SEE ALSO
+.B "XopenChunk(8),"
+.B "Xput(8),"
+.B "Xget(8)"
+.SH AUTHOR
+Harshad Shirwadkar <harshad@cmu.edu>

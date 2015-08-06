@@ -1,0 +1,46 @@
+.TH XreadChunk 8 "05 May 2015" "1.0" "XIA Manual Pages"
+.SH NAME
+XreadChunk \- Read chunk from xcache.
+.SH SYNOPSIS
+.nf
+.B "#include <xcache.h>"
+.sp
+.BR "int XreadChunk(int xcacheSock, void *buf, size_t bulen);"
+.fi
+
+.SH DESCRIPTION
+.B XreadChunk()
+reads chunk associated with
+.I xcacheSock
+into the buffer
+.I buf
+of length
+.I buflen.
+.I xcacheSock
+must ONLY be obtained by calling
+.B XopenChunk().
+
+.SH RETURN VALUE
+XreadChunk returns number of bytes succesfully read. On completion of
+chunk read, 0 is returned. On error, -1 is returned.
+
+.SH ERRORS
+.B ENOTCONN	
+XcacheSock is not connected.
+
+.B EHOSTDOWN	
+Xcache is not running.
+.B 
+.\".SH NOTES
+
+.SH EXAMPLE
+
+See
+.B XrequestChunk(8).
+
+.SH SEE ALSO
+.B "XopenChunk(8),"
+.B "Xput(8),"
+.B "Xget(8)"
+.SH AUTHOR
+Harshad Shirwadkar <harshad@cmu.edu>

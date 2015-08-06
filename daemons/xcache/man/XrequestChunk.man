@@ -1,0 +1,110 @@
+.\" Manpage for Slice manipulation
+.TH Xput 8 "05 May 2015" "1.0" "XIA Manual Pages"
+.SH NAME
+XreadChunk \- Read chunk from xcache.
+.SH SYNOPSIS
+.nf
+.B "#include <xcache.h>"
+.sp
+.BR "int XrequestChunk(int xcacheSock, sockaddr_x *addr, socklen_t addrlen, int flags);"
+.fi
+
+.SH DESCRIPTION
+.B XrequestChunk()
+requests for chunk with address
+.I addr.
+.I addrlen
+must be set to the length of the address pointed by
+.I addr.
+By default, XrequestChunk does not block. As soon as the request is
+sent, it returns. (Blocking mode can be enabled by setting
+XCACHE_BLOCK flag (See below)). After receiving the chunk, Xcache
+sends 
+.B XCE_ARRIVED
+notification. (See
+.B XcacheNotifications(8)
+for more details). With
+.B XrequestChunk()
+chunk is always cached in the client's cache. In order to skip caching
+at client's end, use
+.B XgetChunk(8).
+
+The argument
+.I flags
+can be used to set / reset following options by bitwise-OR'ing.
+
+.B "XCF_BLOCK"
+.RS
+Blocks till chunk is received. In this case, Xcache does not send
+.B "XCE_ARRIVED"
+notification. If
+.B "XrequestChunk()"
+succeds, the chunk is ready for read.
+
+.RE
+.SH RETURN VALUE
+On success,
+.B XrequestChunk()
+returns 0. On failure, -1 is returned and appropriate errno is set.
+
+.SH ERRORS
+.B ENOTCONN	
+XcacheSock is not connected.
+
+.B EHOSTDOWN	
+Xcache is not running.
+.B 
+.\".SH NOTES
+
+.SH EXAMPLE
+
+.nf
+#include <xcache.h>
+#include <stdio.h>
+
+int get_chunk(char **data, sockaddr_x *addr, socklen_t addrlen)
+{
+	int sock = XcacheSocket();
+	int ret, chunk_sock;
+	int total_size = 0;
+	char buf[1024];
+
+	if(sock < 0) {
+		perror("XcacheSocket");
+		return -1;
+	}
+
+	if(XrequestChunk(sock, addr, addrlen, XCF_BLOCK) < 0) {
+		perror("XrequestChunk");
+		close(sock);
+		return -1;
+	}
+
+	chunk_sock = XopenChunk(addr_to_cid(addr), CID_HASH_SIZE);
+	if(chunk_sock < 0) {
+		perror("XopenChunk");
+		close(sock);
+		return -1;
+	}
+
+	*data = NULL;
+
+	while((ret = XreadChunk(chunk_sock, buf, 1024)) != 0) {
+		*data = realloc(*data, total_size + ret);
+		memcpy(*data + total_size, buf, ret);
+		total_size += ret;
+	}
+
+	close(sock);
+	close(chunk_sock);
+
+	return ret;
+}
+.fi
+
+.SH SEE ALSO
+.B "XopenChunk(8),"
+.B "Xput(8),"
+.B "Xget(8)"
+.SH AUTHOR
+Harshad Shirwadkar <harshad@cmu.edu>

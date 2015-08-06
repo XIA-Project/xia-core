@@ -1,0 +1,51 @@
+XgetChunkStatus(8)             XIA Manual Pages             XgetChunkStatus(8)
+
+
+
+NAME
+       XgetChunkStatus - Get status of chunks.
+
+SYNOPSIS
+       #include <xcache.h>
+
+       int XgetChunkStatus(int xcacheSock, const char *cid, size_t len);
+
+
+DESCRIPTION
+       XgetChunkStatus()  reads  the  status  of the chunk associated with CID
+       cid.  CID is of length len.  xcacheSock must be a socket  allocated  by
+       call to XcacheSocket() function.  XgetChunkStatus() Chunk status can be
+       one of the following:
+
+       XCS_AVAILABLE
+              Chunk is available and ready for read.
+       XCS_WAITING
+              Xcache is waiting for the chunk to be read from the network.
+       XCS_NOTFOUND
+              Chunk is not cached.
+
+
+RETURN VALUE
+       XgetChunkStatus() returns the status of a chunk. In case of  error,  -1
+       is returned and errno is set appropriately.
+
+
+ERRORS
+       ENOTCONN   XcacheSock is not connected.
+
+       EHOSTDOWN  Xcache is not running.
+
+
+EXAMPLE
+       See XrequestChunk(8).
+
+
+SEE ALSO
+       XopenChunk(8), Xput(8), Xget(8)
+
+AUTHOR
+       Harshad Shirwadkar <harshad@cmu.edu>
+
+
+
+1.0                               05 May 2015               XgetChunkStatus(8)

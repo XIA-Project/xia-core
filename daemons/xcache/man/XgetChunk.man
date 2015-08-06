@@ -1,0 +1,81 @@
+.\" Manpage for Slice manipulation
+.TH XgetChunk 8 "05 May 2015" "1.0" "XIA Manual Pages"
+.SH NAME
+XgetChunk \- Get chunk in memory.
+.SH SYNOPSIS
+.nf
+.B "#include <xcache.h>"
+.sp
+.BR "int XgetChunk(int xcacheSock, void *buf, size_t buflen, sockaddr_x *addr, socklen_t addrlen, int *flags);"
+.fi
+
+.SH DESCRIPTION
+.B XgetChunk()
+fetches the chunk with address
+.I addr
+from the XIA network into the buffer pointed to by
+.I buf.
+At the max,
+.I buflen
+bytes are copied. If the chunk is of size greater than
+.I buflen,
+then the rest of the bytes are discarded and
+.B XCF_OVERFLOW
+is set in
+.I *flags.
+The argument
+.I xcacheSock
+must be a file descriptor returned by
+.B xcacheSocket(8).
+The argument
+.I addrlen
+must be set to the length of the address of the chunk pointed to by
+.I addr.
+By default, arrived chunks are not cached by the xcache. But, this
+behaviour can be overridden by setting
+.B XCF_DOCACHE (See below).
+
+The argument
+.I flags
+is both input as well as output argument. Before the call,
+.I flags
+can be set by bitwise-OR'ing one or more of the following options:
+
+.B "XCF_DOCACHE"
+.RS
+Overrides no-cache behaviour i.e. on arrival of a chunk the chunk is
+cached by local xcache.
+.RE
+
+On return, one or more of the following options can be set:
+
+.B "XCF_OVERFLOW"
+.RS
+Chunk was too big to fit in the supplied buffer.
+.RE
+
+
+.SH RETURN VALUE
+On success, the number of bytes successfully copied is returned. On
+failure, -1 is returned and appropriate errno is set.
+
+.SH ERRORS
+.B ENOTCONN	
+XcacheSock is not connected.
+
+.B EHOSTDOWN	
+Xcache is not running.
+.B 
+.\".SH NOTES
+
+.SH EXAMPLE
+
+See
+.B XrequestChunk(8).
+
+.SH SEE ALSO
+.B "XopenChunk(8),"
+.B "Xput(8),"
+.B "Xget(8)"
+.SH AUTHOR
+Harshad Shirwadkar <harshad@cmu.edu>
