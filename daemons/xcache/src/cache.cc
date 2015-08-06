@@ -135,6 +135,7 @@ void *xcache_cache::run(void *arg)
 		toaddr = fromaddr;
 		toaddr.sin_port = htons(args->cache_in_port);
 
+		//FIXME: Send meaningful messages
 		ret = sendto(s, "Something", strlen("Something") + 1, 0, (struct sockaddr *)&toaddr, sizeof(toaddr));
 		if(ret <= 0) {
 			LOG_CACHE_ERROR("Error while sending to click\n");

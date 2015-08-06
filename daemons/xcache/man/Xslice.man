@@ -1,5 +1,5 @@
 .\" Manpage for Slice manipulation
-.TH XcacheSock 8 "05 May 2015" "1.0" "XIA Manual Pages"
+.TH Xslice 8 "05 May 2015" "1.0" "XIA Manual Pages"
 .SH NAME
 XallocateSlice, XfreeSlice \- Slice manipulation functions.
 .SH SYNOPSIS

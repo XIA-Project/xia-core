@@ -25,5 +25,5 @@ int Xinit(void)
 	if(connect(xcache_sock, (struct sockaddr *)&xcache_addr, sizeof(xcache_addr)) < 0)
 		return -1;
 
-	return 0;
+	return xcache_sock;
 }

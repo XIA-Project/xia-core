@@ -7,10 +7,10 @@
  * Abstract class that defines a eviction policy.
  * Xcache eviction policy decides which content object to evict. The policy module
  * does not need to care about actually storing the data. It only deals in terms of
- * "meta"data.
+ * "meta" data.
  */
 
-class xcache_policy  {
+class xcache_eviction_policy  {
 public:
 	virtual int store(xcache_meta *) {
 		return 0;

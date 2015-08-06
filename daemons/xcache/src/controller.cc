@@ -315,7 +315,7 @@ void *xcache_controller::start_xcache(void *arg)
 	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
 	int xcache_sock, accept_sock;
 
-	if ((xcache_sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+	if((xcache_sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		return NULL;
 
 	if(XmakeNewSID(sid_string, sizeof(sid_string))) {
@@ -435,6 +435,7 @@ int xcache_controller::register_meta(xcache_meta *meta)
 	LOG_CTRL_DEBUG("Setting Route for %s.\n", temp_cid.c_str());
 	rv = xr.setRoute(temp_cid, DESTINED_FOR_LOCALHOST, empty_str, 0);
 	LOG_CTRL_DEBUG("Route Setting Returned %d\n", rv);
+
 	return rv;
 }
 
@@ -470,68 +471,66 @@ void xcache_controller::run(void)
 
 	LOG_CTRL_INFO("Entering The Loop\n");
 
-	while(1) {
-		memcpy(&fds, &allfds, sizeof(fd_set));
+repeat:
+	memcpy(&fds, &allfds, sizeof(fd_set));
 
-		max = libsocket;
-		for(iter = active_conns.begin(); iter != active_conns.end(); ++iter) {
-			max = MAX(max, *iter);
+	max = libsocket;
+	for(iter = active_conns.begin(); iter != active_conns.end(); ++iter) {
+		max = MAX(max, *iter);
+	}
+
+	Xselect(max + 1, &fds, NULL, NULL, NULL);
+
+	LOG_CTRL_INFO("Broken\n");
+
+	if(FD_ISSET(libsocket, &fds)) {
+		int new_connection = accept(libsocket, NULL, 0);
+		LOG_CTRL_INFO("Action on libsocket\n");
+		active_conns.push_back(new_connection);
+		FD_SET(new_connection, &allfds);
+	}
+
+	for(iter = active_conns.begin(); iter != active_conns.end(); ) {
+		if(!FD_ISSET(*iter, &fds)) {
+			++iter;
+			continue;
 		}
 
-		Xselect(max + 1, &fds, NULL, NULL, NULL);
+		char buf[512] = "";
+		std::string buffer("");
+		xcache_cmd resp, cmd;
+		int ret;
 
-		LOG_CTRL_INFO("Broken\n");
+		do {
+			ret = recv(*iter, buf, 512, 0);
+			LOG_CTRL_INFO("Recv returned %d\n", ret);
+			if(ret <= 0)
+				break;
 
-		if(FD_ISSET(libsocket, &fds)) {
-			int new_connection = accept(libsocket, NULL, 0);
-			LOG_CTRL_INFO("Action on libsocket\n");
-			active_conns.push_back(new_connection);
-			FD_SET(new_connection, &allfds);
-		}
+			buffer.append(buf, ret);
+		} while(ret == 512);
 
-		for(iter = active_conns.begin(); iter != active_conns.end();) {
-			if(!FD_ISSET(*iter, &fds)) {
-				++iter;
-				continue;
-			}
-
-			char buf[512] = "";
-			std::string buffer("");
-			xcache_cmd resp, cmd;
-			int ret;
-
-			do {
-				ret = recv(*iter, buf, 512, 0);
-				LOG_CTRL_INFO("Recv returned %d\n", ret);
-				if(ret <= 0)
-					break;
-
-				buffer.append(buf, ret);
-			} while(ret == 512);
-
-			if(ret <= 0) {
-				LOG_CTRL_DEBUG("Client Disconnected.\n");
-				close(*iter);
-				FD_CLR(*iter, &allfds);
-				active_conns.erase(iter);
-				continue;
-			} else if(ret != 0) {
-				bool parse_success = cmd.ParseFromString(buffer);
-				LOG_CTRL_INFO("Controller received %lu bytes\n", buffer.length());
-				if(!parse_success) {
-					LOG_CTRL_ERROR("[ERROR] Protobuf could not parse\n");
+		if(ret <= 0) {
+			LOG_CTRL_DEBUG("Client Disconnected.\n");
+			close(*iter);
+			FD_CLR(*iter, &allfds);
+			active_conns.erase(iter);
+			continue;
+		} else if(ret != 0) {
+			bool parse_success = cmd.ParseFromString(buffer);
+			LOG_CTRL_INFO("Controller received %lu bytes\n", buffer.length());
+			if(!parse_success) {
+				LOG_CTRL_ERROR("[ERROR] Protobuf could not parse\n");
+			} else if(handle_cmd(&resp, &cmd) == OK_SEND_RESPONSE) {
+				resp.SerializeToString(&buffer);
+				if(send_response(*iter, buffer.c_str(), buffer.length()) < 0) {
+					LOG_CTRL_ERROR("FIXME: handle return value of write\n");
 				} else {
-					if(handle_cmd(&resp, &cmd) == OK_SEND_RESPONSE) {
-						resp.SerializeToString(&buffer);
-						if(send_response(*iter, buffer.c_str(), buffer.length()) < 0) {
-							LOG_CTRL_ERROR("FIXME: handle return value of write\n");
-						} else {
-							LOG_CTRL_INFO("Data sent to client\n");
-						}
-					}
+					LOG_CTRL_INFO("Data sent to client\n");
 				}
 			}
-			++iter;
 		}
+		++iter;
 	}
+	goto repeat;
 }

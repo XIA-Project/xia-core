@@ -5,6 +5,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 #define CIDLEN 512
 
 /* CID cache context */
@@ -37,5 +42,10 @@ int XgetChunk(int sockfd, sockaddr_x *addr, socklen_t addr_len, void *rbuf, size
 ChunkContext *XallocCacheSlice(int32_t cache_size, int32_t ttl, int32_t cache_policy);
 int XputChunk(ChunkContext *ctx, const char *data, unsigned length, ChunkInfo *info);
 int XputFile(ChunkContext *ctx, const char *fname, unsigned chunkSize, ChunkInfo **chunks);
+int XputBuffer(ChunkContext *ctx, const char *data, unsigned length, unsigned chunkSize, ChunkInfo **info);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

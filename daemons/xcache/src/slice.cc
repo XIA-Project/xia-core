@@ -69,6 +69,7 @@ int xcache_slice::store(xcache_meta *meta)
 
 	make_room(meta);
 	add_meta(meta);
+
 	return policy.store(meta);
 }
 
@@ -80,7 +81,7 @@ int xcache_slice::get(xcache_meta *meta)
 	return 0;
 }
 
-void xcache_slice::set_policy(xcache_policy policy)
+void xcache_slice::set_policy(xcache_eviction_policy policy)
 {
 	this->policy = policy;
 }

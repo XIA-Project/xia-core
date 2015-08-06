@@ -31,7 +31,7 @@ std::string xcache_meta::safe_get(void)
 	std::string data;
 
 	this->lock();
-	data = get(this);
+	data = get();
 	this->unlock();
 
 	return data;

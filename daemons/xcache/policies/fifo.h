@@ -1,13 +1,21 @@
 #ifndef __FIFO_H__
 #define __FIFO_H__
 
+#include <stdint.h>
+#include <queue>
 #include "policy.h"
 
-class FifoPolicy:public xcache_policy {
+class FifoPolicy:public xcache_eviction_policy {
+	std::queue <xcache_meta *> q;
+
 public:
+	FifoPolicy() {
+		
+	}
+
 	int store(xcache_meta *meta) {
 		/* Ignoring compiler error for unused attribute */
-		(void)meta;
+		q.push(meta);
 
 		return 1;
 	}
@@ -24,7 +32,12 @@ public:
 		return 1;
 	}
 	xcache_meta *evict() {
-		return NULL;
+		xcache_meta *meta = q.front();
+
+		if(meta)
+			q.pop();
+
+		return meta;
 	}
 };
 

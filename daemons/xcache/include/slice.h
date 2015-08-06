@@ -9,7 +9,7 @@
 #include <stdint.h>
 
 class xcache_meta;
-class xcache_policy;
+class xcache_eviction_policy;
 
 class xcache_slice {
 private:
@@ -42,7 +42,7 @@ private:
 	/**
 	 * Eviction policy used by this slice/
 	 */
-	xcache_policy policy;
+	xcache_eviction_policy policy;
 
 public:
 	/**
@@ -59,7 +59,7 @@ public:
 		this->max_size = size;
 	}
 
-	void set_policy(xcache_policy);
+	void set_policy(xcache_eviction_policy);
 
 	int32_t get_context_id(void) {
 		return context_id;

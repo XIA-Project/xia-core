@@ -1,15 +1,16 @@
-CC=protoc
+PROTOC=protoc
 
 OBJS=xcache_cmd.pb.o xcache_cache_click.pb.o
+CFLAGS+=-fpic
 
 all: $(OBJS)
 
 %.pb.cc: %.proto
-	$(CC) $^ --cpp_out=$(XCACHEDIR)/proto
-	$(CC) $^ --python_out=$(XCACHEDIR)/proto
+	$(PROTOC) $^ --cpp_out=$(XCACHEDIR)/proto
+	$(PROTOC) $^ --python_out=$(XCACHEDIR)/proto
 
 %.pb.o: %.pb.cc
-	g++ -c $^ -o $@
+	$(CC) $(CFLAGS) -c $^ -o $@
 
 clean:
 	rm -f *.o

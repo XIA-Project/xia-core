@@ -1,7 +1,7 @@
 .\" Manpage for Slice manipulation
-.TH Xput 8 "05 May 2015" "1.0" "XIA Manual Pages"
+.TH XrequestChunk 8 "05 May 2015" "1.0" "XIA Manual Pages"
 .SH NAME
-XreadChunk \- Read chunk from xcache.
+XrequestChunk \- Send a chunk request.
 .SH SYNOPSIS
 .nf
 .B "#include <xcache.h>"

@@ -1,6 +1,6 @@
 .TH XgetChunkStatus 8 "05 May 2015" "1.0" "XIA Manual Pages"
 .SH NAME
-XgetChunkStatus \- Get status of chunks.
+XgetChunkStatus \- Get status of a chunk.
 .SH SYNOPSIS
 .nf
 .B "#include <xcache.h>"
