@@ -256,11 +256,32 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 
 
 	if (local || loopback) {
+		// New multi-homing implementation, simply use default DAG
+		int rc;
+		char dag[XIA_MAX_DAG_STR_SIZE], fid[XID_LEN];
+		int sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
+		if (sock < 0) {
+			return EAI_SYSTEM;
+		}
+		// Find the default DAG for this system
+		rc = XreadLocalHostAddr(sock, dag, XIA_MAX_DAG_STR_SIZE, fid, XID_LEN);
+		Graph g_localhost(dag);
+		Xclose(sock);
+		if (rc < 0) {
+			return EAI_SYSTEM;
+		}
+		Graph g = g_localhost;
+		// Append the SID to it if one was provided
+		if (service)
+			g = g * Node(stype, sname);
+
+		g.fill_sockaddr(&sa);
+
+		/*
 		// user wants the name of the local system for binding to a suocket to be used in accept calls
 
-		/* NOTE: this code needs to be modified if we ever have the concept of INADDR_ANY or multiple interfaces or names for a host in XIA
-		** at some point in the future local and loopback may require different code
-		*/
+		// NOTE: this code needs to be modified if we ever have the concept of INADDR_ANY or multiple interfaces or names for a host in XIA
+		// at some point in the future local and loopback may require different code
 
 		char dag[XIA_MAX_DAG_STR_SIZE], fid[XID_LEN];
 		//char rv_ad[XID_LEN], rv_hid[XID_LEN], rv_sid[XID_LEN];
@@ -291,9 +312,8 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 			return EAI_SYSTEM;
 		}
 
-		/* check the 4id and if it's correct, look at the last 8 chars to find the ip address
-		** if they are 0.0.0.0 or 127.0.0.1, we can ignore the 4id as it's local only
-		*/
+		// check the 4id and if it's correct, look at the last 8 chars to find the ip address
+		// if they are 0.0.0.0 or 127.0.0.1, we can ignore the 4id as it's local only
 		int have4id = 0;
 
 		if (checkXid(fid, "IP:")) {
@@ -321,12 +341,10 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 				printf("Rendezvous DAG:\n%s\n", rvg.dag_string().c_str());
 				Graph g3 = g2 * rvg * (n_hid);
 				printf("Rendezvous Fallback:\n%s\n", g3.dag_string().c_str());
-				/*
-				Node n_rvad = Node(rv_ad);
-				Node n_rvhid = Node(rv_hid);
-				Node n_rvsid = Node(rv_sid);
-				Graph g2 = (n_src * n_ad * n_rvad * n_rvhid * n_rvsid * n_hid);
-				*/
+				//Node n_rvad = Node(rv_ad);
+				//Node n_rvhid = Node(rv_hid);
+				//Node n_rvsid = Node(rv_sid);
+				//Graph g2 = (n_src * n_ad * n_rvad * n_rvhid * n_rvsid * n_hid);
 				g = g + g3;
 				printf("DAG after adding RV:\n%s\n", g.dag_string().c_str());
 			}
@@ -344,6 +362,7 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 			g = g * Node(stype, sname);
 
 		g.fill_sockaddr(&sa);
+		*/
 
 	} else if (!havename) {
 		slen = sizeof(sa);
