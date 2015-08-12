@@ -3730,20 +3730,30 @@ void XTRANSPORT::Xgethostname(unsigned short _sport, xia::XSocketMsg *xia_socket
 }
 
 
+void XTRANSPORT::_add_ifaddr(xia::X_GetIfAddrs_Msg *_msg, int interface)
+{
+	char iface_name[16];
+
+	sprintf(iface_name, "iface%d", interface);
+	xia::X_GetIfAddrs_Msg::IfAddr *ifaddr = _msg->add_ifaddrs();
+	ifaddr->set_iface_name(iface_name);
+	ifaddr->set_flags(0);
+	ifaddr->set_src_addr_str(_interfaces.getDAG(interface).c_str());
+	ifaddr->set_dst_addr_str(_interfaces.getDAG(interface).c_str());
+}
 
 void XTRANSPORT::Xgetifaddrs(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
 	xia::X_GetIfAddrs_Msg *_msg = xia_socket_msg->mutable_x_getifaddrs();
+
+	// Add the default interface first
+	_add_ifaddr(_msg, _interfaces.default_interface());
 	// Read the _interfaces table
 	for(int i=0; i<_interfaces.size(); i++) {
-		char iface_name[16];
-		sprintf(iface_name, "iface%d", i);
-		// Return a packet with info about all known interfaces
-		xia::X_GetIfAddrs_Msg::IfAddr *ifaddr = _msg->add_ifaddrs();
-		ifaddr->set_iface_name(iface_name);
-		ifaddr->set_flags(0);
-		ifaddr->set_src_addr_str(_interfaces.getDAG(i).c_str());
-		ifaddr->set_dst_addr_str(_interfaces.getDAG(i).c_str());
+		if(i == _interfaces.default_interface()) {
+			continue;
+		}
+		_add_ifaddr(_msg, i);
 	}
 	ReturnResult(_sport, xia_socket_msg);
 }

@@ -384,6 +384,7 @@ protected:
 	static String Netstat(Element *e, void *thunk);
 	static int purge(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
 	int IfaceFromSIDPath(XIAPath sidPath);
+	void _add_ifaddr(xia::X_GetIfAddrs_Msg *_msg, int interface);
 
 	// modify routing table
 	void addRoute(const XID &sid) {
