@@ -299,28 +299,30 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 
 
 	if (local || loopback) {
-		// New multi-homing implementation, simply use default DAG
-		char dag[XIA_MAX_DAG_STR_SIZE], fid[XID_LEN];
+		// New multi-homing implementation, return DAGs for all interfaces
 		int sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
 		if (sock < 0) {
 			return EAI_SYSTEM;
 		}
-		// Find the default DAG for this system
-		rc = XreadLocalHostAddr(sock, dag, XIA_MAX_DAG_STR_SIZE, fid, XID_LEN);
-		Graph g_localhost(dag);
-		Xclose(sock);
-		if (rc < 0) {
+		// Read DAGs for all system interfaces
+		struct ifaddrs *ifaddr, *ifa;
+		if(Xgetifaddrs(&ifaddr)) {
 			return EAI_SYSTEM;
 		}
-		Graph g = g_localhost;
-		// Append the SID to it if one was provided
-		if (service)
-			g = g * Node(stype, sname);
-
-		g.fill_sockaddr(&sa);
-		if((rc =_append_addrinfo(pai, sa, socktype, protocol, cname)) != 0) {
-			return rc;
+		// Add a DAG for each interface to the results in pai
+		for(ifa=ifaddr; ifa!=NULL; ifa=ifa->ifa_next) {
+			sockaddr_x *iface_dag = (sockaddr_x *)ifa->ifa_addr;
+			Graph g(iface_dag);
+			if(service) {
+				g = g * Node(stype, sname);
+			}
+			g.fill_sockaddr(&sa);
+			if((rc =_append_addrinfo(pai, sa, socktype, protocol, cname)) != 0) {
+				Xfreeifaddrs(ifaddr);
+				return rc;
+			}
 		}
+		Xfreeifaddrs(ifaddr);
 
 		/*
 		// user wants the name of the local system for binding to a suocket to be used in accept calls
