@@ -112,6 +112,49 @@ int XreadRVServerControlAddr(char *rv_dag_str, int rvstrlen)
 	return ret;
 }
 
+int _append_addrinfo(struct addrinfo **pai, sockaddr_x sa, int socktype, int protocol, int cname)
+{
+	struct addrinfo *ai = NULL;
+	// allocate memory needed
+	ai = (struct addrinfo *)calloc(sizeof(struct addrinfo), 1);
+	sockaddr_x *psa = (sockaddr_x *)calloc(sizeof(sockaddr_x), 1);
+	if (!ai || !psa) {
+		if (ai)
+			free(ai);
+		return EAI_MEMORY;
+	}
+	memcpy(psa, &sa, sizeof(sa));
+
+	// fill in the blanks
+
+	ai->ai_family    = AF_XIA;
+	ai->ai_socktype  = socktype;
+	ai->ai_protocol  = protocol;
+	ai->ai_flags     = 0;
+	ai->ai_addr      = (struct sockaddr *)psa;
+	ai->ai_addrlen   = sizeof(sockaddr_x);
+	ai->ai_next      = NULL;	// this addrinfo will be added to end of list
+
+	if (cname) {
+		// FIXME: should we allocate a copy of the dag string in this case?
+		ai->ai_canonname = NULL;
+	}
+
+	// If the list is empty, simply add this addrinfo and return
+	if(*pai == NULL) {
+		*pai = ai;
+		return 0;
+	}
+	// If the list was not empty, walk to the end of the list
+	struct addrinfo *listptr = *pai;
+	while(listptr->ai_next != NULL) {
+		listptr = listptr->ai_next;
+	}
+	// Append this addrinfo as the next element in the list
+	listptr->ai_next = ai;
+	return 0;
+}
+
 /*
 ** NOTE: although we currently check them, we don't use the protocol or socktype fields of the hints structure.
 **  they are just checked to make sure no IPv4 code slips past us by mistake.
@@ -119,7 +162,7 @@ int XreadRVServerControlAddr(char *rv_dag_str, int rvstrlen)
 
 int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *hints, struct addrinfo **pai)
 {
-	struct addrinfo *ai = NULL;
+	int rc;
 	sockaddr_x sa;
 	socklen_t slen;
 	char sname[41];
@@ -257,7 +300,6 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 
 	if (local || loopback) {
 		// New multi-homing implementation, simply use default DAG
-		int rc;
 		char dag[XIA_MAX_DAG_STR_SIZE], fid[XID_LEN];
 		int sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
 		if (sock < 0) {
@@ -276,6 +318,9 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 			g = g * Node(stype, sname);
 
 		g.fill_sockaddr(&sa);
+		if((rc =_append_addrinfo(pai, sa, socktype, protocol, cname)) != 0) {
+			return rc;
+		}
 
 		/*
 		// user wants the name of the local system for binding to a suocket to be used in accept calls
@@ -379,6 +424,9 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 			}
 			g = g * Node(stype, sname);
 			g.fill_sockaddr(&sa);
+			if((rc =_append_addrinfo(pai, sa, socktype, protocol, cname)) != 0) {
+				return rc;
+			}
 		}
 
 	} else {
@@ -394,34 +442,10 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 			g = g * Node(stype, sname);
 
 		g.fill_sockaddr(&sa);
+		if((rc =_append_addrinfo(pai, sa, socktype, protocol, cname)) != 0) {
+			return rc;
+		}
 	}
-
-	// allocate memory needed
- 	ai = (struct addrinfo *)calloc(sizeof(struct addrinfo), 1);
- 	sockaddr_x *psa = (sockaddr_x *)calloc(sizeof(sockaddr_x), 1);
-	if (!ai || !psa) {
-		if (ai)
-			free(ai);
-		return EAI_MEMORY;
-	}
-	memcpy(psa, &sa, sizeof(sa));
-
-	// fill in the blanks
-
-	ai->ai_family    = AF_XIA;
-	ai->ai_socktype  = socktype;
-	ai->ai_protocol  = protocol;
-	ai->ai_flags     = 0;
-	ai->ai_addr      = (struct sockaddr *)psa;
-	ai->ai_addrlen   = sizeof(sockaddr_x);
-	ai->ai_next      = NULL;	// this could change in the future at least for local lookups if multiple interfaces are present
-
-	if (cname) {
-		// FIXME: should we allocate a copy of the dag string in this case?
-		ai->ai_canonname = NULL;
-	}
-
-	*pai = ai;
 
 	return 0;
 }
