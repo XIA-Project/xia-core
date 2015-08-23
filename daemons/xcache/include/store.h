@@ -2,6 +2,7 @@
 #define __STORE_H__
 
 #include <iostream>
+#include <sys/types.h>
 
 class xcache_meta;
 
@@ -44,6 +45,21 @@ public:
 	virtual std::string get(xcache_meta *meta) {
 		/* Ignoring compiler error for unused attribute */
 		(void)meta;
+
+		return NULL;
+	};
+
+	/**
+	 * This get only reads a chunk partially.
+	 * @param meta: Key
+	 * @returns data: Actual data. The store should read the content in memory as
+	 *                a std::string and then pass it back to the storeManager.
+	 */
+	virtual std::string get_partial(xcache_meta *meta, off_t off, size_t len) {
+		/* Ignoring compiler error for unused attribute */
+		(void)meta;
+		(void)off;
+		(void)len;
 
 		return NULL;
 	};

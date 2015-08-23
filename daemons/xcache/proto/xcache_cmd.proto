@@ -2,15 +2,18 @@
 
 message xcache_cmd {
 	enum req_type {
-		XCACHE_STORE = 1;
-		XCACHE_NEWSLICE = 2;
-		XCACHE_GETCHUNK = 3;
-		XCACHE_REQUESTCHUNK = 4;
-		XCACHE_TIMEOUT = 5;
-		XCACHE_CLEAR = 6;
-		XCACHE_RESPONSE = 7;
-		XCACHE_ERROR = 8;
-		XCACHE_GET_STATUS = 9;
+		XCACHE_FLAG_NOTIFSOCK = 1;
+		XCACHE_FLAG_DATASOCKET = 2;
+		XCACHE_ALLOC_CONTEXT = 3;
+		XCACHE_STORE = 4;
+		XCACHE_NEWSLICE = 5;
+		XCACHE_FETCHCHUNK = 7;
+		XCACHE_TIMEOUT = 8;
+		XCACHE_CLEAR = 9;
+		XCACHE_RESPONSE = 10;
+		XCACHE_ERROR = 11;
+		XCACHE_GET_STATUS = 12;
+		XCACHE_READ = 13;
 	};
 
 	enum status_type {
@@ -27,5 +30,14 @@ message xcache_cmd {
 	optional int32 ttl = 6;
 	optional int32 cache_size = 7;
 	optional int32 cache_policy = 8;
-	optional status_type status = 9;
+	optional int32 flags = 9;
+	optional status_type status = 10;
+	optional int32 readoffset = 11;
+	optional int32 readlen = 12;
+	optional bytes msg = 13;
+};
+
+message xcache_notif {
+	required int32 cmd = 1;
+	optional bytes dag = 2;
 };

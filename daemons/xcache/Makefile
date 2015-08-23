@@ -9,7 +9,7 @@ CLICKDIR=$(XIADIR)/click-2.0.1/
 CLICKINCLUDE=$(CLICKDIR)/include
 
 CFLAGS+=-g -I$(CLICKINCLUDE) -I$(XCACHEDIR)/common -I$(DAEMONS_COMMON_INCLUDE) -I$(XCACHEDIR)/include -I$(XCACHEDIR)/bin -I$(XCACHEDIR) -I$(XCACHEDIR)/proto -Wall -Werror
-LDFLAGS= $(LIBS) -lpthread -lssl -lcrypto
+LDFLAGS= -lXsocket -lpthread -lssl -lcrypto -ldagaddr
 XCACHE_BINDIR=$(XCACHEDIR)/bin/
 DAEMONS_COMMON=$(DAEMONS_COMMON_PATH)/csclient.o $(DAEMONS_COMMON_PATH)/XIARouter.o
 

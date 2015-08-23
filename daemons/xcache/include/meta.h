@@ -10,6 +10,7 @@
 #include "xcache_cmd.pb.h"
 #include <unistd.h>
 
+
 class xcache_slice;
 
 class xcache_meta {
@@ -72,6 +73,11 @@ public:
 	 * Actually read the content.
 	 */
 	std::string get(void);
+
+	/**
+	 * Actually read the content.
+	 */
+	std::string get(off_t off, size_t len);
 
 	/**
 	 * Actually read the content.

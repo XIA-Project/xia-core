@@ -8,7 +8,9 @@
 #include "store_manager.h"
 #include "XIARouter.hh"
 #include "cache.h"
+#include "dagaddr.hpp"
 #include <errno.h>
+#include "api/xcache.h"
 
 struct xcache_conf {
 	char hostname[128];
@@ -16,6 +18,7 @@ struct xcache_conf {
 
 class xcache_controller {
 private:
+#define MAX_XID_SIZE 100
 	pthread_mutex_t meta_map_lock;
 
 	/**
@@ -24,9 +27,9 @@ private:
 	std::map<std::string, xcache_meta *> meta_map;	
 
 	/**
-	 * Map of slices.
+	 * Map of contexts.
 	 */
-	std::map<int32_t, xcache_slice *> slice_map;
+	std::map<uint32_t, struct xcache_context *> context_map;
 
 	/**
 	 * Hostname while running on localhost.
@@ -34,14 +37,9 @@ private:
 	std::string hostname;
 
 	/**
-	 * Allocate a new slice.
+	 * Lookup a context based on context ID.
 	 */
-	int new_slice(xcache_cmd *, xcache_cmd *);
-
-	/**
-	 * Lookup a slice based on context ID.
-	 */
-	xcache_slice *lookup_slice(int);
+	struct xcache_context *lookup_context(int);
 
 	/**
 	 * Manages various content stores.
@@ -54,23 +52,17 @@ private:
 	int context_id;
 
 public:
+	char myAD[MAX_XID_SIZE];
+	char myHID[MAX_XID_SIZE];
+	char my4ID[MAX_XID_SIZE];
 	/**
 	 * A Constructor.
 	 * FIXME: What do we need to do in the constructor?
 	 */
 	xcache_controller() {
-		xcache_slice *slice = new xcache_slice(0);
-
-#define DEFAULT_SLICE_TTL 10000
-#define DEFAULT_SLICE_SIZE 2000000
-
-		slice->set_ttl(DEFAULT_SLICE_TTL);
-		slice->set_ttl(DEFAULT_SLICE_SIZE);
-		slice_map[0] = slice;
 		hostname.assign("host0");
 		pthread_mutex_init(&meta_map_lock, NULL);
-		
-		context_id = 1;
+		context_id = 0;
 	}
 
 	/**
@@ -79,6 +71,7 @@ public:
 	 * and then sends appropriate content chunk to the receiver
 	 */
 	static void *start_xcache(void *);
+	static void send_content_remote(xcache_controller *ctrl, int sock, sockaddr_x *mypath);
 
 
 	/**
@@ -94,20 +87,23 @@ public:
 	 * On reception of XgetChunk API, this function _MAY_ be invoked. If the
 	 * chunk is found locally, then no need to fetch from remote.
 	 */
-	int fetch_content_remote(xcache_cmd *, xcache_cmd *);
+	int fetch_content_remote(sockaddr_x *addr, socklen_t addrlen, xcache_cmd *, xcache_cmd *, int flags);
+	int fetch_content_local(sockaddr_x *addr, socklen_t addrlen, xcache_cmd *, xcache_cmd *, int flags);
+	static void *__fetch_content(void *__args);
+	int xcache_fetch_content(xcache_cmd *resp, xcache_cmd *cmd, int flags);
 
 	/**
-	 * Fetch content locally.
+	 * Chunk reading
 	 */
-	int fetch_content_local(xcache_cmd *, std::string);
+	int chunk_read(xcache_cmd *resp, xcache_cmd *cmd);
 
 	/**
 	 * Handles commands received from the API.
 	 */
-	int handle_cmd(xcache_cmd *, xcache_cmd *);
+	int handle_cmd(int fd, xcache_cmd *, xcache_cmd *);
 
 	/**
-	 * Prints current xcache status (all the metas and slices).
+	 * Prints current xcache status.
 	 */
 	void status(void);
 
@@ -116,6 +112,7 @@ public:
 	 */
 	void run(void);
 
+	/** Xcache Command handlers **/
 	/**
 	 * Searches content locally (for now).
 	 */
@@ -125,65 +122,31 @@ public:
 	 * Stores content locally.
 	 */
 	int store(xcache_cmd *, xcache_cmd *);
+	int __store(struct xcache_context *context, xcache_meta *meta, const std::string *data);
+	int __store_policy(xcache_meta *);
+
+
+	/**
+	 * Allocate a new context.
+	 */
+	int alloc_context(xcache_cmd *resp, xcache_cmd *cmd);
 
 	/**
 	 * Remove content.
 	 */
 	void remove(void);
 
-	xcache_meta *acquire_meta(std::string cid) {
-		lock_meta_map();
-
-		std::map<std::string, xcache_meta *>::iterator i = meta_map.find(cid);
-		if(i == meta_map.end()) {
-			/* We could not find the content locally */
-			unlock_meta_map();
-			return NULL;
-		}
-
-		xcache_meta *meta = i->second;
-		meta->lock();
-
-		return meta;
-	}
-
-	void release_meta(xcache_meta *meta) {
-		unlock_meta_map();
-		if(meta)
-			meta->unlock();
-	}
-
-	inline int lock_meta_map(void) {
-		int rv;
-//		std::cout << getpid() << " LOCKING METAMAP\n";
-		rv = pthread_mutex_lock(&meta_map_lock);
-		if(rv != 0) {
-//			std::cout << "LOCKING FAILED " << errno << "\n";
-		} else {
-//			std::cout << getpid() << " LOCKED METAMAP\n";
-		}
-		return rv;
-	}
-
-	inline int unlock_meta_map(void) {
-		int rv;
-//		std::cout << getpid() << " UNLOCKING METAMAP\n";
-		rv = pthread_mutex_unlock(&meta_map_lock);
-		if(rv != 0) {
-//			std::cout << "UNLOCKING FAILED " << errno << "\n";
-		}
-		return 0;
-	}
+	/** Concurrency control **/
+	xcache_meta *acquire_meta(std::string cid);
+	void release_meta(xcache_meta *meta);
+	inline int lock_meta_map(void);
+	inline int unlock_meta_map(void);
 
 	int register_meta(xcache_meta *);
-
-	int __store(xcache_slice *slice, xcache_meta *meta, const std::string *data);
-
-	void add_meta(xcache_meta *meta) {
-		lock_meta_map();
-		meta_map[meta->get_cid()] = meta;
-		unlock_meta_map();
-	}
+	void add_meta(xcache_meta *meta);
+	int xcache_notify(struct xcache_context *c, sockaddr_x *addr, socklen_t addrlen, int event);
+	std::string addr2cid(sockaddr_x *addr);
+	sockaddr_x cid2addr(std::string cid);
 };
 
 #endif

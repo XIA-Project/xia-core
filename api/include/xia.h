@@ -1,3 +1,4 @@
+
 /*
 ** Copyright 2013 Carnegie Mellon University
 **
@@ -31,6 +32,15 @@
 #define EDGE_UNUSED 127u
 #define XID_SIZE	20
 #define NODES_MAX	20
+
+enum XID_TYPE {
+	XID_TYPE_AD = 0x10,  // TODO: why does swig complain when these are uint32_t?
+	XID_TYPE_HID = 0x11,
+	XID_TYPE_CID = 0x12,
+	XID_TYPE_SID = 0x13,
+	XID_TYPE_IP = 0x14,
+	XID_TYPE_DUMMY_SOURCE = 0xff,
+};
 
 typedef struct {
 	unsigned int  s_type;

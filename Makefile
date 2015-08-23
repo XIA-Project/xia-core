@@ -6,7 +6,8 @@ endif
 
 
 # list of top level directories that need to be built
-MAKEDIRS=click api daemons applications tools
+# FIXME: Temporarily removed applications compilation.
+MAKEDIRS=click api daemons tools
 
 # make sure we run clean in anything we built in
 CLEANDIRS=$(addsuffix .build, $(MAKEDIRS))
@@ -40,6 +41,12 @@ config: xia.mk
 xia.mk: configure
 	@./configure
 
+xia.env:
+	echo "export CC=\"${CC}\"" > xia.env
+	echo "export LD=\"${LD}\"" >> xia.env
+	echo "export LDFLAGS=\"-lstdc++ ${ENV_LDFLAGS}\"" >> xia.env
+	echo "export CFLAGS=\"${CFLAGS}\"" >> xia.env
+	echo "export LD_LIBRARY_PATH=\"${ENV_LD_LIBRARY_PATH}\"" >> xia.env
 
 #### CLEAN RULES
 clean: $(CLEANDIRS)

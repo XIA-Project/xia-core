@@ -26,18 +26,22 @@ BINDIR=\$(XIADIR)/bin
 XCACHEAPIDIR=\$(XIADIR)/daemons/xcache/api
 ETC=\$(XIADIR)/etc
 XLIB=\$(APIDIR)/lib
-XINC=\$(APIDIR)/include \$(XCACHEAPIDIR)
+XINC=\$(APIDIR)/include
+XCACHEINC=\$(XCACHEAPIDIR)
 
 CC=g++
 LD=g++
-CFLAGS=-Wall -Wextra -I\$(XINC)
-LDFLAGS=-lpthread
+CFLAGS=-Wall -Wextra -I\$(XINC) -I\$(XCACHEINC) -L\$(XLIB) -L\$(XCACHEAPIDIR)
+ENV_LD_LIBRARY_PATH+=\$(XLIB):\$(XCACHEAPIDIR)
+ENV_LDFLAGS=-lpthread -lprotobuf
 ifeq (\$(wildcard \$(XLIB)/libXsocket.a),)
 	LIBS=\$(XLIB)/libXsocket.so \$(XLIB)/libdagaddr.so \$(XLIB)/libXssl.so
+	ENV_LDFLAGS+=-lXsocket -ldagaddr -lXssl -lxcache
 else
 	LIBS=\$(XLIB)/libXsocket.a \$(XLIB)/libdagaddr.a \$(XLIB)/libXssl.a -Bstatic -lprotobuf
+	ENV_LDFLAGS+=-lXsocket -ldagaddr -lXssl -lxcache
 endif
-LIBS+=$(XCACHEAPIDIR)/libxcache.a
+LIBS+=\$(XCACHEAPIDIR)/libxcache.a
 
 ifdef DEBUG
 CFLAGS +=-ggdb -DDEBUG

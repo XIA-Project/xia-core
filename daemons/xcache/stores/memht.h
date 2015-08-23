@@ -33,6 +33,11 @@ public:
 		return memht[meta];
 	}
 
+	std::string get_partial(xcache_meta *meta, off_t off, size_t len)
+	{
+		return memht[meta].substr(off, len);
+	}
+
 	void print(void)
 	{
     

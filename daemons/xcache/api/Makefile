@@ -1,7 +1,7 @@
 CC=g++
 AR=ar
 CFLAGS+=-g -I../../click/include/click -shared
-OBJS=XallocCacheSlice.o XgetChunk.o Xinit.o XcacheMain.o Xput.o ../common/xcache_sock.o
+OBJS=XcacheApis.o ../common/xcache_sock.o
 
 lib: $(OBJS)
 	$(AR) -rcs libxcache.a $(OBJS) ../bin/xcache_cmd.pb.o

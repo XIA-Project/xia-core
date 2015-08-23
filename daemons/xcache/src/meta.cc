@@ -15,15 +15,12 @@ xcache_meta::xcache_meta(std::string cid)
 
 std::string xcache_meta::get(void)
 {
-	std::map<uint32_t, xcache_slice *>::iterator i;
-
-	for(i = slice_map.begin(); i != slice_map.end(); ++i) {
-		xcache_slice *slice = i->second;
-
-		slice->get(this);
-	}
-
 	return store->get(this);
+}
+
+std::string xcache_meta::get(off_t off, size_t len)
+{
+	return store->get_partial(this, off, len);
 }
 
 std::string xcache_meta::safe_get(void)

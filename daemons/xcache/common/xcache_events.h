@@ -1,0 +1,10 @@
+#ifndef __XCACHE_EVENTS_H__
+#define __XCACHE_EVENTS_H__
+
+enum {
+	XCE_CHUNKARRIVED = 0,
+	XCE_CHUNKAVAILABLE,
+	XCE_MAX,
+};
+
+#endif

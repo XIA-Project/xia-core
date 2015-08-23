@@ -14,8 +14,98 @@
 ** limitations under the License.
 */
 #include "dagaddr.hpp"
+#include "dagaddr.h"
 #include <stdlib.h>
 #include <cstdio>
+
+const char *get_xid_str(int id);
+void hex2str(char *strdst, size_t strdstlen, unsigned char *hexsrc, size_t hexsrclen);
+
+void print_node(int i, node_t *node)
+{
+	char id[100];
+	int j;
+
+	hex2str(id, 100, node->s_xid.s_id, XID_SIZE);
+	printf("Node[%d] (%s%s)\n\t", i, get_xid_str(node->s_xid.s_type), id);
+	for(j = 0; j < EDGES_MAX; j++) {
+		printf("%d\t",node->s_edge[j]);
+	}
+	printf("\n");
+
+}
+
+void print_sockaddrx(sockaddr_x *addr)
+{
+	int i;
+
+	for(i = 0; i <= addr->sx_addr.s_count; i++) {
+		node_t *node;
+
+		node = &addr->sx_addr.s_addr[i];
+		print_node(i, node);
+	}
+}
+
+void test_c(void)
+{
+	sockaddr_x addr, addr1;
+	char ad[] = "AD:0606060606060606060606060606060606060606";
+	char hid[] = "HID:0101010101010101010101010101010101010101";
+	char cid[] = "CID:0202020202020202020202020202020202020202";
+	char url[256];
+
+	memset(&addr, 0, sizeof(sockaddr_x));
+	// dag_add_nodes(&addr, 3, ad, hid, cid);
+	// dag_set_intent(&addr, 2);
+	// dag_add_path(&addr, 2, 0, 2);
+	// dag_add_path(&addr, 3, 0, 1, 2);
+	memset(&addr, 0, sizeof(sockaddr_x));
+	dag_add_node(&addr, ad);
+	dag_add_node(&addr, hid);
+	dag_add_node(&addr, cid);
+
+	dag_set_intent(&addr, 2);
+
+	dag_add_edge(&addr, 0, 1);
+	dag_add_edge(&addr, 1, 2);
+	dag_set_fallback(&addr, 0);
+
+
+	Graph g1(&addr);
+
+	printf("I have an address which looks like: \n");
+
+	g1.print_graph();
+	printf("Converting to URL\n");
+
+ 	dag_to_url(url, 256, &addr);
+	printf("Got URL from DAG as: %s\n", url);
+
+ 	url_to_dag(&addr1, url, 256);
+	printf("Got Dag from URL. Drawing graph from received Dag\n");
+ 	Graph g(&addr1);
+ 	g.print_graph();
+
+	// Node n_ad(ad);
+	// Node n_hid(hid);
+	// Node n_cid(cid);
+	// Node n_src;
+
+	// Graph g2 = n_src * n_ad * n_hid * n_cid;
+	// Graph g3 = n_src * n_cid;
+
+	// Graph g4 = g3 + g2;
+	// Graph g5 = g2 + g3;
+	// g4.print_graph();
+	// g4.fill_sockaddr(&addr1);
+	// print_sockaddrx(&addr1);
+
+	// g5.print_graph();
+	// g5.fill_sockaddr(&addr1);
+	// print_sockaddrx(&addr1);
+	
+}
 
 int main()
 {
@@ -204,6 +294,8 @@ int main()
 	printf("g14.dag_string().c_str():\n%s\n", g14.dag_string().c_str());
 
 	printf("Testing string parse error checking ^^^\n\n\n");
+
+	test_c();
 
 	return 0;
 }
