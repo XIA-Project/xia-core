@@ -411,12 +411,9 @@ void process_control_message(int controlsock)
 	}
 
 	// Extract AD from DAG
-	int ADstringLength = strlen("AD:") + 40 + 1;
-	char ADstring[ADstringLength];
-	bzero(ADstring, ADstringLength);
-	strncpy(ADstring, strstr(dag, "AD:"), ADstringLength-1);
-	HIDtoAD[hid] = ADstring;
-	syslog(LOG_INFO, "Added %s:%s to table", hid, ADstring);
+	Graph hostaddr(dag);
+	HIDtoAD[hid] = hostaddr.intent_AD_str();
+	syslog(LOG_INFO, "Added %s:%s to table", hid, dag.intent_AD_str().c_str());
 
 	// Registration message
 	// Extract HID, newAD, timestamp, Signature, Pubkey
