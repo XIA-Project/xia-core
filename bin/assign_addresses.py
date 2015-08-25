@@ -140,7 +140,7 @@ def configure_click(click, config):
                 # If nameserver running on this router, assign it a dag
                 # NOTE: Even the nameserver gets RV DAG, if available
                 if hostname in ns_hosts:
-                    resolvconf_lines.append('nameserver=%s %s\n' % (router_dag, ns_sid))
+                    resolvconf_lines.append('nameserver=%s %s' % (router_dag, ns_sid))
 
                 # Finally, assign the DAG for this router in Click
                 click.assignDAG(hostname, hosttype, router_dag)
@@ -150,7 +150,7 @@ def configure_click(click, config):
             # TODO: error out if a dag is not available for hostname
             with open(resolvconfpath, 'w') as resolvconf:
                 for line in resolvconf_lines:
-                    resolvconf.write(line)
+                    resolvconf.write('%s\n' % line)
 
 if __name__ == "__main__":
     # If address.conf doesn't exist create it
