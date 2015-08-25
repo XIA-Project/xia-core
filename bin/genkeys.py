@@ -57,12 +57,19 @@ def create_new_AD():
 def create_new_HID():
 	return 'HID:' + create_new_address()
 
+def create_new_SID():
+	return 'SID:' + create_new_address()
+
 def delete_AD(ad):
 	adstr, xid = ad.split(':')
 	remove_key_files(xid)
 
 def delete_HID(hid):
 	hidstr, xid = hid.split(':')
+	remove_key_files(xid)
+
+def delete_SID(sid):
+	sidstr, xid = sid.split(':')
 	remove_key_files(xid)
 
 def pubkey_hash(pubkey):

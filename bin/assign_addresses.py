@@ -33,7 +33,6 @@ ns_sid = 'SID:1110000000000000000000000000000000001113'
 
 # We create resolv.conf in the same directory as address.conf
 resolvconfpath = os.path.join(os.path.dirname(addressconf), 'resolv.conf')
-router_dags = {}
 
 # Patterns to look for in config files
 
@@ -41,15 +40,27 @@ router_dags = {}
 # e.g. host0 XIAEndHost (HID:<cryptoHID>)
 addrconfpattern = re.compile('^(\w+)\s+(\w+)\s+\((.+)\)')
 nspattern = re.compile('^(\w+)\s+nameserver')
+rvpattern = re.compile('^(\w+)\s+rendezvous\s+(.+)\s+(.+)')
 
 # e.g. "host0    XIAEndHost"
 nodeconfpattern = re.compile('^(\w+)\s+(\w+)')
 
-# Assign ADs and HIDs for routers and just HIDs for hosts
+# Assign XIDs as needed for RV, Routers etc.
+# NS:     <hostname> nameserver
+# RV:     <hostname> rendezvous (<rv_SID> <rvc_SID>)
+# Router: <hostname> <hosttype> (AD:<new_AD> HID:<new_HID>)
+# Host:   <hostname> <hosttype> (HID:<new_HID>)
 def assign_xids(outfile, hostname, hosttype):
     # Nameserver entry has no args
     if hosttype == 'nameserver':
         outfile.write('%s %s\n' % (hostname, hosttype))
+        return
+
+    # Rendezvous entry has no args
+    if hosttype == 'rendezvous':
+        rv_sid = genkeys.create_new_SID()
+        rvc_sid = genkeys.create_new_SID()
+        outfile.write('%s %s %s %s\n' % (hostname, hosttype, rv_sid, rvc_sid))
         return
 
     # All other host/router entries have arguments in parentheses
@@ -62,45 +73,84 @@ def assign_xids(outfile, hostname, hosttype):
     # Assign the same HID for every interface this host has
     hid = genkeys.create_new_HID()
     outfile.write(hid)
-    #for i in range(clickcontrol.numIfaces[hosttype]):
-        #outfile.write(' %s' % hid)
 
     # Completed writing the address.conf
     outfile.write(')\n')
 
 # Read in nodes.conf and write address.conf with new ADs and HIDs
-def process_config(infile, outfile):
+def create_addrconf(infile, outfile):
     for line in infile:
         match = nodeconfpattern.match(line)
         if match:
             assign_xids(outfile, match.group(1), match.group(2))
 
 # Read in address.conf and configure ADs and HIDs in Click elements as needed
+# NOTE: Also creates resolv.conf if RV and/or nameserver running on this router
 def configure_click(click, config):
+    rendezvous_hosts = {}
+    resolvconf_lines = []
+    ns_hosts = []
+
+    # First pass - look for rendezvous entries
+    for line in config:
+        match = rvpattern.match(line)
+        if match:
+            hostname = match.group(1)
+            rv_sid = match.group(2)
+            rvc_sid = match.group(3)
+            rendezvous_hosts[hostname] = (rv_sid, rvc_sid)
+        match = nspattern.match(line)
+        if match:
+            hostname = match.group(1)
+            ns_hosts.append(hostname)
+
+    # Second pass - look for host, router and nameserver entries
+    # NOTE: Assumes nameserver line is after all router lines in address.conf
+    config.seek(0)
     for line in config:
         ad = None
+
         # Read in XIA host addresses from address.conf
         match = addrconfpattern.match(line)
         if match:
             hostname = match.group(1)
             hosttype = match.group(2)
             hid = match.group(3)
+
             # Routers have AD and HID in their arguments
             if 'Router' in hosttype:
                 ad, hid = hid.split(' ')
+
             # Assign HID to this host
             click.assignHID(hostname, hosttype, hid)
-            # Assign AD to routers
+
+            # Assign DAG to routers
             if ad:
                 router_dag = 'RE %s %s' % (ad, hid)
+
+                # If rendezvous chosen, assign a fallback also
+                if hostname in rendezvous_hosts:
+                    rv_sid, rvc_sid = rendezvous_hosts[hostname]
+                    rv_fallback = '%s %s %s' % (ad, hid, rv_sid)
+                    rvc_dag = 'RE %s %s %s' % (ad, hid, rvc_sid)
+                    router_dag = 'RE (%s) %s %s' % (rv_fallback, ad, hid)
+                    resolvconf_lines.append('rendezvous=RE %s' % (rv_fallback))
+                    resolvconf_lines.append('rendezvousc=%s' % (rvc_dag))
+
+                # If nameserver running on this router, assign it a dag
+                # NOTE: Even the nameserver gets RV DAG, if available
+                if hostname in ns_hosts:
+                    resolvconf_lines.append('nameserver=%s %s\n' % (router_dag, ns_sid))
+
+                # Finally, assign the DAG for this router in Click
                 click.assignDAG(hostname, hosttype, router_dag)
-                router_dags[hostname] = router_dag
-        # Write resolv.conf if nameserver runs here
-        match = nspattern.match(line)
-        if match:
+
+        # Write resolv.conf contents
+        if len(resolvconf_lines) > 0:
             # TODO: error out if a dag is not available for hostname
             with open(resolvconfpath, 'w') as resolvconf:
-                resolvconf.write('nameserver=%s %s\n' % (router_dags[hostname], ns_sid))
+                for line in resolvconf_lines:
+                    resolvconf.write(line)
 
 if __name__ == "__main__":
     # If address.conf doesn't exist create it
@@ -109,7 +159,7 @@ if __name__ == "__main__":
         print 'Creating %s' % addressconf
         with open(nodesconf, 'r') as infile:
             with open(addressconf, 'w') as outfile:
-                process_config(infile, outfile)
+                create_addrconf(infile, outfile)
     else:
         print 'Using existing addresses from %s' % addressconf
 
