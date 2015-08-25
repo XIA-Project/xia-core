@@ -133,7 +133,7 @@ def configure_click(click, config):
                     rv_sid, rvc_sid = rendezvous_hosts[hostname]
                     rv_fallback = '%s %s %s' % (ad, hid, rv_sid)
                     rvc_dag = 'RE %s %s %s' % (ad, hid, rvc_sid)
-                    router_dag = 'RE (%s) %s %s' % (rv_fallback, ad, hid)
+                    router_dag = 'RE ( %s ) %s %s' % (rv_fallback, ad, hid)
                     resolvconf_lines.append('rendezvous=RE %s' % (rv_fallback))
                     resolvconf_lines.append('rendezvousc=%s' % (rvc_dag))
 
