@@ -1,0 +1,43 @@
+/* Protocol between libxsocket and Xcache */
+
+message xcache_cmd {
+	enum req_type {
+		XCACHE_FLAG_NOTIFSOCK = 1;
+		XCACHE_FLAG_DATASOCKET = 2;
+		XCACHE_ALLOC_CONTEXT = 3;
+		XCACHE_STORE = 4;
+		XCACHE_NEWSLICE = 5;
+		XCACHE_FETCHCHUNK = 7;
+		XCACHE_TIMEOUT = 8;
+		XCACHE_CLEAR = 9;
+		XCACHE_RESPONSE = 10;
+		XCACHE_ERROR = 11;
+		XCACHE_GET_STATUS = 12;
+		XCACHE_READ = 13;
+	};
+
+	enum status_type {
+		XCACHE_OK = 1;
+		XCACHE_ERR_EXISTS = 2;
+	};
+  
+	required req_type cmd = 1;
+
+	optional int32 context_id = 2;
+	optional bytes cid = 3;
+	optional bytes dag = 4;
+	optional bytes data = 5;
+	optional int32 ttl = 6;
+	optional int32 cache_size = 7;
+	optional int32 cache_policy = 8;
+	optional int32 flags = 9;
+	optional status_type status = 10;
+	optional int32 readoffset = 11;
+	optional int32 readlen = 12;
+	optional bytes msg = 13;
+};
+
+message xcache_notif {
+	required int32 cmd = 1;
+	optional bytes dag = 2;
+};

@@ -213,13 +213,23 @@ void __InitXSocket::read_conf(const char *inifile, const char *section_name)
 	if (ini_gets(section_name, "host", "", host, sizeof(host), inifile) > 0) {
 		// local ini file specified a host entry in the master
 		// look for the specified host entry in the master conf file, and return the default port if not found
-		ini_gets(host, "click_port", DEFAULT_CLICKPORT, _conf.click_port, __PORT_LEN , __XSocketConf::master_conf);
+		ini_gets(host, "click_port", DEFAULT_CLICKPORT, _conf.click_port, \
+				 __PORT_LEN , __XSocketConf::master_conf);
+		ini_gets(host, "cache_in_port", DEFAULT_CACHE_IN_PORT, _conf.cache_in_port, \
+				 __PORT_LEN , __XSocketConf::master_conf);
+		ini_gets(host, "cache_out_port", DEFAULT_CACHE_OUT_PORT, _conf.cache_out_port, \
+				 __PORT_LEN , __XSocketConf::master_conf);
 
 	} else if (ini_gets(section_name, "click_port", "", _conf.click_port, __PORT_LEN , inifile) == 0) {
 		// look for a port entry under the section specified in the local ini file
 		// if not found, look for that section in the master ini file
-		ini_gets(section_name, "click_port", DEFAULT_CLICKPORT, _conf.click_port, __PORT_LEN , __XSocketConf::master_conf);
-  	}
+		ini_gets(section_name, "click_port", DEFAULT_CLICKPORT, _conf.click_port, \
+				 __PORT_LEN , __XSocketConf::master_conf);
+		ini_gets(host, "cache_in_port", DEFAULT_CACHE_IN_PORT, _conf.cache_in_port, \
+				 __PORT_LEN , __XSocketConf::master_conf);
+		ini_gets(host, "cache_out_port", DEFAULT_CACHE_OUT_PORT, _conf.cache_out_port, \
+				 __PORT_LEN , __XSocketConf::master_conf);
+	}
 }
 
 struct __XSocketConf _conf;

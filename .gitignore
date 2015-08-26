@@ -14,7 +14,7 @@ core
 tags
 .tags*
 *.sublime-workspace
-cscope.out
+*cscope*
 *.o.cmd
 *.ko.cmd
 *.ko
@@ -135,3 +135,11 @@ etc/click/templates/dual_stack_router.click
 experiments/planetlab/logs/*.txt
 experiments/planetlab/logs/tunneling
 experiments/planetlab/logs/fourid
+
+# xcache
+bin/xcache
+xcache_cmd_pb2.py
+xftp_basic_client
+xftp_basic_server
+xcache_server
+xcache_client

@@ -1,0 +1,43 @@
+.\" Manpage for nuseradd.
+.TH XopenChunk 8 "05 May 2015" "1.0" "XIA Manual Pages"
+.SH NAME
+XopenChunk \- Open chunk for reading
+.SH SYNOPSIS
+.nf
+.B "#include <xcache.h>"
+.sp
+.BR "int XopenChunk(const char *cid);"
+.BR "int XopenChunks(const char **cids, int nCids);"
+.fi
+
+.SH DESCRIPTION
+.B XopenChunk()
+creates an endpoint for communicating with Xcache daemon and
+associates it with chunk with content identifier as
+.I cid.
+Applications should subsequntly call
+.B XreadChunk(8)
+to start reading the chunk.
+
+.SH RETURN VALUE
+On success, it returns file descriptor of the new, connected socket
+which is available for reading. On failure, -1 is returned and errno
+is set appropriately.
+
+.SH ERRORS
+.B ENOTCONN	
+XcacheSock is not connected.
+
+.B EHOSTDOWN	
+Xcache is not running.
+
+.SH EXAMPLE
+See
+.B XreadChunk(8).
+
+.SH SEE ALSO
+.B "XreadChunk(8)"
+.B "Xget(8)"
+
+.SH AUTHOR
+Harshad Shirwadkar <harshad@cmu.edu>

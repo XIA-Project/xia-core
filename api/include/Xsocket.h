@@ -74,28 +74,6 @@ extern "C" {
 
 #define DEFAULT_CHUNK_SIZE	2000
 
-/* CID cache context */
-typedef struct {
-    int sockfd;
-    int contextID;
-	unsigned cachePolicy;
-    unsigned cacheSize;
-	unsigned ttl;
-} ChunkContext;
-
-typedef struct {
-	int size;
-	char cid[CID_HASH_SIZE + 1];
-	int32_t ttl;
-	struct timeval timestamp;
-} ChunkInfo;
-
-typedef struct {
-	char* cid;
-	size_t cidLen;
-	int status; // 1: ready to be read, 0: waiting for chunk response, -1: failed
-} ChunkStatus;
-
 
 // XIA specific addrinfo flags
 #define XAI_DAGHOST	AI_NUMERICHOST	// if set, name is a dag instead of a generic name string
@@ -132,6 +110,7 @@ typedef struct {
 //Function list
 extern int Xsocket(int family, int transport_type, int protocol);
 extern int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+extern int XacceptAs(int sockfd, struct sockaddr *remote_addr, socklen_t *remote_addrlen, struct sockaddr *addr, socklen_t *addrlen);
 extern int Xaccept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags);
 extern int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 extern int Xconnect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
@@ -149,6 +128,7 @@ extern int Xsend(int sockfd, const void *buf, size_t len, int flags);
 extern int Xfcntl(int sockfd, int cmd, ...);
 extern int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struct timeval *timeout);
 
+#if 0
 extern int XrequestChunk(int sockfd, char* dag, size_t dagLen);
 extern int XrequestChunks(int sockfd, const ChunkStatus *chunks, int numChunks);
 extern int XgetChunkStatus(int sockfd, char* dag, size_t dagLen);
@@ -167,6 +147,7 @@ extern int XputFile(ChunkContext *ctx, const char *fname, unsigned chunkSize, Ch
 extern int XputBuffer(ChunkContext *ctx, const char *, unsigned size, unsigned chunkSize, ChunkInfo **infoList);
 extern int XremoveChunk(ChunkContext *ctx, const char *cid);
 extern void XfreeChunkInfo(ChunkInfo *infoList);
+#endif
 
 extern void set_conf(const char *filename, const char *sectioname);
 extern void print_conf();
@@ -180,6 +161,7 @@ extern int XregisterName(const char *name, sockaddr_x *addr);
 extern int XrendezvousUpdate(const char *hidstr, sockaddr_x *DAG);
 
 extern int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *localhostHID, unsigned lenHID, char *local4ID, unsigned len4ID);
+extern int XsetXcacheSID(int sockfd, char *, unsigned);
 
 /* internal only functions */
 extern int XupdateAD(int sockfd, char *newad, char *new4id);
@@ -200,6 +182,9 @@ extern int checkXid(const char *xid, const char *type);
 
 extern char *XrootDir(char *buf, unsigned len);
 extern void debug(int sock);
+	
+extern int getXcacheInPort(void);
+extern int getXcacheOutPort(void);
 
 #ifdef __cplusplus
 }

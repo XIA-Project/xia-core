@@ -116,6 +116,7 @@ private:
 	XIAPath _local_addr;
 	XID _local_4id;
 	XID _null_4id;
+	XID _xcache_sid;
 	bool _is_dual_stack_router;
 	XIAPath _nameserver_addr;
 
@@ -167,6 +168,7 @@ private:
 			num_migrate_tries = 0;
 			migrate_pkt = NULL;
 			recv_pending = false;
+			xcacheSock = false;
 		}
 
 	/* =========================
@@ -245,6 +247,7 @@ private:
 		HashTable<XID, int> XIDtoStatus;	// Content-chunk request status... 1: waiting to be read, 0: waiting for chunk response, -1: failed
 		HashTable<XID, bool> XIDtoReadReq;	// Indicates whether ReadCID() is called for a specific CID
 		HashTable<XID, WritablePacket*> XIDtoCIDresponsePkt;
+		bool xcacheSock;
 	} ;
 
 protected:
@@ -317,6 +320,7 @@ protected:
 	void Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void XsetXcacheSid(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xupdatenameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xreadnameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xgetpeername(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
@@ -368,6 +372,7 @@ protected:
 	void MigrateFailure(sock *sk);
 	void ScheduleTimer(sock *sk, int delay);
 	void CancelRetransmit(sock *sk);
+	sock *XID2Sock(XID dest_xid);
 
 	static const char *StateStr(SocketState state);
 	static const char *SocketTypeStr(int);
@@ -375,6 +380,8 @@ protected:
 
 	static String Netstat(Element *e, void *thunk);
 	static int purge(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
+
+	XIAPath alterCIDDstPath(XIAPath dstPath);
 
 	// modify routing table
 	void addRoute(const XID &sid) {

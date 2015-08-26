@@ -22,6 +22,8 @@ import genkeys
 from Crypto.PublicKey import RSA
 
 DEFAULT_PORT=1500
+DEFAULT_CACHE_IN_PORT=1501
+DEFAULT_CACHE_OUT_PORT=1502
 create_xia_address_click = False
 
 # Directory where all the keys will be dumped
@@ -43,7 +45,7 @@ permanent_xia_addresses = {
 topology_xia_addresses = {}
 
 def help():
-	print '\nusage: make_sockconf click_conf_file dest_sockconf dest_nodeconf dest_xia_addr_click'
+	print '\nusage: make_sockconf click_conf_file dest_sockconf dest_nodeconf resolv_conf dest_xia_addr_click'
 	print 'creates xsockconf.ini and xnodeconf in the current directory based on the'
 	print 'specified template file\n'
 	sys.exit(-1)
@@ -59,7 +61,7 @@ def create_output_file(name):
 
 # start here
 
-if len(sys.argv) != 5:
+if len(sys.argv) != 6:
 	help()
 
 nshost = None
@@ -95,14 +97,16 @@ except:
 
 sockconf = create_output_file(sys.argv[2])
 sockconf.write('# Generated from %s\n\n' % os.path.basename(sys.argv[1]))
-sockconf.write('[default]\nclick_port=%s\n\n' % DEFAULT_PORT)
+sockconf.write('[default]\nclick_port=%s\n' % DEFAULT_PORT)
+sockconf.write('cache_in_port=%s\n' % DEFAULT_CACHE_IN_PORT)
+sockconf.write('cache_out_port=%s\n\n' % DEFAULT_CACHE_OUT_PORT)
 
 nodeconf = create_output_file(sys.argv[3])
 
 xia_address = None
 if 'topology' in sys.argv[1]:
 	create_xia_address_click = True
-	xia_address = create_output_file(sys.argv[4])
+	xia_address = create_output_file(sys.argv[5])
 	xia_address.write('XIAXIDInfo(\n')
 
 # look for elements of type XIAEndHost, XiaRouter[n]Port, and XIADualRouter[n]Port
@@ -121,10 +125,14 @@ for line in lines:
 	field = 0
 	idfield = 0
 	if element.group() == 'XIAEndHost':
-		field = 2
+		click_port_field = 2
+                cache_in_field = 3
+                cache_out_field = 4
 		idfield = 1
 	else:
-		field = 4
+		click_port_field = 4
+                cache_in_field = 5
+                cache_out_field = 6
 		idfield = 2
 		if xia_address:
 			ad_num = 'AD%d' % next_ad
@@ -138,7 +146,9 @@ for line in lines:
 	fields = fields.split(',')
 	name = name.strip()
 
-	sockconf.write('[%s]\nclick_port=%s\n\n' % (name, fields[field].strip()))
+	sockconf.write('[%s]\nclick_port=%s\n' % (name, fields[click_port_field].strip()))
+	sockconf.write('cache_in_port=%s\n' % (fields[cache_in_field].strip()))
+	sockconf.write('cache_out_port=%s\n\n' % (fields[cache_out_field].strip()))
 	nodeconf.write("%s\t%s\n" % (name, element.group()))
 	if xia_address:
 		dev_name = fields[idfield].strip()
@@ -158,6 +168,6 @@ if create_xia_address_click:
 		xia_address.write('\t' + ' '.join([key, value]) + ',\n')
 	xia_address.write(');\n')
 	xia_address.close()
-	resolv_conf = create_output_file('etc/resolv.conf')
+	resolv_conf = create_output_file(sys.argv[4])
 	resolv_conf.write('nameserver=RE %s %s %s\n' % (topology_xia_addresses['AD0'], topology_xia_addresses['HID0'], permanent_xia_addresses['SID_NS']))
 	resolv_conf.close()

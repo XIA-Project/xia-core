@@ -24,30 +24,10 @@
 #include "Xinit.h"
 #include "Xutil.h"
 #include "dagaddr.hpp"
+#include <iostream>
+#include <stdio.h>
 
-/*!
-** @brief Accept a conection from a remote Xsocket
-**
-** The Xaccept system call is is only valid with Xsockets created with
-** the XSOCK_STREAM transport type. It accepts the first available connection
-** request for the listening socket, sockfd, creates a new connected socket,
-** and returns a new Xsocket descriptor referring to that socket. The newly
-** created socket is not in the listening state. The original socket
-** sockfd is unaffected by this call.
-**
-** @param sockfd	an Xsocket() previously created with the XSOCK_STREAM type,
-** and bound to a local DAG with Xbind()
-** @param addr if non-NULL, points to a block of memory that will contain the
-** address of the peer on return
-** @param addrlen on entry, contains the size of addr, on exit contains the actual
-** size of the address. addr will be truncated, if the size passed in is smaller than
-** the actual size.
-**
-** @returns a non-negative integer that is the new Xsocket id
-** @returns -1 on error with errno set to an error compatible with those
-** returned by the standard accept call.
-*/
-int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
+static int _Xaccept(int sockfd, struct sockaddr *self_addr, socklen_t *self_addrlen, struct sockaddr *addr, socklen_t *addrlen)
 {
 	// Xaccept accepts the connection, creates new socket, and returns it.
 
@@ -124,6 +104,9 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	
 	xia::X_Accept_Msg *x_accept_msg = xsm.mutable_x_accept();
 	x_accept_msg->set_new_port(((struct sockaddr_in)my_addr).sin_port);
+	if (self_addr) {
+		x_accept_msg->set_sendmypath(true);
+	}
 
 	if (click_send(sockfd, &xsm) < 0) {
 		(_f_close)(new_sockfd);
@@ -137,15 +120,16 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		return -1;
 	}
 
+	xia::X_Accept_Msg *msg = xsm.mutable_x_accept();
 	if (addr != NULL && *addrlen >= sizeof(sockaddr_x)) {
 
-		xia::X_Accept_Msg *msg = xsm.mutable_x_accept();
 		Graph g(msg->remote_dag().c_str());
-		g.fill_sockaddr((sockaddr_x*)addr);
+		g.fill_sockaddr((sockaddr_x *)addr);
 
 		if (*addrlen < sizeof(sockaddr_x)) {
 			LOG("addr is not large enough to hold a sockaddr_x");
 		}
+
 
 	} else if (addr) {
 		memset((void*)addr, 0, sizeof(sockaddr_x));
@@ -155,9 +139,48 @@ int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 		*addrlen = sizeof(sockaddr_x);
 	}
 
+	if (msg->has_self_dag() && self_addr && *self_addrlen >= sizeof(sockaddr_x)) {
+		Graph g(msg->self_dag().c_str());
+		g.fill_sockaddr((sockaddr_x *)self_addr);
+	} else if (self_addr) {
+		memset((void *)self_addr, 0, sizeof(sockaddr_x));
+	}
+
 	setConnState(new_sockfd, CONNECTED);
 
 	return new_sockfd;
+}
+
+/*!
+** @brief Accept a conection from a remote Xsocket
+**
+** The Xaccept system call is is only valid with Xsockets created with
+** the XSOCK_STREAM transport type. It accepts the first available connection
+** request for the listening socket, sockfd, creates a new connected socket,
+** and returns a new Xsocket descriptor referring to that socket. The newly
+** created socket is not in the listening state. The original socket
+** sockfd is unaffected by this call.
+**
+** @param sockfd	an Xsocket() previously created with the XSOCK_STREAM type,
+** and bound to a local DAG with Xbind()
+** @param addr if non-NULL, points to a block of memory that will contain the
+** address of the peer on return
+** @param addrlen on entry, contains the size of addr, on exit contains the actual
+** size of the address. addr will be truncated, if the size passed in is smaller than
+** the actual size.
+**
+** @returns a non-negative integer that is the new Xsocket id
+** @returns -1 on error with errno set to an error compatible with those
+** returned by the standard accept call.
+*/
+int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
+{
+	return _Xaccept(sockfd, NULL, NULL, addr, addrlen);
+}
+
+int XacceptAs(int sockfd, struct sockaddr *remote_addr, socklen_t *remote_addrlen, struct sockaddr *addr, socklen_t *addrlen)
+{
+	return _Xaccept(sockfd, remote_addr, remote_addrlen, addr, addrlen);
 }
 
 /*!
@@ -198,7 +221,7 @@ int Xaccept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
 		}
 	}
 
-	int rc = Xaccept(sockfd, addr, addrlen);
+	int rc = _Xaccept(sockfd, NULL, NULL, addr, addrlen);
 
 	if (block == FALSE) {
 		setBlocking(sockfd, FALSE);

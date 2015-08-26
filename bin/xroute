@@ -213,7 +213,7 @@ class RouterConfig:
 			# FIXME: should this be case insensitive?
 			if entry.startswith("XIAXIDInfo"):
 				self.handleXIDs(entry)
-			elif entry.find("/cache ::") > 0:
+			elif entry.find("/xtransport ::") > 0:
 				# hacky way of finding the devices that are configured
 				self.addDevice(entry)
 			else:

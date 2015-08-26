@@ -219,75 +219,75 @@
 
 
 
-/* ===== XputChunk ===== */
-/* The "in" map: python users don't pass a ChunkInfo pointer;
-   we make one here */
-%typemap (in) (unsigned length, ChunkInfo *info)
-{
-    if (!PyInt_Check($input)) {
-        PyErr_SetString(PyExc_ValueError, "Expecting an integer");
-        return NULL;
-    }
+/* /\* ===== XputChunk ===== *\/ */
+/* /\* The "in" map: python users don't pass a ChunkInfo pointer; */
+/*    we make one here *\/ */
+/* %typemap (in) (unsigned length, ChunkInfo *info) */
+/* { */
+/*     if (!PyInt_Check($input)) { */
+/*         PyErr_SetString(PyExc_ValueError, "Expecting an integer"); */
+/*         return NULL; */
+/*     } */
 
-    $1 = (int)PyInt_AsLong($input);
-    $2 = (ChunkInfo*) malloc(sizeof(ChunkInfo));
-}
+/*     $1 = (int)PyInt_AsLong($input); */
+/*     $2 = (ChunkInfo*) malloc(sizeof(ChunkInfo)); */
+/* } */
 
-/* The "out" map: Take the data C put in info and instead returns it as 
-   the Python function's return value. Since this means the caller of the 
-   Python function no longer has access to the C function's return value,
-   the status code, we do an error check here instead. */
-%typemap(argout) (unsigned length, ChunkInfo *info) 
-{
-    Py_XDECREF($result);
-    if (result < 0) {
-        free($2);
-        PyErr_SetFromErrno(PyExc_IOError);
-        return NULL;
-    }
-    $result = SWIG_NewPointerObj(SWIG_as_voidptr($2), SWIGTYPE_p_ChunkInfo, 0 |  0 );
-    free($2);
-}
+/* /\* The "out" map: Take the data C put in info and instead returns it as  */
+/*    the Python function's return value. Since this means the caller of the  */
+/*    Python function no longer has access to the C function's return value, */
+/*    the status code, we do an error check here instead. *\/ */
+/* %typemap(argout) (unsigned length, ChunkInfo *info)  */
+/* { */
+/*     Py_XDECREF($result); */
+/*     if (result < 0) { */
+/*         free($2); */
+/*         PyErr_SetFromErrno(PyExc_IOError); */
+/*         return NULL; */
+/*     } */
+/*     $result = SWIG_NewPointerObj(SWIG_as_voidptr($2), SWIGTYPE_p_ChunkInfo, 0 |  0 ); */
+/*     free($2); */
+/* } */
 
 
-/* ===== XputFile and XputBuffer ===== */
-/* The "in" map: python users don't pass a ChunkInfo list pointer;
-   we make one here */
-%typemap (in) (unsigned chunkSize, ChunkInfo **infoList)
-{
-    if (!PyInt_Check($input)) {
-        PyErr_SetString(PyExc_ValueError, "Expecting an integer");
-        return NULL;
-    }
+/* /\* ===== XputFile and XputBuffer ===== *\/ */
+/* /\* The "in" map: python users don't pass a ChunkInfo list pointer; */
+/*    we make one here *\/ */
+/* %typemap (in) (unsigned chunkSize, ChunkInfo **infoList) */
+/* { */
+/*     if (!PyInt_Check($input)) { */
+/*         PyErr_SetString(PyExc_ValueError, "Expecting an integer"); */
+/*         return NULL; */
+/*     } */
 
-    $1 = (int)PyInt_AsLong($input);
-    $2 = (ChunkInfo**) malloc(sizeof(ChunkInfo*));
-}
+/*     $1 = (int)PyInt_AsLong($input); */
+/*     $2 = (ChunkInfo**) malloc(sizeof(ChunkInfo*)); */
+/* } */
 
 /* The "out" map: Take the data C put in infoList and instead returns it as 
    the Python function's return value. Since this means the caller of the 
    Python function no longer has access to the C function's return value,
    the status code, we do an error check here instead. */
-%typemap(argout) (unsigned chunkSize, ChunkInfo **infoList)
-{
-    Py_XDECREF($result);
-    if (result < 0) {
-        free($2);
-        PyErr_SetFromErrno(PyExc_IOError);
-        return NULL;
-    }
+/* %typemap(argout) (unsigned chunkSize, ChunkInfo **infoList) */
+/* { */
+/*     Py_XDECREF($result); */
+/*     if (result < 0) { */
+/*         free($2); */
+/*         PyErr_SetFromErrno(PyExc_IOError); */
+/*         return NULL; */
+/*     } */
 
-    /* figure out how long list is, and build a python tuple.  */
-    PyObject *chunkInfoTuple = PyTuple_New(result);
-    int i;
-    for (i = 0; i < result; i++) {
-        ChunkInfo *chunkInfo = &(*$2)[i];
-        PyTuple_SetItem(chunkInfoTuple, i, SWIG_NewPointerObj(SWIG_as_voidptr(chunkInfo), SWIGTYPE_p_ChunkInfo, 0 | 0 ));
-    }
+/*     /\* figure out how long list is, and build a python tuple.  *\/ */
+/*     PyObject *chunkInfoTuple = PyTuple_New(result); */
+/*     int i; */
+/*     for (i = 0; i < result; i++) { */
+/*         ChunkInfo *chunkInfo = &(*$2)[i]; */
+/*         PyTuple_SetItem(chunkInfoTuple, i, SWIG_NewPointerObj(SWIG_as_voidptr(chunkInfo), SWIGTYPE_p_ChunkInfo, 0 | 0 )); */
+/*     } */
     
-    $result = chunkInfoTuple;
-    free ($2);
-}
+/*     $result = chunkInfoTuple; */
+/*     free ($2); */
+/* } */
 
 
 
@@ -397,49 +397,49 @@ def Xsendto(sock, data, flags, dest_dag):
     return _c_xsocket.Xsendto(sock, data, len(data), flags, dest_dag)
 %}
 
-/* ===== XgetChunkStatus ===== */
-/* eliminate the need for python users to pass the length of the data or the DAG, 
-   since we can calculate it */
-%pythoncode %{
-def XgetChunkStatus(sock, dag):
-    return _c_xsocket.XgetChunkStatus(sock, dag, len(dag))
-%}
+/* /\* ===== XgetChunkStatus ===== *\/ */
+/* /\* eliminate the need for python users to pass the length of the data or the DAG,  */
+/*    since we can calculate it *\/ */
+/* %pythoncode %{ */
+/* def XgetChunkStatus(sock, dag): */
+/*     return _c_xsocket.XgetChunkStatus(sock, dag, len(dag)) */
+/* %} */
 
-/* ===== XreadChunk ===== */
-/* eliminate the need for python users to pass the length of the data or the DAG, 
-   since we can calculate it */
-%pythoncode %{
-def XreadChunk(sock, length, flags, dag):
-    return _c_xsocket.XreadChunk(sock, length, flags, dag, len(dag))
-%}
+/* /\* ===== XreadChunk ===== *\/ */
+/* /\* eliminate the need for python users to pass the length of the data or the DAG,  */
+/*    since we can calculate it *\/ */
+/* %pythoncode %{ */
+/* def XreadChunk(sock, length, flags, dag): */
+/*     return _c_xsocket.XreadChunk(sock, length, flags, dag, len(dag)) */
+/* %} */
 
-/* ===== XrequestChunk ===== */
-/* eliminate the need for python users to pass the length of the data or the DAG, 
-   since we can calculate it */
-%pythoncode %{
-def XrequestChunk(sock, dag):
-    return _c_xsocket.XrequestChunk(sock, dag, len(dag))
-%}
+/* /\* ===== XrequestChunk ===== *\/ */
+/* /\* eliminate the need for python users to pass the length of the data or the DAG,  */
+/*    since we can calculate it *\/ */
+/* %pythoncode %{ */
+/* def XrequestChunk(sock, dag): */
+/*     return _c_xsocket.XrequestChunk(sock, dag, len(dag)) */
+/* %} */
 
-/* ===== XputBuffer ===== */
-/* eliminate the need for python users to pass the length of the data or the DAG, 
-   since we can calculate it */
-%pythoncode %{
-def XputBuffer(context, data, chunk_size):
-    return _c_xsocket.XputBuffer(context, data, len(data), chunk_size)
-%}
+/* /\* ===== XputBuffer ===== *\/ */
+/* /\* eliminate the need for python users to pass the length of the data or the DAG,  */
+/*    since we can calculate it *\/ */
+/* %pythoncode %{ */
+/* def XputBuffer(context, data, chunk_size): */
+/*     return _c_xsocket.XputBuffer(context, data, len(data), chunk_size) */
+/* %} */
 
-/* ===== XputChunk ===== */
-/* eliminate the need for python users to pass the length of the data or the DAG, 
-   since we can calculate it */
-%pythoncode %{
-def XputChunk(context, data):
-    return _c_xsocket.XputChunk(context, data, len(data))
-%}
+/* /\* ===== XputChunk ===== *\/ */
+/* /\* eliminate the need for python users to pass the length of the data or the DAG,  */
+/*    since we can calculate it *\/ */
+/* %pythoncode %{ */
+/* def XputChunk(context, data): */
+/*     return _c_xsocket.XputChunk(context, data, len(data)) */
+/* %} */
 
 
 /* The next two lines make it possible for python code to pass an
    array of ChunkStatus's or ChunkInfo's to a C function. */
 %include "carrays.i"
-%array_class(ChunkStatus, ChunkStatusArray);
+/* %array_class(ChunkStatus, ChunkStatusArray); */
 /*%array_class(ChunkInfo, ChunkInfoArray);*/

@@ -30,8 +30,14 @@
 #include <openssl/pem.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include "Xsecurity.h"
+//#include "Xsecurity.h"
+#ifndef XIA_SHA_DIGEST_STR_LEN
+#define XIA_SHA_DIGEST_STR_LEN SHA_DIGEST_LENGTH*2+1
+#endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 void sha1_hash_to_hex_string(unsigned char *digest, int digest_len, char *hex_string, int hex_string_len);
 
@@ -44,4 +50,7 @@ int XmakeNewSID(char *randomSID, int randomSIDlen);
 // Check if keys matching the given SID exist
 int XexistsSID(const char *sid);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

@@ -42,6 +42,8 @@ enum XSocketCallType {
   XLISTEN = 32;
 
   XUPDATERV = 33;
+
+  XSETXCACHESID = 34;
 }
 
 message XSocketMsg {
@@ -86,6 +88,7 @@ message XSocketMsg {
 
   optional X_Updaterv_Msg x_updaterv = 33;
   optional X_Listen_Msg x_listen = 34;
+  optional X_SetXcacheSid_Msg x_setxcachesid = 35;
 }
 
 message X_Socket_Msg {
@@ -121,6 +124,8 @@ message X_Accept_Msg {
   optional string dag = 1; // peer's dag
   required uint32 new_port = 2; // the UDP port for the new API socket
   optional string remote_dag = 3;
+  optional bool sendmypath = 4;
+  optional string self_dag = 5;
 }
 
 message X_Sendto_Msg {
@@ -311,3 +316,7 @@ message X_Recvchunkfrom_Msg {
 message X_BindPush_Msg {
   required string sdag = 1; // bind to src dag 
 } 
+
+message X_SetXcacheSid_Msg {
+  optional string sid = 1;
+}
