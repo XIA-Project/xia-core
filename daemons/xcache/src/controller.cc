@@ -481,7 +481,7 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd)
 }
 
 
-void xcache_controller::send_content_remote(xcache_controller *ctrl, int sock, sockaddr_x *mypath)
+void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 {
 	Graph g(mypath);
 	Node cid(g.get_final_intent());
@@ -489,7 +489,7 @@ void xcache_controller::send_content_remote(xcache_controller *ctrl, int sock, s
 
 	LOG_CTRL_INFO("CID = %s\n", cid.id_string().c_str());
 
-	if(ctrl->fetch_content_local(mypath, sizeof(sockaddr_x), &resp, NULL, 0)) {
+	if(fetch_content_local(mypath, sizeof(sockaddr_x), &resp, NULL, 0)) {
 		LOG_CTRL_ERROR("This should not happen.\n");
 	}
 
@@ -521,40 +521,38 @@ void xcache_controller::send_content_remote(xcache_controller *ctrl, int sock, s
 	}
 }
 
-void *xcache_controller::start_xcache(void *arg)
+int xcache_controller::create_sender(void)
 {
-	xcache_controller *ctrl = (xcache_controller *)arg;
 	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
-	int xcache_sock, accept_sock;
+	int xcache_sock;
 	struct addrinfo *ai;
 
 	if((xcache_sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
-		return NULL;
+		return -1;
 
 	if(XreadLocalHostAddr(xcache_sock,
-			      ctrl->myAD, sizeof(ctrl->myAD),
-			      ctrl->myHID, sizeof(ctrl->myHID),
-			      ctrl->my4ID, sizeof(ctrl->my4ID)) < 0)
-		return NULL;
+			      myAD, sizeof(myAD), myHID, sizeof(myHID),
+			      my4ID, sizeof(my4ID)) < 0)
+		return -1;
 
 	if(XmakeNewSID(sid_string, sizeof(sid_string))) {
 		LOG_CTRL_ERROR("XmakeNewSID failed\n");
-		return NULL;
+		return -1;
 	}
 
 	if(XsetXcacheSID(xcache_sock, sid_string, strlen(sid_string)) < 0)
-		return NULL;
+		return -1;
 
 	LOG_CTRL_DEBUG("XcacheSID is %s\n", sid_string);
 
 	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
-		return NULL;
+		return -1;
 
 	sockaddr_x *dag = (sockaddr_x *)ai->ai_addr;
 
 	if (Xbind(xcache_sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
 		Xclose(xcache_sock);
-		return NULL;
+		return -1;
 	}
 
 	Xlisten(xcache_sock, 5);
@@ -562,20 +560,7 @@ void *xcache_controller::start_xcache(void *arg)
 	Graph g(dag);
 	LOG_CTRL_INFO("Listening on dag: %s\n", g.dag_string().c_str());
 
-	while(1) {
-		sockaddr_x mypath;
-		socklen_t mypath_len = sizeof(mypath);
-
-		LOG_CTRL_INFO("XcacheSender waiting for incoming connections\n");
-		if ((accept_sock = XacceptAs(xcache_sock, (struct sockaddr *)&mypath, &mypath_len, NULL, NULL)) < 0) {
-			LOG_CTRL_ERROR("Xaccept failed\n");
-			pthread_exit(NULL);
-		}
-
-		send_content_remote(ctrl, accept_sock, &mypath);
-
- 		Xclose(accept_sock);
-	}
+	return xcache_sock;
 }
 
 int xcache_controller::register_meta(xcache_meta *meta)
@@ -596,8 +581,7 @@ int xcache_controller::register_meta(xcache_meta *meta)
 void xcache_controller::run(void)
 {
 	fd_set fds, allfds;
-	int max, libsocket, rc;
-	pthread_t xcache_sender;
+	int max, libsocket, rc, sendersocket;
 	struct cache_args args;
 
 	std::vector<int> active_conns;
@@ -612,16 +596,17 @@ void xcache_controller::run(void)
 	
 	cache.spawn_thread(&args);
 
-	pthread_create(&xcache_sender, NULL, start_xcache, (void *)this);
-	if ((rc = xr.connect()) != 0) {
+	if((rc = xr.connect()) != 0) {
 		LOG_CTRL_ERROR("Unable to connect to click %d \n", rc);
 		return;
 	}
 
 	xr.setRouter(hostname); 
+	sendersocket = create_sender();
 
 	FD_ZERO(&fds);
 	FD_SET(libsocket, &allfds);
+	FD_SET(sendersocket, &allfds);
 
 	LOG_CTRL_INFO("Entering The Loop\n");
 
@@ -645,6 +630,19 @@ repeat:
 		LOG_CTRL_INFO("Action on libsocket\n");
 		active_conns.push_back(new_connection);
 		FD_SET(new_connection, &allfds);
+	}
+
+	if(FD_ISSET(sendersocket, &fds)) {
+		int accept_sock;
+		sockaddr_x mypath;
+		socklen_t mypath_len = sizeof(mypath);
+
+		if((accept_sock = XacceptAs(sendersocket, (struct sockaddr *)&mypath, &mypath_len, NULL, NULL)) < 0) {
+			LOG_CTRL_ERROR("XacceptAs failed\n");
+		} else {
+			send_content_remote(accept_sock, &mypath);
+			Xclose(accept_sock);
+		}
 	}
 
 	for(iter = active_conns.begin(); iter != active_conns.end(); ) {
@@ -752,4 +750,11 @@ void xcache_controller::add_meta(xcache_meta *meta)
 	lock_meta_map();
 	meta_map[meta->get_cid()] = meta;
 	unlock_meta_map();
+}
+
+void xcache_controller::set_conf(struct xcache_conf *conf)
+{
+	hostname = std::string(conf->hostname);
+
+	threads = (pthread_t *)malloc(sizeof(pthread_t) * conf->threads);
 }

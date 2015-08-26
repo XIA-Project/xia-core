@@ -1,0 +1,36 @@
+#+AUTHOR: Harshad Shirwadkar
+#+EMAIL: harshad@cmu.edu
+#+TITLE: Xcache APIs
+
+* Old Caching APIs and Their Meaning
+** Cache Slices
+   Cache slices are just meant to make content chunks available.
+   :Question: Is it really necessary to allocate a "slice" in order to
+   put a chunk?
+   ->
+   
+** Cache Socket
+   Socket of type "XSOCK_CHUNK" is used to download a chunk(s). 
+
+** Chunk Context
+   Identifies a cache slice.
+
+** Chunk Status
+** Chunk Info
+
+* New APIs
+** Downloading a Chunk
+*** Option 1: Non Blocking
+    - Allocate a chunk socket
+    - Request a chunk
+    - Check if chunk is available
+    - Read chunk
+*** Option 2: Blocking
+    - Allocate a chunk socket
+    - Get a chunk and block until received
+    - Read chunk
+** Publishing a Chunk
+   - Allocate a slice
+   - Publish a chunk in the slice
+   - [Optional] Remove chunk
+   - [Optional] Remove Slice

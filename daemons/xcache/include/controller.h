@@ -12,14 +12,20 @@
 #include <errno.h>
 #include "api/xcache.h"
 
+#define DEFAULT_THREADS 4
+
 struct xcache_conf {
 	char hostname[128];
+	int threads;
 };
 
 class xcache_controller {
 private:
 #define MAX_XID_SIZE 100
 	pthread_mutex_t meta_map_lock;
+
+	int n_threads;
+	pthread_t *threads;
 
 	/**
 	 * Map of metadata.
@@ -70,17 +76,15 @@ public:
 	 * For sending content chunk, this thread keeps on "Accepting" connections
 	 * and then sends appropriate content chunk to the receiver
 	 */
-	static void *start_xcache(void *);
-	static void send_content_remote(xcache_controller *ctrl, int sock, sockaddr_x *mypath);
+	int create_sender(void);
+	void send_content_remote(int sock, sockaddr_x *mypath);
 
 
 	/**
 	 * Configures Xcache.
 	 * Based on command line parameters passed, this function configures xcache.
 	 */
-	void set_conf(struct xcache_conf *conf) {
-		hostname = std::string(conf->hostname);
-	}
+	void set_conf(struct xcache_conf *conf);
 
 	/**
 	 * Fetch content from remote Xcache.

@@ -7,6 +7,7 @@
 
 DEFINE_LOG_MACROS(XCACHE)
 
+
 static char version[] = "0.1";
 
 static void display_version(void)
@@ -54,13 +55,14 @@ int main(int argc, char *argv[])
 {
 	int c;
 	xcache_controller ctrl;
-	struct xcache_conf conf;
+	struct xcache_conf xcache_conf;
 	struct logger_config logger_conf;
 
 	logger_conf.level = 0;
 	logger_conf.mask = LOG_ALL;
+	xcache_conf.threads = DEFAULT_THREADS;
 
-	strcpy(conf.hostname, "router0");
+	strcpy(xcache_conf.hostname, "router0");
 
 	struct option options[] = {
 		{"host", required_argument, 0, 0},
@@ -68,13 +70,14 @@ int main(int argc, char *argv[])
 		{"version", no_argument, 0, 0},
 		{"log_level", required_argument, 0, 0},
 		{"log_mask", required_argument, 0, 0},
+		{"threads", required_argument, 0, 0},
 		{0, 0, 0, 0},
 	};
 
 	while(1) {
 		int option_index = 0;
 
-		c = getopt_long(argc, argv, "vl:m:h:", options, &option_index);
+		c = getopt_long(argc, argv, "vl:m:h:t:", options, &option_index);
 		if(c == -1)
 			break;
 
@@ -82,7 +85,7 @@ int main(int argc, char *argv[])
 		case 0:
 			/* long option passed */
 			if(!strcmp(options[option_index].name, "host")) {
-				sethostname(&conf, optarg);
+				sethostname(&xcache_conf, optarg);
 			} else if(!strcmp(options[option_index].name, "help")) {
 				usage(argv);
 				return 0;
@@ -95,13 +98,16 @@ int main(int argc, char *argv[])
 			} else if(!strcmp(options[option_index].name, "log_mask")) {
 				logger_conf.mask = strtol(optarg, NULL, 0);
 				break;
+			} else if(!strcmp(options[option_index].name, "threads")) {
+				xcache_conf.threads = strtol(optarg, NULL, 0);
+				break;
 			} else {
 				usage(argv);
 				return 1;
 			}
 			break;
 		case 'h':
-			sethostname(&conf, optarg);
+			sethostname(&xcache_conf, optarg);
 			break;
 		case 'l':
 			logger_conf.level = strtol(optarg, NULL, 10);
@@ -112,7 +118,11 @@ int main(int argc, char *argv[])
 		case 'v':
 			display_version();
 			return 0;
+		case 't':
+			xcache_conf.threads = strtol(optarg, NULL, 0);
+			break;
 		default:
+
 			usage(argv);
 			return 1;
 			
@@ -120,7 +130,7 @@ int main(int argc, char *argv[])
 	}
 
 	configure_logger(&logger_conf);
-	ctrl.set_conf(&conf);
+	ctrl.set_conf(&xcache_conf);
 	ctrl.run();
 	return 0;
 }

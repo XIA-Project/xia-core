@@ -6,16 +6,15 @@ XopenChunk \- Open chunk for reading
 .nf
 .B "#include <xcache.h>"
 .sp
-.BR "int XopenChunk(const char *cid, int cidlen);"
+.BR "int XopenChunk(const char *cid);"
+.BR "int XopenChunks(const char **cids, int nCids);"
 .fi
 
 .SH DESCRIPTION
 .B XopenChunk()
 creates an endpoint for communicating with Xcache daemon and
 associates it with chunk with content identifier as
-.I cid
-of length
-.I cidlen.
+.I cid.
 Applications should subsequntly call
 .B XreadChunk(8)
 to start reading the chunk.
