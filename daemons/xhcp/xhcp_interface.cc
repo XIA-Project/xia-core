@@ -26,7 +26,7 @@ XHCPInterface::XHCPInterface(int id=-1, std::string name="",
 		std::string r4id="", std::string ns_dag="");
 		*/
 
-XHCPInterface::XHCPInterface(int id, bool active, std::string name, std::string hid, std::string rdag, std::string rhid, std::string r4id, std::string ns_dag)
+XHCPInterface::XHCPInterface(int id, bool active, std::string name, std::string hid, std::string rdag, std::string rhid, std::string r4id, std::string ns_dag, std::string rvc_dag)
 {
 	_id = id;
 	_active = active;
@@ -36,6 +36,7 @@ XHCPInterface::XHCPInterface(int id, bool active, std::string name, std::string 
 	_router_hid = rhid;
 	_router_4id = r4id;
 	_nameserver_dag = ns_dag;
+	_rv_control_dag = rvc_dag;
 }
 
 XHCPInterface::~XHCPInterface()
@@ -111,6 +112,24 @@ std::string XHCPInterface::getNameServerDAG()
 void XHCPInterface::setNameServerDAG(std::string ns_dag)
 {
 	_nameserver_dag = ns_dag;
+}
+
+bool XHCPInterface::hasRendezvousControlDAG()
+{
+	if(_rv_control_dag.size() > 0) {
+		return true;
+	}
+	return false;
+}
+
+std::string XHCPInterface::getRendezvousControlDAG()
+{
+	return _rv_control_dag;
+}
+
+void XHCPInterface::setRendezvousControlDAG(std::string rvc_dag)
+{
+	_rv_control_dag = rvc_dag;
 }
 
 bool XHCPInterface::isActive()

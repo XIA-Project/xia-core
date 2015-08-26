@@ -375,6 +375,7 @@ int main(int argc, char *argv[]) {
 		bool rhid_changed = false;
 		bool r4id_changed = false;
 		bool ns_changed = false;
+		bool rv_changed = false;
 
 		if(get_beacon(sockfd, &ifID, buf, XIA_MAXBUF)) {
 			syslog(LOG_ERR, "ERROR receiving beacon\n");
@@ -402,6 +403,9 @@ int main(int argc, char *argv[]) {
 			if(iface.getNameServerDAG().compare(beacon.getNameServerDAG())) {
 				ns_changed = true;
 			}
+			if(iface.getRendezvousControlDAG().compare(beacon.getRendezvousControlDAG())) {
+				rv_changed = true;
+			}
 		} else {
 			printf("Creating new entry for interface %d\n", ifID);
 			//TODO:NITIN: setName(), setHID() after getting it from new Xgetifaddrs()
@@ -411,10 +415,12 @@ int main(int argc, char *argv[]) {
 			iface.setRouterHID(beacon.getRouterHID());
 			iface.setRouter4ID(beacon.getRouter4ID());
 			iface.setNameServerDAG(beacon.getNameServerDAG());
+			iface.setRendezvousControlDAG(beacon.getRendezvousControlDAG());
 			network_changed = true;
 			rhid_changed = true;
 			r4id_changed = true;
 			ns_changed = true;
+			rv_changed = true;
 		}
 
 		if(network_changed) {
@@ -484,6 +490,13 @@ int main(int argc, char *argv[]) {
 			printf("Name server for interface %d changed from %s to %s\n", ifID, iface.getNameServerDAG().c_str(), beacon.getNameServerDAG().c_str());
 			iface.setNameServerDAG(beacon.getNameServerDAG());
 		}
+
+		if(rv_changed) {
+			if(XupdateRV(sockfd) < 0) {
+				syslog(LOG_ERR, "Unable to update rendezvous server with new locator");
+			}
+		}
+
 		if(gw_register_countdown-- <= 0) {
 			register_with_gw_router(sockfd, iface.getHID(), network_changed);
 			gw_register_countdown = ceil(XHCP_CLIENT_ADVERTISE_INTERVAL/XHCP_SERVER_BEACON_INTERVAL);

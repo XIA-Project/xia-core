@@ -21,12 +21,13 @@
 #include<syslog.h>
 #include <sstream>
 
-XHCPBeacon::XHCPBeacon(std::string dag, std::string rhid, std::string r4id, std::string ns_dag)
+XHCPBeacon::XHCPBeacon(std::string dag, std::string rhid, std::string r4id, std::string ns_dag, std::string rvc_dag)
 {
 	_dag = dag;
 	_router_hid = rhid;
 	_router_4id = r4id;
 	_nameserver_dag = ns_dag;
+	_rv_control_dag = rvc_dag;
 }
 
 XHCPBeacon::XHCPBeacon(char *buf)
@@ -37,6 +38,7 @@ XHCPBeacon::XHCPBeacon(char *buf)
 	std::getline(ss, _router_hid, ',');
 	std::getline(ss, _router_4id, ',');
 	std::getline(ss, _nameserver_dag, ',');
+	std::getline(ss, _rv_control_dag, ',');
 }
 
 XHCPBeacon::~XHCPBeacon()
@@ -82,12 +84,23 @@ void XHCPBeacon::setNameServerDAG(std::string ns_dag)
 	_nameserver_dag = ns_dag;
 }
 
+std::string XHCPBeacon::getRendezvousControlDAG()
+{
+	return _rv_control_dag;
+}
+
+void XHCPBeacon::setRendezvousControlDAG(std::string rvc_dag)
+{
+	_rv_control_dag = rvc_dag;
+}
+
 bool XHCPBeacon::operator==(const XHCPBeacon& other)
 {
 	if(!_dag.compare(other._dag)) return false;
 	if(!_router_hid.compare(other._router_hid)) return false;
 	if(!_router_4id.compare(other._router_4id)) return false;
 	if(!_nameserver_dag.compare(other._nameserver_dag)) return false;
+	if(!_rv_control_dag.compare(other._rv_control_dag)) return false;
 	return true;
 }
 
@@ -97,6 +110,8 @@ std::string XHCPBeacon::to_string()
 	ss << _dag + ',';
 	ss << _router_hid + ',';
 	ss << _router_4id + ',';
-	ss << _nameserver_dag + ',' << std::endl;
+	ss << _nameserver_dag + ',';
+	ss << _rv_control_dag + ',';
+	ss << std::endl;
 	return ss.str();
 }

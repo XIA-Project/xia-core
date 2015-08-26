@@ -76,6 +76,7 @@ int main(int argc, char *argv[]) {
 	char pkt[XHCP_MAX_PACKET_SIZE];
 	char myDAG[MAX_DAG_SIZE];
 	char gw_router_4id[MAX_XID_SIZE];
+	bool rendezvous = false;
 
 	config(argc, argv);
 	syslog(LOG_NOTICE, "%s started on %s", APPNAME, hostname);
@@ -117,6 +118,12 @@ int main(int argc, char *argv[]) {
 		syslog(LOG_WARNING, "Unable to create socket: %s", strerror(sk));
 	}
 
+	// See if a rendezvous control address is configured
+	char rv_control_plane_dag[XIA_MAX_DAG_STR_SIZE];
+	if(XreadRVServerControlAddr(rv_control_plane_dag, XIA_MAX_DAG_STR_SIZE) == 0) {
+		rendezvous = true;
+	}
+
 	// Broadcast DAG to send beacons out
 	Graph g = Node() * Node(BHID) * Node(SID_XHCP);
 	g.fill_sockaddr(&ddag);
@@ -126,6 +133,10 @@ int main(int argc, char *argv[]) {
 	beacon.setRouterDAG(myDAG);
 	beacon.setRouter4ID(gw_router_4id);
 	beacon.setNameServerDAG(ns);
+	// Note: beacon will have "" or a complete rendezvous dag
+	if (rendezvous) {
+		beacon.setRendezvousControlDAG(rv_control_plane_dag);
+	}
 
 	while (1) {
 		int rc;

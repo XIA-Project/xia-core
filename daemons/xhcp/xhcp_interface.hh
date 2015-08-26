@@ -6,7 +6,8 @@ class XHCPInterface {
 	public:
 		XHCPInterface(int id=-1, bool active=false, std::string name="",
 		        std::string hid="", std::string rdag="", std::string rhid="",
-		        std::string r4id="", std::string ns_dag="");
+		        std::string r4id="", std::string ns_dag="",
+				std::string rvc_dag="");
 		//XHCPInterface(int id, std::string name, std::string hid, std::string ndag, std::string rhid, std::string r4id, std::string ns_dag);
 		~XHCPInterface();
 		int getID();
@@ -16,6 +17,7 @@ class XHCPInterface {
 		std::string getRouterHID();
 		std::string getRouter4ID();
 		std::string getNameServerDAG();
+		std::string getRendezvousControlDAG();
 		void setID(int);
 		void setActive() { _active = true;}
 		void setName(std::string);
@@ -24,6 +26,8 @@ class XHCPInterface {
 		void setRouterHID(std::string);
 		void setRouter4ID(std::string);
 		void setNameServerDAG(std::string);
+		void setRendezvousControlDAG(std::string);
+		bool hasRendezvousControlDAG();
 		bool isActive();
 		bool operator==(const XHCPInterface& other);
 	private:
@@ -35,6 +39,7 @@ class XHCPInterface {
 		std::string _router_hid;
 		std::string _router_4id;
 		std::string _nameserver_dag;
+		std::string _rv_control_dag;
 };
 
 #endif
