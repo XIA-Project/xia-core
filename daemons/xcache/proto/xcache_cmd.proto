@@ -14,6 +14,7 @@ message xcache_cmd {
 		XCACHE_ERROR = 11;
 		XCACHE_GET_STATUS = 12;
 		XCACHE_READ = 13;
+		XCACHE_SENDCHUNK = 14;
 	};
 
 	enum status_type {

@@ -1,7 +1,9 @@
 #ifndef __XCACHE_CONTROLLER_H__
 #define __XCACHE_CONTROLLER_H__
 #include <map>
+#include <queue>
 #include <iostream>
+#include <semaphore.h>
 #include "xcache_cmd.pb.h"
 #include "slice.h"
 #include "meta.h"
@@ -13,16 +15,30 @@
 #include "api/xcache.h"
 
 #define DEFAULT_THREADS 4
+#define MAX_XID_SIZE 100
 
 struct xcache_conf {
 	char hostname[128];
 	int threads;
 };
 
+struct xcache_req {
+	int type;
+
+#define XCFI_REMOVEFD 0x1
+
+	int flags;
+	int from_sock, to_sock;
+	void *data;
+	size_t datalen;
+};
+
 class xcache_controller {
 private:
-#define MAX_XID_SIZE 100
-	pthread_mutex_t meta_map_lock;
+	sem_t req_sem;
+	std::queue<xcache_req *> request_queue;
+	pthread_mutex_t request_queue_lock;
+
 
 	int n_threads;
 	pthread_t *threads;
@@ -36,6 +52,7 @@ private:
 	 * Map of contexts.
 	 */
 	std::map<uint32_t, struct xcache_context *> context_map;
+	pthread_mutex_t meta_map_lock;
 
 	/**
 	 * Hostname while running on localhost.
@@ -68,7 +85,9 @@ public:
 	xcache_controller() {
 		hostname.assign("host0");
 		pthread_mutex_init(&meta_map_lock, NULL);
+		pthread_mutex_init(&request_queue_lock, NULL);
 		context_id = 0;
+		sem_init(&req_sem, 0, 0);
 	}
 
 	/**
@@ -104,7 +123,12 @@ public:
 	/**
 	 * Handles commands received from the API.
 	 */
-	int handle_cmd(int fd, xcache_cmd *, xcache_cmd *);
+	int fast_process_req(int fd, xcache_cmd *, xcache_cmd *);
+
+	void process_req(struct xcache_req *req);
+
+	static void *worker_thread(void *arg);
+	
 
 	/**
 	 * Prints current xcache status.
@@ -151,6 +175,21 @@ public:
 	int xcache_notify(struct xcache_context *c, sockaddr_x *addr, socklen_t addrlen, int event);
 	std::string addr2cid(sockaddr_x *addr);
 	sockaddr_x cid2addr(std::string cid);
+
+	void enqueue_request_safe(xcache_req *req);
+	xcache_req *dequeue_request_safe(void);
+
+	inline int req_sem_wait_safe(void) {
+		while(sem_wait(&req_sem) != 0);
+
+		return 0;
+	}
+
+	inline int req_sem_post_safe(void) {
+		while(sem_post(&req_sem) != 0);
+
+		return 0;
+	}
 };
 
 #endif

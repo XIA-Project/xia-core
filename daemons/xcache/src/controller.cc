@@ -29,6 +29,7 @@ enum {
 	RET_OKSENDRESP = 0,
 	RET_OKNORESP = 1,
 	RET_REMOVEFD = 2,
+	RET_ENQUEUE = 3,
 };
 
 DEFINE_LOG_MACROS(CTRL)
@@ -305,7 +306,7 @@ int xcache_controller::chunk_read(xcache_cmd *resp, xcache_cmd *cmd)
 	return RET_OKSENDRESP;
 }
 
-int xcache_controller::handle_cmd(int fd, xcache_cmd *resp, xcache_cmd *cmd)
+int xcache_controller::fast_process_req(int fd, xcache_cmd *resp, xcache_cmd *cmd)
 {
 	int ret = RET_OKNORESP;
 	xcache_cmd response;
@@ -334,20 +335,12 @@ int xcache_controller::handle_cmd(int fd, xcache_cmd *resp, xcache_cmd *cmd)
 		}
 		break;
 	case xcache_cmd::XCACHE_STORE:
-		LOG_CTRL_INFO("Received Store command\n");
-		ret = store(resp, cmd);
-		break;
 	case xcache_cmd::XCACHE_FETCHCHUNK:
-		LOG_CTRL_INFO("Received Getchunk command\n");
-		ret = xcache_fetch_content(resp, cmd, cmd->flags());
-		break;
-	case xcache_cmd::XCACHE_GET_STATUS:
-		LOG_CTRL_INFO("Received Status command\n");
-		status();
-		break;
 	case xcache_cmd::XCACHE_READ:
-		LOG_CTRL_INFO("Received READ command\n");
-		ret = chunk_read(resp, cmd);
+//		ret = store(resp, cmd);
+//		ret = xcache_fetch_content(resp, cmd, cmd->flags());
+//		ret = chunk_read(resp, cmd);
+		ret = RET_ENQUEUE;
 		break;
 	default:
 		LOG_CTRL_ERROR("Unknown message received\n");
@@ -578,6 +571,86 @@ int xcache_controller::register_meta(xcache_meta *meta)
 	return rv;
 }
 
+void xcache_controller::enqueue_request_safe(xcache_req *req)
+{
+	pthread_mutex_lock(&request_queue_lock);
+	request_queue.push(req);
+	pthread_mutex_unlock(&request_queue_lock);
+
+	while(sem_post(&req_sem) != 0);
+}
+
+xcache_req *xcache_controller::dequeue_request_safe(void)
+{
+	xcache_req *ret;
+
+	while(sem_wait(&req_sem) != 0);
+
+	pthread_mutex_lock(&request_queue_lock);
+	ret = request_queue.front();
+	request_queue.pop();
+	pthread_mutex_unlock(&request_queue_lock);
+
+	return ret;
+}
+
+void xcache_controller::process_req(xcache_req *req)
+{
+	xcache_cmd resp, *cmd;
+	int ret;
+	std::string buffer;
+
+	ret = RET_OKNORESP;
+
+	switch(req->type) {
+	case xcache_cmd::XCACHE_STORE:
+		ret = store(&resp, (xcache_cmd *)req->data);
+		if(ret == RET_OKSENDRESP) {
+			resp.SerializeToString(&buffer);
+			send_response(req->to_sock, buffer.c_str(), buffer.length());
+		}
+		break;
+	case xcache_cmd::XCACHE_FETCHCHUNK:
+		cmd = (xcache_cmd *)req->data;
+		ret = xcache_fetch_content(&resp, cmd, cmd->flags());
+		if(ret == RET_OKSENDRESP) {
+			resp.SerializeToString(&buffer);
+			send_response(req->to_sock, buffer.c_str(), buffer.length());
+		}
+		break;
+	case xcache_cmd::XCACHE_READ:
+		cmd = (xcache_cmd *)req->data;
+		ret = chunk_read(&resp, cmd);
+		if(ret == RET_OKSENDRESP) {
+			resp.SerializeToString(&buffer);
+			send_response(req->to_sock, buffer.c_str(), buffer.length());
+		}
+		break;
+	case xcache_cmd::XCACHE_SENDCHUNK:
+		send_content_remote(req->to_sock, (sockaddr_x *)req->data);
+		break;
+	}
+
+	if(req->flags & XCFI_REMOVEFD) {
+		Xclose(req->to_sock);
+	}
+}
+
+void *xcache_controller::worker_thread(void *arg)
+{
+	xcache_controller *ctrl = (xcache_controller *)arg;
+
+	LOG_CTRL_INFO("Worker started working.\n");
+
+	while(1) {
+		xcache_req *req;
+
+		req = ctrl->dequeue_request_safe();
+		if(req)
+			ctrl->process_req(req);
+	}
+}
+
 void xcache_controller::run(void)
 {
 	fd_set fds, allfds;
@@ -608,6 +681,11 @@ void xcache_controller::run(void)
 	FD_SET(libsocket, &allfds);
 	FD_SET(sendersocket, &allfds);
 
+	LOG_CTRL_INFO("Launching worker threads\n");
+	for(int i = 0; i < n_threads; i++) {
+		pthread_create(&threads[i], NULL, worker_thread, (void *)this);
+	}
+	
 	LOG_CTRL_INFO("Entering The Loop\n");
 
 repeat:
@@ -620,12 +698,9 @@ repeat:
 
 	Xselect(max + 1, &fds, NULL, NULL, NULL);
 
-	int something;
-	something = 0;
 	LOG_CTRL_INFO("Broken\n");
 
 	if(FD_ISSET(libsocket, &fds)) {
-		something = 1;
 		int new_connection = accept(libsocket, NULL, 0);
 		LOG_CTRL_INFO("Action on libsocket\n");
 		active_conns.push_back(new_connection);
@@ -640,8 +715,17 @@ repeat:
 		if((accept_sock = XacceptAs(sendersocket, (struct sockaddr *)&mypath, &mypath_len, NULL, NULL)) < 0) {
 			LOG_CTRL_ERROR("XacceptAs failed\n");
 		} else {
-			send_content_remote(accept_sock, &mypath);
-			Xclose(accept_sock);
+			xcache_req *req = new xcache_req();
+
+			req->type = xcache_cmd::XCACHE_SENDCHUNK;
+			req->from_sock = sendersocket;
+			req->to_sock = accept_sock;
+			req->data = malloc(mypath_len);
+			memcpy(req->data, &mypath, mypath_len);
+			req->datalen = mypath_len;
+			req->flags = XCFI_REMOVEFD;
+
+			enqueue_request_safe(req);
 		}
 	}
 
@@ -650,7 +734,6 @@ repeat:
 			++iter;
 			continue;
 		}
-		something = 1;
 
 		char buf[512] = "";
 		std::string buffer("");
@@ -681,17 +764,34 @@ repeat:
 			LOG_CTRL_INFO("Controller received %lu bytes\n", buffer.length());
 			if(!parse_success) {
 				LOG_CTRL_ERROR("[ERROR] Protobuf could not parse\n");
-			} else if((ret = handle_cmd(*iter, &resp, &cmd)) == RET_OKSENDRESP) {
-				resp.SerializeToString(&buffer);
-				if(send_response(*iter, buffer.c_str(), buffer.length()) < 0) {
-					LOG_CTRL_ERROR("FIXME: handle return value of write\n");
-				} else {
-					LOG_CTRL_INFO("Data sent to client\n");
-				}
-			} else if(ret == RET_REMOVEFD) {
-				goto removefd;
+				goto next;
 			}
 		}
+
+		ret = fast_process_req(*iter, &resp, &cmd);
+
+		if(ret == RET_OKSENDRESP) {
+			resp.SerializeToString(&buffer);
+			if(send_response(*iter, buffer.c_str(), buffer.length()) < 0) {
+				LOG_CTRL_ERROR("FIXME: handle return value of write\n");
+			} else {
+				LOG_CTRL_INFO("Data sent to client\n");
+			}
+		} else if(ret == RET_REMOVEFD) {
+			goto removefd;
+		} else if(ret == RET_ENQUEUE) {
+			xcache_req *req = new xcache_req();
+
+			req->type = cmd.cmd();
+			req->from_sock = *iter;
+			req->to_sock = *iter;
+			req->data = new xcache_cmd(cmd);
+			req->datalen = sizeof(xcache_cmd);
+
+			enqueue_request_safe(req);
+		}
+				
+next:
 		++iter;
 		continue;
 disconnected:
@@ -700,10 +800,6 @@ disconnected:
 removefd:
 		FD_CLR(*iter, &allfds);
 		active_conns.erase(iter);
-	}
-
-	if(!something) {
-		sleep(5);
 	}
 
 
@@ -756,5 +852,6 @@ void xcache_controller::set_conf(struct xcache_conf *conf)
 {
 	hostname = std::string(conf->hostname);
 
+	n_threads = conf->threads;
 	threads = (pthread_t *)malloc(sizeof(pthread_t) * conf->threads);
 }
