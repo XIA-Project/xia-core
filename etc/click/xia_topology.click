@@ -17,14 +17,6 @@ require(library xia_address.click);
 //
 
 // host & router instantiation
-host0 :: XIAEndHost (RE AD0 HID0, HID0, 1500, 0, aa:aa:aa:aa:aa:aa);
-host1 :: XIAEndHost (RE AD1 HID1, HID1, 11500, 1, aa:aa:aa:aa:aa:aa);
-host2 :: XIAEndHost (RE AD2 HID2, HID2, 12500, 1, aa:aa:aa:aa:aa:aa);
-host20 :: XIAEndHost (RE AD2 HID20, HID20, 12501, 1, aa:aa:aa:aa:aa:aa);
-host21 :: XIAEndHost (RE AD2 HID21, HID21, 12502, 1, aa:aa:aa:aa:aa:aa);
-host3 :: XIAEndHost (RE AD3 HID3, HID3, 13500, 1, aa:aa:aa:aa:aa:aa);
-host4 :: XIAEndHost (RE AD4 HID4, HID4, 14500, 1, aa:aa:aa:aa:aa:aa);
-
 router0 :: XIARouter4Port(RE AD0 RHID0, AD0, RHID0, 0.0.0.0, 10700, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
 router1 :: XIARouter4Port(RE AD1 RHID1, AD1, RHID1, 0.0.0.0, 11700, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
 router2 :: XIARouter4Port(RE AD2 RHID2, AD2, RHID2, 0.0.0.0, 12700, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
@@ -38,6 +30,14 @@ controller1 :: XIAController(RE AD1 CHID1, AD1, CHID1, 0.0.0.0, 11900, aa:aa:aa:
 controller2 :: XIAController(RE AD2 CHID2, AD2, CHID2, 0.0.0.0, 12900, aa:aa:aa:aa:aa:aa);
 controller3 :: XIAController(RE AD3 CHID3, AD3, CHID3, 0.0.0.0, 13900, aa:aa:aa:aa:aa:aa);
 controller4 :: XIAController(RE AD4 CHID4, AD4, CHID4, 0.0.0.0, 14900, aa:aa:aa:aa:aa:aa);
+
+host0 :: XIAEndHost (RE AD0 HID0, HID0, 1500, 0, aa:aa:aa:aa:aa:aa);
+host1 :: XIAEndHost (RE AD1 HID1, HID1, 11500, 1, aa:aa:aa:aa:aa:aa);
+host2 :: XIAEndHost (RE AD2 HID2, HID2, 12500, 1, aa:aa:aa:aa:aa:aa);
+host20 :: XIAEndHost (RE AD2 HID20, HID20, 12501, 1, aa:aa:aa:aa:aa:aa);
+host21 :: XIAEndHost (RE AD2 HID21, HID21, 12502, 1, aa:aa:aa:aa:aa:aa);
+host3 :: XIAEndHost (RE AD3 HID3, HID3, 13500, 1, aa:aa:aa:aa:aa:aa);
+host4 :: XIAEndHost (RE AD4 HID4, HID4, 14500, 1, aa:aa:aa:aa:aa:aa);
 
 // The following line is required by the xianet script so it can determine the appropriate
 // host/router pair to run the nameserver on
