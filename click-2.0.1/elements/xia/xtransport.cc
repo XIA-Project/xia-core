@@ -3193,16 +3193,28 @@ void XTRANSPORT::Xupdaterv(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 
 	// Retrieve rendezvous service DAG from user provided argument
 	xia::X_Updaterv_Msg *x_updaterv_msg = xia_socket_msg->mutable_x_updaterv();
+	int iface = x_updaterv_msg->interface();
 	String rendezvousDAGstr(x_updaterv_msg->rvdag().c_str());
+
+	// Update XIAInterfaceTable with new rendezvous control dag.
+	// Note: If DAG is an empty string, it will be silently ignored.
+	_interfaces.update_rv_control_dag(iface, rendezvousDAGstr);
+
+	XIAInterface interface = _interfaces.getInterface(iface);
+	// Return if we don't have a valid RV Control DAG to send a control msg to
+	if(!interface.has_rv_control_dag()) {
+		return;
+	}
+
+	// Send a control message to the rendezvous service to tell our location
 	XIAPath rendezvousDAG;
-	rendezvousDAG.parse(rendezvousDAGstr, NULL);
+	rendezvousDAG.parse(interface.rv_control_dag(), NULL);
 
 	// HID of this host
-	String myHID = _hid.unparse();
+	String ifaceHID = interface.hid().c_str();
 
 	// Current local DAG for this host
-	XIAPath localDAG = local_addr();
-	String localDAGstr = localDAG.unparse();
+	String ifaceDAGstr = interface.dag();
 
 	// Current timestamp as nonce against replay attacks
 	Timestamp now = Timestamp::now();
@@ -3210,26 +3222,26 @@ void XTRANSPORT::Xupdaterv(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 
 	// Message going out to the rendezvous server
 	INFO("RV DAG:%s", rendezvousDAGstr.c_str());
-	INFO("for:%s", myHID.c_str());
-	INFO("at:%s", localDAGstr.c_str());
+	INFO("for:%s", ifaceHID.c_str());
+	INFO("at:%s", ifaceDAGstr.c_str());
 	INFO("timestamp: %f", timestamp);
 
 	// Prepare control message for rendezvous service
 	XIASecurityBuffer controlMsg = XIASecurityBuffer(1024);
-	controlMsg.pack(myHID.c_str(), myHID.length());
-	controlMsg.pack(localDAGstr.c_str(), localDAGstr.length());
+	controlMsg.pack(ifaceHID.c_str(), ifaceHID.length());
+	controlMsg.pack(ifaceDAGstr.c_str(), ifaceDAGstr.length());
 	controlMsg.pack((const char *)&timestamp, (uint16_t) sizeof timestamp);
 
 	// Sign the control message
 	char signature[MAX_SIGNATURE_SIZE];
 	uint16_t signatureLength = MAX_SIGNATURE_SIZE;
-	xs_sign(myHID.c_str(), (unsigned char *)controlMsg.get_buffer(), controlMsg.size(), (unsigned char *)signature, &signatureLength);
+	xs_sign(ifaceHID.c_str(), (unsigned char *)controlMsg.get_buffer(), controlMsg.size(), (unsigned char *)signature, &signatureLength);
 
 	// Retrieve public key for this host
 	char pubkey[MAX_PUBKEY_SIZE];
 	uint16_t pubkeyLength = MAX_PUBKEY_SIZE;
-	if(xs_getPubkey(myHID.c_str(), pubkey, &pubkeyLength)) {
-		ERROR("ERROR public key not found for %s", myHID.c_str());
+	if(xs_getPubkey(ifaceHID.c_str(), pubkey, &pubkeyLength)) {
+		ERROR("ERROR public key not found for %s", ifaceHID.c_str());
 		return;
 	}
 

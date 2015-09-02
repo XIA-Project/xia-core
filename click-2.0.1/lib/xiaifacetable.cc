@@ -22,6 +22,15 @@ XIAInterface::~XIAInterface()
 	_rv_control_dag = "";
 }
 
+String XIAInterface::hid()
+{
+	XIAPath rvc_dag;
+	if(!rvc_dag.parse(_rv_control_dag)) {
+		return "";
+	}
+	return rvc_dag.xid(rvc_dag.destination_node()).unparse();
+}
+
 bool XIAInterface::has_rv_control_dag()
 {
 	return _rv_control_dag_exists;
@@ -114,6 +123,11 @@ bool XIAInterfaceTable::update(int iface, String dag)
 bool XIAInterfaceTable::update(int iface, XIAPath dag)
 {
 	return update(iface, dag.unparse());
+}
+
+bool XIAInterfaceTable::update_rv_control_dag(int iface, String dag)
+{
+	return interfaceToDag[iface].update_rv_control_dag(dag);
 }
 
 // Remove entry from both tables for iface

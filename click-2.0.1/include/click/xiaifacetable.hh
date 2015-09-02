@@ -14,9 +14,13 @@ class XIAInterface {
 		String dag() {
 			return _dag;
 		}
+		String rv_control_dag() {
+			return _rv_control_dag;
+		}
 		bool has_rv_control_dag();
 		bool update_dag(String dag);
 		bool update_rv_control_dag(String rv_control_dag);
+		String hid();
 	private:
 		String _dag;
 		String _rv_control_dag;
@@ -29,6 +33,7 @@ class XIAInterfaceTable {
 		~XIAInterfaceTable();
 		bool update(int iface, String dag);
 		bool update(int iface, XIAPath dag);
+		bool update_rv_control_dag(int iface, String dag);
 		bool add(int iface, String dag);
 		bool add(int iface, XIAPath dag);
 		bool remove(int iface);
@@ -36,6 +41,9 @@ class XIAInterfaceTable {
 		//bool remove(XIAPath dag);
 		String getDAG(int iface) {
 			return interfaceToDag[iface].dag();
+		}
+		XIAInterface getInterface(int iface) {
+			return interfaceToDag[iface];
 		}
 		int getIface(String dag);
 		int size() {

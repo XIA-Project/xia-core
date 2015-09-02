@@ -492,7 +492,7 @@ int main(int argc, char *argv[]) {
 		}
 
 		if(rv_changed) {
-			if(XupdateRV(sockfd) < 0) {
+			if(XupdateRV(sockfd, ifID, beacon.getRendezvousControlDAG().c_str()) < 0) {
 				syslog(LOG_ERR, "Unable to update rendezvous server with new locator");
 			}
 		}

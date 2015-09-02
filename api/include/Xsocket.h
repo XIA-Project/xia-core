@@ -187,7 +187,7 @@ extern void Xfreeifaddrs(struct ifaddrs *ifa);
 
 /* internal only functions */
 extern int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id);
-extern int XupdateRV(int sockfd);
+extern int XupdateRV(int sockfd, int interface, const char *rv_control_dag);
 extern int XupdateNameServerDAG(int sockfd, const char *nsDAG);
 extern int XreadNameServerDAG(int sockfd, sockaddr_x *nsDAG);
 extern int XisDualStackRouter(int sockfd);

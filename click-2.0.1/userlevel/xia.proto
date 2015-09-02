@@ -275,6 +275,7 @@ message X_Poll_Msg {
 
 message X_Updaterv_Msg {
   required string rvdag = 1;
+  required int32 interface = 2;
 }
 
 /**************************************************/
