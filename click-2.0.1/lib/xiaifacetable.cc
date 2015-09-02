@@ -5,6 +5,51 @@
 #include <click/xiapath.hh>
 
 
+XIAInterface::XIAInterface(String dag, String rv_control_dag)
+{
+	_dag = dag;
+	_rv_control_dag = rv_control_dag;
+	_rv_control_dag_exists = false;
+	if(_rv_control_dag.length() > CLICK_XIA_XID_ID_LEN) {
+		_rv_control_dag_exists = true;
+	}
+}
+
+XIAInterface::~XIAInterface()
+{
+	_rv_control_dag_exists = false;
+	_dag = "";
+	_rv_control_dag = "";
+}
+
+bool XIAInterface::has_rv_control_dag()
+{
+	return _rv_control_dag_exists;
+}
+
+bool XIAInterface::update_dag(String dag)
+{
+	_dag = dag;
+	return true;
+}
+
+bool XIAInterface::update_rv_control_dag(String rv_control_dag)
+{
+	bool retval = false;
+	// If the user passed a valid dag, update our dag
+	if(rv_control_dag.length() > CLICK_XIA_XID_ID_LEN) {
+		_rv_control_dag = rv_control_dag;
+		_rv_control_dag_exists = true;
+		retval = true;
+	} else {
+		click_chatter("XIAInterface: Provided rv_control_dag not valid, skip");
+		if (_rv_control_dag_exists) {
+			click_chatter("XIAInterface: Using: %s", _rv_control_dag.c_str());
+		}
+	}
+	return retval;
+}
+
 XIAInterfaceTable::XIAInterfaceTable()
 {
 	numInterfaces = 0;
@@ -82,7 +127,7 @@ bool XIAInterfaceTable::remove(int iface)
 		return false;
 	}
 	// Retrieve DAG and find its entry in dagToInterface
-	String dag = ifaceDagIter.value();
+	String dag = ifaceDagIter.value().dag();
 	//if(dagToInterface.find(dag) == dagToInterface.end()) {
 	//	click_chatter("XIAInterfaceTable::remove Removing non-existent dag %s", dag.c_str());
 	//	return false;
@@ -96,7 +141,7 @@ int XIAInterfaceTable::getIface(String dag)
 {
 	ifaceDagIter = interfaceToDag.begin();
 	for(;ifaceDagIter!=interfaceToDag.end();ifaceDagIter++) {
-		if(dag.compare(ifaceDagIter.value()) == 0) {
+		if(dag.compare(ifaceDagIter.value().dag()) == 0) {
 			return ifaceDagIter.key();
 		}
 	}
@@ -134,7 +179,7 @@ bool XIAInterfaceTable::remove(XIAPath dag)
 // Unconditionally insert or update an entry in both tables
 void XIAInterfaceTable::_insert(int iface, String dag)
 {
-	interfaceToDag[iface] = dag;
+	interfaceToDag[iface] = XIAInterface(dag);
 	//dagToInterface[dag] = iface;
 }
 
