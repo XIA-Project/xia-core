@@ -58,6 +58,7 @@
 #include "Xutil.h"
 #include "Xkeys.h"
 #include "dagaddr.hpp"
+#include "minIni.h"
 #include <map>
 #include <vector>
 
@@ -68,6 +69,8 @@
 #define ID_LEN (INET_ADDRSTRLEN + 10)	// size of an id string
 #define SID_SIZE 45						// (40 byte XID + 4 bytes SID: + null terminator)
 #define FORCE_XIA() (1)					// FIXME: get rid of this logic
+
+#define SID_FILE "/etc/sidmap.conf"
 
 // Logging Macros ***************************************************
 #define TRACE()          {if (_log_trace)    fprintf(_log, "xwrap: %s\n", __FUNCTION__);}
@@ -199,6 +202,14 @@ typedef std::map<std::string, std::string> dag2id_t;
 static id2dag_t id2dag;
 static dag2id_t dag2id;
 
+// HACK to allow services with fixed ports always get the same SID
+// This will only work correctly for DATAGRAM sockets unless the SID
+// is generated cryptographically and keys are distributed to
+// all hosts that host the service
+typedef std::map<unsigned short, std::string> port2sid_t;
+
+static port2sid_t *port2sid;
+
 // Negative name lookups are saved here ****************************
 #define NEG_LOOKUP_LIFETIME	15	// duration in seconds of a negative lookup
 
@@ -239,6 +250,41 @@ static unsigned short _NewPort()
 		port = PROTECTED;
 	}
 	return htons(port);
+}
+
+// load the list of static port to SID mappings
+// the static mapping will only work if
+// a) it is used with a DATAGRAM socket
+// b) the SID was created crypographically and the associated
+//  key is resident on the server binding to the SID
+static void _LoadSIDs() 
+{
+	char conf[2048];
+	char p[64];
+	char s[64];
+	unsigned short port;
+
+	if (!XrootDir(conf, sizeof(conf))) {
+		conf[0] = 0;
+	}
+	strncat(conf, SID_FILE, sizeof(conf));
+
+	port2sid = new port2sid_t;
+
+	for (int i = 0; ini_getkey(NULL, i, p, sizeof(p), conf); i++) {
+		ini_gets(NULL, p, NULL, s, sizeof(s), conf);
+
+		port = strtol(p, NULL, 10);
+		std::string sid(s);
+		if (errno != ERANGE) {
+			MSG("Adding port<->SID mapping for %d : %s\n", port, sid.c_str());
+
+			port = htons(port);
+			port2sid->insert(std::pair<unsigned short, std::string>(port, sid));
+		} else {
+			WARNING("%s is not a valid port number\n", p);
+		}
+	}
 }
 
 
@@ -317,22 +363,26 @@ static int _GetIP(const sockaddr_x *sax, struct sockaddr_in *sin, const char *ad
 
 
 // Generate a random SID
-static char *_NewSID(char *buf, unsigned len)
+static char *_NewSID(char *buf, unsigned len, unsigned short port)
 {
-	// FIXME: this is a stand-in function until we get certificate based names
-	//
+	printf("********************************************************newsid port = %d\n", port);
 	// note: buf must be at least 45 characters long
 	// (longer if the XID type gets longer than 3 characters)
 	if (len < SID_SIZE) {
 		WARNING("buf is only %d chars long, it needs to be %d. Truncating...\n", len, SID_SIZE);
 	}
 
-	if (XmakeNewSID(buf, len)) {
+	// lookup port, and if found use the static SID associated with it
+
+	port2sid_t::iterator it = port2sid->find(port);
+	if (it != port2sid->end()) {
+		std::string sid = it->second;
+		strncpy(buf, sid.c_str(), len);
+
+	} else if (XmakeNewSID(buf, len)) {
 		MSG("Unable to create a new SID\n");
 		return NULL;
 	}
-
-//	snprintf(buf, len, "SID:44444ff0000000000000000000000000%08x", rand());
 
 	return buf;
 }
@@ -430,7 +480,7 @@ static int _Register(const struct sockaddr *addr, socklen_t len)
 	sa.sin_port = ((sockaddr_in *)addr)->sin_port;
 
 	// create a DAG for this host in the form of "(4ID) AD HID SID"
-	Xgetaddrinfo(NULL, _NewSID(sid, sizeof(sid)), NULL, &ai);
+	Xgetaddrinfo(NULL, _NewSID(sid, sizeof(sid), sa.sin_port), NULL, &ai);
 
 	// register it in the name server with the ip-port id
 	XregisterName(_IDstring(id, ID_LEN, &sa), (sockaddr_x*)ai->ai_addr);
@@ -800,6 +850,7 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	GET_FCN(sendmsg);
 
 	_GetLocalIPs();
+	_LoadSIDs();
 }
 
 

@@ -1,0 +1,11 @@
+# IP port to SID mappings
+# This file is used by xwrap and provides mappings between IP port numbers and
+# static SIDs. Mappings in this file are meant to be used for services that 
+# must use same address every time.
+#
+# NOTE: mappings will only work on DATAGRAM sockets. Because STREAM connections
+# use intrinsic security they require a crypotgraphically generated SID.
+
+53 :   SID:ffffff0000000000000000000000000000001112
+9999 : SID:ffffff0000000000000000000000000000009999
+
