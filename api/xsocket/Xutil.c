@@ -174,13 +174,7 @@ idrec opt_values[] = {
 * @param sock
 */
 void debug(int sock) {
-	struct sockaddr_in my_addr;
-	socklen_t len = sizeof(my_addr);
-	if(getsockname(sock, (struct sockaddr *)&my_addr, &len) < 0) {
-		printf("Error retrieving socket's UDP port: %s", strerror(errno));
-	}
-
-	printf("[ sock %d/%d, thread %p ]\t", sock, ((struct sockaddr_in)my_addr).sin_port, (void*)pthread_self());
+	printf("[ sock %d/%d, thread %p ]\t", sock, getPort(sock), (void*)pthread_self());
 }
 
 /*!
@@ -247,6 +241,8 @@ int click_send(int sockfd, xia::XSocketMsg *xsm)
 		// make sure click know if it should reply immediately or not
 		xsm->set_blocking(true);
 	}
+
+	xsm->set_port(getPort(sockfd));
 
 	std::string p_buf;
 	xsm->SerializeToString(&p_buf);
@@ -329,6 +325,8 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 				// these are not the data you were looking for
 				LOGF("Expected packet %u, received %u, caching packet\n", seq, sn);
 				cachePacket(sock, sn, buf, buflen);
+
+				msg->PrintDebugString();
 				msg->Clear();
 			}
 		}
@@ -372,6 +370,43 @@ int click_status(int sock, unsigned seq)
 	}
 
 	return rc;
+}
+
+int MakeApiSocket(int transport_type)
+{
+	struct sockaddr_in sa;
+	int sock;
+	unsigned short port;
+
+	socklen_t len = sizeof(sa);
+
+	if ((sock = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
+		LOGF("Error creating socket: %s", strerror(errno));
+		return sock;
+	}
+
+	// bind to an unused random port number
+	sa.sin_family = PF_INET;
+	sa.sin_addr.s_addr = inet_addr("127.0.0.1");
+	sa.sin_port = 0;
+
+	if ((_f_bind)(sock, (const struct sockaddr *)&sa, sizeof(sa)) < 0) {
+		(_f_close)(sock);
+
+		LOGF("Error binding new socket to local port: %s", strerror(errno));
+		return -1;
+	}
+
+	if((_f_getsockname)(sock, (struct sockaddr *)&sa, &len) < 0) {
+		LOGF("Error retrieving socket's UDP port: %s", strerror(errno));
+		port = 0;
+	} else {
+		port = ((struct sockaddr_in)sa).sin_port;
+	}
+
+	allocSocketState(sock, transport_type, port);
+
+	return sock;
 }
 
 // print out the list of flags in the bitmap

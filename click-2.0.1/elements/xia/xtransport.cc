@@ -213,7 +213,7 @@ String XTRANSPORT::Netstat(Element *e, void *)
 			xid = source_xid.unparse().c_str();
 		}
 
-		sprintf(line, "%d,%s,%s,%s\n", _sport, type, state, xid);
+		sprintf(line, "%d,%s,%s,%s,%d\n", _sport, type, state, xid, sk->refcount);
 		table += line;
 	}
 
@@ -724,13 +724,15 @@ void XTRANSPORT::run_timer(Timer *timer)
 				tear_down = RetransmitDATA(sk, _sport, now);
 
 			} else if (sk->state == TIME_WAIT && sk->expiry <= now) {
-				DBG("tearing down socket %p %d %s\n", sk, sk->port, StateStr(sk->state));
-				TeardownSocket(sk);
 				tear_down = true;
 			}
 		}
 
-		if (!tear_down) {
+		if (tear_down) {
+			DBG("tearing down socket %p %d %s\n", sk, sk->port, StateStr(sk->state));
+			TeardownSocket(sk);
+
+		} else {
 			// find the (next) earliest expiry
 			if (sk->timer_on == true) {
 				if (sk->expiry > now && (sk->expiry < earliest_pending_expiry || earliest_pending_expiry == now)) {
@@ -1845,6 +1847,7 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 		new_sk->src_path = dst_path;
 		new_sk->isAcceptedSocket = true;
 		new_sk->pkt = copy_packet(p, new_sk);
+		new_sk->refcount = 1;
 
 		memset(new_sk->send_buffer, 0, new_sk->send_buffer_size * sizeof(WritablePacket*));
 		memset(new_sk->recv_buffer, 0, new_sk->recv_buffer_size * sizeof(WritablePacket*));
@@ -2071,6 +2074,8 @@ void XTRANSPORT::ProcessStreamDataPacket(WritablePacket*p_in)
 
 	} else {
 		if (sk->state >= CONNECTED) {
+			DBG("data received on %d\n", sk->port);
+
 			// buffer data, if we have room
 			if (should_buffer_received_packet(p_in, sk)) {
 				add_packet_to_recv_buf(p_in, sk);
@@ -2139,23 +2144,24 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 		ChangeState(new_sk, CONNECTED);
 		CancelRetransmit(new_sk);
 
+		// push this socket into pending_connection_buf and let Xaccept handle that
 		sk->pending_connection_buf.push(new_sk);
 
-		// push this socket into pending_connection_buf and let Xaccept handle that
+		// finish the connection handshake
+		XIDpairToConnectPending.erase(xid_pair);
 
+		if (sk->polling) {
+			// tell API we are live
+			ProcessPollEvent(sk->port, POLLIN|POLLOUT);
+		}
 		// If the app is ready for a new connection, alert it
 		if (!sk->pendingAccepts.empty()) {
 			xia::XSocketMsg *acceptXSM = sk->pendingAccepts.front();
-			ReturnResult(sk->port, acceptXSM);
+			// FIXME: can I just use pop in the line above?
 			sk->pendingAccepts.pop();
+			ReturnResult(sk->port, acceptXSM);
 			delete acceptXSM;
 		}
-		if (sk->polling) {
-			// tell API we are writeable
-			ProcessPollEvent(sk->port, POLLIN|POLLOUT);
-		}
-		// finish the connection handshake
-		XIDpairToConnectPending.erase(xid_pair);
 
 	} else if (sk->state == FIN_WAIT1) {
 		INFO("Socket %d FIN-ACK received\n", sk->port);
@@ -2605,6 +2611,9 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XUPDATERV:
 		Xupdaterv(_sport, &xia_socket_msg);
 		break;
+	case xia::XFORK:
+		Xfork(_sport, &xia_socket_msg);
+		break;
 	default:
 		ERROR("ERROR: Unknown API request\n");
 		break;
@@ -2643,6 +2652,7 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	sk->port = _sport;
 	sk->sock_type = sock_type;
 	sk->state = INACTIVE;
+	sk->refcount = 1;
 
 	memset(sk->send_buffer, 0, sk->send_buffer_size * sizeof(WritablePacket*));
 	memset(sk->recv_buffer, 0, sk->recv_buffer_size * sizeof(WritablePacket*));
@@ -2688,6 +2698,10 @@ void XTRANSPORT::Xsetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_
 
 		case SO_DEBUG:
 			sk->so_debug = x_sso_msg->int_opt();
+			break;
+
+		case SO_ERROR:
+			sk->so_error = x_sso_msg->int_opt();
 			break;
 
 		default:
@@ -2787,6 +2801,35 @@ void XTRANSPORT::Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 
 
+void XTRANSPORT::Xfork(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
+{
+	xia::X_Fork_Msg *msg = xia_socket_msg->mutable_x_fork();
+	int count = msg->count();
+	int increment = msg->increment() ? 1 : -1;
+
+	xia_socket_msg->PrintDebugString();
+
+	DBG("Xfork=======================\n");
+	// loop through list of ports and modify the ref counter
+	for (int i = 0; i < count; i++) {
+		int port = msg->ports(i);
+
+		DBG("port = %d\n", port);
+
+		sock *sk = portToSock.get(port);
+		if (sk) {
+			DBG("incrementing refcount for %d\n", port);
+			sk->refcount += increment;
+			assert(sk->refcount > 0);
+		}
+	}
+
+	DBG("Xfork returning\n");
+	ReturnResult(_sport, xia_socket_msg);
+}
+
+
+
 // FIXME: This way of doing things is a bit hacky.
 void XTRANSPORT::XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
@@ -2842,14 +2885,25 @@ void XTRANSPORT::XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 
 void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
+	int control_port = _sport;
+
+	xia::X_Close_Msg *xcm = xia_socket_msg->mutable_x_close();
+	_sport = xcm->port();
+
 	sock *sk = portToSock.get(_sport);
 	bool teardown_now = true;
-
-	INFO("closing %d %d sk = %p state=%s\n", _sport, sk->port, sk, StateStr(sk->state));
 
 	if (!sk) {
 		// this shouldn't happen!
 		ERROR("Invalid socket %d\n", _sport);
+		goto done;
+	}
+	INFO("closing %d %d sk = %p state=%s refcount=%d\n", _sport, sk->port, sk, StateStr(sk->state), sk->refcount);
+
+	assert(sk->refcount != 0);
+
+	if (--sk->refcount != 0) {
+		// the app was forked and not everyone has closed the socket yet
 		goto done;
 	}
 
@@ -2878,7 +2932,10 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	}
 
 done:
-	ReturnResult(_sport, xia_socket_msg);
+//	INFO("Close :%d seq:%d\n", sk->port, xcm->sequence());
+	xcm->set_refcount(sk->refcount);
+	xcm->set_delkeys(sk->isAcceptedSocket == false);
+	ReturnResult(control_port, xia_socket_msg);
 }
 
 
@@ -2988,6 +3045,7 @@ void XTRANSPORT::XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_sock
 
 		ReturnResult(_sport, xia_socket_msg);
 
+
 	} else if (xia_socket_msg->blocking()) {
 		// If not and we are blocking, add this request to the pendingAccept queue and wait
 
@@ -3014,7 +3072,9 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	unsigned short new_port = xia_socket_msg->x_accept().new_port();
 	sock *sk = portToSock.get(_sport);
 
-	DBG("_sport %d, new_port %d\n", _sport, new_port);
+	DBG("_sport %d, new_port %d seq:%d\n", _sport, new_port, xia_socket_msg->sequence());
+	DBG("p buf size = %d\n", sk->pending_connection_buf.size());
+	DBG("blocking = %d\n", sk->isBlocking);
 
 	sk->hlim = HLIM_DEFAULT;
 	sk->nxt_xport = CLICK_XIA_NXT_TRN;
@@ -3105,6 +3165,8 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		x_accept_msg->set_remote_dag(new_sk->dst_path.unparse().c_str()); // remote endpoint is dest from our perspective
 
 	} else {
+		// FIXME: THIS BETTER NOT HAPPEN!
+		INFO("Got EWOULDBLOCK on a blocking accept!");
 		rc = -1;
 		ec = EWOULDBLOCK;
 		goto Xaccept_done;
