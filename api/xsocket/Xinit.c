@@ -73,7 +73,7 @@ static size_t mtu()
 	ioctl(sock, SIOCGIFMTU, &ifr);
 	(_f_close)(sock);
 
-	LOGF("API MTU = %d\n", ifr.ifr_mtu);
+	//LOGF("API MTU = %d\n", ifr.ifr_mtu);
 	return ifr.ifr_mtu;
 }
 

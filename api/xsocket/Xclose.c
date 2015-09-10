@@ -75,7 +75,7 @@ int Xclose(int sockfd)
 
 	ref = xcm->refcount();
 
-	LOGF("%d refcount = %d\n", sockfd, ref);
+	// LOGF("%d refcount = %d\n", sockfd, ref);
 
 	if (isTempSID(sockfd) && xcm->refcount() <= 0) {
 
