@@ -139,7 +139,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 ** HANDLER FUNCTIONS
 *************************************************************/
 // ?????????
-enum {DAG, HID};
+enum {DAG, HID, RVDAG};
 
 int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorHandler *errh)
 {
@@ -166,6 +166,25 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorH
 		}
 		break;
 
+	}
+	case RVDAG:
+	{
+		XIAPath rvdag;
+		if (cp_va_kparse(conf, f, errh,
+						 "RVDAG", cpkP + cpkM, cpXIAPath, &rvdag,
+						 cpEnd) < 0)
+			return -1;
+		click_chatter("XTRANSPORT: RV DAG is now %s", f->_local_addr.unparse().c_str());
+		String local_addr_str = f->_local_addr.unparse().c_str();
+		// If a RV dag was assigned, this is a router.
+		// So assign the same RV DAG to all interfaces
+		for(int i=0; i<f->_num_ports; i++) {
+			if(!f->_interfaces.update_rv_dag(i, local_addr_str)) {
+				click_chatter("ERROR: Updating dag: %s to iface: %d", local_addr_str.c_str(), i);
+				return -1;
+			}
+		}
+		break;
 	}
 	case HID:
 	{
@@ -258,6 +277,7 @@ void XTRANSPORT::add_handlers()
 {
 	//add_write_handler("local_addr", write_param, (void *)H_MOVE);
 	add_write_handler("dag", write_param, (void *)DAG);
+	add_write_handler("rvDAG", write_param, (void *)RVDAG);
 	add_write_handler("hid", write_param, (void *)HID);
 	add_write_handler("purge", purge, (void*)1);
 	add_write_handler("flush", purge, 0);
@@ -2797,7 +2817,7 @@ int XTRANSPORT::IfaceFromSIDPath(XIAPath sidPath)
 		click_chatter("Xtransport::IfaceFromSIDPath couldn't remove node");
 		return -1;
 	}
-	return _interfaces.getIface(interface_dag.unparse());
+	return _interfaces.getIfaceID(interface_dag.unparse());
 }
 
 void XTRANSPORT::Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)

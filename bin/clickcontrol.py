@@ -175,6 +175,12 @@ class ClickControl:
             return False
         return True
 
+    # Assign a Rendezvous DAG to a given router
+    def assignRVDAG(self, hostname, hosttype, dag):
+        if not self.writeCommand('%s/xrc/xtransport.rvDAG %s' % (hostname, dag)):
+            return False
+        return True
+
 # If this library is run by itself, it does a unit test that
 # connects to Click and configures its elements as an XIAEndHost
 if __name__ == "__main__":

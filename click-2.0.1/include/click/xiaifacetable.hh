@@ -8,8 +8,9 @@
 #define MAX_XIA_INTERFACES 4
 
 class XIAInterface {
+
 	public:
-		XIAInterface(String dag="", String rv_control_dag="");
+		XIAInterface(String dag="", String rv_dag="", String rv_control_dag="");
 		~XIAInterface();
 		String dag() {
 			return _dag;
@@ -18,11 +19,18 @@ class XIAInterface {
 			return _rv_control_dag;
 		}
 		bool has_rv_control_dag();
+		bool has_rv_dag();
 		bool update_dag(String dag);
+		bool update_rv_dag(String rv_dag);
 		bool update_rv_control_dag(String rv_control_dag);
 		String hid();
+
 	private:
+		bool _is_valid_dag(String dag);
+
 		String _dag;
+		String _rv_dag;
+		bool _rv_dag_exists;
 		String _rv_control_dag;
 		bool _rv_control_dag_exists;
 };
@@ -33,6 +41,7 @@ class XIAInterfaceTable {
 		~XIAInterfaceTable();
 		bool update(int iface, String dag);
 		bool update(int iface, XIAPath dag);
+		bool update_rv_dag(int iface, String dag);
 		bool update_rv_control_dag(int iface, String dag);
 		bool add(int iface, String dag);
 		bool add(int iface, XIAPath dag);
@@ -45,7 +54,7 @@ class XIAInterfaceTable {
 		XIAInterface getInterface(int iface) {
 			return interfaceToDag[iface];
 		}
-		int getIface(String dag);
+		int getIfaceID(String dag);
 		int size() {
 			return numInterfaces;
 		}
