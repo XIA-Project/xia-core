@@ -365,7 +365,7 @@ static int _GetIP(const sockaddr_x *sax, struct sockaddr_in *sin, const char *ad
 // Generate a random SID
 static char *_NewSID(char *buf, unsigned len, unsigned short port)
 {
-	printf("********************************************************newsid port = %d\n", port);
+	printf("newsid port = %d\n", port);
 	// note: buf must be at least 45 characters long
 	// (longer if the XID type gets longer than 3 characters)
 	if (len < SID_SIZE) {
@@ -468,22 +468,17 @@ static int _x2i(const sockaddr_x *sax, sockaddr_in *sin)
 
 // create a dag with sid for this sockaddr and register it with
 // the xia name server. Also create a mapping to go from ip->xia and xia-ip
-static int _Register(const struct sockaddr *addr, socklen_t len)
+static int _Register(const struct sockaddr_in *sa)
 {
 	char id[ID_LEN];
 	char sid[SID_SIZE];
-	struct sockaddr_in sa;
 	struct addrinfo *ai;
 
-	// use our default ip address withe the caller's port
-	memcpy(&sa, &local_sa, len);
-	sa.sin_port = ((sockaddr_in *)addr)->sin_port;
-
 	// create a DAG for this host in the form of "(4ID) AD HID SID"
-	Xgetaddrinfo(NULL, _NewSID(sid, sizeof(sid), sa.sin_port), NULL, &ai);
+	Xgetaddrinfo(NULL, _NewSID(sid, sizeof(sid), sa->sin_port), NULL, &ai);
 
 	// register it in the name server with the ip-port id
-	XregisterName(_IDstring(id, ID_LEN, &sa), (sockaddr_x*)ai->ai_addr);
+	XregisterName(_IDstring(id, ID_LEN, sa), (sockaddr_x*)ai->ai_addr);
 
 	// put it into the mapping tables
 	Graph g((sockaddr_x*)ai->ai_addr);
@@ -911,22 +906,26 @@ int bind(int fd, const struct sockaddr *addr, socklen_t len)
 	if (shouldWrap(fd) ) {
 		XIAIFY();
 
-		// swap in our local ip for whatever the caller used
-		memcpy(&sin, &local_sa, sizeof(sockaddr_in));
-		sin.sin_port = ((struct sockaddr_in*)addr)->sin_port;
+		// swap in our local ip if the caller specified INADDR_ANY
+		if (memcmp("\0\0\0\0", &((sockaddr_in*)addr)->sin_addr, 4) != 0) {
+			MSG(" using supplied address\n");
+			memcpy(&sin, addr, sizeof(sockaddr_in));
+		} else {
+			MSG(" using default address\n");
+			memcpy(&sin, &local_sa, sizeof(sockaddr_in));
+			sin.sin_port = ((struct sockaddr_in*)addr)->sin_port;
+		}
 
 		if (FORCE_XIA()) {
 			// create a mapping from IP/port to a dag and register it
-			_Register((struct sockaddr*)&sin, len);
+			_Register(&sin);
 
 			char id[ID_LEN];
 			_IDstring(id, ID_LEN, &sin);
 			MSG("id:%s\n", id);
 
 			// convert the sockaddr to a sockaddr_x
-			MSG("before\n");
 			_i2x(&sin, &sax);
-			MSG("after\n");
 		}
 
 		rc = Xbind(fd, (struct sockaddr *)&sax, len);
