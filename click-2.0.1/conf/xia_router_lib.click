@@ -131,9 +131,11 @@ elementclass XIALineCard {
 	// output[1]: send up to the higher stack (i.e. router or end host)
 
 	// setup XARP module
-	c :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/C0DE);  // XARP (query) or XARP (response) or XIP
+	c :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/C0DE, 12/9991);  // XARP (query) or XARP (response) or XIP or XIANetJoin
 	xarpq :: XARPQuerier($mac);
 	xarpr :: XARPResponder($mac);
+	netjoin :: XIANetJoin($mac);
+	XIAFromHost(8228) -> [0]netjoin[0] -> XIAToHost(8228)
 
 	print_in :: XIAPrint(">>> (In Iface $num) ");
 	print_out :: XIAPrint("<<< (Out Iface $num)");
