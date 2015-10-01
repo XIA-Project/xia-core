@@ -287,7 +287,7 @@ XStream::tcp_input(WritablePacket *p)
 				tp->iss = iss; 
 			} else {
 				printf("tcpinput TCPS_LISTEN: You should pick a correct tcpiss\n");
-				tp->iss = click_random(0, 0xffffffff); /* TODO: sensible iss function */
+				tp->iss = 0x1; /* TODO: sensible iss function */
 				//tp->iss = _tcp_iss(); /* suggested sensible iss function */
 			}
 			tp->irs = ti.ti_seq; 
@@ -373,7 +373,7 @@ XStream::tcp_input(WritablePacket *p)
 		if (ti.ti_len > tp->rcv_wnd) {
 			goto dropafterack;
 		}
-		tp->snd_wl1 = ti.ti_seq;    // @Harald: I noticed that these values were +1 greater than in the book
+		tp->snd_wl1 = ti.ti_seq - 1;    // @Harald: I noticed that these values were +1 greater than in the book
 		tp->rcv_up = ti.ti_seq + 1;  
 		goto step6;
 	}
