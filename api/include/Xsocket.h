@@ -40,7 +40,7 @@
 extern "C" {
 #endif
 
-#define MAXBUFLEN    15600 // Note that this limits the size of chunk we can receive TODO: What should this be?
+#define MAXBUFLEN    65535 // Note that this limits the size of chunk we can receive TODO: What should this be?
 #define XIA_MAXBUF   MAXBUFLEN
 #define XIA_MAXCHUNK MAXBUFLEN
 
