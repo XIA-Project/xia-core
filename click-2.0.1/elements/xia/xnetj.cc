@@ -1,5 +1,5 @@
 /*
- * xianetjoin.(cc,hh) --
+ * xnetj.(cc,hh) --
  *
  *
  * Copyright 2012 Carnegie Mellon University
@@ -18,7 +18,7 @@
  */
 
 #include <click/config.h>
-#include "xianetjoin.hh"
+#include "xnetj.hh"
 #include <clicknet/ether.h>
 #include <click/nameinfo.hh>
 #include <click/confparse.hh>
@@ -31,26 +31,26 @@
 
 CLICK_DECLS
 
-#define APIPORT           9228
-#define XIANETJOINDEVPORT 0
-#define XIANETJOINAPIPORT 1
+#define XNETJDEVPORT 0
+#define XNETJOINPORT 1
 
-XIANetJoin::XIANetJoin()
+XNetJ::XNetJ()
 {
 
 }
 
 // no cleanup needed
-XIANetJoin::~XIANetJoin()
+XNetJ::~XNetJ()
 {
 
 }
 
 // allow users to modify SRC/DST and the frequency of prints
 int
-XIANetJoin::configure(Vector<String> &conf, ErrorHandler *errh)
+XNetJ::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (cp_va_kparse(conf, this, errh,
+				"ETH", cpkP + cpkM, cpEtherAddress, &_my_en,
 				cpEnd) < 0)
         return -1; // error config
 
@@ -58,47 +58,51 @@ XIANetJoin::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 int
-XIANetJoin::initialize(ErrorHandler *)
+XNetJ::initialize(ErrorHandler *)
 {
     return 0;
 }
 
 void
-XIANetJoin::push(int in_port, Packet *p_in)
+XNetJ::push(int in_port, Packet *p_in)
 {
 	switch(in_port) {
-		case XIANETJOINDEVPORT:
+		case XNETJDEVPORT:
 			{
 			// Received a packet destined for this host
-			click_chatter("XIANetJoin: Received a packet from XNetJ");
+			click_chatter("XNetJ: Dev: Received a packet from network");
+			click_ether *e = (click_ether *)p_in->data();
 			std::string p_buf;
-			p_buf.assign((const char *)p_in->data(), (const char *)p_in->end_data());
+			p_buf.assign((const char *)p_in->data()+sizeof(click_ether), (const char *)p_in->end_data());
+			click_chatter("XNetJ: Extracted mac address from packet");
 			WritablePacket *apiPacket = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
+			/*
 			apiPacket->set_dst_ip_anno(IPAddress("127.0.0.1"));
 			SET_DST_PORT_ANNO(apiPacket, htons(APIPORT));
-			output(XIANETJOINAPIPORT).push(apiPacket);
+			*/
+			output(XNETJOINPORT).push(apiPacket);
 			}
 			break;
-		case XIANETJOINAPIPORT:
+		case XNETJOINPORT:
 			{
+			click_chatter("XNetJ: Received a packet from XNetJoin");
 			// Received a packet from NetJoin API to be sent on the wire
 			std::string p_buf;
 			p_buf.assign((const char *)p_in->data(), (const char *)p_in->end_data());
-			click_chatter("XIANetJoin: API: %s.", p_buf.c_str());
-			click_chatter("XIANetJoin: Sending unmodified API packet to XNetj");
+			click_chatter("XNetJ: API: %s.", p_buf.c_str());
 
-			/*
+			click_chatter("XNetJ: Building a mac header on XNetJoin packet");
 			WritablePacket *q = p_in->push_mac_header(sizeof(click_ether));
 			if(!q) {
-				click_chatter("XIANetJoin: ERROR: dropping API packet");
+				click_chatter("XNetJ: ERROR: dropping API packet");
 				return;
 			}
 			q->ether_header()->ether_type = htons(ETHERTYPE_XNETJ);
 			EtherAddress *dst_eth = reinterpret_cast<EtherAddress *>(q->ether_header()->ether_dhost);
 			memset(dst_eth, 0xff, 6);
 			memcpy(&q->ether_header()->ether_shost, _my_en.data(), 6);
-			*/
-			output(XIANETJOINDEVPORT).push(p_in);
+			click_chatter("XNetJ: Broadcasting XNetJoin packet");
+			output(XNETJDEVPORT).push(q);
 			/*
 			WritablePacket *reply = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
 			reply->set_dst_ip_anno(IPAddress("127.0.0.1"));
@@ -112,5 +116,5 @@ XIANetJoin::push(int in_port, Packet *p_in)
 }
 
 CLICK_ENDDECLS
-EXPORT_ELEMENT(XIANetJoin)
-ELEMENT_MT_SAFE(XIANetJoin)
+EXPORT_ELEMENT(XNetJ)
+ELEMENT_MT_SAFE(XNetJ)

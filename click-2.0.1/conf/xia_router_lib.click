@@ -134,8 +134,6 @@ elementclass XIALineCard {
 	c :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/C0DE, 12/9991);  // XARP (query) or XARP (response) or XIP or XIANetJoin
 	xarpq :: XARPQuerier($mac);
 	xarpr :: XARPResponder($mac);
-	netjoin :: XIANetJoin($mac);
-	XIAFromHost(8228) -> [0]netjoin[0] -> XIAToHost(8228)
 
 	print_in :: XIAPrint(">>> (In Iface $num) ");
 	print_out :: XIAPrint("<<< (Out Iface $num)");
@@ -161,6 +159,10 @@ elementclass XIALineCard {
 	// also, save the source port so we can use it in xtransport
 	input[0] -> XIAPaint(ANNO $SRC_PORT_ANNO, COLOR $num) -> c;
    
+	// Received a network joining packet
+	c[3] -> xnetj :: XNetJ($mac) -> toNet;
+	input[2] -> [1]xnetj[1] -> [2]output;
+
 	// Receiving an XIA packet
 	c[2] -> Strip(14) -> MarkXIAHeader() -> [0]xchal[0] -> [0]xresp[0] -> XIAPaint($num) -> print_in -> [1]output; // this should send out to [0]n; 
 
@@ -409,6 +411,7 @@ elementclass XIADualRouter4Port {
 elementclass XIAEndHost {
 	$click_port, $hostname, $mac0, $mac1, $mac2, $mac3 |
 
+	xianetjoin :: XIANetJoin();
 
 	// input: a packet arrived at the node
 	// output: forward to interface 0
@@ -426,6 +429,8 @@ elementclass XIAEndHost {
 
 	input => xlc0, xlc1, xlc2, xlc3 => output;
 	xrc -> XIAPaintSwitch[0,1,2,3] => [1]xlc0[1], [1]xlc1[1], [1]xlc2[1], [1]xlc3[1] -> [0]xrc;
+	xianetjoin[0] -> XIAPaintSwitch[0,1,2,3] => [2]xlc0[2], [2]xlc1[2], [2]xlc2[2], [2]xlc3[2] -> [0]xianetjoin;
+	XIAFromHost(9882) -> [1]xianetjoin[1] -> XIAToHost(9882);
 };
 
 // Endhost node with XRoute process running and IP support

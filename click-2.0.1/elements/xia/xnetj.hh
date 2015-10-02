@@ -15,8 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef CLICK_XIANETJOIN_HH
-#define CLICK_XIANETJOIN_HH
+#ifndef CLICK_XNETJ_HH
+#define CLICK_XNETJ_HH
 #include <click/element.hh>
 #include <click/glue.hh>
 #include <click/atomic.hh>
@@ -30,7 +30,7 @@ CLICK_DECLS
 /*
   =c
 
-  XIANetJoin(SRC, DST [, PRINT_EVERY])
+  XNetJ(SRC, DST [, PRINT_EVERY])
 
   =s xia
 
@@ -43,12 +43,12 @@ CLICK_DECLS
 
 */
 
-class XIANetJoin : public Element { public:
+class XNetJ : public Element { public:
 
-	XIANetJoin();
-    ~XIANetJoin();
+	XNetJ();
+    ~XNetJ();
 
-    const char *class_name() const		{ return "XIANetJoin"; }
+    const char *class_name() const		{ return "XNetJ"; }
     const char *port_count() const		{ return "2/2"; }
     const char *processing() const		{ return PUSH; }
 
@@ -59,6 +59,7 @@ class XIANetJoin : public Element { public:
 
 private:
 	char* _message;
+	EtherAddress _my_en;
 };
 
 CLICK_ENDDECLS
