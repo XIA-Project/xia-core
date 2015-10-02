@@ -105,7 +105,7 @@ void getConfig(int argc, char** argv)
 				// if 0, send random sized packets
 				pktSize = atoi(optarg);
 				if (pktSize < 0) pktSize = 0;
-				if (pktSize > XIA_MAXBUF) pktSize = XIA_MAXBUF;
+				// if (pktSize > XIA_MAXBUF) pktSize = XIA_MAXBUF;
 				break;
 			case 'r':
 				// close and reopen the connection every <reconnect> operations
@@ -201,16 +201,47 @@ int process(int sock)
 	int sent = 0;
 	int received = 0;
 	int rc = 0;
-	char buf1[XIA_MAXBUF + 1], buf2[XIA_MAXBUF + 1], temp[XIA_MAXBUF + 1];
+	char buf1[pktSize + 1], buf2[pktSize + 1], temp[pktSize + 1];
 
 	if (pktSize == 0)
-		size = (rand() % XIA_MAXBUF) + 1;
+		size = (rand() % pktSize) + 1;
 	else
 		size = pktSize;
 	randomString(buf1, size);
+	printf("%d\n", (int)size);
+	int count = size;
+	if (count <= 51200)
+	{
+		sent = Xsend(sock, buf1, count, 0);
+		if (sent < 0)
+		{
+			die(-4, "Send error %d on socket %d\n", errno, sock);
+		}
+	} else {
+		while (count > 0) {
+			if (count > 51200)
+			{
+			printf("count %d\n",count);
 
-	if ((sent = Xsend(sock, buf1, size, 0)) < 0)
-		die(-4, "Send error %d on socket %d\n", errno, sock);
+				sent = Xsend(sock, buf1, 51200, 0);
+				if (sent < 0)
+				{
+					die(-4, "Send error %d on socket %d\n", errno, sock);
+				}
+			} else {
+			printf("count %d\n",count);
+
+				sent = Xsend(sock, buf1, count, 0);
+								if (sent < 0)
+				{
+					die(-4, "Send error %d on socket %d\n", errno, sock);
+				}
+			}
+			count -= 51200;
+			printf("count %d\n",count);
+		}
+	}
+	
 
 	say("Xsock %4d sent %d of %d bytes\n", sock, sent, size);
 
@@ -223,7 +254,7 @@ int process(int sock)
 
 	memset(buf2, 0, sizeof(buf2));
 	memset(temp, 0, sizeof(temp));
-	int count = 0;
+	count = 0;
 	while (sent != received && (count = Xrecv(sock, temp, sizeof(temp), 0)) > 0) {
 		say("%5d received %d bytes\n", sock, count);
 		received += count;
