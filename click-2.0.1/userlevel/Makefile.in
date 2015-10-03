@@ -71,7 +71,7 @@ GENERIC_OBJS = string.o straccum.o nameinfo.o \
 	integers.o md5.o crc32.o in_cksum.o iptable.o \
 	archive.o userutils.o driver.o \
 	xid.o xidpair.o xiapath.o xiaheader.o xiaextheader.o xiacontentheader.o xiatransportheader.o xiautil.o xia.pb.o \
-	xiasecurity.o \
+	xcache.pb.o xiasecurity.o \
 	error-syslog.o \
 	$(EXTRA_DRIVER_OBJS)
 
@@ -113,6 +113,9 @@ INSTALLPROGS = $(DRIVER)
 
 all: $(INSTALLPROGS) $(INSTALLLIBS)
 
+xcache.pb.cc: xcache.proto
+	protoc --cpp_out=. xcache.proto
+
 xia.pb.cc: xia.proto
 	protoc --cpp_out=. --python_out=../../applications/web xia.proto
 
@@ -142,6 +145,7 @@ $(ELEMENTSCONF).cc: $(ELEMENTSCONF).conf $(top_builddir)/click-buildtool
 	$(call verbose_cmd,$(top_builddir)/click-buildtool elem2export < $(ELEMENTSCONF).conf >,CREATE,$(ELEMENTSCONF).cc)
 	@rm -f $(ELEMENTSCONF).d
 	echo '#include "xia.pb.h"' | cat - $(ELEMENTSCONF).cc  > temp && mv temp $(ELEMENTSCONF).cc
+	echo '#include "xcache.pb.h"' | cat - $(ELEMENTSCONF).cc  > temp && mv temp $(ELEMENTSCONF).cc
 
 DEPFILES := $(wildcard *.d)
 ifneq ($(DEPFILES),)
@@ -163,7 +167,7 @@ uninstall:
 	for i in $(INSTALLPROGS); do rm -f $(DESTDIR)$(bindir)/$$i; done
 
 clean:
-	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc elements.conf libclick.a xia.pb.h xia.pb.cc
+	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc elements.conf libclick.a xcache.pb.h xcache.pb.cc xia.pb.h xia.pb.cc
 clean-lib:
 	rm -f $(LIBOBJS) libclick.a
 distclean: clean
