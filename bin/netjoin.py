@@ -26,7 +26,7 @@ if __name__ == "__main__":
     while True:
         it += 1
         message = 'Iteration: ' + str(it)
-        sock.sendto(message, ('127.0.0.1', 8228))
+        sock.sendto(message, ('127.0.0.1', 9882))
         print 'Sent: ' + message
         reply = sock.recvfrom(1024)
         print 'Got: ', reply

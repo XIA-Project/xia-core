@@ -335,6 +335,8 @@ elementclass XIARouter4Port {
 	$click_port, $hostname, $external_ip,
 	$mac0, $mac1, $mac2, $mac3 |
 
+	xianetjoin :: XIANetJoin();
+
 	// $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
 	// $malicious_cache: if set to 1, the content cache responds with bad content
 
@@ -353,6 +355,9 @@ elementclass XIARouter4Port {
     
 	input => xlc0, xlc1, xlc2, xlc3 => output;
 	xrc -> XIAPaintSwitch[0,1,2,3] => [1]xlc0[1], [1]xlc1[1], [1]xlc2[1], [1]xlc3[1] -> [0]xrc;
+
+	xianetjoin[0] -> XIAPaintSwitch[0,1,2,3] => [2]xlc0[2], [2]xlc1[2], [2]xlc2[2], [2]xlc3[2] -> [0]xianetjoin;
+	XIAFromHost(9882) -> [1]xianetjoin[1] -> XIAToHost(9882);
 };
 
 // 4-port router node with XRoute process running and IP support
@@ -429,6 +434,7 @@ elementclass XIAEndHost {
 
 	input => xlc0, xlc1, xlc2, xlc3 => output;
 	xrc -> XIAPaintSwitch[0,1,2,3] => [1]xlc0[1], [1]xlc1[1], [1]xlc2[1], [1]xlc3[1] -> [0]xrc;
+
 	xianetjoin[0] -> XIAPaintSwitch[0,1,2,3] => [2]xlc0[2], [2]xlc1[2], [2]xlc2[2], [2]xlc3[2] -> [0]xianetjoin;
 	XIAFromHost(9882) -> [1]xianetjoin[1] -> XIAToHost(9882);
 };
