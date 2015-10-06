@@ -93,10 +93,12 @@ XIAInterfaceTable::~XIAInterfaceTable()
 bool XIAInterfaceTable::add(int iface, String dag)
 {
 	// Ensure interfaceToDag does not have an entry for iface
+	/* TODO: Nitin: This find() causes a segfault. Fix it.
 	if(interfaceToDag.find(iface) != interfaceToDag.end()) {
 		click_chatter("XIAInterfaceTable::add Entry for %d exists", iface);
 		return false;
 	}
+	*/
 	// Ensure dagToInterface does not have an entry for dag
 	//if(dagToInterface.find(dag) != dagToInterface.end()) {
 	//	click_chatter("XIAInterfaceTable::add Entry for %s exists", dag.c_str());
