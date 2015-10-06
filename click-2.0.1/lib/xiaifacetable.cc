@@ -5,30 +5,40 @@
 #include <click/xiapath.hh>
 
 
-XIAInterface::XIAInterface(String dag, String rv_control_dag)
+XIAInterface::XIAInterface(String dag, String rv_dag, String rv_control_dag)
 {
 	_dag = dag;
+	_rv_dag = rv_dag;
+	_rv_dag_exists = _is_valid_dag(_rv_dag);
 	_rv_control_dag = rv_control_dag;
-	_rv_control_dag_exists = false;
-	if(_rv_control_dag.length() > CLICK_XIA_XID_ID_LEN) {
-		_rv_control_dag_exists = true;
-	}
+	_rv_control_dag_exists = _is_valid_dag(_rv_control_dag);
 }
 
 XIAInterface::~XIAInterface()
 {
 	_rv_control_dag_exists = false;
 	_dag = "";
+	_rv_dag = "";
 	_rv_control_dag = "";
+}
+
+bool XIAInterface::_is_valid_dag(String dag)
+{
+	return (dag.length() > CLICK_XIA_XID_ID_LEN);
 }
 
 String XIAInterface::hid()
 {
-	XIAPath rvc_dag;
-	if(!rvc_dag.parse(_rv_control_dag)) {
+	XIAPath dag;
+	if(!dag.parse(_dag)) {
 		return "";
 	}
-	return rvc_dag.xid(rvc_dag.destination_node()).unparse();
+	return dag.xid(dag.destination_node()).unparse();
+}
+
+bool XIAInterface::has_rv_dag()
+{
+	return _rv_dag_exists;
 }
 
 bool XIAInterface::has_rv_control_dag()
@@ -39,6 +49,12 @@ bool XIAInterface::has_rv_control_dag()
 bool XIAInterface::update_dag(String dag)
 {
 	_dag = dag;
+	return true;
+}
+
+bool XIAInterface::update_rv_dag(String rv_dag)
+{
+	_rv_dag = rv_dag;
 	return true;
 }
 
@@ -125,6 +141,11 @@ bool XIAInterfaceTable::update(int iface, XIAPath dag)
 	return update(iface, dag.unparse());
 }
 
+bool XIAInterfaceTable::update_rv_dag(int iface, String dag)
+{
+	return interfaceToDag[iface].update_rv_dag(dag);
+}
+
 bool XIAInterfaceTable::update_rv_control_dag(int iface, String dag)
 {
 	return interfaceToDag[iface].update_rv_control_dag(dag);
@@ -151,7 +172,7 @@ bool XIAInterfaceTable::remove(int iface)
 	return true;
 }
 
-int XIAInterfaceTable::getIface(String dag)
+int XIAInterfaceTable::getIfaceID(String dag)
 {
 	ifaceDagIter = interfaceToDag.begin();
 	for(;ifaceDagIter!=interfaceToDag.end();ifaceDagIter++) {
