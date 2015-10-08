@@ -29,10 +29,11 @@ sys.path.append(XIADIR + '/api/lib')
 
 from c_xsocket import *
 
-SID = "SID:0f00000000000000000000000000000000001777"
 NAME = "www_s.dgram_echo.aaa.xia"
 
 try:
+	SID = XmakeNewSID()
+
 	sock = Xsocket(XSOCK_DGRAM)
 
 	(ad, hid, fid) = XreadLocalHostAddr(sock)
@@ -50,6 +51,7 @@ try:
 		Xsendto(sock, data, 0, cdag)
 
 	Xclose(sock)
+	XremoveSID(SID)
 
 except:
 	print "socket error"
