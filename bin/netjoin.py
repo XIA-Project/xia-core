@@ -28,6 +28,6 @@ if __name__ == "__main__":
         message = 'Iteration: ' + str(it)
         sock.sendto(message, ('127.0.0.1', 9882))
         print 'Sent: ' + message
-        reply = sock.recvfrom(1024)
-        print 'Got: ', reply
+        reply, sender = sock.recvfrom(1024)
+        print 'Got: %s' % reply
         time.sleep(1)
