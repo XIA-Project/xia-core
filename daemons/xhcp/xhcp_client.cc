@@ -291,6 +291,8 @@ void register_with_gw_router(int sockfd, std::string hid, bool network_changed)
 
 int main(int argc, char *argv[]) {
 	int sockfd;
+	int netjoinfd;
+	struct sockaddr_in my_addr;
 	string default_AD("AD:-"), default_HID("HID:-"), default_4ID("IP:-");
 	string empty_str("");
 	unsigned gw_register_countdown = ceil(XHCP_CLIENT_ADVERTISE_INTERVAL/XHCP_SERVER_BEACON_INTERVAL);
@@ -306,6 +308,22 @@ int main(int argc, char *argv[]) {
 	// Receive beacon from an interface.
 	if((sockfd = initialize(interfaces)) < 0) {
 		syslog(LOG_ERR, "Failed to set up beacon receiver\n");
+		return -1;
+	}
+
+	// Network joining socket to receive XNetJoin messages
+	netjoinfd = socket(AF_INET, SOCK_DGRAM, 0);
+	if(netjoinfd < 0) {
+		syslog(LOG_ERR, "Failed creating netjoin socket\n");
+		return -1;
+	}
+
+	// Bind the socket to XNetJoin API port
+	my_addr.sin_family = AF_INET;
+	my_addr.sin_addr.s_addr = INADDR_ANY;
+	my_addr.sin_port = htons(XIANETJOIN_API_PORT);
+	if (bind(netjoinfd, (struct sockaddr *)&my_addr, sizeof(struct sockaddr_in)) == -1) {
+		syslog(LOG_ERR, "Failed binding to netjoin API port\n");
 		return -1;
 	}
 	// If AD changes - update XupdateAD(ifID, HID, AD, R4ID) - Xtransport updates DAG for ifID in XIAInterfaceTable (Interface, DAG). Set DESTINED_FOR_LOCALHOST route for new AD and delete route for old AD.
@@ -376,11 +394,28 @@ int main(int argc, char *argv[]) {
 		bool r4id_changed = false;
 		bool ns_changed = false;
 		bool rv_changed = false;
+		struct sockaddr_in xianetjoin_addr;
+		socklen_t xianetjoin_addrlen = sizeof(xianetjoin_addr);
+		int retval;
 
+		/*
 		if(get_beacon(sockfd, &ifID, buf, XIA_MAXBUF)) {
 			syslog(LOG_ERR, "ERROR receiving beacon\n");
 			continue;
 		}
+		*/
+		retval = recvfrom(netjoinfd, buf, XIA_MAXBUF, 0, (struct sockaddr *)&xianetjoin_addr, &xianetjoin_addrlen);
+		if(retval < 0) {
+			syslog(LOG_ERR, "Failed receiving packet from XIANetJoin element");
+			return -1;
+		}
+		syslog(LOG_INFO, "Received beacon of size %d\n", retval);
+		syslog(LOG_INFO, "Beacon raw contents: %s.\n", buf);
+
+		// TODO: HACK: Nitin fix. Interface ID should be received from XIANetJoin element
+		ifID = 0;
+
+		// Convert beacon to in-memory object
 		XHCPBeacon beacon(buf);
 		XHCPInterface &iface = interfaces[ifID];
 		/*
@@ -492,12 +527,14 @@ int main(int argc, char *argv[]) {
 		}
 
 		if(rv_changed) {
+			printf("Rendezvous service dag changed\n");
 			if(XupdateRV(sockfd, ifID, beacon.getRendezvousControlDAG().c_str()) < 0) {
 				syslog(LOG_ERR, "Unable to update rendezvous server with new locator");
 			}
 		}
 
 		if(gw_register_countdown-- <= 0) {
+			printf("Registering with gateway router\n");
 			register_with_gw_router(sockfd, iface.getHID(), network_changed);
 			gw_register_countdown = ceil(XHCP_CLIENT_ADVERTISE_INTERVAL/XHCP_SERVER_BEACON_INTERVAL);
 		}

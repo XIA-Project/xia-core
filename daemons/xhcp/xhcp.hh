@@ -39,6 +39,9 @@
 #define SOURCE_DIR "xia-core"
 #define RESOLV_CONF "/etc/resolv.conf"
 
+#define XIANETJOIN_API_PORT 9228
+#define XIANETJOIN_ELEMENT_PORT 9882
+
 typedef struct xhcp_pkt_entry {
 	short type;
 	char data[];

@@ -166,6 +166,7 @@ void processHostRegister(const char* host_register_msg) {
 	size_t found, start;
 	string msg, hostHID;
 	start = 0;
+	printf("xrouted: Registering: %s.\n", host_register_msg);
 	msg = host_register_msg;
  	// read message-type
 	found=msg.find("^", start);
@@ -181,6 +182,7 @@ void processHostRegister(const char* host_register_msg) {
   	}
 
  	int interface = interfaceNumber("HID", hostHID);
+	printf("xrouted: Routing table entry: interface=%d, host=%s\n", interface, hostHID.c_str());
 	// update the host entry in (click-side) HID table
 	if ((rc = xr.setRoute(hostHID, interface, hostHID, 0xffff)) != 0)
 		syslog(LOG_ERR, "unable to set route %d", rc);

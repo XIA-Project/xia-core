@@ -78,6 +78,11 @@ int main(int argc, char *argv[]) {
 	char gw_router_4id[MAX_XID_SIZE];
 	bool rendezvous = false;
 
+	struct sockaddr_in xianetjoin_addr;
+	xianetjoin_addr.sin_family = AF_INET;
+	xianetjoin_addr.sin_addr.s_addr = INADDR_ANY;
+	xianetjoin_addr.sin_port = htons(XIANETJOIN_ELEMENT_PORT);
+
 	config(argc, argv);
 	syslog(LOG_NOTICE, "%s started on %s", APPNAME, hostname);
 
@@ -85,6 +90,13 @@ int main(int argc, char *argv[]) {
 	int sockfd = Xsocket(AF_XIA, SOCK_DGRAM, 0);
 	if (sockfd < 0) {
 		syslog(LOG_ERR, "Unable to create a socket");
+		exit(-1);
+	}
+
+	// NetJoin socket
+	int netjoinfd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (netjoinfd < 0) {
+		syslog(LOG_ERR, "Unable to create netjoin socket");
 		exit(-1);
 	}
 
@@ -147,7 +159,8 @@ int main(int argc, char *argv[]) {
 		int pktlen = beacon.to_string().size() + 1;
 
 		// send out packet
-		rc = Xsendto(sockfd, pkt, pktlen, 0, (struct sockaddr*)&ddag, sizeof(ddag));
+		//rc = Xsendto(sockfd, pkt, pktlen, 0, (struct sockaddr*)&ddag, sizeof(ddag));
+		rc = sendto(netjoinfd, pkt, pktlen, 0, (struct sockaddr*)&xianetjoin_addr, sizeof(xianetjoin_addr));
 		if (rc < 0)
 			syslog(LOG_WARNING, "Error sending beacon: %s", strerror(rc));
 		sleep(XHCP_SERVER_BEACON_INTERVAL);
