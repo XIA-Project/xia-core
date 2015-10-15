@@ -76,10 +76,6 @@ XNetJ::push(int in_port, Packet *p_in)
 			p_buf.assign((const char *)p_in->data()+sizeof(click_ether), (const char *)p_in->end_data());
 			click_chatter("XNetJ: Extracted mac address from packet");
 			WritablePacket *apiPacket = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
-			/*
-			apiPacket->set_dst_ip_anno(IPAddress("127.0.0.1"));
-			SET_DST_PORT_ANNO(apiPacket, htons(APIPORT));
-			*/
 			output(XNETJOINPORT).push(apiPacket);
 			}
 			break;
@@ -103,13 +99,6 @@ XNetJ::push(int in_port, Packet *p_in)
 			memcpy(&q->ether_header()->ether_shost, _my_en.data(), 6);
 			click_chatter("XNetJ: Broadcasting XNetJoin packet");
 			output(XNETJDEVPORT).push(q);
-			/*
-			WritablePacket *reply = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
-			reply->set_dst_ip_anno(IPAddress("127.0.0.1"));
-			SET_DST_PORT_ANNO(reply, htons(9228));
-			// Just forward the packet back to API
-			output(0).push(reply);
-			*/
 			}
 			break;
 	};
