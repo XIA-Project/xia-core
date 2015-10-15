@@ -70,11 +70,18 @@ XNetJ::push(int in_port, Packet *p_in)
 		case XNETJDEVPORT:
 			{
 			// Received a packet destined for this host
-			click_chatter("XNetJ: Dev: Received a packet from network");
+			uint16_t iface = SRC_PORT_ANNO(p_in);
+			click_chatter("XNetJ: Dev: Interface %d: Got packet", (int)iface);
 			click_ether *e = (click_ether *)p_in->data();
 			std::string p_buf;
+
+			// Strip ethernet header from packet
 			p_buf.assign((const char *)p_in->data()+sizeof(click_ether), (const char *)p_in->end_data());
-			click_chatter("XNetJ: Extracted mac address from packet");
+
+			// Prepend netj header containing src mac address and iface num
+			p_buf.insert(0, (const char *)e->ether_shost, 6);
+			p_buf.insert(0, (const char *)&iface, 2);
+
 			WritablePacket *apiPacket = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
 			output(XNETJOINPORT).push(apiPacket);
 			}

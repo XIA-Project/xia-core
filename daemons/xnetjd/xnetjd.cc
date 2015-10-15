@@ -35,7 +35,7 @@ class NetjoinLocalHeader {
 				cout << "ERROR: Netjoin message with invalid header" << endl;
 				return;
 			}
-			_interfaceID = (int)*netjoinmsg;
+			_interfaceID = (uint16_t)*netjoinmsg;
 			memcpy(_sender_mac_addr, netjoinmsg+1, 6);
 			for(int i=0; i<6; i++) {
 				snprintf(&_sender_mac_addr_str[i*3], 1, "%02x:", _sender_mac_addr[i]);
