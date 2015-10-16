@@ -107,6 +107,12 @@ protected:
 
     void forward_packet(Packet *m, uint32_t from_local_ad,
 					 uint8_t dpdk_rx_port);
+    void ingress_shortcut_xovr(Packet *m, uint8_t dpdk_rx_port);
+    void ingress_peer_xovr(Packet *m, uint8_t dpdk_rx_port);
+    void ingress_core_xovr(Packet *m, uint8_t dpdk_rx_port);
+    void handle_ingress_xovr(Packet *m, uint8_t dpdk_rx_port);
+    uint8_t verify_of(HopOpaqueField *hof, HopOpaqueField *prev_hof,
+                                       uint32_t ts);
 
 
 private:

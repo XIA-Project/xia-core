@@ -969,6 +969,7 @@ void XIANEWXIDRouteTable::deliver(Packet *m, uint32_t ptype,
   */
   // TODO update destination MAC address
   l2fwd_send_packet(m, port_map[dpdk_rx_port].local);
+  return;
 }
 
 void XIANEWXIDRouteTable::forward_packet(Packet *m, uint32_t from_local_ad,
@@ -1002,109 +1003,28 @@ void XIANEWXIDRouteTable::forward_packet(Packet *m, uint32_t from_local_ad,
       /*egress_normal_forward(m, dpdk_rx_port);*/
     }
   }
+  return;
 }
 
-void XIANEWXIDRouteTable::handle_ingress_xovr(Packet *m, uint8_t dpdk_rx_port) {
-  SCIONHeader *scion_hdr;
-  SCIONCommonHeader *sch;
-  HopOpaqueField *hof;
-  InfoOpaqueField *iof;
-  /*
-  RTE_LOG(DEBUG, HSR, "handle ingresst xovr\n");
-  scion_hdr = (SCIONHeader *)(rte_pktmbuf_mtod(m, unsigned char *)+sizeof(
-                                  struct ether_hdr) +
-                              sizeof(struct ipv4_hdr) + sizeof(struct udp_hdr));
-  */
-
-  sch = &(scion_hdr->commonHeader);
-  hof = (HopOpaqueField *)((unsigned char *)sch + sch->currentOF +
-                           SCION_COMMON_HEADER_LEN);
-  iof = (InfoOpaqueField *)((unsigned char *)sch + sch->currentIOF +
-                            SCION_COMMON_HEADER_LEN);
-
-  if (iof->info == OFT_SHORTCUT) {
-    ingress_shortcut_xovr(m, dpdk_rx_port);
-  } else if (iof->info == OFT_INTRA_ISD_PEER ||
-             iof->info == OFT_INTER_ISD_PEER) {
-    ingress_peer_xovr(m, dpdk_rx_port);
-  } else if (iof->info == OFT_CORE) {
-    ingress_core_xovr(m, dpdk_rx_port);
-  } else {
-    // invalid OF
-  }
-}
-
-/*
-static inline uint8_t verify_of(HopOpaqueField *hof, HopOpaqueField *prev_hof,
-                                uint32_t ts) {
-
-#ifndef VERIFY_OF
-  return 1;
-#endif
-
-#define MAC_LEN 3
-
-  unsigned char input[16];
-  unsigned char mac[16];
-
-  RTE_LOG(DEBUG, HSR, "verify_of\n");
-
-  // setup input vector
-  // rte_mov32 ((void*)input, (void *)hof+1); //copy exp_type and
-  // ingress/egress IF (4bytes)
-  // rte_mov64 ((void*)input+4, (void *)prev_hof+1); //copy previous OF except
-  // info field (7bytes)
-  // rte_mov32 ((void*)input+11, (void*)&ts);
-
-  rte_memcpy((void *)input, (void *)hof + 1,
-             4); // copy exp_type and  ingress/egress IF (4bytes)
-  rte_memcpy((void *)input + 4, (void *)prev_hof + 1,
-             7); // copy previous OF except info field (7bytes)
-  rte_memcpy((void *)input + 11, (void *)&ts, 4);
-
-  // pkcs7_padding
-  input[15] = 1;
-
-  // call AES-NI
-  // int i;
-  // for (i = 0; i < 16; i++)
-  //  printf("%02x", input[i]);
-  // printf("\n");
-  CBCMAC1BLK(rk.roundkey, rk.iv, input, mac);
-  // for (i = 0; i < 16; i++)
-  //  printf("%02x", mac[i]);
-  // printf("\n");
-
-  if (memcmp((void *)hof + 5, &mac,
-             MAC_LEN)) { // (void *)hof + 5 is address of mac.
-    return 1;
-  } else {
-    RTE_LOG(WARNING, HSR, "invalid MAC\n");
-    // return 0;
-    // TODO DEBUG, currently disable MAC check
-    return 1;
-  }
-}
-
-
-static inline void ingress_shortcut_xovr(struct rte_mbuf *m,
+void XIANEWXIDRouteTable::ingress_shortcut_xovr(Packet *m,
                                          uint8_t dpdk_rx_port) {
   SCIONHeader *scion_hdr;
   SCIONCommonHeader *sch;
   HopOpaqueField *hof;
   HopOpaqueField *prev_hof;
   InfoOpaqueField *iof;
-
+  /*
   RTE_LOG(DEBUG, HSR, "ingress shortcut xovr\n");
   scion_hdr = (SCIONHeader *)(rte_pktmbuf_mtod(m, unsigned char *)+sizeof(
                                   struct ether_hdr) +
                               sizeof(struct ipv4_hdr) + sizeof(struct udp_hdr));
+  */
   sch = &(scion_hdr->commonHeader);
   hof = (HopOpaqueField *)((unsigned char *)sch + sch->currentOF +
                            SCION_COMMON_HEADER_LEN);
   iof = (InfoOpaqueField *)((unsigned char *)sch + sch->currentIOF +
                             SCION_COMMON_HEADER_LEN);
-
+  
   prev_hof = hof + 1;
   if (verify_of(hof, prev_hof, iof->timestamp) == 0) {
     return;
@@ -1129,18 +1049,23 @@ static inline void ingress_shortcut_xovr(struct rte_mbuf *m,
   } else {
     send_ingress(m, EGRESS_IF(hof), dpdk_rx_port);
   }
+  return;
 }
-static inline void ingress_peer_xovr(struct rte_mbuf *m, uint8_t dpdk_rx_port) {
+
+void XIANEWXIDRouteTable::ingress_peer_xovr(Packet *m, uint8_t dpdk_rx_port) {
   SCIONHeader *scion_hdr;
   SCIONCommonHeader *sch;
   HopOpaqueField *hof;
   HopOpaqueField *prev_hof;
   InfoOpaqueField *iof;
 
+  /*
   RTE_LOG(DEBUG, HSR, "ingress peer xovr\n");
   scion_hdr = (SCIONHeader *)(rte_pktmbuf_mtod(m, unsigned char *)+sizeof(
                                   struct ether_hdr) +
                               sizeof(struct ipv4_hdr) + sizeof(struct udp_hdr));
+  */
+
   sch = &(scion_hdr->commonHeader);
   hof = (HopOpaqueField *)((unsigned char *)sch + sch->currentOF +
                            SCION_COMMON_HEADER_LEN);
@@ -1168,17 +1093,18 @@ static inline void ingress_peer_xovr(struct rte_mbuf *m, uint8_t dpdk_rx_port) {
     send_ingress(m, fwd_if, dpdk_rx_port);
 }
 
-static inline void ingress_core_xovr(struct rte_mbuf *m, uint8_t dpdk_rx_port) {
+void XIANEWXIDRouteTable::ingress_core_xovr(Packet *m, uint8_t dpdk_rx_port) {
   SCIONHeader *scion_hdr;
   SCIONCommonHeader *sch;
   HopOpaqueField *hof;
   HopOpaqueField *prev_hof;
   InfoOpaqueField *iof;
-
+  /*
   RTE_LOG(DEBUG, HSR, "ingress peer xovr\n");
   scion_hdr = (SCIONHeader *)(rte_pktmbuf_mtod(m, unsigned char *)+sizeof(
                                   struct ether_hdr) +
                               sizeof(struct ipv4_hdr) + sizeof(struct udp_hdr));
+  */
   sch = &(scion_hdr->commonHeader);
   hof = (HopOpaqueField *)((unsigned char *)sch + sch->currentOF +
                            SCION_COMMON_HEADER_LEN);
@@ -1215,6 +1141,94 @@ static inline void ingress_core_xovr(struct rte_mbuf *m, uint8_t dpdk_rx_port) {
   }
 }
 
+
+void XIANEWXIDRouteTable::handle_ingress_xovr(Packet *m, uint8_t dpdk_rx_port) {
+  SCIONHeader *scion_hdr;
+  SCIONCommonHeader *sch;
+  HopOpaqueField *hof;
+  InfoOpaqueField *iof;
+  /*
+  RTE_LOG(DEBUG, HSR, "handle ingresst xovr\n");
+  scion_hdr = (SCIONHeader *)(rte_pktmbuf_mtod(m, unsigned char *)+sizeof(
+                                  struct ether_hdr) +
+                              sizeof(struct ipv4_hdr) + sizeof(struct udp_hdr));
+  */
+
+  sch = &(scion_hdr->commonHeader);
+  hof = (HopOpaqueField *)((unsigned char *)sch + sch->currentOF +
+                           SCION_COMMON_HEADER_LEN);
+  iof = (InfoOpaqueField *)((unsigned char *)sch + sch->currentIOF +
+                            SCION_COMMON_HEADER_LEN);
+
+  if (iof->info == OFT_SHORTCUT) {
+    ingress_shortcut_xovr(m, dpdk_rx_port);
+  } else if (iof->info == OFT_INTRA_ISD_PEER ||
+             iof->info == OFT_INTER_ISD_PEER) {
+    ingress_peer_xovr(m, dpdk_rx_port);
+  } else if (iof->info == OFT_CORE) {
+    ingress_core_xovr(m, dpdk_rx_port);
+  } else {
+    // invalid OF
+  }
+}
+
+
+uint8_t XIANEWXIDRouteTable::verify_of(HopOpaqueField *hof, HopOpaqueField *prev_hof,
+                                       uint32_t ts) {
+
+  return 1;
+  /*
+#ifndef VERIFY_OF
+  return 1;
+#endif
+
+#define MAC_LEN 3
+
+  unsigned char input[16];
+  unsigned char mac[16];
+
+  //RTE_LOG(DEBUG, HSR, "verify_of\n");
+
+  // setup input vector
+  // rte_mov32 ((void*)input, (void *)hof+1); //copy exp_type and
+  // ingress/egress IF (4bytes)
+  // rte_mov64 ((void*)input+4, (void *)prev_hof+1); //copy previous OF except
+  // info field (7bytes)
+  // rte_mov32 ((void*)input+11, (void*)&ts);
+
+  rte_memcpy((void *)input, (void *)hof + 1,
+             4); // copy exp_type and  ingress/egress IF (4bytes)
+  rte_memcpy((void *)input + 4, (void *)prev_hof + 1,
+             7); // copy previous OF except info field (7bytes)
+  rte_memcpy((void *)input + 11, (void *)&ts, 4);
+
+  // pkcs7_padding
+  input[15] = 1;
+
+  // call AES-NI
+  // int i;
+  // for (i = 0; i < 16; i++)
+  //  printf("%02x", input[i]);
+  // printf("\n");
+  CBCMAC1BLK(rk.roundkey, rk.iv, input, mac);
+  // for (i = 0; i < 16; i++)
+  //  printf("%02x", mac[i]);
+  // printf("\n");
+
+  if (memcmp((void *)hof + 5, &mac,
+             MAC_LEN)) { // (void *)hof + 5 is address of mac.
+    return 1;
+  } else {
+    RTE_LOG(WARNING, HSR, "invalid MAC\n");
+    // return 0;
+    // TODO DEBUG, currently disable MAC check
+    return 1;
+  }
+  */
+}
+
+
+/*
 static inline void ingress_normal_forward(struct rte_mbuf *m,
                                           uint8_t dpdk_rx_port) {
   SCIONHeader *scion_hdr;
