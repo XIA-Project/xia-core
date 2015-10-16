@@ -122,7 +122,8 @@ protected:
   void egress_core_xovr(Packet *m, uint8_t dpdk_rx_port);
   void egress_normal_forward(Packet *m,
 			   uint8_t dpdk_rx_port);
-
+  void handle_request(Packet *m, uint8_t dpdk_rx_port);
+  
 
 private:
 	HashTable<XID, XIARouteData*> _rts;

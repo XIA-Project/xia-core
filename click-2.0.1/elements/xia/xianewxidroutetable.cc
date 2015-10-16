@@ -1417,29 +1417,29 @@ void XIANEWXIDRouteTable::egress_normal_forward(Packet *m,
 }
 
 
-/*
-void handle_request(struct rte_mbuf *m, uint8_t dpdk_rx_port) {
+void XIANEWXIDRouteTable::handle_request(Packet *m, uint8_t dpdk_rx_port) {
   struct ether_hdr *eth_hdr;
   SCIONHeader *scion_hdr;
-
+  /*
   RTE_LOG(DEBUG, HSR, "packet recieved, dpdk_port=%d\n", dpdk_rx_port);
 
   eth_hdr = rte_pktmbuf_mtod(m, struct ether_hdr *);
-
+  */
   // if (m->ol_flags & PKT_RX_IPV4_HDR )
-  if (m->ol_flags & PKT_RX_IPV4_HDR || eth_hdr->ether_type == ntohs(0x0800)) {
+  //if (m->ol_flags & PKT_RX_IPV4_HDR || eth_hdr->ether_type == ntohs(0x0800)) {
+  if (1) {
 
     // from local socket?
     uint8_t from_local_socket = 0;
     if (dpdk_rx_port % 2 == 1) {
       from_local_socket = 1;
     }
-
+    /*
     scion_hdr =
         (SCIONHeader *)(rte_pktmbuf_mtod(m, unsigned char *)+sizeof(
                             struct ether_hdr) +
                         sizeof(struct ipv4_hdr) + sizeof(struct udp_hdr));
-
+    */
     uint8_t ptype = get_type(scion_hdr);
     switch (ptype) {
     case DATA_PACKET:
@@ -1448,8 +1448,8 @@ void handle_request(struct rte_mbuf *m, uint8_t dpdk_rx_port) {
     case IFID_PKT_PACKET:
       if (!from_local_socket)
         process_ifid_request(m, dpdk_rx_port);
-      else
-        RTE_LOG(WARNING, HSR, "IFID packet from local socket\n");
+      //else
+      //  RTE_LOG(WARNING, HSR, "IFID packet from local socket\n");
 
       break;
     case BEACON_PACKET:
@@ -1465,12 +1465,12 @@ void handle_request(struct rte_mbuf *m, uint8_t dpdk_rx_port) {
       process_path_mgmt_packet(m, from_local_socket, dpdk_rx_port);
       break;
     default:
-      RTE_LOG(DEBUG, HSR, "unknown packet type %d ?\n", ptype);
+      //RTE_LOG(DEBUG, HSR, "unknown packet type %d ?\n", ptype);
       break;
     }
   }
 }
-*/
+
 void XIANEWXIDRouteTable::l2fwd_send_packet(Packet *m, uint8_t port){
   return;
 }
