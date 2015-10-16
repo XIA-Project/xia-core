@@ -993,14 +993,14 @@ void XIANEWXIDRouteTable::forward_packet(Packet *m, uint32_t from_local_ad,
     if (hof->info == OFT_XOVR_POINT) {
       handle_ingress_xovr(m, dpdk_rx_port);
     } else {
-      /*ingress_normal_forward(m, dpdk_rx_port);*/
+      ingress_normal_forward(m, dpdk_rx_port);
     }
   } else {
     // Egress entry point
     if (hof->info == OFT_XOVR_POINT) {
-      /*handle_egress_xovr(m, dpdk_rx_port);*/
+      handle_egress_xovr(m, dpdk_rx_port);
     } else {
-      /*egress_normal_forward(m, dpdk_rx_port);*/
+      egress_normal_forward(m, dpdk_rx_port);
     }
   }
   return;
@@ -1228,8 +1228,7 @@ uint8_t XIANEWXIDRouteTable::verify_of(HopOpaqueField *hof, HopOpaqueField *prev
 }
 
 
-/*
-static inline void ingress_normal_forward(struct rte_mbuf *m,
+void XIANEWXIDRouteTable::ingress_normal_forward(Packet *m,
                                           uint8_t dpdk_rx_port) {
   SCIONHeader *scion_hdr;
   SCIONCommonHeader *sch;
@@ -1237,10 +1236,12 @@ static inline void ingress_normal_forward(struct rte_mbuf *m,
   HopOpaqueField *prev_hof;
   InfoOpaqueField *iof;
 
-  RTE_LOG(DEBUG, HSR, "ingress normal forward\n");
+  //RTE_LOG(DEBUG, HSR, "ingress normal forward\n");
+  /*
   scion_hdr = (SCIONHeader *)(rte_pktmbuf_mtod(m, unsigned char *)+sizeof(
                                   struct ether_hdr) +
                               sizeof(struct ipv4_hdr) + sizeof(struct udp_hdr));
+  */
   sch = &(scion_hdr->commonHeader);
   hof = (HopOpaqueField *)((unsigned char *)sch + sch->currentOF +
                            SCION_COMMON_HEADER_LEN);
@@ -1268,16 +1269,18 @@ static inline void ingress_normal_forward(struct rte_mbuf *m,
   }
 }
 
-static inline void handle_egress_xovr(struct rte_mbuf *m, uint8_t dpdk_rx_port) {
+
+void XIANEWXIDRouteTable::handle_egress_xovr(Packet *m, uint8_t dpdk_rx_port) {
   SCIONHeader *scion_hdr;
   SCIONCommonHeader *sch;
   HopOpaqueField *hof;
   InfoOpaqueField *iof;
-
+  /*
   RTE_LOG(DEBUG, HSR, "handle egress xovr\n");
   scion_hdr = (SCIONHeader *)(rte_pktmbuf_mtod(m, unsigned char *)+sizeof(
                                   struct ether_hdr) +
                               sizeof(struct ipv4_hdr) + sizeof(struct udp_hdr));
+  */
   sch = &(scion_hdr->commonHeader);
   iof = (InfoOpaqueField *)((unsigned char *)sch + sch->currentIOF +
                             SCION_COMMON_HEADER_LEN);
@@ -1294,21 +1297,25 @@ static inline void handle_egress_xovr(struct rte_mbuf *m, uint8_t dpdk_rx_port) 
   }
 }
 
-static inline void egress_shortcut_xovr(struct rte_mbuf *m, uint8_t dpdk_rx_port) {
+
+void XIANEWXIDRouteTable::egress_shortcut_xovr(Packet *m, uint8_t dpdk_rx_port) {
   egress_normal_forward(m, dpdk_rx_port);
 }
-static inline void egress_peer_xovr(struct rte_mbuf *m, uint8_t dpdk_rx_port) {
+
+
+void XIANEWXIDRouteTable::egress_peer_xovr(Packet *m, uint8_t dpdk_rx_port) {
   struct ether_hdr *eth_hdr;
   SCIONHeader *scion_hdr;
   SCIONCommonHeader *sch;
   HopOpaqueField *hof;
   HopOpaqueField *prev_hof;
   InfoOpaqueField *iof;
-
+  /*
   RTE_LOG(DEBUG, HSR, "egress normal forward\n");
   scion_hdr = (SCIONHeader *)(rte_pktmbuf_mtod(m, unsigned char *)+sizeof(
                                   struct ether_hdr) +
                               sizeof(struct ipv4_hdr) + sizeof(struct udp_hdr));
+  */
   sch = &(scion_hdr->commonHeader);
   hof = (HopOpaqueField *)((unsigned char *)sch + sch->currentOF +
                            SCION_COMMON_HEADER_LEN);
@@ -1335,18 +1342,20 @@ static inline void egress_peer_xovr(struct rte_mbuf *m, uint8_t dpdk_rx_port) {
 
   send_egress(m, dpdk_rx_port);
 }
-static inline void egress_core_xovr(struct rte_mbuf *m, uint8_t dpdk_rx_port) {
+
+void XIANEWXIDRouteTable::egress_core_xovr(Packet *m, uint8_t dpdk_rx_port) {
   struct ether_hdr *eth_hdr;
   SCIONHeader *scion_hdr;
   SCIONCommonHeader *sch;
   HopOpaqueField *hof;
   HopOpaqueField *prev_hof;
   InfoOpaqueField *iof;
-
+  /*
   RTE_LOG(DEBUG, HSR, "egress core xovr\n");
   scion_hdr = (SCIONHeader *)(rte_pktmbuf_mtod(m, unsigned char *)+sizeof(
                                   struct ether_hdr) +
                               sizeof(struct ipv4_hdr) + sizeof(struct udp_hdr));
+  */
   sch = &(scion_hdr->commonHeader);
   hof = (HopOpaqueField *)((unsigned char *)sch + sch->currentOF +
                            SCION_COMMON_HEADER_LEN);
@@ -1367,7 +1376,8 @@ static inline void egress_core_xovr(struct rte_mbuf *m, uint8_t dpdk_rx_port) {
   send_egress(m, dpdk_rx_port);
 }
 
-static inline void egress_normal_forward(struct rte_mbuf *m,
+
+void XIANEWXIDRouteTable::egress_normal_forward(Packet *m,
                                          uint8_t dpdk_rx_port) {
   struct ether_hdr *eth_hdr;
   SCIONHeader *scion_hdr;
@@ -1375,11 +1385,12 @@ static inline void egress_normal_forward(struct rte_mbuf *m,
   HopOpaqueField *hof;
   HopOpaqueField *prev_hof;
   InfoOpaqueField *iof;
-
+  /*
   RTE_LOG(DEBUG, HSR, "egress normal forward\n");
   scion_hdr = (SCIONHeader *)(rte_pktmbuf_mtod(m, unsigned char *)+sizeof(
                                   struct ether_hdr) +
                               sizeof(struct ipv4_hdr) + sizeof(struct udp_hdr));
+  */
   sch = &(scion_hdr->commonHeader);
   hof = (HopOpaqueField *)((unsigned char *)sch + sch->currentOF +
                            SCION_COMMON_HEADER_LEN);
@@ -1393,17 +1404,18 @@ static inline void egress_normal_forward(struct rte_mbuf *m,
     prev_hof = hof - 1;
   }
 
+  
   // TODO  verify MAC
   if (verify_of(hof, prev_hof, iof->timestamp) == 0) {
     return;
   }
-
+  
   sch + sch->currentOF + sizeof(HopOpaqueField);
 
   // send packet to neighbor AD's router
   send_egress(m, dpdk_rx_port);
 }
-*/
+
 
 /*
 void handle_request(struct rte_mbuf *m, uint8_t dpdk_rx_port) {

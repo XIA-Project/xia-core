@@ -86,8 +86,10 @@ protected:
     int sync_interface(void); 
     // send a packet to neighbor AD router
     int send_egress(Packet *m, uint8_t dpdk_rx_port);
+
     int send_ingress(Packet *m, uint32_t next_ifid,
   			      uint8_t dpdk_rx_port);
+
     uint8_t get_type(SCIONHeader *hdr);
     void process_ifid_request(Packet *m, uint8_t dpdk_rx_port);
     void l2fwd_send_packet(Packet *m, uint8_t port);
@@ -113,6 +115,13 @@ protected:
     void handle_ingress_xovr(Packet *m, uint8_t dpdk_rx_port);
     uint8_t verify_of(HopOpaqueField *hof, HopOpaqueField *prev_hof,
                                        uint32_t ts);
+  void ingress_normal_forward(Packet *m, uint8_t dpdk_rx_port);
+  void handle_egress_xovr(Packet *m, uint8_t dpdk_rx_port);
+  void egress_shortcut_xovr(Packet *m, uint8_t dpdk_rx_port);
+  void egress_peer_xovr(Packet *m, uint8_t dpdk_rx_port);
+  void egress_core_xovr(Packet *m, uint8_t dpdk_rx_port);
+  void egress_normal_forward(Packet *m,
+			   uint8_t dpdk_rx_port);
 
 
 private:
