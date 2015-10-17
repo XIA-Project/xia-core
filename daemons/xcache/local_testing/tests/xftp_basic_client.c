@@ -172,7 +172,7 @@ int getListedChunks(FILE *fd, char *url, int n_chunks)
 	int status;
 	int n = -1;
 	char *saveptr, *token;
-	
+
 	printf("Received url = %s\n", url);
 	token = strtok_r(url, " ", &saveptr);
 	while(token) {
@@ -183,7 +183,7 @@ int getListedChunks(FILE *fd, char *url, int n_chunks)
 
 		printf("Fetching URL %s\n", token);
 		url_to_dag(&addr, token, strlen(token));
-		
+
 		Graph g(&addr);
 		printf("------------------------\n");
 		g.print_graph();
@@ -197,8 +197,8 @@ int getListedChunks(FILE *fd, char *url, int n_chunks)
 		fwrite(buf, 1, ret, fd);
 		token = strtok_r(NULL, " ", &saveptr);
 	}
-  
-	return n;
+
+	return 0;
 }
 
 
@@ -212,9 +212,7 @@ int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout
 	char cmd[5120];
 	char reply[5120];
 	int status = 0;
-	
-	//TODO: check the arguments to be correct
-	
+
 	// send the file request
 	sprintf(cmd, "get %s",  fin);
 	sendCmd(sock, cmd);
@@ -226,6 +224,7 @@ int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout
 	}
 
 	int count = atoi(&reply[4]);
+	printf("Count = %d\n", count);
 
 	FILE *f = fopen(fout, "w");
 
@@ -246,11 +245,12 @@ int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout
 		offset += NUM_CHUNKS;
 		printf("reply4 = %s\n", &reply[4]);
 		if (getListedChunks(f, &reply[4], num) < 0) {
+			printf(" = %s\n", &reply[4]);
 			status= -1;
 			break;
 		}
 	}
-	
+
 	fclose(f);
 
 	if (status < 0) {
@@ -409,24 +409,22 @@ int main(int argc, char **argv)
 
 //		enable this if you want to limit how many times this is done
 // 		i++;
-		
+
 		if (strncmp(cmd, "get", 3) == 0){
 			params = sscanf(cmd,"get %s %s", fin, fout);
-			
+
 			if(params !=2 ){
 				sprintf(reply, "FAIL: invalid command (%s)\n", cmd);
 				warn(reply);
 				usage();
 				continue;
 			}
-			
+
 			if(strcmp(fin, fout) == 0){
 				warn("Since both applications write to the same folder (local case) the names should be different.\n");
 				continue;
 			}
-			
 			getFile(sock, s_ad, s_hid, fin, fout);
-			
 		}
 	}
 	return 1;

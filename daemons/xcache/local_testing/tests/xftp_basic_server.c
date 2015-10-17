@@ -121,10 +121,10 @@ void *recvCmd(void *socketid)
 
 	while (1) {
 		say("waiting for command\n");
-		
+
 		memset(command, '\0', strlen(command));
 		memset(reply, '\0', strlen(reply));
-		
+
 		if ((n = Xrecv(sock, command, 1024, 0))  < 0) {
 			warn("socket error while waiting for data, closing connection\n");
 			break;
@@ -135,9 +135,9 @@ void *recvCmd(void *socketid)
 			say("client requested file %s\n", fname);
 
 			count = 0;
-			
+
 			say("chunking file %s\n", fname);
-			
+
 			//Chunking is done by the XputFile which itself uses XputChunk, and fills out the info
 			if ((count = XputFile(&xcache, fname, CHUNKSIZE, &addrs)) < 0) {
 				warn("unable to serve the file: %s\n", fname);
@@ -146,8 +146,8 @@ void *recvCmd(void *socketid)
 				sprintf(reply, "OK: %d", count);
 			}
 			say("%s\n", reply);
-			
-			
+
+
 			//Just tells the receiver how many chunks it should expect.
 			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
 				warn("unable to send reply to client\n");
@@ -172,16 +172,25 @@ void *recvCmd(void *socketid)
 					char url[256];
 
 					dag_to_url(url, 256, &addrs[i]);
-					strcat(reply, " ");
-					strcat(reply, url);
+					if (strlen(reply) + strlen(url) >= XIA_MAXBUF) {
+						printf("reply 0 %s\n", reply);
+						if (Xsend(sock, reply, strlen(reply), 0) < 0) {
+							warn("unable to send reply to client\n");
+							break;
+						}
+						reply[0] = 0;
+					} else {
+						strcat(reply, " ");
+						strcat(reply, url);
+					}
 				}
 			}
-			printf("%s\n", reply);
+			printf("reply 1 %s\n", reply);
 			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
 				warn("unable to send reply to client\n");
 				break;
 			}
- 
+
 		} else if(strncmp(command, "meta", 4) == 0) {
 			char *start = &command[6];
 			char *end = strchr(start, ':');
@@ -218,7 +227,7 @@ void *recvCmd(void *socketid)
 			count = 0;
 		}
 	}
-	
+
 	/* if (info) */
 	/* 	XfreeChunkInfo(info); */
 	/* XfreeCacheSlice(ctx); */
