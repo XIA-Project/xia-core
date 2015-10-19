@@ -75,24 +75,24 @@
 // Logging Macros ***************************************************
 #define TRACE()          {if (_log_trace)    fprintf(_log, "xwrap: %s\n", __FUNCTION__);}
 
-#define MSG(...)         {if (_log_info)    {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
+#define MSG(...)         {if (_log_info)    {fprintf(_log, "xwrap: %08x %s ", getpid(), __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
 #define XFER_FLAGS(f)    {if (_log_info)     fprintf(_log, "xwrap: %s flags:%s\n", __FUNCTION__, xferFlags(f));}
 #define AI_FLAGS(f)      {if (_log_info)     fprintf(_log, "xwrap: %s flags:%s\n", __FUNCTION__, aiFlags(f));}
 #define FCNTL_FLAGS(f)   {if (_log_info)     fprintf(_log, "xwrap: %s flags:%s\n", __FUNCTION__, fcntlFlags(f));}
 #define AF_VALUE(f)      {if (_log_info)     fprintf(_log, "xwrap: %s family:%s\n", __FUNCTION__, afValue(f));}
 #define OPT_VALUE(f)     {if (_log_info)     fprintf(_log, "xwrap: %s opt:%s\n", __FUNCTION__, optValue(f));}
 #define POLL_FLAGS(i, f) {if (_log_info)     fprintf(_log, "xwrap: %s socket:%u %s\n", __FUNCTION__, i, pollFlags(f));}
-#define XIAIFY()         {if (_log_wrap)     fprintf(_log, "xwrap: %s redirected to XIA\n", __FUNCTION__);}
+#define XIAIFY()         {if (_log_wrap)     fprintf(_log, "xwrap: %08x %s redirected to XIA\n", getpid(), __FUNCTION__);}
 
 //#define NOXIA()        {if (_log_wrap)     fprintf(_log, "xwrap: %s used normally\n", __FUNCTION__);}
 #define NOXIA()
 #define SKIP()           {if (_log_wrap)     fprintf(_log, "xwrap: %s not required/supported in XIA (no-op)\n", __FUNCTION__);}
 
 #define ALERT()          {if (_log_warning)  fprintf(_log, "xwrap: ALERT!!!, %s is not implemented in XIA!\n", __FUNCTION__);}
-#define WARNING(...)     {if (_log_warning) {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
+#define WARNING(...)     {if (_log_warning) {fprintf(_log, "xwrap: %08x %s ", getpid(), __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
 
 #ifdef DEBUG
-#define DBG(...) {if (_log_warning) {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
+#define DBG(...) {if (_log_warning) {fprintf(_log, "xwrap: %08x %s ", getpid(), __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
 #else
 #define DBG(...)
 #endif

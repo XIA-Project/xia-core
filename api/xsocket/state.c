@@ -153,7 +153,9 @@ void SocketMap::add(int sock, int tt, unsigned short port)
 {
 	SocketMap *state = getMap();
 	pthread_rwlock_wrlock(&rwlock);
-	if (state->sockets[sock] == 0)
+
+	if (state->sockets.find(sock) == state->sockets.end())
+//	if (state->sockets.[sock] == 0)
 		state->sockets[sock] = new SocketState(tt, port);
 	pthread_rwlock_unlock(&rwlock);
 }
