@@ -2614,6 +2614,9 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XFORK:
 		Xfork(_sport, &xia_socket_msg);
 		break;
+	case xia::XREPLAY:
+		Xreplay(_sport, &xia_socket_msg);
+		break;		
 	default:
 		ERROR("ERROR: Unknown API request\n");
 		break;
@@ -2818,8 +2821,9 @@ void XTRANSPORT::Xfork(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 		sock *sk = portToSock.get(port);
 		if (sk) {
-			DBG("incrementing refcount for %d\n", port);
+			int ref = sk->refcount;
 			sk->refcount += increment;
+			DBG("%s refcount for %d (%d -> %d)\n", (increment > 0 ? "incrementing" : "decrementing"), port, ref, sk->refcount);
 			assert(sk->refcount > 0);
 		}
 	}
@@ -2829,6 +2833,20 @@ void XTRANSPORT::Xfork(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 }
 
 
+
+void XTRANSPORT::Xreplay(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
+{
+	xia::X_Replay_Msg *msg = xia_socket_msg->mutable_x_replay();
+
+	DBG("Received PingPong packet\n");
+	xia_socket_msg->PrintDebugString();
+
+	xia_socket_msg->set_type(msg->type());
+	xia_socket_msg->set_sequence(msg->sequence());
+	msg->Clear();
+
+	ReturnResult(_sport, xia_socket_msg);
+}
 
 // FIXME: This way of doing things is a bit hacky.
 void XTRANSPORT::XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
@@ -2898,14 +2916,16 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		ERROR("Invalid socket %d\n", _sport);
 		goto done;
 	}
-	INFO("closing %d %d sk = %p state=%s refcount=%d\n", _sport, sk->port, sk, StateStr(sk->state), sk->refcount);
 
 	assert(sk->refcount != 0);
 
 	if (--sk->refcount != 0) {
 		// the app was forked and not everyone has closed the socket yet
+		INFO("decremented ref count on %d %d sk = %p state=%s refcount=%d\n", _sport, sk->port, sk, StateStr(sk->state), sk->refcount);
 		goto done;
 	}
+
+	INFO("closing %d %d sk = %p state=%s refcount=%d\n", _sport, sk->port, sk, StateStr(sk->state), sk->refcount);
 
 	if (sk->sock_type == SOCK_STREAM) {
 

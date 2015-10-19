@@ -337,6 +337,7 @@ protected:
 	void Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xupdaterv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xfork(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xreplay(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 
 	// protocol handlers
 	void ProcessDatagramPacket(WritablePacket *p_in);
