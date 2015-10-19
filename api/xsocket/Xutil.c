@@ -284,7 +284,7 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 	int rc;
 
 	if (isBlocking(sock)) {
-		// make sure click know if it should reply immediately or not
+		// make sure click knows if it should reply immediately or not
 		msg->set_blocking(true);
 	}
 
@@ -324,9 +324,19 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 
 				// these are not the data you were looking for
 				LOGF("Expected packet %u, received %u, caching packet\n", seq, sn);
-				cachePacket(sock, sn, buf, buflen);
-
+//				cachePacket(sock, sn, buf, buflen);
 				msg->PrintDebugString();
+
+				// shove this back into click so the requester can get at it
+				xia::X_Replay_Msg *xrm = msg->mutable_x_replay();
+				xrm->set_sequence(msg->sequence());
+				xrm->set_type(msg->type());
+
+				msg->set_sequence(0);
+				msg->set_type(xia::XREPLAY);
+
+				click_send(sock, msg);
+
 				msg->Clear();
 			}
 		}
@@ -402,6 +412,7 @@ int MakeApiSocket(int transport_type)
 		port = 0;
 	} else {
 		port = ((struct sockaddr_in)sa).sin_port;
+		LOGF("API socket %d bound to port %d", sock, port);
 	}
 
 	allocSocketState(sock, transport_type, port);
