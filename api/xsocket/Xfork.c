@@ -43,7 +43,7 @@ static int makeList(bool increment)
 	xia::X_Fork_Msg *fm = xsm.mutable_x_fork();
 
 	socketmap->lock();
-	printf("XFORK: count = %d\n", sockets->size());
+	LOGF("XFORK: count = %d\n", sockets->size());
 
 	for (it = sockets->begin(); it != sockets->end(); it++) {
 		int sock = it->first;
@@ -64,6 +64,7 @@ static int makeList(bool increment)
 		fm->set_increment(increment);
 		fm->set_count(count);
 
+LOG("making an api socket");
 		sock = MakeApiSocket(SOCK_DGRAM);
 
 		LOG("sending socket list to click");

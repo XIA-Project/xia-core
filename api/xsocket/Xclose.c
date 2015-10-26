@@ -45,7 +45,7 @@ int Xclose(int sockfd)
 
 	if (getSocketType(sockfd) == XSOCK_INVALID)
 	{
-		LOG("The socket is not a valid Xsocket");
+		LOGF("The socket %d is not a valid Xsocket", sockfd);
 		errno = EBADF;
 		return -1;
 	}
