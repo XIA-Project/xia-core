@@ -117,8 +117,6 @@ void __attribute__ ((constructor)) api_init()
     get_conf();
 
 	SocketMap *socketmap = SocketMap::getMap();
-	printf("XXXXXXXXXXXXXXX SocketMap size = %d\n",socketmap->smap()->size());
-
 }
 
 // Run at library unload time to close sockets left open by the app
@@ -130,10 +128,7 @@ void __attribute__ ((destructor)) api_destruct(void)
 	SMap *sockets = socketmap->smap();
 	SMap::iterator it;
 
-printf("YYYYY count = %d\n", sockets->size());
-
 	for (it = sockets->begin(); it != sockets->end(); it++) {
-		LOGF("closing %d", it->first);
 		Xclose(it->first);
 	}
 }
