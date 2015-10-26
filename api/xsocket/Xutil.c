@@ -115,6 +115,29 @@ idrec fcntl_flags[] = {
 	FR(O_WRONLY)
 };
 
+idrec fcntl_cmds[] = {
+	FR(F_DUPFD),
+	FR(F_DUPFD_CLOEXEC),
+	FR(F_SETFD),
+	FR(F_SETFL),
+	FR(F_SETOWN),
+	FR(F_SETOWN_EX),
+	FR(F_SETSIG),
+	FR(F_SETLEASE),
+	FR(F_NOTIFY),
+	FR(F_SETPIPE_SZ),
+	FR(F_GETLK),
+	FR(F_SETLK),
+	FR(F_SETLKW),
+	FR(F_GETFD),
+	FR(F_GETFL),
+	FR(F_GETOWN),
+	FR(F_GETOWN_EX),
+	FR(F_GETSIG),
+	FR(F_GETLEASE),
+	FR(F_GETPIPE_SZ)
+};
+
 idrec poll_flags[] = {
 	FR(POLLERR),
 	FR(POLLHUP),
@@ -412,7 +435,6 @@ int MakeApiSocket(int transport_type)
 		port = 0;
 	} else {
 		port = ((struct sockaddr_in)sa).sin_port;
-		LOGF("API socket %d bound to port %d", sock, port);
 	}
 
 	allocSocketState(sock, transport_type, port);
@@ -569,6 +591,11 @@ const char *optValue(size_t f)
 const char *protoValue(size_t f)
 {
 	return getValue(proto_values, sizeof(proto_values)/sizeof(idrec), f);
+}
+
+const char *fcntlCmd(int c)
+{
+	return getValue(fcntl_cmds, sizeof(fcntl_cmds)/sizeof(idrec), c);
 }
 
 int checkXid(const char *xid, const char *type)
