@@ -116,7 +116,8 @@ void __attribute__ ((constructor)) api_init()
     mtu_api = mtu();
     get_conf();
 
-	SocketMap *socketmap = SocketMap::getMap();
+    // force creation of the socket map
+	SocketMap::getMap();
 }
 
 // Run at library unload time to close sockets left open by the app
