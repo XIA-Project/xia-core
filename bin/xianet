@@ -30,6 +30,7 @@ NODECONF=$XIADIR/etc/nodes.conf
 XSOCKCONF=$XIADIR/etc/xsockconf.ini
 XIAADDRCLICK=$XIADIR/etc/click/xia_address.click
 
+#FIXME: add SCION process names to this list
 ALL_PROCESSES="click xrouted xhcp_serverd xhcp_clientd xnameservice xstats xstatserver"
 
 NAME=`basename $0`
@@ -41,6 +42,7 @@ CLICK_ONLY=0
 NO_CLICK=0
 NAMESERVER=0
 RENDEZVOUS=0
+SCION=0
 RUN_VISUALIZER_CLIENT=0
 RUN_VISUALIZER_SERVER=0
 VISUALIZER_SERVER="localhost"
@@ -58,7 +60,7 @@ help()
 
 Start or stop the XIA network services.
 
-usage: $NAME [-cvV4rtnZg] [-l <loglevel>] [-i <hostname>] [-m <ip-addr>]
+usage: $NAME [-cvV4rtnRSZg] [-l <loglevel>] [-i <hostname>] [-m <ip-addr>]
              [-f <filter_str>] [-I <interface>] [-P <socket-ports>]
              [-s <script>] [-N <host>] [-z <statserver>] [start|stop|restart|check|kill]
 where:
@@ -76,6 +78,7 @@ where:
   -P set the TCP socket ports to use (instead of ToDevice/FromDevice)
   -n if generating a click script, this node will be the name server
   -R if generating a click script, this node will provide rendezvous service
+  -S if generating a click script, this node will be the SCION gateway
   -f if generating a click script, don't use interfaces matching the supplied string
      (to ignore multiple interfaces, use a comma-separated list)
   -I if generating a click script, use this interface (i.e., pick which interface a host uses)
@@ -99,7 +102,7 @@ setup()
 {
 	local OPTARG=$2
 
-	while getopts "cCl:s:qvV4nN:rRthi:m:f:I:z:ZP:g" opt; do
+	while getopts "cCl:s:qvV4nN:rRSthi:m:f:I:z:ZP:g" opt; do
 		case $opt in
 			c)
 				CLICK_ONLY=1
@@ -134,6 +137,9 @@ setup()
 				;;
 			R)
 				RENDEZVOUS=1
+				;;
+			S)
+				SCION=1
 				;;
 			t)
 				MAKECONF=$MAKECONF"host"
@@ -398,6 +404,36 @@ rendezvous()
 }
 
 #
+# start/stop/check the rendezvous server
+#
+# FIXME: add scion startup here
+scion()
+{
+	local host=$1
+	local action=$2
+
+	cd $XIADIR/bin
+	case $action in
+		"start")
+			echo start SCION services placeholder
+#			echo ./xrendezvous -h $host $LOG_FLAGS
+#			./xrendezvous -h $host $LOG_FLAGS &
+			;;
+		"stop")
+			echo stop SCION services placeholder
+#			kill_service $host "xrendezvous"
+			;;
+		"check")
+			echo check SCION services placeholder
+#			check_service $host "xrendezvous"
+			;;
+		*)
+			echo "unrecognized action: $action"
+			;;
+	esac
+}
+
+#
 # read etc/nodes.conf and perform the given action on each node
 # assumes the first host found is the nameserver
 # FIXME: work out a better solution for setting the name server in a local topology
@@ -427,6 +463,9 @@ process_nodes()
 				;;
 			rendezvous)
 				rendezvous $name $action
+				;;
+			scion)
+				scion $name $action
 				;;
 			*)
 				echo Unknown device type $name:$type
@@ -468,6 +507,10 @@ start_click()
 
 	if [ $RENDEZVOUS -eq 1 ]; then
 		printf "$HOSTNAME\trendezvous\n" >> $NODECONF
+	fi
+
+	if [ $SCION -eq 1 ]; then
+		printf "$HOSTNAME\tscion\n" >> $NODECONF
 	fi
 
 	[ "$VALGRIND" != "" ] && echo Logging valgrind output to $VGLOG
