@@ -2071,6 +2071,7 @@ void XTRANSPORT::ProcessStreamDataPacket(WritablePacket*p_in)
 	sock *sk = XIDpairToSock.get(xid_pair);
 	if (!sk) {
 		ERROR("sk == NULL, we are probably in the middle of creating the endpoint\n");
+		ERROR("src:%s\ndst:%s\n", src_path.unparse().c_str(), dst_path.unparse().c_str());
 
 	} else {
 		if (sk->state >= CONNECTED) {
@@ -2164,7 +2165,7 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 		}
 
 	} else if (sk->state == FIN_WAIT1) {
-		INFO("Socket %d FIN-ACK received\n", sk->port);
+		INFO("Socket %d ACK received\n", sk->port);
 
 		// now we wait for a FIN from the peer
 		ChangeState(sk, FIN_WAIT2);
@@ -2249,7 +2250,7 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 
 	if (sk->state == FIN_WAIT2) {
 		// Active shutdown
-		INFO("Socket %d moved to FIN_WAIT2\n", sk->port);
+		INFO("Socket %d moved to TIME_WAIT\n", sk->port);
 
 		const char *payload = "ACK";
 		SendControlPacket(TransportHeader::ACK, sk, payload, strlen(payload), src_path, dst_path);
@@ -2932,8 +2933,10 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		if (sk->state == CONNECTED || sk->state == CLOSE_WAIT) {
 			// schedule a close
 			if (sk->state == CONNECTED) {
+				INFO("active close, FIN sent\n");
 				ChangeState(sk, FIN_WAIT1);
 			} else {
+				INFO("passive close, FIN sent\n");
 				ChangeState(sk, LAST_ACK);
 			}
 
