@@ -69,6 +69,8 @@ const char *xerr_unimplemented = "This feature is not currently supported";
 #define CONFIG_PATH_BUF_SIZE 1024
 #define RESOLV_CONF "/etc/resolv.conf"
 
+// FIXME: collapse duplicated code in these 3 functions at some point
+
 // Read DAG for rendezvous server data plane from resolv.conf
 int XreadRVServerAddr(char *rv_dag_str, int rvstrlen)
 {
@@ -113,6 +115,24 @@ int XreadRVServerControlAddr(char *rv_dag_str, int rvstrlen)
 	return ret;
 }
 
+// Read the SID for the SCION gateway from resolv.conf
+int XreadScionSID(char *sid, int len)
+{
+	int ret = -1;
+	int rc;
+	// If there is a resolv.conf file with SCION info, return that info
+	char root[CONFIG_PATH_BUF_SIZE];
+	// clear out the buffers
+	bzero(sid, len);
+	bzero(root, CONFIG_PATH_BUF_SIZE);
+	// Read SCION gateway SID from xia-core/etc/resolv.conf, if present
+	rc = ini_gets(NULL, "scion_gateway", sid, sid, len, strcat(XrootDir(root, CONFIG_PATH_BUF_SIZE), RESOLV_CONF));
+	if(rc > 0) {
+		ret = 0;
+	}
+	return ret;
+}
+
 /*
 ** NOTE: although we currently check them, we don't use the protocol or socktype fields of the hints structure.
 **  they are just checked to make sure no IPv4 code slips past us by mistake.
@@ -125,6 +145,7 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 	socklen_t slen;
 	char sname[41];
 	char stype[21];
+	char scion_sid[50];
 
 	int local    = 0;	// local and loopback are the same right now, they tell us
 	int loopback = 0;	//  to look up the local AD:HID instead of going to the name server
@@ -132,6 +153,7 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 	int havename = 0;	// user passed us a DAG instead of a name-string
 	int haveserv = 0;	// user passed us an XID instead of a service-name
 	int fallback = 0;	// user wants the dag wrapped in ()'s
+	int scion    = 0;	// return a DAG including the SCION gateway
 
 	int socktype = 0;
 	int protocol = 0;
@@ -172,6 +194,19 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 			} else {
 				loopback = 1;
 			}
+		}
+
+		if (flags & XAI_SCION) {
+			if (flags & XAI_FALLBACK) {
+				LOG("SCION and FALLBACK flags cannot be specified at the same time\n");
+				return EAI_BADFLAGS;
+			}
+			if (XreadScionSID(scion_sid, sizeof(scion_sid)) != 0) {
+				LOG("The SCION gateway SID is not present in etc/resolv.conf\n");
+				return EAI_BADFLAGS;
+			}
+			LOGF("SCION gateway SID=%s\n", scion_sid);
+			scion = 1;
 		}
 
 		if (flags & AI_CANONNAME) {
@@ -273,6 +308,11 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 			return EAI_SYSTEM;
 		}
 
+		if (scion) {
+			LOG("The SCION flag can not be used when creating a DAG for the local system\n");
+			return EAI_SERVICE;
+		}
+
 		rc = XreadLocalHostAddr(sock, ad, XID_LEN, hid, XID_LEN, fid, XID_LEN);
 
 		Xclose(sock);
@@ -340,14 +380,24 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 			return EAI_NONAME;
 		}
 
-		if (service) {
+		if (service || scion) {
 			Graph g(&sa);
 
-			if (fallback) {
+			if (scion) {
+				Graph g_scion = Node() * Node(scion_sid);
+				Graph g_final = g_scion * g;
+
+				g = g_final;
+
+			} else if (fallback) {
 				Graph gf = Node();
 				g = gf + g;
 			}
-			g = g * Node(stype, sname);
+
+			if (service) {
+				g = g * Node(stype, sname);
+			}
+
 			g.fill_sockaddr(&sa);
 		}
 

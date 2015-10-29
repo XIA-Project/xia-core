@@ -74,7 +74,9 @@ idrec ai_flags[] = {
 	FR(AI_NUMERICHOST),
 	FR(AI_NUMERICSERV),
 	FR(AI_PASSIVE),
-	FR(AI_V4MAPPED)
+	FR(AI_V4MAPPED),
+	FR(XAI_FALLBACK),
+	FR(XAI_SCION)
 };
 
 idrec proto_values[] = {
