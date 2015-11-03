@@ -3130,6 +3130,10 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 		sk->pending_connection_buf.pop();
 
+
+
+// FIXME: does this block of code do anything??? I don't see the payload getting used
+// I think it's all happening in the syn handling above? 
 		WritablePacket *just_payload_part;
 		int payloadLength;
 		if(usingRendezvousDAG(sk->src_path, new_sk->src_path)) {
@@ -3443,6 +3447,11 @@ void XTRANSPORT::Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 						} else if (sk->state == CLOSE_WAIT) {
 							// other end closed, app needs to know!
 							flags_out |= POLLIN;
+						}
+
+						if (!sk->pending_connection_buf.empty()) {
+							INFO("%d accepts are pending\n", sk->pending_connection_buf.size());
+							flags_out |= POLLIN | POLLOUT;
 						}
 
 					} else if (sk->sock_type == SOCK_DGRAM || sk->sock_type == SOCK_RAW) {
