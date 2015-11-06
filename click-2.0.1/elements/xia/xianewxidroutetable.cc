@@ -444,11 +444,13 @@ XIANEWXIDRouteTable::push(int in_ether_port, Packet *p)
 
 	in_ether_port = XIA_PAINT_ANNO(p);
 
+	click_chatter("scion:newidrouter push\n");
 	if (!_principal_type_enabled) {
 		output(2).push(p);
 		return;
 	}
 
+	click_chatter("scion: do the job\n");
     if(in_ether_port == REDIRECT) {
         // if this is an XCMP redirect packet
         process_xcmp_redirect(p);
@@ -1420,6 +1422,9 @@ void XIANEWXIDRouteTable::egress_normal_forward(Packet *m,
 void XIANEWXIDRouteTable::handle_request(Packet *m, uint8_t dpdk_rx_port) {
   struct ether_hdr *eth_hdr;
   SCIONHeader *scion_hdr;
+
+	printf("scion: handle request\n");
+
   /*
   RTE_LOG(DEBUG, HSR, "packet recieved, dpdk_port=%d\n", dpdk_rx_port);
 

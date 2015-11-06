@@ -326,14 +326,20 @@ int main(int argc, char **argv)
 {
 	srand(time(NULL));
 	getConfig(argc, argv);
-
+        struct addrinfo hints;
+        bzero(&hints, sizeof(hints));
+        hints.ai_flags = XAI_SCION;
+ 
 //	signal(SIGINT, quithandler);
 
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 
-	if (Xgetaddrinfo(STREAM_NAME, NULL, NULL, &ai) != 0)
+	//if (Xgetaddrinfo(STREAM_NAME, NULL, NULL, &ai) != 0)
+	if (Xgetaddrinfo(STREAM_NAME, NULL, &hints, &ai) != 0)
 		die(-1, "unable to lookup name %s\n", STREAM_NAME);
 	sa = (sockaddr_x*)ai->ai_addr;
+
+
 
 	Graph g(sa);
 	printf("\n%s\n", g.dag_string().c_str());

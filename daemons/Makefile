@@ -1,4 +1,4 @@
-TARGETS=nameserver xhcp xrouted rendezvous
+TARGETS=nameserver xhcp xrouted rendezvous gateway
 CLEAN=$(addsuffix .build, $(TARGETS))
 
 .PHONY: all clean $(TARGETS)

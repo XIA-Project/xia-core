@@ -13,6 +13,7 @@
 #define CLICK_XIA_XID_TYPE_CID      (0x12)
 #define CLICK_XIA_XID_TYPE_SID      (0x13)
 #define CLICK_XIA_XID_TYPE_IP       (0x14)
+#define CLICK_XIA_XID_TYPE_SCION    (0x15)
 
 #define CLICK_XIA_XID_ID_LEN        20
 
@@ -69,6 +70,7 @@ struct click_xia {
 #define CLICK_XIA_NXT_HDR_MAX   (CLICK_XIA_NXT_NO-1)  /* maximum non-upper-layer nxt value */
 #define CLICK_XIA_NXT_NO        59                      /* no next header (as in IPv6) */
 #define CLICK_XIA_NXT_TRN       60  /* Transport header */
+#define CLICK_XIA_NXT_SCION     70  /* scion header */
 
 // XIA extension header
 #pragma pack(push)

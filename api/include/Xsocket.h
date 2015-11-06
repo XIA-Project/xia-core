@@ -195,6 +195,7 @@ extern int Xgetsockname(int sockd, struct sockaddr *addr, socklen_t *addrlen);
 extern int Xgetaddrinfo(const char *, const char *, const struct addrinfo *, struct addrinfo **);
 extern int XreadRVServerAddr(char *, int);
 extern int XreadRVServerControlAddr(char *, int);
+extern int XreadScionSID(char *, int);
 extern void Xfreeaddrinfo(struct addrinfo *);
 extern const char *Xgai_strerror(int);
 extern int checkXid(const char *xid, const char *type);

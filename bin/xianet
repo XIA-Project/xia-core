@@ -415,17 +415,17 @@ scion()
 	cd $XIADIR/bin
 	case $action in
 		"start")
-			echo start SCION services placeholder
-#			echo ./xrendezvous -h $host $LOG_FLAGS
-#			./xrendezvous -h $host $LOG_FLAGS &
+#			echo start SCION services placeholder
+			echo ./xgateway -h $host $LOG_FLAGS
+			./xgateway -h $host $LOG_FLAGS &
 			;;
 		"stop")
-			echo stop SCION services placeholder
-#			kill_service $host "xrendezvous"
+#			echo stop SCION services placeholder
+			kill_service $host "xgateway"
 			;;
 		"check")
-			echo check SCION services placeholder
-#			check_service $host "xrendezvous"
+#			echo check SCION services placeholder
+			check_service $host "xgateway"
 			;;
 		*)
 			echo "unrecognized action: $action"
