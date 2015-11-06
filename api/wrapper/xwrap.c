@@ -53,6 +53,7 @@
 #include <limits.h>
 #include <ifaddrs.h>
 #include <unistd.h>
+#include <sched.h>
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
@@ -184,6 +185,8 @@ DECLARE(ssize_t, recvmsg, int fd, struct msghdr *msg, int flags);
 DECLARE(ssize_t, sendmsg, int fd, const struct msghdr *msg, int flags);
 
 DECLARE(int, execve, const char *filename, char *const argv[], char *const envp[]);
+
+DECLARE(int, clone, int (*fn)(void *), void *child_stack,int flags, void *arg, ...);
 
 
 
@@ -771,7 +774,7 @@ void bufferDump(int fd, int type, const void *buf, size_t len)
 	char *s = (char *)malloc(len + 10);
 	memcpy(s, buf, len);
 	s[len] = 0;
-	MSG("buf: %s\n", s);
+	MSG("buf: (%s)\n", s);
 	free(s);
 }
 
@@ -857,6 +860,7 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	GET_FCN(sendmsg);
 
 	GET_FCN(execve);
+	GET_FCN(clone);
 
 	_GetLocalIPs();
 	_LoadSIDs();
@@ -960,7 +964,7 @@ int close(int fd)
 	socklen_t len = sizeof(addr);
 	int rc;
 
-	TRACE();
+//	TRACE();
 	if (shouldWrap(fd)) {
 		XIAIFY();
 		MSG("closing %d\n", fd);
@@ -1024,7 +1028,7 @@ extern "C" int fcntl (int fd, int cmd, ...)
 	va_list args;
 	fcn_fcntl f;
 
-	TRACE();
+//	TRACE();
 
 	bool xia = isXsocket(fd);
 
@@ -1434,7 +1438,7 @@ int listen(int fd, int n)
 int poll(struct pollfd *fds, nfds_t nfds, int timeout)
 {
 	int rc;
-	TRACE();
+//	TRACE();
 
 	// Let Xpoll do all the work of figuring out what fds we are handling
 	pollDump(fds, nfds, 1);
@@ -1455,7 +1459,7 @@ ssize_t read(int fd, void *buf, size_t n)
 {
 	size_t rc;
 
-	TRACE();
+//	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1477,7 +1481,7 @@ ssize_t readv(int fd, const struct iovec *iov, int iovcnt)
 {
 	int rc;
 
-	TRACE();
+//	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1570,7 +1574,7 @@ ssize_t recvmsg(int fd, struct msghdr *msg, int flags)
 	struct msghdr mh;
 	sockaddr_x sax;
 
-	TRACE();
+//	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1649,7 +1653,7 @@ ssize_t sendmsg(int fd, const struct msghdr *msg, int flags)
 	struct msghdr mh;
 	sockaddr_x sax;
 
-	TRACE();
+//	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1872,7 +1876,7 @@ ssize_t write(int fd, const void *buf, size_t n)
 {
 	size_t rc;
 
-	TRACE();
+//	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1894,7 +1898,7 @@ ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
 {
 	int rc;
 
-	TRACE();
+//	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
 
@@ -2069,4 +2073,13 @@ int getservbyport_r (int port, const char *proto, struct servent *result_buf, ch
 	TRACE();
 	ALERT();
 	return __real_getservbyport_r(port, proto, result_buf, buf, buflen, result);
+}
+
+int clone(int (*fn)(void *), void *child_stack,
+                 int flags, void *arg, ...
+                 /* pid_t *ptid, struct user_desc *tls, pid_t *ctid */ )
+{
+	TRACE();
+	ALERT();
+	return __real_clone(fn, child_stack, flags, arg);
 }
