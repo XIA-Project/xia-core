@@ -191,6 +191,7 @@ idrec opt_values[] = {
 	FR(SO_TYPE)
 };
 
+
 /*!
 * @brief Prints some debug information
 *
@@ -322,12 +323,13 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 
 		} else {
 
+			bzero(buf, buflen);
 			// we do this with a blocking socket even if the Xsocket is marked as nonblocking.
 			// The UDP socket is treated as an API call rather than a sock so making it
 			// non-blocking would cause problems
 			rc = (_f_recvfrom)(sock, buf, buflen - 1 , 0, NULL, NULL);
 
-			// LOGF("seq %d received %d bytes\n", seq, rc);
+//			LOGF("seq %d received %d bytes\n", seq, rc);
 
 			if (rc < 0) {
 				if (isBlocking(sock) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
@@ -371,8 +373,9 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 int click_reply(int sock, unsigned seq, xia::XSocketMsg *msg)
 {
 	int rc;
-	char buf[XIA_INTERNAL_BUFSIZE];
-	unsigned buflen = sizeof(buf);
+	int e = 0;
+	char *buf = (char *)malloc(XIA_INTERNAL_BUFSIZE);
+	unsigned buflen = XIA_INTERNAL_BUFSIZE;
 
 	if ((rc = click_get(sock, seq, buf, buflen, msg)) >= 0) {
 
@@ -380,16 +383,20 @@ int click_reply(int sock, unsigned seq, xia::XSocketMsg *msg)
 
 		rc = res->return_code();
 		if (rc == -1)
-			errno = res->err_code();
+			e = res->err_code();
 	}
+
+	free(buf);
+	errno = e;
 
 	return rc;
 }
 
 int click_status(int sock, unsigned seq)
 {
-	char buf[XIA_INTERNAL_BUFSIZE];
-	unsigned buflen = sizeof(buf);
+	char *buf = (char *)malloc(XIA_INTERNAL_BUFSIZE);
+	unsigned buflen = XIA_INTERNAL_BUFSIZE;
+	int e = 0;
 	int rc;
 	xia::XSocketMsg msg;
 
@@ -399,9 +406,11 @@ int click_status(int sock, unsigned seq)
 
 		rc = res->return_code();
 		if (rc == -1)
-			errno = res->err_code();
+			e = res->err_code();
 	}
 
+	free(buf);
+	errno = e;
 	return rc;
 }
 
