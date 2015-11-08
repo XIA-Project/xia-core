@@ -80,6 +80,7 @@ int getFile(int sock)
 
 	// chunk fetching begins
 	for (unsigned int i = 0; i < CIDs.size(); i++) {
+		say("The number of chunks is %d.\n", CIDs.size());
 		printf("Fetching chunk %u / %lu\n", i+1, CIDs.size());
 		ChunkStatus cs[NUM_CHUNKS];
 		char data[XIA_MAXCHUNK];
