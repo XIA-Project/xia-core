@@ -21,11 +21,17 @@
 
 CLICK_DECLS
 
-/**
-XIATransport:   input port[0]:  get CID request or reponse from network, should be connect to RouteEngine
-output[0] : if the cache has the chunk, it will serve the CID request by pushing chunk pkts to RouteEngine
-input port[1]:  connect with RPC, in server, the RPC will pushCID into cache before serve it.
-output port[1]: connect with RPC, in client, when a chunk is complete, cache will push it to RPC (higher level)
+/*
+WARNING: We are not using XIATransrpot element but instead XIACache (its inherited version) in click configure file
+input[0]:   get CID request or reponse from network, should be connect to RouteEngine
+output[0]:  if the cache has the chunk, it will serve the CID request by pushing chunk pkts to RouteEngine
+input[1]:   connect with RPC, in server, the RPC will push CID into cache before serve it.
+output[1]:  connect with RPC, in client, when a chunk is complete, cache will push it to RPC (higher level)
+
+                ---------
+RouterEngine - 0|       |0 --- RouterEngine
+Server App --- 1|       |1 --- Client App
+                ---------
 */
 
 class XIAContentModule;    
@@ -47,7 +53,6 @@ class XIATransport : public Element {
     XID _local_hid;
     XIAPath _local_addr;
     XIAContentModule* _content_module;
-
 };
 
 CLICK_ENDDECLS

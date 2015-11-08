@@ -19,13 +19,18 @@
 
 CLICK_DECLS
 
-/**
+/*
 This is a fork of XIAtransport
 
-XIATransport:   input port[0]:  get CID request or reponse from network, should be connect to RouteEngine
-output[0] : if the cache has the chunk, it will serve the CID request by pushing chunk pkts to RouteEngine
-input port[1]:  connect with RPC, in server, the RPC will pushCID into cache before serve it.
-output port[1]: connect with RPC, in client, when a chunk is complete, cache will push it to RPC (higher level)
+input[0]:   get CID request or reponse from network, should be connect to RouteEngine
+output[0]:  if the cache has the chunk, it will serve the CID request by pushing chunk pkts to RouteEngine
+input[1]:   connect with RPC, in server, the RPC will pushCID into cache before serve it.
+output[1]:  connect with RPC, in client, when a chunk is complete, cache will push it to RPC (higher level)
+
+                ---------
+RouterEngine - 0|       |0 --- RouterEngine
+Server App --- 1|       |1 --- Client App
+                ---------
 */
 
 class XIAContentModule;    

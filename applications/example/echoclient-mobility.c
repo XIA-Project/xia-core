@@ -205,30 +205,50 @@ int process(int sock)
 		size = (rand() % XIA_MAXBUF) + 1;
 	else
 		size = pktSize;
-	randomString(buf1, size);
+		
+	int dot_c = 0;
+	
+	while (1) {
+		memset(buf1, '\0', strlen(buf1));
+		memset(buf2, '\0', strlen(buf2));
+	
+		randomString(buf1, size);
 
-	if ((sent = Xsend(sock, buf1, size, 0)) < 0)
-		die(-4, "Send error %d on socket %d\n", errno, sock);
+		if ((sent = Xsend(sock, buf1, size, 0)) < 0)
+			die(-4, "Send error %d on socket %d\n", errno, sock);
 
-	say("Xsock %4d sent %d of %d bytes\n", sock, sent, size);
+		//say("Xsock %4d sent %d of %d bytes\n", sock, sent, size);
 
-	struct pollfd pfds[2];
-	pfds[0].fd = sock;
-	pfds[0].events = POLLIN;
-	if ((rc = Xpoll(pfds, 1, 5000)) <= 0) {
-		die(-5, "Poll returned %d\n", rc);
+		struct pollfd pfds[2];
+		pfds[0].fd = sock;
+		pfds[0].events = POLLIN;
+		if ((rc = Xpoll(pfds, 1, 100000)) <= 0) {
+			die(-5, "Poll returned %d\n", rc);
+		}
+
+		memset(buf2, 0, sizeof(buf2));
+		if ((received = Xrecv(sock, buf2, sizeof(buf2), 0)) < 0)
+			die(-5, "Receive error %d on socket %d\n", errno, sock);
+
+		dot_c++;
+
+		for (int i = 0; i < dot_c; i++)
+			printf(".");
+		printf("\n");
+		
+		//say("Xsock %4d received %d bytes\n", sock, received);
+
+		if (sent != received || strcmp(buf1, buf2) != 0)
+			warn("Xsock %4d received data different from sent data! (bytes sent/recv'd: %d/%d)\n", sock, sent, received);
+		usleep(1000000);
+		// test for udp
+		if (Xgetaddrinfo(STREAM_NAME, NULL, NULL, &ai) != 0)
+			die(-1, "unable to lookup name %s\n", STREAM_NAME);
+		sa = (sockaddr_x*)ai->ai_addr;
+
+		Graph g(sa);
+		printf("\n%s\n", g.dag_string().c_str());		
 	}
-
-	memset(buf2, 0, sizeof(buf2));
-	if ((received = Xrecv(sock, buf2, sizeof(buf2), 0)) < 0)
-		die(-5, "Receive error %d on socket %d\n", errno, sock);
-
-	say("Xsock %4d received %d bytes\n", sock, received);
-
-	if (sent != received || strcmp(buf1, buf2) != 0)
-		warn("Xsock %4d received data different from sent data! (bytes sent/recv'd: %d/%d)\n",
-				sock, sent, received);
-
 	return 0;
 }
 

@@ -621,7 +621,7 @@ void config(int argc, char** argv)
 	// note: ident must exist for the life of the app
 	ident = (char *)calloc(strlen(hostname) + strlen (APPNAME) + 4, 1);
 	sprintf(ident, "%s:%s", APPNAME, hostname);
-	openlog(ident, LOG_CONS|LOG_NDELAY|LOG_LOCAL4|verbose, LOG_LOCAL4);
+	openlog(ident, LOG_CONS|LOG_NDELAY|verbose, LOG_LOCAL4);
 	setlogmask(LOG_UPTO(level));
 }
 

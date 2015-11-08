@@ -27,7 +27,12 @@
 #include "xns.h"
 #include "dagaddr.hpp"
 
+#include <assert.h>
+
 #define ETC_HOSTS "/etc/hosts.xia"
+
+#define NS_LOOKUP_RETRY_NUM 30
+#define NS_LOOKUP_WAIT_MSEC 1000
 
 /*!
 ** @brief Lookup a DAG in the hosts.xia file
@@ -264,26 +269,25 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 	}
 
 	if (!strncmp(name, "RE ", 3) || !strncmp(name, "DAG ", 4)) {
+		// check to see if name is actually a dag to begin with
+    Graph gcheck(name);
 
-        // check to see if name is actually a dag to begin with
-        Graph gcheck(name);
-
-        // check to see if the returned dag was valid
-        // we may want a better check for this in the future
-        if (gcheck.num_nodes() > 0) {
-            std::string s = gcheck.dag_string();
-            gcheck.fill_sockaddr((sockaddr_x*)addr);
-            *addrlen = sizeof(sockaddr_x);
-            return 0;
-        }
+		// check to see if the returned dag was valid
+    // we may want a better check for this in the future
+		if (gcheck.num_nodes() > 0) {
+			std::string s = gcheck.dag_string();
+			gcheck.fill_sockaddr((sockaddr_x*)addr);
+			*addrlen = sizeof(sockaddr_x);
+			return 0;
     }
-
+	}
+//printf("Before Xsocket\n");
 	// not found locally, check the name server
 	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
 		return -1;
-
+//printf("Before XreadNameServerDAG\n");
 	//Read the nameserver DAG (the one that the name-query will be sent to)
-	if ( XreadNameServerDAG(sock, &ns_dag) < 0 ) {
+	if (XreadNameServerDAG(sock, &ns_dag) < 0 ) {
 		LOG("Unable to find nameserver address");
 		errno = NO_RECOVERY;
 		return -1;
@@ -296,40 +300,69 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 	query_pkt.name = name;
 	query_pkt.dag = NULL;
 	int len = make_ns_packet(&query_pkt, pkt, sizeof(pkt));
-
+printf("Sending nameservice queny with length %d\n", len);
+assert(len > 0);
 	//Send a name query to the name server
 	if ((rc = Xsendto(sock, pkt, len, 0, (const struct sockaddr*)&ns_dag, sizeof(sockaddr_x))) < 0) {
 		int err = errno;
+printf("Error: sent %d bytes\n", rc);
 		LOGF("Error sending name query (%d)", rc);
 		Xclose(sock);
 		errno = err;
 		return -1;
 	}
 
+	for (int i = 0; i < NS_LOOKUP_RETRY_NUM; i++) {
+		struct pollfd pfds[2];
+		pfds[0].fd = sock;
+		pfds[0].events = POLLIN;
+		if ((rc = Xpoll(pfds, 1, NS_LOOKUP_WAIT_MSEC)) <= 0) {
+			//die(-5, "Poll returned %d\n", rc);
+			if ((rc = Xsendto(sock, pkt, len, 0, (const struct sockaddr*)&ns_dag, sizeof(sockaddr_x))) < 0) {
+				int err = errno;
+				LOGF("Error sending name query (%d)", rc);
+				Xclose(sock);
+				errno = err;
+				return -1;
+			}
+printf("Retried %d times...\n", i+1);		
+		}
+		else {
+			break;
+		}
+	}
+	
+	// TODO: reties =4 for, if time out, then Xsendto again  Xsekect(readfdf = sock, timeout)<0
+printf("Sent %d bytes and begin to Xrecvfrom\n", rc);
 	//Check the response from the name server
 	memset(pkt, 0, sizeof(pkt));
 	if ((rc = Xrecvfrom(sock, pkt, NS_MAX_PACKET_SIZE, 0, NULL, NULL)) < 0) {
 		int err = errno;
+printf("Error retrieving name query (%d)", err);		
 		LOGF("Error retrieving name query (%d)", rc);
 		Xclose(sock);
 		errno = err;
 		return -1;
 	}
 
+Graph gns(&ns_dag);
+printf("Nameserver DAG: %s\n", gns.dag_string().c_str());
+
 	ns_pkt resp_pkt;
 	get_ns_packet(pkt, rc, &resp_pkt);
+// printf("Before switch\n");
 
 	switch (resp_pkt.type) {
-	case NS_TYPE_RESPONSE_QUERY:
-		result = 1;
-		break;
-	case NS_TYPE_RESPONSE_ERROR:
-		result = -1;
-		break;
-	default:
-		LOG("Unknown nameserver response");
-		result = -1;
-		break;
+		case NS_TYPE_RESPONSE_QUERY:
+			result = 1;
+			break;
+		case NS_TYPE_RESPONSE_ERROR:
+			result = -1;
+			break;
+		default:
+			LOG("Unknown nameserver response");
+			result = -1;
+			break;
 	}
 	Xclose(sock);
 

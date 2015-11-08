@@ -252,11 +252,11 @@ int main(int argc, char *argv[]) {
 			syslog(LOG_WARNING, "error receiving data (%s)", strerror(errno));
 			continue;
 		}
-
+		printf("\n\nReceived %d bytes in name lookup\n\n", rc);
    		ns_pkt req_pkt;
    		get_ns_packet(pkt_in, rc, &req_pkt);
 
-    	switch (req_pkt.type) {
+		switch (req_pkt.type) {
 		case NS_TYPE_REGISTER:
 			// insert a new entry
 
@@ -284,9 +284,11 @@ int main(int argc, char *argv[]) {
 				response_str = it->second;
 				rtype = NS_TYPE_RESPONSE_QUERY;
 				syslog(LOG_DEBUG, "Successful name lookup for %s", req_pkt.name);
+				printf("\n\nSuccessful name lookup for %s\n\n", req_pkt.name);
 			} else {
 				rtype = NS_TYPE_RESPONSE_ERROR;
 				syslog(LOG_DEBUG, "DAG for %s not found", req_pkt.name);
+				printf("DAG for %s not found", req_pkt.name);
 			}
 			break;
 		}
@@ -321,13 +323,17 @@ int main(int argc, char *argv[]) {
 		response_pkt.dag = (rtype == NS_TYPE_RESPONSE_QUERY) ? response_str.c_str() : NULL;
 		// pack it up to go on the wire
 		int len = make_ns_packet(&response_pkt, pkt_out, sizeof(pkt_out));
-
+		printf("Req DAG: %s\nRes DAG: %s\n\n", req_pkt.dag, response_pkt.dag);
 		//Send the response packet back to the query node
 		rc = Xsendto(sock, pkt_out, len, 0, (struct sockaddr*)&ddag, sizeof(ddag));
-		if (rc >= 0)
+		if (rc >= 0) {
 			syslog(LOG_DEBUG, "returned %d bytes", rc);
-		else
+			//printf(LOG_DEBUG, "returned %d bytes\n\n\n\n", rc);
+		}
+		else {
 			syslog(LOG_WARNING, "unable to send response (%d)", errno);
+			//printf(LOG_WARNING, "unable to send response (%d)", errno);
+		}
 	}
 	return 0;
 }

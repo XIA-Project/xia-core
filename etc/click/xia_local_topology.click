@@ -1,7 +1,6 @@
 require(library xia_router_lib.click);
 require(library xia_address.click);
 
-log::XLog(VERBOSE 0, LEVEL 6);
 
 // host & router instantiation
 host0 :: XIAEndHost (RE AD0 HID0, HID0, 1500, 0, aa:aa:aa:aa:aa:aa);
@@ -26,3 +25,5 @@ router0[1] -> LinkUnqueue(0.005, 1 GB/s) ->[1]router1;
 router1[1] -> LinkUnqueue(0.005, 1 GB/s) ->[1]router0;
 
 ControlSocket(tcp, 7777);
+log::XLog(VERBOSE 0, LEVEL 6);
+

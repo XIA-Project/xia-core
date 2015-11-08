@@ -102,6 +102,10 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 			LOGF("Error retrieving recv data from Click: %s", strerror(errno));
 		}
 		return -1;
+	} else if (numbytes == 0) {
+		// the socket has closed gracefully on the other end
+		LOG("The peer closed the connection");
+		return 0;
 	}
 
 	xrm = xsm.mutable_x_recv();
