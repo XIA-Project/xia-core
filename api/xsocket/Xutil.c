@@ -314,7 +314,8 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 
 	while (1) {
 		// see if another thread received and cached our packet
-		if ((rc = getCachedPacket(sock, seq, buf, buflen)) > 0) {
+		if (0) {
+//		if ((rc = getCachedPacket(sock, seq, buf, buflen)) > 0) {
 
 			LOGF("Got cached response with sequence # %d\n", seq);
 			std::string s(buf, rc);
@@ -348,7 +349,7 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 					break;
 
 				// these are not the data you were looking for
-				LOGF("Expected packet %u, received %u, caching packet\n", seq, sn);
+				LOGF("Expected packet %u, received %u, replaying packet\n", seq, sn);
 //				cachePacket(sock, sn, buf, buflen);
 				msg->PrintDebugString();
 

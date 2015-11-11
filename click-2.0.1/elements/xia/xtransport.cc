@@ -2813,7 +2813,6 @@ void XTRANSPORT::Xfork(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 	xia_socket_msg->PrintDebugString();
 
-	DBG("Xfork=======================\n");
 	// loop through list of ports and modify the ref counter
 	for (int i = 0; i < count; i++) {
 		int port = msg->ports(i);
@@ -2829,7 +2828,6 @@ void XTRANSPORT::Xfork(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		}
 	}
 
-	DBG("Xfork returning\n");
 	ReturnResult(_sport, xia_socket_msg);
 }
 
@@ -2844,7 +2842,6 @@ void XTRANSPORT::Xreplay(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 	xia_socket_msg->set_type(msg->type());
 	xia_socket_msg->set_sequence(msg->sequence());
-	msg->Clear();
 
 	ReturnResult(_sport, xia_socket_msg);
 }
