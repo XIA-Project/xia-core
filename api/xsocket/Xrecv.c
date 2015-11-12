@@ -66,6 +66,12 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 	if (len == 0)
 		return 0;
 
+	// FIXME: this is overkill, figure out how much room we really need to reserver
+	// make sure there's enough room for the protobuf
+	size_t max_buf = api_mtu() - 1000;
+	if (len > max_buf)
+		len = max_buf;
+
 	if (!rbuf) {
 		LOG("buffer pointer is null!\n");
 		errno = EFAULT;

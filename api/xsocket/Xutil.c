@@ -375,8 +375,8 @@ int click_reply(int sock, unsigned seq, xia::XSocketMsg *msg)
 {
 	int rc;
 	int e = 0;
-	char *buf = (char *)malloc(XIA_INTERNAL_BUFSIZE);
-	unsigned buflen = XIA_INTERNAL_BUFSIZE;
+	unsigned buflen = api_mtu();
+	char *buf = (char *)malloc(buflen);
 
 	if ((rc = click_get(sock, seq, buf, buflen, msg)) >= 0) {
 
@@ -395,8 +395,8 @@ int click_reply(int sock, unsigned seq, xia::XSocketMsg *msg)
 
 int click_status(int sock, unsigned seq)
 {
-	char *buf = (char *)malloc(XIA_INTERNAL_BUFSIZE);
-	unsigned buflen = XIA_INTERNAL_BUFSIZE;
+	unsigned buflen = api_mtu();
+	char *buf = (char *)malloc(buflen);
 	int e = 0;
 	int rc;
 	xia::XSocketMsg msg;
