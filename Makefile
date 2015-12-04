@@ -1,4 +1,4 @@
-ifeq ($(wildcard xia.mk),)
+ifeq ($(wildcard xia.mk),) 
 $(error You must run configure first)
 else
 include xia.mk
