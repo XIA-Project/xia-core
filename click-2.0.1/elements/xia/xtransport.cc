@@ -2458,16 +2458,6 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 		portToSock.set(new_port, new_sk);
 
-		XID source_xid = new_sk->src_path.xid(new_sk->src_path.destination_node());
-		XID destination_xid = new_sk->dst_path.xid(new_sk->dst_path.destination_node());
-
-		XIDpair xid_pair;
-		xid_pair.set_src(source_xid);
-		xid_pair.set_dst(destination_xid);
-
-		// Map the src & dst XID pair to source port
-		XIDpairToSock.set(xid_pair, new_sk);
-
 		sk->pending_connection_buf.pop();
 
 		WritablePacket *just_payload_part;
