@@ -202,7 +202,7 @@ int process(int sock)
 	int received = 0;
 	int rc = 0;
 	char buf1[pktSize + 1], buf2[pktSize + 1], temp[pktSize + 1];
-
+	char *bufp = buf1;
 	if (pktSize == 0)
 		size = (rand() % pktSize) + 1;
 	else
@@ -223,15 +223,15 @@ int process(int sock)
 			{
 			printf("count %d\n",count);
 
-				sent = Xsend(sock, buf1, 51200, 0);
+				sent += Xsend(sock, bufp, 51200, 0);
+				bufp += 51200;
 				if (sent < 0)
 				{
 					die(-4, "Send error %d on socket %d\n", errno, sock);
 				}
 			} else {
 			printf("count %d\n",count);
-
-				sent = Xsend(sock, buf1, count, 0);
+				sent += Xsend(sock, bufp, count, 0);
 								if (sent < 0)
 				{
 					die(-4, "Send error %d on socket %d\n", errno, sock);
