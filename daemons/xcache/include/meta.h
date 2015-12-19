@@ -113,13 +113,13 @@ public:
 		return rv;
 	}
 
-#define DEFINE_STATE_MACROS(__state)						\
-	bool is_##__state(void)  {								\
-		return (state == (__state));						\
-	}														\
-	bool set_##__state(void) {								\
+#define DEFINE_STATE_MACROS(__state)					\
+	bool is_##__state(void)  {					\
+		return (state == (__state));				\
+	}								\
+	bool set_##__state(void) {					\
 		std::cout << cid << " IS NOW " << #__state << "\n";	\
-		return (state = (__state));							\
+		return (state = (__state));				\
 	}
 
 DEFINE_STATE_MACROS(AVAILABLE)

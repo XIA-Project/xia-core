@@ -7,7 +7,7 @@ endif
 
 # list of top level directories that need to be built
 # FIXME: Temporarily removed applications compilation.
-MAKEDIRS=click api daemons tools
+MAKEDIRS=click api daemons tools applications
 
 # make sure we run clean in anything we built in
 CLEANDIRS=$(addsuffix .build, $(MAKEDIRS))

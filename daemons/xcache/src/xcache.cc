@@ -30,19 +30,23 @@ static void usage(char *argv[])
 
 	display_version();
 	printf("Usage: %s [OPTIONS]\n", argv[0]);
-	printf("  -h, --host=HOSTNAME       Specify the host on which this daemon should run.\n");
+	printf("  -h, --host=HOSTNAME       Specify the host on which"
+		   " this daemon should run.\n");
 	printf("                            Default host = \"host0\"\n");
 	printf("  -v, --version             Displays xcache version.\n");
-	printf("  -l, --log-level=level     Set xcache log level (From LOG_ERROR = %d to LOG_INFO = %d).\n",
+	printf("  -l, --log-level=level     Set xcache log level"
+		   "(From LOG_ERROR = %d to LOG_INFO = %d).\n",
 		   LOG_ERROR, LOG_INFO);
-	printf("  -m, --log-mask=<num>      Set xcache log Mask. Following are the mask values for various modules\n");
+	printf("  -m, --log-mask=<num>      Set xcache log Mask. "
+		   "Following are the mask values for various modules\n");
 	for(i = LOG_CTRL; i < LOG_END; i++) {
 		printf("                            Mask for module \"%s\": 0x%4.4x\n",
 			   mask[i], 0x1 << i);
 	}
 
 
-	printf("                            Default Mask = 0xFFFF (Enables all logs)\n");
+	printf("                            Default Mask = 0xFFFF "
+		   "(Enables all logs)\n");
 	printf("  --help                    Displays this help.\n");
 }
 
@@ -122,10 +126,8 @@ int main(int argc, char *argv[])
 			xcache_conf.threads = strtol(optarg, NULL, 0);
 			break;
 		default:
-
 			usage(argv);
 			return 1;
-			
 		}
 	}
 

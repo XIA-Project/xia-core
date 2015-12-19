@@ -46,13 +46,13 @@ private:
 	/**
 	 * Map of metadata.
 	 */
-	std::map<std::string, xcache_meta *> meta_map;	
+	std::map<std::string, xcache_meta *> meta_map;
+	pthread_mutex_t meta_map_lock;
 
 	/**
 	 * Map of contexts.
 	 */
 	std::map<uint32_t, struct xcache_context *> context_map;
-	pthread_mutex_t meta_map_lock;
 
 	/**
 	 * Hostname while running on localhost.
@@ -78,6 +78,7 @@ public:
 	char myAD[MAX_XID_SIZE];
 	char myHID[MAX_XID_SIZE];
 	char my4ID[MAX_XID_SIZE];
+
 	/**
 	 * A Constructor.
 	 * FIXME: What do we need to do in the constructor?
@@ -93,7 +94,7 @@ public:
 	/**
 	 * Xcache Sender Thread.
 	 * For sending content chunk, this thread keeps on "Accepting" connections
-	 * and then sends appropriate content chunk to the receiver
+	 * and then sends appropriate content chunks to the receiver
 	 */
 	int create_sender(void);
 	void send_content_remote(int sock, sockaddr_x *mypath);
@@ -110,9 +111,14 @@ public:
 	 * On reception of XgetChunk API, this function _MAY_ be invoked. If the
 	 * chunk is found locally, then no need to fetch from remote.
 	 */
-	int fetch_content_remote(sockaddr_x *addr, socklen_t addrlen, xcache_cmd *, xcache_cmd *, int flags);
-	int fetch_content_local(sockaddr_x *addr, socklen_t addrlen, xcache_cmd *, xcache_cmd *, int flags);
+	int fetch_content_remote(sockaddr_x *addr, socklen_t addrlen, xcache_cmd *,
+							 xcache_cmd *, int flags);
+
+	int fetch_content_local(sockaddr_x *addr, socklen_t addrlen, xcache_cmd *,
+							xcache_cmd *, int flags);
+
 	static void *__fetch_content(void *__args);
+
 	int xcache_fetch_content(xcache_cmd *resp, xcache_cmd *cmd, int flags);
 
 	/**
@@ -128,7 +134,7 @@ public:
 	void process_req(struct xcache_req *req);
 
 	static void *worker_thread(void *arg);
-	
+
 
 	/**
 	 * Prints current xcache status.
@@ -172,7 +178,8 @@ public:
 
 	int register_meta(xcache_meta *);
 	void add_meta(xcache_meta *meta);
-	int xcache_notify(struct xcache_context *c, sockaddr_x *addr, socklen_t addrlen, int event);
+	int xcache_notify(struct xcache_context *c, sockaddr_x *addr,
+					  socklen_t addrlen, int event);
 	std::string addr2cid(sockaddr_x *addr);
 	sockaddr_x cid2addr(std::string cid);
 

@@ -120,7 +120,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 
 	Node expected_cid(g.get_final_intent());
 	xcache_meta *meta = new xcache_meta(expected_cid.id_string());
-	
+
 	meta->set_FETCHING();
 
 	do {
@@ -173,7 +173,7 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen, 
 
 	meta = acquire_meta(cid);
 	LOG_CTRL_INFO("Fetching content from local\n");
-	
+
 	if(!meta) {
 		/* We could not find the content locally */
 		return RET_FAILED;
@@ -185,7 +185,7 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen, 
 	}
 
 	data = meta->get();
-	
+
 	ret = RET_OKNORESP;
 
 	if(resp) {
@@ -247,7 +247,7 @@ void *xcache_controller::__fetch_content(void *__args)
 		delete args;
 	}
 	return NULL;
-}       
+}
 
 int xcache_controller::xcache_fetch_content(xcache_cmd *resp, xcache_cmd *cmd, int flags)
 {
@@ -264,7 +264,8 @@ int xcache_controller::xcache_fetch_content(xcache_cmd *resp, xcache_cmd *cmd, i
 		__fetch_content(&args);
 		ret = args.ret;
 	} else {
-		struct __fetch_content_args *args = 
+		/* FIXME: Add to worker queue */
+		struct __fetch_content_args *args =
 			(struct __fetch_content_args *)malloc(sizeof(struct __fetch_content_args));
 
 		pthread_t fetch_thread;
@@ -636,6 +637,10 @@ void xcache_controller::process_req(xcache_req *req)
 	}
 }
 
+/**
+ * Worker thread
+ * This thea
+ */
 void *xcache_controller::worker_thread(void *arg)
 {
 	xcache_controller *ctrl = (xcache_controller *)arg;
@@ -660,13 +665,19 @@ void xcache_controller::run(void)
 	std::vector<int> active_conns;
 	std::vector<int>::iterator iter;
 
+	/* Application interface */
 	libsocket = xcache_create_lib_socket();
 
+	/* Arguments for the cache thread */
 	args.cache = &cache;
 	args.cache_in_port = getXcacheInPort();
 	args.cache_out_port = getXcacheOutPort();
 	args.ctrl = this;
-	
+
+	/*
+	 * Caching is performed by an independent thread
+	 * Please see cache.cc for details
+	 */
 	cache.spawn_thread(&args);
 
 	if((rc = xr.connect()) != 0) {
@@ -674,34 +685,36 @@ void xcache_controller::run(void)
 		return;
 	}
 
-	xr.setRouter(hostname); 
+	xr.setRouter(hostname);
 	sendersocket = create_sender();
 
 	FD_ZERO(&fds);
 	FD_SET(libsocket, &allfds);
 	FD_SET(sendersocket, &allfds);
 
-	LOG_CTRL_INFO("Launching worker threads\n");
+	/* Launch all the worker threads */
 	for(int i = 0; i < n_threads; i++) {
 		pthread_create(&threads[i], NULL, worker_thread, (void *)this);
 	}
-	
+
 	LOG_CTRL_INFO("Entering The Loop\n");
 
 repeat:
 	memcpy(&fds, &allfds, sizeof(fd_set));
 
 	max = libsocket;
+
+	/* FIXME: do something better */
 	for(iter = active_conns.begin(); iter != active_conns.end(); ++iter) {
 		max = MAX(max, *iter);
 	}
 
 	Xselect(max + 1, &fds, NULL, NULL, NULL);
-
 	LOG_CTRL_INFO("Broken\n");
 
 	if(FD_ISSET(libsocket, &fds)) {
 		int new_connection = accept(libsocket, NULL, 0);
+
 		LOG_CTRL_INFO("Action on libsocket\n");
 		active_conns.push_back(new_connection);
 		FD_SET(new_connection, &allfds);
@@ -712,17 +725,22 @@ repeat:
 		sockaddr_x mypath;
 		socklen_t mypath_len = sizeof(mypath);
 
-		if((accept_sock = XacceptAs(sendersocket, (struct sockaddr *)&mypath, &mypath_len, NULL, NULL)) < 0) {
+		if((accept_sock = XacceptAs(sendersocket, (struct sockaddr *)&mypath,
+									&mypath_len, NULL, NULL)) < 0) {
 			LOG_CTRL_ERROR("XacceptAs failed\n");
 		} else {
 			xcache_req *req = new xcache_req();
 
+			/* Create a request to add to worker queue */
+
+			/* Send chunk Request */
 			req->type = xcache_cmd::XCACHE_SENDCHUNK;
 			req->from_sock = sendersocket;
 			req->to_sock = accept_sock;
 			req->data = malloc(mypath_len);
 			memcpy(req->data, &mypath, mypath_len);
 			req->datalen = mypath_len;
+			/* Indicates that after sending, remove the fd */
 			req->flags = XCFI_REMOVEFD;
 
 			enqueue_request_safe(req);
@@ -761,6 +779,7 @@ repeat:
 			goto disconnected;
 		} else {
 			bool parse_success = cmd.ParseFromString(buffer);
+
 			LOG_CTRL_INFO("Controller received %lu bytes\n", buffer.length());
 			if(!parse_success) {
 				LOG_CTRL_ERROR("[ERROR] Protobuf could not parse\n");
@@ -768,9 +787,11 @@ repeat:
 			}
 		}
 
+		/* Try to see if we can process request in the fast path */
 		ret = fast_process_req(*iter, &resp, &cmd);
 
 		if(ret == RET_OKSENDRESP) {
+			/* Send response back to the client */
 			resp.SerializeToString(&buffer);
 			if(send_response(*iter, buffer.c_str(), buffer.length()) < 0) {
 				LOG_CTRL_ERROR("FIXME: handle return value of write\n");
@@ -778,8 +799,13 @@ repeat:
 				LOG_CTRL_INFO("Data sent to client\n");
 			}
 		} else if(ret == RET_REMOVEFD) {
+			/* Remove this fd from the pool */
 			goto removefd;
 		} else if(ret == RET_ENQUEUE) {
+			/*
+			 * Fast path processing not possible:
+			 * Enqueue the request into worker queue
+			 */
 			xcache_req *req = new xcache_req();
 
 			req->type = cmd.cmd();
@@ -790,10 +816,11 @@ repeat:
 
 			enqueue_request_safe(req);
 		}
-				
+
 next:
 		++iter;
 		continue;
+
 disconnected:
 		LOG_CTRL_DEBUG("Client %d disconnected.\n", *iter);
 		close(*iter);
@@ -801,7 +828,6 @@ removefd:
 		FD_CLR(*iter, &allfds);
 		active_conns.erase(iter);
 	}
-
 
 	goto repeat;
 }

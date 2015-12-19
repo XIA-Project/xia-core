@@ -143,5 +143,6 @@ xftp_basic_client
 xftp_basic_server
 xcache_server
 xcache_client
+daemons/xcache/local_testing
 
 key/

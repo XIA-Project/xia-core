@@ -1,14 +1,19 @@
 XIA Caching Daemon
 ==================
+
 This is XIA's content caching daemon.
 
 Installation
 ------------
-<Installation steps would go here>
+
 
 Usage
 -----
-<Usage goes here>
+
+
+Architecture
+------------
+
 
 APIs
 ----
