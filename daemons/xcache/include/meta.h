@@ -11,8 +11,6 @@
 #include <unistd.h>
 
 
-class xcache_slice;
-
 class xcache_meta {
 private:
 	enum chunk_states {
@@ -28,10 +26,6 @@ private:
 	 */
 	uint64_t len;
 
-	/**
-	 * Map of all the slices that store this meta.
-	 */
-	std::map<uint32_t, xcache_slice *> slice_map;
 	xcache_content_store *store;
 	std::string cid;
 
@@ -52,18 +46,6 @@ public:
 	void set_store(xcache_content_store *s) {
 		store = s;
 	}
-
-	/**
-	 * Adds passed slice to the slice_map.
-	 * Must be called when a meta is added to slice.
-	 */
-	void added_to_slice(xcache_slice *slice);
-
-	/**
-	 * Removes slice from the map.
-	 * Must be called whenever a meta is evicted from a slice.
-	 */
-	void removed_from_slice(xcache_slice *slice);
 
 	void set_length(uint64_t length) {
 		this->len = length;

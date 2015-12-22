@@ -43,7 +43,7 @@ void log(const char *func, int line, const char *fmt, va_list ap);
 
 /* Basic logging macro */
 #define LOG(__mask, __level, __fmt, __ap)			\
-	do {											\
+	do {							\
 		if((__level <= logger_config.level) &&		\
 		   ((__mask & logger_config.mask) != 0))	\
 			log(__func__, __LINE__, __fmt, __ap);	\
@@ -60,33 +60,33 @@ void configure_logger(struct logger_config *);
 
 extern struct logger_config logger_config;
 
-#define DEFINE_LOG_MACROS(__module)										\
+#define DEFINE_LOG_MACROS(__module)						\
 	static inline void LOG_##__module##_INFO(const char *fmt, ...) {	\
-		va_list ap;														\
-		va_start(ap, fmt);												\
-		LOG_INFO(1 << LOG_##__module, fmt, ap);							\
-		va_end(ap);														\
-	}																	\
-																		\
+		va_list ap;							\
+		va_start(ap, fmt);						\
+		LOG_INFO(1 << LOG_##__module, fmt, ap);				\
+		va_end(ap);							\
+	}									\
+										\
 	static inline void LOG_##__module##_WARN(const char *fmt, ...) {	\
-		va_list ap;														\
-		va_start(ap, fmt);												\
-		LOG_WARN(1 << LOG_##__module, fmt, ap);							\
-		va_end(ap);														\
-	}																	\
-																		\
+		va_list ap;							\
+		va_start(ap, fmt);						\
+		LOG_WARN(1 << LOG_##__module, fmt, ap);				\
+		va_end(ap);							\
+	}									\
+										\
 	static inline void LOG_##__module##_DEBUG(const char *fmt, ...) {	\
-		va_list ap;														\
-		va_start(ap, fmt);												\
-		LOG_DEBUG(1 << LOG_##__module, fmt, ap);						\
-		va_end(ap);														\
-	}																	\
-																		\
+		va_list ap;							\
+		va_start(ap, fmt);						\
+		LOG_DEBUG(1 << LOG_##__module, fmt, ap);			\
+		va_end(ap);							\
+	}									\
+										\
 	static inline void LOG_##__module##_ERROR(const char *fmt, ...) {	\
-		va_list ap;														\
-		va_start(ap, fmt);												\
-		LOG_ERROR(1 << LOG_##__module, fmt, ap);						\
-		va_end(ap);														\
+		va_list ap;							\
+		va_start(ap, fmt);						\
+		LOG_ERROR(1 << LOG_##__module, fmt, ap);			\
+		va_end(ap);							\
 	}
 
 #endif
