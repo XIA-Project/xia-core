@@ -5,8 +5,8 @@ XcacheNotifications \- Xcache Notifications.
 .nf
 .B "#include <xcache.h>"
 .sp
-.BR "int XregisterNotification(int events, void (*func)(int event, const char *cid, int cidlen));"
-.BR "int XprocessNotification(int xcacheSock);"
+.BR "int XregisterNotification(int events, void (*func)(XcacheHandle *, const char *cid, int cidlen));"
+.BR "int XprocessNotification(XcacheHandle *h);"
 .fi
 
 .SH DESCRIPTION
@@ -27,10 +27,6 @@ Chunk arrived.
 .B "XCE_CHUNKEVICTED"
 .RS
 Chunk evicted.
-.RE
-.B "XCE_SLICEEXPIRED"
-.RS
-Slice expired.
 .RE
 
 Applications can register to multiple events by a single call to
@@ -55,19 +51,14 @@ is of length
 .I cidlen.
 
 Xcache sends these notifications on
-.B ALL
-the sockets allocated by
-.B XcacheSocket(8).
-Normally, applications should not need more than one such
-socket. Application does not need to parse and process any notification
-by itself. Function
+.B XcacheHandle->notifSocket.
+Function
 .B XprocessNotification()
 parses the incoming notification and invokes appropriate registered
-function.
-.B xcacheSock
-must be allocated
-.B XcacheSocket()
-call.
+function. Applications interested in using Xcache notifications, wait
+for incoming data by calling
+.B select()
+like functions.
 
 .SH RETURN VALUE
 On success
@@ -76,10 +67,10 @@ returns 0. On failure it returns -1.
 .B XprocessNotification()
 returns the number of notifications received.
 .SH ERRORS
-.B ENOTCONN	
+.B ENOTCONN
 XcacheSock is not connected.
 
-.B EHOSTDOWN	
+.B EHOSTDOWN
 Xcache is not running.
 .B 
 .\".SH NOTES

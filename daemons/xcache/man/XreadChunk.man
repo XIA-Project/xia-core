@@ -5,24 +5,35 @@ XreadChunk \- Read chunk from xcache.
 .nf
 .B "#include <xcache.h>"
 .sp
-.BR "int XreadChunk(int xcacheSock, void *buf, size_t bulen);"
+.BR "int XreadChunk(XcacheHandle *h, sockaddr_x *addr, socklen_t addrlen, void *buf, size_t len, off_t offset);"
 .fi
 
 .SH DESCRIPTION
 .B XreadChunk()
-reads chunk associated with
-.I xcacheSock
+reads chunk associated with address
+.I addr
 into the buffer
 .I buf
 of length
 .I buflen.
-.I xcacheSock
-must ONLY be obtained by calling
-.B XopenChunk().
+The argument
+.I addrlen
+must be initialized to the length of the address pointed to by
+.I addr.
+.I offset
+is the start offset.
+.B XreadChunk()
+reads at max
+.I len
+bytes skipping first
+.I offset
+bytes from the chunk.
+
+
 
 .SH RETURN VALUE
-XreadChunk returns number of bytes succesfully read. On completion of
-chunk read, 0 is returned. On error, -1 is returned.
+XreadChunk returns number of bytes succesfully read. On error, -1 is
+returned.
 
 .SH ERRORS
 .B ENOTCONN	
@@ -34,9 +45,30 @@ Xcache is not running.
 .\".SH NOTES
 
 .SH EXAMPLE
+.nf
+#include <xcache.h>
+#include <stdio.h>
 
-See
-.B XrequestChunk(8).
+int get_chunk(char **data, sockaddr_x *addr, socklen_t addrlen)
+{
+	XcacheHandle h;
+	int ret;
+	char buf[1024];
+
+	if(XcacheHandleInit(&h) < 0) {
+		perror("XcacheHandleInit");
+		return -1;
+	}
+
+	ret = XreadChunk(h, addr, addrlen, buf, 1024, 0);
+	printf("Read %d bytes.\n", ret);
+
+	XcacheHandleDestroy(&h);
+
+	return ret;
+}
+.fi
+
 
 .SH SEE ALSO
 .B "XopenChunk(8),"

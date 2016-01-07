@@ -6,58 +6,39 @@ XputChunk, XputFile, XputBuffer \- Content Publishing Functions.
 .nf
 .B "#include <xcache.h>"
 .sp
-.BR "int XputChunk(int xcacheSock, ChunkContext *ctx, const void *data,"
-.BR "    size_t length, ChunkInfo *info)"
-.BR "int XputFile(int xcacheSock, ChunkContext *ctx, const char *filename,"
-.BR "    size_t chunkSize, ChunkInfo **info)"
-.BR "int XputBuffer(int xcacheSock, ChunkContext *ctx, const void *data,"
-.BR "    size_t length, size_t chunkSize, ChunkInfo **info)"
+.BR "int XputChunk(XcacheHandle *h, const void *data, size_t length,"
+.BR "    sockaddr_x *info)"
+.BR "int XputFile(XcacheHandle *h, const char *filename, size_t chunkSize,"
+.BR "    sockaddr_x **info)"
+.BR "int XputBuffer(XcacheHandle *h, const void *data, size_t length, size_t chunkSize,"
+.BR "    sockaddr_x **info)"
 .fi
 .SH DESCRIPTION
 The functions in Xput family publish content to the XIA network. The
-content chunks are added into the slice pointed to by
-.I "ctx"
-argument. (See
-.B Xslice(8)
-for details).
+argument
+.I h
+must be initialized by calling the function
+.B XcacheHandleInit().
 
 .B XputChunk()
-publishes a single chunk of data pointed to by argument
-.I data
-and having length
-.I length.
-It fills
-.I info
-with following information about the chunk just published.
-
-.nf
-typedef struct {
-	int size;
-	char cid[CID_HASH_SIZE + 1];
-	int32_t ttl;                 /* FIXME: unused */
-	struct timeval timestamp;    /* FIXME: unused */
-} ChunkInfo;
-.fi
+publishes a single chunk of length
+.I length
+, containing data
+.I data.
 
 .B XputFile()
 publishes content from file
 .I filename
 while
-.B XputBuffer
+.B XputBuffer()
 publishes content from buffer
 .I data
 of total length
 .I length.
-Both the functions publish chunks of size 
-.I chunkSize
-at the max into the cache slice
-.I ctx
-which should have been allocated by
-.B XallocSlice(8).
-Information about the chunks published is filled in
-.I info
-which is allocated by
-.B XputBuffer() or XputFile().
+Both the functions publish chunks of size
+.I chunkSize.
+The addresses of the chunks published are filled into
+.I info.
 
 .SH RETURN VALUE
 On success, all these functions return number of chunks
@@ -65,12 +46,12 @@ published. Return value 0 does not indicate any error. On failure,
 these functions return -1 and errno is set appropriately.
 
 .SH ERRORS
-.B ENOTCONN	
+.B ENOTCONN
 XcacheSock is not connected.
 
-.B EHOSTDOWN	
+.B EHOSTDOWN
 Xcache is not running.
-.B 
+.B
 .\".SH NOTES
 
 .SH EXAMPLE
@@ -80,45 +61,28 @@ Xcache is not running.
 
 int main(void)
 {
-	int sock = XcacheSock();
-	ChunkCtx *ctx;
-	struct sliceInfo info;
 	char buffer[1024];
-	ChunkInfo *info;
+	XcacheHandle h;
 	int n_chunks;
 
-	if(sock < 0) {
-		perror("XcacheSock");
-		exit(EXIT_FAILURE);
-	}
-
-	info.ttl = XCACHE_INF;
-	info.size = XCACHE_INF;
-	info.policy = XCACHE_EVICT_POLICY_LRU;
-
-	ctx = XallocateSlice(sock, &info);
-	if(!ctx) {
-		perror("XallocateSlice");
-		exit(EXIT_FAILURE);
+	if (XcacheHandleInit(&h) < 0) {
+		perror("XcacheHandleInit");
+		return -1;
 	}
 
 	memset(buffer, 0, sizeof(buffer));
 
-	if((n_chunks = XputBuffer(sock, ctx, buffer, 1024, 100, &info)) < 0) {
+	if((n_chunks = XputBuffer(h, buffer, 1024, 100, &info)) < 0) {
 		perror(XputBuffer());
 	} else {
 		printf("Published %d chunks successfully!\\n", n_chunks);
 	}
 
-	if(XfreeSlice(sock, ctx) < 0) {
-		perror("XfreeSlice");
-	}
-
-	close(sock);
+	XcacheHandleDestroy(&h);
 }
 .fi
 .SH SEE ALSO
-.B "XcacheSocket(8),"
+.B "XcacheHandle(8),"
 .B "Xput(8),"
 .B "Xget(8)"
 .SH AUTHOR

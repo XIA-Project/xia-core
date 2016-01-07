@@ -654,6 +654,8 @@ void *xcache_controller::worker_thread(void *arg)
 		if(req)
 			ctrl->process_req(req);
 	}
+
+	return NULL;
 }
 
 void xcache_controller::run(void)

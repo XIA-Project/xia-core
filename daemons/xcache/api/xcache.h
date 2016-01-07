@@ -47,6 +47,13 @@ typedef struct {
  * Initializes XcacheHandle.
  */
 int XcacheHandleInit(XcacheHandle *h); //DONE
+#ifdef notyet
+int XcacheHandleDestroy(XcacheHandle *h);
+#else
+#define XcacheHandleDestroy(...)
+#endif
+
+
 int XputFile(XcacheHandle *h, const char *filename, size_t chunkSize, sockaddr_x **info);  //DONE
 int XputChunk(XcacheHandle *h, const void *data, size_t length, sockaddr_x *info);  //DONE
 int XputBuffer(XcacheHandle *h, const void *data, size_t length, size_t chunkSize, sockaddr_x **info);  //DONE

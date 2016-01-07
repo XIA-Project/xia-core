@@ -1,0 +1,96 @@
+.\" Manual page for content fetch API
+.TH XgetChunk 8 "05 May 2015" "1.0" "XIA Manual Pages"
+.SH NAME
+XgetChunk \- Get chunk in memory.
+.SH SYNOPSIS
+.nf
+.B "#include <xcache.h>"
+.sp
+.BR "int XfetchChunk(XcacheHandle *h, void *buf, size_t buflen, int flags, sockaddr_x *addr, socklen_t addrlen);"
+.fi
+
+.SH DESCRIPTION
+.B XfetchChunk()
+fetches the chunk with address
+.I addr
+from the XIA network and fills the content into the buffer pointed to
+by
+.I buf.
+At max,
+.I buflen
+bytes are copied.
+The argument
+.I h
+must be a xcache handle initialized by
+.B XcacheHandleInit(8).
+The argument
+.I addrlen
+must be set to the length of the address of the chunk pointed to by
+.I addr.
+The argument
+.I flags
+is bitwise OR of one or more of the following flags:
+
+
+.B XCF_BLOCK
+.RS
+Enable blocking mode. If this flag is specified, xcache daemon blocks
+until the chunk has been received. In this case, the read data is
+filled into buffer pointed to by
+.I buf.
+However, if this flag is not specified, xcache daemon fetches the
+chunk in a non-blocking manner. Once the chunk arrives, Xcache daemon
+sends
+.B XCE_CHUNKARRIVED
+notification (See
+.B XcacheNotifications
+for details). Upon receipt of this notification, the caller must read
+the chunk by calling
+.B XreadChunk(8).
+.RE
+
+.SH RETURN VALUE
+On success, the number of bytes successfully copied is returned. On
+failure, -1 is returned and appropriate errno is set.
+
+.SH ERRORS
+.B ENOTCONN	
+XcacheSock is not connected.
+
+.B EHOSTDOWN	
+Xcache is not running.
+.B 
+.\".SH NOTES
+
+.SH EXAMPLE
+.nf
+#include <xcache.h>
+#include <stdio.h>
+
+int get_chunk(char **data, sockaddr_x *addr, socklen_t addrlen)
+{
+	XcacheHandle h;
+	int ret, chunk_sock;
+	int total_size = 0;
+	char buf[1024];
+
+	if(XcacheHandleInit(&h) < 0) {
+		perror("XcacheHandleInit");
+		return -1;
+	}
+
+	if(XfetchChunk(h, buf, 1024, XCF_BLOCK, addr, addrlen) < 0) {
+		perror("XrequestChunk");
+		close(sock);
+		return -1;
+	}
+
+	XcacheHandleDestroy(&h);
+
+	return ret;
+}
+.fi
+
+
+.SH AUTHOR
+Harshad Shirwadkar <harshad@cmu.edu>
