@@ -4,12 +4,15 @@ include ../../xia.mk
 
 LDFLAGS += $(LIBS)
 SOURCES=xnetjd.cc
-NS=$(BINDIR)/xnetjd
+NETJD=$(BINDIR)/xnetjd
 
-all: $(NS)
+ndap_pb2.py: ndap.proto
+	protoc --python_out=. $^
 
-$(NS): $(SOURCES) $(XINC)/Xsocket.h $(XINC)/xns.h
+all: $(NETJD) ndap_pb2.py
+
+$(NETJD): $(SOURCES) $(XINC)/Xsocket.h
 	$(CC) -o $@ $(CFLAGS) $(SOURCES) $(LDFLAGS)
 
 clean:
-	-rm $(NS)
+	-rm $(NETJD) ndap_pb2.py
