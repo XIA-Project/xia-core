@@ -2,6 +2,7 @@
 #
 
 import time
+import struct
 import socket
 import argparse
 import threading
@@ -38,19 +39,17 @@ def beacon_handler():
     sockfd.bind(xnetjd)
     while True:
         data, addr = sockfd.recvfrom(1034)
-        print "Received beacon from", addr
+        print "Received beacon from: ", addr
         # Convert beacon to protobuf and print its contents
-        dataarray = bytearray(data)
-        interface = int(dataarray[0:2])
-        sendermac = dataarray[2:8]
-        beaconstr = str(dataarray[9:])
+        interface = struct.unpack("H", data[0:2])[0]
+        sendermac = struct.unpack("BBBBBB", data[2:8])
         # First two bytes contain interface number
-        print "Received on interface:" , interface
+        print "On interface: ", interface
         # Six bytes contain source mac address
-        print "Sent by:", sendermac
+        print "Sent by: ", sendermac
         # Remaining data is the beacon
         beacon = ndap_pb2.NetDescriptor()
-        beacon.ParseFromString(beaconstr)
+        beacon.ParseFromString(data[8:])
         print "Beacon contained:"
         ndap_beacon.print_descriptor(beacon)
 
