@@ -36,6 +36,7 @@ enum XSocketCallType {
   XUPDATERV = 33;
   XFORK = 34;
   XREPLAY = 35;
+  XNOTIFY = 36;
 }
 
 message XSocketMsg {
@@ -83,6 +84,7 @@ message XSocketMsg {
   optional X_Listen_Msg x_listen = 35;
   optional X_Fork_Msg x_fork = 36;
   optional X_Replay_Msg x_replay = 37;
+  optional X_Notify_Msg x_notify = 38;
 }
 
 message X_Socket_Msg {
@@ -320,4 +322,8 @@ message X_BindPush_Msg {
 message X_Replay_Msg {
   required XSocketCallType type = 1; // type of message we are replaying
   optional int32 sequence = 2;
+}
+
+message X_Notify_Msg {
+  optional int32 status = 1; // placeholder for now
 }

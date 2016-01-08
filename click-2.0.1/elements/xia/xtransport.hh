@@ -254,6 +254,9 @@ protected:
 	// list of ports wanting xcmp notifications
 	list<int> xcmp_listeners;
 
+	// list of ports waiting for a notification
+	list <int> notify_listeners;
+
 	// outstanding poll/selects indexed by API port #
 	HashTable<unsigned short, PollEvent> poll_events;
 
@@ -338,6 +341,7 @@ protected:
 	void Xupdaterv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xfork(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xreplay(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xnotify(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 
 	// protocol handlers
 	void ProcessDatagramPacket(WritablePacket *p_in);

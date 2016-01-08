@@ -83,6 +83,7 @@ XTRANSPORT::~XTRANSPORT()
 	XIDpairToConnectPending.clear();
 
 	xcmp_listeners.clear();
+	notify_listeners.clear();
 }
 
 
@@ -2618,6 +2619,9 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XREPLAY:
 		Xreplay(_sport, &xia_socket_msg);
 		break;		
+	case xia::XNOTIFY:
+		Xnotify(_sport, &xia_socket_msg);
+		break;		
 	default:
 		ERROR("ERROR: Unknown API request\n");
 		break;
@@ -2845,6 +2849,16 @@ void XTRANSPORT::Xreplay(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 	ReturnResult(_sport, xia_socket_msg);
 }
+
+
+void XTRANSPORT::Xnotify(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
+{
+	notify_listeners.push_back(_sport);
+
+	// we just go away and wait for XchangeAD to be called which will trigger a response on this client socket
+}
+
+
 
 // FIXME: This way of doing things is a bit hacky.
 void XTRANSPORT::XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
@@ -3653,7 +3667,21 @@ void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 		}
 		output(NETWORK_PORT).push(p);
 	}
+
 	ReturnResult(_sport, xia_socket_msg);
+
+
+	// now also tell anyone who is waiting on a notification this happened
+	list<int>::iterator i;
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XNOTIFY);
+	xsm.set_sequence(0);
+
+	for (i = notify_listeners.begin(); i != notify_listeners.end(); i++) {
+		ReturnResult(*i, &xsm);
+	}
+	// get rid of them all now so we can start fresh
+	notify_listeners.clear();
 }
 
 
