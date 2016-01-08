@@ -15,4 +15,4 @@ $(NETJD): $(SOURCES) $(XINC)/Xsocket.h
 	$(CC) -o $@ $(CFLAGS) $(SOURCES) $(LDFLAGS)
 
 clean:
-	-rm $(NETJD) ndap_pb2.py
+	-rm ndap_pb2.py
