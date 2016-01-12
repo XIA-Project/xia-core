@@ -18,18 +18,64 @@
  @file dagaddr.cpp
  @brief Implements dagaddr library
 */
+
+
 #include "dagaddr.hpp"
 #include "utils.hpp"
 #include <cstring>
-#include <cstdio>
 #include <map>
 #include <algorithm>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-
 static const std::size_t vector_find_npos = std::size_t(-1);
+
+/*
+ * load user defined XIDs for use in parsing and unparsing DAGs
+ */
+Node::XidMap Node::load_xids()
+{
+	Node::XidMap ids;
+
+	char path[PATH_SIZE];
+	char name[256], text[256];
+	short id;
+	unsigned len = sizeof(path);
+	char *p;
+
+	if ((p = getenv("XIADIR")) != NULL) {
+		strncpy(path, p, len);
+	} else if (!getcwd(path, len)) {
+		path[0] = 0;
+	}
+
+	p = strstr(path, SOURCE_DIR);
+	if (p) {
+		p += sizeof(SOURCE_DIR) - 1;
+		*p = '\0';
+	}
+	strncat(path, "/etc/xids", len);
+
+	FILE *f = fopen(path, "r");
+	if (f) {
+		while (!feof(f)) {
+			if (fgets(text, sizeof(text), f)) {
+ 				if (sscanf(text, "%hi %s", &id, name) == 2) {
+					ids[id] = name;
+				}
+			}
+		}
+		fclose(f);
+	}
+
+	return ids;
+}
+
+// call the load_xids function at init time to fill in the hash map
+Node::XidMap Node::xids = Node::load_xids();
+
+
 
 template <typename T>
 static std::size_t
@@ -232,8 +278,23 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 		ptr_->type = XID_TYPE_DUMMY_SOURCE;
 	else
 	{
-		ptr_->type = 0;
-		printf("WARNING: Unrecognized XID type: %s\n", type_str.c_str());
+		// see if it's a user defined XID
+		XidMap::const_iterator itr;
+		int found = 0;
+
+		for (itr = Node::xids.begin(); itr != Node::xids.end(); itr++) {
+
+			if (type_str == (*itr).second) {
+				found = 1;
+				ptr_->type = (*itr).first;
+				break;
+			}
+		}
+
+		if (!found) {
+			ptr_->type = 0;
+			printf("WARNING: Unrecognized XID type: %s\n", type_str.c_str());
+		}
 	}
 
 	// If this is a 4ID formatted as an IP address (x.x.x.x), we
@@ -273,7 +334,8 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 /**
 * @brief Return the node's type as a string
 *
-* @return The node's type as a string. Will be one of:
+* The type string will either be one of the following built-in XID types or will match 
+* one of the entries in etc/xids.
 *			\n Node::XID_TYPE_AD_STRING
 *			\n Node::XID_TYPE_HID_STRING
 *			\n Node::XID_TYPE_CID_STRING
@@ -281,6 +343,7 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 *			\n Node::XID_TYPE_IP_STRING
 *			\n Node::XID_TYPE_DUMMY_SOURCE
 *			\n Node:: ID_TYPE_UNKNOWN_STRING
+* @return the node's type as a string
 */
 std::string
 Node::type_string() const
@@ -300,7 +363,11 @@ Node::type_string() const
 		case XID_TYPE_DUMMY_SOURCE:
 			return XID_TYPE_DUMMY_SOURCE_STRING;
 		default:
-			return XID_TYPE_UNKNOWN_STRING;
+			std::string s = xids[this->type()];
+			if (s.empty())
+				s = XID_TYPE_UNKNOWN_STRING;
+
+			return s;
 	}
 }
 
@@ -416,7 +483,7 @@ Graph::Graph(std::string dag_string)
 *
 * @param s The sockaddr_x
 */
-Graph::Graph(sockaddr_x *s)
+Graph::Graph(const sockaddr_x *s)
 {
 	from_sockaddr(s);
 }
@@ -523,7 +590,7 @@ Graph::print_graph() const
 		else
 			printf("      ");
 
-		printf("Node %zu: [%s] ", i, nodes_[i].type_string().c_str());
+		printf("Node %lu: [%s] ", i, nodes_[i].type_string().c_str());
 		//printf("%20s", nodes_[i].id());
 		for (std::size_t j = 0; j < Node::ID_LEN; j++)
 			printf("%02x", nodes_[i].id()[j]);
@@ -535,7 +602,7 @@ Graph::print_graph() const
 				first = false;
 				printf(" ->");
 			}
-			printf(" Node %zu", out_edges_[i][j]);
+			printf(" Node %lu", out_edges_[i][j]);
 		}
 		if (is_sink(i))
 			printf(" [SNK]");
@@ -627,7 +694,7 @@ Graph::out_edges_for_index(std::size_t i, std::size_t source_index, std::size_t 
 	std::string out_edge_string;
 	for (std::size_t j = 0; j < out_edges_[i].size(); j++)
 	{
-		int idx = index_in_dag_string(out_edges_[i][j], source_index, sink_index);
+		size_t idx = index_in_dag_string(out_edges_[i][j], source_index, sink_index);
 		char *idx_str;
 		int size = snprintf(NULL, 0, " %zu", idx);
 		idx_str = (char*)malloc(sizeof(char) * size +1); // +1 for null char (sprintf automatically appends it)
@@ -1034,7 +1101,6 @@ Graph::get_node(int i) const
 	return nodes_[index_from_dag_string_index(i, src_index, sink_index)];
 }
 
-
 /**
 * @brief Get the out edges for a node
 *
@@ -1252,6 +1318,11 @@ void
 Graph::fill_sockaddr(sockaddr_x *s) const
 {
 	s->sx_family = AF_XIA;
+#ifdef __APPLE__
+	// the length field is not big enough for the size of a sockaddr_x
+	// we don't use it anywhere in our code, so just set it to a known state.
+	s->sx_len = 0;
+#endif
 	s->sx_addr.s_count = num_nodes();
 
 	for (int i = 0; i < num_nodes(); i++)
@@ -1291,14 +1362,16 @@ Graph::fill_sockaddr(sockaddr_x *s) const
 * @param s The sockaddr_x.
 */
 void
-Graph::from_sockaddr(sockaddr_x *s)
+Graph::from_sockaddr(const sockaddr_x *s)
 {
+	// FIXME: check to be sure it's really a sockaddr_x!
+
 	int num_nodes = s->sx_addr.s_count;
 	// First add nodes to the graph and remember their new indices
 	std::vector<uint8_t> graph_indices;
 	for (int i = 0; i < num_nodes; i++)
 	{
-		node_t *node = &(s->sx_addr.s_addr[i]);
+		const node_t *node = &(s->sx_addr.s_addr[i]);
 		Node n = Node(node->s_xid.s_type, &(node->s_xid.s_id), 0); // 0 means nothing
 		graph_indices.push_back(add_node(n));
 	}
@@ -1309,7 +1382,7 @@ Graph::from_sockaddr(sockaddr_x *s)
 	// Add edges
 	for (int i = 0; i < num_nodes; i++)
 	{
-		node_t *node = &(s->sx_addr.s_addr[i]);
+		const node_t *node = &(s->sx_addr.s_addr[i]);
 
 		int from_node;
 		if (i == num_nodes-1)
@@ -1353,8 +1426,16 @@ void
 Graph::replace_node_at(int i, const Node& new_node)
 {
 	// FIXME: validate that i is a valid index into the dag
-	nodes_[i] = new_node;
+	std::size_t src_index = -1, sink_index = -1;
+	for (std::size_t j = 0; j < nodes_.size(); j++)
+	{
+		if (is_source(j)) src_index = j;
+		if (is_sink(j)) sink_index = j;
+	}
+
+	nodes_[index_from_dag_string_index(i, src_index, sink_index)] = new_node;
 }
+
 
 /**
 * @brief Return the final intent of the DAG.
@@ -1394,6 +1475,7 @@ Graph::get_nodes_of_type(unsigned int type) const
 	for (it = nodes_.begin(); it != nodes_.end(); ++it) {
 		if (it->type() == type) {
 			nodes.push_back(&*it);
+			printf("FOUND IT");
 		}
 	}
 

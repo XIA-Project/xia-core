@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include "Xsocket.h"
+#include "Xkeys.h"
 #include "dagaddr.hpp"
 #include <assert.h>
 
@@ -35,6 +36,7 @@
 
 #define CHUNKSIZE 1024
 #define NUM_CHUNKS	10
+#define REREQUEST 3
 
 int verbose = 1;
 char myAD[MAX_XID_SIZE];
@@ -265,6 +267,8 @@ void *recvCmd (void *socketid)
 int registerReceiver()
 {
     int sock;
+	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
+
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 
 	// create a socket, and listen for incoming connections
@@ -275,23 +279,34 @@ int registerReceiver()
     if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
     	die(-1, "Reading localhost address\n");
 
-	struct addrinfo *ai;
-    //FIXME: SID is hardcoded
-	if (Xgetaddrinfo(NULL, SID, NULL, &ai) != 0)
-		die(-1, "getaddrinfo failure!\n");
+    // Generate an SID to use
+    if(XmakeNewSID(sid_string, sizeof(sid_string))) {
+        die(-1, "Unable to create a temporary SID");
+    }
 
-	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
-	//FIXME NAME is hard coded
-    if (XregisterName(NAME, dag) < 0 )
-    	die(-1, "error registering name: %s\n", NAME);
+    struct addrinfo hints, *ai;
+    bzero(&hints, sizeof(hints));
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_family = AF_XIA;
+    if (Xgetaddrinfo(NULL, sid_string, &hints, &ai) != 0)
+        die(-1, "getaddrinfo failure!\n");
 
-	if (Xbind(sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
+    Graph g((sockaddr_x*)ai->ai_addr);
+
+    sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
+	if (Xbind(sock, (struct sockaddr*)sa, sizeof(sockaddr_x)) < 0) {
 		Xclose(sock);
-		 die(-1, "Unable to bind to the dag: %s\n", dag);
+		 die(-1, "Unable to bind to the dag: %s\n", g.dag_string().c_str());
 	}
-
-	Graph g(dag);
 	say("listening on dag: %s\n", g.dag_string().c_str());
+
+	Xlisten(sock, 5);
+
+	//FIXME NAME is hard coded
+    if (XregisterName(NAME, sa) < 0 )
+        die(-1, "error registering name: %s\n", NAME);
+    say("\nRegistering DAG with nameserver:\n%s\n", g.dag_string().c_str());
+
   return sock;
   
 }
@@ -385,15 +400,22 @@ int getListedChunks(int csock, FILE *fd, char *chunks, char *ad, char *hid)
 	
 	n = buildChunkDAGs(cs, chunks, ad, hid);
 	
-	// bring the list of chunks local
-	say("requesting list of %d chunks\n", n);
-	if (XrequestChunks(csock, cs, n) < 0) {
-		say("unable to request chunks\n");
-		return -1;
-	}
-	
-	say("checking chunk status\n");
+	// NOTE: the chunk transport is not currently reliable and chunks may need to be re-requested
+	// ask for the current chunk list again every REREQUEST seconds
+	// chunks already in the local cache will not be refetched from the network 
+	unsigned ctr = 0;
 	while (1) {
+		if (ctr % REREQUEST == 0) {
+			// bring the list of chunks local
+			say("%srequesting list of %d chunks\n", (ctr == 0 ? "" : "re-"), n);
+			if (XrequestChunks(csock, cs, n) < 0) {
+				say("unable to request chunks\n");
+				return -1;
+			}
+			say("checking chunk status\n");
+			ctr++;
+		}
+
 		status = XgetChunkStatuses(csock, cs, n);
 
 		if (status == READY_TO_READ)

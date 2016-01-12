@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 OUTPUT=xia.mk
 
@@ -17,6 +17,8 @@ fi
 echo NPROCS=$(($CORES * 2)) >> $OUTPUT
 
 echo XIADIR=$(pwd) >> $OUTPUT
+
+[ "$1" == "DEBUG" ] && echo "DEBUG=1" >> $OUTPUT
 
 cat >> $OUTPUT << EOF
 APIDIR=\$(XIADIR)/api

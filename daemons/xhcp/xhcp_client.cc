@@ -29,13 +29,6 @@
 #include "../common/XIARouter.hh"
 #include "dagaddr.hpp"
 
-
-unsigned int quit_flag = 0;
-char *adv_selfdag = NULL;
-char *adv_gwdag = NULL;
-char *adv_gw4id = NULL;
-char *adv_nsdag = NULL;
-
 #define DEFAULT_NAME "host0"
 #define EXTENSION "xia"
 #define APPNAME "xhcp_client"
@@ -131,9 +124,9 @@ int main(int argc, char *argv[]) {
 	unsigned  beacon_reception_count=0;
 	unsigned beacon_response_freq = ceil(XHCP_CLIENT_ADVERTISE_INTERVAL/XHCP_SERVER_BEACON_INTERVAL);
 	int update_ns = 0;
-	char *self_dag = (char *)malloc(XHCP_MAX_DAG_LENGTH);
-	char *gw_dag = (char *)malloc(XHCP_MAX_DAG_LENGTH);
-	char *gw_4id = (char *)malloc(XHCP_MAX_DAG_LENGTH);
+	char *router_ad = (char *)malloc(XHCP_MAX_DAG_LENGTH);
+	char *router_hid = (char *)malloc(XHCP_MAX_DAG_LENGTH);
+	char *router_4id = (char *)malloc(XHCP_MAX_DAG_LENGTH);
 	char *ns_dag = (char *)malloc(XHCP_MAX_DAG_LENGTH);
 	sockaddr_x pseudo_gw_router_dag; // dag for host_register_message (broadcast message), but only the gw router will accept it
 	string host_register_message;
@@ -195,19 +188,23 @@ int main(int argc, char *argv[]) {
 	*/
 	
 	// main looping
-	while(!(quit_flag & 2)) {
+	while(1) {
 		// clear out packet
 		memset(pkt, 0, sizeof(pkt));
 		socklen_t ddaglen = sizeof(ddag);
 		int rc = Xrecvfrom(sockfd, pkt, XHCP_MAX_PACKET_SIZE, 0, (struct sockaddr*)&ddag, &ddaglen);
 
 		if (rc < 0) {
-			syslog(LOG_WARNING, "error receiving data");
+			syslog(LOG_ERR, "ERROR receiving beacon");
 			continue;
 		}
-		memset(self_dag, '\0', XHCP_MAX_DAG_LENGTH);
-		memset(gw_dag, '\0', XHCP_MAX_DAG_LENGTH);
-		memset(gw_4id, '\0', XHCP_MAX_DAG_LENGTH);
+		if (rc == 0) {
+			syslog(LOG_ERR, "xhcp_client: ERROR: zero length beacon, skipping\n");
+			continue;
+		}
+		memset(router_ad, '\0', XHCP_MAX_DAG_LENGTH);
+		memset(router_hid, '\0', XHCP_MAX_DAG_LENGTH);
+		memset(router_4id, '\0', XHCP_MAX_DAG_LENGTH);
 		memset(ns_dag, '\0', XHCP_MAX_DAG_LENGTH);
 		int i;
 		xhcp_pkt *tmp = (xhcp_pkt *)pkt;
@@ -215,13 +212,13 @@ int main(int argc, char *argv[]) {
 		for (i=0; i<tmp->num_entries; i++) {
 			switch (entry->type) {
 				case XHCP_TYPE_AD:
-					sprintf(self_dag, "%s", entry->data);
+					sprintf(router_ad, "%s", entry->data);
 					break;
 				case XHCP_TYPE_GATEWAY_ROUTER_HID:
-					sprintf(gw_dag, "%s", entry->data);
+					sprintf(router_hid, "%s", entry->data);
 					break;
 				case XHCP_TYPE_GATEWAY_ROUTER_4ID:
-					sprintf(gw_4id, "%s", entry->data);
+					sprintf(router_4id, "%s", entry->data);
 					break;					
 				case XHCP_TYPE_NAME_SERVER_DAG:
 					sprintf(ns_dag, "%s", entry->data);
@@ -233,18 +230,14 @@ int main(int argc, char *argv[]) {
 			entry = (xhcp_pkt_entry *)((char *)entry + sizeof(entry->type) + strlen(entry->data) + 1);
 		}
 		// validate pkt
-		if (strlen(self_dag) <= 0 || strlen(gw_dag) <= 0 || strlen(gw_4id) <= 0 || strlen(ns_dag) <= 0) {
+		if (strlen(router_ad) <= 0 || strlen(router_hid) <= 0 || strlen(router_4id) <= 0 || strlen(ns_dag) <= 0) {
+			syslog(LOG_WARNING, "xhcp_client:main: ERROR invalid beacon packet received");
 			continue;
 		}
-		if (adv_selfdag != NULL && adv_gwdag != NULL && adv_nsdag != NULL) {
-			if (!strcmp(adv_selfdag, self_dag) && !strcmp(adv_gwdag, gw_dag) && !strcmp(adv_gw4id, gw_4id) && !strcmp(adv_nsdag, ns_dag)) {
-				continue;
-			}
-		}
 		
-		AD = self_dag;
-		gwRHID = gw_dag;
-		gwR4ID = gw_4id;
+		AD = router_ad;
+		gwRHID = router_hid;
+		gwR4ID = router_4id;
 		nsDAG = ns_dag;
 		
 		changed = 0;
@@ -254,15 +247,17 @@ int main(int argc, char *argv[]) {
 			changed = 1;
 			syslog(LOG_INFO, "AD updated");
 			// update new AD information
-			if(XupdateAD(sockfd, self_dag, gw_4id) < 0)
-				syslog(LOG_WARNING, "Error updating my AD");
+			if(XupdateAD(sockfd, router_ad, router_4id) < 0) {
+				syslog(LOG_WARNING, "Error updating my AD to click");
+			}
 		
 			// delete obsolete myAD entry
 			xr.delRoute(myAD);
 		
 			// update AD table (my AD entry)
-			if ((rc = xr.setRoute(AD, DESTINED_FOR_LOCALHOST, empty_str, 0)) != 0)
+			if ((rc = xr.setRoute(AD, DESTINED_FOR_LOCALHOST, empty_str, 0)) != 0) {
 				syslog(LOG_WARNING, "error setting route %d\n", rc);
+			}
 				
 			myAD = AD;
 			update_ns = 1;
@@ -308,6 +303,7 @@ int main(int argc, char *argv[]) {
 		// Check if myNS_DAG has been changed
 		if(myNS_DAG.compare(nsDAG) != 0) {
 
+			syslog(LOG_INFO, "nameserver changed");
 			// update new name-server-DAG information
 			XupdateNameServerDAG(sockfd, ns_dag);		
 			myNS_DAG = nsDAG;
@@ -333,15 +329,30 @@ int main(int argc, char *argv[]) {
 			strcpy (buffer, host_register_message.c_str());
 			// send the registraton message to gw router
 			Xsendto(sockfd, buffer, strlen(buffer), 0, (sockaddr*)&pseudo_gw_router_dag, sizeof(pseudo_gw_router_dag));
+			// TODO: Hack to allow intrinsic security code to drop packet
+			// Ideally there should be a handshake with the gateway router
+			if(changed) {
+				sleep(5);
+				syslog(LOG_INFO, "xhcp_client: AD or NS changed, resend registration message");
+				Xsendto(sockfd, buffer, strlen(buffer), 0, (sockaddr*)&pseudo_gw_router_dag, sizeof(pseudo_gw_router_dag));
+			}
 		}
 
 		//Register this hostname to the name server
 		if (update_ns && beacon_reception_count >= XHCP_CLIENT_NAME_REGISTER_WAIT) {	
+			int tmpsockfd = Xsocket(AF_XIA, SOCK_DGRAM, 0);
+			if (tmpsockfd < 0) {
+				syslog(LOG_ERR, "unable to create a socket");
+				exit(-1);
+			}
+	
 			// read the localhost HID 
-			if ( XreadLocalHostAddr(sockfd, myrealAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE, my4ID, MAX_XID_SIZE) < 0 ) {
+			if ( XreadLocalHostAddr(tmpsockfd, myrealAD, MAX_XID_SIZE, myHID, MAX_XID_SIZE, my4ID, MAX_XID_SIZE) < 0 ) {
 				syslog(LOG_WARNING, "error reading localhost address"); 
+				Xclose(tmpsockfd);
 				continue;
 			}
+			Xclose(tmpsockfd);
 
 			// make the host DAG 
 			Node n_src = Node();
@@ -361,6 +372,19 @@ int main(int argc, char *argv[]) {
 				syslog(LOG_INFO, "registered %s as %s", fullname, hg.dag_string().c_str());
 				update_ns = 0;
 			}
+
+			// Also notify the rendezvous service of this change
+			if(XupdateRV(sockfd) < 0) {
+				syslog(LOG_ERR, "Unable to update rendezvous server with new locator");
+			}
+			/*
+			if(XrendezvousUpdate(myHID, &hdag)) {
+				syslog(LOG_ERR, "error updating rendezvous service for %s", myHID);
+				beacon_reception_count = 0;
+			} else {
+				syslog(LOG_INFO, "updated %s as %s at rendezvous", myHID, hg.dag_string().c_str());
+			}
+			*/
 		}   
 	}	
 	return 0;

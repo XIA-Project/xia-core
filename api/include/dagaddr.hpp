@@ -1,8 +1,17 @@
 #pragma once
 
+ #define PATH_SIZE 4096
+ #include <unistd.h>
+ #include <stdio.h>
+ #include <string.h>
+ #include <stdlib.h>
+
+
+
 #include <stdint.h>	// for non-c++0x
 #include <vector>
 #include <string>
+#include <map>
 #include "xia.h"
 
 class Graph;
@@ -27,7 +36,6 @@ public:
 	static const std::string XID_TYPE_CID_STRING;
 	static const std::string XID_TYPE_SID_STRING;
 	static const std::string XID_TYPE_IP_STRING;
-
 
 public:
 	Node();
@@ -55,6 +63,12 @@ public:
 
 	bool equal_to(const Node& r) const;
 
+	typedef std::map<int, std::string> XidMap;
+	static XidMap xids;
+	static XidMap load_xids();
+
+	
+
 protected:
 	void acquire() const;
 	void release() const;
@@ -80,7 +94,7 @@ public:
 	Graph(const Node& n);
 	Graph(const Graph& r);
 	Graph(std::string dag_string);
-	Graph(sockaddr_x *s);
+	Graph(const sockaddr_x *s);
 
 	Graph& operator=(const Graph& r);
 	Graph& operator*=(const Graph& r);
@@ -105,7 +119,7 @@ public:
 	Node get_node(int i) const;
 	std::vector<std::size_t> get_out_edges(int i) const;
 	void fill_sockaddr(sockaddr_x *s) const;
-	void from_sockaddr(sockaddr_x *s);
+	void from_sockaddr(const sockaddr_x *s);
 	void replace_final_intent(const Node& new_intent);
 	Node get_final_intent() const;
 	void replace_node_at(int i, const Node& new_node);

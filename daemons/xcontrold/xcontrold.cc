@@ -1423,7 +1423,7 @@ int processMsg(std::string msg)
             rc = processSidDecisionAnswer(m);
             break;
         default:
-            perror("unknown routing message");
+            syslog(LOG_INFO, "process unknown\n");
             break;
     }
 
@@ -1598,6 +1598,17 @@ int processLSA(ControlMessage msg)
 
 			sendRoutingTable(it1->second.hid, routingTable);
 		}
+
+		// HACK HACK HACK!!!!
+		// for some reason some controllers will delete their routing table entries in 
+		// populateRoutingTable when they shouldn't. This forces the entries back into the table
+		// it's the same logic from inside the loop above
+		std::map<std::string, RouteEntry> routingTable;
+		populateRoutingTable(route_state.myHID, route_state.networkTable, routingTable);
+		populateNeighboringADBorderRouterEntries(route_state.myHID, routingTable);
+		populateADEntries(routingTable, ADRoutingTable);
+		sendRoutingTable(route_state.myHID, routingTable);
+		// END HACK
 
 		route_state.calc_dijstra_ticks = route_state.calc_dijstra_ticks >0?0:route_state.calc_dijstra_ticks;
 	}
@@ -2245,7 +2256,7 @@ int main(int argc, char *argv[])
 		timeoutval.tv_usec = 2000; // every 0.002 sec, check if any received packets
 
 		int32_t highSock = max(route_state.sock, tempSock);
-		selectRetVal = select(highSock+1, &socks, NULL, NULL, &timeoutval);
+		selectRetVal = Xselect(highSock+1, &socks, NULL, NULL, &timeoutval);
 		if (selectRetVal > 0) {
 			// receiving a Hello or LSA packet
 			memset(&recv_message[0], 0, sizeof(recv_message));

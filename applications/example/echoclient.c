@@ -6,7 +6,7 @@
 ** you may not use this file except in compliance with the License.
 ** You may obtain a copy of the License at
 **
-**    http://www.apache.org/licenses/LICENSE-2.0
+** http://www.apache.org/licenses/LICENSE-2.0
 **
 ** Unless required by applicable law or agreed to in writing, software
 ** distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,6 +23,8 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <signal.h>
+#include <poll.h>
 #ifdef __APPLE__
 #include <libgen.h>
 #endif
@@ -40,9 +42,10 @@
 int verbose = 1;	// display all messages
 int delay = -1;		// don't delay between loops
 int loops = 1;		// only do 1 pass
-int  pktSize = 512;	// default pkt size
+int pktSize = 512;	// default pkt size
 int reconnect = 0;	// don't reconnect between loops
 int threads = 1;	// just a single thread
+int terminate = 0;  // sighandler sets to 1 if we should quit
 
 struct addrinfo *ai;
 sockaddr_x *sa;
@@ -55,11 +58,11 @@ void help(const char *name)
 	printf("\n%s (%s)\n", TITLE, VERSION);
 	printf("usage: %s [-q] -[l loops] [-s size] [-d delay] [-r recon] [-t threads]\n", name);
 	printf("where:\n");
-	printf(" -q         : quiet mode\n");
-	printf(" -l loops   : loop <loops> times and exit\n");
-	printf(" -s size    : set packet size to <size>. if 0, uses random sizes\n");
-	printf(" -d delay   : delay for <delay> hundredths of a second between sends\n");
-	printf(" -r recon   : reconnect to the echo server every recon sends\n");
+	printf(" -q : quiet mode\n");
+	printf(" -l loops : loop <loops> times and exit\n");
+	printf(" -s size : set packet size to <size>. if 0, uses random sizes\n");
+	printf(" -d delay : delay for <delay> hundredths of a second between sends\n");
+	printf(" -r recon : reconnect to the echo server every recon sends\n");
 	printf(" -t threads : start up the specified # of threads\n");
 	printf("\n");
 	exit(0);
@@ -177,7 +180,7 @@ char *randomString(char *buf, int size)
 
 	if (!(--refresh)) {
 		// refresh rand every now and then so it doesn't degenerate too much
-		//  use a prime number to keep it interesting
+		// use a prime number to keep it interesting
 		srand(time(NULL));
 		refresh = 997;
 	}
@@ -195,7 +198,7 @@ char *randomString(char *buf, int size)
 int process(int sock)
 {
 	int size;
-	int sent, received;
+	int sent, received, rc;
 	char buf1[XIA_MAXBUF + 1], buf2[XIA_MAXBUF + 1];
 
 	if (pktSize == 0)
@@ -208,6 +211,13 @@ int process(int sock)
 		die(-4, "Send error %d on socket %d\n", errno, sock);
 
 	say("Xsock %4d sent %d of %d bytes\n", sock, sent, size);
+
+	struct pollfd pfds[2];
+	pfds[0].fd = sock;
+	pfds[0].events = POLLIN;
+	if ((rc = Xpoll(pfds, 1, 5000)) <= 0) {
+		die(-5, "Poll returned %d\n", rc);
+	}
 
 	memset(buf2, 0, sizeof(buf2));
 	if ((received = Xrecv(sock, buf2, sizeof(buf2), 0)) < 0)
@@ -276,7 +286,7 @@ void *mainLoop(void * /* dummy */)
 
 	ssock = connectToServer();
 
-	for (;;) {
+	while (!terminate) {
 
 		if (printcount)
 			say("Xsock %4d loop #%d\n", ssock, count);
@@ -304,6 +314,11 @@ void *mainLoop(void * /* dummy */)
 	return NULL;
 }
 
+void quithandler(int)
+{
+	terminate = 1;
+}
+
 /*
 ** where it all happens
 */
@@ -311,6 +326,8 @@ int main(int argc, char **argv)
 {
 	srand(time(NULL));
 	getConfig(argc, argv);
+
+//	signal(SIGINT, quithandler);
 
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 

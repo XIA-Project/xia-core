@@ -21,6 +21,7 @@ class XID { public:
     inline const struct click_xia_xid& xid() const;
     inline struct click_xia_xid& xid();
     
+	inline uint32_t type() { return _xid.type; };
     inline unsigned char* data();
     inline const unsigned char* data() const;
     

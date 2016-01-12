@@ -11,6 +11,7 @@
 #include <click/integers.hh>
 #include <click/standard/xiaxidinfo.hh>
 #include <click/args.hh>
+#include <click/xiautil.hh>
 CLICK_DECLS
 
 /** @file xid.hh
@@ -65,6 +66,7 @@ XID::unparse() const
     const unsigned char *p = _xid.id;
     char buf[48];
     char *c = buf;
+    String name;
     switch (ntohl(_xid.type)) {
         case CLICK_XIA_XID_TYPE_UNDEF:
            c += sprintf(c, "UNDEF");
@@ -83,9 +85,12 @@ XID::unparse() const
            break;
         case CLICK_XIA_XID_TYPE_IP:
            c += sprintf(c, "IP");
-	   break;
+      	   break;
         default:
-           c += sprintf(c, "%x", _xid.type);
+           if (XidMap::name(ntohl(_xid.type), name))
+             c += sprintf(c, "%s", name.c_str());
+            else 
+             c += sprintf(c, "%x", _xid.type);
     }
     c += sprintf(c, ":");
     for (size_t i = 0; i < sizeof(_xid.id); i++)

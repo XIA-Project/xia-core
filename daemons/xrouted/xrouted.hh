@@ -22,6 +22,11 @@
 #include "../common/XIARouter.hh"
 
 #define WAKEUP_INTERVAL 0.5
+// Main loop iterates every 1000 usec = 1 ms = 0.001 sec
+#define MAIN_LOOP_USEC 1000
+#define RECV_ITERS 2
+#define HELLO_ITERS 100
+#define LSA_ITERS 400
 #define HELLO_INTERVAL 2
 #define LSA_INTERVAL 5.0
 #define CALC_DIJKSTRA_INTERVAL 4
@@ -54,6 +59,8 @@ typedef struct RouteState {
 	int32_t hello_ratio;  // frequency ratio of wakeup:hello (for timer purpose)  
 	int32_t lsa_timer;  // hello timer of this router 
 	int32_t lsa_ratio; // frequency ratio of wakeup:lsa (for timer purpose) 
+	int32_t hello_seq;  // hello seq number of this router 
+	int32_t hello_lsa_ratio; // frequency ratio of hello:lsa (for timer purpose) 
 	int32_t calc_dijstra_ticks;   
 	bool send_hello;  // Should a hello message be sent?
 	bool send_lsa;  // Should a LSA message be sent?

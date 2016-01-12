@@ -186,7 +186,10 @@ XCMP::processUnreachable(Packet *p_in) {
 
     XIAPath dst_path = hdr.dst_path();
     if (!dst_path.is_valid()) {
-        click_chatter("xcmp: discarding invalid path\n");
+        click_chatter("xcmp: discarding invalid path. %s\n", dst_path.unparse_re().c_str() );
+	        click_chatter("%s: Dest (S: %s , D: %s) Unreachable\n", _src_path.unparse().c_str(), 
+                      hdr.src_path().unparse().c_str(), 
+                      hdr.dst_path().unparse().c_str());
         return;
     }
     dst_path.remove_node(dst_path.destination_node());

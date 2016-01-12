@@ -34,6 +34,7 @@
 #if HAVE_XIA
 #include <click/xid.hh>
 #include <click/standard/xiaxidinfo.hh>
+
 #endif
 #if HAVE_IP6
 # include <click/ip6address.hh>
@@ -63,6 +64,8 @@
 #else
 # include <stdarg.h>
 #endif
+
+ #include <click/xiautil.hh>
 CLICK_DECLS
 
 int cp_errno;
@@ -1630,6 +1633,8 @@ cp_ip_address(const String &str, unsigned char *result
 bool
 cp_xid_type(const String& str, uint32_t* result)
 {
+    int r;
+
     if (str.compare(String("UNDEF")) == 0)
         *result = htonl(CLICK_XIA_XID_TYPE_UNDEF);
     else if (str.compare(String("AD")) == 0)
@@ -1642,8 +1647,9 @@ cp_xid_type(const String& str, uint32_t* result)
         *result = htonl(CLICK_XIA_XID_TYPE_SID);
     else if (str.compare(String("IP")) == 0)
         *result = htonl(CLICK_XIA_XID_TYPE_IP);
-    else if (!cp_integer(str, result))      // TODO: apply htonl (also change xiarandomize.cc)
-    {
+    else if ((r = XidMap::id(str)) >= 0)
+        *result = htonl(r);
+    else if (!cp_integer(str, result)) {      // TODO: apply htonl (also change xiarandomize.cc)
         click_chatter("unrecognized XID type: %s\n", str.c_str());
         return false;
     }

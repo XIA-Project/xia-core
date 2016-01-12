@@ -22,6 +22,7 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
+#include "dagaddr.hpp"
 
 /*!
 ** @brief Receive data from an Xsocket
@@ -29,12 +30,6 @@
 ** Xrecv() retrieves data from a connected Xsocket of type XSOCK_STREAM.
 ** sockfd must have previously been connected via Xaccept() or
 ** Xconnect().
-**
-** Xrecv() does not currently have a non-blocking mode, and will block
-** until a data is available on sockfd. However, the standard socket API
-** calls select and poll may be used with the Xsocket. Either function
-** will deliver a readable event when a new connection is attempted and
-** you may then call Xrecv() to get the data.
 **
 ** NOTE: in cases where more data is received than specified by the caller,
 ** the excess data will be stored at the API level. Subsequent Xrecv calls
@@ -56,9 +51,14 @@
 int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 {
 	int numbytes;
-	char UDPbuf[MAXBUFLEN];
-	
-	if (flags) {
+	int iface = 0;
+
+	int stype = getSocketType(sockfd);
+	if (stype == SOCK_DGRAM) {
+		return _xrecvfromconn(sockfd, rbuf, len, flags, &iface);
+
+	} else if (stype != SOCK_STREAM) {
+		LOGF("Socket %d must be a stream or datagram socket", sockfd);
 		errno = EOPNOTSUPP;
 		return -1;
 	}
@@ -72,44 +72,231 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 		return -1;
 	}
 
-	if (validateSocket(sockfd, XSOCK_STREAM, EOPNOTSUPP) < 0) {
-		LOGF("Socket %d must be a stream socket", sockfd);
-		return -1;
-	}
-
-	if (!isConnected(sockfd)) {
+	if (getConnState(sockfd) != CONNECTED) {
 		LOGF("Socket %d is not connected", sockfd);
 		errno = ENOTCONN;
 		return -1;
 	}
 
-	// see if we have bytes leftover from a previous Xrecv call
-	if ((numbytes = getSocketData(sockfd, (char *)rbuf, len)) > 0)
-		return numbytes;
 
-	if ((numbytes = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) < 0) {
-		LOGF("Error retrieving recv data from Click: %s", strerror(errno));
+
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XRECV);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
+
+	xia::X_Recv_Msg *xrm = xsm.mutable_x_recv();
+	xrm->set_bytes_requested(len);
+	xrm->set_flags(flags);
+
+	if (click_send(sockfd, &xsm) < 0) {
+		if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
+			LOGF("Error talking to Click: %s", strerror(errno));
+		}
 		return -1;
 	}
 
-	std::string str(UDPbuf, numbytes);
-	xia::XSocketMsg xsm;
+	xsm.Clear();
+	if ((numbytes = click_reply(sockfd, seq, &xsm)) < 0) {
+		if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
+			LOGF("Error retrieving recv data from Click: %s", strerror(errno));
+		}
+		return -1;
+	} else if (numbytes == 0) {
+		// the socket has closed gracefully on the other end
+		LOG("The peer closed the connection");
+		return 0;
+	}
 
-	xsm.ParseFromString(str);
+	xrm = xsm.mutable_x_recv();
+	const char *payload = xrm->payload().c_str();
 
-	xia::X_Recv_Msg *msg = xsm.mutable_x_recv();
-	unsigned paylen = msg->payload().size();
-	const char *payload = msg->payload().c_str();
+	xia::X_Result_Msg *r = xsm.mutable_x_result();
+	int paylen = r->return_code();
 
-	if (paylen <= len)
+	if (paylen < 0) {
+		errno = r->err_code();
+	
+	} else if ((size_t)paylen <= len) {
 		memcpy(rbuf, payload, paylen);
-	else {
+
+	} else {
+		// THIS SHOULD NOT HAPPEN ANYMORE
 		// we got back more data than the caller requested
-		// stash the extra away for subsequent Xrecv calls
+
 		memcpy(rbuf, payload, len);
-		paylen -= len;
-		setSocketData(sockfd, payload + len, paylen);
 		paylen = len;
 	}
 	return paylen;
+}
+
+/*!
+** @brief receives datagram data on an Xsocket.
+**
+** Xrecvfrom() retrieves data from an Xsocket of type XSOCK_DGRAM. Unlike the
+** standard recvfrom API, it will not work with sockets of type XSOCK_STREAM.
+**
+** NOTE: in cases where more data is received than specified by the caller,
+** the excess data will be stored in the socket state structure and will
+** be returned from there rather than from Click. Once the socket state
+** is drained, requests will be sent through to Click again.
+**
+** @param sockfd The socket to receive with
+** @param rbuf where to put the received data
+** @param len maximum amount of data to receive. The amount of data
+** returned may be less than len bytes.
+** @param flags (This is not currently used but is kept to be compatible
+** with the standard sendto socket call.
+** @param addr if non-NULL, filled with the address of the sender on success
+** @param addrlen contians the size of addr when called, replaced with the length
+** of the received addr on return. addrlen MUST be set to the size of addr before
+** calling Xrecvfrom() when addr is non-NULL. If addrlen is smaller than the length
+** of the source DAG, the returned address is truncated and addrlen will contain length
+** of the actual address.
+**
+** @returns number of bytes received
+** @returns -1 on failure with errno set.
+*/
+int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
+	struct sockaddr *addr, socklen_t *addrlen)
+{
+	int iface = 0;
+
+	if (validateSocket(sockfd, XSOCK_DGRAM, EOPNOTSUPP) < 0) {
+		LOGF("Socket %d must be a datagram socket", sockfd);
+		return -1;
+	}
+
+	if (getConnState(sockfd) == CONNECTED) {
+		LOGF("socket %d is connected, use Xrecv instead!", sockfd);
+		errno = EISCONN;
+		return -1;
+	}
+
+	return _xrecvfrom(sockfd, rbuf, len, flags, (sockaddr_x *)addr, addrlen, &iface);
+}
+
+
+int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
+	sockaddr_x *addr, socklen_t *addrlen, int *iface)
+{
+    int numbytes;
+
+	if (!rbuf || (addr && !addrlen)) {
+		LOG("null pointer!\n");
+		errno = EFAULT;
+		return -1;
+	}
+
+	if (addr && *addrlen < sizeof(sockaddr_x)) {
+		LOG("addr is not large enough");
+		errno = EINVAL;
+		return -1;
+	}
+
+	xia::XSocketMsg xsm;
+	unsigned seq;
+	const char *payload;
+	int paylen;
+	xia::X_Recvfrom_Msg *xrm;
+
+	xsm.set_type(xia::XRECVFROM);
+	seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
+
+	xrm = xsm.mutable_x_recvfrom();
+	xrm->set_bytes_requested(len);
+	xrm->set_flags(flags);
+
+	if (click_send(sockfd, &xsm) < 0) {
+		if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
+			LOGF("Error talking to Click: %s", strerror(errno));
+		}
+		return -1;
+	}
+
+	xsm.Clear();
+
+	if ((numbytes = click_reply(sockfd, seq, &xsm)) < 0) {
+		if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
+			LOGF("Error retrieving recv data from Click: %s", strerror(errno));
+		}
+		return -1;
+	}
+	xrm = xsm.mutable_x_recvfrom();
+	payload = xrm->payload().c_str();
+	paylen = xrm->bytes_returned();
+
+	*iface = xrm->interface_id();
+
+	if ((unsigned)paylen <= len) {
+		memcpy(rbuf, payload, paylen);
+
+	} else {
+		// TRUNCATE and discard the extra tail
+		memcpy(rbuf, payload, len);
+		paylen = len;
+	}
+
+	if (addr) {
+		Graph g(xrm->sender_dag().c_str());
+
+		// FIXME: validate addr
+		g.fill_sockaddr((sockaddr_x*)addr);
+		*addrlen = sizeof(sockaddr_x);
+	}
+
+    return paylen;
+}
+
+int _xrecvfromconn(int sockfd, void *rbuf, size_t len, int flags, int *iface)
+{
+
+	int rc;
+	sockaddr_x sa;
+	socklen_t addrlen;
+	Graph g(dgramPeer(sockfd));
+
+	if (g.num_nodes() == 0) {
+		errno = EHOSTUNREACH;
+		return -1;
+	}
+
+	if (len == 0)
+		return 0;
+
+	if (!rbuf) {
+		LOG("buffer pointer is null!\n");
+		errno = EFAULT;
+		return -1;
+	}
+
+	if (getConnState(sockfd) != CONNECTED) {
+		LOGF("Socket %d is not connected", sockfd);
+		errno = ENOTCONN;
+		return -1;
+	}
+
+	Node nPeer = g.get_final_intent();
+
+	// the loop discards packets that are received on the socket and are not from our connected peer
+	while (1) {
+
+		addrlen = sizeof(sa);
+		rc = _xrecvfrom(sockfd, rbuf, len, flags, &sa, &addrlen, iface);
+
+		if (rc < 0)
+			return rc;
+
+		// check to see if addr and the stored addr for the connection are the same
+		g.from_sockaddr(&sa);
+
+		if (g.get_final_intent() == nPeer)
+			break;
+
+		// packet came from a different peer, just discard it and try again
+		LOGF("discarding packet from unconnected peer: %s", g.dag_string().c_str());
+	}
+
+	return rc;
 }

@@ -23,6 +23,7 @@
 #include <libgen.h>
 #endif
 #include "Xsocket.h"
+#include "Xkeys.h"
 #include "dagaddr.hpp"
 
 #define VERSION "v1.0"
@@ -31,7 +32,6 @@
 #define MAX_XID_SIZE 100
 #define STREAM_NAME "www_s.stream_echo.aaa.xia"
 #define DGRAM_NAME "www_s.dgram_echo.aaa.xia"
-#define SID_STREAM  "SID:0f00000000000000000000000000000000000888"
 #define SID_DGRAM   "SID:0f00000000000000000000000000000000008888"
 
 // if no data is received from the client for this number of seconds, close the socket
@@ -150,16 +150,17 @@ void process(int sock)
 	FD_ZERO(&fds);
 	FD_SET(sock, &fds);
 
+#ifdef USE_SELECT
 	struct timeval tv;
 	tv.tv_sec = WAIT_FOR_DATA;
 	tv.tv_usec = 0;
-
+#endif
    	while (1) {
 		memset(buf, 0, sizeof(buf));
-
-	tv.tv_sec = WAIT_FOR_DATA;
-	tv.tv_usec = 0;
-		 if ((n = select(sock + 1, &fds, NULL, NULL, &tv)) < 0) {
+#ifdef USE_SELECT
+		tv.tv_sec = WAIT_FOR_DATA;
+		tv.tv_usec = 0;
+		 if ((n = Xselect(sock + 1, &fds, NULL, NULL, &tv)) < 0) {
 			 warn("%5d Select failed, closing...\n", pid);
 			 break;
 
@@ -171,9 +172,13 @@ void process(int sock)
 			 // this shouldn't happen!
 			 die(-4, "something is really wrong, exiting\n");
 		 }
+#endif
 
 		if ((n = Xrecv(sock, buf, sizeof(buf), 0)) < 0) {
 			warn("Recv error on socket %d, closing connection\n", pid);
+			break;
+		} else if (n == 0) {
+			warn("%d client closed the connection\n", pid);
 			break;
 		}
 
@@ -201,6 +206,7 @@ static void reaper(int sig)
 void echo_stream()
 {
 	int acceptor, sock;
+	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
 
 	if (signal(SIGCHLD, reaper) == SIG_ERR) {
 		die(-1, "unable to catch SIGCHLD");
@@ -211,8 +217,16 @@ void echo_stream()
 	if ((acceptor = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		die(-2, "unable to create the stream socket\n");
 
-	struct addrinfo *ai;
-	if (Xgetaddrinfo(NULL, SID_STREAM, NULL, &ai) != 0)
+	// Generate an SID to use
+	if(XmakeNewSID(sid_string, sizeof(sid_string))) {
+		die(-1, "Unable to create a temporary SID");
+	}
+
+	struct addrinfo hints, *ai;
+	bzero(&hints, sizeof(hints));
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_family = AF_XIA;
+	if (Xgetaddrinfo(NULL, sid_string, &hints, &ai) != 0)
 		die(-1, "getaddrinfo failure!\n");
 
 	Graph g((sockaddr_x*)ai->ai_addr);
@@ -228,6 +242,8 @@ void echo_stream()
 	if (Xbind(acceptor, (struct sockaddr *)sa, sizeof(sockaddr_x)) < 0) {
 		die(-3, "unable to bind to the dag\n");
 	}
+
+	Xlisten(acceptor, 5);
 
 	while (1) {
 
@@ -252,6 +268,11 @@ void echo_stream()
 
 		} else if (pid == 0) {
 			process(sock);
+			if(XremoveSID((const char *)sid_string)) {
+				say("Unable to remove keys for SID %s.\n", sid_string);
+			}else {
+				say("Removed keys for temporary SID %s.\n", sid_string);
+			}
 			exit(0);
 
 		} else {
@@ -296,12 +317,15 @@ void echo_dgram()
 		die(-3, "unable to bind to the dag\n");
 	}
 
-	pid_t pid = fork();
+	pid_t pid = 0;
+
+	// only need to fork if doing stream echo at the same time
+	if (stream == 1)
+		pid = fork();
+
 	if (pid == 0) {
 		while (1) {
 			say("Dgram Server waiting\n");
-
-
 
 			dlen = sizeof(cdag);
 			memset(buf, 0, sizeof(buf));

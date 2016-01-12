@@ -67,7 +67,7 @@
 #define SHA_LAST_BLOCK  56
 #define SHA_LENGTH_BLOCK 8
 #define SHA_DIGEST_LENGTH 20
-typedef struct SHAstate_st
+typedef struct SHAstate_st_struct
 {
   unsigned long h0, h1, h2, h3, h4;
   unsigned long Nl, Nh;

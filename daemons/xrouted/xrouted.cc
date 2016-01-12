@@ -10,6 +10,7 @@
 #include <map>
 #include <time.h>
 #include <algorithm>
+#include <errno.h>
 
 #include <sys/types.h>
 #include <netdb.h>
@@ -531,8 +532,8 @@ void help(const char *name)
 {
 	printf("\nusage: %s [-l level] [-v] [-c config] [-h hostname]\n", name);
 	printf("where:\n");
-	printf(" -l level    : syslog logging level 0 = LOG_EMERG ... 7 = LOG_DEBUG (default=3:LOG_ERR)");
-	printf(" -v          : log to the console as well as syslog");
+	printf(" -l level    : syslog logging level 0 = LOG_EMERG ... 7 = LOG_DEBUG (default=3:LOG_ERR)\n");
+	printf(" -v          : log to the console as well as syslog\n");
 	printf(" -h hostname : click device name (default=router0)\n");
 	printf("\n");
 	exit(0);
@@ -574,7 +575,7 @@ void config(int argc, char** argv)
 	// note: ident must exist for the life of the app
 	ident = (char *)calloc(strlen(hostname) + strlen (APPNAME) + 4, 1);
 	sprintf(ident, "%s:%s", APPNAME, hostname);
-	openlog(ident, LOG_CONS|LOG_NDELAY|LOG_LOCAL4|verbose, LOG_LOCAL4);
+	openlog(ident, LOG_CONS|LOG_NDELAY|verbose, LOG_LOCAL4);
 	setlogmask(LOG_UPTO(level));
 }
 
@@ -633,27 +634,47 @@ int main(int argc, char *argv[])
 		FD_ZERO(&socks);
 		FD_SET(route_state.sock, &socks);
 		timeoutval.tv_sec = 0;
-		timeoutval.tv_usec = 2000; // every 0.002 sec, check if any received packets
+		timeoutval.tv_usec = MAIN_LOOP_USEC *2; // Main loop runs every 1000 usec
 
-		selectRetVal = select(route_state.sock+1, &socks, NULL, NULL, &timeoutval);
+		// every 0.001 sec, check if any received packets
+		selectRetVal = Xselect(route_state.sock+1, &socks, NULL, NULL, &timeoutval);
 		if (selectRetVal > 0) {
 			// receiving a Hello or LSA packet
 			memset(&recv_message[0], 0, sizeof(recv_message));
 			dlen = sizeof(sockaddr_x);
 			n = Xrecvfrom(route_state.sock, recv_message, 10240, 0, (struct sockaddr*)&theirDAG, &dlen);
 			if (n < 0) {
-				perror("recvfrom");
+					perror("recvfrom");
 			}
 
             std::string msg = recv_message;
             processMsg(msg);
+		} else if (selectRetVal < 0) {
+			perror("Xselect failed");
+			syslog(LOG_WARNING, "ERROR: Xselect returned %d", selectRetVal);
+		}
+		// Send HELLO every 100 ms
+		if((iteration % HELLO_ITERS) == 0) {
+			// Except when we are sending an LSA
+			if((iteration % LSA_ITERS) != 0) {
+				route_state.hello_seq++;
+				if(sendHello()) {
+					syslog(LOG_WARNING, "ERROR: Failed sending hello");
+				}
+			}
+		}
+		// Send an LSA every 400 ms
+		if((iteration % LSA_ITERS) == 0) {
+			route_state.hello_seq = 0;
+			if(sendLSA()) {
+				syslog(LOG_WARNING, "ERROR: Failed sending LSA");
+			}
 		}
 
 		time_t now = time(NULL);
 		if (now - last_purge >= EXPIRE_TIME)
 		{
 			last_purge = now;
-			//fprintf(stderr, "checking entry\n");
 			map<string, time_t>::iterator iter = timeStamp.begin();
 
 			while (iter != timeStamp.end())	

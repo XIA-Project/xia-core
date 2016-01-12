@@ -27,7 +27,7 @@ XIAXIDRouteTable::~XIAXIDRouteTable()
 int
 XIAXIDRouteTable::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    click_chatter("XIAXIDRouteTable: configuring %s\n", this->name().c_str());
+    //click_chatter("XIAXIDRouteTable: configuring %s\n", this->name().c_str());
 
 	_principal_type_enabled = 1;
 	_num_ports = 0;
@@ -255,8 +255,10 @@ XIAXIDRouteTable::remove_handler(const String &xid_str, Element *e, void *, Erro
 			return errh->error("nonexistent XID: ", xid_str.c_str());
 
 		XIARouteData *xrd = (XIARouteData*)it.value();
+		if (xrd->nexthop) {
+			delete xrd->nexthop;
+		}
 
-		// FIXME: delete the nxthop xid if any
 		table->_rts.erase(it);
 		delete xrd;
 	}
@@ -539,7 +541,7 @@ XIAXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
     const struct click_xia_xid_node& node = hdr->node[idx];
 
     XIAHeader xiah(p->xia_header());
-    
+
     if (_bcast_xid == node.xid) {
     	// Broadcast packet
     	
@@ -594,7 +596,7 @@ XIAXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
 			// check if outgoing packet
 			if(_rtdata.port != DESTINED_FOR_LOCALHOST && _rtdata.port != FALLBACK && _rtdata.nexthop != NULL) {
 				p->set_nexthop_neighbor_xid_anno(*(_rtdata.nexthop));
-			}			
+			}
 			return _rtdata.port;
 		}
 	}

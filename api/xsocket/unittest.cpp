@@ -85,6 +85,178 @@ TEST(Xclose, InvalidSocket)
 	EXPECT_EQ(-1, Xclose(0));
 }
 
+// Xgetsockopt / Xsetsockopt ***********************************************
+class XsockoptTest : public ::testing::Test {
+protected:
+	virtual void SetUp() {
+		sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
+	}
+
+	virtual void TearDown() {
+		Xclose(sock);
+	}
+
+	void integerSet(int opt, int val)
+	{
+		EXPECT_EQ(0, Xsetsockopt(sock, opt, (const void *)&val, sizeof(val)));
+	}
+
+	void integerSetInvalid(int opt, int val)
+	{
+		EXPECT_EQ(-1, Xsetsockopt(sock, opt, (const void *)&val, sizeof(val)));
+	}
+
+	void integerGet(int opt, int val)
+	{
+		int s = Xsocket(AF_XIA, SOCK_DGRAM, 0);
+		socklen_t sz = sizeof(int);
+		int v = 999;
+		EXPECT_EQ(0, Xsetsockopt(sock, opt, (const void *)&val, sz));
+		EXPECT_EQ(0, Xgetsockopt(sock, opt, (void *)&v, &sz));
+		EXPECT_EQ(sizeof(int), sz);
+		EXPECT_EQ(v, val);
+		Xclose(s);
+	}
+
+
+	int sock;
+};
+
+
+TEST_F(XsockoptTest, Set_InvalidSocket)
+{
+	int val = 1;
+	socklen_t sz = sizeof(val);
+	EXPECT_EQ(-1, Xsetsockopt(1, SO_DEBUG, (const void *)&val, sz));
+}
+
+TEST_F(XsockoptTest, Set_InvalidOpt)
+{
+	int val;
+	EXPECT_EQ(-1, Xsetsockopt(sock, 999999999, (const void *)&val, sizeof(val)));
+}
+
+TEST_F(XsockoptTest, Get_InvalidOpt)
+{
+	int val;
+	socklen_t sz;
+	EXPECT_EQ(-1, Xgetsockopt(sock, 999999999, (void *)&val, &sz));
+}
+
+TEST_F(XsockoptTest, Set_NullValue)
+{
+	int val;
+	EXPECT_EQ(-1, Xsetsockopt(sock, SO_DEBUG, NULL, sizeof(val)));
+}
+
+TEST_F(XsockoptTest, Get_NullValue)
+{
+	socklen_t sz;
+	EXPECT_EQ(-1, Xgetsockopt(sock, SO_DEBUG, NULL, &sz));
+}
+
+TEST_F(XsockoptTest, Get_NullSize)
+{
+	int val;
+	EXPECT_EQ(-1, Xgetsockopt(sock, SO_DEBUG, (void *)&val, NULL));
+}
+
+TEST_F(XsockoptTest, SetSmallSize)
+{
+	int val = 1;
+	EXPECT_EQ(-1, Xsetsockopt(sock, SO_DEBUG, (const void *)&val, 1));
+}
+
+TEST_F(XsockoptTest, SetLargeSize)
+{
+	int val = 1;
+	EXPECT_EQ(0, Xsetsockopt(sock, SO_DEBUG, (const void *)&val, 10));
+}
+
+TEST_F(XsockoptTest, GetSmallSize)
+{
+	int val = 1;
+	socklen_t sz = 1;
+	EXPECT_EQ(-1, Xgetsockopt(sock, SO_DEBUG, (void *)&val, &sz));
+	EXPECT_EQ(sizeof(int), sz);
+}
+
+TEST_F(XsockoptTest, GetLargeSize)
+{
+	int val = 1;
+	socklen_t sz = 10;
+	EXPECT_EQ(0, Xgetsockopt(sock, SO_DEBUG, (void *)&val, &sz));
+	EXPECT_EQ(sizeof(int), sz);
+}
+
+TEST_F(XsockoptTest, SO_DEBUG_Set)
+{
+	integerSet(SO_DEBUG, 1);
+}
+
+TEST_F(XsockoptTest, SO_DEBUG_Get)
+{
+	integerGet(SO_DEBUG, 2);
+}
+
+TEST_F(XsockoptTest, SO_ERROR_Set)
+{
+	integerSet(SO_ERROR, 1);
+}
+
+TEST_F(XsockoptTest, SO_ERROR_Get)
+{
+	integerGet(SO_ERROR, 5);
+}
+
+TEST_F(XsockoptTest, SO_TYPE_Set)
+{
+	int val = 1;
+	socklen_t sz = sizeof(val);
+	EXPECT_EQ(-1, Xsetsockopt(sock, SO_TYPE, (const void *)&val, sz));
+}
+
+TEST_F(XsockoptTest, SO_TYPE_Get)
+{
+	int val;
+	socklen_t sz = sizeof(val);
+	EXPECT_EQ(0, Xgetsockopt(sock, SO_TYPE, (void *)&val, &sz));
+	EXPECT_EQ(SOCK_DGRAM, val);
+}
+
+TEST_F(XsockoptTest, XOPT_HLIM_Set)
+{
+	integerSet(XOPT_HLIM, 0);
+	integerSet(XOPT_HLIM, 255);
+}
+
+TEST_F(XsockoptTest, XOPT_HLIM_SetInvalid)
+{
+	integerSetInvalid(XOPT_HLIM, -1);
+	integerSetInvalid(XOPT_HLIM, 256);
+}
+
+TEST_F(XsockoptTest, XOPT_HLIM_Get)
+{
+	integerGet(XOPT_HLIM, 20);
+}
+
+TEST_F(XsockoptTest, XOPT_NEXT_PROTO_Set)
+{
+	integerSet(XOPT_HLIM, XPROTO_XCMP);
+}
+
+TEST_F(XsockoptTest, XOPT_NEXT_PROTO_SetInvalid)
+{
+	integerSetInvalid(XOPT_HLIM, 1234);
+}
+
+TEST_F(XsockoptTest, XOPT_NEXT_PROTO_Get)
+{
+	integerGet(XOPT_HLIM, XPROTO_XCMP);
+}
+
+
 // XreadLocalHostAddr *********************************************************
 TEST(XreadLocalHostAddr, ValidParameters)
 {
@@ -329,7 +501,7 @@ TEST_F(XgetaddrinfoTest, EmptyName)
 	struct addrinfo hints;
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_flags = XAI_XIDSERV;
-	ASSERT_LT(Xgetaddrinfo("", NULL, &hints, &ai), 0);
+	ASSERT_NE(Xgetaddrinfo("", NULL, &hints, &ai), 0);
 }
 
 TEST_F(XgetaddrinfoTest, EmptyHints)
@@ -375,7 +547,7 @@ TEST_F(XgetaddrinfoTest, HintsWithNullSid)
 	struct addrinfo hints;
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_flags = XAI_XIDSERV;
-	ASSERT_LT(Xgetaddrinfo(HOST_NAME, NULL, &hints, &ai), 0);
+	ASSERT_NE(Xgetaddrinfo(HOST_NAME, NULL, &hints, &ai), 0);
 }
 
 TEST_F(XgetaddrinfoTest, StreamHints)
@@ -407,7 +579,7 @@ TEST_F(XgetaddrinfoTest, RawHints)
 	struct addrinfo hints;
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_socktype = SOCK_RAW;
-	ASSERT_LT(Xgetaddrinfo(FULL_NAME, NULL, &hints, &ai), 0);
+	ASSERT_NE(Xgetaddrinfo(FULL_NAME, NULL, &hints, &ai), 0);
 }
 
 TEST_F(XgetaddrinfoTest, Protocol)
@@ -415,7 +587,7 @@ TEST_F(XgetaddrinfoTest, Protocol)
 	struct addrinfo hints;
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_protocol = 1;
-	ASSERT_LT(Xgetaddrinfo(FULL_NAME, NULL, &hints, &ai), 0);
+	ASSERT_NE(Xgetaddrinfo(FULL_NAME, NULL, &hints, &ai), 0);
 }
 
 TEST_F(XgetaddrinfoTest, ValidFamily)
@@ -431,7 +603,7 @@ TEST_F(XgetaddrinfoTest, InvalidFamily)
 	struct addrinfo hints;
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET;
-	ASSERT_LT(Xgetaddrinfo(FULL_NAME, NULL, &hints, &ai), 0);
+	ASSERT_NE(Xgetaddrinfo(FULL_NAME, NULL, &hints, &ai), 0);
 }
 
 TEST_F(XgetaddrinfoTest, UnspecFamily)
@@ -448,7 +620,7 @@ TEST_F(XgetaddrinfoTest, CanonNameError)
 	struct addrinfo hints;
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_flags = AI_CANONNAME;
-	ASSERT_LT(Xgetaddrinfo(NULL, NULL, &hints, &ai), 0);
+	ASSERT_NE(Xgetaddrinfo(NULL, NULL, &hints, &ai), 0);
 }
 
 TEST_F(XgetaddrinfoTest, NullNameDagInHints)
@@ -456,7 +628,7 @@ TEST_F(XgetaddrinfoTest, NullNameDagInHints)
 	struct addrinfo hints;
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_flags = XAI_DAGHOST;
-	ASSERT_LT(Xgetaddrinfo(NULL, NULL, &hints, &ai), 0);
+	ASSERT_NE(Xgetaddrinfo(NULL, NULL, &hints, &ai), 0);
 }
 
 TEST_F(XgetaddrinfoTest, DagInHints)
@@ -544,7 +716,7 @@ TEST_F(XgetaddrinfoTest, LocalAddrPlusFallback)
 	sockaddr_x *sa;
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_flags = XAI_FALLBACK;
-	ASSERT_EQ(Xgetaddrinfo(NULL, NULL, &hints, &ai), 0);
+	ASSERT_EQ(0, Xgetaddrinfo(NULL, NULL, &hints, &ai));
 	sa = (sockaddr_x*)ai->ai_addr;
 	Graph g(sa);
 	EXPECT_EQ(2, g.num_nodes());
@@ -566,6 +738,9 @@ TEST_F(XgetaddrinfoTest, LocalAddrPlusFallbackPlusSid)
 	EXPECT_EQ(g.get_node(1).id_string(), nhid->id_string());
 	EXPECT_EQ(g.get_node(2).id_string(), nsid->id_string());
 }
+
+
+
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);

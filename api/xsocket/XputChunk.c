@@ -15,7 +15,7 @@
 */
 /*!
 ** @file XputChunk.c
-** @brief implements XputChunk(), XputFile(), XputBuffer(), XremoveChunk(), 
+** @brief implements XputChunk(), XputFile(), XputBuffer(), XremoveChunk(),
 ** XallocCacheSlice(),XfreeCacheSlice(), and XfreeChunkInfo()
 */
 
@@ -26,7 +26,7 @@
 #include <errno.h>
 
 /*!
-** @brief Allocate content cache space for use by the XputChunk(), 
+** @brief Allocate content cache space for use by the XputChunk(),
 ** XputFile(), and XputBuffer() functions.
 **
 ** Allocate a slice of content cache storage in the local machine to
@@ -40,11 +40,11 @@
 ** @param ttl Time to live in seconds; 0 means permanent. Once the TTL is
 ** elapsed content will be automatically flushed from the cache. Content may
 ** be flushed before th TTL expires if the cache becomes full.
-** @param size Max size for the cache slice 
+** @param size Max size for the cache slice
 **
 ** @returns A struct that contains the cache slice context.
 ** @returns NULL if the slice can't be allocated.
-** 
+**
 ** @warning, As currently implemented, this function uses the process id
 ** as the the cache slice identifier. This needs to be changed so that an
 ** can create multiple slices.
@@ -86,7 +86,7 @@ ChunkContext *XallocCacheSlice(unsigned policy, unsigned ttl, unsigned size) {
 ** @returns -1 on error with errno set.
 **
 ** @note This does not tear down the content cache itself. It will live until
-** the content in it expires. To clear the cache in the current release, 
+** the content in it expires. To clear the cache in the current release,
 ** XremoveChunk() can be called for each chunk of data.
 */
 int XfreeCacheSlice(ChunkContext *ctx)
@@ -108,11 +108,11 @@ int XfreeCacheSlice(ChunkContext *ctx)
 ** before the client applicatation can request it, otherwise an error will
 ** occur.
 **
-** If the chunk causes the cache slice to grow too large, the oldest content 
+** If the chunk causes the cache slice to grow too large, the oldest content
 ** chunk(s) will be reoved to make enough space for this chunk.
 **
 ** @param ctx Pointer to the cache slice where this chunk will be stored
-** @param data The data to published. The size of data must be less than 
+** @param data The data to published. The size of data must be less than
 ** XIA_MAXCHUNK or an error will be returned.
 ** @param length Length of the data buffer
 ** @param info Struct to hold metadata returned, include the chunk identifier (CID)
@@ -124,8 +124,6 @@ int XfreeCacheSlice(ChunkContext *ctx)
 int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkInfo *info)
 {
     int rc;
-    char buffer[MAXBUFLEN];
-
 
 	if (length > XIA_MAXCHUNK) {
 		errno = EMSGSIZE;
@@ -145,6 +143,8 @@ int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkI
     //Build request
     xia::XSocketMsg xsm;
     xsm.set_type(xia::XPUTCHUNK);
+	unsigned seq = seqNo(ctx->sockfd);
+	xsm.set_sequence(seq);
 
     xia::X_Putchunk_Msg *_msg = xsm.mutable_x_putchunk();
 
@@ -160,14 +160,12 @@ int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkI
 	}
 
 	// process the reply from click
-	if ((rc = click_reply(ctx->sockfd, buffer, sizeof(buffer))) < 0) {
+    xia::XSocketMsg _socketMsgReply;
+	if ((rc = click_reply(ctx->sockfd, seq, &_socketMsgReply)) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
 		return -1;
 	}
 
-    xia::XSocketMsg _socketMsgReply;
-    std::string bufStr(buffer, rc);
-    _socketMsgReply.ParseFromString(bufStr);
     if(_socketMsgReply.type() == xia::XPUTCHUNK) {
 		xia::X_Putchunk_Msg *_msgReply = _socketMsgReply.mutable_x_putchunk();
 		info->size = _msgReply->payload().size();
@@ -175,6 +173,7 @@ int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkI
 		info->ttl= _msgReply->ttl();
 		info->timestamp.tv_sec=_msgReply->timestamp();
 		info->timestamp.tv_usec = 0;
+		LOGF(">>>>>> PUT: info->cid: %s \n", _msgReply->cid().c_str()); 
         return 0;
     } else {
         return -1;
@@ -184,7 +183,7 @@ int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkI
 /*!
 ** @brief Publish a file by breaking it into one or more content chunks.
 **
-** XputFile() calls XputChunk() internally and has the same requiremts as that 
+** XputFile() calls XputChunk() internally and has the same requiremts as that
 ** function.
 **
 ** On success, the CID of the chunk is set to the 40 character hash of the
@@ -192,7 +191,7 @@ int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkI
 ** before the client applicatation can request it, otherwise an error will
 ** occur.
 **
-** If the file causes the cache slice to grow too large, the oldest content 
+** If the file causes the cache slice to grow too large, the oldest content
 ** chunk(s) will be reoved to make enough space for the new chunk(s).
 **
 ** @param ctx Pointer to the cache slice where this chunk will be stored
@@ -203,7 +202,7 @@ int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkI
 ** this array is allocated by the XputFile() function on success and should
 ** be free'd with the XfreeChunkInfo() function when it is no longer needed.
 **
-** @returns The number of chunks created on success with info pointing to an 
+** @returns The number of chunks created on success with info pointing to an
 ** allocated array of ChunkInfo structures.
 ** @returns -1 on error
 **
@@ -243,7 +242,7 @@ int XputFile(ChunkContext *ctx, const char *fname, unsigned chunkSize, ChunkInfo
 	numChunks = fs.st_size / chunkSize;
 	if (fs.st_size % chunkSize)
 		numChunks ++;
-
+	//FIXME: this should be numChunks, sizeof(ChunkInfo)
 	if (!(infoList = (ChunkInfo*)calloc(numChunks, chunkSize))) {
 		fclose(fp);
 		return -1;
@@ -257,7 +256,7 @@ int XputFile(ChunkContext *ctx, const char *fname, unsigned chunkSize, ChunkInfo
 
 	i = 0;
 	while (!feof(fp)) {
-	
+
 		if ((count = fread(buf, sizeof(char), chunkSize, fp)) > 0) {
 
 			if ((rc = XputChunk(ctx, buf, count, &infoList[i])) < 0)
@@ -284,7 +283,7 @@ int XputFile(ChunkContext *ctx, const char *fname, unsigned chunkSize, ChunkInfo
 /*!
 ** @brief Publish a file by breaking it into one or more content chunks.
 **
-** XputBuffer() calls XputChunk() internally and has the same requiremts as that 
+** XputBuffer() calls XputChunk() internally and has the same requiremts as that
 ** function.
 **
 ** On success, the CID of the chunk is set to the 40 character hash of the
@@ -292,7 +291,7 @@ int XputFile(ChunkContext *ctx, const char *fname, unsigned chunkSize, ChunkInfo
 ** before the client applicatation can request it, otherwise an error will
 ** occur.
 **
-** If the file causes the cache slice to grow too large, the oldest content 
+** If the file causes the cache slice to grow too large, the oldest content
 ** chunk(s) will be reoved to make enough space for the new chunk(s).
 **
 ** @param ctx Pointer to the cache slice where this chunk will be stored
@@ -304,7 +303,7 @@ int XputFile(ChunkContext *ctx, const char *fname, unsigned chunkSize, ChunkInfo
 ** this array is allocated by the XputBuffer() function on success and should
 ** be free'd with the XfreeChunkInfo() function when it is no longer needed.
 **
-** @returns The number of chunks created on success with info pointing to an 
+** @returns The number of chunks created on success with info pointing to an
 ** allocated array of ChunkInfo structures.
 ** @returns -1 on error
 **
@@ -369,11 +368,11 @@ int XputBuffer(ChunkContext *ctx, const char *data, unsigned len, unsigned chunk
 ** @brief Remove a chunk of content from the cache.
 **
 ** This function will remove the specified CID from the content cache. A
-** successful return code will be returned regardless of whether or not the 
+** successful return code will be returned regardless of whether or not the
 ** chunk was already expired out of the cache. The CID parameter must be
 ** the value returned from one of the Xput... functions, a full DAG will not be
 ** recognized as a valid identifier.
-** 
+**
 ** @param ctx The cache slice containing the content.
 ** @param cid The CID to remove. This should only be the 40 character
 ** hash identifier of the CID, not the entire DAG.
@@ -384,7 +383,6 @@ int XputBuffer(ChunkContext *ctx, const char *data, unsigned len, unsigned chunk
 */
 int XremoveChunk(ChunkContext *ctx, const char *cid)
 {
-    char buffer[2048];
     int rc;
 
     if(cid == NULL || ctx == NULL) {
@@ -394,6 +392,8 @@ int XremoveChunk(ChunkContext *ctx, const char *cid)
 
     xia::XSocketMsg xsm;
     xsm.set_type(xia::XREMOVECHUNK);
+	unsigned seq = seqNo(ctx->sockfd);
+	xsm.set_sequence(seq);
     xia::X_Removechunk_Msg *_msg = xsm.mutable_x_removechunk();
 
     _msg->set_contextid(ctx->contextID);
@@ -405,14 +405,11 @@ int XremoveChunk(ChunkContext *ctx, const char *cid)
 	}
 
 	// process the reply from click
-	if ((rc = click_reply(ctx->sockfd, buffer, sizeof(buffer))) < 0) {
+    xia::XSocketMsg _socketMsgReply;
+	if ((rc = click_reply(ctx->sockfd, seq, &_socketMsgReply)) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
 		return -1;
 	}
-
-    xia::XSocketMsg _socketMsgReply;
-    std::string bufStr(buffer, rc);
-    _socketMsgReply.ParseFromString(bufStr);
 
     if(_socketMsgReply.type() == xia::XREMOVECHUNK) {
         xia::X_Removechunk_Msg *_msgReply = _socketMsgReply.mutable_x_removechunk();
@@ -427,7 +424,7 @@ int XremoveChunk(ChunkContext *ctx, const char *cid)
 **
 ** This function should be called when the application is done with the
 ** ChunkInfo array returned from XputFile() or XputBuffer() to release the
-** memory. 
+** memory.
 **
 ** @param infop The memory to free
 **

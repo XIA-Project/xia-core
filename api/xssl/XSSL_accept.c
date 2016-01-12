@@ -45,7 +45,7 @@ int XSSL_accept(XSSL *xssl) {
 
 	/* Send SERVER HELLO */
 	sprintf(buf, "SERVER HELLO");
-	if ((n = Xsend(xssl->sockfd, buf, strlen(buf), 0)) != strlen(buf)) {
+	if ((n = Xsend(xssl->sockfd, buf, strlen(buf), 0)) != (int)strlen(buf)) {
 		ERROR("ERROR sending SERVER HELLO");
 		return 0;
 	}
@@ -76,17 +76,17 @@ int XSSL_accept(XSSL *xssl) {
 	offset += siglen;
 
 	// Send it!
-	if ((n = Xsend(xssl->sockfd, buf, offset, 0)) != offset) {
+	if ((n = Xsend(xssl->sockfd, buf, offset, 0)) != (int)offset) {
 		ERROR("ERROR sending public keys");
 		return 0;
 	}
 
-	DBGF("Sent keys (%d bytes)\n\tkeylen: %d\n\ttempkeylen: %d\n\tsiglen:%d", offset, keybufsize, tempkeybufsize, siglen);
+	DBGF("Sent keys (%u bytes)\n\tkeylen: %u\n\ttempkeylen: %u\n\tsiglen:%u", (unsigned)offset, (unsigned)keybufsize, (unsigned)tempkeybufsize, (unsigned)siglen);
 
 
 	/* Send SERVER DONE */
 	sprintf(buf, "SERVER DONE");
-	if ((n = Xsend(xssl->sockfd, buf, strlen(buf), 0)) != strlen(buf)) {
+	if ((n = Xsend(xssl->sockfd, buf, strlen(buf), 0)) != (int)strlen(buf)) {
 		ERROR("ERROR sending SERVER DONE");
 		return 0;
 	}

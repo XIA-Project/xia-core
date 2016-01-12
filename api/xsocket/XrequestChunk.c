@@ -27,11 +27,11 @@
 ** @brief request that a content chunk be loaded into the local machine's
 ** content cache.
 **
-** XrequestChunk() is called by a client application to load a content chunk 
+** XrequestChunk() is called by a client application to load a content chunk
 ** into the XIA content cache. It does not return the requested data, it only
-** causes the chunk to be loaded into the local content cache. XgetChunkStatus() 
-** may be called to get the status of the chunk to determine when it becomes 
-** available. Once the chunk is ready to be read, XreadChunk() should be called 
+** causes the chunk to be loaded into the local content cache. XgetChunkStatus()
+** may be called to get the status of the chunk to determine when it becomes
+** available. Once the chunk is ready to be read, XreadChunk() should be called
 ** get the actual content chunk data.
 **
 ** XrequestChunk() is a simple wrapper around the XrequestChunks() API call.
@@ -42,7 +42,7 @@
 **
 ** @returns 0 on success
 ** @returns -1 if the requested chunk could not be located or a socket error
-** occurred. If the error is a socket error, errno set will be set with an 
+** occurred. If the error is a socket error, errno set will be set with an
 ** appropriate code.
 */
 int XrequestChunk(int sockfd, char* dag, size_t /* dagLen */)
@@ -56,14 +56,14 @@ int XrequestChunk(int sockfd, char* dag, size_t /* dagLen */)
 }
 
 /*!
-** @brief request that a list of content chunks be loaded into the local 
+** @brief request that a list of content chunks be loaded into the local
 ** machine's content cache.
 **
-** XrequestChunks() is called by a client application to load a content chunk 
+** XrequestChunks() is called by a client application to load a content chunk
 ** into the XIA content cache. It does not return the requested data, it only
-** causes the chunk to be loaded into the local content cache. XgetChunkStatuses() 
-** may be called to get the status of the chunk to determine when it becomes 
-** available. Once the chunk is ready to be read, XreadChunk() should be called 
+** causes the chunk to be loaded into the local content cache. XgetChunkStatuses()
+** may be called to get the status of the chunk to determine when it becomes
+** available. Once the chunk is ready to be read, XreadChunk() should be called
 ** get the actual content chunk data.
 **
 ** XrequestChunk() can be used when only a single chunk is requested.
@@ -73,8 +73,8 @@ int XrequestChunk(int sockfd, char* dag, size_t /* dagLen */)
 ** @param numChunks number of CIDs in the chunk list
 **
 ** @returns 0 on success
-** @returns -1 if one or more of the requested chunks could not be located 
-** or a socket error occurred. If the error is a socket error, errno set 
+** @returns -1 if one or more of the requested chunks could not be located
+** or a socket error occurred. If the error is a socket error, errno set
 ** will be set with an appropriate code.
 */
 int XrequestChunks(int sockfd, const ChunkStatus *chunks, int numChunks)
@@ -95,7 +95,7 @@ int XrequestChunks(int sockfd, const ChunkStatus *chunks, int numChunks)
 		errno = EFAULT;
 		return -1;
 	}
-	
+
 	// If the DAG list is too long for a UDP packet to click, replace with multiple calls
 	if (numChunks > 300) //TODO: Make this more precise
 	{
@@ -116,12 +116,14 @@ int XrequestChunks(int sockfd, const ChunkStatus *chunks, int numChunks)
 
 		return rc;
 	}
-	
+
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XREQUESTCHUNK);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
 
 	xia::X_Requestchunk_Msg *x_requestchunk_msg = xsm.mutable_x_requestchunk();
-  
+
 	for (int i = 0; i < numChunks; i++) {
 		if (chunks[i].cid != NULL)
 			x_requestchunk_msg->add_dag(chunks[i].cid);
@@ -147,9 +149,9 @@ int XrequestChunks(int sockfd, const ChunkStatus *chunks, int numChunks)
 		return -1;
 	}
 
-#if 0	
+#if 0
 	// process the reply from click
-	if ((rc = click_reply2(sockfd, &type)) < 0) {
+	if ((rc = click_reply2(sockfd, seq, &type)) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
 		return -1;
 	}

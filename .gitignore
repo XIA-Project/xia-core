@@ -9,10 +9,12 @@
 core
 *~
 *.sw?
-!/visualizations/local_click/Visualizer.swf
 !/tools/visualizations/local_click/Visualizer.swf
 !/tools/visualizations/distributed_click/Visualizer.swf
+!/tools/visualizations/distributed_click/Visualizer.swf
 tags
+.tags*
+*.sublime-workspace
 cscope.out
 *.o.cmd
 *.ko.cmd
@@ -28,6 +30,9 @@ asm
 xia.mk
 .DS_Store
 *.dSYM
+
+# directories
+key
 
 # ignore session layer files on this branch only
 api/session
@@ -128,7 +133,6 @@ etc/click/templates/controller.click
 etc/click/templates/dual_stack_host.click
 etc/click/templates/dual_stack_router.click
 etc/click/templates/backbone_AD.click
-etc/click/xia_topology_local.click
 
 # planetlab
 experiments/planetlab/logs/*.txt

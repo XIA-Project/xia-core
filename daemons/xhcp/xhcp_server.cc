@@ -109,6 +109,15 @@ int main(int argc, char *argv[]) {
 	Graph gns(ns);
 	gns.fill_sockaddr(&ns_dag);
 
+	// tell click where the nameserver is so apps on the router can find it
+	int sk = Xsocket(AF_XIA, SOCK_DGRAM, 0);
+	if (sk >= 0) {
+		XupdateNameServerDAG(sk, ns);
+		Xclose(sk);
+	} else {
+		syslog(LOG_WARNING, "Unable to create socket: %s", strerror(sk));
+	}
+
 	xhcp_pkt beacon_pkt;
 	beacon_pkt.seq_num = 0;
 	beacon_pkt.num_entries = 4;

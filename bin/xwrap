@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
+export XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
 XLIB=$XIADIR/api/lib
 
 export LD_PRELOAD="$XLIB/xwrap.so $XLIB/libXsocket.so $XLIB/libdagaddr.so"
@@ -25,8 +25,9 @@ help ()
 
 Start or stop the XIA network services.
 
-usage: xwrap [-tixwv] [-o <logfile>] cmd
+usage: xwrap [-h host] [-tixwv] [-o <logfile>] cmd
 where:
+  -h <host> run on the specified host (when using local topology file)
   -t log at entry of every wrapped API call
   -i log informative messages
   -x log XIA related messages
@@ -41,8 +42,11 @@ EOH
 }
 
 
-while getopts "o:tvwx" opt; do
+while getopts "o:h:tvwx" opt; do
 	case $opt in
+		h)
+			export XSOCKCONF_SECTION=$OPTARG
+			;;
 		o)
 			export XWRAP_LOGFILE=$OPTARG
 			;;
@@ -60,7 +64,7 @@ while getopts "o:tvwx" opt; do
 			;;	 
 		w)
 			export XWRAP_WARNING=1
-			;;	 
+			;;
 		\?)
 			help
 			;;

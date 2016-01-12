@@ -18,6 +18,7 @@
 #define XINIT_H
 
 #include "xia.pb.h"
+#include <poll.h>
 
 //Click side: Control/data address/info
 #define DEFAULT_CLICKPORT "1500"
@@ -47,4 +48,30 @@ extern struct __XSocketConf _conf;
 extern struct __XSocketConf* get_conf(void);
 
 #define CLICKPORT  (get_conf()->click_port)
+
+extern "C" {
+typedef int (*socket_t)(int, int, int);
+typedef int (*bind_t)(int, const struct sockaddr*, socklen_t);
+typedef int (*getsockname_t)(int, struct sockaddr *, socklen_t*);
+typedef int (*setsockopt_t)(int, int, int, const void*, socklen_t);
+typedef int (*close_t)(int);
+typedef int (*fcntl_t)(int, int, ...);
+typedef int (*select_t)(int, fd_set*, fd_set*, fd_set*, struct timeval*);
+typedef ssize_t (*sendto_t)(int, const void*, size_t, int, const struct sockaddr*, socklen_t);
+typedef int (*poll_t)(struct pollfd*, nfds_t, int);
+typedef ssize_t (*recvfrom_t)(int, void*, size_t, int, struct sockaddr*, socklen_t*);
+
+extern void xapi_load_func_ptrs();
+extern socket_t _f_socket;
+extern bind_t _f_bind;
+extern getsockname_t _f_getsockname;
+extern setsockopt_t _f_setsockopt;
+extern close_t _f_close;
+extern fcntl_t _f_fcntl;
+extern select_t _f_select;
+extern poll_t _f_poll;
+extern sendto_t _f_sendto;
+extern recvfrom_t _f_recvfrom;
+}
+
 #endif

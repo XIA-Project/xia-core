@@ -32,32 +32,102 @@
 #include <limits.h>
 #include <pthread.h>
 #include <errno.h>
+#include <dlfcn.h> 
+#include <sys/ioctl.h>
+#include <net/if.h>
+
+#define LIBNAME	"libc.so.6"
 
 using namespace std;
 
 extern "C" {
 
+socket_t _f_socket;
+bind_t _f_bind;
+getsockname_t _f_getsockname;
+setsockopt_t _f_setsockopt;
+close_t _f_close;
+fcntl_t _f_fcntl;
+select_t _f_select;
+poll_t _f_poll;
+sendto_t _f_sendto;
+recvfrom_t _f_recvfrom;
+
+size_t mtu_api;
+size_t mtu_wire = 1500;
+
+
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
-	/*!
-	** @brief Specify the location of the XSockets configuration file.
-	**
-	** Specifies the name of a config file to read, and (re)loads the
-	** conf file.
-	**
-	** @returns void
-	*/
-    void set_conf(const char *filename, const char* sectionname)
-    {
-		pthread_mutex_lock(&lock);
+void xapi_load_func_ptrs()
+{
+	void *handle = dlopen(LIBNAME, RTLD_LAZY);
 
-		char root[BUF_SIZE];
+	// FIXME: add code to find the name of the library instead of hard coding it.
+	if (!handle) {
+		fprintf(stderr, "Unable to locate %s. Is there a different version of libc?", LIBNAME);
+		exit(-1);
+	} 
 
-		snprintf(__XSocketConf::master_conf, BUF_SIZE, "%s%s", XrootDir(root, BUF_SIZE), "/etc/xsockconf.ini");
-        __InitXSocket::read_conf(filename, sectionname);
-		__XSocketConf::initialized=1;
-		pthread_mutex_unlock(&lock);
-    }
+	if(!(_f_socket = (socket_t)dlsym(handle, "socket")))
+		printf("can't find socket!\n");
+	if(!(_f_bind = (bind_t)dlsym(handle, "bind")))
+		printf("can't find bind!\n");
+	if(!(_f_getsockname = (getsockname_t)dlsym(handle, "getsockname")))
+		printf("can't find getsockname!\n");
+	if(!(_f_setsockopt = (setsockopt_t)dlsym(handle, "setsockopt")))
+		printf("can't find setsockopt!\n");
+	if(!(_f_close = (close_t)dlsym(handle, "close")))
+		printf("can't find close!\n");
+	if(!(_f_fcntl = (fcntl_t)dlsym(handle, "fcntl")))
+		printf("can't find fcntl!\n");
+	if(!(_f_select = (select_t)dlsym(handle, "select")))
+		printf("can't find select!\n");
+	if(!(_f_poll = (poll_t)dlsym(handle, "poll")))
+		printf("can't find select!\n");
+	if(!(_f_sendto = (sendto_t)dlsym(handle, "sendto")))
+		printf("can't find sendto!\n");
+	if(!(_f_recvfrom = (recvfrom_t)dlsym(handle, "recvfrom")))
+		printf("can't find recvfrom!\n");
+}
+
+static size_t mtu()
+{
+	struct ifreq ifr;
+
+	int sock = (_f_socket)(AF_INET, SOCK_DGRAM, 0);
+
+	strncpy(ifr.ifr_name, "lo", IFNAMSIZ - 1);
+	ifr.ifr_addr.sa_family = AF_INET;
+	ioctl(sock, SIOCGIFMTU, &ifr);
+	(_f_close)(sock);
+
+	LOGF("API MTU = %d\n", ifr.ifr_mtu);
+	return ifr.ifr_mtu;
+}
+
+
+/*!
+** @brief Specify the location of the XSockets configuration file.
+**
+** Specifies the name of a config file to read, and (re)loads the
+** conf file.
+**
+** @returns void
+*/
+void set_conf(const char *filename, const char* sectionname)
+{
+	pthread_mutex_lock(&lock);
+
+	char root[BUF_SIZE];
+
+	snprintf(__XSocketConf::master_conf, BUF_SIZE, "%s%s", XrootDir(root, BUF_SIZE), "/etc/xsockconf.ini");
+    __InitXSocket::read_conf(filename, sectionname);
+    xapi_load_func_ptrs();
+	__XSocketConf::initialized=1;
+	pthread_mutex_unlock(&lock);
+}
+
 
 } /* extern C */
 
@@ -123,6 +193,10 @@ __InitXSocket::__InitXSocket()
 
 	// NOTE: unlikely, but what happens if section_name is NULL?
 	read_conf(inifile, section_name);
+
+    xapi_load_func_ptrs();
+
+    mtu_api = mtu();
 }
 
 /*!

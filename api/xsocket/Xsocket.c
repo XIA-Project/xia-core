@@ -34,35 +34,39 @@
 /*!
 ** @brief Create an XIA socket
 **
-** Creates an XIA socket of the specified type. 
+** Creates an XIA socket of the specified type.
 **
 ** @param family socket family, currently must be AF_XIA
-** @param transport_type Valid values are: 
+** @param transport_type Valid values are:
 **	\n SOCK_STREAM for reliable communications (SID)
-**	\n SOCK_DGRAM for a ligher weight connection, but with 
+**	\n SOCK_DGRAM for a ligher weight connection, but with
 **	unguranteed delivery (SID)
 **	\n XSOCK_CHUNK for getting/putting content chunks (CID)
 **	\n SOCK_RAW for a raw socket that can have direct edits made to the header
-** @param for posix compatibility, currently must be 0
+**	\n SOCK_NONBLOCK may be or'd into the transport_type to create the socket in nonblocking mode
+** @param for posix compatibility, currently ignored
 **
-** @returns socket id on success. 
+** @returns socket id on success.
 ** @returns -1 on failure with errno set to an error compatible with those
 ** from the standard socket call.
 **
-** @warning In the current implementation, the returned socket is 
+** @warning In the current implementation, the returned socket is
 ** a normal UDP socket that is used to communicate with the click
 ** transport layer. Using this socket with normal unix socket
-** calls (aside from select and poll) will cause unexpected behaviors. 
+** calls (aside from select and poll) will cause unexpected behaviors.
 ** Attempting to pass a socket created with the the standard socket function
 ** to the Xsocket API will have similar results.
 **
 */
 int Xsocket(int family, int transport_type, int protocol)
 {
-	struct sockaddr_in addr;
-	xia::XSocketCallType type;
 	int rc;
 	int sockfd;
+	int block = TRUE;
+
+	// force the system to init and load the socket function pointers
+	get_conf();
+
 
 	if (family != AF_XIA) {
 		LOG("error: the Xsockets API only supports the AF_XIA family");
@@ -70,17 +74,16 @@ int Xsocket(int family, int transport_type, int protocol)
 		return -1;
 	}
 
-	if (protocol != 0) {
-		LOG("error: the protocol field is not currently used in the Xsocket API");
-		errno = EINVAL;
-		return -1;
+	if (transport_type & SOCK_CLOEXEC) {
+		LOG("warning: SOCK_CLOEXEC is not currently supported in XIA");
 	}
 
-	/*if (transport_type & SOCK_NONBLOCK || transport_type & SOCK_CLOEXEC) {
-		LOG("error: invalid flags passed as part of the treansport_type");
-		errno = EINVAL;
-		return -1;
-		}*/
+	if (transport_type & SOCK_NONBLOCK) {
+		block = FALSE;
+	}
+
+	// get rid of the flags
+	transport_type &= 0x0f;
 
 	switch (transport_type) {
 		case SOCK_STREAM:
@@ -95,46 +98,41 @@ int Xsocket(int family, int transport_type, int protocol)
 			return -1;
 	}
 
-	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+	if ((sockfd = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		LOGF("error creating Xsocket: %s", strerror(errno));
 		return -1;
 	}
 
-	// bind to any random port number
-	addr.sin_family = PF_INET;
-	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-	addr.sin_port = 0;
+	allocSocketState(sockfd, transport_type);
 
 	// protobuf message
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XSOCKET);
-		
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
+
 	xia::X_Socket_Msg *x_socket_msg = xsm.mutable_x_socket();
-	x_socket_msg->set_type(transport_type);		
-	
+	x_socket_msg->set_type(transport_type);
+
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
-		close(sockfd);
+		(_f_close)(sockfd);
 		return -1;
 	}
 
 	// process the reply from click
-	if ((rc = click_reply2(sockfd, &type)) < 0) {
+	if ((rc = click_status(sockfd, seq)) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
-
-	} else if (type != xia::XSOCKET) {
-		// something bad happened
-		LOGF("Expected type %d, got %d", xia::XSOCKET, type);
-		errno = ECLICKCONTROL;
-		rc = -1;
 	}
 
 	if (rc == 0) {
-		allocSocketState(sockfd, transport_type);
+		setBlocking(sockfd, block);
+		setProtocol(sockfd, protocol);
 		return sockfd;
 	}
 
 	// close the control socket since the underlying Xsocket is no good
-	close(sockfd);
-	return -1; 
+	freeSocketState(sockfd);
+	(_f_close)(sockfd);
+	return rc;
 }

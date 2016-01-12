@@ -29,8 +29,8 @@
 **
 ** the CID specified in cid must be a full DAG, not a fragment such as is
 ** returned by XputChunk. For instance: "RE ( AD:AD0 HID:HID0 ) CID:<hash>"
-** where <hash> is the 40 character hash of the content chunk generated 
-** by the sender. The XputChunk() API call only returns <hash>. Either the 
+** where <hash> is the 40 character hash of the content chunk generated
+** by the sender. The XputChunk() API call only returns <hash>. Either the
 ** client or server application must generate the full DAG that is passed
 ** to this API call.
 **
@@ -45,11 +45,10 @@
 ** @returns -1 on error with errno set
 **
 */
-int XreadChunk(int sockfd, void *rbuf, size_t len, int /* flags */, 
+int XreadChunk(int sockfd, void *rbuf, size_t len, int /* flags */,
 		char * cid, size_t /* cidLen */)
 {
 	int rc;
-	char UDPbuf[MAXBUFLEN];
 
 	if (validateSocket(sockfd, XSOCK_CHUNK, EAFNOSUPPORT) < 0) {
 		LOGF("Socket %d must be a chunk socket\n", sockfd);
@@ -67,9 +66,11 @@ int XreadChunk(int sockfd, void *rbuf, size_t len, int /* flags */,
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XREADCHUNK);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
 
 	xia::X_Readchunk_Msg *x_readchunk_msg = xsm.mutable_x_readchunk();
-  
+
 	x_readchunk_msg->set_dag(cid);
 
 	std::string p_buf;
@@ -80,22 +81,18 @@ int XreadChunk(int sockfd, void *rbuf, size_t len, int /* flags */,
 		return -1;
 	}
 
-	if ((rc = click_reply(sockfd, UDPbuf, sizeof(UDPbuf))) < 0) {
+	xsm.Clear();
+	if ((rc = click_reply(sockfd, seq, &xsm)) < 0) {
 		LOGF("Error retrieving status from Click: %s", strerror(errno));
 		return -1;
 	}
-
-	std::string str(UDPbuf, rc);
-
-	xsm.Clear();
-	xsm.ParseFromString(str);
 
 	xia::X_Readchunk_Msg *msg = xsm.mutable_x_readchunk();
 	unsigned paylen = msg->payload().size();
 	const char *payload = msg->payload().c_str();
 
 	if (paylen > len) {
-		LOGF("CID is %d bytes, but rbuf is only %d bytes", paylen, len);
+		LOGF("CID is %u bytes, but rbuf is only %lu bytes", paylen, len);
 		errno = EFAULT;
 		return -1;
 	}
