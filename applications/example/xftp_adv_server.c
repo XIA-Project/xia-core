@@ -67,7 +67,8 @@ void *recvCmd (void *socketid)
 						warn("unable to send reply to client\n");
 						break;
 					}
-					usleep(SCAN_DELAY_MSEC);
+					hearHello(sock);
+					//usleep(SCAN_DELAY_MSEC);
 				}
 				memset(reply, '\0', strlen(reply));
 				sprintf(reply, "done");	
