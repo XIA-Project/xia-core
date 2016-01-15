@@ -59,6 +59,7 @@
 #include "dagaddr.hpp"
 #include <map>
 #include <vector>
+#include <algorithm>
 
 //#define PRINTBUFS
 
