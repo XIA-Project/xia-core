@@ -515,6 +515,29 @@ void *blockListener(void *listenID, void *recvFuntion (void *))
 	return NULL;
 }
 
+void *twoFunctionBlockListener(void *listenID, void *oneRecvFuntion (void *), void *twoRecvFuntion (void *)) 
+{
+  int listenSock = *((int*)listenID);
+  int acceptSock;
+
+  while (1) {
+		say("Waiting for a client connection\n");
+   		
+		if ((acceptSock = Xaccept(listenSock, NULL, NULL)) < 0){
+			die(-1, "accept failed\n");
+		}
+		say("connected\n");
+		
+		pthread_t client, fetchData;
+		pthread_create(&client, NULL, oneRecvFuntion, (void *)&acceptSock);
+		pthread_create(&fetchData, NULL, twoRecvFuntion, (void *)&acceptSock);
+	}
+	
+	Xclose(listenSock);
+
+	return NULL;
+}
+
 int getIndex(string target, vector<string> pool) {
 	for (unsigned i = 0; i < pool.size(); i++) {
 		if (target == pool[i])
@@ -531,19 +554,30 @@ int registerStageService(const char *name, char *src_ad, char *src_hid, char *ds
 	char sdag[1024];
 	char IP[MAX_XID_SIZE];
 
+cerr << "--------------------------1" << endl;
+say("------------------------name is: %s\n", name);
+say("------------------------myAD is: %s\n", src_ad);
+say("------------------------myHID is: %s\n", src_hid);
+say("------------------------stageAD is: %s\n", dst_ad);
+say("------------------------stageHID is: %s\n", dst_hid);
 	// lookup the xia service 
 	daglen = sizeof(dag);
+cerr << "--------------------daglen is: " << daglen << endl;
 	if (XgetDAGbyName(name, &dag, &daglen) < 0) {
+		cerr << "-----------------------name is: " << name << endl;
 		die(-1, "unable to locate: %s\n", name);
 	}
+cerr << "-------------------------2" << endl;
 	// create a socket, and listen for incoming connections
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
 		die(-1, "Unable to create the listening socket\n");
 	}
+	say("------------------------------3\n");
 	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(sock);
 		die(-1, "Unable to bind to the dag: %s\n", dag);
 	}
+	say("------------------------------4\n");
 	rc = XreadLocalHostAddr(sock, src_ad, MAX_XID_SIZE, src_hid, MAX_XID_SIZE, IP, MAX_XID_SIZE);
 
 	if (rc < 0) {
@@ -553,6 +587,7 @@ int registerStageService(const char *name, char *src_ad, char *src_hid, char *ds
 	else{
 		warn("My AD: %s, My HID: %s\n", src_ad, src_hid);
 	}
+	say("----------------------------------5\n");
 	
 	// save the AD and HID for later. This seems hacky we need to find a better way to deal with this
 	Graph g(&dag);
@@ -568,7 +603,7 @@ int registerStageService(const char *name, char *src_ad, char *src_hid, char *ds
 		die(-1, "Unable to extract HID.");
 	}
 	warn("Service AD: %s, Service HID: %s\n", dst_ad, dst_hid);
-
+say("-------------------------------------6\n");
 	return sock;
 }
 
@@ -598,10 +633,12 @@ int registerStageManager(const char *name)
 
 int updateManifest(int sock, vector<string> CIDs) 
 {
+	say("In updateManifest()\n");
 	char cmd[XIA_MAX_BUF];		
 	int offset = 0;
 	int count = CIDs.size();
 	int num;
+	int num_of_receive_;
 	while (offset < count) {
 		num = MAX_CID_NUM;
 		if (count - offset < MAX_CID_NUM) {
@@ -616,12 +653,17 @@ int updateManifest(int sock, vector<string> CIDs)
 		offset += MAX_CID_NUM;
 		sendStreamCmd(sock, cmd);
 		usleep(SCAN_DELAY_MSEC*000);
+	    num_of_receive_ = hearHello(sock);
+	    say("In updateManifest, successfully receive the message of %d length from manager.\n", num_of_receive_);	
 	}
 	memset(cmd, '\0', strlen(cmd));
 	sprintf(cmd, "reg done");	
 	if (Xsend(sock, cmd, strlen(cmd), 0) < 0) {
 		warn("unable to send reply to client\n");
-	}		
+	}
+	say("Waiting for manager finish profile.\n");
+	hearHello(sock);
+	say("In updateManifest, register to manager done.");	
 	usleep(SCAN_DELAY_MSEC*000);
 
 	return 0;
@@ -648,7 +690,7 @@ int XrequestChunkStage(int sock, const ChunkStatus *cs) {
 	sprintf(cmd, "fetch %ld %s", strlen(dag), dag);
 */	
 	int n = sendStreamCmd(sock, cmd);
-
+	//hearHello(sock);
 	return n;
 }
 

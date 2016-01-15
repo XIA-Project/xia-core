@@ -31,6 +31,7 @@ struct chunkProfile {
 	long fetchFinishTimestamp;
 };
 
+// Used by different service to communicate with each other.
 map<string, map<string, chunkProfile> > SIDToProfile;	// stage state
 map<string, vector<string> > SIDToBuf; // chunk buffer to stage
 map<string, long> SIDToTime; // timestamp last seen
@@ -95,15 +96,25 @@ void stageControl(int sock, char *cmd)
 	// send the chunk ready msg one by one
 	for (unsigned int i = 0; i < CIDs.size(); i++) {
 		while (1) {
+                        say("In stage control, getting chunk: %s\n", string2char(CIDs[i]));
 			//pthread_mutex_lock(&dataLock); 
 			//pthread_cond_wait(&dataCond, &dataLock);	
 			if (SIDToProfile[remoteSID][CIDs[i]].fetchState == READY) {
 				char reply[XIA_MAX_BUF];
 				sprintf(reply, "ready %s %ld %ld", string2char(CIDs[i]), SIDToProfile[remoteSID][CIDs[i]].fetchStartTimestamp, SIDToProfile[remoteSID][CIDs[i]].fetchFinishTimestamp);
+<<<<<<< HEAD
 				hearHello(sock);									
+=======
+<<<<<<< HEAD
+				hearHello(sock);									
+=======
+				// Send chunk ready message to state manager.									
+>>>>>>> a6926f19278244e9b922d50f8f8cc50419862a43
+>>>>>>> 3c4823309b079fc74aa5d71951c7e79820633197
 				sendStreamCmd(sock, reply);
 				break;
 			}
+			// Determine the intervals to check the state of current chunk.
 			usleep(SCAN_DELAY_MSEC*1000); // chenren: check timing issue
 		}
 	}
@@ -127,6 +138,7 @@ void *stageData(void *)
 {
 	int chunkSock;
 
+    // Create socket with server.
 	if ((chunkSock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0) {
 		die(-1, "unable to create chunk socket\n");
 	}
@@ -136,6 +148,7 @@ void *stageData(void *)
 		//pthread_mutex_lock(&controlLock); 
 		//pthread_cond_wait(&controlCond, &controlLock);			
 		pthread_mutex_lock(&bufLock);
+		// For each stage manager.
 		for (map<string, vector<string> >::iterator I = SIDToBuf.begin(); I != SIDToBuf.end(); ++I) {
 			if ((*I).second.size() > 0) {
 				string SID = (*I).first;
@@ -144,6 +157,7 @@ void *stageData(void *)
 				int status;
 				int n = (*I).second.size();
 
+                // For each Content.
 				for (unsigned int i = 0; i < (*I).second.size(); i++) {
 					char *dag = (char *)malloc(512);
 					sprintf(dag, "RE ( %s %s ) CID:%s", ftpServAD, ftpServHID, string2char((*I).second[i]));
@@ -157,9 +171,18 @@ void *stageData(void *)
 				unsigned ctr = 0;
 
 				while (1) {
+					// REREQUEST = 3
 					if (ctr % REREQUEST == 0) {
 						// bring the list of chunks local
 // say("%srequesting list of %d chunks\n", (ctr == 0 ? "" : "re-"), n);
+<<<<<<< HEAD
+say("Fetching chunks from server. The number of chunks is %d, the first chunk is %s\n", n, string2char((*I).second[0]));
+=======
+						// Cache chunks from server.
+						// Actually, time intervals should be inserted into this while loop to change the intervals between chunk cache.
+						// XrequestChunk may be better, because it is more controllable.
+						say("Fetching chunks from server. The number of chunks is %d, the first chunk is %s\n", n, string2char((*I).second[0]));
+>>>>>>> a6926f19278244e9b922d50f8f8cc50419862a43
 						if (XrequestChunks(chunkSock, cs, n) < 0) {
 							say("unable to request chunks\n");
 							pthread_exit(NULL); 
@@ -237,11 +260,19 @@ void *stageCmd(void *socketid)
 	while (1) {
 say("In stageCmd.\n");
 		memset(cmd, '\0', XIA_MAXBUF);
+		// Receive the stage command sent by stage_manager.
 		if ((n = Xrecv(sock, cmd, sizeof(cmd), 0))  < 0) {
 			warn("socket error while waiting for data, closing connection\n");
 			break;
 		}
+<<<<<<< HEAD
 say("Successfully receive stage command from stage manager.\n");	
+=======
+<<<<<<< HEAD
+say("Successfully receive stage command from stage manager.\n");	
+=======
+>>>>>>> a6926f19278244e9b922d50f8f8cc50419862a43
+>>>>>>> 3c4823309b079fc74aa5d71951c7e79820633197
 		if (strncmp(cmd, "stage", 5) == 0) {
 			say("Receive a stage message\n");
 			stageControl(sock, cmd+6);
@@ -283,8 +314,12 @@ int main()
 	pthread_create(&thread_stage, NULL, stageData, NULL); // dequeue, stage and update profile
 	//pthread_create(&thread_mgt, NULL, profileMgt, NULL);
 
+//ftpSock is used to communicate with click and build chunk.
 	ftpSock = initStreamClient(getXftpName(), myAD, myHID, ftpServAD, ftpServHID); // get ftpServAD and ftpServHID for building chunk request
+
+//stageServerSock is used to communicate with stage manager.
 	stageServerSock = registerStreamReceiver(getStageServiceName(), myAD, myHID, my4ID);
+say("The current stageServerSock is %d\n", stageServerSock);
 	blockListener((void *)&stageServerSock, stageCmd);
 
 	return 0;	

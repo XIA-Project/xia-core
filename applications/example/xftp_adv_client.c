@@ -22,6 +22,9 @@ int getFile(int sock)
 	FILE *fd = fopen(fout, "w");
 	int n;
 	int status = -1;
+	char send_to_server_[XIA_MAX_BUF];
+	memset(send_to_server_, '\0', strlen(send_to_server_));
+	sprintf(send_to_server_, "finish receiveing the current CIDs.");
 
 	int chunkSock;
 	if ((chunkSock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0) {
@@ -39,6 +42,7 @@ int getFile(int sock)
 
 	// receive the CID list from xftp server
 	while (1) {
+		say("In getFile, receive CID list from xftp server.\n");
 		memset(reply, '\0', XIA_MAX_BUF);		
 		if ((n = Xrecv(sock, reply, sizeof(reply), 0)) < 0) {
 			Xclose(sock);
@@ -46,10 +50,12 @@ int getFile(int sock)
 		}
 		if (strncmp(reply, "cont", 4) == 0) {
 			say("Receiving partial chunk list\n");
-			char reply_arr[strlen(reply+5)];
-			strcpy(reply_arr, reply+5);
+			char reply_arr[strlen(reply)];
+			//char reply_arr[strlen(reply+5)];
+			strcpy(reply_arr, reply + 5);
 			char *cid;
 			CIDs.push_back(strtok(reply_arr, " "));	
+			// register CID
 			while ((cid = strtok(NULL, " ")) != NULL) {
 				CIDs.push_back(cid);
 			}
@@ -59,9 +65,11 @@ int getFile(int sock)
 			say("Finish receiving all the CIDs\n");
 			break;
 		}
+		sayHello(sock, send_to_server_);
 	}
 
 	// update CID list to the local staging service if exists.
+	// Send CID list to stage manager
 	if (stage) {
 		if ((n = updateManifest(stageManagerSock, CIDs) < 0)) {
 			Xclose(stageManagerSock);
@@ -81,12 +89,12 @@ int getFile(int sock)
 	// chunk fetching begins
 	for (unsigned int i = 0; i < CIDs.size(); i++) {
 		say("The number of chunks is %d.\n", CIDs.size());
-		printf("Fetching chunk %u / %lu\n", i+1, CIDs.size());
+		printf("Fetching chunk %u / %lu\n", i, CIDs.size() - 1);
 		ChunkStatus cs[NUM_CHUNKS];
 		char data[XIA_MAXCHUNK];
 		int len;
 		int status;
-		int n = NUM_CHUNKS; 
+		int n = NUM_CHUNKS;
 		char *dag = (char *)malloc(512);
 
 		sprintf(dag, "RE ( %s %s ) CID:%s", ftpServAD, ftpServHID, string2char(CIDs[i]));
@@ -96,21 +104,28 @@ int getFile(int sock)
 
 		fetchTime = now_msec();
 		while (1) {
+			say("In while loop of getFIle.\n");
 			if (ctr % REREQUEST == 0) {
 				// bring the list of chunks local
 //say("%srequesting list of %d chunks\n", (ctr == 0 ? "" : "re-"), n);
 				if (stage) {
+					sprintf(dag, "RE ( %s %s ) CID:%s", myAD, myHID, string2char(CIDs[i]));
+					cs[0].cidLen = strlen(dag);
+					cs[0].cid = dag; // cs[i].cid is a DAG, not just the CID
+					//hearHello(stageManagerSock);					
 					if (XrequestChunkStage(stageManagerSock, cs) < 0) {
 						say("unable to request chunks\n");
 						return -1;
 					}
-					sprintf(dag, "RE ( %s %s ) CID:%s", myAD, myHID, string2char(CIDs[i]));
-					cs[0].cidLen = strlen(dag);
-					cs[0].cid = dag; // cs[i].cid is a DAG, not just the CID					
+					hearHello(stageManagerSock);
+					//sprintf(dag, "RE ( %s %s ) CID:%s", myAD, myHID, string2char(CIDs[i]));
+					//cs[0].cidLen = strlen(dag);
+					//cs[0].cid = dag; // cs[i].cid is a DAG, not just the CID
+					say("Requesting chunk %d/%d.\n", i, CIDs.size() - 1);
 					if (XrequestChunks(chunkSock, cs, n) < 0) {
 						say("unable to request chunks\n");
 						return -1;
-					}
+					}					
 				}
 				else {
 					if (XrequestChunks(chunkSock, cs, n) < 0) {
@@ -165,7 +180,7 @@ int getFile(int sock)
 	fclose(fd);
 	long finishTime = now_msec();
 	say("Received file %s at %f MB/s (Time: %lu msec, Size: %d bytes)\n", fout, (1000 * (float)bytes / 1024) / (float)(finishTime - startTime) , finishTime - startTime, bytes);
-	sendStreamCmd(sock, "done"); 	// chunk fetching ends
+	sendStreamCmd(sock, "done"); 	// chunk fetching ends, send command to server
 	for (unsigned int i = 0; i < CIDs.size(); i++) {
 		cout<<fout<<"\t"<<CIDs[i]<<"\t"<<chunkSize[i]<<" B\t"<<latency[i]<<"\t"<<chunkStartTime[i]<<"\t"<<chunkFinishTime[i]<<endl;
 	}
@@ -177,13 +192,18 @@ int getFile(int sock)
 int main(int argc, char **argv) 
 {	
 	while (1) {
+		say("In main function of xftp_adv_client.\n");
 		if (argc == 2) {
 			say("\n%s (%s): started\n", TITLE, VERSION);		
 			strcpy(fin, argv[1]);
 			sprintf(fout, "my%s", fin);
+			//sprintf(fout, "/home/xia/Pictures/gugu5.jpg");
+			//sprintf(fout, "/home/xia/Pictures/fb.jpg");
 
 			ftpSock = initStreamClient(getXftpName(), myAD, myHID, ftpServAD, ftpServHID);
+			//stageMagegerSock is used to communicate with stage manager.
 			stageManagerSock = registerStageManager(getStageManagerName());
+			say("The current stageManagerSock is %d\n", stageManagerSock);
 			if (stageManagerSock == -1) {
 				say("No local staging service running\n");
 				stage = false;
