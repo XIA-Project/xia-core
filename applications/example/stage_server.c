@@ -31,6 +31,7 @@ struct chunkProfile {
 	long fetchFinishTimestamp;
 };
 
+// Used by different service to communicate with each other.
 map<string, map<string, chunkProfile> > SIDToProfile;	// stage state
 map<string, vector<string> > SIDToBuf; // chunk buffer to stage
 map<string, long> SIDToTime; // timestamp last seen
@@ -99,10 +100,12 @@ void stageControl(int sock, char *cmd)
 			//pthread_cond_wait(&dataCond, &dataLock);	
 			if (SIDToProfile[remoteSID][CIDs[i]].fetchState == READY) {
 				char reply[XIA_MAX_BUF];
-				sprintf(reply, "ready %s %ld %ld", string2char(CIDs[i]), SIDToProfile[remoteSID][CIDs[i]].fetchStartTimestamp, SIDToProfile[remoteSID][CIDs[i]].fetchFinishTimestamp);									
+				sprintf(reply, "ready %s %ld %ld", string2char(CIDs[i]), SIDToProfile[remoteSID][CIDs[i]].fetchStartTimestamp, SIDToProfile[remoteSID][CIDs[i]].fetchFinishTimestamp);
+				// Send chunk ready message to state manager.									
 				sendStreamCmd(sock, reply);
 				break;
 			}
+			// Determine the intervals to check the state of current chunk.
 			usleep(SCAN_DELAY_MSEC*1000); // chenren: check timing issue
 		}
 	}
@@ -126,6 +129,7 @@ void *stageData(void *)
 {
 	int chunkSock;
 
+    // Create socket with server.
 	if ((chunkSock = Xsocket(AF_XIA, XSOCK_CHUNK, 0)) < 0) {
 		die(-1, "unable to create chunk socket\n");
 	}
@@ -135,6 +139,7 @@ void *stageData(void *)
 		//pthread_mutex_lock(&controlLock); 
 		//pthread_cond_wait(&controlCond, &controlLock);			
 		pthread_mutex_lock(&bufLock);
+		// For each stage manager.
 		for (map<string, vector<string> >::iterator I = SIDToBuf.begin(); I != SIDToBuf.end(); ++I) {
 			if ((*I).second.size() > 0) {
 				string SID = (*I).first;
@@ -143,6 +148,7 @@ void *stageData(void *)
 				int status;
 				int n = (*I).second.size();
 
+                // For each Content.
 				for (unsigned int i = 0; i < (*I).second.size(); i++) {
 					char *dag = (char *)malloc(512);
 					sprintf(dag, "RE ( %s %s ) CID:%s", ftpServAD, ftpServHID, string2char((*I).second[i]));
@@ -156,9 +162,14 @@ void *stageData(void *)
 				unsigned ctr = 0;
 
 				while (1) {
+					// REREQUEST = 3
 					if (ctr % REREQUEST == 0) {
 						// bring the list of chunks local
 // say("%srequesting list of %d chunks\n", (ctr == 0 ? "" : "re-"), n);
+						// Cache chunks from server.
+						// Actually, time intervals should be inserted into this while loop to change the intervals between chunk cache.
+						// XrequestChunk may be better, because it is more controllable.
+						say("Fetching chunks from server. The number of chunks is %d, the first chunk is %s\n", n, string2char((*I).second[0]));
 						if (XrequestChunks(chunkSock, cs, n) < 0) {
 							say("unable to request chunks\n");
 							pthread_exit(NULL); 
@@ -235,10 +246,11 @@ void *stageCmd(void *socketid)
 
 	while (1) {
 		memset(cmd, '\0', XIA_MAXBUF);
+		// Receive the stage command sent by stage_manager.
 		if ((n = Xrecv(sock, cmd, sizeof(cmd), 0))  < 0) {
 			warn("socket error while waiting for data, closing connection\n");
 			break;
-		}	
+		}
 		if (strncmp(cmd, "stage", 5) == 0) {
 			say("Receive a stage message\n");
 			stageControl(sock, cmd+6);
