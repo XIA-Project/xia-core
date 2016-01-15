@@ -99,7 +99,8 @@ void stageControl(int sock, char *cmd)
 			//pthread_cond_wait(&dataCond, &dataLock);	
 			if (SIDToProfile[remoteSID][CIDs[i]].fetchState == READY) {
 				char reply[XIA_MAX_BUF];
-				sprintf(reply, "ready %s %ld %ld", string2char(CIDs[i]), SIDToProfile[remoteSID][CIDs[i]].fetchStartTimestamp, SIDToProfile[remoteSID][CIDs[i]].fetchFinishTimestamp);									
+				sprintf(reply, "ready %s %ld %ld", string2char(CIDs[i]), SIDToProfile[remoteSID][CIDs[i]].fetchStartTimestamp, SIDToProfile[remoteSID][CIDs[i]].fetchFinishTimestamp);
+				hearHello(sock);									
 				sendStreamCmd(sock, reply);
 				break;
 			}
@@ -234,11 +235,13 @@ void *stageCmd(void *socketid)
 	int n = -1;
 
 	while (1) {
+say("In stageCmd.\n");
 		memset(cmd, '\0', XIA_MAXBUF);
 		if ((n = Xrecv(sock, cmd, sizeof(cmd), 0))  < 0) {
 			warn("socket error while waiting for data, closing connection\n");
 			break;
-		}	
+		}
+say("Successfully receive stage command from stage manager.\n");	
 		if (strncmp(cmd, "stage", 5) == 0) {
 			say("Receive a stage message\n");
 			stageControl(sock, cmd+6);
