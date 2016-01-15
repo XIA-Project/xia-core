@@ -576,6 +576,7 @@ bool XTRANSPORT::RetransmitFIN(sock *sk, unsigned short _sport, Timestamp &now)
 
 		WritablePacket *copy = copy_packet(sk->pkt, sk);
 		output(NETWORK_PORT).push(copy);
+		//printf("~~~~~~~~~~~~~~~~~~~~~~~~~~After output in RetransmitFIN.\n");
 	}
 	else {
 		// The App initiated the FIN and close returned right away, so there's nothing to tell it
@@ -662,7 +663,9 @@ bool XTRANSPORT::RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now)
 
 bool XTRANSPORT::RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp &now, Timestamp &earliest_pending_expiry)
 {
+	//printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~In RetransmitCIDRequest.\n");
 	for (HashTable<XID, bool>::iterator it = sk->XIDtoTimerOn.begin(); it != sk->XIDtoTimerOn.end(); ++it ) {
+		//printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~In for of RetransmitCIDRequest.\n");
 		XID requested_cid = it->first;
 		bool timer_on = it->second;
 
@@ -678,6 +681,7 @@ bool XTRANSPORT::RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp
 			it3 = sk->XIDtoCIDreqPkt.find(requested_cid);
 			WritablePacket *copy = copy_cid_req_packet(it3->second, sk);
 			output(NETWORK_PORT).push(copy);
+			//printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~After output in RetransmitCIDRequest.\n");
 
 			cid_req_expiry  = Timestamp::now() + Timestamp::make_msec(ACK_DELAY);
 			sk->XIDtoExpiryTime.set(requested_cid, cid_req_expiry);
@@ -694,14 +698,17 @@ bool XTRANSPORT::RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp
 
 void XTRANSPORT::run_timer(Timer *timer)
 {
+	//printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~In run_timer.\n");
 	assert(timer == &_timer);
 
 	Timestamp now = Timestamp::now();
 	Timestamp earliest_pending_expiry = now;
 
 	for (HashTable<unsigned short, sock*>::iterator iter = portToSock.begin(); iter != portToSock.end(); ++iter ) {
+		printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~In for of run_timer.\n");
 		unsigned short _sport = iter->first;
 		sock *sk = portToSock.get(_sport);
+		//printf("~~~~~~~~~~~~~~~~~~~sk's size is %lu.\n", sk->XIDtoTimerOn.size());
 		bool tear_down = false;
 
 		if (!sk) {
@@ -712,15 +719,19 @@ void XTRANSPORT::run_timer(Timer *timer)
 
 		if (sk->timer_on == true) {
 			if (sk->state == SYN_SENT && sk->expiry <= now ) {
+				printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Before RetransmitSYN.\n");
 				RetransmitSYN(sk, _sport, now);
 
 			} else if ((sk->state == FIN_WAIT1 || sk->state == LAST_ACK) && sk->expiry <= now) {
+				printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Before RetransmitFIN.\n");
 				tear_down = RetransmitFIN(sk, _sport, now);
 
 			} else if (sk->state == CONNECTED && sk->migrateack_waiting && sk->expiry <= now ) {
+				printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Before RetransmitMIGRATE.\n");
 				tear_down = RetransmitMIGRATE(sk, _sport, now);
 
 			} else if (sk->state == CONNECTED && sk->expiry <= now ) {
+				printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Before RetransmitDATA.\n");
 				tear_down = RetransmitDATA(sk, _sport, now);
 
 			} else if (sk->state == TIME_WAIT && sk->expiry <= now) {
@@ -740,6 +751,7 @@ void XTRANSPORT::run_timer(Timer *timer)
 
 			// FIXME: why is this here instead of with the other retransmits?
 			// check for CID request cases
+			printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Before RetransmitCIDRequest.\n");
 			RetransmitCIDRequest(sk, _sport, now, earliest_pending_expiry);
 		}
 	}
@@ -3647,6 +3659,7 @@ void XTRANSPORT::Xgetsockname(unsigned short _sport, xia::XSocketMsg *xia_socket
 void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in)
 {
 	int rc = 0, ec = 0;
+	printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~In Xsend.\n");
 
 	//Find socket state
 	sock *sk = portToSock.get(_sport);
@@ -3718,7 +3731,7 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 		WritablePacket *p = WritablePacket::make(p_in->headroom() + 1, (const void*)pktcontents, pktcontentslen, p_in->tailroom());
 		p = xiahencap.encap(p, false);
 
-		output(NETWORK_PORT).push(p);
+		//output(NETWORK_PORT).push(p);
 		x_send_msg->clear_payload(); // clear payload before returning result
 		ReturnResult(_sport, xia_socket_msg);
 		return;
@@ -3811,7 +3824,7 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 			ERROR("ERROR _sport %d, sk->port %d", _sport, sk->port);
 		}
 
-		output(NETWORK_PORT).push(p);
+		//output(NETWORK_PORT).push(p);
 	}
 
 	x_send_msg->clear_payload(); // clear payload before returning result

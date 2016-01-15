@@ -242,7 +242,9 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 	sockaddr_x ns_dag;
 	char pkt[NS_MAX_PACKET_SIZE];
 	char *dag;
-
+printf("============================= name is: %s\n", name);
+//printf("============================= dag is: %s\n", *addr);
+printf("============================= daglen is: %d\n", *addrlen);
 	if (!name || *name == 0) {
 		errno = EINVAL;
 		return -1;
@@ -252,7 +254,7 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 		errno = EINVAL;
 		return -1;
 	}
-
+printf("============================= 1.1\n");
 	// see if name is registered in the local hosts.xia file
 	if((dag = hostsLookup(name))) {
 		Graph g(dag);
@@ -267,7 +269,7 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 			return 0;
 		}
 	}
-
+printf("============================= 1.2\n");
 	if (!strncmp(name, "RE ", 3) || !strncmp(name, "DAG ", 4)) {
 		// check to see if name is actually a dag to begin with
     Graph gcheck(name);
@@ -292,7 +294,7 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 		errno = NO_RECOVERY;
 		return -1;
 	}
-
+printf("============================= 1.3\n");
 	//Construct a name-query packet
 	ns_pkt query_pkt;
 	query_pkt.type = NS_TYPE_QUERY;
@@ -311,8 +313,9 @@ printf("Error: sent %d bytes\n", rc);
 		errno = err;
 		return -1;
 	}
-
+printf("============================= 1.4\n");
 	for (int i = 0; i < NS_LOOKUP_RETRY_NUM; i++) {
+printf("============================= %d/%d\n", i + 1, NS_LOOKUP_RETRY_NUM);
 		struct pollfd pfds[2];
 		pfds[0].fd = sock;
 		pfds[0].events = POLLIN;
@@ -325,13 +328,13 @@ printf("Error: sent %d bytes\n", rc);
 				errno = err;
 				return -1;
 			}
-printf("Retried %d times...\n", i+1);		
+printf("Retried %d times...\n", i + 1);		
 		}
 		else {
 			break;
 		}
 	}
-	
+printf("============================= 1.5\n");
 	// TODO: reties =4 for, if time out, then Xsendto again  Xsekect(readfdf = sock, timeout)<0
 printf("Sent %d bytes and begin to Xrecvfrom\n", rc);
 	//Check the response from the name server
@@ -344,7 +347,7 @@ printf("Error retrieving name query (%d)", err);
 		errno = err;
 		return -1;
 	}
-
+printf("============================= 1.6\n");
 Graph gns(&ns_dag);
 printf("Nameserver DAG: %s\n", gns.dag_string().c_str());
 
@@ -373,6 +376,7 @@ printf("Nameserver DAG: %s\n", gns.dag_string().c_str());
 	Graph g(resp_pkt.dag);
 	g.fill_sockaddr(addr);
 	*addrlen = sizeof(sockaddr_x);
+printf("============================= 1.7\n");
 	return 0;
 }
 
