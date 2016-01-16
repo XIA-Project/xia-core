@@ -102,15 +102,8 @@ void stageControl(int sock, char *cmd)
 			if (SIDToProfile[remoteSID][CIDs[i]].fetchState == READY) {
 				char reply[XIA_MAX_BUF];
 				sprintf(reply, "ready %s %ld %ld", string2char(CIDs[i]), SIDToProfile[remoteSID][CIDs[i]].fetchStartTimestamp, SIDToProfile[remoteSID][CIDs[i]].fetchFinishTimestamp);
-<<<<<<< HEAD
 				hearHello(sock);									
-=======
-<<<<<<< HEAD
-				hearHello(sock);									
-=======
 				// Send chunk ready message to state manager.									
->>>>>>> a6926f19278244e9b922d50f8f8cc50419862a43
->>>>>>> 3c4823309b079fc74aa5d71951c7e79820633197
 				sendStreamCmd(sock, reply);
 				break;
 			}
@@ -175,14 +168,11 @@ void *stageData(void *)
 					if (ctr % REREQUEST == 0) {
 						// bring the list of chunks local
 // say("%srequesting list of %d chunks\n", (ctr == 0 ? "" : "re-"), n);
-<<<<<<< HEAD
 say("Fetching chunks from server. The number of chunks is %d, the first chunk is %s\n", n, string2char((*I).second[0]));
-=======
 						// Cache chunks from server.
 						// Actually, time intervals should be inserted into this while loop to change the intervals between chunk cache.
 						// XrequestChunk may be better, because it is more controllable.
 						say("Fetching chunks from server. The number of chunks is %d, the first chunk is %s\n", n, string2char((*I).second[0]));
->>>>>>> a6926f19278244e9b922d50f8f8cc50419862a43
 						if (XrequestChunks(chunkSock, cs, n) < 0) {
 							say("unable to request chunks\n");
 							pthread_exit(NULL); 
@@ -265,14 +255,7 @@ say("In stageCmd.\n");
 			warn("socket error while waiting for data, closing connection\n");
 			break;
 		}
-<<<<<<< HEAD
 say("Successfully receive stage command from stage manager.\n");	
-=======
-<<<<<<< HEAD
-say("Successfully receive stage command from stage manager.\n");	
-=======
->>>>>>> a6926f19278244e9b922d50f8f8cc50419862a43
->>>>>>> 3c4823309b079fc74aa5d71951c7e79820633197
 		if (strncmp(cmd, "stage", 5) == 0) {
 			say("Receive a stage message\n");
 			stageControl(sock, cmd+6);
