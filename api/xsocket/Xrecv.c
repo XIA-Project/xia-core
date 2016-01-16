@@ -161,18 +161,18 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 	struct sockaddr *addr, socklen_t *addrlen)
 {
 	int iface = 0;
-
+//printf("```````````````````````````In Xrecvfrom 1\n");
 	if (validateSocket(sockfd, XSOCK_DGRAM, EOPNOTSUPP) < 0) {
 		LOGF("Socket %d must be a datagram socket", sockfd);
 		return -1;
 	}
-
+//printf("```````````````````````````In Xrecvfrom 2\n");
 	if (getConnState(sockfd) == CONNECTED) {
 		LOGF("socket %d is connected, use Xrecv instead!", sockfd);
 		errno = EISCONN;
 		return -1;
 	}
-
+//printf("```````````````````````````In Xrecvfrom 3\n");
 	return _xrecvfrom(sockfd, rbuf, len, flags, (sockaddr_x *)addr, addrlen, &iface);
 }
 

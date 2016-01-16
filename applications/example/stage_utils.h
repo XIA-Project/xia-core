@@ -130,6 +130,8 @@ int registerStreamReceiver(char *name, char *myAD, char *myHID, char *my4ID);
 // bind the receiving function
 void *blockListener(void *listenID, void *recvFuntion (void *));
 
+void *twoFunctionBlockListener(void *listenID, void *OneRecvFuntion (void *), void *TwoRecvFuntion (void *));
+
 int getIndex(string target, vector<string> pool);
 
 // update the CID list to the local staging service

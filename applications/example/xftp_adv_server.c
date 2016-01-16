@@ -11,8 +11,8 @@ void *recvCmd (void *socketid)
 {
 	int i, n, count = 0;
 	ChunkInfo *info = NULL;
-	char cmd[XIA_MAX_BUF];
-	char reply[XIA_MAX_BUF];
+	char cmd[XIA_MAX_BUF + 4];
+	char reply[XIA_MAX_BUF + 5];
 	int sock = *((int*)socketid);
 	char *fname;
 
@@ -51,6 +51,7 @@ void *recvCmd (void *socketid)
 			else {
 				int offset = 0;
 				int num;
+				// Each CID's size is set to MAX_CID_NUM
 				while (offset < count) {
 					num = MAX_CID_NUM;
 					if (count - offset < MAX_CID_NUM) {
@@ -63,6 +64,8 @@ void *recvCmd (void *socketid)
 						strcat(reply, info[i].cid);
 					}
 					offset += MAX_CID_NUM;
+					// Send CID list to client.
+					say("Sending %d chunks of %d to %d: %s\n", num, offset, offset + num, reply);
 					if (Xsend(sock, reply, strlen(reply), 0) < 0) {
 						warn("unable to send reply to client\n");
 						break;
@@ -77,7 +80,8 @@ void *recvCmd (void *socketid)
 					break;
 				}								
 			}
-		} 	
+		}
+		// After all chunks had been sent, they can be removed from server. 	
 		else if (strncmp(cmd, "done", 4) == 0) {
 			say("done sending file: removing the chunks from the cache\n");
 			for (i = 0; i < count; i++) {
