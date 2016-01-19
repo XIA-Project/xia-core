@@ -511,7 +511,7 @@ cerr<<CIDs_fetching[i]<<"\t fetch state: ready\n";
 				// TODO: timeout the chunks by free(cs[i].cid); cs[j].cid = NULL; cs[j].cidLen = 0;
 			}
 		}
-		usleep(LOOP_DELAY_MSEC*1000);		
+		usleep(LOOP_DELAY_MSEC*1000);
 		//pthread_mutex_unlock(&fetchLock);
 	}
 	//Xclose(clientSock);
