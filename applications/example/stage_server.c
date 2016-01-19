@@ -105,13 +105,8 @@ say("In stage control, getting chunk: %s\n", string2char(CIDs[i]));
 			if (SIDToProfile[remoteSID][CIDs[i]].fetchState == READY) {
 				char reply[XIA_MAX_BUF];
 				sprintf(reply, "ready %s %ld %ld", string2char(CIDs[i]), SIDToProfile[remoteSID][CIDs[i]].fetchStartTimestamp, SIDToProfile[remoteSID][CIDs[i]].fetchFinishTimestamp);
-<<<<<<< HEAD
 				hearHello(sock);
 				// Send chunk ready message to state manager.
-=======
-				hearHello(sock);									
-				// Send chunk ready message to state manager.									
->>>>>>> dd1f8ba30aec6071c0ccac4a89abdac146635a79
 				sendStreamCmd(sock, reply);
 				break;
 			}
@@ -266,11 +261,7 @@ say("In stageCmd.\n");
 			warn("socket error while waiting for data, closing connection\n");
 			break;
 		}
-<<<<<<< HEAD
 say("Successfully receive stage command from stage manager.\n");
-=======
-say("Successfully receive stage command from stage manager.\n");	
->>>>>>> dd1f8ba30aec6071c0ccac4a89abdac146635a79
 		if (strncmp(cmd, "stage", 5) == 0) {
 			say("Receive a stage message\n");
             //Why 6 , a magic num?          --Lwy   1.16
