@@ -2,31 +2,21 @@
 #
 
 from google.protobuf import text_format as protobuf_text_format
+import logging
 import ndap_pb2
 import uuid
 
-warn_messages = True
-dbg_messages = False
-
 def print_descriptor(net_descriptor):
     print protobuf_text_format.MessageToString(net_descriptor)
-
-def warn(msg):
-    if warn_messages:
-        print __name__, "WARNING:", msg
-
-def dbg(msg):
-    if dbg_messages:
-        print __name__, "DEBUG:", msg
 
 # For now we just build a beacon with a dummy AuthCapStruct
 def build_beacon(guid=None, xip_netid=None):
     if guid == None:
         guid = uuid.uuid4().bytes
-        warn("GUID not provided. Assigning a temporary one")
+        logging.warning("GUID not provided. Assigning a temporary one")
     if xip_netid == None:
         xip_netid = uuid.uuid4().bytes
-        warn("XIP NID not giver. Assigning a temporary one")
+        logging.warning("XIP NID not giver. Assigning a temporary one")
 
     # Our network descriptor message
     net_descriptor = ndap_pb2.NetDescriptor()
@@ -83,7 +73,8 @@ def build_beacon(guid=None, xip_netid=None):
 
 if __name__ == "__main__":
     serialized_net_descriptor = build_beacon()
-    dbg("Serialized descriptor size: %s" % len(serialized_net_descriptor))
+    descriptor_size = len(serialized_net_descriptor)
+    logging.debug("Serialized descriptor size: {}".format(descriptor_size))
     #with open("net_descriptor.beacon", "wb") as fd:
     #    fd.write(serialized_net_descriptor)
 

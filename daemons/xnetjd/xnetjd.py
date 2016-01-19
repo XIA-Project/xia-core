@@ -4,15 +4,20 @@
 import time
 import struct
 import socket
+import logging
 import argparse
 import threading
 import ndap_pb2
 import ndap_beacon
+import netjoin_policy
+
+# Setup logging for this application
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s: %(module)s %(levelname)s: %(message)s')
 
 # Announce the presence of this network
 def network_announcer(beacon_interval, serialized_beacon, sockfd, xianetjoin):
     # Send beacon to XIANetJoin
-    print time.time(), "Sent beacon"
+    logging.debug("Sent beacon")
     sockfd.sendto(serialized_beacon, xianetjoin)
 
     # Call ourselves from a new thread after some time
@@ -33,25 +38,27 @@ def announce_network(beacon_interval):
 
 
 # Listen for incoming beacons
-def beacon_handler():
+def beacon_handler(policy):
     xnetjd = ("127.0.0.1", 9228)
     sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sockfd.bind(xnetjd)
     while True:
         data, addr = sockfd.recvfrom(1034)
-        print "Received beacon from: ", addr
+        logging.debug("Received beacon from: {}".format(addr))
         # Convert beacon to protobuf and print its contents
         interface = struct.unpack("H", data[0:2])[0]
         sendermac = struct.unpack("BBBBBB", data[2:8])
         # First two bytes contain interface number
-        print "On interface: ", interface
+        logging.debug("On interface: {}".format(interface))
         # Six bytes contain source mac address
-        print "Sent by: ", sendermac
+        logging.debug("Sent by: %02x:%02x:%02x:%02x:%02x:%02x" % sendermac)
         # Remaining data is the beacon
-        beacon = ndap_pb2.NetDescriptor()
-        beacon.ParseFromString(data[8:])
-        print "Beacon contained:"
-        ndap_beacon.print_descriptor(beacon)
+        serialized_beacon = data[8:]
+        #beacon = ndap_pb2.NetDescriptor()
+        #beacon.ParseFromString(serialized_beacon)
+        #print "Beacon contained:"
+        #ndap_beacon.print_descriptor(beacon)
+        policy.process_serialized_beacon(serialized_beacon)
 
 # Argument parser
 def parse_args():
@@ -66,13 +73,18 @@ if __name__ == "__main__":
     # Parse user provided arguments
     args = parse_args()
 
+    # Initialize the policy module
+    # For now we have one policy for all beacons.
+    # TODO: Pass list of auth providers
+    policy = netjoin_policy.NetjoinPolicy()
+
     if args.accesspoint:
-        print "Announcing network"
+        logging.debug("Announcing network")
         announce_network(args.beacon_interval)
 
     if args.client:
-        print "Listening for available networks"
-        beacon_handler()
+        logging.debug("Listening for network announcements")
+        beacon_handler(policy)
     #new_descriptor = ndap_pb2.NetDescriptor()
     #new_descriptor.ParseFromString(serialized_beacon)
     #ndap_beacon.print_descriptor(new_descriptor)
