@@ -60,7 +60,10 @@
 #include <map>
 #include <vector>
 #include <algorithm>
+<<<<<<< HEAD
+=======
 
+>>>>>>> dd1f8ba30aec6071c0ccac4a89abdac146635a79
 //#define PRINTBUFS
 
 // defines **********************************************************
@@ -745,7 +748,7 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	GET_FCN(socket);
 	GET_FCN(socketpair);
 	GET_FCN(write);
-	GET_FCN(writev);	
+	GET_FCN(writev);
 
 	// do the same for the informational functions
 	GET_FCN(gethostbyaddr);
@@ -1700,14 +1703,14 @@ int shutdown(int fd, int how)
 			rc = -1;
 
 		} else if (getConnState(fd) != CONNECTED) {
-			errno = ENOTCONN; 
+			errno = ENOTCONN;
 			rc = -1;
-		
+
 		} else {
 			// we don't have anything like shutdown in XIA, so lie and say we did something
 			rc = 0;
-		}		
-	
+		}
+
 	} else {
 		NOXIA();
 		rc = __real_shutdown(fd, how);

@@ -17,7 +17,7 @@ char ftpServHID[MAX_XID_SIZE];
 
 int ftpSock, stageManagerSock;
 
-int getFile(int sock) 
+int getFile(int sock)
 {
 	FILE *fd = fopen(fout, "w");
 	int n;
@@ -43,7 +43,7 @@ int getFile(int sock)
 	// receive the CID list from xftp server
 	while (1) {
 		say("In getFile, receive CID list from xftp server.\n");
-		memset(reply, '\0', XIA_MAX_BUF);		
+		memset(reply, '\0', XIA_MAX_BUF);
 		if ((n = Xrecv(sock, reply, sizeof(reply), 0)) < 0) {
 			Xclose(sock);
 			die(-1, "Unable to communicate with the server\n");
@@ -54,7 +54,7 @@ int getFile(int sock)
 			//char reply_arr[strlen(reply+5)];
 			strcpy(reply_arr, reply + 5);
 			char *cid;
-			CIDs.push_back(strtok(reply_arr, " "));	
+			CIDs.push_back(strtok(reply_arr, " "));
 			// register CID
 			while ((cid = strtok(NULL, " ")) != NULL) {
 				CIDs.push_back(cid);
@@ -112,7 +112,7 @@ int getFile(int sock)
 					sprintf(dag, "RE ( %s %s ) CID:%s", myAD, myHID, string2char(CIDs[i]));
 					cs[0].cidLen = strlen(dag);
 					cs[0].cid = dag; // cs[i].cid is a DAG, not just the CID
-					//hearHello(stageManagerSock);					
+					//hearHello(stageManagerSock);
 					if (XrequestChunkStage(stageManagerSock, cs) < 0) {
 						say("unable to request chunks\n");
 						return -1;
@@ -125,7 +125,7 @@ int getFile(int sock)
 					if (XrequestChunks(chunkSock, cs, n) < 0) {
 						say("unable to request chunks\n");
 						return -1;
-					}					
+					}
 				}
 				else {
 					if (XrequestChunks(chunkSock, cs, n) < 0) {
@@ -155,13 +155,13 @@ cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^client: n is " << n << end
 				die(-1, "no chunks found\n");
 			}
 			else if (status < 0) {
-				die(-1, "error getting chunk status\n"); 
+				die(-1, "error getting chunk status\n");
 			}
 			else {
 				say("unexpected result\n");
 			}
 
-			usleep(CHUNK_REQUEST_DELAY_MSEC*1000);
+			usleep(CHUNK_REQUEST_DELAY_MSEC*10000);
 		}
 
 		say("Chunk is ready\n");
@@ -176,7 +176,7 @@ cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^client: n is " << n << end
 		cs[0].cid = NULL;
 		cs[0].cidLen = 0;
 		bytes += len;
-		chunkSize.push_back(len); 
+		chunkSize.push_back(len);
 		latency.push_back(now_msec()-fetchTime);
 		chunkStartTime.push_back(fetchTime);
 		chunkFinishTime.push_back(now_msec());
@@ -189,16 +189,16 @@ cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^client: n is " << n << end
 		cout<<fout<<"\t"<<CIDs[i]<<"\t"<<chunkSize[i]<<" B\t"<<latency[i]<<"\t"<<chunkStartTime[i]<<"\t"<<chunkFinishTime[i]<<endl;
 	}
 	Xclose(chunkSock);
-	Xclose(sock);	
+	Xclose(sock);
 	return status;
 }
 
-int main(int argc, char **argv) 
-{	
+int main(int argc, char **argv)
+{
 	while (1) {
 		say("In main function of xftp_adv_client.\n");
 		if (argc == 2) {
-			say("\n%s (%s): started\n", TITLE, VERSION);		
+			say("\n%s (%s): started\n", TITLE, VERSION);
 			strcpy(fin, argv[1]);
 			sprintf(fout, "my%s", fin);
 			//sprintf(fout, "/home/xia/Pictures/gugu5.jpg");
@@ -220,6 +220,6 @@ int main(int argc, char **argv)
 			 die(-1, "Please input the filename as the second argument\n");
 		}
 	}
-	
+
 	return 0;
 }
