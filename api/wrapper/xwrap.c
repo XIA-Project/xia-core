@@ -54,6 +54,7 @@
 #include <ifaddrs.h>
 #include <unistd.h>
 #include <sched.h>
+#include <algorithm>
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
