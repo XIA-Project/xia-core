@@ -60,10 +60,6 @@
 #include <map>
 #include <vector>
 #include <algorithm>
-<<<<<<< HEAD
-=======
-
->>>>>>> dd1f8ba30aec6071c0ccac4a89abdac146635a79
 //#define PRINTBUFS
 
 // defines **********************************************************
