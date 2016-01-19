@@ -25,15 +25,16 @@ char fetchHID[MAX_XID_SIZE];
 
 string lastSSID, currSSID;
 
+//TODO: better to rename in case of mixing up with the chunkProfile struct in server   --Lwy   1.16
 struct chunkProfile {
 	int fetchState;
-	int stageState;	
+	int stageState;
 	string fetchAD;
-	string fetchHID;	
+	string fetchHID;
 	long fetchStartTimestamp;
-	long fetchFinishTimestamp;	
-	long stageStartTimestamp;	
-	long stageFinishTimestamp;	
+	long fetchFinishTimestamp;
+	long stageStartTimestamp;
+	long stageFinishTimestamp;
 };
 
 map<string, vector<string> > SIDToCIDs;
@@ -62,6 +63,8 @@ pthread_cond_t  fetchCond = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t StageFetchLock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t FetchDelegationLock = PTHREAD_MUTEX_INITIALIZER;
 
+pthread_mutex_t StageControl = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t FetchControl = PTHREAD_MUTEX_INITIALIZER;
 bool netChange, netChangeACK;
 
 // TODO: mem leak; window pred alg; int netMonSock;
@@ -70,8 +73,8 @@ void regHandler(int sock, char *cmd)
 	say("In regHandler.\n");
 	char send_to_client_[XIA_MAX_BUF];
 	memset(send_to_client_, '\0', strlen(send_to_client_));
-	XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID); 
-//cerr<<"Peer SID: "<<remoteSID<<endl; 
+	XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID);
+//cerr<<"Peer SID: "<<remoteSID<<endl;
 cerr<<cmd<<endl;
 
 	if (strncmp(cmd, "reg cont", 8) == 0) {
@@ -79,8 +82,8 @@ cerr<<"Receiving partial chunk list"<<endl;
 		char cmd_arr[strlen(cmd+9)];
 		strcpy(cmd_arr, cmd+9);
 		char *cid;
-		pthread_mutex_lock(&cidVecLock);		
-		SIDToCIDs[remoteSID].push_back(strtok(cmd_arr, " "));	
+		pthread_mutex_lock(&cidVecLock);
+		SIDToCIDs[remoteSID].push_back(strtok(cmd_arr, " "));
 		while ((cid = strtok(NULL, " ")) != NULL) {
 			SIDToCIDs[remoteSID].push_back(cid);
 cerr<<cid<<endl;
@@ -90,22 +93,24 @@ cerr<<cid<<endl;
 		sprintf(send_to_client_, "Continue to register CID.");
 		say("Ready to sent command to client.\n");
 		sayHello(sock, send_to_client_);
-		say("Successfully sent Continue command to client.\n");			
+		say("Successfully sent Continue command to client.\n");
 		return;
 	}
 
 //	vector<string> CIDs = strVector(cmd);
 	else if (strncmp(cmd, "reg done", 8) == 0) {
 		say("Receive the reg done command\n");
-		pthread_mutex_lock(&windowLock);	
+		pthread_mutex_lock(&windowLock);
 		SIDToWindow[remoteSID] = STAGE_WIN_INIT;
 		pthread_mutex_unlock(&windowLock);
 
-		pthread_mutex_lock(&timeLock);	
+		pthread_mutex_lock(&timeLock);
 		SIDToTime[remoteSID] = now_msec();
-		pthread_mutex_unlock(&timeLock);	
+		pthread_mutex_unlock(&timeLock);
 
 		map<string, chunkProfile> profile;
+        //add lock and unlock(cidVecLock)   --Lwy   1.16
+        pthread_mutex_lock(&cidVecLock);
 		for (unsigned int i = 0; i < SIDToCIDs[remoteSID].size(); i++) {
 			chunkProfile cp;
 			cp.fetchState = BLANK;
@@ -113,13 +118,14 @@ cerr<<cid<<endl;
 			cp.fetchAD = "";
 			cp.fetchHID = "";
 			cp.fetchStartTimestamp = 0;
-			cp.fetchFinishTimestamp = 0;	
-			cp.stageStartTimestamp = 0;	
-			cp.stageFinishTimestamp = 0;	
+			cp.fetchFinishTimestamp = 0;
+			cp.stageStartTimestamp = 0;
+			cp.stageFinishTimestamp = 0;
 			profile[SIDToCIDs[remoteSID][i]] = cp;
 //cerr<<i<<"\t"<<SIDToCIDs[remoteSID][i]<<endl;
 			say("Updating profile: %d/%d\n", i + 1, SIDToCIDs[remoteSID].size());
 		}
+        pthread_mutex_unlock(&cidVecLock);
 		pthread_mutex_lock(&profileLock);
 		SIDToProfile[remoteSID] = profile;
 		pthread_mutex_unlock(&profileLock);
@@ -128,54 +134,57 @@ cerr<<cid<<endl;
 		sayHello(sock, send_to_client_);
 		say("Successfully sent Done profile. command to client.\n");
 cerr<<"Quit the profileLock and finish reg"<<endl;
-		//pthread_mutex_lock(&stageLock); 
+		//pthread_mutex_lock(&stageLock);
 		//pthread_cond_signal(&stageCond);
 		//pthread_mutex_unlock(&stageLock);
 		return;
 	}
 }
 
-void delegationHandler(int sock, char *cmd) 
+void delegationHandler(int sock, char *cmd)
 {
 	say("In delegationHandler.\n");
 	say("The command is %s\n", cmd);
-	XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID); 
+	XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID);
 	size_t cidLen;
 	char *CID = (char *)malloc(512);
 	char send_to_client_[XIA_MAX_BUF];
-	memset(send_to_client_, '\0', strlen(send_to_client_)); 
+	memset(send_to_client_, '\0', strlen(send_to_client_));
 	// TODO: right now it's hacky, need to fix the way reading XIDs when including fallback DAG
 	sscanf(cmd, "%ld RE ( %s %s ) CID:%s", &cidLen, ftpServAD, ftpServHID, CID);
 
+    //put the lock and unlock outside the loop  --Lwy   1.16
+	pthread_mutex_lock(&profileLock);
 	if (SIDToProfile[remoteSID][CID].fetchState == BLANK) {
-		pthread_mutex_lock(&profileLock);
+		//pthread_mutex_lock(&profileLock);
 		SIDToProfile[remoteSID][CID].fetchState = PENDING;
-cerr<<"CID: "<< CID << " change from BLANK to PENDING\n";		
-		pthread_mutex_unlock(&profileLock);
+cerr<<"CID: "<< CID << " change from BLANK to PENDING\n";
+		//pthread_mutex_unlock(&profileLock);
 	}
+    pthread_mutex_unlock(&profileLock);
 //cerr<<CID<<" fetch state: "<<SIDToProfile[remoteSID][CID].fetchState<<endl;
 	free(CID);
 
-	pthread_mutex_lock(&timeLock);	
+	pthread_mutex_lock(&timeLock);
 	SIDToTime[remoteSID] = now_msec();
 	pthread_mutex_unlock(&timeLock);
 
 	sprintf(send_to_client_, "Finish current delegationHandler.");
-	//sayHello(sock, send_to_client_);	
+	//sayHello(sock, send_to_client_);
 
-//	pthread_mutex_lock(&stageLock); 
+//	pthread_mutex_lock(&stageLock);
 //	pthread_cond_signal(&stageCond);
-//	pthread_mutex_unlock(&stageLock);	
+//	pthread_mutex_unlock(&stageLock);
 
-//	pthread_mutex_lock(&fetchLock); 
+//	pthread_mutex_lock(&fetchLock);
 //	pthread_cond_signal(&fetchCond);
-//	pthread_mutex_unlock(&fetchLock);	
+//	pthread_mutex_unlock(&fetchLock);
 
     //pthread_mutex_lock(&FetchDelegationLock);
 	return;
 }
 
-void *clientCmd(void *socketid) 
+void *clientCmd(void *socketid)
 {
 	char cmd[XIA_MAXBUF];
 	int sock = *((int*)socketid);
@@ -184,8 +193,11 @@ void *clientCmd(void *socketid)
 	memset(client_, '\0', strlen(client_));
 	sprintf(client_, "clientCmd```````````````````````````````````Ready to receive cmd from client.\n");
 
+    void *stageData(void *);
+    void *fetchData(void *);
 	while (1) {
 		memset(cmd, '\0', XIA_MAXBUF);
+
 		//sayHello(sock, client_);
 		if ((n = Xrecv(sock, cmd, sizeof(cmd), 0)) < 0) {
 			warn("socket error while waiting for data, closing connection\n");
@@ -196,12 +208,14 @@ void *clientCmd(void *socketid)
 		if (strncmp(cmd, "reg", 3) == 0) {
 			say("Receive a chunk list registration message\n");
 			regHandler(sock, cmd);
+			pthread_mutex_unlock(&StageControl);
 		}
 		// chunk request from xftp client: fetch CID
 		else if (strncmp(cmd, "fetch", 5) == 0) {
 			say("Receive a chunk request\n");
 			say("clientCmd````````````````````````````The sock is %d\n", sock);
 			delegationHandler(sock, cmd + 6);
+			pthread_mutex_unlock(&StageControl);
 		}
 		//usleep(10000);
 	}
@@ -211,9 +225,9 @@ void *clientCmd(void *socketid)
 }
 
 // WORKING version
-// TODO: scheduling 
+// TODO: scheduling
 // control plane: figure out the right CIDs to stage, change the stage state from BLANK to PENDING to READY
-void *stageData(void *) 
+void *stageData(void *)
 {
 	//say("------------------------------In stageData.\n");
 	thread_c++;
@@ -226,7 +240,7 @@ cerr << "Current " << getAD() << endl;
 	bool finish = false;
 
 //netStageSock is used to communicate with stage server.
-	int netStageSock = registerStageService(getStageServiceName(), myAD, myHID, stageAD, stageHID); 
+	int netStageSock = registerStageService(getStageServiceName(), myAD, myHID, stageAD, stageHID);
     say("++++++++++++++++++++++++++++++++++++The current netStageSock is %d\n", netStageSock);
 	if (netStageSock == -1) {
 		netStageOn = false;
@@ -235,8 +249,9 @@ cerr << "Current " << getAD() << endl;
 	// TODO: need to handle the case that new SID joins dynamically
 	// TODO: handle no in-net staging service
 	while (1) {
+		pthread_mutex_lock(&StageControl);
 		say("************************************In while loop of stageData\n");
-		//pthread_mutex_lock(&stageLock); 
+		//pthread_mutex_lock(&stageLock);
 		//pthread_cond_wait(&stageCond, &stageLock);
 		int tmp_cnt = 1;
 
@@ -252,9 +267,10 @@ cerr << "Current " << getAD() << endl;
 cerr<<"Thread id "<<thread_id<<": "<<"Network changed, create another thread to continute\n";
 					getNewAD(myAD);
 					lastSSID = currSSID;
-					//ssidChange = true;			
-					pthread_t thread_stageDataNew; 
+					//ssidChange = true;
+					pthread_t thread_stageDataNew;
 					pthread_create(&thread_stageDataNew, NULL, stageData, NULL);
+					pthread_mutex_unlock(&StageControl);
 					finish = true; // need to finish
 				}
 
@@ -263,15 +279,15 @@ cerr<<"Thread id "<<thread_id<<": "<<"Network changed, create another thread to 
 				int n = -1;
 				memset(cmd, '\0', strlen(cmd));
 				memset(reply, '\0', strlen(reply));
-				
+
 				string SID = (*I).first;
-//cerr<<"SID: "<<SID<<"chunks to be pulled from the queue\n";				
+//cerr<<"SID: "<<SID<<"chunks to be pulled from the queue\n";
 				vector<string> CIDs;
 				// find the right list to fetch
 				int s = -1;
 				for (unsigned int i = 0; i < (*I).second.size(); i++) {
 //cerr<<(*I).second[i]<<endl;
-					// start from the first CID not yet staged if it is the first time to stage 
+					// start from the first CID not yet staged if it is the first time to stage
 					if (bootstrap) {
 						if (SIDToProfile[SID][(*I).second[i]].stageState == BLANK) {
 							say("====================================The first time to stage chunks %d.\n", i);
@@ -280,7 +296,7 @@ cerr<<"Thread id "<<thread_id<<": "<<"Network changed, create another thread to 
 							break;
 						}
 					}
-					// start from the first CID not yet fetched 
+					// start from the first CID not yet fetched
 					else {
 						if (SIDToProfile[SID][(*I).second[i]].fetchState != READY) {
 							s = (int)i;
@@ -298,11 +314,11 @@ cerr<<"Thread id "<<thread_id<<": "<<"Network changed, create another thread to 
 				}
 				say("s = %d, e = %d.\n", s, e);
 //cerr<<s<<"\t"<<e<<endl;
-				pthread_mutex_lock(&profileLock);	
-				// only update the state of the chunks not staged yet 
+				pthread_mutex_lock(&profileLock);
+				// only update the state of the chunks not staged yet
 				for (int i = s; i < e; i++) {
 					if (SIDToProfile[SID][(*I).second[i]].stageState == BLANK) {
-//cerr<<(*I).second[i]<<endl;						
+//cerr<<(*I).second[i]<<endl;
 						CIDs.push_back((*I).second[i]);
 						SIDToProfile[SID][(*I).second[i]].stageState = PENDING;
 						SIDToProfile[SID][(*I).second[i]].fetchAD = stageAD;
@@ -322,7 +338,7 @@ cerr<<"Thread id "<<thread_id<<": "<<"Network changed, create another thread to 
 						strcat(cmd, string2char(CIDs[i]));
 					}
 					//cerr << "The current command is: " << cmd << "\n";
-					say("Before manager send command to server: %s.\n", cmd);				
+					say("Before manager send command to server: %s.\n", cmd);
 					sendStreamCmd(netStageSock, cmd);
 					say("After manager send command to server: %s.\n", cmd);
 
@@ -342,8 +358,8 @@ cerr<<"Thread id "<<thread_id<<": "<<"Network changed, create another thread to 
 						if (strncmp(reply, "ready", 5) == 0) {
 							vector<string> staged_info = strVector(reply + 6);
 							if (CIDs[i] == staged_info[0]) {
-								pthread_mutex_lock(&profileLock);								
-								SIDToProfile[SID][CIDs[i]].stageStartTimestamp = string2long(staged_info[1]);							
+								pthread_mutex_lock(&profileLock);
+								SIDToProfile[SID][CIDs[i]].stageStartTimestamp = string2long(staged_info[1]);
 								SIDToProfile[SID][CIDs[i]].stageFinishTimestamp = string2long(staged_info[2]);
 								SIDToProfile[SID][CIDs[i]].stageState = READY;
 								say("StageData----------------CID: %s is ready.\n", string2char(staged_info[0]));
@@ -362,14 +378,14 @@ cerr<<"Thread id "<<thread_id<<": "<<"Network changed, create another thread to 
 					// update "ready" to stage state
 					if (strncmp(reply, "ready", 5) == 0) {
 						vector<string> CIDs_staging = strVector(reply+6);
-						pthread_mutex_lock(&profileLock);							
+						pthread_mutex_lock(&profileLock);
 						for (unsigned i = 0; i < CIDs_staging.size(); i++) {
 							SIDToProfile[SID][CIDs_staging[i]].stageState = READY;
 						}
 						pthread_mutex_unlock(&profileLock);
-					}	
-*/					
-				}
+					}
+*/
+                }
 			}
 		}
 		// after looping all the SIDs
@@ -377,18 +393,22 @@ cerr<<"Thread id "<<thread_id<<": "<<"Network changed, create another thread to 
 			say("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Kill stageData thread.\n");
 			pthread_exit(NULL);
 		}
+		else
+			pthread_mutex_unlock(&FetchControl);
 		usleep(SCAN_DELAY_MSEC*1000);
-		//pthread_mutex_unlock(&fetchLock); 		
+		//pthread_mutex_unlock(&fetchLock);
 	}
 	pthread_exit(NULL);
 }
 
 // WORKING version
-// data plane of staging: find the pending chunk, construct the dag and send the pending chunk request, 
-void *fetchData(void *socketid) 
+// data plane of staging: find the pending chunk, construct the dag and send the pending chunk request,
+//void *fetchData(void *socketid)
+void *fetchData(void *)
 {
+	pthread_mutex_lock(&FetchControl);
 	int chunkSock;
-    int clientSock = *((int*)socketid);
+    //int clientSock = *((int*)socketid);
 	char fetchinfo_send_to_client_[XIA_MAX_BUF];
 	memset(fetchinfo_send_to_client_, '\0', strlen(fetchinfo_send_to_client_));
 	sprintf(fetchinfo_send_to_client_, "Finish fetch current CID.");
@@ -399,25 +419,26 @@ void *fetchData(void *socketid)
 	int status = -1;
 
 	while (1) {
+		pthread_mutex_lock(&FetchControl);
 		say("First===========================================In while loop of fetchData.\n");
-		//pthread_mutex_lock(&fetchLock); 
+		//pthread_mutex_lock(&fetchLock);
 		//pthread_cond_wait(&fetchCond, &fetchLock);
 		//pthread_mutex_lock(&StageFetchLock);
 		for (map<string, vector<string> >::iterator I = SIDToCIDs.begin(); I != SIDToCIDs.end(); ++I) {
 			if ((*I).second.size() > 0) {// && SIDToProfile[(*I).first][(*I).second[(*I).second.size()-1]].fetchState != READY) {
 				string SID = (*I).first;
-//cerr<<"SID: "<<SID<<"chunks to be pulled from the queue\n";				
+//cerr<<"SID: "<<SID<<"chunks to be pulled from the queue\n";
 				vector<string> CIDs_fetching;
 				// find the CID to fetch behalf of the xftp client
 				for (unsigned int i = 0; i < (*I).second.size(); i++) {
 //cerr<<(*I).second[i]<<endl;
 					if (SIDToProfile[SID][(*I).second[i]].fetchState == PENDING && SIDToProfile[SID][(*I).second[i]].stageState == READY) {
-cerr<<(*I).second[i]<<"\t fetch state: PENDING; \t stage state: READY\n"; 
+cerr<<(*I).second[i]<<"\t fetch state: PENDING; \t stage state: READY\n";
 						CIDs_fetching.push_back((*I).second[i]);
 					}
 				}
 				say("FetchData-----------------------------Size of CIDs is %d\n", CIDs_fetching.size());
-				if (CIDs_fetching.size() > 0) {			
+				if (CIDs_fetching.size() > 0) {
 					// TODO: check the size is smaller than the max chunk to fetch at one time
 					ChunkStatus cs[CIDs_fetching.size()];
 					int n = CIDs_fetching.size();
@@ -425,9 +446,9 @@ cerr<<(*I).second[i]<<"\t fetch state: PENDING; \t stage state: READY\n";
 					unsigned ctr = 0;
 
 					for (unsigned int i = 0; i < CIDs_fetching.size(); i++) {
-						pthread_mutex_lock(&profileLock);	
+						pthread_mutex_lock(&profileLock);
 						SIDToProfile[SID][CIDs_fetching[i]].fetchStartTimestamp = now_msec();
-						pthread_mutex_unlock(&profileLock);							
+						pthread_mutex_unlock(&profileLock);
 					}
 
 					while (1) {
@@ -436,7 +457,7 @@ cerr<<(*I).second[i]<<"\t fetch state: PENDING; \t stage state: READY\n";
 						for (unsigned int i = 0; i < CIDs_fetching.size(); i++) {
 							char *dag = (char *)malloc(512);
 							sprintf(dag, "RE ( %s %s ) CID:%s", string2char(SIDToProfile[SID][CIDs_fetching[i]].fetchAD), string2char(SIDToProfile[SID][CIDs_fetching[i]].fetchHID), string2char(CIDs_fetching[i]));
-							cerr << dag << endl;					
+							cerr << dag << endl;
 							cs[i].cidLen = strlen(dag);
 							cs[i].cid = dag; // cs[i].cid is a DAG, not just the CID
 							//free(dag); chenren: why freeze the program!!!!! see error msg below
@@ -458,45 +479,45 @@ cerr<<(*I).second[i]<<"\t fetch state: PENDING; \t stage state: READY\n";
 						status = XgetChunkStatuses(chunkSock, cs, n);
 
 						if (status == READY_TO_READ) {
-							pthread_mutex_lock(&profileLock);	
+							pthread_mutex_lock(&profileLock);
 							for (unsigned int i = 0; i < CIDs_fetching.size(); i++) {
 								SIDToProfile[SID][CIDs_fetching[i]].fetchState = READY;
 cerr<<CIDs_fetching[i]<<"\t fetch state: ready\n";
-say("fetchData````````````````````````````The clientSock is %d\n", clientSock);
-sayHello(clientSock, fetchinfo_send_to_client_);
+//say("fetchData````````````````````````````The clientSock is %d\n", clientSock);
+//sayHello(clientSock, fetchinfo_send_to_client_);
                                 //pthread_mutex_unlock(&FetchDelegationLock);
 							}
-							pthread_mutex_unlock(&profileLock);		
+							pthread_mutex_unlock(&profileLock);
 							break;
 						}
-						else if (status < 0) 
-							die(-1, "error getting chunk status\n"); 
+						else if (status < 0)
+							die(-1, "error getting chunk status\n");
 						else if (status & WAITING_FOR_CHUNK) {
 							//say("waiting... one or more chunks aren't ready yet\n");
 						}
-						else if (status & INVALID_HASH) 
+						else if (status & INVALID_HASH)
 							die(-1, "one or more chunks has an invalid hash");
 						else if (status & REQUEST_FAILED)
 							die(-1, "no chunks found\n");
-						else 
+						else
 							say("unexpected result\n");
 
-						usleep(CHUNK_REQUEST_DELAY_MSEC*1000); 
+						usleep(CHUNK_REQUEST_DELAY_MSEC*1000);
 					}
 				}
-				// TODO: timeout the chunks by free(cs[i].cid); cs[j].cid = NULL; cs[j].cidLen = 0;			
+				// TODO: timeout the chunks by free(cs[i].cid); cs[j].cid = NULL; cs[j].cidLen = 0;
 			}
-		} 
-		usleep(LOOP_DELAY_MSEC*1000);		
-		//pthread_mutex_unlock(&fetchLock); 		
+		}
+		usleep(LOOP_DELAY_MSEC*1000);
+		//pthread_mutex_unlock(&fetchLock);
 	}
-	Xclose(clientSock);
+	//Xclose(clientSock);
 	// 	big loop, SIDToProfile[remoteSID][CID].fetchState = PENDING and stage state == done, construct dag, fetch data, update
 	pthread_exit(NULL);
 }
 
 // TODO: make it as a library
-void *netMon(void *) 
+void *netMon(void *)
 {
 	ofstream mfile;
 	mfile.open("ssid.txt", ios::app);
@@ -508,7 +529,7 @@ void *netMon(void *)
 	while (1) {
 		currTempSSID = execSystem(GETSSID_CMD);
 		if (lastTempSSID != currTempSSID) {
-			lastTempSSID = currTempSSID;			
+			lastTempSSID = currTempSSID;
 			if (currTempSSID == "") {
 				mfile<<now_msec()<<"\tNA"<<endl;
 			}
@@ -519,7 +540,7 @@ void *netMon(void *)
 		usleep(SCAN_DELAY_MSEC*1000);
 	}
 
-/*	
+/*
 	int sock;
 
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
@@ -536,17 +557,17 @@ void *netMon(void *)
 
 	strcpy(last_ad, curr_ad);
 
-	while (1) 
+	while (1)
 	{
 		if (XreadLocalHostAddr(sock, curr_ad, sizeof(curr_ad), hid, sizeof(hid), ip, sizeof(ip)) < 0) {
-			die(-1, "Reading localhost address\n");		
+			die(-1, "Reading localhost address\n");
 		}
 //cerr<<"Current AD: "<<curr_ad<<endl;
 		if (strcmp(last_ad, curr_ad) != 0) {
 			cerr<<"AD changed!\n";
 			netChange = true;
 			strcpy(last_ad, curr_ad);
-			// wait for client to ack the network change 
+			// wait for client to ack the network change
 			while (1) {
 				if (netChangeACK == true) {
 					netChange = false;
@@ -561,14 +582,14 @@ void *netMon(void *)
 		//pfds[0].events = POLLIN;
 		//if ((rc = Xpoll(pfds, 1, 5000)) <= 0) {
 		//	die(-5, "Poll returned %d\n", rc);
-		//}	
-		usleep(LOOP_DELAY_MSEC*1000);			
+		//}
+		usleep(LOOP_DELAY_MSEC*1000);
 	}
-*/	
+*/
 	pthread_exit(NULL);
 }
 
-void *winPred(void *) 
+void *winPred(void *)
 {
 	long fetch_latency;
 	long stage_latency;
@@ -587,7 +608,7 @@ void *winPred(void *)
 			if (CIDs.size() > 0 && CIDs.size() <= STAGE_WIN_RECENT_NUM) {
 				for (unsigned int i = 0; i < (*I).second.size(); i++) {
 					fetch_latency += SIDToProfile[SID][CIDs[i]].fetchFinishTimestamp - SIDToProfile[SID][CIDs[i]].fetchStartTimestamp;
-					stage_latency += SIDToProfile[SID][CIDs[i]].stageFinishTimestamp - SIDToProfile[SID][CIDs[i]].stageStartTimestamp;					
+					stage_latency += SIDToProfile[SID][CIDs[i]].stageFinishTimestamp - SIDToProfile[SID][CIDs[i]].stageStartTimestamp;
 				}
 				pthread_mutex_lock(&windowLock);
 				if (stage_latency > fetch_latency) {
@@ -595,7 +616,7 @@ void *winPred(void *)
 				}
 				else {
 					if (SIDToWindow[SID] > 1) {
-						SIDToWindow[SID] -= 1;					
+						SIDToWindow[SID] -= 1;
 					}
 				}
 				pthread_mutex_unlock(&windowLock);
@@ -603,7 +624,7 @@ void *winPred(void *)
 			else if (CIDs.size() > STAGE_WIN_RECENT_NUM) {
 				for (unsigned int i = (*I).second.size() - 1; i > (*I).second.size() - i - STAGE_WIN_RECENT_NUM; i--) {
 					fetch_latency += SIDToProfile[SID][CIDs[i]].fetchFinishTimestamp - SIDToProfile[SID][CIDs[i]].fetchStartTimestamp;
-					stage_latency += SIDToProfile[SID][CIDs[i]].stageFinishTimestamp - SIDToProfile[SID][CIDs[i]].stageStartTimestamp;					
+					stage_latency += SIDToProfile[SID][CIDs[i]].stageFinishTimestamp - SIDToProfile[SID][CIDs[i]].stageStartTimestamp;
 				}
 				pthread_mutex_lock(&windowLock);
 				if (stage_latency > fetch_latency) {
@@ -611,7 +632,7 @@ void *winPred(void *)
 				}
 				else {
 					if (SIDToWindow[SID] > 1) {
-						SIDToWindow[SID] -= 1;					
+						SIDToWindow[SID] -= 1;
 					}
 				}
 				pthread_mutex_unlock(&windowLock);
@@ -623,13 +644,13 @@ void *winPred(void *)
 }
 
 // TODO: if the SID's all CIDs have READY fetch state, then remove
-void *profileMgt(void *) 
+void *profileMgt(void *)
 {
 	while (1) {
 		say("In profileMgt.\n");
 		/*
 		for (map<string, long>::iterator I = SIDToTime.begin(); I != SIDToTime.end(); ++I) {
-			if (now_msec() - (*I).second >= PURGE_DELAY_SEC*1000) {				
+			if (now_msec() - (*I).second >= PURGE_DELAY_SEC*1000) {
 				string SID = (*I).first;
 cerr<<"Deleting profile of "<<SID<<endl;
 				pthread_mutex_lock(&profileLock);
@@ -639,11 +660,11 @@ cerr<<"Deleting CIDs of "<<SID<<endl;
 				pthread_mutex_lock(&cidVecLock);
 				SIDToCIDs.erase(SID);
 				pthread_mutex_unlock(&cidVecLock);
-cerr<<"Deleting window of "<<SID<<endl;				
+cerr<<"Deleting window of "<<SID<<endl;
 				pthread_mutex_lock(&windowLock);
 				SIDToWindow.erase(SID);
 				pthread_mutex_unlock(&windowLock);
-cerr<<"Deleting time of "<<SID<<endl;				
+cerr<<"Deleting time of "<<SID<<endl;
 				pthread_mutex_lock(&timeLock);
 				SIDToTime.erase(SID);
 				pthread_mutex_unlock(&timeLock);
@@ -653,10 +674,10 @@ cerr<<"Deleting time of "<<SID<<endl;
 		*/
 		sleep(MGT_DELAY_SEC);
 	}
-	pthread_exit(NULL);	
+	pthread_exit(NULL);
 }
 
-int main() 
+int main()
 {
 	ftpSock = initStreamClient(getXftpName(), myAD, myHID, ftpServAD, ftpServHID); // get ftpServAD and ftpServHID for building chunk request
 	lastSSID = getSSID();
@@ -665,16 +686,18 @@ int main()
 	stageSock = registerStreamReceiver(getStageManagerName(), myAD, myHID, my4ID); // communicate with client app
 
 	//pthread_t thread_winPred, thread_mgt, thread_netMon, thread_fetchData, thread_stageData, thread_client; // TODO: thread_netMon
-	pthread_t thread_winPred, thread_mgt, thread_netMon, thread_stageData; // TODO: thread_netMon
+	pthread_t thread_winPred, thread_mgt, thread_netMon, thread_stageData,thread_fetchData; // TODO: thread_netMon
 	pthread_create(&thread_netMon, NULL, netMon, NULL);	// TODO: improve the netMon function
-	//pthread_create(&thread_winPred, NULL, winPred, NULL);	// TODO: improve the netMon function	
-	pthread_create(&thread_mgt, NULL, profileMgt, NULL); // dequeue, stage and update profile	
+	//pthread_create(&thread_winPred, NULL, winPred, NULL);	// TODO: improve the netMon function
+	pthread_create(&thread_mgt, NULL, profileMgt, NULL); // dequeue, stage and update profile
 	//pthread_create(&thread_fetchData, NULL, fetchData, (void *)&acceptSock);
-	pthread_create(&thread_stageData, NULL, stageData, NULL);	
+	pthread_create(&thread_fetchData, NULL, fetchData, NULL);
 
-	//say("The current stageSock is %d\n", stageSock);	
+    pthread_create(&thread_stageData, NULL, stageData, NULL);
+
+	//say("The current stageSock is %d\n", stageSock);
 	//blockListener((void *)&stageSock, clientCmd);
-	twoFunctionBlockListener((void *)&stageSock, clientCmd, fetchData);
-
-	return 0;	
+	//twoFunctionBlockListener((void *)&stageSock, clientCmd, fetchData);
+    blockListener((void*)&stageSock,clientCmd);
+	return 0;
 }

@@ -2,7 +2,7 @@
 
 int verbose = 1;
 
-void say(const char *fmt, ...) 
+void say(const char *fmt, ...)
 {
 	if (verbose) {
 		va_list args;
@@ -12,7 +12,7 @@ void say(const char *fmt, ...)
 	}
 }
 
-void warn(const char *fmt, ...) 
+void warn(const char *fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
@@ -20,7 +20,7 @@ void warn(const char *fmt, ...)
 	va_end(args);
 }
 
-void die(int ecode, const char *fmt, ...) 
+void die(int ecode, const char *fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
@@ -31,7 +31,7 @@ void die(int ecode, const char *fmt, ...)
 }
 
 // create a semi-random alphanumeric string of the specified size
-char *randomString(char *buf, int size) 
+char *randomString(char *buf, int size)
 {
 	int i;
 	static const char *filler = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -51,44 +51,44 @@ char *randomString(char *buf, int size)
 
 	return buf;
 }
-
-vector<string> strVector(char *strs) 
+//split the str     --Lwy   1.16
+vector<string> strVector(char *strs)
 {
 	char str_arr[strlen(strs)];
 	strcpy(str_arr, strs);
 	vector<string> strVec;
 	char *str;
-	strVec.push_back(strtok(str_arr, " "));	
+	strVec.push_back(strtok(str_arr, " "));
 	while ((str = strtok(NULL, " ")) != NULL) {
 		strVec.push_back(str);
 	}
 
 	return strVec;
 }
-
-char *getStageServiceName() 
+//change the return type into const char*   --Lwy   1.16
+const char *getStageServiceName()
 {
 	return string2char(string(STAGE_SERVER_NAME) + "." + getAD());
-} 
+}
 
-char *getStageManagerName() 
+const char *getStageManagerName()
 {
 	return string2char(string(STAGE_MANAGER_NAME) + "." + getHID());
-} 
+}
 
-char *getXftpName() 
+const char *getXftpName()
 {
 	return string2char(string(FTP_NAME));
-} 
-
-char* string2char(string str) 
+}
+//TODO:consider how to free the memory  --Lwy   1.16
+char* string2char(string str)
 {
 	char *cstr = new char[str.length() + 1];
-	strcpy(cstr, str.c_str());	
+	strcpy(cstr, str.c_str());
 	return cstr;
-} 
+}
 
-long string2long(string str) 
+long string2long(string str)
 {
 	stringstream buffer(str);
 	long var;
@@ -96,24 +96,24 @@ long string2long(string str)
 	return var;
 }
 
-string execSystem(string cmd) 
+string execSystem(string cmd)
 {
 	FILE* pipe = popen(string2char(cmd), "r");
 	if (!pipe) return NULL;
-  char buffer[128];
-  string result = "";
-  while (!feof(pipe)) {
+    char buffer[128];
+    string result = "";
+    while (!feof(pipe)) {
 		if (fgets(buffer, 128, pipe) != NULL)
 			result += buffer;
 	}
 	pclose(pipe);
 
-	if (result.empty()) return result; 	
+	if (result.empty()) return result;
 	result.erase(result.end()-1, result.end()); // remove the newline character
 	return result;
 }
 
-bool file_exists(const char * filename) 
+bool file_exists(const char * filename)
 {
 	if (FILE * file = fopen(filename, "r")) {
 		fclose(file);
@@ -122,7 +122,7 @@ bool file_exists(const char * filename)
 	return false;
 }
 
-long now_msec() 
+long now_msec()
 {
 	struct timeval tv;
 	if (gettimeofday(&tv, NULL) == 0)
@@ -130,7 +130,7 @@ long now_msec()
 	else
 		return -1;
 }
-
+//TODO: consider change to MAC address??    --Lwy   1.16
 string getSSID()
 {
 	string ssid = execSystem(GETSSID_CMD);
@@ -139,7 +139,7 @@ string getSSID()
 // cerr<<"No network\n";
 		while (1) {
 			usleep(SCAN_DELAY_MSEC * 1000);
-			ssid = execSystem(GETSSID_CMD); 
+			ssid = execSystem(GETSSID_CMD);
 			if (!ssid.empty()) {
 // cerr<<"Network back\n";
 				break;
@@ -149,9 +149,9 @@ string getSSID()
 	return ssid;
 }
 
-string getAD() 
+string getAD()
 {
-	int sock; 
+	int sock;
 
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		die(-1, "Unable to create the listening socket\n");
@@ -166,9 +166,9 @@ string getAD()
 	return string(ad);
 }
 
-string getHID() 
+string getHID()
 {
-	int sock; 
+	int sock;
 
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		die(-1, "Unable to create the listening socket\n");
@@ -183,9 +183,9 @@ string getHID()
 	return string(hid);
 }
 
-void getNewAD(char *old_ad) 
+void getNewAD(char *old_ad)
 {
-	int sock; 
+	int sock;
 
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		die(-1, "Unable to create the listening socket\n");
@@ -198,14 +198,14 @@ void getNewAD(char *old_ad)
 cerr<<"AD changed!"<<endl;
 			strcpy(old_ad, new_ad);
 			Xclose(sock);
-			return;			
+			return;
 		}
 		usleep(SCAN_DELAY_MSEC * 1000);
 	}
 	return;
 }
 
-string netConnStatus(string lastSSID) 
+string netConnStatus(string lastSSID)
 {
 	string currSSID = execSystem(GETSSID_CMD);
 
@@ -221,8 +221,16 @@ string netConnStatus(string lastSSID)
 		}
 	}
 }
-
-int getReply(int sock, const char *cmd, char *reply, sockaddr_x *sa, int timeout, int tries) 
+/*  Send $cmd to $sa with $sock and store the respose to $reply
+ *
+ *  return value:
+ *      -2  :   No Network
+ *      -3  :   Timeout
+ *      otherwise   size of reply btye
+ *
+ *      --Lwy   1.16
+ */
+int getReply(int sock, const char *cmd, char *reply, sockaddr_x *sa, int timeout, int tries)
 {
 	int sent, received, rc;
 
@@ -246,7 +254,9 @@ int getReply(int sock, const char *cmd, char *reply, sockaddr_x *sa, int timeout
 			}
 
 			memset(reply, 0, strlen(reply));
-			if ((received = Xrecvfrom(sock, reply, strlen(reply), 0, NULL, NULL)) < 0)
+            //ERROR?    strlen(reply) is wrong??    --Lwy   1.16
+			//if ((received = Xrecvfrom(sock, reply, strlen(reply), 0, NULL, NULL)) < 0)
+			if ((received = Xrecvfrom(sock, reply, sizeof(reply), 0, NULL, NULL)) < 0)
 				die(-5, "Receive error %d on socket %d\n", errno, sock);
 			else {
 				say("Xsock %4d received %d bytes\n", sock, received);
@@ -254,10 +264,10 @@ int getReply(int sock, const char *cmd, char *reply, sockaddr_x *sa, int timeout
 			}
 		}
 	}
-	return -3; 
+	return -3;
 }
 
-int sendStreamCmd(int sock, const char *cmd) 
+int sendStreamCmd(int sock, const char *cmd)
 {
 	warn("Sending Command: %s \n", cmd);
 	int n;
@@ -267,22 +277,27 @@ int sendStreamCmd(int sock, const char *cmd)
 	}
 	return n;
 }
-
-int sayHello(int sock, const char *helloMsg) 
+/* No Use for sayHello, so I change it into Marco
+ * and #define sayHello sendStreamCmd in header
+ *          --Lwy   1.16
+int sayHello(int sock, const char *helloMsg)
 {
-	int m = sendStreamCmd(sock, helloMsg); 
+	int m = sendStreamCmd(sock, helloMsg);
 	return m;
 }
+*/
 
-int hearHello(int sock) 
-{ 
+int hearHello(int sock)
+{
+	//say("HearHello Start!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n\n\n\n\n\n\n");
 	char command[XIA_MAXBUF];
 	memset(command, '\0', strlen(command));
 	int n;
 	if ((n = Xrecv(sock, command, RECV_BUF_SIZE, 0))  < 0) {
 		warn("socket error while waiting for data, closing connection\n");
 	}
-	printf("%s\n", command);	
+	//say("HearHello printf!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1\n\n\n\n\n\n\n\n");
+	printf("%s\n", command);
 	return n;
 	/*
 	if (strncmp(command, "get", 3) == 0) {
@@ -292,11 +307,11 @@ int hearHello(int sock)
 		say("Received hello from context client\n");
 		char* hello = "Hello from prefetch client";
 		sendCmd(prefetchProfileSock, hello);
-	}	
+	}
 	*/
 }
 
-int XgetRemoteAddr(int sock, char *ad, char *hid, char *sid) 
+int XgetRemoteAddr(int sock, char *ad, char *hid, char *sid)
 {
 	sockaddr_x dag;
 	socklen_t daglen = sizeof(dag);
@@ -307,10 +322,10 @@ int XgetRemoteAddr(int sock, char *ad, char *hid, char *sid)
 
 	Graph g(&dag);
 	strncpy(sdag, g.dag_string().c_str(), sizeof(sdag));
-	// say("sdag = %s\n",sdag);	
+	// say("sdag = %s\n",sdag);
 	char *ads = strstr(sdag, "AD:");	// first occurrence
-	char *hids = strstr(sdag, "HID:");	
-	char *sids = strstr(sdag, "SID:"); 
+	char *hids = strstr(sdag, "HID:");
+	char *sids = strstr(sdag, "SID:");
 	if (sscanf(ads, "%s", ad) < 1 || strncmp(ad, "AD:", 3) != 0) {
 		die(-1, "Unable to extract AD.");
 	}
@@ -320,10 +335,10 @@ int XgetRemoteAddr(int sock, char *ad, char *hid, char *sid)
 	if (sscanf(sids, "%s", sid) < 1 || strncmp(sid, "SID:", 4) != 0) {
 		die(-1, "Unable to extract SID.");
 	}
-	return 1;	
+	return 1;
 }
 
-int XgetServADHID(const char *name, char *ad, char *hid) 
+int XgetServADHID(const char *name, char *ad, char *hid)
 {
 	sockaddr_x dag;
 	socklen_t daglen = sizeof(dag);
@@ -346,7 +361,7 @@ int XgetServADHID(const char *name, char *ad, char *hid)
 	return 1;
 }
 
-int initDatagramClient(const char *name, struct addrinfo *ai, sockaddr_x *sa) 
+int initDatagramClient(const char *name, struct addrinfo *ai, sockaddr_x *sa)
 {
 	if (Xgetaddrinfo(name, NULL, NULL, &ai) != 0)
 		die(-1, "unable to lookup name %s\n", name);
@@ -364,7 +379,7 @@ int initDatagramClient(const char *name, struct addrinfo *ai, sockaddr_x *sa)
 	return sock;
 }
 
-int initStreamClient(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid) 
+int initStreamClient(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid)
 {
 	int sock, rc;
 	sockaddr_x dag;
@@ -372,7 +387,7 @@ int initStreamClient(const char *name, char *src_ad, char *src_hid, char *dst_ad
 	char sdag[1024];
 	char IP[MAX_XID_SIZE];
 
-	// lookup the xia service 
+	// lookup the xia service
 	daglen = sizeof(dag);
 //cerr<<"Before got DAG by name: "<<name<<"\n";
 	if (XgetDAGbyName(name, &dag, &daglen) < 0)
@@ -381,7 +396,7 @@ int initStreamClient(const char *name, char *src_ad, char *src_hid, char *dst_ad
 	// create a socket, and listen for incoming connections
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		die(-1, "Unable to create the listening socket\n");
-//cerr<<"Created socket\n";    
+//cerr<<"Created socket\n";
 	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(sock);
 		die(-1, "Unable to bind to the dag: %s\n", dag);
@@ -392,18 +407,18 @@ int initStreamClient(const char *name, char *src_ad, char *src_hid, char *dst_ad
 	if (rc < 0) {
 		Xclose(sock);
 		die(-1, "Unable to read local address.\n");
-	} 
+	}
 	else{
 		warn("My AD: %s, My HID: %s\n", src_ad, src_hid);
 	}
-	
+
 	// save the AD and HID for later. This seems hacky we need to find a better way to deal with this
 	Graph g(&dag);
 	strncpy(sdag, g.dag_string().c_str(), sizeof(sdag));
 	// say("sdag = %s\n",sdag);
 	char *ads = strstr(sdag, "AD:");
 	char *hids = strstr(sdag, "HID:");
-	
+
 	if (sscanf(ads, "%s", dst_ad) < 1 || strncmp(dst_ad, "AD:", 3) != 0) {
 		die(-1, "Unable to extract AD.");
 	}
@@ -414,7 +429,7 @@ int initStreamClient(const char *name, char *src_ad, char *src_hid, char *dst_ad
 	return sock;
 }
 
-int registerDatagramReceiver(char* name) 
+int registerDatagramReceiver(char* name)
 {
 	int sock;
 
@@ -447,7 +462,7 @@ int registerDatagramReceiver(char* name)
 	return sock;
 }
 
-int registerStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID) 
+int registerStreamReceiver(const char* name, char *myAD, char *myHID, char *my4ID)
 {
 	int sock;
 
@@ -493,46 +508,57 @@ int registerStreamReceiver(char* name, char *myAD, char *myHID, char *my4ID)
   return sock;
 }
 
-void *blockListener(void *listenID, void *recvFuntion (void *)) 
+void *blockListener(void *listenID, void *recvFuntion (void *))
 {
   int listenSock = *((int*)listenID);
-  int acceptSock;
+  //int acceptSock;
 
+  //change acceptSock with dynamically allocated in case of race    --Lwy   1.16
+  //TODO:BUT HOW TO FREE IT ????
   while (1) {
 		say("Waiting for a client connection\n");
-   		
-		if ((acceptSock = Xaccept(listenSock, NULL, NULL)) < 0){
+
+		//if ((acceptSock = Xaccept(listenSock, NULL, NULL)) < 0){
+        int *acceptSock = new int;
+		if ((*acceptSock = Xaccept(listenSock, NULL, NULL)) < 0){
 			die(-1, "accept failed\n");
 		}
 		say("connected\n");
-		
+
 		pthread_t client;
-		pthread_create(&client, NULL, recvFuntion, (void *)&acceptSock);
+		//pthread_create(&client, NULL, recvFuntion, (void *)&acceptSock);
+		pthread_create(&client, NULL, recvFuntion, (void *)acceptSock);
 	}
-	
+
 	Xclose(listenSock);
 
 	return NULL;
 }
 
-void *twoFunctionBlockListener(void *listenID, void *oneRecvFuntion (void *), void *twoRecvFuntion (void *)) 
+void *twoFunctionBlockListener(void *listenID, void *oneRecvFuntion (void *), void *twoRecvFuntion (void *))
 {
   int listenSock = *((int*)listenID);
-  int acceptSock;
+  //int acceptSock;
 
+  //change acceptSock with dynamically allocated in case of race    --Lwy   1.16
+  //TODO:BUT HOW TO FREE IT ????
   while (1) {
 		say("Waiting for a client connection\n");
-   		
-		if ((acceptSock = Xaccept(listenSock, NULL, NULL)) < 0){
+
+       int *acceptSock = (int*)malloc(sizeof(int));
+		//if ((acceptSock = Xaccept(listenSock, NULL, NULL)) < 0){
+		if ((*acceptSock = Xaccept(listenSock, NULL, NULL)) < 0){
 			die(-1, "accept failed\n");
 		}
 		say("connected\n");
-		
+
 		pthread_t client, fetchData;
-		pthread_create(&client, NULL, oneRecvFuntion, (void *)&acceptSock);
-		pthread_create(&fetchData, NULL, twoRecvFuntion, (void *)&acceptSock);
+		//pthread_create(&client, NULL, oneRecvFuntion, (void *)&acceptSock);
+		//pthread_create(&fetchData, NULL, twoRecvFuntion, (void *)&acceptSock);
+		pthread_create(&client, NULL, oneRecvFuntion, (void *)acceptSock);
+		pthread_create(&fetchData, NULL, twoRecvFuntion, (void *)acceptSock);
 	}
-	
+
 	Xclose(listenSock);
 
 	return NULL;
@@ -546,7 +572,7 @@ int getIndex(string target, vector<string> pool) {
 	return -1;
 }
 
-int registerStageService(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid) 
+int registerStageService(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid)
 {
 	int sock, rc;
 	sockaddr_x dag;
@@ -560,11 +586,11 @@ say("------------------------myAD is: %s\n", src_ad);
 say("------------------------myHID is: %s\n", src_hid);
 say("------------------------stageAD is: %s\n", dst_ad);
 say("------------------------stageHID is: %s\n", dst_hid);
-	// lookup the xia service 
+	// lookup the xia service
 	daglen = sizeof(dag);
 cerr << "--------------------daglen is: " << daglen << endl;
 	if (XgetDAGbyName(name, &dag, &daglen) < 0) {
-		cerr << "-----------------------name is: " << name << endl;
+cerr << "-----------------------name is: " << name << endl;
 		die(-1, "unable to locate: %s\n", name);
 	}
 cerr << "-------------------------2" << endl;
@@ -572,30 +598,30 @@ cerr << "-------------------------2" << endl;
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
 		die(-1, "Unable to create the listening socket\n");
 	}
-	say("------------------------------3\n");
+say("------------------------------3\n");
 	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(sock);
 		die(-1, "Unable to bind to the dag: %s\n", dag);
 	}
-	say("------------------------------4\n");
+say("------------------------------4\n");
 	rc = XreadLocalHostAddr(sock, src_ad, MAX_XID_SIZE, src_hid, MAX_XID_SIZE, IP, MAX_XID_SIZE);
 
 	if (rc < 0) {
 		Xclose(sock);
 		die(-1, "Unable to read local address.\n");
-	} 
+	}
 	else{
 		warn("My AD: %s, My HID: %s\n", src_ad, src_hid);
 	}
-	say("----------------------------------5\n");
-	
+say("----------------------------------5\n");
+
 	// save the AD and HID for later. This seems hacky we need to find a better way to deal with this
 	Graph g(&dag);
 	strncpy(sdag, g.dag_string().c_str(), sizeof(sdag));
 	// say("sdag = %s\n",sdag);
 	char *ads = strstr(sdag, "AD:");
 	char *hids = strstr(sdag, "HID:");
-	
+
 	if (sscanf(ads, "%s", dst_ad) < 1 || strncmp(dst_ad, "AD:", 3) != 0) {
 		die(-1, "Unable to extract AD.");
 	}
@@ -607,13 +633,13 @@ say("-------------------------------------6\n");
 	return sock;
 }
 
-int registerStageManager(const char *name) 
+int registerStageManager(const char *name)
 {
 	int sock;
 	sockaddr_x dag;
 	socklen_t daglen;
 
-	// lookup the xia service 
+	// lookup the xia service
 	daglen = sizeof(dag);
 
 	if (XgetDAGbyName(name, &dag, &daglen) < 0) {
@@ -626,15 +652,15 @@ int registerStageManager(const char *name)
 	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(sock);
 		warn("Unable to bind to the dag: %s\n", dag);
-		sock = -1;		
+		sock = -1;
 	}
 	return sock;
 }
 
-int updateManifest(int sock, vector<string> CIDs) 
+int updateManifest(int sock, vector<string> CIDs)
 {
 	say("In updateManifest()\n");
-	char cmd[XIA_MAX_BUF];		
+	char cmd[XIA_MAX_BUF];
 	int offset = 0;
 	int count = CIDs.size();
 	int num;
@@ -652,18 +678,18 @@ int updateManifest(int sock, vector<string> CIDs)
 		}
 		offset += MAX_CID_NUM;
 		sendStreamCmd(sock, cmd);
-		usleep(SCAN_DELAY_MSEC*000);
+		usleep(SCAN_DELAY_MSEC*1000);
 	    num_of_receive_ = hearHello(sock);
-	    say("In updateManifest, successfully receive the message of %d length from manager.\n", num_of_receive_);	
+	    say("In updateManifest, successfully receive the message of %d length from manager.\n", num_of_receive_);
 	}
 	memset(cmd, '\0', strlen(cmd));
-	sprintf(cmd, "reg done");	
+	sprintf(cmd, "reg done");
 	if (Xsend(sock, cmd, strlen(cmd), 0) < 0) {
 		warn("unable to send reply to client\n");
 	}
 	say("Waiting for manager finish profile.\n");
 	hearHello(sock);
-	say("In updateManifest, register to manager done.");	
+	say("In updateManifest, register to manager done.");
 	usleep(SCAN_DELAY_MSEC*000);
 
 	return 0;
@@ -688,7 +714,7 @@ int XrequestChunkStage(int sock, const ChunkStatus *cs) {
 	sprintf(dag, "RE ( %s %s ) CID:%s", AD, HID, CID);
 
 	sprintf(cmd, "fetch %ld %s", strlen(dag), dag);
-*/	
+*/
 	int n = sendStreamCmd(sock, cmd);
 	//hearHello(sock);
 	return n;
@@ -698,31 +724,31 @@ int XrequestChunkStage(int sock, const ChunkStatus *cs) {
 // TODO: right now it's hacky, need to fix the way reading XIDs when including fallback DAG
 char *chunkReqDag2cid(char *dag) {
 	char *cid = (char *)malloc(512);
-	char *cids = strstr(dag, "CID:"); 
+	char *cids = strstr(dag, "CID:");
 	if (sscanf(cids, "%s", cid) < 1 || strncmp(cid, "CID:", 4) != 0) {
 		die(-1, "Unable to extract AD.");
 	}
-cerr<<"CID: "<<cid+4<<endl;	
+cerr<<"CID: "<<cid+4<<endl;
 	return cid+4;
 }
 
-char *getPrefetchManagerName() 
+char *getPrefetchManagerName()
 {
 	return string2char(string(PREFETCH_MANAGER_NAME) + "." + getHID());
-} 
+}
 
-char *getPrefetchServiceName() 
+char *getPrefetchServiceName()
 {
 	return string2char(string(PREFETCH_SERVER_NAME) + "." + getAD());
-} 
+}
 
-int registerPrefetchManager(const char *name) 
+int registerPrefetchManager(const char *name)
 {
 	int sock;
 	sockaddr_x dag;
 	socklen_t daglen;
 
-	// lookup the xia service 
+	// lookup the xia service
 	daglen = sizeof(dag);
 
 	if (XgetDAGbyName(name, &dag, &daglen) < 0) {
@@ -735,12 +761,12 @@ int registerPrefetchManager(const char *name)
 	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(sock);
 		warn("Unable to bind to the dag: %s\n", dag);
-		sock = -1;		
+		sock = -1;
 	}
 	return sock;
 }
 
-int registerPrefetchService(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid) 
+int registerPrefetchService(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid)
 {
 	int sock, rc;
 	sockaddr_x dag;
@@ -748,7 +774,7 @@ int registerPrefetchService(const char *name, char *src_ad, char *src_hid, char 
 	char sdag[1024];
 	char IP[MAX_XID_SIZE];
 
-	// lookup the xia service 
+	// lookup the xia service
 	daglen = sizeof(dag);
 	if (XgetDAGbyName(name, &dag, &daglen) < 0)
 		die(-1, "unable to locate: %s\n", name);
@@ -764,18 +790,18 @@ int registerPrefetchService(const char *name, char *src_ad, char *src_hid, char 
 	if (rc < 0) {
 		Xclose(sock);
 		die(-1, "Unable to read local address.\n");
-	} 
+	}
 	else{
 		warn("My AD: %s, My HID: %s\n", src_ad, src_hid);
 	}
-	
+
 	// save the AD and HID for later. This seems hacky we need to find a better way to deal with this
 	Graph g(&dag);
 	strncpy(sdag, g.dag_string().c_str(), sizeof(sdag));
 	// say("sdag = %s\n",sdag);
 	char *ads = strstr(sdag, "AD:");
 	char *hids = strstr(sdag, "HID:");
-	
+
 	if (sscanf(ads, "%s", dst_ad) < 1 || strncmp(dst_ad, "AD:", 3) != 0) {
 		die(-1, "Unable to extract AD.");
 	}
@@ -787,7 +813,7 @@ int registerPrefetchService(const char *name, char *src_ad, char *src_hid, char 
 	return sock;
 }
 
-int updateManifestOld(int sock, vector<string> CIDs) 
+int updateManifestOld(int sock, vector<string> CIDs)
 {
 	char cmd[XIA_MAX_BUF];
 	memset(cmd, '\0', strlen(cmd));
@@ -797,7 +823,7 @@ int updateManifestOld(int sock, vector<string> CIDs)
 	for (unsigned int i = 0; i < CIDs.size(); i++) {
 		strcat(cids, " ");
 		strcat(cids, string2char(CIDs[i]));
-	}	
+	}
 	// TODO: check total length of cids should not exceed max buf
 	sprintf(cmd, "reg%s", cids);
 	int n = sendStreamCmd(sock, cmd);
