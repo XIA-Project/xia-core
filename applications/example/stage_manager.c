@@ -486,7 +486,7 @@ cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^manager: n is" << n << end
 							for (unsigned int i = 0; i < CIDs_fetching.size(); i++) {
 								SIDToProfile[SID][CIDs_fetching[i]].fetchState = READY;
 cerr<<CIDs_fetching[i]<<"\t fetch state: ready\n";
-say("fetchData````````````````````````````The clientSock is %d\n", clientSock);
+//say("fetchData````````````````````````````The clientSock is %d\n", clientSock);
 //sayHello(clientSock, fetchinfo_send_to_client_);
                                 //pthread_mutex_unlock(&FetchDelegationLock);
 							}
@@ -511,7 +511,7 @@ say("fetchData````````````````````````````The clientSock is %d\n", clientSock);
 				// TODO: timeout the chunks by free(cs[i].cid); cs[j].cid = NULL; cs[j].cidLen = 0;
 			}
 		}
-		usleep(LOOP_DELAY_MSEC*1000);		
+		usleep(LOOP_DELAY_MSEC*1000);
 		//pthread_mutex_unlock(&fetchLock);
 	}
 	//Xclose(clientSock);
