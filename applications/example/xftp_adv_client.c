@@ -117,7 +117,7 @@ int getFile(int sock)
 						say("unable to request chunks\n");
 						return -1;
 					}
-					hearHello(stageManagerSock);
+					//hearHello(stageManagerSock);
 					//sprintf(dag, "RE ( %s %s ) CID:%s", myAD, myHID, string2char(CIDs[i]));
 					//cs[0].cidLen = strlen(dag);
 					//cs[0].cid = dag; // cs[i].cid is a DAG, not just the CID
@@ -136,6 +136,10 @@ int getFile(int sock)
 			}
 			ctr++;
 
+cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^client: chunksock is " << chunkSock << endl;
+cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^client: cs[0].cid is " << cs[0].cid << endl;
+cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^client: cs[0].cidLen is " << cs[0].cidLen << endl;
+cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^client: n is " << n << endl;
 			status = XgetChunkStatuses(chunkSock, cs, n);
 
 			if (status == READY_TO_READ) {
