@@ -136,6 +136,10 @@ int getFile(int sock)
 			}
 			ctr++;
 
+cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^client: chunksock is " << chunkSock << endl;
+cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^client: cs[0].cid is " << cs[0].cid << endl;
+cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^client: cs[0].cidLen is " << cs[0].cidLen << endl;
+cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^client: n is " << n << endl;
 			status = XgetChunkStatuses(chunkSock, cs, n);
 
 			if (status == READY_TO_READ) {

@@ -217,7 +217,7 @@ void *clientCmd(void *socketid)
 			delegationHandler(sock, cmd + 6);
 			pthread_mutex_unlock(&StageControl);
 		}
-		//usleep(10000);
+		usleep(SCAN_DELAY_MSEC*1000);
 	}
 	Xclose(sock);
 	say("Socket closed\n");
@@ -475,7 +475,10 @@ cerr<<(*I).second[i]<<"\t fetch state: PENDING; \t stage state: READY\n";
 							//say("checking chunk status\n");
 						}
 						ctr++;
-
+cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^manager: chunksock is " << chunkSock << endl;
+cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^manager: cs.cid is" << cs[0].cid << endl;
+cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^manager: cs.cidLen is" << cs[0].cidLen << endl;
+cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^manager: n is" << n << endl;
 						status = XgetChunkStatuses(chunkSock, cs, n);
 
 						if (status == READY_TO_READ) {
@@ -483,7 +486,7 @@ cerr<<(*I).second[i]<<"\t fetch state: PENDING; \t stage state: READY\n";
 							for (unsigned int i = 0; i < CIDs_fetching.size(); i++) {
 								SIDToProfile[SID][CIDs_fetching[i]].fetchState = READY;
 cerr<<CIDs_fetching[i]<<"\t fetch state: ready\n";
-//say("fetchData````````````````````````````The clientSock is %d\n", clientSock);
+say("fetchData````````````````````````````The clientSock is %d\n", clientSock);
 //sayHello(clientSock, fetchinfo_send_to_client_);
                                 //pthread_mutex_unlock(&FetchDelegationLock);
 							}
@@ -508,7 +511,7 @@ cerr<<CIDs_fetching[i]<<"\t fetch state: ready\n";
 				// TODO: timeout the chunks by free(cs[i].cid); cs[j].cid = NULL; cs[j].cidLen = 0;
 			}
 		}
-		usleep(LOOP_DELAY_MSEC*1000);
+		usleep(LOOP_DELAY_MSEC*1000);		
 		//pthread_mutex_unlock(&fetchLock);
 	}
 	//Xclose(clientSock);
