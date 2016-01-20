@@ -45,7 +45,7 @@ map<string, long> SIDToTime; // store the timestamp last seen
 int stageSock, ftpSock, clientAcceptSock;
 
 bool netStageOn = true;
-
+int clientSock;
 int thread_c = 0;
 
 pthread_mutex_t profileLock = PTHREAD_MUTEX_INITIALIZER;
@@ -65,6 +65,7 @@ pthread_mutex_t FetchDelegationLock = PTHREAD_MUTEX_INITIALIZER;
 
 pthread_mutex_t StageControl = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t FetchControl = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t netMonControl = PTHREAD_MUTEX_INITIALIZER;
 bool netChange, netChangeACK;
 
 // TODO: mem leak; window pred alg; int netMonSock;
@@ -73,7 +74,7 @@ void regHandler(int sock, char *cmd)
 	say("In regHandler.\n");
 	char send_to_client_[XIA_MAX_BUF];
 	memset(send_to_client_, '\0', strlen(send_to_client_));
-	XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID);
+	//XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID);
 //cerr<<"Peer SID: "<<remoteSID<<endl;
 cerr<<cmd<<endl;
 
@@ -92,7 +93,7 @@ cerr<<cid<<endl;
 		pthread_mutex_unlock(&cidVecLock);
 		sprintf(send_to_client_, "Continue to register CID.");
 		say("Ready to sent command to client.\n");
-		sayHello(sock, send_to_client_);
+		//sayHello(sock, send_to_client_);
 		say("Successfully sent Continue command to client.\n");
 		return;
 	}
@@ -131,7 +132,7 @@ cerr<<cid<<endl;
 		pthread_mutex_unlock(&profileLock);
 	    //say("Ready to sent command to client.\n");
 		sprintf(send_to_client_, "Done profile.");
-		sayHello(sock, send_to_client_);
+		//sayHello(sock, send_to_client_);
 		say("Successfully sent Done profile. command to client.\n");
 cerr<<"Quit the profileLock and finish reg"<<endl;
 		//pthread_mutex_lock(&stageLock);
@@ -145,7 +146,7 @@ void delegationHandler(int sock, char *cmd)
 {
 	say("In delegationHandler.\n");
 	say("The command is %s\n", cmd);
-	XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID);
+	//XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID);
 	size_t cidLen;
 	char *CID = (char *)malloc(512);
 	char send_to_client_[XIA_MAX_BUF];
@@ -199,10 +200,20 @@ void *clientCmd(void *socketid)
 		memset(cmd, '\0', XIA_MAXBUF);
 
 		//sayHello(sock, client_);
-		if ((n = Xrecv(sock, cmd, sizeof(cmd), 0)) < 0) {
+		//if ((n = Xrecv(sock, cmd, sizeof(cmd), 0)) < 0) {
+		if ((n = recv(sock, cmd, sizeof(cmd), 0)) < 0) {
 			warn("socket error while waiting for data, closing connection\n");
 			break;
 		}
+		else {
+			if(n == 0){
+				say("Unix Socket closed by client.");
+				close(sock);
+				pthread_exit(NULL);
+			}
+		}
+		clientSock = sock;
+		sprintf(remoteSID,"TMPSID:%d",sock);
 		say("clientCmd````````````````````````````````Receive the command that: %s\n", cmd);
 		// registration msg from xftp client: reg CID1, CID2, ... CIDn
 		if (strncmp(cmd, "reg", 3) == 0) {
@@ -219,7 +230,8 @@ void *clientCmd(void *socketid)
 		}
 		usleep(SCAN_DELAY_MSEC*1000);
 	}
-	Xclose(sock);
+	//Xclose(sock);
+	close(sock);
 	say("Socket closed\n");
 	pthread_exit(NULL);
 }
@@ -269,8 +281,9 @@ cerr<<"Thread id "<<thread_id<<": "<<"Network changed, create another thread to 
 					lastSSID = currSSID;
 					//ssidChange = true;
 					pthread_t thread_stageDataNew;
-					pthread_create(&thread_stageDataNew, NULL, stageData, NULL);
+                    pthread_mutex_unlock(&netMonControl);
 					pthread_mutex_unlock(&StageControl);
+					pthread_create(&thread_stageDataNew, NULL, stageData, NULL);
 					finish = true; // need to finish
 				}
 
@@ -389,12 +402,11 @@ cerr<<"Thread id "<<thread_id<<": "<<"Network changed, create another thread to 
 			}
 		}
 		// after looping all the SIDs
+		pthread_mutex_unlock(&FetchControl);
 		if (finish) {
 			say("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Kill stageData thread.\n");
 			pthread_exit(NULL);
 		}
-		else
-			pthread_mutex_unlock(&FetchControl);
 		usleep(SCAN_DELAY_MSEC*1000);
 		//pthread_mutex_unlock(&fetchLock);
 	}
@@ -490,6 +502,7 @@ cerr<<CIDs_fetching[i]<<"\t fetch state: ready\n";
 //sayHello(clientSock, fetchinfo_send_to_client_);
                                 //pthread_mutex_unlock(&FetchDelegationLock);
 							}
+							say("Send to Client!");
 							pthread_mutex_unlock(&profileLock);
 							break;
 						}
@@ -511,6 +524,7 @@ cerr<<CIDs_fetching[i]<<"\t fetch state: ready\n";
 				// TODO: timeout the chunks by free(cs[i].cid); cs[j].cid = NULL; cs[j].cidLen = 0;
 			}
 		}
+		send(clientSock,"done",4,0);
 		usleep(LOOP_DELAY_MSEC*1000);
 		//pthread_mutex_unlock(&fetchLock);
 	}
@@ -530,6 +544,10 @@ void *netMon(void *)
 	mfile<<now_msec()<<"\t"<<lastTempSSID<<endl;
 
 	while (1) {
+        //add control lock in case of useless while loop
+        //may cause a problem(change ssid when it wait)
+        //--Lwy 1.20
+        pthread_mutex_lock(&netMonControl);
 		currTempSSID = execSystem(GETSSID_CMD);
 		if (lastTempSSID != currTempSSID) {
 			lastTempSSID = currTempSSID;
@@ -686,8 +704,8 @@ int main()
 	lastSSID = getSSID();
 	currSSID = lastSSID;
 	strcpy(currAD, myAD);
-	stageSock = registerStreamReceiver(getStageManagerName(), myAD, myHID, my4ID); // communicate with client app
-
+	//stageSock = registerStreamReceiver(getStageManagerName(), myAD, myHID, my4ID); // communicate with client app
+	stageSock = registerUnixStreamReceiver(UNIXMANAGERSOCK);
 	//pthread_t thread_winPred, thread_mgt, thread_netMon, thread_fetchData, thread_stageData, thread_client; // TODO: thread_netMon
 	pthread_t thread_winPred, thread_mgt, thread_netMon, thread_stageData,thread_fetchData; // TODO: thread_netMon
 	pthread_create(&thread_netMon, NULL, netMon, NULL);	// TODO: improve the netMon function
@@ -701,6 +719,7 @@ int main()
 	//say("The current stageSock is %d\n", stageSock);
 	//blockListener((void *)&stageSock, clientCmd);
 	//twoFunctionBlockListener((void *)&stageSock, clientCmd, fetchData);
-    blockListener((void*)&stageSock,clientCmd);
+  //blockListener((void*)&stageSock,clientCmd);
+	UnixBlockListener((void*)&stageSock,clientCmd);
 	return 0;
 }

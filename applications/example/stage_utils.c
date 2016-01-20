@@ -519,7 +519,7 @@ void *blockListener(void *listenID, void *recvFuntion (void *))
 		say("Waiting for a client connection\n");
 
 		//if ((acceptSock = Xaccept(listenSock, NULL, NULL)) < 0){
-        int *acceptSock = new int;
+    int *acceptSock = new int;
 		if ((*acceptSock = Xaccept(listenSock, NULL, NULL)) < 0){
 			die(-1, "accept failed\n");
 		}
@@ -677,18 +677,21 @@ int updateManifest(int sock, vector<string> CIDs)
 			strcat(cmd, string2char(CIDs[i]));
 		}
 		offset += MAX_CID_NUM;
-		sendStreamCmd(sock, cmd);
+		//change To Unix Socket	--Lwy	1.20
+		//sendStreamCmd(sock, cmd);
+		send(sock,cmd,strlen(cmd),0);
 		usleep(SCAN_DELAY_MSEC*1000);
-	    num_of_receive_ = hearHello(sock);
-	    say("In updateManifest, successfully receive the message of %d length from manager.\n", num_of_receive_);
+	    //num_of_receive_ = hearHello(sock);
+	    //say("In updateManifest, successfully receive the message of %d length from manager.\n", num_of_receive_);
 	}
 	memset(cmd, '\0', strlen(cmd));
 	sprintf(cmd, "reg done");
-	if (Xsend(sock, cmd, strlen(cmd), 0) < 0) {
+	//if (Xsend(sock, cmd, strlen(cmd), 0) < 0) {
+	if (send(sock, cmd, strlen(cmd), 0) < 0) {
 		warn("unable to send reply to client\n");
 	}
 	say("Waiting for manager finish profile.\n");
-	hearHello(sock);
+	//hearHello(sock);
 	say("In updateManifest, register to manager done.");
 	usleep(SCAN_DELAY_MSEC*000);
 
@@ -699,7 +702,7 @@ int updateManifest(int sock, vector<string> CIDs)
 int XrequestChunkStage(int sock, const ChunkStatus *cs) {
 	char cmd[XIA_MAX_BUF];
 	memset(cmd, '\0', strlen(cmd));
-	sprintf(cmd, "fetch %ld %s", cs[0].cidLen, cs[0].cid);
+	sprintf(cmd, "fetch %ld %s\n", cs[0].cidLen, cs[0].cid);
 
 /*
 	char AD[MAX_XID_SIZE], HID[MAX_XID_SIZE], IP[MAX_XID_SIZE];
@@ -715,7 +718,8 @@ int XrequestChunkStage(int sock, const ChunkStatus *cs) {
 
 	sprintf(cmd, "fetch %ld %s", strlen(dag), dag);
 */
-	int n = sendStreamCmd(sock, cmd);
+	//int n = sendStreamCmd(sock, cmd);
+	int n = send(sock,cmd,strlen(cmd),0);
 	//hearHello(sock);
 	return n;
 }
@@ -831,3 +835,96 @@ int updateManifestOld(int sock, vector<string> CIDs)
 	return n;
 }
 */
+//add unix style socket	--Lwy	1.20
+int registerUnixStreamReceiver(const char *servername){
+	int fd;
+  struct sockaddr_un un;
+  if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0)  {
+     return(-1);
+  }
+  int len, rval;
+  unlink(servername);               /* in case it already exists */
+  memset(&un, 0, sizeof(un));
+  un.sun_family = AF_UNIX;
+  strcpy(un.sun_path, servername);
+  len = offsetof(struct sockaddr_un, sun_path) + strlen(servername);
+  /* bind the name to the descriptor */
+  if (bind(fd, (struct sockaddr *)&un, len) < 0){
+    rval = -2;
+  }
+  else{
+      if (listen(fd, 5) < 0)      {
+        rval =  -3;
+      }
+      else {
+        return fd;
+      }
+  }
+  int err;
+  err = errno;
+  close(fd);
+  errno = err;
+  return rval;
+}
+int UnixBlockListener(void* listenID, void* recvFuntion (void*)){
+	int listenSock = *(int*)listenID;
+	struct sockaddr_un un;
+	socklen_t len = sizeof(un);
+	while (1) {
+		say("Waiting for a Unix client connection\n");
+
+		//if ((acceptSock = Xaccept(listenSock, NULL, NULL)) < 0){
+		int *acceptSock = new int;
+		if ((*acceptSock = accept(listenSock, (struct sockaddr *)&un, &len)) < 0){
+			die(-1, "Unix accept failed\n");
+		}
+		say("connected\n");
+
+		pthread_t client;
+		//pthread_create(&client, NULL, recvFuntion, (void *)&acceptSock);
+		pthread_create(&client, NULL, recvFuntion, (void *)acceptSock);
+	}
+
+	close(listenSock);
+
+	return 0;
+}
+int registerUnixStageManager(const char* servername){
+	int fd;
+  if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0)    /* create a UNIX domain stream socket */
+  {
+    return(-1);
+  }
+  int len, rval;
+  struct sockaddr_un un;
+  memset(&un, 0, sizeof(un));            /* fill socket address structure with our address */
+  un.sun_family = AF_UNIX;
+  sprintf(un.sun_path, "scktmp%05d", getpid());
+  len = offsetof(struct sockaddr_un, sun_path) + strlen(un.sun_path);
+  unlink(un.sun_path);               /* in case it already exists */
+  if (bind(fd, (struct sockaddr *)&un, len) < 0)
+  {
+     rval=  -2;
+  }
+  else
+  {
+    /* fill socket address structure with server's address */
+      memset(&un, 0, sizeof(un));
+      un.sun_family = AF_UNIX;
+      strcpy(un.sun_path, servername);
+      len = offsetof(struct sockaddr_un, sun_path) + strlen(servername);
+      if (connect(fd, (struct sockaddr *)&un, len) < 0)
+      {
+          rval= -4;
+      }
+      else
+      {
+         return (fd);
+      }
+  }
+  int err;
+  err = errno;
+  close(fd);
+  errno = err;
+  return rval;
+}
