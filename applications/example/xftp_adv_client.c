@@ -11,10 +11,12 @@ char fin[256], fout[256];
 
 char myAD[MAX_XID_SIZE];
 char myHID[MAX_XID_SIZE];
+char my4ID[MAX_XID_SIZE];
 
 char ftpServAD[MAX_XID_SIZE];
 char ftpServHID[MAX_XID_SIZE];
 
+char recvBuff[MAX_XID_SIZE];
 int ftpSock, stageManagerSock;
 
 int getFile(int sock)
@@ -109,14 +111,21 @@ int getFile(int sock)
 				// bring the list of chunks local
 //say("%srequesting list of %d chunks\n", (ctr == 0 ? "" : "re-"), n);
 				if (stage) {
+					//add it to deal with the problem happened in change AP	--Lwy	1.20
+					if(XreadLocalHostAddr(chunkSock,myAD,sizeof(myAD),myHID,sizeof(myHID),my4ID,sizeof(my4ID)) < 0){
+            say("XreadLocalHostAddr Error\n");
+	            return -1;
+          }
 					sprintf(dag, "RE ( %s %s ) CID:%s", myAD, myHID, string2char(CIDs[i]));
 					cs[0].cidLen = strlen(dag);
 					cs[0].cid = dag; // cs[i].cid is a DAG, not just the CID
 					//hearHello(stageManagerSock);
+					//use Unix domain socket	--Lwy	1.20
 					if (XrequestChunkStage(stageManagerSock, cs) < 0) {
 						say("unable to request chunks\n");
 						return -1;
 					}
+					recv(stageManagerSock,recvBuff,MAX_XID_SIZE,0);
 					//hearHello(stageManagerSock);
 					//sprintf(dag, "RE ( %s %s ) CID:%s", myAD, myHID, string2char(CIDs[i]));
 					//cs[0].cidLen = strlen(dag);
@@ -205,15 +214,17 @@ int main(int argc, char **argv)
 			//sprintf(fout, "/home/xia/Pictures/fb.jpg");
 
 			ftpSock = initStreamClient(getXftpName(), myAD, myHID, ftpServAD, ftpServHID);
-			//stageMagegerSock is used to communicate with stage manager.
-			stageManagerSock = registerStageManager(getStageManagerName());
+			//stageManagerSock is used to communicate with stage manager.
+			//change it into Unix domain socket
+			stageManagerSock = registerUnixStageManager(UNIXMANAGERSOCK);
+			//stageManagerSock = registerStageManager(getStageManagerName());
 			say("The current stageManagerSock is %d\n", stageManagerSock);
 			if (stageManagerSock == -1) {
 				say("No local staging service running\n");
 				stage = false;
 			}
 			getFile(ftpSock);
-
+			close(stageManagerSock);
 			return 0;
 		}
 		else {

@@ -18,7 +18,10 @@
 #include "Xsocket.h"
 #include "dagaddr.hpp"
 #include <assert.h>
-
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <errno.h>
+#include <stddef.h>
 #include <sys/time.h>
 
 #include "Xkeys.h"
@@ -40,7 +43,7 @@
 
 #define PREFETCH_SERVER_NAME "www_s.prefetch_server.aaa.xia"
 #define PREFETCH_MANAGER_NAME "www_s.prefetch_client.aaa.xia"
-
+#define UNIXMANAGERSOCK "/tmp/stage_manager.sock"
 #define GETSSID_CMD "iwgetid -r"
 
 #define PURGE_DELAY_SEC 10
@@ -159,7 +162,10 @@ int registerPrefetchService(const char *name, char *src_ad, char *src_hid, char 
 
 int updateManifestOld(int sock, vector<string> CIDs);
 */
-
+//add Unix Socket   --Lwy   1.20
+int registerUnixStreamReceiver(const char *servername);
+int UnixBlockListener(void* listenId, void* recvFuntion (void*));
+int registerUnixStageManager(const char* servername);
 #endif
 
 /* reference
