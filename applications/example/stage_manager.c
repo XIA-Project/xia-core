@@ -487,10 +487,10 @@ cerr<<(*I).second[i]<<"\t fetch state: PENDING; \t stage state: READY\n";
 							//say("checking chunk status\n");
 						}
 						ctr++;
-cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^manager: chunksock is " << chunkSock << endl;
-cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^manager: cs.cid is" << cs[0].cid << endl;
-cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^manager: cs.cidLen is" << cs[0].cidLen << endl;
-cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^manager: n is" << n << endl;
+//cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^manager: chunksock is " << chunkSock << endl;
+//cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^manager: cs.cid is" << cs[0].cid << endl;
+//cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^manager: cs.cidLen is" << cs[0].cidLen << endl;
+//cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^manager: n is" << n << endl;
 						status = XgetChunkStatuses(chunkSock, cs, n);
 
 						if (status == READY_TO_READ) {
