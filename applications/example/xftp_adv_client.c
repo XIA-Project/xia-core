@@ -172,7 +172,7 @@ int getFile(int sock)
 				say("unexpected result\n");
 			}
 
-			usleep(CHUNK_REQUEST_DELAY_MSEC*10000);
+			usleep(CHUNK_REQUEST_DELAY_MSEC*1000);
 		}
 
 		say("Chunk is ready\n");
