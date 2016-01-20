@@ -23,74 +23,18 @@
 #include <pthread.h>
 #include <string.h>
 #include <assert.h>
+#include <errno.h>
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
-
-using namespace std;
-
-class SocketState
-{
-public:
-	SocketState();
-	SocketState(int tt);
-	~SocketState();
-
-	int transportType() { return m_transportType; };
-	void setTransportType(int tt) {m_transportType = tt; };
-
-	int protocol() { return m_protocol; };
-	void setProtocol(int p) {m_protocol = p; };
-
-	int getConnState() { return m_connected; };
-	void setConnState(int conn) { m_connected = conn; };
-
-	int isBlocking() { return m_blocking; };
-	void setBlocking(int blocking) { m_blocking = blocking; };
-
-	unsigned seqNo();
-
-	int getPacket(unsigned seq, char *buf, unsigned buflen);
-	void insertPacket(unsigned seq, char *buf, unsigned buflen);
-
-	void setDebug(int debug) { m_debug = debug; };
-	int getDebug() { return m_debug; };
-
-	void setRecvTimeout(struct timeval *timeout) { m_timeout.tv_sec = timeout->tv_sec; m_timeout.tv_usec = timeout->tv_usec; };
-	void getRecvTimeout(struct timeval *timeout) {timeout->tv_sec = m_timeout.tv_sec; timeout->tv_usec = m_timeout.tv_usec; };
-
-	const sockaddr_x *peer() { return m_peer; };
-	int setPeer(const sockaddr_x *peer);
-
-	int isSIDAssigned() { return m_sid_assigned; };
-	void setSIDAssigned() { m_sid_assigned = 1; };
-
-	int isTempSID() { return (m_temp_sid == NULL) ? 0 : 1;};
-	void setTempSID(const char *sid);
-	const char *getTempSID() {return m_temp_sid;};
-
-	void init();
-private:
-	int m_transportType;
-	int m_protocol;
-	int m_connected;
-	int m_blocking;
-	int m_debug;
-	sockaddr_x *m_peer;
-	char *m_temp_sid;
-	int m_sid_assigned;
-	unsigned m_sequence;
-	struct timeval m_timeout;
-	pthread_mutex_t m_sequence_lock;
-	map<unsigned, string> m_packets;
+#include "state.h"
 
 
-};
-
-SocketState::SocketState(int tt)
+SocketState::SocketState(int tt, unsigned short port)
 {
 	init();
 	m_transportType = tt;
+	m_port = port;
 }
 
 SocketState::SocketState()
@@ -102,6 +46,8 @@ SocketState::~SocketState()
 {
 	if (m_peer)
 		free(m_peer);
+	if (m_temp_sid)
+		delete(m_temp_sid);
 	m_packets.clear();
 	pthread_mutex_destroy(&m_sequence_lock);
 }
@@ -119,6 +65,7 @@ void SocketState::init()
 	m_debug = 0;
 	m_timeout.tv_sec = 0;
 	m_timeout.tv_usec = 0;
+	m_port = 0;
 	pthread_mutex_init(&m_sequence_lock, NULL);
 }
 
@@ -146,7 +93,6 @@ int SocketState::getPacket(unsigned seq, char *buf, unsigned buflen)
 	if (it != m_packets.end()) {
 		string s = it->second;
 
-printf("getting a packet\n");
 		rc = MIN(buflen, s.size());
 		memcpy(buf, s.c_str(), rc);
 
@@ -163,33 +109,17 @@ void SocketState::insertPacket(unsigned seq, char *buf, unsigned buflen)
 }
 
 unsigned SocketState::seqNo()
-{ 
+{
 	pthread_mutex_lock(&m_sequence_lock);
 	unsigned seq = m_sequence++;
 	pthread_mutex_unlock(&m_sequence_lock);
 
-	return seq; 
+	return seq;
 }
 
-class SocketMap
-{
-public:
-	~SocketMap();
 
-	static SocketMap *getMap();
 
-	void add(int sock, int tt);
-	void remove(int sock);
-	SocketState *get(int sock);
 
-private:
-	SocketMap();
-
-	map<int, SocketState *> sockets;
-	pthread_rwlock_t rwlock;
-
-	static SocketMap *instance;
-};
 
 SocketMap::SocketMap()
 {
@@ -219,12 +149,14 @@ SocketMap *SocketMap::getMap()
 	return instance;
 }
 
-void SocketMap::add(int sock, int tt)
+void SocketMap::add(int sock, int tt, unsigned short port)
 {
-	SocketMap *state = getMap();
 	pthread_rwlock_wrlock(&rwlock);
-	if (state->sockets[sock] == 0)
-		state->sockets[sock] = new SocketState(tt);
+	SocketMap *state = getMap();
+
+	if (state->sockets.count(sock) == 0) {
+		state->sockets[sock] = new SocketState(tt, port);
+	}
 	pthread_rwlock_unlock(&rwlock);
 }
 
@@ -244,7 +176,14 @@ SocketState *SocketMap::get(int sock)
 	// we don't need to be more protective of the stat structure
 
 	pthread_rwlock_rdlock(&rwlock);
-	SocketState *p =  SocketMap::getMap()->sockets[sock];
+
+	SocketState *p = NULL;
+	SocketMap *s = SocketMap::getMap();
+
+	if (s->sockets.count(sock) > 0) {
+		p = s->sockets[sock];
+	}
+
 	pthread_rwlock_unlock(&rwlock);
 	return p;
 }
@@ -265,9 +204,9 @@ int SocketState::setPeer(const sockaddr_x *peer)
 
 // extern "C" {
 
-void allocSocketState(int sock, int tt)
+void allocSocketState(int sock, int tt, unsigned short port)
 {
-	SocketMap::getMap()->add(sock, tt);
+	SocketMap::getMap()->add(sock, tt, port);
 }
 
 void freeSocketState(int sock)
@@ -423,6 +362,15 @@ unsigned seqNo(int sock)
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
 		return sstate->seqNo();
+	else
+		return 0;
+}
+
+unsigned short getPort(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		return sstate->port();
 	else
 		return 0;
 }

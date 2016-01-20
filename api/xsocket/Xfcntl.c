@@ -86,8 +86,14 @@ int Xfcntl(int sockfd, int cmd, ...)
 			}
 			break;
 		}
+
+		case F_GETFD:
+			// always say F_CLOEXEC is not enabled for now
+			rc = 0;
+			break;
+
 		default:
-			LOGF("Invalid command specified to Xfcntl: %08x", cmd);
+			LOGF("Invalid command specified to Xfcntl: %s", fcntlCmd(cmd));
 			rc = -1;
 			break;
 	}

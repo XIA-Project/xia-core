@@ -4,11 +4,11 @@
 #include <signal.h>
 #include <stdarg.h>
 #include "Xsocket.h"
+#include "Xkeys.h"
 
 #define VERSION "v1.0"
 #define TITLE "XIA Firehose"
 #define NAME "firehose.xia"
-#define SID "SID:1234567890098765432112345678900987654321"
 #define PKTSIZE 4096
 
 typedef struct {
@@ -148,7 +148,7 @@ done:
 
 void help()
 {
-	printf("usage: firehost [-v] name\n");
+	printf("usage: firehose [-v] name\n");
 	printf("where:\n");
 	printf(" -v : run in verbose mode\n");
 	printf("name = XIA name to listen for connections on\n");
@@ -184,6 +184,7 @@ int main(int argc, char **argv)
 	int sock = -1;
 	int peer = -1;
 	struct addrinfo hints, *ai;
+	char sid[50];
 
 // FIXME: put signal handlers back into code once Xselect is working
 //	signal(SIGINT, handler);
@@ -192,10 +193,14 @@ int main(int argc, char **argv)
 	configure(argc, argv);
 	say("XIA firehose listening on %s\n", name);
 
+	// Generate an SID to use
+	if(XmakeNewSID(sid, sizeof(sid))) {
+		die("Unable to create a temporary SID");
+	}
 	// get our local AD/HID and append the SID to the resultant dag
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_flags = XAI_XIDSERV;
-	int rc = Xgetaddrinfo(NULL, SID, &hints, &ai);
+	int rc = Xgetaddrinfo(NULL, sid, &hints, &ai);
 	if (rc != 0)
 		die("%s\n", Xgai_strerror(rc));
 
@@ -208,6 +213,11 @@ int main(int argc, char **argv)
 	if (Xbind(sock, (struct sockaddr*)sa, sizeof(sockaddr_x)) < 0) {
 		Xclose(sock);
 		die("Unable to bind to DAG\n");
+	}
+
+	if (Xlisten(sock, 5) < 0) {
+		Xclose(sock);
+		die("Listen failed\n");
 	}
 
 	while (!timetodie) {

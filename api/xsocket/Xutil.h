@@ -59,8 +59,9 @@ int validateSocket(int sock, int stype, int err);
 
 // socket state functions for internal API use
 // implementation is in state.c
-void allocSocketState(int sock, int tt);
+void allocSocketState(int sock, int tt, unsigned short port);
 void freeSocketState(int sock);
+unsigned short getPort(int sock);
 int getSocketType(int sock);
 void setSocketType(int sock, int tt);
 int getProtocol(int sock);
@@ -82,6 +83,7 @@ unsigned seqNo(int sock);
 void cachePacket(int sock, unsigned seq, char *buf, unsigned buflen);
 int getCachedPacket(int sock, unsigned seq, char *buf, unsigned buflen);
 int connectDgram(int sock, sockaddr_x *addr);
+int MakeApiSocket(int transport_type);
 const sockaddr_x *dgramPeer(int sock);
 
 int _xsendto(int sockfd, const void *buf, size_t len, int flags, const sockaddr_x *addr, socklen_t addrlen);
@@ -98,6 +100,7 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags, sockaddr_x *addr, 
 extern "C" {
 const char *xferFlags(size_t f);
 const char *fcntlFlags(size_t f);
+const char *fcntlCmd(int c);
 const char *aiFlags(size_t f);
 const char *pollFlags(size_t f);
 const char *afValue(size_t f);

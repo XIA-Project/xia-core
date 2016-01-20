@@ -55,12 +55,6 @@ using namespace xia;
 #define UDP_HEADER_SIZE		8
 
 // SOCK_STREAM, etc from std socket definitions
-#define XSOCKET_INVALID -1  // invalid socket type  
-#define XSOCKET_STREAM  1   // Reliable transport (SID)
-#define XSOCKET_DGRAM   2   // Unreliable transport (SID)
-#define XSOCKET_RAW     3   // Raw XIA socket
-#define XSOCKET_CHUNK   4   // Content Chunk transport (CID)
-
 #define SOCK_CHUNK		4
 
 // TODO: switch these to bytes, not packets?
@@ -189,6 +183,9 @@ public:
 	// list of ports wanting xcmp notifications
 	list<int> xcmp_listeners;
 
+	// list of ports waiting for a notification
+	list <int> notify_listeners;
+
 	// outstanding poll/selects indexed by API port #
 	HashTable<unsigned short, PollEvent> poll_events;
 
@@ -272,6 +269,9 @@ public:
 	void XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xupdaterv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xfork(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xreplay(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xnotify(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 
 	// protocol handlers
 	void ProcessDatagramPacket(WritablePacket *p_in);
