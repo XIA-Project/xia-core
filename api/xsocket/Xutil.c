@@ -351,7 +351,7 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 				// these are not the data you were looking for
 				LOGF("Expected packet %u, received %u, replaying packet\n", seq, sn);
 //				cachePacket(sock, sn, buf, buflen);
-				msg->PrintDebugString();
+//				msg->PrintDebugString();
 
 				// shove this back into click so the requester can get at it
 				xia::X_Replay_Msg *xrm = msg->mutable_x_replay();

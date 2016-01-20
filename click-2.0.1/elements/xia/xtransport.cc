@@ -2815,7 +2815,7 @@ void XTRANSPORT::Xfork(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	int count = msg->count();
 	int increment = msg->increment() ? 1 : -1;
 
-	xia_socket_msg->PrintDebugString();
+//	xia_socket_msg->PrintDebugString();
 
 	// loop through list of ports and modify the ref counter
 	for (int i = 0; i < count; i++) {
@@ -2841,8 +2841,8 @@ void XTRANSPORT::Xreplay(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
 	xia::X_Replay_Msg *msg = xia_socket_msg->mutable_x_replay();
 
-	DBG("Received PingPong packet\n");
-	xia_socket_msg->PrintDebugString();
+	DBG("Received REPLAY packet\n");
+//	xia_socket_msg->PrintDebugString();
 
 	xia_socket_msg->set_type(msg->type());
 	xia_socket_msg->set_sequence(msg->sequence());
