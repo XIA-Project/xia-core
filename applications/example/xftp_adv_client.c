@@ -1,4 +1,5 @@
 #include "stage_utils.h"
+#include <time.h>
 
 #define VERSION "v1.0"
 #define TITLE "XIA Advanced FTP client"
@@ -103,6 +104,7 @@ int getFile(int sock)
 		unsigned ctr = 0;
 
 		fetchTime = now_msec();
+		clock_t start_time = clock();
 		while (1) {
 			say("In while loop of getFIle.\n");
 			if (ctr % REREQUEST == 0) {
@@ -136,10 +138,10 @@ int getFile(int sock)
 			}
 			ctr++;
 
-cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^client: chunksock is " << chunkSock << endl;
-cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^client: cs[0].cid is " << cs[0].cid << endl;
-cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^client: cs[0].cidLen is " << cs[0].cidLen << endl;
-cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^client: n is " << n << endl;
+//cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^client: chunksock is " << chunkSock << endl;
+//cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^client: cs[0].cid is " << cs[0].cid << endl;
+//cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^client: cs[0].cidLen is " << cs[0].cidLen << endl;
+//cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^client: n is " << n << endl;
 			status = XgetChunkStatuses(chunkSock, cs, n);
 
 			if (status == READY_TO_READ) {
@@ -170,6 +172,8 @@ cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^client: n is " << n << end
 			warn("error getting chunk\n");
 			return -1;
 		}
+		clock_t end_time = clock();
+		cerr << "Running time is: "<< static_cast<double>(end_time - start_time) / CLOCKS_PER_SEC * 1000 << "ms" << endl;
 		say("writing %d bytes of chunk %s to disk\n", len, string2char(CIDs[i]));
 		fwrite(data, 1, len, fd);
 		free(cs[0].cid);
