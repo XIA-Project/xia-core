@@ -13,6 +13,8 @@
 #include <click/xiatransportheader.hh>
 #include "xlog.hh"
 
+#include <click/xiasecurity.hh>  // xs_getSHA1Hash()
+
 /*
 ** FIXME:
 ** - set saner retransmit values before we get backoff code
@@ -2323,15 +2325,13 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 
 	if (ch.opcode()==ContentHeader::OP_PUSH) {
 		// compute the hash and verify it matches the CID
-		String hash = "CID:";
-		char hexBuf[3];
-		int i = 0;
-		SHA1_ctx sha_ctx;
-		unsigned char digest[HASH_KEYSIZE];
-		SHA1_init(&sha_ctx);
-		SHA1_update(&sha_ctx, (unsigned char *)xiah.payload(), xiah.plen());
-		SHA1_final(digest, &sha_ctx);
-		for(i = 0; i < HASH_KEYSIZE; i++) {
+		unsigned char digest[SHA_DIGEST_LENGTH];
+		xs_getSHA1Hash((const unsigned char *)xiah.payload(), xiah.plen(), \
+        digest, SHA_DIGEST_LENGTH);
+
+		String hash = "CID:";        
+		char hexBuf[3];        
+		for(int i = 0; i < SHA_DIGEST_LENGTH; i++) {
 			sprintf(hexBuf, "%02x", digest[i]);
 			hash.append(const_cast<char *>(hexBuf), 2);
 		}
@@ -2424,15 +2424,13 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 		}
 
 		// compute the hash and verify it matches the CID
-		String hash = "CID:";
+		unsigned char digest[SHA_DIGEST_LENGTH];
+        xs_getSHA1Hash((const unsigned char *)xiah.payload(), xiah.plen(), \
+            digest, SHA_DIGEST_LENGTH);
+    
+        String hash = "CID:";
 		char hexBuf[3];
-		int i = 0;
-		SHA1_ctx sha_ctx;
-		unsigned char digest[HASH_KEYSIZE];
-		SHA1_init(&sha_ctx);
-		SHA1_update(&sha_ctx, (unsigned char *)xiah.payload(), xiah.plen());
-		SHA1_final(digest, &sha_ctx);
-		for(i = 0; i < HASH_KEYSIZE; i++) {
+		for(int i = 0; i < SHA_DIGEST_LENGTH; i++) {
 			sprintf(hexBuf, "%02x", digest[i]);
 			hash.append(const_cast<char *>(hexBuf), 2);
 		}
@@ -4427,14 +4425,12 @@ void XTRANSPORT::XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	String src;
 
 	/* Computes SHA1 Hash if user does not supply it */
-	char hexBuf[3];
-	int i = 0;
-	SHA1_ctx sha_ctx;
-	unsigned char digest[HASH_KEYSIZE];
-	SHA1_init(&sha_ctx);
-	SHA1_update(&sha_ctx, (unsigned char *)pktPayload.c_str() , pktPayload.length() );
-	SHA1_final(digest, &sha_ctx);
-	for(i = 0; i < HASH_KEYSIZE; i++) {
+    unsigned char digest[SHA_DIGEST_LENGTH];
+    xs_getSHA1Hash((const unsigned char *)pktPayload.c_str(), \
+        pktPayload.length(), digest, SHA_DIGEST_LENGTH);
+    
+    char hexBuf[3];
+	for(int i = 0; i < SHA_DIGEST_LENGTH; i++) {
 		sprintf(hexBuf, "%02x", digest[i]);
 		src.append(const_cast<char *>(hexBuf), 2);
 	}
