@@ -82,6 +82,3 @@ if __name__ == "__main__":
     if args.client:
         logging.debug("Listening for network announcements")
         beacon_handler(policy)
-    #new_descriptor = ndap_pb2.NetDescriptor()
-    #new_descriptor.ParseFromString(serialized_beacon)
-    #ndap_beacon.print_descriptor(new_descriptor)
