@@ -6,8 +6,11 @@ import logging
 import ndap_pb2
 import uuid
 
+def beacon_str(net_descriptor):
+    return protobuf_text_format.MessageToString(net_descriptor)
+
 def print_descriptor(net_descriptor):
-    print protobuf_text_format.MessageToString(net_descriptor)
+    print beacon_str(net_descriptor)
 
 # For now we just build a beacon with a dummy AuthCapStruct
 def build_beacon(guid=None, xip_netid=None):

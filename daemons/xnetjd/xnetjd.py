@@ -54,10 +54,7 @@ def beacon_handler(policy):
         logging.debug("Sent by: %02x:%02x:%02x:%02x:%02x:%02x" % sendermac)
         # Remaining data is the beacon
         serialized_beacon = data[8:]
-        #beacon = ndap_pb2.NetDescriptor()
-        #beacon.ParseFromString(serialized_beacon)
-        #print "Beacon contained:"
-        #ndap_beacon.print_descriptor(beacon)
+        # Pass the serialized beacon to policy module and move on
         policy.process_serialized_beacon(serialized_beacon)
 
 # Argument parser

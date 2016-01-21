@@ -60,6 +60,7 @@ class NetjoinPolicy:
         # Convert beacon to an object we can look into
         beacon = ndap_pb2.NetDescriptor()
         beacon.ParseFromString(serialized_beacon)
+        logging.info("Beacon:\n {}".format(ndap_beacon.beacon_str(beacon)))
         if is_joinable(beacon):
             # Initiate Netjoiner action and add to known_beacons as JOINING
             pass
