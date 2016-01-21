@@ -1,15 +1,17 @@
+#include <stdint.h>
 #include <syslog.h>
 #include <errno.h>
 #include <map>
 #include <string>
 using namespace std;
 
-#include <stdint.h>
+
 #include "clicknetxia.h"
 #include "Xsocket.h"
 #include "Xsecurity.h"
 #include "dagaddr.hpp"
 #include "Xkeys.h"
+#include "scion.h"
 
 #define DEFAULT_NAME "host0"
 #define APPNAME "xrendezvous"
@@ -229,7 +231,7 @@ void print_packet_header(click_xia *xiah)
 			case CLICK_XIA_XID_TYPE_IP:
 				strcpy(type, "4ID");
 				break;
-		        case CLICK_XIA_XID_TYPE_SCION:
+		        case CLICK_XIA_XID_TYPE_SCIONID:
 				strcpy(type, "SCION");
 				break;
 			default:
@@ -259,51 +261,9 @@ void process_data(int datasock)
 	print_packet_contents(packet, retval);
 	click_xia *xiah = reinterpret_cast<struct click_xia *>(packet);
 	print_packet_header(xiah);
-	/*
-	syslog(LOG_INFO, "======= RAW PACKET HEADER ========");
-	syslog(LOG_INFO, "ver:%d", xiah->ver);
-	syslog(LOG_INFO, "nxt:%d", xiah->nxt);
-	syslog(LOG_INFO, "plen:%d", htons(xiah->plen));
-	syslog(LOG_INFO, "hlim:%d", xiah->hlim);
-	syslog(LOG_INFO, "dnode:%d", xiah->dnode);
-	syslog(LOG_INFO, "snode:%d", xiah->snode);
-	syslog(LOG_INFO, "last:%d", xiah->last);
-	int total_nodes = xiah->dnode + xiah->snode;
-	for(int i=0;i<total_nodes;i++) {
-		uint8_t id[20];
-		char hex_string[41];
-		bzero(hex_string, 41);
-		memcpy(id, xiah->node[i].xid.id, 20);
-		for(int j=0;j<20;j++) {
-			sprintf(&hex_string[2*j], "%02x", (unsigned int)id[j]);
-		}
-		char type[10];
-		bzero(type, 10);
-		switch (htonl(xiah->node[i].xid.type)) {
-			case CLICK_XIA_XID_TYPE_AD:
-				strcpy(type, "AD");
-				break;
-			case CLICK_XIA_XID_TYPE_HID:
-				strcpy(type, "HID");
-				break;
-			case CLICK_XIA_XID_TYPE_SID:
-				strcpy(type, "SID");
-				break;
-			case CLICK_XIA_XID_TYPE_CID:
-				strcpy(type, "CID");
-				break;
-			case CLICK_XIA_XID_TYPE_IP:
-				strcpy(type, "4ID");
-				break;
-			default:
-				sprintf(type, "%d", xiah->node[i].xid.type);
-		};
-		syslog(LOG_INFO, "%s:%s", type, hex_string);
-	}
-	*/
         
 #if 1
-	xiah->node[0].xid.type = CLICK_XIA_XID_TYPE_SCION;
+	xiah->node[0].xid.type = htonl(CLICK_XIA_XID_TYPE_SCIONID);
 #endif
           
 #if 0   // keep the same id
@@ -449,8 +409,13 @@ void process_control_message(int controlsock)
 	// Heartbeat message?
 }
 
-int main(int argc, char *argv[]) {
+//void print_scion_header(SCIONHeader *scionh)
+//{
+//	syslog(LOG_INFO, "======= SCION HEADER ========");
+//}
 
+
+int main(int argc, char *argv[]) {
 	// Parse command-line arguments
 	config(argc, argv);
 	syslog(LOG_NOTICE, "%s started on %s", APPNAME, hostname);
@@ -498,6 +463,7 @@ int main(int argc, char *argv[]) {
 			process_data(datasock);
 		}
 	}
+
 	return 0;
 
 }
