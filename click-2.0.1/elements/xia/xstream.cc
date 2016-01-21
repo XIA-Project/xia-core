@@ -2007,7 +2007,7 @@ XStream::tcp_newtcpcb()
 
 
 XStream::XStream(XTRANSPORT *transport, const unsigned short port)
-	: sock(transport, port, XSOCKET_STREAM), _q_recv(this), _q_usr_input(this)
+	: sock(transport, port, TransportHeader::XSOCK_STREAM), _q_recv(this), _q_usr_input(this)
 {
 
     tp = tcp_newtcpcb();

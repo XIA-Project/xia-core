@@ -397,6 +397,8 @@ class sock : public Element {
 
 		unsigned short nxt_xport;
 
+		int refcount;				// # of processes that have this socket open
+
 		/* =========================
 		 * "TCP" state
 		 * ========================= */

@@ -79,6 +79,7 @@ sock::sock(
 	_errh = transport -> error_handler();
 	hlim = HLIM_DEFAULT;
 	nxt = CLICK_XIA_NXT_TRN;
+	refcount = 0;
 }
 
 sock::sock() {
@@ -122,6 +123,7 @@ sock::sock() {
 	num_migrate_tries = 0;
 	migrate_pkt = NULL;
 	recv_pending = false;
+	refcount = 0;
 }
 XTRANSPORT::XTRANSPORT() : _timer(this)
 {
@@ -711,7 +713,7 @@ void XTRANSPORT::run_timer(Timer *timer)
 
 	if (timer == _fast_ticks) {
 		for (; i; i++) {
-			if (i->second->get_type() == XSOCKET_STREAM &&
+			if (i->second->get_type() == SOCK_STREAM &&
 			        !i->second->reap)
 			{
 				con = dynamic_cast<XStream *>(i->second);
@@ -719,7 +721,7 @@ void XTRANSPORT::run_timer(Timer *timer)
 			}
 		}
 		for (; j; j++) {
-			if (j->second->get_type() == XSOCKET_STREAM &&
+			if (j->second->get_type() == SOCK_STREAM &&
 			        !j->second->reap)
 			{
 				con = dynamic_cast<XStream *>(j->second);
@@ -729,7 +731,7 @@ void XTRANSPORT::run_timer(Timer *timer)
 		_fast_ticks->reschedule_after_msec(TCP_FAST_TICK_MS);
 	} else if (timer == _slow_ticks) {
 		for (; i; i++) {
-			if (i->second->get_type() == XSOCKET_STREAM &&
+			if (i->second->get_type() == SOCK_STREAM &&
 			        !i->second->reap)
 			{
 				con = dynamic_cast<XStream *>(i->second);
@@ -737,7 +739,7 @@ void XTRANSPORT::run_timer(Timer *timer)
 			}
 		}
 		for (; j; j++) {
-			if (j->second->get_type() == XSOCKET_STREAM &&
+			if (j->second->get_type() == SOCK_STREAM &&
 			        !j->second->reap)
 			{
 				con = dynamic_cast<XStream *>(j->second);
@@ -2327,7 +2329,7 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	sock *sk = portToSock.get(_sport);
 	bool teardown_now = true;
 
-	INFO("closing %d %d sk = %p state=%s\n", _sport, sk->port, sk, StateStr(sk->state));
+	INFO("closing %d %d sk = %p state=%s ref = %d\n", _sport, sk->port, sk, StateStr(sk->state), sk->refcount);
 
 	if (!sk) {
 		// this shouldn't happen!
@@ -2391,7 +2393,7 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 	// 	sk->so_error = EALREADY;
 	// 	ReturnResult(_sport, xia_socket_msg, -1, EALREADY);
 	// }
-	if (sk ->get_type() == XSOCKET_STREAM) {
+	if (sk ->get_type() == SOCK_STREAM) {
 		XStream *tcp_conn = dynamic_cast<XStream *>(sk);
 		if (tcp_conn -> tp->t_state == TCPS_SYN_SENT) {
 			// a connect is already in progress
