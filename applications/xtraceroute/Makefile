@@ -1,6 +1,5 @@
 include ../../xia.mk
 
-CC=g++
 LDFLAGS += $(LIBS)
 
 OUT=xtraceroute

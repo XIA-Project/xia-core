@@ -27,10 +27,16 @@ ETC=\$(XIADIR)/etc
 XLIB=\$(APIDIR)/lib
 XINC=\$(APIDIR)/include
 
-CC=g++
-LD=g++
-CFLAGS=-Wall -Wextra -I\$(XINC)
-LDFLAGS=-lpthread
+MIPSHOMEDIR=/opt/buildroot-2013.11/output/host
+MIPSINCDIR=\$(MIPSHOMEDIR)/usr/include/
+MIPSPYINCDIR=\$(MIPSHOMEDIR)/usr/include/python2.7/
+MIPSLIBDIR=\$(MIPSHOMEDIR)/usr/lib/
+
+CC=/opt/buildroot-2013.11/output/host/usr/bin/mips-linux-g++
+LD=/opt/buildroot-2013.11/output/host/usr/bin/mips-linux-g++
+CFLAGS=-Wall -Wextra -march=24kc -fomit-frame-pointer -fPIC -pipe -I\$(XINC) -I\$(MIPSINCDIR) -I\$(MIPSPYINCDIR)
+LDFLAGS=-I\$(MIPSLIBDIR) -lpthread
+
 ifeq (\$(wildcard \$(XLIB)/libXsocket.a),)
 	LIBS=\$(XLIB)/libXsocket.so \$(XLIB)/libdagaddr.so \$(XLIB)/libXssl.so
 else

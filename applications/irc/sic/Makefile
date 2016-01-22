@@ -1,7 +1,9 @@
 # sic - simple irc client
 
-include ../../../xia.mk
 include config.mk
+include ../../../xia.mk
+
+LDFLAGS += $(LIBS)
 
 SRC = sic.c
 OBJ = ${SRC:.c=.o}
