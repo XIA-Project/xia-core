@@ -40,6 +40,17 @@
 extern "C" {
 #endif
 
+#ifdef __mips__ // to add missing constants
+    #define F_SETOWN_EX 15
+    #define F_GETOWN_EX 16
+    #define F_SETPIPE_SZ 1031
+    #define F_GETPIPE_SZ 1032
+    #define SO_REUSEPORT 15
+    #define IPPROTO_BEETPH 94
+    #define MSG_FASTOPEN 0x20000000
+#endif
+
+
 #define MAXBUFLEN    15600 // Note that this limits the size of chunk we can receive TODO: What should this be?
 #define XIA_MAXBUF   MAXBUFLEN
 #define XIA_MAXCHUNK MAXBUFLEN
