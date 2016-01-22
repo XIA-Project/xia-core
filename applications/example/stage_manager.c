@@ -227,6 +227,7 @@ void *clientCmd(void *socketid)
 			say("clientCmd````````````````````````````The sock is %d\n", sock);
 			delegationHandler(sock, cmd + 6);
 			pthread_mutex_unlock(&StageControl);
+			pthread_mutex_unlock(&FetchControl);
 		}
 		usleep(SCAN_DELAY_MSEC*1000);
 	}
@@ -361,11 +362,14 @@ cerr<<"Thread id "<<thread_id<<": "<<"Network changed, create another thread to 
 					// receive chunk ready msg one by one
 					for (unsigned i = 0; i < CIDs.size(); i++) {
 						memset(reply, '\0', strlen(reply));
+						//Bug Here!!!!!!!
 						sayHello(netStageSock, send_to_stage_server_);
+						say("BUG --BUG -- RecvBUG -- RecvBUG -- RecvBUG -- RecvBUG -- RecvBUG -- RecvBUG -- Recv\n");
 						if ((n = Xrecv(netStageSock, reply, sizeof(reply), 0)) < 0) {
 							Xclose(netStageSock);
 							die(-1, "Unable to communicate with the server\n");
 						}
+						say("No BUGNo BUGNo BUGNo BUGNo BUGNo BUGNo BUGNo BUGNo BUGNo BUGNo BUGNo BUGNo BUGNo BUG\n");
 //cerr<<reply<<endl;
 						// update "ready" to stage state
 						if (strncmp(reply, "ready", 5) == 0) {
@@ -418,7 +422,7 @@ cerr<<"Thread id "<<thread_id<<": "<<"Network changed, create another thread to 
 //void *fetchData(void *socketid)
 void *fetchData(void *)
 {
-	pthread_mutex_lock(&FetchControl);
+	//pthread_mutex_lock(&FetchControl);
 	int chunkSock;
     //int clientSock = *((int*)socketid);
 	char fetchinfo_send_to_client_[XIA_MAX_BUF];

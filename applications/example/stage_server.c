@@ -108,6 +108,7 @@ say("In stage control, getting chunk: %s\n", string2char(CIDs[i]));
 				hearHello(sock);
 				// Send chunk ready message to state manager.
 				sendStreamCmd(sock, reply);
+				cerr << "xsend return ----- xsend return ---- xsend return ---- " << CIDs[i] << endl;
 				break;
 			}
             pthread_mutex_unlock(&profileLock);

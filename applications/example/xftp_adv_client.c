@@ -127,7 +127,9 @@ int getFile(int sock)
 						say("unable to request chunks\n");
 						return -1;
 					}
+					cerr << "<<<<<<<<<<<<<<<<<<<<<<<<< Before recv." << endl;
 					recv(stageManagerSock,recvBuff,MAX_XID_SIZE,0);
+					cerr << "<<<<<<<<<<<<<<<<<<<<<<<<< The content of recvBuff is: " << recvBuff << endl;
 					//hearHello(stageManagerSock);
 					//sprintf(dag, "RE ( %s %s ) CID:%s", myAD, myHID, string2char(CIDs[i]));
 					//cs[0].cidLen = strlen(dag);

@@ -899,7 +899,7 @@ int registerUnixStageManager(const char* servername){
   struct sockaddr_un un;
   memset(&un, 0, sizeof(un));            /* fill socket address structure with our address */
   un.sun_family = AF_UNIX;
-  sprintf(un.sun_path, "scktmp%05d", getpid());
+  sprintf(un.sun_path, "/tmp/scktmp%05d", getpid());
   len = offsetof(struct sockaddr_un, sun_path) + strlen(un.sun_path);
   unlink(un.sun_path);               /* in case it already exists */
   if (bind(fd, (struct sockaddr *)&un, len) < 0)
