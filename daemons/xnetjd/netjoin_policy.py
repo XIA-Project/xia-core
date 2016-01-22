@@ -13,20 +13,15 @@ class NetjoinPolicy:
 
     def __init__(self):
         logging.debug("Policy module initialized")
+
+        # Beacons seen before. One set for each policy instance
         self.known_beacons = {}
-        # Load list of available auth providers from config file
+
+        #TODO Load list of available auth providers from config file
+        #TODO Load list of XIP networks we can join?
 
     def print_known_beacons(self):
         print self.known_beacons.keys()
-
-    def get_beacon_id(self, beacon):
-        return hashlib.sha256(beacon.SerializeToString()).hexdigest()
-
-    def is_known_beacon(self, beacon):
-        beacon_ID = self.get_beacon_id(beacon)
-        if beacon_ID in self.known_beacons:
-            return True
-        return False
 
     def keep_known_beacon_id(self, beacon_ID, state):
         if beacon_ID in self.known_beacons:
@@ -54,6 +49,7 @@ class NetjoinPolicy:
             return False
         return True
 
+    # Remove nodes that we cannot satisfy from the joining graph
     def reduce_graph(self, G):
         # Load list of auth providers we support
         # Load list of XIP networks we can join
@@ -106,17 +102,13 @@ class NetjoinPolicy:
                 pass
         return path
 
+    # Get a beacon ID from serialized protobuf containing beacon
     def get_serialized_beacon_id(serialized_beacon):
         return hashlib.sha256(serialized_beacon).hexdigest()
 
+    # Check given beacon ID against list of known beacons
     def is_known_beacon_id(self, beacon_id):
         if beacon_id in self.known_beacons:
-            return True
-        return False
-
-    def is_known_serialized_beacon(self, serialized_beacon):
-        beacon_ID = get_serialized_beacon_id(serialized_beacon)
-        if beacon_ID in self.known_beacons:
             return True
         return False
 
@@ -155,7 +147,7 @@ if __name__ == "__main__":
     serialized_test_beacon = ndap_beacon.build_beacon()
     test_beacon = ndap_pb2.NetDescriptor()
     test_beacon.ParseFromString(serialized_test_beacon)
-    beacon_ID = policy.get_beacon_id(test_beacon)
+    beacon_ID = policy.get_serialized_beacon_id(serialized_test_beacon)
     policy.keep_known_beacon_id(beacon_ID, NetjoinPolicy.JOINING)
     policy.print_known_beacons()
     policy.remove_known_beacon_id(beacon_ID)
