@@ -1,0 +1,57 @@
+General GNU/Linux instructions for MIPS cross compilation (tested on Debian 8)
+Rui Meireles
+
+A. Extract arada toolchain to /opt/buildroot-2013.11 (if you need the file ask me, can't put it in a public folder)
+
+B. Compiling protobuf for MIPS (used version protobuf-3.0.0-beta-2)
+
+1. First you must compile protobuf for the localhost architecture, because protoc (protobuf compiler) has to be executed by the build process. For this just copy the release to another folder and run:
+$ ./configure
+$ make
+$ make check
+$ sudo make install
+$ sudo ldconfig
+
+Now we can focus on cross-compiling protobuf for the MIPS architecture. Run:
+
+$ export PATH=/opt/buildroot-2013.11/output/host/usr/bin/:$PATH
+
+$ ./configure --host=mips-linux --prefix=/opt/buildroot-2013.11/output/host/usr/ --with-protoc=<path-to-localhost-architecture/protoc-binary>
+
+$ make
+$ make check # (this will fail but it's OK)
+$ sudo make install
+
+
+C. Cross compiling openssl:
+
+I used version 1.0.2e.  Download, extract, and cd into the directory. Then run:
+
+$ export CC=/opt/buildroot-2013.11/output/host/usr/bin/mips-linux-gcc 
+
+$ ./configure shared no-ssl2 --prefix=/opt/buildroot-2013.11/output/host/usr/ linux-mips32
+
+$ sudo make install
+
+D. Cross compiling python 2.7.11
+
+Download, extract and cd into the Python-2.7.11 folder.
+We need to build some stuff for the current host. Without these steps it doesn't work, although I don't really understand why. Run the following commands:
+
+$ ./configure
+$ make python.exe Parser/pgen
+$ mv python.exe python_for_build
+$ mv Parser/pgen Parser/pgen_for_build
+
+Now on to the cross compilation proper:
+
+$ export PATH=/opt/buildroot-2013.11/output/host/usr/bin/:$PATH
+
+$ ./configure --host=mips-linux --build=x86_64-linux-gnu --prefix=/opt/buildroot-2013.11/output/host/usr/ --disable-ipv6 ac_cv_file__dev_ptmx=no ac_cv_file__dev_ptc=no ac_cv_have_long_long_format=yes
+
+$ make CFLAGS="-g0 -s -O2 -march=24kc -fomit-frame-pointer -fPIC -fdata-sections -ffunction-sections -pipe"
+
+E. Now simply go to the XIA root folder, do ./configure and make. Et voilá. :)
+
+
+
