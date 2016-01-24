@@ -102,14 +102,18 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	int ret, sock;
 	Graph g(addr);
 
+	LOG_CTRL_INFO("Fetching content from remote DAG = %s\n", g.dag_string().c_str());
+
+	LOG_CTRL_INFO("Trying Xsocket\n");
 	sock = Xsocket(AF_XIA, SOCK_STREAM, 0);
 	if(sock < 0) {
+		LOG_CTRL_INFO("Can't create socket\n");
 		return RET_FAILED;
 	}
 
-	LOG_CTRL_INFO("Fetching content from remote DAG = %s\n", g.dag_string().c_str());
-
-	if(Xconnect(sock, (struct sockaddr *)addr, addrlen) < 0) {
+	LOG_CTRL_INFO("Trying Xconnect\n");
+	if (Xconnect(sock, (struct sockaddr *)addr, addrlen) < 0) {
+		LOG_CTRL_INFO("Errno = %d\n", errno);
 		return RET_FAILED;
 	}
 
@@ -124,7 +128,9 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	meta->set_FETCHING();
 
 	do {
+		LOG_CTRL_INFO("Waiting XRECV\n");
 		ret = Xrecv(sock, buf, XIA_MAXBUF, 0);
+		LOG_CTRL_INFO("Xrecv returned %d\n", ret);
 		if(ret <= 0)
 			break;
 
@@ -141,8 +147,6 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 		delete meta;
 		return RET_FAILED;
 	}
-
-	LOG_CTRL_INFO("DATA = %s", data.c_str());
 
 	if(!(flags & XCF_SKIPCACHE))
 		__store(context, meta, (const std::string *)&data);
@@ -174,16 +178,21 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen, 
 	meta = acquire_meta(cid);
 	LOG_CTRL_INFO("Fetching content from local\n");
 
+	LOG_CTRL_INFO("Here %d", __LINE__);
 	if(!meta) {
+		LOG_CTRL_INFO("Here %d", __LINE__);
 		/* We could not find the content locally */
 		return RET_FAILED;
 	}
 
 	if(!meta->is_AVAILABLE()) {
+		LOG_CTRL_INFO("Here %d", __LINE__);
 		release_meta(meta);
+		LOG_CTRL_INFO("Here %d", __LINE__);
 		return RET_FAILED;
 	}
 
+	LOG_CTRL_INFO("Getting data by calling meta->get()\n");
 	data = meta->get();
 
 	ret = RET_OKNORESP;
@@ -194,7 +203,11 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen, 
 		ret = RET_OKSENDRESP;
 	}
 
+	LOG_CTRL_INFO("Releasing meta\n");
+
 	release_meta(meta);
+
+	LOG_CTRL_INFO("Fetching content from local DONE\n");
 
 	return ret;
 }
@@ -227,13 +240,23 @@ void *xcache_controller::__fetch_content(void *__args)
 	struct __fetch_content_args *args = (struct __fetch_content_args *)__args;
 	sockaddr_x addr;
 	size_t daglen;
+	int dirty_try;
 
 	daglen = args->cmd->dag().length();
 	memcpy(&addr, args->cmd->dag().c_str(), args->cmd->dag().length());
 
 	ret = args->ctrl->fetch_content_local(&addr, daglen, args->resp, args->cmd, args->flags);
-	if(ret == RET_FAILED)
+	if(ret == RET_FAILED) {
+		dirty_try = 5;
+retry_fetch:
 		ret = args->ctrl->fetch_content_remote(&addr, daglen, args->resp, args->cmd, args->flags);
+		dirty_try--;
+		if (ret == RET_FAILED && dirty_try > 0) {
+			LOG_CTRL_INFO("fetch_content_remote returned %d\n", ret);
+			goto retry_fetch;
+		}
+
+	}
 
 	args->ret = ret;
 	if(!(args->flags & XCF_BLOCK)) {
@@ -410,8 +433,6 @@ int xcache_controller::__store(struct xcache_context *context, xcache_meta *meta
 	register_meta(meta);
 	store_manager.store(meta, data);
 
-	LOG_CTRL_INFO("STORING %s\n", data->c_str());
-
 	meta->set_AVAILABLE();
 	meta->unlock();
 	unlock_meta_map();
@@ -480,6 +501,7 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 	Graph g(mypath);
 	Node cid(g.get_final_intent());
 	xcache_cmd resp;
+	int ret;
 
 	LOG_CTRL_INFO("CID = %s\n", cid.id_string().c_str());
 
@@ -509,7 +531,10 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 
 		remaining -= to_send;
 
-		Xsend(sock, buf, to_send + header_size, 0);
+		LOG_CTRL_INFO("Calling Xsend\n");
+		ret = Xsend(sock, buf, to_send + header_size, 0);
+		LOG_CTRL_INFO("Xsend was sending %d and returned %d\n",
+			      to_send + header_size, ret);
 
 		offset += to_send;
 	}
@@ -614,6 +639,7 @@ void xcache_controller::process_req(xcache_req *req)
 	case xcache_cmd::XCACHE_FETCHCHUNK:
 		cmd = (xcache_cmd *)req->data;
 		ret = xcache_fetch_content(&resp, cmd, cmd->flags());
+		LOG_CTRL_INFO("xcache_fetch_content returned %d\n", ret);
 		if(ret == RET_OKSENDRESP) {
 			resp.SerializeToString(&buffer);
 			send_response(req->to_sock, buffer.c_str(), buffer.length());
@@ -633,6 +659,7 @@ void xcache_controller::process_req(xcache_req *req)
 	}
 
 	if(req->flags & XCFI_REMOVEFD) {
+		LOG_CTRL_INFO("Closing Socket\n");
 		Xclose(req->to_sock);
 	}
 }
@@ -712,7 +739,7 @@ repeat:
 	}
 
 	Xselect(max + 1, &fds, NULL, NULL, NULL);
-	LOG_CTRL_INFO("Broken\n");
+//	LOG_CTRL_INFO("Broken\n");
 
 	if(FD_ISSET(libsocket, &fds)) {
 		int new_connection = accept(libsocket, NULL, 0);
@@ -727,12 +754,14 @@ repeat:
 		sockaddr_x mypath;
 		socklen_t mypath_len = sizeof(mypath);
 
+		LOG_CTRL_INFO("Accepting!\n");
 		if((accept_sock = XacceptAs(sendersocket, (struct sockaddr *)&mypath,
 									&mypath_len, NULL, NULL)) < 0) {
 			LOG_CTRL_ERROR("XacceptAs failed\n");
 		} else {
 			xcache_req *req = new xcache_req();
 
+			LOG_CTRL_INFO("XacceptAs Succeeded\n");
 			/* Create a request to add to worker queue */
 
 			/* Send chunk Request */
@@ -746,6 +775,7 @@ repeat:
 			req->flags = XCFI_REMOVEFD;
 
 			enqueue_request_safe(req);
+			LOG_CTRL_INFO("Request Enqueued\n");
 		}
 	}
 

@@ -14,7 +14,7 @@
 #include <errno.h>
 #include "api/xcache.h"
 
-#define DEFAULT_THREADS 4
+#define DEFAULT_THREADS 2
 #define MAX_XID_SIZE 100
 
 struct xcache_conf {
