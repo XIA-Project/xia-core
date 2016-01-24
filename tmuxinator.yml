@@ -1,7 +1,7 @@
 # ~/.tmuxinator/xcache.yml
 
 name: xcache
-root: /mnt/test/xia-core
+root: ~/projects/xia-core/
 
 # Optional tmux socket
 # socket_name: foo
@@ -28,10 +28,13 @@ root: /mnt/test/xia-core
 # post: tmux -CC attach -t xcache
 
 windows:
-  - dev:
-  - click: cd click
-  - elements: cd click/elements
-  - xcache: cd xcache
+  - dev0:
+  - dev1:
+  - dev2:
+  - dev3:
+  - local_testing: cd ~/projects/xia-core/daemons/xcache/local_testing
+  - xftp_server: cd ~/projects/xia-core/daemons/xcache/local_testing/tests
+  - xftp_client: cd ~/projects/xia-core/daemons/xcache/local_testing/tests
   # - geni-host:
   #   - ssh -p 30522 hshirwad@pc3.utah.geniracks.net
   # - geni-servers:
