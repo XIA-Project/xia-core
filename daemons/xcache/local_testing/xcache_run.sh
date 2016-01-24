@@ -31,6 +31,7 @@ if [ "$1" = "run" ]; then
 	./xcache.host0 -h host0 -l 3 -m 0xFF&
 	# ./xcache.router0 -h router0 -l 3 -m 0x0&
 	# ./xcache.router1 -h router1 -l 3 -m 0x0&
+	exit 0
 fi
 
 if [ "$1" = "stop" ]; then
@@ -38,5 +39,7 @@ if [ "$1" = "stop" ]; then
 	killall xcache.host1
 	killall xcache.router0
 	killall xcache.router1
+	exit 0
 fi
-	
+
+./xcache.${1} -h ${1} -l3 -m 0xFF

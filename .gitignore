@@ -146,3 +146,6 @@ xcache_client
 daemons/xcache/local_testing
 
 key/
+
+xcache.host*
+xcache.router*
