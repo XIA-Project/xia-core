@@ -34,7 +34,7 @@ $(filter-out click, $(MAKEDIRS)):
 #### CONFIG RULES
 # add other configuration targets here as needed
 config: xia.mk
-	@cd click && ./conf_xia
+	@cd click && tarch='$(tarch)' ./conf_xia
 
 xia.mk: configure
 	@./configure

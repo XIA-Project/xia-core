@@ -7,6 +7,16 @@ fi
 
 if [ ! -f .configured ] ; then
 	echo Configuring Click.....
-	./configure --host=mips-linux --libdir=/opt/buildroot-2013.11/output/host/usr/lib --includedir=/opt/buildroot-2013.11/output/host/usr/include prefix=/tmp/usb/bin/ --enable-tools=no --disable-linuxmodule --enable-warp9 --enable-user-multithread --enable-userlevel --enable-multithread=24  --enable-ip6 --disable-ipsec --disable-analysis --disable-app --disable-aqm --disable-ethernet --disable-test --disable-threads --disable-icmp --disable-tcpudp --disable-ip "$*"
+
+	OPTFLAGS=""
+	if [ "$tarch" = "mips" ] ; then # target architecture argument
+		OPTFLAGS="--host=mips-linux --libdir=/opt/buildroot-2013.11/output/host/usr/lib --includedir=/opt/buildroot-2013.11/output/host/usr/include prefix=/tmp/usb/bin/"
+	fi
+
+	./configure $OPTFLAGS --enable-tools=no --disable-linuxmodule --enable-warp9 --enable-user-multithread --enable-userlevel --enable-multithread=24  --enable-ip6 --disable-ipsec --disable-analysis --disable-app --disable-aqm --disable-ethernet --disable-test --disable-threads --disable-icmp --disable-tcpudp --disable-ip "$*"
+
+else 
+
+
 	touch .configured
 fi

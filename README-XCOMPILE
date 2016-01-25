@@ -51,7 +51,7 @@ $ ./configure --host=mips-linux --build=x86_64-linux-gnu --prefix=/opt/buildroot
 
 $ make CFLAGS="-g0 -s -O2 -march=24kc -fomit-frame-pointer -fPIC -fdata-sections -ffunction-sections -pipe"
 
-E. Now simply go to the XIA root folder, do ./configure and make. Et voilá. :)
+E. Now simply go to the XIA root folder, do "./configure" and "make tarch=mips". This will build click, the api and the applications. :)
 
 
 
