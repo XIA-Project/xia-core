@@ -37,6 +37,14 @@ XIANEWXIDRouteTable::~XIANEWXIDRouteTable()
 	_rts.clear();
 }
 
+int XIANEWXIDRouteTable::initialize(ErrorHandler *)
+{
+	// XLog installed the syslog error handler, use it!
+	_errh = (SyslogErrorHandler*)ErrorHandler::default_handler();
+	//_timer.initialize(this);
+	return 0;
+}
+
 int
 XIANEWXIDRouteTable::configure(Vector<String> &conf, ErrorHandler *errh)
 {
@@ -92,6 +100,8 @@ XIANEWXIDRouteTable::add_handlers()
 	add_read_handler("list", list_routes_handler, 0);
 	add_write_handler("enabled", write_handler, (void *)PRINCIPAL_TYPE_ENABLED);
 	add_read_handler("enabled", read_handler, (void *)PRINCIPAL_TYPE_ENABLED);
+	add_write_handler("addmtb", set_mtb_handler, 0); /*add mapping table entry*/
+	//add_write_handler("setmtb", set_mtb__handler, 0); /*set mapping table entry*/
 }
 
 String
@@ -189,6 +199,77 @@ XIANEWXIDRouteTable::set_handler4(const String &conf, Element *e, void *thunk, E
 		return errh->error("invalid route: ", conf.c_str());
 
 	xid_str = args[0];
+
+	if (!cp_integer(args[1], &port))
+		return errh->error("invalid port: ", conf.c_str());
+
+	if (args.size() == 4) {
+		if (!cp_integer(args[3], &flags))
+			return errh->error("invalid flags: ", conf.c_str());
+	}
+
+	if (args.size() >= 3 && args[2].length() > 0) {
+	    String nxthop = args[2];
+		nexthop = new XID;
+		cp_xid(nxthop, nexthop, e);
+		//nexthop = new XID(args[2]);
+		if (!nexthop->valid()) {
+			delete nexthop;
+			return errh->error("invalid next hop xid: ", conf.c_str());
+		}
+	}
+
+	if (xid_str == "-") {
+		if (add_mode && table->_rtdata.port != -1)
+			return errh->error("duplicate default route: ", xid_str.c_str());
+		table->_rtdata.port= port;
+		table->_rtdata.flags = flags;
+		table->_rtdata.nexthop = nexthop;
+	} else {
+		 XID xid;
+		if (!cp_xid(xid_str, &xid, e)) {
+			if (nexthop) delete nexthop;
+			return errh->error("invalid XID: ", xid_str.c_str());
+		}
+		if (add_mode && table->_rts.find(xid) != table->_rts.end()) {
+			if (nexthop) delete nexthop;
+			return errh->error("duplicate XID: ", xid_str.c_str());
+		}
+
+		XIARouteData *xrd = new XIARouteData();
+		
+		xrd->port = port;
+		xrd->flags = flags;
+		xrd->nexthop = nexthop;
+		table->_rts[xid] = xrd;
+	}
+
+	return 0;
+}
+
+int
+XIANEWXIDRouteTable::set_mtb_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
+{
+	XIANEWXIDRouteTable* table = static_cast<XIANEWXIDRouteTable*>(e);
+
+	bool add_mode = !thunk;
+
+	Vector<String> args;
+	int port = 0;
+	unsigned flags = 0;
+	String xid_str;
+	XID *nexthop = NULL;
+
+        printf("call set mtb handler - SCIONDEBUG\n");
+
+	cp_argvec(conf, args);
+
+	if (args.size() < 2 || args.size() > 4)
+		return errh->error("invalid route: ", conf.c_str());
+
+	xid_str = args[0];
+
+        printf("call set mtb handler xid_str %s - SCIONDEBUG\n", xid_str);
 
 	if (!cp_integer(args[1], &port))
 		return errh->error("invalid port: ", conf.c_str());
@@ -443,7 +524,7 @@ XIANEWXIDRouteTable::push(int in_ether_port, Packet *p)
     int port;
 
 	in_ether_port = XIA_PAINT_ANNO(p);
-
+        DBG("scion: newidrouterpush");
 	click_chatter("scion:newidrouter push\n");
 	if (!_principal_type_enabled) {
 		output(2).push(p);
@@ -535,6 +616,10 @@ XIANEWXIDRouteTable::process_xcmp_redirect(Packet *p)
 int
 XIANEWXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
 {
+   DBG("scion route lookup");
+   //click_chatter("scion route: lookup route return\n");
+   //return DESTINED_FOR_LOCALHOST;
+
    const struct click_xia* hdr = p->xia_header();
    int last = hdr->last;
    if (last < 0)

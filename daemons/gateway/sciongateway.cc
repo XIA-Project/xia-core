@@ -241,6 +241,154 @@ void print_packet_header(click_xia *xiah)
 	}
 }
 
+#ifdef SCION_PACKET
+
+int my_isd = 1; // ISD ID of this router
+int my_ad = 1;  // AD ID of this router
+int neighbor_isd = 2; // ISD ID of a neighbor AD
+int neighbor_ad = 2; // AD ID of a neighbor AD
+
+#define MAX_DPDK_PORT 16
+uint32_t interface_ip[MAX_DPDK_PORT]; // current router IP address (TODO: IPv6)
+
+#define INGRESS_IF(HOF)                                                        \
+  (ntohl((HOF)->ingress_egress_if) >>                                          \
+   (12 +                                                                       \
+    8)) // 12bit is  egress if and 8 bit gap between uint32 and 24bit field
+#define EGRESS_IF(HOF) ((ntohl((HOF)->ingress_egress_if) >> 8) & 0x000fff)
+#define IN_EGRESS_IF(EN, IN) (((IN)&0x000fff) | (((EN)<<12)&0xfff000))
+
+
+
+void build_addr_hdr(SCIONCommonHeader *sch, SCIONAddr *src, SCIONAddr *dst)
+{
+  int src_len = 16;
+  int dst_len = 16;
+  int pad = (SCION_ADDR_PAD - ((src_len + dst_len) % 8)) % 8;
+  uint8_t *ptr = (uint8_t *)sch + sizeof(*sch);
+  *(uint32_t *)ptr = htonl(src->isd_ad);
+  ptr += 4;
+  //memcpy(ptr, src->host_addr, src_len);
+  ptr += src_len;
+  *(uint32_t *)ptr = htonl(dst->isd_ad);
+  ptr += 4;
+  //memcpy(ptr, dst->host_addr, dst_len);
+  sch->headerLen += src_len + dst_len + 8 + pad;
+  sch->totalLen = htons(sch->headerLen);
+}
+
+void build_cmn_hdr(SCIONCommonHeader *sch, int src_type, int dst_type, int next_hdr)
+{
+  uint16_t vsd = 0;
+  vsd |= src_type << 6;
+  vsd |= dst_type;
+  sch->versionSrcDst = htons(vsd);
+  sch->nextHeader = next_hdr;
+  sch->headerLen = sizeof(*sch);
+  sch->currentIOF = 0;
+  sch->currentOF = 0;
+  sch->totalLen = htons(sch->headerLen);
+  return;
+}
+
+size_t add_scion_header(SCIONCommonHeader* sch, char* payload, uint16_t payload_len) {
+  //int size = sizeof(SCIONCommonHeader) +
+  //           sizeof(SCIONAddr) + sizeof(SCIONAddr) +
+  //           72 + /*path + pathLen */
+  //           payload_len;  /*payload*/
+  uint8_t *ptr;
+  size_t path_length;
+  size_t header_length;
+  SCIONAddr src_addr, dst_addr;
+  
+  build_cmn_hdr(sch, ADDR_IPV4_TYPE, ADDR_IPV4_TYPE, L4_UDP);  
+
+  //Fill in SCION addresses - 
+  //we donot need the SCION addr at all.
+  //but we use the code to calculate the correct len
+  src_addr.isd_ad = ISD_AD(my_isd, my_ad);
+  //*(uint32_t *)(src_addr.host_addr) = interface_ip[0];
+  dst_addr.isd_ad = ISD_AD(neighbor_isd, neighbor_ad);
+  //*(uint32_t *)(dst_addr.host_addr) = interface_ip[0];
+  build_addr_hdr(sch, &src_addr, &dst_addr);
+
+  /* construct path info */
+  //path information - gateway should call path server to get the path info
+  InfoOpaqueField up_inf = {IOF_CORE, 1111, 1, 2};
+  HopOpaqueField up_hops = {0, 111, IN_EGRESS_IF(12, 45), 0x010203};
+  HopOpaqueField up_hops_next = {0, 111, IN_EGRESS_IF(78, 98), 0x010203};
+  InfoOpaqueField core_inf = {IOF_CORE, 2222, 1, 2};
+  HopOpaqueField core_hops = {0, 111, IN_EGRESS_IF(11, 22), 0x010203};
+  HopOpaqueField core_hops_next = {0, 111, IN_EGRESS_IF(33, 44), 0x010203};
+  InfoOpaqueField dw_inf = {IOF_CORE, 3333, 1, 2};
+  HopOpaqueField dw_hops = {0, 111, IN_EGRESS_IF(12, 45), 0x010203};
+  HopOpaqueField dw_hops_next = {0, 111, IN_EGRESS_IF(78, 78), 0x010203};  
+
+  ptr = (uint8_t *)sch + sizeof(SCIONCommonHeader) + sizeof(SCIONAddr) + sizeof(SCIONAddr);
+
+  size_t offset = 0;
+  //add path info to SCION header
+  memcpy(ptr, (void*)&up_inf, sizeof(up_inf));
+  offset += sizeof(up_inf);
+  memcpy(ptr + offset, (void*)&up_hops, sizeof(up_hops));
+  offset += sizeof(up_hops);
+  memcpy(ptr + offset, (void*)&up_hops_next, sizeof(up_hops_next));
+  offset += sizeof(up_hops_next);
+  memcpy(ptr + offset, (void*)&core_inf, sizeof(core_inf));
+  offset += sizeof(core_inf);
+  memcpy(ptr + offset, (void*)&core_hops, sizeof(core_hops));
+  offset += sizeof(core_hops);
+  memcpy(ptr + offset, (void*)&core_hops_next, sizeof(core_hops_next));
+  offset += sizeof(core_hops_next);
+  memcpy(ptr + offset, (void*)&dw_inf, sizeof(dw_inf));
+  offset += sizeof(dw_inf);
+  memcpy(ptr + offset, (void*)&dw_hops, sizeof(dw_hops));
+  offset += sizeof(dw_hops);
+  memcpy(ptr + offset, (void*)&dw_hops_next, sizeof(dw_hops_next));
+  offset += sizeof(dw_hops_next);
+  ptr += offset;
+  path_length = offset;
+  *(size_t *)ptr = htons(path_length); /*path length*/
+  path_length += 4;
+
+  header_length = sizeof(SCIONCommonHeader) +
+    sizeof(SCIONAddr) + sizeof(SCIONAddr) + path_length;
+  sch->headerLen = htons(header_length);
+
+  printf("path length is %d bytes\n", (int)path_length);
+  
+  memcpy(((uint8_t*)sch +  header_length), payload, payload_len);
+
+  sch->totalLen = htons(header_length + payload_len);
+  
+  return header_length;
+}
+
+
+void add_scion_ext_header(char* packet, char* packet_payload, uint16_t payload_len){
+  click_xia_ext* xia_ext_header = (click_xia_ext*)packet; 
+  SCIONCommonHeader *scion_common_header = (SCIONCommonHeader*)(&xia_ext_header->data[0]);
+  size_t scion_len = add_scion_header(scion_common_header, packet_payload, payload_len);
+  xia_ext_header->hlen = scion_len + 2; /*hlen is uint8 now*/ 
+  xia_ext_header->nxt = CLICK_XIA_NXT_NO; 
+  return;
+}
+
+//
+//add scion header as xia extension header
+//
+void add_scion_info(click_xia *xiah)
+{
+  char packet_payload[RV_MAX_DATA_PACKET_SIZE];
+  int total_nodes = xiah->dnode + xiah->snode;
+  char* payload = (char*)(&(xiah->node[total_nodes - 1])) + sizeof(click_xia_xid_node);
+  memcpy(packet_payload, payload, xiah->plen);
+  memset(payload, 0, xiah->plen);
+  add_scion_ext_header(payload, packet_payload, xiah->plen);
+  return; 
+}
+#endif
+
 void process_data(int datasock)
 {
 	int packetlen;
@@ -262,8 +410,11 @@ void process_data(int datasock)
 	click_xia *xiah = reinterpret_cast<struct click_xia *>(packet);
 	print_packet_header(xiah);
         
+
 #if 1
-	xiah->node[0].xid.type = htonl(CLICK_XIA_XID_TYPE_SCIONID);
+	//xiah->node[0].xid.type = htonl(CLICK_XIA_XID_TYPE_SCIONID);
+        xiah->nxt = htonl(CLICK_XIA_XID_TYPE_SCIONID);
+        add_scion_info(xiah);
 #endif
           
 #if 0   // keep the same id

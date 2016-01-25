@@ -9,6 +9,9 @@
 #include "xiaxidroutetable.hh"
 #include "scion.h"
 #include "aesni.h"
+#include "xlog.hh"
+#include <click/error.hh>
+#include <click/error-syslog.hh>
 CLICK_DECLS
 
 #define RTE_LOGTYPE_HSR RTE_LOGTYPE_USER2
@@ -50,6 +53,10 @@ so use the XIACheckDest element before using this element.
 =a StaticIPLookup, IPRouteTable
 */
 
+typedef struct {
+  uint8_t IP[4];
+} IPAddr;
+
 class XIANEWXIDRouteTable : public Element { public:
 
     XIANEWXIDRouteTable();
@@ -58,12 +65,12 @@ class XIANEWXIDRouteTable : public Element { public:
     const char *class_name() const		{ return "XIANEWXIDRouteTable"; }
     const char *port_count() const		{ return "-/-"; }
     const char *processing() const		{ return PUSH; }
-
+  
     int configure(Vector<String> &, ErrorHandler *);
     void add_handlers();
 
     void push(int in_ether_port, Packet *);
-
+int initialize(ErrorHandler *);
 	int set_enabled(int e);
 	int get_enabled();
 
@@ -78,7 +85,7 @@ protected:
     static int generate_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
 	static String read_handler(Element *e, void *thunk);
 	static int write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh);
-
+  static int set_mtb_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
     static String list_routes_handler(Element *e, void *thunk);
 
     //scion functions
@@ -127,6 +134,7 @@ protected:
 
 private:
 	HashTable<XID, XIARouteData*> _rts;
+	HashTable<XID, IPAddr> _mts;
 	XIARouteData _rtdata;
     uint32_t _drops;
 
@@ -151,7 +159,7 @@ uint32_t my_ifid[16]; // the current router's IFID
 
   struct keystruct rk; // AES-NI key structure
 
-
+SyslogErrorHandler *_errh;
 };
 
 CLICK_ENDDECLS
