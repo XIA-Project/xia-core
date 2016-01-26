@@ -1326,7 +1326,8 @@ void XTRANSPORT::SendControlPacket(int type, sock *sk, const void *payload, size
 bool XTRANSPORT::usingRendezvousDAG(XIAPath bound_dag, XIAPath pkt_dag)
 {
 	// If both DAGs match, then the pkt_dag did not come through rendezvous service
-	if(bound_dag == pkt_dag) {
+	//if(bound_dag == pkt_dag) {
+        if(1) {  // skip it for scion integration now
 		return false;
 	}
 	INFO("DAG possibly modified by a rendezvous server");
@@ -1718,7 +1719,6 @@ void XTRANSPORT::MigrateFailure(sock *sk)
 void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
-
 	XIAPath dst_path = xiah.dst_path();
 	XIAPath src_path = xiah.src_path();
 
@@ -1955,7 +1955,8 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 	}
 
 	// FIXME: this should become a migrate function
-	if(sk->dst_path != src_path) {
+	//if(sk->dst_path != src_path) {
+        if(0) { //skip it now for scion integration
 		INFO("remote path in SYNACK different from that used in SYN");
 		// Retrieve the signed payload
 		const char *payload = (const char *)thdr.payload();

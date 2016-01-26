@@ -14,7 +14,7 @@ using namespace std;
 #include "scion.h"
 
 #define DEFAULT_NAME "host0"
-#define APPNAME "xrendezvous"
+#define APPNAME "sciongateway0"
 
 #define RV_MAX_DATA_PACKET_SIZE 16384
 #define RV_MAX_CONTROL_PACKET_SIZE 1024
@@ -412,9 +412,10 @@ void process_data(int datasock)
         
 
 #if 1
-	//xiah->node[0].xid.type = htonl(CLICK_XIA_XID_TYPE_SCIONID);
-        xiah->nxt = htonl(CLICK_XIA_XID_TYPE_SCIONID);
-        add_scion_info(xiah);
+	xiah->node[0].xid.type = htonl(CLICK_XIA_XID_TYPE_SCIONID);
+	syslog(LOG_INFO, "gateway: change type to SCION");
+        //xiah->nxt = htonl(CLICK_XIA_XID_TYPE_SCIONID);
+        //add_scion_info(xiah);
 #endif
           
 #if 0   // keep the same id
@@ -596,7 +597,7 @@ int main(int argc, char *argv[]) {
 			return 2;
 		}
 
-                syslog(LOG_DEBUG, "Gateway loop");
+                //syslog(LOG_DEBUG, "Gateway loop");
 
 		if(retval == 0) {
 			// No data on control/data sockets, loop again

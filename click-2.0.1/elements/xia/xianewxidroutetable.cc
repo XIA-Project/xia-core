@@ -264,12 +264,14 @@ XIANEWXIDRouteTable::set_mtb_handler(const String &conf, Element *e, void *thunk
 
 	cp_argvec(conf, args);
 
+        //update the code to add mapping 
+
 	if (args.size() < 2 || args.size() > 4)
 		return errh->error("invalid route: ", conf.c_str());
 
 	xid_str = args[0];
 
-        printf("call set mtb handler xid_str %s - SCIONDEBUG\n", xid_str);
+        //printf("call set mtb handler xid_str %s - SCIONDEBUG\n", (char*)xid_str);
 
 	if (!cp_integer(args[1], &port))
 		return errh->error("invalid port: ", conf.c_str());
@@ -547,6 +549,7 @@ XIANEWXIDRouteTable::push(int in_ether_port, Packet *p)
 	  SET_XIA_PAINT_ANNO(q, (XIA_PAINT_ANNO(q)+TOTAL_SPECIAL_CASES)*-1);
 	  output(4).push(q); 
     }
+
     if (port >= 0) {
 	  SET_XIA_PAINT_ANNO(p,port);
 	  output(0).push(p);
@@ -619,11 +622,14 @@ XIANEWXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
    DBG("scion route lookup");
    //click_chatter("scion route: lookup route return\n");
    //return DESTINED_FOR_LOCALHOST;
-
    const struct click_xia* hdr = p->xia_header();
    int last = hdr->last;
    if (last < 0)
 	last += hdr->dnode;
+
+   DBG("scion: last %d, dnode %d\n", last, hdr->dnode);
+   click_chatter("chatter scion: last %d\n", last);
+
    const struct click_xia_xid_edge* edge = hdr->node[last].edge;
    const struct click_xia_xid_edge& current_edge = edge[XIA_NEXT_PATH_ANNO(p)];
    const int& idx = current_edge.idx;
@@ -631,13 +637,23 @@ XIANEWXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
    {
 	// unused edge -- use default route
   	return _rtdata.port;
-    }
+   }
 
-    const struct click_xia_xid_node& node = hdr->node[idx];
+   DBG("scion: idx %d\n", idx);
+   click_chatter("chatter scion: idx %d\n", idx);
 
-    XIAHeader xiah(p->xia_header());
-    
-    if (_bcast_xid == node.xid) {
+   const struct click_xia_xid_node& node = hdr->node[idx];
+
+   XIAHeader xiah(p->xia_header());
+
+   //quick hack
+   if(idx == 0){
+     DBG("scion: idx %d - return for local host\n", idx);
+     click_chatter("chatter scion: idx %d - return for local host\n", idx);
+     return DESTINED_FOR_LOCALHOST;
+   }
+
+   if (_bcast_xid == node.xid) {
     	// Broadcast packet
     	
     	XIAPath source_path = xiah.src_path();
@@ -694,6 +710,9 @@ XIANEWXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
 		}
 		else
 		{
+		  DBG("scion: no match\n");
+		  click_chatter("chatter scion: no match\n");
+
 			// no match -- use default route
 			// check if outgoing packet
 			if(_rtdata.port != DESTINED_FOR_LOCALHOST && _rtdata.port != FALLBACK && _rtdata.nexthop != NULL) {
@@ -1508,7 +1527,7 @@ void XIANEWXIDRouteTable::handle_request(Packet *m, uint8_t dpdk_rx_port) {
   struct ether_hdr *eth_hdr;
   SCIONHeader *scion_hdr;
 
-	printf("scion: handle request\n");
+  printf("scion: handle request\n");
 
   /*
   RTE_LOG(DEBUG, HSR, "packet recieved, dpdk_port=%d\n", dpdk_rx_port);
@@ -1518,7 +1537,6 @@ void XIANEWXIDRouteTable::handle_request(Packet *m, uint8_t dpdk_rx_port) {
   // if (m->ol_flags & PKT_RX_IPV4_HDR )
   //if (m->ol_flags & PKT_RX_IPV4_HDR || eth_hdr->ether_type == ntohs(0x0800)) {
   if (1) {
-
     // from local socket?
     uint8_t from_local_socket = 0;
     if (dpdk_rx_port % 2 == 1) {
@@ -1540,7 +1558,6 @@ void XIANEWXIDRouteTable::handle_request(Packet *m, uint8_t dpdk_rx_port) {
         process_ifid_request(m, dpdk_rx_port);
       //else
       //  RTE_LOG(WARNING, HSR, "IFID packet from local socket\n");
-
       break;
     case BEACON_PACKET:
       process_pcb(m, from_local_socket, dpdk_rx_port);

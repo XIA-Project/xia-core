@@ -330,7 +330,7 @@ int main(int argc, char **argv)
         bzero(&hints, sizeof(hints));
         hints.ai_flags = XAI_SCION;
  
-//	signal(SIGINT, quithandler);
+	signal(SIGINT, quithandler);
 
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 
