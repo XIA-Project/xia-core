@@ -305,7 +305,7 @@ router()
 			cd $XIADIR/bin
 			./xrouted -h $host $LOG_FLAGS &
 			./xhcp_serverd -h $host $LOG_FLAGS &
-			./xcache -h $host -l3 -m 0xFF&
+			LD_LIBRARY_PATH=${XIADIR}/api/lib ./xcache -h $host -l3 -m 0xFF&
 			sleep 0.5
 			;;
 		"stop")
@@ -336,7 +336,7 @@ host()
 	case $action in
 		"start")
 			./xhcp_clientd -h $host $LOG_FLAGS &
-			./xcache -h $host -l3 -m 0xFF&
+			LD_LIBRARY_PATH=${XIADIR}/api/lib ./xcache -h $host -l3 -m 0xFF&
 			sleep 0.5
 			;;
 		"stop")
