@@ -305,15 +305,18 @@ router()
 			cd $XIADIR/bin
 			./xrouted -h $host $LOG_FLAGS &
 			./xhcp_serverd -h $host $LOG_FLAGS &
+			./xcache -h $host -l3 -m 0xFF&
 			sleep 0.5
 			;;
 		"stop")
 			kill_service $host "xrouted"
 			kill_service $host "xhcp_serverd"
+			kill_service $host "xcache"
 			;;
 		"check")
 			check_service $host "xrouted"
 			check_service $host "xhcp_serverd"
+			check_service $host "xcache"
 			;;
 		*)
 			echo "unrecognized action: $action"
@@ -333,13 +336,16 @@ host()
 	case $action in
 		"start")
 			./xhcp_clientd -h $host $LOG_FLAGS &
+			./xcache -h $host -l3 -m 0xFF&
 			sleep 0.5
 			;;
 		"stop")
 			kill_service $host "xhcp_clientd"
+			kill_service $host "xcache"
 			;;
 		"check")
 			check_service $host "xhcp_clientd"
+			check_service $host "xcache"
 			;;
 		*)
 			echo "unrecognized action: $action"
