@@ -4,7 +4,7 @@ require(library xia_address.click);
 log::XLog(VERBOSE 0, LEVEL 6);
 
 // host instantiation
-$HNAME :: XIAEndHost (RE $ADNAME $HID, $HID, 1500, 0, $MAC0);
+$HNAME :: XIAEndHost (RE $ADNAME $HID, $HID, 1500, 1501, 1502, 0, $MAC0);
 
 ######
 sock_server::Socket("UDP", 0.0.0.0, $PORT) -> [0]${HNAME}[0] -> socket_client::Socket("UDP", $SOCK_IP, $PORT);
