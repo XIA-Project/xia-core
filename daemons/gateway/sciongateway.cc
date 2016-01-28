@@ -176,7 +176,7 @@ int getServerSocket(char *sid, int type)
 
 	// Data plane socket binding to the SID
 	if (Xbind(sockfd, (struct sockaddr*)sa, sizeof(sockaddr_x)) < 0) {
-   		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
+  		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
    		return -3;
 	}
 	return sockfd;
@@ -187,6 +187,22 @@ void print_packet_contents(char *packet, int len)
 	int hex_string_len = (len*2) + 1;
 	char hex_string[hex_string_len];
     int i;
+    uint8_t* data = (uint8_t*)packet;
+    bzero(hex_string, hex_string_len);
+    for(i=0;i<len;i++) {
+        sprintf(&hex_string[2*i], "%02x", (unsigned int)data[i]);
+    }
+    hex_string[hex_string_len-1] = '\0';
+	syslog(LOG_INFO, "Packet contents|%s|", hex_string);
+}
+
+void print_packet_contents_old(char *packet, int len)
+{
+	int hex_string_len = (len*2) + 1;
+	char hex_string[hex_string_len];
+    int i;
+    //uint8_t* data = (uint8_t*)packet;
+    //bzero(hex_string, hex_string_len);
     for(i=0;i<len;i++) {
         sprintf(&hex_string[2*i], "%02x", (unsigned int)packet[i]);
     }
@@ -194,12 +210,40 @@ void print_packet_contents(char *packet, int len)
 	syslog(LOG_INFO, "Packet contents|%s|", hex_string);
 }
 
-void print_packet_header(click_xia *xiah)
+void print_packet_contents_old_with_zero(char *packet, int len)
+{
+	int hex_string_len = (len*2) + 1;
+	char hex_string[hex_string_len];
+    int i;
+    //uint8_t* data = (uint8_t*)packet;
+    bzero(hex_string, hex_string_len);
+    for(i=0;i<len;i++) {
+        sprintf(&hex_string[2*i], "%02x", (unsigned int)packet[i]);
+    }
+    hex_string[hex_string_len-1] = '\0';
+	syslog(LOG_INFO, "Packet contents|%s|", hex_string);
+}
+
+void print_packet_contents_old_with_uint(char *packet, int len)
+{
+	int hex_string_len = (len*2) + 1;
+	char hex_string[hex_string_len];
+    int i;
+    uint8_t* data = (uint8_t*)packet;
+    //bzero(hex_string, hex_string_len);
+    for(i=0;i<len;i++) {
+        sprintf(&hex_string[2*i], "%02x", (unsigned int)data[i]);
+    }
+    hex_string[hex_string_len-1] = '\0';
+	syslog(LOG_INFO, "Packet contents|%s|", hex_string);
+}
+
+int print_packet_header(click_xia *xiah)
 {
 	syslog(LOG_INFO, "======= RAW PACKET HEADER ========");
 	syslog(LOG_INFO, "ver:%d", xiah->ver);
 	syslog(LOG_INFO, "nxt:%d", xiah->nxt);
-	syslog(LOG_INFO, "plen:%d", htons(xiah->plen));
+	syslog(LOG_INFO, "plen:%d, %d", htons(xiah->plen), ntohs(xiah->plen));
 	syslog(LOG_INFO, "hlim:%d", xiah->hlim);
 	syslog(LOG_INFO, "dnode:%d", xiah->dnode);
 	syslog(LOG_INFO, "snode:%d", xiah->snode);
@@ -239,6 +283,8 @@ void print_packet_header(click_xia *xiah)
 		};
 		syslog(LOG_INFO, "%s:%s", type, hex_string);
 	}
+        
+        return total_nodes;
 }
 
 #ifdef SCION_PACKET
@@ -291,7 +337,7 @@ void build_cmn_hdr(SCIONCommonHeader *sch, int src_type, int dst_type, int next_
   return;
 }
 
-size_t add_scion_header(SCIONCommonHeader* sch, char* payload, uint16_t payload_len) {
+size_t add_scion_header(SCIONCommonHeader* sch, uint8_t* payload, uint16_t payload_len) {
   //int size = sizeof(SCIONCommonHeader) +
   //           sizeof(SCIONAddr) + sizeof(SCIONAddr) +
   //           72 + /*path + pathLen */
@@ -365,26 +411,65 @@ size_t add_scion_header(SCIONCommonHeader* sch, char* payload, uint16_t payload_
 }
 
 
-void add_scion_ext_header(char* packet, char* packet_payload, uint16_t payload_len){
-  click_xia_ext* xia_ext_header = (click_xia_ext*)packet; 
+size_t add_scion_ext_header(click_xia_ext* xia_ext_header, uint8_t* packet_payload, uint16_t payload_len){
   SCIONCommonHeader *scion_common_header = (SCIONCommonHeader*)(&xia_ext_header->data[0]);
   size_t scion_len = add_scion_header(scion_common_header, packet_payload, payload_len);
   xia_ext_header->hlen = scion_len + 2; /*hlen is uint8 now*/ 
   xia_ext_header->nxt = CLICK_XIA_NXT_NO; 
-  return;
+  return xia_ext_header->hlen;
 }
 
 //
 //add scion header as xia extension header
 //
-void add_scion_info(click_xia *xiah)
+void add_scion_info(click_xia *xiah, int xia_hdr_len)
 {
-  char packet_payload[RV_MAX_DATA_PACKET_SIZE];
-  int total_nodes = xiah->dnode + xiah->snode;
-  char* payload = (char*)(&(xiah->node[total_nodes - 1])) + sizeof(click_xia_xid_node);
-  memcpy(packet_payload, payload, xiah->plen);
-  memset(payload, 0, xiah->plen);
-  add_scion_ext_header(payload, packet_payload, xiah->plen);
+  uint8_t packet_data[RV_MAX_DATA_PACKET_SIZE];
+  uint8_t* original_data;
+  //int total_nodes = xiah->dnode + xiah->snode;
+  uint16_t original_payload_len = htons(xiah->plen);
+  short data_len = 0;
+  uint8_t nxt_hdr_type = xiah->nxt;
+  uint8_t* packet = reinterpret_cast<uint8_t *>(xiah);
+  //uint16_t xia_hdr_len =  sizeof(struct click_xia) + total_nodes*sizeof(struct click_xia_xid_node);
+  uint16_t hdr_len = xia_hdr_len;
+  struct click_xia_ext* xia_ext_hdr = reinterpret_cast<struct click_xia_ext *>(packet + hdr_len);
+  
+  if(nxt_hdr_type != CLICK_XIA_NXT_NO){
+    syslog(LOG_INFO, "next header type %d, xia hdr len %d ", (int)nxt_hdr_type, hdr_len);
+    nxt_hdr_type = xia_ext_hdr->nxt;
+
+    while(nxt_hdr_type != CLICK_XIA_NXT_NO){
+      syslog(LOG_INFO, "next header type %d, hdr len %d, xia hdr len %d ", (int)nxt_hdr_type, (int)xia_ext_hdr->hlen, hdr_len);
+      hdr_len += xia_ext_hdr->hlen;
+      xia_ext_hdr = reinterpret_cast<struct click_xia_ext *>(packet + hdr_len);
+      nxt_hdr_type = xia_ext_hdr->nxt;
+    }
+
+    hdr_len += xia_ext_hdr->hlen;
+  }
+
+  original_data = packet + hdr_len;
+  data_len = xia_hdr_len + original_payload_len - hdr_len; 
+
+  syslog(LOG_INFO, "next header type %d, hdr len %d, data len %d, original payload len %d", (int)nxt_hdr_type, hdr_len, (int)data_len, original_payload_len);
+
+  assert(data_len >= 0);
+
+  memcpy(packet_data, original_data, data_len);
+  // add SCION header
+  memset(packet + hdr_len, 0, data_len);
+
+  xia_ext_hdr->nxt = CLICK_XIA_NXT_SCION;
+  
+  //now add/configure SCION ext header
+  xia_ext_hdr = reinterpret_cast<struct click_xia_ext *>(packet + hdr_len);
+  xia_ext_hdr->nxt = CLICK_XIA_NXT_NO;
+  size_t scion_hdr_len = add_scion_ext_header(xia_ext_hdr, packet_data, data_len);
+  xiah->plen = htons(original_payload_len + (uint16_t)scion_hdr_len);//htonl(original_payload_len + (uint16_t)scion_hdr_len);
+
+  syslog(LOG_INFO, "add scion hdr: final payload len is %d, scion hdr len is %d", (int)xiah->plen, (int)scion_hdr_len);
+
   return; 
 }
 #endif
@@ -407,10 +492,25 @@ void process_data(int datasock)
 	Graph g(&rdag);
 	syslog(LOG_INFO, "gateway: Packet of size:%d received from %s:", retval, g.dag_string().c_str());
 	print_packet_contents(packet, retval);
-	click_xia *xiah = reinterpret_cast<struct click_xia *>(packet);
-	print_packet_header(xiah);
-        
+	syslog(LOG_INFO, "\ngateway: old print packet contents");
+	print_packet_contents_old(packet, retval);
+	syslog(LOG_INFO, "\ngateway: old print packet contents with zero ");
+	print_packet_contents_old_with_zero(packet, retval);
+	syslog(LOG_INFO, "\ngateway: old print packet contents with unit");
+	print_packet_contents_old_with_uint(packet, retval);
 
+	click_xia *xiah = reinterpret_cast<struct click_xia *>(packet);
+	int total_nodes = print_packet_header(xiah);
+        int xia_header_size = sizeof(struct click_xia) + total_nodes * sizeof(struct click_xia_xid_node);
+        //syslog(LOG_INFO, "xia_header_size %d, and click_xia size %d", xia_header_size, sizeof(struct click_xia));
+
+        syslog(LOG_INFO, "\ngateway: XIA header contents, size %d\n", xia_header_size);
+        //print_packet_contents(packet, xia_header_size);
+
+        syslog(LOG_INFO, "\ngateway: contents after XIA header, size %d\n", retval - xia_header_size);
+        print_packet_contents(packet + xia_header_size, retval - xia_header_size);
+         
+        add_scion_info(xiah, xia_header_size);
 #if 1
 	xiah->node[0].xid.type = htonl(CLICK_XIA_XID_TYPE_SCIONID);
 	syslog(LOG_INFO, "gateway: change type to SCION");
@@ -418,27 +518,6 @@ void process_data(int datasock)
         //add_scion_info(xiah);
 #endif
           
-#if 0   // keep the same id
-	// Starting at node at offset 0, verify it is an AD node
-	if(htonl(xiah->node[0].xid.type) != CLICK_XIA_XID_TYPE_AD) {
-		syslog(LOG_ERR, "First node in destination DAG is not an AD");
-		return;
-	}
-
-	// Walk the destination DAG to find HID
-	char hid_str[41];
-	sha1_hash_to_hex_string(xiah->node[xiah->node[0].edge[0].idx].xid.id, 20, hid_str, 41);
-	syslog(LOG_INFO, "DestHost = %s", hid_str);
-	Node hidNode("HID", hid_str);
-	syslog(LOG_INFO, "DestHostID = %s", hidNode.to_string().c_str());
-	std::string ad_string(HIDtoAD[hidNode.to_string()]);
-	Node adNode(ad_string);
-	//char id_hex_string[41];
-	//bzero(id_hex_string, 41);
-	//sha1_hash_to_hex_string((unsigned char *)adNode.id(), 20, id_hex_string, 41);
-	//syslog(LOG_INFO, "AD from table = %s", id_hex_string);
-	memcpy(xiah->node[0].xid.id, adNode.id(), 20);
-#endif
 	xiah->last = -1;
 	syslog(LOG_INFO, "gateway: Updated AD and last pointer in header");
 	print_packet_header(xiah);
