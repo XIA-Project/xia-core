@@ -196,48 +196,6 @@ void print_packet_contents(char *packet, int len)
 	syslog(LOG_INFO, "Packet contents|%s|", hex_string);
 }
 
-void print_packet_contents_old(char *packet, int len)
-{
-	int hex_string_len = (len*2) + 1;
-	char hex_string[hex_string_len];
-    int i;
-    //uint8_t* data = (uint8_t*)packet;
-    //bzero(hex_string, hex_string_len);
-    for(i=0;i<len;i++) {
-        sprintf(&hex_string[2*i], "%02x", (unsigned int)packet[i]);
-    }
-    hex_string[hex_string_len-1] = '\0';
-	syslog(LOG_INFO, "Packet contents|%s|", hex_string);
-}
-
-void print_packet_contents_old_with_zero(char *packet, int len)
-{
-	int hex_string_len = (len*2) + 1;
-	char hex_string[hex_string_len];
-    int i;
-    //uint8_t* data = (uint8_t*)packet;
-    bzero(hex_string, hex_string_len);
-    for(i=0;i<len;i++) {
-        sprintf(&hex_string[2*i], "%02x", (unsigned int)packet[i]);
-    }
-    hex_string[hex_string_len-1] = '\0';
-	syslog(LOG_INFO, "Packet contents|%s|", hex_string);
-}
-
-void print_packet_contents_old_with_uint(char *packet, int len)
-{
-	int hex_string_len = (len*2) + 1;
-	char hex_string[hex_string_len];
-    int i;
-    uint8_t* data = (uint8_t*)packet;
-    //bzero(hex_string, hex_string_len);
-    for(i=0;i<len;i++) {
-        sprintf(&hex_string[2*i], "%02x", (unsigned int)data[i]);
-    }
-    hex_string[hex_string_len-1] = '\0';
-	syslog(LOG_INFO, "Packet contents|%s|", hex_string);
-}
-
 int print_packet_header(click_xia *xiah)
 {
 	syslog(LOG_INFO, "======= RAW PACKET HEADER ========");
@@ -493,19 +451,12 @@ void process_data(int datasock)
 	syslog(LOG_INFO, "gateway: Packet of size:%d received from %s:", retval, g.dag_string().c_str());
 	print_packet_contents(packet, retval);
 	syslog(LOG_INFO, "\ngateway: old print packet contents");
-	print_packet_contents_old(packet, retval);
-	syslog(LOG_INFO, "\ngateway: old print packet contents with zero ");
-	print_packet_contents_old_with_zero(packet, retval);
-	syslog(LOG_INFO, "\ngateway: old print packet contents with unit");
-	print_packet_contents_old_with_uint(packet, retval);
 
 	click_xia *xiah = reinterpret_cast<struct click_xia *>(packet);
 	int total_nodes = print_packet_header(xiah);
         int xia_header_size = sizeof(struct click_xia) + total_nodes * sizeof(struct click_xia_xid_node);
-        //syslog(LOG_INFO, "xia_header_size %d, and click_xia size %d", xia_header_size, sizeof(struct click_xia));
-
         syslog(LOG_INFO, "\ngateway: XIA header contents, size %d\n", xia_header_size);
-        //print_packet_contents(packet, xia_header_size);
+        print_packet_contents(packet, xia_header_size);
 
         syslog(LOG_INFO, "\ngateway: contents after XIA header, size %d\n", retval - xia_header_size);
         print_packet_contents(packet + xia_header_size, retval - xia_header_size);
@@ -514,8 +465,6 @@ void process_data(int datasock)
 #if 1
 	xiah->node[0].xid.type = htonl(CLICK_XIA_XID_TYPE_SCIONID);
 	syslog(LOG_INFO, "gateway: change type to SCION");
-        //xiah->nxt = htonl(CLICK_XIA_XID_TYPE_SCIONID);
-        //add_scion_info(xiah);
 #endif
           
 	xiah->last = -1;
@@ -523,12 +472,6 @@ void process_data(int datasock)
 	print_packet_header(xiah);
 	syslog(LOG_INFO, "gateway: Sending the packet out on the network");
 	Xsend(datasock, packet, packetlen, 0);
-	// Find the AD->HID->SID this packet was destined to
-	// Verify HID is in table and find newAD
-	// If newAD is different from the AD in XIP header, update it
-	// If not, drop the packet
-	// Reset the next pointer in the XIP header
-	// Send packet back on the network
 }
 
 #define MAX_XID_STR_SIZE 64
