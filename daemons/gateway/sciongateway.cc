@@ -247,10 +247,10 @@ int print_packet_header(click_xia *xiah)
 
 #ifdef SCION_PACKET
 
-int my_isd = 1; // ISD ID of this router
-int my_ad = 1;  // AD ID of this router
-int neighbor_isd = 2; // ISD ID of a neighbor AD
-int neighbor_ad = 2; // AD ID of a neighbor AD
+int my_isd = 0; // ISD ID of this router
+int my_ad = 0;  // AD ID of this router
+int neighbor_isd = 1; // ISD ID of a neighbor AD
+int neighbor_ad = 1; // AD ID of a neighbor AD
 
 #define MAX_DPDK_PORT 16
 uint32_t interface_ip[MAX_DPDK_PORT]; // current router IP address (TODO: IPv6)
@@ -296,40 +296,41 @@ void build_cmn_hdr(SCIONCommonHeader *sch, int src_type, int dst_type, int next_
 }
 
 size_t add_scion_header(SCIONCommonHeader* sch, uint8_t* payload, uint16_t payload_len) {
-  //int size = sizeof(SCIONCommonHeader) +
-  //           sizeof(SCIONAddr) + sizeof(SCIONAddr) +
-  //           72 + /*path + pathLen */
-  //           payload_len;  /*payload*/
   uint8_t *ptr;
   size_t path_length;
   size_t header_length;
   SCIONAddr src_addr, dst_addr;
   
+  //data packet uses IPV4 although XIA-SCION does not use it at all.
+  //it is used to distinglish data or control packet
   build_cmn_hdr(sch, ADDR_IPV4_TYPE, ADDR_IPV4_TYPE, L4_UDP);  
 
   //Fill in SCION addresses - 
-  //we donot need the SCION addr at all.
-  //but we use the code to calculate the correct len
+  // we need to isd and ad information for routing.
+  // but we do not need the address info
   src_addr.isd_ad = ISD_AD(my_isd, my_ad);
   //*(uint32_t *)(src_addr.host_addr) = interface_ip[0];
   dst_addr.isd_ad = ISD_AD(neighbor_isd, neighbor_ad);
   //*(uint32_t *)(dst_addr.host_addr) = interface_ip[0];
   build_addr_hdr(sch, &src_addr, &dst_addr);
 
+
   /* construct path info */
   //path information - gateway should call path server to get the path info
-  InfoOpaqueField up_inf = {IOF_CORE, 1111, 1, 2};
-  HopOpaqueField up_hops = {0, 111, IN_EGRESS_IF(12, 45), 0x010203};
-  HopOpaqueField up_hops_next = {0, 111, IN_EGRESS_IF(78, 98), 0x010203};
-  InfoOpaqueField core_inf = {IOF_CORE, 2222, 1, 2};
-  HopOpaqueField core_hops = {0, 111, IN_EGRESS_IF(11, 22), 0x010203};
-  HopOpaqueField core_hops_next = {0, 111, IN_EGRESS_IF(33, 44), 0x010203};
-  InfoOpaqueField dw_inf = {IOF_CORE, 3333, 1, 2};
-  HopOpaqueField dw_hops = {0, 111, IN_EGRESS_IF(12, 45), 0x010203};
-  HopOpaqueField dw_hops_next = {0, 111, IN_EGRESS_IF(78, 78), 0x010203};  
+  InfoOpaqueField up_inf = {IOF_CORE, htonl(1111), htons(1), 2};
+  HopOpaqueField up_hops = {HOP_NORMAL_OF, 111, IN_EGRESS_IF(12, 45), htonl(0x010203)};
+  HopOpaqueField up_hops_next = {HOP_NORMAL_OF, 111, IN_EGRESS_IF(78, 98), htonl(0x010203)};
+  InfoOpaqueField core_inf = {IOF_CORE, htonl(2222), htons(1), 2};
+  HopOpaqueField core_hops = {HOP_NORMAL_OF, 111, htonl(IN_EGRESS_IF(11, 22)), htonl(0x010203)};
+  HopOpaqueField core_hops_next = {HOP_NORMAL_OF, 111, htonl(IN_EGRESS_IF(33, 44)), htonl(0x010203)};
+  InfoOpaqueField dw_inf = {IOF_CORE, htonl(3333), htons(1), 2};
+  HopOpaqueField dw_hops = {HOP_NORMAL_OF, 111, htonl(IN_EGRESS_IF(12, 45)), htonl(0x010203)};
+  HopOpaqueField dw_hops_next = {HOP_NORMAL_OF, 111, htonl(IN_EGRESS_IF(78, 78)), htonl(0x010203)};  
 
   ptr = (uint8_t *)sch + sizeof(SCIONCommonHeader) + sizeof(SCIONAddr) + sizeof(SCIONAddr);
 
+  sch->currentOF = sizeof(SCIONCommonHeader) + sizeof(SCIONAddr) + sizeof(SCIONAddr) + sizeof(up_inf);
+  
   size_t offset = 0;
   //add path info to SCION header
   memcpy(ptr, (void*)&up_inf, sizeof(up_inf));

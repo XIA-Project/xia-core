@@ -28,12 +28,14 @@
 
 #define SCION_UDP_PORT 30040
 #define SCION_UDP_EH_DATA_PORT 30041
+#define SCION_ROUTER_PORT 50000
 
 #define SCION_ADDR_LEN 8 // ISD + AD = 4, IPv4 ADDR = 4
 #define SCION_PROTO_SDAMP 150
 
 #define SCION_ISD_AD_LEN 4
 #define SCION_HOST_ADDR_LEN 4
+#define SCION_SVC_ADDR_LEN 2
 #define SCION_HOST_OFFSET (SCION_ISD_LEN + SCION_AD_LEN)
 
 #define SCION_COMMON_HEADER_LEN 8
@@ -48,8 +50,10 @@
 #define MASTER_KEY_LEN 16
 #define IFID_SIZE 2
 #define AID_SIZE 8
-#define TS_SIZE 2 
+#define TS_SIZE 2
 
+#define IFID_PKT_US 1000000
+#define IFSTATE_REQ_US 30000000
 
 #define MASTER_SECRET_KEY_SIZE 16 /*in bytes*/
 
@@ -99,23 +103,26 @@
 	Struct for SCION Addresses:
 	12 bits ISD ID
 	20 bits AD ID
-	4 bytes IP Addr
+	(4 bytes IPv4 Addr OR
+   16 bytes IPv6 Addr OR
+   2 bytes SVC addr)
 */
 typedef struct {
-	uint16_t isd_id:12;
-	uint32_t ad_id:20;
-	uint8_t host_addr[4];
+	uint32_t isd_ad;
+	uint8_t host_addr[16];
 } SCIONAddr;
 
+#define ISD(isd_ad) (isd_ad >> 20)
+#define AD(isd_ad) (isd_ad & 0xfffff)
+#define ISD_AD(isd, ad) ((isd) << 20 | (ad))
+
+#define SCION_ADDR_PAD 8
+ 
 typedef struct {
-	/** Packet Type of the packet*/
-	uint8_t version:4; //last bit is up/down-path flag temporally
-	/** Length of the source address */
-	uint8_t srcLen:6;
-	/** Length of the destination address*/
-	uint8_t dstLen:6;
-	/** Total Length of the packet */
-	uint16_t totalLen;
+  /** Packet Type of the packet (version, srcType, dstType) */
+  uint16_t versionSrcDst;
+  /** Total Length of the packet */
+  uint16_t totalLen;
 	/** Index of current Info opaque field*/
 	uint8_t currentIOF;
 	/** Index of current opaque field*/
@@ -126,20 +133,21 @@ typedef struct {
 	uint8_t headerLen;
 } SCIONCommonHeader;
 
+#define SRC_TYPE(sch) ((ntohs(sch->versionSrcDst) & 0xfc0) >> 6)
+#define DST_TYPE(sch) (ntohs(sch->versionSrcDst) & 0x3f)
+
 typedef struct {
     SCIONCommonHeader commonHeader;
     SCIONAddr srcAddr;
-    SCIONAddr dstAddr;
-    uint8_t *path;
-    size_t pathLen;
+    //SCIONAddr dstAddr;  // length of srcAddr depends on its type, so we cannot get dstAddr by a pointer cast...
+    //uint8_t *path;
+    //size_t pathLen;
 } SCIONHeader;
 
 typedef struct {
-	SCIONCommonHeader commonHeader;
-	SCIONAddr srcAddr;
-	SCIONAddr dstAddr;
-	uint8_t *path;
-	size_t pathLen;
+//	SCIONCommonHeader commonHeader;  //now IFID in on the SCION UDP
+//	SCIONAddr srcAddr;
+//	SCIONAddr dstAddr;
 	uint16_t reply_id; // how many bits?
 	uint16_t request_id; // how many bits?
 } IFIDHeader;
@@ -207,11 +215,11 @@ typedef struct {
 } PathSegment;
 
 typedef struct {
-	SCIONHeader hdr;
+//	SCIONHeader hdr;  //now PCB is on the SCION UDP
 	PathSegment payload;
 } PathConstructionBeacon;
 
-#define DATA_PACKET 255
+#define DATA_PACKET 0
 // Path Construction Beacon
 #define BEACON_PACKET 1
 // Path management packet from/to PS
@@ -230,13 +238,68 @@ typedef struct {
 #define CERT_CHAIN_REP_PACKET 8
 // IF ID packet to the peer router
 #define IFID_PKT_PACKET 9
+// error condition
+#define PACKET_TYPE_ERROR 99
+
+// SCION UDP packet classes
+#define PCB_CLASS 0
+#define IFID_CLASS 1
+#define CERT_CLASS 2
+#define PATH_CLASS 3
+
+// IFID Packet types
+#define IFID_PAYLOAD_TYPE 0
+
+// PATH Packet types
+#define PMT_REQUEST_TYPE 0
+#define PMT_REPLY_TYPE 1
+#define PMT_REG_TYPE 2
+#define PMT_SYNC_TYPE 3
+#define PMT_REVOCATION_TYPE 4
+#define PMT_IFSTATE_INFO_TYPE 5
+#define PMT_IFSTATE_REQ_TYPE 6
 
 #pragma pack(pop)
 
+
+//Address type
+// Null address type
+#define ADDR_NONE_TYPE  0
+// IPv4 address type
+#define ADDR_IPV4_TYPE  1
+// IPv6 address type
+#define ADDR_IPV6_TYPE  2
+// SCION Service address type
+#define ADDR_SVC_TYPE  3
+
+// SVC addresses
+#define SVC_BEACON 1
+#define SVC_PATH_MGMT 2
+#define SVC_CERT_MGMT 3
+#define SVC_IFID 4
+
+// L4 Protocols
+#define L4_UDP 17
 
 //DPDK port
 #define DPDK_EGRESS_PORT 0
 #define DPDK_LOCAL_PORT 1
 
+//Types for HopOpaqueFields (7 MSB bits).
+#define    HOP_NORMAL_OF  0b0000000
+#define    HOP_XOVR_POINT  0b0010000  //Indicates a crossover point.
+//Types for Info Opaque Fields (7 MSB bits).
+#define    IOF_CORE  0b1000000
+#define    IOF_SHORTCUT  0b1100000
+#define    IOF_INTRA_ISD_PEER  0b1111000
+#define    IOF_INTER_ISD_PEER  0b1111100
+
+#define SCION_PACKET_SIZE 256
+#define SCION_PACKET_PAYLOAD_LEN 16
+
+#define SCION_PACKET_SIZE 256
+#define SCION_PACKET_PAYLOAD_LEN 16
+
+#define SCION_PACKET // enable SCION packet in XIA packet
 
 #endif /* _ROUTE_H_ */

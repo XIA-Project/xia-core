@@ -88,50 +88,9 @@ protected:
   static int set_mtb_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
     static String list_routes_handler(Element *e, void *thunk);
 
-    //scion functions
-    int scion_init(int port);
-    int sync_interface(void); 
-    // send a packet to neighbor AD router
-    int send_egress(Packet *m, uint8_t dpdk_rx_port);
-
-    int send_ingress(Packet *m, uint32_t next_ifid,
-  			      uint8_t dpdk_rx_port);
-
-    uint8_t get_type(SCIONHeader *hdr);
-    void process_ifid_request(Packet *m, uint8_t dpdk_rx_port);
-    void l2fwd_send_packet(Packet *m, uint8_t port);
-    void process_pcb(Packet *m, uint8_t from_bs,
-				      uint8_t dpdk_rx_port);
-
-    void relay_cert_server_packet(Packet *m,
-                                  uint8_t from_local_socket,
-				  uint8_t dpdk_rx_port);
-
-    void process_path_mgmt_packet(Packet *m,
-                                  uint8_t from_local_ad,
-				  uint8_t dpdk_rx_port);
-
-    void deliver(Packet *m, uint32_t ptype,
-				  uint8_t dpdk_rx_port);
-
-    void forward_packet(Packet *m, uint32_t from_local_ad,
-					 uint8_t dpdk_rx_port);
-    void ingress_shortcut_xovr(Packet *m, uint8_t dpdk_rx_port);
-    void ingress_peer_xovr(Packet *m, uint8_t dpdk_rx_port);
-    void ingress_core_xovr(Packet *m, uint8_t dpdk_rx_port);
-    void handle_ingress_xovr(Packet *m, uint8_t dpdk_rx_port);
-    uint8_t verify_of(HopOpaqueField *hof, HopOpaqueField *prev_hof,
-                                       uint32_t ts);
-  void ingress_normal_forward(Packet *m, uint8_t dpdk_rx_port);
-  void handle_egress_xovr(Packet *m, uint8_t dpdk_rx_port);
-  void egress_shortcut_xovr(Packet *m, uint8_t dpdk_rx_port);
-  void egress_peer_xovr(Packet *m, uint8_t dpdk_rx_port);
-  void egress_core_xovr(Packet *m, uint8_t dpdk_rx_port);
-  void egress_normal_forward(Packet *m,
-			   uint8_t dpdk_rx_port);
-  void handle_request(Packet *m, uint8_t dpdk_rx_port);
+    
+    int scion_forward_packet(const struct click_xia* hdr);
   
-
 private:
 	HashTable<XID, XIARouteData*> _rts;
 	HashTable<XID, IPAddr> _mts;
@@ -144,20 +103,6 @@ private:
     XID _local_hid;
     XID _bcast_xid;
 
-uint32_t beacon_servers[MAX_NUM_BEACON_SERVERS];
-uint32_t certificate_servers[10];
-uint32_t path_servers[10];
-
-struct port_map {
-  uint8_t egress;
-  uint8_t local;
-} port_map[16];
-
-uint32_t neighbor_ad_router_ip[16];
-
-uint32_t my_ifid[16]; // the current router's IFID
-
-  struct keystruct rk; // AES-NI key structure
 
 SyslogErrorHandler *_errh;
 };
