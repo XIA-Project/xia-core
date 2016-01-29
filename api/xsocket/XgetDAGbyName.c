@@ -281,7 +281,7 @@ printf("============================= 1.2\n");
 			gcheck.fill_sockaddr((sockaddr_x*)addr);
 			*addrlen = sizeof(sockaddr_x);
 			return 0;
-    }
+		}
 	}
 //printf("Before Xsocket\n");
 	// not found locally, check the name server

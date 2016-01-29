@@ -58,6 +58,9 @@
 #define PENDING 1 // chunk is being fetched/prefetched
 #define READY 2	// chunk is available in the local/network cache
 
+#define NS_LOOKUP_RETRY_NUM 30
+#define NS_LOOKUP_WAIT_MSEC 1000
+
 using namespace std;
 
 // write the message to stdout unless in quiet mode
@@ -126,6 +129,8 @@ int initDatagramClient(const char *name, struct addrinfo *ai, sockaddr_x *sa);
 int initStreamClient(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid);
 
 int registerDatagramReceiver(char* name);
+
+int reXgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen);
 
 // register the service with the name server and open the necessary sockets, update with XListen
 int registerStreamReceiver(const char *name, char *myAD, char *myHID, char *my4ID);

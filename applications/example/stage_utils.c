@@ -379,6 +379,41 @@ int initDatagramClient(const char *name, struct addrinfo *ai, sockaddr_x *sa)
 	return sock;
 }
 
+int reXgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
+{
+	int result = -1;
+	int sock;
+	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
+		return -1;
+printf("-----------sock is %d.\n", sock);
+	for (int i = 0; i < NS_LOOKUP_RETRY_NUM; i++) {
+		printf("-----------Retried %d/%d times...\n", i + 1, NS_LOOKUP_RETRY_NUM);	
+//printf("============================= %d/%d\n", i + 1, NS_LOOKUP_RETRY_NUM);
+		struct pollfd pfds[2];
+		pfds[0].fd = sock;
+		pfds[0].events = POLLIN;
+		if (Xpoll(pfds, 1, NS_LOOKUP_WAIT_MSEC) > 0) {
+			//die(-5, "Poll returned %d\n", rc);
+/*			if ((rc = Xsendto(sock, pkt, len, 0, (const struct sockaddr*)&ns_dag, sizeof(sockaddr_x))) < 0) {
+				int err = errno;
+				LOGF("Error sending name query (%d)", rc);
+				Xclose(sock);
+				errno = err;
+				return -1;
+			}*/
+printf("-----------Ready to POLLIN.\n");
+			if ((result = XgetDAGbyName(name, addr, addrlen)) < 0)
+				die(-1, "unable to locate: %s\n", name);
+			break;	
+		}
+		else {
+			continue;
+		}
+	}
+	Xclose(sock);
+	return result;
+}
+
 int initStreamClient(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid)
 {
 	int sock, rc;
