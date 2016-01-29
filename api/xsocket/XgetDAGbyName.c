@@ -177,6 +177,17 @@ int XgetNamebyDAG(char *name, int namelen, const sockaddr_x *addr, socklen_t *ad
 		return -1;
 	}
 
+	fd_set read_fds;
+	FD_ZERO(&read_fds);
+	FD_SET(sock, &read_fds);
+	struct timeval timeout;
+	timeout.tv_sec = 5;
+	timeout.tv_usec = 0;
+	if(Xselect(sock+1, &read_fds, NULL, NULL, &timeout) == 0) {
+		LOGF("ERROR: Application should try again. No registration response in %d seconds", (int)timeout.tv_sec);
+		return -1;
+	}
+
 	//Check the response from the name server
 	memset(pkt, 0, sizeof(pkt));
 	if ((rc = Xrecvfrom(sock, pkt, NS_MAX_PACKET_SIZE, 0, NULL, NULL)) < 0) {
@@ -242,9 +253,6 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 	sockaddr_x ns_dag;
 	char pkt[NS_MAX_PACKET_SIZE];
 	char *dag;
-printf("============================= name is: %s\n", name);
-//printf("============================= dag is: %s\n", *addr);
-printf("============================= daglen is: %d\n", *addrlen);
 	if (!name || *name == 0) {
 		errno = EINVAL;
 		return -1;
@@ -254,7 +262,6 @@ printf("============================= daglen is: %d\n", *addrlen);
 		errno = EINVAL;
 		return -1;
 	}
-printf("============================= 1.1\n");
 	// see if name is registered in the local hosts.xia file
 	if((dag = hostsLookup(name))) {
 		Graph g(dag);
@@ -269,7 +276,6 @@ printf("============================= 1.1\n");
 			return 0;
 		}
 	}
-printf("============================= 1.2\n");
 	if (!strncmp(name, "RE ", 3) || !strncmp(name, "DAG ", 4)) {
 		// check to see if name is actually a dag to begin with
     Graph gcheck(name);
@@ -294,7 +300,6 @@ printf("============================= 1.2\n");
 		errno = NO_RECOVERY;
 		return -1;
 	}
-printf("============================= 1.3\n");
 	//Construct a name-query packet
 	ns_pkt query_pkt;
 	query_pkt.type = NS_TYPE_QUERY;
@@ -313,31 +318,18 @@ printf("Error: sent %d bytes\n", rc);
 		errno = err;
 		return -1;
 	}
-printf("============================= 1.4\n");
-	for (int i = 0; i < NS_LOOKUP_RETRY_NUM; i++) {
-printf("============================= %d/%d\n", i + 1, NS_LOOKUP_RETRY_NUM);
-		struct pollfd pfds[2];
-		pfds[0].fd = sock;
-		pfds[0].events = POLLIN;
-		if ((rc = Xpoll(pfds, 1, NS_LOOKUP_WAIT_MSEC)) <= 0) {
-			//die(-5, "Poll returned %d\n", rc);
-			if ((rc = Xsendto(sock, pkt, len, 0, (const struct sockaddr*)&ns_dag, sizeof(sockaddr_x))) < 0) {
-				int err = errno;
-				LOGF("Error sending name query (%d)", rc);
-				Xclose(sock);
-				errno = err;
-				return -1;
-			}
-printf("Retried %d times...\n", i + 1);		
-		}
-		else {
-			break;
-		}
+
+	fd_set read_fds;
+	FD_ZERO(&read_fds);
+	FD_SET(sock, &read_fds);
+	struct timeval timeout;
+	timeout.tv_sec = 1;
+	timeout.tv_usec = 0;
+	if(Xselect(sock + 1, &read_fds, NULL, NULL, &timeout) == 0) {
+		LOGF("ERROR: Application should try again. No registration response in %d seconds", (int)timeout.tv_sec);
+		return -1;
 	}
-printf("============================= 1.5\n");
-	// TODO: reties =4 for, if time out, then Xsendto again  Xsekect(readfdf = sock, timeout)<0
-printf("Sent %d bytes and begin to Xrecvfrom\n", rc);
-	//Check the response from the name server
+
 	memset(pkt, 0, sizeof(pkt));
 	if ((rc = Xrecvfrom(sock, pkt, NS_MAX_PACKET_SIZE, 0, NULL, NULL)) < 0) {
 		int err = errno;
@@ -347,7 +339,6 @@ printf("Error retrieving name query (%d)", err);
 		errno = err;
 		return -1;
 	}
-printf("============================= 1.6\n");
 Graph gns(&ns_dag);
 printf("Nameserver DAG: %s\n", gns.dag_string().c_str());
 
@@ -376,7 +367,6 @@ printf("Nameserver DAG: %s\n", gns.dag_string().c_str());
 	Graph g(resp_pkt.dag);
 	g.fill_sockaddr(addr);
 	*addrlen = sizeof(sockaddr_x);
-printf("============================= 1.7\n");
 	return 0;
 }
 
