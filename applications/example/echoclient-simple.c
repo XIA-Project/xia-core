@@ -26,6 +26,9 @@
 #define STREAM_NAME "www_s.stream_echo.aaa.xia"
 #define DGRAM_NAME "www_s.dgram_echo.aaa.xia"
 
+struct addrinfo *ai;
+sockaddr_x *sa;
+
 void help()
 {
         printf("usage: xecho [-ds]\n");
@@ -43,6 +46,7 @@ void echo_dgram()
         char buf[2048];
         char reply[2048];
         int ns, nr;
+
         
         if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0) {
                 printf("error creating socket\n");
@@ -84,11 +88,24 @@ void echo_dgram()
 void echo_stream()
 {
         int sock;
-        sockaddr_x sa;
+        sockaddr_x* sa;
         socklen_t slen;
         char buf[2048];
         char reply[2048];
         int ns, nr;
+
+        struct addrinfo hints;
+        bzero(&hints, sizeof(hints));
+        hints.ai_flags = XAI_SCION;
+
+	if (Xgetaddrinfo(STREAM_NAME, NULL, &hints, &ai) != 0){
+		printf("unable to lookup name %s\n", STREAM_NAME);
+		return;
+	}
+	sa = (sockaddr_x*)ai->ai_addr;
+	//Graph g(sa);
+	//printf("\n%s\n", g.dag_string().c_str());
+
 
         if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
                 printf("error creating socket\n");
@@ -96,13 +113,13 @@ void echo_stream()
         }
 
     // lookup the xia service
-        slen = sizeof(sa);
-    if (XgetDAGbyName(STREAM_NAME, &sa, &slen) != 0) {
-                printf("unable to locate: %s\n", STREAM_NAME);
-                exit(1);
-        }
+        //slen = sizeof(sa);
+	//if (XgetDAGbyName(STREAM_NAME, &sa, &slen) != 0) {
+	//      printf("unable to locate: %s\n", STREAM_NAME);
+	//      exit(1);
+        //}
 
-        if (Xconnect(sock, (struct sockaddr*)&sa, sizeof(sa)) < 0) {
+        if (Xconnect(sock, (struct sockaddr*)sa, sizeof(struct sockaddr)) < 0) {
                 printf("can't connect to %s\n", STREAM_NAME);
                 Xclose(sock);
                 exit(1);

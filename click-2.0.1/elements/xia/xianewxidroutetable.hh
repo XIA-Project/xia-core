@@ -87,10 +87,12 @@ protected:
 	static int write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh);
   static int set_mtb_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
     static String list_routes_handler(Element *e, void *thunk);
-
-    
+  void print_packet_contents(uint8_t *packet, int len);
+  int print_packet_header(click_xia *xiah);
+  void print_scion_header(SCIONCommonHeader *sch);
     int scion_forward_packet(const struct click_xia* hdr);
-  
+  int check_scion_info(const struct click_xia* xiah);  
+
 private:
 	HashTable<XID, XIARouteData*> _rts;
 	HashTable<XID, IPAddr> _mts;
