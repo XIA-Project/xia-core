@@ -1,0 +1,44 @@
+diff --git a/api/wrapper/xwrap.c b/api/wrapper/xwrap.c
+index f8a3df3..c21ffb7 100644
+--- a/api/wrapper/xwrap.c
++++ b/api/wrapper/xwrap.c
+@@ -1649,7 +1649,7 @@ int setsockopt(int fd, int level, int optname, const void *optval, socklen_t opt
+ 				case SO_RCVBUF:
+ 				case SO_LINGER:
+ 				case SO_KEEPALIVE:
+-				case SO_REUSEPORT:
++				  //				case SO_REUSEPORT:
+ 					MSG("Unhandled option returning success %s\n", optValue(optname));
+ 					rc = 0;
+ 					break;
+diff --git a/api/xsocket/Xutil.c b/api/xsocket/Xutil.c
+index 355fa91..7b8a9a7 100644
+--- a/api/xsocket/Xutil.c
++++ b/api/xsocket/Xutil.c
+@@ -49,7 +49,7 @@ idrec xfer_flags[] = {
+ 	FR(MSG_DONTWAIT),
+ 	FR(MSG_EOR),
+ 	FR(MSG_ERRQUEUE),
+-	FR(MSG_FASTOPEN),
++	//	FR(MSG_FASTOPEN),
+ 	FR(MSG_FIN),
+ 	FR(MSG_MORE),
+ 	FR(MSG_NOSIGNAL),
+@@ -95,7 +95,7 @@ idrec proto_values[] = {
+ 	FR(IPPROTO_ESP),
+ 	FR(IPPROTO_AH),
+ 	FR(IPPROTO_MTP),
+-	FR(IPPROTO_BEETPH),
++	//	FR(IPPROTO_BEETPH),
+ 	FR(IPPROTO_ENCAP),
+ 	FR(IPPROTO_PIM),
+ 	FR(IPPROTO_COMP),
+@@ -160,7 +160,7 @@ idrec opt_values[] = {
+ 	FR(SO_RCVLOWAT),
+ 	FR(SO_RCVTIMEO),
+ 	FR(SO_REUSEADDR),
+-	FR(SO_REUSEPORT),
++	//	FR(SO_REUSEPORT),
+ 	FR(SO_SNDBUF),
+ 	FR(SO_SNDBUFFORCE),
+ 	FR(SO_SNDLOWAT),
