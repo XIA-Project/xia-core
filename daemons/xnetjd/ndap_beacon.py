@@ -91,8 +91,6 @@ if __name__ == "__main__":
     serialized_beacon = beacon.get_next_beacon()
     descriptor_size = len(serialized_beacon)
     logging.debug("Serialized descriptor size: {}".format(descriptor_size))
-    #with open("net_descriptor.beacon", "wb") as fd:
-    #    fd.write(serialized_net_descriptor)
 
     # Deserialize and print the contents of beacon again
     new_beacon = NetjoinBeacon()
