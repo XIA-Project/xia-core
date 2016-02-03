@@ -79,7 +79,7 @@ class NetjoinBeacon(object):
         edge4.from_node = 2
         edge4.to_node = 3
 
-    def get_next_beacon(self):
+    def update_and_get_serialized_beacon(self):
         # Create new nonce
         # Update nonce in self.net_descriptor
         # Update any other data in self.net_descriptor
@@ -88,7 +88,7 @@ class NetjoinBeacon(object):
 if __name__ == "__main__":
     beacon = NetjoinBeacon()
     beacon.initialize()
-    serialized_beacon = beacon.get_next_beacon()
+    serialized_beacon = beacon.update_and_get_serialized_beacon()
     descriptor_size = len(serialized_beacon)
     logging.debug("Serialized descriptor size: {}".format(descriptor_size))
 
