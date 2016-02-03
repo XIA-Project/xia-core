@@ -43,13 +43,19 @@ $ make python.exe Parser/pgen
 $ mv python.exe python_for_build
 $ mv Parser/pgen Parser/pgen_for_build
 
+In file setup.py, replace line 220 with:
+
+            if ext.name in ('__builtin__', '__main__', '_ast', '_codecs', '_sre', '_symtable', '_warnings', '_weakref', 'errno', 'exceptions', 'gc', 'imp', 'marshal', 'posix', 'pwd', 'signal', 'sys', 'thread', 'xxsubtype', 'zipimport'):
+
+This step is needed to ensure that 'math' and other useful modules are built.
+
 Now on to the cross compilation proper:
 
-$ export PATH=/opt/buildroot-2013.11/output/host/usr/bin/:$PATH
+$ export PATH=$PATH:/opt/buildroot-2013.11/output/host/usr/bin/
 
 $ ./configure --host=mips-linux --build=x86_64-linux-gnu --prefix=/opt/buildroot-2013.11/output/host/usr/ --disable-ipv6 ac_cv_file__dev_ptmx=no ac_cv_file__dev_ptc=no ac_cv_have_long_long_format=yes
 
-$ make CFLAGS="-g0 -s -O2 -march=24kc -fomit-frame-pointer -fPIC -fdata-sections -ffunction-sections -pipe"
+$ make CFLAGS="-g0 -s -O2 -march=24kc -fomit-frame-pointer -fPIC -fdata-sections -ffunction-sections -pipe -L/opt/buildroot-2013.11/output/host/usr/lib/"
 
 E. Now simply go to the XIA root folder, do "./configure" and "make tarch=mips". This will build click, the api and the applications. :)
 

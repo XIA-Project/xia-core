@@ -28,6 +28,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <stdint.h> // for uint8_t
 
 static const std::size_t vector_find_npos = std::size_t(-1);
 
@@ -171,8 +172,8 @@ Node::Node(int type, const std::string id_str)
 
 	for (std::size_t i = 0; i < ID_LEN; i++)
 	{
-		int num = stoi(id_str.substr(2*i, 2), 0, 16);
-		memcpy(&(ptr_->id[i]), &num, 1);
+		const uint8_t byte = (uint8_t) stoi(id_str.substr(2*i, 2), 0, 16);
+		memcpy(&(ptr_->id[i]), &byte, 1);
 	}
 }
 
@@ -325,8 +326,10 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 			int num = stoi(id_str.substr(2*i, 2), 0, 16);
 			if (num == -1)
 				printf("WARNING: Error parsing XID string (should be 20 hex digits): %s\n", id_str.c_str());
-			else
-				memcpy(&(ptr_->id[i]), &num, 1);
+			else {
+                const uint8_t byte = (uint8_t) num;
+				memcpy(&(ptr_->id[i]), &byte, 1);
+            }
 		}
 	}
 }
@@ -590,7 +593,7 @@ Graph::print_graph() const
 		else
 			printf("      ");
 
-		printf("Node %lu: [%s] ", i, nodes_[i].type_string().c_str());
+		printf("Node %u: [%s] ", i, nodes_[i].type_string().c_str());
 		//printf("%20s", nodes_[i].id());
 		for (std::size_t j = 0; j < Node::ID_LEN; j++)
 			printf("%02x", nodes_[i].id()[j]);
@@ -602,7 +605,7 @@ Graph::print_graph() const
 				first = false;
 				printf(" ->");
 			}
-			printf(" Node %lu", out_edges_[i][j]);
+			printf(" Node %u", out_edges_[i][j]);
 		}
 		if (is_sink(i))
 			printf(" [SNK]");
