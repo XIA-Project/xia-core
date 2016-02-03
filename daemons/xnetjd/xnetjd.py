@@ -15,26 +15,25 @@ import netjoin_policy
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s: %(module)s %(levelname)s: %(message)s')
 
 # Announce the presence of this network
-def network_announcer(beacon_interval, serialized_beacon, sockfd, xianetjoin):
-    # Send beacon to XIANetJoin
-    logging.debug("Sent beacon")
-    sockfd.sendto(serialized_beacon, xianetjoin)
+class NetjoinAnnouncer(object):
+    def announce(self):
+        # Send beacon to XIANetJoin
+        logging.debug("Sent beacon")
+        updated_beacon = self.beacon.update_and_get_serialized_beacon()
+        self.sockfd.sendto(updated_beacon, self.xianetjoin)
 
-    # Call ourselves from a new thread after some time
-    args = (beacon_interval, serialized_beacon, sockfd, xianetjoin)
-    threading.Timer(beacon_interval, network_announcer, args).start()
+        # Call ourselves from a new thread after some time
+        threading.Timer(self.beacon_interval, self.announce).start()
 
-def announce_network(beacon_interval):
-    xianetjoin = ("127.0.0.1", 9882)
+    def __init__(self, beacon_interval):
+        self.beacon_interval = beacon_interval
+        self.xianetjoin = ("127.0.0.1", 9882)
 
-    # A socket for sending messages to XIANetJoin
-    sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # A socket for sending messages to XIANetJoin
+        self.sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-    # A serialized beacon advertizing this network
-    serialized_beacon = ndap_beacon.build_beacon()
-
-    # Announce the beacon to the world
-    network_announcer(beacon_interval, serialized_beacon, sockfd, xianetjoin)
+        # A beacon object we will send to announce the network
+        self.beacon = NetjoinBeacon()
 
 
 # Listen for incoming beacons
@@ -77,7 +76,8 @@ if __name__ == "__main__":
 
     if args.accesspoint:
         logging.debug("Announcing network")
-        announce_network(args.beacon_interval)
+        announcer = NetjoinAnnouncer(args.beacon_interval)
+        announcer.announce()
 
     if args.client:
         logging.debug("Listening for network announcements")
