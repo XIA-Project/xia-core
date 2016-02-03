@@ -5,3 +5,4 @@ protobuf-compiler
 swig
 libprotobuf-dev
 python-dev
+python-crypto
