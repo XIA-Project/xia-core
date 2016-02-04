@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #ts=4
 #
 # Copyright 2011 Carnegie Mellon University
