@@ -1051,6 +1051,7 @@ void MulticastRP::InitializeClient(std::string mySID)
   int rc;
 // 	char sdag[1024];
   char IP[MAX_XID_SIZE];
+  char localdag[XIA_MAX_DAG_STR_SIZE];
 
   // create a socket, and listen for incoming connections
   if ((DGramSock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
@@ -1059,12 +1060,15 @@ void MulticastRP::InitializeClient(std::string mySID)
   char my_ad[MAX_XID_SIZE];
   char my_hid[MAX_XID_SIZE];
   
-  rc = XreadLocalHostAddr(DGramSock, my_ad, MAX_XID_SIZE, my_hid, MAX_XID_SIZE, IP, MAX_XID_SIZE);
+  rc = XreadLocalHostAddr(DGramSock, localdag, XIA_MAX_DAG_STR_SIZE, IP, MAX_XID_SIZE);
 
   if (rc < 0) {
 	  Xclose(DGramSock);
 	    die(-1, "Unable to read local address.\n");
   } else{
+	  Graph g_localhost(localdag);
+	  strcpy(my_ad, g_localhost.intent_AD_str().c_str());
+	  strcpy(my_hid, g_localhost.intent_HID_str().c_str());
 	  warn("My AD: %s, My HID: %s\n", my_ad, my_hid);
   }
     
