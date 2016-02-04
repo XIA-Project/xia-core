@@ -6,6 +6,9 @@
 #define MAX_PUBKEY_SIZE 2048
 #define MAX_SIGNATURE_SIZE 256
 #define XIA_KEYDIR "key"
+
+#define SHA_DIGEST_LENGTH 20
+
 #define XIA_SHA_DIGEST_STR_LEN SHA_DIGEST_LENGTH*2+1
 
 // Generic buffer to serialize data to be sent over the wire

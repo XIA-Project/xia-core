@@ -20,39 +20,21 @@
 
 import sys
 import os
+from socket import *
 
-# find the path to xia-core
-XIADIR=os.getcwd()
-while os.path.split(XIADIR)[1] != 'xia-core':
-    XIADIR=os.path.split(XIADIR)[0]
-sys.path.append(XIADIR + '/api/lib')
+#try:
+sock = socket(AF_INET, SOCK_DGRAM)
 
-from c_xsocket import *
+sock.bind(("10.0.0.10", 8888))
 
-NAME = "www_s.dgram_echo.aaa.xia"
+while (1):
+	print "waiting for data"
+	(data, addr) = sock.recvfrom(8192, 0)
+	print "received %d bytes from client" % (len(data))
+	sock.sendto(data, 0, addr)
 
-try:
-	SID = XmakeNewSID()
+sock.close()
 
-	sock = Xsocket(XSOCK_DGRAM)
-
-	(ad, hid, fid) = XreadLocalHostAddr(sock)
-
-	dag = "RE %s %s %s" % (ad, hid, SID) 
-
-	XregisterName(NAME, dag)
-
-	Xbind(sock, dag)
-
-	while (1):
-		print "waiting for data"
-		(data, cdag) = Xrecvfrom(sock, 8192, 0)
-		print "received %d bytes from client" % (len(data))
-		Xsendto(sock, data, 0, cdag)
-
-	Xclose(sock)
-	XremoveSID(SID)
-
-except:
-	print "socket error"
+#except:
+#	print "socket error"
 

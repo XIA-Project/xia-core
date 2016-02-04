@@ -35,14 +35,10 @@
 #include <libgen.h>
 #endif
 #include "Xsocket.h"
+#include "Xkeys.h"
 
 #define VERSION "v1.0"
 #define TITLE "XIA Video Server"
-
-#define AD1   "AD:1000000000000000000000000000000000000001"
-#define HID1 "HID:0000000000000000000000000000000000000001"
-#define SID_VIDEO "SID:1f10000001111111111111111111111110000056"
-#define DAG "RE %s %s %s"
 
 #define CHUNKSIZE (1024)
 #define SNAME "www_s.video.com.xia"
@@ -97,20 +93,6 @@ void getConfig(int argc, char** argv)
 		help(basename(argv[0]));
 
 	videoname = argv[optind];
-}
-
-/*
-** simple code to create a formatted DAG
-**
-** The dag should be free'd by the calling code when no longer needed
-*/
-char *createDAG(const char *ad, const char *host, const char *id)
-{
-	int len = snprintf(NULL, 0, DAG, ad, host, id) + 1;
-
-	char * dag = (char*)malloc(len);
-	sprintf(dag, DAG, ad, host, id);
-	return dag;
 }
 
 /*
@@ -246,6 +228,7 @@ int main(int argc, char *argv[])
 	sockaddr_x *dag;
 	int sock;
 	pthread_t client;
+	char sid_string[256];
 
 	getConfig(argc, argv);
 
@@ -257,18 +240,21 @@ int main(int argc, char *argv[])
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		 die(-1, "Unable to create the listening socket\n");
 
+	// Generate an SID to use
+	if(XmakeNewSID(sid_string, sizeof(sid_string)))
+		die(-1, "Unable to create a temporary SID");
+
 	struct addrinfo *ai;
-	if (Xgetaddrinfo(NULL, SID_VIDEO, NULL, &ai) < 0)
+	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) < 0)
 		 die(-1, "Unable to create the local dag\n");
 	dag = (sockaddr_x*)ai->ai_addr;
 
 	// register this service name to the name server
-    if (XregisterName(SNAME, dag) < 0 )
+    if (XregisterName(SNAME, dag) < 0)
 		perror("name register");
 
 	if(Xbind(sock, (struct sockaddr*)dag, sizeof(sockaddr_x)) < 0)
 		 die(-1, "Unable to bind to the dag: %s\n", dag);
-
 
 	Xlisten(sock, 5);
 	

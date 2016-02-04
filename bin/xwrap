@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Copyright 2013 Carnegie Mellon University
 #
@@ -14,24 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
-XLIB=$XIADIR/api/lib
-
-export LD_PRELOAD="$XLIB/xwrap.so $XLIB/libXsocket.so $XLIB/libdagaddr.so"
-
 help ()
 {
 	cat << EOH
 
 Start or stop the XIA network services.
 
-usage: xwrap [-h host] [-tixwv] [-o <logfile>] cmd
+usage: xwrap [-h host] [-tixwdv] [-o <logfile>] cmd
 where:
   -h <host> run on the specified host (when using local topology file)
   -t log at entry of every wrapped API call
   -i log informative messages
   -x log XIA related messages
   -w log warnings and errors
+  -d log send & recv buffers
   -v log everything in the wrapper
   -o <logfile> log to the specified file instead of stderr
 
@@ -42,13 +38,16 @@ EOH
 }
 
 
-while getopts "o:h:tvwx" opt; do
+[[ "$#" == "0" ]] && help
+
+while getopts "o:h:tivwxd" opt; do
 	case $opt in
 		h)
 			export XSOCKCONF_SECTION=$OPTARG
 			;;
 		o)
-			export XWRAP_LOGFILE=$OPTARG
+			LOGFILE=$OPTARG
+			# export XWRAP_LOGFILE=$OPTARG
 			;;
 		v)
 			export XWRAP_VERBOSE=1
@@ -65,13 +64,24 @@ while getopts "o:h:tvwx" opt; do
 		w)
 			export XWRAP_WARNING=1
 			;;
-		\?)
+		d)
+			export XWRAP_DUMP=1
+			;;
+		*)
 			help
 			;;
 	esac
 done
-
 shift $((OPTIND-1))
 
+export XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
+XLIB=$XIADIR/api/lib
+
+export LD_PRELOAD="$XLIB/xwrap.so $XLIB/libXsocket.so $XLIB/libdagaddr.so"
+
 # ececute command
-$@
+if [ "$LOGFILE" == "" ]; then
+	$@
+else
+	$@ 2>&1 | tee -a $LOGFILE
+fi

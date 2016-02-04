@@ -114,7 +114,7 @@ int XreadLocalHostAddr(int sockfd, char *localhostDAG, unsigned lenDAG, char *lo
   	int rc;
 
  	if (getSocketType(sockfd) == XSOCK_INVALID) {
-   	 	LOG("The socket is not a valid Xsocket");
+		LOGF("The socket %d is not a valid Xsocket", sockfd);
    	 	errno = EBADF;
   		return -1;
  	}

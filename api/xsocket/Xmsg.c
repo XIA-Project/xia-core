@@ -120,7 +120,7 @@ ssize_t Xrecvmsg(int fd, struct msghdr *msg, int flags)
 }
 
 
-ssize_t sendmsg(int fd, const struct msghdr *msg, int flags)
+ssize_t Xsendmsg(int fd, const struct msghdr *msg, int flags)
 {
 	int rc;
 	size_t size;

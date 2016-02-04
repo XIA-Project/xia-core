@@ -14,7 +14,6 @@
 #include "xiaxidroutetable.hh"
 #include <clicknet/udp.h>
 #include <click/string.hh>
-#include <elements/ipsec/sha1_impl.hh>
 #include <click/xiatransportheader.hh>
 #include <click/xiaifacetable.hh>
 #include <click/error.hh>
@@ -65,8 +64,6 @@ using namespace std;
 #define WAITING_FOR_CHUNK 0x00000002
 #define READY_TO_READ	  0x00000004
 #define INVALID_HASH	  0x00000008
-
-#define HASH_KEYSIZE 20
 
 #define API_PORT	 0
 #define BAD_PORT	 1  // FIXME why do we still have this?
@@ -150,7 +147,7 @@ private:
 			seq_num = 0;
 			ack_num = 0;
 			isAcceptedSocket = false;
-
+			refcount = 0;
 			num_connect_tries = 0;
 			num_retransmits = 0;
 			num_close_tries = 0;
@@ -190,6 +187,7 @@ private:
 		bool recv_pending;			// true if API is waiting to receive data
 		bool timer_on;				// if true timer is enabled
 		Timestamp expiry;			// when timer should fire next
+		unsigned refcount;			// bumped whenever owning app is forked
 
 		XIAPath src_path;			// peer DAG
 		XIAPath dst_path;			// our DAG
@@ -258,6 +256,9 @@ protected:
 
 	// list of ports wanting xcmp notifications
 	list<int> xcmp_listeners;
+
+	// list of ports waiting for a notification
+	list <int> notify_listeners;
 
 	// outstanding poll/selects indexed by API port #
 	HashTable<unsigned short, PollEvent> poll_events;
@@ -343,6 +344,9 @@ protected:
 	void XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xupdaterv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xfork(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xreplay(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xnotify(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 
 	// protocol handlers
 	void ProcessDatagramPacket(WritablePacket *p_in);

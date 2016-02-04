@@ -23,8 +23,6 @@
 #include <clicknet/xia.h>
 #include <click/xiapath.hh>
 #include <click/hashtable.hh>
-#include <elements/ipsec/sha1_impl.hh>
-#include <elements/ipsec/hmac.hh>
 #include <string>
 CLICK_DECLS
 

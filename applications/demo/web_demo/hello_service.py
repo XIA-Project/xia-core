@@ -19,6 +19,7 @@ print_conf()
 
 #while(True):
 try:
+    SID_HELLO = XmakeNewSID()
     sock=Xsocket(XSOCK_STREAM)
         
     if (sock<0):
@@ -33,12 +34,14 @@ try:
     XregisterName("www_s.hello.com.xia", dag)
         
     # Bind to the DAG
-    ret= Xbind(sock,dag);
+    ret = Xbind(sock,dag)
     print "listening on %s" % dag
     print "bind returns %d listening socket %d" % (ret, sock)
         
+    Xlisten(sock, 5)
+
     while(True):
-        (accept_sock, peer) = Xaccept(sock);
+        (accept_sock, peer) = Xaccept(sock)
         child_pid = os.fork()
 
         if child_pid == 0:
@@ -54,6 +57,6 @@ try:
             Xclose(accept_sock)
             os._exit(0)
 except (KeyboardInterrupt, SystemExit), e:
-       sys.exit()
-
-c_xsocket.Xclose(sock)
+    c_xsocket.Xclose(sock)
+    XremoveSID(SID_HELLO)
+    sys.exit()

@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# create a gretap (ethernet over GRE) tunnel
+#
+
+usage() {
+	cat << TEXT
+usage: xtunnel dev ip local remote
+where:
+  dev is the ethernet device name to create
+  ip is the local ip address to associate with the tunnel
+  local is the local ip address to bind the tunnel to
+  remote is the ip address on the other end to connect to
+ex:
+  sudo xtunnel gre1 10.0.0.1 128.2.210.200 155.99.144.114
+
+TEXT
+exit
+}
+
+if [ "$#" != "4" ]; then
+	usage
+fi
+
+# make sure the kernel tunnel module is loaded
+modprobe ip_gre
+
+DEV=$1
+IP=$2
+LOCAL=$3
+REMOTE=$4
+
+ip link add $DEV type gretap remote $REMOTE local $LOCAL
+ip link set dev $DEV up
+#ip address add $IP dev $DEV

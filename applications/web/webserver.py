@@ -160,7 +160,7 @@ def main():
 
         # Get local AD, HID, and 4ID; build DAG to listen on
         (myAD, myHID, my4ID) = XreadLocalHostAddr(listen_sock)
-        mySID = SID1 # TODO: eventually this should come from a public key
+        mySID = XmakeNewSID()
 
         # TODO: When we have persistent caching, we can eliminate
     	# this and make a separate 'content publishing' app.
@@ -170,8 +170,11 @@ def main():
         listen_dag_re = "RE %s %s %s" % (myAD, myHID, mySID) # dag to listen on; TODO: fix Xbind so this can be DAG format, not just RE
         listen_dag = "DAG 3 0 1 - \n %s 3 2 - \n %s 3 0 - \n %s 3 - \n %s" % (myAD, my4ID, myHID, mySID)
 
-        Xbind(listen_sock, listen_dag_re)
+#        Xbind(listen_sock, listen_dag_re)
+        Xbind(listen_sock, listen_dag)
         print 'Webserver listening on %s' % listen_dag
+
+        Xlisten(listen_sock, 5)
 
         # Publish DAG to naming service
         XregisterName("www_s.xiaweb.com.xia", listen_dag)
@@ -196,6 +199,7 @@ def main():
     except (KeyboardInterrupt, SystemExit), e:
        print 'Closing webserver'
        Xclose(listen_sock)
+       XremoveSID(mySID)
        sys.exit()
     
 
