@@ -22,6 +22,9 @@
 
 #define IGNORE_PARAM(__param) ((void)__param)
 
+#undef XIA_MAXBUF
+#define XIA_MAXBUF 500
+
 #define MAX_XID_SIZE 100
 
 enum {
@@ -176,7 +179,7 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen, 
 	IGNORE_PARAM(cmd);
 
 	meta = acquire_meta(cid);
-	LOG_CTRL_INFO("Fetching content from local\n");
+	LOG_CTRL_INFO("Fetching content %s from local\n", expected_cid.id_string().c_str());
 
 	LOG_CTRL_INFO("Here %d", __LINE__);
 	if(!meta) {

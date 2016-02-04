@@ -27,6 +27,9 @@
 #include "dagaddr.h"
 #include <assert.h>
 
+#undef XIA_MAXBUF
+#define XIA_MAXBUF 500
+
 #define MAX_XID_SIZE 100
 #define VERSION "v1.0"
 #define TITLE "XIA Basic FTP client"
@@ -34,7 +37,7 @@
 #define CHUNKSIZE 1024
 #define REREQUEST 3
 
-#define NUM_CHUNKS	10
+#define NUM_CHUNKS	1
 #define NUM_PROMPTS	2
 
 // global configuration options
@@ -279,7 +282,10 @@ int initializeClient(const char *name)
 	char sdag[1024];
 	char IP[MAX_XID_SIZE];
 
-	XcacheHandleInit(&h);
+	if (XcacheHandleInit(&h) < 0) {
+		printf("Xcache handle initialization failed.\n");
+		exit(-1);
+	}
 
 	XregisterNotif(XCE_CHUNKARRIVED, xcache_chunk_arrived);
 	XlaunchNotifThread(&h);

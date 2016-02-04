@@ -36,6 +36,9 @@
 // #define DAG  "RE %s %s %s"
 #define NAME "www_s.basicftp.aaa.xia"
 
+#undef XIA_MAXBUF
+#define XIA_MAXBUF 500
+
 #define MB(__mb) (KB(__mb) * 1024)
 #define KB(__kb) ((__kb) * 1024)
 #define CHUNKSIZE MB(1)
