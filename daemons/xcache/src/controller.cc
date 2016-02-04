@@ -462,28 +462,30 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd)
 
 	meta = acquire_meta(cid);
 
-	/* FIXME: Add proper errnos */
-	if(meta) {
-		LOG_CTRL_ERROR("Meta Exists.\n");
-		resp->set_cmd(xcache_cmd::XCACHE_ERROR);
+	if (meta != NULL) {
+		/*
+		 * Meta already exists
+		 */
 		resp->set_status(xcache_cmd::XCACHE_ERR_EXISTS);
 		release_meta(meta);
-		return RET_OKSENDRESP;
-	}
+	} else {
+		/*
+		 * New object - Allocate a meta
+		 */
+		meta = new xcache_meta(cid);
 
-	/* New object - Allocate a meta */
-	meta = new xcache_meta(cid);
+		context = lookup_context(cmd->context_id());
+		if(!context) {
+			return RET_FAILED;
+		}
 
-	context = lookup_context(cmd->context_id());
-	if(!context) {
-		return RET_FAILED;
-	}
-
-	if(__store(context, meta, &cmd->data()) == RET_FAILED) {
-		return RET_FAILED;
+		if(__store(context, meta, &cmd->data()) == RET_FAILED) {
+			return RET_FAILED;
+		}
 	}
 
 	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
+
 	sockaddr_x addr = cid2addr(cid);
 	resp->set_dag((char *)&addr, sizeof(sockaddr_x));
 	Graph g(&addr);
@@ -744,9 +746,12 @@ repeat:
 	if(FD_ISSET(libsocket, &fds)) {
 		int new_connection = accept(libsocket, NULL, 0);
 
-		LOG_CTRL_INFO("Action on libsocket\n");
-		active_conns.push_back(new_connection);
-		FD_SET(new_connection, &allfds);
+		if (new_connection > 0) {
+
+			active_conns.push_back(new_connection);
+			FD_SET(new_connection, &allfds);
+			LOG_CTRL_INFO("HEREH\n");
+		}
 	}
 
 	if(FD_ISSET(sendersocket, &fds)) {
@@ -819,11 +824,15 @@ repeat:
 			}
 		}
 
-		/* Try to see if we can process request in the fast path */
+		/*
+		 * Try to see if we can process request in the fast path
+		 */
 		ret = fast_process_req(*iter, &resp, &cmd);
 
 		if(ret == RET_OKSENDRESP) {
-			/* Send response back to the client */
+			/*
+			 * Send response back to the client
+			 */
 			resp.SerializeToString(&buffer);
 			if(send_response(*iter, buffer.c_str(), buffer.length()) < 0) {
 				LOG_CTRL_ERROR("FIXME: handle return value of write\n");

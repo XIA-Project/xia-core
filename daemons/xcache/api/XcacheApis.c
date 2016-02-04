@@ -119,10 +119,6 @@ static int get_response_blocking(int xcache_sock, xcache_cmd *cmd)
 	}
 
 	cmd->ParseFromString(buffer);
-	if(cmd->cmd() == xcache_cmd::XCACHE_ERROR) {
-		fprintf(stderr, "ERROR: %s\n", cmd->msg().c_str());
-		return -1;
-	}
 
 	return 0;
 }
