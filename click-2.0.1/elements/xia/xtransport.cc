@@ -13,6 +13,8 @@
 #include <click/xiatransportheader.hh>
 #include "xlog.hh"
 
+#include <click/xiasecurity.hh>  // xs_getSHA1Hash()
+
 /*
 ** FIXME:
 ** - set saner retransmit values before we get backoff code
@@ -85,6 +87,7 @@ XTRANSPORT::~XTRANSPORT()
 	XIDpairToConnectPending.clear();
 
 	xcmp_listeners.clear();
+	notify_listeners.clear();
 }
 
 
@@ -264,7 +267,7 @@ String XTRANSPORT::Netstat(Element *e, void *)
 			xid = source_xid.unparse().c_str();
 		}
 
-		sprintf(line, "%d,%s,%s,%s\n", _sport, type, state, xid);
+		sprintf(line, "%d,%s,%s,%s,%d\n", _sport, type, state, xid, sk->refcount);
 		table += line;
 	}
 
@@ -778,13 +781,15 @@ void XTRANSPORT::run_timer(Timer *timer)
 				tear_down = RetransmitDATA(sk, _sport, now);
 
 			} else if (sk->state == TIME_WAIT && sk->expiry <= now) {
-				DBG("tearing down socket %p %d %s\n", sk, sk->port, StateStr(sk->state));
-				TeardownSocket(sk);
 				tear_down = true;
 			}
 		}
 
-		if (!tear_down) {
+		if (tear_down) {
+			DBG("tearing down socket %p %d %s\n", sk, sk->port, StateStr(sk->state));
+			TeardownSocket(sk);
+
+		} else {
 			// find the (next) earliest expiry
 			if (sk->timer_on == true) {
 				if (sk->expiry > now && (sk->expiry < earliest_pending_expiry || earliest_pending_expiry == now)) {
@@ -1904,6 +1909,7 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 		if((iface = IfaceFromSIDPath(new_sk->src_path)) != -1) {
 			new_sk->outgoing_iface = iface;
 		}
+		new_sk->refcount = 1;
 
 		memset(new_sk->send_buffer, 0, new_sk->send_buffer_size * sizeof(WritablePacket*));
 		memset(new_sk->recv_buffer, 0, new_sk->recv_buffer_size * sizeof(WritablePacket*));
@@ -2127,9 +2133,12 @@ void XTRANSPORT::ProcessStreamDataPacket(WritablePacket*p_in)
 	sock *sk = XIDpairToSock.get(xid_pair);
 	if (!sk) {
 		ERROR("sk == NULL, we are probably in the middle of creating the endpoint\n");
+		ERROR("src:%s\ndst:%s\n", src_path.unparse().c_str(), dst_path.unparse().c_str());
 
 	} else {
 		if (sk->state >= CONNECTED) {
+			DBG("data received on %d\n", sk->port);
+
 			// buffer data, if we have room
 			if (should_buffer_received_packet(p_in, sk)) {
 				add_packet_to_recv_buf(p_in, sk);
@@ -2198,26 +2207,27 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 		ChangeState(new_sk, CONNECTED);
 		CancelRetransmit(new_sk);
 
+		// push this socket into pending_connection_buf and let Xaccept handle that
 		sk->pending_connection_buf.push(new_sk);
 
-		// push this socket into pending_connection_buf and let Xaccept handle that
-
-		// If the app is ready for a new connection, alert it
-		if (!sk->pendingAccepts.empty()) {
-			xia::XSocketMsg *acceptXSM = sk->pendingAccepts.front();
-			ReturnResult(sk->port, acceptXSM);
-			sk->pendingAccepts.pop();
-			delete acceptXSM;
-		}
-		if (sk->polling) {
-			// tell API we are writeable
-			ProcessPollEvent(sk->port, POLLIN|POLLOUT);
-		}
 		// finish the connection handshake
 		XIDpairToConnectPending.erase(xid_pair);
 
+		if (sk->polling) {
+			// tell API we are live
+			ProcessPollEvent(sk->port, POLLIN|POLLOUT);
+		}
+		// If the app is ready for a new connection, alert it
+		if (!sk->pendingAccepts.empty()) {
+			xia::XSocketMsg *acceptXSM = sk->pendingAccepts.front();
+			// FIXME: can I just use pop in the line above?
+			sk->pendingAccepts.pop();
+			ReturnResult(sk->port, acceptXSM);
+			delete acceptXSM;
+		}
+
 	} else if (sk->state == FIN_WAIT1) {
-		INFO("Socket %d FIN-ACK received\n", sk->port);
+		INFO("Socket %d ACK received\n", sk->port);
 
 		// now we wait for a FIN from the peer
 		ChangeState(sk, FIN_WAIT2);
@@ -2302,7 +2312,7 @@ void XTRANSPORT::ProcessFinPacket(WritablePacket *p_in)
 
 	if (sk->state == FIN_WAIT2) {
 		// Active shutdown
-		INFO("Socket %d moved to FIN_WAIT2\n", sk->port);
+		INFO("Socket %d moved to TIME_WAIT\n", sk->port);
 
 		const char *payload = "ACK";
 		SendControlPacket(TransportHeader::ACK, sk, payload, strlen(payload), src_path, dst_path);
@@ -2374,15 +2384,13 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 
 	if (ch.opcode()==ContentHeader::OP_PUSH) {
 		// compute the hash and verify it matches the CID
-		String hash = "CID:";
-		char hexBuf[3];
-		int i = 0;
-		SHA1_ctx sha_ctx;
-		unsigned char digest[HASH_KEYSIZE];
-		SHA1_init(&sha_ctx);
-		SHA1_update(&sha_ctx, (unsigned char *)xiah.payload(), xiah.plen());
-		SHA1_final(digest, &sha_ctx);
-		for(i = 0; i < HASH_KEYSIZE; i++) {
+		unsigned char digest[SHA_DIGEST_LENGTH];
+		xs_getSHA1Hash((const unsigned char *)xiah.payload(), xiah.plen(), \
+        digest, SHA_DIGEST_LENGTH);
+
+		String hash = "CID:";        
+		char hexBuf[3];        
+		for(int i = 0; i < SHA_DIGEST_LENGTH; i++) {
 			sprintf(hexBuf, "%02x", digest[i]);
 			hash.append(const_cast<char *>(hexBuf), 2);
 		}
@@ -2475,15 +2483,13 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 		}
 
 		// compute the hash and verify it matches the CID
-		String hash = "CID:";
+		unsigned char digest[SHA_DIGEST_LENGTH];
+        xs_getSHA1Hash((const unsigned char *)xiah.payload(), xiah.plen(), \
+            digest, SHA_DIGEST_LENGTH);
+    
+        String hash = "CID:";
 		char hexBuf[3];
-		int i = 0;
-		SHA1_ctx sha_ctx;
-		unsigned char digest[HASH_KEYSIZE];
-		SHA1_init(&sha_ctx);
-		SHA1_update(&sha_ctx, (unsigned char *)xiah.payload(), xiah.plen());
-		SHA1_final(digest, &sha_ctx);
-		for(i = 0; i < HASH_KEYSIZE; i++) {
+		for(int i = 0; i < SHA_DIGEST_LENGTH; i++) {
 			sprintf(hexBuf, "%02x", digest[i]);
 			hash.append(const_cast<char *>(hexBuf), 2);
 		}
@@ -2670,6 +2676,15 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XUPDATERV:
 		Xupdaterv(_sport, &xia_socket_msg);
 		break;
+	case xia::XFORK:
+		Xfork(_sport, &xia_socket_msg);
+		break;
+	case xia::XREPLAY:
+		Xreplay(_sport, &xia_socket_msg);
+		break;		
+	case xia::XNOTIFY:
+		Xnotify(_sport, &xia_socket_msg);
+		break;		
 	default:
 		ERROR("ERROR: Unknown API request\n");
 		break;
@@ -2708,6 +2723,7 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	sk->port = _sport;
 	sk->sock_type = sock_type;
 	sk->state = INACTIVE;
+	sk->refcount = 1;
 
 	memset(sk->send_buffer, 0, sk->send_buffer_size * sizeof(WritablePacket*));
 	memset(sk->recv_buffer, 0, sk->recv_buffer_size * sizeof(WritablePacket*));
@@ -2753,6 +2769,10 @@ void XTRANSPORT::Xsetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_
 
 		case SO_DEBUG:
 			sk->so_debug = x_sso_msg->int_opt();
+			break;
+
+		case SO_ERROR:
+			sk->so_error = x_sso_msg->int_opt();
 			break;
 
 		default:
@@ -2872,6 +2892,57 @@ void XTRANSPORT::Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 
 
+void XTRANSPORT::Xfork(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
+{
+	xia::X_Fork_Msg *msg = xia_socket_msg->mutable_x_fork();
+	int count = msg->count();
+	int increment = msg->increment() ? 1 : -1;
+
+//	xia_socket_msg->PrintDebugString();
+
+	// loop through list of ports and modify the ref counter
+	for (int i = 0; i < count; i++) {
+		int port = msg->ports(i);
+
+		DBG("port = %d\n", port);
+
+		sock *sk = portToSock.get(port);
+		if (sk) {
+			int ref = sk->refcount;
+			sk->refcount += increment;
+			DBG("%s refcount for %d (%d -> %d)\n", (increment > 0 ? "incrementing" : "decrementing"), port, ref, sk->refcount);
+			assert(sk->refcount > 0);
+		}
+	}
+
+	ReturnResult(_sport, xia_socket_msg);
+}
+
+
+
+void XTRANSPORT::Xreplay(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
+{
+	xia::X_Replay_Msg *msg = xia_socket_msg->mutable_x_replay();
+
+	DBG("Received REPLAY packet\n");
+//	xia_socket_msg->PrintDebugString();
+
+	xia_socket_msg->set_type(msg->type());
+	xia_socket_msg->set_sequence(msg->sequence());
+
+	ReturnResult(_sport, xia_socket_msg);
+}
+
+
+void XTRANSPORT::Xnotify(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
+{
+	notify_listeners.push_back(_sport);
+
+	// we just go away and wait for XchangeAD to be called which will trigger a response on this client socket
+}
+
+
+
 // FIXME: This way of doing things is a bit hacky.
 void XTRANSPORT::XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
@@ -2927,10 +2998,13 @@ void XTRANSPORT::XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 
 void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
+	int control_port = _sport;
+
+	xia::X_Close_Msg *xcm = xia_socket_msg->mutable_x_close();
+	_sport = xcm->port();
+
 	sock *sk = portToSock.get(_sport);
 	bool teardown_now = true;
-
-	INFO("closing %d %d sk = %p state=%s\n", _sport, sk->port, sk, StateStr(sk->state));
 
 	if (!sk) {
 		// this shouldn't happen!
@@ -2938,13 +3012,25 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		goto done;
 	}
 
+	assert(sk->refcount != 0);
+
+	if (--sk->refcount != 0) {
+		// the app was forked and not everyone has closed the socket yet
+		INFO("decremented ref count on %d %d sk = %p state=%s refcount=%d\n", _sport, sk->port, sk, StateStr(sk->state), sk->refcount);
+		goto done;
+	}
+
+	INFO("closing %d %d sk = %p state=%s refcount=%d\n", _sport, sk->port, sk, StateStr(sk->state), sk->refcount);
+
 	if (sk->sock_type == SOCK_STREAM) {
 
 		if (sk->state == CONNECTED || sk->state == CLOSE_WAIT) {
 			// schedule a close
 			if (sk->state == CONNECTED) {
+				INFO("active close, FIN sent\n");
 				ChangeState(sk, FIN_WAIT1);
 			} else {
+				INFO("passive close, FIN sent\n");
 				ChangeState(sk, LAST_ACK);
 			}
 
@@ -2963,7 +3049,10 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	}
 
 done:
-	ReturnResult(_sport, xia_socket_msg);
+//	INFO("Close :%d seq:%d\n", sk->port, xcm->sequence());
+	xcm->set_refcount(sk->refcount);
+	xcm->set_delkeys(sk->isAcceptedSocket == false);
+	ReturnResult(control_port, xia_socket_msg);
 }
 
 
@@ -3079,6 +3168,7 @@ void XTRANSPORT::XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_sock
 
 		ReturnResult(_sport, xia_socket_msg);
 
+
 	} else if (xia_socket_msg->blocking()) {
 		// If not and we are blocking, add this request to the pendingAccept queue and wait
 
@@ -3105,7 +3195,9 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	unsigned short new_port = xia_socket_msg->x_accept().new_port();
 	sock *sk = portToSock.get(_sport);
 
-	DBG("_sport %d, new_port %d\n", _sport, new_port);
+	DBG("_sport %d, new_port %d seq:%d\n", _sport, new_port, xia_socket_msg->sequence());
+	DBG("p buf size = %d\n", sk->pending_connection_buf.size());
+	DBG("blocking = %d\n", sk->isBlocking);
 
 	sk->hlim = HLIM_DEFAULT;
 	sk->nxt_xport = CLICK_XIA_NXT_TRN;
@@ -3138,6 +3230,10 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 		sk->pending_connection_buf.pop();
 
+
+
+// FIXME: does this block of code do anything??? I don't see the payload getting used
+// I think it's all happening in the syn handling above? 
 		WritablePacket *just_payload_part;
 		int payloadLength;
 		if(usingRendezvousDAG(sk->src_path, new_sk->src_path)) {
@@ -3196,6 +3292,8 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		x_accept_msg->set_remote_dag(new_sk->dst_path.unparse().c_str()); // remote endpoint is dest from our perspective
 
 	} else {
+		// FIXME: THIS BETTER NOT HAPPEN!
+		INFO("Got EWOULDBLOCK on a blocking accept!");
 		rc = -1;
 		ec = EWOULDBLOCK;
 		goto Xaccept_done;
@@ -3461,6 +3559,11 @@ void XTRANSPORT::Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 						} else if (sk->state == CLOSE_WAIT) {
 							// other end closed, app needs to know!
 							flags_out |= POLLIN;
+						}
+
+						if (!sk->pending_connection_buf.empty()) {
+							INFO("%d accepts are pending\n", sk->pending_connection_buf.size());
+							flags_out |= POLLIN | POLLOUT;
 						}
 
 					} else if (sk->sock_type == SOCK_DGRAM || sk->sock_type == SOCK_RAW) {
@@ -3731,7 +3834,21 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, xia::XSocketMsg *xia_socket_m
 		}
 		output(NETWORK_PORT).push(p);
 	}
+
 	ReturnResult(_sport, xia_socket_msg);
+
+
+	// now also tell anyone who is waiting on a notification this happened
+	list<int>::iterator i;
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XNOTIFY);
+	xsm.set_sequence(0);
+
+	for (i = notify_listeners.begin(); i != notify_listeners.end(); i++) {
+		ReturnResult(*i, &xsm);
+	}
+	// get rid of them all now so we can start fresh
+	notify_listeners.clear();
 }
 
 
@@ -4513,14 +4630,12 @@ void XTRANSPORT::XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	String src;
 
 	/* Computes SHA1 Hash if user does not supply it */
-	char hexBuf[3];
-	int i = 0;
-	SHA1_ctx sha_ctx;
-	unsigned char digest[HASH_KEYSIZE];
-	SHA1_init(&sha_ctx);
-	SHA1_update(&sha_ctx, (unsigned char *)pktPayload.c_str() , pktPayload.length() );
-	SHA1_final(digest, &sha_ctx);
-	for(i = 0; i < HASH_KEYSIZE; i++) {
+    unsigned char digest[SHA_DIGEST_LENGTH];
+    xs_getSHA1Hash((const unsigned char *)pktPayload.c_str(), \
+        pktPayload.length(), digest, SHA_DIGEST_LENGTH);
+    
+    char hexBuf[3];
+	for(int i = 0; i < SHA_DIGEST_LENGTH; i++) {
 		sprintf(hexBuf, "%02x", digest[i]);
 		src.append(const_cast<char *>(hexBuf), 2);
 	}

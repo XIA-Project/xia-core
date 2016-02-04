@@ -329,7 +329,7 @@ class XnetstatApp:
 		lines = data.split("\n")
 		for line in lines:
 			socket = line.split(",")
-			if len(socket) != 4:
+			if len(socket) != 5:
 				continue
 
 			if socket[1] in self.types:
@@ -339,7 +339,7 @@ class XnetstatApp:
 		sockets.sort(key=lambda tup: tup[self.options.sort()])
 
 		for socket in sockets:
-			text += "%-5s  %-6s  %-10s  %s\n" % (socket[0], socket[1], socket[2], socket[3])
+			text += "%-5s  %-3s %-6s  %-10s  %s\n" % (socket[0], socket[4], socket[1], socket[2], socket[3])
 		return text
 
 
@@ -349,8 +349,8 @@ class XnetstatApp:
 	def getSocketTable(self, device):
 		text  = device
 		text += "\n"
-		text += "%-5s  %-6s  %-10s  %s\n" % ("PORT", "TYPE", "STATE",  "XID")
-		text +=  "=" * 71
+		text += "%-5s  %-3s %-6s  %-10s  %s\n" % ("PORT", "REF", "TYPE", "STATE",  "XID")
+		text +=  "=" * 75
 		text += "\n"
 		text += self.printSocketTable(device)
 		return text

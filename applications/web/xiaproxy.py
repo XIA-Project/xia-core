@@ -45,9 +45,10 @@ def recv_with_timeout(sock, timeout=5, transport_proto=XSP):
     try:
         while (time.time() - start_time < timeout and not received_data):
             try:
-                (rl, wl, xl) = select.select([sock], [], [], 0.02)
-		if not rl:
-		    continue
+# we haven't ported Xselect into SWIG yet, and normal select no longer works on xsocket
+#               (rl, wl, xl) = select.select([sock], [], [], 0.02)
+#               if not rl:
+#                   continue
 
                 if transport_proto == XSP:
                     reply = Xrecv(sock, XIA_MAXBUF, 0)
@@ -449,7 +450,7 @@ def xia_handler(host, path, http_header, browser_socket):
             send_sid_request(ddag, http_header, browser_socket, XDP)
         elif host.find('www_s.video.com.xia') != -1:   
             sendVideoSIDRequest(ddag, http_header, browser_socket)          
-        elif host.find('www_s.') != -1:     	
+        elif host.find('www_s.') != -1:
             send_sid_request(ddag, http_header, browser_socket)
         elif host.find('www_c.') != -1:     	
     	    # Extract dst AD, 4ID, HID, and CID from ddag	

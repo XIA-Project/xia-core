@@ -258,6 +258,19 @@ int main(int argc, char **argv)
 		strncpy(s_from, gf.dag_string().c_str(), sizeof(s_from));
 		pr_pack( packet, cc, s_from);
 		if(!strcmp(s_to,s_from)) finish();
+
+		// FIXME: HACK!!!
+		// if the 2 dags are equivelent, but the above comparison fails because the nodes of the
+		// 2 dags are in different orders, isolate just the HIDs and compare them instead
+		// This is not great, because in theory, xtraceroute should work with any final
+		// intent including SID, AD, CID, etc.
+		// THis hack only addresses the case where the intent is an HID _AND_ the HID is the last
+		// node in the DAG.
+		char *f = strstr(s_from, "HID:");
+		char *t = strstr(s_to, "HID:");
+		if (!strcmp(f, t)) finish();
+		// END HACK
+
 		if (npackets && nreceived >= npackets)
 			finish();
 	}

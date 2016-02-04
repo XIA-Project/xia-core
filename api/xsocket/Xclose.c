@@ -39,35 +39,63 @@
 */
 int Xclose(int sockfd)
 {
-	int rc;
+	int rc = -1;
+	int sock = 0;
+	int ref;
 
 	if (getSocketType(sockfd) == XSOCK_INVALID)
 	{
-		LOG("The socket is not a valid Xsocket");
+		LOGF("The socket %d is not a valid Xsocket", sockfd);
 		errno = EBADF;
 		return -1;
 	}
 
 	xia::XSocketMsg xsm;
+	xia::X_Close_Msg *xcm;
 	xsm.set_type(xia::XCLOSE);
 	unsigned seq = seqNo(sockfd);
 	xsm.set_sequence(seq);
 
-	if ((rc = click_send(sockfd, &xsm)) < 0) {
+	xcm = xsm.mutable_x_close();
+
+	unsigned short port;
+	port = getPort(sockfd);
+	xcm->set_port(port);
+
+	sock = MakeApiSocket(SOCK_DGRAM);
+
+	if ((rc = click_send(sock, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
+		goto done;
 
-	} else if ((rc = click_status(sockfd, seq)) < 0) {
+	} else if ((rc = click_reply(sock, seq, &xsm)) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
+		goto done;
 	}
+#if 0
+	ref = xcm->refcount();
+	 LOGF("%d refcount = %d\n", sockfd, ref);
+#endif
+	if (isTempSID(sockfd) && xcm->refcount() <= 0) {
 
-	// Delete any temporary keys created for this sockfd
-	if(isTempSID(sockfd)) {
-		if(XremoveSID(getTempSID(sockfd))) {
-			LOGF("ERROR removing key files for %s", getTempSID(sockfd));
+		if (xcm->delkeys()) {
+			LOGF("Deleting keys for %s", getTempSID(sockfd));
+
+			// Delete any temporary keys created for this sockfd
+			if (XremoveSID(getTempSID(sockfd))) {
+				LOGF("ERROR removing key files for %s", getTempSID(sockfd));
+			}
 		}
 	}
+done:
 	(_f_close)(sockfd);
 	freeSocketState(sockfd);
+
+
+	if (sock > 0) {
+		freeSocketState(sock);
+		(_f_close)(sock);
+	}
 
 	return rc;
 }
