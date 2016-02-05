@@ -84,7 +84,7 @@ XIANetJoin::push(int in_port, Packet *p_in)
 			// Received a packet from NetJoin API to be sent on the wire
 			std::string p_buf;
 			p_buf.assign((const char *)p_in->data(), (const char *)p_in->end_data());
-			click_chatter("XIANetJoin: API: %s.", p_buf.c_str());
+			//click_chatter("XIANetJoin: API: %s.", p_buf.c_str());
 			click_chatter("XIANetJoin: Sending unmodified API packet to XNetj");
 
 			/*
