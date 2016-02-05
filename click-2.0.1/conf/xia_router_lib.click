@@ -1,5 +1,5 @@
 require(library xia_constants.click);
-
+ 
 elementclass XIAFromHost {
 	$click_port |
 	// Packets coming down from API
@@ -155,7 +155,7 @@ elementclass XIALineCard {
 	
 	// On receiving a packet from interface
 	// also, save the source port so we can use it in xtransport
-	input[0] -> XIAPaint(ANNO $SRC_PORT_ANNO, COLOR $num) -> c;
+	input[0] -> XIAPaint(ANNO $SRC_PORT_ANNO, COLOR $num) -> Align(4, 0) -> c;
    
 	// Receiving an XIA packet
 	c[2] -> Strip(14) -> MarkXIAHeader() -> [0]xchal[0] -> [0]xresp[0] -> XIAPaint($num) -> print_in -> [1]output; // this should send out to [0]n; 
@@ -289,7 +289,7 @@ elementclass XIARoutingCore {
 	input -> [0]n;
 
 	srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
-	n[1] -> c[1] -> srcTypeClassifier[1] -> [2]xtransport[2] -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [0]n;
+	n[1] -> Align(4, 0) -> c[1] -> srcTypeClassifier[1] -> [2]xtransport[2] -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [0]n;
 	srcTypeClassifier[0] -> Discard;	// do not send CID responses directly to RPC;
 	c[0] -> x[0] -> [0]n; // new (response) XCMP packets destined for some other machine
 	
