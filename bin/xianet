@@ -303,7 +303,7 @@ router()
 		"start")
 			cd $XIADIR/bin
 			./xrouted -h $host $LOG_FLAGS &
-			./xnetjd --accesspoint &
+			./xnetjd --accesspoint --hostname $host &
 			sleep 0.5
 			;;
 		"stop")

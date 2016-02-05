@@ -63,6 +63,7 @@ def parse_args():
     parser.add_argument("-c", "--client", help="process network discovery beacons", action="store_true")
     parser.add_argument("-a", "--accesspoint", help="provide access point beacons on all interfaces", action="store_true")
     parser.add_argument("-i", "--beacon_interval", help="beacon interval in seconds(float)", type=float, default=0.5)
+    parser.add_argument("--hostname", help="click hostname", type=str)
     return parser.parse_args()
 
 if __name__ == "__main__":
