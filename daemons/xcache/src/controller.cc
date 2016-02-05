@@ -148,6 +148,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	if(!context) {
 		LOG_CTRL_ERROR("Context Lookup Failed\n");
 		delete meta;
+		Xclose(sock);
 		return RET_FAILED;
 	}
 
@@ -161,6 +162,8 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 		resp->set_data(data);
 		ret = RET_OKSENDRESP;
 	}
+
+	Xclose(sock);
 
 	return ret;
 }
