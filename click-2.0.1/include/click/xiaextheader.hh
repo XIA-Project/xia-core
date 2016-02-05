@@ -16,6 +16,7 @@ class XIAGenericExtHeader { public:
 
     XIAGenericExtHeader(const struct click_xia_ext* hdr); 
     XIAGenericExtHeader(const Packet* p);  // read from packet p->network_header() should point to XIA header
+    XIAGenericExtHeader(const Packet *p, uint8_t t);    // walk header chain to find type t
 
     inline const struct click_xia_ext* hdr() const;
 

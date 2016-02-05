@@ -16,7 +16,7 @@ class TransportHeaderEncap;
 
 class TransportHeader : public XIAGenericExtHeader { public:
     TransportHeader(const struct click_xia_ext* hdr) :XIAGenericExtHeader(hdr) {};
-    TransportHeader(const Packet* p):XIAGenericExtHeader(p) {};
+    TransportHeader(const Packet* p):XIAGenericExtHeader(p, CLICK_XIA_NXT_TRN) {};
 
     //uint8_t opcode() { if (!exists(OPCODE)) return 0 ; return *(const uint8_t*)_map[OPCODE].data();};  
     uint8_t type() { if (!exists(TYPE)) return 0 ; return *(const uint8_t*)_map[TYPE].data();}; 

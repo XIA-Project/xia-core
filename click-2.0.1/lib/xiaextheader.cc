@@ -29,6 +29,39 @@ XIAGenericExtHeader::XIAGenericExtHeader(const struct click_xia_ext* hdr)
     populate_map();
 }
 
+XIAGenericExtHeader::XIAGenericExtHeader(const Packet* p, uint8_t t)
+{
+    XIAHeader xiah(p);
+    uint8_t nxt = xiah.nxt();
+    const struct click_xia_ext* temp_hdr(reinterpret_cast<const struct click_xia_ext*>(xiah.next_header()));
+
+    if (nxt == t) {
+        _hdr = temp_hdr;
+        populate_map();
+
+    } else {
+        click_chatter("Looking for Header of type %d\n", t);
+        click_chatter("Next = %d\n", temp_hdr->nxt);
+        click_chatter("temp_hdr = %p\n", temp_hdr);
+
+        while (temp_hdr->nxt != t && temp_hdr->nxt != CLICK_XIA_NXT_NO) {
+
+            // walk the header chain
+            temp_hdr += temp_hdr->hlen;
+            click_chatter("Next = %d\n", temp_hdr->nxt);
+        }
+
+        if (temp_hdr->nxt == t) {
+            _hdr = (temp_hdr + temp_hdr->hlen);
+            populate_map();
+        } else {
+            // something horrible happened and we're gonna crash
+            click_chatter("Header %d not found!", t);
+            assert(0);
+        }
+    }
+}
+
 XIAGenericExtHeader::XIAGenericExtHeader(const Packet* p)
     : _hdr(reinterpret_cast<const struct click_xia_ext*>(XIAHeader(p).next_header()))
 {
