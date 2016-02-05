@@ -54,7 +54,6 @@ class NetjoinBeacon(object):
         node2.ja.context = 0
 
         # The network provides XIP with NID xip_netid
-        node3.id = 3
         node3.xip.is_global = True
         node3.xip.NetworkId = self.xip_netid
 

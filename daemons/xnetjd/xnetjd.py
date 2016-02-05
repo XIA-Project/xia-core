@@ -8,8 +8,8 @@ import logging
 import argparse
 import threading
 import ndap_pb2
-import ndap_beacon
 import netjoin_policy
+from netjoin_beacon import NetjoinBeacon
 
 # Setup logging for this application
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s: %(module)s %(levelname)s: %(message)s')
@@ -19,8 +19,8 @@ class NetjoinAnnouncer(object):
     def announce(self):
         # Send beacon to XIANetJoin
         logging.debug("Sent beacon")
-        updated_beacon = self.beacon.update_and_get_serialized_beacon()
-        self.sockfd.sendto(updated_beacon, self.xianetjoin)
+        next_serialized_beacon = self.beacon.update_and_get_serialized_beacon()
+        self.sockfd.sendto(next_serialized_beacon, self.xianetjoin)
 
         # Call ourselves from a new thread after some time
         threading.Timer(self.beacon_interval, self.announce).start()
@@ -34,6 +34,7 @@ class NetjoinAnnouncer(object):
 
         # A beacon object we will send to announce the network
         self.beacon = NetjoinBeacon()
+        self.beacon.initialize()
 
 
 # Listen for incoming beacons

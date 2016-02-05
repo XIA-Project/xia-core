@@ -5,7 +5,7 @@ import logging
 import hashlib
 import networkx
 import ndap_pb2
-import ndap_beacon
+from netjoin_beacon import NetjoinBeacon
 
 class NetjoinPolicy:
 
@@ -123,16 +123,16 @@ class NetjoinPolicy:
             return
 
         # Convert beacon to an object we can look into
-        beacon = ndap_pb2.NetDescriptor()
-        beacon.ParseFromString(serialized_beacon)
-        logging.info("Beacon: {}".format(ndap_beacon.beacon_str(beacon)))
+        beacon = NetjoinBeacon()
+        beacon.from_serialized_beacon(serialized_beacon)
+        logging.info("Beacon: {}".format(beacon.beacon_str()))
 
         # Try to find a set of steps we can take to join a desirable network
         path = get_shortest_joinable_path(beacon)
         joining_state = None
         if path:
             # Initiate Netjoiner action and add to known_beacons as JOINING
-            logging.debug("Joining: {}".format(ndap_beacon.beacon_str(beacon)))
+            logging.debug("Joining: {}".format(beacon.beacon_str()))
             joining_state = self.JOINING
         else:
             # Add to known_beacons as UNJOINABLE
@@ -144,7 +144,9 @@ class NetjoinPolicy:
 # Unit test this module when run by itself
 if __name__ == "__main__":
     policy = NetjoinPolicy()
-    serialized_test_beacon = ndap_beacon.build_beacon()
+    beacon = NetjoinBeacon()
+    beacon.initialize() # A default beacon announcing this network
+    serialized_test_beacon = beacon.update_and_get_serialized_beacon()
     test_beacon = ndap_pb2.NetDescriptor()
     test_beacon.ParseFromString(serialized_test_beacon)
     beacon_ID = policy.get_serialized_beacon_id(serialized_test_beacon)
