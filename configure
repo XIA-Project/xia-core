@@ -38,7 +38,7 @@ else
 endif
 
 ifdef DEBUG
-CFLAGS +=-ggdb -DDEBUG
+CFLAGS +=-O0 -ggdb -DDEBUG
 else
 CFLAGS +=-O2
 endif
