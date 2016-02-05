@@ -11,6 +11,7 @@
 #include "xiatransport.hh"
 #include "xtransport.hh"
 #include <click/xiatransportheader.hh>
+#include <click/xiascionheader.hh>
 #include "xlog.hh"
 
 /*
@@ -1131,18 +1132,32 @@ void XTRANSPORT::ProcessXhcpPacket(WritablePacket *p_in)
 
 
 /*************************************************************
-** DATAGRAM PACKET HANDLER
+** INCOMING PACKET HANDLER
 *************************************************************/
 void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
-	TransportHeader thdr(p_in);
+	int nxt = xiah.nxt();
 
-	if (xiah.nxt() == CLICK_XIA_NXT_XCMP) {
+//	INFO("Next header == %d\n", nxt);
+
+	// the SCION header is only used for routing and doesn't
+	// contain any useful information for the transport code
+	// at this time. It will always be the next header after
+	// the XIA header if present
+	if (nxt == CLICK_XIA_NXT_SCION) {
+		ScionHeader shdr(p_in);
+		nxt = shdr.nxt();
+//		INFO("Next next hdr = %02x\n", nxt);
+	}
+
+	if (nxt == CLICK_XIA_NXT_XCMP) {
 		// pass the packet to all sockets that registered for XMCP packets
 		ProcessXcmpPacket(p_in);
 		return;
 	}
+
+	TransportHeader thdr(p_in);
 
 	switch(thdr.type()) {
 		case TransportHeader::XSOCK_STREAM:
@@ -3979,8 +3994,8 @@ void XTRANSPORT::Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg,
 		p = thdr->encap(just_payload_part);
 
 		thdr->update();
-		xiah.set_plen(pktPayloadSize + thdr->hlen()); // XIA payload = transport header + transport-layer data
 
+		xiah.set_plen(pktPayloadSize + thdr->hlen()); // XIA payload = transport header + transport-layer data
 		p = xiah.encap(p, false);
 		delete thdr;
 	}
