@@ -113,7 +113,7 @@ class NetjoinPolicy:
         return False
 
     # Main entry point for the policy module
-    def process_serialized_beacon(serialized_beacon):
+    def process_serialized_beacon(self, serialized_beacon):
 
         # Retrieve ID of beacon so we can test against known beacons
         beacon_ID = get_serialized_beacon_id(serialized_beacon)
