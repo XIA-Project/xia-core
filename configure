@@ -18,6 +18,8 @@ echo NPROCS=$(($CORES * 2)) >> $OUTPUT
 
 echo XIADIR=$(pwd) >> $OUTPUT
 
+if [ "$tarch" = "mips" ]; then
+
 [ "$1" == "DEBUG" ] && echo "DEBUG=1" >> $OUTPUT
 
 cat >> $OUTPUT << EOF
@@ -27,6 +29,7 @@ ETC=\$(XIADIR)/etc
 XLIB=\$(APIDIR)/lib
 XINC=\$(APIDIR)/include
 
+TARCH=mips
 MIPSHOMEDIR=/opt/buildroot-2013.11/output/host
 MIPSINCDIR=\$(MIPSHOMEDIR)/usr/include/
 MIPSPYINCDIR=\$(MIPSHOMEDIR)/usr/include/python2.7/
@@ -35,6 +38,8 @@ MIPSLIBDIR=\$(MIPSHOMEDIR)/usr/lib/
 CC=/opt/buildroot-2013.11/output/host/usr/bin/mips-linux-g++
 LD=/opt/buildroot-2013.11/output/host/usr/bin/mips-linux-g++
 CFLAGS=-Wall -Wextra -march=24kc -fomit-frame-pointer -fPIC -pipe -I\$(XINC) -I\$(MIPSINCDIR) -I\$(MIPSPYINCDIR)
+CXXFLAGS=\$(CFLAGS)
+
 LDFLAGS=-I\$(MIPSLIBDIR) -lpthread
 
 ifeq (\$(wildcard \$(XLIB)/libXsocket.a),)
@@ -50,3 +55,32 @@ CFLAGS +=-O2
 endif
 
 EOF
+
+else # regular X86 case
+
+cat >> $OUTPUT << EOF
+APIDIR=\$(XIADIR)/api
+BINDIR=\$(XIADIR)/bin
+ETC=\$(XIADIR)/etc
+XLIB=\$(APIDIR)/lib
+XINC=\$(APIDIR)/include
+
+CC=g++
+LD=g++
+CFLAGS=-Wall -Wextra -I\$(XINC)
+LDFLAGS=-lpthread
+ifeq (\$(wildcard \$(XLIB)/libXsocket.a),)
+	LIBS=\$(XLIB)/libXsocket.so \$(XLIB)/libdagaddr.so \$(XLIB)/libXssl.so
+else
+	LIBS=\$(XLIB)/libXsocket.a \$(XLIB)/libdagaddr.a \$(XLIB)/libXssl.a -Bstatic -lprotobuf
+endif
+
+ifdef DEBUG
+CFLAGS +=-ggdb -DDEBUG
+else
+CFLAGS +=-O2
+endif
+
+EOF
+
+fi
