@@ -338,7 +338,7 @@ WritablePacket *XTRANSPORT::copy_packet(Packet *p, sock *sk)
 	TransportHeader thdr(p);
 	TransportHeaderEncap *new_thdr = new TransportHeaderEncap(thdr.type(), thdr.pkt_info(), thdr.seq_num(), thdr.ack_num(), thdr.length(), thdr.recv_window());
 
-	WritablePacket *copy = WritablePacket::make(256, thdr.payload(), xiahdr.plen() - thdr.hlen(), 20);
+	WritablePacket *copy = WritablePacket::make(256, thdr.payload(), thdr.plen(), 20);
 
 	copy = new_thdr->encap(copy);
 	copy = xiah.encap(copy, false);
@@ -995,7 +995,7 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk)
 			WritablePacket *p = sk->recv_buffer[i % sk->recv_buffer_size];
 			XIAHeader xiah(p->xia_header());
 			TransportHeader thdr(p);
-			size_t data_size = xiah.plen() - thdr.hlen();
+			size_t data_size = thdr.plen();
 
 			const char *payload = (char *)thdr.payload();
 			uint16_t tail = XIA_TAIL_ANNO(p);
@@ -1021,7 +1021,7 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk)
 					// we need to keep the tail data the application didn't ask for
 					// update this packet to shrink the data
 					int extra = bytes_returned - bytes_requested;
-					tail = xiah.plen() - thdr.hlen() - extra;
+					tail = thdr.plen() - extra;
 
 					DBG("%d: keeping the last %d bytes in packet %d\n", sk->port, extra, i % sk->recv_buffer_size);
 					SET_XIA_TAIL_ANNO(p, tail);
@@ -1057,10 +1057,10 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk)
 			TransportHeader thdr(p);
 			int data_size;
 			String payload;
-
 			switch (sk->sock_type) {
 				case SOCK_DGRAM:
-					data_size = xiah.plen() - thdr.hlen();
+					data_size = thdr.plen();
+
 					payload = String((const char*)thdr.payload(), data_size);
 					break;
 
@@ -1587,7 +1587,7 @@ void XTRANSPORT::ProcessMigrateAck(WritablePacket *p_in)
 	// Verify the MIGRATEACK and start using new DAG
 	// 1. Retrieve payload (migratedDAG, timestamp) signature, Pubkey
 	const uint8_t *payload = thdr.payload();
-	int payload_len = xiah.plen() - thdr.hlen();
+	int payload_len = thdr.plen();
 	const uint8_t *payloadptr = payload;
 	size_t signed_datalen;
 
@@ -1975,7 +1975,7 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 		INFO("remote path in SYNACK different from that used in SYN");
 		// Retrieve the signed payload
 		const char *payload = (const char *)thdr.payload();
-		int payload_len = xiah.plen() - thdr.hlen();
+		int payload_len = thdr.plen();
 		XIASecurityBuffer signedPayload(payload, payload_len);
 
 		// Retrieve the synack payload
@@ -3996,7 +3996,8 @@ void XTRANSPORT::Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg,
 		thdr->update();
 
 		xiah.set_plen(pktPayloadSize + thdr->hlen()); // XIA payload = transport header + transport-layer data
-		p = xiah.encap(p, false);
+		p = xiah.encap(p, true);
+
 		delete thdr;
 	}
 

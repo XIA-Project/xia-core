@@ -28,11 +28,18 @@ class XIAGenericExtHeader { public:
 
     inline const uint8_t* payload() const;  // payload
 
+    inline uint16_t plen() { return _payload_length; };
+
+    inline bool isValid() { return _valid; };
+
 protected:
     void populate_map();
 
 protected:
     const struct click_xia_ext* _hdr;
+
+    bool _valid;
+    uint16_t _payload_length;
 
     HashTable<uint8_t, String> _map;        // parsed key-value map
 
