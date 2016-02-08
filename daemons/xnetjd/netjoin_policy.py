@@ -37,15 +37,15 @@ class NetjoinPolicy:
     # Determine if the beacon has a network descriptor we can deal with
     def sane_beacon(self, beacon):
         # Should have at least two nodes and 1 edge
-        if num(beacon.auth_cap.nodes) < 2:
+        if len(beacon.net_descriptor.auth_cap.nodes) < 2:
             return False
-        if num(beacon.auth_cap.edges) < 1:
+        if len(beacon.net_descriptor.auth_cap.edges) < 1:
             return False
         valid_l2_types = []
         valid_l2_types.append(ndap_pb2.LayerTwoIdentifier.ETHERNET)
         valid_l2_types.append(ndap_pb2.LayerTwoIdentifier.WIFI)
         valid_l2_types.append(ndap_pb2.LayerTwoIdentifier.DSRC)
-        if beacon.l2_id.l2_type not in valid_l2_types:
+        if beacon.net_descriptor.l2_id.l2_type not in valid_l2_types:
             return False
         return True
 
@@ -59,9 +59,13 @@ class NetjoinPolicy:
     # Walk a graph and find all XIP nodes
     def find_xip_nodes(self, G):
         xip_nodes = []
-        for node in G.nodes:
+        for node in G.nodes():
+            if node == 'Start':
+                continue
+            acnode = ndap_pb2.ACNode()
+            acnode.ParseFromString(node)
             #if type(node) is ndap_pb2.XIP_Node:
-            if node.has_xip():
+            if acnode.HasField('xip'):
                 xip_nodes.append(node)
         return xip_nodes
 
@@ -69,25 +73,31 @@ class NetjoinPolicy:
     def get_shortest_joinable_path(self, beacon):
 
         # Sanity check the beacon
-        if not sane_beacon(beacon):
+        if not self.sane_beacon(beacon):
             logging.error("Bad beacon ignored")
             return False
         # Build a directed graph object we can traverse
         beacon_graph = networkx.DiGraph()
 
         # List of nodes including a fake Start node
-        nodes_in_order = ['Start'] + beacon.auth_cap.nodes
-        beacon_graph.add_nodes_from(nodes_in_order)
+        #nodes_in_order = ['Start'] + beacon.net_descriptor.auth_cap.nodes
+        nodes_in_order = ['Start']
+        beacon_graph.add_node('Start')
+        for node in beacon.net_descriptor.auth_cap.nodes:
+            serialized_node = node.SerializeToString()
+            nodes_in_order.append(serialized_node)
+            beacon_graph.add_node(serialized_node)
+        #beacon_graph.add_nodes_from(nodes_in_order)
 
         # Now add edges by indexing into nodes_in_order
-        for edge in beacon.auth_cap.edges:
+        for edge in beacon.net_descriptor.auth_cap.edges:
             beacon_graph.add_edge(nodes_in_order[edge.from_node], nodes_in_order[edge.to_node])
 
         # Reduce graph - take out nodes we can't deal with
-        beacon_graph = reduce_graph(beacon_graph)
+        beacon_graph = self.reduce_graph(beacon_graph)
 
         # We will join any available XIP network. Get a list of all XIP nodes
-        goal_nodes = find_xip_nodes(beacon_graph)
+        goal_nodes = self.find_xip_nodes(beacon_graph)
 
         # Walk the graph to find a path matching available auth providers
         start = nodes_in_order[0]
@@ -103,7 +113,7 @@ class NetjoinPolicy:
         return path
 
     # Get a beacon ID from serialized protobuf containing beacon
-    def get_serialized_beacon_id(serialized_beacon):
+    def get_serialized_beacon_id(self, serialized_beacon):
         return hashlib.sha256(serialized_beacon).hexdigest()
 
     # Check given beacon ID against list of known beacons
@@ -116,10 +126,10 @@ class NetjoinPolicy:
     def process_serialized_beacon(self, serialized_beacon):
 
         # Retrieve ID of beacon so we can test against known beacons
-        beacon_ID = get_serialized_beacon_id(serialized_beacon)
+        beacon_ID = self.get_serialized_beacon_id(serialized_beacon)
 
         # If this beacon has been processed before, drop it
-        if is_known_beacon_id(beacon_ID):
+        if self.is_known_beacon_id(beacon_ID):
             return
 
         # Convert beacon to an object we can look into
@@ -128,7 +138,7 @@ class NetjoinPolicy:
         logging.info("Beacon: {}".format(beacon.beacon_str()))
 
         # Try to find a set of steps we can take to join a desirable network
-        path = get_shortest_joinable_path(beacon)
+        path = self.get_shortest_joinable_path(beacon)
         joining_state = None
         if path:
             # Initiate Netjoiner action and add to known_beacons as JOINING
@@ -139,7 +149,7 @@ class NetjoinPolicy:
             joining_state = self.UNJOINABLE
 
         # We processed this beacon, so record our decision
-        keep_known_beacon_id(beacon_ID, joining_state)
+        self.keep_known_beacon_id(beacon_ID, joining_state)
 
 # Unit test this module when run by itself
 if __name__ == "__main__":
