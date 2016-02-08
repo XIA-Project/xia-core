@@ -79,7 +79,7 @@ sock::sock(
 	_errh = transport -> error_handler();
 	hlim = HLIM_DEFAULT;
 	nxt = CLICK_XIA_NXT_TRN;
-	refcount = 0;
+	refcount = 1;
 }
 
 sock::sock() {
@@ -123,7 +123,7 @@ sock::sock() {
 	num_migrate_tries = 0;
 	migrate_pkt = NULL;
 	recv_pending = false;
-	refcount = 0;
+	refcount = 1;
 }
 XTRANSPORT::XTRANSPORT() : _timer(this)
 {
@@ -2329,8 +2329,6 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	sock *sk = portToSock.get(_sport);
 	bool teardown_now = true;
 
-	INFO("closing %d %d sk = %p state=%s ref = %d\n", _sport, sk->port, sk, StateStr(sk->state), sk->refcount);
-
 	if (!sk) {
 		// this shouldn't happen!
 		ERROR("Invalid socket %d\n", _sport);
@@ -2339,31 +2337,31 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 	assert(sk->refcount != 0);
 
-	if (sk -> get_type() == SOCK_STREAM)
-	{
-		
-	} else if (sk -> get_type() == SOCK_DGRAM)
-	{
-		/* code */
-	} 
+	if (--sk->refcount == 0) {
 
-	switch (sk -> get_type()) {
-		case SOCK_STREAM:
-			teardown_now = false;
-			dynamic_cast<XStream *>(sk)->usrclosed();
-			break;
-		case SOCK_DGRAM:
-		break;
-		case SOCK_CHUNK:
-			break;
-	}
+		INFO("closing %d state=%s new refcount = %d\n", sk->port, StateStr(sk->state), sk->refcount);
 
-	if (teardown_now) {
-		TeardownSocket(sk);
+		switch (sk -> get_type()) {
+			case SOCK_STREAM:
+				teardown_now = false;
+				dynamic_cast<XStream *>(sk)->usrclosed();
+				break;
+			case SOCK_DGRAM:
+				break;
+			case SOCK_CHUNK:
+				break;
+		}
+
+		if (teardown_now) {
+			TeardownSocket(sk);
+		}
+
+	} else {
+		// the app was forked and not everyone has closed the socket yet
+		INFO("decremented ref count on %d state=%s new refcount=%d\n", sk->port, StateStr(sk->state), sk->refcount);
 	}
 
 done:
-//	INFO("Close :%d seq:%d\n", sk->port, xcm->sequence());
 	xcm->set_refcount(sk->refcount);
 	xcm->set_delkeys(sk->isAcceptedSocket == false);
 	ReturnResult(control_port, xia_socket_msg);
