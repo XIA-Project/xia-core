@@ -331,7 +331,7 @@ host()
 	cd $XIADIR/bin
 	case $action in
 		"start")
-			./xnetjd --client &
+			./xnetjd --client --hostname $host &
 			sleep 0.5
 			;;
 		"stop")
