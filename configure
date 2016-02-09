@@ -35,9 +35,9 @@ MIPSINCDIR=\$(MIPSHOMEDIR)/usr/include/
 MIPSPYINCDIR=\$(MIPSHOMEDIR)/usr/include/python2.7/
 MIPSLIBDIR=\$(MIPSHOMEDIR)/usr/lib/
 
-CC=/opt/buildroot-2013.11/output/host/usr/bin/mips-linux-g++
-LD=/opt/buildroot-2013.11/output/host/usr/bin/mips-linux-g++
-CFLAGS=-Wall -Wextra -march=24kc -fomit-frame-pointer -fPIC -pipe -I\$(XINC) -I\$(MIPSINCDIR) -I\$(MIPSPYINCDIR)
+CC=mips-linux-g++
+LD=mips-linux-g++
+CFLAGS=-Wall -Wextra -march=24kc -fomit-frame-pointer -fPIC -pipe -fno-caller-saves -I\$(XINC) -I\$(MIPSINCDIR) -I\$(MIPSPYINCDIR)
 CXXFLAGS=\$(CFLAGS)
 
 LDFLAGS=-I\$(MIPSLIBDIR) -lpthread
