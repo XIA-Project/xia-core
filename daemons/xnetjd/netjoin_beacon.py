@@ -5,11 +5,18 @@ from google.protobuf import text_format as protobuf_text_format
 import logging
 import ndap_pb2
 import uuid
+import nacl.encoding
+import nacl.signing
+import nacl.utils
 
 # This is a wrapper for the NetDescriptor protobuf defined in ndap.proto
 class NetjoinBeacon(object):
     def __init__(self):
         self.net_descriptor = ndap_pb2.NetDescriptor()
+        self.guid = None
+        self.xip_netid = None
+        self.ephemeral_verify_key = None
+        self.ephemeral_signing_key = None
 
     def beacon_str(self):
         return protobuf_text_format.MessageToString(self.net_descriptor)
@@ -17,8 +24,20 @@ class NetjoinBeacon(object):
     def print_beacon(self):
         print self.beacon_str()
 
+    # serialized_beacon is actually a serialized ndap_pb2.NetDescriptor
     def from_serialized_beacon(self, serialized_beacon):
         self.net_descriptor.ParseFromString(serialized_beacon)
+        # NOTE: we don't have xip_netid and signing_key in received beacon
+        self.guid = self.net_descriptor.GUID
+        self.ephemeral_verify_key = nacl.signing.VerifyKey(self.net_descriptor.ac_shared.ja.gateway_ephemeral_pubkey.the_key, encoder=nacl.encoding.RawEncoder)
+
+    def ephemeral_verify_key_hex(self):
+        return self.ephemeral_verify_key.encode(
+                encoder=nacl.encoding.HexEncoder)
+
+    def ephemeral_verify_key_raw(self):
+        return self.ephemeral_verify_key.encode(
+                encoder=nacl.encoding.RawEncoder)
 
     # For now we just build a beacon with a dummy AuthCapStruct
     def initialize(self, guid=None, xip_netid=None):
@@ -30,6 +49,14 @@ class NetjoinBeacon(object):
         if self.xip_netid == None:
             self.xip_netid = uuid.uuid4().bytes
             logging.warning("XIP NID not giver. Assigning a temporary one")
+
+        # A set of ephemeral keys representing the sender of this beacon
+        self.ephemeral_signing_key = nacl.signing.SigningKey.generate()
+        self.ephemeral_verify_key = self.signing_key.verify_key
+
+        # Hard-code the cipher suite we are using
+        pubkey = self.net_descriptor.ac_shared.ja.gateway_ephemeral_pubkey
+        pubkey.cipher_suite = ndap_pb2.AuthCapSharedInfo.JoinAuthExtraInfo.PublicKey.NACL_curve25519xsalsa20poly1305
 
         # Our network descriptor message
         self.net_descriptor.GUID = self.guid
@@ -78,10 +105,21 @@ class NetjoinBeacon(object):
         edge4.from_node = 2
         edge4.to_node = 3
 
+    # Create a new random nonce for inclusion in next outgoing beacon
+    def update_nonce(self):
+        nonce = self.net_descriptor.ac_shared.ja.gateway_nonce
+        nonce.gmt_unix_time = int(time.time())
+        nonce.random_bytes = nacl.utils.random(2)
+
+    # Copy self.verify_key into self.net_descriptor
+    def update_verify_key(self):
+        pubkey = self.net_descriptor.ac_shared.ja.gateway_ephemeral_pubkey
+        pubkey.the_key = self.ephemeral_verify_key_raw()
+
+    # Update the nonce and ephemeral_pubkey in net_descriptor
     def update_and_get_serialized_beacon(self):
-        # Create new nonce
-        # Update nonce in self.net_descriptor
-        # Update any other data in self.net_descriptor
+        update_nonce()
+        update_verify_key()
         return self.net_descriptor.SerializeToString()
 
 if __name__ == "__main__":
