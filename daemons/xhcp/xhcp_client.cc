@@ -208,7 +208,11 @@ int main(int argc, char *argv[]) {
 		memset(ns_dag, '\0', XHCP_MAX_DAG_LENGTH);
 		int i;
 		xhcp_pkt *tmp = (xhcp_pkt *)pkt;
+        tmp->seq_num = ntohl(tmp->seq_num);
+        tmp->num_entries = ntohs(tmp->num_entries);
 		xhcp_pkt_entry *entry = (xhcp_pkt_entry *)tmp->data;
+        entry->type = ntohs(entry->type);
+        
 		for (i=0; i<tmp->num_entries; i++) {
 			switch (entry->type) {
 				case XHCP_TYPE_AD:
@@ -228,6 +232,7 @@ int main(int argc, char *argv[]) {
 					break;
 			}
 			entry = (xhcp_pkt_entry *)((char *)entry + sizeof(entry->type) + strlen(entry->data) + 1);
+            entry->type = ntohs(entry->type);
 		}
 		// validate pkt
 		if (strlen(router_ad) <= 0 || strlen(router_hid) <= 0 || strlen(router_4id) <= 0 || strlen(ns_dag) <= 0) {

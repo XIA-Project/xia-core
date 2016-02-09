@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
 	char ns[XHCP_MAX_DAG_LENGTH];
 	sprintf(ns, "RE %s %s %s", AD0, HID0, SID_NS);
 
-	// read the name server DAG from xia-core/etc/resolv.conf, if present
+	// read the name ser ver DAG from xia-core/etc/resolv.conf, if present
 	char root[BUF_SIZE];
 	memset(root, 0, BUF_SIZE);
 	ini_gets(NULL, "nameserver", ns, ns, XHCP_MAX_DAG_LENGTH, strcat(XrootDir(root, BUF_SIZE), RESOLV_CONF));
@@ -118,18 +118,20 @@ int main(int argc, char *argv[]) {
 		syslog(LOG_WARNING, "Unable to create socket: %s", strerror(sk));
 	}
 
+    uint32_t seqNum = 0;
+
 	xhcp_pkt beacon_pkt;
-	beacon_pkt.seq_num = 0;
-	beacon_pkt.num_entries = 4;
+	beacon_pkt.seq_num = htonl(seqNum);
+	beacon_pkt.num_entries = htons(4);
 	xhcp_pkt_entry *ad_entry = (xhcp_pkt_entry*)malloc(sizeof(short)+strlen(myAD)+1);
 	xhcp_pkt_entry *gw_entry = (xhcp_pkt_entry*)malloc(sizeof(short)+strlen(gw_router_hid)+1);
 	xhcp_pkt_entry *gw_entry_4id = (xhcp_pkt_entry*)malloc(sizeof(short)+strlen(gw_router_4id)+1);
 	xhcp_pkt_entry *ns_entry = (xhcp_pkt_entry*)malloc(sizeof(short)+strlen(ns)+1);
 
-	ad_entry->type = XHCP_TYPE_AD;
-	gw_entry->type = XHCP_TYPE_GATEWAY_ROUTER_HID;
-	gw_entry_4id->type = XHCP_TYPE_GATEWAY_ROUTER_4ID;
-	ns_entry->type = XHCP_TYPE_NAME_SERVER_DAG;
+	ad_entry->type = htons(XHCP_TYPE_AD);
+	gw_entry->type = htons(XHCP_TYPE_GATEWAY_ROUTER_HID);
+	gw_entry_4id->type = htons(XHCP_TYPE_GATEWAY_ROUTER_4ID);
+	ns_entry->type = htons(XHCP_TYPE_NAME_SERVER_DAG);
 	sprintf(ad_entry->data, "%s", myAD);
 	sprintf(gw_entry->data, "%s", gw_router_hid);
 	sprintf(gw_entry_4id->data, "%s", gw_router_4id);
@@ -164,7 +166,8 @@ int main(int argc, char *argv[]) {
 		if (rc < 0)
 			syslog(LOG_WARNING, "Error sending beacon: %s", strerror(rc));
 		//fprintf(stderr, "XHCP beacon %ld\n", beacon_pkt.seq_num);
-		beacon_pkt.seq_num += 1;
+        seqNum++;
+		beacon_pkt.seq_num = htonl(seqNum);
 		sleep(XHCP_SERVER_BEACON_INTERVAL);
 	}
 	free(ad_entry);
