@@ -4,6 +4,7 @@
 from google.protobuf import text_format as protobuf_text_format
 import logging
 import ndap_pb2
+import time
 import uuid
 import nacl.encoding
 import nacl.signing
@@ -52,7 +53,7 @@ class NetjoinBeacon(object):
 
         # A set of ephemeral keys representing the sender of this beacon
         self.ephemeral_signing_key = nacl.signing.SigningKey.generate()
-        self.ephemeral_verify_key = self.signing_key.verify_key
+        self.ephemeral_verify_key = self.ephemeral_signing_key.verify_key
 
         # Hard-code the cipher suite we are using
         pubkey = self.net_descriptor.ac_shared.ja.gateway_ephemeral_pubkey
@@ -118,8 +119,8 @@ class NetjoinBeacon(object):
 
     # Update the nonce and ephemeral_pubkey in net_descriptor
     def update_and_get_serialized_beacon(self):
-        update_nonce()
-        update_verify_key()
+        self.update_nonce()
+        self.update_verify_key()
         return self.net_descriptor.SerializeToString()
 
 if __name__ == "__main__":
