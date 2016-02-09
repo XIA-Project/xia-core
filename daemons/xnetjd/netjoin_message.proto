@@ -1,0 +1,9 @@
+import "ndap.proto";
+import "jacp.proto";
+
+message NetjoinMessage {
+	oneof message_type {
+		NetDescriptor beacon = 1;
+		HandshakeOne handshake_one = 2;
+	}
+}
