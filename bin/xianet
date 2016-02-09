@@ -338,13 +338,17 @@ host()
 	case $action in
 		"start")
 			./xhcp_clientd -h $host $LOG_FLAGS &
+			./xgateway -h $host $LOG_FLAGS &
+
 			sleep 0.5
 			;;
 		"stop")
 			kill_service $host "xhcp_clientd"
+			kill_service $host "xgateway"
 			;;
 		"check")
 			check_service $host "xhcp_clientd"
+			check_service $host "xgateway"
 			;;
 		*)
 			echo "unrecognized action: $action"
@@ -465,7 +469,7 @@ process_nodes()
 				rendezvous $name $action
 				;;
 			scion)
-				scion $name $action
+				#scion $name $action
 				;;
 			*)
 				echo Unknown device type $name:$type
