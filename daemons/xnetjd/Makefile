@@ -2,20 +2,13 @@ include ../../xia.mk
 
 .PHONY: all clean
 
-LDFLAGS += $(LIBS)
-SOURCES=xnetjd.cc
-NETJD=$(BINDIR)/xnetjd
+PROTOS         := $(wildcard *.proto)
+PROTO_OBJS     := $(PROTOS:.proto=_pb2.py)
 
-ndap_pb2.py: ndap.proto
-	protoc --python_out=. $^
+%_pb2.py: %.proto
+	protoc --python_out=. $<
 
-jacp_pb2.py: jacp.proto
-	protoc --python_out=. $^
-
-all: $(NETJD) ndap_pb2.py jacp_pb2.py
-
-$(NETJD): $(SOURCES) $(XINC)/Xsocket.h
-	$(CC) -o $@ $(CFLAGS) $(SOURCES) $(LDFLAGS)
+all: $(PROTO_OBJS)
 
 clean:
-	-rm ndap_pb2.py jacp_pb2.py
+	rm -f $(PROTO_OBJS)
