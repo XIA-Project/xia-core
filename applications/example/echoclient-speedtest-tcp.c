@@ -185,7 +185,6 @@ void *mainLoopThread(void * /*arg*/){
                 pktSize);
         }
 
-
         // poll waiting for reply
         if ((rc = Xpoll(pfds, 1, 5000)) <= 0) {
             die(-5, "Poll returned %d\n", rc);

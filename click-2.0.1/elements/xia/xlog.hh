@@ -2,16 +2,25 @@
 #define CLICK_XLOG_HH
 #include <click/element.hh>
 #include <click/error-syslog.hh>
+#include <click/error.hh>
+
 CLICK_DECLS
 
-#define TRACE()     _errh->debug("%s: %d", __FUNCTION__, __LINE__)
-
-#define DBG(...)    _errh->ldebug(__FUNCTION__, __VA_ARGS__)   // level 7
-#define INFO(...)   _errh->lmessage(__FUNCTION__, __VA_ARGS__) // level 6
-#define NOTICE(...) _errh->lnotice(__FUNCTION__, __VA_ARGS__)  // level 5
-#define WARN(...)   _errh->lwarning(__FUNCTION__, __VA_ARGS__) // level 4
-#define ERROR(...)  _errh->lerror(__FUNCTION__, __VA_ARGS__)   // level 3
-//#define T_ALERT(...)  _errh->fatal(__FUNCTION__, __VA_ARGS__)  // level -1
+#define TRACE()     (ErrorHandler::default_handler())->debug\
+    ("%s: %d", __FUNCTION__, __LINE__)
+#define DBG(...)    (ErrorHandler::default_handler())->ldebug\
+    (__FUNCTION__, __VA_ARGS__)   // level 7
+#define INFO(...)   (ErrorHandler::default_handler())->lmessage\
+    (__FUNCTION__, __VA_ARGS__) // level 6
+#define NOTICE(...) (ErrorHandler::default_handler())->xmessage\
+    (String::make_stable(ErrorHandler::e_notice, 3)+__FUNCTION__+": ", \
+    ErrorHandler::xformat(__VA_ARGS__))  // level 5
+#define WARN(...)   (ErrorHandler::default_handler())->lwarning\
+    (__FUNCTION__, __VA_ARGS__) // level 4
+#define ERROR(...)  (ErrorHandler::default_handler())->lerror\
+    (__FUNCTION__, __VA_ARGS__)   // level 3
+//#define T_ALERT(...)  ErrorHandler::default_handler()->
+//    fatal(__FUNCTION__, __VA_ARGS__)  // level -1
 
 class XLog : public Element { public:
 

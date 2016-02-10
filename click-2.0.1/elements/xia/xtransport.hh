@@ -104,8 +104,6 @@ public:
 
 
 private:
-	SyslogErrorHandler *_errh;
-
 	Timer _timer;
 
 	uint32_t _cid_type, _sid_type;

@@ -92,8 +92,6 @@ XTRANSPORT::~XTRANSPORT()
 
 int XTRANSPORT::initialize(ErrorHandler *)
 {
-	// XLog installed the syslog error handler, use it!
-	_errh = (SyslogErrorHandler*)ErrorHandler::default_handler();
 	_timer.initialize(this);
 	return 0;
 }
@@ -183,7 +181,7 @@ int XTRANSPORT::purge(const String &conf, Element *e, void *thunk, ErrorHandler 
 		if (sk->sock_type == SOCK_STREAM) {
 			if (purge || sk->state == TIME_WAIT) {
 				count++;
-				xt->_errh->warning("purging %d\n", sk->port);
+				WARN("purging %d\n", sk->port);
 				xt->TeardownSocket(sk);
 			}
 		}
@@ -3537,6 +3535,7 @@ void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 		new_local_addr = "RE " + AD_str + " " + HID_str;
 	}
 	NOTICE("new address is - %s", new_local_addr.c_str());
+    
 	_local_addr.parse(new_local_addr);
 
 	// Inform all active stream connections about this change
@@ -4188,7 +4187,6 @@ void XTRANSPORT::XrequestChunk(unsigned short _sport, xia::XSocketMsg *xia_socke
 
 		sk = portToSock.get(_sport);
 
-		//_errh->debug("sent packet to %s, from %s\n", dest.c_str(), sk->src_path.unparse_re().c_str());
 
 		//Add XIA headers
 		XIAHeaderEncap xiah;
@@ -4443,7 +4441,7 @@ void XTRANSPORT::XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	XIAPath src_path;
 	src_path.parse(str_local_addr);
 
-	_errh->debug("DAG: %s\n", str_local_addr.c_str());
+	DBG("DAG: %s\n", str_local_addr.c_str());
 
 	/*TODO: The destination dag of the incoming packet is local_addr:XID
 	 * Thus the cache thinks it is destined for local_addr and delivers to socket
