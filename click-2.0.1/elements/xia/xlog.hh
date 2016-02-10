@@ -19,8 +19,8 @@ CLICK_DECLS
     (__FUNCTION__, __VA_ARGS__) // level 4
 #define ERROR(...)  (ErrorHandler::default_handler())->lerror\
     (__FUNCTION__, __VA_ARGS__)   // level 3
-//#define T_ALERT(...)  ErrorHandler::default_handler()->
-//    fatal(__FUNCTION__, __VA_ARGS__)  // level -1
+//#define T_ALERT(...)  (ErrorHandler::default_handler())->fatal\
+//    (__FUNCTION__, __VA_ARGS__)  // level -1
 
 class XLog : public Element { public:
 
