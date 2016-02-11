@@ -17,6 +17,7 @@ class NetjoinReceiver(threading.Thread):
         self.BUFSIZE = 1024
         self.sockfd = None
         self.shutdown = shutdown
+        self.policy = policy
 
         logging.debug("Receiver initialized")
 
@@ -27,7 +28,6 @@ class NetjoinReceiver(threading.Thread):
     def run(self):
         while not self.shutdown.is_set():
             data, addr = self.sockfd.recvfrom(self.BUFSIZE)
-            logging.debug("Received message from: {}".format(addr))
 
             # Convert beacon to protobuf and print its contents
             interface = struct.unpack("H", data[0:2])[0]
@@ -50,7 +50,7 @@ class NetjoinReceiver(threading.Thread):
 
             if message_type == "beacon":
                 logging.debug("Got a beacon")
-                policy.process_serialized_beacon(netjoin_message.beacon.SerializeToString())
+                self.policy.process_serialized_beacon(netjoin_message.beacon.SerializeToString())
             elif message_type == "handshake_one":
                 logging.debug("Got handshake_one message")
 
