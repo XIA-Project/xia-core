@@ -112,10 +112,6 @@ class NetjoinPolicy:
                 pass
         return path
 
-    # Get a beacon ID from serialized protobuf containing beacon
-    def get_serialized_beacon_id(self, serialized_beacon):
-        return hashlib.sha256(serialized_beacon).hexdigest()
-
     # Check given beacon ID against list of known beacons
     def is_known_beacon_id(self, beacon_id):
         if beacon_id in self.known_beacons:
@@ -159,7 +155,7 @@ if __name__ == "__main__":
     serialized_test_beacon = beacon.update_and_get_serialized_beacon()
     test_beacon = ndap_pb2.NetDescriptor()
     test_beacon.ParseFromString(serialized_test_beacon)
-    beacon_ID = policy.get_serialized_beacon_id(serialized_test_beacon)
+    beacon_ID = test_beacon.get_ID()
     policy.keep_known_beacon_id(beacon_ID, NetjoinPolicy.JOINING)
     policy.print_known_beacons()
     policy.remove_known_beacon_id(beacon_ID)
