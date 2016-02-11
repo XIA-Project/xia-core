@@ -6,10 +6,11 @@
 #include <map>
 #include <iostream>
 #include <stdint.h>
-#include "store.h"
 #include "xcache_cmd.pb.h"
 #include <unistd.h>
 
+
+class xcache_content_store;
 
 class xcache_meta {
 private:

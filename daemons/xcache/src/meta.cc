@@ -1,5 +1,6 @@
 #include "slice.h"
 #include "meta.h"
+#include "store.h"
 
 DEFINE_LOG_MACROS(META)
 

@@ -4,29 +4,33 @@
 #include <iostream>
 #include <sys/types.h>
 
-class xcache_meta;
+#include "meta.h"
 
 /**
  * Abstract class that defines a content store.
- * Content Store is a Xcache module that knows how to store and fetch content.
- * For example, In-memory hash table could be one content store that stores content
- * in a hash table using cid as key and also fetches it from the hash table. These
- * stores are accessed by the StoreManager after it decides to store content in one
- * of these stores.
+ *
+ * Content Store is a Xcache module that knows how to store and fetch
+ * content.  For example, In-memory hash table could be one content
+ * store that stores content in a hash table using cid as key and also
+ * fetches it from the hash table. These stores are accessed by the
+ * StoreManager after it decides to store content in one of these
+ * stores.
  */
 
 class xcache_content_store {
-	/* FIXME Configuration parameters to be added here */
+	/*
+	 * FIXME Configuration parameters to be added here
+	 */
 
-public: 
+public:
 	/**
 	 * Store method for the content store.
 	 * @param meta: Metadata of the content to be stored
 	 * @param data: Actual Data to be stored
 	 * @returns >=0: On successfully storing content
 	 * @returns <0: On failure
-	 * Return values are crucial. These values are used by the store manager to
-	 * take policy decisions.
+	 * Return values are crucial. These values are used by the
+	 * store manager to take policy decisions.
 	 */
 	virtual int store(xcache_meta *meta, const std::string *data) {
 		/* Ignoring compiler error for unused attribute */
@@ -39,8 +43,9 @@ public:
 	/**
 	 * Get method for the content store.
 	 * @param meta: Key
-	 * @returns data: Actual data. The store should read the content in memory as
-	 *                a std::string and then pass it back to the storeManager.
+	 * @returns data: Actual data. The store should read the
+	 *                content in memory as a std::string and then
+	 *                pass it back to the storeManager.
 	 */
 	virtual std::string get(xcache_meta *meta) {
 		/* Ignoring compiler error for unused attribute */
@@ -52,10 +57,12 @@ public:
 	/**
 	 * This get only reads a chunk partially.
 	 * @param meta: Key
-	 * @returns data: Actual data. The store should read the content in memory as
-	 *                a std::string and then pass it back to the storeManager.
+	 * @returns data: Actual data. The store should read the
+	 *                content in memory as a std::string and then
+	 *                pass it back to the storeManager.
 	 */
-	virtual std::string get_partial(xcache_meta *meta, off_t off, size_t len) {
+	virtual std::string get_partial(xcache_meta *meta, off_t off,
+					size_t len) {
 		/* Ignoring compiler error for unused attribute */
 		(void)meta;
 		(void)off;
@@ -80,5 +87,6 @@ public:
  * header files must be included here.
  */
 #include "stores/memht.h"
+#include "stores/disk.h"
 
 #endif

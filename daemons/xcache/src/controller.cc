@@ -97,7 +97,6 @@ static int xcache_create_lib_socket(void)
 void xcache_controller::status(void)
 {
 	LOG_CTRL_INFO("[Status]\n");
-
 }
 
 int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen, xcache_cmd *resp, xcache_cmd *cmd, int flags)
@@ -168,7 +167,9 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	return ret;
 }
 
-int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen, xcache_cmd *resp, xcache_cmd *cmd, int flags)
+int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
+					   xcache_cmd *resp, xcache_cmd *cmd,
+					   int flags)
 {
 	xcache_meta *meta;
 	std::string data;
@@ -182,7 +183,8 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen, 
 	IGNORE_PARAM(cmd);
 
 	meta = acquire_meta(cid);
-	LOG_CTRL_INFO("Fetching content %s from local\n", expected_cid.id_string().c_str());
+	LOG_CTRL_INFO("Fetching content %s from local\n",
+		      expected_cid.id_string().c_str());
 
 	LOG_CTRL_INFO("Here %d", __LINE__);
 	if(!meta) {
@@ -218,7 +220,8 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen, 
 	return ret;
 }
 
-int xcache_controller::xcache_notify(struct xcache_context *c, sockaddr_x *addr, socklen_t addrlen, int event)
+int xcache_controller::xcache_notify(struct xcache_context *c, sockaddr_x *addr,
+				     socklen_t addrlen, int event)
 {
 	xcache_notif notif;
 	std::string buffer("");
@@ -251,11 +254,14 @@ void *xcache_controller::__fetch_content(void *__args)
 	daglen = args->cmd->dag().length();
 	memcpy(&addr, args->cmd->dag().c_str(), args->cmd->dag().length());
 
-	ret = args->ctrl->fetch_content_local(&addr, daglen, args->resp, args->cmd, args->flags);
+	ret = args->ctrl->fetch_content_local(&addr, daglen, args->resp,
+					      args->cmd, args->flags);
+
 	if(ret == RET_FAILED) {
 		dirty_try = 5;
 retry_fetch:
-		ret = args->ctrl->fetch_content_remote(&addr, daglen, args->resp, args->cmd, args->flags);
+		ret = args->ctrl->fetch_content_remote(&addr, daglen, args->resp,
+						       args->cmd, args->flags);
 		dirty_try--;
 		if (ret == RET_FAILED && dirty_try > 0) {
 			LOG_CTRL_INFO("fetch_content_remote returned %d\n", ret);
@@ -268,9 +274,8 @@ retry_fetch:
 	if(!(args->flags & XCF_BLOCK)) {
 		struct xcache_context *c = args->ctrl->lookup_context(args->cmd->context_id());
 
-		if(c) {
+		if(c)
 			args->ctrl->xcache_notify(c, &addr, daglen, XCE_CHUNKARRIVED);
-		}
 
 		delete args->cmd;
 		delete args;
@@ -278,7 +283,8 @@ retry_fetch:
 	return NULL;
 }
 
-int xcache_controller::xcache_fetch_content(xcache_cmd *resp, xcache_cmd *cmd, int flags)
+int xcache_controller::xcache_fetch_content(xcache_cmd *resp, xcache_cmd *cmd,
+					    int flags)
 {
 	int ret = RET_OKNORESP;
 
@@ -295,7 +301,8 @@ int xcache_controller::xcache_fetch_content(xcache_cmd *resp, xcache_cmd *cmd, i
 	} else {
 		/* FIXME: Add to worker queue */
 		struct __fetch_content_args *args =
-			(struct __fetch_content_args *)malloc(sizeof(struct __fetch_content_args));
+			(struct __fetch_content_args *)
+			malloc(sizeof(struct __fetch_content_args));
 
 		pthread_t fetch_thread;
 		args->ctrl = this;
