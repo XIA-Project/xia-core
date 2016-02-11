@@ -4,6 +4,7 @@
 from google.protobuf import text_format as protobuf_text_format
 import logging
 import ndap_pb2
+import hashlib
 import time
 import uuid
 import nacl.encoding
@@ -24,6 +25,14 @@ class NetjoinBeacon(object):
 
     def print_beacon(self):
         print self.beacon_str()
+
+    def get_ID(self):
+        # Copy net_descriptor without nonce and hash it
+        fixed_descriptor = ndap_pb2.NetDescriptor()
+        fixed_descriptor.CopyFrom(self.net_descriptor)
+        fixed_descriptor.ac_shared.ja.ClearField("gateway_nonce")
+        # TODO: store hash if this method is called several times
+        return hashlib.sha256(fixed_descriptor.SerializeToString()).hexdigest()
 
     # serialized_beacon is actually a serialized ndap_pb2.NetDescriptor
     def from_serialized_beacon(self, serialized_beacon):
