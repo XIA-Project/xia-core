@@ -14,7 +14,7 @@ from netjoin_receiver import NetjoinReceiver
 from netjoin_message_pb2 import NetjoinMessage
 
 # Setup logging for this application
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s: %(module)s %(levelname)s: %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s: %(module)s %(levelname)s: %(message)s')
 
 # Announce the presence of this network
 class NetjoinAnnouncer(object):
