@@ -6,6 +6,7 @@ import hashlib
 import networkx
 import ndap_pb2
 from netjoin_beacon import NetjoinBeacon
+from google.protobuf import text_format as protobuf_text_format
 
 class NetjoinPolicy:
 
@@ -105,7 +106,13 @@ class NetjoinPolicy:
         for xip_node in goal_nodes:
             try:
                 path = networkx.shortest_path(beacon_graph, start, xip_node)
-                logging.debug("Can join: {}".format(path))
+                strpath = ["Start"]
+                for node in path[1:]:
+                    nodemsg = ndap_pb2.ACNode()
+                    nodemsg.ParseFromString(node)
+                    nodestr = protobuf_text_format.MessageToString(nodemsg)
+                    strpath.append(nodestr)
+                logging.info("Can join: {}".format(strpath))
                 #TODO: find paths to all goal_nodes, try all if first fails
                 break
             except networkx.NetworkXNoPath, e:
@@ -124,7 +131,7 @@ class NetjoinPolicy:
         # Convert beacon to an object we can look into
         beacon = NetjoinBeacon()
         beacon.from_serialized_beacon(serialized_beacon)
-        logging.info("Beacon: {}".format(beacon.beacon_str()))
+        logging.debug("Beacon: {}".format(beacon.beacon_str()))
 
         # Retrieve ID of beacon so we can test against known beacons
         beacon_ID = beacon.get_ID()
