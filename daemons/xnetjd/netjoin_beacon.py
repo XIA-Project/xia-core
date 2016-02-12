@@ -34,6 +34,11 @@ class NetjoinBeacon(object):
         # TODO: store hash if this method is called several times
         return hashlib.sha256(fixed_descriptor.SerializeToString()).hexdigest()
 
+    def from_net_descriptor(self, net_descriptor):
+        self.net_descriptor.CopyFrom(net_descriptor)
+        self.guid = self.net_descriptor.GUID
+        self.ephemeral_verify_key = nacl.signing.VerifyKey(self.net_descriptor.ac_shared.ja.gateway_ephemeral_pubkey.the_key, encoder=nacl.encoding.RawEncoder)
+
     # serialized_beacon is actually a serialized ndap_pb2.NetDescriptor
     def from_serialized_beacon(self, serialized_beacon):
         self.net_descriptor.ParseFromString(serialized_beacon)
