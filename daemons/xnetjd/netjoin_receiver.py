@@ -18,12 +18,34 @@ class NetjoinReceiver(threading.Thread):
         self.sockfd = None
         self.shutdown = shutdown
         self.policy = policy
+        self.client_sessions = {}
 
         logging.debug("Receiver initialized")
 
         # A socket we will bind to and listen on
         self.sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sockfd.bind(xnetjd_addr)
+
+    def handle_beacon(self, beacon):
+
+        logging.debug("Got a beacon")
+        serialized_beacon = beacon.SerializeToString()
+
+        # Ask the policy module if we should join this network
+        if not self.policy.join_sender_of_serialized_beacon(
+                serialized_beacon):
+            logging.debug("Policy action: ignore beacon")
+            return
+
+        # Initiate session to join the network
+        session = NetjoinClientSession(beacon, self.shutdown)
+        self.client_sessions[session.get_ID()] = session
+
+    def handle_handshake_one(self):
+        logging.debug("Got HandshakeOne message")
+        # Retrieve session ID from handshake one
+        # Pass handshake one to the corresponding session handler
+        pass
 
     def run(self):
         while not self.shutdown.is_set():
@@ -49,11 +71,13 @@ class NetjoinReceiver(threading.Thread):
             logging.debug("Message type: {}".format(message_type))
 
             if message_type == "beacon":
-                logging.debug("Got a beacon")
-                self.policy.process_serialized_beacon(
-                        netjoin_message.beacon.SerializeToString())
+                self.handle_beacon(netjoin_message.beacon)
+
             elif message_type == "handshake_one":
-                logging.debug("Got handshake_one message")
+                self.handle_handshake_one()
+
+            else:
+                logging.warning("Unknown message type: {}".format(message_type)
 
 # Unit test this module when run by itself
 if __name__ == "__main__":

@@ -126,7 +126,8 @@ class NetjoinPolicy:
         return False
 
     # Main entry point for the policy module
-    def process_serialized_beacon(self, serialized_beacon):
+    def join_sender_of_serialized_beacon(self, serialized_beacon):
+        join_network = False
 
         # Convert beacon to an object we can look into
         beacon = NetjoinBeacon()
@@ -138,7 +139,7 @@ class NetjoinPolicy:
 
         # If this beacon has been processed before, drop it
         if self.is_known_beacon_id(beacon_ID):
-            return
+            return False
 
         # Try to find a set of steps we can take to join a desirable network
         path = self.get_shortest_joinable_path(beacon)
@@ -147,12 +148,16 @@ class NetjoinPolicy:
             # Initiate Netjoiner action and add to known_beacons as JOINING
             logging.debug("Joining: {}".format(beacon.beacon_str()))
             joining_state = self.JOINING
+            join_network = True
         else:
             # Add to known_beacons as UNJOINABLE
             joining_state = self.UNJOINABLE
+            join_network = False
 
         # We processed this beacon, so record our decision
         self.keep_known_beacon_id(beacon_ID, joining_state)
+
+        return join_network
 
 # Unit test this module when run by itself
 if __name__ == "__main__":
