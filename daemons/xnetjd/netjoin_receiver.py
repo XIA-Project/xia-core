@@ -50,14 +50,16 @@ class NetjoinReceiver(threading.Thread):
 
             if message_type == "beacon":
                 logging.debug("Got a beacon")
-                self.policy.process_serialized_beacon(netjoin_message.beacon.SerializeToString())
+                self.policy.process_serialized_beacon(
+                        netjoin_message.beacon.SerializeToString())
             elif message_type == "handshake_one":
                 logging.debug("Got handshake_one message")
 
 # Unit test this module when run by itself
 if __name__ == "__main__":
 
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s: %(module)s %(levelname)s: %(message)s')
+    logging.basicConfig(level=logging.DEBUG,
+            format='%(asctime)s: %(module)s %(levelname)s: %(message)s')
 
     policy = NetjoinPolicy()
     shutdown_event = threading.Event()
