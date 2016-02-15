@@ -26,10 +26,10 @@ class NetjoinReceiver(threading.Thread):
         self.sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sockfd.bind(xnetjd_addr)
 
-    def handle_beacon(self, beacon):
+    def handle_beacon(self, message):
 
         logging.debug("Got a beacon")
-        serialized_beacon = beacon.SerializeToString()
+        serialized_beacon = message.beacon.SerializeToString()
 
         # Ask the policy module if we should join this network
         if not self.policy.join_sender_of_serialized_beacon(
@@ -38,8 +38,13 @@ class NetjoinReceiver(threading.Thread):
             return
 
         # Initiate session to join the network
-        session = NetjoinClientSession(beacon, self.shutdown)
+        session = NetjoinSession(beacon, self.shutdown)
+        session.daemon = True
+        session.start()
         self.client_sessions[session.get_ID()] = session
+
+        # Give the NetjoinMessage containing beacon to NetjoinSession
+        session.push(message)
 
     def handle_handshake_one(self):
         logging.debug("Got HandshakeOne message")
@@ -47,11 +52,12 @@ class NetjoinReceiver(threading.Thread):
         # Pass handshake one to the corresponding session handler
         pass
 
+    # Main loop, receives incoming NetjoinMessage(s)
     def run(self):
         while not self.shutdown.is_set():
             data, addr = self.sockfd.recvfrom(self.BUFSIZE)
 
-            # Convert beacon to protobuf and print its contents
+            # Retrieve incoming interface and sender's mac address
             interface = struct.unpack("H", data[0:2])[0]
             sendermac = struct.unpack("BBBBBB", data[2:8])
 
@@ -70,8 +76,10 @@ class NetjoinReceiver(threading.Thread):
             message_type = netjoin_message.WhichOneof("message_type")
             logging.debug("Message type: {}".format(message_type))
 
+            # A new session is started if client decides to join a network
+            # or if an access point receives a handshake one reqest to join
             if message_type == "beacon":
-                self.handle_beacon(netjoin_message.beacon)
+                self.handle_beacon(netjoin_message)
 
             elif message_type == "handshake_one":
                 self.handle_handshake_one()
