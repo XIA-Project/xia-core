@@ -25,6 +25,8 @@ public:
 	bool exists(uint8_t key) { return (_map.find(key)!=_map.end()); }
 
 	enum { OPAQUE_FIELD, LENGTH }; 
+
+	void dump() const;
 };
 
 class ScionHeaderEncap : public XIAGenericExtHeaderEncap

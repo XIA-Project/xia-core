@@ -32,6 +32,8 @@ class XIAGenericExtHeader { public:
 
     inline bool isValid() { return _valid; };
 
+    void dump() const;
+
 protected:
     void populate_map();
 

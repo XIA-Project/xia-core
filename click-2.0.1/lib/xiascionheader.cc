@@ -6,6 +6,11 @@
 #include <click/xiascionheader.hh>
 CLICK_DECLS
 
+void ScionHeader::dump() const {
+	click_chatter("==== SCION HEADER ====\n");
+	XIAGenericExtHeader::dump();
+}
+
 ScionHeaderEncap::ScionHeaderEncap(const uint8_t *opaque_field, uint8_t length)
 {
 	this->map()[ScionHeader::OPAQUE_FIELD]= String((const char*)&opaque_field, length);
