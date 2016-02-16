@@ -24,6 +24,20 @@ TransportHeaderEncap::TransportHeaderEncap(char type, char pkt_info, uint32_t se
     this->update();
 }
 
+void TransportHeader::dump() const {
+    click_chatter("==== TRANSPORT HEADER ====\n");
+    XIAGenericExtHeader::dump();
+    click_chatter("    type: %s\n", KindStr(type()));
+    if (type() == XSOCK_STREAM) {
+        click_chatter("    type: %s\n", TypeStr(pkt_info()));
+        click_chatter("    seq#: %d\n", seq_num());
+        click_chatter("    ack#: %d\n", ack_num());
+        click_chatter("  length: %d\n", length());
+        click_chatter("  window: %d\n", recv_window());
+    }
+}
+
+// FIXME: correct naming of these functions
 const char *TransportHeader::TypeStr(char type)
 {
     const char *t;
@@ -38,6 +52,19 @@ const char *TransportHeader::TypeStr(char type)
         case MIGRATE:    t = "MIGRATE"; break;
         case MIGRATEACK: t = "MIGRATEACK"; break;
         case RST:        t = "RST"; break;
+    }
+    return t;
+}
+
+const char *TransportHeader::KindStr(char type)
+{
+    const char *t;
+
+    switch (type) {
+        case XSOCK_STREAM: t = "STREAM"; break;
+        case XSOCK_DGRAM:  t = "DGRAM";  break;
+        case XSOCK_RAW:    t = "RAW";    break;
+        case XSOCK_CHUNK:  t = "CHUNK";  break;
     }
     return t;
 }

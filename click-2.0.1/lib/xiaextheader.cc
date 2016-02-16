@@ -123,6 +123,12 @@ XIAGenericExtHeader::populate_map()
 	}
 }
 
+void XIAGenericExtHeader::dump() const
+{
+	click_chatter("     nxt: %d\n", _hdr->nxt);
+	click_chatter("    hlen: %d\n", _hdr->hlen);
+}
+
 WritableXIAGenericExtHeader::WritableXIAGenericExtHeader(const WritableXIAGenericExtHeader& r)
 	: XIAGenericExtHeader(r._hdr)
 {
