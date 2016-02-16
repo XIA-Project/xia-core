@@ -145,6 +145,8 @@ void echo_stream()
                 if (ns != nr)
                         printf("warning: sent %d characters, received %d\n", ns, nr);
                 printf("%s", reply);
+                printf("\n");
+                printf("%s", reply + 126);
         }
 
         Xclose(sock);
