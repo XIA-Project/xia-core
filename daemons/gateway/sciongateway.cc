@@ -552,9 +552,11 @@ void process_data(int datasock)
   print_ext_header(eh);
   print_ext_header((click_xia_ext*)((char*)eh + eh->hlen));
 
-	print_packet_contents(packet, retval + 127);
+  // we need to fix the magic number issue here. 
+  // is the scion header size vbariable or is it fixed now?
+	print_packet_contents(packet, retval + 126);
 	syslog(LOG_INFO, "gateway: Sending the packet out on the network");
-	Xsend(datasock, packet, packetlen, 0);
+	Xsend(datasock, packet, packetlen+126, 0);
 }
 
 #define MAX_XID_STR_SIZE 64
