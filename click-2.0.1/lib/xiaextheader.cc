@@ -34,50 +34,57 @@ XIAGenericExtHeader::XIAGenericExtHeader(const Packet* p, uint8_t t)
 {
 	XIAHeader xiah(p);
 	uint8_t nxt = xiah.nxt();
-	const struct click_xia_ext* temp_hdr(reinterpret_cast<const struct click_xia_ext*>(xiah.next_header()));
+	const struct click_xia_ext* ext_hdr(reinterpret_cast<const struct click_xia_ext*>(xiah.next_header()));
+	const uint8_t *phdr = (uint8_t*)ext_hdr;
 
 	//calcalate the size of the actual payload
 	// This gives us the size of the payload and any headers that follow the header
 	// we are looking for
 	int payload_size = xiah.plen();
-	payload_size -= temp_hdr->hlen;
+	payload_size -= ext_hdr->hlen;
 
-//    click_chatter("total payload size = %d\n, this header size = %d adjusted plen = %d", xiah.plen(), temp_hdr->hlen, payload_size);
+    //click_chatter("total payload size = %d this header size = %d adjusted plen = %d", xiah.plen(), ext_hdr->hlen, payload_size);
 
 	// start by assuming that we found the header type we were looking for
 	_valid = true;
 
 	if (nxt == t) {
-		_hdr = temp_hdr;
+		_hdr = ext_hdr;
 		populate_map();
 
 	} else {
-//        click_chatter("Looking for Header of type %d found %d\n", t, nxt);
-//        click_chatter("Next = %d\n", temp_hdr->nxt);
-//        click_chatter("temp_hdr = %p\n", temp_hdr);
+        click_chatter("Looking for Header of type %d found %d\n", t, nxt);
+        click_chatter("Next = %d\n", ext_hdr->nxt);
+        click_chatter("ext_hdr = %p\n", ext_hdr);
+        click_chatter("payload size=%d total:%d\n", payload_size, xiah.plen());
 
-		while (temp_hdr->nxt != t && temp_hdr->nxt != CLICK_XIA_NXT_NO) {
+		while (ext_hdr->nxt != t && ext_hdr->nxt != CLICK_XIA_NXT_NO) {
 
 			// walk the header chain
-			temp_hdr += temp_hdr->hlen;
+			phdr += ext_hdr->hlen;
+			ext_hdr = (const struct click_xia_ext*)phdr;
 
-			payload_size -= temp_hdr->hlen;
-//            click_chatter("Next = %d\n", temp_hdr->nxt);
-//            click_chatter("this header size = %d adjusted plen = %d", temp_hdr->hlen, payload_size);
+			//click_chatter("next ext_hdr = %p\n", ext_hdr);
+
+			payload_size -= ext_hdr->hlen;
+            //click_chatter("Next = %d\n", ext_hdr->nxt);
+            //click_chatter("this header size = %d adjusted plen = %d", ext_hdr->hlen, payload_size);
 		}
 
-		if (temp_hdr->nxt == t) {
-			payload_size -= temp_hdr->hlen;
-//            click_chatter("this header size = %d adjusted plen = %d", temp_hdr->hlen, payload_size);
+		if (ext_hdr->nxt == t) {
+			phdr += ext_hdr->hlen;
+			_hdr = (const struct click_xia_ext*)phdr;
+			click_chatter("_hdr = %p nxt:%d hlen:%d\n", _hdr, _hdr->nxt, _hdr->hlen);
 
-			_hdr = (temp_hdr + temp_hdr->hlen);
+			payload_size -= _hdr->hlen;
+			click_chatter("this header size = %d adjusted plen = %d", _hdr->hlen, payload_size);
+
 			populate_map();
+
 		} else {
 			// something horrible happened and we're gonna crash
 			click_chatter("Header %d not found!", t);
 			_valid = false;
-			//_hdr->hlen = 0;
-			//_hdr->nxt = CLICK_XIA_NXT_NO;
 
 			payload_size = 0;
 			assert(0);
@@ -103,6 +110,7 @@ XIAGenericExtHeader::populate_map()
 
 	const uint8_t* d = _hdr->data;
 	const uint8_t* end = reinterpret_cast<const uint8_t*>(_hdr) + _hdr->hlen;
+
 	while (d < end) {
 		uint8_t kv_len = *d++;
 
@@ -117,6 +125,7 @@ XIAGenericExtHeader::populate_map()
 		}
 
 		uint8_t key = *d;
+
 		String value(reinterpret_cast<const char*>(d + 1), kv_len - 1);
 		_map[key] = value;
 		d += kv_len;
@@ -127,6 +136,7 @@ void XIAGenericExtHeader::dump() const
 {
 	click_chatter("     nxt: %d\n", _hdr->nxt);
 	click_chatter("    hlen: %d\n", _hdr->hlen);
+	click_chatter("    plen: %d\n", plen());
 }
 
 WritableXIAGenericExtHeader::WritableXIAGenericExtHeader(const WritableXIAGenericExtHeader& r)
