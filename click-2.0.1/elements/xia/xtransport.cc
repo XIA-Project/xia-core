@@ -396,7 +396,7 @@ bool XTRANSPORT::TeardownSocket(sock *sk)
 	bool have_src = 0;
 	bool have_dst = 0;
 
-	INFO("Tearing down %s socket %d\n", SocketTypeStr(sk->sock_type), sk->port);
+	DBG("Tearing down %s socket %d\n", SocketTypeStr(sk->sock_type), sk->port);
 
 	CancelRetransmit(sk);
 
@@ -1139,7 +1139,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 	XIAHeader xiah(p_in->xia_header());
 	int nxt = xiah.nxt();
 
-//	INFO("Next header == %d\n", nxt);
+	TransportHeader thdr(p_in);
 
 	// the SCION header is only used for routing and doesn't
 	// contain any useful information for the transport code
@@ -1147,8 +1147,11 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 	// the XIA header if present
 	if (nxt == CLICK_XIA_NXT_SCION) {
 		ScionHeader shdr(p_in);
-		nxt = shdr.nxt();
-//		INFO("Next next hdr = %02x\n", nxt);
+		nxt = shdr .nxt();
+		INFO("Found a SCION Header");
+		xiah.dump();
+		shdr.dump();
+		thdr.dump();
 	}
 
 	if (nxt == CLICK_XIA_NXT_XCMP) {
@@ -1156,8 +1159,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 		ProcessXcmpPacket(p_in);
 		return;
 	}
-
-	TransportHeader thdr(p_in);
 
 	switch(thdr.type()) {
 		case TransportHeader::XSOCK_STREAM:
@@ -2662,7 +2663,7 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	xia::X_Socket_Msg *x_socket_msg = xia_socket_msg->mutable_x_socket();
 	int sock_type = x_socket_msg->type();
 
-	INFO("create %s socket %d\n", SocketTypeStr(sock_type), _sport);
+	DBG("create %s socket %d\n", SocketTypeStr(sock_type), _sport);
 
 	sock *sk = new sock();
 	sk->port = _sport;
@@ -2914,7 +2915,7 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		ERROR("Invalid socket %d\n", _sport);
 		goto done;
 	}
-	INFO("closing %d %d sk = %p state=%s refcount=%d\n", _sport, sk->port, sk, StateStr(sk->state), sk->refcount);
+	DBG("closing %d %d sk = %p state=%s refcount=%d\n", _sport, sk->port, sk, StateStr(sk->state), sk->refcount);
 
 	assert(sk->refcount != 0);
 
@@ -2948,7 +2949,6 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	}
 
 done:
-//	INFO("Close :%d seq:%d\n", sk->port, xcm->sequence());
 	xcm->set_refcount(sk->refcount);
 	xcm->set_delkeys(sk->isAcceptedSocket == false);
 	ReturnResult(control_port, xia_socket_msg);
@@ -3746,14 +3746,17 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 
 	//Find DAG info for that stream
 	if(rc == 0 && sk->sock_type == SOCK_RAW) {
+		// FIXME: change this to use xiah.dump();
 		struct click_xia *xiah = reinterpret_cast<struct click_xia *>(payload);
+		DBG("Received raw packet from API");
 		DBG("xiah->ver = %d", xiah->ver);
 		DBG("xiah->nxt = %d", xiah->nxt);
-		DBG("xiah->plen = %d", xiah->plen);
+		DBG("xiah->plen = %d", htons(xiah->plen));
 		DBG("xiah->hlim = %d", xiah->hlim);
 		DBG("xiah->dnode = %d", xiah->dnode);
 		DBG("xiah->snode = %d", xiah->snode);
 		DBG("xiah->last = %d", xiah->last);
+
 		int total_nodes = xiah->dnode + xiah->snode;
 		for(int i=0;i<total_nodes;i++) {
 			uint8_t id[20];
@@ -3765,6 +3768,7 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 			}
 			char type[10];
 			bzero(type, 10);
+			// FIXME: this should he a helper method, not inline
 			switch (htonl(xiah->node[i].xid.type)) {
 				case CLICK_XIA_XID_TYPE_AD:
 					strcpy(type, "AD");
@@ -3781,6 +3785,9 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 				case CLICK_XIA_XID_TYPE_IP:
 					strcpy(type, "4ID");
 					break;
+				case CLICK_XIA_XID_TYPE_SCIONID:
+					strcpy(type, "SCION");
+					break;
 				default:
 					sprintf(type, "%d", xiah->node[i].xid.type);
 			};
@@ -3796,7 +3803,7 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 		int pktcontentslen = pktPayloadSize - headerlen;
 		INFO("Packet size without XIP header:%d", pktcontentslen);
 
-		WritablePacket *p = WritablePacket::make(p_in->headroom() + 1, (const void*)pktcontents, pktcontentslen, p_in->tailroom());
+		WritablePacket *p = WritablePacket::make(p_in->headroom() + 1, (const void*)pktcontents, pktPayloadSize, p_in->tailroom());
 		p = xiahencap.encap(p, false);
 
 		output(NETWORK_PORT).push(p);
