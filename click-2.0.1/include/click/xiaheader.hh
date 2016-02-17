@@ -37,6 +37,8 @@ class XIAHeader { public:
 
     const uint8_t* payload() const;         // payload (expensive call; need to traverse extension headers)
 
+    void dump() const;
+
 private:
     const struct click_xia* _hdr;
 

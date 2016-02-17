@@ -50,6 +50,20 @@ XIAHeader::payload() const
     return p;
 }
 
+void XIAHeader::dump() const
+{
+    click_chatter("==== XIA HEADER ====");
+    click_chatter("    ver: %d", _hdr->ver);
+    click_chatter("    nxt: %d", _hdr->nxt);
+    click_chatter("   last: %d", _hdr->last);
+    click_chatter("   plen: %d", ntohs(_hdr->plen));
+    click_chatter("   hlim: %d", _hdr->hlim);
+    click_chatter("  dnode: %d", _hdr->dnode);
+    click_chatter("  snode: %d", _hdr->snode);
+    click_chatter("   src: %s", src_path().unparse().c_str());
+    click_chatter("  dest: %s", dst_path().unparse().c_str());
+}
+
 
 XIAHeaderEncap::XIAHeaderEncap()
 {
