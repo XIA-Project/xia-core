@@ -21,6 +21,8 @@
 #include <click/confparse.hh>
 #include <click/packet_anno.hh>
 #include <click/xiaheader.hh>
+#include <click/xiascionheader.hh>
+#include <click/xiatransportheader.hh>
 #if CLICK_USERLEVEL
 #include <fstream>
 #include <stdlib.h>
@@ -48,29 +50,29 @@ int XIANEWXIDRouteTable::initialize(ErrorHandler *)
 int
 XIANEWXIDRouteTable::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    click_chatter("XIANEWXIDRouteTable: configuring %s\n", this->name().c_str());
+	click_chatter("XIANEWXIDRouteTable: configuring %s\n", this->name().c_str());
 
 	_principal_type_enabled = 1;
 	_num_ports = 0;
 
-    _rtdata.port = -1;
-    _rtdata.flags = 0;
-    _rtdata.nexthop = NULL;
+	_rtdata.port = -1;
+	_rtdata.flags = 0;
+	_rtdata.nexthop = NULL;
 
-    XIAPath local_addr;
+	XIAPath local_addr;
 
-    if (cp_va_kparse(conf, this, errh,
+	if (cp_va_kparse(conf, this, errh,
 		"LOCAL_ADDR", cpkP+cpkM, cpXIAPath, &local_addr,
 		"NUM_PORT", cpkP+cpkM, cpInteger, &_num_ports,
 		cpEnd) < 0)
 	return -1;
 
-    _local_addr = local_addr;
-    _local_hid = local_addr.xid(local_addr.destination_node());
-        
-    String broadcast_xid(BHID);  // broadcast HID
-    _bcast_xid.parse(broadcast_xid);    
-    
+	_local_addr = local_addr;
+	_local_hid = local_addr.xid(local_addr.destination_node());
+		
+	String broadcast_xid(BHID);  // broadcast HID
+	_bcast_xid.parse(broadcast_xid);	
+	
 	return 0;
 }
 
@@ -108,26 +110,26 @@ String
 XIANEWXIDRouteTable::read_handler(Element *e, void *thunk)
 {
 	XIANEWXIDRouteTable *t = (XIANEWXIDRouteTable *) e;
-    switch ((intptr_t)thunk) {
+	switch ((intptr_t)thunk) {
 		case PRINCIPAL_TYPE_ENABLED:
 			return String(t->get_enabled());
 
 		default:
 			return "<error>";
-    }
+	}
 }
 
 int 
 XIANEWXIDRouteTable::write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh)
 {
 	XIANEWXIDRouteTable *t = (XIANEWXIDRouteTable *) e;
-    switch ((intptr_t)thunk) {
+	switch ((intptr_t)thunk) {
 		case PRINCIPAL_TYPE_ENABLED:
 			return t->set_enabled(atoi(str.c_str()));
 
 		default:
 			return -1;
-    }
+	}
 }
 
 String
@@ -209,7 +211,7 @@ XIANEWXIDRouteTable::set_handler4(const String &conf, Element *e, void *thunk, E
 	}
 
 	if (args.size() >= 3 && args[2].length() > 0) {
-	    String nxthop = args[2];
+		String nxthop = args[2];
 		nexthop = new XID;
 		cp_xid(nxthop, nexthop, e);
 		//nexthop = new XID(args[2]);
@@ -260,18 +262,18 @@ XIANEWXIDRouteTable::set_mtb_handler(const String &conf, Element *e, void *thunk
 	String xid_str;
 	XID *nexthop = NULL;
 
-        printf("call set mtb handler - SCIONDEBUG\n");
+		printf("call set mtb handler - SCIONDEBUG\n");
 
 	cp_argvec(conf, args);
 
-        //update the code to add mapping 
+		//update the code to add mapping 
 
 	if (args.size() < 2 || args.size() > 4)
 		return errh->error("invalid route: ", conf.c_str());
 
 	xid_str = args[0];
 
-        //printf("call set mtb handler xid_str %s - SCIONDEBUG\n", (char*)xid_str);
+		//printf("call set mtb handler xid_str %s - SCIONDEBUG\n", (char*)xid_str);
 
 	if (!cp_integer(args[1], &port))
 		return errh->error("invalid port: ", conf.c_str());
@@ -282,7 +284,7 @@ XIANEWXIDRouteTable::set_mtb_handler(const String &conf, Element *e, void *thunk
 	}
 
 	if (args.size() >= 3 && args[2].length() > 0) {
-	    String nxthop = args[2];
+		String nxthop = args[2];
 		nexthop = new XID;
 		cp_xid(nxthop, nexthop, e);
 		//nexthop = new XID(args[2]);
@@ -523,34 +525,44 @@ XIANEWXIDRouteTable::generate_routes_handler(const String &conf, Element *e, voi
 void
 XIANEWXIDRouteTable::push(int in_ether_port, Packet *p)
 {
-    int port;
+	int port;
+
+	XIAHeader xhdr(p);
+	ScionHeader shdr(p);
+	TransportHeader thdr(p);
+
+	click_chatter("==== SCION FORWARD ENGINE: PUSH ====\n");
+	xhdr.dump();
+	shdr.dump();
+	thdr.dump();
 
 	in_ether_port = XIA_PAINT_ANNO(p);
-        DBG("scion: newidrouterpush");
-	click_chatter("scion:newidrouter push\n");
+
 	if (!_principal_type_enabled) {
 		output(2).push(p);
 		return;
 	}
 
 	click_chatter("scion: do the job\n");
-    if(in_ether_port == REDIRECT) {
-        // if this is an XCMP redirect packet
-        process_xcmp_redirect(p);
-        p->kill();
-        return;
-    } else {    
-    	port = lookup_route(in_ether_port, p);
-    }
+	if(in_ether_port == REDIRECT) {
+		// if this is an XCMP redirect packet
+		process_xcmp_redirect(p);
+		p->kill();
+		return;
+	} else {	
+		port = lookup_route(in_ether_port, p);
+	}
 
-    if(port == in_ether_port && in_ether_port !=DESTINED_FOR_LOCALHOST && in_ether_port !=DESTINED_FOR_DISCARD) { // need to inform XCMP that this is a redirect
+click_chatter(" scion output port = %d\n", port);
+
+	if(port == in_ether_port && in_ether_port !=DESTINED_FOR_LOCALHOST && in_ether_port !=DESTINED_FOR_DISCARD) { // need to inform XCMP that this is a redirect
 	  // "local" and "discard" shouldn't send a redirect
 	  Packet *q = p->clone();
 	  SET_XIA_PAINT_ANNO(q, (XIA_PAINT_ANNO(q)+TOTAL_SPECIAL_CASES)*-1);
 	  output(4).push(q); 
-    }
+	}
 
-    if (port >= 0) {
+	if (port >= 0) {
 	  SET_XIA_PAINT_ANNO(p,port);
 	  output(0).push(p);
 	}
@@ -575,15 +587,15 @@ XIANEWXIDRouteTable::push(int in_ether_port, Packet *p)
 
 	  //p->set_anno_u8(PAINT_ANNO_OFFSET,UNREACHABLE);
 
-        // no match -- discard packet
+		// no match -- discard packet
 	  // Output 9 is for dropping packets.
 	  // let the routing engine handle the dropping.
 	  //_drops++;
 	  //if (_drops == 1)
-      //      click_chatter("Dropping a packet with no match (last message)\n");
-      //  p->kill();
+	  //	  click_chatter("Dropping a packet with no match (last message)\n");
+	  //  p->kill();
 	  output(2).push(p);
-    }
+	}
 }
 
 int
@@ -600,17 +612,17 @@ XIANEWXIDRouteTable::process_xcmp_redirect(Packet *p)
    if (it != _rts.end()) {
    	(*it).second->nexthop = newroute;
    } else {
-       // Make a new entry for this XID
-       XIARouteData *xrd1 = new XIARouteData();
+	   // Make a new entry for this XID
+	   XIARouteData *xrd1 = new XIARouteData();
 
-       int port = _rtdata.port;
-       if(strstr(_local_addr.unparse().c_str(), dest->unparse().c_str())) {
-           port = DESTINED_FOR_LOCALHOST;
-       }
+	   int port = _rtdata.port;
+	   if(strstr(_local_addr.unparse().c_str(), dest->unparse().c_str())) {
+		   port = DESTINED_FOR_LOCALHOST;
+	   }
 
-       xrd1->port = port;
-       xrd1->nexthop = newroute;
-       _rts[*dest] = xrd1;
+	   xrd1->port = port;
+	   xrd1->nexthop = newroute;
+	   _rts[*dest] = xrd1;
    }
    
    return -1;
@@ -624,6 +636,7 @@ XIANEWXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
    //return DESTINED_FOR_LOCALHOST;
    const struct click_xia* hdr = p->xia_header();
    int last = hdr->last;
+
    if (last < 0)
 	last += hdr->dnode;
 
@@ -654,7 +667,7 @@ XIANEWXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
 
    //TODO: define -10 in xia.h
    if(port > -10){
-     return port;
+	 return port;
    }
 
    //quick hack
@@ -663,64 +676,24 @@ XIANEWXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
    //  click_chatter("chatter scion: idx %d - return for local host\n", idx);
    //  return DESTINED_FOR_LOCALHOST;
    //}
-
-   if (_bcast_xid == node.xid) {
-    	// Broadcast packet
-    	
-    	XIAPath source_path = xiah.src_path();
-    	source_path.remove_node(source_path.destination_node());
-    	XID source_hid = source_path.xid(source_path.destination_node());
-    	
-    	if(_local_hid == source_hid) {
-    	    	// Case 1. Outgoing broadcast packet: send it to port 7 (which will duplicate the packet and send each to every interface)
-    	    	p->set_nexthop_neighbor_xid_anno(_bcast_xid);
-    	    	return DESTINED_FOR_BROADCAST;
-    	} else {
-    		// Case 2. Incoming broadcast packet: send it to port 4 (which eventually send the packet to upper layer)
-    		// Also, mark the incoming (ethernet) interface number that connects to this neighbor
-    		HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(source_hid);
-    		if (it != _rts.end())
-			  {
-				if ((*it).second->port != in_ether_port) {
-				  // update the entry
-				  (*it).second->port = in_ether_port;
-				}	
-			  }
-    		else
-			  {
-    			// Make a new entry for this newly discovered neighbor
-       			XIARouteData *xrd1 = new XIARouteData();
-				xrd1->port = in_ether_port;
-				xrd1->nexthop = new XID(source_hid);
-				_rts[source_hid] = xrd1;
-			  }
-    		return DESTINED_FOR_LOCALHOST;
-    	}    	
-		// TODO: not sure what this should be??
-		assert(0);
-		return DESTINED_FOR_LOCALHOST; 
-    
-    } else {
-    	// Unicast packet
-		HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(node.xid);
-		if (it != _rts.end())
-		{
-			XIARouteData *xrd = (*it).second;
-			// check if outgoing packet
-			if(xrd->port != DESTINED_FOR_LOCALHOST && xrd->port != FALLBACK && xrd->nexthop != NULL) {
-				p->set_nexthop_neighbor_xid_anno(*(xrd->nexthop));
-			}
-			return xrd->port;
+	
+	// Unicast packet
+	HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(node.xid);
+	if (it != _rts.end())
+	{
+		XIARouteData *xrd = (*it).second;
+		// check if outgoing packet
+		if(xrd->port != DESTINED_FOR_LOCALHOST && xrd->port != FALLBACK && xrd->nexthop != NULL) {
+			p->set_nexthop_neighbor_xid_anno(*(xrd->nexthop));
 		}
-		else
-		{
-			// no match -- use default route
-			// check if outgoing packet
-			if(_rtdata.port != DESTINED_FOR_LOCALHOST && _rtdata.port != FALLBACK && _rtdata.nexthop != NULL) {
-				p->set_nexthop_neighbor_xid_anno(*(_rtdata.nexthop));
-			}
-			return _rtdata.port;
+		return xrd->port;
+	} else {
+		// no match -- use default route
+		// check if outgoing packet
+		if(_rtdata.port != DESTINED_FOR_LOCALHOST && _rtdata.port != FALLBACK && _rtdata.nexthop != NULL) {
+			p->set_nexthop_neighbor_xid_anno(*(_rtdata.nexthop));
 		}
+		return _rtdata.port;
 	}
 
 
@@ -728,8 +701,8 @@ XIANEWXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
 
 /*
 typedef struct {
-        uint16_t versionSrcDst;
-        uint16_t totalLen;
+		uint16_t versionSrcDst;
+		uint16_t totalLen;
 	uint8_t currentIOF;
 	uint8_t currentOF;
 	uint8_t nextHeader;
@@ -737,34 +710,34 @@ typedef struct {
 } SCIONCommonHeader;
 */
 void XIANEWXIDRouteTable::print_scion_header(SCIONCommonHeader *sch){
-    click_chatter("print scion common header:");
-    click_chatter("versionSrcDst : %d", ntohs(sch->versionSrcDst));
-    click_chatter("totalLen: %d", ntohs(sch->totalLen));
-    click_chatter("currentIOF: %d", sch->currentIOF);
-    click_chatter("currentOF: %d", sch->currentOF);
-    click_chatter("nextHeader: %d", sch->nextHeader);
-    click_chatter("headerLen: %d", sch->headerLen);
-    return;
+	click_chatter("print scion common header:");
+	click_chatter("versionSrcDst : %d", ntohs(sch->versionSrcDst));
+	click_chatter("totalLen: %d", ntohs(sch->totalLen));
+	click_chatter("currentIOF: %d", sch->currentIOF);
+	click_chatter("currentOF: %d", sch->currentOF);
+	click_chatter("nextHeader: %d", sch->nextHeader);
+	click_chatter("headerLen: %d", sch->headerLen);
+	return;
 }
 
 void XIANEWXIDRouteTable::print_packet_contents(uint8_t *packet, int len)
 {
 	int hex_string_len = (len*2) + 1;
 	char hex_string[hex_string_len];
-    int i;
-    uint8_t* data = (uint8_t*)packet;
-    bzero(hex_string, hex_string_len);
-    for(i=0;i<len;i++) {
-        sprintf(&hex_string[2*i], "%02x", (unsigned int)data[i]);
-    }
-    hex_string[hex_string_len-1] = '\0';
-    click_chatter("Packet contents|%s|", hex_string);
+	int i;
+	uint8_t* data = (uint8_t*)packet;
+	bzero(hex_string, hex_string_len);
+	for(i=0;i<len;i++) {
+		sprintf(&hex_string[2*i], "%02x", (char)data[i]);
+	}
+	hex_string[hex_string_len-1] = '\0';
+	click_chatter("Packet contents|%s|", hex_string);
 }
 
 
 int XIANEWXIDRouteTable::print_packet_header(click_xia *xiah)
 {
-	click_chatter("======= RAW PACKET HEADER ========");
+	click_chatter("======= XIA PACKET HEADER ========");
 	click_chatter("ver:%d", xiah->ver);
 	click_chatter("nxt:%d", xiah->nxt);
 	click_chatter("plen:%d", ntohs(xiah->plen));
@@ -772,22 +745,22 @@ int XIANEWXIDRouteTable::print_packet_header(click_xia *xiah)
 	click_chatter("dnode:%d", xiah->dnode);
 	click_chatter("snode:%d", xiah->snode);
 	click_chatter("last:%d", xiah->last);
-        return xiah->dnode + xiah->snode;;
+		return xiah->dnode + xiah->snode;;
 }
 
 int XIANEWXIDRouteTable::check_scion_info(const struct click_xia* xiah) {
   uint8_t* packet = (uint8_t *)(xiah);
   uint8_t* scion_sid = ((click_xia*)packet)->node[0].xid.id;
-      
+	  
   if(scion_sid[0] == 0){
-    click_chatter("SCION FE: router 0");
-    scion_sid[0] = 1;
-    ((click_xia*)packet)->last = -1;
-    return 1;
+	click_chatter("SCION FE: router 0");
+	scion_sid[0] = 1;
+	((click_xia*)packet)->last = -1;
+	return 1;
   }else{
-    click_chatter("SCION FE: router 1");
-      //second router - router 1, last router
-    return DESTINED_FOR_LOCALHOST;    
+	click_chatter("SCION FE: router 1");
+	  //second router - router 1, last router
+	return DESTINED_FOR_LOCALHOST;	
   }
 }
 
@@ -800,55 +773,55 @@ int XIANEWXIDRouteTable::scion_forward_packet(const struct click_xia* xiah) {
   struct click_xia_ext* xia_ext_hdr = (struct click_xia_ext *)(packet + hdr_len);
   uint8_t nxt_hdr_type = xiah->nxt;
   uint8_t OF_offset = sizeof(SCIONCommonHeader) + sizeof(SCIONAddr) 
-                       + sizeof(SCIONAddr) + sizeof(InfoOpaqueField);
-  print_packet_header((click_xia*)packet);
+					   + sizeof(SCIONAddr) + sizeof(InfoOpaqueField);
+  //print_packet_header((click_xia*)packet);
   click_chatter("xia_hdr_len %d, total nodes %d", xia_hdr_len, total_nodes);
 
   while((nxt_hdr_type != CLICK_XIA_NXT_SCION) && (nxt_hdr_type != CLICK_XIA_NXT_NO)){
-    click_chatter("next header type %d, xia hdr len %d ", (int)nxt_hdr_type, hdr_len);
-    nxt_hdr_type = xia_ext_hdr->nxt;
-    hdr_len += xia_ext_hdr->hlen;
-    xia_ext_hdr = (struct click_xia_ext *)(packet + hdr_len);
+	click_chatter("next header type %d, xia hdr len %d ", (int)nxt_hdr_type, hdr_len);
+	nxt_hdr_type = xia_ext_hdr->nxt;
+	hdr_len += xia_ext_hdr->hlen;
+	xia_ext_hdr = (struct click_xia_ext *)(packet + hdr_len);
   }
   
   if(nxt_hdr_type == CLICK_XIA_NXT_SCION){
-    click_chatter("get SCION header!! scion ext offset %d, header len %d", hdr_len, xia_ext_hdr->hlen);
-    SCIONCommonHeader *scion_common_hdr = (SCIONCommonHeader*)((uint8_t*)xia_ext_hdr + 2);
-    //uint8_t* data = (uint8_t*)scion_common_hdr;
-    //HopOpaqueField* current_hops = (HopOpaqueField)((uint8_t *)scion_common_hdr + scion_common_hdr->currentOF);
-    click_chatter("SCION FE: OF offset %d, currentOF %d", OF_offset, scion_common_hdr->currentOF);
-    click_chatter("SCION FE: scion ext header length %d", xia_ext_hdr->hlen);
-    print_scion_header(scion_common_hdr);
-    print_packet_contents((uint8_t*)xia_ext_hdr, xia_ext_hdr->hlen);
+	click_chatter("get SCION header!! scion ext offset %d, header len %d", hdr_len, xia_ext_hdr->hlen);
+	SCIONCommonHeader *scion_common_hdr = (SCIONCommonHeader*)((uint8_t*)xia_ext_hdr + 2);
+	//uint8_t* data = (uint8_t*)scion_common_hdr;
+	//HopOpaqueField* current_hops = (HopOpaqueField)((uint8_t *)scion_common_hdr + scion_common_hdr->currentOF);
+	click_chatter("SCION FE: OF offset %d, currentOF %d", OF_offset, scion_common_hdr->currentOF);
+	click_chatter("SCION FE: scion ext header length %d", xia_ext_hdr->hlen);
+	print_scion_header(scion_common_hdr);
+	print_packet_contents((uint8_t*)xia_ext_hdr, xia_ext_hdr->hlen);
  
    /*
-    if(data[0] == 0){
-      click_chatter("SCION FE: router 0");
-      data[0] = 1;
-      ((click_xia*)packet)->last = -1;
-      return 1; // next router
-    }else{
-      click_chatter("SCION FE: router 1");
-      //second router - router 1, last router
-      return DESTINED_FOR_LOCALHOST;
-    }
-    */
-    if(OF_offset == scion_common_hdr->currentOF){
-      click_chatter("SCION FE: router 0");
-      // first router - router 0
-      scion_common_hdr->currentOF += sizeof(HopOpaqueField);
-      //xiah->last = -1;
-      ((click_xia*)packet)->last = -1;
-      return 1; // next router
-    }else{
-      click_chatter("SCION FE: router 1");
-      //second router - router 1, last router
-      return DESTINED_FOR_LOCALHOST;
-    }
-    
+	if(data[0] == 0){
+	  click_chatter("SCION FE: router 0");
+	  data[0] = 1;
+	  ((click_xia*)packet)->last = -1;
+	  return 1; // next router
+	}else{
+	  click_chatter("SCION FE: router 1");
+	  //second router - router 1, last router
+	  return DESTINED_FOR_LOCALHOST;
+	}
+	*/
+	if(OF_offset == scion_common_hdr->currentOF){
+	  click_chatter("SCION FE: router 0");
+	  // first router - router 0
+	  scion_common_hdr->currentOF += sizeof(HopOpaqueField);
+	  //xiah->last = -1;
+	  ((click_xia*)packet)->last = -1;
+	  return 1; // next router
+	}else{
+	  click_chatter("SCION FE: router 1");
+	  //second router - router 1, last router
+	  return DESTINED_FOR_LOCALHOST;
+	}
+	
   }else{
-    click_chatter("no SCION header!! return -10");
-    return -10; //unused for SCION now 
+	click_chatter("no SCION header!! return -10");
+	return -10; //unused for SCION now 
   }
    
   return DESTINED_FOR_LOCALHOST;
@@ -913,7 +886,7 @@ size_t add_scion_header(SCIONCommonHeader* sch, uint8_t* payload, uint16_t paylo
   path_length += 4;
 
   header_length = sizeof(SCIONCommonHeader) +
-    sizeof(SCIONAddr) + sizeof(SCIONAddr) + path_length;
+	sizeof(SCIONAddr) + sizeof(SCIONAddr) + path_length;
   sch->headerLen = htons(header_length);
 
   printf("path length is %d bytes\n", (int)path_length);
