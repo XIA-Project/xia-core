@@ -97,13 +97,13 @@ private:
 	HashTable<XID, XIARouteData*> _rts;
 	HashTable<XID, IPAddr> _mts;
 	XIARouteData _rtdata;
-    uint32_t _drops;
+  uint32_t _drops;
+  XIAXIDRouteTable *_hid_table;
 
 	int _principal_type_enabled;
     int _num_ports;
     XIAPath _local_addr;
     XID _local_hid;
-    XID _bcast_xid;
 
 
 SyslogErrorHandler *_errh;

@@ -60,19 +60,19 @@ XIANEWXIDRouteTable::configure(Vector<String> &conf, ErrorHandler *errh)
 	_rtdata.nexthop = NULL;
 
 	XIAPath local_addr;
+	Element *elem;
 
 	if (cp_va_kparse(conf, this, errh,
 		"LOCAL_ADDR", cpkP+cpkM, cpXIAPath, &local_addr,
 		"NUM_PORT", cpkP+cpkM, cpInteger, &_num_ports,
+		"HID_TABLE", cpkP+cpkM, cpElement, &elem,
 		cpEnd) < 0)
 	return -1;
 
 	_local_addr = local_addr;
 	_local_hid = local_addr.xid(local_addr.destination_node());
 		
-	String broadcast_xid(BHID);  // broadcast HID
-	_bcast_xid.parse(broadcast_xid);	
-	
+	_hid_table = (XIAXIDRouteTable*)elem;
 	return 0;
 }
 
@@ -544,43 +544,16 @@ XIANEWXIDRouteTable::push(int in_ether_port, Packet *p)
 	}
 
 	click_chatter("scion: do the job\n");
-	if(in_ether_port == REDIRECT) {
-		// if this is an XCMP redirect packet
-		process_xcmp_redirect(p);
-		p->kill();
-		return;
-	} else {	
-		port = lookup_route(in_ether_port, p);
-	}
+	port = lookup_route(in_ether_port, p);
 
-click_chatter(" scion output port = %d\n", port);
-
-	if(port == in_ether_port && in_ether_port !=DESTINED_FOR_LOCALHOST && in_ether_port !=DESTINED_FOR_DISCARD) { // need to inform XCMP that this is a redirect
-	  // "local" and "discard" shouldn't send a redirect
-	  Packet *q = p->clone();
-	  SET_XIA_PAINT_ANNO(q, (XIA_PAINT_ANNO(q)+TOTAL_SPECIAL_CASES)*-1);
-	  output(4).push(q); 
-	}
+	click_chatter(" scion output port = %d\n", port);
 
 	if (port >= 0) {
-	  SET_XIA_PAINT_ANNO(p,port);
-	  output(0).push(p);
+		SET_XIA_PAINT_ANNO(p,port);
+		output(0).push(p);
 	}
 	else if (port == DESTINED_FOR_LOCALHOST) {
-	  output(1).push(p);
-	}
-	else if (port == DESTINED_FOR_DHCP) {
-	  SET_XIA_PAINT_ANNO(p,port);
-	  output(3).push(p);
-	}
-	else if (port == DESTINED_FOR_BROADCAST) {
-	  for(int i = 0; i <= _num_ports; i++) {
-		Packet *q = p->clone();
-		SET_XIA_PAINT_ANNO(q,i);
-		//q->set_anno_u8(PAINT_ANNO_OFFSET,i);
-		output(0).push(q);
-	  }
-	  p->kill();
+		output(1).push(p);
 	}
 	else {
 	  //SET_XIA_PAINT_ANNO(p,UNREACHABLE);
@@ -640,8 +613,7 @@ XIANEWXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
    if (last < 0)
 	last += hdr->dnode;
 
-   DBG("scion: last %d, dnode %d\n", last, hdr->dnode);
-   click_chatter("chatter scion: last %d\n", last);
+   click_chatter("scion: last %d\n", last);
 
    const struct click_xia_xid_edge* edge = hdr->node[last].edge;
    const struct click_xia_xid_edge& current_edge = edge[XIA_NEXT_PATH_ANNO(p)];
@@ -652,8 +624,7 @@ XIANEWXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
   	return _rtdata.port;
    }
 
-   DBG("scion: idx %d\n", idx);
-   click_chatter("chatter scion: idx %d\n", idx);
+   click_chatter("scion: idx %d\n", idx);
 
    const struct click_xia_xid_node& node = hdr->node[idx];
 
@@ -662,13 +633,21 @@ XIANEWXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
    //scion info is in scion ext header  
    int port = scion_forward_packet(hdr);
 
+   click_chatter("SCION PORT=%d\n", port);
+
    //scion info is in scion_sid
    //int port = check_scion_info(hdr);
 
    //TODO: define -10 in xia.h
-   if(port > -10){
-	 return port;
-   }
+	if(port > -10){
+		XID nexthop;
+		_hid_table->next_hop(port, nexthop);
+		click_chatter("nexthop = %s\n", nexthop.unparse().c_str());
+		p->set_nexthop_neighbor_xid_anno(nexthop);
+
+	} else {
+		port = DESTINED_FOR_DISCARD;
+	}
 
    //quick hack
    //if(idx == 0){
@@ -676,27 +655,8 @@ XIANEWXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
    //  click_chatter("chatter scion: idx %d - return for local host\n", idx);
    //  return DESTINED_FOR_LOCALHOST;
    //}
-	
-	// Unicast packet
-	HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(node.xid);
-	if (it != _rts.end())
-	{
-		XIARouteData *xrd = (*it).second;
-		// check if outgoing packet
-		if(xrd->port != DESTINED_FOR_LOCALHOST && xrd->port != FALLBACK && xrd->nexthop != NULL) {
-			p->set_nexthop_neighbor_xid_anno(*(xrd->nexthop));
-		}
-		return xrd->port;
-	} else {
-		// no match -- use default route
-		// check if outgoing packet
-		if(_rtdata.port != DESTINED_FOR_LOCALHOST && _rtdata.port != FALLBACK && _rtdata.nexthop != NULL) {
-			p->set_nexthop_neighbor_xid_anno(*(_rtdata.nexthop));
-		}
-		return _rtdata.port;
-	}
 
-
+   return port;
 }
 
 /*
