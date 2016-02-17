@@ -535,7 +535,7 @@ XIAXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
   	return _rtdata.port;
     }
 
-    click_chatter("scion-debug: idx %d", idx);
+	// click_chatter("scion-debug: idx %d", idx);
     const struct click_xia_xid_node& node = hdr->node[idx];
 
     XIAHeader xiah(p->xia_header());

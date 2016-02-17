@@ -199,10 +199,10 @@ void print_packet_contents(char *packet, int len)
 
 int print_packet_header(click_xia *xiah)
 {
-	syslog(LOG_INFO, "======= RAW PACKET HEADER ========");
+	syslog(LOG_INFO, "======= XIA PACKET HEADER ========");
 	syslog(LOG_INFO, "ver:%d", xiah->ver);
 	syslog(LOG_INFO, "nxt:%d", xiah->nxt);
-	syslog(LOG_INFO, "plen:%d, %d", ntohs(xiah->plen));
+	syslog(LOG_INFO, "plen:%d", ntohs(xiah->plen));
 	syslog(LOG_INFO, "hlim:%d", xiah->hlim);
 	syslog(LOG_INFO, "dnode:%d", xiah->dnode);
 	syslog(LOG_INFO, "snode:%d", xiah->snode);
@@ -244,6 +244,13 @@ int print_packet_header(click_xia *xiah)
 	}
         
         return total_nodes;
+}
+
+void print_ext_header(click_xia_ext *hdr)
+{
+  syslog(LOG_INFO, "======= EXT PACKET HEADER ========");
+  syslog(LOG_INFO, "hlen:%d", hdr->hlen);
+  syslog(LOG_INFO, " nxt:%d", hdr->nxt);
 }
 
 #ifdef SCION_PACKET
@@ -540,9 +547,16 @@ void process_data(int datasock)
 	xiah->last = -1;
 	syslog(LOG_INFO, "gateway: Updated AD and last pointer in header");
 	print_packet_header(xiah);
-	print_packet_contents(packet, retval + 127);
+
+  click_xia_ext *eh = reinterpret_cast<struct click_xia_ext *>(packet+xia_header_size);
+  print_ext_header(eh);
+  print_ext_header((click_xia_ext*)((char*)eh + eh->hlen));
+
+  // we need to fix the magic number issue here. 
+  // is the scion header size vbariable or is it fixed now?
+	print_packet_contents(packet, retval + 126);
 	syslog(LOG_INFO, "gateway: Sending the packet out on the network");
-	Xsend(datasock, packet, packetlen, 0);
+	Xsend(datasock, packet, packetlen+126, 0);
 }
 
 #define MAX_XID_STR_SIZE 64

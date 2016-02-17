@@ -26,14 +26,18 @@ TransportHeaderEncap::TransportHeaderEncap(char type, char pkt_info, uint32_t se
 
 void TransportHeader::dump() const {
     click_chatter("==== TRANSPORT HEADER ====\n");
-    XIAGenericExtHeader::dump();
-    click_chatter("    type: %s\n", KindStr(type()));
-    if (type() == XSOCK_STREAM) {
-        click_chatter("    type: %s\n", TypeStr(pkt_info()));
-        click_chatter("    seq#: %d\n", seq_num());
-        click_chatter("    ack#: %d\n", ack_num());
-        click_chatter("  length: %d\n", length());
-        click_chatter("  window: %d\n", recv_window());
+    if (isValid()) {
+        XIAGenericExtHeader::dump();
+        click_chatter("    type: %s\n", KindStr(type()));
+        if (type() == XSOCK_STREAM) {
+            click_chatter("    type: %s\n", TypeStr(pkt_info()));
+            click_chatter("    seq#: %d\n", seq_num());
+            click_chatter("    ack#: %d\n", ack_num());
+            click_chatter("  length: %d\n", length());
+            click_chatter("  window: %d\n", recv_window());
+        }
+    } else {
+        click_chatter("Header is not correctly formed!\n");
     }
 }
 
@@ -52,6 +56,7 @@ const char *TransportHeader::TypeStr(char type)
         case MIGRATE:    t = "MIGRATE"; break;
         case MIGRATEACK: t = "MIGRATEACK"; break;
         case RST:        t = "RST"; break;
+        default:         t = "UNKNOWN";
     }
     return t;
 }
@@ -65,6 +70,7 @@ const char *TransportHeader::KindStr(char type)
         case XSOCK_DGRAM:  t = "DGRAM";  break;
         case XSOCK_RAW:    t = "RAW";    break;
         case XSOCK_CHUNK:  t = "CHUNK";  break;
+        default:           t = "UNKNOWN";
     }
     return t;
 }
