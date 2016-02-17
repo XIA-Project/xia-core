@@ -28,9 +28,9 @@ class XIAGenericExtHeader { public:
 
     inline const uint8_t* payload() const;  // payload
 
-    inline uint16_t plen() { return _payload_length; };
+    inline uint16_t plen() const { return _payload_length; };
 
-    inline bool isValid() { return _valid; };
+    inline bool isValid() const { return _valid; };
 
     void dump() const;
 
