@@ -51,6 +51,7 @@ def main():
 
     # Start a new thread to listen for messages
     receiver = NetjoinReceiver(policy, shutdown_event)
+    receiver.daemon = True
     receiver.start()
     threads.append(receiver)
 
