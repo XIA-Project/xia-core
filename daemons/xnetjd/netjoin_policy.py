@@ -126,12 +126,12 @@ class NetjoinPolicy:
         return False
 
     # Main entry point for the policy module
-    def join_sender_of_serialized_beacon(self, serialized_beacon):
+    def join_sender_of_serialized_net_descriptor(self, serialized_descriptor):
         join_network = False
 
         # Convert beacon to an object we can look into
         beacon = NetjoinBeacon()
-        beacon.from_serialized_beacon(serialized_beacon)
+        beacon.from_serialized_net_descriptor(serialized_descriptor)
         logging.debug("Beacon: {}".format(beacon.beacon_str()))
 
         # Retrieve ID of beacon so we can test against known beacons

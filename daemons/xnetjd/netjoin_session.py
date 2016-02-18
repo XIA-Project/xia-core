@@ -9,21 +9,28 @@ import threading
 import Queue
 from netjoin_beacon import NetjoinBeacon
 from netjoin_message_pb2 import NetjoinMessage
+from netjoin_authsession import NetjoinAuthsession
+from netjoin_handshake_one import NetjoinHandshakeOne
 
 # A client session reperesenting a client joining a network
 class NetjoinSession(threading.Thread):
     next_session_ID = 1
 
-    def __init__(self, net_descriptor, shutdown_event):
+    def __init__(self, shutdown_event, auth=None):
         threading.Thread.__init__(self)
+        (self.START, self.SEND_HS_ONE, self.VALIDATE_HS_ONE) = range(3)
 
         self.xianetjoin = ("127.0.0.1", 9882)
         self.beacon = NetjoinBeacon()
         self.state = self.START
-        #self.beacon.from_net_descriptor(net_descriptor)
         self.shutdown_event = shutdown_event
+        self.auth = auth
         self.session_ID = NetjoinSession.next_session_ID
         NetjoinSession.next_session_ID += 1
+
+        # Create an encryption/authentication session if one not provided
+        if not self.auth:
+            self.auth = NetjoinAuthsession()
 
         # A queue for receiving NetjoinMessage messages
         self.q = Queue.Queue()
@@ -36,17 +43,32 @@ class NetjoinSession(threading.Thread):
         return self.session_ID()
 
     # Push a NetjoinMessage to the processing queue from another thread
-    def push(self, message):
-        self.q.push(message)
+    def push(self, message_tuple):
+        self.q.push(message_tuple)
 
     # Send a message out to a specific recipient
-    def send_netjoin_message(self, message):
-        self.sockfd.sendto(self.xianetjoin, message.SerializeToString())
+    def send_netjoin_message(self, message, mymac, sendermac):
+        # TODO: May need to include interface here to help XIANetjoin
+        outgoing_packet = sendermac + mymac + message.SerializeToString()
+        self.sockfd.sendto(self.xianetjoin, outgoing_packet)
 
-    def send_handshake_one(self, message):
+    def send_handshake_one(self, message_tuple):
+        message, interface, mymac, sendermac = message_tuple
+
+        # Save access point verify key included in NetDescriptor message
+        join_auth_info = message.net_descriptor.ac_shared.ja
+        gateway_raw_key = join_auth_info.gateway_ephemeral_pubkey.the_key
+        self.auth.set_their_raw_verify_key(gateway_raw_key)
+
         # Build handshake one
+        handshake_one = NetjoinHandshakeOne(self, message_tuple)
+        handshake_one.update_nonce()
+
+        handshake_message = NetjoinMessage()
+        handshake_message.handshake_one = handshake_one.handshake_one
+
         # Send handshake one
-        self.send_netjoin_message(handshake_one)
+        self.send_netjoin_message(handshake_message, mymac, sendermac)
 
     # Main thread handles all messages based on state of joining session
     def run(self):
@@ -56,18 +78,19 @@ class NetjoinSession(threading.Thread):
 
             # Keep waiting for a message indefinitely
             try:
-                message = self.q.get(block=True, self.q.timeout)
+                message_tuple = self.q.get(block=True, timeout=self.q.timeout)
+                message = message_tuple[0]
             except (Queue.Empty):
                 continue
             # We got a message, determine if we are waiting for it
             message_type = message.WhichOneof("message_type")
-            if self.state = self.START:
-                if message_type == "beacon":
+            if self.state == self.START:
+                if message_type == "net_descriptor":
                     self.state = self.SEND_HS_ONE
-                    self.send_handshake_one(message)
+                    self.send_handshake_one(message_tuple)
                 elif message_type == "handshake_one":
                     self.state = self.VALIDATE_HS_ONE
-                    solf.got_handshake_one(message)
+                    solf.got_handshake_one(message_tuple)
                 else:
                     logging.error("Invalid message: {}".format(message_type))
                     break

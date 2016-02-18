@@ -12,12 +12,14 @@ from netjoin_message_pb2 import NetjoinMessage
 # from the XIANetJoin click module and invoking the handler for each packet
 class NetjoinReceiver(threading.Thread):
 
-    def __init__(self, policy, shutdown, xnetjd_addr=("127.0.0.1", 9228)):
+    def __init__(self, policy, announcer, shutdown,
+            xnetjd_addr=("127.0.0.1", 9228)):
         threading.Thread.__init__(self)
         self.BUFSIZE = 1024
         self.sockfd = None
         self.shutdown = shutdown
         self.policy = policy
+        self.announcer = announcer    # None, unless running as access point
         self.client_sessions = {}
 
         logging.debug("Receiver initialized")
@@ -26,27 +28,29 @@ class NetjoinReceiver(threading.Thread):
         self.sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sockfd.bind(xnetjd_addr)
 
-    def handle_beacon(self, message):
+    def handle_net_descriptor(self, message_tuple):
 
         logging.debug("Got a beacon")
-        serialized_beacon = message.beacon.SerializeToString()
+
+        message = message_tuple[0]
+        serialized_net_descriptor = message.net_descriptor.SerializeToString()
 
         # Ask the policy module if we should join this network
-        if not self.policy.join_sender_of_serialized_beacon(
-                serialized_beacon):
+        if not self.policy.join_sender_of_serialized_net_descriptor(
+                serialized_net_descriptor):
             logging.debug("Policy action: ignore beacon")
             return
 
-        # Initiate session to join the network
-        session = NetjoinSession(beacon, self.shutdown)
+        # Initiate a NetjoinSession thread to join the network
+        session = NetjoinSession(self.shutdown)
         session.daemon = True
         session.start()
         self.client_sessions[session.get_ID()] = session
 
-        # Give the NetjoinMessage containing beacon to NetjoinSession
-        session.push(message)
+        # Send the message info to the NetjoinSession
+        session.push(message_tuple)
 
-    def handle_handshake_one(self):
+    def handle_handshake_one(self, message_tuple):
         logging.debug("Got HandshakeOne message")
         # Retrieve session ID from handshake one
         # Pass handshake one to the corresponding session handler
@@ -59,7 +63,8 @@ class NetjoinReceiver(threading.Thread):
 
             # Retrieve incoming interface and sender's mac address
             interface = struct.unpack("H", data[0:2])[0]
-            sendermac = struct.unpack("BBBBBB", data[2:8])
+            mymac = struct.unpack("BBBBBB", data[2:8])
+            sendermac = struct.unpack("BBBBBB", data[8:14])
 
             # First two bytes contain interface number
             logging.debug("On interface: {}".format(interface))
@@ -68,7 +73,7 @@ class NetjoinReceiver(threading.Thread):
             logging.debug("Sent by: %02x:%02x:%02x:%02x:%02x:%02x" % sendermac)
 
             # Remaining data is the beacon
-            serialized_message = data[8:]
+            serialized_message = data[14:]
 
             # Identify what kind of message this is
             netjoin_message = NetjoinMessage()
@@ -76,13 +81,16 @@ class NetjoinReceiver(threading.Thread):
             message_type = netjoin_message.WhichOneof("message_type")
             logging.debug("Message type: {}".format(message_type))
 
+            # Collect all info about this message into a message_tuple
+            message_tuple = (netjoin_message, interface, mymac, sendermac)
+
             # A new session is started if client decides to join a network
             # or if an access point receives a handshake one reqest to join
-            if message_type == "beacon":
-                self.handle_beacon(netjoin_message)
+            if message_type == "net_descriptor":
+                self.handle_net_descriptor(message_tuple)
 
             elif message_type == "handshake_one":
-                self.handle_handshake_one()
+                self.handle_handshake_one(message_tuple)
 
             else:
                 logging.warning("Unknown message type: {}".format(message_type)

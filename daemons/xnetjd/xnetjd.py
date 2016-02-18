@@ -4,9 +4,10 @@
 import logging
 import argparse
 import threading
-import netjoin_policy
+from netjoin_policy import NetjoinPolicy
 from netjoin_receiver import NetjoinReceiver
 from netjoin_announcer import NetjoinAnnouncer
+from netjoin_authsession import NetjoinAuthsession
 
 # Setup logging for this application
 logging.basicConfig(level=logging.INFO, format='%(asctime)s: %(module)s %(levelname)s: %(message)s')
@@ -39,10 +40,12 @@ def main():
     # Initialize the policy module
     # For now we have one policy for all beacons.
     # TODO: Pass list of auth providers
-    policy = netjoin_policy.NetjoinPolicy()
+    policy = NetjoinPolicy()
 
+    announcer = None
     if args.accesspoint:
         logging.debug("Announcing network and listening for join requests")
+        # Start an auth session for announcer
         announcer = NetjoinAnnouncer(args.beacon_interval, shutdown_event)
         announcer.announce()
 
@@ -50,7 +53,7 @@ def main():
         logging.debug("Listening for network announcements")
 
     # Start a new thread to listen for messages
-    receiver = NetjoinReceiver(policy, shutdown_event)
+    receiver = NetjoinReceiver(policy, announcer, shutdown_event)
     receiver.daemon = True
     receiver.start()
     threads.append(receiver)

@@ -10,6 +10,7 @@ import uuid
 import nacl.encoding
 import nacl.signing
 import nacl.utils
+from netjoin_authsession import NetjoinAuthsession
 
 # This is a wrapper for the NetDescriptor protobuf defined in ndap.proto
 class NetjoinBeacon(object):
@@ -17,8 +18,7 @@ class NetjoinBeacon(object):
         self.net_descriptor = ndap_pb2.NetDescriptor()
         self.guid = None
         self.xip_netid = None
-        self.ephemeral_verify_key = None
-        self.ephemeral_signing_key = None
+        self.raw_verify_key = None
 
     def beacon_str(self):
         return protobuf_text_format.MessageToString(self.net_descriptor)
@@ -34,40 +34,33 @@ class NetjoinBeacon(object):
         # TODO: store hash if this method is called several times
         return hashlib.sha256(fixed_descriptor.SerializeToString()).hexdigest()
 
+    def _update_object_from_net_descriptor(self):
+        # NOTE: we don't have xip_netid received beacon
+        self.guid = self.net_descriptor.GUID
+        self.raw_verify_key = self.net_descriptor.ac_shared.ja.gateway_ephemeral_pubkey.the_key
+
     def from_net_descriptor(self, net_descriptor):
         self.net_descriptor.CopyFrom(net_descriptor)
-        self.guid = self.net_descriptor.GUID
-        self.ephemeral_verify_key = nacl.signing.VerifyKey(self.net_descriptor.ac_shared.ja.gateway_ephemeral_pubkey.the_key, encoder=nacl.encoding.RawEncoder)
+        self._update_object_from_net_descriptor()
 
     # serialized_beacon is actually a serialized ndap_pb2.NetDescriptor
-    def from_serialized_beacon(self, serialized_beacon):
-        self.net_descriptor.ParseFromString(serialized_beacon)
-        # NOTE: we don't have xip_netid and signing_key in received beacon
-        self.guid = self.net_descriptor.GUID
-        self.ephemeral_verify_key = nacl.signing.VerifyKey(self.net_descriptor.ac_shared.ja.gateway_ephemeral_pubkey.the_key, encoder=nacl.encoding.RawEncoder)
-
-    def ephemeral_verify_key_hex(self):
-        return self.ephemeral_verify_key.encode(
-                encoder=nacl.encoding.HexEncoder)
-
-    def ephemeral_verify_key_raw(self):
-        return self.ephemeral_verify_key.encode(
-                encoder=nacl.encoding.RawEncoder)
+    def from_serialized_net_descriptor(self, serialized_descriptor):
+        self.net_descriptor.ParseFromString(serialized_descriptor)
+        self._update_object_from_net_descriptor()
 
     # For now we just build a beacon with a dummy AuthCapStruct
-    def initialize(self, guid=None, xip_netid=None):
+    def initialize(self, raw_verify_key, guid=None, xip_netid=None):
         self.guid = guid
         self.xip_netid = xip_netid
+        self.raw_verify_key = raw_verify_key
+
         if self.guid == None:
             self.guid = uuid.uuid4().bytes
             logging.warning("GUID not provided. Assigning a temporary one")
+
         if self.xip_netid == None:
             self.xip_netid = uuid.uuid4().bytes
             logging.warning("XIP NID not giver. Assigning a temporary one")
-
-        # A set of ephemeral keys representing the sender of this beacon
-        self.ephemeral_signing_key = nacl.signing.SigningKey.generate()
-        self.ephemeral_verify_key = self.ephemeral_signing_key.verify_key
 
         # Hard-code the cipher suite we are using
         pubkey = self.net_descriptor.ac_shared.ja.gateway_ephemeral_pubkey
@@ -129,25 +122,27 @@ class NetjoinBeacon(object):
     # Copy self.verify_key into self.net_descriptor
     def update_verify_key(self):
         pubkey = self.net_descriptor.ac_shared.ja.gateway_ephemeral_pubkey
-        pubkey.the_key = self.ephemeral_verify_key_raw()
+        pubkey.the_key = self.raw_verify_key
 
     # Update the nonce and ephemeral_pubkey in net_descriptor
-    def update_and_get_serialized_beacon(self):
+    def update_and_get_serialized_descriptor(self):
         self.update_nonce()
         self.update_verify_key()
         return self.net_descriptor.SerializeToString()
 
 if __name__ == "__main__":
     beacon = NetjoinBeacon()
-    beacon.initialize()
-    serialized_beacon = beacon.update_and_get_serialized_beacon()
-    descriptor_size = len(serialized_beacon)
+    auth = NetjoinAuthsession()
+    beacon.initialize(auth.get_raw_verify_key())
+    serialized_descriptor = beacon.update_and_get_serialized_descriptor()
+    descriptor_size = len(serialized_descriptor)
     logging.debug("Serialized descriptor size: {}".format(descriptor_size))
 
     # Deserialize and print the contents of beacon again
     new_beacon = NetjoinBeacon()
-    new_beacon.from_serialized_beacon(serialized_beacon)
+    new_beacon.from_serialized_net_descriptor(serialized_descriptor)
     new_beacon.print_beacon()
+    print "PASSED: NetjoinBeacon"
 
     # The beacon payload should now be sent to XIANetJoin
     # XIANetJoin will need a header to identify this as a beacon

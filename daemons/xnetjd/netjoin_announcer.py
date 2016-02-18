@@ -20,9 +20,9 @@ class NetjoinAnnouncer(object):
 
         # Send beacon to XIANetJoin
         logging.debug("Sent beacon")
-        next_serialized_beacon = self.beacon.update_and_get_serialized_beacon()
+        net_descriptor = self.beacon.update_and_get_serialized_descriptor()
         beacon_message = NetjoinMessage()
-        beacon_message.beacon.ParseFromString(next_serialized_beacon)
+        beacon_message.net_descriptor.ParseFromString(net_descriptor)
         serialized_beacon_message = beacon_message.SerializeToString()
 
         #self.sockfd.sendto(next_serialized_beacon, self.xianetjoin)
@@ -33,6 +33,7 @@ class NetjoinAnnouncer(object):
 
     def __init__(self, beacon_interval, shutdown_event):
         self.beacon_interval = beacon_interval
+        self.auth = NetjoinAuthsession()
         self.xianetjoin = ("127.0.0.1", 9882)
         self.shutdown_event = shutdown_event
 
@@ -41,7 +42,7 @@ class NetjoinAnnouncer(object):
 
         # A beacon object we will send to announce the network
         self.beacon = NetjoinBeacon()
-        self.beacon.initialize()
+        self.beacon.initialize(self.auth.get_raw_verify_key())
 
 # Parse arguments and launch necessary threads
 def main():
