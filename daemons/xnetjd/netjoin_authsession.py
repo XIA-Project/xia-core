@@ -1,7 +1,7 @@
 import nacl.hash
 import nacl.utils
 from nacl.public import Box
-from nacl.signing import SigningKey
+from nacl.signing import SigningKey, VerifyKey
 from nacl.encoding import RawEncoder
 
 class NetjoinAuthsession(object):
