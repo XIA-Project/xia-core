@@ -80,6 +80,9 @@ XNetJ::push(int in_port, Packet *p_in)
 
 			// Prepend netj header containing src mac address and iface num
 			p_buf.insert(0, (const char *)e->ether_shost, 6);
+			// TODO: Confirm that it is OK to blindly copy our address here
+			// We do this so if dest was broadcast, we send actual addr up
+			p_buf.insert(0, (const char *)_my_en.data(), 6);
 			p_buf.insert(0, (const char *)&iface, 2);
 
 			WritablePacket *apiPacket = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
@@ -91,7 +94,11 @@ XNetJ::push(int in_port, Packet *p_in)
 			click_chatter("XNetJ: Received a packet from XNetJoin");
 			// Received a packet from NetJoin API to be sent on the wire
 			std::string p_buf;
-			p_buf.assign((const char *)p_in->data(), (const char *)p_in->end_data());
+			const char *packet_data = (const char *)p_in->data();
+			uint16_t iface = (uint16_t)*packet_data;
+			const char *dest_mac_addr = (const char *)packet_data+sizeof(iface);
+			const char *payload = (const char *) packet_data+sizeof(iface)+6;
+			p_buf.assign((const char *)payload, (const char *)p_in->end_data());
 			//click_chatter("XNetJ: API: %s.", p_buf.c_str());
 
 			click_chatter("XNetJ: Building a mac header on XNetJoin packet");
@@ -101,8 +108,9 @@ XNetJ::push(int in_port, Packet *p_in)
 				return;
 			}
 			q->ether_header()->ether_type = htons(ETHERTYPE_XNETJ);
-			EtherAddress *dst_eth = reinterpret_cast<EtherAddress *>(q->ether_header()->ether_dhost);
-			memset(dst_eth, 0xff, 6);
+			//EtherAddress *dst_eth = reinterpret_cast<EtherAddress *>(q->ether_header()->ether_dhost);
+			memcpy(&q->ether_header()->ether_dhost, dest_mac_addr, 6);
+			//memset(dst_eth, 0xff, 6);
 			memcpy(&q->ether_header()->ether_shost, _my_en.data(), 6);
 			click_chatter("XNetJ: Broadcasting XNetJoin packet");
 			output(XNETJDEVPORT).push(q);

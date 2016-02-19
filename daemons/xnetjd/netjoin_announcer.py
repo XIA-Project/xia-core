@@ -24,9 +24,10 @@ class NetjoinAnnouncer(object):
         beacon_message = NetjoinMessage()
         beacon_message.net_descriptor.ParseFromString(net_descriptor)
         serialized_beacon_message = beacon_message.SerializeToString()
+        header = struct.pack("H6B", XNETJ_BROADCAST_IFACE, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff)
 
         #self.sockfd.sendto(next_serialized_beacon, self.xianetjoin)
-        self.sockfd.sendto(serialized_beacon_message, self.xianetjoin)
+        self.sockfd.sendto(header+serialized_beacon_message, self.xianetjoin)
 
         # Call ourselves from a new thread after some time
         threading.Timer(self.beacon_interval, self.announce).start()

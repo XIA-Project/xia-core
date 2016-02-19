@@ -34,6 +34,7 @@ CLICK_DECLS
 #define APIPORT           9228
 #define XIANETJOINDEVPORT 0
 #define XIANETJOINAPIPORT 1
+#define XNETJ_BROADCAST_IFACE 255
 
 XIANetJoin::XIANetJoin()
 {
@@ -50,6 +51,7 @@ XIANetJoin::~XIANetJoin()
 int
 XIANetJoin::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+	// TODO: Pass down number of ports and use for broadcast loop below
     if (cp_va_kparse(conf, this, errh,
 				cpEnd) < 0)
         return -1; // error config
@@ -82,30 +84,26 @@ XIANetJoin::push(int in_port, Packet *p_in)
 		case XIANETJOINAPIPORT:
 			{
 			// Received a packet from NetJoin API to be sent on the wire
-			std::string p_buf;
-			p_buf.assign((const char *)p_in->data(), (const char *)p_in->end_data());
-			//click_chatter("XIANetJoin: API: %s.", p_buf.c_str());
-			click_chatter("XIANetJoin: Sending unmodified API packet to XNetj");
+			// Read outgoing interface from packet but don't strip it
+			uint16_t iface = (uint16_t)*(p_in->data());
 
-			/*
-			WritablePacket *q = p_in->push_mac_header(sizeof(click_ether));
-			if(!q) {
-				click_chatter("XIANetJoin: ERROR: dropping API packet");
+			// Broadcast the packet on all interfaces, if requested
+			if(iface == XNETJ_BROADCAST_IFACE) {
+				click_chatter("XIANetJoin: Broadcasting API packet to XNetjs");
+				//TODO: Hardcoded number of ports. Pass down from click conf
+				for(int i=0; i<4; i++) {
+					Packet *q = p_in->clone();
+					SET_XIA_PAINT_ANNO(q, i);
+					output(XIANETJOINDEVPORT).push(q);
+				}
 				return;
 			}
-			q->ether_header()->ether_type = htons(ETHERTYPE_XNETJ);
-			EtherAddress *dst_eth = reinterpret_cast<EtherAddress *>(q->ether_header()->ether_dhost);
-			memset(dst_eth, 0xff, 6);
-			memcpy(&q->ether_header()->ether_shost, _my_en.data(), 6);
-			*/
+
+			// Or send it to the specifically requested interface
+			SET_XIA_PAINT_ANNO(p_in, iface);
+			click_chatter("XIANetJoin: Sending pkt to Iface %d XNetj", iface);
+
 			output(XIANETJOINDEVPORT).push(p_in);
-			/*
-			WritablePacket *reply = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
-			reply->set_dst_ip_anno(IPAddress("127.0.0.1"));
-			SET_DST_PORT_ANNO(reply, htons(9228));
-			// Just forward the packet back to API
-			output(0).push(reply);
-			*/
 			}
 			break;
 	};

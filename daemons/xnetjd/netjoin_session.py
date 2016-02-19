@@ -47,13 +47,15 @@ class NetjoinSession(threading.Thread):
         self.q.push(message_tuple)
 
     # Send a message out to a specific recipient
-    def send_netjoin_message(self, message, mymac, sendermac):
+    def send_netjoin_message(self, message, interface, theirmac):
         # TODO: May need to include interface here to help XIANetjoin
-        outgoing_packet = sendermac + mymac + message.SerializeToString()
+        netj_header = struct.pack("H6B", interface, theirmac[0], theirmac[1],
+                theirmac[2], theirmac[3], theirmac[4], theirmac[5])
+        outgoing_packet = netj_header + message.SerializeToString()
         self.sockfd.sendto(self.xianetjoin, outgoing_packet)
 
     def send_handshake_one(self, message_tuple):
-        message, interface, mymac, sendermac = message_tuple
+        message, interface, mymac, theirmac = message_tuple
 
         # Save access point verify key included in NetDescriptor message
         join_auth_info = message.net_descriptor.ac_shared.ja
@@ -68,7 +70,7 @@ class NetjoinSession(threading.Thread):
         handshake_message.handshake_one = handshake_one.handshake_one
 
         # Send handshake one
-        self.send_netjoin_message(handshake_message, mymac, sendermac)
+        self.send_netjoin_message(handshake_message, interface, theirmac)
 
     # Main thread handles all messages based on state of joining session
     def run(self):
