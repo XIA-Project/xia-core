@@ -2,10 +2,12 @@
 #
 
 import time
+import struct
 import socket
 import logging
 import threading
 from netjoin_beacon import NetjoinBeacon
+from netjoin_authsession import NetjoinAuthsession
 from netjoin_message_pb2 import NetjoinMessage
 
 # Announce the presence of this network
