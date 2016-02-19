@@ -2,6 +2,7 @@
 #
 
 import time
+import struct
 import socket
 import logging
 import threading
