@@ -93,7 +93,7 @@ class NetjoinReceiver(threading.Thread):
                 self.handle_handshake_one(message_tuple)
 
             else:
-                logging.warning("Unknown message type: {}".format(message_type)
+                logging.warning("Unknown message type: {}".format(message_type))
 
 # Unit test this module when run by itself
 if __name__ == "__main__":
