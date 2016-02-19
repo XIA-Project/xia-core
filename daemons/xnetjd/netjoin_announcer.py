@@ -13,6 +13,7 @@ class NetjoinAnnouncer(object):
 
     def announce(self):
 
+        XNETJ_BROADCAST_IFACE = 255
         # Exit immediately if shutting down
         if self.shutdown_event.is_set():
             logging.debug("Stopping network announcement")
