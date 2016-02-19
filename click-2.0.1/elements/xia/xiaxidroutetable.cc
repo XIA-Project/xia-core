@@ -600,6 +600,26 @@ XIAXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
 	}
 }
 
+bool
+XIAXIDRouteTable::next_hop(uint16_t port, XID &next_hop)
+{
+	bool found = false;
+
+	HashTable<XID, XIARouteData *>::iterator it = _rts.begin();
+	while (it != _rts.end()) {
+		XIARouteData *xrd = (XIARouteData *)it.value();
+
+		if (xrd->port == port) {
+			next_hop = *xrd->nexthop;
+			found = true;
+			break;
+		}
+		it++;
+	}
+
+	return found;
+}
+
 CLICK_ENDDECLS
 EXPORT_ELEMENT(XIAXIDRouteTable)
 ELEMENT_MT_SAFE(XIAXIDRouteTable)

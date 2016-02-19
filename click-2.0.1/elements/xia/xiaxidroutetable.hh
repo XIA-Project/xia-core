@@ -62,6 +62,8 @@ class XIAXIDRouteTable : public Element { public:
 	int set_enabled(int e);
 	int get_enabled();
 
+    bool next_hop(uint16_t port, XID &nexthop);
+
 protected:
     int lookup_route(int in_ether_port, Packet *);
     int process_xcmp_redirect(Packet *);
