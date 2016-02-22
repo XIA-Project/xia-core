@@ -50,10 +50,18 @@ class NetjoinReceiver(threading.Thread):
         # Send the message info to the NetjoinSession
         session.push(message_tuple)
 
+    # First message received from client when running as access point
     def handle_handshake_one(self, message_tuple):
-        logging.debug("Got HandshakeOne message")
-        # Retrieve session ID from handshake one
+        logging.info("Got HandshakeOne message")
+        # Inherit the auth session from announcer to bootstrap a new session
+        session = NetjoinSession(self.shutdown, auth=self.announcer.auth)
+        session.daemon = True
+        # TODO: Retrieve session ID from handshake one
+        self.server_sessions[session.get_ID()] = session
+
         # Pass handshake one to the corresponding session handler
+        session.push(message_tuple)
+
         pass
 
     # Main loop, receives incoming NetjoinMessage(s)
