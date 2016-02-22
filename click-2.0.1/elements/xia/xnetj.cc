@@ -91,28 +91,37 @@ XNetJ::push(int in_port, Packet *p_in)
 			break;
 		case XNETJOINPORT:
 			{
-			click_chatter("XNetJ: Received a packet from XNetJoin");
-			// Received a packet from NetJoin API to be sent on the wire
-			std::string p_buf;
-			const char *packet_data = (const char *)p_in->data();
-			uint16_t iface = (uint16_t)*packet_data;
-			const char *dest_mac_addr = (const char *)packet_data+sizeof(iface);
-			const char *payload = (const char *) packet_data+sizeof(iface)+6;
-			p_buf.assign((const char *)payload, (const char *)p_in->end_data());
-			//click_chatter("XNetJ: API: %s.", p_buf.c_str());
 
-			click_chatter("XNetJ: Building a mac header on XNetJoin packet");
-			WritablePacket *q = p_in->push_mac_header(sizeof(click_ether));
+			// Received a packet from NetJoin API to be sent on the wire
+
+			std::string p_buf;
+
+			uint16_t iface = (uint16_t)*p_in->data();
+
+			EtherAddress dest_ether_addr =
+				EtherAddress((const unsigned char *)p_in->data()+2);
+
+			p_buf.assign((const char *)p_in->data()+8,
+					(const char *)p_in->end_data());
+
+			click_chatter("XNetJ: Outgoing pkt: Iface: %d (255==ALL):", iface);
+			click_chatter("XNetJ: dest: %s", dest_ether_addr.unparse().c_str());
+			click_chatter("XNetJ: src: %s", _my_en.unparse().c_str());
+			click_chatter("XNetJ: size: %d", p_buf.size());
+
+			WritablePacket *p = WritablePacket::make(1024, p_buf.c_str(),
+					p_buf.size(), 0);
+
+			WritablePacket *q = p->push_mac_header(sizeof(click_ether));
 			if(!q) {
 				click_chatter("XNetJ: ERROR: dropping API packet");
 				return;
 			}
+
 			q->ether_header()->ether_type = htons(ETHERTYPE_XNETJ);
-			//EtherAddress *dst_eth = reinterpret_cast<EtherAddress *>(q->ether_header()->ether_dhost);
-			memcpy(&q->ether_header()->ether_dhost, dest_mac_addr, 6);
-			//memset(dst_eth, 0xff, 6);
+			memcpy(&q->ether_header()->ether_dhost, dest_ether_addr.data(), 6);
 			memcpy(&q->ether_header()->ether_shost, _my_en.data(), 6);
-			click_chatter("XNetJ: Broadcasting XNetJoin packet");
+
 			output(XNETJDEVPORT).push(q);
 			}
 			break;
