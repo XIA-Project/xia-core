@@ -1148,10 +1148,10 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 	if (nxt == CLICK_XIA_NXT_SCION) {
 		ScionHeader shdr(p_in);
 		nxt = shdr .nxt();
-		INFO("Found a SCION Header");
-		xiah.dump();
-		shdr.dump();
-		thdr.dump();
+		INFO("PNP: Found a SCION Header in incoming packet\n");
+//		xiah.dump();
+//		shdr.dump();
+//		thdr.dump();
 	}
 
 	if (nxt == CLICK_XIA_NXT_XCMP) {
@@ -1308,7 +1308,12 @@ void XTRANSPORT::SendControlPacket(int type, sock *sk, const void *payload, size
 	xiah_new.set_nxt(CLICK_XIA_NXT_TRN);
 	xiah_new.set_last(LAST_NODE_DEFAULT);
 	xiah_new.set_hlim(sk->hlim);
-	xiah_new.set_dst_path(src_path);
+
+	// SCION: using original dst_path so we don't lose the scion gteway sid
+	// FIXME: this is going to interfere with migration
+	//xiah_new.set_dst_path(src_path);
+	xiah_new.set_dst_path(sk->dst_path);
+
 	xiah_new.set_src_path(dst_path);
 	xiah_new.set_plen(plen);
 
@@ -1943,7 +1948,6 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 	// We may have already received this, so be sure to check to see if we are safe to delete things
 
 	XIAHeader xiah(p_in->xia_header());
-
 	XIAPath dst_path = xiah.dst_path();
 	XIAPath src_path = xiah.src_path();
 
@@ -1970,9 +1974,11 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 		return;
 	}
 
+	// FIXME: taking out migration support until we figure out how
+	// it coexists with scion
+    if(0) {
 	// FIXME: this should become a migrate function
 	//if(sk->dst_path != src_path) {
-        if(0) { //skip it now for scion integration
 		INFO("remote path in SYNACK different from that used in SYN");
 		// Retrieve the signed payload
 		const char *payload = (const char *)thdr.payload();
@@ -2205,7 +2211,9 @@ void XTRANSPORT::ProcessAckPacket(WritablePacket *p_in)
 		sk->remote_recv_window = thdr.recv_window();
 
 		//In case of Client Mobility...	 Update 'sk->dst_path'
-		sk->dst_path = src_path;
+
+		//: FIXME: TOOK OUT FOR SCION TESTING, NEED TO FIX MOBILITY vs SCION ISSUES
+		//sk->dst_path = src_path;
 
 		int remote_next_seqnum_expected = thdr.ack_num();
 
@@ -3748,14 +3756,14 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 	if(rc == 0 && sk->sock_type == SOCK_RAW) {
 		// FIXME: change this to use xiah.dump();
 		struct click_xia *xiah = reinterpret_cast<struct click_xia *>(payload);
-		DBG("Received raw packet from API");
-		DBG("xiah->ver = %d", xiah->ver);
-		DBG("xiah->nxt = %d", xiah->nxt);
-		DBG("xiah->plen = %d", htons(xiah->plen));
-		DBG("xiah->hlim = %d", xiah->hlim);
-		DBG("xiah->dnode = %d", xiah->dnode);
-		DBG("xiah->snode = %d", xiah->snode);
-		DBG("xiah->last = %d", xiah->last);
+		DBG("Xsend: Received raw packet from API");
+//		DBG("xiah->ver = %d", xiah->ver);
+//		DBG("xiah->nxt = %d", xiah->nxt);
+//		DBG("xiah->plen = %d", htons(xiah->plen));
+//		DBG("xiah->hlim = %d", xiah->hlim);
+//		DBG("xiah->dnode = %d", xiah->dnode);
+//		DBG("xiah->snode = %d", xiah->snode);
+//		DBG("xiah->last = %d", xiah->last);
 
 		int total_nodes = xiah->dnode + xiah->snode;
 		for(int i=0;i<total_nodes;i++) {
@@ -3797,11 +3805,11 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 		XIAHeader xiaheader(xiah);
 		XIAHeaderEncap xiahencap(xiaheader);
 		XIAPath dst_path = xiaheader.dst_path();
-		INFO("Sending RAW packet to:%s:", dst_path.unparse().c_str());
+		INFO("(%d), Sending RAW packet to:%s:", _sport, dst_path.unparse().c_str());
 		size_t headerlen = xiaheader.hdr_size();
 		char *pktcontents = &payload[headerlen];
 		int pktcontentslen = pktPayloadSize - headerlen;
-		INFO("Packet size without XIP header:%d", pktcontentslen);
+//		INFO("Packet size without XIP header:%d", pktcontentslen);
 
 		WritablePacket *p = WritablePacket::make(p_in->headroom() + 1, (const void*)pktcontents, pktPayloadSize, p_in->tailroom());
 		p = xiahencap.encap(p, false);
@@ -4031,11 +4039,13 @@ void XTRANSPORT::Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 		if (xia_socket_msg->x_recv().bytes_returned() > 0) {
 			// Return response to API
+			INFO("(%d) Sending %d bytes to the API", _sport, xia_socket_msg->x_recv().bytes_returned());
 			ReturnResult(_sport, xia_socket_msg, xia_socket_msg->x_recv().bytes_returned());
 
 		} else if (sk->state == CLOSE_WAIT) {
 			// other end has closed, tell app there's nothing to read
 			// what if other end is doing retransmits??
+			INFO("(%d) Other size closed the connection", _sport, xia_socket_msg->x_recv().bytes_returned());
 			ReturnResult(_sport, xia_socket_msg, 0);
 
 		}else if (!xia_socket_msg->blocking()) {
