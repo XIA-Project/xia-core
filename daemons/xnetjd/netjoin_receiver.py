@@ -6,6 +6,7 @@ import struct
 import logging
 import threading
 from netjoin_policy import NetjoinPolicy
+from netjoin_session import NetjoinSession
 from netjoin_message_pb2 import NetjoinMessage
 
 # Receiver thread, only responsible for receiving netjoin related packets
@@ -71,6 +72,7 @@ class NetjoinReceiver(threading.Thread):
 
             # Six bytes contain source mac address
             logging.debug("Sent by: %02x:%02x:%02x:%02x:%02x:%02x" % sendermac)
+            logging.debug("Sent to: %02x:%02x:%02x:%02x:%02x:%02x" % mymac)
 
             # Remaining data is the beacon
             serialized_message = data[14:]
