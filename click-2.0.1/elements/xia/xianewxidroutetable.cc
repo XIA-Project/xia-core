@@ -772,10 +772,24 @@ int XIANEWXIDRouteTable::scion_forward_packet(const struct click_xia* xiah) {
 	  scion_common_hdr->currentOF += sizeof(HopOpaqueField);
 	  //xiah->last = -1;
 	  ((click_xia*)packet)->last = -1;
+	  click_chatter("in host 0, return 0 for router 0");
 	  return 0; // HACK! The first hop is a host which only has one port, so send it out 0
+	}else if(scion_common_hdr->currentOF == (OF_offset + sizeof(HopOpaqueField))){
+          scion_common_hdr->currentOF += sizeof(HopOpaqueField);
+	  //xiah->last = -1;
+	  ((click_xia*)packet)->last = -1;
+          click_chatter("in router 0, return port 1 for router 1");
+	  return 1;
+        }else if(scion_common_hdr->currentOF == (OF_offset + 2*sizeof(HopOpaqueField))){
+          scion_common_hdr->currentOF += sizeof(HopOpaqueField);
+	  //xiah->last = -1;
+	  ((click_xia*)packet)->last = -1;
+          click_chatter("in router 1, return port 0 for host 1");
+	  return 0;
 	}else{
 //	  click_chatter("SCION FE: router 1");
 	  //second router - router 1, last router
+          click_chatter("in host 1, return port local host for destination host");
 	  return DESTINED_FOR_LOCALHOST;
 	}
 	
