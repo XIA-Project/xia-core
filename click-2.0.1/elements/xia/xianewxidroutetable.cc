@@ -532,9 +532,9 @@ XIANEWXIDRouteTable::push(int in_ether_port, Packet *p)
 	TransportHeader thdr(p);
 
 	click_chatter("==== SCION FORWARD ENGINE: PUSH ====\n");
-	xhdr.dump();
-	shdr.dump();
-	thdr.dump();
+//	xhdr.dump();
+//	shdr.dump();
+//	thdr.dump();
 
 	in_ether_port = XIA_PAINT_ANNO(p);
 
@@ -543,7 +543,7 @@ XIANEWXIDRouteTable::push(int in_ether_port, Packet *p)
 		return;
 	}
 
-	click_chatter("scion: do the job\n");
+//	click_chatter("scion: do the job\n");
 	port = lookup_route(in_ether_port, p);
 
 	click_chatter(" scion output port = %d\n", port);
@@ -604,7 +604,7 @@ XIANEWXIDRouteTable::process_xcmp_redirect(Packet *p)
 int
 XIANEWXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
 {
-   DBG("scion route lookup");
+//   DBG("scion route lookup");
    //click_chatter("scion route: lookup route return\n");
    //return DESTINED_FOR_LOCALHOST;
    const struct click_xia* hdr = p->xia_header();
@@ -613,7 +613,7 @@ XIANEWXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
    if (last < 0)
 	last += hdr->dnode;
 
-   click_chatter("scion: last %d\n", last);
+//   click_chatter("scion: last %d\n", last);
 
    const struct click_xia_xid_edge* edge = hdr->node[last].edge;
    const struct click_xia_xid_edge& current_edge = edge[XIA_NEXT_PATH_ANNO(p)];
@@ -624,7 +624,7 @@ XIANEWXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
   	return _rtdata.port;
    }
 
-   click_chatter("scion: idx %d\n", idx);
+//   click_chatter("scion: idx %d\n", idx);
 
    const struct click_xia_xid_node& node = hdr->node[idx];
 
@@ -633,7 +633,7 @@ XIANEWXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
    //scion info is in scion ext header  
    int port = scion_forward_packet(hdr);
 
-   click_chatter("SCION PORT=%d\n", port);
+   click_chatter("SCION OUTPUT PORT=%d\n", port);
 
    //scion info is in scion_sid
    //int port = check_scion_info(hdr);
@@ -735,7 +735,7 @@ int XIANEWXIDRouteTable::scion_forward_packet(const struct click_xia* xiah) {
   uint8_t OF_offset = sizeof(SCIONCommonHeader) + sizeof(SCIONAddr) 
 					   + sizeof(SCIONAddr) + sizeof(InfoOpaqueField);
   //print_packet_header((click_xia*)packet);
-  click_chatter("xia_hdr_len %d, total nodes %d", xia_hdr_len, total_nodes);
+//  click_chatter("xia_hdr_len %d, total nodes %d", xia_hdr_len, total_nodes);
 
   while((nxt_hdr_type != CLICK_XIA_NXT_SCION) && (nxt_hdr_type != CLICK_XIA_NXT_NO)){
 	click_chatter("next header type %d, xia hdr len %d ", (int)nxt_hdr_type, hdr_len);
@@ -745,12 +745,12 @@ int XIANEWXIDRouteTable::scion_forward_packet(const struct click_xia* xiah) {
   }
   
   if(nxt_hdr_type == CLICK_XIA_NXT_SCION){
-	click_chatter("get SCION header!! scion ext offset %d, header len %d", hdr_len, xia_ext_hdr->hlen);
+//	click_chatter("get SCION header!! scion ext offset %d, header len %d", hdr_len, xia_ext_hdr->hlen);
 	SCIONCommonHeader *scion_common_hdr = (SCIONCommonHeader*)((uint8_t*)xia_ext_hdr + 2);
 	//uint8_t* data = (uint8_t*)scion_common_hdr;
 	//HopOpaqueField* current_hops = (HopOpaqueField)((uint8_t *)scion_common_hdr + scion_common_hdr->currentOF);
-	click_chatter("SCION FE: OF offset %d, currentOF %d", OF_offset, scion_common_hdr->currentOF);
-	click_chatter("SCION FE: scion ext header length %d", xia_ext_hdr->hlen);
+//	click_chatter("SCION FE: OF offset %d, currentOF %d", OF_offset, scion_common_hdr->currentOF);
+//	click_chatter("SCION FE: scion ext header length %d", xia_ext_hdr->hlen);
 	print_scion_header(scion_common_hdr);
 	print_packet_contents((uint8_t*)xia_ext_hdr, xia_ext_hdr->hlen);
  
@@ -767,14 +767,14 @@ int XIANEWXIDRouteTable::scion_forward_packet(const struct click_xia* xiah) {
 	}
 	*/
 	if(OF_offset == scion_common_hdr->currentOF){
-	  click_chatter("SCION FE: router 0");
+//	  click_chatter("SCION FE: router 0");
 	  // first router - router 0
 	  scion_common_hdr->currentOF += sizeof(HopOpaqueField);
 	  //xiah->last = -1;
 	  ((click_xia*)packet)->last = -1;
-	  return 1; // next router
+	  return 0; // HACK! The first hop is a host which only has one port, so send it out 0
 	}else{
-	  click_chatter("SCION FE: router 1");
+//	  click_chatter("SCION FE: router 1");
 	  //second router - router 1, last router
 	  return DESTINED_FOR_LOCALHOST;
 	}
