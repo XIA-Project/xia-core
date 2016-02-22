@@ -40,11 +40,11 @@ class NetjoinSession(threading.Thread):
         self.sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     def get_ID(self):
-        return self.session_ID()
+        return self.session_ID
 
     # Push a NetjoinMessage to the processing queue from another thread
     def push(self, message_tuple):
-        self.q.push(message_tuple)
+        self.q.put(message_tuple)
 
     # Send a message out to a specific recipient
     def send_netjoin_message(self, message, interface, theirmac):
