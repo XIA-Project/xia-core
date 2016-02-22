@@ -149,8 +149,9 @@ elementclass XIALineCard {
 	// we only want to print/count the XIA packets
 	toNet :: Tee(3) -> Queue(200) -> [0]output;   // send all packets
 	toNet[1] -> statsFilter :: Classifier(12/C0DE, -) -> print_out -> count_final_out -> count_next_out -> Discard;  // only print/count XIP packets
-    toNet[2] -> Strip(14) -> MarkXIAHeader() -> [1]xresp[2] -> Discard
+    toNet[2] -> xrespFilter :: Classifier(12/C0DE, -) -> Strip(14) -> MarkXIAHeader() -> [1]xresp[2] -> Discard
 	statsFilter[1] -> Discard;   // don't print/count XARP or XCMP packets
+    xrespFilter[1] -> Discard
 
 	// On receiving a packet from the host
 	input[1] -> xarpq;
