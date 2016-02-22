@@ -3,6 +3,7 @@
 
 import time
 import socket
+import struct
 import logging
 import ndap_pb2
 import threading
@@ -52,7 +53,7 @@ class NetjoinSession(threading.Thread):
         netj_header = struct.pack("H6B", interface, theirmac[0], theirmac[1],
                 theirmac[2], theirmac[3], theirmac[4], theirmac[5])
         outgoing_packet = netj_header + message.SerializeToString()
-        self.sockfd.sendto(self.xianetjoin, outgoing_packet)
+        self.sockfd.sendto(outgoing_packet, self.xianetjoin)
 
     def send_handshake_one(self, message_tuple):
         message, interface, mymac, theirmac = message_tuple
@@ -63,14 +64,14 @@ class NetjoinSession(threading.Thread):
         self.auth.set_their_raw_verify_key(gateway_raw_key)
 
         # Build handshake one
-        handshake_one = NetjoinHandshakeOne(self, message_tuple)
-        handshake_one.update_nonce()
+        netjoin_h1 = NetjoinHandshakeOne(self, mymac)
+        netjoin_h1.update_nonce()
 
-        handshake_message = NetjoinMessage()
-        handshake_message.handshake_one = handshake_one.handshake_one
+        outgoing_message = NetjoinMessage()
+        outgoing_message.handshake_one.CopyFrom(netjoin_h1.handshake_one)
 
         # Send handshake one
-        self.send_netjoin_message(handshake_message, interface, theirmac)
+        self.send_netjoin_message(outgoing_message, interface, theirmac)
 
     # Main thread handles all messages based on state of joining session
     def run(self):
