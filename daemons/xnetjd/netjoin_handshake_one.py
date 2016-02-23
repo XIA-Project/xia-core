@@ -55,9 +55,29 @@ class NetjoinHandshakeOne(object):
     def from_handshake_one(self, handshake_one):
         self.handshake_one.CopyFrom(handshake_one)
 
-    # serialized_handshake_one is actually a serialized jacp_pb2.HandshakeOne
-    def from_serialized_handshake_one(self, serialized_handshake_one):
-        self.handshake_one.ParseFromString(serialized_handshake_one)
+    # wire_handshake_one is actually a serialized jacp_pb2.HandshakeOne
+    def from_wire_handshake_one(self, wire_handshake_one):
+
+        # Populate the internal handshake one protobuf
+        self.handshake_one.CopyFrom(wire_handshake_one)
+
+        # Record the client's public key into our auth session
+        # NOTE: THIS IS BAD, we are overwriting their_public_key in auth
+        # session shared by all incoming connections. Should we copy it?
+        self.session.auth.set_their_raw_verify_key(self.handshake_one.encrypted.client_ephemeral_pubkey)
+
+        # Decrypt payload and make it available
+        encrypted_payload = self.handshake_one.encrypted.encrypted_data
+        serialized_payload = self.session.auth.decrypt(encrypted_payload)
+
+        # Populate the internal payload after decrypting it
+        self.payload.ParseFromString(serialized_payload)
+
+    def is_valid(self):
+        # Handle l2 credentials
+        # Handle l3 credentials
+        # Handle client credentials
+        return True
 
 if __name__ == "__main__":
     shutdown_event = threading.Event()

@@ -22,6 +22,7 @@ class NetjoinReceiver(threading.Thread):
         self.policy = policy
         self.announcer = announcer    # None, unless running as access point
         self.client_sessions = {}
+        self.server_sessions = {}
 
         logging.debug("Receiver initialized")
 
@@ -57,13 +58,12 @@ class NetjoinReceiver(threading.Thread):
         # Inherit the auth session from announcer to bootstrap a new session
         session = NetjoinSession(self.shutdown, auth=self.announcer.auth)
         session.daemon = True
+
         # TODO: Retrieve session ID from handshake one
         self.server_sessions[session.get_ID()] = session
 
         # Pass handshake one to the corresponding session handler
         session.push(message_tuple)
-
-        pass
 
     # Main loop, receives incoming NetjoinMessage(s)
     def run(self):

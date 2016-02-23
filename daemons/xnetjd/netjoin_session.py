@@ -73,6 +73,17 @@ class NetjoinSession(threading.Thread):
         # Send handshake one
         self.send_netjoin_message(outgoing_message, interface, theirmac)
 
+    def handle_handshake_one(self, message_tuple):
+        message, interface, mymac, theirmac = message_tuple
+
+        netjoin_h1 = NetjoinHandshakeOne(self, mymac)
+        netjoin_h1.from_wire_handshake_one(message.handshake_one)
+
+        if netjoin_h1.is_valid():
+            logging.info("Accepted handshake one from client")
+        logging.info("Now send handshake two")
+        # TODO: Build and send handshake two
+
     # Main thread handles all messages based on state of joining session
     def run(self):
         logging.debug("Started session ID: {}".format(self.session_ID))
@@ -93,7 +104,7 @@ class NetjoinSession(threading.Thread):
                     self.send_handshake_one(message_tuple)
                 elif message_type == "handshake_one":
                     self.state = self.VALIDATE_HS_ONE
-                    solf.got_handshake_one(message_tuple)
+                    self.handle_handshake_one(message_tuple)
                 else:
                     logging.error("Invalid message: {}".format(message_type))
                     break
