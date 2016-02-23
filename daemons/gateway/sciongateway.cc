@@ -289,6 +289,17 @@ void build_addr_hdr(SCIONCommonHeader *sch, SCIONAddr *src, SCIONAddr *dst)
   sch->totalLen = htons(sch->headerLen);
 }
 
+//get the scion path through SCION endhost daemon
+// * create a connection to the SCION endhost daemon
+// * send the path request
+// * save the path info in path
+// return - path size
+uint32_t get_scion_path(SCIONAddr *src, SCIONAddr *dst, uint8_t* path)
+{
+ 
+  return 0;
+}
+
 void build_cmn_hdr(SCIONCommonHeader *sch, int src_type, int dst_type, int next_hdr)
 {
   uint16_t vsd = 0;
@@ -308,6 +319,7 @@ size_t add_scion_header(SCIONCommonHeader* sch, uint8_t* payload, uint16_t paylo
   uint8_t path_length;
   uint8_t header_length;
   SCIONAddr src_addr, dst_addr;
+  uint8_t path_data[RV_MAX_DATA_PACKET_SIZE];
   
   //data packet uses IPV4 although XIA-SCION does not use it at all.
   //it is used to distinglish data or control packet
@@ -321,8 +333,9 @@ size_t add_scion_header(SCIONCommonHeader* sch, uint8_t* payload, uint16_t paylo
   dst_addr.isd_ad = ISD_AD(neighbor_isd, neighbor_ad);
   //*(uint32_t *)(dst_addr.host_addr) = interface_ip[0];
   build_addr_hdr(sch, &src_addr, &dst_addr);
-
-
+  
+  uint32_t path_size = get_scion_path(&src_addr, &dst_addr, path_data);
+  
   /* construct path info */
   //path information - gateway should call path server to get the path info
   InfoOpaqueField up_inf = {IOF_CORE, htonl(1111), htons(1), 2};
