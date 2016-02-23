@@ -60,7 +60,7 @@ class NetjoinBeacon(object):
 
         if self.xip_netid == None:
             self.xip_netid = uuid.uuid4().bytes
-            logging.warning("XIP NID not giver. Assigning a temporary one")
+            logging.warning("XIP NID not given. Assigning a temporary one")
 
         # Hard-code the cipher suite we are using
         pubkey = self.net_descriptor.ac_shared.ja.gateway_ephemeral_pubkey
