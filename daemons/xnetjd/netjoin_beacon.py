@@ -115,9 +115,7 @@ class NetjoinBeacon(object):
 
     # Create a new random nonce for inclusion in next outgoing beacon
     def update_nonce(self):
-        nonce = self.net_descriptor.ac_shared.ja.gateway_nonce
-        nonce.gmt_unix_time = int(time.time())
-        nonce.random_bytes = nacl.utils.random(2)
+        self.net_descriptor.ac_shared.ja.gateway_nonce = nacl.utils.random(2)
 
     # Copy self.verify_key into self.net_descriptor
     def update_verify_key(self):
