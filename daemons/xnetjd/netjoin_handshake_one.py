@@ -36,6 +36,7 @@ class NetjoinHandshakeOne(object):
         h1.nonce = self.session.auth.get_nonce()
 
         # Update the hash of headers that includes the nonce
+        # TODO: Convert to using methed get_hash_of_headers below
         data_to_hash = h1.nonce + h1.client_ephemeral_pubkey
         self.payload.hash_of_headers = self.session.auth.sha512(data_to_hash)
 
@@ -51,6 +52,12 @@ class NetjoinHandshakeOne(object):
 
     def print_handshake_one(self):
         print self.handshake_one_str()
+
+    def payload_str(self):
+        return protobuf_text_format.MessageToString(self.payload)
+
+    def print_payload(self):
+        print self.payload_str()
 
     def from_handshake_one(self, handshake_one):
         self.handshake_one.CopyFrom(handshake_one)
@@ -73,7 +80,19 @@ class NetjoinHandshakeOne(object):
         # Populate the internal payload after decrypting it
         self.payload.ParseFromString(serialized_payload)
 
+    def get_hash_of_headers(self):
+        h1 = self.handshake_one.encrypted
+        data_to_hash = h1.nonce + h1.client_ephemeral_pubkey
+        return self.session.auth.sha512(data_to_hash)
+
     def is_valid(self):
+        # Verify that headers were untouched in transit
+        hash_of_headers = self.get_hash_of_headers()
+        hash_in_payload = self.payload.hash_of_headers
+        if hash_of_headers != hash_in_payload:
+            logging.error("Headers have been tampered with")
+            return False
+        logging.debug("Headers have not been tampered")
         # Handle l2 credentials
         # Handle l3 credentials
         # Handle client credentials
