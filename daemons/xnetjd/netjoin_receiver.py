@@ -58,6 +58,7 @@ class NetjoinReceiver(threading.Thread):
         # Inherit the auth session from announcer to bootstrap a new session
         session = NetjoinSession(self.shutdown, auth=self.announcer.auth)
         session.daemon = True
+        session.start()
 
         # TODO: Retrieve session ID from handshake one
         self.server_sessions[session.get_ID()] = session
