@@ -69,9 +69,9 @@ class NetjoinHandshakeOne(object):
         self.handshake_one.CopyFrom(wire_handshake_one)
 
         # Record the client's public key into our auth session
-        # NOTE: THIS IS BAD, we are overwriting their_public_key in auth
-        # session shared by all incoming connections. Should we copy it?
-        self.session.auth.set_their_raw_verify_key(self.handshake_one.encrypted.client_ephemeral_pubkey)
+        # NOTE: Our auth session is a shallow copy of announcer's auth session
+        their_verify_key = self.handshake_one.encrypted.client_ephemeral_pubkey
+        self.session.auth.set_their_raw_verify_key(their_verify_key)
 
         # Decrypt payload and make it available
         encrypted_payload = self.handshake_one.encrypted.encrypted_data

@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 #
 
+import copy
 import socket
 import struct
 import logging
@@ -55,8 +56,11 @@ class NetjoinReceiver(threading.Thread):
     # First message received from client when running as access point
     def handle_handshake_one(self, message_tuple):
         logging.info("Got HandshakeOne message")
-        # Inherit the auth session from announcer to bootstrap a new session
-        session = NetjoinSession(self.shutdown, auth=self.announcer.auth)
+
+        # TODO: Avoid copying announcer's auth because that copies private key
+        # Copy the auth session from announcer to bootstrap a new session
+        authsession = copy.copy(self.announcer.auth)
+        session = NetjoinSession(self.shutdown, auth=authsession)
         session.daemon = True
         session.start()
 
