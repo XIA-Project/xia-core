@@ -61,6 +61,7 @@
 #include "minIni.h"
 #include <map>
 #include <vector>
+#include <algorithm>
 
 // defines **********************************************************
 #define ADDR_MASK  "169.254.%d.%d"   // fake addresses created in this subnet
