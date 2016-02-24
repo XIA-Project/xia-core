@@ -49,7 +49,6 @@ class NetjoinSession(threading.Thread):
 
     # Send a message out to a specific recipient
     def send_netjoin_message(self, message, interface, theirmac):
-        # TODO: May need to include interface here to help XIANetjoin
         netj_header = struct.pack("H6B", interface, theirmac[0], theirmac[1],
                 theirmac[2], theirmac[3], theirmac[4], theirmac[5])
         outgoing_packet = netj_header + message.SerializeToString()
@@ -78,6 +77,8 @@ class NetjoinSession(threading.Thread):
 
         netjoin_h1 = NetjoinHandshakeOne(self, mymac)
         netjoin_h1.from_wire_handshake_one(message.handshake_one)
+        netjoin_h1.print_handshake_one()
+        netjoin_h1.print_payload()
 
         if netjoin_h1.is_valid():
             logging.info("Accepted handshake one from client")
