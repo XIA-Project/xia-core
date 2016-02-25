@@ -8,6 +8,7 @@ import jacp_pb2
 import threading
 import nacl.utils
 import netjoin_session
+from netjoin_xiaconf import NetjoinXIAConf
 
 # Build a HandshakeOne protobuf in response to a NetDescriptor beacon
 class NetjoinHandshakeOne(object):
@@ -16,6 +17,7 @@ class NetjoinHandshakeOne(object):
         self.handshake_one = jacp_pb2.HandshakeOne()
         self.payload = jacp_pb2.HandshakeOne.HandshakeOneEncrypted.Payload()
         self.session = session
+        self.conf = NetjoinXIAConf()
 
         # Now fill in handshake_one
         h1 = self.handshake_one.encrypted
@@ -25,7 +27,8 @@ class NetjoinHandshakeOne(object):
         core = self.payload.core
         raw_mac = struct.pack("6B", mymac[0], mymac[1], mymac[2], mymac[3], mymac[4], mymac[5])
         core.client_l2_req.ethernet.client_mac_address = raw_mac
-        core.client_l3_req.xip.single.ClientHID = "HID:01234"
+        core.client_l3_req.xip.single.ClientHID = self.conf.get_raw_hid()
+        core.client_l3.req.xip.single.ClientAIPPubKey = self.conf.get_der_key()
         core.client_l3_req.xip.single.configXIP.pxhcp.SetInParent()
         core.client_credentials.null.SetInParent()
 
@@ -85,6 +88,29 @@ class NetjoinHandshakeOne(object):
         data_to_hash = h1.nonce + h1.client_ephemeral_pubkey
         return self.session.auth.sha512(data_to_hash)
 
+    def is_l2_valid(self):
+        return True
+
+    def is_l3_valid(self):
+
+        # For now we just handle XIP requests
+        #l3_req_type = self.payload.core.client_l3_req.WhichOneOf("l3_req")
+        xip_l3_req = self.payload.core.client_l3_req.xip.single
+        if not xip_l3_req:
+            logging.error("No XIP L3 request")
+            return False
+
+        # Hash the pubkey
+        pubkey_hash = conf.pem_key_hash_hex_from_der(xip_l3_req.ClientAIPPubKey)
+
+        # Make sure it matches HID
+        hex_hid = conf.raw_hid_to_hex(xip_l3_req.ClientHID)
+        if hex_hid != pubkey_hash:
+            logging.error("HID:{}, pubkey hash:{}".format(hex_hid, pubkey_hash)
+            return False
+
+        return True
+
     def is_valid(self):
         # Verify that headers were untouched in transit
         hash_of_headers = self.get_hash_of_headers()
@@ -94,7 +120,13 @@ class NetjoinHandshakeOne(object):
             return False
         logging.debug("Headers have not been tampered")
         # Handle l2 credentials
+        if not self.is_l2_valid():
+            logging.error("L2 creds invalid")
+            return False
         # Handle l3 credentials
+        if not self.is_l3_valid():
+            logging.error("L3 creds invalid")
+            return False
         # Handle client credentials
         return True
 
