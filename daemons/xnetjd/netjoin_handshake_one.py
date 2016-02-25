@@ -101,10 +101,10 @@ class NetjoinHandshakeOne(object):
             return False
 
         # Hash the pubkey
-        pubkey_hash = conf.pem_key_hash_hex_from_der(xip_l3_req.ClientAIPPubKey)
+        pubkey_hash = self.conf.pem_key_hash_hex_from_der(xip_l3_req.ClientAIPPubKey)
 
         # Make sure it matches HID
-        hex_hid = conf.raw_hid_to_hex(xip_l3_req.ClientHID)
+        hex_hid = self.conf.raw_hid_to_hex(xip_l3_req.ClientHID)
         if hex_hid != pubkey_hash:
             logging.error("HID:{}, pubkey hash:{}".format(hex_hid, pubkey_hash))
             return False
