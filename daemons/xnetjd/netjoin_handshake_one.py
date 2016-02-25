@@ -106,7 +106,7 @@ class NetjoinHandshakeOne(object):
         # Make sure it matches HID
         hex_hid = conf.raw_hid_to_hex(xip_l3_req.ClientHID)
         if hex_hid != pubkey_hash:
-            logging.error("HID:{}, pubkey hash:{}".format(hex_hid, pubkey_hash)
+            logging.error("HID:{}, pubkey hash:{}".format(hex_hid, pubkey_hash))
             return False
 
         return True
