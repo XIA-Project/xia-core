@@ -28,7 +28,7 @@ class NetjoinHandshakeOne(object):
         raw_mac = struct.pack("6B", mymac[0], mymac[1], mymac[2], mymac[3], mymac[4], mymac[5])
         core.client_l2_req.ethernet.client_mac_address = raw_mac
         core.client_l3_req.xip.single.ClientHID = self.conf.get_raw_hid()
-        core.client_l3.req.xip.single.ClientAIPPubKey = self.conf.get_der_key()
+        core.client_l3_req.xip.single.ClientAIPPubKey = self.conf.get_der_key()
         core.client_l3_req.xip.single.configXIP.pxhcp.SetInParent()
         core.client_credentials.null.SetInParent()
 
