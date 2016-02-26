@@ -9,15 +9,25 @@ import threading
 import nacl.utils
 import netjoin_session
 from netjoin_xiaconf import NetjoinXIAConf
+from netjoin_message_pb2 import SignedMessage
 
 # Build a HandshakeOne protobuf in response to a NetDescriptor beacon
 class NetjoinHandshakeOne(object):
 
-    def __init__(self, session, mymac):
+    def __init__(self, session, mymac, challenge=None):
         self.handshake_one = jacp_pb2.HandshakeOne()
         self.payload = jacp_pb2.HandshakeOne.HandshakeOneEncrypted.Payload()
         self.session = session
         self.conf = NetjoinXIAConf()
+        self.challenge = challenge
+
+        # No challenge, means AP got this handshake
+        # It will use from_handshake_one() to fill in everything
+        if not self.challenge:
+            return
+
+        # Sign the challenge
+        signed_challenge = self.conf.sign(challenge)
 
         # Now fill in handshake_one
         h1 = self.handshake_one.encrypted
@@ -30,6 +40,7 @@ class NetjoinHandshakeOne(object):
         core.client_l3_req.xip.single.ClientHID = self.conf.get_raw_hid()
         core.client_l3_req.xip.single.ClientAIPPubKey = self.conf.get_der_key()
         core.client_l3_req.xip.single.configXIP.pxhcp.SetInParent()
+        core.client_l3_req.xip.single.XIPChallengeResponse = signed_challenge
         core.client_credentials.null.SetInParent()
 
     def update_nonce(self):
@@ -109,6 +120,19 @@ class NetjoinHandshakeOne(object):
             logging.error("HID:{}, pubkey hash:{}".format(hex_hid, pubkey_hash))
             return False
 
+        # Check signature
+        challenge_response = xip_l3_req.XIPChallengeResponse
+        der_pubkey = xip_l3_req.ClientAIPPubKey
+        if not self.conf.verify(challenge_response, der_pubkey):
+            logging.error("Challenge incorrectly signed")
+            return False
+
+        # See if the message that was signed matches a recent gw_nonce
+        signed_message = SignedMessage()
+        signed_message.ParseFromString(challenge_response)
+        if not self.session.auth.is_recent_challenge(signed_message.message):
+            logging.error("Response does not match a recent challenge")
+            return False
         return True
 
     def is_valid(self):

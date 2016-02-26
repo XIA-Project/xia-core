@@ -1,3 +1,4 @@
+import collections
 import nacl.hash
 import nacl.utils
 from nacl.public import Box
@@ -18,6 +19,17 @@ class NetjoinAuthsession(object):
         # Their keys - populated by set_their_verify_key()
         self.their_verify_key = None
         self.their_public_key = None
+
+        # Challenges sent by announcer
+        self.recent_challenges = collections.deque(maxlen=20)
+
+    def is_recent_challenge(self, challenge):
+        return challenge in self.recent_challenges
+
+    # Record all recent challenges from outgoing beacons
+    def sent_challenge(self, challenge):
+        # Newest first because it is most likely to see a response
+        self.recent_challenges.appendleft(challenge)
 
     def sha512(self, data):
         return nacl.hash.sha512(data, RawEncoder)

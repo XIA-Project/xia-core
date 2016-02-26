@@ -7,3 +7,8 @@ message NetjoinMessage {
 		HandshakeOne handshake_one = 2;
 	}
 }
+
+message SignedMessage {
+	required bytes signature = 1;
+	required bytes message = 2;
+}

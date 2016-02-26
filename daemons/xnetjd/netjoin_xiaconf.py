@@ -4,7 +4,10 @@ import re
 import socket
 import hashlib
 import binascii
+from Crypto.Signature import PKCS1_v1_5
+from Crypto.Hash import SHA
 from Crypto.PublicKey import RSA
+from netjoin_message_pb2 import SignedMessage
 
 class NetjoinXIAConf(object):
     def __init__(self, hostname=socket.gethostname()):
@@ -14,6 +17,30 @@ class NetjoinXIAConf(object):
         self.conf_dir = os.path.join(self.src_dir, "etc")
         self.key_dir = os.path.join(self.src_dir, "key")
         self.addrconfpattern = re.compile('^(\w+)\s+(\w+)\s+\((.+)\)')
+
+    # Return serialized SignedMessage
+    def sign(self, message):
+        hid = self.get_hid()
+        keyfilepath = os.path.join(self.key_dir, hid)
+        key = RSA.importKey(open(keyfilepath).read())
+        h = SHA.new(message)
+        signer = PKCS1_v1_5.new(key)
+        signature = signer.sign(h)
+        signed_message = SignedMessage()
+        signed_message.signature = signature
+        signed_message.message = message
+        return signed_message.SerializeToString()
+
+    def verify(self, message, der_pubkey):
+        signed_message = SignedMessage()
+        signed_message.ParseFromString(message)
+
+        key = RSA.importKey(der_pubkey)
+        h = SHA.new(signed_message.message)
+        verifier = PKCS1_v1_5.new(key)
+        if verifier.verify(h, signed_message.signature):
+            return True
+        return False
 
     def get_der_key(self):
         hid = self.get_hid()
@@ -86,3 +113,7 @@ if __name__ == "__main__":
     print "Hash of PEM key: {}".format(conf.pem_key_hash_hex(pem_key))
     print "Hash from DER: {}".format(conf.pem_key_hash_hex_from_der(der_key))
     print "HID: {}".format(hid)
+    signed_message = conf.sign("test message")
+    if not conf.verify(signed_message, conf.get_der_key()):
+        print "FAILED"
+    print "PASSED: NetjoinXIAConf"

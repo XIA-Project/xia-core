@@ -62,8 +62,11 @@ class NetjoinSession(threading.Thread):
         gateway_raw_key = join_auth_info.gateway_ephemeral_pubkey.the_key
         self.auth.set_their_raw_verify_key(gateway_raw_key)
 
+        # Retrieve gateway_nonce as the challenge to include in l3 request
+        gw_nonce = join_auth_info.gateway_nonce
+
         # Build handshake one
-        netjoin_h1 = NetjoinHandshakeOne(self, mymac)
+        netjoin_h1 = NetjoinHandshakeOne(self, mymac, challenge=gw_nonce)
         netjoin_h1.update_nonce()
 
         outgoing_message = NetjoinMessage()

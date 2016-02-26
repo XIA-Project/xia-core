@@ -26,10 +26,12 @@ class NetjoinAnnouncer(object):
         net_descriptor = self.beacon.update_and_get_serialized_descriptor()
         beacon_message = NetjoinMessage()
         beacon_message.net_descriptor.ParseFromString(net_descriptor)
+        challenge = beacon_message.net_descriptor.ac_shared.ja.gateway_nonce
+        self.auth.sent_challenge(challenge)
         serialized_beacon_message = beacon_message.SerializeToString()
         header = struct.pack("H6B", XNETJ_BROADCAST_IFACE, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff)
 
-        #self.sockfd.sendto(next_serialized_beacon, self.xianetjoin)
+        # Send packet down to XIANetJoin in Click
         self.sockfd.sendto(header+serialized_beacon_message, self.xianetjoin)
 
         # Call ourselves from a new thread after some time
