@@ -22,7 +22,7 @@ class NetjoinHandshakeOne(object):
         self.challenge = challenge
 
         # No challenge, means AP got this handshake
-        # It will use from_handshake_one() to fill in everything
+        # It will use from_wire_handshake_one() to fill in everything
         if not self.challenge:
             return
 
@@ -73,9 +73,6 @@ class NetjoinHandshakeOne(object):
     def print_payload(self):
         print self.payload_str()
 
-    def from_handshake_one(self, handshake_one):
-        self.handshake_one.CopyFrom(handshake_one)
-
     # wire_handshake_one is actually a serialized jacp_pb2.HandshakeOne
     def from_wire_handshake_one(self, wire_handshake_one):
 
@@ -93,6 +90,10 @@ class NetjoinHandshakeOne(object):
 
         # Populate the internal payload after decrypting it
         self.payload.ParseFromString(serialized_payload)
+
+    # Used at receiver of handshake one to retrieve nonce that came over wire
+    def get_nonce(self):
+        return self.handshake_one.encrypted.nonce
 
     def get_hash_of_headers(self):
         h1 = self.handshake_one.encrypted

@@ -5,6 +5,7 @@ message NetjoinMessage {
 	oneof message_type {
 		NetDescriptor net_descriptor = 1;
 		HandshakeOne handshake_one = 2;
+		HandshakeTwo handshake_two = 3;
 	}
 }
 

@@ -12,6 +12,7 @@ from netjoin_beacon import NetjoinBeacon
 from netjoin_message_pb2 import NetjoinMessage
 from netjoin_authsession import NetjoinAuthsession
 from netjoin_handshake_one import NetjoinHandshakeOne
+from netjoin_handshake_two import NetjoinHandshakeTwo
 
 # A client session reperesenting a client joining a network
 class NetjoinSession(threading.Thread):
@@ -83,10 +84,30 @@ class NetjoinSession(threading.Thread):
         netjoin_h1.print_handshake_one()
         netjoin_h1.print_payload()
 
-        if netjoin_h1.is_valid():
-            logging.info("Accepted handshake one from client")
-        logging.info("Now send handshake two")
-        # TODO: Build and send handshake two
+        deny_h2 = False
+        if not netjoin_h1.is_valid():
+            deny_h2 = True
+            logging.info("HandshakeOne invalid, denying connection request")
+        logging.info("Accepted handshake one from client")
+        h1_nonce = netjoin_h1.get_nonce()
+        netjoin_h2 = NetjoinHandshakeTwo(self, deny=deny_h2, challenge=h1_nonce)
+
+        logging.info("Now sending handshake two")
+        outgoing_message = NetjoinMessage()
+        outgoing_message.handshake_two.CopyFrom(netjoin_h2.handshake_two)
+        self.send_netjoin_message(outgoing_message, interface, theirmac)
+
+    def handle_handshake_two(self, message_tuple):
+        message, interface, mymac, theirmac = message_tuple
+
+        netjoin_h2 = NetjoinHandshakeTwo(self)
+        netjoin_h2.from_wire_handshake_two(message.handshake_two)
+        netjoin_h2.print_handshake_two()
+        netjoin_h2.print_cyphertext()
+
+        # TODO: Ensure that our netjoin request was granted
+        # TODO: Configure Click info
+        # TODO: Setup routes to the router
 
     # Main thread handles all messages based on state of joining session
     def run(self):
@@ -109,6 +130,9 @@ class NetjoinSession(threading.Thread):
                 elif message_type == "handshake_one":
                     self.state = self.VALIDATE_HS_ONE
                     self.handle_handshake_one(message_tuple)
+                elif message_type == "handshake_two":
+                    self.state = self.PROCESS_HS_TWO
+                    self.handle_handshake_two(message_tuple)
                 else:
                     logging.error("Invalid message: {}".format(message_type))
                     break
