@@ -1668,8 +1668,6 @@ void XTRANSPORT::ProcessXcmpPacket(WritablePacket *p_in)
 	std::string p_buf;
 	xsm.SerializeToString(&p_buf);
 
-	WritablePacket *xcmp_pkt = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
-
 	list<int>::iterator i;
 
 	for (i = xcmp_listeners.begin(); i != xcmp_listeners.end(); i++) {
@@ -1738,7 +1736,7 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 	INFO("socket %d received SYN\n", sk->port);
 
 	if (sk->state != LISTEN) {
-		// we aren't marked to accept connecctions, drop it
+		// we aren't marked to accept connections, drop it
 		WARN("SYN received on a non-listening socket (port:%u), dropping...\n", sk->port);
 		return;
 	}
@@ -1839,6 +1837,9 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 		new_sk->port = 0; // just for now. This will be updated via Xaccept call
 		new_sk->sock_type = SOCK_STREAM;
 		new_sk->dst_path = src_path;
+
+		// FIXME: should we reset this to the value we created the socket with in case it has been changed
+		// on the client or enroute? May cause SCION or migrations issues if we do.
 		new_sk->src_path = dst_path;
 		new_sk->isAcceptedSocket = true;
 		new_sk->pkt = copy_packet(p, new_sk);
@@ -2040,6 +2041,7 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 		}
 	}
 
+	// FIXME: shoudl we revert to the original source dag instead of the one that came
 	const char *payload = "SYNACK-ACK";
 	SendControlPacket(TransportHeader::ACK, sk, payload, strlen(payload), src_path, dst_path);
 }
