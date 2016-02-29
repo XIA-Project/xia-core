@@ -54,7 +54,7 @@ class NetjoinSession(threading.Thread):
         outgoing_packet = netj_header + message.SerializeToString()
         self.sockfd.sendto(outgoing_packet, self.xianetjoin)
 
-    def send_handshake_one(self, message_tuple):
+    def handle_net_descriptor(self, message_tuple):
         message, interface, mymac, theirmac = message_tuple
 
         # Save access point verify key included in NetDescriptor message
@@ -105,7 +105,7 @@ class NetjoinSession(threading.Thread):
             if self.state == self.START:
                 if message_type == "net_descriptor":
                     self.state = self.SEND_HS_ONE
-                    self.send_handshake_one(message_tuple)
+                    self.handle_net_descriptor(message_tuple)
                 elif message_type == "handshake_one":
                     self.state = self.VALIDATE_HS_ONE
                     self.handle_handshake_one(message_tuple)
