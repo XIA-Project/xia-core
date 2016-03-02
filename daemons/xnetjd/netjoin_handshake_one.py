@@ -42,6 +42,10 @@ class NetjoinHandshakeOne(object):
         core.client_l3_req.xip.single.configXIP.pxhcp.SetInParent()
         core.client_l3_req.xip.single.XIPChallengeResponse = signed_challenge
         core.client_credentials.null.SetInParent()
+        core.client_session_id = session.get_ID()
+
+    def client_session_id(self):
+        return self.payload.core.client_session_id
 
     def update_nonce(self):
         h1 = self.handshake_one.encrypted
