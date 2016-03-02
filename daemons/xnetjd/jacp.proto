@@ -61,6 +61,7 @@ message HandshakeOneCore {
     optional LayerTwoRequest client_l2_req = 1;
     optional LayerThreeRequest client_l3_req = 2;
     optional ClientCredentials client_credentials = 3;
+    optional uint32 client_session_id = 4;
 }
 
 // Initiation\ \(Handshake\ Message\ 1\):1 ends here
@@ -168,12 +169,15 @@ message HandshakeTwoProtected {
     optional LayerThreeReply gateway_l3_reply = 2;
     optional ClientCredentialReply gateway_cc_reply = 3;
     optional GatewayCredentials gateway_credentials = 4;
+    optional uint32 client_session_id = 5;
+    optional uint32 gateway_session_id = 5;
 }
 
 message EncryptedData {
     optional ClientHello.CipherSuite cipher_suite = 1;
     optional bytes nonce = 2;
     required bytes cyphertext = 3;
+    required uint32 client_session_id = 4;
 }
 
 // Gateway\ Response\ \(Handshake\ Message\ 2\):1 ends here
