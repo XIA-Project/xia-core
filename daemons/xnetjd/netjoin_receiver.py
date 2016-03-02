@@ -70,6 +70,20 @@ class NetjoinReceiver(threading.Thread):
         # Pass handshake one to the corresponding session handler
         session.push(message_tuple)
 
+    def handle_handshake_two(self, message_tuple):
+        logging.info("Got HandshakeTwo message")
+
+        # Find the session this message should be delivered to
+        handshake_two = message_tuple[0].handshake_two
+        client_session_id = handshake_two.cyphertext.client_session_id
+
+        # Deliver the message
+        if not client_session_id in self.client_sessions:
+            logging.error("Session not found to deliver handshake two")
+            return
+        client_session = self.client_sessions[client_session_id]
+        client_session.push(message_tuple)
+
     # Main loop, receives incoming NetjoinMessage(s)
     def run(self):
         while not self.shutdown.is_set():
@@ -106,6 +120,9 @@ class NetjoinReceiver(threading.Thread):
 
             elif message_type == "handshake_one":
                 self.handle_handshake_one(message_tuple)
+
+            elif message_type == "handshake_two":
+                self.handle_handshake_two(message_tuple)
 
             else:
                 logging.warning("Unknown message type: {}".format(message_type))
