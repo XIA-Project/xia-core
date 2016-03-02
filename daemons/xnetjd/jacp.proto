@@ -170,7 +170,7 @@ message HandshakeTwoProtected {
     optional ClientCredentialReply gateway_cc_reply = 3;
     optional GatewayCredentials gateway_credentials = 4;
     optional uint32 client_session_id = 5;
-    optional uint32 gateway_session_id = 5;
+    optional uint32 gateway_session_id = 6;
 }
 
 message EncryptedData {
