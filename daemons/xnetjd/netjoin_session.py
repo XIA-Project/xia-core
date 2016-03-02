@@ -79,20 +79,29 @@ class NetjoinSession(threading.Thread):
     def handle_handshake_one(self, message_tuple):
         message, interface, mymac, theirmac = message_tuple
 
+        # Convert incoming protobuf to a handshake one object we can assess
         netjoin_h1 = NetjoinHandshakeOne(self, mymac)
         netjoin_h1.from_wire_handshake_one(message.handshake_one)
         netjoin_h1.print_handshake_one()
         netjoin_h1.print_payload()
 
+        # Validate incoming client joining request (handshake one)
         deny_h2 = False
         if not netjoin_h1.is_valid():
             deny_h2 = True
             logging.info("HandshakeOne invalid, denying connection request")
         logging.info("Accepted handshake one from client")
-        h1_nonce = netjoin_h1.get_nonce()
-        netjoin_h2 = NetjoinHandshakeTwo(self, deny=deny_h2, challenge=h1_nonce)
 
+        # Retrieve handshake one info to be included in handshake two
+        h1_nonce = netjoin_h1.get_nonce()
+        client_session_id = netjoin_h1.client_session_id()
+
+        # Now build a handshake two message
         logging.info("Now sending handshake two")
+        netjoin_h2 = NetjoinHandshakeTwo(self, deny=deny_h2,
+                challenge=h1_nonce, client_session=client_session_id)
+
+        # Package the handshake two into a netjoin message wrapper
         outgoing_message = NetjoinMessage()
         outgoing_message.handshake_two.CopyFrom(netjoin_h2.handshake_two)
         self.send_netjoin_message(outgoing_message, interface, theirmac)
@@ -105,7 +114,16 @@ class NetjoinSession(threading.Thread):
         netjoin_h2.print_handshake_two()
         netjoin_h2.print_cyphertext()
 
-        # TODO: Ensure that our netjoin request was granted
+        # Verify the client_session_id matches the encrypted one
+        if not netjoin_h2.valid_client_session_id():
+            logging.error("Invalid client session ID")
+            return
+
+        # Ensure that our netjoin request was granted
+        if not netjoin_h2.join_granted():
+            logging.error("Our join request was denied")
+            return
+
         # TODO: Configure Click info
         # TODO: Setup routes to the router
 
