@@ -63,19 +63,19 @@ class NetjoinHandshakeTwo(object):
         self.handshake_two.cyphertext.cyphertext = session.auth.encrypt(data_to_encrypt, challenge)
 
     def layer_two_granted(self):
-        l2_response_t = self.cyphertext.gateway_l2_reply.WhichOneOf("l2_reply")
+        l2_response_t = self.cyphertext.gateway_l2_reply.WhichOneof("l2_reply")
         if l2_response_t == "deny":
             return False
         return True
 
     def layer_three_granted(self):
-        l3_response_t = self.cyphertext.gateway_l3_reply.WhichOneOf("l3_reply")
+        l3_response_t = self.cyphertext.gateway_l3_reply.WhichOneof("l3_reply")
         if l3_response_t == "deny":
             return False
         return True
 
     def client_creds_granted(self):
-        cc_response_t = self.cyphertext.gateway_cc_reply.WhichOneOf("gateway_response")
+        cc_response_t = self.cyphertext.gateway_cc_reply.WhichOneof("gateway_response")
         if cc_response_t == "deny":
             return False
         return True
@@ -118,7 +118,7 @@ class NetjoinHandshakeTwo(object):
         self.handshake_two.CopyFrom(wire_handshake_two)
 
         # Decrypt cyphertext and make it available
-        encrypted_cyphertext = self.handshake_two.encrypted.encrypted
+        encrypted_cyphertext = self.handshake_two.cyphertext.cyphertext
         serialized_cyphertext = self.session.auth.decrypt(encrypted_cyphertext)
 
         # Populate the internal cyphertext after decrypting it
