@@ -12,7 +12,8 @@ from netjoin_xiaconf import NetjoinXIAConf
 # Build a HandshakeTwo protobuf in response to a NetDescriptor beacon
 class NetjoinHandshakeTwo(object):
 
-    def __init__(self, session, deny=False, challenge=None):
+    def __init__(self, session, deny=False, challenge=None,
+            client_session=None):
         self.session = session
         self.conf = NetjoinXIAConf()
         self.challenge = challenge
@@ -22,16 +23,25 @@ class NetjoinHandshakeTwo(object):
         suite = jacp_pb2.ClientHello.NACL_curve25519xsalsa20poly1305
         self.handshake_two.cyphertext.cipher_suite = suite
 
+        # A container for the encrypted data
+        self.cyphertext = jacp_pb2.HandshakeTwoProtected()
+
         # If a challenge was not provided, this message just came over the wire
         # Call from_wire_handshake_two to complete initialization
         if not challenge:
             return
 
+        if not client_session:
+            logging.error("Client session ID not provided during H2 creation")
+            return
+
         # A new nonce for the outgoing handshake two
         self.handshake_two.cyphertext.nonce = session.auth.get_nonce()
 
+        # Put in the plaintext client_session_id
+        self.handshake_two.cyphertext.client_session_id = client_session
+
         # The protobuf defining the encrypted message
-        self.cyphertext = jacp_pb2.HandshakeTwoProtected()
         l2_reply = self.cyphertext.gateway_l2_reply
         l3_reply = self.cyphertext.gateway_l3_reply
         cc_reply = self.cyphertext.gateway_cc_reply
@@ -45,10 +55,49 @@ class NetjoinHandshakeTwo(object):
             l3_reply.grant.XIP.single.pxhcp.SetInParent()
             cc_reply.accept.SetInParent()
         self.cyphertext.gateway_credentials.SetInParent()
+        self.cyphertext.client_session_id = client_session
+        self.cyphertext.gateway_session_id = self.session.get_ID()
 
         # Encrypt the message with nonce received in handshake one (challenge)
         data_to_encrypt = self.cyphertext.SerializeToString()
         self.handshake_two.cyphertext.cyphertext = session.auth.encrypt(data_to_encrypt, challenge)
+
+    def layer_two_granted(self):
+        l2_response_t = self.cyphertext.gateway_l2_reply.WhichOneOf("l2_reply")
+        if l2_response_t == "deny":
+            return False
+        return True
+
+    def layer_three_granted(self):
+        l3_response_t = self.cyphertext.gateway_l3_reply.WhichOneOf("l3_reply")
+        if l3_response_t == "deny":
+            return False
+        return True
+
+    def client_creds_granted(self):
+        cc_response_t = self.cyphertext.gateway_cc_reply.WhichOneOf("gateway_response")
+        if cc_response_t == "deny":
+            return False
+        return True
+
+    def join_granted(self):
+        if not self.layer_two_granted():
+            logging.info("Layer 2 request denied")
+            return False
+        elif not self.layer_three_granted():
+            logging.info("Layer 3 request denied")
+            return False
+        elif not self.client_creds_granted():
+            logging.info("Client credentials invalid")
+            return False
+        else:
+            logging.info("Valid handshake two received")
+            return True
+
+    def valid_client_session_id(self):
+        plain_client_sess_id = self.handshake_two.cyphertext.client_session_id
+        secure_client_sess_id = self.cyphertext.client_session_id
+        return plain_client_sess_id == secure_client_sess_id
 
     def handshake_two_str(self):
         return protobuf_text_format.MessageToString(self.handshake_two)
