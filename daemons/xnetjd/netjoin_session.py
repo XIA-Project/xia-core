@@ -58,6 +58,7 @@ class NetjoinSession(threading.Thread):
     def handle_net_descriptor(self, message_tuple):
         message, interface, mymac, theirmac = message_tuple
 
+        logging.info("Got a beacon from a network we want to join")
         # Save access point verify key included in NetDescriptor message
         join_auth_info = message.net_descriptor.ac_shared.ja
         gateway_raw_key = join_auth_info.gateway_ephemeral_pubkey.the_key
@@ -109,6 +110,7 @@ class NetjoinSession(threading.Thread):
     def handle_handshake_two(self, message_tuple):
         message, interface, mymac, theirmac = message_tuple
 
+        logging.info("Got a handshake two message")
         netjoin_h2 = NetjoinHandshakeTwo(self)
         netjoin_h2.from_wire_handshake_two(message.handshake_two)
         netjoin_h2.print_handshake_two()
@@ -123,6 +125,7 @@ class NetjoinSession(threading.Thread):
         if not netjoin_h2.join_granted():
             logging.error("Our join request was denied")
             return
+        logging.info("Valid handshake two: We can join this network now")
 
         # TODO: Configure Click info
         # TODO: Setup routes to the router
@@ -140,20 +143,18 @@ class NetjoinSession(threading.Thread):
             except (Queue.Empty):
                 continue
             # We got a message, determine if we are waiting for it
+            # TODO: Add states to allow retransmission and expected messages
             message_type = message.WhichOneof("message_type")
-            if self.state == self.START:
-                if message_type == "net_descriptor":
-                    self.state = self.SEND_HS_ONE
-                    self.handle_net_descriptor(message_tuple)
-                elif message_type == "handshake_one":
-                    self.state = self.VALIDATE_HS_ONE
-                    self.handle_handshake_one(message_tuple)
-                elif message_type == "handshake_two":
-                    self.state = self.PROCESS_HS_TWO
-                    self.handle_handshake_two(message_tuple)
-                else:
-                    logging.error("Invalid message: {}".format(message_type))
-                    break
+            logging.info("Got a {} message".format(message_type))
+            if message_type == "net_descriptor":
+                self.handle_net_descriptor(message_tuple)
+            elif message_type == "handshake_one":
+                self.handle_handshake_one(message_tuple)
+            elif message_type == "handshake_two":
+                self.handle_handshake_two(message_tuple)
+            else:
+                logging.error("Invalid message: {}".format(message_type))
+                break
 
         logging.debug("Shutting down session ID: {}".format(self.session_ID))
 
