@@ -20,7 +20,7 @@ class NetjoinSession(threading.Thread):
 
     def __init__(self, shutdown_event, auth=None):
         threading.Thread.__init__(self)
-        (self.START, self.SEND_HS_ONE, self.VALIDATE_HS_ONE) = range(3)
+        (self.START, self.HS_2_WAIT, self.HS_3_WAIT) = range(3)
 
         self.xianetjoin = ("127.0.0.1", 9882)
         self.beacon = NetjoinBeacon()
@@ -77,6 +77,9 @@ class NetjoinSession(threading.Thread):
         # Send handshake one
         self.send_netjoin_message(outgoing_message, interface, theirmac)
 
+        # Now we will wait for handshake two
+        self.state = self.HS_2_WAIT
+
     def handle_handshake_one(self, message_tuple):
         message, interface, mymac, theirmac = message_tuple
 
@@ -106,6 +109,9 @@ class NetjoinSession(threading.Thread):
         outgoing_message = NetjoinMessage()
         outgoing_message.handshake_two.CopyFrom(netjoin_h2.handshake_two)
         self.send_netjoin_message(outgoing_message, interface, theirmac)
+
+        # Now we will wait for handshake 3
+        self.state = self.HS_3_WAIT
 
     def handle_handshake_two(self, message_tuple):
         message, interface, mymac, theirmac = message_tuple
@@ -141,20 +147,29 @@ class NetjoinSession(threading.Thread):
                 message_tuple = self.q.get(block=True, timeout=self.q.timeout)
                 message = message_tuple[0]
             except (Queue.Empty):
+                # TODO: Retransmit last message if not in START state
                 continue
+
             # We got a message, determine if we are waiting for it
-            # TODO: Add states to allow retransmission and expected messages
             message_type = message.WhichOneof("message_type")
             logging.info("Got a {} message".format(message_type))
-            if message_type == "net_descriptor":
-                self.handle_net_descriptor(message_tuple)
-            elif message_type == "handshake_one":
-                self.handle_handshake_one(message_tuple)
-            elif message_type == "handshake_two":
-                self.handle_handshake_two(message_tuple)
-            else:
-                logging.error("Invalid message: {}".format(message_type))
-                break
+            if self.state == self.START:
+                if message_type == "net_descriptor":
+                    self.handle_net_descriptor(message_tuple)
+                elif message_type == "handshake_one":
+                    self.handle_handshake_one(message_tuple)
+                else:
+                    logging.error("Invalid message: {}".format(message_type))
+                    logging.error("Expected net_descriptor or handshake one")
+                continue
+
+            if self.state == self.HS_2_WAIT:
+                if message_type == "handshake_two":
+                    self.handle_handshake_two(message_tuple)
+                else:
+                    logging.error("Invalid message: {}".format(message_type))
+                    logging.error("Expected handshake two.")
+                continue
 
         logging.debug("Shutting down session ID: {}".format(self.session_ID))
 
