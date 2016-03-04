@@ -73,9 +73,25 @@ class NetjoinXIAConf(object):
     def raw_hid_to_hex(self, raw_hid):
         return binascii.hexlify(raw_hid)
 
-    # Read address.conf looking for HID of this host
+    def get_raw_ad(self):
+        ad_hex_str = self.get_ad()
+        return binascii.unhexlify(ad_hex_str)
+
+    def raw_ad_to_hex(self, raw_ad):
+        return binascii.hexlify(raw_ad)
+
+    def get_ad(self):
+        ad, hid = self.get_ad_hid()
+        return ad
+
     def get_hid(self):
+        ad, hid = self.get_ad_hid()
+        return hid
+
+    # Read address.conf looking for HID of this host
+    def get_ad_hid(self):
         hid = None
+        ad = None
         addrconfpath = os.path.join(self.conf_dir, "address.conf")
         with open(addrconfpath, "r") as addrconf:
             for line in addrconf:
@@ -93,7 +109,12 @@ class NetjoinXIAConf(object):
                     ad, hid = hid.split(' ')
                 break
 
-        return hid[len("HID:"):]
+        if ad:
+            ad = ad[len("AD:"):]
+
+        if hid:
+            hid = hid[len("HID:"):]
+        return (ad, hid)
 
 if __name__ == "__main__":
     conf = NetjoinXIAConf()
