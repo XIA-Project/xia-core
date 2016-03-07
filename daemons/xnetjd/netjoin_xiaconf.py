@@ -17,6 +17,7 @@ class NetjoinXIAConf(object):
         self.conf_dir = os.path.join(self.src_dir, "etc")
         self.key_dir = os.path.join(self.src_dir, "key")
         self.addrconfpattern = re.compile('^(\w+)\s+(\w+)\s+\((.+)\)')
+        self.resolvconfpattern = re.compile('nameserver=(RE.+)')
 
     # Return serialized SignedMessage
     def sign(self, message):
@@ -88,6 +89,13 @@ class NetjoinXIAConf(object):
         ad, hid = self.get_ad_hid()
         return hid
 
+    def get_router_dag(self):
+        router_dag = None
+        ad, hid = self.get_ad_hid()
+        if ad is not None and hid is not None:
+            router_dag = "RE AD:{} HID:{}".format(ad, hid)
+        return router_dag
+
     # Read address.conf looking for HID of this host
     def get_ad_hid(self):
         hid = None
@@ -115,6 +123,20 @@ class NetjoinXIAConf(object):
         if hid:
             hid = hid[len("HID:"):]
         return (ad, hid)
+
+    def get_ns_dag(self):
+        ns_dag = None
+        resolvconfpath = os.path.join(self.conf_dir, "resolv.conf")
+        with open(resolvconfpath) as resolvconf:
+            for line in resolvconf:
+                match = self.resolvconfpattern.match(line)
+                if not match:
+                    continue
+
+                ns_dag = match.group(1)
+                break
+
+        return ns_dag
 
 if __name__ == "__main__":
     conf = NetjoinXIAConf()
