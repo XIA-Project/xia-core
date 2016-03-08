@@ -52,7 +52,9 @@ class NetjoinHandshakeTwo(object):
         else:
             l2_reply.grant.ethernet.SetInParent()
             # TODO: Add XHCP beacon info in pxhcp below
-            l3_reply.grant.XIP.single.pxhcp.SetInParent()
+            xhcp_reply = l3_reply.grant.XIP.single.pxhcp
+            xhcp_reply.router_dag = self.conf.get_router_dag()
+            xhcp_reply.nameserver_dag = self.conf.get_ns_dag()
             cc_reply.accept.SetInParent()
         self.cyphertext.gateway_credentials.SetInParent()
         self.cyphertext.client_session_id = client_session
