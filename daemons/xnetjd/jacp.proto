@@ -248,7 +248,13 @@ message XIPConfiguration {
 
 // [[file:~/work/git/xia-vehicular/veh/jacp-spec.orgmk::*XIP%20Configuration][XIP\ Configuration:1]]
 
-message PXHCPConfigDeclaration { }
+message PXHCPConfigDeclaration {
+    optional string router_dag = 1;
+    optional string nameserver_dag = 2;
+    optional string router_rv_dag = 3;
+    optional string control_rv_dag = 4;
+    optional bytes router_4id = 5;
+}
 
 // XIP\ Configuration:1 ends here
 
