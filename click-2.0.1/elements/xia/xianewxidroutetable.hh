@@ -89,9 +89,27 @@ protected:
     static String list_routes_handler(Element *e, void *thunk);
   void print_packet_contents(uint8_t *packet, int len);
   int print_packet_header(click_xia *xiah);
-  void print_scion_header(SCIONCommonHeader *sch);
-    int scion_forward_packet(const struct click_xia* hdr);
-  int check_scion_info(const struct click_xia* xiah);  
+  //void print_scion_header(SCIONCommonHeader *sch);
+  uint16_t hof_get_ingress(HopOpaqueField *hof);
+  uint16_t hof_get_egress(HopOpaqueField *hof);
+  uint16_t iof_get_isd(InfoOpaqueField* iof);
+  uint32_t iof_get_timestamp(InfoOpaqueField* iof);
+  uint8_t is_on_up_path(InfoOpaqueField *currIOF);
+  bool is_last_path_of(SCIONCommonHeader *sch);
+  int print_scion_path_info(uint8_t* path, uint32_t path_len);
+  int print_scion_header(uint8_t *hdr);
+  int scion_forward_packet(const struct click_xia* xiah);
+  int handle_ingress_xovr(SCIONCommonHeader *sch);
+  int ingress_shortcut_xovr(SCIONCommonHeader *sch);
+  int ingress_peer_xovr(SCIONCommonHeader *sch);
+  int ingress_core_xovr(SCIONCommonHeader *sch);
+  int ingress_normal_forward(SCIONCommonHeader *sch);
+  int handle_egress_xovr(SCIONCommonHeader *sch);
+  int egress_shortcut_xovr(SCIONCommonHeader *sch);
+  int egress_peer_xovr(SCIONCommonHeader *sch);
+  int egress_core_xovr(SCIONCommonHeader *sch);
+  int egress_normal_forward(SCIONCommonHeader *sch);
+  int verify_of(HopOpaqueField *hof, HopOpaqueField *prev_hof, uint32_t ts);
 
 private:
 	HashTable<XID, XIARouteData*> _rts;
