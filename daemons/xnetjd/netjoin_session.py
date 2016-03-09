@@ -137,7 +137,7 @@ class NetjoinSession(threading.Thread):
         # Configure Click info
         router_dag = netjoin_h2.router_dag()
         logging.info("Router DAG is: {}".format(router_dag))
-        sockfd = c_xsocket.Xsocket(c_xsocket.SOCK_STREAM))
+        sockfd = c_xsocket.Xsocket(c_xsocket.SOCK_STREAM)
         retval = c_xsocket.XupdateDAG(sockfd, interface, router_dag, "")
         if retval != 0:
             logging.error("Failed updating DAG in XIA stack")
