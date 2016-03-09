@@ -22,17 +22,20 @@
 #include <click/args.hh> /* Args() */
 #include <click/standard/scheduleinfo.hh> /* ScheduleInfo */
 #include <click/packet.hh> /* Packet::default_headroom */
-#include <click/packet_anno.hh> /* EXTRA_LENGTH_ANNO_OFFSET */
+#include <clicknet/ether.h> /* click_ether */
 
 #include <stdint.h> /* uint*_t */
 #include <cassert> /* assert() */
 #include <unistd.h> /* pipe() */
 #include <pthread.h> /* pthread_create, pthread_cancel, etc */
 
-//
-//extern "C" {
-//    #include <arada/wave.h> /* wave lib: txWSMPacket(), etc... */
-//}
+#include <sstream>
+#include <iomanip>
+#include <string>
+
+extern "C" {
+    #include <arada/wave.h> /* wave lib: txWSMPacket(), etc... */
+}
 
 
 #include "wavedevice.hh"
@@ -42,6 +45,18 @@
 
 
 CLICK_DECLS
+
+// static members initialization
+// these guys are not declared in the header because then we'd need to include
+// wave.h in the header file and since, a linking error re. struct variable
+// named GETAvailableServiceInfo will arise. The include guards on wave.h
+// only work for code in the same compilation unit and click compiles 
+// wavedevice.cc and elements.cc (which includes all the element headers)
+// separately. It's just bad practice to declare variables in header files
+// but what can we do? We have to work with wave.h.
+static WMEApplicationRequest _wmeReq; // don't know why static but must
+static WSMRequest _wsmReq; // don't know why static but must
+
 
 enum {WAVE_PROVIDER, WAVE_USER}; // WAVE roles
 
@@ -64,14 +79,14 @@ WaveDevice::~WaveDevice(){
 int WaveDevice::configure(Vector<String> &conf, ErrorHandler *errh){
 
     String roleStr;
-    uint32_t psid = 32;
+    uint32_t psid = 5;
 	int txPower = 23;
     double dataRate = 27;
-    uint32_t  channel = 178;
+    uint32_t  channel = 172;
     int userPrio = 1;
     int expiryTime = 0;
     int bufLen = 2048;
-    unsigned headroom = Packet::default_headroom;
+    int headroom = Packet::default_headroom;
     int setTstamp = false;
 
 	int res;
@@ -190,7 +205,7 @@ int WaveDevice::initialize(ErrorHandler *errh){
 
     _pid = getpid(); // save the process ID, required by the WAVE driver
 
-    if (invokeWAVEDevice(WAVEDEVICE_LOCAL, 0 /*blockflag*/) < 0)
+    if (invokeWAVEDevice(WAVEDEVICE_LOCAL, 1 /*blockflag*/) < 0)
         return errh->error("%s, initialize(): invokeWAVEDevice(), strerror=%s",\
             declaration().c_str(), strerror(errno));
 
@@ -392,6 +407,7 @@ bool WaveDevice::run_task(Task*){
         p = input(0).pull();
 
     if (p) {
+    
         // mind the MTU
         if (p->length() > WSMP_MTU){
             errh->error("%s, run_task(): packet larger than WSM MTU (%d vs %d \
@@ -424,6 +440,7 @@ dropping", declaration().c_str(), strerror(err));
     return retval;
 }
 
+
 /**
  * Write a packet to the WAVE device.
  */
@@ -431,27 +448,35 @@ int WaveDevice::write_packet(Packet *p, ErrorHandler *errh){
 
     assert(_isWaveRegistered); // because initialize runs before
 
-    // set mac addresses
-    // TODO: set mac address
+    // set mac addresses, this is the part that assumes the received
+    // packet is an ethernet frame
+    const click_ether *ethHeader = p->ether_header();
+    // source mac
+    memcpy(&_wsmReq.srcmacaddr, &(ethHeader->ether_shost), IEEE80211_ADDR_LEN);
+    // destination mac
+    memcpy(&_wsmReq.macaddr, &(ethHeader->ether_dhost), IEEE80211_ADDR_LEN);
     
-    /*
-    EtherAddress *dst_eth = reinterpret_cast<EtherAddress *>(q->ether_header()->ether_dhost);
-
-
-    q->ether_header()
-    */
-
-
-/*
-    // set source mac address
+    std::ostringstream macAddrStream, myMacAddrStream;
     for (int i=0; i < IEEE80211_ADDR_LEN; i++){
-        const uint8_t macByte = myMacAddr[i];
-        _wsmReq.srcmacaddr[i] = macByte;
+
+        uint8_t macByte = _wsmReq.macaddr[i];
+        macAddrStream << std::hex << std::setfill('0') << std::setw(2) << \
+            static_cast<unsigned short>(macByte);
+            
+        macByte = _wsmReq.srcmacaddr[i];
+        myMacAddrStream << std::hex << std::setfill('0') << std::setw(2) << \
+            static_cast<unsigned short>(macByte);
+
+
+        if (i < (IEEE80211_ADDR_LEN-1)){
+            macAddrStream << ":";
+            myMacAddrStream << ":";
+        }
     }
-*/
-
-    // set destination mac address
-
+    
+    std::string fromMacStr = myMacAddrStream.str();
+    std::string toMacStr = macAddrStream.str();
+    click_chatter("Sending WSM from %s to %s", fromMacStr.c_str(), toMacStr.c_str());
 
 
     // set content
@@ -522,6 +547,23 @@ void* WaveDevice::receiver_thread(void *arg){
     while (1){
 
         if ((len = rxWSMPacket(pid, &rxPkt)) > 0){ // got a packet, yay
+        
+
+        std::ostringstream macAddrStream;
+    for (int i=0; i < IEEE80211_ADDR_LEN; i++){
+
+        const uint8_t macByte = rxPkt.macaddr[i];
+        macAddrStream << std::hex << std::setfill('0') << std::setw(2) << \
+            static_cast<unsigned short>(macByte);
+            
+        if (i < (IEEE80211_ADDR_LEN-1)){
+            macAddrStream << ":";
+        }
+    }
+    
+        std::string macStr = macAddrStream.str();
+        click_chatter("Rx %d byte WSM from %s", len, macStr.c_str());
+
 
             assert(len <= bufLen);
 

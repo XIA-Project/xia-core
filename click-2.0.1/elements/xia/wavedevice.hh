@@ -31,9 +31,6 @@
 #include <pthread.h> /* pthread_mutex_t */
 #include <unistd.h> /* pid_t */
 
-extern "C" {
-    #include <arada/wave.h> /* wave lib: txWSMPacket(), etc... */
-}
 
 CLICK_DECLS
 
@@ -147,8 +144,6 @@ private:
 
     static void* receiver_thread(void *arg);
 
-    static WMEApplicationRequest _wmeReq; // don't know why static but must
-    static WSMRequest _wsmReq; // don't know why static but must
     int _role;
     int _txPower;
     double _dataRate;

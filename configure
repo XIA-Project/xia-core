@@ -37,10 +37,10 @@ MIPSLIBDIR=\$(MIPSHOMEDIR)/usr/lib/
 
 CC=mips-linux-g++
 LD=mips-linux-g++
-CFLAGS=-Wall -Wextra -march=24kc -fomit-frame-pointer -fPIC -pipe -fno-caller-saves -I\$(XINC) -I\$(MIPSINCDIR) -I\$(MIPSPYINCDIR)
+CFLAGS=-Wall -Wextra -Wno-strict-aliasing -Wno-unused-parameter -march=24kc -fomit-frame-pointer -fPIC -pipe -fno-caller-saves -I\$(XINC) -I\$(MIPSINCDIR) -I\$(MIPSPYINCDIR)
 CXXFLAGS=\$(CFLAGS)
 
-LDFLAGS=-I\$(MIPSLIBDIR) -lpthread
+LDFLAGS=-L\$(MIPSLIBDIR) -lpthread
 
 ifeq (\$(wildcard \$(XLIB)/libXsocket.a),)
 	LIBS=\$(XLIB)/libXsocket.so \$(XLIB)/libdagaddr.so \$(XLIB)/libXssl.so
