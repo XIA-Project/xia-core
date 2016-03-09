@@ -29,6 +29,8 @@ map<string, string> HIDtoAD;
 map<string, double> HIDtoTimestamp;
 map<string, double>::iterator HIDtoTimestampIterator;
 
+int get_scion_path(SCIONAddr *dst, uint8_t* path);
+
 void help(const char *name)
 {
 	printf("\nusage: %s [-l level] [-v] [-d SID -c SID][-h hostname]\n", name);
@@ -253,6 +255,82 @@ void print_ext_header(click_xia_ext *hdr)
   syslog(LOG_INFO, " nxt:%d", hdr->nxt);
 }
 
+int dump_contents(uint8_t* buf, uint32_t len){
+  uint32_t i = 0;
+  printf("dump contents:\n");
+  while(i < len){
+    printf("%x ", buf[i]);
+    i++;
+  }
+  printf("\n");
+  return 0;
+}
+
+uint16_t hof_get_ingress(HopOpaqueField *hof){
+  return ((uint16_t)hof->ingress_egress[0]) << 4 | ((uint16_t)hof->ingress_egress[1] & 0xf0) >> 4;
+}
+
+uint16_t hof_get_egress(HopOpaqueField *hof){
+  return ((uint16_t)hof->ingress_egress[1] & 0xf) << 8 | ((uint16_t)hof->ingress_egress[2]);
+}
+
+uint32_t iof_get_timestamp(InfoOpaqueField* iof){
+  //unimplemented
+  return 0;
+}
+
+uint16_t iof_get_isd(InfoOpaqueField* iof){
+  return (uint16_t)iof->isd_id[0] << 8 | iof->isd_id[1]; 
+}
+
+int print_scion_path_info(uint8_t* path, uint32_t path_len){
+  InfoOpaqueField *iof = (InfoOpaqueField *)path;
+  printf("Print scion path info, path length %d bytes:\n", path_len);
+  printf("InfoOpaqueField:\n");
+  printf("info %x\n", iof->info >> 1);
+  printf("flag %x\n", iof->info & 0x1);
+
+  dump_contents((uint8_t*)iof, 8);
+  printf("info %#x, flag %d, timestamp %d, isd-id %d, hops %d\n", iof->info >> 1, iof->info & 0x1, iof_get_timestamp(iof), iof_get_isd(iof), iof->hops);
+
+  for(int i = 0; i < 2; i++){
+      HopOpaqueField *hof = (HopOpaqueField *)((uint8_t *)path + sizeof(InfoOpaqueField) + i * sizeof(HopOpaqueField));
+      dump_contents((uint8_t*)hof, sizeof(HopOpaqueField));
+      printf("Ingress %d, Egress %d\n", hof_get_ingress(hof), hof_get_egress(hof));
+  }
+  return 0;
+}
+
+int print_scion_header(uint8_t *hdr, uint16_t hdr_len){
+    SCIONCommonHeader *sch = (SCIONCommonHeader *)hdr;
+    HopOpaqueField *hof;
+    //HopOpaqueField *prev_hof;
+    InfoOpaqueField *iof;
+    printf("print scion common header:");
+    dump_contents(hdr, (uint32_t)hdr_len);
+
+    printf("versionAddrs : %d\n", ntohs(sch->versionSrcDst));
+    printf("totalLen: %d\n", ntohs(sch->totalLen));
+    printf("currentIOF: %d\n", sch->currentIOF);
+    printf("currentOF: %d\n", sch->currentOF);
+    printf("nextHeader: %d\n", sch->nextHeader);
+    printf("headerLen: %d\n", sch->headerLen);
+    
+    iof = (InfoOpaqueField *)((unsigned char *)sch + sch->currentIOF);
+    dump_contents((uint8_t*)iof, 8);
+    printf("info %#x, flag %d, timestamp %d, isd-id %d, hops %d\n", iof->info >> 1, iof->info & 0x1, iof_get_timestamp(iof), iof_get_isd(iof), iof->hops);
+
+    for(int i = 0; i < 2; i++){
+      hof = (HopOpaqueField *)((unsigned char *)sch + sch->currentIOF + sizeof(InfoOpaqueField) + i * sizeof(HopOpaqueField));
+      dump_contents((uint8_t*)hof, sizeof(HopOpaqueField));
+      printf("Ingress %d, Egress %d\n", hof_get_ingress(hof), hof_get_egress(hof));
+      //DEBUG("ingress_egress_if %#x, %#x, Ingress %d, Egress %d\n", hof->ingress_egress_if, ntohl(hof->ingress_egress_if), INGRESS_IF(hof), EGRESS_IF(hof));
+    }
+    
+    return 0;
+}
+
+
 #ifdef SCION_PACKET
 
 int my_isd = 0; // ISD ID of this router
@@ -270,34 +348,20 @@ uint32_t interface_ip[MAX_DPDK_PORT]; // current router IP address (TODO: IPv6)
 #define EGRESS_IF(HOF) ((ntohl((HOF)->ingress_egress_if) >> 8) & 0x000fff)
 #define IN_EGRESS_IF(EN, IN) (((IN)&0x000fff) | (((EN)<<12)&0xfff000))
 
-
-
 void build_addr_hdr(SCIONCommonHeader *sch, SCIONAddr *src, SCIONAddr *dst)
 {
-  int src_len = 16;
-  int dst_len = 16;
-  int pad = (SCION_ADDR_PAD - ((src_len + dst_len) % 8)) % 8;
+  int src_len = 4;
+  int dst_len = 4;
+  //int pad = (SCION_ADDR_PAD - ((src_len + dst_len) % 8)) % 8;
   uint8_t *ptr = (uint8_t *)sch + sizeof(*sch);
   *(uint32_t *)ptr = htonl(src->isd_ad);
-  ptr += 4;
-  //memcpy(ptr, src->host_addr, src_len);
-  ptr += src_len;
+  ptr += SCION_ISD_AD_LEN;
+  ptr += src->host.addrLen;
   *(uint32_t *)ptr = htonl(dst->isd_ad);
-  ptr += 4;
-  //memcpy(ptr, dst->host_addr, dst_len);
-  sch->headerLen += src_len + dst_len + 8 + pad;
+  ptr += SCION_ISD_AD_LEN;
+  ptr += dst->host.addrLen;
+  sch->headerLen += src_len + dst_len;
   sch->totalLen = htons(sch->headerLen);
-}
-
-//get the scion path through SCION endhost daemon
-// * create a connection to the SCION endhost daemon
-// * send the path request
-// * save the path info in path
-// return - path size
-uint32_t get_scion_path(SCIONAddr *src, SCIONAddr *dst, uint8_t* path)
-{
- 
-  return 0;
 }
 
 void build_cmn_hdr(SCIONCommonHeader *sch, int src_type, int dst_type, int next_hdr)
@@ -315,12 +379,11 @@ void build_cmn_hdr(SCIONCommonHeader *sch, int src_type, int dst_type, int next_
 }
 
 size_t add_scion_header(SCIONCommonHeader* sch, uint8_t* payload, uint16_t payload_len) {
-  uint8_t *ptr;
-  uint8_t path_length;
-  uint8_t header_length;
+  uint8_t path_length = 0;
+  uint8_t header_length = 0;
   SCIONAddr src_addr, dst_addr;
-  uint8_t path_data[RV_MAX_DATA_PACKET_SIZE];
-  
+  uint8_t *start = (uint8_t*)sch;
+
   //data packet uses IPV4 although XIA-SCION does not use it at all.
   //it is used to distinglish data or control packet
   build_cmn_hdr(sch, ADDR_IPV4_TYPE, ADDR_IPV4_TYPE, L4_UDP);  
@@ -328,69 +391,37 @@ size_t add_scion_header(SCIONCommonHeader* sch, uint8_t* payload, uint16_t paylo
   //Fill in SCION addresses - 
   // we need to isd and ad information for routing.
   // but we do not need the address info
-  src_addr.isd_ad = ISD_AD(my_isd, my_ad);
-  //*(uint32_t *)(src_addr.host_addr) = interface_ip[0];
-  dst_addr.isd_ad = ISD_AD(neighbor_isd, neighbor_ad);
-  //*(uint32_t *)(dst_addr.host_addr) = interface_ip[0];
+  src_addr.isd_ad = ISD_AD(1, 12);
+  dst_addr.isd_ad = ISD_AD(1, 13);
+  src_addr.host.addrLen = 4;
+  dst_addr.host.addrLen = 4;
   build_addr_hdr(sch, &src_addr, &dst_addr);
   
-  uint32_t path_size = get_scion_path(&src_addr, &dst_addr, path_data);
+  uint8_t srcLen = SCION_ISD_AD_LEN + src_addr.host.addrLen;
+  uint8_t dstLen = SCION_ISD_AD_LEN + dst_addr.host.addrLen;
+
+  sch->currentIOF = sizeof(SCIONCommonHeader) + srcLen + dstLen;
+  sch->currentOF = sch->currentIOF + sizeof(InfoOpaqueField);
   
-  /* construct path info */
-  //path information - gateway should call path server to get the path info
-  InfoOpaqueField up_inf = {IOF_CORE, htonl(1111), htons(1), 2};
-  HopOpaqueField up_hops = {HOP_NORMAL_OF, 111, IN_EGRESS_IF(12, 45), htonl(0x010203)};
-  HopOpaqueField up_hops_next = {HOP_NORMAL_OF, 111, IN_EGRESS_IF(78, 98), htonl(0x010203)};
-  InfoOpaqueField core_inf = {IOF_CORE, htonl(2222), htons(1), 2};
-  HopOpaqueField core_hops = {HOP_NORMAL_OF, 111, htonl(IN_EGRESS_IF(11, 22)), htonl(0x010203)};
-  HopOpaqueField core_hops_next = {HOP_NORMAL_OF, 111, htonl(IN_EGRESS_IF(33, 44)), htonl(0x010203)};
-  InfoOpaqueField dw_inf = {IOF_CORE, htonl(3333), htons(1), 2};
-  HopOpaqueField dw_hops = {HOP_NORMAL_OF, 111, htonl(IN_EGRESS_IF(12, 45)), htonl(0x010203)};
-  HopOpaqueField dw_hops_next = {HOP_NORMAL_OF, 111, htonl(IN_EGRESS_IF(78, 78)), htonl(0x010203)};  
+  path_length = get_scion_path(&dst_addr, (uint8_t*)sch + sch->currentIOF);
 
+  uint8_t *hof = start + sch->currentOF;
 
-  ptr = (uint8_t *)sch + sizeof(SCIONCommonHeader) + sizeof(SCIONAddr) + sizeof(SCIONAddr);
+  if (*hof == XOVR_POINT){
+     syslog(LOG_INFO, "hof is XOVR_POINT");
+     ((SCIONCommonHeader *)(start))->currentOF += 8;
+  }
 
-  sch->currentOF = sizeof(SCIONCommonHeader) + sizeof(SCIONAddr) + sizeof(SCIONAddr) + sizeof(up_inf);
-  
-  syslog(LOG_INFO, "scion currentOF is %d", sch->currentOF);
+  header_length = sizeof(SCIONCommonHeader) + srcLen + dstLen + path_length;
 
-  size_t offset = 0;
-  //add path info to SCION header
-  memcpy(ptr, (void*)&up_inf, sizeof(up_inf));
-  offset += sizeof(up_inf);
-  memcpy(ptr + offset, (void*)&up_hops, sizeof(up_hops));
-  offset += sizeof(up_hops);
-  memcpy(ptr + offset, (void*)&up_hops_next, sizeof(up_hops_next));
-  offset += sizeof(up_hops_next);
-  memcpy(ptr + offset, (void*)&core_inf, sizeof(core_inf));
-  offset += sizeof(core_inf);
-  memcpy(ptr + offset, (void*)&core_hops, sizeof(core_hops));
-  offset += sizeof(core_hops);
-  memcpy(ptr + offset, (void*)&core_hops_next, sizeof(core_hops_next));
-  offset += sizeof(core_hops_next);
-  memcpy(ptr + offset, (void*)&dw_inf, sizeof(dw_inf));
-  offset += sizeof(dw_inf);
-  memcpy(ptr + offset, (void*)&dw_hops, sizeof(dw_hops));
-  offset += sizeof(dw_hops);
-  memcpy(ptr + offset, (void*)&dw_hops_next, sizeof(dw_hops_next));
-  offset += sizeof(dw_hops_next);
-  ptr += offset;
-  path_length = offset;
-  *(size_t *)ptr = htons(path_length); /*path length*/
-  path_length += 4;
-
-  header_length = sizeof(SCIONCommonHeader) +
-    sizeof(SCIONAddr) + sizeof(SCIONAddr) + path_length;
   sch->headerLen = header_length;
 
-  printf("path length is %d bytes\n", (int)path_length);
+  syslog(LOG_INFO, "path length is %d bytes\n", (int)path_length);
   
   memcpy(((uint8_t*)sch +  header_length), payload, payload_len);
 
   sch->totalLen = htons(header_length + payload_len);
-  
-    
+      
   syslog(LOG_INFO, "after modification scion currentOF is %d", sch->currentOF);
 
   return header_length;
@@ -510,16 +541,6 @@ void add_scion_info_before_xtransport_hdr(click_xia *xiah, int xia_hdr_len)
 }
 
 
-//
-//add scion header as xia extension header
-//
-void add_scion_info_in_scion_sid(click_xia *xiah, int xia_hdr_len)
-{
-  uint8_t* scion_sid = xiah->node[0].xid.id;
-  scion_sid[0] = 0; // 0: router 0; 1: router 1
-  return; 
-}
-
 #endif
 
 void process_data(int datasock)
@@ -552,7 +573,6 @@ void process_data(int datasock)
         //add_scion_info(xiah, xia_header_size);  //add scion hdr after all headers
 	add_scion_info_before_xtransport_hdr(xiah, xia_header_size);
 #if 1
-        //add_scion_info_in_scion_sid(xiah, xia_header_size); // for debugging
 	xiah->node[0].xid.type = htonl(CLICK_XIA_XID_TYPE_SCIONID);
 	syslog(LOG_INFO, "gateway: change type to SCION");
 #endif
@@ -561,9 +581,9 @@ void process_data(int datasock)
 	syslog(LOG_INFO, "gateway: Updated AD and last pointer in header");
 	print_packet_header(xiah);
 
-  click_xia_ext *eh = reinterpret_cast<struct click_xia_ext *>(packet+xia_header_size);
-  print_ext_header(eh);
-  print_ext_header((click_xia_ext*)((char*)eh + eh->hlen));
+        click_xia_ext *eh = reinterpret_cast<struct click_xia_ext *>(packet+xia_header_size);
+        print_ext_header(eh);
+        print_ext_header((click_xia_ext*)((char*)eh + eh->hlen));
 
   // we need to fix the magic number issue here. 
   // is the scion header size vbariable or is it fixed now?
@@ -686,6 +706,59 @@ void process_control_message(int controlsock)
 //	syslog(LOG_INFO, "======= SCION HEADER ========");
 //}
 
+#define SCIOND_API_HOST "127.255.255.254"
+#define SCIOND_API_PORT 3333
+
+/*
+ *
+ * query SCION Daemon to get path information
+ *
+ */
+int get_scion_path(SCIONAddr *dst, uint8_t* path){
+    int sockfd;
+    struct sockaddr_in serv_addr;
+    struct sockaddr_in addr;
+    int addrlen = sizeof(addr);
+    int buflen = (MAX_PATH_LEN + 15)*MAX_TOTAL_PATHS;
+    uint8_t buf[buflen];
+    int recvlen;
+
+    memset(buf, 0, buflen);
+
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0){ 
+        printf("ERROR opening socket\n");
+        return -1;
+    }
+
+    serv_addr.sin_addr.s_addr = INADDR_ANY;//inet_addr(SCIOND_API_HOST);
+    serv_addr.sin_family = AF_INET;
+    bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
+
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = inet_addr(SCIOND_API_HOST);
+    addr.sin_port = htons(SCIOND_API_PORT);
+
+    uint32_t isd = 1;
+    uint32_t ad = 13;
+    *(uint32_t *)(buf + 1) = htonl(ISD_AD(isd, ad));
+    //*(uint32_t *)(buf + 1) = htonl(dst->isd_ad);
+    sendto(sockfd, buf, 5, 0, (struct sockaddr*)&addr, addrlen);
+    
+    memset(buf, 0, buflen);
+    recvlen = recvfrom(sockfd, buf, buflen, 0, NULL, NULL);
+
+    if(recvlen > 0){
+      printf("%d bytes response from daemon\n", recvlen);
+      int path_len = *buf * 8;
+      printf("path length is %d bytes\n", path_len); 
+      print_scion_path_info(buf + 1, path_len);
+      memcpy(path, buf + 1, path_len);
+      return path_len;
+    }
+
+    return -1;
+}
 
 int main(int argc, char *argv[]) {
 	// Parse command-line arguments
