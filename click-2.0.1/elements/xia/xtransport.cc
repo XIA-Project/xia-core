@@ -1139,8 +1139,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 	XIAHeader xiah(p_in->xia_header());
 	int nxt = xiah.nxt();
 
-	TransportHeader thdr(p_in);
-
 	// the SCION header is only used for routing and doesn't
 	// contain any useful information for the transport code
 	// at this time. It will always be the next header after
@@ -1159,6 +1157,8 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 		ProcessXcmpPacket(p_in);
 		return;
 	}
+
+	TransportHeader thdr(p_in);
 
 	switch(thdr.type()) {
 		case TransportHeader::XSOCK_STREAM:
