@@ -8,6 +8,7 @@ import logging
 import ndap_pb2
 import threading
 import Queue
+import c_xsocket
 from netjoin_beacon import NetjoinBeacon
 from netjoin_message_pb2 import NetjoinMessage
 from netjoin_authsession import NetjoinAuthsession
@@ -133,7 +134,14 @@ class NetjoinSession(threading.Thread):
             return
         logging.info("Valid handshake two: We can join this network now")
 
-        # TODO: Configure Click info
+        # Configure Click info
+        router_dag = netjoin_h2.router_dag()
+        logging.info("Router DAG is: {}".format(router_dag))
+        sockfd = c_xsocket.Xsocket(c_xsocket.SOCK_STREAM))
+        retval = c_xsocket.XupdateDAG(sockfd, interface, router_dag, "")
+        if retval != 0:
+            logging.error("Failed updating DAG in XIA stack")
+        logging.info("Local DAG updated")
         # TODO: Setup routes to the router
 
     # Main thread handles all messages based on state of joining session
