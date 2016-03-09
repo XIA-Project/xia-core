@@ -66,9 +66,9 @@ int Xgethostname(char *name, size_t len)
         xia::X_GetHostName_Msg *msg = xsm1.mutable_x_gethostname();
 		std::string hostname = msg->hostname();
 		if(len < hostname.length()) {
-			LOGF("Hostname truncated: actual: %d, returned %d\n", hostname.length(), len);
+			LOGF("Hostname truncated: actual: %d, returned %d\n", (int)hostname.length(), (int)len);
 		}
-		strncpy(name, hostname, len);
+		strncpy(name, hostname.c_str(), len);
         rc = 0;
     } else {
         LOG("Xgethostname: ERROR: Invalid response for XGETHOSTNAME request");
