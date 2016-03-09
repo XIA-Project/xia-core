@@ -5,11 +5,16 @@ import sys
 import logging
 import argparse
 import threading
+
+# Put XIA API in path
+from netjoin_xiaconf import NetjoinXIAConf
+conf = NetjoinXIAConf()
+sys.path.append(conf.get_swig_path())
+
 from netjoin_policy import NetjoinPolicy
 from netjoin_receiver import NetjoinReceiver
 from netjoin_announcer import NetjoinAnnouncer
 from netjoin_authsession import NetjoinAuthsession
-from netjoin_xiaconf import NetjoinXIAConf
 
 # Setup logging for this application
 logging.basicConfig(level=logging.INFO, format='%(asctime)s: %(module)s %(levelname)s: %(message)s')
@@ -29,10 +34,6 @@ def parse_args():
 
 # Parse arguments and launch necessary threads
 def main():
-
-    # Add swig wrapper for XIA API in path
-    conf = NetjoinXIAConf()
-    sys.path.append(conf.get_swig_path())
 
     # Parse user provided arguments
     args = parse_args()
