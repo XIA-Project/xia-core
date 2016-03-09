@@ -135,10 +135,11 @@ class NetjoinSession(threading.Thread):
         logging.info("Valid handshake two: We can join this network now")
 
         # Configure Click info
-        router_dag = netjoin_h2.router_dag()
+        router_dag = str(netjoin_h2.router_dag())
+        router_4id = ""
         logging.info("Router DAG is: {}".format(router_dag))
         sockfd = c_xsocket.Xsocket(c_xsocket.SOCK_STREAM)
-        retval = c_xsocket.XupdateDAG(sockfd, interface, router_dag, "")
+        retval = c_xsocket.XupdateDAG(sockfd, interface, router_dag, router_4id)
         if retval != 0:
             logging.error("Failed updating DAG in XIA stack")
         logging.info("Local DAG updated")
