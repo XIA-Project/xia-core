@@ -10,7 +10,7 @@
 
 ### 1.1 checkout xia-scion-yanlin branch.
    
-`git checkout xia-scion-yanlin` (Yanlin is still asking ETH folks to help create this branch. Please checkou the main branch, and then ask Yanlin for the topology configure file SCIONXIA.topo) 
+`git checkout xia-scion-yanlin` (Yanlin is still asking ETH folks to help create this branch. Please checkout the main branch, and then copy the SCIONXIA.topo from xia branch to scion/topology) 
 
 Please note the main change we made to SCION source code are (1) we added a new topology configuration file (topology/SCIONXIA.topo), (2) we added more debugging messages.
 
