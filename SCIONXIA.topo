@@ -1,0 +1,37 @@
+--- # Default topology
+defaults:
+  zookeepers:
+    1:
+      manage: false
+      addr: 127.0.0.1
+ASes:
+  1-12:
+    path_servers: 1
+    cert_issuer: 1-13
+    certificate_servers: 3
+  1-11:
+    core: true
+    zookeepers:
+      1:
+        manage: true
+        clientPort: 4000
+        leaderPort: 4001
+        electionPort: 4002
+      2:
+        manage: true
+        clientPort: 4003
+        leaderPort: 4004
+        electionPort: 4005
+      3:
+        manage: true
+        clientPort: 4006
+        leaderPort: 4007
+        electionPort: 4008
+  1-13:
+    core: true
+    beacon_servers: 2
+    certificate_servers: 3
+    dns_servers: 2
+links:
+  - {a: 1-11, b: 1-12, ltype: ROUTING}
+  - {a: 1-12, b: 1-13, ltype: ROUTING}
