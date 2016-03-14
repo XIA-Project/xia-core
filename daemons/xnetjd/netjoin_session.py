@@ -143,7 +143,6 @@ class NetjoinSession(threading.Thread):
         if retval != 0:
             logging.error("Failed updating DAG in XIA stack")
         logging.info("Local DAG updated")
-        # TODO: Setup routes to the router
 
     # Main thread handles all messages based on state of joining session
     def run(self):
