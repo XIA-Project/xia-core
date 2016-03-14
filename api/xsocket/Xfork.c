@@ -43,6 +43,7 @@ static int makeList(bool increment)
 	xia::X_Fork_Msg *fm = xsm.mutable_x_fork();
 
 	socketmap->lock();
+	LOGF("XFORK: count = %d\n", sockets->size());
 
 	for (it = sockets->begin(); it != sockets->end(); it++) {
 		int sock = it->first;
@@ -55,7 +56,7 @@ static int makeList(bool increment)
 		fm->add_ports(sin.sin_port);
 		count++;
 
-		LOGF("adding socket: %d port%d", sock, sin.sin_port);
+		LOGF("adding socket:%d port:%d", sock, sin.sin_port);
 	}
 	socketmap->unlock();
 
@@ -63,6 +64,7 @@ static int makeList(bool increment)
 		fm->set_increment(increment);
 		fm->set_count(count);
 
+LOG("making an api socket");
 		sock = MakeApiSocket(SOCK_DGRAM);
 
 		LOG("sending socket list to click");

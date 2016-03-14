@@ -46,7 +46,8 @@ while getopts "o:h:tivwxd" opt; do
 			export XSOCKCONF_SECTION=$OPTARG
 			;;
 		o)
-			export XWRAP_LOGFILE=$OPTARG
+			LOGFILE=$OPTARG
+			# export XWRAP_LOGFILE=$OPTARG
 			;;
 		v)
 			export XWRAP_VERBOSE=1
@@ -79,4 +80,8 @@ XLIB=$XIADIR/api/lib
 export LD_PRELOAD="$XLIB/xwrap.so $XLIB/libXsocket.so $XLIB/libdagaddr.so"
 
 # ececute command
-$@
+if [ "$LOGFILE" == "" ]; then
+	$@
+else
+	$@ 2>&1 | tee -a $LOGFILE
+fi

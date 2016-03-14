@@ -73,6 +73,9 @@ extern poll_t _f_poll;
 extern sendto_t _f_sendto;
 extern recvfrom_t _f_recvfrom;
 extern fork_t _f_fork;
+
+extern size_t api_mtu();
+
 }
 
 #endif

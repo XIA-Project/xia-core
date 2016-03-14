@@ -105,7 +105,7 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 				struct sockaddr_in sin;
 				socklen_t slen = sizeof(sin);
 				(_f_getsockname)(ufds[i].fd, (struct sockaddr*)&sin, &slen);
-				//printf("sock %d, port %d, flags %x\n", ufds[i].fd, ntohs(sin.sin_port), ufds[i].events);
+				// LOGF("XSocket! sock %d, port %d, flags %x\n", ufds[i].fd, ntohs(sin.sin_port), ufds[i].events);
 
 				pfd->set_port(sin.sin_port);
 				s2p[i].fd = ufds[i].fd;

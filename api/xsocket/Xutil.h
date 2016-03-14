@@ -100,6 +100,7 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags, sockaddr_x *addr, 
 extern "C" {
 const char *xferFlags(size_t f);
 const char *fcntlFlags(size_t f);
+const char *fcntlCmd(int c);
 const char *aiFlags(size_t f);
 const char *pollFlags(size_t f);
 const char *afValue(size_t f);

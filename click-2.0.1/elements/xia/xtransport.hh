@@ -14,7 +14,6 @@
 #include "xiaxidroutetable.hh"
 #include <clicknet/udp.h>
 #include <click/string.hh>
-#include <elements/ipsec/sha1_impl.hh>
 #include <click/xiatransportheader.hh>
 #include <click/error.hh>
 #include <click/error-syslog.hh>
@@ -64,8 +63,6 @@ using namespace std;
 #define WAITING_FOR_CHUNK 0x00000002
 #define READY_TO_READ	  0x00000004
 #define INVALID_HASH	  0x00000008
-
-#define HASH_KEYSIZE 20
 
 #define API_PORT	 0
 #define BAD_PORT	 1  // FIXME why do we still have this?
@@ -254,6 +251,9 @@ protected:
 	// list of ports wanting xcmp notifications
 	list<int> xcmp_listeners;
 
+	// list of ports waiting for a notification
+	list <int> notify_listeners;
+
 	// outstanding poll/selects indexed by API port #
 	HashTable<unsigned short, PollEvent> poll_events;
 
@@ -337,6 +337,8 @@ protected:
 	void Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xupdaterv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 	void Xfork(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xreplay(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xnotify(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
 
 	// protocol handlers
 	void ProcessDatagramPacket(WritablePacket *p_in);

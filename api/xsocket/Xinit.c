@@ -55,26 +55,30 @@ sendto_t _f_sendto;
 recvfrom_t _f_recvfrom;
 fork_t _f_fork;
 
-size_t mtu_api;
+size_t mtu_internal = 0;
 size_t mtu_wire = 1500;
 
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 
 
-static size_t mtu()
+size_t api_mtu()
 {
-	struct ifreq ifr;
+	if (mtu_internal == 0) {
+		struct ifreq ifr;
 
-	int sock = (_f_socket)(AF_INET, SOCK_DGRAM, 0);
+		int sock = (_f_socket)(AF_INET, SOCK_DGRAM, 0);
 
-	strncpy(ifr.ifr_name, "lo", IFNAMSIZ - 1);
-	ifr.ifr_addr.sa_family = AF_INET;
-	ioctl(sock, SIOCGIFMTU, &ifr);
-	(_f_close)(sock);
+		strncpy(ifr.ifr_name, "lo", IFNAMSIZ - 1);
+		ifr.ifr_addr.sa_family = AF_INET;
+		ioctl(sock, SIOCGIFMTU, &ifr);
+		(_f_close)(sock);
 
-	//LOGF("API MTU = %d\n", ifr.ifr_mtu);
-	return ifr.ifr_mtu;
+		mtu_internal = ifr.ifr_mtu;
+		// LOGF("API MTU = %d\n", ifr.ifr_mtu);
+	}
+
+	return mtu_internal;
 }
 
 
@@ -113,8 +117,11 @@ void __attribute__ ((constructor)) api_init()
 	if(!(_f_fork = (fork_t)dlsym(handle, "fork")))
 		printf("can't find fork!\n");
 
-    mtu_api = mtu();
+    api_mtu();
     get_conf();
+
+    // force creation of the socket map
+	SocketMap::getMap();
 }
 
 // Run at library unload time to close sockets left open by the app
@@ -127,7 +134,6 @@ void __attribute__ ((destructor)) api_destruct(void)
 	SMap::iterator it;
 
 	for (it = sockets->begin(); it != sockets->end(); it++) {
-		LOGF("closing %d", it->first);
 		Xclose(it->first);
 	}
 }

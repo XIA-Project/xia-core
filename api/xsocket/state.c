@@ -151,10 +151,12 @@ SocketMap *SocketMap::getMap()
 
 void SocketMap::add(int sock, int tt, unsigned short port)
 {
-	SocketMap *state = getMap();
 	pthread_rwlock_wrlock(&rwlock);
-	if (state->sockets[sock] == 0)
+	SocketMap *state = getMap();
+
+	if (state->sockets.count(sock) == 0) {
 		state->sockets[sock] = new SocketState(tt, port);
+	}
 	pthread_rwlock_unlock(&rwlock);
 }
 
@@ -174,7 +176,14 @@ SocketState *SocketMap::get(int sock)
 	// we don't need to be more protective of the stat structure
 
 	pthread_rwlock_rdlock(&rwlock);
-	SocketState *p =  SocketMap::getMap()->sockets[sock];
+
+	SocketState *p = NULL;
+	SocketMap *s = SocketMap::getMap();
+
+	if (s->sockets.count(sock) > 0) {
+		p = s->sockets[sock];
+	}
+
 	pthread_rwlock_unlock(&rwlock);
 	return p;
 }
