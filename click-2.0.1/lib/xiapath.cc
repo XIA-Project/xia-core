@@ -665,6 +665,18 @@ XIAPath::first_hop_from_node(XIAPath::handle_t node) const
 bool
 XIAPath::replace_intent_hid(XID new_hid)
 {
+	handle_t intent_hid_node = find_intent_hid();
+	if(intent_hid_node == INVALID_NODE_HANDLE) {
+		return false;
+	}
+	// If we found the node, replace the HID with the new one
+	_nodes[intent_hid_node].xid = new_hid;
+	return true;
+}
+
+XIAPath::handle_t
+XIAPath::find_intent_hid()
+{
 	handle_t current_node = source_node();
 	handle_t dst = destination_node();
 	handle_t intent_hid_node = INVALID_NODE_HANDLE;
@@ -685,10 +697,7 @@ XIAPath::replace_intent_hid(XID new_hid)
 		click_chatter("XIAPath: ERROR Intent HID not found");
 		return false;
 	}
-
-	// If we found the node, replace the HID with the new one
-	_nodes[intent_hid_node].xid = new_hid;
-	return true;
+	return intent_hid_node;
 }
 
 Vector<XIAPath::handle_t>

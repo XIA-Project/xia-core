@@ -80,6 +80,9 @@ class XIAPath { public:
 	// First child node for the given node
 	handle_t first_hop_from_node(handle_t node) const;
 
+	// Find the intent HID - last HID in path to dest node
+	handle_t find_intent_hid();
+
 	// Replace intent HID node with a new one
 	bool replace_intent_hid(XID new_hid);
 
