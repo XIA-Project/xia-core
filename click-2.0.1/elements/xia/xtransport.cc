@@ -3636,9 +3636,75 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, xia::XSocketMsg *xia_socket_m
 	String IP4ID_str(x_updatedag_msg->ip4id().c_str());
 	click_chatter("XTRANSPORT:Xupdatedag Router 4ID: %s (ignored unless in addr above)", IP4ID_str.c_str());
 
+	String ad_table_str = _hostname + "/xrc/n/proc/rt_AD";
+	String hid_table_str = _hostname + "/xrc/n/proc/rt_HID";
+	String ip_table_str = _hostname + "/xrc/n/proc/rt_IP";
+	String cmd;
+	String cmdargs;
+	String default_AD("-"), default_HID("-"), default_4ID("-");
+
 	// Find the old dag that we will be replacing
 	XIAPath old_dag;
 	old_dag.parse(_interfaces.getDAG(interface));
+
+	// Retrieve AD from old DAG for this interface
+	XIAPath::handle_t h = old_dag.first_ad_node();
+	if(h != INVALID_NODE_HANDLE) {
+		XID old_ad = old_dag.xid(h);
+
+		// Delete route for the old AD
+		cmd = ad_table_str + ".remove";
+		HandlerCall::call_write(cmd.c_str(), old_ad.unparse().c_str(), this);
+	}
+
+	// Retrieve RHID corresponding to the router for this interface
+	if(_interfaces.has_rhid(interface)) {
+		String old_rhid = _interfaces.getRHID(interface);
+
+		// Delete route for this old RHID
+		cmd = hid_table_str + ".remove";
+		HandlerCall::call_write(cmd.c_str(), old_rhid.c_str(), this);
+	}
+
+	// Retrieve new AD from router_dag
+	XID new_ad = router_dag.xid(router_dag.first_ad_node());
+
+	// Retrieve new RHID from router_dag
+	XID new_rhid = router_dag.xid(router_dag.find_intent_hid());
+
+	// Add DESTINED_FOR_LOCALHOST route for new AD
+	cmd = ad_table_str + ".add";
+	cmdargs = new_ad.unparse() + " " + String(DESTINED_FOR_LOCALHOST);
+	HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
+
+	click_chatter("XTRANSPORT::Xupdatedag Added localhost route for new AD");
+
+	// If default interface, update default_AD, default_4ID, default_HID
+	//    so they all point to new RHID
+	if(interface == _interfaces.default_interface()) {
+
+		// Set default AD to point to new RHID
+		cmd = ad_table_str + ".set4";
+		cmdargs = default_AD + ",0," + new_rhid.unparse() + "," + String(0xffff);
+		click_chatter("XTRANSPORT: %s ...%s.", cmd.c_str(), cmdargs.c_str());
+		HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
+
+		// Set default HID to point to new RHID
+		cmd = hid_table_str + ".set4";
+		cmdargs = default_HID + ",0," + new_rhid.unparse() + "," + String(0xffff);
+		click_chatter("XTRANSPORT: %s ...%s.", cmd.c_str(), cmdargs.c_str());
+		HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
+
+		// Set default AD to point to new RHID
+		cmd = ip_table_str + ".set4";
+		cmdargs = default_4ID + ",0," + new_rhid.unparse() + "," + String(0xffff);
+		click_chatter("XTRANSPORT: %s ...%s.", cmd.c_str(), cmdargs.c_str());
+		HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
+	}
+	// Add new RHID route pointing to new RHID
+	cmd = hid_table_str + ".add";
+	cmdargs = new_rhid.unparse() + " " + new_rhid.unparse();
+	HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
 
 	// Replace intent HID in router's DAG to form new_dag
 	XIAPath new_dag = router_dag;
@@ -3649,6 +3715,9 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, xia::XSocketMsg *xia_socket_m
 
 	// Update the XIAInterfaceTable with new dag
 	_interfaces.update(interface, new_dag);
+
+	// Add the corresponding rhid also
+	_interfaces.update_rhid(interface, new_rhid.unparse());
 
 	// Put the new DAG back into the xia_socket_msg to return to API
 	x_updatedag_msg->set_dag(new_dag.unparse().c_str());
