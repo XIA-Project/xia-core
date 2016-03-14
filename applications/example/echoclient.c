@@ -46,6 +46,7 @@ int pktSize = 512;	// default pkt size
 int reconnect = 0;	// don't reconnect between loops
 int threads = 1;	// just a single thread
 int terminate = 0;  // sighandler sets to 1 if we should quit
+int scion = 0;		// try to use SCION for routing the packets
 
 struct addrinfo *ai;
 sockaddr_x *sa;
@@ -56,7 +57,7 @@ sockaddr_x *sa;
 void help(const char *name)
 {
 	printf("\n%s (%s)\n", TITLE, VERSION);
-	printf("usage: %s [-q] -[l loops] [-s size] [-d delay] [-r recon] [-t threads]\n", name);
+	printf("usage: %s [-qS] -[l loops] [-s size] [-d delay] [-r recon] [-t threads]\n", name);
 	printf("where:\n");
 	printf(" -q : quiet mode\n");
 	printf(" -l loops : loop <loops> times and exit\n");
@@ -64,6 +65,7 @@ void help(const char *name)
 	printf(" -d delay : delay for <delay> hundredths of a second between sends\n");
 	printf(" -r recon : reconnect to the echo server every recon sends\n");
 	printf(" -t threads : start up the specified # of threads\n");
+	printf(" -S : use a SCION path in the dest DAG\n");
 	printf("\n");
 	exit(0);
 }
@@ -77,7 +79,7 @@ void getConfig(int argc, char** argv)
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "hqd:l:s:r:t:")) != -1) {
+	while ((c = getopt(argc, argv, "hqSd:l:s:r:t:")) != -1) {
 		switch (c) {
 			case '?':
 			case 'h':
@@ -119,6 +121,11 @@ void getConfig(int argc, char** argv)
 				threads = atoi(optarg);
 				if (threads < 1) threads = 1;
 				if (threads > 100) threads = 100;
+				break;
+			case 'S':
+				// tell getaddrinfo to create a SCION-compatible DAG
+				scion = 1;
+				printf("setting scion to 1\n");
 				break;
 			default:
 				help(basename(argv[0]));
@@ -326,11 +333,15 @@ int main(int argc, char **argv)
 {
 	srand(time(NULL));
 	getConfig(argc, argv);
-        struct addrinfo hints;
-        bzero(&hints, sizeof(hints));
-        hints.ai_flags = XAI_SCION;
- 
-	signal(SIGINT, quithandler);
+
+	struct addrinfo hints;
+	bzero(&hints, sizeof(hints));
+	if (scion) {
+		hints.ai_flags = XAI_SCION;
+	}
+
+ 	// this isn't working quit right, so commented out
+	// signal(SIGINT, quithandler);
 
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 
