@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# FIXME: Be smarter about where and when to start the scion gateway
+
+
 # find the root of the XIA source tree
 # assumes this script is in a directory off the parent of the XIA tree
 # and that the daemons it starts are rooted off of the same location
@@ -31,7 +34,7 @@ XSOCKCONF=$XIADIR/etc/xsockconf.ini
 XIAADDRCLICK=$XIADIR/etc/click/xia_address.click
 
 #FIXME: add SCION process names to this list
-ALL_PROCESSES="click xrouted xhcp_serverd xhcp_clientd xnameservice xstats xstatserver"
+ALL_PROCESSES="click xrouted xhcp_serverd xhcp_clientd xgateway xnameservice xstats xstatserver"
 
 NAME=`basename $0`
 VERBOSE=0
@@ -53,6 +56,7 @@ HOSTNAME=$(hostname -s | tr -C -d 'a-zA-Z0-9')
 # for debugging
 VALGRIND=""
 VGLOG="valgrind.log"
+
 
 help()
 {
@@ -78,7 +82,7 @@ where:
   -P set the TCP socket ports to use (instead of ToDevice/FromDevice)
   -n if generating a click script, this node will be the name server
   -R if generating a click script, this node will provide rendezvous service
-  -S if generating a click script, this node will be the SCION gateway
+  -S run a SCION gateway on each host
   -f if generating a click script, don't use interfaces matching the supplied string
      (to ignore multiple interfaces, use a comma-separated list)
   -I if generating a click script, use this interface (i.e., pick which interface a host uses)
@@ -334,21 +338,23 @@ host()
 	local host=$1
 	local action=$2
 
+# FIXME: this is not the right long term way that SCION should work!
+
 	cd $XIADIR/bin
 	case $action in
 		"start")
 			./xhcp_clientd -h $host $LOG_FLAGS &
-			./xgateway -h $host $LOG_FLAGS &
+			[ $SCION -eq 1 ]&& scion $1 $2
 
 			sleep 0.5
 			;;
 		"stop")
 			kill_service $host "xhcp_clientd"
-			kill_service $host "xgateway"
+			[ $SCION -eq 1 ] && scion $1 $2
 			;;
 		"check")
 			check_service $host "xhcp_clientd"
-			check_service $host "xgateway"
+			[ $SCION -eq 1 ] && scion $1 $2
 			;;
 		*)
 			echo "unrecognized action: $action"
@@ -410,7 +416,6 @@ rendezvous()
 #
 # start/stop/check the rendezvous server
 #
-# FIXME: add scion startup here
 scion()
 {
 	local host=$1
@@ -419,16 +424,12 @@ scion()
 	cd $XIADIR/bin
 	case $action in
 		"start")
-#			echo start SCION services placeholder
-			echo ./xgateway -h $host $LOG_FLAGS
 			./xgateway -h $host $LOG_FLAGS &
 			;;
 		"stop")
-#			echo stop SCION services placeholder
 			kill_service $host "xgateway"
 			;;
 		"check")
-#			echo check SCION services placeholder
 			check_service $host "xgateway"
 			;;
 		*)
@@ -469,7 +470,7 @@ process_nodes()
 				rendezvous $name $action
 				;;
 			scion)
-				#scion $name $action
+				# FIXME this is done by the host config ATM
 				;;
 			*)
 				echo Unknown device type $name:$type
@@ -513,9 +514,9 @@ start_click()
 		printf "$HOSTNAME\trendezvous\n" >> $NODECONF
 	fi
 
-	if [ $SCION -eq 1 ]; then
-		printf "$HOSTNAME\tscion\n" >> $NODECONF
-	fi
+#	if [ $SCION -eq 1 ]; then
+#		printf "$HOSTNAME\tscion\n" >> $NODECONF
+#	fi
 
 	[ "$VALGRIND" != "" ] && echo Logging valgrind output to $VGLOG
 
