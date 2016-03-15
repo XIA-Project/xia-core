@@ -205,7 +205,7 @@ int WaveDevice::initialize(ErrorHandler *errh){
 
     _pid = getpid(); // save the process ID, required by the WAVE driver
 
-    if (invokeWAVEDevice(WAVEDEVICE_LOCAL, 1 /*blockflag*/) < 0)
+    if (invokeWAVEDevice(WAVEDEVICE_LOCAL, 255 /*blockflag*/) < 0)
         return errh->error("%s, initialize(): invokeWAVEDevice(), strerror=%s",\
             declaration().c_str(), strerror(errno));
 
@@ -455,29 +455,6 @@ int WaveDevice::write_packet(Packet *p, ErrorHandler *errh){
     memcpy(&_wsmReq.srcmacaddr, &(ethHeader->ether_shost), IEEE80211_ADDR_LEN);
     // destination mac
     memcpy(&_wsmReq.macaddr, &(ethHeader->ether_dhost), IEEE80211_ADDR_LEN);
-    
-    std::ostringstream macAddrStream, myMacAddrStream;
-    for (int i=0; i < IEEE80211_ADDR_LEN; i++){
-
-        uint8_t macByte = _wsmReq.macaddr[i];
-        macAddrStream << std::hex << std::setfill('0') << std::setw(2) << \
-            static_cast<unsigned short>(macByte);
-            
-        macByte = _wsmReq.srcmacaddr[i];
-        myMacAddrStream << std::hex << std::setfill('0') << std::setw(2) << \
-            static_cast<unsigned short>(macByte);
-
-
-        if (i < (IEEE80211_ADDR_LEN-1)){
-            macAddrStream << ":";
-            myMacAddrStream << ":";
-        }
-    }
-    
-    std::string fromMacStr = myMacAddrStream.str();
-    std::string toMacStr = macAddrStream.str();
-    click_chatter("Sending WSM from %s to %s", fromMacStr.c_str(), toMacStr.c_str());
-
 
     // set content
     memset(&_wsmReq.data, 0, sizeof(WSMData)); // initialize to zeros
@@ -505,6 +482,10 @@ int WaveDevice::write_packet(Packet *p, ErrorHandler *errh){
                 break;
             }
         } else
+            
+#ifdef DEBUG        
+            errh->debug("%s, sent WSM, %d byte payload", waveDeviceInst->declaration().c_str(), p->length());
+#endif
             done = true;
         }
 
@@ -534,10 +515,6 @@ void* WaveDevice::receiver_thread(void *arg){
     const int pipeFd = waveDeviceInst->get_pipefd(true);
     const int bufLen = waveDeviceInst->get_bufLen();
 
-    assert(bufLen > 0);
-    uint8_t recvBuf[bufLen];
-    memset(recvBuf, 0, bufLen);
-
     // prepare wsm indication data structure
     WSMIndication rxPkt;
     memset(&rxPkt, 0, sizeof(WSMIndication)); // playing it safe
@@ -548,24 +525,14 @@ void* WaveDevice::receiver_thread(void *arg){
 
         if ((len = rxWSMPacket(pid, &rxPkt)) > 0){ // got a packet, yay
         
+#ifdef DEBUG        
+            errh->debug("%s, received WSM, %d byte payload", waveDeviceInst->declaration().c_str(), rxPkt.data.length);
+#endif
 
-        std::ostringstream macAddrStream;
-    for (int i=0; i < IEEE80211_ADDR_LEN; i++){
+            if (rxPkt.data.length <= 0)
+                continue; // nothing to do if empty payload
 
-        const uint8_t macByte = rxPkt.macaddr[i];
-        macAddrStream << std::hex << std::setfill('0') << std::setw(2) << \
-            static_cast<unsigned short>(macByte);
-            
-        if (i < (IEEE80211_ADDR_LEN-1)){
-            macAddrStream << ":";
-        }
-    }
-    
-        std::string macStr = macAddrStream.str();
-        click_chatter("Rx %d byte WSM from %s", len, macStr.c_str());
-
-
-            assert(len <= bufLen);
+            assert(rxPkt.data.length <= bufLen);
 
             if (pthread_mutex_lock(pipeMutex))
                 errh->error("%s, receiver_thread(): \
@@ -573,7 +540,8 @@ pthread_mutex_lock(pipeMutex), strerror=%s",
                     waveDeviceInst->declaration().c_str(), strerror(errno));
 
             // write the received data on the pipe
-            if (write(pipeFd, recvBuf, len) != len)
+            if (write(pipeFd, rxPkt.data.contents, rxPkt.data.length) != \
+                rxPkt.data.length)
                 errh->error("%s, receiver_thread(): write(pipeFd), \
 strerror=%s", waveDeviceInst->declaration().c_str(), strerror(errno));
 

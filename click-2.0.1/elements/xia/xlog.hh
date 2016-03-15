@@ -6,6 +6,7 @@
 
 CLICK_DECLS
 
+#ifdef DEBUG
 #define TRACE()     (ErrorHandler::default_handler())->debug\
     ("%s: %d", __FUNCTION__, __LINE__)
 #define DBG(...)    (ErrorHandler::default_handler())->ldebug\
@@ -19,8 +20,16 @@ CLICK_DECLS
     (__FUNCTION__, __VA_ARGS__) // level 4
 #define ERROR(...)  (ErrorHandler::default_handler())->lerror\
     (__FUNCTION__, __VA_ARGS__)   // level 3
-//#define T_ALERT(...)  (ErrorHandler::default_handler())->fatal\
+//#define T_ALERT(...)  (ErrorHandler::default_handler())->fatal\ 
 //    (__FUNCTION__, __VA_ARGS__)  // level -1
+#else
+	#define TRACE()
+	#define DBG(...)
+	#define INFO(...)
+	#define NOTICE(...)
+	#define WARN(...)
+	#define ERROR(...)
+#endif
 
 class XLog : public Element { public:
 
