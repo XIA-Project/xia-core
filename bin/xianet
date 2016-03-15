@@ -34,7 +34,7 @@ XSOCKCONF=$XIADIR/etc/xsockconf.ini
 XIAADDRCLICK=$XIADIR/etc/click/xia_address.click
 
 #FIXME: add SCION process names to this list
-ALL_PROCESSES="click xrouted xhcp_serverd xhcp_clientd xgateway xnameservice xstats xstatserver"
+ALL_PROCESSES="click xrouted xhcp_serverd xhcp_clientd xgatewayd xnameservice xstats xstatserver"
 
 NAME=`basename $0`
 VERBOSE=0
@@ -424,13 +424,13 @@ scion()
 	cd $XIADIR/bin
 	case $action in
 		"start")
-			./xgateway -h $host $LOG_FLAGS &
+			./xgatewayd -h $host $LOG_FLAGS &
 			;;
 		"stop")
-			kill_service $host "xgateway"
+			kill_service $host "xgatewayd"
 			;;
 		"check")
-			check_service $host "xgateway"
+			check_service $host "xgatewayd"
 			;;
 		*)
 			echo "unrecognized action: $action"

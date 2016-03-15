@@ -4,12 +4,12 @@ include ../../xia.mk
 
 LDFLAGS += $(LIBS)
 SOURCES=sciongateway.cc
-NS=$(BINDIR)/xgateway
+GW=$(BINDIR)/xgatewayd
 
-all: $(NS)
+all: $(GW)
 
-$(NS): $(SOURCES) $(XINC)/Xsocket.h $(XINC)/xns.h
+$(GW): $(SOURCES) $(XINC)/Xsocket.h
 	$(CC) -o $@ $(CFLAGS) $(SOURCES) $(LDFLAGS)	
 
 clean:
-	-rm $(NS)
+	-rm $(GW)
