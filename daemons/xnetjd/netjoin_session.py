@@ -149,7 +149,7 @@ class NetjoinSession(threading.Thread):
 
         # Retrieve handshake two info to be included in handshake three
         h2_nonce = netjoin_h2.get_nonce()
-        gateway_session_id = netjoin_h2.gateway_session_id()
+        gateway_session_id = netjoin_h2.get_gateway_session_id()
 
         # Build a handshake three in responso to this handshake two
         logging.info("Sending handshake three")
