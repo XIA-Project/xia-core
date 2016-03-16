@@ -10,6 +10,7 @@ import threading
 from netjoin_xiaconf import NetjoinXIAConf
 conf = NetjoinXIAConf()
 sys.path.append(conf.get_swig_path())
+sys.path.append(conf.get_clickcontrol_path())
 
 from netjoin_policy import NetjoinPolicy
 from netjoin_receiver import NetjoinReceiver
@@ -60,7 +61,7 @@ def main():
         logging.debug("Listening for network announcements")
 
     # Start a new thread to listen for messages
-    receiver = NetjoinReceiver(policy, announcer, shutdown_event)
+    receiver = NetjoinReceiver(args.hostname, policy, announcer, shutdown_event)
     receiver.daemon = True
     receiver.start()
     threads.append(receiver)

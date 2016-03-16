@@ -9,6 +9,7 @@ import ndap_pb2
 import threading
 import Queue
 import c_xsocket
+from clickcontrol import ClickControl
 from netjoin_beacon import NetjoinBeacon
 from netjoin_message_pb2 import NetjoinMessage
 from netjoin_authsession import NetjoinAuthsession
@@ -20,13 +21,14 @@ from netjoin_handshake_three import NetjoinHandshakeThree
 class NetjoinSession(threading.Thread):
     next_session_ID = 1
 
-    def __init__(self, shutdown_event, auth=None):
+    def __init__(self, hostname, shutdown_event, auth=None):
         threading.Thread.__init__(self)
         (self.START, self.HS_2_WAIT, self.HS_3_WAIT) = range(3)
 
         self.xianetjoin = ("127.0.0.1", 9882)
         self.beacon = NetjoinBeacon()
         self.state = self.START
+        self.hostname = hostname
         self.shutdown_event = shutdown_event
         self.auth = auth
         self.session_ID = NetjoinSession.next_session_ID
@@ -188,12 +190,19 @@ class NetjoinSession(threading.Thread):
         if len(self.client_hid) < 20:
             logging.error("Client HID not known while handling H3")
             return
-        client_hid = str(self.client_hid)
+        client_hid = str("HID:{}".format(self.client_hid))
         logging.info("Routing table now points to: {}".format(client_hid))
         # TODO: Configure routing table
         # interface number is the port for the route
         # client_hid is the entry in HID routing table and also next hop
         # flags are 0xffff
+        flags = 0xffff
+        with ClickControl() as click:
+            ret = click.setHIDRoute(self.hostname, client_hid, interface, flags)
+            if ret == False:
+                logging.error("Failed setting route for {}".format(client_hid))
+            else:
+                logging.info("Route set up for {}".format(client_hid))
 
     # Main thread handles all messages based on state of joining session
     def run(self):

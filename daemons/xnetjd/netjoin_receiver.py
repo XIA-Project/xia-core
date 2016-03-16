@@ -14,12 +14,13 @@ from netjoin_message_pb2 import NetjoinMessage
 # from the XIANetJoin click module and invoking the handler for each packet
 class NetjoinReceiver(threading.Thread):
 
-    def __init__(self, policy, announcer, shutdown,
+    def __init__(self, hostname, policy, announcer, shutdown,
             xnetjd_addr=("127.0.0.1", 9228)):
         threading.Thread.__init__(self)
         self.BUFSIZE = 1024
         self.sockfd = None
         self.shutdown = shutdown
+        self.hostname = hostname
         self.policy = policy
         self.announcer = announcer    # None, unless running as access point
         self.client_sessions = {}
@@ -45,7 +46,7 @@ class NetjoinReceiver(threading.Thread):
             return
 
         # Initiate a NetjoinSession thread to join the network
-        session = NetjoinSession(self.shutdown)
+        session = NetjoinSession(self.hostname, self.shutdown)
         session.daemon = True
         session.start()
         self.client_sessions[session.get_ID()] = session
@@ -60,7 +61,7 @@ class NetjoinReceiver(threading.Thread):
         # TODO: Avoid copying announcer's auth because that copies private key
         # Copy the auth session from announcer to bootstrap a new session
         authsession = copy.copy(self.announcer.auth)
-        session = NetjoinSession(self.shutdown, auth=authsession)
+        session = NetjoinSession(self.hostname, self.shutdown, auth=authsession)
         session.daemon = True
         session.start()
 

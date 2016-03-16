@@ -141,6 +141,9 @@ class NetjoinXIAConf(object):
     def get_swig_path(self):
         return os.path.join(self.src_dir, "api/lib")
 
+    def get_clickcontrol_path(self):
+        return os.path.join(self.src_dir, "bin")
+
 if __name__ == "__main__":
     conf = NetjoinXIAConf()
     raw_hid = conf.get_raw_hid()

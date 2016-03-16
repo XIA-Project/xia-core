@@ -181,6 +181,14 @@ class ClickControl:
             return False
         return True
 
+    # Set an HID routing table entry
+    def setHIDRoute(self, hostname, hid_str, port, flags):
+        cmd = "{}/xrc/n/proc/rt_HID.set4 {},{},{},{}".format(
+                hostname, hid_str, port, hid_str, flags)
+        if not self.writeCommand(cmd):
+            return False
+        return True
+
 # If this library is run by itself, it does a unit test that
 # connects to Click and configures its elements as an XIAEndHost
 if __name__ == "__main__":
