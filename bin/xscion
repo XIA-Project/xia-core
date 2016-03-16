@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# find the root of the xia tree
+XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
+
+action=$1
+shift
+
+if [ $action == "start" ]; then
+	echo make sure you have started the SCION infrastructure first!
+
+elif [ "$action" != "stop" ] && [ "$action" != "check" ]; then
+	echo Missing or invalid acion!
+	exit 1
+fi
+
+[ action == "start" ] && echo make sure you have started the SCION infrastructure first!
+
+cd $XIADIR
+bin/xianet -S $@ $action
+
+# add the scion gateway to resolv.conf
+echo "scion_gateway=$(grep "DATA ID" /var/log/syslog | tail -1 | cut -d' ' -f10)" >> etc/resolv.conf
