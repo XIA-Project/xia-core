@@ -161,6 +161,7 @@ message ClientCredentials {
 // [[file:~/work/git/xia-vehicular/veh/jacp-spec.orgmk::*Gateway%20Response%20(Handshake%20Message%202)][Gateway\ Response\ \(Handshake\ Message\ 2\):1]]
 
 message HandshakeTwo {
+    required uint32 client_session_id = 1;
     required EncryptedData cyphertext = 2; //encrypted (HandshakeTwoProtected)
 }
 
@@ -177,7 +178,6 @@ message EncryptedData {
     optional ClientHello.CipherSuite cipher_suite = 1;
     optional bytes nonce = 2;
     required bytes cyphertext = 3;
-    required uint32 client_session_id = 4;
 }
 
 // Gateway\ Response\ \(Handshake\ Message\ 2\):1 ends here
