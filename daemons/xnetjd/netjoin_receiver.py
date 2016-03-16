@@ -85,7 +85,7 @@ class NetjoinReceiver(threading.Thread):
         client_session.push(message_tuple)
 
     def handle_handshake_three(self, message_tuple):
-        logging.info("Got HandshakeTwo message")
+        logging.info("Got HandshakeThree message")
 
         # Find the session this message should be delivered to
         handshake_three = message_tuple[0].handshake_three
