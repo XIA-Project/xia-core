@@ -1,12 +1,12 @@
-#ifndef CLICK_XIANEWXIDROUTETABLE_HH
-#define CLICK_XIANEWXIDROUTETABLE_HH
+#ifndef CLICK_XIASCIONForwarder_HH
+#define CLICK_XIASCIONForwarder_HH
 #include <click/element.hh>
 #include <click/hashtable.hh>
 #include <clicknet/xia.h>
 #include <click/xid.hh>
 #include <click/xiapath.hh>
 #include "xcmp.hh"
-#include "xiaxidroutetable.hh"
+//#include "xiaxidroutetable.hh"
 #include "scion.h"
 #include "aesni.h"
 #include "xlog.hh"
@@ -35,7 +35,7 @@ CLICK_DECLS
 
 /*
 =c
-XIANEWXIDRouteTable(XID1 OUT1, XID2 OUT2, ..., - OUTn)
+XIASCIONForwarder(XID1 OUT1, XID2 OUT2, ..., - OUTn)
 
 =s ip
 simple XID routing table
@@ -45,7 +45,7 @@ Routes XID according to a routing table.
 
 =e
 
-XIANEWXIDRouteTable(AD0 0, HID2 1, - 2)
+XIASCIONForwarder(AD0 0, HID2 1, - 2)
 It outputs AD0 packets to port 0, HID2 packets to port 1, and other packets to port 2.
 If the packet has already arrived at the destination node, the packet will be destroyed,
 so use the XIACheckDest element before using this element.
@@ -57,12 +57,12 @@ typedef struct {
   uint8_t IP[4];
 } IPAddr;
 
-class XIANEWXIDRouteTable : public Element { public:
+class XIASCIONForwarder : public Element { public:
 
-    XIANEWXIDRouteTable();
-    ~XIANEWXIDRouteTable();
+    XIASCIONForwarder();
+    ~XIASCIONForwarder();
 
-    const char *class_name() const		{ return "XIANEWXIDRouteTable"; }
+    const char *class_name() const		{ return "XIASCIONForwarder"; }
     const char *port_count() const		{ return "-/-"; }
     const char *processing() const		{ return PUSH; }
   

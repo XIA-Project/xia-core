@@ -1,5 +1,5 @@
 /*
- * xianewxidroutetable.{cc,hh} -- simple XID routing table for new XID. 
+ * XIASCIONForwarder.{cc,hh} -- simple XID routing table for new XID. 
  * The code is almost the same as XIAXIDRouteTable.cc
  */
 
@@ -15,7 +15,7 @@
 #include <getopt.h>
 
 #include <click/config.h>
-#include "xianewxidroutetable.hh"
+#include "xiascionforwarder.hh"
 #include <click/glue.hh>
 #include <click/error.hh>
 #include <click/confparse.hh>
@@ -30,16 +30,16 @@
 CLICK_DECLS
 
 
-XIANEWXIDRouteTable::XIANEWXIDRouteTable(): _drops(0)
+XIASCIONForwarder::XIASCIONForwarder(): _drops(0)
 {
 }
 
-XIANEWXIDRouteTable::~XIANEWXIDRouteTable()
+XIASCIONForwarder::~XIASCIONForwarder()
 {
 	_rts.clear();
 }
 
-int XIANEWXIDRouteTable::initialize(ErrorHandler *)
+int XIASCIONForwarder::initialize(ErrorHandler *)
 {
 	// XLog installed the syslog error handler, use it!
 	_errh = (SyslogErrorHandler*)ErrorHandler::default_handler();
@@ -48,9 +48,9 @@ int XIANEWXIDRouteTable::initialize(ErrorHandler *)
 }
 
 int
-XIANEWXIDRouteTable::configure(Vector<String> &conf, ErrorHandler *errh)
+XIASCIONForwarder::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-	click_chatter("XIANEWXIDRouteTable: configuring %s\n", this->name().c_str());
+	click_chatter("XIASCIONForwarder: configuring %s\n", this->name().c_str());
 
 	_principal_type_enabled = 1;
 	_num_ports = 0;
@@ -77,19 +77,19 @@ XIANEWXIDRouteTable::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 int
-XIANEWXIDRouteTable::set_enabled(int e)
+XIASCIONForwarder::set_enabled(int e)
 {
 	_principal_type_enabled = e;
 	return 0;
 }
 
-int XIANEWXIDRouteTable::get_enabled()
+int XIASCIONForwarder::get_enabled()
 {
 	return _principal_type_enabled;
 }
 
 void
-XIANEWXIDRouteTable::add_handlers()
+XIASCIONForwarder::add_handlers()
 {
 	add_write_handler("add", set_handler, 0);
 	add_write_handler("set", set_handler, (void*)1);
@@ -107,9 +107,9 @@ XIANEWXIDRouteTable::add_handlers()
 }
 
 String
-XIANEWXIDRouteTable::read_handler(Element *e, void *thunk)
+XIASCIONForwarder::read_handler(Element *e, void *thunk)
 {
-	XIANEWXIDRouteTable *t = (XIANEWXIDRouteTable *) e;
+	XIASCIONForwarder *t = (XIASCIONForwarder *) e;
 	switch ((intptr_t)thunk) {
 		case PRINCIPAL_TYPE_ENABLED:
 			return String(t->get_enabled());
@@ -120,9 +120,9 @@ XIANEWXIDRouteTable::read_handler(Element *e, void *thunk)
 }
 
 int 
-XIANEWXIDRouteTable::write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh)
+XIASCIONForwarder::write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh)
 {
-	XIANEWXIDRouteTable *t = (XIANEWXIDRouteTable *) e;
+	XIASCIONForwarder *t = (XIASCIONForwarder *) e;
 	switch ((intptr_t)thunk) {
 		case PRINCIPAL_TYPE_ENABLED:
 			return t->set_enabled(atoi(str.c_str()));
@@ -133,9 +133,9 @@ XIANEWXIDRouteTable::write_handler(const String &str, Element *e, void *thunk, E
 }
 
 String
-XIANEWXIDRouteTable::list_routes_handler(Element *e, void * /*thunk */)
+XIASCIONForwarder::list_routes_handler(Element *e, void * /*thunk */)
 {
-	XIANEWXIDRouteTable* table = static_cast<XIANEWXIDRouteTable*>(e);
+	XIASCIONForwarder* table = static_cast<XIASCIONForwarder*>(e);
 	XIARouteData *xrd = &table->_rtdata;
 
 	// get the default route
@@ -160,7 +160,7 @@ XIANEWXIDRouteTable::list_routes_handler(Element *e, void * /*thunk */)
 }
 
 int
-XIANEWXIDRouteTable::set_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
+XIASCIONForwarder::set_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
 {
 	// handle older style route entries
 
@@ -183,9 +183,9 @@ XIANEWXIDRouteTable::set_handler(const String &conf, Element *e, void *thunk, Er
 }
 
 int
-XIANEWXIDRouteTable::set_handler4(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
+XIASCIONForwarder::set_handler4(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
 {
-	XIANEWXIDRouteTable* table = static_cast<XIANEWXIDRouteTable*>(e);
+	XIASCIONForwarder* table = static_cast<XIASCIONForwarder*>(e);
 
 	bool add_mode = !thunk;
 
@@ -250,9 +250,9 @@ XIANEWXIDRouteTable::set_handler4(const String &conf, Element *e, void *thunk, E
 }
 
 int
-XIANEWXIDRouteTable::set_mtb_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
+XIASCIONForwarder::set_mtb_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
 {
-	XIANEWXIDRouteTable* table = static_cast<XIANEWXIDRouteTable*>(e);
+	XIASCIONForwarder* table = static_cast<XIASCIONForwarder*>(e);
 
 	bool add_mode = !thunk;
 
@@ -323,9 +323,9 @@ XIANEWXIDRouteTable::set_mtb_handler(const String &conf, Element *e, void *thunk
 }
 
 int
-XIANEWXIDRouteTable::remove_handler(const String &xid_str, Element *e, void *, ErrorHandler *errh)
+XIASCIONForwarder::remove_handler(const String &xid_str, Element *e, void *, ErrorHandler *errh)
 {
-	XIANEWXIDRouteTable* table = static_cast<XIANEWXIDRouteTable*>(e);
+	XIASCIONForwarder* table = static_cast<XIASCIONForwarder*>(e);
 
 	if (xid_str.length() == 0)
 	{
@@ -359,7 +359,7 @@ XIANEWXIDRouteTable::remove_handler(const String &xid_str, Element *e, void *, E
 }
 
 int
-XIANEWXIDRouteTable::load_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh)
+XIASCIONForwarder::load_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh)
 {
 #if CLICK_USERLEVEL
 	std::ifstream in_f(conf.c_str());
@@ -426,12 +426,12 @@ XIANEWXIDRouteTable::load_routes_handler(const String &conf, Element *e, void *,
 }
 
 int
-XIANEWXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh)
+XIASCIONForwarder::generate_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh)
 {
 #if CLICK_USERLEVEL
-	XIANEWXIDRouteTable* table = dynamic_cast<XIANEWXIDRouteTable*>(e);
+	XIASCIONForwarder* table = dynamic_cast<XIASCIONForwarder*>(e);
 #else
-	XIANEWXIDRouteTable* table = reinterpret_cast<XIANEWXIDRouteTable*>(e);
+	XIASCIONForwarder* table = reinterpret_cast<XIASCIONForwarder*>(e);
 #endif
 	assert(table);
 
@@ -523,7 +523,7 @@ XIANEWXIDRouteTable::generate_routes_handler(const String &conf, Element *e, voi
 
 
 void
-XIANEWXIDRouteTable::push(int in_ether_port, Packet *p)
+XIASCIONForwarder::push(int in_ether_port, Packet *p)
 {
 	int port;
 
@@ -572,7 +572,7 @@ XIANEWXIDRouteTable::push(int in_ether_port, Packet *p)
 }
 
 int
-XIANEWXIDRouteTable::process_xcmp_redirect(Packet *p)
+XIASCIONForwarder::process_xcmp_redirect(Packet *p)
 {
    XIAHeader hdr(p->xia_header());
    const uint8_t *pay = hdr.payload();
@@ -602,7 +602,7 @@ XIANEWXIDRouteTable::process_xcmp_redirect(Packet *p)
 }
 
 int
-XIANEWXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
+XIASCIONForwarder::lookup_route(int in_ether_port, Packet *p)
 {
 //   DBG("scion route lookup");
    //click_chatter("scion route: lookup route return\n");
@@ -667,7 +667,7 @@ typedef struct {
 } SCIONCommonHeader;
 */
 /*
-void XIANEWXIDRouteTable::print_scion_header(SCIONCommonHeader *sch){
+void XIASCIONForwarder::print_scion_header(SCIONCommonHeader *sch){
 	click_chatter("print scion common header:");
 	click_chatter("versionSrcDst : %d", ntohs(sch->versionSrcDst));
 	click_chatter("totalLen: %d", ntohs(sch->totalLen));
@@ -678,7 +678,7 @@ void XIANEWXIDRouteTable::print_scion_header(SCIONCommonHeader *sch){
 	return;
 }
 */
-void XIANEWXIDRouteTable::print_packet_contents(uint8_t *packet, int len)
+void XIASCIONForwarder::print_packet_contents(uint8_t *packet, int len)
 {
 	int hex_string_len = (len*2) + 1;
 	char hex_string[hex_string_len];
@@ -693,7 +693,7 @@ void XIANEWXIDRouteTable::print_packet_contents(uint8_t *packet, int len)
 }
 
 
-int XIANEWXIDRouteTable::print_packet_header(click_xia *xiah)
+int XIASCIONForwarder::print_packet_header(click_xia *xiah)
 {
 	click_chatter("======= XIA PACKET HEADER ========");
 	click_chatter("ver:%d", xiah->ver);
@@ -706,23 +706,23 @@ int XIANEWXIDRouteTable::print_packet_header(click_xia *xiah)
 	return xiah->dnode + xiah->snode;;
 }
 
-uint16_t XIANEWXIDRouteTable::hof_get_ingress(HopOpaqueField *hof){
+uint16_t XIASCIONForwarder::hof_get_ingress(HopOpaqueField *hof){
   return ((uint16_t)hof->ingress_egress[0]) << 4 | ((uint16_t)hof->ingress_egress[1] & 0xf0) >> 4;
 }
 
-uint16_t XIANEWXIDRouteTable::hof_get_egress(HopOpaqueField *hof){
+uint16_t XIASCIONForwarder::hof_get_egress(HopOpaqueField *hof){
   return ((uint16_t)hof->ingress_egress[1] & 0xf) << 8 | ((uint16_t)hof->ingress_egress[2]);
 }
 
-uint16_t XIANEWXIDRouteTable::iof_get_isd(InfoOpaqueField* iof){
+uint16_t XIASCIONForwarder::iof_get_isd(InfoOpaqueField* iof){
   return (uint16_t)iof->isd_id[0] << 8 | iof->isd_id[1]; 
 }
 
-uint32_t XIANEWXIDRouteTable::iof_get_timestamp(InfoOpaqueField* iof){
+uint32_t XIASCIONForwarder::iof_get_timestamp(InfoOpaqueField* iof){
   return ((uint32_t)iof->timestamp[0] << 24) | ((uint32_t)iof->timestamp[2] << 16) | ((uint32_t)iof->timestamp[1] << 8) | (uint32_t)iof->timestamp[0]; 
 }
 
-uint8_t XIANEWXIDRouteTable::is_on_up_path(InfoOpaqueField *currIOF) {
+uint8_t XIASCIONForwarder::is_on_up_path(InfoOpaqueField *currIOF) {
   if ((currIOF->info & 0x1) == 1) { // low bit of type field is used for uppath/downpath flag
     click_chatter("is on up path\n");
     return 1;
@@ -730,14 +730,14 @@ uint8_t XIANEWXIDRouteTable::is_on_up_path(InfoOpaqueField *currIOF) {
   return 0;
 }
 
-bool XIANEWXIDRouteTable::is_last_path_of(SCIONCommonHeader *sch) {
+bool XIASCIONForwarder::is_last_path_of(SCIONCommonHeader *sch) {
   uint8_t offset = sch->headerLen -  sizeof(HopOpaqueField);
   click_chatter("is_last_path_of %d %d\n",sch->currentOF, offset);
   return sch->currentOF == offset;
 }
 
 
-int XIANEWXIDRouteTable::print_scion_path_info(uint8_t* path, uint32_t path_len){
+int XIASCIONForwarder::print_scion_path_info(uint8_t* path, uint32_t path_len){
   InfoOpaqueField *iof = (InfoOpaqueField *)path;
   click_chatter("Print scion path info, path length %d bytes:\n", path_len);
   click_chatter("InfoOpaqueField:\n");
@@ -755,7 +755,7 @@ int XIANEWXIDRouteTable::print_scion_path_info(uint8_t* path, uint32_t path_len)
   return 0;
 }
 
-int XIANEWXIDRouteTable::print_scion_header(uint8_t *hdr){
+int XIASCIONForwarder::print_scion_header(uint8_t *hdr){
     SCIONCommonHeader *sch = (SCIONCommonHeader *)hdr;
     HopOpaqueField *hof;
     InfoOpaqueField *iof;
@@ -781,7 +781,7 @@ int XIANEWXIDRouteTable::print_scion_header(uint8_t *hdr){
     return 0;
 }
 
-int XIANEWXIDRouteTable::handle_ingress_xovr(SCIONCommonHeader *sch) {
+int XIASCIONForwarder::handle_ingress_xovr(SCIONCommonHeader *sch) {
   HopOpaqueField *hof;
   InfoOpaqueField *iof;
 
@@ -804,7 +804,7 @@ int XIANEWXIDRouteTable::handle_ingress_xovr(SCIONCommonHeader *sch) {
   return -10;
 }
 
-int XIANEWXIDRouteTable::ingress_shortcut_xovr(SCIONCommonHeader *sch) {
+int XIASCIONForwarder::ingress_shortcut_xovr(SCIONCommonHeader *sch) {
   HopOpaqueField *hof;
   HopOpaqueField *prev_hof;
   InfoOpaqueField *iof;
@@ -838,7 +838,7 @@ int XIANEWXIDRouteTable::ingress_shortcut_xovr(SCIONCommonHeader *sch) {
   }
 }
 
-int XIANEWXIDRouteTable::ingress_peer_xovr(SCIONCommonHeader *sch) {
+int XIASCIONForwarder::ingress_peer_xovr(SCIONCommonHeader *sch) {
   HopOpaqueField *hof;
   HopOpaqueField *prev_hof;
   InfoOpaqueField *iof;
@@ -870,7 +870,7 @@ int XIANEWXIDRouteTable::ingress_peer_xovr(SCIONCommonHeader *sch) {
     return fwd_if;
 }
 
-int XIANEWXIDRouteTable::ingress_core_xovr(SCIONCommonHeader *sch) {
+int XIASCIONForwarder::ingress_core_xovr(SCIONCommonHeader *sch) {
   HopOpaqueField *hof;
   HopOpaqueField *prev_hof;
   InfoOpaqueField *iof;
@@ -913,7 +913,7 @@ int XIANEWXIDRouteTable::ingress_core_xovr(SCIONCommonHeader *sch) {
   return -10;
 }
 
-int XIANEWXIDRouteTable::ingress_normal_forward(SCIONCommonHeader *sch) {
+int XIASCIONForwarder::ingress_normal_forward(SCIONCommonHeader *sch) {
   HopOpaqueField *hof;
   HopOpaqueField *prev_hof;
   InfoOpaqueField *iof;
@@ -949,7 +949,7 @@ int XIANEWXIDRouteTable::ingress_normal_forward(SCIONCommonHeader *sch) {
   return -10;
 }
 
-int XIANEWXIDRouteTable::handle_egress_xovr(SCIONCommonHeader *sch) {
+int XIASCIONForwarder::handle_egress_xovr(SCIONCommonHeader *sch) {
   HopOpaqueField *hof;
   InfoOpaqueField *iof;
 
@@ -970,13 +970,13 @@ int XIANEWXIDRouteTable::handle_egress_xovr(SCIONCommonHeader *sch) {
   return -10;
 }
 
-int XIANEWXIDRouteTable::egress_shortcut_xovr(SCIONCommonHeader *sch) {
+int XIASCIONForwarder::egress_shortcut_xovr(SCIONCommonHeader *sch) {
 
   click_chatter("egress_shortcut_xovr\n");
   return egress_normal_forward(sch);
 }
 
-int XIANEWXIDRouteTable::egress_peer_xovr(SCIONCommonHeader *sch) {
+int XIASCIONForwarder::egress_peer_xovr(SCIONCommonHeader *sch) {
   HopOpaqueField *hof;
   HopOpaqueField *prev_hof;
   InfoOpaqueField *iof;
@@ -1005,7 +1005,7 @@ int XIANEWXIDRouteTable::egress_peer_xovr(SCIONCommonHeader *sch) {
   return -10;
 }
 
-int XIANEWXIDRouteTable::egress_core_xovr(SCIONCommonHeader *sch){
+int XIASCIONForwarder::egress_core_xovr(SCIONCommonHeader *sch){
   HopOpaqueField *hof;
   HopOpaqueField *prev_hof;
   InfoOpaqueField *iof;
@@ -1031,7 +1031,7 @@ int XIANEWXIDRouteTable::egress_core_xovr(SCIONCommonHeader *sch){
   return -10;
 }
 
-int XIANEWXIDRouteTable::egress_normal_forward(SCIONCommonHeader *sch) {  
+int XIASCIONForwarder::egress_normal_forward(SCIONCommonHeader *sch) {  
   HopOpaqueField *hof;
   HopOpaqueField *prev_hof;
   InfoOpaqueField *iof;
@@ -1060,11 +1060,11 @@ int XIANEWXIDRouteTable::egress_normal_forward(SCIONCommonHeader *sch) {
 //
 //skip verification now as the routers do not have mac key
 //
-int XIANEWXIDRouteTable::verify_of(HopOpaqueField *hof, HopOpaqueField *prev_hof, uint32_t ts) {
+int XIASCIONForwarder::verify_of(HopOpaqueField *hof, HopOpaqueField *prev_hof, uint32_t ts) {
   return 1;
 }
 
-int XIANEWXIDRouteTable::scion_forward_packet(const struct click_xia* xiah) {
+int XIASCIONForwarder::scion_forward_packet(const struct click_xia* xiah) {
   //XIAHeader xiah(hdr);
   uint8_t* packet = (uint8_t *)(xiah);
   int total_nodes = xiah->dnode + xiah->snode;
@@ -1138,7 +1138,7 @@ int XIANEWXIDRouteTable::scion_forward_packet(const struct click_xia* xiah) {
 
 
 /*
-int XIANEWXIDRouteTable::scion_forward_packet(const struct click_xia* xiah) {
+int XIASCIONForwarder::scion_forward_packet(const struct click_xia* xiah) {
   //XIAHeader xiah(hdr);
   uint8_t* packet = (uint8_t *)(xiah);
   int total_nodes = xiah->dnode + xiah->snode;
@@ -1202,5 +1202,5 @@ int XIANEWXIDRouteTable::scion_forward_packet(const struct click_xia* xiah) {
 */
 //
 CLICK_ENDDECLS
-EXPORT_ELEMENT(XIANEWXIDRouteTable)
-ELEMENT_MT_SAFE(XIANEWXIDRouteTable)
+EXPORT_ELEMENT(XIASCIONForwarder)
+ELEMENT_MT_SAFE(XIASCIONForwarder)
