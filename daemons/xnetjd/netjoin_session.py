@@ -174,7 +174,7 @@ class NetjoinSession(threading.Thread):
         netjoin_h3.print_cyphertext()
 
         # Verify the client_session_id matches the encrypted one
-        if not netjoin_h3.valid_client_session_id():
+        if not netjoin_h3.valid_gateway_session_id():
             logging.error("Invalid client session ID")
             return
 
@@ -185,7 +185,7 @@ class NetjoinSession(threading.Thread):
         logging.info("Valid handshake three: We can join this network now")
 
         # Configure Click info
-        if len(client_hid < 20):
+        if len(self.client_hid) < 20:
             logging.error("Client HID not known while handling H3")
             return
         client_hid = str(self.client_hid)
@@ -228,6 +228,14 @@ class NetjoinSession(threading.Thread):
                 else:
                     logging.error("Invalid message: {}".format(message_type))
                     logging.error("Expected handshake two.")
+                continue
+
+            if self.state == self.HS_3_WAIT:
+                if message_type == "handshake_three":
+                    self.handle_handshake_three(message_tuple)
+                else:
+                    logging.error("Invalid message: {}".format(message_type))
+                    logging.error("Expected handshake three.")
                 continue
 
         logging.debug("Shutting down session ID: {}".format(self.session_ID))
