@@ -30,6 +30,8 @@ class NetjoinSession(threading.Thread):
         self.auth = auth
         self.session_ID = NetjoinSession.next_session_ID
         NetjoinSession.next_session_ID += 1
+        # TODO Is this the best place to store client HID recv'd in H1?
+        self.client_hid = None
 
         # Create an encryption/authentication session if one not provided
         if not self.auth:
@@ -96,6 +98,7 @@ class NetjoinSession(threading.Thread):
             deny_h2 = True
             logging.info("HandshakeOne invalid, denying connection request")
         logging.info("Accepted handshake one from client")
+        self.client_hid = netjoin_h1.hex_client_hid()
 
         # Retrieve handshake one info to be included in handshake two
         h1_nonce = netjoin_h1.get_nonce()
@@ -143,6 +146,37 @@ class NetjoinSession(threading.Thread):
         if retval != 0:
             logging.error("Failed updating DAG in XIA stack")
         logging.info("Local DAG updated")
+
+    def handle_handshake_three(self, message_tuple):
+        message, interface, mymac, theirmac = message_tuple
+
+        logging.info("Got a handshake three message")
+        netjoin_h3 = NetjoinHandshakeTwo(self)
+        netjoin_h3.from_wire_handshake_three(message.handshake_three)
+        netjoin_h3.print_handshake_three()
+        netjoin_h3.print_cyphertext()
+
+        # Verify the client_session_id matches the encrypted one
+        if not netjoin_h3.valid_client_session_id():
+            logging.error("Invalid client session ID")
+            return
+
+        # Ensure that our netjoin request was granted
+        if not netjoin_h3.join_granted():
+            logging.error("Our join request was denied")
+            return
+        logging.info("Valid handshake three: We can join this network now")
+
+        # Configure Click info
+        if len(client_hid < 20):
+            logging.error("Client HID not known while handling H3")
+            return
+        client_hid = str(self.client_hid)
+        logging.info("Routing table now points to: {}".format(client_hid))
+        # TODO: Configure routing table
+        # interface number is the port for the route
+        # client_hid is the entry in HID routing table and also next hop
+        # flags are 0xffff
 
     # Main thread handles all messages based on state of joining session
     def run(self):
