@@ -14,6 +14,7 @@ from netjoin_message_pb2 import NetjoinMessage
 from netjoin_authsession import NetjoinAuthsession
 from netjoin_handshake_one import NetjoinHandshakeOne
 from netjoin_handshake_two import NetjoinHandshakeTwo
+from netjoin_handshake_three import NetjoinHandshakeThree
 
 # A client session reperesenting a client joining a network
 class NetjoinSession(threading.Thread):
