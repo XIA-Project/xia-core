@@ -44,6 +44,10 @@ class NetjoinHandshakeOne(object):
         core.client_credentials.null.SetInParent()
         core.client_session_id = session.get_ID()
 
+    def hex_client_hid(self):
+        raw_hid = self.payload.core.client_l3_req.xip.single.ClientHID
+        return self.conf.raw_hid_to_hex(raw_hid)
+
     def client_session_id(self):
         return self.payload.core.client_session_id
 
