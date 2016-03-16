@@ -332,6 +332,63 @@ message GatewayCredentials {
 
 // Gateway\ credentials\ for\ the\ client::1 ends here
 
+// [[file:~/work/git/xia-vehicular/veh/jacp-spec.orgmk::*Client%20Confirmation%20(Handshake%20Message%203)][Client\ Confirmation\ \(Handshake\ Message\ 3\):1]]
+
+message HandshakeThree {
+    // encrypted (HandshakeThreeProtected)
+    required EncryptedData cyphertext = 1;
+    optional uint32 gateway_session_id = 2;
+}
+
+message HandshakeThreeProtected {
+    // Must match unprotected (that is, unsigned) session id.
+    optional uint32 gateway_session_id = 1;
+    optional LayerTwoClientAck client_l2_ack_nack = 2;
+    optional LayerThreeClientAck client_l3_ack_nack = 3;
+    optional GatewayCredentialReply gateway_gc_reply = 4;
+}
+
+// Client\ Confirmation\ \(Handshake\ Message\ 3\):1 ends here
+
+// [[file:~/work/git/xia-vehicular/veh/jacp-spec.orgmk::*Client%20response%20to%20gateway's%20credentials:][Client\ response\ to\ gateway\'s\ credentials::1]]
+
+message GatewayCredentialReply {
+    message GatewayCredentialAccept {}
+    message GatewayCredentialDeny {}
+    oneof client_response {
+        GatewayCredentialAccept accept = 1;
+        GatewayCredentialDeny deny = 2;
+    }
+}
+
+// Client\ response\ to\ gateway\'s\ credentials::1 ends here
+
+// [[file:~/work/git/xia-vehicular/veh/jacp-spec.orgmk::*Client%20Ack/Nack%20of%20gateway's%20L2%20configuration%20directives][Client\ Ack/Nack\ of\ gateway\'s\ L2\ configuration\ directives:1]]
+
+message LayerTwoClientAck {
+    message LayerTwoNack { }
+    message LayerTwoAck{ }
+    oneof l2_reply {
+        LayerTwoNack nack = 1;
+        LayerTwoAck ack = 2;
+    }
+}
+
+// Client\ Ack/Nack\ of\ gateway\'s\ L2\ configuration\ directives:1 ends here
+
+// [[file:~/work/git/xia-vehicular/veh/jacp-spec.orgmk::*Client%20Ack/Nack%20of%20gateway's%20L3%20configuration%20directives][Client\ Ack/Nack\ of\ gateway\'s\ L3\ configuration\ directives:1]]
+
+message LayerThreeClientAck {
+    message LayerThreeNack { }
+    message LayerThreeAck{ }
+    oneof l3_reply {
+        LayerThreeNack nack = 1;
+        LayerThreeAck ack = 2;
+    }
+}
+
+// Client\ Ack/Nack\ of\ gateway\'s\ L3\ configuration\ directives:1 ends here
+
 // [[file:~/work/git/xia-vehicular/veh/jacp-spec.orgmk::*Some%20dummy%20/%20placeholder%20stubs][Some\ dummy\ /\ placeholder\ stubs:1]]
 
 message Real80211AssocRequestParams {
