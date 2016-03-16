@@ -6,6 +6,7 @@ message NetjoinMessage {
 		NetDescriptor net_descriptor = 1;
 		HandshakeOne handshake_one = 2;
 		HandshakeTwo handshake_two = 3;
+		HandshakeThree handshake_three = 4;
 	}
 }
 
