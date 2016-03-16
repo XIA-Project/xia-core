@@ -64,6 +64,12 @@ class NetjoinHandshakeTwo(object):
         data_to_encrypt = self.cyphertext.SerializeToString()
         self.handshake_two.cyphertext.cyphertext = session.auth.encrypt(data_to_encrypt, challenge)
 
+    def get_gateway_session_id(self):
+        return self.cyphertext.gateway_session_id
+
+    def get_nonce(self):
+        return self.handshake_two.cyphertext.nonce
+
     def router_dag(self):
         xhcp_info = self.cyphertext.gateway_l3_reply.grant.XIP.single.pxhcp
         return xhcp_info.router_dag

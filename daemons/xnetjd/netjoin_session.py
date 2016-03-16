@@ -147,6 +147,22 @@ class NetjoinSession(threading.Thread):
             logging.error("Failed updating DAG in XIA stack")
         logging.info("Local DAG updated")
 
+        # Retrieve handshake two info to be included in handshake three
+        h2_nonce = netjoin_h2.get_nonce()
+        gateway_session_id = netjoin_h2.gateway_session_id()
+
+        # Build a handshake three in responso to this handshake two
+        logging.info("Sending handshake three")
+        netjoin_h3 = NetjoinHandshakeThree(self, deny=False,
+                challenge=h2_nonce, gateway_session=gateway_session_id)
+
+        # Package the handshake three into a netjoin message wrapper
+        outgoing_message = NetjoinMessage()
+        outgoing_message.handshake_three.CopyFrom(netjoin_h3.handshake_three)
+        self.send_netjoin_message(outgoing_message, interface, theirmac)
+
+        # TODO; notify policy module that the client side handshake is complete
+
     def handle_handshake_three(self, message_tuple):
         message, interface, mymac, theirmac = message_tuple
 
