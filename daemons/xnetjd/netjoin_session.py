@@ -168,7 +168,7 @@ class NetjoinSession(threading.Thread):
         message, interface, mymac, theirmac = message_tuple
 
         logging.info("Got a handshake three message")
-        netjoin_h3 = NetjoinHandshakeTwo(self)
+        netjoin_h3 = NetjoinHandshakeThree(self)
         netjoin_h3.from_wire_handshake_three(message.handshake_three)
         netjoin_h3.print_handshake_three()
         netjoin_h3.print_cyphertext()
