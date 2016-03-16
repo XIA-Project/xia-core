@@ -39,7 +39,7 @@ class NetjoinHandshakeTwo(object):
         self.handshake_two.cyphertext.nonce = session.auth.get_nonce()
 
         # Put in the plaintext client_session_id
-        self.handshake_two.cyphertext.client_session_id = client_session
+        self.handshake_two.client_session_id = client_session
 
         # The protobuf defining the encrypted message
         l2_reply = self.cyphertext.gateway_l2_reply
@@ -101,7 +101,7 @@ class NetjoinHandshakeTwo(object):
             return True
 
     def valid_client_session_id(self):
-        plain_client_sess_id = self.handshake_two.cyphertext.client_session_id
+        plain_client_sess_id = self.handshake_two.client_session_id
         secure_client_sess_id = self.cyphertext.client_session_id
         return plain_client_sess_id == secure_client_sess_id
 

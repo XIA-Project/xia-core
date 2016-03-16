@@ -75,7 +75,7 @@ class NetjoinReceiver(threading.Thread):
 
         # Find the session this message should be delivered to
         handshake_two = message_tuple[0].handshake_two
-        client_session_id = handshake_two.cyphertext.client_session_id
+        client_session_id = handshake_two.client_session_id
 
         # Deliver the message
         if not client_session_id in self.client_sessions:
