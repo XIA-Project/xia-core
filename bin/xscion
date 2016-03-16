@@ -1,23 +1,45 @@
 #!/bin/bash
+# NOTE: this script assumes that the xia-core and scion directories
+# live at the same level in the directory tree
 
 # find the root of the xia tree
 XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
+cd $XIADIR
 
 action=$1
 shift
 
-if [ $action == "start" ]; then
-	echo make sure you have started the SCION infrastructure first!
+if [ "$action" == "scion" ]; then
+	cd ../scion
 
-elif [ "$action" != "stop" ] && [ "$action" != "check" ]; then
-	echo Missing or invalid acion!
+	if [ "$1" == "config" ]; then	
+		echo configuring the SCION infrastructure
+		cp ../xia-core/scion/SCIONXIA.topo topology/Default.topo
+		./scion.sh build
+		./scion.sh topology
+
+	elif [ "$1" == "start" ]; then
+		./scion.sh run
+		./scion.sh sock_cli 1 12 &
+	
+	elif [ "$1" == "stop" ]; then
+		./scion.sh stop
+
+	else
+		echo Invalid SCION command
+	fi
+	exit
+
+elif [ "$action" != "start" ] && [ "$action" != "stop" ] && [ "$action" != "check" ]; then
+	echo usage:
+	echo    "xscion [start|stop|check] args to control XIA"
+	echo    "xscion scion [start|stop|config] to control SCION"
 	exit 1
 fi
 
-[ action == "start" ] && echo make sure you have started the SCION infrastructure first!
-
-cd $XIADIR
 bin/xianet -S $@ $action
 
-# add the scion gateway to resolv.conf
-echo "scion_gateway=$(grep "DATA ID" /var/log/syslog | tail -1 | cut -d' ' -f10)" >> etc/resolv.conf
+if [ "$action" == "start" ]; then
+	echo adding gateway to resolv.conf
+	echo "scion_gateway=$(grep "DATA ID" /var/log/syslog | tail -1 | cut -d' ' -f10)" >> etc/resolv.conf
+fi
