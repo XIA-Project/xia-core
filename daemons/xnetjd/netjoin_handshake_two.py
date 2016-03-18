@@ -76,7 +76,7 @@ class NetjoinHandshakeTwo(object):
 
     def nameserver_dag(self):
         xhcp_info = self.cyphertext.gateway_l3_reply.grant.XIP.single.pxhcp
-        return xhcp_info.ns_dag
+        return xhcp_info.nameserver_dag
 
     def layer_two_granted(self):
         l2_response_t = self.cyphertext.gateway_l2_reply.WhichOneof("l2_reply")
