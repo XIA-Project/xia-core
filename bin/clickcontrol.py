@@ -191,6 +191,9 @@ class ClickControl:
 
     # Set nameserver DAG
     def setNSDAG(self, ns_dag):
+        # TODO: Remove this hacky import.
+        # Only python modules that have XIA swig in path can call this method
+        import c_xsocket
         sockfd = c_xsocket.Xsocket(c_xsocket.SOCK_STREAM)
         retval = c_xsocket.XupdateNameServerDAG(sockfd, ns_dag)
         if retval != 0:
