@@ -426,9 +426,9 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 			}
 			g = g * Node(stype, sname);
 			g.fill_sockaddr(&sa);
-			if((rc =_append_addrinfo(pai, sa, socktype, protocol, cname)) != 0) {
-				return rc;
-			}
+		}
+		if((rc =_append_addrinfo(pai, sa, socktype, protocol, cname)) != 0) {
+			return rc;
 		}
 
 	} else {
