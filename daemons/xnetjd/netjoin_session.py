@@ -150,6 +150,13 @@ class NetjoinSession(threading.Thread):
             logging.error("Failed updating DAG in XIA stack")
         logging.info("Local DAG updated")
 
+        # Set the nameserver dag into Click
+        ns_dag = str(netjoin_h2.nameserver_dag())
+        with ClickControl() as click:
+            if click.setNSDAG(ns_dag) == False:
+                logging.error("Failed updating Nameserver DAG in XIA Stack")
+        logging.info("Nameserver DAG updated")
+
         # Retrieve handshake two info to be included in handshake three
         h2_nonce = netjoin_h2.get_nonce()
         gateway_session_id = netjoin_h2.get_gateway_session_id()

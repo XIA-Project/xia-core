@@ -189,6 +189,15 @@ class ClickControl:
             return False
         return True
 
+    # Set nameserver DAG
+    def setNSDAG(self, ns_dag):
+        sockfd = c_xsocket.Xsocket(c_xsocket.SOCK_STREAM)
+        retval = c_xsocket.XupdateNameServerDAG(sockfd, ns_dag)
+        if retval != 0:
+            print "Failed updating Nameserver DAG in Click"
+            return False
+        return True
+
 # If this library is run by itself, it does a unit test that
 # connects to Click and configures its elements as an XIAEndHost
 if __name__ == "__main__":

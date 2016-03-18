@@ -74,6 +74,10 @@ class NetjoinHandshakeTwo(object):
         xhcp_info = self.cyphertext.gateway_l3_reply.grant.XIP.single.pxhcp
         return xhcp_info.router_dag
 
+    def nameserver_dag(self):
+        xhcp_info = self.cyphertext.gateway_l3_reply.grant.XIP.single.pxhcp
+        return xhcp_info.ns_dag
+
     def layer_two_granted(self):
         l2_response_t = self.cyphertext.gateway_l2_reply.WhichOneof("l2_reply")
         if l2_response_t == "deny":
