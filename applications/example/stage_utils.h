@@ -18,17 +18,20 @@
 #include "Xsocket.h"
 #include "dagaddr.hpp"
 #include <assert.h>
-
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <errno.h>
+#include <stddef.h>
 #include <sys/time.h>
 
 #include "Xkeys.h"
 
 #define MAX_XID_SIZE 100
 #define RECV_BUF_SIZE 1024
-#define XIA_MAX_BUF 15600 
+#define XIA_MAX_BUF 15600
 #define MAX_CID_NUM 20
 
-#define CHUNKSIZE 1024 
+#define CHUNKSIZE 1024
 
 #define REREQUEST 6
 #define NUM_CHUNKS 1 // 12 is the max NUM_CHUNKS to fetch at one time for 1024 K
@@ -40,7 +43,7 @@
 
 #define PREFETCH_SERVER_NAME "www_s.prefetch_server.aaa.xia"
 #define PREFETCH_MANAGER_NAME "www_s.prefetch_client.aaa.xia"
-
+#define UNIXMANAGERSOCK "/tmp/stage_manager.sock"
 #define GETSSID_CMD "iwgetid -r"
 
 #define PURGE_DELAY_SEC 10
@@ -52,8 +55,11 @@
 #define SCAN_DELAY_MSEC 10
 
 #define BLANK 0	// initilized: by registration message
-#define PENDING 1 // chunk is being fetched/prefetched 
-#define READY 2	// chunk is available in the local/network cache 
+#define PENDING 1 // chunk is being fetched/prefetched
+#define READY 2	// chunk is available in the local/network cache
+
+#define NS_LOOKUP_RETRY_NUM 30
+#define NS_LOOKUP_WAIT_MSEC 1000
 
 using namespace std;
 
@@ -72,12 +78,12 @@ char *randomString(char *buf, int size);
 vector<string> strVector(char *strs);
 
 // format: STAGE_SERVER_NAME.getAD()
-char *getStageServiceName();
+const char *getStageServiceName();
 
 // format: STAGE_MANAGER_NAME.getHID()
-char *getStageManagerName();
+const char *getStageManagerName();
 
-char *getXftpName();
+const char *getXftpName();
 
 char *string2char(string str);
 
@@ -108,8 +114,8 @@ int getReply(int sock, const char *cmd, char *reply, sockaddr_x *sa, int timeout
 
 int sendStreamCmd(int sock, const char *cmd);
 
-int sayHello(int sock, const char *helloMsg);
-
+//int sayHello(int sock, const char *helloMsg);
+#define sayHello    sendStreamCmd
 int hearHello(int sock);
 
 // assume there is no fallback and only one SID or the first SID encounted is the final intent
@@ -119,16 +125,20 @@ int XgetServADHID(const char *name, char *ad, char *hid);
 
 int initDatagramClient(const char *name, struct addrinfo *ai, sockaddr_x *sa);
 
-// make connection, instantiate src_ad, src_hid, dst_ad, dst_hid 
+// make connection, instantiate src_ad, src_hid, dst_ad, dst_hid
 int initStreamClient(const char *name, char *src_ad, char *src_hid, char *dst_ad, char *dst_hid);
 
 int registerDatagramReceiver(char* name);
 
+int reXgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen);
+
 // register the service with the name server and open the necessary sockets, update with XListen
-int registerStreamReceiver(char *name, char *myAD, char *myHID, char *my4ID);
+int registerStreamReceiver(const char *name, char *myAD, char *myHID, char *my4ID);
 
 // bind the receiving function
 void *blockListener(void *listenID, void *recvFuntion (void *));
+
+void *twoFunctionBlockListener(void *listenID, void *OneRecvFuntion (void *), void *TwoRecvFuntion (void *));
 
 int getIndex(string target, vector<string> pool);
 
@@ -157,10 +167,13 @@ int registerPrefetchService(const char *name, char *src_ad, char *src_hid, char 
 
 int updateManifestOld(int sock, vector<string> CIDs);
 */
-
+//add Unix Socket   --Lwy   1.20
+int registerUnixStreamReceiver(const char *servername);
+int UnixBlockListener(void* listenId, void* recvFuntion (void*));
+int registerUnixStageManager(const char* servername);
 #endif
 
-/* reference 
+/* reference
 
 #define MAXBUFLEN = XIA_MAXBUF = XIA_MAXCHUNK = 15600
 

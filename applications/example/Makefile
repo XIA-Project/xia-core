@@ -33,7 +33,7 @@ stage_manager: stage_manager.c stage_utils.c
 stage_server: stage_server.c stage_utils.c
 	$(CC) -o $@ $(CFLAGS) $^ $(LDFLAGS) -lpthread
 
-xftp_adv_server: xftp_adv_server.c prefetch_utils.c
+xftp_adv_server: xftp_adv_server.c stage_utils.c
 	$(CC) -o $@ $(CFLAGS) $^ $(LDFLAGS) -lpthread
 
 xftp_adv_client_backup: xftp_adv_client_backup.c prefetch_utils.c

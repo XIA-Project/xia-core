@@ -88,14 +88,14 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 	xia::X_Recv_Msg *xrm = xsm.mutable_x_recv();
 	xrm->set_bytes_requested(len);
 	xrm->set_flags(flags);
-
+//printf(" 1111 In Xrecv 1111 In Xrecv 1111 In Xrecv 1111 In Xrecv 1111 In Xrecv 1111 In Xrecv\n");
 	if (click_send(sockfd, &xsm) < 0) {
 		if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
 			LOGF("Error talking to Click: %s", strerror(errno));
 		}
 		return -1;
 	}
-
+//printf(" 2222 In Xrecv 2222 In Xrecv 2222 In Xrecv 2222 In Xrecv 2222 In Xrecv 2222 In Xrecv\n");
 	xsm.Clear();
 	if ((numbytes = click_reply(sockfd, seq, &xsm)) < 0) {
 		if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
@@ -107,7 +107,7 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 		LOG("The peer closed the connection");
 		return 0;
 	}
-
+//printf(" 3333 In Xrecv 3333 In Xrecv 3333 In Xrecv 3333 In Xrecv 3333 In Xrecv 3333 In Xrecv\n");
 	xrm = xsm.mutable_x_recv();
 	const char *payload = xrm->payload().c_str();
 
@@ -161,18 +161,18 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 	struct sockaddr *addr, socklen_t *addrlen)
 {
 	int iface = 0;
-
+//printf("```````````````````````````In Xrecvfrom 1\n");
 	if (validateSocket(sockfd, XSOCK_DGRAM, EOPNOTSUPP) < 0) {
 		LOGF("Socket %d must be a datagram socket", sockfd);
 		return -1;
 	}
-
+//printf("```````````````````````````In Xrecvfrom 2\n");
 	if (getConnState(sockfd) == CONNECTED) {
 		LOGF("socket %d is connected, use Xrecv instead!", sockfd);
 		errno = EISCONN;
 		return -1;
 	}
-
+//printf("```````````````````````````In Xrecvfrom 3\n");
 	return _xrecvfrom(sockfd, rbuf, len, flags, (sockaddr_x *)addr, addrlen, &iface);
 }
 
