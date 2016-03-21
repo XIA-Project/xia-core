@@ -134,6 +134,7 @@ private:
 			interface_id = -1;
 			polling = false;
 			recv_pending = false;
+			scion = false;
 			timer_on = false;
 			hlim = HLIM_DEFAULT;
 			full_src_dag = false;
@@ -179,6 +180,7 @@ private:
 		int interface_id;			// port of the interface the packets arrive on
 		unsigned polling;			// # of outstanding poll/select requests on this socket
 		bool recv_pending;			// true if API is waiting to receive data
+		bool scion;					// true if we should attempt SCION routing
 		bool timer_on;				// if true timer is enabled
 		Timestamp expiry;			// when timer should fire next
 		unsigned refcount;			// bumped whenever owning app is forked

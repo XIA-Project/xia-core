@@ -63,6 +63,7 @@ int Xsocket(int family, int transport_type, int protocol)
 	int rc;
 	int sockfd;
 	int block = TRUE;
+	int scion = FALSE;
 
 	if (family != AF_XIA) {
 		LOG("error: the Xsockets API only supports the AF_XIA family");
@@ -76,6 +77,10 @@ int Xsocket(int family, int transport_type, int protocol)
 
 	if (transport_type & SOCK_NONBLOCK) {
 		block = FALSE;
+	}
+
+	if (transport_type & XSOCK_SCION) {
+		scion = TRUE;
 	}
 
 	// get rid of the flags
@@ -108,6 +113,7 @@ int Xsocket(int family, int transport_type, int protocol)
 
 	xia::X_Socket_Msg *x_socket_msg = xsm.mutable_x_socket();
 	x_socket_msg->set_type(transport_type);
+	x_socket_msg->set_scion(scion);
 
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));

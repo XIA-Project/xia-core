@@ -95,7 +95,7 @@ int print_packet_header(click_xia *xiah)
 	syslog(LOG_INFO, "last:%d", xiah->last);
 
 	int total_nodes = xiah->dnode + xiah->snode;
-	
+
 	for(int i = 0; i < total_nodes; i++) {
 		uint8_t id[20];
 		char hex_string[41];
@@ -117,23 +117,23 @@ int print_packet_header(click_xia *xiah)
 			case CLICK_XIA_XID_TYPE_HID:
 				strcpy(type, "HID");
 			break;
-			
+
 			case CLICK_XIA_XID_TYPE_SID:
 				strcpy(type, "SID");
 			break;
-			
+
 			case CLICK_XIA_XID_TYPE_CID:
 				strcpy(type, "CID");
 			break;
-			
+
 			case CLICK_XIA_XID_TYPE_IP:
 				strcpy(type, "4ID");
 			break;
-			
+
 			case CLICK_XIA_XID_TYPE_SCIONID:
 				strcpy(type, "SCION");
 			break;
-			
+
 			default:
 				sprintf(type, "%d", xiah->node[i].xid.type);
 		};
@@ -181,7 +181,7 @@ uint32_t iof_get_timestamp(InfoOpaqueField* /* iof */)
 
 uint16_t iof_get_isd(InfoOpaqueField* iof)
 {
-	return (uint16_t)iof->isd_id[0] << 8 | iof->isd_id[1]; 
+	return (uint16_t)iof->isd_id[0] << 8 | iof->isd_id[1];
 }
 
 int print_scion_path_info(uint8_t* path, uint32_t path_len)
@@ -223,7 +223,7 @@ int get_scion_path(SCIONAddr * /*dst */, uint8_t* path)
 	memset(buf, 0, buflen);
 
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-	if (sockfd < 0) { 
+	if (sockfd < 0) {
 		syslog(LOG_ERR, "ERROR opening socket\n");
 		return -1;
 	}
@@ -241,14 +241,14 @@ int get_scion_path(SCIONAddr * /*dst */, uint8_t* path)
 	*(uint32_t *)(buf + 1) = htonl(ISD_AD(isd, ad));
 	//*(uint32_t *)(buf + 1) = htonl(dst->isd_ad);
 	sendto(sockfd, buf, 5, 0, (struct sockaddr*)&addr, addrlen);
-	
+
 	memset(buf, 0, buflen);
 	recvlen = recvfrom(sockfd, buf, buflen, 0, NULL, NULL);
 
 	if (recvlen > 0) {
 	  syslog(LOG_INFO, "%d bytes response from daemon\n", recvlen);
 	  int path_len = *buf * 8;
-	  syslog(LOG_INFO, "path length is %d bytes\n", path_len); 
+	  syslog(LOG_INFO, "path length is %d bytes\n", path_len);
 	  print_scion_path_info(buf + 1, path_len);
 	  memcpy(path, buf + 1, path_len);
 	  return path_len;
@@ -313,9 +313,9 @@ size_t add_scion_header(SCIONCommonHeader* sch, uint8_t* payload, uint16_t paylo
 
 	//data packet uses IPV4 although XIA-SCION does not use it at all.
 	//it is used to distinglish data or control packet
-	build_cmn_hdr(sch, ADDR_IPV4_TYPE, ADDR_IPV4_TYPE, L4_UDP);  
+	build_cmn_hdr(sch, ADDR_IPV4_TYPE, ADDR_IPV4_TYPE, L4_UDP);
 
-	//Fill in SCION addresses - 
+	//Fill in SCION addresses -
 	// we need to isd and ad information for routing.
 	// but we do not need the address info
 	src_addr.isd_ad = ISD_AD(1, 12);
@@ -366,7 +366,7 @@ int print_scion_header(uint8_t *hdr, uint16_t hdr_len) {
 	syslog(LOG_INFO, "currentOF: %d\n", sch->currentOF);
 	syslog(LOG_INFO, "nextHeader: %d\n", sch->nextHeader);
 	syslog(LOG_INFO, "headerLen: %d\n", sch->headerLen);
-	
+
 	iof = (InfoOpaqueField *)((unsigned char *)sch + sch->currentIOF);
 	dump_contents((uint8_t*)iof, 8);
 	syslog(LOG_INFO, "info %#x, flag %d, timestamp %d, isd-id %d, hops %d\n", iof->info >> 1, iof->info & 0x1, iof_get_timestamp(iof), iof_get_isd(iof), iof->hops);
@@ -377,7 +377,7 @@ int print_scion_header(uint8_t *hdr, uint16_t hdr_len) {
 	  syslog(LOG_INFO, "Ingress %d, Egress %d\n", hof_get_ingress(hof), hof_get_egress(hof));
 	  //DEBUG("ingress_egress_if %#x, %#x, Ingress %d, Egress %d\n", hof->ingress_egress_if, ntohl(hof->ingress_egress_if), INGRESS_if (hof), EGRESS_if (hof));
 	}
-	
+
 	return 0;
 }
 #endif
@@ -397,12 +397,12 @@ size_t add_scion_ext_header(click_xia_ext* xia_ext_header, uint8_t* packet_paylo
 	SCIONCommonHeader *scion_common_header = (SCIONCommonHeader*)((uint8_t*)xia_ext_header + 2);
 	size_t scion_len = add_scion_header(scion_common_header, packet_payload, payload_len);
 
-	xia_ext_header->hlen = (uint8_t)scion_len + 2; /*hlen is uint8 now*/ 
+	xia_ext_header->hlen = (uint8_t)scion_len + 2; /*hlen is uint8 now*/
 	xia_ext_header->nxt = CLICK_XIA_NXT_NO;
 
 	syslog(LOG_INFO, "scion ext header length %d", xia_ext_header->hlen);
 	print_scion_header((SCIONCommonHeader*)((uint8_t*)xia_ext_header + 2));
-	print_packet_contents((char*)xia_ext_header, xia_ext_header->hlen); 
+	print_packet_contents((char*)xia_ext_header, xia_ext_header->hlen);
 
 	return xia_ext_header->hlen;
 }
@@ -425,12 +425,12 @@ void add_scion_info(click_xia *xiah, int xia_hdr_len)
 
 	if (nxt_hdr_type != CLICK_XIA_NXT_NO) {
 		syslog(LOG_INFO, "next header type %d, xia hdr len %d ", (int)nxt_hdr_type, hdr_len);
-		
+
 		nxt_hdr_type = xia_ext_hdr->nxt;
 
 		while(nxt_hdr_type != CLICK_XIA_NXT_NO) {
 			syslog(LOG_INFO, "next header type %d, hdr len %d, xia hdr len %d ", (int)nxt_hdr_type, (int)xia_ext_hdr->hlen, hdr_len);
-		
+
 			hdr_len += xia_ext_hdr->hlen;
 			xia_ext_hdr = reinterpret_cast<struct click_xia_ext *>(packet + hdr_len);
 			nxt_hdr_type = xia_ext_hdr->nxt;
@@ -440,14 +440,14 @@ void add_scion_info(click_xia *xiah, int xia_hdr_len)
 	}
 
 	original_data = packet + hdr_len;
-	data_len = xia_hdr_len + original_payload_len - hdr_len; 
+	data_len = xia_hdr_len + original_payload_len - hdr_len;
 
 	syslog(LOG_INFO, "next header type %d, hdr len %d, data len %d, original payload len %d", (int)nxt_hdr_type, hdr_len, (int)data_len, original_payload_len);
 
 	assert(data_len >= 0);
 
 	memcpy(packet_data, original_data, data_len);
-	
+
 	// add SCION header
 	memset(packet + hdr_len, 0, data_len);
 
@@ -458,7 +458,7 @@ void add_scion_info(click_xia *xiah, int xia_hdr_len)
 	xia_ext_hdr->nxt = CLICK_XIA_NXT_NO;
 
 	syslog(LOG_INFO, "add scion hdr: scion header offset is %d", hdr_len);
-	
+
 	size_t scion_hdr_len = add_scion_ext_header(xia_ext_hdr, packet_data, data_len);
 
 	xiah->plen = htons(original_payload_len + (uint16_t)scion_hdr_len);
@@ -478,10 +478,10 @@ void add_scion_info_before_xtransport_hdr(click_xia *xiah, int xia_hdr_len)
 	//uint16_t xia_hdr_len =  sizeof(struct click_xia) + total_nodes*sizeof(struct click_xia_xid_node);
 	uint16_t hdr_len = xia_hdr_len;
 	uint8_t* packet = reinterpret_cast<uint8_t *>(xiah);
-	struct click_xia_ext* xia_ext_hdr = reinterpret_cast<struct click_xia_ext *>(packet + hdr_len);  
+	struct click_xia_ext* xia_ext_hdr = reinterpret_cast<struct click_xia_ext *>(packet + hdr_len);
 
 	memcpy(packet_data, packet + hdr_len, original_payload_len);
-	memset(packet + hdr_len, 0, original_payload_len); 
+	memset(packet + hdr_len, 0, original_payload_len);
 
 	xiah->nxt = CLICK_XIA_NXT_SCION;
 
@@ -565,8 +565,8 @@ void config(int argc, char** argv)
 	// Read Data plane SID from resolv.conf, if needed
 	if (datasid == NULL) {
 		char data_plane_DAG[MAX_RV_DAG_SIZE];
-		//if (XreadRVServerAddr(data_plane_DAG, MAX_RV_DAG_SIZE) == 0) {
-				if (XreadScionSID(data_plane_DAG, MAX_RV_DAG_SIZE) == 0) {
+
+		if (XreadScionSID(data_plane_DAG, MAX_RV_DAG_SIZE) == 0) {
 			char *sid = strstr(data_plane_DAG, "SID:");
 			datasid = (char *)calloc(strlen(sid) + 1, 1);
 			if (!datasid) {
@@ -657,16 +657,16 @@ void process_data(int datasock)
 	packetlen = retval;
 	Graph g(&rdag);
 	syslog(LOG_INFO, "gateway: Packet of size:%d received from %s:", retval, g.dag_string().c_str());
-	
+
 	click_xia *xiah = reinterpret_cast<struct click_xia *>(packet);
 	int total_nodes = print_packet_header(xiah);
 	int xia_header_size = sizeof(struct click_xia) + total_nodes * sizeof(struct click_xia_xid_node);
-		
+
 	syslog(LOG_INFO, "\ngateway: XIA header contents, size %d\n", xia_header_size);
 	print_packet_contents(packet, xia_header_size);
 	syslog(LOG_INFO, "\ngateway: contents after XIA header, size %d\n", retval - xia_header_size);
 	print_packet_contents(packet + xia_header_size, retval - xia_header_size);
-		 
+
 	//add scion infor as extension header here
 	//add_scion_info(xiah, xia_header_size);  //add scion hdr after all headers
 	add_scion_info_before_xtransport_hdr(xiah, xia_header_size);
@@ -677,17 +677,17 @@ void process_data(int datasock)
 	//xiah->node[0].xid.type = htonl(CLICK_XIA_XID_TYPE_SCIONID);
 	syslog(LOG_INFO, "gateway: change type to SCION");
 #endif
-		  
+
 	xiah->last = -1;
 	syslog(LOG_INFO, "gateway: Updated AD and last pointer in header");
 	print_packet_header(xiah);
 
 	click_xia_ext *eh = reinterpret_cast<struct click_xia_ext *>(packet+xia_header_size);
-	
+
 	print_ext_header(eh);
 	print_ext_header((click_xia_ext*)((char*)eh + eh->hlen));
 
-	// FIXME: we need to fix the magic number issue here. 
+	// FIXME: we need to fix the magic number issue here.
 	// is the scion header size vbariable or is it fixed now?
 	print_packet_contents(packet, retval + 126);
 	syslog(LOG_INFO, "gateway: Sending the packet out on the network");

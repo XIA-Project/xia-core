@@ -57,6 +57,7 @@ extern "C" {
 #define XSOCK_DGRAM  SOCK_DGRAM		// Unreliable transport (SID)
 #define XSOCK_RAW	 SOCK_RAW		// Raw XIA socket
 #define XSOCK_CHUNK  4				// Content Chunk transport (CID)
+#define XSOCK_SCION  0x00008000		// if set on the type field, use SCION to route the packets
 
 #define REQUEST_FAILED    0x00000001
 #define WAITING_FOR_CHUNK 0x00000002
@@ -101,7 +102,6 @@ typedef struct {
 #define XAI_DAGHOST	AI_NUMERICHOST	// if set, name is a dag instead of a generic name string
 #define XAI_XIDSERV	AI_NUMERICSERV	// if set, service is an XID instead of a name string
 #define XAI_FALLBACK 0x10000 		// if set, wrap the dag in parens
-#define XAI_SCION	 0x20000		// If set, add SCION gateway SID to the front of the DAG
 
 // XIA specific getaddrinfo error codes (move to xia.h)
 #define XEAI_UNIMPLEMENTED	-8000
