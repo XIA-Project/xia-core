@@ -65,7 +65,7 @@ elementclass XIAPacketRoute {
 	// c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, rt_FOO, [2]output;
 	
 	rt_AD, rt_HID, rt_SID, rt_CID, rt_IP :: XIAXIDRouteTable($local_addr, $num_ports);
-	rt_SCIONID :: XIASCIONForwarder($local_addr, $num_ports, n/proc/rt_HID);
+	rt_SCIONID :: XIASCIONForwarder($num_ports, n/proc/rt_HID);
 	c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, rt_SCIONID, [2]output;
 		
 	// TO ADD A NEW USER DEFINED XID (step 3)
