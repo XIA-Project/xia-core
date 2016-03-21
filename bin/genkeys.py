@@ -17,6 +17,7 @@
 import sys
 import os
 import re
+import stat
 import hashlib
 from Crypto.PublicKey import RSA
 
@@ -35,6 +36,8 @@ def write_key_files(basename, privkey, pubkey):
 	pubkeyfilename = os.path.join(keydir, basename + '.pub')
 	with open(privkeyfilename, 'w') as privkeyfile:
 		privkeyfile.write(privkey + '\n')
+        # Make the private key accessible only to owner
+        os.chmod(privkeyfilename, stat.S_IWRITE|stat.S_IREAD)
 	with open(pubkeyfilename, 'w') as pubkeyfile:
 		pubkeyfile.write(pubkey + '\n')
 
