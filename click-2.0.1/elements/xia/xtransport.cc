@@ -3024,6 +3024,7 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 		x_connect_msg->set_status(xia::X_Connect_Msg::XCONNECTING);
 		sk->so_error = EALREADY;
 		ReturnResult(_sport, xia_socket_msg, -1, EALREADY);
+		return;
 	}
 
 	sk->dst_path = dst_path;
