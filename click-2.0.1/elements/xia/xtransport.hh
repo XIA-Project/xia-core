@@ -345,7 +345,7 @@ protected:
 	// protocol handlers
 	void ProcessDatagramPacket(WritablePacket *p_in);
 	void ProcessStreamPacket(WritablePacket *p_in);
-	int HandleStreamRawPacket(WritablePacket *p_in);
+	int HandleRawPacket(WritablePacket *p_in);
 
 	// socket teardown
 	bool TeardownSocket(sock *sk);

@@ -1161,6 +1161,12 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 		return;
 	}
 
+	// see if a service like rendezvous or scion gateway wants it
+	if (HandleRawPacket(p_in)) {
+		// we handled it, no further processing is needed
+		return;
+	}
+
 	TransportHeader thdr(p_in);
 
 	switch(thdr.type()) {
@@ -1221,12 +1227,6 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 	// FIXME: creating variables is duplicated in this function and the one below
 	// that is called if this returns 0. Is it better to make the variable here
 	//  and pass all of them to the handlers?
-
-	// Is this packet arriving at a rendezvous server?
-	if (HandleStreamRawPacket(p_in)) {
-		// we handled it, no further processing is needed
-		return;
-	}
 
 	// FIXME: it might be clearer to have this table be based on current socket state
 	// but that would require rewriting more code, so leaving as is for now
@@ -1894,7 +1894,7 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 
 
 
-int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
+int XTRANSPORT::HandleRawPacket(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
 
@@ -1930,7 +1930,7 @@ int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 
 	String src_path_str = src_path.unparse();
 	String dst_path_str = dst_path.unparse();
-	INFO("received stream packet on raw socket");
+	INFO("received packet on raw socket");
 	INFO("src|%s|", src_path_str.c_str());
 	INFO("dst|%s|", dst_path_str.c_str());
 	INFO("len=%d", p_in->length());
@@ -1977,11 +1977,10 @@ void XTRANSPORT::ProcessSynAckPacket(WritablePacket *p_in)
 		return;
 	}
 
-	// FIXME: taking out migration support until we figure out how
-	// it coexists with scion
-    if(0) {
+	// FIXME: more migration / scion collisions need to be fixed yet!
+
 	// FIXME: this should become a migrate function
-	//if(sk->dst_path != src_path) {
+	if(!sk->scion && (sk->dst_path != src_path)) {
 		INFO("remote path in SYNACK different from that used in SYN");
 		// Retrieve the signed payload
 		const char *payload = (const char *)thdr.payload();
