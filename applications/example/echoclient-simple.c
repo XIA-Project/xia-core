@@ -157,18 +157,16 @@ int main(int argc, char **argv)
 	printf("%s %s\n", TITLE, VERSION);
 
 	// determine if we should use a stream or a datagram connection
-	if (argc == 2) {
-		if (strcmp(argv[1], "-d") == 0)
+	for (int i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "-d") == 0)
 			mode = 0;
-		else if(strcmp(argv[1], "-s") == 0)
+		else if(strcmp(argv[i], "-s") == 0)
 			mode = 1;
-		else if (strcmp(argv[1], "-S") == 0)
+		else if (strcmp(argv[i], "-S") == 0)
 			scion = 1;		
 		else
 			help();
 	}
-	else if (argc > 2)
-		help();
 
 	printf("running in %s mode\n", mode == 0 ? "datagram" : "stream");
 
