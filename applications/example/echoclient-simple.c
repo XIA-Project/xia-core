@@ -48,9 +48,13 @@ void echo_dgram()
 	char buf[2048];
 	char reply[2048];
 	int ns, nr;
+	unsigned type = SOCK_DGRAM;
 
+	if (scion) {
+		type |= XSOCK_SCION;
+	}
 	
-	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0) {
+	if ((sock = Xsocket(AF_XIA, type, 0)) < 0) {
 		printf("error creating socket\n");
 		exit(1);
 	}
@@ -91,17 +95,14 @@ void echo_stream()
 {
 	int sock;
 	sockaddr_x* sa;
-	socklen_t slen;
 	char buf[2048];
 	char reply[2048];
 	int ns, nr;
+	unsigned type = SOCK_STREAM;
 
     // lookup the xia service
     struct addrinfo hints;
 	bzero(&hints, sizeof(hints));
-	if (scion) {
-		hints.ai_flags = XAI_SCION;
-	}
 
 	if (Xgetaddrinfo(STREAM_NAME, NULL, &hints, &ai) != 0){
 		printf("unable to lookup name %s\n", STREAM_NAME);
@@ -109,7 +110,11 @@ void echo_stream()
 	}
 	sa = (sockaddr_x*)ai->ai_addr;
 
-	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
+	if (scion) {
+		type |= XSOCK_SCION;
+	}
+
+	if ((sock = Xsocket(AF_XIA, type, 0)) < 0) {
 		printf("error creating socket\n");
 		exit(1);
 	}

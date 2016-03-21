@@ -42,6 +42,7 @@
 int verbose = 1;	// display all messages
 int delay = -1;		// don't delay between loops
 int loops = 1;		// only do 1 pass
+int scion = 0;
 int pktSize = 512;	// default pkt size
 int reconnect = 0;	// don't reconnect between loops
 int threads = 1;	// just a single thread
@@ -56,9 +57,10 @@ sockaddr_x *sa;
 void help(const char *name)
 {
 	printf("\n%s (%s)\n", TITLE, VERSION);
-	printf("usage: %s [-q] -[l loops] [-s size] [-d delay] [-r recon] [-t threads]\n", name);
+	printf("usage: %s [-qS] -[l loops] [-s size] [-d delay] [-r recon] [-t threads]\n", name);
 	printf("where:\n");
 	printf(" -q : quiet mode\n");
+	printf(" -S : use SCION paths for routing\n");
 	printf(" -l loops : loop <loops> times and exit\n");
 	printf(" -s size : set packet size to <size>. if 0, uses random sizes\n");
 	printf(" -d delay : delay for <delay> hundredths of a second between sends\n");
@@ -77,7 +79,7 @@ void getConfig(int argc, char** argv)
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "hqd:l:s:r:t:")) != -1) {
+	while ((c = getopt(argc, argv, "hqSd:l:s:r:t:")) != -1) {
 		switch (c) {
 			case '?':
 			case 'h':
@@ -119,6 +121,9 @@ void getConfig(int argc, char** argv)
 				threads = atoi(optarg);
 				if (threads < 1) threads = 1;
 				if (threads > 100) threads = 100;
+				break;
+			case 'S':
+				scion = 1;
 				break;
 			default:
 				help(basename(argv[0]));
@@ -258,7 +263,13 @@ void pausex()
 int connectToServer()
 {
 	int ssock;
-	if ((ssock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0) {
+	unsigned type = SOCK_DGRAM;
+
+	if (scion) {
+		type |= XSOCK_SCION;
+	}
+
+	if ((ssock = Xsocket(AF_XIA, type, 0)) < 0) {
 		die(-2, "unable to create the socket\n");
 	}
 	say("Xsock %4d created\n", ssock);

@@ -263,7 +263,13 @@ void pausex()
 int connectToServer()
 {
 	int ssock;
-	if ((ssock = Xsocket(AF_XIA, XSOCK_STREAM, 0)) < 0) {
+	unsigned type = SOCK_STREAM;
+
+	if (scion) {
+		type |= XSOCK_SCION;
+	}
+
+	if ((ssock = Xsocket(AF_XIA, type, 0)) < 0) {
 		die(-2, "unable to create the server socket\n");
 	}
 	say("Xsock %4d created\n", ssock);
@@ -336,9 +342,6 @@ int main(int argc, char **argv)
 
 	struct addrinfo hints;
 	bzero(&hints, sizeof(hints));
-	if (scion) {
-		hints.ai_flags = XAI_SCION;
-	}
 
  	// this isn't working quit right, so commented out
 	// signal(SIGINT, quithandler);

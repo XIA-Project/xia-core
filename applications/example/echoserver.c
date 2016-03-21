@@ -259,7 +259,7 @@ void echo_stream()
 
 		Graph g(&sa);
 		say ("Xsock %4d new session\n", sock);
-		say("peer:%s\n", g.dag_string().c_str()); 
+		say("peer:%s\n", g.dag_string().c_str());
 
 		pid_t pid = Xfork();
 
