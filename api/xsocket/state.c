@@ -66,6 +66,7 @@ void SocketState::init()
 	m_timeout.tv_sec = 0;
 	m_timeout.tv_usec = 0;
 	m_port = 0;
+	m_scion = FALSE;
 	pthread_mutex_init(&m_sequence_lock, NULL);
 }
 
@@ -248,6 +249,22 @@ void setConnState(int sock, int conn)
 	SocketState *sstate = SocketMap::getMap()->get(sock);
 	if (sstate)
 		sstate->setConnState(conn);
+}
+
+int isScion(int sock)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		return sstate->isScion();
+	else
+		return FALSE;
+}
+
+void setScion(int sock, int scion)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate)
+		sstate->setScion(scion);
 }
 
 int isSIDAssigned(int sock)

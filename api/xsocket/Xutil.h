@@ -66,6 +66,8 @@ int getSocketType(int sock);
 void setSocketType(int sock, int tt);
 int getProtocol(int sock);
 void setProtocol(int sock, int p);
+int isScion(int sock);
+void setScion(int sock, int scion);
 int isSIDAssigned(int sock);
 void setSIDAssigned(int sock);
 int isTempSID(int sock);

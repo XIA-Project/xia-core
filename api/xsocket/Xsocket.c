@@ -129,6 +129,7 @@ int Xsocket(int family, int transport_type, int protocol)
 	if (rc == 0) {
 		setBlocking(sockfd, block);
 		setProtocol(sockfd, protocol);
+		setScion(sockfd, scion);
 		return sockfd;
 	}
 

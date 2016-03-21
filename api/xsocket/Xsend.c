@@ -159,6 +159,8 @@ int _xsendto(int sockfd, const void *buf, size_t len, int flags,
 	const sockaddr_x *addr, socklen_t addrlen)
 {
 	int rc;
+	char scion_sid[50];
+	sockaddr_x new_sa;
 
 	if (len == 0)
 		return 0;
@@ -178,6 +180,21 @@ int _xsendto(int sockfd, const void *buf, size_t len, int flags,
 		LOG("null pointer!\n");
 		errno = EFAULT;
 		return -1;
+	}
+
+	if (isScion(sockfd)) {
+		// we need to prepend the SCION gateway SID to the DAG
+		if (XreadScionSID(scion_sid, sizeof(scion_sid)) != 0) {
+			LOG("The SCION gateway SID is not present in etc/resolv.conf\n");
+			errno = ENETUNREACH;
+			return -1;
+		}
+		Graph g((sockaddr_x*)addr);
+		Graph gs = Node() * Node(scion_sid);
+		Graph gscion = gs * g;
+		gscion.fill_sockaddr(&new_sa);
+		addr = &new_sa;
+		LOGF("SCION DAG = \n%s\n", gscion.dag_string().c_str());
 	}
 
 	// FIXME: should this return an error, like sendto does?

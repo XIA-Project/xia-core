@@ -65,6 +65,9 @@ public:
 	int isSIDAssigned() { return m_sid_assigned; };
 	void setSIDAssigned() { m_sid_assigned = 1; };
 
+	int isScion() { return m_scion; };
+	void setScion(int scion) { m_scion = scion; };
+
 	unsigned short port() { return m_port; };
 	void setPort(unsigned short port) { m_port = port; };
 
@@ -79,6 +82,7 @@ private:
 	int m_connected;
 	int m_blocking;
 	int m_debug;
+	int m_scion;
 	sockaddr_x *m_peer;
 	char *m_temp_sid;
 	int m_sid_assigned;

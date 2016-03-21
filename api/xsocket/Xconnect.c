@@ -178,12 +178,31 @@ int Xconnect(int sockfd, const sockaddr *addr, socklen_t addrlen)
 {
 	int stype = getSocketType(sockfd);
 	int rc = -1;
+	char scion_sid[50];
+	sockaddr_x new_sa;
 
 	if (!addr) {
 		errno = EINVAL;
-		rc = -1;
+		return -1;
+	}
 
-	} else if (stype == SOCK_DGRAM) {
+	if (isScion(sockfd)) {
+		// we need to prepend the SCION gateway SID to the DAG
+		if (XreadScionSID(scion_sid, sizeof(scion_sid)) != 0) {
+			LOG("The SCION gateway SID is not present in etc/resolv.conf\n");
+			errno = ENETUNREACH;
+			return -1;
+		}
+
+		Graph g((sockaddr_x*)addr);
+		Graph gs = Node() * Node(scion_sid);
+		Graph gscion = gs * g;
+		gscion.fill_sockaddr(&new_sa);
+		addr = (sockaddr*)&new_sa;
+//		LOGF("SCION DAG = \n%s\n", gscion.dag_string().c_str());
+	}
+
+	if (stype == SOCK_DGRAM) {
 		rc = _connDgram(sockfd, addr, addrlen);
 
 	} else if (stype == SOCK_STREAM) {
