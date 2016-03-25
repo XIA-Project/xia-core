@@ -6,6 +6,7 @@ import socket
 import struct
 import logging
 import threading
+from netjoin_policy import NetjoinBeacon
 from netjoin_policy import NetjoinPolicy
 from netjoin_session import NetjoinSession
 from netjoin_message_pb2 import NetjoinMessage
@@ -37,16 +38,19 @@ class NetjoinReceiver(threading.Thread):
         logging.debug("Got a beacon")
 
         message = message_tuple[0]
+        # Convert network descriptor to a beacon
         serialized_net_descriptor = message.net_descriptor.SerializeToString()
+        beacon = NetjoinBeacon()
+        beacon.from_serialized_net_descriptor(serialized_net_descriptor)
 
         # Ask the policy module if we should join this network
-        if not self.policy.join_sender_of_serialized_net_descriptor(
-                serialized_net_descriptor):
+        if not self.policy.join_sender_of_beacon(beacon):
             logging.debug("Policy action: ignore beacon")
             return
 
         # Initiate a NetjoinSession thread to join the network
-        session = NetjoinSession(self.hostname, self.shutdown)
+        session = NetjoinSession(self.hostname, self.shutdown,
+                beacon_id=beacon.get_ID(), policy=self.policy)
         session.daemon = True
         session.start()
         self.client_sessions[session.get_ID()] = session

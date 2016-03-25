@@ -21,7 +21,11 @@ from netjoin_handshake_three import NetjoinHandshakeThree
 class NetjoinSession(threading.Thread):
     next_session_ID = 1
 
-    def __init__(self, hostname, shutdown_event, auth=None):
+    # auth is set on gateway side, new one created on client for handshake 1
+    # beacon_id is set only on client side
+    # policy is set only on client side
+    def __init__(self, hostname, shutdown_event,
+            auth=None, beacon_id=None, policy=None):
         threading.Thread.__init__(self)
         (self.START, self.HS_2_WAIT, self.HS_3_WAIT) = range(3)
 
@@ -31,6 +35,8 @@ class NetjoinSession(threading.Thread):
         self.hostname = hostname
         self.shutdown_event = shutdown_event
         self.auth = auth
+        self.beacon_id = beacon_id
+        self.policy = policy
         self.session_ID = NetjoinSession.next_session_ID
         NetjoinSession.next_session_ID += 1
         # TODO Is this the best place to store client HID recv'd in H1?
@@ -171,7 +177,11 @@ class NetjoinSession(threading.Thread):
         outgoing_message.handshake_three.CopyFrom(netjoin_h3.handshake_three)
         self.send_netjoin_message(outgoing_message, interface, theirmac)
 
-        # TODO; notify policy module that the client side handshake is complete
+        # notify policy module that the client side handshake is complete
+        if self.policy is None:
+            logging.error("Policy module not known for joined network")
+            return
+        self.policy.join_complete(self.beacon_id)
 
     def handle_handshake_three(self, message_tuple):
         message, interface, mymac, theirmac = message_tuple
