@@ -37,7 +37,7 @@ class NetjoinHandshakeOne(object):
         # Build the payload and add it to h1
         core = self.payload.core
         raw_mac = struct.pack("6B", mymac[0], mymac[1], mymac[2], mymac[3], mymac[4], mymac[5])
-        core.client_l2_req = self.session.l2_handler.build_request(raw_mac)
+        core.client_l2_req.CopyFrom(self.session.l2_handler.build_request(raw_mac))
         core.client_l3_req.xip.single.ClientHID = self.conf.get_raw_hid()
         core.client_l3_req.xip.single.ClientAIPPubKey = self.conf.get_der_key()
         core.client_l3_req.xip.single.configXIP.pxhcp.SetInParent()

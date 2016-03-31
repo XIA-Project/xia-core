@@ -83,6 +83,11 @@ class NetjoinSession(threading.Thread):
         message, interface, mymac, theirmac = message_tuple
 
         logging.info("Got a beacon from a network we want to join")
+
+        # A layer 2 handler for creating/processing l2 requests
+        l2_type = message.net_descriptor.l2_id.l2_type
+        self.l2_handler = self.create_l2_handler(l2_type)
+
         # Save access point verify key included in NetDescriptor message
         join_auth_info = message.net_descriptor.ac_shared.ja
         gateway_raw_key = join_auth_info.gateway_ephemeral_pubkey.the_key
@@ -100,9 +105,6 @@ class NetjoinSession(threading.Thread):
 
         # Send handshake one
         self.send_netjoin_message(outgoing_message, interface, theirmac)
-
-        l2_type = message.net_descriptor.l2_id.l2_type
-        self.l2_handler = self.create_l2_handler(l2_type)
 
         # Now we will wait for handshake two
         self.state = self.HS_2_WAIT
