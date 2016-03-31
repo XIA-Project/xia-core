@@ -9,6 +9,7 @@ import threading
 import nacl.utils
 import netjoin_session
 from netjoin_xiaconf import NetjoinXIAConf
+from netjoin_l2_handler import NetjoinL2Handler
 from netjoin_message_pb2 import SignedMessage
 
 # Build a HandshakeOne protobuf in response to a NetDescriptor beacon
@@ -36,7 +37,7 @@ class NetjoinHandshakeOne(object):
         # Build the payload and add it to h1
         core = self.payload.core
         raw_mac = struct.pack("6B", mymac[0], mymac[1], mymac[2], mymac[3], mymac[4], mymac[5])
-        core.client_l2_req.ethernet.client_mac_address = raw_mac
+        core.client_l2_req = self.session.l2_handler.build_request(raw_mac)
         core.client_l3_req.xip.single.ClientHID = self.conf.get_raw_hid()
         core.client_l3_req.xip.single.ClientAIPPubKey = self.conf.get_der_key()
         core.client_l3_req.xip.single.configXIP.pxhcp.SetInParent()
@@ -108,8 +109,9 @@ class NetjoinHandshakeOne(object):
         data_to_hash = h1.nonce + h1.client_ephemeral_pubkey
         return self.session.auth.sha512(data_to_hash)
 
-    def is_l2_valid(self):
-        return True
+    def l2_type(self):
+        l2_type_str = self.payload.core.client_l2_req.WhichOneof('l2_req')
+        return NetjoinL2Handler.l2_str_to_type[l2_type_str]
 
     def is_l3_valid(self):
 
@@ -152,10 +154,6 @@ class NetjoinHandshakeOne(object):
             logging.error("Headers have been tampered with")
             return False
         logging.debug("Headers have not been tampered")
-        # Handle l2 credentials
-        if not self.is_l2_valid():
-            logging.error("L2 creds invalid")
-            return False
         # Handle l3 credentials
         if not self.is_l3_valid():
             logging.error("L3 creds invalid")

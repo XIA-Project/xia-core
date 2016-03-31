@@ -5,14 +5,15 @@ import time
 import socket
 import struct
 import logging
-import ndap_pb2
 import threading
 import Queue
 import c_xsocket
 from clickcontrol import ClickControl
+from ndap_pb2 import LayerTwoIdentifier, NetDescriptor
 from netjoin_beacon import NetjoinBeacon
 from netjoin_message_pb2 import NetjoinMessage
 from netjoin_authsession import NetjoinAuthsession
+from netjoin_ethernet_handler import NetjoinEthernetHandler
 from netjoin_handshake_one import NetjoinHandshakeOne
 from netjoin_handshake_two import NetjoinHandshakeTwo
 from netjoin_handshake_three import NetjoinHandshakeThree
@@ -37,6 +38,7 @@ class NetjoinSession(threading.Thread):
         self.auth = auth
         self.beacon_id = beacon_id
         self.policy = policy
+        self.l2_handler = None    # Created on receiving beacon or handshake1
         self.session_ID = NetjoinSession.next_session_ID
         NetjoinSession.next_session_ID += 1
         # TODO Is this the best place to store client HID recv'd in H1?
@@ -67,6 +69,16 @@ class NetjoinSession(threading.Thread):
         outgoing_packet = netj_header + message.SerializeToString()
         self.sockfd.sendto(outgoing_packet, self.xianetjoin)
 
+    def create_l2_handler(self, l2_type):
+        l2_handler = None
+
+        if l2_type == LayerTwoIdentifier.ETHERNET:
+            l2_handler = NetjoinEthernetHandler()
+        else:
+            logging.error("Invalid l2_type: {}".format(l2_type))
+
+        return l2_handler
+
     def handle_net_descriptor(self, message_tuple):
         message, interface, mymac, theirmac = message_tuple
 
@@ -89,6 +101,9 @@ class NetjoinSession(threading.Thread):
         # Send handshake one
         self.send_netjoin_message(outgoing_message, interface, theirmac)
 
+        l2_type = message.net_descriptor.l2_id.l2_type
+        self.l2_handler = self.create_l2_handler(l2_type)
+
         # Now we will wait for handshake two
         self.state = self.HS_2_WAIT
 
@@ -101,8 +116,13 @@ class NetjoinSession(threading.Thread):
         netjoin_h1.print_handshake_one()
         netjoin_h1.print_payload()
 
+        # Layer 2 handler to create/process l2 requests
+        self.l2_handler = self.create_l2_handler(netjoin_h1.l2_type())
+
         # Validate incoming client joining request (handshake one)
         deny_h2 = False
+        l2_request = netjoin_h1.payload.core.client_l2_req
+        l2_reply = self.l2_handler.handle_request(l2_request)
         if not netjoin_h1.is_valid():
             deny_h2 = True
             logging.info("HandshakeOne invalid, denying connection request")
