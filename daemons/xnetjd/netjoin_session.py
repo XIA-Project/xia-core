@@ -187,7 +187,6 @@ class NetjoinSession(threading.Thread):
         logging.info("Nameserver DAG updated")
 
         # Retrieve handshake two info to be included in handshake three
-        h2_nonce = netjoin_h2.get_nonce()
         gateway_session_id = netjoin_h2.get_gateway_session_id()
 
         # Build a handshake three in responso to this handshake two
