@@ -12,7 +12,7 @@ from netjoin_xiaconf import NetjoinXIAConf
 # Build a HandshakeThree protobuf in response to a NetDescriptor beacon
 class NetjoinHandshakeThree(object):
 
-    def __init__(self, session, deny=False, challenge=None,
+    def __init__(self, session, deny=False,
             gateway_session=None):
         self.session = session
         self.conf = NetjoinXIAConf()
@@ -25,17 +25,12 @@ class NetjoinHandshakeThree(object):
         # A container for the encrypted data
         self.cyphertext = jacp_pb2.HandshakeThreeProtected()
 
-        # If a challenge was not provided, this message just came over the wire
+        # If a gateway_session was not provided,
+        # this message just came over the wire
         # Call from_wire_handshake_three to complete initialization
-        if not challenge:
-            return
-
         if not gateway_session:
-            logging.error("Gateway session ID not provided during H3 creation")
+            logging.info("Got handshake 3 over the wire")
             return
-
-        # A new nonce for the outgoing handshake three
-        self.handshake_three.cyphertext.nonce = session.auth.get_nonce()
 
         # Put in the plaintext gateway_session_id
         self.handshake_three.gateway_session_id = gateway_session
@@ -54,9 +49,15 @@ class NetjoinHandshakeThree(object):
             gc_reply.accept.SetInParent()
         self.cyphertext.gateway_session_id = gateway_session
 
-        # Encrypt the message with nonce received in handshake one (challenge)
+    # MUST call every time before sending out handshake three
+    def update_nonce(self):
+        # Create a new nonce
+        nonce = self.session.auth.get_nonce()
+
+        # Encrypt the message with newly created nonce
+        self.handshake_three.cyphertext.nonce = nonce
         data_to_encrypt = self.cyphertext.SerializeToString()
-        self.handshake_three.cyphertext.cyphertext = session.auth.encrypt(data_to_encrypt, challenge)
+        self.handshake_three.cyphertext.cyphertext = session.auth.encrypt(data_to_encrypt, nonce)
 
     def layer_three_granted(self):
         l2_response_t = self.cyphertext.client_l2_ack_nack.WhichOneof("l2_reply")

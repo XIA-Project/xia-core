@@ -100,10 +100,6 @@ class NetjoinHandshakeOne(object):
         # Populate the internal payload after decrypting it
         self.payload.ParseFromString(serialized_payload)
 
-    # Used at receiver of handshake one to retrieve nonce that came over wire
-    def get_nonce(self):
-        return self.handshake_one.encrypted.nonce
-
     def get_hash_of_headers(self):
         h1 = self.handshake_one.encrypted
         data_to_hash = h1.nonce + h1.client_ephemeral_pubkey

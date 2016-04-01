@@ -12,11 +12,10 @@ from netjoin_xiaconf import NetjoinXIAConf
 # Build a HandshakeTwo protobuf in response to a NetDescriptor beacon
 class NetjoinHandshakeTwo(object):
 
-    def __init__(self, session, deny=False, challenge=None,
+    def __init__(self, session, deny=False,
             client_session=None):
         self.session = session
         self.conf = NetjoinXIAConf()
-        self.challenge = challenge
 
         # A new HandshakeTwo protocol buffer
         self.handshake_two = jacp_pb2.HandshakeTwo()
@@ -26,17 +25,12 @@ class NetjoinHandshakeTwo(object):
         # A container for the encrypted data
         self.cyphertext = jacp_pb2.HandshakeTwoProtected()
 
-        # If a challenge was not provided, this message just came over the wire
+        # If a client_session was not provided,
+        # this message just came over the wire
         # Call from_wire_handshake_two to complete initialization
-        if not challenge:
-            return
-
         if not client_session:
-            logging.error("Client session ID not provided during H2 creation")
+            logging.info("Got handshake two over wire")
             return
-
-        # A new nonce for the outgoing handshake two
-        self.handshake_two.cyphertext.nonce = session.auth.get_nonce()
 
         # Put in the plaintext client_session_id
         self.handshake_two.client_session_id = client_session
@@ -60,15 +54,17 @@ class NetjoinHandshakeTwo(object):
         self.cyphertext.client_session_id = client_session
         self.cyphertext.gateway_session_id = self.session.get_ID()
 
-        # Encrypt the message with nonce received in handshake one (challenge)
+    def update_nonce(self):
+        # Get a new nonce
+        nonce = self.session.auth.get_nonce()
+
+        # Encrypt the message with the new nonce
+        self.handshake_two.cyphertext.nonce = nonce
         data_to_encrypt = self.cyphertext.SerializeToString()
-        self.handshake_two.cyphertext.cyphertext = session.auth.encrypt(data_to_encrypt, challenge)
+        self.handshake_two.cyphertext.cyphertext = session.auth.encrypt(data_to_encrypt, nonce)
 
     def get_gateway_session_id(self):
         return self.cyphertext.gateway_session_id
-
-    def get_nonce(self):
-        return self.handshake_two.cyphertext.nonce
 
     def router_dag(self):
         xhcp_info = self.cyphertext.gateway_l3_reply.grant.XIP.single.pxhcp

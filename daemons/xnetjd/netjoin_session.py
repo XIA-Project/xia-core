@@ -98,6 +98,7 @@ class NetjoinSession(threading.Thread):
 
         # Build handshake one
         netjoin_h1 = NetjoinHandshakeOne(self, mymac, challenge=gw_nonce)
+        # Nonce MUST be updated every time before sending out
         netjoin_h1.update_nonce()
 
         outgoing_message = NetjoinMessage()
@@ -132,13 +133,13 @@ class NetjoinSession(threading.Thread):
         self.client_hid = netjoin_h1.hex_client_hid()
 
         # Retrieve handshake one info to be included in handshake two
-        h1_nonce = netjoin_h1.get_nonce()
         client_session_id = netjoin_h1.client_session_id()
 
         # Now build a handshake two message
         logging.info("Now sending handshake two")
         netjoin_h2 = NetjoinHandshakeTwo(self, deny=deny_h2,
-                challenge=h1_nonce, client_session=client_session_id)
+                client_session=client_session_id)
+        netjoin_h2.update_nonce()
 
         # Package the handshake two into a netjoin message wrapper
         outgoing_message = NetjoinMessage()
@@ -192,7 +193,8 @@ class NetjoinSession(threading.Thread):
         # Build a handshake three in responso to this handshake two
         logging.info("Sending handshake three")
         netjoin_h3 = NetjoinHandshakeThree(self, deny=False,
-                challenge=h2_nonce, gateway_session=gateway_session_id)
+                gateway_session=gateway_session_id)
+        netjoin_h3.update_nonce()
 
         # Package the handshake three into a netjoin message wrapper
         outgoing_message = NetjoinMessage()
