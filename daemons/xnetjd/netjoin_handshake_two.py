@@ -61,7 +61,7 @@ class NetjoinHandshakeTwo(object):
         # Encrypt the message with the new nonce
         self.handshake_two.cyphertext.nonce = nonce
         data_to_encrypt = self.cyphertext.SerializeToString()
-        self.handshake_two.cyphertext.cyphertext = session.auth.encrypt(data_to_encrypt, nonce)
+        self.handshake_two.cyphertext.cyphertext = self.session.auth.encrypt(data_to_encrypt, nonce)
 
     def get_gateway_session_id(self):
         return self.cyphertext.gateway_session_id

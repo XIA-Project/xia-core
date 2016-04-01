@@ -57,7 +57,7 @@ class NetjoinHandshakeThree(object):
         # Encrypt the message with newly created nonce
         self.handshake_three.cyphertext.nonce = nonce
         data_to_encrypt = self.cyphertext.SerializeToString()
-        self.handshake_three.cyphertext.cyphertext = session.auth.encrypt(data_to_encrypt, nonce)
+        self.handshake_three.cyphertext.cyphertext = self.session.auth.encrypt(data_to_encrypt, nonce)
 
     def layer_three_granted(self):
         l2_response_t = self.cyphertext.client_l2_ack_nack.WhichOneof("l2_reply")
