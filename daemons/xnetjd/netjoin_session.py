@@ -17,6 +17,7 @@ from netjoin_ethernet_handler import NetjoinEthernetHandler
 from netjoin_handshake_one import NetjoinHandshakeOne
 from netjoin_handshake_two import NetjoinHandshakeTwo
 from netjoin_handshake_three import NetjoinHandshakeThree
+from netjoin_handshake_four import NetjoinHandshakeFour
 
 # A client session reperesenting a client joining a network
 class NetjoinSession(threading.Thread):
