@@ -343,9 +343,10 @@ message HandshakeThree {
 message HandshakeThreeProtected {
     // Must match unprotected (that is, unsigned) session id.
     optional uint32 gateway_session_id = 1;
-    optional LayerTwoClientAck client_l2_ack_nack = 2;
-    optional LayerThreeClientAck client_l3_ack_nack = 3;
-    optional GatewayCredentialReply gateway_gc_reply = 4;
+    optional uint32 client_session_id = 2;
+    optional LayerTwoClientAck client_l2_ack_nack = 3;
+    optional LayerThreeClientAck client_l3_ack_nack = 4;
+    optional GatewayCredentialReply gateway_gc_reply = 5;
 }
 
 // Client\ Confirmation\ \(Handshake\ Message\ 3\):1 ends here
@@ -409,3 +410,32 @@ message NullClientCredential {
 }
 
 // Some\ dummy\ /\ placeholder\ stubs:1 ends here
+
+// [[file:~/work/git/xia-vehicular/veh/jacp-spec.orgmk::*Gateway%20Confirmation%20(Handshake%20Message%204)][Gateway\ Confirmation\ \(Handshake\ Message\ 4\):1]]
+
+message HandshakeFour {
+    // encrypted (HandshakeFourProtected)
+    required EncryptedData cyphertext = 1;
+    optional uint32 client_session_id = 2;
+}
+
+message HandshakeFourProtected {
+    // Must match unprotected (that is, unsigned) session id.
+    optional uint32 client_session_id = 1;
+    optional LayerThreeGatewayAck gateway_l3_ack_nack = 2;
+}
+
+// Gateway\ Confirmation\ \(Handshake\ Message\ 4\):1 ends here
+
+// [[file:~/work/git/xia-vehicular/veh/jacp-spec.orgmk::*Gateway%20Ack/Nack%20of%20setting%20up%20route%20to%20client][Gateway\ Ack/Nack\ of\ setting\ up\ route\ to\ client:1]]
+
+message LayerThreeGatewayAck {
+    message LayerThreeNack { }
+    message LayerThreeAck{ }
+    oneof l3_reply {
+        LayerThreeNack nack = 1;
+        LayerThreeAck ack = 2;
+    }
+}
+
+// Gateway\ Ack/Nack\ of\ setting\ up\ route\ to\ client:1 ends here

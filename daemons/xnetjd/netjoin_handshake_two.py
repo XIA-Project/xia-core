@@ -46,7 +46,6 @@ class NetjoinHandshakeTwo(object):
             l3_reply.deny.SetInParent()
             cc_reply.deny.SetInParent()
         else:
-            # TODO: Add XHCP beacon info in pxhcp below
             xhcp_reply = l3_reply.grant.XIP.single.pxhcp
             xhcp_reply.router_dag = self.conf.get_router_dag()
             xhcp_reply.nameserver_dag = self.conf.get_ns_dag()

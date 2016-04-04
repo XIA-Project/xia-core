@@ -7,6 +7,7 @@ message NetjoinMessage {
 		HandshakeOne handshake_one = 2;
 		HandshakeTwo handshake_two = 3;
 		HandshakeThree handshake_three = 4;
+		HandshakeFour handshake_four = 5;
 	}
 }
 

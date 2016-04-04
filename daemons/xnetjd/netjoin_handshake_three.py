@@ -48,6 +48,10 @@ class NetjoinHandshakeThree(object):
             l3_reply.ack.SetInParent()
             gc_reply.accept.SetInParent()
         self.cyphertext.gateway_session_id = gateway_session
+        self.cyphertext.client_session_id = self.session.get_ID()
+
+    def get_client_session_id(self):
+        return self.cyphertext.client_session_id
 
     # MUST call every time before sending out handshake three
     def update_nonce(self):
@@ -59,13 +63,13 @@ class NetjoinHandshakeThree(object):
         data_to_encrypt = self.cyphertext.SerializeToString()
         self.handshake_three.cyphertext.cyphertext = self.session.auth.encrypt(data_to_encrypt, nonce)
 
-    def layer_three_granted(self):
+    def layer_two_acked(self):
         l2_response_t = self.cyphertext.client_l2_ack_nack.WhichOneof("l2_reply")
         if l2_response_t == "nack":
             return False
         return True
 
-    def layer_three_granted(self):
+    def layer_three_acked(self):
         l3_response_t = self.cyphertext.client_l3_ack_nack.WhichOneof("l3_reply")
         if l3_response_t == "nack":
             return False
@@ -77,11 +81,11 @@ class NetjoinHandshakeThree(object):
             return False
         return True
 
-    def join_granted(self):
-        if not self.layer_three_granted():
+    def replies_acked(self):
+        if not self.layer_two_acked():
             logging.info("Layer 2 request denied")
             return False
-        elif not self.layer_three_granted():
+        elif not self.layer_three_acked():
             logging.info("Layer 3 request denied")
             return False
         elif not self.gateway_creds_granted():

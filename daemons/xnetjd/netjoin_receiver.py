@@ -103,6 +103,20 @@ class NetjoinReceiver(threading.Thread):
         gateway_session = self.server_sessions[gateway_session_id]
         gateway_session.push(message_tuple)
 
+    def handle_handshake_four(self, message_tuple):
+        logging.info("Got HandshakeFour message")
+
+        # Find the session this message should be delivered to
+        handshake_four = message_tuple[0].handshake_four
+        client_session_id = handshake_four.client_session_id
+
+        # Deliver the message
+        if not client_session_id in self.client_sessions:
+            logging.error("Session not found to deliver handshake four")
+            return
+        client_session = self.client_sessions[client_session_id]
+        client_session.push(message_tuple)
+
     # Main loop, receives incoming NetjoinMessage(s)
     def run(self):
         while not self.shutdown.is_set():
@@ -145,6 +159,9 @@ class NetjoinReceiver(threading.Thread):
 
             elif message_type == "handshake_three":
                 self.handle_handshake_three(message_tuple)
+
+            elif message_type == "handshake_four":
+                self.handle_handshake_four(message_tuple)
 
             else:
                 logging.warning("Unknown message type: {}".format(message_type))

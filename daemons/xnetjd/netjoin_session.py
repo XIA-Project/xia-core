@@ -28,7 +28,7 @@ class NetjoinSession(threading.Thread):
     def __init__(self, hostname, shutdown_event,
             auth=None, beacon_id=None, policy=None):
         threading.Thread.__init__(self)
-        (self.START, self.HS_2_WAIT, self.HS_3_WAIT) = range(3)
+        (self.START, self.HS_2_WAIT, self.HS_3_WAIT, self.HS_4_WAIT) = range(4)
 
         self.xianetjoin = ("127.0.0.1", 9882)
         self.beacon = NetjoinBeacon()
@@ -206,6 +206,9 @@ class NetjoinSession(threading.Thread):
             return
         self.policy.join_complete(self.beacon_id)
 
+        # Now we are waiting for handshake 4 confirmation message
+        self.state = self.HS_4_WAIT
+
     def handle_handshake_three(self, message_tuple):
         message, interface, mymac, theirmac = message_tuple
 
@@ -220,9 +223,9 @@ class NetjoinSession(threading.Thread):
             logging.error("Invalid client session ID")
             return
 
-        # Ensure that our netjoin request was granted
-        if not netjoin_h3.join_granted():
-            logging.error("Our join request was denied")
+        # Ensure that client acknowledged our l2 and l3 replies
+        if not netjoin_h3.replies_acked():
+            logging.error("Client declined l2/l3/gateway-creds response")
             return
         logging.info("Valid handshake three: We can join this network now")
 
@@ -232,7 +235,7 @@ class NetjoinSession(threading.Thread):
             return
         client_hid = str("HID:{}".format(self.client_hid))
         logging.info("Routing table now points to: {}".format(client_hid))
-        # TODO: Configure routing table
+        # Configure routing table
         # interface number is the port for the route
         # client_hid is the entry in HID routing table and also next hop
         # flags are 0xffff
@@ -243,6 +246,37 @@ class NetjoinSession(threading.Thread):
                 logging.error("Failed setting route for {}".format(client_hid))
             else:
                 logging.info("Route set up for {}".format(client_hid))
+        # Tell client that gateway side configuration is now complete
+        logging.info("Sending handshake four")
+        client_session = netjoin_h3.get_client_session_id()
+        netjoin_h4 = NetjoinHandshakeFour(self, deny=False,
+                client_session=client_session)
+        netjoin_h4.update_nonce()
+
+        # Package the handshake four into a netjoin message wrapper
+        outgoing_message = NetjoinMessage()
+        outgoing_message.handshake_four.CopyFrom(netjoin_h4.handshake_four)
+        self.send_netjoin_message(outgoing_message, interface, theirmac)
+
+    def handle_handshake_four(self, message_tuple):
+        message, interface, mymac, theirmac = message_tuple
+
+        logging.info("Got a handshake four message")
+        netjoin_h4 = NetjoinHandshakeFour(self)
+        netjoin_h4.from_wire_handshake_four(message.handshake_four)
+        netjoin_h4.print_handshake_four()
+        netjoin_h4.print_cyphertext()
+
+        # Verify the client_session_id matches the encrypted one
+        if not netjoin_h4.valid_client_session_id():
+            logging.error("Invalid client session ID")
+            return
+
+        # Ensure that client acknowledged our l2 and l3 replies
+        if not netjoin_h4.replies_acked():
+            logging.error("Gateway had trouble setting up routes to us")
+            return
+        logging.info("Valid handshake four: We are on this network now")
 
     # Main thread handles all messages based on state of joining session
     def run(self):
@@ -285,6 +319,14 @@ class NetjoinSession(threading.Thread):
                 else:
                     logging.error("Invalid message: {}".format(message_type))
                     logging.error("Expected handshake three.")
+                continue
+
+            if self.state == self.HS_4_WAIT:
+                if message_type == "handshake_four":
+                    self.handle_handshake_four(message_tuple)
+                else:
+                    logging.error("Invalid message: {}".format(message_type))
+                    logging.error("Expected handshake four.")
                 continue
 
         logging.debug("Shutting down session ID: {}".format(self.session_ID))
