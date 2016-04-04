@@ -65,9 +65,29 @@ class NetjoinSession(threading.Thread):
 
     # Send a message out to a specific recipient
     def send_netjoin_message(self, message, interface, theirmac):
+        # Update nonce every time we send a message
+        message.update_nonce()
+
+        # Build a NetjoinMessage object containing the actual handshake message
+        netj_msg = NetjoinMessage()
+        if type(message) is NetjoinHandshakeOne:
+            netj_msg.handshake_one.CopyFrom(message.handshake_one)
+        elif type(message) is NetjoinHandshakeTwo:
+            netj_msg.handshake_two.CopyFrom(message.handshake_two)
+        elif type(message) is NetjoinHandshakeThree:
+            netj_msg.handshake_three.CopyFrom(message.handshake_three)
+        elif type(message) is NetjoinHandshakeFour:
+            netj_msg.handshake_four.CopyFrom(message.handshake_four)
+        else:
+            logging.error("{} message not supported".format(type(message)))
+            return
+
+        # Header contains outgoing interface and destination mac address
         netj_header = struct.pack("H6B", interface, theirmac[0], theirmac[1],
                 theirmac[2], theirmac[3], theirmac[4], theirmac[5])
-        outgoing_packet = netj_header + message.SerializeToString()
+
+        # Final outgoing packet with header and serialized NetjoinMessage
+        outgoing_packet = netj_header + netj_msg.SerializeToString()
         self.sockfd.sendto(outgoing_packet, self.xianetjoin)
 
     def create_l2_handler(self, l2_type):
@@ -99,14 +119,9 @@ class NetjoinSession(threading.Thread):
 
         # Build handshake one
         netjoin_h1 = NetjoinHandshakeOne(self, mymac, challenge=gw_nonce)
-        # Nonce MUST be updated every time before sending out
-        netjoin_h1.update_nonce()
-
-        outgoing_message = NetjoinMessage()
-        outgoing_message.handshake_one.CopyFrom(netjoin_h1.handshake_one)
 
         # Send handshake one
-        self.send_netjoin_message(outgoing_message, interface, theirmac)
+        self.send_netjoin_message(netjoin_h1, interface, theirmac)
 
         # Now we will wait for handshake two
         self.state = self.HS_2_WAIT
@@ -140,12 +155,9 @@ class NetjoinSession(threading.Thread):
         logging.info("Now sending handshake two")
         netjoin_h2 = NetjoinHandshakeTwo(self, deny=deny_h2,
                 client_session=client_session_id, l2_reply=l2_reply)
-        netjoin_h2.update_nonce()
 
-        # Package the handshake two into a netjoin message wrapper
-        outgoing_message = NetjoinMessage()
-        outgoing_message.handshake_two.CopyFrom(netjoin_h2.handshake_two)
-        self.send_netjoin_message(outgoing_message, interface, theirmac)
+        # Send handshake two
+        self.send_netjoin_message(netjoin_h2, interface, theirmac)
 
         # Now we will wait for handshake 3
         self.state = self.HS_3_WAIT
@@ -194,12 +206,9 @@ class NetjoinSession(threading.Thread):
         logging.info("Sending handshake three")
         netjoin_h3 = NetjoinHandshakeThree(self, deny=False,
                 gateway_session=gateway_session_id)
-        netjoin_h3.update_nonce()
 
-        # Package the handshake three into a netjoin message wrapper
-        outgoing_message = NetjoinMessage()
-        outgoing_message.handshake_three.CopyFrom(netjoin_h3.handshake_three)
-        self.send_netjoin_message(outgoing_message, interface, theirmac)
+        # Send handshake three
+        self.send_netjoin_message(netjoin_h3, interface, theirmac)
 
         # notify policy module that the client side handshake is complete
         if self.policy is None:
@@ -252,12 +261,9 @@ class NetjoinSession(threading.Thread):
         client_session = netjoin_h3.get_client_session_id()
         netjoin_h4 = NetjoinHandshakeFour(self, deny=False,
                 client_session=client_session)
-        netjoin_h4.update_nonce()
 
-        # Package the handshake four into a netjoin message wrapper
-        outgoing_message = NetjoinMessage()
-        outgoing_message.handshake_four.CopyFrom(netjoin_h4.handshake_four)
-        self.send_netjoin_message(outgoing_message, interface, theirmac)
+        # Send handshake four
+        self.send_netjoin_message(netjoin_h4, interface, theirmac)
 
     def handle_handshake_four(self, message_tuple):
         message, interface, mymac, theirmac = message_tuple
