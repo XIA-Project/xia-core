@@ -56,8 +56,8 @@ class NetjoinHandshakeFour(object):
         self.handshake_four.cyphertext.cyphertext = self.session.auth.encrypt(data_to_encrypt, nonce)
 
     def layer_three_acked(self):
-        l3_response_t = self.cyphertext.client_l3_ack_nack.WhichOneof("l3_reply")
-        if l3_response_t == "nack":
+        response_t = self.cyphertext.gateway_l3_ack_nack.WhichOneof("l3_reply")
+        if response_t == "nack":
             return False
         return True
 
