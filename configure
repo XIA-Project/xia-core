@@ -18,7 +18,10 @@ echo NPROCS=$(($CORES * 2)) >> $OUTPUT
 
 echo XIADIR=$(pwd) >> $OUTPUT
 
-[ "$1" == "DEBUG" ] && echo "DEBUG=1" >> $OUTPUT
+for opt in $@; do
+	echo "$opt=1" >> $OUTPUT
+done
+#[ "$1" == "DEBUG" ] && echo "DEBUG=1" >> $OUTPUT
 
 cat >> $OUTPUT << EOF
 APIDIR=\$(XIADIR)/api
@@ -41,6 +44,10 @@ ifdef DEBUG
 CFLAGS +=-ggdb -DDEBUG
 else
 CFLAGS +=-O2
+endif
+
+ifdef PROFILE
+	CFLAGS+=-pg
 endif
 
 EOF
