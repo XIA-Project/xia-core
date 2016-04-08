@@ -20,7 +20,7 @@ $ ./configure --host=mips-linux --prefix=/opt/buildroot-2013.11/output/host/usr/
 
 $ make
 $ make check # (this will fail but it's OK)
-$ sudo make install
+$ sudo PATH=$PATH make install
 
 
 C. Cross compiling openssl:
