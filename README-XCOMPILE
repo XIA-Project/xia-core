@@ -33,6 +33,8 @@ $ ./configure shared no-ssl2 --prefix=/opt/buildroot-2013.11/output/host/usr/ li
 
 $ sudo make install
 
+$ unset CC
+
 D. Cross compiling python 2.7.11
 
 Download, extract and cd into the Python-2.7.11 folder.
@@ -48,6 +50,11 @@ In file setup.py, replace line 220 with:
             if ext.name in ('__builtin__', '__main__', '_ast', '_codecs', '_sre', '_symtable', '_warnings', '_weakref', 'errno', 'exceptions', 'gc', 'imp', 'marshal', 'posix', 'pwd', 'signal', 'sys', 'thread', 'xxsubtype', 'zipimport'):
 
 This step is needed to ensure that 'math' and other useful modules are built.
+
+Finally install:
+
+$ sudo PATH=$PATH make install
+
 
 Now on to the cross compilation proper:
 

@@ -43,9 +43,9 @@ CXXFLAGS=\$(CFLAGS)
 LDFLAGS=-L\$(MIPSLIBDIR) -lpthread
 
 ifeq (\$(wildcard \$(XLIB)/libXsocket.a),)
-	LIBS=\$(XLIB)/libXsocket.so \$(XLIB)/libdagaddr.so \$(XLIB)/libXssl.so
+	LIBS=\$(XLIB)/libXsocket.so \$(XLIB)/libdagaddr.so \$(XLIB)/libXssl.so -lprotobuf -lssl -lcrypto
 else
-	LIBS=\$(XLIB)/libXsocket.a \$(XLIB)/libdagaddr.a \$(XLIB)/libXssl.a -Bstatic -lprotobuf
+	LIBS=\$(XLIB)/libXsocket.a \$(XLIB)/libdagaddr.a \$(XLIB)/libXssl.a -Bstatic -lprotobuf -lssl -lcrypto
 endif
 
 ifdef DEBUG
