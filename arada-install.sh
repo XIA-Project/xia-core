@@ -201,6 +201,20 @@ else
 	export PATH=$ORIGPATH
 fi
 
+echo "Copying Arada wave headers to /opt/buildroot"
+sudo cp -ax arada/code/include /opt/buildroot-2013.11/output/host/usr/include/arada
+if [ $? -ne 0 ]; then
+	echo "ERROR: copying Arada headers to /opt/buildroot.../usr/include/arada"
+	exit -20
+fi
+
+echo "Copying Arada wave libraries to /opt/buildroot"
+sudo cp -ax arada/code/mips/lib/* /opt/buildroot-2013.11/output/host/usr/lib/
+if [ $? -ne 0 ]; then
+	echo "ERROR: copying Arada libs to /opt/buildroot.../usr/lib/"
+	exit -21
+fi
+
 echo "Cross-compile toolchain setup complete."
 echo ""
 echo ""
