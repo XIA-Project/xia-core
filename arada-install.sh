@@ -218,5 +218,6 @@ fi
 echo "Cross-compile toolchain setup complete."
 echo ""
 echo ""
-echo "XIA can now be built with the following command in xia-core:"
+echo "XIA can now be built with the following commands in xia-core:"
+echo "export PATH=\$PATH:/opt/buildroot-2013.11/output/host/usr/bin/"
 echo "tarch=mips ./configure; make"
