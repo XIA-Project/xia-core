@@ -25,7 +25,7 @@
 #include <click/hashtable.hh>
 #include <click/xiapath.hh>
 #include <click/timer.hh>
-#include <elements/ipsec/sha1_impl.hh>
+#include <click/xiasecurity.hh>
 
 CLICK_DECLS
 

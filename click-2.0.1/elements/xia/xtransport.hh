@@ -15,7 +15,6 @@
 #include <clicknet/udp.h>
 #include <clicknet/tcp.h>
 #include <click/string.hh>
-#include <elements/ipsec/sha1_impl.hh>
 #include <click/xiatransportheader.hh>
 #include <click/error.hh>
 #include <click/error-syslog.hh>
@@ -69,8 +68,6 @@ using namespace xia;
 #define WAITING_FOR_CHUNK 0x00000002
 #define READY_TO_READ	  0x00000004
 #define INVALID_HASH	  0x00000008
-
-#define HASH_KEYSIZE 20
 
 #define API_PORT	 0
 #define BAD_PORT	 1  // FIXME why do we still have this?

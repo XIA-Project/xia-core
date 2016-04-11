@@ -216,8 +216,8 @@ __InitXSocket::__InitXSocket()
 	snprintf(__XSocketConf::master_conf, BUF_SIZE, "%s%s", XrootDir(root, BUF_SIZE), "/etc/xsockconf.ini");
 
 	if ((rc = readlink("/proc/self/exe", buf, sizeof(buf) - 1)) != -1) {
-		section_name = basename(buf);
 		buf[rc] = 0;
+		section_name = basename(buf);
 	}
 
 	const char * section_name_env  = getenv("XSOCKCONF_SECTION");

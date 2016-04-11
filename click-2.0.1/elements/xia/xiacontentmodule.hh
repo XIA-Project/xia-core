@@ -18,7 +18,6 @@
 
 #define POLICY_FIFO 1
 
-#define HASH_KEYSIZE 20
 
 CLICK_DECLS
 class XIAContentModule;
