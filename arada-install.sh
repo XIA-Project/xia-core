@@ -178,7 +178,7 @@ else
 	pushd python2.7-*
 	echo "Python: configuring the host build"
 	# TODO: Reset to original path without /opt/buildroot-
-	./configure
+	./configure &> python_host_configure.log
 	echo "Python: building for host"
 	make python Parser/pgen &> python_host_build.log
 	echo "Python: saving off host binaries. Will not use"
