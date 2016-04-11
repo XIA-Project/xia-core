@@ -1,0 +1,237 @@
+.\" -*- mode: nroff -*-
+.ds V 1.2
+.ds D 27/Apr/2000
+.ds E " \-\- 
+.if t .ds E \(em
+.de Sp
+.if n .sp
+.if t .sp 0.4
+..
+.de Es
+.Sp
+.RS 5
+.nf
+..
+.de Ee
+.fi
+.RE
+.PP
+..
+.de Rs
+.RS
+.Sp
+..
+.de Re
+.Sp
+.RE
+..
+.de M
+.BR "\\$1" "(\\$2)\\$3"
+..
+.de RM
+.RB "\\$1" "\\$2" "(\\$3)\\$4"
+..
+.TH CLICK-INSTALL 1 "\*D" "Version \*V"
+.SH NAME
+click-install \- installs a Click configuration into the kernel module driver
+'
+.SH SYNOPSIS
+.B click-install
+.RI \%[ options ]
+.RI \%[ param = value " ...]"
+.RI \%[ router\-file ]
+'
+.SH DESCRIPTION
+.B Click-install
+is a convenience program that installs a Click router configuration
+into the current Linux kernel. It reads a router configuration file in the
+.M click 5
+language, installs the
+.M click.o 8
+kernel module if necessary, compiles and/or installs any dynamically
+loadable packages required by the router configuration, installs the router
+configuration itself by writing it to /click/config, and uninstalls
+any unused packages. It reports any errors to standard error, including
+errors reported by the Click module, and returns a zero (true) exit status
+if and only if the configuration was successfully installed.
+'
+.SH "OPTIONS"
+'
+Arguments such as "NAME=value" set configuration parameters, overriding any
+existing settings. Thus, "echo \%'Message($MSG)' | \fBclick\-install\fR
+MSG=Hi" will cause the kernel module to print "Hi".
+.PP
+If any filename argument is a single dash "-",
+.B click-install
+will use the standard input or output instead, as appropriate.
+'
+.TP 5
+.BI \-f " file"
+.PD 0
+.TP
+.BI \-\-file " file"
+Read the router configuration to transform from
+.IR file .
+The default is the standard input.
+'
+.Sp
+.TP
+.BI \-e " expr"
+.TP
+.BI \-\-expression " expr"
+Use
+.IR expr ,
+a string in the Click language, as the router configuration.
+'
+.Sp
+.TP 5
+.BR \-h ", " \-\-hotswap
+Hot-swap install the new configuration. If you supply this option, the new
+configuration will only be installed if it initializes correctly. If it
+fails, the old configuration will continue to route packets without
+interruption. Furthermore, state from the old configuration\*Esuch as
+packets contained in
+.M Queue n
+elements\*Ewill be swapped into the new configuration under certain
+conditions. See under
+.B /click/hotconfig
+in
+.M click.o 8
+for details.
+'
+.Sp
+.TP 5
+.BR \-u ", " \-\-uninstall
+Uninstall and reinstall the Click kernel module.
+.B \-\-hotswap
+and
+.B \-\-uninstall
+are mutually exclusive.
+'
+.Sp
+.TP 5
+.BR \-j ", " "\-\-threads=\fIN\fP"
+The Click kernel module will run
+.I N
+threads per router. Click must have been build with
+\f(CW\-\-enable\-multithread\fR. This option only matters when
+.B click-install
+installs a Click kernel module. The thread count on an installed kernel
+module cannot be changed. (The
+.B \-\-uninstall
+option is useful here.)
+'
+.Sp
+.TP 5
+.BR \-n ", " "\-\-priority=\fIN\fP"
+Set the Click kernel thread's priority to
+.IR N .
+Lower numbers have higher priority. A typical range for priority values is
+-20 (highest) to +19 (lowest). If you do not give a
+.B \-\-priority
+option, then the current priority is left unchanged.
+'
+.Sp
+.TP 5
+.BR \-G ", " "\-\-greedy"
+The Click kernel module will claim an entire CPU, not allowing any other
+process to run.  This option only matters when
+.B click-install
+installs a Click kernel module; the greediness of an installed kernel
+module cannot be changed.  (The
+.B \-\-uninstall
+option is useful here.)
+'
+.Sp
+.TP 5
+.BR \-p ", " "\-\-private"
+Make the /click directory hierarchy readable only by the owning user, which
+is usually root. Generally, files under /click are writable only by the
+owner, but readable by everyone. Works only when simultaneously loading a
+Click kernel module; see
+.BR \-\-uninstall .
+'
+.Sp
+.TP 5
+.BR \-U ", " "\-\-user=\fIUSER\fR[:\fIGROUP\fR]"
+Set the user ID and group ID of the /click directory hierarchy to
+.I USER
+and group
+.IR GROUP .
+By default
+.IR USER " and " GROUP
+are both root. Works only when simultaneously loading a
+Click kernel module; see
+.BR \-\-uninstall .
+'
+.Sp
+.TP 5
+.BR \-\-cpu =\fIN
+Sets the Click thread to preferentially run on CPU
+.IR N .
+If Click is running
+.I K
+threads, they are run preferentially on CPUs
+.I N
+up to, but not including,
+.I N
++
+.IR K .
+Thread affinities are ignored if they refer to unavailable CPUs. Works
+only when simultaneously loading a Click kernel module; see
+.BR \-\-uninstall .
+'
+.Sp
+.TP 5
+.BR \-m ", " \-\-map
+(Linux 2.4 only) If a Click kernel module is installed, write its load map
+to standard output. This can make it easier to debug kernel panics.
+'
+.Sp
+.TP 5
+.BR \-V ", " \-\-verbose
+Print information about each step in the install process, including the
+filenames of any installed modules.
+'
+.Sp
+.TP 5
+.BI \-\-help
+Print usage information and exit.
+'
+.Sp
+.TP
+.BI \-\-version
+Print the version number and some quickie warranty information and exit.
+'
+.PD
+'
+.SH "EXIT STATUS"
+.B Click-install
+exits with one of the following return values:
+.TP 5
+.B 0
+The configuration was successfully installed.
+.TP
+.B 1
+Some error prevented
+.B click-install
+from attempting to install the configuration. For example, perhaps the
+configuration could not be parsed, or the kernel module could not be
+loaded.
+.TP
+.B 2
+The configuration was installed, but the kernel module reports that it
+could not be initialized.
+.PD
+'
+.SH "SEE ALSO"
+.M click-uninstall 1 ,
+.M click 5 ,
+.M click.o 8
+'
+.SH AUTHOR
+.na
+Eddie Kohler, kohler@seas.harvard.edu
+.br
+http://www.pdos.lcs.mit.edu/click/
+'

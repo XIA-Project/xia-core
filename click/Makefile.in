@@ -1,0 +1,258 @@
+# Warning: this file must be usable by regular make
+# (unlike the Makefiles in subdirectories).
+
+SHELL = @SHELL@
+@SUBMAKE@
+
+PACKAGE = click
+VERSION = @CLICK_VERSION@
+
+top_srcdir = @top_srcdir@
+srcdir = @srcdir@
+top_builddir = .
+subdir = .
+conf_auxdir = @conf_auxdir@
+
+AUTOCONF = @AUTOCONF@
+PERL = @PERL@
+INSTALL = @INSTALL@
+INSTALL_IF_CHANGED = @INSTALL_IF_CHANGED@
+INSTALL_DATA = $(INSTALL) -m 644
+INSTALL_DATA_IF_CHANGED = $(INSTALL_IF_CHANGED) -m 644
+mkinstalldirs = $(conf_auxdir)/mkinstalldirs
+
+EXTRA_PROVIDES =
+PROVISIONS = @provisions@ $(EXTRA_PROVIDES)
+
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+includedir = @includedir@
+clickincludedir = $(includedir)/click
+netincludedir = $(includedir)/clicknet
+toolincludedir = $(includedir)/clicktool
+bindir = @bindir@
+datarootdir = @datarootdir@
+datadir = @datadir@
+clickdatadir = $(datadir)/click
+
+CLICK_BUILDTOOL = bin/click-buildtool
+CLICK_COMPILE = bin/click-compile
+ELEMENTMAP = share/click/elementmap.xml
+
+DRIVERS = @DRIVERS@
+OTHER_TARGETS = @OTHER_TARGETS@
+ALL_TARGETS = $(DRIVERS) $(OTHER_TARGETS)
+INSTALL_TARGETS = @INSTALL_TARGETS@
+CLEAN_TARGETS = @CLEAN_TARGETS@
+
+all: $(ALL_TARGETS) Makefile
+
+bsdmodule: Makefile $(CLICK_BUILDTOOL) stamp-h
+	@cd bsdmodule && $(MAKE) all
+linuxmodule: Makefile $(CLICK_BUILDTOOL) stamp-h
+	@cd linuxmodule && $(MAKE) all
+ns: Makefile $(CLICK_BUILDTOOL) stamp-h
+	@cd ns && $(MAKE) all
+userlevel: Makefile $(CLICK_BUILDTOOL) $(CLICK_COMPILE) stamp-h
+	@cd userlevel && $(MAKE) all
+minios: Makefile $(CLICK_BUILDTOOL) $(CLICK_COMPILE) stamp-h
+	@cd minios && $(MAKE) all
+tools: Makefile stamp-h
+	@cd tools && $(MAKE) all
+
+install-bsdmodule: Makefile $(CLICK_BUILDTOOL) stamp-h installch
+	@cd bsdmodule && $(MAKE) install
+install-linuxmodule: Makefile $(CLICK_BUILDTOOL) stamp-h installch
+	@cd linuxmodule && $(MAKE) install
+install-ns: Makefile $(CLICK_BUILDTOOL) stamp-h installch
+	@cd ns && $(MAKE) install
+install-userlevel: Makefile $(CLICK_BUILDTOOL) stamp-h installch
+	@cd userlevel && $(MAKE) install
+install-tools: Makefile $(CLICK_BUILDTOOL) stamp-h installch
+	@cd tools && $(MAKE) install
+
+clean-bsdmodule:
+	@cd bsdmodule && $(MAKE) clean
+clean-linuxmodule:
+	@cd linuxmodule && $(MAKE) clean
+clean-ns:
+	@cd ns && $(MAKE) clean
+clean-userlevel:
+	@cd userlevel && $(MAKE) clean
+clean-minios:
+	@cd minios && $(MAKE) clean
+clean-tools:
+	@cd tools && $(MAKE) clean
+
+install: $(INSTALL_TARGETS) install-local install-doc install-local-include
+install-local: $(ELEMENTMAP) $(CLICK_BUILDTOOL) $(CLICK_COMPILE) \
+	share/click/config.mk share/click/pkg-config.mk installch
+	$(mkinstalldirs) $(DESTDIR)$(bindir)
+	$(INSTALL_IF_CHANGED) $(CLICK_BUILDTOOL) $(DESTDIR)$(bindir)/click-buildtool
+	$(INSTALL_IF_CHANGED) $(CLICK_COMPILE) $(DESTDIR)$(bindir)/click-compile
+	$(INSTALL_IF_CHANGED) $(srcdir)/click-mkelemmap $(DESTDIR)$(bindir)/click-mkelemmap
+	$(INSTALL_IF_CHANGED) $(top_srcdir)/test/testie $(DESTDIR)$(bindir)/testie
+	$(mkinstalldirs) $(DESTDIR)$(clickdatadir)
+	$(INSTALL) $(mkinstalldirs) $(DESTDIR)$(clickdatadir)/mkinstalldirs
+	$(INSTALL_DATA) $(ELEMENTMAP) $(DESTDIR)$(clickdatadir)/elementmap.xml
+	$(INSTALL_DATA_IF_CHANGED) share/click/config.mk $(DESTDIR)$(clickdatadir)/config.mk
+	$(INSTALL_DATA_IF_CHANGED) share/click/pkg-config.mk $(DESTDIR)$(clickdatadir)/pkg-config.mk
+	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/share/click/pkg-Makefile $(DESTDIR)$(clickdatadir)/pkg-Makefile
+	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/share/click/pkg-userlevel.mk $(DESTDIR)$(clickdatadir)/pkg-userlevel.mk
+	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/share/click/pkg-linuxmodule.mk $(DESTDIR)$(clickdatadir)/pkg-linuxmodule.mk
+	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/share/click/pkg-linuxmodule-26.mk $(DESTDIR)$(clickdatadir)/pkg-linuxmodule-26.mk
+	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/share/click/pkg-bsdmodule.mk $(DESTDIR)$(clickdatadir)/pkg-bsdmodule.mk
+	(cd $(top_srcdir); pwd) > $(DESTDIR)$(clickdatadir)/srcdir
+	/bin/rm -rf $(DESTDIR)$(clickdatadir)/src
+	/bin/ln -s "`cd $(top_srcdir); pwd`" $(DESTDIR)$(clickdatadir)/src
+install-doc: $(ELEMENTMAP)
+	@cd doc && $(MAKE) install
+install-man: $(ELEMENTMAP)
+	@-for d in $(ALL_TARGETS) doc; do (cd $$d && $(MAKE) install-man); done
+install-local-include: stamp-h installch
+	$(mkinstalldirs) $(DESTDIR)$(clickincludedir)
+	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/include/click/*.h $(DESTDIR)$(clickincludedir)
+	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/include/click/*.hh $(DESTDIR)$(clickincludedir)
+	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/include/click/*.cc $(DESTDIR)$(clickincludedir)
+	$(INSTALL_DATA_IF_CHANGED) $(top_builddir)/include/click/*.h $(DESTDIR)$(clickincludedir)
+	$(mkinstalldirs) $(DESTDIR)$(clickincludedir)/standard
+	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/include/click/standard/*.hh $(DESTDIR)$(clickincludedir)/standard
+	$(mkinstalldirs) $(DESTDIR)$(netincludedir)
+	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/include/clicknet/*.h $(DESTDIR)$(netincludedir)
+install-include: install-local-include
+	@for d in $(ALL_TARGETS); do (cd $$d && $(MAKE) install-include) || exit 1; done
+install-lib:
+	@if echo $(ALL_TARGETS) | grep userlevel >/dev/null 2>&1; then cd userlevel && $(MAKE) install-lib; fi
+	@if echo $(ALL_TARGETS) | grep tools >/dev/null 2>&1; then cd tools && $(MAKE) install-lib; fi
+
+uninstall: $(ELEMENTMAP)
+	@for d in $(ALL_TARGETS) doc; do (cd $$d && $(MAKE) uninstall) || exit 1; done
+	@$(MAKE) uninstall-local uninstall-local-include
+uninstall-local:
+	/bin/rm -f $(DESTDIR)$(bindir)/click-buildtool $(DESTDIR)$(bindir)/click-compile $(DESTDIR)$(bindir)/click-mkelemmap $(DESTDIR)$(bindir)/testie $(DESTDIR)$(clickdatadir)/elementmap.xml $(DESTDIR)$(clickdatadir)/srcdir $(DESTDIR)$(clickdatadir)/src $(DESTDIR)$(clickdatadir)/config.mk $(DESTDIR)$(clickdatadir)/mkinstalldirs
+	/bin/rm -f $(DESTDIR)$(clickdatadir)/pkg-config.mk $(DESTDIR)$(clickdatadir)/pkg-userlevel.mk $(DESTDIR)$(clickdatadir)/pkg-linuxmodule.mk $(DESTDIR)$(clickdatadir)/pkg-linuxmodule-26.mk $(DESTDIR)$(clickdatadir)/pkg-bsdmodule.mk $(DESTDIR)$(clickdatadir)/pkg-Makefile
+uninstall-local-include:
+	cd $(srcdir)/include/click; for i in *.h *.hh *.cc; do /bin/rm -f $(DESTDIR)$(clickincludedir)/$$i; done
+	cd $(top_builddir)/include/click; for i in *.h; do /bin/rm -f $(DESTDIR)$(clickincludedir)/$$i; done
+	cd $(srcdir)/include/click/standard; for i in *.hh; do /bin/rm -f $(DESTDIR)$(clickincludedir)/standard/$$i; done
+	cd $(srcdir)/include/clicknet; for i in *.h; do /bin/rm -f $(DESTDIR)$(netincludedir)/$$i; done
+	for i in $(clickincludedir)/standard $(clickincludedir) $(netincludedir); do if test -d $(DESTDIR)$$i; then /bin/rmdir $(DESTDIR)$$i; fi; done
+
+elemlist elemlists: $(CLICK_BUILDTOOL)
+	@for d in $(DRIVERS); do (cd $$d && $(MAKE) elemlist) || exit 1; done
+
+MKELEMMAPFLAGS =
+FINDELEMFLAGS = @FINDELEMFLAGS@
+$(ELEMENTMAP): $(CLICK_BUILDTOOL) $(srcdir)/click-mkelemmap always
+	echo $(DRIVERS) @element_groups@ $(EXTRA_PROVIDES) | $(CLICK_BUILDTOOL) findelem -r "$(PROVISIONS) $(DRIVERS)" -p $(top_srcdir) $(FINDELEMFLAGS) | $(PERL) $(top_srcdir)/click-mkelemmap -r "$(PROVISIONS)" -t "$(DRIVERS)" -p $(top_srcdir) -Iinclude -s "`cd $(top_srcdir) && pwd`" $(MKELEMMAPFLAGS) > $(ELEMENTMAP)
+always:
+	@:
+
+$(CLICK_BUILDTOOL): $(srcdir)/click-buildtool.in config.status
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+	@chmod +x $(CLICK_BUILDTOOL); touch $(CLICK_BUILDTOOL)
+$(CLICK_COMPILE): $(srcdir)/click-compile.in config.status
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+	@chmod +x $(CLICK_COMPILE); touch $(CLICK_COMPILE)
+installch: $(srcdir)/installch.in config.status
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+	@chmod +x installch; touch installch
+share/click/config.mk: $(srcdir)/config.mk.in config.status
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+share/click/pkg-config.mk: $(srcdir)/share/click/pkg-config.mk.in config.status
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+
+$(srcdir)/configure: $(srcdir)/configure.in $(srcdir)/m4/click.m4
+	cd $(srcdir) && $(AUTOCONF)
+config.status: $(srcdir)/configure
+	$(SHELL) $(srcdir)/configure @ac_configure_args@
+Makefile: config.status $(srcdir)/Makefile.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+config.h: stamp-h
+stamp-h: $(srcdir)/config.h.in $(srcdir)/config-bsdmodule.h.in $(srcdir)/config-linuxmodule.h.in $(srcdir)/config-ns.h.in $(srcdir)/config-userlevel.h.in $(srcdir)/config-minios.h.in config.status
+	cd $(top_builddir) && $(SHELL) ./config.status
+	echo > stamp-h
+
+check-filenames:
+	@a=`find . \( -name \*.cc -or -name \*.c \) -print | sed 's/.*\/\(.*\)\.c*$$/\1.o/' | grep -v 'elements\.o' | sort | uniq -d`; \
+	if test -z $$a; then echo OK; else echo "*** warning: duplicate object file names:"; echo "$$a"; fi
+
+clean: $(CLEAN_TARGETS) clean-doc clean-local
+clean-doc:
+	@cd doc && $(MAKE) clean
+clean-local:
+	-rm -f $(ELEMENTMAP) conftest.*
+distclean:
+	@-for d in @POSSIBLE_DRIVERS@ tools doc; do (cd $$d && $(MAKE) distclean); done
+	-rm -f Makefile config.status etc/libclick/Makefile
+	-rm -f include/click/config.h include/click/config-*.h include/click/pathvars.h
+	-rm -f config.cache config.log $(CLICK_BUILDTOOL) $(CLICK_COMPILE) stamp-h
+	-rm -f share/click/config.mk share/click/pkg-config.mk $(ELEMENTMAP)
+	-rm -f bin/click-buildtool bin/click-compile
+	-rm -f config.mk elementmap.xml etc/pkg-config.mk pkg-config.mk
+	-rm -f conftest.* installch
+	-rmdir bin
+
+check: $(ALL_TARGETS) Makefile $(ELEMENTMAP)
+	$(top_srcdir)/test/testie -p $(top_builddir)/bin -p $(top_srcdir)/test \
+		$(if $V,-V,) CLICKPATH="`cd $(top_builddir); pwd`:" \
+		CLICKTEST_PREINSTALL=1 \
+		$(top_srcdir)/test
+
+distdir = $(PACKAGE)-$(VERSION)
+top_distdir = $(distdir)
+
+dist: distdir
+	tar czf $(distdir).tar.gz $(distdir)
+	-rm -rf $(distdir)
+distdir: $(srcdir)/configure
+	-rm -rf doc/click.info* doc/testie.1 $(srcdir)/doc/click.info* $(srcdir)/doc/testie.1
+	cd doc && $(MAKE) testie.1
+	cd $(srcdir)/etc/samplepackage && $(AUTOCONF)
+	-rm -rf $(distdir)
+	mkdir $(distdir)
+	chmod 777 $(distdir)
+	@echo Copying library, documentation, configuration, and driver files...
+	[ "$(srcdir)" = . ] || cp doc/testie.1 $(srcdir)/doc
+	@for file in `cat $(srcdir)/DISTFILES | grep .`; do \
+	  if expr "$$file" : '.*:$$' >/dev/null 2>&1; then \
+	    d=`echo $$file | sed 's/:$$//;s/^\.\///'`; \
+	  elif test -d "$(srcdir)/$$d/$$file"; then \
+	    mkdir $(distdir)/$$d/$$file; \
+	    chmod 777 $(distdir)/$$d/$$file; \
+	  else \
+	    for f in `cd $(srcdir)/$$d && echo $$file`; do \
+	      test -f "$(distdir)/$$d/$$f" \
+	      || ln $(srcdir)/$$d/$$f $(distdir)/$$d/$$f 2> /dev/null \
+	      || cp -p $(srcdir)/$$d/$$f $(distdir)/$$d/$$f \
+	      || echo "Could not copy $$d/$$f!" 1>&2; \
+	  done; fi; \
+	done
+	@echo Copying element files...
+	@d=$(srcdir); \
+	for dir in `cd $$d && find elements -type d -print | grep -v 'exopc\|CVS'`; do \
+	  mkdir $(distdir)/$$dir 2>/dev/null; \
+	  chmod 777 $(distdir)/$$dir; \
+	  for cfile in `cd $$d && find $$dir -maxdepth 1 \( -type f -and \( -name \[^,.]\*.cc -or -name \[^,.]\*.c -or -name \[^,.]\*.hh -or -name \[^,.]\*.h -or -name README \) \) -print`; do \
+	    ln $$d/$$cfile $(distdir)/$$cfile; \
+	  done; \
+	done
+	@echo Removing files not meant for distribution...
+	@if test -r $(srcdir)/NODIST; then \
+	for i in `cat $(srcdir)/NODIST`; do \
+	  rm -rf $(distdir)/$$i; \
+	done; fi
+	@if grep -q 'Id:.*benjie' `find $(srcdir)/etc -maxdepth 1 -type f -print`; then \
+	  echo 'ERROR: Benjie must be punished!'; exit 1; \
+	fi
+	@if test `grep 'CLICK_VERSION=' $(srcdir)/configure.in` != `grep 'CLICK_VERSION=' $(srcdir)/etc/libclick/lc-configure.in`; then \
+	  echo 'ERROR: Bad libclick CLICK_VERSION!'; exit 1; \
+	fi
+
+
+.PHONY: all always elemlist elemlists \
+	bsdmodule linuxmodule ns userlevel minios tools \
+	install install-doc install-lib install-man install-local install-include install-local-include $(INSTALL_TARGETS) \
+	clean clean-doc clean-local $(CLEAN_TARGETS) distclean \
+	uninstall uninstall-local uninstall-local-include \
+	dist distdir check

@@ -1,0 +1,5 @@
+*.d
+*.o
+Makefile
+click2xml
+xml2click

@@ -1,0 +1,121 @@
+## Click userlevel driver Makefile ##
+SHELL = @SHELL@
+
+top_srcdir = @top_srcdir@
+srcdir = @srcdir@
+top_builddir = ..
+subdir = libsrc
+conf_auxdir = @conf_auxdir@
+
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+bindir = @bindir@
+sbindir = @sbindir@
+libdir = @libdir@
+
+VPATH = .:$(srcdir)
+
+CC = @CC@
+CPP = @CPP@
+CXX = @CXX@
+CXXCPP = @CXXCPP@
+AR_CREATE = @AR@ @AR_CREATEFLAGS@
+RANLIB = @RANLIB@
+INSTALL = @INSTALL@
+mkinstalldirs = $(conf_auxdir)/mkinstalldirs
+
+DEPDIR = .deps
+DEPSTAMP = $(DEPDIR)/stamp
+
+.SUFFIXES:
+.SUFFIXES: .S .c .cc .o .s .ii
+
+.c.o:
+	$(COMPILE) -c $<
+.s.o:
+	$(COMPILE) -c $<
+.S.o:
+	$(COMPILE) -c $<
+.cc.o:
+	$(CXXCOMPILE) -c $<
+.cc.ii:
+	$(CXXCOMPILE) -E $< > $@
+
+
+INSTALLLIBS = libclick.a
+
+GENERIC_OBJS = string.o straccum.o nameinfo.o \
+	bitvector.o bighashmap_arena.o hashallocator.o \
+	ipaddress.o ipflowid.o etheraddress.o \
+	packet.o \
+	error.o timestamp.o glue.o task.o timer.o atomic.o fromfile.o gaprate.o \
+	element.o \
+	confparse.o args.o variableenv.o lexer.o elemfilter.o routervisitor.o \
+	routerthread.o router.o master.o timerset.o selectset.o handlercall.o notifier.o \
+	integers.o md5.o crc32.o in_cksum.o iptable.o \
+	archive.o userutils.o driver.o \
+	$(EXTRA_DRIVER_OBJS)
+
+EXTRA_DRIVER_OBJS = @EXTRA_DRIVER_OBJS@
+
+LIBOBJS = $(GENERIC_OBJS) $(STD_ELEMENT_OBJS) clp.o exportstub.o
+STD_ELEMENT_OBJS = addressinfo.o alignmentinfo.o errorelement.o \
+	portinfo.o scheduleinfo.o
+
+CPPFLAGS = @CPPFLAGS@ -DCLICK_USERLEVEL
+CFLAGS = @CFLAGS@
+CXXFLAGS = @CXXFLAGS@
+DEPCFLAGS = @DEPCFLAGS@ @DEPDIRFLAG@
+
+DEFS = @DEFS@
+INCLUDES = -I$(top_builddir)/include -I$(top_srcdir)/include \
+	@PCAP_INCLUDES@ @NETMAP_INCLUDES@
+LDFLAGS = @LDFLAGS@
+LIBS = @LIBS@ @PCAP_LIBS@ @DL_LIBS@ @SOCKET_LIBS@
+
+CXXCOMPILE = $(CXX) $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CXXFLAGS) $(DEPCFLAGS)
+CXXLD = $(CXX)
+CXXLINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
+COMPILE = $(CC) $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CFLAGS) $(DEPCFLAGS)
+CCLD = $(CC)
+LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
+
+
+all: $(INSTALLLIBS)
+
+libclick.a: Makefile $(LIBOBJS)
+	$(AR_CREATE) libclick.a $(LIBOBJS)
+	$(RANLIB) libclick.a
+
+Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
+	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
+
+#!gmake
+DEPFILES := $(wildcard $(DEPDIR)/*.d)
+ifneq ($(DEPFILES),)
+include $(DEPFILES)
+endif
+#!end gmake
+
+$(LIBOBJS): $(DEPSTAMP)
+$(DEPSTAMP):
+	@-mkdir $(DEPDIR) >/dev/null 2>&1
+	@touch $@
+
+install: install-lib
+install-lib: $(INSTALLLIBS)
+	$(mkinstalldirs) $(DESTDIR)$(libdir)
+	for i in $(INSTALLLIBS); do $(INSTALL) $$i $(DESTDIR)$(libdir)/$$i; done
+uninstall:
+	for i in $(INSTALLLIBS); do rm -f $(DESTDIR)$(libdir)/$$i; done
+
+clean:
+	-rm -rf $(DEPDIR)
+	-rm -f *.o libclick.a
+clean-lib:
+	-rm -f $(LIBOBJS) libclick.a
+distclean: clean
+	-rm -f Makefile
+
+.PHONY: all clean clean-lib distclean elemlist \
+	install install-lib uninstall

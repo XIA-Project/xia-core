@@ -1,0 +1,60 @@
+SHELL = @SHELL@
+
+
+# THESE VARIABLES MAY CHANGE BETWEEN PACKAGES
+
+# Set 'package' to the name of your package.
+package := @CLICKPACKAGENAME@
+
+# Set these variables appropriately.
+top_builddir := .
+subdir := .
+
+# Require Click prefix settings.
+# Generally, you will provide a '--with-click=CLICKPREFIX' option, and set:
+clickbuild_prefix := @clickbuild_prefix@
+include @clickbuild_datadir@/config.mk
+
+# Set 'MAKE_UPACKAGE', 'MAKE_KPACKAGE', and 'MAKE_BPACKAGE' to '0' or '1'
+# to determine whether to build userlevel, linuxmodule, and bsdmodule
+# packages, respectively.
+MAKE_UPACKAGE = @BUILD_USERLEVEL@
+MAKE_KPACKAGE = @BUILD_LINUXMODULE@
+MAKE_BPACKAGE = @BUILD_BSDMODULE@
+
+# Set 'KVERSIONFLAGS' to '--gpl' to generate a dual BSD/GPL licensed
+# linuxmodule package.
+KVERSIONFLAGS = --gpl
+
+# Set 'STRIP_UPACKAGE' to 'strip -g' to strip debugging symbols from the
+# userlevel package before installing.
+#STRIP_UPACKAGE = $(STRIP) -g
+
+# Set these variables as required.
+DEFS = @DEFS@ $(CLICKDEFS)
+INCLUDES = -I. -I$(top_builddir) -I$(srcdir) $(CLICKINCLUDES)
+
+# Set this variable to force 'click-elem2package' to include a header,
+# such as your package's '<config.h>', if necessary.
+#ELEM2PACKAGE_INCLUDES = -i'<config.h>'
+
+# END OF VARIABLES THAT MAY CHANGE BETWEEN PACKAGES
+
+
+# Everything below here will probably stay unchanged
+
+srcdir := @srcdir@
+top_srcdir := @top_srcdir@
+
+ifeq ($(CLICK_PACKAGE_MAKING),)
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+bindir = @bindir@
+sbindir = @sbindir@
+libdir = @libdir@
+mandir = @mandir@
+datarootdir = @datarootdir@
+datadir = @datadir@
+endif
+
+include $(clickbuild_datadir)/pkg-Makefile

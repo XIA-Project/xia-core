@@ -1,0 +1,2139 @@
+Click NEWS
+
+Version 2.1
+
+* Major Linux kernel module improvements. Click now runs patchlessly
+  inside Linux kernels up to version 3.5. Thanks to Kevin Paul
+  Herbert.
+
+* Json: Add new JSON handling functions as an element library
+  (--enable-json to get it).
+
+* RadixIPLookup: Make it cache aware. Thanks to Madhuri Venkatesh.
+
+* Native netmap support. Thanks to Luigi Rizzo.
+
+* NS fixes and scheduling improvements. Thanks to Björn Lichtblau and
+  Sascha Alexander Jopen.
+
+* Internal library improvements to String, StringAccum, Vector, Deque,
+  and others. Better performance, smaller code size.
+
+* Start preparing for C++11.
+
+* New elements include Bypass, NetmapInfo, JsonTest, NotifierTest, and
+  BitvectorTest.
+
+* New features to Script, FromDevice, ICMPPingSource, PullSwitch,
+  RawSocket, ARPTable, FromHost, ARPQuerier, AnyDevice, SetIPAddress,
+  AddressInfo, the IPsec elements, and others.
+
+* Bug fixes to IPRewriter, SetIPChecksum, BandwidthRatedSplitter,
+  InfiniteSource, FromHost, ToHost, ToDevice, FrontDropQueue, Print,
+  Classifier (and IPClassifier, etc.), the multithreaded-Click packet
+  pool, notifiers (particularly on multithreaded Click), Bitvector,
+  and the configuration lexer.
+
+* Thanks to Cliff Frey, and to Bart Braem, Beyers Cronje, Markku
+  Savela, Derrick Pallas, Ruetee Chitpranee, Wim Vandenberghe, Matteo
+  Croce, Justin Delegard, Raluca Musaloiu-E., Jim Roewe, Brian Kim,
+  Patrick Verkaik, Lalith Suresh, Jimmy Kjällman, Asa Zernik, Robert
+  Sombrutzki, Roman Chertov, Piotr Jurkiewicz, and others.
+
+
+Version 2.0.1   24.Sep.2011
+
+* ns-3 support, thanks to Lalith Suresh and Sascha Alexander Jopen.
+
+* Important bug fixes for user-level ToDevice thanks to Jaeyong Yoo.
+
+* Better handling for time: Timestamp knows about steady clocks (also known
+  as monotonic clocks -- clocks that never go backwards) on most platforms,
+  so Timers should go off at predictable intervals even when the system
+  time is set backwards.
+
+* IPRewriter and friends: TCP supports >2GB transfers and multiple sequence
+  number transitions; UDP supports different timeouts for streaming
+  connections and RPC-like connections.
+
+* Configure with --enable-stats=2 for more precise cycle counting.
+
+* Classifier and friends (IPFilter, etc.): Correct bugs and improve
+  optimization.
+
+* Bug fixes for AddressInfo, user-level packet pool (thanks to Seiichi
+  Tetsukawa).
+
+* Support packages on patchless Linux installs.
+
+* Thanks to Cliff Frey, and to Felipe Chaulet, Sascha Alexander Jopen,
+  Christian Kreibich, Meraki, Inc., Roberto Riggio, Jim Roewe, Robert
+  Sombrutzki, Lalith Suresh, Dimitris Syrivelis, Seiichi Tetsukawa, Michael
+  W.S. Yee, Jaeyong Yoo, and all other contributors.
+
+
+Version 2.0   16.Jul.2011
+
+* New elements: AdjustTimestamp, BlockThread, ClickyInfo, EtherVLANEncap,
+  HandlerTask, ICMPIPEncap, NullTask, SetVLANAnno, StoreUDPTimeSeqRecord,
+  StripDSRHeader, StripEtherVLANHeader, TCPFragmenter, UDPIP6Encap,
+  UnstripDSRHeader.
+
+* Improved elements: ARPQuerier, AddressInfo, BandwidthRatedSplitter,
+  BandwidthRatedUnqueue, CheckLength, DRRSched, FromDevice linuxmodule,
+  FromDevice userlevel, FromHost userlevel, FromIPSummaryDump,
+  FromSimDevice, FromUserDevice, GetIPAddress, HostEtherFilter, IPFilter
+  ("ether" comparisons, faster initialization), InfiniteSource, KernelTun,
+  LinkUnqueue, RandomSource, RatedSource, RatedSplitter, RatedUnqueue,
+  Script, SetIPAddress, SetTimestamp, TCPIPSend, TimeSortedSched, ToDevice
+  userlevel, ToUserDevice, Truncate, Unqueue2, and others.
+
+* Element and tool bug fixes: CheckTCPHeader, CheckUDPHeader, DSRRouteTable
+  DelayUnqueue, FastUDPSourceIP6, FromHost, FromUserDevice, IP6Encap,
+  IPAddrRewriter, IPFilter and other classifiers, KernelFilter,
+  RadiotapDecap, RadixIPLookup, SetIP6DSCP, Socket, ThreadSafeQueue,
+  TimeSortedSched, ToUserDevice, UDPIPEncap, WifiDecap, click-align,
+  click-undead, and others.
+
+* Performance improvements
+
+** Tasks: A simplified reschedule implementation and streamlined driver
+   loop is both faster and less error prone (now calling fast_reschedule()
+   outside of Element::run_task() is safe).
+
+** Tasks: If a task does no work, delay re-running it.  This simple change
+   improves performance on many configurations, particularly those mixing
+   file descriptor or timer access and Tasks.
+
+** Timers: A 4-heap improves performance with very large numbers of timers.
+
+** User-level: Device elements default to libpcap even on Linux, offering
+   improved performance depending on how libpcap was compiled (e.g. packet
+   mmap support).  A packet memory pool suggested by Luigi Rizzo offers
+   much better performance for packet allocation and freeing.
+
+** The round-robin scheduler (--disable-stride) works again.
+
+** New configure option --enable-bound-port-transfer slightly optimizes
+   push() and pull() calls (Cliff Frey).
+
+* Language changes
+
+** New "require(library FILE)" allows one Click script to include another
+   (Christian Kreibich).
+
+** Many-to-one, one-to-many, and many-to-many connections cleanly express
+   some connection patterns.  For example, "c :: Classifier => a1, a2, a3"
+   means the same as "c :: Classifier; c [0] -> a1; c [1] -> a2; c [2] ->
+   a3".
+
+** Element groups cleanly express short detours from a connection path.
+   For example, this:
+
+	c :: Classifier(00/01);
+	x -> c -> y;
+	c [1] -> Paint(1) -> y;
+
+   can be expressed like this:
+
+	x -> c :: Classifier(00/01) => (
+            [0] -> [0]; [1] -> Paint(1) -> [0]
+        ) -> y;
+
+* Multithreading
+
+** Many performance and stability improvements to multithreaded
+   configurations, particularly at userlevel.
+
+** Lazy Task rescheduling reduces opportunities for bugs.
+
+** Each thread gains its own sets of Timers (and, at user level, selector
+   file descriptors).  An element's Timers are initially scheduled on the
+   same thread as its Tasks.  This should simplify reasoning about
+   Task/Timer conflicts, and can help improve performance.
+
+* Linuxmodule
+
+** Patchless installs are on by default.  Click installs and works without
+   a patch on many versions of Linux up to 2.6.38.
+
+* Clicky changes
+
+** Per-router styles: ClickyInfo elements let a script specify how it
+   should be drawn.
+
+** "Run" and "Stop" buttons can execute a configuration.
+
+* Internals
+
+** Args: This new class and its helpers support concise, easy-to-use,
+   type-safe argument parsing and are strongly preferred to cp_va_kparse in
+   new code.
+
+** TokenBucket: This new template class supports fast, flexible,
+   integer-based token bucket rate management.
+
+** Timestamps default to nanosecond precision on many platforms.
+
+** Element::simple_action() can be used for multi-port elements.
+
+** On some platforms, set environment variable CLICK_BACKTRACE to 1 and get
+   a useful stack backtrace if Click crashes (Cliff Frey).
+
+** Other improvements: more flexible handlers, simple_action, type traits,
+   faster multi-precision arithmetic, better IPv6 address unparsing.
+
+* Acknowledgements
+
+** Thanks to Cliff Frey for extensive discussion, multithreaded debugging,
+   802.1Q elements, TokenBucket, TCPFragmenter, bound port transfer, and
+   others.
+
+** Thanks to Joonwoo Park for Linux kernel module patches.
+
+** Thanks to Jimmy Kjällman and Pekka Nikander for FreeBSD kernel module
+   support.
+
+** Thanks to Johan Bergs, Jesse Brown, Roman Chertov, Beyers Cronje, Jens
+   De Wit, Kevin Paul Herbert, Sascha Alexander Jopen, Christian Kreibich,
+   Bobby Longpocket, Ruben Merz, Derrick Pallas, Roberto Riggio, Luigi
+   Rizzo, Jim Roewe, Ian Rose, Harald Schiöberg, Florian Sesser, Lalith
+   Suresh, and Wim Vandenberghe for patches, bug fixes, and new elements.
+
+** Thanks to Dan Aguayo, Mark Allman, Manel Bourguiba, Bart Braem, Lars
+   Bro, Dmitriy Bubnov, Rémi Clavier, Jonathan Kirchhoff, Dan Levin, José
+   Pedro Oliveira, Kostas Pelechrinis, Sami Ruponen, Robert Shanks, Robert
+   Sombrutzki, Patrick Verkaik, Nicholas Weaver, Xianghua Xiao, and
+   xuhui122000 gmail com for bug reports.
+
+** Thanks to everyone else who supports and uses Click.
+
+
+Version 1.8.0   28.Feb.2010
+
+* Simulation time feature.  By default the Click driver runs in real time:
+  Timestamp::now() returns the current time.  But a router-wide "timewarp"
+  write handler is available.  Set the "timewarp" handler to 2, and Click
+  time appears to move twice as fast as real time.
+
+  Or run "click --simtime".  This runs Click in simulation time.  Time is
+  completely divorced from real time.  Timers appear to expire immediately
+  (in other words, Click time jumps to the closest timer expiration time).
+  Every call to Timestamp::now() increments Click time by epsilon (one
+  subsecond).  This turns Click into an event-driven simulator, makes time
+  completely deterministic, and makes tests run fast.
+
+* IPRewriter and associated elements rewrite.  This major refactoring adds
+  new functionality, robustness, and speed, while reducing memory
+  footprint.  A few features are lost, especially hotswapping support, and
+  some syntax has changed, FTPPortMapper and ICMPPingRewriter in
+  particular.  Thanks to Cliff Frey.
+
+* Initial BETA support for running in UNPATCHED Linux kernels.  Give
+  ./configure the --enable-fixincludes option to test this support.  (On
+  later kernels, you may need to disable FromHost by adding
+  ELEMENT_REQUIRES(false) to the bottom of
+  elements/linuxmodule/fromhost.cc.)  Thanks to Harald Schiöberg for ideas.
+
+  Note that Click packages (like etc/samplepackage) don't yet work on
+  patchless installs.
+
+* Patch for ns-2.34, thanks to Wim Vandenberghe.
+
+* BETA support for FreeBSD 7.1 kernels, thanks to Nikola Knežević and Simon
+  Schubert.
+
+* Patch for Intel's e1000e driver from Joonwoo Park.  Thanks!
+
+* Patch for Intel's e1000-7.6.15.5 driver from Joonwoo Park, work sponsored
+  by NemeanNetworks.  Thanks!
+
+* Clicky GUI bug fixes, visual improvements.
+
+* New features: ARPPrint ACTIVE, ARPQuerier POLL_TIMEOUT, ARPResponder
+  lookup, add, and remove handlers, Classifier and IPFilter live
+  reconfiguration and optimization improvements, ControlSocket advanced TCP
+  ports, DecIPTTL MULTICAST and ACTIVE, Discard ACTIVE, FromDevice
+  ALIGNMENT, FromUserDevice HEADROOM, ICMPError live reconfiguration, IP
+  summary dump ip_dscp and ip_ecn, MarkIPCE FORCE, PullSwitch notification,
+  Queue memory barriers, RED has GENTLE false and STABILITY 0, Unqueue
+  LIMIT and handlers, click-pretty diagram templates.
+
+* New elements: IP6Encap, MarkMACHeader, QuickNoteQueue, Script, SetIPECN,
+  SimpleIdle, SimplePullSwitch.
+
+* Element bug fixes: ARPQuerier/ARPTable (memory corruption bug),
+  AthDescEncap, Classifier, FromHost, FromIPSummaryDump, ICMPPingResponder,
+  ICMPRewriter, IPClassifier, IPFilter, IPFlowRawSockets, IPNameInfo, IPsec
+  elements, KernelTun, linuxmodule device and queue elements (memory
+  corruption bugs), Print80211, RadioTapDecap, StaticThreadSched,
+  StoreIPAddress, Unqueue, WEPEncap, WifiDefrag.
+
+* Other bug fixes: Timer fairness, select handling in user-level
+  multithreaded configurations.
+
+* Internals: IP6Address improvements, String performance and memory-usage
+  improvements, avoid strict-aliasing warnings, default to including
+  analysis and test elements, new RouterVisitor class for analyzing
+  configuration graphs, new algorithms for heap functions, set the random
+  seed to a "truly random" value at router configure time, signal handlers
+  become more robust, tool improvements to variable scope handling.
+
+* Deprecated features: ElementFilter.
+
+* Thanks to Mark Allman, Bart Braem, Andrew Brampton, Robert Buchholz,
+  Roman Chertov, Jens De Wit, Xiaojun Feng, Cliff Frey, Raja Hayek, David
+  Johnson, Nikola Knežević, NemeanNetworks, Joonwoo Park, Roberto Riggio,
+  Nadi Sarrar, Harald Schiöberg, Simon Schubert, Robert Sombrutzki, Ashish
+  Sharma, Seiichi Tetsukawa, Erwin Van de Velde, Wim Vandenberghe, Nick
+  Weaver.
+
+
+Version 1.7.0rc1   7.Mar.2009
+
+* Clicky GUI
+
+** Include clicky, a new Click GUI using the GTK+ toolkit.  To compile,
+   install the GTK+ development package for your OS, then install Click.
+   Finally, "cd apps/clicky; autoreconf -i; ./configure
+   --prefix=CLICKPREFIX; make install".  Clicky is capable of interacting
+   live with Click routers, either in the kernel or using the ControlSocket
+   protocol for user-level configurations.  It displays a configuration as
+   text, highlights configuration errors, and displays handlers.  It can
+   also display an automatically-created configuration diagram.  A powerful
+   Cascading Style Sheets-like language can be used to control the diagram.
+   For instance, elements on the diagram can display live counter values.
+
+* Drivers
+
+** Support Linux 2.6.24.7.  Major thanks to Joonwoo Park and
+   NemeanNetworks, and Adam Greenhalgh.
+
+** Many soft lockup fixes to the kernel driver, for both multithreading and
+   uniprocessor scenarios.  Problems reported especially by Joonwoo Park
+   and Kevin Springborn.
+
+** Add support for user-level multithreading.
+
+** Improve atomic operations and multithreading support for notifiers.
+
+** ThreadSafeQueue is a completely thread-safe queue, allowing multiple
+   simultaneous pushers and/or pullers.
+
+** Linux kernel device elements support carrier check.
+
+** Major improvements in parsing and initialization time for large
+   configurations.
+
+** The Timestamp class supports any timestamp layout used by Linux,
+   including various types of 64-bit scalar values.
+ 
+** Linuxmodule Click file system: Prefer element names to handler names --
+   "/click/ELEMENTNAME" always matches an element of that name.  To
+   reliably find a handler, use "/click/ELEMENTNAME/.h/HANDLERNAME".
+   Similarly for global handlers.
+
+* Elements
+
+** New AnnotationInfo element adds support for named packet annotations.
+   Use this support in other elements, such as Paint, which now allows
+   users to name which annotation to paint.  Required refactoring of Packet
+   annotation area.
+
+** ControlSocket: add READDATA, READUNTIL, and WRITEUNTIL commands, add
+   LOCALHOST keyword argument, fix LLRPC support.
+
+** Script: support "goto label CONDITION", add printn, error, returnq,
+   setq, and initq commands, add PROXY and PACKET types, add many handlers.
+
+** Queue: add second output for rejected packets.
+
+** IPSummaryDump elements: support ICMP, FromIPSummaryDump supports more
+   data types, fix MD5 checksums.
+
+** Add handlers to Counter, TimedSink, others.
+
+** New elements, including ARPTable, EtherPauseSource, FlowInfo,
+   KernelFilter, StoreEtherAddress, TimedUnqueue, TruncateIPPayload.
+
+** Bug fixes and other improvements to click-align, click-devirtualize,
+   ARPFaker, ARPQuerier, ARPResponder, AddressInfo, AggregateIPFlows,
+   AnyDevice, CheckIPHeader, DirectIPLookup, FromDevice, FromHost,
+   FromUserDevice, IPFilter, IPPrint, IPReassembler, IPRouteTable,
+   KernelTun, Print, ProgressBar, Queue, RadixIPLookup, SpinlockInfo,
+   StoreIPAddress, StrideSched, StrideSwitch, Suppressor, TimeFilter,
+   TimeRange, ToDevice, ToHost, ToUserDevice, and others.
+
+* Internals
+
+** New HashTable template is preferred over HashMap.  It is documented.
+
+** Improve Timer scheduling precision by dynamically adjusting the expiry
+   time.  Improve Timer fairness as well; a Timer cannot starve Task
+   processing or other Timers.
+
+** New cp_va_kparse functions replace cp_va_parse.  The cp_va_kparse
+   functions assign a keyword to *every* argument, facilitating better
+   error messages.
+
+** Element::add_data_handlers() is an easy way to provide handler access to
+   element data members.  Element::read/reconfigure_keyword_handler can
+   handle optionaly-positional handlers.
+
+** New Handler class features handler flags that act as hints to GUI
+   displays.
+
+** New List template for doubly-linked lists.
+
+** New Bigint template for simple multiple-precision integer arithmetic.
+   Code derived from GNU MP.
+
+** Timestamp refactoring required by newer Linux drivers.
+
+** The number of supported Notifiers is possibly infinite.  Additionally,
+   Notifiers better support combinations of large numbers of basic signals,
+   so a RoundRobinSched downstream of more than 32 Queues won't pin the
+   CPU.
+
+** testie regression test framework improvements.
+
+** 64-bit platform fixes.
+
+** Improved error message subsystem (documented in error.hh/error.cc).
+
+** Improved sort function is faster and robust to bad comparators.
+
+** Use click_random() for random numbers.
+
+** UTF-8 support in command line arguments and ErrorHandler.
+
+** "./configure --enable-valgrind" turns on extra support for memory
+   debugging with Valgrind.
+
+** Remove the "connectiontunnel" primitive.
+
+** Much documentation, including to Task, Timer, NameDB, NameInfo,
+   ErrorHandler, CLP.
+
+** Other bug fixes, including to String and StringAccum.
+
+* Special thanks to Joonwoo Park, Cliff Frey, Roman Chertov, Kevin
+  Springborn, and Adam Greenhalgh for their extraordinary contributions.
+
+* Thanks to Alexander Afanasyev, Damien Ancelin, Johan Bergs, Lorenzo
+  Bianconi, Bart Braem, Lars Bro, Marco Canini, Remi Clavier, Beyers
+  Cronje, Lionel Debroux, Giovanni Di Stasi, Norbert Egi, Megan Leigh
+  Elmore, Ulf Hermann, Bob Keyes, Brian Kim, Klocwork for code analysis,
+  Nikola Knežević, Hashimoto Kouki, John Russell Lane, Jinyang Li, Mustafa
+  Mohammad, Jim Mott-Smith, Tom Parker, Vern Paxson, Matthias Petschick,
+  Stephen Pink, Pavlin Radoslavov, Manuel Requena, Barret Rhoden, Roberto
+  Riggio, Robert Ross, Javier Sánchez, Harald Schiöberg, Robert Sombrutzki,
+  Seiichi Tatsukawa, Neil Viberg, Vivek Vijayan, Michael Voorhaen, Nicholas
+  Weaver, Marco Wenzel, Christopher White, Pieter Wuytens, Xiao Yu, and
+  anyone else we inadvertently left off the list.
+
+
+Version 1.6.0   18.Sep.2007
+
+* Drivers
+
+** The Click drivers, language, and tools support named configuration
+   parameters, which can be set in configuration files or on the command
+   line.  See 'conf/test-ping.click' for an example.
+
+** click-install provides a --cpu option, to force Click to run on a given
+   CPU (Beyers Cronje).  Also, click-install provides a --user option,
+   setting the uid/gid owning the Click file system.
+
+** Linux 2.6.19 support.
+
+** Improved support for recent FreeBSD kernels (Bruce Simpson).
+
+** ns-2.30 support, and ns-2.29 support removed.  You will need to apply
+   the ns-2.30-patch with this distribution; old patches are obsolete.
+
+** Improved stability for e1000-5.x drivers (Kevin Lahey), e1000-6.x
+   drivers (Beyers Cronje, Adam Greenhalgh, Joonwoo Park), and e1000-7.x
+   drivers (Max Poletto, Roman Chertov).
+
+** Improved stability for Linux kernel module.
+
+** Improved SMP Click.  For instance, removed NotifierQueue race
+   conditions.  Thanks very much to Joonwoo Park.
+
+** click-viz is integrated into click-pretty.
+
+** click-fastclassifier and click-devirtualize work.
+
+** click-align's output is smaller; it generates output only for elements
+   that require alignment information.  The need for alignment information
+   is indicated by the character A in flags().
+
+* Elements
+
+** Linuxmodule elements FromDevice and PollDevice have a TIMESTAMP keyword
+   argument, to force timestamps at device receive time.  Recent kernels
+   don't timestamp received packets most of the time.
+
+** Linuxmodule FromDevice, PollDevice, and ToDevice support the QUIET
+   keyword argument.  Another change makes it easier to use these elements
+   when there are many devices with the same Ethernet address.  Thanks to
+   Cliff Frey.
+
+** Greatly improved IPsec elements from Dimitris Syrivelis and Ioannis
+   Avramopoulos.
+
+** ToIPSummaryDump supports MD5 checksums (Vern Paxson request).
+
+** Add support for PlanetLab Privileged Operations (proper) packet sending
+   and receiving (thanks, Mark Huang).
+
+** Script: The "run" handlers accepts arguments, which the script can refer
+   to as $args, $1, $2, and so forth.  "goto exit" works.
+
+** User-level FromDevice's SNIFFER argument now works.  SNIFFER false
+   automatically installs a firewall rule that prevents the kernel from
+   processing FromDevice's packets.  When Click stops, the rule is
+   automatically removed.  Works only on Linux at the moment.
+
+** More handlers for UDPIPEncap, ARPQuerier, ICMPPingSource, ICMPPingEncap,
+   and others.
+
+** Linuxmodule: Add experimental FromUserDevice and ToUserDevice elements,
+   for communicating between kernel configurations and user level via /dev.
+   Only available if --enable-experimental was supplied to configure.
+   Thanks to Roman Chertov.
+
+** Bug fixes, performance improvements, and extensions to many elements,
+   including AddressTranslator, AverageCounter, BandwidthMeter,
+   BeaconSource, ControlSocket, DSRRouteTable, DirectIPLookup, Discard,
+   FromDevice, FromDump, FromNetFlowSummaryDump, FromSimDevice,
+   HostEtherFilter, ICMPPingRewriter, ICMPRewriter, IP6Mirror,
+   IPClassifier/IPFilter, IPEncap, IPMirror, IPNameInfo, InfiniteSource,
+   KernelTap, KernelTun, LinuxIPLookup, RangeIPLookup, RawSocket, Reframe,
+   Script, SetUDPChecksum, SimpleQueue, Socket, ToDevice, ToDump, ToHost,
+   ToSimDevice, UDPIPEncap, UMLSwitch.
+
+* Internals
+
+** Initial and very preliminary support for multithreading at user level.
+   If one of your elements plans to fork a new thread, compile Click with
+   --enable-user-multithread.  Most of Click is still not thread safe, but
+   this will fix some common problems, such as Packet reference counts.
+
+** Introduce new cp_va_kparse() functions with a better interface than
+   cp_va_parse().  Document confparse functions.
+
+** Document and rewrite EWMA classes.
+
+** Important bug fixes in Task will make notification more stable.
+
+** Remove some deprecated member functions in String and Element
+   (notify_ninputs() and notify_noutputs()).
+
+** Fix bugs in lexing, notification, and Linux kernel module locking and
+   SMP support.  Thanks especially to Joonwoo (Jason) Park for SMP patches
+   and bug reports.
+
+** String and StringAccum objects use specialized memory allocation
+   functions, allowing very large Strings and StringAccums in kernel space.
+   So do Queues.
+
+** Compilation fixes for x86_64.  Thanks, Puneet Sood.
+
+** A better hashcode() system uses templates and overloading, reducing the
+   chance that an operator bool() will mistakenly be used as a hashcode().
+   Thanks, Andrew Ratin.
+
+** Use operator unspecified_bool_type() rather than operator bool() for
+   similar reasons.
+
+* Other bug fixes and improvements.
+
+* Thanks to Nicola Arnoldi, Ioannis Avramopoulos, Salman Abdul Baset, Koen
+  Beel, Kristian Beilke, Torquato Bertani, John Bicket, Bart Braem,
+  Vladimir Bychkovsky, Marco Canini, Srivas Chennu, Szymon Chachulski,
+  Roman Chertov, David Claffey, Beyers Cronje, Peter De Cleyn, Norbert Egi,
+  Nick Feamster, Cliff Frey, Matt Gordon, Adam Greenhalgh, Mark Huang,
+  Mathias Jeschke, Azeem Khan, Christian Kreibich, Mathias Kurth, Kevin
+  Lahey, lastlijing yahoo com cn, Pierre-Emmanuel Le Roux, Nicolas Letor,
+  Joe Maldonaldo, David Moore, Tim Morgan, Jim Mott-Smith, Jens Mueller,
+  Arvid Nilsson, Joonwoo (Jason) Park, Vern Paxson, Max Poletto, Vivek
+  Raghunathan, Roberto Riggio, Robert Ross, Bruce Simpson, Puneet Sood,
+  Dimitris Syrivelis, Seiichi Tatsukawa, Andy Van Maele, Frederic Van
+  Quickenborne, Wim Vandenberghe, Rob Wachol, and Mike Wilson, and anyone
+  we inadvertently forgot to mention here.
+
+
+Version 1.5.0   19.May.2006
+
+* Linux 2.6.16.13 kernel module support, including support for packages.
+
+* click-packages-1.5.0 supports SNMP and Netflow (donated by Mazu Networks)
+  and multicast (preliminary).
+
+* IP routing element improvements, including new, gloriously fast
+  DirectIPLookup element (Marko Zec with kohler).
+
+* Add new Script element, basically replacing PokeHandlers and
+  DriverManager, with support for programmability and signal handling;
+  check it out.
+
+* New elements: ChangeUID, ListenEtherSwitch, RawSocket, Socket, Truncate,
+  ARPPrint and CheckARPHeader (Jose Maria Gonzalez), many wifi elements.
+
+* Deprecated elements: FromRawSocket, FromSocket, PokeHandlers, ToRawSocket,
+  ToSocket.
+
+* Polling version of Intel's e1000-5.7.6 driver.
+
+* Bug fixes and extensions to many elements, including ARPQuerier,
+  EtherSwitch, FromDAGDump, FromDevice (userlevel), ICMPPingSource,
+  IPAddrRewriter, IPFilter/IPClassifier, IPPrint, LinkUnqueue,
+  RandomBitErrors, RatedUnqueue, SetTimestamp, ToDevice (kernel and
+  userlevel), ToIPSummaryDump.
+
+* Integrated nsclick patch, and improved nsclick (Michael Voorhaen, Bart
+  Braem, kohler).
+
+* x86_64 support.
+
+* Wifi (bicket)
+
+** Most wifi elements have been removed from the repository.  They will be
+   added back later as a separate package in click-packages.
+
+* Internals
+
+** Initiate Doxygen documentation for important base types, such as
+   Element, String, Notifier, and so forth.  This project is not complete;
+   as each class gets Doxygenated its interface tends to change, so be
+   prepared.
+
+** Add new port_count() method, allowing elements to declare how many ports
+   they support.  This replaces Element::set_ninputs(), set_noutputs(),
+   add_input(), add_output(), notify_ninputs(), and notify_noutputs(),
+   which are all now deprecated.
+
+** Add RAW handler flag, for handlers whose output should not be modified
+   (for example, no adding a courtesy newline).
+
+** Element::run_timer takes a Timer * argument.  The old version is
+   deprecated.
+
+** Add a new, general mechanism for named enumerations (such as IP
+   protocols, TCP/UDP ports, addresses, and so forth), NameInfo/NameDB.
+
+** Add ELEMENT_LIBS support, so an element can pull in a static library.
+
+** Many bug fixes.
+
+** Diagram library improvements.
+
+* Thanks to Dan Aguayo, Mark Allman, Bart Braem, Kristof Cauwel, Spencer
+  Chang, YenJung Chang, Jacky Cheng, Beyers Cronje, Weidong Cui, Anne
+  Dudfield, Brian Gallaway, Michael Gellman, Chema Gonzalez, Andrew
+  Gorelik, Adam Greenhalgh, Jason Haas, Trevor Harrison, Felipe Huici, Bart
+  Jooris, Srikanth Kandula, Bob Keyes, Kevin Lahey, Dagang Li, Nikitas
+  Liogkas, Yun Mao, Ross Mcilroy, Alastair McKinley, Indian Mogul, Thomas
+  Paine, Ruoming Pang, Juncheol Park, Vern Paxson, Michael Voorhaen,
+  Michael Walfish, Nick Weaver, Qinghua Ye, Marko Zec, and anyone else
+  whose name was forgotten.
+
+
+Version 1.4.3   5.Jan.2005
+
+* Remove bonehead linuxmodule compile error.
+
+
+Version 1.4.2   29.Dec.2004
+
+* BSD kernel module support!  Implemented by Marko Zec, University of
+  Zagreb.
+
+* KernelTap is undeprecated.  (jbicket)
+
+* User-level Click has FromHost and ToHost elements, at least on Linux!
+  (jbicket)
+
+* Add FullNoteQueue option.  FullNoteQueue informs upstream listeners when
+  it's full.  Queue now invokes FullNoteQueue by default.  (kohler)
+
+* New elements: Truncate, RandomSeed, IPAddrPairRewriter, SchedOrderTest.
+
+* IPFilter/IPClassifier: Support "ip[POS:LEN]" and "transp[POS:LEN]"
+  expressions.  (kohler)
+
+* Add support for new-format DAG dumps, and more encapsulation types for
+  FromDump, including 802.11 and PPP.  (kohler)
+
+* ToIPSummaryDump will emit a dash for a field only if that field wasn't
+  captured, rather than if the header wasn't captured.  For example, if the
+  first 8 bytes of the TCP header were captured, ToIPSummaryDump will
+  happily print the source and destination ports, but not anything further.
+  (kohler)
+
+* DriverManager: Add "loop" instruction, available at user level.  (kohler)
+
+* Bug fixes, particularly to IPReassembler, click-fastclassifier,
+  click-devirtualize (kohler), and fix the linuxmodule bug that led to
+  errors like "wmem_alloc != 0" (jbicket).
+
+* Fixes to wireless source routing elements (element/wifi/sr/) -
+  gives each link a sequence number and age to prevent old linkstate
+  from floating around in the network.  Also more documentation.
+  (jbicket)
+
+* Add header (click_wifi_extra) to replace prism header. Communicates
+  with the device driver (things like transmission status, bitrate,
+  retries, etc).  See ExtraEncap and ExtraDecap as well as FilterTX.
+  (jbicket)
+
+* Internal changes (kohler)
+
+** Handler class rewritten. 
+
+** Timers are stored in a heap; thanks to Jonathan K. Lee for an initial
+   implementation.
+
+** If you supply the --enable-task-heap option to ./configure, tasks will
+   also be stored in a heap, rather than a linked list.
+
+* Thanks to Peter De Cleyn, Holger Dreger, Thomer Gil, Jeff Gold, Bob
+  Keyes, Peter Lippens, Nikitas Liogkas, Kevin Mitchell, Indian Mogul,
+  Michele Mordenti, Vern Paxson, Marcel Poisot, Pavlin Radoslavov, Rick
+  Stewart, Erik VandeKieft, Frederic Van Quickenborne, Erwin Van de Velde,
+  Marko Zec.
+
+
+Version 1.4.1   7.Jul.2004
+
+* Added Element::static_initialize() and static_cleanup() methods.
+  Elements use these methods to set up and tear down global state.  See the
+  programming manual (doc/click.info*) for details.
+
+* Fix click-mkmindriver (reported by Harvey Jones).
+
+* Fix IPInputCombo (reported by Jerry Parente).
+
+* Grid/Wifi updates (John Bicket).
+
+* Add /click/messages handler.
+
+* Updates so that Click may be compiled by gcc-3.4.1.
+
+
+Version 1.4   29.Jun.2004
+
+* Elements
+
+** Major rearrangement of Grid/Wifi elements (John Bicket).  Add
+   "--enable-wifi" configuration option, to select the wifi elements.
+   There are elements in the elements/wifi/ap directory that will allow you
+   to build an access point. Also, There is a driver available at 
+   http://www.pdos.lcs.mit.edu/~jbicket/madwifi.stripped 
+   that works with Atheros-based 802.11a/b/g cars which sends/receives
+   802.11 packets.  To compile with that driver, download the driver and 
+   then point configure at it using "--with-wifi=DIR".  The elements 
+   WifiEncap and WifiDecap to encapsulate/decapsulate 802.3 packets 
+   into 802.11 before they go to FromDev and after they come from ToDev.  
+   Elements such as SetTXPower and SetTXRate allow per-packet transmit 
+   control and bit-rate control, respectively.
+
+** Add FromSocket, ToSocket, IPFlowRawSockets, FromRawSocket, and
+   ToRawSocket elements from Mark Huang.  These elements let user-level
+   configurations talk to the network over raw sockets.
+
+** Add FromCapDump element, to support trace files generated by Mark
+   Allman's cap tool.
+
+** Add AggregatePacketCounter, EraseIPPayload, StoreData, ComparePackets,
+   Message elements.
+
+** Rename SortedTaskSched to BalancedThreadSched (the old name still works
+   for now).  Its implementation also changed; rather than sort *all*
+   tasks, it repeatedly moves tasks from the most-oversubscribed thread to
+   the most-undersubscribed thread (in sorted order).
+
+** DriverManager adds "save" and "append" instructions.
+
+** ICMPSendPings can keep ping statistics, like a standalone ping program.
+
+** AnonymizeIPAddr handles IP addresses in headers embedded within ICMP
+   packets.
+
+** IPSummaryDump elements change the format for TCP SACK options; the new
+   format is "sack:N1-N2".
+
+** Add syntax for bandwidths with units, such as "kb/s".
+
+** Other improvements to DriverManager, RatedUnqueue, DelayShaper,
+   CycleCountAccum, From/ToIPSummaryDump, ControlSocket.
+
+** Bug fixes to StrideSched and others.
+
+* Drivers
+
+** The user-level driver will quit immediately if given a configuration
+   with no elements.  It also supports the "--exit-handler" option.
+
+* Bug fixes
+
+** Fix compound element parsing.
+
+** Fix race conditions on the task list.
+
+** Fix bugs with "atomic_uint32_t::operator{&=,|=}", and fix their
+   definitions on ARM.
+
+** Fix user-level hotswapping.
+
+** Fix TCP/UDP checksum calculation in the presence of IP source routing
+   options.
+
+** Support Click SMP again.
+
+** Improve Linux patches (to correct bugs in AX25 and similar headers), and
+   add a linux-2.4.26 patch.
+
+* Internal changes
+
+** Allow for multiple kinds of Notifiers, defined by name.
+
+** Renamed the uatomic32_t type to atomic_uint32_t.
+
+** Generate click-buildtool from click-buildtool.in.
+
+** Remove Element::clone() function.
+
+** Add more regression tests, improve 'testie'.
+
+
+Version 1.4pre1   18.Mar.2004
+
+* Major changes
+
+** Huge Grid changes, bug fixes, new functionality, and restructuring into
+   multiple directories.
+
+** Scheduling rewrite. Previously, each Router object had its own set of
+   "threads". In the kernel, this meant many Click kernel threads might be
+   active during a configuration change, limiting how fast you could change
+   configurations. Now all Routers share a single set of "threads", so
+   configuration changes are faster and hopefully more reliable.
+
+   Bugs remain. We would so appreciate testing help it's not funny.
+
+** Userlevel driver: Support hotswapping. Hotswappable elements include
+   ControlSocket, ChatterSocket, FromDump.
+
+* New elements
+
+** Add many Grid elements.
+
+** Add FromNLANRDump (read directly from NLANR traces), FromTcpdump (read
+   from ASCII tcpdump(1) output), LinkUnqueue (model a link including
+   delay), SetTimestampDelta.
+
+** Add SourceIPHashMapper element (Max Krohn).
+
+** Add PortInfo and cp_tcpudp_port(): now you can refer to TCP/UDP ports by
+   name in elements like UDPIPEncap.
+
+* Element changes
+
+** ControlSocket supports LLRPCs.
+
+** IPClassifier and IPFilter support "ip hl", "ip id", and "ip vers";
+   arbitrary >, >=, <, and <= comparisons; and ?: expressions.
+
+** CheckIPHeader and friends accept packets with bad source addresses, as
+   long as they are destined for the router. Added keyword arguments.
+
+** SetTCPChecksum implements the correct checksum.
+
+** ICMPError handles source-routed packets appropriately.
+
+** FromIPSummaryDump supports ip_opt, ip_ttl, ip_tos, and tcp_ntopt types.
+
+** Scheduler elements (such as StrideSched), packet dump elements (such as
+   FromDump), and KernelTun use notification, reducing CPU overhead.
+
+** Updates to AggregateCounter, AggregateIP, AggregateIPFlows, DelayShaper,
+   ICMPPingSource, InfiniteSource, KernelTun, StoreIPAddress, TCPRewriter.
+
+** SimpleQueue supports the (C++-only) yank() operation.
+
+** Linuxmodule: Fix race condition in FromHost.
+
+** Linuxmodule: ToHost watches for device up/down events.
+
+* Language, configuration, and driver changes
+
+** Compound elements support keyword arguments and __REST__ arguments.
+
+** Add 'conf/click-mkclgw.pl', a script that reads a simple configuration
+   file ('conf/example.clgw' for the format) and generates a NAT cluster
+   gateway, supporting firewalls, reverse NAT mappings through the
+   firewalls, and load-balanced clusters (Max Krohn).
+
+** Userlevel: Remove --stop option.
+
+** Userlevel: Use poll() instead of select() when available; supports more
+   file descriptors.
+
+** Linuxmodule: Add --enable-kassert configure option to enable kernel
+   assertion checking.
+
+** Support recursive element directories.
+
+** Tool cleanups.
+
+** Diagram macro updates.
+
+* Internal changes
+
+** Standardize on a single HashMap template class, called HashMap.
+
+** String::c_str() is const.
+
+** Add String functionality based on 'const char *' iterators (STL-like).
+
+** Configuration fixes for Mac OS X.
+
+** DeQueues can grow arbitrarily large in the kernel.
+
+** Adjust startup sequence. Add click_static_initialize() to take care of
+   common initialization steps.
+
+** Handlers: Change the way global handlers are called.
+
+** Add click_ether_vlan structure in <clicknet/ether.h>.
+
+** Add tests and bug fixes (including Packet::shrink_data, IPMapper).
+
+** ErrorHandler supports verbosity settings; other updates.
+
+** Timers that stop the router prevent later timers from running.
+
+** 'tickets' handlers are often writable.
+
+** Remove compatibility functions.
+
+** Add click_in_cksum_pseudohdr() function.
+
+
+Version 1.3pre1   5.Mar.2003
+
+* Incompatible changes
+
+** The 'Queue' element is now a NotifierQueue. To access a queue without
+   notification, use 'SimpleQueue'.
+
+** The semantics of IPFilter 'deny' arguments have changed. Now, 'deny'
+   means the same thing as 'drop'. The old behavior was inappropriately
+   surprising.
+
+** Deprecated KernelTap element in favor of KernelTun.
+
+** Renamed MergeByTimestamp to TimeSortedSched.
+
+** '--enable-clickfs' is the default. (Clickfs provides a symlink from
+   /proc/click to /click to make upgrading easier.)
+
+** Removed elements deprecated in 1.2.4. This includes LookupIPRoute,
+   LookupIPRouteLinux, FromLinux, ToLinux, ToLinuxSniffers, PeekHandlers,
+   ProbSplitter, and RandomLossage.
+
+** Removed user-level Click driver's '--stop' option.
+
+** The 'void Element::run_scheduled()' method has been deprecated; use
+   'bool Element::run_task()' or 'void Element::run_timer()' instead.
+   'run_task()'s bool return value should be true iff the task managed to
+   do some useful work. (This helps the adaptive scheduler.)
+
+** HandlerCall's interface has changed. So have the raw functions for
+   accessing handlers from a Router object.
+
+** Element map files now use an XML format, and are called 'elementmap.xml'
+   and 'elementmap-PACKAGE.xml', not 'elementmap' and 'elementmap.PACKAGE'.
+
+** LLRPCs now explicitly encode the amount of data they transfer to and
+   from the caller, using the same mechanism as ioctl(). The local_llrpc()
+   virtual method has been removed.
+
+** Removed deprecated header files like <click/click_ip.h> (use
+   <clicknet/ip.h> and similar).
+
+** Changed ICMP structure and macro names in <clicknet/icmp.h>.
+
+** Removed deprecated Element methods and method signatures, including
+   'Element::uninitialize()', 'Element::configure(const Vector<String> &)',
+   and 'Element::live_reconfigure(const Vector<String> &)'.
+
+** Click declarations and definitions are now surrounded with CLICK_DECLS
+   and CLICK_ENDDECLS macros (see any source file for an example). These
+   macros normally do nothing. In the 'ns' driver, though, they drop all
+   Click declarations into a separate namespace.
+
+** Removed 'String::operator const char *()', which caused problems with
+   newer GCCs.
+
+* Drivers
+
+** Add an optional adaptive task scheduler, written initially by Petros
+   Zerfos <pzerfos@cs.ucla.edu>. Give 'configure' the '--enable-adaptive'
+   option to turn it on. The adaptive scheduler takes less CPU time when
+   Click isn't busy, and lets you control the minimum and maximum shares
+   that Click will take of the CPU. This is particularly useful for the
+   Linux kernel module, on a uniprocessor, for running user-level programs
+   (tcpdump, for instance) as well as Click. The adaptive scheduler
+   provides access to its parameters via handlers; see click.o(8) for more
+   information.
+
+** Integrated the 'nsclick' driver from the University of Colorado, and
+   particularly by Michael Neufeld. This driver lets you integrate a Click
+   router with an ns simulation; Click can accept ns packets and return
+   packets to ns. See configure's '--enable-ns' option and the 'ns'
+   subdirectory.
+
+** Add support for Linux 2.4.20 and a newer Intel E1000 driver (4.3.15).
+
+** Linux kernel module driver notices when other processes are waiting to
+   access the task list (to unschedule a task, for example), and explicitly
+   waits to give them a chance.
+
+** Various Linux kernel module bug fixes, including a serious one in the
+   SKB manager (mismeasured packet sizes could cause a kernel crash
+   eventually).
+
+** Add 'Task::strong_unschedule()', which moves tasks to the quiescent
+   thread; that way, tasks will not run even if they are rescheduled.
+   Useful in the presence of notification.
+
+** Improve performance of add_select() and remove_select() at user level.
+
+* Elements
+
+** Add SetUDPChecksum, TimestampAccum, PaintSwitch, KernelTun, MixedQueue.
+
+** Add a set of elements for trace analysis via a new packet annotation,
+   the aggregate annotation. Elements include AggregateIPFlows,
+   ToIPFlowDumps, AggregateIP, AggregateLength, AggregateCounter,
+   AggregateFilter, AggregateFirst, AggregateLast.
+
+** Added notification support to ToDevice, DelayUnqueue, Unqueue,
+   ToIPSummaryDump, ToDump.
+
+** FromIPSummaryDump and ToIPSummaryDump: Add optional binary format to
+   save space and speed processing. Add 'aggregate', 'tcp_opt', 'tcp_sack',
+   'tcp_window', 'first_timestamp', and 'ip_opt' content types.
+   FromIPSummaryDump understands '!flowid' and '!aggregate' lines.
+
+** FromDump and friends support 802.11 link types and the IPv6 Ethernet type.
+
+** Extended or changed functionality for ToDump (optional output port),
+   Counter (different keyword argument names), CycleCountAccum and
+   PerfCountAccum (different handler names), ControlSocket (different
+   select() plan for writes reduces needless spinning; READONLY is a
+   keyword argument), DelayUnqueue (supports combination of long delays and
+   fast rates), IPFragmenter (HONOR_DF is a keyword argument), SetIPAddress
+   (supports live reconfiguration), UDPIPEncap (supports live
+   reconfiguration), IPGWOptions (lazy packet copying and better behavior
+   on bad options), ICMPError (accept mnemonic names for ICMP error types
+   and codes), IPReassembler (optionally emit dead fragments to output 1).
+
+** Bug fixes to FromIPSummaryDump, ToIPSummaryDump, IPReassembler,
+   FromDump, ICMPRewriter, ICMPPingRewriter, ProgressBar, TCPRewriter,
+   AddressInfo, ARPResponder, ToHost, ToHostSniffers, Classifier,
+   InfiniteSource, IPGWOptions, ICMPError, IPOutputCombo, SetTCPChecksum.
+
+* Tools
+
+** Add click2xml tool, for translating a Click configuration into an XML
+   format, and a preliminary version of xml2click, which goes the other
+   way.
+
+** Changed meaning of click-mkmindriver's `-e' option. Now `-e' means
+   `--expression' for consistency. `-E' means `--elements'.
+
+** click-install supports the BSD kernel module.
+
+** Bug fixes to click-devirtualize, click-install, click-xform,
+   click-buildtool.
+
+* Internals
+
+** Add 'typename' where required to support newer GCCs.
+
+** Add Packet::shrink_data(), Packet::icmp_header(), and some others.
+
+** Change interface to BigHashMap iterators and BigHashMap_Arenas.
+
+** At user-level, ErrorHandler supports '%[efgEFG]' conversions for
+   doubles. To print an element declaration, say '%{element}' (not '%e').
+
+** Bug fixes to CLP, BigHashMap, ...
+
+** Compiles cleanly on machines with 64-bit longs.
+
+* Acknowledgements
+
+** Thanks to AUTHORS, and (in no particular order) to YongKang Zhu, Filip
+   Henderieckx, Vlemincx Koen, David Scott Page, Wang Po-Cheng, Adam Smith,
+   Ryan Menezes, Gordon Lee, Chip Coldwell, Xiao Phong, Jose Vasconcellos,
+   Tomasz Jaskolski, Bart Samwel, and anyone we've missed.
+
+
+Version 1.2.4   21.May.2002
+
+* Drivers
+
+** FreeBSD module updates from Luigi Rizzo.
+
+** The Linux kernel module can support its own /proc-like file system,
+   "clickfs". This file system is faster and takes less memory than the
+   default /proc/click filesystem, and it is not subject to arbitrary
+   limits on the number of files. Generally you will mount it under /click.
+   (Click-install takes care of file system mounting and unmounting.) Give
+   ./configure the --enable-clickfs option to enable clickfs (and disable
+   /proc/click). Currently, clickfs only works under Linux 2.2. In the next
+   release, it will also work under Linux 2.4, and --enable-clickfs will be
+   the default.
+
+** Fix several race conditions in the Linux kernel module.
+
+** The user-level driver works on Solaris. Thanks to David Scott Page
+   <page@cs.utexas.edu> for patches and suggestions.
+
+* Elements
+
+** Add notifier support. The NotifierQueue element acts like a Queue, but
+   can reschedule downstream Tasks when packets arrive on a previously
+   empty Queue. This can greatly reduce CPU usage. Several other elements
+   listen for notification, including DelayUnqueue, Discard, and ToDevice.
+
+** Rename FromLinux, ToLinux, and ToLinuxSniffers to FromHost, ToHost, and
+   ToHostSniffers. The old names are still available.
+
+** Classifier optimization algorithm changed. The new algorithm, based on
+   dominators, is much faster for medium-to-large Classifiers.
+
+** Add FromDAGDump element in the analysis package. This element reads DAG
+   dumps (see http://dag.cs.waikato.ac.nz/).
+
+** Add LinearIPLookup element, a version of StaticIPLookup that supports
+   dynamically adding and removing routes.
+
+** Add SortedIPLookup element, a version of LinearIPLookup that sorts its
+   routes.
+
+** Bug fixes and enhancements in AddressInfo, CheckIPHeader, DelayUnqueue,
+   DriverManager, Linux FromDevice, FromDump, FromIPSummaryDump,
+   FrontDropQueue, Grid elements, ICMPPingResponder, ICMPSendPings,
+   IPAddrRewriter, IPFragmenter, IPPrint, IPReassembler, IPRewriter,
+   IPRouteTable, RadixIPLookup, TCPRewriter, TimeFilter, ToIPSummaryDump,
+   etc.
+
+** Add RandomSwitch element.
+
+** Add preliminary elements that support regression testing, in
+   elements/test.
+
+* Tools
+
+** Add click-pretty tool, which pretty-prints Click configuration files as
+   HTML.
+
+** Click-install works for the FreeBSD kernel module.
+
+** Click-install exits with nonzero exit status if the configuration could
+   not be initialized.
+
+* Internals
+
+** The signatures for the `Element::configure()' and
+   `Element::live_reconfigure()' methods have changed. Formerly, these
+   methods took a `const Vector<String> &conf'. Now, they take a
+   `Vector<String> &conf', and the methods may alter the `conf' argument
+   however they'd like. The old signatures still work for backward
+   compatibility, but they are deprecated, and will be removed in a future
+   release.
+
+** Deprecated `Element::uninitialize()' in favor of a new method,
+   `Element::cleanup(CleanupStage stage)'. The `stage' argument, an
+   enumerated value, says how far the element was initialized: not at all
+   (CLEANUP_NO_ROUTER), configure() failed (CLEANUP_CONFIGURE_FAILED),
+   configure() succeeded but initialize() was not called
+   (CLEANUP_CONFIGURED), initialize() failed (CLEANUP_INITIALIZE_FAILED),
+   initialize() succeeded but the router as a whole failed
+   (CLEANUP_INITIALIZED), and the router initialized successfully,
+   including this element (CLEANUP_ROUTER_INITIALIZED). So `uninitialize()'
+   corresponded to `stage >= CLEANUP_INITIALIZED'.
+   `Element::uninitialize()' works for now, but it will be removed in a
+   future release.
+
+** The signature for the `Element::configuration()' method has also changed.
+   It no longer takes a `bool *' argument.
+
+** Add cp_va_parse_remove_keywords() function, which removes keywords from
+   an argument list.
+
+** Moved network-header-structure #include files to include/clicknet. For
+   instance, `#include <click/click_ip.h>' should now be written `#include
+   <clicknet/ip.h>'. The old names still work, but will be removed in a
+   future release.
+
+** Renamed `IPAddress::mask_more_specific()' method to
+   `IPAddress::mask_as_specific()', to emphasize that it allows equality.
+
+** Changed click_ip6 header structure.
+
+** Tools substantially rewritten. The tool library is now much easier to
+   deal with, so tools should be easier to write, debug, and understand.
+
+** Better handling of out-of-memory events.
+
+** Improved `Packet::uniqueify()' implementation: it now copies only the
+   packet data, not both header and data.
+
+** Click identifiers can no longer end with a slash.
+
+* Acknowledgements
+
+** Thanks to the usual suspects (AUTHORS), and to David Scott Page
+   <page@cs.utexas.edu>, Luigi Rizzo <rizzo@aciri.org>, Eric Freudenthal
+   <eric.freudenthal@nyu.edu> and Tao Zhao <taozhao@cs.nyu.edu>, and Jose
+   Vasconcellos <jvasco@bellatlantic.net>.
+
+
+Version 1.2.3   4.Dec.2001
+
+* Drivers
+
+** Linux kernel module: Rename Click kernel threads to "kclick".
+
+** User-level driver: Add `-e' option.
+
+** Various Linux 2.4 improvements.
+
+** FreeBSD driver is coming along nicely. You should compile this version
+   of the driver against an *unmodified* FreeBSD kernel (RELENG_4 branch,
+   version 440002 or later). Thanks to Luigi Rizzo, some of the
+   improvements in the Click kernel patch have been checked in to the
+   latest FreeBSD source! Bug fixes: can handle chained mbufs, etc.
+
+** Better support for cross-compiling tools, via the `--enable-tools'
+   configuration switch.
+
+** Linux kernel module: Bug fixes, from Mazu, for dynamic installation and
+   removal of devices, and for receiving large packets.
+
+* Elements
+
+** Added a collection of analysis-related elements; give
+   `--enable-analysis' to ./configure. Elements include FromIPSummaryDump
+   and ToIPSummaryDump (read and write ASCII summary files; see
+   http://www.aciri.org/kohler/ipsumdump/), FromNetFlowSummaryDump (read
+   ASCII NetFlow summary files), AnonymizeIPAddr (anonymize IP addresses
+   while preserving prefixes), MergeByTimestamp (merge multiple time-sorted
+   packet streams into a single time-sorted stream), TimeFilter (select
+   packets by timestamp), and TimeRange (monitors packet timestamps).
+
+** New elements: StripToNetworkHeader, ProgressBar (prints an ultra-cool
+   progress bar to standard error), etc.
+
+** CheckIPHeader and friends set the destination IP address annotation from
+   the IP header's destination address.
+
+** IPClassifier/IPFilter supports more >/>=/</<= comparisons, and gives
+   better error messages on comparisons it does not support.
+
+** RED handles long quiescent periods better. As a result, Queue and
+   friends could remove their annoying _empty_jiffies member. Also, RED
+   uses the Gentle variant recommended by the RED gods.
+
+** Added AdaptiveRED element, by Jitendra Padhye <padhye@aciri.org>.
+
+** FromDump can read from gzipped or bzipped tcpdump files.
+
+** Deprecate RandomLossage and ProbSplitter elements in favor of new
+   RandomSample element.
+
+** Deprecate PeekHandlers in favor of PokeHandlers, whose syntax has been
+   extended. The new PokeHandlers is incompatible with old PokeHandlers
+   configuration strings.
+
+** Bug fixes in ARPQuerier, FromDevice, ToDevice, FromDump,
+   ICMPPingResponder, ControlSocket, DriverManager, IPRewriter and friends,
+   Grid elements, Classifier.
+
+** Added functionality to FromDevice, FromDump, Shaper, BandwidthShaper,
+   PokeHandlers, DriverManager, Grid elements, Counter.
+
+* Configuration parsing
+
+** Configuration arguments that represent time can take suffixes like "h"
+   for hours and "m" for minutes, as well as "s" for seconds, "ms" for
+   milliseconds, and so forth.
+
+** Bug fixes in cp_real unparsing.
+
+** Add cp_double() and cpDouble, available only at user level.
+
+** Fix static binding errors in configuration language. Also, configuration
+   language supports `${VAR-DEFAULT}' variable reference syntax, which uses
+   the text `DEFAULT' if `$VAR' is not set.
+
+* General
+
+** General configuration cleanup: Split config.h into multiple files to
+   reduce needless recompilation; regularize symbols.
+
+** Task improvements should make everything a bit more robust. For example,
+   Task::unschedule() always unschedules the task right away; it grabs a
+   lock.
+
+* Grid
+
+** New startup scripts for generating Grid configurations.
+
+** New elements implement Grid-level route tracing and statistics:
+   GridProbeSender, GridProbeHandler, and GridProbeReplyReceiver.
+
+** Extended logging code in old Grid elements.
+
+* Acknowledgements
+
+** Thanks to the usual suspects (AUTHORS), and to Geir <kp13@gmx.co.uk>,
+   Luigi Rizzo <rizzo@aciri.org>, and Atanu Ghosh <atanu@aciri.org>.
+
+
+Version 1.2.2   1.Sep.2001
+
+* General
+
+** Added `etc/diagrams' directory, containing source code we use to
+   generate Click diagrams.
+
+** Added `etc/samplellrpc' directory, a simple program demonstrating how to
+   poke a Linux kernel Click's LLRPC handlers with ioctl() calls.
+
+** Added `etc/libclick' directory, which contains a self-sufficient
+   distribution for building the Click user-level library.
+
+** Add `--enable-warp9' configuration option, which loosens element
+   specifications to enable high-speed tests. For example, with
+   `--enable-warp9' on, PollDevice does not set timestamps on packets it
+   receives.
+
+** Add `--enable-greedy' configuration option, which prevents the Linux
+   kernel driver from giving up the CPU. Use only if you have multiple
+   CPUs. (Benjie Chen)
+
+** Many bug fixes.
+
+* Drivers
+
+** Add preliminary support for a polling FreeBSD kernel driver!! (Nickolai
+   B. Zeldovich)
+
+** Add polling support for EEpro 100 devices (Nickolai B. Zeldovich), and
+   improve polling support for Tulip and Acenic (Benjie Chen, Nickolai).
+
+** Significantly more stable support for Linux 2.4, and update the kernel
+   patch to Linux 2.4.9.
+
+* Parsing
+
+** Time arguments understand suffixes like "ms", for milliseconds, and
+   "us", for microseconds. So you can say `1ms' or `2sec' or `5000usec'.
+
+** Support IP prefix syntax like `192.111/16'. Requested by Vern Paxson
+   <vern@aciri.org>.
+
+* Elements
+
+** FromDump is significantly faster, supports new keyword arguments, and
+   can read Linux tcpdump files. Also, FromDump supports FDDI
+   encapsulation.
+
+** ToDump can write to standard output.
+
+** Removed deprecated elements HashDemux, PullToPush, FromBPF, and ToBPF.
+
+** Fix bugs in Linux kernel module device elements: avoid dereferencing
+   null devices, and be careful about device reference counts for Linux
+   2.4.
+
+** Bug fixes to IPRewriter, TCPRewriter, Switch, PullSwitch, ....
+
+** Added functionality to ControlSocket, RED, FromLinux, FromDump, ....
+
+** Added SetPacketType, IPLookupRadix, ....
+
+** Renamed LookupIPRoute to StaticIPLookup, LookupIPRoute2 to
+   RadixIPLookup, and LookupIPRouteLinux to LinuxIPLookup. The old names
+   are still available.
+
+* Internal
+
+** The format of `elements.conf' files has changed.
+
+** The header files for ScheduleInfo, AddressInfo, AlignmentInfo, Error,
+   and DriverManager are stored in `<include/click/standard>'. This makes
+   it simpler to distribute a self-contained Click library.
+
+** Bug fix: Elements are uninitialized and destroyed in the reverse order
+   from which they were initialized. Reported by Kyle Jamieson
+   <jamieson@mit.edu>.
+
+** Made most Click configuration tests into Autoconf macros in
+   `acclick.m4'. This file may be shared among "Click-like" packages.
+
+** Check for byte order, and provide CLICK_BYTE_ORDER configuration
+   constant.
+
+** Add Packet::tcp_header() and Packet::udp_header() convenience functions.
+
+
+Version 1.2.1   26.Jun.2001
+
+* General
+
+** Added preliminary support for Linux 2.4! The patch is in
+   etc/linux-2.4.4-patch; it also applies to Linux 2.4.5. Click can receive
+   and send packets, and there is preliminary support for polling, as well.
+   We will be improving Linux 2.4's stability with time. Thanks to Nickolai
+   B. Zeldovich.
+
+** Many bug fixes, particularly to ARPResponder, ToLinux, LookupIPRoute,
+   cp_unparse_real2, cpArguments.
+
+** Updated etc/samplepackage to bring it up to date. It is a good starting
+   point for building your own package.
+
+* Elements
+
+** In the kernel, FromDevice, PollDevice, and ToDevice watch for
+   notifications when devices go up or down. Now you can remove a device
+   that the Click configuration refers to; the relevant element will simply
+   stop pushing or pulling packets. If you add the device back again, the
+   relevant element will seamlessly attach to it. Also added the
+   `ALLOW_NONEXISTENT' keyword argument to these elements.
+
+** In the kernel, AddressInfo supports device names as Ethernet address
+   shorthand. So you can say `EtherEncap(..., eth0, ...)' and it will use
+   eth0's Ethernet address.
+
+** Added KernelHandlerProxy element, and added the `PROXY' keyword argument
+   to ControlSocket. Now you can use a ControlSocket to talk to a kernel
+   configuration -- for example, with ClickController. Element donated by
+   Mazu Networks, Inc.
+
+** FromDump can read modified tcpdump files generated by Linux tcpdump.
+
+** ICMPSendPings has more keyword arguments. ICMPPingResponder now sets the
+   destination IP address annotation. ICMPRewriter can rewrite ping
+   responses as well as TCP and UDP responses.
+
+** Added DelayUnqueue, DelayShaper, and IP6Print elements.
+
+* Tools
+
+** Added click-flatten tool.
+
+* C++ API changes
+
+** Renamed `u_intXX_t' types to `uintXX_t'.
+
+** Elements no longer need to `#include <click/package.hh>'.
+
+** Added cpFilename confparse type at user level, which includes tilde
+   expansion.
+
+** `hashcode()', the function used by BigHashMap and HashMap to calculate
+   hash values, is now an overloaded function, not a member function. See
+   include/click/ipflowid.hh for an example.
+
+
+Version 1.2.0   3.May.2001
+
+* General
+
+** Added support for Click multithreading: multiple processors processing
+   packets through the Click configuration simultaneously. This required
+   extensive source code changes and adding optional locks to several
+   elements. Turn multithreading on at configure time with
+   `--enable-multithread=[NTHREADS]'. Most elements in ip, standard, and
+   linuxmodule are synchronized. SMP safe elements are marked with 
+   ELEMENT_MT_SAFE(elementname) at the end of the .cc file. See
+   http://www.pdos.lcs.mit.edu/papers/click:usenix01/ for a paper on SMP
+   Click.
+   
+** Multithreading: User can use StaticThreadSched or SortedTaskSched elements
+   to assign schedulable elements such as PollDevice and ToDevice to different
+   threads. 
+   
+** Multithreading: Queue is not synchronized, but MSQueue and CPUQueue
+   elements are SMP safe queue implementations. LookupIPRoute is not
+   synchronized. Should use LookupIPRouteMP instead.
+
+** Multithreading: ARPQuerier and IPRewriter have been synchronzied using
+   spinlocks and readwrite locks.
+
+** Added FastTCPFlows, FastUDPSrc, and FastUDPFlows elements. These elements
+   can be used to generate test traffic.
+
+** Added preliminary support for cross-compilation. Everyone loves Doug!!
+
+** Many bug fixes, and being careful about out-of-memory situations.
+
+** Added support for special Intel-only assembly instructions, which make
+   things faster. Turn it on at configure time with `--enable-intel-cpu'.
+
+* Kernel driver
+
+** Changed device polling interface: sk_buff recycling moved out of
+   individual device drivers and into Click (linuxmodule/skbmgr.cc). This
+   requires a different 2.2.18 patch. You will need to apply the patch in
+   this distribution and recompile.
+
+** Added a polling Intel EEPro 1000 gigabit driver, which can receive or
+   send up to 1.3 million 64 byte packets per second.
+
+** Added `accessible' and `priority' module parameters (see
+   click-install(1)'s `--private' and `--priority' options).
+
+* Elements
+
+** Kernel module device elements changed to use the new polling interface.
+   See above.
+
+** Added MarkIPCE element for ECN support.
+
+** Added ECN syntax (`ip ect' and `ip ce') and `ip ttl' to IPFilter and
+   IPClassifier.
+
+** Added DriverManager element that says how to handle please_stop_driver()
+   events.
+
+** Added keyword arguments to Print, IPPrint, InfiniteSource, RatedSource,
+   RED, TimedSource, ....
+
+** Added ChatterSocket, DRRSched, PrintOld, PushNull, PullNull, and
+   SetTimestamp elements.
+
+** Real number parsing functions handle overflow and rounding better.
+
+** IPRewriter garbage collection optimizations from Benjie.
+
+** Added AddressTranslator, ProtocolTranslator46, ProtocolTranslator64
+   elements that can translate between IPv6 networks and IPv4
+   networks.
+
+* Tools
+
+** Added click-mkmindriver(1).
+
+** click-align(1) and click-devirtualize(1) bug fixes.
+
+** Add `-C CLICKPATH' argument to all relevant tools.
+
+* C++ API changes
+
+** Added preliminary programmer documentation in Texinfo format
+   (doc/click.texi). Removed old Element and Connection man pages, which
+   were obsolete.
+
+** The Element class no longer inherents from `ElementLink'. Elements that
+   wish to be scheduled must include and initialize a `Task' object.
+
+** Changed TimerHook type to `void (*)(Timer *, void *)'.
+
+** Added Element methods `flow_code' and `configuration'.
+
+** Renamed `Element::Connection' class to `Element::Port'.
+
+** Other changes.
+
+
+Version 1.1   15.Dec.2000
+
+* Element packages
+
+** Added support for element packages. An element package is a group of
+   elements that can be dynamically loaded into a driver. Required several
+   changes described below.
+
+** Rearranged include files. All include files formerly in `lib/' are now
+   stored in `include/click/' instead. Do not say `#include "element.hh"'
+   any more; say `#include <click/element.hh>' instead. Similar statements
+   hold for `<click/packet.hh>', `<click/confparse.hh>', and many others.
+   Check under include/click for a full list. Required for element package
+   support.
+
+** Every element should say `MOD_INC_USE_COUNT;' in its constructor and
+   `MOD_DEC_USE_COUNT;' in its destructor. Required for element package
+   support.
+
+** Added a new directory, `etc/samplepackage', that demonstrates a simple
+   element package. In particular, this shows how to write a Makefile for
+   an element package.
+
+* General
+
+** Compound element semantics: Connecting to a compound element port whose
+   corresponding `input' or `output' was not mentioned inside the compound
+   element is now an error. Leaving a compound element input or output port
+   unused is also an error.
+
+** Compound element semantics: Added overloaded compound elements. A single
+   compound element can have multiple definitions; Click uses the
+   definition with matching numbers of arguments, input ports, and output
+   ports. See click(5) for details.
+
+** Restructured build tools: created `click-buildtool' and
+   `click-mkelemmap'.
+
+** Changed element documentation format: list of keywords follows `=s'. See
+   elementdoc(7) for details.
+
+** The `cp_va_parse' family of functions supports keyword arguments. Use
+   cpKeywords, and see `elements/ip/ipprint.cc' for an example. Also
+   supported: adding and removing argument types dynamically.
+
+** Added support for generic annotations, such as "a one-byte annotation
+   stored in generic annotation byte 13". Transitioned many existing packet
+   annotations to macro wrappers for generic annotations; see
+   `include/click/packet_anno.hh'. New structure is more easily extensible.
+
+** Many other bug fixes and configuration fixes.
+
+* Elements
+
+** Added ICMPRewriter and ICMPPingRewriter for rewriting ICMP errors and
+   ICMP pings, respectively.
+
+** Reorganized ICMP elements into `elements/icmp' directory, and TCP/UDP
+   elements into `elements/tcpudp' directory.
+
+** IPRewriter and TCPRewriter quickly release completed TCP connections.
+
+** Improved IPFilter parsing functions and added some new protocols.
+
+** CheckIPHeader, CheckIPHeader2, CheckICMPHeader, CheckTCPHeader, and
+   CheckUDPHeader can print more detailed information about why they are
+   dropping packets.
+
+** Fixed bugs in many elements, including ToDump and FromLinux.
+
+** Classifier optimization is now iterative, not recursive, which gets
+   around problems with small kernel stacks.
+
+** Removed 'PACKETS' or 'BYTES' argument to Counter. Now it always keeps
+   track of both number of packets and number of bytes. Also added several
+   LLRPCs.
+
+* Kernel driver
+
+** Added patch for 2.2.18 kernel.
+
+** Changed /proc/click file handling: Now closing a write handler file may
+   report an error back to the user through the return value of close().
+   Also, can remove Click kernel module even while someone has a file in
+   /proc/click open.
+
+** Added TulipStats element for collecting information about Tulip
+   performance.
+
+** Replaced old cycle-counting elements with SetCycleCount and
+   CycleCountAccum, and similarly for performance counter elements (new
+   elements are SetPerfCount and PerfCountAccum).
+
+** Fixed crash when Linux and Click both sent packets out the same
+   interface on an SMP machine.
+
+
+Version 1.1b1   4.Oct.2000
+
+* Incompatible element changes
+
+** Added support for parsing CIDR-style [Classless Inter-Domain Routing]
+   netmasks in element configuration strings. Old-style netmasks are still
+   supported, but you must use a slash, not a space. So for the 18.26.7
+   IP prefix, you can write either `18.26.7.0/255.255.255.0' or
+   `18.26.7.0/24'. You will need to change the arguments to any
+   ARPResponder, FromLinux, LookupIPRoute, LookupIPRoute2, and RIPSend
+   elements in your configuration files.
+
+** Deprecated FromBPF and ToBPF in favor of FromDevice and ToDevice. (But
+   the arguments to FromDevice and ToDevice are the same as FromBPF and
+   ToBPF.)
+
+** The KernelTap element (formerly Tun) no longer takes a device name as
+   the first argument; it chooses between /dev/tun and /dev/tap
+   automatically. KernelTap also expects and produces ethernet-encapsulated
+   packets (rather than IP), as the Ethernet type field lets it handle IPv6
+   packets as well as IPv4.
+
+** Changed the third argument to RatedSource. Used to be a duration to send
+   packets; now it is the number of packets to send.
+
+** The following elements have been renamed.
+
+	OLD			NEW
+	------------------	------------------
+	CheckPaint*		PaintTee
+	FromBPF			FromDevice
+	HashDemux*		HashSwitch
+	Meter			BandwidthMeter
+	PacketMeter		Meter
+	PacketShaper		Shaper
+	PullToPush*		Unqueue
+	SetIPAddress+		StoreIPAddress
+	Shaper			BandwidthShaper
+	ToBPF			ToDevice
+	Tun			KernelTap
+
+   * Old element name may still be used for this release, but is
+     deprecated.
+   + A new element has taken the name SetIPAddress.
+
+   Our apologies. We don't expect this kind of renaming will be a common
+   event.
+
+** To reiterate, the elements that measure bytes per second are now named
+   BandwidthMeter and BandwidthShaper. The elements that measure packets
+   per second have taken the names Meter and Shaper.
+
+** Removed the SaveIPFields and IPsec elements (they were rotting).
+
+* Incompatible C++ API changes
+
+** Reorganized Linux kernel polling patches. If you have a previous version
+   of Click, you must unapply the old kernel patch and apply the new kernel
+   patch before compiling.
+
+** Improved Packet copy-on-write behavior by reflecting it in the C++ class
+   structure. Now there is a class for possibly-shared packets (named
+   Packet), and a class for definitely-not-shared packets (named
+   WritablePacket). WritablePacket is a subclass of Packet. Packet's data
+   is always read-only (that is, the `data()' method returns a `const
+   unsigned char *', and so forth). WritablePacket's data is read/write
+   (the `data()' method returns an `unsigned char *').
+   `Packet::uniqueify()' and similar methods return a WritablePacket.
+
+** Made configuration argument parsing more uniform among elements. For
+   example, every configuration argument is always a comma-separated
+   string. This is enforced by passing a vector of strings to the
+   `configure' method: `cp_argvec' is called before the `configure' method
+   is called. Changed Element method `int configure(const String &,
+   ErrorHandler *)' to `int configure(const Vector<String> &, ErrorHandler
+   *)', and updated elements.
+
+** The `cp_DATATYPE' functions take pointers instead of references. This
+   makes their use easier to read.
+
+** The `cp_DATATYPE' functions no longer take an optional `String *rest'
+   argument. They always parse their argument string entirely.
+
+** Changed Element method `bool configure_first() const' to `int
+   configure_phase() const'. Now element classes can specify their relative
+   configuration and initialization order; for example, ToDevice specifies
+   that it should be configured and initialized after any FromDevices.
+
+** Removed user-level Element method `select_fd()'. Replaced with
+   `add_select(fd, mask)' and `remove_select(fd, mask)', so elements can
+   listen to any number of file descriptors for reading, writing, or both.
+   (`mask' is either `SELECT_READ', `SELECT_WRITE', or
+   `SELECT_READ|SELECT_WRITE'.)
+
+** Other small changes and method renamings should have limited impact. For
+   instance, renamed `Element::number()' to `Element::eindex()'; removed
+   `Element::use()' and `Element::unuse()'; renamed
+   `Element::change_configuration()' to `Element::set_configuration()' and
+   `Element::set_configuration_argument()'.
+
+** Renamed Ethernet and ARP structures; what was `struct ether_header' is
+   now `struct click_ether', and so forth, to avoid conflicts.
+
+** Removed `IPVERSION' constant from `click_ip.h' to support IPv6.
+
+* General
+
+** Added new `tickets' and `handlers' handlers, available by default on
+   every element. Removed default `inputs' and `outputs' handlers,
+   replacing them with `ports'.
+
+** Improved support for large numbers of handlers by reducing memory usage.
+
+** Click configurations can contain cpp(1)-style `#line LINENUMBER' or `#
+   LINENUMBER' directives. The tools generate them, too, so you will get
+   better error messages than before.
+
+** Improved element documentation by adding summaries. The generated
+   elements(n) manual page now groups the elements by function. Also
+   updated and documented the format for doc comments (see
+   `doc/elementdoc.7').
+
+** Added low-level RPC capability. LLRPCs are low-level handlers designed
+   for speed rather than ease of use or human-readable results. In the
+   Linux kernel module, LLRPCs are called in response to ioctl(2) commands
+   on handler files. (The user-level program doesn't support LLRPCs yet.)
+   Unlike handlers, LLRPCs can both take arguments and return results.
+   IPRateMonitor(n), for example, uses LLRPCs to report rate information.
+
+** Lexer changes: Now single and double quotes are interpreted in
+   configuration arguments vaguely as in Perl. Configuration argument
+   parsing is generally more regular.
+
+** Fixed bugs in real-number parsing and unparsing functions.
+
+* User-level driver
+
+** User-level Click will no longer stop by default when an InfiniteSource
+   (or RatedSource or FromDump) runs out of packets to send. Supply the
+   `-s' option to get the old behavior.
+
+** You can give shell globbing syntax to the user-level driver's `-h
+   HANDLER' option; for example, `-h "*.config"'.
+ 
+** Fixed FromBPF and ToBPF, finally. The fixed versions are called
+   FromDevice and ToDevice.
+
+** Added ControlSocket element so you can call handlers from other
+   programs.
+
+* Kernel driver
+
+** Added patch for Linux kernel 2.2.16. This patch contains the latest
+   changes to Linux. While Click will continue to work under 2.2.14 for the
+   time being, it may not work in the future. If you have a previous
+   version of Click, you must unapply the old kernel patch and apply the
+   new kernel patch before compiling.
+
+** Improved /proc handling. It is now safe to keep open file descriptors to
+   handler files even while uninstalling the kernel module or installing a
+   new configuration. These files will become unusable after the
+   (un)installation -- every operation will return EINVAL -- but the kernel
+   will not crash and the Click module's reference count will not get
+   screwed up.
+
+** Cleaned up polling interface in Linux.
+
+* Elements
+
+** Added QuitWatcher, FrontDropQueue, StripIPHeader, IPClassifier,
+   IPFilter, IPPrint, FTPPortMapper, IPRewriterPatterns, Switch,
+   PullSwitch, StaticSwitch, StaticPullSwitch, RoundRobinSwitch,
+   StrideSwitch, RatedSplitter, BandwidthRatedSplitter, RatedUnqueue, and
+   BandwidthRatedUnqueue, among others. Also mentioned above: user-level
+   FromDevice, ToDevice, and ControlSocket; kernel module ToLinuxSniffers;
+   generic SetIPAddress, StoreIPAddress.
+
+** Added AddressInfo element, which supports network address mnemonics. For
+   example, you can now say `AddressInfo(butt 18.26.4.44); IPEncap(6, butt,
+   18.26.4.15)'. The `butt' in IPEncap's configuration string then means
+   `18.26.4.44'.
+
+** Added experimental IPv6 elements; `./configure --enable-ip6' to compile
+   them.
+
+** Fixed kernel alignment bug in IP header checking elements: can't use
+   Linux's `fast_ip_csum' on unaligned data.
+
+** Fixed user-level FromDevice and ToDevice bugs. Now FromDevice will not
+   starve other router processing, and ToDevice works on Linux.
+
+** Fixed FromLinux bug: now supports multiple instances of FromLinux for same
+   device (this happens while installing a new configuration: initialize is
+   called on the new FromLinux before the last FromLinux instance is
+   uninitialized).
+
+** Fixed ToLinux: now calls ptype_dispatch inside start_bh_atomic() and
+   end_bh_atomic().
+
+** Modified kernel ToDevice: ToDevice now sends Linux's packets when the
+   device is idle. This prevents Click from starving out packets sent by
+   other processes or Linux.
+
+** Shaper and BandwidthShaper work significantly better. They are less
+   bursty and can correctly shape traffic to low rates. 
+
+** Improved Classifier optimizations.
+
+** Radio elements are not compiled by default.
+
+** Added new `elements/local' directory for your own elements. They are not
+   compiled by default.
+
+* Tools
+
+** Added new click-undead(1) tool.
+
+** Fixed click-uncombine(1) bugs and changed its order of arguments.
+
+** Added PollDevice and EtherEncap specifications to click-align(1).
+
+** click-fastclassifier(1) works on IPClassifier and IPFilter.
+
+** Added `--verbose' option to click-install(1).
+
+
+Version 1.0.6   6.May.2000
+
+* Kernel driver
+
+** Fixed kernel Packet::expensive_push. Patch by Richard Mortier
+   <rmm1002@cam.ac.uk>.
+
+** Added /proc/click/version.
+
+* Elements
+
+** Replace UDPEncap with UDPIPEncap. New element adds both IP and UDP
+   headers, and fixes several bugs in UDPEncap. Thanks to Richard Mortier
+   <Richard.Mortier@cl.cam.ac.uk>.
+
+* Miscellaneous
+
+** Fixed findelements.sh: Ethernet switch elements were not being included.
+
+
+Version 1.0.5   1.May.2000
+
+* Kernel and user-level drivers
+
+** You can hot-swap install Click configurations in the Linux kernel
+   module. In a hot-swap install, packets stored in the old configuration
+   will not be lost. (The new configuration's Queues must have the same
+   names as the old configuration's Queues.) See the click.o(8) man page
+   (under /proc/click/hotconfig) and the click-install(1) man page for more
+   information.
+
+** Bug fixes: User-level Click correctly handles timed elements like
+   TimedSource and TimedSink and scheduled elements like RatedSource; and
+   the kernel module correctly handles timed elements. Reported by Saurabh
+   Sandhir <sandhir@purdue.edu>.
+
+** More changes to ToDevice to enable Linux and Click to send packets
+   independently and not cause race conditions. This includes a new linux
+   kernel patch (etc/linux-2.2.14-patch) and changes to ToDevice. Click
+   runs in a separate kernel thread, so we synchronize ToDevice send
+   operations in kernel with a bit lock (dev->tbusy).
+
+** Every Linux kernel module now runs as a separate kernel thread, even if
+   HAVE_POLLING is not defined.
+
+** The click user-level driver can now automatically compile any required
+   package sources. (Click-install has been able to do this for a while.)
+
+** Every router has its own list of Timers, so Timer has no global state.
+   Originally requested by Leigh Stoller <stoller@fast.cs.utah.edu>. This
+   changed the Timer abstraction; you now need to call Timer::attach() on a
+   Timer before using it. See timedsource.cc for an example.
+
+** Fixed bugs and memory leaks.
+
+* Tools
+
+** click-xform: Bug fixes and performance improvements. Also, click-xform
+   tries to preserve element names from the original configuration. If a
+   pattern element and a replacement element share a name, then when the
+   pattern is applied, the replacing element will use the name of the
+   original element that corresponded to the pattern element. (Phew!)
+
+** click-devirtualize: Bug fixes. It also uses standards-compliant C++.
+
+** click-fastclassifier can combine adjacent Classifiers.
+
+** Added click-combine and click-uncombine.
+
+* Elements
+
+** Removed UnlimitedElement in favor of `notify_n{in,out}puts()'.
+
+** Removed TimedElement.
+
+** Removed Broadcast in favor of Tee.
+
+** Added select_fd() and selected() to ToBPF.
+
+** Various other fixes.
+
+* Configurations
+
+** Added conf/make-udpgen.pl, a Perl script that generates a udpgen-like
+   Click configuration.
+
+** Added conf/make-udpcount.pl, a Perl script that generates a
+   udpcount-like Click configuration.
+
+
+Version 1.0.4   13.Apr.2000 (not released)
+
+* Changed how FromDevice, ToDevice, and PollDevice interact with each
+  other. Before, if you specify just PollDevice w/o ToDevice, the tx queue
+  does not get cleaned because in polling mode tx queue cleaning must be
+  scheduled explicitly. Now, PollDevice looks for a ToDevice on the same
+  device. If no such element exists, it remembers to clean the tx queue
+  itself. Also ToDevice looks for a PollDevice to decide if it should use
+  polling extensions. Some of this code was in the 1.0.3 release, but there
+  was a bug.
+
+* New linux kernel patch (etc/linux-2.2.14-patch): locks are added to protect
+  recycling of sk_buff objects and device polling functions - not extensively
+  tested.
+
+* New elements: UDPEncap (put an UDP header on a packet), RatedSource (like
+  infinite source, but send packets at a given rate).
+
+* udpgen click configuration (conf/udpgen.click): This is better than
+  udpgen.o in that you can utilize device driver polling extensions. Also,
+  on some machines we observe a delay (on order of ms) between when
+  transmission complete and tx interrupt. This causes the transmission
+  queue to not get cleaned fast enough for udpgen to send its packets.
+  Using Click, we can control when the tx queue is cleaned.
+
+
+Version 1.0.3   9.Apr.2000
+
+* Added `--with-linux[=DIR]' option to `./configure'. Suggested by Richard
+  Mortier <Richard.Mortier@cl.cam.ac.uk>.
+
+* Removed `default_processing()' method of Element and replaced it with
+  `processing()'. Where you once wrote `Processing default_processing()
+  const { return PUSH; }', now write `const char *processing() const {
+  return PUSH; }'. The new way is more flexible and lets us abstract the
+  element's processing code. See Element(3) for details.
+
+* Added `click-check' tool, a static checker for Click configurations.
+  Currently it only checks push and pull processing for correctness.
+
+* Added `--reverse' option to click-xform. Suggested by Mike Burrows
+  (Compaq SRC).
+
+* Added `--reverse' options to click-fastclassifier and click-devirtualize.
+
+* Renamed click-specialize tool to click-devirtualize. It's clearer. Also
+  fixed several bugs.
+
+* Click-devirtualize now determines automatically whether two specialized
+  elements can share code. As a result, the `--like' option has been
+  removed.
+
+* Fixed bugs: RFC2507Decomp didn't compile. Rewriter updates. Several bugs
+  caught by recent GCCs; patches supplied by Richard Mortier
+  <Richard.Mortier@cl.cam.ac.uk>.
+
+
+Version 1.0.2   20.Mar.2000
+
+* Fixed reentrancy bug: in this release, when running in polling mode in
+  kernel, timers are maintained by click, in the same fashion userlevel timers
+  are maintained. Previously, we use linux timers, and so callbacks may get
+  called by linux when click is running, creating possible race conditions.
+  Note: in polling mode, if the click thread yields to other processes, timers
+  will not get called until the click thread runs again.
+
+* Added Rewriter, MappingCreator, and IPMirror elements for rewriting
+  TCP/IP and UDP/IP streams.
+
+* Added MarkIPHeader, CheckTCPHeader, and CheckUDPHeader elements.
+
+* Fixed FromDump and ToDump.
+
+* Added optional queue names to RED.
+
+* Removed `is_a()' and `is_a_cast()' methods of Element. The new way,
+  `cast()', allows arbitrary interfaces.
+
+* Use Linux's fast checksum routines in CheckIPHeader and IPInputCombo.
+
+* Fixed bug in userlevel Click: elements weren't being scheduled, so
+  nothing seemed to happen.
+
+
+Version 1.0.1   28.Feb.2000
+
+* Fixed Makefile bugs; Linux module installs properly now. Problem reported
+  by Joe Elliott <joe@inetd.com>.
+
+
+Version 1.0   25.Feb.2000
+
+* Added polling support. Result: 4-5 times better peak performance. The
+  optimization tools can get it up to 6 times better (435,000 64-byte
+  packets per second).
+
+* Replaced work list with stride scheduler.
+
+* In the Linux kernel, Click now runs in a kernel thread.
+
+* Removed packet-upstream events and the associated processing in Queue,
+  Shaper, and so forth. The stride scheduler solves the same problem more
+  elegantly.
+
+* Added `click-specialize' tool.
+
+* Added `click-uninstall' tool.
+
+* Added dynamic IP routing table element (LookupIPRoute2).
+
+* Added stride scheduling packet scheduler element (StrideSched).
+
+* Added PeekHandlers and PokeHandlers elements so you can test read and
+  write handlers at user level.
+
+* Fixed lexer bug: compound elements with `{' are accepted everywhere.
+
+* Added arguments to compound elements.
+
+* Rearranged directory structure. (Include files placed in
+  PREFIX/include/click, not directly in PREFIX/include.)
+
+* Improved several elements, including ARPQuerier.
+
+* Changed interface for registering handlers. See
+  `elements/standard/red.cc' or the Element(3) manual page for examples.
+
+* Many other changes, bug fixes and improvements.
+
+
+Version 0.6   11.Dec.1999
+
+* Added dynamic linking support. Click configuration files can now be ar(1)
+  archives, possibly containing "packages"---dynamically linked object
+  files that are loaded into the kernel module or the user-level program.
+  This means you can make your own element classes and link them
+  dynamically.
+
+* Added `click-fastclassifier' and `click-install' tools.
+
+* Added `--help', `--version', etc. options to tools.
+
+* Added man pages for `click', `click-align', and `click-install'.
+
+* More options for user-level Click, including support for hander
+  invocations on the command line.
+
+* Added `udpgen' and `udpcount' in the `tools' directory.
+
+* Fixed dynamic reconfiguration bug: no more doubled characters.
+
+* Fixed compound element bug: input and output ports bigger than 0 were
+  ignored.
+
+
+Version 0.51   12.Nov.1999
+
+* Support for required-alignment machines via `click-align' tool. Added
+  click-align tool, Align and AlignmentInfo elements.
+
+* More documentation.
+
+
+Version 0.5   20.Oct.1999
+
+* First public release.

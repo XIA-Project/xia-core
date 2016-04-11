@@ -1,0 +1,33 @@
+%info
+test device up/down
+
+%require
+click-buildtool provides linuxmodule
+[ `whoami` = root ] || sudo -n true
+ifconfig eth1 >/dev/null 2>&1
+
+%script
+SUDO=; if ! [ `whoami` = root ]; then SUDO="sudo -n"; fi
+
+usleep () { click -e "DriverManager(wait ${1}us)"; }
+$SUDO ifconfig eth1 down
+$SUDO click-install KERNELCONFIG
+usleep 5000
+$SUDO ifconfig eth1 up
+usleep 5000
+$SUDO ifconfig eth1 down
+usleep 5000
+$SUDO click-uninstall
+$SUDO ifconfig eth1 up
+
+%file KERNELCONFIG
+FromDevice(eth1) -> Idle -> ToDevice(eth1)
+Idle -> ToHost(eth1)
+
+%expect stderr
+KERNELCONFIG:1: While configuring 'ToDevice@3 :: ToDevice':
+  warning: device 'eth1' is down
+KERNELCONFIG:1: While configuring 'FromDevice@1 :: FromDevice':
+  warning: device 'eth1' is down
+KERNELCONFIG:2: While initializing 'ToHost@5 :: ToHost':
+  warning: device 'eth1' is down

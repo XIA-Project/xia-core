@@ -29,6 +29,7 @@ asm
 xia.mk
 .DS_Store
 *.dSYM
+.fuse*
 
 # directories
 key
@@ -126,10 +127,10 @@ example/xecho
 
 # output from scripts
 etc/click/templates/xia_address.click
-etc/click/templates/host.click
-etc/click/templates/router.click
-etc/click/templates/dual_stack_host.click
-etc/click/templates/dual_stack_router.click
+etc/click/templates/host*.click
+etc/click/templates/router*.click
+etc/click/templates/dual_stack_host*.click
+etc/click/templates/dual_stack_router*.click
 
 # planetlab
 experiments/planetlab/logs/*.txt

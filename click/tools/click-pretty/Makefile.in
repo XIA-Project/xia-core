@@ -1,0 +1,110 @@
+SHELL = @SHELL@
+@SUBMAKE@
+
+top_srcdir = @top_srcdir@
+srcdir = @srcdir@
+top_builddir = ../..
+subdir = tools/click-pretty
+conf_auxdir = @conf_auxdir@
+
+prefix = @prefix@
+bindir = @bindir@
+HOST_TOOLS = @HOST_TOOLS@
+
+VPATH = .:$(top_srcdir)/$(subdir):$(top_srcdir)/tools/lib:$(top_srcdir)/include
+
+ifeq ($(HOST_TOOLS),build)
+CC = @BUILD_CC@
+CXX = @BUILD_CXX@
+LIBCLICKTOOL = libclicktool_build.a
+DL_LIBS = @BUILD_DL_LIBS@
+DL_LDFLAGS = @BUILD_DL_LDFLAGS@
+else
+CC = @CC@
+CXX = @CXX@
+LIBCLICKTOOL = libclicktool.a
+DL_LIBS = @DL_LIBS@
+DL_LDFLAGS = @DL_LDFLAGS@
+endif
+INSTALL = @INSTALL@
+mkinstalldirs = $(conf_auxdir)/mkinstalldirs
+
+ifeq ($(V),1)
+ccompile = $(COMPILE) $(1)
+cxxcompile = $(CXXCOMPILE) $(1)
+cxxlink = $(CXXLINK) $(1)
+x_verbose_cmd = $(1) $(3)
+verbose_cmd = $(1) $(3)
+else
+ccompile = @/bin/echo ' ' $(2) $< && $(COMPILE) $(1)
+cxxcompile = @/bin/echo ' ' $(2) $< && $(CXXCOMPILE) $(1)
+cxxlink = @/bin/echo ' ' $(2) $@ && $(CXXLINK) $(1)
+x_verbose_cmd = $(if $(2),/bin/echo ' ' $(2) $(3) &&,) $(1) $(3)
+verbose_cmd = @$(x_verbose_cmd)
+endif
+
+.SUFFIXES:
+.SUFFIXES: .S .c .cc .o .s
+
+.c.o:
+	$(call ccompile,-c $< -o $@,CC)
+.s.o:
+	$(call ccompile,-c $< -o $@,ASM)
+.S.o:
+	$(call ccompile,-c $< -o $@,ASM)
+.cc.o:
+	$(call cxxcompile,-c $< -o $@,CXX)
+
+
+OBJS = click-pretty.o html.o
+
+CPPFLAGS = @CPPFLAGS@ -DCLICK_TOOL
+CFLAGS = @CFLAGS@
+CXXFLAGS = @CXXFLAGS@
+DEPCFLAGS = @DEPCFLAGS@
+
+DEFS = @DEFS@
+INCLUDES = -I$(top_builddir)/include -I$(top_srcdir)/include \
+	-I$(top_srcdir)/tools/lib -I$(srcdir)
+LDFLAGS = @LDFLAGS@
+LIBS = @LIBS@ @POSIX_CLOCK_LIBS@ $(DL_LIBS)
+
+CXXCOMPILE = $(CXX) $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CXXFLAGS) $(DEPCFLAGS)
+CXXLD = $(CXX)
+CXXLINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
+COMPILE = $(CC) $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CFLAGS) $(DEPCFLAGS)
+CCLD = $(CC)
+LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
+
+all: $(LIBCLICKTOOL) all-local
+all-local: click-pretty
+
+$(LIBCLICKTOOL):
+	@cd ../lib; $(MAKE) $(LIBCLICKTOOL)
+
+click-pretty: Makefile $(OBJS) ../lib/$(LIBCLICKTOOL)
+	$(call cxxlink,$(DL_LDFLAGS) $(OBJS) ../lib/$(LIBCLICKTOOL) $(LIBS),LINK)
+	@-mkdir -p ../../bin; ln -sf ../tools/click-pretty/$@ ../../bin/$@
+
+Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
+	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
+
+DEPFILES := $(wildcard *.d)
+ifneq ($(DEPFILES),)
+include $(DEPFILES)
+endif
+
+install: $(LIBCLICKTOOL) install-local
+install-local: all-local
+	$(call verbose_cmd,$(mkinstalldirs) $(DESTDIR)$(bindir))
+	$(call verbose_cmd,$(INSTALL) click-pretty,INSTALL,$(DESTDIR)$(bindir)/click-pretty)
+uninstall:
+	/bin/rm -f $(DESTDIR)$(bindir)/click-pretty
+
+clean:
+	rm -f *.d *.o click-pretty ../../bin/click-pretty
+distclean: clean
+	-rm -f Makefile
+
+.PHONY: all all-local clean distclean \
+	install install-local uninstall $(LIBCLICKTOOL)

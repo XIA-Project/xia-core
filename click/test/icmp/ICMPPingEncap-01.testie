@@ -1,0 +1,21 @@
+%require
+printf '\xd4\xc3\xb2\xa1\x02\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\xd0\x07\x00\x00\x01\x00\x00\x00' > TESTDUMP
+tcpdump -r TESTDUMP >/dev/null 2>&1
+
+%script
+
+# read from a hand-written IPSummaryDump file; check headers, emit to a dump
+click -e "
+InfiniteSource('', LIMIT 2, STOP true)
+	-> ICMPPingEncap(1.0.0.1, 2.0.0.2, IDENTIFIER 3)
+	-> CheckICMPHeader
+	-> CheckIPHeader
+	-> ICMPPingResponder
+	-> ToDump(FOO, ENCAP IP)
+"
+tcpdump -n -r FOO > CHECK
+
+%file FOO
+%expectx -i CHECK
+.* 2\.0\.0\.2 > 1\.0\.0\.1: icmp.* echo reply.*
+.* 2\.0\.0\.2 > 1\.0\.0\.1: icmp.* echo reply.*
